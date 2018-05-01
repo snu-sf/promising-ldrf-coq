@@ -1,14 +1,10 @@
 # A Promising Semantics for Relaxed-Memory Concurrency
 
-Jeehoon Kang, Chung-Kil Hur, Ori Lahav, Viktor Vafeiadis, Derek Dreyer.
-
-Proceedings of the 44th ACM SIGPLAN-SIGACT Symposium on Principles of Programming Languages ([POPL 2017](http://conf.researchr.org/home/POPL-2017)).
-
 Please visit the [project website](http://sf.snu.ac.kr/promise-concurrency/) for more information.
 
 ## Build
 
-- Requirement: [Coq 8.7](https://coq.inria.fr/download), Make, Rsync.
+- Requirement: [Coq 8.8](https://coq.inria.fr/download), Make, Rsync.
 
 - Initialization
 
@@ -36,7 +32,7 @@ Please visit the [project website](http://sf.snu.ac.kr/promise-concurrency/) for
     + `Language.v`: abstract interface of the programming languages
     + `Memory.v`: memory model (`MEMORY: *` rules in Figure 3)
     + `Commit.v`: the rule for thread views (`*-HELPER` rules in Figure 3)
-    + `Thread.v`: thread and its execution (`READ`, `WRITE`, `UPDATE`, `FENCE`, `SYSTEM CALL`, `SILENT`, `PROMISE` rules in Figure 3)
+    + `Local.v`, `Thread.v`: thread and its execution (`READ`, `WRITE`, `UPDATE`, `FENCE`, `SYSTEM CALL`, `SILENT`, `PROMISE` rules in Figure 3)
     + `Configuration.v`: configuration (machine state) and its execution (`MACHINE STEP` rule in Figure 3)
     + `Behavior.v`: the behaviors of a configuration
 
@@ -69,15 +65,17 @@ Please visit the [project website](http://sf.snu.ac.kr/promise-concurrency/) for
         * Composition: `sim_compose` (`Composition.v`).  "horizontally" composing configuration simulations for disjoint configurations.
         * Compatibility: `sim_stmts_*` (`Compatibility.v`).
 
-- `src/axiomatic`: definition of an axiomatic semantics, which is equivalent to our promise-free machine.
-  This equivalence result is a stepping-stone for the compilation to TSO and Power (Section 5.2).
-    + `model.v` and `Machine.v`: Definition of the axiomatic machine.
-    + `SimRel.v`: Definition of the simulation relation.
-    + `MsimG.v`, `GsimM.v`: the operational machine (`M`) simulates the axiomatic one (`G`), and vice versa.
-
 - `src/drf`: DRF Theorems (Section 5.3)
     + Promise-Free DRF (Theorem 1): `drf_pf` (`DRF_PF.v`)
     + We did not formalize DRF-RA (Theorem 2) and DRF-SC (Theorem 3) yet.
 
 - `src/invariant`: An Invariant-Based Program Logic (Section 5.4)
     + Soundness: `sound` (`Invariant.v`)
+
+## References
+
+- [Jeehoon Kang](http://sf.snu.ac.kr/jeehoon.kang), [Chung-Kil Hur](http://sf.snu.ac.kr/gil.hur), [Ori Lahav](https://www.cs.tau.ac.il/~orilahav/), [Viktor Vafeiadis](https://people.mpi-sws.org/~viktor/), [Derek Dreyer](https://people.mpi-sws.org/~dreyer/).
+
+  [A Promising Semantics for Relaxed-Memory Concurrency](https://dl.acm.org/citation.cfm?id=3009850).
+
+  Proceedings of the 44th ACM SIGPLAN-SIGACT Symposium on Principles of Programming Languages ([POPL 2017](http://conf.researchr.org/home/POPL-2017)).
