@@ -38,6 +38,7 @@ Module ThreadEvent.
   | kind_syscall
   | kind_others
   .
+  Hint Constructors kind.
 
   Definition kinds_all := fun k: kind => True.
   Hint Unfold kinds_all.
@@ -131,6 +132,7 @@ Module ThreadEvent.
   | le_syscall e:
       le (syscall e) (syscall e)
   .
+  Hint Constructors le.
 
   Definition lift (ord0:Ordering.t) (e:t): t :=
     match e with
@@ -167,6 +169,7 @@ Module Local.
   | is_terminal_intro
       (PROMISES: lc.(promises) = Memory.bot)
   .
+  Hint Constructors is_terminal.
 
   Inductive wf (lc:t) (mem:Memory.t): Prop :=
   | wf_intro
@@ -175,11 +178,13 @@ Module Local.
       (PROMISES: Memory.le lc.(promises) mem)
       (FINITE: Memory.finite lc.(promises))
   .
+  Hint Constructors wf.
 
   Inductive disjoint (lc1 lc2:t): Prop :=
   | disjoint_intro
       (DISJOINT: Memory.disjoint lc1.(promises) lc2.(promises))
   .
+  Hint Constructors disjoint.
 
   Global Program Instance disjoint_Symmetric: Symmetric disjoint.
   Next Obligation.
@@ -193,6 +198,7 @@ Module Local.
       (CLOSED: Memory.closed_opt_view released mem2):
       promise_step lc1 mem1 loc from to val released (mk lc1.(tview) promises2) mem2 kind
   .
+  Hint Constructors promise_step.
 
   Inductive read_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (to:Time.t) (val:Const.t) (released:option View.t) (ord:Ordering.t): forall (lc2:t), Prop :=
   | read_step_intro
@@ -203,6 +209,7 @@ Module Local.
       (TVIEW: TView.read_tview lc1.(tview) loc to released ord = tview2):
       read_step lc1 mem1 loc to val released ord (mk tview2 lc1.(promises))
   .
+  Hint Constructors read_step.
 
   Inductive write_step (lc1:t) (sc1:TimeMap.t) (mem1:Memory.t) (loc:Loc.t) (from to:Time.t) (val:Const.t) (releasedm released:option View.t) (ord:Ordering.t): forall (lc2:t) (sc2:TimeMap.t) (mem2:Memory.t) (kind:Memory.op_kind), Prop :=
   | write_step_intro
@@ -215,6 +222,7 @@ Module Local.
                  (mk (TView.write_tview lc1.(tview) sc1 loc to ord) promises2)
                  sc1 mem2 kind
   .
+  Hint Constructors write_step.
 
   Inductive fence_step (lc1:t) (sc1:TimeMap.t) (ordr ordw:Ordering.t): forall (lc2:t) (sc2:TimeMap.t), Prop :=
   | fence_step_intro
@@ -223,6 +231,7 @@ Module Local.
       (RELEASE: Ordering.le Ordering.strong_relaxed ordw -> Memory.nonsynch lc1.(promises)):
       fence_step lc1 sc1 ordr ordw (mk (TView.write_fence_tview tview2 sc1 ordw) lc1.(promises)) (TView.write_fence_sc tview2 sc1 ordw)
   .
+  Hint Constructors fence_step.
 
   Inductive program_step: forall (e:ThreadEvent.t) lc1 sc1 mem1 lc2 sc2 mem2, Prop :=
   | step_silent
@@ -257,6 +266,7 @@ Module Local.
       (LOCAL: Local.fence_step lc1 sc1 Ordering.seqcst Ordering.seqcst lc2 sc2):
       program_step (ThreadEvent.syscall e) lc1 sc1 mem1 lc2 sc2 mem1
   .
+  Hint Constructors program_step.
 
   Lemma promise_step_future lc1 sc1 mem1 loc from to val released lc2 mem2 kind
         (STEP: promise_step lc1 mem1 loc from to val released lc2 mem2 kind)
@@ -327,7 +337,6 @@ Module Local.
     exploit Memory.write_future; try apply WRITE; eauto. i. des.
     exploit Memory.write_get2; try apply WRITE; eauto; try by viewtac. i. des.
     splits; eauto.
-    - econs; ss.
     - apply TViewFacts.write_tview_incr. auto.
     - refl.
     - inv WRITE. inv PROMISE; auto.
@@ -361,7 +370,6 @@ Module Local.
     exploit TViewFacts.read_fence_future; eauto. i. des.
     exploit TViewFacts.write_fence_future; eauto. i. des.
     splits; eauto.
-    - econs; eauto.
     - etrans.
       + apply TViewFacts.write_fence_tview_incr. auto.
       + apply TViewFacts.write_fence_tview_mon; eauto; try refl.

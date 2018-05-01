@@ -403,7 +403,6 @@ Proof.
       - econs; eauto. econs 2. econs; [|econs 1]; eauto.
       - inv WF4; ss.
         econs; [by rewrite THS; setoid_rewrite IdentMap.Properties.F.map_o; rewrite THS4|..]; eauto.
-        econs 2. econs; eauto. econs; eauto.
       - s. by rewrite !IdentMap.gss.
       - i. des; done.
     }

@@ -59,9 +59,7 @@ Proof.
   exploit TViewFacts.write_future_fulfill; try apply x; try apply SC1; try apply WF1; eauto.
   { eapply CLOSED1. eauto. }
   i. des.
-  esplits; eauto.
-  - econs; eauto.
-  - refl.
+  esplits; eauto. refl.
 Qed.
 
 Lemma write_promise_fulfill
@@ -80,10 +78,9 @@ Lemma write_promise_fulfill
 Proof.
   exploit Local.write_step_future; eauto. i. des.
   inv WRITE. inv WRITE0. esplits; eauto.
-  - econs; eauto.
-  - refine (step_fulfill _ _ _ _ _ _ _); auto.
-    + refl.
-    + eapply MemoryFacts.promise_time_lt. eauto.
+  refine (step_fulfill _ _ _ _ _ _ _); auto.
+  - refl.
+  - eapply MemoryFacts.promise_time_lt. eauto.
 Qed.
 
 Lemma fulfill_write

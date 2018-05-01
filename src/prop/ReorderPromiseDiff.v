@@ -43,7 +43,6 @@ Proof.
   inv STEP1. inv STEP2.
   hexploit MemoryFacts.MemoryFacts.promise_get_inv_diff; eauto. i. des.
   esplits; eauto.
-  econs; eauto.
 Qed.
 
 Lemma reorder_promise_promise_diff
@@ -264,7 +263,7 @@ Proof.
     exploit reorder_promise_write_diff; try symmetry; eauto. i. des.
     esplits; eauto. econs; [|econs 4]; eauto.
   - inv LOCAL0.
-    esplits; eauto. econs; [|econs 5]; eauto. econs; eauto.
+    esplits; eauto. econs; [|econs 5]; eauto.
   - inv LOCAL0.
-    esplits; eauto. econs; [|econs 6]; eauto. econs; eauto.
+    esplits; eauto. econs; [|econs 6]; eauto.
 Qed.

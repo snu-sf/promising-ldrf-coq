@@ -47,9 +47,7 @@ Lemma reorder_promise_read
 Proof.
   inv STEP1. inv STEP2.
   hexploit MemoryFacts.MemoryFacts.promise_get_inv_diff; eauto. i. des.
-  esplits; eauto.
-  + econs; eauto.
-  + econs; eauto.
+  esplits; eauto. econs; eauto.
 Qed.
 
 Lemma reorder_promise_promise_lower_None
@@ -90,18 +88,16 @@ Proof.
     }
     { exploit MemoryReorder.split_lower_diff; try exact PROMISES0; try exact PROMISES; eauto. i. des.
       - subst. exploit MemoryReorder.split_lower_diff; try exact MEM1; try exact MEM; eauto. i. des; [|congr].
-        left. esplits; eauto. econs; [|by econs]. econs 2; eauto.
+        left. esplits; eauto.
       - exploit MemoryReorder.split_lower_diff; try exact MEM1; try exact MEM; eauto. i. des; [congr|].
         right. esplits; eauto.
-        + econs; [|by econs]. econs 3; eauto.
-        + refine (Local.promise_step_intro _ _ _); eauto.
-          eapply Memory.lower_closed_opt_view; eauto.
+        refine (Local.promise_step_intro _ _ _); eauto.
+        eapply Memory.lower_closed_opt_view; eauto.
     }
   - exploit MemoryReorder.lower_lower; try exact PROMISES0; try exact PROMISES; eauto. i. des.
     + subst.
       exploit MemoryReorder.lower_lower; try exact MEM1; try exact MEM; eauto. i. des; [|congr].
       left. esplits; eauto.
-      econs; eauto.
     + exploit MemoryReorder.lower_lower; try exact MEM1; try exact MEM; eauto. i. des; [congr|].
       right. esplits.
       * econs; [|by econs]. econs 3; eauto.
@@ -519,8 +515,7 @@ Proof.
   inv STEP1. inv STEP. ss. inv STEP2. inv LOCAL1; ss.
   - (* silent *)
     esplits; eauto.
-    + econs; eauto. econs.
-    + right. esplits. econs; eauto.
+    right. esplits. econs; eauto.
   - (* read *)
     exploit reorder_promise_read; try exact LOCAL0; eauto; try by viewtac.
     { ii. inv H.
@@ -529,7 +524,7 @@ Proof.
       eapply Time.lt_strorder. eauto.
     }
     i. des. esplits.
-    + econs; eauto. econs 2; eauto.
+    + econs; eauto.
     + right. esplits. econs; eauto.
   - (* write *)
     exploit reorder_promise_write'; try exact LOCAL0; eauto; try by viewtac.
@@ -540,7 +535,7 @@ Proof.
       exfalso. eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt; eauto.
     }
     esplits.
-    + econs; eauto. econs 3; eauto.
+    + econs; eauto.
     + unguardH STEP2. des.
       * inv STEP2. left. auto.
       * right. esplits. econs; eauto.
@@ -562,7 +557,7 @@ Proof.
       exfalso. eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt; eauto.
     }
     esplits.
-    + econs; eauto. econs 4; eauto.
+    + econs; eauto.
     + unguardH STEP3. des.
       * inv STEP3. left. auto.
       * right. esplits. econs; eauto.
@@ -570,7 +565,6 @@ Proof.
     esplits; eauto.
     + econs; eauto. econs 5; eauto. econs; eauto. ss.
       intros ORDW l. eapply promise_step_nonsynch_loc_inv; eauto.
-      * econs; eauto.
       * apply promise_pf_false_inv. ss.
       * apply RELEASE. ss.
     + right. esplits. econs; eauto. econs; eauto.
@@ -578,7 +572,6 @@ Proof.
     esplits; eauto.
     + econs; eauto. econs 6; eauto. econs; eauto.
       intros ORDW l. eapply promise_step_nonsynch_loc_inv; eauto.
-      * econs; eauto.
       * apply promise_pf_false_inv. ss.
       * apply RELEASE. ss.
     + right. esplits. econs; eauto. econs; eauto.

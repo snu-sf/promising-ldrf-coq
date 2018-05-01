@@ -171,7 +171,7 @@ Proof.
       - i. des; eapply (@pi_consistent_small_step_pi_rw _ _ _ (_,_)); s; try apply MSTEP; try apply PI_CONSISTENT; eauto.
     }
     { inv LOCAL0. eexists. econs.
-      - econs; eauto. econs 2. econs; [|econs 2]; eauto. econs; eauto.
+      - econs; eauto.
       - econs.
         + ss. setoid_rewrite IdentMap.Properties.F.map_o.
           by rewrite TID.
@@ -215,8 +215,7 @@ Proof.
       eexists; econs.
       - eauto.
       - s. econs; s; eauto.
-        + setoid_rewrite IdentMap.Properties.F.map_o. by rewrite TID.
-        + rewrite Bool.orb_true_r. econs 2. econs; [|econs 3]; eauto.
+        setoid_rewrite IdentMap.Properties.F.map_o. by rewrite TID.
       - s. by rewrite !IdentMap.gss.
       - i. des; eapply (@pi_consistent_small_step_pi_rw _ _ _ (_,_)); s; try apply MSTEP; try apply PI_CONSISTENT; eauto.
     }
@@ -237,7 +236,7 @@ Proof.
       intro WRITE; des.
 
       inv LOCAL1. eexists. econs.
-      - econs; eauto. econs 2. econs; [|econs 4]; eauto; econs; eauto.
+      - econs; eauto.
       - s. econs.
         + ss. setoid_rewrite IdentMap.Properties.F.map_o.
           by rewrite TID.
@@ -273,7 +272,7 @@ Proof.
       - i. des; eapply (@pi_consistent_small_step_pi_rw _ _ _ (_,_)); s; try apply MSTEP; try apply PI_CONSISTENT; eauto.
     }
     { inv LOCAL0. eexists. econs.
-      - econs; eauto. econs 2. econs; [|econs 5]; eauto. econs; eauto.
+      - econs; eauto.
       - econs.
         + ss. setoid_rewrite IdentMap.Properties.F.map_o.
           by rewrite TID.
@@ -286,7 +285,7 @@ Proof.
       - i. des; eapply (@pi_consistent_small_step_pi_rw _ _ _ (_,_)); s; try apply MSTEP; try apply PI_CONSISTENT; eauto.
     }
     { inv LOCAL0. eexists. econs.
-      - econs; eauto. econs 2. econs; [|econs 6]; eauto. econs; eauto.
+      - econs; eauto.
       - econs.
         + ss. setoid_rewrite IdentMap.Properties.F.map_o.
           by rewrite TID.

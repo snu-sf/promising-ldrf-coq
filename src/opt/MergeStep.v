@@ -101,8 +101,7 @@ Lemma promise_promise_promise
   Local.promise_step lc0 mem0 loc from to val released2 lc2 mem2 kind.
 Proof.
   inv PROMISE1. inv PROMISE2. ss.
-  exploit MemoryMerge.promise_promise_promise; try exact PROMISE; eauto. i.
-  econs; eauto.
+  exploit MemoryMerge.promise_promise_promise; try exact PROMISE; eauto.
 Qed.
 
 Lemma to_lt_from_le

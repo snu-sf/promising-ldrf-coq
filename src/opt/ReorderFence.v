@@ -77,7 +77,6 @@ Proof.
   inv STEP.
   erewrite TViewFacts.write_fence_tview_acqrel; auto.
   erewrite <- TViewFacts.write_fence_sc_acqrel at 2; eauto.
-  econs; auto.
 Qed.
 
 Lemma sim_fence_step

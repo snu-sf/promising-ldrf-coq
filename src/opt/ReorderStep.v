@@ -134,7 +134,6 @@ Proof.
   exploit Memory.promise_get1; eauto. i. des.
   esplits; eauto.
   - econs; eauto.
-  - econs; eauto.
     s. eapply TViewFacts.readable_mon; eauto; try refl.
   - s. econs; ss.
     + apply TViewFacts.read_tview_mon; try refl; try apply WF0; eauto.
@@ -159,9 +158,7 @@ Lemma reorder_read_promise_diff
 Proof.
   inv STEP1. inv STEP2. ss.
   exploit MemoryFacts.promise_get1_diff; eauto. i. des.
-  esplits; eauto.
-  - econs; eauto.
-  - econs; eauto.
+  esplits; eauto. econs; eauto.
 Qed.
 
 Lemma reorder_read_fulfill
@@ -187,7 +184,7 @@ Proof.
   guardH ORD.
   exploit Local.read_step_future; eauto. i. des.
   inv STEP1. inv STEP2.
-  esplits; eauto.
+  esplits.
   - econs; eauto.
     + etrans; eauto. unfold TView.write_released. s.
       condtac; econs. repeat (try condtac; aggrtac; try apply WF0).

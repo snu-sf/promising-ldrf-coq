@@ -534,9 +534,7 @@ Proof.
   { eapply MemoryFacts.released_time_lt; [by apply MEM1_SRC|]. apply LOCAL1_SRC. eauto. }
   i. des.
   exploit Memory.promise_future; try apply LOCAL1_SRC; eauto; try by econs. i. des.
-  exploit sim_localF_lower_src; eauto.
-  { econs; eauto. }
-  i. des.
+  exploit sim_localF_lower_src; eauto. i. des.
   exploit IHdom; eauto.
   { eapply Memory.future_closed_timemap; eauto. }
   { eapply TView.future_closed; eauto. }
@@ -548,7 +546,7 @@ Proof.
   }
   i. des. esplits; try exact NONSYNCH2; eauto.
   econs 2; eauto. econs.
-  - econs. econs 1. econs; eauto. econs; eauto.
+  - econs. econs 1. econs; eauto.
   - ss.
 Qed.
 

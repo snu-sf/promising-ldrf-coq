@@ -61,9 +61,7 @@ Proof.
   { apply WF1_SRC. }
   { apply WF1_SRC. }
   i. des.
-  esplits; eauto.
-  - econs; eauto.
-  - econs; eauto.
+  esplits; eauto. econs; eauto.
 Qed.
 
 Lemma sim_local_fulfill_acquired
