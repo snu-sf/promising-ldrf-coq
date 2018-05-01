@@ -433,4 +433,12 @@ Module View <: JoinableType.
       + refl.
     - apply join_r.
   Qed.
+
+  Lemma join_le
+        v1 v2 w1 w2
+        (LE1: le v1 w1)
+        (LE2: le v2 w2):
+    le (join v1 v2) (join w1 w2).
+  Proof. eauto using join_spec, join_l, join_r. Qed.
+
 End View.
