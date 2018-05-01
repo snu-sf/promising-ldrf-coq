@@ -71,6 +71,7 @@ Next Obligation.
   exploit IHclos_refl_trans_1n; eauto. i.
   econs 2; eauto.
 Qed.
+Hint Resolve rtc_PreOrder_obligation_2.
 
 Lemma rtc_tail A R
       (a1 a3:A)

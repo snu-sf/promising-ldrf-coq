@@ -631,6 +631,15 @@ Module UsualPositiveMap <: S with Module E:=PositiveOrderedTypeBits.
     rewrite Facts.map_o. auto.
   Qed.
 
+  Lemma map_remove A B (f:A -> B) i m:
+    map f (remove i m) = remove i (map f m).
+  Proof.
+    apply eq_leibniz. intro.
+    rewrite ? Facts.map_o, ? Properties.F.remove_o.
+    destruct (Properties.F.eq_dec i y); auto.
+    rewrite Facts.map_o. auto.
+  Qed.
+
   (* Derivable from the Map interface *)
   Theorem gsspec:
     forall (A:Type)(i j: key) (x: A) (m: t A),

@@ -37,6 +37,7 @@ Module DOAux.
 
   Definition eq := @eq t.
   Global Program Instance eq_equiv : Equivalence eq.
+  Hint Resolve (Equivalence_Transitive eq_equiv).
 
   Inductive lt_: forall (lhs rhs:t), Prop :=
   | lt_xO_xH lhs:
@@ -55,6 +56,7 @@ Module DOAux.
       lt_ (xI lhs) (xI rhs)
   .
   Definition lt := lt_.
+
   Global Program Instance lt_strorder: StrictOrder lt.
   Next Obligation.
     intro x. induction x; intro X; inv X; eauto.
@@ -65,10 +67,13 @@ Module DOAux.
     - apply IHXY. auto.
     - apply IHXY. auto.
   Qed.
+  Hint Resolve lt_strorder_obligation_2.
+
   Global Program Instance lt_compat: Proper (eq ==> eq ==> iff) lt.
   Next Obligation.
     ii. unfold eq in *. subst. auto.
   Qed.
+
   Fixpoint compare (lhs rhs:t): comparison :=
     match lhs, rhs with
     | xH, xH =>
@@ -333,12 +338,14 @@ Next Obligation.
   des; subst; auto.
   left. rewrite H. auto.
 Qed.
+Hint Resolve DOAux_le_PreOrder_obligation_2.
 
 Module DenseOrder.
   Definition t := positive.
 
   Definition eq := @eq t.
   Global Program Instance eq_equiv : Equivalence eq.
+  Hint Resolve (Equivalence_Transitive eq_equiv).
 
   Inductive lt_: forall (lhs rhs:t), Prop :=
   | lt_xH_xO lhs:
@@ -356,7 +363,9 @@ Module DenseOrder.
       (LT: DOAux.lt lhs rhs):
       lt_ (xI lhs) (xI rhs)
   .
+
   Definition lt := lt_.
+
   Global Program Instance lt_strorder: StrictOrder lt.
   Next Obligation.
     ii. inv H.
@@ -368,10 +377,13 @@ Module DenseOrder.
     - etrans; eauto.
     - etrans; eauto.
   Qed.
+  Hint Resolve lt_strorder_obligation_2.
+
   Global Program Instance lt_compat: Proper (eq ==> eq ==> iff) lt.
   Next Obligation.
     ii. unfold eq in *. subst. auto.
   Qed.
+
   Fixpoint compare (lhs rhs:t): comparison :=
     match lhs, rhs with
     | xH, xH =>
@@ -388,6 +400,7 @@ Module DenseOrder.
     | xI ltl, xI rtl =>
       DOAux.compare ltl rtl
     end.
+
   Lemma compare_spec :
     forall x y : t,
       CompareSpec (x = y) (lt x y) (lt y x) (compare x y).
@@ -638,6 +651,7 @@ Next Obligation.
   des; subst; auto.
   left. rewrite H. auto.
 Qed.
+Hint Resolve DenseOrder_le_PreOrder_obligation_2.
 
 
 Module DOSet := UsualSet DenseOrder.

@@ -227,6 +227,15 @@ Section Respectful9.
   Qed.
 End Respectful9.
 
+Hint Constructors sound9.
+Hint Constructors respectful9.
+Hint Constructors grespectful9.
+Hint Resolve gfclo9_mon : paco.
+Hint Resolve gfgres9_mon : paco.
+Hint Resolve grespectful9_incl.
+Hint Resolve rclo9_mon: paco.
+Hint Constructors weak_respectful9.
+
 Ltac pupto9_init := apply upto9_init; eauto with paco.
 Ltac pupto9_final := apply upto9_final; eauto with paco.
 Ltac pupto9 H := eapply upto9_step; [|exact H|]; eauto with paco.

@@ -225,6 +225,15 @@ Section Respectful7.
   Qed.
 End Respectful7.
 
+Hint Constructors sound7.
+Hint Constructors respectful7.
+Hint Constructors grespectful7.
+Hint Resolve gfclo7_mon : paco.
+Hint Resolve gfgres7_mon : paco.
+Hint Resolve grespectful7_incl.
+Hint Resolve rclo7_mon: paco.
+Hint Constructors weak_respectful7.
+
 Ltac pupto7_init := apply upto7_init; eauto with paco.
 Ltac pupto7_final := apply upto7_final; eauto with paco.
 Ltac pupto7 H := eapply upto7_step; [|exact H|]; eauto with paco.

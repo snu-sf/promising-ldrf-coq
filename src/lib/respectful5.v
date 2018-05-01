@@ -223,6 +223,15 @@ Section Respectful5.
   Qed.
 End Respectful5.
 
+Hint Constructors sound5.
+Hint Constructors respectful5.
+Hint Constructors grespectful5.
+Hint Resolve gfclo5_mon : paco.
+Hint Resolve gfgres5_mon : paco.
+Hint Resolve grespectful5_incl.
+Hint Resolve rclo5_mon: paco.
+Hint Constructors weak_respectful5.
+
 Ltac pupto5_init := apply upto5_init; eauto with paco.
 Ltac pupto5_final := apply upto5_final; eauto with paco.
 Ltac pupto5 H := eapply upto5_step; [|exact H|]; eauto with paco.

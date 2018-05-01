@@ -574,8 +574,7 @@ Module Memory.
     i. inv H. exploit op_get1; eauto. i. des.
     exploit IHLE; eauto. i. des.
     esplits; eauto.
-    - etrans; eauto.
-    - etrans; eauto.
+    etrans; eauto.
   Qed.
 
 
