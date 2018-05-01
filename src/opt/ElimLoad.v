@@ -64,12 +64,12 @@ Proof.
     exploit PLN; eauto.
   }
   des. inv MEM. exploit CLOSED; eauto. i. des.
-  esplits. econs; s; eauto.
+  esplits. econs; eauto.
   - econs; viewtac.
-  - apply TView.antisym.
+  - f_equal. apply TView.antisym.
+    + apply TViewFacts.read_tview_incr.
     + unfold TView.read_tview. econs; repeat (condtac; aggrtac; try apply WF).
       etrans; apply WF.
-    + apply TViewFacts.read_tview_incr.
 Qed.
 
 Lemma elim_load_sim_stmts

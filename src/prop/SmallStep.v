@@ -111,7 +111,7 @@ Lemma local_simul_fence
       (LOCAL: Local.fence_step (Local.mk com prm) sc ordr ordw (Local.mk com' prm') sc'):
   Local.fence_step (Local.mk com Memory.bot) sc ordr ordw (Local.mk com' Memory.bot) sc'.
 Proof.
-  inv LOCAL. econs; eauto.
+  inv LOCAL. inv LC2. econs; eauto.
   s. i. apply Memory.bot_nonsynch.
 Qed.
 
@@ -131,7 +131,7 @@ Proof.
     - inv MEM. inv SPLIT. auto.
     - inv MEM. inv LOWER. auto.
   }
-  inv WRITE.
+  inv WRITE. inv LC2.
   hexploit (@Memory.add_exists Memory.bot loc from to val relw'); eauto.
   { i. rewrite Memory.bot_get in *. congr. }
   { eapply MemoryFacts.write_time_lt. eauto. }

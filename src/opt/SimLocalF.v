@@ -565,7 +565,7 @@ Lemma sim_localF_fence_src
     <<LOCAL2: sim_localF pview lc2_src lc1_tgt>> /\
     <<SC2: TimeMap.le sc2_src sc1_tgt>>.
 Proof.
-  esplits; ss. econs; s.
+  esplits; eauto. econs; ss; eauto.
   - repeat (condtac; aggrtac). apply LOCAL1.
   - repeat (condtac; aggrtac). apply LOCAL1.
   - apply LOCAL1.

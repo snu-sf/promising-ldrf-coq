@@ -101,14 +101,14 @@ Proof.
   - econs; eauto.
     eapply TViewFacts.readable_mon; try apply READABLE0; eauto; try refl.
     apply TViewFacts.read_tview_incr.
-  - refine (Local.read_step_intro _ _ _ _ _); eauto.
+  - econs; eauto.
     + s. unfold View.singleton_ur_if.
       econs; repeat (try condtac; try splits; aggrtac; eauto; try apply READABLE;
                      unfold TimeMap.singleton, LocFun.add in *).
       * specialize (LOC eq_refl). des. viewtac.
       * specialize (LOC eq_refl). des. viewtac.
       * specialize (LOC eq_refl). des. viewtac.
-    + apply TView.antisym; apply ReorderTView.read_read_tview;
+    + f_equal. apply TView.antisym; apply ReorderTView.read_read_tview;
         (try by apply WF0);
         (try by eapply MEM0; eauto).
 Qed.
@@ -158,7 +158,7 @@ Lemma reorder_read_promise_diff
 Proof.
   inv STEP1. inv STEP2. ss.
   exploit MemoryFacts.promise_get1_diff; eauto. i. des.
-  esplits; eauto. econs; eauto.
+  esplits; eauto.
 Qed.
 
 Lemma reorder_read_fulfill

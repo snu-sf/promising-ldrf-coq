@@ -47,7 +47,7 @@ Lemma reorder_promise_read
 Proof.
   inv STEP1. inv STEP2.
   hexploit MemoryFacts.MemoryFacts.promise_get_inv_diff; eauto. i. des.
-  esplits; eauto. econs; eauto.
+  esplits; eauto.
 Qed.
 
 Lemma reorder_promise_promise_lower_None
@@ -73,25 +73,20 @@ Proof.
       exploit MemoryReorder.add_lower; try exact MEM1; try exact MEM; eauto. i. des; [|congr].
       left. esplits; ss. econs; eauto.
     + exploit MemoryReorder.add_lower; try exact MEM1; try exact MEM; eauto. i. des; [congr|].
-      right. esplits.
-      * econs; [|by econs]. econs 3; eauto.
-      * refine (Local.promise_step_intro _ _ _); eauto.
-        eapply Memory.lower_closed_opt_view; eauto.
+      right. esplits; eauto. econs; eauto.
+      eapply Memory.lower_closed_opt_view; eauto.
   - destruct (classic ((loc1, ts3) = (loc2, to2))).
     { inv H.
       exploit MemoryReorder.split_lower_same; try exact PROMISES0; try exact PROMISES; eauto. i. des.
       exploit MemoryReorder.split_lower_same; try exact MEM1; try exact MEM; eauto. i. des.
-      subst. right. esplits.
-      - econs; [|by econs]. econs 3; eauto.
-      - refine (Local.promise_step_intro _ _ _); eauto.
-        eapply Memory.lower_closed_opt_view; eauto.
+      subst. right. esplits; eauto. econs; eauto.
+      eapply Memory.lower_closed_opt_view; eauto.
     }
     { exploit MemoryReorder.split_lower_diff; try exact PROMISES0; try exact PROMISES; eauto. i. des.
       - subst. exploit MemoryReorder.split_lower_diff; try exact MEM1; try exact MEM; eauto. i. des; [|congr].
         left. esplits; eauto.
       - exploit MemoryReorder.split_lower_diff; try exact MEM1; try exact MEM; eauto. i. des; [congr|].
-        right. esplits; eauto.
-        refine (Local.promise_step_intro _ _ _); eauto.
+        right. esplits; eauto. econs; eauto.
         eapply Memory.lower_closed_opt_view; eauto.
     }
   - exploit MemoryReorder.lower_lower; try exact PROMISES0; try exact PROMISES; eauto. i. des.
@@ -99,10 +94,8 @@ Proof.
       exploit MemoryReorder.lower_lower; try exact MEM1; try exact MEM; eauto. i. des; [|congr].
       left. esplits; eauto.
     + exploit MemoryReorder.lower_lower; try exact MEM1; try exact MEM; eauto. i. des; [congr|].
-      right. esplits.
-      * econs; [|by econs]. econs 3; eauto.
-      * refine (Local.promise_step_intro _ _ _); eauto.
-        eapply Memory.lower_closed_opt_view; cycle 1; eauto.
+      right. esplits; eauto. econs; eauto.
+      eapply Memory.lower_closed_opt_view; cycle 1; eauto.
 Qed.
 
 Lemma reorder_promise_promise
@@ -140,40 +133,27 @@ Proof.
     - exploit MemoryReorder.add_add; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       exploit MemoryReorder.add_add; try exact MEM; try exact MEM0; eauto. i. des.
       esplits.
-      + econs.
-        * econs; eauto.
-        * eapply REL_CLOSED. econs; eauto.
-      + right. esplits; eauto.
-        refine (Local.promise_step_intro _ _ _); eauto.
+      + econs; eauto.
+      + right. esplits; eauto. econs; eauto.
         eapply Memory.add_closed_opt_view; cycle 1; eauto.
       + auto.
     - exploit MemoryReorder.add_split; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       + subst.
         exploit MemoryReorder.add_split; try exact MEM; try exact MEM0; eauto. i. des; [|congr].
         esplits.
-        * econs.
-          { econs; eauto. }
-          { eapply REL_CLOSED. econs; eauto. }
-        * right. esplits; cycle 2.
-          { refine (Local.promise_step_intro _ _ _); eauto.
-            eapply Memory.split_closed_opt_view; eauto.
-          }
+        * econs; eauto.
+        * right. esplits; eauto.
           { ii. inv H. inv ADD3. inv ADD. eapply Time.lt_strorder. eauto. }
-          { congr. }
+          { econs; eauto. eapply Memory.split_closed_opt_view; eauto. }
         * auto.
       + exploit MemoryReorder.add_split; try exact MEM; try exact MEM0; eauto. i. des; [congr|].
         esplits.
-        * econs.
-          { econs 2; eauto. }
-          { eapply REL_CLOSED. econs 2; eauto. }
-        * right. esplits; cycle 2.
-          { refine (Local.promise_step_intro _ _ _); eauto.
-            eapply Memory.split_closed_opt_view; eauto.
-          }
+        * econs; eauto.
+        * right. esplits; eauto.
           { ii. inv H. exploit Memory.split_get0; try exact MEM1; eauto. i. des.
             revert GET. erewrite Memory.add_o; eauto. condtac; ss. des; congr.
           }
-          { congr. }
+          { econs; eauto. eapply Memory.split_closed_opt_view; eauto. }
         * auto.
     - exploit MemoryReorder.add_lower; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       + subst.
@@ -184,26 +164,17 @@ Proof.
         * auto.
       + exploit MemoryReorder.add_lower; try exact MEM; try exact MEM0; eauto. i. des; [congr|].
         esplits.
-        * econs.
-          { econs 3; eauto. }
-          { eapply REL_CLOSED. econs 3; eauto. }
-        * right. esplits; cycle 2.
-          { refine (Local.promise_step_intro _ _ _); eauto.
-            eapply Memory.lower_closed_opt_view; eauto.
-          }
-          { auto. }
-          { congr. }
+        * econs; eauto.
+        * right. esplits; eauto. econs; eauto.
+          eapply Memory.lower_closed_opt_view; eauto.
         * auto.
   }
   { inv PROMISE0.
     - exploit MemoryReorder.split_add; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       exploit MemoryReorder.split_add; try exact MEM; try exact MEM0; eauto. i. des.
       esplits.
-      + econs.
-        * econs; eauto.
-        * eapply REL_CLOSED. econs; eauto.
-      + right. esplits; eauto; cycle 1.
-        refine (Local.promise_step_intro _ _ _); eauto.
+      + econs; eauto.
+      + right. esplits; eauto. econs; eauto.
         eapply Memory.add_closed_opt_view; eauto.
       + auto.
     - exploit MemoryReorder.split_split; try exact PROMISES; try exact PROMISES0; eauto.
@@ -213,40 +184,22 @@ Proof.
         { ii. inv H. inv SPLIT2. inv SPLIT. eapply Time.lt_strorder. eauto. }
         i. des; [|congr].
         esplits.
-        * econs.
-          { econs 2; eauto. }
-          { eapply REL_CLOSED. econs 2; eauto. }
-        * right. esplits; cycle 2.
-          { refine (Local.promise_step_intro _ _ _); eauto.
-            eapply Memory.split_closed_opt_view; cycle 1; eauto.
-          }
+        * econs; eauto.
+        * right. esplits; eauto.
           { ii. inv H. inv SPLIT2. inv SPLIT. eapply Time.lt_strorder. eauto. }
-          { i. inv KIND. splits.
-            - ii. subst. inv SPLIT2. inv SPLIT. eapply Time.lt_strorder. etrans; try exact TS12; eauto.
-            - ii. inv H. inv SPLIT3. inv SPLIT. eapply Time.lt_strorder. eauto.
-          }
+          { econs; eauto. eapply Memory.split_closed_opt_view; cycle 1; eauto. }
         * congr.
       + exploit MemoryReorder.split_split; try exact MEM; try exact MEM0; eauto.
         { ii. inv H. eapply LOCTS; eauto. }
         i. des; [congr|].
         esplits.
-        * econs.
-          { econs 2; eauto. }
-          { eapply REL_CLOSED. econs 2; eauto. }
-        * right. esplits; cycle 2.
-          { refine (Local.promise_step_intro _ _ _); eauto.
-            eapply Memory.split_closed_opt_view; cycle 1; eauto.
-          }
+        * econs; eauto.
+        * right. esplits; eauto.
           { ii. inv H. exploit Memory.split_get0; try exact MEM1; eauto. i. des.
             revert GET. erewrite Memory.split_o; eauto. repeat condtac; ss.
             guardH o0. des; congr.
           }
-          { i. inv KIND. splits.
-            - ii. subst. exploit Memory.split_get0; try exact MEM1; eauto. i. des.
-              revert GET. erewrite Memory.split_o; eauto. repeat condtac; ss.
-              guardH o. des; congr.
-            - ii. inv H. eapply LOCTS; eauto.
-          }
+          { econs; eauto. eapply Memory.split_closed_opt_view; cycle 1; eauto. }
         * auto.
     - exploit MemoryReorder.split_lower_diff; try exact PROMISES; try exact PROMISES0; eauto.
       { ii. inv H. exploit LOCTS; eauto. i. des. congr. }
@@ -255,38 +208,24 @@ Proof.
         { ii. inv H. exploit LOCTS; eauto. i. des. congr. }
         i. des; [|congr].
         esplits.
-        * econs.
-          { econs 2; eauto. }
-          { eapply REL_CLOSED. econs 2; eauto. }
+        * econs; eauto.
         * left. auto.
         * congr.
       + subst. exploit MemoryReorder.split_lower_diff; try exact MEM; try exact MEM0; eauto.
         { ii. inv H. exploit LOCTS; eauto. i. des. congr. }
         i. des; [congr|].
         esplits.
-        * econs.
-          { econs 3; eauto. }
-          { eapply REL_CLOSED. econs 3; eauto. }
-        * right. esplits; cycle 2.
-          { refine (Local.promise_step_intro _ _ _); eauto.
-            eapply Memory.lower_closed_opt_view; eauto.
-          }
-          { ii. inv H. exploit Memory.split_get0; try exact MEM1; eauto. }
-          { i. inv KIND. splits.
-            - ii. subst. exploit LOCTS; eauto. i. des. congr.
-            - ii. inv H.
-          }
+        * econs; eauto.
+        * right. esplits; eauto. econs; eauto.
+          eapply Memory.lower_closed_opt_view; eauto.
         * congr.
   }
   { inv PROMISE0.
     - exploit MemoryReorder.lower_add; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       exploit MemoryReorder.lower_add; try exact MEM; try exact MEM0; eauto. i. des.
       esplits.
-      + econs.
-        * econs; eauto.
-        * eapply REL_CLOSED. econs; eauto.
-      + right. esplits; eauto.
-        refine (Local.promise_step_intro _ _ _); eauto.
+      + econs; eauto.
+      + right. esplits; eauto. econs; eauto.
         eapply Memory.add_closed_opt_view; eauto.
       + auto.
     - exploit MemoryReorder.lower_split; try exact PROMISES; try exact PROMISES0; eauto. i. des.
@@ -294,31 +233,21 @@ Proof.
       unguardH FROM1. des.
       + inv FROM1. unguardH FROM0. des; [|congr]. inv FROM0.
         esplits.
-        * econs.
-          { econs 2; eauto. }
-          { eapply REL_CLOSED. econs 2; eauto. }
-        * right. esplits; cycle 2.
-          { refine (Local.promise_step_intro _ _ _); eauto.
-            eapply Memory.split_closed_opt_view; eauto.
-          }
+        * econs; eauto.
+        * right. esplits; eauto.
           { ii. inv H. inv SPLIT1. inv SPLIT.
             exfalso. eapply Time.lt_strorder. eauto.
           }
-          { auto. }
+          { econs; eauto. eapply Memory.split_closed_opt_view; eauto. }
         * congr.
       + inv FROM2. unguardH FROM0. des; [congr|]. inv FROM2.
         esplits.
-        * econs.
-          { econs 2; eauto. }
-          { eapply REL_CLOSED. econs 2; eauto. }
-        * right. esplits; cycle 2.
-          { refine (Local.promise_step_intro _ _ _); eauto.
-            eapply Memory.split_closed_opt_view; eauto.
-          }
+        * econs; eauto.
+        * right. esplits; eauto.
           { ii. inv H. exploit Memory.lower_get0; try exact MEM; eauto.
             exploit Memory.split_get0; try exact SPLIT0; eauto. i. des. congr.
           }
-          { congr. }
+          { econs; eauto. eapply Memory.split_closed_opt_view; eauto. }
         * auto.
     - exploit MemoryReorder.lower_lower; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       + subst.
@@ -329,15 +258,9 @@ Proof.
         * congr.
       + exploit MemoryReorder.lower_lower; try exact MEM; try exact MEM0; eauto. i. des; [congr|].
         esplits.
-        * econs.
-          { econs 3; eauto. }
-          { eapply REL_CLOSED. econs 3; eauto. }
-        * right. esplits; cycle 2.
-          { refine (Local.promise_step_intro _ _ _); eauto.
-            eapply Memory.lower_closed_opt_view; cycle 1; eauto.
-          }
-          { auto. }
-          { auto. }
+        * econs; eauto.
+        * right. esplits; eauto. econs; eauto.
+          eapply Memory.lower_closed_opt_view; cycle 1; eauto.
         * auto.
   }
 Qed.
@@ -567,14 +490,14 @@ Proof.
       intros ORDW l. eapply promise_step_nonsynch_loc_inv; eauto.
       * apply promise_pf_false_inv. ss.
       * apply RELEASE. ss.
-    + right. esplits. econs; eauto. econs; eauto.
+    + right. esplits. econs; eauto.
   - inv LOCAL0. inv LOCAL2.
     esplits; eauto.
     + econs; eauto. econs 6; eauto. econs; eauto.
       intros ORDW l. eapply promise_step_nonsynch_loc_inv; eauto.
       * apply promise_pf_false_inv. ss.
       * apply RELEASE. ss.
-    + right. esplits. econs; eauto. econs; eauto.
+    + right. esplits. econs; eauto.
 Qed.
 
 Lemma reorder_nonpf_pf

@@ -901,7 +901,7 @@ Lemma lift_read
    <<CoMLE: TView.le com1' com2'>> /\
    <<RELLE: View.opt_le rel1 rel2>>).
 Proof.
-  inversion LOCAL. ss. subst.
+  inversion LOCAL. inv LC2. ss. subst.
   exploit mem_eqlerel_lift_get; eauto. i. des; eauto.
   right. right. esplits; try exact REL; ss.
   - econs; eauto. eapply TViewFacts.readable_mon; eauto.
@@ -1123,7 +1123,7 @@ Proof.
   }
   assert (RELWLE: View.opt_le relw1 relw2).
   { unfold relw1. inv LOCAL. s. eapply TViewFacts.write_released_mon; eauto. refl. }
-  inv LOCAL. inv WRITE.
+  inv LOCAL. inv LC2. inv WRITE.
   exploit mem_eqlerel_lift_promise; eauto. i. des.
   hexploit Memory.promise_future0; eauto; try by viewtac. i. des.
   hexploit MemorySplit.remove_promise_remove; try exact REMOVE; eauto.
@@ -1156,9 +1156,8 @@ Lemma lift_fence
   <<CoMLE: TView.le com1' com2'>> /\
   <<SC: TimeMap.le sc1' sc2'>>.
 Proof.
-  inversion LOCAL. ss. subst.
+  inversion LOCAL. inv LC2. ss. subst.
   esplits; eauto.
-  - econs; eauto.
   - apply TViewFacts.write_fence_tview_mon; eauto; try refl.
     + apply TViewFacts.read_fence_tview_mon; eauto; try refl.
     + unfold TView.read_fence_tview. ss.
@@ -1206,25 +1205,12 @@ Proof.
     { rewrite <- PRM. apply WFS1. }
     s. i. des. destruct thS1. ss.
     right. right. esplits.
-    + econs 1. econs. econs.
-      * rewrite PRM. eauto.
-      * econs.
-      * ss.
-    + ss.
-    + ss.
-    + econs. econs.
-    + ss.
-    + ss.
-    + ss.
+    { econs 1. econs. econs; try rewrite PRM; eauto. ss. }
+    all: eauto.
   - subst. destruct thS1, local. ss. subst.
     right. right. esplits.
-    + econs 2. econs; [|econs 1]; eauto.
-    + ss.
-    + ss.
-    + econs.
-    + ss.
-    + ss.
-    + ss.
+    { econs 2. econs; [|econs 1]; eauto. }
+    all: eauto.
   - destruct lc1. inversion LOCAL0. subst. ss.
     exploit lift_read; eauto.
     { apply WFT1. }
@@ -1234,25 +1220,15 @@ Proof.
     { right. left. esplits; eauto. }
     destruct thS1, local. ss. subst.
     right. right. esplits.
-    + econs 2. econs; [|econs 2]; eauto.
-    + ss.
-    + ss.
-    + econs. eauto.
-    + ss.
-    + ss.
-    + ss.
+    { econs 2. econs; [|econs 2]; eauto. }
+    all: eauto.
   - destruct lc1. inversion LOCAL0. ss. subst.
     hexploit lift_write; try exact MEM; eauto; try refl;
       try apply WFS1; try apply WFT1; try by viewtac. i. des.
     destruct thS1, local. ss. subst.
     right. right. esplits.
-    + econs 2. econs; [|econs 3]; eauto.
-    + ss.
-    + ss.
-    + econs. eauto.
-    + ss.
-    + ss.
-    + ss.
+    { econs 2. econs; [|econs 3]; eauto. }
+    all: eauto.
   - destruct lc1. inversion LOCAL1. subst. ss.
     exploit Local.read_step_future; eauto. s. i. des.
     exploit lift_read; eauto.
@@ -1268,13 +1244,8 @@ Proof.
       try apply WF0; try apply WF2; try by viewtac. i. des.
     destruct thS1, local. ss. subst.
     right. right. esplits.
-    + econs 2. econs; [|econs 4]; eauto.
-    + ss.
-    + ss.
-    + econs; eauto.
-    + ss.
-    + ss.
-    + ss.
+    { econs 2. econs; [|econs 4]; eauto. }
+    all: eauto.
   - destruct lc1. inversion LOCAL0. subst. ss.
     exploit lift_fence; eauto.
     { apply WFS1. }
@@ -1282,13 +1253,8 @@ Proof.
     i. des.
     destruct thS1, local. ss. subst.
     right. right. esplits.
-    + econs 2. econs; [|econs 5]; eauto.
-    + ss.
-    + ss.
-    + econs.
-    + ss.
-    + ss.
-    + ss.
+    { econs 2. econs; [|econs 5]; eauto. }
+    all: eauto.
   - destruct lc1. inversion LOCAL0. subst. ss.
     exploit lift_fence; eauto.
     { apply WFS1. }
@@ -1296,11 +1262,6 @@ Proof.
     i. des.
     destruct thS1, local. ss. subst.
     right. right. esplits.
-    + econs 2. econs; [|econs 6]; eauto.
-    + ss.
-    + ss.
-    + econs.
-    + ss.
-    + ss.
-    + ss.
+    { econs 2. econs; [|econs 6]; eauto. }
+    all: eauto.
 Qed.

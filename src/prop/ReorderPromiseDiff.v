@@ -72,46 +72,33 @@ Proof.
   { inv PROMISE0.
     - exploit MemoryReorder.add_add; try exact MEM; try exact MEM0; eauto. i. des.
       esplits.
-      + econs.
-        * econs; eauto.
-        * eapply REL_CLOSED. econs; eauto.
-      + econs.
-        * econs; eauto.
-        * eapply Memory.add_closed_opt_view; cycle 1; eauto.
+      + econs; eauto.
+      + econs; eauto.
+        eapply Memory.add_closed_opt_view; cycle 1; eauto.
     - exploit MemoryReorder.add_split; try exact MEM; try exact MEM0; eauto. i. des.
       { subst. exfalso. eapply Memory.disjoint_get; try apply DISJOINT2; s; cycle 1.
         - hexploit Memory.split_get0; try exact PROMISES0; eauto. i. des. eauto.
         - erewrite Memory.add_o; eauto. condtac; [|des; congr]. ss.
       }
       esplits.
-      + econs.
-        * econs 2; eauto.
-        * eapply REL_CLOSED. econs 2; eauto.
-      + econs.
-        * econs; eauto.
-        * eapply Memory.split_closed_opt_view; eauto.
+      + econs; eauto.
+      + econs; eauto.
+        eapply Memory.split_closed_opt_view; eauto.
     - exploit MemoryReorder.add_lower; try exact MEM; try exact MEM0; eauto. i. des.
       { subst. exfalso. eapply Memory.disjoint_get; try apply DISJOINT2; s; cycle 1.
         - hexploit Memory.lower_get0; try exact PROMISES0; eauto. i. des. eauto.
         - erewrite Memory.add_o; eauto. condtac; [|des; congr]. ss.
       }
       esplits.
-      + econs.
-        * econs 3; eauto.
-        * eapply REL_CLOSED. econs 3; eauto.
-      + econs.
-        * econs; eauto.
-        * eapply Memory.lower_closed_opt_view; eauto.
+      + econs; eauto.
+      + econs; eauto.
+        eapply Memory.lower_closed_opt_view; eauto.
   }
   { inv PROMISE0.
     - exploit MemoryReorder.split_add; try exact MEM; try exact MEM0; eauto. i. des.
       esplits.
-      + econs.
-        * econs; eauto.
-        * eapply REL_CLOSED. econs; eauto.
-      + econs.
-        * econs; eauto.
-        * eapply Memory.add_closed_opt_view; eauto.
+      + econs; eauto.
+      + econs; eauto using Memory.add_closed_opt_view.
     - exploit MemoryReorder.split_split; try exact MEM; try exact MEM0; eauto.
       { ii. inv H. exfalso. eapply Memory.disjoint_get; try apply DISJ.
         - hexploit Memory.split_get0; try exact PROMISES; eauto. i. des. eauto.
@@ -125,12 +112,9 @@ Proof.
         - hexploit Memory.split_get0; try exact PROMISES; eauto. i. des. eauto.
       }
       esplits.
-      + econs.
-        * econs 2; eauto.
-        * eapply REL_CLOSED. econs 2; eauto.
-      + econs.
-        * econs; eauto.
-        * eapply Memory.split_closed_opt_view; cycle 1; eauto.
+      + econs; eauto.
+      + econs; eauto.
+        eapply Memory.split_closed_opt_view; cycle 1; eauto.
     - exploit MemoryReorder.split_lower_diff; try exact MEM; try exact MEM0; eauto.
       { ii. inv H. exfalso. eapply Memory.disjoint_get; try apply DISJ.
         - hexploit Memory.split_get0; try exact PROMISES; eauto. i. des. eauto.
@@ -144,22 +128,15 @@ Proof.
         - hexploit Memory.split_get0; try exact PROMISES; eauto. i. des. eauto.
       }
       esplits.
-      + econs.
-        * econs 3; eauto.
-        * eapply REL_CLOSED. econs 3; eauto.
-      + econs.
-        * econs; eauto.
-        * eapply Memory.lower_closed_opt_view; eauto.
+      + econs; eauto.
+      + econs; eauto.
+        eapply Memory.lower_closed_opt_view; eauto.
   }
   { inv PROMISE0.
     - exploit MemoryReorder.lower_add; try exact MEM; try exact MEM0; eauto. i. des.
       esplits.
-      + econs.
-        * econs; eauto.
-        * eapply REL_CLOSED. econs; eauto.
-      + econs.
-        * econs; eauto.
-        * eapply Memory.add_closed_opt_view; eauto.
+      + econs; eauto.
+      + econs; eauto using Memory.add_closed_opt_view.
     - exploit MemoryReorder.lower_split; try exact MEM; try exact MEM0; eauto. i. des.
       unguardH FROM1. des.
       { inv FROM1. exfalso. eapply Memory.disjoint_get; try apply DISJ.
@@ -168,24 +145,16 @@ Proof.
       }
       inv FROM0.
       esplits.
-      + econs.
-        * econs 2; eauto.
-        * eapply REL_CLOSED. econs 2; eauto.
-      + econs.
-        * econs; eauto.
-        * eapply Memory.split_closed_opt_view; eauto.
+      + econs; eauto.
+      + econs; eauto using Memory.split_closed_opt_view.
     - exploit MemoryReorder.lower_lower; try exact MEM; try exact MEM0; eauto. i. des.
       { subst. exfalso. eapply Memory.disjoint_get; try apply DISJ.
         - hexploit Memory.lower_get0; try exact PROMISES; eauto. i. des. eauto.
         - hexploit Memory.lower_get0; try exact PROMISES0; eauto. i. des. eauto.
       }
       esplits.
-      + econs.
-        * econs 3; eauto.
-        * eapply REL_CLOSED. econs 3; eauto.
-      + econs.
-        * econs; eauto.
-        * eapply Memory.lower_closed_opt_view; cycle 1; eauto.
+      + econs; eauto.
+      + econs; eauto using Memory.lower_closed_opt_view.
   }
 Qed.
 

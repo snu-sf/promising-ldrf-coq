@@ -158,8 +158,7 @@ Proof.
   exploit Local.promise_step_future; eauto. i. des.
   inv PROMISE. inv FULFILL.
   exploit MemorySplit.remove_promise_remove;
-    try exact REMOVE; eauto; try apply WF2; try refl. i. des.
-  refine (Local.write_step_intro _ _ _ _ _ _); eauto.
+    try exact REMOVE; eauto; try apply WF2; try refl.
 Qed.
 
 Lemma fulfill_step_promises_diff

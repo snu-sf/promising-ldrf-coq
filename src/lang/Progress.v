@@ -88,7 +88,7 @@ Proof.
   i. des.
   exploit Memory.add_exists_le; try apply WF1; eauto. i. des.
   hexploit Memory.add_inhabited; try apply x0; [viewtac|]. i. des.
-  esplits. econs.
+  esplits. econs; eauto.
   - econs; eauto.
     unfold TView.write_released.
     viewtac; repeat (condtac; viewtac);

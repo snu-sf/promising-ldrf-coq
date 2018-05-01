@@ -222,7 +222,7 @@ Proof.
     { destruct lc2, lc3. exploit local_simul_write; [| |by eapply LOCAL2|..].
       { instantiate (1:= memory). ii. eapply LR in IN.
         des; eauto. }
-      { inv LOCAL1. ss.
+      { inv LOCAL1. inv LC2. ss.
         econs. i. destruct msg1. exploit LR; eauto. i. des.
         inv WFT. inv WF1. exploit THREADS; eauto. i. inv x.
         exploit PROMISES; eauto. i.
@@ -235,7 +235,7 @@ Proof.
       }
       intro WRITE; des.
 
-      inv LOCAL1. eexists. econs.
+      inv LOCAL1. inv LC2. eexists. econs.
       - econs; eauto.
       - s. econs.
         + ss. setoid_rewrite IdentMap.Properties.F.map_o.

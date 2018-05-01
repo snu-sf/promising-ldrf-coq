@@ -47,7 +47,7 @@ Lemma merge_read_read
       (STEP1: Local.read_step lc0 mem0 loc ts val released ord lc2):
   Local.read_step lc2 mem0 loc ts val released ord lc2.
 Proof.
-  inv STEP1. refine (Local.read_step_intro _ _ _ _ _); s; eauto.
+  inv STEP1. econs; s; eauto.
   - unfold View.singleton_ur_if.
     econs; repeat (try condtac; aggrtac); try apply READABLE; auto.
     + inv MEM0. exploit CLOSED; eauto. i. des.
@@ -55,10 +55,10 @@ Proof.
     + inv MEM0. exploit CLOSED; eauto. i. des.
       etrans; eauto. apply View.unwrap_opt_wf. ss.
     + inv MEM0. exploit CLOSED; eauto. i. des. auto.
-  - apply TView.antisym.
+  - f_equal. apply TView.antisym.
+    + apply TViewFacts.read_tview_incr.
     + apply MergeTView.read_read_tview; try refl; try apply WF0.
       eapply MEM0. eauto.
-    + apply TViewFacts.read_tview_incr.
 Qed.
 
 Lemma merge_write_read
@@ -86,7 +86,7 @@ Proof.
     econs; repeat (try condtac; aggrtac); (try by left; eauto).
     + etrans; [|left; eauto]. apply WF0.
   - unfold TView.read_tview, TView.write_released, TView.write_tview. s.
-    apply TView.antisym; econs;
+    f_equal. apply TView.antisym; econs;
       repeat (try condtac; aggrtac; rewrite <- ? View.join_l; try apply WF0; eauto).
     etrans; apply WF0.
 Qed.
@@ -272,8 +272,7 @@ Proof.
   exploit MemoryReorder.promise_add_promise_split_same; eauto. i. des.
   esplits.
   - econs; eauto.
-  - refine (Local.promise_step_intro _ _ _); eauto.
-    eapply Memory.promise_closed_opt_view; eauto.
+  - econs; eauto using Memory.promise_closed_opt_view.
 Qed.
 
 Lemma reorder_promise_split_promise_split
@@ -297,8 +296,7 @@ Proof.
   exploit MemoryReorder.promise_split_promise_split_same; try exact PROMISE; eauto. s. i. des.
   esplits.
   - econs; eauto.
-  - refine (Local.promise_step_intro _ _ _); eauto.
-    eapply Memory.promise_closed_opt_view; eauto.
+  - econs; eauto using Memory.promise_closed_opt_view.
 Qed.
 
 Lemma reorder_promise_add_promise_add
@@ -325,8 +323,7 @@ Proof.
   exploit MemoryReorder.promise_add_promise_add; try exact PROMISE; eauto. i. des.
   esplits.
   - econs; eauto.
-  - refine (Local.promise_step_intro _ _ _); eauto.
-    viewtac.
+  - econs; eauto using Memory.promise_closed_opt_view.
 Qed.
 
 Lemma reorder_promise_add_fulfill

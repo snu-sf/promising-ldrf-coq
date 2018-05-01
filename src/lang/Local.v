@@ -191,45 +191,49 @@ Module Local.
     econs. symmetry. apply H.
   Qed.
 
-  Inductive promise_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (from to:Time.t) (val:Const.t) (released:option View.t): forall (lc2:t) (mem2:Memory.t) (kind:Memory.op_kind), Prop :=
+  Inductive promise_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (from to:Time.t) (val:Const.t) (released:option View.t) (lc2:t) (mem2:Memory.t) (kind:Memory.op_kind): Prop :=
   | promise_step_intro
-      promises2 mem2 kind
+      promises2
       (PROMISE: Memory.promise lc1.(promises) mem1 loc from to val released promises2 mem2 kind)
-      (CLOSED: Memory.closed_opt_view released mem2):
-      promise_step lc1 mem1 loc from to val released (mk lc1.(tview) promises2) mem2 kind
+      (CLOSED: Memory.closed_opt_view released mem2)
+      (LC2: lc2 = mk lc1.(tview) promises2):
+      promise_step lc1 mem1 loc from to val released lc2 mem2 kind
   .
   Hint Constructors promise_step.
 
-  Inductive read_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (to:Time.t) (val:Const.t) (released:option View.t) (ord:Ordering.t): forall (lc2:t), Prop :=
+  Inductive read_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (to:Time.t) (val:Const.t) (released:option View.t) (ord:Ordering.t) (lc2:t): Prop :=
   | read_step_intro
       from
       tview2
       (GET: Memory.get loc to mem1 = Some (from, Message.mk val released))
       (READABLE: TView.readable lc1.(tview).(TView.cur) loc to released ord)
-      (TVIEW: TView.read_tview lc1.(tview) loc to released ord = tview2):
-      read_step lc1 mem1 loc to val released ord (mk tview2 lc1.(promises))
+      (TVIEW: TView.read_tview lc1.(tview) loc to released ord = tview2)
+      (LC2: lc2 = mk tview2 lc1.(promises)):
+      read_step lc1 mem1 loc to val released ord lc2
   .
   Hint Constructors read_step.
 
-  Inductive write_step (lc1:t) (sc1:TimeMap.t) (mem1:Memory.t) (loc:Loc.t) (from to:Time.t) (val:Const.t) (releasedm released:option View.t) (ord:Ordering.t): forall (lc2:t) (sc2:TimeMap.t) (mem2:Memory.t) (kind:Memory.op_kind), Prop :=
+  Inductive write_step (lc1:t) (sc1:TimeMap.t) (mem1:Memory.t) (loc:Loc.t) (from to:Time.t) (val:Const.t) (releasedm released:option View.t) (ord:Ordering.t) (lc2:t) (sc2:TimeMap.t) (mem2:Memory.t) (kind:Memory.op_kind): Prop :=
   | write_step_intro
-      promises2 mem2 kind
+      promises2
       (RELEASED: released = TView.write_released lc1.(tview) sc1 loc to releasedm ord)
       (WRITABLE: TView.writable lc1.(tview).(TView.cur) sc1 loc to ord)
       (WRITE: Memory.write lc1.(promises) mem1 loc from to val released promises2 mem2 kind)
-      (RELEASE: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc lc1.(promises)):
-      write_step lc1 sc1 mem1 loc from to val releasedm released ord
-                 (mk (TView.write_tview lc1.(tview) sc1 loc to ord) promises2)
-                 sc1 mem2 kind
+      (RELEASE: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc lc1.(promises))
+      (LC2: lc2 = mk (TView.write_tview lc1.(tview) sc1 loc to ord) promises2)
+      (SC2: sc2 = sc1):
+      write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
   .
   Hint Constructors write_step.
 
-  Inductive fence_step (lc1:t) (sc1:TimeMap.t) (ordr ordw:Ordering.t): forall (lc2:t) (sc2:TimeMap.t), Prop :=
+  Inductive fence_step (lc1:t) (sc1:TimeMap.t) (ordr ordw:Ordering.t) (lc2:t) (sc2:TimeMap.t): Prop :=
   | fence_step_intro
       tview2
       (READ: TView.read_fence_tview lc1.(tview) ordr = tview2)
-      (RELEASE: Ordering.le Ordering.strong_relaxed ordw -> Memory.nonsynch lc1.(promises)):
-      fence_step lc1 sc1 ordr ordw (mk (TView.write_fence_tview tview2 sc1 ordw) lc1.(promises)) (TView.write_fence_sc tview2 sc1 ordw)
+      (RELEASE: Ordering.le Ordering.strong_relaxed ordw -> Memory.nonsynch lc1.(promises))
+      (LC2: lc2 = mk (TView.write_fence_tview tview2 sc1 ordw) lc1.(promises))
+      (SC2: sc2 = TView.write_fence_sc tview2 sc1 ordw):
+      fence_step lc1 sc1 ordr ordw lc2 sc2
   .
   Hint Constructors fence_step.
 
