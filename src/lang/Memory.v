@@ -49,6 +49,7 @@ Module Memory.
           Interval.disjoint (from1, to1) (from2, to2) /\
           (to1, to2) <> (Time.bot, Time.bot))
   .
+  Hint Constructors disjoint.
 
   Global Program Instance disjoint_Symmetric: Symmetric disjoint.
   Next Obligation.
@@ -75,11 +76,11 @@ Module Memory.
         exploit VOLUME; eauto. i. des; auto. inv x1. congr.
   Qed.
 
-  Lemma disjoint_get'
+  Lemma disjoint_get_general
         lhs rhs
         loc ts0 ts1 ts2 ts3 msgl msgr
         (TS12: Time.lt ts1 ts2)
-        (TS23: Time.lt ts2 ts3)
+        (TS23: Time.le ts2 ts3)
         (DISJOINT: disjoint lhs rhs)
         (LMSG: get loc ts2 lhs = Some (ts0, msgl))
         (RMSG: get loc ts3 rhs = Some (ts1, msgr)):
@@ -92,18 +93,8 @@ Module Memory.
       + eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt; eauto.
     - eapply x.
       + eapply Interval.mem_ub. auto.
-      + econs; auto. left. auto.
+      + econs; auto.
   Qed.
-
-  (* Inductive disjoint (lhs rhs:t): Prop := *)
-  (* | disjoint_intro *)
-  (*     (DISJOINT: forall loc, Cell.disjoint (lhs loc) (rhs loc)) *)
-  (* . *)
-
-  (* Global Program Instance disjoint_Symmetric: Symmetric disjoint. *)
-  (* Next Obligation. *)
-  (*   econs. ii. symmetry. apply H. *)
-  (* Qed. *)
 
   Definition bot: t := fun _ => Cell.bot.
 
@@ -120,14 +111,16 @@ Module Memory.
 
   Definition singleton
              (loc:Loc.t) (from to:Time.t) (val:Const.t) (released:option View.t)
-             (LT: Time.lt from to): t :=
-    (LocFun.add loc (Cell.singleton val released LT)
+             (LT: Time.lt from to)
+             (WF: View.opt_wf released): t :=
+    (LocFun.add loc (Cell.singleton val LT WF)
                 (fun _ => Cell.bot)).
 
   Lemma singleton_get
-        loc from to val released (LT:Time.lt from to)
-        l t:
-    get l t (singleton loc val released LT) =
+        loc from to val released l t
+        (LT:Time.lt from to)
+        (WF: View.opt_wf released):
+    get l t (singleton loc val LT WF) =
     if Loc.eq_dec l loc
     then if Time.eq_dec t to
          then Some (from, Message.mk val released)
@@ -151,6 +144,7 @@ Module Memory.
       (PLN: closed_timemap view.(View.pln) mem)
       (RLX: closed_timemap view.(View.rlx) mem)
   .
+  Hint Constructors closed_view.
 
   Inductive closed_opt_view: forall (view:option View.t) (mem:t), Prop :=
   | closed_opt_view_some
@@ -161,18 +155,22 @@ Module Memory.
       mem:
       closed_opt_view None mem
   .
+  Hint Constructors closed_opt_view.
 
   Definition inhabited (mem:t): Prop :=
     forall loc, get loc Time.bot mem = Some (Time.bot, Message.elt).
+  Hint Unfold inhabited.
 
   Inductive closed (mem:t): Prop :=
   | closed_intro
-      (CLOSED: forall loc from to val released (MSG: get loc to mem = Some (from, Message.mk val released)),
+      (CLOSED: forall loc from to val released
+                 (MSG: get loc to mem = Some (from, Message.mk val released)),
           <<WF: View.opt_wf released>> /\
           <<TS: Time.le (released.(View.unwrap).(View.rlx) loc) to>> /\
           <<CLOSED: closed_opt_view released mem>>)
       (INHABITED: inhabited mem)
   .
+  Hint Constructors closed.
 
   Lemma closed_timemap_bot
         mem
@@ -200,45 +198,51 @@ Module Memory.
     econs; i; ss.
     unfold get, init, Cell.get, Cell.init in MSG. ss.
     unfold Cell.Raw.singleton in MSG. ss. apply DOMap.singleton_find_inv in MSG. des. inv MSG0.
-    splits; ss.
-    - econs.
-    - refl.
-    - unfold init. econs.
+    splits; ss. refl.
   Qed.
 
-  Inductive add (mem1:t) (loc:Loc.t) (from to:Time.t) (val:Const.t) (released:option View.t): forall (mem2:t), Prop :=
+  Inductive add (mem1:t) (loc:Loc.t) (from to:Time.t) (val:Const.t) (released:option View.t) (mem2:t): Prop :=
   | add_intro
       r
-      (ADD: Cell.add (mem1 loc) from to val released r):
-      add mem1 loc from to val released (LocFun.add loc r mem1)
+      (ADD: Cell.add (mem1 loc) from to val released r)
+      (MEM2: mem2 = LocFun.add loc r mem1):
+      add mem1 loc from to val released mem2
   .
+  Hint Constructors add.
 
-  Inductive split (mem1:t) (loc:Loc.t) (ts1 ts2 ts3:Time.t) (val2 val3:Const.t) (released2 released3:option View.t): forall (mem2:t), Prop :=
+  Inductive split (mem1:t) (loc:Loc.t) (ts1 ts2 ts3:Time.t) (val2 val3:Const.t) (released2 released3:option View.t) (mem2:t): Prop :=
   | split_intro
       r
-      (SPLIT: Cell.split (mem1 loc) ts1 ts2 ts3 val2 val3 released2 released3 r):
-      split mem1 loc ts1 ts2 ts3 val2 val3 released2 released3 (LocFun.add loc r mem1)
+      (SPLIT: Cell.split (mem1 loc) ts1 ts2 ts3 val2 val3 released2 released3 r)
+      (MEM2: mem2 = LocFun.add loc r mem1):
+      split mem1 loc ts1 ts2 ts3 val2 val3 released2 released3 mem2
   .
+  Hint Constructors split.
 
-  Inductive lower (mem1:t) (loc:Loc.t) (from to:Time.t) (val:Const.t) (released1 released2:option View.t): forall (mem2:t), Prop :=
+  Inductive lower (mem1:t) (loc:Loc.t) (from to:Time.t) (val:Const.t) (released1 released2:option View.t) (mem2:t): Prop :=
   | lower_intro
       r
-      (LOWER: Cell.lower (mem1 loc) from to val released1 released2 r):
-      lower mem1 loc from to val released1 released2 (LocFun.add loc r mem1)
+      (LOWER: Cell.lower (mem1 loc) from to val released1 released2 r)
+      (MEM2: mem2 = LocFun.add loc r mem1):
+      lower mem1 loc from to val released1 released2 mem2
   .
+  Hint Constructors lower.
 
-  Inductive remove (mem1:t) (loc:Loc.t) (from1 to1:Time.t) (val1:Const.t) (released1:option View.t): forall (mem2:t), Prop :=
+  Inductive remove (mem1:t) (loc:Loc.t) (from1 to1:Time.t) (val1:Const.t) (released1:option View.t) (mem2:t): Prop :=
   | remove_intro
       r
-      (REMOVE: Cell.remove (mem1 loc) from1 to1 val1 released1 r):
-      remove mem1 loc from1 to1 val1 released1 (LocFun.add loc r mem1)
+      (REMOVE: Cell.remove (mem1 loc) from1 to1 val1 released1 r)
+      (MEM2: mem2 = LocFun.add loc r mem1):
+      remove mem1 loc from1 to1 val1 released1 mem2
   .
+  Hint Constructors remove.
 
   Inductive op_kind :=
   | op_kind_add
   | op_kind_split (ts3:Time.t) (val3:Const.t) (released3:option View.t)
   | op_kind_lower (released1:option View.t)
   .
+  Hint Constructors op_kind.
 
   Inductive op_kind_match: forall (k1 k2:op_kind), Prop :=
   | op_kind_match_add:
@@ -257,11 +261,14 @@ Module Memory.
         (op_kind_lower r2)
   .
 
+  Definition op_kind_is_add kind :=
+    match kind with op_kind_add => true | _ => false end.
+
+  Definition op_kind_is_split kind :=
+    match kind with op_kind_split _ _ _ => true | _ => false end.
+
   Definition op_kind_is_lower (kind:op_kind): bool :=
-    match kind with
-    | op_kind_lower rel => true
-    | _ => false
-    end.
+    match kind with op_kind_lower _ => true | _ => false end.
 
   Inductive op mem1 loc from to val rel mem2: forall (kind:op_kind), Prop :=
   | op_add
@@ -276,6 +283,7 @@ Module Memory.
       (LOWER: lower mem1 loc from to val rel0 rel mem2):
       op mem1 loc from to val rel mem2 (op_kind_lower rel0)
   .
+  Hint Constructors op.
 
   Inductive future_imm (mem1 mem2:t): Prop :=
   | future_imm_intro
@@ -284,9 +292,10 @@ Module Memory.
       (CLOSED: closed_opt_view released mem2)
       (TS: Time.le (released.(View.unwrap).(View.rlx) loc) to)
   .
+  Hint Constructors future_imm.
 
   Definition future := rtc future_imm.
-
+  Hint Unfold future.
 
   Inductive promise
             (promises1 mem1:t)
@@ -310,6 +319,7 @@ Module Memory.
       (TS: Time.le (released.(View.unwrap).(View.rlx) loc) to):
       promise promises1 mem1 loc from to val released promises2 mem2 (op_kind_lower released0)
   .
+  Hint Constructors promise.
 
   Inductive write
             (promises1 mem1:t)
@@ -320,6 +330,7 @@ Module Memory.
       (PROMISE: promise promises1 mem1 loc from1 to1 val1 released1 promises2 mem2 kind)
       (REMOVE: remove promises2 loc from1 to1 val1 released1 promises3)
   .
+  Hint Constructors write.
 
   (* Lemmas on add, split, lower & remove *)
 
@@ -560,6 +571,18 @@ Module Memory.
       + i. right. esplits; eauto. refl.
   Qed.
 
+  Lemma op_inhabited kind
+        mem1 mem2 loc from to val released
+        (OP: op mem1 loc from to val released mem2 kind)
+        (INHABITED: inhabited mem1):
+    inhabited mem2.
+  Proof.
+    inv OP.
+    - eapply add_inhabited; eauto.
+    - eapply split_inhabited; eauto.
+    - eapply lower_inhabited; eauto.
+  Qed.
+
   Lemma future_get1
         loc from to val released mem1 mem2
         (LE: future mem1 mem2)
@@ -574,7 +597,6 @@ Module Memory.
     i. inv H. exploit op_get1; eauto. i. des.
     exploit IHLE; eauto. i. des.
     esplits; eauto.
-    etrans; eauto.
   Qed.
 
 
@@ -977,9 +999,9 @@ Module Memory.
       <<RELEASED: View.opt_le r' r>>.
   Proof.
     inv PROMISE.
-    - eapply op_get1; eauto. econs 1. eauto.
-    - eapply op_get1; eauto. econs 2. eauto.
-    - eapply op_get1; eauto. econs 3. eauto.
+    - eapply op_get1; eauto.
+    - eapply op_get1; eauto.
+    - eapply op_get1; eauto.
   Qed.
 
   Lemma promise_get2
@@ -987,10 +1009,7 @@ Module Memory.
         (PROMISE: promise promises1 mem1 loc from to val released promises2 mem2 kind):
     get loc to promises2 = Some (from, Message.mk val released).
   Proof.
-    inv PROMISE.
-    - eapply op_get2. econs 1. eauto.
-    - eapply op_get2. econs 2. eauto.
-    - eapply op_get2. econs 3. eauto.
+    inv PROMISE; eapply op_get2; eauto.
   Qed.
 
   Lemma promise_promises_get1
@@ -1003,22 +1022,7 @@ Module Memory.
       <<FROM: Time.le f f'>> /\
       <<RELEASED: View.opt_le r' r>>.
   Proof.
-    inv PROMISE.
-    - eapply op_get1; eauto. econs 1. eauto.
-    - eapply op_get1; eauto. econs 2. eauto.
-    - eapply op_get1; eauto. econs 3. eauto.
-  Qed.
-
-  Lemma op_future0
-        mem1 loc from to val released mem2 kind
-        (INHABITED1: inhabited mem1)
-        (OP: op mem1 loc from to val released mem2 kind):
-    inhabited mem2.
-  Proof.
-    inv OP.
-    - eapply add_inhabited; eauto.
-    - eapply split_inhabited; eauto.
-    - eapply lower_inhabited; eauto.
+    inv PROMISE; eapply op_get1; eauto.
   Qed.
 
   Lemma op_future
@@ -1030,12 +1034,12 @@ Module Memory.
     <<CLOSED2: closed mem2>> /\
     <<FUTURE: future mem1 mem2>>.
   Proof.
-    hexploit op_future0; try apply CLOSED1; eauto. i. splits; auto.
+    hexploit op_inhabited; try apply CLOSED1; eauto. i. splits; auto.
     - inv OP.
       + eapply add_closed; eauto.
       + eapply split_closed; eauto.
       + eapply lower_closed; eauto.
-    - econs 2; eauto. econs; eauto.
+    - econs 2; eauto.
   Qed.
 
   Lemma promise_future0
@@ -1048,7 +1052,7 @@ Module Memory.
     <<FINITE2: finite promises2>> /\
     <<INHABITED2: inhabited mem2>>.
   Proof.
-    hexploit op_future0; eauto.
+    hexploit op_inhabited; eauto.
     { eapply promise_op. eauto. }
     i. splits; ss. inv PROMISE.
     - splits; eauto.
@@ -1563,17 +1567,19 @@ Module Memory.
   Qed.
 
   Lemma remove_singleton
-        loc from to val released (LT:Time.lt from to):
-    remove (singleton loc val released LT) loc from to val released bot.
+        loc from to val released
+        (LT:Time.lt from to)
+        (WF: View.opt_wf released):
+    remove (singleton loc val LT WF) loc from to val released bot.
   Proof.
-    assert (bot = LocFun.add loc Cell.bot (singleton loc val released LT)).
+    assert (bot = LocFun.add loc Cell.bot (singleton loc val LT WF)).
     { apply ext. i. rewrite bot_get.
       unfold get, LocFun.add, LocFun.find. condtac.
       - rewrite Cell.bot_get. auto.
       - unfold singleton, LocFun.add, LocFun.find. condtac; [congr|].
         rewrite Cell.bot_get. auto.
     }
-    rewrite H. econs.
+    rewrite H. econs; ss.
     unfold singleton, LocFun.add, LocFun.find. condtac; [|congr].
     eapply Cell.remove_singleton.
   Qed.
@@ -1584,7 +1590,7 @@ Module Memory.
     exists mem2, remove mem1 loc from to val released mem2.
   Proof.
     exploit Cell.remove_exists; eauto. i. des.
-    eexists. econs. eauto.
+    eexists. econs; ss. eauto.
   Qed.
 
   Definition nonsynch_loc (loc:Loc.t) (mem:t): Prop :=

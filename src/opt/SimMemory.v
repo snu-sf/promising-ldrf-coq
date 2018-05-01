@@ -49,7 +49,7 @@ Next Obligation.
   ii. inv H. inv H0. econs; try etrans; eauto. i.
   exploit MSG0; eauto. i. des.
   exploit MSG; eauto. i. des.
-  esplits; eauto. etrans; eauto.
+  esplits; eauto.
 Qed.
 
 

@@ -900,12 +900,11 @@ Lemma lift_read
 Proof.
   inversion LOCAL. ss. subst.
   exploit mem_eqlerel_lift_get; eauto. i. des; eauto.
-  right. right. esplits; ss.
-  - econs; eauto. ss. eapply TViewFacts.readable_mon; eauto.
+  right. right. esplits; try exact REL; ss.
+  - econs; eauto. eapply TViewFacts.readable_mon; eauto.
     + apply CoMLE.
     + refl.
   - apply TViewFacts.read_tview_mon; eauto; try refl.
-  - auto.
 Qed.
 
 Lemma lift_mem_add
@@ -931,19 +930,16 @@ Proof.
   i. des. inv PMREL.
   - exploit MemoryReorder.add_add; try exact MEM; eauto. i. des.
     esplits; eauto; cycle 2.
-    + econs 1; eauto.
     + erewrite Memory.add_o; eauto. condtac; ss. des. subst. congr.
     + congr.
   - exploit MemoryReorder.split_add; try exact MEM; eauto. i. des.
     esplits; eauto; cycle 2.
-    + econs 2; eauto.
     + erewrite Memory.add_o; eauto. condtac; ss. des. subst. congr.
     + i. inv KIND.
       erewrite Memory.add_o; eauto. condtac; ss; eauto.
       des. subst. congr.
   - exploit MemoryReorder.lower_add; try exact MEM; eauto. i. des.
     esplits; eauto; cycle 2.
-    + econs 3; eauto.
     + erewrite Memory.add_o; eauto. condtac; ss. des. subst. congr.
     + congr.
 Qed.
@@ -979,7 +975,6 @@ Proof.
       i. des. congr.
     }
     esplits; eauto; cycle 2.
-    + econs 1; eauto.
     + erewrite Memory.split_o; eauto. repeat condtac; ss.
       { des. subst. exploit Memory.split_get0; try exact SPLIT2; eauto. i. des.
         revert GET2. erewrite Memory.add_o; eauto. condtac; ss.
@@ -993,7 +988,6 @@ Proof.
     i. des.
     { subst. exploit Memory.split_get0; try exact SPLITP2; eauto. i. des. congr. }
     esplits; eauto; cycle 2.
-    + econs 2; eauto.
     + erewrite Memory.split_o; eauto. repeat condtac; ss.
       * des. subst. exploit Memory.split_get0; try exact SPLIT2; eauto. i. des.
         revert GET2. erewrite Memory.split_o; eauto. condtac; ss.
@@ -1008,7 +1002,6 @@ Proof.
     unguardH FROM1. des.
     { inv FROM1. subst. exploit Memory.split_get0; try exact SPLITP2; eauto. i. des. congr. }
     inv FROM0. esplits; eauto; cycle 2.
-    + econs 3; eauto.
     + erewrite Memory.split_o; eauto. repeat condtac; ss.
       * des. subst. exploit Memory.split_get0; try exact SPLIT2; eauto. i. des.
         revert GET2. erewrite Memory.lower_o; eauto. condtac; ss.
@@ -1041,7 +1034,6 @@ Proof.
   - exploit MemoryReorder.add_lower; try exact MEM; eauto. i. des.
     { subst. erewrite Memory.lower_get0 in NOPRM; eauto. congr. }
     esplits; eauto; cycle 2.
-    + econs 1; eauto.
     + erewrite Memory.lower_o; eauto. condtac; ss. des. subst. congr.
     + congr.
   - exploit MemoryReorder.split_lower_diff; try exact MEM; eauto.
@@ -1051,7 +1043,6 @@ Proof.
     i. des.
     { subst. erewrite Memory.lower_get0 in NOPRM; eauto. congr. }
     esplits; eauto; cycle 2.
-    + econs 2; eauto.
     + erewrite Memory.lower_o; eauto. condtac; ss. des. subst. congr.
     + i. inv KIND. erewrite Memory.lower_o; eauto. condtac; ss.
       * des. subst. exploit DISJ; eauto.
@@ -1060,7 +1051,6 @@ Proof.
   - exploit MemoryReorder.lower_lower; try exact MEM; eauto. i. des.
     { subst. erewrite Memory.lower_get0 in NOPRM; eauto. congr. }
     esplits; eauto; cycle 2.
-    + econs 3; eauto.
     + erewrite Memory.lower_o; eauto. condtac; ss. des. subst. congr.
     + congr.
 Qed.
@@ -1077,11 +1067,11 @@ Lemma lift_mem_promise
 Proof.
   inv PROMISE2.
   - exploit lift_mem_add; eauto. i. des.
-    esplits; eauto. econs; eauto.
+    esplits; eauto.
   - exploit lift_mem_split; eauto. i. des.
-    esplits; eauto. econs; eauto.
+    esplits; eauto.
   - exploit lift_mem_lower; eauto. i. des.
-    esplits; eauto. econs; eauto.
+    esplits; eauto.
 Qed.
 
 Lemma mem_eqlerel_lift_promise
@@ -1141,10 +1131,9 @@ Proof.
   hexploit MemoryMerge.promise_promise_promise; try exact PROMISE1; eauto. i.
   esplits; eauto.
   - econs; eauto.
-    + eapply TViewFacts.writable_mon; eauto.
-      * apply CoMLE.
-      * refl.
-    + econs; eauto.
+    eapply TViewFacts.writable_mon; eauto.
+    + apply CoMLE.
+    + refl.
   - apply TViewFacts.write_tview_mon; auto. refl.
   - inv MEMLE'. econs; eauto.
     + etrans; eauto.

@@ -237,8 +237,7 @@ Module Configuration.
         auto.
     - ii. simplify; eauto.
       eapply CONSISTENT1; eauto.
-      + s. repeat (etrans; eauto).
-      + s. repeat (etrans; eauto).
+      s. repeat (etrans; eauto).
   Qed.
 
   Lemma step_disjoint
@@ -297,8 +296,7 @@ Module Configuration.
       i. des.
       exploit Thread.step_disjoint; eauto. s. i. des.
       eapply CONSISTENT; eauto.
-      + s. etrans; eauto. etrans; eauto.
-      + s. etrans; eauto. etrans; eauto.
+      s. etrans; eauto. etrans; eauto.
   Qed.
 
   Lemma opt_step_future

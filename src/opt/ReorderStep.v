@@ -627,8 +627,7 @@ Proof.
   exploit Local.read_step_future; try exact STEP6; eauto; try by viewtac. i. des.
   exploit sim_local_fulfill; try exact STEP4; try exact LOCAL0; try refl; eauto. i. des.
   esplits; eauto.
-  - etrans; eauto.
-  - etrans; eauto.
+  etrans; eauto.
 Qed.
 
 Lemma reorder_update_write

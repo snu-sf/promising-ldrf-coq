@@ -177,8 +177,7 @@ Proof.
   { apply WF1_TGT. }
   i. des. esplits.
   - econs; eauto.
-    + etrans; eauto.
-    + inv WRITABLE. econs; ss. eapply TimeFacts.le_lt_lt; [apply LOCAL1|apply TS].
+    inv WRITABLE. econs; ss. eapply TimeFacts.le_lt_lt; [apply LOCAL1|apply TS].
   - econs; eauto. s.
     unfold TView.write_tview, View.singleton_ur_if. repeat (condtac; aggrtac).
     econs; repeat (condtac; aggrtac);

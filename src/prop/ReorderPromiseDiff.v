@@ -118,9 +118,9 @@ Proof.
         - eapply Memory.split_get0. eauto.
       }
       i. des.
-      { subst. exfalso. eapply Memory.disjoint_get'; try (symmetry; apply DISJ).
+      { subst. exfalso. eapply Memory.disjoint_get_general; try (symmetry; apply DISJ).
         - inv MEM. inv SPLIT. apply TS12.
-        - inv PROMISES. inv SPLIT. apply TS23.
+        - inv PROMISES. inv SPLIT. apply Time.le_lteq. left. apply TS23.
         - eapply Memory.split_get0. eauto.
         - eapply Memory.split_get0. eauto.
       }
@@ -137,9 +137,9 @@ Proof.
         - eapply Memory.lower_get0. eauto.
       }
       i. des.
-      { subst. exfalso. eapply Memory.disjoint_get'; try (symmetry; apply DISJ).
+      { subst. exfalso. eapply Memory.disjoint_get_general; try (symmetry; apply DISJ).
         - inv MEM1. inv LOWER. eauto.
-        - inv MEM. inv SPLIT. eauto.
+        - inv MEM. inv SPLIT. apply Time.le_lteq. left. eauto.
         - eapply Memory.lower_get0. eauto.
         - eapply Memory.split_get0. eauto.
       }

@@ -301,15 +301,14 @@ Module SimPromises.
         try by inv MEM; inv LOWER.
       { apply INV1. eauto. }
       { unfold none_if. condtac; ss.
-        - econs.
-        - inv MEM. inv LOWER. ss.
+        inv MEM. inv LOWER. ss.
       }
       { unfold none_if. condtac; try refl.
         inv MEM. inv LOWER. ss.
       }
       i. des.
       exploit Memory.lower_exists_le; try apply LE1_SRC; eauto. i. des.
-      exploit sim_memory_lower; try apply SIM1; eauto.
+      exploit sim_memory_lower; try exact SIM1; try exact x1; try exact x2; eauto.
       { unfold none_if. condtac; try refl. econs. }
       i. esplits; eauto.
       + econs 3; eauto.
@@ -504,26 +503,21 @@ Module SimPromises.
       { inv ADD. inv ADD0. auto. }
       { econs. eapply Memory.max_released_wf; eauto. }
       i. des.
-      exploit sim_memory_add; try exact SIM1; eauto.
+      exploit sim_memory_add; try exact SIM1; try exact ADD; try exact x0; eauto.
       { erewrite Memory.max_released_spec; try exact ADD; eauto.
         econs. apply sim_memory_max_released; auto.
       }
       i.
       exploit Memory.max_released_closed; eauto. i. des.
       esplits.
-      + econs 2; eauto. econs.
-        * econs 1. eauto.
-        * econs. eauto.
-        * eauto.
+      + econs 2; eauto.
       + ii. erewrite Memory.add_o; eauto. condtac; ss; eauto.
         des. subst. exploit LE1_TGT; eauto. erewrite Memory.add_get0; eauto. congr.
       + auto.
     - esplits; eauto.
-      + refl.
-      + etrans; eauto. eapply split_sim_memory. eauto.
+      etrans; eauto. eapply split_sim_memory. eauto.
     - esplits; eauto.
-      + refl.
-      + etrans; eauto. eapply lower_sim_memory. eauto.
+      etrans; eauto. eapply lower_sim_memory. eauto.
   Qed.
 
   Lemma future_aux
@@ -546,10 +540,10 @@ Module SimPromises.
     revert INV1 SIM1 LE1_SRC LE1_TGT LE2_SRC CLOSED1_SRC CLOSED1_TGT.
     revert inv promises_src promises_tgt mem1_tgt.
     induction FUTURE_SRC; i.
-    { esplits; eauto. refl. }
+    { esplits; eauto. }
     assert (LE_SRC: Memory.le promises_src y).
     { ii. exploit LE1_SRC; eauto. i. destruct msg.
-      exploit Memory.future_get1; try exact x0; eauto.
+      exploit Memory.future_get1; try exact x0.
       { econs 2; [|refl]. eauto. }
       i. des.
       exploit Memory.future_get1; try exact GET; eauto. i. des.
@@ -560,7 +554,7 @@ Module SimPromises.
     }
     exploit future_aux_imm; eauto. i. des.
     exploit IHFUTURE_SRC; eauto.
-    { eapply Memory.future_closed; try exact CLOSED1_SRC; eauto. econs 2; eauto. }
+    { eapply Memory.future_closed; try exact CLOSED1_SRC; eauto. }
     { eapply Memory.future_closed; try exact CLOSED1_TGT; eauto. }
     i. des.
     esplits.

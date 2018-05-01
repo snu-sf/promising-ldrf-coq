@@ -339,8 +339,7 @@ Proof.
     + ii. inv H.
       revert TID0. rewrite IdentMap.gsspec. condtac; ss; i.
       * inv TID0. ss. eapply FULFILLED.
-        destruct msg0. hexploit Memory.op_get_inv; eauto.
-        { econs 3. eauto. }
+        destruct msg0. hexploit Memory.op_get_inv; try exact PROMISES0; eauto.
         i. des.
         { subst. econs; eauto. eapply Memory.lower_get0. eauto. }
         { econs; eauto. }

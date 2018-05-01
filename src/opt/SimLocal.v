@@ -178,8 +178,7 @@ Proof.
   { apply WF1_TGT. }
   i. des. esplits.
   - econs; eauto.
-    + etrans; eauto.
-    + eapply TViewFacts.writable_mon; eauto. apply LOCAL1.
+    eapply TViewFacts.writable_mon; eauto. apply LOCAL1.
   - econs; eauto. s. apply TViewFacts.write_tview_mon; auto.
     + apply LOCAL1.
     + apply WF1_TGT.

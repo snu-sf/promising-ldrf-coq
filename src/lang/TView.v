@@ -675,7 +675,7 @@ Module TViewFacts.
         (OP: Memory.op mem1 loc from to val released mem2 kind):
     TView.closed (TView.write_tview tview1 sc1 loc to ord) mem2.
   Proof.
-    hexploit Memory.op_future0; eauto; try by tac. i. des.
+    hexploit Memory.op_inhabited; eauto; try by tac. i. des.
     unfold TView.write_tview.
     econs; repeat (try condtac; tac);
       (try by eapply Memory.op_closed_view; eauto; apply CLOSED2);
@@ -690,7 +690,7 @@ Module TViewFacts.
         (OP: Memory.op mem1 loc from to val released mem2 kind):
     Memory.closed_timemap sc1 mem2.
   Proof.
-    hexploit Memory.op_future0; eauto; try by tac. i. des.
+    hexploit Memory.op_inhabited; eauto; try by tac. i. des.
     eapply Memory.op_closed_timemap; eauto.
   Qed.
 
@@ -703,7 +703,7 @@ Module TViewFacts.
         (OP: Memory.op mem1 loc from to val released mem2 kind):
     Memory.closed_opt_view (TView.write_released tview1 sc1 loc to releasedm ord) mem2.
   Proof.
-    hexploit Memory.op_future0; eauto; try by tac. i. des.
+    hexploit Memory.op_inhabited; eauto; try by tac. i. des.
     unfold TView.write_released. condtac; econs.
     apply Memory.join_closed_view.
     - eapply Memory.op_closed_view; eauto.

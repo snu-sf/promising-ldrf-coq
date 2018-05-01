@@ -75,8 +75,6 @@ Proof.
     exploit IHSTEPS; eauto.
     intros []; i.
     econs; swap 5 8; eauto.
-    etrans; [|apply STEPS0].
-    econs; eauto 10.
   - exploit thread_step_unset_promises; eauto; s; eauto.
     i. des. econs; eauto 20.
 Qed.
@@ -122,8 +120,6 @@ Proof.
     exploit IHSTEPS; eauto.
     intros []; i.
     econs; swap 5 8; eauto.
-    etrans; [|apply STEPS0].
-    econs; eauto 10.
   - exploit thread_step_unset_promises; eauto; s; eauto.
     i; des. econs; eauto.
 Qed.
@@ -1075,8 +1071,7 @@ Proof.
     { ii. eapply PRCONSIS; eauto. }
     { apply can_fulfill_promises_promise_consistent in FULFILL2; eauto.
       eapply promise_consistent_th_rtc_small_step, FULFILL2; eauto.
-      etrans; [|apply STEPS1].
-      econs 2; [|reflexivity]; eauto. }
+    }
     { inv WF3; eauto. }
   }
   { by rewrite PROMISE0. }
@@ -1097,4 +1092,3 @@ Proof.
   econs; eauto.
   by rewrite THS; setoid_rewrite IdentMap.Properties.F.map_o; rewrite TH0.
 Qed.
-

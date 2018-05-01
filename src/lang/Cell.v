@@ -32,18 +32,23 @@ Module Cell.
         (VOLUME: forall from to msg
                    (GET: DOMap.find to cell = Some (from, msg)),
             (from, to) = (Time.bot, Time.bot) \/ Time.lt from to)
+        (WF: forall from to val released
+               (GET: DOMap.find to cell = Some (from, Message.mk val released)),
+            View.opt_wf released)
         (DISJOINT: forall to1 to2 from1 from2 msg1 msg2
                      (GET1: DOMap.find to1 cell = Some (from1, msg1))
                      (GET2: DOMap.find to2 cell = Some (from2, msg2))
                      (NEQ: to1 <> to2),
             Interval.disjoint (from1, to1) (from2, to2))
     .
+    Hint Constructors wf.
 
     Definition bot: t := DOMap.empty _.
 
     Lemma bot_wf: wf bot.
     Proof.
       econs; i.
+      - rewrite DOMap.gempty in GET. inv GET.
       - rewrite DOMap.gempty in GET. inv GET.
       - rewrite DOMap.gempty in GET1. inv GET1.
     Qed.
@@ -53,12 +58,13 @@ Module Cell.
 
     Lemma singleton_wf
           from to val released
-          (LT: Time.lt from to):
+          (LT: Time.lt from to)
+          (WF: View.opt_wf released):
       wf (singleton from to val released).
     Proof.
       unfold singleton. econs; s; i.
-      - apply DOMap.singleton_find_inv in GET. des. inv GET0.
-        auto.
+      - apply DOMap.singleton_find_inv in GET. des. inv GET0. auto.
+      - apply DOMap.singleton_find_inv in GET. des. inv GET0. auto.
       - apply DOMap.singleton_find_inv in GET1. des. inv GET0.
         apply DOMap.singleton_find_inv in GET2. des. inv GET0.
         congr.
@@ -70,8 +76,8 @@ Module Cell.
     Lemma init_wf: wf init.
     Proof.
       unfold init. econs; s; i.
-      - apply DOMap.singleton_find_inv in GET. des. inv GET0.
-        auto.
+      - apply DOMap.singleton_find_inv in GET. des. inv GET0. auto.
+      - apply DOMap.singleton_find_inv in GET. des. inv GET0. auto.
       - apply DOMap.singleton_find_inv in GET1. des. inv GET0.
         apply DOMap.singleton_find_inv in GET2. des. inv GET0.
         congr.
@@ -88,15 +94,16 @@ Module Cell.
       right. econs; eauto. refl.
     Qed.
 
-    Inductive add (cell1:t) (from to:Time.t) (val:Const.t) (released:option View.t): forall (rhs:t), Prop :=
+    Inductive add (cell1:t) (from to:Time.t) (val:Const.t) (released:option View.t) (cell2:t): Prop :=
     | add_intro
         (DISJOINT: forall to2 from2 msg2
                      (GET2: DOMap.find to2 cell1 = Some (from2, msg2)),
             Interval.disjoint (from, to) (from2, to2))
         (TO: Time.lt from to)
-        (WF: View.opt_wf released):
-        add cell1 from to val released (DOMap.add to (from, (Message.mk val released)) cell1)
-    .
+        (WF: View.opt_wf released)
+        (CELL2: cell2 = DOMap.add to (from, (Message.mk val released)) cell1):
+        add cell1 from to val released cell2.
+    Hint Constructors add.
 
     Lemma add_o
           cell2 cell1 from to val released
@@ -114,13 +121,17 @@ Module Cell.
     Lemma add_wf
           cell1 from to val released cell2
           (ADD: add cell1 from to val released cell2)
-          (CELL1: wf cell1):
-      wf cell2.
+          (CELL1: wf cell1)
+      :
+        wf cell2.
     Proof.
       inv CELL1. econs; i.
       - revert GET. erewrite add_o; eauto. condtac; auto.
         + i. inv GET. inv ADD. auto.
         + i. eapply VOLUME; eauto.
+      - revert GET. erewrite add_o; eauto. condtac; auto.
+        + i. inv GET. inv ADD. auto.
+        + i. eapply WF; eauto.
       - revert GET1 GET2.
         erewrite (add_o to1); eauto.
         erewrite (add_o to2); eauto.
@@ -131,27 +142,30 @@ Module Cell.
         + eapply DISJOINT; eauto.
     Qed.
 
-    Inductive split (cell1:t) (ts1 ts2 ts3:Time.t) (val2 val3:Const.t) (released2 released3:option View.t): forall (cell2:t), Prop :=
+    Inductive split (cell1:t) (ts1 ts2 ts3:Time.t) (val2 val3:Const.t) (released2 released3:option View.t) (cell2:t): Prop :=
     | split_intro
         (GET2: DOMap.find ts3 cell1 = Some (ts1, Message.mk val3 released3))
         (TS12: Time.lt ts1 ts2)
         (TS23: Time.lt ts2 ts3)
-        (REL_WF: View.opt_wf released2):
-        split cell1 ts1 ts2 ts3 val2 val3 released2 released3
-              (DOMap.add ts2 (ts1, Message.mk val2 released2)
-              (DOMap.add ts3 (ts2, Message.mk val3 released3) cell1))
+        (REL_WF: View.opt_wf released2)
+        (CELL2: cell2 = DOMap.add ts2 (ts1, Message.mk val2 released2)
+                                  (DOMap.add ts3 (ts2, Message.mk val3 released3) cell1))
+      :
+        split cell1 ts1 ts2 ts3 val2 val3 released2 released3 cell2
     .
+    Hint Constructors split.
 
     Lemma split_o
           cell2 cell1 ts1 ts2 ts3 val2 val3 released2 released3
           t
-          (SPLIT: split cell1 ts1 ts2 ts3 val2 val3 released2 released3 cell2):
-      DOMap.find t cell2 =
-      if Time.eq_dec t ts2
-      then Some (ts1, Message.mk val2 released2)
-      else if Time.eq_dec t ts3
-           then Some (ts2, Message.mk val3 released3)
-           else DOMap.find t cell1.
+          (SPLIT: split cell1 ts1 ts2 ts3 val2 val3 released2 released3 cell2)
+      :
+        DOMap.find t cell2 =
+        if Time.eq_dec t ts2
+        then Some (ts1, Message.mk val2 released2)
+        else if Time.eq_dec t ts3
+             then Some (ts2, Message.mk val3 released3)
+             else DOMap.find t cell1.
     Proof.
       inv SPLIT. rewrite ? DOMap.gsspec.
       repeat condtac; repeat subst; try congr.
@@ -168,6 +182,10 @@ Module Cell.
         + i. inv GET. inv SPLIT. auto.
         + i. inv GET. inv SPLIT. auto.
         + i. eapply VOLUME; eauto.
+      - revert GET. erewrite split_o; eauto. repeat condtac; auto.
+        + i. inv GET. inv SPLIT. eauto.
+        + i. inv GET. inv SPLIT. eauto.
+        + i. eapply WF; eauto.
       - revert GET1 GET2.
         erewrite (split_o to1); eauto.
         erewrite (split_o to2); eauto.
@@ -204,6 +222,7 @@ Module Cell.
         lower cell1 from to val released1 released2
               (DOMap.add to (from, Message.mk val released2) cell1)
     .
+    Hint Constructors lower.
 
     Lemma lower_o
           cell2 cell1 from to val released1 released2
@@ -221,13 +240,18 @@ Module Cell.
     Lemma lower_wf
           cell2 cell1 from to val released1 released2
           (LOWER: lower cell1 from to val released1 released2 cell2)
-          (CELL1: wf cell1):
-      wf cell2.
+          (CELL1: wf cell1)
+          (RELEASED2: View.opt_wf released2)
+      :
+        wf cell2.
     Proof.
       inv CELL1. econs; i.
       - revert GET. erewrite lower_o; eauto. condtac; auto.
         + i. inv GET. inv LOWER. eapply VOLUME. eauto.
         + i. eapply VOLUME; eauto.
+      - revert GET. erewrite lower_o; eauto. condtac.
+        + i. inv GET. inv LOWER. auto.
+        + i. eapply WF. eauto.
       - revert GET1 GET2.
         erewrite (lower_o to1); eauto.
         erewrite (lower_o to2); eauto.
@@ -242,6 +266,7 @@ Module Cell.
         (GET: DOMap.find to cell1 = Some (from, Message.mk val released)):
         remove cell1 from to val released (DOMap.remove to cell1)
     .
+    Hint Constructors remove.
 
     Lemma remove_o
           cell2 cell1 from to val released
@@ -265,6 +290,7 @@ Module Cell.
       inv CELL1. econs; i.
       - revert GET. erewrite remove_o; eauto. condtac; try congr.
         i. eapply VOLUME; eauto.
+      - revert GET. erewrite remove_o; eauto. condtac; ss. apply WF.
       - revert GET1 GET2.
         erewrite (remove_o to1); eauto.
         erewrite (remove_o to2); eauto.
@@ -310,13 +336,15 @@ Module Cell.
 
   Definition singleton
              (from to:Time.t) (val:Const.t) (released:option View.t)
-             (LT: Time.lt from to): t :=
-    mk (Raw.singleton_wf val released LT).
+             (LT: Time.lt from to)
+             (WF: View.opt_wf released): t :=
+    mk (Raw.singleton_wf val LT WF).
 
   Lemma singleton_get
-        from to val released (LT:Time.lt from to)
-        t:
-    get t (singleton val released LT) =
+        from to val released t
+        (LT: Time.lt from to)
+        (WF: View.opt_wf released):
+    get t (singleton val LT WF) =
     if Loc.eq_dec t to
     then Some (from, Message.mk val released)
     else None.
@@ -410,9 +438,9 @@ Module Cell.
         (WF: View.opt_wf released):
     exists cell2, add cell1 from to val released cell2.
   Proof.
-    destruct cell1. eexists (mk _). unfold add. econs; eauto.
-  Grab Existential Variables.
-    eapply Raw.add_wf; eauto. econs; eauto.
+    destruct cell1. eexists (mk _). econs; s; eauto.
+    Grab Existential Variables.
+    eapply Raw.add_wf; eauto.
   Qed.
 
   Lemma add_exists_max_ts
@@ -429,8 +457,8 @@ Module Cell.
 
   Lemma add_exists_le
         promises1 cell1 from to val released cell2
-        (LE: le promises1 cell1)
-        (ADD: add cell1 from to val released cell2):
+        (ADD: add cell1 from to val released cell2)
+        (LE: le promises1 cell1):
     exists promises2, add promises1 from to val released promises2.
   Proof.
     inv ADD. apply add_exists; auto. i.
@@ -445,9 +473,9 @@ Module Cell.
         (REL_WF: View.opt_wf released2):
     exists cell2, split cell1 ts1 ts2 ts3 val2 val3 released2 released3 cell2.
   Proof.
-    destruct cell1. eexists (mk _). unfold split. econs; eauto.
+    destruct cell1. eexists (mk _). econs; s; eauto.
   Grab Existential Variables.
-    eapply Raw.split_wf; eauto. econs; eauto.
+    eapply Raw.split_wf; eauto.
   Qed.
 
   Lemma split_exists_le
@@ -469,7 +497,7 @@ Module Cell.
   Proof.
     destruct cell1. eexists (mk _). unfold lower. econs; eauto.
   Grab Existential Variables.
-    eapply Raw.lower_wf; eauto. econs; eauto.
+    eapply Raw.lower_wf; eauto.
   Qed.
 
   Lemma lower_exists_le
@@ -559,8 +587,8 @@ Module Cell.
 
   Lemma add_max_ts
         cell1 to val released cell2
-        (INHABITED: get Time.bot cell1 = Some (Time.bot, Message.elt))
-        (ADD: add cell1 (max_ts cell1) to val released cell2):
+        (ADD: add cell1 (max_ts cell1) to val released cell2)
+        (INHABITED: get Time.bot cell1 = Some (Time.bot, Message.elt)):
     max_ts cell2 = to.
   Proof.
     hexploit add_inhabited; eauto. i. des.
@@ -574,10 +602,12 @@ Module Cell.
   Qed.
 
   Lemma remove_singleton
-        from to val released (LT:Time.lt from to):
-    remove (singleton val released LT) from to val released bot.
+        from to val released
+        (LT:Time.lt from to)
+        (WF: View.opt_wf released):
+    remove (singleton val LT WF) from to val released bot.
   Proof.
-    assert (Raw.bot = DOMap.remove to ((singleton val released LT).(raw))).
+    assert (Raw.bot = DOMap.remove to ((singleton val LT WF).(raw))).
     { apply DOMap.eq_leibniz. ii.
       unfold Raw.bot. rewrite DOMap.gempty.
       rewrite DOMap.grspec. condtac; auto.
@@ -600,4 +630,13 @@ Module Cell.
       - apply WF.
     }
   Qed.
+
+  Lemma get_opt_wf
+        cell from to val released
+        (GET: get to cell = Some (from, Message.mk val released)):
+    View.opt_wf released.
+  Proof.
+    destruct cell. destruct WF0. eauto.
+  Qed.
+
 End Cell.

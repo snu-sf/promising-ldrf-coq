@@ -48,7 +48,6 @@ Lemma with_pre_rtc_union
 Proof.
   ginduction STEPS; s; i; subst; eauto.
   i. etrans; eauto.
-  econs 2; [|reflexivity]. eauto.
 Qed.
 
 Lemma rtc_union_with_pre

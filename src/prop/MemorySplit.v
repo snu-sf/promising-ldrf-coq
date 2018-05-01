@@ -35,7 +35,7 @@ Module MemorySplit.
     erewrite <- LocFun.add_add_eq.
     destruct r. ss. subst.
     esplits.
-    - econs. instantiate (1 := Cell.mk _). econs; eauto.
+    - econs; ss. instantiate (1 := Cell.mk _). econs; eauto.
     - econs; eauto. unfold LocFun.add. condtac; [|congr].
       unfold Cell.remove. s.
       replace (DOMap.remove to (Cell.raw (mem0 loc))) with
@@ -49,11 +49,8 @@ Module MemorySplit.
       + econs. rewrite DOMap.gss. auto.
       + apply DOMap.eq_leibniz. ii.
         rewrite ? DOMap.grspec, DOMap.gsspec. condtac; auto.
-        Grab Existential Variables.
-        { eapply Cell.Raw.lower_wf; eauto.
-          - econs; eauto.
-          - apply mem0.
-        }
+  Grab Existential Variables.
+    { eapply Cell.Raw.lower_wf; eauto. apply mem0. }
   Qed.
 
   Lemma remove_promise_remove
@@ -126,7 +123,7 @@ Module MemorySplit.
     exploit LE; eauto. i.
     exploit Memory.split_exists; eauto. i. des.
     exploit commute_remove_split_remove_remove; try exact REMOVE; eauto. i. des.
-    esplits; eauto. econs; eauto.
+    esplits; eauto.
   Qed.
 
   Lemma commute_add_split_add_add

@@ -112,8 +112,7 @@ Proof.
   i. des.
   esplits; eauto.
   - econs; eauto.
-    + econs; eauto.
-    + i. destruct ord; inv ORD; inv H.
+    i. destruct ord; inv ORD; inv H.
   - eapply promise_lower_sim_memory. eauto.
 Qed.
 
@@ -169,7 +168,6 @@ Proof.
   exploit MemorySplit.remove_promise_remove;
     try exact REMOVE; eauto; try apply WF2; try refl. i. des.
   refine (Local.write_step_intro _ _ _ _ _ _); eauto.
-  econs; eauto.
 Qed.
 
 Lemma fulfill_step_promises_diff

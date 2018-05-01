@@ -410,8 +410,7 @@ Proof.
     exploit Configuration.rtc_step_future; eauto. s. i. des.
     exploit Configuration.rtc_step_disjoint; eauto. s. i. des.
     exploit compose_rtc_step1; eauto. s. i. des.
-    punfold SIM2. exploit SIM2; try apply SC; eauto.
-    { etrans; eauto. }
+    punfold SIM2. exploit SIM2; try exact SC; eauto.
     { etrans; eauto. }
     i. des.
     exploit TERMINAL0; eauto. i. des.
@@ -439,8 +438,6 @@ Proof.
       eapply sim_future; eauto.
       * repeat (etrans; eauto).
       * repeat (etrans; eauto).
-      * repeat (etrans; eauto).
-      * repeat (etrans; eauto).
     + exploit Configuration.step_future; eauto. s. i. des.
       exploit Configuration.step_disjoint; try symmetry; eauto. s. i. des.
       punfold SIM2. exploit SIM2; try apply SC1; eauto. i. des.
@@ -455,8 +452,6 @@ Proof.
       right. apply CIH; auto.
       { symmetry. auto. }
       eapply sim_future; eauto.
-      * repeat (etrans; eauto).
-      * repeat (etrans; eauto).
       * repeat (etrans; eauto).
       * repeat (etrans; eauto).
 Qed.

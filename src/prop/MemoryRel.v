@@ -56,10 +56,10 @@ Next Obligation.
   ii. inv H. inv H0. des. econs; ii.
   - exploit H1; eauto. i. des.
     exploit H; eauto. i. des.
-    esplits; eauto. etrans; eauto.
+    esplits; eauto.
   - exploit H3; eauto. i. des.
     exploit H2; eauto. i. des.
-    esplits; eauto. etrans; eauto.
+    esplits; eauto.
 Qed.
 
 Lemma mem_eqlerel_get
@@ -259,11 +259,11 @@ Lemma mem_eqlerel_promise
 Proof.
   inv PROMISE2.
   - exploit mem_eqlerel_add; eauto. i. des.
-    esplits; eauto. econs; eauto.
+    esplits; eauto.
   - exploit mem_eqlerel_split; eauto. i. des.
-    esplits; eauto. econs; eauto.
+    esplits; eauto.
   - exploit mem_eqlerel_lower; eauto. i. des.
-    esplits; eauto. econs; eauto.
+    esplits; eauto.
 Qed.
 
 Lemma mem_eqlerel_add_forward
@@ -336,7 +336,6 @@ Proof.
   apply MEMLE in x0. des.
   exploit (@Memory.lower_exists m1 loc from to val rel2 released2); eauto;
     try by inv LOWER2; inv LOWER; eauto; try by viewtac.
-  { etrans; eauto. inv LOWER2. inv LOWER. auto. }
   i. des.
   esplits; eauto.
   econs; esplits; ii; revert IN0.

@@ -141,9 +141,8 @@ Proof.
   }
   i. des.
   esplits. econs; eauto.
-  - econs; i; (try eapply TimeFacts.le_lt_lt; [|eauto]).
-    + apply Memory.max_ts_spec2. apply WF1.
-  - econs; eauto.
+  econs; i; (try eapply TimeFacts.le_lt_lt; [|eauto]).
+  apply Memory.max_ts_spec2. apply WF1.
 Qed.
 
 Lemma progress_fence_step

@@ -317,7 +317,7 @@ Module Local.
     <<REL_CLOSED: Memory.closed_opt_view released mem1>>.
   Proof.
     inv WF1. inv STEP.
-    exploit TViewFacts.read_future; eauto.
+    exploit TViewFacts.read_future; try exact GET; eauto.
     { eapply CLOSED1. eauto. }
     inv CLOSED1. exploit CLOSED; eauto. i. des.
     splits; auto.

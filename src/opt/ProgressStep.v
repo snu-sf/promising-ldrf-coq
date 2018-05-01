@@ -41,8 +41,6 @@ Proof.
       esplits. econs; [|econs 2]; eauto. econs. econs.
     + hexploit progress_write_step; eauto.
       { apply Time.incr_spec. }
-      { econs 2. }
-      { econs. }
       { i. rewrite PROMISES1. apply Memory.bot_nonsynch_loc. }
       i. des. esplits. econs; [|econs 3]; eauto. econs. econs.
     + hexploit progress_read_step; eauto. i. des.

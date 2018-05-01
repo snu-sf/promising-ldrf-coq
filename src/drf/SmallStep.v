@@ -48,7 +48,6 @@ Lemma with_pre_rtc_union
 Proof.
   ginduction STEPS; s; i; subst; eauto.
   i. etrans; eauto.
-  econs 2; [|reflexivity]. eauto.
 Qed.
 
 Lemma rtc_union_with_pre
@@ -245,8 +244,7 @@ Proof.
     exploit small_step_future; eauto. i; des.
     exploit IHSTEP; eauto. i; des.
     splits; eauto.
-    + etrans; eauto.
-    + etrans; eauto.
+    etrans; eauto.
 Qed.
 
 Lemma thread_step_small_step
@@ -509,9 +507,7 @@ Proof.
       (try inv LOCAL0);
       (try by esplits; eauto).
     + ss. apply promise_pf_inv in PFREE; eauto. des. subst. inv PROMISE.
-      destruct msg2. exploit Memory.op_get_inv; eauto.
-      { econs 3. eauto. }
-      i. des.
+      destruct msg2. exploit Memory.op_get_inv; try exact PROMISES; eauto. i. des.
       * subst. esplits; eauto. eapply Memory.lower_get0. eauto.
       * esplits; eauto.
     + inv WRITE.

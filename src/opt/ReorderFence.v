@@ -202,8 +202,7 @@ Proof.
     }
     { eapply Local.fence_step_future; try apply SC_SRC0; eauto.
       eapply future_fence_step; try apply FENCE; eauto.
-      - inv REORDER; etrans; eauto.
-      - etrans; eauto.
+      inv REORDER; etrans; eauto.
     }
     i. des. esplits; eauto.
     + etrans.

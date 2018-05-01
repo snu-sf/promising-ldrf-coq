@@ -135,8 +135,7 @@ Proof.
     + auto.
     + left. eapply paco9_mon; [apply sim_update_sim_thread|done].
       econs; [eauto|..]; s; eauto.
-      * etrans; eauto.
-      * etrans; eauto.
+      etrans; eauto.
   - (* fence *)
     exploit sim_local_fence; try apply SC; eauto; try refl. i. des.
     esplits.

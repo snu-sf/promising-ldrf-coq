@@ -237,7 +237,7 @@ Proof.
       + rewrite <- View.join_r. rewrite <- ? View.join_l. apply LOCAL1.
       + rewrite <- View.join_r. rewrite <- ? View.join_l.
         etrans; [|apply LOCAL1]. apply WF1_SRC.
-    - unfold TView.write_released. repeat (condtac; viewtac). refl.
+    - unfold TView.write_released. repeat (condtac; viewtac).
   }
   assert (RELT_WF:
    View.opt_wf (TView.write_released lc1_src.(Local.tview) sc1_src loc to releasedm_src ord_src)).
@@ -520,7 +520,7 @@ Proof.
   i. des.
   exploit Memory.promise_future; try apply LOCAL1_SRC; eauto; try by econs. i. des.
   exploit sim_localF_lower_src; eauto.
-  { econs; eauto. econs. }
+  { econs; eauto. }
   i. des.
   exploit IHdom; eauto.
   { eapply Memory.future_closed_timemap; eauto. }
@@ -533,7 +533,7 @@ Proof.
   }
   i. des. esplits; try exact NONSYNCH2; eauto.
   econs 2; eauto. econs.
-  - econs. econs 1. econs; eauto. econs; eauto. econs.
+  - econs. econs 1. econs; eauto. econs; eauto.
   - ss.
 Qed.
 

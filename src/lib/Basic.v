@@ -64,12 +64,12 @@ Notation rtc := (clos_refl_trans_1n _). (* reflexive transitive closure *)
 Notation rc := (clos_refl _). (* reflexive transitive closure *)
 Notation tc := (clos_trans _). (* transitive closure *)
 Hint Immediate rt1n_refl rt1n_trans t_step.
+Hint Resolve Relation_Operators.rt1n_trans.
 
 Program Instance rtc_PreOrder A (R:A -> A -> Prop): PreOrder (rtc R).
 Next Obligation.
   ii. revert H0. induction H; auto. i.
-  exploit IHclos_refl_trans_1n; eauto. i.
-  econs 2; eauto.
+  exploit IHclos_refl_trans_1n; eauto.
 Qed.
 Hint Resolve rtc_PreOrder_obligation_2.
 
@@ -90,8 +90,6 @@ Lemma rtc_implies A (R1 R2: A -> A -> Prop)
   rtc R1 <2= rtc R2.
 Proof.
   i. induction PR; eauto.
-  etrans; [|eauto]. econs 2; [|econs 1].
-  apply IMPL. auto.
 Qed.
 
 Lemma rtc_refl
@@ -106,7 +104,7 @@ Lemma rtc_n1
       (BC: R b c):
   rtc R a c.
 Proof.
-  etrans; eauto. econs 2; eauto.
+  etrans; eauto.
 Qed.
 
 Lemma rtc_reverse
@@ -115,7 +113,7 @@ Lemma rtc_reverse
   rtc (fun x y => R y x) b a.
 Proof.
   induction RTC; eauto.
-  etrans; eauto. econs 2; eauto.
+  etrans; eauto.
 Qed.
 
 Lemma fapp A (B:A->Type) (a:A) (P Q:forall (a:A), B a)
@@ -219,3 +217,8 @@ Lemma proj_sumbool_true:
 Proof.
   intros P Q a. destruct a; simpl. auto. congruence.
 Qed.
+
+Lemma orb_symm (a b: bool): orb a b -> orb b a.
+Proof. destruct a,b; eauto. Qed.
+
+Hint Resolve orb_symm.

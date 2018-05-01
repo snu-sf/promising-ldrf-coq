@@ -274,7 +274,6 @@ Proof.
   exploit (@fulfill_write lc2' sc2' mem2'); try eexact STEP_SRC; eauto. i. des.
   esplits; eauto.
   - etrans; eauto.
-  - etrans; eauto.
   - etrans; eauto. etrans; eauto.
 Qed.
 
@@ -402,10 +401,10 @@ Proof.
   exploit merge_split; try exact STEP2; eauto; try by viewtac.
   { eapply fulfill_step_lc_from; eauto. }
   i. des.
-  exploit promise_add_promise_split_promise_add_promise_add; try exact STEP1; eauto.
+  exploit promise_add_promise_split_promise_add_promise_add; try exact STEP1; try exact STEP0; eauto.
   { i. rewrite REL1'.
     exploit Memory.promise_op; eauto. i.
-    eapply TViewFacts.op_closed_released; try eexact x0; eauto.
+    eapply TViewFacts.op_closed_released; try exact x0; eauto.
     inv STEP1. apply WF0.
   }
   i. des.
@@ -423,8 +422,6 @@ Proof.
   i. des.
   hexploit sim_local_write; try exact MEM; try exact REL_LE; try refl; eauto. i. des.
   esplits; eauto.
-  - etrans; eauto.
-  - etrans; eauto.
   - etrans; eauto.
   - etrans; eauto. etrans; eauto.
 Qed.

@@ -126,10 +126,9 @@ Proof.
   { apply WF1_TGT. }
   i. des. esplits.
   - econs; eauto.
-    + etrans; eauto.
-    + inv WRITABLE. econs.
-      * eapply TimeFacts.le_lt_lt; [apply ACQUIRED1|]. viewtac.
-        eapply TimeFacts.le_lt_lt; eauto.
+    inv WRITABLE. econs.
+    eapply TimeFacts.le_lt_lt; [apply ACQUIRED1|]. viewtac.
+    eapply TimeFacts.le_lt_lt; eauto.
   - econs; eauto. s.
     unfold TView.write_tview, TView.write_fence_tview, TView.read_fence_tview. ss.
     econs; ss; repeat (condtac; aggrtac).

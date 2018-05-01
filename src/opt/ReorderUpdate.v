@@ -378,7 +378,6 @@ Proof.
     + auto.
     + right. econs; [eauto|..]; s; eauto.
       * etrans; eauto.
-      * etrans; eauto.
       * eapply Memory.future_closed_timemap; eauto.
   - (* load *)
     apply RegSet.disjoint_add in REGS. des.

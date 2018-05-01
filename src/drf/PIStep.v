@@ -529,8 +529,7 @@ Lemma pi_steps_all_small_steps_all_snd
   rtc (small_step_all withprm) (snd cST1) (snd cST2).
 Proof.
   induction PI_STEPS; eauto.
-  inv H. exploit pi_step_small_step_snd; eauto. i.
-  econs 2; eauto.
+  inv H. exploit pi_step_small_step_snd; eauto.
 Qed.
 
 Lemma pi_steps_small_steps_snd
