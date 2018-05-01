@@ -370,12 +370,12 @@ Module SimPromises.
   Proof.
     hexploit Memory.remove_future; eauto. i. des.
     exploit Memory.remove_get0; [eauto|]. i.
-    inv INV1. exploit LE; eauto. i.
+    inv INV1. exploit LE0; eauto. i.
     esplits.
     - econs.
       + ii. revert LHS.
         erewrite Memory.remove_o; eauto. condtac; ss. i.
-        exploit LE; eauto. unfold none_if. repeat condtac; ss.
+        exploit LE0; eauto. unfold none_if. repeat condtac; ss.
         * revert COND1. rewrite unset_o. condtac; ss; [|congr].
           guardH o. des. subst. unguardH o. des; congr.
         * revert COND1. rewrite unset_o. condtac; ss. congr.
@@ -450,7 +450,7 @@ Module SimPromises.
     hexploit Memory.remove_future; try apply REMOVE_TGT; eauto. i. des.
     exploit remove_tgt; eauto. i. des.
     exploit Memory.remove_get0; eauto. i.
-    inv INV1. exploit LE; eauto. i.
+    inv INV1. exploit LE0; eauto. i.
     exploit remove_src; try apply set_eq; eauto. i. des.
     esplits; eauto.
     rewrite unset_set in INV0; auto.

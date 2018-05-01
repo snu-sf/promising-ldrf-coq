@@ -77,7 +77,7 @@ Proof.
         * eapply REL_CLOSED. econs; eauto.
       + econs.
         * econs; eauto.
-        * eapply Memory.add_closed_opt_view; eauto.
+        * eapply Memory.add_closed_opt_view; cycle 1; eauto.
     - exploit MemoryReorder.add_split; try exact MEM; try exact MEM0; eauto. i. des.
       { subst. exfalso. eapply Memory.disjoint_get; try apply DISJOINT2; s; cycle 1.
         - eapply Memory.split_get0. eauto.
@@ -130,7 +130,7 @@ Proof.
         * eapply REL_CLOSED. econs 2; eauto.
       + econs.
         * econs; eauto.
-        * eapply Memory.split_closed_opt_view; eauto.
+        * eapply Memory.split_closed_opt_view; cycle 1; eauto.
     - exploit MemoryReorder.split_lower_diff; try exact MEM; try exact MEM0; eauto.
       { ii. inv H. exfalso. eapply Memory.disjoint_get; try apply DISJ.
         - eapply Memory.split_get0. eauto.
@@ -185,7 +185,7 @@ Proof.
         * eapply REL_CLOSED. econs 3; eauto.
       + econs.
         * econs; eauto.
-        * eapply Memory.lower_closed_opt_view; eauto.
+        * eapply Memory.lower_closed_opt_view; cycle 1; eauto.
   }
 Qed.
 

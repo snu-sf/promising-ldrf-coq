@@ -450,8 +450,10 @@ Proof.
   exploit Local.promise_step_future; eauto. i. des.
   exploit reorder_fulfill_promise; try exact STEP1; eauto. i. des.
   exploit Local.promise_step_future; eauto. i. des.
-  exploit fulfill_step_future; try exact STEP5; try exact WF3; eauto; try by viewtac. i. des.
-  exploit reorder_fulfill_fulfill; try exact STEP5; try exact STEP3; eauto; try by viewtac. i. des.
+  exploit fulfill_step_future; try exact STEP5; try exact WF3;
+    eauto using Memory.future_closed_opt_view, Memory.future_closed_timemap. i. des.
+  exploit reorder_fulfill_fulfill; try exact STEP5; try exact STEP3;
+    eauto using Memory.future_closed_opt_view, Memory.future_closed_timemap. i. des.
   exploit promise_fulfill_write; eauto.
   { i. exploit ORD; eauto. i. des. splits; ss.
     ii. unfold Memory.get in GET.
@@ -559,7 +561,8 @@ Proof.
   exploit Local.promise_step_future; eauto. i. des.
   exploit Local.read_step_future; eauto. i. des.
   exploit sim_local_fulfill; try exact STEP4; try exact LOCAL; try exact REL1;
-    try exact WF3; try exact WF5; try refl; eauto; try by viewtac. i. des.
+    try exact WF3; try exact WF5; try refl;
+      eauto using Memory.future_closed_opt_view, Memory.future_closed_timemap. i. des.
   esplits; eauto.
 Qed.
 
@@ -669,8 +672,10 @@ Proof.
   i. des.
   exploit Local.promise_step_future; eauto. i. des.
   exploit Local.read_step_future; eauto. i. des.
-  hexploit reorder_update_fulfill; try exact STEP6; try exact STEP7; try exact STEP4; eauto; try by viewtac. i. des.
-  exploit fulfill_step_future; try exact STEP8; try exact WF3; eauto; try by viewtac. i. des.
+  hexploit reorder_update_fulfill; try exact STEP6; try exact STEP7; try exact STEP4;
+    eauto using Memory.future_closed_opt_view, Memory.future_closed_timemap. i. des.
+  exploit fulfill_step_future; try exact STEP8; try exact WF3;
+    eauto using Memory.future_closed_opt_view, Memory.future_closed_timemap. i. des.
   exploit promise_fulfill_write; eauto.
   { i. exploit ORD; eauto. i. des.
     splits; auto.
@@ -893,7 +898,8 @@ Proof.
   exploit write_promise_fulfill; eauto. i. des.
   exploit reorder_fence_promise; try exact STEP1; try exact STEP0; eauto. i. des.
   exploit Local.promise_step_future; eauto. i. des.
-  exploit reorder_fence_fulfill; try exact STEP5; try exact STEP3; eauto; try by viewtac. i. des.
+  exploit reorder_fence_fulfill; try exact STEP5; try exact STEP3;
+    eauto using Memory.future_closed_opt_view, Memory.future_closed_timemap. i. des.
   exploit promise_fulfill_write; eauto.
   { i. exploit ORD; eauto. i. des.
     splits; auto. inv STEP1. auto.

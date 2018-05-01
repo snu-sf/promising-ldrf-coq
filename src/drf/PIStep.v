@@ -608,7 +608,7 @@ Proof.
   inv STEP. inv STEP0; inv STEP; inv PROMISING.
   s. econs.
   - rewrite IdentMap.gss. eauto.
-  - inv LOCAL. s. eapply Memory.promise_get2. eauto.
+  - inv LOCAL. hexploit Memory.promise_get2; eauto. i. des. eauto.
 Qed.
 
 Lemma pi_step_except_small_step
@@ -633,7 +633,7 @@ Proof.
   { econs; eauto. rewrite IdentMap.gso; eauto. }
   subst. rewrite TID in TID0. inv TID0. apply inj_pair2 in H1. subst.
   inv STEP0; inv STEP; inv PROMISING.
-  inv LOCAL. hexploit Memory.promise_promises_get1; eauto. i. des.
+  inv LOCAL. hexploit Memory.promise_get1_promise; eauto. i. des.
   econs; try rewrite IdentMap.gss; eauto.
 Qed.
 

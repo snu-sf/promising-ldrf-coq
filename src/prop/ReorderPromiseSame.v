@@ -105,7 +105,7 @@ Proof.
       right. esplits.
       * econs; [|by econs]. econs 3; eauto.
       * refine (Local.promise_step_intro _ _ _); eauto.
-        eapply Memory.lower_closed_opt_view; eauto.
+        eapply Memory.lower_closed_opt_view; cycle 1; eauto.
 Qed.
 
 Lemma reorder_promise_promise
@@ -148,7 +148,7 @@ Proof.
         * eapply REL_CLOSED. econs; eauto.
       + right. esplits; eauto.
         refine (Local.promise_step_intro _ _ _); eauto.
-        eapply Memory.add_closed_opt_view; eauto.
+        eapply Memory.add_closed_opt_view; cycle 1; eauto.
       + auto.
     - exploit MemoryReorder.add_split; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       + subst.
@@ -221,7 +221,7 @@ Proof.
           { eapply REL_CLOSED. econs 2; eauto. }
         * right. esplits; cycle 2.
           { refine (Local.promise_step_intro _ _ _); eauto.
-            eapply Memory.split_closed_opt_view; eauto.
+            eapply Memory.split_closed_opt_view; cycle 1; eauto.
           }
           { ii. inv H. inv SPLIT2. inv SPLIT. eapply Time.lt_strorder. eauto. }
           { i. inv KIND. splits.
@@ -238,7 +238,7 @@ Proof.
           { eapply REL_CLOSED. econs 2; eauto. }
         * right. esplits; cycle 2.
           { refine (Local.promise_step_intro _ _ _); eauto.
-            eapply Memory.split_closed_opt_view; eauto.
+            eapply Memory.split_closed_opt_view; cycle 1; eauto.
           }
           { ii. inv H. exploit Memory.split_get0; try exact MEM1; eauto. i. des.
             revert GET2. erewrite Memory.split_o; eauto. repeat condtac; ss.
@@ -337,7 +337,7 @@ Proof.
           { eapply REL_CLOSED. econs 3; eauto. }
         * right. esplits; cycle 2.
           { refine (Local.promise_step_intro _ _ _); eauto.
-            eapply Memory.lower_closed_opt_view; eauto.
+            eapply Memory.lower_closed_opt_view; cycle 1; eauto.
           }
           { auto. }
           { auto. }
@@ -445,7 +445,7 @@ Proof.
     exploit promise_fulfill_write_exact; try exact STEP4; eauto.
     { i. exploit ORD; eauto. i. des. subst.
       inv STEP0. inv PROMISE. exploit Memory.add_get0; try exact PROMISES; eauto.
-      inv STEP1. exploit Memory.promise_get2; eauto. s. i. congr.
+      inv STEP1. exploit Memory.promise_get2; eauto. s. i. des. congr.
     }
     { inv STEP1. ss. }
     i. esplits; eauto. left; eauto.
@@ -524,7 +524,7 @@ Proof.
   - (* read *)
     exploit reorder_promise_read; try exact LOCAL0; eauto; try by viewtac.
     { ii. inv H.
-      inv LOCAL0. exploit Memory.promise_get2; eauto. i.
+      inv LOCAL0. exploit Memory.promise_get2; eauto. i. des.
       exploit promise_consistent_promise_read; eauto. i.
       eapply Time.lt_strorder. eauto.
     }
@@ -535,7 +535,7 @@ Proof.
     exploit reorder_promise_write'; try exact LOCAL0; eauto; try by viewtac.
     { apply promise_pf_false_inv. ss. }
     i. des.
-    { subst. inv LOCAL0. exploit Memory.promise_get2; eauto. i.
+    { subst. inv LOCAL0. exploit Memory.promise_get2; eauto. i. des.
       exploit promise_consistent_promise_write; eauto. i.
       exfalso. eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt; eauto.
     }
@@ -547,7 +547,7 @@ Proof.
   - (* update *)
     exploit reorder_promise_read; try exact LOCAL1; eauto; try by viewtac.
     { ii. inv H.
-      inv LOCAL0. exploit Memory.promise_get2; eauto. i.
+      inv LOCAL0. exploit Memory.promise_get2; eauto. i. des.
       exploit promise_consistent_promise_read; eauto.
       { eapply write_step_promise_consistent; eauto. }
       i. eapply Time.lt_strorder. eauto.
@@ -557,7 +557,7 @@ Proof.
     exploit reorder_promise_write'; try exact LOCAL2; eauto; try by viewtac.
     { apply promise_pf_false_inv. ss. }
     i. des.
-    { subst. inv STEP2. exploit Memory.promise_get2; eauto. i.
+    { subst. inv STEP2. exploit Memory.promise_get2; eauto. i. des.
       exploit promise_consistent_promise_write; eauto. i.
       exfalso. eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt; eauto.
     }

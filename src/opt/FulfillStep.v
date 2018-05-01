@@ -138,7 +138,7 @@ Proof.
   inv PROMISE. inv FULFILL. ss.
   exploit TViewFacts.write_future_fulfill; try exact REL_WF; eauto; try by apply WF2.
   { eapply Memory.future_closed_opt_view; eauto. }
-  { apply WF2. eapply Memory.promise_get2. eauto. }
+  { eapply Memory.promise_get2. eauto. }
   s. i. des.
   exploit MemorySplit.remove_promise_remove;
     try exact REMOVE; eauto; try apply WF2; try refl. i. des.

@@ -45,7 +45,7 @@ Lemma promise_step_promise_consistent
   promise_consistent lc1.
 Proof.
   inv STEP. ii. destruct msg.
-  exploit Memory.promise_promises_get1; eauto. i. des.
+  exploit Memory.promise_get1_promise; eauto. i. des.
   exploit CONS; eauto.
 Qed.
 
@@ -85,7 +85,7 @@ Proof.
   - apply CONS in X. eapply TimeFacts.le_lt_lt; eauto.
     s. etrans; [|apply Time.join_l]. refl.
   - destruct msg. inv WRITE.
-    exploit Memory.promise_promises_get1; eauto. i. des.
+    exploit Memory.promise_get1_promise; eauto. i. des.
     exploit fulfill_unset_promises; eauto. i. des. subst.
     apply WRITABLE.
 Qed.
@@ -199,7 +199,7 @@ Proof.
     apply TimeFacts.join_lt_des in x. des.
     left. revert BC. unfold TimeMap.singleton, LocFun.add. condtac; ss.
   - inv STEP. inv WRITE. destruct m.
-    exploit Memory.promise_promises_get1; eauto. i. des.
+    exploit Memory.promise_get1_promise; eauto. i. des.
     exploit fulfill_unset_promises; eauto. i. des. subst. refl.
 Qed.
 
@@ -215,14 +215,14 @@ Lemma thread_step_unset_promises
 Proof.
   inv STEP.
   { inv STEP0. inv LOCAL. destruct msg. ss.
-    exploit Memory.promise_promises_get1; eauto. i. des. congr.
+    exploit Memory.promise_get1_promise; eauto. i. des. congr.
   }
   destruct msg.
   inv STEP0; ss; inv LOCAL; ss;
     (try congr);
     (try by inv LOCAL0; ss; congr).
   - inv LOCAL0. inv WRITE.
-    exploit Memory.promise_promises_get1; eauto. i. des.
+    exploit Memory.promise_get1_promise; eauto. i. des.
     exploit fulfill_unset_promises; eauto. i. des. subst.
     unfold Memory.get in *.
     esplits; s; eauto.
@@ -233,7 +233,7 @@ Proof.
       destruct ord; inv COND. ss.
     + inv WRITABLE. eauto.
   - inv LOCAL1. inv LOCAL2. inv WRITE.
-    exploit Memory.promise_promises_get1; eauto. i. des.
+    exploit Memory.promise_get1_promise; eauto. i. des.
     exploit fulfill_unset_promises; eauto. i. des. subst.
     unfold Memory.get in *.
     esplits; s; eauto.

@@ -133,8 +133,9 @@ Lemma sim_store_future
 Proof.
   inv SIM1.
   exploit fulfill_step_future; eauto; try by viewtac. i. des.
-  exploit fulfill_step_future; try exact WF_SRC; eauto; try by viewtac. i. des.
-  exploit future_fulfill_step; try exact FULFILL; eauto; try refl; try by viewtac.
+  exploit fulfill_step_future; try exact WF_SRC;
+    eauto using Memory.future_closed_timemap. i. des.
+  exploit future_fulfill_step; try exact FULFILL; eauto.
   { by inv REORDER. }
   i. des.
   exploit SimPromises.future; try exact MEM1; eauto.

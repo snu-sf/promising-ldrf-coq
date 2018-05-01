@@ -76,7 +76,7 @@ Proof.
     hexploit Memory.promise_op; eauto. i.
     hexploit TViewFacts.write_future; try exact H; eauto; try apply WF0; try by viewtac. i. des.
     hexploit Memory.promise_future; try apply PROMISE; try apply WF0; eauto; try by viewtac. i. des.
-    hexploit Memory.promise_get2; eauto.
+    eapply Memory.promise_get2; eauto.
   - inv WRITABLE. unfold TView.write_released. s.
     econs; repeat (try condtac; aggrtac); (try by left; eauto).
     + etrans; [|left; eauto]. apply WF0.
@@ -106,7 +106,7 @@ Proof.
     hexploit Memory.promise_op; eauto. i.
     hexploit TViewFacts.write_future; try exact H; eauto; try apply WF0; try by viewtac. i. des.
     hexploit Memory.promise_future; try apply PROMISE; try apply WF0; eauto; try by viewtac. i. des.
-    hexploit Memory.promise_get2; eauto.
+    eapply Memory.promise_get2; eauto.
   - inv WRITABLE. unfold TView.write_released. s.
     econs; repeat (try condtac; aggrtac); (try by left; eauto).
     + etrans; [|left; eauto]. apply WF0.

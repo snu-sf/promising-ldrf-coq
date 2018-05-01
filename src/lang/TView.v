@@ -357,15 +357,15 @@ Module TViewFacts.
            | [H1: Memory.closed_view ?c ?m1,
               H2: Memory.future ?m1 ?m2 |-
               Memory.closed_view ?c ?m2] =>
-             eapply Memory.future_closed_view; [exact H1|exact H2]
+             eapply Memory.future_closed_view; [exact H2|exact H1]
            | [H1: Memory.closed_opt_view ?c ?m1,
               H2: Memory.future ?m1 ?m2 |-
               Memory.closed_opt_view ?c ?m2] =>
-             eapply Memory.future_closed_opt_view; [exact H1|exact H2]
+             eapply Memory.future_closed_opt_view; [exact H2|exact H1]
            | [H1: Memory.closed_timemap ?tm ?m1,
               H2: Memory.future ?m1 ?m2 |-
               Memory.closed_timemap ?tm ?m2] =>
-             eapply Memory.future_closed_timemap; [exact H1|exact H2]
+             eapply Memory.future_closed_timemap; [exact H2|exact H1]
 
            | [|- View.wf (View.join _ _)] =>
              eapply View.join_wf; eauto
