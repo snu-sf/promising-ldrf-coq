@@ -13,6 +13,7 @@ Require Import View.
 Require Import Cell.
 Require Import Memory.
 Require Import TView.
+Require Import Local.
 Require Import Thread.
 Require Import Configuration.
 Require Import Progress.
@@ -877,11 +878,11 @@ Proof.
     econs.
     - rewrite THS4. s. eauto.
     - eauto.
-    - left. destruct e1; inv EVTR; s; eauto.
+    - left. destruct e0; inv EVTR; s; eauto.
     - eauto.
     - apply with_pre_rtc_union in PI_STEPS.
-      inv PI_STEP. inv STEPT. ss. inv STEP0; inv STEP1; inv EVTP.
-      inv LOCAL0. inv PROMISE; inv EVTL. inv PROMISES. inv LOWER.
+      inv PI_STEP. inv STEPT. ss. inv STEP0; inv STEP1; inv LOCAL0; inv EVTP.
+      inv PROMISE; inv EVTL. inv PROMISES. inv LOWER.
       econs.
       + rewrite <-(rtc_small_step_find PI_STEPS); eauto.
         s. rewrite IdentMap.gss. eauto.

@@ -15,6 +15,7 @@ Require Import Cell.
 Require Import Memory.
 Require Import MemoryFacts.
 Require Import TView.
+Require Import Local.
 Require Import Thread.
 Require Import Configuration.
 Require Import Progress.
@@ -517,8 +518,8 @@ Lemma small_step_false_promising
       (NONWRITING: e = ThreadEvent.promise loc from to val released kind):
   Memory.op c1.(Configuration.memory) loc from to val released c2.(Configuration.memory) kind.
 Proof.
-  inv STEP. inv STEP0; inv STEP; inv PFREE; ss.
-  apply promise_pf_inv in H0. des. subst. inv LOCAL.
+  inv STEP. inv STEP0; inv STEP; inv LOCAL; inv PFREE; ss.
+  apply promise_pf_inv in H0. des. subst.
   eapply Memory.promise_op. eauto.
 Qed.
 
@@ -727,9 +728,9 @@ Proof.
       - destruct e; inv Y. ss.
         inv PI_STEP0; ss. subst.
         inv STEPT; ss. destruct pf; ss.
-        inv STEP. inv STEP0; ss.
+        inv STEP; inv STEP0; inv LOCAL; ss.
         symmetry in PF. apply promise_pf_inv in PF. des. subst. des.
-        inv LOCAL. inv PROMISE. ss.
+        inv PROMISE. ss.
         eapply memory_lower_None_mem_eqrel; eauto.
     }
     des.

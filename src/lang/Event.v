@@ -70,6 +70,7 @@ Module Ordering.
   Next Obligation.
     ii. destruct x, y, z; auto.
   Qed.
+  Hint Resolve le_PreOrder_obligation_2.
 
   Definition join (lhs rhs:t): t :=
     match lhs, rhs with

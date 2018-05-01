@@ -8,6 +8,7 @@ Require Import View.
 Require Import Cell.
 Require Import Memory.
 Require Import TView.
+Require Import Local.
 Require Import Thread.
 Require Import Configuration.
 

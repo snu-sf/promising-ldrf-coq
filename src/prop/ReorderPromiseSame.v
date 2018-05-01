@@ -16,6 +16,7 @@ Require Import View.
 Require Import Cell.
 Require Import Memory.
 Require Import TView.
+Require Import Local.
 Require Import Thread.
 
 Require Import SimMemory.
@@ -594,11 +595,11 @@ Lemma reorder_nonpf_pf
       (MEMORY: Memory.closed th0.(Thread.memory)):
   (exists pf2' e2',
       <<STEP: Thread.step pf2' e2' th0 th2>> /\
-      <<EVENT: ThreadEvent.get_program e2' = ThreadEvent.get_program e2>>) \/
+      <<EVENT: __guard__ (e2' = e2 \/ (ThreadEvent.is_promising e2' /\ ThreadEvent.is_promising e2))>>) \/
   (exists e2' pf1' e1' th1',
       <<STEP1: Thread.step true e2' th0 th1'>> /\
       <<STEP2: Thread.promise_step pf1' e1' th1' th2>> /\
-      <<EVENT: ThreadEvent.get_program e2' = ThreadEvent.get_program e2>>).
+      <<EVENT: __guard__ (e2' = e2 \/ (ThreadEvent.is_promising e2' /\ ThreadEvent.is_promising e2))>>).
 Proof.
   inv STEP2; ss.
   - inv STEP. ss. symmetry in PF. apply promise_pf_inv in PF. des. subst.
@@ -606,13 +607,13 @@ Proof.
     exploit reorder_promise_promise_lower_None; eauto. i. des; subst.
     + left. esplits.
       * econs 1. econs; eauto.
-      * ss.
+      * right. ss.
     + right. esplits.
       * econs 1. econs; eauto.
       * econs; eauto.
-      * ss.
+      * right. ss.
   - exploit reorder_nonpf_program; eauto. i. des.
     unguardH STEP2. des.
-    + subst. left. esplits; eauto.
-    + right. esplits; eauto.
+    + subst. left. esplits; eauto. left. ss.
+    + right. esplits; eauto. left. ss.
 Qed.

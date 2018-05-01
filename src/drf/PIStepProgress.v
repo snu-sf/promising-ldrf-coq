@@ -13,6 +13,7 @@ Require Import View.
 Require Import Cell.
 Require Import Memory.
 Require Import TView.
+Require Import Local.
 Require Import Thread.
 Require Import Configuration.
 Require Import Progress.
@@ -111,7 +112,7 @@ Proof.
   - inv STEP. inv STEP0; inv STEP; [by rdes RW; inv RW|].
     econs; eauto.
     + by rewrite TID.
-    + destruct e0; rdes RW; inv RW; s; eauto.
+    + destruct e; rdes RW; inv RW; s; eauto.
 Qed.
 
 Lemma pi_consistent_small_step_pi

@@ -15,6 +15,7 @@ Require Import View.
 Require Import Cell.
 Require Import Memory.
 Require Import TView.
+Require Import Local.
 Require Import Thread.
 Require Import Configuration.
 
@@ -181,7 +182,7 @@ Proof.
   i. des.
   - assert (STEPS: rtcn (@Thread.tau_step lang) (S n) e1 e2).
     { econs 2.
-      - econs. econs; eauto. by destruct e2', e0; inv EVENT1.
+      - econs. econs; eauto. unguardH EVENT1. by destruct e2', e0; des.
       - eapply rtcn_imply; [|exact A0]. apply tau_mon. apply Thread.allpf.
     }
     exploit IH; try exact STEPS; eauto.
@@ -200,7 +201,7 @@ Proof.
     exploit IH; try exact STEPS; eauto.
     { omega. }
     i. des. esplits; cycle 1.
-    + econs 2; eauto. econs; eauto. by destruct e2', e0; inv EVENT1.
+    + econs 2; eauto. econs; eauto. unguardH EVENT1. by destruct e2', e0; des.
     + etrans; eauto.
     + omega.
 Qed.

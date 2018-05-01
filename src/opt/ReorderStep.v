@@ -16,6 +16,7 @@ Require Import Cell.
 Require Import Memory.
 Require Import MemoryFacts.
 Require Import TView.
+Require Import Local.
 Require Import Thread.
 Require Import Configuration.
 Require Import Progress.

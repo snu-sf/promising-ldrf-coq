@@ -16,6 +16,7 @@ Require Import View.
 Require Import Cell.
 Require Import Memory.
 Require Import TView.
+Require Import Local.
 Require Import Thread.
 Require Import Configuration.
 
@@ -326,8 +327,7 @@ Proof.
   i. des.
   exploit promise_fulfill_write; try exact STEP_SRC; try exact STEP_SRC0; eauto.
   { i. hexploit ORD0; eauto.
-    - etrans; eauto.
-    - eapply sim_local_nonsynch_loc; eauto.
+    eapply sim_local_nonsynch_loc; eauto.
   }
   i. des. subst. esplits; eauto.
   - apply TViewFacts.write_released_mon; ss;
@@ -473,7 +473,6 @@ Lemma sim_local_fence
 Proof.
   inv STEP_TGT. esplits; eauto.
   - econs; eauto. i. eapply sim_local_nonsynch; eauto.
-    apply RELEASE. etrans; eauto.
   - econs; try apply LOCAL1. s.
     apply TViewFacts.write_fence_tview_mon; auto; try refl.
     apply TViewFacts.read_fence_tview_mon; auto; try refl.

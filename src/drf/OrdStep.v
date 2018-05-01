@@ -13,6 +13,7 @@ Require Import View.
 Require Import Cell.
 Require Import Memory.
 Require Import TView.
+Require Import Local.
 Require Import Thread.
 Require Import Configuration.
 Require Import SmallStep.
@@ -20,7 +21,7 @@ Require Import SmallStep.
 Set Implicit Arguments.
 
 
-Inductive ord_thread_step (ord:Ordering.t) (lang:Language.t) (e:ThreadEvent.program_t): forall (e1 e2:Thread.t lang), Prop :=
+Inductive ord_thread_step (ord:Ordering.t) (lang:Language.t) (e:ThreadEvent.t): forall (e1 e2:Thread.t lang), Prop :=
 | ra_thread_step_intro
     st1 lc1 sc1 mem1
     st2 lc2 sc2 mem2
@@ -30,7 +31,7 @@ Inductive ord_thread_step (ord:Ordering.t) (lang:Language.t) (e:ThreadEvent.prog
 .
 Hint Constructors ord_thread_step.
 
-Inductive ord_step (ord:Ordering.t) (e:ThreadEvent.program_t) (tid:Ident.t): forall (c1 c2:Configuration.t), Prop :=
+Inductive ord_step (ord:Ordering.t) (e:ThreadEvent.t) (tid:Ident.t): forall (c1 c2:Configuration.t), Prop :=
 | ord_step_intro
     c1 lang st1 lc1 st2 lc2 sc2 memory2
     (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
@@ -58,7 +59,7 @@ Definition interleaving (e:ThreadEvent.t) (c2:Configuration.t): bool :=
     Time.le_lt_dec (Memory.max_ts loc c2.(Configuration.memory)) ts
   end.
 
-Inductive interleaving_step (etid:ThreadEvent.program_t * Ident.t) (c1 c2:Configuration.t): Prop :=
+Inductive interleaving_step (etid:ThreadEvent.t * Ident.t) (c1 c2:Configuration.t): Prop :=
 | interleaving_step_intro
     (STEP: ord_step Ordering.acqrel etid.(fst) etid.(snd) c1 c2)
     (INTERLEAVING: interleaving etid.(fst) c2)

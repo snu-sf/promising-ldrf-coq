@@ -14,6 +14,7 @@ Require Import View.
 Require Import Cell.
 Require Import Memory.
 Require Import TView.
+Require Import Local.
 Require Import Thread.
 Require Import Configuration.
 Require Import Progress.
@@ -57,8 +58,7 @@ Proof.
     esplits; try apply SC; eauto.
     econs 2. econs 1; eauto. econs; eauto. eauto.
   - (* load *)
-    destruct e; inv H4.
-    esplits; eauto.
+    destruct e_tgt; ss. esplits; eauto.
     + econs 1.
     + ss.
     + by inv LOCAL0.

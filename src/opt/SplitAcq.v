@@ -14,6 +14,7 @@ Require Import View.
 Require Import Cell.
 Require Import Memory.
 Require Import TView.
+Require Import Local.
 Require Import Thread.
 Require Import Configuration.
 
@@ -178,8 +179,7 @@ Proof.
   i. des.
   exploit promise_fulfill_write; try exact STEP_SRC; try exact STEP_SRC0; eauto.
   { i. hexploit ORD0; eauto.
-    - etrans; eauto.
-    - i. des. splits; auto. eapply sim_local_nonsynch_loc; eauto.
+    i. des. splits; auto. eapply sim_local_nonsynch_loc; eauto.
   }
   i. des. esplits; eauto. etrans; eauto.
 Qed.

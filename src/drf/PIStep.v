@@ -13,6 +13,7 @@ Require Import View.
 Require Import Cell.
 Require Import Memory.
 Require Import TView.
+Require Import Local.
 Require Import Thread.
 Require Import Configuration.
 Require Import Progress.
@@ -608,10 +609,10 @@ Lemma pi_wf_small_step_is_promising
       (PROMISING: ThreadEvent.is_promising e = Some (l, t)):
   Threads.is_promised tid l t t2.(Configuration.threads).
 Proof.
-  inv STEP. inv STEP0; inv STEP; inv PROMISING.
+  inv STEP. inv STEP0; inv STEP; inv LOCAL; inv PROMISING.
   s. econs.
   - rewrite IdentMap.gss. eauto.
-  - inv LOCAL. hexploit Memory.promise_get2; eauto. i. des. eauto.
+  - hexploit Memory.promise_get2; eauto. i. des. eauto.
 Qed.
 
 Lemma pi_step_except_small_step
@@ -635,8 +636,8 @@ Proof.
   destruct (Ident.eq_dec x tid); cycle 1.
   { econs; eauto. rewrite IdentMap.gso; eauto. }
   subst. rewrite TID in TID0. inv TID0. apply inj_pair2 in H1. subst.
-  inv STEP0; inv STEP; inv PROMISING.
-  inv LOCAL. hexploit Memory.promise_get1_promise; eauto. i. des.
+  inv STEP0; inv STEP; inv LOCAL; inv PROMISING.
+  hexploit Memory.promise_get1_promise; eauto. i. des.
   econs; try rewrite IdentMap.gss; eauto.
 Qed.
 
@@ -701,10 +702,10 @@ Proof.
   i. destruct cST3. subst. des.
   { destruct (ThreadEvent.is_promising e0) eqn:E0; subst.
     - exploit IH; try exact A23; try exact WF; eauto.
-      { econs; econs; eauto; ii; by des; destruct e2', e0. }
+      { unguardH EVENT. econs; econs; eauto; ii; by des; destruct e2', e0. }
       i. des. esplits; try exact STEPS; eauto.
     - assert (EQ: e2' = e0).
-      { by destruct e2', e0; inv EVENT. }
+      { unguardH EVENT. by des; destruct e2', e0. }
       subst. esplits; [|econs; try exact A23|]; eauto.
       econs; eauto. econs; econs.
       + instantiate (1 := e0).
@@ -718,14 +719,14 @@ Proof.
   assert (STEP0': pi_step_except false tidex (cS2, cT1) (cS0,c1')).
   { econs; eauto. econs; econs.
     + eauto.
-    + by destruct e2', e0; ss; inv EVENT.
+    + unguardH EVENT. by des; destruct e2', e0; ss; inv EVENT.
     + rewrite LANGMATCH0.
-      inv STEP2. inv STEP; [|by inv STEP0].
+      inv STEP2. inv STEP; [|by inv STEP0; inv LOCAL].
       s. inv STEP0. destruct (Ident.eq_dec tid0 tid).
       * subst. by rewrite IdentMap.gss, TID0.
       * rewrite IdentMap.gso; eauto.
     + ii. eapply NOWR0; eauto.
-      * des; destruct e2'; ss; destruct e0; ss; inv EVENT; destruct event0; eauto.
+      * unguardH EVENT. des; destruct e2'; ss; destruct e0; ss; inv EVENT; eauto.
       * eapply small_step_is_promised; eauto.
   }
   assert (STEP2': pi_step_evt true tid (cS0, c1') (cS0, cT3)).
@@ -740,13 +741,13 @@ Proof.
   }
   assert (STEP1': pi_step_evt false tid0 (cS2, cT1) (cS0, c1')).
   { econs. econs; eauto.
-    - by destruct e2', e0; inv EVENT.
+    - unguardH EVENT. by des; destruct e2', e0; inv EVENT.
     - etrans; eauto. destruct (Ident.eq_dec tid tid0).
       + subst. inv STEP2. s. rewrite IdentMap.gss.
-        inv STEP; [by inv STEP0; rewrite TID0|by inv STEP0; inv PROMISING].
+        inv STEP; [by inv STEP0; rewrite TID0|by inv STEP0; inv LOCAL; inv PROMISING].
       + rewrite (small_step_find STEP2); eauto.
     - ii. eapply NOWR0; eauto.
-      + des; destruct e2'; ss; destruct e0; ss; inv EVENT; destruct event0; eauto.
+      + unguardH EVENT. des; destruct e2'; ss; destruct e0; ss; inv EVENT; eauto.
       + eapply small_step_is_promised; eauto.
   }
 
