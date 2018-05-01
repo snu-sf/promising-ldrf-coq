@@ -260,6 +260,22 @@ Proof.
   rewrite SimPromises.unset_bot in *; ss.
 Qed.
 
+Lemma sim_local_promise_not_lower
+      pview
+      lc1_src
+      lc1_tgt mem1_tgt loc from to val released_tgt lc1 mem2_tgt kind
+      (LOCAL: sim_local pview lc1_src lc1_tgt)
+      (STEP: Local.promise_step lc1_tgt mem1_tgt loc from to val released_tgt lc1 mem2_tgt kind)
+      (KIND: negb (Memory.op_kind_is_lower kind)):
+  SimPromises.mem loc to pview = false.
+Proof.
+  destruct (SimPromises.mem loc to pview) eqn:X; ss.
+  inv LOCAL. inv PROMISES. exploit PVIEW; eauto. i. des.
+  inv STEP. inv PROMISE; ss.
+  - exploit Memory.add_get0; try exact PROMISES; eauto. i. des. congr.
+  - exploit Memory.split_get0; try exact PROMISES; eauto. i. des. congr.
+Qed.
+
 Lemma sim_local_write
       pview
       lc1_src sc1_src mem1_src
@@ -304,21 +320,20 @@ Proof.
     try apply LOCAL2; try apply MEM2; eauto.
   { eapply Memory.future_closed_opt_view; eauto. }
   { unguardH PVIEW. des; intuition.
-    admit. (* it's add; so pview = false *)
+    exploit Local.write_step_strong_relaxed; eauto. i.
+    left. eapply sim_local_promise_not_lower; try exact STEP1; eauto.
   }
   i. des.
   exploit promise_fulfill_write; try exact STEP_SRC; try exact STEP_SRC0; eauto.
-  { i. exploit ORD0; eauto.
+  { i. hexploit ORD0; eauto.
     - etrans; eauto.
-    - i. des. splits; auto.
-      + eapply sim_local_nonsynch_loc; eauto.
-      + subst. ss.
+    - eapply sim_local_nonsynch_loc; eauto.
   }
   i. des. subst. esplits; eauto.
   - apply TViewFacts.write_released_mon; ss;
       try apply LOCAL1; try apply WF1_TGT.
   - etrans; eauto.
-Admitted.
+Qed.
 
 Lemma sim_local_write_bot
       lc1_src sc1_src mem1_src

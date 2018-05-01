@@ -101,7 +101,7 @@ Proof.
   - contradict PROMISE.
     destruct pf; ss. inv STEP1.
     symmetry in PF. apply promise_pf_inv in PF. des. subst.
-    inv LOCAL. inv PROMISE. exploit Memory.lower_get0; try exact PROMISES; eauto. i.
+    inv LOCAL. inv PROMISE. exploit Memory.lower_get0; try exact PROMISES; eauto. i. des.
     econs; eauto.
   - esplits; eauto.
     + econs; eauto. inv STEP1. econs; eauto.

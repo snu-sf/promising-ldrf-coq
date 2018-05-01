@@ -153,7 +153,7 @@ Proof.
     + auto.
   - (* store *)
     hexploit sim_local_write_bot; try exact LOCAL1; try exact SC; eauto; try refl; try by viewtac. i. des.
-    exploit merge_write_read1; try exact STEP_SRC; eauto. i. des.
+    exploit merge_write_read; try exact STEP_SRC; eauto using View.bot_spec. i. des.
     esplits.
     + econs 2; [|econs 1]. econs.
       * econs. econs 2. econs; [|econs 3]; eauto. econs. econs.
@@ -286,7 +286,7 @@ Proof.
         }
       * econs 2. econs 2. econs; [|econs 4]; eauto.
         { econs. econs. s. rewrite ? Const.add_0_r. eauto. }
-        { eapply merge_write_read1; try exact STEP2; eauto. }
+        { eapply merge_write_read; try exact STEP2; eauto using View.bot_spec. }
       * auto.
       * etrans; eauto.
       * etrans; eauto.
@@ -300,7 +300,7 @@ Proof.
         { auto. }
       * econs 2. econs 2. econs; [|econs 4]; eauto.
         { econs. econs. s. rewrite ? Const.add_0_r. eauto. }
-        { eapply merge_write_read1; try apply STEP2; eauto. }
+        { eapply merge_write_read; try apply STEP2; eauto using View.bot_spec. }
       * auto.
       * etrans; eauto.
       * etrans; eauto.
@@ -344,7 +344,7 @@ Proof.
   - (* update *)
     exploit Local.read_step_future; eauto. i. des.
     exploit Local.write_step_future; eauto. i. des.
-    exploit merge_write_read2; try apply LOCAL2; eauto.
+    exploit merge_write_read; try apply LOCAL2; eauto.
     { inv LOCAL1. s. i. repeat (try condtac; aggrtac).
       destruct ordr, or2; inv H; inv COND; inv OR2.
     }
@@ -438,7 +438,7 @@ Proof.
         }
       * econs 2. econs 2. econs; [|econs 4]; eauto.
         { econs. econs. s. rewrite ? Const.add_0_r. eauto. }
-        { inv RMW. eapply merge_write_read2; try exact STEP2; viewtac.
+        { inv RMW. eapply merge_write_read; try exact STEP2; viewtac.
           - inv STEP4. s. repeat (try condtac; aggrtac).
             destruct or2, ordr; inv H; inv OR2; inv COND.
           - inv STEP4. s. repeat (try condtac; aggrtac).
@@ -462,7 +462,7 @@ Proof.
         { auto. }
       * econs 2. econs 2. econs; [|econs 4]; eauto.
         { econs. econs. s. rewrite ? Const.add_0_r. eauto. }
-        { inv RMW. eapply merge_write_read2; try exact STEP2; viewtac.
+        { inv RMW. eapply merge_write_read; try exact STEP2; viewtac.
           - inv STEP_SRC. s. repeat (try condtac; aggrtac).
             destruct or2, ordr; inv H; inv OR2; inv COND.
           - inv STEP_SRC. s. repeat (try condtac; aggrtac).

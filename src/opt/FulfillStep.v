@@ -53,7 +53,7 @@ Lemma fulfill_step_future lc1 sc1 mem1 loc from to val releasedm released ord lc
 Proof.
   inv STEP.
   hexploit Memory.remove_future; try apply REMOVE; try apply WF1; eauto. i. des.
-  exploit Memory.remove_get0; eauto. i.
+  exploit Memory.remove_get0; eauto. i. des.
   inversion WF1. exploit PROMISES; eauto. i.
   exploit TViewFacts.write_future_fulfill; try apply x; try apply SC1; try apply WF1; eauto.
   { eapply CLOSED1. eauto. }
@@ -75,9 +75,7 @@ Lemma write_promise_fulfill
     <<STEP1: Local.promise_step lc0 mem0 loc from to val released lc1 mem2 kind>> /\
     <<STEP2: fulfill_step lc1 sc0 loc from to val releasedm released ord lc2 sc2>> /\
     <<REL: released = TView.write_released lc0.(Local.tview) sc0 loc to releasedm ord>> /\
-    <<ORD: Ordering.le Ordering.strong_relaxed ord ->
-           Memory.nonsynch_loc loc lc0.(Local.promises) /\
-           kind = Memory.op_kind_add>>.
+    <<ORD: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc lc0.(Local.promises)>>.
 Proof.
   exploit Local.write_step_future; eauto. i. des.
   inv WRITE. inv WRITE0. esplits; eauto.
@@ -122,9 +120,7 @@ Lemma promise_fulfill_write
       (FULFILL: fulfill_step lc1 sc0 loc from to val releasedm released ord lc2 sc2)
       (REL_WF: View.opt_wf releasedm)
       (REL_CLOSED: Memory.closed_opt_view releasedm mem0)
-      (ORD: Ordering.le Ordering.strong_relaxed ord ->
-            Memory.nonsynch_loc loc lc0.(Local.promises) /\
-            kind = Memory.op_kind_add)
+      (ORD: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc lc0.(Local.promises))
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0):
@@ -154,9 +150,7 @@ Lemma promise_fulfill_write_exact
       (FULFILL: fulfill_step lc1 sc0 loc from to val releasedm released ord lc2 sc2)
       (REL_WF: View.opt_wf releasedm)
       (REL_CLOSED: Memory.closed_opt_view releasedm mem0)
-      (ORD: Ordering.le Ordering.strong_relaxed ord ->
-            Memory.nonsynch_loc loc lc0.(Local.promises) /\
-            kind = Memory.op_kind_add)
+      (ORD: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc lc0.(Local.promises))
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)

@@ -324,10 +324,12 @@ Proof.
     + unfold lift_view_if. condtac; cycle 1.
       { exfalso. apply n. right. clear COND.
         destruct (Ordering.le ord Ordering.relaxed) eqn:Y; ss.
-        exploit ORD; eauto.
+        hexploit ORD; eauto; i.
         { by destruct ord; inv Y. }
-        i. des. congr.
-      }
+        exploit Memory.lower_get0; try exact PROMISES; eauto. i. des.
+        exploit H; eauto. s. i. subst. inv REL_LE.
+        revert H1. unfold TView.write_released. condtac; ss. by destruct ord.
+      }        
       econs 3; eauto.
     + destruct (Memory.get loc to (Local.promises lco)) as [[]|] eqn:X; auto.
       exfalso. eapply Memory.disjoint_get; try apply DISJOINT2; eauto. s.
@@ -361,7 +363,7 @@ Proof.
     destruct (Memory.get loc to (Local.promises t0)) as [[]|] eqn:X; [|done].
     exfalso. eapply Memory.disjoint_get.
     - inv WFT. inv WF1. eapply DISJOINT; eauto.
-    - eapply Memory.lower_get0. eauto.
+    - hexploit Memory.lower_get0; try exact PROMISES; eauto. i. des. eauto.
     - eauto.
   }
   { clear PFREE. inversion WF. subst. ss.
@@ -610,14 +612,14 @@ Proof.
   - apply EQMEM in IN. des. esplits; eauto. apply lift_view_le_incr'; ss.
   - apply EQMEM in IN. des. esplits; eauto. apply lift_view_le_incr'; ss.
   - subst. exploit Memory.split_get0; try exact SPLIT; eauto. i. des.
-    apply EQMEM in GET3. des.
+    apply EQMEM in GET0. des.
     exploit Memory.split_get0; try exact SPLIT0; eauto. i. des.
     rewrite IN0 in GET3. inv GET3. condtac; ss.
     + des. inv IN. esplits; eauto. apply lift_view_le_imm.
     + guardH o. inv IN. esplits; eauto. apply lift_view_le_incr'; ss.
   - apply EQMEM in IN. des. esplits; eauto. apply lift_view_le_incr'; ss.
   - subst. exploit Memory.split_get0; try exact SPLIT; eauto. i. des.
-    apply EQMEM in GET3. des.
+    apply EQMEM in GET0. des.
     exploit Memory.split_get0; try exact SPLIT0; eauto. i. des.
     rewrite IN0 in GET3. inv GET3. condtac; ss.
     + des. inv IN. esplits; eauto. apply lift_view_le_imm.
@@ -977,7 +979,7 @@ Proof.
     esplits; eauto; cycle 2.
     + erewrite Memory.split_o; eauto. repeat condtac; ss.
       { des. subst. exploit Memory.split_get0; try exact SPLIT2; eauto. i. des.
-        revert GET2. erewrite Memory.add_o; eauto. condtac; ss.
+        revert GET. erewrite Memory.add_o; eauto. condtac; ss.
       }
       { guardH o0. des. subst. congr. }
     + congr.
@@ -990,12 +992,12 @@ Proof.
     esplits; eauto; cycle 2.
     + erewrite Memory.split_o; eauto. repeat condtac; ss.
       * des. subst. exploit Memory.split_get0; try exact SPLIT2; eauto. i. des.
-        revert GET2. erewrite Memory.split_o; eauto. condtac; ss.
+        revert GET. erewrite Memory.split_o; eauto. condtac; ss.
       * guardH o0. des. subst. exploit Memory.split_get0; try exact SPLITP2; eauto.
         i. des. congr.
     + i. inv KIND. erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
       * des. subst. exploit Memory.split_get0; try exact SPLIT2; eauto. i. des.
-        revert GET2. erewrite Memory.split_o; eauto. repeat condtac; ss.
+        revert GET. erewrite Memory.split_o; eauto. repeat condtac; ss.
       * guardH o0. des. subst. exploit DISJ; eauto.
         exploit Memory.split_get0; try exact SPLITP2; eauto. i. des. congr.
   - exploit MemoryReorder.lower_split; try exact MEM; eauto. i. des.
@@ -1004,7 +1006,7 @@ Proof.
     inv FROM0. esplits; eauto; cycle 2.
     + erewrite Memory.split_o; eauto. repeat condtac; ss.
       * des. subst. exploit Memory.split_get0; try exact SPLIT2; eauto. i. des.
-        revert GET2. erewrite Memory.lower_o; eauto. condtac; ss.
+        revert GET. erewrite Memory.lower_o; eauto. condtac; ss.
       * guardH o0. des. subst. congr.
     + congr.
 Qed.
@@ -1026,30 +1028,30 @@ Proof.
     destruct released0; try by subst; esplits; eauto.
     destruct kind; try by subst; esplits; eauto. des. ss.
     exploit MemoryReorder.lower_lower; eauto. i. des.
-    - subst. exploit Memory.lower_get0; try exact LOWERP2; eauto. congr.
+    - subst. exploit Memory.lower_get0; try exact LOWERP2; eauto. i. des. congr.
     - esplits; eauto.
       erewrite Memory.lower_o; eauto. condtac; ss. des. subst. ss.
   }
   i. des. inv PMREL.
   - exploit MemoryReorder.add_lower; try exact MEM; eauto. i. des.
-    { subst. erewrite Memory.lower_get0 in NOPRM; eauto. congr. }
+    { subst. exploit Memory.lower_get0; try exact LOWERP2; eauto. i. des. congr. }
     esplits; eauto; cycle 2.
     + erewrite Memory.lower_o; eauto. condtac; ss. des. subst. congr.
     + congr.
   - exploit MemoryReorder.split_lower_diff; try exact MEM; eauto.
     { ii. inv H. exploit DISJ; eauto. i.
-      exploit Memory.lower_get0; try exact LOWERP2; eauto. i. congr.
+      exploit Memory.lower_get0; try exact LOWERP2; eauto. i. des. congr.
     }
     i. des.
-    { subst. erewrite Memory.lower_get0 in NOPRM; eauto. congr. }
+    { subst. exploit Memory.lower_get0; try exact LOWERP2; eauto. i. des. congr. }
     esplits; eauto; cycle 2.
     + erewrite Memory.lower_o; eauto. condtac; ss. des. subst. congr.
     + i. inv KIND. erewrite Memory.lower_o; eauto. condtac; ss.
       * des. subst. exploit DISJ; eauto.
-        erewrite Memory.lower_get0; [|eauto]. congr.
+        exploit Memory.lower_get0; try exact LOWERP2; eauto. i. des. congr.
       * eapply DISJ. eauto.
   - exploit MemoryReorder.lower_lower; try exact MEM; eauto. i. des.
-    { subst. erewrite Memory.lower_get0 in NOPRM; eauto. congr. }
+    { subst. exploit Memory.lower_get0; try exact LOWERP2; eauto. i. des. congr. }
     esplits; eauto; cycle 2.
     + erewrite Memory.lower_o; eauto. condtac; ss. des. subst. congr.
     + congr.

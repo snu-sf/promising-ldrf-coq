@@ -230,9 +230,7 @@ Module Local.
       (RELEASED: released = TView.write_released lc1.(tview) sc1 loc to releasedm ord)
       (WRITABLE: TView.writable lc1.(tview).(TView.cur) sc1 loc to ord)
       (WRITE: Memory.write lc1.(promises) mem1 loc from to val released promises2 mem2 kind)
-      (RELEASE: Ordering.le Ordering.strong_relaxed ord ->
-                Memory.nonsynch_loc loc lc1.(promises) /\
-                kind = Memory.op_kind_add):
+      (RELEASE: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc lc1.(promises)):
       write_step lc1 sc1 mem1 loc from to val releasedm released ord
                  (mk (TView.write_tview lc1.(tview) sc1 loc to ord) promises2)
                  sc1 mem2 kind
@@ -353,6 +351,20 @@ Module Local.
     - apply TViewFacts.write_tview_incr. auto.
     - refl.
     - inv WRITE. inv PROMISE; auto.
+  Qed.
+
+  Lemma write_step_strong_relaxed
+        lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
+        (STEP: write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
+        (ORD: Ordering.le Ordering.strong_relaxed ord):
+    negb (Memory.op_kind_is_lower kind).
+  Proof.
+    destruct kind; ss.
+    inv STEP. specialize (RELEASE ORD).
+    inv WRITE. inv PROMISE.
+    exploit Memory.lower_get0; try exact PROMISES; eauto. i. des.
+    exploit RELEASE; eauto. s. i. subst. inv REL_LE.
+    revert H0. unfold TView.write_released. condtac; ss. by destruct ord.
   Qed.
 
   Lemma fence_step_future lc1 sc1 mem1 ordr ordw lc2 sc2

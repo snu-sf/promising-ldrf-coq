@@ -133,7 +133,7 @@ Proof.
         + by rewrite IdentMap.gso.
       - s. i. exploit LR; eauto. i. des. inv PROMISE.
         + erewrite Memory.add_o; eauto. condtac; ss; i.
-          * des. subst. exploit Memory.add_get0; eauto. congr.
+          * des. subst. exploit Memory.add_get0; eauto. i. des. congr.
           * guardH o. esplits; eauto.
             ii. inv H. revert TID0. rewrite IdentMap.gsspec. condtac; ss.
             { i. inv TID0. apply inj_pair2 in H1. subst. ss.
@@ -144,11 +144,14 @@ Proof.
         + erewrite Memory.split_o; eauto. repeat condtac; ss; i.
           * des. subst. exploit Memory.split_get0; eauto. i. des. congr.
           * guardH o. des. subst. esplits; eauto.
-            { exfalso. eapply NOT. econs; eauto. eapply Memory.split_get0. eauto. }
+            { exfalso. eapply NOT. econs; eauto.
+              hexploit Memory.split_get0; try exact PROMISES; eauto. i. des. eauto.
+            }
             ii. inv H. revert TID0. rewrite IdentMap.gsspec. condtac; ss.
             { i. inv TID0. apply inj_pair2 in H1. subst. ss.
               revert PROMISES0. erewrite Memory.split_o; eauto. repeat condtac; ss. i. inv PROMISES0.
-              eapply NOT. econs; eauto. eapply Memory.split_get0; eauto.
+              guardH o0. eapply NOT. econs; eauto.
+              hexploit Memory.split_get0; try exact PROMISES; eauto. i. des. eauto.
             }
             { i. eapply NOT. econs; eauto. }
           * guardH o. guardH o0. esplits; eauto.
@@ -159,7 +162,7 @@ Proof.
             }
             { i. eapply NOT. econs; eauto. }
         + erewrite Memory.lower_o; eauto. condtac; ss; i.
-          * des. subst. exploit Memory.lower_get0; try exact PROMISES; eauto. i.
+          * des. subst. exploit Memory.lower_get0; try exact PROMISES; eauto. i. des.
             exfalso. eapply NOT. econs; eauto.
           * guardH o. esplits; eauto.
             ii. inv H. revert TID0. rewrite IdentMap.gsspec. condtac; ss.

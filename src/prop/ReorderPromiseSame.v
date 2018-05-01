@@ -174,7 +174,7 @@ Proof.
             eapply Memory.split_closed_opt_view; eauto.
           }
           { ii. inv H. exploit Memory.split_get0; try exact MEM1; eauto. i. des.
-            revert GET2. erewrite Memory.add_o; eauto. condtac; ss. des; congr.
+            revert GET. erewrite Memory.add_o; eauto. condtac; ss. des; congr.
           }
           { congr. }
         * auto.
@@ -241,12 +241,12 @@ Proof.
             eapply Memory.split_closed_opt_view; cycle 1; eauto.
           }
           { ii. inv H. exploit Memory.split_get0; try exact MEM1; eauto. i. des.
-            revert GET2. erewrite Memory.split_o; eauto. repeat condtac; ss.
+            revert GET. erewrite Memory.split_o; eauto. repeat condtac; ss.
             guardH o0. des; congr.
           }
           { i. inv KIND. splits.
             - ii. subst. exploit Memory.split_get0; try exact MEM1; eauto. i. des.
-              revert GET2. erewrite Memory.split_o; eauto. repeat condtac; ss.
+              revert GET. erewrite Memory.split_o; eauto. repeat condtac; ss.
               guardH o. des; congr.
             - ii. inv H. eapply LOCTS; eauto.
           }
@@ -443,9 +443,8 @@ Proof.
   unguardH STEP5. des.
   - inv STEP5.
     exploit promise_fulfill_write_exact; try exact STEP4; eauto.
-    { i. exploit ORD; eauto. i. des. subst.
-      inv STEP0. inv PROMISE. exploit Memory.add_get0; try exact PROMISES; eauto.
-      inv STEP1. exploit Memory.promise_get2; eauto. s. i. des. congr.
+    { i. hexploit ORD; eauto. i.
+      eapply promise_step_nonsynch_loc_inv; try exact STEP1; eauto.
     }
     { inv STEP1. ss. }
     i. esplits; eauto. left; eauto.
@@ -455,7 +454,7 @@ Proof.
     i. des.
     exploit fulfill_step_future; try exact STEP7; try exact WF0; eauto; try by viewtac. i. des.
     exploit promise_fulfill_write_exact; try exact STEP4; eauto; try by viewtac.
-    { i. exploit ORD; eauto. i. des. subst. splits; auto.
+    { i. hexploit ORD; eauto. i.
       eapply promise_step_nonsynch_loc_inv; try exact STEP1; eauto.
     }
     { subst. inv STEP1. ss. }
@@ -492,10 +491,10 @@ Proof.
     inv STEP1. inv PROMISE. inv MEM. inv SPLIT. auto.
   - ii. subst. apply H. splits; auto.
     inv STEP2. inv WRITE. inv PROMISE. exploit Memory.split_get0; eauto. i. des.
-    inv STEP1. inv PROMISE. revert GET3. erewrite Memory.split_o; eauto. repeat condtac; ss.
-    + i. des. inv GET3. inv MEM1. inv SPLIT.
+    inv STEP1. inv PROMISE. revert GET0. erewrite Memory.split_o; eauto. repeat condtac; ss.
+    + i. des. inv GET0. inv MEM1. inv SPLIT.
       exfalso. eapply Time.lt_strorder. eauto.
-    + guardH o. i. des. inv GET3. inv MEM. inv SPLIT. auto.
+    + guardH o. i. des. inv GET0. inv MEM. inv SPLIT. auto.
     + guardH o. des; congr.
 Qed.
 

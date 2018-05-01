@@ -80,7 +80,7 @@ Proof.
         * eapply Memory.add_closed_opt_view; cycle 1; eauto.
     - exploit MemoryReorder.add_split; try exact MEM; try exact MEM0; eauto. i. des.
       { subst. exfalso. eapply Memory.disjoint_get; try apply DISJOINT2; s; cycle 1.
-        - eapply Memory.split_get0. eauto.
+        - hexploit Memory.split_get0; try exact PROMISES0; eauto. i. des. eauto.
         - erewrite Memory.add_o; eauto. condtac; [|des; congr]. ss.
       }
       esplits.
@@ -92,7 +92,7 @@ Proof.
         * eapply Memory.split_closed_opt_view; eauto.
     - exploit MemoryReorder.add_lower; try exact MEM; try exact MEM0; eauto. i. des.
       { subst. exfalso. eapply Memory.disjoint_get; try apply DISJOINT2; s; cycle 1.
-        - eapply Memory.lower_get0. eauto.
+        - hexploit Memory.lower_get0; try exact PROMISES0; eauto. i. des. eauto.
         - erewrite Memory.add_o; eauto. condtac; [|des; congr]. ss.
       }
       esplits.
@@ -114,15 +114,15 @@ Proof.
         * eapply Memory.add_closed_opt_view; eauto.
     - exploit MemoryReorder.split_split; try exact MEM; try exact MEM0; eauto.
       { ii. inv H. exfalso. eapply Memory.disjoint_get; try apply DISJ.
-        - eapply Memory.split_get0. eauto.
-        - eapply Memory.split_get0. eauto.
+        - hexploit Memory.split_get0; try exact PROMISES; eauto. i. des. eauto.
+        - hexploit Memory.split_get0; try exact PROMISES0; eauto. i. des. eauto.
       }
       i. des.
       { subst. exfalso. eapply Memory.disjoint_get_general; try (symmetry; apply DISJ).
         - inv MEM. inv SPLIT. apply TS12.
         - inv PROMISES. inv SPLIT. apply Time.le_lteq. left. apply TS23.
-        - eapply Memory.split_get0. eauto.
-        - eapply Memory.split_get0. eauto.
+        - hexploit Memory.split_get0; try exact PROMISES0; eauto. i. des. eauto.
+        - hexploit Memory.split_get0; try exact PROMISES; eauto. i. des. eauto.
       }
       esplits.
       + econs.
@@ -133,15 +133,15 @@ Proof.
         * eapply Memory.split_closed_opt_view; cycle 1; eauto.
     - exploit MemoryReorder.split_lower_diff; try exact MEM; try exact MEM0; eauto.
       { ii. inv H. exfalso. eapply Memory.disjoint_get; try apply DISJ.
-        - eapply Memory.split_get0. eauto.
-        - eapply Memory.lower_get0. eauto.
+        - hexploit Memory.split_get0; try exact PROMISES; eauto. i. des. eauto.
+        - hexploit Memory.lower_get0; try exact PROMISES0; eauto. i. des. eauto.
       }
       i. des.
       { subst. exfalso. eapply Memory.disjoint_get_general; try (symmetry; apply DISJ).
         - inv MEM1. inv LOWER. eauto.
         - inv MEM. inv SPLIT. apply Time.le_lteq. left. eauto.
-        - eapply Memory.lower_get0. eauto.
-        - eapply Memory.split_get0. eauto.
+        - hexploit Memory.lower_get0; try exact PROMISES0; eauto. i. des. eauto.
+        - hexploit Memory.split_get0; try exact PROMISES; eauto. i. des. eauto.
       }
       esplits.
       + econs.
@@ -163,8 +163,8 @@ Proof.
     - exploit MemoryReorder.lower_split; try exact MEM; try exact MEM0; eauto. i. des.
       unguardH FROM1. des.
       { inv FROM1. exfalso. eapply Memory.disjoint_get; try apply DISJ.
-        - eapply Memory.lower_get0. eauto.
-        - eapply Memory.split_get0. eauto.
+        - hexploit Memory.lower_get0; try exact PROMISES; eauto. i. des. eauto.
+        - hexploit Memory.split_get0; try exact PROMISES0; eauto. i. des. eauto.
       }
       inv FROM0.
       esplits.
@@ -176,8 +176,8 @@ Proof.
         * eapply Memory.split_closed_opt_view; eauto.
     - exploit MemoryReorder.lower_lower; try exact MEM; try exact MEM0; eauto. i. des.
       { subst. exfalso. eapply Memory.disjoint_get; try apply DISJ.
-        - eapply Memory.lower_get0. eauto.
-        - eapply Memory.lower_get0. eauto.
+        - hexploit Memory.lower_get0; try exact PROMISES; eauto. i. des. eauto.
+        - hexploit Memory.lower_get0; try exact PROMISES0; eauto. i. des. eauto.
       }
       esplits.
       + econs.

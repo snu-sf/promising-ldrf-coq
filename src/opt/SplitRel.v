@@ -230,7 +230,7 @@ Proof.
   { by inv STEP1. }
   i. des.
   exploit promise_fulfill_write; try exact STEP_SRC; try exact STEP_SRC0; eauto.
-  { i. exploit ORD; eauto. i. des. splits; ss.
+  { i. hexploit ORD; eauto. i. des. splits; ss.
     eapply sim_local_nonsynch_loc; eauto.
   }
   i. des. esplits; eauto. etrans; eauto.

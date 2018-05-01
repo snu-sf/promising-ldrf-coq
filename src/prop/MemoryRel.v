@@ -117,12 +117,12 @@ Lemma lower_mem_eqlerel
 Proof.
   econs; ii.
   - revert IN. erewrite Memory.lower_o; eauto. condtac; ss.
-    + i. des. inv IN. exploit Memory.lower_get0; eauto. i. esplits; eauto.
-      inv LOWER. inv LOWER0. auto.
+    + i. des. inv IN. exploit Memory.lower_get0; eauto. i. des. esplits; eauto.
     + i. esplits; eauto. refl.
   - erewrite Memory.lower_o; eauto. condtac; ss.
-    + des. subst. revert IN. erewrite Memory.lower_get0; eauto. i. inv IN.
-      esplits; eauto. inv LOWER. inv LOWER0. auto.
+    + des. subst. exploit Memory.lower_get0; eauto. i. des.
+      rewrite GET in IN. inv IN.
+      esplits; eauto.
     + esplits; eauto. refl.
 Qed.
 
@@ -137,33 +137,33 @@ Lemma mem_eqrel_memory_op
 Proof.
   inv OP1; inv OP2; try by econs.
   - exploit Memory.split_get0; eauto. i. des.
-    apply EQMEM in GET3. des.
+    apply EQMEM in GET0. des.
     inv ADD. inv ADD0. exfalso. eapply DISJOINT; eauto.
     + apply Interval.mem_ub. auto.
     + inv SPLIT. inv SPLIT0. econs; auto. left. auto.
-  - exploit Memory.lower_get0; eauto. i.
-    apply EQMEM in x0. des.
-    erewrite Memory.add_get0 in IN; eauto. congr.
+  - exploit Memory.lower_get0; eauto. i. des.
+    apply EQMEM in GET. des.
+    exploit Memory.add_get0; eauto. i. des. congr.
   - exploit Memory.split_get0; eauto. i. des.
-    apply EQMEM in GET3. des.
+    apply EQMEM in GET0. des.
     inv ADD. inv ADD0. exfalso. eapply DISJOINT; eauto.
     + apply Interval.mem_ub. auto.
     + inv SPLIT. inv SPLIT0. econs; auto. left. auto.
   - exploit Memory.split_get0; try exact SPLIT; eauto. i. des.
-    apply EQMEM in GET3. des.
+    apply EQMEM in GET0. des.
     exploit Memory.split_get0; eauto. i. des.
     exploit MemoryFacts.get_same_from; [exact IN|exact GET3|..].
     { ii. subst. inv SPLIT. inv SPLIT1. inv TS23. }
     { ii. subst. inv SPLIT0. inv SPLIT1. inv TS23. }
     i. des. inv x1. econs; ss.
-  - exploit Memory.lower_get0; eauto. i.
-    apply EQMEM in x0. des.
+  - exploit Memory.lower_get0; eauto. i. des.
+    apply EQMEM in GET. des.
     exploit Memory.split_get0; eauto. i. des. congr.
-  - exploit Memory.lower_get0; eauto. i.
-    apply EQMEM in x0. des.
-    erewrite Memory.add_get0 in IN; eauto. congr.
-  - exploit Memory.lower_get0; eauto. i.
-    apply EQMEM in x0. des.
+  - exploit Memory.lower_get0; eauto. i. des.
+    apply EQMEM in GET. des.
+    exploit Memory.add_get0; eauto. i. des. congr.
+  - exploit Memory.lower_get0; eauto. i. des.
+    apply EQMEM in GET. des.
     exploit Memory.split_get0; eauto. i. des. congr.
 Qed.
 
@@ -204,7 +204,7 @@ Lemma mem_eqlerel_split
     <<SPLIT2: Memory.split m1 loc ts1 ts2 ts3 val2 val3 released2 released3 m1'>> /\
     <<MEMLE': mem_eqlerel m1' m2'>>.
 Proof.
-  exploit Memory.split_get0; eauto. i. des. apply PRM1 in GET3.
+  exploit Memory.split_get0; eauto. i. des. apply PRM1 in GET0.
   exploit (@Memory.split_exists m1 loc ts1 ts2 ts3);
     try by inv SPLIT2; inv SPLIT; eauto. i. des.
   esplits; eauto.
@@ -232,7 +232,7 @@ Lemma mem_eqlerel_lower
     <<LOWER1: Memory.lower m1 loc from to val released1 released2 m1'>> /\
     <<MEMLE': mem_eqlerel m1' m2'>>.
 Proof.
-  exploit Memory.lower_get0; eauto. i. apply PRM1 in x0.
+  exploit Memory.lower_get0; eauto. i. des. apply PRM1 in GET.
   exploit (@Memory.lower_exists m1 loc from to val released1 released2);
     try by inv LOWER2; inv LOWER; eauto; try by viewtac. i. des.
   esplits; eauto.
@@ -306,7 +306,7 @@ Lemma mem_eqlerel_split_forward
     <<MEMLE': mem_eqlerel m2' m1'>>.
 Proof.
   exploit Memory.split_get0; eauto. i. des.
-  apply MEMLE in GET3. i. des.
+  apply MEMLE in GET0. i. des.
   exploit (@Memory.split_exists m1 loc ts1 ts2 ts3); eauto;
     try by inv SPLIT2; inv SPLIT; eauto. i. des.
   esplits; eauto.
@@ -332,8 +332,8 @@ Lemma mem_eqlerel_lower_forward
     <<LOWER1: Memory.lower m1 loc from to val released1' released2 m1'>> /\
     <<MEMLE': mem_eqlerel m2' m1'>>.
 Proof.
-  exploit Memory.lower_get0; eauto. i.
-  apply MEMLE in x0. des.
+  exploit Memory.lower_get0; eauto. i. des.
+  apply MEMLE in GET. des.
   exploit (@Memory.lower_exists m1 loc from to val rel2 released2); eauto;
     try by inv LOWER2; inv LOWER; eauto; try by viewtac.
   i. des.

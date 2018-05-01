@@ -144,7 +144,7 @@ Proof.
       inv DISJOINT. exploit DISJOINT0; eauto. i. des.
       symmetry in x. eapply Interval.le_disjoint; eauto. econs; [refl|].
       inv MEM. inv SPLIT. left. auto.
-    - exploit Memory.lower_get0; try exact PROMISES; eauto. s. i.
+    - exploit Memory.lower_get0; try exact PROMISES; eauto. s. i. des.
       symmetry. eapply DISJOINT; eauto.
   }
   { eapply MemoryFacts.write_time_lt. eauto. }
@@ -508,7 +508,8 @@ Proof.
       (try by esplits; eauto).
     + ss. apply promise_pf_inv in PFREE; eauto. des. subst. inv PROMISE.
       destruct msg2. exploit Memory.op_get_inv; try exact PROMISES; eauto. i. des.
-      * subst. esplits; eauto. eapply Memory.lower_get0. eauto.
+      * subst. esplits; eauto.
+        hexploit Memory.lower_get0; try exact PROMISES0; eauto. i. des. eauto.
       * esplits; eauto.
     + inv WRITE.
       revert PROMISES. erewrite Memory.remove_o; eauto. condtac; ss.

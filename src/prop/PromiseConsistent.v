@@ -70,7 +70,8 @@ Lemma fulfill_unset_promises
   l = loc /\ t = ts /\ f = from /\ m.(Message.val) = val /\ View.opt_le rel m.(Message.released).
 Proof.
   revert TH2. erewrite Memory.remove_o; eauto. condtac; ss; [|congr].
-  des. subst. erewrite Memory.remove_get0 in TH1; eauto. inv TH1.
+  des. subst. exploit Memory.remove_get0; eauto. i. des.
+  rewrite GET in TH1. inv TH1.
   esplits; eauto. refl.
 Qed.
 

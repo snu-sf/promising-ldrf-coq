@@ -118,7 +118,7 @@ Module MemorySplit.
       <<STEP2: Memory.remove promises1 loc ts1 ts2 val2 released2 promises2>> /\
       <<STEP3: Memory.remove promises2 loc ts2 ts3 val3 released3 promises3>>.
   Proof.
-    exploit Memory.remove_get0; eauto. i.
+    exploit Memory.remove_get0; eauto. i. des.
     exploit Memory.split_exists; eauto. i. des.
     exploit LE; eauto. i.
     exploit Memory.split_exists; eauto. i. des.
@@ -126,56 +126,4 @@ Module MemorySplit.
     esplits; eauto.
   Qed.
 
-  Lemma commute_add_split_add_add
-        mem0 loc ts1 ts2 ts3 val2 val3 released2 released3 mem1 mem2
-        (ADD1: Memory.add mem0 loc ts1 ts3 val3 released3 mem1)
-        (SPLIT2: Memory.split mem1 loc ts1 ts2 ts3 val2 val3 released2 released3 mem2):
-    exists mem1',
-      <<ADD1: Memory.add mem0 loc ts1 ts2 val2 released2 mem1'>> /\
-      <<ADD2: Memory.add mem1' loc ts2 ts3 val3 released3 mem2>>.
-  Proof.
-    exploit (@Memory.add_exists mem0 loc ts1 ts2 val2 released2); eauto.
-    { i. inv ADD1. inv ADD. hexploit DISJOINT; eauto. i.
-      eapply Interval.le_disjoint; eauto. econs; [refl|].
-      inv SPLIT2. inv SPLIT. left. auto.
-    }
-    { inv SPLIT2. inv SPLIT. auto. }
-    { inv SPLIT2. inv SPLIT. auto. }
-    i. des.
-    exploit (@Memory.add_exists mem3 loc ts2 ts3 val3 released3); eauto.
-    { i. revert GET2. erewrite Memory.add_o; eauto. condtac; ss.
-      - des. subst. i. inv GET2.
-        symmetry. apply Interval.disjoint_imm.
-      - i. inv ADD1. inv ADD. hexploit DISJOINT; eauto. i.
-        eapply Interval.le_disjoint; eauto. econs; [|refl].
-        inv SPLIT2. inv SPLIT. left. auto.
-    }
-    { inv SPLIT2. inv SPLIT. auto. }
-    { inv ADD1. inv ADD. auto. }
-    i. des.
-    cut (mem4 = mem2); [by i; subst; eauto|].
-    apply Memory.ext. i.
-    erewrite Memory.add_o; eauto. erewrite Memory.add_o; eauto.
-    erewrite (@Memory.split_o mem2); eauto. erewrite (@Memory.add_o mem1); eauto.
-    repeat (condtac; ss). des. repeat subst.
-    inv SPLIT2. inv SPLIT. exfalso. eapply Time.lt_strorder. eauto.
-  Qed.
-
-  Lemma commute_promise_add_promise_split_promise_add_promise_add
-        promises0 mem0 loc ts1 ts2 ts3 val2 val3 released2 released3
-        promises1 mem1
-        promises2 mem2
-        (ADD1: Memory.promise promises0 mem0 loc ts1 ts3 val3 released3 promises1 mem1 Memory.op_kind_add)
-        (SPLIT2: Memory.promise promises1 mem1 loc ts1 ts2 val2 released2 promises2 mem2 (Memory.op_kind_split ts3 val3 released3)):
-    exists promises1' mem1',
-      <<ADD1: Memory.promise promises0 mem0 loc ts1 ts2 val2 released2 promises1' mem1' Memory.op_kind_add>> /\
-      <<ADD2: Memory.promise promises1' mem1' loc ts2 ts3 val3 released3 promises2 mem2 Memory.op_kind_add>>.
-  Proof.
-    inv ADD1. inv SPLIT2.
-    exploit commute_add_split_add_add; try exact PROMISES; eauto. i. des.
-    exploit commute_add_split_add_add; try exact MEM; eauto. i. des.
-    esplits.
-    - econs; eauto.
-    - econs; eauto.
-  Qed.
 End MemorySplit.

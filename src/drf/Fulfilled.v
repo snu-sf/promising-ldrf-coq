@@ -41,7 +41,7 @@ Proof.
   - inv LOCAL0. inv WRITE. inv PROMISE.
     { i. inv NP. econs; s.
       - erewrite Memory.add_o; eauto. condtac; ss.
-        des. subst. exploit Memory.add_get0; eauto. congr.
+        des. subst. exploit Memory.add_get0; eauto. i. des. congr.
       - ii. inv H. revert TID0. rewrite IdentMap.gsspec. condtac.
         + i. inv TID0. apply inj_pair2 in H1. subst. ss.
           revert PROMISES0. erewrite Memory.remove_o; eauto. condtac; ss.
@@ -68,7 +68,7 @@ Proof.
     { i. inv NP. econs; s.
       - erewrite Memory.lower_o; eauto. condtac; ss.
         des. subst. exfalso. eapply FULFILLED. econs; eauto.
-        hexploit Memory.lower_get0; try exact PROMISES; eauto.
+        hexploit Memory.lower_get0; try exact PROMISES; eauto. i. des. eauto.
       - ii. inv H. revert TID0. rewrite IdentMap.gsspec. condtac.
         + i. inv TID0. apply inj_pair2 in H1. subst. ss.
           revert PROMISES0. erewrite Memory.remove_o; eauto. condtac; ss.
@@ -81,7 +81,7 @@ Proof.
     inv LOCAL2. inv WRITE. inv PROMISE.
     { i. inv NP. econs; s.
       - erewrite Memory.add_o; eauto. condtac; ss.
-        des. subst. exploit Memory.add_get0; eauto. congr.
+        des. subst. exploit Memory.add_get0; eauto. i. des. congr.
       - ii. inv H. revert TID0. rewrite IdentMap.gsspec. condtac.
         + i. inv TID0. apply inj_pair2 in H1. subst. ss.
           revert PROMISES0. erewrite Memory.remove_o; eauto. condtac; ss.
@@ -108,7 +108,7 @@ Proof.
     { i. inv NP. econs; s.
       - erewrite Memory.lower_o; eauto. condtac; ss.
         des. subst. exfalso. eapply FULFILLED. econs; eauto.
-        hexploit Memory.lower_get0; try exact PROMISES; eauto.
+        hexploit Memory.lower_get0; try exact PROMISES; eauto. i. des. eauto.
       - ii. inv H. revert TID0. rewrite IdentMap.gsspec. condtac.
         + i. inv TID0. apply inj_pair2 in H1. subst. ss.
           revert PROMISES0. erewrite Memory.remove_o; eauto. condtac; ss.
@@ -137,7 +137,7 @@ Proof.
           des; congr.
         + i. exploit Memory.add_get0; eauto. i.
           inv WF. inv WF0. exploit THREADS; eauto. i. inv x.
-          apply PROMISES1 in PROMISES0. congr.
+          apply PROMISES1 in PROMISES0. i. des. congr.
     }
     { econs; s.
       - erewrite Memory.split_o; eauto. condtac; ss.
@@ -159,7 +159,7 @@ Proof.
         + i. exploit Memory.lower_get0; eauto. i.
           inv WF. inv WF0. exploit DISJOINT; eauto. i.
           eapply Memory.disjoint_get; try apply x; eauto.
-          eapply Memory.lower_get0. eauto.
+          hexploit Memory.lower_get0; try exact PROMISES; eauto. i. des. eauto.
     }
   - inv LOCAL1. clear GET.
     inv LOCAL2. inv WRITE. inv PROMISE.
@@ -169,7 +169,7 @@ Proof.
         + i. inv TID0. apply inj_pair2 in H1. subst. ss.
           revert PROMISES0. erewrite Memory.remove_o; eauto. condtac; ss.
           des; congr.
-        + i. exploit Memory.add_get0; eauto. i.
+        + i. exploit Memory.add_get0; eauto. i. des.
           inv WF. inv WF0. exploit THREADS; eauto. i. inv x.
           apply PROMISES1 in PROMISES0. congr.
     }
@@ -190,10 +190,10 @@ Proof.
         + i. inv TID0. apply inj_pair2 in H1. subst. ss.
           revert PROMISES0. erewrite Memory.remove_o; eauto. condtac; ss.
           des; congr.
-        + i. exploit Memory.lower_get0; eauto. i.
+        + i. exploit Memory.lower_get0; eauto. i. des.
           inv WF. inv WF0. exploit DISJOINT; eauto. i.
           eapply Memory.disjoint_get; try apply x; eauto.
-          eapply Memory.lower_get0. eauto.
+          hexploit Memory.lower_get0; try exact PROMISES; eauto. i. des. eauto.
     }
 Qed.
 
@@ -335,13 +335,14 @@ Proof.
     apply promise_pf_inv in PFREE. des. subst. inv PROMISE.
     i. inv NP. econs; ss.
     + erewrite Memory.lower_o; eauto. condtac; ss. des. subst.
-      exfalso. eapply FULFILLED. econs; eauto. eapply Memory.lower_get0. eauto.
+      exfalso. eapply FULFILLED. econs; eauto.
+      hexploit Memory.lower_get0; try exact PROMISES; eauto. i. des. eauto.
     + ii. inv H.
       revert TID0. rewrite IdentMap.gsspec. condtac; ss; i.
       * inv TID0. ss. eapply FULFILLED.
         destruct msg0. hexploit Memory.op_get_inv; try exact PROMISES0; eauto.
         i. des.
-        { subst. econs; eauto. eapply Memory.lower_get0. eauto. }
+        { subst. econs; eauto. hexploit Memory.lower_get0; try exact PROMISES; eauto. i. des. eauto. }
         { econs; eauto. }
       * eapply FULFILLED. econs; eauto.
   - i. inv NP. econs; eauto. ii. inv H. ss.

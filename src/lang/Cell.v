@@ -514,45 +514,63 @@ Module Cell.
   Lemma add_get0
         cell1 from1 to1 val1 released1 cell2
         (ADD: add cell1 from1 to1 val1 released1 cell2):
-    get to1 cell1 = None.
+    <<GET: get to1 cell1 = None>> /\
+    <<GET: get to1 cell2 = Some (from1, Message.mk val1 released1)>>.
   Proof.
-    inv ADD. unfold get.
-    destruct (DOMap.find to1 (raw cell1)) as [[]|] eqn:X; auto.
-    exfalso. exploit DISJOINT; eauto.
-    - apply Interval.mem_ub. auto.
-    - apply Interval.mem_ub.
-      destruct cell1.(Cell.WF). exploit VOLUME; eauto. i. des; ss.
-      inv x. inv TO.
+    inv ADD. unfold get. splits.
+    - destruct (DOMap.find to1 (raw cell1)) as [[]|] eqn:X; auto.
+      exfalso. exploit DISJOINT; eauto.
+      + apply Interval.mem_ub. auto.
+      + apply Interval.mem_ub.
+        destruct cell1.(Cell.WF). exploit VOLUME; eauto. i. des; ss.
+        inv x. inv TO.
+    - rewrite CELL2, DOMap.gsspec. condtac; ss.
   Qed.
 
   Lemma split_get0
         cell1 ts1 ts2 ts3 val2 val3 released2 released3 cell2
         (SPLIT: split cell1 ts1 ts2 ts3 val2 val3 released2 released3 cell2):
-    <<GET2: get ts2 cell1 = None>> /\
-    <<GET3: get ts3 cell1 = Some (ts1, Message.mk val3 released3)>>.
+    <<GET: get ts2 cell1 = None>> /\
+    <<GET: get ts3 cell1 = Some (ts1, Message.mk val3 released3)>> /\
+    <<GET: get ts2 cell2 = Some (ts1, Message.mk val2 released2)>> /\
+    <<GET: get ts3 cell2 = Some (ts2, Message.mk val3 released3)>>.
   Proof.
     inv SPLIT. splits; auto.
-    destruct (get ts2 cell1) as [[]|] eqn:X; auto.
-    destruct cell1.(WF). exfalso. eapply DISJOINT.
-    - apply X.
-    - apply GET2.
-    - ii. subst. eapply Time.lt_strorder. eauto.
-    - apply Interval.mem_ub. exploit VOLUME; eauto. i. des; auto.
-      inv x. inv TS12.
-    - econs; ss. left. auto.
+    - destruct (get ts2 cell1) as [[]|] eqn:X; auto.
+      destruct cell1.(WF). exfalso. eapply DISJOINT.
+      + apply X.
+      + apply GET2.
+      + ii. subst. eapply Time.lt_strorder. eauto.
+      + apply Interval.mem_ub. exploit VOLUME; eauto. i. des; auto.
+        inv x. inv TS12.
+      + econs; ss. left. auto.
+    - unfold get. rewrite CELL2. rewrite ? DOMap.gsspec.
+      repeat condtac; ss.
+    - unfold get. rewrite CELL2. rewrite ? DOMap.gsspec.
+      repeat condtac; ss.
+      subst. timetac.
   Qed.
 
   Lemma lower_get0
         cell1 from to val released1 released2 cell2
         (LOWER: lower cell1 from to val released1 released2 cell2):
-    get to cell1 = Some (from, Message.mk val released1).
-  Proof. inv LOWER. auto. Qed.
+    <<GET: get to cell1 = Some (from, Message.mk val released1)>> /\
+    <<GET: get to cell2 = Some (from, Message.mk val released2)>> /\
+    <<REL_LE: View.opt_le released2 released1>>.
+  Proof.
+    inv LOWER. splits; auto.
+    unfold get. rewrite <- H0. rewrite DOMap.gsspec. condtac; ss.
+  Qed.
 
   Lemma remove_get0
         cell1 from to val released cell2
         (REMOVE: remove cell1 from to val released cell2):
-    get to cell1 = Some (from, Message.mk val released).
-  Proof. inv REMOVE. auto. Qed.
+    <<GET: get to cell1 = Some (from, Message.mk val released)>> /\
+    <<GET: get to cell2 = None>>.
+  Proof.
+    inv REMOVE. splits; auto.
+    unfold get. rewrite <- H0. rewrite DOMap.grspec. condtac; ss.
+  Qed.
 
   Lemma add_inhabited
         cell1 cell2 from to val released

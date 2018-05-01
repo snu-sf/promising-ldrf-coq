@@ -16,7 +16,6 @@ Require Import Memory.
 Require Import MemoryFacts.
 
 Require Import SimMemory.
-Require Import MemorySplit.
 
 Set Implicit Arguments.
 
@@ -36,7 +35,7 @@ Module MemoryReorder.
     exploit (@Memory.add_exists mem0 loc2 from2 to2).
     { i. inv ADD2. inv ADD. eapply DISJOINT.
       etrans; [eapply Memory.add_o; eauto|]. condtac; ss; eauto.
-      des. subst. erewrite Memory.add_get0 in GET2; eauto. congr.
+      des. subst. exploit Memory.add_get0; eauto. i. des. congr.
     }
     { inv ADD2. inv ADD. auto. }
     { inv ADD2. inv ADD. eauto. }
@@ -55,15 +54,51 @@ Module MemoryReorder.
     esplits; eauto; cycle 1.
     { ii. inv H.
       exploit Memory.add_get0; try exact ADD2; eauto.
-      erewrite Memory.add_o; eauto. condtac; ss. des; congr.
+      erewrite Memory.add_o; eauto. condtac; s; i; des; congr.
     }
     cut (mem4 = mem2); [by i; subst; eauto|].
     apply Memory.ext. i.
+    setoid_rewrite Memory.add_o; cycle 1; eauto.
+    erewrite (@Memory.add_o mem3); eauto. erewrite (@Memory.add_o mem1); eauto.
+    repeat (condtac; ss). des. subst.
+    exploit Memory.add_get0; try exact ADD1; eauto. i. des.
+    exploit Memory.add_get0; try exact ADD2; eauto. i. des.
+    congr.
+  Qed.
+
+  Lemma add_split_same
+        mem0 loc ts1 ts2 ts3 val2 val3 released2 released3 mem1 mem2
+        (ADD1: Memory.add mem0 loc ts1 ts3 val3 released3 mem1)
+        (SPLIT2: Memory.split mem1 loc ts1 ts2 ts3 val2 val3 released2 released3 mem2):
+    exists mem1',
+      <<ADD1: Memory.add mem0 loc ts1 ts2 val2 released2 mem1'>> /\
+      <<ADD2: Memory.add mem1' loc ts2 ts3 val3 released3 mem2>>.
+  Proof.
+    exploit (@Memory.add_exists mem0 loc ts1 ts2 val2 released2); eauto.
+    { i. inv ADD1. inv ADD. hexploit DISJOINT; eauto. i.
+      eapply Interval.le_disjoint; eauto. econs; [refl|].
+      inv SPLIT2. inv SPLIT. left. auto.
+    }
+    { inv SPLIT2. inv SPLIT. auto. }
+    { inv SPLIT2. inv SPLIT. auto. }
+    i. des.
+    exploit (@Memory.add_exists mem3 loc ts2 ts3 val3 released3); eauto.
+    { i. revert GET2. erewrite Memory.add_o; eauto. condtac; ss.
+      - des. subst. i. inv GET2.
+        symmetry. apply Interval.disjoint_imm.
+      - i. inv ADD1. inv ADD. hexploit DISJOINT; eauto. i.
+        eapply Interval.le_disjoint; eauto. econs; [|refl].
+        inv SPLIT2. inv SPLIT. left. auto.
+    }
+    { inv SPLIT2. inv SPLIT. auto. }
+    { inv ADD1. inv ADD. auto. }
+    i. des.
+    cut (mem4 = mem2); [by i; subst; eauto|].
+    apply Memory.ext. i.
     erewrite Memory.add_o; eauto. erewrite Memory.add_o; eauto.
-    erewrite (@Memory.add_o mem2); eauto. erewrite (@Memory.add_o mem1); eauto.
+    erewrite (@Memory.split_o mem2); eauto. erewrite (@Memory.add_o mem1); eauto.
     repeat (condtac; ss). des. repeat subst.
-    exploit Memory.add_get0; try exact ADD2; eauto.
-    erewrite Memory.add_o; eauto. condtac; ss.
+    inv SPLIT2. inv SPLIT. exfalso. eapply Time.lt_strorder. eauto.
   Qed.
 
   Lemma add_split
@@ -82,9 +117,9 @@ Module MemoryReorder.
        <<ADD2: Memory.add mem1' loc1 from1 to1 val1 released1 mem2>>).
   Proof.
     exploit Memory.split_get0; eauto. i. des.
-    revert GET3. erewrite Memory.add_o; eauto. condtac; ss.
-    { des. i. inv GET3. left. splits; eauto.
-      eapply MemorySplit.commute_add_split_add_add; eauto.
+    revert GET0. erewrite Memory.add_o; eauto. condtac; ss.
+    { des. i. inv GET0. left. splits; eauto.
+      eapply add_split_same; eauto.
     }
     guardH o. i. right. splits.
     { ii. inv H. unguardH o. des; congr. }
@@ -93,12 +128,12 @@ Module MemoryReorder.
     i. des.
     exploit (@Memory.add_exists mem3 loc1 from1 to1);
       try by inv ADD1; inv ADD; eauto.
-    { i. revert GET0. erewrite Memory.split_o; eauto. repeat condtac; ss.
-      - des. subst. i. inv GET0.
+    { i. revert GET3. erewrite Memory.split_o; eauto. repeat condtac; ss.
+      - des. subst. i. inv GET3.
         inv ADD1. inv ADD. hexploit DISJOINT; eauto. i. symmetry in H.
         symmetry. eapply Interval.le_disjoint; eauto. econs; [refl|].
         inv SPLIT2. inv SPLIT. left. auto.
-      - guardH o0. i. des. inv GET0.
+      - guardH o0. i. des. inv GET3.
         inv ADD1. inv ADD. hexploit DISJOINT; eauto. i. symmetry in H.
         symmetry. eapply Interval.le_disjoint; eauto. econs; [|refl].
         inv SPLIT2. inv SPLIT. left. auto.
@@ -109,10 +144,13 @@ Module MemoryReorder.
     cut (mem4 = mem2); [by i; subst; eauto|].
     apply Memory.ext. i.
     erewrite Memory.add_o; eauto. erewrite Memory.split_o; eauto.
-    erewrite (@Memory.split_o mem2); eauto. erewrite (@Memory.add_o mem1); eauto.
+    setoid_rewrite Memory.split_o; cycle 1; eauto.
+    erewrite (@Memory.add_o mem1); eauto.
     repeat (condtac; ss).
     - des. repeat subst.
-      revert GET2. erewrite Memory.add_o; eauto. condtac; ss.
+      exploit Memory.add_get0; try exact ADD1; eauto. i. des.
+      exploit Memory.split_get0; try exact SPLIT2; eauto. i. des.
+      congr.
     - guardH o0. des. repeat subst. unguardH o. des; congr.
   Qed.
 
@@ -131,14 +169,14 @@ Module MemoryReorder.
   Proof.
     exploit Memory.lower_get0; eauto.
     erewrite Memory.add_o; eauto. condtac; ss.
-    - des. subst. i. inv x0. left. splits; eauto.
+    - des. subst. i. des. inv GET. left. splits; eauto.
       inv ADD1. inv ADD. inv LOWER2. inv LOWER.
       rewrite LocFun.add_add_eq. econs; auto.
       unfold Cell.add in *.
       destruct r, r0. ss. subst.
       unfold LocFun.add. condtac; [|congr]. s.
       rewrite DOMap.add_add_eq. econs; auto.
-    - guardH o. i. right. splits.
+    - guardH o. i. des. right. splits.
       { ii. inv H. unguardH o. des; congr. }
       exploit (@Memory.lower_exists mem0 loc2 from2 to2);
         try by inv LOWER2; inv LOWER; eauto.
@@ -146,8 +184,8 @@ Module MemoryReorder.
       exploit (@Memory.add_exists mem3 loc1 from1 to1).
       { i. revert GET2. erewrite Memory.lower_o; eauto. condtac; ss.
         - des. subst. i. inv GET2.
-          inv ADD1. inv ADD. eapply DISJOINT.
-          eapply Memory.lower_get0. eauto.
+          exploit Memory.lower_get0; eauto. i. des.
+          inv ADD1. inv ADD. eapply DISJOINT. eauto.
         - guardH o0. i. inv ADD1. inv ADD. eapply DISJOINT; eauto.
       }
       { inv ADD1. inv ADD. auto. }
@@ -157,7 +195,8 @@ Module MemoryReorder.
       cut (mem4 = mem2); [by i; subst; eauto|].
       apply Memory.ext. i.
       erewrite Memory.add_o; eauto. erewrite Memory.lower_o; eauto.
-      erewrite (@Memory.lower_o mem2); eauto. erewrite (@Memory.add_o mem1); eauto.
+      setoid_rewrite Memory.lower_o; cycle 1; eauto.
+      erewrite (@Memory.add_o mem1); eauto.
       repeat (condtac; ss). des. repeat subst.
       unguardH o. des; congr.
   Qed.
@@ -175,9 +214,7 @@ Module MemoryReorder.
   Proof.
     exploit (@Memory.remove_exists mem0 loc2 from2 to2).
     { hexploit Memory.remove_get0; eauto.
-      erewrite Memory.add_o; eauto. condtac; ss.
-      { des. subst. congr. }
-      eauto.
+      erewrite Memory.add_o; eauto. condtac; ss; i; des; subst; eauto. congr.
     }
     i. des.
     exploit (@Memory.add_exists mem3 loc1 from1 to1);
@@ -214,22 +251,21 @@ Module MemoryReorder.
     exploit (@Memory.split_exists mem3 loc1 ts11 ts12 ts13);
       try by inv SPLIT1; inv SPLIT; eauto.
     { erewrite Memory.add_o; eauto. condtac; ss.
-      { des. subst.
-        hexploit Memory.add_get0; try exact ADD2; eauto.
-        erewrite Memory.split_o; eauto. repeat condtac; ss.
-      }
-      eapply Memory.split_get0. eauto.
+      - des. subst.
+        hexploit Memory.add_get0; try exact ADD2; eauto. i. des.
+        revert GET. erewrite Memory.split_o; eauto. repeat condtac; ss.
+      - guardH o. hexploit Memory.split_get0; eauto. i. des. eauto.
     }
     i. des.
     splits.
     { ii. inv H.
-      hexploit Memory.add_get0; try exact ADD2; eauto.
-      erewrite Memory.split_o; eauto. repeat condtac; ss.
+      hexploit Memory.add_get0; try exact ADD2; eauto. i. des.
+      revert GET. erewrite Memory.split_o; eauto. repeat condtac; ss.
       guardH o0. des; congr.
     }
     { ii. inv H.
-      hexploit Memory.add_get0; try exact ADD2; eauto.
-      erewrite Memory.split_o; eauto. repeat condtac; ss.
+      hexploit Memory.add_get0; try exact ADD2; eauto. i. des.
+      revert GET. erewrite Memory.split_o; eauto. repeat condtac; ss.
       guardH o. des; congr.
     }
     cut (mem4 = mem2); [by i; subst; eauto|].
@@ -238,11 +274,11 @@ Module MemoryReorder.
     erewrite (@Memory.add_o mem2); eauto. erewrite (@Memory.split_o mem1); eauto.
     repeat (condtac; ss).
     - des. repeat subst.
-      hexploit Memory.add_get0; try exact ADD2; eauto.
-      erewrite Memory.split_o; eauto. repeat condtac; ss.
+      hexploit Memory.add_get0; try exact ADD2; eauto. i. des.
+      revert GET. erewrite Memory.split_o; eauto. repeat condtac; ss.
     - guardH o. des. repeat subst.
-      hexploit Memory.add_get0; try exact ADD2; eauto.
-      erewrite Memory.split_o; eauto. repeat condtac; ss.
+      hexploit Memory.add_get0; try exact ADD2; eauto. i. des.
+      revert GET. erewrite Memory.split_o; eauto. repeat condtac; ss.
   Qed.
 
   Lemma split_split
@@ -262,8 +298,8 @@ Module MemoryReorder.
        <<SPLIT2: Memory.split mem1' loc1 ts11 ts12 ts13 val12 val13 released12 released13 mem2>>).
   Proof.
     exploit Memory.split_get0; try exact SPLIT2; eauto. i. des.
-    revert GET3. erewrite Memory.split_o; eauto. repeat condtac; ss.
-    - i. des. inv GET3. left. splits; auto.
+    revert GET0. erewrite Memory.split_o; eauto. repeat condtac; ss.
+    - i. des. inv GET0. left. splits; auto.
       exploit Memory.split_get0; try exact SPLIT1; eauto. i. des.
       exploit Memory.split_get0; try exact SPLIT2; eauto. i. des.
       revert GET4. erewrite Memory.split_o; eauto. condtac; ss.
@@ -292,7 +328,7 @@ Module MemoryReorder.
         exfalso. eapply Time.lt_strorder. eauto.
       + guardH o. des. repeat subst. inv x0. inv SPLIT.
         exfalso. eapply Time.lt_strorder. eauto.
-    - guardH o. i. des. inv GET3. congr.
+    - guardH o. i. des. inv GET0. congr.
     - guardH o. guardH o0. i. right.
       exploit (@Memory.split_exists mem0 loc2 ts21 ts22 ts23);
         try by inv SPLIT2; inv SPLIT; eauto. i. des.
@@ -300,9 +336,9 @@ Module MemoryReorder.
         try by inv SPLIT1; inv SPLIT; eauto.
       { erewrite Memory.split_o; eauto. repeat condtac; ss.
         - des. subst. hexploit Memory.split_get0; try exact SPLIT2; eauto. i. des.
-          revert GET0. erewrite Memory.split_o; eauto. repeat condtac; ss.
+          revert GET3. erewrite Memory.split_o; eauto. repeat condtac; ss.
         - guardH o1. des. subst. unguardH o0. des; congr.
-        - eapply Memory.split_get0. eauto.
+        - guardH o1. guardH o2. hexploit Memory.split_get0; try exact SPLIT1; eauto. i. des. eauto.
       }
       i. des. splits.
       { ii. inv H. unguardH o. des; congr. }
@@ -313,11 +349,11 @@ Module MemoryReorder.
       repeat (condtac; ss).
       + des. repeat subst.
         exploit Memory.split_get0; try exact SPLIT2; eauto. i. des.
-        revert GET0. erewrite Memory.split_o; eauto. repeat condtac; ss.
+        revert GET3. erewrite Memory.split_o; eauto. repeat condtac; ss.
       + guardH o1. des. repeat subst. unguardH o. des; congr.
       + guardH o1. des. repeat subst.
         exploit Memory.split_get0; try exact SPLIT2; eauto. i. des.
-        revert GET0. erewrite Memory.split_o; eauto. repeat condtac; ss.
+        revert GET3. erewrite Memory.split_o; eauto. repeat condtac; ss.
       + guardH o1. guardH o2. des. repeat subst. unguardH o0. des; congr.
   Qed.
 
@@ -335,8 +371,9 @@ Module MemoryReorder.
         <<LOWER1: Memory.lower mem0 loc2 from2 to2 val2 released2 released2' mem1'>> /\
         <<SPLIT2: Memory.split mem1' loc1 ts11 ts12 ts13 val12 val13 released12 released13 mem2>>).
   Proof.
-    exploit Memory.lower_get0; eauto. erewrite Memory.split_o; eauto. repeat condtac; ss.
-    - des. subst. i. inv x0. left. splits; auto.
+    exploit Memory.lower_get0; eauto. i. des.
+    revert GET. erewrite Memory.split_o; eauto. repeat condtac; ss.
+    - des. subst. i. inv GET. left. splits; auto.
       inv SPLIT1. inv SPLIT. inv LOWER2. inv LOWER.
       rewrite LocFun.add_add_eq. econs; auto.
       unfold Cell.split in *.
@@ -350,13 +387,13 @@ Module MemoryReorder.
       exploit (@Memory.split_exists mem3 loc1 ts11 ts12 ts13);
         try by inv SPLIT1; inv SPLIT; eauto.
       { erewrite Memory.lower_o; eauto. condtac; ss.
-        { des. subst. congr. }
-        eapply Memory.split_get0. eauto.
+        - des. subst. congr.
+        - guardH o1. hexploit Memory.split_get0; try exact SPLIT1; eauto. i. des. eauto.
       }
       i. des.
       splits.
       { ii. inv H. exploit Memory.split_get0; try exact SPLIT1; eauto. i. des.
-        revert GET2. erewrite Memory.lower_get0; eauto. congr.
+        exploit Memory.lower_get0; eauto. i. des. congr.
       }
       cut (mem4 = mem2); [by i; subst; eauto|].
       apply Memory.ext. i.
@@ -382,7 +419,7 @@ Module MemoryReorder.
     exploit Memory.lower_get0; eauto. erewrite Memory.split_o; eauto. repeat condtac; ss; cycle 2.
     { clear -o0. des; congr. }
     { des. subst. inv SPLIT1. inv SPLIT. exfalso. eapply Time.lt_strorder. eauto. }
-    clear o a COND COND0. i. inv x0. splits; ss.
+    clear o a COND COND0. i. des. inv GET. splits; ss.
     exploit Memory.split_get0; eauto. i. des.
     exploit (@Memory.lower_exists mem0 loc ts11 ts13);
       try by inv LOWER2; inv LOWER; eauto.
@@ -441,14 +478,14 @@ Module MemoryReorder.
       erewrite Memory.split_o; eauto. repeat condtac; ss.
       { des. subst. congr. }
       { guardH o. des. subst. congr. }
-      eauto.
+      guardH o. guardH o0. i. des. eauto.
     }
     i. des.
     exploit (@Memory.split_exists mem3 loc1 ts11 ts12 ts13);
       try by inv SPLIT1; inv SPLIT; eauto.
     { erewrite Memory.remove_o; eauto. condtac; ss.
       { des. subst. congr. }
-      eapply Memory.split_get0. eauto.
+      guardH o. hexploit Memory.split_get0; eauto. i. des. eauto.
     }
     i. des.
     cut (mem4 = mem2); [by i; subst; eauto|].
@@ -480,23 +517,23 @@ Module MemoryReorder.
     exploit (@Memory.lower_exists mem3 loc1 from1 to1);
       try by inv LOWER1; inv LOWER; eauto.
     { erewrite Memory.add_o; eauto. condtac; ss.
-      - des. subst. hexploit Memory.lower_get0; eauto.
-        erewrite Memory.add_get0; eauto. congr.
-      - eapply Memory.lower_get0. eauto.
+      - des. subst. hexploit Memory.lower_get0; eauto. i. des.
+        hexploit Memory.add_get0; eauto. i. des. congr.
+      - guardH o. hexploit Memory.lower_get0; eauto. i. des. eauto.
     }
     i. des.
     esplits; eauto; cycle 1.
     { ii. inv H.
-      exploit Memory.lower_get0; try exact LOWER1; eauto.
-      erewrite Memory.add_get0; eauto. congr.
+      exploit Memory.lower_get0; try exact LOWER1; eauto. i. des.
+      exploit Memory.add_get0; eauto. i. des. congr.
     }
     cut (mem4 = mem2); [by i; subst; eauto|].
     apply Memory.ext. i.
     erewrite Memory.lower_o; eauto. erewrite Memory.add_o; eauto.
     erewrite (@Memory.add_o mem2); eauto. erewrite (@Memory.lower_o mem1); eauto.
     repeat (condtac; ss). des. repeat subst.
-    exploit Memory.add_get0; try exact ADD2; eauto.
-    erewrite Memory.lower_o; eauto. condtac; ss.
+    exploit Memory.add_get0; try exact ADD2; eauto. i. des.
+    revert GET. erewrite Memory.lower_o; eauto. condtac; ss.
   Qed.
 
   Lemma lower_split
@@ -514,12 +551,12 @@ Module MemoryReorder.
     destruct (loc_ts_eq_dec (loc1, to1) (loc2, ts23)); ss.
     - des. subst.
       exploit Memory.split_get0; eauto. i. des.
-      revert GET3. erewrite Memory.lower_o; eauto. condtac; ss; cycle 1.
+      revert GET0. erewrite Memory.lower_o; eauto. condtac; ss; cycle 1.
       { des; congr. }
-      i. inv GET3.
+      i. inv GET0.
       exploit (@Memory.split_exists mem0 loc2 ts21 ts22 ts23);
         try by inv SPLIT2; inv SPLIT; eauto.
-      { eapply Memory.lower_get0. eauto. }
+      { hexploit Memory.lower_get0; eauto. i. des. eauto. }
       i. des.
       exploit (@Memory.lower_exists mem3 loc2 ts22 ts23);
         try by inv LOWER1; inv LOWER; eauto.
@@ -537,23 +574,23 @@ Module MemoryReorder.
       erewrite (@Memory.split_o mem2); eauto. erewrite (@Memory.lower_o mem1); eauto.
       repeat (condtac; ss).
       des. repeat subst.
-      revert GET2. erewrite Memory.lower_o; eauto. condtac; ss.
+      revert GET. erewrite Memory.lower_o; eauto. condtac; ss.
     - guardH o.
       exploit Memory.split_get0; eauto. i. des.
       exploit (@Memory.split_exists mem0 loc2 ts21 ts22 ts23);
         try by inv SPLIT2; inv SPLIT; eauto.
-      { revert GET3. erewrite Memory.lower_o; eauto. condtac; eauto.
-        ss. i. des. inv GET3. unguardH o. des; congr.
+      { revert GET0. erewrite Memory.lower_o; eauto. condtac; eauto.
+        ss. i. des. inv GET0. unguardH o. des; congr.
       }
       i. des.
       exploit (@Memory.lower_exists mem3 loc1 from1 to1);
         try by inv LOWER1; inv LOWER; eauto.
       { erewrite Memory.split_o; eauto. repeat condtac; ss.
         - des. subst. hexploit Memory.split_get0; eauto.
-          erewrite Memory.lower_get0; eauto. i. des. congr.
+          hexploit Memory.lower_get0; eauto. i. des. congr.
         - guardH o0. des. subst.
           unguardH o. des; congr.
-        - eapply Memory.lower_get0. eauto.
+        - guardH o0. guardH o1. hexploit Memory.lower_get0; eauto. i. des. eauto.
       }
       i. des.
       esplits; eauto; cycle 1.
@@ -564,7 +601,7 @@ Module MemoryReorder.
       erewrite (@Memory.split_o mem2); eauto. erewrite (@Memory.lower_o mem1); eauto.
       repeat (condtac; ss).
       + des. repeat subst.
-        revert GET2. erewrite Memory.lower_o; eauto. condtac; ss.
+        revert GET. erewrite Memory.lower_o; eauto. condtac; ss.
       + guardH o0. des. repeat subst. unguardH o. des; congr.
   Qed.
 
@@ -581,9 +618,9 @@ Module MemoryReorder.
        <<LOWER1: Memory.lower mem0 loc2 from2 to2 val2 released2 released2' mem1'>> /\
        <<LOWER2: Memory.lower mem1' loc1 from1 to1 val1 released1 released1' mem2>>).
   Proof.
-    exploit Memory.lower_get0; eauto.
-    erewrite Memory.lower_o; eauto. condtac; ss.
-    - des. subst. i. inv x0. left. splits; eauto.
+    exploit Memory.lower_get0; eauto. i. des.
+    revert GET. erewrite Memory.lower_o; eauto. condtac; ss.
+    - des. subst. i. inv GET. left. splits; eauto.
       inv LOWER1. inv LOWER. inv LOWER2. inv LOWER.
       rewrite LocFun.add_add_eq. econs; auto.
       unfold Cell.lower in *.
@@ -600,7 +637,7 @@ Module MemoryReorder.
         try by inv LOWER1; inv LOWER; eauto.
       { erewrite Memory.lower_o; eauto. condtac; ss.
         - des. subst. unguardH o. des; congr.
-        - eapply Memory.lower_get0. eauto.
+        - guardH o0. hexploit Memory.lower_get0; try exact LOWER1; eauto. i. des. eauto.
       }
       i. des.
       esplits; eauto.
@@ -624,8 +661,8 @@ Module MemoryReorder.
       <<LOWER2: Memory.lower mem1' loc1 from1 to1 val1 released1 released1' mem2>>.
   Proof.
     exploit (@Memory.remove_exists mem0 loc2 from2 to2).
-    { hexploit Memory.remove_get0; eauto.
-      erewrite Memory.lower_o; eauto. condtac; ss.
+    { hexploit Memory.remove_get0; eauto. i. des.
+      revert GET. erewrite Memory.lower_o; eauto. condtac; ss.
       { des. subst. congr. }
       eauto.
     }
@@ -654,10 +691,10 @@ Module MemoryReorder.
         (ADD1: Memory.add mem0 loc2 from2 to2 val2 released2 mem1'):
     Memory.remove mem1' loc1 from1 to1 val1 released1 mem2.
   Proof.
-    exploit Memory.remove_get0; try eexact REMOVE1; eauto. i.
+    exploit Memory.remove_get0; try eexact REMOVE1; eauto. i. des.
     exploit (@Memory.remove_exists mem1' loc1 from1 to1 val1 released1); eauto.
     { erewrite Memory.add_o; eauto. condtac; ss; eauto.
-      des. subst. erewrite Memory.add_get0 in x0; eauto. congr.
+      des. subst. exploit Memory.add_get0; eauto. i. des. congr.
     }
     i. des.
     cut (mem3 = mem2); [by i; subst|].
@@ -665,7 +702,7 @@ Module MemoryReorder.
     erewrite Memory.remove_o; eauto. erewrite Memory.add_o; eauto.
     erewrite (@Memory.add_o mem2); eauto. erewrite (@Memory.remove_o mem1); eauto.
     repeat (condtac; ss). des. subst. subst.
-    exploit Memory.add_get0; try eexact ADD1; eauto. congr.
+    exploit Memory.add_get0; try eexact ADD1; eauto. i. des. congr.
   Qed.
 
   Lemma remove_split
@@ -678,14 +715,14 @@ Module MemoryReorder.
         (SPLIT1: Memory.split mem0 loc2 ts21 ts22 ts23 val22 val23 released22 released23 mem1'):
     Memory.remove mem1' loc1 from1 to1 val1 released1 mem2.
   Proof.
-    exploit Memory.remove_get0; try eexact REMOVE1; eauto. i.
+    exploit Memory.remove_get0; try eexact REMOVE1; eauto. i. des.
     exploit Memory.split_get0; try exact SPLIT1; eauto. i. des.
     exploit (@Memory.remove_exists mem1' loc1 from1 to1 val1 released1); eauto.
     { erewrite Memory.split_o; eauto. repeat condtac; ss.
       - des. subst. congr.
-      - guardH o. des. subst. rewrite GET3 in x0. inv x0.
+      - guardH o. des. subst. rewrite GET0 in GET0. inv GET0.
         exploit Memory.split_get0; try exact SPLIT2; eauto. i. des.
-        revert GET1. erewrite Memory.remove_o; eauto. condtac; ss.
+        revert GET5. erewrite Memory.remove_o; eauto. condtac; ss.
     }
     i. des.
     cut (mem3 = mem2); [by i; subst|].
@@ -694,9 +731,9 @@ Module MemoryReorder.
     erewrite (@Memory.split_o mem2); eauto. erewrite (@Memory.remove_o mem1); eauto.
     repeat (condtac; ss).
     - des; congr.
-    - guardH o. des. repeat subst. rewrite GET3 in x0. inv x0.
-      exploit Memory.remove_get0; try exact x1; eauto.
-      erewrite Memory.split_o; eauto. repeat condtac; ss. i. inv x0.
+    - guardH o. des. subst. rewrite GET in GET2. inv GET2.
+      exploit Memory.remove_get0; try exact GET1; eauto. i. des.
+      revert GET2. erewrite Memory.split_o; eauto. repeat condtac; ss. i. inv GET2.
       inv SPLIT1. inv SPLIT. exfalso. eapply Time.lt_strorder. eauto.
   Qed.
 
@@ -710,12 +747,12 @@ Module MemoryReorder.
         (LOWER1: Memory.lower mem0 loc2 from2 to2 val2 released2' released2 mem1'):
     Memory.remove mem1' loc1 from1 to1 val1 released1 mem2.
   Proof.
-    exploit Memory.remove_get0; try eexact REMOVE1; eauto. i.
+    exploit Memory.remove_get0; try eexact REMOVE1; eauto. i. des.
     exploit (@Memory.remove_exists mem1' loc1 from1 to1 val1 released1); eauto.
     { erewrite Memory.lower_o; eauto. condtac; ss.
       des. subst.
-      exploit Memory.lower_get0; try exact LOWER2; eauto.
-      erewrite Memory.remove_o; eauto. condtac; ss.
+      exploit Memory.lower_get0; try exact LOWER2; eauto. i. des.
+      revert GET1. erewrite Memory.remove_o; eauto. condtac; ss.
     }
     i. des.
     cut (mem3 = mem2); [by i; subst|].
@@ -723,8 +760,8 @@ Module MemoryReorder.
     erewrite Memory.remove_o; eauto. erewrite Memory.lower_o; eauto.
     erewrite (@Memory.lower_o mem2); eauto. erewrite (@Memory.remove_o mem1); eauto.
     repeat (condtac; ss). des. repeat subst.
-    exploit Memory.lower_get0; try exact LOWER2; eauto.
-    erewrite Memory.remove_o; eauto. condtac; ss.
+    exploit Memory.lower_get0; try exact LOWER2; eauto. i. des.
+    revert GET1. erewrite Memory.remove_o; eauto. condtac; ss.
   Qed.
 
   Lemma remove_remove
@@ -737,10 +774,10 @@ Module MemoryReorder.
       <<REMOVE1: Memory.remove promises0 loc2 from2 to2 val2 released2 promises1'>> /\
       <<REMOVE2: Memory.remove promises1' loc1 from1 to1 val1 released1 promises2>>.
   Proof.
-    exploit Memory.remove_get0; try apply REMOVE2; eauto.
-    erewrite Memory.remove_o; eauto. condtac; ss. i. guardH o.
+    exploit Memory.remove_get0; try apply REMOVE2; eauto. i. des.
+    revert GET. erewrite Memory.remove_o; eauto. condtac; ss. guardH o. i.
     exploit Memory.remove_exists; eauto. i. des.
-    exploit Memory.remove_get0; try apply REMOVE1; eauto. i.
+    hexploit Memory.remove_get0; try apply REMOVE1; eauto. i. des.
     exploit (@Memory.remove_exists mem2 loc1 from1 to1 val1 released1); eauto.
     { erewrite Memory.remove_o; eauto. condtac; ss. des. subst. congr. }
     i. des.
@@ -751,6 +788,9 @@ Module MemoryReorder.
     erewrite (@Memory.remove_o promises2); eauto. erewrite (@Memory.remove_o promises1); eauto.
     repeat (condtac; ss).
   Qed.
+
+
+  (* Lemmas on promise *)
 
   Lemma promise_add_promise_add
         loc1 from1 to1 val1 released1
@@ -789,6 +829,26 @@ Module MemoryReorder.
     esplits; eauto.
   Qed.
 
+  Lemma promise_split_remove
+        loc1 from1 to1 val1 released1
+        loc2 from2 to2 val2 released2
+        to3 val3 released3
+        promises0 mem0
+        promises1 mem1
+        promises2
+        (LOCTS1: (loc1, to1) <> (loc2, to2))
+        (LOCTS2: (loc1, to3) <> (loc2, to2))
+        (PROMISE1: Memory.promise promises0 mem0 loc1 from1 to1 val1 released1 promises1 mem1 (Memory.op_kind_split to3 val3 released3))
+        (REMOVE2: Memory.remove promises1 loc2 from2 to2 val2 released2 promises2):
+    exists promises1',
+      <<REMOVE1: Memory.remove promises0 loc2 from2 to2 val2 released2 promises1'>> /\
+      <<PROMISE2: Memory.promise promises1' mem0 loc1 from1 to1 val1 released1 promises2 mem1 (Memory.op_kind_split to3 val3 released3)>>.
+  Proof.
+    inv PROMISE1.
+    exploit split_remove; try exact PROMISES; eauto. i. des.
+    esplits; eauto.
+  Qed.
+
   Lemma remove_promise
         promises1 loc1 from1 to1 val1 released1
         promises2 loc2 from2 to2 val2 released2
@@ -806,12 +866,51 @@ Module MemoryReorder.
     - exploit Memory.add_exists_le; eauto. i. des.
       exploit remove_add; eauto.
     - exploit Memory.split_get0; try eexact PROMISES; eauto. i. des.
-      revert GET3. erewrite Memory.remove_o; eauto. condtac; ss. i. guardH o.
-      exploit Memory.split_exists; try exact GET3; try by inv PROMISES; inv SPLIT; eauto. i. des.
+      revert GET0. erewrite Memory.remove_o; eauto. condtac; ss. i. guardH o.
+      exploit Memory.split_exists; try exact GET0; try by inv PROMISES; inv SPLIT; eauto. i. des.
       exploit remove_split; eauto.
-    - exploit Memory.lower_get0; try eexact PROMISES; eauto.
-      erewrite Memory.remove_o; eauto. condtac; ss. i. guardH o.
-      exploit Memory.lower_exists; try exact x0; try by inv PROMISES; inv LOWER; eauto. i. des.
+    - exploit Memory.lower_get0; try eexact PROMISES; eauto. i. des.
+      revert GET. erewrite Memory.remove_o; eauto. condtac; ss. i. guardH o.
+      exploit Memory.lower_exists; try exact GET; try by inv PROMISES; inv LOWER; eauto. i. des.
       exploit remove_lower; eauto.
   Qed.
+
+  Lemma promise_add_promise_split_same
+        promises0 mem0 loc ts1 ts2 ts3 val2 val3 released2 released3
+        promises1 mem1
+        promises2 mem2
+        (ADD1: Memory.promise promises0 mem0 loc ts1 ts3 val3 released3 promises1 mem1 Memory.op_kind_add)
+        (SPLIT2: Memory.promise promises1 mem1 loc ts1 ts2 val2 released2 promises2 mem2 (Memory.op_kind_split ts3 val3 released3)):
+    exists promises1' mem1',
+      <<ADD1: Memory.promise promises0 mem0 loc ts1 ts2 val2 released2 promises1' mem1' Memory.op_kind_add>> /\
+      <<ADD2: Memory.promise promises1' mem1' loc ts2 ts3 val3 released3 promises2 mem2 Memory.op_kind_add>>.
+  Proof.
+    inv ADD1. inv SPLIT2.
+    exploit add_split; try exact PROMISES; eauto. i. des; [|congr].
+    exploit add_split; try exact MEM; eauto. i. des; [|congr].
+    esplits.
+    - econs; eauto.
+    - econs; eauto.
+  Qed.
+
+  Lemma promise_split_promise_split_same
+        promises0 mem0 loc ts1 ts2 ts3 ts4 val2 val3 val4 released2 released3 released4
+        promises1 mem1
+        promises2 mem2
+        (SPLIT1: Memory.promise promises0 mem0 loc ts1 ts3 val3 released3 promises1 mem1 (Memory.op_kind_split ts4 val4 released4))
+        (SPLIT2: Memory.promise promises1 mem1 loc ts1 ts2 val2 released2 promises2 mem2 (Memory.op_kind_split ts3 val3 released3)):
+    exists promises1' mem1',
+      <<SPLIT1: Memory.promise promises0 mem0 loc ts1 ts2 val2 released2 promises1' mem1' (Memory.op_kind_split ts4 val4 released4)>> /\
+      <<SPLIT2: Memory.promise promises1' mem1' loc ts2 ts3 val3 released3 promises2 mem2 (Memory.op_kind_split ts4 val4 released4)>>.
+  Proof.
+    assert (LOCTS: (loc, ts4) <> (loc, ts3)).
+    { intro X. inv X. inv SPLIT1. inv MEM. inv SPLIT. timetac. }
+    inv SPLIT1. inv SPLIT2.
+    exploit split_split; try exact PROMISES; eauto. i. des; [|congr].
+    exploit split_split; try exact MEM; eauto. i. des; [|congr].
+    esplits.
+    - econs; eauto.
+    - econs; eauto.
+  Qed.
+
 End MemoryReorder.

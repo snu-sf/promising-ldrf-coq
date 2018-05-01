@@ -155,7 +155,7 @@ Proof.
   - des.
     + inv H. econs; eauto.
       erewrite Memory.add_o; eauto. condtac; ss; eauto.
-      des. subst. erewrite Memory.add_get0 in GET; eauto. congr.
+      des. subst. exploit Memory.add_get0; eauto. i. des. congr.
     + subst. econs; eauto. erewrite Memory.add_o; eauto. condtac; ss.
       des; congr.
 Qed.
@@ -168,18 +168,18 @@ Lemma split_covered
 Proof.
   econs; i.
   - exploit Memory.split_get0; eauto. i. des.
-    inv H. revert GET. erewrite Memory.split_o; eauto. repeat condtac; ss.
-    + des. subst. i. inv GET. econs; eauto.
+    inv H. revert GET3. erewrite Memory.split_o; eauto. repeat condtac; ss.
+    + des. subst. i. inv GET3. econs; eauto.
       eapply Interval.le_mem; eauto. econs; [refl|].
       inv SPLIT. inv SPLIT0. left. auto.
-    + guardH o. des. subst. i. inv GET. econs; eauto.
+    + guardH o. des. subst. i. inv GET3. econs; eauto.
       eapply Interval.le_mem; eauto. econs; [|refl].
       inv SPLIT. inv SPLIT0. left. auto.
     + i. econs; eauto.
   - exploit Memory.split_get0; eauto. i. des.
     inv H.
     destruct (loc_ts_eq_dec (l, to) (loc, ts3)); ss.
-    + des. subst. rewrite GET3 in GET. inv GET.
+    + des. subst. rewrite GET0 in GET3. inv GET3.
       destruct (Time.le_lt_dec t ts2).
       * econs.
         { instantiate (2 := from). instantiate (2 := ts2).
@@ -211,17 +211,16 @@ Proof.
   econs; i.
   - inv H. revert GET. erewrite Memory.lower_o; eauto. condtac; ss.
     + des. subst. i. inv GET. econs; eauto.
-      eapply Memory.lower_get0; eauto.
+      hexploit Memory.lower_get0; eauto. i. des. eauto.
     + i. econs; eauto.
-  - exploit Memory.lower_get0; eauto. i.
+  - exploit Memory.lower_get0; eauto. i. des.
     inv H.
     destruct (loc_ts_eq_dec (l, to0) (loc, to)); ss.
-    + des. subst. econs; eauto.
-      erewrite Memory.lower_o; eauto. condtac.
-      * rewrite GET in x0. inv x0. eauto.
-      * ss. des; congr.
+    + des. subst. econs; cycle 1; eauto.
+      erewrite Memory.lower_o; eauto. condtac; [|by des].
+      rewrite GET in GET1. inv GET1. eauto.
     + econs; eauto.
-      erewrite Memory.lower_o; eauto. rewrite GET. condtac; ss.
+      erewrite Memory.lower_o; eauto. rewrite GET1. condtac; ss.
       des; congr.
 Qed.
 
@@ -266,7 +265,7 @@ Proof.
       i. inv GET. guardH o. guardH o0. des. subst.
       exploit Memory.split_get0; try exact SRC; eauto. i. des.
       exploit Memory.split_get0; try exact TGT; eauto. i. des.
-      exploit MSG; eauto. i. des. rewrite GET3 in GET. inv GET.
+      exploit MSG; eauto. i. des. rewrite GET0 in GET7. inv GET7.
       esplits; eauto.
     + erewrite (@Memory.split_o mem2_src); eauto. repeat condtac; ss. eauto.
 Qed.
@@ -348,8 +347,9 @@ Proof.
   - i. eapply lower_covered. eauto.
   - i. erewrite Memory.lower_o; eauto. condtac; ss.
     + des. subst.
-      erewrite Memory.lower_get0 in GET; eauto. inv GET.
-      esplits; eauto. inv LOWER. inv LOWER0. auto.
+      exploit Memory.lower_get0; eauto. i. des.
+      rewrite GET0 in GET. inv GET.
+      esplits; eauto.
     + esplits; eauto. refl.
 Qed.
 
@@ -371,7 +371,7 @@ Proof.
   - i. exploit Memory.split_get0; eauto. i. des.
     erewrite Memory.split_o; eauto. repeat condtac; ss.
     + des. subst. congr.
-    + guardH o. des. subst. rewrite GET3 in GET. inv GET.
+    + guardH o. des. subst. rewrite GET1 in GET. inv GET.
       esplits; eauto. refl.
     + esplits; eauto. refl.
 Qed.

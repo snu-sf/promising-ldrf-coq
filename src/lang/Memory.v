@@ -399,34 +399,44 @@ Module Memory.
   Lemma add_get0
         mem1 loc from1 to1 val1 released1 mem2
         (ADD: add mem1 loc from1 to1 val1 released1 mem2):
-    get loc to1 mem1 = None.
+    <<GET: get loc to1 mem1 = None>> /\
+    <<GET: get loc to1 mem2 = Some (from1, Message.mk val1 released1)>>.
   Proof.
     inv ADD. eapply Cell.add_get0; eauto.
+    unfold get, Cell.get, LocFun.add. condtac; ss.
   Qed.
 
   Lemma split_get0
         mem1 loc ts1 ts2 ts3 val2 val3 released2 released3 mem2
         (SPLIT: split mem1 loc ts1 ts2 ts3 val2 val3 released2 released3 mem2):
-    <<GET2: get loc ts2 mem1 = None>> /\
-    <<GET3: get loc ts3 mem1 = Some (ts1, Message.mk val3 released3)>>.
+    <<GET: get loc ts2 mem1 = None>> /\
+    <<GET: get loc ts3 mem1 = Some (ts1, Message.mk val3 released3)>> /\
+    <<GET: get loc ts2 mem2 = Some (ts1, Message.mk val2 released2)>> /\
+    <<GET: get loc ts3 mem2 = Some (ts2, Message.mk val3 released3)>>.
   Proof.
     inv SPLIT. eapply Cell.split_get0; eauto.
+    unfold get, Cell.get, LocFun.add. condtac; ss.
   Qed.
 
   Lemma lower_get0
         mem1 loc from to val released1 released2 mem2
         (LOWER: lower mem1 loc from to val released1 released2 mem2):
-    get loc to mem1 = Some (from, Message.mk val released1).
+    <<GET: get loc to mem1 = Some (from, Message.mk val released1)>> /\
+    <<GET: get loc to mem2 = Some (from, Message.mk val released2)>> /\
+    <<REL_LE: View.opt_le released2 released1>>.
   Proof.
     inv LOWER. eapply Cell.lower_get0; eauto.
+    unfold get, Cell.get, LocFun.add. condtac; ss.
   Qed.
 
   Lemma remove_get0
         mem1 loc from1 to1 val1 released1 mem2
         (REMOVE: remove mem1 loc from1 to1 val1 released1 mem2):
-    get loc to1 mem1 = Some (from1, Message.mk val1 released1).
+    <<GET: get loc to1 mem1 = Some (from1, Message.mk val1 released1)>> /\
+    <<GET: get loc to1 mem2 = None>>.
   Proof.
     inv REMOVE. eapply Cell.remove_get0; eauto.
+    unfold get, Cell.get, LocFun.add. condtac; ss.
   Qed.
 
   Lemma add_get1
@@ -437,7 +447,7 @@ Module Memory.
     get l t m2 = Some (f, Message.mk v r).
   Proof.
     erewrite add_o; eauto. condtac; ss.
-    des. subst. erewrite add_get0 in GET1; eauto. congr.
+    des. subst. exploit add_get0; eauto. i. des. congr.
   Qed.
 
   Lemma split_get1
@@ -452,7 +462,8 @@ Module Memory.
     erewrite split_o; eauto. repeat condtac; ss.
     - des. subst. exploit split_get0; eauto. i. des. congr.
     - guardH o. des. subst. exploit split_get0; eauto. i. des.
-      rewrite GET3 in GET1. inv GET1. esplits; eauto.
+      rewrite GET1 in GET0. inv GET0.
+      esplits; eauto.
       inv SPLIT. inv SPLIT0. left. ss.
     - esplits; eauto.
       refl.
@@ -468,8 +479,9 @@ Module Memory.
       <<RELEASED: View.opt_le r' r>>.
   Proof.
     erewrite lower_o; eauto. condtac; ss.
-    - des. subst. erewrite lower_get0 in GET1; [|eauto]. inv GET1. esplits; eauto.
-      inv LOWER. inv LOWER0. ss.
+    - des. subst. exploit lower_get0; eauto. i. des.
+      rewrite GET1 in GET. inv GET.
+      esplits; eauto.
     - esplits; eauto.
       refl.
   Qed.
@@ -510,7 +522,7 @@ Module Memory.
     le mem1 mem2.
   Proof.
     ii. erewrite add_o; eauto. condtac; ss.
-    des. subst. exploit add_get0; eauto. congr.
+    des. subst. exploit add_get0; eauto. i. des. congr.
   Qed.
 
   Lemma add_split_released_eq
@@ -519,10 +531,8 @@ Module Memory.
         (SPLIT : Memory.split promises1 loc ts1 ts2 ts3 val2 val3 released2 released3 promises2):
     released1 = released3.
   Proof.
-    hexploit Memory.split_get0; eauto. i; des.
-    revert GET3. erewrite Memory.add_o; eauto.
-    condtac; ss; des; try done.
-    i. inv GET3. eauto.
+    hexploit Memory.split_get0; eauto. i. des.
+    revert GET0. erewrite Memory.add_o; eauto. condtac; ss; [|by des]. congr.
   Qed.
 
   (* Lemmas on op *)
@@ -584,7 +594,7 @@ Module Memory.
       + i. des. inv GET2. left. auto.
       + guardH o. i. des. inv GET2. right. splits; auto.
         exploit split_get0; try exact MEM; eauto. i. des.
-        rewrite GET3. esplits; eauto. inv SPLIT. inv SPLIT0. left. auto.
+        rewrite GET0. esplits; eauto. inv SPLIT. inv SPLIT0. left. auto.
       + i. right. esplits; eauto. refl.
     - erewrite lower_o; eauto. condtac; ss.
       + i. des. inv GET2. left. auto.
@@ -998,7 +1008,7 @@ Module Memory.
     revert GET. erewrite split_o; eauto. repeat condtac; ss; eauto.
     - i. des. inv GET. auto.
     - guardH o. i. des. inv GET. right. eapply FINITE.
-      eapply split_get0. eauto.
+      hexploit split_get0; eauto. i. des. eauto.
   Qed.
 
   Lemma lower_finite
@@ -1010,7 +1020,7 @@ Module Memory.
     unfold finite in *. des. exists dom. i.
     revert GET. erewrite lower_o; eauto. condtac; ss; eauto.
     i. des. inv GET. eapply FINITE.
-    eapply lower_get0. eauto.
+    hexploit lower_get0; eauto. i. des. eauto.
   Qed.
 
   Lemma remove_finite
@@ -1182,7 +1192,7 @@ Module Memory.
         * i. eapply DISJOINT0; eauto.
       + ii. erewrite split_o; eauto. repeat condtac; ss; eauto.
         * des. subst. exfalso. inv DISJOINT. exploit DISJOINT0; eauto.
-          { eapply split_get0. eauto. }
+          { hexploit split_get0; try exact PROMISES; eauto. i. des. eauto. }
           i. des. eapply x.
           { inv MEM. inv SPLIT. econs. eauto. left. auto. }
           { apply Interval.mem_ub.
@@ -1190,7 +1200,7 @@ Module Memory.
             inv x1. inv MEM. inv SPLIT. inv TS12.
           }
         * guardH o. des. subst. exfalso. inv DISJOINT. exploit DISJOINT0; eauto.
-          { eapply split_get0. eauto. }
+          { hexploit split_get0; try exact PROMISES; eauto. i. des. eauto. }
           i. des. eapply x.
           { apply Interval.mem_ub. inv MEM. inv SPLIT. etrans; eauto. }
           { apply Interval.mem_ub.
@@ -1200,10 +1210,11 @@ Module Memory.
     - splits.
       + inv DISJOINT. econs. i. revert GET1. erewrite lower_o; eauto. condtac; ss.
         * des. subst. i. inv GET1. eapply DISJOINT0; eauto.
-          eapply lower_get0. eauto.
+          hexploit lower_get0; eauto. i. des. eauto.
         * i. eapply DISJOINT0; eauto.
       + ii. erewrite lower_o; eauto. condtac; ss; eauto.
-        des. subst. exfalso. eapply disjoint_get; eauto. eapply lower_get0. eauto.
+        des. subst. exfalso. eapply disjoint_get; eauto.
+        hexploit lower_get0; try exact PROMISES; eauto. i. des. eauto.
   Qed.
 
   Lemma remove_future
@@ -1681,14 +1692,15 @@ Module Memory.
     mem3 = mem'3.
   Proof.
     apply Memory.ext. i.
-    exploit Memory.split_get0; try exact SPLIT; eauto. i; des.
-    exploit Memory.split_get0; try exact SPLIT'; eauto. i; des.
-    rewrite GET3 in GET1. depdes GET1.
-
     setoid_rewrite Memory.remove_o; cycle 1; eauto.
     condtac; eauto. guardH o.
     setoid_rewrite Memory.split_o; cycle 1; eauto.
-    repeat condtac; subst; ss; eauto.
+    repeat condtac; subst; ss; eauto. guardH o0.
+    des. subst.
+
+    exploit Memory.split_get0; try exact SPLIT; eauto. i. des.
+    exploit Memory.split_get0; try exact SPLIT'; eauto. i. des.
+    rewrite GET0 in GET4. inv GET4. ss.
   Qed.
 
   Lemma remove_exists

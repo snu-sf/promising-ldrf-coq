@@ -53,7 +53,7 @@ Module MemoryFacts.
       + des. subst. congr.
       + guardH o. des. subst.
         exploit Memory.split_get0; eauto. i. des.
-        rewrite GET3 in GET. inv GET. esplits; eauto.
+        rewrite GET in GET1. inv GET1. esplits; eauto.
       + esplits; eauto.
     - erewrite Memory.lower_o; eauto. condtac; ss.
       + des. subst. congr.
@@ -180,7 +180,8 @@ Module MemoryFacts.
     apply Memory.ext. i.
     erewrite (@Memory.remove_o mem3); eauto.
     erewrite (@Memory.add_o mem2); eauto.
-    condtac; ss. des. subst. symmetry. eauto using Memory.add_get0.
+    condtac; ss. des. subst. symmetry.
+    eapply Memory.add_get0. eauto.
   Qed.
 
   Lemma write_add_promises

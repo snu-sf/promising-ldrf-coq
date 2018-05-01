@@ -177,7 +177,7 @@ Proof.
   { inv STEP_SRC. inv STEP1. ss. }
   i. des.
   exploit promise_fulfill_write; try exact STEP_SRC; try exact STEP_SRC0; eauto.
-  { i. exploit ORD0; eauto.
+  { i. hexploit ORD0; eauto.
     - etrans; eauto.
     - i. des. splits; auto. eapply sim_local_nonsynch_loc; eauto.
   }

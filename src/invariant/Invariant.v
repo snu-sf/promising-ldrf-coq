@@ -199,7 +199,7 @@ Section Invariant.
       splits; ss. inv LOCAL. inv PROMISE.
       ii. apply MEM1. ii. specialize (PR loc0). des.
       revert PR. erewrite Memory.lower_o; eauto. condtac; eauto.
-      ss. i. des. inv PR. exploit Memory.lower_get0; eauto.
+      ss. i. des. inv PR. exploit Memory.lower_get0; eauto. i. des. eauto.
     }
     inv STEP0. inv LOCAL.
     - esplits; eauto.

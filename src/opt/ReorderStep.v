@@ -232,7 +232,7 @@ Proof.
   exploit Local.promise_step_future; eauto. i. des.
   exploit reorder_read_fulfill; try exact STEP5; try exact STEP3; eauto; try by viewtac. i. des.
   exploit promise_fulfill_write; try exact x4; try exact STEP6; eauto; try by viewtac.
-  { i. exploit ORD0; eauto. i. des.
+  { i. hexploit ORD0; eauto. i. des.
     splits; auto. inv STEP1. auto.
   }
   i. des.
@@ -455,7 +455,7 @@ Proof.
   exploit reorder_fulfill_fulfill; try exact STEP5; try exact STEP3;
     eauto using Memory.future_closed_opt_view, Memory.future_closed_timemap. i. des.
   exploit promise_fulfill_write; eauto.
-  { i. exploit ORD; eauto. i. des. splits; ss.
+  { i. hexploit ORD; eauto. i. des. splits; ss.
     ii. unfold Memory.get in GET.
     erewrite fulfill_step_promises_diff in GET; eauto.
   }
@@ -677,7 +677,7 @@ Proof.
   exploit fulfill_step_future; try exact STEP8; try exact WF3;
     eauto using Memory.future_closed_opt_view, Memory.future_closed_timemap. i. des.
   exploit promise_fulfill_write; eauto.
-  { i. exploit ORD; eauto. i. des.
+  { i. hexploit ORD; eauto. i. des.
     splits; auto.
     erewrite Local.read_step_promises; [|eauto].
     ii. unfold Memory.get in GET. erewrite fulfill_step_promises_diff in GET; eauto.
@@ -852,7 +852,7 @@ Proof.
     + etrans; [|etrans].
       * apply TViewFacts.write_fence_tview_mon; [|refl|refl|].
         { apply ReorderTView.read_fence_write_tview; auto. apply WF0. }
-        { exploit Memory.remove_get0; eauto. s. i.
+        { exploit Memory.remove_get0; eauto. s. i. des.
           inv WF0. exploit PROMISES; eauto. i.
           exploit TViewFacts.write_future_fulfill; try exact SC0; eauto.
           { eapply MEM0. eauto. }
@@ -901,7 +901,7 @@ Proof.
   exploit reorder_fence_fulfill; try exact STEP5; try exact STEP3;
     eauto using Memory.future_closed_opt_view, Memory.future_closed_timemap. i. des.
   exploit promise_fulfill_write; eauto.
-  { i. exploit ORD; eauto. i. des.
+  { i. hexploit ORD; eauto. i. des.
     splits; auto. inv STEP1. auto.
   }
   i. des.

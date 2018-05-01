@@ -265,6 +265,22 @@ Proof.
   - ss.
 Qed.
 
+Lemma sim_localF_promise_not_lower
+      pview
+      lc1_src
+      lc1_tgt mem1_tgt loc from to val released_tgt lc1 mem2_tgt kind
+      (LOCAL: sim_localF pview lc1_src lc1_tgt)
+      (STEP: Local.promise_step lc1_tgt mem1_tgt loc from to val released_tgt lc1 mem2_tgt kind)
+      (KIND: negb (Memory.op_kind_is_lower kind)):
+  SimPromises.mem loc to pview = false.
+Proof.
+  destruct (SimPromises.mem loc to pview) eqn:X; ss.
+  inv LOCAL. inv PROMISES. exploit PVIEW; eauto. i. des.
+  inv STEP. inv PROMISE; ss.
+  - exploit Memory.add_get0; try exact PROMISES; eauto. i. des. congr.
+  - exploit Memory.split_get0; try exact PROMISES; eauto. i. des. congr.
+Qed.
+
 Lemma sim_localF_write
       pview
       lc1_src sc1_src mem1_src
@@ -306,19 +322,18 @@ Proof.
     - right. unguardH ORD_TGT. destruct ord_tgt; des; ss.
     - left. splits.
       { by destruct ord_tgt; inv X. }
-      exploit ORD0.
+      hexploit ORD0.
       { by destruct ord_tgt; inv X. }
-      i. des. subst.
-      destruct (SimPromises.mem loc to pview) eqn:Y; ss.
-      inv LOCAL1. inv PROMISES. exploit PVIEW; eauto. i. des.
-      inv STEP1. inv PROMISE. exploit Memory.add_get0; try exact PROMISES; eauto. congr.
+      exploit Local.write_step_strong_relaxed; eauto.
+      { by destruct ord_tgt. }
+      i. eapply sim_localF_promise_not_lower; try exact STEP1; eauto.
   }
   exploit sim_localF_fulfill; try apply STEP2;
     try apply LOCAL2; try apply MEM2; eauto.
   { eapply Memory.future_closed_opt_view; eauto. }
   i. des.
   exploit promise_fulfill_write; try exact STEP_SRC; try exact STEP_SRC0; eauto.
-  { i. exploit ORD0; eauto.
+  { i. hexploit ORD0; eauto.
     - etrans; eauto.
     - i. des. subst. splits; auto. eapply sim_localF_nonsynch_loc; eauto.
   }
@@ -451,7 +466,7 @@ Proof.
       * rewrite SimPromises.set_o. condtac; ss.
         { des. subst. condtac; ss; cycle 1.
           { revert COND0. condtac; ss. des; congr. }
-          rewrite x in x1. inv x1. ss.
+          rewrite GET in x. inv x. ss.
         }
         { guardH o. condtac.
           { revert COND0. condtac; ss.
@@ -469,7 +484,8 @@ Proof.
       { eapply PVIEW. }
       i. des. subst. destruct p. eauto.
     + i. revert SRC. erewrite Memory.lower_o; eauto. condtac; ss.
-      * i. des. inv SRC. eapply COMPLETE; eauto. eapply Memory.lower_get0. eauto.
+      * i. des. inv SRC. eapply COMPLETE; eauto.
+        hexploit Memory.lower_get0; try exact PROMISES; eauto. i. des. eauto.
       * i. eapply COMPLETE; eauto.
   - etrans; [|eauto]. inv STEP_SRC. inv PROMISE. eapply lower_sim_memory. eauto.
   - eapply Local.promise_step_future; eauto.

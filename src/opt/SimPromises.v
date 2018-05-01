@@ -246,7 +246,7 @@ Module SimPromises.
       esplits; eauto.
       + unfold none_if. condtac.
         { inv INV1. exploit PVIEW; eauto. i. des.
-          hexploit Memory.add_get0; try exact PROMISES; eauto. congr.
+          hexploit Memory.add_get0; try exact PROMISES; eauto. i. des. congr.
         }
         econs 1; eauto.
       + econs.
@@ -255,7 +255,7 @@ Module SimPromises.
           condtac; ss.
           { i. des. inv LHS. unfold none_if. condtac; ss.
             inv INV1. exploit PVIEW; eauto. i. des.
-            exploit Memory.add_get0; try exact PROMISES; eauto. congr.
+            exploit Memory.add_get0; try exact PROMISES; eauto. i. des. congr.
           }
           { apply INV1. }
         * i. inv INV1. exploit PVIEW; eauto. i. des.
@@ -263,7 +263,7 @@ Module SimPromises.
         * i. inv INV1. exploit SOUND; eauto. i.
           erewrite Memory.add_o; eauto. erewrite (@Memory.add_o promises2); eauto.
           condtac; ss. des. subst.
-          erewrite Memory.add_get0 in x3; eauto. congr.
+          exploit Memory.add_get0; eauto. i. des. congr.
         * i. revert SRC TGT.
           erewrite Memory.add_o; eauto. erewrite (@Memory.add_o promises2_tgt); eauto.
           condtac; ss. inv INV1. eapply COMPLETE; eauto.
@@ -302,7 +302,7 @@ Module SimPromises.
         * i. revert SRC TGT.
           erewrite Memory.split_o; eauto. erewrite (@Memory.split_o promises2_tgt); eauto.
           repeat condtac; ss. inv INV1. eapply COMPLETE; eauto.
-    - exploit Memory.lower_get0; try exact PROMISES; eauto. i.
+    - exploit Memory.lower_get0; try exact PROMISES; eauto. i. des.
       exploit (@Memory.lower_exists promises1_src loc from to val (none_if loc to pview released0) (none_if loc to pview released));
         try by inv MEM; inv LOWER.
       { apply INV1. eauto. }
@@ -321,7 +321,7 @@ Module SimPromises.
         unfold none_if. condtac; viewtac.
       + econs.
         * ii. revert LHS.
-          erewrite Memory.lower_o; eauto. erewrite (@Memory.lower_o mem2); try exact x1.
+          erewrite Memory.lower_o; eauto. erewrite (@Memory.lower_o mem2); try exact x0.
           condtac; ss.
           { i. des. inv LHS. ss. }
           { apply INV1. }
@@ -375,7 +375,7 @@ Module SimPromises.
       <<INV2': mem loc to inv = false>>.
   Proof.
     hexploit Memory.remove_future; eauto. i. des.
-    exploit Memory.remove_get0; [eauto|]. i.
+    exploit Memory.remove_get0; [eauto|]. i. des.
     inv INV1. exploit LE0; eauto. i.
     esplits.
     - econs.
@@ -455,7 +455,7 @@ Module SimPromises.
   Proof.
     hexploit Memory.remove_future; try apply REMOVE_TGT; eauto. i. des.
     exploit remove_tgt; eauto. i. des.
-    exploit Memory.remove_get0; eauto. i.
+    exploit Memory.remove_get0; eauto. i. des.
     inv INV1. exploit LE0; eauto. i.
     exploit remove_src; try apply set_eq; eauto. i. des.
     esplits; eauto.
@@ -518,7 +518,7 @@ Module SimPromises.
       esplits.
       + econs 2; eauto.
       + ii. erewrite Memory.add_o; eauto. condtac; ss; eauto.
-        des. subst. exploit LE1_TGT; eauto. erewrite Memory.add_get0; eauto. congr.
+        des. subst. exploit LE1_TGT; eauto. exploit Memory.add_get0; eauto. i. des. congr.
       + auto.
     - esplits; eauto.
       etrans; eauto. eapply split_sim_memory. eauto.
