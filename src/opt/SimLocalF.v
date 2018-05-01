@@ -31,16 +31,16 @@ Require Import Semantics.
 Set Implicit Arguments.
 
 
-Inductive sim_localF (none_for:SimPromises.t) (lc_src lc_tgt:Local.t): Prop :=
+Inductive sim_localF (pview:SimPromises.t) (lc_src lc_tgt:Local.t): Prop :=
 | sim_localF_intro
     (TVIEW_CUR: View.le lc_src.(Local.tview).(TView.cur) lc_tgt.(Local.tview).(TView.cur))
     (TVIEW_ACQ: View.le lc_src.(Local.tview).(TView.acq) lc_tgt.(Local.tview).(TView.acq))
-    (PROMISES: SimPromises.sem none_for SimPromises.bot lc_src.(Local.promises) lc_tgt.(Local.promises))
+    (PROMISES: SimPromises.sem pview SimPromises.bot lc_src.(Local.promises) lc_tgt.(Local.promises))
 .
 
 Lemma sim_localF_nonsynch_loc
-      none_for loc lc_src lc_tgt
-      (SIM: sim_localF none_for lc_src lc_tgt)
+      pview loc lc_src lc_tgt
+      (SIM: sim_localF pview lc_src lc_tgt)
       (NONSYNCH: Memory.nonsynch_loc loc lc_tgt.(Local.promises)):
   Memory.nonsynch_loc loc lc_src.(Local.promises).
 Proof.
@@ -53,8 +53,8 @@ Proof.
 Qed.
 
 Lemma sim_localF_nonsynch
-      none_for lc_src lc_tgt
-      (SIM: sim_localF none_for lc_src lc_tgt)
+      pview lc_src lc_tgt
+      (SIM: sim_localF pview lc_src lc_tgt)
       (NONSYNCH: Memory.nonsynch lc_tgt.(Local.promises)):
   Memory.nonsynch lc_src.(Local.promises).
 Proof.
@@ -62,8 +62,8 @@ Proof.
 Qed.
 
 Lemma sim_localF_memory_bot
-      none_for lc_src lc_tgt
-      (SIM: sim_localF none_for lc_src lc_tgt)
+      pview lc_src lc_tgt
+      (SIM: sim_localF pview lc_src lc_tgt)
       (BOT: lc_tgt.(Local.promises) = Memory.bot):
   lc_src.(Local.promises) = Memory.bot.
 Proof.
@@ -75,21 +75,21 @@ Proof.
 Qed.
 
 Lemma sim_localF_promise
-      none_for
+      pview
       lc1_src mem1_src
       lc1_tgt mem1_tgt
       lc2_tgt mem2_tgt
       loc from to val released kind
       (STEP_TGT: Local.promise_step lc1_tgt mem1_tgt loc from to val released lc2_tgt mem2_tgt kind)
-      (LOCAL1: sim_localF none_for lc1_src lc1_tgt)
+      (LOCAL1: sim_localF pview lc1_src lc1_tgt)
       (MEM1: sim_memory mem1_src mem1_tgt)
       (WF1_SRC: Local.wf lc1_src mem1_src)
       (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
       (MEM1_SRC: Memory.closed mem1_src)
       (MEM1_TGT: Memory.closed mem1_tgt):
   exists lc2_src mem2_src,
-    <<STEP_SRC: Local.promise_step lc1_src mem1_src loc from to val (SimPromises.none_if loc to none_for released) lc2_src mem2_src (SimPromises.kind_transf loc to none_for kind)>> /\
-    <<LOCAL2: sim_localF none_for lc2_src lc2_tgt>> /\
+    <<STEP_SRC: Local.promise_step lc1_src mem1_src loc from to val (SimPromises.none_if loc to pview released) lc2_src mem2_src (SimPromises.kind_transf loc to pview kind)>> /\
+    <<LOCAL2: sim_localF pview lc2_src lc2_tgt>> /\
     <<MEM2: sim_memory mem2_src mem2_tgt>>.
 Proof.
   inv LOCAL1. inv STEP_TGT.
@@ -138,13 +138,13 @@ Proof.
 Qed.
 
 Lemma sim_localF_read
-      none_for
+      pview
       lc1_src mem1_src
       lc1_tgt mem1_tgt
       lc2_tgt
       loc ts val released_tgt ord_src ord_tgt
       (STEP_TGT: Local.read_step lc1_tgt mem1_tgt loc ts val released_tgt ord_tgt lc2_tgt)
-      (LOCAL1: sim_localF none_for lc1_src lc1_tgt)
+      (LOCAL1: sim_localF pview lc1_src lc1_tgt)
       (MEM1: sim_memory mem1_src mem1_tgt)
       (WF1_SRC: Local.wf lc1_src mem1_src)
       (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
@@ -154,7 +154,7 @@ Lemma sim_localF_read
   exists released_src lc2_src,
     <<REL: View.opt_le released_src released_tgt>> /\
     <<STEP_SRC: Local.read_step lc1_src mem1_src loc ts val released_src ord_src lc2_src>> /\
-    <<LOCAL2: sim_localF none_for lc2_src lc2_tgt>>.
+    <<LOCAL2: sim_localF pview lc2_src lc2_tgt>>.
 Proof.
   inv LOCAL1. inv STEP_TGT.
   exploit sim_memory_get; try apply MEM1; eauto. i. des.
@@ -194,7 +194,7 @@ Proof.
 Qed.
 
 Lemma sim_localF_fulfill
-      none_for
+      pview
       lc1_src sc1_src mem1_src
       lc1_tgt sc1_tgt mem1_tgt
       lc2_tgt sc2_tgt
@@ -204,10 +204,10 @@ Lemma sim_localF_fulfill
       (RELM_CLOSED: Memory.closed_opt_view releasedm_src mem1_src)
       (WF_RELM_TGT: View.opt_wf releasedm_tgt)
       (ORD: Ordering.le ord_src ord_tgt)
-      (NONEFOR: (Ordering.le Ordering.acqrel ord_tgt /\ SimPromises.mem loc to none_for = false) \/
+      (PVIEW: (Ordering.le Ordering.acqrel ord_tgt /\ SimPromises.mem loc to pview = false) \/
                 Ordering.le ord_tgt Ordering.plain)
       (STEP_TGT: fulfill_step lc1_tgt sc1_tgt loc from to val releasedm_tgt released ord_tgt lc2_tgt sc2_tgt)
-      (LOCAL1: sim_localF none_for lc1_src lc1_tgt)
+      (LOCAL1: sim_localF pview lc1_src lc1_tgt)
       (SC1: TimeMap.le sc1_src sc1_tgt)
       (MEM1: sim_memory mem1_src mem1_tgt)
       (WF1_SRC: Local.wf lc1_src mem1_src)
@@ -217,21 +217,21 @@ Lemma sim_localF_fulfill
       (MEM1_SRC: Memory.closed mem1_src)
       (MEM1_TGT: Memory.closed mem1_tgt):
   exists lc2_src sc2_src,
-    <<STEP_SRC: fulfill_step lc1_src sc1_src loc from to val releasedm_src (SimPromises.none_if loc to none_for released) ord_src lc2_src sc2_src>> /\
-    <<LOCAL2: sim_localF (SimPromises.unset loc to none_for) lc2_src lc2_tgt>> /\
+    <<STEP_SRC: fulfill_step lc1_src sc1_src loc from to val releasedm_src (SimPromises.none_if loc to pview released) ord_src lc2_src sc2_src>> /\
+    <<LOCAL2: sim_localF (SimPromises.unset loc to pview) lc2_src lc2_tgt>> /\
     <<SC2: TimeMap.le sc2_src sc2_tgt>>.
 Proof.
-  guardH NONEFOR.
+  guardH PVIEW.
   inv STEP_TGT.
   assert (RELT_LE:
    View.opt_le
      (TView.write_released lc1_src.(Local.tview) sc1_src loc to releasedm_src ord_src)
      (TView.write_released lc1_tgt.(Local.tview) sc2_tgt loc to releasedm_tgt ord_tgt)).
-  { unguardH NONEFOR. des.
+  { unguardH PVIEW. des.
     - unfold TView.write_released.
       condtac; [|by econs].
       condtac; cycle 1.
-      { by destruct ord_tgt; inv NONEFOR; inv COND0. }
+      { by destruct ord_tgt; inv PVIEW; inv COND0. }
       econs. unfold TView.write_tview. s.
       repeat (condtac; aggrtac); try by apply WF1_TGT.
       + rewrite <- View.join_r. rewrite <- ? View.join_l. apply LOCAL1.
@@ -251,9 +251,9 @@ Proof.
   { apply WF1_TGT. }
   i. des. esplits.
   - econs; eauto.
-    + unfold SimPromises.none_if. destruct (SimPromises.mem loc to none_for) eqn:X.
-      * unguardH NONEFOR. des; [congr|]. unfold TView.write_released. condtac; [|refl].
-        destruct ord_src, ord_tgt; inv ORD; inv NONEFOR; inv COND.
+    + unfold SimPromises.none_if. destruct (SimPromises.mem loc to pview) eqn:X.
+      * unguardH PVIEW. des; [congr|]. unfold TView.write_released. condtac; [|refl].
+        destruct ord_src, ord_tgt; inv ORD; inv PVIEW; inv COND.
       * etrans; eauto.
     + unfold SimPromises.none_if. condtac; viewtac.
     + eapply TViewFacts.writable_mon; try exact WRITABLE; eauto. apply LOCAL1.
@@ -266,7 +266,7 @@ Proof.
 Qed.
 
 Lemma sim_localF_write
-      none_for
+      pview
       lc1_src sc1_src mem1_src
       lc1_tgt sc1_tgt mem1_tgt
       lc2_tgt sc2_tgt mem2_tgt
@@ -279,7 +279,7 @@ Lemma sim_localF_write
       (ORD: Ordering.le ord_src ord_tgt)
       (ORD_TGT: Ordering.le ord_tgt Ordering.plain \/ Ordering.le Ordering.acqrel ord_tgt)
       (STEP_TGT: Local.write_step lc1_tgt sc1_tgt mem1_tgt loc from to val releasedm_tgt released_tgt ord_tgt lc2_tgt sc2_tgt mem2_tgt kind)
-      (LOCAL1: sim_localF none_for lc1_src lc1_tgt)
+      (LOCAL1: sim_localF pview lc1_src lc1_tgt)
       (SC1: TimeMap.le sc1_src sc1_tgt)
       (MEM1: sim_memory mem1_src mem1_tgt)
       (WF1_SRC: Local.wf lc1_src mem1_src)
@@ -289,9 +289,9 @@ Lemma sim_localF_write
       (MEM1_SRC: Memory.closed mem1_src)
       (MEM1_TGT: Memory.closed mem1_tgt):
   exists released_src lc2_src sc2_src mem2_src,
-    <<STEP_SRC: Local.write_step lc1_src sc1_src mem1_src loc from to val releasedm_src released_src ord_src lc2_src sc2_src mem2_src (SimPromises.kind_transf loc to none_for kind)>> /\
+    <<STEP_SRC: Local.write_step lc1_src sc1_src mem1_src loc from to val releasedm_src released_src ord_src lc2_src sc2_src mem2_src (SimPromises.kind_transf loc to pview kind)>> /\
     <<REL2: View.opt_le released_src released_tgt>> /\
-    <<LOCAL2: sim_localF (SimPromises.unset loc to none_for) lc2_src lc2_tgt>> /\
+    <<LOCAL2: sim_localF (SimPromises.unset loc to pview) lc2_src lc2_tgt>> /\
     <<SC2: TimeMap.le sc2_src sc2_tgt>> /\
     <<MEM2: sim_memory mem2_src mem2_tgt>>.
 Proof.
@@ -300,7 +300,7 @@ Proof.
   exploit Local.promise_step_future; eauto. i. des.
   exploit sim_localF_promise; eauto. i. des.
   exploit Local.promise_step_future; eauto. i. des.
-  assert (NONEFOR: __guard__ ((Ordering.le Ordering.acqrel ord_tgt /\ SimPromises.mem loc to none_for = false) \/
+  assert (PVIEW: __guard__ ((Ordering.le Ordering.acqrel ord_tgt /\ SimPromises.mem loc to pview = false) \/
                               Ordering.le ord_tgt Ordering.plain)).
   { destruct (Ordering.le ord_tgt Ordering.strong_relaxed) eqn:X.
     - right. unguardH ORD_TGT. destruct ord_tgt; des; ss.
@@ -309,8 +309,8 @@ Proof.
       exploit ORD0.
       { by destruct ord_tgt; inv X. }
       i. des. subst.
-      destruct (SimPromises.mem loc to none_for) eqn:Y; ss.
-      inv LOCAL1. inv PROMISES. exploit NONEFOR; eauto. i. des.
+      destruct (SimPromises.mem loc to pview) eqn:Y; ss.
+      inv LOCAL1. inv PROMISES. exploit PVIEW; eauto. i. des.
       inv STEP1. inv PROMISE. exploit Memory.add_get0; try exact PROMISES; eauto. congr.
   }
   exploit sim_localF_fulfill; try apply STEP2;
@@ -323,15 +323,15 @@ Proof.
     - i. des. subst. splits; auto. eapply sim_localF_nonsynch_loc; eauto.
   }
   i. des. esplits; eauto.
-  - unguardH NONEFOR. des.
-    + unfold SimPromises.none_if in *. rewrite NONEFOR0 in *. ss.
+  - unguardH PVIEW. des.
+    + unfold SimPromises.none_if in *. rewrite PVIEW0 in *. ss.
     + subst. unfold TView.write_released at 1. condtac; [|by econs].
-      destruct ord_src, ord_tgt; inv ORD; inv NONEFOR; inv COND.
+      destruct ord_src, ord_tgt; inv ORD; inv PVIEW; inv COND.
   - etrans; eauto.
 Qed.
 
 Lemma sim_localF_update
-      none_for
+      pview
       lc1_src sc1_src mem1_src
       lc1_tgt sc1_tgt mem1_tgt
       lc2_tgt
@@ -340,7 +340,7 @@ Lemma sim_localF_update
       from2 to2 val2 released2_tgt ord2_src ord2_tgt kind
       (STEP1_TGT: Local.read_step lc1_tgt mem1_tgt loc ts1 val1 released1_tgt ord1_tgt lc2_tgt)
       (STEP2_TGT: Local.write_step lc2_tgt sc1_tgt mem1_tgt loc from2 to2 val2 released1_tgt released2_tgt ord2_tgt lc3_tgt sc3_tgt mem3_tgt kind)
-      (LOCAL1: sim_localF none_for lc1_src lc1_tgt)
+      (LOCAL1: sim_localF pview lc1_src lc1_tgt)
       (SC1: TimeMap.le sc1_src sc1_tgt)
       (MEM1: sim_memory mem1_src mem1_tgt)
       (WF1_SRC: Local.wf lc1_src mem1_src)
@@ -356,8 +356,8 @@ Lemma sim_localF_update
     <<REL1: View.opt_le released1_src released1_tgt>> /\
     <<REL2: View.opt_le released2_src released2_tgt>> /\
     <<STEP1_SRC: Local.read_step lc1_src mem1_src loc ts1 val1 released1_src ord1_src lc2_src>> /\
-    <<STEP2_SRC: Local.write_step lc2_src sc1_src mem1_src loc from2 to2 val2 released1_src released2_src ord2_src lc3_src sc3_src mem3_src (SimPromises.kind_transf loc to2 none_for kind)>> /\
-    <<LOCAL3: sim_localF (SimPromises.unset loc to2 none_for) lc3_src lc3_tgt>> /\
+    <<STEP2_SRC: Local.write_step lc2_src sc1_src mem1_src loc from2 to2 val2 released1_src released2_src ord2_src lc3_src sc3_src mem3_src (SimPromises.kind_transf loc to2 pview kind)>> /\
+    <<LOCAL3: sim_localF (SimPromises.unset loc to2 pview) lc3_src lc3_tgt>> /\
     <<SC3: TimeMap.le sc3_src sc3_tgt>> /\
     <<MEM3: sim_memory mem3_src mem3_tgt>>.
 Proof.
@@ -370,14 +370,14 @@ Proof.
 Qed.
 
 Lemma sim_localF_fence
-      none_for
+      pview
       lc1_src sc1_src mem1_src
       lc1_tgt sc1_tgt mem1_tgt
       lc2_tgt sc2_tgt
       ordr_src ordw_src
       ordr_tgt ordw_tgt
       (STEP_TGT: Local.fence_step lc1_tgt sc1_tgt ordr_tgt ordw_tgt lc2_tgt sc2_tgt)
-      (LOCAL1: sim_localF none_for lc1_src lc1_tgt)
+      (LOCAL1: sim_localF pview lc1_src lc1_tgt)
       (SC1: TimeMap.le sc1_src sc1_tgt)
       (MEM1: sim_memory mem1_src mem1_tgt)
       (WF1_SRC: Local.wf lc1_src mem1_src)
@@ -388,7 +388,7 @@ Lemma sim_localF_fence
       (ORDW_TGT: Ordering.le ordw_tgt Ordering.relaxed):
   exists lc2_src sc2_src,
     <<STEP_SRC: Local.fence_step lc1_src sc1_src ordr_src ordw_src lc2_src sc2_src>> /\
-    <<LOCAL2: sim_localF none_for lc2_src lc2_tgt>> /\
+    <<LOCAL2: sim_localF pview lc2_src lc2_tgt>> /\
     <<SC2: TimeMap.le sc2_src sc2_tgt>>.
 Proof.
   inv STEP_TGT. esplits; eauto.
@@ -419,27 +419,27 @@ Proof.
 Qed.
 
 Lemma sim_localF_lower_src
-      none_for1
+      pview1
       lc1_src sc1_src mem1_src
       lc1_tgt mem1_tgt
       lc2_src mem2_src
       loc from to val released
-      (LOCAL1: sim_localF none_for1 lc1_src lc1_tgt)
+      (LOCAL1: sim_localF pview1 lc1_src lc1_tgt)
       (MEM1: sim_memory mem1_src mem1_tgt)
       (WF1_SRC: Local.wf lc1_src mem1_src)
       (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
       (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
       (MEM1_SRC: Memory.closed mem1_src)
       (STEP_SRC: Local.promise_step lc1_src mem1_src loc from to val None lc2_src mem2_src (Memory.op_kind_lower released)):
-  <<LOCAL2: exists none_for2, sim_localF none_for2 lc2_src lc1_tgt>> /\
+  <<LOCAL2: exists pview2, sim_localF pview2 lc2_src lc1_tgt>> /\
   <<MEM2: sim_memory mem2_src mem1_tgt>> /\
   <<WF2_SRC: Local.wf lc2_src mem2_src>>.
 Proof.
   splits.
   - inv STEP_SRC. inv PROMISE.
     exists (match Memory.get loc to lc1_tgt.(Local.promises) with
-       | Some _ => SimPromises.set loc to none_for1
-       | None => none_for1
+       | Some _ => SimPromises.set loc to pview1
+       | None => pview1
        end).
     inv LOCAL1. econs; ss. inv PROMISES0. econs; ss.
     + ii.
@@ -464,9 +464,9 @@ Proof.
         }
       * condtac; ss. des. subst. congr.
     + i. revert MEM0. condtac; ss; cycle 1.
-      { eapply NONEFOR. }
+      { eapply PVIEW. }
       rewrite SimPromises.set_o. condtac; ss; cycle 1.
-      { eapply NONEFOR. }
+      { eapply PVIEW. }
       i. des. subst. destruct p. eauto.
     + i. revert SRC. erewrite Memory.lower_o; eauto. condtac; ss.
       * i. des. inv SRC. eapply COMPLETE; eauto. eapply Memory.lower_get0. eauto.
@@ -476,11 +476,11 @@ Proof.
 Qed.
 
 Lemma sim_localF_nonsynch_src
-      none_for
+      pview
       lang st sc
       lc1_src sc1_src mem1_src
       lc1_tgt sc1_tgt mem1_tgt
-      (LOCAL1: sim_localF none_for lc1_src lc1_tgt)
+      (LOCAL1: sim_localF pview lc1_src lc1_tgt)
       (SC1: TimeMap.le sc1_src sc1_tgt)
       (MEM1: sim_memory mem1_src mem1_tgt)
       (LOCAL1_SRC: Local.wf lc1_src mem1_src)
@@ -488,12 +488,12 @@ Lemma sim_localF_nonsynch_src
       (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
       (MEM1_SRC: Memory.closed mem1_src)
       (MEM1_TGT: Memory.closed mem1_tgt):
-  exists none_for2 lc2_src mem2_src,
+  exists pview2 lc2_src mem2_src,
     <<STEP_SRC: rtc (@Thread.tau_step lang)
                     (Thread.mk lang st lc1_src sc mem1_src)
                     (Thread.mk lang st lc2_src sc mem2_src)>> /\
     <<NONSYNCH2: Memory.nonsynch lc2_src.(Local.promises)>> /\
-    <<LOCAL2: sim_localF none_for2 lc2_src lc1_tgt>> /\
+    <<LOCAL2: sim_localF pview2 lc2_src lc1_tgt>> /\
     <<MEM2: sim_memory mem2_src mem1_tgt>>.
 Proof.
   inversion LOCAL1_SRC. unfold Memory.finite in *. des.
@@ -501,7 +501,7 @@ Proof.
              Memory.get loc to (Local.promises lc1_src) =
              Some (from, msg) -> msg.(Message.released) <> None -> In (loc, to) dom).
   { ii. eapply FINITE. eauto. }
-  clear FINITE. move dom after lc1_src. revert_until dom. revert none_for.
+  clear FINITE. move dom after lc1_src. revert_until dom. revert pview.
   induction dom.
   { esplits; eauto. ii. destruct (Message.released msg) eqn:X; ss.
     exfalso. eapply FINITE'; eauto. congr.
@@ -516,7 +516,7 @@ Proof.
     inv H1. rewrite H in X. inv X. ss.
   }
   exploit MemoryFacts.promise_exists_None; eauto.
-  { eapply MemoryFacts.some_released_time_lt; [by apply MEM1_SRC|]. apply LOCAL1_SRC. eauto. }
+  { eapply MemoryFacts.released_time_lt; [by apply MEM1_SRC|]. apply LOCAL1_SRC. eauto. }
   i. des.
   exploit Memory.promise_future; try apply LOCAL1_SRC; eauto; try by econs. i. des.
   exploit sim_localF_lower_src; eauto.
@@ -538,18 +538,18 @@ Proof.
 Qed.
 
 Lemma sim_localF_fence_src
-      none_for
+      pview
       lc1_src sc1_src mem1_src
       lc1_tgt sc1_tgt mem1_tgt
       (NONSYNCH: Memory.nonsynch lc1_src.(Local.promises))
-      (LOCAL1: sim_localF none_for lc1_src lc1_tgt)
+      (LOCAL1: sim_localF pview lc1_src lc1_tgt)
       (SC1: TimeMap.le sc1_src sc1_tgt)
       (MEM1: sim_memory mem1_src mem1_tgt)
       (WF1_SRC: Local.wf lc1_src mem1_src)
       (WF1_TGT: Local.wf lc1_tgt mem1_tgt):
   exists lc2_src sc2_src,
     <<STEP_SRC: Local.fence_step lc1_src sc1_src Ordering.plain Ordering.acqrel lc2_src sc2_src>> /\
-    <<LOCAL2: sim_localF none_for lc2_src lc1_tgt>> /\
+    <<LOCAL2: sim_localF pview lc2_src lc1_tgt>> /\
     <<SC2: TimeMap.le sc2_src sc1_tgt>>.
 Proof.
   esplits; ss. econs; s.
@@ -559,12 +559,12 @@ Proof.
 Qed.
 
 Lemma sim_localF_elimination
-      none_for
+      pview
       lc1_src sc1_src mem1_src
       lc1_tgt sc1_tgt mem1_tgt
       lc2_tgt sc2_tgt
       (STEP_TGT: Local.fence_step lc1_tgt sc1_tgt Ordering.plain Ordering.acqrel lc2_tgt sc2_tgt)
-      (LOCAL1: sim_localF none_for lc1_src lc1_tgt)
+      (LOCAL1: sim_localF pview lc1_src lc1_tgt)
       (SC1: TimeMap.le sc1_src sc1_tgt)
       (MEM1: sim_memory mem1_src mem1_tgt)
       (WF1_SRC: Local.wf lc1_src mem1_src)

@@ -1,4 +1,4 @@
-COQMODULE    := cmem
+COQMODULE    := promising
 COQTHEORIES  := lib/sflib/*.v lib/paco/src/*.v src/*/*.v
 
 .PHONY: all theories clean

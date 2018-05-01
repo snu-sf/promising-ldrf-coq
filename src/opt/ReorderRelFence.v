@@ -54,10 +54,10 @@ Inductive sim_release_fenceF: forall (st_src:lang.(Language.state)) (lc_src:Loca
                         (st_tgt:lang.(Language.state)) (lc_tgt:Local.t) (sc1_tgt:TimeMap.t) (mem1_tgt:Memory.t), Prop :=
 | sim_relese_fenceF_intro
     rs
-    none_for
+    pview
     lc1_src sc1_src mem1_src
     lc1_tgt sc1_tgt mem1_tgt
-    (LOCALF: sim_localF none_for lc1_src lc1_tgt):
+    (LOCALF: sim_localF pview lc1_src lc1_tgt):
     sim_release_fenceF
       (State.mk rs []) lc1_src sc1_src mem1_src
       (State.mk rs [Stmt.instr (Instr.fence Ordering.plain Ordering.acqrel)]) lc1_tgt sc1_tgt mem1_tgt
