@@ -106,7 +106,7 @@ Module DOAux.
   Definition le := lt \2/ eq.
   Lemma le_lteq : forall x y : t, le x y <-> lt x y \/ x = y.
   Proof.
-    auto. 
+    auto.
   Qed.
   Global Opaque le.
 

@@ -134,7 +134,7 @@ Proof.
     + etrans; eauto.
     + auto.
     + left. eapply paco9_mon; [apply sim_update_sim_thread|done].
-      econs; [eauto|..]; s; eauto. 
+      econs; [eauto|..]; s; eauto.
       * etrans; eauto.
       * etrans; eauto.
   - (* fence *)

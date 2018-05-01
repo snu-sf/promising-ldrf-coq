@@ -65,7 +65,7 @@ Proof.
 
   clear CONSIS. i. des.
   exploit (PI_RACEFREE cS3 ord ord0).
-  { etrans. 
+  { etrans.
     - eapply rtc_implies; [by i; econs; eapply PR|].
       by eapply pi_steps_small_steps_fst in PI_STEPS; eauto.
     - eapply rtc_implies, STEPS. by econs; eauto.
@@ -75,7 +75,7 @@ Proof.
     assert (LC1: exists lc1', IdentMap.find tid (Configuration.threads cS3) = Some (existT _ lang st1, lc1')).
     { erewrite <-rtc_small_step_find; eauto.
       inv WF2. rewrite THS. unfold remove_promise.
-      setoid_rewrite IdentMap.Properties.F.map_o. 
+      setoid_rewrite IdentMap.Properties.F.map_o.
       destruct (IdentMap.find tid (Configuration.threads cT2)) as [[]|]; [|done].
       inv ST1. s. eauto.
     }
@@ -211,7 +211,7 @@ Proof.
         subst. exfalso. eapply NOT. econs; eauto.
       }
       intro WRITE; des.
-      eexists; econs. 
+      eexists; econs.
       - eauto.
       - s. econs; s; eauto.
         + setoid_rewrite IdentMap.Properties.F.map_o. by rewrite TID.
@@ -241,7 +241,7 @@ Proof.
         + ss. setoid_rewrite IdentMap.Properties.F.map_o.
           by rewrite TID.
         + econs 2. econs; [|econs 4]; [by eauto|..].
-          { 
+          {
             econs; eauto.
             s. hexploit RL; [| |by intro X; des; unfold loctmeq in *; subst; apply X]; eauto.
             i. destruct (Ident.eq_dec tid tid0) eqn: EQ; cycle 1.
@@ -316,7 +316,7 @@ Lemma small_step_evt_to_true
   small_step_evt true tid cST1 cST2.
 Proof.
   destruct withprm; eauto.
-  inv STEP. inv USTEP. 
+  inv STEP. inv USTEP.
   econs. econs; eauto.
 Qed.
 
@@ -329,7 +329,7 @@ Lemma pi_consistent_rtc_small_step_pi
       cT3 pre
       (STEP: with_pre (small_step withprm tid) cST2.(snd) pre cT3)
       (FULFILL: forall tid0, promise_consistent_th tid0 cT3):
-  exists cS3 pre', with_pre (pi_step withprm tid) cST2 pre' (cS3,cT3) /\ 
+  exists cS3 pre', with_pre (pi_step withprm tid) cST2 pre' (cS3,cT3) /\
                    pre = pi_pre_proj pre'.
 Proof.
   destruct cST2 as [cS2 cT2].
@@ -354,10 +354,10 @@ Proof.
 
   intro STEPS. des. ss.
   eapply (@pi_consistent_small_step_pi _ _ _ (_,_)) in PSTEP; eauto; cycle 1.
-  { etrans; eauto. subst. 
+  { etrans; eauto. subst.
     eapply rtc_implies; [eapply pi_step_evt_to_true|].
     eapply with_pre_rtc_union; eauto. }
-  { eapply (@rtc_promise_consistent_th_small_step_backward true); try apply FULFILL. 
+  { eapply (@rtc_promise_consistent_th_small_step_backward true); try apply FULFILL.
     - etrans.
       + eapply pi_steps_small_steps_snd. eauto.
       + eapply rtc_implies; [eapply small_step_evt_to_true|].

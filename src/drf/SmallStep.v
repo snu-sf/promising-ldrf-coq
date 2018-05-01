@@ -96,7 +96,7 @@ Proof.
   induction STEPS; eauto.
 Qed.
 
-Lemma with_pre_trans 
+Lemma with_pre_trans
       A E (step: E -> A -> A -> Prop) c1 c2 c3 pre1 pre2
       (STEPS1: with_pre step c1 pre1 c2)
       (STEPS2: with_pre step c2 pre2 c3):
@@ -241,7 +241,7 @@ Lemma rtc_small_step_future
 Proof.
   revert WF1. induction STEP; i.
   - splits; eauto; reflexivity.
-  - destruct H. destruct USTEP. 
+  - destruct H. destruct USTEP.
     exploit small_step_future; eauto. i; des.
     exploit IHSTEP; eauto. i; des.
     splits; eauto.
@@ -348,7 +348,7 @@ Lemma tau_pf_step_small_step
       st2 lc2 sc2 mem2
       (TID: IdentMap.find tid threads = Some (existT _ lang st1, lc1))
       (STEP: tau (Thread.step true) (Thread.mk lang st1 lc1 sc1 mem1) (Thread.mk lang st2 lc2 sc2 mem2)):
-  small_step_evt false tid 
+  small_step_evt false tid
              (Configuration.mk threads sc1 mem1)
              (Configuration.mk (IdentMap.add tid (existT _ lang st2, lc2) threads) sc2 mem2).
 Proof.
@@ -399,7 +399,7 @@ Lemma rtc_tau_pf_step_rtc_small_step
       (Configuration.mk threads sc1 mem1)
       (Configuration.mk (IdentMap.add tid (existT _ lang st2, lc2) threads) sc2 mem2).
 Proof.
-  exploit rtc_tau_pf_step_rtc_small_step_aux; eauto. 
+  exploit rtc_tau_pf_step_rtc_small_step_aux; eauto.
   eauto.
 Qed.
 
@@ -441,7 +441,7 @@ Lemma rtc_small_step_find
       (TID: tid1 <> tid2):
   IdentMap.find tid2 c1.(Configuration.threads) = IdentMap.find tid2 c2.(Configuration.threads).
 Proof.
-  induction STEP; auto. 
+  induction STEP; auto.
   inv H. rewrite <-IHSTEP.
   eauto using small_step_find.
 Qed.
@@ -542,7 +542,7 @@ Proof.
   destruct (Memory.get loc ts (Local.promises lc2)) as [[from msg]|] eqn: EQ; eauto.
   exploit small_step_promise_decr; eauto.
   i; des. rewrite FIND0 in FIND1. inv FIND1.
-  rewrite PROMISES in *. 
+  rewrite PROMISES in *.
   setoid_rewrite Cell.bot_get in PROMISES0. done.
 Qed.
 

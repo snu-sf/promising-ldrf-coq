@@ -173,9 +173,9 @@ Definition option_app {A} (a b: option A) : option A :=
   if a then a else b.
 
 Definition option_rel {A B} (P: A -> B -> Prop) : option A -> option B -> Prop :=
-  fun a b => match a, b with 
-             | Some x, Some y => P x y 
-             | None, None => True 
+  fun a b => match a, b with
+             | Some x, Some y => P x y
+             | None, None => True
              | _, _ => False end.
 
 Lemma strengthen

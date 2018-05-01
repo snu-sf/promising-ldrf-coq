@@ -101,7 +101,7 @@ Lemma fence_step_promise_consistent
 Proof.
   exploit Local.fence_step_future; eauto. i. des.
   inversion STEP. subst. ii. exploit CONS; eauto. i.
-  eapply TimeFacts.le_lt_lt; eauto. apply TVIEW_FUTURE. 
+  eapply TimeFacts.le_lt_lt; eauto. apply TVIEW_FUTURE.
 Qed.
 
 Lemma ordering_relaxed_dec
@@ -201,7 +201,7 @@ Proof.
   - inv STEP. inv WRITE. destruct m.
     exploit Memory.promise_promises_get1; eauto. i. des.
     exploit fulfill_unset_promises; eauto. i. des. subst. refl.
-Qed.  
+Qed.
 
 Lemma thread_step_unset_promises
       lang loc pf e from ts msg (th1 th2:Thread.t lang)
@@ -214,7 +214,7 @@ Lemma thread_step_unset_promises
   <<TIME: Time.lt (th1.(Thread.local).(Local.tview).(TView.cur).(View.rlx) loc) ts>>.
 Proof.
   inv STEP.
-  { inv STEP0. inv LOCAL. destruct msg. ss. 
+  { inv STEP0. inv LOCAL. destruct msg. ss.
     exploit Memory.promise_promises_get1; eauto. i. des. congr.
   }
   destruct msg.
@@ -261,7 +261,7 @@ Proof.
   { ss. rewrite FIND1 in FIND2. depdes FIND2.
     by rewrite GET1 in GET2.
   }
-  inv H. 
+  inv H.
   exploit small_step_future; eauto. intros [WF2 _].
   inv USTEP. ss. rewrite FIND1 in TID. depdes TID.
   destruct (Memory.get loc ts lc3.(Local.promises)) as [[t m]|] eqn: PRM.
@@ -269,7 +269,7 @@ Proof.
     exploit IHSTEPS; eauto.
     intro LT. move STEP at bottom.
     eapply TimeFacts.le_lt_lt; eauto.
-    inv WF. exploit thread_step_tview_le; try exact STEP; eauto. 
+    inv WF. exploit thread_step_tview_le; try exact STEP; eauto.
     { eapply WF0. rewrite FIND1. eauto. }
     s. i. apply x1.
   - guardH PFREE.
@@ -299,7 +299,7 @@ Proof.
     inv STEP. inv USTEP. ss.
     rewrite THREAD in TID. inv TID.
     rewrite IdentMap.gss in THREAD2. inv THREAD2.
-    inv WF. exploit thread_step_tview_le; try exact STEP; eauto. 
+    inv WF. exploit thread_step_tview_le; try exact STEP; eauto.
     { eapply WF0. rewrite THREAD. eauto. }
     s. i. apply x0.
 Qed.
@@ -311,14 +311,14 @@ Lemma promise_consistent_th_rtc_small_step
       (FULFILL: promise_consistent_th tid' c2):
   promise_consistent_th tid' c1.
 Proof.
-  ginduction STEP; eauto. 
+  ginduction STEP; eauto.
   i. eapply promise_consistent_th_small_step; eauto.
   eapply IHSTEP; eauto.
   inv H. eapply small_step_future; eauto.
 Qed.
 
 Lemma consistent_promise_consistent_th
-      tid c 
+      tid c
       (WF: Configuration.wf c)
       (CONSISTENT: Configuration.consistent c):
   promise_consistent_th tid c.
@@ -328,7 +328,7 @@ Proof.
   i. des. destruct e2.
   exploit rtc_thread_step_rtc_small_step; [eauto|..].
   { ss. eapply rtc_implies, STEPS. apply tau_union. }
-  intro STEPS2. 
+  intro STEPS2.
   eapply rtc_small_step_unset_promises in STEPS2; eauto.
   - destruct c. eapply rtc_small_step_future; eauto.
   - s. rewrite IdentMap.gss. eauto.
@@ -347,8 +347,8 @@ Proof.
   i. s. destruct (Ident.eq_dec tid0 tid) eqn: EQ.
   - subst. eauto.
   - ii. exploit small_step_find; eauto.
-    s; intro X. rewrite <-X in THREAD. 
-    eapply (PRCONS tid0); eauto.  
+    s; intro X. rewrite <-X in THREAD.
+    eapply (PRCONS tid0); eauto.
 Qed.
 
 Lemma rtc_promise_consistent_th_small_step_forward
@@ -383,8 +383,8 @@ Proof.
   i. s. destruct (Ident.eq_dec tid0 tid) eqn: EQ.
   - subst. hexploit promise_consistent_th_small_step; eauto.
   - ii. exploit small_step_find; eauto.
-    s; intro X. rewrite X in THREAD. 
-    eapply (PRCONS tid0); eauto.  
+    s; intro X. rewrite X in THREAD.
+    eapply (PRCONS tid0); eauto.
 Qed.
 
 Lemma rtc_promise_consistent_th_small_step_backward
@@ -395,7 +395,7 @@ Lemma rtc_promise_consistent_th_small_step_backward
   forall tid0, promise_consistent_th tid0 c1.
 Proof.
   ginduction STEP; eauto.
-  i. inv H. 
+  i. inv H.
   i. hexploit promise_consistent_th_small_step_backward; eauto.
   i. hexploit IHSTEP; eauto.
   eapply small_step_future; eauto.

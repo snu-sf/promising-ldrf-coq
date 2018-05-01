@@ -55,7 +55,7 @@ Inductive race (c:Configuration.t) (ord1 ord2:Ordering.t): Prop :=
     (PROEVT2: Configuration_program_event c tid2 e2)
     (RACE: race_condition e1 e2 ord1 ord2)
 .
-Hint Constructors race.            
+Hint Constructors race.
 
 Definition pf_racefree (c1:Configuration.t): Prop :=
   forall c2 ordr ordw

@@ -52,7 +52,7 @@ Module TView <: JoinableType.
   Proof.
     econs; i; eapply Memory.closed_view_bot; apply Memory.init_closed.
   Qed.
-  
+
   Lemma future_closed
         tview mem1 mem2
         (CLOSED: closed tview mem1)

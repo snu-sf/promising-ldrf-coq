@@ -73,8 +73,8 @@ Inductive sim_update: forall (st_src:lang.(Language.state)) (lc_src:Local.t) (sc
     (RMW: RegFile.eval_rmw rs rmw1 vr1 = (vret1, vw1))
     (REORDER: reorder_update r1 l1 rmw1 or1 ow1 i2)
     (READ: Local.read_step lc1_src mem1_src l1 from1 vr1 releasedr1 or1 lc2_src)
-    (FULFILL: match vw1 with 
-              | Some val => fulfill_step lc2_src sc1_src l1 from1 to1 val releasedr1 releasedw1 ow1 lc3_src sc3_src 
+    (FULFILL: match vw1 with
+              | Some val => fulfill_step lc2_src sc1_src l1 from1 to1 val releasedr1 releasedw1 ow1 lc3_src sc3_src
               | None => lc3_src = lc2_src /\ sc3_src = sc1_src
               end)
     (LOCAL: sim_local lc3_src lc1_tgt)
@@ -169,7 +169,7 @@ Proof.
     { inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite <- PROMISES.
       inv READ. ss. apply SimPromises.sem_bot.
     }
-    i. des. 
+    i. des.
 
     esplits.
     - etrans.
@@ -360,7 +360,7 @@ Proof.
           { apply RegSet.add_spec. left. eauto. }
           { apply RegSet.add_spec. left. eauto. }
         * etrans; eauto.
-  }  
+  }
 
   exploit fulfill_step_future; eauto. i. des.
   inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
@@ -419,14 +419,14 @@ Proof.
     + econs 2. econs 2. econs; [|econs 4]; eauto. econs. econs.
       erewrite RegFile.eq_except_rmw; eauto; cycle 1.
       * apply RegFile.eq_except_singleton.
-      * ii. apply RegSet.singleton_spec in LHS. subst. 
+      * ii. apply RegSet.singleton_spec in LHS. subst.
         eapply REGS0; eauto. apply RegSet.add_spec. auto.
     + auto.
     + auto.
     + etrans; eauto.
     + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
-      apply RegFun.add_add. ii. subst. 
-      eapply REGS. apply RegSet.add_spec. auto. 
+      apply RegFun.add_add. ii. subst.
+      eapply REGS. apply RegSet.add_spec. auto.
   - (* store *)
     guardH ORD2.
     apply RegSet.disjoint_add in REGS. des.

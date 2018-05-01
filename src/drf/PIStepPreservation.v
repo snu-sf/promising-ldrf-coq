@@ -56,7 +56,7 @@ Inductive can_fulfill_promises (tid: Ident.t) : Configuration.t -> Prop :=
 Hint Constructors can_fulfill_promises.
 
 Lemma rtc_small_step_fulfill
-      tid loc ts c1 lst1 lc1 c2 lst2 lc2 from msg 
+      tid loc ts c1 lst1 lc1 c2 lst2 lc2 from msg
       (STEPS: rtc (small_step_evt false tid) c1 c2)
       (FIND1: IdentMap.find tid c1.(Configuration.threads) = Some (lst1, lc1))
       (GET1: Memory.get loc ts lc1.(Local.promises) = Some (from, msg))
@@ -66,7 +66,7 @@ Lemma rtc_small_step_fulfill
 Proof.
   ginduction STEPS; i; subst.
   { ss. rewrite FIND1 in FIND2. depdes FIND2.
-    by rewrite GET1 in GET2. 
+    by rewrite GET1 in GET2.
   }
   inv H. inv USTEP. ss. rewrite FIND1 in TID. depdes TID.
   destruct (Memory.get loc ts lc3.(Local.promises)) eqn: PRM.
@@ -76,7 +76,7 @@ Proof.
     intros []; i.
     econs; swap 5 8; eauto.
     etrans; [|apply STEPS0].
-    econs; eauto 10.  
+    econs; eauto 10.
   - exploit thread_step_unset_promises; eauto; s; eauto.
     i. des. econs; eauto 20.
 Qed.
@@ -103,7 +103,7 @@ Proof.
 Qed.
 
 Lemma rtc_small_step_unset_fulfill
-      tid loc ts c1 lst1 lc1 c2 lst2 lc2 from msg 
+      tid loc ts c1 lst1 lc1 c2 lst2 lc2 from msg
       (STEPS: rtc (small_step_evt false tid) c1 c2)
       (FIND1: IdentMap.find tid c1.(Configuration.threads) = Some (lst1, lc1))
       (GET1: Memory.get loc ts lc1.(Local.promises) = Some (from, msg))
@@ -113,7 +113,7 @@ Lemma rtc_small_step_unset_fulfill
 Proof.
   ginduction STEPS; i; subst.
   { ss. rewrite FIND1 in FIND2. depdes FIND2.
-    by rewrite GET1 in GET2. 
+    by rewrite GET1 in GET2.
   }
   inv H. inv USTEP. ss. rewrite FIND1 in TID. depdes TID.
   destruct (Memory.get loc ts lc3.(Local.promises)) eqn: PRM.
@@ -125,7 +125,7 @@ Proof.
     etrans; [|apply STEPS0].
     econs; eauto 10.
   - exploit thread_step_unset_promises; eauto; s; eauto.
-    i; des. econs; eauto. 
+    i; des. econs; eauto.
 Qed.
 
 Lemma consistent_can_fulfill_promises_future
@@ -181,7 +181,7 @@ Qed.
 
 Lemma key_lemma_time_lt:
   forall (loc : Loc.t) (ts : Time.t) (k : Memory.op_kind)
-    (cM4' : Configuration.t) (lc4 : Local.t) 
+    (cM4' : Configuration.t) (lc4 : Local.t)
     (com4' : TView.t) (prm3' : Memory.t) (sc2 : TimeMap.t)
     (memory2 : Memory.t) (loc0 : Loc.t) (ts0 from : Time.t)
     (valr valw : Const.t) (relr relw : option View.t)
@@ -218,7 +218,7 @@ Qed.
 Lemma key_lemma_time_lt2:
   forall (loc : Loc.t) (ts : Time.t) (cM4' : Configuration.t)
     (com4' : TView.t) (loc0 : Loc.t) (ts0 : Time.t)
-    (relw : option View.t) (ordr ordw0 : Ordering.t) 
+    (relw : option View.t) (ordr ordw0 : Ordering.t)
     (tsw : Time.t) xx yy,
     Ordering.le Ordering.acqrel ordr ->
     Time.lt
@@ -325,7 +325,7 @@ Proof.
       + eauto.
     - eauto.
   }
-  i; des. 
+  i; des.
 
   inv MEMLE. r in MEMWR. rewrite EVTW in MEMWR. des.
   revert PMREL. unfold lift_view_if. condtac; i.
@@ -350,19 +350,19 @@ Grab Existential Variables. exact true.
 Qed.
 
 Definition pre_in_msgs A (pre: option (A * ThreadEvent.t)) msgs : Prop :=
-  match pre with 
-  | Some (_,pe) => 
+  match pre with
+  | Some (_,pe) =>
     match ThreadEvent.is_reading pe with
     | Some (l, t, val, relr, ordr) => ~ List.In (l,t) msgs
     | _ => True
     end
-  | _ => True 
+  | _ => True
   end.
 Hint Unfold pre_in_msgs.
 
 Lemma key_lemma_core
   tid tid0 l t msgs e evt3 evt4 pre4'
-  cS3 cT3 cS3' cM3' cS3'x cS3'' cM3'' cS4 cT4 cS4' cM4' cM4'' M3 M4 
+  cS3 cT3 cS3' cM3' cS3'x cS3'' cM3'' cS4 cT4 cS4' cM4' cM4'' M3 M4
   lang st4' st4'' com3' com3'' com4' com4'' prm4' prm4''
   (STEP3_4: pi_step false tid0 e (cS3, cT3) (cS4, cT4))
   (STEPS3: rtc (pi_step_evt false tid) (cS3, conf_update_memory cT3 M3) (cS3', cM3'))
@@ -381,7 +381,7 @@ Lemma key_lemma_core
     <<STEPS: with_pre (pi_step false tid) (cS4, conf_update_memory cT4 M4) pre4'' (cS4'', cM4'')>> /\
     <<EQPRE: Some (cM4', evt4) = pi_pre_proj pre4'' >>.
 Proof.
-  inv STEP4. ss. 
+  inv STEP4. ss.
   rewrite THS4 in TID. symmetry in TID. depdes TID.
   rewrite IdentMap.gss in THS4'. depdes THS4'. destruct pf; ss.
 
@@ -393,7 +393,7 @@ Proof.
     { econs 2; [econs 1|]. econs.
       - econs; eauto. econs; eauto. econs; eauto.
       - s. eauto.
-      - s. rewrite !IdentMap.gss. ss. 
+      - s. rewrite !IdentMap.gss. ss.
         inv WF4. by rewrite THS; setoid_rewrite IdentMap.Properties.F.map_o; rewrite THS4.
       - i. des; done.
     }
@@ -421,10 +421,10 @@ Proof.
       - s. econs; eauto.
         { s. by rewrite THS; setoid_rewrite IdentMap.Properties.F.map_o; rewrite THS4. }
         s. econs 2. econs; [|econs 2]; [eauto|].
-        
+
         inv LOCAL0. s.
         eapply Local.read_step_intro; cycle 1; eauto.
-        
+
         inv STEPS3'.
         hexploit rtc_pi_step_future; swap 1 3; swap 2 3.
         { eapply rtc_implies, with_pre_rtc_union, PSTEPS. eauto. }
@@ -448,7 +448,7 @@ Proof.
           - eauto. }
 
         exploit rtc_pi_step_except_find.
-        { eapply rtc_implies, STEPS3. eauto. } 
+        { eapply rtc_implies, STEPS3. eauto. }
         s; intro EQA; des.
         exploit rtc_pi_step_except_find.
         { eapply rtc_implies, with_pre_rtc_union, STEPS4. eauto. }
@@ -456,16 +456,16 @@ Proof.
 
         inv PRM4. rewrite <-EQB0 in TID0. inv STEP3_4.
         exploit small_step_promise_decr; eauto.
-        i; des. rewrite EQA0 in FIND1. 
+        i; des. rewrite EQA0 in FIND1.
         destruct lst1. econs; eauto.
       - s. by rewrite !IdentMap.gss.
-      - i. des; try done. 
+      - i. des; try done.
         inv WRITE. inv STEPS3'. inv PSTEP. inv EVT.
         hexploit NOWR; s; eauto.
         intros X PRM2. apply X.
 
         hexploit rtc_pi_step_except_find.
-        { eapply rtc_implies, STEPS3. eauto. } 
+        { eapply rtc_implies, STEPS3. eauto. }
         s; intro EQA; des.
         hexploit rtc_pi_step_except_find.
         { eapply rtc_implies, with_pre_rtc_union, STEPS4. eauto. }
@@ -473,7 +473,7 @@ Proof.
 
         inv PRM2. rewrite <-EQB0 in TID. inv STEP3_4.
         hexploit small_step_promise_decr; eauto.
-        i; des. rewrite EQA0 in FIND1. 
+        i; des. rewrite EQA0 in FIND1.
         destruct lst1. econs; eauto.
     }
     eauto.
@@ -507,7 +507,7 @@ Proof.
         intros X PRM2. apply X.
 
         hexploit rtc_pi_step_except_find.
-        { eapply rtc_implies, STEPS3. eauto. } 
+        { eapply rtc_implies, STEPS3. eauto. }
         s; intro EQA; des.
         hexploit rtc_pi_step_except_find.
         { eapply rtc_implies, with_pre_rtc_union, STEPS4. eauto. }
@@ -515,7 +515,7 @@ Proof.
 
         inv PRM2. rewrite <-EQB0 in TID. inv STEP3_4.
         hexploit small_step_promise_decr; eauto.
-        i; des. rewrite EQA0 in FIND1. 
+        i; des. rewrite EQA0 in FIND1.
         destruct lst1. econs; eauto.
     }
     eauto.
@@ -524,7 +524,7 @@ Proof.
   (* Update step *)
   { assert (X:= LOCAL1). inv X. ss.
 
-    hexploit (@local_simul_write (lift_view_le l t (msg_add l e msgs))); try apply LOCAL2. 
+    hexploit (@local_simul_write (lift_view_le l t (msg_add l e msgs))); try apply LOCAL2.
     { inv WF4. ii. apply LR in IN. des. esplits; eauto. }
     { inv WF4.
       econs. i. destruct msg1. exploit LR; eauto. i. des.
@@ -539,7 +539,7 @@ Proof.
     }
     intro WRITE4. des.
 
-    inv WF4. 
+    inv WF4.
     esplits; [eapply with_pre_trans; [by apply STEPS4|]|].
     { econs 2; [econs 1|]. econs.
       { econs; eauto. econs 2. econs; [|econs 4]; eauto. }
@@ -548,7 +548,7 @@ Proof.
         s. econs 2. econs; [|econs 4]; [eauto|..].
         { inv LOCAL1. s.
           eapply Local.read_step_intro; cycle 1; eauto.
-          
+
           inv STEPS3'.
           hexploit rtc_pi_step_future; swap 1 3; swap 2 3.
           { eapply rtc_implies, with_pre_rtc_union, PSTEPS. eauto. }
@@ -572,7 +572,7 @@ Proof.
             - eauto. }
 
           exploit rtc_pi_step_except_find.
-          { eapply rtc_implies, STEPS3. eauto. } 
+          { eapply rtc_implies, STEPS3. eauto. }
           s; intro EQA; des.
           exploit rtc_pi_step_except_find.
           { eapply rtc_implies, with_pre_rtc_union, STEPS4. eauto. }
@@ -580,7 +580,7 @@ Proof.
 
           inv PRM4. rewrite <-EQB0 in TID0. inv STEP3_4.
           exploit small_step_promise_decr; eauto.
-          i; des. rewrite EQA0 in FIND1. 
+          i; des. rewrite EQA0 in FIND1.
           destruct lst1. econs; eauto.
         }
         { s. rewrite SC. eauto. }
@@ -593,7 +593,7 @@ Proof.
         intros X PRM'. apply X.
 
         hexploit rtc_pi_step_except_find.
-        { eapply rtc_implies, STEPS3. eauto. } 
+        { eapply rtc_implies, STEPS3. eauto. }
         s; intro EQA; des.
         hexploit rtc_pi_step_except_find.
         { eapply rtc_implies, with_pre_rtc_union, STEPS4. eauto. }
@@ -601,7 +601,7 @@ Proof.
 
         inv PRM'. rewrite <-EQB0 in TID. inv STEP3_4.
         hexploit small_step_promise_decr; eauto.
-        i; des. rewrite EQA0 in FIND1. 
+        i; des. rewrite EQA0 in FIND1.
         destruct lst1. econs; eauto.
 
         rdes WRITE; inv WRITE; eauto.
@@ -651,7 +651,7 @@ Lemma key_lemma
       (WF : pi_wf loctmeq (cS1, cT1))
       (RACEFREE : pf_racefree cS1)
       (STEPS : rtc (pi_step_evt true tid) (cS1, cT1) (cS2, cT2))
-      loc ts lst2 lc2 from2 msg2 
+      loc ts lst2 lc2 from2 msg2
       (THREAD2 : IdentMap.find tid (Configuration.threads cT2) = Some (lst2, lc2))
       (PROMISE2 : Memory.get loc ts (Local.promises lc2) = Some (from2, msg2))
       cSTM3
@@ -692,13 +692,13 @@ Proof.
       destruct lst2. exploit THREADS; eauto.
       intro X. inv X. apply PROMISES in PROMISE2. rewrite PROMISE2. done.
     - done.
-    - s. i. 
+    - s. i.
       exploit pi_consistent_rtc_small_step_pi; [apply WF|..]
       ; try (by instantiate (3:=(_,_)); eapply with_pre_implies, PI_STEPS; eauto); eauto.
       { destruct cT2. eauto. }
       i; des; subst.
       esplits.
-      + eapply (@pi_consistent_lang_step_pi_rw tid _ (_,_)); [apply WF|..]; eauto. 
+      + eapply (@pi_consistent_lang_step_pi_rw tid _ (_,_)); [apply WF|..]; eauto.
         etrans; eauto.
         apply with_pre_rtc_union in x0.
         destruct cT2. ss.
@@ -766,7 +766,7 @@ Proof.
   revert_until PI_STEPS.
   induction PI_STEPS; i.
   { split; eauto.
-    destruct lc4 as [com4 prm4]. subst. ss. inv PI_STEP. 
+    destruct lc4 as [com4 prm4]. subst. ss. inv PI_STEP.
     esplits.
     { eauto. }
     { i. eapply promise_consistent_th_small_step_backward in STEPT; eauto.
@@ -784,7 +784,7 @@ Proof.
     { cut (~ is_reading_writing_promise_except tid (conf_update_memory cT3 M3)).
       { ii. apply H. clear H. inv H0. econs; eauto.
         - setoid_rewrite THEQB0. eauto.
-        - guardH RW. inv PROM0. ss. 
+        - guardH RW. inv PROM0. ss.
           destruct (Ident.eq_dec tid' tid0) eqn: TEQ; cycle 1.
           + rewrite <- (small_step_find STEPT) in TID0; eauto.
             econs; eauto.
@@ -825,7 +825,7 @@ Proof.
   { eapply rtc_implies, with_pre_rtc_union, PI_STEPS. eauto. }
   { inv WF4'. eauto. }
   intros [WF4'' _].
-  
+
   exploit IHPI_STEPS; eauto using promise_consistent_th_small_step.
   { exploit small_step_promise_decr; [apply STEP2|..].
     - s. rewrite IdentMap.gss. eauto.
@@ -856,7 +856,7 @@ Proof.
       (EVTW: ThreadEvent.is_writing e = Some (loc', from, ts', valw, relw, ordw)),
     False).
   { i; eapply key_lemma_rw_race; eauto.
-    - s. rewrite IdentMap.gss. eauto. 
+    - s. rewrite IdentMap.gss. eauto.
     - eapply PRCONSIS; eauto. by s; rewrite IdentMap.gss.
   }
 
@@ -886,10 +886,10 @@ Proof.
     - apply with_pre_rtc_union in PI_STEPS.
       inv PI_STEP. inv STEPT. ss. inv STEP0; inv STEP1; inv EVTP.
       inv LOCAL0. inv PROMISE; inv EVTL. inv PROMISES. inv LOWER.
-      econs. 
+      econs.
       + rewrite <-(rtc_small_step_find PI_STEPS); eauto.
         s. rewrite IdentMap.gss. eauto.
-      + s. unfold Memory.get, Cell.get. 
+      + s. unfold Memory.get, Cell.get.
         setoid_rewrite LocFun.add_spec_eq.
         rewrite <-H1, IdentMap.gss. eauto.
   }
@@ -906,10 +906,10 @@ Proof.
     { ii. s in THREAD. rewrite IdentMap.gso in THREAD; eauto.
       eapply (PRCONSIS3 tid1); eauto. }
 
-    subst; ii. r in PRCONSIS. ss. 
-    rewrite IdentMap.gss in THREAD. 
+    subst; ii. r in PRCONSIS. ss.
+    rewrite IdentMap.gss in THREAD.
     specialize (PRCONSIS tid). rewrite IdentMap.gss in PRCONSIS.
-    inv THREAD. rewrite PRM in PROMISE. 
+    inv THREAD. rewrite PRM in PROMISE.
     exploit PRCONSIS; eauto.
     intro LT. move COM at bottom.
     eapply TimeFacts.le_lt_lt; eauto. apply COM.
@@ -969,9 +969,9 @@ Proof.
         rewrite <-(rtc_small_step_find STEPS3'), <-TID0; eauto.
         apply (small_step_find STEPT); eauto.
       + subst. guardH RW.
-        exploit small_step_promise_decr; [apply STEPT|..]; eauto. i; des. destruct lst1. 
+        exploit small_step_promise_decr; [apply STEPT|..]; eauto. i; des. destruct lst1.
         econs.
-        * rewrite IdentMap.gso; eauto. 
+        * rewrite IdentMap.gso; eauto.
           rewrite <-(rtc_small_step_find STEPS3'); eauto.
         * eauto.
   }
@@ -992,7 +992,7 @@ Theorem pi_consistent_pi_step_pi_consistent
   pi_consistent cST2.
 Proof.
   destruct cST1 as [cS1 cT1], cST2 as [cS2 cT2].
-  econs. i. 
+  econs. i.
 
   exploit rtc_pi_step_future; [eauto|..].
   { reflexivity. }
@@ -1000,7 +1000,7 @@ Proof.
   i; des. clear FUTURES FUTURET.
 
   destruct (Ident.eq_dec tid0 tid); cycle 1.
-  { exploit (@rtc_pi_step_remove_promises tid); try apply STEP; try apply STEPS; eauto. 
+  { exploit (@rtc_pi_step_remove_promises tid); try apply STEP; try apply STEPS; eauto.
     intro STEPS'. des. ss.
 
     assert (TEQA:= rtc_pi_step_except_find STEPS). des. ss.
@@ -1009,7 +1009,7 @@ Proof.
     { eapply rtc_implies, STEP. i. eauto. } intro TEQC; des; ss.
     rewrite <-TEQA0,<-TEQC0,TEQB0 in THREAD.
 
-    inv PI_CONSISTENT. 
+    inv PI_CONSISTENT.
     exploit CONSIS; cycle 1; eauto.
   }
   subst. rename cS0 into cS3, cT0 into cT3, lst2 into lst3, lc2 into lc3.
@@ -1065,7 +1065,7 @@ Proof.
   rewrite <-EQ0 in TH.
   exploit key_lemma; eauto.
   s; i; des.
-  
+
   exploit rtc_union_with_pre; [by apply STEPS0|].
   intro STEPS'. des.
 
@@ -1081,7 +1081,7 @@ Proof.
   }
   { by rewrite PROMISE0. }
   s; i; des.
-  
+
   exploit small_step_to_program_step_writing; eauto.
   i; des.
 

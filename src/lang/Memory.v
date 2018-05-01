@@ -336,7 +336,7 @@ Module Memory.
     - subst. erewrite Cell.add_o; eauto.
       repeat (condtac; subst; des; ss; try congr).
     - repeat (condtac; subst; des; ss; try congr).
-  Qed.      
+  Qed.
 
   Lemma split_o
         mem2 mem1 loc ts1 ts2 ts3 val2 val3 released2 released3
@@ -353,7 +353,7 @@ Module Memory.
     - subst. erewrite Cell.split_o; eauto.
       repeat (condtac; subst; des; ss; try congr).
     - repeat (condtac; subst; des; ss; try congr).
-  Qed.      
+  Qed.
 
   Lemma lower_o
         mem2 mem1 loc from to val released1 released2

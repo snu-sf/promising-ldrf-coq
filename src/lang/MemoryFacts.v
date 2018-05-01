@@ -80,7 +80,7 @@ Module MemoryFacts.
     - erewrite Memory.lower_o; eauto. condtac; ss.
       + des. subst. congr.
       + i. inv GET. esplits; eauto.
-  Qed.        
+  Qed.
 
   Lemma promise_get_promises_inv_diff
         promises1 mem1 loc from to val released promises2 mem2 kind

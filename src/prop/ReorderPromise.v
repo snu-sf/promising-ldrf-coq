@@ -76,7 +76,7 @@ Proof.
     rewrite IdentMap.gso in TID0; auto.
     inv STEP; [|by inv STEP1; inv E1].
     inv STEP0.
-    { inv STEP. inv STEP1. 
+    { inv STEP. inv STEP1.
       exploit reorder_promise_promise_diff; eauto; try eapply WF; eauto.
       { i. apply promise_pf_inv in PFREE0. des; subst. econs. }
       i; des. esplits; eauto using Thread.promise_step_intro.

@@ -33,7 +33,7 @@ Inductive pi_step withprm: Ident.t -> ThreadEvent.t -> Configuration.t*Configura
     (STEPS: if ThreadEvent.is_promising e
             then cS1 = cS2
             else small_step false tid e cS1 cS2)
-    (LANGMATCH: 
+    (LANGMATCH:
      option_map fst (IdentMap.find tid cS2.(Configuration.threads)) =
      option_map fst (IdentMap.find tid cT2.(Configuration.threads)))
     (NOWR: forall loc from ts val rel ord tid' ts'
@@ -97,7 +97,7 @@ Inductive pi_consistent: Configuration.t*Configuration.t -> Prop :=
   pi_consistent (cS1, cT1).
 Hint Constructors pi_consistent.
 
-Definition pi_pre_proj (pre: option (Configuration.t*Configuration.t*ThreadEvent.t)) := 
+Definition pi_pre_proj (pre: option (Configuration.t*Configuration.t*ThreadEvent.t)) :=
   option_map (fun p => (p.(fst).(snd),p.(snd))) pre.
 
 Lemma pi_step_future
@@ -109,7 +109,7 @@ Lemma pi_step_future
   <<FUTURES: Memory.future cST1.(fst).(Configuration.memory) cST2.(fst).(Configuration.memory)>> /\
   <<FUTURET: Memory.future cST1.(snd).(Configuration.memory) cST2.(snd).(Configuration.memory)>>.
 Proof.
-  inv WF1. inv STEP. inv USTEP. splits; cycle 1. 
+  inv WF1. inv STEP. inv USTEP. splits; cycle 1.
   - destruct (ThreadEvent.is_promising e).
     + subst. ss. econs.
     + eapply small_step_future in STEPS; eauto; des; ss.
@@ -228,7 +228,7 @@ Proof.
         + by rewrite !IdentMap.gso.
       - ii. exploit LR; eauto. i; des.
         esplits; eauto.
-        ii. eapply (NOT tid0). inv H. 
+        ii. eapply (NOT tid0). inv H.
         destruct (Ident.eq_dec tid0 tid) eqn: EQ.
         { subst. rewrite IdentMap.gss in TID1. inv TID1.
           econs; eauto. }
@@ -254,7 +254,7 @@ Proof.
       - inv LOCAL0. inv LOCAL1.
         ii. exploit LR; eauto. i; des.
         esplits; eauto.
-        ii. eapply (NOT tid0). inv H. 
+        ii. eapply (NOT tid0). inv H.
         destruct (Ident.eq_dec tid0 tid) eqn: EQ.
         { subst. rewrite IdentMap.gss in TID1. inv TID1.
           econs; eauto. }
@@ -263,9 +263,9 @@ Proof.
         ii. exploit RL; eauto. i; des.
         ii. apply (NOT tid0). inv H.
         destruct (Ident.eq_dec tid0 tid) eqn: EQ.
-        { subst. rewrite TID1 in TID. inv TID. depdes H1. destruct lc1. 
-          ss. econs; eauto. 
-          - rewrite IdentMap.gss. s. reflexivity. 
+        { subst. rewrite TID1 in TID. inv TID. depdes H1. destruct lc1.
+          ss. econs; eauto.
+          - rewrite IdentMap.gss. s. reflexivity.
           - eauto. }
         econs; eauto. rewrite IdentMap.gso; eauto.
     }
@@ -394,13 +394,13 @@ Proof.
         + subst. rewrite !IdentMap.gss.
           inv LOCAL0. inv LOCAL1. eauto.
         + by rewrite !IdentMap.gso.
-      - inv LOCAL0. inv LOCAL1. ss. 
+      - inv LOCAL0. inv LOCAL1. ss.
         setoid_rewrite IdentMap.Properties.F.map_o in TID0.
         rewrite TID in TID0. inv TID0. depdes H1. eauto.
       - inv LOCAL0. inv LOCAL1.
         ii. exploit LR; eauto. i; des.
         esplits; eauto.
-        ii. eapply (NOT tid0). inv H. 
+        ii. eapply (NOT tid0). inv H.
         destruct (Ident.eq_dec tid0 tid) eqn: EQ.
         { subst. rewrite IdentMap.gss in TID1. inv TID1.
           econs; eauto. }
@@ -409,9 +409,9 @@ Proof.
         ii. exploit RL; eauto. i; des.
         ii. apply (NOT tid0). inv H.
         destruct (Ident.eq_dec tid0 tid) eqn: EQ.
-        { subst. rewrite TID1 in TID. inv TID. depdes H1. destruct lc1. 
-          ss. econs; eauto. 
-          - rewrite IdentMap.gss. s. reflexivity. 
+        { subst. rewrite TID1 in TID. inv TID. depdes H1. destruct lc1.
+          ss. econs; eauto.
+          - rewrite IdentMap.gss. s. reflexivity.
           - eauto. }
         econs; eauto. rewrite IdentMap.gso; eauto.
     }
@@ -426,13 +426,13 @@ Proof.
         + subst. rewrite !IdentMap.gss.
           inv LOCAL0. inv LOCAL1. eauto.
         + by rewrite !IdentMap.gso.
-      - inv LOCAL0. inv LOCAL1. ss. 
+      - inv LOCAL0. inv LOCAL1. ss.
         setoid_rewrite IdentMap.Properties.F.map_o in TID0.
         rewrite TID in TID0. inv TID0. depdes H1. eauto.
       - inv LOCAL0. inv LOCAL1.
         ii. exploit LR; eauto. i; des.
         esplits; eauto.
-        ii. eapply (NOT tid0). inv H. 
+        ii. eapply (NOT tid0). inv H.
         destruct (Ident.eq_dec tid0 tid) eqn: EQ.
         { subst. rewrite IdentMap.gss in TID1. inv TID1.
           econs; eauto. }
@@ -441,9 +441,9 @@ Proof.
         ii. exploit RL; eauto. i; des.
         ii. apply (NOT tid0). inv H.
         destruct (Ident.eq_dec tid0 tid) eqn: EQ.
-        { subst. rewrite TID1 in TID. inv TID. depdes H1. destruct lc1. 
-          ss. econs; eauto. 
-          - rewrite IdentMap.gss. s. reflexivity. 
+        { subst. rewrite TID1 in TID. inv TID. depdes H1. destruct lc1.
+          ss. econs; eauto.
+          - rewrite IdentMap.gss. s. reflexivity.
           - eauto. }
         econs; eauto. rewrite IdentMap.gso; eauto.
     }
@@ -509,10 +509,10 @@ Lemma pi_steps_small_steps_fst
   rtc (small_step_evt withprm' tid) (fst cST1) (fst cST2).
 Proof.
   induction PI_STEPS; eauto.
-  inv H. inv USTEP. 
+  inv H. inv USTEP.
   destruct (ThreadEvent.is_promising e).
   - subst. eauto.
-  - econs; eauto. s. inv STEPS. destruct withprm'; econs; eauto 10. 
+  - econs; eauto. s. inv STEPS. destruct withprm'; econs; eauto 10.
 Qed.
 
 Lemma pi_step_small_step_snd
@@ -557,10 +557,10 @@ Lemma pi_steps_all_pf_steps_fst
   rtc (small_step_all withprm') (fst cST1) (fst cST2).
 Proof.
   induction PI_STEPS; eauto.
-  inv H. inv USTEP. inv USTEP0. 
+  inv H. inv USTEP. inv USTEP0.
   destruct (ThreadEvent.is_promising e0) eqn: PROM.
   - subst. eauto.
-  - econs; eauto. s. inv STEPS. destruct withprm'; econs; eauto 10. 
+  - econs; eauto. s. inv STEPS. destruct withprm'; econs; eauto 10.
 Qed.
 
 Lemma rtc_pi_step_except_find
@@ -569,7 +569,7 @@ Lemma rtc_pi_step_except_find
   IdentMap.find tid c1.(fst).(Configuration.threads) = IdentMap.find tid c2.(fst).(Configuration.threads) /\
   IdentMap.find tid c1.(snd).(Configuration.threads) = IdentMap.find tid c2.(snd).(Configuration.threads).
 Proof.
-  induction STEP; auto. 
+  induction STEP; auto.
   des. rewrite <-IHSTEP, <-IHSTEP0.
   inv H. inv PI_STEP. inv USTEP.
   split; eauto using small_step_find.
@@ -676,7 +676,7 @@ Proof.
   { destruct cST3. esplits; eauto.
      econs; eauto.
      econs; try apply NEQ.
-     econs; econs; rewrite ?COND; eauto. 
+     econs; econs; rewrite ?COND; eauto.
      inv STEPT. destruct pf; eauto.
      inv STEP. inv STEP0. ss. by rewrite NOTLN in PF.
   }
@@ -701,7 +701,7 @@ Proof.
     - exploit IH; try exact A23; try exact WF; eauto.
       { econs; econs; eauto; ii; by des; destruct e2', e0. }
       i. des. esplits; try exact STEPS; eauto.
-    - assert (EQ: e2' = e0). 
+    - assert (EQ: e2' = e0).
       { by destruct e2', e0; inv EVENT. }
       subst. esplits; [|econs; try exact A23|]; eauto.
       econs; eauto. econs; econs.
@@ -717,7 +717,7 @@ Proof.
   { econs; eauto. econs; econs.
     + eauto.
     + by destruct e2', e0; ss; inv EVENT.
-    + rewrite LANGMATCH0. 
+    + rewrite LANGMATCH0.
       inv STEP2. inv STEP; [|by inv STEP0].
       s. inv STEP0. destruct (Ident.eq_dec tid0 tid).
       * subst. by rewrite IdentMap.gss, TID0.
@@ -739,8 +739,8 @@ Proof.
   assert (STEP1': pi_step_evt false tid0 (cS2, cT1) (cS0, c1')).
   { econs. econs; eauto.
     - by destruct e2', e0; inv EVENT.
-    - etrans; eauto. destruct (Ident.eq_dec tid tid0). 
-      + subst. inv STEP2. s. rewrite IdentMap.gss. 
+    - etrans; eauto. destruct (Ident.eq_dec tid tid0).
+      + subst. inv STEP2. s. rewrite IdentMap.gss.
         inv STEP; [by inv STEP0; rewrite TID0|by inv STEP0; inv PROMISING].
       + rewrite (small_step_find STEP2); eauto.
     - ii. eapply NOWR0; eauto.

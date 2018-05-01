@@ -73,7 +73,7 @@ Proof.
   induction STEPS; eauto.
 Qed.
 
-Lemma with_pre_trans 
+Lemma with_pre_trans
       A E (step: E -> A -> A -> Prop) c1 c2 c3 pre1 pre2
       (STEPS1: with_pre step c1 pre1 c2)
       (STEPS2: with_pre step c2 pre2 c3):
