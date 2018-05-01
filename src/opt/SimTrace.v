@@ -91,7 +91,7 @@ Lemma sim_trace_sim_thread
       st1_src lc1_src sc1_src mem1_src
       st1_tgt lc1_tgt sc1_tgt mem1_tgt
       (SIM: sim_trace sim_regs st1_src st1_tgt)
-      (LOCAL: sim_local lc1_src lc1_tgt):
+      (LOCAL: sim_local SimPromises.bot lc1_src lc1_tgt):
   sim_thread
     (sim_terminal sim_regs)
     st1_src lc1_src sc1_src mem1_src
@@ -115,7 +115,7 @@ Proof.
   - i. exploit sim_local_memory_bot; eauto. i.
     esplits; eauto.
   - ii. inv STEP_TGT; inv STEP0; [|inv LOCAL0].
-    + exploit sim_local_promise; eauto. i. des.
+    + exploit sim_local_promise_bot; eauto. i. des.
       esplits; (try exact SC); eauto.
       econs 2. econs 1. econs; eauto.
     + exploit STEP; eauto. i. des. inv SIM0; [|done].
@@ -144,7 +144,7 @@ Proof.
       * right. apply CIH; auto.
     + exploit STEP; eauto. i. des. inv SIM0; [|done].
       inv EVT. inv STEP_SRC.
-      hexploit sim_local_write;
+      hexploit sim_local_write_bot;
         (try exact LOCAL);
         (try exact SC);
         eauto; try refl; try by viewtac. i. des.
@@ -161,7 +161,7 @@ Proof.
       exploit Local.read_step_future; eauto. i. des.
       exploit sim_local_read; eauto; try refl. i. des.
       exploit Local.read_step_future; eauto. i. des.
-      hexploit sim_local_write;
+      hexploit sim_local_write_bot;
         (try exact LOCAL0);
         (try exact SC);
         eauto; try refl; try by viewtac. i. des.

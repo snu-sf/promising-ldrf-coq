@@ -35,7 +35,7 @@ Lemma assign_sim_thread:
   forall v1 r2
     rs_src rs_tgt lc_src lc_tgt sc0_src sc0_tgt mem0_src mem0_tgt
     (RS: rs_src = RegFun.add r2 (RegFile.eval_value rs_tgt v1) rs_tgt)
-    (LOCAL: sim_local lc_src lc_tgt),
+    (LOCAL: sim_local SimPromises.bot lc_src lc_tgt),
     sim_thread
       (sim_terminal eq)
       (State.mk rs_src []) lc_src sc0_src mem0_src
@@ -152,7 +152,7 @@ Proof.
     + econs 2. econs 1. econs; eauto.
     + auto.
   - (* store *)
-    hexploit sim_local_write; try exact LOCAL1; try exact SC; eauto; try refl; try by viewtac. i. des.
+    hexploit sim_local_write_bot; try exact LOCAL1; try exact SC; eauto; try refl; try by viewtac. i. des.
     exploit merge_write_read1; try exact STEP_SRC; eauto. i. des.
     esplits.
     + econs 2; [|econs 1]. econs.
@@ -201,7 +201,7 @@ Proof.
     exploit Time.middle_spec; eauto.
     { inv LOCAL1. eapply MemoryFacts.write_time_lt. eauto. }
     i. des.
-    hexploit sim_local_write; try exact LOCAL0; try exact SC; eauto; try refl; try by viewtac. i. des.
+    hexploit sim_local_write_bot; try exact LOCAL0; try exact SC; eauto; try refl; try by viewtac. i. des.
     exploit merge_write_write_None; try exact STEP_SRC; eauto; try by viewtac. i. des.
     + esplits.
       * econs 2; [|econs 2; eauto].
@@ -270,7 +270,7 @@ Proof.
     exploit Time.middle_spec; eauto.
     { inv LOCAL1. eapply MemoryFacts.write_time_lt. eauto. }
     i. des.
-    hexploit sim_local_write; try exact LOCAL0; try exact SC; eauto; try refl; try by viewtac. i. des.
+    hexploit sim_local_write_bot; try exact LOCAL0; try exact SC; eauto; try refl; try by viewtac. i. des.
     exploit merge_write_write; try exact STEP_SRC; eauto; try by viewtac. i. des.
     exploit Local.promise_step_future; eauto. i. des.
     exploit Local.write_step_future; try apply STEP2; eauto; try by viewtac. i. des.
@@ -357,7 +357,7 @@ Proof.
           | [|- is_true (Ordering.le _ _)] => refl
           end; eauto; try refl; try by viewtac. i. des.
     exploit Local.read_step_future; eauto; try by viewtac. i. des.
-    hexploit sim_local_write; try apply SC; try apply LOCAL2; eauto; try refl. i. des.
+    hexploit sim_local_write_bot; try apply SC; try apply LOCAL2; eauto; try refl. i. des.
     exploit Local.write_step_future; try apply STEP_SRC; eauto; try by viewtac. i. des.
     exploit sim_local_read; try exact x0; eauto; try refl. i. des.
     esplits.
@@ -415,7 +415,7 @@ Proof.
           | [|- is_true (Ordering.le _ _)] => refl
           end; eauto; try refl; try by viewtac. i. des.
     exploit Local.read_step_future; eauto. i. des.
-    hexploit sim_local_write; try exact LOCAL2; try exact SC; eauto; try refl. i. des.
+    hexploit sim_local_write_bot; try exact LOCAL2; try exact SC; eauto; try refl. i. des.
     exploit merge_write_write; try exact STEP_SRC0; eauto.
     { inv STEP_SRC. eapply MEM_SRC. eauto. }
     i. des.

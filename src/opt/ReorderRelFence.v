@@ -166,7 +166,7 @@ Proof.
   inv STEP_TGT.
   { (* promise *)
     inv STEP.
-    exploit sim_local_promise; eauto. i. des.
+    exploit sim_local_promise_bot; eauto. i. des.
     esplits; try apply SC; eauto.
     - econs 2. econs 1; eauto. econs; eauto.
   }

@@ -47,7 +47,7 @@ Inductive sim_released: forall (st_src:lang.(Language.state)) (lc_src:Local.t) (
     lc1_src sc1_src mem1_src
     lc1_tgt sc1_tgt mem1_tgt
     (SPLIT: split_release i_src i_tgt)
-    (LOCAL: sim_local lc1_src lc1_tgt)
+    (LOCAL: sim_local SimPromises.bot lc1_src lc1_tgt)
     (RELEASED: forall l, View.le lc1_tgt.(Local.tview).(TView.cur) (lc1_tgt.(Local.tview).(TView.rel) l))
     (SC: TimeMap.le sc1_src sc1_tgt)
     (MEMORY: sim_memory mem1_src mem1_tgt)
@@ -141,7 +141,7 @@ Lemma sim_local_fulfill_released
       (RELM_CLOSED: Memory.closed_opt_view releasedm_src mem1_src)
       (WF_RELM_TGT: View.opt_wf releasedm_tgt)
       (STEP_TGT: fulfill_step lc1_tgt sc1_tgt loc from to val releasedm_tgt released Ordering.strong_relaxed lc2_tgt sc2_tgt)
-      (LOCAL1: sim_local lc1_src lc1_tgt)
+      (LOCAL1: sim_local SimPromises.bot lc1_src lc1_tgt)
       (RELEASED1: View.le lc1_tgt.(Local.tview).(TView.cur) (View.join (lc1_tgt.(Local.tview).(TView.rel) loc) (View.singleton_ur loc to)))
       (SC1: TimeMap.le sc1_src sc1_tgt)
       (MEM1: sim_memory mem1_src mem1_tgt)
@@ -153,7 +153,7 @@ Lemma sim_local_fulfill_released
       (MEM1_TGT: Memory.closed mem1_tgt):
   exists lc2_src sc2_src,
     <<STEP_SRC: fulfill_step lc1_src sc1_src loc from to val releasedm_src released Ordering.acqrel lc2_src sc2_src>> /\
-    <<LOCAL2: sim_local lc2_src lc2_tgt>> /\
+    <<LOCAL2: sim_local SimPromises.bot lc2_src lc2_tgt>> /\
     <<SC2: TimeMap.le sc2_src sc2_tgt>>.
 Proof.
   inv STEP_TGT.
@@ -203,7 +203,7 @@ Lemma sim_local_write_released
       (RELM_TGT_WF: View.opt_wf releasedm_tgt)
       (RELM_TGT_CLOSED: Memory.closed_opt_view releasedm_tgt mem1_tgt)
       (STEP_TGT: Local.write_step lc1_tgt sc1_tgt mem1_tgt loc from to val releasedm_tgt released_tgt Ordering.strong_relaxed lc2_tgt sc2_tgt mem2_tgt kind)
-      (LOCAL1: sim_local lc1_src lc1_tgt)
+      (LOCAL1: sim_local SimPromises.bot lc1_src lc1_tgt)
       (RELEASED1: View.le lc1_tgt.(Local.tview).(TView.cur) (View.join (lc1_tgt.(Local.tview).(TView.rel) loc) (View.singleton_ur loc to)))
       (SC1: TimeMap.le sc1_src sc1_tgt)
       (MEM1: sim_memory mem1_src mem1_tgt)
@@ -216,13 +216,13 @@ Lemma sim_local_write_released
   exists released_src lc2_src sc2_src mem2_src,
     <<STEP_SRC: Local.write_step lc1_src sc1_src mem1_src loc from to val releasedm_src released_src Ordering.acqrel lc2_src sc2_src mem2_src kind>> /\
     <<REL2: View.opt_le released_src released_tgt>> /\
-    <<LOCAL2: sim_local lc2_src lc2_tgt>> /\
+    <<LOCAL2: sim_local SimPromises.bot lc2_src lc2_tgt>> /\
     <<SC2: TimeMap.le sc2_src sc2_tgt>> /\
     <<MEM2: sim_memory mem2_src mem2_tgt>>.
 Proof.
   exploit write_promise_fulfill; eauto. i. des.
   exploit Local.promise_step_future; eauto. i. des.
-  exploit sim_local_promise; eauto. i. des.
+  exploit sim_local_promise_bot; eauto. i. des.
   exploit Local.promise_step_future; eauto. i. des.
   exploit sim_local_fulfill_released; try apply STEP2;
     try apply LOCAL2; try apply MEM2; eauto.

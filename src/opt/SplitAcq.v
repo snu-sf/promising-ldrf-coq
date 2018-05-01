@@ -39,7 +39,7 @@ Lemma sim_local_promise_acquired
       lc2_tgt mem2_tgt
       loc from to val released kind
       (STEP_TGT: Local.promise_step lc1_tgt mem1_tgt loc from to val released lc2_tgt mem2_tgt kind)
-      (LOCAL1: sim_local lc1_src (local_acquired lc1_tgt))
+      (LOCAL1: sim_local SimPromises.bot lc1_src (local_acquired lc1_tgt))
       (MEM1: sim_memory mem1_src mem1_tgt)
       (WF1_SRC: Local.wf lc1_src mem1_src)
       (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
@@ -47,7 +47,7 @@ Lemma sim_local_promise_acquired
       (MEM1_TGT: Memory.closed mem1_tgt):
   exists lc2_src mem2_src,
     <<STEP_SRC: Local.promise_step lc1_src mem1_src loc from to val released lc2_src mem2_src kind>> /\
-    <<LOCAL2: sim_local lc2_src (local_acquired lc2_tgt)>> /\
+    <<LOCAL2: sim_local SimPromises.bot lc2_src (local_acquired lc2_tgt)>> /\
     <<MEM2: sim_memory mem2_src mem2_tgt>>.
 Proof.
   inv LOCAL1. inv STEP_TGT.
@@ -78,7 +78,7 @@ Lemma sim_local_fulfill_acquired
       (ORD: Ordering.le ord_src ord_tgt)
       (ORD_TGT: Ordering.le ord_tgt Ordering.strong_relaxed)
       (STEP_TGT: fulfill_step lc1_tgt sc1_tgt loc from to val releasedm_tgt released ord_tgt lc2_tgt sc2_tgt)
-      (LOCAL1: sim_local lc1_src (local_acquired lc1_tgt))
+      (LOCAL1: sim_local SimPromises.bot lc1_src (local_acquired lc1_tgt))
       (ACQUIRED1: View.le lc1_src.(Local.tview).(TView.cur)
                           (View.join lc1_tgt.(Local.tview).(TView.cur) releasedm_tgt.(View.unwrap)))
       (SC1: TimeMap.le sc1_src sc1_tgt)
@@ -91,7 +91,7 @@ Lemma sim_local_fulfill_acquired
       (MEM1_TGT: Memory.closed mem1_tgt):
   exists lc2_src sc2_src,
     <<STEP_SRC: fulfill_step lc1_src sc1_src loc from to val releasedm_src released ord_src lc2_src sc2_src>> /\
-    <<LOCAL2: sim_local lc2_src (local_acquired lc2_tgt)>> /\
+    <<LOCAL2: sim_local SimPromises.bot lc2_src (local_acquired lc2_tgt)>> /\
     <<SC2: TimeMap.le sc2_src sc2_tgt>>.
 Proof.
   inv STEP_TGT.
@@ -149,7 +149,7 @@ Lemma sim_local_write_acquired
       (ORD: Ordering.le ord_src ord_tgt)
       (ORD_TGT: Ordering.le ord_tgt Ordering.strong_relaxed)
       (STEP_TGT: Local.write_step lc1_tgt sc1_tgt mem1_tgt loc from to val releasedm_tgt released_tgt ord_tgt lc2_tgt sc2_tgt mem2_tgt kind)
-      (LOCAL1: sim_local lc1_src (local_acquired lc1_tgt))
+      (LOCAL1: sim_local SimPromises.bot lc1_src (local_acquired lc1_tgt))
       (ACQUIRED1: View.le lc1_src.(Local.tview).(TView.cur)
                           (View.join lc1_tgt.(Local.tview).(TView.cur) releasedm_tgt.(View.unwrap)))
       (SC1: TimeMap.le sc1_src sc1_tgt)
@@ -163,7 +163,7 @@ Lemma sim_local_write_acquired
   exists released_src lc2_src sc2_src mem2_src,
     <<STEP_SRC: Local.write_step lc1_src sc1_src mem1_src loc from to val releasedm_src released_src ord_src lc2_src sc2_src mem2_src kind>> /\
     <<REL2: View.opt_le released_src released_tgt>> /\
-    <<LOCAL2: sim_local lc2_src (local_acquired lc2_tgt)>> /\
+    <<LOCAL2: sim_local SimPromises.bot lc2_src (local_acquired lc2_tgt)>> /\
     <<SC2: TimeMap.le sc2_src sc2_tgt>> /\
     <<MEM2: sim_memory mem2_src mem2_tgt>>.
 Proof.
@@ -201,7 +201,7 @@ Inductive sim_acquired: forall (st_src:lang.(Language.state)) (lc_src:Local.t) (
     rs
     lc1_src sc1_src mem1_src
     lc1_tgt sc1_tgt mem1_tgt
-    (LOCAL: sim_local lc1_src (local_acquired lc1_tgt))
+    (LOCAL: sim_local SimPromises.bot lc1_src (local_acquired lc1_tgt))
     (SC: TimeMap.le sc1_src sc1_tgt)
     (MEMORY: sim_memory mem1_src mem1_tgt)
     (WF_SRC: Local.wf lc1_src mem1_src)
@@ -334,7 +334,7 @@ Lemma sim_local_read_acquired
       lc2_tgt
       loc ts val released_tgt
       (STEP_TGT: Local.read_step lc1_tgt mem1_tgt loc ts val released_tgt Ordering.relaxed lc2_tgt)
-      (LOCAL1: sim_local lc1_src lc1_tgt)
+      (LOCAL1: sim_local SimPromises.bot lc1_src lc1_tgt)
       (MEM1: sim_memory mem1_src mem1_tgt)
       (WF1_SRC: Local.wf lc1_src mem1_src)
       (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
@@ -343,7 +343,7 @@ Lemma sim_local_read_acquired
   exists released_src lc2_src,
     <<REL: View.opt_le released_src released_tgt>> /\
     <<STEP_SRC: Local.read_step lc1_src mem1_src loc ts val released_src Ordering.acqrel lc2_src>> /\
-    <<LOCAL2: sim_local lc2_src (local_acquired lc2_tgt)>>.
+    <<LOCAL2: sim_local SimPromises.bot lc2_src (local_acquired lc2_tgt)>>.
 Proof.
   inv LOCAL1. inv STEP_TGT.
   exploit sim_memory_get; try apply MEM1; eauto. i. des.

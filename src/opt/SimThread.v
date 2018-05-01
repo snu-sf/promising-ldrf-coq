@@ -80,7 +80,7 @@ Section SimulationThread.
           <<SC: TimeMap.le sc2_src sc1_tgt>> /\
           <<MEMORY: sim_memory mem2_src mem1_tgt>> /\
           <<TERMINAL_SRC: lang_src.(Language.is_terminal) st2_src>> /\
-          <<LOCAL: sim_local lc2_src lc1_tgt>> /\
+          <<LOCAL: sim_local SimPromises.bot lc2_src lc1_tgt>> /\
           <<TERMINAL: sim_terminal st2_src st1_tgt>>>> /\
       <<FUTURE:
         forall sc2_src mem2_src

@@ -102,7 +102,7 @@ Proof.
       eapply Local.read_step_future; eauto.
   - (* store *)
     exploit Local.write_step_future; eauto; try by viewtac. i. des.
-    hexploit sim_local_write; try exact LOCAL1; try exact SC;
+    hexploit sim_local_write_bot; try exact LOCAL1; try exact SC;
       try exact WF_SRC; try refl; viewtac. i. des.
     exploit write_promise_fulfill; eauto; try by viewtac. i. des.
     exploit Local.promise_step_future; eauto. i. des.
@@ -119,13 +119,13 @@ Proof.
     exploit Local.write_step_future; eauto. i. des.
     exploit sim_local_read; eauto; try refl. i. des.
     exploit Local.read_step_future; eauto. i. des.
-    hexploit sim_local_write; try apply LOCAL2; try apply LOCAL0; try apply SC; eauto; try refl; try by viewtac. i. des.
+    hexploit sim_local_write_bot; try apply LOCAL2; try apply LOCAL0; try apply SC; eauto; try refl; try by viewtac. i. des.
     exploit write_promise_fulfill; eauto; try by viewtac. i. des.
     exploit Local.promise_step_future; eauto. i. des.
     exploit reorder_read_promise; try exact STEP_SRC; try exact STEP1; eauto. i. des.
     exploit Local.promise_step_future; eauto. i. des.
     exploit Local.read_step_future; eauto. i. des.
-    exploit sim_local_fulfill; try exact STEP2; try exact LOCAL4; try exact REL1;
+    exploit sim_local_fulfill_bot; try exact STEP2; try exact LOCAL4; try exact REL1;
       try exact WF3; try refl; eauto; try by viewtac. i. des.
     esplits.
     + eauto.
@@ -147,6 +147,6 @@ Proof.
     + left. eapply paco9_mon; [apply sim_fence_sim_thread|]; ss.
       econs; eauto.
 Grab Existential Variables.
-{ econs 2. }
-{ econs. econs 3. }
+  { econs 2. }
+  { econs. econs 3. }
 Qed.

@@ -66,7 +66,7 @@ Inductive sim_store: forall (st_src:lang.(Language.state)) (lc_src:Local.t) (sc1
     lc2_src sc2_src
     (REORDER: reorder_store l1 v1 o1 i2)
     (FULFILL: fulfill_step lc1_src sc1_src l1 f1 t1 (RegFile.eval_value rs v1) None released1 o1 lc2_src sc2_src)
-    (LOCAL: sim_local lc2_src lc1_tgt)
+    (LOCAL: sim_local SimPromises.bot lc2_src lc1_tgt)
     (SC: TimeMap.le sc2_src sc1_tgt)
     (MEMORY: sim_memory mem1_src mem1_tgt)
     (WF_SRC: Local.wf lc1_src mem1_src)
@@ -220,7 +220,7 @@ Proof.
     + etrans; eauto.
     + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
   - (* store *)
-    hexploit sim_local_write; try exact LOCAL1; eauto; try refl; try by viewtac. i. des.
+    hexploit sim_local_write_bot; try exact LOCAL1; eauto; try refl; try by viewtac. i. des.
     exploit reorder_fulfill_write; try exact FULFILL; try exact STEP_SRC; eauto; try by viewtac. i. des.
     exploit Local.write_step_future; try exact STEP1; eauto; try by viewtac. i. des.
     exploit fulfill_write; eauto; try by viewtac. i. des.
@@ -239,7 +239,7 @@ Proof.
     exploit Local.read_step_future; try exact LOCAL1; eauto; try by viewtac. i. des.
     exploit sim_local_read; try exact LOCAL1; (try by etrans; eauto); eauto; try refl. i. des.
     exploit Local.read_step_future; try exact STEP_SRC; eauto. i. des.
-    hexploit sim_local_write; try exact LOCAL2; eauto; try refl; try by viewtac. i. des.
+    hexploit sim_local_write_bot; try exact LOCAL2; eauto; try refl; try by viewtac. i. des.
     hexploit reorder_fulfill_update; try exact FULFILL; try exact STEP_SRC; try exact STEP_SRC0; eauto; try by viewtac. i. des.
     exploit Local.read_step_future; try apply STEP1; eauto. i. des.
     exploit Local.write_step_future; try apply STEP2; eauto. i. des.

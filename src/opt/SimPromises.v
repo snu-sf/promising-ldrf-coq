@@ -163,6 +163,12 @@ Module SimPromises.
     rewrite unset_o, set_o.  condtac; ss. des. subst. auto.
   Qed.
 
+  Lemma unset_bot loc to:
+    unset loc to bot = bot.
+  Proof.
+    apply ext. i. rewrite unset_o. condtac; ss.
+  Qed.
+
   Inductive disjoint (lhs rhs:t): Prop :=
   | disjoint_intro
       (DISJOINT: forall loc ts

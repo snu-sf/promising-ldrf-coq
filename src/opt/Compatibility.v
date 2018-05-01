@@ -52,7 +52,7 @@ Definition _sim_stmts
            (sim_regs1:SIM_REGS): Prop :=
   forall rs_src rs_tgt lc_src lc_tgt sc0_src sc0_tgt mem0_src mem0_tgt
     (RS: sim_regs0 rs_src rs_tgt)
-    (LOCAL: sim_local lc_src lc_tgt),
+    (LOCAL: sim_local SimPromises.bot lc_src lc_tgt),
     sim_thread
       (sim_terminal sim_regs1)
       (State.mk rs_src stmts_src) lc_src sc0_src mem0_src
@@ -234,7 +234,7 @@ Inductive ctx (sim_thread:SIM_THREAD lang lang): SIM_THREAD lang lang :=
     rs_tgt sc0_tgt mem0_tgt
     lc_src lc_tgt
     (RS: sim_regs rs_src rs_tgt)
-    (LOCAL: sim_local lc_src lc_tgt):
+    (LOCAL: sim_local SimPromises.bot lc_src lc_tgt):
     ctx sim_thread
         (sim_terminal sim_regs)
         (State.mk rs_src []) lc_src sc0_src mem0_src
@@ -258,7 +258,7 @@ Inductive ctx (sim_thread:SIM_THREAD lang lang): SIM_THREAD lang lang :=
     lc_src lc_tgt
     (COND: sim_expr sim_regs0 cond_src cond_tgt)
     (RS: sim_regs0 rs_src rs_tgt)
-    (LOCAL: sim_local lc_src lc_tgt)
+    (LOCAL: sim_local SimPromises.bot lc_src lc_tgt)
     (SIM1: _sim_stmts sim_thread sim_regs0 stmts1_src stmts1_tgt sim_regs1)
     (SIM2: _sim_stmts sim_thread sim_regs0 stmts2_src stmts2_tgt sim_regs1):
     ctx sim_thread
@@ -272,7 +272,7 @@ Inductive ctx (sim_thread:SIM_THREAD lang lang): SIM_THREAD lang lang :=
     lc_src lc_tgt
     (COND: sim_expr sim_regs cond_src cond_tgt)
     (RS: sim_regs rs_src rs_tgt)
-    (LOCAL: sim_local lc_src lc_tgt)
+    (LOCAL: sim_local SimPromises.bot lc_src lc_tgt)
     (SIM: _sim_stmts sim_thread sim_regs stmts_src stmts_tgt sim_regs):
     ctx sim_thread
         (sim_terminal sim_regs)

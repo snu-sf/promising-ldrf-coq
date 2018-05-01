@@ -186,7 +186,7 @@ Lemma merge_split
     <<STEP1: Local.promise_step lc0 mem0 loc ts1 ts2 val2 released1' lc1' mem1' (Memory.op_kind_split ts3 val3 released3)>> /\
     <<STEP2: fulfill_step lc1' sc0 loc ts1 ts2 val2 released0 released1' ord lc2' sc2'>> /\
     <<STEP3: fulfill_step lc2' sc2' loc ts2 ts3 val3 released1' released3 ord lc3' sc3'>> /\
-    <<LOCAL3: sim_local lc3' lc3>> /\
+    <<LOCAL3: sim_local SimPromises.bot lc3' lc3>> /\
     <<SC3: TimeMap.le sc3' sc3>> /\
     <<MEM3: sim_memory mem1' mem0>> /\
     <<REL1': released1' = TView.write_released (Local.tview lc0) sc0 loc ts2 released0 ord>>.
@@ -255,7 +255,7 @@ Lemma merge_write_write_relaxed
     <<STEP2: Local.write_step lc1' sc0 mem1' loc ts1 ts2 val2 released0 released2' ord lc2' sc2' mem2' (Memory.op_kind_split ts3 val3 released3)>> /\
     <<STEP3: Local.write_step lc2' sc2' mem2' loc ts2 ts3 val3 released2' released3' ord lc3' sc3' mem3' (Memory.op_kind_lower released3)>> /\
     <<REL3: View.opt_le released3' released3>> /\
-    <<LOCAL3: sim_local lc3' lc3>> /\
+    <<LOCAL3: sim_local SimPromises.bot lc3' lc3>> /\
     <<SC3: TimeMap.le sc3' sc3>> /\
     <<MEM3: sim_memory mem3' mem3>>.
 Proof.
@@ -270,7 +270,7 @@ Proof.
   { i. destruct ord; inv ORD; inv H. }
   i. des.
   exploit Local.write_step_future; eauto; try by viewtac. i. des.
-  exploit sim_local_fulfill; try eexact STEP4; try exact REL_LE; try refl; eauto. i. des.
+  exploit sim_local_fulfill_bot; try eexact STEP4; try exact REL_LE; try refl; eauto. i. des.
   exploit (@fulfill_write lc2' sc2' mem2'); try eexact STEP_SRC; eauto. i. des.
   esplits; eauto.
   - etrans; eauto.
@@ -391,7 +391,7 @@ Lemma merge_write_write_add
     <<STEP1: Local.write_step lc0 sc0 mem0 loc ts1 ts2 val1 released0 released1' ord lc1' sc1' mem1' Memory.op_kind_add>> /\
     <<STEP2: Local.write_step lc1' sc1' mem1' loc ts2 ts3 val2 released1' released2' ord lc2' sc2' mem2' Memory.op_kind_add>> /\
     <<REL2: View.opt_le released2' released2>> /\
-    <<LOCAL2: sim_local lc2' lc2>> /\
+    <<LOCAL2: sim_local SimPromises.bot lc2' lc2>> /\
     <<SC2: TimeMap.le sc2' sc2>> /\
     <<MEM2: sim_memory mem2' mem2>>.
 Proof.
@@ -420,7 +420,7 @@ Proof.
     eapply write_step_nonsynch_loc; eauto.
   }
   i. des.
-  hexploit sim_local_write; try exact MEM; try exact REL_LE; try refl; eauto. i. des.
+  hexploit sim_local_write_bot; try exact MEM; try exact REL_LE; try refl; eauto. i. des.
   esplits; eauto.
   - etrans; eauto.
   - etrans; eauto. etrans; eauto.
@@ -444,7 +444,7 @@ Lemma merge_write_write
     <<STEP2: Local.write_step lc1' sc0 mem1' loc ts1 ts2 val1 released0 released1' ord lc2' sc2' mem2' kind2>> /\
     <<STEP3: Local.write_step lc2' sc2' mem2' loc ts2 ts3 val2 released1' released2' ord lc3' sc3' mem3' kind3>> /\
     <<REL3: View.opt_le released2' released2>> /\
-    <<LOCAL3: sim_local lc3' lc3>> /\
+    <<LOCAL3: sim_local SimPromises.bot lc3' lc3>> /\
     <<SC3: TimeMap.le sc3' sc3>> /\
     <<MEM3: sim_memory mem3' mem3>>.
 Proof.
@@ -475,7 +475,7 @@ Lemma merge_write_write_None
     <<STEP2: Local.write_step lc1' sc0 mem1' loc ts1 ts2 val1 released0 released1' ord lc2' sc2' mem2' kind2>> /\
     <<STEP3: Local.write_step lc2' sc2' mem2' loc ts2 ts3 val2 None released2' ord lc3' sc3' mem3' kind3>> /\
     <<REL3: View.opt_le released2' released2>> /\
-    <<LOCAL3: sim_local lc3' lc3>> /\
+    <<LOCAL3: sim_local SimPromises.bot lc3' lc3>> /\
     <<SC3: TimeMap.le sc3' sc3>> /\
     <<MEM3: sim_memory mem3' mem3>>.
 Proof.
@@ -483,12 +483,12 @@ Proof.
   - exploit Local.promise_step_future; eauto. i. des.
     exploit Memory.future_closed_opt_view; try exact REL0_CLOSED; eauto. i.
     exploit Local.write_step_future; try apply STEP2; eauto. i. des.
-    hexploit sim_local_write; try apply STEP3;
+    hexploit sim_local_write_bot; try apply STEP3;
       try apply View.opt_None_spec; try refl; eauto; try by viewtac. i. des.
     esplits; cycle 1; eauto; try (etrans; eauto).
   - inv STEP1.
     exploit Local.write_step_future; try apply STEP2; eauto. i. des.
-    hexploit sim_local_write; try apply STEP3;
+    hexploit sim_local_write_bot; try apply STEP3;
       try apply View.opt_None_spec; try refl; eauto; viewtac. i. des.
     esplits; cycle 1; eauto; try (etrans; eauto).
 Qed.
@@ -503,7 +503,7 @@ Lemma merge_fence_fence
   exists lc1 lc2' sc1' sc2',
     <<STEP1: Local.fence_step lc0 sc0 ordr ordw lc1 sc1'>> /\
     <<STEP2: Local.fence_step lc1 sc1' ordr ordw lc2' sc2'>> /\
-    <<LOCAL: sim_local lc2' lc2>> /\
+    <<LOCAL: sim_local SimPromises.bot lc2' lc2>> /\
     <<SC2: TimeMap.le sc2' sc2>>.
 Proof.
   inv STEP. esplits.

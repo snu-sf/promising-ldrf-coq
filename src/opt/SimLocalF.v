@@ -408,7 +408,7 @@ Qed.
 Lemma sim_localF_introduction
       lc1_src sc1_src mem1_src
       lc1_tgt sc1_tgt mem1_tgt
-      (LOCAL1: sim_local lc1_src lc1_tgt)
+      (LOCAL1: sim_local SimPromises.bot lc1_src lc1_tgt)
       (SC1: TimeMap.le sc1_src sc1_tgt)
       (MEM1: sim_memory mem1_src mem1_tgt)
       (WF1_SRC: Local.wf lc1_src mem1_src)
@@ -569,7 +569,7 @@ Lemma sim_localF_elimination
       (MEM1: sim_memory mem1_src mem1_tgt)
       (WF1_SRC: Local.wf lc1_src mem1_src)
       (WF1_TGT: Local.wf lc1_tgt mem1_tgt):
-  <<LOCAL2: sim_local lc1_src lc2_tgt>> /\
+  <<LOCAL2: sim_local SimPromises.bot lc1_src lc2_tgt>> /\
   <<SC2: TimeMap.le sc1_src sc2_tgt>>.
 Proof.
   inv LOCAL1. inv STEP_TGT. esplits; ss.

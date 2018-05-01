@@ -46,7 +46,7 @@ Lemma future_read_step
   exists released' lc2',
     <<STEP: Local.read_step lc1 mem1' loc ts val released' ord lc2'>> /\
     <<REL: View.opt_le released' released>> /\
-    <<LOCAL: sim_local lc2' lc2>>.
+    <<LOCAL: sim_local SimPromises.bot lc2' lc2>>.
 Proof.
   inv STEP. exploit Memory.future_get1; eauto. i. des.
   esplits.
@@ -126,7 +126,7 @@ Lemma reorder_read_promise
     <<STEP1: Local.promise_step lc0 mem0 loc2 from2 to2 val2 released2 lc1' mem2 kind2>> /\
     <<STEP2: Local.read_step lc1' mem2 loc1 ts1 val1 released1' ord1 lc2'>> /\
     <<REL1: View.opt_le released1' released1>> /\
-    <<LOCAL: sim_local lc2' lc2>>.
+    <<LOCAL: sim_local SimPromises.bot lc2' lc2>>.
 Proof.
   inv STEP1. inv STEP2. ss.
   exploit Memory.promise_future; try exact PROMISE; try apply WF0; eauto. i. des.
@@ -181,7 +181,7 @@ Lemma reorder_read_fulfill
   exists lc1' lc2',
     <<STEP1: fulfill_step lc0 sc0 loc2 from2 to2 val2 releasedm2 released2 ord2 lc1' sc2>> /\
     <<STEP2: Local.read_step lc1' mem0 loc1 ts1 val1 released1 ord1 lc2'>> /\
-    <<LOCAL: sim_local lc2' lc2>>.
+    <<LOCAL: sim_local SimPromises.bot lc2' lc2>>.
 Proof.
   guardH ORD.
   exploit Local.read_step_future; eauto. i. des.
@@ -218,7 +218,7 @@ Lemma reorder_read_write
   exists released2' mem2' lc1' lc2',
     <<STEP1: Local.write_step lc0 sc0 mem0 loc2 from2 to2 val2 releasedm2 released2' ord2 lc1' sc2 mem2' kind>> /\
     <<STEP2: Local.read_step lc1' mem2' loc1 ts1 val1 released1 ord1 lc2'>> /\
-    <<LOCAL: sim_local lc2' lc2>> /\
+    <<LOCAL: sim_local SimPromises.bot lc2' lc2>> /\
     <<RELEASED: View.opt_le released2' released2>> /\
     <<MEM: sim_memory mem2' mem2>>.
 Proof.
@@ -266,7 +266,7 @@ Lemma reorder_read_update
     <<STEP1: Local.read_step lc0 mem0 loc2 ts2 val2 released2 ord2 lc1'>> /\
     <<STEP2: Local.write_step lc1' sc0 mem0 loc2 from3 to3 val3 released2 released3' ord3 lc2' sc3 mem3' kind>> /\
     <<STEP3: Local.read_step lc2' mem3' loc1 ts1 val1 released1 ord1 lc3'>> /\
-    <<LOCAL: sim_local lc3' lc3>> /\
+    <<LOCAL: sim_local SimPromises.bot lc3' lc3>> /\
     <<RELEASED: View.opt_le released3' released3>> /\
     <<MEM: sim_memory mem3' mem3>>.
 Proof.
@@ -294,7 +294,7 @@ Lemma reorder_read_fence
   exists lc1' lc2' sc2',
     <<STEP1: Local.fence_step lc0 sc0 ordr2 ordw2 lc1' sc2'>> /\
     <<STEP2: Local.read_step lc1' mem0 loc1 ts1 val1 released1 ord1 lc2'>> /\
-    <<LOCAL: sim_local lc2' lc2>> /\
+    <<LOCAL: sim_local SimPromises.bot lc2' lc2>> /\
     <<SC: TimeMap.le sc2' sc2>>.
 Proof.
   exploit Local.read_step_future; eauto. i. des.
@@ -395,7 +395,7 @@ Lemma reorder_fulfill_fulfill
   exists lc1' lc2' sc1' sc2',
     <<STEP1: fulfill_step lc0 sc0 loc2 from2 to2 val2 releasedm2 released2 ord2 lc1' sc1'>> /\
     <<STEP2: fulfill_step lc1' sc1' loc1 from1 to1 val1 releasedm1 released1 ord1 lc2' sc2'>> /\
-    <<LOCAL: sim_local lc2' lc2>> /\
+    <<LOCAL: sim_local SimPromises.bot lc2' lc2>> /\
     <<SC: TimeMap.le sc2' sc2>>.
 Proof.
   inv STEP1. inv STEP2.
@@ -441,7 +441,7 @@ Lemma reorder_fulfill_write
     <<STEP1: Local.write_step lc0 sc0 mem0 loc2 from2 to2 val2 releasedm2 released2' ord2 lc1' sc1' mem2' kind2>> /\
     <<STEP2: fulfill_step lc1' sc1' loc1 from1 to1 val1 releasedm1 released1 ord1 lc2' sc2'>> /\
     <<RELEASED2: View.opt_le released2' released2>> /\
-    <<LOCAL: sim_local lc2' lc2>> /\
+    <<LOCAL: sim_local SimPromises.bot lc2' lc2>> /\
     <<SC: TimeMap.le sc2' sc2>> /\
     <<MEM: sim_memory mem2' mem2>>.
 Proof.
@@ -486,7 +486,7 @@ Lemma reorder_fulfill_update
     <<STEP1: Local.read_step lc0 mem0 loc2 ts2 val2 released2 ord2 lc1'>> /\
     <<STEP2: Local.write_step lc1' sc0 mem0 loc2 from3 to3 val3 released2 released3' ord3 lc2' sc2' mem2' kind3>> /\
     <<STEP3: fulfill_step lc2' sc2' loc1 from1 to1 val1 releasedm1 released1 ord1 lc3' sc3'>> /\
-    <<LOCAL: sim_local lc3' lc3>> /\
+    <<LOCAL: sim_local SimPromises.bot lc3' lc3>> /\
     <<RELEASED: View.opt_le released3' released3>> /\
     <<SC: TimeMap.le sc3' sc3>> /\
     <<MEM: sim_memory mem2' mem3>>.
@@ -496,7 +496,7 @@ Proof.
   exploit reorder_fulfill_read; try exact STEP1; try exact STEP2; eauto. i. des.
   exploit Local.read_step_future; try exact STEP0; eauto. i. des.
   exploit fulfill_step_future; try exact STEP4; eauto. i. des.
-  exploit sim_local_write; try exact STEP3; try exact LOCAL; try refl; eauto. i. des.
+  exploit sim_local_write_bot; try exact STEP3; try exact LOCAL; try refl; eauto. i. des.
   exploit reorder_fulfill_write; try exact STEP4; try exact STEP_SRC; eauto. i. des.
   esplits; eauto.
 Qed.
@@ -550,7 +550,7 @@ Lemma reorder_update_promise
     <<STEP2: Local.read_step lc1' mem3 loc1 ts1 val1 released1' ord1 lc2'>> /\
     <<STEP3: fulfill_step lc2' sc0 loc1 from2 to2 val2 released1' released2 ord2 lc3' sc3'>> /\
     <<RELEASED1: View.opt_le released1' released1>> /\
-    <<LOCAL: sim_local lc3' lc3>> /\
+    <<LOCAL: sim_local SimPromises.bot lc3' lc3>> /\
     <<SC: TimeMap.le sc3' sc2>>.
 Proof.
   exploit Local.read_step_future; try exact STEP1; eauto. i. des.
@@ -560,7 +560,7 @@ Proof.
   exploit reorder_read_promise; try exact STEP1; try exact STEP0; eauto. i. des.
   exploit Local.promise_step_future; eauto. i. des.
   exploit Local.read_step_future; eauto. i. des.
-  exploit sim_local_fulfill; try exact STEP4; try exact LOCAL; try exact REL1;
+  exploit sim_local_fulfill_bot; try exact STEP4; try exact LOCAL; try exact REL1;
     try exact WF3; try exact WF5; try refl;
       eauto using Memory.future_closed_opt_view, Memory.future_closed_timemap. i. des.
   esplits; eauto.
@@ -617,7 +617,7 @@ Lemma reorder_update_fulfill
     <<STEP1: fulfill_step lc0 sc0 loc3 from3 to3 val3 releasedm3 released3 ord3 lc1' sc1'>> /\
     <<STEP2: Local.read_step lc1' mem0 loc1 ts1 val1 released1 ord1 lc2'>> /\
     <<STEP3: fulfill_step lc2' sc1' loc1 from2 to2 val2 released1 released2 ord2 lc3' sc3'>> /\
-    <<LOCAL: sim_local lc3' lc3>> /\
+    <<LOCAL: sim_local SimPromises.bot lc3' lc3>> /\
     <<SC: TimeMap.le sc3' sc3>>.
 Proof.
   guardH ORD3.
@@ -628,7 +628,7 @@ Proof.
   exploit reorder_read_fulfill; try exact STEP1; try exact STEP0; eauto; try by viewtac. i. des.
   exploit fulfill_step_future; try exact STEP5; eauto; try by viewtac. i. des.
   exploit Local.read_step_future; try exact STEP6; eauto; try by viewtac. i. des.
-  exploit sim_local_fulfill; try exact STEP4; try exact LOCAL0; try refl; eauto. i. des.
+  exploit sim_local_fulfill_bot; try exact STEP4; try exact LOCAL0; try refl; eauto. i. des.
   esplits; eauto.
   etrans; eauto.
 Qed.
@@ -657,7 +657,7 @@ Lemma reorder_update_write
     <<STEP1: Local.write_step lc0 sc0 mem0 loc3 from3 to3 val3 releasedm3 released3' ord3 lc1' sc1' mem1' kind3>> /\
     <<STEP2: Local.read_step lc1' mem1' loc1 ts1 val1 released1 ord1 lc2'>> /\
     <<STEP3: fulfill_step lc2' sc1' loc1 from2 to2 val2 released1 released2' ord2 lc3' sc3'>> /\
-    <<LOCAL: sim_local lc3' lc3>> /\
+    <<LOCAL: sim_local SimPromises.bot lc3' lc3>> /\
     <<RELEASED2: View.opt_le released2' released2>> /\
     <<RELEASED3: View.opt_le released3' released3>> /\
     <<SC: TimeMap.le sc3' sc3>> /\
@@ -718,7 +718,7 @@ Lemma reorder_update_update
     <<STEP2: Local.write_step lc1' sc0 mem0 loc3 from4 to4 val4 released3 released4' ord4 lc2' sc2' mem2' kind4>> /\
     <<STEP3: Local.read_step lc2' mem2' loc1 ts1 val1 released1 ord1 lc3'>> /\
     <<STEP4: fulfill_step lc3' sc2' loc1 from2 to2 val2 released1 released2' ord2 lc4' sc4'>> /\
-    <<LOCAL: sim_local lc4' lc4>> /\
+    <<LOCAL: sim_local SimPromises.bot lc4' lc4>> /\
     <<RELEASED2: View.opt_le released2' released2>> /\
     <<RELEASED4: View.opt_le released4' released4>> /\
     <<SC: TimeMap.le sc4' sc4>> /\
@@ -748,7 +748,7 @@ Lemma reorder_fence_read
   exists lc1' lc2' sc2',
     <<STEP1: Local.read_step lc0 mem0 loc2 to2 val2 released2 ord2 lc1'>> /\
     <<STEP2: Local.fence_step lc1' sc0 ordr1 ordw1 lc2' sc2'>> /\
-    <<LOCAL: sim_local lc2' lc2>> /\
+    <<LOCAL: sim_local SimPromises.bot lc2' lc2>> /\
     <<SC: TimeMap.le sc2' sc1>>.
 Proof.
   guardH ORD2. inv STEP1. inv STEP2.
@@ -821,7 +821,7 @@ Lemma reorder_fence_fulfill
   exists lc1' lc2' sc1' sc2',
     <<STEP1: fulfill_step lc0 sc0 loc2 from2 to2 val2 releasedm2 released2 ord2 lc1' sc1'>> /\
     <<STEP2: Local.fence_step lc1' sc1' ordr1 ordw1 lc2' sc2'>> /\
-    <<LOCAL: sim_local lc2' lc2>> /\
+    <<LOCAL: sim_local SimPromises.bot lc2' lc2>> /\
     <<SC: TimeMap.le sc2' sc2>>.
 Proof.
   inv STEP1. inv STEP2.
@@ -889,7 +889,7 @@ Lemma reorder_fence_write
   exists released2' lc1' lc2' sc1' sc2' mem1',
     <<STEP1: Local.write_step lc0 sc0 mem0 loc2 from2 to2 val2 releasedm2 released2' ord2 lc1' sc1' mem1' kind>> /\
     <<STEP2: Local.fence_step lc1' sc1' ordr1 ordw1 lc2' sc2'>> /\
-    <<LOCAL: sim_local lc2' lc2>> /\
+    <<LOCAL: sim_local SimPromises.bot lc2' lc2>> /\
     <<RELEASED2: View.opt_le released2' released2>> /\
     <<SC: TimeMap.le sc2' sc2>> /\
     <<MEM: sim_memory mem1' mem2>>.
@@ -926,7 +926,7 @@ Lemma reorder_fence_fence
   exists lc1' lc2' sc1' sc2',
     <<STEP1: Local.fence_step lc0 sc0 ordr2 ordw2 lc1' sc1'>> /\
     <<STEP2: Local.fence_step lc1' sc1' ordr1 ordw1 lc2' sc2'>> /\
-    <<LOCAL: sim_local lc2' lc2>> /\
+    <<LOCAL: sim_local SimPromises.bot lc2' lc2>> /\
     <<SC: TimeMap.le sc2' sc2>>.
 Proof.
   inv STEP1. inv STEP2. ss.

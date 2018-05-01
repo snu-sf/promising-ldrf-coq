@@ -60,7 +60,7 @@ Inductive sim_fence: forall (st_src:lang.(Language.state)) (lc_src:Local.t) (sc1
     lc2_src sc2_src
     (REORDER: reorder_fence or1 ow1 i2)
     (FENCE: Local.fence_step lc1_src sc1_src or1 ow1 lc2_src sc2_src)
-    (LOCAL: sim_local lc2_src lc1_tgt):
+    (LOCAL: sim_local SimPromises.bot lc2_src lc1_tgt):
     sim_fence
       (State.mk rs [Stmt.instr i2; Stmt.instr (Instr.fence or1 ow1)]) lc1_src sc1_src mem1_src
       (State.mk rs [Stmt.instr i2]) lc1_tgt sc1_tgt mem1_tgt
@@ -151,7 +151,7 @@ Proof.
     + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
       etrans; eauto.
   - (* store *)
-    hexploit sim_local_write; try exact LOCAL1; try apply SC; eauto; try refl; viewtac.
+    hexploit sim_local_write_bot; try exact LOCAL1; try apply SC; eauto; try refl; viewtac.
     { eapply Local.fence_step_future; eauto. }
     i. des.
     exploit reorder_fence_write; try apply x0; try apply STEP_SRC; eauto; try by viewtac. i. des.
@@ -176,7 +176,7 @@ Proof.
     exploit Local.fence_step_future; eauto. i. des.
     generalize LOCAL3. i. rewrite LOCAL0 in LOCAL3.
     generalize SC0. i. rewrite SC in SC1.
-    hexploit sim_local_write; try exact LOCAL2; try apply SC1; eauto; try refl; viewtac. i. des.
+    hexploit sim_local_write_bot; try exact LOCAL2; try apply SC1; eauto; try refl; viewtac. i. des.
     exploit reorder_fence_write; try apply STEP2; try apply STEP_SRC0; eauto; try by viewtac. i. des.
     esplits.
     + econs 2; [|econs 1]. econs.
