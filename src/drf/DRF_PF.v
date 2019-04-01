@@ -1,7 +1,7 @@
 Require Import Omega.
 Require Import RelationClasses.
 
-Require Import paco.
+From Paco Require Import paco.
 Require Import sflib.
 
 Require Import Axioms.
@@ -148,7 +148,7 @@ Proof.
   s. pcofix CIH. i. pfold. econs.
   - i. esplits; eauto. inv PR. inv WF. rewrite THS. clear -TERMINAL_TGT.
     ii. rewrite IdentMap.Facts.map_o in FIND.
-    destruct (IdentMap.find tid x1.(Configuration.threads)) as [[]|] eqn:X; ss. inv FIND.
+    destruct (IdentMap.find tid x3.(Configuration.threads)) as [[]|] eqn:X; ss. inv FIND.
     exploit TERMINAL_TGT; eauto. i. des. esplits; ss.
   - hexploit sim_pf_has_promise; eauto. i.
     i. exploit sim_pf_step; eauto. i. des.

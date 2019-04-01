@@ -3,8 +3,7 @@ Require Import Bool.
 Require Import List.
 
 Require Import sflib.
-Require Import paco.
-Require Import respectful5.
+From Paco Require Import paco.
 
 Require Import Basic.
 Require Import Event.
@@ -496,10 +495,10 @@ Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss; ii.
   - inv TERMINAL_TGT. inv PR; ss.
   - exploit sim_update_mon; eauto. i. des.
-    exploit sim_update_future; try apply x8; eauto. i. des.
+    exploit sim_update_future; try apply x0; eauto. i. des.
     esplits; eauto.
   - exploit sim_update_mon; eauto. i.
-    inversion x8. subst. i.
+    inversion x0. subst. i.
     exploit (progress_program_step (RegFun.add r1 (fst (RegFile.eval_rmw rs rmw1 vr1)) rs) i2 nil); eauto. i. des.
     destruct th2. exploit sim_update_step; eauto.
     { rewrite RMW in *. ss. econs 2. eauto. }

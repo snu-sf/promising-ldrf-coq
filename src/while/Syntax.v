@@ -191,6 +191,7 @@ Module SyntaxNotations.
   Notation "'IF' cond 'THEN' c1 'ELSE' c2" := (Stmt.ite cond c1 c2) (at level 43).
   Notation "'DO' c 'WHILE' cond" := (Stmt.dowhile c cond) (at level 43).
 
+  (*
   Program Definition example1: list Stmt.t := [
     DO [
       SKIP;
@@ -215,4 +216,5 @@ Module SyntaxNotations.
     FETCH_ADD %r"r1" ::= %l"x", 1 @ rlx, rlx;
     CAS %r"r1" ::= %l"x", 1, 2 @ rlx, rlx
   ].
+  *)
 End SyntaxNotations.

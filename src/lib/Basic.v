@@ -8,7 +8,7 @@ Require Import FMapFacts.
 Require Import MSetList.
 
 Require Import sflib.
-Require Import paco.
+From Paco Require Import paco.
 
 Require Import DataStructure.
 
@@ -208,7 +208,7 @@ Ltac condtac :=
 Definition proj_sumbool (P Q: Prop) (a: {P} + {Q}) : bool :=
   if a then true else false.
 
-Implicit Arguments proj_sumbool [P Q].
+Arguments proj_sumbool [P Q].
 
 Coercion proj_sumbool: sumbool >-> bool.
 

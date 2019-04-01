@@ -4,7 +4,7 @@ Please visit the [project website](http://sf.snu.ac.kr/promise-concurrency/) for
 
 ## Build
 
-- Requirement: [Coq 8.8](https://coq.inria.fr/download), Make, Rsync.
+- Requirement: [Coq 8.9](https://coq.inria.fr/download), opam, Make, Rsync.
 
 - Initialization
 
@@ -12,6 +12,11 @@ Please visit the [project website](http://sf.snu.ac.kr/promise-concurrency/) for
         cd promising-coq
         git submodule init
         git submodule update
+
+- Installing dependencies with opam
+
+        opam repo add coq-released https://coq.inria.fr/opam/released
+        opam install coq-paco
 
 - `make`: quickly build without checking the proofs.
 

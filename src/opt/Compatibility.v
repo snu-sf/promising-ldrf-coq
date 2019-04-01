@@ -3,8 +3,7 @@ Require Import Bool.
 Require Import List.
 
 Require Import sflib.
-Require Import paco.
-Require Import respectful9.
+From Paco Require Import paco.
 
 Require Import Axioms.
 Require Import Basic.
@@ -483,7 +482,7 @@ Qed.
 Lemma sim_stmts_nil sim_regs:
   sim_stmts sim_regs [] [] sim_regs.
 Proof.
-  ii. pupto9_init. pupto9 ctx_weak_respectful.
+  ii. pupto9_init. pupto9 ctx_weak_respectful. eauto.
 Qed.
 
 Lemma sim_stmts_seq

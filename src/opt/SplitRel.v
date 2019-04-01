@@ -3,8 +3,7 @@ Require Import Bool.
 Require Import List.
 
 Require Import sflib.
-Require Import paco.
-Require Import respectful5.
+From Paco Require Import paco.
 
 Require Import Basic.
 Require Import Event.
@@ -294,12 +293,12 @@ Lemma sim_released_sim_thread:
 Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss; ii.
   - inv TERMINAL_TGT. inv PR; ss.
-  - exploit sim_released_mon; eauto. i. des.
-    exploit sim_released_future; try apply x8; eauto. i. des.
+  - exploit sim_released_mon; eauto. i.
+    exploit sim_released_future; try apply x0; eauto. i. des.
     esplits; eauto.
   - esplits; eauto.
     inv PR. eapply sim_local_memory_bot; eauto.
-  - exploit sim_released_mon; eauto. i. des.
+  - exploit sim_released_mon; eauto. i.
     exploit sim_released_step; eauto. i. des.
     + esplits; eauto.
       left. eapply paco9_mon; eauto. ss.
