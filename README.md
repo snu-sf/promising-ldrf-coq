@@ -6,17 +6,17 @@ Please visit the [project website](http://sf.snu.ac.kr/promise-concurrency/) for
 
 - Requirement: [Coq 8.9](https://coq.inria.fr/download), opam, Make, Rsync.
 
+- Installing dependencies with opam
+
+        opam repo add coq-released https://coq.inria.fr/opam/released
+        opam install coq-paco.2.0.3
+
 - Initialization
 
         git clone https://github.com/snu-sf/promising-coq.git
         cd promising-coq
         git submodule init
         git submodule update
-
-- Installing dependencies with opam
-
-        opam repo add coq-released https://coq.inria.fr/opam/released
-        opam install coq-paco
 
 - `make`: quickly build without checking the proofs.
 
