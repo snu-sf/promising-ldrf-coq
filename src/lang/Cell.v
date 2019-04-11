@@ -60,7 +60,6 @@ Module Message.
   | wf_half:
       wf half
   .
-  Hint Constructors wf.
 
   Definition elt_wf: wf elt.
   Proof. econs; ss. Qed.
@@ -353,6 +352,17 @@ Module Cell.
     assert (raw0 = raw1).
     { apply DOMap.eq_leibniz. ii. apply EXT. }
     subst raw1. f_equal. apply proof_irrelevance.
+  Qed.
+
+  Lemma get_ts
+        to cell from msg
+        (GET: get to cell = Some (from, msg)):
+    (from = Time.bot /\ to = Time.bot) \/ Time.lt from to.
+  Proof.
+    destruct cell. unfold get in *. ss.
+    inv WF0. exploit VOLUME; eauto. i. des.
+    - inv x. auto.
+    - generalize (Time.le_lteq from to). i. des. auto.
   Qed.
 
   Definition le (lhs rhs:t): Prop :=
@@ -693,5 +703,41 @@ Module Cell.
     Message.wf msg.
   Proof.
     destruct cell. destruct WF0. eauto.
+  Qed.
+
+  Inductive max_full_ts (cell: t) (ts: Time.t): Prop :=
+  | max_full_ts_intro
+      (GET: exists from val released, get ts cell = Some (from, Message.mk val released))
+      (MAX: forall to from' val' released'
+              (GET: get to cell = Some (from', Message.mk val' released')),
+          Time.le to ts)
+  .
+
+  Lemma max_full_ts_exists
+        cell
+        (INHABITED: get Time.bot cell = Some (Time.bot, Message.elt)):
+    exists ts, max_full_ts cell ts.
+  Proof.
+  Admitted.
+
+  Lemma max_full_ts_inj
+        cell ts1 ts2
+        (MAX1: max_full_ts cell ts1)
+        (MAX2: max_full_ts cell ts2):
+    ts1 = ts2.
+  Proof.
+    inv MAX1. inv MAX2. des.
+    apply MAX0 in GET. apply MAX in GET0.
+    apply TimeFacts.antisym; auto.
+  Qed.
+
+  Lemma max_full_ts_spec
+        ts from val released cell mts
+        (MAX: max_full_ts cell mts)
+        (GET: get ts cell = Some (from, Message.mk val released)):
+    <<GET: exists f v r, get mts cell = Some (f, Message.mk v r)>> /\
+    <<MAX: Time.le ts mts>>.
+  Proof.
+    inv MAX. des. esplits; eauto.
   Qed.
 End Cell.
