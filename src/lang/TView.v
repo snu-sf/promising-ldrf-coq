@@ -2,7 +2,6 @@ Require Import Omega.
 Require Import RelationClasses.
 
 Require Import sflib.
-From Paco Require Import paco.
 
 Require Import Axioms.
 Require Import Basic.
@@ -64,9 +63,9 @@ Module TView <: JoinableType.
 
   Lemma promise_closed
         tview1
-        promises1 mem1 loc from to val released promises2 mem2 kind
+        promises1 mem1 loc from to msg promises2 mem2 kind
         (CLOSED: closed tview1 mem1)
-        (PROMISE: Memory.promise promises1 mem1 loc from to val released promises2 mem2 kind):
+        (PROMISE: Memory.promise promises1 mem1 loc from to msg promises2 mem2 kind):
     closed tview1 mem2.
   Proof.
     inv CLOSED. econs; i; eapply Memory.promise_closed_view; eauto.
@@ -663,7 +662,7 @@ Module TViewFacts.
     <<CLOSED_TVIEW: TView.closed (TView.read_tview tview loc to released ord) mem>>.
   Proof.
     splits; try eapply read_future1; eauto.
-    inv MEM. exploit CLOSED; eauto. i. des.
+    inv MEM. exploit CLOSED; eauto. i. des. inv MSG_CLOSED.
     econs; tac; try apply CLOSED_TVIEW; condtac; tac.
   Qed.
 
@@ -672,7 +671,7 @@ Module TViewFacts.
         (CLOSED0: Memory.closed_timemap sc1 mem1)
         (CLOSED1: Memory.closed mem1)
         (CLOSED2: TView.closed tview1 mem1)
-        (OP: Memory.op mem1 loc from to val released mem2 kind):
+        (OP: Memory.op mem1 loc from to (Message.mk val released) mem2 kind):
     TView.closed (TView.write_tview tview1 sc1 loc to ord) mem2.
   Proof.
     hexploit Memory.op_inhabited; eauto; try by tac. i. des.
@@ -684,10 +683,10 @@ Module TViewFacts.
   Qed.
 
   Lemma op_closed_sc
-        mem1 sc1 loc from to val released mem2 kind
+        mem1 sc1 loc from to msg mem2 kind
         (CLOSED0: Memory.closed_timemap sc1 mem1)
         (CLOSED1: Memory.closed mem1)
-        (OP: Memory.op mem1 loc from to val released mem2 kind):
+        (OP: Memory.op mem1 loc from to msg mem2 kind):
     Memory.closed_timemap sc1 mem2.
   Proof.
     hexploit Memory.op_inhabited; eauto; try by tac. i. des.
@@ -700,7 +699,7 @@ Module TViewFacts.
         (CLOSED1: Memory.closed mem1)
         (CLOSED2: TView.closed tview1 mem1)
         (CLOSED3: Memory.closed_opt_view releasedm mem1)
-        (OP: Memory.op mem1 loc from to val released mem2 kind):
+        (OP: Memory.op mem1 loc from to (Message.mk val released) mem2 kind):
     Memory.closed_opt_view (TView.write_released tview1 sc1 loc to releasedm ord) mem2.
   Proof.
     hexploit Memory.op_inhabited; eauto; try by tac. i. des.
@@ -720,7 +719,7 @@ Module TViewFacts.
     TView.closed (TView.write_tview tview1 sc1 loc to ord) mem1.
   Proof.
     econs; tac; (try by apply CLOSED2).
-    - unfold LocFun.add. repeat condtac; tac; (try by apply CLOSED2).
+    unfold LocFun.add. repeat condtac; tac; (try by apply CLOSED2).
   Qed.
 
   Lemma get_closed_released
@@ -761,8 +760,8 @@ Module TViewFacts.
         (CLOSED_TVIEW: TView.closed tview mem1)
         (CLOSED_SC: Memory.closed_timemap sc mem1)
         (CLOSED_RELM: Memory.closed_opt_view releasedm mem1)
-        (OP: Memory.op mem1 loc from to val
-                       (TView.write_released tview sc loc to releasedm ord)
+        (OP: Memory.op mem1 loc from to
+                       (Message.mk val (TView.write_released tview sc loc to releasedm ord))
                        mem2 kind):
     <<WF_TVIEW: TView.wf (TView.write_tview tview sc loc to ord)>> /\
     <<WF_RELEASED: View.opt_wf (TView.write_released tview sc loc to releasedm ord)>> /\
