@@ -23,7 +23,7 @@ Set Implicit Arguments.
 
 Module ThreadEvent.
   Inductive t :=
-  | promise (loc:Loc.t) (from to:Time.t) (val:Const.t) (released:option View.t) (kind:Memory.op_kind)
+  | promise (loc:Loc.t) (from to:Time.t) (msg:Message.t) (kind:Memory.op_kind)
   | silent
   | read (loc:Loc.t) (ts:Time.t) (val:Const.t) (released:option View.t) (ord:Ordering.t)
   | write (loc:Loc.t) (from to:Time.t) (val:Const.t) (released:option View.t) (ord:Ordering.t)
@@ -51,7 +51,7 @@ Module ThreadEvent.
 
   Definition get_kind (e:t): kind :=
     match e with
-    | promise _ _ _ _ _ _ => kind_promise
+    | promise _ _ _ _ _ => kind_promise
     | syscall _ => kind_syscall
     | _ => kind_others
     end.
@@ -64,7 +64,7 @@ Module ThreadEvent.
 
   Definition get_program_event (e:t) : ProgramEvent.t :=
     match e with
-    | promise _ _ _ _ _ _ => ProgramEvent.silent
+    | promise _ _ _ _ _  => ProgramEvent.silent
     | silent => ProgramEvent.silent
     | read loc _ val _ ord => ProgramEvent.read loc val ord
     | write loc _ _ val _ ord => ProgramEvent.write loc val ord
@@ -75,15 +75,15 @@ Module ThreadEvent.
 
   Definition is_promising (e:t) : option (Loc.t * Time.t) :=
     match e with
-    | promise loc from to v rel kind => Some (loc, to)
+    | promise loc from to msg kind => Some (loc, to)
     | _ => None
     end.
 
-  Definition is_lower_none (e:t) : bool :=
-    match e with
-    | promise loc from to v rel kind => Memory.op_kind_is_lower kind && negb rel
-    | _ => false
-    end.
+  (* Definition is_lower_none (e:t) : bool := *)
+  (*   match e with *)
+  (*   | promise loc from to msg kind => Memory.op_kind_is_lower kind && negb rel *)
+  (*   | _ => false *)
+  (*   end. *)
 
   Definition is_reading (e:t): option (Loc.t * Time.t * Const.t * option View.t * Ordering.t) :=
     match e with
@@ -109,9 +109,9 @@ Module ThreadEvent.
 
   Inductive le: forall (lhs rhs:t), Prop :=
   | le_promise
-      loc from to val rel1 rel2 kind1 kind2
-      (LEREL: View.opt_le rel1 rel2):
-      le (promise loc from to val rel1 kind1) (promise loc from to val rel2 kind2)
+      loc from to msg1 msg2 kind1 kind2
+      (LEREL: Message.le msg1 msg2):
+      le (promise loc from to msg1 kind1) (promise loc from to msg2 kind2)
   | le_silent:
       le silent silent
   | le_read
@@ -136,8 +136,8 @@ Module ThreadEvent.
 
   Definition lift (ord0:Ordering.t) (e:t): t :=
     match e with
-    | promise loc from to val rel kind =>
-      promise loc from to val rel kind
+    | promise loc from to msg kind =>
+      promise loc from to msg kind
     | silent => silent
     | read loc ts val released ord =>
       read loc ts val released (Ordering.join ord0 ord)
@@ -191,13 +191,13 @@ Module Local.
     econs. symmetry. apply H.
   Qed.
 
-  Inductive promise_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (from to:Time.t) (val:Const.t) (released:option View.t) (lc2:t) (mem2:Memory.t) (kind:Memory.op_kind): Prop :=
+  Inductive promise_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (from to:Time.t) (msg:Message.t) (lc2:t) (mem2:Memory.t) (kind:Memory.op_kind): Prop :=
   | promise_step_intro
       promises2
-      (PROMISE: Memory.promise lc1.(promises) mem1 loc from to val released promises2 mem2 kind)
-      (CLOSED: Memory.closed_opt_view released mem2)
+      (PROMISE: Memory.promise lc1.(promises) mem1 loc from to msg promises2 mem2 kind)
+      (CLOSED: Memory.closed_message_view msg mem2)
       (LC2: lc2 = mk lc1.(tview) promises2):
-      promise_step lc1 mem1 loc from to val released lc2 mem2 kind
+      promise_step lc1 mem1 loc from to msg lc2 mem2 kind
   .
   Hint Constructors promise_step.
 
@@ -218,7 +218,7 @@ Module Local.
       promises2
       (RELEASED: released = TView.write_released lc1.(tview) sc1 loc to releasedm ord)
       (WRITABLE: TView.writable lc1.(tview).(TView.cur) sc1 loc to ord)
-      (WRITE: Memory.write lc1.(promises) mem1 loc from to val released promises2 mem2 kind)
+      (WRITE: Memory.write lc1.(promises) mem1 loc from to (Message.mk val released) promises2 mem2 kind)
       (RELEASE: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc lc1.(promises))
       (LC2: lc2 = mk (TView.write_tview lc1.(tview) sc1 loc to ord) promises2)
       (SC2: sc2 = sc1):
@@ -272,8 +272,8 @@ Module Local.
   .
   Hint Constructors program_step.
 
-  Lemma promise_step_future lc1 sc1 mem1 loc from to val released lc2 mem2 kind
-        (STEP: promise_step lc1 mem1 loc from to val released lc2 mem2 kind)
+  Lemma promise_step_future lc1 sc1 mem1 loc from to msg lc2 mem2 kind
+        (STEP: promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
         (WF1: wf lc1 mem1)
         (SC1: Memory.closed_timemap sc1 mem1)
         (CLOSED1: Memory.closed mem1):
@@ -282,9 +282,9 @@ Module Local.
     <<CLOSED2: Memory.closed mem2>> /\
     <<FUTURE: Memory.future mem1 mem2>> /\
     <<TVIEW_FUTURE: TView.le lc1.(tview) lc2.(tview)>> /\
-    <<REL_WF: View.opt_wf released>> /\
-    <<REL_TS: Time.le (released.(View.unwrap).(View.rlx) loc) to>> /\
-    <<REL_CLOSED: Memory.closed_opt_view released mem2>>.
+    <<MSG_WF: Message.wf msg>> /\
+    <<MSG_TS: Memory.message_ts msg loc to>> /\
+    <<MSG_CLOSED: Memory.closed_message_view msg mem2>>.
   Proof.
     inv WF1. inv STEP.
     exploit Memory.promise_future; eauto. i. des.
@@ -309,10 +309,10 @@ Module Local.
     <<REL_CLOSED: Memory.closed_opt_view released mem1>>.
   Proof.
     inv WF1. inv STEP.
+    dup CLOSED1. inv CLOSED0. exploit CLOSED; eauto. i. des.
+    inv MSG_WF. inv MSG_CLOSED.
     exploit TViewFacts.read_future; try exact GET; eauto.
-    { eapply CLOSED1. eauto. }
-    inv CLOSED1. exploit CLOSED; eauto. i. des.
-    splits; auto.
+    i. des. splits; auto.
     - econs; eauto.
     - apply TViewFacts.read_tview_incr.
   Qed.
@@ -343,7 +343,7 @@ Module Local.
     splits; eauto.
     - apply TViewFacts.write_tview_incr. auto.
     - refl.
-    - inv WRITE. inv PROMISE; auto.
+    - inv WRITE. inv PROMISE; try inv TS; auto.
   Qed.
 
   Lemma write_step_strong_relaxed
@@ -356,8 +356,10 @@ Module Local.
     inv STEP. specialize (RELEASE ORD).
     inv WRITE. inv PROMISE.
     exploit Memory.lower_get0; try exact PROMISES; eauto. i. des.
-    exploit RELEASE; eauto. s. i. subst. inv REL_LE.
-    revert H0. unfold TView.write_released. condtac; ss. by destruct ord.
+    exploit RELEASE; eauto. inv MSG_LE; s; i.
+    - subst. inv RELEASED.
+      revert H0. unfold TView.write_released. condtac; ss. by destruct ord.
+    - inv x.
   Qed.
 
   Lemma fence_step_future lc1 sc1 mem1 ordr ordw lc2 sc2
@@ -407,8 +409,8 @@ Module Local.
   Qed.
 
   Lemma promise_step_disjoint
-        lc1 sc1 mem1 loc from to val released lc2 mem2 lc kind
-        (STEP: promise_step lc1 mem1 loc from to val released lc2 mem2 kind)
+        lc1 sc1 mem1 loc from to msg lc2 mem2 lc kind
+        (STEP: promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
         (WF1: wf lc1 mem1)
         (SC1: Memory.closed_timemap sc1 mem1)
         (CLOSED1: Memory.closed mem1)

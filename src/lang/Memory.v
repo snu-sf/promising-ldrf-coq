@@ -2099,16 +2099,19 @@ Module Memory.
     eexists. econs; ss. eauto.
   Qed.
 
-  (* Definition nonsynch_loc (loc:Loc.t) (mem:t): Prop := *)
-  (*   forall f t msg (GET: get loc t mem = Some (f, msg)), *)
-  (*     msg.(Message.released) = None. *)
+  Definition nonsynch_loc (loc:Loc.t) (mem:t): Prop :=
+    forall f t msg (GET: get loc t mem = Some (f, msg)),
+      match msg with
+      | Message.mk _ rel => rel = None
+      | Message.half => False
+      end.
 
-  (* Definition nonsynch (mem:t): Prop := *)
-  (*   forall loc, nonsynch_loc loc mem. *)
+  Definition nonsynch (mem:t): Prop :=
+    forall loc, nonsynch_loc loc mem.
 
-  (* Lemma bot_nonsynch_loc loc: nonsynch_loc loc Memory.bot. *)
-  (* Proof. ii. rewrite bot_get in *. congr. Qed. *)
+  Lemma bot_nonsynch_loc loc: nonsynch_loc loc Memory.bot.
+  Proof. ii. rewrite bot_get in *. congr. Qed.
 
-  (* Lemma bot_nonsynch: nonsynch Memory.bot. *)
-  (* Proof. ii. eapply bot_nonsynch_loc. eauto. Qed. *)
+  Lemma bot_nonsynch: nonsynch Memory.bot.
+  Proof. ii. eapply bot_nonsynch_loc. eauto. Qed.
 End Memory.
