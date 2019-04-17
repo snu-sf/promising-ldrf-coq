@@ -63,6 +63,12 @@ Module Message.
 
   Definition elt_wf: wf elt.
   Proof. econs; ss. Qed.
+
+  Definition is_released_none (msg: t): bool :=
+    match msg with
+    | mk _ released => negb released
+    | half => false
+    end.
 End Message.
 
 Module Cell.

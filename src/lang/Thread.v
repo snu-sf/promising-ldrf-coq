@@ -71,11 +71,11 @@ Module Thread.
     Inductive promise_step (pf:bool): forall (e:ThreadEvent.t) (e1 e2:t), Prop :=
     | promise_step_intro
         st lc1 sc1 mem1
-        loc from to val released kind
+        loc from to msg kind
         lc2 mem2
-        (LOCAL: Local.promise_step lc1 mem1 loc from to val released lc2 mem2 kind)
-        (PF: pf = andb (Memory.op_kind_is_lower kind) (negb released)):
-        promise_step pf (ThreadEvent.promise loc from to val released kind) (mk st lc1 sc1 mem1) (mk st lc2 sc1 mem2)
+        (LOCAL: Local.promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
+        (PF: pf = andb (Memory.op_kind_is_lower kind) (Message.is_released_none msg)):
+        promise_step pf (ThreadEvent.promise loc from to msg kind) (mk st lc1 sc1 mem1) (mk st lc2 sc1 mem2)
     .
 
     (* NOTE: Syscalls act like an SC fence.
