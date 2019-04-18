@@ -350,16 +350,15 @@ Module Local.
         lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
         (STEP: write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
         (ORD: Ordering.le Ordering.strong_relaxed ord):
-    negb (Memory.op_kind_is_lower kind).
+    negb (Memory.op_kind_is_lower kind) \/ (Memory.op_kind_is_lower_half kind).
   Proof.
-    destruct kind; ss.
+    destruct kind; eauto.
     inv STEP. specialize (RELEASE ORD).
     inv WRITE. inv PROMISE.
     exploit Memory.lower_get0; try exact PROMISES; eauto. i. des.
-    exploit RELEASE; eauto. inv MSG_LE; s; i.
-    - subst. inv RELEASED.
-      revert H0. unfold TView.write_released. condtac; ss. by destruct ord.
-    - inv x.
+    exploit RELEASE; eauto. inv MSG_LE; eauto; i.
+    subst. inv RELEASED.
+    revert H0. unfold TView.write_released. condtac; ss. by destruct ord.
   Qed.
 
   Lemma fence_step_future lc1 sc1 mem1 ordr ordw lc2 sc2

@@ -298,6 +298,9 @@ Module Memory.
   Definition op_kind_is_lower (kind:op_kind): bool :=
     match kind with op_kind_lower _ => true | _ => false end.
 
+  Definition op_kind_is_lower_half (kind:op_kind): bool :=
+    match kind with op_kind_lower Message.half => true | _ => false end.
+
   Inductive op mem1 loc from to msg mem2: forall (kind:op_kind), Prop :=
   | op_add
       (ADD: add mem1 loc from to msg mem2):
@@ -2103,7 +2106,7 @@ Module Memory.
     forall f t msg (GET: get loc t mem = Some (f, msg)),
       match msg with
       | Message.mk _ rel => rel = None
-      | Message.half => False
+      | Message.half => True
       end.
 
   Definition nonsynch (mem:t): Prop :=
@@ -2114,4 +2117,16 @@ Module Memory.
 
   Lemma bot_nonsynch: nonsynch Memory.bot.
   Proof. ii. eapply bot_nonsynch_loc. eauto. Qed.
+
+  (* future memory for thread consistency *)
+
+  Inductive future_concrete (promises mem1 mem2: t): Prop :=
+  | future_concrete_intro
+      (FUTURE: future mem1 mem2)
+      (NOHALF: forall loc to from
+                 (GET: get loc to mem2 = Some (from, Message.half)),
+          get loc to promises = Some (from, Message.half))
+  .
+  Hint Constructors future_concrete.
+
 End Memory.
