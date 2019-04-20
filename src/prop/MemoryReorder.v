@@ -22,14 +22,14 @@ Set Implicit Arguments.
 
 Module MemoryReorder.
   Lemma add_add
-        mem0 loc1 from1 to1 val1 released1
-        mem1 loc2 from2 to2 val2 released2
+        mem0 loc1 from1 to1 msg1
+        mem1 loc2 from2 to2 msg2
         mem2
-        (ADD1: Memory.add mem0 loc1 from1 to1 val1 released1 mem1)
-        (ADD2: Memory.add mem1 loc2 from2 to2 val2 released2 mem2):
+        (ADD1: Memory.add mem0 loc1 from1 to1 msg1 mem1)
+        (ADD2: Memory.add mem1 loc2 from2 to2 msg2 mem2):
     exists mem1',
-      <<ADD1: Memory.add mem0 loc2 from2 to2 val2 released2 mem1'>> /\
-      <<ADD2: Memory.add mem1' loc1 from1 to1 val1 released1 mem2>> /\
+      <<ADD1: Memory.add mem0 loc2 from2 to2 msg2 mem1'>> /\
+      <<ADD2: Memory.add mem1' loc1 from1 to1 msg1 mem2>> /\
       <<LOCTS: (loc1, to1) <> (loc2, to2)>>.
   Proof.
     exploit (@Memory.add_exists mem0 loc2 from2 to2).
@@ -67,14 +67,14 @@ Module MemoryReorder.
   Qed.
 
   Lemma add_split_same
-        mem0 loc ts1 ts2 ts3 val2 val3 released2 released3 mem1 mem2
-        (ADD1: Memory.add mem0 loc ts1 ts3 val3 released3 mem1)
-        (SPLIT2: Memory.split mem1 loc ts1 ts2 ts3 val2 val3 released2 released3 mem2):
+        mem0 loc ts1 ts2 ts3 msg2 msg3 mem1 mem2
+        (ADD1: Memory.add mem0 loc ts1 ts3 msg3 mem1)
+        (SPLIT2: Memory.split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2):
     exists mem1',
-      <<ADD1: Memory.add mem0 loc ts1 ts2 val2 released2 mem1'>> /\
-      <<ADD2: Memory.add mem1' loc ts2 ts3 val3 released3 mem2>>.
+      <<ADD1: Memory.add mem0 loc ts1 ts2 msg2 mem1'>> /\
+      <<ADD2: Memory.add mem1' loc ts2 ts3 msg3 mem2>>.
   Proof.
-    exploit (@Memory.add_exists mem0 loc ts1 ts2 val2 released2); eauto.
+    exploit (@Memory.add_exists mem0 loc ts1 ts2 msg2); eauto.
     { i. inv ADD1. inv ADD. hexploit DISJOINT; eauto. i.
       eapply Interval.le_disjoint; eauto. econs; [refl|].
       inv SPLIT2. inv SPLIT. left. auto.
@@ -82,7 +82,7 @@ Module MemoryReorder.
     { inv SPLIT2. inv SPLIT. auto. }
     { inv SPLIT2. inv SPLIT. auto. }
     i. des.
-    exploit (@Memory.add_exists mem3 loc ts2 ts3 val3 released3); eauto.
+    exploit (@Memory.add_exists mem3 loc ts2 ts3 msg3); eauto.
     { i. revert GET2. erewrite Memory.add_o; eauto. condtac; ss.
       - des. subst. i. inv GET2.
         symmetry. apply Interval.disjoint_imm.
@@ -102,19 +102,19 @@ Module MemoryReorder.
   Qed.
 
   Lemma add_split
-        mem0 loc1 from1 to1 val1 released1
-        mem1 loc2 ts21 ts22 ts23 val22 val23 released22 released23
+        mem0 loc1 from1 to1 msg1
+        mem1 loc2 ts21 ts22 ts23 msg22 msg23
         mem2
-        (ADD1: Memory.add mem0 loc1 from1 to1 val1 released1 mem1)
-        (SPLIT2: Memory.split mem1 loc2 ts21 ts22 ts23 val22 val23 released22 released23 mem2):
-    (loc1 = loc2 /\ from1 = ts21 /\ to1 = ts23 /\ val1 = val23 /\ released1 = released23 /\
+        (ADD1: Memory.add mem0 loc1 from1 to1 msg1 mem1)
+        (SPLIT2: Memory.split mem1 loc2 ts21 ts22 ts23 msg22 msg23 mem2):
+    (loc1 = loc2 /\ from1 = ts21 /\ to1 = ts23 /\ msg1 = msg23 /\
      exists mem1',
-       <<ADD1: Memory.add mem0 loc2 ts21 ts22 val22 released22 mem1'>> /\
-       <<ADD2: Memory.add mem1' loc2 ts22 ts23 val23 released23 mem2>>) \/
+       <<ADD1: Memory.add mem0 loc2 ts21 ts22 msg22 mem1'>> /\
+       <<ADD2: Memory.add mem1' loc2 ts22 ts23 msg23 mem2>>) \/
     (<<LOCTS1: (loc1, to1) <> (loc2, ts23)>> /\
      exists mem1',
-       <<SPLIT1: Memory.split mem0 loc2 ts21 ts22 ts23 val22 val23 released22 released23 mem1'>> /\
-       <<ADD2: Memory.add mem1' loc1 from1 to1 val1 released1 mem2>>).
+       <<SPLIT1: Memory.split mem0 loc2 ts21 ts22 ts23 msg22 msg23 mem1'>> /\
+       <<ADD2: Memory.add mem1' loc1 from1 to1 msg1 mem2>>).
   Proof.
     exploit Memory.split_get0; eauto. i. des.
     revert GET0. erewrite Memory.add_o; eauto. condtac; ss.
@@ -155,17 +155,17 @@ Module MemoryReorder.
   Qed.
 
   Lemma add_lower
-        mem0 loc1 from1 to1 val1 released1
-        mem1 loc2 from2 to2 val2 released2 released2'
+        mem0 loc1 from1 to1 msg1
+        mem1 loc2 from2 to2 msg2 msg2'
         mem2
-        (ADD1: Memory.add mem0 loc1 from1 to1 val1 released1 mem1)
-        (LOWER2: Memory.lower mem1 loc2 from2 to2 val2 released2 released2' mem2):
-    (loc1 = loc2 /\ from1 = from2 /\ to1 = to2 /\ val1 = val2 /\ released1 = released2 /\
-     Memory.add mem0 loc1 from1 to1 val1 released2' mem2) \/
+        (ADD1: Memory.add mem0 loc1 from1 to1 msg1 mem1)
+        (LOWER2: Memory.lower mem1 loc2 from2 to2 msg2 msg2' mem2):
+    (loc1 = loc2 /\ from1 = from2 /\ to1 = to2 /\ msg1 = msg2 /\
+     Memory.add mem0 loc1 from1 to1 msg2' mem2) \/
     (<<LOCTS1: (loc1, to1) <> (loc2, to2)>> /\
      exists mem1',
-       <<LOWER1: Memory.lower mem0 loc2 from2 to2 val2 released2 released2' mem1'>> /\
-       <<ADD2: Memory.add mem1' loc1 from1 to1 val1 released1 mem2>>).
+       <<LOWER1: Memory.lower mem0 loc2 from2 to2 msg2 msg2' mem1'>> /\
+       <<ADD2: Memory.add mem1' loc1 from1 to1 msg1 mem2>>).
   Proof.
     exploit Memory.lower_get0; eauto.
     erewrite Memory.add_o; eauto. condtac; ss.
@@ -202,15 +202,15 @@ Module MemoryReorder.
   Qed.
 
   Lemma add_remove
-        mem0 loc1 from1 to1 val1 released1
-        mem1 loc2 from2 to2 val2 released2
+        mem0 loc1 from1 to1 msg1
+        mem1 loc2 from2 to2 msg2
         mem2
         (LOCTS1: (loc1, to1) <> (loc2, to2))
-        (ADD1: Memory.add mem0 loc1 from1 to1 val1 released1 mem1)
-        (REMOVE2: Memory.remove mem1 loc2 from2 to2 val2 released2 mem2):
+        (ADD1: Memory.add mem0 loc1 from1 to1 msg1 mem1)
+        (REMOVE2: Memory.remove mem1 loc2 from2 to2 msg2 mem2):
     exists mem1',
-      <<REMOVE1: Memory.remove mem0 loc2 from2 to2 val2 released2 mem1'>> /\
-      <<ADD2: Memory.add mem1' loc1 from1 to1 val1 released1 mem2>>.
+      <<REMOVE1: Memory.remove mem0 loc2 from2 to2 msg2 mem1'>> /\
+      <<ADD2: Memory.add mem1' loc1 from1 to1 msg1 mem2>>.
   Proof.
     exploit (@Memory.remove_exists mem0 loc2 from2 to2).
     { hexploit Memory.remove_get0; eauto.
@@ -231,16 +231,16 @@ Module MemoryReorder.
   Qed.
 
   Lemma split_add
-        mem0 loc1 ts11 ts12 ts13 val12 val13 released12 released13
-        mem1 loc2 from2 to2 val2 released2
+        mem0 loc1 ts11 ts12 ts13 msg12 msg13
+        mem1 loc2 from2 to2 msg2
         mem2
-        (SPLIT1: Memory.split mem0 loc1 ts11 ts12 ts13 val12 val13 released12 released13 mem1)
-        (ADD2: Memory.add mem1 loc2 from2 to2 val2 released2 mem2):
+        (SPLIT1: Memory.split mem0 loc1 ts11 ts12 ts13 msg12 msg13 mem1)
+        (ADD2: Memory.add mem1 loc2 from2 to2 msg2 mem2):
     <<LOCTS1: (loc1, ts12) <> (loc2, to2)>> /\
     <<LOCTS2: (loc1, ts13) <> (loc2, to2)>> /\
     exists mem1',
-      <<ADD1: Memory.add mem0 loc2 from2 to2 val2 released2 mem1'>> /\
-      <<SPLIT2: Memory.split mem1' loc1 ts11 ts12 ts13 val12 val13 released12 released13 mem2>>.
+      <<ADD1: Memory.add mem0 loc2 from2 to2 msg2 mem1'>> /\
+      <<SPLIT2: Memory.split mem1' loc1 ts11 ts12 ts13 msg12 msg13 mem2>>.
   Proof.
     exploit (@Memory.add_exists mem0 loc2 from2 to2);
       try by inv ADD2; inv ADD; eauto.
@@ -282,20 +282,20 @@ Module MemoryReorder.
   Qed.
 
   Lemma split_split
-        mem0 loc1 ts11 ts12 ts13 val12 val13 released12 released13
-        mem1 loc2 ts21 ts22 ts23 val22 val23 released22 released23
+        mem0 loc1 ts11 ts12 ts13 msg12 msg13
+        mem1 loc2 ts21 ts22 ts23 msg22 msg23
         mem2
         (LOCTS1: (loc1, ts13) <> (loc2, ts23))
-        (SPLIT1: Memory.split mem0 loc1 ts11 ts12 ts13 val12 val13 released12 released13 mem1)
-        (SPLIT2: Memory.split mem1 loc2 ts21 ts22 ts23 val22 val23 released22 released23 mem2):
+        (SPLIT1: Memory.split mem0 loc1 ts11 ts12 ts13 msg12 msg13 mem1)
+        (SPLIT2: Memory.split mem1 loc2 ts21 ts22 ts23 msg22 msg23 mem2):
     (loc1 = loc2 /\ ts21 = ts11 /\ ts23 = ts12 /\
      exists mem1',
-       <<SPLIT1: Memory.split mem0 loc2 ts21 ts22 ts13 val22 val13 released22 released13 mem1'>> /\
-       <<SPLIT2: Memory.split mem1' loc1 ts22 ts12 ts13 val12 val13 released12 released13 mem2>>) \/
+       <<SPLIT1: Memory.split mem0 loc2 ts21 ts22 ts13 msg22 msg13 mem1'>> /\
+       <<SPLIT2: Memory.split mem1' loc1 ts22 ts12 ts13 msg12 msg13 mem2>>) \/
     ((loc2, ts21, ts23) <> (loc1, ts11, ts12) /\
      exists mem1',
-       <<SPLIT1: Memory.split mem0 loc2 ts21 ts22 ts23 val22 val23 released22 released23 mem1'>> /\
-       <<SPLIT2: Memory.split mem1' loc1 ts11 ts12 ts13 val12 val13 released12 released13 mem2>>).
+       <<SPLIT1: Memory.split mem0 loc2 ts21 ts22 ts23 msg22 msg23 mem1'>> /\
+       <<SPLIT2: Memory.split mem1' loc1 ts11 ts12 ts13 msg12 msg13 mem2>>).
   Proof.
     exploit Memory.split_get0; try exact SPLIT2; eauto. i. des.
     revert GET0. erewrite Memory.split_o; eauto. repeat condtac; ss.
@@ -358,18 +358,18 @@ Module MemoryReorder.
   Qed.
 
   Lemma split_lower_diff
-        mem0 loc1 ts11 ts12 ts13 val12 val13 released12 released13
-        mem1 loc2 from2 to2 val2 released2 released2'
+        mem0 loc1 ts11 ts12 ts13 msg12 msg13
+        mem1 loc2 from2 to2 msg2 msg2'
         mem2
         (LOCTS1: (loc1, ts13) <> (loc2, to2))
-        (SPLIT1: Memory.split mem0 loc1 ts11 ts12 ts13 val12 val13 released12 released13 mem1)
-        (LOWER2: Memory.lower mem1 loc2 from2 to2 val2 released2 released2' mem2):
-    (loc1 = loc2 /\ ts11 = from2 /\ ts12 = to2 /\ val12 = val2 /\ released12 = released2 /\
-     Memory.split mem0 loc1 ts11 ts12 ts13 val12 val13 released2' released13 mem2) \/
+        (SPLIT1: Memory.split mem0 loc1 ts11 ts12 ts13 msg12 msg13 mem1)
+        (LOWER2: Memory.lower mem1 loc2 from2 to2 msg2 msg2' mem2):
+    (loc1 = loc2 /\ ts11 = from2 /\ ts12 = to2 /\ msg12 = msg2 /\
+     Memory.split mem0 loc1 ts11 ts12 ts13 msg2' msg13 mem2) \/
     ((loc1, ts12) <> (loc2, to2) /\
      exists mem1',
-        <<LOWER1: Memory.lower mem0 loc2 from2 to2 val2 released2 released2' mem1'>> /\
-        <<SPLIT2: Memory.split mem1' loc1 ts11 ts12 ts13 val12 val13 released12 released13 mem2>>).
+        <<LOWER1: Memory.lower mem0 loc2 from2 to2 msg2 msg2' mem1'>> /\
+        <<SPLIT2: Memory.split mem1' loc1 ts11 ts12 ts13 msg12 msg13 mem2>>).
   Proof.
     exploit Memory.lower_get0; eauto. i. des.
     revert GET. erewrite Memory.split_o; eauto. repeat condtac; ss.
@@ -406,15 +406,15 @@ Module MemoryReorder.
 
   Lemma split_lower_same
         loc
-        mem0 ts11 ts12 ts13 val12 val13 released12 released13
-        mem1 from2 val2 released2 released2'
+        mem0 ts11 ts12 ts13 msg12 msg13
+        mem1 from2 msg2 msg2'
         mem2
-        (SPLIT1: Memory.split mem0 loc ts11 ts12 ts13 val12 val13 released12 released13 mem1)
-        (LOWER2: Memory.lower mem1 loc from2 ts13 val2 released2 released2' mem2):
-    from2 = ts12 /\ released13 = released2 /\
+        (SPLIT1: Memory.split mem0 loc ts11 ts12 ts13 msg12 msg13 mem1)
+        (LOWER2: Memory.lower mem1 loc from2 ts13 msg2 msg2' mem2):
+    from2 = ts12 /\ msg13 = msg2 /\
     exists mem1',
-      <<LOWER1: Memory.lower mem0 loc ts11 ts13 val2 released2 released2' mem1'>> /\
-      <<SPLIT2: Memory.split mem1' loc ts11 ts12 ts13 val12 val13 released12 released2' mem2>>.
+      <<LOWER1: Memory.lower mem0 loc ts11 ts13 msg2 msg2' mem1'>> /\
+      <<SPLIT2: Memory.split mem1' loc ts11 ts12 ts13 msg12 msg2' mem2>>.
   Proof.
     exploit Memory.lower_get0; eauto. erewrite Memory.split_o; eauto. repeat condtac; ss; cycle 2.
     { clear -o0. des; congr. }
@@ -437,41 +437,17 @@ Module MemoryReorder.
     des. repeat subst. congr.
   Qed.
 
-  Lemma split_lower
-        mem0 loc1 ts11 ts12 ts13 val12 val13 released12 released13
-        mem1 loc2 from2 to2 val2 released2 released2'
-        mem2
-        (SPLIT1: Memory.split mem0 loc1 ts11 ts12 ts13 val12 val13 released12 released13 mem1)
-        (LOWER2: Memory.lower mem1 loc2 from2 to2 val2 released2 released2' mem2):
-    (loc1 = loc2 /\ ts11 = from2 /\ ts12 = to2 /\ val12 = val2 /\ released12 = released2 /\
-     Memory.split mem0 loc1 ts11 ts12 ts13 val12 val13 released2' released13 mem2) \/
-    ((loc1, ts12) <> (loc2, to2) /\
-     exists from2' released13' mem1',
-        <<LOWER1: Memory.lower mem0 loc2 from2' to2 val2 released2 released2' mem1'>> /\
-        <<SPLIT2: Memory.split mem1' loc1 ts11 ts12 ts13 val12 val13 released12 released13' mem2>>).
-  Proof.
-    destruct (classic ((loc1, ts13) = (loc2, to2))).
-    { inv H. exploit split_lower_same; eauto. i. des. subst.
-      right. esplits; eauto. ii. inv H.
-      inv SPLIT1. inv SPLIT. exfalso. eapply Time.lt_strorder. eauto.
-    }
-    { exploit split_lower_diff; eauto. i. des.
-      - left. ss.
-      - right. splits; ss. esplits; eauto.
-    }
-  Qed.
-
   Lemma split_remove
-        mem0 loc1 ts11 ts12 ts13 val12 val13 released12 released13
-        mem1 loc2 from2 to2 val2 released2
+        mem0 loc1 ts11 ts12 ts13 msg12 msg13
+        mem1 loc2 from2 to2 msg2
         mem2
         (LOCTS1: (loc1, ts12) <> (loc2, to2))
         (LOCTS2: (loc1, ts13) <> (loc2, to2))
-        (SPLIT1: Memory.split mem0 loc1 ts11 ts12 ts13 val12 val13 released12 released13 mem1)
-        (REMOVE2: Memory.remove mem1 loc2 from2 to2 val2 released2 mem2):
+        (SPLIT1: Memory.split mem0 loc1 ts11 ts12 ts13 msg12 msg13 mem1)
+        (REMOVE2: Memory.remove mem1 loc2 from2 to2 msg2 mem2):
     exists mem1',
-      <<REMOVE1: Memory.remove mem0 loc2 from2 to2 val2 released2 mem1'>> /\
-      <<SPLIT2: Memory.split mem1' loc1 ts11 ts12 ts13 val12 val13 released12 released13 mem2>>.
+      <<REMOVE1: Memory.remove mem0 loc2 from2 to2 msg2 mem1'>> /\
+      <<SPLIT2: Memory.split mem1' loc1 ts11 ts12 ts13 msg12 msg13 mem2>>.
   Proof.
     exploit (@Memory.remove_exists mem0 loc2 from2 to2).
     { hexploit Memory.remove_get0; eauto.
@@ -498,14 +474,14 @@ Module MemoryReorder.
   Qed.
 
   Lemma lower_add
-        mem0 loc1 from1 to1 val1 released1 released1'
-        mem1 loc2 from2 to2 val2 released2
+        mem0 loc1 from1 to1 msg1 msg1'
+        mem1 loc2 from2 to2 msg2
         mem2
-        (LOWER1: Memory.lower mem0 loc1 from1 to1 val1 released1 released1' mem1)
-        (ADD2: Memory.add mem1 loc2 from2 to2 val2 released2 mem2):
+        (LOWER1: Memory.lower mem0 loc1 from1 to1 msg1 msg1' mem1)
+        (ADD2: Memory.add mem1 loc2 from2 to2 msg2 mem2):
     exists mem1',
-      <<ADD1: Memory.add mem0 loc2 from2 to2 val2 released2 mem1'>> /\
-      <<LOWER2: Memory.lower mem1' loc1 from1 to1 val1 released1 released1' mem2>> /\
+      <<ADD1: Memory.add mem0 loc2 from2 to2 msg2 mem1'>> /\
+      <<LOWER2: Memory.lower mem1' loc1 from1 to1 msg1 msg1' mem2>> /\
       <<LOCTS: (loc1, to1) <> (loc2, to2)>>.
   Proof.
     exploit (@Memory.add_exists mem0 loc2 from2 to2);
@@ -537,16 +513,16 @@ Module MemoryReorder.
   Qed.
 
   Lemma lower_split
-        mem0 loc1 from1 to1 val1 released1 released1'
-        mem1 loc2 ts21 ts22 ts23 val22 val23 released22 released23
+        mem0 loc1 from1 to1 msg1 msg1'
+        mem1 loc2 ts21 ts22 ts23 msg22 msg23
         mem2
-        (LOWER1: Memory.lower mem0 loc1 from1 to1 val1 released1 released1' mem1)
-        (SPLIT2: Memory.split mem1 loc2 ts21 ts22 ts23 val22 val23 released22 released23 mem2):
-    exists from1' released23' mem1',
-      <<SPLIT1: Memory.split mem0 loc2 ts21 ts22 ts23 val22 val23 released22 released23' mem1'>> /\
-      <<LOWER2: Memory.lower mem1' loc1 from1' to1 val1 released1 released1' mem2>> /\
-      <<FROM1: __guard__ ((loc1, to1, from1', released1', released23') = (loc2, ts23, ts22, released23, released1) \/
-                          ((loc1, to1) <> (loc2, ts23) /\ (from1', released23') = (from1, released23)))>>.
+        (LOWER1: Memory.lower mem0 loc1 from1 to1 msg1 msg1' mem1)
+        (SPLIT2: Memory.split mem1 loc2 ts21 ts22 ts23 msg22 msg23 mem2):
+    exists from1' msg23' mem1',
+      <<SPLIT1: Memory.split mem0 loc2 ts21 ts22 ts23 msg22 msg23' mem1'>> /\
+      <<LOWER2: Memory.lower mem1' loc1 from1' to1 msg1 msg1' mem2>> /\
+      <<FROM1: __guard__ ((loc1, to1, from1', msg1', msg23') = (loc2, ts23, ts22, msg23, msg1) \/
+                          ((loc1, to1) <> (loc2, ts23) /\ (from1', msg23') = (from1, msg23)))>>.
   Proof.
     destruct (loc_ts_eq_dec (loc1, to1) (loc2, ts23)); ss.
     - des. subst.
@@ -606,17 +582,17 @@ Module MemoryReorder.
   Qed.
 
   Lemma lower_lower
-        mem0 loc1 from1 to1 val1 released1 released1'
-        mem1 loc2 from2 to2 val2 released2 released2'
+        mem0 loc1 from1 to1 msg1 msg1'
+        mem1 loc2 from2 to2 msg2 msg2'
         mem2
-        (LOWER1: Memory.lower mem0 loc1 from1 to1 val1 released1 released1' mem1)
-        (LOWER2: Memory.lower mem1 loc2 from2 to2 val2 released2 released2' mem2):
-    (loc1 = loc2 /\ from1 = from2 /\ to1 = to2 /\ val1 = val2 /\ released1' = released2 /\
-     Memory.lower mem0 loc1 from1 to1 val1 released1 released2' mem2) \/
+        (LOWER1: Memory.lower mem0 loc1 from1 to1 msg1 msg1' mem1)
+        (LOWER2: Memory.lower mem1 loc2 from2 to2 msg2 msg2' mem2):
+    (loc1 = loc2 /\ from1 = from2 /\ to1 = to2 /\ msg1' = msg2 /\
+     Memory.lower mem0 loc1 from1 to1 msg1 msg2' mem2) \/
     (<<LOCTS1: (loc1, to1) <> (loc2, to2)>> /\
      exists mem1',
-       <<LOWER1: Memory.lower mem0 loc2 from2 to2 val2 released2 released2' mem1'>> /\
-       <<LOWER2: Memory.lower mem1' loc1 from1 to1 val1 released1 released1' mem2>>).
+       <<LOWER1: Memory.lower mem0 loc2 from2 to2 msg2 msg2' mem1'>> /\
+       <<LOWER2: Memory.lower mem1' loc1 from1 to1 msg1 msg1' mem2>>).
   Proof.
     exploit Memory.lower_get0; eauto. i. des.
     revert GET. erewrite Memory.lower_o; eauto. condtac; ss.
@@ -650,15 +626,15 @@ Module MemoryReorder.
   Qed.
 
   Lemma lower_remove
-        mem0 loc1 from1 to1 val1 released1 released1'
-        mem1 loc2 from2 to2 val2 released2
+        mem0 loc1 from1 to1 msg1 msg1'
+        mem1 loc2 from2 to2 msg2
         mem2
         (LOCTS1: (loc1, to1) <> (loc2, to2))
-        (LOWER1: Memory.lower mem0 loc1 from1 to1 val1 released1 released1' mem1)
-        (REMOVE2: Memory.remove mem1 loc2 from2 to2 val2 released2 mem2):
+        (LOWER1: Memory.lower mem0 loc1 from1 to1 msg1 msg1' mem1)
+        (REMOVE2: Memory.remove mem1 loc2 from2 to2 msg2 mem2):
     exists mem1',
-      <<REMOVE1: Memory.remove mem0 loc2 from2 to2 val2 released2 mem1'>> /\
-      <<LOWER2: Memory.lower mem1' loc1 from1 to1 val1 released1 released1' mem2>>.
+      <<REMOVE1: Memory.remove mem0 loc2 from2 to2 msg2 mem1'>> /\
+      <<LOWER2: Memory.lower mem1' loc1 from1 to1 msg1 msg1' mem2>>.
   Proof.
     exploit (@Memory.remove_exists mem0 loc2 from2 to2).
     { hexploit Memory.remove_get0; eauto. i. des.
@@ -682,17 +658,17 @@ Module MemoryReorder.
   Qed.
 
   Lemma remove_add
-        mem0 loc1 from1 to1 val1 released1
-        mem1 loc2 from2 to2 val2 released2
+        mem0 loc1 from1 to1 msg1
+        mem1 loc2 from2 to2 msg2
         mem2
         mem1'
-        (REMOVE1: Memory.remove mem0 loc1 from1 to1 val1 released1 mem1)
-        (ADD2: Memory.add mem1 loc2 from2 to2 val2 released2 mem2)
-        (ADD1: Memory.add mem0 loc2 from2 to2 val2 released2 mem1'):
-    Memory.remove mem1' loc1 from1 to1 val1 released1 mem2.
+        (REMOVE1: Memory.remove mem0 loc1 from1 to1 msg1 mem1)
+        (ADD2: Memory.add mem1 loc2 from2 to2 msg2 mem2)
+        (ADD1: Memory.add mem0 loc2 from2 to2 msg2 mem1'):
+    Memory.remove mem1' loc1 from1 to1 msg1 mem2.
   Proof.
     exploit Memory.remove_get0; try eexact REMOVE1; eauto. i. des.
-    exploit (@Memory.remove_exists mem1' loc1 from1 to1 val1 released1); eauto.
+    exploit (@Memory.remove_exists mem1' loc1 from1 to1 msg1); eauto.
     { erewrite Memory.add_o; eauto. condtac; ss; eauto.
       des. subst. exploit Memory.add_get0; eauto. i. des. congr.
     }
@@ -706,18 +682,18 @@ Module MemoryReorder.
   Qed.
 
   Lemma remove_split
-        mem0 loc1 from1 to1 val1 released1
-        mem1 loc2 ts21 ts22 ts23 val22 val23 released22 released23
+        mem0 loc1 from1 to1 msg1
+        mem1 loc2 ts21 ts22 ts23 msg22 msg23
         mem2
         mem1'
-        (REMOVE1: Memory.remove mem0 loc1 from1 to1 val1 released1 mem1)
-        (SPLIT2: Memory.split mem1 loc2 ts21 ts22 ts23 val22 val23 released22 released23 mem2)
-        (SPLIT1: Memory.split mem0 loc2 ts21 ts22 ts23 val22 val23 released22 released23 mem1'):
-    Memory.remove mem1' loc1 from1 to1 val1 released1 mem2.
+        (REMOVE1: Memory.remove mem0 loc1 from1 to1 msg1 mem1)
+        (SPLIT2: Memory.split mem1 loc2 ts21 ts22 ts23 msg22 msg23 mem2)
+        (SPLIT1: Memory.split mem0 loc2 ts21 ts22 ts23 msg22 msg23 mem1'):
+    Memory.remove mem1' loc1 from1 to1 msg1 mem2.
   Proof.
     exploit Memory.remove_get0; try eexact REMOVE1; eauto. i. des.
     exploit Memory.split_get0; try exact SPLIT1; eauto. i. des.
-    exploit (@Memory.remove_exists mem1' loc1 from1 to1 val1 released1); eauto.
+    exploit (@Memory.remove_exists mem1' loc1 from1 to1 msg1); eauto.
     { erewrite Memory.split_o; eauto. repeat condtac; ss.
       - des. subst. congr.
       - guardH o. des. subst. rewrite GET0 in GET0. inv GET0.
@@ -738,17 +714,17 @@ Module MemoryReorder.
   Qed.
 
   Lemma remove_lower
-        mem0 loc1 from1 to1 val1 released1
-        mem1 loc2 from2 to2 val2 released2' released2
+        mem0 loc1 from1 to1 msg1
+        mem1 loc2 from2 to2 msg2' msg2
         mem2
         mem1'
-        (REMOVE1: Memory.remove mem0 loc1 from1 to1 val1 released1 mem1)
-        (LOWER2: Memory.lower mem1 loc2 from2 to2 val2 released2' released2 mem2)
-        (LOWER1: Memory.lower mem0 loc2 from2 to2 val2 released2' released2 mem1'):
-    Memory.remove mem1' loc1 from1 to1 val1 released1 mem2.
+        (REMOVE1: Memory.remove mem0 loc1 from1 to1 msg1 mem1)
+        (LOWER2: Memory.lower mem1 loc2 from2 to2 msg2' msg2 mem2)
+        (LOWER1: Memory.lower mem0 loc2 from2 to2 msg2' msg2 mem1'):
+    Memory.remove mem1' loc1 from1 to1 msg1 mem2.
   Proof.
     exploit Memory.remove_get0; try eexact REMOVE1; eauto. i. des.
-    exploit (@Memory.remove_exists mem1' loc1 from1 to1 val1 released1); eauto.
+    exploit (@Memory.remove_exists mem1' loc1 from1 to1 msg1); eauto.
     { erewrite Memory.lower_o; eauto. condtac; ss.
       des. subst.
       exploit Memory.lower_get0; try exact LOWER2; eauto. i. des.
@@ -765,20 +741,20 @@ Module MemoryReorder.
   Qed.
 
   Lemma remove_remove
-        promises0 loc1 from1 to1 val1 released1
-        promises1 loc2 from2 to2 val2 released2
+        promises0 loc1 from1 to1 msg1
+        promises1 loc2 from2 to2 msg2
         promises2
-        (REMOVE1: Memory.remove promises0 loc1 from1 to1 val1 released1 promises1)
-        (REMOVE2: Memory.remove promises1 loc2 from2 to2 val2 released2 promises2):
+        (REMOVE1: Memory.remove promises0 loc1 from1 to1 msg1 promises1)
+        (REMOVE2: Memory.remove promises1 loc2 from2 to2 msg2 promises2):
     exists promises1',
-      <<REMOVE1: Memory.remove promises0 loc2 from2 to2 val2 released2 promises1'>> /\
-      <<REMOVE2: Memory.remove promises1' loc1 from1 to1 val1 released1 promises2>>.
+      <<REMOVE1: Memory.remove promises0 loc2 from2 to2 msg2 promises1'>> /\
+      <<REMOVE2: Memory.remove promises1' loc1 from1 to1 msg1 promises2>>.
   Proof.
     exploit Memory.remove_get0; try apply REMOVE2; eauto. i. des.
     revert GET. erewrite Memory.remove_o; eauto. condtac; ss. guardH o. i.
     exploit Memory.remove_exists; eauto. i. des.
     hexploit Memory.remove_get0; try apply REMOVE1; eauto. i. des.
-    exploit (@Memory.remove_exists mem2 loc1 from1 to1 val1 released1); eauto.
+    exploit (@Memory.remove_exists mem2 loc1 from1 to1 msg1); eauto.
     { erewrite Memory.remove_o; eauto. condtac; ss. des. subst. congr. }
     i. des.
     esplits; eauto.
@@ -793,16 +769,16 @@ Module MemoryReorder.
   (* Lemmas on promise *)
 
   Lemma promise_add_promise_add
-        loc1 from1 to1 val1 released1
-        loc2 from2 to2 val2 released2
+        loc1 from1 to1 msg1
+        loc2 from2 to2 msg2
         promises0 mem0
         promises1 mem1
         promises2 mem2
-        (PROMISE1: Memory.promise promises0 mem0 loc1 from1 to1 val1 released1 promises1 mem1 Memory.op_kind_add)
-        (PROMISE2: Memory.promise promises1 mem1 loc2 from2 to2 val2 released2 promises2 mem2 Memory.op_kind_add):
+        (PROMISE1: Memory.promise promises0 mem0 loc1 from1 to1 msg1 promises1 mem1 Memory.op_kind_add)
+        (PROMISE2: Memory.promise promises1 mem1 loc2 from2 to2 msg2 promises2 mem2 Memory.op_kind_add):
     exists promises1' mem1',
-      <<PROMISE1: Memory.promise promises0 mem0 loc2 from2 to2 val2 released2 promises1' mem1' Memory.op_kind_add>> /\
-      <<PROMISE2: Memory.promise promises1' mem1' loc1 from1 to1 val1 released1 promises2 mem2 Memory.op_kind_add>> /\
+      <<PROMISE1: Memory.promise promises0 mem0 loc2 from2 to2 msg2 promises1' mem1' Memory.op_kind_add>> /\
+      <<PROMISE2: Memory.promise promises1' mem1' loc1 from1 to1 msg1 promises2 mem2 Memory.op_kind_add>> /\
       <<LOCTS: (loc1, to1) <> (loc2, to2)>>.
   Proof.
     inv PROMISE1. inv PROMISE2.
@@ -812,17 +788,17 @@ Module MemoryReorder.
   Qed.
 
   Lemma promise_add_remove
-        loc1 from1 to1 val1 released1
-        loc2 from2 to2 val2 released2
+        loc1 from1 to1 msg1
+        loc2 from2 to2 msg2
         promises0 mem0
         promises1 mem1
         promises2
         (LOCTS1: (loc1, to1) <> (loc2, to2))
-        (PROMISE1: Memory.promise promises0 mem0 loc1 from1 to1 val1 released1 promises1 mem1 Memory.op_kind_add)
-        (REMOVE2: Memory.remove promises1 loc2 from2 to2 val2 released2 promises2):
+        (PROMISE1: Memory.promise promises0 mem0 loc1 from1 to1 msg1 promises1 mem1 Memory.op_kind_add)
+        (REMOVE2: Memory.remove promises1 loc2 from2 to2 msg2 promises2):
     exists promises1',
-      <<REMOVE1: Memory.remove promises0 loc2 from2 to2 val2 released2 promises1'>> /\
-      <<PROMISE2: Memory.promise promises1' mem0 loc1 from1 to1 val1 released1 promises2 mem1 Memory.op_kind_add>>.
+      <<REMOVE1: Memory.remove promises0 loc2 from2 to2 msg2 promises1'>> /\
+      <<PROMISE2: Memory.promise promises1' mem0 loc1 from1 to1 msg1 promises2 mem1 Memory.op_kind_add>>.
   Proof.
     inv PROMISE1.
     exploit add_remove; try exact PROMISES; eauto. i. des.
@@ -830,19 +806,19 @@ Module MemoryReorder.
   Qed.
 
   Lemma promise_split_remove
-        loc1 from1 to1 val1 released1
-        loc2 from2 to2 val2 released2
-        to3 val3 released3
+        loc1 from1 to1 msg1
+        loc2 from2 to2 msg2
+        to3 msg3
         promises0 mem0
         promises1 mem1
         promises2
         (LOCTS1: (loc1, to1) <> (loc2, to2))
         (LOCTS2: (loc1, to3) <> (loc2, to2))
-        (PROMISE1: Memory.promise promises0 mem0 loc1 from1 to1 val1 released1 promises1 mem1 (Memory.op_kind_split to3 val3 released3))
-        (REMOVE2: Memory.remove promises1 loc2 from2 to2 val2 released2 promises2):
+        (PROMISE1: Memory.promise promises0 mem0 loc1 from1 to1 msg1 promises1 mem1 (Memory.op_kind_split to3 msg3))
+        (REMOVE2: Memory.remove promises1 loc2 from2 to2 msg2 promises2):
     exists promises1',
-      <<REMOVE1: Memory.remove promises0 loc2 from2 to2 val2 released2 promises1'>> /\
-      <<PROMISE2: Memory.promise promises1' mem0 loc1 from1 to1 val1 released1 promises2 mem1 (Memory.op_kind_split to3 val3 released3)>>.
+      <<REMOVE1: Memory.remove promises0 loc2 from2 to2 msg2 promises1'>> /\
+      <<PROMISE2: Memory.promise promises1' mem0 loc1 from1 to1 msg1 promises2 mem1 (Memory.op_kind_split to3 msg3)>>.
   Proof.
     inv PROMISE1.
     exploit split_remove; try exact PROMISES; eauto. i. des.
@@ -850,17 +826,17 @@ Module MemoryReorder.
   Qed.
 
   Lemma remove_promise
-        promises1 loc1 from1 to1 val1 released1
-        promises2 loc2 from2 to2 val2 released2
+        promises1 loc1 from1 to1 msg1
+        promises2 loc2 from2 to2 msg2
         promises3
         mem1 mem3
         kind
         (LE: Memory.le promises1 mem1)
-        (REMOVE: Memory.remove promises1 loc1 from1 to1 val1 released1 promises2)
-        (PROMISE: Memory.promise promises2 mem1 loc2 from2 to2 val2 released2 promises3 mem3 kind):
+        (REMOVE: Memory.remove promises1 loc1 from1 to1 msg1 promises2)
+        (PROMISE: Memory.promise promises2 mem1 loc2 from2 to2 msg2 promises3 mem3 kind):
     exists promises2',
-      Memory.promise promises1 mem1 loc2 from2 to2 val2 released2 promises2' mem3 kind /\
-      Memory.remove promises2' loc1 from1 to1 val1 released1 promises3.
+      Memory.promise promises1 mem1 loc2 from2 to2 msg2 promises2' mem3 kind /\
+      Memory.remove promises2' loc1 from1 to1 msg1 promises3.
   Proof.
     inv PROMISE.
     - exploit Memory.add_exists_le; eauto. i. des.
@@ -876,14 +852,14 @@ Module MemoryReorder.
   Qed.
 
   Lemma promise_add_promise_split_same
-        promises0 mem0 loc ts1 ts2 ts3 val2 val3 released2 released3
+        promises0 mem0 loc ts1 ts2 ts3 msg2 msg3
         promises1 mem1
         promises2 mem2
-        (ADD1: Memory.promise promises0 mem0 loc ts1 ts3 val3 released3 promises1 mem1 Memory.op_kind_add)
-        (SPLIT2: Memory.promise promises1 mem1 loc ts1 ts2 val2 released2 promises2 mem2 (Memory.op_kind_split ts3 val3 released3)):
+        (ADD1: Memory.promise promises0 mem0 loc ts1 ts3 msg3 promises1 mem1 Memory.op_kind_add)
+        (SPLIT2: Memory.promise promises1 mem1 loc ts1 ts2 msg2 promises2 mem2 (Memory.op_kind_split ts3 msg3)):
     exists promises1' mem1',
-      <<ADD1: Memory.promise promises0 mem0 loc ts1 ts2 val2 released2 promises1' mem1' Memory.op_kind_add>> /\
-      <<ADD2: Memory.promise promises1' mem1' loc ts2 ts3 val3 released3 promises2 mem2 Memory.op_kind_add>>.
+      <<ADD1: Memory.promise promises0 mem0 loc ts1 ts2 msg2 promises1' mem1' Memory.op_kind_add>> /\
+      <<ADD2: Memory.promise promises1' mem1' loc ts2 ts3 msg3 promises2 mem2 Memory.op_kind_add>>.
   Proof.
     inv ADD1. inv SPLIT2.
     exploit add_split; try exact PROMISES; eauto. i. des; [|congr].
@@ -894,14 +870,14 @@ Module MemoryReorder.
   Qed.
 
   Lemma promise_split_promise_split_same
-        promises0 mem0 loc ts1 ts2 ts3 ts4 val2 val3 val4 released2 released3 released4
+        promises0 mem0 loc ts1 ts2 ts3 ts4 msg2 msg3 msg4
         promises1 mem1
         promises2 mem2
-        (SPLIT1: Memory.promise promises0 mem0 loc ts1 ts3 val3 released3 promises1 mem1 (Memory.op_kind_split ts4 val4 released4))
-        (SPLIT2: Memory.promise promises1 mem1 loc ts1 ts2 val2 released2 promises2 mem2 (Memory.op_kind_split ts3 val3 released3)):
+        (SPLIT1: Memory.promise promises0 mem0 loc ts1 ts3 msg3 promises1 mem1 (Memory.op_kind_split ts4 msg4))
+        (SPLIT2: Memory.promise promises1 mem1 loc ts1 ts2 msg2 promises2 mem2 (Memory.op_kind_split ts3 msg3)):
     exists promises1' mem1',
-      <<SPLIT1: Memory.promise promises0 mem0 loc ts1 ts2 val2 released2 promises1' mem1' (Memory.op_kind_split ts4 val4 released4)>> /\
-      <<SPLIT2: Memory.promise promises1' mem1' loc ts2 ts3 val3 released3 promises2 mem2 (Memory.op_kind_split ts4 val4 released4)>>.
+      <<SPLIT1: Memory.promise promises0 mem0 loc ts1 ts2 msg2 promises1' mem1' (Memory.op_kind_split ts4 msg4)>> /\
+      <<SPLIT2: Memory.promise promises1' mem1' loc ts2 ts3 msg3 promises2 mem2 (Memory.op_kind_split ts4 msg4)>>.
   Proof.
     assert (LOCTS: (loc, ts4) <> (loc, ts3)).
     { intro X. inv X. inv SPLIT1. inv MEM. inv SPLIT. timetac. }
@@ -912,5 +888,4 @@ Module MemoryReorder.
     - econs; eauto.
     - econs; eauto.
   Qed.
-
 End MemoryReorder.
