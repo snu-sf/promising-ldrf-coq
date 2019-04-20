@@ -19,10 +19,10 @@ Set Implicit Arguments.
 
 Module MemoryMerge.
   Lemma add_lower_add
-        mem0 loc from to val released1 released2 mem1 mem2
-        (ADD1: Memory.add mem0 loc from to val released1 mem1)
-        (LOWER2: Memory.lower mem1 loc from to val released1 released2 mem2):
-    Memory.add mem0 loc from to val released2 mem2.
+        mem0 loc from to msg1 msg2 mem1 mem2
+        (ADD1: Memory.add mem0 loc from to msg1 mem1)
+        (LOWER2: Memory.lower mem1 loc from to msg1 msg2 mem2):
+    Memory.add mem0 loc from to msg2 mem2.
   Proof.
     inv ADD1. inv ADD. inv LOWER2. inv LOWER.
     rewrite LocFun.add_add_eq. econs; auto.
@@ -33,10 +33,10 @@ Module MemoryMerge.
   Qed.
 
   Lemma split_lower_split
-        mem0 loc ts1 ts2 ts3 val2 val3 released2 released2' released3 mem1 mem2
-        (SPLIT1: Memory.split mem0 loc ts1 ts2 ts3 val2 val3 released2 released3 mem1)
-        (LOWER2: Memory.lower mem1 loc ts1 ts2 val2 released2 released2' mem2):
-    Memory.split mem0 loc ts1 ts2 ts3 val2 val3 released2' released3 mem2.
+        mem0 loc ts1 ts2 ts3 msg2 msg2' msg3 mem1 mem2
+        (SPLIT1: Memory.split mem0 loc ts1 ts2 ts3 msg2 msg3 mem1)
+        (LOWER2: Memory.lower mem1 loc ts1 ts2 msg2 msg2' mem2):
+    Memory.split mem0 loc ts1 ts2 ts3 msg2' msg3 mem2.
   Proof.
     inv SPLIT1. inv SPLIT. inv LOWER2. inv LOWER.
     rewrite LocFun.add_add_eq. econs; auto.
@@ -47,10 +47,10 @@ Module MemoryMerge.
   Qed.
 
   Lemma lower_lower_lower
-        mem0 loc from to val released0 released1 released2 mem1 mem2
-        (LOWER1: Memory.lower mem0 loc from to val released0 released1 mem1)
-        (LOWER2: Memory.lower mem1 loc from to val released1 released2 mem2):
-    Memory.lower mem0 loc from to val released0 released2 mem2.
+        mem0 loc from to msg0 msg1 msg2 mem1 mem2
+        (LOWER1: Memory.lower mem0 loc from to msg0 msg1 mem1)
+        (LOWER2: Memory.lower mem1 loc from to msg1 msg2 mem2):
+    Memory.lower mem0 loc from to msg0 msg2 mem2.
   Proof.
     inv LOWER1. inv LOWER. inv LOWER2. inv LOWER.
     rewrite LocFun.add_add_eq. econs; auto.
@@ -62,10 +62,10 @@ Module MemoryMerge.
   Qed.
 
   Lemma promise_promise_promise
-        loc from to val released1 released2 promises0 promises1 promises2 mem0 mem1 mem2 kind
-        (PROMISE1: Memory.promise promises0 mem0 loc from to val released1 promises1 mem1 kind)
-        (PROMISE2: Memory.promise promises1 mem1 loc from to val released2 promises2 mem2 (Memory.op_kind_lower released1)):
-    Memory.promise promises0 mem0 loc from to val released2 promises2 mem2 kind.
+        loc from to msg1 msg2 promises0 promises1 promises2 mem0 mem1 mem2 kind
+        (PROMISE1: Memory.promise promises0 mem0 loc from to msg1 promises1 mem1 kind)
+        (PROMISE2: Memory.promise promises1 mem1 loc from to msg2 promises2 mem2 (Memory.op_kind_lower msg1)):
+    Memory.promise promises0 mem0 loc from to msg2 promises2 mem2 kind.
   Proof.
     inv PROMISE2. inv PROMISE1.
     - econs; eauto.
