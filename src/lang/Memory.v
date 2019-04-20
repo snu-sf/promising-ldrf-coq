@@ -2129,4 +2129,12 @@ Module Memory.
   .
   Hint Constructors future_concrete.
 
+  Lemma future_concrete_future
+        mem1 mem2 mem3 promises
+        (FUTURE1: future mem1 mem2)
+        (FUTURE2: future_concrete promises mem2 mem3):
+    future_concrete promises mem1 mem3.
+  Proof.
+    inv FUTURE2. econs; eauto. etrans; eauto.
+  Qed.
 End Memory.

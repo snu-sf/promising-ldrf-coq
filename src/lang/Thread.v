@@ -136,7 +136,7 @@ Module Thread.
 
     Definition consistent (e:t): Prop :=
       forall sc1 mem1
-        (FUTURE: Memory.future e.(memory) mem1)
+        (FUTURE: Memory.future_concrete e.(local).(Local.promises) e.(memory) mem1)
         (FUTURE: TimeMap.le e.(sc) sc1)
         (WF: Local.wf e.(local) mem1)
         (SC: Memory.closed_timemap sc1 mem1)

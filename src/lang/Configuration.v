@@ -237,8 +237,9 @@ Module Configuration.
         exploit Thread.step_disjoint; eauto. s. i. des.
         auto.
     - ii. simplify; eauto.
-      eapply CONSISTENT1; eauto.
-      s. repeat (etrans; eauto).
+      eapply CONSISTENT1; eauto. s.
+      eapply Memory.future_concrete_future; try eapply FUTURE.
+      etrans; eauto.
   Qed.
 
   Lemma step_disjoint
@@ -296,8 +297,9 @@ Module Configuration.
       { eapply WF; eauto. }
       i. des.
       exploit Thread.step_disjoint; eauto. s. i. des.
-      eapply CONSISTENT; eauto.
-      s. etrans; eauto. etrans; eauto.
+      eapply CONSISTENT; eauto. s.
+      eapply Memory.future_concrete_future; try eapply FUTURE.
+      etrans; eauto.
   Qed.
 
   Lemma opt_step_future
