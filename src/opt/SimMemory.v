@@ -32,6 +32,7 @@ Inductive sim_message: forall (msg_src msg_tgt: Message.t), Prop :=
 | sim_message_half:
     sim_message Message.half Message.half
 .
+Hint Constructors sim_message.
 
 Program Instance sim_message_PreOrder: PreOrder sim_message.
 Next Obligation.
@@ -293,10 +294,10 @@ Qed.
 Lemma sim_memory_lower
       mem1_src mem1_tgt
       mem2_src mem2_tgt
-      loc from to msg1_src msg2_src msg1_tgt msg2_tgt
+      loc to from_src msg1_src msg2_src from_tgt msg1_tgt msg2_tgt
       (SIM_MSG: sim_message msg2_src msg2_tgt)
-      (SRC: Memory.lower mem1_src loc from to msg1_src msg2_src mem2_src)
-      (TGT: Memory.lower mem1_tgt loc from to msg1_tgt msg2_tgt mem2_tgt)
+      (SRC: Memory.lower mem1_src loc from_src to msg1_src msg2_src mem2_src)
+      (TGT: Memory.lower mem1_tgt loc from_tgt to msg1_tgt msg2_tgt mem2_tgt)
       (SIM: sim_memory mem1_src mem1_tgt):
   sim_memory mem2_src mem2_tgt.
 Proof.
@@ -307,6 +308,20 @@ Proof.
     + des. subst. i. inv GET. esplits; eauto.
       erewrite Memory.lower_o; eauto. condtac; ss.
     + erewrite (@Memory.lower_o mem2_src); eauto. condtac; ss. eauto.
+Qed.
+
+Lemma sim_memory_lower_none
+      mem1_src mem2_src mem_tgt
+      loc from to msg1 msg2
+      (SRC: Memory.lower mem1_src loc from to msg1 msg2 mem2_src)
+      (TGT: Memory.get loc to mem_tgt = None)
+      (SIM: sim_memory mem1_src mem_tgt):
+  sim_memory mem2_src mem_tgt.
+Proof.
+  inv SIM. econs.
+  - i. rewrite lower_covered; [|eauto]. eauto.
+  - i. erewrite Memory.lower_o; eauto.
+    condtac; eauto; ss. des. subst. congr.
 Qed.
 
 Lemma sim_memory_promise
@@ -370,7 +385,7 @@ Proof.
     + des. subst.
       exploit Memory.lower_get0; eauto. i. des.
       rewrite GET0 in GET. inv GET. inv MSG_LE.
-      esplits; eauto. econs; eauto.
+      esplits; eauto.
     + esplits; eauto. refl.
 Qed.
 

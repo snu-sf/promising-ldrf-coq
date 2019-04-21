@@ -181,85 +181,101 @@ Module SimPromises.
     econs. ii. eapply H; eauto.
   Qed.
 
-  Definition none_if loc ts (pview:t) (released:option View.t): option View.t :=
-    if mem loc ts pview
-    then None
-    else released.
+  Definition none_if loc ts (pview:t) (msg:Message.t): Message.t :=
+    match msg with
+    | Message.mk val released =>
+      Message.mk val
+                 (if mem loc ts pview
+                  then None
+                  else released)
+    | Message.half => Message.half
+    end.
+
+  Lemma none_if_bot loc ts msg:
+    none_if loc ts bot msg = msg.
+  Proof.
+    destruct msg; ss.
+  Qed.
 
   Definition mem_le_transf (pview:t) (lhs rhs:Memory.t): Prop :=
-    forall loc to from val released
-      (LHS: Memory.get loc to lhs = Some (from, Message.mk val released)),
-      Memory.get loc to rhs = Some (from, Message.mk val (none_if loc to pview released)).
+    forall loc to from msg
+      (LHS: Memory.get loc to lhs = Some (from, msg)),
+      Memory.get loc to rhs = Some (from, none_if loc to pview msg).
 
   Definition kind_transf loc ts (pview:t) (kind:Memory.op_kind): Memory.op_kind :=
     match kind with
     | Memory.op_kind_add => Memory.op_kind_add
-    | Memory.op_kind_split ts val rel => Memory.op_kind_split ts val (none_if loc ts pview rel)
-    | Memory.op_kind_lower rel => Memory.op_kind_lower (none_if loc ts pview rel)
+    | Memory.op_kind_split ts msg => Memory.op_kind_split ts (none_if loc ts pview msg)
+    | Memory.op_kind_lower msg => Memory.op_kind_lower (none_if loc ts pview msg)
     end.
 
   Lemma kind_transf_bot loc ts kind:
     kind_transf loc ts bot kind = kind.
   Proof.
-    destruct kind; ss.
+    destruct kind; ss; rewrite none_if_bot; ss.
   Qed.
 
   Inductive sem (pview:t) (inv:t) (promises_src promises_tgt:Memory.t): Prop :=
   | sem_intro
       (LE: mem_le_transf pview promises_tgt promises_src)
-      (PVIEW: forall l t (MEM: mem l t pview), exists f msg, Memory.get l t promises_tgt = Some (f, msg))
+      (PVIEW: forall l t (MEM: mem l t pview), exists f val released, Memory.get l t promises_tgt = Some (f, Message.mk val released))
       (SOUND: forall l t (INV: mem l t inv),
           Memory.get l t promises_tgt = None /\
-          exists f v r, Memory.get l t promises_src = Some (f, Message.mk v r))
-      (COMPLETE: forall l t f v r
-                   (SRC: Memory.get l t promises_src = Some (f, Message.mk v r))
+          exists f m, Memory.get l t promises_src = Some (f, m))
+      (COMPLETE: forall l t f m
+                   (SRC: Memory.get l t promises_src = Some (f, m))
                    (TGT: Memory.get l t promises_tgt = None),
           mem l t inv)
   .
 
   Lemma promise
         pview inv
-        loc from to val released
+        loc from to msg
         promises1_src mem1_src
         promises1_tgt mem1_tgt promises2_tgt mem2_tgt
         kind_tgt
-        (PROMISE_TGT: Memory.promise promises1_tgt mem1_tgt loc from to val released promises2_tgt mem2_tgt kind_tgt)
+        (PROMISE_TGT: Memory.promise promises1_tgt mem1_tgt loc from to msg promises2_tgt mem2_tgt kind_tgt)
         (INV1: sem pview inv promises1_src promises1_tgt)
         (SIM1: sim_memory mem1_src mem1_tgt)
         (LE1_SRC: Memory.le promises1_src mem1_src)
         (LE1_TGT: Memory.le promises1_tgt mem1_tgt):
     exists promises2_src mem2_src,
-      <<PROMISE_SRC: Memory.promise promises1_src mem1_src loc from to val (none_if loc to pview released) promises2_src mem2_src (kind_transf loc to pview kind_tgt)>> /\
+      <<PROMISE_SRC: Memory.promise promises1_src mem1_src loc from to (none_if loc to pview msg) promises2_src mem2_src (kind_transf loc to pview kind_tgt)>> /\
       <<INV2: sem pview inv promises2_src promises2_tgt>> /\
       <<SIM2: sim_memory mem2_src mem2_tgt>>.
   Proof.
     inv PROMISE_TGT.
-    - exploit (@Memory.add_exists mem1_src loc from to val released);
+    - exploit (@Memory.add_exists mem1_src loc from to msg);
         try by inv MEM; inv ADD.
       { eapply covered_disjoint.
         - apply SIM1.
-        - inv MEM. inv ADD. auto.
-      }
+        - inv MEM. inv ADD. auto. }
       i. des.
       exploit Memory.add_exists_le; try apply LE1_SRC; eauto. i. des.
       exploit sim_memory_add; try apply SIM1; try refl; eauto. i.
       esplits; eauto.
-      + unfold none_if. condtac.
-        { inv INV1. exploit PVIEW; eauto. i. des.
-          hexploit Memory.add_get0; try exact PROMISES; eauto. i. des. congr.
-        }
-        econs 1; eauto.
+      + unfold none_if. destruct msg; ss.
+        * condtac.
+          { inv INV1. exploit PVIEW; eauto. i. des.
+            hexploit Memory.add_get0; try exact PROMISES; eauto. i. des. congr. }
+          { econs 1; eauto. }
+        * econs 1; eauto.
       + econs.
         * ii. erewrite Memory.add_o; eauto.
           erewrite (@Memory.add_o promises2_tgt) in LHS; try exact PROMISES. revert LHS.
           condtac; ss.
-          { i. des. inv LHS. unfold none_if. condtac; ss.
+          { i. des. inv LHS. unfold none_if. destruct msg0; ss.
+            condtac; ss.
             inv INV1. exploit PVIEW; eauto. i. des.
-            exploit Memory.add_get0; try exact PROMISES; eauto. i. des. congr.
-          }
+            exploit Memory.add_get0; try exact PROMISES; eauto. i. des. congr. }
           { apply INV1. }
         * i. inv INV1. exploit PVIEW; eauto. i. des.
           erewrite Memory.add_o; eauto. condtac; eauto.
+          ss. des. subst. exploit LE; eauto. i.
+          inv x1. inv ADD. exfalso.
+          eapply DISJOINT; eauto; econs; eauto; try refl. ss.
+          exploit Memory.get_ts; try eapply x. i. des; ss.
+          subst. inv TO.
         * i. inv INV1. exploit SOUND; eauto. i.
           erewrite Memory.add_o; eauto. erewrite (@Memory.add_o promises2); eauto.
           condtac; ss. des. subst.
@@ -268,30 +284,33 @@ Module SimPromises.
           erewrite Memory.add_o; eauto. erewrite (@Memory.add_o promises2_tgt); eauto.
           condtac; ss. inv INV1. eapply COMPLETE; eauto.
     - exploit Memory.split_get0; try exact PROMISES; eauto. i. des.
-      exploit (@Memory.split_exists promises1_src loc from to ts3 val val3 released);
+      exploit (@Memory.split_exists promises1_src loc from to ts3 msg (none_if loc ts3 pview msg3));
         try by inv PROMISES; inv SPLIT.
       { apply INV1. eauto. }
       i. des.
       exploit Memory.split_exists_le; try apply LE1_SRC; eauto. i. des.
       exploit sim_memory_split; try apply SIM1; try refl; eauto. i.
       esplits; eauto.
-      + unfold none_if. condtac.
-        { inv INV1. exploit PVIEW; eauto. i. des.
-          hexploit Memory.split_get0; try exact PROMISES; eauto. congr.
-        }
-        econs 2; eauto.
+      + unfold none_if. destruct msg; ss.
+        * condtac; ss.
+          { inv INV1. exploit PVIEW; eauto. i. des.
+            hexploit Memory.split_get0; try exact PROMISES; eauto. congr. }
+          { econs 2; eauto. }
+        * econs 2; eauto.
       + econs.
         * ii. revert LHS.
           erewrite Memory.split_o; eauto. erewrite (@Memory.split_o mem2); try exact x0.
           repeat condtac; ss.
-          { i. des. inv LHS. unfold none_if. condtac; ss.
+          { i. des. inv LHS. unfold none_if.  destruct msg0; ss.
+            condtac; ss.
             inv INV1. exploit PVIEW; eauto. i. des.
-            exploit Memory.split_get0; try exact PROMISES; eauto. congr.
-          }
+            exploit Memory.split_get0; try exact PROMISES; eauto. congr. }
           { guardH o. i. des. inv LHS. ss. }
           { apply INV1. }
         * i. inv INV1. exploit PVIEW; eauto. i. des.
           erewrite Memory.split_o; eauto. repeat condtac; eauto.
+          { des. ss. subst. congr. }
+          { des; ss. subst. rewrite GET0 in x. inv x. eauto. }
         * i. inv INV1. exploit SOUND; eauto. i.
           erewrite Memory.split_o; eauto. erewrite (@Memory.split_o mem2); eauto.
           exploit Memory.split_get0; try exact x0; eauto. i. des.
@@ -303,22 +322,26 @@ Module SimPromises.
           erewrite Memory.split_o; eauto. erewrite (@Memory.split_o promises2_tgt); eauto.
           repeat condtac; ss. inv INV1. eapply COMPLETE; eauto.
     - exploit Memory.lower_get0; try exact PROMISES; eauto. i. des.
-      exploit (@Memory.lower_exists promises1_src loc from to val (none_if loc to pview released0) (none_if loc to pview released));
+      exploit (@Memory.lower_exists promises1_src loc from to (none_if loc to pview msg0) (none_if loc to pview msg));
         try by inv MEM; inv LOWER.
       { apply INV1. eauto. }
-      { unfold none_if. condtac; ss.
-        inv MEM. inv LOWER. ss.
-      }
-      { unfold none_if. condtac; try refl.
-        inv MEM. inv LOWER. ss.
-      }
+      { unfold none_if. destruct msg; ss.
+        - condtac; econs; ss.
+          inv MEM. inv LOWER. inv MSG_WF. ss.
+        - econs. }
+      { unfold none_if.  destruct msg; destruct msg0; ss.
+        - inv MEM. inv LOWER. inv MSG_LE.
+          condtac; ss. econs. refl.
+        - inv PROMISES. inv MSG_LE. }
       i. des.
       exploit Memory.lower_exists_le; try apply LE1_SRC; eauto. i. des.
       exploit sim_memory_lower; try exact SIM1; try exact x1; try exact x2; eauto.
-      { unfold none_if. condtac; try refl. econs. }
+      { unfold none_if. destruct msg; ss.
+        condtac; try refl. econs. econs. }
       i. esplits; eauto.
       + econs 3; eauto.
-        unfold none_if. condtac; viewtac.
+        unfold none_if. destruct msg; ss.
+        condtac; viewtac. econs. viewtac.
       + econs.
         * ii. revert LHS.
           erewrite Memory.lower_o; eauto. erewrite (@Memory.lower_o mem2); try exact x0.
@@ -327,6 +350,8 @@ Module SimPromises.
           { apply INV1. }
         * i. inv INV1. exploit PVIEW; eauto. i. des.
           erewrite Memory.lower_o; eauto. condtac; eauto.
+          des. ss. subst. rewrite GET in x. inv x.
+          inv MSG_LE. esplits; eauto.
         * i. inv INV1. exploit SOUND; eauto. i.
           erewrite Memory.lower_o; eauto. erewrite (@Memory.lower_o mem2); eauto.
           exploit Memory.lower_get0; try exact x1; eauto. i. des.
@@ -340,32 +365,32 @@ Module SimPromises.
 
   Lemma promise_bot
         inv
-        loc from to val released
+        loc from to msg
         promises1_src mem1_src
         promises1_tgt mem1_tgt promises2_tgt mem2_tgt
         kind
-        (PROMISE_TGT: Memory.promise promises1_tgt mem1_tgt loc from to val released promises2_tgt mem2_tgt kind)
+        (PROMISE_TGT: Memory.promise promises1_tgt mem1_tgt loc from to msg promises2_tgt mem2_tgt kind)
         (INV1: sem bot inv promises1_src promises1_tgt)
         (SIM1: sim_memory mem1_src mem1_tgt)
         (LE1_SRC: Memory.le promises1_src mem1_src)
         (LE1_TGT: Memory.le promises1_tgt mem1_tgt):
     exists promises2_src mem2_src,
-      <<PROMISE_SRC: Memory.promise promises1_src mem1_src loc from to val released promises2_src mem2_src kind>> /\
+      <<PROMISE_SRC: Memory.promise promises1_src mem1_src loc from to msg promises2_src mem2_src kind>> /\
       <<INV2: sem bot inv promises2_src promises2_tgt>> /\
       <<SIM2: sim_memory mem2_src mem2_tgt>>.
   Proof.
     exploit promise; eauto. i. des.
-    unfold none_if in *. rewrite bot_spec in *.
+    rewrite none_if_bot in *.
     rewrite kind_transf_bot in *.
     esplits; eauto.
   Qed.
 
   Lemma remove_tgt
         pview inv
-        loc from to val released
+        loc from to msg
         promises1_src mem1_src
         promises1_tgt mem1_tgt promises2_tgt
-        (REMOVE_TGT: Memory.remove promises1_tgt loc from to val released promises2_tgt)
+        (REMOVE_TGT: Memory.remove promises1_tgt loc from to msg promises2_tgt)
         (INV1: sem pview inv promises1_src promises1_tgt)
         (SIM1: sim_memory mem1_src mem1_tgt)
         (LE1_SRC: Memory.le promises1_src mem1_src)
@@ -374,7 +399,7 @@ Module SimPromises.
       <<INV2: sem (unset loc to pview) (set loc to inv) promises1_src promises2_tgt>> /\
       <<INV2': mem loc to inv = false>>.
   Proof.
-    hexploit Memory.remove_future; eauto. i. des.
+    exploit Memory.remove_future; eauto. i. des.
     exploit Memory.remove_get0; [eauto|]. i. des.
     inv INV1. exploit LE0; eauto. i.
     esplits.
@@ -404,17 +429,17 @@ Module SimPromises.
 
   Lemma remove_src
         pview inv
-        loc from to val released
+        loc from to msg
         promises1_src mem1_src
         promises1_tgt mem1_tgt
         (INV1: sem pview inv promises1_src promises1_tgt)
         (INV1': mem loc to inv)
         (SIM1: sim_memory mem1_src mem1_tgt)
-        (GET: Memory.get loc to promises1_src = Some (from, Message.mk val released))
+        (GET: Memory.get loc to promises1_src = Some (from, msg))
         (LE1_SRC: Memory.le promises1_src mem1_src)
         (LE1_TGT: Memory.le promises1_tgt mem1_tgt):
     exists promises2_src,
-      <<REMOVE_SRC: Memory.remove promises1_src loc from to val released promises2_src>> /\
+      <<REMOVE_SRC: Memory.remove promises1_src loc from to msg promises2_src>> /\
       <<INV2: sem pview (unset loc to inv) promises2_src promises1_tgt>>.
   Proof.
     inv INV1.
@@ -438,19 +463,19 @@ Module SimPromises.
 
   Lemma remove
         pview inv
-        loc from to val released
+        loc from to msg
         promises1_src mem1_src
         promises1_tgt mem1_tgt promises2_tgt
-        (REL_WF: View.opt_wf released)
+        (MSG_WF: Message.wf msg)
         (TIME: Time.lt from to)
-        (REMOVE_TGT: Memory.remove promises1_tgt loc from to val released promises2_tgt)
+        (REMOVE_TGT: Memory.remove promises1_tgt loc from to msg promises2_tgt)
         (INV1: sem pview inv promises1_src promises1_tgt)
         (SIM1: sim_memory mem1_src mem1_tgt)
         (LE1_SRC: Memory.le promises1_src mem1_src)
         (LE1_TGT: Memory.le promises1_tgt mem1_tgt)
         (FINITE1_TGT: Memory.finite promises1_tgt):
     exists promises2_src,
-      <<REMOVE_SRC: Memory.remove promises1_src loc from to val (none_if loc to pview released) promises2_src>> /\
+      <<REMOVE_SRC: Memory.remove promises1_src loc from to (none_if loc to pview msg) promises2_src>> /\
       <<INV2: sem (unset loc to pview) inv promises2_src promises2_tgt>>.
   Proof.
     hexploit Memory.remove_future; try apply REMOVE_TGT; eauto. i. des.
@@ -464,34 +489,34 @@ Module SimPromises.
 
   Lemma remove_bot
         inv
-        loc from to val released
+        loc from to msg
         promises1_src mem1_src
         promises1_tgt mem1_tgt promises2_tgt
-        (REL_WF: View.opt_wf released)
+        (MSG_WF: Message.wf msg)
         (TIME: Time.lt from to)
-        (REMOVE_TGT: Memory.remove promises1_tgt loc from to val released promises2_tgt)
+        (REMOVE_TGT: Memory.remove promises1_tgt loc from to msg promises2_tgt)
         (INV1: sem bot inv promises1_src promises1_tgt)
         (SIM1: sim_memory mem1_src mem1_tgt)
         (LE1_SRC: Memory.le promises1_src mem1_src)
         (LE1_TGT: Memory.le promises1_tgt mem1_tgt)
         (FINITE1_TGT: Memory.finite promises1_tgt):
     exists promises2_src,
-      <<REMOVE_SRC: Memory.remove promises1_src loc from to val released promises2_src>> /\
+      <<REMOVE_SRC: Memory.remove promises1_src loc from to msg promises2_src>> /\
       <<INV2: sem bot inv promises2_src promises2_tgt>>.
   Proof.
     exploit remove; eauto. i. des.
-    unfold none_if in *. rewrite bot_spec in *.
+    rewrite none_if_bot in *.
     esplits; eauto.
     replace bot with (unset loc to bot); ss. apply ext. i.
     rewrite unset_o. condtac; ss.
   Qed.
 
   Lemma future_aux_imm
-        pview inv
+        pview
         promises_src mem1_src mem2_src
         promises_tgt mem1_tgt
         (FUTURE_SRC: Memory.future_imm mem1_src mem2_src)
-        (INV1: sem pview inv promises_src promises_tgt)
+        (INV1: sem pview bot promises_src promises_tgt)
         (SIM1: sim_memory mem1_src mem1_tgt)
         (LE1_SRC: Memory.le promises_src mem1_src)
         (LE1_TGT: Memory.le promises_tgt mem1_tgt)
@@ -504,34 +529,90 @@ Module SimPromises.
       <<SIM2: sim_memory mem2_src mem2_tgt>>.
   Proof.
     inv FUTURE_SRC. inv OP.
-    - exploit (@Memory.add_exists mem1_tgt loc from to val (Some (Memory.max_released mem1_tgt loc to))).
+    - destruct msg; cycle 1.
+      { exploit (@Memory.add_exists mem1_tgt loc from to Message.half).
+        { eapply covered_disjoint; try apply SIM1; eauto. inv ADD. inv ADD0. auto. }
+        { inv ADD. inv ADD0. auto. }
+        { econs. }
+        i. des.
+        esplits.
+        - econs 2; eauto.
+        - ii. erewrite Memory.add_o; eauto. condtac; ss; eauto.
+          des. subst. exploit LE1_TGT; eauto. exploit Memory.add_get0; eauto. i. des. congr.
+        - eapply sim_memory_add; eauto. }
+      exploit (@Memory.max_full_released_exists mem1_tgt loc to).
+      { eapply CLOSED1_TGT. }
+      i. des.
+      exploit (@Memory.add_exists mem1_tgt loc from to (Message.mk val (Some released0))).
       { eapply covered_disjoint; try apply SIM1; eauto. inv ADD. inv ADD0. auto. }
       { inv ADD. inv ADD0. auto. }
-      { econs. eapply Memory.max_released_wf; eauto. }
+      { econs. econs. eapply Memory.max_full_released_wf; eauto. }
       i. des.
-      exploit sim_memory_add; try exact SIM1; try exact ADD; try exact x0; eauto.
-      { erewrite Memory.max_released_spec; try exact ADD; eauto.
-        econs. apply sim_memory_max_released; auto.
-      }
-      i.
-      exploit Memory.max_released_closed; eauto. i. des.
+      exploit Memory.max_full_released_closed_add; eauto. i. des.
       esplits.
-      + econs 2; eauto.
+      + econs 2; eauto. econs; eauto.
       + ii. erewrite Memory.add_o; eauto. condtac; ss; eauto.
         des. subst. exploit LE1_TGT; eauto. exploit Memory.add_get0; eauto. i. des. congr.
-      + auto.
+      + eapply sim_memory_add; try exact ADD; try exact x1; eauto.
+        econs. eapply Memory.max_full_released_spec_add; try exact ADD; eauto.
+        * inv CLOSED. ss.
+        * inv TS. ss.
+        * admit. (* sim_memory_max_released *)
     - esplits; eauto.
       etrans; eauto. eapply split_sim_memory. eauto.
-    - esplits; eauto.
-      etrans; eauto. eapply lower_sim_memory. eauto.
-  Qed.
+    - destruct msg0.
+      { esplits; eauto.
+        etrans; eauto. eapply lower_sim_memory. eauto. }
+      destruct msg; cycle 1.
+      { esplits; eauto.
+        replace mem2_src with mem1_src; ss.
+        apply Memory.ext. i.
+        erewrite (@Memory.lower_o mem2_src); eauto.
+        condtac; ss. des. subst.
+        inv LOWER. inv LOWER0. unfold Memory.get. unfold Cell.get.
+        rewrite GET2. ss. }
+      destruct (Memory.get loc to mem1_tgt) eqn:GET; cycle 1.
+      { esplits; eauto.
+        eapply sim_memory_lower_none; eauto. }
+      destruct p as [from_tgt]. destruct t0.
+      { inv LOWER. inv LOWER0. inv SIM1.
+        exploit MSG; eauto. i. des. inv MSG0.
+        unfold Memory.get in GET0. unfold Cell.get in GET0. congr. }
+      exploit (@Memory.max_full_released_exists mem1_tgt loc to).
+      { eapply CLOSED1_TGT. }
+      i. des.
+      exploit (@Memory.lower_exists mem1_tgt loc from_tgt to Message.half (Message.mk val (Some released0))); eauto.
+      { exploit MemoryFacts.half_time_lt; eauto. }
+      { econs. econs. eapply Memory.max_full_released_wf; eauto. }
+      i. des.
+      exploit Memory.max_full_released_closed_lower; eauto. i. des.
+      esplits.
+      + econs 2; eauto. econs; eauto.
+      + ii. erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+        des. subst. clear COND.
+        exploit LE1_TGT; try exact LHS. i.
+        replace msg with Message.half in *; cycle 1.
+        { inv x1. inv LOWER0.
+          unfold Memory.get in x. unfold Cell.get in x.
+          rewrite GET2 in x. inv x. refl. }
+        inv SIM1. exploit MSG; try exact x. i. des.
+        inv INV1. exploit LE; try exact LHS. i. ss.
+        exploit LE2_SRC; try exact x2. i.
+        erewrite Memory.lower_o in x3; eauto.
+        revert x3. condtac; ss. des; congr.
+      + eapply sim_memory_lower; try exact LOWER; try exact x1; eauto.
+        econs. eapply Memory.max_full_released_spec_lower; try exact LOWER; eauto.
+        * inv CLOSED. ss.
+        * inv TS. ss.
+        * admit. (* sim_memory_max_released *)
+  Admitted.
 
   Lemma future_aux
-        pview inv
+        pview
         promises_src mem1_src mem2_src
         promises_tgt mem1_tgt
         (FUTURE_SRC: Memory.future mem1_src mem2_src)
-        (INV1: sem pview inv promises_src promises_tgt)
+        (INV1: sem pview bot promises_src promises_tgt)
         (SIM1: sim_memory mem1_src mem1_tgt)
         (LE1_SRC: Memory.le promises_src mem1_src)
         (LE1_TGT: Memory.le promises_tgt mem1_tgt)
@@ -544,11 +625,11 @@ Module SimPromises.
       <<SIM2: sim_memory mem2_src mem2_tgt>>.
   Proof.
     revert INV1 SIM1 LE1_SRC LE1_TGT LE2_SRC CLOSED1_SRC CLOSED1_TGT.
-    revert inv promises_src promises_tgt mem1_tgt.
+    revert promises_src promises_tgt mem1_tgt.
     induction FUTURE_SRC; i.
     { esplits; eauto. }
     assert (LE_SRC: Memory.le promises_src y).
-    { ii. exploit LE1_SRC; eauto. i. destruct msg.
+    { ii. exploit LE1_SRC; eauto. i.
       exploit Memory.future_get1; try exact x0.
       { econs 2; [|refl]. eauto. }
       i. des.
@@ -556,7 +637,8 @@ Module SimPromises.
       erewrite LE2_SRC in GET0; eauto. inv GET0.
       rewrite GET. f_equal. f_equal.
       - apply TimeFacts.antisym; eauto.
-      - f_equal. apply View.opt_antisym; eauto.
+      - destruct msg', msg'0; inv MSG_LE; inv MSG_LE0; ss.
+        f_equal. apply View.opt_antisym; eauto.
     }
     exploit future_aux_imm; eauto. i. des.
     exploit IHFUTURE_SRC; eauto.
@@ -570,10 +652,10 @@ Module SimPromises.
   Qed.
 
   Lemma future
-        pview inv
+        pview
         lc_src mem1_src mem2_src
         lc_tgt mem1_tgt
-        (INV1: sem pview inv lc_src.(Local.promises) lc_tgt.(Local.promises))
+        (INV1: sem pview bot lc_src.(Local.promises) lc_tgt.(Local.promises))
         (MEM1: sim_memory mem1_src mem1_tgt)
         (FUTURE_SRC: Memory.future mem1_src mem2_src)
         (WF1_SRC: Local.wf lc_src mem1_src)
@@ -604,7 +686,7 @@ Module SimPromises.
     sem bot bot promises promises.
   Proof.
     econs.
-    - ii. ss.
+    - ii. rewrite none_if_bot. ss.
     - i. revert MEM. rewrite bot_spec. congr.
     - i. inv INV.
     - i. congr.
@@ -618,7 +700,13 @@ Module SimPromises.
     apply Memory.ext. i.
     destruct (Memory.get loc ts promises_tgt) as [[? []]|] eqn:X.
     - inv SEM. exploit LE; eauto.
-    - destruct (Memory.get loc ts promises_src) as [[? []]|] eqn:Y; auto.
-      inv SEM. exploit COMPLETE; eauto. i. inv x.
+    - destruct (Memory.get loc ts promises_src) as [[? []]|] eqn:Y.
+      + inv SEM. exploit LE; eauto. s. i. congr.
+      + inv SEM. exploit LE; eauto. s. i. congr.
+      + inv SEM. exploit LE; eauto. s. i. congr.
+    - destruct (Memory.get loc ts promises_src) as [[? []]|] eqn:Y.
+      + inv SEM. exploit COMPLETE; eauto. i. inv x.
+      + inv SEM. exploit COMPLETE; eauto. i. inv x.
+      + ss.
   Qed.
 End SimPromises.

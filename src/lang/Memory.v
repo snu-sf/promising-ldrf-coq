@@ -1785,6 +1785,29 @@ Module Memory.
         erewrite add_o; eauto. condtac; ss. des; congr.
   Qed.
 
+  Lemma lower_max_full_timemap
+        mem1 mem2 loc from to msg0 val released tm1 tm2
+        (lower: lower mem1 loc from to msg0 (Message.mk val released) mem2)
+        (MAX1: max_full_timemap mem1 tm1)
+        (MAX2: max_full_timemap mem2 tm2):
+    tm2 = TimeMap.join tm1 (TimeMap.singleton loc to).
+  Proof.
+    extensionality l. apply TimeFacts.antisym; auto.
+    - exploit max_full_timemap_closed; eauto. instantiate (1 := l). i. des.
+      revert x0. erewrite lower_o; eauto. condtac; ss.
+      + des. subst. i. inv x0. etrans; [|apply TimeMap.join_r].
+        apply TimeMap.singleton_inv. refl.
+      + i. etrans; [|apply TimeMap.join_l].
+        eapply max_full_ts_spec; eauto.
+    - apply TimeMap.join_spec.
+      + eapply max_full_timemap_spec; eauto.
+        eapply lower_closed_timemap; eauto.
+        apply max_full_timemap_closed. auto.
+      + apply TimeMap.singleton_spec.
+        eapply max_full_ts_spec; eauto.
+        erewrite lower_o; eauto. condtac; ss. des; congr.
+  Qed.
+
   Lemma add_max_full_view
         mem1 mem2 loc from to val released mview1 mview2
         (ADD: add mem1 loc from to (Message.mk val released) mem2)
@@ -1795,6 +1818,18 @@ Module Memory.
     inv MAX1. inv MAX2. apply View.ext; s.
     - eapply add_max_full_timemap; eauto.
     - eapply add_max_full_timemap; eauto.
+  Qed.
+
+  Lemma lower_max_full_view
+        mem1 mem2 loc from to msg0 val released mview1 mview2
+        (LOWER: lower mem1 loc from to msg0 (Message.mk val released) mem2)
+        (MAX1: max_full_view mem1 mview1)
+        (MAX2: max_full_view mem2 mview2):
+    mview2 = View.join mview1 (View.singleton_ur loc to).
+  Proof.
+    inv MAX1. inv MAX2. apply View.ext; s.
+    - eapply lower_max_full_timemap; eauto.
+    - eapply lower_max_full_timemap; eauto.
   Qed.
 
   Inductive max_full_released (mem: t) (loc: Loc.t) (ts: Time.t): forall (released: View.t), Prop :=
@@ -1834,7 +1869,7 @@ Module Memory.
     inv MAX. econs. refl.
   Qed.
 
-  Lemma max_full_released_closed
+  Lemma max_full_released_closed_add
         mem1 loc from to val released mem2 mr
         (ADD: add mem1 loc from to (Message.mk val released) mem2)
         (CLOSED: closed mem1)
@@ -1854,7 +1889,7 @@ Module Memory.
     - inv MAX. ss. unfold TimeMap.add. condtac; [|congr]. refl.
   Qed.
 
-  Lemma max_released_spec
+  Lemma max_full_released_spec_add
         mem1 loc from to val released mem2 mr
         (CLOSED: closed mem1)
         (ADD: add mem1 loc from to (Message.mk val released) mem2)
@@ -1872,6 +1907,52 @@ Module Memory.
     - ii. unfold TimeMap.add. condtac.
       + subst. etrans; [|exact REL_TS].
         inv ADD. inv ADD0. inv MSG_WF. inv WF. apply WF0.
+      + etrans; [apply PLN|]. apply Time.join_spec; [refl|].
+        unfold TimeMap.singleton, LocFun.add. condtac; ss. apply Time.bot_spec.
+    - ii. unfold TimeMap.add. condtac.
+      + subst. ss.
+      + etrans; [apply RLX|]. apply Time.join_spec; [refl|].
+        unfold TimeMap.singleton, LocFun.add. condtac; ss. apply Time.bot_spec.
+  Qed.
+
+  Lemma max_full_released_closed_lower
+        mem1 loc from to msg0 val released mem2 mr
+        (LOWER: lower mem1 loc from to msg0 (Message.mk val released) mem2)
+        (CLOSED: closed mem1)
+        (MAX: max_full_released mem1 loc to mr):
+    <<CLOSED: closed_view mr mem2>> /\
+    <<REL_TS: Time.le (mr.(View.rlx) loc) to>>.
+  Proof.
+    splits.
+    - inv MAX.
+      hexploit lower_inhabited; try apply CLOSED; eauto. i. des.
+      cut (closed_timemap (TimeMap.add loc to tm) mem2).
+      { i. econs; ss. }
+      eapply closed_timemap_add.
+      + erewrite lower_o; eauto. condtac; ss. des; congr.
+      + eapply lower_closed_timemap; eauto.
+        eapply max_full_timemap_closed. auto.
+    - inv MAX. ss. unfold TimeMap.add. condtac; [|congr]. refl.
+  Qed.
+
+  Lemma max_full_released_spec_lower
+        mem1 loc from to msg0 val released mem2 mr
+        (CLOSED: closed mem1)
+        (LOWER: lower mem1 loc from to msg0 (Message.mk val released) mem2)
+        (REL_CLOSED: closed_opt_view released mem2)
+        (REL_TS: Time.le (released.(View.unwrap).(View.rlx) loc) to)
+        (MAX: max_full_released mem1 loc to mr):
+    View.opt_le released (Some mr).
+  Proof.
+    inv REL_CLOSED; econs.
+    hexploit lower_inhabited; try apply CLOSED; eauto. i. des.
+    exploit max_full_view_exists; eauto. i. des.
+    exploit max_full_view_spec; eauto. i.
+    inv MAX. erewrite lower_max_full_view in x1; eauto. ss.
+    inv x1. econs; ss.
+    - ii. unfold TimeMap.add. condtac.
+      + subst. etrans; [|exact REL_TS].
+        inv LOWER. inv LOWER0. inv MSG_WF. inv WF. apply WF0.
       + etrans; [apply PLN|]. apply Time.join_spec; [refl|].
         unfold TimeMap.singleton, LocFun.add. condtac; ss. apply Time.bot_spec.
     - ii. unfold TimeMap.add. condtac.
