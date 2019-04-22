@@ -1,5 +1,10 @@
 COQMODULE    := promising
-COQTHEORIES  := lib/sflib/*.v src/*/*.v
+COQTHEORIES  := lib/sflib/*.v \
+	src/lib/*.v \
+	src/lang/*.v \
+	src/while/*.v \
+	src/prop/*.v \
+	src/opt/*.v
 
 .PHONY: all theories clean
 
@@ -25,7 +30,6 @@ Makefile.coq: Makefile $(COQTHEORIES)
    echo "-R src/while $(COQMODULE)"; \
    echo "-R src/prop $(COQMODULE)"; \
    echo "-R src/opt $(COQMODULE)"; \
-   echo "-R src/drf $(COQMODULE)"; \
    echo "-R src/invariant $(COQMODULE)"; \
    \
    echo $(COQTHEORIES)) > _CoqProject
