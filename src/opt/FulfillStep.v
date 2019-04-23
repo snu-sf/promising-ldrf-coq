@@ -103,8 +103,14 @@ Proof.
   i. des.
   exploit MemorySplit.remove_promise_remove;
     try exact REMOVE; eauto; try apply WF1; try by econs; eauto.
-  { eapply MEM1.  apply WF1. eapply Memory.remove_get0. eauto. }
-  {
+  { econs. inv REL_LE; try apply Time.bot_spec.
+    cut (Time.le (View.rlx (View.unwrap (Some lhs)) loc)
+                 (View.rlx (View.unwrap (Some rhs)) loc)).
+    { i. etrans; eauto.
+      cut (Memory.message_ts (Message.mk val (Some rhs)) loc to).
+      { i. inv H1. auto. }
+      eapply MEM1. apply WF1. eapply Memory.remove_get0. eauto. }
+    destruct lhs; destruct rhs; inv LE; ss. }
   i. des.
   esplits; eauto.
   - econs; eauto.
@@ -114,7 +120,7 @@ Qed.
 
 Lemma promise_fulfill_write
       lc0 sc0 mem0 loc from to val releasedm released ord lc1 lc2 sc2 mem2 kind
-      (PROMISE: Local.promise_step lc0 mem0 loc from to val released lc1 mem2 kind)
+      (PROMISE: Local.promise_step lc0 mem0 loc from to (Message.mk val released) lc1 mem2 kind)
       (FULFILL: fulfill_step lc1 sc0 loc from to val releasedm released ord lc2 sc2)
       (REL_WF: View.opt_wf releasedm)
       (REL_CLOSED: Memory.closed_opt_view releasedm mem0)
@@ -135,7 +141,16 @@ Proof.
   { eapply Memory.promise_get2. eauto. }
   s. i. des.
   exploit MemorySplit.remove_promise_remove;
-    try exact REMOVE; eauto; try apply WF2; try refl. i. des.
+    try exact REMOVE; eauto; try apply WF2; try by econs; eauto.
+  { econs. inv REL_LE; try apply Time.bot_spec.
+    cut (Time.le (View.rlx (View.unwrap (Some lhs)) loc)
+                 (View.rlx (View.unwrap (Some rhs)) loc)).
+    { i. etrans; eauto.
+      cut (Memory.message_ts (Message.mk val (Some rhs)) loc to).
+      { i. inv H1. auto. }
+      eapply CLOSED2. apply WF2. eapply Memory.remove_get0. eauto. }
+    destruct lhs; destruct rhs; inv LE; ss. }
+  i. des.
   esplits; eauto.
   - econs; eauto. econs; eauto.
     eapply MemoryMerge.promise_promise_promise; eauto.
@@ -144,7 +159,7 @@ Qed.
 
 Lemma promise_fulfill_write_exact
       lc0 sc0 mem0 loc from to val releasedm released ord lc1 lc2 sc2 mem2 kind
-      (PROMISE: Local.promise_step lc0 mem0 loc from to val released lc1 mem2 kind)
+      (PROMISE: Local.promise_step lc0 mem0 loc from to (Message.mk val released) lc1 mem2 kind)
       (FULFILL: fulfill_step lc1 sc0 loc from to val releasedm released ord lc2 sc2)
       (REL_WF: View.opt_wf releasedm)
       (REL_CLOSED: Memory.closed_opt_view releasedm mem0)
