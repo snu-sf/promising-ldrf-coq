@@ -34,7 +34,7 @@ Inductive fulfill_step (lc1:Local.t) (sc1:TimeMap.t) (loc:Loc.t) (from to:Time.t
     (REL_LE: View.opt_le (TView.write_released lc1.(Local.tview) sc1 loc to releasedm ord) released)
     (REL_WF: View.opt_wf released)
     (WRITABLE: TView.writable lc1.(Local.tview).(TView.cur) sc1 loc to ord)
-    (REMOVE: Memory.remove lc1.(Local.promises) loc from to val released promises2)
+    (REMOVE: Memory.remove lc1.(Local.promises) loc from to (Message.mk val released) promises2)
     (TIME: Time.lt from to):
     fulfill_step lc1 sc1 loc from to val releasedm released ord
                  (Local.mk (TView.write_tview lc1.(Local.tview) sc1 loc to ord) promises2)
@@ -56,7 +56,7 @@ Proof.
   exploit Memory.remove_get0; eauto. i. des.
   inversion WF1. exploit PROMISES; eauto. i.
   exploit TViewFacts.write_future_fulfill; try apply x; try apply SC1; try apply WF1; eauto.
-  { eapply CLOSED1. eauto. }
+  { inv CLOSED1. exploit CLOSED; eauto. i. des. inv MSG_CLOSED. eauto. }
   i. des.
   esplits; eauto. refl.
 Qed.
@@ -70,7 +70,7 @@ Lemma write_promise_fulfill
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0):
   exists lc1,
-    <<STEP1: Local.promise_step lc0 mem0 loc from to val released lc1 mem2 kind>> /\
+    <<STEP1: Local.promise_step lc0 mem0 loc from to (Message.mk val released) lc1 mem2 kind>> /\
     <<STEP2: fulfill_step lc1 sc0 loc from to val releasedm released ord lc2 sc2>> /\
     <<REL: released = TView.write_released lc0.(Local.tview) sc0 loc to releasedm ord>> /\
     <<ORD: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc lc0.(Local.promises)>>.
@@ -92,7 +92,7 @@ Lemma fulfill_write
       (SC1: Memory.closed_timemap sc1 mem1)
       (MEM1: Memory.closed mem1):
   exists released' mem2',
-    <<STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released' ord lc2 sc2 mem2' (Memory.op_kind_lower released)>> /\
+    <<STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released' ord lc2 sc2 mem2' (Memory.op_kind_lower (Message.mk val released))>> /\
     <<REL_LE: View.opt_le released' released>> /\
     <<MEM: sim_memory mem2' mem1>>.
 Proof.
@@ -102,8 +102,9 @@ Proof.
   { apply WF1. eapply Memory.remove_get0. eauto. }
   i. des.
   exploit MemorySplit.remove_promise_remove;
-    try exact REMOVE; eauto; try apply WF1; try refl.
-  { eapply MEM1. apply WF1. eapply Memory.remove_get0. eauto. }
+    try exact REMOVE; eauto; try apply WF1; try by econs; eauto.
+  { eapply MEM1.  apply WF1. eapply Memory.remove_get0. eauto. }
+  {
   i. des.
   esplits; eauto.
   - econs; eauto.

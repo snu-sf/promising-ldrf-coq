@@ -2201,21 +2201,58 @@ Module Memory.
 
   (* future memory for thread consistency *)
 
-  Inductive future_concrete (promises mem1 mem2: t): Prop :=
-  | future_concrete_intro
-      (FUTURE: future mem1 mem2)
-      (NOHALF: forall loc to from
-                 (GET: get loc to mem2 = Some (from, Message.half)),
-          get loc to promises = Some (from, Message.half))
-  .
-  Hint Constructors future_concrete.
+  Definition no_half (promises mem: t): Prop :=
+    forall loc to from
+      (GET: get loc to mem = Some (from, Message.half)),
+      get loc to promises = Some (from, Message.half).
 
-  Lemma future_concrete_future
-        mem1 mem2 mem3 promises
-        (FUTURE1: future mem1 mem2)
-        (FUTURE2: future_concrete promises mem2 mem3):
-    future_concrete promises mem1 mem3.
+  Inductive concrete_imm (mem1 mem2:t): Prop :=
+  | concrete_imm_intro
+      loc from to msg
+      (LOWER: lower mem1 loc from to Message.half msg mem2)
+      (CLOSED: closed_message_view msg mem2)
+      (TS: message_ts msg loc to)
+  .
+  Hint Constructors concrete_imm.
+
+  Lemma concrete_imm_future_imm
+        mem1 mem2
+        (CONCRETE: concrete_imm mem1 mem2):
+    future_imm mem1 mem2.
   Proof.
-    inv FUTURE2. econs; eauto. etrans; eauto.
+    inv CONCRETE. eauto.
+  Qed.
+
+  Inductive concrete (promises mem1 mem2: t): Prop :=
+  | concrete_intro
+      (CONCRETE: rtc concrete_imm mem1 mem2)
+      (NOHALF: no_half promises mem2)
+  .
+  Hint Constructors concrete.
+
+  Lemma concrete_future
+        promises mem1 mem2
+        (CONCRETE: concrete promises mem1 mem2):
+    future mem1 mem2.
+  Proof.
+    inv CONCRETE. clear NOHALF.
+    induction CONCRETE0; try refl.
+    apply concrete_imm_future_imm in H.
+    etrans; eauto.
+  Qed.
+
+  Lemma no_half_bot_max_ts
+        mem loc mts
+        (NOHALF: no_half bot mem)
+        (MAX: max_full_ts mem loc mts):
+    mts = max_ts loc mem.
+  Proof.
+    inv MAX. des.
+    exploit max_ts_spec; eauto. i. des.
+    apply TimeFacts.antisym; eauto.
+    destruct msg.
+    - eapply MAX0; eauto.
+    - exploit NOHALF; eauto. i.
+      rewrite bot_get in x. inv x.
   Qed.
 End Memory.
