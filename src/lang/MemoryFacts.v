@@ -192,23 +192,17 @@ Module MemoryFacts.
   Qed.
 
   Lemma promise_exists_None
-        promises1 mem1 loc from to msg
+        promises1 mem1 loc from to val released
         (LE: Memory.le promises1 mem1)
-        (GET: Memory.get loc to promises1 = Some (from, msg))
+        (GET: Memory.get loc to promises1 = Some (from, Message.mk val released))
         (LT: Time.lt from to):
-    exists promises2 mem2 msg',
-      Memory.promise promises1 mem1 loc from to msg' promises2 mem2 (Memory.op_kind_lower msg) /\
-      Message.le msg' msg.
+    exists promises2 mem2,
+      Memory.promise promises1 mem1 loc from to (Message.mk val None) promises2 mem2 (Memory.op_kind_lower (Message.mk val released)).
   Proof.
-    destruct msg.
-    - exploit Memory.lower_exists; eauto; try by econs. i. des.
-      exploit LE; eauto. i.
-      exploit Memory.lower_exists; eauto; try by econs. i. des.
-      esplits; eauto. econs; eauto. econs. apply Time.bot_spec.
-    - exploit Memory.lower_exists; eauto; try by econs. i. des.
-      exploit LE; eauto. i.
-      exploit Memory.lower_exists; eauto; try by econs. i. des.
-      esplits; eauto.
+    exploit Memory.lower_exists; eauto; try by econs. i. des.
+    exploit LE; eauto. i.
+    exploit Memory.lower_exists; eauto; try by econs. i. des.
+    esplits. econs; eauto. econs. apply Time.bot_spec.
   Qed.
 
   Lemma released_time_lt

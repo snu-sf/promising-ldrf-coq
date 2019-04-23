@@ -374,6 +374,16 @@ Proof.
   inv TGT; econs. eapply sim_memory_closed_view; eauto.
 Qed.
 
+Lemma sim_memory_closed_message_view
+      mem_src mem_tgt
+      msg
+      (SIM: sim_memory mem_src mem_tgt)
+      (TGT: Memory.closed_message_view msg mem_tgt):
+  Memory.closed_message_view msg mem_src.
+Proof.
+  inv TGT; ss. econs. eapply sim_memory_closed_opt_view; eauto.
+Qed.
+
 Lemma lower_sim_memory
       mem1 loc from to val released1 msg2 mem2
       (LOWER: Memory.lower mem1 loc from to (Message.mk val released1) msg2 mem2):

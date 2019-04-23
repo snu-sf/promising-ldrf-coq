@@ -181,13 +181,15 @@ Module SimPromises.
     econs. ii. eapply H; eauto.
   Qed.
 
+  Definition none_if_released loc ts (pview:t) (released:option View.t): option View.t :=
+    if mem loc ts pview
+    then None
+    else released.
+
   Definition none_if loc ts (pview:t) (msg:Message.t): Message.t :=
     match msg with
     | Message.mk val released =>
-      Message.mk val
-                 (if mem loc ts pview
-                  then None
-                  else released)
+      Message.mk val (none_if_released loc ts pview released)
     | Message.half => Message.half
     end.
 
@@ -196,6 +198,15 @@ Module SimPromises.
   Proof.
     destruct msg; ss.
   Qed.
+
+  Ltac none_if_tac :=
+    repeat
+      (try match goal with
+           | [ |- context[none_if _ _ _ ?msg]] =>
+             unfold none_if; destruct msg; ss
+           | [ |- context[none_if_released _ _ ?msg]] =>
+             unfold none_if_released; condtac; ss
+           end).
 
   Definition mem_le_transf (pview:t) (lhs rhs:Memory.t): Prop :=
     forall loc to from msg
@@ -254,18 +265,16 @@ Module SimPromises.
       exploit Memory.add_exists_le; try apply LE1_SRC; eauto. i. des.
       exploit sim_memory_add; try apply SIM1; try refl; eauto. i.
       esplits; eauto.
-      + unfold none_if. destruct msg; ss.
-        * condtac.
-          { inv INV1. exploit PVIEW; eauto. i. des.
-            hexploit Memory.add_get0; try exact PROMISES; eauto. i. des. congr. }
-          { econs 1; eauto. }
+      + none_if_tac.
+        * inv INV1. exploit PVIEW; eauto. i. des.
+          hexploit Memory.add_get0; try exact PROMISES; eauto. i. des. congr.
+        * econs 1; eauto.
         * econs 1; eauto.
       + econs.
         * ii. erewrite Memory.add_o; eauto.
           erewrite (@Memory.add_o promises2_tgt) in LHS; try exact PROMISES. revert LHS.
           condtac; ss.
-          { i. des. inv LHS. unfold none_if. destruct msg0; ss.
-            condtac; ss.
+          { i. des. inv LHS. none_if_tac.
             inv INV1. exploit PVIEW; eauto. i. des.
             exploit Memory.add_get0; try exact PROMISES; eauto. i. des. congr. }
           { apply INV1. }
@@ -292,7 +301,7 @@ Module SimPromises.
       exploit sim_memory_split; try apply SIM1; try refl; eauto. i.
       esplits; eauto.
       + unfold none_if. destruct msg; ss.
-        * condtac; ss.
+        * unfold none_if_released. condtac; ss.
           { inv INV1. exploit PVIEW; eauto. i. des.
             hexploit Memory.split_get0; try exact PROMISES; eauto. congr. }
           { econs 2; eauto. }
@@ -301,8 +310,7 @@ Module SimPromises.
         * ii. revert LHS.
           erewrite Memory.split_o; eauto. erewrite (@Memory.split_o mem2); try exact x0.
           repeat condtac; ss.
-          { i. des. inv LHS. unfold none_if.  destruct msg0; ss.
-            condtac; ss.
+          { i. des. inv LHS. none_if_tac.
             inv INV1. exploit PVIEW; eauto. i. des.
             exploit Memory.split_get0; try exact PROMISES; eauto. congr. }
           { guardH o. i. des. inv LHS. ss. }
@@ -325,23 +333,18 @@ Module SimPromises.
       exploit (@Memory.lower_exists promises1_src loc from to (none_if loc to pview msg0) (none_if loc to pview msg));
         try by inv MEM; inv LOWER.
       { apply INV1. eauto. }
-      { unfold none_if. destruct msg; ss.
-        - condtac; econs; ss.
-          inv MEM. inv LOWER. inv MSG_WF. ss.
-        - econs. }
-      { unfold none_if.  destruct msg; destruct msg0; ss.
-        - inv MEM. inv LOWER. inv MSG_LE.
-          condtac; ss. econs. refl.
+      { none_if_tac; econs; ss.
+        inv MEM. inv LOWER. inv MSG_WF. ss. }
+      { none_if_tac; destruct msg0; ss.
+        - inv MEM. inv LOWER. inv MSG_LE. econs. refl.
         - inv PROMISES. inv MSG_LE. }
       i. des.
       exploit Memory.lower_exists_le; try apply LE1_SRC; eauto. i. des.
       exploit sim_memory_lower; try exact SIM1; try exact x1; try exact x2; eauto.
-      { unfold none_if. destruct msg; ss.
-        condtac; try refl. econs. econs. }
+      { none_if_tac; try refl. econs. econs. }
       i. esplits; eauto.
       + econs 3; eauto.
-        unfold none_if. destruct msg; ss.
-        condtac; viewtac. econs. viewtac.
+        none_if_tac; viewtac. econs. viewtac.
       + econs.
         * ii. revert LHS.
           erewrite Memory.lower_o; eauto. erewrite (@Memory.lower_o mem2); try exact x0.
@@ -406,7 +409,8 @@ Module SimPromises.
     - econs.
       + ii. revert LHS.
         erewrite Memory.remove_o; eauto. condtac; ss. i.
-        exploit LE0; eauto. unfold none_if. repeat condtac; ss.
+        exploit LE0; eauto.
+        unfold none_if, none_if_released. repeat condtac; ss.
         * revert COND1. rewrite unset_o. condtac; ss; [|congr].
           guardH o. des. subst. unguardH o. des; congr.
         * revert COND1. rewrite unset_o. condtac; ss. congr.
