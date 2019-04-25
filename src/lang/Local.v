@@ -299,6 +299,16 @@ Module Local.
     - by inv PROMISE.
   Qed.
 
+  Lemma promise_step_no_half
+        lc1 mem1 loc from to msg lc2 mem2 kind
+        (STEP: promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
+        (NOHALF1: Memory.no_half lc1.(promises) mem1):
+    Memory.no_half lc2.(promises) mem2.
+  Proof.
+    ii. inv STEP. s.
+    eapply Memory.promise_no_half; eauto.
+  Qed.
+
   Lemma read_step_future lc1 mem1 loc ts val released ord lc2
         (STEP: read_step lc1 mem1 loc ts val released ord lc2)
         (WF1: wf lc1 mem1)
@@ -495,5 +505,24 @@ Module Local.
       exploit write_step_disjoint; eauto.
     - exploit fence_step_disjoint; eauto.
     - exploit fence_step_disjoint; eauto.
+  Qed.
+
+  Lemma program_step_no_half
+        e lc1 sc1 mem1 lc2 sc2 mem2
+        (STEP: program_step e lc1 sc1 mem1 lc2 sc2 mem2)
+        (NOHALF1: Memory.no_half lc1.(promises) mem1):
+    Memory.no_half lc2.(promises) mem2.
+  Proof.
+    ii. inv STEP; try inv LOCAL; eauto; ss.
+    - inv WRITE.
+      erewrite Memory.remove_o; eauto. condtac; ss.
+      + des. subst.
+        exploit Memory.promise_get0; eauto. i. des. congr.
+      + eapply Memory.promise_no_half; eauto.
+    - inv LOCAL1. inv LOCAL2. inv WRITE. ss.
+      erewrite Memory.remove_o; eauto. condtac; ss.
+      + des. subst.
+        exploit Memory.promise_get0; eauto. i. des. congr.
+      + eapply Memory.promise_no_half; eauto.
   Qed.
 End Local.

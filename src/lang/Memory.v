@@ -1141,6 +1141,25 @@ Module Memory.
 
   (* Lemmas on promise & remove *)
 
+  Lemma promise_get0
+        promises1 promises2 mem1 mem2
+        loc from to msg kind
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind):
+    <<GET_PROMISES: get loc to promises2 = Some (from, msg)>> /\
+    <<GET_MEM: get loc to mem2 = Some (from, msg)>>.
+  Proof.
+    inv PROMISE.
+    - erewrite (add_o _ _ PROMISES).
+      erewrite (add_o _ _ MEM).
+      condtac; ss. des; congr.
+    - erewrite (split_o _ _ PROMISES).
+      erewrite (split_o _ _ MEM).
+      repeat condtac; ss; des; intuition.
+    - erewrite (lower_o _ _ PROMISES).
+      erewrite (lower_o _ _ MEM).
+      condtac; ss. des; congr.
+  Qed.
+
   Lemma promise_get1
         promises1 mem1 loc from to msg promises2 mem2 kind
         l t f m
@@ -2254,5 +2273,24 @@ Module Memory.
     - eapply MAX0; eauto.
     - exploit NOHALF; eauto. i.
       rewrite bot_get in x. inv x.
+  Qed.
+
+  Lemma promise_no_half
+        promises1 promises2 mem1 mem2
+        loc from to msg kind
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (NOHALF1: no_half promises1 mem1):
+    no_half promises2 mem2.
+  Proof.
+    ii. inv PROMISE.
+    - erewrite add_o; try exact PROMISES.
+      erewrite add_o in GET; try exact MEM.
+      condtac; eauto.
+    - erewrite split_o; try exact PROMISES.
+      erewrite split_o in GET; try exact MEM.
+      repeat condtac; eauto.
+    - erewrite lower_o; try exact PROMISES.
+      erewrite lower_o in GET; try exact MEM.
+      condtac; eauto.
   Qed.
 End Memory.

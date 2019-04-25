@@ -378,6 +378,36 @@ Module Thread.
       eapply rtc_implies; [|eauto].
       apply tau_union.
     Qed.
+
+    Lemma step_no_half pf e e1 e2
+          (STEP: step pf e e1 e2)
+          (NOHALF1: Memory.no_half e1.(local).(Local.promises) e1.(memory)):
+      <<NOHALF2: Memory.no_half e2.(local).(Local.promises) e2.(memory)>>.
+    Proof.
+      inv STEP; inv STEP0.
+      - eapply Local.promise_step_no_half; eauto.
+      - eapply Local.program_step_no_half; eauto.
+    Qed.
+
+    Lemma rtc_all_step_no_half e1 e2
+          (STEP: rtc all_step e1 e2)
+          (NOHALF1: Memory.no_half e1.(local).(Local.promises) e1.(memory)):
+      <<NOHALF2: Memory.no_half e2.(local).(Local.promises) e2.(memory)>>.
+    Proof.
+      induction STEP; auto.
+      inv H. inv USTEP.
+      hexploit step_no_half; eauto.
+    Qed.
+
+    Lemma rtc_tau_step_no_half e1 e2
+          (STEP: rtc tau_step e1 e2)
+          (NOHALF1: Memory.no_half e1.(local).(Local.promises) e1.(memory)):
+      <<NOHALF2: Memory.no_half e2.(local).(Local.promises) e2.(memory)>>.
+    Proof.
+      eapply rtc_all_step_no_half; try exact NOHALF1.
+      eapply rtc_implies; [|eauto].
+      apply tau_union.
+    Qed.
   End Thread.
 End Thread.
 

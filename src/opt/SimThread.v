@@ -89,7 +89,8 @@ Section SimulationThread.
           (MEM_FUTURE_SRC: Memory.future mem1_src mem2_src)
           (WF_SRC: Local.wf lc1_src mem2_src)
           (SC_SRC: Memory.closed_timemap sc2_src mem2_src)
-          (MEM_SRC: Memory.closed mem2_src),
+          (MEM_SRC: Memory.closed mem2_src)
+          (NOHALF_SRC: Memory.no_half lc1_src.(Local.promises) mem2_src),
         exists sc2_tgt mem2_tgt,
           <<SC: TimeMap.le sc2_src sc2_tgt>> /\
           <<MEMORY: sim_memory mem2_src mem2_tgt>> /\
@@ -97,9 +98,11 @@ Section SimulationThread.
           <<MEM_FUTURE_TGT: Memory.future mem1_tgt mem2_tgt>> /\
           <<WF_TGT: Local.wf lc1_tgt mem2_tgt>> /\
           <<SC_TGT: Memory.closed_timemap sc2_tgt mem2_tgt>> /\
-          <<MEM_TGT: Memory.closed mem2_tgt>>>> /\
+          <<MEM_TGT: Memory.closed mem2_tgt>> /\
+          <<NOHALF_TGT: Memory.no_half lc1_tgt.(Local.promises) mem2_tgt>>>> /\
       <<PROMISES:
-        forall (PROMISES_TGT: lc1_tgt.(Local.promises) = Memory.bot),
+        forall (PROMISES_TGT: lc1_tgt.(Local.promises) = Memory.bot)
+          (NOHALF_TGT: Memory.no_half lc1_tgt.(Local.promises) mem1_tgt),
         exists st2_src lc2_src sc2_src mem2_src,
           <<STEPS: rtc (@Thread.tau_step _)
                        (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
@@ -308,6 +311,7 @@ Proof.
   exploit sim_thread_rtc_step; try apply MEMORY0; try apply SC0; eauto.
   { s. eapply sim_thread_future; eauto. }
   i. des. destruct e2. ss.
+  hexploit Thread.rtc_tau_step_no_half; try exact STEPS; eauto. s. i. des.
   punfold SIM0. exploit SIM0; eauto; try refl. i. des.
   exploit PROMISES1; eauto. i. des.
   eexists (Thread.mk _ _ _ _ _). splits; [|eauto].
