@@ -49,9 +49,17 @@ Inductive covered (loc:Loc.t) (ts:Time.t) (mem:Memory.t): Prop :=
     (ITV: Interval.mem (from, to) ts)
 .
 
+Inductive covered_half (loc: Loc.t) (ts: Time.t) (mem: Memory.t): Prop :=
+| covered_half_intro
+    from to
+    (GET: Memory.get loc to mem = Some (from, Message.half))
+    (ITV: Interval.mem (from, to) ts)
+.
+
 Inductive sim_memory (mem_src mem_tgt:Memory.t): Prop :=
 | sim_memory_intro
     (COVER: forall loc ts, covered loc ts mem_src <-> covered loc ts mem_tgt)
+    (COVER_HALF: forall loc ts, covered_half loc ts mem_src <-> covered_half loc ts mem_tgt)
     (MSG: forall loc from_tgt to msg_tgt
             (GET: Memory.get loc to mem_tgt = Some (from_tgt, msg_tgt)),
         exists from_src msg_src,
@@ -245,6 +253,104 @@ Proof.
       des; congr.
 Qed.
 
+Lemma add_covered_half
+      mem2 mem1 loc from to msg
+      l t
+      (ADD: Memory.add mem1 loc from to msg mem2):
+  covered_half l t mem2 <->
+  covered_half l t mem1 \/
+  (l = loc /\ Interval.mem (from, to) t /\ msg = Message.half).
+Proof.
+  econs; i.
+  - inv H. revert GET. erewrite Memory.add_o; eauto. condtac; ss.
+    + des. subst. i. inv GET. auto.
+    + left. econs; eauto.
+  - des.
+    + inv H. econs; eauto.
+      erewrite Memory.add_o; eauto. condtac; ss; eauto.
+      des. subst. exploit Memory.add_get0; eauto. i. des. congr.
+    + subst. econs; eauto. erewrite Memory.add_o; eauto. condtac; ss.
+      des; congr.
+Qed.
+
+(* Lemma split_covered_half *)
+(*       mem2 mem1 loc ts1 ts2 ts3 msg2 msg3 *)
+(*       l t *)
+(*       (SPLIT: Memory.split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2): *)
+(*   covered_half l t mem2 <-> *)
+(*   (msg2 = Message.half /\ message3 = Message.half /\ covered_half l t mem1) \/ *)
+(*   (msg2 = Message.half /\ *)
+(*   (msg2 = Message.half /\ l = loc /\ Interval.mem (ts1, ts2) t). *)
+(* Proof. *)
+(*   econs; i. *)
+(*   - exploit Memory.split_get0; eauto. i. des. *)
+(*     inv H. revert GET3. erewrite Memory.split_o; eauto. repeat condtac; ss. *)
+(*     + des. subst. i. inv GET3. eauto. *)
+(*     + guardH o. des. subst. i. inv GET3. *)
+(*       left. econs; eauto. *)
+(*       eapply Interval.le_mem; eauto. econs; [|refl]. *)
+(*       inv SPLIT. inv SPLIT0. left. auto. *)
+(*     + i. left. econs; eauto. *)
+(*   - exploit Memory.split_get0; eauto. i. des. *)
+(*     + inv H. *)
+(*       destruct (loc_ts_eq_dec (l, to) (loc, ts3)); ss. *)
+(*       * des. subst. rewrite GET0 in GET3. inv GET3. *)
+(*         destruct (Time.le_lt_dec t ts2). *)
+(*         { econs. *)
+(*           - instantiate (2 := from). instantiate (2 := ts2). *)
+(*             erewrite Memory.split_o; eauto. condtac; ss. *)
+(*             des; congr. *)
+(*           - inv ITV. econs; ss. *)
+(*         } *)
+(*         { econs. *)
+(*           - instantiate (2 := ts2). instantiate (2 := ts3). *)
+(*           erewrite Memory.split_o; eauto. repeat condtac; ss. *)
+(*             + des. subst. inv SPLIT. inv SPLIT0. *)
+(*             exfalso. eapply Time.lt_strorder. eauto. *)
+(*             + guardH o. des; congr. *)
+(*           - inv ITV. econs; ss. *)
+(*         } *)
+(*     + econs; eauto. erewrite Memory.split_o; eauto. *)
+(*       repeat condtac; ss; eauto. *)
+(*       * guardH o. des. subst. congr. *)
+(*       * guardH o. guardH o0. des. subst. *)
+(*         unguardH o. des; congr. *)
+(* Qed. *)
+
+Lemma lower_covered_half
+      mem2 mem1 loc from to msg1 msg2
+      l t
+      (LOWER: Memory.lower mem1 loc from to msg1 msg2 mem2):
+  covered_half l t mem2 <->
+  ((l <> loc \/ ~ Interval.mem (from, to) t) /\ covered_half l t mem1) \/
+  (l = loc /\ Interval.mem (from, to) t /\ msg2 = Message.half).
+Proof.
+  econs; i.
+  - exploit Memory.lower_get0; eauto. i. des.
+    inv H.
+    destruct (loc_ts_eq_dec (l, to0) (loc, to)); ss.
+    + des. subst. rewrite GET0 in GET1. inv GET1. eauto.
+    + left. split.
+      * des; eauto. destruct (Loc.eq_dec l loc); eauto.
+        subst. inv LOWER. unfold Memory.get in *. ss.
+        rewrite LocFun.add_spec in GET0, GET1.
+        exploit Cell.lower_wf; eauto.
+    inv H. revert GET. erewrite Memory.lower_o; eauto. condtac; ss.
+    + des. subst. i. inv GET. right. left.
+      hexploit Memory.lower_get0; eauto. i. des. inv MSG_LE.
+      esplits; eauto. econs; eauto.
+    + i. econs; eauto.
+  - exploit Memory.lower_get0; eauto. i. des.
+    inv H.
+    destruct (loc_ts_eq_dec (l, to0) (loc, to)); ss.
+    + des. subst. econs; cycle 1; eauto.
+      erewrite Memory.lower_o; eauto. condtac; [|by des].
+      rewrite GET in GET1. inv GET1. eauto.
+    + econs; eauto.
+      erewrite Memory.lower_o; eauto. rewrite GET1. condtac; ss.
+      des; congr.
+Qed.
+
 Lemma sim_memory_add
       mem1_src mem1_tgt msg_src
       mem2_src mem2_tgt msg_tgt
@@ -260,6 +366,7 @@ Proof.
     econs; i; des; (try by right).
     + left. eapply COVER. eauto.
     + left. eapply COVER. eauto.
+  - i.
   - i. revert GET. erewrite Memory.add_o; eauto. condtac; ss.
     + des. subst. i. inv GET. esplits; eauto.
       erewrite Memory.add_o; eauto. condtac; ss.
