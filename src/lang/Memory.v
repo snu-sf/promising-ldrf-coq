@@ -1804,6 +1804,34 @@ Module Memory.
         erewrite add_o; eauto. condtac; ss. des; congr.
   Qed.
 
+  Lemma split_max_full_timemap
+        mem1 mem2 loc ts1 ts2 ts3 val released msg3 tm1 tm2
+        (SPLIT: split mem1 loc ts1 ts2 ts3 (Message.mk val released) msg3 mem2)
+        (MAX1: max_full_timemap mem1 tm1)
+        (MAX2: max_full_timemap mem2 tm2):
+    tm2 = TimeMap.join tm1 (TimeMap.singleton loc ts2).
+  Proof.
+    extensionality l. apply TimeFacts.antisym; auto.
+    - exploit max_full_timemap_closed; eauto. instantiate (1 := l). i. des.
+      revert x0. erewrite split_o; eauto. repeat condtac; ss.
+      + des. subst. i. inv x0. etrans; [|apply TimeMap.join_r].
+        apply TimeMap.singleton_inv. refl.
+      + guardH o. des. subst. i. inv x0. etrans; [|apply TimeMap.join_l].
+        inv SPLIT. inv SPLIT0.
+        eapply max_full_ts_spec; eauto.
+      + i. etrans; [|apply TimeMap.join_l].
+        eapply max_full_ts_spec; eauto.
+    - apply TimeMap.join_spec.
+      + eapply max_full_timemap_spec; eauto.
+        eapply split_closed_timemap; eauto.
+        apply max_full_timemap_closed. auto.
+      + apply TimeMap.singleton_spec.
+        eapply max_full_ts_spec; eauto.
+        erewrite split_o; eauto. repeat condtac; ss.
+        * guardH o. des. subst. congr.
+        * des; congr.
+  Qed.
+
   Lemma lower_max_full_timemap
         mem1 mem2 loc from to msg0 val released tm1 tm2
         (lower: lower mem1 loc from to msg0 (Message.mk val released) mem2)
@@ -1837,6 +1865,18 @@ Module Memory.
     inv MAX1. inv MAX2. apply View.ext; s.
     - eapply add_max_full_timemap; eauto.
     - eapply add_max_full_timemap; eauto.
+  Qed.
+
+  Lemma split_max_full_view
+        mem1 mem2 loc ts1 ts2 ts3 val released msg3 mview1 mview2
+        (SPLIT: split mem1 loc ts1 ts2 ts3 (Message.mk val released) msg3 mem2)
+        (MAX1: max_full_view mem1 mview1)
+        (MAX2: max_full_view mem2 mview2):
+    mview2 = View.join mview1 (View.singleton_ur loc ts2).
+  Proof.
+    inv MAX1. inv MAX2. apply View.ext; s.
+    - eapply split_max_full_timemap; eauto.
+    - eapply split_max_full_timemap; eauto.
   Qed.
 
   Lemma lower_max_full_view
@@ -1926,6 +1966,52 @@ Module Memory.
     - ii. unfold TimeMap.add. condtac.
       + subst. etrans; [|exact REL_TS].
         inv ADD. inv ADD0. inv MSG_WF. inv WF. apply WF0.
+      + etrans; [apply PLN|]. apply Time.join_spec; [refl|].
+        unfold TimeMap.singleton, LocFun.add. condtac; ss. apply Time.bot_spec.
+    - ii. unfold TimeMap.add. condtac.
+      + subst. ss.
+      + etrans; [apply RLX|]. apply Time.join_spec; [refl|].
+        unfold TimeMap.singleton, LocFun.add. condtac; ss. apply Time.bot_spec.
+  Qed.
+
+  Lemma max_full_released_closed_split
+        mem1 loc ts1 ts2 ts3 val released msg3 mem2 mr
+        (SPLIT: split mem1 loc ts1 ts2 ts3 (Message.mk val released) msg3 mem2)
+        (CLOSED: closed mem1)
+        (MAX: max_full_released mem1 loc ts2 mr):
+    <<CLOSED: closed_view mr mem2>> /\
+    <<REL_TS: Time.le (mr.(View.rlx) loc) ts2>>.
+  Proof.
+    splits.
+    - inv MAX.
+      hexploit split_inhabited; try apply CLOSED; eauto. i. des.
+      cut (closed_timemap (TimeMap.add loc ts2 tm) mem2).
+      { i. econs; ss. }
+      eapply closed_timemap_add.
+      + erewrite split_o; eauto. condtac; ss. des; congr.
+      + eapply split_closed_timemap; eauto.
+        eapply max_full_timemap_closed. auto.
+    - inv MAX. ss. unfold TimeMap.add. condtac; [|congr]. refl.
+  Qed.
+
+  Lemma max_full_released_spec_split
+        mem1 loc ts1 ts2 ts3 val released msg3 mem2 mr
+        (CLOSED: closed mem1)
+        (SPLIT: split mem1 loc ts1 ts2 ts3 (Message.mk val released) msg3 mem2)
+        (REL_CLOSED: closed_opt_view released mem2)
+        (REL_TS: Time.le (released.(View.unwrap).(View.rlx) loc) ts2)
+        (MAX: max_full_released mem1 loc ts2 mr):
+    View.opt_le released (Some mr).
+  Proof.
+    inv REL_CLOSED; econs.
+    hexploit split_inhabited; try apply CLOSED; eauto. i. des.
+    exploit max_full_view_exists; eauto. i. des.
+    exploit max_full_view_spec; eauto. i.
+    inv MAX. erewrite split_max_full_view in x1; eauto. ss.
+    inv x1. econs; ss.
+    - ii. unfold TimeMap.add. condtac.
+      + subst. etrans; [|exact REL_TS].
+        inv SPLIT. inv SPLIT0. inv MSG_WF. inv WF. apply WF0.
       + etrans; [apply PLN|]. apply Time.join_spec; [refl|].
         unfold TimeMap.singleton, LocFun.add. condtac; ss. apply Time.bot_spec.
     - ii. unfold TimeMap.add. condtac.
