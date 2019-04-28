@@ -851,6 +851,56 @@ Module SimPromises.
     - eapply Memory.future_closed; eauto.
   Qed.
 
+  Lemma future_sc_mem
+        pview
+        lc_src mem1_src mem2_src sc1_src sc2_src
+        lc_tgt mem1_tgt sc1_tgt
+        (INV1: sem pview bot lc_src.(Local.promises) lc_tgt.(Local.promises))
+        (MEM1: sim_memory mem1_src mem1_tgt)
+        (MEM_FUTURE_SRC: Memory.future mem1_src mem2_src)
+        (SC_FUTURE_SRC: TimeMap.le sc1_src sc2_src)
+        (WF1_SRC: Local.wf lc_src mem1_src)
+        (WF1_TGT: Local.wf lc_tgt mem1_tgt)
+        (WF2_SRC: Local.wf lc_src mem2_src)
+        (MEM1_SRC: Memory.closed mem1_src)
+        (MEM1_TGT: Memory.closed mem1_tgt)
+        (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
+        (SC1_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
+        (SC2_SRC: Memory.closed_timemap sc2_src mem2_src)
+        (NOHALF_SRC: Memory.no_half lc_src.(Local.promises) mem2_src):
+    exists sc2_tgt mem2_tgt,
+      <<SC2: TimeMap.le sc2_src sc2_tgt>> /\
+      <<MEM2: sim_memory mem2_src mem2_tgt>> /\
+      <<SC_FUTURE_TGT: TimeMap.le sc1_tgt sc2_tgt>> /\
+      <<MEM_FUTURE_TGT: Memory.future mem1_tgt mem2_tgt>> /\
+      <<WF2_TGT: Local.wf lc_tgt mem2_tgt>> /\
+      <<SC2_TGT: Memory.closed_timemap sc2_tgt mem2_tgt>> /\
+      <<MEM2_TGT: Memory.closed mem2_tgt>> /\
+      <<NOHALF_TGT: Memory.no_half lc_tgt.(Local.promises) mem2_tgt>>.
+  Proof.
+    exploit Memory.future_closed; eauto. intro MEM2_SRC.
+    exploit future; eauto. i. des.
+    exploit Memory.max_full_timemap_exists; try apply MEM2_SRC. i. des.
+    exploit Memory.max_full_timemap_exists; try apply MEM2_TGT. i. des.
+    exploit sim_memory_max_full_timemap; try exact MEM2; eauto. i. subst.
+    esplits; eauto.
+    - etrans; [|refl].
+      eapply Memory.max_full_timemap_spec; try exact x0; eauto.
+    - etrans; [|refl].
+      eapply Memory.max_full_timemap_spec; try exact x1; eauto.
+      eapply Memory.future_closed_timemap; eauto.
+    - eapply Memory.max_full_timemap_closed; eauto.
+    - ii. dup MEM2. inv MEM0. inv INV1.
+      exploit MSG; eauto. i. des. inv MSG0.
+      exploit NOHALF_SRC; eauto. i.
+      destruct (Memory.get loc to lc_tgt.(Local.promises)) as [[from_tgt msg_tgt]|] eqn:GET_TGT; cycle 1.
+      { exploit COMPLETE; eauto. i. rewrite bot_spec in x2. inv x2. }
+      exploit LE; eauto. i. rewrite x in x2.
+      destruct msg_tgt; ss; inv x2.
+      inv WF2_TGT. exploit PROMISES; eauto. i.
+      rewrite GET in x2. inv x2. refl.
+  Qed.
+
   Lemma sem_bot promises:
     sem bot bot promises promises.
   Proof.
