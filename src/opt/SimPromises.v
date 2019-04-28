@@ -630,8 +630,7 @@ Module SimPromises.
         { eapply covered_disjoint; try apply SIM1; eauto. inv ADD. inv ADD0. auto. }
         { inv ADD. inv ADD0. auto. }
         { econs. }
-        i. des.
-        esplits.
+        i. des. esplits.
         - econs 2; eauto.
         - ii. erewrite Memory.add_o; eauto. condtac; ss; eauto.
           des. subst. exploit LE1_TGT; eauto. exploit Memory.add_get0; eauto. i. des. congr.
@@ -656,54 +655,126 @@ Module SimPromises.
         * exploit Memory.max_full_released_exists; try apply CLOSED1_SRC. i. des.
           exploit sim_memory_max_full_released; try exact SIM1; eauto. i. subst.
           auto.
-    - esplits; eauto.
-      etrans; eauto. eapply split_sim_memory. eauto.
-    - destruct msg0.
-      { esplits; eauto.
-        etrans; eauto. eapply lower_sim_memory. eauto. }
+    - exploit Memory.split_get0; eauto. i. des.
+      exploit split_exists; eauto. i. des.
+      exploit Memory.future_closed; eauto. intro CLOSED2_TGT.
       destruct msg; cycle 1.
-      { esplits; eauto.
-        replace mem2_src with mem1_src; ss.
-        apply Memory.ext. i.
-        erewrite (@Memory.lower_o mem2_src); eauto.
-        condtac; ss. des. subst.
-        inv LOWER. inv LOWER0. unfold Memory.get. unfold Cell.get.
-        rewrite GET2. ss. }
-      destruct (Memory.get loc to mem1_tgt) eqn:GET; cycle 1.
-      { esplits; eauto.
-        eapply sim_memory_lower_none; eauto. }
-      destruct p as [from_tgt]. destruct t0.
-      { inv LOWER. inv LOWER0. inv SIM1.
-        exploit MSG; eauto. i. des. inv MSG0.
-        unfold Memory.get in GET0. unfold Cell.get in GET0. congr. }
-      exploit (@Memory.max_full_released_exists mem1_tgt loc to).
-      { eapply CLOSED1_TGT. }
+      { exploit (@Memory.split_exists mem2_tgt loc from to to3 Message.half msg_tgt).
+        { eauto. }
+        { inv SPLIT. inv SPLIT0. ss. }
+        { inv SPLIT. inv SPLIT0. ss. }
+        { econs. }
+        intro SPLIT_TGT. des. esplits.
+        - etrans; try exact FUTURE_TGT. econs 2; eauto.
+        - exploit Memory.split_get0; try exact SPLIT_TGT. i. des.
+          ii. exploit LE2_TGT; eauto. i.
+          erewrite Memory.split_o; eauto. repeat condtac; ss.
+          + des. subst. rewrite GET3 in x. inv x.
+          + guardH o. des. subst. rewrite GET4 in x. inv x.
+            inv INV1. exploit LE; eauto. i.
+            exploit LE2_SRC; eauto. i.
+            exploit MemoryFacts.get_disjoint; [exact GET2|exact x0|..]. i. des.
+            * subst. inv SPLIT. inv SPLIT0. timetac.
+            * exfalso.
+              exploit Memory.get_ts; try exact GET2. i. des.
+              { subst. rewrite GET in GET0. inv GET0. }
+              exploit Memory.get_ts; try exact x0. i. des.
+              { subst. inv x3. }
+              apply (x2 to3); econs; ss; try refl.
+        - eapply sim_memory_split; eauto.
+      }
+      exploit (@Memory.max_full_released_exists mem2_tgt loc to).
+      { apply CLOSED2_TGT. }
       i. des.
-      exploit (@Memory.lower_exists mem1_tgt loc from_tgt to Message.half (Message.mk val (Some released0))); eauto.
-      { exploit MemoryFacts.half_time_lt; eauto. }
+      exploit (@Memory.split_exists mem2_tgt loc from to to3 (Message.mk val (Some released0)) msg_tgt).
+      { eauto. }
+      { inv SPLIT. inv SPLIT0. ss. }
+      { inv SPLIT. inv SPLIT0. ss. }
       { econs. econs. eapply Memory.max_full_released_wf; eauto. }
-      i. des.
-      exploit Memory.max_full_released_closed_lower; eauto. i. des.
-      esplits.
-      + econs 2; eauto. econs; eauto.
-      + ii. erewrite Memory.lower_o; eauto. condtac; ss; eauto.
-        des. subst. clear COND.
-        exploit LE1_TGT; try exact LHS. i.
-        replace msg with Message.half in *; cycle 1.
-        { inv x1. inv LOWER0.
-          unfold Memory.get in x. unfold Cell.get in x.
-          rewrite GET2 in x. inv x. refl. }
-        inv SIM1. exploit MSG; try exact x. i. des.
-        inv INV1. exploit LE; try exact LHS. i. ss.
-        exploit LE2_SRC; try exact x2. i.
-        erewrite Memory.lower_o in x3; eauto.
-        revert x3. condtac; ss. des; congr.
-      + eapply sim_memory_lower; try exact LOWER; try exact x1; eauto.
-        econs. eapply Memory.max_full_released_spec_lower; try exact LOWER; eauto.
-        * inv CLOSED. ss.
-        * inv TS. ss.
-        * admit. (* sim_memory_max_released *)
-  Admitted.
+      intro SPLIT_TGT. des. esplits.
+      + etrans; try exact FUTURE_TGT. econs 2; try refl. econs; eauto.
+        * econs. econs. eapply Memory.max_full_released_closed_split; eauto.
+        * econs. eapply Memory.max_full_released_closed_split; eauto.
+      + exploit Memory.split_get0; try exact SPLIT_TGT. i. des.
+        ii. exploit LE2_TGT; eauto. i.
+        erewrite Memory.split_o; eauto. repeat condtac; ss.
+        * des. subst. rewrite GET3 in x. inv x.
+        * guardH o. des. subst. rewrite GET4 in x. inv x.
+          inv INV1. exploit LE; eauto. i.
+          exploit LE2_SRC; eauto. i.
+          exploit MemoryFacts.get_disjoint; [exact GET2|exact x1|..]. i. des.
+          { subst. inv SPLIT. inv SPLIT0. timetac. }
+          { exfalso.
+            exploit Memory.get_ts; try exact GET2. i. des.
+            { subst. rewrite GET in GET0. inv GET0. }
+            exploit Memory.get_ts; try exact x1. i. des.
+            { subst. inv x4. }
+            apply (x3 to3); econs; ss; try refl. }
+      + eapply sim_memory_split; try exact SIM2; try exact SPLIT; try exact SPLIT_TGT.
+        econs.
+        exploit Memory.max_full_released_exists; try apply CLOSED1_SRC. i. des.
+        exploit sim_memory_max_full_released; try exact SIM2; eauto; i. subst.
+        inv CLOSED. inv TS.
+        eapply Memory.max_full_released_spec_split; try exact SPLIT; eauto.
+    - exploit Memory.lower_get0; eauto. i. des.
+      exploit split_exists; eauto. i. des.
+      exploit Memory.future_closed; eauto. intro CLOSED2_TGT.
+      exploit (@Memory.max_full_released_exists mem2_tgt loc to).
+      { apply CLOSED2_TGT. }
+      intro MAX. des.
+      dup SIM2. inv SIM0. exploit MSG; eauto. i. des.
+      rewrite GET in GET1. symmetry in GET1. inv GET1.
+      clear COVER COVER_HALF MSG.
+      exploit (@Memory.lower_exists mem2_tgt loc from to msg_tgt
+                                    (match msg with
+                                     | Message.half => Message.half
+                                     | Message.mk val _ =>
+                                       (match msg_tgt with
+                                        | Message.half => Message.mk val (Some released)
+                                        | _ => msg_tgt
+                                        end)
+                                     end)).
+      { eauto. }
+      { inv LOWER. inv LOWER0. ss. }
+      { destruct msg; destruct msg_tgt; ss; econs.
+        - inv CLOSED2_TGT. exploit CLOSED0; eauto. i. des.
+          inv MSG_WF. ss.
+        - econs. eapply Memory.max_full_released_wf; eauto. }
+      { destruct msg; destruct msg_tgt; ss.
+        - econs. refl.
+        - inv LOWER. inv LOWER0. inv MSG_LE0. inv MSG0. }
+      intro LOWER_TGT. des. esplits.
+      + etrans; try exact FUTURE_TGT. econs 2; try refl. econs; eauto.
+        * destruct msg; destruct msg_tgt; try by econs.
+          { inv CLOSED2_TGT. exploit CLOSED0; eauto. i. des.
+            eapply Memory.lower_closed_message_view; eauto. }
+          { econs. econs. eapply Memory.max_full_released_closed_lower; eauto. }
+        * destruct msg; destruct msg_tgt; try by econs.
+          { inv CLOSED2_TGT. exploit CLOSED0; eauto. i. des.
+            exploit Memory.lower_closed_message_view; eauto. }
+          { econs. eapply Memory.max_full_released_closed_lower; eauto. }
+      + exploit Memory.lower_get0; try exact LOWER_TGT. i. des.
+        ii. exploit LE2_TGT; eauto. i.
+        erewrite Memory.lower_o; eauto. repeat condtac; ss.
+        * des. subst. rewrite GET1 in x. inv x.
+          inv LOWER_TGT. inv MSG_LE0. ss.
+        * des. subst. rewrite GET1 in x. inv x.
+          inv LOWER_TGT. inv MSG_LE0.
+        * des. subst. rewrite GET1 in x. inv x.
+          destruct msg; ss.
+          inv INV1. exploit LE; eauto. i.
+          exploit LE2_SRC; eauto. i. ss.
+          rewrite GET0 in x0. inv x0.
+      + eapply sim_memory_lower; try exact SIM2; try exact LOWER; try exact LOWER_TGT.
+        destruct msg; ss. destruct msg_tgt; ss.
+        * inv LOWER. inv LOWER0. inv MSG0. inv MSG_LE0.
+          econs. etrans; eauto.
+        * econs.
+          exploit Memory.max_full_released_exists; try apply CLOSED1_SRC. i. des.
+          exploit sim_memory_max_full_released; try exact SIM2; eauto. i. subst.
+          inv CLOSED. inv TS.
+          eapply Memory.max_full_released_spec_lower; try exact LOWER; eauto.
+  Qed.
 
   Lemma future_aux
         pview
