@@ -593,7 +593,7 @@ Proof.
       * i. des. inv SRC. eapply COMPLETE; eauto.
         hexploit Memory.lower_get0; try exact PROMISES; eauto. i. des. eauto.
       * i. eapply COMPLETE; eauto.
-  - etrans; [|eauto]. inv STEP_SRC. inv PROMISE. eapply lower_sim_memory. eauto.
+  - etrans; [|eauto]. inv STEP_SRC. inv PROMISE. eapply lower_sim_memory; eauto. econs.
   - eapply Local.promise_step_future; eauto.
 Qed.
 
