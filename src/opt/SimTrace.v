@@ -104,15 +104,7 @@ Proof.
   - i. exploit TERMINAL; eauto. i. des.
     exploit rtc_lang_tau_step_rtc_thread_tau_step; eauto. i.
     esplits; eauto. econs. ss.
-  - i. exploit SimPromises.future; (try by apply LOCAL); eauto. i. des.
-    esplits; eauto.
-    + etrans.
-      * apply Memory.max_timemap_spec; eauto. viewtac.
-      * apply sim_memory_max_timemap; eauto.
-    + etrans.
-      * apply Memory.max_timemap_spec; eauto. viewtac.
-      * apply Memory.future_max_timemap; eauto.
-    + apply Memory.max_timemap_closed. viewtac.
+  - i. eapply SimPromises.future_sc_mem; try apply LOCAL; eauto.
   - i. exploit sim_local_memory_bot; eauto. i.
     esplits; eauto.
   - ii. inv STEP_TGT; inv STEP0; [|inv LOCAL0].
