@@ -92,16 +92,7 @@ Proof.
     - auto.
     - econs. s. etrans; eauto. apply RegFile.eq_except_singleton.
   }
-  { i. exploit SimPromises.future; try apply LOCAL; eauto. i. des.
-    esplits; eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply sim_memory_max_timemap; eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply Memory.future_max_timemap; eauto.
-    - apply Memory.max_timemap_closed. viewtac.
-  }
+  { i. eapply SimPromises.future_sc_mem; try apply LOCAL; eauto. }
   { i. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
