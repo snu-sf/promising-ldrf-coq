@@ -515,6 +515,98 @@ Module SimPromises.
     rewrite unset_o. condtac; ss.
   Qed.
 
+  Lemma split_exists
+        pview
+        promises_src mem1_src
+        promises_tgt mem1_tgt
+        loc from to msg_src
+        (INV1: sem pview bot promises_src promises_tgt)
+        (SIM1: sim_memory mem1_src mem1_tgt)
+        (GET1_SRC: Memory.get loc to mem1_src = Some (from, msg_src))
+        (LE1_SRC: Memory.le promises_src mem1_src)
+        (LE1_TGT: Memory.le promises_tgt mem1_tgt)
+        (CLOSED1_SRC: Memory.closed mem1_src)
+        (CLOSED1_TGT: Memory.closed mem1_tgt):
+    exists mem2_tgt msg_tgt,
+      <<FUTURE_TGT: Memory.future mem1_tgt mem2_tgt>> /\
+      <<GET2_TGT: Memory.get loc to mem2_tgt = Some (from, msg_tgt)>> /\
+      <<LE2_TGT: Memory.le promises_tgt mem2_tgt>> /\
+      <<SIM2: sim_memory mem1_src mem2_tgt>>.
+  Proof.
+    exploit sim_memory_split_exists; try exact SIM1; eauto. i. des.
+    - subst. esplits; eauto.
+    - exploit Memory.split_get0; eauto. i. des.
+      subst. esplits.
+      + econs 2. econs; eauto. refl.
+      + eauto.
+      + ii. erewrite Memory.split_o; eauto. repeat condtac; ss.
+        * des. subst. exploit LE1_TGT; eauto. i.
+          rewrite GET in x. inv x.
+        * guardH o. des. subst. exploit LE1_TGT; eauto. i.
+          rewrite GET0 in x. inv x.
+          inv INV1. exploit LE; eauto. i.
+          exploit LE1_SRC; eauto. i.
+          exploit MemoryFacts.get_disjoint; [exact GET1_SRC|exact x0|..]. i. des.
+          { subst. timetac. }
+          { exfalso.
+            exploit Memory.get_ts; try exact GET1_SRC. i. des.
+            { subst. inv CLOSED1_TGT. rewrite INHABITED in GET. inv GET. }
+            apply (x2 to); econs; ss; try refl. econs; eauto. }
+        * eapply LE1_TGT; eauto.
+      + auto.
+    - exploit Memory.split_get0; eauto. i. des.
+      subst. esplits.
+      + econs 2. econs; eauto. refl.
+      + eauto.
+      + ii. erewrite Memory.split_o; eauto. repeat condtac; ss.
+        * des. subst. exploit LE1_TGT; eauto. i.
+          rewrite GET in x. inv x.
+        * guardH o. des. subst. exploit LE1_TGT; eauto. i.
+          rewrite GET0 in x. inv x.
+          inv INV1. exploit LE; eauto. i.
+          exploit LE1_SRC; eauto. i.
+          exploit MemoryFacts.get_disjoint; [exact GET1_SRC|exact x0|..]. i. des.
+          { subst. timetac. }
+          { exfalso.
+            exploit Memory.get_ts; try exact GET1_SRC. i. des.
+            { subst. inv CLOSED1_TGT. rewrite INHABITED in GET. inv GET. }
+            exploit Memory.get_ts; try exact GET0. i. des.
+            { subst. inv x3. }
+            apply (x2 to_tgt); econs; ss; try refl. }
+        * apply LE1_TGT; eauto.
+      + auto.
+    - exploit Memory.split_get0; try exact SPLIT. i. des.
+      exploit Memory.split_get0; try exact SPLIT2. i. des.
+      subst. esplits.
+      + econs 2. econs; eauto.
+        econs 2. econs; eauto. refl.
+      + eauto.
+      + ii. erewrite Memory.split_o; eauto. repeat condtac; ss.
+        * des. subst. exploit LE1_TGT; eauto. i.
+          revert GET3. erewrite Memory.split_o; eauto. repeat condtac; ss. i.
+          rewrite GET3 in x. inv x.
+        * guardH o. des. subst. exploit LE1_TGT; eauto. i.
+          rewrite GET in x. inv x.
+        * guardH o. guardH o0.
+          erewrite Memory.split_o; eauto. repeat condtac; ss.
+          { guardH o1. des. subst. exploit LE1_TGT; eauto. i.
+            rewrite GET0 in x. inv x.
+            inv INV1. exploit LE; eauto. i.
+            exploit LE1_SRC; eauto. i.
+            exploit MemoryFacts.get_disjoint; [exact GET1_SRC|exact x0|..]. i. des.
+            - subst. timetac.
+            - exfalso.
+              exploit Memory.get_ts; try exact GET1_SRC. i. des.
+              { subst. inv FROM. }
+              exploit Memory.get_ts; try exact GET0. i. des.
+              { subst. inv TO. }
+              apply (x2 to); econs; ss; try refl.
+              + eapply TimeFacts.lt_le_lt; try exact FROM. econs; eauto.
+              + econs; eauto. }
+          { apply LE1_TGT; eauto. }
+      + auto.
+  Qed.
+
   Lemma future_aux_imm
         pview
         promises_src mem1_src mem2_src
@@ -561,7 +653,9 @@ Module SimPromises.
         econs. eapply Memory.max_full_released_spec_add; try exact ADD; eauto.
         * inv CLOSED. ss.
         * inv TS. ss.
-        * admit. (* sim_memory_max_released *)
+        * exploit Memory.max_full_released_exists; try apply CLOSED1_SRC. i. des.
+          exploit sim_memory_max_full_released; try exact SIM1; eauto. i. subst.
+          auto.
     - esplits; eauto.
       etrans; eauto. eapply split_sim_memory. eauto.
     - destruct msg0.

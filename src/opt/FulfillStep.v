@@ -115,7 +115,7 @@ Proof.
   esplits; eauto.
   - econs; eauto.
     i. destruct ord; inv ORD; inv H.
-  - eapply promise_lower_sim_memory. eauto.
+  - eapply promise_lower_sim_memory; eauto. econs.
 Qed.
 
 Lemma promise_fulfill_write
@@ -154,7 +154,7 @@ Proof.
   esplits; eauto.
   - econs; eauto. econs; eauto.
     eapply MemoryMerge.promise_promise_promise; eauto.
-  - eapply promise_lower_sim_memory. eauto.
+  - eapply promise_lower_sim_memory; eauto. econs.
 Qed.
 
 Lemma promise_fulfill_write_exact
