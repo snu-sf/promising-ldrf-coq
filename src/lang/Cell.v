@@ -724,6 +724,22 @@ Module Cell.
         (INHABITED: get Time.bot cell = Some (Time.bot, Message.elt)):
     exists ts, max_full_ts cell ts.
   Proof.
+    destruct cell. unfold get in *. ss.
+    remember (DOMap.elements raw0) as l eqn:DOM.
+    revert DOM INHABITED. revert raw0 WF0.
+    induction l; i.
+    - exploit DOMap.elements_correct; eauto. i.
+      rewrite <- DOM in *. inv x0.
+    - destruct a.
+      exploit DOMap.elements_complete.
+      { rewrite <- DOM. econs 1. refl. }
+      i. destruct p. exploit remove_exists.
+      { instantiate (3 := mk WF0). unfold get. ss. eapply x0. }
+      i. des. destruct cell2.
+      assert (REMOVE: DOMap.elements (DOMap.remove k raw1) = l).
+      { admit. }
+      exploit IHl.
+      { rewrite <- REMOVE. refl. }
   Admitted.
 
   Lemma max_full_ts_inj
