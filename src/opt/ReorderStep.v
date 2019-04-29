@@ -48,7 +48,7 @@ Lemma future_read_step
     <<REL: View.opt_le released' released>> /\
     <<LOCAL: sim_local SimPromises.bot lc2' lc2>>.
 Proof.
-  inv STEP. exploit Memory.future_get1; eauto. i. des.
+  inv STEP. exploit Memory.future_get1; eauto. i. des. inv MSG_LE.
   esplits.
   - econs; eauto. eapply TViewFacts.readable_mon; eauto; refl.
   - auto.
@@ -56,7 +56,7 @@ Proof.
     + apply TViewFacts.read_tview_mon; auto.
       * refl.
       * apply WF.
-      * eapply MEM. eauto.
+      * inv MEM. exploit CLOSED; eauto. i. des. inv MSG_WF. auto.
       * refl.
     + apply SimPromises.sem_bot.
 Qed.
@@ -107,42 +107,44 @@ Proof.
       * specialize (LOC eq_refl). des. viewtac.
       * specialize (LOC eq_refl). des. viewtac.
       * specialize (LOC eq_refl). des. viewtac.
-    + f_equal. apply TView.antisym; apply ReorderTView.read_read_tview;
-        (try by apply WF0);
-        (try by eapply MEM0; eauto).
+    + inv MEM0. exploit CLOSED; try exact GET. i. des.
+      exploit CLOSED; try exact GET0. i. des. f_equal.
+      inv MSG_WF. inv MSG_WF0.
+      apply TView.antisym; apply ReorderTView.read_read_tview; 
+        (try by apply WF0); eauto.
 Qed.
 
 Lemma reorder_read_promise
       loc1 ts1 val1 released1 ord1
-      loc2 from2 to2 val2 released2 kind2
+      loc2 from2 to2 msg2 kind2
       lc0 mem0
       lc1
       lc2 mem2
       (WF0: Local.wf lc0 mem0)
       (MEM0: Memory.closed mem0)
       (STEP1: Local.read_step lc0 mem0 loc1 ts1 val1 released1 ord1 lc1)
-      (STEP2: Local.promise_step lc1 mem0 loc2 from2 to2 val2 released2 lc2 mem2 kind2):
+      (STEP2: Local.promise_step lc1 mem0 loc2 from2 to2 msg2 lc2 mem2 kind2):
   exists lc1' lc2' released1',
-    <<STEP1: Local.promise_step lc0 mem0 loc2 from2 to2 val2 released2 lc1' mem2 kind2>> /\
+    <<STEP1: Local.promise_step lc0 mem0 loc2 from2 to2 msg2 lc1' mem2 kind2>> /\
     <<STEP2: Local.read_step lc1' mem2 loc1 ts1 val1 released1' ord1 lc2'>> /\
     <<REL1: View.opt_le released1' released1>> /\
     <<LOCAL: sim_local SimPromises.bot lc2' lc2>>.
 Proof.
   inv STEP1. inv STEP2. ss.
   exploit Memory.promise_future; try exact PROMISE; try apply WF0; eauto. i. des.
-  exploit Memory.promise_get1; eauto. i. des.
+  exploit Memory.promise_get1; eauto. i. des. inv MSG_LE.
   esplits; eauto.
   - econs; eauto.
     s. eapply TViewFacts.readable_mon; eauto; try refl.
   - s. econs; ss.
     + apply TViewFacts.read_tview_mon; try refl; try apply WF0; eauto.
-      eapply MEM0. eauto.
+      inv MEM0. exploit CLOSED0; eauto. i. des. inv MSG_WF. auto.
     + apply SimPromises.sem_bot.
 Qed.
 
 Lemma reorder_read_promise_diff
       loc1 ts1 val1 released1 ord1
-      loc2 from2 to2 val2 released2 kind2
+      loc2 from2 to2 msg2 kind2
       lc0 mem0
       lc1
       lc2 mem2
@@ -150,9 +152,9 @@ Lemma reorder_read_promise_diff
       (WF0: Local.wf lc0 mem0)
       (MEM0: Memory.closed mem0)
       (STEP1: Local.read_step lc0 mem0 loc1 ts1 val1 released1 ord1 lc1)
-      (STEP2: Local.promise_step lc1 mem0 loc2 from2 to2 val2 released2 lc2 mem2 kind2):
+      (STEP2: Local.promise_step lc1 mem0 loc2 from2 to2 msg2 lc2 mem2 kind2):
   exists lc1',
-    <<STEP1: Local.promise_step lc0 mem0 loc2 from2 to2 val2 released2 lc1' mem2 kind2>> /\
+    <<STEP1: Local.promise_step lc0 mem0 loc2 from2 to2 msg2 lc1' mem2 kind2>> /\
     <<STEP2: Local.read_step lc1' mem2 loc1 ts1 val1 released1 ord1 lc2>>.
 Proof.
   inv STEP1. inv STEP2. ss.
@@ -340,7 +342,7 @@ Proof.
   - unfold Local.tview at 2.
     unfold Local.promises at 2.
     rewrite ReorderTView.read_write_tview_eq; eauto; try apply WF0; cycle 1.
-    { eapply MEM0. eauto. }
+    { inv MEM0. exploit CLOSED; eauto. i. des. inv MSG_WF. eauto. }
     econs; try exact REMOVE; eauto.
     + etrans; eauto. unfold TView.write_released. s. condtac; econs.
       repeat (try condtac; aggrtac).
@@ -352,16 +354,16 @@ Qed.
 
 Lemma reorder_fulfill_promise
       loc1 from1 to1 val1 releasedm1 released1 ord1
-      loc2 from2 to2 val2 released2 kind2
+      loc2 from2 to2 msg2 kind2
       lc0 sc0 mem0
       lc1 sc1
       lc2 mem2
       (WF0: Local.wf lc0 mem0)
       (MEM0: Memory.closed mem0)
       (STEP1: fulfill_step lc0 sc0 loc1 from1 to1 val1 releasedm1 released1 ord1 lc1 sc1)
-      (STEP2: Local.promise_step lc1 mem0 loc2 from2 to2 val2 released2 lc2 mem2 kind2):
+      (STEP2: Local.promise_step lc1 mem0 loc2 from2 to2 msg2 lc2 mem2 kind2):
   exists lc1',
-    <<STEP1: Local.promise_step lc0 mem0 loc2 from2 to2 val2 released2 lc1' mem2 kind2>> /\
+    <<STEP1: Local.promise_step lc0 mem0 loc2 from2 to2 msg2 lc1' mem2 kind2>> /\
     <<STEP2: fulfill_step lc1' sc0 loc1 from1 to1 val1 releasedm1 released1 ord1 lc2 sc1>>.
 Proof.
   inv STEP1. inv STEP2.
@@ -455,6 +457,7 @@ Proof.
   { i. hexploit ORD; eauto. i. des. splits; ss.
     ii. unfold Memory.get in GET.
     erewrite fulfill_step_promises_diff in GET; eauto.
+    exploit H0; eauto.
   }
   i. des.
   esplits; eauto.
@@ -531,7 +534,7 @@ Qed.
 Lemma reorder_update_promise
       loc1 ts1 val1 released1 ord1
       from2 to2 val2 released2 ord2
-      loc3 from3 to3 val3 released3 kind3
+      loc3 from3 to3 msg3 kind3
       lc0 sc0 mem0
       lc1
       lc2 sc2
@@ -541,9 +544,9 @@ Lemma reorder_update_promise
       (MEM0: Memory.closed mem0)
       (STEP1: Local.read_step lc0 mem0 loc1 ts1 val1 released1 ord1 lc1)
       (STEP2: fulfill_step lc1 sc0 loc1 from2 to2 val2 released1 released2 ord2 lc2 sc2)
-      (STEP3: Local.promise_step lc2 mem0 loc3 from3 to3 val3 released3 lc3 mem3 kind3):
+      (STEP3: Local.promise_step lc2 mem0 loc3 from3 to3 msg3 lc3 mem3 kind3):
   exists released1' lc1' lc2' lc3' sc3',
-    <<STEP1: Local.promise_step lc0 mem0 loc3 from3 to3 val3 released3 lc1' mem3 kind3>> /\
+    <<STEP1: Local.promise_step lc0 mem0 loc3 from3 to3 msg3 lc1' mem3 kind3>> /\
     <<STEP2: Local.read_step lc1' mem3 loc1 ts1 val1 released1' ord1 lc2'>> /\
     <<STEP3: fulfill_step lc2' sc0 loc1 from2 to2 val2 released1' released2 ord2 lc3' sc3'>> /\
     <<RELEASED1: View.opt_le released1' released1>> /\
@@ -566,7 +569,7 @@ Qed.
 Lemma reorder_update_promise_diff
       loc1 ts1 val1 released1 ord1
       from2 to2 val2 released2 ord2
-      loc3 from3 to3 val3 released3 kind3
+      loc3 from3 to3 msg3 kind3
       lc0 sc0 mem0
       lc1
       lc2 sc2
@@ -577,9 +580,9 @@ Lemma reorder_update_promise_diff
       (MEM0: Memory.closed mem0)
       (STEP1: Local.read_step lc0 mem0 loc1 ts1 val1 released1 ord1 lc1)
       (STEP2: fulfill_step lc1 sc0 loc1 from2 to2 val2 released1 released2 ord2 lc2 sc2)
-      (STEP3: Local.promise_step lc2 mem0 loc3 from3 to3 val3 released3 lc3 mem3 kind3):
+      (STEP3: Local.promise_step lc2 mem0 loc3 from3 to3 msg3 lc3 mem3 kind3):
   exists lc1' lc2',
-    <<STEP1: Local.promise_step lc0 mem0 loc3 from3 to3 val3 released3 lc1' mem3 kind3>> /\
+    <<STEP1: Local.promise_step lc0 mem0 loc3 from3 to3 msg3 lc1' mem3 kind3>> /\
     <<STEP2: Local.read_step lc1' mem3 loc1 ts1 val1 released1 ord1 lc2'>> /\
     <<STEP3: fulfill_step lc2' sc0 loc1 from2 to2 val2 released1 released2 ord2 lc3 sc2>>.
 Proof.
@@ -677,7 +680,9 @@ Proof.
   { i. hexploit ORD; eauto. i. des.
     splits; auto.
     erewrite Local.read_step_promises; [|eauto].
-    ii. unfold Memory.get in GET. erewrite fulfill_step_promises_diff in GET; eauto.
+    ii. unfold Memory.get in GET.
+    erewrite fulfill_step_promises_diff in GET; eauto.
+    exploit H0; eauto.
   }
   i. des.
   inv STEP1.
@@ -759,7 +764,9 @@ Proof.
   - econs; eauto.
   - s. econs; s.
     + inversion MEM0. exploit CLOSED; eauto. i. des.
-      exploit TViewFacts.read_future; try exact GET; try apply WF0; eauto. i. des.
+      exploit TViewFacts.read_future; try exact GET; try apply WF0; eauto.
+      { inv MEM0. exploit CLOSED0; eauto. i. des. inv MSG_WF. ss. }
+      i. des.
       exploit TViewFacts.read_fence_future; try apply WF0; eauto. i. des.
       etrans; [|etrans].
       * apply TViewFacts.write_fence_tview_mon; [|refl|refl|].
@@ -768,8 +775,10 @@ Proof.
           eapply TViewFacts.read_fence_future; eauto.
         }
       * apply ReorderTView.write_fence_read_tview; eauto.
+        { inv MEM0. exploit CLOSED0; eauto. i. des. inv MSG_WF. ss. }
       * apply TViewFacts.read_tview_mon; auto; try refl.
-        eapply TViewFacts.write_fence_future; eauto.
+        { eapply TViewFacts.write_fence_future; eauto. }
+        { inv MEM0. exploit CLOSED0; eauto. i. des. inv MSG_WF. ss. }
     + apply SimPromises.sem_bot.
   - s. etrans.
     + apply TViewFacts.write_fence_sc_mon; [|refl|refl].
@@ -780,7 +789,7 @@ Qed.
 
 Lemma reorder_fence_promise
       ordr1 ordw1
-      loc2 from2 to2 val2 released2
+      loc2 from2 to2 msg2
       lc0 sc0 mem0
       lc1 sc1
       lc2 mem2
@@ -789,9 +798,9 @@ Lemma reorder_fence_promise
       (WF0: Local.wf lc0 mem0)
       (MEM0: Memory.closed mem0)
       (STEP1: Local.fence_step lc0 sc0 ordr1 ordw1 lc1 sc1)
-      (STEP2: Local.promise_step lc1 mem0 loc2 from2 to2 val2 released2 lc2 mem2 kind):
+      (STEP2: Local.promise_step lc1 mem0 loc2 from2 to2 msg2 lc2 mem2 kind):
   exists lc1',
-    <<STEP1: Local.promise_step lc0 mem0 loc2 from2 to2 val2 released2 lc1' mem2 kind>> /\
+    <<STEP1: Local.promise_step lc0 mem0 loc2 from2 to2 msg2 lc1' mem2 kind>> /\
     <<STEP2: Local.fence_step lc1' sc0 ordr1 ordw1 lc2 sc1>>.
 Proof.
   inv STEP1. inv STEP2. ss.
@@ -852,7 +861,7 @@ Proof.
         { exploit Memory.remove_get0; eauto. s. i. des.
           inv WF0. exploit PROMISES; eauto. i.
           exploit TViewFacts.write_future_fulfill; try exact SC0; eauto.
-          { eapply MEM0. eauto. }
+          { inv MEM0. exploit CLOSED; eauto. i. des. inv MSG_CLOSED. ss.  }
           i. des.
           eapply TViewFacts.read_fence_future; eauto.
         }
