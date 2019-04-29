@@ -43,16 +43,7 @@ Lemma assign_sim_thread:
 Proof.
   pcofix CIH. i. pfold. ii. splits.
   { i. inv TERMINAL_TGT. }
-  { i. exploit SimPromises.future; try apply LOCAL; eauto. i. des.
-    esplits; eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply sim_memory_max_timemap; eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply Memory.future_max_timemap; eauto.
-    - apply Memory.max_timemap_closed. viewtac.
-  }
+  { i. eapply SimPromises.future_sc_mem; try apply LOCAL; eauto. }
   { i. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
@@ -83,16 +74,7 @@ Lemma merge_load_load_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits.
   { i. inv TERMINAL_TGT. }
-  { i. exploit SimPromises.future; try apply LOCAL; eauto. i. des.
-    esplits; eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply sim_memory_max_timemap; eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply Memory.future_max_timemap; eauto.
-    - apply Memory.max_timemap_closed. viewtac.
-  }
+  { i. eapply SimPromises.future_sc_mem; try apply LOCAL; eauto. }
   { i. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
@@ -131,16 +113,7 @@ Lemma merge_store_load_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits.
   { i. inv TERMINAL_TGT. }
-  { i. exploit SimPromises.future; try apply LOCAL; eauto. i. des.
-    esplits; eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply sim_memory_max_timemap; eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply Memory.future_max_timemap; eauto.
-    - apply Memory.max_timemap_closed. viewtac.
-  }
+  { i. eapply SimPromises.future_sc_mem; try apply LOCAL; eauto. }
   { i. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
@@ -178,16 +151,7 @@ Lemma merge_store_store_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits.
   { i. inv TERMINAL_TGT. }
-  { i. exploit SimPromises.future; try apply LOCAL; eauto. i. des.
-    esplits; eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply sim_memory_max_timemap; eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply Memory.future_max_timemap; eauto.
-    - apply Memory.max_timemap_closed. viewtac.
-  }
+  { i. eapply SimPromises.future_sc_mem; try apply LOCAL; eauto. }
   { i. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
@@ -247,16 +211,7 @@ Lemma merge_store_update_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits.
   { i. inv TERMINAL_TGT. }
-  { i. exploit SimPromises.future; try apply LOCAL; eauto. i. des.
-    esplits; eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply sim_memory_max_timemap; eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply Memory.future_max_timemap; eauto.
-    - apply Memory.max_timemap_closed. viewtac.
-  }
+  { i. eapply SimPromises.future_sc_mem; try apply LOCAL; eauto. }
   { i. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
@@ -322,16 +277,7 @@ Lemma merge_update_load_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits.
   { i. inv TERMINAL_TGT. }
-  { i. exploit SimPromises.future; try apply LOCAL; eauto. i. des.
-    esplits; eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply sim_memory_max_timemap; eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply Memory.future_max_timemap; eauto.
-    - apply Memory.max_timemap_closed. viewtac.
-  }
+  { i. eapply SimPromises.future_sc_mem; try apply LOCAL; eauto. }
   { i. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
@@ -386,16 +332,7 @@ Lemma merge_update_update_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits.
   { i. inv TERMINAL_TGT. }
-  { i. exploit SimPromises.future; try apply LOCAL; eauto. i. des.
-    esplits; eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply sim_memory_max_timemap; eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply Memory.future_max_timemap; eauto.
-    - apply Memory.max_timemap_closed. viewtac.
-  }
+  { i. eapply SimPromises.future_sc_mem; try apply LOCAL; eauto. }
   { i. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
@@ -417,7 +354,8 @@ Proof.
     exploit Local.read_step_future; eauto. i. des.
     hexploit sim_local_write_bot; try exact LOCAL2; try exact SC; eauto; try refl. i. des.
     exploit merge_write_write; try exact STEP_SRC0; eauto.
-    { inv STEP_SRC. eapply MEM_SRC. eauto. }
+    { inv STEP_SRC. inv MEM_SRC. exploit CLOSED; eauto. i. des.
+      inv MSG_TS. ss. }
     i. des.
     + exploit Local.promise_step_future; eauto. i. des.
       exploit Local.write_step_future; try apply STEP2; eauto; try by viewtac. i. des.
@@ -488,16 +426,7 @@ Lemma merge_fence_fence_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits.
   { i. inv TERMINAL_TGT. }
-  { i. exploit SimPromises.future; try apply LOCAL; eauto. i. des.
-    esplits; eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply sim_memory_max_timemap; eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply Memory.future_max_timemap; eauto.
-    - apply Memory.max_timemap_closed. viewtac.
-  }
+  { i. eapply SimPromises.future_sc_mem; try apply LOCAL; eauto. }
   { i. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
