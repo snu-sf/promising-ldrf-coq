@@ -719,6 +719,66 @@ Module Cell.
           Time.le to ts)
   .
 
+  Lemma max_full_ts_exists_aux
+        A t a
+        (l: list (Time.t * A))
+        (f: A -> bool)
+        (INHABITED1: f a = true)
+        (INHABITED2: List.In (t, a) l):
+    exists max_t max_a,
+      f max_a = true /\
+      List.In (max_t, max_a) l /\
+      (forall t' a' (IN: List.In (t', a') l) (F: f a' = true), Time.le t' max_t).
+  Proof.
+    remember (length l) eqn:LEN.
+    revert INHABITED1 INHABITED2 LEN. revert t a l.
+    induction n; i.
+    { destruct l; inv LEN. inv INHABITED2. }
+    destruct l; inv LEN.
+    destruct p as [t1 a1]. ss. des.
+    - inv INHABITED2. destruct l.
+      + esplits; eauto. i. des; inv IN. refl.
+      + exploit (IHn t0 a ((t0, a)::l)); auto; try by econs.
+        i. des. destruct p as [new_t new_a]. ss.
+        destruct (f new_a) eqn:FNEW; cycle 1.
+        { esplits; try exact x0.
+          - des; eauto.
+          - i. guardH x1. des.
+            + inv IN. eapply x2; eauto.
+            + inv IN. rewrite F in FNEW. inv FNEW.
+            + eapply x2; eauto. }
+        destruct (Time.le_lt_dec new_t max_t).
+        { esplits; try exact x0.
+          - des; eauto.
+          - i. guardH x1. des.
+            + inv IN. eapply x2; eauto.
+            + inv IN. auto.
+            + eapply x2; eauto. }
+        exists new_t. exists new_a. splits; auto.
+        i. guardH x1. des.
+        * inv IN. exploit (x2 t' a'); eauto. i.
+          etrans; eauto. econs. auto.
+        * inv IN. refl.
+        * etrans; [|econs; exact l0].
+          eapply x2; eauto.
+    - exploit (IHn t0 a l); eauto. i. des.
+      destruct (f a1) eqn:FNEW; cycle 1.
+      { esplits; try exact x0; eauto.
+        i. des.
+        - inv IN. rewrite FNEW in F. inv F.
+        - eapply x2; eauto. }
+      destruct (Time.le_lt_dec t1 max_t).
+      { esplits; try exact x0; eauto.
+        i. des.
+        - inv IN. auto.
+        - eapply x2; eauto. }
+      exists t1. exists a1. esplits; eauto.
+      i. des.
+      + inv IN. refl.
+      + etrans; [|econs; exact l0].
+        eapply x2; eauto.
+  Qed.
+
   Lemma max_full_ts_exists
         cell
         (INHABITED: get Time.bot cell = Some (Time.bot, Message.elt)):
@@ -726,21 +786,22 @@ Module Cell.
   Proof.
     destruct cell. unfold get in *. ss.
     remember (DOMap.elements raw0) as l eqn:DOM.
-    revert DOM INHABITED. revert raw0 WF0.
-    induction l; i.
-    - exploit DOMap.elements_correct; eauto. i.
-      rewrite <- DOM in *. inv x0.
-    - destruct a.
-      exploit DOMap.elements_complete.
-      { rewrite <- DOM. econs 1. refl. }
-      i. destruct p. exploit remove_exists.
-      { instantiate (3 := mk WF0). unfold get. ss. eapply x0. }
-      i. des. destruct cell2.
-      assert (REMOVE: DOMap.elements (DOMap.remove k raw1) = l).
-      { admit. }
-      exploit IHl.
-      { rewrite <- REMOVE. refl. }
-  Admitted.
+    exploit (max_full_ts_exists_aux
+               Time.bot (Time.bot, Message.elt) l
+               (fun (a: Time.t * Message.t) => match a with
+                                            | (_, Message.mk _ _) => true
+                                            | _ => false
+                                            end)).
+    { ss. }
+    { subst. eapply DOMap.elements_correct. auto. }
+    i. des. destruct max_a. destruct t1; ss.
+    exists max_t. econs.
+    - subst. esplits. unfold get. ss.
+      eapply DOMap.elements_complete. eauto.
+    - i. unfold get in GET. ss.
+      apply DOMap.elements_correct in GET. subst.
+      eapply x2; eauto.
+  Qed.
 
   Lemma max_full_ts_inj
         cell ts1 ts2
