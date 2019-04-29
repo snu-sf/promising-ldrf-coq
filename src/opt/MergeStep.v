@@ -288,8 +288,8 @@ Lemma promise_lower_promise_split_promise_split_promise_lower
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
-      (REL_CLOSED: forall promises1' mem1'
-                     (PROMISE1: Memory.promise (Local.promises lc0) mem0 loc ts1 ts2 msg2 promises1' mem1' Memory.op_kind_add),
+      (REL_CLOSED: forall promises1' mem1' msg ts
+                     (PROMISE1: Memory.promise (Local.promises lc0) mem0 loc ts1 ts2 msg2 promises1' mem1' (Memory.op_kind_split ts msg)),
           Memory.closed_message_view msg2 mem1')
       (STEP1: Local.promise_step lc0 mem0 loc ts1 ts3 msg3 lc1 mem1 (Memory.op_kind_lower msg0))
       (STEP2: Local.promise_step lc1 mem1 loc ts1 ts2 msg2 lc2 mem2 (Memory.op_kind_split ts3 msg3)):
@@ -299,12 +299,12 @@ Lemma promise_lower_promise_split_promise_split_promise_lower
 Proof.
   exploit Local.promise_step_future; try exact STEP1; eauto. i. des.
   inv STEP1. inv STEP2.
-  (* exploit MemoryReorder.promise_add_promise_split_same; eauto. i. des. *)
-  (* esplits. *)
-  (* - econs; eauto. *)
-  (* - econs; eauto. inv MSG_CLOSED; ss. econs. *)
-  (*   eauto using Memory.promise_closed_opt_view. *)
-Admitted.
+  exploit MemoryReorder.promise_lower_promise_split_same; eauto. i. des.
+  esplits.
+  - econs; eauto.
+  - econs; eauto. inv MSG_CLOSED; ss. econs.
+    eauto using Memory.promise_closed_opt_view.
+Qed.
 
 Lemma reorder_promise_split_promise_split
       loc ts1 ts2 ts3 ts4 msg2 msg3 msg4
@@ -410,6 +410,32 @@ Proof.
   exploit fulfill_step_future; try exact STEP2; try exact WF2; eauto; try by viewtac. i. des.
   inv STEP1. inv STEP2.
   exploit MemoryReorder.promise_split_remove; try exact PROMISE; eauto. i. des.
+  esplits.
+  - econs; eauto.
+  - econs; eauto.
+Qed.
+
+Lemma reorder_promise_lower_fulfill
+      loc1 from1 to1 msg1 msg2
+      loc2 from2 to2 val2 releasedm2 released2 ord2
+      lc0 sc0 mem0
+      lc1 mem1
+      lc2 sc2
+      (WF0: Local.wf lc0 mem0)
+      (SC0: Memory.closed_timemap sc0 mem0)
+      (MEM0: Memory.closed mem0)
+      (RELM_WF: Memory.closed_opt_view releasedm2 mem0)
+      (DIFF: (loc1, to1) <> (loc2, to2))
+      (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 msg2 lc1 mem1 (Memory.op_kind_lower msg1))
+      (STEP2: fulfill_step lc1 sc0 loc2 from2 to2 val2 releasedm2 released2 ord2 lc2 sc2):
+  exists lc1',
+    <<STEP1: fulfill_step lc0 sc0 loc2 from2 to2 val2 releasedm2 released2 ord2 lc1' sc2>> /\
+    <<STEP2: Local.promise_step lc1' mem0 loc1 from1 to1 msg2 lc2 mem1 (Memory.op_kind_lower msg1)>>.
+Proof.
+  exploit Local.promise_step_future; try exact STEP1; eauto. i. des.
+  exploit fulfill_step_future; try exact STEP2; try exact WF2; eauto; try by viewtac. i. des.
+  inv STEP1. inv STEP2.
+  exploit MemoryReorder.promise_lower_remove; try exact PROMISE; eauto. i. des.
   esplits.
   - econs; eauto.
   - econs; eauto.
@@ -549,8 +575,8 @@ Proof.
   - etrans; eauto. etrans; eauto.
 Qed.
 
-Lemma merge_write_write_lower_half
-      loc ts1 ts2 ts3 val1 val2 released0 released2 ord
+Lemma merge_write_write_lower
+      loc ts1 ts2 ts3 val1 val2 released0 released2 ord msg0
       lc0 sc0 mem0
       lc2 sc2 mem2
       (WF0: Local.wf lc0 mem0)
@@ -561,10 +587,10 @@ Lemma merge_write_write_lower_half
       (REL0_CLOSED: Memory.closed_opt_view released0 mem0)
       (TS12: Time.lt ts1 ts2)
       (TS23: Time.lt ts2 ts3)
-      (STEP: Local.write_step lc0 sc0 mem0 loc ts1 ts3 val2 released0 released2 ord lc2 sc2 mem2 (Memory.op_kind_lower Message.half)):
+      (STEP: Local.write_step lc0 sc0 mem0 loc ts1 ts3 val2 released0 released2 ord lc2 sc2 mem2 (Memory.op_kind_lower msg0)):
   exists lc1' lc2' sc1' sc2' mem1' mem2' released1' released2',
-    <<STEP1: Local.write_step lc0 sc0 mem0 loc ts1 ts2 val1 released0 released1' ord lc1' sc1' mem1' (Memory.op_kind_split ts3 Message.half)>> /\
-    <<STEP2: Local.write_step lc1' sc1' mem1' loc ts2 ts3 val2 released1' released2' ord lc2' sc2' mem2' (Memory.op_kind_lower Message.half)>> /\
+    <<STEP1: Local.write_step lc0 sc0 mem0 loc ts1 ts2 val1 released0 released1' ord lc1' sc1' mem1' (Memory.op_kind_split ts3 msg0)>> /\
+    <<STEP2: Local.write_step lc1' sc1' mem1' loc ts2 ts3 val2 released1' released2' ord lc2' sc2' mem2' (Memory.op_kind_lower msg0)>> /\
     <<REL3: View.opt_le released2' released2>> /\
     <<LOCAL3: sim_local SimPromises.bot lc2' lc2>> /\
     <<SC3: TimeMap.le sc2' sc2>> /\
@@ -586,7 +612,7 @@ Proof.
   i. des.
   exploit Local.promise_step_future; try eexact STEP5; eauto. i. des.
   (* start from here *)
-  exploit reorder_promise_add_fulfill; try exact STEP6; try eexact STEP3; eauto; try by viewtac.
+  exploit reorder_promise_lower_fulfill; try exact STEP6; try eexact STEP3; eauto; try by viewtac.
   { ii. inv H. exfalso. eapply Time.lt_strorder. eauto. }
   i. des.
   exploit fulfill_step_future; try eexact STEP7; try exact WF3; eauto; try by viewtac. i. des.
@@ -606,7 +632,7 @@ Proof.
   esplits; eauto.
   - etrans; eauto.
   - etrans; eauto. etrans; eauto.
-Admitted.
+Qed.
 
 Lemma merge_write_write
       loc ts1 ts2 ts3 val1 val2 released0 released2 ord kind
@@ -638,15 +664,17 @@ Proof.
     exploit merge_write_write_split; try apply TS12; eauto. i. des.
     esplits; try apply STEP2; eauto.
   - (* lower *)
-    destruct (Ordering.le Ordering.strong_relaxed ord) eqn:ORD.
-    + exploit Local.write_step_strong_relaxed; eauto; i; des; ss.
-      destruct msg1; ss.
-      exploit merge_write_write_lower_half; try apply TS12; eauto. i. des.
-      esplits; try apply STEP2; eauto.
-    + exploit merge_write_write_relaxed; try apply TS12; eauto.
-      { by destruct ord. }
-      i. des.
-      esplits; try exact STEP2; eauto.
+    exploit merge_write_write_lower; try apply TS12; eauto. i. des.
+    esplits; try apply STEP2; eauto.
+    (* destruct (Ordering.le Ordering.strong_relaxed ord) eqn:ORD. *)
+    (* + exploit Local.write_step_strong_relaxed; eauto; i; des; ss. *)
+    (*   destruct msg1; ss. *)
+    (*   exploit merge_write_write_lower_half; try apply TS12; eauto. i. des. *)
+    (*   esplits; try apply STEP2; eauto. *)
+    (* + exploit merge_write_write_relaxed; try apply TS12; eauto. *)
+    (*   { by destruct ord. } *)
+    (*   i. des. *)
+    (*   esplits; try exact STEP2; eauto. *)
 Qed.
 
 Lemma merge_write_write_None
@@ -663,7 +691,7 @@ Lemma merge_write_write_None
       (TS23: Time.lt ts2 ts3)
       (STEP: Local.write_step lc0 sc0 mem0 loc ts1 ts3 val2 released0 released2 ord lc3 sc3 mem3 kind):
   exists lc1' lc2' lc3' sc2' sc3' mem1' mem2' mem3' released1' released2' kind2 kind3,
-    <<STEP1: Local.promise_step lc0 mem0 loc ts1 ts3 val2 released2 lc1' mem1' kind \/ (lc0, mem0) = (lc1', mem1')>> /\
+    <<STEP1: Local.promise_step lc0 mem0 loc ts1 ts3 (Message.mk val2 released2) lc1' mem1' kind \/ (lc0, mem0) = (lc1', mem1')>> /\
     <<STEP2: Local.write_step lc1' sc0 mem1' loc ts1 ts2 val1 released0 released1' ord lc2' sc2' mem2' kind2>> /\
     <<STEP3: Local.write_step lc2' sc2' mem2' loc ts2 ts3 val2 None released2' ord lc3' sc3' mem3' kind3>> /\
     <<REL3: View.opt_le released2' released2>> /\
