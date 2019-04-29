@@ -65,16 +65,7 @@ Lemma reorder_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { inv TERMINAL_TGT. }
-  { exploit SimPromises.future; try apply LOCAL; eauto. i. des.
-    esplits; eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply sim_memory_max_timemap; eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply Memory.future_max_timemap; eauto.
-    - apply Memory.max_timemap_closed. viewtac.
-  }
+  { eapply SimPromises.future_sc_mem; try apply LOCAL; eauto. }
   { esplits; eauto.
     inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   }

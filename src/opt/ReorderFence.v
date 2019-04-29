@@ -194,7 +194,7 @@ Lemma sim_fence_sim_thread:
 Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss.
   - i. inv TERMINAL_TGT. inv PR; ss.
-  - i. inv PR. exploit SimPromises.future; try apply LOCAL; eauto.
+  - i. inv PR. eapply SimPromises.future_sc_mem; try apply LOCAL; eauto.
     { eapply Local.fence_step_future; try exact SC_SRC; eauto.
       eapply future_fence_step; try apply FENCE; eauto.
       inv REORDER; etrans; eauto.
@@ -203,14 +203,8 @@ Proof.
       eapply future_fence_step; try apply FENCE; eauto.
       inv REORDER; etrans; eauto.
     }
-    i. des. esplits; eauto.
-    + etrans.
-      * apply Memory.max_timemap_spec; eauto. viewtac.
-      * apply sim_memory_max_timemap; eauto.
-    + etrans.
-      * apply Memory.max_timemap_spec; eauto. viewtac.
-      * apply Memory.future_max_timemap; eauto.
-    + apply Memory.max_timemap_closed. viewtac.
+    eapply Local.program_step_no_half; try exact NOHALF_SRC.
+    econs 5; eauto.
   - i. esplits; eauto.
     inv PR. inversion FENCE. subst lc2_src. inversion LOCAL. ss.
     apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.

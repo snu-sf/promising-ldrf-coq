@@ -149,7 +149,8 @@ Lemma sim_update_future
       (MEM_FUTURE_SRC: Memory.future mem1_src mem2_src)
       (WF_SRC: Local.wf lc_src mem2_src)
       (SC_SRC: Memory.closed_timemap sc2_src mem2_src)
-      (MEM_SRC: Memory.closed mem2_src):
+      (MEM_SRC: Memory.closed mem2_src)
+      (NOHALF_SRC: Memory.no_half lc_src.(Local.promises) mem2_src):
   exists lc'_src sc2_tgt mem2_tgt,
     <<SC2: TimeMap.le sc2_src sc2_tgt>> /\
     <<MEM2: sim_memory mem2_src mem2_tgt>> /\
@@ -158,6 +159,7 @@ Lemma sim_update_future
     <<WF_TGT: Local.wf lc_tgt mem2_tgt>> /\
     <<SC_TGT: Memory.closed_timemap sc2_tgt mem2_tgt>> /\
     <<MEM_TGT: Memory.closed mem2_tgt>> /\
+    <<NOHALF_TGT: Memory.no_half lc_tgt.(Local.promises) mem2_tgt>> /\
     <<SIM2: sim_update st_src lc'_src sc2_src mem2_src
                        st_tgt lc_tgt sc2_tgt mem2_tgt>>.
 Proof.
@@ -165,32 +167,15 @@ Proof.
   destruct vw1 as [vw1|]; cycle 1.
   { ss. des. subst.
     exploit future_read_step; try exact READ; eauto. i. des.
-    exploit SimPromises.future; try apply MEM1; eauto.
+    exploit SimPromises.future_sc_mem; try apply SC_FUTURE_SRC; try apply MEM1; eauto.
     { inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite <- PROMISES.
       inv READ. ss. apply SimPromises.sem_bot.
     }
     i. des.
-
-    esplits.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply sim_memory_max_timemap; eauto.
-    - eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply Memory.future_max_timemap; eauto.
-    - auto.
-    - auto.
-    - apply Memory.max_timemap_closed. viewtac.
-    - auto.
-    - econs; [eauto|..]; s; eauto.
-      + etrans; eauto.
-      + etrans.
-        * apply Memory.max_timemap_spec; eauto. viewtac.
-        * apply sim_memory_max_timemap; eauto.
-      + apply Memory.max_timemap_closed. viewtac.
+    esplits; eauto.
+    econs; [eauto|..]; s; eauto.
+    etrans; eauto.
   }
-
   exploit Local.read_step_future; eauto. i. des.
   exploit fulfill_step_future; eauto; try by viewtac. i. des.
   exploit future_read_step; try exact READ; eauto. i. des.
@@ -215,32 +200,19 @@ Proof.
   }
   i. des.
   exploit fulfill_step_future; eauto. i. des.
-  exploit SimPromises.future; try apply MEM1; eauto.
+  exploit SimPromises.future_sc_mem; try apply SC_FUTURE_SRC; try apply MEM1; eauto.
   { inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite <- PROMISES.
     apply SimPromises.sem_bot.
   }
-  i. des. esplits.
-  - etrans.
-    + apply Memory.max_timemap_spec; eauto. viewtac.
-    + apply sim_memory_max_timemap; eauto.
-  - eauto.
-  - etrans.
-    + apply Memory.max_timemap_spec; eauto. viewtac.
-    + apply Memory.future_max_timemap; eauto.
-  - auto.
-  - auto.
-  - apply Memory.max_timemap_closed. viewtac.
-  - auto.
-  - econs; [eauto|..]; s; eauto.
-    + etrans; eauto.
-    + etrans.
-      * apply Memory.max_timemap_spec; eauto. viewtac.
-      * apply sim_memory_max_timemap; eauto.
-    + apply Memory.max_timemap_closed. viewtac.
+  { admit. (* fulfill_step_no_half *) }
+  i. des. esplits; eauto.
+  econs; [eauto|..]; s; eauto.
+  etrans; eauto.
 Grab Existential Variables.
+{ admit. }
 { econs 2. }
 { econs. econs 3. }
-Qed.
+Admitted.
 
 Lemma sim_update_step
       st1_src lc1_src sc1_src mem1_src
@@ -507,6 +479,7 @@ Proof.
       exploit Thread.rtc_tau_step_future; eauto. s. i. des.
       exploit Thread.opt_step_future; eauto. s. i. des.
       exploit Thread.program_step_future; eauto. s. i. des.
+      hexploit Thread.step_no_half; [econs 2; eauto|..]; eauto. s. i. des.
       punfold SIM. exploit SIM; try apply SC3; eauto; try refl. s. i. des.
       exploit PROMISES; eauto. i. des.
       esplits; [|eauto].
