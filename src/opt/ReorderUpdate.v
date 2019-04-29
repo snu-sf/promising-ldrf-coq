@@ -204,15 +204,17 @@ Proof.
   { inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite <- PROMISES.
     apply SimPromises.sem_bot.
   }
-  { admit. (* fulfill_step_no_half *) }
+  { eapply fulfill_step_no_half; eauto.
+    inv LOCAL0. eapply SimPromises.sem_bot_inv in PROMISES. rewrite <- PROMISES.
+    eapply Local.program_step_no_half; (try by econs 2; eauto); auto. }
   i. des. esplits; eauto.
   econs; [eauto|..]; s; eauto.
   etrans; eauto.
 Grab Existential Variables.
-{ admit. }
+{ auto. (* SC view of read step *) }
 { econs 2. }
 { econs. econs 3. }
-Admitted.
+Qed.
 
 Lemma sim_update_step
       st1_src lc1_src sc1_src mem1_src

@@ -61,6 +61,20 @@ Proof.
   esplits; eauto. refl.
 Qed.
 
+Lemma fulfill_step_no_half
+      lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2
+      (STEP: fulfill_step lc1 sc1 loc from to val releasedm released ord lc2 sc2)
+      (NOHALF: Memory.no_half lc1.(Local.promises) mem1):
+  Memory.no_half lc2.(Local.promises) mem1.
+Proof.
+  destruct lc1 as [tview1 promises1], lc2 as [tview2 promises2]. ss.
+  ii. exploit NOHALF; eauto. i.
+  inv STEP. ss.
+  exploit Memory.remove_get0; eauto. i. des.
+  erewrite Memory.remove_o; eauto. condtac; ss.
+  des. subst. rewrite x in GET0. inv GET0.
+Qed.
+
 Lemma write_promise_fulfill
       lc0 sc0 mem0 loc from to val releasedm released ord lc2 sc2 mem2 kind
       (WRITE: Local.write_step lc0 sc0 mem0 loc from to val releasedm released ord lc2 sc2 mem2 kind)

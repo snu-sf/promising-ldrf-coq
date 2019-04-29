@@ -144,10 +144,10 @@ Proof.
   { inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite <- PROMISES.
     apply SimPromises.sem_bot.
   }
-  { admit. (* fullfill_step_no_half *) }
+  { eapply fulfill_step_no_half; eauto. }
   i. des. esplits; eauto.
   econs; eauto.
-Admitted.
+Qed.
 
 Lemma sim_store_step
       st1_src lc1_src sc1_src mem1_src
