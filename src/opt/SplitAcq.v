@@ -37,8 +37,8 @@ Lemma sim_local_promise_acquired
       lc1_src mem1_src
       lc1_tgt mem1_tgt
       lc2_tgt mem2_tgt
-      loc from to val released kind
-      (STEP_TGT: Local.promise_step lc1_tgt mem1_tgt loc from to val released lc2_tgt mem2_tgt kind)
+      loc from to msg kind
+      (STEP_TGT: Local.promise_step lc1_tgt mem1_tgt loc from to msg lc2_tgt mem2_tgt kind)
       (LOCAL1: sim_local SimPromises.bot lc1_src (local_acquired lc1_tgt))
       (MEM1: sim_memory mem1_src mem1_tgt)
       (WF1_SRC: Local.wf lc1_src mem1_src)
@@ -46,7 +46,7 @@ Lemma sim_local_promise_acquired
       (MEM1_SRC: Memory.closed mem1_src)
       (MEM1_TGT: Memory.closed mem1_tgt):
   exists lc2_src mem2_src,
-    <<STEP_SRC: Local.promise_step lc1_src mem1_src loc from to val released lc2_src mem2_src kind>> /\
+    <<STEP_SRC: Local.promise_step lc1_src mem1_src loc from to msg lc2_src mem2_src kind>> /\
     <<LOCAL2: sim_local SimPromises.bot lc2_src (local_acquired lc2_tgt)>> /\
     <<MEM2: sim_memory mem2_src mem2_tgt>>.
 Proof.
@@ -55,12 +55,17 @@ Proof.
   { apply WF1_SRC. }
   { apply WF1_TGT. }
   i. des.
-  exploit sim_memory_closed_opt_view; eauto. i.
   exploit Memory.promise_future; try apply PROMISE_SRC; eauto.
   { apply WF1_SRC. }
   { apply WF1_SRC. }
+  { destruct msg; ss. inv CLOSED. econs.
+    eapply sim_memory_closed_opt_view; eauto. }
   i. des.
-  esplits; eauto. econs; eauto.
+  esplits; eauto.
+  - econs; eauto.
+    destruct msg; ss. inv CLOSED. econs.
+    eapply sim_memory_closed_opt_view; eauto.
+  - econs; eauto.
 Qed.
 
 Lemma sim_local_fulfill_acquired
@@ -114,6 +119,7 @@ Proof.
   }
   exploit SimPromises.remove_bot; try exact REMOVE;
     try exact MEM1; try apply LOCAL1; eauto.
+  { econs. ss. }
   { apply WF1_SRC. }
   { apply WF1_TGT. }
   { apply WF1_TGT. }
@@ -237,48 +243,6 @@ Proof.
   inv SIM1. econs; eauto.
 Qed.
 
-Lemma sim_acquired_future
-      st_src lc_src sc1_src mem1_src
-      st_tgt lc_tgt sc1_tgt mem1_tgt
-      sc2_src mem2_src
-      (SC1: TimeMap.le sc1_src sc1_tgt)
-      (MEM1: sim_memory mem1_src mem1_tgt)
-      (SIM1: sim_acquired st_src lc_src sc1_src mem1_src
-                          st_tgt lc_tgt sc1_tgt mem1_tgt)
-      (SC_FUTURE_SRC: TimeMap.le sc1_src sc2_src)
-      (MEM_FUTURE_SRC: Memory.future mem1_src mem2_src)
-      (WF_SRC: Local.wf lc_src mem2_src)
-      (SC_SRC: Memory.closed_timemap sc2_src mem2_src)
-      (MEM_SRC: Memory.closed mem2_src):
-  exists lc'_src sc2_tgt mem2_tgt,
-    <<SC2: TimeMap.le sc2_src sc2_tgt>> /\
-    <<MEM2: sim_memory mem2_src mem2_tgt>> /\
-    <<SC_FUTURE_TGT: TimeMap.le sc1_tgt sc2_tgt>> /\
-    <<MEM_FUTURE_TGT: Memory.future mem1_tgt mem2_tgt>> /\
-    <<WF_TGT: Local.wf lc_tgt mem2_tgt>> /\
-    <<SC_TGT: Memory.closed_timemap sc2_tgt mem2_tgt>> /\
-    <<MEM_TGT: Memory.closed mem2_tgt>> /\
-    <<SIM2: sim_acquired st_src lc'_src sc2_src mem2_src
-                         st_tgt lc_tgt sc2_tgt mem2_tgt>>.
-Proof.
-  inv SIM1.
-  exploit SimPromises.future; try apply MEM1; eauto.
-  { inv LOCAL. ss. eauto. }
-  i. des. esplits; eauto.
-  - etrans.
-    + apply Memory.max_timemap_spec; eauto. viewtac.
-    + apply sim_memory_max_timemap; eauto.
-  - etrans.
-    + apply Memory.max_timemap_spec; eauto. viewtac.
-    + apply Memory.future_max_timemap; eauto.
-  - apply Memory.max_timemap_closed. viewtac.
-  - econs; eauto.
-    + etrans.
-      * apply Memory.max_timemap_spec; eauto. viewtac.
-      * apply sim_memory_max_timemap; eauto.
-    + apply Memory.max_timemap_closed. viewtac.
-Qed.
-
 Lemma sim_acquired_step
       st1_src lc1_src sc1_src mem1_src
       st1_tgt lc1_tgt sc1_tgt mem1_tgt
@@ -314,8 +278,8 @@ Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss; ii.
   - inv TERMINAL_TGT. inv PR; ss.
   - exploit sim_acquired_mon; eauto. i.
-    exploit sim_acquired_future; try apply x0; eauto. i. des.
-    esplits; eauto.
+    eapply SimPromises.future_sc_mem; try apply LOCAL; eauto.
+    inv PR. apply LOCAL.
   - esplits; eauto.
     inv PR. eapply sim_local_memory_bot; eauto.
   - exploit sim_acquired_mon; eauto. i.
@@ -343,7 +307,7 @@ Lemma sim_local_read_acquired
     <<LOCAL2: sim_local SimPromises.bot lc2_src (local_acquired lc2_tgt)>>.
 Proof.
   inv LOCAL1. inv STEP_TGT.
-  exploit sim_memory_get; try apply MEM1; eauto. i. des.
+  exploit sim_memory_get; try apply MEM1; eauto. i. des. inv MSG.
   esplits; eauto.
   - econs; eauto. inv READABLE. econs; ss; i.
     + rewrite <- PLN. apply TVIEW.
@@ -354,9 +318,11 @@ Proof.
     all: try by apply TVIEW.
     all: try by apply WF1_TGT.
     + rewrite <- ? View.join_l. etrans; [apply TVIEW|]. apply WF1_TGT.
-    + inv MEM1_TGT. exploit CLOSED; eauto. i. des. apply View.unwrap_opt_wf. ss.
+    + inv MEM1_TGT. exploit CLOSED; eauto. i. des.
+      apply View.unwrap_opt_wf. inv MSG_WF. ss.
     + rewrite <- ? View.join_l. apply TVIEW.
-    + inv MEM1_TGT. exploit CLOSED; eauto. i. des. apply View.unwrap_opt_wf. ss.
+    + inv MEM1_TGT. exploit CLOSED; eauto. i. des.
+      apply View.unwrap_opt_wf. inv MSG_WF. ss.
 Qed.
 
 Lemma split_acquire_sim_stmts
@@ -369,16 +335,7 @@ Lemma split_acquire_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { inv TERMINAL_TGT. }
-  { exploit SimPromises.future; try apply LOCAL; eauto. i. des.
-    esplits; eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply sim_memory_max_timemap; eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply Memory.future_max_timemap; eauto.
-    - apply Memory.max_timemap_closed. viewtac.
-  }
+  { eapply SimPromises.future_sc_mem; try apply LOCAL; eauto. }
   { esplits; eauto.
     inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   }
@@ -414,7 +371,8 @@ Proof.
     exploit Local.read_step_future; eauto. i. des.
     exploit Local.write_step_future; eauto. i. des.
     hexploit sim_local_write_acquired; try exact LOCAL2; try exact SC; eauto; try refl.
-    { inv LOCAL1. eapply MEM_TGT. eauto. }
+    { inv LOCAL1. inv MEM_TGT. exploit CLOSED; eauto. i. des.
+      inv MSG_TS. ss. }
     { inv STEP_SRC. inv LOCAL1. ss. repeat (condtac; aggrtac).
       - rewrite <- ? View.join_l. apply LOCAL.
       - apply WF_TGT.

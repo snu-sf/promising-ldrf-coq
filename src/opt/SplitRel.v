@@ -87,49 +87,49 @@ Proof.
   inv SIM1. econs; eauto.
 Qed.
 
-Lemma sim_released_future
-      st_src lc_src sc1_src mem1_src
-      st_tgt lc_tgt sc1_tgt mem1_tgt
-      sc2_src mem2_src
-      (SC1: TimeMap.le sc1_src sc1_tgt)
-      (MEM1: sim_memory mem1_src mem1_tgt)
-      (SIM1: sim_released st_src lc_src sc1_src mem1_src
-                          st_tgt lc_tgt sc1_tgt mem1_tgt)
-      (SC_FUTURE_SRC: TimeMap.le sc1_src sc2_src)
-      (MEM_FUTURE_SRC: Memory.future mem1_src mem2_src)
-      (WF_SRC: Local.wf lc_src mem2_src)
-      (SC_SRC: Memory.closed_timemap sc2_src mem2_src)
-      (MEM_SRC: Memory.closed mem2_src):
-  exists lc'_src sc2_tgt mem2_tgt,
-    <<SC2: TimeMap.le sc2_src sc2_tgt>> /\
-    <<MEM2: sim_memory mem2_src mem2_tgt>> /\
-    <<SC_FUTURE_TGT: TimeMap.le sc1_tgt sc2_tgt>> /\
-    <<MEM_FUTURE_TGT: Memory.future mem1_tgt mem2_tgt>> /\
-    <<WF_TGT: Local.wf lc_tgt mem2_tgt>> /\
-    <<SC_TGT: Memory.closed_timemap sc2_tgt mem2_tgt>> /\
-    <<MEM_TGT: Memory.closed mem2_tgt>> /\
-    <<SIM2: sim_released st_src lc'_src sc2_src mem2_src
-                         st_tgt lc_tgt sc2_tgt mem2_tgt>>.
-Proof.
-  inv SIM1.
-  exploit SimPromises.future; try apply MEM1; eauto.
-  { inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite <- PROMISES.
-    apply SimPromises.sem_bot.
-  }
-  i. des. esplits; eauto.
-  - etrans.
-    + apply Memory.max_timemap_spec; eauto. viewtac.
-    + apply sim_memory_max_timemap; eauto.
-  - etrans.
-    + apply Memory.max_timemap_spec; eauto. viewtac.
-    + apply Memory.future_max_timemap; eauto.
-  - apply Memory.max_timemap_closed. viewtac.
-  - econs; eauto.
-    + etrans.
-      * apply Memory.max_timemap_spec; eauto. viewtac.
-      * apply sim_memory_max_timemap; eauto.
-    + apply Memory.max_timemap_closed. viewtac.
-Qed.
+(* Lemma sim_released_future *)
+(*       st_src lc_src sc1_src mem1_src *)
+(*       st_tgt lc_tgt sc1_tgt mem1_tgt *)
+(*       sc2_src mem2_src *)
+(*       (SC1: TimeMap.le sc1_src sc1_tgt) *)
+(*       (MEM1: sim_memory mem1_src mem1_tgt) *)
+(*       (SIM1: sim_released st_src lc_src sc1_src mem1_src *)
+(*                           st_tgt lc_tgt sc1_tgt mem1_tgt) *)
+(*       (SC_FUTURE_SRC: TimeMap.le sc1_src sc2_src) *)
+(*       (MEM_FUTURE_SRC: Memory.future mem1_src mem2_src) *)
+(*       (WF_SRC: Local.wf lc_src mem2_src) *)
+(*       (SC_SRC: Memory.closed_timemap sc2_src mem2_src) *)
+(*       (MEM_SRC: Memory.closed mem2_src): *)
+(*   exists lc'_src sc2_tgt mem2_tgt, *)
+(*     <<SC2: TimeMap.le sc2_src sc2_tgt>> /\ *)
+(*     <<MEM2: sim_memory mem2_src mem2_tgt>> /\ *)
+(*     <<SC_FUTURE_TGT: TimeMap.le sc1_tgt sc2_tgt>> /\ *)
+(*     <<MEM_FUTURE_TGT: Memory.future mem1_tgt mem2_tgt>> /\ *)
+(*     <<WF_TGT: Local.wf lc_tgt mem2_tgt>> /\ *)
+(*     <<SC_TGT: Memory.closed_timemap sc2_tgt mem2_tgt>> /\ *)
+(*     <<MEM_TGT: Memory.closed mem2_tgt>> /\ *)
+(*     <<SIM2: sim_released st_src lc'_src sc2_src mem2_src *)
+(*                          st_tgt lc_tgt sc2_tgt mem2_tgt>>. *)
+(* Proof. *)
+(*   inv SIM1. *)
+(*   exploit SimPromises.future; try apply MEM1; eauto. *)
+(*   { inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite <- PROMISES. *)
+(*     apply SimPromises.sem_bot. *)
+(*   } *)
+(*   i. des. esplits; eauto. *)
+(*   - etrans. *)
+(*     + apply Memory.max_timemap_spec; eauto. viewtac. *)
+(*     + apply sim_memory_max_timemap; eauto. *)
+(*   - etrans. *)
+(*     + apply Memory.max_timemap_spec; eauto. viewtac. *)
+(*     + apply Memory.future_max_timemap; eauto. *)
+(*   - apply Memory.max_timemap_closed. viewtac. *)
+(*   - econs; eauto. *)
+(*     + etrans. *)
+(*       * apply Memory.max_timemap_spec; eauto. viewtac. *)
+(*       * apply sim_memory_max_timemap; eauto. *)
+(*     + apply Memory.max_timemap_closed. viewtac. *)
+(* Qed. *)
 
 Lemma sim_local_fulfill_released
       lc1_src sc1_src mem1_src
@@ -172,6 +172,7 @@ Proof.
   }
   exploit SimPromises.remove_bot; try exact REMOVE;
     try exact MEM1; try apply LOCAL1; eauto.
+  { econs. ss. }
   { apply WF1_SRC. }
   { apply WF1_TGT. }
   { apply WF1_TGT. }
@@ -293,9 +294,8 @@ Lemma sim_released_sim_thread:
 Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss; ii.
   - inv TERMINAL_TGT. inv PR; ss.
-  - exploit sim_released_mon; eauto. i.
-    exploit sim_released_future; try apply x0; eauto. i. des.
-    esplits; eauto.
+  - eapply SimPromises.future_sc_mem; eauto.
+    inv PR. apply LOCAL.
   - esplits; eauto.
     inv PR. eapply sim_local_memory_bot; eauto.
   - exploit sim_released_mon; eauto. i.
@@ -315,16 +315,7 @@ Lemma split_release_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { inv TERMINAL_TGT. }
-  { exploit SimPromises.future; try apply LOCAL; eauto. i. des.
-    esplits; eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply sim_memory_max_timemap; eauto.
-    - etrans.
-      + apply Memory.max_timemap_spec; eauto. viewtac.
-      + apply Memory.future_max_timemap; eauto.
-    - apply Memory.max_timemap_closed. viewtac.
-  }
+  { eapply SimPromises.future_sc_mem; try apply LOCAL; eauto. }
   { esplits; eauto.
     inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   }
