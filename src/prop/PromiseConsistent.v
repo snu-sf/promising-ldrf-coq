@@ -39,12 +39,12 @@ Definition promise_consistent_th (tid: Ident.t) (c: Configuration.t) : Prop :=
   promise_consistent lc.
 
 Lemma promise_step_promise_consistent
-      lc1 mem1 loc from msg released lc2 mem2 kind
-      (STEP: Local.promise_step lc1 mem1 loc from msg released lc2 mem2 kind)
+      lc1 mem1 loc from to msg lc2 mem2 kind
+      (STEP: Local.promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
       (CONS: promise_consistent lc2):
   promise_consistent lc1.
 Proof.
-  inv STEP. ii. destruct msg.
+  inv STEP. ii.
   exploit Memory.promise_get1_promise; eauto. i. des.
   exploit CONS; eauto.
 Qed.
@@ -61,13 +61,13 @@ Proof.
 Qed.
 
 Lemma fulfill_unset_promises
-      loc from ts val rel
+      loc from ts msg
       promises1 promises2
       l t f m
-      (FULFILL: Memory.remove promises1 loc from ts val rel promises2)
+      (FULFILL: Memory.remove promises1 loc from ts msg promises2)
       (TH1: Memory.get l t promises1 = Some (f, m))
       (TH2: Memory.get l t promises2 = None):
-  l = loc /\ t = ts /\ f = from /\ m.(Message.val) = val /\ View.opt_le rel m.(Message.released).
+  l = loc /\ t = ts /\ f = from /\ Message.le msg m.
 Proof.
   revert TH2. erewrite Memory.remove_o; eauto. condtac; ss; [|congr].
   des. subst. exploit Memory.remove_get0; eauto. i. des.
@@ -85,7 +85,7 @@ Proof.
   destruct (Memory.get loc0 ts promises2) as [[]|] eqn:X.
   - apply CONS in X. eapply TimeFacts.le_lt_lt; eauto.
     s. etrans; [|apply Time.join_l]. refl.
-  - destruct msg. inv WRITE.
+  - inv WRITE.
     exploit Memory.promise_get1_promise; eauto. i. des.
     exploit fulfill_unset_promises; eauto. i. des. subst.
     apply WRITABLE.
@@ -165,9 +165,16 @@ Lemma consistent_promise_consistent
       (MEM: Memory.closed th.(Thread.memory)):
   promise_consistent th.(Thread.local).
 Proof.
-  exploit CONS; eauto; try refl. i. des.
-  eapply rtc_tau_step_promise_consistent; (try by destruct th; eauto).
-  ii. rewrite PROMISES, Memory.bot_get in *. congr.
+  destruct th. destruct local. inv WF. ss.
+  exploit Memory.no_half_future_exists; eauto. i. des.
+  exploit CONS; try exact FUTURE; eauto; ss; try refl.
+  { econs; eauto. eapply TView.future_closed; eauto. }
+  { eapply Memory.future_closed_timemap; eauto. }
+  i. des.
+  hexploit rtc_tau_step_promise_consistent; try exact STEPS; ss; eauto.
+  { ii. rewrite PROMISES0, Memory.bot_get in *. congr. }
+  { econs; eauto. eapply TView.future_closed; eauto. }
+  { eapply Memory.future_closed_timemap; eauto. }
 Qed.
 
 Lemma promise_consistent_promise_read
