@@ -24,7 +24,6 @@ Require Import SimLocal.
 Require Import FulfillStep.
 Require Import MemoryReorder.
 Require Import Configuration.
-Require Import SmallStep.
 
 Set Implicit Arguments.
 
@@ -40,8 +39,8 @@ Definition promise_consistent_th (tid: Ident.t) (c: Configuration.t) : Prop :=
   promise_consistent lc.
 
 Lemma promise_step_promise_consistent
-      lc1 mem1 loc from to val released lc2 mem2 kind
-      (STEP: Local.promise_step lc1 mem1 loc from to val released lc2 mem2 kind)
+      lc1 mem1 loc from msg released lc2 mem2 kind
+      (STEP: Local.promise_step lc1 mem1 loc from msg released lc2 mem2 kind)
       (CONS: promise_consistent lc2):
   promise_consistent lc1.
 Proof.
