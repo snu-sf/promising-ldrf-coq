@@ -410,6 +410,17 @@ Module Cell.
 
   Definition init: t := mk Raw.init_wf.
 
+  Lemma init_get t:
+    get t init =
+    if Loc.eq_dec t Time.bot
+    then Some (Time.bot, Message.elt)
+    else None.
+  Proof.
+    unfold get, init, Raw.init. ss. condtac.
+    - subst. rewrite DOMap.singleton_eq. auto.
+    - rewrite DOMap.singleton_neq; auto.
+  Qed.
+
   Definition add (cell1:t) (from to:Time.t) (msg: Message.t) (cell2:t): Prop :=
     Raw.add cell1 from to msg cell2.
 

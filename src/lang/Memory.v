@@ -145,6 +145,32 @@ Module Memory.
 
   Definition init: t := fun _ => Cell.init.
 
+  Definition finite (mem:t): Prop :=
+    exists dom,
+    forall loc from to msg (GET: get loc to mem = Some (from, msg)),
+      List.In (loc, to) dom.
+
+  Lemma bot_finite: finite bot.
+  Proof.
+    exists []. ii. rewrite bot_get in *. congr.
+  Qed.
+
+  Definition finite_half (mem:t): Prop :=
+    exists dom,
+    forall loc from to (GET: get loc to mem = Some (from, Message.half)),
+      List.In (loc, to) dom.
+
+  Lemma bot_finite_half: finite_half bot.
+  Proof.
+    exists []. ii. rewrite bot_get in *. congr.
+  Qed.
+
+  Lemma init_finite_half: finite_half init.
+  Proof.
+    exists []. i. revert GET. unfold get. unfold init. s.
+    rewrite Cell.init_get. condtac; ss.
+  Qed.
+
   Inductive message_ts: forall (msg:Message.t) (loc:Loc.t) (to:Time.t), Prop :=
   | message_ts_full
       val released loc to
@@ -201,6 +227,7 @@ Module Memory.
           <<MSG_TS: message_ts msg loc to>> /\
           <<MSG_CLOSED: closed_message_view msg mem>>)
       (INHABITED: inhabited mem)
+      (FINITE_HALF: finite_half mem)
   .
   Hint Constructors closed.
 
@@ -228,9 +255,10 @@ Module Memory.
   Lemma init_closed: closed init.
   Proof.
     econs; i; ss.
-    unfold get, init, Cell.get, Cell.init in MSG. ss.
-    apply DOMap.singleton_find_inv in MSG. des. inv MSG0.
-    splits; try econs; ss. refl.
+    - unfold get, init, Cell.get, Cell.init in MSG. ss.
+      apply DOMap.singleton_find_inv in MSG. des. inv MSG0.
+      splits; try econs; ss. refl.
+    - apply init_finite_half.
   Qed.
 
   Inductive add (mem1:t) (loc:Loc.t) (from to:Time.t) (msg:Message.t) (mem2:t): Prop :=
@@ -661,6 +689,118 @@ Module Memory.
   Qed.
 
 
+  (* lemmas on finite *)
+
+  Lemma add_finite
+        mem1 loc from to msg mem2
+        (ADD: add mem1 loc from to msg mem2)
+        (FINITE: finite mem1):
+    finite mem2.
+  Proof.
+    unfold finite in *. des. exists ((loc, to) :: dom). i.
+    revert GET. erewrite add_o; eauto. condtac; ss; eauto.
+    i. des. inv GET. auto.
+  Qed.
+
+  Lemma split_finite
+        mem1 loc ts1 ts2 ts3 msg2 msg3 mem2
+        (SPLIT: split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2)
+        (FINITE: finite mem1):
+    finite mem2.
+  Proof.
+    unfold finite in *. des. exists ((loc, ts2) :: dom). i.
+    revert GET. erewrite split_o; eauto. repeat condtac; ss; eauto.
+    - i. des. inv GET. auto.
+    - guardH o. i. des. inv GET. right. eapply FINITE.
+      hexploit split_get0; eauto. i. des. eauto.
+  Qed.
+
+  Lemma lower_finite
+        mem1 loc from to msg1 msg2 mem2
+        (LOWER: lower mem1 loc from to msg1 msg2 mem2)
+        (FINITE: finite mem1):
+    finite mem2.
+  Proof.
+    unfold finite in *. des. exists dom. i.
+    revert GET. erewrite lower_o; eauto. condtac; ss; eauto.
+    i. des. inv GET. eapply FINITE.
+    hexploit lower_get0; eauto. i. des. eauto.
+  Qed.
+
+  Lemma remove_finite
+        mem1 loc from to msg mem2
+        (REMOVE: remove mem1 loc from to msg mem2)
+        (FINITE: finite mem1):
+    finite mem2.
+  Proof.
+    unfold finite in *. des. exists dom. i.
+    revert GET. erewrite remove_o; eauto. condtac; ss; eauto.
+  Qed.
+
+  Lemma add_finite_half
+        mem1 loc from to msg mem2
+        (ADD: add mem1 loc from to msg mem2)
+        (FINITE: finite_half mem1):
+    finite_half mem2.
+  Proof.
+    unfold finite_half in *. des. destruct msg.
+    - exists dom. i.
+      revert GET. erewrite add_o; eauto. condtac; ss; eauto.
+    - exists ((loc, to) :: dom). i.
+      revert GET. erewrite add_o; eauto. condtac; ss; eauto.
+      i. des. inv GET. auto.
+  Qed.
+
+  Lemma split_finite_half
+        mem1 loc ts1 ts2 ts3 msg2 msg3 mem2
+        (SPLIT: split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2)
+        (FINITE: finite_half mem1):
+    finite_half mem2.
+  Proof.
+    unfold finite_half in *. des. destruct msg2.
+    - exists dom. i.
+      revert GET. erewrite split_o; eauto. repeat condtac; ss; eauto.
+      guardH o. des. i. inv GET.
+      exploit split_get0; eauto. i. des.
+      eapply FINITE; eauto.
+    - exists ((loc, ts2) :: dom). i.
+      revert GET. erewrite split_o; eauto. repeat condtac; ss; eauto.
+      + i. des. inv GET. auto.
+      + guardH o. i. des. inv GET.
+        exploit split_get0; eauto. i. des.
+        right. eapply FINITE; eauto.
+  Qed.
+
+  Lemma lower_finite_half
+        mem1 loc from to msg1 msg2 mem2
+        (LOWER: lower mem1 loc from to msg1 msg2 mem2)
+        (FINITE: finite_half mem1):
+    finite_half mem2.
+  Proof.
+    unfold finite_half in *. des. destruct msg1, msg2.
+    - exists dom. i.
+      revert GET. erewrite lower_o; eauto. condtac; ss; eauto.
+    - inv LOWER. inv LOWER0. inv MSG_LE.
+    - exists ((loc, to) :: dom). i.
+      revert GET. erewrite lower_o; eauto. repeat condtac; ss; eauto.
+    - exists dom. i.
+      revert GET. erewrite lower_o; eauto. condtac; ss; eauto.
+      des. subst. i.
+      exploit lower_get0; eauto. i. des.
+      eapply FINITE; eauto.
+  Qed.
+
+  Lemma remove_finite_half
+        mem1 loc from to msg mem2
+        (REMOVE: remove mem1 loc from to msg mem2)
+        (FINITE: finite_half mem1):
+    finite_half mem2.
+  Proof.
+    unfold finite_half in *. des. exists dom. i.
+    revert GET. erewrite remove_o; eauto. condtac; ss; eauto.
+  Qed.
+
+
   (* Lemmas on closedness *)
 
   Lemma join_closed_timemap
@@ -754,6 +894,7 @@ Module Memory.
       + guardH o. i. exploit CLOSED0; eauto. i. des. splits; auto.
         eapply add_closed_message_view; eauto.
     - eapply add_inhabited; eauto.
+    - eapply add_finite_half; eauto.
   Qed.
 
   Lemma split_closed_timemap
@@ -840,6 +981,7 @@ Module Memory.
       + guardH o. guardH o0. i. exploit CLOSED0; eauto. i. des. splits; auto.
         eapply split_closed_message_view; eauto.
     - eapply split_inhabited; eauto.
+    - eapply split_finite_half; eauto.
   Qed.
 
   Lemma lower_closed_timemap
@@ -905,6 +1047,7 @@ Module Memory.
       + guardH o. i. exploit CLOSED0; eauto. i. des. splits; auto.
         eapply lower_closed_message_view; eauto.
     - eapply lower_inhabited; eauto.
+    - eapply lower_finite_half; eauto.
   Qed.
 
   Lemma op_closed_timemap
@@ -1077,65 +1220,6 @@ Module Memory.
     destruct cond; ss.
     - eapply singleton_ur_closed_view; eauto.
     - eapply singleton_rw_closed_view; eauto.
-  Qed.
-
-
-  (* finite *)
-
-  Definition finite (mem:t): Prop :=
-    exists dom,
-    forall loc from to msg (GET: get loc to mem = Some (from, msg)),
-      List.In (loc, to) dom.
-
-  Lemma bot_finite: finite bot.
-  Proof.
-    exists []. ii. rewrite bot_get in *. congr.
-  Qed.
-
-  Lemma add_finite
-        mem1 loc from to msg mem2
-        (ADD: add mem1 loc from to msg mem2)
-        (FINITE: finite mem1):
-    finite mem2.
-  Proof.
-    unfold finite in *. des. exists ((loc, to) :: dom). i.
-    revert GET. erewrite add_o; eauto. condtac; ss; eauto.
-    i. des. inv GET. auto.
-  Qed.
-
-  Lemma split_finite
-        mem1 loc ts1 ts2 ts3 msg2 msg3 mem2
-        (SPLIT: split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2)
-        (FINITE: finite mem1):
-    finite mem2.
-  Proof.
-    unfold finite in *. des. exists ((loc, ts2) :: dom). i.
-    revert GET. erewrite split_o; eauto. repeat condtac; ss; eauto.
-    - i. des. inv GET. auto.
-    - guardH o. i. des. inv GET. right. eapply FINITE.
-      hexploit split_get0; eauto. i. des. eauto.
-  Qed.
-
-  Lemma lower_finite
-        mem1 loc from to msg1 msg2 mem2
-        (LOWER: lower mem1 loc from to msg1 msg2 mem2)
-        (FINITE: finite mem1):
-    finite mem2.
-  Proof.
-    unfold finite in *. des. exists dom. i.
-    revert GET. erewrite lower_o; eauto. condtac; ss; eauto.
-    i. des. inv GET. eapply FINITE.
-    hexploit lower_get0; eauto. i. des. eauto.
-  Qed.
-
-  Lemma remove_finite
-        mem1 loc from to msg mem2
-        (REMOVE: remove mem1 loc from to msg mem2)
-        (FINITE: finite mem1):
-    finite mem2.
-  Proof.
-    unfold finite in *. des. exists dom. i.
-    revert GET. erewrite remove_o; eauto. condtac; ss; eauto.
   Qed.
 
 
