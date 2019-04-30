@@ -2484,7 +2484,41 @@ Module Memory.
           revert x1. erewrite lower_o; eauto. condtac; ss.
           i. esplits; try exact x1.
           erewrite lower_o in x5; eauto. revert x5. condtac; ss.
-  Admitted.
+      + exploit get_ts; try exact GET. i. des.
+        { subst. rewrite INHABITED in GET. inv GET. }
+        exploit lower_exists; try exact GET; try apply Message.elt_wf; eauto.
+        i. des.
+        assert (LE2: le promises mem2).
+        { ii. erewrite lower_o; eauto. condtac; ss.
+          - des. subst. congr.
+          - exploit LE; eauto. }
+        exploit IHx; try exact LE2; eauto.
+        { eapply lower_inhabited; eauto. }
+        { i. revert GET0. erewrite lower_o; eauto. condtac; ss.
+          i. exploit H; eauto. i. des; congr. }
+        i. des.
+        exists ((loc, to) :: dom). splits; i.
+        * econs; eauto. ii.
+          exploit COMPLETE; eauto. i. des.
+          exploit lower_get0; eauto. i. des.
+          rewrite x0 in GET1. inv GET1.
+        * destruct (loc_ts_eq_dec (loc0, to0) (loc, to)); ss.
+          { des. subst. auto. }
+          right. eapply SOUND; eauto.
+          { erewrite lower_o; eauto. condtac; ss.
+            - des; subst; congr.
+            - rewrite GET0; eauto. }
+        * inv IN.
+          { inv H0. esplits; eauto. }
+          { exploit COMPLETE; eauto. i. des.
+            esplits; eauto.
+            revert x0. erewrite lower_o; eauto. condtac; ss.
+            i. rewrite x0. ss. }
+    - eapply IHx; eauto. i. exploit H; eauto. i. des; ss.
+      inv x0. subst. congr.
+  Grab Existential Variables.
+  { inv IN. }
+  Qed.
 
   Lemma no_half_future_exists
         promises mem1
@@ -2492,20 +2526,27 @@ Module Memory.
         (CLOSED1: closed mem1):
     exists mem2,
       <<FUTURE: future mem1 mem2>> /\
+      <<NOHALF: no_half promises mem2>> /\
       <<LE2: le promises mem2>> /\
       <<CLOSED2: closed mem2>>.
   Proof.
     exploit le_finite_half_domain; eauto. i. des.
     revert mem1 LE1 CLOSED1 NODUP SOUND COMPLETE.
     induction dom; i.
-    { esplits; eauto. }
+    { esplits; eauto.
+      ii. destruct (get loc to promises) eqn:GETP.
+      - destruct p. exploit LE1; eauto. i.
+        rewrite GET in x. inv x. ss.
+      - exploit SOUND; eauto. i. inv x. }
     destruct a as [loc to]. ss.
     exploit (COMPLETE loc to); eauto. i. des.
     exploit get_ts; try exact x0. i. des.
     { subst. inv CLOSED1. rewrite INHABITED in x0. inv x0. }
     exploit lower_exists; eauto; try apply Message.elt_wf. i. des.
     exploit (IHdom mem2).
-    { admit. }
+    { ii. exploit LE1; eauto. i.
+      erewrite lower_o; eauto. condtac; ss.
+      des. subst. rewrite x1 in LHS. inv LHS. }
     { eapply lower_closed; eauto; econs; ss.
       unfold TimeMap.bot. apply Time.bot_spec. }
     { inv NODUP. ss. }
