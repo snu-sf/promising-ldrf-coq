@@ -230,13 +230,13 @@ Lemma union_step_nonpf_bot
   False.
 Proof.
   inv STEP. inv USTEP. inv STEP. inv LOCAL. ss. subst. inv PROMISE0.
-  - exploit (@Memory.add_o Memory.bot lc1.(Local.promises) loc from to val released loc to)
+  - exploit (@Memory.add_o Memory.bot lc1.(Local.promises) loc from to msg loc to)
     ; try exact PROMISES; eauto. condtac; ss; [|des; congr].
     rewrite Memory.bot_get. congr.
-  - exploit (@Memory.split_o Memory.bot lc1.(Local.promises) loc from to ts3 val val3 released released3 loc to)
+  - exploit (@Memory.split_o Memory.bot lc1.(Local.promises) loc from to ts3 msg msg3 loc to)
     ; try exact PROMISES; eauto. condtac; ss; [|des; congr].
     rewrite Memory.bot_get. congr.
-  - exploit (@Memory.lower_o Memory.bot lc1.(Local.promises) loc from to val released0 released loc to)
+  - exploit (@Memory.lower_o Memory.bot lc1.(Local.promises) loc from to msg0 msg loc to)
     ; try exact PROMISES; eauto. condtac; ss; [|des; congr].
     rewrite Memory.bot_get. congr.
 Qed.
