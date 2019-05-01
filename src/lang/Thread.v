@@ -413,22 +413,21 @@ End Thread.
 
 Lemma promise_pf_inv
       (kind:Memory.op_kind)
-      (released:option View.t)
-      (PF: (Memory.op_kind_is_lower kind) && (negb released)):
-  exists released0, kind = Memory.op_kind_lower released0 /\
-               released = None.
+      (msg:Message.t)
+      (PF: (Memory.op_kind_is_lower kind) && (Message.is_released_none msg)):
+  exists msg0, kind = Memory.op_kind_lower msg0 /\
+          Message.is_released_none msg = true.
 Proof.
   apply andb_true_iff in PF. des.
-  destruct kind; inv PF. destruct released; inv PF0.
-  esplits; eauto.
+  destruct kind; inv PF. esplits; eauto.
 Qed.
 
 Lemma promise_pf_false_inv
       (kind:Memory.op_kind)
-      (released:option View.t)
-      (PF: false = (Memory.op_kind_is_lower kind) && (negb released)):
-  Memory.op_kind_is_lower kind = false \/ released <> None.
+      (msg:Message.t)
+      (PF: false = (Memory.op_kind_is_lower kind) && (Message.is_released_none msg)):
+  Memory.op_kind_is_lower kind = false \/ ~ Message.is_released_none msg.
 Proof.
   symmetry in PF. apply andb_false_iff in PF. des; auto.
-  destruct released; ss. right. ss.
+  right. ii. rewrite PF in H. inv H.
 Qed.
