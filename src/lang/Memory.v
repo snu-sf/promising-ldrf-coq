@@ -2395,40 +2395,80 @@ Module Memory.
       (GET: get loc to mem = Some (from, Message.half)),
       get loc to promises = Some (from, Message.half).
 
-  (* Inductive concrete_imm (mem1 mem2:t): Prop := *)
-  (* | concrete_imm_intro *)
-  (*     loc from to msg *)
-  (*     (LOWER: lower mem1 loc from to Message.half msg mem2) *)
-  (*     (CLOSED: closed_message_view msg mem2) *)
-  (*     (TS: message_ts msg loc to) *)
-  (* . *)
-  (* Hint Constructors concrete_imm. *)
+  Inductive concrete_imm (mem1 mem2:t): Prop :=
+  | concrete_imm_intro
+      loc from to
+      (LOWER: lower mem1 loc from to Message.half Message.elt mem2)
+  .
+  Hint Constructors concrete_imm.
 
-  (* Lemma concrete_imm_future_imm *)
-  (*       mem1 mem2 *)
-  (*       (CONCRETE: concrete_imm mem1 mem2): *)
-  (*   future_imm mem1 mem2. *)
-  (* Proof. *)
-  (*   inv CONCRETE. eauto. *)
-  (* Qed. *)
+  Lemma concrete_imm_future_imm
+        mem1 mem2
+        (CONCRETE: concrete_imm mem1 mem2):
+    future_imm mem1 mem2.
+  Proof.
+    inv CONCRETE. econs; eauto.
+    - repeat econs.
+    - econs. s. unfold TimeMap.bot. apply Time.bot_spec.
+  Qed.
 
-  (* Inductive concrete (promises mem1 mem2: t): Prop := *)
-  (* | concrete_intro *)
-  (*     (CONCRETE: rtc concrete_imm mem1 mem2) *)
-  (*     (NOHALF: no_half promises mem2) *)
-  (* . *)
-  (* Hint Constructors concrete. *)
+  Definition concrete := rtc concrete_imm.
+  Hint Unfold concrete.
 
-  (* Lemma concrete_future *)
-  (*       promises mem1 mem2 *)
-  (*       (CONCRETE: concrete promises mem1 mem2): *)
-  (*   future mem1 mem2. *)
-  (* Proof. *)
-  (*   inv CONCRETE. clear NOHALF. *)
-  (*   induction CONCRETE0; try refl. *)
-  (*   apply concrete_imm_future_imm in H. *)
-  (*   etrans; eauto. *)
-  (* Qed. *)
+  Lemma concrete_future
+        mem1 mem2
+        (CONCRETE: concrete mem1 mem2):
+    future mem1 mem2.
+  Proof.
+    induction CONCRETE; try refl.
+    apply concrete_imm_future_imm in H.
+    etrans; eauto.
+  Qed.
+
+  Lemma concrete_sound
+        mem1 mem2
+        loc from to msg
+        (CONCRETE: concrete mem1 mem2)
+        (GET: get loc to mem1 = Some (from, msg)):
+    get loc to mem2 = Some (from, msg) \/
+    msg = Message.half /\
+    get loc to mem2 = Some (from, Message.elt).
+  Proof.
+    revert loc from to msg GET.
+    induction CONCRETE; i; auto.
+    inv H. destruct (get loc to y) as [[from1 msg1]|] eqn:GET1.
+    - exploit IHCONCRETE; eauto. i. guardH x0.
+      erewrite lower_o in GET1; eauto.
+      revert GET1. condtac; ss.
+      + des. subst. i. inv GET1.
+        exploit lower_get0; eauto. i. des.
+        rewrite GET in GET0. inv GET0.
+        unguard. des; eauto.
+      + guardH o. i. rewrite GET in GET1. inv GET1.
+        unguardH x0. des; eauto.
+    - erewrite lower_o in GET1; eauto.
+      revert GET1. condtac; ss; congr.
+  Qed.
+
+  Lemma concrete_complete
+        mem1 mem2
+        loc from to msg
+        (CONCRETE: concrete mem1 mem2)
+        (GET: get loc to mem2 = Some (from, msg)):
+    get loc to mem1 = Some (from, msg) \/
+    msg = Message.elt /\
+    get loc to mem1 = Some (from, Message.half).
+  Proof.
+    revert loc from to msg GET.
+    induction CONCRETE; i; auto.
+    inv H. exploit lower_get0; eauto. i. des.
+    exploit IHCONCRETE; eauto. i. des.
+    - erewrite lower_o in x0; eauto.
+      revert x0. condtac; ss; auto.
+      des. subst. i. inv x0. eauto.
+    - subst. erewrite lower_o in x1; eauto.
+      revert x1. condtac; ss; auto.
+  Qed.
 
   Lemma le_finite_half_domain
         promises mem
@@ -2520,12 +2560,12 @@ Module Memory.
   { inv IN. }
   Qed.
 
-  Lemma no_half_future_exists
+  Lemma no_half_concrete_exists
         promises mem1
         (LE1: le promises mem1)
         (CLOSED1: closed mem1):
     exists mem2,
-      <<FUTURE: future mem1 mem2>> /\
+      <<CONCRETE: concrete mem1 mem2>> /\
       <<NOHALF: no_half promises mem2>> /\
       <<LE2: le promises mem2>> /\
       <<CLOSED2: closed mem2>>.
@@ -2556,10 +2596,22 @@ Module Memory.
     { i. exploit COMPLETE; eauto. i. des. esplits; eauto.
       erewrite lower_o; eauto. condtac; ss; eauto.
       des. subst. inv NODUP. congr. }
-    i. des. exists mem0. splits; eauto. econs; eauto.
-    econs; eauto; try repeat econs. ss.
-    unfold TimeMap.bot. eapply TimeFacts.le_lt_lt; eauto.
-    apply Time.bot_spec.
+    i. des. exists mem0. splits; eauto.
+  Qed.
+
+  Lemma no_half_future_exists
+        promises mem1
+        (LE1: le promises mem1)
+        (CLOSED1: closed mem1):
+    exists mem2,
+      <<FUTURE: future mem1 mem2>> /\
+      <<NOHALF: no_half promises mem2>> /\
+      <<LE2: le promises mem2>> /\
+      <<CLOSED2: closed mem2>>.
+  Proof.
+    exploit no_half_concrete_exists; eauto. i. des.
+    esplits; try exact LE2; eauto.
+    apply concrete_future; eauto.
   Qed.
 
   Lemma no_half_bot_max_ts
