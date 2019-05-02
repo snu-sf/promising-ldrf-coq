@@ -2670,6 +2670,26 @@ Module Memory.
     inv CLOSED; eauto using concrete_closed_opt_view.
   Qed.
 
+  Lemma concrete_closed
+        mem mem'
+        (CONCRETE: concrete mem mem')
+        (CLOSED: closed mem):
+    closed mem'.
+  Proof.
+    dup CONCRETE. inv CONCRETE0. inv CLOSED.
+    econs; i.
+    - exploit COMPLETE; eauto. i. des.
+      + exploit CLOSED0; eauto. i. des.
+        esplits; eauto.
+        eapply concrete_closed_message_view; eauto.
+      + subst. splits; econs; eauto.
+        s. unfold TimeMap.bot. apply Time.bot_spec.
+    - ii. specialize (INHABITED loc).
+      exploit SOUND; eauto. i. des; auto.
+    - inv FINITE_HALF. exists x. i.
+      exploit COMPLETE; eauto. i. des; eauto.
+  Qed.
+
   Lemma concrete_promise_exists
         promises1 mem1 loc from to msg promises2 mem2 kind
         mem1'
