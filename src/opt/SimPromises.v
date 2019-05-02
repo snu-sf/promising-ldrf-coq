@@ -546,7 +546,7 @@ Module SimPromises.
           rewrite GET0 in x. inv x.
           inv INV1. exploit LE; eauto. i.
           exploit LE1_SRC; eauto. i.
-          exploit MemoryFacts.get_disjoint; [exact GET1_SRC|exact x0|..]. i. des.
+          exploit Memory.get_disjoint; [exact GET1_SRC|exact x0|..]. i. des.
           { subst. timetac. }
           { exfalso.
             exploit Memory.get_ts; try exact GET1_SRC. i. des.
@@ -565,7 +565,7 @@ Module SimPromises.
           rewrite GET0 in x. inv x.
           inv INV1. exploit LE; eauto. i.
           exploit LE1_SRC; eauto. i.
-          exploit MemoryFacts.get_disjoint; [exact GET1_SRC|exact x0|..]. i. des.
+          exploit Memory.get_disjoint; [exact GET1_SRC|exact x0|..]. i. des.
           { subst. timetac. }
           { exfalso.
             exploit Memory.get_ts; try exact GET1_SRC. i. des.
@@ -593,7 +593,7 @@ Module SimPromises.
             rewrite GET0 in x. inv x.
             inv INV1. exploit LE; eauto. i.
             exploit LE1_SRC; eauto. i.
-            exploit MemoryFacts.get_disjoint; [exact GET1_SRC|exact x0|..]. i. des.
+            exploit Memory.get_disjoint; [exact GET1_SRC|exact x0|..]. i. des.
             - subst. timetac.
             - exfalso.
               exploit Memory.get_ts; try exact GET1_SRC. i. des.
@@ -673,7 +673,7 @@ Module SimPromises.
           + guardH o. des. subst. rewrite GET4 in x. inv x.
             inv INV1. exploit LE; eauto. i.
             exploit LE2_SRC; eauto. i.
-            exploit MemoryFacts.get_disjoint; [exact GET2|exact x0|..]. i. des.
+            exploit Memory.get_disjoint; [exact GET2|exact x0|..]. i. des.
             * subst. inv SPLIT. inv SPLIT0. timetac.
             * exfalso.
               exploit Memory.get_ts; try exact GET2. i. des.
@@ -702,7 +702,7 @@ Module SimPromises.
         * guardH o. des. subst. rewrite GET4 in x. inv x.
           inv INV1. exploit LE; eauto. i.
           exploit LE2_SRC; eauto. i.
-          exploit MemoryFacts.get_disjoint; [exact GET2|exact x1|..]. i. des.
+          exploit Memory.get_disjoint; [exact GET2|exact x1|..]. i. des.
           { subst. inv SPLIT. inv SPLIT0. timetac. }
           { exfalso.
             exploit Memory.get_ts; try exact GET2. i. des.

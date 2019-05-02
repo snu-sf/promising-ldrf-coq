@@ -133,11 +133,11 @@ Proof.
   destruct msg_src, msg_tgt; try by econs.
   - inv SIM. specialize (COVER_HALF loc ts). des.
     exploit COVER_HALF0; try by econs; eauto. i. inv x.
-    exploit MemoryFacts.get_disjoint; [exact GET_SRC|exact GET|..]. i. des; try congr.
+    exploit Memory.get_disjoint; [exact GET_SRC|exact GET|..]. i. des; try congr.
     exfalso. apply (x0 ts); auto.
   - inv SIM. specialize (COVER_HALF loc ts). des.
     exploit COVER_HALF; try by econs; eauto. i. inv x.
-    exploit MemoryFacts.get_disjoint; [exact GET_TGT|exact GET|..]. i. des; try congr.
+    exploit Memory.get_disjoint; [exact GET_TGT|exact GET|..]. i. des; try congr.
     exfalso. apply (x0 ts); auto.
 Qed.
 
@@ -167,7 +167,7 @@ Proof.
     econs; eauto. s. econs. eapply TimeFacts.lt_le_lt; eauto. }
   inv ITV. ss. inv TO0; cycle 1.
   { inv H. congr. }
-  exploit MemoryFacts.get_disjoint; [exact GET_SRC|exact GET|..]. i. des.
+  exploit Memory.get_disjoint; [exact GET_SRC|exact GET|..]. i. des.
   { subst. timetac. }
   exfalso. destruct (Time.le_lt_dec to_src to).
   - apply (x2 to_src).
@@ -207,14 +207,14 @@ Proof.
     i. inv x0.
     destruct (Time.eq_dec to0 from).
     + subst. exploit MSG; try exact GET0. i. des.
-      exploit MemoryFacts.get_disjoint; [exact GET_SRC|exact GET1|..]. i. des.
+      exploit Memory.get_disjoint; [exact GET_SRC|exact GET1|..]. i. des.
       * subst. inv ITV. timetac.
       * exfalso. apply (x1 from).
         { inv ITV. econs; eauto. s. econs; eauto. }
         { econs; try refl. s.
           exploit Memory.get_ts; try exact GET1. i. des; ss.
           subst. inv ITV0. inv FROM. }
-    + exploit MemoryFacts.get_disjoint; [exact GET|exact GET0|..]. i. des.
+    + exploit Memory.get_disjoint; [exact GET|exact GET0|..]. i. des.
       * subst. inv ITV0. timetac.
       * exfalso. destruct (Time.le_lt_dec to to0).
         { apply (x1 to).
@@ -451,7 +451,7 @@ Proof.
     + i. left. split.
       * destruct (Loc.eq_dec l loc); auto.
         subst. guardH o0. des; auto. right. ii.
-        exploit MemoryFacts.get_disjoint; [exact GET0|exact GET3|..]. i. des.
+        exploit Memory.get_disjoint; [exact GET0|exact GET3|..]. i. des.
         { subst. unguard. des; ss. }
         eapply x0; eauto. inv ITV. inv H. ss.
         exploit Memory.get_ts; try exact GET2. i. des.
@@ -553,7 +553,7 @@ Proof.
     + i. left. split.
       * destruct (Loc.eq_dec l loc); auto.
         subst. des; auto. right. ii.
-        exploit MemoryFacts.get_disjoint; [exact GET|exact GET1|..]. i. des; try congr.
+        exploit Memory.get_disjoint; [exact GET|exact GET1|..]. i. des; try congr.
         eapply x0; eauto.
       * econs; eauto.
   - destruct H.

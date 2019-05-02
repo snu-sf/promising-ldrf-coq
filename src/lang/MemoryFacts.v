@@ -159,20 +159,6 @@ Module MemoryFacts.
     - exploit get_same_from_aux; (try by left; eauto); eauto. i. des. ss.
   Qed.
 
-  Lemma get_disjoint
-        l f1 f2 t1 t2 msg1 msg2 m
-        (GET1: Memory.get l t1 m = Some (f1, msg1))
-        (GET2: Memory.get l t2 m = Some (f2, msg2)):
-    (t1 = t2 /\ f1 = f2 /\ msg1 = msg2) \/
-    Interval.disjoint (f1, t1) (f2, t2).
-  Proof.
-    destruct (Time.eq_dec t1 t2).
-    { subst. rewrite GET1 in GET2. inv GET2. auto. }
-    unfold Memory.get in *. unfold Cell.get in *.
-    destruct (m l); ss. inv WF.
-    hexploit DISJOINT; [exact GET1|exact GET2|..]; eauto.
-  Qed.
-
   Lemma write_not_bot
         pm1 mem1 loc from to msg pm2 mem2 kind
         (WRITE: Memory.write pm1 mem1 loc from to msg pm2 mem2 kind):
