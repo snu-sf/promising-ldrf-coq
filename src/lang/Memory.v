@@ -343,6 +343,9 @@ Module Memory.
   Definition op_kind_is_lower_half (kind:op_kind): bool :=
     match kind with op_kind_lower Message.half => true | _ => false end.
 
+  Definition op_kind_is_lower_full (kind:op_kind): bool :=
+    match kind with op_kind_lower (Message.mk _ _) => true | _ => false end.
+
   Inductive op mem1 loc from to msg mem2: forall (kind:op_kind), Prop :=
   | op_add
       (ADD: add mem1 loc from to msg mem2):

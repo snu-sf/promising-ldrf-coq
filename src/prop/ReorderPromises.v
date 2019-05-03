@@ -25,20 +25,6 @@ Require Import ReorderPromiseSame.
 Set Implicit Arguments.
 
 
-Lemma rtc_all_step_promise_consistent
-      lang th1 th2
-      (STEP: rtc (@Thread.all_step lang) th1 th2)
-      (CONS: promise_consistent th2.(Thread.local))
-      (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
-      (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory))
-      (MEM1: Memory.closed th1.(Thread.memory)):
-  promise_consistent th1.(Thread.local).
-Proof.
-  revert_until STEP. induction STEP; auto. i.
-  inv H. inv USTEP. exploit Thread.step_future; eauto. i. des.
-  eapply step_promise_consistent; eauto.
-Qed.
-
 Lemma steps_pf_steps_aux
       lang
       n e1 e3
