@@ -601,16 +601,6 @@ Module Memory.
     des. subst. exploit add_get0; eauto. i. des. congr.
   Qed.
 
-  (* Lemma add_split_released_eq *)
-  (*       promises0 promises1 promises2 loc ts1 ts2 ts3 val2 val3 released1 released2 released3 *)
-  (*       (ADD : Memory.add promises0 loc ts1 ts3 val3 released1 promises1) *)
-  (*       (SPLIT : Memory.split promises1 loc ts1 ts2 ts3 val2 val3 released2 released3 promises2): *)
-  (*   released1 = released3. *)
-  (* Proof. *)
-  (*   hexploit Memory.split_get0; eauto. i. des. *)
-  (*   revert GET0. erewrite Memory.add_o; eauto. condtac; ss; [|by des]. congr. *)
-  (* Qed. *)
-
   (* Lemmas on op *)
 
   Lemma promise_op
@@ -2288,7 +2278,7 @@ Module Memory.
   Lemma bot_nonsynch: nonsynch Memory.bot.
   Proof. ii. eapply bot_nonsynch_loc. eauto. Qed.
 
-  (* concrete memory *)
+  (* Lemmas on no_half and concrete *)
 
   Definition no_half (promises mem: t): Prop :=
     forall loc to from
