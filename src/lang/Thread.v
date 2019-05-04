@@ -415,7 +415,7 @@ Lemma promise_pf_inv
       (kind:Memory.op_kind)
       (msg:Message.t)
       (PF: (Memory.op_kind_is_lower_full kind) && (Message.is_released_none msg)):
-  exists val released, kind = Memory.op_kind_lower (Message.mk val released) /\
+  exists val released, kind = Memory.op_kind_lower (Message.full val released) /\
           Message.is_released_none msg = true.
 Proof.
   apply andb_true_iff in PF. des.

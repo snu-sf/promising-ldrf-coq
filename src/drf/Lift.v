@@ -855,13 +855,13 @@ Qed.
 Lemma mem_eqlerel_lift_get
       loc ts prm e m1 m2 l f t v r2
       (LIFT: mem_eqlerel_lift loc ts prm e m1 m2)
-      (GET: Memory.get l t m2 = Some (f, Message.mk v r2)):
+      (GET: Memory.get l t m2 = Some (f, Message.full v r2)):
   (exists r o, ThreadEvent.is_writing e = Some (l, f, t, v, r, o)) \/
   (ThreadEvent.is_promising e = Some (l, t) /\
    ThreadEvent.is_lower_none e) \/
   (exists f' r1,
       <<EVT: forall o, ThreadEvent.is_writing e <> Some (l, f, t, v, r1, o)>> /\
-      <<GET: Memory.get l t m1 = Some (f', Message.mk v r1)>> /\
+      <<GET: Memory.get l t m1 = Some (f', Message.full v r1)>> /\
       <<REL: View.opt_le r1 r2>> /\
       <<FROM: Time.le f' f>>).
 Proof.

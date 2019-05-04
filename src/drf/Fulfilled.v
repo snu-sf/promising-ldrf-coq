@@ -125,7 +125,7 @@ Lemma writing_small_step_fulfilled_new
       (WF: Configuration.wf c1)
       (STEP: small_step withprm tid e c1 c2)
       (WRITING: ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord)):
-  fulfilled c2 loc from to (Message.mk val released).
+  fulfilled c2 loc from to (Message.full val released).
 Proof.
   inv STEP. guardH PFREE.
   inv STEP0; inv STEP; ss. inv LOCAL; inv WRITING; ss.
@@ -205,7 +205,7 @@ Lemma writing_small_step_fulfilled_backward
       (WRITING: ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord)):
   forall l f t msg
     (NP: fulfilled c2 l f t msg),
-    fulfilled c1 l f t msg \/ (l, f, t, msg) = (loc, from, to, Message.mk val released).
+    fulfilled c1 l f t msg \/ (l, f, t, msg) = (loc, from, to, Message.full val released).
 Proof.
   inv STEP. guardH PFREE.
   inv STEP0; inv STEP; ss. inv LOCAL; inv WRITING; ss.
@@ -312,7 +312,7 @@ Lemma writing_small_step_fulfilled
       (STEP: small_step withprm tid e c1 c2)
       (WRITING: ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord)):
   forall l f t msg,
-    fulfilled c2 l f t msg <-> fulfilled c1 l f t msg \/ (l, f, t, msg) = (loc, from, to, Message.mk val released).
+    fulfilled c2 l f t msg <-> fulfilled c1 l f t msg \/ (l, f, t, msg) = (loc, from, to, Message.full val released).
 Proof.
   econs; i.
   - eapply writing_small_step_fulfilled_backward; eauto.

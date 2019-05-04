@@ -88,12 +88,12 @@ Lemma progress_promise_step
       (CLOSED_REL: Memory.closed_opt_view releasedm mem1):
   exists promises2 mem2,
     Local.promise_step lc1 mem1 loc (Memory.max_ts loc mem1) to
-                       (Message.mk val (TView.write_released (Local.tview lc1) sc1 loc to releasedm ord))
+                       (Message.full val (TView.write_released (Local.tview lc1) sc1 loc to releasedm ord))
                        (Local.mk lc1.(Local.tview) promises2) mem2 Memory.op_kind_add.
 Proof.
   exploit (@Memory.add_exists_max_ts
              mem1 loc to
-             (Message.mk val (TView.write_released (Local.tview lc1) sc1 loc to releasedm ord))); eauto.
+             (Message.full val (TView.write_released (Local.tview lc1) sc1 loc to releasedm ord))); eauto.
   { econs. eapply TViewFacts.write_future0; eauto. apply WF1. }
   i. des.
   exploit Memory.add_exists_le; try apply WF1; eauto. i. des.

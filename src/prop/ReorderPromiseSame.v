@@ -58,14 +58,14 @@ Lemma reorder_promise_promise_lower_None
       loc1 from1 to1 msg1 kind1
       loc2 from2 to2 val2 kind2
       (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 msg1 lc1 mem1 kind1)
-      (STEP2: Local.promise_step lc1 mem1 loc2 from2 to2 (Message.mk val2 None) lc2 mem2 kind2)
+      (STEP2: Local.promise_step lc1 mem1 loc2 from2 to2 (Message.full val2 None) lc2 mem2 kind2)
       (LOCAL0: Local.wf lc0 mem0)
       (MEM0: Memory.closed mem0)
       (KIND2: Memory.op_kind_is_lower kind2 = true):
-  (loc1 = loc2 /\ from1 = from2 /\ to1 = to2 /\ Message.le (Message.mk val2 None) msg1 /\ kind2 = Memory.op_kind_lower msg1 /\
-   exists kind1', <<STEP: Local.promise_step lc0 mem0 loc1 from1 to1 (Message.mk val2 None) lc2 mem2 kind1'>>) \/
+  (loc1 = loc2 /\ from1 = from2 /\ to1 = to2 /\ Message.le (Message.full val2 None) msg1 /\ kind2 = Memory.op_kind_lower msg1 /\
+   exists kind1', <<STEP: Local.promise_step lc0 mem0 loc1 from1 to1 (Message.full val2 None) lc2 mem2 kind1'>>) \/
   (exists lc1' mem1' from2' kind1',
-      <<STEP1: Local.promise_step lc0 mem0 loc2 from2' to2 (Message.mk val2 None) lc1' mem1' kind2>> /\
+      <<STEP1: Local.promise_step lc0 mem0 loc2 from2' to2 (Message.full val2 None) lc1' mem1' kind2>> /\
       <<STEP2: Local.promise_step lc1' mem1' loc1 from1 to1 msg1 lc2 mem2 kind1'>>).
 Proof.
   inv STEP1. inv STEP2. ss. inv PROMISE0; inv KIND2. inv PROMISE.

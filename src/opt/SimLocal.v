@@ -549,7 +549,7 @@ Lemma sim_local_lower_src
       (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
       (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
       (MEM1_SRC: Memory.closed mem1_src)
-      (STEP_SRC: Local.promise_step lc1_src mem1_src loc from to (Message.mk val None) lc2_src mem2_src (Memory.op_kind_lower (Message.mk val released))):
+      (STEP_SRC: Local.promise_step lc1_src mem1_src loc from to (Message.full val None) lc2_src mem2_src (Memory.op_kind_lower (Message.full val released))):
   <<LOCAL2: exists pview2, sim_local pview2 lc2_src lc1_tgt>> /\
   <<MEM2: sim_memory mem2_src mem1_tgt>> /\
   <<WF2_SRC: Local.wf lc2_src mem2_src>>.
@@ -622,7 +622,7 @@ Proof.
   assert (FINITE' : forall (loc : Loc.t) (from to : Time.t) (msg : Message.t),
              Memory.get loc to (Local.promises lc1_src) = Some (from, msg) ->
              (match msg with
-              | Message.mk _ (Some _) => True
+              | Message.full _ (Some _) => True
               | _ => False
               end) ->
              In (loc, to) dom).

@@ -205,7 +205,7 @@ Module Local.
   | read_step_intro
       from
       tview2
-      (GET: Memory.get loc to mem1 = Some (from, Message.mk val released))
+      (GET: Memory.get loc to mem1 = Some (from, Message.full val released))
       (READABLE: TView.readable lc1.(tview).(TView.cur) loc to released ord)
       (TVIEW: TView.read_tview lc1.(tview) loc to released ord = tview2)
       (LC2: lc2 = mk tview2 lc1.(promises)):
@@ -218,7 +218,7 @@ Module Local.
       promises2
       (RELEASED: released = TView.write_released lc1.(tview) sc1 loc to releasedm ord)
       (WRITABLE: TView.writable lc1.(tview).(TView.cur) sc1 loc to ord)
-      (WRITE: Memory.write lc1.(promises) mem1 loc from to (Message.mk val released) promises2 mem2 kind)
+      (WRITE: Memory.write lc1.(promises) mem1 loc from to (Message.full val released) promises2 mem2 kind)
       (RELEASE: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc lc1.(promises))
       (LC2: lc2 = mk (TView.write_tview lc1.(tview) sc1 loc to ord) promises2)
       (SC2: sc2 = sc1):

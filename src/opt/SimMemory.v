@@ -28,7 +28,7 @@ Inductive sim_message: forall (msg_src msg_tgt: Message.t), Prop :=
 | sim_message_full
     val released_src released_tgt
     (RELEASED: View.opt_le released_src released_tgt):
-    sim_message (Message.mk val released_src) (Message.mk val released_tgt)
+    sim_message (Message.full val released_src) (Message.full val released_tgt)
 | sim_message_half:
     sim_message Message.half Message.half
 .
@@ -45,7 +45,7 @@ Qed.
 Inductive message_same_kind: forall (msg_src msg_tgt: Message.t), Prop :=
 | message_same_kind_full
     val_src val_tgt released_src released_tgt:
-    message_same_kind (Message.mk val_src released_src) (Message.mk val_tgt released_tgt)
+    message_same_kind (Message.full val_src released_src) (Message.full val_tgt released_tgt)
 | same_message_kine_half:
     message_same_kind Message.half Message.half
 .
@@ -654,7 +654,7 @@ Proof.
   destruct msg_src.
   - exploit (@Memory.max_full_released_exists mem1_tgt loc ts2); try apply CLOSED_TGT. i. des.
     exploit Memory.max_full_released_wf; eauto. i.
-    exploit (@Memory.split_exists mem1_tgt loc ts1 ts2 ts3 (Message.mk val (Some released0)) msg_tgt); eauto.
+    exploit (@Memory.split_exists mem1_tgt loc ts1 ts2 ts3 (Message.full val (Some released0)) msg_tgt); eauto.
     { econs. eauto. }
     i. des.
     exploit Memory.max_full_released_closed_split; eauto. i. des.

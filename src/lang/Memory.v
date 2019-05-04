@@ -189,7 +189,7 @@ Module Memory.
   | message_ts_full
       val released loc to
       (TS: Time.le (released.(View.unwrap).(View.rlx) loc) to):
-      message_ts (Message.mk val released) loc to
+      message_ts (Message.full val released) loc to
   | message_ts_half
       loc to:
       message_ts Message.half loc to
@@ -197,7 +197,7 @@ Module Memory.
   Hint Constructors message_ts.
 
   Definition closed_timemap (times:TimeMap.t) (mem:t): Prop :=
-    forall loc, exists from val released, get loc (times loc) mem = Some (from, Message.mk val released).
+    forall loc, exists from val released, get loc (times loc) mem = Some (from, Message.full val released).
 
   Inductive closed_view (view:View.t) (mem:t): Prop :=
   | closed_view_intro
@@ -221,7 +221,7 @@ Module Memory.
   | closed_message_view_full
       val released mem
       (CLOSED: closed_opt_view released mem):
-      closed_message_view (Message.mk val released) mem
+      closed_message_view (Message.full val released) mem
   | closed_message_view_half
       mem:
       closed_message_view Message.half mem
@@ -344,7 +344,7 @@ Module Memory.
     match kind with op_kind_lower Message.half => true | _ => false end.
 
   Definition op_kind_is_lower_full (kind:op_kind): bool :=
-    match kind with op_kind_lower (Message.mk _ _) => true | _ => false end.
+    match kind with op_kind_lower (Message.full _ _) => true | _ => false end.
 
   Inductive op mem1 loc from to msg mem2: forall (kind:op_kind), Prop :=
   | op_add
@@ -1197,7 +1197,7 @@ Module Memory.
 
   Lemma singleton_closed_timemap
         loc from to val released mem
-        (GET: get loc to mem = Some (from, Message.mk val released))
+        (GET: get loc to mem = Some (from, Message.full val released))
         (INHABITED: inhabited mem):
     closed_timemap (TimeMap.singleton loc to) mem.
   Proof.
@@ -1208,7 +1208,7 @@ Module Memory.
 
   Lemma singleton_ur_closed_view
         loc from to val released mem
-        (GET: get loc to mem = Some (from, Message.mk val released))
+        (GET: get loc to mem = Some (from, Message.full val released))
         (INHABITED: inhabited mem):
     closed_view (View.singleton_ur loc to) mem.
   Proof.
@@ -1219,7 +1219,7 @@ Module Memory.
 
   Lemma singleton_rw_closed_view
         loc from to val released mem
-        (GET: get loc to mem = Some (from, Message.mk val released))
+        (GET: get loc to mem = Some (from, Message.full val released))
         (INHABITED: inhabited mem):
     closed_view (View.singleton_rw loc to) mem.
   Proof.
@@ -1230,7 +1230,7 @@ Module Memory.
 
   Lemma singleton_ur_if_closed_view
         cond loc from to val released mem
-        (GET: get loc to mem = Some (from, Message.mk val released))
+        (GET: get loc to mem = Some (from, Message.full val released))
         (INHABITED: inhabited mem):
     closed_view (View.singleton_ur_if cond loc to) mem.
   Proof.
@@ -1569,7 +1569,7 @@ Module Memory.
   Qed.
 
   Lemma max_timemap_spec' tm mem
-        (TIMEMAP: forall loc, exists from to val released, Time.le (tm loc) to /\ get loc to mem = Some (from, Message.mk val released))
+        (TIMEMAP: forall loc, exists from to val released, Time.le (tm loc) to /\ get loc to mem = Some (from, Message.full val released))
         (INHABITED: inhabited mem):
     TimeMap.le tm (max_timemap mem).
   Proof.
@@ -1593,7 +1593,7 @@ Module Memory.
 
   Lemma closed_timemap_add
         loc from to val released mem tm
-        (GET: get loc to mem = Some (from, Message.mk val released))
+        (GET: get loc to mem = Some (from, Message.full val released))
         (CLOSED: closed_timemap tm mem):
     closed_timemap (TimeMap.add loc to tm) mem.
   Proof.
@@ -1627,8 +1627,8 @@ Module Memory.
   Lemma max_full_ts_spec
         loc ts from val released mem mts
         (MAX: max_full_ts mem loc mts)
-        (GET: get loc ts mem = Some (from, Message.mk val released)):
-    <<GET: exists from val' released', get loc mts mem = Some (from, Message.mk val' released')>> /\
+        (GET: get loc ts mem = Some (from, Message.full val released)):
+    <<GET: exists from val' released', get loc mts mem = Some (from, Message.full val' released')>> /\
     <<MAX: Time.le ts mts>>.
   Proof.
     eapply Cell.max_full_ts_spec; eauto.
@@ -1688,7 +1688,7 @@ Module Memory.
   Lemma max_full_timemap_spec'
         tm mem mtm
         (MAX: max_full_timemap mem mtm)
-        (TIMEMAP: forall loc, exists from to val released, Time.le (tm loc) to /\ get loc to mem = Some (from, Message.mk val released)):
+        (TIMEMAP: forall loc, exists from to val released, Time.le (tm loc) to /\ get loc to mem = Some (from, Message.full val released)):
     TimeMap.le tm mtm.
   Proof.
     ii. specialize (TIMEMAP loc). specialize (MAX loc). des.
@@ -1767,7 +1767,7 @@ Module Memory.
 
   Lemma add_max_full_timemap
         mem1 mem2 loc from to val released tm1 tm2
-        (ADD: add mem1 loc from to (Message.mk val released) mem2)
+        (ADD: add mem1 loc from to (Message.full val released) mem2)
         (MAX1: max_full_timemap mem1 tm1)
         (MAX2: max_full_timemap mem2 tm2):
     tm2 = TimeMap.join tm1 (TimeMap.singleton loc to).
@@ -1790,7 +1790,7 @@ Module Memory.
 
   Lemma split_max_full_timemap
         mem1 mem2 loc ts1 ts2 ts3 val released msg3 tm1 tm2
-        (SPLIT: split mem1 loc ts1 ts2 ts3 (Message.mk val released) msg3 mem2)
+        (SPLIT: split mem1 loc ts1 ts2 ts3 (Message.full val released) msg3 mem2)
         (MAX1: max_full_timemap mem1 tm1)
         (MAX2: max_full_timemap mem2 tm2):
     tm2 = TimeMap.join tm1 (TimeMap.singleton loc ts2).
@@ -1818,7 +1818,7 @@ Module Memory.
 
   Lemma lower_max_full_timemap
         mem1 mem2 loc from to msg0 val released tm1 tm2
-        (lower: lower mem1 loc from to msg0 (Message.mk val released) mem2)
+        (lower: lower mem1 loc from to msg0 (Message.full val released) mem2)
         (MAX1: max_full_timemap mem1 tm1)
         (MAX2: max_full_timemap mem2 tm2):
     tm2 = TimeMap.join tm1 (TimeMap.singleton loc to).
@@ -1841,7 +1841,7 @@ Module Memory.
 
   Lemma add_max_full_view
         mem1 mem2 loc from to val released mview1 mview2
-        (ADD: add mem1 loc from to (Message.mk val released) mem2)
+        (ADD: add mem1 loc from to (Message.full val released) mem2)
         (MAX1: max_full_view mem1 mview1)
         (MAX2: max_full_view mem2 mview2):
     mview2 = View.join mview1 (View.singleton_ur loc to).
@@ -1853,7 +1853,7 @@ Module Memory.
 
   Lemma split_max_full_view
         mem1 mem2 loc ts1 ts2 ts3 val released msg3 mview1 mview2
-        (SPLIT: split mem1 loc ts1 ts2 ts3 (Message.mk val released) msg3 mem2)
+        (SPLIT: split mem1 loc ts1 ts2 ts3 (Message.full val released) msg3 mem2)
         (MAX1: max_full_view mem1 mview1)
         (MAX2: max_full_view mem2 mview2):
     mview2 = View.join mview1 (View.singleton_ur loc ts2).
@@ -1865,7 +1865,7 @@ Module Memory.
 
   Lemma lower_max_full_view
         mem1 mem2 loc from to msg0 val released mview1 mview2
-        (LOWER: lower mem1 loc from to msg0 (Message.mk val released) mem2)
+        (LOWER: lower mem1 loc from to msg0 (Message.full val released) mem2)
         (MAX1: max_full_view mem1 mview1)
         (MAX2: max_full_view mem2 mview2):
     mview2 = View.join mview1 (View.singleton_ur loc to).
@@ -1914,7 +1914,7 @@ Module Memory.
 
   Lemma max_full_released_closed_add
         mem1 loc from to val released mem2 mr
-        (ADD: add mem1 loc from to (Message.mk val released) mem2)
+        (ADD: add mem1 loc from to (Message.full val released) mem2)
         (CLOSED: closed mem1)
         (MAX: max_full_released mem1 loc to mr):
     <<CLOSED: closed_view mr mem2>> /\
@@ -1935,7 +1935,7 @@ Module Memory.
   Lemma max_full_released_spec_add
         mem1 loc from to val released mem2 mr
         (CLOSED: closed mem1)
-        (ADD: add mem1 loc from to (Message.mk val released) mem2)
+        (ADD: add mem1 loc from to (Message.full val released) mem2)
         (REL_CLOSED: closed_opt_view released mem2)
         (REL_TS: Time.le (released.(View.unwrap).(View.rlx) loc) to)
         (MAX: max_full_released mem1 loc to mr):
@@ -1960,7 +1960,7 @@ Module Memory.
 
   Lemma max_full_released_closed_split
         mem1 loc ts1 ts2 ts3 val released msg3 mem2 mr
-        (SPLIT: split mem1 loc ts1 ts2 ts3 (Message.mk val released) msg3 mem2)
+        (SPLIT: split mem1 loc ts1 ts2 ts3 (Message.full val released) msg3 mem2)
         (CLOSED: closed mem1)
         (MAX: max_full_released mem1 loc ts2 mr):
     <<CLOSED: closed_view mr mem2>> /\
@@ -1981,7 +1981,7 @@ Module Memory.
   Lemma max_full_released_spec_split
         mem1 loc ts1 ts2 ts3 val released msg3 mem2 mr
         (CLOSED: closed mem1)
-        (SPLIT: split mem1 loc ts1 ts2 ts3 (Message.mk val released) msg3 mem2)
+        (SPLIT: split mem1 loc ts1 ts2 ts3 (Message.full val released) msg3 mem2)
         (REL_CLOSED: closed_opt_view released mem2)
         (REL_TS: Time.le (released.(View.unwrap).(View.rlx) loc) ts2)
         (MAX: max_full_released mem1 loc ts2 mr):
@@ -2006,7 +2006,7 @@ Module Memory.
 
   Lemma max_full_released_closed_lower
         mem1 loc from to msg0 val released mem2 mr
-        (LOWER: lower mem1 loc from to msg0 (Message.mk val released) mem2)
+        (LOWER: lower mem1 loc from to msg0 (Message.full val released) mem2)
         (CLOSED: closed mem1)
         (MAX: max_full_released mem1 loc to mr):
     <<CLOSED: closed_view mr mem2>> /\
@@ -2027,7 +2027,7 @@ Module Memory.
   Lemma max_full_released_spec_lower
         mem1 loc from to msg0 val released mem2 mr
         (CLOSED: closed mem1)
-        (LOWER: lower mem1 loc from to msg0 (Message.mk val released) mem2)
+        (LOWER: lower mem1 loc from to msg0 (Message.full val released) mem2)
         (REL_CLOSED: closed_opt_view released mem2)
         (REL_TS: Time.le (released.(View.unwrap).(View.rlx) loc) to)
         (MAX: max_full_released mem1 loc to mr):
@@ -2275,7 +2275,7 @@ Module Memory.
   Definition nonsynch_loc (loc:Loc.t) (mem:t): Prop :=
     forall f t msg (GET: get loc t mem = Some (f, msg)),
       match msg with
-      | Message.mk _ rel => rel = None
+      | Message.full _ rel => rel = None
       | Message.half => True
       end.
 

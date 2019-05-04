@@ -17,18 +17,18 @@ Set Implicit Arguments.
 
 Module Message.
   Inductive t :=
-  | mk (val: Const.t) (released: option View.t)
+  | full (val: Const.t) (released: option View.t)
   | half
   .
   Hint Constructors t.
 
-  Definition elt: t := mk 0 None.
+  Definition elt: t := full 0 None.
 
   Inductive le : t -> t -> Prop :=
   | le_view
       val released released'
       (RELEASED: View.opt_le released released'):
-      le (mk val released) (mk val released')
+      le (full val released) (full val released')
   | le_half
       msg:
       le msg half
@@ -56,7 +56,7 @@ Module Message.
   | wf_view
       val released
       (WF: View.opt_wf released):
-      wf (mk val released)
+      wf (full val released)
   | wf_half:
       wf half
   .
@@ -66,7 +66,7 @@ Module Message.
 
   Definition is_released_none (msg: t): bool :=
     match msg with
-    | mk _ released => negb released
+    | full _ released => negb released
     | half => false
     end.
 End Message.
@@ -724,9 +724,9 @@ Module Cell.
 
   Inductive max_full_ts (cell: t) (ts: Time.t): Prop :=
   | max_full_ts_intro
-      (GET: exists from val released, get ts cell = Some (from, Message.mk val released))
+      (GET: exists from val released, get ts cell = Some (from, Message.full val released))
       (MAX: forall to from' val' released'
-              (GET: get to cell = Some (from', Message.mk val' released')),
+              (GET: get to cell = Some (from', Message.full val' released')),
           Time.le to ts)
   .
 
@@ -800,7 +800,7 @@ Module Cell.
     exploit (max_full_ts_exists_aux
                Time.bot (Time.bot, Message.elt) l
                (fun (a: Time.t * Message.t) => match a with
-                                            | (_, Message.mk _ _) => true
+                                            | (_, Message.full _ _) => true
                                             | _ => false
                                             end)).
     { ss. }
@@ -828,8 +828,8 @@ Module Cell.
   Lemma max_full_ts_spec
         ts from val released cell mts
         (MAX: max_full_ts cell mts)
-        (GET: get ts cell = Some (from, Message.mk val released)):
-    <<GET: exists f v r, get mts cell = Some (f, Message.mk v r)>> /\
+        (GET: get ts cell = Some (from, Message.full val released)):
+    <<GET: exists f v r, get mts cell = Some (f, Message.full v r)>> /\
     <<MAX: Time.le ts mts>>.
   Proof.
     inv MAX. des. esplits; eauto.

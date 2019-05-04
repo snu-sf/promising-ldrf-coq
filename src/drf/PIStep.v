@@ -71,13 +71,13 @@ Inductive pi_wf cmp: Configuration.t*Configuration.t -> Prop :=
     (THS: cS.(Configuration.threads) = IdentMap.map remove_promise cT.(Configuration.threads))
     (SC: cS.(Configuration.sc) = cT.(Configuration.sc))
     (LR: forall loc ts from val rel1
-           (IN: Memory.get loc ts cS.(Configuration.memory) = Some (from, Message.mk val rel1)),
-         <<IN: exists rel2, Memory.get loc ts cT.(Configuration.memory) = Some (from, Message.mk val rel2) /\ <<CMP: cmp loc ts rel1 rel2>>>> /\
+           (IN: Memory.get loc ts cS.(Configuration.memory) = Some (from, Message.full val rel1)),
+         <<IN: exists rel2, Memory.get loc ts cT.(Configuration.memory) = Some (from, Message.full val rel2) /\ <<CMP: cmp loc ts rel1 rel2>>>> /\
          <<NOT: forall tid, ~Threads.is_promised tid loc ts cT.(Configuration.threads)>>)
     (RL: forall loc ts from val rel2
-           (IN: Memory.get loc ts cT.(Configuration.memory) = Some (from, Message.mk val rel2))
+           (IN: Memory.get loc ts cT.(Configuration.memory) = Some (from, Message.full val rel2))
            (NOT: forall tid, ~Threads.is_promised tid loc ts cT.(Configuration.threads)),
-         exists rel1, Memory.get loc ts cS.(Configuration.memory) = Some (from, Message.mk val rel1) /\ <<CMP: cmp loc ts rel1 rel2>>):
+         exists rel1, Memory.get loc ts cS.(Configuration.memory) = Some (from, Message.full val rel1) /\ <<CMP: cmp loc ts rel1 rel2>>):
   pi_wf cmp (cS,cT)
 .
 Hint Constructors pi_wf.

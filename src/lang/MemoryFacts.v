@@ -194,10 +194,10 @@ Module MemoryFacts.
   Lemma promise_exists_None
         promises1 mem1 loc from to val released
         (LE: Memory.le promises1 mem1)
-        (GET: Memory.get loc to promises1 = Some (from, Message.mk val released))
+        (GET: Memory.get loc to promises1 = Some (from, Message.full val released))
         (LT: Time.lt from to):
     exists promises2 mem2,
-      Memory.promise promises1 mem1 loc from to (Message.mk val None) promises2 mem2 (Memory.op_kind_lower (Message.mk val released)).
+      Memory.promise promises1 mem1 loc from to (Message.full val None) promises2 mem2 (Memory.op_kind_lower (Message.full val released)).
   Proof.
     exploit Memory.lower_exists; eauto; try by econs. i. des.
     exploit LE; eauto. i.
@@ -208,7 +208,7 @@ Module MemoryFacts.
   Lemma released_time_lt
         mem loc from to val released
         (CLOSED: Memory.closed mem)
-        (GET: Memory.get loc to mem = Some (from, Message.mk val (Some released))):
+        (GET: Memory.get loc to mem = Some (from, Message.full val (Some released))):
     Time.lt from to.
   Proof.
     destruct (mem loc).(Cell.WF). exploit VOLUME; eauto. i. des; ss. inv x.

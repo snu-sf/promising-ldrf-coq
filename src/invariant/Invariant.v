@@ -94,7 +94,7 @@ Section Invariant.
     forall loc,
     exists from to released,
       Memory.get loc to m =
-      Some (from, Message.mk (LocFun.find loc assign) released).
+      Some (from, Message.full (LocFun.find loc assign) released).
 
   Definition sem_memory (m:Memory.t): Prop :=
     memory_assign m <1= J.

@@ -158,7 +158,7 @@ Lemma merge_split
       (TS23: Time.lt ts2 ts3)
       (STEP: fulfill_step lc0 sc0 loc ts1 ts3 val3 released0 released3 ord lc3 sc3):
   exists lc1' lc2' lc3' sc2' sc3' mem1' released1',
-    <<STEP1: Local.promise_step lc0 mem0 loc ts1 ts2 (Message.mk val2 released1') lc1' mem1' (Memory.op_kind_split ts3 (Message.mk val3 released3))>> /\
+    <<STEP1: Local.promise_step lc0 mem0 loc ts1 ts2 (Message.full val2 released1') lc1' mem1' (Memory.op_kind_split ts3 (Message.full val3 released3))>> /\
     <<STEP2: fulfill_step lc1' sc0 loc ts1 ts2 val2 released0 released1' ord lc2' sc2'>> /\
     <<STEP3: fulfill_step lc2' sc2' loc ts2 ts3 val3 released1' released3 ord lc3' sc3'>> /\
     <<LOCAL3: sim_local SimPromises.bot lc3' lc3>> /\
@@ -173,7 +173,7 @@ Proof.
   inv STEP.
   exploit MemorySplit.remove_promise_promise_remove_remove;
     try exact TS12; try exact TS23; try exact REMOVE.
-  { instantiate (1 := Message.mk val2 released1'). econs; eauto. }
+  { instantiate (1 := Message.full val2 released1'). econs; eauto. }
   { econs. unfold released1', TView.write_released. repeat (try condtac; aggrtac).
     - etrans; eauto. left. auto.
     - etrans; eauto. left. auto.
@@ -226,9 +226,9 @@ Lemma merge_write_write_relaxed
       (TS23: Time.lt ts2 ts3)
       (STEP: Local.write_step lc0 sc0 mem0 loc ts1 ts3 val3 released0 released3 ord lc3 sc3 mem3 kind):
   exists lc1' lc2' lc3' sc2' sc3' mem1' mem2' mem3' released2' released3',
-    <<STEP1: Local.promise_step lc0 mem0 loc ts1 ts3 (Message.mk val3 released3) lc1' mem1' kind>> /\
-    <<STEP2: Local.write_step lc1' sc0 mem1' loc ts1 ts2 val2 released0 released2' ord lc2' sc2' mem2' (Memory.op_kind_split ts3 (Message.mk val3 released3))>> /\
-    <<STEP3: Local.write_step lc2' sc2' mem2' loc ts2 ts3 val3 released2' released3' ord lc3' sc3' mem3' (Memory.op_kind_lower (Message.mk val3 released3))>> /\
+    <<STEP1: Local.promise_step lc0 mem0 loc ts1 ts3 (Message.full val3 released3) lc1' mem1' kind>> /\
+    <<STEP2: Local.write_step lc1' sc0 mem1' loc ts1 ts2 val2 released0 released2' ord lc2' sc2' mem2' (Memory.op_kind_split ts3 (Message.full val3 released3))>> /\
+    <<STEP3: Local.write_step lc2' sc2' mem2' loc ts2 ts3 val3 released2' released3' ord lc3' sc3' mem3' (Memory.op_kind_lower (Message.full val3 released3))>> /\
     <<REL3: View.opt_le released3' released3>> /\
     <<LOCAL3: sim_local SimPromises.bot lc3' lc3>> /\
     <<SC3: TimeMap.le sc3' sc3>> /\
@@ -648,7 +648,7 @@ Lemma merge_write_write
       (TS23: Time.lt ts2 ts3)
       (STEP: Local.write_step lc0 sc0 mem0 loc ts1 ts3 val2 released0 released2 ord lc3 sc3 mem3 kind):
   exists lc1' lc2' lc3' sc2' sc3' mem1' mem2' mem3' released1' released2' kind2 kind3,
-    <<STEP1: Local.promise_step lc0 mem0 loc ts1 ts3 (Message.mk val2 released2) lc1' mem1' kind \/ (lc0, mem0) = (lc1', mem1')>> /\
+    <<STEP1: Local.promise_step lc0 mem0 loc ts1 ts3 (Message.full val2 released2) lc1' mem1' kind \/ (lc0, mem0) = (lc1', mem1')>> /\
     <<STEP2: Local.write_step lc1' sc0 mem1' loc ts1 ts2 val1 released0 released1' ord lc2' sc2' mem2' kind2>> /\
     <<STEP3: Local.write_step lc2' sc2' mem2' loc ts2 ts3 val2 released1' released2' ord lc3' sc3' mem3' kind3>> /\
     <<REL3: View.opt_le released2' released2>> /\
@@ -682,7 +682,7 @@ Lemma merge_write_write_None
       (TS23: Time.lt ts2 ts3)
       (STEP: Local.write_step lc0 sc0 mem0 loc ts1 ts3 val2 released0 released2 ord lc3 sc3 mem3 kind):
   exists lc1' lc2' lc3' sc2' sc3' mem1' mem2' mem3' released1' released2' kind2 kind3,
-    <<STEP1: Local.promise_step lc0 mem0 loc ts1 ts3 (Message.mk val2 released2) lc1' mem1' kind \/ (lc0, mem0) = (lc1', mem1')>> /\
+    <<STEP1: Local.promise_step lc0 mem0 loc ts1 ts3 (Message.full val2 released2) lc1' mem1' kind \/ (lc0, mem0) = (lc1', mem1')>> /\
     <<STEP2: Local.write_step lc1' sc0 mem1' loc ts1 ts2 val1 released0 released1' ord lc2' sc2' mem2' kind2>> /\
     <<STEP3: Local.write_step lc2' sc2' mem2' loc ts2 ts3 val2 None released2' ord lc3' sc3' mem3' kind3>> /\
     <<REL3: View.opt_le released2' released2>> /\

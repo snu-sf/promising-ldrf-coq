@@ -35,9 +35,9 @@ Hint Unfold loctmeq.
 
 Definition mem_sub (cmp: VIEW_CMP) (m1 m2: Memory.t) : Prop :=
   forall loc ts from val rel1
-    (IN: Memory.get loc ts m1 = Some (from, Message.mk val rel1)),
+    (IN: Memory.get loc ts m1 = Some (from, Message.full val rel1)),
   exists rel2,
-  <<IN: Memory.get loc ts m2 = Some (from, Message.mk val rel2)>> /\
+  <<IN: Memory.get loc ts m2 = Some (from, Message.full val rel2)>> /\
   <<CMP: cmp loc ts rel1 rel2>>.
 
 Definition mem_eqrel (cmp: VIEW_CMP) (m1 m2: Memory.t) : Prop :=
@@ -67,9 +67,9 @@ Lemma mem_eqlerel_get
       m1 m2
       l f t v r2
       (LE: mem_eqlerel m1 m2)
-      (GET2: Memory.get l t m2 = Some (f, Message.mk v r2)):
+      (GET2: Memory.get l t m2 = Some (f, Message.full v r2)):
   exists r1,
-    <<GET1: Memory.get l t m1 = Some (f, Message.mk v r1)>> /\
+    <<GET1: Memory.get l t m1 = Some (f, Message.full v r1)>> /\
     <<REL: View.opt_le r1 r2>>.
 Proof. inv LE. des. exploit H0; eauto. Qed.
 

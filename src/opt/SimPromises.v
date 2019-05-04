@@ -188,8 +188,8 @@ Module SimPromises.
 
   Definition none_if loc ts (pview:t) (msg:Message.t): Message.t :=
     match msg with
-    | Message.mk val released =>
-      Message.mk val (none_if_released loc ts pview released)
+    | Message.full val released =>
+      Message.full val (none_if_released loc ts pview released)
     | Message.half => Message.half
     end.
 
@@ -229,7 +229,7 @@ Module SimPromises.
   Inductive sem (pview:t) (inv:t) (promises_src promises_tgt:Memory.t): Prop :=
   | sem_intro
       (LE: mem_le_transf pview promises_tgt promises_src)
-      (PVIEW: forall l t (MEM: mem l t pview), exists f val released, Memory.get l t promises_tgt = Some (f, Message.mk val released))
+      (PVIEW: forall l t (MEM: mem l t pview), exists f val released, Memory.get l t promises_tgt = Some (f, Message.full val released))
       (SOUND: forall l t (INV: mem l t inv),
           Memory.get l t promises_tgt = None /\
           exists f m, Memory.get l t promises_src = Some (f, m))
@@ -638,7 +638,7 @@ Module SimPromises.
       exploit (@Memory.max_full_released_exists mem1_tgt loc to).
       { eapply CLOSED1_TGT. }
       i. des.
-      exploit (@Memory.add_exists mem1_tgt loc from to (Message.mk val (Some released0))).
+      exploit (@Memory.add_exists mem1_tgt loc from to (Message.full val (Some released0))).
       { eapply covered_disjoint; try apply SIM1; eauto. inv ADD. inv ADD0. auto. }
       { inv ADD. inv ADD0. auto. }
       { econs. econs. eapply Memory.max_full_released_wf; eauto. }
@@ -686,7 +686,7 @@ Module SimPromises.
       exploit (@Memory.max_full_released_exists mem2_tgt loc to).
       { apply CLOSED2_TGT. }
       i. des.
-      exploit (@Memory.split_exists mem2_tgt loc from to to3 (Message.mk val (Some released0)) msg_tgt).
+      exploit (@Memory.split_exists mem2_tgt loc from to to3 (Message.full val (Some released0)) msg_tgt).
       { eauto. }
       { inv SPLIT. inv SPLIT0. ss. }
       { inv SPLIT. inv SPLIT0. ss. }
@@ -728,9 +728,9 @@ Module SimPromises.
       exploit (@Memory.lower_exists mem2_tgt loc from to msg_tgt
                                     (match msg with
                                      | Message.half => Message.half
-                                     | Message.mk val _ =>
+                                     | Message.full val _ =>
                                        (match msg_tgt with
-                                        | Message.half => Message.mk val (Some released)
+                                        | Message.half => Message.full val (Some released)
                                         | _ => msg_tgt
                                         end)
                                      end)).
