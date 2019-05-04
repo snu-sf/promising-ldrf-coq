@@ -2635,6 +2635,31 @@ Module Memory.
     esplits; try exact LE2; eauto.
   Qed.
 
+  Lemma no_half_concrete_inj
+        promises mem mem1 mem2
+        (CONCRETE1: concrete mem mem1)
+        (CONCRETE2: concrete mem mem2)
+        (LE1: le promises mem1)
+        (LE2: le promises mem2)
+        (NOHALF1: no_half promises mem1)
+        (NOHALF2: no_half promises mem2):
+    mem1 = mem2.
+  Proof.
+    apply ext. i.
+    inv CONCRETE1. inv CONCRETE2.
+    destruct (get loc ts mem1) as [[from msg]|] eqn:GET1.
+    - exploit COMPLETE; eauto. i. des.
+      + exploit SOUND0; eauto. i. des; auto.
+        subst. exploit LE2; eauto.
+      + subst. exploit SOUND0; eauto. i. des; auto.
+        exploit LE1; eauto. i.
+        rewrite GET1 in x1. inv x1.
+    - destruct (get loc ts mem2) as [[from msg]|] eqn:GET2; ss.
+      exploit COMPLETE0; eauto. i. des.
+      + exploit SOUND; eauto. i. des; congr.
+      + exploit SOUND; eauto. i. des; congr.
+  Qed.
+
   Lemma concrete_closed_timemap
         mem mem' tm
         (CONCRETE: concrete mem mem')

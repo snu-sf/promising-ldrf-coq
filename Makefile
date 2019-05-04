@@ -4,7 +4,8 @@ COQTHEORIES  := lib/sflib/*.v \
 	src/lang/*.v \
 	src/while/*.v \
 	src/prop/*.v \
-	src/opt/*.v
+	src/opt/*.v \
+  src/invariant/*.v
 
 .PHONY: all theories clean
 
