@@ -83,21 +83,18 @@ Section SimulationThread.
           <<TERMINAL_SRC: lang_src.(Language.is_terminal) st2_src>> /\
           <<LOCAL: sim_local SimPromises.bot lc2_src lc1_tgt>> /\
           <<TERMINAL: sim_terminal st2_src st1_tgt>>>> /\
-      <<FUTURE:
-        forall sc2_src mem2_src
-          (SC_FUTURE_SRC: TimeMap.le sc1_src sc2_src)
-          (MEM_FUTURE_SRC: Memory.future mem1_src mem2_src)
+      <<CONCRETE:
+        forall mem2_src
+          (FUTURE_SRC: Memory.future mem1_src mem2_src)
+          (CONCRETE_SRC: Memory.concrete mem1_src mem2_src)
           (WF_SRC: Local.wf lc1_src mem2_src)
-          (SC_SRC: Memory.closed_timemap sc2_src mem2_src)
           (MEM_SRC: Memory.closed mem2_src)
           (NOHALF_SRC: Memory.no_half lc1_src.(Local.promises) mem2_src),
-        exists sc2_tgt mem2_tgt,
-          <<SC: TimeMap.le sc2_src sc2_tgt>> /\
+        exists mem2_tgt,
           <<MEMORY: sim_memory mem2_src mem2_tgt>> /\
-          <<SC_FUTURE_TGT: TimeMap.le sc1_tgt sc2_tgt>> /\
-          <<MEM_FUTURE_TGT: Memory.future mem1_tgt mem2_tgt>> /\
+          <<FUTURE_TGT: Memory.future mem1_tgt mem2_tgt>> /\
+          <<CONCRETE_TGT: Memory.concrete mem1_tgt mem2_tgt>> /\
           <<WF_TGT: Local.wf lc1_tgt mem2_tgt>> /\
-          <<SC_TGT: Memory.closed_timemap sc2_tgt mem2_tgt>> /\
           <<MEM_TGT: Memory.closed mem2_tgt>> /\
           <<NOHALF_TGT: Memory.no_half lc1_tgt.(Local.promises) mem2_tgt>>>> /\
       <<PROMISES:
@@ -306,10 +303,11 @@ Lemma sim_thread_consistent
 Proof.
   generalize SIM. intro X.
   punfold X. exploit X; eauto; try refl. i. des.
-  ii. ss. exploit FUTURE; eauto. i. des.
+  ii. ss. exploit CONCRETE; eauto. i. des.
   exploit CONSISTENT; eauto; try refl. i. des.
-  exploit sim_thread_rtc_step; try apply MEMORY0; try apply SC0; eauto.
-  { s. eapply sim_thread_future; eauto. }
+  exploit sim_thread_rtc_step; try apply MEMORY0;
+    eauto using Memory.concrete_closed_timemap; s.
+  { eapply sim_thread_future; eauto; try refl. }
   i. des. destruct e2. ss.
   hexploit Thread.rtc_tau_step_no_half; try exact STEPS; eauto. s. i. des.
   punfold SIM0. exploit SIM0; eauto; try refl. i. des.

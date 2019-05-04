@@ -172,7 +172,7 @@ Module Configuration.
       (TID: IdentMap.find tid c1.(threads) = Some (existT _ lang st1, lc1))
       (STEPS: rtc (@Thread.tau_step _) (Thread.mk _ st1 lc1 c1.(sc) c1.(memory)) e2)
       (STEP: Thread.step pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
-      (CONSISTENT: Thread.consistent (Thread.mk lang st3 lc3 sc3 memory3)):
+      (CONSISTENT: consistent (mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(threads)) sc3 memory3)):
       step (ThreadEvent.get_event e) tid c1 (mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(threads)) sc3 memory3)
   .
 
@@ -219,85 +219,23 @@ Module Configuration.
     exploit THREADS; ss; eauto. i.
     exploit Thread.rtc_tau_step_future; eauto. s. i. des.
     exploit Thread.step_future; eauto. s. i. des.
-    splits; [| |by etrans; eauto|by etrans; eauto].
-    - econs; ss. econs.
-      + i. simplify.
-        * exploit THREADS; try apply TH1; eauto. i. des.
-          exploit Thread.rtc_tau_step_disjoint; eauto. i. des.
-          exploit Thread.step_disjoint; eauto. s. i. des.
-          symmetry. auto.
-        * exploit THREADS; try apply TH2; eauto. i. des.
-          exploit Thread.rtc_tau_step_disjoint; eauto. i. des.
-          exploit Thread.step_disjoint; eauto. i. des.
-          auto.
-        * eapply DISJOINT; [|eauto|eauto]. auto.
-      + i. simplify.
-        exploit THREADS; try apply TH; eauto. i.
+    splits; [|auto|by etrans; eauto|by etrans; eauto].
+    econs; ss. econs.
+    - i. simplify.
+      + exploit THREADS; try apply TH1; eauto. i. des.
         exploit Thread.rtc_tau_step_disjoint; eauto. i. des.
         exploit Thread.step_disjoint; eauto. s. i. des.
+        symmetry. auto.
+      + exploit THREADS; try apply TH2; eauto. i. des.
+        exploit Thread.rtc_tau_step_disjoint; eauto. i. des.
+        exploit Thread.step_disjoint; eauto. i. des.
         auto.
-    - ii. simplify; eauto.
-      eapply CONSISTENT1; eauto. s.
-      repeat (etrans; eauto).
-  Qed.
-
-  Lemma step_disjoint
-        e tid c1 c2 ths
-        (STEP: step e tid c1 c2)
-        (DISJOINT: Threads.disjoint c1.(threads) ths)
-        (WF1: wf c1)
-        (CONSISTENT1: consistent c1)
-        (WF: wf (mk ths c1.(sc) c1.(memory)))
-        (CONSISTENT: consistent (mk ths c1.(sc) c1.(memory))):
-      <<DISJOINT: Threads.disjoint c2.(threads) ths>> /\
-      <<WF: wf (mk ths c2.(sc) c2.(memory))>> /\
-      <<CONSISTENT: consistent (mk ths c2.(sc) c2.(memory))>>.
-  Proof.
-    inv STEP. ss.
-    exploit Thread.rtc_tau_step_future; eauto.
-    { econs; eapply WF1; eauto. }
-    { apply WF1. }
-    { apply WF1. }
-    s. i. des.
-    exploit Thread.step_future; eauto. s. i. des.
-    splits.
-    - econs; s; ii; simplify.
-      + inv DISJOINT. eapply THREAD; eauto.
-      + inv DISJOINT. eapply THREAD; eauto.
-      + exploit Thread.rtc_tau_step_disjoint; eauto; s.
-        { econs; eapply WF1; eauto. }
-        { apply WF1. }
-        { apply WF1. }
-        { eapply DISJOINT; eauto. }
-        { eapply WF; eauto. }
-        i. des.
-        exploit Thread.step_disjoint; eauto. s. i. des.
-        auto.
-      + inv DISJOINT. eapply MEMORY; eauto.
-    - econs; s; eauto.
-      + econs.
-        * i. eapply WF; eauto.
-        * i.
-          exploit Thread.rtc_tau_step_disjoint; eauto.
-          { econs; eapply WF1; eauto. }
-          { apply WF1. }
-          { apply WF1. }
-          { eapply DISJOINT; eauto. }
-          { eapply WF; eauto. }
-          i. des.
-          exploit Thread.step_disjoint; eauto. s. i. des.
-          splits; ss.
-    - ii. ss.
-      exploit Thread.rtc_tau_step_disjoint; eauto.
-      { econs; eapply WF1; eauto. }
-      { apply WF1. }
-      { apply WF1. }
-      { eapply DISJOINT; eauto. }
-      { eapply WF; eauto. }
-      i. des.
+      + eapply DISJOINT; [|eauto|eauto]. auto.
+    - i. simplify.
+      exploit THREADS; try apply TH; eauto. i.
+      exploit Thread.rtc_tau_step_disjoint; eauto. i. des.
       exploit Thread.step_disjoint; eauto. s. i. des.
-      eapply CONSISTENT; eauto. s.
-      repeat (etrans; eauto).
+      auto.
   Qed.
 
   Lemma opt_step_future
@@ -313,23 +251,6 @@ Module Configuration.
     inv STEP.
     - splits; auto; refl.
     - eapply step_future; eauto.
-  Qed.
-
-  Lemma opt_step_disjoint
-        e tid c1 c2 ths
-        (STEP: opt_step e tid c1 c2)
-        (DISJOINT: Threads.disjoint c1.(threads) ths)
-        (WF1: wf c1)
-        (CONSISTENT1: consistent c1)
-        (WF: wf (mk ths c1.(sc) c1.(memory)))
-        (CONSISTENT: consistent (mk ths c1.(sc) c1.(memory))):
-      <<DISJOINT: Threads.disjoint c2.(threads) ths>> /\
-      <<WF: wf (mk ths c2.(sc) c2.(memory))>> /\
-      <<CONSISTENT: consistent (mk ths c2.(sc) c2.(memory))>>.
-  Proof.
-    inv STEP.
-    - splits; auto; refl.
-    - eapply step_disjoint; eauto.
   Qed.
 
   Lemma rtc_step_future
@@ -348,23 +269,5 @@ Module Configuration.
       exploit step_future; eauto. i. des.
       exploit IHSTEPS; eauto. i. des.
       splits; eauto; etrans; eauto.
-  Qed.
-
-  Lemma rtc_step_disjoint
-        c1 c2 ths
-        (STEPS: rtc tau_step c1 c2)
-        (DISJOINT: Threads.disjoint c1.(threads) ths)
-        (WF1: wf c1)
-        (CONSISTENT1: consistent c1)
-        (WF: wf (mk ths c1.(sc) c1.(memory)))
-        (CONSISTENT: consistent (mk ths c1.(sc) c1.(memory))):
-      <<DISJOINT: Threads.disjoint c2.(threads) ths>> /\
-      <<WF: wf (mk ths c2.(sc) c2.(memory))>> /\
-      <<CONSISTENT: consistent (mk ths c2.(sc) c2.(memory))>>.
-  Proof.
-    revert DISJOINT CONSISTENT1 CONSISTENT. induction STEPS; auto. i. inv H.
-    exploit step_future; eauto. i. des.
-    exploit step_disjoint; eauto. i. des.
-    apply IHSTEPS; auto.
   Qed.
 End Configuration.
