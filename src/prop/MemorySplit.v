@@ -53,7 +53,7 @@ Module MemorySplit.
         (MSG_LE: Message.le msg2 msg1)
         (MSG_WF1: Message.wf msg1)
         (MSG_WF2: Message.wf msg2)
-        (MSG_TS: Memory.message_ts msg2 loc to)
+        (MSG_TS: Memory.message_to msg2 loc to)
         (TS: Time.lt from to)
         (REMOVE: Memory.remove promises0 loc from to msg1 promises2):
     exists promises1' mem1',
@@ -103,7 +103,7 @@ Module MemorySplit.
         (TS12: Time.lt ts1 ts2)
         (TS23: Time.lt ts2 ts3)
         (MSG_WF2: Message.wf msg2)
-        (MSG_TS2: Memory.message_ts msg2 loc ts2)
+        (MSG_TS2: Memory.message_to msg2 loc ts2)
         (LE: Memory.le promises0 mem0)
         (REMOVE: Memory.remove promises0 loc ts1 ts3 msg3 promises3):
     exists promises1 promises2 mem1,

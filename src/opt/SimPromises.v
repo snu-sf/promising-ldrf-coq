@@ -747,11 +747,11 @@ Module SimPromises.
       + etrans; try exact FUTURE_TGT. econs 2; try refl. econs; eauto.
         * destruct msg; destruct msg_tgt; try by econs.
           { inv CLOSED2_TGT. exploit CLOSED0; eauto. i. des.
-            eapply Memory.lower_closed_message_view; eauto. }
+            eapply Memory.lower_closed_message; eauto. }
           { econs. econs. eapply Memory.max_full_released_closed_lower; eauto. }
         * destruct msg; destruct msg_tgt; try by econs.
           { inv CLOSED2_TGT. exploit CLOSED0; eauto. i. des.
-            exploit Memory.lower_closed_message_view; eauto. }
+            exploit Memory.lower_closed_message; eauto. }
           { econs. eapply Memory.max_full_released_closed_lower; eauto. }
       + exploit Memory.lower_get0; try exact LOWER_TGT. i. des.
         ii. exploit LE2_TGT; eauto. i.

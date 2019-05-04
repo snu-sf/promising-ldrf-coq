@@ -647,8 +647,8 @@ Lemma sim_memory_split_exists_aux
   exists msg_tgt' mem2_tgt,
     <<SPLIT: Memory.split mem1_tgt loc ts1 ts2 ts3 msg_tgt' msg_tgt mem2_tgt>> /\
     <<MSG_WF: Message.wf msg_tgt'>> /\
-    <<MSG_TS: Memory.message_ts msg_tgt' loc ts2>> /\
-    <<MSG_CLOSED: Memory.closed_message_view msg_tgt' mem2_tgt>> /\
+    <<MSG_TS: Memory.message_to msg_tgt' loc ts2>> /\
+    <<MSG_CLOSED: Memory.closed_message msg_tgt' mem2_tgt>> /\
     <<MSG_SIM: sim_message msg_src msg_tgt'>>.
 Proof.
   destruct msg_src.
@@ -693,25 +693,25 @@ Lemma sim_memory_split_exists
      <<TO: Time.lt to_src to_tgt>> /\
      <<SPLIT1: exists msg_tgt' mem2_tgt,
          Memory.split mem1_tgt loc from_tgt to_src to_tgt msg_tgt' msg_tgt mem2_tgt /\
-         Memory.message_ts msg_tgt' loc to_src /\
-         Memory.closed_message_view msg_tgt' mem2_tgt /\
+         Memory.message_to msg_tgt' loc to_src /\
+         Memory.closed_message msg_tgt' mem2_tgt /\
          sim_memory mem_src mem2_tgt>>)\/
     (<<FROM: Time.lt from_tgt from_src>> /\
      <<TO: to_src = to_tgt>> /\
      <<SPLIT: exists msg_tgt' mem2_tgt,
          Memory.split mem1_tgt loc from_tgt from_src to_tgt msg_tgt' msg_tgt mem2_tgt /\
-         Memory.message_ts msg_tgt' loc from_src /\
-         Memory.closed_message_view msg_tgt' mem2_tgt /\
+         Memory.message_to msg_tgt' loc from_src /\
+         Memory.closed_message msg_tgt' mem2_tgt /\
          sim_memory mem_src mem2_tgt>>) \/
     (<<FROM: Time.lt from_tgt from_src>> /\
      <<TO: Time.lt to_src to_tgt>> /\
      <<SPLIT: exists msg_tgt' msg_tgt'' mem2_tgt mem3_tgt,
          Memory.split mem1_tgt loc from_tgt to_src to_tgt msg_tgt' msg_tgt mem2_tgt /\
-         Memory.message_ts msg_tgt' loc to_src /\
-         Memory.closed_message_view msg_tgt' mem2_tgt /\
+         Memory.message_to msg_tgt' loc to_src /\
+         Memory.closed_message msg_tgt' mem2_tgt /\
          Memory.split mem2_tgt loc from_tgt from_src to_src msg_tgt'' msg_tgt' mem3_tgt /\
-         Memory.message_ts msg_tgt'' loc from_src /\
-         Memory.closed_message_view msg_tgt'' mem3_tgt /\
+         Memory.message_to msg_tgt'' loc from_src /\
+         Memory.closed_message msg_tgt'' mem3_tgt /\
          sim_memory mem_src mem3_tgt>>).
 Proof.
   dup CLOSED_SRC. inv CLOSED_SRC0.
@@ -906,12 +906,12 @@ Proof.
   inv TGT; econs. eapply sim_memory_closed_view; eauto.
 Qed.
 
-Lemma sim_memory_closed_message_view
+Lemma sim_memory_closed_message
       mem_src mem_tgt
       msg
       (SIM: sim_memory mem_src mem_tgt)
-      (TGT: Memory.closed_message_view msg mem_tgt):
-  Memory.closed_message_view msg mem_src.
+      (TGT: Memory.closed_message msg mem_tgt):
+  Memory.closed_message msg mem_src.
 Proof.
   inv TGT; ss. econs. eapply sim_memory_closed_opt_view; eauto.
 Qed.

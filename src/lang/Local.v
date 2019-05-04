@@ -195,7 +195,7 @@ Module Local.
   | promise_step_intro
       promises2
       (PROMISE: Memory.promise lc1.(promises) mem1 loc from to msg promises2 mem2 kind)
-      (CLOSED: Memory.closed_message_view msg mem2)
+      (CLOSED: Memory.closed_message msg mem2)
       (LC2: lc2 = mk lc1.(tview) promises2):
       promise_step lc1 mem1 loc from to msg lc2 mem2 kind
   .
@@ -283,8 +283,8 @@ Module Local.
     <<FUTURE: Memory.future mem1 mem2>> /\
     <<TVIEW_FUTURE: TView.le lc1.(tview) lc2.(tview)>> /\
     <<MSG_WF: Message.wf msg>> /\
-    <<MSG_TS: Memory.message_ts msg loc to>> /\
-    <<MSG_CLOSED: Memory.closed_message_view msg mem2>>.
+    <<MSG_TS: Memory.message_to msg loc to>> /\
+    <<MSG_CLOSED: Memory.closed_message msg mem2>>.
   Proof.
     inv WF1. inv STEP.
     exploit Memory.promise_future; eauto. i. des.

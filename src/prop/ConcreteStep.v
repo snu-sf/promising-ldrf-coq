@@ -36,7 +36,7 @@ Proof.
   inv WF1. inv WF1'. inv STEP.
   exploit Memory.concrete_promise_exists; try exact PROMISE; eauto. i. des.
   esplits; eauto. econs; eauto.
-  eapply Memory.concrete_closed_message_view; eauto.
+  eapply Memory.concrete_closed_message; eauto.
 Qed.
 
 Lemma concrete_read_step

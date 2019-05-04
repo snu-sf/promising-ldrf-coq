@@ -264,7 +264,7 @@ Lemma promise_add_promise_split_promise_add_promise_add
       (MEM0: Memory.closed mem0)
       (REL_CLOSED: forall promises1' mem1'
                      (PROMISE1: Memory.promise (Local.promises lc0) mem0 loc ts1 ts2 msg2 promises1' mem1' Memory.op_kind_add),
-          Memory.closed_message_view msg2 mem1')
+          Memory.closed_message msg2 mem1')
       (STEP1: Local.promise_step lc0 mem0 loc ts1 ts3 msg3 lc1 mem1 Memory.op_kind_add)
       (STEP2: Local.promise_step lc1 mem1 loc ts1 ts2 msg2 lc2 mem2 (Memory.op_kind_split ts3 msg3)):
   exists lc1' mem1',
@@ -290,7 +290,7 @@ Lemma promise_lower_promise_split_promise_split_promise_lower
       (MEM0: Memory.closed mem0)
       (REL_CLOSED: forall promises1' mem1' msg ts
                      (PROMISE1: Memory.promise (Local.promises lc0) mem0 loc ts1 ts2 msg2 promises1' mem1' (Memory.op_kind_split ts msg)),
-          Memory.closed_message_view msg2 mem1')
+          Memory.closed_message msg2 mem1')
       (STEP1: Local.promise_step lc0 mem0 loc ts1 ts3 msg3 lc1 mem1 (Memory.op_kind_lower msg0))
       (STEP2: Local.promise_step lc1 mem1 loc ts1 ts2 msg2 lc2 mem2 (Memory.op_kind_split ts3 msg3)):
   exists lc1' mem1',
@@ -316,7 +316,7 @@ Lemma reorder_promise_split_promise_split
       (MEM0: Memory.closed mem0)
       (REL_CLOSED: forall promises1' mem1' ts5 msg5
                      (PROMISE1: Memory.promise (Local.promises lc0) mem0 loc ts1 ts2 msg2 promises1' mem1' (Memory.op_kind_split ts5 msg5)),
-          Memory.closed_message_view msg2 mem1')
+          Memory.closed_message msg2 mem1')
       (STEP1: Local.promise_step lc0 mem0 loc ts1 ts3 msg3 lc1 mem1 (Memory.op_kind_split ts4 msg4))
       (STEP2: Local.promise_step lc1 mem1 loc ts1 ts2 msg2 lc2 mem2 (Memory.op_kind_split ts3 msg3)):
   exists lc1' mem1',
@@ -344,7 +344,7 @@ Lemma reorder_promise_add_promise_add
       (DIFF: (loc1, to1) <> (loc2, to2))
       (REL_CLOSED: forall promises1' mem1'
                      (PROMISE1: Memory.promise (Local.promises lc0) mem0 loc2 from2 to2 msg2 promises1' mem1' Memory.op_kind_add),
-          Memory.closed_message_view msg2 mem1')
+          Memory.closed_message msg2 mem1')
       (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 msg1 lc1 mem1 Memory.op_kind_add)
       (STEP2: Local.promise_step lc1 mem1 loc2 from2 to2 msg2 lc2 mem2 Memory.op_kind_add):
   exists lc1' mem1',

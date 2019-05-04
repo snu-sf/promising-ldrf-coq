@@ -121,7 +121,7 @@ Proof.
     cut (Time.le (View.rlx (View.unwrap (Some lhs)) loc)
                  (View.rlx (View.unwrap (Some rhs)) loc)).
     { i. etrans; eauto.
-      cut (Memory.message_ts (Message.full val (Some rhs)) loc to).
+      cut (Memory.message_to (Message.full val (Some rhs)) loc to).
       { i. inv H1. auto. }
       eapply MEM1. apply WF1. eapply Memory.remove_get0. eauto. }
     destruct lhs; destruct rhs; inv LE; ss. }
@@ -160,7 +160,7 @@ Proof.
     cut (Time.le (View.rlx (View.unwrap (Some lhs)) loc)
                  (View.rlx (View.unwrap (Some rhs)) loc)).
     { i. etrans; eauto.
-      cut (Memory.message_ts (Message.full val (Some rhs)) loc to).
+      cut (Memory.message_to (Message.full val (Some rhs)) loc to).
       { i. inv H1. auto. }
       eapply CLOSED2. apply WF2. eapply Memory.remove_get0. eauto. }
     destruct lhs; destruct rhs; inv LE; ss. }

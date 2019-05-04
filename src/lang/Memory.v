@@ -185,16 +185,16 @@ Module Memory.
     rewrite Cell.init_get. condtac; ss.
   Qed.
 
-  Inductive message_ts: forall (msg:Message.t) (loc:Loc.t) (to:Time.t), Prop :=
-  | message_ts_full
+  Inductive message_to: forall (msg:Message.t) (loc:Loc.t) (to:Time.t), Prop :=
+  | message_to_full
       val released loc to
       (TS: Time.le (released.(View.unwrap).(View.rlx) loc) to):
-      message_ts (Message.full val released) loc to
-  | message_ts_half
+      message_to (Message.full val released) loc to
+  | message_to_half
       loc to:
-      message_ts Message.half loc to
+      message_to Message.half loc to
   .
-  Hint Constructors message_ts.
+  Hint Constructors message_to.
 
   Definition closed_timemap (times:TimeMap.t) (mem:t): Prop :=
     forall loc, exists from val released, get loc (times loc) mem = Some (from, Message.full val released).
@@ -217,16 +217,16 @@ Module Memory.
   .
   Hint Constructors closed_opt_view.
 
-  Inductive closed_message_view: forall (msg:Message.t) (mem:t), Prop :=
-  | closed_message_view_full
+  Inductive closed_message: forall (msg:Message.t) (mem:t), Prop :=
+  | closed_message_full
       val released mem
       (CLOSED: closed_opt_view released mem):
-      closed_message_view (Message.full val released) mem
-  | closed_message_view_half
+      closed_message (Message.full val released) mem
+  | closed_message_half
       mem:
-      closed_message_view Message.half mem
+      closed_message Message.half mem
   .
-  Hint Constructors closed_message_view.
+  Hint Constructors closed_message.
 
 
   Definition inhabited (mem:t): Prop :=
@@ -238,8 +238,8 @@ Module Memory.
       (CLOSED: forall loc from to msg
                  (MSG: get loc to mem = Some (from, msg)),
           <<MSG_WF: Message.wf msg>> /\
-          <<MSG_TS: message_ts msg loc to>> /\
-          <<MSG_CLOSED: closed_message_view msg mem>>)
+          <<MSG_TS: message_to msg loc to>> /\
+          <<MSG_CLOSED: closed_message msg mem>>)
       (INHABITED: inhabited mem)
       (FINITE_HALF: finite_half mem)
   .
@@ -365,8 +365,8 @@ Module Memory.
   | future_imm_intro
       loc from to msg kind
       (OP: op mem1 loc from to msg mem2 kind)
-      (CLOSED: closed_message_view msg mem2)
-      (TS: message_ts msg loc to)
+      (CLOSED: closed_message msg mem2)
+      (TS: message_to msg loc to)
   .
   Hint Constructors future_imm.
 
@@ -380,19 +380,19 @@ Module Memory.
   | promise_add
       (PROMISES: add promises1 loc from to msg promises2)
       (MEM: add mem1 loc from to msg mem2)
-      (TS: message_ts msg loc to):
+      (TS: message_to msg loc to):
       promise promises1 mem1 loc from to msg promises2 mem2 op_kind_add
   | promise_split
       ts3 msg3
       (PROMISES: split promises1 loc from to ts3 msg msg3 promises2)
       (MEM: split mem1 loc from to ts3 msg msg3 mem2)
-      (TS: message_ts msg loc to):
+      (TS: message_to msg loc to):
       promise promises1 mem1 loc from to msg promises2 mem2 (op_kind_split ts3 msg3)
   | promise_lower
       msg0
       (PROMISES: lower promises1 loc from to msg0 msg promises2)
       (MEM: lower mem1 loc from to msg0 msg mem2)
-      (TS: message_ts msg loc to):
+      (TS: message_to msg loc to):
       promise promises1 mem1 loc from to msg promises2 mem2 (op_kind_lower msg0)
   .
   Hint Constructors promise.
@@ -885,12 +885,12 @@ Module Memory.
     inv CLOSED; econs. eapply add_closed_view; eauto.
   Qed.
 
-  Lemma add_closed_message_view
+  Lemma add_closed_message
         msg'
         mem1 loc from to msg mem2
         (ADD: add mem1 loc from to msg mem2)
-        (CLOSED: closed_message_view msg' mem1):
-    closed_message_view msg' mem2.
+        (CLOSED: closed_message msg' mem1):
+    closed_message msg' mem2.
   Proof.
     destruct msg'; ss. inv CLOSED. econs.
     eapply add_closed_opt_view; eauto.
@@ -900,8 +900,8 @@ Module Memory.
         mem1 loc from to msg mem2
         (ADD: add mem1 loc from to msg mem2)
         (CLOSED: closed mem1)
-        (MSG_CLOSED: closed_message_view msg mem2)
-        (MSG_TS: message_ts msg loc to):
+        (MSG_CLOSED: closed_message msg mem2)
+        (MSG_TS: message_to msg loc to):
     closed mem2.
   Proof.
     inv CLOSED. econs.
@@ -909,7 +909,7 @@ Module Memory.
       + des. subst. i. inv MSG. splits; auto.
         inv ADD. inv ADD0. auto.
       + guardH o. i. exploit CLOSED0; eauto. i. des. splits; auto.
-        eapply add_closed_message_view; eauto.
+        eapply add_closed_message; eauto.
     - eapply add_inhabited; eauto.
     - eapply add_finite_half; eauto.
   Qed.
@@ -968,12 +968,12 @@ Module Memory.
     inv CLOSED; econs. eapply split_closed_view; eauto.
   Qed.
 
-  Lemma split_closed_message_view
+  Lemma split_closed_message
         msg'
         mem1 loc ts1 ts2 ts3 msg2 msg3 mem2
         (SPLIT: split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2)
-        (CLOSED: closed_message_view msg' mem1):
-    closed_message_view msg' mem2.
+        (CLOSED: closed_message msg' mem1):
+    closed_message msg' mem2.
   Proof.
     destruct msg'; ss. inv CLOSED. econs.
     eapply split_closed_opt_view; eauto.
@@ -983,8 +983,8 @@ Module Memory.
         mem1 loc ts1 ts2 ts3 msg2 msg3 mem2
         (SPLIT: split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2)
         (CLOSED: closed mem1)
-        (MSG_CLOSED: closed_message_view msg2 mem2)
-        (MSG_TS: message_ts msg2 loc ts2):
+        (MSG_CLOSED: closed_message msg2 mem2)
+        (MSG_TS: message_to msg2 loc ts2):
     closed mem2.
   Proof.
     inv CLOSED. econs.
@@ -994,9 +994,9 @@ Module Memory.
       + guardH o. des. subst. i. inv MSG.
         exploit split_get0; eauto. i. des. exploit CLOSED0; eauto. i. des.
         splits; eauto.
-        eapply split_closed_message_view; eauto.
+        eapply split_closed_message; eauto.
       + guardH o. guardH o0. i. exploit CLOSED0; eauto. i. des. splits; auto.
-        eapply split_closed_message_view; eauto.
+        eapply split_closed_message; eauto.
     - eapply split_inhabited; eauto.
     - eapply split_finite_half; eauto.
   Qed.
@@ -1038,12 +1038,12 @@ Module Memory.
     inv CLOSED; econs. eapply lower_closed_view; eauto.
   Qed.
 
-  Lemma lower_closed_message_view
+  Lemma lower_closed_message
         msg'
         mem1 loc from to msg1 msg2 mem2
         (LOWER: lower mem1 loc from to msg1 msg2 mem2)
-        (CLOSED: closed_message_view msg' mem1):
-    closed_message_view msg' mem2.
+        (CLOSED: closed_message msg' mem1):
+    closed_message msg' mem2.
   Proof.
     destruct msg'; ss. inv CLOSED. econs.
     eapply lower_closed_opt_view; eauto.
@@ -1053,8 +1053,8 @@ Module Memory.
         mem1 loc from to msg1 msg2 mem2
         (LOWER: lower mem1 loc from to msg1 msg2 mem2)
         (CLOSED: closed mem1)
-        (MSG_CLOSED: closed_message_view msg2 mem2)
-        (MSG_TS: message_ts msg2 loc to):
+        (MSG_CLOSED: closed_message msg2 mem2)
+        (MSG_TS: message_to msg2 loc to):
     closed mem2.
   Proof.
     inv CLOSED. econs.
@@ -1062,7 +1062,7 @@ Module Memory.
       + des. subst. i. inv MSG. splits; auto.
         inv LOWER. inv LOWER0. auto.
       + guardH o. i. exploit CLOSED0; eauto. i. des. splits; auto.
-        eapply lower_closed_message_view; eauto.
+        eapply lower_closed_message; eauto.
     - eapply lower_inhabited; eauto.
     - eapply lower_finite_half; eauto.
   Qed.
@@ -1103,22 +1103,22 @@ Module Memory.
     inv OP; eauto using Memory.add_closed_opt_view, Memory.split_closed_opt_view, Memory.lower_closed_opt_view.
   Qed.
 
-  Lemma op_closed_message_view
+  Lemma op_closed_message
         kind msg'
         mem1 loc from to msg mem2
         (OP: Memory.op mem1 loc from to msg mem2 kind)
-        (CLOSED: Memory.closed_message_view msg' mem1):
-    closed_message_view msg' mem2.
+        (CLOSED: Memory.closed_message msg' mem1):
+    closed_message msg' mem2.
   Proof.
-    inv OP; eauto using Memory.add_closed_message_view, Memory.split_closed_message_view, Memory.lower_closed_message_view.
+    inv OP; eauto using Memory.add_closed_message, Memory.split_closed_message, Memory.lower_closed_message.
   Qed.
 
   Lemma op_closed
         mem1 loc from to msg mem2 kind
         (OP: op mem1 loc from to msg mem2 kind)
         (CLOSED: closed mem1)
-        (MSG_CLOSED: closed_message_view msg mem2)
-        (MSG_TS: message_ts msg loc to):
+        (MSG_CLOSED: closed_message msg mem2)
+        (MSG_TS: message_to msg loc to):
     closed mem2.
   Proof.
     inv OP; eauto using add_closed, split_closed, lower_closed.
@@ -1303,8 +1303,8 @@ Module Memory.
         mem1 loc from to msg mem2 kind
         (OP: op mem1 loc from to msg mem2 kind)
         (CLOSED1: closed mem1)
-        (MSG_CLOSED: closed_message_view msg mem2)
-        (MSG_TS: message_ts msg loc to):
+        (MSG_CLOSED: closed_message msg mem2)
+        (MSG_TS: message_to msg loc to):
     <<CLOSED2: closed mem2>> /\
     <<FUTURE: future mem1 mem2>> /\
     <<MSG_WF: Message.wf msg>>.
@@ -1357,7 +1357,7 @@ Module Memory.
         (LE_PROMISES1: le promises1 mem1)
         (FINITE1: finite promises1)
         (CLOSED1: closed mem1)
-        (MSG_CLOSED: closed_message_view msg mem2)
+        (MSG_CLOSED: closed_message msg mem2)
         (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind):
     <<LE_PROMISES2: le promises2 mem2>> /\
     <<FINITE2: finite promises2>> /\
@@ -1503,7 +1503,7 @@ Module Memory.
         (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
         (CLOSED: closed mem1)
         (FINITE: finite promises1)
-        (MSG_CLOSED: closed_message_view msg mem2)
+        (MSG_CLOSED: closed_message msg mem2)
         (LE: le promises1 mem1):
     <<CLOSED: closed mem2>> /\
     <<FINITE: finite promises2>> /\
@@ -2095,8 +2095,8 @@ Module Memory.
         promises1 mem1 loc from to msg mem2
         (LE_PROMISES1: le promises1 mem1)
         (ADD: add mem1 loc from to msg mem2)
-        (MSG_CLOSED: closed_message_view msg mem2)
-        (MSG_TS: message_ts msg loc to):
+        (MSG_CLOSED: closed_message msg mem2)
+        (MSG_TS: message_to msg loc to):
     exists promises2,
       promise promises1 mem1 loc from to msg promises2 mem2 op_kind_add.
   Proof.
@@ -2572,11 +2572,11 @@ Module Memory.
     inv CLOSED; eauto using concrete_closed_view.
   Qed.
 
-  Lemma concrete_closed_message_view
+  Lemma concrete_closed_message
         mem mem' msg
         (CONCRETE: concrete mem mem')
-        (CLOSED: closed_message_view msg mem):
-    closed_message_view msg mem'.
+        (CLOSED: closed_message msg mem):
+    closed_message msg mem'.
   Proof.
     inv CLOSED; eauto using concrete_closed_opt_view.
   Qed.
@@ -2592,7 +2592,7 @@ Module Memory.
     - exploit COMPLETE; eauto. i. des.
       + exploit CLOSED0; eauto. i. des.
         esplits; eauto.
-        eapply concrete_closed_message_view; eauto.
+        eapply concrete_closed_message; eauto.
       + subst. splits; econs; eauto.
         s. unfold TimeMap.bot. apply Time.bot_spec.
     - ii. specialize (INHABITED loc).
