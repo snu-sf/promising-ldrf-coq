@@ -166,7 +166,7 @@ Lemma consistent_promise_consistent
   promise_consistent th.(Thread.local).
 Proof.
   destruct th. destruct local. inv WF. ss.
-  exploit Memory.no_half_future_exists; eauto. i. des.
+  exploit Memory.no_half_concrete_future_exists; eauto. i. des.
   exploit CONS; try exact FUTURE; eauto; ss; try refl.
   { econs; eauto. eapply TView.future_closed; eauto. }
   { eapply Memory.future_closed_timemap; eauto. }

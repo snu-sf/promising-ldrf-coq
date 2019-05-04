@@ -260,28 +260,28 @@ Section Invariant.
     inv MSG_LE. esplits; eauto.
   Qed.
 
-  Lemma concrete_sem_memory1
+  Lemma concrete_elt_sem_memory1
         m1 m2
         (CLOSED: Memory.closed m1)
-        (CONCRETE: Memory.concrete m1 m2)
+        (CONCRETE_ELT: Memory.concrete_elt m1 m2)
         (SEM: sem_memory m1):
     sem_memory m2.
   Proof.
     ii.  apply SEM. ii. specialize (PR loc). des.
-    inv CONCRETE. exploit COMPLETE; eauto. i; des.
+    inv CONCRETE_ELT. exploit COMPLETE; eauto. i; des.
     - esplits; eauto.
     - inv x. rewrite H0. inv CLOSED.
       esplits; eauto.
   Qed.
 
-  Lemma concrete_sem_memory2
+  Lemma concrete_elt_sem_memory2
         m1 m2
-        (CONCRETE: Memory.concrete m1 m2)
+        (CONCRETE_ELT: Memory.concrete_elt m1 m2)
         (SEM: sem_memory m2):
     sem_memory m1.
   Proof.
     ii. apply SEM. ii. specialize (PR loc). des.
-    inv CONCRETE. exploit SOUND; eauto. i. des; try congr.
+    inv CONCRETE_ELT. exploit SOUND; eauto. i. des; try congr.
     esplits; eauto.
   Qed.
 
@@ -319,54 +319,54 @@ Section Invariant.
       { inv WF. inv WF0. eauto. }
       exploit Thread.rtc_tau_step_future; eauto; try by inv WF. s. i. des.
       exploit Thread.step_future; eauto. s. i. des.
-      exploit Memory.no_half_concrete_future_exists; try exact CLOSED0; eauto.
+      exploit Memory.no_half_concrete_elt_future_exists; try exact CLOSED0; eauto.
       { inv WF0. eauto. }
       i. des.
       exploit CONSISTENT; try exact NOHALF; try refl; eauto; s.
-      { inv WF0. econs; eauto. eapply TView.concrete_closed; eauto. }
-      { eapply Memory.concrete_closed_timemap; eauto. }
+      { inv WF0. econs; eauto. eapply TView.future_closed; eauto. }
+      { eapply Memory.concrete_elt_closed_timemap; eauto. }
       i. des.
-      exploit Memory.no_half_concrete_future_exists.
+      exploit Memory.no_half_concrete_elt_future_exists.
       { inv WF_LOCAL. apply PROMISES0. }
       { inv WF. ss. }
       i. des.
       assert (WF_LOCAL': Local.wf lc1 mem0).
-      { inv WF_LOCAL. econs; eauto. eapply TView.concrete_closed; eauto. }
-      exploit concrete_thread_rtc_tau_step; try exact STEPS; try exact CONCRETE0; eauto; try by inv WF.
-      s. i. des.
-      exploit concrete_thread_step; try exact STEP0; try exact CONCRETE2; eauto.
+      { inv WF_LOCAL. econs; eauto. eapply TView.future_closed; eauto. }
+      exploit concrete_elt_thread_rtc_tau_step;
+        try exact STEPS; try exact CONCRETE_ELT0; eauto; try by inv WF. s. i. des.
+      exploit concrete_elt_thread_step; try exact STEP0; try exact CONCRETE_ELT2; eauto.
       { s. exploit Thread.rtc_tau_step_future; try exact STEP'; eauto; s.
-        { inv WF. eapply Memory.concrete_closed_timemap; eauto. }
+        { inv WF. eapply Memory.concrete_elt_closed_timemap; eauto. }
         i. des. ss. }
       s. i. des.
-      hexploit Thread.rtc_tau_step_no_half; try exact STEP'; eauto. s. i. des.
-      hexploit Thread.step_no_half; try exact STEP'0; eauto. s. i. des.
-      exploit Memory.no_half_concrete_inj; [exact CONCRETE|exact CONCRETE1|..]; eauto.
-      { exploit Thread.rtc_tau_step_future; try exact STEP'; eauto; s.
-        { inv WF. eapply Memory.concrete_closed_timemap; eauto. }
+      hexploit Thread.rtc_tau_step_no_half; try exact STEPS'; eauto. s. i. des.
+      hexploit Thread.step_no_half; try exact STEP'; eauto. s. i. des.
+      exploit Memory.no_half_concrete_elt_inj; [exact CONCRETE_ELT|exact CONCRETE_ELT1|..]; eauto.
+      { exploit Thread.rtc_tau_step_future; try exact STEPS'; eauto; s.
+        { inv WF. eapply Memory.concrete_elt_closed_timemap; eauto. }
         i. des.
-        exploit Thread.step_future; try exact STEP'0; eauto. s. i. des.
+        exploit Thread.step_future; try exact STEP'; eauto. s. i. des.
         inv WF3. ss. }
       i. subst.
-      eapply rtc_implies in STEP'; [|by apply tau_union].
+      eapply rtc_implies in STEPS'; [|by apply tau_union].
       exploit rtc_n1; eauto; i.
       { econs. econs. eauto. }
       exploit Thread.rtc_all_step_future; eauto; ss; try by inv WF.
-      { inv WF. eapply Memory.concrete_closed_timemap; eauto. }
+      { inv WF. eapply Memory.concrete_elt_closed_timemap; eauto. }
       i. des.
       eapply rtc_implies in STEPS0; [|by apply tau_union].
       rewrite STEPS0 in x0.
       exploit steps_pf_steps; try exact x0; eauto; ss; try by inv WF.
       { ii. rewrite PROMISES, Memory.bot_get in *. congr. }
-      { inv WF. eapply Memory.concrete_closed_timemap; eauto. }
+      { inv WF. eapply Memory.concrete_elt_closed_timemap; eauto. }
       i. des.
       exploit rtc_union_step_nonpf_bot; eauto. i. subst.
       exploit rtc_thread_step_sem; try exact STEPS1; eauto; ss; try by inv WF.
-      { eapply concrete_sem_memory1; try exact CONCRETE0; eauto. by inv WF. }
-      { inv WF. eapply Memory.concrete_closed_timemap; eauto. }
+      { eapply concrete_elt_sem_memory1; try exact CONCRETE_ELT0; eauto. by inv WF. }
+      { inv WF. eapply Memory.concrete_elt_closed_timemap; eauto. }
       i. des.
       exploit Thread.rtc_all_step_future; try exact STEPS0; eauto. s. i. des.
-      eapply concrete_sem_memory2; try exact CONCRETE1.
+      eapply concrete_elt_sem_memory2; try exact CONCRETE_ELT1.
       eapply future_sem_memory; eauto.
   Qed.
 
