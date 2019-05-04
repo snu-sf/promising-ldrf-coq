@@ -666,15 +666,6 @@ Proof.
   - (* lower *)
     exploit merge_write_write_lower; try apply TS12; eauto. i. des.
     esplits; try apply STEP2; eauto.
-    (* destruct (Ordering.le Ordering.strong_relaxed ord) eqn:ORD. *)
-    (* + exploit Local.write_step_strong_relaxed; eauto; i; des; ss. *)
-    (*   destruct msg1; ss. *)
-    (*   exploit merge_write_write_lower_half; try apply TS12; eauto. i. des. *)
-    (*   esplits; try apply STEP2; eauto. *)
-    (* + exploit merge_write_write_relaxed; try apply TS12; eauto. *)
-    (*   { by destruct ord. } *)
-    (*   i. des. *)
-    (*   esplits; try exact STEP2; eauto. *)
 Qed.
 
 Lemma merge_write_write_None

@@ -856,21 +856,6 @@ Proof.
     + erewrite (@Memory.lower_o mem2_src); eauto. condtac; ss. eauto.
 Qed.
 
-(* not used *)
-(* Lemma sim_memory_lower_none *)
-(*       mem1_src mem2_src mem_tgt *)
-(*       loc from to msg1 msg2 *)
-(*       (SRC: Memory.lower mem1_src loc from to msg1 msg2 mem2_src) *)
-(*       (TGT: Memory.get loc to mem_tgt = None) *)
-(*       (SIM: sim_memory mem1_src mem_tgt): *)
-(*   sim_memory mem2_src mem_tgt. *)
-(* Proof. *)
-(*   inv SIM. econs; i. *)
-(*   - i. rewrite lower_covered; [|eauto]. eauto. *)
-(*   - i. erewrite Memory.lower_o; eauto. *)
-(*     condtac; eauto; ss. des. subst. congr. *)
-(* Qed. *)
-
 Lemma sim_memory_promise
       loc from to kind
       promises1_src mem1_src msg_src promises2_src mem2_src

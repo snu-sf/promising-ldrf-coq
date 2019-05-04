@@ -1558,15 +1558,6 @@ Module Memory.
   Definition max_timemap (mem:t): TimeMap.t :=
     fun loc => max_ts loc mem.
 
-  (* Lemma max_timemap_closed *)
-  (*       mem *)
-  (*       (INHABITED: inhabited mem): *)
-  (*   closed_timemap (max_timemap mem) mem. *)
-  (* Proof. *)
-  (*   ii. specialize (INHABITED loc). des. *)
-  (*   eapply max_ts_spec. eauto. *)
-  (* Qed. *)
-
   Lemma max_timemap_spec tm mem
         (TIMEMAP: closed_timemap tm mem)
         (INHABITED: inhabited mem):
@@ -1586,30 +1577,11 @@ Module Memory.
     etrans; eauto. eapply max_ts_spec; eauto.
   Qed.
 
-  (* Lemma future_max_timemap *)
-  (*       mem1 mem2 *)
-  (*       (FUTURE: future mem1 mem2) *)
-  (*       (CLOSED1: closed mem1) *)
-  (*       (CLOSED2: closed mem2): *)
-  (*   TimeMap.le (max_timemap mem1) (max_timemap mem2). *)
-  (* Proof. *)
-  (*   apply max_timemap_spec; try apply CLOSED2. *)
-  (*   ii. exploit max_timemap_closed; try apply CLOSED1; eauto. i. des. *)
-  (*   exploit future_get1; eauto. i. des. *)
-  (*   eauto. *)
-  (* Qed. *)
-
   Definition max_view (mem:t): View.t :=
     View.mk (max_timemap mem) (max_timemap mem).
 
   Lemma max_view_wf mem: View.wf (max_view mem).
   Proof. econs. refl. Qed.
-
-  (* Lemma max_view_closed *)
-  (*       mem *)
-  (*       (INHABITED: inhabited mem): *)
-  (*   closed_view (max_view mem) mem. *)
-  (* Proof. econs; apply max_timemap_closed; auto. Qed. *)
 
   Lemma max_view_spec tm mem
         (VIEW: closed_view tm mem)
@@ -1618,39 +1590,6 @@ Module Memory.
   Proof.
     econs; apply max_timemap_spec; try apply VIEW; auto.
   Qed.
-
-  (* Lemma add_max_timemap *)
-  (*       mem1 mem2 loc from to msg *)
-  (*       (ADD: add mem1 loc from to msg mem2) *)
-  (*       (INHABITED: inhabited mem1): *)
-  (*   max_timemap mem2 = TimeMap.join (max_timemap mem1) (TimeMap.singleton loc to). *)
-  (* Proof. *)
-  (*   hexploit add_inhabited; eauto. i. des. *)
-  (*   extensionality l. apply TimeFacts.antisym; auto. *)
-  (*   - exploit max_timemap_closed; eauto. instantiate (1 := l). i. des. *)
-  (*     revert x0. erewrite add_o; eauto. condtac; ss. *)
-  (*     + des. subst. i. inv x0. etrans; [|apply TimeMap.join_r]. *)
-  (*       apply TimeMap.singleton_inv. refl. *)
-  (*     + i. etrans; [|apply TimeMap.join_l]. *)
-  (*       eapply max_ts_spec; eauto. *)
-  (*   - apply TimeMap.join_spec. *)
-  (*     + apply max_timemap_spec; auto. *)
-  (*       eapply add_closed_timemap; eauto. *)
-  (*       apply max_timemap_closed. auto. *)
-  (*     + apply TimeMap.singleton_spec. eapply max_ts_spec. *)
-  (*       erewrite add_o; eauto. condtac; ss. des; congr. *)
-  (* Qed. *)
-
-  (* Lemma add_max_view *)
-  (*       mem1 mem2 loc from to val released *)
-  (*       (ADD: add mem1 loc from to val released mem2) *)
-  (*       (INHABITED: inhabited mem1): *)
-  (*   max_view mem2 = View.join (max_view mem1) (View.singleton_ur loc to). *)
-  (* Proof. *)
-  (*   apply View.ext; s. *)
-  (*   - eapply add_max_timemap; eauto. *)
-  (*   - eapply add_max_timemap; eauto. *)
-  (* Qed. *)
 
   Lemma closed_timemap_add
         loc from to val released mem tm
@@ -1662,62 +1601,6 @@ Module Memory.
     - subst. esplits; eauto.
     - apply CLOSED.
   Qed.
-
-  (* Definition max_released *)
-  (*            mem loc ts := *)
-  (*   let rlx := TimeMap.add loc ts (max_timemap mem) in *)
-  (*   View.mk rlx rlx. *)
-
-  (* Lemma  max_released_wf *)
-  (*        mem1 loc to: *)
-  (*   View.wf (max_released mem1 loc to). *)
-  (* Proof. *)
-  (*   econs. refl. *)
-  (* Qed. *)
-
-  (* Lemma max_released_closed *)
-  (*       mem1 loc from to val released mem2 *)
-  (*       (ADD: add mem1 loc from to val released mem2) *)
-  (*       (CLOSED: closed mem1): *)
-  (*   <<CLOSED: closed_view (max_released mem1 loc to) mem2>> /\ *)
-  (*   <<REL_TS: Time.le ((max_released mem1 loc to).(View.rlx) loc) to>>. *)
-  (* Proof. *)
-  (*   splits. *)
-  (*   - unfold max_released. *)
-  (*     hexploit add_inhabited; try apply CLOSED; eauto. i. des. *)
-  (*     cut (closed_timemap (TimeMap.add loc to (max_timemap mem1)) mem2). *)
-  (*     { i. econs; ss. } *)
-  (*     eapply closed_timemap_add. *)
-  (*     + erewrite add_o; eauto. condtac; ss. des; congr. *)
-  (*     + eapply add_closed_timemap; eauto. *)
-  (*       eapply max_timemap_closed. apply CLOSED. *)
-  (*   - ss. unfold TimeMap.add. condtac; [|congr]. refl. *)
-  (* Qed. *)
-
-  (* Lemma max_released_spec *)
-  (*       mem1 loc from to val released mem2 *)
-  (*       (CLOSED: closed mem1) *)
-  (*       (ADD: add mem1 loc from to val released mem2) *)
-  (*       (REL_CLOSED: closed_opt_view released mem2) *)
-  (*       (REL_TS: Time.le (released.(View.unwrap).(View.rlx) loc) to): *)
-  (*   View.opt_le released (Some (max_released mem1 loc to)). *)
-  (* Proof. *)
-  (*   inv REL_CLOSED; econs. *)
-  (*   hexploit add_inhabited; try apply CLOSED; eauto. i. des. *)
-  (*   exploit max_view_spec; eauto. i. *)
-  (*   erewrite add_max_view in x0; try apply CLOSED; eauto. *)
-  (*   inv x0. ss. *)
-  (*   unfold max_released. econs; ss. *)
-  (*   - ii. unfold TimeMap.add. condtac. *)
-  (*     + subst. etrans; [|exact REL_TS]. *)
-  (*       inv ADD. inv ADD0. inv WF. apply WF0. *)
-  (*     + etrans; [apply PLN|]. apply Time.join_spec; [refl|]. *)
-  (*       unfold TimeMap.singleton, LocFun.add. condtac; ss. apply Time.bot_spec. *)
-  (*   - ii. unfold TimeMap.add. condtac. *)
-  (*     + subst. ss. *)
-  (*     + etrans; [apply RLX|]. apply Time.join_spec; [refl|]. *)
-  (*       unfold TimeMap.singleton, LocFun.add. condtac; ss. apply Time.bot_spec. *)
-  (* Qed. *)
 
   (* Lemmas on max_full_timemap *)
 
