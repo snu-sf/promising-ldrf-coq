@@ -623,22 +623,25 @@ Proof.
   inv PROMISE. eapply lower_sim_memory; eauto.
 Qed.
 
-(* Lemma split_sim_memory *)
-(*       mem0 loc ts1 ts2 ts3 msg2 msg3 mem1 *)
-(*       (SPLIT: Memory.split mem0 loc ts1 ts2 ts3 msg2 msg3 mem1) *)
-(*       (MSG: message_same_kind msg2 msg3): *)
-(*   sim_memory mem1 mem0. *)
-(* Proof. *)
-(*   econs; i. *)
-(*   - eapply split_covered. eauto. *)
-(*   - eapply split_covered_half_same; eauto. *)
-(*   - exploit Memory.split_get0; eauto. i. des. *)
-(*     erewrite Memory.split_o; eauto. repeat condtac; ss. *)
-(*     + des. subst. congr. *)
-(*     + guardH o. des. subst. rewrite GET1 in GET. inv GET. *)
-(*       esplits; eauto. refl. *)
-(*     + esplits; eauto. refl. *)
-(* Qed. *)
+Lemma split_sim_memory
+      mem0 loc ts1 ts2 ts3 val2 released2 val3 released3 mem1
+      (SPLIT: Memory.split mem0 loc ts1 ts2 ts3 (Message.full val2 released2) (Message.full val3 released3) mem1):
+  sim_memory mem1 mem0.
+Proof.
+  econs; i.
+  - eapply split_covered. eauto.
+  - exploit Memory.split_get0; eauto. i. des.
+    erewrite Memory.split_o; eauto. repeat condtac; ss.
+    + des. subst. congr.
+    + guardH o. des. subst. rewrite GET1 in GET. inv GET.
+      esplits; eauto. refl.
+    + esplits; eauto. refl.
+  - exploit Memory.split_get0; eauto. i. des.
+    erewrite Memory.split_o; eauto.
+    repeat condtac; ss; split; i; try congr.
+    + des. subst. rewrite GET in H. inv H.
+    + guardH o. des. subst. rewrite GET0 in H. inv H.
+Qed.
 
 (* Lemma sim_memory_split_exists_aux *)
 (*       ts1 ts2 ts3 *)

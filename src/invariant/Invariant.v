@@ -303,7 +303,10 @@ Section Invariant.
       { inv WF. eapply WF0. eauto. }
       i. des.
       exploit steps_pf_steps; eauto; ss; try by inv WF.
-      { hexploit consistent_promise_consistent; eauto. }
+      { unfold Configuration.consistent in CONSISTENT. ss.
+        unfold Threads.consistent in CONSISTENT.
+        hexploit CONSISTENT; try eapply IdentMap.gss. i.
+        hexploit consistent_promise_consistent; eauto. }
       { inv WF. eapply WF0. eauto. }
       i. des.
       exploit rtc_implies; [|exact STEPS1|i].
@@ -322,9 +325,12 @@ Section Invariant.
       exploit Memory.no_half_concrete_elt_future_exists; try exact CLOSED0; eauto.
       { inv WF0. eauto. }
       i. des.
-      exploit CONSISTENT; try exact NOHALF; try refl; eauto; s.
+      unfold Configuration.consistent in CONSISTENT. ss.
+      unfold Threads.consistent in CONSISTENT.
+      hexploit CONSISTENT; try eapply IdentMap.gss. i.
+      exploit H; try exact NOHALF; try refl; eauto; s.
+      { eapply Memory.concrete_elt_concrete; eauto. }
       { inv WF0. econs; eauto. eapply TView.future_closed; eauto. }
-      { eapply Memory.concrete_elt_closed_timemap; eauto. }
       i. des.
       exploit Memory.no_half_concrete_elt_future_exists.
       { inv WF_LOCAL. apply PROMISES0. }

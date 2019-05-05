@@ -38,7 +38,7 @@ Lemma intro_load_sim_stmts
             (RegFile.eq_except (RegSet.singleton r)).
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; try done.
-  { i. eapply SimPromises.future_sc_mem; try apply LOCAL; eauto. }
+  { i. eapply SimPromises.concrete_future; try apply LOCAL; eauto. }
   { i. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }

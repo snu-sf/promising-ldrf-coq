@@ -113,38 +113,34 @@ Qed.
 Lemma sim_load_future
       st_src lc_src sc1_src mem1_src
       st_tgt lc_tgt sc1_tgt mem1_tgt
-      sc2_src mem2_src
-      (SC1: TimeMap.le sc1_src sc1_tgt)
+      mem2_src
       (MEM1: sim_memory mem1_src mem1_tgt)
       (SIM1: sim_load st_src lc_src sc1_src mem1_src
                       st_tgt lc_tgt sc1_tgt mem1_tgt)
-      (SC_FUTURE_SRC: TimeMap.le sc1_src sc2_src)
-      (MEM_FUTURE_SRC: Memory.future mem1_src mem2_src)
+      (FUTURE_SRC: Memory.future mem1_src mem2_src)
+      (CONCRETE_SRC: Memory.concrete mem1_src mem2_src)
       (WF_SRC: Local.wf lc_src mem2_src)
-      (SC_SRC: Memory.closed_timemap sc2_src mem2_src)
       (MEM_SRC: Memory.closed mem2_src)
       (NOHALF_SRC: Memory.no_half lc_src.(Local.promises) mem2_src):
-  exists lc'_src sc2_tgt mem2_tgt,
-    <<SC2: TimeMap.le sc2_src sc2_tgt>> /\
+  exists lc'_src mem2_tgt,
     <<MEM2: sim_memory mem2_src mem2_tgt>> /\
-    <<SC_FUTURE_TGT: TimeMap.le sc1_tgt sc2_tgt>> /\
-    <<MEM_FUTURE_TGT: Memory.future mem1_tgt mem2_tgt>> /\
+    <<FUTURE_TGT: Memory.future mem1_tgt mem2_tgt>> /\
+    <<CONCRETE_TGT: Memory.concrete mem1_tgt mem2_tgt>> /\
     <<WF_TGT: Local.wf lc_tgt mem2_tgt>> /\
-    <<SC_TGT: Memory.closed_timemap sc2_tgt mem2_tgt>> /\
     <<MEM_TGT: Memory.closed mem2_tgt>> /\
     <<NOHALF_TGT: Memory.no_half lc_tgt.(Local.promises) mem2_tgt>> /\
-    <<SIM2: sim_load st_src lc'_src sc2_src mem2_src
-                     st_tgt lc_tgt sc2_tgt mem2_tgt>>.
+    <<SIM2: sim_load st_src lc'_src sc1_src mem2_src
+                     st_tgt lc_tgt sc1_tgt mem2_tgt>>.
 Proof.
   inv SIM1.
   exploit future_read_step; try exact READ; eauto. i. des.
-  exploit SimPromises.future_sc_mem; try apply SC_FUTURE_SRC; try apply MEM1; eauto.
+  exploit SimPromises.concrete_future; try apply MEM1; eauto.
   { inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite <- PROMISES.
     inv READ. ss. apply SimPromises.sem_bot.
   }
   i. des. esplits; eauto.
-  econs; eauto.
-  - etrans; eauto.
+  econs; eauto using Memory.future_closed_timemap.
+  etrans; eauto.
 Qed.
 
 Lemma sim_load_step

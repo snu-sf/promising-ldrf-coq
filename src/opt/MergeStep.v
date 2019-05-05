@@ -207,7 +207,7 @@ Proof.
     + eapply MergeTView.write_write_tview; eauto. apply WF0.
     + apply SimPromises.sem_bot.
   - refl.
-  - inv STEP1. eapply split_sim_memory; eauto. econs.
+  - inv STEP1. eapply split_sim_memory; eauto.
   - refl.
 Qed.
 

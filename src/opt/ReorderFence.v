@@ -194,12 +194,13 @@ Lemma sim_fence_sim_thread:
 Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss.
   - i. inv TERMINAL_TGT. inv PR; ss.
-  - i. inv PR. eapply SimPromises.future_sc_mem; try apply LOCAL; eauto.
+  - i. inv PR. eapply SimPromises.concrete_future; try apply LOCAL; eauto.
     { eapply Local.fence_step_future; try exact SC_SRC; eauto.
       eapply future_fence_step; try apply FENCE; eauto.
       inv REORDER; etrans; eauto.
     }
-    { eapply Local.fence_step_future; try apply SC_SRC0; eauto.
+    { hexploit Memory.future_closed_timemap; try apply SC_SRC; eauto. i.
+      eapply Local.fence_step_future; try apply H; eauto.
       eapply future_fence_step; try apply FENCE; eauto.
       inv REORDER; etrans; eauto.
     }

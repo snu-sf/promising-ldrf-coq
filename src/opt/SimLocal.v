@@ -164,7 +164,7 @@ Lemma sim_local_read
     <<LOCAL2: sim_local pview lc2_src lc2_tgt>>.
 Proof.
   inv LOCAL1. inv STEP_TGT.
-  exploit sim_memory_get; try apply MEM1; eauto. i. des.
+  exploit sim_memory_get; try apply GET; eauto. i. des.
   inv MSG. esplits; eauto.
   - econs; eauto. eapply TViewFacts.readable_mon; eauto. apply TVIEW.
   - econs; eauto. s. apply TViewFacts.read_tview_mon; auto.

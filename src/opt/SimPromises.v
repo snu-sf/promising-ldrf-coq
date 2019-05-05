@@ -1243,6 +1243,7 @@ Module SimPromises.
       <<FUTURE_TGT: Memory.future mem1_tgt mem2_tgt>> /\
       <<CONCRETE_TGT: Memory.concrete mem1_tgt mem2_tgt>> /\
       <<WF2_TGT: Local.wf lc_tgt mem2_tgt>> /\
+      <<MEM2_TGT: Memory.closed mem2_tgt>> /\
       <<NOHALF_TGT: Memory.no_half lc_tgt.(Local.promises) mem2_tgt>>.
   Proof.
     exploit concrete_concrete_dom; try exact CONCRETE_SRC; eauto. i. des.
@@ -1251,6 +1252,8 @@ Module SimPromises.
     { inv WF1_TGT. ss. }
     { inv WF2_SRC. ss. }
     i. des.
+    exploit Memory.future_closed; try exact FUTURE_SRC; eauto. i.
+    exploit Memory.future_closed; try exact FUTURE_TGT; eauto. i.
     esplits; eauto.
     - eapply concrete_dom_concrete; eauto.
       i. exploit HALF; eauto. i. des.
@@ -1260,8 +1263,6 @@ Module SimPromises.
     - eapply no_half; eauto.
       + inv WF1_TGT. econs; eauto.
         eapply TView.future_closed; eauto.
-      + eapply Memory.future_closed; eauto.
-      + eapply Memory.future_closed; eauto.
   Qed.
 
   Lemma sem_bot promises:

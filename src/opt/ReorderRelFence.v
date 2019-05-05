@@ -107,7 +107,7 @@ Lemma sim_local_read_relfenced
     <<LOCAL2: sim_local pview lc2_src (local_relfenced lc2_tgt)>>.
 Proof.
   inv LOCAL1. inv STEP_TGT.
-  exploit sim_memory_get; try apply MEM1; eauto. i. des. inv MSG.
+  exploit sim_memory_get; try apply GET; try apply MEM1. i. des. inv MSG.
   esplits; eauto.
   - econs; eauto. eapply TViewFacts.readable_mon; eauto. apply TVIEW.
   - econs; eauto. inv TVIEW. ss. econs; s.
@@ -495,7 +495,7 @@ Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss.
   - i. inv TERMINAL_TGT. inv PR; ss.
   - i. inv PR.
-    eapply SimPromises.future_sc_mem; (try by apply LOCALF); eauto using local_relfenced_wf.
+    eapply SimPromises.concrete_future; (try by apply LOCALF); eauto using local_relfenced_wf.
   - i. inv PR.
     esplits; eauto.
     eapply sim_local_memory_bot; eauto.
@@ -514,7 +514,7 @@ Lemma reorder_release_fenceF_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { inv TERMINAL_TGT. }
-  { eapply SimPromises.future_sc_mem; try apply LOCAL; eauto. }
+  { eapply SimPromises.concrete_future; try apply LOCAL; eauto. }
   { esplits; eauto.
     inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   }

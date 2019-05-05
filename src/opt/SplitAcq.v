@@ -278,7 +278,7 @@ Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss; ii.
   - inv TERMINAL_TGT. inv PR; ss.
   - exploit sim_acquired_mon; eauto. i.
-    eapply SimPromises.future_sc_mem; try apply LOCAL; eauto.
+    eapply SimPromises.concrete_future; eauto.
     inv PR. apply LOCAL.
   - esplits; eauto.
     inv PR. eapply sim_local_memory_bot; eauto.
@@ -307,7 +307,7 @@ Lemma sim_local_read_acquired
     <<LOCAL2: sim_local SimPromises.bot lc2_src (local_acquired lc2_tgt)>>.
 Proof.
   inv LOCAL1. inv STEP_TGT.
-  exploit sim_memory_get; try apply MEM1; eauto. i. des. inv MSG.
+  exploit sim_memory_get; try apply GET; try apply MEM1. i. des. inv MSG.
   esplits; eauto.
   - econs; eauto. inv READABLE. econs; ss; i.
     + rewrite <- PLN. apply TVIEW.
@@ -335,7 +335,7 @@ Lemma split_acquire_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { inv TERMINAL_TGT. }
-  { eapply SimPromises.future_sc_mem; try apply LOCAL; eauto. }
+  { eapply SimPromises.concrete_future; try apply LOCAL; eauto. }
   { esplits; eauto.
     inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   }
