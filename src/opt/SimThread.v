@@ -268,6 +268,50 @@ Proof.
   - etrans; eauto.
 Qed.
 
+Lemma sim_thread_plus_step
+      lang_src lang_tgt
+      sim_terminal
+      pf_tgt e_tgt
+      st1_src lc1_src sc1_src mem1_src
+      e1_tgt e2_tgt e3_tgt
+      (STEPS: rtc (@Thread.tau_step lang_tgt) e1_tgt e2_tgt)
+      (STEP: @Thread.step lang_tgt pf_tgt e_tgt e2_tgt e3_tgt)
+      (SC: TimeMap.le sc1_src e1_tgt.(Thread.sc))
+      (MEMORY: sim_memory mem1_src e1_tgt.(Thread.memory))
+      (WF_SRC: Local.wf lc1_src mem1_src)
+      (WF_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
+      (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
+      (SC_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
+      (MEM_SRC: Memory.closed mem1_src)
+      (MEM_TGT: Memory.closed e1_tgt.(Thread.memory))
+      (SIM: sim_thread sim_terminal st1_src lc1_src sc1_src mem1_src e1_tgt.(Thread.state) e1_tgt.(Thread.local) e1_tgt.(Thread.sc) e1_tgt.(Thread.memory)):
+  exists e_src st2_src lc2_src sc2_src mem2_src st3_src lc3_src sc3_src mem3_src,
+    <<STEPS: rtc (@Thread.tau_step lang_src)
+                 (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
+                 (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>> /\
+    <<STEP: Thread.opt_step e_src
+                            (Thread.mk _ st2_src lc2_src sc2_src mem2_src)
+                            (Thread.mk _ st3_src lc3_src sc3_src mem3_src)>> /\
+    <<EVENT: ThreadEvent.get_event e_src = ThreadEvent.get_event e_tgt>> /\
+    <<SC: TimeMap.le sc3_src e3_tgt.(Thread.sc)>> /\
+    <<MEMORY: sim_memory mem3_src e3_tgt.(Thread.memory)>> /\
+    <<WF_SRC: Local.wf lc3_src mem3_src>> /\
+    <<WF_TGT: Local.wf e3_tgt.(Thread.local) e3_tgt.(Thread.memory)>> /\
+    <<SC_SRC: Memory.closed_timemap sc3_src mem3_src>> /\
+    <<SC_TGT: Memory.closed_timemap e3_tgt.(Thread.sc) e3_tgt.(Thread.memory)>> /\
+    <<MEM_SRC: Memory.closed mem3_src>> /\
+    <<MEM_TGT: Memory.closed e3_tgt.(Thread.memory)>> /\
+    <<SIM: sim_thread sim_terminal st3_src lc3_src sc3_src mem3_src e3_tgt.(Thread.state) e3_tgt.(Thread.local) e3_tgt.(Thread.sc) e3_tgt.(Thread.memory)>>.
+Proof.
+  destruct e1_tgt, e2_tgt, e3_tgt. ss.
+  exploit sim_thread_rtc_step; eauto. s. i. des.
+  exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
+  exploit Thread.rtc_tau_step_future; try exact STEPS0; eauto. s. i. des.
+  exploit sim_thread_step; try exact STEP; try exact SIM0; eauto. s. i. des.
+  rewrite STEPS1 in STEPS0.
+  esplits; try exact STEPS0; try exact STEP0; eauto.
+Qed.
+
 Lemma sim_thread_future
       lang_src lang_tgt
       sim_terminal

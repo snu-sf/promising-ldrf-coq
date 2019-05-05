@@ -65,21 +65,6 @@ Module Threads.
       (TH: IdentMap.find tid ths = Some (existT _ lang st, lc)),
       Thread.consistent (Thread.mk lang st lc sc mem).
 
-  Inductive disjoint (ths1 ths2:t): Prop :=
-  | disjoint_intro
-      (THREAD:
-         forall tid llc1 llc2
-           (TH1: IdentMap.find tid ths1 = Some llc1)
-           (TH2: IdentMap.find tid ths2 = Some llc2),
-           False)
-      (MEMORY:
-         forall tid1 lang1 st1 lc1
-           tid2 lang2 st2 lc2
-           (TH1: IdentMap.find tid1 ths1 = Some (existT _ lang1 st1, lc1))
-           (TH2: IdentMap.find tid2 ths2 = Some (existT _ lang2 st2, lc2)),
-           Local.disjoint lc1 lc2)
-  .
-
   Lemma init_wf syn: wf (init syn) Memory.init.
   Proof.
     econs.
@@ -103,32 +88,50 @@ Module Threads.
     destruct (UsualFMapPositive.UsualPositiveMap'.find tid syn); inv TH. ss.
   Qed.
 
-  Global Program Instance disjoint_Symmetric: Symmetric disjoint.
-  Next Obligation.
-    inv H. econs; i.
-    - eapply THREAD; eauto.
-    - symmetry. eapply MEMORY; eauto.
-  Qed.
-
-  Definition compose_option {A} (lc1 lc2:option A) :=
-    match lc1 with
-    | None => lc2
-    | Some _ => lc1
-    end.
-
-  Definition compose (ths1 ths2:t): t :=
-    IdentMap.map2 compose_option ths1 ths2.
-
-  Lemma compose_spec ths1 ths2 tid:
-    IdentMap.find tid (compose ths1 ths2) = compose_option (IdentMap.find tid ths1) (IdentMap.find tid ths2).
-  Proof. apply IdentMap.Facts.map2_1bis; auto. Qed.
-
   Inductive is_promised tid (loc:Loc.t) (to:Time.t) (threads:t): Prop :=
   | is_promised_intro
       lang st lc from msg
       (TID: IdentMap.find tid threads = Some (existT _ lang st, lc))
       (PROMISES: Memory.get loc to lc.(Local.promises) = Some (from, msg))
   .
+
+  Definition tids (ths: t): IdentSet.t :=
+    List.fold_right (fun p s => IdentSet.add (fst p) s) IdentSet.empty (IdentMap.elements ths).
+
+  Lemma tids_o tid ths:
+    IdentSet.mem tid (tids ths) = IdentMap.find tid ths.
+  Proof.
+    unfold tids. rewrite IdentMap.Facts.elements_o.
+    induction (IdentMap.elements ths); ss. destruct a. s.
+    rewrite IdentSet.Facts.add_b, IHl.
+    unfold IdentSet.Facts.eqb, IdentMap.Facts.eqb.
+    repeat match goal with
+           | [|- context[if ?c then true else false]] => destruct c
+           end; ss; congr.
+  Qed.
+
+  Lemma tids_add
+        tid lang st lc ths:
+    tids (IdentMap.add tid (existT _ lang st, lc) ths) = IdentSet.add tid (tids ths).
+  Proof.
+    apply IdentSet.ext. i.
+    rewrite IdentSet.Facts.add_b, ? tids_o.
+    rewrite IdentMap.Facts.add_o. unfold IdentSet.Facts.eqb.
+    repeat condtac; ss.
+  Qed.
+
+  Lemma is_terminal_spec ths:
+    Threads.is_terminal ths <->
+    forall tid lang st lc
+      (TIDS: IdentSet.mem tid (tids ths))
+      (FIND: IdentMap.find tid ths = Some (existT _ lang st, lc)),
+      lang.(Language.is_terminal) st /\ Local.is_terminal lc.
+  Proof.
+    unfold Threads.is_terminal. econs; i.
+    - eapply H. eauto.
+    - destruct (IdentMap.find tid ths) eqn:X; inv FIND.
+      eapply H; eauto. rewrite tids_o, X. ss.
+  Qed.
 End Threads.
 
 

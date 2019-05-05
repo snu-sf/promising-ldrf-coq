@@ -215,6 +215,19 @@ Module UsualSet (S: UsualOrderedType).
     constructor; auto.
   Qed.
 
+  Lemma add_mem a s
+        (MEM: mem a s = true):
+    add a s = s.
+  Proof.
+    apply ext. i. destruct (mem i s) eqn:H.
+    - rewrite mem_spec in *. rewrite add_spec. auto.
+    - destruct (mem i (add a s)) eqn:H'; auto.
+      rewrite mem_spec, add_spec in H'. des.
+      + subst. rewrite MEM in H. inv H.
+      + rewrite <- mem_spec in H'.
+        rewrite H in H'. inv H'.
+  Qed.
+
   Definition remove_if_exists i s :=
     if mem i s
     then Some (remove i s)
