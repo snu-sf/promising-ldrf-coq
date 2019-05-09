@@ -43,7 +43,7 @@ Module Message.
     ii. inv H; inv H0; econs. etrans; eauto.
   Qed.
 
-  Lemma le_antisym a b
+  Lemma antisym a b
         (AB: le a b)
         (BA: le b a):
     a = b.

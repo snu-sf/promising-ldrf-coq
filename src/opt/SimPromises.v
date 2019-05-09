@@ -903,7 +903,7 @@ Module SimPromises.
       rewrite GET1 in x. inv x.
       rewrite GET0. f_equal. f_equal.
       + apply TimeFacts.antisym; eauto.
-      + apply Message.le_antisym; eauto.
+      + apply Message.antisym; eauto.
     - exploit Memory.future_get1; try exact GET; eauto. i. des.
       exploit COMPLETE_IN; eauto. i. des.
       exploit Memory.future_get1; try exact x; eauto. i. des.
@@ -916,7 +916,7 @@ Module SimPromises.
       rewrite GET in GET1. inv GET1.
       rewrite x. esplits. f_equal. f_equal.
       + apply TimeFacts.antisym; eauto.
-      + apply Message.le_antisym; eauto.
+      + apply Message.antisym; eauto.
     - exploit Memory.future_get1; try exact GET; eauto. i. des.
       exploit COMPLETE_IN; eauto. i. des.
       exploit Memory.future_get1; try exact x; eauto. i. des.
@@ -929,7 +929,7 @@ Module SimPromises.
       rewrite GET in GET1. inv GET1.
       rewrite GET0. esplits. f_equal. f_equal.
       + apply TimeFacts.antisym; eauto.
-      + apply Message.le_antisym; eauto.
+      + apply Message.antisym; eauto.
     - exploit COMPLETE_IN; eauto. i. des.
       exploit Memory.future_get1; try exact x; eauto. i. des.
       exploit Memory.future_get1; try exact GET0; eauto. i. des.
@@ -942,7 +942,7 @@ Module SimPromises.
       rewrite GET in GET1. inv GET1.
       rewrite GET0. esplits. f_equal. f_equal.
       + apply TimeFacts.antisym; eauto.
-      + apply Message.le_antisym; eauto.
+      + apply Message.antisym; eauto.
   Qed.
 
   Lemma concrete_future_imm
@@ -1061,7 +1061,7 @@ Module SimPromises.
       rewrite x1 in GET0. inv GET0.
       rewrite GET. f_equal. f_equal.
       - apply TimeFacts.antisym; eauto.
-      - apply Message.le_antisym; eauto. }
+      - apply Message.antisym; eauto. }
     exploit concrete_future_imm; try exact H; try exact MEM1; eauto. i. des.
     exploit IHFUTURE_SRC; eauto.
     { eapply Memory.future_closed; eauto. }
