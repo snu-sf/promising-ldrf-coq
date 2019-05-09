@@ -399,12 +399,12 @@ Module Memory.
 
   Inductive write
             (promises1 mem1:t)
-            (loc:Loc.t) (from1 to1:Time.t) (msg1:Message.t)
+            (loc:Loc.t) (from1 to1:Time.t) (val:Const.t) (released: option View.t)
             (promises3 mem2:t) (kind:op_kind): Prop :=
   | write_intro
       promises2
-      (PROMISE: promise promises1 mem1 loc from1 to1 msg1 promises2 mem2 kind)
-      (REMOVE: remove promises2 loc from1 to1 msg1 promises3)
+      (PROMISE: promise promises1 mem1 loc from1 to1 (Message.full val released) promises2 mem2 kind)
+      (REMOVE: remove promises2 loc from1 to1 (Message.full val released) promises3)
   .
   Hint Constructors write.
 
@@ -1467,13 +1467,13 @@ Module Memory.
   Qed.
 
   Lemma write_get2
-        promises1 mem1 loc from to msg promises2 mem2 kind
-        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
+        promises1 mem1 loc from to val released promises2 mem2 kind
+        (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind)
         (MEM: inhabited mem1)
         (FINITE: finite promises1)
         (LE: le promises1 mem1):
     <<GET_PROMISE: get loc to promises2 = None>> /\
-    <<GET_MEM: get loc to mem2 = Some (from, msg)>>.
+    <<GET_MEM: get loc to mem2 = Some (from, Message.full val released)>>.
   Proof.
     inv WRITE. splits.
     - erewrite remove_o; eauto. condtac; ss. des; ss.
@@ -1482,11 +1482,11 @@ Module Memory.
   Qed.
 
   Lemma write_future0
-        promises1 mem1 loc from to msg promises2 mem2 kind
+        promises1 mem1 loc from to val released promises2 mem2 kind
         (LE_PROMISES1: le promises1 mem1)
         (FINITE1: finite promises1)
         (INHABITED1: inhabited mem1)
-        (PROMISE: write promises1 mem1 loc from to msg promises2 mem2 kind):
+        (PROMISE: write promises1 mem1 loc from to val released promises2 mem2 kind):
     <<LE_PROMISES2: le promises2 mem2>> /\
     <<FINITE2: finite promises2>> /\
     <<INHABITED2: inhabited mem2>>.
@@ -1498,11 +1498,11 @@ Module Memory.
   Qed.
 
   Lemma write_future
-        promises1 mem1 loc from to msg promises2 mem2 kind
-        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
+        promises1 mem1 loc from to val released promises2 mem2 kind
+        (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind)
         (CLOSED: closed mem1)
         (FINITE: finite promises1)
-        (MSG_CLOSED: closed_message msg mem2)
+        (MSG_CLOSED: closed_message (Message.full val released) mem2)
         (LE: le promises1 mem1):
     <<CLOSED: closed mem2>> /\
     <<FINITE: finite promises2>> /\
@@ -1516,8 +1516,8 @@ Module Memory.
   Qed.
 
   Lemma write_disjoint
-        promises1 mem1 loc from to msg promises2 mem2 ctx kind
-        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
+        promises1 mem1 loc from to val released promises2 mem2 ctx kind
+        (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind)
         (CLOSED: closed mem1)
         (FINITE: finite promises1)
         (DISJOINT: disjoint promises1 ctx)

@@ -29,8 +29,8 @@ Module MemoryFacts.
   Qed.
 
   Lemma write_time_lt
-        promises1 mem1 loc from to msg promises2 mem2 kind
-        (WRITE: Memory.write promises1 mem1 loc from to msg promises2 mem2 kind):
+        promises1 mem1 loc from to val released promises2 mem2 kind
+        (WRITE: Memory.write promises1 mem1 loc from to val released promises2 mem2 kind):
     Time.lt from to.
   Proof.
     inv WRITE. eapply promise_time_lt. eauto.
@@ -160,8 +160,8 @@ Module MemoryFacts.
   Qed.
 
   Lemma write_not_bot
-        pm1 mem1 loc from to msg pm2 mem2 kind
-        (WRITE: Memory.write pm1 mem1 loc from to msg pm2 mem2 kind):
+        pm1 mem1 loc from to val released pm2 mem2 kind
+        (WRITE: Memory.write pm1 mem1 loc from to val released pm2 mem2 kind):
     to <> Time.bot.
   Proof.
     ii. subst. inv WRITE. inv PROMISE.
@@ -184,8 +184,8 @@ Module MemoryFacts.
   Qed.
 
   Lemma write_add_promises
-        promises1 mem1 loc from to msg promises2 mem2
-        (WRITE: Memory.write promises1 mem1 loc from to msg promises2 mem2 Memory.op_kind_add):
+        promises1 mem1 loc from to val released promises2 mem2
+        (WRITE: Memory.write promises1 mem1 loc from to val released promises2 mem2 Memory.op_kind_add):
     promises2 = promises1.
   Proof.
     inv WRITE. inv PROMISE. eapply add_remove_eq; eauto.
