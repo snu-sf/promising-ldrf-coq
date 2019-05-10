@@ -82,7 +82,8 @@ Lemma write_promise_fulfill
       (REL_CLOSED: Memory.closed_opt_view releasedm mem0)
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
-      (MEM0: Memory.closed mem0):
+      (MEM0: Memory.closed mem0)
+      (HALF_WF0: Memory.half_wf mem0):
   exists lc1,
     <<STEP1: Local.promise_step lc0 mem0 loc from to (Message.full val released) lc1 mem2 kind>> /\
     <<STEP2: fulfill_step lc1 sc0 loc from to val releasedm released ord lc2 sc2>> /\
@@ -141,7 +142,8 @@ Lemma promise_fulfill_write
       (ORD: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc lc0.(Local.promises))
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
-      (MEM0: Memory.closed mem0):
+      (MEM0: Memory.closed mem0)
+      (HALF_WF0: Memory.half_wf mem0):
   exists released' mem2',
     <<STEP: Local.write_step lc0 sc0 mem0 loc from to val releasedm released' ord lc2 sc2 mem2' kind>> /\
     <<REL_LE: View.opt_le released' released>> /\
@@ -181,6 +183,7 @@ Lemma promise_fulfill_write_exact
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
+      (HALF_WF0: Memory.half_wf mem0)
       (REL: released = TView.write_released lc0.(Local.tview) sc0 loc to releasedm ord):
   Local.write_step lc0 sc0 mem0 loc from to val releasedm released ord lc2 sc2 mem2 kind.
 Proof.

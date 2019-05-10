@@ -332,34 +332,35 @@ Proof.
     eauto using Memory.promise_closed_opt_view.
 Qed.
 
-Lemma reorder_promise_add_promise_add
-      loc1 from1 to1 msg1
-      loc2 from2 to2 msg2
-      lc0 sc0 mem0
-      lc1 mem1
-      lc2 mem2
-      (WF0: Local.wf lc0 mem0)
-      (SC0: Memory.closed_timemap sc0 mem0)
-      (MEM0: Memory.closed mem0)
-      (DIFF: (loc1, to1) <> (loc2, to2))
-      (REL_CLOSED: forall promises1' mem1'
-                     (PROMISE1: Memory.promise (Local.promises lc0) mem0 loc2 from2 to2 msg2 promises1' mem1' Memory.op_kind_add),
-          Memory.closed_message msg2 mem1')
-      (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 msg1 lc1 mem1 Memory.op_kind_add)
-      (STEP2: Local.promise_step lc1 mem1 loc2 from2 to2 msg2 lc2 mem2 Memory.op_kind_add):
-  exists lc1' mem1',
-    <<STEP1: Local.promise_step lc0 mem0 loc2 from2 to2 msg2 lc1' mem1' Memory.op_kind_add>> /\
-    <<STEP2: Local.promise_step lc1' mem1' loc1 from1 to1 msg1 lc2 mem2 Memory.op_kind_add>>.
-Proof.
-  exploit Local.promise_step_future; try exact STEP1; eauto. i. des.
-  exploit Local.promise_step_future; try exact STEP2; eauto. i. des.
-  inv STEP1. inv STEP2.
-  exploit MemoryReorder.promise_add_promise_add; try exact PROMISE; eauto. i. des.
-  esplits.
-  - econs; eauto.
-  - econs; eauto. inv MSG_CLOSED; ss. econs.
-    eauto using Memory.promise_closed_opt_view.
-Qed.
+(* unused *)
+(* Lemma reorder_promise_add_promise_add *)
+(*       loc1 from1 to1 msg1 *)
+(*       loc2 from2 to2 msg2 *)
+(*       lc0 sc0 mem0 *)
+(*       lc1 mem1 *)
+(*       lc2 mem2 *)
+(*       (WF0: Local.wf lc0 mem0) *)
+(*       (SC0: Memory.closed_timemap sc0 mem0) *)
+(*       (MEM0: Memory.closed mem0) *)
+(*       (DIFF: (loc1, to1) <> (loc2, to2)) *)
+(*       (REL_CLOSED: forall promises1' mem1' *)
+(*                      (PROMISE1: Memory.promise (Local.promises lc0) mem0 loc2 from2 to2 msg2 promises1' mem1' Memory.op_kind_add), *)
+(*           Memory.closed_message msg2 mem1') *)
+(*       (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 msg1 lc1 mem1 Memory.op_kind_add) *)
+(*       (STEP2: Local.promise_step lc1 mem1 loc2 from2 to2 msg2 lc2 mem2 Memory.op_kind_add): *)
+(*   exists lc1' mem1', *)
+(*     <<STEP1: Local.promise_step lc0 mem0 loc2 from2 to2 msg2 lc1' mem1' Memory.op_kind_add>> /\ *)
+(*     <<STEP2: Local.promise_step lc1' mem1' loc1 from1 to1 msg1 lc2 mem2 Memory.op_kind_add>>. *)
+(* Proof. *)
+(*   exploit Local.promise_step_future; try exact STEP1; eauto. i. des. *)
+(*   exploit Local.promise_step_future; try exact STEP2; eauto. i. des. *)
+(*   inv STEP1. inv STEP2. *)
+(*   exploit MemoryReorder.promise_add_promise_add; try exact PROMISE; eauto. i. des. *)
+(*   esplits. *)
+(*   - econs; eauto. *)
+(*   - econs; eauto. inv MSG_CLOSED; ss. econs. *)
+(*     eauto using Memory.promise_closed_opt_view. *)
+(* Qed. *)
 
 Lemma reorder_promise_add_fulfill
       loc1 from1 to1 msg1

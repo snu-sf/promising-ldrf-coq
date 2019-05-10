@@ -768,24 +768,25 @@ Module MemoryReorder.
 
   (* Lemmas on promise *)
 
-  Lemma promise_add_promise_add
-        loc1 from1 to1 msg1
-        loc2 from2 to2 msg2
-        promises0 mem0
-        promises1 mem1
-        promises2 mem2
-        (PROMISE1: Memory.promise promises0 mem0 loc1 from1 to1 msg1 promises1 mem1 Memory.op_kind_add)
-        (PROMISE2: Memory.promise promises1 mem1 loc2 from2 to2 msg2 promises2 mem2 Memory.op_kind_add):
-    exists promises1' mem1',
-      <<PROMISE1: Memory.promise promises0 mem0 loc2 from2 to2 msg2 promises1' mem1' Memory.op_kind_add>> /\
-      <<PROMISE2: Memory.promise promises1' mem1' loc1 from1 to1 msg1 promises2 mem2 Memory.op_kind_add>> /\
-      <<LOCTS: (loc1, to1) <> (loc2, to2)>>.
-  Proof.
-    inv PROMISE1. inv PROMISE2.
-    exploit add_add; try exact PROMISES; eauto. i. des.
-    exploit add_add; try exact MEM; eauto. i. des.
-    esplits; eauto.
-  Qed.
+  (* unused *)
+  (* Lemma promise_add_promise_add *)
+  (*       loc1 from1 to1 msg1 *)
+  (*       loc2 from2 to2 msg2 *)
+  (*       promises0 mem0 *)
+  (*       promises1 mem1 *)
+  (*       promises2 mem2 *)
+  (*       (PROMISE1: Memory.promise promises0 mem0 loc1 from1 to1 msg1 promises1 mem1 Memory.op_kind_add) *)
+  (*       (PROMISE2: Memory.promise promises1 mem1 loc2 from2 to2 msg2 promises2 mem2 Memory.op_kind_add): *)
+  (*   exists promises1' mem1', *)
+  (*     <<PROMISE1: Memory.promise promises0 mem0 loc2 from2 to2 msg2 promises1' mem1' Memory.op_kind_add>> /\ *)
+  (*     <<PROMISE2: Memory.promise promises1' mem1' loc1 from1 to1 msg1 promises2 mem2 Memory.op_kind_add>> /\ *)
+  (*     <<LOCTS: (loc1, to1) <> (loc2, to2)>>. *)
+  (* Proof. *)
+  (*   inv PROMISE1. inv PROMISE2. *)
+  (*   exploit add_add; try exact PROMISES; eauto. i. des. *)
+  (*   exploit add_add; try exact MEM; eauto. i. des. *)
+  (*   esplits; eauto. *)
+  (* Qed. *)
 
   Lemma promise_add_remove
         loc1 from1 to1 msg1
@@ -884,17 +885,22 @@ Module MemoryReorder.
     exploit add_split; try exact MEM; eauto. i. des; [|congr].
     esplits.
     - econs; eauto.
+      i. subst. exploit HALF1; eauto. i. des.
+      revert x. erewrite Memory.add_o; eauto. condtac; ss; eauto.
+      des. subst. inv MEM0. inv SPLIT. rewrite TS12 in TS23. timetac.
     - econs; eauto.
+      i. subst. exploit HALF2; eauto. i. des. subst.
+      exploit Memory.add_get0; try exact ADD0. i. des. eauto.
   Qed.
 
   Lemma promise_split_promise_split_same
-        promises0 mem0 loc ts1 ts2 ts3 ts4 msg2 msg3 msg4
+        promises0 mem0 loc ts1 ts2 ts3 ts4 val2 released2 msg3 msg4
         promises1 mem1
         promises2 mem2
         (SPLIT1: Memory.promise promises0 mem0 loc ts1 ts3 msg3 promises1 mem1 (Memory.op_kind_split ts4 msg4))
-        (SPLIT2: Memory.promise promises1 mem1 loc ts1 ts2 msg2 promises2 mem2 (Memory.op_kind_split ts3 msg3)):
+        (SPLIT2: Memory.promise promises1 mem1 loc ts1 ts2 (Message.full val2 released2) promises2 mem2 (Memory.op_kind_split ts3 msg3)):
     exists promises1' mem1',
-      <<SPLIT1: Memory.promise promises0 mem0 loc ts1 ts2 msg2 promises1' mem1' (Memory.op_kind_split ts4 msg4)>> /\
+      <<SPLIT1: Memory.promise promises0 mem0 loc ts1 ts2 (Message.full val2 released2) promises1' mem1' (Memory.op_kind_split ts4 msg4)>> /\
       <<SPLIT2: Memory.promise promises1' mem1' loc ts2 ts3 msg3 promises2 mem2 (Memory.op_kind_split ts4 msg4)>>.
   Proof.
     assert (LOCTS: (loc, ts4) <> (loc, ts3)).
@@ -903,18 +909,19 @@ Module MemoryReorder.
     exploit split_split; try exact PROMISES; eauto. i. des; [|congr].
     exploit split_split; try exact MEM; eauto. i. des; [|congr].
     esplits.
-    - econs; eauto.
-    - econs; eauto.
+    - econs; eauto; congr.
+    - econs; eauto. i. subst.
+      exploit Memory.split_get0; try exact SPLIT0. i. des. eauto.
   Qed.
 
   Lemma promise_lower_promise_split_same
-        promises0 mem0 loc ts1 ts2 ts3 msg0 msg2 msg3
+        promises0 mem0 loc ts1 ts2 ts3 msg0 val2 released2 msg3
         promises1 mem1
         promises2 mem2
         (LOWER1: Memory.promise promises0 mem0 loc ts1 ts3 msg3 promises1 mem1 (Memory.op_kind_lower msg0))
-        (SPLIT2: Memory.promise promises1 mem1 loc ts1 ts2 msg2 promises2 mem2 (Memory.op_kind_split ts3 msg3)):
+        (SPLIT2: Memory.promise promises1 mem1 loc ts1 ts2 (Message.full val2 released2) promises2 mem2 (Memory.op_kind_split ts3 msg3)):
     exists promises1' mem1',
-      <<SPLIT1: Memory.promise promises0 mem0 loc ts1 ts2 msg2 promises1' mem1' (Memory.op_kind_split ts3 msg0)>> /\
+      <<SPLIT1: Memory.promise promises0 mem0 loc ts1 ts2 (Message.full val2 released2) promises1' mem1' (Memory.op_kind_split ts3 msg0)>> /\
       <<LOWER2: Memory.promise promises1' mem1' loc ts2 ts3 msg3 promises2 mem2 (Memory.op_kind_lower msg0)>>.
   Proof.
     inv LOWER1. inv SPLIT2.
@@ -923,7 +930,7 @@ Module MemoryReorder.
     exploit lower_split; try exact MEM; eauto. i. des.
     unguard. des; [|congr]. inv FROM1.
     esplits.
-    - econs; eauto.
+    - econs; eauto; congr.
     - econs; eauto.
   Qed.
 End MemoryReorder.
