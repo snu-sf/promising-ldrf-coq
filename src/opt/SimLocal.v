@@ -99,7 +99,9 @@ Lemma sim_local_promise
       (WF1_SRC: Local.wf lc1_src mem1_src)
       (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
       (MEM1_SRC: Memory.closed mem1_src)
-      (MEM1_TGT: Memory.closed mem1_tgt):
+      (MEM1_TGT: Memory.closed mem1_tgt)
+      (HALF_WF1_SRC: Memory.half_wf mem1_src)
+      (HALF_WF1_TGT: Memory.half_wf mem1_tgt):
   exists lc2_src mem2_src,
     <<STEP_SRC: Local.promise_step lc1_src mem1_src loc from to (SimPromises.none_if loc to pview msg) lc2_src mem2_src (SimPromises.kind_transf loc to pview kind)>> /\
     <<LOCAL2: sim_local pview lc2_src lc2_tgt>> /\
@@ -133,7 +135,9 @@ Lemma sim_local_promise_bot
       (WF1_SRC: Local.wf lc1_src mem1_src)
       (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
       (MEM1_SRC: Memory.closed mem1_src)
-      (MEM1_TGT: Memory.closed mem1_tgt):
+      (MEM1_TGT: Memory.closed mem1_tgt)
+      (HALF_WF1_SRC: Memory.half_wf mem1_src)
+      (HALF_WF1_TGT: Memory.half_wf mem1_tgt):
   exists lc2_src mem2_src,
     <<STEP_SRC: Local.promise_step lc1_src mem1_src loc from to msg lc2_src mem2_src kind>> /\
     <<LOCAL2: sim_local SimPromises.bot lc2_src lc2_tgt>> /\
@@ -312,7 +316,9 @@ Lemma sim_local_write
       (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
       (SC1_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
       (MEM1_SRC: Memory.closed mem1_src)
-      (MEM1_TGT: Memory.closed mem1_tgt):
+      (MEM1_TGT: Memory.closed mem1_tgt)
+      (HALF_WF1_SRC: Memory.half_wf mem1_src)
+      (HALF_WF1_TGT: Memory.half_wf mem1_tgt):
   exists released_src lc2_src sc2_src mem2_src,
     <<STEP_SRC: Local.write_step lc1_src sc1_src mem1_src loc from to val releasedm_src
                                  released_src
@@ -366,7 +372,9 @@ Lemma sim_local_write_bot
       (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
       (SC1_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
       (MEM1_SRC: Memory.closed mem1_src)
-      (MEM1_TGT: Memory.closed mem1_tgt):
+      (MEM1_TGT: Memory.closed mem1_tgt)
+      (HALF_WF1_SRC: Memory.half_wf mem1_src)
+      (HALF_WF1_TGT: Memory.half_wf mem1_tgt):
   exists released_src lc2_src sc2_src mem2_src,
     <<STEP_SRC: Local.write_step lc1_src sc1_src mem1_src loc from to val releasedm_src
                                  released_src
@@ -403,6 +411,8 @@ Lemma sim_local_update
       (SC1_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
       (MEM1_SRC: Memory.closed mem1_src)
       (MEM1_TGT: Memory.closed mem1_tgt)
+      (HALF_WF1_SRC: Memory.half_wf mem1_src)
+      (HALF_WF1_TGT: Memory.half_wf mem1_tgt)
       (ORD1: Ordering.le ord1_src ord1_tgt)
       (ORD2: Ordering.le ord2_src ord2_tgt)
       (PVIEW: SimPromises.mem loc to2 pview = false \/
@@ -444,6 +454,8 @@ Lemma sim_local_update_bot
       (SC1_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
       (MEM1_SRC: Memory.closed mem1_src)
       (MEM1_TGT: Memory.closed mem1_tgt)
+      (HALF_WF1_SRC: Memory.half_wf mem1_src)
+      (HALF_WF1_TGT: Memory.half_wf mem1_tgt)
       (ORD1: Ordering.le ord1_src ord1_tgt)
       (ORD2: Ordering.le ord2_src ord2_tgt):
   exists released1_src released2_src lc2_src lc3_src sc3_src mem3_src,
@@ -507,6 +519,8 @@ Lemma sim_local_program_step
       (SC1_TGT: Memory.closed_timemap th1_tgt.(Thread.sc) th1_tgt.(Thread.memory))
       (MEM1_SRC: Memory.closed th1_src.(Thread.memory))
       (MEM1_TGT: Memory.closed th1_tgt.(Thread.memory))
+      (HALF_WF1_SRC: Memory.half_wf th1_src.(Thread.memory))
+      (HALF_WF1_TGT: Memory.half_wf th1_tgt.(Thread.memory))
       (STATE: th1_src.(Thread.state) = th1_tgt.(Thread.state))
       (LOCAL: sim_local SimPromises.bot th1_src.(Thread.local) th1_tgt.(Thread.local))
       (SC: TimeMap.le th1_src.(Thread.sc) th1_tgt.(Thread.sc))
@@ -549,6 +563,7 @@ Lemma sim_local_lower_src
       (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
       (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
       (MEM1_SRC: Memory.closed mem1_src)
+      (HALF_WF1_SRC: Memory.half_wf mem1_src)
       (STEP_SRC: Local.promise_step lc1_src mem1_src loc from to (Message.full val None) lc2_src mem2_src (Memory.op_kind_lower (Message.full val released))):
   <<LOCAL2: exists pview2, sim_local pview2 lc2_src lc1_tgt>> /\
   <<MEM2: sim_memory mem2_src mem1_tgt>> /\
@@ -609,7 +624,9 @@ Lemma sim_local_nonsynch_src
       (LOCAL2_TGT: Local.wf lc1_tgt mem1_tgt)
       (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
       (MEM1_SRC: Memory.closed mem1_src)
-      (MEM1_TGT: Memory.closed mem1_tgt):
+      (MEM1_TGT: Memory.closed mem1_tgt)
+      (HALF_WF1_SRC: Memory.half_wf mem1_src)
+      (HALF_WF1_TGT: Memory.half_wf mem1_tgt):
   exists pview2 lc2_src mem2_src,
     <<STEP_SRC: rtc (@Thread.tau_step lang)
                     (Thread.mk lang st lc1_src sc mem1_src)
