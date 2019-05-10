@@ -2426,423 +2426,56 @@ Module Memory.
 
   (* concrete *)
 
-  (* Inductive concrete (mem1 mem2: t): Prop := *)
-  (* | concrete_intro *)
-  (*     (SOUND: forall loc from to msg (GET: get loc to mem1 = Some (from, msg)), *)
-  (*         get loc to mem2 = Some (from, msg) \/ *)
-  (*         msg = Message.half /\ *)
-  (*         exists msg', get loc to mem2 = Some (from, msg')) *)
-  (*     (COMPLETE: forall loc from to msg (GET: get loc to mem2 = Some (from, msg)), *)
-  (*         get loc to mem1 = Some (from, msg) \/ *)
-  (*         get loc to mem1 = Some (from, Message.half)) *)
-  (* . *)
-
-  (* Global Program Instance concrete_PreOrder: PreOrder concrete. *)
-  (* Next Obligation. *)
-  (*   ii. econs; eauto. *)
-  (* Qed. *)
-  (* Next Obligation. *)
-  (*   ii. inv H. inv H0. econs; i. *)
-  (*   - exploit SOUND; eauto. i. des. *)
-  (*     + exploit SOUND0; eauto. *)
-  (*     + exploit SOUND0; eauto. i. des; eauto. *)
-  (*   - exploit COMPLETE0; eauto. i. des. *)
-  (*     + exploit COMPLETE; eauto. *)
-  (*     + exploit COMPLETE; eauto. i. des; eauto. *)
-  (* Qed. *)
-
-  (* Lemma concrete_closed_timemap *)
-  (*       mem1 mem2 tm *)
-  (*       (CONCRETE: concrete mem1 mem2) *)
-  (*       (CLOSED: closed_timemap tm mem1): *)
-  (*   closed_timemap tm mem2. *)
-  (* Proof. *)
-  (*   ii. specialize (CLOSED loc). des. *)
-  (*   inv CONCRETE. exploit SOUND; eauto. i. des; eauto. *)
-  (*   inv x. *)
-  (* Qed. *)
-
-  (* Lemma concrete_closed_view *)
-  (*       mem1 mem2 view *)
-  (*       (CONCRETE: concrete mem1 mem2) *)
-  (*       (CLOSED: closed_view view mem1): *)
-  (*   closed_view view mem2. *)
-  (* Proof. *)
-  (*   inv CLOSED; eauto using concrete_closed_timemap. *)
-  (* Qed. *)
-
-  (* Lemma concrete_closed_opt_view *)
-  (*       mem1 mem2 view *)
-  (*       (CONCRETE: concrete mem1 mem2) *)
-  (*       (CLOSED: closed_opt_view view mem1): *)
-  (*   closed_opt_view view mem2. *)
-  (* Proof. *)
-  (*   inv CLOSED; eauto using concrete_closed_view. *)
-  (* Qed. *)
-
-  (* Lemma concrete_closed_message *)
-  (*       mem1 mem2 msg *)
-  (*       (CONCRETE: concrete mem1 mem2) *)
-  (*       (CLOSED: closed_message msg mem1): *)
-  (*   closed_message msg mem2. *)
-  (* Proof. *)
-  (*   inv CLOSED; eauto using concrete_closed_opt_view. *)
-  (* Qed. *)
-
-  (* Lemma concrete_promise_exists *)
-  (*       promises1 mem1 loc from to msg promises2 mem2 kind *)
-  (*       mem1' *)
-  (*       (LE: le promises1 mem1) *)
-  (*       (CLOSED1: closed mem1) *)
-  (*       (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind) *)
-  (*       (CONCRETE1: concrete mem1 mem1') *)
-  (*       (LE': le promises1 mem1'): *)
-  (*   exists mem2', *)
-  (*     <<PROMISE': promise promises1 mem1' loc from to msg promises2 mem2' kind>> /\ *)
-  (*     <<CONCRETE2: concrete mem2 mem2'>>. *)
-  (* Proof. *)
-  (*   inv CONCRETE1. inv PROMISE. *)
-  (*   - exploit add_get0; try exact MEM. i. des. *)
-  (*     exploit get_ts; try exact GET0. i. des. *)
-  (*     { subst. inv CLOSED1. rewrite INHABITED in GET. inv GET. } *)
-  (*     exploit (@add_exists mem1' loc from to msg); eauto. *)
-  (*     { ii. assert (GET3: exists msg, get loc to2 mem1 = Some (from2, msg)). *)
-  (*       { exploit COMPLETE; eauto. i. des; eauto. } *)
-  (*       des. exploit add_o; eauto. erewrite GET3. condtac; ss. *)
-  (*       - des. subst. rewrite GET in GET3. inv GET3. *)
-  (*       - i. des; try congr. *)
-  (*         exploit get_disjoint; [exact GET0|exact x2|..]. i. des; try congr. *)
-  (*         eapply x3; eauto. } *)
-  (*     { inv MEM. inv ADD. ss. } *)
-  (*     i. des. *)
-  (*     exploit add_get0; try exact x1. i. des. *)
-  (*     esplits. *)
-  (*     + econs; eauto. *)
-  (*     + econs; i. *)
-  (*       * erewrite add_o; eauto. condtac; ss. *)
-  (*         { des. subst. rewrite GET0 in GET3. inv GET3. auto. } *)
-  (*         { revert GET3. erewrite add_o; eauto. condtac; ss. i. *)
-  (*           exploit SOUND; eauto. } *)
-  (*       * erewrite add_o; eauto. condtac; ss. *)
-  (*         { des. subst. rewrite GET2 in GET3. inv GET3. auto. } *)
-  (*         { revert GET3. erewrite add_o; eauto. condtac; ss. i. *)
-  (*           exploit COMPLETE; eauto. } *)
-  (*   - exploit split_get0; try exact MEM. i. des. *)
-  (*     exploit get_ts; try exact GET1. i. des. *)
-  (*     { subst. inv CLOSED1. rewrite INHABITED in GET. inv GET. } *)
-  (*     exploit get_ts; try exact GET2. i. des. *)
-  (*     { subst. inv CLOSED1. rewrite INHABITED in GET. inv GET. } *)
-  (*     exploit (@split_exists mem1' loc from to ts3 msg msg3); eauto. *)
-  (*     { exploit split_get0; try exact PROMISES. i. des. *)
-  (*       exploit LE'; try exact GET4. ss. } *)
-  (*     { inv MEM. inv SPLIT. ss. } *)
-  (*     i. des. *)
-  (*     exploit split_get0; try exact x2. i. des. *)
-  (*     esplits. *)
-  (*     + econs; eauto. *)
-  (*     + econs; i. *)
-  (*       * erewrite split_o; eauto. repeat condtac; ss. *)
-  (*         { des. subst. rewrite GET1 in GET7. inv GET7. auto. } *)
-  (*         { guardH o. des. subst. rewrite GET2 in GET7. inv GET7. auto. } *)
-  (*         { revert GET7. erewrite split_o; eauto. repeat condtac; ss. i. *)
-  (*           exploit SOUND; eauto. } *)
-  (*       * erewrite split_o; eauto. repeat condtac; ss. *)
-  (*         { des. subst. rewrite GET5 in GET7. inv GET7. auto. } *)
-  (*         { guardH o. des. subst. rewrite GET6 in GET7. inv GET7. auto. } *)
-  (*         { revert GET7. erewrite split_o; eauto. repeat condtac; ss. i. *)
-  (*           exploit COMPLETE; eauto. } *)
-  (*   - exploit lower_get0; try exact MEM. i. des. *)
-  (*     exploit get_ts; try exact GET. i. des. *)
-  (*     { subst. inv MEM. inv LOWER. inv TS0. } *)
-  (*     exploit (@lower_exists mem1' loc from to msg0 msg); eauto. *)
-  (*     { exploit lower_get0; try exact PROMISES. i. des. *)
-  (*       exploit LE'; try exact GET1. ss. } *)
-  (*     { inv MEM. inv LOWER. ss. } *)
-  (*     i. des. *)
-  (*     exploit lower_get0; try exact x1. i. des. *)
-  (*     esplits. *)
-  (*     + econs; eauto. *)
-  (*     + econs; i. *)
-  (*       * erewrite lower_o; eauto. condtac; ss. *)
-  (*         { des. subst. rewrite GET0 in GET3. inv GET3. auto. } *)
-  (*         { revert GET3. erewrite lower_o; eauto. condtac; ss. i. *)
-  (*           exploit SOUND; eauto. } *)
-  (*       * erewrite lower_o; eauto. condtac; ss. *)
-  (*         { des. subst. rewrite GET2 in GET3. inv GET3. auto. } *)
-  (*         { revert GET3. erewrite lower_o; eauto. condtac; ss. i. *)
-  (*           exploit COMPLETE; eauto. } *)
-  (* Qed. *)
-
-
-  (* concrete_elt *)
-
   Inductive concrete (mem1 mem2: t): Prop :=
   | concrete_intro
       (SOUND: forall loc from to msg (GET: get loc to mem1 = Some (from, msg)),
           get loc to mem2 = Some (from, msg) \/
           msg = Message.half /\
-          exists from' val' released',
-            get loc from mem1 = Some (from', Message.full val' released') /\
-            get loc to mem2 = Some (from, Message.full val' released'))
+          exists from' msg1 msg2,
+            get loc from mem1 = Some (from', msg1) /\
+            get loc to mem2 = Some (from, msg2) /\
+            Message.le msg1 msg2)
       (COMPLETE: forall loc from to msg (GET: get loc to mem2 = Some (from, msg)),
           get loc to mem1 = Some (from, msg) \/
           get loc to mem1 = Some (from, Message.half))
   .
 
   Lemma concrete_closed_timemap
-        mem mem' tm
-        (CONCRETE: concrete mem mem')
-        (CLOSED: closed_timemap tm mem):
-    closed_timemap tm mem'.
+        mem1 mem2 tm
+        (CONCRETE: concrete mem1 mem2)
+        (CLOSED: closed_timemap tm mem1):
+    closed_timemap tm mem2.
   Proof.
     ii. specialize (CLOSED loc). des.
-    inv CONCRETE. exploit SOUND; eauto. i. des; eauto.
+    inv CONCRETE. exploit SOUND; eauto.
+    i. des; eauto. inv x.
   Qed.
 
   Lemma concrete_closed_view
-        mem mem' view
-        (CONCRETE: concrete mem mem')
-        (CLOSED: closed_view view mem):
-    closed_view view mem'.
+        mem1 mem2 view
+        (CONCRETE: concrete mem1 mem2)
+        (CLOSED: closed_view view mem1):
+    closed_view view mem2.
   Proof.
-    inv CLOSED.
-    econs; eauto using concrete_closed_timemap.
+    inv CLOSED; eauto using concrete_closed_timemap.
   Qed.
 
   Lemma concrete_closed_opt_view
-        mem mem' view
-        (CONCRETE: concrete mem mem')
-        (CLOSED: closed_opt_view view mem):
-    closed_opt_view view mem'.
+        mem1 mem2 view
+        (CONCRETE: concrete mem1 mem2)
+        (CLOSED: closed_opt_view view mem1):
+    closed_opt_view view mem2.
   Proof.
     inv CLOSED; eauto using concrete_closed_view.
   Qed.
 
   Lemma concrete_closed_message
-        mem mem' msg
-        (CONCRETE: concrete mem mem')
-        (CLOSED: closed_message msg mem):
-    closed_message msg mem'.
+        mem1 mem2 msg
+        (CONCRETE: concrete mem1 mem2)
+        (CLOSED: closed_message msg mem1):
+    closed_message msg mem2.
   Proof.
     inv CLOSED; eauto using concrete_closed_opt_view.
-  Qed.
-
-  Lemma concrete_closed
-        mem mem'
-        (CONCRETE: concrete mem mem')
-        (CLOSED: closed mem):
-    closed mem'.
-  Proof.
-    dup CONCRETE. inv CONCRETE0. inv CLOSED.
-    econs; i.
-    - exploit COMPLETE; eauto. i. des.
-      + exploit CLOSED0; eauto. i. des.
-        esplits; eauto.
-        eapply concrete_closed_message; eauto.
-      + exploit SOUND; eauto. i. des.
-        * rewrite MSG in x0. inv x0.
-          splits; econs; eauto.
-        * rewrite MSG in x2. inv x2.
-          exploit CLOSED0; try exact x1. i. des.
-          splits; eauto.
-          { exploit get_ts; try exact x. i. des.
-            - subst. rewrite INHABITED in x. inv x.
-            - inv MSG_TS. econs. etrans; eauto. econs; eauto. }
-          { eapply concrete_closed_message; eauto. }
-    - ii. specialize (INHABITED loc).
-      exploit SOUND; eauto. i. des; auto. inv x.
-    - inv FINITE_HALF. exists x. i.
-      exploit COMPLETE; eauto. i. des; eauto.
-  Qed.
-
-  Lemma lower_half_concrete
-        mem1 loc from to val released mem2
-        (MSG: get loc from mem1 = Some (from, Message.full val released))
-        (LOWER: lower mem1 loc from to Message.half (Message.full val released) mem2):
-    concrete mem1 mem2.
-  Proof.
-    exploit lower_get0; eauto. i. des.
-    econs; i.
-    - erewrite lower_o; eauto. condtac; ss.
-      + des. subst. rewrite GET in GET1. inv GET1.
-        right. esplits; eauto.
-      + left. eauto.
-    - revert GET1. erewrite lower_o; eauto. condtac; ss; i.
-      + des. subst. inv GET1. eauto.
-      + left. eauto.
-  Qed.
-
-  Lemma no_half_concret_inj
-        promises mem mem1 mem2
-        (CONCRETE1: concrete mem mem1)
-        (CONCRETE2: concrete mem mem2)
-        (LE1: le promises mem1)
-        (LE2: le promises mem2)
-        (NOHALF1: no_half promises mem1)
-        (NOHALF2: no_half promises mem2):
-    mem1 = mem2.
-  Proof.
-    apply ext. i.
-    inv CONCRETE1. inv CONCRETE2.
-    destruct (get loc ts mem1) as [[from msg]|] eqn:GET1.
-    - exploit COMPLETE; eauto. i. des.
-      + exploit SOUND0; eauto. i. des; auto.
-        subst. exploit LE2; eauto.
-      + subst. exploit SOUND0; eauto. i. des.
-        * exploit NOHALF2; eauto. i.
-          exploit LE1; eauto. i.
-          rewrite GET1 in x2. inv x2. eauto.
-        * exploit SOUND; try exact x. i. des.
-          { rewrite GET1 in x3. inv x3.
-            exploit NOHALF1; eauto. i.
-            exploit LE2; eauto. }
-          { rewrite x1 in x4. inv x4.
-            rewrite GET1 in x5. inv x5. ss. }
-    - destruct (get loc ts mem2) as [[from msg]|] eqn:GET2; ss.
-      exploit COMPLETE0; eauto. i. des.
-      + exploit SOUND; eauto. i. des; congr.
-      + exploit SOUND; eauto. i. des; congr.
-  Qed.
-
-  Lemma concrete_promise_exists_add
-        promises1 mem1 loc from to msg promises2 mem2
-        mem1'
-        (LE: le promises1 mem1)
-        (CLOSED1: closed mem1)
-        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 op_kind_add)
-        (CONCRETE1: concrete mem1 mem1')
-        (LE': le promises1 mem1'):
-    exists mem2',
-      <<PROMISE': promise promises1 mem1' loc from to msg promises2 mem2' op_kind_add>> /\
-      <<CONCRETE2: concrete mem2 mem2'>>.
-  Proof.
-    inv CONCRETE1. inv PROMISE.
-    exploit add_get0; try exact MEM. i. des.
-    exploit get_ts; try exact GET0. i. des.
-    { subst. inv CLOSED1. rewrite INHABITED in GET. inv GET. }
-    exploit (@add_exists mem1' loc from to msg); eauto.
-    { ii. assert (GET3: exists msg, get loc to2 mem1 = Some (from2, msg)).
-      { exploit COMPLETE; eauto. i. des; eauto. }
-      des. exploit add_o; eauto. erewrite GET3. condtac; ss.
-      - des. subst. rewrite GET in GET3. inv GET3.
-      - i. des; try congr.
-        exploit get_disjoint; [exact GET0|exact x2|..]. i. des; try congr.
-        eapply x3; eauto. }
-    { inv MEM. inv ADD. ss. }
-    i. des.
-    exploit add_get0; try exact x1. i. des.
-    esplits.
-    - econs; eauto.
-      i. subst. exploit HALF; eauto. i. des.
-      exploit SOUND; eauto. i. des; eauto.
-    - econs; i.
-      + erewrite add_o; eauto. condtac; ss.
-        * des. subst. rewrite GET0 in GET3. inv GET3. auto.
-        * guardH o. revert GET3. erewrite add_o; eauto. condtac; ss.
-          i. guardH o0. exploit SOUND; eauto. i. des; eauto.
-          subst. right. split; auto.
-          erewrite add_o; eauto. condtac; ss; eauto.
-          des. subst. exploit SOUND; try exact x2. i. des; congr.
-      + erewrite add_o; eauto. condtac; ss.
-        * des. subst. rewrite GET2 in GET3. inv GET3. auto.
-        * revert GET3. erewrite add_o; eauto. condtac; ss. i.
-          exploit COMPLETE; eauto.
-  Qed.
-
-  Lemma concrete_promise_exists_split
-        promises1 mem1 loc from to msg promises2 mem2 ts3 msg3
-        mem1'
-        (LE: le promises1 mem1)
-        (CLOSED1: closed mem1)
-        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 (op_kind_split ts3 msg3))
-        (CONCRETE1: concrete mem1 mem1')
-        (LE': le promises1 mem1'):
-    exists mem2',
-      <<PROMISE': promise promises1 mem1' loc from to msg promises2 mem2' (op_kind_split ts3 msg3)>> /\
-      <<CONCRETE2: concrete mem2 mem2'>>.
-  Proof.
-    inv CONCRETE1. inv PROMISE.
-    exploit split_get0; try exact MEM. i. des.
-    exploit get_ts; try exact GET1. i. des.
-    { subst. inv CLOSED1. rewrite INHABITED in GET. inv GET. }
-    exploit get_ts; try exact GET2. i. des.
-    { subst. inv CLOSED1. rewrite INHABITED in GET. inv GET. }
-    exploit (@split_exists mem1' loc from to ts3 msg msg3); eauto.
-    { exploit split_get0; try exact PROMISES. i. des.
-      exploit LE'; try exact GET4. ss. }
-    { inv MEM. inv SPLIT. ss. }
-    i. des.
-    exploit split_get0; try exact x2. i. des.
-    esplits.
-    - econs; eauto.
-      i. subst. exploit HALF1; eauto. i. des.
-      exploit SOUND; eauto. i. des; eauto.
-    - econs; i.
-      + erewrite split_o; eauto. repeat condtac; ss.
-        * des. subst. rewrite GET1 in GET7. inv GET7. auto.
-        * guardH o. des. subst. rewrite GET2 in GET7. inv GET7. auto.
-        * revert GET7. erewrite split_o; eauto. repeat condtac; ss.
-          i. guardH o. guardH o1. guardH o0. guardH o2.
-          exploit SOUND; eauto. i. des; eauto.
-          subst. right. split; auto.
-          erewrite split_o; eauto. repeat condtac; ss; eauto.
-          { des. subst. exploit SOUND; try exact x3. i. des; congr. }
-          { guardH o3. des. subst.
-            exploit SOUND; try exact GET7. i. des; try congr.
-            exploit SOUND; try exact x5. i. des; try congr.
-            rewrite GET4 in x7. inv x7. eauto. }
-      + erewrite split_o; eauto. repeat condtac; ss.
-        * des. subst. rewrite GET5 in GET7. inv GET7. auto.
-        * guardH o. des. subst. rewrite GET6 in GET7. inv GET7. auto.
-        * revert GET7. erewrite split_o; eauto. repeat condtac; ss. i.
-          exploit COMPLETE; eauto.
-  Qed.
-
-  Lemma concrete_promise_exists_lower
-        promises1 mem1 loc from to msg promises2 mem2 msg0
-        mem1'
-        (LE: le promises1 mem1)
-        (CLOSED1: closed mem1)
-        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 (op_kind_lower msg0))
-        (CONCRETE1: concrete mem1 mem1')
-        (LE': le promises1 mem1'):
-    exists promises mem from' to' msg' mem2',
-      <<PROMISE1': promise promises1 mem1' loc from to msg promises mem (op_kind_lower msg0)>> /\
-      <<PROMISE2': promise promises mem loc from' to' msg promises2 mem2' (op_kind_lower msg')>> /\
-      <<CONCRETE2: concrete mem2 mem2'>>.
-  Proof.
-    inv CONCRETE1. inv PROMISE.
-    specialize (classic (exists ts, get loc ts mem1 = Some (to, Message.half))).
-    i. des.
-    - admit.
-    - exploit lower_get0; try exact MEM. i. des.
-      exploit get_ts; try exact GET. i. des.
-      { subst. inv MEM. inv LOWER. inv TS0. }
-      exploit (@lower_exists mem1' loc from to msg0 msg); eauto.
-      { exploit lower_get0; try exact PROMISES. i. des.
-        exploit LE'; try exact GET1. ss. }
-      { inv MEM. inv LOWER. ss. }
-      i. des.
-      exploit lower_get0; try exact x1. i. des.
-      esplits.
-      + econs; eauto.
-      + 
-      + econs; i.
-        * erewrite lower_o; eauto. condtac; ss.
-          { des. subst. rewrite GET0 in GET3. inv GET3. auto. }
-          { revert GET3. erewrite lower_o; eauto. condtac; ss.
-            i. guardH o. guardH o0. exploit SOUND; eauto. i. des; eauto.
-            subst. right. split; auto.
-            erewrite lower_o; eauto. repeat condtac; ss; eauto.
-            des. subst.
-            exploit SOUND; try exact GET. i. des; try congr.
-            exploit SOUND; try exact x2. i. des; try congr.
-            rewrite GET0 
-          }
-        * erewrite lower_o; eauto. condtac; ss.
-          { des. subst. rewrite GET2 in GET3. inv GET3. auto. }
-          { revert GET3. erewrite lower_o; eauto. condtac; ss. i.
-            exploit COMPLETE; eauto. }
   Qed.
 
   Lemma concrete_promise_exists
@@ -2875,19 +2508,19 @@ Module Memory.
       esplits.
       + econs; eauto.
         i. subst. exploit HALF; eauto. i. des.
-        exploit SOUND; eauto. i. des; eauto.
+        exploit SOUND; eauto. i. des; eauto; congr.
       + econs; i.
-        * erewrite add_o; eauto. condtac; ss.
-          { des. subst. rewrite GET0 in GET3. inv GET3. auto. }
-          { guardH o. revert GET3. erewrite add_o; eauto. condtac; ss.
-            i. guardH o0. exploit SOUND; eauto. i. des; eauto.
-            subst. right. split; auto.
-            erewrite add_o; eauto. condtac; ss; eauto.
-            des. subst. exploit SOUND; try exact x2. i. des; congr. }
-        * erewrite add_o; eauto. condtac; ss.
-          { des. subst. rewrite GET2 in GET3. inv GET3. auto. }
-          { revert GET3. erewrite add_o; eauto. condtac; ss. i.
-            exploit COMPLETE; eauto. }
+        * erewrite add_o; eauto.
+          revert GET3. erewrite add_o; try exact MEM.
+          condtac; ss; eauto; i.
+          guardH o. exploit SOUND; eauto. i. des; eauto.
+          subst. right. split; auto.
+          erewrite add_o; eauto. condtac; ss.
+          { des. subst. exploit SOUND; try exact x2. i. des; congr. }
+          { esplits; eauto. }
+        * erewrite add_o; eauto.
+          revert GET3. erewrite add_o; try exact x1.
+          condtac; ss; eauto.
     - exploit split_get0; try exact MEM. i. des.
       exploit get_ts; try exact GET1. i. des.
       { subst. inv CLOSED1. rewrite INHABITED in GET. inv GET. }
@@ -2902,26 +2535,22 @@ Module Memory.
       esplits.
       + econs; eauto.
         i. subst. exploit HALF1; eauto. i. des.
-        exploit SOUND; eauto. i. des; eauto.
+        exploit SOUND; eauto. i. des; eauto; congr.
       + econs; i.
-        * erewrite split_o; eauto. repeat condtac; ss.
-          { des. subst. rewrite GET1 in GET7. inv GET7. auto. }
-          { guardH o. des. subst. rewrite GET2 in GET7. inv GET7. auto. }
-          { revert GET7. erewrite split_o; eauto. repeat condtac; ss.
-            i. guardH o. guardH o1. guardH o0. guardH o2.
+        * erewrite split_o; eauto.
+          revert GET7. erewrite split_o; try exact MEM.
+          repeat condtac; ss; eauto; i.
+          { guardH o. guardH o0.
             exploit SOUND; eauto. i. des; eauto.
             subst. right. split; auto.
             erewrite split_o; eauto. repeat condtac; ss; eauto.
             - des. subst. exploit SOUND; try exact x3. i. des; congr.
-            - guardH o3. des. subst.
-              exploit SOUND; try exact GET7. i. des; try congr.
-              exploit SOUND; try exact x5. i. des; try congr.
-              rewrite GET4 in x7. inv x7. eauto. }
-        * erewrite split_o; eauto. repeat condtac; ss.
-          { des. subst. rewrite GET5 in GET7. inv GET7. auto. }
-          { guardH o. des. subst. rewrite GET6 in GET7. inv GET7. auto. }
-          { revert GET7. erewrite split_o; eauto. repeat condtac; ss. i.
-            exploit COMPLETE; eauto. }
+            - guardH o1. des. subst. rewrite GET0 in x3. inv x3.
+              esplits; eauto.
+            - esplits; eauto. }
+        * erewrite split_o; eauto.
+          revert GET7. erewrite split_o; try exact x2.
+          repeat condtac; ss; eauto.
     - exploit lower_get0; try exact MEM. i. des.
       exploit get_ts; try exact GET. i. des.
       { subst. inv MEM. inv LOWER. inv TS0. }
@@ -2934,21 +2563,162 @@ Module Memory.
       esplits.
       + econs; eauto.
       + econs; i.
-        * erewrite lower_o; eauto. condtac; ss.
-          { des. subst. rewrite GET0 in GET3. inv GET3. auto. }
-          { revert GET3. erewrite lower_o; eauto. condtac; ss.
-            i. guardH o. guardH o0. exploit SOUND; eauto. i. des; eauto.
-            subst. right. split; auto.
-            erewrite lower_o; eauto. repeat condtac; ss; eauto.
-            des. subst.
-            exploit SOUND; try exact GET. i. des; try congr.
-            exploit SOUND; try exact x2. i. des; try congr.
-            rewrite GET0 
-          }
-        * erewrite lower_o; eauto. condtac; ss.
-          { des. subst. rewrite GET2 in GET3. inv GET3. auto. }
-          { revert GET3. erewrite lower_o; eauto. condtac; ss. i.
-            exploit COMPLETE; eauto. }
+        * erewrite lower_o; eauto.
+          revert GET3. erewrite lower_o; try exact MEM.
+          condtac; ss; eauto; i.
+          guardH o. exploit SOUND; eauto. i. des; eauto.
+          subst. right. split; auto.
+          erewrite lower_o; eauto. condtac; ss; eauto.
+          { des. subst. rewrite GET in x2. inv x2.
+            exploit SOUND; try exact GET. i. des.
+            - esplits; eauto. etrans; eauto.
+            - subst. inv x4. esplits; eauto. }
+          { esplits; eauto. }
+        * erewrite lower_o; eauto.
+          revert GET3. erewrite lower_o; try exact x1.
+          condtac; ss; eauto.
+  Qed.
+
+
+  (* concrete_exact *)
+
+  Inductive concrete_exact (mem1 mem2: t): Prop :=
+  | concrete_exact_intro
+      (SOUND: forall loc from to msg (GET: get loc to mem1 = Some (from, msg)),
+          get loc to mem2 = Some (from, msg) \/
+          msg = Message.half /\
+          exists from' val' released',
+            get loc from mem1 = Some (from', Message.full val' released') /\
+            get loc to mem2 = Some (from, Message.full val' released'))
+      (COMPLETE: forall loc from to msg (GET: get loc to mem2 = Some (from, msg)),
+          get loc to mem1 = Some (from, msg) \/
+          get loc to mem1 = Some (from, Message.half))
+  .
+
+  Lemma concrete_exact_concrete
+        mem mem'
+        (CONCRETE: concrete_exact mem mem'):
+    concrete mem mem'.
+  Proof.
+    inv CONCRETE. econs; eauto.
+    i. exploit SOUND; eauto. i. des; eauto.
+    subst. right. split; auto.
+    esplits; eauto. refl.
+  Qed.
+
+  Lemma concrete_exact_closed_timemap
+        mem mem' tm
+        (CONCRETE: concrete_exact mem mem')
+        (CLOSED: closed_timemap tm mem):
+    closed_timemap tm mem'.
+  Proof.
+    ii. specialize (CLOSED loc). des.
+    inv CONCRETE. exploit SOUND; eauto. i. des; eauto.
+  Qed.
+
+  Lemma concrete_exact_closed_view
+        mem mem' view
+        (CONCRETE: concrete_exact mem mem')
+        (CLOSED: closed_view view mem):
+    closed_view view mem'.
+  Proof.
+    inv CLOSED.
+    econs; eauto using concrete_exact_closed_timemap.
+  Qed.
+
+  Lemma concrete_exact_closed_opt_view
+        mem mem' view
+        (CONCRETE: concrete_exact mem mem')
+        (CLOSED: closed_opt_view view mem):
+    closed_opt_view view mem'.
+  Proof.
+    inv CLOSED; eauto using concrete_exact_closed_view.
+  Qed.
+
+  Lemma concrete_exact_closed_message
+        mem mem' msg
+        (CONCRETE: concrete_exact mem mem')
+        (CLOSED: closed_message msg mem):
+    closed_message msg mem'.
+  Proof.
+    inv CLOSED; eauto using concrete_exact_closed_opt_view.
+  Qed.
+
+  Lemma concrete_exact_closed
+        mem mem'
+        (CONCRETE: concrete_exact mem mem')
+        (CLOSED: closed mem):
+    closed mem'.
+  Proof.
+    dup CONCRETE. inv CONCRETE0. inv CLOSED.
+    econs; i.
+    - exploit COMPLETE; eauto. i. des.
+      + exploit CLOSED0; eauto. i. des.
+        esplits; eauto.
+        eapply concrete_exact_closed_message; eauto.
+      + exploit SOUND; eauto. i. des.
+        * rewrite MSG in x0. inv x0.
+          splits; econs; eauto.
+        * rewrite MSG in x2. inv x2.
+          exploit CLOSED0; try exact x1. i. des.
+          splits; eauto.
+          { exploit get_ts; try exact x. i. des.
+            - subst. rewrite INHABITED in x. inv x.
+            - inv MSG_TS. econs. etrans; eauto. econs; eauto. }
+          { eapply concrete_exact_closed_message; eauto. }
+    - ii. specialize (INHABITED loc).
+      exploit SOUND; eauto. i. des; auto. inv x.
+    - inv FINITE_HALF. exists x. i.
+      exploit COMPLETE; eauto. i. des; eauto.
+  Qed.
+
+  Lemma lower_half_concrete_exact
+        mem1 loc from to val released mem2
+        (MSG: get loc from mem1 = Some (from, Message.full val released))
+        (LOWER: lower mem1 loc from to Message.half (Message.full val released) mem2):
+    concrete_exact mem1 mem2.
+  Proof.
+    exploit lower_get0; eauto. i. des.
+    econs; i.
+    - erewrite lower_o; eauto. condtac; ss.
+      + des. subst. rewrite GET in GET1. inv GET1.
+        right. esplits; eauto.
+      + left. eauto.
+    - revert GET1. erewrite lower_o; eauto. condtac; ss; i.
+      + des. subst. inv GET1. eauto.
+      + left. eauto.
+  Qed.
+
+  Lemma no_half_concret_exact_inj
+        promises mem mem1 mem2
+        (CONCRETE1: concrete_exact mem mem1)
+        (CONCRETE2: concrete_exact mem mem2)
+        (LE1: le promises mem1)
+        (LE2: le promises mem2)
+        (NOHALF1: no_half promises mem1)
+        (NOHALF2: no_half promises mem2):
+    mem1 = mem2.
+  Proof.
+    apply ext. i.
+    inv CONCRETE1. inv CONCRETE2.
+    destruct (get loc ts mem1) as [[from msg]|] eqn:GET1.
+    - exploit COMPLETE; eauto. i. des.
+      + exploit SOUND0; eauto. i. des; auto.
+        subst. exploit LE2; eauto.
+      + subst. exploit SOUND0; eauto. i. des.
+        * exploit NOHALF2; eauto. i.
+          exploit LE1; eauto. i.
+          rewrite GET1 in x2. inv x2. eauto.
+        * exploit SOUND; try exact x. i. des.
+          { rewrite GET1 in x3. inv x3.
+            exploit NOHALF1; eauto. i.
+            exploit LE2; eauto. }
+          { rewrite x1 in x4. inv x4.
+            rewrite GET1 in x5. inv x5. ss. }
+    - destruct (get loc ts mem2) as [[from msg]|] eqn:GET2; ss.
+      exploit COMPLETE0; eauto. i. des.
+      + exploit SOUND; eauto. i. des; congr.
+      + exploit SOUND; eauto. i. des; congr.
   Qed.
 
 
@@ -3044,13 +2814,13 @@ Module Memory.
   { inv IN. }
   Qed.
 
-  Lemma no_half_concrete_elt_future_exists
+  Lemma no_half_concrete_exact_future_exists
         promises mem1
         (LE1: le promises mem1)
         (CLOSED1: closed mem1):
     exists mem2,
       <<FUTURE: future mem1 mem2>> /\
-      <<CONCRETE_ELT: concrete_elt mem1 mem2>> /\
+      <<CONCRETE: concrete_exact mem1 mem2>> /\
       <<NOHALF: no_half promises mem2>> /\
       <<LE2: le promises mem2>> /\
       <<CLOSED2: closed mem2>>.
@@ -3058,7 +2828,7 @@ Module Memory.
     exploit le_finite_half_domain; eauto. i. des.
     revert mem1 LE1 CLOSED1 NODUP SOUND COMPLETE.
     induction dom; i.
-    { esplits; eauto; try refl.
+    { esplits; eauto.
       ii. destruct (get loc to promises) eqn:GETP.
       - destruct p. exploit LE1; eauto. i.
         rewrite GET in x. inv x. ss.
