@@ -276,10 +276,12 @@ Module Local.
         (STEP: promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
         (WF1: wf lc1 mem1)
         (SC1: Memory.closed_timemap sc1 mem1)
-        (CLOSED1: Memory.closed mem1):
+        (CLOSED1: Memory.closed mem1)
+        (HALF_WF1: Memory.half_wf mem1):
     <<WF2: wf lc2 mem2>> /\
     <<SC2: Memory.closed_timemap sc1 mem2>> /\
     <<CLOSED2: Memory.closed mem2>> /\
+    <<HALF_WF2: Memory.half_wf mem2>> /\
     <<FUTURE: Memory.future mem1 mem2>> /\
     <<TVIEW_FUTURE: TView.le lc1.(tview) lc2.(tview)>> /\
     <<MSG_WF: Message.wf msg>> /\
@@ -333,10 +335,12 @@ Module Local.
         (REL_CLOSED: Memory.closed_opt_view releasedm mem1)
         (WF1: wf lc1 mem1)
         (SC1: Memory.closed_timemap sc1 mem1)
-        (CLOSED1: Memory.closed mem1):
+        (CLOSED1: Memory.closed mem1)
+        (HALF_WF1: Memory.half_wf mem1):
     <<WF2: wf lc2 mem2>> /\
     <<SC2: Memory.closed_timemap sc2 mem2>> /\
     <<CLOSED2: Memory.closed mem2>> /\
+    <<HALF_WF2: Memory.half_wf mem2>> /\
     <<TVIEW_FUTURE: TView.le lc1.(tview) lc2.(tview)>> /\
     <<SC_FUTURE: TimeMap.le sc1 sc2>> /\
     <<MEM_FUTURE: Memory.future mem1 mem2>> /\
@@ -396,10 +400,12 @@ Module Local.
         (STEP: program_step e lc1 sc1 mem1 lc2 sc2 mem2)
         (WF1: wf lc1 mem1)
         (SC1: Memory.closed_timemap sc1 mem1)
-        (CLOSED1: Memory.closed mem1):
+        (CLOSED1: Memory.closed mem1)
+        (HALF_WF1: Memory.half_wf mem1):
     <<WF2: wf lc2 mem2>> /\
     <<SC2: Memory.closed_timemap sc2 mem2>> /\
     <<CLOSED2: Memory.closed mem2>> /\
+    <<HALF_WF2: Memory.half_wf mem2>> /\
     <<TVIEW_FUTURE: TView.le lc1.(tview) lc2.(tview)>> /\
     <<SC_FUTURE: TimeMap.le sc1 sc2>> /\
     <<MEM_FUTURE: Memory.future mem1 mem2>>.
@@ -423,6 +429,7 @@ Module Local.
         (WF1: wf lc1 mem1)
         (SC1: Memory.closed_timemap sc1 mem1)
         (CLOSED1: Memory.closed mem1)
+        (HALF_WF1: Memory.half_wf mem1)
         (DISJOINT1: disjoint lc1 lc)
         (WF: wf lc mem1):
     <<DISJOINT2: disjoint lc2 lc>> /\

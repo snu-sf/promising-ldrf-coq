@@ -97,18 +97,18 @@ Module MemorySplit.
   Qed.
 
   Lemma remove_promise_promise_remove_remove
-        loc ts1 ts2 ts3 msg2 msg3
+        loc ts1 ts2 ts3 val2 released2 msg3
         promises0 mem0
         promises3
         (TS12: Time.lt ts1 ts2)
         (TS23: Time.lt ts2 ts3)
-        (MSG_WF2: Message.wf msg2)
-        (MSG_TS2: Memory.message_to msg2 loc ts2)
+        (MSG_WF2: Message.wf (Message.full val2 released2))
+        (MSG_TS2: Memory.message_to (Message.full val2 released2) loc ts2)
         (LE: Memory.le promises0 mem0)
         (REMOVE: Memory.remove promises0 loc ts1 ts3 msg3 promises3):
     exists promises1 promises2 mem1,
-      <<STEP1: Memory.promise promises0 mem0 loc ts1 ts2 msg2 promises1 mem1 (Memory.op_kind_split ts3 msg3)>> /\
-      <<STEP2: Memory.remove promises1 loc ts1 ts2 msg2 promises2>> /\
+      <<STEP1: Memory.promise promises0 mem0 loc ts1 ts2 (Message.full val2 released2) promises1 mem1 (Memory.op_kind_split ts3 msg3)>> /\
+      <<STEP2: Memory.remove promises1 loc ts1 ts2 (Message.full val2 released2) promises2>> /\
       <<STEP3: Memory.remove promises2 loc ts2 ts3 msg3 promises3>>.
   Proof.
     exploit Memory.remove_get0; eauto. i. des.
@@ -116,6 +116,6 @@ Module MemorySplit.
     exploit LE; eauto. i.
     exploit Memory.split_exists; eauto. i. des.
     exploit commute_remove_split_remove_remove; try exact REMOVE; eauto. i. des.
-    esplits; eauto.
+    esplits; eauto. econs; eauto; try congr.
   Qed.
 End MemorySplit.

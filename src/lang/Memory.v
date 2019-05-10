@@ -2434,7 +2434,10 @@ Module Memory.
           exists from' msg1 msg2,
             get loc from mem1 = Some (from', msg1) /\
             get loc to mem2 = Some (from, msg2) /\
-            Message.le msg1 msg2)
+            Message.le msg1 msg2 /\
+            Message.wf msg2 /\
+            closed_message msg2 mem2 /\
+            message_to msg2 loc to)
       (COMPLETE: forall loc from to msg (GET: get loc to mem2 = Some (from, msg)),
           get loc to mem1 = Some (from, msg) \/
           get loc to mem1 = Some (from, Message.half))
@@ -2478,6 +2481,25 @@ Module Memory.
     inv CLOSED; eauto using concrete_closed_opt_view.
   Qed.
 
+  Lemma concrete_closed
+        mem1 mem2
+        (CONCRETE: concrete mem1 mem2)
+        (CLOSED: closed mem1):
+    closed mem2.
+  Proof.
+    dup CONCRETE. inv CONCRETE0. inv CLOSED. econs; i.
+    - exploit COMPLETE; eauto. i. des.
+      + exploit CLOSED0; eauto. i. des. splits; auto.
+        eapply concrete_closed_message; eauto.
+      + exploit SOUND; eauto. i. des.
+        * rewrite MSG in x0. inv x0. splits; try by econs.
+        * rewrite MSG in x2. inv x2. splits; eauto.
+    - ii. specialize (INHABITED loc).
+      exploit SOUND; eauto. i. des; try congr. inv x.
+    - inv FINITE_HALF. exists x. i.
+      exploit COMPLETE; eauto. i. des; eauto.
+  Qed.
+
   Lemma concrete_promise_exists
         promises1 mem1 loc from to msg promises2 mem2 kind
         mem1'
@@ -2517,7 +2539,7 @@ Module Memory.
           subst. right. split; auto.
           erewrite add_o; eauto. condtac; ss.
           { des. subst. exploit SOUND; try exact x2. i. des; congr. }
-          { esplits; eauto. }
+          { esplits; eauto. eapply add_closed_message; eauto. }
         * erewrite add_o; eauto.
           revert GET3. erewrite add_o; try exact x1.
           condtac; ss; eauto.
@@ -2546,8 +2568,8 @@ Module Memory.
             erewrite split_o; eauto. repeat condtac; ss; eauto.
             - des. subst. exploit SOUND; try exact x3. i. des; congr.
             - guardH o1. des. subst. rewrite GET0 in x3. inv x3.
-              esplits; eauto.
-            - esplits; eauto. }
+              esplits; eauto. eapply split_closed_message; eauto.
+            - esplits; eauto. eapply split_closed_message; eauto. }
         * erewrite split_o; eauto.
           revert GET7. erewrite split_o; try exact x2.
           repeat condtac; ss; eauto.
@@ -2571,9 +2593,11 @@ Module Memory.
           erewrite lower_o; eauto. condtac; ss; eauto.
           { des. subst. rewrite GET in x2. inv x2.
             exploit SOUND; try exact GET. i. des.
-            - esplits; eauto. etrans; eauto.
+            - esplits; eauto.
+              + etrans; eauto.
+              + eapply lower_closed_message; eauto.
             - subst. inv x4. esplits; eauto. }
-          { esplits; eauto. }
+          { esplits; eauto. eapply lower_closed_message; eauto. }
         * erewrite lower_o; eauto.
           revert GET3. erewrite lower_o; try exact x1.
           condtac; ss; eauto.
@@ -2609,17 +2633,6 @@ Module Memory.
           get loc to mem1 = Some (from, msg) \/
           get loc to mem1 = Some (from, Message.half))
   .
-
-  Lemma concrete_exact_concrete
-        mem mem'
-        (CONCRETE: concrete_exact mem mem'):
-    concrete mem mem'.
-  Proof.
-    inv CONCRETE. econs; eauto.
-    i. exploit SOUND; eauto. i. des; eauto.
-    subst. right. split; auto.
-    esplits; eauto. refl.
-  Qed.
 
   Lemma concrete_exact_closed_timemap
         mem mem' tm
@@ -2687,14 +2700,33 @@ Module Memory.
       exploit COMPLETE; eauto. i. des; eauto.
   Qed.
 
+  Lemma concrete_exact_concrete
+        mem mem'
+        (CONCRETE: concrete_exact mem mem')
+        (CLOSED: closed mem):
+    concrete mem mem'.
+  Proof.
+    exploit concrete_exact_closed; eauto. i.
+    inv CONCRETE. econs; eauto.
+    i. exploit SOUND; eauto. i. des; eauto.
+    subst. right. split; auto.
+    inv x0. exploit CLOSED0; eauto. i. des.
+    esplits; eauto. refl.
+  Qed.
+
   Lemma concrete_exact_half_wf
         mem mem'
         (CONCRETE: concrete_exact mem mem')
         (HALF_WF: half_wf mem):
     half_wf mem'.
   Proof.
-    exploit concrete_exact_concrete; eauto. i.
-    eapply concrete_half_wf; eauto.
+    ii. inv CONCRETE. exploit COMPLETE; eauto. i. des.
+    - exploit HALF_WF; eauto. i. des.
+      exploit SOUND; eauto. i. des; try congr.
+      esplits; eauto.
+    - exploit HALF_WF; eauto. i. des.
+      exploit SOUND; eauto. i. des; try congr.
+      esplits; eauto.
   Qed.
 
   Lemma half_wf_concrete_exact_trans
