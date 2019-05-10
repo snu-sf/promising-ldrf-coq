@@ -29,6 +29,7 @@ Lemma progress_program_step
       rs1 i1 s1 lc1 sc1 mem1
       (WF1: Local.wf lc1 mem1)
       (MEM1: Memory.closed mem1)
+      (HALF_WF1: Memory.half_wf mem1)
       (SC1: Memory.closed_timemap sc1 mem1)
       (PROMISES1: lc1.(Local.promises) = Memory.bot)
       (NOHALF1: Memory.no_half lc1.(Local.promises) mem1):

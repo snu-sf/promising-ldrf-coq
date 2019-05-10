@@ -99,8 +99,8 @@ Proof.
   exploit Memory.add_exists_le; try apply WF1; eauto. i. des.
   hexploit Memory.add_inhabited; try apply x0; [viewtac|]. i. des.
   esplits. econs; eauto.
-  - econs; eauto.
-    unfold TView.write_released. econs.
+  - econs; eauto; try congr.
+    econs. unfold TView.write_released.
     viewtac; repeat (condtac; viewtac);
       (try by apply Time.bot_spec);
       (try by unfold TimeMap.singleton, LocFun.add; condtac; [refl|congr]);
@@ -141,6 +141,7 @@ Lemma progress_write_step
       (WF1: Local.wf lc1 mem1)
       (SC1: Memory.closed_timemap sc1 mem1)
       (MEM1: Memory.closed mem1)
+      (HALF_WF1: Memory.half_wf mem1)
       (WF_REL: View.opt_wf releasedm)
       (CLOSED_REL: Memory.closed_opt_view releasedm mem1)
       (PROMISES1: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc lc1.(Local.promises)):
