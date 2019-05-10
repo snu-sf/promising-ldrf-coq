@@ -71,7 +71,9 @@ Section SimulationThread.
       (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
       (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
       (MEM_SRC: Memory.closed mem1_src)
-      (MEM_TGT: Memory.closed mem1_tgt),
+      (MEM_TGT: Memory.closed mem1_tgt)
+      (HALF_WF1_SRC: Memory.half_wf mem1_src)
+      (HALF_WF1_TGT: Memory.half_wf mem1_tgt),
       <<TERMINAL:
         forall (TERMINAL_TGT: lang_tgt.(Language.is_terminal) st1_tgt),
         exists st2_src lc2_src sc2_src mem2_src,
@@ -85,17 +87,16 @@ Section SimulationThread.
           <<TERMINAL: sim_terminal st2_src st1_tgt>>>> /\
       <<CONCRETE:
         forall mem2_src
-          (FUTURE_SRC: Memory.future mem1_src mem2_src)
-          (CONCRETE_SRC: Memory.concrete mem1_src mem2_src)
+          (CONCRETE_SRC: Memory.concrete_exact mem1_src mem2_src)
           (WF_SRC: Local.wf lc1_src mem2_src)
           (MEM_SRC: Memory.closed mem2_src)
           (NOHALF_SRC: Memory.no_half lc1_src.(Local.promises) mem2_src),
         exists mem2_tgt,
           <<MEMORY: sim_memory mem2_src mem2_tgt>> /\
-          <<FUTURE_TGT: Memory.future mem1_tgt mem2_tgt>> /\
-          <<CONCRETE_TGT: Memory.concrete mem1_tgt mem2_tgt>> /\
+          <<CONCRETE_TGT: Memory.concrete_exact mem1_tgt mem2_tgt>> /\
           <<WF_TGT: Local.wf lc1_tgt mem2_tgt>> /\
           <<MEM_TGT: Memory.closed mem2_tgt>> /\
+          <<HALF_WF_TGT: Memory.half_wf mem2_tgt>> /\
           <<NOHALF_TGT: Memory.no_half lc1_tgt.(Local.promises) mem2_tgt>>>> /\
       <<PROMISES:
         forall (PROMISES_TGT: lc1_tgt.(Local.promises) = Memory.bot)
@@ -155,6 +156,8 @@ Lemma sim_thread_step
       (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
       (MEM_SRC: Memory.closed mem1_src)
       (MEM_TGT: Memory.closed mem1_tgt)
+      (HALF_WF_SRC: Memory.half_wf mem1_src)
+      (HALF_WF_TGT: Memory.half_wf mem1_tgt)
       (SIM: sim_thread sim_terminal st1_src lc1_src sc1_src mem1_src st1_tgt lc1_tgt sc1_tgt mem1_tgt):
   exists e_src st2_src lc2_src sc2_src mem2_src st3_src lc3_src sc3_src mem3_src,
     <<STEPS: rtc (@Thread.tau_step lang_src)
@@ -172,6 +175,8 @@ Lemma sim_thread_step
     <<SC_TGT: Memory.closed_timemap sc3_tgt mem3_tgt>> /\
     <<MEM_SRC: Memory.closed mem3_src>> /\
     <<MEM_TGT: Memory.closed mem3_tgt>> /\
+    <<HALF_WF_SRC: Memory.half_wf mem3_src>> /\
+    <<HALF_WF_TGT: Memory.half_wf mem3_tgt>> /\
     <<SIM: sim_thread sim_terminal st3_src lc3_src sc3_src mem3_src st3_tgt lc3_tgt sc3_tgt mem3_tgt>>.
 Proof.
   punfold SIM. exploit SIM; eauto; try refl. i. des.
@@ -200,6 +205,8 @@ Lemma sim_thread_opt_step
       (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
       (MEM_SRC: Memory.closed mem1_src)
       (MEM_TGT: Memory.closed mem1_tgt)
+      (HALF_WF_SRC: Memory.half_wf mem1_src)
+      (HALF_WF_TGT: Memory.half_wf mem1_tgt)
       (SIM: sim_thread sim_terminal st1_src lc1_src sc1_src mem1_src st1_tgt lc1_tgt sc1_tgt mem1_tgt):
   exists e_src st2_src lc2_src sc2_src mem2_src st3_src lc3_src sc3_src mem3_src,
     <<STEPS: rtc (@Thread.tau_step lang_src)
@@ -217,6 +224,8 @@ Lemma sim_thread_opt_step
     <<SC_TGT: Memory.closed_timemap sc3_tgt mem3_tgt>> /\
     <<MEM_SRC: Memory.closed mem3_src>> /\
     <<MEM_TGT: Memory.closed mem3_tgt>> /\
+    <<HALF_WF_SRC: Memory.half_wf mem3_src>> /\
+    <<HALF_WF_TGT: Memory.half_wf mem3_tgt>> /\
     <<SIM: sim_thread sim_terminal st3_src lc3_src sc3_src mem3_src st3_tgt lc3_tgt sc3_tgt mem3_tgt>>.
 Proof.
   inv STEP.
@@ -238,6 +247,8 @@ Lemma sim_thread_rtc_step
       (SC_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
       (MEM_SRC: Memory.closed mem1_src)
       (MEM_TGT: Memory.closed e1_tgt.(Thread.memory))
+      (HALF_WF_SRC: Memory.half_wf mem1_src)
+      (HALF_WF_TGT: Memory.half_wf e1_tgt.(Thread.memory))
       (SIM: sim_thread sim_terminal st1_src lc1_src sc1_src mem1_src e1_tgt.(Thread.state) e1_tgt.(Thread.local) e1_tgt.(Thread.sc) e1_tgt.(Thread.memory)):
   exists st2_src lc2_src sc2_src mem2_src,
     <<STEPS: rtc (@Thread.tau_step lang_src)
@@ -251,9 +262,11 @@ Lemma sim_thread_rtc_step
     <<SC_TGT: Memory.closed_timemap e2_tgt.(Thread.sc) e2_tgt.(Thread.memory)>> /\
     <<MEM_SRC: Memory.closed mem2_src>> /\
     <<MEM_TGT: Memory.closed e2_tgt.(Thread.memory)>> /\
+    <<HALF_WF_SRC: Memory.half_wf mem2_src>> /\
+    <<HALF_WF_TGT: Memory.half_wf e2_tgt.(Thread.memory)>> /\
     <<SIM: sim_thread sim_terminal st2_src lc2_src sc2_src mem2_src e2_tgt.(Thread.state) e2_tgt.(Thread.local) e2_tgt.(Thread.sc) e2_tgt.(Thread.memory)>>.
 Proof.
-  revert SC MEMORY WF_SRC WF_TGT SC_SRC SC_TGT MEM_SRC MEM_TGT SIM.
+  revert SC MEMORY WF_SRC WF_TGT SC_SRC SC_TGT MEM_SRC MEM_TGT HALF_WF_SRC HALF_WF_TGT SIM.
   revert st1_src lc1_src sc1_src mem1_src.
   induction STEPS; i.
   { esplits; eauto. }
@@ -284,6 +297,8 @@ Lemma sim_thread_plus_step
       (SC_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
       (MEM_SRC: Memory.closed mem1_src)
       (MEM_TGT: Memory.closed e1_tgt.(Thread.memory))
+      (HALF_WF_SRC: Memory.half_wf mem1_src)
+      (HALF_WF_TGT: Memory.half_wf e1_tgt.(Thread.memory))
       (SIM: sim_thread sim_terminal st1_src lc1_src sc1_src mem1_src e1_tgt.(Thread.state) e1_tgt.(Thread.local) e1_tgt.(Thread.sc) e1_tgt.(Thread.memory)):
   exists e_src st2_src lc2_src sc2_src mem2_src st3_src lc3_src sc3_src mem3_src,
     <<STEPS: rtc (@Thread.tau_step lang_src)
@@ -301,6 +316,8 @@ Lemma sim_thread_plus_step
     <<SC_TGT: Memory.closed_timemap e3_tgt.(Thread.sc) e3_tgt.(Thread.memory)>> /\
     <<MEM_SRC: Memory.closed mem3_src>> /\
     <<MEM_TGT: Memory.closed e3_tgt.(Thread.memory)>> /\
+    <<HALF_WF_SRC: Memory.half_wf mem3_src>> /\
+    <<HALF_WF_TGT: Memory.half_wf e3_tgt.(Thread.memory)>> /\
     <<SIM: sim_thread sim_terminal st3_src lc3_src sc3_src mem3_src e3_tgt.(Thread.state) e3_tgt.(Thread.local) e3_tgt.(Thread.sc) e3_tgt.(Thread.memory)>>.
 Proof.
   destruct e1_tgt, e2_tgt, e3_tgt. ss.
@@ -342,6 +359,8 @@ Lemma sim_thread_consistent
       (SC_TGT: Memory.closed_timemap sc_tgt mem_tgt)
       (MEM_SRC: Memory.closed mem_src)
       (MEM_TGT: Memory.closed mem_tgt)
+      (HALF_WF_SRC: Memory.half_wf mem_src)
+      (HALF_WF_TGT: Memory.half_wf mem_tgt)
       (CONSISTENT: Thread.consistent (Thread.mk lang_tgt st_tgt lc_tgt sc_tgt mem_tgt)):
   Thread.consistent (Thread.mk lang_src st_src lc_src sc_src mem_src).
 Proof.
@@ -350,8 +369,13 @@ Proof.
   ii. ss. exploit CONCRETE; eauto. i. des.
   exploit CONSISTENT; eauto; try refl. i. des.
   exploit sim_thread_rtc_step; try apply MEMORY0;
-    eauto using Memory.concrete_closed_timemap; s.
-  { eapply sim_thread_future; eauto; try refl. }
+    eauto using Memory.concrete_exact_closed_timemap; s.
+  { eapply Memory.concrete_exact_half_wf; eauto. }
+  { eapply sim_thread_future; eauto; try refl.
+    - eapply Memory.no_half_concrete_exact_future; eauto;
+        try apply WF_SRC; try apply WF.
+    - eapply Memory.no_half_concrete_exact_future; eauto;
+        try apply WF_TGT; try apply WF_TGT0. }
   i. des. destruct e2. ss.
   hexploit Thread.rtc_tau_step_no_half; try exact STEPS; eauto. s. i. des.
   punfold SIM0. exploit SIM0; eauto; try refl. i. des.
