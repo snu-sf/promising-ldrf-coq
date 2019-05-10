@@ -2579,6 +2579,21 @@ Module Memory.
           condtac; ss; eauto.
   Qed.
 
+  Lemma concrete_half_wf
+        mem mem'
+        (CONCRETE: concrete mem mem')
+        (HALF_WF: half_wf mem):
+    half_wf mem'.
+  Proof.
+    ii. inv CONCRETE. exploit COMPLETE; eauto. i. des.
+    - exploit HALF_WF; eauto. i. des.
+      exploit SOUND; eauto. i. des; try congr.
+      esplits; eauto.
+    - exploit HALF_WF; eauto. i. des.
+      exploit SOUND; eauto. i. des; try congr.
+      esplits; eauto.
+  Qed.
+
 
   (* concrete_exact *)
 
@@ -2672,9 +2687,38 @@ Module Memory.
       exploit COMPLETE; eauto. i. des; eauto.
   Qed.
 
+  Lemma concrete_exact_half_wf
+        mem mem'
+        (CONCRETE: concrete_exact mem mem')
+        (HALF_WF: half_wf mem):
+    half_wf mem'.
+  Proof.
+    exploit concrete_exact_concrete; eauto. i.
+    eapply concrete_half_wf; eauto.
+  Qed.
+
+  Lemma half_wf_concrete_exact_trans
+        mem1 mem2 mem3
+        (HALF_WF: half_wf mem1)
+        (CONCRETE12: concrete_exact mem1 mem2)
+        (CONCRETE23: concrete_exact mem2 mem3):
+    concrete_exact mem1 mem3.
+  Proof.
+    inv CONCRETE12. inv CONCRETE23. econs; i.
+    - exploit SOUND; eauto. i. des.
+      + exploit SOUND0; eauto. i. des; eauto.
+        subst. right. split; eauto.
+        exploit COMPLETE; try exact x1. i. des; eauto.
+        exploit HALF_WF; try exact GET. i. des. congr.
+      + exploit SOUND0; eauto. i. des; subst; try congr.
+        right. split; eauto.
+    - exploit COMPLETE0; eauto. i. des; eauto.
+      exploit COMPLETE; eauto. i. des; eauto.
+  Qed.
+
   Lemma lower_half_concrete_exact
-        mem1 loc from to val released mem2
-        (MSG: get loc from mem1 = Some (from, Message.full val released))
+        mem1 loc from to val released mem2 from'
+        (MSG: get loc from mem1 = Some (from', Message.full val released))
         (LOWER: lower mem1 loc from to Message.half (Message.full val released) mem2):
     concrete_exact mem1 mem2.
   Proof.
@@ -2689,7 +2733,7 @@ Module Memory.
       + left. eauto.
   Qed.
 
-  Lemma no_half_concret_exact_inj
+  Lemma no_half_concrete_exact_inj
         promises mem mem1 mem2
         (CONCRETE1: concrete_exact mem mem1)
         (CONCRETE2: concrete_exact mem mem2)
@@ -2817,34 +2861,44 @@ Module Memory.
   Lemma no_half_concrete_exact_future_exists
         promises mem1
         (LE1: le promises mem1)
-        (CLOSED1: closed mem1):
+        (CLOSED1: closed mem1)
+        (HALF_WF1: half_wf mem1):
     exists mem2,
       <<FUTURE: future mem1 mem2>> /\
       <<CONCRETE: concrete_exact mem1 mem2>> /\
       <<NOHALF: no_half promises mem2>> /\
       <<LE2: le promises mem2>> /\
-      <<CLOSED2: closed mem2>>.
+      <<CLOSED2: closed mem2>> /\
+      <<HALF_WF2: half_wf mem2>>.
   Proof.
     exploit le_finite_half_domain; eauto. i. des.
-    revert mem1 LE1 CLOSED1 NODUP SOUND COMPLETE.
+    revert mem1 LE1 CLOSED1 HALF_WF1 NODUP SOUND COMPLETE.
     induction dom; i.
     { esplits; eauto.
-      ii. destruct (get loc to promises) eqn:GETP.
-      - destruct p. exploit LE1; eauto. i.
-        rewrite GET in x. inv x. ss.
-      - exploit SOUND; eauto. i. inv x. }
+      - econs; eauto.
+      - ii. destruct (get loc to promises) eqn:GETP.
+        + destruct p. exploit LE1; eauto. i.
+          rewrite GET in x. inv x. ss.
+        + exploit SOUND; eauto. i. inv x. }
     destruct a as [loc to]. ss.
     exploit (COMPLETE loc to); eauto. i. des.
     exploit get_ts; try exact x0. i. des.
     { subst. inv CLOSED1. rewrite INHABITED in x0. inv x0. }
-    exploit lower_exists; eauto; try apply Message.elt_wf. i. des.
-    exploit lower_half_elt_concrete_elt; eauto. i.
+    exploit HALF_WF1; eauto. i. des.
+    exploit lower_exists; try exact x2; eauto.
+    { inv CLOSED1. exploit CLOSED; try exact x. i. des. eauto. }
+    i. des.
+    exploit lower_half_concrete_exact; eauto. i.
     exploit (IHdom mem2).
     { ii. exploit LE1; eauto. i.
       erewrite lower_o; eauto. condtac; ss.
       des. subst. rewrite x1 in LHS. inv LHS. }
-    { eapply lower_closed; eauto; econs; ss.
-      unfold TimeMap.bot. apply Time.bot_spec. }
+    { inv CLOSED1. exploit CLOSED; try exact x. i. des.
+      eapply lower_closed; eauto.
+      - eapply lower_closed_message; eauto.
+      - inv MSG_TS. econs. etrans; eauto. econs; eauto. }
+    { ii. revert MSG. erewrite lower_o; eauto. condtac; ss.
+      i. guardH o. erewrite lower_o; eauto. condtac; ss; eauto. }
     { inv NODUP. ss. }
     { i. exploit lower_get0; eauto. i. des.
       revert GET. erewrite lower_o; eauto. condtac; ss.
@@ -2853,37 +2907,43 @@ Module Memory.
       erewrite lower_o; eauto. condtac; ss; eauto.
       des. subst. inv NODUP. congr. }
     i. des.
-    exists mem0. splits; eauto; try by etrans; eauto.
-    econs; eauto. econs; eauto; try by repeat econs.
-    econs. ss. unfold TimeMap.bot. apply Time.bot_spec.
+    exists mem0. splits; eauto.
+    - inv CLOSED1. exploit CLOSED; try exact x. i. des.
+      etrans; eauto. econs; eauto. econs; eauto.
+      + eapply lower_closed_message; eauto.
+      + inv MSG_TS. econs. etrans; eauto. econs; eauto.
+    - eapply half_wf_concrete_exact_trans; eauto.
   Qed.
 
-  Lemma no_half_concrete_elt_future
+  Lemma no_half_concrete_exact_future
         promises mem1 mem2
         (CLOSED1: closed mem1)
+        (HALF_WF1: half_wf mem1)
         (LE1: le promises mem1)
         (LE2: le promises mem2)
-        (CONCRETE_ELT: concrete_elt mem1 mem2)
+        (CONCRETE: concrete_exact mem1 mem2)
         (NOHALF: no_half promises mem2):
     future mem1 mem2.
   Proof.
-    exploit no_half_concrete_elt_future_exists; try exact CLOSED1; eauto. i. des.
-    exploit no_half_concrete_elt_inj; [exact CONCRETE_ELT|exact CONCRETE_ELT0|..]; eauto. i. subst.
+    exploit no_half_concrete_exact_future_exists; try exact CLOSED1; eauto. i. des.
+    exploit no_half_concrete_exact_inj; [exact CONCRETE|exact CONCRETE0|..]; eauto. i. subst.
     ss.
   Qed.
 
   Lemma no_half_concrete_future_exists
         promises mem1
         (LE1: le promises mem1)
-        (CLOSED1: closed mem1):
+        (CLOSED1: closed mem1)
+        (HALF_WF1: half_wf mem1):
     exists mem2,
       <<FUTURE: future mem1 mem2>> /\
       <<CONCRETE: concrete mem1 mem2>> /\
       <<NOHALF: no_half promises mem2>> /\
       <<LE2: le promises mem2>> /\
-      <<CLOSED2: closed mem2>>.
+      <<CLOSED2: closed mem2>> /\
+      <<HALF_WF2: half_wf mem2>>.
   Proof.
-    exploit no_half_concrete_elt_future_exists; eauto. i. des.
-    esplits; eauto. apply concrete_elt_concrete; auto.
+    exploit no_half_concrete_exact_future_exists; eauto. i. des.
+    esplits; eauto. apply concrete_exact_concrete; auto.
   Qed.
 End Memory.
