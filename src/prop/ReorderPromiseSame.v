@@ -74,23 +74,34 @@ Proof.
       exploit MemoryReorder.add_lower; try exact MEM1; try exact MEM; eauto. i. des; [|congr].
       left. esplits; ss.
       * inv MEM. inv LOWER. ss.
-      * econs; eauto.
+      * econs; eauto. econs; eauto; congr.
     + exploit MemoryReorder.add_lower; try exact MEM1; try exact MEM; eauto. i. des; [congr|].
       right. esplits; eauto. econs; eauto.
-      eapply Memory.lower_closed_message; eauto.
+      * econs; eauto.
+        i. subst. exploit HALF; eauto. i. des.
+        erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+      * eapply Memory.lower_closed_message; eauto.
   - destruct (classic ((loc1, ts3) = (loc2, to2))).
     { inv H.
       exploit MemoryReorder.split_lower_same; try exact PROMISES0; try exact PROMISES; eauto. i. des.
       exploit MemoryReorder.split_lower_same; try exact MEM1; try exact MEM; eauto. i. des.
       subst. right. esplits; eauto. econs; eauto.
-      eapply Memory.lower_closed_message; eauto.
+      - econs 2; eauto; try congr.
+        i. subst. exploit HALF1; eauto. i. des.
+        erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+      - eapply Memory.lower_closed_message; eauto.
     }
     { exploit MemoryReorder.split_lower_diff; try exact PROMISES0; try exact PROMISES; eauto. i. des.
       - subst. exploit MemoryReorder.split_lower_diff; try exact MEM1; try exact MEM; eauto. i. des; [|congr].
-        left. esplits; eauto. inv MEM. inv LOWER. ss.
+        left. esplits; eauto.
+        + inv MEM. inv LOWER. ss.
+        + econs; eauto. econs 2; eauto; congr.
       - exploit MemoryReorder.split_lower_diff; try exact MEM1; try exact MEM; eauto. i. des; [congr|].
         right. esplits; eauto. econs; eauto.
-        eapply Memory.lower_closed_message; eauto.
+        + econs 2; eauto.
+          i. subst. exploit HALF1; eauto. i. des.
+          erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+        + eapply Memory.lower_closed_message; eauto.
     }
   - exploit MemoryReorder.lower_lower; try exact PROMISES0; try exact PROMISES; eauto. i. des.
     + subst.
