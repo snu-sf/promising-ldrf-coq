@@ -85,7 +85,9 @@ Inductive sim_update: forall (st_src:lang.(Language.state)) (lc_src:Local.t) (sc
     (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
     (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
     (MEM_SRC: Memory.closed mem1_src)
-    (MEM_TGT: Memory.closed mem1_tgt):
+    (MEM_TGT: Memory.closed mem1_tgt)
+    (HALF_WF_SRC: Memory.half_wf mem1_src)
+    (HALF_WF_TGT: Memory.half_wf mem1_tgt):
     sim_update
       (State.mk rs [Stmt.instr i2; Stmt.instr (Instr.update r1 l1 rmw1 or1 ow1)]) lc1_src sc1_src mem1_src
       (State.mk (RegFun.add r1 vret1 rs) [Stmt.instr i2]) lc1_tgt sc1_tgt mem1_tgt
@@ -109,7 +111,9 @@ Lemma sim_update_mon
       (SC_SRC: Memory.closed_timemap sc2_src mem2_src)
       (SC_TGT: Memory.closed_timemap sc2_tgt mem2_tgt)
       (MEM_SRC: Memory.closed mem2_src)
-      (MEM_TGT: Memory.closed mem2_tgt):
+      (MEM_TGT: Memory.closed mem2_tgt)
+      (HALF_WF_SRC: Memory.half_wf mem2_src)
+      (HALF_WF_TGT: Memory.half_wf mem2_tgt):
   sim_update st_src lc_src sc2_src mem2_src
              st_tgt lc_tgt sc2_tgt mem2_tgt.
 Proof.
@@ -144,30 +148,36 @@ Lemma sim_update_future
       (MEM1: sim_memory mem1_src mem1_tgt)
       (SIM1: sim_update st_src lc_src sc1_src mem1_src
                        st_tgt lc_tgt sc1_tgt mem1_tgt)
-      (FUTURE_SRC: Memory.future mem1_src mem2_src)
-      (CONCRETE_SRC: Memory.concrete mem1_src mem2_src)
+      (CONCRETE_SRC: Memory.concrete_exact mem1_src mem2_src)
       (WF_SRC: Local.wf lc_src mem2_src)
       (MEM_SRC: Memory.closed mem2_src)
       (NOHALF_SRC: Memory.no_half lc_src.(Local.promises) mem2_src):
   exists lc'_src mem2_tgt,
     <<MEM2: sim_memory mem2_src mem2_tgt>> /\
+    <<FUTURE_SRC: Memory.future mem1_src mem2_src>> /\
     <<FUTURE_TGT: Memory.future mem1_tgt mem2_tgt>> /\
-    <<CONCRETE_TGT: Memory.concrete mem1_tgt mem2_tgt>> /\
+    <<CONCRETE_TGT: Memory.concrete_exact mem1_tgt mem2_tgt>> /\
     <<WF_TGT: Local.wf lc_tgt mem2_tgt>> /\
     <<MEM_TGT: Memory.closed mem2_tgt>> /\
+    <<HALF_WF_SRC: Memory.half_wf mem2_src>> /\
+    <<HALF_WF_TGT: Memory.half_wf mem2_tgt>> /\
     <<NOHALF_TGT: Memory.no_half lc_tgt.(Local.promises) mem2_tgt>> /\
     <<SIM2: sim_update st_src lc'_src sc1_src mem2_src
                        st_tgt lc_tgt sc1_tgt mem2_tgt>>.
 Proof.
   inv SIM1.
+  exploit Memory.no_half_concrete_exact_future;
+    try exact CONCRETE_SRC; try apply WF_SRC; try apply WF_SRC0; eauto. i.
   destruct vw1 as [vw1|]; cycle 1.
   { ss. des. subst.
     exploit future_read_step; try exact READ; eauto. i. des.
-    exploit SimPromises.concrete_future; try apply MEM1; eauto.
+    exploit SimPromises.concrete; try apply MEM1; eauto.
     { inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite <- PROMISES.
       inv READ. ss. apply SimPromises.sem_bot.
     }
     i. des.
+    exploit SimPromises.concrete_future;
+      [exact CONCRETE_SRC|exact CONCRETE_TGT|..]; eauto. i. des.
     esplits; eauto.
     econs; [eauto|..]; s; eauto using Memory.future_closed_timemap.
     etrans; eauto.
@@ -179,7 +189,7 @@ Proof.
   exploit future_fulfill_step; try exact FULFILL; eauto; try refl; try by viewtac.
   { by inv REORDER. }
   i. des.
-  exploit fulfill_step_future; try apply x0; try exact WF1; eauto; try by viewtac.
+  exploit fulfill_step_future; try apply x1; try exact WF1; eauto; try by viewtac.
   { econs.
     - apply WF2.
     - eapply TView.future_closed; eauto. apply WF2.
@@ -188,7 +198,7 @@ Proof.
   }
   { eapply Memory.future_closed_timemap; try exact SC_SRC; eauto. }
   i. des.
-  exploit sim_local_fulfill_bot; try exact x0; try exact LOCAL0; try refl; eauto.
+  exploit sim_local_fulfill_bot; try exact x1; try exact LOCAL0; try refl; eauto.
   { econs.
     - apply WF2.
     - eapply TView.future_closed; eauto. apply WF2.
@@ -197,20 +207,28 @@ Proof.
   }
   i. des.
   exploit fulfill_step_future; eauto. i. des.
-  exploit SimPromises.concrete_future; try apply MEM1; eauto.
+  exploit SimPromises.concrete; try apply MEM1; eauto.
   { inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite <- PROMISES.
     apply SimPromises.sem_bot.
   }
   { eapply fulfill_step_no_half; eauto.
     inv LOCAL0. eapply SimPromises.sem_bot_inv in PROMISES. rewrite <- PROMISES.
     eapply Local.program_step_no_half; (try by econs 2; eauto); auto. }
-  i. des. esplits; eauto.
+  i. des.
+  exploit SimPromises.concrete_future;
+    [exact CONCRETE_SRC|exact CONCRETE_TGT|..]; eauto.
+  { eapply fulfill_step_no_half; eauto.
+    inv LOCAL0. eapply SimPromises.sem_bot_inv in PROMISES. rewrite <- PROMISES.
+    eapply Local.program_step_no_half; (try by econs 2; eauto); auto. }
+  i. des.
+  esplits; eauto.
   econs; [eauto|..]; s; eauto using Memory.future_closed_timemap.
   etrans; eauto.
 Grab Existential Variables.
 { auto. (* SC view of read step *) }
-{ econs 2. }
-{ econs. econs 3. }
+{ auto. }
+{ auto. }
+{ auto. }
 Qed.
 
 Lemma sim_update_step

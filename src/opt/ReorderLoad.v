@@ -78,7 +78,9 @@ Inductive sim_load: forall (st_src:lang.(Language.state)) (lc_src:Local.t) (sc1_
     (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
     (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
     (MEM_SRC: Memory.closed mem1_src)
-    (MEM_TGT: Memory.closed mem1_tgt):
+    (MEM_TGT: Memory.closed mem1_tgt)
+    (HALF_WF_SRC: Memory.half_wf mem1_src)
+    (HALF_WF_TGT: Memory.half_wf mem1_tgt):
     sim_load
       (State.mk rs [Stmt.instr i2; Stmt.instr (Instr.load r1 l1 o1)]) lc1_src sc1_src mem1_src
       (State.mk (RegFun.add r1 v1 rs) [Stmt.instr i2]) lc1_tgt sc1_tgt mem1_tgt
@@ -102,7 +104,9 @@ Lemma sim_load_mon
       (SC_SRC: Memory.closed_timemap sc2_src mem2_src)
       (SC_TGT: Memory.closed_timemap sc2_tgt mem2_tgt)
       (MEM_SRC: Memory.closed mem2_src)
-      (MEM_TGT: Memory.closed mem2_tgt):
+      (MEM_TGT: Memory.closed mem2_tgt)
+      (HALF_WF_SRC: Memory.half_wf mem2_src)
+      (HALF_WF_TGT: Memory.half_wf mem2_tgt):
   sim_load st_src lc_src sc2_src mem2_src
            st_tgt lc_tgt sc2_tgt mem2_tgt.
 Proof.
@@ -117,28 +121,35 @@ Lemma sim_load_future
       (MEM1: sim_memory mem1_src mem1_tgt)
       (SIM1: sim_load st_src lc_src sc1_src mem1_src
                       st_tgt lc_tgt sc1_tgt mem1_tgt)
-      (FUTURE_SRC: Memory.future mem1_src mem2_src)
-      (CONCRETE_SRC: Memory.concrete mem1_src mem2_src)
+      (CONCRETE_SRC: Memory.concrete_exact mem1_src mem2_src)
       (WF_SRC: Local.wf lc_src mem2_src)
       (MEM_SRC: Memory.closed mem2_src)
       (NOHALF_SRC: Memory.no_half lc_src.(Local.promises) mem2_src):
   exists lc'_src mem2_tgt,
     <<MEM2: sim_memory mem2_src mem2_tgt>> /\
+    <<FUTURE_SRC: Memory.future mem1_src mem2_src>> /\
     <<FUTURE_TGT: Memory.future mem1_tgt mem2_tgt>> /\
-    <<CONCRETE_TGT: Memory.concrete mem1_tgt mem2_tgt>> /\
+    <<CONCRETE_TGT: Memory.concrete_exact mem1_tgt mem2_tgt>> /\
     <<WF_TGT: Local.wf lc_tgt mem2_tgt>> /\
     <<MEM_TGT: Memory.closed mem2_tgt>> /\
+    <<HALF_WF_SRC: Memory.half_wf mem2_src>> /\
+    <<HALF_WF_TGT: Memory.half_wf mem2_tgt>> /\
     <<NOHALF_TGT: Memory.no_half lc_tgt.(Local.promises) mem2_tgt>> /\
     <<SIM2: sim_load st_src lc'_src sc1_src mem2_src
                      st_tgt lc_tgt sc1_tgt mem2_tgt>>.
 Proof.
   inv SIM1.
+  exploit Memory.no_half_concrete_exact_future;
+    try exact CONCRETE_SRC; try apply WF_SRC; try apply WF_SRC0; eauto. i.
   exploit future_read_step; try exact READ; eauto. i. des.
-  exploit SimPromises.concrete_future; try apply MEM1; eauto.
+  exploit SimPromises.concrete; try apply MEM1; eauto.
   { inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite <- PROMISES.
     inv READ. ss. apply SimPromises.sem_bot.
   }
-  i. des. esplits; eauto.
+  i. des.
+  exploit SimPromises.concrete_future;
+    [exact CONCRETE_SRC|exact CONCRETE_TGT|..]; eauto. i. des.
+  esplits; eauto.
   econs; eauto using Memory.future_closed_timemap.
   etrans; eauto.
 Qed.

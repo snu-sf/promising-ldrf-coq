@@ -74,7 +74,9 @@ Inductive sim_store: forall (st_src:lang.(Language.state)) (lc_src:Local.t) (sc1
     (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
     (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
     (MEM_SRC: Memory.closed mem1_src)
-    (MEM_TGT: Memory.closed mem1_tgt):
+    (MEM_TGT: Memory.closed mem1_tgt)
+    (HALF_WF_SRC: Memory.half_wf mem1_src)
+    (HALF_WF_TGT: Memory.half_wf mem1_tgt):
     sim_store
       (State.mk rs [Stmt.instr i2; Stmt.instr (Instr.store l1 v1 o1)]) lc1_src sc1_src mem1_src
       (State.mk rs [Stmt.instr i2]) lc1_tgt sc1_tgt mem1_tgt
@@ -98,7 +100,9 @@ Lemma sim_store_mon
       (SC_SRC: Memory.closed_timemap sc2_src mem2_src)
       (SC_TGT: Memory.closed_timemap sc2_tgt mem2_tgt)
       (MEM_SRC: Memory.closed mem2_src)
-      (MEM_TGT: Memory.closed mem2_tgt):
+      (MEM_TGT: Memory.closed mem2_tgt)
+      (HALF_WF_SRC: Memory.half_wf mem2_src)
+      (HALF_WF_TGT: Memory.half_wf mem2_tgt):
   sim_store st_src lc_src sc2_src mem2_src
             st_tgt lc_tgt sc2_tgt mem2_tgt.
 Proof.
@@ -114,35 +118,42 @@ Lemma sim_store_future
       (MEM1: sim_memory mem1_src mem1_tgt)
       (SIM1: sim_store st_src lc_src sc1_src mem1_src
                        st_tgt lc_tgt sc1_tgt mem1_tgt)
-      (FUTURE_SRC: Memory.future mem1_src mem2_src)
-      (CONCRETE_SRC: Memory.concrete mem1_src mem2_src)
+      (CONCRETE_SRC: Memory.concrete_exact mem1_src mem2_src)
       (WF_SRC: Local.wf lc_src mem2_src)
       (MEM_SRC: Memory.closed mem2_src)
       (NOHALF_SRC: Memory.no_half lc_src.(Local.promises) mem2_src):
   exists lc'_src mem2_tgt,
     <<MEM2: sim_memory mem2_src mem2_tgt>> /\
+    <<FUTURE_SRC: Memory.future mem1_src mem2_src>> /\
     <<FUTURE_TGT: Memory.future mem1_tgt mem2_tgt>> /\
-    <<CONCRETE_TGT: Memory.concrete mem1_tgt mem2_tgt>> /\
+    <<CONCRETE_TGT: Memory.concrete_exact mem1_tgt mem2_tgt>> /\
     <<WF_TGT: Local.wf lc_tgt mem2_tgt>> /\
     <<MEM_TGT: Memory.closed mem2_tgt>> /\
+    <<HALF_WF_SRC: Memory.half_wf mem2_src>> /\
+    <<HALF_WF_TGT: Memory.half_wf mem2_tgt>> /\
     <<NOHALF_TGT: Memory.no_half lc_tgt.(Local.promises) mem2_tgt>> /\
     <<SIM2: sim_store st_src lc'_src sc1_src mem2_src
                       st_tgt lc_tgt sc1_tgt mem2_tgt>>.
 Proof.
   inv SIM1.
+  exploit Memory.no_half_concrete_exact_future;
+    try exact CONCRETE_SRC; try apply WF_SRC; try apply WF_SRC0; eauto. i.
   exploit fulfill_step_future; eauto; try by viewtac. i. des.
   exploit fulfill_step_future; try exact WF_SRC;
     eauto using Memory.future_closed_timemap. i. des.
   exploit future_fulfill_step; try exact FULFILL; eauto.
   { by inv REORDER. }
   i. des.
-  exploit SimPromises.concrete_future; try exact MEM1; eauto.
+  hexploit fulfill_step_no_half; eauto. i.
+  exploit SimPromises.concrete; try exact MEM1; eauto.
   { inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite <- PROMISES.
     apply SimPromises.sem_bot.
   }
-  { eapply fulfill_step_no_half; eauto. }
-  i. des. esplits; eauto.
-  econs; eauto using Memory.future_closed_timemap.
+  i. des.
+  exploit SimPromises.concrete_future;
+    [exact CONCRETE_SRC|exact CONCRETE_TGT|..]; eauto. i. des.
+  esplits; eauto.
+  econs; eauto using Memory.concrete_exact_closed_timemap.
 Qed.
 
 Lemma sim_store_step
@@ -209,7 +220,7 @@ Proof.
     + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
   - (* store *)
     hexploit sim_local_write_bot; try exact LOCAL1; eauto; try refl; try by viewtac. i. des.
-    exploit reorder_fulfill_write; try exact FULFILL; try exact STEP_SRC; eauto; try by viewtac. i. des.
+    hexploit reorder_fulfill_write; try exact FULFILL; try exact STEP_SRC; eauto; try by viewtac. i. des.
     exploit Local.write_step_future; try exact STEP1; eauto; try by viewtac. i. des.
     exploit fulfill_write; eauto; try by viewtac. i. des.
     esplits.

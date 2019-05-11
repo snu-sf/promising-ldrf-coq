@@ -367,15 +367,12 @@ Proof.
   generalize SIM. intro X.
   punfold X. exploit X; eauto; try refl. i. des.
   ii. ss. exploit CONCRETE; eauto. i. des.
+  exploit SimPromises.concrete_future;
+    [exact CONCRETE0|exact CONCRETE_TGT|..]; eauto. i. des.
   exploit CONSISTENT; eauto; try refl. i. des.
   exploit sim_thread_rtc_step; try apply MEMORY0;
     eauto using Memory.concrete_exact_closed_timemap; s.
-  { eapply Memory.concrete_exact_half_wf; eauto. }
-  { eapply sim_thread_future; eauto; try refl.
-    - eapply Memory.no_half_concrete_exact_future; eauto;
-        try apply WF_SRC; try apply WF.
-    - eapply Memory.no_half_concrete_exact_future; eauto;
-        try apply WF_TGT; try apply WF_TGT0. }
+  { eapply sim_thread_future; eauto; try refl. }
   i. des. destruct e2. ss.
   hexploit Thread.rtc_tau_step_no_half; try exact STEPS; eauto. s. i. des.
   punfold SIM0. exploit SIM0; eauto; try refl. i. des.

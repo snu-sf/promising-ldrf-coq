@@ -96,7 +96,9 @@ Lemma sim_fence_step
     (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
     (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
     (MEM_SRC: Memory.closed mem1_src)
-    (MEM_TGT: Memory.closed mem1_tgt),
+    (MEM_TGT: Memory.closed mem1_tgt)
+    (HALF_WF_SRC: Memory.half_wf mem1_src)
+    (HALF_WF_TGT: Memory.half_wf mem1_tgt),
     _sim_thread_step lang lang ((sim_thread (sim_terminal eq)) \8/ sim_fence)
                      st1_src lc1_src sc1_src mem1_src
                      st1_tgt lc1_tgt sc1_tgt mem1_tgt.
@@ -194,12 +196,14 @@ Lemma sim_fence_sim_thread:
 Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss.
   - i. inv TERMINAL_TGT. inv PR; ss.
-  - i. inv PR. eapply SimPromises.concrete_future; try apply LOCAL; eauto.
+  - i. inv PR. eapply SimPromises.concrete; try apply LOCAL; eauto.
     { eapply Local.fence_step_future; try exact SC_SRC; eauto.
       eapply future_fence_step; try apply FENCE; eauto.
       inv REORDER; etrans; eauto.
     }
-    { hexploit Memory.future_closed_timemap; try apply SC_SRC; eauto. i.
+    { exploit Memory.no_half_concrete_exact_future;
+        try exact CONCRETE_SRC; try apply WF_SRC; try apply WF_SRC0; eauto. i.
+      hexploit Memory.future_closed_timemap; try apply SC_SRC; eauto. i.
       eapply Local.fence_step_future; try apply H; eauto.
       eapply future_fence_step; try apply FENCE; eauto.
       inv REORDER; etrans; eauto.

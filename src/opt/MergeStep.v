@@ -70,6 +70,7 @@ Lemma merge_write_read
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
+      (HALF_WF0: Memory.half_wf mem0)
       (WF_RELEASED: View.opt_wf releasedm)
       (WF_CLOSED: Memory.closed_opt_view releasedm mem0)
       (RLX: Ordering.le Ordering.relaxed ord2 -> View.le releasedm.(View.unwrap) lc0.(Local.tview).(TView.acq))
@@ -150,6 +151,7 @@ Lemma merge_split
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
+      (HALF_WF0: Memory.half_wf mem0)
       (LC0_TS: Time.le (lc0.(Local.tview).(TView.cur).(View.rlx) loc) ts1)
       (REL0_TS: Time.le (released0.(View.unwrap).(View.rlx) loc) ts1)
       (REL0_WF: View.opt_wf released0)
@@ -173,7 +175,7 @@ Proof.
   inv STEP.
   exploit MemorySplit.remove_promise_promise_remove_remove;
     try exact TS12; try exact TS23; try exact REMOVE.
-  { instantiate (1 := Message.full val2 released1'). econs; eauto. }
+  { instantiate (1 := released1'). instantiate (1 := val2). econs; eauto. }
   { econs. unfold released1', TView.write_released. repeat (try condtac; aggrtac).
     - etrans; eauto. left. auto.
     - etrans; eauto. left. auto.
@@ -218,6 +220,7 @@ Lemma merge_write_write_relaxed
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
+      (HALF_WF0: Memory.half_wf mem0)
       (REL0_WF: View.opt_wf released0)
       (REL0_TS: Time.le (released0.(View.unwrap).(View.rlx) loc) ts1)
       (REL0_CLOSED: Memory.closed_opt_view released0 mem0)
@@ -262,6 +265,7 @@ Lemma promise_add_promise_split_promise_add_promise_add
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
+      (HALF_WF0: Memory.half_wf mem0)
       (REL_CLOSED: forall promises1' mem1'
                      (PROMISE1: Memory.promise (Local.promises lc0) mem0 loc ts1 ts2 msg2 promises1' mem1' Memory.op_kind_add),
           Memory.closed_message msg2 mem1')
@@ -281,20 +285,21 @@ Proof.
 Qed.
 
 Lemma promise_lower_promise_split_promise_split_promise_lower
-      loc ts1 ts2 ts3 msg0 msg2 msg3
+      loc ts1 ts2 ts3 msg0 val2 released2 msg3
       lc0 sc0 mem0
       lc1 mem1
       lc2 mem2
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
+      (HALF_WF0: Memory.half_wf mem0)
       (REL_CLOSED: forall promises1' mem1' msg ts
-                     (PROMISE1: Memory.promise (Local.promises lc0) mem0 loc ts1 ts2 msg2 promises1' mem1' (Memory.op_kind_split ts msg)),
-          Memory.closed_message msg2 mem1')
+                     (PROMISE1: Memory.promise (Local.promises lc0) mem0 loc ts1 ts2 (Message.full val2 released2) promises1' mem1' (Memory.op_kind_split ts msg)),
+          Memory.closed_message (Message.full val2 released2) mem1')
       (STEP1: Local.promise_step lc0 mem0 loc ts1 ts3 msg3 lc1 mem1 (Memory.op_kind_lower msg0))
-      (STEP2: Local.promise_step lc1 mem1 loc ts1 ts2 msg2 lc2 mem2 (Memory.op_kind_split ts3 msg3)):
+      (STEP2: Local.promise_step lc1 mem1 loc ts1 ts2 (Message.full val2 released2) lc2 mem2 (Memory.op_kind_split ts3 msg3)):
   exists lc1' mem1',
-    <<STEP1: Local.promise_step lc0 mem0 loc ts1 ts2 msg2 lc1' mem1' (Memory.op_kind_split ts3 msg0)>> /\
+    <<STEP1: Local.promise_step lc0 mem0 loc ts1 ts2 (Message.full val2 released2) lc1' mem1' (Memory.op_kind_split ts3 msg0)>> /\
     <<STEP2: Local.promise_step lc1' mem1' loc ts2 ts3 msg3 lc2 mem2 (Memory.op_kind_lower msg0)>>.
 Proof.
   exploit Local.promise_step_future; try exact STEP1; eauto. i. des.
@@ -307,20 +312,21 @@ Proof.
 Qed.
 
 Lemma reorder_promise_split_promise_split
-      loc ts1 ts2 ts3 ts4 msg2 msg3 msg4
+      loc ts1 ts2 ts3 ts4 val2 released2 msg3 msg4
       lc0 sc0 mem0
       lc1 mem1
       lc2 mem2
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
+      (HALF_WF0: Memory.half_wf mem0)
       (REL_CLOSED: forall promises1' mem1' ts5 msg5
-                     (PROMISE1: Memory.promise (Local.promises lc0) mem0 loc ts1 ts2 msg2 promises1' mem1' (Memory.op_kind_split ts5 msg5)),
-          Memory.closed_message msg2 mem1')
+                     (PROMISE1: Memory.promise (Local.promises lc0) mem0 loc ts1 ts2 (Message.full val2 released2) promises1' mem1' (Memory.op_kind_split ts5 msg5)),
+          Memory.closed_message (Message.full val2 released2) mem1')
       (STEP1: Local.promise_step lc0 mem0 loc ts1 ts3 msg3 lc1 mem1 (Memory.op_kind_split ts4 msg4))
-      (STEP2: Local.promise_step lc1 mem1 loc ts1 ts2 msg2 lc2 mem2 (Memory.op_kind_split ts3 msg3)):
+      (STEP2: Local.promise_step lc1 mem1 loc ts1 ts2 (Message.full val2 released2) lc2 mem2 (Memory.op_kind_split ts3 msg3)):
   exists lc1' mem1',
-    <<STEP1: Local.promise_step lc0 mem0 loc ts1 ts2 msg2 lc1' mem1' (Memory.op_kind_split ts4 msg4)>> /\
+    <<STEP1: Local.promise_step lc0 mem0 loc ts1 ts2 (Message.full val2 released2) lc1' mem1' (Memory.op_kind_split ts4 msg4)>> /\
     <<STEP2: Local.promise_step lc1' mem1' loc ts2 ts3 msg3 lc2 mem2 (Memory.op_kind_split ts4 msg4)>>.
 Proof.
   exploit Local.promise_step_future; try exact STEP1; eauto. i. des.
@@ -371,6 +377,7 @@ Lemma reorder_promise_add_fulfill
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
+      (HALF_WF0: Memory.half_wf mem0)
       (RELM_WF: Memory.closed_opt_view releasedm2 mem0)
       (DIFF: (loc1, to1) <> (loc2, to2))
       (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 msg1 lc1 mem1 Memory.op_kind_add)
@@ -398,6 +405,7 @@ Lemma reorder_promise_split_fulfill
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
+      (HALF_WF0: Memory.half_wf mem0)
       (RELM_WF: Memory.closed_opt_view releasedm2 mem0)
       (DIFF1: (loc1, to1) <> (loc2, to2))
       (DIFF2: (loc1, to3) <> (loc2, to2))
@@ -425,6 +433,7 @@ Lemma reorder_promise_lower_fulfill
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
+      (HALF_WF0: Memory.half_wf mem0)
       (RELM_WF: Memory.closed_opt_view releasedm2 mem0)
       (DIFF: (loc1, to1) <> (loc2, to2))
       (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 msg2 lc1 mem1 (Memory.op_kind_lower msg1))
@@ -466,6 +475,7 @@ Lemma merge_write_write_add
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
+      (HALF_WF0: Memory.half_wf mem0)
       (REL0_WF: View.opt_wf released0)
       (REL0_TS: Time.le (released0.(View.unwrap).(View.rlx) loc) ts1)
       (REL0_CLOSED: Memory.closed_opt_view released0 mem0)
@@ -524,6 +534,7 @@ Lemma merge_write_write_split
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
+      (HALF_WF0: Memory.half_wf mem0)
       (REL0_WF: View.opt_wf released0)
       (REL0_TS: Time.le (released0.(View.unwrap).(View.rlx) loc) ts1)
       (REL0_CLOSED: Memory.closed_opt_view released0 mem0)
@@ -583,6 +594,7 @@ Lemma merge_write_write_lower
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
+      (HALF_WF0: Memory.half_wf mem0)
       (REL0_WF: View.opt_wf released0)
       (REL0_TS: Time.le (released0.(View.unwrap).(View.rlx) loc) ts1)
       (REL0_CLOSED: Memory.closed_opt_view released0 mem0)
@@ -642,6 +654,7 @@ Lemma merge_write_write
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
+      (HALF_WF0: Memory.half_wf mem0)
       (REL0_WF: View.opt_wf released0)
       (REL0_TS: Time.le (released0.(View.unwrap).(View.rlx) loc) ts1)
       (REL0_CLOSED: Memory.closed_opt_view released0 mem0)
@@ -676,6 +689,7 @@ Lemma merge_write_write_None
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
+      (HALF_WF0: Memory.half_wf mem0)
       (REL0_WF: View.opt_wf released0)
       (REL0_TS: Time.le (released0.(View.unwrap).(View.rlx) loc) ts1)
       (REL0_CLOSED: Memory.closed_opt_view released0 mem0)

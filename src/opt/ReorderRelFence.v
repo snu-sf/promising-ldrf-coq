@@ -63,7 +63,9 @@ Lemma sim_local_promise_relfenced
       (WF1_SRC: Local.wf lc1_src mem1_src)
       (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
       (MEM1_SRC: Memory.closed mem1_src)
-      (MEM1_TGT: Memory.closed mem1_tgt):
+      (MEM1_TGT: Memory.closed mem1_tgt)
+      (HALF_WF_SRC: Memory.half_wf mem1_src)
+      (HALF_WF_TGT: Memory.half_wf mem1_tgt):
   exists lc2_src mem2_src,
     <<STEP_SRC: Local.promise_step lc1_src mem1_src loc from to (SimPromises.none_if loc to pview msg) lc2_src mem2_src (SimPromises.kind_transf loc to pview kind)>> /\
     <<LOCAL2: sim_local pview lc2_src (local_relfenced lc2_tgt)>> /\
@@ -239,7 +241,9 @@ Lemma sim_local_write_relfenced
       (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
       (SC1_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
       (MEM1_SRC: Memory.closed mem1_src)
-      (MEM1_TGT: Memory.closed mem1_tgt):
+      (MEM1_TGT: Memory.closed mem1_tgt)
+      (HALF_WF_SRC: Memory.half_wf mem1_src)
+      (HALF_WF_TGT: Memory.half_wf mem1_tgt):
   exists released_src lc2_src sc2_src mem2_src,
     <<STEP_SRC: Local.write_step lc1_src sc1_src mem1_src loc from to val releasedm_src released_src ord_src lc2_src sc2_src mem2_src (SimPromises.kind_transf loc to pview kind)>> /\
     <<REL2: View.opt_le released_src released_tgt>> /\
@@ -299,6 +303,8 @@ Lemma sim_local_update_relfenced
       (SC1_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
       (MEM1_SRC: Memory.closed mem1_src)
       (MEM1_TGT: Memory.closed mem1_tgt)
+      (HALF_WF_SRC: Memory.half_wf mem1_src)
+      (HALF_WF_TGT: Memory.half_wf mem1_tgt)
       (ORD1: Ordering.le ord1_src ord1_tgt)
       (ORD2: Ordering.le ord2_src ord2_tgt)
       (ORD2_TGT: Ordering.le ord2_tgt Ordering.plain \/ Ordering.le Ordering.acqrel ord2_tgt):
@@ -461,7 +467,9 @@ Lemma sim_release_fenceF_step
     (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
     (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
     (MEM_SRC: Memory.closed mem1_src)
-    (MEM_TGT: Memory.closed mem1_tgt),
+    (MEM_TGT: Memory.closed mem1_tgt)
+    (HALF_WF_SRC: Memory.half_wf mem1_src)
+    (HALF_WF_TGT: Memory.half_wf mem1_tgt),
     _sim_thread_step lang lang ((sim_thread (sim_terminal eq)) \8/ sim_release_fenceF)
                      st1_src lc1_src sc1_src mem1_src
                      st1_tgt lc1_tgt sc1_tgt mem1_tgt.
@@ -495,7 +503,7 @@ Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss.
   - i. inv TERMINAL_TGT. inv PR; ss.
   - i. inv PR.
-    eapply SimPromises.concrete_future; (try by apply LOCALF); eauto using local_relfenced_wf.
+    eapply SimPromises.concrete; (try by apply LOCALF); eauto using local_relfenced_wf.
   - i. inv PR.
     esplits; eauto.
     eapply sim_local_memory_bot; eauto.
@@ -514,7 +522,7 @@ Lemma reorder_release_fenceF_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { inv TERMINAL_TGT. }
-  { eapply SimPromises.concrete_future; try apply LOCAL; eauto. }
+  { eapply SimPromises.concrete; try apply LOCAL; eauto. }
   { esplits; eauto.
     inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   }

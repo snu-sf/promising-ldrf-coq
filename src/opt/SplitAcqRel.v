@@ -49,7 +49,9 @@ Lemma sim_local_promise_acqrel
       (WF1_SRC: Local.wf lc1_src mem1_src)
       (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
       (MEM1_SRC: Memory.closed mem1_src)
-      (MEM1_TGT: Memory.closed mem1_tgt):
+      (MEM1_TGT: Memory.closed mem1_tgt)
+      (HALF_WF1_SRC: Memory.half_wf mem1_src)
+      (HALF_WF1_TGT: Memory.half_wf mem1_tgt):
   exists lc2_src mem2_src,
     <<STEP_SRC: Local.promise_step lc1_src mem1_src loc from to msg lc2_src mem2_src kind>> /\
     <<LOCAL2: sim_local SimPromises.bot lc2_src (local_acqrel lc2_tgt)>> /\
@@ -174,7 +176,9 @@ Lemma sim_local_write_acqrel
       (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
       (SC1_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
       (MEM1_SRC: Memory.closed mem1_src)
-      (MEM1_TGT: Memory.closed mem1_tgt):
+      (MEM1_TGT: Memory.closed mem1_tgt)
+      (HALF_WF1_SRC: Memory.half_wf mem1_src)
+      (HALF_WF1_TGT: Memory.half_wf mem1_tgt):
   exists released_src lc2_src sc2_src mem2_src,
     <<STEP_SRC: Local.write_step lc1_src sc1_src mem1_src loc from to val releasedm_src released_src ord_src lc2_src sc2_src mem2_src kind>> /\
     <<REL2: View.opt_le released_src released_tgt>> /\
@@ -223,7 +227,9 @@ Inductive sim_acqrel: forall (st_src:lang.(Language.state)) (lc_src:Local.t) (sc
     (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
     (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
     (MEM_SRC: Memory.closed mem1_src)
-    (MEM_TGT: Memory.closed mem1_tgt):
+    (MEM_TGT: Memory.closed mem1_tgt)
+    (HALF_WF1_SRC: Memory.half_wf mem1_src)
+    (HALF_WF1_TGT: Memory.half_wf mem1_tgt):
     sim_acqrel
       (State.mk rs []) lc1_src sc1_src mem1_src
       (State.mk rs [Stmt.instr (Instr.fence Ordering.acqrel Ordering.acqrel)]) lc1_tgt sc1_tgt mem1_tgt
@@ -247,7 +253,9 @@ Lemma sim_acqrel_mon
       (SC_SRC: Memory.closed_timemap sc2_src mem2_src)
       (SC_TGT: Memory.closed_timemap sc2_tgt mem2_tgt)
       (MEM_SRC: Memory.closed mem2_src)
-      (MEM_TGT: Memory.closed mem2_tgt):
+      (MEM_TGT: Memory.closed mem2_tgt)
+      (HALF_WF1_SRC: Memory.half_wf mem2_src)
+      (HALF_WF1_TGT: Memory.half_wf mem2_tgt):
   sim_acqrel st_src lc_src sc2_src mem2_src
                st_tgt lc_tgt sc2_tgt mem2_tgt.
 Proof.
@@ -286,7 +294,7 @@ Lemma sim_acqrel_sim_thread:
 Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss; ii.
   - inv TERMINAL_TGT. inv PR; ss.
-  - eapply SimPromises.concrete_future; eauto.
+  - eapply SimPromises.concrete; eauto.
     inv PR. apply LOCAL.
   - esplits; eauto.
     inv PR. eapply sim_local_memory_bot; eauto.
@@ -307,7 +315,7 @@ Lemma split_acqrel_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { inv TERMINAL_TGT. }
-  { eapply SimPromises.concrete_future; eauto. apply LOCAL. }
+  { eapply SimPromises.concrete; eauto. apply LOCAL. }
   { esplits; eauto.
     inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   }

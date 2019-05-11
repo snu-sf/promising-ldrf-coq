@@ -942,3 +942,27 @@ Lemma sim_memory_closed_message
 Proof.
   inv TGT; ss. econs. eapply sim_memory_closed_opt_view; eauto.
 Qed.
+
+Lemma concrete_covered
+      mem1 mem2 loc ts
+      (CONCRETE: Memory.concrete mem1 mem2):
+  covered loc ts mem1 <-> covered loc ts mem2.
+Proof.
+  inv CONCRETE. split; i.
+  - inv H. exploit SOUND; eauto.
+    i. des; subst; econs; eauto.
+  - inv H. exploit COMPLETE; eauto.
+    i. des; subst; econs; eauto.
+Qed.
+
+Lemma concrete_exact_covered
+      mem1 mem2 loc ts
+      (CONCRETE: Memory.concrete_exact mem1 mem2):
+  covered loc ts mem1 <-> covered loc ts mem2.
+Proof.
+  inv CONCRETE. split; i.
+  - inv H. exploit SOUND; eauto.
+    i. des; subst; econs; eauto.
+  - inv H. exploit COMPLETE; eauto.
+    i. des; subst; econs; eauto.
+Qed.

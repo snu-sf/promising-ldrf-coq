@@ -731,30 +731,6 @@ Module SimPromises.
     rewrite GET in x0. inv x0. refl.
   Qed.
 
-  Lemma concrete_covered
-        mem1 mem2 loc ts
-        (CONCRETE: Memory.concrete mem1 mem2):
-    covered loc ts mem1 <-> covered loc ts mem2.
-  Proof.
-    inv CONCRETE. split; i.
-    - inv H. exploit SOUND; eauto.
-      i. des; subst; econs; eauto.
-    - inv H. exploit COMPLETE; eauto.
-      i. des; subst; econs; eauto.
-  Qed.
-
-  Lemma concrete_exact_covered
-        mem1 mem2 loc ts
-        (CONCRETE: Memory.concrete_exact mem1 mem2):
-    covered loc ts mem1 <-> covered loc ts mem2.
-  Proof.
-    inv CONCRETE. split; i.
-    - inv H. exploit SOUND; eauto.
-      i. des; subst; econs; eauto.
-    - inv H. exploit COMPLETE; eauto.
-      i. des; subst; econs; eauto.
-  Qed.
-
   Lemma concrete_aux
         pview
         promises_src mem1_src mem2_src
@@ -834,10 +810,39 @@ Module SimPromises.
     exploit concrete_aux; eauto;
       try apply WF1_SRC; try apply WF2_SRC; try apply WF1_TGT. i.
     esplits; try exact x0; eauto.
-    exploit Memory.no_half_concrete_exact_future;
-      try exact CONCRETE; try apply WF1_TGT; eauto. i.
     inv WF1_TGT. econs; eauto.
     eapply TView.future_closed; eauto.
+  Qed.
+
+  Lemma concrete_future
+        lc_src mem1_src mem2_src
+        lc_tgt mem1_tgt mem2_tgt
+        (CONCRETE_SRC: Memory.concrete_exact mem1_src mem2_src)
+        (CONCRETE_TGT: Memory.concrete_exact mem1_tgt mem2_tgt)
+        (WF1_SRC: Local.wf lc_src mem1_src)
+        (WF1_TGT: Local.wf lc_tgt mem1_tgt)
+        (WF2_SRC: Local.wf lc_src mem2_src)
+        (WF2_TGT: Local.wf lc_tgt mem2_tgt)
+        (MEM1_SRC: Memory.closed mem1_src)
+        (MEM1_TGT: Memory.closed mem1_tgt)
+        (HALF_WF1_SRC: Memory.half_wf mem1_src)
+        (HALF_WF1_TGT: Memory.half_wf mem1_tgt)
+        (NOHALF_SRC: Memory.no_half lc_src.(Local.promises) mem2_src)
+        (NOHALF_TGT: Memory.no_half lc_tgt.(Local.promises) mem2_tgt):
+      <<FUTURE_SRC: Memory.future mem1_src mem2_src>> /\
+      <<FUTURE_TGT: Memory.future mem1_tgt mem2_tgt>> /\
+      <<HALF_WF2_SRC: Memory.half_wf mem2_src>> /\
+      <<HALF_WF2_TGT: Memory.half_wf mem2_tgt>>.
+  Proof.
+    splits.
+    - eapply Memory.no_half_concrete_exact_future; eauto.
+      + apply WF1_SRC.
+      + apply WF2_SRC.
+    - eapply Memory.no_half_concrete_exact_future; eauto.
+      + apply WF1_TGT.
+      + apply WF2_TGT.
+    - eapply Memory.concrete_exact_half_wf; eauto.
+    - eapply Memory.concrete_exact_half_wf; eauto.
   Qed.
 
   (* Lemma future_sc_mem *)
