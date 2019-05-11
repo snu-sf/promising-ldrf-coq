@@ -135,7 +135,8 @@ Lemma rtc_all_step_promise_consistent
       (CONS: promise_consistent th2.(Thread.local))
       (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
       (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory))
-      (MEM1: Memory.closed th1.(Thread.memory)):
+      (MEM1: Memory.closed th1.(Thread.memory))
+      (HALF_WF1: Memory.half_wf th1.(Thread.memory)):
   promise_consistent th1.(Thread.local).
 Proof.
   revert_until STEP. induction STEP; auto. i.
@@ -149,7 +150,8 @@ Lemma rtc_tau_step_promise_consistent
       (CONS: promise_consistent th2.(Thread.local))
       (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
       (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory))
-      (MEM1: Memory.closed th1.(Thread.memory)):
+      (MEM1: Memory.closed th1.(Thread.memory))
+      (HALF_WF1: Memory.half_wf th1.(Thread.memory)):
   promise_consistent th1.(Thread.local).
 Proof.
   eapply rtc_all_step_promise_consistent; cycle 1; eauto.
@@ -162,18 +164,19 @@ Lemma consistent_promise_consistent
       (CONS: @Thread.consistent lang th)
       (WF: Local.wf th.(Thread.local) th.(Thread.memory))
       (SC: Memory.closed_timemap th.(Thread.sc) th.(Thread.memory))
-      (MEM: Memory.closed th.(Thread.memory)):
+      (MEM: Memory.closed th.(Thread.memory))
+      (HALF_WF: Memory.half_wf th.(Thread.memory)):
   promise_consistent th.(Thread.local).
 Proof.
   destruct th. destruct local. inv WF. ss.
-  exploit Memory.no_half_concrete_future_exists; eauto. i. des.
+  exploit Memory.no_half_concrete_exact_future_exists; eauto. i. des.
   exploit CONS; try exact CONCRETE; eauto; ss; try refl.
   { econs; eauto. eapply TView.future_closed; eauto. }
   i. des.
   hexploit rtc_tau_step_promise_consistent; try exact STEPS; ss; eauto.
   { ii. rewrite PROMISES0, Memory.bot_get in *. congr. }
-  { econs; eauto. eapply TView.concrete_closed; eauto. }
-  { eapply Memory.concrete_closed_timemap; eauto. }
+  { econs; eauto. eapply TView.concrete_exact_closed; eauto. }
+  { eapply Memory.concrete_exact_closed_timemap; eauto. }
 Qed.
 
 Lemma promise_consistent_promise_read
