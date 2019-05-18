@@ -21,30 +21,30 @@ Require Import Thread.
 Set Implicit Arguments.
 
 
-Lemma concrete_promise_step
+Lemma concrete_none_promise_step
       lc1 mem1 loc from to msg lc2 mem2 kind
       mem1'
       (CLOSED1: Memory.closed mem1)
       (WF1: Local.wf lc1 mem1)
       (STEP: Local.promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
       (WF1': Local.wf lc1 mem1')
-      (CONCRETE1: Memory.concrete mem1 mem1'):
+      (CONCRETE1: Memory.concrete_none mem1 mem1'):
   exists mem2',
     <<STEP': Local.promise_step lc1 mem1' loc from to msg lc2 mem2' kind>> /\
-    <<CONCRETE2: Memory.concrete mem2 mem2'>>.
+    <<CONCRETE2: Memory.concrete_none mem2 mem2'>>.
 Proof.
   inv WF1. inv WF1'. inv STEP.
-  exploit Memory.concrete_promise_exists; try exact PROMISE; eauto.
+  exploit Memory.concrete_none_promise_exists; try exact PROMISE; eauto.
   i. des.
   esplits; eauto. econs; eauto.
-  eapply Memory.concrete_closed_message; eauto.
+  eapply Memory.concrete_none_closed_message; eauto.
 Qed.
 
-Lemma concrete_read_step
+Lemma concrete_none_read_step
       lc1 mem1 loc ts val released ord lc2
       mem1'
       (STEP: Local.read_step lc1 mem1 loc ts val released ord lc2)
-      (CONCRETE1: Memory.concrete mem1 mem1'):
+      (CONCRETE1: Memory.concrete_none mem1 mem1'):
   <<STEP': Local.read_step lc1 mem1' loc ts val released ord lc2>>.
 Proof.
   inv CONCRETE1. inv STEP.
@@ -52,130 +52,130 @@ Proof.
   esplits; eauto.
 Qed.
 
-Lemma concrete_write_step
+Lemma concrete_none_write_step
       lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
       mem1'
       (CLOSED1: Memory.closed mem1)
       (WF1: Local.wf lc1 mem1)
       (WF1': Local.wf lc1 mem1')
-      (CONCRETE1: Memory.concrete mem1 mem1')
+      (CONCRETE1: Memory.concrete_none mem1 mem1')
       (STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind):
   exists mem2',
     <<STEP': Local.write_step lc1 sc1 mem1' loc from to val releasedm released ord lc2 sc2 mem2' kind>> /\
-    <<CONCRETE2: Memory.concrete mem2 mem2'>>.
+    <<CONCRETE2: Memory.concrete_none mem2 mem2'>>.
 Proof.
   inv WF1. inv WF1'. inv STEP. inv WRITE.
-  exploit Memory.concrete_promise_exists; try exact PROMISE; eauto. i. des.
+  exploit Memory.concrete_none_promise_exists; try exact PROMISE; eauto. i. des.
   esplits; eauto.
 Qed.
 
-Lemma concrete_program_step
+Lemma concrete_none_program_step
       e lc1 sc1 mem1 lc2 sc2 mem2
       mem1'
       (CLOSED1: Memory.closed mem1)
       (WF1: Local.wf lc1 mem1)
       (WF1': Local.wf lc1 mem1')
-      (CONCRETE1: Memory.concrete mem1 mem1')
+      (CONCRETE1: Memory.concrete_none mem1 mem1')
       (STEP: Local.program_step e lc1 sc1 mem1 lc2 sc2 mem2):
   exists mem2',
     <<STEP': Local.program_step e lc1 sc1 mem1' lc2 sc2 mem2'>> /\
-    <<CONCRETE2: Memory.concrete mem2 mem2'>>.
+    <<CONCRETE2: Memory.concrete_none mem2 mem2'>>.
 Proof.
   inv STEP.
   - esplits; eauto.
-  - exploit concrete_read_step; eauto.
-  - exploit concrete_write_step; eauto. i. des.
+  - exploit concrete_none_read_step; eauto.
+  - exploit concrete_none_write_step; eauto. i. des.
     esplits; eauto.
-  - exploit Memory.concrete_closed; eauto. i.
-    exploit concrete_read_step; eauto. i. des.
+  - exploit Memory.concrete_none_closed; eauto. i.
+    exploit concrete_none_read_step; eauto. i. des.
     exploit Local.read_step_future; try exact LOCAL1; eauto. i. des.
     exploit Local.read_step_future; try exact x0; eauto. i. des.
-    exploit concrete_write_step; try exact LOCAL2; eauto. i. des.
+    exploit concrete_none_write_step; try exact LOCAL2; eauto. i. des.
     esplits; eauto.
   - esplits; eauto.
   - esplits; eauto.
 Qed.
 
-Lemma concrete_thread_promise_step
+Lemma concrete_none_thread_promise_step
       lang pf e e1 e2
       mem1'
       (CLOSED1: Memory.closed e1.(Thread.memory))
       (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
       (WF1': Local.wf e1.(Thread.local) mem1')
-      (CONCRETE1: Memory.concrete e1.(Thread.memory) mem1')
+      (CONCRETE1: Memory.concrete_none e1.(Thread.memory) mem1')
       (STEP: Thread.promise_step pf e e1 e2):
   exists mem2',
     <<STEP': Thread.promise_step pf e
                                  (Thread.mk lang e1.(Thread.state) e1.(Thread.local) e1.(Thread.sc) mem1')
                                  (Thread.mk lang e2.(Thread.state) e2.(Thread.local) e2.(Thread.sc) mem2')>> /\
-    <<CONCRETE2: Memory.concrete e2.(Thread.memory) mem2'>>.
+    <<CONCRETE2: Memory.concrete_none e2.(Thread.memory) mem2'>>.
 Proof.
   destruct e1. destruct e2. ss. inv STEP.
-  exploit concrete_promise_step; eauto. i. des.
+  exploit concrete_none_promise_step; eauto. i. des.
   esplits; eauto. econs; eauto.
 Qed.
 
-Lemma concrete_thread_program_step
+Lemma concrete_none_thread_program_step
       lang e e1 e2
       mem1'
       (CLOSED1: Memory.closed e1.(Thread.memory))
       (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
       (WF1': Local.wf e1.(Thread.local) mem1')
-      (CONCRETE1: Memory.concrete e1.(Thread.memory) mem1')
+      (CONCRETE1: Memory.concrete_none e1.(Thread.memory) mem1')
       (STEP: Thread.program_step e e1 e2):
   exists mem2',
     <<STEP': Thread.program_step e
                                  (Thread.mk lang e1.(Thread.state) e1.(Thread.local) e1.(Thread.sc) mem1')
                                  (Thread.mk lang e2.(Thread.state) e2.(Thread.local) e2.(Thread.sc) mem2')>> /\
-    <<CONCRETE2: Memory.concrete e2.(Thread.memory) mem2'>>.
+    <<CONCRETE2: Memory.concrete_none e2.(Thread.memory) mem2'>>.
 Proof.
   destruct e1. destruct e2. ss. inv STEP.
-  exploit concrete_program_step; eauto. i. des.
+  exploit concrete_none_program_step; eauto. i. des.
   esplits; eauto. econs; eauto.
 Qed.
 
-Lemma concrete_thread_step
+Lemma concrete_none_thread_step
       lang pf e e1 e2
       mem1'
       (CLOSED1: Memory.closed e1.(Thread.memory))
       (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
       (WF1': Local.wf e1.(Thread.local) mem1')
-      (CONCRETE1: Memory.concrete e1.(Thread.memory) mem1')
+      (CONCRETE1: Memory.concrete_none e1.(Thread.memory) mem1')
       (STEP: Thread.step pf e e1 e2):
   exists mem2',
     <<STEP': Thread.step pf e
                          (Thread.mk lang e1.(Thread.state) e1.(Thread.local) e1.(Thread.sc) mem1')
                          (Thread.mk lang e2.(Thread.state) e2.(Thread.local) e2.(Thread.sc) mem2')>> /\
-    <<CONCRETE2: Memory.concrete e2.(Thread.memory) mem2'>>.
+    <<CONCRETE2: Memory.concrete_none e2.(Thread.memory) mem2'>>.
 Proof.
   inv STEP.
-  - exploit concrete_thread_promise_step; eauto. i. des.
+  - exploit concrete_none_thread_promise_step; eauto. i. des.
     esplits; eauto. econs 1. eauto.
-  - exploit concrete_thread_program_step; eauto. i. des.
+  - exploit concrete_none_thread_program_step; eauto. i. des.
     esplits; eauto. econs 2. eauto.
 Qed.
 
-Lemma concrete_thread_opt_step
+Lemma concrete_none_thread_opt_step
       lang e e1 e2
       mem1'
       (CLOSED1: Memory.closed e1.(Thread.memory))
       (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
       (WF1': Local.wf e1.(Thread.local) mem1')
-      (CONCRETE1: Memory.concrete e1.(Thread.memory) mem1')
+      (CONCRETE1: Memory.concrete_none e1.(Thread.memory) mem1')
       (STEP: Thread.opt_step e e1 e2):
   exists mem2',
     <<STEP': Thread.opt_step e
                              (Thread.mk lang e1.(Thread.state) e1.(Thread.local) e1.(Thread.sc) mem1')
                              (Thread.mk lang e2.(Thread.state) e2.(Thread.local) e2.(Thread.sc) mem2')>> /\
-    <<CONCRETE2: Memory.concrete e2.(Thread.memory) mem2'>>.
+    <<CONCRETE2: Memory.concrete_none e2.(Thread.memory) mem2'>>.
 Proof.
   inv STEP.
   - esplits; eauto. econs 1; eauto.
-  - exploit concrete_thread_step; eauto. i. des.
+  - exploit concrete_none_thread_step; eauto. i. des.
     esplits; eauto. econs 2; eauto.
 Qed.
 
-Lemma concrete_thread_rtc_all_step
+Lemma concrete_none_thread_rtc_all_step
       lang e1 e2
       mem1'
       (CLOSED1: Memory.closed e1.(Thread.memory))
@@ -183,30 +183,30 @@ Lemma concrete_thread_rtc_all_step
       (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
       (WF1': Local.wf e1.(Thread.local) mem1')
       (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-      (CONCRETE1: Memory.concrete e1.(Thread.memory) mem1')
+      (CONCRETE1: Memory.concrete_none e1.(Thread.memory) mem1')
       (STEPS: rtc (@Thread.all_step _) e1 e2):
   exists mem2',
     <<STEPS': rtc (@Thread.all_step _)
                  (Thread.mk lang e1.(Thread.state) e1.(Thread.local) e1.(Thread.sc) mem1')
                  (Thread.mk lang e2.(Thread.state) e2.(Thread.local) e2.(Thread.sc) mem2')>> /\
-    <<CONCRETE2: Memory.concrete e2.(Thread.memory) mem2'>>.
+    <<CONCRETE2: Memory.concrete_none e2.(Thread.memory) mem2'>>.
 Proof.
   revert mem1' CLOSED1 WF1 WF1' SC1 CONCRETE1.
   induction STEPS; i.
   - esplits; eauto.
   - inv H. inv USTEP.
-    hexploit Memory.concrete_half_wf; eauto. i.
-    exploit concrete_thread_step; eauto. i. des.
+    hexploit Memory.concrete_none_half_wf; eauto. i.
+    exploit concrete_none_thread_step; eauto. i. des.
     exploit Thread.step_future; try exact STEP; eauto. i. des.
     exploit Thread.step_future; try exact STEP'; eauto; s.
-    { eapply Memory.concrete_closed_timemap; eauto. }
-    { eapply Memory.concrete_closed; eauto. }
+    { eapply Memory.concrete_none_closed_timemap; eauto. }
+    { eapply Memory.concrete_none_closed; eauto. }
     i. des.
     exploit IHSTEPS; try exact CONCRETE2; eauto. i. des.
     esplits; eauto. econs; eauto. econs. econs. eauto.
 Qed.
 
-Lemma concrete_thread_rtc_tau_step
+Lemma concrete_none_thread_rtc_tau_step
       lang e1 e2
       mem1'
       (CLOSED1: Memory.closed e1.(Thread.memory))
@@ -214,24 +214,24 @@ Lemma concrete_thread_rtc_tau_step
       (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
       (WF1': Local.wf e1.(Thread.local) mem1')
       (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-      (CONCRETE1: Memory.concrete e1.(Thread.memory) mem1')
+      (CONCRETE1: Memory.concrete_none e1.(Thread.memory) mem1')
       (STEPS: rtc (@Thread.tau_step _) e1 e2):
   exists mem2',
     <<STEPS': rtc (@Thread.tau_step _)
                  (Thread.mk lang e1.(Thread.state) e1.(Thread.local) e1.(Thread.sc) mem1')
                  (Thread.mk lang e2.(Thread.state) e2.(Thread.local) e2.(Thread.sc) mem2')>> /\
-    <<CONCRETE2: Memory.concrete e2.(Thread.memory) mem2'>>.
+    <<CONCRETE2: Memory.concrete_none e2.(Thread.memory) mem2'>>.
 Proof.
   revert mem1' CLOSED1 WF1 WF1' SC1 CONCRETE1.
   induction STEPS; i.
   - esplits; eauto.
   - inv H. inv TSTEP.
-    hexploit Memory.concrete_half_wf; eauto. i.
-    exploit concrete_thread_step; eauto. i. des.
+    hexploit Memory.concrete_none_half_wf; eauto. i.
+    exploit concrete_none_thread_step; eauto. i. des.
     exploit Thread.step_future; try exact STEP; eauto. i. des.
     exploit Thread.step_future; try exact STEP'; eauto; s.
-    { eapply Memory.concrete_closed_timemap; eauto. }
-    { eapply Memory.concrete_closed; eauto. }
+    { eapply Memory.concrete_none_closed_timemap; eauto. }
+    { eapply Memory.concrete_none_closed; eauto. }
     i. des.
     exploit IHSTEPS; try exact CONCRETE2; eauto. i. des.
     esplits; eauto. econs; eauto. econs; eauto. econs. eauto.
