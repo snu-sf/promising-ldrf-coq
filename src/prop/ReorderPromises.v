@@ -32,7 +32,8 @@ Lemma steps_pf_steps_aux
       (CONS: promise_consistent e3.(Thread.local))
       (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
       (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-      (MEM1: Memory.closed e1.(Thread.memory)):
+      (MEM1: Memory.closed e1.(Thread.memory))
+      (HALF_WF1: Memory.half_wf e1.(Thread.memory)):
   exists n' e2,
     <<N: n' <= n>> /\
     <<STEPS1: rtcn (union (Thread.step true)) n' e1 e2>> /\
@@ -106,7 +107,8 @@ Lemma steps_pf_steps
       (CONS: promise_consistent e3.(Thread.local))
       (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
       (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-      (MEM1: Memory.closed e1.(Thread.memory)):
+      (MEM1: Memory.closed e1.(Thread.memory))
+      (HALF_WF1: Memory.half_wf e1.(Thread.memory)):
   exists e2,
     <<STEPS1: rtc (union (Thread.step true)) e1 e2>> /\
     <<STEPS2: rtc (union (Thread.step false)) e2 e3>>.
@@ -123,7 +125,8 @@ Lemma tau_steps_pf_tau_steps_aux
       (CONS: promise_consistent e3.(Thread.local))
       (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
       (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-      (MEM1: Memory.closed e1.(Thread.memory)):
+      (MEM1: Memory.closed e1.(Thread.memory))
+      (HALF_WF1: Memory.half_wf e1.(Thread.memory)):
   exists n' e2,
     <<N: n' <= n>> /\
     <<STEPS1: rtcn (tau (Thread.step true)) n' e1 e2>> /\
@@ -199,7 +202,8 @@ Lemma tau_steps_pf_tau_steps
       (CONS: promise_consistent e3.(Thread.local))
       (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
       (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-      (MEM1: Memory.closed e1.(Thread.memory)):
+      (MEM1: Memory.closed e1.(Thread.memory))
+      (HALF_WF1: Memory.half_wf e1.(Thread.memory)):
   exists e2,
     <<STEPS1: rtc (tau (Thread.step true)) e1 e2>> /\
     <<STEPS2: rtc (tau (Thread.step false)) e2 e3>>.
