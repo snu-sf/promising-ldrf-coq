@@ -374,9 +374,6 @@ Section Invariant.
       eapply rtc_implies in STEPS'; [|by apply tau_union].
       exploit rtc_n1; eauto; i.
       { econs. econs. eauto. }
-      (* exploit Thread.rtc_all_step_future; eauto; ss; try by inv WF. *)
-      (* { inv WF. eapply Memory.concrete_elt_closed_timemap; eauto. } *)
-      (* i. des. *)
       eapply rtc_implies in STEPS_SRC; [|by apply tau_union].
       rewrite STEPS_SRC in x1.
       inv LC2. rewrite PROMISES in PROMISES0.

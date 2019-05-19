@@ -2183,20 +2183,6 @@ Module Memory.
     eexists. econs; eauto.
   Qed.
 
-  (* unused *)
-  (* Lemma promise_add_exists *)
-  (*       promises1 mem1 loc from to msg mem2 *)
-  (*       (LE_PROMISES1: le promises1 mem1) *)
-  (*       (ADD: add mem1 loc from to msg mem2) *)
-  (*       (MSG_CLOSED: closed_message msg mem2) *)
-  (*       (MSG_TS: message_to msg loc to): *)
-  (*   exists promises2, *)
-  (*     promise promises1 mem1 loc from to msg promises2 mem2 op_kind_add. *)
-  (* Proof. *)
-  (*   exploit add_exists_le; eauto. i. des. *)
-  (*   eexists. econs 1; s; eauto. *)
-  (* Qed. *)
-
   Lemma split_exists
         mem1 loc ts1 ts2 ts3 msg2 msg3
         (GET2: get loc ts3 mem1 = Some (ts1, msg3))

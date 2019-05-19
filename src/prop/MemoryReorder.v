@@ -768,26 +768,6 @@ Module MemoryReorder.
 
   (* Lemmas on promise *)
 
-  (* unused *)
-  (* Lemma promise_add_promise_add *)
-  (*       loc1 from1 to1 msg1 *)
-  (*       loc2 from2 to2 msg2 *)
-  (*       promises0 mem0 *)
-  (*       promises1 mem1 *)
-  (*       promises2 mem2 *)
-  (*       (PROMISE1: Memory.promise promises0 mem0 loc1 from1 to1 msg1 promises1 mem1 Memory.op_kind_add) *)
-  (*       (PROMISE2: Memory.promise promises1 mem1 loc2 from2 to2 msg2 promises2 mem2 Memory.op_kind_add): *)
-  (*   exists promises1' mem1', *)
-  (*     <<PROMISE1: Memory.promise promises0 mem0 loc2 from2 to2 msg2 promises1' mem1' Memory.op_kind_add>> /\ *)
-  (*     <<PROMISE2: Memory.promise promises1' mem1' loc1 from1 to1 msg1 promises2 mem2 Memory.op_kind_add>> /\ *)
-  (*     <<LOCTS: (loc1, to1) <> (loc2, to2)>>. *)
-  (* Proof. *)
-  (*   inv PROMISE1. inv PROMISE2. *)
-  (*   exploit add_add; try exact PROMISES; eauto. i. des. *)
-  (*   exploit add_add; try exact MEM; eauto. i. des. *)
-  (*   esplits; eauto. *)
-  (* Qed. *)
-
   Lemma promise_add_remove
         loc1 from1 to1 msg1
         loc2 from2 to2 msg2
