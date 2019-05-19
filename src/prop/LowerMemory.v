@@ -194,6 +194,16 @@ Module LowerMemory.
       (PROMISES: lc_src.(Local.promises) = lc_tgt.(Local.promises))
   .
 
+  Program Instance lower_local_PreOrder: PreOrder lower_local.
+  Next Obligation.
+    econs; eauto. refl.
+  Qed.
+  Next Obligation.
+    ii. inv H. inv H0. econs.
+    - etrans; eauto.
+    - rewrite PROMISES. auto.
+  Qed.
+
   Lemma promise
         promises1_tgt mem1_tgt loc from to msg promises2_tgt mem2_tgt kind
         promises1_src mem1_src
