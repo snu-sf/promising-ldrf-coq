@@ -136,7 +136,7 @@ Module Thread.
 
     Definition consistent (e:t): Prop :=
       forall mem1
-        (CONCRETE: Memory.concrete_exact e.(memory) mem1)
+        (CONCRETE: Memory.concrete e.(memory) mem1)
         (NOHALF: Memory.no_half e.(local).(Local.promises) mem1)
         (MEM: Memory.closed mem1)
         (WF: Local.wf e.(local) mem1),

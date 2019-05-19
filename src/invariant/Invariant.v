@@ -276,9 +276,9 @@ Section Invariant.
       rewrite PR in x3. inv x3. eauto.
   Qed.
 
-  Lemma concrete_exact_sem_memory_inv
+  Lemma concrete_sem_memory_inv
         m1 m2
-        (CONCRETE: Memory.concrete_exact m1 m2)
+        (CONCRETE: Memory.concrete m1 m2)
         (SEM: sem_memory m2):
     sem_memory m1.
   Proof.
@@ -335,7 +335,7 @@ Section Invariant.
       { inv WF. inv WF0. eauto. }
       exploit Thread.rtc_tau_step_future; eauto; try by inv WF. s. i. des.
       exploit Thread.step_future; eauto. s. i. des.
-      exploit Memory.no_half_concrete_exact_future_exists; try exact CLOSED0; eauto.
+      exploit Memory.no_half_concrete_future_exists; try exact CLOSED0; eauto.
       { apply WF0. }
       i. des.
       unfold Configuration.consistent in CONSISTENT. ss.
@@ -364,7 +364,7 @@ Section Invariant.
       exploit Thread.step_future; try exact STEP'; eauto. s. i. des.
       hexploit Thread.rtc_tau_step_no_half; try exact STEPS'; eauto. s. i. des.
       hexploit Thread.step_no_half; try exact STEP'; eauto. s. i. des.
-      exploit LowerMemory.no_half_concrete_none_concrete_exact_lower_memory;
+      exploit LowerMemory.no_half_concrete_none_concrete_lower_memory;
         try exact CONCRETE; try exact CONCRETE1; try exact NOHALF; try apply WF3; eauto. i.
       exploit (@LowerMemory.thread_rtc_tau_step lang (Thread.mk lang st3 lc3 sc3 mem2'0));
         try exact STEPS0; try refl; eauto; s.
@@ -387,7 +387,7 @@ Section Invariant.
       { inv WF. eapply Memory.future_closed_timemap; eauto. }
       i. des.
       exploit Thread.rtc_all_step_future; try exact STEPS0; eauto. s. i. des.
-      eapply concrete_exact_sem_memory_inv; try exact CONCRETE2; eauto.
+      eapply concrete_sem_memory_inv; try exact CONCRETE2; eauto.
       eapply lower_memory_sem_memory; try exact x0; eauto.
       eapply future_sem_memory; eauto.
   Qed.

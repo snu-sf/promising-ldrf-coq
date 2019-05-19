@@ -401,8 +401,8 @@ Module SimPromises.
         promises_tgt mem1_tgt mem2_tgt
         (INV1: sem pview bot promises_src promises_tgt)
         (MEM1: sim_memory mem1_src mem1_tgt)
-        (CONCRETE_SRC: Memory.concrete_exact mem1_src mem2_src)
-        (CONCRETE_TGT: Memory.concrete_exact mem1_tgt mem2_tgt)
+        (CONCRETE_SRC: Memory.concrete mem1_src mem2_src)
+        (CONCRETE_TGT: Memory.concrete mem1_tgt mem2_tgt)
         (LE1_SRC: Memory.le promises_src mem1_src)
         (LE1_TGT: Memory.le promises_tgt mem1_tgt)
         (LE2_SRC: Memory.le promises_src mem2_src)
@@ -414,8 +414,8 @@ Module SimPromises.
     sim_memory mem2_src mem2_tgt.
   Proof.
     inv MEM1. econs; i.
-    - exploit concrete_exact_covered; try exact CONCRETE_SRC. i.
-      exploit concrete_exact_covered; try exact CONCRETE_TGT. i.
+    - exploit concrete_covered; try exact CONCRETE_SRC. i.
+      exploit concrete_covered; try exact CONCRETE_TGT. i.
       rewrite <- x0. rewrite <- x1. auto.
     - destruct msg_tgt; cycle 1.
       { inv INV1. exploit NOHALF_TGT; eauto. i.
@@ -452,7 +452,7 @@ Module SimPromises.
         lc_tgt mem1_tgt
         (INV1: sem pview bot lc_src.(Local.promises) lc_tgt.(Local.promises))
         (MEM1: sim_memory mem1_src mem1_tgt)
-        (CONCRETE_SRC: Memory.concrete_exact mem1_src mem2_src)
+        (CONCRETE_SRC: Memory.concrete mem1_src mem2_src)
         (WF1_SRC: Local.wf lc_src mem1_src)
         (WF1_TGT: Local.wf lc_tgt mem1_tgt)
         (WF2_SRC: Local.wf lc_src mem2_src)
@@ -463,13 +463,13 @@ Module SimPromises.
         (NOHALF_SRC: Memory.no_half lc_src.(Local.promises) mem2_src):
     exists mem2_tgt,
       <<MEM2: sim_memory mem2_src mem2_tgt>> /\
-      <<CONCRETE_TGT: Memory.concrete_exact mem1_tgt mem2_tgt>> /\
+      <<CONCRETE_TGT: Memory.concrete mem1_tgt mem2_tgt>> /\
       <<WF2_TGT: Local.wf lc_tgt mem2_tgt>> /\
       <<MEM2_TGT: Memory.closed mem2_tgt>> /\
       <<HALF_WF2_TGT: Memory.half_wf mem2_tgt>> /\
       <<NOHALF_TGT: Memory.no_half lc_tgt.(Local.promises) mem2_tgt>>.
   Proof.
-    exploit Memory.no_half_concrete_exact_future_exists;
+    exploit Memory.no_half_concrete_future_exists;
       try apply WF1_TGT; eauto. i. des.
     exploit concrete_aux; eauto;
       try apply WF1_SRC; try apply WF2_SRC; try apply WF1_TGT. i.
@@ -481,8 +481,8 @@ Module SimPromises.
   Lemma concrete_future
         lc_src mem1_src mem2_src
         lc_tgt mem1_tgt mem2_tgt
-        (CONCRETE_SRC: Memory.concrete_exact mem1_src mem2_src)
-        (CONCRETE_TGT: Memory.concrete_exact mem1_tgt mem2_tgt)
+        (CONCRETE_SRC: Memory.concrete mem1_src mem2_src)
+        (CONCRETE_TGT: Memory.concrete mem1_tgt mem2_tgt)
         (WF1_SRC: Local.wf lc_src mem1_src)
         (WF1_TGT: Local.wf lc_tgt mem1_tgt)
         (WF2_SRC: Local.wf lc_src mem2_src)
@@ -499,14 +499,14 @@ Module SimPromises.
       <<HALF_WF2_TGT: Memory.half_wf mem2_tgt>>.
   Proof.
     splits.
-    - eapply Memory.no_half_concrete_exact_future; eauto.
+    - eapply Memory.no_half_concrete_future; eauto.
       + apply WF1_SRC.
       + apply WF2_SRC.
-    - eapply Memory.no_half_concrete_exact_future; eauto.
+    - eapply Memory.no_half_concrete_future; eauto.
       + apply WF1_TGT.
       + apply WF2_TGT.
-    - eapply Memory.concrete_exact_half_wf; eauto.
-    - eapply Memory.concrete_exact_half_wf; eauto.
+    - eapply Memory.concrete_half_wf; eauto.
+    - eapply Memory.concrete_half_wf; eauto.
   Qed.
 
   Lemma sem_bot promises:

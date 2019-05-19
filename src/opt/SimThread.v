@@ -87,13 +87,13 @@ Section SimulationThread.
           <<TERMINAL: sim_terminal st2_src st1_tgt>>>> /\
       <<CONCRETE:
         forall mem2_src
-          (CONCRETE_SRC: Memory.concrete_exact mem1_src mem2_src)
+          (CONCRETE_SRC: Memory.concrete mem1_src mem2_src)
           (WF_SRC: Local.wf lc1_src mem2_src)
           (MEM_SRC: Memory.closed mem2_src)
           (NOHALF_SRC: Memory.no_half lc1_src.(Local.promises) mem2_src),
         exists mem2_tgt,
           <<MEMORY: sim_memory mem2_src mem2_tgt>> /\
-          <<CONCRETE_TGT: Memory.concrete_exact mem1_tgt mem2_tgt>> /\
+          <<CONCRETE_TGT: Memory.concrete mem1_tgt mem2_tgt>> /\
           <<WF_TGT: Local.wf lc1_tgt mem2_tgt>> /\
           <<MEM_TGT: Memory.closed mem2_tgt>> /\
           <<HALF_WF_TGT: Memory.half_wf mem2_tgt>> /\
@@ -371,7 +371,7 @@ Proof.
     [exact CONCRETE0|exact CONCRETE_TGT|..]; eauto. i. des.
   exploit CONSISTENT; eauto; try refl. i. des.
   exploit sim_thread_rtc_step; try apply MEMORY0;
-    eauto using Memory.concrete_exact_closed_timemap; s.
+    eauto using Memory.concrete_closed_timemap; s.
   { eapply sim_thread_future; eauto; try refl. }
   i. des. destruct e2. ss.
   hexploit Thread.rtc_tau_step_no_half; try exact STEPS; eauto. s. i. des.

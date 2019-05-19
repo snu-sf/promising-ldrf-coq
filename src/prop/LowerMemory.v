@@ -154,12 +154,12 @@ Module LowerMemory.
         * revert GET_TGT. erewrite Memory.lower_o; eauto. condtac; ss; eauto.
   Qed.
 
-  Lemma no_half_concrete_none_concrete_exact_lower_memory
+  Lemma no_half_concrete_none_concrete_lower_memory
         promises mem mem1 mem2
         (LE1: Memory.le promises mem1)
         (LE2: Memory.le promises mem2)
         (CONCRETE1: Memory.concrete_none mem mem1)
-        (CONCRETE2: Memory.concrete_exact mem mem2)
+        (CONCRETE2: Memory.concrete mem mem2)
         (NO_HALF1: Memory.no_half promises mem1)
         (NO_HALF2: Memory.no_half promises mem2):
     lower_memory mem1 mem2.

@@ -201,7 +201,7 @@ Proof.
       eapply future_fence_step; try apply FENCE; eauto.
       inv REORDER; etrans; eauto.
     }
-    { exploit Memory.no_half_concrete_exact_future;
+    { exploit Memory.no_half_concrete_future;
         try exact CONCRETE_SRC; try apply WF_SRC; try apply WF_SRC0; eauto. i.
       hexploit Memory.future_closed_timemap; try apply SC_SRC; eauto. i.
       eapply Local.fence_step_future; try apply H; eauto.

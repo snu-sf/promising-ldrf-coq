@@ -148,7 +148,7 @@ Lemma sim_update_future
       (MEM1: sim_memory mem1_src mem1_tgt)
       (SIM1: sim_update st_src lc_src sc1_src mem1_src
                        st_tgt lc_tgt sc1_tgt mem1_tgt)
-      (CONCRETE_SRC: Memory.concrete_exact mem1_src mem2_src)
+      (CONCRETE_SRC: Memory.concrete mem1_src mem2_src)
       (WF_SRC: Local.wf lc_src mem2_src)
       (MEM_SRC: Memory.closed mem2_src)
       (NOHALF_SRC: Memory.no_half lc_src.(Local.promises) mem2_src):
@@ -156,7 +156,7 @@ Lemma sim_update_future
     <<MEM2: sim_memory mem2_src mem2_tgt>> /\
     <<FUTURE_SRC: Memory.future mem1_src mem2_src>> /\
     <<FUTURE_TGT: Memory.future mem1_tgt mem2_tgt>> /\
-    <<CONCRETE_TGT: Memory.concrete_exact mem1_tgt mem2_tgt>> /\
+    <<CONCRETE_TGT: Memory.concrete mem1_tgt mem2_tgt>> /\
     <<WF_TGT: Local.wf lc_tgt mem2_tgt>> /\
     <<MEM_TGT: Memory.closed mem2_tgt>> /\
     <<HALF_WF_SRC: Memory.half_wf mem2_src>> /\
@@ -166,7 +166,7 @@ Lemma sim_update_future
                        st_tgt lc_tgt sc1_tgt mem2_tgt>>.
 Proof.
   inv SIM1.
-  exploit Memory.no_half_concrete_exact_future;
+  exploit Memory.no_half_concrete_future;
     try exact CONCRETE_SRC; try apply WF_SRC; try apply WF_SRC0; eauto. i.
   destruct vw1 as [vw1|]; cycle 1.
   { ss. des. subst.
