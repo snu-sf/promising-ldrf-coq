@@ -169,6 +169,24 @@ Module Memory.
     exists []. ii. rewrite bot_get in *. congr.
   Qed.
 
+  Definition finite_new (mem:t): Prop :=
+    exists dom,
+    forall loc from to msg
+      (TO: to <> Time.bot)
+      (GET: get loc to mem = Some (from, msg)),
+      List.In (loc, to) dom.
+
+  Lemma bot_finite_new: finite_new bot.
+  Proof.
+    exists []. ii. rewrite bot_get in *. congr.
+  Qed.
+
+  Lemma init_finite_new: finite_new init.
+  Proof.
+    exists []. i. revert GET. unfold get. unfold init. s.
+    rewrite Cell.init_get. condtac; ss.
+  Qed.
+
   Definition finite_half (mem:t): Prop :=
     exists dom,
     forall loc from to (GET: get loc to mem = Some (from, Message.half)),
@@ -241,6 +259,7 @@ Module Memory.
           <<MSG_TS: message_to msg loc to>> /\
           <<MSG_CLOSED: closed_message msg mem>>)
       (INHABITED: inhabited mem)
+      (FINITE_NEW: finite_new mem)
       (FINITE_HALF: finite_half mem)
   .
   Hint Constructors closed.
@@ -272,6 +291,7 @@ Module Memory.
     - unfold get, init, Cell.get, Cell.init in MSG. ss.
       apply DOMap.singleton_find_inv in MSG. des. inv MSG0.
       splits; try econs; ss. refl.
+    - apply init_finite_new.
     - apply init_finite_half.
   Qed.
 
@@ -765,6 +785,57 @@ Module Memory.
     revert GET. erewrite remove_o; eauto. condtac; ss; eauto.
   Qed.
 
+  Lemma add_finite_new
+        mem1 loc from to msg mem2
+        (ADD: add mem1 loc from to msg mem2)
+        (FINITE: finite_new mem1):
+    finite_new mem2.
+  Proof.
+    unfold finite_new in *. des.
+    exists ((loc, to) :: dom). i.
+    revert GET. erewrite add_o; eauto. condtac; ss; eauto.
+    i. des. inv GET. auto.
+  Qed.
+
+  Lemma split_finite_new
+        mem1 loc ts1 ts2 ts3 msg2 msg3 mem2
+        (SPLIT: split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2)
+        (FINITE: finite_new mem1):
+    finite_new mem2.
+  Proof.
+    unfold finite_new in *. des.
+    exists ((loc, ts2) :: dom). i.
+    revert GET. erewrite split_o; eauto. repeat condtac; ss; eauto.
+    - i. des. inv GET. auto.
+    - guardH o. i. des. inv GET.
+      exploit split_get0; eauto. i. des.
+      right. eapply FINITE; eauto.
+  Qed.
+
+  Lemma lower_finite_new
+        mem1 loc from to msg1 msg2 mem2
+        (LOWER: lower mem1 loc from to msg1 msg2 mem2)
+        (FINITE: finite_new mem1):
+    finite_new mem2.
+  Proof.
+    unfold finite_new in *. des.
+    exists dom. i.
+    revert GET. erewrite lower_o; eauto. condtac; ss; eauto.
+    des. subst. i.
+    exploit lower_get0; eauto. i. des.
+    eapply FINITE; eauto.
+  Qed.
+
+  Lemma remove_finite_new
+        mem1 loc from to msg mem2
+        (REMOVE: remove mem1 loc from to msg mem2)
+        (FINITE: finite_new mem1):
+    finite_new mem2.
+  Proof.
+    unfold finite_new in *. des. exists dom. i.
+    revert GET. erewrite remove_o; eauto. condtac; ss; eauto.
+  Qed.
+
   Lemma add_finite_half
         mem1 loc from to msg mem2
         (ADD: add mem1 loc from to msg mem2)
@@ -922,6 +993,7 @@ Module Memory.
       + guardH o. i. exploit CLOSED0; eauto. i. des. splits; auto.
         eapply add_closed_message; eauto.
     - eapply add_inhabited; eauto.
+    - eapply add_finite_new; eauto.
     - eapply add_finite_half; eauto.
   Qed.
 
@@ -1009,6 +1081,7 @@ Module Memory.
       + guardH o. guardH o0. i. exploit CLOSED0; eauto. i. des. splits; auto.
         eapply split_closed_message; eauto.
     - eapply split_inhabited; eauto.
+    - eapply split_finite_new; eauto.
     - eapply split_finite_half; eauto.
   Qed.
 
@@ -1075,6 +1148,7 @@ Module Memory.
       + guardH o. i. exploit CLOSED0; eauto. i. des. splits; auto.
         eapply lower_closed_message; eauto.
     - eapply lower_inhabited; eauto.
+    - eapply lower_finite_new; eauto.
     - eapply lower_finite_half; eauto.
   Qed.
 
@@ -2487,6 +2561,8 @@ Module Memory.
           { eapply concrete_closed_message; eauto. }
     - ii. specialize (INHABITED loc).
       exploit SOUND; eauto. i. des; auto. inv x.
+    - inv FINITE_NEW. exists x. i.
+      exploit COMPLETE; eauto. i. des; eauto.
     - inv FINITE_HALF. exists x. i.
       exploit COMPLETE; eauto. i. des; eauto.
   Qed.
@@ -2652,6 +2728,8 @@ Module Memory.
           { econs. ss. unfold TimeMap.bot. apply Time.bot_spec. }
     - ii. specialize (INHABITED loc).
       exploit SOUND; eauto. i. des; auto. inv x.
+    - inv FINITE_NEW. exists x. i.
+      exploit COMPLETE; eauto. i. des; eauto.
     - inv FINITE_HALF. exists x. i.
       exploit COMPLETE; eauto. i. des; eauto.
   Qed.
@@ -2853,7 +2931,7 @@ Module Memory.
           exists from, get loc to mem = Some (from, Message.half) /\
                   get loc to promises = None>>.
   Proof.
-    inv CLOSED. inv FINITE_HALF. clear CLOSED0.
+    inv CLOSED. inv FINITE_HALF. clear CLOSED0 FINITE_NEW.
     revert promises mem LE INHABITED H.
     induction x; i.
     { esplits; eauto; try by econs. }
