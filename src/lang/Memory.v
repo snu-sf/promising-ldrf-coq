@@ -3148,4 +3148,122 @@ Module Memory.
     exploit no_half_concrete_none_inj; [exact CONCRETE|exact CONCRETE0|..]; eauto. i. subst.
     ss.
   Qed.
+
+
+  (* cap *)
+
+  Inductive cap (mem1 mem2: t): Prop :=
+  | cap_intro
+      (SOUND: forall loc from to msg (GET: get loc to mem1 = Some (from, msg)),
+          get loc to mem2 = Some (from, msg))
+      (CAP_MIDDLE: forall loc from1 to1 val1 released1 from2 to2 msg2
+                     (GET1: get loc to1 mem1 = Some (from1, Message.full val1 released1))
+                     (GET2: get loc to2 mem1 = Some (from2, msg2))
+                     (TS: Time.lt to1 from2)
+                     (NONE: forall ts (TS1: Time.lt to1 ts) (TS2: Time.le ts from2),
+                         get loc ts mem1 = None),
+          exists mr,
+            max_full_released mem1 loc (Time.middle to1 from2) mr /\
+            get loc (Time.middle to1 from2) mem2 = Some (to1, Message.full val1 (Some mr)))
+      (CAP_BACK: forall loc from val released
+                   (GET: get loc (max_ts loc mem1) mem1 = Some (from, Message.full val released))
+                   (MAX: max_ts loc mem1 <> Time.bot),
+          exists mr,
+            max_full_released mem1 loc (Time.incr (max_ts loc mem1)) mr /\
+            get loc (Time.incr (max_ts loc mem1)) mem2 = Some (from, Message.full val (Some mr)))
+      (COMPLETE: forall loc from to msg (GET: get loc to mem2 = Some (from, msg)),
+          get loc to mem1 = Some (from, msg) \/
+          ((exists ts p,
+               ts <> Time.bot /\
+               get loc ts mem1 = Some p) /\
+           (exists p, get loc from mem1 = Some p)))
+  .
+
+  Lemma cap_closed_timemap
+        mem mem' tm
+        (CAP: cap mem mem')
+        (CLOSED: closed_timemap tm mem):
+    closed_timemap tm mem'.
+  Proof.
+  Admitted.
+
+  Lemma cap_closed_view
+        mem mem' view
+        (CAP: cap mem mem')
+        (CLOSED: closed_view view mem):
+    closed_view view mem'.
+  Proof.
+    inv CLOSED.
+    econs; eauto using cap_closed_timemap.
+  Qed.
+
+  Lemma cap_closed_opt_view
+        mem mem' view
+        (cap: cap mem mem')
+        (CLOSED: closed_opt_view view mem):
+    closed_opt_view view mem'.
+  Proof.
+    inv CLOSED; eauto using cap_closed_view.
+  Qed.
+
+  Lemma cap_closed_message
+        mem mem' msg
+        (CAP: cap mem mem')
+        (CLOSED: closed_message msg mem):
+    closed_message msg mem'.
+  Proof.
+    inv CLOSED; eauto using cap_closed_opt_view.
+  Qed.
+
+  Lemma cap_closed
+        mem mem'
+        (CONCRETE: cap mem mem')
+        (CLOSED: closed mem):
+    closed mem'.
+  Proof.
+  Admitted.
+
+  Lemma cap_half_wf
+        mem mem'
+        (CAP: cap mem mem')
+        (HALF_WF: half_wf mem):
+    half_wf mem'.
+  Proof.
+  Admitted.
+
+  Lemma cap_no_half
+        promises mem mem'
+        (CAP: cap mem mem')
+        (NOHALF: no_half promises mem):
+    no_half promises mem'.
+  Proof.
+  Admitted.
+
+  Lemma cap_inj
+        mem mem1 mem2
+        (CAP1: cap mem mem1)
+        (CAP2: cap mem mem2):
+    mem1 = mem2.
+  Proof.
+  Admitted.
+
+  Lemma cap_future_exists
+        mem1
+        (CLOSED1: closed mem1):
+    exists mem2,
+      <<FUTURE: future mem1 mem2>> /\
+      <<CAP: cap mem1 mem2>>.
+  Proof.
+  Admitted.
+
+  Lemma cap_future
+        mem1 mem2
+        (CAP: cap mem1 mem2)
+        (CLOSED1: closed mem1):
+    future mem1 mem2.
+  Proof.
+    exploit cap_future_exists; eauto. i. des.
+    exploit cap_inj; [exact CAP|exact CAP0|]. i. subst.
+    auto.
+  Qed.
 End Memory.
