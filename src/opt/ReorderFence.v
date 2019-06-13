@@ -205,11 +205,13 @@ Proof.
         try exact CONCRETE_SRC; try apply WF_SRC; try apply WF_SRC0; eauto. i.
       hexploit Memory.future_closed_timemap; try apply SC_SRC; eauto. i.
       eapply Local.fence_step_future; try apply H; eauto.
-      eapply future_fence_step; try apply FENCE; eauto.
-      inv REORDER; etrans; eauto.
+      - eapply future_fence_step; try apply FENCE; eauto.
+        inv REORDER; etrans; eauto.
+      - eapply Memory.concrete_closed; eauto.
     }
-    eapply Local.program_step_no_half; try exact NOHALF_SRC.
-    econs 5; eauto.
+    { eapply Local.program_step_no_half; try exact NOHALF_SRC.
+      econs 5; eauto.
+    }
   - i. esplits; eauto.
     inv PR. inversion FENCE. subst lc2_src. inversion LOCAL. ss.
     apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.

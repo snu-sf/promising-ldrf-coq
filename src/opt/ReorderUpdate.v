@@ -141,6 +141,9 @@ Grab Existential Variables.
 { econs. econs 3. }
 Qed.
 
+Ltac concrete_eauto :=
+  eauto using Memory.concrete_closed_timemap, Memory.concrete_closed, Memory.concrete_half_wf.
+
 Lemma sim_update_future
       st_src lc_src sc1_src mem1_src
       st_tgt lc_tgt sc1_tgt mem1_tgt
@@ -150,17 +153,11 @@ Lemma sim_update_future
                        st_tgt lc_tgt sc1_tgt mem1_tgt)
       (CONCRETE_SRC: Memory.concrete mem1_src mem2_src)
       (WF_SRC: Local.wf lc_src mem2_src)
-      (MEM_SRC: Memory.closed mem2_src)
       (NOHALF_SRC: Memory.no_half lc_src.(Local.promises) mem2_src):
   exists lc'_src mem2_tgt,
     <<MEM2: sim_memory mem2_src mem2_tgt>> /\
-    <<FUTURE_SRC: Memory.future mem1_src mem2_src>> /\
-    <<FUTURE_TGT: Memory.future mem1_tgt mem2_tgt>> /\
     <<CONCRETE_TGT: Memory.concrete mem1_tgt mem2_tgt>> /\
     <<WF_TGT: Local.wf lc_tgt mem2_tgt>> /\
-    <<MEM_TGT: Memory.closed mem2_tgt>> /\
-    <<HALF_WF_SRC: Memory.half_wf mem2_src>> /\
-    <<HALF_WF_TGT: Memory.half_wf mem2_tgt>> /\
     <<NOHALF_TGT: Memory.no_half lc_tgt.(Local.promises) mem2_tgt>> /\
     <<SIM2: sim_update st_src lc'_src sc1_src mem2_src
                        st_tgt lc_tgt sc1_tgt mem2_tgt>>.
@@ -176,16 +173,14 @@ Proof.
       inv READ. ss. apply SimPromises.sem_bot.
     }
     i. des.
-    exploit SimPromises.concrete_future;
-      [exact CONCRETE_SRC|exact CONCRETE_TGT|..]; eauto. i. des.
     esplits; eauto.
-    econs; [eauto|..]; s; eauto using Memory.future_closed_timemap.
+    econs; [eauto|..]; s; concrete_eauto.
     etrans; eauto.
   }
   exploit Local.read_step_future; eauto. i. des.
   exploit fulfill_step_future; eauto; try by viewtac. i. des.
   exploit future_read_step; try exact READ; eauto. i. des.
-  exploit Local.read_step_future; eauto. i. des.
+  exploit Local.read_step_future; concrete_eauto. i. des.
   exploit future_fulfill_step; try exact FULFILL; eauto; try refl; try by viewtac.
   { by inv REORDER. }
   i. des.
@@ -196,9 +191,10 @@ Proof.
     - inv READ. apply WF_SRC.
     - apply WF2.
   }
-  { eapply Memory.future_closed_timemap; try exact SC_SRC; eauto. }
+  { eapply Memory.concrete_closed_timemap; try exact SC_SRC; eauto. }
+  { eapply Memory.concrete_closed; eauto. }
   i. des.
-  exploit sim_local_fulfill_bot; try exact x1; try exact LOCAL0; try refl; eauto.
+  exploit sim_local_fulfill_bot; try exact x1; try exact LOCAL0; try refl; concrete_eauto.
   { econs.
     - apply WF2.
     - eapply TView.future_closed; eauto. apply WF2.
@@ -206,7 +202,7 @@ Proof.
     - apply WF2.
   }
   i. des.
-  exploit fulfill_step_future; eauto. i. des.
+  exploit fulfill_step_future; concrete_eauto. i. des.
   exploit SimPromises.concrete; try apply MEM1; eauto.
   { inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite <- PROMISES.
     apply SimPromises.sem_bot.
@@ -215,18 +211,11 @@ Proof.
     inv LOCAL0. eapply SimPromises.sem_bot_inv in PROMISES. rewrite <- PROMISES.
     eapply Local.program_step_no_half; (try by econs 2; eauto); auto. }
   i. des.
-  exploit SimPromises.concrete_future;
-    [exact CONCRETE_SRC|exact CONCRETE_TGT|..]; eauto.
-  { eapply fulfill_step_no_half; eauto.
-    inv LOCAL0. eapply SimPromises.sem_bot_inv in PROMISES. rewrite <- PROMISES.
-    eapply Local.program_step_no_half; (try by econs 2; eauto); auto. }
-  i. des.
   esplits; eauto.
-  econs; [eauto|..]; s; eauto using Memory.future_closed_timemap.
+  econs; [eauto|..]; s; concrete_eauto.
   etrans; eauto.
 Grab Existential Variables.
 { auto. (* SC view of read step *) }
-{ auto. }
 { auto. }
 { auto. }
 Qed.

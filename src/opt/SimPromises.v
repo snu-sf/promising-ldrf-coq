@@ -465,8 +465,6 @@ Module SimPromises.
       <<MEM2: sim_memory mem2_src mem2_tgt>> /\
       <<CONCRETE_TGT: Memory.concrete mem1_tgt mem2_tgt>> /\
       <<WF2_TGT: Local.wf lc_tgt mem2_tgt>> /\
-      <<MEM2_TGT: Memory.closed mem2_tgt>> /\
-      <<HALF_WF2_TGT: Memory.half_wf mem2_tgt>> /\
       <<NOHALF_TGT: Memory.no_half lc_tgt.(Local.promises) mem2_tgt>>.
   Proof.
     exploit Memory.no_half_concrete_future_exists;

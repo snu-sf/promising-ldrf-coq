@@ -120,17 +120,11 @@ Lemma sim_store_future
                        st_tgt lc_tgt sc1_tgt mem1_tgt)
       (CONCRETE_SRC: Memory.concrete mem1_src mem2_src)
       (WF_SRC: Local.wf lc_src mem2_src)
-      (MEM_SRC: Memory.closed mem2_src)
       (NOHALF_SRC: Memory.no_half lc_src.(Local.promises) mem2_src):
   exists lc'_src mem2_tgt,
     <<MEM2: sim_memory mem2_src mem2_tgt>> /\
-    <<FUTURE_SRC: Memory.future mem1_src mem2_src>> /\
-    <<FUTURE_TGT: Memory.future mem1_tgt mem2_tgt>> /\
     <<CONCRETE_TGT: Memory.concrete mem1_tgt mem2_tgt>> /\
     <<WF_TGT: Local.wf lc_tgt mem2_tgt>> /\
-    <<MEM_TGT: Memory.closed mem2_tgt>> /\
-    <<HALF_WF_SRC: Memory.half_wf mem2_src>> /\
-    <<HALF_WF_TGT: Memory.half_wf mem2_tgt>> /\
     <<NOHALF_TGT: Memory.no_half lc_tgt.(Local.promises) mem2_tgt>> /\
     <<SIM2: sim_store st_src lc'_src sc1_src mem2_src
                       st_tgt lc_tgt sc1_tgt mem2_tgt>>.
@@ -140,20 +134,19 @@ Proof.
     try exact CONCRETE_SRC; try apply WF_SRC; try apply WF_SRC0; eauto. i.
   exploit fulfill_step_future; eauto; try by viewtac. i. des.
   exploit fulfill_step_future; try exact WF_SRC;
-    eauto using Memory.future_closed_timemap. i. des.
+    eauto using Memory.concrete_closed_timemap, Memory.concrete_closed.
+  i. des.
   exploit future_fulfill_step; try exact FULFILL; eauto.
   { by inv REORDER. }
-  i. des.
+  i.
   hexploit fulfill_step_no_half; eauto. i.
   exploit SimPromises.concrete; try exact MEM1; eauto.
   { inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite <- PROMISES.
     apply SimPromises.sem_bot.
   }
   i. des.
-  exploit SimPromises.concrete_future;
-    [exact CONCRETE_SRC|exact CONCRETE_TGT|..]; eauto. i. des.
   esplits; eauto.
-  econs; eauto using Memory.concrete_closed_timemap.
+  econs; eauto using Memory.concrete_closed_timemap, Memory.concrete_closed, Memory.concrete_half_wf.
 Qed.
 
 Lemma sim_store_step
