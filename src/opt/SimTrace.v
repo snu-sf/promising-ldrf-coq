@@ -104,7 +104,7 @@ Proof.
   - i. exploit TERMINAL; eauto. i. des.
     exploit rtc_lang_tau_step_rtc_thread_tau_step; eauto. i.
     esplits; eauto. econs. ss.
-  - i. eapply SimPromises.concrete; try apply LOCAL; eauto.
+  - i. eapply SimPromises.concrete_cap; try apply LOCAL; eauto.
   - i. exploit sim_local_memory_bot; eauto. i.
     esplits; eauto.
   - ii. inv STEP_TGT; inv STEP0; [|inv LOCAL0].

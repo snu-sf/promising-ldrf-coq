@@ -476,35 +476,60 @@ Module SimPromises.
     eapply TView.future_closed; eauto.
   Qed.
 
-  Lemma concrete_future
-        lc_src mem1_src mem2_src
-        lc_tgt mem1_tgt mem2_tgt
+  Lemma concrete_cap
+        pview
+        lc_src mem1_src mem2_src mem3_src
+        lc_tgt mem1_tgt
+        (INV1: sem pview bot lc_src.(Local.promises) lc_tgt.(Local.promises))
+        (MEM1: sim_memory mem1_src mem1_tgt)
         (CONCRETE_SRC: Memory.concrete mem1_src mem2_src)
-        (CONCRETE_TGT: Memory.concrete mem1_tgt mem2_tgt)
         (WF1_SRC: Local.wf lc_src mem1_src)
         (WF1_TGT: Local.wf lc_tgt mem1_tgt)
         (WF2_SRC: Local.wf lc_src mem2_src)
-        (WF2_TGT: Local.wf lc_tgt mem2_tgt)
         (MEM1_SRC: Memory.closed mem1_src)
         (MEM1_TGT: Memory.closed mem1_tgt)
         (HALF_WF1_SRC: Memory.half_wf mem1_src)
         (HALF_WF1_TGT: Memory.half_wf mem1_tgt)
         (NOHALF_SRC: Memory.no_half lc_src.(Local.promises) mem2_src)
-        (NOHALF_TGT: Memory.no_half lc_tgt.(Local.promises) mem2_tgt):
-      <<FUTURE_SRC: Memory.future mem1_src mem2_src>> /\
-      <<FUTURE_TGT: Memory.future mem1_tgt mem2_tgt>> /\
-      <<HALF_WF2_SRC: Memory.half_wf mem2_src>> /\
-      <<HALF_WF2_TGT: Memory.half_wf mem2_tgt>>.
+        (CAP_SRC: Memory.cap mem2_src mem3_src):
+    exists mem2_tgt mem3_tgt,
+      <<MEM3: sim_memory mem3_src mem3_tgt>> /\
+      <<CONCRETE_TGT: Memory.concrete mem1_tgt mem2_tgt>> /\
+      <<WF2_TGT: Local.wf lc_tgt mem2_tgt>> /\
+      <<NOHALF_TGT: Memory.no_half lc_tgt.(Local.promises) mem2_tgt>> /\
+      <<CAP_TGT: Memory.cap mem2_tgt mem3_tgt>>.
   Proof.
-    splits.
-    - eapply Memory.no_half_concrete_future; eauto.
-      + apply WF1_SRC.
-      + apply WF2_SRC.
-    - eapply Memory.no_half_concrete_future; eauto.
-      + apply WF1_TGT.
-      + apply WF2_TGT.
-    - eapply Memory.concrete_half_wf; eauto.
-    - eapply Memory.concrete_half_wf; eauto.
+    exploit concrete; eauto. i. des.
+    exploit Memory.concrete_closed; try exact CONCRETE_SRC; eauto. i.
+    exploit Memory.concrete_closed; try exact CONCRETE_TGT; eauto. i.
+    exploit Memory.cap_future_exists; try exact x1; eauto. i. des.
+    exploit sim_memory_cap; try exact MEM2; eauto. i.
+    esplits; try exact x2; eauto.
+  Qed.
+
+  Lemma concrete_cap_future
+        lc mem1 mem2 mem3
+        (CONCRETE: Memory.concrete mem1 mem2)
+        (WF1: Local.wf lc mem1)
+        (WF2: Local.wf lc mem2)
+        (MEM1: Memory.closed mem1)
+        (HALF_WF1: Memory.half_wf mem1)
+        (NOHALF: Memory.no_half lc.(Local.promises) mem2)
+        (CAP: Memory.cap mem2 mem3):
+      <<FUTURE: Memory.future mem1 mem3>> /\
+      <<WF3: Local.wf lc mem3>> /\
+      <<HALF_WF3: Memory.half_wf mem3>> /\
+      <<NOHALF3: Memory.no_half lc.(Local.promises) mem3>>.
+  Proof.
+    exploit Memory.no_half_concrete_future; eauto;
+      try apply WF1; try apply WF2; i.
+    exploit Memory.future_closed; eauto. i.
+    exploit Memory.cap_future; eauto. i.
+    exploit Local.cap_wf; eauto. i.
+    hexploit Memory.concrete_half_wf; eauto. i.
+    hexploit Memory.cap_half_wf; eauto. i.
+    hexploit Memory.cap_no_half; eauto. i.
+    esplits; eauto. etrans; eauto.
   Qed.
 
   Lemma sem_bot promises:

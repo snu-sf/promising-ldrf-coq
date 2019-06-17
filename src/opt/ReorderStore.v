@@ -114,39 +114,29 @@ Qed.
 Lemma sim_store_future
       st_src lc_src sc1_src mem1_src
       st_tgt lc_tgt sc1_tgt mem1_tgt
-      mem2_src
+      mem2_src mem3_src
       (MEM1: sim_memory mem1_src mem1_tgt)
       (SIM1: sim_store st_src lc_src sc1_src mem1_src
                        st_tgt lc_tgt sc1_tgt mem1_tgt)
       (CONCRETE_SRC: Memory.concrete mem1_src mem2_src)
       (WF_SRC: Local.wf lc_src mem2_src)
-      (NOHALF_SRC: Memory.no_half lc_src.(Local.promises) mem2_src):
-  exists lc'_src mem2_tgt,
-    <<MEM2: sim_memory mem2_src mem2_tgt>> /\
+      (NOHALF_SRC: Memory.no_half lc_src.(Local.promises) mem2_src)
+      (CAP_SRC: Memory.cap mem2_src mem3_src):
+  exists mem2_tgt mem3_tgt,
+    <<MEM3: sim_memory mem3_src mem3_tgt>> /\
     <<CONCRETE_TGT: Memory.concrete mem1_tgt mem2_tgt>> /\
     <<WF_TGT: Local.wf lc_tgt mem2_tgt>> /\
     <<NOHALF_TGT: Memory.no_half lc_tgt.(Local.promises) mem2_tgt>> /\
-    <<SIM2: sim_store st_src lc'_src sc1_src mem2_src
-                      st_tgt lc_tgt sc1_tgt mem2_tgt>>.
+    <<CAP_TGT: Memory.cap mem2_tgt mem3_tgt>>.
 Proof.
   inv SIM1.
-  exploit Memory.no_half_concrete_future;
-    try exact CONCRETE_SRC; try apply WF_SRC; try apply WF_SRC0; eauto. i.
-  exploit fulfill_step_future; eauto; try by viewtac. i. des.
+  exploit fulfill_step_future; try exact WF_SRC0; eauto; try by viewtac. i. des.
   exploit fulfill_step_future; try exact WF_SRC;
-    eauto using Memory.concrete_closed_timemap, Memory.concrete_closed.
-  i. des.
-  exploit future_fulfill_step; try exact FULFILL; eauto.
-  { by inv REORDER. }
-  i.
-  hexploit fulfill_step_no_half; eauto. i.
-  exploit SimPromises.concrete; try exact MEM1; eauto.
-  { inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite <- PROMISES.
-    apply SimPromises.sem_bot.
-  }
-  i. des.
-  esplits; eauto.
-  econs; eauto using Memory.concrete_closed_timemap, Memory.concrete_closed, Memory.concrete_half_wf.
+    eauto using Memory.concrete_closed_timemap, Memory.concrete_closed. i. des.
+  hexploit fulfill_step_no_half; try exact NOHALF_SRC; eauto. i.
+  eapply SimPromises.concrete_cap; try apply MEM1; eauto.
+  inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite <- PROMISES.
+  apply SimPromises.sem_bot.
 Qed.
 
 Lemma sim_store_step
@@ -258,8 +248,7 @@ Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss; ii.
   - inv TERMINAL_TGT. inv PR; ss.
   - exploit sim_store_mon; eauto. i.
-    exploit sim_store_future; try apply x0; eauto. i. des.
-    esplits; eauto.
+    eapply sim_store_future; eauto.
   - exploit sim_store_mon; eauto. i.
     inversion x0. subst. i.
     exploit (progress_program_step rs i2 nil); eauto. i. des.

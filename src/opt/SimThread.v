@@ -86,15 +86,17 @@ Section SimulationThread.
           <<LOCAL: sim_local SimPromises.bot lc2_src lc1_tgt>> /\
           <<TERMINAL: sim_terminal st2_src st1_tgt>>>> /\
       <<CONCRETE:
-        forall mem2_src
+        forall mem2_src mem3_src
           (CONCRETE_SRC: Memory.concrete mem1_src mem2_src)
           (WF_SRC: Local.wf lc1_src mem2_src)
-          (NOHALF_SRC: Memory.no_half lc1_src.(Local.promises) mem2_src),
-        exists mem2_tgt,
-          <<MEMORY: sim_memory mem2_src mem2_tgt>> /\
+          (NOHALF_SRC: Memory.no_half lc1_src.(Local.promises) mem2_src)
+          (CAP_SRC: Memory.cap mem2_src mem3_src),
+        exists mem2_tgt mem3_tgt,
+          <<MEMORY: sim_memory mem3_src mem3_tgt>> /\
           <<CONCRETE_TGT: Memory.concrete mem1_tgt mem2_tgt>> /\
           <<WF_TGT: Local.wf lc1_tgt mem2_tgt>> /\
-          <<NOHALF_TGT: Memory.no_half lc1_tgt.(Local.promises) mem2_tgt>>>> /\
+          <<NOHALF_TGT: Memory.no_half lc1_tgt.(Local.promises) mem2_tgt>> /\
+          <<CAP_TGT: Memory.cap mem2_tgt mem3_tgt>>>> /\
       <<PROMISES:
         forall (PROMISES_TGT: lc1_tgt.(Local.promises) = Memory.bot)
           (NOHALF_TGT: Memory.no_half lc1_tgt.(Local.promises) mem1_tgt),
@@ -364,11 +366,13 @@ Proof.
   generalize SIM. intro X.
   punfold X. exploit X; eauto; try refl. i. des.
   ii. ss. exploit CONCRETE; eauto. i. des.
-  exploit SimPromises.concrete_future;
-    [exact CONCRETE0|exact CONCRETE_TGT|..]; eauto. i. des.
+  exploit SimPromises.concrete_cap_future;
+    try exact CONCRETE0; try exact CAP; eauto. i. des.
+  exploit SimPromises.concrete_cap_future;
+    try exact CONCRETE_TGT; try exact CAP_TGT; eauto. i. des.
   exploit CONSISTENT; eauto; try refl. i. des.
   exploit sim_thread_rtc_step; try apply MEMORY0;
-    eauto using Memory.concrete_closed, Memory.concrete_closed_timemap; s.
+    eauto using Memory.future_closed, Memory.future_closed_timemap; s.
   { eapply sim_thread_future; eauto; try refl. }
   i. des. destruct e2. ss.
   hexploit Thread.rtc_tau_step_no_half; try exact STEPS; eauto. s. i. des.

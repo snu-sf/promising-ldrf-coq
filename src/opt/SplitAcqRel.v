@@ -294,7 +294,7 @@ Lemma sim_acqrel_sim_thread:
 Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss; ii.
   - inv TERMINAL_TGT. inv PR; ss.
-  - eapply SimPromises.concrete; eauto.
+  - eapply SimPromises.concrete_cap; eauto.
     inv PR. apply LOCAL.
   - esplits; eauto.
     inv PR. eapply sim_local_memory_bot; eauto.
@@ -315,7 +315,7 @@ Lemma split_acqrel_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { inv TERMINAL_TGT. }
-  { eapply SimPromises.concrete; eauto. apply LOCAL. }
+  { eapply SimPromises.concrete_cap; eauto. apply LOCAL. }
   { esplits; eauto.
     inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   }

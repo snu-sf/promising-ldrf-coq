@@ -180,6 +180,14 @@ Module Local.
   .
   Hint Constructors wf.
 
+  Lemma cap_wf
+        lc mem1 mem2
+        (CAP: Memory.cap mem1 mem2)
+        (WF: wf lc mem1):
+    wf lc mem2.
+  Proof.
+  Admitted.
+
   Inductive disjoint (lc1 lc2:t): Prop :=
   | disjoint_intro
       (DISJOINT: Memory.disjoint lc1.(promises) lc2.(promises))

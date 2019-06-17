@@ -589,3 +589,15 @@ Proof.
   - inv H. exploit COMPLETE; eauto.
     i. des; subst; econs; eauto.
 Qed.
+
+Lemma sim_memory_cap
+      mem1_src mem2_src
+      mem1_tgt mem2_tgt
+      (SIM: sim_memory mem1_src mem1_tgt)
+      (CAP_SRC: Memory.cap mem1_src mem2_src)
+      (CAP_TGT: Memory.cap mem1_tgt mem2_tgt)
+      (CLOSED_SRC: Memory.closed mem1_src)
+      (CLOSED_TGT: Memory.closed mem1_tgt):
+  sim_memory mem2_src mem2_tgt.
+Proof.
+Admitted.

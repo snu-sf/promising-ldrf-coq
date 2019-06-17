@@ -65,7 +65,7 @@ Lemma reorder_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { inv TERMINAL_TGT. }
-  { eapply SimPromises.concrete; try apply LOCAL; eauto. }
+  { eapply SimPromises.concrete_cap; try apply LOCAL; eauto. }
   { esplits; eauto.
     inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   }

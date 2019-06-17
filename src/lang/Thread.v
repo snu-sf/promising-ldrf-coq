@@ -135,10 +135,11 @@ Module Thread.
     Hint Constructors opt_step.
 
     Definition consistent (e:t): Prop :=
-      forall mem1
-        (CONCRETE: Memory.concrete e.(memory) mem1)
-        (NOHALF: Memory.no_half e.(local).(Local.promises) mem1)
-        (WF: Local.wf e.(local) mem1),
+      forall mem0 mem1
+        (CONCRETE: Memory.concrete e.(memory) mem0)
+        (WF: Local.wf e.(local) mem0)
+        (NOHALF: Memory.no_half e.(local).(Local.promises) mem0)
+        (CAP: Memory.cap mem0 mem1),
       exists e2,
         <<STEPS: rtc tau_step (mk e.(state) e.(local) e.(sc) mem1) e2>> /\
         <<PROMISES: e2.(local).(Local.promises) = Memory.bot>>.

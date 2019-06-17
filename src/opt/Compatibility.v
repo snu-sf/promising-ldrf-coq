@@ -305,7 +305,7 @@ Proof.
     destruct lc_src, lc_tgt. ss. subst.
     splits; s; ii.
     { inv TERMINAL_TGT. ss. esplits; eauto; ss. }
-    { eapply SimPromises.concrete; try apply LOCAL; eauto. }
+    { eapply SimPromises.concrete_cap; try apply LOCAL; eauto. }
     { subst. esplits; eauto. }
     inv STEP_TGT; try by inv STEP; inv STATE.
     inv STEP; ss.
@@ -375,7 +375,7 @@ Proof.
     destruct lc_src, lc_tgt. ss. subst.
     splits; s; ii.
     { inv TERMINAL_TGT. }
-    { eapply SimPromises.concrete; try apply LOCAL; eauto. }
+    { eapply SimPromises.concrete_cap; try apply LOCAL; eauto. }
     { ss. subst. esplits; eauto. }
     inv STEP_TGT; ss.
     + (* promise *)
@@ -408,7 +408,7 @@ Proof.
     destruct lc_src, lc_tgt. ss. subst.
     splits; s; ii.
     { inv TERMINAL_TGT. }
-    { eapply SimPromises.concrete; try apply LOCAL; eauto. }
+    { eapply SimPromises.concrete_cap; try apply LOCAL; eauto. }
     { ss. subst. esplits; eauto. }
     inv STEP_TGT; ss.
     + (* promise *)
