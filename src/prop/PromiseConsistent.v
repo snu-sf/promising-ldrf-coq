@@ -170,13 +170,18 @@ Lemma consistent_promise_consistent
 Proof.
   destruct th. destruct local. inv WF. ss.
   exploit Memory.no_half_concrete_future_exists; eauto. i. des.
+  exploit Memory.cap_future_exists; try exact CLOSED2. i. des.
   exploit CONS; try exact CONCRETE; eauto; ss; try refl.
   { econs; eauto. eapply TView.future_closed; eauto. }
   i. des.
   hexploit rtc_tau_step_promise_consistent; try exact STEPS; ss; eauto.
   { ii. rewrite PROMISES0, Memory.bot_get in *. congr. }
-  { econs; eauto. eapply TView.concrete_closed; eauto. }
-  { eapply Memory.concrete_closed_timemap; eauto. }
+  { eapply Local.cap_wf; eauto.
+    econs; eauto. eapply TView.future_closed; eauto. }
+  { eapply Memory.cap_closed_timemap; eauto.
+    eapply Memory.concrete_closed_timemap; eauto. }
+  { eapply Memory.cap_closed; eauto. }
+  { eapply Memory.cap_half_wf; eauto. }
 Qed.
 
 Lemma promise_consistent_promise_read
