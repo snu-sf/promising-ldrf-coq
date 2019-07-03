@@ -3152,31 +3152,64 @@ Module Memory.
 
   (* cap *)
 
+  Definition loc_non_init (loc: Loc.t) (mem: t): Prop :=
+    exists ts p, ts <> Time.bot /\ get loc ts mem = Some p.
+
+  Inductive adjacent (loc: Loc.t) (from1 to1 from2 to2: Time.t) (mem: t): Prop :=
+  | adjacent_intro
+      m1 m2
+      (GET1: get loc to1 mem = Some (from1, m1))
+      (GET2: get loc to2 mem = Some (from2, m2))
+      (TS: Time.lt to1 to2)
+      (EMPTY: forall ts (TS1: Time.lt to1 ts) (TS2: Time.le ts from2),
+          get loc ts mem = None)
+  .
+
+  Lemma adjacent_ts
+        loc from1 to1 from2 to2 mem
+        (ADJ: adjacent loc from1 to1 from2 to2 mem):
+    Time.le to1 from2.
+  Proof.
+    destruct (Time.le_lt_dec to1 from2); auto.
+    exfalso. inv ADJ.
+    exploit get_ts; try exact GET1. i. des.
+    { subst. inv l. }
+    exploit get_ts; try exact GET2. i. des.
+    { subst. inv TS. }
+    exploit get_disjoint; [exact GET1|exact GET2|..]. i. des.
+    { subst. timetac. }
+    apply (x2 to1); econs; ss.
+    - refl.
+    - econs. auto.
+  Qed.
+
   Inductive cap (mem1 mem2: t): Prop :=
   | cap_intro
       (SOUND: forall loc from to msg (GET: get loc to mem1 = Some (from, msg)),
           get loc to mem2 = Some (from, msg))
-      (CAP_MIDDLE: forall loc from1 to1 val1 released1 from2 to2 msg2
-                     (GET1: get loc to1 mem1 = Some (from1, Message.full val1 released1))
-                     (GET2: get loc to2 mem1 = Some (from2, msg2))
-                     (TS: Time.lt to1 from2)
-                     (NONE: forall ts (TS1: Time.lt to1 ts) (TS2: Time.le ts from2),
-                         get loc ts mem1 = None),
-          exists mr,
-            max_full_released mem1 loc (Time.middle to1 from2) mr /\
-            get loc (Time.middle to1 from2) mem2 = Some (to1, Message.full val1 (Some mr)))
-      (CAP_BACK: forall loc from val released
-                   (GET: get loc (max_ts loc mem1) mem1 = Some (from, Message.full val released))
-                   (MAX: max_ts loc mem1 <> Time.bot),
-          exists mr,
-            max_full_released mem1 loc (Time.incr (max_ts loc mem1)) mr /\
-            get loc (Time.incr (max_ts loc mem1)) mem2 = Some (from, Message.full val (Some mr)))
       (COMPLETE: forall loc from to msg (GET: get loc to mem2 = Some (from, msg)),
           get loc to mem1 = Some (from, msg) \/
-          ((exists ts p,
-               ts <> Time.bot /\
-               get loc ts mem1 = Some p) /\
-           (exists p, get loc from mem1 = Some p)))
+          (get loc to mem1 = None /\
+           loc_non_init loc mem1 /\
+           exists p, get loc from mem1 = Some p))
+      (MIDDLE: forall loc from1 to1 from2 to2
+                     (ADJ: adjacent loc from1 to1 from2 to2 mem1)
+                     (TO: Time.lt to1 from2),
+          get loc from2 mem2 = Some (to1, Message.half))
+      (BACK: forall loc from to m r
+               (NON_INIT: loc_non_init loc mem1)
+               (TO: to = max_ts loc mem1)
+               (GET: get loc to mem1 = Some (from, m))
+               (MAX: max_full_view mem1 r),
+          max_full_view mem1 r /\
+          match m with
+          | Message.full val _ =>
+            get loc (Time.incr to) mem2 = Some (to, Message.full val (Some r))
+          | Message.half =>
+            exists f' val r',
+            get loc from mem1 = Some (f', Message.full val (Some r')) /\
+            get loc (Time.incr to) mem2 = Some (to, Message.full val (Some r))
+          end)
   .
 
   Lemma cap_closed_timemap
@@ -3185,7 +3218,10 @@ Module Memory.
         (CLOSED: closed_timemap tm mem):
     closed_timemap tm mem'.
   Proof.
-  Admitted.
+    inv CAP. ii.
+    specialize (CLOSED loc). des.
+    exploit SOUND; eauto.
+  Qed.
 
   Lemma cap_closed_view
         mem mem' view
@@ -3217,7 +3253,7 @@ Module Memory.
 
   Lemma cap_closed
         mem mem'
-        (CONCRETE: cap mem mem')
+        (CAP: cap mem mem')
         (CLOSED: closed mem):
     closed mem'.
   Proof.
