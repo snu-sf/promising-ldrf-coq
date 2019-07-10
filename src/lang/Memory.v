@@ -3401,47 +3401,70 @@ Module Memory.
 
   Definition finite_non_init (mem: t): Prop :=
     exists dom,
-      forall loc from to msg
-        (NON_INIT: loc_non_init loc mem)
-        (GET: get loc to mem = Some (from, msg)),
-        List.In (loc, to) dom.
+      (forall loc from to msg
+         (NON_INIT: loc_non_init loc mem)
+         (GET: get loc to mem = Some (from, msg)),
+          List.In (loc, to) dom) /\
+      (forall loc to (IN: List.In (loc, to) dom),
+          exists from msg, get loc to mem = Some (from, msg)).
 
-  Fixpoint extend_dom (dom: list (Loc.t * Time.t)): list (Loc.t * Time.t) :=
+  Fixpoint extend_dom (mem: t) (dom: list (Loc.t * Time.t)): list (Loc.t * Time.t) :=
     match dom with
     | [] => []
-    | (loc, to) :: dom => (loc, Time.bot) :: (loc, to) :: (extend_dom dom)
+    | (loc, to) :: dom =>
+      if (get loc to mem)
+      then (loc, Time.bot) :: (loc, to) :: (extend_dom mem dom)
+      else (extend_dom mem dom)
     end.
 
   Lemma extend_dom_sound
-        dom loc to
+        mem dom loc from to msg
+        (GET: get loc to mem = Some (from, msg))
         (IN: List.In (loc, to) dom):
-    List.In (loc, to) (extend_dom dom) /\
-    List.In (loc, Time.bot) (extend_dom dom).
+    List.In (loc, to) (extend_dom mem dom) /\
+    List.In (loc, Time.bot) (extend_dom mem dom).
   Proof.
-    revert loc to IN. induction dom; ss; i.
+    revert loc from to msg GET IN.
+    induction dom; ss; i.
     destruct a. des; split.
-    - inv IN. econs 2. econs. refl.
-    - inv IN. econs. refl.
-    - econs 2. econs 2. eapply IHdom; eauto.
-    - econs 2. econs 2. eapply IHdom; eauto.
+    - inv IN. rewrite GET. econs 2. econs. refl.
+    - inv IN. rewrite GET. econs. refl.
+    - exploit IHdom; eauto. i. des.
+      destruct (get t0 t1 mem); eauto.
+      econs 2. econs 2. auto.
+    - exploit IHdom; eauto. i. des.
+      destruct (get t0 t1 mem); eauto.
+      econs 2. econs 2. auto.
   Qed.
 
   Lemma finite_new_finite_non_init
         mem
+        (CLOSED: closed mem)
         (FINITE_NEW: finite_new mem):
     finite_non_init mem.
   Proof.
-    inv FINITE_NEW. exists (extend_dom x). i.
-    destruct (Time.eq_dec to Time.bot).
-    - subst. inv NON_INIT. des. destruct p.
-      exploit H; eauto. i.
-      exploit extend_dom_sound; eauto. i. des. ss.
-    - exploit H; eauto. i.
-      exploit extend_dom_sound; eauto. i. des. ss.
+    inv FINITE_NEW. exists (extend_dom mem x). split; i.
+    - destruct (Time.eq_dec to Time.bot).
+      + subst. inv NON_INIT. des. destruct p.
+        exploit H; eauto. i.
+        exploit extend_dom_sound; eauto. i. des. ss.
+      + exploit H; eauto. i.
+        exploit extend_dom_sound; eauto. i. des. ss.
+    - clear H. revert CLOSED loc to IN. induction x; i; ss.
+      destruct a.
+      destruct (get t0 t1 mem) as [[]|] eqn:GET.
+      + inv IN.
+        { inv H. esplits. eapply CLOSED. }
+        inv H.
+        { inv H0. eauto. }
+        eapply IHx; eauto.
+      + eapply IHx; eauto.
   Qed.
 
   Inductive cap_aux (dom: list (Loc.t * Time.t)) (mem1 mem2: t): Prop :=
   | cap_aux_intro
+      (DOM: forall loc to (IN: List.In (loc, to) dom),
+          exists from msg, get loc to mem1 = Some (from, msg))
       (SOUND: forall loc from to msg (GET: get loc to mem1 = Some (from, msg)),
           get loc to mem2 = Some (from, msg))
       (MIDDLE: forall loc from1 to1 from2 to2
