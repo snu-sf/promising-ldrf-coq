@@ -3461,10 +3461,8 @@ Module Memory.
       + eapply IHx; eauto.
   Qed.
 
-  Inductive cap_aux (dom: list (Loc.t * Time.t)) (mem1 mem2: t): Prop :=
+  Inductive cap_aux (dom: list (Loc.t * Time.t)) (view: View.t) (mem1 mem2: t): Prop :=
   | cap_aux_intro
-      (DOM: forall loc to (IN: List.In (loc, to) dom),
-          exists from msg, get loc to mem1 = Some (from, msg))
       (SOUND: forall loc from to msg (GET: get loc to mem1 = Some (from, msg)),
           get loc to mem2 = Some (from, msg))
       (MIDDLE: forall loc from1 to1 from2 to2
@@ -3472,11 +3470,10 @@ Module Memory.
                  (TO: Time.lt to1 from2)
                  (IN: List.In (loc, to1) dom),
           get loc from2 mem2 = Some (to1, Message.half))
-      (BACK: forall loc from to msg view
+      (BACK: forall loc from to msg
                (NON_INIT: loc_non_init loc mem1)
                (TO: to = max_ts loc mem1)
                (GET: get loc to mem1 = Some (from, msg))
-               (MAX: max_full_view mem1 view)
                (IN: List.In (loc, to) dom),
           exists val,
             get loc (Time.incr to) mem2 = Some (to, Message.full val (Some view)) /\
@@ -3510,7 +3507,7 @@ Module Memory.
     ii. eauto.
   Qed.
 
-  Inductive cap_imm (loc: Loc.t) (to: Time.t) (mem1 mem2: t): Prop :=
+  Inductive cap_imm (loc: Loc.t) (to: Time.t) (view: View.t) (mem1 mem2: t): Prop :=
   | cap_imm_intro
       (SOUND: forall loc' from' to' msg (GET: get loc' to' mem1 = Some (from', msg)),
           get loc' to' mem2 = Some (from', msg))
@@ -3518,11 +3515,10 @@ Module Memory.
                  (ADJ: adjacent loc from to from2 to2 mem1)
                  (TO: Time.lt to from2),
           get loc from2 mem2 = Some (to, Message.half))
-      (BACK: forall from msg view
+      (BACK: forall from msg
                (NON_INIT: loc_non_init loc mem1)
                (TO: to = max_ts loc mem1)
-               (GET: get loc to mem1 = Some (from, msg))
-               (MAX: max_full_view mem1 view),
+               (GET: get loc to mem1 = Some (from, msg)),
           exists val,
             get loc (Time.incr to) mem2 = Some (to, Message.full val (Some view)) /\
             match msg with
@@ -3536,106 +3532,109 @@ Module Memory.
           get loc' to' mem1 = Some (from', msg) \/
           (loc' = loc /\
            from' = to /\
-           get loc to mem1 = None /\
+           get loc to' mem1 = None /\
            loc_non_init loc mem1 /\
            exists f m, get loc from' mem1 = Some (f, m)))
   .
 
   Lemma cap_imm_exists
-        mem1 loc to
+        mem1 loc to view
         (CLOSED1: closed mem1)
-        (HALF_WF_BACK1: half_wf_back mem1):
+        (HALF_WF_BACK1: half_wf_back mem1)
+        (VIEW: max_full_view mem1 view):
     exists mem2,
       <<FUTURE: future mem1 mem2>> /\
-      <<CAP: cap_imm loc to mem1 mem2>> /\
+      <<CAP: cap_imm loc to view mem1 mem2>> /\
       <<CLOSED2: closed mem2>> /\
       <<HALF_WF_BACK2: half_wf_back mem2>>.
   Proof.
-    destruct (get loc to mem1) as [[from msg]|] eqn:GET1; cycle 1.
-    { exists mem1. splits; auto.
-      econs; i; eauto; try congr.
-      inv ADJ. congr.
-    }
-    exploit max_ts_spec; eauto. i. des. inv MAX.
-    - (* to <> max_ts loc mem1 *)
-      exploit adjacent_exists; try exact GET1; eauto. i. des.
-      exploit adjacent_ts; eauto. i. inv x1; cycle 1.
-      { exists mem1. inv H0. splits; auto. econs; i; eauto.
-        - exploit adjacent_inj; [exact x0|exact ADJ|..]. i. des. subst.
-          timetac.
-        - subst. timetac. }
-      exploit (@add_exists mem1 loc to from2 Message.half); auto.
-      { admit. }
-      { econs. }
-      i. des. exists mem2. splits.
-      + econs; eauto.
-      + admit.
-      + eapply future_closed; try exact CLOSED1.
-        econs; eauto.
-      + ii. subst.
-        assert (MAX: forall loc, max_ts loc mem1 = max_ts loc mem2) by admit.
-        revert MSG. erewrite add_o; eauto. condtac; ss; i.
-        * des. subst. inv MSG. inv x0.
-          exploit max_ts_spec; try exact GET2; eauto. i. des.
-          exploit get_ts; try exact GET2; eauto. i. des.
-          { subst. inv TS. }
-          { exfalso. rewrite MAX in *.
-            eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt; eauto. }
-        * guardH o. exploit HALF_WF_BACK1; try exact MSG; eauto. i. des.
-          exploit add_get1; try exact x; eauto.
-    - (* to = max_ts loc mem1 *)
-      exploit max_full_view_exists; try apply CLOSED1. i. des.
-      destruct msg0.
-      + exploit (@add_exists_max_ts mem1 loc (Time.incr (max_ts loc mem1))
-                                    (Message.full val (Some view))).
-        { apply Time.incr_spec. }
-        { econs. econs. eapply max_full_view_wf; eauto. }
-        i. des. exists mem2. splits.
-        * econs; eauto. econs; eauto.
-          { econs. econs. eapply add_closed_view; eauto.
-            eapply max_full_view_closed; eauto. }
-          { econs. ss. inv x0. ss.
-            specialize (MAX loc). inv MAX. des.
-            exploit max_ts_spec; try exact GET0. i. des.
-            etrans; eauto. econs. apply Time.incr_spec. }
-        * admit.
-        * eapply add_closed; eauto.
-          { econs. econs. eapply add_closed_view; eauto.
-            eapply max_full_view_closed; eauto. }
-          { econs. ss. inv x0. ss.
-            specialize (MAX loc). inv MAX. des.
-            exploit max_ts_spec; try exact GET0. i. des.
-            etrans; eauto. econs. apply Time.incr_spec. }
-        * admit.
-      + exploit HALF_WF_BACK1; try exact GET; eauto. i. des.
-        exploit (@add_exists_max_ts mem1 loc (Time.incr (max_ts loc mem1))
-                                    (Message.full val' (Some view))).
-        { apply Time.incr_spec. }
-        { econs. econs. eapply max_full_view_wf; eauto. }
-        i. des. exists mem2. splits.
-        * econs; eauto. econs; eauto.
-          { econs. econs. eapply add_closed_view; eauto.
-            eapply max_full_view_closed; eauto. }
-          { econs. ss. inv x0. ss.
-            specialize (MAX loc). inv MAX. des.
-            exploit max_ts_spec; try exact GET0. i. des.
-            etrans; eauto. econs. apply Time.incr_spec. }
-        * admit.
-        * eapply add_closed; eauto.
-          { econs. econs. eapply add_closed_view; eauto.
-            eapply max_full_view_closed; eauto. }
-          { econs. ss. inv x0. ss.
-            specialize (MAX loc). inv MAX. des.
-            exploit max_ts_spec; try exact GET0. i. des.
-            etrans; eauto. econs. apply Time.incr_spec. }
-        * admit.
+    (* destruct (get loc to mem1) as [[from msg]|] eqn:GET1; cycle 1. *)
+    (* { exists mem1. splits; auto. *)
+    (*   econs; i; eauto; try congr. *)
+    (*   inv ADJ. congr. *)
+    (* } *)
+    (* exploit max_ts_spec; eauto. i. des. inv MAX. *)
+    (* - (* to <> max_ts loc mem1 *) *)
+    (*   exploit adjacent_exists; try exact GET1; eauto. i. des. *)
+    (*   exploit adjacent_ts; eauto. i. inv x1; cycle 1. *)
+    (*   { exists mem1. inv H0. splits; auto. econs; i; eauto. *)
+    (*     - exploit adjacent_inj; [exact x0|exact ADJ|..]. i. des. subst. *)
+    (*       timetac. *)
+    (*     - subst. timetac. } *)
+    (*   exploit (@add_exists mem1 loc to from2 Message.half); auto. *)
+    (*   { admit. } *)
+    (*   { econs. } *)
+    (*   i. des. exists mem2. splits. *)
+    (*   + econs; eauto. *)
+    (*   + admit. *)
+    (*   + eapply future_closed; try exact CLOSED1. *)
+    (*     econs; eauto. *)
+    (*   + ii. subst. *)
+    (*     assert (MAX: forall loc, max_ts loc mem1 = max_ts loc mem2) by admit. *)
+    (*     revert MSG. erewrite add_o; eauto. condtac; ss; i. *)
+    (*     * des. subst. inv MSG. inv x0. *)
+    (*       exploit max_ts_spec; try exact GET2; eauto. i. des. *)
+    (*       exploit get_ts; try exact GET2; eauto. i. des. *)
+    (*       { subst. inv TS. } *)
+    (*       { exfalso. rewrite MAX in *. *)
+    (*         eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt; eauto. } *)
+    (*     * guardH o. exploit HALF_WF_BACK1; try exact MSG; eauto. i. des. *)
+    (*       exploit add_get1; try exact x; eauto. *)
+    (* - (* to = max_ts loc mem1 *) *)
+    (*   exploit max_full_view_exists; try apply CLOSED1. i. des. *)
+    (*   destruct msg0. *)
+    (*   + exploit (@add_exists_max_ts mem1 loc (Time.incr (max_ts loc mem1)) *)
+    (*                                 (Message.full val (Some view))). *)
+    (*     { apply Time.incr_spec. } *)
+    (*     { econs. econs. eapply max_full_view_wf; eauto. } *)
+    (*     i. des. exists mem2. splits. *)
+    (*     * econs; eauto. econs; eauto. *)
+    (*       { econs. econs. eapply add_closed_view; eauto. *)
+    (*         eapply max_full_view_closed; eauto. } *)
+    (*       { econs. ss. inv x0. ss. *)
+    (*         specialize (MAX loc). inv MAX. des. *)
+    (*         exploit max_ts_spec; try exact GET0. i. des. *)
+    (*         etrans; eauto. econs. apply Time.incr_spec. } *)
+    (*     * admit. *)
+    (*     * eapply add_closed; eauto. *)
+    (*       { econs. econs. eapply add_closed_view; eauto. *)
+    (*         eapply max_full_view_closed; eauto. } *)
+    (*       { econs. ss. inv x0. ss. *)
+    (*         specialize (MAX loc). inv MAX. des. *)
+    (*         exploit max_ts_spec; try exact GET0. i. des. *)
+    (*         etrans; eauto. econs. apply Time.incr_spec. } *)
+    (*     * admit. *)
+    (*   + exploit HALF_WF_BACK1; try exact GET; eauto. i. des. *)
+    (*     exploit (@add_exists_max_ts mem1 loc (Time.incr (max_ts loc mem1)) *)
+    (*                                 (Message.full val' (Some view))). *)
+    (*     { apply Time.incr_spec. } *)
+    (*     { econs. econs. eapply max_full_view_wf; eauto. } *)
+    (*     i. des. exists mem2. splits. *)
+    (*     * econs; eauto. econs; eauto. *)
+    (*       { econs. econs. eapply add_closed_view; eauto. *)
+    (*         eapply max_full_view_closed; eauto. } *)
+    (*       { econs. ss. inv x0. ss. *)
+    (*         specialize (MAX loc). inv MAX. des. *)
+    (*         exploit max_ts_spec; try exact GET0. i. des. *)
+    (*         etrans; eauto. econs. apply Time.incr_spec. } *)
+    (*     * admit. *)
+    (*     * eapply add_closed; eauto. *)
+    (*       { econs. econs. eapply add_closed_view; eauto. *)
+    (*         eapply max_full_view_closed; eauto. } *)
+    (*       { econs. ss. inv x0. ss. *)
+    (*         specialize (MAX loc). inv MAX. des. *)
+    (*         exploit max_ts_spec; try exact GET0. i. des. *)
+    (*         etrans; eauto. econs. apply Time.incr_spec. } *)
+    (*     * admit. *)
   Admitted.
 
   Lemma cap_imm_cap_aux_cap_aux
-        mem1 mem2 mem3 loc to dom
-        (CAP1: cap_imm loc to mem1 mem2)
-        (CAP2: cap_aux dom mem2 mem3):
-    cap_aux ((loc, to) :: dom) mem1 mem3.
+        mem1 mem2 mem3 loc to dom view
+        (CAP1: cap_imm loc to view mem1 mem2)
+        (CAP2: cap_aux dom view mem2 mem3)
+        (DOM: forall loc to (IN: List.In (loc, to) dom),
+            exists from msg, get loc to mem1 = Some (from, msg)):
+    cap_aux ((loc, to) :: dom) view mem1 mem3.
   Proof.
     inv CAP1. inv CAP2. econs; i; eauto.
     - destruct (loc_ts_eq_dec (loc0, to1) (loc, to)); ss.
@@ -3647,11 +3646,27 @@ Module Memory.
         inv ADJ. econs; i; eauto.
         exploit EMPTY; eauto. i.
         destruct (get loc0 ts mem2) as [[f m]|] eqn:GET; auto.
-        exploit COMPLETE; try exact GET; i; des; try congr.
+        exploit COMPLETE; try exact GET. i. des; try congr. subst.
+        admit. (* to1 < to < to2 *)
     - destruct (loc_ts_eq_dec (loc0, to0) (loc, to)); ss.
       + guardH IN. inv a. exploit BACK; eauto. i. des.
         exists val. des; eauto.
-      + admit.
+      + inv IN; try by (des; congr). guardH o.
+        exploit (BACK0 loc0 from (max_ts loc0 mem1) msg); eauto.
+        { admit. }
+        { admit. }
+        i. des. destruct msg.
+        * subst. esplits; eauto.
+        * des. subst. exploit COMPLETE; eauto. i. des.
+          { esplits; eauto. }
+          subst. unguard. des; try congr.
+          exploit COMPLETE; try exact x1. i. des; try congr.
+          exploit (MIDDLE f from (max_ts loc mem1)); try congr.
+          { admit. }
+          { admit. }
+    - exploit COMPLETE0; eauto. i. des.
+      + exploit COMPLETE; eauto. i. des; eauto.
+        subst. right. splits; eauto.
   Admitted.
 
   Lemma cap_aux_exists
