@@ -722,6 +722,9 @@ Module Cell.
     destruct cell. destruct WF0. eauto.
   Qed.
 
+
+  (* max_full_ts *)
+
   Inductive max_full_ts (cell: t) (ts: Time.t): Prop :=
   | max_full_ts_intro
       (GET: exists from val released, get ts cell = Some (from, Message.full val released))
@@ -833,5 +836,172 @@ Module Cell.
     <<MAX: Time.le ts mts>>.
   Proof.
     inv MAX. des. esplits; eauto.
+  Qed.
+
+
+  (* existence of the next greater timestamp *)
+
+  Fixpoint next (t: Time.t) (l: list Time.t) (res: option Time.t): option Time.t :=
+    match l with
+    | [] => res
+    | hd :: tl =>
+      if (Time.le_lt_dec hd t)
+      then next t tl res
+      else
+        match res with
+        | Some res =>
+          if (Time.le_lt_dec res hd)
+          then next t tl (Some res)
+          else next t tl (Some hd)
+        | None => next t tl (Some hd)
+        end
+    end.
+
+  Lemma next_le
+        t1 t2 init l
+        (NEXT: next t1 l (Some init) = Some t2):
+    Time.le t2 init.
+  Proof.
+    revert init NEXT. induction l; ss; i.
+    - inv NEXT. refl.
+    - revert NEXT. repeat (condtac; ss); i.
+      + exploit IHl; try exact NEXT. i. auto.
+      + exploit IHl; try exact NEXT. i. auto.
+      + exploit IHl; try exact NEXT. i.
+        econs. eapply TimeFacts.le_lt_lt; eauto.
+  Qed.
+
+  Lemma next_spec_Some_aux
+        t1 t2 init l
+        (NEXT: next t1 l init = Some t2):
+    (init = Some t2 /\
+     forall ts (TS1: Time.lt t1 ts) (TS2: Time.lt ts t2),
+       ~ List.In ts l) \/
+    (List.In t2 l /\
+     Time.lt t1 t2 /\
+     forall ts (TS1: Time.lt t1 ts) (TS2: Time.lt ts t2),
+       ~ List.In ts l).
+  Proof.
+    revert t1 t2 init NEXT. induction l; ss; i.
+    { left. ss. }
+    revert NEXT. condtac; ss; i.
+    - exploit IHl; eauto. i. des.
+      + subst. left. split; auto. ii. des.
+        * subst. timetac.
+        * eapply x0; eauto.
+      + right. splits; eauto. ii. des.
+        * subst. timetac.
+        * eapply x1; eauto.
+    - destruct init0.
+      + revert NEXT. condtac; ss; i.
+        * exploit IHl; eauto. i. des.
+          { inv x. left. split; auto. ii. des.
+            - subst. timetac.
+            - eapply x0; eauto. }
+          { right. splits; eauto. ii. des.
+            - subst. exploit next_le; eauto. i.
+              rewrite l1 in x3. timetac.
+            - eapply x1; eauto. }
+        * exploit IHl; eauto. i. des.
+          { inv x. right. splits; eauto. ii. des.
+            - subst. timetac.
+            - eapply x0; eauto. }
+          { right. splits; eauto. ii. des.
+            - subst. exploit next_le; eauto. i. timetac.
+            - eapply x1; eauto. }
+      + right. exploit IHl; eauto. i. des.
+        * inv x. esplits; eauto. ii. des.
+          { subst. timetac. }
+          { eapply x0; eauto. }
+        * esplits; eauto. ii. des.
+          { subst. exploit next_le; eauto. i. timetac. }
+          { eapply x1; eauto. }
+  Qed.
+
+  Lemma next_spec_Some
+        t1 t2 l
+        (NEXT: next t1 l None = Some t2):
+    List.In t2 l /\
+    Time.lt t1 t2 /\
+    forall ts (TS1: Time.lt t1 ts) (TS2: Time.lt ts t2),
+      ~ List.In ts l.
+  Proof.
+    exploit next_spec_Some_aux; eauto. i.
+    des; try congr; eauto.
+  Qed.
+
+  Lemma next_spec_None_aux
+        t1 init l:
+    next t1 l (Some init) <> None.
+  Proof.
+    revert t1 init. induction l; ss; i.
+    repeat condtac; ss; eauto.
+  Qed.
+
+  Lemma next_spec_None
+        t1 l
+        (NEXT: next t1 l None = None):
+    forall ts (IN: List.In ts l),
+      Time.le ts t1.
+  Proof.
+    revert t1 NEXT. induction l; ss; i. des.
+    - subst. revert NEXT. condtac; ss; i.
+      specialize (next_spec_None_aux t1 ts l). congr.
+    - revert NEXT. condtac; ss; i.
+      + exploit IHl; eauto.
+      + specialize (next_spec_None_aux t1 a l). congr.
+  Qed.
+
+  Lemma in_prod
+        A B
+        (a: A)
+        (b: B)
+        (l: list (A * B))
+        (IN: List.In (a, b) l):
+    List.In a (List.map (fun x => fst x) l).
+  Proof.
+    revert a b IN. induction l; ss; i. des.
+    - destruct a. ss. inv IN. esplits; eauto.
+    - exploit IHl; eauto.
+  Qed.
+
+  Lemma in_prod_inv
+        A B
+        (a: A)
+        (l: list (A * B))
+        (IN: List.In a (List.map (fun x => fst x) l)):
+    exists b, List.In (a, b) l.
+  Proof.
+    revert a IN. induction l; ss; i. des.
+    - destruct a. ss. subst. esplits; eauto.
+    - exploit IHl; eauto. i. des. eauto.
+  Qed.
+
+  Lemma adjacent_exists
+        cell from1 to1 msg1
+        (GET1: get to1 cell = Some (from1, msg1))
+        (MAX: Time.lt to1 (max_ts cell)):
+    exists from2 to2 msg2,
+      get to2 cell = Some (from2, msg2) /\
+      Time.lt to1 to2 /\
+      forall ts (TS1: Time.lt to1 ts) (TS2: Time.lt ts to2),
+        get ts cell = None.
+  Proof.
+    destruct cell. unfold get in *. ss.
+    destruct (next to1 (List.map (fun x => fst x) (DOMap.elements raw0)) None) eqn:NEXT.
+    - exploit next_spec_Some; eauto. i. des.
+      exploit in_prod_inv; eauto. i. des. destruct b.
+      exploit DOMap.elements_complete; eauto. i.
+      esplits; try exact x4; eauto. i.
+      destruct (DOMap.find ts raw0) as [[]|] eqn:GET; ss.
+      exploit DOMap.elements_correct; try exact GET. i.
+      exploit in_prod; try exact x5. i.
+      exploit x2; eauto. ss.
+    - exploit (@max_ts_spec to1 from1 msg1 (Cell.mk WF0)); ss. i. des.
+      unfold get in *. ss.
+      exploit DOMap.elements_correct; try exact GET. i.
+      exploit in_prod; try exact x0. i.
+      exploit next_spec_None; eauto. i.
+      exploit TimeFacts.antisym; eauto. i. subst. timetac.
   Qed.
 End Cell.

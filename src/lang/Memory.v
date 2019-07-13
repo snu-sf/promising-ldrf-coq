@@ -3201,7 +3201,37 @@ Module Memory.
         (ADJ2: adjacent loc from2 to from4 to4 mem):
     from1 = from2 /\ from3 = from4 /\ to3 = to4.
   Proof.
-  Admitted.
+    inv ADJ1. inv ADJ2.
+    rewrite GET1 in GET0. inv GET0.
+    destruct (Time.le_lt_dec to3 to4); cycle 1.
+    { exfalso.
+      destruct (Time.le_lt_dec to4 from3).
+      - exploit EMPTY; try exact l0; eauto. i. congr.
+      - exploit get_ts; try exact GET2. i. des.
+        { subst. inv l. }
+        exploit get_ts; try exact GET3. i. des.
+        { subst. inv l0. }
+        exploit get_disjoint; [exact GET2|exact GET3|..]. i. des.
+        { subst. timetac. }
+        apply (x2 to4); econs; ss.
+        + econs. ss.
+        + refl. }
+    inv l.
+    { exfalso.
+      destruct (Time.le_lt_dec to3 from4).
+      - exploit EMPTY0; try exact l; eauto. i. congr.
+      - exploit get_ts; try exact GET2. i. des.
+        { subst. inv l. }
+        exploit get_ts; try exact GET3. i. des.
+        { subst. inv H. }
+        exploit get_disjoint; [exact GET2|exact GET3|..]. i. des.
+        { subst. timetac. }
+        apply (x2 to3); econs; ss.
+        + refl.
+        + econs. ss. }
+    inv H. rewrite GET2 in GET3. inv GET3.
+    splits; auto.
+  Qed.
 
   Lemma adjacent_exists
         loc from1 to1 msg mem
@@ -3210,7 +3240,14 @@ Module Memory.
     exists from2 to2,
       adjacent loc from1 to1 from2 to2 mem.
   Proof.
-  Admitted.
+    unfold get in *.
+    exploit Cell.adjacent_exists; eauto. i. des.
+    exists from2. exists to2. econs; i; eauto.
+    eapply x2; eauto.
+    eapply TimeFacts.le_lt_lt; eauto.
+    exploit get_ts; try exact x0. i. des; ss.
+    subst. inv x1.
+  Qed.
 
   Inductive cap (mem1 mem2: t): Prop :=
   | cap_intro
@@ -3898,7 +3935,8 @@ Module Memory.
         (HALF_WF_BACK1: half_wf_back mem1)
         (DOM: forall loc to (IN: List.In (loc, to) dom),
             exists from msg, get loc to mem1 = Some (from, msg))
-        (VIEW: closed_view view mem1):
+        (VIEW: closed_view view mem1)
+        (VIEW_WF: View.wf view):
     exists mem2,
       <<FUTURE: future mem1 mem2>> /\
       <<CAP: cap_aux dom view mem1 mem2>>.
@@ -3928,16 +3966,19 @@ Module Memory.
       <<FUTURE: future mem1 mem2>> /\
       <<CAP: cap mem1 mem2>>.
   Proof.
-    exploit finite_new_finite_non_init; try apply CLOSED1. i. inv x0.
+    exploit finite_new_finite_non_init; try apply CLOSED1. i. inv x0. des.
     hexploit half_wf_half_wf_back; eauto. i.
-    exploit (@cap_aux_exists mem1 x); eauto. i. des.
-    esplits; eauto.
+    exploit (@max_full_view_exists mem1); try apply CLOSED1. i. des.
+    exploit (@cap_aux_exists mem1 x view); eauto.
+    { eapply max_full_view_closed; eauto. }
+    { eapply max_full_view_wf; eauto. }
+    i. des. esplits; eauto.
     inv CAP. econs; i; eauto.
     - exploit MIDDLE; eauto.
       inv ADJ. eapply H; eauto.
       exists to2. esplits; eauto. ii. subst. inv TS.
+    - exploit max_full_view_inj; [exact x1|exact MAX|..]. i. subst. eauto.
     - exploit COMPLETE; eauto. i. des; eauto.
-      right. splits; eauto.
   Qed.
 
   Lemma cap_future
