@@ -135,11 +135,7 @@ Module Thread.
     Hint Constructors opt_step.
 
     Definition consistent (e:t): Prop :=
-      forall mem0 mem1
-        (CONCRETE: Memory.concrete e.(memory) mem0)
-        (WF: Local.wf e.(local) mem0)
-        (NOHALF: Memory.no_half e.(local).(Local.promises) mem0)
-        (CAP: Memory.cap mem0 mem1),
+      forall mem1 (CAP: Memory.cap e.(memory) mem1),
       exists e2,
         <<STEPS: rtc tau_step (mk e.(state) e.(local) e.(sc) mem1) e2>> /\
         <<PROMISES: e2.(local).(Local.promises) = Memory.bot>>.
@@ -150,11 +146,11 @@ Module Thread.
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
           (CLOSED1: Memory.closed e1.(memory))
-          (HALF_WF1: Memory.half_wf e1.(memory)):
+          (HALF1: Memory.half_wf e1.(memory)):
       <<WF2: Local.wf e2.(local) e2.(memory)>> /\
       <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
       <<CLOSED2: Memory.closed e2.(memory)>> /\
-      <<HALF_WF2: Memory.half_wf e2.(memory)>> /\
+      <<HALF2: Memory.half_wf e2.(memory)>> /\
       <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
       <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
       <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>>.
@@ -169,11 +165,11 @@ Module Thread.
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
           (CLOSED1: Memory.closed e1.(memory))
-          (HALF_WF1: Memory.half_wf e1.(memory)):
+          (HALF1: Memory.half_wf e1.(memory)):
       <<WF2: Local.wf e2.(local) e2.(memory)>> /\
       <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
       <<CLOSED2: Memory.closed e2.(memory)>> /\
-      <<HALF_WF2: Memory.half_wf e2.(memory)>> /\
+      <<HALF2: Memory.half_wf e2.(memory)>> /\
       <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
       <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
       <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>>.
@@ -186,11 +182,11 @@ Module Thread.
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
           (CLOSED1: Memory.closed e1.(memory))
-          (HALF_WF1: Memory.half_wf e1.(memory)):
+          (HALF1: Memory.half_wf e1.(memory)):
       <<WF2: Local.wf e2.(local) e2.(memory)>> /\
       <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
       <<CLOSED2: Memory.closed e2.(memory)>> /\
-      <<HALF_WF2: Memory.half_wf e2.(memory)>> /\
+      <<HALF2: Memory.half_wf e2.(memory)>> /\
       <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
       <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
       <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>>.
@@ -205,11 +201,11 @@ Module Thread.
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
           (CLOSED1: Memory.closed e1.(memory))
-          (HALF_WF1: Memory.half_wf e1.(memory)):
+          (HALF1: Memory.half_wf e1.(memory)):
       <<WF2: Local.wf e2.(local) e2.(memory)>> /\
       <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
       <<CLOSED2: Memory.closed e2.(memory)>> /\
-      <<HALF_WF2: Memory.half_wf e2.(memory)>> /\
+      <<HALF2: Memory.half_wf e2.(memory)>> /\
       <<TVIEW_FUTURE: TView.le e1.(local).(Local.tview) e2.(local).(Local.tview)>> /\
       <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
       <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>> /\
@@ -225,11 +221,11 @@ Module Thread.
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
           (CLOSED1: Memory.closed e1.(memory))
-          (HALF_WF1: Memory.half_wf e1.(memory)):
+          (HALF1: Memory.half_wf e1.(memory)):
       <<WF2: Local.wf e2.(local) e2.(memory)>> /\
       <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
       <<CLOSED2: Memory.closed e2.(memory)>> /\
-      <<HALF_WF2: Memory.half_wf e2.(memory)>> /\
+      <<HALF2: Memory.half_wf e2.(memory)>> /\
       <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
       <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
       <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>>.
@@ -244,11 +240,11 @@ Module Thread.
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
           (CLOSED1: Memory.closed e1.(memory))
-          (HALF_WF1: Memory.half_wf e1.(memory)):
+          (HALF1: Memory.half_wf e1.(memory)):
       <<WF2: Local.wf e2.(local) e2.(memory)>> /\
       <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
       <<CLOSED2: Memory.closed e2.(memory)>> /\
-      <<HALF_WF2: Memory.half_wf e2.(memory)>> /\
+      <<HALF2: Memory.half_wf e2.(memory)>> /\
       <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
       <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
       <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>>.
@@ -266,11 +262,11 @@ Module Thread.
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
           (CLOSED1: Memory.closed e1.(memory))
-          (HALF_WF1: Memory.half_wf e1.(memory)):
+          (HALF1: Memory.half_wf e1.(memory)):
       <<WF2: Local.wf e2.(local) e2.(memory)>> /\
       <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
       <<CLOSED2: Memory.closed e2.(memory)>> /\
-      <<HALF_WF2: Memory.half_wf e2.(memory)>> /\
+      <<HALF2: Memory.half_wf e2.(memory)>> /\
       <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
       <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
       <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>>.
@@ -285,11 +281,11 @@ Module Thread.
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
           (CLOSED1: Memory.closed e1.(memory))
-          (HALF_WF1: Memory.half_wf e1.(memory)):
+          (HALF1: Memory.half_wf e1.(memory)):
       <<WF2: Local.wf e2.(local) e2.(memory)>> /\
       <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
       <<CLOSED2: Memory.closed e2.(memory)>> /\
-      <<HALF_WF2: Memory.half_wf e2.(memory)>> /\
+      <<HALF2: Memory.half_wf e2.(memory)>> /\
       <<TVIEW_FUTURE: TView.le e1.(local).(Local.tview) e2.(local).(Local.tview)>> /\
       <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
       <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>> /\
@@ -308,7 +304,7 @@ Module Thread.
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
           (CLOSED1: Memory.closed e1.(memory))
-          (HALF_WF1: Memory.half_wf e1.(memory))
+          (HALF1: Memory.half_wf e1.(memory))
           (DISJOINT1: Local.disjoint e1.(local) lc)
           (WF: Local.wf lc e1.(memory)):
       <<DISJOINT2: Local.disjoint e2.(local) lc>> /\
@@ -337,7 +333,7 @@ Module Thread.
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
           (CLOSED1: Memory.closed e1.(memory))
-          (HALF_WF1: Memory.half_wf e1.(memory))
+          (HALF1: Memory.half_wf e1.(memory))
           (DISJOINT1: Local.disjoint e1.(local) lc)
           (WF: Local.wf lc e1.(memory)):
       <<DISJOINT2: Local.disjoint e2.(local) lc>> /\
@@ -353,7 +349,7 @@ Module Thread.
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
           (CLOSED1: Memory.closed e1.(memory))
-          (HALF_WF1: Memory.half_wf e1.(memory))
+          (HALF1: Memory.half_wf e1.(memory))
           (DISJOINT1: Local.disjoint e1.(local) lc)
           (WF: Local.wf lc e1.(memory)):
       <<DISJOINT2: Local.disjoint e2.(local) lc>> /\
@@ -369,7 +365,7 @@ Module Thread.
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
           (CLOSED1: Memory.closed e1.(memory))
-          (HALF_WF1: Memory.half_wf e1.(memory))
+          (HALF1: Memory.half_wf e1.(memory))
           (DISJOINT1: Local.disjoint e1.(local) lc)
           (WF: Local.wf lc e1.(memory)):
       <<DISJOINT2: Local.disjoint e2.(local) lc>> /\
@@ -387,7 +383,7 @@ Module Thread.
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
           (CLOSED1: Memory.closed e1.(memory))
-          (HALF_WF1: Memory.half_wf e1.(memory))
+          (HALF1: Memory.half_wf e1.(memory))
           (DISJOINT1: Local.disjoint e1.(local) lc)
           (WF: Local.wf lc e1.(memory)):
       <<DISJOINT2: Local.disjoint e2.(local) lc>> /\

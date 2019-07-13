@@ -151,7 +151,7 @@ Module Configuration.
       (WF: Threads.wf conf.(threads) conf.(memory))
       (SC: Memory.closed_timemap conf.(sc) conf.(memory))
       (MEM: Memory.closed conf.(memory))
-      (HALF_WF: Memory.half_wf conf.(memory))
+      (HALF: Memory.half_wf conf.(memory))
   .
 
   Definition consistent (conf:t): Prop :=

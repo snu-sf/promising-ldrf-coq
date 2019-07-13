@@ -61,13 +61,13 @@ Module TView <: JoinableType.
     inv CLOSED. econs; i; eapply Memory.future_closed_view; eauto.
   Qed.
 
-  Lemma concrete_closed
+  Lemma cap_closed
         tview mem1 mem2
         (CLOSED: closed tview mem1)
-        (CONCRETE: Memory.concrete mem1 mem2):
+        (CAP: Memory.cap mem1 mem2):
     closed tview mem2.
   Proof.
-    inv CLOSED. econs; eauto using Memory.concrete_closed_view; eauto.
+    inv CLOSED. econs; i; eapply Memory.cap_closed_view; eauto.
   Qed.
 
   Lemma promise_closed

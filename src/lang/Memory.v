@@ -2778,6 +2778,15 @@ Module Memory.
       + subst. exploit BACK; eauto. i. des. congr.
   Qed.
 
+  Lemma cap_le
+        promises mem1 mem2
+        (CAP: cap mem1 mem2)
+        (LE: le promises mem1):
+    le promises mem2.
+  Proof.
+    ii. inv CAP. eauto.
+  Qed.
+
 
   (* Existence of cap *)
 
