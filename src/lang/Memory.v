@@ -2530,6 +2530,7 @@ Module Memory.
       rewrite <- x0 in *. eauto.
   Qed.
 
+
   (* cap *)
 
   Definition loc_non_init (loc: Loc.t) (mem: t): Prop :=
