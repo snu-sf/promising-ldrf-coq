@@ -92,7 +92,6 @@ Proof.
     - auto.
     - econs. s. etrans; eauto. apply RegFile.eq_except_singleton.
   }
-  { i. eapply SimPromises.concrete_cap; try apply LOCAL; eauto. }
   { i. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }

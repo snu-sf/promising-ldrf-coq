@@ -285,9 +285,6 @@ Lemma sim_acquired_sim_thread:
 Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss; ii.
   - inv TERMINAL_TGT. inv PR; ss.
-  - exploit sim_acquired_mon; eauto. i.
-    eapply SimPromises.concrete_cap; eauto.
-    inv PR. apply LOCAL.
   - esplits; eauto.
     inv PR. eapply sim_local_memory_bot; eauto.
   - exploit sim_acquired_mon; eauto. i.
@@ -343,7 +340,6 @@ Lemma split_acquire_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { inv TERMINAL_TGT. }
-  { eapply SimPromises.concrete_cap; try apply LOCAL; eauto. }
   { esplits; eauto.
     inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   }
