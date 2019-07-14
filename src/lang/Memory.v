@@ -2450,45 +2450,85 @@ Module Memory.
 
   (* no_half *)
 
-  Definition no_half (promises mem: t): Prop :=
-    forall loc to from
-      (GET: get loc to mem = Some (from, Message.half)),
-      get loc to promises = Some (from, Message.half).
+  Definition no_half (mem: t): Prop :=
+    forall loc,
+    exists from val released,
+      get loc (max_ts loc mem) mem = Some (from, Message.full val released).
 
-  Lemma no_half_bot_max_ts
+  Lemma no_half_max_ts
         mem loc mts
-        (NOHALF: no_half bot mem)
+        (NOHALF: no_half mem)
         (MAX: max_full_ts mem loc mts):
     mts = max_ts loc mem.
   Proof.
-    inv MAX. des.
-    exploit max_ts_spec; eauto. i. des.
-    apply TimeFacts.antisym; eauto.
-    destruct msg.
-    - eapply MAX0; eauto.
-    - exploit NOHALF; eauto. i.
-      rewrite bot_get in x. inv x.
+    apply TimeFacts.antisym.
+    - inv MAX. des.
+      exploit max_ts_spec; eauto. i. des. auto.
+    - inv MAX. specialize (NOHALF loc). des.
+      exploit MAX0; try exact NOHALF. i. auto.
   Qed.
 
-  Lemma promise_no_half
+  Definition no_half_except (promises mem: t): Prop :=
+    forall loc from
+      (GET: get loc (max_ts loc mem) mem = Some (from, Message.half)),
+      get loc (max_ts loc mem) promises = Some (from, Message.half).
+
+  Lemma no_half_no_half_except
+        promises mem
+        (NOHALF: no_half mem):
+    no_half_except promises mem.
+  Proof.
+    ii. specialize (NOHALF loc). des. congr.
+  Qed.
+
+  Lemma no_half_except_bot_no_half
+        mem
+        (INHABITED: inhabited mem)
+        (NOHALF: no_half_except bot mem):
+    no_half mem.
+  Proof.
+    ii. exploit (@max_ts_spec loc); try apply INHABITED. i. des.
+    destruct msg; eauto.
+    exploit NOHALF; eauto. i.
+    rewrite bot_get in *. congr.
+  Qed.
+
+  Lemma promise_no_half_except
         promises1 promises2 mem1 mem2
         loc from to msg kind
         (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
-        (NOHALF1: no_half promises1 mem1):
-    no_half promises2 mem2.
+        (NOHALF1: no_half_except promises1 mem1):
+    no_half_except promises2 mem2.
   Proof.
     ii. inv PROMISE.
     - erewrite add_o; try exact PROMISES.
       erewrite add_o in GET; try exact MEM.
       condtac; eauto.
+      guardH o.
+      exploit max_ts_spec; try exact GET. i. des.
+      exploit add_get1; try exact GET0; eauto. i.
+      exploit max_ts_spec; try exact x0. i. des.
+      exploit TimeFacts.antisym; eauto. i.
+      rewrite <- x1 in *. eauto.
     - erewrite split_o; try exact PROMISES.
       erewrite split_o in GET; try exact MEM.
       repeat condtac; eauto.
+      guardH o. guardH o0.
+      exploit max_ts_spec; try exact GET. i. des.
+      exploit split_get1; try exact GET0; eauto. i. des.
+      exploit max_ts_spec; try exact GET2. i. des.
+      exploit TimeFacts.antisym; eauto. i.
+      rewrite <- x0 in *. eauto.
     - erewrite lower_o; try exact PROMISES.
       erewrite lower_o in GET; try exact MEM.
       condtac; eauto.
+      guardH o.
+      exploit max_ts_spec; try exact GET. i. des.
+      exploit lower_get1; try exact GET0; eauto. i. des.
+      exploit max_ts_spec; try exact GET2. i. des.
+      exploit TimeFacts.antisym; eauto. i.
+      rewrite <- x0 in *. eauto.
   Qed.
-
 
   (* cap *)
 
@@ -2785,6 +2825,67 @@ Module Memory.
     le promises mem2.
   Proof.
     ii. inv CAP. eauto.
+  Qed.
+
+  Lemma cap_half_wf
+        mem1 mem2
+        (CAP: cap mem1 mem2)
+        (CLOSED: closed mem1):
+    half_wf mem2.
+  Proof.
+    ii. exploit cap_inv; eauto. i. des; try congr.
+    - inv CAP.
+      exploit max_ts_spec; eauto. i. des.
+      exploit SOUND; try exact GET. i.
+      exploit max_ts_spec; try exact x. i. des.
+      exploit TimeFacts.antisym; eauto. i.
+      rewrite <- x2 in *.
+      clear from0 msg GET MAX x from1 msg0 GET0 MAX0.
+      exploit max_full_view_exists; try eapply CLOSED. i. des.
+      exploit (BACK loc); eauto.
+      { exists (max_ts loc mem1).
+        esplits; eauto. ii. rewrite H in *.
+        inv CLOSED. rewrite INHABITED in *. inv x0. }
+      i. des.
+      exploit max_ts_spec; try exact x3. i. des.
+      specialize (Time.incr_spec (max_ts loc mem2)). i.
+      rewrite x2 in *. timetac.
+    - inv x1. exploit get_ts; try exact GET2. i. des.
+      { subst. inv TS. }
+      inv CAP. exploit SOUND; try exact GET2. i.
+      exploit max_ts_spec; try exact x. i. des. timetac.
+  Qed.
+
+  Lemma cap_no_half
+        mem1 mem2
+        (CAP: cap mem1 mem2)
+        (CLOSED: closed mem1):
+    no_half mem2.
+  Proof.
+    ii. exploit (@max_ts_spec loc).
+    { inv CLOSED. inv CAP. eapply SOUND; eauto. }
+    i. des.
+    destruct msg; eauto. clear MAX.
+    exploit cap_inv; eauto. i. des; try congr.
+    - inv CAP.
+      exploit max_ts_spec; try exact x0. i. des.
+      exploit SOUND; try exact GET0. i.
+      exploit max_ts_spec; try exact x. i. des.
+      exploit TimeFacts.antisym; eauto. i.
+      clear from0 msg GET0 MAX x from1 msg0 GET1 MAX0.
+      exploit max_full_view_exists; try eapply CLOSED. i. des.
+      exploit (BACK loc); try exact x0; eauto.
+      { exists (max_ts loc mem2).
+        esplits; eauto. ii. rewrite H in *.
+        inv CLOSED. rewrite INHABITED in *. inv x0. }
+      i. des.
+      exploit max_ts_spec; try exact x3. i. des.
+      specialize (Time.incr_spec (max_ts loc mem2)). i. timetac.
+    - inv CAP. inv x1.
+      exploit get_ts; try exact GET2. i. des.
+      { subst. inv TS. }
+      exploit SOUND; try exact GET2. i.
+      exploit max_ts_spec; try exact x. i. des. timetac.
   Qed.
 
 

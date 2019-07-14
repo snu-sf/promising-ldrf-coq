@@ -578,17 +578,17 @@ Proof.
   inv TGT; ss. econs. eapply sim_memory_closed_opt_view; eauto.
 Qed.
 
-Lemma concrete_covered
-      mem1 mem2 loc ts
-      (CONCRETE: Memory.concrete mem1 mem2):
-  covered loc ts mem1 <-> covered loc ts mem2.
+Lemma sim_memory_adjacent_src
+      mem_src mem_tgt
+      loc from1 to1 from2 to2
+      (SIM: sim_memory mem_src mem_tgt)
+      (CLOSED_SRC: Memory.closed mem_src)
+      (CLOSED_TGT: Memory.closed mem_tgt)
+      (ADJ: Memory.adjacent loc from1 to1 from2 to2 mem_src):
+  exists from1' to2',
+    Memory.adjacent loc from1' to1 from2 to2' mem_tgt.
 Proof.
-  inv CONCRETE. split; i.
-  - inv H. exploit SOUND; eauto.
-    i. des; subst; econs; eauto.
-  - inv H. exploit COMPLETE; eauto.
-    i. des; subst; econs; eauto.
-Qed.
+Admitted.
 
 Lemma sim_memory_cap
       mem1_src mem2_src

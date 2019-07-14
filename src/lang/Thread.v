@@ -394,34 +394,48 @@ Module Thread.
       apply tau_union.
     Qed.
 
-    Lemma step_no_half pf e e1 e2
+    Definition no_half_except (e: t) :=
+      Memory.no_half_except e.(local).(Local.promises) e.(memory).
+
+    Lemma step_no_half_except
+          pf e e1 e2
           (STEP: step pf e e1 e2)
-          (NOHALF1: Memory.no_half e1.(local).(Local.promises) e1.(memory)):
-      <<NOHALF2: Memory.no_half e2.(local).(Local.promises) e2.(memory)>>.
+          (NOHALF1: no_half_except e1):
+      no_half_except e2.
     Proof.
       inv STEP; inv STEP0.
-      - eapply Local.promise_step_no_half; eauto.
-      - eapply Local.program_step_no_half; eauto.
+      - eapply Local.promise_step_no_half_except; eauto.
+      - eapply Local.program_step_no_half_except; eauto.
     Qed.
 
-    Lemma rtc_all_step_no_half e1 e2
-          (STEP: rtc all_step e1 e2)
-          (NOHALF1: Memory.no_half e1.(local).(Local.promises) e1.(memory)):
-      <<NOHALF2: Memory.no_half e2.(local).(Local.promises) e2.(memory)>>.
-    Proof.
-      induction STEP; auto.
-      inv H. inv USTEP.
-      hexploit step_no_half; eauto.
-    Qed.
-
-    Lemma rtc_tau_step_no_half e1 e2
+    Lemma rtc_tau_step_no_half_except
+          e1 e2
           (STEP: rtc tau_step e1 e2)
-          (NOHALF1: Memory.no_half e1.(local).(Local.promises) e1.(memory)):
-      <<NOHALF2: Memory.no_half e2.(local).(Local.promises) e2.(memory)>>.
+          (NOHALF1: no_half_except e1):
+      no_half_except e2.
     Proof.
-      eapply rtc_all_step_no_half; try exact NOHALF1.
-      eapply rtc_implies; [|eauto].
-      apply tau_union.
+      induction STEP; ss; i.
+      eapply IHSTEP. inv H. inv TSTEP.
+      eapply step_no_half_except; eauto.
+    Qed.
+
+    Lemma rtc_tau_step_bot_no_half
+          e1 e2
+          (STEP: rtc tau_step e1 e2)
+          (WF1: Local.wf e1.(local) e1.(memory))
+          (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
+          (CLOSED1: Memory.closed e1.(memory))
+          (HALF1: Memory.half_wf e1.(memory))
+          (NOHALF1: Memory.no_half e1.(memory))
+          (PROMISES2: e2.(local).(Local.promises) = Memory.bot):
+      Memory.no_half e2.(memory).
+    Proof.
+      exploit rtc_tau_step_future; eauto. i. des.
+      hexploit rtc_tau_step_no_half_except; eauto; i.
+      { eapply Memory.no_half_no_half_except; eauto. }
+      unfold no_half_except in *. rewrite PROMISES2 in *.
+      eapply Memory.no_half_except_bot_no_half; eauto.
+      apply CLOSED2.
     Qed.
   End Thread.
 End Thread.
