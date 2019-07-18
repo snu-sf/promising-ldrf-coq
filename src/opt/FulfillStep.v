@@ -61,6 +61,17 @@ Proof.
   esplits; eauto. refl.
 Qed.
 
+Lemma fulfill_step_cap
+      lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2
+      mem2
+      (STEP: fulfill_step lc1 sc1 loc from to val releasedm released ord lc2 sc2)
+      (CAP: Memory.cap lc1.(Local.promises) mem1 mem2):
+  Memory.cap lc2.(Local.promises) mem1 mem2.
+Proof.
+  inv STEP. destruct lc1. ss.
+  eapply Memory.remove_cap; eauto.
+Qed.
+
 Lemma write_promise_fulfill
       lc0 sc0 mem0 loc from to val releasedm released ord lc2 sc2 mem2 kind
       (WRITE: Local.write_step lc0 sc0 mem0 loc from to val releasedm released ord lc2 sc2 mem2 kind)

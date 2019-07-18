@@ -133,7 +133,7 @@ Proof.
   exploit future_fulfill_step; try exact FULFILL; eauto.
   { by inv REORDER. }
   i. des.
-  assert (CAP_SRC2: Memory.cap lc2_src.(Local.promises) mem1_src mem2_src) by admit.
+  exploit fulfill_step_cap; eauto. i.
   exploit SimPromises.cap; try exact MEM1; eauto.
   { inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite <- PROMISES.
     apply SimPromises.sem_bot.
@@ -143,7 +143,7 @@ Proof.
   exploit cap_property; try exact CAP_TGT; eauto. i. des.
   esplits; eauto.
   econs; eauto using Memory.future_closed_timemap.
-Admitted.
+Qed.
 
 Lemma sim_store_step
       st1_src lc1_src sc1_src mem1_src

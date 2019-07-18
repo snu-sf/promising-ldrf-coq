@@ -195,7 +195,9 @@ Proof.
   }
   i. des.
   exploit fulfill_step_future; eauto. i. des.
-  assert (CAP_SRC2: Memory.cap lc3_src.(Local.promises) mem1_src mem2_src) by admit.
+  exploit Local.read_step_promises; try exact READ. i.
+  rewrite x2 in CAP_SRC.
+  exploit fulfill_step_cap; try exact FULFILL; eauto. i.
   exploit SimPromises.cap; try apply MEM1; eauto.
   { inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite <- PROMISES.
     apply SimPromises.sem_bot.
@@ -205,7 +207,10 @@ Proof.
   esplits; eauto.
   econs; [eauto|..]; s; eauto using Memory.future_closed_timemap.
   etrans; eauto.
-Admitted.
+Grab Existential Variables.
+  { auto. }
+  { auto. }
+Qed.
 
 Lemma sim_update_step
       st1_src lc1_src sc1_src mem1_src

@@ -2922,6 +2922,26 @@ Module Memory.
       exploit max_ts_spec; try exact x. i. des. timetac.
   Qed.
 
+  Lemma remove_cap
+        promises1 mem1 mem2
+        loc from to val released promises2
+        (CAP1: cap promises1 mem1 mem2)
+        (REMOVE: remove promises1 loc from to (Message.full val released) promises2):
+    cap promises2 mem1 mem2.
+  Proof.
+    inv CAP1. econs; i; eauto.
+    - eapply BACK; eauto.
+      unfold half_non_promise in *. des_ifs.
+      + revert Heq0. erewrite remove_o; eauto. condtac; ss; congr.
+      + revert Heq0. erewrite remove_o; eauto. condtac; ss; try congr.
+        des. subst. exploit remove_get0; eauto. i. des. congr.
+    - exploit COMPLETE; eauto. i. des. splits; eauto. i.
+      exploit x1; eauto. i.
+      unfold half_non_promise in *. des_ifs.
+      + revert Heq. erewrite remove_o; eauto. condtac; ss; congr.
+      + revert Heq. erewrite remove_o; eauto. condtac; ss; try congr.
+  Qed.
+
 
   (* Existence of cap *)
 
