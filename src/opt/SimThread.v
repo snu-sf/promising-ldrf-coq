@@ -85,6 +85,12 @@ Section SimulationThread.
           <<TERMINAL_SRC: lang_src.(Language.is_terminal) st2_src>> /\
           <<LOCAL: sim_local SimPromises.bot lc2_src lc1_tgt>> /\
           <<TERMINAL: sim_terminal st2_src st1_tgt>>>> /\
+      <<CAP:
+        forall mem2_src
+          (CAP_SRC: Memory.cap lc1_src.(Local.promises) mem1_src mem2_src),
+        exists mem2_tgt,
+          <<MEMORY: sim_memory mem2_src mem2_tgt>> /\
+          <<CAP_TGT: Memory.cap lc1_tgt.(Local.promises) mem1_tgt mem2_tgt>>>> /\
       <<PROMISES:
         forall (PROMISES_TGT: lc1_tgt.(Local.promises) = Memory.bot)
           (NOHALF: Memory.no_half mem1_tgt),
@@ -335,23 +341,25 @@ Qed.
 
 Lemma cap_property
       mem1 mem2 lc sc
-      (CAP: Memory.cap mem1 mem2)
+      (CAP: Memory.cap lc.(Local.promises) mem1 mem2)
       (WF: Local.wf lc mem1)
       (SC: Memory.closed_timemap sc mem1)
       (CLOSED: Memory.closed mem1)
       (HALF: Memory.half_wf mem1):
+  <<FUTURE: Memory.future mem1 mem2>> /\
   <<WF: Local.wf lc mem2>> /\
   <<SC: Memory.closed_timemap sc mem2>> /\
   <<CLOSED: Memory.closed mem2>> /\
   <<HALF: Memory.half_wf mem2>> /\
-  <<NOHALF: Memory.no_half mem2>>.
+  <<NOHALF: Memory.no_half_except lc.(Local.promises) mem2>>.
 Proof.
   splits.
+  - eapply Memory.cap_future; eauto.
   - eapply Local.cap_wf; eauto.
   - eapply Memory.cap_closed_timemap; eauto.
   - eapply Memory.cap_closed; eauto.
   - eapply Memory.cap_half_wf; eauto.
-  - eapply Memory.cap_no_half; eauto.
+  - eapply Memory.cap_no_half_except; eauto. apply WF.
 Qed.
 
 Lemma sim_thread_consistent
@@ -376,17 +384,19 @@ Proof.
   generalize SIM. intro X.
   punfold X. exploit X; eauto; try refl. i. des.
   ii. ss.
-  exploit Memory.cap_exists; try exact MEM_TGT; eauto. i. des.
-  exploit Memory.cap_future; try exact CAP; eauto. i.
-  exploit CONSISTENT; eauto. i. des.
-  exploit sim_memory_cap; try exact MEMORY; eauto. i.
-  exploit cap_property; try exact CAP; eauto. i. des.
+  exploit CAP; eauto. i. des.
+  exploit CONSISTENT; eauto. s. i. des.
   exploit cap_property; try exact CAP0; eauto. i. des.
-  exploit sim_thread_rtc_step; try apply x1; eauto; s.
+  exploit cap_property; try exact CAP_TGT; eauto. i. des.
+  exploit sim_thread_rtc_step; try apply STEPS; eauto; s.
   { eapply sim_thread_future; eauto; try refl. }
   i. des. destruct e2. ss.
   punfold SIM0. exploit SIM0; eauto; try refl. i. des.
-  hexploit Thread.rtc_tau_step_bot_no_half; try exact STEPS; eauto. s. i.
+  hexploit Thread.rtc_tau_step_no_half_except; try exact STEPS; eauto. i.
+  unfold Thread.no_half_except in H. ss.
+  rewrite PROMISES0 in *.
+  hexploit Memory.no_half_except_bot_no_half; eauto; i.
+  { apply MEM_TGT0. }
   exploit PROMISES1; eauto. i. des.
   eexists (Thread.mk _ _ _ _ _). splits; [|eauto].
   etrans; eauto.

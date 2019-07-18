@@ -2855,10 +2855,10 @@ Module Memory.
   Qed.
 
   Lemma cap_le
-        promises mem1 mem2
+        promises' promises mem1 mem2
         (CAP: cap promises mem1 mem2)
-        (LE: le promises mem1):
-    le promises mem2.
+        (LE: le promises' mem1):
+    le promises' mem2.
   Proof.
     ii. inv CAP. eauto.
   Qed.

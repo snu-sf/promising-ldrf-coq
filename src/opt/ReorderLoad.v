@@ -114,6 +114,35 @@ Proof.
   econs; eauto. etrans; eauto.
 Qed.
 
+Lemma sim_load_cap
+      st_src lc_src sc1_src mem1_src
+      st_tgt lc_tgt sc1_tgt mem1_tgt
+      mem2_src
+      (MEM1: sim_memory mem1_src mem1_tgt)
+      (SIM1: sim_load st_src lc_src sc1_src mem1_src
+                      st_tgt lc_tgt sc1_tgt mem1_tgt)
+      (CAP_SRC: Memory.cap lc_src.(Local.promises) mem1_src mem2_src):
+  exists lc'_src mem2_tgt,
+    <<MEM2: sim_memory mem2_src mem2_tgt>> /\
+    <<CAP_TGT: Memory.cap lc_tgt.(Local.promises) mem1_tgt mem2_tgt>> /\
+    <<SIM2: sim_load st_src lc'_src sc1_src mem2_src
+                     st_tgt lc_tgt sc1_tgt mem2_tgt>>.
+Proof.
+  inv SIM1.
+  exploit Memory.cap_future; try exact CAP_SRC; eauto. i.
+  exploit future_read_step; try exact READ; eauto. i. des.
+  exploit SimPromises.cap; try apply MEM1; eauto.
+  { inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite <- PROMISES.
+    inv READ. ss. apply SimPromises.sem_bot.
+  }
+  i. des.
+  exploit cap_property; try exact CAP_SRC; eauto. i. des.
+  exploit cap_property; try exact CAP_TGT; eauto. i. des.
+  esplits; eauto.
+  econs; eauto using Memory.future_closed_timemap.
+  etrans; eauto.
+Qed.
+
 Lemma sim_load_step
       st1_src lc1_src sc1_src mem1_src
       st1_tgt lc1_tgt sc1_tgt mem1_tgt
@@ -234,6 +263,9 @@ Lemma sim_load_sim_thread:
 Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss; ii.
   - inv TERMINAL_TGT. inv PR; ss.
+  - exploit sim_load_mon; eauto. i.
+    exploit sim_load_cap; try apply x0; eauto. i. des.
+    esplits; eauto.
   - esplits; eauto.
     inv PR. inv READ. inv LOCAL. ss.
     apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.

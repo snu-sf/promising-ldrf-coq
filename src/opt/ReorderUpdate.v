@@ -141,6 +141,72 @@ Grab Existential Variables.
 { econs. econs 3. }
 Qed.
 
+Lemma sim_update_cap
+      st_src lc_src sc1_src mem1_src
+      st_tgt lc_tgt sc1_tgt mem1_tgt
+      mem2_src
+      (MEM1: sim_memory mem1_src mem1_tgt)
+      (SIM1: sim_update st_src lc_src sc1_src mem1_src
+                        st_tgt lc_tgt sc1_tgt mem1_tgt)
+      (CAP_SRC: Memory.cap lc_src.(Local.promises) mem1_src mem2_src):
+  exists lc'_src mem2_tgt,
+    <<MEM2: sim_memory mem2_src mem2_tgt>> /\
+    <<CAP_TGT: Memory.cap lc_tgt.(Local.promises) mem1_tgt mem2_tgt>> /\
+    <<SIM2: sim_update st_src lc'_src sc1_src mem2_src
+                       st_tgt lc_tgt sc1_tgt mem2_tgt>>.
+Proof.
+  inv SIM1.
+  exploit Memory.cap_future; eauto. i.
+  exploit cap_property; try exact CAP_SRC; eauto. i. des.
+  destruct vw1 as [vw1|]; cycle 1.
+  { ss. des. subst.
+    exploit future_read_step; try exact READ; eauto. i. des.
+    exploit SimPromises.cap; try apply MEM1; eauto.
+    { inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite <- PROMISES.
+      inv READ. ss. apply SimPromises.sem_bot.
+    }
+    i. des.
+    exploit cap_property; try exact CAP_TGT; eauto. i. des.
+    esplits; eauto.
+    econs; [eauto|..]; s; eauto using Memory.future_closed_timemap.
+    etrans; eauto.
+  }
+  exploit Local.read_step_future; eauto. i. des.
+  exploit fulfill_step_future; eauto; try by viewtac. i. des.
+  exploit future_read_step; try exact READ; eauto. i. des.
+  exploit Local.read_step_future; eauto. i. des.
+  exploit future_fulfill_step; try exact FULFILL; eauto; try refl; try by viewtac.
+  { by inv REORDER. }
+  i. des.
+  exploit fulfill_step_future; try apply x1; try exact WF1; eauto; try by viewtac.
+  { econs.
+    - apply WF2.
+    - eapply TView.future_closed; eauto. apply WF2.
+    - inv READ. ss. apply WF.
+    - apply WF2.
+  }
+  i. des.
+  exploit sim_local_fulfill_bot; try exact x1; try exact LOCAL0; try refl; eauto.
+  { econs.
+    - apply WF2.
+    - eapply TView.future_closed; eauto. apply WF2.
+    - inv READ. apply WF.
+    - apply WF2.
+  }
+  i. des.
+  exploit fulfill_step_future; eauto. i. des.
+  assert (CAP_SRC2: Memory.cap lc3_src.(Local.promises) mem1_src mem2_src) by admit.
+  exploit SimPromises.cap; try apply MEM1; eauto.
+  { inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite <- PROMISES.
+    apply SimPromises.sem_bot.
+  }
+  i. des.
+  exploit cap_property; try exact CAP_TGT; eauto. i. des.
+  esplits; eauto.
+  econs; [eauto|..]; s; eauto using Memory.future_closed_timemap.
+  etrans; eauto.
+Admitted.
+
 Lemma sim_update_step
       st1_src lc1_src sc1_src mem1_src
       st1_tgt lc1_tgt sc1_tgt mem1_tgt
@@ -393,6 +459,9 @@ Lemma sim_update_sim_thread:
 Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss; ii.
   - inv TERMINAL_TGT. inv PR; ss.
+  - exploit sim_update_mon; eauto. i. des.
+    exploit sim_update_cap; try apply x0; eauto. i. des.
+    esplits; eauto.
   - exploit sim_update_mon; eauto. i.
     inversion x0. subst. i.
     exploit (progress_program_step (RegFun.add r1 (fst (RegFile.eval_rmw rs rmw1 vr1)) rs) i2 nil); eauto. i. des.

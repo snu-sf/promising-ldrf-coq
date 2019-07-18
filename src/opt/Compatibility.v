@@ -305,6 +305,7 @@ Proof.
     destruct lc_src, lc_tgt. ss. subst.
     splits; s; ii.
     { inv TERMINAL_TGT. ss. esplits; eauto; ss. }
+    { exploit SimPromises.cap; try eapply LOCAL; eauto. }
     { subst. esplits; eauto. }
     inv STEP_TGT; try by inv STEP; inv STATE.
     inv STEP; ss.
@@ -336,6 +337,7 @@ Proof.
       + etrans; [|eauto].
         eapply rtc_internal_step_seq in STEPS. eauto.
     }
+    { eapply CAP; eauto. }
     { exploit PROMISES; eauto. i. des.
       destruct lc_tgt, st2_src, lc2_src. ss. subst.
       esplits; [|eauto].
@@ -373,6 +375,7 @@ Proof.
     destruct lc_src, lc_tgt. ss. subst.
     splits; s; ii.
     { inv TERMINAL_TGT. }
+    { exploit SimPromises.cap; try apply LOCAL; eauto. }
     { ss. subst. esplits; eauto. }
     inv STEP_TGT; ss.
     + (* promise *)
@@ -405,6 +408,7 @@ Proof.
     destruct lc_src, lc_tgt. ss. subst.
     splits; s; ii.
     { inv TERMINAL_TGT. }
+    { exploit SimPromises.cap; try apply LOCAL; eauto. }
     { ss. subst. esplits; eauto. }
     inv STEP_TGT; ss.
     + (* promise *)

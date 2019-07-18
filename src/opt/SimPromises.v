@@ -398,4 +398,25 @@ Module SimPromises.
       + inv SEM. exploit COMPLETE; eauto. i. inv x.
       + ss.
   Qed.
+
+  Lemma cap
+        pview
+        lc_src mem1_src mem2_src
+        lc_tgt mem1_tgt
+        (INV1: sem pview bot lc_src.(Local.promises) lc_tgt.(Local.promises))
+        (MEM1: sim_memory mem1_src mem1_tgt)
+        (CAP_SRC: Memory.cap lc_src.(Local.promises) mem1_src mem2_src)
+        (WF1_SRC: Local.wf lc_src mem1_src)
+        (WF1_TGT: Local.wf lc_tgt mem1_tgt)
+        (MEM1_SRC: Memory.closed mem1_src)
+        (MEM1_TGT: Memory.closed mem1_tgt)
+        (HALF_WF1_SRC: Memory.half_wf mem1_src)
+        (HALF_WF1_TGT: Memory.half_wf mem1_tgt):
+    exists mem2_tgt,
+      <<MEM2: sim_memory mem2_src mem2_tgt>> /\
+      <<CAP_TGT: Memory.cap lc_tgt.(Local.promises) mem1_tgt mem2_tgt>>.
+  Proof.
+    exploit Memory.cap_exists; try exact MEM1_TGT; eauto. i. des.
+    esplits; eauto.
+  Admitted.
 End SimPromises.

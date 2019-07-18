@@ -503,6 +503,8 @@ Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss.
   - i. inv TERMINAL_TGT. inv PR; ss.
   - i. inv PR.
+    exploit SimPromises.cap; (try by apply LOCALF); eauto using local_relfenced_wf.
+  - i. inv PR.
     esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   - ii. exploit sim_release_fenceF_step; try apply PR; try apply SC; eauto. i. des.
@@ -520,6 +522,7 @@ Lemma reorder_release_fenceF_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { inv TERMINAL_TGT. }
+  { exploit SimPromises.cap; try apply LOCAL; eauto. }
   { esplits; eauto.
     inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   }

@@ -111,6 +111,40 @@ Proof.
   i. des. econs; eauto.
 Qed.
 
+Lemma sim_store_cap
+      st_src lc_src sc1_src mem1_src
+      st_tgt lc_tgt sc1_tgt mem1_tgt
+      mem2_src
+      (MEM1: sim_memory mem1_src mem1_tgt)
+      (SIM1: sim_store st_src lc_src sc1_src mem1_src
+                       st_tgt lc_tgt sc1_tgt mem1_tgt)
+      (CAP_SRC: Memory.cap lc_src.(Local.promises) mem1_src mem2_src):
+  exists lc'_src mem2_tgt,
+    <<MEM2: sim_memory mem2_src mem2_tgt>> /\
+    <<CAP_TGT: Memory.cap lc_tgt.(Local.promises) mem1_tgt mem2_tgt>> /\
+    <<SIM2: sim_store st_src lc'_src sc1_src mem2_src
+                      st_tgt lc_tgt sc1_tgt mem2_tgt>>.
+Proof.
+  inv SIM1.
+  exploit Memory.cap_future; eauto. i.
+  exploit fulfill_step_future; eauto; try by viewtac. i. des.
+  exploit fulfill_step_future; try exact WF_SRC;
+    eauto using Memory.future_closed_timemap. i. des.
+  exploit future_fulfill_step; try exact FULFILL; eauto.
+  { by inv REORDER. }
+  i. des.
+  assert (CAP_SRC2: Memory.cap lc2_src.(Local.promises) mem1_src mem2_src) by admit.
+  exploit SimPromises.cap; try exact MEM1; eauto.
+  { inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite <- PROMISES.
+    apply SimPromises.sem_bot.
+  }
+  i. des.
+  exploit cap_property; try exact CAP_SRC; eauto. i. des.
+  exploit cap_property; try exact CAP_TGT; eauto. i. des.
+  esplits; eauto.
+  econs; eauto using Memory.future_closed_timemap.
+Admitted.
+
 Lemma sim_store_step
       st1_src lc1_src sc1_src mem1_src
       st1_tgt lc1_tgt sc1_tgt mem1_tgt
@@ -219,6 +253,9 @@ Lemma sim_store_sim_thread:
 Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss; ii.
   - inv TERMINAL_TGT. inv PR; ss.
+  - exploit sim_store_mon; eauto. i.
+    exploit sim_store_cap; try apply x0; eauto. i. des.
+    esplits; eauto.
   - exploit sim_store_mon; eauto. i.
     inversion x0. subst. i.
     exploit (progress_program_step rs i2 nil); eauto. i. des.

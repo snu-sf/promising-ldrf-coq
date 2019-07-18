@@ -181,8 +181,8 @@ Module Local.
   Hint Constructors wf.
 
   Lemma cap_wf
-        lc mem1 mem2
-        (CAP: Memory.cap mem1 mem2)
+        lc promises mem1 mem2
+        (CAP: Memory.cap promises mem1 mem2)
         (WF: wf lc mem1):
     wf lc mem2.
   Proof.

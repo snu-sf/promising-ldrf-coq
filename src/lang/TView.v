@@ -62,9 +62,9 @@ Module TView <: JoinableType.
   Qed.
 
   Lemma cap_closed
-        tview mem1 mem2
+        tview promises mem1 mem2
         (CLOSED: closed tview mem1)
-        (CAP: Memory.cap mem1 mem2):
+        (CAP: Memory.cap promises mem1 mem2):
     closed tview mem2.
   Proof.
     inv CLOSED. econs; i; eapply Memory.cap_closed_view; eauto.

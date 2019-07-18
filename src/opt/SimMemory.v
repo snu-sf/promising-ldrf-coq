@@ -577,27 +577,3 @@ Lemma sim_memory_closed_message
 Proof.
   inv TGT; ss. econs. eapply sim_memory_closed_opt_view; eauto.
 Qed.
-
-Lemma sim_memory_adjacent_src
-      mem_src mem_tgt
-      loc from1 to1 from2 to2
-      (SIM: sim_memory mem_src mem_tgt)
-      (CLOSED_SRC: Memory.closed mem_src)
-      (CLOSED_TGT: Memory.closed mem_tgt)
-      (ADJ: Memory.adjacent loc from1 to1 from2 to2 mem_src):
-  exists from1' to2',
-    Memory.adjacent loc from1' to1 from2 to2' mem_tgt.
-Proof.
-Admitted.
-
-Lemma sim_memory_cap
-      mem1_src mem2_src
-      mem1_tgt mem2_tgt
-      (SIM: sim_memory mem1_src mem1_tgt)
-      (CAP_SRC: Memory.cap mem1_src mem2_src)
-      (CAP_TGT: Memory.cap mem1_tgt mem2_tgt)
-      (CLOSED_SRC: Memory.closed mem1_src)
-      (CLOSED_TGT: Memory.closed mem1_tgt):
-  sim_memory mem2_src mem2_tgt.
-Proof.
-Admitted.

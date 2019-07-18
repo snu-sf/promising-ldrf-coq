@@ -196,6 +196,8 @@ Lemma sim_fence_sim_thread:
 Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss.
   - i. inv TERMINAL_TGT. inv PR; ss.
+  - i. eapply SimPromises.cap; eauto.
+    inv PR. inv FENCE. apply LOCAL.
   - i. esplits; eauto.
     inv PR. inversion FENCE. subst lc2_src. inversion LOCAL. ss.
     apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.

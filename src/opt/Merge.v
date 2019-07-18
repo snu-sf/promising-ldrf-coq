@@ -43,6 +43,7 @@ Lemma assign_sim_thread:
 Proof.
   pcofix CIH. i. pfold. ii. splits.
   { i. inv TERMINAL_TGT. }
+  { i. exploit SimPromises.cap; try eapply LOCAL; eauto. }
   { i. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
@@ -73,6 +74,7 @@ Lemma merge_load_load_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits.
   { i. inv TERMINAL_TGT. }
+  { i. exploit SimPromises.cap; try eapply LOCAL; eauto. }
   { i. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
@@ -111,6 +113,7 @@ Lemma merge_store_load_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits.
   { i. inv TERMINAL_TGT. }
+  { i. exploit SimPromises.cap; try eapply LOCAL; eauto. }
   { i. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
@@ -148,6 +151,7 @@ Lemma merge_store_store_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits.
   { i. inv TERMINAL_TGT. }
+  { i. exploit SimPromises.cap; try eapply LOCAL; eauto. }
   { i. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
@@ -207,6 +211,7 @@ Lemma merge_store_update_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits.
   { i. inv TERMINAL_TGT. }
+  { i. exploit SimPromises.cap; try eapply LOCAL; eauto. }
   { i. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
@@ -272,6 +277,7 @@ Lemma merge_update_load_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits.
   { i. inv TERMINAL_TGT. }
+  { i. exploit SimPromises.cap; try eapply LOCAL; eauto. }
   { i. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
@@ -326,6 +332,7 @@ Lemma merge_update_update_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits.
   { i. inv TERMINAL_TGT. }
+  { i. exploit SimPromises.cap; try eapply LOCAL; eauto. }
   { i. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
@@ -419,6 +426,7 @@ Lemma merge_fence_fence_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits.
   { i. inv TERMINAL_TGT. }
+  { i. exploit SimPromises.cap; try eapply LOCAL; eauto. }
   { i. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
