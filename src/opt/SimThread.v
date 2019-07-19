@@ -362,6 +362,19 @@ Proof.
   - eapply Memory.cap_no_half_except; eauto. apply WF.
 Qed.
 
+Lemma sc_property
+      sc1 sc2 mem
+      (MAX: Memory.max_full_timemap mem sc2)
+      (SC1: Memory.closed_timemap sc1 mem)
+      (MEM: Memory.closed mem):
+  <<SC2: Memory.closed_timemap sc2 mem>> /\
+  <<LE: TimeMap.le sc1 sc2>>.
+Proof.
+  splits.
+  - eapply Memory.max_full_timemap_closed; eauto.
+  - eapply Memory.max_full_timemap_spec; eauto.
+Qed.
+
 Lemma sim_thread_consistent
       lang_src lang_tgt
       sim_terminal
@@ -385,18 +398,21 @@ Proof.
   punfold X. exploit X; eauto; try refl. i. des.
   ii. ss.
   exploit CAP; eauto. i. des.
-  exploit CONSISTENT; eauto. s. i. des.
   exploit cap_property; try exact CAP0; eauto. i. des.
   exploit cap_property; try exact CAP_TGT; eauto. i. des.
-  exploit sim_thread_rtc_step; try apply STEPS; eauto; s.
-  { eapply sim_thread_future; eauto; try refl. }
-  i. des. destruct e2. ss.
+  exploit Memory.max_full_timemap_exists; try apply CLOSED0. i. des.
+  exploit sim_memory_max_full_timemap; try exact MEMORY0; eauto. i. subst.
+  exploit sc_property; try exact SC_FUTURE; eauto. i. des.
+  exploit sc_property; try exact x0; eauto. i. des.
+  exploit CONSISTENT; eauto. s. i. des.
+  exploit sim_thread_future; try exact SIM; try exact LE; try exact LE0; eauto. i.
+  exploit sim_thread_rtc_step; try apply STEPS; try exact x1; eauto; try refl. i. des.
+  destruct e2. ss.
   punfold SIM0. exploit SIM0; eauto; try refl. i. des.
   hexploit Thread.rtc_tau_step_no_half_except; try exact STEPS; eauto. i.
   unfold Thread.no_half_except in H. ss.
   rewrite PROMISES0 in *.
-  hexploit Memory.no_half_except_bot_no_half; eauto; i.
-  { apply MEM_TGT0. }
+  hexploit Memory.no_half_except_bot_no_half; try apply MEM_TGT0; eauto. i.
   exploit PROMISES1; eauto. i. des.
   eexists (Thread.mk _ _ _ _ _). splits; [|eauto].
   etrans; eauto.

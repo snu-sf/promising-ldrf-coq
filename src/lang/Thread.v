@@ -135,11 +135,11 @@ Module Thread.
     Hint Constructors opt_step.
 
     Definition consistent (e:t): Prop :=
-      forall mem1
+      forall mem1 sc1
         (CAP: Memory.cap e.(local).(Local.promises) e.(memory) mem1)
-        (* TODO: quantify forall future sc view *),
+        (SC_FUTURE: Memory.max_full_timemap mem1 sc1),
       exists e2,
-        <<STEPS: rtc tau_step (mk e.(state) e.(local) e.(sc) mem1) e2>> /\
+        <<STEPS: rtc tau_step (mk e.(state) e.(local) sc1 mem1) e2>> /\
         <<PROMISES: e2.(local).(Local.promises) = Memory.bot>>.
 
     Lemma promise_step_future

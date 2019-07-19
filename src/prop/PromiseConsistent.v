@@ -170,12 +170,13 @@ Lemma consistent_promise_consistent
 Proof.
   destruct th. destruct local. inv WF. ss.
   exploit Memory.cap_exists; eauto. i. des.
-  exploit CONS; try exact CAP; eauto. s. i. des.
+  exploit Memory.future_closed; eauto. i.
+  exploit Memory.max_full_timemap_exists; try apply x0. i. des.
+  exploit CONS; eauto. s. i. des.
   hexploit rtc_tau_step_promise_consistent; try exact STEPS; ss; eauto.
   { ii. rewrite PROMISES0, Memory.bot_get in *. congr. }
   { eapply Local.cap_wf; eauto. }
-  { eapply Memory.cap_closed_timemap; eauto. }
-  { eapply Memory.cap_closed; eauto. }
+  { eapply Memory.max_full_timemap_closed; eauto. }
   { eapply Memory.cap_half_wf; eauto. }
 Qed.
 
