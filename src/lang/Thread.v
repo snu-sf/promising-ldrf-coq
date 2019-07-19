@@ -136,7 +136,8 @@ Module Thread.
 
     Definition consistent (e:t): Prop :=
       forall mem1
-        (CAP: Memory.cap e.(local).(Local.promises) e.(memory) mem1),
+        (CAP: Memory.cap e.(local).(Local.promises) e.(memory) mem1)
+        (* TODO: quantify forall future sc view *),
       exists e2,
         <<STEPS: rtc tau_step (mk e.(state) e.(local) e.(sc) mem1) e2>> /\
         <<PROMISES: e2.(local).(Local.promises) = Memory.bot>>.
