@@ -402,7 +402,7 @@ Proof.
   exploit cap_property; try exact CAP_TGT; eauto. i. des.
   exploit Memory.max_full_timemap_exists; try apply CLOSED0. i. des.
   exploit sim_memory_max_full_timemap; try exact MEMORY0; eauto. i. subst.
-  exploit sc_property; try exact SC_FUTURE; eauto. i. des.
+  exploit sc_property; try exact SC_MAX; eauto. i. des.
   exploit sc_property; try exact x0; eauto. i. des.
   exploit CONSISTENT; eauto. s. i. des.
   exploit sim_thread_future; try exact SIM; try exact LE; try exact LE0; eauto. i.

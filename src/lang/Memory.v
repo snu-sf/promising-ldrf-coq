@@ -2670,17 +2670,17 @@ Module Memory.
     exists val. econs; eauto.
   Qed.
 
-  Definition half_non_promise (loc: Loc.t) (promises mem: t): Prop :=
+  Definition latest_half (loc: Loc.t) (promises mem: t): Prop :=
     match get loc (max_ts loc mem) promises with
     | Some (_, Message.half) => False
     | _ => True
     end.
 
-  Lemma half_non_promise_dec loc promises mem:
-    half_non_promise loc promises mem \/
-    ~ half_non_promise loc promises mem.
+  Lemma latest_half_dec loc promises mem:
+    latest_half loc promises mem \/
+    ~ latest_half loc promises mem.
   Proof.
-    unfold half_non_promise.
+    unfold latest_half.
     destruct (get loc (max_ts loc mem) promises) eqn:PROMISE; auto.
     destruct p; ss. destruct t1; auto.
   Qed.
@@ -2695,7 +2695,7 @@ Module Memory.
           get loc from2 mem2 = Some (to1, Message.half))
       (BACK: forall loc val view
                (NON_INIT: loc_non_init loc mem1)
-               (PROMISE: half_non_promise loc promises mem1)
+               (PROMISE: latest_half loc promises mem1)
                (LATEST: latest_val loc mem1 val)
                (MAX: max_full_view mem1 view),
             get loc (Time.incr (max_ts loc mem1)) mem2 =
@@ -2705,7 +2705,7 @@ Module Memory.
                    (GET2: get loc to mem2 = Some (from, msg)),
           loc_non_init loc mem1 /\
           (exists f m, get loc from mem1 = Some (f, m)) /\
-          (from = max_ts loc mem1 -> half_non_promise loc promises mem1))
+          (from = max_ts loc mem1 -> latest_half loc promises mem1))
   .
 
   Lemma cap_inv
@@ -2723,7 +2723,7 @@ Module Memory.
         msg = Message.half) \/
     (get loc to mem1 = None /\
      loc_non_init loc mem1 /\
-     half_non_promise loc promises mem1 /\
+     latest_half loc promises mem1 /\
      from = max_ts loc mem1 /\
      to = Time.incr from /\
      exists val view,
@@ -2923,7 +2923,7 @@ Module Memory.
       { exists (max_ts loc mem2). rewrite <- x2.
         esplits; eauto. ii. rewrite H in *.
         inv CLOSED. rewrite INHABITED in *. inv x0. }
-      { unfold half_non_promise. rewrite PROMISE. ss. }
+      { unfold latest_half. rewrite PROMISE. ss. }
       exploit max_ts_spec; try exact x4. i. des.
       specialize (Time.incr_spec (max_ts loc mem2)). i.
       rewrite x2 in *. timetac.
@@ -2943,13 +2943,13 @@ Module Memory.
   Proof.
     inv CAP1. econs; i; eauto.
     - eapply BACK; eauto.
-      unfold half_non_promise in *. des_ifs.
+      unfold latest_half in *. des_ifs.
       + revert Heq0. erewrite remove_o; eauto. condtac; ss; congr.
       + revert Heq0. erewrite remove_o; eauto. condtac; ss; try congr.
         des. subst. exploit remove_get0; eauto. i. des. congr.
     - exploit COMPLETE; eauto. i. des. splits; eauto. i.
       exploit x1; eauto. i.
-      unfold half_non_promise in *. des_ifs.
+      unfold latest_half in *. des_ifs.
       + revert Heq. erewrite remove_o; eauto. condtac; ss; congr.
       + revert Heq. erewrite remove_o; eauto. condtac; ss; try congr.
   Qed.
@@ -2968,7 +2968,7 @@ Module Memory.
       (BACK: forall val
                (TO: to = max_ts loc mem1)
                (NON_INIT: loc_non_init loc mem1)
-               (PROMISE: half_non_promise loc promises mem1)
+               (PROMISE: latest_half loc promises mem1)
                (LATEST: latest_val loc mem1 val),
           get loc (Time.incr to) mem2 = Some (to, Message.full val (Some view)))
       (COMPLETE: forall loc' from' to' msg
@@ -2978,7 +2978,7 @@ Module Memory.
           from' = to /\
           loc_non_init loc mem1 /\
           (exists f m, get loc from' mem1 = Some (f, m)) /\
-          (from' = max_ts loc mem1 -> half_non_promise loc promises mem1))
+          (from' = max_ts loc mem1 -> latest_half loc promises mem1))
   .
 
   Inductive cap_aux (dom: list (Loc.t * Time.t)) (view: View.t) (promises mem1 mem2: t): Prop :=
@@ -2993,7 +2993,7 @@ Module Memory.
       (BACK: forall loc val
                (IN: List.In (loc, max_ts loc mem1) dom)
                (NON_INIT: loc_non_init loc mem1)
-               (PROMISE: half_non_promise loc promises mem1)
+               (PROMISE: latest_half loc promises mem1)
                (LATEST: latest_val loc mem1 val),
           get loc (Time.incr (max_ts loc mem1)) mem2 = Some (max_ts loc mem1, Message.full val (Some view)))
       (COMPLETE: forall loc from to msg
@@ -3002,7 +3002,7 @@ Module Memory.
           loc_non_init loc mem1 /\
           List.In (loc, from) dom /\
           (exists f m, get loc from mem1 = Some (f, m)) /\
-          (from = max_ts loc mem1 -> half_non_promise loc promises mem1))
+          (from = max_ts loc mem1 -> latest_half loc promises mem1))
   .
 
   Lemma cap_imm_exists
@@ -3108,7 +3108,7 @@ Module Memory.
           apply TimeFacts.antisym; auto.
           apply Time.bot_spec.
       }
-      destruct (@half_non_promise_dec loc promises mem1); cycle 1.
+      destruct (@latest_half_dec loc promises mem1); cycle 1.
       { exists mem1. splits; auto. econs; i; try congr.
         inv ADJ. exploit max_ts_spec; try exact GET2. i. des.
         exploit get_ts; try exact GET2. i. des.
@@ -3232,7 +3232,7 @@ Module Memory.
         { inv NON_INIT. des. destruct p.
           exploit SOUND; try exact H1. i.
           exists x. esplits; eauto. }
-        { unfold half_non_promise in *. rewrite TS in *. ss. }
+        { unfold latest_half in *. rewrite TS in *. ss. }
         { inv LATEST. exploit SOUND; eauto. i. econs; eauto.
           inv MAX. des. econs; eauto. i.
           destruct (get loc0 to0 mem1) as [[]|] eqn:GET2.
@@ -3294,7 +3294,7 @@ Module Memory.
         - exploit COMPLETE; try exact GET4; eauto. i. des. subst. ss. }
       i. subst.
       cut (max_ts loc0 mem1 = max_ts loc0 mem2).
-      { i. unfold half_non_promise in *.
+      { i. unfold latest_half in *.
         rewrite H in *. eapply x2; ss. }
       exploit max_ts_spec; try exact x3. i. des.
       eapply TimeFacts.antisym; eauto.

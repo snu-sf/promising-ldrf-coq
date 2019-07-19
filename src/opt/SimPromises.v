@@ -400,7 +400,7 @@ Module SimPromises.
   Qed.
 
 
-  Lemma half_non_promise
+  Lemma latest_half
         pview
         promises_src mem_src
         promises_tgt mem_tgt
@@ -409,10 +409,10 @@ Module SimPromises.
         (MEM: sim_memory mem_src mem_tgt)
         (MEM_SRC: Memory.closed mem_src)
         (MEM_TGT: Memory.closed mem_tgt):
-    Memory.half_non_promise loc promises_src mem_src <->
-    Memory.half_non_promise loc promises_tgt mem_tgt.
+    Memory.latest_half loc promises_src mem_src <->
+    Memory.latest_half loc promises_tgt mem_tgt.
   Proof.
-    inv INV. unfold Memory.half_non_promise.
+    inv INV. unfold Memory.latest_half.
     split; i.
     - erewrite <- sim_memory_max_ts; eauto. des_ifs.
       + exploit LE; eauto. i. ss. congr.
@@ -448,7 +448,7 @@ Module SimPromises.
     - subst.
       erewrite sim_memory_max_ts; eauto.
       rewrite sim_memory_loc_non_init in *; eauto.
-      rewrite half_non_promise in *; eauto.
+      rewrite latest_half in *; eauto.
       exploit sim_memory_latest_val_src; eauto. i.
       exploit Memory.max_full_view_exists; try apply MEM1_TGT. i. des.
       exploit sim_memory_max_full_view; try exact MEM1; eauto. i. subst.
@@ -484,7 +484,7 @@ Module SimPromises.
     - subst.
       erewrite <- sim_memory_max_ts; eauto.
       rewrite <- sim_memory_loc_non_init in *; eauto.
-      rewrite <- half_non_promise in *; eauto.
+      rewrite <- latest_half in *; eauto.
       exploit sim_memory_latest_val_tgt; eauto. i.
       exploit Memory.max_full_view_exists; try apply MEM1_SRC. i. des.
       exploit sim_memory_max_full_view; try exact MEM1; eauto. i. subst.
