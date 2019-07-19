@@ -281,20 +281,6 @@ Proof.
   subst. ss.
 Qed.
 
-Lemma sim_memory_max_full_released
-      mem_src mem_tgt loc ts mr_src mr_tgt
-      (CLOSED_SRC: Memory.closed mem_src)
-      (CLOSED_TGT: Memory.closed mem_tgt)
-      (SIM: sim_memory mem_src mem_tgt)
-      (MAX_SRC: Memory.max_full_released mem_src loc ts mr_src)
-      (MAX_TGT: Memory.max_full_released mem_tgt loc ts mr_tgt):
-  mr_src = mr_tgt.
-Proof.
-  inv MAX_SRC. inv MAX_TGT.
-  exploit sim_memory_max_full_timemap; try exact SIM; eauto. i.
-  subst. ss.
-Qed.
-
 Lemma covered_disjoint
       mem1 mem2 loc from to
       (COVER: forall loc ts, covered loc ts mem1 -> covered loc ts mem2)
@@ -409,6 +395,26 @@ Proof.
       des; congr.
 Qed.
 
+Lemma split_sim_memory
+      mem0 loc ts1 ts2 ts3 val2 released2 val3 released3 mem1
+      (SPLIT: Memory.split mem0 loc ts1 ts2 ts3 (Message.full val2 released2) (Message.full val3 released3) mem1):
+  sim_memory mem1 mem0.
+Proof.
+  econs; i.
+  - eapply split_covered. eauto.
+  - exploit Memory.split_get0; eauto. i. des.
+    erewrite Memory.split_o; eauto. repeat condtac; ss.
+    + des. subst. congr.
+    + guardH o. des. subst. rewrite GET1 in GET. inv GET.
+      esplits; eauto. refl.
+    + esplits; eauto. refl.
+  - exploit Memory.split_get0; eauto. i. des.
+    erewrite Memory.split_o; eauto.
+    repeat condtac; ss; split; i; try congr.
+    + des. subst. rewrite GET in H. inv H.
+    + guardH o. des. subst. rewrite GET0 in H. inv H.
+Qed.
+
 Lemma lower_sim_memory
       mem1 loc from to msg1 msg2 mem2
       (LOWER: Memory.lower mem1 loc from to msg1 msg2 mem2)
@@ -440,26 +446,6 @@ Lemma promise_lower_sim_memory
   sim_memory mem2 mem1.
 Proof.
   inv PROMISE. eapply lower_sim_memory; eauto.
-Qed.
-
-Lemma split_sim_memory
-      mem0 loc ts1 ts2 ts3 val2 released2 val3 released3 mem1
-      (SPLIT: Memory.split mem0 loc ts1 ts2 ts3 (Message.full val2 released2) (Message.full val3 released3) mem1):
-  sim_memory mem1 mem0.
-Proof.
-  econs; i.
-  - eapply split_covered. eauto.
-  - exploit Memory.split_get0; eauto. i. des.
-    erewrite Memory.split_o; eauto. repeat condtac; ss.
-    + des. subst. congr.
-    + guardH o. des. subst. rewrite GET1 in GET. inv GET.
-      esplits; eauto. refl.
-    + esplits; eauto. refl.
-  - exploit Memory.split_get0; eauto. i. des.
-    erewrite Memory.split_o; eauto.
-    repeat condtac; ss; split; i; try congr.
-    + des. subst. rewrite GET in H. inv H.
-    + guardH o. des. subst. rewrite GET0 in H. inv H.
 Qed.
 
 Lemma sim_memory_add
@@ -560,22 +546,6 @@ Proof.
       erewrite Memory.lower_o; try exact SRC. condtac; ss.
       * des. subst. inv H. inv SIM_MSG. ss.
       * rewrite HALF. ss.
-Qed.
-
-Lemma sim_memory_promise
-      loc from to kind
-      promises1_src mem1_src msg_src promises2_src mem2_src
-      promises1_tgt mem1_tgt msg_tgt promises2_tgt mem2_tgt
-      (SIM_MSG: sim_message msg_src msg_tgt)
-      (PROMISE_SRC: Memory.promise promises1_src mem1_src loc from to msg_src promises2_src mem2_src kind)
-      (PROMISE_TGT: Memory.promise promises1_tgt mem1_tgt loc from to msg_tgt promises2_tgt mem2_tgt kind)
-      (SIM: sim_memory mem1_src mem1_tgt):
-  sim_memory mem2_src mem2_tgt.
-Proof.
-  inv PROMISE_SRC; inv PROMISE_TGT.
-  - eapply sim_memory_add; eauto.
-  - eapply sim_memory_split; eauto.
-  - eapply sim_memory_lower; eauto.
 Qed.
 
 Lemma sim_memory_closed_timemap
