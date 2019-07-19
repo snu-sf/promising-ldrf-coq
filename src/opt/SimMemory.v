@@ -622,6 +622,31 @@ Proof.
   inv TGT; ss. econs. eapply sim_memory_closed_opt_view; eauto.
 Qed.
 
+Lemma sim_memory_loc_non_init
+      mem_src mem_tgt loc
+      (SIM: sim_memory mem_src mem_tgt):
+  Memory.loc_non_init loc mem_src <->
+  Memory.loc_non_init loc mem_tgt.
+Proof.
+  inv SIM. split; i.
+  - inv H. des. destruct p.
+    exploit Memory.get_ts; eauto. i. des; try congr.
+    destruct (COVER loc x).
+    exploit H; i.
+    { econs; eauto. econs; eauto. refl. }
+    inv x0. inv ITV. ss.
+    econs. esplits; try eapply GET. ii. subst.
+    inv TO; inv H3. timetac.
+  - inv H. des. destruct p.
+    exploit Memory.get_ts; eauto. i. des; try congr.
+    destruct (COVER loc x).
+    exploit H2; i.
+    { econs; eauto. econs; eauto. refl. }
+    inv x0. inv ITV. ss.
+    econs. esplits; try eapply GET. ii. subst.
+    inv TO; inv H3. timetac.
+Qed.
+
 Lemma sim_memory_latest_val_src
       mem_src mem_tgt loc val
       (SIM: sim_memory mem_src mem_tgt)
@@ -645,7 +670,7 @@ Lemma sim_memory_latest_val_tgt
       (CLOSED_SRC: Memory.closed mem_src)
       (CLOSED_TGT: Memory.closed mem_tgt)
       (LATEST: Memory.latest_val loc mem_tgt val):
-  Memory.latest_val loc mem_tgt val.
+  Memory.latest_val loc mem_src val.
 Proof.
   inv LATEST.
   exploit Memory.max_full_ts_exists; try apply CLOSED_SRC. i. des.
@@ -677,3 +702,14 @@ Lemma sim_memory_adjacent_tgt
     Memory.adjacent loc from1' to1 from2 to2' mem_src.
 Proof.
 Admitted.
+
+Lemma cap_cover
+      promises mem1 mem2 loc ts
+      (CAP: Memory.cap promises mem1 mem2)
+      (COVER: covered loc ts mem1):
+  covered loc ts mem2.
+Proof.
+  inv CAP. inv COVER.
+  exploit SOUND; eauto. i.
+  econs; eauto.
+Qed.
