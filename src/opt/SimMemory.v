@@ -201,6 +201,57 @@ Proof.
     econs; eauto. refl.
 Qed.
 
+Lemma sim_memory_max_ts
+      mem_src mem_tgt loc
+      (SIM: sim_memory mem_src mem_tgt)
+      (CLOSED_SRC: Memory.closed mem_src)
+      (CLOSED_TGT: Memory.closed mem_tgt):
+  Memory.max_ts loc mem_src = Memory.max_ts loc mem_tgt.
+Proof.
+  inv SIM. inv CLOSED_SRC. inv CLOSED_TGT.
+  clear MSG HALF CLOSED FINITE_NEW FINITE_HALF CLOSED0 FINITE_NEW0 FINITE_HALF0.
+  apply TimeFacts.antisym.
+  - specialize (COVER loc (Memory.max_ts loc mem_src)). des.
+    exploit Memory.max_ts_spec; try eapply (INHABITED loc). i. des.
+    exploit Memory.get_ts; eauto. i. des.
+    { rewrite x1. apply Time.bot_spec. }
+    exploit COVER; i.
+    { econs; eauto. econs; eauto. refl. }
+    inv x. exploit Memory.max_ts_spec; try exact GET0. i. des.
+    inv ITV. ss. etrans; eauto.
+  - specialize (COVER loc (Memory.max_ts loc mem_tgt)). des.
+    exploit Memory.max_ts_spec; try eapply (INHABITED0 loc). i. des.
+    exploit Memory.get_ts; eauto. i. des.
+    { rewrite x1. apply Time.bot_spec. }
+    exploit COVER0; i.
+    { econs; eauto. econs; eauto. refl. }
+    inv x. exploit Memory.max_ts_spec; try exact GET0. i. des.
+    inv ITV. ss. etrans; eauto.
+Qed.
+
+Lemma sim_memory_max_full_ts
+      mem_src mem_tgt
+      loc mts_src mts_tgt
+      (SIM: sim_memory mem_src mem_tgt)
+      (CLOSED_SRC: Memory.closed mem_src)
+      (CLOSED_TGT: Memory.closed mem_tgt)
+      (MAX_SRC: Memory.max_full_ts mem_src loc mts_src)
+      (MAX_TGT: Memory.max_full_ts mem_tgt loc mts_tgt):
+  mts_src = mts_tgt.
+Proof.
+  apply TimeFacts.antisym.
+  - inv MAX_SRC. des.
+    exploit sim_memory_get_inv; eauto.
+    { apply CLOSED_SRC. }
+    { apply CLOSED_TGT. }
+    i. des. inv MSG.
+    exploit Memory.max_full_ts_spec; eauto. i. des.
+    etrans; eauto.
+  - inv MAX_TGT. des.
+    inv SIM. exploit MSG; eauto. i. des. inv MSG0.
+    exploit Memory.max_full_ts_spec; eauto. i. des. ss.
+Qed.
+
 Lemma sim_memory_max_full_timemap
       mem_src mem_tgt mtm_src mtm_tgt
       (CLOSED_SRC: Memory.closed mem_src)
@@ -210,17 +261,10 @@ Lemma sim_memory_max_full_timemap
       (MAX_TGT: Memory.max_full_timemap mem_tgt mtm_tgt):
   mtm_src = mtm_tgt.
 Proof.
-  apply TimeMap.antisym.
-  - eapply Memory.max_full_timemap_spec'; eauto. i.
-    destruct (MAX_SRC loc). des.
-    exploit sim_memory_get_inv; eauto.
-    { apply CLOSED_SRC. }
-    { apply CLOSED_TGT. }
-    i. des. inv MSG. esplits; eauto.
-  - eapply Memory.max_full_timemap_spec'; eauto. i.
-    destruct (MAX_TGT loc). des.
-    inv SIM. exploit MSG; eauto. i. des.
-    inv MSG0. esplits; eauto.
+  extensionality loc.
+  specialize (MAX_SRC loc).
+  specialize (MAX_TGT loc).
+  eapply sim_memory_max_full_ts; eauto.
 Qed.
 
 Lemma sim_memory_max_full_view
@@ -577,3 +621,59 @@ Lemma sim_memory_closed_message
 Proof.
   inv TGT; ss. econs. eapply sim_memory_closed_opt_view; eauto.
 Qed.
+
+Lemma sim_memory_latest_val_src
+      mem_src mem_tgt loc val
+      (SIM: sim_memory mem_src mem_tgt)
+      (CLOSED_SRC: Memory.closed mem_src)
+      (CLOSED_TGT: Memory.closed mem_tgt)
+      (LATEST: Memory.latest_val loc mem_src val):
+  Memory.latest_val loc mem_tgt val.
+Proof.
+  inv LATEST.
+  exploit Memory.max_full_ts_exists; try apply CLOSED_TGT. i. des.
+  exploit sim_memory_max_full_ts; eauto. i. subst.
+  dup x0. inv x1. des.
+  inv SIM. exploit MSG; eauto. i. des. inv MSG0.
+  rewrite GET1 in GET. inv GET.
+  econs; eauto.
+Qed.
+
+Lemma sim_memory_latest_val_tgt
+      mem_src mem_tgt loc val
+      (SIM: sim_memory mem_src mem_tgt)
+      (CLOSED_SRC: Memory.closed mem_src)
+      (CLOSED_TGT: Memory.closed mem_tgt)
+      (LATEST: Memory.latest_val loc mem_tgt val):
+  Memory.latest_val loc mem_tgt val.
+Proof.
+  inv LATEST.
+  exploit Memory.max_full_ts_exists; try apply CLOSED_SRC. i. des.
+  exploit sim_memory_max_full_ts; eauto. i. subst.
+  dup x0. inv x1. des.
+  inv SIM. exploit MSG; eauto. i. des. inv MSG0.
+  unfold Memory.get in *. rewrite GET0 in GET1. inv GET1.
+  econs; eauto.
+Qed.
+
+Lemma sim_memory_adjacent_src
+      mem_src mem_tgt
+      loc from1 to1 from2 to2
+      (SIM: sim_memory mem_src mem_tgt)
+      (ADJ: Memory.adjacent loc from1 to1 from2 to2 mem_src)
+      (TS: Time.lt to1 from2):
+  exists from1' to2',
+    Memory.adjacent loc from1' to1 from2 to2' mem_tgt.
+Proof.
+Admitted.
+
+Lemma sim_memory_adjacent_tgt
+      mem_src mem_tgt
+      loc from1 to1 from2 to2
+      (SIM: sim_memory mem_src mem_tgt)
+      (ADJ: Memory.adjacent loc from1 to1 from2 to2 mem_tgt)
+      (TS: Time.lt to1 from2):
+  exists from1' to2',
+    Memory.adjacent loc from1' to1 from2 to2' mem_src.
+Proof.
+Admitted.

@@ -399,6 +399,55 @@ Module SimPromises.
       + ss.
   Qed.
 
+
+  Lemma half_non_promise
+        pview
+        promises_src mem_src
+        promises_tgt mem_tgt
+        loc
+        (INV: sem pview bot promises_src promises_tgt)
+        (MEM: sim_memory mem_src mem_tgt):
+    Memory.half_non_promise loc promises_src mem_src <->
+    Memory.half_non_promise loc promises_src mem_tgt.
+  Proof.
+  Admitted.
+
+  Lemma cap_get_src
+        pview
+        promises_src mem1_src mem2_src
+        promises_tgt mem1_tgt mem2_tgt
+        loc from to msg
+        (INV1: sem pview bot promises_src promises_tgt)
+        (MEM1: sim_memory mem1_src mem1_tgt)
+        (CAP_SRC: Memory.cap promises_src mem1_src mem2_src)
+        (CAP_TGT: Memory.cap promises_tgt mem1_tgt mem2_tgt)
+        (MEM1_SRC: Memory.closed mem1_src)
+        (MEM1_TGT: Memory.closed mem1_tgt)
+        (GET1_SRC: Memory.get loc to mem1_src = None)
+        (GET2_SRC: Memory.get loc to mem2_src = Some (from, msg)):
+    <<GET1_TGT: Memory.get loc to mem1_tgt = None>> /\
+    <<GET2_TGT: Memory.get loc to mem2_tgt = Some (from, msg)>>.
+  Proof.
+  Admitted.
+
+  Lemma cap_get_tgt
+        pview
+        promises_src mem1_src mem2_src
+        promises_tgt mem1_tgt mem2_tgt
+        loc from to msg
+        (INV1: sem pview bot promises_src promises_tgt)
+        (MEM1: sim_memory mem1_src mem1_tgt)
+        (CAP_SRC: Memory.cap promises_src mem1_src mem2_src)
+        (CAP_TGT: Memory.cap promises_tgt mem1_tgt mem2_tgt)
+        (MEM1_SRC: Memory.closed mem1_src)
+        (MEM1_TGT: Memory.closed mem1_tgt)
+        (GET1_TGT: Memory.get loc to mem1_tgt = None)
+        (GET2_TGT: Memory.get loc to mem2_tgt = Some (from, msg)):
+    <<GET1_SRC: Memory.get loc to mem1_src = None>> /\
+    <<GET2_SRC: Memory.get loc to mem2_src = Some (from, msg)>>.
+  Proof.
+  Admitted.
+
   Lemma cap
         pview
         lc_src mem1_src mem2_src
