@@ -2614,6 +2614,19 @@ Module Memory.
     splits; auto.
   Qed.
 
+  Lemma next_exists
+        mem loc f t m ts
+        (GET: get loc t mem = Some (f, m))
+        (TS: Time.lt ts (max_ts loc mem)):
+    exists from to msg,
+      get loc to mem = Some (from, msg) /\
+      Time.lt ts to /\
+      forall ts' (TS1: Time.lt ts ts') (TS2: Time.lt ts' to),
+        get loc ts' mem = None.
+  Proof.
+    exploit Cell.next_exists; eauto.
+  Qed.
+
   Lemma adjacent_exists
         loc from1 to1 msg mem
         (GET: get loc to1 mem = Some (from1, msg))
@@ -2621,13 +2634,12 @@ Module Memory.
     exists from2 to2,
       adjacent loc from1 to1 from2 to2 mem.
   Proof.
-    unfold get in *.
-    exploit Cell.adjacent_exists; eauto. i. des.
-    exists from2. exists to2. econs; i; eauto.
+    exploit next_exists; eauto. i. des.
+    esplits. econs; try exact x0; eauto. i.
     eapply x2; eauto.
-    eapply TimeFacts.le_lt_lt; eauto.
-    exploit get_ts; try exact x0. i. des; ss.
-    subst. inv x1.
+    exploit get_ts; try exact x0. i. des.
+    - subst. inv x1.
+    - eapply TimeFacts.le_lt_lt; eauto.
   Qed.
 
   Inductive latest_val (loc: Loc.t) (mem: t) (val: Const.t): Prop :=

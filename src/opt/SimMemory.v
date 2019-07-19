@@ -685,23 +685,218 @@ Lemma sim_memory_adjacent_src
       mem_src mem_tgt
       loc from1 to1 from2 to2
       (SIM: sim_memory mem_src mem_tgt)
+      (CLOSED_SRC: Memory.closed mem_src)
+      (CLOSED_TGT: Memory.closed mem_tgt)
       (ADJ: Memory.adjacent loc from1 to1 from2 to2 mem_src)
       (TS: Time.lt to1 from2):
   exists from1' to2',
     Memory.adjacent loc from1' to1 from2 to2' mem_tgt.
 Proof.
-Admitted.
+  dup SIM. inv SIM0. inv ADJ. clear HALF TS0.
+  assert (GET1_TGT: exists from1' m1', Memory.get loc to1 mem_tgt = Some (from1', m1')).
+  { exploit Memory.get_ts; try exact GET1. i. des.
+    { subst. esplits. eapply CLOSED_TGT. }
+    destruct (COVER loc to1). exploit H; i.
+    { econs; try exact GET1. econs; eauto. refl. }
+    inv x. inv ITV. ss. inv TO; cycle 1.
+    { inv H1. esplits; eauto. }
+    exfalso.
+    destruct (Time.le_lt_dec to from2).
+    { exploit MSG; eauto. i. des.
+      exploit (EMPTY to); eauto. i. congr. }
+    destruct (COVER loc from2). exploit H3; i.
+    { econs; eauto. econs; eauto. econs. ss. }
+    inv x. inv ITV. ss. inv TO.
+    - exploit Memory.get_ts; try exact GET2. i. des.
+      { subst. inv FROM0. }
+      exploit Memory.get_ts; try exact GET0. i. des.
+      { subst. inv H4. }
+      exploit Memory.get_disjoint; [exact GET2|exact GET0|..]. i. des.
+      { timetac. }
+      destruct (Time.le_lt_dec to2 to0).
+      + apply (x3 to2); econs; ss; try refl.
+        etrans; try exact FROM0. ss.
+      + apply (x3 to0); econs; ss; try refl.
+        econs. ss.
+    - inv H4. exploit (EMPTY to0); eauto; try refl. i. congr.
+  }
+  assert (GET2_TGT: exists to2' m2', Memory.get loc to2' mem_tgt = Some (from2, m2')).
+  { exploit Memory.get_ts; try exact GET2. i. des.
+    { subst. inv TS. }
+    exploit Memory.max_ts_spec; try exact GET2. i. des.
+    clear from msg GET.
+    erewrite sim_memory_max_ts in MAX; eauto.
+    exploit TimeFacts.lt_le_lt; try exact x0; try exact MAX. i.
+    exploit Memory.next_exists; try exact x1; try eapply CLOSED_TGT. i. des.
+    destruct (TimeFacts.le_lt_dec from from2).
+    - inv l; cycle 1.
+      { inv H. esplits; eauto. }
+      destruct (COVER loc from2). exploit H1; i.
+      { econs; try exact x2. econs; ss. econs; ss. }
+      inv x. inv ITV. ss. inv TO; cycle 1.
+      { inv H2. exploit (EMPTY to0); eauto; try refl. i. congr. }
+      exploit Memory.get_disjoint; [exact GET2|exact GET|..]. i. des.
+      { subst. timetac. }
+      exfalso.
+      destruct (TimeFacts.le_lt_dec to2 to0).
+      + apply (x5 to2); econs; ss; try refl.
+        etrans; try exact FROM. ss.
+      + apply (x5 to0); econs; ss; try refl.
+        * econs. ss.
+        * etrans; eauto.
+    - destruct (TimeFacts.le_lt_dec to2 from).
+      + destruct (COVER loc to2). exploit H; i.
+        { econs; eauto. econs; ss. refl. }
+        inv x. inv ITV. ss.
+        exploit (x4 to0); eauto; try congr.
+        { eapply TimeFacts.lt_le_lt; try exact TO; ss. }
+        destruct (Time.le_lt_dec to to0); ss.
+        exploit Memory.get_ts; try exact x2. i. des.
+        { subst. inv x3. }
+        exploit Memory.get_disjoint; [exact x2|exact GET|..]. i. des.
+        { subst. timetac. }
+        exfalso.
+        apply (x6 to); econs; ss; try refl.
+        etrans; try exact FROM.
+        eapply TimeFacts.le_lt_lt; try exact x5. ss.
+      + destruct (COVER loc from). exploit H; i.
+        { econs; try exact GET2. econs; ss. econs. ss. }
+        inv x. inv ITV. ss.
+        destruct (TimeFacts.le_lt_dec to to0).
+        * exploit Memory.get_ts; try exact x2. i. des.
+          { subst. inv x3. }
+          exploit Memory.get_ts; try exact GET. i. des.
+          { subst. timetac. }
+          exploit Memory.get_disjoint; [exact x2|exact GET|..]. i. des.
+          { subst. timetac. }
+          exfalso.
+          apply (x7 to); econs; ss; try refl.
+          eapply TimeFacts.lt_le_lt; try exact FROM. econs. ss.
+        * exploit (x4 to0); ss; try congr.
+          eapply TimeFacts.lt_le_lt; try exact TO; ss.
+  }
+  des. esplits. econs; eauto; i.
+  { exploit Memory.get_ts; try exact GET2_TGT. i. des.
+    - subst. inv TS.
+    - etrans; eauto. }
+  destruct (Memory.get loc ts mem_tgt) as [[]|] eqn:GET; ss.
+  exfalso.
+  exploit Memory.get_ts; try exact GET. i. des.
+  { subst. inv TS1. }
+  destruct (COVER loc ts). exploit H0; i.
+  { econs; eauto. econs; ss. refl. }
+  inv x. inv ITV. ss.
+  destruct (TimeFacts.le_lt_dec to from2).
+  { exploit (EMPTY to); try congr.
+    eapply TimeFacts.lt_le_lt; try exact TS1. ss. }
+  exploit Memory.get_ts; try exact GET2. i. des.
+  { subst. inv TS. }
+  exploit Memory.get_ts; try exact GET0. i. des.
+  { subst. inv l. }
+  exploit Memory.get_disjoint; [exact GET2|exact GET0|..]. i. des.
+  { subst. timetac. }
+  destruct (TimeFacts.le_lt_dec to2 to).
+  - apply (x3 to2); econs; ss; try refl.
+    etrans; try exact x1.
+    eapply TimeFacts.lt_le_lt; try exact TS2. ss.
+  - apply (x3 to); econs; ss; try refl. econs. ss.
+Qed.
 
 Lemma sim_memory_adjacent_tgt
       mem_src mem_tgt
       loc from1 to1 from2 to2
       (SIM: sim_memory mem_src mem_tgt)
+      (CLOSED_SRC: Memory.closed mem_src)
+      (CLOSED_TGT: Memory.closed mem_tgt)
       (ADJ: Memory.adjacent loc from1 to1 from2 to2 mem_tgt)
       (TS: Time.lt to1 from2):
   exists from1' to2',
     Memory.adjacent loc from1' to1 from2 to2' mem_src.
 Proof.
-Admitted.
+  dup SIM. inv SIM0. inv ADJ. clear HALF TS0.
+  assert (GET1_SRC: exists from1' m1', Memory.get loc to1 mem_src = Some (from1', m1')).
+  { exploit MSG; try exact GET1. i. des. eauto. }
+  assert (GET2_SRC: exists to2' m2', Memory.get loc to2' mem_src = Some (from2, m2')).
+  { exploit Memory.get_ts; try exact GET2. i. des.
+    { subst. inv TS. }
+    exploit Memory.max_ts_spec; try exact GET2. i. des.
+    clear from msg GET.
+    erewrite <- sim_memory_max_ts in MAX; eauto.
+    exploit TimeFacts.lt_le_lt; try exact x0; try exact MAX. i.
+    exploit Memory.next_exists; try exact x1; try eapply CLOSED_SRC. i. des.
+    destruct (TimeFacts.le_lt_dec from from2).
+    - inv l; cycle 1.
+      { inv H. esplits; eauto. }
+      destruct (COVER loc from2). exploit H0; i.
+      { econs; try exact x2. econs; ss. econs; ss. }
+      inv x. inv ITV. ss. inv TO; cycle 1.
+      { inv H2. exploit (EMPTY to0); eauto; try refl. i. congr. }
+      exploit Memory.get_disjoint; [exact GET2|exact GET|..]. i. des.
+      { subst. timetac. }
+      exfalso.
+      destruct (TimeFacts.le_lt_dec to2 to0).
+      + apply (x5 to2); econs; ss; try refl.
+        etrans; try exact FROM. ss.
+      + apply (x5 to0); econs; ss; try refl.
+        * econs. ss.
+        * etrans; eauto.
+    - destruct (TimeFacts.le_lt_dec to2 from).
+      + destruct (COVER loc to2). exploit H0; i.
+        { econs; eauto. econs; ss. refl. }
+        inv x. inv ITV. ss.
+        exploit (x4 to0); eauto; try congr.
+        { eapply TimeFacts.lt_le_lt; try exact TO; ss. }
+        destruct (Time.le_lt_dec to to0); ss.
+        exploit Memory.get_ts; try exact x2. i. des.
+        { subst. inv x3. }
+        exploit Memory.get_disjoint; [exact x2|exact GET|..]. i. des.
+        { subst. timetac. }
+        exfalso.
+        apply (x6 to); econs; ss; try refl.
+        etrans; try exact FROM.
+        eapply TimeFacts.le_lt_lt; try exact x5. ss.
+      + destruct (COVER loc from). exploit H0; i.
+        { econs; try exact GET2. econs; ss. econs. ss. }
+        inv x. inv ITV. ss.
+        destruct (TimeFacts.le_lt_dec to to0).
+        * exploit Memory.get_ts; try exact x2. i. des.
+          { subst. inv x3. }
+          exploit Memory.get_ts; try exact GET. i. des.
+          { subst. timetac. }
+          exploit Memory.get_disjoint; [exact x2|exact GET|..]. i. des.
+          { subst. timetac. }
+          exfalso.
+          apply (x7 to); econs; ss; try refl.
+          eapply TimeFacts.lt_le_lt; try exact FROM. econs. ss.
+        * exploit (x4 to0); ss; try congr.
+          eapply TimeFacts.lt_le_lt; try exact TO; ss.
+  }
+  des. esplits. econs; eauto; i.
+  { exploit Memory.get_ts; try exact GET2_SRC. i. des.
+    - subst. inv TS.
+    - etrans; eauto. }
+  destruct (Memory.get loc ts mem_src) as [[]|] eqn:GET; ss.
+  exfalso.
+  exploit Memory.get_ts; try exact GET. i. des.
+  { subst. inv TS1. }
+  destruct (COVER loc ts). exploit H; i.
+  { econs; eauto. econs; ss. refl. }
+  inv x. inv ITV. ss.
+  destruct (TimeFacts.le_lt_dec to from2).
+  { exploit (EMPTY to); try congr.
+    eapply TimeFacts.lt_le_lt; try exact TS1. ss. }
+  exploit Memory.get_ts; try exact GET2. i. des.
+  { subst. inv TS. }
+  exploit Memory.get_ts; try exact GET0. i. des.
+  { subst. inv l. }
+  exploit Memory.get_disjoint; [exact GET2|exact GET0|..]. i. des.
+  { subst. timetac. }
+  destruct (TimeFacts.le_lt_dec to2 to).
+  - apply (x3 to2); econs; ss; try refl.
+    etrans; try exact x1.
+    eapply TimeFacts.lt_le_lt; try exact TS2. ss.
+  - apply (x3 to); econs; ss; try refl. econs. ss.
+Qed.
 
 Lemma cap_cover
       promises mem1 mem2 loc ts

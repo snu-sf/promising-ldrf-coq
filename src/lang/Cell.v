@@ -977,31 +977,30 @@ Module Cell.
     - exploit IHl; eauto. i. des. eauto.
   Qed.
 
-  Lemma adjacent_exists
-        cell from1 to1 msg1
-        (GET1: get to1 cell = Some (from1, msg1))
-        (MAX: Time.lt to1 (max_ts cell)):
-    exists from2 to2 msg2,
-      get to2 cell = Some (from2, msg2) /\
-      Time.lt to1 to2 /\
-      forall ts (TS1: Time.lt to1 ts) (TS2: Time.lt ts to2),
-        get ts cell = None.
+  Lemma next_exists
+        cell f t m ts
+        (INHABITED: get t cell = Some (f, m))
+        (TS: Time.lt ts (max_ts cell)):
+    exists from to msg,
+      get to cell = Some (from, msg) /\
+      Time.lt ts to /\
+      forall ts' (TS1: Time.lt ts ts') (TS2: Time.lt ts' to),
+        get ts' cell = None.
   Proof.
     destruct cell. unfold get in *. ss.
-    destruct (next to1 (List.map (fun x => fst x) (DOMap.elements raw0)) None) eqn:NEXT.
+    destruct (next ts (List.map (fun x => fst x) (DOMap.elements raw0)) None) eqn:NEXT.
     - exploit next_spec_Some; eauto. i. des.
       exploit in_prod_inv; eauto. i. des. destruct b.
       exploit DOMap.elements_complete; eauto. i.
       esplits; try exact x4; eauto. i.
-      destruct (DOMap.find ts raw0) as [[]|] eqn:GET; ss.
+      destruct (DOMap.find ts' raw0) as [[]|] eqn:GET; ss.
       exploit DOMap.elements_correct; try exact GET. i.
       exploit in_prod; try exact x5. i.
       exploit x2; eauto. ss.
-    - exploit (@max_ts_spec to1 from1 msg1 (Cell.mk WF0)); ss. i. des.
+    - exploit (@max_ts_spec t f m (Cell.mk WF0)); ss. i. des.
       unfold get in *. ss.
       exploit DOMap.elements_correct; try exact GET. i.
       exploit in_prod; try exact x0. i.
-      exploit next_spec_None; eauto. i.
-      exploit TimeFacts.antisym; eauto. i. subst. timetac.
+      exploit next_spec_None; eauto. i. timetac.
   Qed.
 End Cell.
