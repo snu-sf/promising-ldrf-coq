@@ -3659,102 +3659,102 @@ Module Memory.
       + left. eauto.
   Qed.
 
-  (* Lemma concrete_promise_exists *)
-  (*       promises1 mem1 loc from to msg promises2 mem2 kind *)
-  (*       mem1' *)
-  (*       (LE: le promises1 mem1) *)
-  (*       (CLOSED1: closed mem1) *)
-  (*       (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind) *)
-  (*       (CONCRETE1: concrete mem1 mem1') *)
-  (*       (LE': le promises1 mem1'): *)
-  (*   exists mem2', *)
-  (*     <<PROMISE': promise promises1 mem1' loc from to msg promises2 mem2' kind>> /\ *)
-  (*     <<CONCRETE2: concrete mem2 mem2'>>. *)
-  (* Proof. *)
-  (*   inv CONCRETE1. inv PROMISE. *)
-  (*   - exploit add_get0; try exact MEM. i. des. *)
-  (*     exploit get_ts; try exact GET0. i. des. *)
-  (*     { subst. inv CLOSED1. rewrite INHABITED in GET. inv GET. } *)
-  (*     exploit (@add_exists mem1' loc from to msg); eauto. *)
-  (*     { ii. assert (GET3: exists msg, get loc to2 mem1 = Some (from2, msg)). *)
-  (*       { exploit COMPLETE; eauto. i. des; eauto. } *)
-  (*       des. exploit add_o; eauto. erewrite GET3. condtac; ss. *)
-  (*       - des. subst. rewrite GET in GET3. inv GET3. *)
-  (*       - i. des; try congr. *)
-  (*         exploit get_disjoint; [exact GET0|exact x2|..]. i. des; try congr. *)
-  (*         eapply x3; eauto. } *)
-  (*     { inv MEM. inv ADD. ss. } *)
-  (*     i. des. *)
-  (*     exploit add_get0; try exact x1. i. des. *)
-  (*     esplits. *)
-  (*     + econs; eauto. *)
-  (*       i. subst. exploit HALF; eauto. i. des. *)
-  (*       exploit SOUND; eauto. i. des; eauto; congr. *)
-  (*     + econs; i. *)
-  (*       * erewrite add_o; eauto. *)
-  (*         revert GET3. erewrite add_o; try exact MEM. *)
-  (*         condtac; ss; eauto; i. *)
-  (*         guardH o. exploit SOUND; eauto. i. des; eauto. *)
-  (*         subst. right. split; auto. *)
-  (*         erewrite add_o; eauto. condtac; ss. *)
-  (*         { des. subst. exploit SOUND; try exact x2. i. des; congr. } *)
-  (*         { esplits; eauto. } *)
-  (*       * erewrite add_o; eauto. *)
-  (*         revert GET3. erewrite add_o; try exact x1. *)
-  (*         condtac; ss; eauto. *)
-  (*   - exploit split_get0; try exact MEM. i. des. *)
-  (*     exploit get_ts; try exact GET1. i. des. *)
-  (*     { subst. inv CLOSED1. rewrite INHABITED in GET. inv GET. } *)
-  (*     exploit get_ts; try exact GET2. i. des. *)
-  (*     { subst. inv CLOSED1. rewrite INHABITED in GET. inv GET. } *)
-  (*     exploit (@split_exists mem1' loc from to ts3 msg msg3); eauto. *)
-  (*     { exploit split_get0; try exact PROMISES. i. des. *)
-  (*       exploit LE'; try exact GET4. ss. } *)
-  (*     { inv MEM. inv SPLIT. ss. } *)
-  (*     i. des. *)
-  (*     exploit split_get0; try exact x2. i. des. *)
-  (*     esplits. *)
-  (*     + econs; eauto. *)
-  (*       i. subst. exploit HALF1; eauto. i. des. *)
-  (*       exploit SOUND; eauto. i. des; eauto; congr. *)
-  (*     + econs; i. *)
-  (*       * erewrite split_o; eauto. *)
-  (*         revert GET7. erewrite split_o; try exact MEM. *)
-  (*         repeat condtac; ss; eauto; i. *)
-  (*         { guardH o. guardH o0. *)
-  (*           exploit SOUND; eauto. i. des; eauto. *)
-  (*           subst. right. split; auto. *)
-  (*           erewrite split_o; eauto. repeat condtac; ss; eauto. *)
-  (*           - des. subst. exploit SOUND; try exact x3. i. des; congr. *)
-  (*           - guardH o1. des. subst. *)
-  (*             rewrite GET0 in x3. inv x3. esplits; eauto. } *)
-  (*       * erewrite split_o; eauto. *)
-  (*         revert GET7. erewrite split_o; try exact x2. *)
-  (*         repeat condtac; ss; eauto. *)
-  (*   - exploit lower_get0; try exact MEM. i. des. *)
-  (*     exploit get_ts; try exact GET. i. des. *)
-  (*     { subst. inv MEM. inv LOWER. inv TS0. } *)
-  (*     exploit (@lower_exists mem1' loc from to msg0 msg); eauto. *)
-  (*     { exploit lower_get0; try exact PROMISES. i. des. *)
-  (*       exploit LE'; try exact GET1. ss. } *)
-  (*     { inv MEM. inv LOWER. ss. } *)
-  (*     i. des. *)
-  (*     exploit lower_get0; try exact x1. i. des. *)
-  (*     esplits. *)
-  (*     + econs; eauto. *)
-  (*     + econs; i. *)
-  (*       * erewrite lower_o; eauto. *)
-  (*         revert GET3. erewrite lower_o; try exact MEM. *)
-  (*         condtac; ss; eauto; i. *)
-  (*         guardH o. exploit SOUND; eauto. i. des; eauto. *)
-  (*         subst. right. split; auto. *)
-  (*         erewrite lower_o; eauto. condtac; ss; eauto. *)
-  (*         des. subst. rewrite GET in x2. inv x2. *)
-  (*         inv MSG_LE. exploit SOUND; try exact GET. i. des; eauto. *)
-  (*       * erewrite lower_o; eauto. *)
-  (*         revert GET3. erewrite lower_o; try exact x1. *)
-  (*         condtac; ss; eauto. *)
-  (* Qed. *)
+  Lemma concrete_promise_exists
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        mem1'
+        (LE: le promises1 mem1)
+        (CLOSED1: closed mem1)
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (CONCRETE1: concrete mem1 mem1')
+        (LE': le promises1 mem1'):
+    exists mem2',
+      <<PROMISE': promise promises1 mem1' loc from to msg promises2 mem2' kind>> /\
+      <<CONCRETE2: concrete mem2 mem2'>>.
+  Proof.
+    inv CONCRETE1. inv PROMISE.
+    - exploit add_get0; try exact MEM. i. des.
+      exploit get_ts; try exact GET0. i. des.
+      { subst. inv CLOSED1. rewrite INHABITED in GET. inv GET. }
+      exploit (@add_exists mem1' loc from to msg); eauto.
+      { ii. assert (GET3: exists msg, get loc to2 mem1 = Some (from2, msg)).
+        { exploit COMPLETE; eauto. i. des; eauto. }
+        des. exploit add_o; eauto. erewrite GET3. condtac; ss.
+        - des. subst. rewrite GET in GET3. inv GET3.
+        - i. des; try congr.
+          exploit get_disjoint; [exact GET0|exact x2|..]. i. des; try congr.
+          eapply x3; eauto. }
+      { inv MEM. inv ADD. ss. }
+      i. des.
+      exploit add_get0; try exact x1. i. des.
+      esplits.
+      + econs; eauto.
+        i. subst. exploit HALF; eauto. i. des.
+        exploit SOUND; eauto. i. des; eauto; congr.
+      + econs; i.
+        * erewrite add_o; eauto.
+          revert GET3. erewrite add_o; try exact MEM.
+          condtac; ss; eauto; i.
+          guardH o. exploit SOUND; eauto. i. des; eauto.
+          subst. right. split; auto.
+          erewrite add_o; eauto. condtac; ss.
+          { des. subst. exploit SOUND; try exact x2. i. des; congr. }
+          { esplits; eauto. }
+        * erewrite add_o; eauto.
+          revert GET3. erewrite add_o; try exact x1.
+          condtac; ss; eauto.
+    - exploit split_get0; try exact MEM. i. des.
+      exploit get_ts; try exact GET1. i. des.
+      { subst. inv CLOSED1. rewrite INHABITED in GET. inv GET. }
+      exploit get_ts; try exact GET2. i. des.
+      { subst. inv CLOSED1. rewrite INHABITED in GET. inv GET. }
+      exploit (@split_exists mem1' loc from to ts3 msg msg3); eauto.
+      { exploit split_get0; try exact PROMISES. i. des.
+        exploit LE'; try exact GET4. ss. }
+      { inv MEM. inv SPLIT. ss. }
+      i. des.
+      exploit split_get0; try exact x2. i. des.
+      esplits.
+      + econs; eauto.
+        i. subst. exploit HALF1; eauto. i. des.
+        exploit SOUND; eauto. i. des; eauto; congr.
+      + econs; i.
+        * erewrite split_o; eauto.
+          revert GET7. erewrite split_o; try exact MEM.
+          repeat condtac; ss; eauto; i.
+          { guardH o. guardH o0.
+            exploit SOUND; eauto. i. des; eauto.
+            subst. right. split; auto.
+            erewrite split_o; eauto. repeat condtac; ss; eauto.
+            - des. subst. exploit SOUND; try exact x3. i. des; congr.
+            - guardH o1. des. subst.
+              rewrite GET0 in x3. inv x3. esplits; eauto. }
+        * erewrite split_o; eauto.
+          revert GET7. erewrite split_o; try exact x2.
+          repeat condtac; ss; eauto.
+    - exploit lower_get0; try exact MEM. i. des.
+      exploit get_ts; try exact GET. i. des.
+      { subst. inv MEM. inv LOWER. inv TS0. }
+      exploit (@lower_exists mem1' loc from to msg0 msg); eauto.
+      { exploit lower_get0; try exact PROMISES. i. des.
+        exploit LE'; try exact GET1. ss. }
+      { inv MEM. inv LOWER. ss. }
+      i. des.
+      exploit lower_get0; try exact x1. i. des.
+      esplits.
+      + econs; eauto.
+      + econs; i.
+        * erewrite lower_o; eauto.
+          revert GET3. erewrite lower_o; try exact MEM.
+          condtac; ss; eauto; i.
+          guardH o. exploit SOUND; eauto. i. des; eauto.
+          subst. right. split; auto.
+          erewrite lower_o; eauto. condtac; ss; eauto.
+          des. subst. rewrite GET in x2. inv x2.
+          inv MSG_LE. exploit SOUND; try exact GET. i. des; eauto.
+        * erewrite lower_o; eauto.
+          revert GET3. erewrite lower_o; try exact x1.
+          condtac; ss; eauto.
+  Qed.
 
 
   (* existence of and concrete and concrete *)
