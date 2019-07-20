@@ -222,3 +222,28 @@ Lemma orb_symm (a b: bool): orb a b -> orb b a.
 Proof. destruct a,b; eauto. Qed.
 
 Hint Resolve orb_symm.
+
+Lemma in_prod
+      A B
+      (a: A)
+      (b: B)
+      (l: list (A * B))
+      (IN: List.In (a, b) l):
+  List.In a (List.map (fun x => fst x) l).
+Proof.
+  revert a b IN. induction l; ss; i. des.
+  - destruct a. ss. inv IN. esplits; eauto.
+  - exploit IHl; eauto.
+Qed.
+
+Lemma in_prod_inv
+      A B
+      (a: A)
+      (l: list (A * B))
+      (IN: List.In a (List.map (fun x => fst x) l)):
+  exists b, List.In (a, b) l.
+Proof.
+  revert a IN. induction l; ss; i. des.
+  - destruct a. ss. subst. esplits; eauto.
+  - exploit IHl; eauto. i. des. eauto.
+Qed.

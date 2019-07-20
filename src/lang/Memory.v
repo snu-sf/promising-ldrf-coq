@@ -3772,7 +3772,7 @@ Module Memory.
     inv CLOSED. inv FINITE_HALF.
     exists (List.map (fun a => fst a) x). ii.
     exploit H; eauto. i.
-    eapply Cell.in_prod; eauto.
+    eapply in_prod; eauto.
   Qed.
 
   Lemma concrete_exists
