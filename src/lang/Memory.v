@@ -2531,6 +2531,40 @@ Module Memory.
   Qed.
 
 
+  (* next and previous message *)
+
+  Lemma next_exists
+        mem loc f t m ts
+        (GET: get loc t mem = Some (f, m))
+        (TS: Time.lt ts (max_ts loc mem)):
+    exists from to msg,
+      get loc to mem = Some (from, msg) /\
+      Time.lt ts to /\
+      forall ts' (TS1: Time.lt ts ts') (TS2: Time.lt ts' to),
+        get loc ts' mem = None.
+  Proof.
+    exploit Cell.next_exists; eauto.
+  Qed.
+
+  Inductive prev (loc: Loc.t) (ts: Time.t) (mem: t) (from to: Time.t) (msg: Message.t): Prop :=
+  | prev_intro
+      (GET: get loc to mem = Some (from, msg))
+      (TO: Time.le to ts)
+      (EMPTY: forall ts' (TS1: Time.lt to ts') (TS2: Time.le ts' ts),
+          get loc ts' mem = None)
+  .
+
+  Lemma prev_exists
+        loc ts mem
+        (INHABITED: inhabited mem):
+    exists from to msg,
+      prev loc ts mem from to msg.
+  Proof.
+    exploit Cell.prev_exists; eauto. i. des.
+    esplits; econs; eauto.
+  Qed.
+
+
   (* cap *)
 
   Definition loc_non_init (loc: Loc.t) (mem: t): Prop :=
@@ -2612,19 +2646,6 @@ Module Memory.
         + econs. ss. }
     inv H. rewrite GET2 in GET3. inv GET3.
     splits; auto.
-  Qed.
-
-  Lemma next_exists
-        mem loc f t m ts
-        (GET: get loc t mem = Some (f, m))
-        (TS: Time.lt ts (max_ts loc mem)):
-    exists from to msg,
-      get loc to mem = Some (from, msg) /\
-      Time.lt ts to /\
-      forall ts' (TS1: Time.lt ts ts') (TS2: Time.lt ts' to),
-        get loc ts' mem = None.
-  Proof.
-    exploit Cell.next_exists; eauto.
   Qed.
 
   Lemma adjacent_exists
