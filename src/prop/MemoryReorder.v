@@ -15,6 +15,7 @@ Require Import Cell.
 Require Import Memory.
 Require Import MemoryFacts.
 
+Require Import Cover.
 Require Import SimMemory.
 
 Set Implicit Arguments.
