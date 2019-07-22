@@ -234,7 +234,6 @@ Section Invariant.
         (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
         (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory))
         (CLOSED1: Memory.closed th1.(Thread.memory))
-        (HALF_WF1: Memory.half_wf th1.(Thread.memory))
         (STEP: rtc (union (Thread.step true)) th1 th2):
     <<TH2: S tid lang th2.(Thread.state)>> /\
     <<MEM2: sem_memory th2.(Thread.memory)>>.

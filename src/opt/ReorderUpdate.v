@@ -85,9 +85,7 @@ Inductive sim_update: forall (st_src:lang.(Language.state)) (lc_src:Local.t) (sc
     (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
     (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
     (MEM_SRC: Memory.closed mem1_src)
-    (MEM_TGT: Memory.closed mem1_tgt)
-    (HALF_WF_SRC: Memory.half_wf mem1_src)
-    (HALF_WF_TGT: Memory.half_wf mem1_tgt):
+    (MEM_TGT: Memory.closed mem1_tgt):
     sim_update
       (State.mk rs [Stmt.instr i2; Stmt.instr (Instr.update r1 l1 rmw1 or1 ow1)]) lc1_src sc1_src mem1_src
       (State.mk (RegFun.add r1 vret1 rs) [Stmt.instr i2]) lc1_tgt sc1_tgt mem1_tgt
@@ -111,9 +109,7 @@ Lemma sim_update_mon
       (SC_SRC: Memory.closed_timemap sc2_src mem2_src)
       (SC_TGT: Memory.closed_timemap sc2_tgt mem2_tgt)
       (MEM_SRC: Memory.closed mem2_src)
-      (MEM_TGT: Memory.closed mem2_tgt)
-      (HALF_WF_SRC: Memory.half_wf mem2_src)
-      (HALF_WF_TGT: Memory.half_wf mem2_tgt):
+      (MEM_TGT: Memory.closed mem2_tgt):
   sim_update st_src lc_src sc2_src mem2_src
              st_tgt lc_tgt sc2_tgt mem2_tgt.
 Proof.

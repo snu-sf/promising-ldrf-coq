@@ -122,7 +122,6 @@ Lemma reorder_read_promise
       lc2 mem2
       (WF0: Local.wf lc0 mem0)
       (MEM0: Memory.closed mem0)
-      (HALF_WF0: Memory.half_wf mem0)
       (STEP1: Local.read_step lc0 mem0 loc1 ts1 val1 released1 ord1 lc1)
       (STEP2: Local.promise_step lc1 mem0 loc2 from2 to2 msg2 lc2 mem2 kind2):
   exists lc1' lc2' released1',
@@ -213,7 +212,6 @@ Lemma reorder_read_write
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
-      (HALF_WF0: Memory.half_wf mem0)
       (STEP1: Local.read_step lc0 mem0 loc1 ts1 val1 released1 ord1 lc1)
       (STEP2: Local.write_step lc1 sc0 mem0 loc2 from2 to2 val2 releasedm2 released2 ord2 lc2 sc2 mem2 kind):
   exists released2' mem2' lc1' lc2',
@@ -260,7 +258,6 @@ Lemma reorder_read_update
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
-      (HALF_WF0: Memory.half_wf mem0)
       (STEP1: Local.read_step lc0 mem0 loc1 ts1 val1 released1 ord1 lc1)
       (STEP2: Local.read_step lc1 mem0 loc2 ts2 val2 released2 ord2 lc2)
       (STEP3: Local.write_step lc2 sc0 mem0 loc2 from3 to3 val3 released2 released3 ord3 lc3 sc3 mem3 kind):
@@ -363,7 +360,6 @@ Lemma reorder_fulfill_promise
       lc2 mem2
       (WF0: Local.wf lc0 mem0)
       (MEM0: Memory.closed mem0)
-      (HALF_WF0: Memory.half_wf mem0)
       (STEP1: fulfill_step lc0 sc0 loc1 from1 to1 val1 releasedm1 released1 ord1 lc1 sc1)
       (STEP2: Local.promise_step lc1 mem0 loc2 from2 to2 msg2 lc2 mem2 kind2):
   exists lc1',
@@ -434,7 +430,6 @@ Lemma reorder_fulfill_write
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
-      (HALF_WF0: Memory.half_wf mem0)
       (REL1_WF: View.opt_wf releasedm1)
       (REL1_CLOSED: Memory.closed_opt_view releasedm1 mem0)
       (REL2_WF: View.opt_wf releasedm2)
@@ -482,7 +477,6 @@ Lemma reorder_fulfill_update
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
-      (HALF_WF0: Memory.half_wf mem0)
       (REL1_WF: View.opt_wf releasedm1)
       (REL1_CLOSED: Memory.closed_opt_view releasedm1 mem0)
       (STEP1: fulfill_step lc0 sc0 loc1 from1 to1 val1 releasedm1 released1 ord1 lc1 sc1)
@@ -521,7 +515,6 @@ Lemma reorder_update_read
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
-      (HALF_WF0: Memory.half_wf mem0)
       (STEP1: Local.read_step lc0 mem0 loc1 ts1 val1 released1 ord1 lc1)
       (STEP2: fulfill_step lc1 sc0 loc1 from2 to2 val2 released1 released2 ord2 lc2 sc2)
       (STEP3: Local.read_step lc2 mem0 loc3 ts3 val3 released3 ord3 lc3):
@@ -549,7 +542,6 @@ Lemma reorder_update_promise
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
-      (HALF_WF0: Memory.half_wf mem0)
       (STEP1: Local.read_step lc0 mem0 loc1 ts1 val1 released1 ord1 lc1)
       (STEP2: fulfill_step lc1 sc0 loc1 from2 to2 val2 released1 released2 ord2 lc2 sc2)
       (STEP3: Local.promise_step lc2 mem0 loc3 from3 to3 msg3 lc3 mem3 kind3):
@@ -586,7 +578,6 @@ Lemma reorder_update_promise_diff
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
-      (HALF_WF0: Memory.half_wf mem0)
       (STEP1: Local.read_step lc0 mem0 loc1 ts1 val1 released1 ord1 lc1)
       (STEP2: fulfill_step lc1 sc0 loc1 from2 to2 val2 released1 released2 ord2 lc2 sc2)
       (STEP3: Local.promise_step lc2 mem0 loc3 from3 to3 msg3 lc3 mem3 kind3):
@@ -619,7 +610,6 @@ Lemma reorder_update_fulfill
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
-      (HALF_WF0: Memory.half_wf mem0)
       (STEP1: Local.read_step lc0 mem0 loc1 ts1 val1 released1 ord1 lc1)
       (STEP2: fulfill_step lc1 sc0 loc1 from2 to2 val2 released1 released2 ord2 lc2 sc2)
       (STEP3: fulfill_step lc2 sc2 loc3 from3 to3 val3 releasedm3 released3 ord3 lc3 sc3):
@@ -660,7 +650,6 @@ Lemma reorder_update_write
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
-      (HALF_WF0: Memory.half_wf mem0)
       (STEP1: Local.read_step lc0 mem0 loc1 ts1 val1 released1 ord1 lc1)
       (STEP2: fulfill_step lc1 sc0 loc1 from2 to2 val2 released1 released2 ord2 lc2 sc2)
       (STEP3: Local.write_step lc2 sc2 mem0 loc3 from3 to3 val3 releasedm3 released3 ord3 lc3 sc3 mem3 kind3):
@@ -722,7 +711,6 @@ Lemma reorder_update_update
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
-      (HALF_WF0: Memory.half_wf mem0)
       (STEP1: Local.read_step lc0 mem0 loc1 ts1 val1 released1 ord1 lc1)
       (STEP2: fulfill_step lc1 sc0 loc1 from2 to2 val2 released1 released2 ord2 lc2 sc2)
       (STEP3: Local.read_step lc2 mem0 loc3 ts3 val3 released3 ord3 lc3)
@@ -900,7 +888,6 @@ Lemma reorder_fence_write
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
-      (HALF_WF0: Memory.half_wf mem0)
       (REL2_WF: View.opt_wf releasedm2)
       (REL2_CLOSED: Memory.closed_opt_view releasedm2 mem0)
       (STEP1: Local.fence_step lc0 sc0 ordr1 ordw1 lc1 sc1)

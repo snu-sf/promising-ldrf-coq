@@ -414,7 +414,6 @@ Lemma reorder_promise_write
       (LOCAL0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
-      (HALF_WF0: Memory.half_wf mem0)
       (LOCTS: forall to1' msg1'
                 (LOC: loc1 = loc2)
                 (KIND: kind1 = Memory.op_kind_split to1' msg1'),
@@ -471,8 +470,7 @@ Lemma reorder_promise_write'
       (REL_CLOSED: Memory.closed_opt_view releasedm2 mem0)
       (LOCAL0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
-      (MEM0: Memory.closed mem0)
-      (HALF_WF0: Memory.half_wf mem0):
+      (MEM0: Memory.closed mem0):
   (loc1 = loc2 /\ Time.lt to1 to2) \/
   (exists kind2' lc1' mem1',
      <<STEP1: Local.write_step lc0 sc0 mem0 loc2 from2 to2 val2 releasedm2 released2 ord2 lc1' sc2 mem1' kind2'>> /\
@@ -506,8 +504,7 @@ Lemma reorder_nonpf_program
       (CONS2: promise_consistent th2.(Thread.local))
       (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
       (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
-      (MEMORY: Memory.closed th0.(Thread.memory))
-      (HALF_WF: Memory.half_wf th0.(Thread.memory)):
+      (MEMORY: Memory.closed th0.(Thread.memory)):
   exists th1',
      <<STEP1: Thread.program_step e2 th0 th1'>> /\
      <<STEP2: __guard__ (th2 = th1' \/ exists pf2' e2', Thread.promise_step pf2' e2' th1' th2)>>.
@@ -585,8 +582,7 @@ Lemma reorder_nonpf_pf
       (CONS2: promise_consistent th2.(Thread.local))
       (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
       (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
-      (MEMORY: Memory.closed th0.(Thread.memory))
-      (HALF_WF: Memory.half_wf th0.(Thread.memory)):
+      (MEMORY: Memory.closed th0.(Thread.memory)):
   (exists pf2' e2',
       <<STEP: Thread.step pf2' e2' th0 th2>> /\
       <<EVENT: __guard__ (e2' = e2 \/ (ThreadEvent.is_promising e2' /\ ThreadEvent.is_promising e2))>>) \/

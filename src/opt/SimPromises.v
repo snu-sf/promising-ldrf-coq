@@ -434,8 +434,6 @@ Module SimPromises.
         (CAP_TGT: Memory.cap promises_tgt mem1_tgt mem2_tgt)
         (MEM1_SRC: Memory.closed mem1_src)
         (MEM1_TGT: Memory.closed mem1_tgt)
-        (HALF_WF1_SRC: Memory.half_wf mem1_src)
-        (HALF_WF1_TGT: Memory.half_wf mem1_tgt)
         (GET1_SRC: Memory.get loc to mem1_src = None)
         (GET2_SRC: Memory.get loc to mem2_src = Some (from, msg)):
     <<GET1_TGT: Memory.get loc to mem1_tgt = None>> /\
@@ -470,8 +468,6 @@ Module SimPromises.
         (CAP_TGT: Memory.cap promises_tgt mem1_tgt mem2_tgt)
         (MEM1_SRC: Memory.closed mem1_src)
         (MEM1_TGT: Memory.closed mem1_tgt)
-        (HALF_WF1_SRC: Memory.half_wf mem1_src)
-        (HALF_WF1_TGT: Memory.half_wf mem1_tgt)
         (GET1_TGT: Memory.get loc to mem1_tgt = None)
         (GET2_TGT: Memory.get loc to mem2_tgt = Some (from, msg)):
     <<GET1_SRC: Memory.get loc to mem1_src = None>> /\
@@ -503,9 +499,7 @@ Module SimPromises.
         (MEM1: sim_memory mem1_src mem1_tgt)
         (CAP_SRC: Memory.cap lc_src.(Local.promises) mem1_src mem2_src)
         (MEM1_SRC: Memory.closed mem1_src)
-        (MEM1_TGT: Memory.closed mem1_tgt)
-        (HALF_WF1_SRC: Memory.half_wf mem1_src)
-        (HALF_WF1_TGT: Memory.half_wf mem1_tgt):
+        (MEM1_TGT: Memory.closed mem1_tgt):
     exists mem2_tgt,
       <<MEM2: sim_memory mem2_src mem2_tgt>> /\
       <<CAP_TGT: Memory.cap lc_tgt.(Local.promises) mem1_tgt mem2_tgt>>.

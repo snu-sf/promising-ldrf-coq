@@ -283,16 +283,18 @@ Module Local.
   .
   Hint Constructors program_step.
 
-  Lemma promise_step_future lc1 sc1 mem1 loc from to msg lc2 mem2 kind
+
+  (* step_future *)
+
+  Lemma promise_step_future
+        lc1 sc1 mem1 loc from to msg lc2 mem2 kind
         (STEP: promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
         (WF1: wf lc1 mem1)
         (SC1: Memory.closed_timemap sc1 mem1)
-        (CLOSED1: Memory.closed mem1)
-        (HALF1: Memory.half_wf mem1):
+        (CLOSED1: Memory.closed mem1):
     <<WF2: wf lc2 mem2>> /\
     <<SC2: Memory.closed_timemap sc1 mem2>> /\
     <<CLOSED2: Memory.closed mem2>> /\
-    <<HALF2: Memory.half_wf mem2>> /\
     <<FUTURE: Memory.future mem1 mem2>> /\
     <<TVIEW_FUTURE: TView.le lc1.(tview) lc2.(tview)>> /\
     <<MSG_WF: Message.wf msg>> /\
@@ -312,7 +314,8 @@ Module Local.
     - by inv PROMISE.
   Qed.
 
-  Lemma read_step_future lc1 mem1 loc ts val released ord lc2
+  Lemma read_step_future
+        lc1 mem1 loc ts val released ord lc2
         (STEP: read_step lc1 mem1 loc ts val released ord lc2)
         (WF1: wf lc1 mem1)
         (CLOSED1: Memory.closed mem1):
@@ -330,18 +333,17 @@ Module Local.
     - apply TViewFacts.read_tview_incr.
   Qed.
 
-  Lemma write_step_future lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
+  Lemma write_step_future
+        lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
         (STEP: write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
         (REL_WF: View.opt_wf releasedm)
         (REL_CLOSED: Memory.closed_opt_view releasedm mem1)
         (WF1: wf lc1 mem1)
         (SC1: Memory.closed_timemap sc1 mem1)
-        (CLOSED1: Memory.closed mem1)
-        (HALF1: Memory.half_wf mem1):
+        (CLOSED1: Memory.closed mem1):
     <<WF2: wf lc2 mem2>> /\
     <<SC2: Memory.closed_timemap sc2 mem2>> /\
     <<CLOSED2: Memory.closed mem2>> /\
-    <<HALF2: Memory.half_wf mem2>> /\
     <<TVIEW_FUTURE: TView.le lc1.(tview) lc2.(tview)>> /\
     <<SC_FUTURE: TimeMap.le sc1 sc2>> /\
     <<MEM_FUTURE: Memory.future mem1 mem2>> /\
@@ -376,7 +378,8 @@ Module Local.
     revert H0. unfold TView.write_released. condtac; ss. by destruct ord.
   Qed.
 
-  Lemma fence_step_future lc1 sc1 mem1 ordr ordw lc2 sc2
+  Lemma fence_step_future
+        lc1 sc1 mem1 ordr ordw lc2 sc2
         (STEP: fence_step lc1 sc1 ordr ordw lc2 sc2)
         (WF1: wf lc1 mem1)
         (SC1: Memory.closed_timemap sc1 mem1)
@@ -397,16 +400,15 @@ Module Local.
     - apply TViewFacts.write_fence_sc_incr.
   Qed.
 
-  Lemma program_step_future e lc1 sc1 mem1 lc2 sc2 mem2
+  Lemma program_step_future
+        e lc1 sc1 mem1 lc2 sc2 mem2
         (STEP: program_step e lc1 sc1 mem1 lc2 sc2 mem2)
         (WF1: wf lc1 mem1)
         (SC1: Memory.closed_timemap sc1 mem1)
-        (CLOSED1: Memory.closed mem1)
-        (HALF1: Memory.half_wf mem1):
+        (CLOSED1: Memory.closed mem1):
     <<WF2: wf lc2 mem2>> /\
     <<SC2: Memory.closed_timemap sc2 mem2>> /\
     <<CLOSED2: Memory.closed mem2>> /\
-    <<HALF2: Memory.half_wf mem2>> /\
     <<TVIEW_FUTURE: TView.le lc1.(tview) lc2.(tview)>> /\
     <<SC_FUTURE: TimeMap.le sc1 sc2>> /\
     <<MEM_FUTURE: Memory.future mem1 mem2>>.
@@ -424,13 +426,15 @@ Module Local.
     - exploit fence_step_future; eauto. i. des. esplits; eauto; try refl.
   Qed.
 
+
+  (* step_disjoint *)
+
   Lemma promise_step_disjoint
         lc1 sc1 mem1 loc from to msg lc2 mem2 lc kind
         (STEP: promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
         (WF1: wf lc1 mem1)
         (SC1: Memory.closed_timemap sc1 mem1)
         (CLOSED1: Memory.closed mem1)
-        (HALF1: Memory.half_wf mem1)
         (DISJOINT1: disjoint lc1 lc)
         (WF: wf lc mem1):
     <<DISJOINT2: disjoint lc2 lc>> /\
@@ -514,6 +518,41 @@ Module Local.
     - exploit fence_step_disjoint; eauto.
     - exploit fence_step_disjoint; eauto.
   Qed.
+
+
+  (* step_half_wf*)
+
+  Lemma promise_step_half_wf
+        lc1 mem1 loc from to msg lc2 mem2 kind
+        (STEP: promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
+        (HALF1: Memory.half_wf mem1):
+    <<HALF2: Memory.half_wf mem2>>.
+  Proof.
+    inv STEP. hexploit Memory.promise_half_wf; eauto.
+  Qed.
+
+  Lemma write_step_half_wf
+        lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
+        (STEP: write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
+        (HALF1: Memory.half_wf mem1):
+    <<HALF2: Memory.half_wf mem2>>.
+  Proof.
+    inv STEP. hexploit Memory.write_half_wf; eauto.
+  Qed.
+
+  Lemma program_step_half_wf
+        e lc1 sc1 mem1 lc2 sc2 mem2
+        (STEP: program_step e lc1 sc1 mem1 lc2 sc2 mem2)
+        (HALF1: Memory.half_wf mem1):
+    <<HALF2: Memory.half_wf mem2>>.
+  Proof.
+    inv STEP; eauto.
+    - eapply write_step_half_wf; eauto.
+    - eapply write_step_half_wf; eauto.
+  Qed.
+
+
+  (* step_no_half_except *)
 
   Lemma promise_step_no_half_except
         lc1 mem1 loc from to msg lc2 mem2 kind

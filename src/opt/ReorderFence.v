@@ -96,9 +96,7 @@ Lemma sim_fence_step
     (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
     (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
     (MEM_SRC: Memory.closed mem1_src)
-    (MEM_TGT: Memory.closed mem1_tgt)
-    (HALF_WF_SRC: Memory.half_wf mem1_src)
-    (HALF_WF_TGT: Memory.half_wf mem1_tgt),
+    (MEM_TGT: Memory.closed mem1_tgt),
     _sim_thread_step lang lang ((sim_thread (sim_terminal eq)) \8/ sim_fence)
                      st1_src lc1_src sc1_src mem1_src
                      st1_tgt lc1_tgt sc1_tgt mem1_tgt.

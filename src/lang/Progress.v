@@ -141,7 +141,6 @@ Lemma progress_write_step
       (WF1: Local.wf lc1 mem1)
       (SC1: Memory.closed_timemap sc1 mem1)
       (MEM1: Memory.closed mem1)
-      (HALF_WF1: Memory.half_wf mem1)
       (WF_REL: View.opt_wf releasedm)
       (CLOSED_REL: Memory.closed_opt_view releasedm mem1)
       (PROMISES1: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc lc1.(Local.promises)):

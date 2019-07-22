@@ -56,9 +56,7 @@ Inductive sim_released: forall (st_src:lang.(Language.state)) (lc_src:Local.t) (
     (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
     (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
     (MEM_SRC: Memory.closed mem1_src)
-    (MEM_TGT: Memory.closed mem1_tgt)
-    (HALF_WF1_SRC: Memory.half_wf mem1_src)
-    (HALF_WF1_TGT: Memory.half_wf mem1_tgt):
+    (MEM_TGT: Memory.closed mem1_tgt):
     sim_released
       (State.mk rs [Stmt.instr i_src]) lc1_src sc1_src mem1_src
       (State.mk rs [Stmt.instr i_tgt]) lc1_tgt sc1_tgt mem1_tgt
@@ -82,9 +80,7 @@ Lemma sim_released_mon
       (SC_SRC: Memory.closed_timemap sc2_src mem2_src)
       (SC_TGT: Memory.closed_timemap sc2_tgt mem2_tgt)
       (MEM_SRC: Memory.closed mem2_src)
-      (MEM_TGT: Memory.closed mem2_tgt)
-      (HALF_WF1_SRC: Memory.half_wf mem2_src)
-      (HALF_WF1_TGT: Memory.half_wf mem2_tgt):
+      (MEM_TGT: Memory.closed mem2_tgt):
   sim_released st_src lc_src sc2_src mem2_src
                st_tgt lc_tgt sc2_tgt mem2_tgt.
 Proof.
@@ -173,9 +169,7 @@ Lemma sim_local_write_released
       (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
       (SC1_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
       (MEM1_SRC: Memory.closed mem1_src)
-      (MEM1_TGT: Memory.closed mem1_tgt)
-      (HALF_WF1_SRC: Memory.half_wf mem1_src)
-      (HALF_WF1_TGT: Memory.half_wf mem1_tgt):
+      (MEM1_TGT: Memory.closed mem1_tgt):
   exists released_src lc2_src sc2_src mem2_src,
     <<STEP_SRC: Local.write_step lc1_src sc1_src mem1_src loc from to val releasedm_src released_src Ordering.acqrel lc2_src sc2_src mem2_src kind>> /\
     <<REL2: View.opt_le released_src released_tgt>> /\

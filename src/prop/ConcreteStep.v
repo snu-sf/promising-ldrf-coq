@@ -198,6 +198,7 @@ Proof.
     hexploit Memory.concrete_half_wf; eauto. i.
     exploit concrete_thread_step; eauto. i. des.
     exploit Thread.step_future; try exact STEP; eauto. i. des.
+    hexploit Thread.step_half_wf; try exact STEP; eauto. i. des.
     exploit Thread.step_future; try exact STEP'; eauto; s.
     { eapply Memory.concrete_closed_timemap; eauto. }
     { eapply Memory.concrete_closed; eauto. }
@@ -229,6 +230,7 @@ Proof.
     hexploit Memory.concrete_half_wf; eauto. i.
     exploit concrete_thread_step; eauto. i. des.
     exploit Thread.step_future; try exact STEP; eauto. i. des.
+    hexploit Thread.step_half_wf; try exact STEP; eauto. i. des.
     exploit Thread.step_future; try exact STEP'; eauto; s.
     { eapply Memory.concrete_closed_timemap; eauto. }
     { eapply Memory.concrete_closed; eauto. }

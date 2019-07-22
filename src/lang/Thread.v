@@ -142,17 +142,18 @@ Module Thread.
         <<STEPS: rtc tau_step (mk e.(state) e.(local) sc1 mem1) e2>> /\
         <<PROMISES: e2.(local).(Local.promises) = Memory.bot>>.
 
+
+    (* step_future *)
+
     Lemma promise_step_future
           pf e e1 e2
           (STEP: promise_step pf e e1 e2)
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
-          (CLOSED1: Memory.closed e1.(memory))
-          (HALF1: Memory.half_wf e1.(memory)):
+          (CLOSED1: Memory.closed e1.(memory)):
       <<WF2: Local.wf e2.(local) e2.(memory)>> /\
       <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
       <<CLOSED2: Memory.closed e2.(memory)>> /\
-      <<HALF2: Memory.half_wf e2.(memory)>> /\
       <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
       <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
       <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>>.
@@ -162,16 +163,15 @@ Module Thread.
       splits; eauto. refl.
     Qed.
 
-    Lemma program_step_future e e1 e2
+    Lemma program_step_future
+          e e1 e2
           (STEP: program_step e e1 e2)
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
-          (CLOSED1: Memory.closed e1.(memory))
-          (HALF1: Memory.half_wf e1.(memory)):
+          (CLOSED1: Memory.closed e1.(memory)):
       <<WF2: Local.wf e2.(local) e2.(memory)>> /\
       <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
       <<CLOSED2: Memory.closed e2.(memory)>> /\
-      <<HALF2: Memory.half_wf e2.(memory)>> /\
       <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
       <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
       <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>>.
@@ -179,16 +179,15 @@ Module Thread.
       inv STEP. ss. eapply Local.program_step_future; eauto.
     Qed.
 
-    Lemma step_future pf e e1 e2
+    Lemma step_future
+          pf e e1 e2
           (STEP: step pf e e1 e2)
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
-          (CLOSED1: Memory.closed e1.(memory))
-          (HALF1: Memory.half_wf e1.(memory)):
+          (CLOSED1: Memory.closed e1.(memory)):
       <<WF2: Local.wf e2.(local) e2.(memory)>> /\
       <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
       <<CLOSED2: Memory.closed e2.(memory)>> /\
-      <<HALF2: Memory.half_wf e2.(memory)>> /\
       <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
       <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
       <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>>.
@@ -198,16 +197,15 @@ Module Thread.
       - eapply program_step_future; eauto.
     Qed.
 
-    Lemma step_nonpf_future e e1 e2
+    Lemma step_nonpf_future
+          e e1 e2
           (STEP: step false e e1 e2)
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
-          (CLOSED1: Memory.closed e1.(memory))
-          (HALF1: Memory.half_wf e1.(memory)):
+          (CLOSED1: Memory.closed e1.(memory)):
       <<WF2: Local.wf e2.(local) e2.(memory)>> /\
       <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
       <<CLOSED2: Memory.closed e2.(memory)>> /\
-      <<HALF2: Memory.half_wf e2.(memory)>> /\
       <<TVIEW_FUTURE: TView.le e1.(local).(Local.tview) e2.(local).(Local.tview)>> /\
       <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
       <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>> /\
@@ -218,16 +216,15 @@ Module Thread.
       esplits; ss. refl.
     Qed.
 
-    Lemma opt_step_future e e1 e2
+    Lemma opt_step_future
+          e e1 e2
           (STEP: opt_step e e1 e2)
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
-          (CLOSED1: Memory.closed e1.(memory))
-          (HALF1: Memory.half_wf e1.(memory)):
+          (CLOSED1: Memory.closed e1.(memory)):
       <<WF2: Local.wf e2.(local) e2.(memory)>> /\
       <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
       <<CLOSED2: Memory.closed e2.(memory)>> /\
-      <<HALF2: Memory.half_wf e2.(memory)>> /\
       <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
       <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
       <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>>.
@@ -237,16 +234,15 @@ Module Thread.
       - eapply step_future; eauto.
     Qed.
 
-    Lemma rtc_all_step_future e1 e2
+    Lemma rtc_all_step_future
+          e1 e2
           (STEP: rtc all_step e1 e2)
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
-          (CLOSED1: Memory.closed e1.(memory))
-          (HALF1: Memory.half_wf e1.(memory)):
+          (CLOSED1: Memory.closed e1.(memory)):
       <<WF2: Local.wf e2.(local) e2.(memory)>> /\
       <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
       <<CLOSED2: Memory.closed e2.(memory)>> /\
-      <<HALF2: Memory.half_wf e2.(memory)>> /\
       <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
       <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
       <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>>.
@@ -259,16 +255,15 @@ Module Thread.
         splits; ss; etrans; eauto.
     Qed.
 
-    Lemma rtc_tau_step_future e1 e2
+    Lemma rtc_tau_step_future
+          e1 e2
           (STEP: rtc tau_step e1 e2)
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
-          (CLOSED1: Memory.closed e1.(memory))
-          (HALF1: Memory.half_wf e1.(memory)):
+          (CLOSED1: Memory.closed e1.(memory)):
       <<WF2: Local.wf e2.(local) e2.(memory)>> /\
       <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
       <<CLOSED2: Memory.closed e2.(memory)>> /\
-      <<HALF2: Memory.half_wf e2.(memory)>> /\
       <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
       <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
       <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>>.
@@ -278,16 +273,15 @@ Module Thread.
       apply tau_union.
     Qed.
 
-    Lemma rtc_step_nonpf_future e1 e2
+    Lemma rtc_step_nonpf_future
+          e1 e2
           (STEP: rtc (union (step false)) e1 e2)
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
-          (CLOSED1: Memory.closed e1.(memory))
-          (HALF1: Memory.half_wf e1.(memory)):
+          (CLOSED1: Memory.closed e1.(memory)):
       <<WF2: Local.wf e2.(local) e2.(memory)>> /\
       <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
       <<CLOSED2: Memory.closed e2.(memory)>> /\
-      <<HALF2: Memory.half_wf e2.(memory)>> /\
       <<TVIEW_FUTURE: TView.le e1.(local).(Local.tview) e2.(local).(Local.tview)>> /\
       <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
       <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>> /\
@@ -300,13 +294,15 @@ Module Thread.
         splits; ss; etrans; eauto.
     Qed.
 
+
+    (* step_disjoint *)
+
     Lemma promise_step_disjoint
           pf e e1 e2 lc
           (STEP: promise_step pf e e1 e2)
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
           (CLOSED1: Memory.closed e1.(memory))
-          (HALF1: Memory.half_wf e1.(memory))
           (DISJOINT1: Local.disjoint e1.(local) lc)
           (WF: Local.wf lc e1.(memory)):
       <<DISJOINT2: Local.disjoint e2.(local) lc>> /\
@@ -317,7 +313,8 @@ Module Thread.
       exploit Local.promise_step_disjoint; eauto.
     Qed.
 
-    Lemma program_step_disjoint e e1 e2 lc
+    Lemma program_step_disjoint
+          e e1 e2 lc
           (STEP: program_step e e1 e2)
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
@@ -330,12 +327,12 @@ Module Thread.
       inv STEP. ss. eapply Local.program_step_disjoint; eauto.
     Qed.
 
-    Lemma step_disjoint pf e e1 e2 lc
+    Lemma step_disjoint
+          pf e e1 e2 lc
           (STEP: step pf e e1 e2)
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
           (CLOSED1: Memory.closed e1.(memory))
-          (HALF1: Memory.half_wf e1.(memory))
           (DISJOINT1: Local.disjoint e1.(local) lc)
           (WF: Local.wf lc e1.(memory)):
       <<DISJOINT2: Local.disjoint e2.(local) lc>> /\
@@ -346,12 +343,12 @@ Module Thread.
       - eapply program_step_disjoint; eauto.
     Qed.
 
-    Lemma opt_step_disjoint e e1 e2 lc
+    Lemma opt_step_disjoint
+          e e1 e2 lc
           (STEP: opt_step e e1 e2)
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
           (CLOSED1: Memory.closed e1.(memory))
-          (HALF1: Memory.half_wf e1.(memory))
           (DISJOINT1: Local.disjoint e1.(local) lc)
           (WF: Local.wf lc e1.(memory)):
       <<DISJOINT2: Local.disjoint e2.(local) lc>> /\
@@ -362,12 +359,12 @@ Module Thread.
       - eapply step_disjoint; eauto.
     Qed.
 
-    Lemma rtc_all_step_disjoint e1 e2 lc
+    Lemma rtc_all_step_disjoint
+          e1 e2 lc
           (STEP: rtc all_step e1 e2)
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
           (CLOSED1: Memory.closed e1.(memory))
-          (HALF1: Memory.half_wf e1.(memory))
           (DISJOINT1: Local.disjoint e1.(local) lc)
           (WF: Local.wf lc e1.(memory)):
       <<DISJOINT2: Local.disjoint e2.(local) lc>> /\
@@ -380,12 +377,12 @@ Module Thread.
       exploit IHSTEP; eauto.
     Qed.
 
-    Lemma rtc_tau_step_disjoint e1 e2 lc
+    Lemma rtc_tau_step_disjoint
+          e1 e2 lc
           (STEP: rtc tau_step e1 e2)
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
           (CLOSED1: Memory.closed e1.(memory))
-          (HALF1: Memory.half_wf e1.(memory))
           (DISJOINT1: Local.disjoint e1.(local) lc)
           (WF: Local.wf lc e1.(memory)):
       <<DISJOINT2: Local.disjoint e2.(local) lc>> /\
@@ -395,6 +392,73 @@ Module Thread.
       eapply rtc_implies; [|eauto].
       apply tau_union.
     Qed.
+
+
+    (* step_half_wf *)
+
+    Lemma promise_step_half_wf
+          pf e e1 e2
+          (STEP: promise_step pf e e1 e2)
+          (HALF1: Memory.half_wf e1.(memory)):
+      <<HALF2: Memory.half_wf e2.(memory)>>.
+    Proof.
+      inv STEP. ss. eapply Local.promise_step_half_wf; eauto.
+    Qed.
+
+    Lemma program_step_half_wf
+          e e1 e2
+          (STEP: program_step e e1 e2)
+          (HALF1: Memory.half_wf e1.(memory)):
+      <<HALF2: Memory.half_wf e2.(memory)>>.
+    Proof.
+      inv STEP. ss. eapply Local.program_step_half_wf; eauto.
+    Qed.
+
+    Lemma step_half_wf
+          pf e e1 e2
+          (STEP: step pf e e1 e2)
+          (HALF1: Memory.half_wf e1.(memory)):
+      <<HALF2: Memory.half_wf e2.(memory)>>.
+    Proof.
+      inv STEP.
+      - eapply promise_step_half_wf; eauto.
+      - eapply program_step_half_wf; eauto.
+    Qed.
+
+    Lemma opt_step_half_wf
+          e e1 e2
+          (STEP: opt_step e e1 e2)
+          (HALF1: Memory.half_wf e1.(memory)):
+      <<HALF2: Memory.half_wf e2.(memory)>>.
+    Proof.
+      inv STEP; ss.
+      eapply step_half_wf; eauto.
+    Qed.
+
+    Lemma rtc_all_step_half_wf
+          e1 e2
+          (STEP: rtc all_step e1 e2)
+          (HALF1: Memory.half_wf e1.(memory)):
+      <<HALF2: Memory.half_wf e2.(memory)>>.
+    Proof.
+      induction STEP; ss.
+      inv H. inv USTEP.
+      hexploit step_half_wf; eauto.
+    Qed.
+
+    Lemma rtc_tau_step_half_wf
+          e1 e2
+          (STEP: rtc tau_step e1 e2)
+          (HALF1: Memory.half_wf e1.(memory)):
+      <<HALF2: Memory.half_wf e2.(memory)>>.
+    Proof.
+      eapply rtc_all_step_half_wf; try exact HALF1.
+      eapply rtc_implies; [|eauto].
+      apply tau_union.
+    Qed.
+
+
+    (* step_no_half_except *)
 
     Definition no_half_except (e: t) :=
       Memory.no_half_except e.(local).(Local.promises) e.(memory).
@@ -427,7 +491,6 @@ Module Thread.
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
           (CLOSED1: Memory.closed e1.(memory))
-          (HALF1: Memory.half_wf e1.(memory))
           (NOHALF1: Memory.no_half e1.(memory))
           (PROMISES2: e2.(local).(Local.promises) = Memory.bot):
       Memory.no_half e2.(memory).
@@ -446,7 +509,6 @@ Module Thread.
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
           (CLOSED1: Memory.closed e1.(memory))
-          (HALF1: Memory.half_wf e1.(memory))
           (NOHALF1: Memory.no_half e1.(memory))
           (PROMISES2: e2.(local).(Local.promises) = Memory.bot):
       Memory.no_half e2.(memory).

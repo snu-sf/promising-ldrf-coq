@@ -135,8 +135,7 @@ Lemma rtc_all_step_promise_consistent
       (CONS: promise_consistent th2.(Thread.local))
       (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
       (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory))
-      (MEM1: Memory.closed th1.(Thread.memory))
-      (HALF_WF1: Memory.half_wf th1.(Thread.memory)):
+      (MEM1: Memory.closed th1.(Thread.memory)):
   promise_consistent th1.(Thread.local).
 Proof.
   revert_until STEP. induction STEP; auto. i.
@@ -150,8 +149,7 @@ Lemma rtc_tau_step_promise_consistent
       (CONS: promise_consistent th2.(Thread.local))
       (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
       (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory))
-      (MEM1: Memory.closed th1.(Thread.memory))
-      (HALF_WF1: Memory.half_wf th1.(Thread.memory)):
+      (MEM1: Memory.closed th1.(Thread.memory)):
   promise_consistent th1.(Thread.local).
 Proof.
   eapply rtc_all_step_promise_consistent; cycle 1; eauto.
@@ -164,8 +162,7 @@ Lemma consistent_promise_consistent
       (CONS: @Thread.consistent lang th)
       (WF: Local.wf th.(Thread.local) th.(Thread.memory))
       (SC: Memory.closed_timemap th.(Thread.sc) th.(Thread.memory))
-      (MEM: Memory.closed th.(Thread.memory))
-      (HALF_WF: Memory.half_wf th.(Thread.memory)):
+      (MEM: Memory.closed th.(Thread.memory)):
   promise_consistent th.(Thread.local).
 Proof.
   destruct th. destruct local. inv WF. ss.
@@ -177,7 +174,6 @@ Proof.
   { ii. rewrite PROMISES0, Memory.bot_get in *. congr. }
   { eapply Local.cap_wf; eauto. }
   { eapply Memory.max_full_timemap_closed; eauto. }
-  { eapply Memory.cap_half_wf; eauto. }
 Qed.
 
 Lemma promise_consistent_promise_read
