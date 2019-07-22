@@ -3077,35 +3077,6 @@ Module Memory.
           { subst. exploit max_ts_spec; try exact GET3. i. des. timetac. }
       + eapply future_closed; try exact CLOSED1.
         econs; eauto.
-      (* + ii. assert (MAX: forall loc, max_ts loc mem1 = max_ts loc mem2). *)
-      (*   { i. destruct (Loc.eq_dec loc loc1). *)
-      (*     - subst. apply TimeFacts.antisym. *)
-      (*       + exploit add_get1; try exact GET; eauto. i. *)
-      (*         exploit max_ts_spec; try exact x2. i. des. auto. *)
-      (*       + exploit add_get0; eauto. i. des. *)
-      (*         exploit max_ts_spec; try exact GET2. i. des. *)
-      (*         revert GET3. erewrite add_o; eauto. condtac; ss; i. *)
-      (*         * des. subst. inv GET3. *)
-      (*           exploit get_ts; try exact GET2. i. des. *)
-      (*           { subst. rewrite x3 in *. inv H0. } *)
-      (*           { inv x0. exploit max_ts_spec; try exact GET4. i. des. *)
-      (*             etrans; try exact MAX0. *)
-      (*             exploit get_ts; try exact GET4. i. des. *)
-      (*             - subst. rewrite x0 in *. refl. *)
-      (*             - econs. ss. } *)
-      (*         * exploit max_ts_spec; try exact GET3. i. des; ss. *)
-      (*     - unfold max_ts. inv x1. *)
-      (*       unfold LocFun.add. condtac; ss. subst. congr. } *)
-      (*   revert MSG. erewrite add_o; eauto. condtac; ss; i. *)
-      (*   * des. subst. inv MSG. inv x0. *)
-      (*     exploit max_ts_spec; try exact GET2; eauto. i. des. *)
-      (*     exploit get_ts; try exact GET2; eauto. i. des. *)
-      (*     { subst. inv TS. } *)
-      (*     { exfalso. rewrite MAX in *. *)
-      (*       eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt; eauto. } *)
-      (*   * guardH o. rewrite <- MAX in *. *)
-      (*     exploit HALF1; try exact MSG; eauto. i. des. *)
-      (*     exploit add_get1; try exact x; eauto. *)
     - (* to = max_ts loc mem1 *)
       inv H.
       destruct (Time.eq_dec (max_ts loc mem1) Time.bot).
@@ -3159,22 +3130,6 @@ Module Memory.
           specialize (RLX loc). des.
           exploit max_ts_spec; try exact RLX. i. des.
           etrans; eauto. econs. apply Time.incr_spec.
-      (* + ii. destruct (Loc.eq_dec loc loc0). *)
-      (*   * subst. *)
-      (*     assert (MAX: max_ts loc0 mem2 = Time.incr (max_ts loc0 mem1)). *)
-      (*     { unfold max_ts in *. inv x1. *)
-      (*       unfold LocFun.add. condtac; ss. *)
-      (*       eapply Cell.add_max_ts; eauto. *)
-      (*       inv CLOSED1. eauto. } *)
-      (*     exploit add_get0; eauto. i. des. *)
-      (*     rewrite MAX in *. congr. *)
-      (*   * assert (MAX: max_ts loc0 mem2 = max_ts loc0 mem1). *)
-      (*     { unfold max_ts. inv x1. *)
-      (*       unfold LocFun.add. condtac; ss. subst. ss. } *)
-      (*     revert MSG. erewrite add_o; eauto. condtac; ss; i. *)
-      (*     guardH o. rewrite MAX in *. *)
-      (*     exploit HALF1; try exact MSG; ss. i. des. *)
-      (*     exploit add_get1; try exact x; eauto. *)
   Qed.
 
   Lemma cap_imm_cap_aux_cap_aux
