@@ -7,6 +7,9 @@ COQTHEORIES  :=	src/lang/*.v \
 	src/invariant/*.v \
 	src/gopt/*.v \
 	src/promotion/*.v
+	src/drf/*.v \
+  src/invariant/*.v \
+  src/gopt/*.v
 
 .PHONY: all theories clean
 
@@ -27,6 +30,7 @@ Makefile.coq: Makefile $(COQTHEORIES)
    echo "-R src/invariant $(COQMODULE)"; \
    echo "-R src/gopt $(COQMODULE)"; \
    echo "-R src/promotion $(COQMODULE)"; \
+   echo "-R src/drf $(COQMODULE)"; \
    \
    echo $(COQTHEORIES)) > _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq
