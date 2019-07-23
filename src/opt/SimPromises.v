@@ -56,7 +56,7 @@ Module SimPromises.
       (try match goal with
            | [ |- context[none_if _ _ _ ?msg]] =>
              unfold none_if; destruct msg; ss
-           | [ |- context[none_if_released _ _ ?msg]] =>
+           | [ |- context[none_if_released _ _ _ _]] =>
              unfold none_if_released; condtac; ss
            end).
 
@@ -117,13 +117,9 @@ Module SimPromises.
       exploit Memory.add_exists_le; try apply LE1_SRC; eauto. i. des.
       exploit sim_memory_add; try apply SIM1; try refl; eauto. i.
       esplits; eauto.
-      + none_if_tac.
-        * inv INV1. exploit PVIEW; eauto. i. des.
-          hexploit Memory.add_get0; try exact PROMISES; eauto. i. des. congr.
-        * econs 1; eauto; congr.
-        * econs 1; eauto.
-          i. exploit HALF; eauto. i. des.
-          inv SIM1. exploit MSG; eauto. i. des. inv MSG0. eauto.
+      + none_if_tac; try by (econs 1; eauto).
+        inv INV1. exploit PVIEW; eauto. i. des.
+        hexploit Memory.add_get0; try exact PROMISES; eauto. i. des. congr.
       + econs.
         * ii. erewrite Memory.add_o; eauto.
           erewrite (@Memory.add_o promises2_tgt) in LHS; try exact PROMISES. revert LHS.
@@ -154,15 +150,11 @@ Module SimPromises.
       exploit Memory.split_exists_le; try apply LE1_SRC; eauto. i. des.
       exploit sim_memory_split; try apply SIM1; try refl; eauto. i.
       esplits; eauto.
-      + unfold none_if. destruct msg; ss.
-        * unfold none_if_released. condtac; ss.
-          { inv INV1. exploit PVIEW; eauto. i. des.
-            hexploit Memory.split_get0; try exact PROMISES; eauto. congr. }
-          { econs 2; eauto; congr. }
+      + unfold none_if. destruct msg; ss; try by (econs 2; eauto).
+        unfold none_if_released. condtac; ss.
+        * inv INV1. exploit PVIEW; eauto. i. des.
+          hexploit Memory.split_get0; try exact PROMISES; eauto. congr.
         * econs 2; eauto.
-          { i. exploit HALF1; eauto. i. des.
-            inv SIM1. exploit MSG; eauto. i. des. inv MSG0. eauto. }
-          { destruct msg3; ss. }
       + econs.
         * ii. revert LHS.
           erewrite Memory.split_o; eauto. erewrite (@Memory.split_o mem2); try exact x0.

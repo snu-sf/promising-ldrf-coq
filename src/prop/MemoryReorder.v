@@ -864,14 +864,7 @@ Module MemoryReorder.
     inv ADD1. inv SPLIT2.
     exploit add_split; try exact PROMISES; eauto. i. des; [|congr].
     exploit add_split; try exact MEM; eauto. i. des; [|congr].
-    esplits.
-    - econs; eauto.
-      i. subst. exploit HALF1; eauto. i. des.
-      revert x. erewrite Memory.add_o; eauto. condtac; ss; eauto.
-      des. subst. inv MEM0. inv SPLIT. rewrite TS12 in TS23. timetac.
-    - econs; eauto.
-      i. subst. exploit HALF2; eauto. i. des. subst.
-      exploit Memory.add_get0; try exact ADD0. i. des. eauto.
+    esplits; econs; eauto.
   Qed.
 
   Lemma promise_split_promise_split_same
@@ -889,10 +882,7 @@ Module MemoryReorder.
     inv SPLIT1. inv SPLIT2.
     exploit split_split; try exact PROMISES; eauto. i. des; [|congr].
     exploit split_split; try exact MEM; eauto. i. des; [|congr].
-    esplits.
-    - econs; eauto; congr.
-    - econs; eauto. i. subst.
-      exploit Memory.split_get0; try exact SPLIT0. i. des. eauto.
+    esplits; econs; eauto.
   Qed.
 
   Lemma promise_lower_promise_split_same
@@ -910,8 +900,6 @@ Module MemoryReorder.
     unguard. des; [|congr]. inv FROM1.
     exploit lower_split; try exact MEM; eauto. i. des.
     unguard. des; [|congr]. inv FROM1.
-    esplits.
-    - econs; eauto; congr.
-    - econs; eauto.
+    esplits; econs; eauto.
   Qed.
 End MemoryReorder.

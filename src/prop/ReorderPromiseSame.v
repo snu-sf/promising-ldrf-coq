@@ -74,34 +74,24 @@ Proof.
       exploit MemoryReorder.add_lower; try exact MEM1; try exact MEM; eauto. i. des; [|congr].
       left. esplits; ss.
       * inv MEM. inv LOWER. ss.
-      * econs; eauto. econs; eauto; congr.
+      * econs; eauto.
     + exploit MemoryReorder.add_lower; try exact MEM1; try exact MEM; eauto. i. des; [congr|].
       right. esplits; eauto. econs; eauto.
-      * econs; eauto.
-        i. subst. exploit HALF; eauto. i. des.
-        erewrite Memory.lower_o; eauto. condtac; ss; eauto.
-      * eapply Memory.lower_closed_message; eauto.
+      eapply Memory.lower_closed_message; eauto.
   - destruct (classic ((loc1, ts3) = (loc2, to2))).
     { inv H.
       exploit MemoryReorder.split_lower_same; try exact PROMISES0; try exact PROMISES; eauto. i. des.
       exploit MemoryReorder.split_lower_same; try exact MEM1; try exact MEM; eauto. i. des.
       subst. right. esplits; eauto. econs; eauto.
-      - econs 2; eauto; try congr.
-        i. subst. exploit HALF1; eauto. i. des.
-        erewrite Memory.lower_o; eauto. condtac; ss; eauto.
-      - eapply Memory.lower_closed_message; eauto.
+      eapply Memory.lower_closed_message; eauto.
     }
     { exploit MemoryReorder.split_lower_diff; try exact PROMISES0; try exact PROMISES; eauto. i. des.
       - subst. exploit MemoryReorder.split_lower_diff; try exact MEM1; try exact MEM; eauto. i. des; [|congr].
         left. esplits; eauto.
-        + inv MEM. inv LOWER. ss.
-        + econs; eauto. econs 2; eauto; congr.
+        inv MEM. inv LOWER. ss.
       - exploit MemoryReorder.split_lower_diff; try exact MEM1; try exact MEM; eauto. i. des; [congr|].
         right. esplits; eauto. econs; eauto.
-        + econs 2; eauto.
-          i. subst. exploit HALF1; eauto. i. des.
-          erewrite Memory.lower_o; eauto. condtac; ss; eauto.
-        + eapply Memory.lower_closed_message; eauto.
+        eapply Memory.lower_closed_message; eauto.
     }
   - exploit MemoryReorder.lower_lower; try exact PROMISES0; try exact PROMISES; eauto. i. des.
     + subst.
@@ -148,76 +138,46 @@ Proof.
     - exploit MemoryReorder.add_add; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       exploit MemoryReorder.add_add; try exact MEM; try exact MEM0; eauto. i. des.
       esplits.
-      + econs.
-        * econs; eauto. congr.
-        * econs. eapply REL_CLOSED. econs; eauto. i. inv H.
-        * eauto.
+      + econs; eauto.
       + right. esplits; eauto. econs; eauto.
-        * econs; eauto. i. subst.
-          erewrite Memory.add_o; eauto. condtac; ss; eauto.
-        * eapply Memory.add_closed_message; cycle 1; eauto.
+        eapply Memory.add_closed_message; cycle 1; eauto.
       + auto.
     - exploit MemoryReorder.add_split; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       + subst.
         exploit MemoryReorder.add_split; try exact MEM; try exact MEM0; eauto. i. des; [|congr].
         esplits.
-        * econs.
-          { econs; eauto. congr. }
-          { econs. eapply REL_CLOSED. econs; eauto. congr. }
-          { auto. }
+        * econs; eauto.
         * right. esplits; eauto.
           { ii. inv H. inv ADD3. inv ADD. timetac. }
-          { econs.
-            - econs; eauto. i. subst.
-              erewrite Memory.add_o; eauto. condtac; ss; eauto. des; congr.
-            - eapply Memory.split_closed_message; eauto.
-            - auto. }
+          { econs; eauto.
+            eapply Memory.split_closed_message; eauto. }
         * auto.
       + exploit MemoryReorder.add_split; try exact MEM; try exact MEM0; eauto. i. des; [congr|].
         esplits.
-        * econs.
-          { econs 2; eauto. congr. }
-          { econs. eapply REL_CLOSED. econs 2; eauto. congr. }
-          { auto. }
+        * econs; eauto.
         * right. esplits; eauto.
           { ii. inv H. exploit Memory.split_get0; try exact MEM0; eauto. i. des.
             revert GET. erewrite Memory.add_o; eauto. condtac; ss. des; congr. }
           { econs; eauto.
-            - econs; eauto. i. subst.
-              erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
-              guardH o. des. subst. exploit HALF; eauto. i. des.
-              exploit Memory.split_get0; try exact SPLIT0. i. des.
-              rewrite x in GET0. inv GET0. esplits; eauto.
-            - eapply Memory.split_closed_message; eauto. }
+            eapply Memory.split_closed_message; eauto. }
         * auto.
     - exploit MemoryReorder.add_lower; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       + subst.
         exploit MemoryReorder.add_lower; try exact MEM; try exact MEM0; eauto. i. des; [|congr].
-        esplits.
-        * econs; eauto. econs; eauto. congr.
-        * left. auto.
-        * auto.
+        esplits; eauto. left. auto.
       + exploit MemoryReorder.add_lower; try exact MEM; try exact MEM0; eauto. i. des; [congr|].
-        esplits.
+        esplits; eauto.
         * econs; eauto.
         * right. esplits; eauto. econs; eauto.
-          { econs; eauto. i. subst.
-            erewrite Memory.lower_o; eauto. condtac; ss; eauto. }
-          { eapply Memory.lower_closed_message; eauto. }
-        * auto.
+          eapply Memory.lower_closed_message; eauto.
   }
   { inv PROMISE0.
     - exploit MemoryReorder.split_add; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       exploit MemoryReorder.split_add; try exact MEM; try exact MEM0; eauto. i. des.
       esplits.
-      + econs.
-        * econs; eauto. congr.
-        * econs. eapply REL_CLOSED; eauto. econs; eauto. congr.
-        * auto.
+      + econs; eauto.
       + right. esplits; eauto. econs; eauto.
-        * econs; eauto. i. subst.
-          erewrite Memory.add_o; eauto. condtac; ss; eauto.
-        * eapply Memory.add_closed_message; eauto.
+        eapply Memory.add_closed_message; eauto.
       + auto.
     - exploit MemoryReorder.split_split; try exact PROMISES; try exact PROMISES0; eauto.
       { ii. inv H. eapply LOCTS; eauto. }
@@ -226,38 +186,23 @@ Proof.
         { ii. inv H. inv SPLIT2. inv SPLIT. timetac. }
         i. des; [|congr].
         esplits.
-        * econs.
-          { econs 2; eauto. congr. }
-          { econs. eapply REL_CLOSED. econs 2; eauto. congr. }
-          { auto. }
+        * econs; eauto.
         * right. esplits; eauto.
           { ii. inv H. inv SPLIT2. inv SPLIT. timetac. }
           { econs; eauto.
-            - econs; eauto. i. subst.
-              erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
-              + destruct o; congr.
-              + destruct o; congr.
-            - eapply Memory.split_closed_message; cycle 1; eauto. }
+            eapply Memory.split_closed_message; cycle 1; eauto. }
         * congr.
       + exploit MemoryReorder.split_split; try exact MEM; try exact MEM0; eauto.
         { ii. inv H. eapply LOCTS; eauto. }
         i. des; [congr|].
         esplits.
-        * econs.
-          { econs 2; eauto. congr. }
-          { econs. eapply REL_CLOSED. econs 2; eauto. congr. }
-          { auto. }
+        * econs; eauto.
         * right. esplits; eauto.
           { ii. inv H. exploit Memory.split_get0; try exact MEM1; eauto. i. des.
             revert GET. erewrite Memory.split_o; eauto. repeat condtac; ss.
             guardH o0. des; congr. }
           { econs; eauto.
-            - econs 2; eauto. i. subst.
-              erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
-              guardH o. des. subst. exploit HALF1; eauto. i. des.
-              exploit Memory.split_get0; try exact SPLIT0. i. des.
-              rewrite x in GET0. inv GET0. esplits; eauto.
-            - eapply Memory.split_closed_message; cycle 1; eauto. }
+            eapply Memory.split_closed_message; cycle 1; eauto. }
         * auto.
     - exploit MemoryReorder.split_lower_diff; try exact PROMISES; try exact PROMISES0; eauto.
       { ii. inv H. exploit LOCTS; eauto. i. des. congr. }
@@ -266,10 +211,7 @@ Proof.
         { ii. inv H. exploit LOCTS; eauto. i. des. congr. }
         i. des; [|congr].
         esplits.
-        * econs.
-          { econs 2; eauto. congr. }
-          { econs. eapply REL_CLOSED. econs 2; eauto. congr. }
-          { auto. }
+        * econs; eauto.
         * left. auto.
         * congr.
       + subst. exploit MemoryReorder.split_lower_diff; try exact MEM; try exact MEM0; eauto.
@@ -278,19 +220,14 @@ Proof.
         esplits.
         * econs; eauto.
         * right. esplits; eauto. econs; eauto.
-          { econs; eauto. i. subst.
-            erewrite Memory.lower_o; eauto. condtac; ss; eauto. }
-          { eapply Memory.lower_closed_message; eauto. }
+          eapply Memory.lower_closed_message; eauto.
         * congr.
   }
   { inv PROMISE0.
     - exploit MemoryReorder.lower_add; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       exploit MemoryReorder.lower_add; try exact MEM; try exact MEM0; eauto. i. des.
       esplits.
-      + econs.
-        * econs; eauto. congr.
-        * econs. eapply REL_CLOSED. econs; eauto. congr.
-        * auto.
+      + econs; eauto.
       + right. esplits; eauto. econs; eauto.
         eapply Memory.add_closed_message; eauto.
       + auto.
@@ -299,20 +236,14 @@ Proof.
       unguardH FROM1. des.
       + inv FROM1. unguardH FROM0. des; [|congr]. inv FROM0.
         esplits.
-        * econs.
-          { econs 2; eauto. congr. }
-          { econs. eapply REL_CLOSED. econs 2; eauto. congr. }
-          { auto. }
+        * econs; eauto.
         * right. esplits; eauto.
           { ii. inv H. inv SPLIT1. inv SPLIT. timetac. }
           { econs; eauto. eapply Memory.split_closed_message; eauto. }
         * congr.
       + inv FROM2. unguardH FROM0. des; [congr|]. inv FROM2.
         esplits.
-        * econs.
-          { econs 2; eauto. congr. }
-          { econs. eapply REL_CLOSED. econs 2; eauto. congr. }
-          { auto. }
+        * econs; eauto.
         * right. esplits; eauto.
           { ii. inv H. exploit Memory.lower_get0; try exact MEM; eauto.
             exploit Memory.split_get0; try exact SPLIT0; eauto. i. des. congr. }
