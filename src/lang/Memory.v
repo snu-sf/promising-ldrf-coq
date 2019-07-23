@@ -1841,90 +1841,6 @@ Module Memory.
   Qed.
 
 
-  (* Lemmas on half_wf *)
-
-  Definition half_wf (mem: t): Prop :=
-    forall loc from
-      (MSG: get loc (max_ts loc mem) mem = Some (from, Message.half)),
-    exists from' val' released',
-      get loc from mem = Some (from', Message.full val' released').
-
-  Lemma init_half_wf: half_wf init.
-  Proof.
-    ii. unfold get, init, Cell.get, Cell.init in MSG. ss.
-  Qed.
-
-  Lemma promise_half_wf
-        promises1 mem1 loc from to msg promises2 mem2 kind
-        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
-        (HALF1: half_wf mem1):
-    <<HALF2: half_wf mem2>>.
-  Proof.
-    ii. inv PROMISE.
-    - exploit add_get0; try exact MEM. i. des.
-      revert MSG. erewrite add_o; eauto. condtac; ss.
-      + des. subst. i. inv MSG.
-        exploit HALF; eauto. i. des.
-        erewrite add_o; eauto. condtac; ss; eauto.
-        des. subst. inv MEM. inv ADD. timetac.
-      + i. guardH o.
-        exploit max_ts_spec; try exact MSG. i. des.
-        exploit add_get1; try exact GET1; eauto. i.
-        exploit max_ts_spec; try exact x0. i. des.
-        exploit TimeFacts.antisym; eauto. i.
-        erewrite add_o; eauto. condtac; ss; eauto.
-        * des. subst. rewrite <- x1 in *.
-          exploit HALF1; eauto. i. des. congr.
-        * rewrite <- x1 in *. exploit HALF1; eauto.
-    - exploit split_get0; try exact MEM. i. des.
-      revert MSG. erewrite split_o; eauto. repeat condtac; ss.
-      + des. subst. i. inv MSG. inv PROMISES. inv SPLIT.
-        exploit max_ts_spec; try exact GET2. i. des. timetac.
-      + guardH o. des. subst. i. inv MSG.
-        exploit HALF2; eauto. i. des. subst.
-        esplits; eauto.
-      + i. guardH o. guardH o0.
-        exploit max_ts_spec; try exact MSG. i. des.
-        exploit split_get1; try exact GET3; eauto. i. des.
-        exploit max_ts_spec; try exact GET4. i. des.
-        exploit TimeFacts.antisym; eauto. i.
-        erewrite split_o; eauto. repeat condtac; ss; eauto.
-        * des. subst. rewrite <- x0 in *.
-          exploit HALF1; eauto. i. des. congr.
-        * guardH o1. des. subst. rewrite <- x0 in *.
-          exploit HALF1; eauto. i. des.
-          rewrite x in GET0. inv GET0. esplits; eauto.
-        * rewrite <- x0 in *. exploit HALF1; eauto.
-    - exploit lower_get0; try exact MEM. i. des.
-      revert MSG. erewrite lower_o; eauto. condtac; ss.
-      + des. subst. i. inv MSG. inv MSG_LE.
-        exploit max_ts_spec; try exact GET. i. des.
-        exploit lower_get1; try exact GET1; eauto. i. des.
-        exploit max_ts_spec; try exact GET2. i. des.
-        exploit TimeFacts.antisym; eauto. i.
-        rewrite <- x0 in *. exploit HALF1; eauto. i. des.
-        exploit lower_get1; try exact x; eauto. i. des.
-        inv MSG_LE0. esplits; eauto.
-      + guardH o. i.
-        exploit max_ts_spec; try exact MSG. i. des.
-        exploit lower_get1; try exact GET1; eauto. i. des.
-        exploit max_ts_spec; try exact GET2. i. des.
-        exploit TimeFacts.antisym; eauto. i.
-        rewrite <- x0 in *. exploit HALF1; eauto. i. des.
-        exploit lower_get1; try exact x; eauto. i. des.
-        inv MSG_LE1. esplits; eauto.
-  Qed.
-
-  Lemma write_half_wf
-        promises1 mem1 loc from to val released promises3 mem2 kind
-        (WRITE: write promises1 mem1 loc from to val released promises3 mem2 kind)
-        (HALF1: half_wf mem1):
-    <<HALF2: half_wf mem2>>.
-  Proof.
-    inv WRITE. eapply promise_half_wf; eauto.
-  Qed.
-
-
   (* Lemmas on promise & remove *)
 
   Lemma promise_get0
@@ -2888,29 +2804,6 @@ Module Memory.
     le promises' mem2.
   Proof.
     ii. inv CAP. eauto.
-  Qed.
-
-  Lemma cap_half_wf
-        promises mem1 mem2
-        (CAP: cap promises mem1 mem2)
-        (CLOSED: closed mem1)
-        (HALF: half_wf mem1):
-    half_wf mem2.
-  Proof.
-    ii. exploit cap_inv; eauto. i. des; try congr.
-    - inv CAP.
-      exploit max_ts_spec; eauto. i. des.
-      exploit SOUND; try exact GET. i.
-      exploit max_ts_spec; try exact x. i. des.
-      exploit TimeFacts.antisym; eauto. i.
-      rewrite <- x2 in *.
-      exploit HALF; eauto. i. des.
-      exploit SOUND; try exact x1. i.
-      esplits; eauto.
-    - inv x1. exploit get_ts; try exact GET2. i. des.
-      { subst. inv TS. }
-      inv CAP. exploit SOUND; try exact GET2. i.
-      exploit max_ts_spec; try exact x. i. des. timetac.
   Qed.
 
   Lemma cap_no_half_except

@@ -520,38 +520,6 @@ Module Local.
   Qed.
 
 
-  (* step_half_wf*)
-
-  Lemma promise_step_half_wf
-        lc1 mem1 loc from to msg lc2 mem2 kind
-        (STEP: promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
-        (HALF1: Memory.half_wf mem1):
-    <<HALF2: Memory.half_wf mem2>>.
-  Proof.
-    inv STEP. hexploit Memory.promise_half_wf; eauto.
-  Qed.
-
-  Lemma write_step_half_wf
-        lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
-        (STEP: write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
-        (HALF1: Memory.half_wf mem1):
-    <<HALF2: Memory.half_wf mem2>>.
-  Proof.
-    inv STEP. hexploit Memory.write_half_wf; eauto.
-  Qed.
-
-  Lemma program_step_half_wf
-        e lc1 sc1 mem1 lc2 sc2 mem2
-        (STEP: program_step e lc1 sc1 mem1 lc2 sc2 mem2)
-        (HALF1: Memory.half_wf mem1):
-    <<HALF2: Memory.half_wf mem2>>.
-  Proof.
-    inv STEP; eauto.
-    - eapply write_step_half_wf; eauto.
-    - eapply write_step_half_wf; eauto.
-  Qed.
-
-
   (* step_no_half_except *)
 
   Lemma promise_step_no_half_except
