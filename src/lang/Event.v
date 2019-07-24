@@ -3,9 +3,11 @@ Require Import PeanoNat.
 Require Import Orders.
 Require Import MSetList.
 Require Import Omega.
+Require Import Coq.Logic.PropExtensionality.
 
 Require Import sflib.
 
+Require Import DataStructure.
 Require Import Basic.
 Require Import Time.
 
@@ -13,11 +15,43 @@ Set Implicit Arguments.
 Import ListNotations.
 
 
-Module Loc := Ident.
-Module LocSet := IdentSet.
-Module LocMap := IdentMap.
-Module LocFun := IdentFun.
+Module Loc <: UsualDecidableType.
+  Definition max := Pos.pow 2 64.
+  Global Opaque max.
 
+  Structure t' := mk {
+    loc :> Ident.t;
+    RANGE: Pos.le loc max;
+  }.
+
+  Definition t := t'.
+
+  Definition eq := (@eq t).
+
+  Global Program Instance eq_equiv: Equivalence eq.
+
+  Lemma eq_dec: forall x y: t, {x = y} + {x <> y}.
+  Proof.
+    i. destruct x, y.
+    destruct (Ident.eq_dec loc0 loc1).
+    - left. subst. f_equal.
+      apply proof_irrelevance.
+    - right. ii. inv H. ss.
+  Qed.
+
+  Program Definition of_string (str: String.string): t :=
+    @mk _ _.
+  Next Obligation.
+  Admitted.
+  Next Obligation.
+  Admitted.
+
+  Lemma finite: exists (locs: list t), forall (loc: t), List.In loc locs.
+  Proof.
+  Admitted.
+End Loc.
+
+Module LocFun := UsualFun (Loc).
 
 Module Const := Nat.
 

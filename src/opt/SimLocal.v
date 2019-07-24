@@ -113,7 +113,6 @@ Proof.
   exploit sim_memory_closed_message; eauto. i.
   exploit Memory.promise_future; try apply PROMISE_SRC; eauto.
   { apply WF1_SRC. }
-  { apply WF1_SRC. }
   { unfold SimPromises.none_if, SimPromises.none_if_released.
     destruct msg; try condtac; eauto. }
   i. des.
@@ -218,7 +217,6 @@ Proof.
     try exact MEM1; try apply LOCAL1; eauto.
   { econs. ss. }
   { apply WF1_SRC. }
-  { apply WF1_TGT. }
   { apply WF1_TGT. }
   i. des. esplits.
   - econs; eauto.
@@ -618,7 +616,8 @@ Lemma sim_local_nonsynch_src
     <<LOCAL2: sim_local pview2 lc2_src lc1_tgt>> /\
     <<MEM2: sim_memory mem2_src mem1_tgt>>.
 Proof.
-  inversion LOCAL1_SRC. unfold Memory.finite in *. des.
+  inversion LOCAL1_SRC.
+  destruct (Memory.finite lc1_src.(Local.promises)). rename x into dom.
   assert (FINITE' : forall (loc : Loc.t) (from to : Time.t) (msg : Message.t),
              Memory.get loc to (Local.promises lc1_src) = Some (from, msg) ->
              (match msg with
@@ -626,8 +625,8 @@ Proof.
               | _ => False
               end) ->
              In (loc, to) dom).
-  { ii. eapply FINITE. eauto. }
-  clear FINITE. move dom after lc1_src. revert_until dom. revert pview.
+  { ii. eapply H. eauto. }
+  clear H. move dom after lc1_src. revert_until dom. revert pview.
   induction dom.
   { esplits; eauto. ii. destruct msg; ss. destruct released; ss.
     exfalso. eapply FINITE'; eauto. ss.

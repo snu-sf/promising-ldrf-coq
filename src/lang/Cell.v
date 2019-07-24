@@ -399,7 +399,7 @@ Module Cell.
         (LT: Time.lt from to)
         (WF: Message.wf msg):
     get t (singleton LT WF) =
-    if Loc.eq_dec t to
+    if Time.eq_dec t to
     then Some (from, msg)
     else None.
   Proof.
@@ -412,7 +412,7 @@ Module Cell.
 
   Lemma init_get t:
     get t init =
-    if Loc.eq_dec t Time.bot
+    if Time.eq_dec t Time.bot
     then Some (Time.bot, Message.elt)
     else None.
   Proof.

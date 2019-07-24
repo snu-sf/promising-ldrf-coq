@@ -197,7 +197,7 @@ Lemma sim_memory_max_ts
   Memory.max_ts loc mem_src = Memory.max_ts loc mem_tgt.
 Proof.
   inv SIM. inv CLOSED_SRC. inv CLOSED_TGT.
-  clear MSG HALF CLOSED FINITE_NEW FINITE_HALF CLOSED0 FINITE_NEW0 FINITE_HALF0.
+  clear MSG HALF CLOSED CLOSED0.
   apply TimeFacts.antisym.
   - specialize (COVER loc (Memory.max_ts loc mem_src)). des.
     exploit Memory.max_ts_spec; try eapply (INHABITED loc). i. des.
@@ -464,31 +464,6 @@ Lemma sim_memory_closed_message
   Memory.closed_message msg mem_src.
 Proof.
   inv TGT; ss. econs. eapply sim_memory_closed_opt_view; eauto.
-Qed.
-
-Lemma sim_memory_loc_non_init
-      mem_src mem_tgt loc
-      (SIM: sim_memory mem_src mem_tgt):
-  Memory.loc_non_init loc mem_src <->
-  Memory.loc_non_init loc mem_tgt.
-Proof.
-  inv SIM. split; i.
-  - inv H. des. destruct p.
-    exploit Memory.get_ts; eauto. i. des; try congr.
-    destruct (COVER loc x).
-    exploit H; i.
-    { econs; eauto. econs; eauto. refl. }
-    inv x0. inv ITV. ss.
-    econs. esplits; try eapply GET. ii. subst.
-    inv TO; inv H3. timetac.
-  - inv H. des. destruct p.
-    exploit Memory.get_ts; eauto. i. des; try congr.
-    destruct (COVER loc x).
-    exploit H2; i.
-    { econs; eauto. econs; eauto. refl. }
-    inv x0. inv ITV. ss.
-    econs. esplits; try eapply GET. ii. subst.
-    inv TO; inv H3. timetac.
 Qed.
 
 Lemma sim_memory_latest_val_src

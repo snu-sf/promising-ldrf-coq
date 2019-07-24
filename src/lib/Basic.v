@@ -247,3 +247,15 @@ Proof.
   - destruct a. ss. subst. esplits; eauto.
   - exploit IHl; eauto. i. des. eauto.
 Qed.
+
+Lemma prod_in
+      A B
+      (a: A)
+      (b: B)
+      (l: list B)
+      (IN: List.In b l):
+  List.In (a, b) (List.map (fun x => (a, x)) l).
+Proof.
+  revert b IN. induction l; ss; i.
+  des; subst; eauto.
+Qed.

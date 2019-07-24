@@ -246,19 +246,18 @@ Module SimPromises.
         (INV1: sem pview inv promises1_src promises1_tgt)
         (SIM1: sim_memory mem1_src mem1_tgt)
         (LE1_SRC: Memory.le promises1_src mem1_src)
-        (LE1_TGT: Memory.le promises1_tgt mem1_tgt)
-        (FINITE1_TGT: Memory.finite promises1_tgt):
+        (LE1_TGT: Memory.le promises1_tgt mem1_tgt):
       <<INV2: sem (unset loc to pview) (set loc to inv) promises1_src promises2_tgt>> /\
       <<INV2': mem loc to inv = false>>.
   Proof.
-    exploit Memory.remove_future; eauto. i. des.
+    hexploit Memory.remove_future; eauto. i. des.
     exploit Memory.remove_get0; [eauto|]. i. des.
-    inv INV1. exploit LE0; eauto. i.
+    inv INV1. exploit LE; eauto. i.
     esplits.
     - econs.
       + ii. revert LHS.
         erewrite Memory.remove_o; eauto. condtac; ss. i.
-        exploit LE0; eauto.
+        exploit LE; eauto.
         unfold none_if, none_if_released. repeat condtac; ss.
         * revert COND1. rewrite unset_o. condtac; ss; [|congr].
           guardH o. des. subst. unguardH o. des; congr.
@@ -325,8 +324,7 @@ Module SimPromises.
         (INV1: sem pview inv promises1_src promises1_tgt)
         (SIM1: sim_memory mem1_src mem1_tgt)
         (LE1_SRC: Memory.le promises1_src mem1_src)
-        (LE1_TGT: Memory.le promises1_tgt mem1_tgt)
-        (FINITE1_TGT: Memory.finite promises1_tgt):
+        (LE1_TGT: Memory.le promises1_tgt mem1_tgt):
     exists promises2_src,
       <<REMOVE_SRC: Memory.remove promises1_src loc from to (none_if loc to pview msg) promises2_src>> /\
       <<INV2: sem (unset loc to pview) inv promises2_src promises2_tgt>>.
@@ -334,7 +332,7 @@ Module SimPromises.
     hexploit Memory.remove_future; try apply REMOVE_TGT; eauto. i. des.
     exploit remove_tgt; eauto. i. des.
     exploit Memory.remove_get0; eauto. i. des.
-    inv INV1. exploit LE0; eauto. i.
+    inv INV1. exploit LE; eauto. i.
     exploit remove_src; try apply set_eq; eauto. i. des.
     esplits; eauto.
     rewrite unset_set in INV0; auto.
@@ -351,8 +349,7 @@ Module SimPromises.
         (INV1: sem bot inv promises1_src promises1_tgt)
         (SIM1: sim_memory mem1_src mem1_tgt)
         (LE1_SRC: Memory.le promises1_src mem1_src)
-        (LE1_TGT: Memory.le promises1_tgt mem1_tgt)
-        (FINITE1_TGT: Memory.finite promises1_tgt):
+        (LE1_TGT: Memory.le promises1_tgt mem1_tgt):
     exists promises2_src,
       <<REMOVE_SRC: Memory.remove promises1_src loc from to msg promises2_src>> /\
       <<INV2: sem bot inv promises2_src promises2_tgt>>.
@@ -438,7 +435,6 @@ Module SimPromises.
       inv x3. apply EMPTY; eauto. refl.
     - subst.
       erewrite sim_memory_max_ts; eauto.
-      rewrite sim_memory_loc_non_init in *; eauto.
       rewrite latest_half in *; eauto.
       exploit sim_memory_latest_val_src; eauto. i.
       exploit Memory.max_full_view_exists; try apply MEM1_TGT. i. des.
@@ -472,7 +468,6 @@ Module SimPromises.
       inv x3. apply EMPTY; eauto. refl.
     - subst.
       erewrite <- sim_memory_max_ts; eauto.
-      rewrite <- sim_memory_loc_non_init in *; eauto.
       rewrite <- latest_half in *; eauto.
       exploit sim_memory_latest_val_tgt; eauto. i.
       exploit Memory.max_full_view_exists; try apply MEM1_SRC. i. des.
