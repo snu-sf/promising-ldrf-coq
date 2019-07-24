@@ -34,8 +34,6 @@ Section Simulation.
       (MEMORY1: sim_memory mem1_src mem1_tgt)
       (WF_SRC: Configuration.wf (Configuration.mk ths1_src sc1_src mem1_src))
       (WF_TGT: Configuration.wf (Configuration.mk ths1_tgt sc1_tgt mem1_tgt))
-      (CONSISTENT_SRC: Configuration.consistent (Configuration.mk ths1_src sc1_src mem1_src))
-      (CONSISTENT_TGT: Configuration.consistent (Configuration.mk ths1_tgt sc1_tgt mem1_tgt))
       (SC_FUTURE_SRC: TimeMap.le sc0_src sc1_src)
       (SC_FUTURE_TGT: TimeMap.le sc0_tgt sc1_tgt)
       (MEM_FUTURE_SRC: Memory.future mem0_src mem1_src)

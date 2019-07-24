@@ -68,7 +68,6 @@ Lemma thread_rtc_step_rtc_step
             @sim_thread lang_src lang_tgt sim_terminal st_src lc_src sc1_src mem1_src st_tgt lc_tgt sc_tgt mem_tgt)
       (WF_SRC: Configuration.wf (Configuration.mk ths1_src sc1_src mem1_src))
       (WF_TGT: Configuration.wf (Configuration.mk ths_tgt sc_tgt mem_tgt))
-      (CONSISTENT_TGT: Configuration.consistent (Configuration.mk ths_tgt sc_tgt mem_tgt))
       (FIND: IdentMap.find tid ths1_src = Some (existT _ lang_src st1_src, lc1_src))
       (STEPS: rtc (@Thread.tau_step lang_src)
                   (Thread.mk lang_src st1_src lc1_src sc1_src mem1_src)
@@ -85,29 +84,7 @@ Proof.
   generalize (rtc_tail STEPS). i. des.
   - inv H0. inv TSTEP. econs; eauto.
     econs. rewrite <- EVENT. econs; ss; eauto.
-    unfold Configuration.consistent. s.
-    unfold Threads.consistent. i.
-    destruct (Ident.eq_dec tid0 tid).
-    + subst. rewrite IdentMap.gss in TH.
-      inv TH. Configuration.simplify.
-      ii. ss. esplits; eauto.
-    + rewrite IdentMap.gso in TH; auto.
-      destruct (List.In_dec Ident.eq_dec tid0 l); cycle 1.
-      { exploit NOTIN; eauto.
-        { ii. des; ss. subst. ss. }
-        i. des. ii. esplits; eauto. ss. apply x1. }
-      destruct (IdentMap.find tid0 ths_tgt) as [[[lang_tgt st_tgt] lc_tgt]|] eqn:FIND_TGT; cycle 1.
-      { remember (Threads.tids ths1_src) as tids eqn:TIDS_SRC.
-        exploit tids_find; [exact TIDS_SRC|exact TIDS|..]. i. des.
-        exploit x1; eauto. i. des. rewrite FIND_TGT in x3. inv x3. }
-      exploit IN; eauto. i. des.
-      exploit sim_thread_future; try exact x0; try exact SC_FUTURE; try exact MEM_FUTURE; try refl; eauto. i.
-      inv WF_TGT. inv WF. ss. exploit THREADS0; eauto. i.
-      hexploit sim_thread_consistent; try exact x2; eauto.
-      exploit Thread.rtc_tau_step_disjoint; eauto. s. i. des.
-      exploit Thread.rtc_tau_step_future; eauto. s. i. des.
-      exploit Thread.step_disjoint; eauto. s. i. des.
-      auto.
+    ii. ss. esplits; eauto.
   - inv H.
     replace (IdentMap.add tid (existT _ lang_src st2_src, lc2_src) ths1_src) with ths1_src; auto.
     apply IdentMap.eq_leibniz. ii.
@@ -212,35 +189,7 @@ Proof.
       * inv X0. inv TSTEP. esplits; eauto.
         { rewrite <- EVENT. ss. rewrite <- EVENT0.
           econs 2. econs; eauto. ss.
-          unfold Configuration.consistent. s.
-          unfold Threads.consistent. i.
-          rewrite IdentMap.gsspec in TH. revert TH. condtac; ss; i.
-          - inv TH. Configuration.simplify.
-            eapply sim_thread_consistent; eauto.
-            eapply CONSISTENT; ss. rewrite IdentMap.gss. ss.
-          - destruct (IdentMap.find tid ths_tgt) as [[[lang_tgt st_tgt] lc_tgt]|] eqn:FIND_TGT; cycle 1.
-            { remember (Threads.tids ths_src) as tids eqn:TIDS_SRC.
-              exploit tids_find; [exact TIDS_SRC|exact TIDS_TGT|..]. i. des.
-              exploit x2.
-              { esplits; eapply TH. }
-              i. des. rewrite FIND_TGT in x4. inv x4. }
-            exploit SIM; eauto. i. des.
-            exploit sim_thread_future; try exact x0; eauto. i.
-            exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
-            exploit Thread.step_future; try exact STEP; eauto. s. i. des.
-            exploit Thread.rtc_tau_step_future; try exact STEPS0; eauto. s. i. des.
-            exploit sim_thread_future; try exact x3;
-              try exact SC_FUTURE1; try exact MEM_FUTURE1; try (etrans; eauto). i.
-            eapply sim_thread_consistent; try exact x4; eauto.
-            { exploit THREADS; eauto. i.
-              exploit DISJOINT; [|exact FIND_SRC|exact TH|]; eauto. i.
-              exploit Thread.rtc_tau_step_disjoint; try exact STEPS0; eauto. s. i. des. ss. }
-            { exploit THREADS0; eauto. i.
-              exploit DISJOINT0; [|exact TID|exact FIND_TGT|]; eauto. i.
-              exploit Thread.rtc_tau_step_disjoint; try exact STEPS; eauto. s. i. des.
-              exploit Thread.step_disjoint; try exact STEP; eauto. s. i. des. ss. }
-            { eapply CONSISTENT. s. rewrite IdentMap.gso; eauto. }
-        }
+          eapply sim_thread_consistent; eauto. }
         { ss. right. eapply CIH.
           - rewrite Threads.tids_add. rewrite IdentSet.add_mem; ss.
             rewrite Threads.tids_o. rewrite FIND_SRC. ss.
@@ -272,36 +221,7 @@ Proof.
     + esplits; eauto.
       * rewrite <- EVENT.
         econs 2. econs; eauto. ss.
-        unfold Configuration.consistent. s.
-        unfold Threads.consistent. i.
-        rewrite IdentMap.gsspec in TH. revert TH. condtac; ss; i.
-        { inv TH. Configuration.simplify.
-          eapply sim_thread_consistent; eauto.
-          eapply CONSISTENT; ss. rewrite IdentMap.gss. ss. }
-        { destruct (IdentMap.find tid ths_tgt) as [[[lang_tgt st_tgt] lc_tgt]|] eqn:FIND_TGT; cycle 1.
-          { remember (Threads.tids ths_src) as tids eqn:TIDS_SRC.
-            exploit tids_find; [exact TIDS_SRC|exact TIDS_TGT|..]. i. des.
-            exploit x2.
-            { esplits; eapply TH. }
-            i. des. rewrite FIND_TGT in x4. inv x4. }
-          exploit SIM; eauto. i. des.
-          exploit sim_thread_future; try exact x0; eauto. i.
-          exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
-          exploit Thread.step_future; try exact STEP; eauto. s. i. des.
-          exploit Thread.rtc_tau_step_future; try exact STEPS0; eauto. s. i. des.
-          exploit Thread.step_future; try exact STEP1; eauto. s. i. des.
-          exploit sim_thread_future; try exact x3; try by etrans; eauto. i.
-          eapply sim_thread_consistent; try exact x4; eauto.
-          { exploit THREADS; eauto. i.
-            exploit DISJOINT; [|exact FIND_SRC|exact TH|]; eauto. i.
-            exploit Thread.rtc_tau_step_disjoint; try exact STEPS0; eauto. s. i. des.
-            exploit Thread.step_disjoint; try exact STEP1; eauto. s. i. des. ss. }
-          { exploit THREADS0; eauto. i.
-            exploit DISJOINT0; [|exact TID|exact FIND_TGT|]; eauto. i.
-            exploit Thread.rtc_tau_step_disjoint; try exact STEPS; eauto. s. i. des.
-            exploit Thread.step_disjoint; try exact STEP; eauto. s. i. des. ss. }
-          { eapply CONSISTENT. s. rewrite IdentMap.gso; eauto. }
-        }
+        eapply sim_thread_consistent; eauto.
       * ss. right. eapply CIH.
         { rewrite Threads.tids_add. rewrite IdentSet.add_mem; ss.
           rewrite Threads.tids_o. rewrite FIND_SRC. ss. }

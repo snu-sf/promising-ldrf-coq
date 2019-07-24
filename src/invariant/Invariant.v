@@ -391,13 +391,11 @@ Section Invariant.
   Proof.
     cut (forall c1 c2
            (WF: Configuration.wf c1)
-           (CONS: Configuration.consistent c1)
            (SEM: sem c1)
            (STEPS: rtc Configuration_step_evt c1 c2),
             sem c2).
     { i. eapply H; eauto.
       - apply Configuration.init_wf.
-      - apply Configuration.init_consistent.
       - apply init_sem; auto.
     }
     i. revert WF SEM. induction STEPS0; ss. i.

@@ -25,8 +25,6 @@ Lemma sim_adequacy
       ths_tgt sc_tgt mem_tgt
       (WF_SRC: Configuration.wf (Configuration.mk ths_src sc_src mem_src))
       (WF_TGT: Configuration.wf (Configuration.mk ths_tgt sc_tgt mem_tgt))
-      (CONSISTENT_SRC: Configuration.consistent (Configuration.mk ths_src sc_src mem_src))
-      (CONSISTENT_TGT: Configuration.consistent (Configuration.mk ths_tgt sc_tgt mem_tgt))
       (SC: TimeMap.le sc_src sc_tgt)
       (MEMORY: sim_memory mem_src mem_tgt)
       (SIM: sim ths_src sc_src mem_src ths_tgt sc_tgt mem_tgt):
@@ -34,7 +32,7 @@ Lemma sim_adequacy
   behaviors Configuration.step (Configuration.mk ths_src sc_src mem_src).
 Proof.
   s. i.
-  revert WF_SRC WF_TGT CONSISTENT_SRC CONSISTENT_TGT SC MEMORY SIM.
+  revert WF_SRC WF_TGT SC MEMORY SIM.
   revert ths_src sc_src mem_src.
   dependent induction PR; i.
   - punfold SIM. exploit SIM; eauto; try refl. i. des.
