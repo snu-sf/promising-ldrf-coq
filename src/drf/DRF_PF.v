@@ -53,9 +53,9 @@ Inductive promised (mem: Memory.t) (loc: Loc.t) : Prop :=
 Inductive all_promises (c: Configuration.t) (P: IdentMap.key -> Prop)
           (l: Loc.t) (t: Time.t) : Prop :=
 | all_promises_intro
-    tid st lc
+    tid st lc msg
     (TID1: IdentMap.find tid c.(Configuration.threads) = Some (st, lc))
-    (COV: covered l t lc.(Local.promises))
+    (PROISED: Memory.get l t lc.(Local.promises) = Some msg)
     (SAT: P tid)
 .
 
@@ -73,10 +73,10 @@ Module Forget.
   
   Inductive forget_memory P msrc mtgt : Prop :=
   | forget_memory_intro
-      (FUTURE: Memory.le msrc mtgt)
-      (COMPLETE: forall l t (COV: covered l t mtgt),
-          (<<COV: covered l t msrc>>) \/ (<<PROM: P l t>>))
-      (FORGET: forall l t (PROMS: P l t), (<<NCOV: ~ covered l t msrc>>))
+      (* (FUTURE: Memory.le msrc mtgt) *)
+      (COMPLETE: forall l t (NPROMS: ~ P l t),
+          Memory.get l t msrc = Memory.get l t mtgt)
+      (FORGET: forall l t (PROMS: P l t), Memory.get l t msrc = None)
   .
   
   Inductive forget_config csrc ctgt : Prop :=
@@ -125,6 +125,9 @@ Module Inv.
 
 End Inv.
 
+
+
+
 Inductive opt_pred_step P (lang : Language.t)
   : ThreadEvent.t -> Thread.t lang -> Thread.t lang -> Prop :=
 | step_none t: opt_pred_step P ThreadEvent.silent t t
@@ -134,6 +137,255 @@ Inductive opt_pred_step P (lang : Language.t)
   :
     opt_pred_step P e t0 t1.
 Hint Constructors opt_pred_step.
+
+Definition promise_view_consistent (lc: Local.t): Prop :=
+  forall
+    loc to msg
+    (GET: Memory.get loc to lc.(Local.promises) = Some msg),
+    Time.lt (lc.(Local.tview).(TView.cur).(View.rlx) loc) to.    
+
+Lemma promise_view_consistent_le tv0 tv1 prm
+      (VLE: TView.le tv0 tv1)
+      (CONS: promise_view_consistent (Local.mk tv1 prm))
+  :
+    promise_view_consistent (Local.mk tv0 prm).
+Proof.
+  ii. exploit CONS; eauto. i. ss.
+  inv VLE. inv CUR. specialize (RLX loc).
+  clear - RLX x. inv RLX.
+  - etrans; eauto.
+  - rewrite H in *. auto.
+Qed.
+
+Lemma promise_view_consistent_step lang (st0 st1: Language.state lang) lc0 lc1
+      sc0 sc1 m0 m1 pf e
+      (WF1: Local.wf lc0 m0)
+      (SC1: Memory.closed_timemap sc0 m0)
+      (CLOSED1: Memory.closed m0)
+      (CONSISTENT: promise_view_consistent lc1)
+      (STEP: Thread.step pf e (Thread.mk _ st0 lc0 sc0 m0) (Thread.mk _ st1 lc1 sc1 m1))
+  :
+    promise_view_consistent lc0.    
+Proof.
+  exploit Thread.step_future; eauto; ss. i. des.
+  inv STEP; ss.
+  - inv STEP0. inv LOCAL. ii. destruct msg0.
+    exploit Memory.promise_get1_promise; eauto. i. des.
+    exploit CONSISTENT; ss; eauto.
+  - inv STEP0. destruct lc0, lc1. inv LOCAL; ss; eauto.
+    + inv LOCAL0; ss. clarify.
+      eapply promise_view_consistent_le; eauto.
+    + admit.
+    + admit.
+    + inv LOCAL0; ss. clarify.
+      eapply promise_view_consistent_le; eauto.
+    + inv LOCAL0; ss. clarify.
+      eapply promise_view_consistent_le; eauto.
+Admitted.
+
+Lemma inhabited_future mem1 mem2
+      (FUTURE: Memory.future mem1 mem2)
+      (INHABITED: Memory.inhabited mem1)
+  :
+    Memory.inhabited mem2.
+Proof.
+  induction FUTURE; auto. apply IHFUTURE.
+  inv H. hexploit Memory.op_inhabited; eauto.
+Qed.
+
+Lemma thread_consistent_view_consistent lang st lc sc mem
+      (CLOSED1: Memory.closed mem)
+      (INHABITED: Memory.inhabited mem)
+      (CONSISTENT: Thread.consistent (Thread.mk lang st lc sc mem))
+  :
+    promise_view_consistent lc.    
+Proof.
+  exploit Memory.cap_exists; eauto. instantiate (1:=lc.(Local.promises)). i. des.
+  hexploit inhabited_future; eauto. i. 
+  exploit Memory.max_full_timemap_exists; eauto. i. des.
+  exploit CONSISTENT; eauto. i. des. ss.
+  assert (CONSISTENT1: promise_view_consistent (Thread.local e2)).
+  { ii. rewrite PROMISES in *. rewrite Memory.bot_get in *. clarify. }
+Admitted.  
+
+Lemma self_promise_remove
+      P lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc'
+      mem_src mem_tgt mem_tgt' e_tgt
+      (TH_SRC: th_src = Thread.mk lang st (Local.mk v Memory.bot) sc mem_src)
+      (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v prom) sc mem_tgt)
+      (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
+      (CONSISTENT: Thread.consistent th_tgt')
+      (MEM: Forget.forget_memory (fun loc to => covered loc to prom) mem_src mem_tgt)
+      (STEP: (@pred_step P lang) e_tgt th_tgt th_tgt')
+  :
+    exists mem_src' e_src,
+      (<<STEP: opt_pred_step
+                 (P /1\ no_promise) e_src th_src
+                 (Thread.mk lang st' (Local.mk v' Memory.bot) sc' mem_src')>>) /\
+      (<<EVT: ThreadEvent.get_event e_src = ThreadEvent.get_event e_tgt>>) /\ 
+      (<<MEM: Forget.forget_memory (fun loc to => covered loc to prom') mem_src' mem_tgt'>>).
+Proof.
+Admitted.
+    
+Lemma other_promise_remove
+      P lang th_src th_tgt th_tgt' st st' lc lc' sc sc' mem_src mem_tgt proms mem_tgt' e
+      (TH_SRC: th_src = Thread.mk lang st lc sc mem_src)
+      (TH_TGT0: th_tgt = Thread.mk lang st lc sc mem_tgt)
+      (NOPRM: lc.(Local.promises) = Memory.bot)
+      (TH_TGT1: th_tgt' = Thread.mk lang st' lc' sc' mem_tgt')
+      (MEM: Forget.forget_memory proms mem_src mem_tgt)
+      (STEP: pred_step (P /1\ no_promise /1\ no_read_msgs proms) e th_tgt th_tgt')
+  :
+    exists mem_src',
+      (<<STEP: pred_step (P /1\ no_promise /1\ no_read_msgs proms)
+                         e th_src (Thread.mk lang st' lc' sc' mem_src')>>) /\
+      (<<MEM: Forget.forget_memory proms mem_src' mem_tgt'>>).
+Proof.
+  inv STEP. des. inv STEP0. inv STEP; inv STEP0; ss. inv LOCAL; ss.
+  - exists mem_src. esplits; eauto.
+    econs; eauto. econs. econs 2; eauto. econs; eauto.
+  - exists mem_src. esplits; eauto.
+    econs; eauto. econs. econs 2; eauto. econs; eauto. econs; eauto.
+    inv LOCAL0. inv MEM. econs; eauto. erewrite COMPLETE; eauto.
+  - inv LOCAL0. inv WRITE. inv PROMISE.
+    + admit.
+    + exfalso. rewrite NOPRM in *. clear - PROMISES. inv PROMISES. inv SPLIT.
+      ss. unfold Cell.Raw.bot in *. rewrite IdentMap.Properties.F.empty_o in *. clarify.
+    + exfalso. rewrite NOPRM in *. clear - PROMISES. inv PROMISES. inv LOWER.
+      ss. unfold Cell.Raw.bot in *. rewrite IdentMap.Properties.F.empty_o in *. clarify.
+  - admit.
+  - exists mem_src. esplits; eauto.
+    econs; eauto. econs. econs 2; eauto. econs; eauto.
+  - exists mem_src. esplits; eauto.
+    econs; eauto. econs. econs 2; eauto. econs; eauto.
+Admitted.
+
+Lemma self_promise_remove
+      P lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc'
+      mem_src mem_tgt mem_tgt' e_tgt
+      (TH_SRC: th_src = Thread.mk lang st (Local.mk v Memory.bot) sc mem_src)
+      (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v prom) sc mem_tgt)
+      (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
+      (CONSISTENT: Thread.consistent th_tgt')
+      (MEM: Forget.forget_memory (fun loc to => covered loc to prom) mem_src mem_tgt)
+      (STEP: (@pred_step P lang) e_tgt th_tgt th_tgt')
+  :
+    exists mem_src' e_src,
+      (<<STEP: opt_pred_step
+                 (P /1\ no_promise) e_src th_src
+                 (Thread.mk lang st' (Local.mk v' Memory.bot) sc' mem_src')>>) /\
+      (<<MEM: Forget.forget_memory (fun loc to => covered loc to prom') mem_src' mem_tgt'>>).
+Proof.
+Admitted.
+
+
+opt_pred_step
+  
+  
+      
+Thread.consistent
+
+Lemma consistent_no_read_self_promise
+      P lang th_src th_tgt th_tgt' st st' lc lc' sc sc' mem_src mem_tgt proms mem_tgt' e
+      (TH_SRC: th_src = Thread.mk lang st lc sc mem_src)
+      (TH_TGT0: th_tgt = Thread.mk lang st lc sc mem_tgt)
+      (TH_TGT1: th_tgt' = Thread.mk lang st' lc' sc' mem_tgt')
+      (MEM: Forget.forget_memory proms mem_src mem_tgt)
+      (STEP: pred_step (P /1\ no_promise /1\ no_read_msgs proms) e th_tgt th_tgt')
+  :
+    exists mem_src',
+      (<<STEP: pred_step (P /1\ no_promise /1\ no_read_msgs proms)
+                         e th_src (Thread.mk lang st' lc' sc' mem_src')>>) /\
+      (<<MEM: Forget.forget_memory proms mem_src' mem_tgt'>>).
+Proof.
+
+
+Lemma other_promise_remove
+      P lang th_src th_tgt th_tgt' st st' lc lc' sc sc' mem_src mem_tgt proms mem_tgt' e
+      (TH_SRC: th_src = Thread.mk lang st lc sc mem_src)
+      (TH_TGT0: th_tgt = Thread.mk lang st lc sc mem_tgt)
+      (TH_TGT1: th_tgt' = Thread.mk lang st' lc' sc' mem_tgt')
+      (MEM: Forget.forget_memory proms mem_src mem_tgt)
+      (STEP: pred_step (P /1\ no_promise /1\ no_read_msgs proms) e th_tgt th_tgt')
+  :
+    exists mem_src',
+      (<<STEP: pred_step (P /1\ no_promise /1\ no_read_msgs proms)
+                         e th_src (Thread.mk lang st' lc' sc' mem_src')>>) /\
+      (<<MEM: Forget.forget_memory proms mem_src' mem_tgt'>>).
+Proof.
+
+Lemma other_promise_remove
+      P lang th_src th_tgt th_tgt' st st' lc lc' sc sc' mem_src mem_tgt proms mem_tgt' e
+      (TH_SRC: th_src = Thread.mk lang st lc sc mem_src)
+      (TH_TGT0: th_tgt = Thread.mk lang st lc sc mem_tgt)
+      (TH_TGT1: th_tgt' = Thread.mk lang st' lc' sc' mem_tgt')
+      (MEM: Forget.forget_memory proms mem_src mem_tgt)
+      (STEP: pred_step (P /1\ no_promise /1\ no_read_msgs proms) e th_tgt th_tgt')
+  :
+    exists mem_src',
+      (<<STEP: pred_step (P /1\ no_promise /1\ no_read_msgs proms)
+                         e th_src (Thread.mk lang st' lc' sc' mem_src')>>) /\
+      (<<MEM: Forget.forget_memory proms mem_src' mem_tgt'>>).
+Proof.
+
+
+Lemma local_step_view_incr lc1 lc2 e sc1 sc2 mem1 mem2
+      (TVIEW: TView.wf (Local.tview lc1))
+      (STEP: Local.program_step e lc1 sc1 mem1 lc2 sc2 mem2)
+  :
+    (<<INCR: TView.le (Local.tview lc1) (Local.tview lc2)>>) /\
+    (<<TVIEW: TView.wf (Local.tview lc2)>>).
+Proof.
+  inv STEP.
+  - split; auto. red. refl.
+  - inv LOCAL; ss. split.
+    + apply TViewFacts.read_tview_incr.
+    + 
+  - inv LOCAL; ss. apply TViewFacts.write_tview_incr.
+Local.wf   
+    
+    
+  
+  :
+    ~ promise_view_consistent lc1.    
+Proof.
+
+
+
+
+Lemma promise_view_inconsistent_step lang (st0 st1: Language.state lang) lc0 lc1
+      sc0 sc1 m0 m1 pf e
+      (INCONSISTENT: ~ promise_view_consistent lc0)
+      (STEP: Thread.step pf e (Thread.mk _ st0 lc0 sc0 m0) (Thread.mk _ st1 lc1 sc1 m1))
+  :
+    ~ promise_view_consistent lc1.    
+Proof.
+  inv STEP; ss.
+  - inv STEP0. inv LOCAL. ii. eapply INCONSISTENT. ii. destruct msg0.
+    exploit Memory.promise_get1_promise; eauto. i. des.
+    exploit H; ss; eauto.
+  - ii. inv STEP0. inv LOCAL; ss; eauto.
+    + inv LOCAL0; ss.
+TView.le      
+
+
+  Admitt
+
+      (STEP: Local.program_step e lc1 sc1 mem1 lc2 sc2 mem2)
+      TViewl.le (Local.tview lc1) (Local.tview lc2)
+      
+
+    Thread.step
+
+    + exploit Memory.promise_get1_promise; eauto.
+      i.
+    
+  
+  forall
+    loc to msg
+    (GET: Memory.get loc to lc.(Local.promises) = Some msg),
+    Time.lt (lc.(Local.tview).(TView.cur).(View.pln) loc) to.    
+
 
 Lemma self_promise_remove
       P lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc' mem_src mem_tgt mem_tgt'
@@ -154,6 +406,8 @@ Proof.
     + right.
     + econs.
 Admitted.
+
+
 
 Lemma other_promise_remove
       P lang th_src th_tgt th_tgt' st st' lc lc' sc sc' mem_src mem_tgt proms mem_tgt' e
