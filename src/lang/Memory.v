@@ -1,6 +1,5 @@
 Require Import Omega.
 Require Import RelationClasses.
-Require Import Coq.Logic.ClassicalChoice.
 
 Require Import sflib.
 
