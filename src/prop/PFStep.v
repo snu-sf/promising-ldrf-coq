@@ -54,6 +54,7 @@ Module PFStep.
   | sim_thread_intro
       (STATE: e_src.(Thread.state) = e_tgt.(Thread.state))
       (LOCAL: sim_local e_src.(Thread.local) e_tgt.(Thread.local))
+      (SC: e_src.(Thread.sc) = e_tgt.(Thread.sc))
       (MEMORY: sim_memory e_tgt.(Thread.local).(Local.promises)
                              e_src.(Thread.memory) e_tgt.(Thread.memory))
   .
@@ -266,7 +267,6 @@ Module PFStep.
   Lemma read_promise_None
         lc1 mem1 loc to val released ord lc2
         (WF1: Local.wf lc1 mem1)
-        (CLOSED1: Memory.closed mem1)
         (STEP: Local.read_step lc1 mem1 loc to val released ord lc2)
         (CONS: promise_consistent lc2):
     Memory.get loc to lc1.(Local.promises) = None.
@@ -295,8 +295,6 @@ Module PFStep.
         (MEM1: sim_memory lc1_tgt.(Local.promises) mem1_src mem1_tgt)
         (WF1_SRC: Local.wf lc1_src mem1_src)
         (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
-        (CLOSED1_SRC: Memory.closed mem1_src)
-        (CLOSED1_TGT: Memory.closed mem1_tgt)
         (STEP_TGT: Local.read_step lc1_tgt mem1_tgt loc to val released ord lc2_tgt)
         (CONS_TGT: promise_consistent lc2_tgt):
     exists lc2_src,
@@ -310,4 +308,25 @@ Module PFStep.
     - econs; eauto. rewrite TVIEW. ss.
     - econs; eauto. rewrite TVIEW. ss.
   Qed.
+
+  Lemma write_step
+        lc1_src mem1_src
+        lc1_tgt sc1 mem1_tgt loc from to val released ord lc3_tgt sc3 mem3_tgt kind_tgt
+        (LOCAL1: sim_local lc1_src lc1_tgt)
+        (MEM1: sim_memory lc1_tgt.(Local.promises) mem1_src mem1_tgt)
+        (WF1_SRC: Local.wf lc1_src mem1_src)
+        (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
+        (SC1_SRC: Memory.closed_timemap sc1 mem1_src)
+        (SC1_TGT: Memory.closed_timemap sc1 mem1_tgt)
+        (CLOSED1_SRC: Memory.closed mem1_src)
+        (CLOSED1_TGT: Memory.closed mem1_tgt)
+        (STEP_TGT: Local.write_step lc1_tgt sc1 mem1_tgt loc from to val None released ord lc3_tgt sc3 mem3_tgt kind_tgt)
+        (CONS_TGT: promise_consistent lc3_tgt):
+    exists lc2_src mem2_src kind2_src lc3_src mem3_src kind3_src,
+      <<STEP1_SRC: Local.promise_step lc1_src mem1_src loc from to (Message.full val released) lc2_src mem2_src kind2_src>> /\
+      <<STEP2_SRC: Local.write_step lc2_src sc1 mem2_src loc from to val None released ord lc3_src sc3 mem3_src kind3_src>> /\
+      <<LOCAL3: sim_local lc3_src lc3_tgt>> /\
+      <<MEM3: sim_memory lc3_tgt.(Local.promises) mem3_src mem3_tgt>>.
+  Proof.
+  Admitted.
 End PFStep.
