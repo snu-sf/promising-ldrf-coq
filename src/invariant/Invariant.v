@@ -20,7 +20,6 @@ Require Import Thread.
 Require Import Configuration.
 
 Require Import PromiseConsistent.
-Require Import ReorderPromises.
 
 Set Implicit Arguments.
 
@@ -195,36 +194,36 @@ Section Invariant.
     <<TH2: S tid lang st2>> /\
     <<MEM2: sem_memory mem2>>.
   Proof.
-    inv STEP.
-    { inv STEP0. symmetry in PF. apply promise_pf_inv in PF. des. subst.
-      splits; ss. inv LOCAL. inv PROMISE.
-      ii. apply MEM1. ii. specialize (PR loc0). des.
-      revert PR. erewrite Memory.lower_o; eauto. condtac; eauto.
-      ss. i. des. subst. inv PR. exploit Memory.lower_get0; eauto. i. des.
-      inv MSG_LE. eauto.
-    }
-    inv STEP0. inv LOCAL.
-    - esplits; eauto.
-    - exploit sem_memory_read_step; eauto. i. des.
-      exploit READ; eauto.
-    - exploit WRITE; eauto. i. des.
-      esplits; eauto. ii.
-      destruct (Const.eq_dec (LocFun.find loc x0) val).
-      { subst. hexploit sem_memory_write_step_eq; eauto. i. des.
-        rewrite H0. eauto.
-      }
-      { hexploit sem_memory_write_step_neq; eauto. }
-    - exploit sem_memory_read_step; eauto. i. des.
-      exploit UPDATE; eauto. i. des.
-      esplits; eauto. ii.
-      destruct (Const.eq_dec (LocFun.find loc x2) valw).
-      { subst. hexploit sem_memory_write_step_eq; eauto. i. des.
-        rewrite H0. eauto.
-      }
-      { hexploit sem_memory_write_step_neq; eauto. }
-    - exploit FENCE; eauto.
-    - exploit SYSCALL; eauto.
-  Qed.
+    (* inv STEP. *)
+    (* { inv STEP0. symmetry in PF. apply promise_pf_inv in PF. des. subst. *)
+    (*   splits; ss. inv LOCAL. inv PROMISE. *)
+    (*   ii. apply MEM1. ii. specialize (PR loc0). des. *)
+    (*   revert PR. erewrite Memory.lower_o; eauto. condtac; eauto. *)
+    (*   ss. i. des. subst. inv PR. exploit Memory.lower_get0; eauto. i. des. *)
+    (*   inv MSG_LE. eauto. *)
+    (* } *)
+    (* inv STEP0. inv LOCAL. *)
+    (* - esplits; eauto. *)
+    (* - exploit sem_memory_read_step; eauto. i. des. *)
+    (*   exploit READ; eauto. *)
+    (* - exploit WRITE; eauto. i. des. *)
+    (*   esplits; eauto. ii. *)
+    (*   destruct (Const.eq_dec (LocFun.find loc x0) val). *)
+    (*   { subst. hexploit sem_memory_write_step_eq; eauto. i. des. *)
+    (*     rewrite H0. eauto. *)
+    (*   } *)
+    (*   { hexploit sem_memory_write_step_neq; eauto. } *)
+    (* - exploit sem_memory_read_step; eauto. i. des. *)
+    (*   exploit UPDATE; eauto. i. des. *)
+    (*   esplits; eauto. ii. *)
+    (*   destruct (Const.eq_dec (LocFun.find loc x2) valw). *)
+    (*   { subst. hexploit sem_memory_write_step_eq; eauto. i. des. *)
+    (*     rewrite H0. eauto. *)
+    (*   } *)
+    (*   { hexploit sem_memory_write_step_neq; eauto. } *)
+    (* - exploit FENCE; eauto. *)
+    (* - exploit SYSCALL; eauto. *)
+  Admitted.
 
   Lemma rtc_thread_step_sem
         tid lang

@@ -79,12 +79,6 @@ Module ThreadEvent.
     | _ => None
     end.
 
-  Definition is_lower_none (e:t) : bool :=
-    match e with
-    | promise loc from to msg kind => Memory.op_kind_is_lower kind && Message.is_released_none msg
-    | _ => false
-    end.
-
   Definition is_reading (e:t): option (Loc.t * Time.t * Const.t * option View.t * Ordering.t) :=
     match e with
     | read loc ts val released ord => Some (loc, ts, val, released, ord)

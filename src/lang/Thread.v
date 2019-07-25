@@ -74,7 +74,7 @@ Module Thread.
         loc from to msg kind
         lc2 mem2
         (LOCAL: Local.promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
-        (PF: pf = andb (Memory.op_kind_is_lower_full kind) (Message.is_released_none msg)):
+        (PF: pf = orb (Message.is_half msg) (Memory.op_kind_is_lower_full kind)):
         promise_step pf (ThreadEvent.promise loc from to msg kind) (mk st lc1 sc1 mem1) (mk st lc2 sc1 mem2)
     .
 
@@ -458,24 +458,24 @@ Module Thread.
   End Thread.
 End Thread.
 
-Lemma promise_pf_inv
-      (kind:Memory.op_kind)
-      (msg:Message.t)
-      (PF: (Memory.op_kind_is_lower_full kind) && (Message.is_released_none msg)):
-  exists val released, kind = Memory.op_kind_lower (Message.full val released) /\
-          Message.is_released_none msg = true.
-Proof.
-  apply andb_true_iff in PF. des.
-  destruct kind; inv PF. destruct msg1; ss.
-  esplits; eauto.
-Qed.
+(* Lemma promise_pf_inv *)
+(*       (kind:Memory.op_kind) *)
+(*       (msg:Message.t) *)
+(*       (PF: (Memory.op_kind_is_lower_full kind) && (Message.is_released_none msg)): *)
+(*   exists val released, kind = Memory.op_kind_lower (Message.full val released) /\ *)
+(*           Message.is_released_none msg = true. *)
+(* Proof. *)
+(*   apply andb_true_iff in PF. des. *)
+(*   destruct kind; inv PF. destruct msg1; ss. *)
+(*   esplits; eauto. *)
+(* Qed. *)
 
-Lemma promise_pf_false_inv
-      (kind:Memory.op_kind)
-      (msg:Message.t)
-      (PF: false = (Memory.op_kind_is_lower_full kind) && (Message.is_released_none msg)):
-  Memory.op_kind_is_lower_full kind = false \/ ~ Message.is_released_none msg.
-Proof.
-  symmetry in PF. apply andb_false_iff in PF. des; auto.
-  right. ii. rewrite PF in H. inv H.
-Qed.
+(* Lemma promise_pf_false_inv *)
+(*       (kind:Memory.op_kind) *)
+(*       (msg:Message.t) *)
+(*       (PF: false = (Memory.op_kind_is_lower_full kind) && (Message.is_released_none msg)): *)
+(*   Memory.op_kind_is_lower_full kind = false \/ ~ Message.is_released_none msg. *)
+(* Proof. *)
+(*   symmetry in PF. apply andb_false_iff in PF. des; auto. *)
+(*   right. ii. rewrite PF in H. inv H. *)
+(* Qed. *)

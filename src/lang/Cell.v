@@ -64,10 +64,10 @@ Module Message.
   Definition elt_wf: wf elt.
   Proof. econs; ss. Qed.
 
-  Definition is_released_none (msg: t): bool :=
+  Definition is_half (msg: t): bool :=
     match msg with
-    | full _ released => negb released
-    | half => false
+    | full _ _ => false
+    | half => true
     end.
 End Message.
 
