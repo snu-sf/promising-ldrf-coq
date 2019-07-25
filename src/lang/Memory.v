@@ -590,14 +590,6 @@ Module Memory.
     des. subst. inv LOWER. inv LOWER0. inv TS.
   Qed.
 
-  Lemma add_le mem1 mem2 loc from to msg
-        (ADD: add mem1 loc from to msg mem2):
-    le mem1 mem2.
-  Proof.
-    ii. erewrite add_o; eauto. condtac; ss.
-    des. subst. exploit add_get0; eauto. i. des. congr.
-  Qed.
-
 
   (* Lemmas on op *)
 
@@ -2255,7 +2247,7 @@ Module Memory.
   Qed.
 
 
-  (* cap *)
+  (* adjacent *)
 
   Inductive adjacent (loc: Loc.t) (from1 to1 from2 to2: Time.t) (mem: t): Prop :=
   | adjacent_intro
@@ -2338,6 +2330,9 @@ Module Memory.
     - subst. inv x1.
     - eapply TimeFacts.le_lt_lt; eauto.
   Qed.
+
+
+  (* cap *)
 
   Inductive latest_val (loc: Loc.t) (mem: t) (val: Const.t): Prop :=
   | latest_val_intro
