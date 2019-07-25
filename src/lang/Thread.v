@@ -78,8 +78,7 @@ Module Thread.
         promise_step pf (ThreadEvent.promise loc from to msg kind) (mk st lc1 sc1 mem1) (mk st lc2 sc1 mem2)
     .
 
-    (* NOTE: Syscalls act like an SC fence.
-     *)
+    (* NOTE: Syscalls act like a SC fence. *)
     Inductive program_step (e:ThreadEvent.t): forall (e1 e2:t), Prop :=
     | program_step_intro
         st1 lc1 sc1 mem1
