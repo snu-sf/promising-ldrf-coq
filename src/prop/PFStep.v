@@ -34,29 +34,51 @@ Module PFStep.
 
   Inductive sim_local (lc_src lc_tgt: Local.t): Prop :=
   | sim_local_intro
-      (TVIEW: lc_src.(Local.tview) = lc_tgt.(Local.tview))
+      (TVIEW: TView.le lc_src.(Local.tview) lc_tgt.(Local.tview))
       (PROMISES: sim_promises lc_src.(Local.promises) lc_tgt.(Local.promises))
   .
 
+  Inductive sim_message: forall (msg_src msg_tgt: Message.t), Prop :=
+  | sim_message_full
+      val released_src released_tgt
+      (RELEASED: View.opt_le released_src released_tgt):
+      sim_message (Message.full val released_src) (Message.full val released_tgt)
+  | sim_message_half:
+      sim_message Message.half Message.half
+  .
+  Hint Constructors sim_message.
+
+  Program Instance sim_message_PreOrder: PreOrder sim_message.
+  Next Obligation.
+    ii. destruct x; econs; refl.
+  Qed.
+  Next Obligation.
+    ii. inv H; inv H0; econs. etrans; eauto.
+  Qed.
+
   Inductive sim_memory (promises mem_src mem_tgt: Memory.t): Prop :=
   | sim_memory_intro
-      (SOUND: forall loc from to msg
+      (SOUND: forall loc from to msg_src
                 (GETP: Memory.get loc to promises = None)
-                (GET_SRC: Memory.get loc to mem_src = Some (from, msg)),
-          <<GET_TGT: Memory.get loc to mem_tgt = Some (from, msg)>>)
-      (COMPLETE: forall loc from to msg
+                (GET_SRC: Memory.get loc to mem_src = Some (from, msg_src)),
+          exists msg_tgt,
+            <<GET_TGT: Memory.get loc to mem_tgt = Some (from, msg_tgt)>> /\
+            <<MSG: sim_message msg_src msg_tgt>>)
+      (COMPLETE: forall loc from to msg_tgt
                    (GETP: Memory.get loc to promises = None)
-                   (GET_TGT: Memory.get loc to mem_tgt = Some (from, msg)),
-          <<GET_SRC: Memory.get loc to mem_src = Some (from, msg)>>)
+                   (GET_TGT: Memory.get loc to mem_tgt = Some (from, msg_tgt)),
+          exists msg_src,
+            <<GET_SRC: Memory.get loc to mem_src = Some (from, msg_src)>> /\
+            <<MSG: sim_message msg_src msg_tgt>>)
   .
 
   Inductive sim_thread (lang: Language.t) (e_src e_tgt: @Thread.t lang): Prop :=
   | sim_thread_intro
       (STATE: e_src.(Thread.state) = e_tgt.(Thread.state))
       (LOCAL: sim_local e_src.(Thread.local) e_tgt.(Thread.local))
-      (SC: e_src.(Thread.sc) = e_tgt.(Thread.sc))
+      (SC: TimeMap.le e_src.(Thread.sc) e_tgt.(Thread.sc))
       (MEMORY: sim_memory e_tgt.(Thread.local).(Local.promises)
-                             e_src.(Thread.memory) e_tgt.(Thread.memory))
+                          e_src.(Thread.memory) e_tgt.(Thread.memory))
   .
 
 
@@ -71,7 +93,7 @@ Module PFStep.
         (GET_SRC: Memory.get loc to mem_src = Some (from, msg_src)):
     exists msg_tgt,
       <<GET_TGT: Memory.get loc to mem_tgt = Some (from, msg_tgt)>> /\
-      <<MSG: __guard__ (msg_src = Message.half \/ msg_src = msg_tgt)>>.
+      <<MSG: __guard__ (msg_src = Message.half \/ sim_message msg_src msg_tgt)>>.
   Proof.
     inv PROMISES. inv MEM.
     destruct (Memory.get loc to promises_tgt) as [[f m]|] eqn:GETP.
@@ -95,7 +117,7 @@ Module PFStep.
         (GET_TGT: Memory.get loc to mem_tgt = Some (from, msg_tgt)):
     exists msg_src,
       <<GET_SRC: Memory.get loc to mem_src = Some (from, msg_src)>> /\
-      <<MSG: __guard__ (msg_src = Message.half \/ msg_src = msg_tgt)>>.
+      <<MSG: __guard__ (msg_src = Message.half \/ sim_message msg_src msg_tgt)>>.
   Proof.
     inv PROMISES. inv MEM.
     destruct (Memory.get loc to promises_tgt) as [[f m]|] eqn:GETP.
@@ -290,23 +312,34 @@ Module PFStep.
 
   Lemma read_step
         lc1_src mem1_src
-        lc1_tgt mem1_tgt loc to val released ord lc2_tgt
+        lc1_tgt mem1_tgt loc to val released_tgt ord lc2_tgt
         (LOCAL1: sim_local lc1_src lc1_tgt)
         (MEM1: sim_memory lc1_tgt.(Local.promises) mem1_src mem1_tgt)
         (WF1_SRC: Local.wf lc1_src mem1_src)
         (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
-        (STEP_TGT: Local.read_step lc1_tgt mem1_tgt loc to val released ord lc2_tgt)
+        (CLOSED1_SRC: Memory.closed mem1_src)
+        (CLOSED1_TGT: Memory.closed mem1_tgt)
+        (STEP_TGT: Local.read_step lc1_tgt mem1_tgt loc to val released_tgt ord lc2_tgt)
         (CONS_TGT: promise_consistent lc2_tgt):
-    exists lc2_src,
-      <<STEP_SRC: Local.read_step lc1_src mem1_src loc to val released ord lc2_src>> /\
+    exists released_src lc2_src,
+      <<STEP_SRC: Local.read_step lc1_src mem1_src loc to val released_src ord lc2_src>> /\
       <<LOCAL2: sim_local lc2_src lc2_tgt>>.
   Proof.
     exploit read_promise_None; try exact STEP_TGT; eauto. i.
     inv MEM1. inv LOCAL1. inv STEP_TGT.
-    exploit COMPLETE; eauto. i. des.
+    exploit COMPLETE; eauto. i. des. inv MSG.
     esplits.
-    - econs; eauto. rewrite TVIEW. ss.
-    - econs; eauto. rewrite TVIEW. ss.
+    - econs; eauto.
+      inv READABLE. inv TVIEW. econs; eauto.
+      + etrans; try exact PLN. apply CUR.
+      + i. exploit RLX; eauto. i.
+        etrans; try exact x. apply CUR.
+    - econs; eauto. ss.
+      eapply TViewFacts.read_tview_mon; eauto.
+      { apply WF1_TGT. }
+      { inv CLOSED1_TGT. exploit CLOSED; eauto. i. des.
+        inv MSG_WF. ss. }
+      { refl. }
   Qed.
 
   Lemma write_step
