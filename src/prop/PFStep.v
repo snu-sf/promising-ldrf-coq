@@ -508,6 +508,7 @@ Module PFStep.
       <<STEP_SRC: Local.write_step lc1_src sc1_src mem1_src loc from to val
                                    releasedm_src released_src ord lc2_src sc2_src mem2_src kind_src>> /\
       <<LOCAL2: sim_local lc2_src lc2_tgt>> /\
+      <<SC2: TimeMap.le sc2_src sc2_tgt>> /\
       <<MEM2: sim_memory lc2_tgt.(Local.promises) mem2_src mem2_tgt>>.
   Proof.
     inv STEP_TGT. inv WRITE.
@@ -542,6 +543,7 @@ Module PFStep.
     - inv LOCAL1. econs; ss; eauto.
       eapply TViewFacts.write_tview_mon; try refl; ss. apply WF1_TGT.
     - ss.
+    - ss.
   Qed.
 
   Lemma fence_step
@@ -554,7 +556,8 @@ Module PFStep.
         (STEP_TGT: Local.fence_step lc1_tgt sc1_tgt ordr ordw lc2_tgt sc2_tgt):
     exists lc2_src sc2_src,
       <<STEP_SRC: Local.fence_step lc1_src sc1_src ordr ordw lc2_src sc2_src>> /\
-      <<LOCAL3: sim_local lc2_src lc2_tgt>>.
+      <<LOCAL2: sim_local lc2_src lc2_tgt>> /\
+      <<SC2: TimeMap.le sc2_src sc2_tgt>>.
   Proof.
     esplits.
     - econs; eauto. ii. inv LOCAL1.
@@ -564,6 +567,10 @@ Module PFStep.
       + eapply TViewFacts.read_fence_tview_mon; try refl; ss.
         apply WF1_TGT.
       + eapply TViewFacts.read_fence_future; apply WF1_SRC.
+    - inv STEP_TGT. inv LOCAL1.
+      eapply TViewFacts.write_fence_sc_mon; try refl; ss.
+      eapply TViewFacts.read_fence_tview_mon; try refl; ss.
+      apply WF1_TGT.
   Qed.
 
   Lemma program_step
@@ -583,7 +590,9 @@ Module PFStep.
     exists e_src lc2_src sc2_src mem2_src,
       <<STEP_SRC: Local.program_step e_src lc1_src sc1_src mem1_src lc2_src sc2_src mem2_src>> /\
       <<LOCAL2: sim_local lc2_src lc2_tgt>> /\
-      <<MEM2: sim_memory lc2_tgt.(Local.promises) mem2_src mem2_tgt>>.
+      <<SC2: TimeMap.le sc2_src sc2_tgt>> /\
+      <<MEM2: sim_memory lc2_tgt.(Local.promises) mem2_src mem2_tgt>> /\
+      <<EVENT: ThreadEvent.get_program_event e_src = ThreadEvent.get_program_event e_tgt>>.
   Proof.
     inv STEP_TGT.
     - esplits; eauto.
@@ -602,12 +611,130 @@ Module PFStep.
       i. des.
       esplits; try exact LOCAL4; eauto.
     - exploit fence_step; eauto. i. des.
-      esplits; try exact LOCAL3; eauto.
+      esplits; try exact LOCAL2; eauto.
       inv LOCAL. ss.
     - exploit fence_step; eauto. i. des.
-      esplits; try exact LOCAL3; eauto.
+      esplits; try exact LOCAL2; eauto.
       inv LOCAL. ss.
-  Grab Existential Variables.
-  { auto. (* event of src syscall step *) }
+  Qed.
+
+  Lemma thread_promise_step
+        lang e1_src
+        pf e_tgt e1_tgt e2_tgt
+        (SIM1: @sim_thread lang e1_src e1_tgt)
+        (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
+        (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
+        (SC1_SRC: Memory.closed_timemap e1_src.(Thread.sc) e1_src.(Thread.memory))
+        (SC1_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
+        (MEM1_SRC: Memory.closed e1_src.(Thread.memory))
+        (MEM1_TGT: Memory.closed e1_tgt.(Thread.memory))
+        (STEP_TGT: Thread.promise_step pf e_tgt e1_tgt e2_tgt):
+    exists e_src e2_src,
+      <<STEP_SRC: Thread.promise_step true e_src e1_src e2_src>> /\
+      <<SIM2: sim_thread e2_src e2_tgt>>.
+  Proof.
+    destruct e1_src, e1_tgt, e2_tgt. ss.
+    inv SIM1. inv STEP_TGT. ss. subst.
+    exploit promise_step; try exact LOCAL; try exact MEMORY; eauto. i. des.
+    esplits.
+    - econs; eauto.
+    - econs; eauto.
+  Qed.
+
+  Lemma thread_program_step
+        lang e1_src
+        e_tgt e1_tgt e2_tgt
+        (SIM1: @sim_thread lang e1_src e1_tgt)
+        (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
+        (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
+        (SC1_SRC: Memory.closed_timemap e1_src.(Thread.sc) e1_src.(Thread.memory))
+        (SC1_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
+        (MEM1_SRC: Memory.closed e1_src.(Thread.memory))
+        (MEM1_TGT: Memory.closed e1_tgt.(Thread.memory))
+        (STEP_TGT: Thread.program_step e_tgt e1_tgt e2_tgt)
+        (CONS: promise_consistent e2_tgt.(Thread.local)):
+    exists e_src e2_src,
+      <<STEP_SRC: Thread.program_step e_src e1_src e2_src>> /\
+      <<SIM2: sim_thread e2_src e2_tgt>>.
+  Proof.
+    destruct e1_src, e1_tgt, e2_tgt. ss.
+    inv SIM1. inv STEP_TGT. ss. subst.
+    exploit program_step; try exact LOCAL; try exact MEMORY; eauto. i. des.
+    esplits.
+    - econs; try exact STEP_SRC. rewrite EVENT. eauto.
+    - econs; eauto.
+  Qed.
+
+  Lemma thread_step
+        lang e1_src
+        pf e_tgt e1_tgt e2_tgt
+        (SIM1: @sim_thread lang e1_src e1_tgt)
+        (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
+        (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
+        (SC1_SRC: Memory.closed_timemap e1_src.(Thread.sc) e1_src.(Thread.memory))
+        (SC1_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
+        (MEM1_SRC: Memory.closed e1_src.(Thread.memory))
+        (MEM1_TGT: Memory.closed e1_tgt.(Thread.memory))
+        (STEP_TGT: Thread.step pf e_tgt e1_tgt e2_tgt)
+        (CONS: promise_consistent e2_tgt.(Thread.local)):
+    exists e_src e2_src,
+      <<STEP_SRC: Thread.step true e_src e1_src e2_src>> /\
+      <<SIM2: sim_thread e2_src e2_tgt>>.
+  Proof.
+    inv STEP_TGT.
+    - exploit thread_promise_step; eauto. i. des.
+      esplits; eauto. econs 1; eauto.
+    - exploit thread_program_step; eauto. i. des.
+      esplits; eauto. econs 2; eauto.
+  Qed.
+
+  Lemma thread_rtc_all_step
+        lang e1_src
+        e1_tgt e2_tgt
+        (SIM1: @sim_thread lang e1_src e1_tgt)
+        (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
+        (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
+        (SC1_SRC: Memory.closed_timemap e1_src.(Thread.sc) e1_src.(Thread.memory))
+        (SC1_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
+        (MEM1_SRC: Memory.closed e1_src.(Thread.memory))
+        (MEM1_TGT: Memory.closed e1_tgt.(Thread.memory))
+        (STEPS_TGT: rtc (@Thread.all_step lang) e1_tgt e2_tgt)
+        (CONS: promise_consistent e2_tgt.(Thread.local)):
+    exists e2_src,
+      <<STEPS_SRC: rtc (union (@Thread.step lang true)) e1_src e2_src>> /\
+      <<SIM2: sim_thread e2_src e2_tgt>>.
+  Proof.
+    revert e1_src SIM1 WF1_SRC SC1_SRC MEM1_SRC.
+    induction STEPS_TGT; eauto; i.
+    inv H. inv USTEP.
+    exploit Thread.step_future; eauto. i. des.
+    exploit thread_step; try exact STEP; eauto.
+    { eapply rtc_all_step_promise_consistent; eauto. }
+    i. des.
+    exploit Thread.step_future; try exact STEP_SRC; eauto. i. des.
+    exploit IHSTEPS_TGT; try exact SIM2; eauto. i. des.
+    esplits; try exact SIM0.
+    econs 2; eauto.
+  Qed.
+
+  Lemma thread_rtc_tau_step
+        lang e1_src
+        e1_tgt e2_tgt
+        (SIM1: @sim_thread lang e1_src e1_tgt)
+        (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
+        (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
+        (SC1_SRC: Memory.closed_timemap e1_src.(Thread.sc) e1_src.(Thread.memory))
+        (SC1_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
+        (MEM1_SRC: Memory.closed e1_src.(Thread.memory))
+        (MEM1_TGT: Memory.closed e1_tgt.(Thread.memory))
+        (STEPS_TGT: rtc (@Thread.tau_step lang) e1_tgt e2_tgt)
+        (CONS: promise_consistent e2_tgt.(Thread.local)):
+    exists e2_src,
+      <<STEPS_SRC: rtc (union (@Thread.step lang true)) e1_src e2_src>> /\
+      <<SIM2: sim_thread e2_src e2_tgt>>.
+  Proof.
+    eapply thread_rtc_all_step; eauto.
+    eapply rtc_implies; [|eauto].
+    apply tau_union.
   Qed.
 End PFStep.
