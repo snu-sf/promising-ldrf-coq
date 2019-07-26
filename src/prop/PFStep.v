@@ -82,6 +82,22 @@ Module PFStep.
   .
 
 
+  Lemma sim_promises_get_src
+        promises_src promises_tgt
+        loc from to msg_src
+        (PROMISES: sim_promises promises_src promises_tgt)
+        (GET_SRC: Memory.get loc to promises_src = Some (from, msg_src)):
+    exists msg_tgt,
+      <<GET_TGT: Memory.get loc to promises_tgt = Some (from, msg_tgt)>> /\
+      <<MSG: msg_src = Message.half>>.
+  Proof.
+    inv PROMISES.
+    exploit SOUND; eauto. i. des.
+    exploit COMPLETE; eauto. i. des.
+    rewrite GET_SRC in x. inv x.
+    esplits; eauto.
+  Qed.
+
   Lemma sim_memory_get_src
         promises_src promises_tgt
         mem_src mem_tgt
@@ -131,30 +147,35 @@ Module PFStep.
   Qed.
 
   Lemma promise
+        msg_src
         promises1_src mem1_src
-        promises1_tgt mem1_tgt loc from to msg promises2_tgt mem2_tgt kind_tgt
+        promises1_tgt mem1_tgt loc from to msg_tgt promises2_tgt mem2_tgt kind_tgt
         (PROMISES1: sim_promises promises1_src promises1_tgt)
         (MEM1: sim_memory promises1_tgt mem1_src mem1_tgt)
         (LE1_SRC: Memory.le promises1_src mem1_src)
         (LE1_TGT: Memory.le promises1_tgt mem1_tgt)
         (CLOSED1_SRC: Memory.closed mem1_src)
         (CLOSED1_TGT: Memory.closed mem1_tgt)
-        (PROMISE_TGT: Memory.promise promises1_tgt mem1_tgt loc from to msg promises2_tgt mem2_tgt kind_tgt):
+        (PROMISE_TGT: Memory.promise promises1_tgt mem1_tgt loc from to msg_tgt promises2_tgt mem2_tgt kind_tgt)
+        (MSG_WF_SRC: Message.wf msg_src)
+        (MSG_TO_SRC: Memory.message_to msg_src loc to):
     exists promises2_src mem2_src kind_src,
-      <<PROMISE_SRC: Memory.promise promises1_src mem1_src loc from to Message.half promises2_src mem2_src kind_src>> /\
-      <<PROMISES2: sim_promises promises2_src promises2_tgt>> /\
-      <<MEM2: sim_memory promises2_tgt mem2_src mem2_tgt>>.
+      <<PROMISE_SRC: Memory.promise promises1_src mem1_src loc from to msg_src promises2_src mem2_src kind_src>> /\
+      <<HALF: msg_src = Message.half ->
+              <<PROMISES2: sim_promises promises2_src promises2_tgt>> /\
+              <<MEM2: sim_memory promises2_tgt mem2_src mem2_tgt>>>> /\
+      <<KIND: Memory.op_kind_match kind_src kind_tgt>>.
   Proof.
     inv PROMISE_TGT.
     - (* add *)
-      exploit (@Memory.add_exists mem1_src loc from to Message.half).
+      exploit (@Memory.add_exists mem1_src loc from to msg_src); eauto.
       { ii. exploit sim_memory_get_src; eauto. i. des.
         inv MEM. inv ADD. eapply DISJOINT; eauto. }
       { inv MEM. inv ADD. ss. }
-      { econs. }
       i. des.
       exploit Memory.add_exists_le; try eapply x0; eauto. i. des.
-      esplits; eauto; econs; i.
+      esplits; eauto; [|econs].
+      i. subst. split; econs; i.
       + erewrite Memory.add_o; eauto. condtac; ss.
         * des. subst.
           revert GET_SRC. erewrite Memory.add_o; eauto. condtac; ss; i.
@@ -184,13 +205,13 @@ Module PFStep.
     - (* split *)
       exploit Memory.split_get0; try exact PROMISES. i. des.
       inv PROMISES1. exploit COMPLETE; try exact GET0. i. des.
-      exploit (@Memory.split_exists promises1_src loc from to ts3 Message.half Message.half); eauto.
+      exploit (@Memory.split_exists promises1_src loc from to ts3 msg_src Message.half); eauto.
       { inv MEM. inv SPLIT. ss. }
       { inv MEM. inv SPLIT. ss. }
-      { econs. }
       i. des.
       exploit Memory.split_exists_le; try exact x1; eauto. i. des.
-      esplits; eauto; econs; i.
+      esplits; eauto; [|econs].
+      i. subst. split; econs; i.
       + erewrite Memory.split_o; eauto. repeat condtac; ss.
         * des. subst.
           revert GET_SRC. erewrite Memory.split_o; eauto. repeat condtac; ss; i.
@@ -228,12 +249,12 @@ Module PFStep.
     - (* lower *)
       exploit Memory.lower_get0; try exact PROMISES. i. des.
       inv PROMISES1. exploit COMPLETE; eauto. i. des.
-      exploit (@Memory.lower_exists promises1_src loc from to Message.half Message.half); eauto.
+      exploit (@Memory.lower_exists promises1_src loc from to Message.half msg_src); eauto.
       { inv MEM. inv LOWER. ss. }
-      { econs. }
       i. des.
       exploit Memory.lower_exists_le; try eapply x1; eauto. i. des.
-      esplits; eauto; econs; i.
+      esplits; eauto; [|econs].
+      i. subst. split; econs; i.
       + erewrite Memory.lower_o; eauto. condtac; ss.
         * des. subst.
           revert GET_SRC. erewrite Memory.lower_o; eauto. condtac; ss; i.
@@ -282,8 +303,10 @@ Module PFStep.
     { apply LOCAL1. }
     { apply WF1_SRC. }
     { apply WF1_TGT. }
-    i. des. esplits; eauto.
-    econs; eauto. apply LOCAL1.
+    { econs. }
+    i. des.
+    exploit HALF; eauto. i. des.
+    esplits; eauto. econs; eauto. apply LOCAL1.
   Qed.
 
   Lemma read_promise_None
@@ -323,7 +346,8 @@ Module PFStep.
         (CONS_TGT: promise_consistent lc2_tgt):
     exists released_src lc2_src,
       <<STEP_SRC: Local.read_step lc1_src mem1_src loc to val released_src ord lc2_src>> /\
-      <<LOCAL2: sim_local lc2_src lc2_tgt>>.
+      <<LOCAL2: sim_local lc2_src lc2_tgt>> /\
+      <<RELEASED: View.opt_le released_src released_tgt>>.
   Proof.
     exploit read_promise_None; try exact STEP_TGT; eauto. i.
     inv MEM1. inv LOCAL1. inv STEP_TGT.
@@ -340,26 +364,250 @@ Module PFStep.
       { inv CLOSED1_TGT. exploit CLOSED; eauto. i. des.
         inv MSG_WF. ss. }
       { refl. }
+    - auto.
+  Qed.
+
+  Lemma promise_remove_sim
+        promises1_src mem1_src loc from to msg_src promises2_src mem2_src kind_src
+        promises3_src
+        promises1_tgt mem1_tgt msg_tgt promises2_tgt mem2_tgt kind_tgt
+        promises3_tgt
+        (PROMISES1: sim_promises promises1_src promises1_tgt)
+        (MEM1: sim_memory promises1_tgt mem1_src mem1_tgt)
+        (LE1_SRC: Memory.le promises1_src mem1_src)
+        (LE1_TGT: Memory.le promises1_tgt mem1_tgt)
+        (CLOSED1_SRC: Memory.closed mem1_src)
+        (CLOSED1_TGT: Memory.closed mem1_tgt)
+        (MSG: sim_message msg_src msg_tgt)
+        (KIND: Memory.op_kind_match kind_src kind_tgt)
+        (PROMISE_SRC: Memory.promise promises1_src mem1_src loc from to msg_src promises2_src mem2_src kind_src)
+        (REMOVE_SRC: Memory.remove promises2_src loc from to msg_src promises3_src)
+        (PROMISE_TGT: Memory.promise promises1_tgt mem1_tgt loc from to msg_tgt promises2_tgt mem2_tgt kind_tgt)
+        (REMOVE_TGT: Memory.remove promises2_tgt loc from to msg_tgt promises3_tgt):
+      <<PROMISES2: sim_promises promises3_src promises3_tgt>> /\
+      <<MEM2: sim_memory promises3_tgt mem2_src mem2_tgt>>.
+  Proof.
+    split; econs; i.
+    - erewrite Memory.remove_o; eauto. condtac; ss.
+      + des. subst.
+        revert GET_SRC. erewrite Memory.remove_o; eauto. condtac; ss.
+      + revert GET_SRC. erewrite Memory.remove_o; eauto. condtac; ss. i.
+        guardH o. guardH o0.
+        inv PROMISE_SRC; inv PROMISE_TGT; inv KIND.
+        * erewrite Memory.add_o; eauto. condtac; ss.
+          revert GET_SRC. erewrite Memory.add_o; eauto. condtac; ss. i.
+          inv PROMISES1. eauto.
+        * erewrite Memory.split_o; eauto. repeat condtac; ss.
+          { guardH o1. des. subst.
+            revert GET_SRC. erewrite Memory.split_o; eauto. repeat condtac; ss. i.
+            inv GET_SRC. inv PROMISES1. eauto. }
+          { guardH o1. guardH o2.
+            revert GET_SRC. erewrite Memory.split_o; eauto. repeat condtac; ss. i.
+            inv PROMISES1. eauto. }
+        * erewrite Memory.lower_o; eauto. condtac; ss.
+          revert GET_SRC. erewrite Memory.lower_o; eauto. condtac; ss. i.
+          inv PROMISES1. eauto.
+    - erewrite Memory.remove_o; eauto. condtac; ss.
+      + des. subst.
+        revert GET_TGT. erewrite Memory.remove_o; eauto. condtac; ss.
+      + revert GET_TGT. erewrite Memory.remove_o; eauto. condtac; ss. i.
+        guardH o. guardH o0.
+        inv PROMISE_SRC; inv PROMISE_TGT; inv KIND.
+        * erewrite Memory.add_o; eauto. condtac; ss.
+          revert GET_TGT. erewrite Memory.add_o; eauto. condtac; ss. i.
+          inv PROMISES1. eauto.
+        * erewrite Memory.split_o; eauto. repeat condtac; ss.
+          { guardH o1. des. subst.
+            revert GET_TGT. erewrite Memory.split_o; eauto. repeat condtac; ss. i.
+            guardH o2.
+            exploit Memory.split_get0; try exact PROMISES. i. des.
+            exploit sim_promises_get_src; try exact GET0; eauto. i. des. subst.
+            inv GET_TGT. inv PROMISES1. eauto. }
+          { guardH o1. guardH o2.
+            revert GET_TGT. erewrite Memory.split_o; eauto. repeat condtac; ss. i.
+            inv PROMISES1. eauto. }
+        * erewrite Memory.lower_o; eauto. condtac; ss.
+          revert GET_TGT. erewrite Memory.lower_o; eauto. condtac; ss. i.
+          inv PROMISES1. eauto.
+    - revert GETP. erewrite Memory.remove_o; eauto. condtac; ss; i.
+      + des. subst.
+        exploit Memory.promise_get0; try exact PROMISE_SRC. i. des.
+        exploit Memory.promise_get0; try exact PROMISE_TGT. i. des.
+        rewrite GET_MEM, GET_MEM0 in *. inv GET_SRC. eauto.
+      + guardH o.
+        inv PROMISE_SRC; inv PROMISE_TGT; inv KIND.
+        * erewrite Memory.add_o; eauto. condtac; ss.
+          revert GET_SRC. erewrite Memory.add_o; eauto. condtac; ss. i.
+          revert GETP. erewrite Memory.add_o; eauto. condtac; ss. i.
+          inv MEM1. eauto.
+        * erewrite Memory.split_o; eauto. repeat condtac; ss.
+          { guardH o0. des. subst.
+            revert GET_SRC. erewrite Memory.split_o; eauto. repeat condtac; ss. i.
+            revert GETP. erewrite Memory.split_o; eauto. repeat condtac; ss. }
+          { guardH o0. guardH o1.
+            revert GET_SRC. erewrite Memory.split_o; eauto. repeat condtac; ss. i.
+            revert GETP. erewrite Memory.split_o; eauto. repeat condtac; ss. i.
+            inv MEM1. eauto. }
+        * erewrite Memory.lower_o; eauto. condtac; ss.
+          revert GET_SRC. erewrite Memory.lower_o; eauto. condtac; ss. i.
+          revert GETP. erewrite Memory.lower_o; eauto. condtac; ss. i.
+          inv MEM1. eauto.
+    - revert GETP. erewrite Memory.remove_o; eauto. condtac; ss; i.
+      + des. subst.
+        exploit Memory.promise_get0; try exact PROMISE_SRC. i. des.
+        exploit Memory.promise_get0; try exact PROMISE_TGT. i. des.
+        rewrite GET_MEM, GET_MEM0 in *. inv GET_TGT. eauto.
+      + guardH o.
+        inv PROMISE_SRC; inv PROMISE_TGT; inv KIND.
+        * erewrite Memory.add_o; eauto. condtac; ss.
+          revert GET_TGT. erewrite Memory.add_o; eauto. condtac; ss. i.
+          revert GETP. erewrite Memory.add_o; eauto. condtac; ss. i.
+          inv MEM1. eauto.
+        * erewrite Memory.split_o; eauto. repeat condtac; ss.
+          { guardH o0. des. subst.
+            revert GET_TGT. erewrite Memory.split_o; eauto. repeat condtac; ss. i.
+            revert GETP. erewrite Memory.split_o; eauto. repeat condtac; ss. }
+          { guardH o0. guardH o1.
+            revert GET_TGT. erewrite Memory.split_o; eauto. repeat condtac; ss. i.
+            revert GETP. erewrite Memory.split_o; eauto. repeat condtac; ss. i.
+            inv MEM1. eauto. }
+        * erewrite Memory.lower_o; eauto. condtac; ss.
+          revert GET_TGT. erewrite Memory.lower_o; eauto. condtac; ss. i.
+          revert GETP. erewrite Memory.lower_o; eauto. condtac; ss. i.
+          inv MEM1. eauto.
+  Qed.
+
+  Lemma view_opt_le_time_le
+        v1 v2 loc
+        (LE: View.opt_le v1 v2):
+    Time.le (v1.(View.unwrap).(View.rlx) loc) (v2.(View.unwrap).(View.rlx) loc).
+  Proof.
+    inv LE; ss.
+    - unfold TimeMap.bot. apply Time.bot_spec.
+    - inv LE0. ss.
   Qed.
 
   Lemma write_step
-        lc1_src mem1_src
-        lc1_tgt sc1 mem1_tgt loc from to val released ord lc3_tgt sc3 mem3_tgt kind_tgt
+        lc1_src sc1_src mem1_src releasedm_src
+        lc1_tgt sc1_tgt mem1_tgt loc from to val releasedm_tgt released_tgt ord lc2_tgt sc2_tgt mem2_tgt kind_tgt
         (LOCAL1: sim_local lc1_src lc1_tgt)
+        (SC1: TimeMap.le sc1_src sc1_tgt)
         (MEM1: sim_memory lc1_tgt.(Local.promises) mem1_src mem1_tgt)
         (WF1_SRC: Local.wf lc1_src mem1_src)
         (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
-        (SC1_SRC: Memory.closed_timemap sc1 mem1_src)
-        (SC1_TGT: Memory.closed_timemap sc1 mem1_tgt)
+        (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
+        (SC1_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
         (CLOSED1_SRC: Memory.closed mem1_src)
         (CLOSED1_TGT: Memory.closed mem1_tgt)
-        (STEP_TGT: Local.write_step lc1_tgt sc1 mem1_tgt loc from to val None released ord lc3_tgt sc3 mem3_tgt kind_tgt)
-        (CONS_TGT: promise_consistent lc3_tgt):
-    exists lc2_src mem2_src kind2_src lc3_src mem3_src kind3_src,
-      <<STEP1_SRC: Local.promise_step lc1_src mem1_src loc from to (Message.full val released) lc2_src mem2_src kind2_src>> /\
-      <<STEP2_SRC: Local.write_step lc2_src sc1 mem2_src loc from to val None released ord lc3_src sc3 mem3_src kind3_src>> /\
-      <<LOCAL3: sim_local lc3_src lc3_tgt>> /\
-      <<MEM3: sim_memory lc3_tgt.(Local.promises) mem3_src mem3_tgt>>.
+        (RELEASEDM_SRC: View.opt_wf releasedm_src)
+        (RELEASEDM_TGT: View.opt_wf releasedm_tgt)
+        (RELEASEDM: View.opt_le releasedm_src releasedm_tgt)
+        (STEP_TGT: Local.write_step lc1_tgt sc1_tgt mem1_tgt loc from to val
+                                    releasedm_tgt released_tgt ord lc2_tgt sc2_tgt mem2_tgt kind_tgt):
+    exists released_src lc2_src sc2_src mem2_src kind_src,
+      <<STEP_SRC: Local.write_step lc1_src sc1_src mem1_src loc from to val
+                                   releasedm_src released_src ord lc2_src sc2_src mem2_src kind_src>> /\
+      <<LOCAL2: sim_local lc2_src lc2_tgt>> /\
+      <<MEM2: sim_memory lc2_tgt.(Local.promises) mem2_src mem2_tgt>>.
   Proof.
-  Admitted.
+    inv STEP_TGT. inv WRITE.
+    exploit (@promise (Message.full val (TView.write_released lc1_src.(Local.tview) sc1_src loc to releasedm_src ord)));
+      try exact PROMISE; eauto.
+    { apply LOCAL1. }
+    { apply WF1_SRC. }
+    { apply WF1_TGT. }
+    { econs. eapply TViewFacts.write_future0; ss. apply WF1_SRC. }
+    { econs. etrans; try by (inv PROMISE; inv TS; eauto).
+      apply view_opt_le_time_le.
+      apply TViewFacts.write_released_mon; try refl; ss.
+      - apply LOCAL1.
+      - apply WF1_TGT. }
+    i. des.
+    exploit Memory.promise_get0; try exact PROMISE_SRC. i. des.
+    exploit Memory.remove_exists; try exact GET_PROMISES. i. des.
+    exploit promise_remove_sim; try eapply LOCAL1; try exact MEM1;
+      try exact PROMISE_SRC; try exact PROMISE; eauto.
+    { apply WF1_SRC. }
+    { apply WF1_TGT. }
+    { econs. apply TViewFacts.write_released_mon; try refl; ss.
+      - apply LOCAL1.
+      - apply WF1_TGT. }
+    i. des. esplits.
+    - econs; eauto.
+      + econs. inv WRITABLE.
+        eapply TimeFacts.le_lt_lt; eauto.
+        inv LOCAL1. inv TVIEW. inv CUR. ss.
+      + ii. inv LOCAL1.
+        exploit sim_promises_get_src; eauto. i. des. subst. ss.
+    - inv LOCAL1. econs; ss; eauto.
+      eapply TViewFacts.write_tview_mon; try refl; ss. apply WF1_TGT.
+    - ss.
+  Qed.
+
+  Lemma fence_step
+        lc1_src sc1_src mem1_src
+        lc1_tgt sc1_tgt mem1_tgt ordr ordw lc2_tgt sc2_tgt
+        (LOCAL1: sim_local lc1_src lc1_tgt)
+        (SC1: TimeMap.le sc1_src sc1_tgt)
+        (WF1_SRC: Local.wf lc1_src mem1_src)
+        (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
+        (STEP_TGT: Local.fence_step lc1_tgt sc1_tgt ordr ordw lc2_tgt sc2_tgt):
+    exists lc2_src sc2_src,
+      <<STEP_SRC: Local.fence_step lc1_src sc1_src ordr ordw lc2_src sc2_src>> /\
+      <<LOCAL3: sim_local lc2_src lc2_tgt>>.
+  Proof.
+    esplits.
+    - econs; eauto. ii. inv LOCAL1.
+      exploit sim_promises_get_src; eauto. i. des. subst. ss.
+    - inv STEP_TGT. inv LOCAL1. econs; eauto. ss.
+      eapply TViewFacts.write_fence_tview_mon; try refl; ss.
+      + eapply TViewFacts.read_fence_tview_mon; try refl; ss.
+        apply WF1_TGT.
+      + eapply TViewFacts.read_fence_future; apply WF1_SRC.
+  Qed.
+
+  Lemma program_step
+        lc1_src sc1_src mem1_src
+        e_tgt lc1_tgt sc1_tgt mem1_tgt lc2_tgt sc2_tgt mem2_tgt
+        (LOCAL1: sim_local lc1_src lc1_tgt)
+        (SC1: TimeMap.le sc1_src sc1_tgt)
+        (MEM1: sim_memory lc1_tgt.(Local.promises) mem1_src mem1_tgt)
+        (WF1_SRC: Local.wf lc1_src mem1_src)
+        (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
+        (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
+        (SC1_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
+        (CLOSED1_SRC: Memory.closed mem1_src)
+        (CLOSED1_TGT: Memory.closed mem1_tgt)
+        (STEP_TGT: Local.program_step e_tgt lc1_tgt sc1_tgt mem1_tgt lc2_tgt sc2_tgt mem2_tgt)
+        (CONS: promise_consistent lc2_tgt):
+    exists e_src lc2_src sc2_src mem2_src,
+      <<STEP_SRC: Local.program_step e_src lc1_src sc1_src mem1_src lc2_src sc2_src mem2_src>> /\
+      <<LOCAL2: sim_local lc2_src lc2_tgt>> /\
+      <<MEM2: sim_memory lc2_tgt.(Local.promises) mem2_src mem2_tgt>>.
+  Proof.
+    inv STEP_TGT.
+    - esplits; eauto.
+    - exploit read_step; eauto. i. des.
+      esplits; try exact LOCAL2; eauto.
+      inv LOCAL. ss.
+    - exploit write_step; try exact LOCAL; eauto. i. des.
+      esplits; try exact LOCAL2; eauto.
+    - exploit read_step; eauto.
+      { eapply write_step_promise_consistent; eauto. }
+      i. des.
+      exploit Local.read_step_future; try exact LOCAL0; eauto. i. des.
+      exploit Local.read_step_future; try exact STEP_SRC; eauto. i. des.
+      exploit write_step; try exact LOCAL2; eauto.
+      { inv LOCAL0. ss. }
+      i. des.
+      esplits; try exact LOCAL4; eauto.
+    - exploit fence_step; eauto. i. des.
+      esplits; try exact LOCAL3; eauto.
+      inv LOCAL. ss.
+    - exploit fence_step; eauto. i. des.
+      esplits; try exact LOCAL3; eauto.
+      inv LOCAL. ss.
+  Grab Existential Variables.
+  { auto. (* event of src syscall step *) }
+  Qed.
 End PFStep.
