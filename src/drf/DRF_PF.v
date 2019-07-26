@@ -35,13 +35,9 @@ Set Implicit Arguments.
 
 Inductive unchanged_on (P: Loc.t -> Time.t -> Prop) m0 m1 : Prop :=
 | unchanged_on_intro
-    (NCOV: forall l t (IN: P l t), ~ covered l t m1)
+    (NCOV: forall l t (IN: P l t) (COV: covered l t m1), covered l t m0)
     (FUTURE : Memory.le m0 m1)
 .
-
-(* Definition to_thread (st: StateLocal.t) sc m := *)
-(*   Thread.mk st.(StateLocal.lang) st.(StateLocal.state) st.(StateLocal.local) sc m. *)
-
 
 Inductive promised (mem: Memory.t) (loc: Loc.t) (to: Time.t) : Prop :=
 | promised_intro
@@ -718,7 +714,6 @@ Inductive map_preserving (P: Loc.t -> Time.t -> Prop) (f: Loc.t -> Time.t -> Tim
     (PRSVLT: forall loc t0 t1 (SAT0: P loc t0) (SAT1: P loc t1) (LT: Time.lt t0 t1),
         Time.lt (f loc t0) (f loc t1))
     (PRSVBOT: forall loc, f loc Time.bot = Time.bot)
-    (* (BOTSAT: forall loc, P loc Time.bot) *)
 .
 
 Definition map_preserving_lt_iff P f
@@ -778,19 +773,6 @@ Proof.
   inv PRSV. eauto.
 Qed.
 Hint Resolve map_preserving_bot.
-
-(* Definition map_preserving_bot P f *)
-(*            (PRSV: map_preserving P f) *)
-(*            loc t *)
-(*            (SAT: P loc t) *)
-(*   : *)
-(*     t = Time.bot <-> f loc t = Time.bot. *)
-(* Proof. *)
-(*   dup PRSV. inv PRSV. split; i; clarify; auto. *)
-(*   erewrite map_preserving_eq_iff; eauto. *)
-(*   rewrite PRSVBOT. auto. *)
-(* Qed. *)
-(* Hint Resolve map_preserving_bot. *)
 
 Definition timemap_map (f: Loc.t -> Time.t -> Time.t) (tm: TimeMap.t): TimeMap.t :=
   fun l => f l (tm l).
@@ -855,22 +837,6 @@ Proof.
 Qed.  
 Hint Resolve times_in_memory_to_in_memory.
 
-(* Lemma map_step *)
-(*       f lang th_tgt th_tgt' st st' v v' prom' sc sc' *)
-(*       mem_tgt mem_tgt' e_tgt *)
-(*       (STEP: (@pred_step no_promise lang) e_tgt th_tgt th_tgt') *)
-(*       (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v Memory.bot) sc mem_tgt) *)
-(*       (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt') *)
-(*       (INMEMORY: map_preserving (times_in_memory mem_tgt') f) *)
-(*   : *)
-(*     map_preserving (times_in_memory mem_tgt) f. *)
-(* Proof. *)
-(*   clarify. inv STEP. inv STEP0. inv STEP; inv STEP0; ss. inv LOCAL; ss. *)
-(*   - inv LOCAL0. ss. clarify. *)
-(*     exploit memory_write_bot_add; eauto. i. clarify. *)
-(*     inv WRITE. inv PROMISE. ii. *)
-(*     +  *)
-
 Lemma map_closed_timemap m f tm
       (INMEMORY: map_preserving (times_in_memory m) f)
       (CLOSED: Memory.closed_timemap tm m)
@@ -879,30 +845,6 @@ Lemma map_closed_timemap m f tm
 Proof.
   ii. right. specialize (CLOSED loc). unfold times_in_memory_to. des. eauto.
 Qed.  
-
-(* Lemma map_closed_view m f v *)
-(*       (INMEMORY: map_preserving (times_in_memory m) f) *)
-(*       (CLOSED: Memory.closed_view v m) *)
-(*   : *)
-(*     (<<PLN: forall loc, times_in_memory m loc (v.(View.pln) loc)>>) /\ *)
-(*     (<<RLX: forall loc, times_in_memory m loc (v.(View.rlx) loc)>>). *)
-(* Proof. *)
-(*   inv CLOSED. split; ii. *)
-(*   - eapply map_closed_timemap; eauto. *)
-(*   - eapply map_closed_timemap; eauto. *)
-(* Qed.   *)
-
-(* Lemma map_closed_view m f tv *)
-(*       (INMEMORY: map_preserving (times_in_memory m) f) *)
-(*       (CLOSED: TView.closed tv m) *)
-(*   : *)
-(*     (<<PLN: forall loc, times_in_memory m loc (tv.(View.pln) loc)>>) /\ *)
-(*     (<<RLX: forall loc, times_in_memory m loc (tv.(View.rlx) loc)>>). *)
-(* Proof. *)
-(*   inv CLOSED. split; ii. *)
-(*   - eapply map_closed_timemap; eauto. *)
-(*   - eapply map_closed_timemap; eauto. *)
-(* Qed.   *)
 
 Lemma map_time_join P f loc t0 t1
       (PRSV: map_preserving P f)
@@ -1468,6 +1410,231 @@ Proof.
     eapply read_fence_closed; eauto. inv LCWF. eauto.    
 Qed.
 
+Lemma unchanged_on_write v v' prom'
+      L loc from to val releasedm released ord sc sc' mem_src
+      mem_tgt mem_tgt' kind
+      (WRITE: Local.write_step
+                (Local.mk v Memory.bot) sc mem_tgt
+                loc from to val releasedm released ord
+                (Local.mk v' prom') sc' mem_tgt' kind)
+      (MEM: unchanged_on L mem_tgt mem_src)
+      (WRITEIN: forall t (IN: Interval.mem (from, to) t), (L loc t))
+  :
+    exists mem_src',
+      (<<WRITE: Local.write_step
+                  (Local.mk v Memory.bot) sc mem_src
+                  loc from to val releasedm released ord
+                  (Local.mk v' Memory.bot) sc' mem_src' Memory.op_kind_add>>) /\
+      (<<MEM: unchanged_on L mem_tgt' mem_src'>>).
+Proof.
+  inv MEM. inv WRITE. ss. clarify. exploit memory_write_bot_add; eauto. i. clarify.
+  exploit write_msg_wf; eauto. i. des.
+  inv WRITE0. inv PROMISE. dup MEM. eapply Memory.add_get0 in MEM; eauto. des.
+  exploit write_succeed; eauto.
+  { instantiate (1:=mem_src). ii.    
+    exploit NCOV; eauto. intros COV. inv COV.
+    exploit Memory.get_disjoint.
+    - eapply GET0.
+    - eapply Memory.add_get1; eauto.
+    - i. des; clarify. eauto. }
+  i. des.
+  exists mem2. esplits; eauto.
+  inv WRITE. inv PROMISE.
+  econs; eauto.
+  - ii. inv COV. erewrite Memory.add_o in GET1; cycle 1; eauto. des_ifs.
+    + ss. des. clarify. econs; eauto.
+    + exploit NCOV; eauto.
+      * econs; eauto.
+      * i. inv x. econs; eauto. eapply Memory.add_get1; eauto.
+  - ii. erewrite Memory.add_o; eauto.
+    erewrite Memory.add_o in LHS; cycle 1; eauto. des_ifs.
+    eapply FUTURE; eauto.
+Qed.    
+  
+Lemma unchanged_on_step
+      P L lang th_src th_tgt th_tgt' st st' v v' prom' sc sc'
+      mem_src mem_tgt mem_tgt' e_tgt
+      (STEP: (@pred_step (P /1\ no_promise /1\ write_in L) lang) e_tgt th_tgt th_tgt')
+      (TH_SRC: th_src = Thread.mk lang st (Local.mk v Memory.bot) sc mem_src)
+      (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v Memory.bot) sc mem_tgt)
+      (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
+      (MEM: unchanged_on L mem_tgt mem_src)
+  :
+    exists mem_src',
+      (<<STEP: (@pred_step (P /1\ no_promise /1\ write_in L) lang)
+                 e_tgt th_src
+                 (Thread.mk lang st' (Local.mk v' Memory.bot) sc' mem_src')>>) /\
+      (<<MEM: unchanged_on L mem_tgt' mem_src'>>).
+Proof.
+  dup MEM. inv MEM.  
+  clarify. inv STEP. des. inv STEP0. inv STEP.
+  { inv STEP0. ss; clarify. }
+  inv STEP0. inv LOCAL; ss.
+  - exists mem_src. esplits; eauto. econs; eauto. econs; eauto.
+    econs 2; eauto. econs; eauto.
+  - inv LOCAL0. ss. clarify.
+    exists mem_src. esplits; eauto. econs; eauto. econs; eauto.
+    econs 2; eauto. econs; eauto.
+  - exploit unchanged_on_write; eauto. i. des. esplits; eauto.
+    econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+  - inv LOCAL1. ss.
+    exploit unchanged_on_write; eauto. i. des. esplits; eauto.
+    econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+  - inv LOCAL0. ss. clarify. exists mem_src. esplits; eauto.
+    econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+  - inv LOCAL0. ss. clarify. exists mem_src. esplits; eauto.
+    econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+Qed.    
+
+Definition cap (m mcap: Memory.t) (l: Loc.t) (t: Time.t): Prop :=
+  (<<NCOV: ~ covered l t m>>) /\ (<<CAP: ~ covered l t mcap>>). 
+
+Definition cap_write_with_update (CAP : Loc.t -> Time.t -> Prop)
+           (e : ThreadEvent.t) : Prop :=
+  match e with
+  | ThreadEvent.write loc from to _ _ _ =>
+    forall t (IN: Interval.mem (from, to) t), (~ CAP loc t)
+  | ThreadEvent.update loc from to _ _ _ _ ordr _ =>
+    forall t (IN: Interval.mem (from, to) t) (INCAP: CAP loc t),
+      Ordering.le ordr Ordering.relaxed
+  | _ => True
+  end.
+
+WIP
+
+Lemma other_promise_remove
+      P lang th_src th_tgt th_tgt' st st' v v' prom' sc sc'
+      mem_src mem_tgt mem_tgt' e_tgt others
+      (STEP: (@pred_step (P /1\ no_promise /1\ no_read_msgs others /1\ write_not_in others) lang) e_tgt th_tgt th_tgt')
+      (TH_SRC: th_src = Thread.mk lang st (Local.mk v Memory.bot) sc mem_src)
+      (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v Memory.bot) sc mem_tgt)
+      (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
+      (MEM: Forget.forget_memory others mem_src mem_tgt)
+  :
+    exists mem_src',
+      (<<STEP: (@pred_step
+                  (P /1\ no_promise /1\ no_read_msgs others) lang)
+                 e_tgt th_src
+                 (Thread.mk lang st' (Local.mk v' Memory.bot) sc' mem_src')>>) /\
+      (<<MEM: Forget.forget_memory others mem_src' mem_tgt'>>).
+
+
+  clarify. inv STEP. inv STEP0. inv STEP; inv STEP0; ss. inv LOCAL; ss.
+  - exists mem_src. esplits; ss; eauto.
+    econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+  - exploit map_step_read; eauto. i. des.
+    exists mem_src. esplits; eauto. econs; eauto. econs; eauto.
+    econs 2; eauto. econs; eauto.
+  - exploit map_step_write; eauto. i. des. ss.
+    exists mem_src'. esplits; eauto. econs; eauto. econs; eauto.
+    econs 2; eauto. econs; eauto.
+  - exploit Local.read_step_future; eauto. i. des.
+    destruct lc2. exploit map_step_read; eauto. i. des.
+    inv LOCAL1. ss. clarify.
+    exploit map_step_write; eauto. i. des.
+    exists mem_src'. esplits; eauto. econs; eauto. econs; eauto.
+    econs 2; eauto. econs; eauto.
+  - exists mem_src. esplits; eauto. econs; eauto. econs; eauto.
+    econs 2; eauto. econs; eauto. econs; eauto.
+    inv LOCAL0. ss. clarify.
+    erewrite map_write_fence_tview; eauto; cycle 1.
+    { eapply read_fence_closed; eauto. inv LCWF. eauto. }
+    repeat erewrite map_read_fence. econs; ss; eauto.
+    erewrite map_write_fence_sc; eauto.
+    + erewrite map_read_fence. auto.
+    + eapply read_fence_closed; eauto. inv LCWF. eauto.
+  - exists mem_src. esplits; eauto. econs; eauto. econs; eauto.
+    econs 2; eauto. econs; eauto. econs; eauto.
+    inv LOCAL0. ss. clarify.
+    erewrite map_write_fence_tview; eauto; cycle 1.
+    { eapply read_fence_closed; eauto. inv LCWF. eauto. }
+    repeat erewrite map_read_fence. econs; ss; eauto.
+    erewrite map_write_fence_sc; eauto.
+    eapply read_fence_closed; eauto. inv LCWF. eauto.    
+Qed.
+
+
+Lemma other_promise_remove_write v v' prom'
+      loc from to val releasedm released ord sc sc' mem_src
+      mem_tgt mem_tgt' kind others
+      (WRITE: Local.write_step
+                (Local.mk v Memory.bot) sc mem_tgt
+                loc from to val releasedm released ord
+                (Local.mk v' prom') sc' mem_tgt' kind)
+      (MEM: Forget.forget_memory others mem_src mem_tgt)
+      (OTHERS: ~ others loc to)
+  :
+    exists mem_src',
+      (<<WRITE: Local.write_step
+                  (Local.mk v Memory.bot) sc mem_src
+                  loc from to val releasedm released ord
+                  (Local.mk v' Memory.bot) sc' mem_src' Memory.op_kind_add>>) /\
+      (<<MEM: Forget.forget_memory others mem_src' mem_tgt'>>).
+Proof.
+  exploit write_msg_wf; eauto. i. des.
+  inv WRITE. ss. clarify. exploit memory_write_bot_add; eauto. i. clarify.
+  dup WRITE0. inv WRITE0. inv PROMISE.  
+  exploit write_succeed; eauto.
+  { instantiate (1:=mem_src). i. eapply forget_memory_le in MEM.
+    eapply memory_le_covered in COVER; eauto. ii.
+    exploit write_disjoint; try apply WRITE1; eauto.
+    { eapply Memory.bot_le. }
+    i. des; eauto. inv PROMISED.
+    erewrite Memory.bot_get in GET. clarify. }
+  i. des. exists mem2. econs; eauto.
+  inv MEM. inv WRITE. inv PROMISE. econs; i.
+  - erewrite (@Memory.add_o mem2); eauto.
+    erewrite (@Memory.add_o mem_tgt'); cycle 1; eauto. des_ifs. eauto.
+  - erewrite (@Memory.add_o mem2); eauto. des_ifs; eauto.
+    ss. des. clarify.
+Qed.
+    
+Lemma other_promise_remove
+      P lang th_src th_tgt th_tgt' st st' v v' prom' sc sc'
+      mem_src mem_tgt mem_tgt' e_tgt others
+      (STEP: (@pred_step (P /1\ no_promise /1\ no_read_msgs others /1\ write_not_in others) lang) e_tgt th_tgt th_tgt')
+      (TH_SRC: th_src = Thread.mk lang st (Local.mk v Memory.bot) sc mem_src)
+      (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v Memory.bot) sc mem_tgt)
+      (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
+      (MEM: Forget.forget_memory others mem_src mem_tgt)
+  :
+    exists mem_src',
+      (<<STEP: (@pred_step
+                  (P /1\ no_promise /1\ no_read_msgs others) lang)
+                 e_tgt th_src
+                 (Thread.mk lang st' (Local.mk v' Memory.bot) sc' mem_src')>>) /\
+      (<<MEM: Forget.forget_memory others mem_src' mem_tgt'>>).
+Proof.
+  dup MEM. eapply forget_memory_le in MEM0.  
+  clarify. inv STEP. des. inv STEP0. inv STEP.
+  { inv STEP0. ss; clarify. }
+  inv STEP0. inv LOCAL; ss.
+  - exists mem_src. esplits; eauto. econs; eauto. econs; eauto.
+    econs 2; eauto. econs; eauto.
+  - inv LOCAL0. ss. clarify.
+    exists mem_src. esplits; eauto. econs; eauto. econs; eauto.
+    econs 2; eauto. econs; eauto. econs; eauto. econs; eauto.
+    inv MEM. erewrite COMPLETE; eauto.
+  - ss. exploit other_promise_remove_write; eauto.
+    { exploit write_msg_wf; eauto. i. des.
+      eapply SAT0. econs; eauto. refl. }
+    i. des. exists mem_src'. esplits; eauto.
+    econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+  - ss. inv LOCAL1. ss.
+    exploit other_promise_remove_write; eauto.
+    { exploit write_msg_wf; eauto. i. des.
+      eapply SAT0. econs; eauto. refl. }
+    i. des. exists mem_src'. esplits; eauto.
+    econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+    econs; eauto. econs; eauto. inv MEM. erewrite COMPLETE; eauto.
+  - inv LOCAL0. ss. clarify. exists mem_src. esplits; eauto.
+    econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+  - inv LOCAL0. ss. clarify. exists mem_src. esplits; eauto.
+    econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+Qed.
+
+
+Memory.cap
       
 
 Inductive sim_pf
