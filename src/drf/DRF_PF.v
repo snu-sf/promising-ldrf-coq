@@ -164,9 +164,6 @@ Module Inv.
 
 End Inv.
 
-
-
-
 Inductive opt_pred_step P (lang : Language.t)
   : ThreadEvent.t -> Thread.t lang -> Thread.t lang -> Prop :=
 | step_none t: opt_pred_step P ThreadEvent.silent t t
@@ -449,7 +446,7 @@ Qed.
 
 Definition no_sc (e : ThreadEvent.t) : Prop :=
   match e with
-  | ThreadEvent.fence _ ordw => ordw <> Ordering.seqcst
+  | ThreadEvent.fence _ ordw => ~ Ordering.le Ordering.seqcst ordw
   | ThreadEvent.syscall _ => False
   | _ => True
   end
@@ -666,7 +663,7 @@ Lemma self_promise_remove
       (<<STEP: opt_pred_step
                  (P /1\ no_promise) e_src th_src
                  (Thread.mk lang st' (Local.mk v' Memory.bot) sc' mem_src')>>) /\
-      (<<EVT: ThreadEvent.get_event e_src = ThreadEvent.get_event e_tgt>>) /\ 
+      (<<EVT: ThreadEvent.get_event e_src = ThreadEvent.get_event e_tgt>>) /\
       (<<MEM: Forget.forget_memory (promised prom') mem_src' mem_tgt'>>).
 Proof.
   dup MEM. eapply forget_memory_le in MEM0.  
@@ -722,50 +719,7 @@ Lemma self_promise_remove_rtc
                    (Thread.mk lang st' (Local.mk v' Memory.bot) sc' mem_src')>>) /\
       (<<MEM: Forget.forget_memory (promised prom') mem_src' mem_tgt'>>).
 Proof.
-  clarify.
-  
-  eapply Operators_Properties.rt1n_ind_right with
-
-  
-  Configuration.step
-
-  dup MEM. eapply forget_memory_le in MEM0.  
-  clarify. inv STEP. des. inv STEP0. inv STEP.
-  - inv STEP0. ss. inv LOCAL. clarify. ss.
-    exists mem_src, ThreadEvent.silent. esplits; eauto.
-    eapply self_promise_remove_promise; eauto.
-  - inv STEP0. ss. inv LOCAL; clarify; ss.
-    + exists mem_src, ThreadEvent.silent.
-      esplits; eauto. econs. econs; ss; eauto. econs; eauto.
-      econs 2; eauto. econs; eauto.
-    + exists mem_src, (ThreadEvent.read loc ts val released ord).
-      inv LOCAL0. ss. clarify.
-      esplits; eauto. econs. econs; ss; eauto. econs; eauto.
-      econs 2; eauto. econs; eauto. econs 2; eauto. econs; eauto.
-      inv MEM. rewrite COMPLETE; eauto.
-    + exploit self_promise_remove_write; eauto. i. des.
-      exists mem_src', (ThreadEvent.write loc from to val released ord).
-      esplits; eauto. econs. econs; eauto. econs; eauto.
-      econs 2; eauto. econs; eauto.
-    + exploit Local.read_step_future; eauto. i. des.
-      inv LOCAL1. ss. exploit self_promise_remove_write; eauto. i. des. 
-      exists mem_src',
-      (ThreadEvent.update loc tsr tsw valr valw releasedr releasedw ordr ordw).
-      esplits; eauto. econs. econs; ss; eauto. econs; eauto.
-      econs 2; eauto. econs; eauto. econs; eauto. econs; eauto.
-      inv MEM. rewrite COMPLETE; eauto.
-    + inv LOCAL0. ss. clarify.
-      exists mem_src, (ThreadEvent.fence ordr ordw).
-      esplits; eauto. econs. econs; ss; eauto. econs; eauto.
-      econs 2; eauto. econs; eauto. econs; eauto. econs; eauto. ss.
-      ii. rewrite Memory.bot_get in *. clarify.
-    + inv LOCAL0. ss. clarify.
-      exists mem_src, (ThreadEvent.syscall e).
-      esplits; eauto. econs. econs; ss; eauto. econs; eauto.
-      econs 2; eauto. econs; eauto. econs; eauto. econs; eauto. ss.
-      ii. rewrite Memory.bot_get in *. clarify.
-Qed.
-
+Admitted.
 
 Lemma memory_write_bot_add
       mem1 loc from1 to1 val released promises3 mem2 kind
@@ -1753,23 +1707,188 @@ Proof.
   - eapply FORGET0; eauto. inv PROMS. destruct msg. eauto.
 Qed.
 
+Definition unchangables (mem prom: Memory.t) (l: Loc.t) (t: Time.t) :=
+  (<<COV: covered l t mem>>) /\
+  (<<NCOV: ~ covered l t prom>>).  
 
-
-Lemma step_wirte_in th_tgt th_tgt'
-      (STEP: Thread.step_allpf e_tgt th_tgt th_tgt')
+Lemma step_wirte_not_in_write promises1 mem1 loc from1 to1 val released promises3 mem2 kind
+      (WRITE: Memory.write promises1 mem1 loc from1 to1 val released promises3 mem2 kind)
+      t
+      (IN: Interval.mem (from1, to1) t)
   :
-    write_in (~2
-    
-  exists mem_src, <<FORGET: Forget.forget_memory prom.(promised) mem_src mem_tgt>>.
+    ~ unchangables mem1 promises1 loc t.
 Proof.
-  hexploit (Memory.finite_sound_exists prom); eauto. i. des.
-  hexploit (forget_exists_list dom mem_tgt). i. des. exists mem_src.
-  inv FORGET. econs; i.
-  - eapply COMPLETE; eauto. ii. eapply NPROMS.
-    exploit H0; eauto. i. des. econs; eauto.
-  - eapply FORGET0; eauto. inv PROMS. destruct msg. eauto.
+  unfold unchangables. inv WRITE. apply or_not_and. inv PROMISE.
+  - left. ii. inv H. dup GET. eapply Memory.add_get1 in GET; eauto.
+    eapply Memory.add_get0 in MEM. des.
+    exploit Memory.get_disjoint.
+    + eapply GET.
+    + eapply GET2.
+    + i. des; clarify. eauto.
+  - right. eapply Memory.split_get0 in PROMISES. des. ii. apply H.
+    econs; eauto. inv IN. econs; ss; eauto. etrans; eauto.
+    inv MEM. inv SPLIT. left. eauto.
+  - right. eapply Memory.lower_get0 in PROMISES. des. ii. apply H.
+    econs; eauto.
 Qed.
 
+Lemma step_wirte_not_in lang (th_tgt th_tgt': Thread.t lang) e_tgt pf
+      (STEP: Thread.step pf e_tgt th_tgt th_tgt')
+  :
+    write_not_in (unchangables th_tgt.(Thread.memory) th_tgt.(Thread.local).(Local.promises))
+                 e_tgt.
+Proof.
+  unfold unchangables. inv STEP.
+  - inv STEP0; ss.
+  - inv STEP0; ss. inv LOCAL; ss.
+    + inv LOCAL0. ii. exploit step_wirte_not_in_write; eauto.
+    + inv LOCAL1. inv LOCAL2. ss. ii. exploit step_wirte_not_in_write; eauto.
+Qed.
+
+Lemma unchangables_promise mem0 prom0 loc from to msg prom1 mem1 kind
+      (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
+  :
+    unchangables mem0 prom0 <2= unchangables mem1 prom1.
+Proof.
+  unfold unchangables. inv PROMISE.
+  - ii. des. econs.
+    + red. erewrite add_covered; eauto.
+    + red. erewrite add_covered; eauto.
+      ii. des; clarify. dup MEM. eapply Memory.add_get0 in MEM. des.
+      inv COV. exfalso. exploit Memory.get_disjoint.
+      { eapply GET0. }
+      { eapply Memory.add_get1; eauto. }
+      i. des; clarify. eapply x0; eauto.
+  - ii. des. econs.
+    + red. erewrite split_covered; eauto.
+    + red. erewrite split_covered; eauto.
+  - ii. des. econs.
+    + red. erewrite lower_covered; eauto.
+    + red. erewrite lower_covered; eauto.
+Qed.
+
+Lemma other_promise_unchangable c tid1 tid2 st1 st2 lc1 lc2
+      (CWF: Configuration.wf c)
+      (TID1: IdentMap.find tid1 c.(Configuration.threads) = Some (st1, lc1))
+      (TID2: IdentMap.find tid2 c.(Configuration.threads) = Some (st2, lc2))    
+      (DIFF: tid1 <> tid2)
+      l t
+      (COV: covered l t lc2.(Local.promises))
+  :
+    unchangables c.(Configuration.memory) lc1.(Local.promises) l t.
+Proof.
+  inv CWF. inv WF. inv COV. destruct st1, st2. econs; eauto.
+  - exploit THREADS; try apply TID2; eauto. intros LCWF. inv LCWF.
+    econs; eauto.
+  - ii. inv H. exploit DISJOINT; eauto. intros LCDISJ. inv LCDISJ.
+    inv DISJOINT0. exploit DISJOINT1; eauto. i. des.
+    eapply x1; eauto.
+Qed.
+
+Lemma unchangables_remove mem prom0 loc from to msg prom1
+      (PROMISE: Memory.remove prom0 loc from to msg prom1)
+  :
+    unchangables mem prom0 <2= unchangables mem prom1.
+Proof.
+  unfold unchangables. ii. des. econs; eauto.
+  ii. eapply NCOV. inv H. erewrite Memory.remove_o in GET; eauto.
+  des_ifs. econs; eauto.
+Qed.
+
+Lemma unchangables_increase pf e lang (th0 th1: Thread.t lang)
+      (STEP: Thread.step pf e th0 th1)
+  :
+    unchangables th0.(Thread.memory) th0.(Thread.local).(Local.promises) <2=
+    unchangables th1.(Thread.memory) th1.(Thread.local).(Local.promises).
+Proof.      
+  inv STEP.
+  - inv STEP0; ss. inv LOCAL. i.
+    hexploit unchangables_promise; eauto.
+  - i. inv STEP0; ss. inv LOCAL; try inv LOCAL0; ss.
+    + inv WRITE. exploit unchangables_promise; eauto.
+      eapply unchangables_remove; eauto.
+    + inv LOCAL1. inv LOCAL2. ss. inv WRITE.
+      exploit unchangables_promise; eauto.
+      eapply unchangables_remove; eauto.
+Qed.
+
+Lemma write_not_in_unchanged_on_write L v v' prom'
+      loc from to val releasedm released ord sc sc'
+      mem_tgt mem_tgt' kind
+      (WRITE: Local.write_step
+                (Local.mk v Memory.bot) sc mem_tgt
+                loc from to val releasedm released ord
+                (Local.mk v' prom') sc' mem_tgt' kind)
+      (NOTIN: forall t (IN: Interval.mem (from, to) t), ~ (L loc t))
+  :
+    unchanged_on L mem_tgt mem_tgt'.
+Proof.
+  inv WRITE. ss. clarify.
+  exploit memory_write_bot_add; eauto. i. clarify.
+  inv WRITE0. inv PROMISE. econs.
+  - i. rewrite add_covered in COV; eauto. des; auto.
+    clarify. exfalso. eapply NOTIN; eauto.
+  - ii. eapply Memory.add_get1; eauto.
+Qed.
+    
+Lemma write_not_in_unchanged_on L e lang (th0 th1: Thread.t lang)
+      (STEP: pred_step (no_promise /1\ write_not_in L) e th0 th1)
+      (BOT: th0.(Thread.local).(Local.promises) = Memory.bot)
+  :
+    unchanged_on L th0.(Thread.memory) th1.(Thread.memory).
+Proof.
+  inv STEP. inv STEP0. inv STEP.
+  - inv STEP0; ss; des; clarify.
+  - des. inv STEP0. ss. inv LOCAL; try refl.
+    + destruct lc1, lc2. ss. clarify. exploit write_not_in_unchanged_on_write; eauto.
+    + inv LOCAL1. ss.
+      destruct lc1, lc2. ss. clarify. exploit write_not_in_unchanged_on_write; eauto.
+Qed.
+
+Lemma no_sc_any_sc
+      P lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc_src sc'
+      mem mem' e
+      (STEP: (@pred_step (P /1\ no_sc) lang) e th_tgt th_tgt')
+      (TH_SRC: th_src = Thread.mk lang st (Local.mk v prom) sc_src mem)
+      (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v prom) sc mem)
+      (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem')
+  :
+    exists sc_src',
+      (<<STEP: (@pred_step (P /1\ no_sc) lang)
+                 e th_src
+                 (Thread.mk lang st' (Local.mk v' prom') sc_src' mem')>>).
+Proof.
+  clarify. inv STEP. inv STEP0. des. inv STEP.
+  - inv STEP0. inv LOCAL. ss. clarify.
+    esplits. econs; eauto. econs; eauto. econs 1; eauto. econs; eauto.
+  - inv STEP0. inv LOCAL; ss.
+    + esplits. econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+    + esplits. econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+    + inv LOCAL0. ss. clarify. exists sc_src. 
+      econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+      econs; eauto. econs; eauto. ss.
+      inv WRITABLE. econs; eauto.
+    + inv LOCAL1. ss. inv LOCAL2. ss. clarify. exists sc_src. 
+      econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+      econs; eauto. econs; eauto. ss.
+      inv WRITABLE. econs; eauto.
+    + inv LOCAL0. ss. clarify.
+      esplits. econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+      econs; eauto. econs; eauto. ss. f_equal.
+      unfold TView.write_fence_tview. ss. des_ifs.
+Qed.
+
+
+Definition no_acq_read_msgs (MSGS : Loc.t -> Time.t -> Prop)
+           (e : ThreadEvent.t) : Prop :=
+  match e with
+  | ThreadEvent.read loc to _ _ ord =>
+    forall (SAT: MSGS loc to), ~ Ordering.le Ordering.acqrel ord
+  | ThreadEvent.update loc from _ _ _ _ _ ordr _ =>
+    forall (SAT: MSGS loc from), ~ Ordering.le Ordering.acqrel ordr
+  | _ => True
+  end
+.
 
 
 Lemma consistent_read_no_self_promise
