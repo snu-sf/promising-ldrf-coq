@@ -58,7 +58,9 @@ Proof.
   exploit TViewFacts.write_future_fulfill; try apply x; try apply SC1; try apply WF1; eauto.
   { inv CLOSED1. exploit CLOSED; eauto. i. des. inv MSG_CLOSED. eauto. }
   i. des.
-  esplits; eauto. refl.
+  esplits; eauto; try refl.
+  econs; eauto. ss.
+  ii. erewrite Memory.remove_o; eauto. condtac; ss.
 Qed.
 
 Lemma fulfill_step_cap

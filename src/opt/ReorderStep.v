@@ -368,7 +368,10 @@ Lemma reorder_fulfill_promise
 Proof.
   inv STEP1. inv STEP2.
   hexploit Memory.remove_future; try apply WF0; eauto. i. des.
-  hexploit Memory.promise_future; eauto. i. des.
+  hexploit Memory.promise_future; eauto.
+  { ii. inv WF0.
+    erewrite Memory.remove_o; eauto. condtac; ss. }
+  i. des.
   exploit MemoryReorder.remove_promise; try apply WF0; eauto. i. des.
   esplits.
   - econs; eauto.

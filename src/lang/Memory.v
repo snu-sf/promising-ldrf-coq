@@ -118,6 +118,10 @@ Module Memory.
       + econs; auto.
   Qed.
 
+  Definition bot_none (mem: t): Prop :=
+    forall loc, get loc Time.bot mem = None.
+  Hint Unfold bot_none.
+
   Definition bot: t := fun _ => Cell.bot.
 
   Lemma bot_get loc ts: get loc ts bot = None.
@@ -130,6 +134,9 @@ Module Memory.
   Proof.
     econs. i. rewrite bot_get in *. inv GET1.
   Qed.
+
+  Lemma bot_bot_none: bot_none bot.
+  Proof. ii. apply bot_get. Qed.
 
   Definition singleton
              (loc:Loc.t) (from to:Time.t) (msg:Message.t)
@@ -557,6 +564,37 @@ Module Memory.
       esplits; eauto.
     - esplits; eauto.
       refl.
+  Qed.
+
+  Lemma add_bot_none
+        mem1 mem2 loc from to msg
+        (ADD: add mem1 loc from to msg mem2)
+        (BOT: bot_none mem1):
+    <<BOT: bot_none mem2>>.
+  Proof.
+    ii. erewrite add_o; eauto. condtac; ss.
+    des. subst. inv ADD. inv ADD0. inv TO.
+  Qed.
+
+  Lemma split_bot_none
+        mem1 mem2 loc ts1 ts2 ts3 msg2 msg3
+        (SPLIT: split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2)
+        (BOT: bot_none mem1):
+    <<BOT: bot_none mem2>>.
+  Proof.
+    ii. erewrite split_o; eauto. repeat (condtac; ss).
+    - des. subst. inv SPLIT. inv SPLIT0. inv TS12.
+    - des; subst; try congr. inv SPLIT. inv SPLIT0. inv TS23.
+  Qed.
+
+  Lemma lower_bot_none
+        mem1 mem2 loc from to msg1 msg2
+        (LOWER: lower mem1 loc from to msg1 msg2 mem2)
+        (BOT: bot_none mem1):
+    <<BOT: bot_none mem2>>.
+  Proof.
+    ii. erewrite lower_o; eauto. condtac; ss.
+    des. subst. inv LOWER. inv LOWER0. inv TS.
   Qed.
 
   Lemma add_inhabited
@@ -1720,7 +1758,7 @@ Module Memory.
   Proof.
     hexploit op_inhabited; eauto.
     { eapply promise_op. eauto. }
-    i. splits; ss. inv PROMISE.
+    i. split; ss. inv PROMISE.
     - splits; eauto.
       ii. revert LHS.
       erewrite add_o; eauto. erewrite (@add_o mem2); try exact MEM; eauto.
@@ -1737,11 +1775,13 @@ Module Memory.
 
   Lemma promise_future
         promises1 mem1 loc from to msg promises2 mem2 kind
+        (BOT1: bot_none promises1)
         (LE_PROMISES1: le promises1 mem1)
         (CLOSED1: closed mem1)
         (MSG_CLOSED: closed_message msg mem2)
         (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind):
     <<LE_PROMISES2: le promises2 mem2>> /\
+    <<BOT2: bot_none promises2>> /\
     <<CLOSED2: closed mem2>> /\
     <<FUTURE: future mem1 mem2>>.
   Proof.
@@ -1750,7 +1790,10 @@ Module Memory.
     { by inv PROMISE. }
     i. des.
     exploit promise_future0; try apply CLOSED1; eauto. i. des.
-    splits; auto.
+    splits; auto. inv PROMISE.
+    - eapply add_bot_none; eauto.
+    - eapply split_bot_none; eauto.
+    - eapply lower_bot_none; eauto.
   Qed.
 
   Lemma promise_disjoint
@@ -1848,6 +1891,7 @@ Module Memory.
         promises1 mem1 loc from to val released promises2 mem2 kind
         (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind)
         (MEM: inhabited mem1)
+        (BOT: bot_none promises1)
         (LE: le promises1 mem1):
     <<GET_PROMISE: get loc to promises2 = None>> /\
     <<GET_MEM: get loc to mem2 = Some (from, Message.full val released)>>.
@@ -1876,14 +1920,18 @@ Module Memory.
         (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind)
         (CLOSED: closed mem1)
         (MSG_CLOSED: closed_message (Message.full val released) mem2)
+        (BOT: bot_none promises1)
         (LE: le promises1 mem1):
     <<CLOSED: closed mem2>> /\
+    <<BOT: bot_none promises2>> /\
     <<LE: le promises2 mem2>> /\
     <<FUTURE: future mem1 mem2>>.
   Proof.
     inv WRITE.
     hexploit promise_future; eauto. i. des.
-    hexploit remove_future; eauto.
+    hexploit remove_future; eauto. i. des.
+    splits; auto.
+    ii. erewrite Memory.remove_o; eauto. condtac; ss.
   Qed.
 
   Lemma write_disjoint

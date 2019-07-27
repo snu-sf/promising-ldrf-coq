@@ -76,6 +76,7 @@ Proof.
   i. des.
   exploit Memory.promise_future; try apply PROMISE_SRC; eauto.
   { apply WF1_SRC. }
+  { apply WF1_SRC. }
   { SimPromises.none_if_tac; econs; ss. inv CLOSED.
     eapply sim_memory_closed_opt_view; eauto. }
   i. des.

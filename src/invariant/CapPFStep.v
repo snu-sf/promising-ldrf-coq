@@ -1054,6 +1054,7 @@ Module CapPFStep.
         inv STEP_SRC. exploit Memory.write_get2; eauto.
         { apply CLOSED1_SRC. }
         { apply WF1_SRC. }
+        { apply WF1_SRC. }
         i. des. eauto.
       + exploit write_step; try exact LOCAL; eauto. i. des.
         esplits; try exact LOCAL2; eauto.
@@ -1069,6 +1070,7 @@ Module CapPFStep.
         esplits; try exact LOCAL4; try exact MEM2; eauto.
         inv STEP_SRC0. exploit Memory.write_get2; eauto.
         { apply CLOSED1_SRC. }
+        { apply WF0. }
         { apply WF0. }
         i. des. eauto.
       + exploit write_step; try exact LOCAL2; eauto.

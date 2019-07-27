@@ -113,6 +113,7 @@ Proof.
   exploit sim_memory_closed_message; eauto. i.
   exploit Memory.promise_future; try apply PROMISE_SRC; eauto.
   { apply WF1_SRC. }
+  { apply WF1_SRC. }
   { unfold SimPromises.none_if, SimPromises.none_if_released.
     destruct msg; try condtac; eauto. }
   i. des.
