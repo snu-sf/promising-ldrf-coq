@@ -384,8 +384,8 @@ Module PFStep.
         (REMOVE_SRC: Memory.remove promises2_src loc from to msg_src promises3_src)
         (PROMISE_TGT: Memory.promise promises1_tgt mem1_tgt loc from to msg_tgt promises2_tgt mem2_tgt kind_tgt)
         (REMOVE_TGT: Memory.remove promises2_tgt loc from to msg_tgt promises3_tgt):
-      <<PROMISES2: sim_promises promises3_src promises3_tgt>> /\
-      <<MEM2: sim_memory promises3_tgt mem2_src mem2_tgt>>.
+    <<PROMISES2: sim_promises promises3_src promises3_tgt>> /\
+    <<MEM2: sim_memory promises3_tgt mem2_src mem2_tgt>>.
   Proof.
     split; econs; i.
     - erewrite Memory.remove_o; eauto. condtac; ss.
