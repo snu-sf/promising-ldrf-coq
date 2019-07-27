@@ -737,4 +737,298 @@ Module PFStep.
     eapply rtc_implies; [|eauto].
     apply tau_union.
   Qed.
+
+
+  (* existence of sim *)
+
+  Inductive sim_promises_aux (dom: list (Loc.t * Time.t)) (promises_src promises_tgt: Memory.t): Prop :=
+  | sim_promises_aux_intro
+      (SOUND: forall loc from to msg_src
+                (GET_SRC: Memory.get loc to promises_src = Some (from, msg_src)),
+          List.In (loc, to) dom /\
+          exists msg_tgt, Memory.get loc to promises_tgt = Some (from, msg_tgt))
+      (COMPLETE: forall loc from to msg_tgt
+                   (IN: List.In (loc, to) dom)
+                   (GET_TGT: Memory.get loc to promises_tgt = Some (from, msg_tgt)),
+          Memory.get loc to promises_src = Some (from, Message.half))
+  .
+
+  Lemma sim_promises_aux_exists
+        dom promises_tgt
+        (BOT: Memory.bot_none promises_tgt):
+    exists promises_src,
+      sim_promises_aux dom promises_src promises_tgt.
+  Proof.
+    induction dom.
+    { exists Memory.bot. econs; ss. i.
+      rewrite Memory.bot_get in *. ss. }
+    des. destruct a as [loc to]. inv IHdom.
+    destruct (Memory.get loc to promises_tgt) as [[from msg]|] eqn:GETT; cycle 1.
+    { exists promises_src. econs; i.
+      - exploit SOUND; eauto. i. des.
+        esplits; eauto. econs 2. ss.
+      - inv IN.
+        + inv H. congr.
+        + exploit COMPLETE; eauto.
+    }
+    destruct (Memory.get loc to promises_src) as [[from_src msg_src]|] eqn:GETS.
+    - exploit SOUND; eauto. i. des.
+      rewrite GETT in x0. inv x0.
+      exists promises_src. econs; i.
+      + exploit SOUND; try exact GET_SRC. i. des.
+        esplits; eauto. econs 2. ss.
+      + inv IN.
+        * inv H. exploit COMPLETE; try exact GET_TGT; eauto.
+        * exploit COMPLETE; try exact GET_TGT; eauto.
+    - exploit (@Memory.add_exists promises_src loc from to Message.half); ii.
+      { exploit SOUND; eauto. i. des.
+        exploit Memory.get_disjoint; [exact GETT|exact x1|..].
+        i. des; eauto; congr. }
+      { exploit Memory.get_ts; try exact GETT. i. des; ss.
+        subst. rewrite BOT in GETT. ss. }
+      { econs. }
+      des. exists mem2. econs; i.
+      + revert GET_SRC. erewrite Memory.add_o; eauto. condtac; ss.
+        * i. inv GET_SRC. des. subst. split; eauto.
+        * i. guardH o. exploit SOUND; eauto. i. des.
+          split; eauto.
+      + inv IN.
+        * inv H. rewrite GETT in GET_TGT. inv GET_TGT.
+          exploit Memory.add_get0; eauto. i. des. ss.
+        * exploit COMPLETE; eauto. i.
+          erewrite Memory.add_o; eauto. condtac; ss.
+          des. subst. rewrite GETT in GET_TGT. inv GET_TGT. ss.
+  Qed.
+
+  Lemma sim_promises_exists
+        promises_tgt
+        (BOT: Memory.bot_none promises_tgt):
+    exists promises_src,
+      sim_promises promises_src promises_tgt.
+  Proof.
+    destruct (Memory.finite promises_tgt).
+    exploit (@sim_promises_aux_exists x promises_tgt); ss. i. des.
+    exists promises_src. inv x1. econs; i.
+    - exploit SOUND; eauto. i. des. eauto.
+    - exploit COMPLETE; eauto.
+  Qed.
+
+  Inductive sim_memory_aux (dom: list (Loc.t * Time.t)) (promises mem_src mem_tgt: Memory.t): Prop :=
+  | sim_memory_aux_intro
+      (INHABITED: Memory.inhabited mem_src)
+      (SOUND: forall loc from to msg_src
+                (GET_SRC: Memory.get loc to mem_src = Some (from, msg_src)),
+          (to = Time.bot /\ from = Time.bot \/ List.In (loc, to) dom) /\
+          exists msg_tgt, Memory.get loc to mem_tgt = Some (from, msg_tgt))
+      (COMPLETE_FULL: forall loc from to val released
+                        (TO: to <> Time.bot)
+                        (IN: List.In (loc, to) dom)
+                        (GETP: Memory.get loc to promises = None)
+                        (GET_TGT: Memory.get loc to mem_tgt = Some (from, Message.full val released)),
+          Memory.get loc to mem_src = Some (from, Message.full val None))
+      (COMPLETE_HALF: forall loc from to
+                        (TO: to <> Time.bot)
+                        (IN: List.In (loc, to) dom)
+                        (GETP: Memory.get loc to promises = None)
+                        (GET_TGT: Memory.get loc to mem_tgt = Some (from, Message.half)),
+          Memory.get loc to mem_src = Some (from, Message.half))
+      (PROMISE: forall loc from to msg
+                  (IN: List.In (loc, to) dom)
+                  (GETP: Memory.get loc to promises = Some (from, msg)),
+          Memory.get loc to mem_src = Some (from, Message.half))
+  .
+
+  Lemma sim_memory_aux_exists
+        dom promises mem_tgt
+        (BOT: Memory.bot_none promises)
+        (LE: Memory.le promises mem_tgt)
+        (INHABITED: Memory.inhabited mem_tgt):
+    exists mem_src, sim_memory_aux dom promises mem_src mem_tgt.
+  Proof.
+    induction dom.
+    { exists Memory.init. econs; i; ss.
+      unfold Memory.get, Memory.init, Cell.get, Cell.init in GET_SRC. ss.
+      Require Import DenseOrder.
+      apply DOMap.singleton_find_inv in GET_SRC. des. inv GET_SRC0.
+      esplits; eauto.
+    }
+    des. destruct a as [loc to]. inv IHdom.
+    destruct (Time.eq_dec to Time.bot).
+    { subst. exists mem_src. econs; i; ss.
+      - exploit SOUND; eauto. i. des; eauto.
+      - inv IN; eauto. inv H. ss.
+      - inv IN; eauto. inv H. ss.
+      - inv IN; eauto. inv H. rewrite BOT in *. ss.
+    }
+    destruct (Memory.get loc to mem_tgt) as [[from msg]|] eqn:GETT; cycle 1.
+    { exists mem_src. econs; i; ss.
+      - exploit SOUND; eauto. i. des; eauto.
+      - inv IN; eauto. inv H. congr.
+      - inv IN; eauto. inv H. congr.
+      - inv IN; eauto. inv H. exploit LE; eauto. congr.
+    }
+    destruct (Memory.get loc to mem_src) as [[from_src msg_src]|] eqn:GETS.
+    { exploit SOUND; eauto. i. des; ss.
+      rewrite GETT in x0. symmetry in x0. inv x0.
+      exists mem_src. econs; i; ss.
+      - exploit SOUND; try exact GET_SRC. i. des; eauto.
+      - inv IN; eauto. inv H. eauto.
+      - inv IN; eauto. inv H. eauto.
+      - inv IN; eauto. inv H. eauto.
+    }
+    destruct (Memory.get loc to promises) as [[]|] eqn:GETP.
+    - exploit LE; eauto. i.
+      rewrite GETT in x. symmetry in x. inv x.
+      exploit (@Memory.add_exists mem_src loc from to Message.half); ii.
+      { exploit SOUND; eauto. i. des.
+        - subst. inv RHS. ss. inv TO.
+          { eapply Time.lt_strorder. etrans; eauto. }
+          inv H. inv FROM.
+        - exploit Memory.get_disjoint; [exact GETT|exact x1|..].
+          i. des; eauto. subst. congr. }
+      { exploit Memory.get_ts; try exact GETP. i. des; ss. }
+      { econs. }
+      des. exists mem2. econs; i.
+      + eapply Memory.add_inhabited; eauto.
+      + revert GET_SRC. erewrite Memory.add_o; eauto. condtac; ss.
+        * des. subst. i. inv GET_SRC. eauto.
+        * guardH o. i. exploit SOUND; eauto. i. des; eauto.
+      + inv IN.
+        * inv H. congr.
+        * exploit COMPLETE_FULL; eauto. i.
+          exploit Memory.add_get1; try exact x; eauto.
+      + inv IN.
+        * inv H. congr.
+        * exploit COMPLETE_HALF; eauto. i.
+          exploit Memory.add_get1; try exact x; eauto.
+      + inv IN.
+        * inv H. rewrite GETP in GETP0. inv GETP0.
+          exploit Memory.add_get0; eauto. i. des. ss.
+        * exploit PROMISE; eauto. i.
+          exploit Memory.add_get1; try exact x; eauto.
+    - exploit (@Memory.add_exists mem_src loc from to
+                                  (match msg with
+                                   | Message.full val _ => Message.full val None
+                                   | Message.half => Message.half
+                                   end)); ii.
+      { exploit SOUND; eauto. i. des.
+        - subst. inv RHS. ss. inv TO.
+          + eapply Time.lt_strorder. etrans; eauto.
+          + inv H. inv FROM.
+        - exploit Memory.get_disjoint; [exact GETT|exact x1|..].
+          i. des; eauto. subst. congr. }
+      { exploit Memory.get_ts; try exact GETT. i. des; ss. }
+      { destruct msg; econs; ss. }
+      des. exists mem2. econs; i.
+      + eapply Memory.add_inhabited; eauto.
+      + revert GET_SRC. erewrite Memory.add_o; eauto. condtac; ss.
+        * i. des. subst. inv GET_SRC. eauto.
+        * i. guardH o. exploit SOUND; eauto. i. des; eauto.
+      + inv IN.
+        * inv H. rewrite GETT in GET_TGT. inv GET_TGT.
+          exploit Memory.add_get0; eauto. i. des. ss.
+        * exploit COMPLETE_FULL; eauto. i.
+          exploit Memory.add_get1; try exact x; eauto.
+      + inv IN.
+        * inv H. rewrite GETT in GET_TGT. inv GET_TGT.
+          exploit Memory.add_get0; eauto. i. des. ss.
+        * exploit COMPLETE_HALF; eauto. i.
+          exploit Memory.add_get1; try exact x; eauto.
+      + inv IN.
+        * inv H. congr.
+        * exploit PROMISE; eauto. i.
+          exploit Memory.add_get1; try exact x; eauto.
+  Qed.
+
+  Lemma sim_memory_exists
+        promises mem_tgt
+        (BOT: Memory.bot_none promises)
+        (LE: Memory.le promises mem_tgt)
+        (INHABITED: Memory.inhabited mem_tgt):
+    exists mem_src,
+      sim_memory promises mem_src mem_tgt /\
+      Memory.closed mem_src /\
+      (forall loc from to msg
+         (GETP: Memory.get loc to promises = Some (from, msg)),
+          Memory.get loc to mem_src = Some (from, Message.half)).
+  Proof.
+    destruct (@Memory.finite mem_tgt).
+    exploit (@sim_memory_aux_exists x promises mem_tgt); eauto. i. des.
+    inv x1. exists mem_src. splits; eauto; econs; eauto; i.
+    - exploit SOUND; eauto. i. des.
+      + subst. rewrite INHABITED, INHABITED0 in *.
+        inv GET_SRC. inv x1. esplits; eauto. econs; ss.
+      + esplits; eauto.
+        destruct (Time.eq_dec to Time.bot).
+        { subst. rewrite INHABITED, INHABITED0 in *.
+          inv GET_SRC. inv x1. econs; ss. }
+        destruct msg_tgt.
+        * exploit COMPLETE_FULL; eauto. i.
+          rewrite GET_SRC in x2. inv x2. econs; ss.
+        * exploit COMPLETE_HALF; eauto. i.
+          rewrite GET_SRC in x2. inv x2. econs; ss.
+    - destruct (Time.eq_dec to Time.bot).
+      { subst. rewrite INHABITED, INHABITED0 in *.
+        inv GET_TGT. esplits; eauto. econs; ss. }
+      destruct msg_tgt.
+      + exploit COMPLETE_FULL; eauto.
+      + exploit COMPLETE_HALF; eauto.
+    - destruct (Time.eq_dec to Time.bot).
+      { subst. rewrite INHABITED0 in *. inv MSG.
+        splits; econs; ss.
+        unfold TimeMap.bot. apply Time.bot_spec. }
+      exploit SOUND; eauto. i. des; ss.
+      destruct (Memory.get loc to promises) as [[]|] eqn:GETP.
+      + exploit LE; eauto. i. rewrite x2 in x1. inv x1.
+        exploit PROMISE; eauto. i. rewrite MSG in x1. inv x1.
+        splits; econs; ss.
+      + destruct msg_tgt.
+        * exploit COMPLETE_FULL; eauto. i.
+          rewrite MSG in x2. inv x2. splits; econs; ss.
+          unfold TimeMap.bot. apply Time.bot_spec.
+        * exploit COMPLETE_HALF; eauto. i.
+          rewrite MSG in x2. inv x2. splits; econs; ss.
+  Qed.
+
+  Lemma sim_thread_exists
+        lang e
+        (WF: Local.wf e.(Thread.local) e.(Thread.memory))
+        (SC: Memory.closed_timemap e.(Thread.sc) e.(Thread.memory))
+        (MEM: Memory.closed e.(Thread.memory)):
+    exists e_src,
+      <<SIM: @sim_thread lang e_src e>> /\
+      <<WF_SRC: Local.wf e_src.(Thread.local) e_src.(Thread.memory)>> /\
+      <<SC_SRC: Memory.closed_timemap e_src.(Thread.sc) e_src.(Thread.memory)>> /\
+      <<MEM_SRC: Memory.closed e_src.(Thread.memory)>>.
+  Proof.
+    destruct e. destruct local. inv WF. ss.
+    exploit sim_promises_exists; eauto. i. des.
+    exploit sim_memory_exists; eauto; try apply MEM. i. des.
+    exists (Thread.mk lang state (Local.mk TView.bot promises_src) TimeMap.bot mem_src).
+    ss. splits; eauto.
+    - econs; ss.
+      + econs; eauto. ss.
+        econs; ss; eauto using View.bot_spec.
+      + ii. unfold TimeMap.bot. apply Time.bot_spec.
+    - econs; ss.
+      + apply TView.bot_wf.
+      + inv x2. econs; ss; i.
+        * unfold LocFun.init. econs; ss; ii.
+          { unfold TimeMap.bot. rewrite INHABITED. esplits; refl. }
+          { unfold TimeMap.bot. rewrite INHABITED. esplits; refl. }
+        * econs; ss; ii.
+          { unfold TimeMap.bot. rewrite INHABITED. esplits; refl. }
+          { unfold TimeMap.bot. rewrite INHABITED. esplits; refl. }
+        * econs; ss; ii.
+          { unfold TimeMap.bot. rewrite INHABITED. esplits; refl. }
+          { unfold TimeMap.bot. rewrite INHABITED. esplits; refl. }
+      + ii. inv x0. exploit SOUND; eauto. i. des.
+        exploit COMPLETE; eauto. i. des.
+        rewrite LHS in x. inv x. eauto.
+      + ii. inv x0.
+        destruct (Memory.get loc Time.bot promises_src) as [[]|] eqn:GETP; ss.
+        exploit SOUND; eauto. i. des.
+        rewrite BOT in *. ss.
+    - ii. inv x2. rewrite INHABITED. esplits; refl.
+  Qed.
 End PFStep.
