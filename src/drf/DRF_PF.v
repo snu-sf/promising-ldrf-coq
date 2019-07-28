@@ -78,7 +78,7 @@ Module Forget.
     :
       forget_statelocal (st, lc1) (st, lc2)
   .
-  
+
   Inductive forget_memory P msrc mtgt : Prop :=
   | forget_memory_intro
       (* (FUTURE: Memory.le msrc mtgt) *)
@@ -702,24 +702,6 @@ Proof.
       econs 2; eauto. econs; eauto. econs; eauto. econs; eauto. ss.
       ii. rewrite Memory.bot_get in *. clarify.
 Qed.
-
-Lemma self_promise_remove_rtc
-      P lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc'
-      mem_src mem_tgt mem_tgt'
-      (STEP: rtc (tau (@pred_step (P /1\ no_read_msgs prom.(promised)) lang)) th_tgt th_tgt')
-      (TH_SRC: th_src = Thread.mk lang st (Local.mk v Memory.bot) sc mem_src)
-      (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v prom) sc mem_tgt)
-      (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
-      (MEM: Forget.forget_memory (promised prom) mem_src mem_tgt)
-      (LCWF: Local.wf (Local.mk v prom) mem_tgt)
-      (CLOSED: Memory.closed mem_tgt)
-  :
-    exists mem_src',
-      (<<STEP: rtc (tau (@pred_step (P /1\ no_promise) lang)) th_src
-                   (Thread.mk lang st' (Local.mk v' Memory.bot) sc' mem_src')>>) /\
-      (<<MEM: Forget.forget_memory (promised prom') mem_src' mem_tgt'>>).
-Proof.
-Admitted.
 
 Lemma memory_write_bot_add
       mem1 loc from1 to1 val released promises3 mem2 kind
@@ -1878,17 +1860,223 @@ Proof.
       unfold TView.write_fence_tview. ss. des_ifs.
 Qed.
 
+Inductive shorter_memory (mem_src mem_tgt: Memory.t): Prop :=
+| shorter_memory_intro
+    (COMPLETE: forall loc to from_tgt msg
+                      (GET: Memory.get loc to mem_tgt = Some (from_tgt, msg)),
+        exists from_src,
+          (<<GET: Memory.get loc to mem_src = Some (from_src, msg)>>))
+    (COVER: forall l t (COV: covered l t mem_src), covered l t mem_tgt)
+.
+Global Program Instance shorter_memory_PreOrder: PreOrder shorter_memory.
+Next Obligation. ii. econs; eauto. Qed.
+Next Obligation.
+  ii. inv H. inv H0. econs; eauto.
+  ii. exploit COMPLETE0; eauto. i. des.
+  exploit COMPLETE; eauto.
+Qed.
 
-Definition no_acq_read_msgs (MSGS : Loc.t -> Time.t -> Prop)
+(* Inductive shorter_memory (mem_src mem_tgt: Memory.t): Prop := *)
+(* | shorter_memory_intro *)
+(*     (SOUND: forall l t msg_src (GET: Memory.get l t mem_src = Some msg_src), *)
+(*         exists msg_tgt, Memory.get l t mem_tgt = Some msg_tgt) *)
+(*     (COMPLETE: forall loc to from_tgt msg *)
+(*                       (GET: Memory.get loc to mem_tgt = Some (from_tgt, msg)), *)
+(*         exists from_src, *)
+(*           (<<GET: Memory.get loc to mem_src = Some (from_src, msg)>>) /\ *)
+(*           (<<ITV: forall t (IN: Interval.mem (from_src, to) t), *)
+(*               Interval.mem (from_tgt, to) t>>)). *)
+
+(* Lemma shorter_memory_covered mem_src mem_tgt *)
+(*       (SHORTER: shorter_memory mem_src mem_tgt) *)
+(*       l t *)
+(*       (COVER: covered l t mem_src) *)
+(*   : *)
+(*     covered l t mem_tgt. *)
+(* Proof. *)
+(*   inv SHORTER. inv COVER. *)
+(*   exploit SOUND; eauto. i. des. destruct msg_tgt. *)
+(*   exploit COMPLETE; eauto. i. des. clarify. *)
+(*   econs; eauto. *)
+(* Qed. *)
+
+Definition not_attatched (L: Loc.t -> Time.t -> Prop) (m: Memory.t) :=
+  forall loc to (SAT: L loc to),
+  exists to',
+    (<<TLE: Time.lt to to'>>) /\ 
+    (<<EMPTY: forall l t (ITV: Interval.mem (to, to') t), ~ covered l t m>>).
+
+Definition no_update_on (MSGS : Loc.t -> Time.t -> Prop)
            (e : ThreadEvent.t) : Prop :=
   match e with
-  | ThreadEvent.read loc to _ _ ord =>
-    forall (SAT: MSGS loc to), ~ Ordering.le Ordering.acqrel ord
-  | ThreadEvent.update loc from _ _ _ _ _ ordr _ =>
-    forall (SAT: MSGS loc from), ~ Ordering.le Ordering.acqrel ordr
+  | ThreadEvent.update loc from to _ _ _ _ _ _ =>
+    ~ MSGS loc from
   | _ => True
-  end
-.
+  end.
+
+(* TODO: make add disjoint lemma *)
+
+Lemma shorter_memory_write mem_src mem_tgt loc from1 to1 val released mem_tgt' from'
+      (SHORTER: shorter_memory mem_src mem_tgt)
+      (ADD: Memory.write Memory.bot mem_tgt loc from1 to1 val released Memory.bot mem_tgt' Memory.op_kind_add)
+      (TO: Time.le from1 from')
+      (FROM: Time.lt from' to1)
+  :
+    exists mem_src',
+      (<<ADD: Memory.write Memory.bot mem_src loc from' to1 val released Memory.bot mem_src' Memory.op_kind_add>>) /\  
+      (<<SHORTER: shorter_memory mem_src' mem_tgt'>>).  
+Proof.
+  dup SHORTER. inv SHORTER. inv ADD. inv PROMISE.
+  exploit write_succeed; eauto.
+  - instantiate (1:=mem_src). instantiate (1:=loc).
+    ii. eapply COVER in COVER0. inv COVER0.
+    dup MEM. eapply Memory.add_get0 in MEM. des. 
+    dup GET. eapply Memory.add_get1 in GET; eauto.
+    exploit Memory.get_disjoint.
+    + eapply GET.
+    + eapply GET1.
+    + i. des; clarify.
+      eapply x0; eauto. inv H. econs; ss; eauto.
+      eapply TimeFacts.le_lt_lt; eauto.
+  - inv MEM. inv ADD. inv MSG_WF. inv TS. eauto.
+  - inv MEM. inv ADD. eauto.
+  - i. des. inv WRITE. inv PROMISE. esplits; eauto. econs.
+    + i. erewrite Memory.add_o in GET; eauto.      
+      erewrite Memory.add_o; cycle 1; eauto. des_ifs; eauto.
+    + i. inv COV. erewrite Memory.add_o in GET; eauto. des_ifs.
+      * ss; des; clarify. eapply Memory.add_get0 in MEM. des.
+        econs; eauto. inv ITV. econs; eauto.
+        ss. eapply TimeFacts.le_lt_lt; eauto.
+      * exploit COVER.
+        { econs; eauto. }
+        intros COV. inv COV. eapply Memory.add_get1 in GET0; eauto.
+        econs; eauto.
+Qed.
+  
+  Lemma write_succeed mem1 loc from1 to1 val released
+      (NCOVER: forall t (COVER: covered loc t mem1),
+          ~ Interval.mem (from1, to1) t)
+      (TO: Time.le (View.rlx (View.unwrap released) loc) to1)
+      (FROMTO: Time.lt from1 to1)
+      (MSGWF: Message.wf (Message.full val released))
+  :
+    exists mem2,
+      (<<WRITE: Memory.write Memory.bot mem1 loc from1 to1 val released Memory.bot mem2 Memory.op_kind_add>>).
+Proof.
+  exploit Memory.add_exists; eauto.
+  { instantiate (1:=mem1). instantiate (1:=loc).
+    ii. eapply NCOVER; eauto. econs; eauto. }
+  i. des. exists mem2.
+  exploit Memory.add_exists; eauto.
+  { instantiate (1:=Memory.bot). instantiate (1:=loc).
+    ii. rewrite Memory.bot_get in *. clarify. } i. des.
+  econs.
+  - econs; eauto; ss.
+  - exploit Memory.remove_exists; eauto.
+    { eapply Memory.add_get0 in x1. des. eauto. } i. des.
+    exploit MemoryFacts.MemoryFacts.add_remove_eq; eauto.
+    i. clarify.
+Qed.
+
+
+Lemma shorter_memory_write mem_src mem_tgt loc from to msg mem_tgt' from'
+      (SHORTER: shorter_memory mem_src mem_tgt)
+      (ADD: Memory.write mem_tgt loc from to msg mem_tgt')
+      (TO: Time.le from' from)
+      (FROM: Time.lt from' to)
+  :
+    exists mem_src',
+      (<<ADD: Memory.add mem_src loc from to msg mem_src'>>) /\  
+      (<<SHORTER: shorter_memory mem_src' mem_tgt'>>).  
+Proof.
+
+  
+
+
+  
+  
+  
+  
+Lemma shorter_memory_step
+      P lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc'
+      mem_tgt mem_tgt' mem_src e
+      (STEP: (@pred_step (P /1\ no_promise) lang) e th_tgt th_tgt')
+      (TH_SRC: th_src = Thread.mk lang st (Local.mk v prom) sc mem_src)
+      (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v prom) sc mem_tgt)
+      (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
+      (SHORTER: shorter_memory mem_src mem_tgt)
+  :
+    exists mem_src',
+      (<<STEP: (@pred_step (P /1\ no_promise) lang)
+                 e th_src
+                 (Thread.mk lang st' (Local.mk v' prom') sc' mem_src')>>) /\
+      (<<SHORTER: shorter_memory mem_src' mem_tgt'>>).
+Proof.
+  dup SHORTER. inv SHORTER. inv STEP. inv STEP0. des. inv STEP.
+  - inv STEP0. ss.
+  - inv STEP0. inv LOCAL.
+    + exists mem_src; eauto. econs; eauto. econs; eauto.
+      
+
+
+    
+    inv LOCAL. ss. clarify.
+    esplits. econs; eauto. econs; eauto. econs 1; eauto. econs; eauto.
+  - inv STEP0. inv LOCAL; ss.
+    + esplits. econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+    + esplits. econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+    + inv LOCAL0. ss. clarify. exists sc_src. 
+      econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+      econs; eauto. econs; eauto. ss.
+      inv WRITABLE. econs; eauto.
+    + inv LOCAL1. ss. inv LOCAL2. ss. clarify. exists sc_src. 
+      econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+      econs; eauto. econs; eauto. ss.
+      inv WRITABLE. econs; eauto.
+    + inv LOCAL0. ss. clarify.
+      esplits. econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+      econs; eauto. econs; eauto. ss. f_equal.
+      unfold TView.write_fence_tview. ss. des_ifs.
+Qed.
+
+
+Lemma not_attatched_write
+      L lang th_tgt th_tgt' st st' v v' prom prom' sc sc'
+      mem_tgt mem_tgt' e_tgt
+      (SCMAX: ~ promise_view_consistent prom sc)
+      (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v Memort.bot) sc mem_tgt)
+      (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
+      (STEP: (@pred_step (no_update_on L) lang) e_tgt th_tgt th_tgt')
+  :
+    no_sc e_tgt.
+Proof.
+
+
+Lemma not_attatched_write
+      L lang th_tgt th_tgt' st st' v v' prom prom' sc sc'
+      mem_tgt mem_tgt' e_tgt
+      (SCMAX: ~ promise_view_consistent prom sc)
+      (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v Memort.bot) sc mem_tgt)
+      (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
+      (STEP: (@pred_step (no_update_on L) lang) e_tgt th_tgt th_tgt')
+  :
+    no_sc e_tgt.
+Proof.
+      
+                         
+    Memory.
+    
+    (<<GET: exists msg, <<MSG: Memory.get l t = Some msg>> >>) /\
+    (<<NOATTATCH: exists msg,
+
+        
+
+                  Memory.adjacent
+  covered
+
+
+
+
 
 
 Lemma consistent_read_no_self_promise
