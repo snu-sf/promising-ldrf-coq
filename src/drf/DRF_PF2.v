@@ -35,49 +35,31 @@ Require Import DRF_PF.
 
 Set Implicit Arguments.
 
-Lemma forget_compose P0 P1 Q m0 m1 m2
+Lemma forget_compose P0 P1 m0 m1 m2
       (FORGET0: forget_memory P0 m0 m1)
       (FORGET1: forget_memory P1 m1 m2)
-      (COMPOSE: forall loc to, Q loc to <-> P0 loc to \/ P1 loc to)
   :
-    forget_memory Q m0 m2.
+    forget_memory (P0 \2/ P1) m0 m2.
 Proof.
   inv FORGET0. inv FORGET1. econs; eauto.
-  - ii. erewrite COMPOSE in NPROMS. apply not_or_and in NPROMS. des.
+  - ii. apply not_or_and in NPROMS. des.
     erewrite COMPLETE; eauto.
-  - i. apply COMPOSE in PROMS. destruct (classic (P0 l t)); auto.
+  - i. destruct (classic (P0 l t)); auto.
     des; clarify. erewrite COMPLETE; eauto.
 Qed.
 
-(* Lemma forget_compose P0 P1 Q m0 m1 m2 *)
-(*       (FORGET0: forget_memory P0 m0 m1) *)
-(*       (FORGET1: forget_memory P1 m1 m2) *)
-(*       (COMPOSE: forall loc to, Q loc to <-> P0 loc to \/ P1 loc to) *)
-(*   : *)
-(*     forget_memory Q m0 m2. *)
-(* Proof. *)
-(*   inv FORGET0. inv FORGET1. econs; eauto. *)
-(*   - ii. erewrite COMPOSE in NPROMS. apply not_or_and in NPROMS. des. *)
-(*     erewrite COMPLETE; eauto. *)
-(*   - i. apply COMPOSE in PROMS. destruct (classic (P0 l t)); auto. *)
-(*     des; clarify. erewrite COMPLETE; eauto. *)
-(* Qed. *)
-
-Lemma forget_compose_middle P0 P1 Q m0 m1 m2
-      (FORGET: forget_memory Q m0 m2)
+Lemma forget_compose_middle P0 P1 m0 m1 m2
+      (FORGET: forget_memory (P0 \2/ P1) m0 m2)
       (FORGET1: forget_memory P1 m1 m2)
-      (COMPOSE: forall loc to, Q loc to <-> P0 loc to \/ P1 loc to)
   :
     forget_memory P0 m0 m1.
 Proof.
   inv FORGET. inv FORGET1. econs; eauto.
-  - ii. destruct (classic (P1 l t)).
-    + erewrite FORGET; eauto. eapply FORGET0; eauto.
-      eapply COMPOSE; eauto.
-    + erewrite COMPLETE; eauto.
-      * erewrite COMPLETE0; eauto.
-      * ii. eapply COMPOSE in H0. des; clarify.
-  - i. eapply FORGET0. eapply COMPOSE; eauto.
+  ii. destruct (classic (P1 l t)).
+  - erewrite FORGET; eauto.
+  - erewrite COMPLETE; eauto.
+    + erewrite COMPLETE0; eauto.
+    + ii. des; clarify.
 Qed.
 
 Lemma step_lifting
@@ -95,7 +77,7 @@ Lemma step_lifting
       (TH_SRC: th_src = Thread.mk lang st (Local.mk v Memory.bot) sc mem_src)
       (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v prom) sc mem_tgt)
       (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')      
-      (MEM: pf_sim_memory (promised prom \2/ others) mem_src mem_tgt)
+      (MEM: pf_sim_memory (others \2/ promised prom) mem_src mem_tgt)
       (NOATTATCH: not_attatched updates mem_src) 
       
       (SC: Memory.closed_timemap sc mem_tgt)
@@ -107,7 +89,7 @@ Lemma step_lifting
                  (no_promise) e_src th_src
                  (Thread.mk lang st' (Local.mk v' Memory.bot) sc' mem_src')>>) /\
       (<<EVT: ThreadEvent.get_event e_src = ThreadEvent.get_event e_tgt>>) /\
-      (<<MEM: pf_sim_memory (promised prom' \2/ others) mem_src' mem_tgt'>>) /\
+      (<<MEM: pf_sim_memory (others \2/ promised prom') mem_src' mem_tgt'>>) /\
       (<<NOATTATCH: not_attatched updates mem_src'>>) /\
       (<<UNCHANGED: unchanged_on otherspace mem_src mem_src'>>).
 Proof.
@@ -118,16 +100,11 @@ Proof.
 
   inv MEM.
   assert (FORGET1: forget_memory others mem_inter mem_src0).
-  { eapply forget_compose_middle; eauto.
-    i. split; i; des; auto. }
+  { eapply forget_compose_middle; eauto. }
   
   inv STEP0.
   { exists mem_src, ThreadEvent.silent. esplits; eauto.
-    - econs; eauto.
-      eapply forget_compose.
-      + eapply FORGET1.
-      + eapply MEM0.
-      + i. split; i; des; auto.
+    - econs; eauto. eapply forget_compose; eauto.
     - refl. }
 
   exploit other_promise_remove; try eapply STEP1; eauto.
@@ -145,81 +122,11 @@ Proof.
     ss. i. des. eauto.
   - etrans; eauto.
   - econs.
-    + instantiate (1:=mem_src'0).
-      eapply forget_compose; eauto.
-      i. split; i; des; auto.
+    + eapply forget_compose; eauto.
     + etrans; eauto.
   - eauto.
   - exploit write_not_in_unchanged_on; try apply STEP3; eauto.
 Qed.
-
-    
-    0
-    eapply pred_step_mon; cycle 1; eauto.
-    ss. i. des. eauto.
-  - eauto.
-  - econs; eauto.
-    admit.
-  -  
-    
-  
-  { eapply STEP1. apply STEP1. }
-  { ss. }
-  { ss. }
-  { ss. }
-  
-
-  ; try apply STEP1; try apply FORGET0; eauto.
-  ss.
-  eauto.
-  eauto.
-  { eapply STEP1. }
-  {
-  {
-  i. des.
-
-  
-  exploit other_promise_remove; try apply STEP1; try apply FORGET0; eauto.
-  ss.
-  eauto.
-  eauto.
-  { eapply STEP1. }
-  {
-  {
-  i. des.
-  
-  exploit other_promise_remove; try apply FORGET0; eauto.
-  i. des.
-
-  
-         Inv.t _ st_src lc_src lc_tgt.(Local.promises) (updates tid) (mlast tid))
-    (FUTURE:
-       forall tid lang_src st_src lc_src
-              (TIDSRC: IdentMap.find tid c_src.(Configuration.threads) =
-                       Some (existT _ lang_src st_src, lc_src)),
-         unchanged_on
-           (fun loc to => covered loc to lc_src.(Local.promises))
-           (mlast tid) c_src.(Configuration.memory))
-    (NOATTATCH:
-       forall tid,
-         not_attatched (updates tid) c_src.(Configuration.memory))
-
-  
-Thread.step
-  
-not_in_others 
-  
-Local.wf lc mem
-Memory.closed_timemap (Configuration.sc conf) (Configuration.memory conf) ->
-Memory.closed (Configuration.memory conf) -> Configuration.wf conf
-                                                              
-                                                              noreadself
-                                                                             
-
-                                                                             
-         
-Inductive wf (conf : Configuration.t) : Prop :=
-    wf_intro : Threads.wf (Configuration.threads conf) (Configuration.memory conf) ->
                
 
                                                                              
