@@ -34,7 +34,7 @@ Section PredStep.
   .
 
   Lemma pred_step_program_step P lang e :
-        @pred_step P lang e <2= @Thread.step_allpf lang e. 
+        @pred_step P lang e <2= @Thread.step_allpf lang e.
   Proof.
     intros t1 t2 []. eauto.
   Qed.
@@ -66,7 +66,7 @@ Section PredStep.
         * apply Operators_Properties.clos_rt_rt1n.
           eapply Relation_Operators.rt_trans. repeat (econs; eauto).
           eapply Operators_Properties.clos_rt1n_rt. eauto.
-        * eauto. 
+        * eauto.
       + right. repeat (econs; eauto).
   Qed.
 
