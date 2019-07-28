@@ -1537,6 +1537,25 @@ Inductive capped (mem_src mem_tgt: Memory.t): Prop :=
           (<<VIEWLE: View.opt_le released_src released>>))
 .
 
+Lemma list_filter_exists A (P: A -> Prop) (l: list A)
+  :
+    exists l',
+      (<<COMPLETE: forall a, ((<<IN: List.In a l>>) /\ (<<SAT: P a>>))
+                             <-> (<<IN: List.In a l'>>)>>).
+Proof.
+  induction l.
+  - exists []. ii. split; i; des.
+    + inv IN.
+    + inv H.
+  - des. destruct (classic (P a)).
+    + exists (a :: l'). split; i; ss; des; clarify; eauto.
+      * right. eapply COMPLETE; eauto.
+      * eapply COMPLETE in H0. des. eauto.
+    + exists l'. split; i; ss; des; clarify; eauto.
+      * eapply COMPLETE; eauto.
+      * eapply COMPLETE in H0. des; eauto.
+Qed.
+
 Lemma forget_exists_list l mem_tgt:
   exists mem_src, <<FORGET: forget_memory (fun loc to => List.In (loc, to) l)
                                                  mem_src mem_tgt>>.
@@ -1554,17 +1573,34 @@ Proof.
     + exists mem_src. inv FORGET.
       econs; eauto. i. des; clarify; eauto.
 Qed.
-  
-Lemma forget_exists prom mem_tgt:
-  exists mem_src, <<FORGET: forget_memory prom.(promised) mem_src mem_tgt>>.
+
+Lemma forget_exists P mem_tgt:
+  exists mem_src, <<FORGET: forget_memory P mem_src mem_tgt>>.
 Proof.
-  hexploit (Memory.finite_sound_exists prom); eauto. i. des.
-  hexploit (forget_exists_list dom mem_tgt). i. des. exists mem_src.
-  inv FORGET. econs; i.
-  - eapply COMPLETE; eauto. ii. eapply NPROMS.
-    exploit H0; eauto. i. des. econs; eauto.
-  - eapply FORGET0; eauto. inv PROMS. destruct msg. eauto.
-Qed.
+  hexploit (Memory.finite_sound_exists mem_tgt); eauto. i. des.
+  hexploit (list_filter_exists (fun locto => P (fst locto) (snd locto)) dom). i. des.
+  hexploit (forget_exists_list l' mem_tgt). i. des.
+  exists mem_src. inv FORGET. econs; eauto.
+  - i. eapply COMPLETE0. ii. eapply COMPLETE in H1. des; eauto.
+  - i. destruct (classic (List.In (l, t) dom)).
+    + eapply FORGET0; eauto. eapply COMPLETE; eauto.
+    + rewrite COMPLETE0; eauto.
+      * destruct (Memory.get l t mem_tgt) as [[from msg]|] eqn:GET; auto.
+        exfalso. exploit H; eauto.
+      * ii. eapply COMPLETE in H2. des; clarify.
+Qed.      
+
+Lemma forget_unique P mem_tgt mem_src0 mem_src1
+      (FORGET0: forget_memory P mem_src0 mem_tgt)
+      (FORGET1: forget_memory P mem_src1 mem_tgt)
+  :
+    mem_src0 = mem_src1.
+Proof.
+  inv FORGET0. inv FORGET1.
+  eapply Memory.ext. i. destruct (classic (P loc ts)).
+  - erewrite FORGET; auto. erewrite FORGET0; auto.
+  - erewrite COMPLETE; auto. erewrite COMPLETE0; auto.
+Qed.  
 
 Definition unchangables (mem prom: Memory.t) (l: Loc.t) (t: Time.t) :=
   (<<COV: covered l t mem>>) /\
