@@ -1209,4 +1209,197 @@ Module CapPFStep.
     eapply rtc_implies; [|eauto].
     apply tau_union.
   Qed.
+
+
+  (* existence of sim *)
+
+  Inductive cap_aux_tgt (latests: TimeMap.t) (mem1 mem2: Memory.t): Prop :=
+  | cap_aux_tgt_intro
+      (SOUND: forall loc from to msg
+                (GET1: Memory.get loc to mem1 = Some (from, msg)),
+          Memory.get loc to mem2 = Some (from, msg))
+      (MIDDLE: forall loc from1 to1 from2 to2
+                 (ADJ: Memory.adjacent loc from1 to1 from2 to2 mem1)
+                 (TS: Time.lt to1 from2),
+          Memory.get loc from2 mem2 = Some (to1, Message.half))
+      (BACK: forall loc to
+               (TO: to = Time.incr (Memory.max_ts loc mem1)),
+          Memory.get loc to mem1 = None /\
+          exists f val r released,
+            Memory.get loc (latests loc) mem1 = Some (f, Message.full val r) /\
+            Memory.get loc to mem2 = Some (Memory.max_ts loc mem1, Message.full val released))
+      (COMPLETE: forall loc from to msg
+                   (TO: to <> Time.incr (Memory.max_ts loc mem1))
+                   (GET2: Memory.get loc to mem2 = Some (from, msg)),
+          Memory.get loc to mem1 = Some (from, msg) \/
+          Memory.get loc to mem1 = None /\
+          Time.lt from to /\
+          msg = Message.half /\
+          exists from1 to1, Memory.adjacent loc from1 from to to1 mem1)
+  .
+
+  Inductive cap_aux_src (latests: TimeMap.t) (promises mem1 mem2: Memory.t): Prop :=
+  | cap_aux_src_intro
+      (SOUND: forall loc from to msg
+                (GET1: Memory.get loc to mem1 = Some (from, msg)),
+          Memory.get loc to mem2 = Some (from, msg))
+      (MIDDLE: forall loc from1 to1 from2 to2
+                 (ADJ: Memory.adjacent loc from1 to1 from2 to2 mem1)
+                 (TS: Time.lt to1 from2),
+          Memory.get loc from2 mem2 = Some (to1, Message.half))
+      (BACK_SOME: forall loc to f m
+                    (TO: to = Time.incr (Memory.max_ts loc mem1))
+                    (GETP: Memory.get loc (latests loc) promises = Some (f, m)),
+          Memory.get loc to mem1 = None /\
+          Memory.get loc to mem2 = Some (Memory.max_ts loc mem1, Message.half))
+      (BACK_NONE: forall loc to
+                    (TO: to = Time.incr (Memory.max_ts loc mem1))
+                    (GETP: Memory.get loc (latests loc) promises = None),
+          Memory.get loc to mem1 = None /\
+          exists from val released,
+            Memory.get loc (latests loc) mem1 = Some (from, Message.full val released) /\
+            Memory.get loc to mem2 = Some (Memory.max_ts loc mem1, Message.full val None))
+      (COMPLETE: forall loc from to msg
+                   (TO: to <> Time.incr (Memory.max_ts loc mem1))
+                   (GET2: Memory.get loc to mem2 = Some (from, msg)),
+          Memory.get loc to mem1 = Some (from, msg) \/
+          Memory.get loc to mem1 = None /\
+          Time.lt from to /\
+          msg = Message.half /\
+          exists from1 to1, Memory.adjacent loc from1 from to to1 mem1)
+  .
+
+  Lemma sim_memory_max_ts
+        promises_src promises_tgt mem_src mem_tgt
+        (PROMISES: sim_promises promises_src promises_tgt)
+        (MEM: PFStep.sim_memory promises_tgt mem_src mem_tgt)
+        (LE_SRC: Memory.le promises_src mem_src)
+        (LE_TGT: Memory.le promises_tgt mem_tgt)
+        (INHABITED_SRC: Memory.inhabited mem_src)
+        (INHABITED_TGT: Memory.inhabited mem_tgt):
+    forall loc, Memory.max_ts loc mem_src = Memory.max_ts loc mem_tgt.
+  Proof.
+    i. inv PROMISES. inv MEM.
+    exploit Memory.max_ts_spec; try eapply INHABITED_SRC.
+    instantiate (1 := loc). i. des. clear MAX.
+    exploit Memory.max_ts_spec; try eapply INHABITED_TGT.
+    instantiate (1 := loc). i. des. clear MAX.
+    apply TimeFacts.antisym.
+    - destruct (Memory.get loc (Memory.max_ts loc mem_src) promises_tgt) as [[]|] eqn:GETP.
+      + exploit LE_TGT; eauto. i.
+        exploit Memory.max_ts_spec; try exact x. i. des. ss.
+      + exploit SOUND0; eauto. i. des.
+        exploit Memory.max_ts_spec; try exact GET_TGT. i. des. ss.
+    - destruct (Memory.get loc (Memory.max_ts loc mem_tgt) promises_tgt) as [[]|] eqn:GETP.
+      + exploit COMPLETE; eauto. i. des.
+        exploit LE_SRC; eauto. i.
+        exploit Memory.max_ts_spec; try exact x0. i. des. ss.
+      + exploit COMPLETE0; eauto. i. des.
+        exploit Memory.max_ts_spec; try exact GET_SRC. i. des. ss.
+  Qed.
+
+  Lemma sim_memory_adjacent_src
+        promises_src promises_tgt mem_src mem_tgt
+        loc from1 to1 from2 to2
+        (PROMISES: sim_promises promises_src promises_tgt)
+        (MEM: PFStep.sim_memory promises_tgt mem_src mem_tgt)
+        (LE_SRC: Memory.le promises_src mem_src)
+        (LE_TGT: Memory.le promises_tgt mem_tgt)
+        (ADJ_SRC: Memory.adjacent loc from1 to1 from2 to2 mem_src):
+    Memory.adjacent loc from1 to1 from2 to2 mem_tgt.
+  Proof.
+    inv ADJ_SRC.
+    exploit PFStep.sim_memory_get_src; try exact GET1; eauto. i. des.
+    exploit PFStep.sim_memory_get_src; try exact GET2; eauto. i. des.
+    econs; eauto. i.
+    exploit EMPTY; eauto. i.
+    inv PROMISES. inv MEM.
+    destruct (Memory.get loc ts mem_tgt) as [[]|] eqn:GET; ss.
+    destruct (Memory.get loc ts promises_tgt) as [[]|] eqn:GETP.
+    - exploit COMPLETE; eauto. i. des.
+      exploit LE_SRC; eauto. i. congr.
+    - exploit COMPLETE0; eauto. i. des. congr.
+  Qed.
+
+  Lemma sim_memory_adjacent_tgt
+        promises_src promises_tgt mem_src mem_tgt
+        loc from1 to1 from2 to2
+        (PROMISES: sim_promises promises_src promises_tgt)
+        (MEM: PFStep.sim_memory promises_tgt mem_src mem_tgt)
+        (LE_SRC: Memory.le promises_src mem_src)
+        (LE_TGT: Memory.le promises_tgt mem_tgt)
+        (ADJ_TGT: Memory.adjacent loc from1 to1 from2 to2 mem_tgt):
+    Memory.adjacent loc from1 to1 from2 to2 mem_src.
+  Proof.
+    inv ADJ_TGT.
+    exploit PFStep.sim_memory_get_tgt; try exact GET1; eauto. i. des.
+    exploit PFStep.sim_memory_get_tgt; try exact GET2; eauto. i. des.
+    econs; eauto; i.
+    exploit EMPTY; eauto. i.
+    inv PROMISES. inv MEM.
+    destruct (Memory.get loc ts mem_src) as [[]|] eqn:GET; ss.
+    destruct (Memory.get loc ts promises_tgt) as [[]|] eqn:GETP.
+    - exploit LE_TGT; eauto. i. congr.
+    - exploit SOUND0; eauto. i. des. congr.
+  Qed.
+
+  Lemma cap_aux_sim_memory
+        latests
+        promises_src promises_tgt
+        mem1_src mem2_src mem1_tgt mem2_tgt
+        (PROMISES: sim_promises promises_src promises_tgt)
+        (MEM1: PFStep.sim_memory promises_tgt mem1_src mem1_tgt)
+        (LE_SRC: Memory.le promises_src mem1_src)
+        (LE_TGT: Memory.le promises_tgt mem1_tgt)
+        (INHABITED_SRC: Memory.inhabited mem1_src)
+        (INHABITED_TGT: Memory.inhabited mem1_tgt)
+        (CAP_SRC: cap_aux_src latests promises_tgt mem1_src mem2_src)
+        (CAP_TGT: cap_aux_tgt latests mem1_tgt mem2_tgt):
+    sim_memory latests (fun loc => Time.incr (Memory.max_ts loc mem1_tgt)) promises_tgt mem2_src mem2_tgt.
+  Proof.
+    assert (MAX: forall loc, Memory.max_ts loc mem1_src = Memory.max_ts loc mem1_tgt).
+    { eapply sim_memory_max_ts; eauto. }
+    dup MEM1. inv MEM0. inv CAP_SRC. inv CAP_TGT. econs; i.
+    { exploit COMPLETE0; eauto.
+      { rewrite MAX. ss. }
+      i. des.
+      - exploit SOUND; eauto. i. des.
+        exploit SOUND1; eauto.
+      - subst. exploit sim_memory_adjacent_src; try exact x2; eauto. i.
+        exploit MIDDLE0; eauto. i.
+        esplits; eauto. ss.
+    }
+    { destruct (Memory.get loc to mem1_tgt) as [[]|] eqn:X.
+      - exploit SOUND1; eauto. i.
+        rewrite GET_TGT in x. symmetry in x. inv x.
+        exploit COMPLETE; eauto. i. des.
+        exploit SOUND0; eauto.
+      - exploit COMPLETE1; eauto. i. des; try congr. subst.
+        exploit sim_memory_adjacent_tgt; try exact x2; eauto. i.
+        exploit MIDDLE; eauto. i.
+        esplits; eauto. ss.
+    }
+    { exploit (BACK loc); try refl. i. des.
+      exploit Memory.max_ts_spec; try exact x1. i. des.
+      eapply TimeFacts.le_lt_lt; eauto.
+      apply Time.incr_spec.
+    }
+    { destruct (Memory.get loc (Time.incr (Memory.max_ts loc mem1_tgt)) promises_tgt) as [[]|] eqn:GETP; ss.
+      exploit LE_TGT; eauto. i.
+      exploit Memory.max_ts_spec; try exact x. i. des.
+      specialize (Time.incr_spec (Memory.max_ts loc mem1_tgt)). i. timetac.
+    }
+    { exploit (BACK loc); try refl. i. des.
+      destruct (Memory.get loc (latests loc) promises_tgt) as [[]|] eqn:GETP.
+      - exploit BACK_SOME; eauto. i. des.
+        rewrite MAX in *. esplits; eauto.
+        unfold cap_src. rewrite GETP. ss.
+      - exploit BACK_NONE; eauto. i. des.
+        rewrite MAX in *. esplits; eauto.
+        unfold cap_src. rewrite GETP.
+        exploit SOUND; eauto. i. des.
+        rewrite x1 in GET_TGT. inv GET_TGT. inv MSG.
+        econs; ss.
+    }
+  Qed.
 End CapPFStep.
