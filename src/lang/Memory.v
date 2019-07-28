@@ -2427,7 +2427,8 @@ Module Memory.
 
   Inductive cap (promises mem1 mem2: t): Prop :=
   | cap_intro
-      (SOUND: forall loc from to msg (GET: get loc to mem1 = Some (from, msg)),
+      (SOUND: forall loc from to msg
+                (GET: get loc to mem1 = Some (from, msg)),
           get loc to mem2 = Some (from, msg))
       (MIDDLE: forall loc from1 to1 from2 to2
                  (ADJ: adjacent loc from1 to1 from2 to2 mem1)
