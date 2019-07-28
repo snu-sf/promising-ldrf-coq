@@ -133,6 +133,20 @@ Proof.
   inv COVERED. econs; eauto.
 Qed.
 
+Lemma memory_add_cover_disjoint mem0 loc from to msg mem1
+      (ADD: Memory.add mem0 loc from to msg mem1)
+      t
+      (IN: Interval.mem (from, to) t) 
+  :
+    ~ covered loc t mem0.
+Proof.
+  ii. inv H. dup ADD. eapply Memory.add_get0 in ADD. des.
+  exploit Memory.get_disjoint.
+  + eapply Memory.add_get1; eauto.
+  + eauto.
+  + i. des; clarify. eauto.
+Qed.
+
 Module Inv.
   
   Inductive t lang (st: Language.state lang) lc
@@ -1900,11 +1914,18 @@ Qed.
 (*   econs; eauto. *)
 (* Qed. *)
 
+(* Definition not_attatched (L: Loc.t -> Time.t -> Prop) (m: Memory.t) := *)
+(*   forall loc to (SAT: L loc to), *)
+(*   exists to', *)
+(*     (<<TLE: Time.lt to to'>>) /\  *)
+(*     (<<EMPTY: forall l t (ITV: Interval.mem (to, to') t), ~ covered l t m>>). *)
+
 Definition not_attatched (L: Loc.t -> Time.t -> Prop) (m: Memory.t) :=
   forall loc to (SAT: L loc to),
-  exists to',
-    (<<TLE: Time.lt to to'>>) /\ 
-    (<<EMPTY: forall l t (ITV: Interval.mem (to, to') t), ~ covered l t m>>).
+    (<<GET: exists msg, <<MSG: Memory.get loc to m = Some msg>> >>) /\ 
+    (<<NOATTATCH: exists to',
+        (<<TLE: Time.lt to to'>>) /\ 
+        (<<EMPTY: forall t (ITV: Interval.mem (to, to') t), ~ covered loc t m>>)>>).
 
 Definition no_update_on (MSGS : Loc.t -> Time.t -> Prop)
            (e : ThreadEvent.t) : Prop :=
@@ -1913,8 +1934,306 @@ Definition no_update_on (MSGS : Loc.t -> Time.t -> Prop)
     ~ MSGS loc from
   | _ => True
   end.
+      
+(* TODO: make threadevent le and force eventpredicate is closed under that? *)
+Lemma shorter_memory_write prom mem_src mem_tgt loc from1 to1 val released mem_tgt' from'
+      (SHORTER: shorter_memory mem_src mem_tgt)
+      (ADD: Memory.write Memory.bot mem_tgt loc from1 to1 val released prom mem_tgt' Memory.op_kind_add)
+      (TO: Time.le from1 from')
+      (FROM: Time.lt from' to1)
+  :
+    exists mem_src',
+      (<<ADD: Memory.write Memory.bot mem_src loc from' to1 val released prom mem_src' Memory.op_kind_add>>) /\  
+      (<<SHORTER: shorter_memory mem_src' mem_tgt'>>).  
+Proof.
+  dup SHORTER. inv SHORTER. inv ADD. inv PROMISE.
+  exploit MemoryFacts.MemoryFacts.add_remove_eq; try apply REMOVE; eauto. i. clarify.
+  exploit write_succeed; eauto.
+  - instantiate (1:=mem_src). instantiate (1:=loc).
+    ii. eapply COVER in COVER0. inv COVER0.
+    dup MEM. eapply Memory.add_get0 in MEM. des. 
+    dup GET. eapply Memory.add_get1 in GET; eauto.
+    exploit Memory.get_disjoint.
+    + eapply GET.
+    + eapply GET1.
+    + i. des; clarify.
+      eapply x0; eauto. inv H. econs; ss; eauto.
+      eapply TimeFacts.le_lt_lt; eauto.
+  - inv MEM. inv ADD. inv MSG_WF. inv TS. eauto.
+  - inv MEM. inv ADD. eauto.
+  - i. des. inv WRITE. inv PROMISE. esplits; eauto. econs.
+    + i. erewrite Memory.add_o in GET; eauto.      
+      erewrite Memory.add_o; cycle 1; eauto. des_ifs; eauto.
+    + i. inv COV. erewrite Memory.add_o in GET; eauto. des_ifs.
+      * ss; des; clarify. eapply Memory.add_get0 in MEM. des.
+        econs; eauto. inv ITV. econs; eauto.
+        ss. eapply TimeFacts.le_lt_lt; eauto.
+      * exploit COVER.
+        { econs; eauto. }
+        intros COV. inv COV. eapply Memory.add_get1 in GET0; eauto.
+        econs; eauto.
+Qed.
 
-(* TODO: make add disjoint lemma *)
+Lemma shorter_memory_step
+      P lang th_src th_tgt th_tgt' st st' v v' prom' sc sc'
+      mem_tgt mem_tgt' mem_src e
+      (STEP: (@pred_step (P /1\ no_promise) lang) e th_tgt th_tgt')
+      (TH_SRC: th_src = Thread.mk lang st (Local.mk v Memory.bot) sc mem_src)
+      (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v Memory.bot) sc mem_tgt)
+      (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
+      (SHORTER: shorter_memory mem_src mem_tgt)
+  :
+    exists mem_src',
+      (<<STEP: (@pred_step (P /1\ no_promise) lang)
+                 e th_src
+                 (Thread.mk lang st' (Local.mk v' prom') sc' mem_src')>>) /\
+      (<<SHORTER: shorter_memory mem_src' mem_tgt'>>).
+Proof.
+  dup SHORTER. inv SHORTER. inv STEP. inv STEP0. des. inv STEP.
+  - inv STEP0. ss.
+  - inv STEP0. inv LOCAL.
+    + exists mem_src; eauto. econs; eauto. econs; eauto.
+      econs; eauto. econs 2; eauto. econs; eauto.
+    + inv LOCAL0. ss. clarify. exploit COMPLETE; eauto. i. des.
+      exists mem_src; eauto. econs; eauto. econs; eauto.
+      econs; eauto. econs 2; eauto. econs; eauto.
+    + exploit write_msg_wf; eauto. i. des.
+      inv LOCAL0. ss. clarify.
+      exploit memory_write_bot_add; eauto. i. clarify.
+      dup WRITE. exploit shorter_memory_write; eauto.
+      { refl. }
+      i. des. esplits; eauto. econs; eauto. econs; eauto.
+      econs 2; eauto. econs; eauto.
+    + inv LOCAL1. ss. exploit write_msg_wf; eauto. i. des.
+      exploit COMPLETE; eauto. i. des.
+      inv LOCAL2. ss. clarify.
+      exploit memory_write_bot_add; eauto. i. clarify.
+      dup WRITE. exploit shorter_memory_write; eauto.
+      { refl. }
+      i. des. esplits; eauto. econs; eauto. econs; eauto.
+      econs 2; eauto. econs; eauto.
+    + inv LOCAL0. ss. clarify. esplits; eauto. econs; eauto.
+      econs; eauto. econs 2; eauto. econs; eauto.
+    + inv LOCAL0. ss. clarify. esplits; eauto. econs; eauto.
+      econs; eauto. econs 2; eauto. econs; eauto.
+Qed.
+
+Lemma not_attatch_write L prom mem_src loc from1 to1 val released mem_src'
+      (ADD: Memory.write Memory.bot mem_src loc from1 to1 val released prom mem_src' Memory.op_kind_add)
+      (NOATTATCH: not_attatched L mem_src)
+      (FROM: ~ L loc from1)
+  :
+    (<<NOATTATCH: not_attatched L mem_src'>>).
+Proof.
+  inv ADD. inv PROMISE. ii.
+  exploit NOATTATCH; eauto. i. des. destruct msg.
+  destruct (Loc.eq_dec loc loc0); clarify.
+  - esplit; eauto.
+    + eexists. eapply Memory.add_get1; eauto.
+    + exists (if (Time.le_lt_dec to from1)
+              then (Time.meet to' from1)
+              else to'). esplits; eauto.
+      * unfold Time.meet. des_ifs.
+        destruct l; eauto. destruct H. clarify.
+      * ii. erewrite add_covered in H; eauto. des.
+        { eapply EMPTY; eauto. unfold Time.meet in *. des_ifs.
+          inv ITV. econs; ss; eauto.
+          left. eapply TimeFacts.le_lt_lt; eauto. }
+        { clarify. unfold Time.meet in *.
+          dup ITV. dup H0. inv ITV. inv H0. ss. des_ifs.
+          - clear - FROM1 TO l0.
+            eapply DenseOrder.DenseOrder.lt_strorder.
+            instantiate (1:=from1).
+            eapply TimeFacts.lt_le_lt; eauto.
+          - eapply DenseOrder.DenseOrder.lt_strorder.
+            instantiate (1:=from1).
+            eapply TimeFacts.lt_le_lt; eauto.
+          - dup MEM. eapply Memory.add_get0 in MEM. des.
+            exploit Memory.get_disjoint.
+            { eapply Memory.add_get1; try apply MSG; eauto. }
+            { eapply GET0. }
+            i. des; clarify. eapply x0.
+            { instantiate (1:=to).
+              exploit Memory.get_ts; eauto. i. des; clarify.
+              - exfalso. eapply DenseOrder.DenseOrder.lt_strorder.
+                instantiate (1:=from1).
+                eapply TimeFacts.lt_le_lt; try apply l; eauto.
+                eapply Time.bot_spec.
+              - econs; ss; eauto. refl. }
+            { econs; ss; eauto. left.
+              eapply TimeFacts.lt_le_lt; eauto. }
+        }
+  - esplits; eauto.
+    + eapply Memory.add_get1; eauto.
+    + ii. erewrite add_covered in H; eauto. des; clarify.
+      eapply EMPTY; eauto.
+Qed.
+
+Lemma no_update_on_step
+      L lang th_src th_tgt th_tgt' st st' v v' prom' sc sc'
+      mem_tgt mem_tgt' mem_src e
+      (STEP: (@pred_step (no_promise /1\ no_update_on L) lang) e th_tgt th_tgt')
+      (TH_SRC: th_src = Thread.mk lang st (Local.mk v Memory.bot) sc mem_src)
+      (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v Memory.bot) sc mem_tgt)
+      (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
+      (SHORTER: shorter_memory mem_src mem_tgt)
+      (NOATTATCH: not_attatched L mem_src) 
+  :
+    exists e_src mem_src',
+      (<<STEP: (@pred_step (no_promise) lang)
+                 e_src th_src
+                 (Thread.mk lang st' (Local.mk v' prom') sc' mem_src')>>) /\
+      (<<SHORTER: shorter_memory mem_src' mem_tgt'>>) /\
+      (<<NOATTATCH: not_attatched L mem_src'>>).
+Proof.
+  dup SHORTER. inv SHORTER. inv STEP. inv STEP0. des. inv STEP.
+  - inv STEP0. ss.
+  - inv STEP0. inv LOCAL.
+    + eexists. exists mem_src; eauto. econs; eauto. econs; eauto.
+      econs; eauto. econs 2; eauto. econs; eauto.
+    + inv LOCAL0. ss. clarify. exploit COMPLETE; eauto. i. des.
+      exists (ThreadEvent.read loc ts val released ord). exists mem_src; eauto.
+      econs; eauto. econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+    + exploit write_msg_wf; eauto. i. des.
+      exists (ThreadEvent.write loc (Time.middle from to) to val released ord).
+      inv LOCAL0. ss. clarify.
+      exploit memory_write_bot_add; eauto. i. clarify.
+      dup WRITE. exploit Time.middle_spec; eauto. i. des.
+      exploit shorter_memory_write.
+      { eauto. }
+      { eauto. }
+      { instantiate (1:=Time.middle from to). left. auto. }
+      { auto. }
+      i. des. esplits; eauto.
+      * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+      * eapply not_attatch_write; eauto. ii.
+        exploit NOATTATCH; eauto. i. des.
+        exploit memory_add_cover_disjoint; auto.
+        { inv WRITE. inv PROMISE. eapply MEM. }
+        { instantiate (1:=(Time.middle from to)).
+          econs; eauto. ss. left. eauto. }
+        { apply COVER. destruct msg. econs; eauto.
+          econs; ss; eauto.
+          - exploit Memory.get_ts; eauto. i. des; clarify.
+            exfalso. rewrite x3 in *.
+            eapply DenseOrder.DenseOrder.lt_strorder.
+            instantiate (1:=Time.bot).
+            eapply DenseOrder.DenseOrderFacts.le_lt_lt; eauto.
+            apply Time.bot_spec.
+          - refl. }
+    + inv LOCAL1. ss.
+      exists (ThreadEvent.update loc tsr tsw valr valw releasedr releasedw ordr ordw).
+      exploit write_msg_wf; eauto. i. des.
+      exploit COMPLETE; eauto. i. des.
+      inv LOCAL2. ss. clarify.
+      exploit memory_write_bot_add; eauto. i. clarify.
+      dup WRITE. exploit shorter_memory_write; eauto.
+      { refl. }
+      i. des. esplits; eauto.
+      * econs; eauto. econs; eauto.
+        econs 2; eauto. econs; eauto.
+      * eapply not_attatch_write; eauto.
+    + inv LOCAL0. exists (ThreadEvent.fence ordr ordw).
+      ss. clarify. esplits; eauto. econs; eauto.
+      econs; eauto. econs 2; eauto. econs; eauto.
+    + inv LOCAL0. exists (ThreadEvent.syscall e0).
+      ss. clarify. esplits; eauto. econs; eauto.
+      econs; eauto. econs 2; eauto. econs; eauto.
+Qed.
+
+
+
+
+
+WIP
+
+Lemma not_attatch L prom mem_src mem_tgt loc from1 to1 val released mem_tgt' from'
+      (SHORTER: shorter_memory mem_src mem_tgt)
+      (NOATTATCH: not_attatched L mem_src) 
+      (ADD: Memory.write Memory.bot mem_tgt loc from1 to1 val released prom mem_tgt' Memory.op_kind_add)
+  :
+    exists mem_src' to',
+      (<<ADD: Memory.write Memory.bot mem_src loc from' to' val released prom mem_src' Memory.op_kind_add>>) /\  
+      (<<SHORTER: shorter_memory mem_src' mem_tgt'>>) /\
+      (<<NOATTATCH: not_attatched L mem_src'>>).
+Proof.
+
+  
+  dup SHORTER. inv SHORTER. inv ADD. inv PROMISE.
+  exploit MemoryFacts.MemoryFacts.add_remove_eq; try apply REMOVE; eauto. i. clarify.
+  exploit write_succeed; eauto.
+  - instantiate (1:=mem_src). instantiate (1:=loc).
+    ii. eapply COVER in COVER0. inv COVER0.
+    dup MEM. eapply Memory.add_get0 in MEM. des. 
+    dup GET. eapply Memory.add_get1 in GET; eauto.
+    exploit Memory.get_disjoint.
+    + eapply GET.
+    + eapply GET1.
+    + i. des; clarify.
+      eapply x0; eauto. inv H. econs; ss; eauto.
+      eapply TimeFacts.le_lt_lt; eauto.
+  - inv MEM. inv ADD. inv MSG_WF. inv TS. eauto.
+  - inv MEM. inv ADD. eauto.
+  - i. des. inv WRITE. inv PROMISE. esplits; eauto. econs.
+    + i. erewrite Memory.add_o in GET; eauto.      
+      erewrite Memory.add_o; cycle 1; eauto. des_ifs; eauto.
+    + i. inv COV. erewrite Memory.add_o in GET; eauto. des_ifs.
+      * ss; des; clarify. eapply Memory.add_get0 in MEM. des.
+        econs; eauto. inv ITV. econs; eauto.
+        ss. eapply TimeFacts.le_lt_lt; eauto.
+      * exploit COVER.
+        { econs; eauto. }
+        intros COV. inv COV. eapply Memory.add_get1 in GET0; eauto.
+        econs; eauto.
+Qed.
+
+
+Lemma no_update_on_step
+      L lang th_src th_tgt th_tgt' st st' v v' prom' sc sc'
+      mem_tgt mem_tgt' mem_src e
+      (STEP: (@pred_step (no_promise /1\ no_update_on L) lang) e th_tgt th_tgt')
+      (TH_SRC: th_src = Thread.mk lang st (Local.mk v Memory.bot) sc mem_src)
+      (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v Memory.bot) sc mem_tgt)
+      (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
+      (SHORTER: shorter_memory mem_src mem_tgt)
+      (NOATTATCH: not_attatched L mem_src) 
+  :
+    exists e_src mem_src',
+      (<<STEP: (@pred_step (no_promise) lang)
+                 e_src th_src
+                 (Thread.mk lang st' (Local.mk v' prom') sc' mem_src')>>) /\
+      (<<SHORTER: shorter_memory mem_src' mem_tgt'>>) /\
+      (<<NOATTATCH: not_attatched L mem_src'>>).
+Proof.
+  dup SHORTER. inv SHORTER. inv STEP. inv STEP0. des. inv STEP.
+  - inv STEP0. ss.
+  - inv STEP0. inv LOCAL.
+    + exists mem_src; eauto. econs; eauto. econs; eauto.
+      econs; eauto. econs 2; eauto. econs; eauto.
+    + inv LOCAL0. ss. clarify. exploit COMPLETE; eauto. i. des.
+      exists mem_src; eauto. econs; eauto. econs; eauto.
+      econs; eauto. econs 2; eauto. econs; eauto.
+    + exploit write_msg_wf; eauto. i. des.
+      inv LOCAL0. ss. clarify.
+      exploit memory_write_bot_add; eauto. i. clarify.
+      dup WRITE. exploit shorter_memory_write; eauto.
+      { refl. }
+      i. des. esplits; eauto. econs; eauto. econs; eauto.
+      econs 2; eauto. econs; eauto.
+    + inv LOCAL1. ss. exploit write_msg_wf; eauto. i. des.
+      exploit COMPLETE; eauto. i. des.
+      inv LOCAL2. ss. clarify.
+      exploit memory_write_bot_add; eauto. i. clarify.
+      dup WRITE. exploit shorter_memory_write; eauto.
+      { refl. }
+      i. des. esplits; eauto. econs; eauto. econs; eauto.
+      econs 2; eauto. econs; eauto.
+    + inv LOCAL0. ss. clarify. esplits; eauto. econs; eauto.
+      econs; eauto. econs 2; eauto. econs; eauto.
+    + inv LOCAL0. ss. clarify. esplits; eauto. econs; eauto.
+      econs; eauto. econs 2; eauto. econs; eauto.
+Qed.
+
 
 Lemma shorter_memory_write mem_src mem_tgt loc from1 to1 val released mem_tgt' from'
       (SHORTER: shorter_memory mem_src mem_tgt)
@@ -1951,8 +2270,11 @@ Proof.
         { econs; eauto. }
         intros COV. inv COV. eapply Memory.add_get1 in GET0; eauto.
         econs; eauto.
-Qed.
-  
+Qed
+
+.
+
+ThreadEvent.t  
   Lemma write_succeed mem1 loc from1 to1 val released
       (NCOVER: forall t (COVER: covered loc t mem1),
           ~ Interval.mem (from1, to1) t)
