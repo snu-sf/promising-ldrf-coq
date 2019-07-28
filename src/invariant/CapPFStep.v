@@ -1927,4 +1927,98 @@ Module CapPFStep.
           right. esplits; eauto.
     }
   Qed.
+
+  Lemma cap_aux_middle_max_ts
+        dom mem1 mem2
+        (CAP: cap_aux_middle dom mem1 mem2)
+        (INHABITED: Memory.inhabited mem1):
+    forall loc, Memory.max_ts loc mem1 = Memory.max_ts loc mem2.
+  Proof.
+    i. inv CAP. apply TimeFacts.antisym.
+    - exploit Memory.max_ts_spec; try eapply INHABITED. i. des.
+      exploit SOUND; eauto. i.
+      exploit Memory.max_ts_spec; try eapply x. i. des. eauto.
+    - exploit SOUND; try eapply INHABITED.
+      instantiate (1 := loc). i.
+      exploit Memory.max_ts_spec; try eapply x. i. des.
+      exploit COMPLETE; eauto. i. des.
+      + exploit Memory.max_ts_spec; try exact GET1. i. des. ss.
+      + inv ADJ.
+        exploit Memory.get_ts; try exact GET2. i. des.
+        { subst. inv TS0. }
+        exploit Memory.max_ts_spec; try exact GET2. i. des.
+        etrans; eauto. econs. ss.
+  Qed.
+
+  Lemma cap_aux_src_exists
+        promises_tgt
+        mem1_src mem1_tgt
+        latests mem2_tgt
+        (MEM: PFStep.sim_memory promises_tgt mem1_src mem1_tgt)
+        (CAP_TGT: cap_aux_tgt latests promises_tgt mem1_tgt mem2_tgt)
+        (INHABITED_SRC: Memory.inhabited mem1_src):
+    exists mem2_src, cap_aux_src latests promises_tgt mem1_src mem2_src.
+  Proof.
+    destruct (@Memory.finite mem1_src).
+    destruct Loc.finite.
+    rename x into dom, x0 into locs.
+    destruct (@cap_aux_middle_exists dom mem1_src).
+    rename x into mem2_src, H1 into CAP_MIDDLE.
+    exploit (@cap_aux_back_exists locs latests promises_tgt mem2_src).
+    { i. inv CAP_TGT. clear SOUND MIDDLE BACK COMPLETE.
+      inv MEM. destruct (LATESTS loc). des.
+      exploit COMPLETE; eauto. i. des. inv MSG.
+      inv CAP_MIDDLE. exploit SOUND0; eauto. }
+    i. des.
+    rename mem2 into mem3_src, x0 into CAP_BACK.
+    dup CAP_MIDDLE. dup CAP_BACK. inv CAP_MIDDLE0. inv CAP_BACK0.
+    exists mem3_src. econs; i; eauto.
+    - exploit MIDDLE; try exact ADJ; eauto.
+      inv ADJ. eauto.
+    - erewrite cap_aux_middle_max_ts in *; eauto.
+      exploit BACK_SOME; eauto.
+      unfold Memory.latest_half in *.
+      erewrite <- cap_aux_middle_max_ts; eauto.
+    - erewrite cap_aux_middle_max_ts in *; eauto.
+      exploit BACK_NONE; eauto.
+      { unfold Memory.latest_half in *.
+        erewrite <- cap_aux_middle_max_ts; eauto. }
+      i. des.
+      inv CAP_TGT. inv MEM. destruct (LATESTS loc). des.
+      exploit COMPLETE2; eauto. i. des. inv MSG.
+      exploit SOUND; eauto. i.
+      rewrite x in x2. inv x2. esplits; eauto.
+    - exploit COMPLETE0; eauto. i. des.
+      + exploit COMPLETE; eauto. i. des; eauto. subst.
+        right. left. esplits; eauto.
+      + subst. right. right.
+        erewrite <- cap_aux_middle_max_ts in *; eauto.
+        esplits; eauto.
+        * destruct (Memory.get loc (Time.incr (Memory.max_ts loc mem1_src)) mem1_src) as [[]|] eqn:GET; ss.
+          exploit SOUND; eauto. congr.
+        * unfold Memory.latest_half in *.
+          erewrite cap_aux_middle_max_ts; eauto.
+  Qed.
+
+  Lemma sim_memory_exists
+        promises_src promises_tgt
+        mem1_src mem1_tgt mem2_tgt
+        (PROMISES: sim_promises promises_src promises_tgt)
+        (MEM: PFStep.sim_memory promises_tgt mem1_src mem1_tgt)
+        (LE_SRC: Memory.le promises_src mem1_src)
+        (LE_TGT: Memory.le promises_tgt mem1_tgt)
+        (CLOSED_SRC: Memory.closed mem1_src)
+        (CLOSED_TGT: Memory.closed mem1_tgt)
+        (CAP: Memory.cap promises_tgt mem1_tgt mem2_tgt):
+    exists latests caps mem2_src,
+      cap_aux_src latests promises_tgt mem1_src mem2_src /\
+      sim_memory latests caps promises_tgt mem2_src mem2_tgt.
+  Proof.
+    exploit cap_cap_aux_tgt; eauto. i. des.
+    exploit cap_aux_src_exists; try apply CLOSED_SRC; eauto. i. des.
+    exploit cap_aux_sim_memory; eauto.
+    { apply CLOSED_SRC. }
+    { apply CLOSED_TGT. }
+    i. des. esplits; eauto.
+  Qed.
 End CapPFStep.
