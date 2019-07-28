@@ -2058,6 +2058,123 @@ Inductive forget_config csrc ctgt : Prop :=
                          (Configuration.memory ctgt))
 .
 
+Definition wf_promise (mem: Memory.t): Prop :=
+  forall loc, Memory.get loc Time.bot mem = None.
+
+Lemma wf_promise_promise
+      promises1 mem1 loc from to msg promises2 mem2 kind
+      (PROMISE: Memory.promise promises1 mem1 loc from to msg promises2 mem2 kind)
+      (WFPROM: wf_promise promises1)
+      (INHABITED: Memory.inhabited mem1)
+  :
+    (<<WFPROM: wf_promise promises2>>) /\
+    (<<INHABITED: Memory.inhabited mem2>>).
+Proof.
+  inv PROMISE.
+  - split; [|eapply Memory.op_inhabited; eauto].
+    ii. erewrite Memory.add_o; eauto. des_ifs.
+    ss; des; clarify. exfalso.
+    inv MEM. inv ADD.
+    eapply DenseOrder.DenseOrder.lt_strorder.
+    instantiate (1:=Time.bot).
+    eapply TimeFacts.le_lt_lt; eauto. apply Time.bot_spec.
+  - split; [|eapply Memory.op_inhabited; eauto].
+    ii. erewrite Memory.split_o; eauto. des_ifs.
+    + ss; des; clarify. exfalso.
+      inv MEM. inv SPLIT.
+      eapply DenseOrder.DenseOrder.lt_strorder.
+      instantiate (1:=Time.bot).
+      eapply TimeFacts.le_lt_lt; eauto. apply Time.bot_spec.
+    + ss. destruct a. clarify. exfalso.
+      inv MEM. inv SPLIT.
+      eapply DenseOrder.DenseOrder.lt_strorder.
+      instantiate (1:=Time.bot).
+      eapply TimeFacts.le_lt_lt; eauto. apply Time.bot_spec.
+  - split; [|eapply Memory.op_inhabited; eauto].
+    ii. erewrite Memory.lower_o; eauto. des_ifs.
+    ss; des; clarify. exfalso.
+    inv MEM. inv LOWER.
+    eapply DenseOrder.DenseOrder.lt_strorder.
+    instantiate (1:=Time.bot).
+    eapply TimeFacts.le_lt_lt; eauto. apply Time.bot_spec.
+Qed.
+
+Lemma wf_promise_remove
+      prom1 loc from1 to1 msg1 prom2
+      (REMOVE: Memory.remove prom1 loc from1 to1 msg1 prom2)
+      (WFPROM: wf_promise prom1)
+  :
+    wf_promise prom2.
+Proof.    
+  ii. erewrite Memory.remove_o; eauto. des_ifs.
+Qed.
+
+Lemma wf_promise_step pf e lang (th0 th1: Thread.t lang)
+      (STEP: Thread.step pf e th0 th1)
+      (WFPROM: wf_promise th0.(Thread.local).(Local.promises))
+      (INHABITED: Memory.inhabited th0.(Thread.memory))
+  :
+    (<<WFPROM: wf_promise th1.(Thread.local).(Local.promises)>>) /\
+    (<<INHABITED: Memory.inhabited th1.(Thread.memory)>>)
+.
+Proof.
+  inv STEP; ss.
+  - inv STEP0; ss. inv LOCAL; ss.
+    eapply wf_promise_promise; eauto.
+  - inv STEP0; ss. inv LOCAL; ss.
+    + inv LOCAL0; ss.
+    + inv LOCAL0; ss. inv WRITE; ss.
+      exploit wf_promise_promise; eauto. i. des. split; ss.
+      eapply wf_promise_remove; eauto.
+    + inv LOCAL1; ss. inv LOCAL2; ss. inv WRITE; ss.
+      exploit wf_promise_promise; eauto. i. des. split; ss.
+      eapply wf_promise_remove; eauto.
+    + inv LOCAL0; ss.
+    + inv LOCAL0; ss.
+Qed. 
+
+Lemma wf_promise_rtc_step lang (th0 th1: Thread.t lang)
+      (STEP: rtc (@Thread.tau_step lang) th0 th1)
+      (INHABITED: Memory.inhabited th0.(Thread.memory))
+      (WFPROM: wf_promise th0.(Thread.local).(Local.promises))
+  :
+    (<<WFPROM: wf_promise th1.(Thread.local).(Local.promises)>>) /\
+    (<<INHABITED: Memory.inhabited th1.(Thread.memory)>>)
+.
+Proof.
+  eapply (@Relation_Operators.clos_refl_trans_1n_ind
+            _ (Thread.tau_step (lang:=lang))
+            (fun e0 e1 =>
+               forall (INHABITED: Memory.inhabited e0.(Thread.memory))
+                      (WFPROM: wf_promise e0.(Thread.local).(Local.promises)),
+                 (<<WFPROM: wf_promise e1.(Thread.local).(Local.promises)>>) /\
+                 (<<INHABITED: Memory.inhabited e1.(Thread.memory)>>))); eauto.
+  i. inv H. inv TSTEP. exploit wf_promise_step; eauto. i. des. eauto.
+Qed.
+
+Lemma configuraion_step_wf_promises c1 c2 e tid
+      (CWF: Configuration.wf c1)
+      (STEP: Configuration.step e tid c1 c2)
+      (WFPROMS:
+         forall tid lang_src st_src lc_src
+                (TIDSRC: IdentMap.find tid c1.(Configuration.threads) =
+                         Some (existT _ lang_src st_src, lc_src)),
+           wf_promise lc_src.(Local.promises))
+  :
+    (<<WFPROMS:
+       forall tid lang_src st_src lc_src
+              (TIDSRC: IdentMap.find tid c2.(Configuration.threads) =
+                       Some (existT _ lang_src st_src, lc_src)),
+         wf_promise lc_src.(Local.promises)>>).
+Proof.    
+  inv STEP. ss. red. i. rewrite IdentMap.gsspec in TIDSRC. des_ifs.
+  - eapply inj_pair2 in H0. clarify.
+    inv CWF. inv MEM. ss.
+    exploit wf_promise_rtc_step; eauto. i. des.
+    exploit wf_promise_step; eauto. ss. i. des. eauto.
+  - eapply WFPROMS; eauto.
+Qed.
+
 Module Inv.
   
   Inductive t lang (st: Language.state lang) lc
@@ -2096,7 +2213,7 @@ Inductive sim_pf
           (c_src c_tgt: Configuration.t) : Prop :=
 | sim_pf_intro
     (FORGET: forget_config c_src c_tgt)
-    (RACEFREE: pf_racefree c_src)
+    
     (INV:
        forall
          tid lang_src st_src lc_src lang_tgt st_tgt lc_tgt
@@ -2105,6 +2222,7 @@ Inductive sim_pf
          (TIDTGT: IdentMap.find tid c_tgt.(Configuration.threads) =
                   Some (existT _ lang_tgt st_tgt, lc_tgt)),
          Inv.t _ st_src lc_src lc_tgt.(Local.promises) (updates tid) (mlast tid))
+
     (FUTURE:
        forall tid lang_src st_src lc_src
               (TIDSRC: IdentMap.find tid c_src.(Configuration.threads) =
@@ -2115,8 +2233,15 @@ Inductive sim_pf
     (NOATTATCH:
        forall tid,
          not_attatched (updates tid) c_src.(Configuration.memory))
+
+    (RACEFREE: pf_racefree c_src)
     (WFSRC: Configuration.wf c_src)
     (WFTGT: Configuration.wf c_tgt)
+    (WFPROMS:
+       forall tid lang st lc
+              (TIDSRC: IdentMap.find tid c_tgt.(Configuration.threads) =
+                       Some (existT _ lang st, lc)),
+         wf_promise lc.(Local.promises))
 .
 
 Inductive sim_pf_all c_src c_tgt: Prop :=
@@ -2158,4 +2283,6 @@ Proof.
   - econs; eauto. refl.
   - eapply Configuration.init_wf.
   - eapply Configuration.init_wf.
+  - unfold Threads.init in *. erewrite UsualFMapPositive.UsualPositiveMap.Facts.map_o in *.
+    unfold option_map in *. des_ifs.
 Qed. 
