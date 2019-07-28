@@ -93,7 +93,7 @@ Lemma step_lifting
       (<<NOATTATCH: not_attatched updates mem_src'>>) /\
       (<<UNCHANGED: unchanged_on otherspace mem_src mem_src'>>).
 Proof.
-  hexploit (forget_exists prom mem_tgt); eauto. i. des.
+  hexploit (forget_exists prom.(promised) mem_tgt); eauto. i. des.
 
   exploit self_promise_remove; try apply FORGET; eauto.
   i. des.
@@ -131,7 +131,7 @@ Qed.
 
                                                                              
   
-  Configuration.wf
+  yConfiguration.wf
 
 
   dup MEM. eapply forget_memory_le in MEM0.  
