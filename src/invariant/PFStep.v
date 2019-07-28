@@ -6,6 +6,7 @@ Require Import sflib.
 Require Import Axioms.
 Require Import Basic.
 Require Import DataStructure.
+Require Import DenseOrder.
 Require Import Time.
 Require Import Event.
 Require Import Language.
@@ -848,7 +849,6 @@ Module PFStep.
     induction dom.
     { exists Memory.init. econs; i; ss.
       unfold Memory.get, Memory.init, Cell.get, Cell.init in GET_SRC. ss.
-      Require Import DenseOrder.
       apply DOMap.singleton_find_inv in GET_SRC. des. inv GET_SRC0.
       esplits; eauto.
     }
