@@ -2010,7 +2010,8 @@ Module PFStepCap.
     exploit COMPLETE; eauto. i. des; eauto; try congr.
     destruct (Memory.get loc (latests loc) promises) as [[]|] eqn:GETP.
     - exploit BACK_SOME; eauto. i. congr.
-    - exploit BACK_NONE; eauto. i. des. eauto.
+    - exploit BACK_NONE; eauto. i. des.
+      rewrite GET1 in *. inv x0. eauto.
   Qed.
 
   Lemma sim_memory_bot_vals_incl
