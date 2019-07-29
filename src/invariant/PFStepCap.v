@@ -1221,7 +1221,11 @@ Module PFStepCap.
   Proof.
     destruct e1, e2. ss. inv STEP.
     exploit Thread.step_future; eauto. s. i. des.
-    assert (CAPS2: caps_sound caps (Local.promises local0) memory0) by admit.
+    assert (CAPS2: caps_sound caps (Local.promises local0) memory0).
+    { ii. exploit CAPS1; eauto. i. des.
+      exploit Thread.step_non_promised; eauto. s. i. des.
+      split; auto. inv LOWER; eauto.
+      exploit Memory.lower_get1; try exact GET2; eauto. i. des. eauto. }
     inv LOWER; try by (esplits; eauto).
     assert (FUTURE: Memory.future mem2 memory0).
     { econs; eauto. econs; eauto. econs. ss.
@@ -1235,7 +1239,7 @@ Module PFStepCap.
     - eapply Memory.future_closed_timemap; eauto.
     - eapply Memory.future_closed; eauto.
     - etrans; eauto.
-  Admitted.
+  Qed.
 
   Lemma program_step
         latests caps

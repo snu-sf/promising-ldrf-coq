@@ -455,27 +455,50 @@ Module Thread.
       eapply Memory.no_half_except_bot_no_half; eauto.
       apply CLOSED2.
     Qed.
+
+
+    (* step_non_promised *)
+
+    Lemma step_non_promised
+          pf e e1 e2
+          l f t m
+          (STEP: step pf e e1 e2)
+          (GETP1: Memory.get l t e1.(local).(Local.promises) = None)
+          (GET1: Memory.get l t e1.(memory) = Some (f, m)):
+      <<GETP2: Memory.get l t e2.(local).(Local.promises) = None>> /\
+      <<GET2: Memory.get l t e2.(memory) = Some (f, m)>>.
+    Proof.
+      inv STEP; inv STEP0.
+      - eapply Local.promise_step_non_promised; eauto.
+      - eapply Local.program_step_non_promised; eauto.
+    Qed.
+
+    Lemma rtc_all_step_non_promised
+          e1 e2
+          l f t m
+          (STEP: rtc all_step e1 e2)
+          (GETP1: Memory.get l t e1.(local).(Local.promises) = None)
+          (GET1: Memory.get l t e1.(memory) = Some (f, m)):
+      <<GETP2: Memory.get l t e2.(local).(Local.promises) = None>> /\
+      <<GET2: Memory.get l t e2.(memory) = Some (f, m)>>.
+    Proof.
+      induction STEP; ss; i.
+      inv H. inv USTEP.
+      exploit step_non_promised; eauto. i. des. eauto.
+    Qed.
+
+    Lemma rtc_tau_step_non_promised
+          e1 e2
+          l f t m
+          (STEP: rtc tau_step e1 e2)
+          (GETP1: Memory.get l t e1.(local).(Local.promises) = None)
+          (GET1: Memory.get l t e1.(memory) = Some (f, m)):
+      <<GETP2: Memory.get l t e2.(local).(Local.promises) = None>> /\
+      <<GET2: Memory.get l t e2.(memory) = Some (f, m)>>.
+    Proof.
+      induction STEP; ss; i.
+      inv H. inv TSTEP.
+      exploit step_non_promised; eauto. i. des. eauto.
+    Qed.
   End Thread.
 End Thread.
-
-(* Lemma promise_pf_inv *)
-(*       (kind:Memory.op_kind) *)
-(*       (msg:Message.t) *)
-(*       (PF: (Memory.op_kind_is_lower_full kind) && (Message.is_released_none msg)): *)
-(*   exists val released, kind = Memory.op_kind_lower (Message.full val released) /\ *)
-(*           Message.is_released_none msg = true. *)
-(* Proof. *)
-(*   apply andb_true_iff in PF. des. *)
-(*   destruct kind; inv PF. destruct msg1; ss. *)
-(*   esplits; eauto. *)
-(* Qed. *)
-
-(* Lemma promise_pf_false_inv *)
-(*       (kind:Memory.op_kind) *)
-(*       (msg:Message.t) *)
-(*       (PF: false = (Memory.op_kind_is_lower_full kind) && (Message.is_released_none msg)): *)
-(*   Memory.op_kind_is_lower_full kind = false \/ ~ Message.is_released_none msg. *)
-(* Proof. *)
-(*   symmetry in PF. apply andb_false_iff in PF. des; auto. *)
-(*   right. ii. rewrite PF in H. inv H. *)
-(* Qed. *)

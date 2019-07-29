@@ -1729,6 +1729,37 @@ Module Memory.
     inv PROMISE; splits; eauto using op_get2.
   Qed.
 
+  Lemma promise_get_None
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        l f t m
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (GETP1: Memory.get l t promises1 = None)
+        (GET1: Memory.get l t mem1 = Some (f, m)):
+    <<GETP2: Memory.get l t promises2 = None>> /\
+    <<GET2: Memory.get l t mem2 = Some (f, m)>>.
+  Proof.
+    inv PROMISE.
+    - exploit add_get0; try exact PROMISES. i. des.
+      exploit add_get0; try exact MEM. i. des.
+      erewrite add_o; eauto. condtac; ss.
+      + des. subst. congr.
+      + splits; auto.
+        erewrite add_o; eauto. condtac; ss.
+    - exploit split_get0; try exact PROMISES. i. des.
+      exploit split_get0; try exact MEM. i. des.
+      erewrite split_o; eauto. repeat condtac; ss.
+      + des. subst. congr.
+      + guardH o. des. subst. congr.
+      + splits; auto.
+        erewrite split_o; eauto. repeat condtac; ss.
+    - exploit lower_get0; try exact PROMISES. i. des.
+      exploit lower_get0; try exact MEM. i. des.
+      erewrite lower_o; eauto. condtac; ss.
+      + des. subst. congr.
+      + splits; auto.
+        erewrite lower_o; eauto. condtac; ss.
+  Qed.
+
   Lemma op_future
         mem1 loc from to msg mem2 kind
         (OP: op mem1 loc from to msg mem2 kind)
@@ -1900,6 +1931,21 @@ Module Memory.
     - erewrite remove_o; eauto. condtac; ss. des; ss.
     - exploit promise_future0; try apply PROMISE; eauto. i. des.
       eapply promise_get2; eauto.
+  Qed.
+
+  Lemma write_get_None
+        promises1 mem1 loc from to val released promises2 mem2 kind
+        l f t m
+        (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind)
+        (GETP1: Memory.get l t promises1 = None)
+        (GET1: Memory.get l t mem1 = Some (f, m)):
+    <<GETP2: Memory.get l t promises2 = None>> /\
+    <<GET2: Memory.get l t mem2 = Some (f, m)>>.
+  Proof.
+    inv WRITE.
+    exploit promise_get_None; eauto. i. des.
+    splits; auto.
+    erewrite Memory.remove_o; eauto. condtac; ss.
   Qed.
 
   Lemma write_future0
