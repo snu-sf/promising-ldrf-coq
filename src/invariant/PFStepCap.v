@@ -1183,15 +1183,35 @@ Module PFStepCap.
   .
   Hint Constructors pf_step.
 
+  Definition caps_sound (caps: Loc.t -> option Time.t) (promises mem: Memory.t): Prop :=
+    forall loc to (TO: Some to = caps loc),
+      Memory.get loc to promises = None /\
+      exists from msg, Memory.get loc to mem = Some (from, msg).
+
+  Lemma sim_memory_caps_sound
+        latests caps
+        promises_src promises_tgt mem_src mem_tgt
+        (PROMISES: sim_promises promises_src promises_tgt)
+        (MEM: sim_memory latests caps promises_tgt mem_src mem_tgt):
+    caps_sound caps promises_src mem_src.
+  Proof.
+    inv PROMISES. inv MEM. ii.
+    exploit CAPS; eauto. i. des.
+    esplits; eauto.
+    destruct (Memory.get loc to promises_src) as [[]|] eqn:GETP; ss.
+    exploit SOUND; eauto. i. des.
+    exploit CAPP; eauto. i. congr.
+  Qed.
+
   Lemma pf_step_future
-        lang
-        latests caps e_tgt
+        lang caps
         e1 e2
-        (SIM: @sim_thread lang latests caps e2 e_tgt)
-        (STEP: pf_step caps e1 e2)
+        (STEP: @pf_step lang caps e1 e2)
+        (CAPS1: caps_sound caps e1.(Thread.local).(Local.promises) e1.(Thread.memory))
         (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
         (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
         (CLOSED1: Memory.closed e1.(Thread.memory)):
+    <<CAPS2: caps_sound caps e2.(Thread.local).(Local.promises) e2.(Thread.memory)>> /\
     <<WF2: Local.wf e2.(Thread.local) e2.(Thread.memory)>> /\
     <<SC2: Memory.closed_timemap e2.(Thread.sc) e2.(Thread.memory)>> /\
     <<CLOSED2: Memory.closed e2.(Thread.memory)>> /\
@@ -1199,8 +1219,9 @@ Module PFStepCap.
     <<SC_FUTURE: TimeMap.le e1.(Thread.sc) e2.(Thread.sc)>> /\
     <<MEM_FUTURE: Memory.future e1.(Thread.memory) e2.(Thread.memory)>>.
   Proof.
-    destruct e1, e2, e_tgt. ss. inv STEP.
+    destruct e1, e2. ss. inv STEP.
     exploit Thread.step_future; eauto. s. i. des.
+    assert (CAPS2: caps_sound caps (Local.promises local0) memory0) by admit.
     inv LOWER; try by (esplits; eauto).
     assert (FUTURE: Memory.future mem2 memory0).
     { econs; eauto. econs; eauto. econs. ss.
@@ -1210,15 +1231,11 @@ Module PFStepCap.
       + eapply TView.future_closed; eauto.
       + ii. exploit PROMISES; eauto. i.
         erewrite Memory.lower_o; eauto. condtac; ss.
-        des. subst.
-        inv SIM. inv MEMORY. ss. specialize (CAPP loc).
-        inv LOCAL. inv PROMISES0.
-        exploit SOUND0; eauto. i. des.
-        exploit CAPP; eauto. congr.
+        des. subst. exploit CAPS2; eauto. i. des. congr.
     - eapply Memory.future_closed_timemap; eauto.
     - eapply Memory.future_closed; eauto.
     - etrans; eauto.
-  Qed.
+  Admitted.
 
   Lemma program_step
         latests caps
@@ -1391,6 +1408,7 @@ Module PFStepCap.
     exploit thread_step; try exact STEP; eauto.
     { eapply rtc_all_step_promise_consistent; eauto. }
     i. des.
+    hexploit sim_memory_caps_sound; try apply SIM1; eauto. i.
     exploit pf_step_future; try exact STEP_SRC; eauto. i. des.
     exploit IHSTEPS_TGT; try exact SIM2; eauto. i. des.
     esplits; try exact SIM0.
@@ -1401,6 +1419,7 @@ Module PFStepCap.
         lang latests caps e1_src
         e1_tgt e2_tgt
         (SIM1: @sim_thread lang latests caps e1_src e1_tgt)
+        (CAPS1_SRC: caps_sound caps e1_src.(Thread.local).(Local.promises) e1_src.(Thread.memory))
         (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
         (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
         (SC1_SRC: Memory.closed_timemap e1_src.(Thread.sc) e1_src.(Thread.memory))
@@ -1961,7 +1980,7 @@ Module PFStepCap.
         (SC1_TGT: Memory.closed_timemap e_tgt.(Thread.sc) e_tgt.(Thread.memory))
         (MEM1_SRC: Memory.closed e_src.(Thread.memory))
         (MEM1_TGT: Memory.closed e_tgt.(Thread.memory))
-        (SC_TGT: Memory.max_full_timemap e_tgt.(Thread.memory) sc1_tgt)
+        (SC_TGT: Memory.max_full_timemap mem1_tgt sc1_tgt)
         (CAP_TGT: Memory.cap e_tgt.(Thread.local).(Local.promises) e_tgt.(Thread.memory) mem1_tgt):
     exists latests caps sc1_src mem1_src,
       <<SIM: sim_thread latests caps
