@@ -62,7 +62,7 @@ Proof.
     + ii. des; clarify.
 Qed.
 
-Lemma step_lifting
+Lemma step_lifting_raw
       lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc'
       mem_src mem_tgt mem_tgt' e_tgt others updates otherspace
 
@@ -127,6 +127,44 @@ Proof.
   - eauto.
   - exploit write_not_in_unchanged_on; try apply STEP3; eauto.
 Qed.
+
+
+Lemma step_lifting
+      lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc'
+      mem_src mem_tgt mem_tgt' e_tgt others updates otherspace
+      (OTHERS: others <2= otherspace)
+
+      (STEP: (@pred_step
+                ((fun _ => True)
+                   /1\ (no_update_on updates)
+                   /1\ (no_read_msgs others)) lang) e_tgt th_tgt th_tgt')
+
+      (TH_SRC: th_src = Thread.mk lang st (Local.mk v Memory.bot) sc mem_src)
+      (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v prom) sc mem_tgt)
+      (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
+      (MEM: pf_sim_memory (others \2/ promised prom) mem_src mem_tgt)
+      (NOATTATCH: not_attatched updates mem_src)
+
+      (CONSISTENT: local_consistent (Local.mk v' prom'))
+      (OTHERSPACE: otherspace <2= unchangables mem_tgt prom)
+
+      (SC: Memory.closed_timemap sc mem_tgt)
+      (CLOSED: Memory.closed mem_tgt)
+      (LCWF: Local.wf (Local.mk v prom) mem_tgt)
+  :
+    exists mem_src' e_src,
+      (<<STEP: opt_pred_step
+                 (no_promise) e_src th_src
+                 (Thread.mk lang st' (Local.mk v' Memory.bot) sc' mem_src')>>) /\
+      (<<EVT: ThreadEvent.get_event e_src = ThreadEvent.get_event e_tgt>>) /\
+      (<<MEM: pf_sim_memory (others \2/ promised prom') mem_src' mem_tgt'>>) /\
+      (<<NOATTATCH: not_attatched updates mem_src'>>) /\
+      (<<UNCHANGED: unchanged_on otherspace mem_src mem_src'>>).
+Proof.
+
+
+
+  hexploit (forget_exists prom.(promised) mem_tgt); eauto. i. des.
 
 
 
