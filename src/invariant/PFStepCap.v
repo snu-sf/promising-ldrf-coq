@@ -18,16 +18,14 @@ Require Import Local.
 Require Import Thread.
 
 Require Import PromiseConsistent.
+Require Import PFStepCommon.
 Require Import PFStep.
 
 Set Implicit Arguments.
 
-Module CapPFStep.
-  Definition sim_promises := PFStep.sim_promises.
-  Hint Unfold sim_promises.
-  Definition sim_local := PFStep.sim_local.
-  Hint Unfold sim_local.
-  Definition sim_message := PFStep.sim_message.
+
+Module PFStepCap.
+  Include PFStepCommon.
 
   Definition cap_src (latests: TimeMap.t) (loc: Loc.t) (promises: Memory.t)
              (msg_src: Message.t) (val: Const.t) (released_tgt: option View.t): Prop :=
@@ -85,8 +83,6 @@ Module CapPFStep.
     - right. ii. ss.
     - right. ii. ss.
   Qed.
-
-  Definition sim_promises_get_src := PFStep.sim_promises_get_src.
 
   Lemma sim_memory_get_src
         latests caps
@@ -147,6 +143,9 @@ Module CapPFStep.
       + exploit COMPLETE0; eauto. i. des.
         unguard. esplits; eauto.
   Qed.
+
+
+  (* lemmas on step *)
 
   Lemma promise
         msg_src
@@ -446,8 +445,6 @@ Module CapPFStep.
     esplits; eauto. econs; eauto. apply LOCAL1.
   Qed.
 
-  Definition read_promise_None := PFStep.read_promise_None.
-
   Lemma read_cap
         latests caps mem1_src
         lc1 mem1_tgt loc to val released ord lc2
@@ -493,7 +490,7 @@ Module CapPFStep.
       <<LOCAL2: sim_local lc2_src lc2_tgt>> /\
       <<RELEASED: View.opt_le released_src released_tgt>>.
   Proof.
-    exploit read_promise_None; try exact STEP_TGT; eauto. i.
+    exploit promise_consistent_read_step_promise; try exact STEP_TGT; eauto. i.
     destruct (opt_ts_eq_dec (Some to) (caps loc)).
     - exploit read_cap; eauto. i.
       inv MEM1. clear SOUND COMPLETE LATESTS.
@@ -807,7 +804,7 @@ Module CapPFStep.
         erewrite Memory.lower_o; eauto. condtac; des; ss; try congr.
         i. inv GET_SRC.
         erewrite Memory.lower_o; eauto. condtac; des; ss; try congr.
-        esplits; eauto. econs. ss.
+        esplits; eauto.
       + guardH o.
         erewrite Memory.lower_o; eauto. condtac; ss.
         revert GET_SRC. erewrite Memory.lower_o; eauto. condtac; ss.
@@ -821,7 +818,7 @@ Module CapPFStep.
         erewrite Memory.lower_o; eauto. condtac; des; ss. i. inv GET_TGT.
         erewrite Memory.lower_o; eauto. condtac; des; ss; try congr.
         erewrite Memory.lower_o; eauto. condtac; des; ss.
-        esplits; eauto. econs. ss.
+        esplits; eauto.
       + guardH o.
         erewrite Memory.lower_o; eauto. condtac; ss.
         { des. subst. congr. }
@@ -845,8 +842,7 @@ Module CapPFStep.
         * erewrite Memory.lower_o; eauto. condtac; [|eauto].
           ss. des. subst. timetac.
         * unfold cap_src in *. des_ifs; eauto.
-          { revert Heq. erewrite Memory.remove_o; eauto. condtac; ss. }
-          { econs. ss. }
+          revert Heq. erewrite Memory.remove_o; eauto. condtac; ss.
       + destruct (Loc.eq_dec loc0 loc).
         { subst. des; ss. }
         clear o COND.
@@ -976,8 +972,6 @@ Module CapPFStep.
             - erewrite Memory.lower_o; eauto. condtac; ss. congr. }
   Qed.
 
-  Definition view_opt_le_time_le := PFStep.view_opt_le_time_le.
-
   Lemma write_step
         latests caps
         lc1_src sc1_src mem1_src releasedm_src
@@ -1012,7 +1006,7 @@ Module CapPFStep.
     { apply WF1_TGT. }
     { econs. eapply TViewFacts.write_future0; ss. apply WF1_SRC. }
     { econs. etrans; try by (inv PROMISE; inv TS; eauto).
-      apply view_opt_le_time_le.
+      apply View.opt_le_ts.
       apply TViewFacts.write_released_mon; try refl; ss.
       - apply LOCAL1.
       - apply WF1_TGT. }
@@ -1075,7 +1069,7 @@ Module CapPFStep.
     { apply WF1_TGT. }
     { econs. eapply TViewFacts.write_future0; ss. apply WF1_SRC. }
     { econs. etrans; try by (inv PROMISE; inv TS; eauto).
-      apply view_opt_le_time_le.
+      apply View.opt_le_ts.
       apply TViewFacts.write_released_mon; try refl; ss.
       - apply LOCAL1.
       - apply WF1_TGT. }
@@ -1137,7 +1131,7 @@ Module CapPFStep.
     { apply WF1_TGT. }
     { econs. eapply TViewFacts.write_future0; ss. apply WF1_SRC. }
     { econs. etrans; try by (inv PROMISE; inv TS; eauto).
-      apply view_opt_le_time_le.
+      apply View.opt_le_ts.
       apply TViewFacts.write_released_mon; try refl; ss.
       - apply LOCAL1.
       - apply WF1_TGT. }
@@ -1163,8 +1157,6 @@ Module CapPFStep.
     - ss.
     - ss.
   Qed.
-
-  Definition fence_step := PFStep.fence_step.
 
   Inductive lower_cap (caps: Loc.t -> option Time.t): forall (mem1 mem2: Memory.t), Prop :=
   | lower_cap_refl mem:
@@ -1492,80 +1484,6 @@ Module CapPFStep.
           <<PROMISE: Memory.latest_half loc promises mem1>>)
   .
 
-  Lemma sim_memory_max_ts
-        promises_src promises_tgt mem_src mem_tgt
-        (PROMISES: sim_promises promises_src promises_tgt)
-        (MEM: PFStep.sim_memory promises_tgt mem_src mem_tgt)
-        (LE_SRC: Memory.le promises_src mem_src)
-        (LE_TGT: Memory.le promises_tgt mem_tgt)
-        (INHABITED_SRC: Memory.inhabited mem_src)
-        (INHABITED_TGT: Memory.inhabited mem_tgt):
-    forall loc, Memory.max_ts loc mem_src = Memory.max_ts loc mem_tgt.
-  Proof.
-    i. inv PROMISES. inv MEM.
-    exploit Memory.max_ts_spec; try eapply INHABITED_SRC.
-    instantiate (1 := loc). i. des. clear MAX.
-    exploit Memory.max_ts_spec; try eapply INHABITED_TGT.
-    instantiate (1 := loc). i. des. clear MAX.
-    apply TimeFacts.antisym.
-    - destruct (Memory.get loc (Memory.max_ts loc mem_src) promises_tgt) as [[]|] eqn:GETP.
-      + exploit LE_TGT; eauto. i.
-        exploit Memory.max_ts_spec; try exact x. i. des. ss.
-      + exploit SOUND0; eauto. i. des.
-        exploit Memory.max_ts_spec; try exact GET_TGT. i. des. ss.
-    - destruct (Memory.get loc (Memory.max_ts loc mem_tgt) promises_tgt) as [[]|] eqn:GETP.
-      + exploit COMPLETE; eauto. i. des.
-        exploit LE_SRC; eauto. i.
-        exploit Memory.max_ts_spec; try exact x0. i. des. ss.
-      + exploit COMPLETE0; eauto. i. des.
-        exploit Memory.max_ts_spec; try exact GET_SRC. i. des. ss.
-  Qed.
-
-  Lemma sim_memory_adjacent_src
-        promises_src promises_tgt mem_src mem_tgt
-        loc from1 to1 from2 to2
-        (PROMISES: sim_promises promises_src promises_tgt)
-        (MEM: PFStep.sim_memory promises_tgt mem_src mem_tgt)
-        (LE_SRC: Memory.le promises_src mem_src)
-        (LE_TGT: Memory.le promises_tgt mem_tgt)
-        (ADJ_SRC: Memory.adjacent loc from1 to1 from2 to2 mem_src):
-    Memory.adjacent loc from1 to1 from2 to2 mem_tgt.
-  Proof.
-    inv ADJ_SRC.
-    exploit PFStep.sim_memory_get_src; try exact GET1; eauto. i. des.
-    exploit PFStep.sim_memory_get_src; try exact GET2; eauto. i. des.
-    econs; eauto. i.
-    exploit EMPTY; eauto. i.
-    inv PROMISES. inv MEM.
-    destruct (Memory.get loc ts mem_tgt) as [[]|] eqn:GET; ss.
-    destruct (Memory.get loc ts promises_tgt) as [[]|] eqn:GETP.
-    - exploit COMPLETE; eauto. i. des.
-      exploit LE_SRC; eauto. i. congr.
-    - exploit COMPLETE0; eauto. i. des. congr.
-  Qed.
-
-  Lemma sim_memory_adjacent_tgt
-        promises_src promises_tgt mem_src mem_tgt
-        loc from1 to1 from2 to2
-        (PROMISES: sim_promises promises_src promises_tgt)
-        (MEM: PFStep.sim_memory promises_tgt mem_src mem_tgt)
-        (LE_SRC: Memory.le promises_src mem_src)
-        (LE_TGT: Memory.le promises_tgt mem_tgt)
-        (ADJ_TGT: Memory.adjacent loc from1 to1 from2 to2 mem_tgt):
-    Memory.adjacent loc from1 to1 from2 to2 mem_src.
-  Proof.
-    inv ADJ_TGT.
-    exploit PFStep.sim_memory_get_tgt; try exact GET1; eauto. i. des.
-    exploit PFStep.sim_memory_get_tgt; try exact GET2; eauto. i. des.
-    econs; eauto; i.
-    exploit EMPTY; eauto. i.
-    inv PROMISES. inv MEM.
-    destruct (Memory.get loc ts mem_src) as [[]|] eqn:GET; ss.
-    destruct (Memory.get loc ts promises_tgt) as [[]|] eqn:GETP.
-    - exploit LE_TGT; eauto. i. congr.
-    - exploit SOUND0; eauto. i. des. congr.
-  Qed.
-
   Lemma caps_exists promises mem:
     exists (caps: Loc.t -> option Time.t),
     forall loc,
@@ -1604,15 +1522,14 @@ Module CapPFStep.
   Proof.
     specialize (caps_exists promises_tgt mem1_tgt). i. des.
     assert (MAX: forall loc, Memory.max_ts loc mem1_src = Memory.max_ts loc mem1_tgt).
-    { eapply sim_memory_max_ts; eauto. }
+    { eapply PFStep.sim_memory_max_ts; eauto. }
     dup MEM1. inv MEM0. inv CAP_SRC. inv CAP_TGT.
     exists caps. econs; i.
     { exploit COMPLETE0; eauto. i. des.
       - exploit SOUND; eauto. i. des.
         exploit SOUND1; eauto.
-      - subst. exploit sim_memory_adjacent_src; eauto. i.
-        exploit MIDDLE0; eauto. i.
-        esplits; eauto. ss.
+      - subst. exploit PFStep.sim_memory_adjacent_src; eauto. i.
+        exploit MIDDLE0; eauto.
       - subst. move H at bottom. specialize (H loc).
         destruct (caps loc); des; try congr.
         exfalso.
@@ -1623,9 +1540,8 @@ Module CapPFStep.
       - exploit SOUND1; eauto. i.
         exploit COMPLETE; eauto. i. des.
         exploit SOUND0; eauto.
-      - subst. exploit sim_memory_adjacent_tgt; eauto. i.
-        exploit MIDDLE; eauto. i.
-        esplits; eauto. ss.
+      - subst. exploit PFStep.sim_memory_adjacent_tgt; eauto. i.
+        exploit MIDDLE; eauto.
       - subst. move H at bottom. specialize (H loc).
         destruct (caps loc); des; try congr.
     }
@@ -2072,39 +1988,45 @@ Module CapPFStep.
     - eapply Memory.future_closed; eauto.
   Qed.
 
-  Definition vals_incl (mem1 mem2: Memory.t): Prop :=
-    forall loc from to val released
-      (GET2: Memory.get loc to mem2 = Some (from, Message.full val released)),
-    exists f t v r,
-      <<GET1: Memory.get loc t mem1 = Some (f, Message.full v r)>>.
+
+  (* lemmas on sim_memory *)
+
+  Lemma lower_cap_vals_incl
+        caps mem1 mem2
+        (LOWER: lower_cap caps mem1 mem2):
+    vals_incl mem2 mem1.
+  Proof.
+    inv LOWER; try refl. ii. revert GET1.
+    erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+    des. subst. i. inv GET1. eauto.
+  Qed.
 
   Lemma cap_aux_src_vals_incl
         latests promises mem1 mem2
         (CAP: cap_aux_src latests promises mem1 mem2):
-    vals_incl mem1 mem2.
+    vals_incl mem2 mem1.
   Proof.
     inv CAP. ii.
-    exploit COMPLETE; eauto. i. des; eauto.
-    - congr.
-    - destruct (Memory.get loc (latests loc) promises) as [[]|] eqn:GETP.
-      + exploit BACK_SOME; eauto. i. congr.
-      + exploit BACK_NONE; eauto. i. des. eauto.
+    exploit COMPLETE; eauto. i. des; eauto; try congr.
+    destruct (Memory.get loc (latests loc) promises) as [[]|] eqn:GETP.
+    - exploit BACK_SOME; eauto. i. congr.
+    - exploit BACK_NONE; eauto. i. des. eauto.
   Qed.
 
   Lemma sim_memory_bot_vals_incl
         latests caps promises mem_src mem_tgt
         (SIM: sim_memory latests caps promises mem_src mem_tgt)
         (PROMISES: promises = Memory.bot):
-    vals_incl mem_src mem_tgt.
+    vals_incl mem_tgt mem_src.
   Proof.
     inv SIM. ii.
     destruct (opt_ts_eq_dec (Some to) (caps loc)).
     - exploit CAPS; eauto. i. des.
-      rewrite GET2 in CAP_TGT. inv CAP_TGT.
+      rewrite GET1 in CAP_TGT. inv CAP_TGT.
       unfold cap_src in *. rewrite Memory.bot_get in MSG. inv MSG.
       eauto.
     - exploit COMPLETE; eauto.
       { rewrite Memory.bot_get. ss. }
       i. des. inv MSG. eauto.
   Qed.
-End CapPFStep.
+End PFStepCap.

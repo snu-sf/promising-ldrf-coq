@@ -441,4 +441,13 @@ Module View <: JoinableType.
     le (join v1 v2) (join w1 w2).
   Proof. eauto using join_spec, join_l, join_r. Qed.
 
+  Lemma opt_le_ts
+        v1 v2 loc
+        (LE: opt_le v1 v2):
+    Time.le (v1.(unwrap).(rlx) loc) (v2.(unwrap).(rlx) loc).
+  Proof.
+    inv LE; ss.
+    - unfold TimeMap.bot. apply Time.bot_spec.
+    - inv LE0. ss.
+  Qed.
 End View.

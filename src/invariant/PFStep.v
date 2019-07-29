@@ -19,43 +19,13 @@ Require Import Thread.
 
 Require Import PromiseConsistent.
 
+Require Import PFStepCommon.
+
 Set Implicit Arguments.
 
+
 Module PFStep.
-  Inductive sim_promises (promises_src promises_tgt: Memory.t): Prop :=
-  | sim_promises_intro
-      (SOUND: forall loc from to msg_src
-                (GET_SRC: Memory.get loc to promises_src = Some (from, msg_src)),
-          exists msg_tgt,
-            <<GET_TGT: Memory.get loc to promises_tgt = Some (from, msg_tgt)>>)
-      (COMPLETE: forall loc from to msg
-                   (GET_TGT: Memory.get loc to promises_tgt = Some (from, msg)),
-          <<GET_SRC: Memory.get loc to promises_src = Some (from, Message.half)>>)
-  .
-
-  Inductive sim_local (lc_src lc_tgt: Local.t): Prop :=
-  | sim_local_intro
-      (TVIEW: TView.le lc_src.(Local.tview) lc_tgt.(Local.tview))
-      (PROMISES: sim_promises lc_src.(Local.promises) lc_tgt.(Local.promises))
-  .
-
-  Inductive sim_message: forall (msg_src msg_tgt: Message.t), Prop :=
-  | sim_message_full
-      val released_src released_tgt
-      (RELEASED: View.opt_le released_src released_tgt):
-      sim_message (Message.full val released_src) (Message.full val released_tgt)
-  | sim_message_half:
-      sim_message Message.half Message.half
-  .
-  Hint Constructors sim_message.
-
-  Program Instance sim_message_PreOrder: PreOrder sim_message.
-  Next Obligation.
-    ii. destruct x; econs; refl.
-  Qed.
-  Next Obligation.
-    ii. inv H; inv H0; econs. etrans; eauto.
-  Qed.
+  Include PFStepCommon.
 
   Inductive sim_memory (promises mem_src mem_tgt: Memory.t): Prop :=
   | sim_memory_intro
@@ -82,22 +52,6 @@ Module PFStep.
                           e_src.(Thread.memory) e_tgt.(Thread.memory))
   .
 
-
-  Lemma sim_promises_get_src
-        promises_src promises_tgt
-        loc from to msg_src
-        (PROMISES: sim_promises promises_src promises_tgt)
-        (GET_SRC: Memory.get loc to promises_src = Some (from, msg_src)):
-    exists msg_tgt,
-      <<GET_TGT: Memory.get loc to promises_tgt = Some (from, msg_tgt)>> /\
-      <<MSG: msg_src = Message.half>>.
-  Proof.
-    inv PROMISES.
-    exploit SOUND; eauto. i. des.
-    exploit COMPLETE; eauto. i. des.
-    rewrite GET_SRC in x. inv x.
-    esplits; eauto.
-  Qed.
 
   Lemma sim_memory_get_src
         promises_src promises_tgt
@@ -146,6 +100,83 @@ Module PFStep.
     - exploit COMPLETE0; eauto. i. des.
       unguard. esplits; eauto.
   Qed.
+
+  Lemma sim_memory_max_ts
+        promises_src promises_tgt mem_src mem_tgt
+        (PROMISES: sim_promises promises_src promises_tgt)
+        (MEM: sim_memory promises_tgt mem_src mem_tgt)
+        (LE_SRC: Memory.le promises_src mem_src)
+        (LE_TGT: Memory.le promises_tgt mem_tgt)
+        (INHABITED_SRC: Memory.inhabited mem_src)
+        (INHABITED_TGT: Memory.inhabited mem_tgt):
+    forall loc, Memory.max_ts loc mem_src = Memory.max_ts loc mem_tgt.
+  Proof.
+    i. inv PROMISES. inv MEM.
+    exploit Memory.max_ts_spec; try eapply INHABITED_SRC.
+    instantiate (1 := loc). i. des. clear MAX.
+    exploit Memory.max_ts_spec; try eapply INHABITED_TGT.
+    instantiate (1 := loc). i. des. clear MAX.
+    apply TimeFacts.antisym.
+    - destruct (Memory.get loc (Memory.max_ts loc mem_src) promises_tgt) as [[]|] eqn:GETP.
+      + exploit LE_TGT; eauto. i.
+        exploit Memory.max_ts_spec; try exact x. i. des. ss.
+      + exploit SOUND0; eauto. i. des.
+        exploit Memory.max_ts_spec; try exact GET_TGT. i. des. ss.
+    - destruct (Memory.get loc (Memory.max_ts loc mem_tgt) promises_tgt) as [[]|] eqn:GETP.
+      + exploit COMPLETE; eauto. i. des.
+        exploit LE_SRC; eauto. i.
+        exploit Memory.max_ts_spec; try exact x0. i. des. ss.
+      + exploit COMPLETE0; eauto. i. des.
+        exploit Memory.max_ts_spec; try exact GET_SRC. i. des. ss.
+  Qed.
+
+  Lemma sim_memory_adjacent_src
+        promises_src promises_tgt mem_src mem_tgt
+        loc from1 to1 from2 to2
+        (PROMISES: sim_promises promises_src promises_tgt)
+        (MEM: sim_memory promises_tgt mem_src mem_tgt)
+        (LE_SRC: Memory.le promises_src mem_src)
+        (LE_TGT: Memory.le promises_tgt mem_tgt)
+        (ADJ_SRC: Memory.adjacent loc from1 to1 from2 to2 mem_src):
+    Memory.adjacent loc from1 to1 from2 to2 mem_tgt.
+  Proof.
+    inv ADJ_SRC.
+    exploit sim_memory_get_src; try exact GET1; eauto. i. des.
+    exploit sim_memory_get_src; try exact GET2; eauto. i. des.
+    econs; eauto. i.
+    exploit EMPTY; eauto. i.
+    inv PROMISES. inv MEM.
+    destruct (Memory.get loc ts mem_tgt) as [[]|] eqn:GET; ss.
+    destruct (Memory.get loc ts promises_tgt) as [[]|] eqn:GETP.
+    - exploit COMPLETE; eauto. i. des.
+      exploit LE_SRC; eauto. i. congr.
+    - exploit COMPLETE0; eauto. i. des. congr.
+  Qed.
+
+  Lemma sim_memory_adjacent_tgt
+        promises_src promises_tgt mem_src mem_tgt
+        loc from1 to1 from2 to2
+        (PROMISES: sim_promises promises_src promises_tgt)
+        (MEM: sim_memory promises_tgt mem_src mem_tgt)
+        (LE_SRC: Memory.le promises_src mem_src)
+        (LE_TGT: Memory.le promises_tgt mem_tgt)
+        (ADJ_TGT: Memory.adjacent loc from1 to1 from2 to2 mem_tgt):
+    Memory.adjacent loc from1 to1 from2 to2 mem_src.
+  Proof.
+    inv ADJ_TGT.
+    exploit sim_memory_get_tgt; try exact GET1; eauto. i. des.
+    exploit sim_memory_get_tgt; try exact GET2; eauto. i. des.
+    econs; eauto; i.
+    exploit EMPTY; eauto. i.
+    inv PROMISES. inv MEM.
+    destruct (Memory.get loc ts mem_src) as [[]|] eqn:GET; ss.
+    destruct (Memory.get loc ts promises_tgt) as [[]|] eqn:GETP.
+    - exploit LE_TGT; eauto. i. congr.
+    - exploit SOUND0; eauto. i. des. congr.
+  Qed.
+
+
+  (* lemmas on step *)
 
   Lemma promise
         msg_src
@@ -310,30 +341,6 @@ Module PFStep.
     esplits; eauto. econs; eauto. apply LOCAL1.
   Qed.
 
-  Lemma read_promise_None
-        lc1 mem1 loc to val released ord lc2
-        (WF1: Local.wf lc1 mem1)
-        (STEP: Local.read_step lc1 mem1 loc to val released ord lc2)
-        (CONS: promise_consistent lc2):
-    Memory.get loc to lc1.(Local.promises) = None.
-  Proof.
-    destruct (Memory.get loc to lc1.(Local.promises)) as [[from msg]|] eqn:GETP; ss.
-    exfalso.
-    inv WF1. inv STEP. exploit PROMISES; eauto. i.
-    rewrite GET in x. inv x.
-    exploit CONS; eauto. ss. i.
-    eapply Time.lt_strorder.
-    eapply TimeFacts.le_lt_lt; eauto.
-    etrans; [|apply Time.join_l]. etrans; [|apply Time.join_r].
-    unfold View.singleton_ur_if. condtac; ss.
-    - unfold TimeMap.singleton.
-      exploit LocFun.add_spec_eq. unfold LocFun.find. i.
-      rewrite x1. refl.
-    - unfold TimeMap.singleton.
-      exploit LocFun.add_spec_eq. unfold LocFun.find. i.
-      rewrite x1. refl.
-  Qed.
-
   Lemma read_step
         lc1_src mem1_src
         lc1_tgt mem1_tgt loc to val released_tgt ord lc2_tgt
@@ -350,7 +357,7 @@ Module PFStep.
       <<LOCAL2: sim_local lc2_src lc2_tgt>> /\
       <<RELEASED: View.opt_le released_src released_tgt>>.
   Proof.
-    exploit read_promise_None; try exact STEP_TGT; eauto. i.
+    exploit promise_consistent_read_step_promise; try exact STEP_TGT; eauto. i.
     inv MEM1. inv LOCAL1. inv STEP_TGT.
     exploit COMPLETE; eauto. i. des. inv MSG.
     esplits.
@@ -478,16 +485,6 @@ Module PFStep.
           inv MEM1. eauto.
   Qed.
 
-  Lemma view_opt_le_time_le
-        v1 v2 loc
-        (LE: View.opt_le v1 v2):
-    Time.le (v1.(View.unwrap).(View.rlx) loc) (v2.(View.unwrap).(View.rlx) loc).
-  Proof.
-    inv LE; ss.
-    - unfold TimeMap.bot. apply Time.bot_spec.
-    - inv LE0. ss.
-  Qed.
-
   Lemma write_step
         lc1_src sc1_src mem1_src releasedm_src
         lc1_tgt sc1_tgt mem1_tgt loc from to val releasedm_tgt released_tgt ord lc2_tgt sc2_tgt mem2_tgt kind_tgt
@@ -520,7 +517,7 @@ Module PFStep.
     { apply WF1_TGT. }
     { econs. eapply TViewFacts.write_future0; ss. apply WF1_SRC. }
     { econs. etrans; try by (inv PROMISE; inv TS; eauto).
-      apply view_opt_le_time_le.
+      apply View.opt_le_ts.
       apply TViewFacts.write_released_mon; try refl; ss.
       - apply LOCAL1.
       - apply WF1_TGT. }
@@ -545,33 +542,6 @@ Module PFStep.
       eapply TViewFacts.write_tview_mon; try refl; ss. apply WF1_TGT.
     - ss.
     - ss.
-  Qed.
-
-  Lemma fence_step
-        lc1_src sc1_src mem1_src
-        lc1_tgt sc1_tgt mem1_tgt ordr ordw lc2_tgt sc2_tgt
-        (LOCAL1: sim_local lc1_src lc1_tgt)
-        (SC1: TimeMap.le sc1_src sc1_tgt)
-        (WF1_SRC: Local.wf lc1_src mem1_src)
-        (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
-        (STEP_TGT: Local.fence_step lc1_tgt sc1_tgt ordr ordw lc2_tgt sc2_tgt):
-    exists lc2_src sc2_src,
-      <<STEP_SRC: Local.fence_step lc1_src sc1_src ordr ordw lc2_src sc2_src>> /\
-      <<LOCAL2: sim_local lc2_src lc2_tgt>> /\
-      <<SC2: TimeMap.le sc2_src sc2_tgt>>.
-  Proof.
-    esplits.
-    - econs; eauto. ii. inv LOCAL1.
-      exploit sim_promises_get_src; eauto. i. des. subst. ss.
-    - inv STEP_TGT. inv LOCAL1. econs; eauto. ss.
-      eapply TViewFacts.write_fence_tview_mon; try refl; ss.
-      + eapply TViewFacts.read_fence_tview_mon; try refl; ss.
-        apply WF1_TGT.
-      + eapply TViewFacts.read_fence_future; apply WF1_SRC.
-    - inv STEP_TGT. inv LOCAL1.
-      eapply TViewFacts.write_fence_sc_mon; try refl; ss.
-      eapply TViewFacts.read_fence_tview_mon; try refl; ss.
-      apply WF1_TGT.
   Qed.
 
   Lemma program_step
@@ -741,78 +711,6 @@ Module PFStep.
 
 
   (* existence of sim *)
-
-  Inductive sim_promises_aux (dom: list (Loc.t * Time.t)) (promises_src promises_tgt: Memory.t): Prop :=
-  | sim_promises_aux_intro
-      (SOUND: forall loc from to msg_src
-                (GET_SRC: Memory.get loc to promises_src = Some (from, msg_src)),
-          List.In (loc, to) dom /\
-          exists msg_tgt, Memory.get loc to promises_tgt = Some (from, msg_tgt))
-      (COMPLETE: forall loc from to msg_tgt
-                   (IN: List.In (loc, to) dom)
-                   (GET_TGT: Memory.get loc to promises_tgt = Some (from, msg_tgt)),
-          Memory.get loc to promises_src = Some (from, Message.half))
-  .
-
-  Lemma sim_promises_aux_exists
-        dom promises_tgt
-        (BOT: Memory.bot_none promises_tgt):
-    exists promises_src,
-      sim_promises_aux dom promises_src promises_tgt.
-  Proof.
-    induction dom.
-    { exists Memory.bot. econs; ss. i.
-      rewrite Memory.bot_get in *. ss. }
-    des. destruct a as [loc to]. inv IHdom.
-    destruct (Memory.get loc to promises_tgt) as [[from msg]|] eqn:GETT; cycle 1.
-    { exists promises_src. econs; i.
-      - exploit SOUND; eauto. i. des.
-        esplits; eauto. econs 2. ss.
-      - inv IN.
-        + inv H. congr.
-        + exploit COMPLETE; eauto.
-    }
-    destruct (Memory.get loc to promises_src) as [[from_src msg_src]|] eqn:GETS.
-    - exploit SOUND; eauto. i. des.
-      rewrite GETT in x0. inv x0.
-      exists promises_src. econs; i.
-      + exploit SOUND; try exact GET_SRC. i. des.
-        esplits; eauto. econs 2. ss.
-      + inv IN.
-        * inv H. exploit COMPLETE; try exact GET_TGT; eauto.
-        * exploit COMPLETE; try exact GET_TGT; eauto.
-    - exploit (@Memory.add_exists promises_src loc from to Message.half); ii.
-      { exploit SOUND; eauto. i. des.
-        exploit Memory.get_disjoint; [exact GETT|exact x1|..].
-        i. des; eauto; congr. }
-      { exploit Memory.get_ts; try exact GETT. i. des; ss.
-        subst. rewrite BOT in GETT. ss. }
-      { econs. }
-      des. exists mem2. econs; i.
-      + revert GET_SRC. erewrite Memory.add_o; eauto. condtac; ss.
-        * i. inv GET_SRC. des. subst. split; eauto.
-        * i. guardH o. exploit SOUND; eauto. i. des.
-          split; eauto.
-      + inv IN.
-        * inv H. rewrite GETT in GET_TGT. inv GET_TGT.
-          exploit Memory.add_get0; eauto. i. des. ss.
-        * exploit COMPLETE; eauto. i.
-          erewrite Memory.add_o; eauto. condtac; ss.
-          des. subst. rewrite GETT in GET_TGT. inv GET_TGT. ss.
-  Qed.
-
-  Lemma sim_promises_exists
-        promises_tgt
-        (BOT: Memory.bot_none promises_tgt):
-    exists promises_src,
-      sim_promises promises_src promises_tgt.
-  Proof.
-    destruct (Memory.finite promises_tgt).
-    exploit (@sim_promises_aux_exists x promises_tgt); ss. i. des.
-    exists promises_src. inv x1. econs; i.
-    - exploit SOUND; eauto. i. des. eauto.
-    - exploit COMPLETE; eauto.
-  Qed.
 
   Inductive sim_memory_aux (dom: list (Loc.t * Time.t)) (promises mem_src mem_tgt: Memory.t): Prop :=
   | sim_memory_aux_intro
@@ -1030,5 +928,23 @@ Module PFStep.
         exploit SOUND; eauto. i. des.
         rewrite BOT in *. ss.
     - ii. inv x2. rewrite INHABITED. esplits; refl.
+  Qed.
+
+
+  (* lemmas on sim_memory and vals_incl *)
+
+  Lemma sim_memory_vals_incl
+        promises_src promises_tgt mem_src mem_tgt
+        (PROMISES: sim_promises promises_src promises_tgt)
+        (MEM: sim_memory promises_tgt mem_src mem_tgt)
+        (LE_SRC: Memory.le promises_src mem_src)
+        (LE_TGT: Memory.le promises_tgt mem_tgt):
+    vals_incl mem_src mem_tgt.
+  Proof.
+    inv PROMISES. inv MEM. ii.
+    destruct (Memory.get loc to promises_tgt) as [[]|] eqn:GETP.
+    - exploit COMPLETE; eauto. i. des.
+      exploit LE_SRC; eauto. i. congr.
+    - exploit SOUND0; eauto. i. des. inv MSG. eauto.
   Qed.
 End PFStep.

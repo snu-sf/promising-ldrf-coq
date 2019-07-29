@@ -60,6 +60,30 @@ Proof.
   etrans; [|apply Time.join_l]. etrans; [|apply Time.join_l]. refl.
 Qed.
 
+Lemma promise_consistent_read_step_promise
+      lc1 mem1 loc to val released ord lc2
+      (WF1: Local.wf lc1 mem1)
+      (STEP: Local.read_step lc1 mem1 loc to val released ord lc2)
+      (CONS: promise_consistent lc2):
+  Memory.get loc to lc1.(Local.promises) = None.
+Proof.
+  destruct (Memory.get loc to lc1.(Local.promises)) as [[from msg]|] eqn:GETP; ss.
+  exfalso.
+  inv WF1. inv STEP. exploit PROMISES; eauto. i.
+  rewrite GET in x. inv x.
+  exploit CONS; eauto. ss. i.
+  eapply Time.lt_strorder.
+  eapply TimeFacts.le_lt_lt; eauto.
+  etrans; [|apply Time.join_l]. etrans; [|apply Time.join_r].
+  unfold View.singleton_ur_if. condtac; ss.
+  - unfold TimeMap.singleton.
+    exploit LocFun.add_spec_eq. unfold LocFun.find. i.
+    rewrite x1. refl.
+  - unfold TimeMap.singleton.
+    exploit LocFun.add_spec_eq. unfold LocFun.find. i.
+    rewrite x1. refl.
+Qed.
+
 Lemma fulfill_unset_promises
       loc from ts msg
       promises1 promises2
