@@ -94,6 +94,22 @@ Section PredStep.
     | _ => True
     end.
 
+  Definition no_update_on (MSGS : Loc.t -> Time.t -> Prop)
+             (e : ThreadEvent.t) : Prop :=
+    match e with
+    | ThreadEvent.update loc from to _ _ _ _ _ _ =>
+      ~ MSGS loc from
+    | _ => True
+    end.
+
+  Definition no_sc (e : ThreadEvent.t) : Prop :=
+    match e with
+    | ThreadEvent.fence _ ordw => ~ Ordering.le Ordering.seqcst ordw
+    | ThreadEvent.syscall _ => False
+    | _ => True
+    end
+  .
+
   Definition write_in (MSGS : Loc.t -> Time.t -> Prop)
              (e : ThreadEvent.t) : Prop :=
     match e with
@@ -103,5 +119,40 @@ Section PredStep.
       forall t (IN: Interval.mem (from, to) t), (MSGS loc t)
     | _ => True
     end.
+
+  Lemma write_not_in_mon L0 L1
+        e
+        (NOTIN: write_not_in L1 e)
+        (LE: L0 <2= L1)
+    :
+      write_not_in L0 e.
+  Proof.
+    i. unfold write_not_in in *. des_ifs.
+    - ii. eapply NOTIN; eauto.
+    - ii. eapply NOTIN; eauto.
+  Qed.
+
+  Lemma no_read_msgs_mon L0 L1
+        e
+        (NOTIN: no_read_msgs L1 e)
+        (LE: L0 <2= L1)
+    :
+      no_read_msgs L0 e.
+  Proof.
+    i. unfold no_read_msgs in *. des_ifs.
+    - ii. eapply NOTIN; eauto.
+    - ii. eapply NOTIN; eauto.
+  Qed.
+
+  Lemma no_update_on_mon L0 L1
+        e
+        (NOTIN: no_update_on L1 e)
+        (LE: L0 <2= L1)
+    :
+      no_update_on L0 e.
+  Proof.
+    i. unfold no_update_on in *. des_ifs.
+    ii. eapply NOTIN; eauto.
+  Qed.
 
 End PredStep.

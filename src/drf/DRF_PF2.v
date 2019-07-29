@@ -35,33 +35,6 @@ Require Import DRF_PF.
 
 Set Implicit Arguments.
 
-Lemma forget_compose P0 P1 m0 m1 m2
-      (FORGET0: forget_memory P0 m0 m1)
-      (FORGET1: forget_memory P1 m1 m2)
-  :
-    forget_memory (P0 \2/ P1) m0 m2.
-Proof.
-  inv FORGET0. inv FORGET1. econs; eauto.
-  - ii. apply not_or_and in NPROMS. des.
-    erewrite COMPLETE; eauto.
-  - i. destruct (classic (P0 l t)); auto.
-    des; clarify. erewrite COMPLETE; eauto.
-Qed.
-
-Lemma forget_compose_middle P0 P1 m0 m1 m2
-      (FORGET: forget_memory (P0 \2/ P1) m0 m2)
-      (FORGET1: forget_memory P1 m1 m2)
-  :
-    forget_memory P0 m0 m1.
-Proof.
-  inv FORGET. inv FORGET1. econs; eauto.
-  ii. destruct (classic (P1 l t)).
-  - erewrite FORGET; eauto.
-  - erewrite COMPLETE; eauto.
-    + erewrite COMPLETE0; eauto.
-    + ii. des; clarify.
-Qed.
-
 Lemma step_lifting_raw
       lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc'
       mem_src mem_tgt mem_tgt' e_tgt others updates otherspace
@@ -128,11 +101,9 @@ Proof.
   - exploit write_not_in_unchanged_on; try apply STEP3; eauto.
 Qed.
 
-
 Lemma step_lifting
       lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc'
       mem_src mem_tgt mem_tgt' e_tgt others updates otherspace
-      (OTHERS: others <2= otherspace)
 
       (STEP: (@pred_step
                 ((fun _ => True)
@@ -146,7 +117,7 @@ Lemma step_lifting
       (NOATTATCH: not_attatched updates mem_src)
 
       (CONSISTENT: local_consistent (Local.mk v' prom'))
-      (OTHERSPACE: otherspace <2= unchangables mem_tgt prom)
+      (OTHERSPACE: others \2/ otherspace <2= unchangables mem_tgt prom)
 
       (SC: Memory.closed_timemap sc mem_tgt)
       (CLOSED: Memory.closed mem_tgt)
@@ -161,6 +132,91 @@ Lemma step_lifting
       (<<NOATTATCH: not_attatched updates mem_src'>>) /\
       (<<UNCHANGED: unchanged_on otherspace mem_src mem_src'>>).
 Proof.
+  eapply step_lifting_raw; ss; eauto.
+  dup STEP. inv STEP. econs; auto. inv STEP1. des.
+  exploit step_wirte_not_in; eauto. ss. i.
+  splits; eauto.
+  - eapply write_not_in_mon; eauto.
+  - eapply write_not_in_mon; eauto.
+  - eapply consistent_read_no_self_promise; eauto.
+Qed.
+
+Lemma step_lifting_rtc
+      others otherspace updates th_src th_tgt th_tgt'
+
+      (STEP: rtc (tau (@pred_step
+                         ((fun _ => True)
+                            /1\ (no_update_on updates)
+                            /1\ (no_read_msgs others)) lang)) th_tgt th_tgt')
+
+      (FORGET: forget_thread others th_src th_tgt)
+
+      (NOATTATCH: not_attatched updates th_src.(Thread.memory))
+      (THWF: thread_wf th_tgt)
+      (CONSISTENT: local_consistent th_tgt'.(Thread.local))
+      (OTHERSPACE: otherspace <2= unchangables th_tgt.(Thread.memory) th_tgt.(Thread.local).(Local.promises))
+  :
+    exists th_src',
+      (<<STEP: rtc (tau (@pred_step (no_promise) lang))
+                   th_src th_src'>>) /\
+      (<<FORGET: forget_thread others th_src' th_tgt'>>) /\
+      (<<THWF: thread_wf th_tgt>>) /\
+      (<<CONSISTENT: local_consistent th_tgt'.(Thread.local)>>) /\
+
+      (<<NOATTATCH: not_attatched updates th_src'.(Thread.memory>>) /\
+      (<<UNCHANGED: unchanged_on otherspace mem_src mem_src'>>).
+Proof.
+ThreadEvent.t
+
+
+Lemma step_lifting_rtc
+      lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc'
+      mem_src mem_tgt mem_tgt' others updates otherspace
+      (OTHERS: others <2= otherspace)
+
+      (STEP: rtc (tau (@pred_step
+                         ((fun _ => True)
+                            /1\ (no_update_on updates)
+                            /1\ (no_read_msgs others)) lang)) th_tgt th_tgt')
+
+      (TH_SRC: th_src = Thread.mk lang st (Local.mk v Memory.bot) sc mem_src)
+      (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v prom) sc mem_tgt)
+      (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
+      (MEM: pf_sim_memory (others \2/ promised prom) mem_src mem_tgt)
+      (NOATTATCH: not_attatched updates mem_src)
+
+      (CONSISTENT: local_consistent (Local.mk v' prom'))
+      (OTHERSPACE: otherspace <2= unchangables mem_tgt prom)
+
+      (SC: Memory.closed_timemap sc mem_tgt)
+      (CLOSED: Memory.closed mem_tgt)
+      (LCWF: Local.wf (Local.mk v prom) mem_tgt)
+  :
+    exists mem_src',
+      (<<STEP: rtc (tau (@pred_step (no_promise) lang))
+                   th_src
+                   (Thread.mk lang st' (Local.mk v' Memory.bot) sc' mem_src')>>) /\
+      (<<MEM: pf_sim_memory (others \2/ promised prom') mem_src' mem_tgt'>>) /\
+      (<<NOATTATCH: not_attatched updates mem_src'>>) /\
+      (<<UNCHANGED: unchanged_on otherspace mem_src mem_src'>>).
+Proof.
+
+
+  rtc_induction
+
+
+  eapply step_lifting_raw; ss; eauto.
+  dup STEP. inv STEP. econs; auto. inv STEP1. des.
+  exploit step_wirte_not_in; eauto. ss. i.
+  splits; eauto.
+  - eapply write_not_in_mon; eauto.
+  - eapply write_not_in_mon; eauto.
+    eapply write_not_in_mon; eauto.
+  - eapply consistent_read_no_self_promise; eauto.
+Qed.
+
+
+esplits
 
 
 
