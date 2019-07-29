@@ -127,7 +127,7 @@ Lemma step_lifting
       (<<STEP: opt_pred_step
                  (no_promise) e_src th_src
                  (Thread.mk lang st' (Local.mk v' Memory.bot) sc' mem_src')>>) /\
-      (<<EVT: ThreadEvent.get_event e_src = ThreadEvent.get_event e_tgt>>) /\
+      (<<EVT: ThreadEvent.get_event e_src = ThreadEvent.get_event e _tgt>>) /\
       (<<MEM: pf_sim_memory (others \2/ promised prom') mem_src' mem_tgt'>>) /\
       (<<NOATTATCH: not_attatched updates mem_src'>>) /\
       (<<UNCHANGED: unchanged_on otherspace mem_src mem_src'>>).
@@ -140,6 +140,33 @@ Proof.
   - eapply write_not_in_mon; eauto.
   - eapply consistent_read_no_self_promise; eauto.
 Qed.
+
+Lemma step_lifting_rtc
+      others otherspace updates th_src th_tgt th_tgt'
+
+      (STEP: rtc (tau (@pred_step
+                         ((fun _ => True)
+                            /1\ (no_update_on updates)
+                            /1\ (no_read_msgs others)) lang)) th_tgt th_tgt')
+
+      (FORGET: forget_thread others th_src th_tgt)
+
+      (NOATTATCH: not_attatched updates th_src.(Thread.memory))
+      (THWF: thread_wf th_tgt)
+      (CONSISTENT: local_consistent th_tgt'.(Thread.local))
+      (OTHERSPACE: otherspace <2= unchangables th_tgt.(Thread.memory) th_tgt.(Thread.local).(Local.promises))
+  :
+    exists th_src',
+      (<<STEP: rtc (tau (@pred_step (no_promise) lang))
+                   th_src th_src'>>) /\
+      (<<FORGET: forget_thread others th_src' th_tgt'>>) /\
+      (<<THWF: thread_wf th_tgt>>) /\
+      (<<CONSISTENT: local_consistent th_tgt'.(Thread.local)>>) /\
+
+      (<<NOATTATCH: not_attatched updates th_src'.(Thread.memory>>) /\
+      (<<UNCHANGED: unchanged_on otherspace mem_src mem_src'>>).
+Proof.
+ThreadEvent.t
 
 Lemma step_lifting_rtc
       others otherspace updates th_src th_tgt th_tgt'
