@@ -25,7 +25,7 @@ Set Implicit Arguments.
 
 
 Module PFStepCap.
-  Include PFStepCommon.
+  Import PFStepCommon.
 
   Definition cap_src (latests: TimeMap.t) (loc: Loc.t) (promises: Memory.t)
              (msg_src: Message.t) (val: Const.t) (released_tgt: option View.t): Prop :=

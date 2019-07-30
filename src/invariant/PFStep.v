@@ -25,7 +25,7 @@ Set Implicit Arguments.
 
 
 Module PFStep.
-  Include PFStepCommon.
+  Import PFStepCommon.
 
   Inductive sim_memory (promises mem_src mem_tgt: Memory.t): Prop :=
   | sim_memory_intro
