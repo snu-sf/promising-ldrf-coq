@@ -2247,12 +2247,20 @@ End FORGET.
 Module Inv.
 
   Inductive t lang (st: Language.state lang) lc
-            (proms: Memory.t) (updates : Loc.t -> Time.t -> Prop) (mlast: Memory.t): Prop :=
+            (proms: Memory.t)
+            (spaces : Loc.t -> Time.t -> Prop)
+            (aupdates : Loc.t -> Time.t -> Prop)
+            (updates : Loc.t -> Time.t -> Prop)
+            (mlast: Memory.t): Prop :=
   | inv_intro
+
+      (UPDATES: updates <2= aupdates)
+      (* (SPACES: forall loc ts (IN: spaces loc ts), covered loc ts proms) *)
+
       (PROMS: forall
           loc to m sc (PROM : concrete_promised proms loc to)
-          (FUTURE: unchanged_on (concrete_covered proms) mlast m)
-          (UNCHANGED: not_attatched updates m),
+          (FUTURE: unchanged_on spaces mlast m)
+          (UNCHANGED: not_attatched aupdates m),
           exists st' lc' sc' m',
             (<<STEPS : rtc (tau (@Thread.program_step _))
                            (Thread.mk _ st lc sc m)
@@ -2260,14 +2268,22 @@ Module Inv.
             (<<WRITING : is_writing _ st' loc Ordering.relaxed>>))
       (UPDATE : forall
           loc to m sc (UPD : updates loc to)
-          (FUTURE: unchanged_on (concrete_covered proms) mlast m)
+          (FUTURE: unchanged_on spaces mlast m)
+          (UNCHANGED: not_attatched aupdates m),
+          exists st' lc' sc' m',
+            (<<STEPS : rtc (tau (@Thread.program_step _))
+                           (Thread.mk _ st lc sc m)
+                           (Thread.mk _ st' lc' sc' m')>>) /\
+            (<<READING : is_updating _ st' loc Ordering.relaxed>>))
+      (AUPDATE : forall
+          loc to m sc (UPD : aupdates loc to)
+          (FUTURE: unchanged_on spaces mlast m)
           (UNCHANGED: not_attatched updates m),
           exists st' lc' sc' m',
             (<<STEPS : rtc (tau (@Thread.program_step _))
                            (Thread.mk _ st lc sc m)
                            (Thread.mk _ st' lc' sc' m')>>) /\
-            (<<READING : is_updating _ st' loc Ordering.relaxed>>)
-      )
+            (<<READING : is_updating _ st' loc Ordering.seqcst>>))
   .
 
 End Inv.
@@ -2282,12 +2298,21 @@ Section SIMPF.
       (LCWF: Local.wf th.(Thread.local) th.(Thread.memory))
   .
 
-
   Inductive sim_pf
-            (mlast: Ident.t -> Memory.t) (updates: Ident.t -> (Loc.t -> Time.t -> Prop))
+            (mlast: Ident.t -> Memory.t)
+            (spaces : Ident.t -> (Loc.t -> Time.t -> Prop))
+            (updates: Ident.t -> (Loc.t -> Time.t -> Prop))
+            (aupdates: Ident.t -> (Loc.t -> Time.t -> Prop))
             (c_src c_tgt: Configuration.t) : Prop :=
   | sim_pf_intro
       (FORGET: forget_config c_src c_tgt)
+
+      (FUTURE:
+         forall tid,
+           unchanged_on (spaces tid) (mlast tid) c_src.(Configuration.memory))
+      (NOATTATCH:
+         forall tid,
+           not_attatched (updates tid) c_src.(Configuration.memory))
 
       (INV:
          forall
@@ -2296,18 +2321,7 @@ Section SIMPF.
                     Some (existT _ lang_src st_src, lc_src))
            (TIDTGT: IdentMap.find tid c_tgt.(Configuration.threads) =
                     Some (existT _ lang_tgt st_tgt, lc_tgt)),
-           Inv.t _ st_src lc_src lc_tgt.(Local.promises) (updates tid) (mlast tid))
-
-      (FUTURE:
-         forall tid lang_src st_src lc_src
-                (TIDSRC: IdentMap.find tid c_src.(Configuration.threads) =
-                         Some (existT _ lang_src st_src, lc_src)),
-           unchanged_on
-             (fun loc to => covered loc to lc_src.(Local.promises))
-             (mlast tid) c_src.(Configuration.memory))
-      (NOATTATCH:
-         forall tid,
-           not_attatched (updates tid) c_src.(Configuration.memory))
+           Inv.t _ st_src lc_src lc_tgt.(Local.promises) (spaces tid) (updates tid) (aupdates tid) (mlast tid))
 
       (RACEFREE: pf_racefree c_src)
       (WFSRC: Configuration.wf c_src)
@@ -2320,7 +2334,8 @@ Section SIMPF.
   .
 
   Inductive sim_pf_all c_src c_tgt: Prop :=
-  | sim_pf_all_intro mlast updates (SIM : sim_pf mlast updates c_src c_tgt)
+  | sim_pf_all_intro mlast spaces updates aupdates
+                     (SIM : sim_pf mlast spaces updates aupdates c_src c_tgt)
   .
 
   Lemma init_pf s tid st lc
@@ -2339,7 +2354,11 @@ Section SIMPF.
       sim_pf_all (Configuration.init s) (Configuration.init s)
   .
   Proof.
-    econs. instantiate (1:=fun _ _ _ => False). instantiate (1:=fun _ => Memory.init).
+    econs.
+    instantiate (1:=fun _ _ _ => False).
+    instantiate (1:=fun _ _ _ => False).
+    instantiate (1:=fun _ _ _ => False).
+    instantiate (1:=fun _ => Memory.init).
     econs; eauto; ss; i.
     - econs; i; ss.
       + unfold Threads.init in *. erewrite UsualFMapPositive.UsualPositiveMap.Facts.map_o in *.
@@ -2354,6 +2373,7 @@ Section SIMPF.
       + i. exploit init_pf; try apply TIDTGT; eauto. i.
         rewrite x0 in *. inv PROM.
         rewrite Memory.bot_get in *. clarify.
+      + i. clarify.
       + i. clarify.
     - econs; eauto. refl.
     - eapply Configuration.init_wf.
