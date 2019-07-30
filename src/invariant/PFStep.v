@@ -357,7 +357,8 @@ Module PFStep.
       <<LOCAL2: sim_local lc2_src lc2_tgt>> /\
       <<RELEASED: View.opt_le released_src released_tgt>>.
   Proof.
-    exploit promise_consistent_read_step_promise; try exact STEP_TGT; eauto. i.
+    destruct (Memory.get loc to lc1_tgt.(Local.promises)) as [[]|] eqn:GETP.
+    { exploit promise_consistent_promise_read; eauto. i. timetac. }
     inv MEM1. inv LOCAL1. inv STEP_TGT.
     exploit COMPLETE; eauto. i. des. inv MSG.
     esplits.

@@ -490,12 +490,13 @@ Module PFStepCap.
       <<LOCAL2: sim_local lc2_src lc2_tgt>> /\
       <<RELEASED: View.opt_le released_src released_tgt>>.
   Proof.
-    exploit promise_consistent_read_step_promise; try exact STEP_TGT; eauto. i.
+    destruct (Memory.get loc to lc1_tgt.(Local.promises)) as [[]|] eqn:GETP.
+    { exploit promise_consistent_promise_read; eauto. i. timetac. }
     destruct (opt_ts_eq_dec (Some to) (caps loc)).
     - exploit read_cap; eauto. i.
       inv MEM1. clear SOUND COMPLETE LATESTS.
       exploit (CAPS loc to); eauto. i. des.
-      unfold cap_src in *. rewrite x1 in *. inv MSG.
+      unfold cap_src in *. rewrite x0 in *. inv MSG.
       inv LOCAL1.
       inv STEP_TGT. rewrite CAP_TGT in GET. inv GET.
       esplits.
