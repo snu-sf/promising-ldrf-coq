@@ -33,22 +33,46 @@ Section PredStep.
   | pred_step_intro (STEP : Thread.step_allpf e e1 e2) (SAT : P e)
   .
 
-  Lemma pred_step_program_step P lang e :
-        @pred_step P lang e <2= @Thread.step_allpf lang e.
+  Lemma pred_step_program_step P:
+        @pred_step P <4= @Thread.step_allpf.
   Proof.
-    intros t1 t2 []. eauto.
+    i. inv PR. eauto.
   Qed.
 
-  Lemma program_step_true_step lang e :
-        @Thread.step_allpf lang e <2= @pred_step (fun _ => True) lang e.
+  Lemma program_step_true_step:
+        @Thread.step_allpf <4= @pred_step (fun _ => True).
   Proof.
     econs; eauto.
   Qed.
 
-  Lemma pred_step_mon P Q lang e (LE : P <1= Q) :
-    @pred_step P lang e <2= @pred_step Q lang e.
+  Lemma pred_step_mon P Q (LE : P <1= Q) :
+    @pred_step P <4= @pred_step Q.
   Proof.
-    intros t1 t2 []. econs; eauto.
+    i. inv PR. econs; eauto.
+  Qed.
+
+  Lemma pred_step_rtc_mon P Q lang (LE : P <1= Q) :
+    rtc (tau (@pred_step P lang)) <2= rtc (tau (@pred_step Q lang)).
+  Proof.
+    eapply Relation_Operators.clos_refl_trans_1n_ind; eauto.
+    i. eapply Relation_Operators.rt1n_trans; eauto.
+    inv H. econs; eauto. eapply pred_step_mon; eauto.
+  Qed.
+
+  Lemma thread_steps_pred_steps P lang:
+    rtc (tau (@pred_step P lang)) <2= rtc (@Thread.tau_step lang).
+  Proof.
+    eapply Relation_Operators.clos_refl_trans_1n_ind; eauto.
+    i. eapply Relation_Operators.rt1n_trans; eauto.
+    inv H. inv TSTEP. econs; eauto.
+  Qed.
+
+  Lemma pred_steps_thread_steps lang:
+    rtc (@Thread.tau_step lang) <2= rtc (tau (@pred_step (fun _ => True) lang)).
+  Proof.
+    eapply Relation_Operators.clos_refl_trans_1n_ind; eauto.
+    i. eapply Relation_Operators.rt1n_trans; eauto.
+    inv H. econs; eauto. eapply program_step_true_step; eauto.
   Qed.
 
   Lemma hold_or_not (P Q : te_pred) lang e1 e2

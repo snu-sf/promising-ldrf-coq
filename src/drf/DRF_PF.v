@@ -1968,8 +1968,8 @@ Section FORGET.
     :
       forget_thread
         others
-        (Thread.mk lang st (Local.mk v prom) sc mem_src)
-        (Thread.mk lang st (Local.mk v Memory.bot) sc mem_tgt)
+        (Thread.mk lang st (Local.mk v Memory.bot) sc mem_src)
+        (Thread.mk lang st (Local.mk v prom) sc mem_tgt)
   .
 
   Inductive all_promises (c: Configuration.t) (P: IdentMap.key -> Prop)
@@ -2020,7 +2020,10 @@ Module Inv.
   | inv_intro
 
       (UPDATES: updates <2= aupdates)
-      (* (SPACES: forall loc ts (IN: spaces loc ts), covered loc ts proms) *)
+      (SPACES: forall loc ts (IN: spaces loc ts), covered loc ts proms)
+      (AUPDATES: forall loc ts (IN: aupdates loc ts),
+          exists to,
+            (<<GET: Memory.get loc ts proms = Some (ts, to)>>))
 
       (PROMS: forall
           loc to m sc (PROM : concrete_promised proms loc to)
@@ -2043,7 +2046,7 @@ Module Inv.
       (AUPDATE : forall
           loc to m sc (UPD : aupdates loc to)
           (FUTURE: unchanged_on spaces mlast m)
-          (UNCHANGED: not_attatched updates m),
+          (UNCHANGED: not_attatched aupdates m),
           exists st' lc' sc' m',
             (<<STEPS : rtc (tau (@Thread.program_step _))
                            (Thread.mk _ st lc sc m)
@@ -2130,12 +2133,10 @@ Section SIMPF.
           inv PROMISED. rewrite Memory.bot_get in *. clarify.
         * refl.
     - econs; ss.
-    - econs; eauto.
-      + ii. exploit init_pf; try apply TIDTGT; eauto. i.
-        rewrite x0 in *. inv PROM.
-        rewrite Memory.bot_get in *. clarify.
-      + i. clarify.
-      + i. clarify.
+    - econs; eauto; ii; clarify.
+      exploit init_pf; try apply TIDTGT; eauto. i.
+      rewrite x0 in *. inv PROM.
+      rewrite Memory.bot_get in *. clarify.
     - eapply Configuration.init_wf.
     - eapply Configuration.init_wf.
   Qed.
