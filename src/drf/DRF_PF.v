@@ -2018,17 +2018,14 @@ Module Inv.
             (updates : Loc.t -> Time.t -> Prop)
             (mlast: Memory.t): Prop :=
   | inv_intro
-
-      (UPDATES: updates <2= aupdates)
       (SPACES: forall loc ts (IN: spaces loc ts), covered loc ts proms)
       (AUPDATES: forall loc ts (IN: aupdates loc ts),
           exists to,
             (<<GET: Memory.get loc ts proms = Some (ts, to)>>))
-
       (PROMS: forall
           loc to m sc (PROM : concrete_promised proms loc to)
           (FUTURE: unchanged_on spaces mlast m)
-          (UNCHANGED: not_attatched aupdates m),
+          (UNCHANGED: not_attatched (updates \2/ aupdates) m),
           exists st' lc' sc' m',
             (<<STEPS : rtc (tau (@Thread.program_step _))
                            (Thread.mk _ st lc sc m)
@@ -2037,7 +2034,7 @@ Module Inv.
       (UPDATE : forall
           loc to m sc (UPD : updates loc to)
           (FUTURE: unchanged_on spaces mlast m)
-          (UNCHANGED: not_attatched aupdates m),
+          (UNCHANGED: not_attatched (updates \2/ aupdates) m),
           exists st' lc' sc' m',
             (<<STEPS : rtc (tau (@Thread.program_step _))
                            (Thread.mk _ st lc sc m)
@@ -2046,7 +2043,7 @@ Module Inv.
       (AUPDATE : forall
           loc to m sc (UPD : aupdates loc to)
           (FUTURE: unchanged_on spaces mlast m)
-          (UNCHANGED: not_attatched aupdates m),
+          (UNCHANGED: not_attatched (updates \2/ aupdates) m),
           exists st' lc' sc' m',
             (<<STEPS : rtc (tau (@Thread.program_step _))
                            (Thread.mk _ st lc sc m)
