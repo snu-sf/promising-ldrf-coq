@@ -277,16 +277,78 @@ Section MEMORYLEMMAS.
       rewrite Memory.bot_get in *. clarify.
   Qed.
 
+  Lemma promise_bot_no_promise P lang (th0 th1: Thread.t lang) e
+        (STEP: (@pred_step (P /1\ no_promise) lang) e th0 th1)
+        (BOT: th0.(Thread.local).(Local.promises) = Memory.bot)
+    :
+      th1.(Thread.local).(Local.promises) = Memory.bot.
+  Proof.
+    inv STEP. inv STEP0. inv STEP.
+    - inv STEP0; des; clarify.
+    - inv STEP0. ss. inv LOCAL; try inv LOCAL0; ss.
+      + rewrite BOT in *. exploit memory_write_bot_add; eauto. i. clarify.
+        exploit MemoryFacts.MemoryFacts.write_add_promises; eauto.
+      + inv LOCAL1. inv LOCAL2. ss. rewrite BOT in *.
+        exploit memory_write_bot_add; eauto. i. clarify.
+        exploit MemoryFacts.MemoryFacts.write_add_promises; eauto.
+  Qed.
+
+  Lemma promise_bot_no_promise_rtc P lang (th0 th1: Thread.t lang)
+        (STEP: rtc (tau (@pred_step (P /1\ no_promise) lang)) th0 th1)
+        (BOT: th0.(Thread.local).(Local.promises) = Memory.bot)
+    :
+      th1.(Thread.local).(Local.promises) = Memory.bot.
+  Proof.
+    induction STEP; auto. erewrite IHSTEP; auto.
+    inv H. eapply promise_bot_no_promise; eauto.
+  Qed.
+
 End MEMORYLEMMAS.
 
 
-Inductive promised (mem: Memory.t) (loc: Loc.t) (to: Time.t) : Prop :=
-| promised_intro
-    msg
-    (GET: Memory.get loc to mem = Some msg)
-  :
-    promised mem loc to
-.
+Section PROMISED.
+
+  Inductive promised (mem: Memory.t) (loc: Loc.t) (to: Time.t) : Prop :=
+  | promised_intro
+      msg
+      (GET: Memory.get loc to mem = Some msg)
+    :
+      promised mem loc to
+  .
+
+  Lemma promised_increase_promise promises1 mem1 loc from to msg promises2 mem2 kind
+        (STEP: Memory.promise promises1 mem1 loc from to msg promises2 mem2 kind)
+    :
+      promised mem1 <2= promised mem2.
+  Proof.
+    inv STEP.
+    - ii. inv PR. destruct msg0.
+      exploit Memory.add_get1; eauto. i.
+      econs; eauto.
+    - ii. inv PR. destruct msg0.
+      exploit Memory.split_get1; eauto. i. des.
+      econs; eauto.
+    - ii. inv PR. destruct msg1.
+      exploit Memory.lower_get1; eauto. i. des.
+      econs; eauto.
+  Qed.
+
+  Lemma promised_increase lang (th0 th1: Thread.t lang) pf e
+        (STEP: Thread.step pf e th0 th1)
+    :
+      promised th0.(Thread.memory) <2= promised th1.(Thread.memory).
+  Proof.
+    i. inv STEP.
+    - inv STEP0. ss. inv LOCAL.
+      eapply promised_increase_promise; eauto.
+    - inv STEP0; ss. inv LOCAL; ss.
+      + inv LOCAL0. inv WRITE.
+        eapply promised_increase_promise; eauto.
+      + inv LOCAL1. inv LOCAL2. inv WRITE.
+        eapply promised_increase_promise; eauto.
+  Qed.
+
+End PROMISED.
 
 Inductive opt_pred_step P (lang : Language.t)
   : ThreadEvent.t -> Thread.t lang -> Thread.t lang -> Prop :=
@@ -1811,6 +1873,94 @@ Section NOTATTATCHED.
       (<<NOATTATCH: exists to',
           (<<TLE: Time.lt to to'>>) /\
           (<<EMPTY: forall t (ITV: Interval.mem (to, to') t), ~ covered loc t m>>)>>).
+
+  Lemma not_attatched_sum L0 L1 mem
+        (NOATTATCH0: not_attatched L0 mem)
+        (NOATTATCH1: not_attatched L1 mem)
+    :
+      not_attatched (L0 \2/ L1) mem.
+  Proof.
+    ii. des; eauto.
+  Qed.
+
+  Lemma not_attatched_mon L0 L1 mem
+        (NOATTATCH0: not_attatched L0 mem)
+        (LE: L1 <2= L0)
+    :
+      not_attatched L1 mem.
+  Proof.
+    ii. eauto.
+  Qed.
+
+  Lemma attached_preserve_add updates mem0 loc from to msg mem1
+        (ADD: Memory.add mem0 loc from to msg mem1)
+        (NOATTATCHED: not_attatched updates mem1)
+        (PROMISED: updates <2= promised mem0)
+    :
+      not_attatched updates mem0.
+  Proof.
+    ii. exploit NOATTATCHED; eauto. i. des. split.
+    - dup MSG. erewrite Memory.add_o in MSG; eauto. des_ifs.
+      + ss. des. clarify. exfalso.
+        eapply PROMISED in SAT. inv SAT.
+        eapply Memory.add_get0 in ADD. des. clarify.
+      + esplits; eauto.
+    - esplits; eauto. ii. eapply EMPTY; eauto.
+      eapply add_covered; eauto.
+  Qed.
+
+  Lemma attatched_preserve P updates lang (th0 th1: Thread.t lang) e
+        (STEP: (@pred_step (P /1\ no_promise) lang) e th0 th1)
+        (BOT: th0.(Thread.local).(Local.promises) = Memory.bot)
+        (NOATTATCHED: not_attatched updates th1.(Thread.memory))
+        (PROMISED: updates <2= promised th0.(Thread.memory))
+    :
+      not_attatched updates th0.(Thread.memory).
+  Proof.
+    inv STEP. inv STEP0. inv STEP.
+    - inv STEP0; des; clarify.
+    - inv STEP0. ss. inv LOCAL; ss.
+      + inv LOCAL0. destruct lc1. ss. clarify.
+        exploit memory_write_bot_add; eauto. i. clarify.
+        inv WRITE. inv PROMISE.
+        eapply attached_preserve_add; eauto.
+      + inv LOCAL1. inv LOCAL2. ss. destruct lc1. ss. clarify.
+        exploit memory_write_bot_add; eauto. i. clarify.
+        inv WRITE. inv PROMISE.
+        eapply attached_preserve_add; eauto.
+  Qed.
+
+  Lemma update_not_attatched P lang (th0 th1: Thread.t lang)
+        loc from to valr valw releasedr releasedw ordr ordw
+        (STEP: (@pred_step P lang) (ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw) th0 th1)
+        (BOT: th0.(Thread.local).(Local.promises) = Memory.bot)
+    :
+      not_attatched (fun l t => l = loc /\ t = from) th0.(Thread.memory).
+  Proof.
+    inv STEP. inv STEP0. inv STEP; ss.
+    - inv STEP0; des; clarify.
+    - inv STEP0. ss. inv LOCAL; ss. destruct lc1, lc3, lc2.
+      exploit write_msg_wf; eauto. i. des. ss. clarify.
+      inv LOCAL1. inv LOCAL2. ss. clarify.
+      exploit memory_write_bot_add; eauto. i. clarify.
+      ii. des. clarify. esplits; eauto.
+      ii. inv WRITE. inv PROMISE. eapply memory_add_cover_disjoint in MEM; eauto.
+  Qed.
+
+  Lemma attatched_preserve_rtc P updates lang (th0 th1: Thread.t lang)
+        (STEP: rtc (tau (@pred_step (P /1\ no_promise) lang)) th0 th1)
+        (BOT: th0.(Thread.local).(Local.promises) = Memory.bot)
+        (NOATTATCHED: not_attatched updates th1.(Thread.memory))
+        (PROMISED: updates <2= promised th0.(Thread.memory))
+    :
+      not_attatched updates th0.(Thread.memory).
+  Proof.
+    revert BOT PROMISED. induction STEP; auto.
+    i. hexploit IHSTEP; eauto.
+    - inv H. eapply promise_bot_no_promise; eauto.
+    - i. inv H. inv TSTEP. inv STEP0. eapply promised_increase; eauto.
+    - i. inv H. eapply attatched_preserve; eauto.
+  Qed.
 
   Lemma not_attatch_write L prom mem_src loc from1 to1 val released mem_src'
         (ADD: Memory.write Memory.bot mem_src loc from1 to1 val released prom mem_src' Memory.op_kind_add)

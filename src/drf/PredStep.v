@@ -54,44 +54,44 @@ Section PredStep.
   Lemma pred_step_rtc_mon P Q lang (LE : P <1= Q) :
     rtc (tau (@pred_step P lang)) <2= rtc (tau (@pred_step Q lang)).
   Proof.
-    eapply Relation_Operators.clos_refl_trans_1n_ind; eauto.
-    i. eapply Relation_Operators.rt1n_trans; eauto.
+    i. induction PR; eauto.
+    eapply Relation_Operators.rt1n_trans; eauto.
     inv H. econs; eauto. eapply pred_step_mon; eauto.
   Qed.
 
   Lemma thread_steps_pred_steps P lang:
     rtc (tau (@pred_step P lang)) <2= rtc (@Thread.tau_step lang).
   Proof.
-    eapply Relation_Operators.clos_refl_trans_1n_ind; eauto.
-    i. eapply Relation_Operators.rt1n_trans; eauto.
+    i. induction PR; eauto.
+    eapply Relation_Operators.rt1n_trans; eauto.
     inv H. inv TSTEP. econs; eauto.
   Qed.
 
   Lemma pred_steps_thread_steps lang:
     rtc (@Thread.tau_step lang) <2= rtc (tau (@pred_step (fun _ => True) lang)).
   Proof.
-    eapply Relation_Operators.clos_refl_trans_1n_ind; eauto.
-    i. eapply Relation_Operators.rt1n_trans; eauto.
+    i. induction PR; eauto.
+    eapply Relation_Operators.rt1n_trans; eauto.
     inv H. econs; eauto. eapply program_step_true_step; eauto.
   Qed.
 
   Lemma hold_or_not (P Q : te_pred) lang e1 e2
         (STEP : rtc (tau (@pred_step P lang)) e1 e2) :
     (<<HOLD : rtc (tau (@pred_step (P /1\ Q) lang)) e1 e2>>) \/
-    (<<NOT : exists e e2' e3, (<<STEPS : rtc (tau (@pred_step (P /1\ Q) lang)) e1 e2'>>) /\
+    (<<NOT : exists e e2' e3, (<<STEPS0 : rtc (tau (@pred_step (P /1\ Q) lang)) e1 e2'>>) /\
                               (<<STEP : Thread.step_allpf e e2' e3>>) /\
-                              (<<BREAKP : P e>>) /\ (<<BREAKQ : ~ Q e>>)>>).
+                              (<<BREAKP : P e>>) /\ (<<BREAKQ : ~ Q e>>) /\
+                              (<<STEPS1 : rtc (tau (@pred_step P lang)) e3 e2>>)>>).
   Proof.
-    induction STEP as [th | th1 th2 th3 HD TL IH].
-    - auto.
-    - inv HD. inv TSTEP. destruct (classic (Q e)) as [QT | QF]. des.
-      + left. repeat (econs; eauto).
-      + right. do 4 (eauto; econs).
-        * apply Operators_Properties.clos_rt_rt1n.
-          eapply Relation_Operators.rt_trans. repeat (econs; eauto).
-          eapply Operators_Properties.clos_rt1n_rt. eauto.
-        * eauto.
-      + right. repeat (econs; eauto).
+    induction STEP as [th | th1 th2 th3 HD TL IH]; auto.
+    inv HD. inv TSTEP. destruct (classic (Q e)) as [QT | QF]. des.
+    - left. repeat (econs; eauto).
+    - right. do 4 (eauto; econs).
+      * apply Operators_Properties.clos_rt_rt1n.
+        eapply Relation_Operators.rt_trans. repeat (econs; eauto).
+        eapply Operators_Properties.clos_rt1n_rt. eauto.
+      * eauto.
+    - right. repeat (econs; eauto).
   Qed.
 
   Definition no_promise (e : ThreadEvent.t) : Prop :=

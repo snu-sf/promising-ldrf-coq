@@ -144,7 +144,6 @@ Qed.
 
 
 
-
 Lemma step_lifting_rtc
       lang others otherspace updates th_src th_tgt th_tgt'
 
@@ -167,67 +166,38 @@ Lemma step_lifting_rtc
       (<<NOATTATCH: not_attatched updates th_src'.(Thread.memory)>>) /\
       (<<UNCHANGED: unchanged_on otherspace th_src.(Thread.memory) th_src'.(Thread.memory)>>).
 Proof.
-  eapply (@Relation_Operators.clos_refl_trans_1n_ind
-            _ (tau
-                 (pred_step
-                    (((fun _ : ThreadEvent.t => True) /1\ no_update_on updates) /1\
-                                                                                no_read_msgs others) (lang:=lang)))
-            (fun th_tgt th_tgt' =>
-               forall th_src
-                      (STEP: rtc (tau (@pred_step
-                                         ((fun _ => True)
-                                            /1\ (no_update_on updates)
-                                            /1\ (no_read_msgs others)) lang)) th_tgt th_tgt')
+  revert th_src FORGET NOATTATCH THWF OTHERSPACE.
+  induction STEP.
+  - i. esplits; eauto. refl.
+  - i. inv H. destruct y. destruct local. ss.
+    dup TSTEP. inv TSTEP. inv STEP0.
 
-                      (FORGET: forget_thread others th_src th_tgt)
-
-                      (NOATTATCH: not_attatched updates th_src.(Thread.memory))
-                      (THWF: thread_wf th_tgt)
-                      (CONSISTENT: promise_consistent th_tgt'.(Thread.local))
-                      (OTHERSPACE: others \2/ otherspace <2= unchangables th_tgt.(Thread.memory) th_tgt.(Thread.local).(Local.promises)),
-               exists th_src',
-                 (<<STEP: rtc (tau (@pred_step (no_promise) lang))
-                              th_src th_src'>>) /\
-                 (<<FORGET: forget_thread others th_src' th_tgt'>>) /\
-                 (<<NOATTATCH: not_attatched updates th_src'.(Thread.memory)>>) /\
-                 (<<UNCHANGED: unchanged_on otherspace th_src.(Thread.memory) th_src'.(Thread.memory)>>))
-         ); eauto.
-
-  - i. exists th_src0. esplits; eauto. refl.
-  - i. ss. inv H. destruct y. destruct local. ss.
-
-    dup TSTEP. inv TSTEP. inv STEP1.
-
-    inv THWF0.
+    inv THWF.
     exploit Thread.step_future; eauto.
     ss. i. des.
 
     hexploit rtc_tau_step_promise_consistent.
-    { eapply thread_steps_pred_steps; try apply H0; eauto. }
+    { eapply thread_steps_pred_steps; try apply STEP; eauto. }
     { eauto. }
     { ss. }
     { eauto. }
     { eauto. }
     i. ss.
 
-    inv FORGET0. ss.
+    inv FORGET. ss.
     ss. exploit step_lifting; eauto.
     i. des.
 
-    exploit H1.
-    { eapply H0. }
+    exploit IHSTEP; eauto; ss.
     { econs; eauto. }
     { ss. }
-    { ss. }
-    { ss. }
     { i. exploit unchangables_increase.
-      - eapply STEP2.
+      - eapply STEP1.
       - eauto.
       - ss. }
-
     i. des. ss.
 
-    exists th_src'. inv STEP1.
+    exists th_src'. inv STEP0.
     { esplits; eauto. }
     { esplits; eauto.
       - eapply Relation_Operators.rt1n_trans; eauto.
@@ -235,20 +205,13 @@ Proof.
       - etrans; eauto. }
 Qed.
 
-Lemma promised_increase lang (th0 th1: Thread.t lang) pf e
-      (STEP: Thread.step pf e th0 th1)
-  :
-    promised th0.(Thread.memory) <2= promised th0.(Thread.memory).
-Proof.
-  i.
-
-
 
 Lemma updates_list_exists
       P lang th0 th1
+      (BOT: th0.(Thread.local).(Local.promises) = Memory.bot)
       (STEPS: rtc (tau (@pred_step (P /1\ no_promise) lang)) th0 th1)
   :
-    exists updates,
+    exists (updates: Loc.t -> Time.t -> Prop),
       (<<COMPLETE:
          rtc (tau (@pred_step (P /1\ no_update_on (fun loc ts => promised th0.(Thread.memory) loc ts /\ ~ updates loc ts)
                                  /1\ no_promise) lang)) th0 th1>>) /\
@@ -257,227 +220,46 @@ Lemma updates_list_exists
          exists th' th'' to valr valw releasedr releasedw ordr ordw,
            (<<STEPS: rtc (tau (@pred_step (P /1\ no_update_on (fun loc ts => promised th0.(Thread.memory) loc ts /\ ~ updates loc ts)
                                              /1\ no_promise) lang)) th0 th'>>) /\
-           (<<STEP: (@pred_step (P /1\ no_update_on (fun loc ts => promised th0.(Thread.memory) loc ts /\ ~ updates loc ts)
-                                   /1\ no_promise) lang)
+           (<<STEP: (@pred_step (P /1\ no_promise) lang)
                       (ThreadEvent.update loc ts to valr valw releasedr releasedw ordr ordw)
-                      th' th''>>)>>).
+                      th' th''>>)>>) /\
+
+      (<<NOATTATCHED: not_attatched updates th0.(Thread.memory)>>)
+.
 Proof.
-  eapply (@Relation_Operators.clos_refl_trans_1n_ind
-            _ (tau
-                 (pred_step
-                    (((fun _ : ThreadEvent.t => True) /1\ no_update_on updates) /1\
-                                                                                no_read_msgs others) (lang:=lang)))
-
-
-
+  eapply Operators_Properties.clos_rt_rt1n_iff in STEPS.
+  eapply Operators_Properties.clos_rt_rtn1_iff in STEPS.
   induction STEPS.
   - exists (fun _ _ => False). esplits; eauto.
-    i. clarify.
+    + i. clarify.
+    + ii. clarify.
   - des. inv H.
+    destruct (classic (no_update_on (fun loc ts => promised th0.(Thread.memory) loc ts /\ ~ updates loc ts) e)).
+    + exists updates. esplits; eauto.
+      eapply rtc_n1; eauto. econs; eauto. inv TSTEP. econs; eauto. des. esplits; eauto.
+    + unfold no_update_on in H. des_ifs. apply NNPP in H.
+      exists (fun l t => (l = loc /\ t = tsr) \/ updates l t).
+      esplits; eauto.
 
-
-    destruct (classic
-
-
-Lemma step_lifting_rtc
-      lang others otherspace updates th_src th_tgt th_tgt'
-
-      (STEP: rtc (tau (@pred_step
-                         ((fun _ => True)
-                            /1\ (no_update_on updates)
-                            /1\ (no_read_msgs others)) lang)) th_tgt th_tgt')
-
-      (FORGET: forget_thread others th_src th_tgt)
-
-      (NOATTATCH: not_attatched updates th_src.(Thread.memory))
-      (THWF: thread_wf th_tgt)
-      (CONSISTENT: promise_consistent th_tgt'.(Thread.local))
-      (OTHERSPACE: others \2/ otherspace <2= unchangables th_tgt.(Thread.memory) th_tgt.(Thread.local).(Local.promises))
-  :
-    exists th_src',
-      (<<STEP: rtc (tau (@pred_step (no_promise) lang))
-                   th_src th_src'>>) /\
-      (<<FORGET: forget_thread others th_src' th_tgt'>>) /\
-      (<<NOATTATCH: not_attatched updates th_src'.(Thread.memory)>>) /\
-      (<<UNCHANGED: unchanged_on otherspace th_src.(Thread.memory) th_src'.(Thread.memory)>>).
-Proof.
-  eapply (@Relation_Operators.clos_refl_trans_1n_ind
-            _ (tau
-                 (pred_step
-                    (((fun _ : ThreadEvent.t => True) /1\ no_update_on updates) /1\
-                                                                                no_read_msgs others) (lang:=lang)))
-            (fun th_tgt th_tgt' =>
-               forall th_src
-                      (STEP: rtc (tau (@pred_step
-                                         ((fun _ => True)
-                                            /1\ (no_update_on updates)
-                                            /1\ (no_read_msgs others)) lang)) th_tgt th_tgt')
-
-                      (FORGET: forget_thread others th_src th_tgt)
-
-                      (NOATTATCH: not_attatched updates th_src.(Thread.memory))
-                      (THWF: thread_wf th_tgt)
-                      (CONSISTENT: promise_consistent th_tgt'.(Thread.local))
-                      (OTHERSPACE: others \2/ otherspace <2= unchangables th_tgt.(Thread.memory) th_tgt.(Thread.local).(Local.promises)),
-               exists th_src',
-                 (<<STEP: rtc (tau (@pred_step (no_promise) lang))
-                              th_src th_src'>>) /\
-                 (<<FORGET: forget_thread others th_src' th_tgt'>>) /\
-                 (<<NOATTATCH: not_attatched updates th_src'.(Thread.memory)>>) /\
-                 (<<UNCHANGED: unchanged_on otherspace th_src.(Thread.memory) th_src'.(Thread.memory)>>))
-         ); eauto.
-
-  - i. exists th_src0. esplits; eauto. refl.
-  - i. ss. inv H. destruct y. destruct local. ss.
-
-    dup TSTEP. inv TSTEP. inv STEP1.
-
-    inv THWF0.
-    exploit Thread.step_future; eauto.
-    ss. i. des.
-
-    hexploit rtc_tau_step_promise_consistent.
-    { eapply thread_steps_pred_steps; try apply H0; eauto. }
-    { eauto. }
-    { ss. }
-    { eauto. }
-    { eauto. }
-    i. ss.
-
-    inv FORGET0. ss.
-    ss. exploit step_lifting; eauto.
-    i. des.
-
-    exploit H1.
-    { eapply H0. }
-    { econs; eauto. }
-    { ss. }
-    { ss. }
-    { ss. }
-    { i. exploit unchangables_increase.
-      - eapply STEP2.
-      - eauto.
-      - ss. }
-
-    i. des. ss.
-
-    exists th_src'. inv STEP1.
-    { esplits; eauto. }
-    { esplits; eauto.
-      - eapply Relation_Operators.rt1n_trans; eauto.
-        econs; eauto. etrans; eauto.
-      - etrans; eauto. }
+      * eapply rtc_n1.
+        { eapply pred_step_rtc_mon; eauto. i. ss. des. esplits; eauto.
+          eapply no_update_on_mon; eauto. i. ss. des; eauto. }
+        { econs; eauto. inv TSTEP. econs; eauto.
+          des. esplits; eauto. ss. ii. des. eauto. }
+      * i. des.
+        { clarify. exists y, z. esplits; eauto.
+          eapply pred_step_rtc_mon; eauto. i. ss. des. esplits; eauto.
+          eapply no_update_on_mon; eauto. i. ss. des; eauto. }
+        { exploit SOUND; eauto. i. des.
+          exists th', th''. esplits; eauto.
+          eapply pred_step_rtc_mon; eauto. i. ss. des. esplits; eauto.
+          eapply no_update_on_mon; eauto. i. ss. des; eauto. }
+      * eapply not_attatched_sum; eauto.
+        eapply attatched_preserve_rtc; try apply COMPLETE; eauto.
+        { eapply update_not_attatched; eauto.
+          eapply promise_bot_no_promise_rtc; try apply COMPLETE; eauto. }
+        { i. des. clarify. }
 Qed.
-
-
-  admit.
-
-
-  eapply (@Relation_Operators.clos_refl_trans_1n_ind
-            _ (tau
-                 (pred_step
-                    (((fun _ : ThreadEvent.t => True) /1\ no_update_on updates) /1\
-                                                                                no_read_msgs others) (lang:=lang)))
-            (fun th_tgt th_tgt' =>
-               forall th_src
-                      (STEP: rtc (tau (@pred_step
-                                         ((fun _ => True)
-                                            /1\ (no_update_on updates)
-                                            /1\ (no_read_msgs others)) lang)) th_tgt th_tgt')
-
-                      (FORGET: forget_thread others th_src th_tgt)
-
-                      (NOATTATCH: not_attatched updates th_src.(Thread.memory))
-                      (THWF: thread_wf th_tgt)
-                      (CONSISTENT: promise_consistent th_tgt'.(Thread.local))
-                      (OTHERSPACE: others \2/ otherspace <2= unchangables th_tgt.(Thread.memory) th_tgt.(Thread.local).(Local.promises)),
-               exists th_src',
-                 (<<STEP: rtc (tau (@pred_step (no_promise) lang))
-                              th_src th_src'>>) /\
-                 (<<FORGET: forget_thread others th_src' th_tgt'>>) /\
-                 (<<NOATTATCH: not_attatched updates th_src'.(Thread.memory)>>) /\
-                 (<<UNCHANGED: unchanged_on otherspace th_src.(Thread.memory) th_src'.(Thread.memory)>>))
-         ); eauto.
-
-
-
-
-
-
-ThreadEvent.update loc ts to valr valw releasedr releasedw or ow
-              can_step th'.(Thread.state) e>>) /\
-           (<<UPDATE: ThreadEvent
-
-
-                        ThreadEvent.update loc ts to valr valw releasedr releasedw or ow
-
-                        ThreadEvent.t
-
-
-             >>). /\
-           (<<STEP: tau (@pred_step (P /1\ no_promise) lang
-                                    is_updating
-
-                                    can_step
-
-                                          (<<COMPLETE:
-         rtc (tau (@pred_step
-                     P /1\
-                     no_update_on (fun loc ts => promised th0.(Thread.memory) loc ts /\ ~ updates loc ts)
-                     /1\ no_promise) lang) th0 th1>>).
-
-
-      /\
-
-         forall loc ts (SAT: updates loc ts)
-
-
-      (<<SOUND:
-         forall loc ts (SAT: updates loc ts),
-         exists th',
-           (<<STEPS: rtc (tau (@pred_step P /1\
-
-
-
-                                          no_update_on (~2 )
-                                          /1\ no_promise
-
-
-                                          /1\ no_promise) lang) th0 th'>>) /\
-           (<<UPDATING:
-
-
-
-    True.
-
-
-
-      exists updates,
-
-
-
-Lemma step_lifting_rtc
-      lang others otherspace updates th_src th_tgt th_tgt'
-
-      (STEP: rtc (tau (@pred_step
-                         ((fun _ => True)
-                            /1\ (no_update_on updates)
-                            /1\ (no_read_msgs others)) lang)) th_tgt th_tgt')
-
-      (FORGET: forget_thread others th_src th_tgt)
-
-      (NOATTATCH: not_attatched updates th_src.(Thread.memory))
-      (THWF: thread_wf th_tgt)
-      (CONSISTENT: promise_consistent th_tgt'.(Thread.local))
-      (OTHERSPACE: others \2/ otherspace <2= unchangables th_tgt.(Thread.memory) th_tgt.(Thread.local).(Local.promises))
-  :
-    exists th_src',
-      (<<STEP: rtc (tau (@pred_step (no_promise) lang))
-                   th_src th_src'>>) /\
-      (<<FORGET: forget_thread others th_src' th_tgt'>>) /\
-      (<<NOATTATCH: not_attatched updates th_src'.(Thread.memory)>>) /\
-      (<<UNCHANGED: unchanged_on otherspace th_src.(Thread.memory) th_src'.(Thread.memory)>>).
-Proof.
 
 
 
