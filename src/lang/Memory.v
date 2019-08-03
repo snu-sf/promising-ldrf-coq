@@ -383,13 +383,21 @@ Module Memory.
   | promise_add
       (PROMISES: add promises1 loc from to msg promises2)
       (MEM: add mem1 loc from to msg mem2)
-      (TS: message_to msg loc to):
+      (TS: message_to msg loc to)
+      (HALF: msg = Message.half ->
+             exists from' val' released',
+               get loc from mem1 = Some (from', Message.full val' released')):
       promise promises1 mem1 loc from to msg promises2 mem2 op_kind_add
   | promise_split
       ts3 msg3
       (PROMISES: split promises1 loc from to ts3 msg msg3 promises2)
       (MEM: split mem1 loc from to ts3 msg msg3 mem2)
-      (TS: message_to msg loc to):
+      (TS: message_to msg loc to)
+      (HALF1: msg = Message.half ->
+              exists from' val' released',
+                get loc from mem1 = Some (from', Message.full val' released'))
+      (HALF2: msg3 = Message.half ->
+              exists val' released', msg = Message.full val' released'):
       promise promises1 mem1 loc from to msg promises2 mem2 (op_kind_split ts3 msg3)
   | promise_lower
       msg0

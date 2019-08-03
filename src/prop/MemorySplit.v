@@ -116,6 +116,6 @@ Module MemorySplit.
     exploit LE; eauto. i.
     exploit Memory.split_exists; eauto. i. des.
     exploit commute_remove_split_remove_remove; try exact REMOVE; eauto. i. des.
-    esplits; eauto.
+    esplits; eauto. econs; eauto; try congr.
   Qed.
 End MemorySplit.
