@@ -84,4 +84,18 @@ Module MemoryMerge.
       + eapply lower_lower_lower; eauto.
       + eapply lower_lower_lower; eauto.
   Qed.
+
+  Lemma add_remove
+        loc from to msg mem0 mem1 mem2
+        (ADD1: Memory.add mem0 loc from to msg mem1)
+        (REMOVE2: Memory.remove mem1 loc from to msg mem2):
+    mem0 = mem2.
+  Proof.
+    apply Memory.ext. i. symmetry.
+    exploit Memory.add_get0; eauto. i. des.
+    erewrite Memory.remove_o; eauto. condtac; ss.
+    - des. subst. rewrite GET. ss.
+    - guardH o.
+      erewrite Memory.add_o; eauto. condtac; ss; eauto.
+  Qed.
 End MemoryMerge.

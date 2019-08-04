@@ -109,7 +109,7 @@ Section Invariant.
 
   Lemma sem_memory_read_step
         lc1 mem1 loc to val released ord lc2
-        (CLOSED: Memory.closed mem1)
+        (INHABITED: Memory.inhabited mem1)
         (STEP: Local.read_step lc1 mem1 loc to val released ord lc2)
         (SEM: sem_memory mem1):
     exists assign,
@@ -122,7 +122,7 @@ Section Invariant.
       + subst. rewrite LocFun.add_spec_eq.
         inv STEP. esplits; eauto.
       + rewrite LocFun.add_spec_neq, LocFun.init_spec.
-        inv CLOSED. specialize (INHABITED loc0).
+        specialize (INHABITED loc0).
         esplits; eauto. congr.
     - apply LocFun.add_spec_eq.
   Qed.
@@ -130,7 +130,7 @@ Section Invariant.
   Lemma sem_memory_write_step_eq
         lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
         assign
-        (CLOSED: Memory.closed mem1)
+        (INHABITED: Memory.inhabited mem1)
         (STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
         (SEM: memory_assign mem2 assign)
         (LOC: LocFun.find loc assign = val):
@@ -142,7 +142,7 @@ Section Invariant.
     - rewrite LocFun.add_add_eq. apply LocFun.ext. i.
       rewrite LocFun.add_spec. condtac; subst; ss.
     - ii. rewrite LocFun.add_spec. condtac.
-      { inv CLOSED. specialize (INHABITED loc). esplits; eauto. }
+      { specialize (INHABITED loc0). esplits; eauto. }
       specialize (SEM loc0). des. revert SEM.
       inv STEP. inv WRITE0. inv PROMISE.
       + erewrite Memory.add_o; eauto. condtac; ss.
@@ -161,7 +161,6 @@ Section Invariant.
   Lemma sem_memory_write_step_neq
         lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
         assign
-        (CLOSED: Memory.closed mem1)
         (STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
         (SEM: memory_assign mem2 assign)
         (LOC: LocFun.find loc assign <> val):
@@ -185,15 +184,15 @@ Section Invariant.
       + i. esplits; eauto.
   Qed.
 
-  (* Lemma vals_incl_sem_memory *)
-  (*       mem1 mem2 *)
-  (*       (VALS: PFStepCommon.vals_incl mem1 mem2) *)
-  (*       (MEM2: sem_memory mem2): *)
-  (*   sem_memory mem1. *)
-  (* Proof. *)
-  (*   ii. apply MEM2. ii. specialize (PR loc). des. *)
-  (*   exploit VALS; eauto. *)
-  (* Qed. *)
+  Lemma vals_incl_sem_memory
+        mem1 mem2
+        (VALS: PFStepCommon.vals_incl mem1 mem2)
+        (MEM2: sem_memory mem2):
+    sem_memory mem1.
+  Proof.
+    ii. apply MEM2. ii. specialize (PR loc). des.
+    exploit VALS; eauto.
+  Qed.
 
   Lemma thread_step_sem
         tid lang e
@@ -201,30 +200,12 @@ Section Invariant.
         st2 lc2 sc2 mem2
         (TH1: S tid lang st1)
         (MEM1: sem_memory mem1)
-        (WF1: Local.wf lc1 mem1)
-        (SC1: Memory.closed_timemap sc1 mem1)
-        (CLOSED1: Memory.closed mem1)
-        (STEP: Thread.step true e (Thread.mk lang st1 lc1 sc1 mem1) (Thread.mk lang st2 lc2 sc2 mem2)):
+        (INHABITED1: Memory.inhabited mem1)
+        (STEP: Thread.program_step e (Thread.mk lang st1 lc1 sc1 mem1) (Thread.mk lang st2 lc2 sc2 mem2)):
     <<TH2: S tid lang st2>> /\
     <<MEM2: sem_memory mem2>>.
   Proof.
-    inv STEP.
-    { inv STEP0. inv LOCAL. split; auto.
-      ii. apply MEM1.
-      ii. specialize (PR loc0). des.
-      destruct msg, kind; ss; inv PROMISE.
-      - destruct msg1; ss.
-        revert PR. erewrite Memory.lower_o; eauto. condtac; ss; eauto.
-        des. subst. i. inv PR.
-        exploit Memory.lower_get0; try exact MEM. i. des.
-        inv MSG_LE. eauto.
-      - revert PR. erewrite Memory.add_o; eauto. condtac; ss; eauto.
-      - revert PR. erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
-        guardH o. des. subst. i. inv PR.
-        exploit Memory.split_get0; eauto. i. des. eauto.
-      - revert PR. erewrite Memory.lower_o; eauto. condtac; ss; eauto.
-    }
-    inv STEP0. inv LOCAL.
+    inv STEP. inv LOCAL.
     - esplits; eauto.
     - exploit sem_memory_read_step; eauto. i. des.
       exploit READ; eauto.
@@ -252,60 +233,55 @@ Section Invariant.
         th1 th2
         (TH1: S tid lang th1.(Thread.state))
         (MEM1: sem_memory th1.(Thread.memory))
-        (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
-        (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory))
-        (CLOSED1: Memory.closed th1.(Thread.memory))
-        (STEP: rtc (union (Thread.step true)) th1 th2):
+        (INHABITED1: Memory.inhabited th1.(Thread.memory))
+        (STEP: rtc (union (@Thread.program_step lang)) th1 th2):
     <<TH2: S tid lang th2.(Thread.state)>> /\
     <<MEM2: sem_memory th2.(Thread.memory)>>.
   Proof.
     move STEP after TH1. revert_until STEP. induction STEP; ss.
     i. inv H.
-    exploit Thread.step_future; eauto. i. des.
     destruct x, y. ss.
     exploit thread_step_sem; eauto. i. des.
     eapply IHSTEP; eauto.
+    inv USTEP.
+    eapply Local.program_step_inhabited; eauto.
   Qed.
 
-  (* Lemma thread_pf_step_sem *)
-  (*       tid lang caps *)
-  (*       st1 lc1 sc1 mem1 *)
-  (*       st2 lc2 sc2 mem2 *)
-  (*       (TH1: S tid lang st1) *)
-  (*       (MEM1: sem_memory mem1) *)
-  (*       (WF1: Local.wf lc1 mem1) *)
-  (*       (SC1: Memory.closed_timemap sc1 mem1) *)
-  (*       (CLOSED1: Memory.closed mem1) *)
-  (*       (STEP: PFStepCap.pf_step caps (Thread.mk lang st1 lc1 sc1 mem1) (Thread.mk lang st2 lc2 sc2 mem2)): *)
-  (*   <<TH2: S tid lang st2>> /\ *)
-  (*   <<MEM2: sem_memory mem2>>. *)
-  (* Proof. *)
-  (*   inv STEP. *)
-  (*   exploit thread_step_sem; try exact STEP0; eauto. i. des. *)
-  (*   split; auto. *)
-  (*   hexploit PFStepCap.lower_cap_vals_incl; eauto. i. *)
-  (*   eapply vals_incl_sem_memory; eauto. *)
-  (* Qed. *)
+  Lemma thread_pf_step_sem
+        tid lang caps
+        st1 lc1 sc1 mem1
+        st2 lc2 sc2 mem2
+        (TH1: S tid lang st1)
+        (MEM1: sem_memory mem1)
+        (INHABITED1: Memory.inhabited mem1)
+        (STEP: PFStepCap.pf_step caps (Thread.mk lang st1 lc1 sc1 mem1) (Thread.mk lang st2 lc2 sc2 mem2)):
+    <<TH2: S tid lang st2>> /\
+    <<MEM2: sem_memory mem2>>.
+  Proof.
+    inv STEP.
+    exploit thread_step_sem; try exact STEP0; eauto. i. des.
+    split; auto.
+    hexploit PFStepCap.add_cap_vals_incl; eauto. i.
+    eapply vals_incl_sem_memory; eauto.
+  Qed.
 
-  (* Lemma rtc_thread_pf_step_sem *)
-  (*       tid lang caps *)
-  (*       th1 th2 *)
-  (*       (TH1: S tid lang th1.(Thread.state)) *)
-  (*       (MEM1: sem_memory th1.(Thread.memory)) *)
-  (*       (CAPS1: PFStepCap.caps_sound caps th1.(Thread.local).(Local.promises) th1.(Thread.memory)) *)
-  (*       (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory)) *)
-  (*       (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory)) *)
-  (*       (CLOSED1: Memory.closed th1.(Thread.memory)) *)
-  (*       (STEP: rtc (PFStepCap.pf_step caps) th1 th2): *)
-  (*   <<TH2: S tid lang th2.(Thread.state)>> /\ *)
-  (*   <<MEM2: sem_memory th2.(Thread.memory)>>. *)
-  (* Proof. *)
-  (*   move STEP after TH1. revert_until STEP. induction STEP; ss. *)
-  (*   i. exploit PFStepCap.pf_step_future; eauto. i. des. *)
-  (*   destruct x, y. ss. *)
-  (*   exploit thread_pf_step_sem; eauto. i. des. *)
-  (*   eapply IHSTEP; eauto. *)
-  (* Qed. *)
+  Lemma rtc_thread_pf_step_sem
+        tid lang caps
+        th1 th2
+        (TH1: S tid lang th1.(Thread.state))
+        (MEM1: sem_memory th1.(Thread.memory))
+        (INHABITED1: Memory.inhabited th1.(Thread.memory))
+        (STEP: rtc (PFStepCap.pf_step caps) th1 th2):
+    <<TH2: S tid lang th2.(Thread.state)>> /\
+    <<MEM2: sem_memory th2.(Thread.memory)>>.
+  Proof.
+    move STEP after TH1. revert_until STEP.
+    induction STEP; ss.
+    i. hexploit PFStepCap.pf_step_inhabited; eauto. i. des.
+    destruct x, y. ss.
+    exploit thread_pf_step_sem; eauto. i. des.
+    eapply IHSTEP; eauto.
+  Qed.
 
   Lemma future_sem_memory
         m1 m2
@@ -327,77 +303,79 @@ Section Invariant.
         (STEP: Configuration.step e tid c1 c2):
     sem c2.
   Proof.
-    (* inv SEM. econs. *)
-    (* - inv STEP. ss. ii. revert FIND. *)
-    (*   rewrite IdentMap.gsspec. condtac; ss; [|by apply TH]. subst. *)
-    (*   i. inv FIND. apply inj_pair2 in H1. subst. *)
-    (*   eapply rtc_implies in STEPS; [|by apply tau_union]. *)
-    (*   exploit rtc_n1; eauto; i. *)
-    (*   { econs. econs. eauto. } *)
-    (*   clear STEP0 STEPS COND. *)
-    (*   inv WF. inv WF0. clear DISJOINT. *)
-    (*   exploit THREADS; eauto. intro WF. clear THREADS. *)
-    (*   exploit Thread.rtc_all_step_future; try eapply x0; eauto. s. i. des. *)
-    (*   exploit (@PFStep.sim_thread_exists *)
-    (*              _ (Thread.mk lang0 st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory))); ss. *)
-    (*   i. des. *)
-    (*   exploit PFStep.thread_rtc_all_step; try exact SIM; try eapply x0; eauto; ss. *)
-    (*   { hexploit consistent_promise_consistent; try exact CONSISTENT; ss. } *)
-    (*   i. des. *)
-    (*   hexploit PFStep.sim_memory_vals_incl; try eapply SIM; eauto; s; i. *)
-    (*   { apply WF_SRC. } *)
-    (*   { apply WF. } *)
-    (*   hexploit vals_incl_sem_memory; eauto. i. *)
-    (*   destruct e_src, e2_src. ss. inv SIM. inv SIM2. ss. subst. *)
-    (*   exploit rtc_thread_step_sem; try exact STEPS_SRC; eauto. i. des. ss. *)
-    (* - inv STEP. ss. inv WF. inv WF0. clear DISJOINT. *)
-    (*   exploit THREADS; eauto. intro WF. clear THREADS. *)
-    (*   eapply rtc_implies in STEPS; [|by apply tau_union]. *)
-    (*   exploit rtc_n1; eauto. *)
-    (*   { econs. econs. eauto. } *)
-    (*   intro STEPS_TGT. clear STEP0 STEPS. *)
-    (*   exploit Thread.rtc_all_step_future; try exact STEPS_TGT; eauto. s. i. des. *)
-    (*   exploit Memory.cap_exists; try exact CLOSED2. *)
-    (*   instantiate (1 := lc3.(Local.promises)). i. des. *)
-    (*   exploit Memory.cap_closed; eauto. intro CLOSED_CAP. *)
-    (*   exploit Local.cap_wf; eauto. intro WF_CAP. *)
-    (*   exploit Memory.max_full_timemap_exists; try eapply CLOSED_CAP. i. des. *)
-    (*   exploit CONSISTENT; try exact CAP; try exact x0; eauto. s. i. des. *)
-    (*   exploit (@PFStep.sim_thread_exists *)
-    (*              _ (Thread.mk lang st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory))); ss. *)
-    (*   i. des. *)
-    (*   exploit PFStep.thread_rtc_all_step; try exact SIM; eauto; ss. *)
-    (*   { hexploit consistent_promise_consistent; eauto. } *)
-    (*   i. des. *)
-    (*   exploit Thread.rtc_all_step_future; try eapply rtc_implies; try exact STEPS_SRC; eauto. *)
-    (*   { i. inv PR. econs. econs. eauto. } *)
-    (*   i. des. *)
-    (*   exploit PFStepCap.sim_thread_exists; try exact SIM2; eauto. s. i. des. *)
-    (*   exploit PFStepCap.thread_rtc_all_step; try eapply rtc_implies; try exact STEPS; eauto; s. *)
-    (*   { apply Memory.max_full_timemap_closed; auto. } *)
-    (*   { i. inv PR. econs. eauto. } *)
-    (*   { ii. rewrite PROMISES in *. rewrite Memory.bot_get in *. ss. } *)
-    (*   i. des. *)
-    (*   exploit Thread.rtc_tau_step_future; try exact STEPS; eauto; s. *)
-    (*   { eapply Memory.max_full_timemap_closed; eauto. } *)
-    (*   i. des. *)
-    (*   hexploit PFStep.sim_memory_vals_incl; try eapply SIM; eauto; s. *)
-    (*   { apply WF_SRC. } *)
-    (*   { apply WF. } *)
-    (*   i. apply vals_incl_sem_memory in H; ss. *)
-    (*   exploit rtc_thread_step_sem; try exact STEPS_SRC; eauto. *)
-    (*   { inv SIM. ss. rewrite STATE. eauto. } *)
-    (*   i. des. *)
-    (*   hexploit PFStepCap.cap_aux_src_vals_incl; eauto. i. *)
-    (*   apply vals_incl_sem_memory in H0; ss. *)
-    (*   exploit rtc_thread_pf_step_sem; try exact STEPS_SRC0; eauto; s. *)
-    (*   { eapply PFStepCap.sim_memory_caps_sound; eapply SIM0. } *)
-    (*   i. des. *)
-    (*   hexploit PFStepCap.sim_memory_bot_vals_incl; try eapply SIM1; eauto. i. *)
-    (*   apply vals_incl_sem_memory in H1; ss. *)
-    (*   eapply future_sem_memory; eauto. *)
-    (*   eapply future_sem_memory; eauto. *)
-  Admitted.
+    inv SEM. econs.
+    - inv STEP. ss. ii. revert FIND.
+      rewrite IdentMap.gsspec. condtac; ss; [|by apply TH]. subst.
+      i. inv FIND. apply inj_pair2 in H1. subst.
+      eapply rtc_implies in STEPS; [|by apply tau_union].
+      exploit rtc_n1; eauto; i.
+      { econs. econs. eauto. }
+      clear STEP0 STEPS COND.
+      inv WF. inv WF0. clear DISJOINT.
+      exploit THREADS; eauto. intro WF. clear THREADS.
+      exploit Thread.rtc_all_step_future; try eapply x0; eauto. s. i. des.
+      exploit (@PFStep.sim_thread_exists
+                 _ (Thread.mk lang0 st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory))); ss.
+      i. des.
+      hexploit PFStep.sim_memory_inhabited; try eapply SIM; s.
+      { apply WF. }
+      { apply MEM0. }
+      i. des.
+      exploit PFStep.thread_rtc_all_step; try exact SIM; try eapply x0; eauto; ss.
+      { hexploit consistent_promise_consistent; try exact CONSISTENT; ss. }
+      i. des.
+      hexploit PFStep.sim_memory_vals_incl; try eapply SIM; eauto. s. i.
+      hexploit vals_incl_sem_memory; eauto. i.
+      destruct e_src, e2_src. ss. inv SIM. inv SIM2. ss. subst.
+      exploit rtc_thread_step_sem; try exact STEPS_SRC; eauto. i. des. ss.
+    - inv STEP. ss. inv WF. inv WF0. clear DISJOINT.
+      exploit THREADS; eauto. intro WF. clear THREADS.
+      eapply rtc_implies in STEPS; [|by apply tau_union].
+      exploit rtc_n1; eauto.
+      { econs. econs. eauto. }
+      intro STEPS_TGT. clear STEP0 STEPS.
+      exploit Thread.rtc_all_step_future; try exact STEPS_TGT; eauto. s. i. des.
+      exploit Memory.cap_exists; try exact CLOSED2.
+      instantiate (1 := lc3.(Local.promises)). i. des.
+      exploit Memory.cap_closed; eauto. intro CLOSED_CAP.
+      exploit Local.cap_wf; eauto. intro WF_CAP.
+      exploit Memory.max_full_timemap_exists; try eapply CLOSED_CAP. i. des.
+      exploit CONSISTENT; try exact CAP; try exact x0; eauto. s. i. des.
+      exploit (@PFStep.sim_thread_exists
+                 _ (Thread.mk lang st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory))); ss.
+      i. des.
+      hexploit PFStep.sim_memory_inhabited; try eapply SIM; s.
+      { apply WF. }
+      { apply MEM0. }
+      intro INHABITED_SRC. des.
+      exploit PFStep.thread_rtc_all_step; try exact SIM; eauto; ss.
+      { hexploit consistent_promise_consistent; eauto. }
+      i. des.
+      exploit PFStepCap.sim_thread_exists; try exact SIM2; eauto. s. i. des.
+      hexploit PFStepCap.sim_memory_inhabited; try eapply SIM0; s.
+      { apply WF_CAP. }
+      { apply CLOSED_CAP. }
+      intro INHABITED_SRC_CAP. des.
+      exploit PFStepCap.thread_rtc_all_step; try eapply rtc_implies; try exact STEPS; eauto; s.
+      { apply Memory.max_full_timemap_closed; auto. }
+      { i. inv PR. econs. eauto. }
+      { ii. rewrite PROMISES in *. rewrite Memory.bot_get in *. ss. }
+      i. des.
+      exploit Thread.rtc_tau_step_future; try exact STEPS; eauto; s.
+      { eapply Memory.max_full_timemap_closed; eauto. }
+      i. des.
+      hexploit PFStep.sim_memory_vals_incl; try eapply SIM; eauto. i.
+      apply vals_incl_sem_memory in H; ss.
+      exploit rtc_thread_step_sem; try exact STEPS_SRC; eauto.
+      { inv SIM. ss. rewrite STATE. eauto. }
+      i. des.
+      apply vals_incl_sem_memory in VALS; ss.
+      exploit rtc_thread_pf_step_sem; try exact STEPS_SRC0; eauto. i. des.
+      hexploit PFStepCap.sim_memory_bot; try eapply SIM1; eauto. i.
+      eapply future_sem_memory; eauto.
+      eapply future_sem_memory; eauto.
+      rewrite H0 in *. ss.
+  Qed.
 
   Inductive Configuration_step_evt (c1 c2:Configuration.t): Prop :=
   | Configuration_step_evt_intro

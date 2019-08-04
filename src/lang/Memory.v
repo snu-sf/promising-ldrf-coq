@@ -1928,17 +1928,13 @@ Module Memory.
 
   Lemma write_get2
         promises1 mem1 loc from to val released promises2 mem2 kind
-        (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind)
-        (MEM: inhabited mem1)
-        (BOT: bot_none promises1)
-        (LE: le promises1 mem1):
+        (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind):
     <<GET_PROMISE: get loc to promises2 = None>> /\
     <<GET_MEM: get loc to mem2 = Some (from, Message.full val released)>>.
   Proof.
     inv WRITE. splits.
     - erewrite remove_o; eauto. condtac; ss. des; ss.
-    - exploit promise_future0; try apply PROMISE; eauto. i. des.
-      eapply promise_get2; eauto.
+    - eapply promise_get2; eauto.
   Qed.
 
   Lemma write_get_None
