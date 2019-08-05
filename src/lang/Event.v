@@ -163,6 +163,14 @@ Module Event.
 End Event.
 
 
+Module MachineEvent.
+  Inductive t :=
+  | syscall (e: Event.t)
+  | abort
+  .
+End MachineEvent.
+
+
 Module ProgramEvent.
   Inductive t :=
   | silent
@@ -171,6 +179,7 @@ Module ProgramEvent.
   | update (loc:Loc.t) (valr valw:Const.t) (ordr ordw:Ordering.t)
   | fence (ordr ordw:Ordering.t)
   | syscall (e:Event.t)
+  | abort
   .
 
   Definition is_reading (e:t): option (Loc.t * Const.t * Ordering.t) :=
@@ -211,5 +220,7 @@ Module ProgramEvent.
   | ord_syscall
       e:
       ord (syscall e) (syscall e)
+  | ord_abort:
+      ord abort abort
   .
 End ProgramEvent.

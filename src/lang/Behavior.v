@@ -32,17 +32,21 @@ Set Implicit Arguments.
  *)
 
 Inductive behaviors
-          (step: forall (e:option Event.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop):
+          (step: forall (e:option MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop):
   forall (conf:Configuration.t) (b:list Event.t), Prop :=
 | behaviors_nil
     c
     (TERMINAL: Configuration.is_terminal c):
     behaviors step c nil
-| behaviors_event
+| behaviors_syscall
     e tid c1 c2 beh
-    (STEP: step (Some e) tid c1 c2)
+    (STEP: step (Some (MachineEvent.syscall e)) tid c1 c2)
     (NEXT: behaviors step c2 beh):
     behaviors step c1 (e::beh)
+| behaviors_abort
+    tid c1 c2 beh
+    (STEP: step (Some MachineEvent.abort) tid c1 c2):
+    behaviors step c1 beh
 | behaviors_tau
     tid c1 c2 beh
     (STEP: step None tid c1 c2)
@@ -57,5 +61,5 @@ Lemma rtc_tau_step_behavior
   behaviors step c1 b.
 Proof.
   revert BEH. induction STEPS; auto. inv H.
-  i. specialize (IHSTEPS BEH). econs 3; eauto.
+  i. specialize (IHSTEPS BEH). econs 4; eauto.
 Qed.

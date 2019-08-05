@@ -30,6 +30,7 @@ Module ThreadEvent.
   | update (loc:Loc.t) (tsr tsw:Time.t) (valr valw:Const.t) (releasedr releasedw:option View.t) (ordr ordw:Ordering.t)
   | fence (ordr ordw:Ordering.t)
   | syscall (e:Event.t)
+  | abort
   .
   Hint Constructors t.
 
@@ -71,6 +72,14 @@ Module ThreadEvent.
     | update loc _ _ valr valw _ _ ordr ordw => ProgramEvent.update loc valr valw ordr ordw
     | fence ordr ordw => ProgramEvent.fence ordr ordw
     | syscall ev => ProgramEvent.syscall ev
+    | abort => ProgramEvent.abort
+    end.
+
+  Definition get_machine_event (e: t): option MachineEvent.t :=
+    match e with
+    | syscall e => Some (MachineEvent.syscall e)
+    | abort => Some MachineEvent.abort
+    | _ => None
     end.
 
   Definition is_promising (e:t) : option (Loc.t * Time.t) :=
@@ -125,6 +134,8 @@ Module ThreadEvent.
       le (fence ordr ordw) (fence ordr ordw)
   | le_syscall e:
       le (syscall e) (syscall e)
+  | le_abort:
+      le abort abort
   .
   Hint Constructors le.
 
@@ -143,6 +154,8 @@ Module ThreadEvent.
       fence (Ordering.join ord0 ordr) (Ordering.join ord0 ordw)
     | syscall e =>
       syscall e
+    | abort =>
+      abort
     end.
 
   Lemma lift_plain e:
@@ -196,6 +209,28 @@ Module Local.
     econs. symmetry. apply H.
   Qed.
 
+  Definition promise_consistent (lc:t): Prop :=
+    forall loc ts from msg
+       (PROMISE: Memory.get loc ts lc.(promises) = Some (from, msg)),
+      Time.lt (lc.(tview).(TView.cur).(View.rlx) loc) ts.
+
+  Lemma bot_promise_consistent
+        lc
+        (PROMISES: lc.(promises) = Memory.bot):
+    promise_consistent lc.
+  Proof.
+    ii. rewrite PROMISES, Memory.bot_get in *. ss.
+  Qed.
+
+  Lemma terminal_promise_consistent
+        lc
+        (TERMINAL: is_terminal lc):
+    promise_consistent lc.
+  Proof.
+    inv TERMINAL. apply bot_promise_consistent. auto.
+  Qed.
+
+
   Inductive promise_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (from to:Time.t) (msg:Message.t) (lc2:t) (mem2:Memory.t) (kind:Memory.op_kind): Prop :=
   | promise_step_intro
       promises2
@@ -242,6 +277,12 @@ Module Local.
   .
   Hint Constructors fence_step.
 
+  Inductive abort_step (lc1:t): Prop :=
+  | abort_step_intro
+      (CONSISTENT: promise_consistent lc1)
+  .
+  Hint Constructors abort_step.
+
   Inductive program_step: forall (e:ThreadEvent.t) lc1 sc1 mem1 lc2 sc2 mem2, Prop :=
   | step_silent
       lc1 sc1 mem1:
@@ -274,6 +315,10 @@ Module Local.
       e lc2 sc2
       (LOCAL: Local.fence_step lc1 sc1 Ordering.seqcst Ordering.seqcst lc2 sc2):
       program_step (ThreadEvent.syscall e) lc1 sc1 mem1 lc2 sc2 mem1
+  | step_abort
+      lc1 sc1 mem1
+      (LOCAL: Local.abort_step lc1):
+      program_step ThreadEvent.abort lc1 sc1 mem1 lc1 sc1 mem1
   .
   Hint Constructors program_step.
 
@@ -418,6 +463,7 @@ Module Local.
       esplits; eauto. etrans; eauto.
     - exploit fence_step_future; eauto. i. des. esplits; eauto; try refl.
     - exploit fence_step_future; eauto. i. des. esplits; eauto; try refl.
+    - esplits; eauto; try refl.
   Qed.
 
   Lemma program_step_inhabited
@@ -524,6 +570,7 @@ Module Local.
       exploit write_step_disjoint; eauto.
     - exploit fence_step_disjoint; eauto.
     - exploit fence_step_disjoint; eauto.
+    - esplits; eauto.
   Qed.
 
 

@@ -159,14 +159,14 @@ Module Configuration.
     - apply Memory.init_closed.
   Qed.
 
-  Inductive step: forall (e:option Event.t) (tid:Ident.t) (c1 c2:t), Prop :=
+  Inductive step: forall (e:option MachineEvent.t) (tid:Ident.t) (c1 c2:t), Prop :=
   | step_intro
       pf e tid c1 lang st1 lc1 e2 st3 lc3 sc3 memory3
       (TID: IdentMap.find tid c1.(threads) = Some (existT _ lang st1, lc1))
       (STEPS: rtc (@Thread.tau_step _) (Thread.mk _ st1 lc1 c1.(sc) c1.(memory)) e2)
       (STEP: Thread.step pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
       (CONSISTENT: Thread.consistent (Thread.mk _ st3 lc3 sc3 memory3)):
-      step (ThreadEvent.get_event e) tid c1 (mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(threads)) sc3 memory3)
+      step (ThreadEvent.get_machine_event e) tid c1 (mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(threads)) sc3 memory3)
   .
 
   Definition opt_step := opt step.

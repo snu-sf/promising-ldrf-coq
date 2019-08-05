@@ -94,6 +94,7 @@ Module Instr.
   | update (lhs:Reg.t) (loc:Loc.t) (rmw:rmw) (ordr ordw:Ordering.t)
   | fence (ordr ordw:Ordering.t)
   | syscall (lhs:Reg.t) (rhses:list Value.t)
+  | assert (e:expr)
   .
 
   Definition regs_of_rmw (rmw:rmw): RegSet.t :=
@@ -111,6 +112,7 @@ Module Instr.
     | update reg _ rmw _ _ => RegSet.add reg (regs_of_rmw rmw)
     | fence _ _ => RegSet.empty
     | syscall lhs rhses => RegSet.add lhs (Value.regs_of_list rhses)
+    | assert e => regs_of_expr e
     end.
 
   Inductive ord: forall (i_src i_tgt:Instr.t), Prop :=
@@ -138,6 +140,9 @@ Module Instr.
   | ord_syscall
       o i:
       ord (Instr.syscall o i) (Instr.syscall o i)
+  | ord_assert
+      e:
+      ord (Instr.assert e) (Instr.assert e)
   .
 
   Global Program Instance instr_ord_Reflexive: Reflexive ord.
@@ -187,6 +192,7 @@ Module SyntaxNotations.
   Notation "'CAS' lhs '::=' loc ',' old ',' new '@' ordr ',' ordw" := (Instr.update lhs loc (Instr.cas old new) ordr ordw) (at level 42).
   Notation "'FENCE' '@' ordr ',' ordw" := (Instr.fence ordr ordw) (at level 42).
   Notation "'SYSCALL' lhs '::=' rhses" := (Instr.syscall lhs rhses) (at level 42).
+  Notation "'ASSERT' e" := (Instr.assert e) (at level 42).
 
   Notation "'IF' cond 'THEN' c1 'ELSE' c2" := (Stmt.ite cond c1 c2) (at level 43).
   Notation "'DO' c 'WHILE' cond" := (Stmt.dowhile c cond) (at level 43).
