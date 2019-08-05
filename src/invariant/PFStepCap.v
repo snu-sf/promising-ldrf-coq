@@ -922,8 +922,8 @@ Module PFStepCap.
         (INHABITED1: Memory.inhabited e1.(Thread.memory)):
     <<INHABITED2: Memory.inhabited e2.(Thread.memory)>>.
   Proof.
-    inv STEP. inv STEP0.
-    hexploit Local.program_step_inhabited; eauto. i.
+    inv STEP.
+    hexploit Thread.program_step_inhabited; eauto. i.
     inv ADD; ss.
     eapply Memory.add_inhabited; eauto.
   Qed.

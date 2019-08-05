@@ -243,8 +243,7 @@ Section Invariant.
     destruct x, y. ss.
     exploit thread_step_sem; eauto. i. des.
     eapply IHSTEP; eauto.
-    inv USTEP.
-    eapply Local.program_step_inhabited; eauto.
+    hexploit Thread.program_step_inhabited; try exact USTEP; eauto.
   Qed.
 
   Lemma thread_pf_step_sem

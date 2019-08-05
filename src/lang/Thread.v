@@ -293,6 +293,16 @@ Module Thread.
         splits; ss; etrans; eauto.
     Qed.
 
+    Lemma program_step_inhabited
+          e e1 e2
+          (STEP: program_step e e1 e2)
+          (INHABITED1: Memory.inhabited e1.(memory)):
+      <<INHABITED2: Memory.inhabited e2.(memory)>>.
+    Proof.
+      inv STEP. ss.
+      eapply Local.program_step_inhabited; eauto.
+    Qed.
+
 
     (* step_disjoint *)
 
