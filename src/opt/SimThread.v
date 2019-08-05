@@ -41,17 +41,19 @@ Section SimulationThread.
       (STEP_TGT: Thread.step pf_tgt e_tgt
                              (Thread.mk _ st1_tgt lc1_tgt sc1_tgt mem1_tgt)
                              (Thread.mk _ st3_tgt lc3_tgt sc3_tgt mem3_tgt)),
-    exists e_src st2_src lc2_src sc2_src mem2_src st3_src lc3_src sc3_src mem3_src,
-      <<STEPS: rtc (@Thread.tau_step _)
-                   (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
-                   (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>> /\
-      <<STEP_SRC: Thread.opt_step e_src
-                                  (Thread.mk _ st2_src lc2_src sc2_src mem2_src)
-                                  (Thread.mk _ st3_src lc3_src sc3_src mem3_src)>> /\
-      <<EVENT: ThreadEvent.get_event e_src = ThreadEvent.get_event e_tgt>> /\
-      <<SC3: TimeMap.le sc3_src sc3_tgt>> /\
-      <<MEMORY3: sim_memory mem3_src mem3_tgt>> /\
-      <<SIM: sim_thread st3_src lc3_src sc3_src mem3_src st3_tgt lc3_tgt sc3_tgt mem3_tgt>>.
+      <<ABORT: Thread.steps_abort (Thread.mk _ st1_src lc1_src sc1_src mem1_src)>> \/
+      exists e_src st2_src lc2_src sc2_src mem2_src st3_src lc3_src sc3_src mem3_src,
+        <<ABORT: e_tgt <> ThreadEvent.abort>> /\
+        <<STEPS: rtc (@Thread.tau_step _)
+                     (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
+                     (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>> /\
+        <<STEP_SRC: Thread.opt_step e_src
+                                    (Thread.mk _ st2_src lc2_src sc2_src mem2_src)
+                                    (Thread.mk _ st3_src lc3_src sc3_src mem3_src)>> /\
+        <<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>> /\
+        <<SC3: TimeMap.le sc3_src sc3_tgt>> /\
+        <<MEMORY3: sim_memory mem3_src mem3_tgt>> /\
+        <<SIM: sim_thread st3_src lc3_src sc3_src mem3_src st3_tgt lc3_tgt sc3_tgt mem3_tgt>>.
 
   Definition _sim_thread
              (sim_thread: SIM_THREAD)
@@ -74,15 +76,16 @@ Section SimulationThread.
       (MEM_TGT: Memory.closed mem1_tgt),
       <<TERMINAL:
         forall (TERMINAL_TGT: lang_tgt.(Language.is_terminal) st1_tgt),
-        exists st2_src lc2_src sc2_src mem2_src,
-          <<STEPS: rtc (@Thread.tau_step _)
-                       (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
-                       (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>> /\
-          <<SC: TimeMap.le sc2_src sc1_tgt>> /\
-          <<MEMORY: sim_memory mem2_src mem1_tgt>> /\
-          <<TERMINAL_SRC: lang_src.(Language.is_terminal) st2_src>> /\
-          <<LOCAL: sim_local SimPromises.bot lc2_src lc1_tgt>> /\
-          <<TERMINAL: sim_terminal st2_src st1_tgt>>>> /\
+          <<ABORT: Thread.steps_abort (Thread.mk _ st1_src lc1_src sc1_src mem1_src)>> \/
+          exists st2_src lc2_src sc2_src mem2_src,
+            <<STEPS: rtc (@Thread.tau_step _)
+                         (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
+                         (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>> /\
+            <<SC: TimeMap.le sc2_src sc1_tgt>> /\
+            <<MEMORY: sim_memory mem2_src mem1_tgt>> /\
+            <<TERMINAL_SRC: lang_src.(Language.is_terminal) st2_src>> /\
+            <<LOCAL: sim_local SimPromises.bot lc2_src lc1_tgt>> /\
+            <<TERMINAL: sim_terminal st2_src st1_tgt>>>> /\
       <<CAP:
         forall mem2_src
           (CAP_SRC: Memory.cap lc1_src.(Local.promises) mem1_src mem2_src),
@@ -92,11 +95,12 @@ Section SimulationThread.
       <<PROMISES:
         forall (PROMISES_TGT: lc1_tgt.(Local.promises) = Memory.bot)
           (NOHALF: Memory.no_half mem1_tgt),
-        exists st2_src lc2_src sc2_src mem2_src,
-          <<STEPS: rtc (@Thread.tau_step _)
-                       (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
-                       (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>> /\
-          <<PROMISES_SRC: lc2_src.(Local.promises) = Memory.bot>>>> /\
+          <<ABORT: Thread.steps_abort (Thread.mk _ st1_src lc1_src sc1_src mem1_src)>> \/
+          exists st2_src lc2_src sc2_src mem2_src,
+            <<STEPS: rtc (@Thread.tau_step _)
+                         (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
+                         (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>> /\
+            <<PROMISES_SRC: lc2_src.(Local.promises) = Memory.bot>>>> /\
       <<STEP: _sim_thread_step (sim_thread sim_terminal)
                                st1_src lc1_src sc1_src mem1_src
                                st1_tgt lc1_tgt sc1_tgt mem1_tgt>>.
@@ -105,8 +109,8 @@ Section SimulationThread.
   Proof.
     ii. exploit IN; try apply SC; eauto. i. des.
     splits; eauto. ii.
-    exploit STEP; eauto. i. des.
-    esplits; eauto.
+    exploit STEP; eauto. i. des; eauto.
+    right. esplits; eauto.
   Qed.
   Hint Resolve _sim_thread_mon: paco.
 
@@ -120,10 +124,11 @@ Section SimulationThread.
     pcofix CIH. i. punfold PR. pfold. ii.
     exploit PR; try apply SC; eauto. i. des.
     splits; auto.
-    - i. exploit TERMINAL; eauto. i. des.
-      esplits; eauto.
-    - ii. exploit STEP; eauto. i. des. inv SIM0; [|done].
-      esplits; eauto.
+    - i. exploit TERMINAL; eauto. i. des; eauto.
+      right. esplits; eauto.
+    - ii. exploit STEP; eauto. i. des; eauto.
+      inv SIM0; [|done].
+      right. esplits; eauto.
   Qed.
 End SimulationThread.
 Hint Resolve _sim_thread_mon: paco.
@@ -148,14 +153,16 @@ Lemma sim_thread_step
       (MEM_SRC: Memory.closed mem1_src)
       (MEM_TGT: Memory.closed mem1_tgt)
       (SIM: sim_thread sim_terminal st1_src lc1_src sc1_src mem1_src st1_tgt lc1_tgt sc1_tgt mem1_tgt):
+  <<ABORT: Thread.steps_abort (Thread.mk lang_src st1_src lc1_src sc1_src mem1_src)>> \/
   exists e_src st2_src lc2_src sc2_src mem2_src st3_src lc3_src sc3_src mem3_src,
+    <<ABORT: e_tgt <> ThreadEvent.abort>> /\
     <<STEPS: rtc (@Thread.tau_step lang_src)
                  (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
                  (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>> /\
     <<STEP: Thread.opt_step e_src
                             (Thread.mk _ st2_src lc2_src sc2_src mem2_src)
                             (Thread.mk _ st3_src lc3_src sc3_src mem3_src)>> /\
-    <<EVENT: ThreadEvent.get_event e_src = ThreadEvent.get_event e_tgt>> /\
+    <<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>> /\
     <<SC: TimeMap.le sc3_src sc3_tgt>> /\
     <<MEMORY: sim_memory mem3_src mem3_tgt>> /\
     <<WF_SRC: Local.wf lc3_src mem3_src>> /\
@@ -168,7 +175,8 @@ Lemma sim_thread_step
 Proof.
   punfold SIM. exploit SIM; eauto; try refl. i. des.
   exploit Thread.step_future; eauto. s. i. des.
-  exploit STEP0; eauto. i. des. inv SIM0; [|done].
+  exploit STEP0; eauto. i. des; eauto.
+  inv SIM0; [|done]. right.
   exploit Thread.rtc_tau_step_future; eauto. s. i. des.
   exploit Thread.opt_step_future; eauto. s. i. des.
   esplits; eauto.
@@ -193,14 +201,16 @@ Lemma sim_thread_opt_step
       (MEM_SRC: Memory.closed mem1_src)
       (MEM_TGT: Memory.closed mem1_tgt)
       (SIM: sim_thread sim_terminal st1_src lc1_src sc1_src mem1_src st1_tgt lc1_tgt sc1_tgt mem1_tgt):
+  <<ABORT: Thread.steps_abort (Thread.mk lang_src st1_src lc1_src sc1_src mem1_src)>> \/
   exists e_src st2_src lc2_src sc2_src mem2_src st3_src lc3_src sc3_src mem3_src,
+    <<ABORT: e_tgt <> ThreadEvent.abort>> /\
     <<STEPS: rtc (@Thread.tau_step lang_src)
                  (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
                  (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>> /\
     <<STEP: Thread.opt_step e_src
                             (Thread.mk _ st2_src lc2_src sc2_src mem2_src)
                             (Thread.mk _ st3_src lc3_src sc3_src mem3_src)>> /\
-    <<EVENT: ThreadEvent.get_event e_src = ThreadEvent.get_event e_tgt>> /\
+    <<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>> /\
     <<SC: TimeMap.le sc3_src sc3_tgt>> /\
     <<MEMORY: sim_memory mem3_src mem3_tgt>> /\
     <<WF_SRC: Local.wf lc3_src mem3_src>> /\
@@ -212,7 +222,7 @@ Lemma sim_thread_opt_step
     <<SIM: sim_thread sim_terminal st3_src lc3_src sc3_src mem3_src st3_tgt lc3_tgt sc3_tgt mem3_tgt>>.
 Proof.
   inv STEP.
-  - esplits; eauto. econs 1.
+  - right. esplits; eauto; ss. econs 1.
   - eapply sim_thread_step; eauto.
 Qed.
 
@@ -231,6 +241,7 @@ Lemma sim_thread_rtc_step
       (MEM_SRC: Memory.closed mem1_src)
       (MEM_TGT: Memory.closed e1_tgt.(Thread.memory))
       (SIM: sim_thread sim_terminal st1_src lc1_src sc1_src mem1_src e1_tgt.(Thread.state) e1_tgt.(Thread.local) e1_tgt.(Thread.sc) e1_tgt.(Thread.memory)):
+  <<ABORT: Thread.steps_abort (Thread.mk lang_src st1_src lc1_src sc1_src mem1_src)>> \/
   exists st2_src lc2_src sc2_src mem2_src,
     <<STEPS: rtc (@Thread.tau_step lang_src)
                  (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
@@ -248,16 +259,22 @@ Proof.
   revert SC MEMORY WF_SRC WF_TGT SC_SRC SC_TGT MEM_SRC MEM_TGT SIM.
   revert st1_src lc1_src sc1_src mem1_src.
   induction STEPS; i.
-  { esplits; eauto. }
+  { right. esplits; eauto. }
   inv H. inv TSTEP. destruct x, y. ss.
-  exploit sim_thread_step; eauto. i. des.
+  exploit sim_thread_step; eauto. i. des; eauto.
   exploit IHSTEPS; eauto. i. des.
-  destruct z. ss.
-  esplits; try apply MEMORY1; eauto.
-  etrans; [eauto|]. etrans; [|eauto]. inv STEP0; eauto.
-  econs 2; eauto. econs.
-  - econs. eauto.
-  - etrans; eauto.
+  - left. inv ABORT0. des.
+    unfold Thread.steps_abort. esplits; [|eauto].
+    etrans; eauto. etrans; eauto. inv STEP0; eauto.
+    econs 2; eauto. econs.
+    + econs. eauto.
+    + destruct e, e_src; ss.
+  - right. destruct z. ss.
+    esplits; try apply MEMORY1; eauto.
+    etrans; [eauto|]. etrans; [|eauto]. inv STEP0; eauto.
+    econs 2; eauto. econs.
+    + econs. eauto.
+    + destruct e, e_src; ss.
 Qed.
 
 Lemma sim_thread_plus_step
@@ -277,14 +294,16 @@ Lemma sim_thread_plus_step
       (MEM_SRC: Memory.closed mem1_src)
       (MEM_TGT: Memory.closed e1_tgt.(Thread.memory))
       (SIM: sim_thread sim_terminal st1_src lc1_src sc1_src mem1_src e1_tgt.(Thread.state) e1_tgt.(Thread.local) e1_tgt.(Thread.sc) e1_tgt.(Thread.memory)):
+  <<ABORT: Thread.steps_abort (Thread.mk lang_src st1_src lc1_src sc1_src mem1_src)>> \/
   exists e_src st2_src lc2_src sc2_src mem2_src st3_src lc3_src sc3_src mem3_src,
+    <<ABORT: e_tgt <> ThreadEvent.abort>> /\
     <<STEPS: rtc (@Thread.tau_step lang_src)
                  (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
                  (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>> /\
     <<STEP: Thread.opt_step e_src
                             (Thread.mk _ st2_src lc2_src sc2_src mem2_src)
                             (Thread.mk _ st3_src lc3_src sc3_src mem3_src)>> /\
-    <<EVENT: ThreadEvent.get_event e_src = ThreadEvent.get_event e_tgt>> /\
+    <<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>> /\
     <<SC: TimeMap.le sc3_src e3_tgt.(Thread.sc)>> /\
     <<MEMORY: sim_memory mem3_src e3_tgt.(Thread.memory)>> /\
     <<WF_SRC: Local.wf lc3_src mem3_src>> /\
@@ -296,12 +315,15 @@ Lemma sim_thread_plus_step
     <<SIM: sim_thread sim_terminal st3_src lc3_src sc3_src mem3_src e3_tgt.(Thread.state) e3_tgt.(Thread.local) e3_tgt.(Thread.sc) e3_tgt.(Thread.memory)>>.
 Proof.
   destruct e1_tgt, e2_tgt, e3_tgt. ss.
-  exploit sim_thread_rtc_step; eauto. s. i. des.
+  exploit sim_thread_rtc_step; eauto. s. i. des; eauto.
   exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
   exploit Thread.rtc_tau_step_future; try exact STEPS0; eauto. s. i. des.
   exploit sim_thread_step; try exact STEP; try exact SIM0; eauto. s. i. des.
-  rewrite STEPS1 in STEPS0.
-  esplits; try exact STEPS0; try exact STEP0; eauto.
+  - left. inv ABORT. des.
+    unfold Thread.steps_abort. esplits; [|eauto].
+    etrans; eauto.
+  - right. rewrite STEPS1 in STEPS0.
+    esplits; try exact STEPS0; try exact STEP0; eauto.
 Qed.
 
 Lemma sim_thread_future
@@ -382,15 +404,21 @@ Proof.
   exploit sc_property; try exact SC_MAX; eauto. i. des.
   exploit sc_property; try exact x0; eauto. i. des.
   exploit CONSISTENT; eauto. s. i. des.
-  exploit sim_thread_future; try exact SIM; try exact LE; try exact LE0; eauto. i.
-  exploit sim_thread_rtc_step; try apply STEPS; try exact x1; eauto; try refl. i. des.
-  destruct e2. ss.
-  punfold SIM0. exploit SIM0; eauto; try refl. i. des.
-  hexploit Thread.rtc_tau_step_no_half_except; try exact STEPS; eauto. i.
-  unfold Thread.no_half_except in H. ss.
-  rewrite PROMISES0 in *.
-  hexploit Memory.no_half_except_bot_no_half; try apply MEM_TGT0; eauto. i.
-  exploit PROMISES1; eauto. i. des.
-  eexists (Thread.mk _ _ _ _ _). splits; [|eauto].
-  etrans; eauto.
+  - left. inv ABORT. des.
+    exploit sim_thread_future; try exact SIM; try exact LE; try exact LE0; eauto. i.
+    exploit sim_thread_plus_step; try exact STEPS; try exact ABORT; try exact x2; eauto; try refl.
+    i. des; auto. ss.
+  - exploit sim_thread_future; try exact SIM; try exact LE; try exact LE0; eauto. i.
+    exploit sim_thread_rtc_step; try apply STEPS; try exact x1; eauto; try refl. i. des; eauto.
+    destruct e2. ss.
+    punfold SIM0. exploit SIM0; eauto; try refl. i. des.
+    hexploit Thread.rtc_tau_step_no_half_except; try exact STEPS; eauto. i.
+    unfold Thread.no_half_except in H. ss.
+    rewrite PROMISES0 in *.
+    hexploit Memory.no_half_except_bot_no_half; try apply MEM_TGT0; eauto. i.
+    exploit PROMISES1; eauto. i. des.
+    + left. unfold Thread.steps_abort in *. des.
+      esplits; [|eauto]. etrans; eauto.
+    + right. eexists (Thread.mk _ _ _ _ _). splits; [|eauto].
+      etrans; eauto.
 Qed.

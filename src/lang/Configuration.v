@@ -173,6 +173,12 @@ Module Configuration.
 
   Definition tau_step := union (step None).
 
+  Definition steps_abort (c1: t): Prop :=
+    exists tid c2 c3,
+      <<STEPS: rtc tau_step c1 c2>> /\
+      <<ABORT: step (Some MachineEvent.abort) tid c2 c3>>.
+  Hint Unfold steps_abort.
+
   Inductive has_promise (c:t): Prop :=
   | has_promise_intro
       tid st lc loc from to msg

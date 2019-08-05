@@ -15,6 +15,7 @@ Require Import View.
 Require Import Cell.
 Require Import Memory.
 Require Import MemoryFacts.
+Require Import MemoryDomain.
 Require Import TView.
 Require Import Local.
 Require Import Thread.
@@ -495,6 +496,22 @@ Proof.
     + apply WF1_TGT.
 Qed.
 
+Lemma sim_local_abort
+      pview
+      lc1_src lc1_tgt
+      (STEP_TGT: Local.abort_step lc1_tgt)
+      (LOCAL1: sim_local pview lc1_src lc1_tgt):
+    <<STEP_SRC: Local.abort_step lc1_src>>.
+Proof.
+  inv STEP_TGT. inv LOCAL1. inv PROMISES. econs. ii.
+  destruct (Memory.get loc ts lc1_tgt.(Local.promises)) as [[]|] eqn:GETP.
+  - exploit CONSISTENT; eauto. i.
+    eapply TimeFacts.le_lt_lt; eauto.
+    inv TVIEW. inv CUR. eauto.
+  - exploit COMPLETE; eauto. i.
+    rewrite MemoryDomain.bot_spec in x. ss.
+Qed.
+
 Lemma sim_local_program_step
       lang
       th1_src
@@ -534,6 +551,8 @@ Proof.
     esplits; (try by econs; [|econs 5]; eauto); ss.
   - exploit sim_local_fence; eauto; try refl. i. des.
     esplits; (try by econs; [|econs 6]; eauto); ss.
+  - exploit sim_local_abort; eauto. i. des.
+    esplits; (try by econs; [|econs 7]; eauto); ss.
 Qed.
 
 Lemma sim_local_lower_src

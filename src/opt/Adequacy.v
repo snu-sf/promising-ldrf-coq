@@ -37,26 +37,48 @@ Proof.
   dependent induction PR; i.
   - punfold SIM. exploit SIM; eauto; try refl. i. des.
     exploit TERMINAL0; eauto. i. des.
-    eapply rtc_tau_step_behavior; eauto.
-    econs 1. auto.
+    + inv ABORT. des.
+      eapply rtc_tau_step_behavior; eauto.
+      econs 3. eauto.
+    + eapply rtc_tau_step_behavior; eauto.
+      econs 1. eauto.
   - destruct c2.
     punfold SIM. exploit SIM; eauto; try refl. i. des.
-    exploit STEP0; eauto. i. des. inv SIM0; [|done].
-    eapply rtc_tau_step_behavior; eauto.
-    exploit Configuration.step_future; try apply STEP; eauto. i. des.
-    exploit Configuration.rtc_step_future; eauto. i. des.
-    inv STEP_SRC. econs 2; eauto.
-    exploit Configuration.step_future; try apply STEP1; eauto. i. des.
-    eapply IHPR; eauto.
-  - destruct c2.
-    punfold SIM. exploit SIM; eauto; try refl. i. des.
-    exploit STEP0; eauto. i. des. inv SIM0; [|done].
-    eapply rtc_tau_step_behavior; eauto.
-    exploit Configuration.step_future; try apply STEP; eauto. i. des.
-    exploit Configuration.rtc_step_future; eauto. i. des.
-    inv STEP_SRC.
-    + eapply IHPR; eauto.
-    + econs 3; eauto.
-      exploit Configuration.step_future; try apply STEP1; eauto. s. i. des.
+    exploit STEP0; eauto. i. des.
+    + inv ABORT. des.
+      eapply rtc_tau_step_behavior; eauto.
+      econs 3. eauto.
+    + inv SIM0; [|done].
+      eapply rtc_tau_step_behavior; eauto.
+      exploit Configuration.step_future; try apply STEP; eauto. i. des.
+      exploit Configuration.rtc_step_future; eauto. i. des.
+      inv STEP_SRC. econs 2; eauto.
+      exploit Configuration.step_future; try apply STEP1; eauto. i. des.
       eapply IHPR; eauto.
+  - destruct c2.
+    punfold SIM. exploit SIM; eauto; try refl. i. des.
+    exploit STEP0; eauto. i. des.
+    + inv ABORT. des.
+      eapply rtc_tau_step_behavior; eauto.
+      econs 3; eauto.
+    + inv SIM0; [|done].
+      eapply rtc_tau_step_behavior; eauto.
+      exploit Configuration.step_future; try apply STEP; eauto. i. des.
+      exploit Configuration.rtc_step_future; eauto. i. des.
+      inv STEP_SRC. econs 3; eauto.
+  - destruct c2.
+    punfold SIM. exploit SIM; eauto; try refl. i. des.
+    exploit STEP0; eauto. i. des.
+    + inv ABORT. des.
+      eapply rtc_tau_step_behavior; eauto.
+      econs 3; eauto.
+    + inv SIM0; [|done].
+      eapply rtc_tau_step_behavior; eauto.
+      exploit Configuration.step_future; try apply STEP; eauto. i. des.
+      exploit Configuration.rtc_step_future; eauto. i. des.
+      inv STEP_SRC.
+      * eapply IHPR; eauto.
+      * econs 4; eauto.
+        exploit Configuration.step_future; try apply STEP1; eauto. s. i. des.
+        eapply IHPR; eauto.
 Qed.
