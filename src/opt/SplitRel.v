@@ -205,29 +205,33 @@ Proof.
   inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
     try (inv STATE; inv INSTR; inv SPLIT); ss.
   - (* promise *)
+    right.
     exploit Local.promise_step_future; eauto. i. des.
     exploit sim_local_promise; eauto. i. des.
     exploit Local.promise_step_future; eauto. i. des.
-    esplits; try apply SC; eauto.
+    esplits; try apply SC; eauto; ss.
     + econs 2. econs. econs; eauto.
     + eauto.
     + right. econs; eauto.
       inv LOCAL0. ss.
   - (* update-load *)
+    right.
     exploit sim_local_read; (try by etrans; eauto); eauto; try refl. i. des.
-    esplits; eauto.
+    esplits; eauto; ss.
     + econs 2. econs 2. econs; [|econs 2]; eauto. econs. econs. eauto.
     + eauto.
     + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
   - (* write *)
+    right.
     hexploit sim_local_write_released; (try by etrans; eauto); eauto; try refl; try by econs.
     { by rewrite <- View.join_l. }
     i. des.
-    esplits; eauto.
+    esplits; eauto; ss.
     + econs 2. econs 2. econs; [|econs 3]; eauto. econs. econs.
     + ss.
     + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
   - (* update *)
+    right.
     exploit Local.read_step_future; eauto. i. des.
     exploit sim_local_read; (try by etrans; eauto); eauto; try refl; try by econs. i. des.
     exploit Local.read_step_future; eauto. i. des.
@@ -238,7 +242,7 @@ Proof.
       destruct ordr; ss.
     }
     i. des.
-    esplits; eauto.
+    esplits; eauto; ss.
     + econs 2. econs 2. econs; [|econs 4]; eauto. econs. econs. eauto.
     + ss.
     + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
@@ -251,13 +255,13 @@ Proof.
   - inv TERMINAL_TGT. inv PR; ss.
   - exploit SimPromises.cap; eauto.
     inv PR. apply LOCAL.
-  - esplits; eauto.
+  - right. esplits; eauto.
     inv PR. eapply sim_local_memory_bot; eauto.
   - exploit sim_released_mon; eauto. i.
-    exploit sim_released_step; eauto. i. des.
-    + esplits; eauto.
+    exploit sim_released_step; eauto. i. des; eauto.
+    + right. esplits; eauto.
       left. eapply paco9_mon; eauto. ss.
-    + esplits; eauto.
+    + right. esplits; eauto.
 Qed.
 
 Lemma split_release_sim_stmts
@@ -271,18 +275,20 @@ Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { inv TERMINAL_TGT. }
   { exploit SimPromises.cap; try apply LOCAL; eauto. }
-  { esplits; eauto.
+  { right. esplits; eauto.
     inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   }
+  right.
   inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
     try (inv STATE; inv INSTR); ss.
   - (* promise *)
     exploit sim_local_promise; eauto. i. des.
-    esplits; try apply SC; eauto.
+    esplits; try apply SC; eauto; ss.
     econs 2. econs 1; eauto. econs; eauto. eauto.
   - (* fence *)
     exploit Local.fence_step_future; eauto. i. des.
     esplits.
+    + ss.
     + eauto.
     + econs 1.
     + ss.

@@ -255,17 +255,19 @@ Proof.
   inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
     try (inv STATE; inv INSTR; inv SPLIT); ss.
   - (* promise *)
+    right.
     exploit Local.promise_step_future; eauto. i. des.
     exploit sim_local_promise_acquired; try exact LOCAL; eauto. i. des.
     exploit Local.promise_step_future; eauto. i. des.
-    esplits; try apply SC; eauto.
+    esplits; try apply SC; eauto; ss.
     + econs 2. econs. econs; eauto.
     + eauto.
     + right. econs; eauto.
   - (* fence *)
+    right.
     exploit Local.fence_step_future; eauto. i. des.
     inv STATE. inv INSTR. inv LOCAL1. ss.
-    esplits; (try by econs 1); eauto.
+    esplits; (try by econs 1); eauto; ss.
     left. eapply paco9_mon; [apply sim_stmts_nil|]; ss. econs; ss.
     + rewrite TViewFacts.write_fence_tview_strong_relaxed; ss. apply LOCAL.
     + apply LOCAL.
@@ -278,13 +280,13 @@ Proof.
   - inv TERMINAL_TGT. inv PR; ss.
   - exploit SimPromises.cap; try apply LOCAL; eauto.
     inv PR. apply LOCAL.
-  - esplits; eauto.
+  - right. esplits; eauto.
     inv PR. eapply sim_local_memory_bot; eauto.
   - exploit sim_acquired_mon; eauto. i.
-    exploit sim_acquired_step; eauto. i. des.
-    + esplits; eauto.
+    exploit sim_acquired_step; eauto. i. des; eauto.
+    + right. esplits; eauto.
       left. eapply paco9_mon; eauto. ss.
-    + esplits; eauto.
+    + right. esplits; eauto.
 Qed.
 
 Lemma sim_local_read_acquired
@@ -334,20 +336,21 @@ Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { inv TERMINAL_TGT. }
   { exploit SimPromises.cap; try apply LOCAL; eauto. }
-  { esplits; eauto.
+  { right. esplits; eauto.
     inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   }
+  right.
   inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
     try (inv STATE; inv INSTR; inv SPLIT); ss.
   - (* promise *)
     exploit sim_local_promise; eauto. i. des.
-    esplits; try apply SC; eauto.
+    esplits; try apply SC; eauto; ss.
     econs 2. econs 1; eauto. econs; eauto. eauto.
   - (* load *)
     exploit Local.read_step_future; eauto. i. des.
     exploit sim_local_read_acquired; eauto. i. des.
     exploit Local.read_step_future; eauto. i. des.
-    esplits; try apply SC; eauto.
+    esplits; try apply SC; eauto; ss.
     + econs 2. econs 2. econs; cycle 1.
       * econs 2. eauto.
       * econs. econs.
@@ -357,7 +360,7 @@ Proof.
     exploit Local.read_step_future; eauto. i. des.
     exploit sim_local_read_acquired; eauto. i. des.
     exploit Local.read_step_future; eauto. i. des.
-    esplits; try apply SC; eauto.
+    esplits; try apply SC; eauto; ss.
     + econs 2. econs 2. econs; cycle 1.
       * econs 2. eauto.
       * econs. econs. eauto.
@@ -380,7 +383,7 @@ Proof.
     }
     i. des.
     exploit Local.write_step_future; eauto. i. des.
-    esplits; try apply SC; eauto.
+    esplits; try apply SC; eauto; ss.
     + econs 2. econs 2. econs; cycle 1.
       * econs 4; eauto.
       * econs. econs. eauto.

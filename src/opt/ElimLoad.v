@@ -80,7 +80,8 @@ Lemma elim_load_sim_stmts
             (RegFile.eq_except (RegSet.singleton r)).
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; i.
-  { exploit elim_read; eauto. i. des.
+  { right.
+    exploit elim_read; eauto. i. des.
     exploit sim_local_read; eauto; try refl. i. des.
     esplits.
     - econs 2; eauto. econs.
@@ -93,12 +94,13 @@ Proof.
     - econs. s. etrans; eauto. apply RegFile.eq_except_singleton.
   }
   { exploit SimPromises.cap; try apply LOCAL; eauto. }
-  { i. esplits; eauto.
+  { i. right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
-  ii. inv STEP_TGT; inv STEP; try (inv STATE; inv INSTR); ss.
+  ii. right.
+  inv STEP_TGT; inv STEP; try (inv STATE; inv INSTR); ss.
   (* promise *)
   exploit sim_local_promise; eauto. i. des.
-  esplits; try apply SC; eauto.
+  esplits; try apply SC; eauto; ss.
   econs 2. econs 1; eauto. econs; eauto. eauto.
 Qed.

@@ -39,16 +39,17 @@ Lemma intro_load_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; try done; i.
   { exploit SimPromises.cap; try apply LOCAL; eauto. }
-  { esplits; eauto.
+  { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
-  ii. inv STEP_TGT; inv STEP; try (inv STATE; inv INSTR); ss.
+  ii. right.
+  inv STEP_TGT; inv STEP; try (inv STATE; inv INSTR); ss.
   - (* promise *)
     exploit sim_local_promise; eauto. i. des.
-    esplits; try apply SC; eauto.
+    esplits; try apply SC; eauto; ss.
     econs 2. econs 1; eauto. econs; eauto. eauto.
   - (* load *)
-    destruct e_tgt; ss. esplits; eauto.
+    destruct e_tgt; ss. esplits; eauto; ss.
     + econs 1.
     + ss.
     + by inv LOCAL0.
