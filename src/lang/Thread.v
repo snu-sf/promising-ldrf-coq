@@ -26,7 +26,7 @@ Inductive tau T (step: forall (e:ThreadEvent.t) (e1 e2:T), Prop) (e1 e2:T): Prop
 | tau_intro
     e
     (TSTEP: step e e1 e2)
-    (EVENT: ThreadEvent.get_event e = None)
+    (EVENT: ThreadEvent.get_machine_event e = None)
 .
 Hint Constructors tau.
 

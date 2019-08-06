@@ -512,6 +512,7 @@ Proof.
     rewrite MemoryDomain.bot_spec in x. ss.
 Qed.
 
+(* unused *)
 Lemma sim_local_program_step
       lang
       th1_src
@@ -529,7 +530,7 @@ Lemma sim_local_program_step
       (MEM: sim_memory th1_src.(Thread.memory) th1_tgt.(Thread.memory)):
   exists e_src th2_src,
     <<STEP_SRC: @Thread.program_step lang e_src th1_src th2_src>> /\
-    <<EVENT: ThreadEvent.get_event e_src = ThreadEvent.get_event e_tgt>> /\
+    <<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>> /\
     <<STATE: th2_src.(Thread.state) = th2_tgt.(Thread.state)>> /\
     <<LOCAL: sim_local SimPromises.bot th2_src.(Thread.local) th2_tgt.(Thread.local)>> /\
     <<SC: TimeMap.le th2_src.(Thread.sc) th2_tgt.(Thread.sc)>> /\
