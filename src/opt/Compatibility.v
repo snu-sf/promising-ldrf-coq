@@ -117,6 +117,7 @@ Proof.
   - econs; [|econs 4]; s; eauto. apply lang_step_seq. auto.
   - econs; [|econs 5]; s; eauto. apply lang_step_seq. auto.
   - econs; [|econs 6]; s; eauto. apply lang_step_seq. auto.
+  - econs; [|econs 7]; s; eauto. apply lang_step_seq. auto.
 Qed.
 
 Lemma step_seq
@@ -304,13 +305,14 @@ Proof.
     inversion LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto.
     destruct lc_src, lc_tgt. ss. subst.
     splits; s; ii.
-    { inv TERMINAL_TGT. ss. esplits; eauto; ss. }
+    { right. inv TERMINAL_TGT. ss. esplits; eauto; ss. }
     { exploit SimPromises.cap; try eapply LOCAL; eauto. }
-    { subst. esplits; eauto. }
+    { right. subst. esplits; eauto. }
     inv STEP_TGT; try by inv STEP; inv STATE.
     inv STEP; ss.
     exploit sim_local_promise; eauto. i. des.
-    esplits.
+    right. esplits.
+    + ss.
     + eauto.
     + econs 2. econs 1. econs; eauto.
     + eauto.
@@ -323,51 +325,91 @@ Proof.
     splits; s; ii.
     { inv TERMINAL_TGT. destruct stmts1_tgt, stmts2_tgt; inv H0.
       exploit TERMINAL; try by econs. i. des.
-      inversion LOCAL. exploit SimPromises.sem_bot_inv; eauto. i.
-      destruct lc2_src. ss. subst.
-      destruct st2_src. inv TERMINAL_SRC. ss. subst.
-      exploit Thread.rtc_tau_step_future; eauto. s. i. des.
-      inv TERMINAL0. ss. subst.
-      exploit SIM2; eauto. intro LC2.
-      exploit GF; try apply LC2; try apply SC0; eauto. s. i. des.
-      exploit TERMINAL0; try by econs. i. des.
-      destruct st2_src, lc2_src. inv TERMINAL_SRC. ss. subst.
-      esplits; cycle 1; eauto.
-      + econs.
-      + etrans; [|eauto].
-        eapply rtc_internal_step_seq in STEPS. eauto.
+      - left.
+        unfold Thread.steps_abort in *. des.
+        destruct e2, e3, state, state0.
+        eapply rtc_internal_step_seq in STEPS.
+        eapply step_seq in ABORT0.
+        esplits; eauto.
+      - inversion LOCAL. exploit SimPromises.sem_bot_inv; eauto. i.
+        destruct lc2_src. ss. subst.
+        destruct st2_src. inv TERMINAL_SRC. ss. subst.
+        exploit Thread.rtc_tau_step_future; eauto. s. i. des.
+        inv TERMINAL0. ss.
+        exploit SIM2; eauto. intro LC2.
+        exploit GF; try apply LC2; try apply SC0; eauto. s. i. des.
+        exploit TERMINAL0; try by econs. i. des.
+        + left.
+          unfold Thread.steps_abort in *. des.
+          destruct e2, state.
+          esplits; [|eauto].
+          etrans; try exact STEPS0.
+          eapply rtc_internal_step_seq in STEPS. eauto.
+        + right.
+          destruct st2_src, lc2_src. inv TERMINAL_SRC. ss. subst.
+          esplits; cycle 1; eauto.
+          * econs.
+          * etrans; [|eauto].
+            eapply rtc_internal_step_seq in STEPS. eauto.
     }
     { eapply CAP; eauto. }
     { exploit PROMISES; eauto. i. des.
-      destruct lc_tgt, st2_src, lc2_src. ss. subst.
-      esplits; [|eauto].
-      - eapply rtc_internal_step_seq. apply STEPS.
-      - ss.
+      - left.
+        unfold Thread.steps_abort in *. des.
+        destruct e2, e3, state, state0.
+        eapply rtc_internal_step_seq in STEPS.
+        eapply step_seq in ABORT0.
+        esplits; eauto.
+      - right.
+        destruct lc_tgt, st2_src, lc2_src. ss. subst.
+        esplits; [|eauto].
+        + eapply rtc_internal_step_seq. apply STEPS.
+        + ss.
     }
     destruct stmts1_tgt.
     + exploit TERMINAL; try by econs. i. des.
-      inversion LOCAL. exploit SimPromises.sem_bot_inv; eauto. i. subst.
-      destruct st2_src, lc2_src. inv TERMINAL_SRC. ss. subst.
-      exploit Thread.rtc_tau_step_future; eauto. s. i. des.
-      inv TERMINAL0. ss. subst.
-      exploit SIM2; eauto. intro LC2.
-      exploit GF; try apply SC0; eauto. i. des.
-      exploit STEP0; eauto. i. des.
-      esplits; cycle 1; eauto.
-      * apply rclo9_incl. auto.
-      * eapply rtc_internal_step_seq in STEPS.
-        etrans; [apply STEPS|eauto].
+      * left.
+        unfold Thread.steps_abort in *. des.
+        destruct e2, e3, state, state0. ss.
+        eapply rtc_internal_step_seq in STEPS.
+        eapply step_seq in ABORT0.
+        esplits; eauto.
+      * inversion LOCAL. exploit SimPromises.sem_bot_inv; eauto. i. subst.
+        destruct st2_src, lc2_src. inv TERMINAL_SRC. ss. subst.
+        exploit Thread.rtc_tau_step_future; eauto. s. i. des.
+        inv TERMINAL0. ss. subst.
+        exploit SIM2; eauto. intro LC2.
+        exploit GF; try apply SC0; eauto. i. des.
+        exploit STEP0; eauto. i. des.
+        { left.
+          unfold Thread.steps_abort in *. des.
+          destruct e2, e3, state, state0.
+          eapply rtc_internal_step_seq in STEPS.
+          esplits; try exact ABORT0.
+          etrans; eauto. }
+        { right.
+          esplits; cycle 2; eauto.
+          - apply rclo9_incl. auto.
+          - eapply rtc_internal_step_seq in STEPS.
+            etrans; [apply STEPS|eauto]. }
     + destruct st3_tgt, lc3_tgt.
       exploit thread_step_deseq; eauto. i. des. ss. subst.
       exploit STEP; eauto. i. des.
-      destruct st2_src, lc2_src. destruct st3_src, lc3_src.
-      esplits; [M|M| | | |]; Mskip eauto.
-      * eapply rtc_internal_step_seq. eauto.
-      * eapply opt_step_seq. eauto.
-      * apply rclo9_step. eapply ctx_seq; eauto.
-        { apply rclo9_incl. eauto. }
-        { eapply _sim_stmts_mon; try apply rclo9_incl; eauto.
-          eapply _sim_stmts_mon; try apply LE; eauto.
+      * left.
+        unfold Thread.steps_abort in *. des.
+        destruct e2, e3, state, state0.
+        eapply rtc_internal_step_seq in STEPS.
+        eapply step_seq in ABORT0.
+        esplits; eauto.
+      * right.
+        destruct st2_src, lc2_src. destruct st3_src, lc3_src.
+        esplits; [|M|M| | | |]; Mskip eauto.
+        { eapply rtc_internal_step_seq. eauto. }
+        { eapply opt_step_seq. eauto. }
+        { apply rclo9_step. eapply ctx_seq; eauto.
+          - apply rclo9_incl. eauto.
+          - eapply _sim_stmts_mon; try apply rclo9_incl; eauto.
+            eapply _sim_stmts_mon; try apply LE; eauto.
         }
   - (* ite *)
     ii.
@@ -376,12 +418,12 @@ Proof.
     splits; s; ii.
     { inv TERMINAL_TGT. }
     { exploit SimPromises.cap; try apply LOCAL; eauto. }
-    { ss. subst. esplits; eauto. }
-    inv STEP_TGT; ss.
+    { right. subst. esplits; eauto. }
+    right. inv STEP_TGT; ss.
     + (* promise *)
       inv STEP; ss.
       exploit sim_local_promise; eauto. i. des.
-      esplits; try apply SC; eauto.
+      esplits; try apply SC; eauto; ss.
       { econs 2. econs 1. econs; eauto. }
       { eauto. }
       { apply rclo9_step. eapply ctx_ite; eauto.
@@ -393,7 +435,7 @@ Proof.
     + (* ite *)
       inv STEP. inv LOCAL0; inv STATE; ss.
       inv LOCAL. ss.
-      esplits; try apply MEMORY; try apply SC; eauto.
+      esplits; try apply MEMORY; try apply SC; eauto; ss.
       { econs 2. econs 2. econs; [|econs 1]; eauto. econs; eauto. }
       { eauto. }
       { s. rewrite ? app_nil_r.
@@ -409,12 +451,12 @@ Proof.
     splits; s; ii.
     { inv TERMINAL_TGT. }
     { exploit SimPromises.cap; try apply LOCAL; eauto. }
-    { ss. subst. esplits; eauto. }
-    inv STEP_TGT; ss.
+    { right. subst. esplits; eauto. }
+    right. inv STEP_TGT; ss.
     + (* promise *)
       inv STEP; ss.
       exploit sim_local_promise; eauto. i. des.
-      esplits; try apply SC; eauto.
+      esplits; try apply SC; eauto; ss.
       { econs 2. econs 1. econs; eauto. }
       { eauto. }
       { apply rclo9_step. apply ctx_dowhile; auto.
@@ -424,7 +466,7 @@ Proof.
     + (* dowhile *)
       inv STEP. inv LOCAL0; inv STATE; ss.
       inv LOCAL. ss.
-      esplits; try apply SC; eauto.
+      esplits; try apply SC; eauto; ss.
       { econs 2. econs 2. econs; [|econs 1]; eauto. econs; eauto. }
       { eauto. }
       { apply rclo9_step. eapply ctx_seq.
