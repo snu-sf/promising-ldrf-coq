@@ -160,7 +160,13 @@ Module Configuration.
   Qed.
 
   Inductive step: forall (e:option MachineEvent.t) (tid:Ident.t) (c1 c2:t), Prop :=
-  | step_intro
+  | step_abort
+      pf tid c1 lang st1 lc1 e2 st3 lc3 sc3 memory3
+      (TID: IdentMap.find tid c1.(threads) = Some (existT _ lang st1, lc1))
+      (STEPS: rtc (@Thread.tau_step _) (Thread.mk _ st1 lc1 c1.(sc) c1.(memory)) e2)
+      (STEP: Thread.step pf ThreadEvent.abort e2 (Thread.mk _ st3 lc3 sc3 memory3)):
+      step (Some MachineEvent.abort) tid c1 (mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(threads)) sc3 memory3)
+  | step_normal
       pf e tid c1 lang st1 lc1 e2 st3 lc3 sc3 memory3
       (TID: IdentMap.find tid c1.(threads) = Some (existT _ lang st1, lc1))
       (STEPS: rtc (@Thread.tau_step _) (Thread.mk _ st1 lc1 c1.(sc) c1.(memory)) e2)
@@ -212,27 +218,47 @@ Module Configuration.
     <<SC_FUTURE: TimeMap.le c1.(sc) c2.(sc)>> /\
     <<MEM_FUTURE: Memory.future c1.(memory) c2.(memory)>>.
   Proof.
-    inv WF1. inv WF. inv STEP. s.
-    exploit THREADS; ss; eauto. i.
-    exploit Thread.rtc_tau_step_future; eauto. s. i. des.
-    exploit Thread.step_future; eauto. s. i. des.
-    splits; [|by etrans; eauto|by etrans; eauto].
-    econs; ss. econs.
-    - i. simplify.
-      + exploit THREADS; try apply TH1; eauto. i. des.
+    inv WF1. inv WF. inv STEP; s.
+    - exploit THREADS; ss; eauto. i.
+      exploit Thread.rtc_tau_step_future; eauto. s. i. des.
+      exploit Thread.step_future; eauto. s. i. des.
+      splits; [|by etrans; eauto|by etrans; eauto].
+      econs; ss. econs.
+      + i. simplify.
+        * exploit THREADS; try apply TH1; eauto. i. des.
+          exploit Thread.rtc_tau_step_disjoint; eauto. i. des.
+          exploit Thread.step_disjoint; eauto. s. i. des.
+          symmetry. auto.
+        * exploit THREADS; try apply TH2; eauto. i. des.
+          exploit Thread.rtc_tau_step_disjoint; eauto. i. des.
+          exploit Thread.step_disjoint; eauto. i. des.
+          auto.
+        * eapply DISJOINT; [|eauto|eauto]. auto.
+      + i. simplify.
+        exploit THREADS; try apply TH; eauto. i.
         exploit Thread.rtc_tau_step_disjoint; eauto. i. des.
         exploit Thread.step_disjoint; eauto. s. i. des.
-        symmetry. auto.
-      + exploit THREADS; try apply TH2; eauto. i. des.
-        exploit Thread.rtc_tau_step_disjoint; eauto. i. des.
-        exploit Thread.step_disjoint; eauto. i. des.
         auto.
-      + eapply DISJOINT; [|eauto|eauto]. auto.
-    - i. simplify.
-      exploit THREADS; try apply TH; eauto. i.
-      exploit Thread.rtc_tau_step_disjoint; eauto. i. des.
-      exploit Thread.step_disjoint; eauto. s. i. des.
-      auto.
+    - exploit THREADS; ss; eauto. i.
+      exploit Thread.rtc_tau_step_future; eauto. s. i. des.
+      exploit Thread.step_future; eauto. s. i. des.
+      splits; [|by etrans; eauto|by etrans; eauto].
+      econs; ss. econs.
+      + i. simplify.
+        * exploit THREADS; try apply TH1; eauto. i. des.
+          exploit Thread.rtc_tau_step_disjoint; eauto. i. des.
+          exploit Thread.step_disjoint; eauto. s. i. des.
+          symmetry. auto.
+        * exploit THREADS; try apply TH2; eauto. i. des.
+          exploit Thread.rtc_tau_step_disjoint; eauto. i. des.
+          exploit Thread.step_disjoint; eauto. i. des.
+          auto.
+        * eapply DISJOINT; [|eauto|eauto]. auto.
+      + i. simplify.
+        exploit THREADS; try apply TH; eauto. i.
+        exploit Thread.rtc_tau_step_disjoint; eauto. i. des.
+        exploit Thread.step_disjoint; eauto. s. i. des.
+        auto.
   Qed.
 
   Lemma opt_step_future
