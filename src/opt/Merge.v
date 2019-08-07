@@ -41,21 +41,22 @@ Lemma assign_sim_thread:
       (State.mk rs_src []) lc_src sc0_src mem0_src
       (State.mk rs_tgt [Stmt.instr (Instr.assign r2 (Instr.expr_val v1))]) lc_tgt sc0_tgt mem0_tgt.
 Proof.
-  pcofix CIH. i. pfold. ii. splits.
-  { i. inv TERMINAL_TGT. }
-  { i. exploit SimPromises.cap; try eapply LOCAL; eauto. }
-  { i. esplits; eauto.
+  pcofix CIH. i. pfold. ii. splits; ii.
+  { right. inv TERMINAL_TGT. }
+  { exploit SimPromises.cap; try eapply LOCAL; eauto. }
+  { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
-  ii. inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
-        try (inv STATE; inv INSTR); ss.
+  right.
+  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
+    try (inv STATE; inv INSTR); ss.
   - (* promise *)
     exploit sim_local_promise; eauto. i. des.
-    esplits; try apply SC; eauto.
+    esplits; try apply SC; eauto; ss.
     + econs 2. econs 1. econs; eauto.
     + auto.
   - (* load *)
-    esplits; try apply SC; eauto.
+    esplits; try apply SC; eauto; ss.
     + econs 1.
     + auto.
     + left. eapply paco9_mon.
@@ -72,23 +73,25 @@ Lemma merge_load_load_sim_stmts
             [Stmt.instr (Instr.load r1 l o); Stmt.instr (Instr.assign r2 (Instr.expr_val (Value.reg r1)))]
             eq.
 Proof.
-  pcofix CIH. ii. subst. pfold. ii. splits.
-  { i. inv TERMINAL_TGT. }
-  { i. exploit SimPromises.cap; try eapply LOCAL; eauto. }
-  { i. esplits; eauto.
+  pcofix CIH. ii. subst. pfold. ii. splits; ii.
+  { right. inv TERMINAL_TGT. }
+  { exploit SimPromises.cap; try eapply LOCAL; eauto. }
+  { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
-  ii. inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
-        try (inv STATE; inv INSTR); ss.
+  right.
+  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
+    try (inv STATE; inv INSTR); ss.
   - (* promise *)
     exploit sim_local_promise; eauto. i. des.
-    esplits; try apply SC; eauto.
+    esplits; try apply SC; eauto; ss.
     + econs 2. econs 1. econs; eauto.
     + auto.
   - (* load *)
     exploit sim_local_read; try exact LOCAL0; eauto; try refl. i. des.
     exploit merge_read_read; try exact STEP_SRC; eauto. i. des.
     esplits.
+    + ss.
     + econs 2; [|econs 1]. econs.
       * econs. econs 2. econs; [|econs 2]; eauto. econs. econs.
       * eauto.
@@ -111,23 +114,25 @@ Lemma merge_store_load_sim_stmts
             [Stmt.instr (Instr.store l v1 o1); Stmt.instr (Instr.assign r2 v1)]
             eq.
 Proof.
-  pcofix CIH. ii. subst. pfold. ii. splits.
-  { i. inv TERMINAL_TGT. }
-  { i. exploit SimPromises.cap; try eapply LOCAL; eauto. }
-  { i. esplits; eauto.
+  pcofix CIH. ii. subst. pfold. ii. splits; ii.
+  { right. inv TERMINAL_TGT. }
+  { exploit SimPromises.cap; try eapply LOCAL; eauto. }
+  { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
-  ii. inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
-        try (inv STATE; inv INSTR); ss.
+  right.
+  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
+    try (inv STATE; inv INSTR); ss.
   - (* promise *)
     exploit sim_local_promise; eauto. i. des.
-    esplits; try apply SC; eauto.
+    esplits; try apply SC; eauto; ss.
     + econs 2. econs 1. econs; eauto.
     + auto.
   - (* store *)
     hexploit sim_local_write_bot; try exact LOCAL1; try exact SC; eauto; try refl; try by viewtac. i. des.
     exploit merge_write_read; try exact STEP_SRC; eauto using View.bot_spec. i. des.
     esplits.
+    + ss.
     + econs 2; [|econs 1]. econs.
       * econs. econs 2. econs; [|econs 3]; eauto. econs. econs.
       * eauto.
@@ -149,17 +154,18 @@ Lemma merge_store_store_sim_stmts
             [Stmt.instr (Instr.store l v2 o)]
             eq.
 Proof.
-  pcofix CIH. ii. subst. pfold. ii. splits.
-  { i. inv TERMINAL_TGT. }
-  { i. exploit SimPromises.cap; try eapply LOCAL; eauto. }
-  { i. esplits; eauto.
+  pcofix CIH. ii. subst. pfold. ii. splits; ii.
+  { right. inv TERMINAL_TGT. }
+  { exploit SimPromises.cap; try eapply LOCAL; eauto. }
+  { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
-  ii. inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
-        try (inv STATE; inv INSTR); ss.
+  right.
+  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
+    try (inv STATE; inv INSTR); ss.
   - (* promise *)
     exploit sim_local_promise; eauto. i. des.
-    esplits; try apply SC; eauto.
+    esplits; try apply SC; eauto; ss.
     econs 2. econs 1; eauto. econs; eauto. eauto.
   - (* store *)
     exploit Time.middle_spec; eauto.
@@ -168,6 +174,7 @@ Proof.
     hexploit sim_local_write_bot; try exact LOCAL0; try exact SC; eauto; try refl; try by viewtac. i. des.
     exploit merge_write_write_None; try exact STEP_SRC; eauto; try by viewtac. i. des.
     + esplits.
+      * ss.
       * econs 2; [|econs 2; eauto].
         { econs.
           - econs. econs 1. econs; eauto.
@@ -186,6 +193,7 @@ Proof.
         { ii. inv PR. }
     + inv STEP1.
       esplits.
+      * ss.
       * econs 2; eauto. econs. econs. econs 2.
         econs; [|econs 3]; try exact STEP2; eauto.
         { econs. econs. }
@@ -209,17 +217,18 @@ Lemma merge_store_update_sim_stmts
             [Stmt.instr (Instr.store l v1 o); Stmt.instr (Instr.assign r2 v1)]
             eq.
 Proof.
-  pcofix CIH. ii. subst. pfold. ii. splits.
-  { i. inv TERMINAL_TGT. }
-  { i. exploit SimPromises.cap; try eapply LOCAL; eauto. }
-  { i. esplits; eauto.
+  pcofix CIH. ii. subst. pfold. ii. splits; ii.
+  { right. inv TERMINAL_TGT. }
+  { exploit SimPromises.cap; try eapply LOCAL; eauto. }
+  { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
-  ii. inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
-        try (inv STATE; inv INSTR); ss.
+  right.
+  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
+    try (inv STATE; inv INSTR); ss.
   - (* promise *)
     exploit sim_local_promise; eauto. i. des.
-    esplits; try apply SC; eauto.
+    esplits; try apply SC; eauto; ss.
     econs 2. econs 1; eauto. econs; eauto. eauto.
   - (* store *)
     exploit Time.middle_spec; eauto.
@@ -230,6 +239,7 @@ Proof.
     exploit Local.promise_step_future; eauto. i. des.
     exploit Local.write_step_future; try apply STEP2; eauto; try by viewtac. i. des.
     + esplits.
+      * ss.
       * econs 2; [|econs 2; eauto].
         { econs.
           - econs. econs 1. econs; eauto.
@@ -250,6 +260,7 @@ Proof.
         { i. inv PR. }
     + inv STEP1.
       esplits.
+      * ss.
       * econs 2; eauto. econs. econs. econs 2. econs; [|econs 3]; try exact STEP2; eauto.
         { econs. econs. }
         { auto. }
@@ -275,17 +286,18 @@ Lemma merge_update_load_sim_stmts
             [Stmt.instr (Instr.update r1 l (Instr.fetch_add v1) or ow); Stmt.instr (Instr.assign r2 r1)]
             eq.
 Proof.
-  pcofix CIH. ii. subst. pfold. ii. splits.
-  { i. inv TERMINAL_TGT. }
-  { i. exploit SimPromises.cap; try eapply LOCAL; eauto. }
-  { i. esplits; eauto.
+  pcofix CIH. ii. subst. pfold. ii. splits; ii.
+  { right. inv TERMINAL_TGT. }
+  { exploit SimPromises.cap; try eapply LOCAL; eauto. }
+  { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
-  ii. inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
-        try (inv STATE; inv INSTR); ss.
+  right.
+  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
+    try (inv STATE; inv INSTR); ss.
   - (* promise *)
     exploit sim_local_promise; eauto. i. des.
-    esplits; try apply SC; eauto.
+    esplits; try apply SC; eauto; ss.
     econs 2. econs 1; eauto. econs; eauto. eauto.
   - (* update *)
     exploit Local.read_step_future; eauto. i. des.
@@ -307,6 +319,7 @@ Proof.
     exploit Local.write_step_future; try apply STEP_SRC; eauto; try by viewtac. i. des.
     exploit sim_local_read; try exact x0; eauto; try refl. i. des.
     esplits.
+    + ss.
     + econs 2; [|econs 1]. econs.
       * econs. econs 2. econs; [|econs 4]; eauto. econs. econs. eauto.
       * eauto.
@@ -330,17 +343,18 @@ Lemma merge_update_update_sim_stmts
             [Stmt.instr (Instr.update r1 l (Instr.fetch_add v1) or ow); Stmt.instr (Instr.assign r2 r1)]
             eq.
 Proof.
-  pcofix CIH. ii. subst. pfold. ii. splits.
-  { i. inv TERMINAL_TGT. }
-  { i. exploit SimPromises.cap; try eapply LOCAL; eauto. }
-  { i. esplits; eauto.
+  pcofix CIH. ii. subst. pfold. ii. splits; ii.
+  { right. inv TERMINAL_TGT. }
+  { exploit SimPromises.cap; try eapply LOCAL; eauto. }
+  { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
-  ii. inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
-        try (inv STATE; inv INSTR); ss.
+  right.
+  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
+    try (inv STATE; inv INSTR); ss.
   - (* promise *)
     exploit sim_local_promise; eauto. i. des.
-    esplits; try apply SC; eauto.
+    esplits; try apply SC; eauto ; ss.
     econs 2. econs 1; eauto. econs; eauto. eauto.
   - (* update *)
     exploit Time.middle_spec; eauto.
@@ -365,6 +379,7 @@ Proof.
       }
       i. des.
       esplits.
+      * ss.
       * econs 2; [|econs 2; eauto].
         { econs.
           - econs. econs 1. econs; eauto.
@@ -394,6 +409,7 @@ Proof.
     + inv STEP1.
       exploit Local.write_step_future; try apply STEP2; eauto; try by viewtac. i. des.
       esplits.
+      * ss.
       * econs 2; eauto.
         econs. econs. econs 2. econs; [|econs 4]; try exact STEP_SRC; try exact STEP2; eauto.
         { econs. econs. s. eauto. }
@@ -424,22 +440,24 @@ Lemma merge_fence_fence_sim_stmts
             [Stmt.instr (Instr.fence ordr ordw)]
             eq.
 Proof.
-  pcofix CIH. ii. subst. pfold. ii. splits.
-  { i. inv TERMINAL_TGT. }
-  { i. exploit SimPromises.cap; try eapply LOCAL; eauto. }
-  { i. esplits; eauto.
+  pcofix CIH. ii. subst. pfold. ii. splits; ii.
+  { right. inv TERMINAL_TGT. }
+  { exploit SimPromises.cap; try eapply LOCAL; eauto. }
+  { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
-  ii. inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
-        try (inv STATE; inv INSTR); ss.
+  right.
+  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
+    try (inv STATE; inv INSTR); ss.
   - (* promise *)
     exploit sim_local_promise; eauto. i. des.
-    esplits; try apply SC; eauto.
+    esplits; try apply SC; eauto; ss.
     econs 2. econs 1; eauto. econs; eauto. eauto.
   - (* fence *)
     exploit sim_local_fence; try exact LOCAL0; try exact SC; eauto; try refl. i. des.
     exploit merge_fence_fence; try exact STEP_SRC; eauto. i. des.
     esplits.
+    + ss.
     + econs 2; [|econs 1]. econs.
       * econs. econs 2. econs; [|econs 5]; eauto. econs. econs.
       * eauto.

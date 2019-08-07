@@ -101,7 +101,7 @@ Lemma sim_fence_step
                      st1_src lc1_src sc1_src mem1_src
                      st1_tgt lc1_tgt sc1_tgt mem1_tgt.
 Proof.
-  inv SIM. ii.
+  inv SIM. ii. right.
   exploit future_fence_step; try apply FENCE; eauto; i.
   { inv REORDER; etrans; eauto. }
   inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
@@ -113,7 +113,7 @@ Proof.
     exploit reorder_fence_promise; try apply x0; try apply STEP_SRC; eauto.
     { inv REORDER; ss. }
     i. des.
-    esplits; try apply SC; eauto.
+    esplits; try apply SC; eauto; ss.
     + econs 2. econs 1. econs; eauto.
     + eauto.
     + right. econs; eauto.
@@ -124,6 +124,7 @@ Proof.
     i. des.
     exploit reorder_fence_read; try apply x0; try apply STEP_SRC; eauto; try by viewtac. i. des.
     esplits.
+    + ss.
     + econs 2; [|econs 1]. econs.
       * econs. econs 2. econs; [|econs 2]; eauto. econs. econs.
       * eauto.
@@ -140,6 +141,7 @@ Proof.
     i. des.
     exploit reorder_fence_read; try apply x0; try apply STEP_SRC; eauto; try by viewtac. i. des.
     esplits.
+    + ss.
     + econs 2; [|econs 1]. econs.
       * econs. econs 2. econs; [|econs 2]; eauto. econs. econs. eauto.
       * eauto.
@@ -155,6 +157,7 @@ Proof.
     i. des.
     exploit reorder_fence_write; try apply x0; try apply STEP_SRC; eauto; try by viewtac. i. des.
     esplits.
+    + ss.
     + econs 2; [|econs 1]. econs.
       * econs. econs 2. econs; [|econs 3]; eauto. econs. econs.
       * eauto.
@@ -178,6 +181,7 @@ Proof.
     hexploit sim_local_write_bot; try exact LOCAL2; try apply SC1; eauto; try refl; viewtac. i. des.
     exploit reorder_fence_write; try apply STEP2; try apply STEP_SRC0; eauto; try by viewtac. i. des.
     esplits.
+    + ss.
     + econs 2; [|econs 1]. econs.
       * econs. econs 2. econs; [|econs 4]; eauto. econs. econs. eauto.
       * eauto.
@@ -192,15 +196,15 @@ Qed.
 Lemma sim_fence_sim_thread:
   sim_fence <8= (sim_thread (sim_terminal eq)).
 Proof.
-  pcofix CIH. i. pfold. ii. ss. splits; ss.
-  - i. inv TERMINAL_TGT. inv PR; ss.
-  - i. eapply SimPromises.cap; eauto.
+  pcofix CIH. i. pfold. ii. ss. splits; ss; ii.
+  - right. inv TERMINAL_TGT. inv PR; ss.
+  - eapply SimPromises.cap; eauto.
     inv PR. inv FENCE. apply LOCAL.
-  - i. esplits; eauto.
+  - right. esplits; eauto.
     inv PR. inversion FENCE. subst lc2_src. inversion LOCAL. ss.
     apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
-  - ii. exploit sim_fence_step; try apply PR; try apply SC; eauto. i. des.
-    + esplits; eauto.
+  - exploit sim_fence_step; try apply PR; try apply SC; eauto. i. des; eauto.
+    + right. esplits; eauto.
       left. eapply paco9_mon; eauto. ss.
-    + esplits; eauto.
+    + right. esplits; eauto.
 Qed.

@@ -148,7 +148,7 @@ Lemma sim_load_step
                    st1_src lc1_src sc1_src mem1_src
                    st1_tgt lc1_tgt sc1_tgt mem1_tgt.
 Proof.
-  inv SIM. ii.
+  inv SIM. ii. right.
   exploit Local.read_step_future; eauto. i. des.
   inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
     try (inv STATE; inv INSTR; inv REORDER); ss.
@@ -157,7 +157,7 @@ Proof.
     exploit sim_local_promise_bot; eauto. i. des.
     exploit reorder_read_promise; try exact READ; try exact STEP_SRC; eauto. i. des.
     exploit Local.promise_step_future; eauto. i. des.
-    esplits; try apply SC; eauto.
+    esplits; try apply SC; eauto; ss.
     + econs 2. econs. econs; eauto.
     + eauto.
     + right. econs; eauto. etrans; eauto.
@@ -165,6 +165,7 @@ Proof.
     exploit sim_local_read; (try by etrans; eauto); eauto; try refl. i. des.
     exploit reorder_read_read; try exact READ; try exact STEP_SRC; eauto. i. des.
     esplits.
+    + ss.
     + econs 2; [|econs 1]. econs.
       * econs. econs 2. econs; [|econs 2]; eauto. econs. econs.
       * eauto.
@@ -181,6 +182,7 @@ Proof.
     exploit sim_local_read; (try by etrans; eauto); eauto; try refl. i. des.
     exploit reorder_read_read; try exact READ; try exact STEP_SRC; try by eauto. i. des.
     esplits.
+    + ss.
     + econs 2; [|econs 1]. econs.
       * econs. econs 2. econs; [|econs 2]; eauto. econs. econs.
         erewrite <- RegFile.eq_except_rmw; eauto; try apply RegFile.eq_except_singleton.
@@ -202,6 +204,7 @@ Proof.
       try exact WF2; try refl; eauto; try by viewtac. i. des.
     exploit reorder_read_write; try exact READ; try exact STEP_SRC; eauto; try by viewtac. i. des.
     esplits.
+    + ss.
     + econs 2; [|econs 1]. econs.
       * econs. econs 2. econs; [|econs 3]; eauto. econs.
         erewrite RegFile.eq_except_value; eauto.
@@ -223,6 +226,7 @@ Proof.
     exploit Local.read_step_future; try exact STEP1; eauto. i. des.
     exploit reorder_read_write; try exact STEP2; try exact STEP_SRC0; eauto; try congr. i. des.
     esplits.
+    + ss.
     + econs 2; [|econs 1]. econs.
       * econs. econs 2. econs; [|econs 4]; eauto. econs. econs.
         erewrite <- RegFile.eq_except_rmw; eauto; try apply RegFile.eq_except_singleton.
@@ -243,6 +247,7 @@ Proof.
     exploit sim_local_fence; try exact LOCAL1; try exact SC; eauto; try refl. i. des.
     exploit reorder_read_fence; try exact READ; try exact STEP_SRC; eauto. i. des.
     esplits.
+    + ss.
     + econs 2; [|econs 1]. econs.
       * econs. econs 2. econs; [|econs 5]; eauto. econs. econs.
       * eauto.
@@ -262,12 +267,13 @@ Proof.
   - exploit sim_load_mon; eauto. i.
     exploit sim_load_cap; try apply x0; eauto. i. des.
     esplits; eauto.
-  - esplits; eauto.
+  - right.
+    esplits; eauto.
     inv PR. inv READ. inv LOCAL. ss.
     apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   - exploit sim_load_mon; eauto. i.
-    exploit sim_load_step; eauto. i. des.
-    + esplits; eauto.
+    exploit sim_load_step; eauto. i. des; eauto.
+    + right. esplits; eauto.
       left. eapply paco9_mon; eauto. ss.
-    + esplits; eauto.
+    + right. esplits; eauto.
 Qed.

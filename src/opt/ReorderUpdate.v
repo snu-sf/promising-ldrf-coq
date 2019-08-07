@@ -217,7 +217,7 @@ Lemma sim_update_step
                    st1_src lc1_src sc1_src mem1_src
                    st1_tgt lc1_tgt sc1_tgt mem1_tgt.
 Proof.
-  inv SIM. ii.
+  inv SIM. ii. right.
   exploit Local.read_step_future; eauto. i. des.
   destruct vw1 as [vw1|]; cycle 1.
   { ss. des. subst.
@@ -229,6 +229,7 @@ Proof.
       exploit reorder_read_promise; try exact READ; try exact STEP_SRC; eauto. i. des.
       exploit Local.promise_step_future; eauto. i. des.
       esplits; try apply SC; eauto.
+      + ss.
       + econs 2. econs. econs; eauto.
       + eauto.
       + right. econs; [eauto|..]; s; eauto. etrans; eauto.
@@ -236,6 +237,7 @@ Proof.
       exploit sim_local_read; (try by etrans; eauto); eauto; try refl. i. des.
       exploit reorder_read_read; try exact READ; try exact STEP_SRC; try by eauto. i. des.
       esplits.
+      + ss.
       + econs 2; [|econs 1]. econs.
         * econs. econs 2. econs; [|econs 2]; eauto. econs. econs.
         * eauto.
@@ -256,6 +258,7 @@ Proof.
       exploit sim_local_read; (try by etrans; eauto); eauto; try refl. i. des.
       exploit reorder_read_read; try exact READ; try exact STEP_SRC; try by eauto. i. des.
       esplits.
+      + ss.
       + econs 2; [|econs 1]. econs.
         * econs. econs 2. econs; [|econs 2]; eauto. econs. econs.
           erewrite <- RegFile.eq_except_rmw; eauto; try apply RegFile.eq_except_singleton.
@@ -282,6 +285,7 @@ Proof.
         try exact WF2; try refl; eauto; try by viewtac. i. des.
       exploit reorder_read_write; try exact READ; try exact STEP_SRC; eauto; try by viewtac. i. des.
       esplits.
+      + ss.
       + econs 2; [|econs 1]. econs.
         * econs. econs 2. econs; [|econs 3]; eauto. econs.
           s. erewrite RegFile.eq_except_value; eauto. econs.
@@ -303,6 +307,7 @@ Proof.
       exploit Local.read_step_future; try exact STEP1; eauto. i. des.
       exploit reorder_read_write; try exact STEP2; try exact STEP_SRC0; eauto; try congr. i. des.
       esplits.
+      + ss.
       + econs 2; [|econs 1]. econs.
         * econs. econs 2. econs; [|econs 4]; eauto. econs. econs.
           erewrite <- RegFile.eq_except_rmw; eauto; try apply RegFile.eq_except_singleton.
@@ -337,6 +342,7 @@ Proof.
     exploit reorder_update_promise; try exact READ; try exact FULFILL; try exact STEP_SRC; eauto. i. des.
     exploit Local.promise_step_future; eauto. i. des.
     esplits.
+    + ss.
     + eauto.
     + econs 2. econs 1. econs; eauto.
     + auto.
@@ -353,6 +359,7 @@ Proof.
     exploit Local.read_step_future; try exact STEP2; eauto. i. des.
     exploit fulfill_write; eauto. i. des.
     esplits.
+    + ss.
     + econs 2; eauto. econs.
       * econs. econs 2. econs; [|econs 2]; eauto. econs. econs.
       * auto.
@@ -375,6 +382,7 @@ Proof.
     exploit Local.read_step_future; try exact STEP2; eauto. i. des.
     exploit fulfill_write; eauto. i. des.
     esplits.
+    + ss.
     + econs 2; eauto. econs.
       * econs. econs 2. econs; [|econs 2]; eauto. econs. econs.
         erewrite RegFile.eq_except_rmw; eauto; cycle 1.
@@ -403,6 +411,7 @@ Proof.
     exploit Local.read_step_future; try exact STEP2; eauto; try by viewtac. i. des.
     exploit fulfill_write; eauto. i. des.
     esplits.
+    + ss.
     + econs 2; eauto. econs.
       * econs. econs 2. econs; [|econs 3]; eauto. econs.
         erewrite RegFile.eq_except_value; cycle 2.
@@ -433,6 +442,7 @@ Proof.
     exploit Local.read_step_future; try exact STEP3; eauto. i. des.
     exploit fulfill_write; eauto. i. des.
     esplits.
+    + ss.
     + econs 2; eauto. econs.
       * econs. econs 2. econs; [|econs 4]; eauto. econs. econs.
         erewrite RegFile.eq_except_rmw; eauto; cycle 1.
@@ -468,7 +478,7 @@ Proof.
     exploit (progress_program_step (RegFun.add r1 (fst (RegFile.eval_rmw rs rmw1 vr1)) rs) i2 nil); eauto. i. des.
     destruct th2. exploit sim_update_step; eauto.
     { rewrite RMW in *. ss. econs 2. eauto. }
-    i. des.
+    i. des; eauto.
     + exploit program_step_promise; eauto. i.
       exploit Thread.rtc_tau_step_future; eauto. s. i. des.
       exploit Thread.opt_step_future; eauto. s. i. des.
@@ -476,16 +486,24 @@ Proof.
       hexploit Thread.step_bot_no_half; [econs 2; eauto|..]; eauto. s. i. des.
       punfold SIM. exploit SIM; try apply SC3; eauto; try refl. s. i. des.
       exploit PROMISES; eauto. i. des.
-      esplits; [|eauto].
-      etrans; eauto. etrans; [|eauto].
-      inv STEP_SRC; eauto. econs 2; eauto. econs.
-      * econs. eauto.
-      * etrans; eauto.
-        destruct e; by inv STEP; inv STATE; inv INSTR; inv REORDER.
+      * left.
+        unfold Thread.steps_abort in *. des.
+        esplits; [|eauto].
+        etrans; eauto. etrans; [|eauto].
+        inv STEP_SRC; eauto. econs 2; eauto. econs.
+        { econs. eauto. }
+        { etrans; eauto.
+          destruct e; by inv STEP; inv STATE; inv INSTR; inv REORDER. }
+      * right. esplits; [|eauto].
+        etrans; eauto. etrans; [|eauto].
+        inv STEP_SRC; eauto. econs 2; eauto. econs.
+        { econs. eauto. }
+        { etrans; eauto.
+          destruct e; by inv STEP; inv STATE; inv INSTR; inv REORDER. }
     + inv SIM. inv STEP; inv STATE.
   - exploit sim_update_mon; eauto. i. des.
-    exploit sim_update_step; eauto. i. des.
-    + esplits; eauto.
+    exploit sim_update_step; eauto. i. des; eauto.
+    + right. esplits; eauto.
       left. eapply paco9_mon; eauto. ss.
-    + esplits; eauto.
+    + right. esplits; eauto.
 Qed.

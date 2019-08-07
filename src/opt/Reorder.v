@@ -66,18 +66,19 @@ Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { inv TERMINAL_TGT. }
   { exploit SimPromises.cap; try eapply LOCAL; eauto. }
-  { esplits; eauto.
+  { right. esplits; eauto.
     inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   }
+  right.
   inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
     try (inv STATE; inv INSTR; inv REORDER); ss.
   - (* promise *)
     exploit sim_local_promise; eauto. i. des.
-    esplits; try apply SC; eauto.
+    esplits; try apply SC; eauto; ss.
     econs 2. econs 1; eauto. econs; eauto. eauto.
   - (* load *)
     exploit sim_local_read; eauto; try refl. i. des.
-    esplits; try apply SC; eauto.
+    esplits; try apply SC; eauto; ss.
     + econs 1.
     + auto.
     + left. eapply paco9_mon; [apply sim_load_sim_thread|]; ss.
@@ -85,7 +86,7 @@ Proof.
       eapply Local.read_step_future; eauto.
   - (* update-load *)
     exploit sim_local_read; eauto; try refl. i. des.
-    esplits; try apply SC; eauto.
+    esplits; try apply SC; eauto; ss.
     + econs 1.
     + auto.
     + left. eapply paco9_mon; [apply sim_update_sim_thread|]; ss.
@@ -98,6 +99,7 @@ Proof.
     exploit write_promise_fulfill; eauto; try by viewtac. i. des.
     exploit Local.promise_step_future; eauto. i. des.
     esplits.
+    + ss.
     + eauto.
     + econs 2. econs 1. econs; eauto.
     + auto.
@@ -119,6 +121,7 @@ Proof.
     exploit sim_local_fulfill_bot; try exact STEP2; try exact LOCAL4; try exact REL1;
       try exact WF3; try refl; eauto; try by viewtac. i. des.
     esplits.
+    + ss.
     + eauto.
     + econs 2. econs 1. econs; eauto.
     + auto.
@@ -130,6 +133,7 @@ Proof.
   - (* fence *)
     exploit sim_local_fence; try apply SC; eauto; try refl. i. des.
     esplits.
+    + ss.
     + eauto.
     + econs 1.
     + auto.

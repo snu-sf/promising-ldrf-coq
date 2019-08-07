@@ -465,12 +465,13 @@ Lemma sim_release_fenceF_step
                      st1_src lc1_src sc1_src mem1_src
                      st1_tgt lc1_tgt sc1_tgt mem1_tgt.
 Proof.
-  inv SIM; ii.
+  inv SIM; ii. right.
   inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL];
     try (inv STATE; inv INSTR); ss.
   - (* promise *)
     exploit sim_local_promise_relfenced; eauto. i. des.
     esplits.
+    + ss.
     + eauto.
     + econs 2. econs 1. econs; eauto.
     + auto.
@@ -480,6 +481,7 @@ Proof.
   - (* fence *)
     exploit sim_local_fence_tgt_relfenced; try exact SC; eauto. i. des.
     esplits.
+    + ss.
     + eauto.
     + econs 1.
     + auto.
@@ -491,17 +493,17 @@ Qed.
 Lemma sim_release_fenceF_sim_thread:
   sim_release_fenceF <8= (sim_thread (sim_terminal eq)).
 Proof.
-  pcofix CIH. i. pfold. ii. ss. splits; ss.
-  - i. inv TERMINAL_TGT. inv PR; ss.
-  - i. inv PR.
+  pcofix CIH. i. pfold. ii. ss. splits; ss; ii.
+  - right. inv TERMINAL_TGT. inv PR; ss.
+  - inv PR.
     exploit SimPromises.cap; (try by apply LOCALF); eauto using local_relfenced_wf.
-  - i. inv PR.
+  - right. inv PR.
     esplits; eauto.
     eapply sim_local_memory_bot; eauto.
-  - ii. exploit sim_release_fenceF_step; try apply PR; try apply SC; eauto. i. des.
-    + esplits; eauto.
+  - exploit sim_release_fenceF_step; try apply PR; try apply SC; eauto. i. des; eauto.
+    + right. esplits; eauto.
       left. eapply paco9_mon; eauto. ss.
-    + esplits; eauto.
+    + right. esplits; eauto.
 Qed.
 
 Lemma reorder_release_fenceF_sim_stmts
@@ -514,15 +516,15 @@ Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { inv TERMINAL_TGT. }
   { exploit SimPromises.cap; try apply LOCAL; eauto. }
-  { esplits; eauto.
+  { right. esplits; eauto.
     inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   }
-  inv STEP_TGT.
+  right. inv STEP_TGT.
   { (* promise *)
     inv STEP.
     exploit sim_local_promise_bot; eauto. i. des.
-    esplits; try apply SC; eauto.
-    - econs 2. econs 1; eauto. econs; eauto.
+    esplits; try apply SC; eauto; ss.
+    econs 2. econs 1; eauto. econs; eauto.
   }
   exploit sim_local_intro_relfenced; eauto. i. des.
   exploit sim_local_nonsynch_src; try exact SC_SRC; eauto using local_relfenced_wf. i. des.
@@ -533,6 +535,7 @@ Proof.
   - (* load *)
     exploit sim_local_read_relfenced; eauto; try refl. i. des.
     esplits.
+    + ss.
     + etrans; [eauto|]. econs 2; [|refl]. econs.
       * econs. econs 2. econs; [|econs 5]; eauto. econs. econs.
       * ss.
@@ -546,6 +549,7 @@ Proof.
     guardH ORDW2.
     exploit sim_local_read_relfenced; eauto; try refl. i. des.
     esplits.
+    + ss.
     + etrans; [eauto|]. econs 2; [|refl]. econs.
       * econs. econs 2. econs; [|econs 5]; eauto. econs. econs.
       * ss.
@@ -560,6 +564,7 @@ Proof.
     hexploit sim_local_write_relfenced; try exact SC; eauto;
       (try refl); (try by econs). i. des.
     esplits.
+    + ss.
     + etrans; [eauto|]. econs 2; [|refl]. econs.
       * econs. econs 2. econs; [|econs 5]; eauto. econs. econs.
       * ss.
@@ -578,6 +583,7 @@ Proof.
     hexploit sim_local_write_relfenced; try exact SC; eauto;
       (try refl); (try by econs). i. des.
     esplits.
+    + ss.
     + etrans; [eauto|]. econs 2; [|refl]. econs.
       * econs. econs 2. econs; [|econs 5]; eauto. econs. econs.
       * ss.
@@ -592,6 +598,7 @@ Proof.
   - (* fence *)
     exploit sim_local_fence_relfenced; try exact SC; eauto; try refl. i. des.
     esplits.
+    + ss.
     + etrans; [eauto|]. econs 2; [|refl]. econs.
       * econs. econs 2. econs; [|econs 5]; eauto. econs. econs.
       * ss.
