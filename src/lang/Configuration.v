@@ -299,4 +299,22 @@ Module Configuration.
       exploit IHSTEPS; eauto. i. des.
       splits; eauto; etrans; eauto.
   Qed.
+
+  Lemma step_inv
+        e tid c1 c2
+        (STEP: step e tid c1 c2):
+    exists lang st1 lc1 e2 pf e_th st3 lc3 sc3 memory3,
+      <<TID: IdentMap.find tid c1.(threads) = Some (existT _ lang st1, lc1)>> /\
+      <<STEPS: rtc (@Thread.tau_step _) (Thread.mk _ st1 lc1 c1.(sc) c1.(memory)) e2>> /\
+      <<STEP: Thread.step pf e_th e2 (Thread.mk _ st3 lc3 sc3 memory3)>> /\
+      <<CONSISTENT: __guard__ (
+                        e_th = ThreadEvent.abort \/
+                        e_th <> ThreadEvent.abort /\
+                        Thread.consistent (Thread.mk _ st3 lc3 sc3 memory3))>> /\
+      <<THS: c2.(threads) = IdentMap.add tid (existT _ _ st3, lc3) c1.(threads)>> /\
+      <<SC: c2.(sc) = sc3>> /\
+      <<MEM: c2.(memory) = memory3>>.
+  Proof.
+    unguard. inv STEP; esplits; eauto.
+  Qed.
 End Configuration.

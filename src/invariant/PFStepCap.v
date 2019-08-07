@@ -897,12 +897,13 @@ Module PFStepCap.
 
   Program Instance add_cap_Reflexive: forall caps, Reflexive (add_cap caps).
 
-  Inductive pf_step (lang: Language.t) (caps: Loc.t -> option Time.t): forall (e1 e2: Thread.t lang), Prop :=
+  Inductive pf_step (lang: Language.t) (caps: Loc.t -> option Time.t) (e: ThreadEvent.t):
+    forall (e1 e2: Thread.t lang), Prop :=
   | pf_step_intro
-      e e1 st2 lc2 sc2 mem2 mem3
+      e1 st2 lc2 sc2 mem2 mem3
       (STEP: @Thread.program_step lang e e1 (Thread.mk lang st2 lc2 sc2 mem2))
       (ADD: @add_cap caps mem2 mem3):
-      pf_step caps e1 (Thread.mk lang st2 lc2 sc2 mem3)
+      pf_step caps e e1 (Thread.mk lang st2 lc2 sc2 mem3)
   .
   Hint Constructors pf_step.
 
@@ -917,8 +918,8 @@ Module PFStepCap.
   Qed.
 
   Lemma pf_step_inhabited
-        lang caps e1 e2
-        (STEP: @pf_step lang caps e1 e2)
+        lang caps e e1 e2
+        (STEP: @pf_step lang caps e e1 e2)
         (INHABITED1: Memory.inhabited e1.(Thread.memory)):
     <<INHABITED2: Memory.inhabited e2.(Thread.memory)>>.
   Proof.
@@ -1017,7 +1018,7 @@ Module PFStepCap.
         (STEP_TGT: Thread.program_step e e1_tgt e2_tgt)
         (CONS: Local.promise_consistent e2_tgt.(Thread.local)):
     exists e2_src,
-      <<STEP_SRC: pf_step caps e1_src e2_src>> /\
+      <<STEP_SRC: pf_step caps e e1_src e2_src>> /\
       <<SIM2: sim_thread latests caps e2_src e2_tgt>>.
   Proof.
     destruct e1_src, e1_tgt, e2_tgt. ss.
@@ -1038,7 +1039,7 @@ Module PFStepCap.
         (STEPS_TGT: rtc (@Thread.all_step lang) e1_tgt e2_tgt)
         (CONS: Local.promise_consistent e2_tgt.(Thread.local)):
     exists e2_src,
-      <<STEPS_SRC: rtc (@pf_step lang caps) e1_src e2_src>> /\
+      <<STEPS_SRC: rtc (union (@pf_step lang caps)) e1_src e2_src>> /\
       <<SIM2: sim_thread latests caps e2_src e2_tgt>>.
   Proof.
     revert e1_src SIM1.
@@ -1065,7 +1066,7 @@ Module PFStepCap.
         (STEPS_TGT: rtc (@Thread.tau_step lang) e1_tgt e2_tgt)
         (CONS: Local.promise_consistent e2_tgt.(Thread.local)):
     exists e2_src,
-      <<STEPS_SRC: rtc (@pf_step lang caps) e1_src e2_src>> /\
+      <<STEPS_SRC: rtc (union (@pf_step lang caps)) e1_src e2_src>> /\
       <<SIM2: sim_thread latests caps e2_src e2_tgt>>.
   Proof.
     eapply thread_rtc_all_step; eauto.
