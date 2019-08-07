@@ -169,12 +169,6 @@ Module MachineEvent.
   | syscall (e: Event.t)
   | abort
   .
-
-  Definition is_abort (e: t): bool :=
-    match e with
-    | abort => true
-    | _ => false
-    end.
 End MachineEvent.
 
 

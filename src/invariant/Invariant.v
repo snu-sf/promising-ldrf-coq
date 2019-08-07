@@ -236,7 +236,7 @@ Section Invariant.
       esplits; eauto.
   Qed.
 
-  Lemma rtc_thread_step_sem
+  Lemma thread_rtc_step_sem
         tid lang
         th1 th2
         (TH1: S tid lang th1.(Thread.state))
@@ -272,7 +272,7 @@ Section Invariant.
     eapply vals_incl_sem_memory; eauto.
   Qed.
 
-  Lemma rtc_thread_pf_step_sem
+  Lemma thread_rtc_pf_step_sem
         tid lang caps
         th1 th2
         (TH1: S tid lang th1.(Thread.state))
@@ -333,7 +333,7 @@ Section Invariant.
       exploit PFStepCap.thread_program_step; try exact STEP; eauto.
       { inv STEP. inv LOCAL. inv LOCAL0. ss. }
       i. des.
-      exploit rtc_thread_pf_step_sem; try exact STEPS_SRC; eauto. i. des.
+      exploit thread_rtc_pf_step_sem; try exact STEPS_SRC; eauto. i. des.
       inv STEP_SRC. inv STEP0.
       exploit ABORT; try exact STATE; eauto. i. des.
       ii. eauto.
@@ -341,7 +341,7 @@ Section Invariant.
       exploit PFStepCap.thread_rtc_tau_step; eauto.
       { eapply Local.bot_promise_consistent; ss. }
       i. des.
-      exploit rtc_thread_pf_step_sem; try exact STEPS_SRC; eauto. i. des.
+      exploit thread_rtc_pf_step_sem; try exact STEPS_SRC; eauto. i. des.
       exploit PFStepCap.sim_memory_bot; try apply SIM2; eauto. i.
       rewrite x0 in *.
       eapply future_sem_memory; eauto.
@@ -373,7 +373,7 @@ Section Invariant.
     exploit PFStep.thread_program_step; try exact SIM2; try eapply STEP; eauto.
     { inv STEP. inv LOCAL. inv LOCAL0. ss. }
     i. des.
-    exploit rtc_thread_step_sem; try exact STEPS_SRC; eauto.
+    exploit thread_rtc_step_sem; try exact STEPS_SRC; eauto.
     { inv SIM. ss. rewrite STATE. eauto. }
     i. des.
     inv STEP_SRC. ss. exploit ABORT; try exact STATE; eauto. i. des.
@@ -405,7 +405,7 @@ Section Invariant.
     exploit PFStep.thread_rtc_all_step; try exact SIM; try eapply STEPS; eauto.
     { eapply consistent_promise_consistent; eauto. }
     i. des.
-    exploit rtc_thread_step_sem; try exact STEPS_SRC; eauto.
+    exploit thread_rtc_step_sem; try exact STEPS_SRC; eauto.
     { inv SIM. ss. rewrite STATE. eauto. }
     i. des.
     econs; s.

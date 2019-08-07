@@ -19,19 +19,6 @@ Require Import Thread.
 Set Implicit Arguments.
 
 
-Inductive opt E T (step: forall (e:option E) (tid:Ident.t) (c1 c2:T), Prop):
-  forall (e:option E) (tid:Ident.t) (c1 c2:T), Prop :=
-| step_none
-    tid c:
-    opt step None tid c c
-| step_some
-    e tid c1 c2
-    (STEP: step e tid c1 c2):
-    opt step e tid c1 c2
-.
-Hint Constructors opt.
-
-
 Module Threads.
   Definition syntax := IdentMap.t {lang:Language.t & lang.(Language.syntax)}.
   Definition t := IdentMap.t ({lang:Language.t & lang.(Language.state)} * Local.t).
@@ -298,23 +285,5 @@ Module Configuration.
       exploit step_future; eauto. i. des.
       exploit IHSTEPS; eauto. i. des.
       splits; eauto; etrans; eauto.
-  Qed.
-
-  Lemma step_inv
-        e tid c1 c2
-        (STEP: step e tid c1 c2):
-    exists lang st1 lc1 e2 pf e_th st3 lc3 sc3 memory3,
-      <<TID: IdentMap.find tid c1.(threads) = Some (existT _ lang st1, lc1)>> /\
-      <<STEPS: rtc (@Thread.tau_step _) (Thread.mk _ st1 lc1 c1.(sc) c1.(memory)) e2>> /\
-      <<STEP: Thread.step pf e_th e2 (Thread.mk _ st3 lc3 sc3 memory3)>> /\
-      <<CONSISTENT: __guard__ (
-                        e_th = ThreadEvent.abort \/
-                        e_th <> ThreadEvent.abort /\
-                        Thread.consistent (Thread.mk _ st3 lc3 sc3 memory3))>> /\
-      <<THS: c2.(threads) = IdentMap.add tid (existT _ _ st3, lc3) c1.(threads)>> /\
-      <<SC: c2.(sc) = sc3>> /\
-      <<MEM: c2.(memory) = memory3>>.
-  Proof.
-    unguard. inv STEP; esplits; eauto.
   Qed.
 End Configuration.
