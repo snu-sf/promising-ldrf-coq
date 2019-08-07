@@ -300,6 +300,16 @@ Module Thread.
         splits; ss; etrans; eauto.
     Qed.
 
+    Lemma promise_step_inhabited
+          pf e e1 e2
+          (STEP: promise_step pf e e1 e2)
+          (INHABITED1: Memory.inhabited e1.(memory)):
+      <<INHABITED2: Memory.inhabited e2.(memory)>>.
+    Proof.
+      inv STEP. ss.
+      eapply Local.promise_step_inhabited; eauto.
+    Qed.
+
     Lemma program_step_inhabited
           e e1 e2
           (STEP: program_step e e1 e2)
@@ -308,6 +318,29 @@ Module Thread.
     Proof.
       inv STEP. ss.
       eapply Local.program_step_inhabited; eauto.
+    Qed.
+
+    Lemma step_inhabited
+          pf e e1 e2
+          (STEP: step pf e e1 e2)
+          (INHABITED1: Memory.inhabited e1.(memory)):
+      <<INHABITED2: Memory.inhabited e2.(memory)>>.
+    Proof.
+      inv STEP.
+      - eapply promise_step_inhabited; eauto.
+      - eapply program_step_inhabited; eauto.
+    Qed.
+
+    Lemma rtc_tau_step_inhabited
+          e1 e2
+          (STEP: rtc tau_step e1 e2)
+          (INHABITED1: Memory.inhabited e1.(memory)):
+      <<INHABITED2: Memory.inhabited e2.(memory)>>.
+    Proof.
+      revert INHABITED1.
+      induction STEP; ss; i.
+      inv H. inv TSTEP.
+      hexploit step_inhabited; eauto.
     Qed.
 
 

@@ -364,7 +364,7 @@ Module PFStep.
         (MEM1_TGT: Memory.closed e1_tgt.(Thread.memory))
         (STEP_TGT: Thread.program_step e e1_tgt e2_tgt)
         (CONS: Local.promise_consistent e2_tgt.(Thread.local)):
-    exists e e2_src,
+    exists e2_src,
       <<STEP_SRC: Thread.program_step e e1_src e2_src>> /\
       <<SIM2: sim_thread e2_src e2_tgt>>.
   Proof.

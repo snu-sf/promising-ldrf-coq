@@ -361,7 +361,32 @@ Section Invariant.
         destruct e_src, e2_src. ss. inv SIM. inv SIM2. ss. subst.
         exploit rtc_thread_step_sem; try exact STEPS_SRC; eauto. i. des. ss.
     - inv STEP.
-      + admit.
+      + ss. inv WF. inv WF0. clear DISJOINT.
+        exploit THREADS; eauto. intro WF. clear THREADS.
+        exploit Thread.rtc_tau_step_future; try eapply STEPS; eauto. s. i. des.
+        exploit (@PFStep.sim_thread_exists
+                   _ (Thread.mk lang st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory))); ss.
+        i. des.
+        hexploit PFStep.sim_memory_inhabited; try eapply SIM; s.
+        { apply WF. }
+        { apply MEM0. }
+        i. des.
+        exploit PFStep.thread_rtc_tau_step; try exact SIM; try exact STEPS; eauto; ss.
+        { inv STEP0; inv STEP. inv LOCAL. inv LOCAL0. ss. }
+        i. des.
+        hexploit PFStep.sim_memory_vals_incl; try eapply SIM; eauto. s. i.
+        eapply vals_incl_sem_memory in H0; eauto.
+        inv STEP0; try by inv STEP.
+        exploit PFStep.thread_program_step; try exact SIM2; try exact STEP; eauto.
+        { inv STEP. inv LOCAL. inv LOCAL0. ss. }
+        i. des.
+        exploit TH; eauto. i.
+        exploit rtc_thread_step_sem; try exact STEPS_SRC; eauto.
+        { inv SIM. ss. subst. eauto. }
+        i. des.
+        destruct e2_src. ss. inv STEP_SRC. ss.
+        exploit ABORT; try exact STATE; eauto. i. des.
+        ii. eauto.
       + ss. inv WF. inv WF0. clear DISJOINT.
         exploit THREADS; eauto. intro WF. clear THREADS.
         eapply rtc_implies in STEPS; [|by apply tau_union].
@@ -375,7 +400,7 @@ Section Invariant.
         exploit Local.cap_wf; eauto. intro WF_CAP.
         exploit Memory.max_full_timemap_exists; try eapply CLOSED_CAP. i. des.
         exploit CONSISTENT; try exact CAP; try exact x0; eauto. s. i. des.
-        * admit.
+        * unfold Thread.steps_abort in ABORT0. des. admit.
         * exploit (@PFStep.sim_thread_exists
                      _ (Thread.mk lang st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory))); ss.
           i. des.

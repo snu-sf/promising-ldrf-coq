@@ -466,6 +466,16 @@ Module Local.
     - esplits; eauto; try refl.
   Qed.
 
+  Lemma promise_step_inhabited
+        lc1 mem1 loc from to msg lc2 mem2 kind
+        (STEP: promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
+        (INHABITED1: Memory.inhabited mem1):
+    <<INHABITED2: Memory.inhabited mem2>>.
+  Proof.
+    inv STEP.
+    inv PROMISE; eauto using Memory.add_inhabited, Memory.split_inhabited, Memory.lower_inhabited.
+  Qed.
+
   Lemma program_step_inhabited
         e lc1 sc1 mem1 lc2 sc2 mem2
         (STEP: program_step e lc1 sc1 mem1 lc2 sc2 mem2)
