@@ -32,7 +32,7 @@ Set Implicit Arguments.
  *)
 
 Inductive behaviors
-          (step: forall (e:option MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop):
+          (step: forall (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop):
   forall (conf:Configuration.t) (b:list Event.t), Prop :=
 | behaviors_nil
     c
@@ -40,23 +40,23 @@ Inductive behaviors
     behaviors step c nil
 | behaviors_syscall
     e tid c1 c2 beh
-    (STEP: step (Some (MachineEvent.syscall e)) tid c1 c2)
+    (STEP: step (MachineEvent.syscall e) tid c1 c2)
     (NEXT: behaviors step c2 beh):
     behaviors step c1 (e::beh)
 | behaviors_abort
     tid c1 c2 beh
-    (STEP: step (Some MachineEvent.abort) tid c1 c2):
+    (STEP: step MachineEvent.abort tid c1 c2):
     behaviors step c1 beh
 | behaviors_tau
     tid c1 c2 beh
-    (STEP: step None tid c1 c2)
+    (STEP: step MachineEvent.silent tid c1 c2)
     (NEXT: behaviors step c2 beh):
     behaviors step c1 beh
 .
 
 Lemma rtc_tau_step_behavior
       step c1 c2 b
-      (STEPS: rtc (union (step None)) c1 c2)
+      (STEPS: rtc (union (step MachineEvent.silent)) c1 c2)
       (BEH: behaviors step c2 b):
   behaviors step c1 b.
 Proof.

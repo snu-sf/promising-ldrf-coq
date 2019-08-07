@@ -75,11 +75,11 @@ Module ThreadEvent.
     | abort => ProgramEvent.abort
     end.
 
-  Definition get_machine_event (e: t): option MachineEvent.t :=
+  Definition get_machine_event (e: t): MachineEvent.t :=
     match e with
-    | syscall e => Some (MachineEvent.syscall e)
-    | abort => Some MachineEvent.abort
-    | _ => None
+    | syscall e => MachineEvent.syscall e
+    | abort => MachineEvent.abort
+    | _ => MachineEvent.silent
     end.
 
   Definition is_promising (e:t) : option (Loc.t * Time.t) :=

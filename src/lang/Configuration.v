@@ -159,30 +159,40 @@ Module Configuration.
     - apply Memory.init_closed.
   Qed.
 
-  Inductive step: forall (e:option MachineEvent.t) (tid:Ident.t) (c1 c2:t), Prop :=
+  Inductive step: forall (e:MachineEvent.t) (tid:Ident.t) (c1 c2:t), Prop :=
   | step_abort
       pf tid c1 lang st1 lc1 e2 st3 lc3 sc3 memory3
       (TID: IdentMap.find tid c1.(threads) = Some (existT _ lang st1, lc1))
       (STEPS: rtc (@Thread.tau_step _) (Thread.mk _ st1 lc1 c1.(sc) c1.(memory)) e2)
       (STEP: Thread.step pf ThreadEvent.abort e2 (Thread.mk _ st3 lc3 sc3 memory3)):
-      step (Some MachineEvent.abort) tid c1 (mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(threads)) sc3 memory3)
+      step MachineEvent.abort tid c1 (mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(threads)) sc3 memory3)
   | step_normal
       pf e tid c1 lang st1 lc1 e2 st3 lc3 sc3 memory3
       (TID: IdentMap.find tid c1.(threads) = Some (existT _ lang st1, lc1))
       (STEPS: rtc (@Thread.tau_step _) (Thread.mk _ st1 lc1 c1.(sc) c1.(memory)) e2)
       (STEP: Thread.step pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
+      (EVENT: e <> ThreadEvent.abort)
       (CONSISTENT: Thread.consistent (Thread.mk _ st3 lc3 sc3 memory3)):
       step (ThreadEvent.get_machine_event e) tid c1 (mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(threads)) sc3 memory3)
   .
 
-  Definition opt_step := opt step.
+  Inductive opt_step: forall (e: MachineEvent.t) (tid: Ident.t) (c1 c2: t), Prop :=
+  | step_none
+      tid c:
+      opt_step MachineEvent.silent tid c c
+  | step_some
+      e tid c1 c2
+      (STEP: step e tid c1 c2):
+      opt_step e tid c1 c2
+  .
+  Hint Constructors opt_step.
 
-  Definition tau_step := union (step None).
+  Definition tau_step := union (step MachineEvent.silent).
 
   Definition steps_abort (c1: t): Prop :=
     exists tid c2 c3,
       <<STEPS: rtc tau_step c1 c2>> /\
-      <<ABORT: step (Some MachineEvent.abort) tid c2 c3>>.
+      <<ABORT: step MachineEvent.abort tid c2 c3>>.
   Hint Unfold steps_abort.
 
   Inductive has_promise (c:t): Prop :=

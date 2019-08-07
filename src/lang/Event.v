@@ -165,6 +165,7 @@ End Event.
 
 Module MachineEvent.
   Inductive t :=
+  | silent
   | syscall (e: Event.t)
   | abort
   .

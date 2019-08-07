@@ -84,7 +84,8 @@ Proof.
   generalize (rtc_tail STEPS). i. des.
   - inv H0. inv TSTEP. econs; eauto.
     econs. rewrite <- EVENT. econs; ss; eauto.
-    ii. ss. esplits; eauto.
+    + destruct e; ss.
+    + ii. ss. esplits; eauto.
   - inv H.
     replace (IdentMap.add tid (existT _ lang_src st2_src, lc2_src) ths1_src) with ths1_src; auto.
     apply IdentMap.eq_leibniz. ii.
@@ -218,10 +219,11 @@ Proof.
         esplits; eauto. econs; eauto.
       * right. inv STEP0.
         { generalize (rtc_tail STEPS0). intro X. des.
-          - inv X0. inv TSTEP. rewrite <- EVENT. ss. esplits; eauto.
-            + rewrite <- EVENT0.
-              econs 2. econs; eauto.
-              eapply sim_thread_consistent; eauto.
+          - inv X0. inv TSTEP. ss.
+            rewrite <- EVENT0. rewrite <- EVENT1. esplits; eauto.
+            + econs 2. econs; eauto.
+              * destruct e; ss.
+              * eapply sim_thread_consistent; eauto.
             + ss. right. eapply CIH.
               * rewrite Threads.tids_add. rewrite IdentSet.add_mem; ss.
                 rewrite Threads.tids_o. rewrite FIND_SRC. ss.
@@ -252,9 +254,10 @@ Proof.
                   eapply sim_thread_future; try exact x0; eauto; try by (etrans; [eauto|etrans; eauto]). }
         }
         { esplits; eauto.
-          - rewrite <- EVENT.
+          - rewrite <- EVENT0.
             econs 2. econs; eauto.
-            eapply sim_thread_consistent; eauto.
+            + destruct e0, e_src; ss.
+            + eapply sim_thread_consistent; eauto.
           - ss. right. eapply CIH.
             + rewrite Threads.tids_add. rewrite IdentSet.add_mem; ss.
               rewrite Threads.tids_o. rewrite FIND_SRC. ss.
