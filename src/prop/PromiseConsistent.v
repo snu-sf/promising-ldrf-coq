@@ -28,21 +28,11 @@ Require Import Configuration.
 Set Implicit Arguments.
 
 
-Definition promise_consistent (lc:Local.t): Prop :=
-  forall loc ts from msg
-    (PROMISE: Memory.get loc ts lc.(Local.promises) = Some (from, msg)),
-    Time.lt (lc.(Local.tview).(TView.cur).(View.rlx) loc) ts.
-
-Definition promise_consistent_th (tid: Ident.t) (c: Configuration.t) : Prop :=
-  forall lst lc
-         (THREAD: IdentMap.find tid c.(Configuration.threads) = Some (lst, lc)),
-  promise_consistent lc.
-
 Lemma promise_step_promise_consistent
       lc1 mem1 loc from to msg lc2 mem2 kind
       (STEP: Local.promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
-      (CONS: promise_consistent lc2):
-  promise_consistent lc1.
+      (CONS: Local.promise_consistent lc2):
+  Local.promise_consistent lc1.
 Proof.
   inv STEP. ii.
   exploit Memory.promise_get1_promise; eauto. i. des.
@@ -52,8 +42,8 @@ Qed.
 Lemma read_step_promise_consistent
       lc1 mem1 loc to val released ord lc2
       (STEP: Local.read_step lc1 mem1 loc to val released ord lc2)
-      (CONS: promise_consistent lc2):
-  promise_consistent lc1.
+      (CONS: Local.promise_consistent lc2):
+  Local.promise_consistent lc1.
 Proof.
   inv STEP. ii. exploit CONS; eauto. i.
   eapply TimeFacts.le_lt_lt; eauto. ss.
@@ -78,8 +68,8 @@ Qed.
 Lemma write_step_promise_consistent
       lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
       (STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
-      (CONS: promise_consistent lc2):
-  promise_consistent lc1.
+      (CONS: Local.promise_consistent lc2):
+  Local.promise_consistent lc1.
 Proof.
   inv STEP. ii.
   destruct (Memory.get loc0 ts promises2) as [[]|] eqn:X.
@@ -97,8 +87,8 @@ Lemma fence_step_promise_consistent
       (WF: Local.wf lc1 mem1)
       (SC: Memory.closed_timemap sc1 mem1)
       (MEM: Memory.closed mem1)
-      (CONS: promise_consistent lc2):
-  promise_consistent lc1.
+      (CONS: Local.promise_consistent lc2):
+  Local.promise_consistent lc1.
 Proof.
   exploit Local.fence_step_future; eauto. i. des.
   inversion STEP. subst. ii. exploit CONS; eauto. i.
@@ -113,11 +103,11 @@ Proof. destruct ord; auto. Qed.
 Lemma step_promise_consistent
       lang pf e th1 th2
       (STEP: @Thread.step lang pf e th1 th2)
-      (CONS: promise_consistent th2.(Thread.local))
+      (CONS: Local.promise_consistent th2.(Thread.local))
       (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
       (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory))
       (MEM1: Memory.closed th1.(Thread.memory)):
-  promise_consistent th1.(Thread.local).
+  Local.promise_consistent th1.(Thread.local).
 Proof.
   inv STEP; [inv STEP0|inv STEP0; inv LOCAL]; ss.
   - eapply promise_step_promise_consistent; eauto.
@@ -132,11 +122,11 @@ Qed.
 Lemma rtc_all_step_promise_consistent
       lang th1 th2
       (STEP: rtc (@Thread.all_step lang) th1 th2)
-      (CONS: promise_consistent th2.(Thread.local))
+      (CONS: Local.promise_consistent th2.(Thread.local))
       (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
       (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory))
       (MEM1: Memory.closed th1.(Thread.memory)):
-  promise_consistent th1.(Thread.local).
+  Local.promise_consistent th1.(Thread.local).
 Proof.
   revert_until STEP. induction STEP; auto. i.
   inv H. inv USTEP. exploit Thread.step_future; eauto. i. des.
@@ -146,11 +136,11 @@ Qed.
 Lemma rtc_tau_step_promise_consistent
       lang th1 th2
       (STEP: rtc (@Thread.tau_step lang) th1 th2)
-      (CONS: promise_consistent th2.(Thread.local))
+      (CONS: Local.promise_consistent th2.(Thread.local))
       (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
       (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory))
       (MEM1: Memory.closed th1.(Thread.memory)):
-  promise_consistent th1.(Thread.local).
+  Local.promise_consistent th1.(Thread.local).
 Proof.
   eapply rtc_all_step_promise_consistent; cycle 1; eauto.
   eapply rtc_implies; [|eauto].
@@ -163,17 +153,19 @@ Lemma consistent_promise_consistent
       (WF: Local.wf th.(Thread.local) th.(Thread.memory))
       (SC: Memory.closed_timemap th.(Thread.sc) th.(Thread.memory))
       (MEM: Memory.closed th.(Thread.memory)):
-  promise_consistent th.(Thread.local).
+  Local.promise_consistent th.(Thread.local).
 Proof.
-  destruct th. destruct local. inv WF. ss.
+  destruct th. ss.
   exploit Memory.cap_exists; eauto. i. des.
   exploit Memory.future_closed; eauto. i.
+  exploit Local.cap_wf; eauto. i.
   exploit Memory.max_full_timemap_exists; try apply x0. i. des.
+  hexploit Memory.max_full_timemap_closed; eauto. i.
   exploit CONS; eauto. s. i. des.
-  hexploit rtc_tau_step_promise_consistent; try exact STEPS; ss; eauto.
-  { ii. rewrite PROMISES0, Memory.bot_get in *. congr. }
-  { eapply Local.cap_wf; eauto. }
-  { eapply Memory.max_full_timemap_closed; eauto. }
+  - inv ABORT. des. inv ABORT; inv STEP. inv LOCAL. inv LOCAL0.
+    hexploit rtc_tau_step_promise_consistent; try exact STEPS; eauto.
+  - hexploit rtc_tau_step_promise_consistent; try exact STEPS; eauto.
+    ii. rewrite PROMISES, Memory.bot_get in *. congr.
 Qed.
 
 Lemma promise_consistent_promise_read
@@ -181,7 +173,7 @@ Lemma promise_consistent_promise_read
       f t m
       (STEP: Local.read_step lc1 mem1 loc to val released ord lc2)
       (PROMISE: Memory.get loc t lc1.(Local.promises) = Some (f, m))
-      (CONS: promise_consistent lc2):
+      (CONS: Local.promise_consistent lc2):
   Time.lt to t.
 Proof.
   inv STEP. exploit CONS; eauto. s. i.
@@ -197,7 +189,7 @@ Lemma promise_consistent_promise_write
       f t m
       (STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
       (PROMISE: Memory.get loc t lc1.(Local.promises) = Some (f, m))
-      (CONS: promise_consistent lc2):
+      (CONS: Local.promise_consistent lc2):
   Time.le to t.
 Proof.
   destruct (Memory.get loc t (Local.promises lc2)) as [[]|] eqn:X.
@@ -210,6 +202,7 @@ Proof.
     exploit fulfill_unset_promises; eauto. i. des. subst. refl.
 Qed.
 
+(* unused *)
 Lemma thread_step_unset_promises
       lang loc pf e from ts msg (th1 th2:Thread.t lang)
       (STEP: Thread.step pf e th1 th2)
@@ -254,157 +247,3 @@ Proof.
       eapply TimeFacts.le_lt_lt; eauto.
       repeat (etrans; [|apply Time.join_l]). refl.
 Qed.
-
-(* Lemma rtc_small_step_unset_promises *)
-(*       tid loc ts c1 lst1 lc1 c2 lst2 lc2 from msg withprm *)
-(*       (STEPS: rtc (small_step_evt withprm tid) c1 c2) *)
-(*       (WF: Configuration.wf c1) *)
-(*       (FIND1: IdentMap.find tid c1.(Configuration.threads) = Some (lst1, lc1)) *)
-(*       (GET1: Memory.get loc ts lc1.(Local.promises) = Some (from, msg)) *)
-(*       (FIND2: IdentMap.find tid c2.(Configuration.threads) = Some (lst2, lc2)) *)
-(*       (GET2: Memory.get loc ts lc2.(Local.promises) = None): *)
-(*   Time.lt (lc1.(Local.tview).(TView.cur).(View.rlx) loc) ts. *)
-(* Proof. *)
-(*   ginduction STEPS; i; subst. *)
-(*   { ss. rewrite FIND1 in FIND2. depdes FIND2. *)
-(*     by rewrite GET1 in GET2. *)
-(*   } *)
-(*   inv H. *)
-(*   exploit small_step_future; eauto. intros [WF2 _]. *)
-(*   inv USTEP. ss. rewrite FIND1 in TID. depdes TID. *)
-(*   destruct (Memory.get loc ts lc3.(Local.promises)) as [[t m]|] eqn: PRM. *)
-(*   - rewrite IdentMap.gss in IHSTEPS. *)
-(*     exploit IHSTEPS; eauto. *)
-(*     intro LT. move STEP at bottom. *)
-(*     eapply TimeFacts.le_lt_lt; eauto. *)
-(*     inv WF. exploit thread_step_tview_le; try exact STEP; eauto. *)
-(*     { eapply WF0. rewrite FIND1. eauto. } *)
-(*     s. i. apply x1. *)
-(*   - guardH PFREE. *)
-(*     eapply thread_step_unset_promises in STEP; eauto. des. *)
-(*     eauto using small_step_write_lt. *)
-(* Qed. *)
-
-(* Lemma promise_consistent_th_small_step *)
-(*       tid c1 c2 withprm tid' *)
-(*       (STEP: small_step_evt withprm tid c1 c2) *)
-(*       (WF: Configuration.wf c1) *)
-(*       (FULFILL: promise_consistent_th tid' c2): *)
-(*   promise_consistent_th tid' c1. *)
-(* Proof. *)
-(*   destruct (Ident.eq_dec tid' tid); cycle 1. *)
-(*   { ii. eapply FULFILL; eauto. *)
-(*     inv STEP. inv USTEP. s. rewrite IdentMap.gso; eauto. *)
-(*   } *)
-(*   subst. *)
-(*   ii. destruct (IdentMap.find tid (Configuration.threads c2)) as [[lang2 lc2]|] eqn: THREAD2; cycle 1. *)
-(*   { inv STEP. inv USTEP. ss. by rewrite IdentMap.gss in THREAD2. } *)
-(*   destruct (Memory.get loc ts (Local.promises lc2)) as [[from2 msg2]|] eqn: PROMISE2; cycle 1. *)
-(*   - apply Operators_Properties.clos_rt1n_step in STEP. *)
-(*     eapply rtc_small_step_unset_promises; eauto. *)
-(*   - eapply FULFILL in PROMISE2; eauto. *)
-(*     eapply TimeFacts.le_lt_lt; eauto. *)
-(*     inv STEP. inv USTEP. ss. *)
-(*     rewrite THREAD in TID. inv TID. *)
-(*     rewrite IdentMap.gss in THREAD2. inv THREAD2. *)
-(*     inv WF. exploit thread_step_tview_le; try exact STEP; eauto. *)
-(*     { eapply WF0. rewrite THREAD. eauto. } *)
-(*     s. i. apply x0. *)
-(* Qed. *)
-
-(* Lemma promise_consistent_th_rtc_small_step *)
-(*       tid c1 c2 withprm tid' *)
-(*       (STEP: rtc (small_step_evt withprm tid) c1 c2) *)
-(*       (WF: Configuration.wf c1) *)
-(*       (FULFILL: promise_consistent_th tid' c2): *)
-(*   promise_consistent_th tid' c1. *)
-(* Proof. *)
-(*   ginduction STEP; eauto. *)
-(*   i. eapply promise_consistent_th_small_step; eauto. *)
-(*   eapply IHSTEP; eauto. *)
-(*   inv H. eapply small_step_future; eauto. *)
-(* Qed. *)
-
-(* Lemma consistent_promise_consistent_th *)
-(*       tid c *)
-(*       (WF: Configuration.wf c) *)
-(*       (CONSISTENT: Configuration.consistent c): *)
-(*   promise_consistent_th tid c. *)
-(* Proof. *)
-(*   ii. assert (X:= WF). inv X. inv WF0. destruct lst as [lang st]. *)
-(*   exploit CONSISTENT; eauto; try reflexivity. *)
-(*   i. des. destruct e2. *)
-(*   exploit rtc_thread_step_rtc_small_step; [eauto|..]. *)
-(*   { ss. eapply rtc_implies, STEPS. apply tau_union. } *)
-(*   intro STEPS2. *)
-(*   eapply rtc_small_step_unset_promises in STEPS2; eauto. *)
-(*   - destruct c. eapply rtc_small_step_future; eauto. *)
-(*   - s. rewrite IdentMap.gss. eauto. *)
-(*   - ss. rewrite PROMISES. apply Cell.bot_get. *)
-(* Grab Existential Variables. exact true. *)
-(* Qed. *)
-
-(* Lemma promise_consistent_th_small_step_forward *)
-(*       withprm tid e c1 c2 *)
-(*       (STEP: small_step withprm tid e c1 c2) *)
-(*       (PRCONS: forall tid0, promise_consistent_th tid0 c1) *)
-(*       (PRCONS2: promise_consistent_th tid c2) *)
-(*       (WF: Configuration.wf c1): *)
-(*   forall tid0, promise_consistent_th tid0 c2. *)
-(* Proof. *)
-(*   i. s. destruct (Ident.eq_dec tid0 tid) eqn: EQ. *)
-(*   - subst. eauto. *)
-(*   - ii. exploit small_step_find; eauto. *)
-(*     s; intro X. rewrite <-X in THREAD. *)
-(*     eapply (PRCONS tid0); eauto. *)
-(* Qed. *)
-
-(* Lemma rtc_promise_consistent_th_small_step_forward *)
-(*       withprm tid c1 c2 *)
-(*       (STEP: rtc (small_step_evt withprm tid) c1 c2) *)
-(*       (PRCONS: forall tid0, promise_consistent_th tid0 c1) *)
-(*       (PRCONS2: promise_consistent_th tid c2) *)
-(*       (WF: Configuration.wf c1): *)
-(*   forall tid0, promise_consistent_th tid0 c2. *)
-(* Proof. *)
-(*   apply Operators_Properties.clos_rt_rt1n_iff, *)
-(*         Operators_Properties.clos_rt_rtn1_iff in STEP. *)
-(*   ginduction STEP; eauto. *)
-(*   apply Operators_Properties.clos_rt_rtn1_iff, *)
-(*         Operators_Properties.clos_rt_rt1n_iff in STEP. *)
-(*   i. inv H. hexploit promise_consistent_th_small_step_forward; eauto; cycle 1. *)
-(*   { eapply rtc_small_step_future; eauto. *)
-(*     eapply rtc_implies, STEP. eauto. } *)
-(*   i. hexploit IHSTEP; eauto. *)
-(*   eapply promise_consistent_th_small_step; eauto. *)
-(*   eapply rtc_small_step_future; eauto. *)
-(*   eapply rtc_implies, STEP. eauto. *)
-(* Qed. *)
-
-(* Lemma promise_consistent_th_small_step_backward *)
-(*       withprm tid e c1 c2 *)
-(*       (STEP: small_step withprm tid e c1 c2) *)
-(*       (PRCONS: forall tid0, promise_consistent_th tid0 c2) *)
-(*       (WF: Configuration.wf c1): *)
-(*   forall tid0, promise_consistent_th tid0 c1. *)
-(* Proof. *)
-(*   i. s. destruct (Ident.eq_dec tid0 tid) eqn: EQ. *)
-(*   - subst. hexploit promise_consistent_th_small_step; eauto. *)
-(*   - ii. exploit small_step_find; eauto. *)
-(*     s; intro X. rewrite X in THREAD. *)
-(*     eapply (PRCONS tid0); eauto. *)
-(* Qed. *)
-
-(* Lemma rtc_promise_consistent_th_small_step_backward *)
-(*       withprm tid c1 c2 *)
-(*       (STEP: rtc (small_step_evt withprm tid) c1 c2) *)
-(*       (PRCONS: forall tid0, promise_consistent_th tid0 c2) *)
-(*       (WF: Configuration.wf c1): *)
-(*   forall tid0, promise_consistent_th tid0 c1. *)
-(* Proof. *)
-(*   ginduction STEP; eauto. *)
-(*   i. inv H. *)
-(*   i. hexploit promise_consistent_th_small_step_backward; eauto. *)
-(*   i. hexploit IHSTEP; eauto. *)
-(*   eapply small_step_future; eauto. *)
-(* Qed. *)

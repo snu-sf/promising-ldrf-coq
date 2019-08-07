@@ -242,7 +242,7 @@ Module PFStepCap.
         (WF1: Local.wf lc1 mem1_tgt)
         (TO: Some to = caps loc)
         (STEP: Local.read_step lc1 mem1_tgt loc to val released ord lc2)
-        (CONS: promise_consistent lc2):
+        (CONS: Local.promise_consistent lc2):
     Memory.get loc (latests loc) lc1.(Local.promises) = None.
   Proof.
     destruct (Memory.get loc (latests loc) (Local.promises lc1)) as [[]|] eqn:PROMISE; ss.
@@ -271,7 +271,7 @@ Module PFStepCap.
         (MEM1: sim_memory latests caps lc1_tgt.(Local.promises) mem1_src mem1_tgt)
         (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
         (STEP_TGT: Local.read_step lc1_tgt mem1_tgt loc to val released ord lc2_tgt)
-        (CONS_TGT: promise_consistent lc2_tgt):
+        (CONS_TGT: Local.promise_consistent lc2_tgt):
     exists lc2_src,
       <<STEP_SRC: Local.read_step lc1_src mem1_src loc to val released ord lc2_src>> /\
       <<LOCAL2: sim_local lc2_src lc2_tgt>>.
@@ -938,7 +938,7 @@ Module PFStepCap.
         (SC1_TGT: Memory.closed_timemap sc1 mem1_tgt)
         (CLOSED1_TGT: Memory.closed mem1_tgt)
         (STEP_TGT: Local.program_step e lc1_tgt sc1 mem1_tgt lc2_tgt sc2 mem2_tgt)
-        (CONS: promise_consistent lc2_tgt):
+        (CONS: Local.promise_consistent lc2_tgt):
     exists lc2_src mem2_src mem3_src,
       <<STEP_SRC: Local.program_step e lc1_src sc1 mem1_src lc2_src sc2 mem2_src>> /\
       <<ADD: add_cap caps mem2_src mem3_src>> /\
@@ -986,6 +986,8 @@ Module PFStepCap.
     - exploit fence_step; eauto. i. des.
       esplits; try exact LOCAL2; eauto.
       inv LOCAL. ss.
+    - exploit abort_step; eauto. i. des.
+      esplits; eauto.
   Qed.
 
   Lemma thread_promise_step
@@ -1013,7 +1015,7 @@ Module PFStepCap.
         (SC1_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
         (MEM1_TGT: Memory.closed e1_tgt.(Thread.memory))
         (STEP_TGT: Thread.program_step e e1_tgt e2_tgt)
-        (CONS: promise_consistent e2_tgt.(Thread.local)):
+        (CONS: Local.promise_consistent e2_tgt.(Thread.local)):
     exists e2_src,
       <<STEP_SRC: pf_step caps e1_src e2_src>> /\
       <<SIM2: sim_thread latests caps e2_src e2_tgt>>.
@@ -1034,7 +1036,7 @@ Module PFStepCap.
         (SC1_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
         (MEM1_TGT: Memory.closed e1_tgt.(Thread.memory))
         (STEPS_TGT: rtc (@Thread.all_step lang) e1_tgt e2_tgt)
-        (CONS: promise_consistent e2_tgt.(Thread.local)):
+        (CONS: Local.promise_consistent e2_tgt.(Thread.local)):
     exists e2_src,
       <<STEPS_SRC: rtc (@pf_step lang caps) e1_src e2_src>> /\
       <<SIM2: sim_thread latests caps e2_src e2_tgt>>.
@@ -1061,7 +1063,7 @@ Module PFStepCap.
         (SC1_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
         (MEM1_TGT: Memory.closed e1_tgt.(Thread.memory))
         (STEPS_TGT: rtc (@Thread.tau_step lang) e1_tgt e2_tgt)
-        (CONS: promise_consistent e2_tgt.(Thread.local)):
+        (CONS: Local.promise_consistent e2_tgt.(Thread.local)):
     exists e2_src,
       <<STEPS_SRC: rtc (@pf_step lang caps) e1_src e2_src>> /\
       <<SIM2: sim_thread latests caps e2_src e2_tgt>>.

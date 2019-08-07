@@ -136,7 +136,7 @@ Module PFStep.
         (MEM1: sim_memory lc1_tgt.(Local.promises) mem1_src mem1_tgt)
         (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
         (STEP_TGT: Local.read_step lc1_tgt mem1_tgt loc to val released ord lc2_tgt)
-        (CONS_TGT: promise_consistent lc2_tgt):
+        (CONS_TGT: Local.promise_consistent lc2_tgt):
     exists lc2_src,
       <<STEP_SRC: Local.read_step lc1_src mem1_src loc to val released ord lc2_src>> /\
       <<LOCAL2: sim_local lc2_src lc2_tgt>>.
@@ -308,7 +308,7 @@ Module PFStep.
         (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
         (CLOSED1_TGT: Memory.closed mem1_tgt)
         (STEP_TGT: Local.program_step e lc1_tgt sc1 mem1_tgt lc2_tgt sc2 mem2_tgt)
-        (CONS: promise_consistent lc2_tgt):
+        (CONS: Local.promise_consistent lc2_tgt):
     exists lc2_src mem2_src,
       <<STEP_SRC: Local.program_step e lc1_src sc1 mem1_src lc2_src sc2 mem2_src>> /\
       <<LOCAL2: sim_local lc2_src lc2_tgt>> /\
@@ -335,6 +335,8 @@ Module PFStep.
     - exploit fence_step; eauto. i. des.
       esplits; try exact LOCAL2; eauto.
       inv LOCAL. ss.
+    - exploit abort_step; eauto. i. des.
+      esplits; eauto.
   Qed.
 
   Lemma thread_promise_step
@@ -361,7 +363,7 @@ Module PFStep.
         (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
         (MEM1_TGT: Memory.closed e1_tgt.(Thread.memory))
         (STEP_TGT: Thread.program_step e e1_tgt e2_tgt)
-        (CONS: promise_consistent e2_tgt.(Thread.local)):
+        (CONS: Local.promise_consistent e2_tgt.(Thread.local)):
     exists e e2_src,
       <<STEP_SRC: Thread.program_step e e1_src e2_src>> /\
       <<SIM2: sim_thread e2_src e2_tgt>>.
@@ -382,7 +384,7 @@ Module PFStep.
         (SC1_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
         (MEM1_TGT: Memory.closed e1_tgt.(Thread.memory))
         (STEPS_TGT: rtc (@Thread.all_step lang) e1_tgt e2_tgt)
-        (CONS: promise_consistent e2_tgt.(Thread.local)):
+        (CONS: Local.promise_consistent e2_tgt.(Thread.local)):
     exists e2_src,
       <<STEPS_SRC: rtc (union (@Thread.program_step lang)) e1_src e2_src>> /\
       <<SIM2: sim_thread e2_src e2_tgt>>.
@@ -409,7 +411,7 @@ Module PFStep.
         (SC1_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
         (MEM1_TGT: Memory.closed e1_tgt.(Thread.memory))
         (STEPS_TGT: rtc (@Thread.tau_step lang) e1_tgt e2_tgt)
-        (CONS: promise_consistent e2_tgt.(Thread.local)):
+        (CONS: Local.promise_consistent e2_tgt.(Thread.local)):
     exists e2_src,
       <<STEPS_SRC: rtc (union (@Thread.program_step lang)) e1_src e2_src>> /\
       <<SIM2: sim_thread e2_src e2_tgt>>.

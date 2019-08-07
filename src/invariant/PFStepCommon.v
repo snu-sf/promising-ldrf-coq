@@ -62,4 +62,15 @@ Module PFStepCommon.
       rewrite Memory.bot_get in *. ss.
     - econs; eauto.
   Qed.
+
+  Lemma abort_step
+        lc1_src lc1_tgt
+        (LOCAL1: sim_local lc1_src lc1_tgt)
+        (STEP_TGT: Local.abort_step lc1_tgt):
+    <<STEP_SRC: Local.abort_step lc1_src>>.
+  Proof.
+    destruct lc1_src, lc1_tgt. inv LOCAL1. inv STEP_TGT. ss.
+    subst. econs; eauto.
+    eapply Local.bot_promise_consistent; ss.
+  Qed.
 End PFStepCommon.
