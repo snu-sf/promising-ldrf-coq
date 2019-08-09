@@ -1,6 +1,6 @@
 COQMODULE    := promising
-COQTHEORIES  := lib/sflib/*.v \
-	src/lib/*.v \
+COQTHEORIES  := lib/promising-lib/lib/sflib/*.v \
+	lib/promising-lib/src/*.v \
 	src/lang/*.v \
 	src/while/*.v \
 	src/prop/*.v \
@@ -11,22 +11,22 @@ COQTHEORIES  := lib/sflib/*.v \
 
 all: quick
 
-build: sflib Makefile.coq
+build: promising-lib Makefile.coq
 	$(MAKE) -f Makefile.coq all
 
-quick: sflib-quick Makefile.coq
+quick: promising-lib-quick Makefile.coq
 	$(MAKE) -f Makefile.coq quick
 
-sflib: lib/sflib
-	$(MAKE) -C lib/sflib
+promising-lib: lib/promising-lib
+	$(MAKE) -C lib/promising-lib
 
-sflib-quick: lib/sflib
-	$(MAKE) -C lib/sflib quick
+promising-lib-quick: lib/promising-lib
+	$(MAKE) -C lib/promising-lib quick
 
 Makefile.coq: Makefile $(COQTHEORIES)
-	(echo "-R lib/sflib sflib"; \
+	(echo "-R lib/promising-lib/lib/sflib sflib"; \
+   echo "-R lib/promising-lib/src PromisingLib"; \
    \
-   echo "-R src/lib $(COQMODULE)"; \
    echo "-R src/lang $(COQMODULE)"; \
    echo "-R src/while $(COQMODULE)"; \
    echo "-R src/prop $(COQMODULE)"; \
