@@ -8,6 +8,8 @@ Require Import Axioms.
 Require Import Basic.
 Require Import DataStructure.
 Require Import DenseOrder.
+Require Import Loc.
+
 Require Import Event.
 Require Import Time.
 Require Import View.
@@ -32,11 +34,11 @@ Module MemorySplit.
   Proof.
     exploit Memory.remove_get0; eauto. i.
     inv REMOVE. inv REMOVE0.
-    erewrite <- LocFun.add_add_eq.
+    erewrite <- FLocFun.add_add_eq.
     destruct r. ss. subst.
     esplits.
     - econs; ss. instantiate (1 := Cell.mk _). econs; ss.
-    - econs; eauto. unfold LocFun.add. condtac; [|congr].
+    - econs; eauto. unfold FLocFun.add. condtac; [|congr].
       unfold Cell.remove. s.
       replace (DOMap.remove to (Cell.raw (mem0 loc))) with
           (DOMap.remove to (DOMap.add to (from, msg2) (Cell.raw (mem0 loc)))).

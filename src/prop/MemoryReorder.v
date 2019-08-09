@@ -8,6 +8,8 @@ Require Import Axioms.
 Require Import Basic.
 Require Import DataStructure.
 Require Import DenseOrder.
+Require Import Loc.
+
 Require Import Event.
 Require Import Time.
 Require Import View.
@@ -172,10 +174,10 @@ Module MemoryReorder.
     erewrite Memory.add_o; eauto. condtac; ss.
     - des. subst. i. des. inv GET. left. splits; eauto.
       inv ADD1. inv ADD. inv LOWER2. inv LOWER.
-      rewrite LocFun.add_add_eq. econs; auto.
+      rewrite FLocFun.add_add_eq. econs; auto.
       unfold Cell.add in *.
       destruct r, r0. ss. subst.
-      unfold LocFun.add. condtac; [|congr]. s.
+      unfold FLocFun.add. condtac; [|congr]. s.
       rewrite DOMap.add_add_eq. econs; auto.
     - guardH o. i. des. right. splits.
       { ii. inv H. unguardH o. des; congr. }
@@ -376,10 +378,10 @@ Module MemoryReorder.
     revert GET. erewrite Memory.split_o; eauto. repeat condtac; ss.
     - des. subst. i. inv GET. left. splits; auto.
       inv SPLIT1. inv SPLIT. inv LOWER2. inv LOWER.
-      rewrite LocFun.add_add_eq. econs; auto.
+      rewrite FLocFun.add_add_eq. econs; auto.
       unfold Cell.split in *.
       destruct r, r0. ss. subst.
-      unfold LocFun.add. condtac; [|congr]. s.
+      unfold FLocFun.add. condtac; [|congr]. s.
       rewrite DOMap.add_add_eq. econs; auto.
     - guardH o. des. subst. congr.
     - guardH o. guardH o0. i. right.
@@ -599,10 +601,10 @@ Module MemoryReorder.
     revert GET. erewrite Memory.lower_o; eauto. condtac; ss.
     - des. subst. i. inv GET. left. splits; eauto.
       inv LOWER1. inv LOWER. inv LOWER2. inv LOWER.
-      rewrite LocFun.add_add_eq. econs; auto.
+      rewrite FLocFun.add_add_eq. econs; auto.
       unfold Cell.lower in *.
       destruct r, r0. ss. subst.
-      unfold LocFun.add. condtac; [|congr]. s.
+      unfold FLocFun.add. condtac; [|congr]. s.
       rewrite DOMap.add_add_eq. econs; auto.
       etrans; eauto.
     - guardH o. i. right. splits.

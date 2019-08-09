@@ -6,6 +6,8 @@ From Paco Require Import paco.
 Require Import DataStructure.
 Require Import DenseOrder.
 Require Import Basic.
+Require Import Loc.
+
 
 Set Implicit Arguments.
 

@@ -8,6 +8,8 @@ Require Import Axioms.
 Require Import Basic.
 Require Import DataStructure.
 Require Import DenseOrder.
+Require Import Loc.
+
 Require Import Event.
 Require Import Time.
 Require Import Language.
@@ -103,7 +105,7 @@ Proof.
     econs. unfold TView.write_released.
     viewtac; repeat (condtac; viewtac);
       (try by apply Time.bot_spec);
-      (try by unfold TimeMap.singleton, LocFun.add; condtac; [refl|congr]);
+      (try by unfold TimeMap.singleton, FLocFun.add; condtac; [refl|congr]);
       (try by left; eapply TimeFacts.le_lt_lt; [|eauto];
        eapply closed_timemap_max_ts; apply WF1).
     left. eapply TimeFacts.le_lt_lt; [|eauto].

@@ -6,6 +6,8 @@ Require Import sflib.
 Require Import Axioms.
 Require Import Basic.
 Require Import DataStructure.
+Require Import Loc.
+
 Require Import Time.
 Require Import Event.
 Require Import Language.
@@ -73,7 +75,7 @@ Module Threads.
     inv THREAD. ii. esplits; eauto.
   Qed.
 
-  Inductive is_promised tid (loc:Loc.t) (to:Time.t) (threads:t): Prop :=
+  Inductive is_promised tid (loc:FLoc.t) (to:Time.t) (threads:t): Prop :=
   | is_promised_intro
       lang st lc from msg
       (TID: IdentMap.find tid threads = Some (existT _ lang st, lc))

@@ -6,6 +6,8 @@ Require Import sflib.
 From Paco Require Import paco.
 
 Require Import Basic.
+Require Import Loc.
+
 Require Import Event.
 Require Import Language.
 Require Import Time.
@@ -357,7 +359,7 @@ Proof.
       - rewrite <- ? View.join_l. apply LOCAL.
       - apply WF_TGT.
       - unfold TimeMap.join. rewrite <- Time.join_l. rewrite <- Time.join_l. rewrite <- Time.join_r.
-        unfold View.singleton_ur_if. condtac; ss. unfold TimeMap.singleton, LocFun.add.
+        unfold View.singleton_ur_if. condtac; ss. unfold TimeMap.singleton, FLocFun.add.
         condtac; ss. refl.
     }
     i. des.

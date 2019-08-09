@@ -7,6 +7,8 @@ From Paco Require Import paco.
 
 Require Import Axioms.
 Require Import Basic.
+Require Import Loc.
+
 Require Import Event.
 Require Import Time.
 Require Import Language.
@@ -28,7 +30,7 @@ Require Import Semantics.
 Set Implicit Arguments.
 
 
-Inductive fulfill_step (lc1:Local.t) (sc1:TimeMap.t) (loc:Loc.t) (from to:Time.t) (val:Const.t) (releasedm released:option View.t) (ord:Ordering.t): forall (lc2:Local.t) (sc2:TimeMap.t), Prop :=
+Inductive fulfill_step (lc1:Local.t) (sc1:TimeMap.t) (loc:FLoc.t) (from to:Time.t) (val:Const.t) (releasedm released:option View.t) (ord:Ordering.t): forall (lc2:Local.t) (sc2:TimeMap.t), Prop :=
 | step_fulfill
     promises2
     (REL_LE: View.opt_le (TView.write_released lc1.(Local.tview) sc1 loc to releasedm ord) released)
@@ -195,6 +197,6 @@ Lemma fulfill_step_promises_diff
       (FULFILL: fulfill_step lc1 sc1 loc1 from to val releasedm released ord lc2 sc2):
   lc1.(Local.promises) loc2 = lc2.(Local.promises) loc2.
 Proof.
-  inv FULFILL. inv REMOVE. unfold LocFun.add. s.
+  inv FULFILL. inv REMOVE. unfold FLocFun.add. s.
   condtac; [congr|]. auto.
 Qed.

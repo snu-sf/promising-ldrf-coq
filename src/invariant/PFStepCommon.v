@@ -7,6 +7,8 @@ Require Import Axioms.
 Require Import Basic.
 Require Import DataStructure.
 Require Import DenseOrder.
+Require Import Loc.
+
 Require Import Time.
 Require Import Event.
 Require Import Language.

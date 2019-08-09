@@ -7,6 +7,8 @@ Require Import Axioms.
 Require Import Basic.
 Require Import DataStructure.
 Require Import DenseOrder.
+Require Import Loc.
+
 Require Import Event.
 Require Import Time.
 Require Import Language.
@@ -18,14 +20,14 @@ Require Import MemoryFacts.
 Set Implicit Arguments.
 
 
-Inductive covered (loc:Loc.t) (ts:Time.t) (mem:Memory.t): Prop :=
+Inductive covered (loc:FLoc.t) (ts:Time.t) (mem:Memory.t): Prop :=
 | covered_intro
     from to msg
     (GET: Memory.get loc to mem = Some (from, msg))
     (ITV: Interval.mem (from, to) ts)
 .
 
-Inductive covered_half (loc: Loc.t) (ts: Time.t) (mem: Memory.t): Prop :=
+Inductive covered_half (loc: FLoc.t) (ts: Time.t) (mem: Memory.t): Prop :=
 | covered_half_intro
     from to
     (GET: Memory.get loc to mem = Some (from, Message.half))

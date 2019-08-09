@@ -8,23 +8,25 @@ Require Import Axioms.
 Require Import Basic.
 Require Import DataStructure.
 Require Import DenseOrder.
+Require Import Loc.
+
 Require Import Event.
 Require Import Time.
 
 Set Implicit Arguments.
 
 
-Definition loc_ts_eq_dec (lhs rhs:Loc.t * Time.t):
+Definition loc_ts_eq_dec (lhs rhs:FLoc.t * Time.t):
   {lhs.(fst) = rhs.(fst) /\ lhs.(snd) = rhs.(snd)} +
   {lhs.(fst) <> rhs.(fst) \/ lhs.(snd) <> rhs.(snd)}.
 Proof.
   destruct lhs, rhs.
-  destruct (Loc.eq_dec t t1), (Time.eq_dec t0 t2); subst; auto.
+  destruct (FLoc.eq_dec t t1), (Time.eq_dec t0 t2); subst; auto.
 Defined.
 Global Opaque loc_ts_eq_dec.
 
 Module TimeMap <: JoinableType.
-  Definition t := Loc.t -> Time.t.
+  Definition t := FLoc.t -> Time.t.
 
   Definition eq := @eq t.
 
@@ -41,17 +43,17 @@ Module TimeMap <: JoinableType.
   Lemma bot_spec (tm:t): le bot tm.
   Proof. ii. apply Time.bot_spec. Qed.
 
-  Definition get (loc:Loc.t) (c:t) := c loc.
+  Definition get (loc:FLoc.t) (c:t) := c loc.
 
-  Definition add (l:Loc.t) (ts:Time.t) (tm:t): t :=
+  Definition add (l:FLoc.t) (ts:Time.t) (tm:t): t :=
     fun l' =>
-      if Loc.eq_dec l' l
+      if FLoc.eq_dec l' l
       then ts
       else get l' tm.
 
   Definition add_spec l' l ts tm:
     get l' (add l ts tm) =
-    if Loc.eq_dec l' l
+    if FLoc.eq_dec l' l
     then ts
     else get l' tm.
   Proof. auto. Qed.
@@ -60,7 +62,7 @@ Module TimeMap <: JoinableType.
     get l (add l ts tm) = ts.
   Proof.
     rewrite add_spec.
-    destruct (Loc.eq_dec l l); auto.
+    destruct (FLoc.eq_dec l l); auto.
     congruence.
   Qed.
 
@@ -68,7 +70,7 @@ Module TimeMap <: JoinableType.
     get l' (add l ts tm) = get l' tm.
   Proof.
     rewrite add_spec.
-    destruct (Loc.eq_dec l' l); auto.
+    destruct (FLoc.eq_dec l' l); auto.
     congruence.
   Qed.
 
@@ -76,11 +78,11 @@ Module TimeMap <: JoinableType.
     fun loc => Time.join (lhs loc) (rhs loc).
 
   Lemma join_comm lhs rhs: join lhs rhs = join rhs lhs.
-  Proof. apply LocFun.ext. i. apply Time.join_comm. Qed.
+  Proof. apply FLocFun.ext. i. apply Time.join_comm. Qed.
 
   Lemma join_assoc a b c: join (join a b) c = join a (join b c).
   Proof.
-    apply LocFun.ext. i. apply Time.join_assoc.
+    apply FLocFun.ext. i. apply Time.join_assoc.
   Qed.
 
   Lemma join_l lhs rhs: le lhs (join lhs rhs).
@@ -96,13 +98,13 @@ Module TimeMap <: JoinableType.
   Proof. unfold join. ii. apply Time.join_spec; auto. Qed.
 
   Definition singleton loc ts :=
-    LocFun.add loc ts (LocFun.init Time.bot).
+    FLocFun.add loc ts (FLocFun.init Time.bot).
 
   Lemma singleton_spec loc ts c
         (LOC: Time.le ts (c loc)):
     le (singleton loc ts) c.
   Proof.
-    ii. unfold singleton, LocFun.add, LocFun.find.
+    ii. unfold singleton, FLocFun.add, FLocFun.find.
     condtac; subst; ss. apply Time.bot_spec.
   Qed.
 
@@ -110,7 +112,7 @@ Module TimeMap <: JoinableType.
         (LE: le (singleton loc ts) c):
     Time.le ts (c loc).
   Proof.
-    generalize (LE loc). unfold singleton, LocFun.add, LocFun.find.
+    generalize (LE loc). unfold singleton, FLocFun.add, FLocFun.find.
     condtac; [|congr]. auto.
   Qed.
 
@@ -118,8 +120,8 @@ Module TimeMap <: JoinableType.
         (LE: le r l):
     join l r = l.
   Proof.
-    apply LocFun.ext. i.
-    unfold join, Time.join, LocFun.find. condtac; auto.
+    apply FLocFun.ext. i.
+    unfold join, Time.join, FLocFun.find. condtac; auto.
     apply TimeFacts.antisym; auto.
   Qed.
 
@@ -127,8 +129,8 @@ Module TimeMap <: JoinableType.
         (LE: le l r):
     join l r = r.
   Proof.
-    apply LocFun.ext. i.
-    unfold join, Time.join, LocFun.find. condtac; auto.
+    apply FLocFun.ext. i.
+    unfold join, Time.join, FLocFun.find. condtac; auto.
     exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto.
   Qed.
 

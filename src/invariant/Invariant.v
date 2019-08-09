@@ -8,6 +8,8 @@ Require Import Axioms.
 Require Import Basic.
 Require Import DataStructure.
 Require Import DenseOrder.
+Require Import Loc.
+
 Require Import Event.
 Require Import Time.
 Require Import Language.
@@ -35,7 +37,7 @@ Definition ThreadsProp :=
     Prop.
 
 Definition MemoryProp :=
-  forall (assign: LocFun.t Const.t),
+  forall (assign: FLocFun.t Const.t),
     Prop.
 
 Section Invariant.
@@ -54,7 +56,7 @@ Section Invariant.
          loc val ord
          assign
          (ST1: S tid lang st1)
-         (ASSIGN1: J assign /\ LocFun.find loc assign = val)
+         (ASSIGN1: J assign /\ FLocFun.find loc assign = val)
          (STEP: lang.(Language.step) (ProgramEvent.read loc val ord) st1 st2),
          S tid lang st2)
     (WRITE:
@@ -63,16 +65,16 @@ Section Invariant.
          (ST1: S tid lang st1)
          (STEP: lang.(Language.step) (ProgramEvent.write loc val ord) st1 st2),
          <<ST2: S tid lang st2>> /\
-         <<ASSIGN2: forall assign, J assign -> J (LocFun.add loc val assign)>>)
+         <<ASSIGN2: forall assign, J assign -> J (FLocFun.add loc val assign)>>)
     (UPDATE:
        forall tid lang st1 st2
          loc valr valw ordr ordw
          assign
          (ST1: S tid lang st1)
-         (ASSIGN1: J assign /\ LocFun.find loc assign = valr)
+         (ASSIGN1: J assign /\ FLocFun.find loc assign = valr)
          (STEP: lang.(Language.step) (ProgramEvent.update loc valr valw ordr ordw) st1 st2),
          <<ST2: S tid lang st2>> /\
-         <<ASSIGN2: forall assign, J assign -> J (LocFun.add loc valw assign)>>)
+         <<ASSIGN2: forall assign, J assign -> J (FLocFun.add loc valw assign)>>)
     (FENCE:
        forall tid lang st1 st2
          ordr ordw
@@ -98,11 +100,11 @@ Section Invariant.
       (FIND: IdentMap.find tid ths = Some (existT _ lang st, lc)),
       S tid lang st.
 
-  Definition memory_assign (m:Memory.t) (assign:Loc.t -> Const.t) :=
+  Definition memory_assign (m:Memory.t) (assign:FLoc.t -> Const.t) :=
     forall loc,
     exists from to released,
       Memory.get loc to m =
-      Some (from, Message.full (LocFun.find loc assign) released).
+      Some (from, Message.full (FLocFun.find loc assign) released).
 
   Definition sem_memory (m:Memory.t): Prop :=
     memory_assign m <1= J.
@@ -119,18 +121,18 @@ Section Invariant.
         (STEP: Local.read_step lc1 mem1 loc to val released ord lc2)
         (SEM: sem_memory mem1):
     exists assign,
-      J assign /\ LocFun.find loc assign = val.
+      J assign /\ FLocFun.find loc assign = val.
   Proof.
-    exists (LocFun.add loc val (LocFun.init 0)).
+    exists (FLocFun.add loc val (FLocFun.init 0)).
     splits.
     - apply SEM. ii.
-      destruct (Loc.eq_dec loc loc0).
-      + subst. rewrite LocFun.add_spec_eq.
+      destruct (FLoc.eq_dec loc loc0).
+      + subst. rewrite FLocFun.add_spec_eq.
         inv STEP. esplits; eauto.
-      + rewrite LocFun.add_spec_neq, LocFun.init_spec.
+      + rewrite FLocFun.add_spec_neq, FLocFun.init_spec.
         specialize (INHABITED loc0).
         esplits; eauto. congr.
-    - apply LocFun.add_spec_eq.
+    - apply FLocFun.add_spec_eq.
   Qed.
 
   Lemma sem_memory_write_step_eq
@@ -139,15 +141,15 @@ Section Invariant.
         (INHABITED: Memory.inhabited mem1)
         (STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
         (SEM: memory_assign mem2 assign)
-        (LOC: LocFun.find loc assign = val):
+        (LOC: FLocFun.find loc assign = val):
     exists assign0,
       memory_assign mem1 assign0 /\
-      assign = LocFun.add loc val assign0.
+      assign = FLocFun.add loc val assign0.
   Proof.
-    exists (LocFun.add loc 0 assign). splits; cycle 1.
-    - rewrite LocFun.add_add_eq. apply LocFun.ext. i.
-      rewrite LocFun.add_spec. condtac; subst; ss.
-    - ii. rewrite LocFun.add_spec. condtac.
+    exists (FLocFun.add loc 0 assign). splits; cycle 1.
+    - rewrite FLocFun.add_add_eq. apply FLocFun.ext. i.
+      rewrite FLocFun.add_spec. condtac; subst; ss.
+    - ii. rewrite FLocFun.add_spec. condtac.
       { specialize (INHABITED loc0). esplits; eauto. }
       specialize (SEM loc0). des. revert SEM.
       inv STEP. inv WRITE0. inv PROMISE.
@@ -169,7 +171,7 @@ Section Invariant.
         assign
         (STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
         (SEM: memory_assign mem2 assign)
-        (LOC: LocFun.find loc assign <> val):
+        (LOC: FLocFun.find loc assign <> val):
     memory_assign mem1 assign.
   Proof.
     ii. specialize (SEM loc0). des. revert SEM.
@@ -217,7 +219,7 @@ Section Invariant.
       exploit READ; eauto.
     - exploit WRITE; eauto. i. des.
       esplits; eauto. ii.
-      destruct (Const.eq_dec (LocFun.find loc x0) val).
+      destruct (Const.eq_dec (FLocFun.find loc x0) val).
       { subst. hexploit sem_memory_write_step_eq; eauto. i. des.
         rewrite H0. eauto.
       }
@@ -225,7 +227,7 @@ Section Invariant.
     - exploit sem_memory_read_step; eauto. i. des.
       exploit UPDATE; eauto. i. des.
       esplits; eauto. ii.
-      destruct (Const.eq_dec (LocFun.find loc x2) valw).
+      destruct (Const.eq_dec (FLocFun.find loc x2) valw).
       { subst. hexploit sem_memory_write_step_eq; eauto. i. des.
         rewrite H0. eauto.
       }
@@ -440,7 +442,7 @@ Section Invariant.
         (TH: forall tid lang syn
                (FIND: IdentMap.find tid program = Some (existT _ lang syn)),
             S tid lang (lang.(Language.init) syn))
-        (MEM: J (LocFun.init 0)):
+        (MEM: J (FLocFun.init 0)):
     sem (Configuration.init program).
   Proof.
     econs.
@@ -449,8 +451,8 @@ Section Invariant.
       destruct ((UsualFMapPositive.UsualPositiveMap'.find tid program)) eqn:X; inv FIND.
       apply inj_pair2 in H1. subst. destruct s. ss.
       eapply TH; eauto.
-    - ii. cut (x0 = LocFun.init 0); [by i; subst|].
-      apply LocFun.ext. i. rewrite LocFun.init_spec.
+    - ii. cut (x0 = FLocFun.init 0); [by i; subst|].
+      apply FLocFun.ext. i. rewrite FLocFun.init_spec.
       specialize (PR i). des. ss.
       unfold Memory.get, Memory.init in PR. unfold Cell.get, Cell.init in PR. ss.
       apply DOMap.singleton_find_inv in PR. des. inv PR0. auto.
@@ -461,7 +463,7 @@ Section Invariant.
         (TH: forall tid lang syn
                (FIND: IdentMap.find tid program = Some (existT _ lang syn)),
             S tid lang (lang.(Language.init) syn))
-        (MEM: J (LocFun.init 0))
+        (MEM: J (FLocFun.init 0))
         (STEPS: rtc Configuration_step_evt (Configuration.init program) c):
     sem c.
   Proof.

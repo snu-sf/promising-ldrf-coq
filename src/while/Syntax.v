@@ -4,6 +4,8 @@ Require Import List.
 Require Import sflib.
 
 Require Import Basic.
+Require Import Loc.
+
 Require Import Event.
 
 Set Implicit Arguments.
@@ -89,9 +91,9 @@ Module Instr.
   Inductive t :=
   | skip
   | assign (lhs:Reg.t) (rhs:expr)
-  | load (lhs:Reg.t) (rhs:Loc.t) (ord:Ordering.t)
-  | store (lhs:Loc.t) (rhs:Value.t) (ord:Ordering.t)
-  | update (lhs:Reg.t) (loc:Loc.t) (rmw:rmw) (ordr ordw:Ordering.t)
+  | load (lhs:Reg.t) (rhs:FLoc.t) (ord:Ordering.t)
+  | store (lhs:FLoc.t) (rhs:Value.t) (ord:Ordering.t)
+  | update (lhs:Reg.t) (loc:FLoc.t) (rmw:rmw) (ordr ordw:Ordering.t)
   | fence (ordr ordw:Ordering.t)
   | syscall (lhs:Reg.t) (rhses:list Value.t)
   | assert (e:expr)
@@ -172,7 +174,7 @@ Module SyntaxNotations.
   Open Scope string_scope.
 
   Notation "'%r' var" := (Reg.of_string var) (at level 41).
-  Notation "'%l' var" := (Loc.of_string var) (at level 41).
+  Notation "'%l' var" := (FLoc.of_string var) (at level 41).
 
   Notation "'pln'" := (Ordering.plain) (at level 41).
   Notation "'rlx'" := (Ordering.relaxed) (at level 41).

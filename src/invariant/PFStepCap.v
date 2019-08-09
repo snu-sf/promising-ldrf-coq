@@ -7,6 +7,8 @@ Require Import sflib.
 Require Import Axioms.
 Require Import Basic.
 Require Import DataStructure.
+Require Import Loc.
+
 Require Import Time.
 Require Import Event.
 Require Import Language.
@@ -28,14 +30,14 @@ Set Implicit Arguments.
 Module PFStepCap.
   Include PFStepCommon.
 
-  Definition cap_src (latests: TimeMap.t) (loc: Loc.t) (promises: Memory.t)
+  Definition cap_src (latests: TimeMap.t) (loc: FLoc.t) (promises: Memory.t)
                      (from: Time.t) (val: Const.t) (released: option View.t):
     option (Time.t * Message.t) :=
     if Memory.get loc (latests loc) promises
     then None
     else Some (from, Message.full val released).
 
-  Inductive sim_memory (latests: TimeMap.t) (caps: Loc.t -> option Time.t) (promises mem_src mem_tgt: Memory.t): Prop :=
+  Inductive sim_memory (latests: TimeMap.t) (caps: FLoc.t -> option Time.t) (promises mem_src mem_tgt: Memory.t): Prop :=
   | sim_memory_intro
       (SOUND: Memory.le mem_src mem_tgt)
       (COMPLETE1: forall loc to from msg
@@ -57,7 +59,7 @@ Module PFStepCap.
             <<CAPP: Memory.get loc to promises = None>>)
   .
 
-  Inductive sim_thread (lang: Language.t) (latests: TimeMap.t) (caps: Loc.t -> option Time.t) (e_src e_tgt: @Thread.t lang): Prop :=
+  Inductive sim_thread (lang: Language.t) (latests: TimeMap.t) (caps: FLoc.t -> option Time.t) (e_src e_tgt: @Thread.t lang): Prop :=
   | sim_thread_intro
       (STATE: e_src.(Thread.state) = e_tgt.(Thread.state))
       (LOCAL: sim_local e_src.(Thread.local) e_tgt.(Thread.local))
@@ -256,10 +258,10 @@ Module PFStepCap.
     etrans; [|apply Time.join_l]. etrans; [|apply Time.join_r].
     unfold View.singleton_ur_if. condtac; ss.
     - unfold TimeMap.singleton.
-      exploit LocFun.add_spec_eq. unfold LocFun.find. i.
+      exploit FLocFun.add_spec_eq. unfold FLocFun.find. i.
       rewrite x2. refl.
     - unfold TimeMap.singleton.
-      exploit LocFun.add_spec_eq. unfold LocFun.find. i.
+      exploit FLocFun.add_spec_eq. unfold FLocFun.find. i.
       rewrite x2. refl.
   Qed.
 
@@ -538,7 +540,7 @@ Module PFStepCap.
           des. subst. timetac.
         * erewrite Memory.remove_o; eauto. condtac; ss.
           erewrite Memory.lower_o; eauto. condtac; ss.
-      + destruct (Loc.eq_dec loc0 loc).
+      + destruct (FLoc.eq_dec loc0 loc).
         { subst. des; ss. }
         guardH o.
         exploit CAPS; try exact CAP. i. des.
@@ -881,7 +883,7 @@ Module PFStepCap.
     - inv WRITE. eapply promise_remove_latest_None; eauto. apply WF1_TGT.
   Qed.
 
-  Inductive add_cap (caps: Loc.t -> option Time.t): forall (mem1 mem2: Memory.t), Prop :=
+  Inductive add_cap (caps: FLoc.t -> option Time.t): forall (mem1 mem2: Memory.t), Prop :=
   | add_cap_refl mem:
       add_cap caps mem mem
   | lower_cap_lower
@@ -897,7 +899,7 @@ Module PFStepCap.
 
   Program Instance add_cap_Reflexive: forall caps, Reflexive (add_cap caps).
 
-  Inductive pf_step (lang: Language.t) (caps: Loc.t -> option Time.t) (e: ThreadEvent.t):
+  Inductive pf_step (lang: Language.t) (caps: FLoc.t -> option Time.t) (e: ThreadEvent.t):
     forall (e1 e2: Thread.t lang), Prop :=
   | pf_step_intro
       e1 st2 lc2 sc2 mem2 mem3
@@ -1104,7 +1106,7 @@ Module PFStepCap.
           <<PROMISE: Memory.latest_half loc promises mem1>>)
   .
 
-  Inductive sim_memory_aux (latests: TimeMap.t) (caps: Loc.t -> option Time.t) (dom: list (Loc.t * Time.t))
+  Inductive sim_memory_aux (latests: TimeMap.t) (caps: FLoc.t -> option Time.t) (dom: list (FLoc.t * Time.t))
                            (promises mem_src mem_tgt: Memory.t): Prop :=
   | sim_memory_aux_intro
       (SOUND: Memory.le mem_src mem_tgt)
@@ -1158,14 +1160,14 @@ Module PFStepCap.
   Qed.
 
   Lemma caps_exists promises mem:
-    exists (caps: Loc.t -> option Time.t),
+    exists (caps: FLoc.t -> option Time.t),
     forall loc,
       if (caps loc)
       then Memory.latest_half loc promises mem /\
            caps loc = Some (Time.incr (Memory.max_ts loc mem))
       else ~ Memory.latest_half loc promises mem.
   Proof.
-    cut (exists (caps: Loc.t -> option Time.t),
+    cut (exists (caps: FLoc.t -> option Time.t),
             forall loc,
               (fun loc (cap: option Time.t) =>
                  if cap
@@ -1179,12 +1181,12 @@ Module PFStepCap.
     - exists None. eauto.
   Qed.
 
-  Lemma loc_decidable: decidable_eq Loc.t.
+  Lemma loc_decidable: decidable_eq FLoc.t.
   Proof.
-    ii. destruct (Loc.eq_dec x y); [left|right]; ss.
+    ii. destruct (FLoc.eq_dec x y); [left|right]; ss.
   Qed.
 
-  Lemma loc_ts_decidable: decidable_eq (Loc.t * Time.t).
+  Lemma loc_ts_decidable: decidable_eq (FLoc.t * Time.t).
   Proof.
     ii. destruct (loc_ts_eq_dec x y), x, y; ss.
     - des. subst. left. ss.
@@ -1339,7 +1341,7 @@ Module PFStepCap.
       inv IHdom. econs; ii; eauto; ss.
       - inv IN; eauto. inv H1. congr.
       - exploit CAPS; eauto. i. des; esplits; eauto.
-        destruct (Loc.eq_dec loc0 loc).
+        destruct (FLoc.eq_dec loc0 loc).
         + subst. left. rewrite e in *. inv CAP0. split; eauto.
           unfold cap_src. rewrite LATESTP. ss.
         + right. split; ss. ii. inv H1; eauto.
@@ -1377,7 +1379,7 @@ Module PFStepCap.
       + left. split; eauto.
         erewrite Memory.add_o; eauto. condtac; ss; eauto.
         des. subst. ss.
-      + destruct (Loc.eq_dec loc0 loc).
+      + destruct (FLoc.eq_dec loc0 loc).
         * subst. left. rewrite e in *. inv CAP0. split; eauto.
           rewrite GETT in *. inv CAP_TGT.
           unfold cap_src. rewrite LATESTP.

@@ -7,6 +7,8 @@ From Paco Require Import paco.
 
 Require Import Basic.
 Require Import DenseOrder.
+Require Import Loc.
+
 Require Import Event.
 Require Import Language.
 Require Import Time.
@@ -103,7 +105,7 @@ Proof.
   - econs; eauto.
     + s. unfold View.singleton_ur_if.
       econs; repeat (try condtac; try splits; aggrtac; eauto; try apply READABLE;
-                     unfold TimeMap.singleton, LocFun.add in *).
+                     unfold TimeMap.singleton, FLocFun.add in *).
       * specialize (LOC eq_refl). des. viewtac.
       * specialize (LOC eq_refl). des. viewtac.
       * specialize (LOC eq_refl). des. viewtac.
@@ -348,7 +350,7 @@ Proof.
       repeat (try condtac; aggrtac).
     + s. unfold View.singleton_ur_if.
       econs; repeat (try condtac; try splits; aggrtac; eauto; try apply WRITABLE;
-                     unfold TimeMap.singleton, LocFun.add in *);
+                     unfold TimeMap.singleton, FLocFun.add in *);
         (try by inv WRITABLE; eapply TimeFacts.le_lt_lt; eauto; aggrtac).
 Qed.
 

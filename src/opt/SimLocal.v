@@ -8,6 +8,8 @@ From Paco Require Import paco.
 
 Require Import Axioms.
 Require Import Basic.
+Require Import Loc.
+
 Require Import Event.
 Require Import Time.
 Require Import Language.
@@ -639,7 +641,7 @@ Lemma sim_local_nonsynch_src
 Proof.
   inversion LOCAL1_SRC.
   destruct (Memory.finite lc1_src.(Local.promises)). rename x into dom.
-  assert (FINITE' : forall (loc : Loc.t) (from to : Time.t) (msg : Message.t),
+  assert (FINITE' : forall (loc : FLoc.t) (from to : Time.t) (msg : Message.t),
              Memory.get loc to (Local.promises lc1_src) = Some (from, msg) ->
              (match msg with
               | Message.full _ (Some _) => True

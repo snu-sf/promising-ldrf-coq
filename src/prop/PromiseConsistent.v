@@ -8,6 +8,8 @@ Require Import Axioms.
 Require Import Basic.
 Require Import DataStructure.
 Require Import DenseOrder.
+Require Import Loc.
+
 Require Import Event.
 Require Import Time.
 Require Import Language.
@@ -180,8 +182,8 @@ Proof.
   apply TimeFacts.join_lt_des in x. des.
   apply TimeFacts.join_lt_des in AC. des.
   revert BC0. unfold View.singleton_ur_if. condtac; ss.
-  - unfold TimeMap.singleton, LocFun.add. condtac; ss.
-  - unfold TimeMap.singleton, LocFun.add. condtac; ss.
+  - unfold TimeMap.singleton, FLocFun.add. condtac; ss.
+  - unfold TimeMap.singleton, FLocFun.add. condtac; ss.
 Qed.
 
 Lemma promise_consistent_promise_write
@@ -196,7 +198,7 @@ Proof.
   - inv STEP. inv WRITE.
     exploit CONS; eauto. i. ss.
     apply TimeFacts.join_lt_des in x. des.
-    left. revert BC. unfold TimeMap.singleton, LocFun.add. condtac; ss.
+    left. revert BC. unfold TimeMap.singleton, FLocFun.add. condtac; ss.
   - inv STEP. inv WRITE.
     exploit Memory.promise_get1_promise; eauto. i. des.
     exploit fulfill_unset_promises; eauto. i. des. subst. refl.
