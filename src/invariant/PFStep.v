@@ -11,7 +11,7 @@ From PromisingLib Require Import Loc.
 
 Require Import Time.
 Require Import Event.
-Require Import Language.
+From PromisingLib Require Import Language.
 Require Import View.
 Require Import Cell.
 Require Import Memory.
@@ -42,7 +42,7 @@ Module PFStep.
           <<GET_SRC: Memory.get loc to mem_src = Some (from, msg)>>)
   .
 
-  Inductive sim_thread (lang: Language.t) (e_src e_tgt: @Thread.t lang): Prop :=
+  Inductive sim_thread (lang: language) (e_src e_tgt: @Thread.t lang): Prop :=
   | sim_thread_intro
       (STATE: e_src.(Thread.state) = e_tgt.(Thread.state))
       (LOCAL: sim_local e_src.(Thread.local) e_tgt.(Thread.local))

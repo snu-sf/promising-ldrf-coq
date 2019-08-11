@@ -11,7 +11,7 @@ From PromisingLib Require Import Loc.
 
 Require Import Time.
 Require Import Event.
-Require Import Language.
+From PromisingLib Require Import Language.
 Require Import View.
 Require Import Cell.
 Require Import Memory.
@@ -59,7 +59,7 @@ Module PFStepCap.
             <<CAPP: Memory.get loc to promises = None>>)
   .
 
-  Inductive sim_thread (lang: Language.t) (latests: TimeMap.t) (caps: FLoc.t -> option Time.t) (e_src e_tgt: @Thread.t lang): Prop :=
+  Inductive sim_thread (lang: language) (latests: TimeMap.t) (caps: FLoc.t -> option Time.t) (e_src e_tgt: @Thread.t lang): Prop :=
   | sim_thread_intro
       (STATE: e_src.(Thread.state) = e_tgt.(Thread.state))
       (LOCAL: sim_local e_src.(Thread.local) e_tgt.(Thread.local))
@@ -899,7 +899,7 @@ Module PFStepCap.
 
   Program Instance add_cap_Reflexive: forall caps, Reflexive (add_cap caps).
 
-  Inductive pf_step (lang: Language.t) (caps: FLoc.t -> option Time.t) (e: ThreadEvent.t):
+  Inductive pf_step (lang: language) (caps: FLoc.t -> option Time.t) (e: ThreadEvent.t):
     forall (e1 e2: Thread.t lang), Prop :=
   | pf_step_intro
       e1 st2 lc2 sc2 mem2 mem3

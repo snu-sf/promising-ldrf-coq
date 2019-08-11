@@ -8,6 +8,7 @@ From sflib Require Import sflib.
 From PromisingLib Require Import DataStructure.
 From PromisingLib Require Import Basic.
 From PromisingLib Require Import Loc.
+From PromisingLib Require Import Language.
 
 Require Import Time.
 
@@ -187,3 +188,6 @@ Module ProgramEvent.
       ord abort abort
   .
 End ProgramEvent.
+
+
+Definition language: Type := Language.t ProgramEvent.t.

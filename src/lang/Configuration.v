@@ -10,7 +10,7 @@ From PromisingLib Require Import Loc.
 
 Require Import Time.
 Require Import Event.
-Require Import Language.
+From PromisingLib Require Import Language.
 Require Import View.
 Require Import Cell.
 Require Import Memory.
@@ -22,8 +22,8 @@ Set Implicit Arguments.
 
 
 Module Threads.
-  Definition syntax := IdentMap.t {lang:Language.t & lang.(Language.syntax)}.
-  Definition t := IdentMap.t ({lang:Language.t & lang.(Language.state)} * Local.t).
+  Definition syntax := IdentMap.t {lang:language & lang.(Language.syntax)}.
+  Definition t := IdentMap.t ({lang:language & lang.(Language.state)} * Local.t).
 
   Definition init (s:syntax): t :=
     IdentMap.map
@@ -31,7 +31,7 @@ Module Threads.
       s.
 
   Definition is_terminal (ths:t): Prop :=
-    forall tid lang st lc (FIND: IdentMap.find tid ths = Some (existT Language.state lang st, lc)),
+    forall tid lang st lc (FIND: IdentMap.find tid ths = Some (existT _ lang st, lc)),
       <<STATE: lang.(Language.is_terminal) st>> /\
       <<THREAD: Local.is_terminal lc>>.
 
@@ -53,11 +53,11 @@ Module Threads.
   Proof.
     econs.
     - i. unfold init in *. rewrite IdentMap.Facts.map_o in *.
-      destruct (UsualFMapPositive.UsualPositiveMap'.find tid1 syn); inv TH1.
-      destruct (UsualFMapPositive.UsualPositiveMap'.find tid2 syn); inv TH2.
+      destruct (@UsualFMapPositive.UsualPositiveMap'.find (@sigT (Language.t ProgramEvent.t) (@Language.syntax ProgramEvent.t)) tid1 syn); inv TH1.
+      destruct (@UsualFMapPositive.UsualPositiveMap'.find (@sigT (Language.t ProgramEvent.t) (@Language.syntax ProgramEvent.t)) tid2 syn); inv TH2.
       econs. ss. econs. i. rewrite Memory.bot_get in *. congr.
     - i. unfold init in *. rewrite IdentMap.Facts.map_o in *.
-      destruct (UsualFMapPositive.UsualPositiveMap'.find tid syn); inv TH.
+      destruct (@UsualFMapPositive.UsualPositiveMap'.find (@sigT (Language.t ProgramEvent.t) (@Language.syntax ProgramEvent.t)) tid syn); inv TH.
       econs; ss.
       + apply TView.bot_wf.
       + apply TView.bot_closed.
