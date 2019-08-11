@@ -1,8 +1,8 @@
-Require Import sflib.
+From sflib Require Import sflib.
 From Paco Require Import paco.
 
-Require Import Basic.
-Require Import Loc.
+From PromisingLib Require Import Basic.
+From PromisingLib Require Import Loc.
 
 Require Import Event.
 Require Import Language.

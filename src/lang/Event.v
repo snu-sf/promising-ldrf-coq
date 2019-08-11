@@ -3,11 +3,11 @@ Require Import PeanoNat.
 Require Import Orders.
 Require Import MSetList.
 
-Require Import sflib.
+From sflib Require Import sflib.
 
-Require Import DataStructure.
-Require Import Basic.
-Require Import Loc.
+From PromisingLib Require Import DataStructure.
+From PromisingLib Require Import Basic.
+From PromisingLib Require Import Loc.
 
 Require Import Time.
 

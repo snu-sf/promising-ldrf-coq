@@ -2,11 +2,11 @@ Require Import Basics.
 Require Import Bool.
 Require Import List.
 
-Require Import sflib.
+From sflib Require Import sflib.
 From Paco Require Import paco.
 
-Require Import Basic.
-Require Import DenseOrder.
+From PromisingLib Require Import Basic.
+From PromisingLib Require Import DenseOrder.
 Require Import Event.
 Require Import Language.
 Require Import Time.
