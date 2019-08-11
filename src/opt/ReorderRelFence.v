@@ -1,11 +1,10 @@
-From PromisingLib Require Import Axioms.
-Require Import Basics.
 Require Import Bool.
 Require Import List.
 
 From sflib Require Import sflib.
 From Paco Require Import paco.
 
+From PromisingLib Require Import Axioms.
 From PromisingLib Require Import Basic.
 From PromisingLib Require Import Loc.
 
