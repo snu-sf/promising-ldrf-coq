@@ -1,4 +1,4 @@
-COQMODULE    := promising
+COQMODULE    := Promising2
 COQTHEORIES  :=	src/lang/*.v \
 	src/while/*.v \
 	src/prop/*.v \
