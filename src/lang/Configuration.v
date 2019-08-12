@@ -53,11 +53,14 @@ Module Threads.
   Proof.
     econs.
     - i. unfold init in *. rewrite IdentMap.Facts.map_o in *.
-      destruct (@UsualFMapPositive.UsualPositiveMap'.find (@sigT (Language.t ProgramEvent.t) (@Language.syntax ProgramEvent.t)) tid1 syn); inv TH1.
-      destruct (@UsualFMapPositive.UsualPositiveMap'.find (@sigT (Language.t ProgramEvent.t) (@Language.syntax ProgramEvent.t)) tid2 syn); inv TH2.
+      destruct (@UsualFMapPositive.UsualPositiveMap'.find
+                  (@sigT _ (@Language.syntax ProgramEvent.t)) tid1 syn); inv TH1.
+      destruct (@UsualFMapPositive.UsualPositiveMap'.find
+                  (@sigT _ (@Language.syntax ProgramEvent.t)) tid2 syn); inv TH2.
       econs. ss. econs. i. rewrite Memory.bot_get in *. congr.
     - i. unfold init in *. rewrite IdentMap.Facts.map_o in *.
-      destruct (@UsualFMapPositive.UsualPositiveMap'.find (@sigT (Language.t ProgramEvent.t) (@Language.syntax ProgramEvent.t)) tid syn); inv TH.
+      destruct (@UsualFMapPositive.UsualPositiveMap'.find
+                  (@sigT _ (@Language.syntax ProgramEvent.t)) tid syn); inv TH.
       econs; ss.
       + apply TView.bot_wf.
       + apply TView.bot_closed.

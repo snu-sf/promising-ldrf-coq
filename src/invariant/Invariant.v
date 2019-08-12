@@ -449,7 +449,8 @@ Section Invariant.
     - ii. unfold Configuration.init in FIND. ss.
       unfold Threads.init in FIND. rewrite IdentMap.Facts.map_o in FIND.
       Set Printing All.
-      destruct (@UsualFMapPositive.UsualPositiveMap'.find (@sigT (Language.t ProgramEvent.t) (@Language.syntax ProgramEvent.t)) tid program) eqn:X; inv FIND.
+      destruct (@UsualFMapPositive.UsualPositiveMap'.find
+                  (@sigT _ (@Language.syntax ProgramEvent.t)) tid program) eqn:X; inv FIND.
       apply inj_pair2 in H1. subst. destruct s. ss.
       eapply TH; eauto.
     - ii. cut (x0 = FLocFun.init 0); [by i; subst|].
