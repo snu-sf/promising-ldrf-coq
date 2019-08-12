@@ -21,6 +21,3 @@ depends: [
   "coq-paco" { (= "2.0.3") }
   "coq-promising-lib" { (= "dev") }
 ]
-url {
-  git: "https://github.com/snu-sf/promising-coq-private.git#imm"
-}
