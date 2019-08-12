@@ -40,60 +40,80 @@ Definition MemoryProp :=
   forall (assign: FLocFun.t Const.t),
     Prop.
 
+
+Module Logic.
+  Section Logic.
+    Variable
+      (S: ThreadsProp)
+      (J: MemoryProp)
+      (program: IdentMap.t {lang:language & lang.(Language.syntax)}).
+
+    Structure t: Type := mk {
+      INIT:
+        <<ST_INIT:
+          forall tid lang syn
+            (FIND: IdentMap.find tid program = Some (existT _ lang syn)),
+            S tid lang (lang.(Language.init) syn)>> /\
+        <<ASSIGN_INIT: J (FLocFun.init 0)>>;
+      SILENT:
+        forall tid lang st1 st2
+          (ST1: S tid lang st1)
+          (STEP: lang.(Language.step) ProgramEvent.silent st1 st2),
+          S tid lang st2;
+      READ:
+        forall tid lang st1 st2
+          loc val ord
+          assign
+          (ST1: S tid lang st1)
+          (ASSIGN1: J assign /\ FLocFun.find loc assign = val)
+          (STEP: lang.(Language.step) (ProgramEvent.read loc val ord) st1 st2),
+          S tid lang st2;
+      WRITE:
+        forall tid lang st1 st2
+          loc val ord
+          (ST1: S tid lang st1)
+          (STEP: lang.(Language.step) (ProgramEvent.write loc val ord) st1 st2),
+          <<ST2: S tid lang st2>> /\
+          <<ASSIGN2: forall assign, J assign -> J (FLocFun.add loc val assign)>>;
+      UPDATE:
+        forall tid lang st1 st2
+          loc valr valw ordr ordw
+          assign
+          (ST1: S tid lang st1)
+          (ASSIGN1: J assign /\ FLocFun.find loc assign = valr)
+          (STEP: lang.(Language.step) (ProgramEvent.update loc valr valw ordr ordw) st1 st2),
+          <<ST2: S tid lang st2>> /\
+          <<ASSIGN2: forall assign, J assign -> J (FLocFun.add loc valw assign)>>;
+      FENCE:
+        forall tid lang st1 st2
+          ordr ordw
+          (ST1: S tid lang st1)
+          (STEP: lang.(Language.step) (ProgramEvent.fence ordr ordw) st1 st2),
+          S tid lang st2;
+      SYSCALL:
+        forall tid lang st1 st2
+          e
+          (ST1: S tid lang st1)
+          (STEP: lang.(Language.step) (ProgramEvent.syscall e) st1 st2),
+          S tid lang st2;
+      ABORT:
+        forall tid lang st1 st2
+          (ST1: S tid lang st1)
+          (STEP: lang.(Language.step) ProgramEvent.abort st1 st2),
+          <<ST2: forall tid lang st, S tid lang st>> /\
+          <<ASSIGN2: forall assign, J assign>>;
+    }.
+  End Logic.
+End Logic.
+
+
 Section Invariant.
   Variable
     (S:ThreadsProp)
-    (J:MemoryProp).
+    (J:MemoryProp)
+    (program: IdentMap.t {lang:language & lang.(Language.syntax)}).
 
-  Hypothesis
-    (SILENT:
-       forall tid lang st1 st2
-         (ST1: S tid lang st1)
-         (STEP: lang.(Language.step) ProgramEvent.silent st1 st2),
-         S tid lang st2)
-    (READ:
-       forall tid lang st1 st2
-         loc val ord
-         assign
-         (ST1: S tid lang st1)
-         (ASSIGN1: J assign /\ FLocFun.find loc assign = val)
-         (STEP: lang.(Language.step) (ProgramEvent.read loc val ord) st1 st2),
-         S tid lang st2)
-    (WRITE:
-       forall tid lang st1 st2
-         loc val ord
-         (ST1: S tid lang st1)
-         (STEP: lang.(Language.step) (ProgramEvent.write loc val ord) st1 st2),
-         <<ST2: S tid lang st2>> /\
-         <<ASSIGN2: forall assign, J assign -> J (FLocFun.add loc val assign)>>)
-    (UPDATE:
-       forall tid lang st1 st2
-         loc valr valw ordr ordw
-         assign
-         (ST1: S tid lang st1)
-         (ASSIGN1: J assign /\ FLocFun.find loc assign = valr)
-         (STEP: lang.(Language.step) (ProgramEvent.update loc valr valw ordr ordw) st1 st2),
-         <<ST2: S tid lang st2>> /\
-         <<ASSIGN2: forall assign, J assign -> J (FLocFun.add loc valw assign)>>)
-    (FENCE:
-       forall tid lang st1 st2
-         ordr ordw
-         (ST1: S tid lang st1)
-         (STEP: lang.(Language.step) (ProgramEvent.fence ordr ordw) st1 st2),
-         S tid lang st2)
-    (SYSCALL:
-       forall tid lang st1 st2
-         e
-         (ST1: S tid lang st1)
-         (STEP: lang.(Language.step) (ProgramEvent.syscall e) st1 st2),
-         S tid lang st2)
-    (ABORT:
-       forall tid lang st1 st2
-         (ST1: S tid lang st1)
-         (STEP: lang.(Language.step) ProgramEvent.abort st1 st2),
-         <<ST2: forall tid lang st, S tid lang st>> /\
-         <<ASSIGN2: forall assign, J assign>>)
-  .
+  Context `{LOGIC: Logic.t S J program}.
 
   Definition sem_threads (ths:Threads.t): Prop :=
     forall tid lang st lc
@@ -152,7 +172,7 @@ Section Invariant.
     - ii. rewrite FLocFun.add_spec. condtac.
       { specialize (INHABITED loc0). esplits; eauto. }
       specialize (SEM loc0). des. revert SEM.
-      inv STEP. inv WRITE0. inv PROMISE.
+      inv STEP. inv WRITE. inv PROMISE.
       + erewrite Memory.add_o; eauto. condtac; ss.
         * i. des. inv SEM. congr.
         * i. esplits; eauto.
@@ -175,7 +195,7 @@ Section Invariant.
     memory_assign mem1 assign.
   Proof.
     ii. specialize (SEM loc0). des. revert SEM.
-    inv STEP. inv WRITE0. inv PROMISE.
+    inv STEP. inv WRITE. inv PROMISE.
     - erewrite Memory.add_o; eauto. condtac; ss.
       + i. des. inv SEM. congr.
       + i. esplits; eauto.
@@ -213,7 +233,7 @@ Section Invariant.
     <<TH2: S tid lang st2>> /\
     <<MEM2: sem_memory mem2>>.
   Proof.
-    inv STEP. inv LOCAL.
+    inv LOGIC. inv STEP. inv LOCAL.
     - esplits; eauto.
     - exploit sem_memory_read_step; eauto. i. des.
       exploit READ; eauto.
@@ -328,7 +348,7 @@ Section Invariant.
     exploit CONSISTENT; eauto. i. des.
     - unfold Thread.steps_abort in *. des.
       exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
-      inv ABORT1; try by inv STEP.
+      inv ABORT0; try by inv STEP.
       exploit PFStepCap.thread_rtc_tau_step; eauto.
       { inv STEP. inv LOCAL. inv LOCAL0. ss. }
       i. des.
@@ -336,7 +356,7 @@ Section Invariant.
       { inv STEP. inv LOCAL. inv LOCAL0. ss. }
       i. des.
       exploit thread_rtc_pf_step_sem; try exact STEPS_SRC; eauto. i. des.
-      inv STEP_SRC. inv STEP0.
+      inv STEP_SRC. inv STEP0. inv LOGIC.
       exploit ABORT; try exact STATE; eauto. i. des.
       ii. eauto.
     - exploit Thread.rtc_tau_step_future; eauto. s. i. des.
@@ -378,7 +398,8 @@ Section Invariant.
     exploit thread_rtc_step_sem; try exact STEPS_SRC; eauto.
     { inv SIM. ss. rewrite STATE. eauto. }
     i. des.
-    inv STEP_SRC. ss. exploit ABORT; try exact STATE; eauto. i. des.
+    inv STEP_SRC. inv LOGIC. ss.
+    exploit ABORT; try exact STATE; eauto. i. des.
     econs; ss; ii; eauto.
   Qed.
 
@@ -437,21 +458,15 @@ Section Invariant.
       (STEP: Configuration.step e tid c1 c2)
   .
 
-  Lemma init_sem
-        program
-        (TH: forall tid lang syn
-               (FIND: IdentMap.find tid program = Some (existT _ lang syn)),
-            S tid lang (lang.(Language.init) syn))
-        (MEM: J (FLocFun.init 0)):
-    sem (Configuration.init program).
+  Lemma init_sem: sem (Configuration.init program).
   Proof.
-    econs.
+    inv LOGIC. des. econs.
     - ii. unfold Configuration.init in FIND. ss.
       unfold Threads.init in FIND. rewrite IdentMap.Facts.map_o in FIND.
       destruct (@UsualFMapPositive.UsualPositiveMap'.find
                   (@sigT _ (@Language.syntax ProgramEvent.t)) tid program) eqn:X; inv FIND.
       apply inj_pair2 in H1. subst. destruct s. ss.
-      eapply TH; eauto.
+      eapply ST_INIT; eauto.
     - ii. cut (x0 = FLocFun.init 0); [by i; subst|].
       apply FLocFun.ext. i. rewrite FLocFun.init_spec.
       specialize (PR i). des. ss.
@@ -460,11 +475,7 @@ Section Invariant.
   Qed.
 
   Lemma sound
-        program c
-        (TH: forall tid lang syn
-               (FIND: IdentMap.find tid program = Some (existT _ lang syn)),
-            S tid lang (lang.(Language.init) syn))
-        (MEM: J (FLocFun.init 0))
+        c
         (STEPS: rtc Configuration_step_evt (Configuration.init program) c):
     sem c.
   Proof.
