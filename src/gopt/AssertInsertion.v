@@ -9,10 +9,10 @@ From PromisingLib Require Import Basic.
 From PromisingLib Require Import DataStructure.
 From PromisingLib Require Import DenseOrder.
 From PromisingLib Require Import Loc.
+From PromisingLib Require Import Language.
 
 Require Import Event.
 Require Import Time.
-From PromisingLib Require Import Language.
 Require Import View.
 Require Import Cell.
 Require Import Memory.
@@ -25,6 +25,8 @@ Require Import Syntax.
 Require Import Semantics.
 
 Require Import Invariant.
+
+Require Import GSimulation.
 
 Set Implicit Arguments.
 
@@ -91,11 +93,10 @@ Section AssertInsertion.
   .
   Hint Constructors sim_thread.
 
-  Inductive sim (c_src c_tgt: Configuration.t): Prop :=
-  | sim_intro
-      tids
-      (TIDS_SRC: Threads.tids c_src.(Configuration.threads) = tids)
-      (TIDS_TGT: Threads.tids c_src.(Configuration.threads) = tids)
+  Inductive sim_conf (c_src c_tgt: Configuration.t): Prop :=
+  | sim_conf_intro
+      (SEM: sem S J c_src)
+      (TIDS: Threads.tids c_src.(Configuration.threads) = Threads.tids c_src.(Configuration.threads))
       (FIND_SRC: forall tid l st_src lc_src
                    (FIND: IdentMap.find tid c_src.(Configuration.threads) = Some (existT _ l st_src, lc_src)),
           l = lang)
@@ -110,7 +111,7 @@ Section AssertInsertion.
       (SC: c_src.(Configuration.sc) = c_tgt.(Configuration.sc))
       (MEMORY: c_src.(Configuration.memory) = c_tgt.(Configuration.memory))
   .
-  Hint Constructors sim.
+  Hint Constructors sim_conf.
 
 
   (* lemmas on simulation relations *)
@@ -142,10 +143,10 @@ Section AssertInsertion.
         destruct (IdentMap.find tid ths_tgt); ss.
   Qed.
 
-  Lemma sim_sim_thread
+  Lemma sim_conf_sim_thread
         c_src c_tgt
         tid st_src lc_src st_tgt lc_tgt
-        (SIM: sim c_src c_tgt)
+        (SIM: sim_conf c_src c_tgt)
         (FIND_SRC: IdentMap.find tid c_src.(Configuration.threads) = Some (existT _ lang st_src, lc_src))
         (FIND_TGT: IdentMap.find tid c_tgt.(Configuration.threads) = Some (existT _ lang st_tgt, lc_tgt)):
     sim_thread tid
@@ -155,4 +156,17 @@ Section AssertInsertion.
     inv SIM. exploit THREADS; eauto. i. des.
     econs; eauto.
   Qed.
+
+
+  Theorem sim_conf_sim
+          c_src c_tgt
+          (SIM: sim_conf c_src c_tgt):
+    sim c_src c_tgt.
+  Proof.
+    revert c_src c_tgt SIM.
+    pcofix CIH. i. pfold. econs; i.
+    { admit.
+    }
+    admit.
+  Admitted.
 End AssertInsertion.
