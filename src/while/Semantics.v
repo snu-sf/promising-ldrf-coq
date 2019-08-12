@@ -322,7 +322,7 @@ Module State.
   .
 End State.
 
-Program Definition lang :=
+Program Definition lang: Language.t ProgramEvent.t :=
   Language.mk
     State.init
     State.is_terminal
