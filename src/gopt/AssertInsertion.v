@@ -96,11 +96,11 @@ Section AssertInsertion.
   Inductive sim_conf (c_src c_tgt: Configuration.t): Prop :=
   | sim_conf_intro
       (SEM: sem S J c_src)
-      (TIDS: Threads.tids c_src.(Configuration.threads) = Threads.tids c_src.(Configuration.threads))
+      (TIDS: Threads.tids c_src.(Configuration.threads) = Threads.tids c_tgt.(Configuration.threads))
       (FIND_SRC: forall tid l st_src lc_src
                    (FIND: IdentMap.find tid c_src.(Configuration.threads) = Some (existT _ l st_src, lc_src)),
           l = lang)
-      (FIND_SRC: forall tid l st_tgt lc_tgt
+      (FIND_TGT: forall tid l st_tgt lc_tgt
                    (FIND: IdentMap.find tid c_tgt.(Configuration.threads) = Some (existT _ l st_tgt, lc_tgt)),
           l = lang)
       (THREADS: forall tid st_src lc_src st_tgt lc_tgt
@@ -117,30 +117,38 @@ Section AssertInsertion.
   (* lemmas on simulation relations *)
 
   Lemma tids_find
-        tids ths_src ths_tgt
-        tid
-        (TIDS_SRC: tids = Threads.tids ths_src)
-        (TIDS_TGT: tids = Threads.tids ths_tgt):
+        ths_src ths_tgt tid
+        (TIDS: Threads.tids ths_src = Threads.tids ths_tgt):
     (exists lang_src st_src lc_src, IdentMap.find tid ths_src = Some (existT _ lang_src st_src, lc_src)) <->
     (exists lang_tgt st_tgt lc_tgt, IdentMap.find tid ths_tgt = Some (existT _ lang_tgt st_tgt, lc_tgt)).
   Proof.
     split; i; des.
-    - destruct (IdentSet.mem tid tids) eqn:MEM.
-      + rewrite TIDS_TGT in MEM.
+    - destruct (IdentSet.mem tid (Threads.tids ths_src)) eqn:MEM.
+      + rewrite TIDS in MEM.
         rewrite Threads.tids_o in MEM.
         destruct (IdentMap.find tid ths_tgt); ss.
         destruct p. destruct s. esplits; eauto.
-      + rewrite TIDS_SRC in MEM.
-        rewrite Threads.tids_o in MEM.
+      + rewrite Threads.tids_o in MEM.
         destruct (IdentMap.find tid ths_src); ss.
-    - destruct (IdentSet.mem tid tids) eqn:MEM.
-      + rewrite TIDS_SRC in MEM.
+    - destruct (IdentSet.mem tid (Threads.tids ths_tgt)) eqn:MEM.
+      + rewrite <- TIDS in MEM.
         rewrite Threads.tids_o in MEM.
         destruct (IdentMap.find tid ths_src); ss.
         destruct p. destruct s. esplits; eauto.
-      + rewrite TIDS_TGT in MEM.
-        rewrite Threads.tids_o in MEM.
+      + rewrite Threads.tids_o in MEM.
         destruct (IdentMap.find tid ths_tgt); ss.
+  Qed.
+
+  Lemma sim_conf_find
+        c_src c_tgt tid
+        (SIM: sim_conf c_src c_tgt):
+    (exists lang_src st_src lc_src,
+        IdentMap.find tid c_src.(Configuration.threads) = Some (existT _ lang_src st_src, lc_src)) <->
+    (exists lang_tgt st_tgt lc_tgt,
+        IdentMap.find tid c_tgt.(Configuration.threads) = Some (existT _ lang_tgt st_tgt, lc_tgt)).
+  Proof.
+    inv SIM. destruct c_src, c_tgt. ss.
+    eapply tids_find; eauto.
   Qed.
 
   Lemma sim_conf_sim_thread
@@ -164,9 +172,58 @@ Section AssertInsertion.
     sim c_src c_tgt.
   Proof.
     revert c_src c_tgt SIM.
-    pcofix CIH. i. pfold. econs; i.
-    { admit.
+    pcofix CIH. i. pfold. econs; ii.
+    { (* terminal *)
+      exploit sim_conf_find; eauto. i. des.
+      exploit x0; eauto. i. des.
+      inv SIM. ss.
+      exploit FIND_SRC; eauto. i. subst.
+      exploit FIND_TGT; eauto. i. subst.
+      exploit THREADS; eauto. i. des. subst.
+      exploit TERMINAL_TGT; eauto. i. des.
+      split; auto.
+      destruct st, st_tgt; ss. inv STATE0. ss. subst.
+      inv STATE. inv STMTS. ss.
     }
-    admit.
+    inv STEP_TGT.
+    { (* abort step *)
+      exploit sim_conf_find; eauto. i. des.
+      exploit x1; eauto. i. des. clear x0 x1.
+      destruct c_src as [ths1_src sc1_src mem1_src].
+      destruct c_tgt as [ths1_tgt sc1 mem1].
+      dup SIM. inv SIM0. ss. subst.
+      exploit FIND_SRC; eauto. i. subst.
+      exploit FIND_TGT; eauto. i. subst.
+      clear FIND_SRC FIND_TGT THREADS.
+      exploit sim_conf_sim_thread; eauto. s. intro SIM_TH.
+      admit.
+    }
+    (* normal step *)
+    exploit sim_conf_find; eauto. i. des.
+    exploit x1; eauto. i. des. clear x0 x1.
+    destruct c_src as [ths1_src sc1_src mem1_src].
+    destruct c_tgt as [ths1_tgt sc1 mem1].
+    dup SIM. inv SIM0. ss. subst.
+    exploit FIND_SRC; eauto. i. subst.
+    exploit FIND_TGT; eauto. i. subst.
+    clear FIND_SRC FIND_TGT THREADS.
+    exploit sim_conf_sim_thread; eauto. s. intro SIM_TH.
+    dup WF_TGT. inv WF_TGT0. inv WF. ss.
+    exploit THREADS; try eauto. s. intro WF.
+    clear DISJOINT. clear THREADS.
+    exploit Thread.rtc_tau_step_future; eauto. s. i. des.
+    exploit Thread.step_future; eauto. s. i. des.
+    exploit Memory.cap_exists; try exact CLOSED0. i. des.
+    exploit Memory.cap_closed; eauto. intro CLOSED_CAP.
+    exploit Local.cap_wf; try exact WF0; eauto. intro WF_CAP.
+    exploit Memory.max_full_timemap_exists; try apply CLOSED_CAP. i. des.
+    hexploit Memory.max_full_timemap_closed; try exact x1; eauto. intro SC_MAX.
+    exploit CONSISTENT; eauto. s. i. des.
+    { (* normal certification *)
+      admit.
+    }
+    { (* abort certification *)
+      admit.
+    }
   Admitted.
 End AssertInsertion.
