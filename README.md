@@ -1,12 +1,3 @@
-# promising-coq-private
-
-```
-opam repo add coq-released https://coq.inria.fr/opam/released
-opam install coq-paco.2.0.3
-git submodule update --init --recursive
-make -j build
-```
-
 # A Promising Semantics for Relaxed-Memory Concurrency
 
 Please visit the [project website](http://sf.snu.ac.kr/promise-concurrency/) for more information.
