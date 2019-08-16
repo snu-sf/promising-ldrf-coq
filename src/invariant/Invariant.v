@@ -258,7 +258,7 @@ Section Invariant.
       esplits; eauto.
   Qed.
 
-  Lemma thread_rtc_step_sem
+  Lemma thread_rtc_all_step_sem
         tid lang
         th1 th2
         (TH1: S tid lang th1.(Thread.state))
@@ -273,7 +273,25 @@ Section Invariant.
     destruct x, y. ss.
     exploit thread_step_sem; eauto. i. des.
     eapply IHSTEP; eauto.
-    hexploit Thread.program_step_inhabited; try exact USTEP; eauto.
+    hexploit Thread.program_step_inhabited; eauto.
+  Qed.
+
+  Lemma thread_rtc_tau_step_sem
+        tid lang
+        th1 th2
+        (TH1: S tid lang th1.(Thread.state))
+        (MEM1: sem_memory th1.(Thread.memory))
+        (INHABITED1: Memory.inhabited th1.(Thread.memory))
+        (STEP: rtc (tau (@Thread.program_step lang)) th1 th2):
+    <<TH2: S tid lang th2.(Thread.state)>> /\
+    <<MEM2: sem_memory th2.(Thread.memory)>>.
+  Proof.
+    move STEP after TH1. revert_until STEP. induction STEP; ss.
+    i. inv H.
+    destruct x, y. ss.
+    exploit thread_step_sem; eauto. i. des.
+    eapply IHSTEP; eauto.
+    hexploit Thread.program_step_inhabited; eauto.
   Qed.
 
   Lemma thread_pf_step_sem
@@ -395,7 +413,7 @@ Section Invariant.
     exploit PFStep.thread_program_step; try exact SIM2; try eapply STEP; eauto.
     { inv STEP. inv LOCAL. inv LOCAL0. ss. }
     i. des.
-    exploit thread_rtc_step_sem; try exact STEPS_SRC; eauto.
+    exploit thread_rtc_tau_step_sem; try exact STEPS_SRC; eauto.
     { inv SIM. ss. rewrite STATE. eauto. }
     i. des.
     inv STEP_SRC. inv LOGIC. ss.
@@ -428,7 +446,7 @@ Section Invariant.
     exploit PFStep.thread_rtc_all_step; try exact SIM; try eapply STEPS; eauto.
     { eapply consistent_promise_consistent; eauto. }
     i. des.
-    exploit thread_rtc_step_sem; try exact STEPS_SRC; eauto.
+    exploit thread_rtc_all_step_sem; try exact STEPS_SRC; eauto.
     { inv SIM. ss. rewrite STATE. eauto. }
     i. des.
     econs; s.

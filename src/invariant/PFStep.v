@@ -415,12 +415,21 @@ Module PFStep.
         (STEPS_TGT: rtc (@Thread.tau_step lang) e1_tgt e2_tgt)
         (CONS: Local.promise_consistent e2_tgt.(Thread.local)):
     exists e2_src,
-      <<STEPS_SRC: rtc (union (@Thread.program_step lang)) e1_src e2_src>> /\
+      <<STEPS_SRC: rtc (tau (@Thread.program_step lang)) e1_src e2_src>> /\
       <<SIM2: sim_thread e2_src e2_tgt>>.
   Proof.
-    eapply thread_rtc_all_step; eauto.
-    eapply rtc_implies; [|eauto].
-    apply tau_union.
+    revert e1_src SIM1.
+    induction STEPS_TGT; eauto; i.
+    inv H. inv TSTEP.
+    exploit Thread.step_future; eauto. i. des.
+    inv STEP.
+    - exploit thread_promise_step; eauto.
+    - exploit thread_program_step; eauto.
+      { eapply rtc_tau_step_promise_consistent; eauto. }
+      i. des.
+      exploit IHSTEPS_TGT; try exact SIM2; eauto. i. des.
+      esplits; try exact SIM0.
+      econs 2; eauto.
   Qed.
 
 
