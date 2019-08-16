@@ -211,36 +211,31 @@ Lemma updates_list_exists
       (BOT: th0.(Thread.local).(Local.promises) = Memory.bot)
       (STEPS: rtc (tau (@pred_step (P /1\ no_promise) lang)) th0 th1)
   :
-    exists (updates: Loc.t -> Time.t -> Prop),
+    exists (updates: Loc.t -> Prop),
       (<<COMPLETE:
-         rtc (tau (@pred_step (P /1\ no_update_on (fun loc ts => promised th0.(Thread.memory) loc ts /\ ~ updates loc ts)
+         rtc (tau (@pred_step (P /1\ no_update_on (fun loc ts => Memory.max_ts loc th0.(Thread.memory) = ts /\ ~ updates loc)
                                  /1\ no_promise) lang)) th0 th1>>) /\
       (<<SOUND:
-         forall loc ts (SAT: updates loc ts),
+         forall loc (SAT: updates loc),
          exists th' th'' to valr valw releasedr releasedw ordr ordw,
-           (<<STEPS: rtc (tau (@pred_step (P /1\ no_update_on (fun loc ts => promised th0.(Thread.memory) loc ts /\ ~ updates loc ts)
+           (<<STEPS: rtc (tau (@pred_step (P /1\ no_update_on (fun loc ts => Memory.max_ts loc th0.(Thread.memory) = ts /\ ~ updates loc)
                                              /1\ no_promise) lang)) th0 th'>>) /\
            (<<STEP: (@pred_step (P /1\ no_promise) lang)
-                      (ThreadEvent.update loc ts to valr valw releasedr releasedw ordr ordw)
-                      th' th''>>)>>) /\
-
-      (<<NOATTATCHED: not_attatched updates th0.(Thread.memory)>>)
+                      (ThreadEvent.update loc (Memory.max_ts loc th0.(Thread.memory)) to valr valw releasedr releasedw ordr ordw)
+                      th' th''>>)>>)
 .
 Proof.
   eapply Operators_Properties.clos_rt_rt1n_iff in STEPS.
   eapply Operators_Properties.clos_rt_rtn1_iff in STEPS.
   induction STEPS.
-  - exists (fun _ _ => False). esplits; eauto.
-    + i. clarify.
-    + ii. clarify.
+  - exists (fun _ => False). esplits; eauto. i. clarify.
   - des. inv H.
-    destruct (classic (no_update_on (fun loc ts => promised th0.(Thread.memory) loc ts /\ ~ updates loc ts) e)).
+    destruct (classic (no_update_on (fun loc ts => Memory.max_ts loc th0.(Thread.memory) = ts /\ ~ updates loc) e)).
     + exists updates. esplits; eauto.
       eapply rtc_n1; eauto. econs; eauto. inv TSTEP. econs; eauto. des. esplits; eauto.
     + unfold no_update_on in H. des_ifs. apply NNPP in H.
-      exists (fun l t => (l = loc /\ t = tsr) \/ updates l t).
+      exists (fun l => l = loc \/ updates l).
       esplits; eauto.
-
       * eapply rtc_n1.
         { eapply pred_step_rtc_mon; eauto. i. ss. des. esplits; eauto.
           eapply no_update_on_mon; eauto. i. ss. des; eauto. }
@@ -254,12 +249,170 @@ Proof.
           exists th', th''. esplits; eauto.
           eapply pred_step_rtc_mon; eauto. i. ss. des. esplits; eauto.
           eapply no_update_on_mon; eauto. i. ss. des; eauto. }
-      * eapply not_attatched_sum; eauto.
-        eapply attatched_preserve_rtc; try apply COMPLETE; eauto.
-        { eapply update_not_attatched; eauto.
-          eapply promise_bot_no_promise_rtc; try apply COMPLETE; eauto. }
-        { i. des. clarify. }
 Qed.
+
+
+(* Lemma updates_list_exists *)
+(*       P lang th0 th1 *)
+(*       (BOT: th0.(Thread.local).(Local.promises) = Memory.bot) *)
+(*       (STEPS: rtc (tau (@pred_step (P /1\ no_promise) lang)) th0 th1) *)
+(*   : *)
+(*     exists (updates: Loc.t -> Time.t -> Prop), *)
+(*       (<<COMPLETE: *)
+(*          rtc (tau (@pred_step (P /1\ no_update_on (fun loc ts => promised th0.(Thread.memory) loc ts /\ ~ updates loc ts) *)
+(*                                  /1\ no_promise) lang)) th0 th1>>) /\ *)
+(*       (<<SOUND: *)
+(*          forall loc ts (SAT: updates loc ts), *)
+(*          exists th' th'' to valr valw releasedr releasedw ordr ordw, *)
+(*            (<<STEPS: rtc (tau (@pred_step (P /1\ no_update_on (fun loc ts => promised th0.(Thread.memory) loc ts /\ ~ updates loc ts) *)
+(*                                              /1\ no_promise) lang)) th0 th'>>) /\ *)
+(*            (<<STEP: (@pred_step (P /1\ no_promise) lang) *)
+(*                       (ThreadEvent.update loc ts to valr valw releasedr releasedw ordr ordw) *)
+(*                       th' th''>>)>>) /\ *)
+
+(*       (<<NOATTATCHED: not_attatched updates th0.(Thread.memory)>>) *)
+(* . *)
+(* Proof. *)
+(*   eapply Operators_Properties.clos_rt_rt1n_iff in STEPS. *)
+(*   eapply Operators_Properties.clos_rt_rtn1_iff in STEPS. *)
+(*   induction STEPS. *)
+(*   - exists (fun _ _ => False). esplits; eauto. *)
+(*     + i. clarify. *)
+(*     + ii. clarify. *)
+(*   - des. inv H. *)
+(*     destruct (classic (no_update_on (fun loc ts => promised th0.(Thread.memory) loc ts /\ ~ updates loc ts) e)). *)
+(*     + exists updates. esplits; eauto. *)
+(*       eapply rtc_n1; eauto. econs; eauto. inv TSTEP. econs; eauto. des. esplits; eauto. *)
+(*     + unfold no_update_on in H. des_ifs. apply NNPP in H. *)
+(*       exists (fun l t => (l = loc /\ t = tsr) \/ updates l t). *)
+(*       esplits; eauto. *)
+
+(*       * eapply rtc_n1. *)
+(*         { eapply pred_step_rtc_mon; eauto. i. ss. des. esplits; eauto. *)
+(*           eapply no_update_on_mon; eauto. i. ss. des; eauto. } *)
+(*         { econs; eauto. inv TSTEP. econs; eauto. *)
+(*           des. esplits; eauto. ss. ii. des. eauto. } *)
+(*       * i. des. *)
+(*         { clarify. exists y, z. esplits; eauto. *)
+(*           eapply pred_step_rtc_mon; eauto. i. ss. des. esplits; eauto. *)
+(*           eapply no_update_on_mon; eauto. i. ss. des; eauto. } *)
+(*         { exploit SOUND; eauto. i. des. *)
+(*           exists th', th''. esplits; eauto. *)
+(*           eapply pred_step_rtc_mon; eauto. i. ss. des. esplits; eauto. *)
+(*           eapply no_update_on_mon; eauto. i. ss. des; eauto. } *)
+(*       * eapply not_attatched_sum; eauto. *)
+(*         eapply attatched_preserve_rtc; try apply COMPLETE; eauto. *)
+(*         { eapply update_not_attatched; eauto. *)
+(*           eapply promise_bot_no_promise_rtc; try apply COMPLETE; eauto. } *)
+(*         { i. des. clarify. } *)
+(* Qed. *)
+
+
+
+Inductive shifted_map mlast mcert
+          (updates: Loc.t -> Prop)
+          (sky gap: TimeMap.t)
+          (f: Loc.t -> Time.t -> Time.t): Prop :=
+| shifted_map_intro
+    (PRSV: map_preserving (times_in_memory mcert) f)
+    (SAME: forall l t (TLE: Time.le t (Memory.max_ts l mlast)),
+        f l t = t)
+    (INGAP: forall l t (TLT: Time.lt (Memory.max_ts l mcert) t),
+        Time.lt (f l t) (gap l))
+    (AFTERSKY: forall l t (TLT: Time.lt (Memory.max_ts l mcert) t),
+        Time.lt (sky l) (f l t))
+.
+
+Lemma shifted_map_exists mlast mcert updates
+      (MLE: Memory.le mlast mcert)
+      (sky gap: TimeMap.t)
+      (SKY: forall l, Time.lt (Memory.max_ts l mlast) (sky l))
+      (GAP: forall l, Time.lt (Memory.max_ts l mlast) (gap l))
+  :
+    exists f, (<<SHIFTED: shifted_map mlast mcert updates sky gap f>>).
+Proof.
+  (* may be very hard... *)
+Admitted.
+
+Lemma shifted_map_preserving_last_mem  mlast mcert updates sky gap f
+      (CLOSED: Memory.closed mlast)
+      (SHIFTED: shifted_map mlast mcert updates sky gap f)
+  :
+    memory_map f mlast mlast.
+Proof.
+  inv SHIFTED. inv PRSV. econs; i.
+  - exploit Memory.max_ts_spec; eauto. i. des.
+    repeat erewrite SAME; eauto.
+    + rewrite GET. unfold msg_map. des_ifs. repeat f_equal.
+      inv CLOSED. exploit CLOSED0; try apply GET; eauto. i. des.
+      inv MSG_CLOSED. inv CLOSED; ss. f_equal.
+      destruct view. inv CLOSED1. unfold view_map, timemap_map. ss. f_equal.
+      * extensionality l. erewrite SAME; auto.
+        specialize (PLN l). des.
+        exploit Memory.max_ts_spec; eauto. i. des. auto.
+      * extensionality l. erewrite SAME; auto.
+        specialize (RLX l). des.
+        exploit Memory.max_ts_spec; eauto. i. des. auto.
+    + exploit Memory.get_ts; try apply GET; eauto. i. des.
+      * clarify.
+      * left. eapply TimeFacts.lt_le_lt; eauto.
+  - destruct msg_src as [from msg]. exploit Memory.max_ts_spec; eauto. i. des.
+    esplits.
+    + erewrite SAME; eauto.
+    + eauto.
+Qed.
+
+Definition cap (m mcap: Memory.t) (l: Loc.t) (t: Time.t): Prop :=
+  (<<NINMEM: ~ promised m l t>>) /\ (<<INCAPPED: promised mcap l t>>).
+
+Definition no_acq_read_msgs (MSGS : Loc.t -> Time.t -> Prop)
+           (e : ThreadEvent.t) : Prop :=
+  match e with
+  | ThreadEvent.read loc to _ _ ordr => ~ (MSGS loc to) \/ Ordering.le ordr Ordering.relaxed
+  | ThreadEvent.update loc from _ _ _ _ _ ordr _ => ~ (MSGS loc from) \/ Ordering.le ordr Ordering.relaxed
+  | _ => True
+  end.
+
+Lemma consistent_no_sc_no_acq lang (th: Thread.t lang)
+      (CONSISTENT: Thread.consistent th)
+      mem1 sc1
+      (CAP: Memory.cap th.(Thread.local).(Local.promises) th.(Thread.memory) mem1)
+      (SC_MAX: Memory.max_full_timemap mem1 sc1)
+  :
+    exists th',
+      (<<STEPS: rtc (tau (@pred_step (no_sc /1\ no_acq_read_msgs (cap th.(Thread.memory) mem1)) lang)) th th'>>) /\
+      (<<CONSISTENT: promise_consistent th'.(Thread.local)>>) /\
+      (<<PROMISES: forall l t (PROM: promised th.(Thread.local).(Local.promises) l t),
+          ~ promised th'.(Thread.local).(Local.promises) l t>>).
+Proof.
+Admitted.
+
+Lemma consistent_no_sc_no_acq lang (th: Thread.t lang)
+      (CONSISTENT: Thread.consistent th)
+      mem1 sc1
+      (CAP: Memory.cap th.(Thread.local).(Local.promises) th.(Thread.memory) mem1)
+      (SC_MAX: Memory.max_full_timemap mem1 sc1)
+  :
+    exists th',
+      (<<STEPS: rtc (tau (@pred_step (no_sc /1\ no_acq_read_msgs (cap th.(Thread.memory) mem1)) lang)) th th'>>) /\
+      (<<CONSISTENT: promise_consistent th'.(Thread.local)>>) /\
+      (<<PROMISES: forall l t (PROM: promised th.(Thread.local).(Local.promises) l t),
+          ~ promised th'.(Thread.local).(Local.promises) l t>>).
+Proof.
+Admitted.
+
+
+
+
+Lemma future_lifting
+      P lang th0 th1
+      (BOT: th0.(Thread.local).(Local.promises) = Memory.bot)
+      (STEPS: rtc (tau (@pred_step (P /1\ no_promise) lang)) th0 th1)
+  :
+    exists (updates: Loc.t -> Time.t -> Prop),
+      (<<COMPLETE:
+         rtc (tau (@pred_step (P /1\ no_update_on (fun loc ts => promised th0.(Thread.memory) loc ts /\ ~ updates loc ts)
+                                 /1\ no_promise) lang)) th0 th1>>) /\
 
 
 
