@@ -24,11 +24,15 @@ Require Import Configuration.
 Require Import Syntax.
 Require Import Semantics.
 
+Require Import PFStepCommon.
+Require Import PFStep.
+Require Import PFStepCap.
 Require Import Invariant.
 
 Require Import GSimulation.
 
 Set Implicit Arguments.
+Set Nested Proofs Allowed.
 
 
 Inductive opt_lang_step: forall (e:ProgramEvent.t) (st1 st2:State.t), Prop :=
@@ -39,6 +43,16 @@ Inductive opt_lang_step: forall (e:ProgramEvent.t) (st1 st2:State.t), Prop :=
     e st1 st2
     (STEP: lang.(Language.step) e st1 st2):
     opt_lang_step e st1 st2
+.
+
+Inductive opt_program_step: forall (e:ThreadEvent.t) (e1 e2:Thread.t lang), Prop :=
+| opt_program_step_none
+    e1:
+    opt_program_step ThreadEvent.silent e1 e1
+| opt_program_step_some
+    e e1 e2
+    (STEP: Thread.program_step e e1 e2):
+    opt_program_step e e1 e2
 .
 
 
@@ -133,6 +147,63 @@ Section AssertInsertion.
       + ss.
   Qed.
 
+  Lemma sim_thread_promise_step
+        tid e1_src
+        pf e e1_tgt e2_tgt
+        (SIM1: sim_thread tid e1_src e1_tgt)
+        (STEP_TGT: Thread.promise_step pf e e1_tgt e2_tgt):
+    exists e2_src,
+      <<STEP_SRC: Thread.promise_step pf e e1_src e2_src>> /\
+      <<SIM2: sim_thread tid e2_src e2_tgt>>.
+  Proof.
+    destruct e1_src, e1_tgt, e2_tgt. ss.
+    inv SIM1. ss. subst.
+    inv STEP_TGT; ss.
+    esplits.
+    - econs; eauto.
+    - eauto.
+  Qed.
+
+  Lemma sim_thread_program_step
+        tid e1_src
+        e e1_tgt e2_tgt
+        (SIM1: sim_thread tid e1_src e1_tgt)
+        (STEP_TGT: Thread.program_step e e1_tgt e2_tgt)
+        (EVENT: e <> ThreadEvent.abort):
+    exists e2_src,
+      <<STEP_SRC: opt_program_step e e1_src e2_src>> /\
+      <<SIM2: sim_thread tid e2_src e2_tgt>>.
+  Proof.
+    destruct e1_src, e1_tgt, e2_tgt. ss.
+    inv SIM1. ss. subst.
+    inv STEP_TGT; ss.
+    exploit sim_state_step; eauto.
+    { destruct e; ss. }
+    i. des.
+    inv LOCAL; inv STEP_SRC; ss.
+    - esplits.
+      + econs 1.
+      + econs; eauto.
+    - esplits.
+      + econs 2. econs; eauto.
+      + econs; eauto.
+    - esplits.
+      + econs 2. econs; eauto.
+      + econs; eauto.
+    - esplits.
+      + econs 2. econs; eauto.
+      + econs; eauto.
+    - esplits.
+      + econs 2. econs; eauto.
+      + econs; eauto.
+    - esplits.
+      + econs 2. econs; eauto.
+      + econs; eauto.
+    - esplits.
+      + econs 2. econs; eauto.
+      + econs; eauto.
+  Qed.
+
   Lemma sim_thread_abort_step
         tid e1_src
         pf e1_tgt e2_tgt
@@ -165,37 +236,15 @@ Section AssertInsertion.
       <<STEP_SRC: Thread.opt_step e e1_src e2_src>> /\
       <<SIM2: sim_thread tid e2_src e2_tgt>>.
   Proof.
-    destruct e1_src, e1_tgt, e2_tgt. ss.
-    inv SIM1. ss. subst.
-    inv STEP_TGT; inv STEP; ss.
-    - esplits.
-      + econs 2. econs 1. econs; eauto.
-      + eauto.
-    - exploit sim_state_step; eauto.
-      { destruct e; ss. }
-      i. des.
-      inv LOCAL; inv STEP_SRC; ss.
-      + esplits.
-        * econs 1.
-        * econs; eauto.
-      + esplits.
-        * econs 2. econs 2. econs; eauto.
-        * econs; eauto.
-      + esplits.
-        * econs 2. econs 2. econs; eauto.
-        * econs; eauto.
-      + esplits.
-        * econs 2. econs 2. econs; eauto.
-        * econs; eauto.
-      + esplits.
-        * econs 2. econs 2. econs; eauto.
-        * econs; eauto.
-      + esplits.
-        * econs 2. econs 2. econs; eauto.
-        * econs; eauto.
-      + esplits.
-        * econs 2. econs 2. econs; eauto.
-        * econs; eauto.
+    inv STEP_TGT.
+    - exploit sim_thread_promise_step; eauto. i. des.
+      esplits; eauto.
+      econs 2. econs 1. eauto.
+    - exploit sim_thread_program_step; eauto. i. des.
+      esplits; eauto.
+      inv STEP_SRC.
+      + econs 1.
+      + econs 2. econs 2. eauto.
   Qed.
 
   Lemma sim_thread_rtc_tau_step
@@ -217,6 +266,71 @@ Section AssertInsertion.
     inv STEP_SRC; eauto.
     econs 2; eauto.
     econs; [econs; eauto|ss].
+  Qed.
+
+  Lemma sim_thread_rtc_program_step
+        tid e1_src e1_tgt e2_tgt
+        (SIM1: sim_thread tid e1_src e1_tgt)
+        (STEPS_TGT: rtc (tau (@Thread.program_step lang)) e1_tgt e2_tgt):
+    exists e2_src,
+      <<STEPS_SRC: rtc (tau (@Thread.program_step lang)) e1_src e2_src>> /\
+      <<SIM2: sim_thread tid e2_src e2_tgt>>.
+  Proof.
+    revert e1_src SIM1.
+    induction STEPS_TGT; eauto; i.
+    inv H. exploit sim_thread_program_step; eauto.
+    { destruct e; ss. }
+    i. des.
+    exploit IHSTEPS_TGT; eauto. i. des.
+    inv STEP_SRC.
+    - esplits; eauto.
+    - esplits; try exact SIM0. econs 2; eauto.
+  Qed.
+
+  Lemma sim_thread_abort_step'
+        tid e1_src
+        pf e1_tgt e2_tgt
+        (SIM1: sim_thread tid e1_src e1_tgt)
+        (STEP_TGT: Thread.step pf ThreadEvent.abort e1_tgt e2_tgt):
+    (exists e2_src,
+        <<STEP_SRC: Thread.step pf ThreadEvent.abort e1_src e2_src>> /\
+        <<SIM2: sim_thread tid e2_src e2_tgt>>) \/
+    (exists e stmts,
+        <<STMTS: e1_tgt.(Thread.state).(State.stmts) = (Stmt.instr (Instr.assert e))::stmts>> /\
+        <<ASSERT: forall (SOUND: S tid lang e1_src.(Thread.state)),
+            RegFile.eval_expr e1_src.(Thread.state).(State.regs) e <> 0>>).
+  Proof.
+    destruct e1_src, e1_tgt, e2_tgt. ss.
+    inv SIM1. ss. subst.
+    destruct state, state0. inv STATE. ss. subst.
+    inv STEP_TGT; inv STEP; ss.
+    inv STATE. inv INSTR. inv STMTS.
+    - left. esplits.
+      + econs 2. econs; eauto. ss. econs; eauto. econs; eauto.
+      + econs; eauto.
+    - right. esplits; eauto.
+  Qed.
+
+  Lemma sim_thread_steps_abort
+        tid e1_src e1_tgt
+        pf e2_tgt e3_tgt
+        (SIM1: sim_thread tid e1_src e1_tgt)
+        (STEPS_TGT: rtc (@Thread.tau_step lang) e1_tgt e2_tgt)
+        (ABORT_TGT: Thread.step pf ThreadEvent.abort e2_tgt e3_tgt):
+    exists e2_src,
+      <<STEPS_SRC: rtc (@Thread.tau_step lang) e1_src e2_src>> /\
+      <<SIM2: sim_thread tid e2_src e2_tgt>> /\
+      ((exists e3_src,
+           <<ABORT_SRC: Thread.step pf ThreadEvent.abort e2_src e3_src>> /\
+           <<SIM3: sim_thread tid e3_src e3_tgt>>) \/
+       (exists e stmts,
+           <<STMTS: e2_tgt.(Thread.state).(State.stmts) = (Stmt.instr (Instr.assert e))::stmts>> /\
+           <<ASSERT: forall (SOUND: S tid lang e2_src.(Thread.state)),
+               RegFile.eval_expr e2_src.(Thread.state).(State.regs) e <> 0>>)).
+  Proof.
+    exploit sim_thread_rtc_tau_step; eauto. i. des.
+    exists e2_src. splits; auto.
+    exploit sim_thread_abort_step'; try exact SIM2; eauto.
   Qed.
 
 
@@ -317,6 +431,19 @@ Section AssertInsertion.
            end;
        ss; subst).
 
+  Lemma pf_sim_thread_sim_thread
+        tid e_src e_tgt
+        e'_src e'_tgt
+        (SIM: sim_thread tid e_src e_tgt)
+        (PFSIM_SRC: PFStep.sim_thread e'_src e_src)
+        (PFSIM_TGT: PFStep.sim_thread e'_tgt e_tgt):
+    sim_thread tid e'_src e'_tgt.
+  Proof.
+    destruct e_src, e_tgt, e'_src, e'_tgt.
+    inv SIM. inv PFSIM_SRC. inv PFSIM_TGT. ss. subst.
+    econs; eauto; ss.
+  Admitted.
+
   Theorem sim_conf_sim
           c_src c_tgt
           (SIM: sim_conf c_src c_tgt):
@@ -347,7 +474,57 @@ Section AssertInsertion.
       exploit FIND_TGT; eauto. i. subst.
       clear FIND_SRC FIND_TGT THREADS.
       exploit sim_conf_sim_thread; eauto. s. intro SIM_TH.
-      admit.
+      exploit sim_thread_steps_abort; eauto. i. des.
+      - destruct e3_src. ss.
+        assert (STEP_SRC: Configuration.step
+                            MachineEvent.abort tid
+                            (Configuration.mk ths1_src sc1 mem1)
+                            (Configuration.mk
+                               (IdentMap.add tid (existT (fun (lang: language) => lang.(Language.state)) lang state, local) ths1_src)
+                               sc memory)).
+        { econs 1; eauto. }
+        esplits; [econs 2; eauto|].
+        right. apply CIH. econs; ss; try by (inv SIM3; ss).
+        + eapply configuration_step_sem; try exact STEP_SRC; eauto.
+        + repeat rewrite Threads.tids_add.
+          repeat rewrite IdentSet.add_mem; ss.
+          * rewrite Threads.tids_o. rewrite TID. ss.
+          * rewrite Threads.tids_o. rewrite x. ss.
+        + i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i.
+          * inv FIND. ss.
+          * inv SIM. eapply FIND_SRC; eauto.
+        + i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i.
+          * inv FIND. ss.
+          * inv SIM. eapply FIND_TGT; eauto.
+        + i. revert FIND_SRC. rewrite IdentMap.gsspec. condtac; ss; i.
+          * subst. revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i.
+            simplify. inv SIM3. ss.
+          * revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i.
+            inv SIM. eauto.
+      - exfalso.
+        dup WF_TGT. inv WF_TGT0. inv WF. ss. clear DISJOINT.
+        exploit THREADS; eauto. intro WF1_TGT. clear THREADS.
+        dup WF_SRC. inv WF_SRC0. inv WF. ss. clear DISJOINT.
+        exploit THREADS; eauto. intro WF1_SRC. clear THREADS.
+        exploit Thread.rtc_tau_step_future; eauto. s. i. des.
+        exploit (@PFStep.sim_thread_exists lang (Thread.mk lang st_src lc_src sc1 mem1)); ss; eauto. i. des.
+        exploit PFStep.thread_rtc_tau_step; try exact SIM0; eauto.
+        { inv STEP; inv STEP0. inv LOCAL. inv LOCAL0. ss.
+          inv SIM2. ss. rewrite LOCAL. ss. }
+        i. des.
+        inv SEM. ss. exploit TH; eauto. i.
+        exploit thread_rtc_tau_step_sem; try exact STEPS_SRC0; eauto.
+        { inv SIM0. ss. rewrite STATE. eauto. }
+        { eapply vals_incl_sem_memory; eauto.
+          eapply PFStep.sim_memory_vals_incl; try eapply SIM0. }
+        { eapply PFStep.sim_memory_inhabited; try eapply SIM0; ss.
+          - apply WF1_SRC.
+          - apply MEM. }
+        i. des.
+        inv SIM1. rewrite STATE in *.
+        inv STEP; inv STEP0. inv STATE0. inv INSTR. inv STMTS.
+        inv SIM2. ss. inv STATE0. ss. subst.
+        eapply ASSERT; eauto.
     }
     (* normal step *)
     exploit sim_conf_find; eauto. i. des.
@@ -360,7 +537,7 @@ Section AssertInsertion.
     clear FIND_SRC FIND_TGT THREADS.
     exploit sim_conf_sim_thread; eauto. s. intro SIM_TH.
     dup WF_TGT. inv WF_TGT0. inv WF. ss.
-    exploit THREADS; try eauto. s. intro WF.
+    exploit THREADS; eauto. s. intro WF.
     clear DISJOINT. clear THREADS.
     exploit Thread.rtc_tau_step_future; eauto. s. i. des.
     exploit Thread.step_future; eauto. s. i. des.
