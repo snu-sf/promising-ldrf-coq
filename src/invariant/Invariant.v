@@ -46,7 +46,7 @@ Module Logic.
     Variable
       (S: ThreadsProp)
       (J: MemoryProp)
-      (program: IdentMap.t {lang:language & lang.(Language.syntax)}).
+      (program: Threads.syntax).
 
     Structure t: Type := mk {
       INIT:
