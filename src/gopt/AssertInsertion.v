@@ -24,6 +24,8 @@ Require Import Configuration.
 Require Import Syntax.
 Require Import Semantics.
 
+Require Import PromiseConsistent.
+
 Require Import PFStepCommon.
 Require Import PFStep.
 Require Import PFStepCap.
@@ -32,7 +34,6 @@ Require Import Invariant.
 Require Import GSimulation.
 
 Set Implicit Arguments.
-Set Nested Proofs Allowed.
 
 
 Inductive opt_lang_step: forall (e:ProgramEvent.t) (st1 st2:State.t), Prop :=
@@ -204,28 +205,6 @@ Section AssertInsertion.
       + econs; eauto.
   Qed.
 
-  Lemma sim_thread_abort_step
-        tid e1_src
-        pf e1_tgt e2_tgt
-        (SEM: S tid lang e1_src.(Thread.state))
-        (SIM1: sim_thread tid e1_src e1_tgt)
-        (STEP_TGT: Thread.step pf ThreadEvent.abort e1_tgt e2_tgt):
-    False \/
-    exists e2_src,
-      <<STEP_SRC: Thread.step pf ThreadEvent.abort e1_src e2_src>> /\
-      <<SIM2: sim_thread tid e2_src e2_tgt>>.
-  Proof.
-    destruct e1_src, e1_tgt, e2_tgt. ss.
-    inv SIM1. ss. subst.
-    destruct state, state0. inv STATE. ss. subst.
-    inv STEP_TGT; inv STEP; ss.
-    inv STATE. inv INSTR. inv STMTS.
-    - right. esplits.
-      + econs 2. econs; eauto. ss. econs; eauto. econs; eauto.
-      + econs; eauto.
-    - left. eapply SUCCESS; eauto.
-  Qed.
-
   Lemma sim_thread_step
         tid e1_src
         pf e e1_tgt e2_tgt
@@ -287,7 +266,7 @@ Section AssertInsertion.
     - esplits; try exact SIM0. econs 2; eauto.
   Qed.
 
-  Lemma sim_thread_abort_step'
+  Lemma sim_thread_abort_step
         tid e1_src
         pf e1_tgt e2_tgt
         (SIM1: sim_thread tid e1_src e1_tgt)
@@ -330,7 +309,7 @@ Section AssertInsertion.
   Proof.
     exploit sim_thread_rtc_tau_step; eauto. i. des.
     exists e2_src. splits; auto.
-    exploit sim_thread_abort_step'; try exact SIM2; eauto.
+    exploit sim_thread_abort_step; try exact SIM2; eauto.
   Qed.
 
 
@@ -431,19 +410,6 @@ Section AssertInsertion.
            end;
        ss; subst).
 
-  Lemma pf_sim_thread_sim_thread
-        tid e_src e_tgt
-        e'_src e'_tgt
-        (SIM: sim_thread tid e_src e_tgt)
-        (PFSIM_SRC: PFStep.sim_thread e'_src e_src)
-        (PFSIM_TGT: PFStep.sim_thread e'_tgt e_tgt):
-    sim_thread tid e'_src e'_tgt.
-  Proof.
-    destruct e_src, e_tgt, e'_src, e'_tgt.
-    inv SIM. inv PFSIM_SRC. inv PFSIM_TGT. ss. subst.
-    econs; eauto; ss.
-  Admitted.
-
   Theorem sim_conf_sim
           c_src c_tgt
           (SIM: sim_conf c_src c_tgt):
@@ -536,9 +502,10 @@ Section AssertInsertion.
     exploit FIND_TGT; eauto. i. subst.
     clear FIND_SRC FIND_TGT THREADS.
     exploit sim_conf_sim_thread; eauto. s. intro SIM_TH.
-    dup WF_TGT. inv WF_TGT0. inv WF. ss.
-    exploit THREADS; eauto. s. intro WF.
-    clear DISJOINT. clear THREADS.
+    dup WF_TGT. inv WF_TGT0. inv WF. ss. clear DISJOINT.
+    exploit THREADS; eauto. intro WF1_TGT. clear THREADS.
+    dup WF_SRC. inv WF_SRC0. inv WF. ss. clear DISJOINT.
+    exploit THREADS; eauto. intro WF1_SRC. clear THREADS.
     exploit Thread.rtc_tau_step_future; eauto. s. i. des.
     exploit Thread.step_future; eauto. s. i. des.
     exploit Memory.cap_exists; try exact CLOSED0. i. des.
@@ -548,24 +515,122 @@ Section AssertInsertion.
     hexploit Memory.max_full_timemap_closed; try exact x1; eauto. intro SC_MAX.
     exploit CONSISTENT; eauto. s. i. des.
     { (* abort certification *)
-      admit.
+      exploit sim_thread_rtc_tau_step; try exact STEPS; eauto. i. des.
+      exploit sim_thread_step; try exact STEP; eauto. i. des.
+      destruct e2_src0.
+      assert (CSTEP: Configuration.opt_step
+                       (ThreadEvent.get_machine_event e0) tid
+                       (Configuration.mk ths1_src sc1 mem1)
+                       (Configuration.mk
+                          (IdentMap.add tid (existT (fun (lang: language) => lang.(Language.state)) lang state, local) ths1_src)
+                          sc memory)).
+      { assert (CONSISTENT_SRC: Thread.consistent (Thread.mk lang state local sc memory)).
+        { dup SIM0. inv SIM1. ss. subst. ii. ss. left.
+          exploit Memory.cap_inj; [exact CAP|exact CAP0|..]; eauto. i. subst.
+          exploit Memory.max_full_timemap_inj; [exact x1|exact SC_MAX0|..]. i. subst.
+          unfold Thread.steps_abort in *. des.
+          exploit (@sim_thread_steps_abort tid (Thread.mk lang state lc3 sc0 mem0));
+            try exact STEPS0; try exact ABORT0; eauto.
+          i. des; try by (esplits; eauto).
+          exfalso.
+
+          Lemma tau_opt_all
+                e1 e2 e3 e
+                (STEPS: rtc (@Thread.tau_step lang) e1 e2)
+                (STEP: Thread.opt_step e e2 e3):
+            rtc (@Thread.all_step lang) e1 e3.
+          Proof.
+            induction STEPS.
+            - inv STEP; eauto.
+              econs 2; eauto. econs. econs. eauto.
+            - exploit IHSTEPS; eauto. i.
+              econs 2; eauto.
+              inv H. inv TSTEP. econs. econs. eauto.
+          Qed.
+
+          exploit tau_opt_all; try exact STEPS_SRC; eauto. i.
+          exploit Thread.rtc_tau_step_future; try exact x2; eauto. s. i. des.
+          exploit (@PFStep.sim_thread_exists lang (Thread.mk lang st_src lc_src sc1 mem1)); ss; eauto. i. des.
+          exploit PFStep.thread_rtc_all_step; try exact x2; eauto.
+          { hexploit consistent_promise_consistent; eauto. }
+          i. des.
+          exploit PFStepCap.sim_thread_exists; try exact SIM4; eauto. s. i. des.
+          exploit PFStepCap.thread_rtc_tau_step; try exact STEPS_SRC0; eauto.
+          { inv SIM1. rewrite LOCAL.
+            inv ABORT0; inv STEP0. inv LOCAL0. inv LOCAL1. ss. }
+          i. des.
+          inv SEM. ss. exploit TH; eauto. i.
+          exploit thread_rtc_all_step_sem; try exact STEPS_SRC; eauto.
+          { inv SIM3. ss. rewrite STATE0. eauto. }
+          { eapply vals_incl_sem_memory; eauto.
+            eapply PFStep.sim_memory_vals_incl; try eapply SIM3. }
+          { eapply PFStep.sim_memory_inhabited; try eapply SIM3; ss.
+            - apply WF1_SRC.
+            - apply MEM. }
+          i. des.
+          exploit thread_rtc_pf_step_sem; try exact STEPS_SRC2; eauto; s.
+          { eapply vals_incl_sem_memory; eauto. }
+          { eapply PFStepCap.sim_memory_inhabited; try eapply SIM5.
+            - apply WF0.
+            - eapply Memory.cap_closed; eauto. }
+          i. des.
+          inv SIM6. rewrite STATE0 in *.
+          inv ABORT0; inv STEP0. inv STATE1. inv INSTR. inv STMTS.
+          inv SIM1. ss. inv STATE1. ss. subst.
+          eapply ASSERT; eauto.
+        }
+        inv STEP_SRC.
+        - generalize (rtc_tail STEPS_SRC). i. des.
+          + inv H0. inv TSTEP. ss. rewrite <- EVENT0.
+            econs 2. econs; try exact x; try exact H; eauto.
+            destruct e; ss.
+          + inv H. ss.
+            replace (IdentMap.add
+                       tid
+                       (existT (fun lang:language => lang.(Language.state)) lang state, local)
+                       ths1_src)
+              with ths1_src; eauto.
+            apply IdentMap.eq_leibniz. ii.
+            rewrite -> IdentMap.gsident; auto.
+        - econs 2. econs 2; try exact x; try exact H; eauto.
+      }
+      esplits; eauto.
+      right. apply CIH. econs; ss; try by (inv SIM0; ss).
+      - inv CSTEP; ss.
+        + repeat rewrite <- H. ss.
+        + eapply configuration_step_sem; try exact STEP0; eauto.
+      - repeat rewrite Threads.tids_add.
+        repeat rewrite IdentSet.add_mem; ss.
+        + rewrite Threads.tids_o. rewrite TID. ss.
+        + rewrite Threads.tids_o. rewrite x. ss.
+      - i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i.
+        + inv FIND. ss.
+        + inv SIM. eapply FIND_SRC; eauto.
+      - i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i.
+        + inv FIND. ss.
+        + inv SIM. eapply FIND_TGT; eauto.
+      - i. revert FIND_SRC. rewrite IdentMap.gsspec. condtac; ss; i.
+        + subst. revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i.
+          simplify. inv SIM0. ss.
+        + revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i.
+          inv SIM. eauto.
     }
     { (* normal certification *)
       exploit sim_thread_rtc_tau_step; try exact STEPS; eauto. i. des.
       exploit sim_thread_step; try exact STEP; eauto. i. des.
-      inv STEP_SRC.
-      - generalize (rtc_tail STEPS_SRC). i. des.
-        + inv H0. inv TSTEP. destruct e2_src0.
-          assert (STEP_SRC: Configuration.step
-                              MachineEvent.silent tid
-                              (Configuration.mk ths1_src sc1 mem1)
-                              (Configuration.mk
-                                 (IdentMap.add tid (existT (fun (lang: language) => lang.(Language.state)) lang state, local) ths1_src)
-                                 sc memory)).
-          { rewrite <- EVENT0.
-            econs; try exact x; try exact H; eauto.
-            - destruct e; ss.
-            - ii. right.
+      destruct e2_src0.
+      assert (CSTEP: Configuration.opt_step
+                       (ThreadEvent.get_machine_event e0) tid
+                       (Configuration.mk ths1_src sc1 mem1)
+                       (Configuration.mk
+                          (IdentMap.add tid (existT (fun (lang: language) => lang.(Language.state)) lang state, local) ths1_src)
+                          sc memory)).
+      { inv STEP_SRC.
+        - generalize (rtc_tail STEPS_SRC). i. des.
+          + inv H0. inv TSTEP. ss. rewrite <- EVENT0.
+            econs 2. econs; try exact x; try exact H; eauto.
+            * destruct e; ss.
+            * ii. right.
               destruct e2. ss. dup SIM0. inv SIM1. ss. subst.
               exploit Memory.cap_inj; [exact CAP|exact CAP0|..]; eauto. i. subst.
               exploit Memory.max_full_timemap_inj; [exact x1|exact SC_MAX0|..]. i. subst.
@@ -573,46 +638,15 @@ Section AssertInsertion.
                 try exact STEPS0; eauto.
               i. des. esplits; eauto.
               inv SIM1. rewrite LOCAL. ss.
-          }
-          ss. esplits.
-          * econs 2; eauto.
-          * right. apply CIH. econs; ss; try by (inv SIM0; ss).
-            { eapply configuration_step_sem; try exact STEP_SRC; eauto. }
-            { repeat rewrite Threads.tids_add.
-              repeat rewrite IdentSet.add_mem; ss.
-              - rewrite Threads.tids_o. rewrite TID. ss.
-              - rewrite Threads.tids_o. rewrite x. ss. }
-            { i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i.
-              - inv FIND. ss.
-              - inv SIM. eapply FIND_SRC; eauto. }
-            { i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i.
-              - inv FIND. ss.
-              - inv SIM. eapply FIND_TGT; eauto. }
-            { i. revert FIND_SRC. rewrite IdentMap.gsspec. condtac; ss; i.
-              - subst. revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i.
-                simplify. inv SIM0. ss.
-              - revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i.
-                inv SIM. eauto. }
-        + subst. ss. esplits; [econs 1|].
-          right. apply CIH. econs; ss; try by (inv SIM0; ss).
-          * rewrite Threads.tids_add.
-            rewrite IdentSet.add_mem; ss.
-            rewrite Threads.tids_o. rewrite TID. ss.
-          * inv SIM. ss.
-          * i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i.
-            { inv FIND. ss. }
-            { inv SIM. eapply FIND_TGT; eauto. }
-          * i. revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i.
-            { subst. rewrite x in FIND_SRC. simplify. inv SIM0. ss. }
-            { inv SIM. eauto. }
-      - destruct e2_src0.
-        assert (STEP_SRC: Configuration.step
-                            (ThreadEvent.get_machine_event e0) tid
-                            (Configuration.mk ths1_src sc1 mem1)
-                            (Configuration.mk
-                               (IdentMap.add tid (existT (fun (lang: language) => lang.(Language.state)) lang state, local) ths1_src)
-                               sc memory)).
-        { econs 2; try exact x; try exact H; eauto.
+          + inv H. ss.
+            replace (IdentMap.add
+                       tid
+                       (existT (fun lang:language => lang.(Language.state)) lang state, local)
+                       ths1_src)
+              with ths1_src; eauto.
+            apply IdentMap.eq_leibniz. ii.
+            rewrite -> IdentMap.gsident; auto.
+        - econs 2. econs 2; try exact x; try exact H; eauto.
           ii. right.
           destruct e2. ss. dup SIM0. inv SIM1. ss. subst.
           exploit Memory.cap_inj; [exact CAP|exact CAP0|..]; eauto. i. subst.
@@ -621,26 +655,27 @@ Section AssertInsertion.
             try exact STEPS0; eauto.
           i. des. esplits; eauto.
           inv SIM1. rewrite LOCAL. ss.
-        }
-        ss. esplits.
-        + econs 2; eauto.
-        + right. apply CIH. econs; ss; try by (inv SIM0; ss).
-          * eapply configuration_step_sem; try exact STEP_SRC; eauto.
-          * repeat rewrite Threads.tids_add.
-            repeat rewrite IdentSet.add_mem; ss.
-            { rewrite Threads.tids_o. rewrite TID. ss. }
-            { rewrite Threads.tids_o. rewrite x. ss. }
-          * i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i.
-            { inv FIND. ss. }
-            { inv SIM. eapply FIND_SRC; eauto. }
-          * i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i.
-            { inv FIND. ss. }
-            { inv SIM. eapply FIND_TGT; eauto. }
-          * i. revert FIND_SRC. rewrite IdentMap.gsspec. condtac; ss; i.
-            { subst. revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i.
-              simplify. inv SIM0. ss. }
-            { revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i.
-              inv SIM. eauto. }
+      }
+      esplits; eauto.
+      right. apply CIH. econs; ss; try by (inv SIM0; ss).
+      - inv CSTEP; ss.
+        + repeat rewrite <- H. ss.
+        + eapply configuration_step_sem; try exact STEP0; eauto.
+      - repeat rewrite Threads.tids_add.
+        repeat rewrite IdentSet.add_mem; ss.
+        + rewrite Threads.tids_o. rewrite TID. ss.
+        + rewrite Threads.tids_o. rewrite x. ss.
+      - i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i.
+        + inv FIND. ss.
+        + inv SIM. eapply FIND_SRC; eauto.
+      - i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i.
+        + inv FIND. ss.
+        + inv SIM. eapply FIND_TGT; eauto.
+      - i. revert FIND_SRC. rewrite IdentMap.gsspec. condtac; ss; i.
+        + subst. revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i.
+          simplify. inv SIM0. ss.
+        + revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i.
+          inv SIM. eauto.
     }
-  Admitted.
+  Qed.
 End AssertInsertion.
