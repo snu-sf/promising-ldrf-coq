@@ -56,17 +56,55 @@ Inductive opt_program_step: forall (e:ThreadEvent.t) (e1 e2:Thread.t lang), Prop
     opt_program_step e e1 e2
 .
 
+Lemma inj_option_pair
+      A B
+      (a1 a2: A)
+      (b1 b2: B)
+      (EQ: Some (a1, b1) = Some (a2, b2)):
+  a1 = a2 /\ b1 = b2.
+Proof.
+  inv EQ. ss.
+Qed.
+
+Ltac simplify :=
+  repeat
+    (try match goal with
+         | [H: context[IdentMap.find _ (IdentMap.add _ _ _)] |- _] =>
+           rewrite IdentMap.Facts.add_o in H
+         | [H: context[if ?c then _ else _] |- _] =>
+           destruct c
+         | [H: Some (_, _) = Some (_, _) |- _] =>
+           apply inj_option_pair in H; des
+         | [H: existT ?P ?p _ = existT ?Q ?q _ |- _] =>
+           apply inj_pair2 in H
+         end;
+     ss; subst).
+
+Lemma tau_opt_all
+      e1 e2 e3 e
+      (STEPS: rtc (@Thread.tau_step lang) e1 e2)
+      (STEP: Thread.opt_step e e2 e3):
+  rtc (@Thread.all_step lang) e1 e3.
+Proof.
+  induction STEPS.
+  - inv STEP; eauto.
+    econs 2; eauto. econs. econs. eauto.
+  - exploit IHSTEPS; eauto. i.
+    econs 2; eauto.
+    inv H. inv TSTEP. econs. econs. eauto.
+Qed.
+
 
 Section AssertInsertion.
   Variable
     (S:ThreadsProp)
     (J:MemoryProp)
-    (program: IdentMap.t {lang:language & lang.(Language.syntax)}).
+    (program: Threads.syntax).
 
   Context `{LOGIC: Logic.t S J program}.
 
 
-  (* simulation relations *)
+  (* simulation relations on threads *)
 
   Inductive sim_stmts (tid: Ident.t): forall (stmts_src stmts_tgt: list Stmt.t), Prop :=
   | sim_stmts_nil:
@@ -313,6 +351,8 @@ Section AssertInsertion.
   Qed.
 
 
+  (* simulation relation on configurations *)
+
   Inductive sim_conf (c_src c_tgt: Configuration.t): Prop :=
   | sim_conf_intro
       (SEM: sem S J c_src)
@@ -333,8 +373,6 @@ Section AssertInsertion.
   .
   Hint Constructors sim_conf.
 
-
-  (* lemmas on simulation relations *)
 
   Lemma tids_find
         ths_src ths_tgt tid
@@ -384,31 +422,6 @@ Section AssertInsertion.
     inv SIM. exploit THREADS; eauto. i. des.
     econs; eauto.
   Qed.
-
-
-  Lemma inj_option_pair
-        A B
-        (a1 a2: A)
-        (b1 b2: B)
-        (EQ: Some (a1, b1) = Some (a2, b2)):
-    a1 = a2 /\ b1 = b2.
-  Proof.
-    inv EQ. ss.
-  Qed.
-
-  Ltac simplify :=
-    repeat
-      (try match goal with
-           | [H: context[IdentMap.find _ (IdentMap.add _ _ _)] |- _] =>
-             rewrite IdentMap.Facts.add_o in H
-           | [H: context[if ?c then _ else _] |- _] =>
-             destruct c
-           | [H: Some (_, _) = Some (_, _) |- _] =>
-             apply inj_option_pair in H; des
-           | [H: existT ?P ?p _ = existT ?Q ?q _ |- _] =>
-             apply inj_pair2 in H
-           end;
-       ss; subst).
 
   Theorem sim_conf_sim
           c_src c_tgt
@@ -533,21 +546,6 @@ Section AssertInsertion.
             try exact STEPS0; try exact ABORT0; eauto.
           i. des; try by (esplits; eauto).
           exfalso.
-
-          Lemma tau_opt_all
-                e1 e2 e3 e
-                (STEPS: rtc (@Thread.tau_step lang) e1 e2)
-                (STEP: Thread.opt_step e e2 e3):
-            rtc (@Thread.all_step lang) e1 e3.
-          Proof.
-            induction STEPS.
-            - inv STEP; eauto.
-              econs 2; eauto. econs. econs. eauto.
-            - exploit IHSTEPS; eauto. i.
-              econs 2; eauto.
-              inv H. inv TSTEP. econs. econs. eauto.
-          Qed.
-
           exploit tau_opt_all; try exact STEPS_SRC; eauto. i.
           exploit Thread.rtc_tau_step_future; try exact x2; eauto. s. i. des.
           exploit (@PFStep.sim_thread_exists lang (Thread.mk lang st_src lc_src sc1 mem1)); ss; eauto. i. des.
@@ -677,5 +675,91 @@ Section AssertInsertion.
         + revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i.
           inv SIM. eauto.
     }
+  Qed.
+
+
+  (* assert insertion *)
+
+  Definition syntax_tids (pgm: Threads.syntax): IdentSet.t :=
+    List.fold_right (fun p s => IdentSet.add (fst p) s) IdentSet.empty (IdentMap.elements pgm).
+
+  Lemma syntax_tids_o tid pgm:
+    IdentSet.mem tid (syntax_tids pgm) = IdentMap.find tid pgm.
+  Proof.
+    unfold syntax_tids. rewrite IdentMap.Facts.elements_o.
+    induction (IdentMap.elements pgm); ss. destruct a. s.
+    rewrite IdentSet.Facts.add_b, IHl.
+    unfold IdentSet.Facts.eqb, IdentMap.Facts.eqb.
+    repeat match goal with
+           | [|- context[if ?c then true else false]] => destruct c
+           end; ss; congr.
+  Qed.
+
+  Inductive insert_assert (program_tgt: Threads.syntax): Prop :=
+  | insert_assert_intro
+      (TIDS: syntax_tids program_tgt = syntax_tids program)
+      (FIND_SRC: forall tid l syn_src
+                   (FIND: IdentMap.find tid program = Some (existT _ l syn_src)),
+          l = lang)
+      (FIND_TGT: forall tid l syn_tgt
+                   (FIND: IdentMap.find tid program_tgt = Some (existT _ l syn_tgt)),
+          l = lang)
+      (THREADS: forall tid syn_src syn_tgt
+                  (FIND_SRC: IdentMap.find tid program = Some (existT _ lang syn_src))
+                  (FIND_TGT: IdentMap.find tid program_tgt = Some (existT _ lang syn_tgt)),
+          sim_stmts tid syn_src syn_tgt)
+  .
+
+  Theorem init_sim_conf
+          program_tgt
+          (INSERT: insert_assert program_tgt):
+    sim_conf (Configuration.init program) (Configuration.init program_tgt).
+  Proof.
+    inv INSERT. econs; ss; i.
+    - apply init_sem; ss.
+    - apply IdentSet.ext. i.
+      repeat rewrite Threads.tids_o.
+      unfold Threads.init.
+      repeat rewrite IdentMap.Facts.map_o.
+      specialize (@syntax_tids_o i program). i.
+      specialize (@syntax_tids_o i program_tgt). i.
+      destruct (@UsualFMapPositive.UsualPositiveMap'.find
+                  (@sigT _ (@Language.syntax ProgramEvent.t)) i program) eqn:SRC;
+        destruct (@UsualFMapPositive.UsualPositiveMap'.find
+                    (@sigT _ (@Language.syntax ProgramEvent.t)) i program_tgt) eqn:TGT; ss.
+      + assert (@UsualFMapPositive.UsualPositiveMap'.find
+                  (@sigT _ (@Language.syntax ProgramEvent.t)) i program = IdentMap.find i program) by ss.
+        rewrite <- H1 in *. rewrite SRC in *. ss.
+        assert (@UsualFMapPositive.UsualPositiveMap'.find
+                  (@sigT _ (@Language.syntax ProgramEvent.t)) i program_tgt = IdentMap.find i program_tgt) by ss.
+        rewrite <- H2 in *. rewrite TGT in *. ss.
+        rewrite TIDS in *. congr.
+      + assert (@UsualFMapPositive.UsualPositiveMap'.find
+                  (@sigT _ (@Language.syntax ProgramEvent.t)) i program = IdentMap.find i program) by ss.
+        rewrite <- H1 in *. rewrite SRC in *. ss.
+        assert (@UsualFMapPositive.UsualPositiveMap'.find
+                  (@sigT _ (@Language.syntax ProgramEvent.t)) i program_tgt = IdentMap.find i program_tgt) by ss.
+        rewrite <- H2 in *. rewrite TGT in *. ss.
+        rewrite TIDS in *. congr.
+    - unfold Threads.init in *.
+      rewrite IdentMap.Facts.map_o in *.
+      destruct (@UsualFMapPositive.UsualPositiveMap'.find
+                  (@sigT _ (@Language.syntax ProgramEvent.t)) tid program) eqn:SRC; ss.
+      destruct s. ss. inv FIND. eapply FIND_SRC; eauto.
+    - unfold Threads.init in *.
+      rewrite IdentMap.Facts.map_o in *.
+      destruct (@UsualFMapPositive.UsualPositiveMap'.find
+                  (@sigT _ (@Language.syntax ProgramEvent.t)) tid program_tgt) eqn:SRC; ss.
+      destruct s. ss. inv FIND. eapply FIND_TGT; eauto.
+    - unfold Threads.init in *.
+      rewrite IdentMap.Facts.map_o in *.
+      destruct (@UsualFMapPositive.UsualPositiveMap'.find
+                  (@sigT _ (@Language.syntax ProgramEvent.t)) tid program) eqn:SRC;
+        destruct (@UsualFMapPositive.UsualPositiveMap'.find
+                    (@sigT _ (@Language.syntax ProgramEvent.t)) tid program_tgt) eqn:TGT; ss.
+      destruct s, s0; ss.
+      inv FIND_SRC0. inv FIND_TGT0. split; ss. simplify.
+      unfold State.init. econs; ss.
+      eapply THREADS; eauto.
   Qed.
 End AssertInsertion.
