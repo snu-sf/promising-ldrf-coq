@@ -514,6 +514,16 @@ Proof.
   esplits; eauto.
 Qed.
 
+Lemma reorder_fulfill_abort
+      lc0 sc0 loc1 from1 to1 val1 releasedm1 released1 ord1 lc1 sc1
+      (STEP1: fulfill_step lc0 sc0 loc1 from1 to1 val1 releasedm1 released1 ord1 lc1 sc1)
+      (STEP2: Local.abort_step lc1):
+  <<STEP1: Local.abort_step lc0>>.
+Proof.
+  inv STEP2. econs.
+  eapply fulfill_step_promise_consistent; eauto.
+Qed.
+
 Lemma reorder_update_read
       loc1 ts1 val1 released1 ord1
       from2 to2 val2 released2 ord2
