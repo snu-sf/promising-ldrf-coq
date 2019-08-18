@@ -31,6 +31,7 @@ Require Import SimThread.
 Require ReorderTView.
 Require Import MemoryReorder.
 Require Import MemoryMerge.
+Require Import PromiseConsistent.
 
 Require Import Syntax.
 Require Import Semantics.
@@ -64,7 +65,6 @@ Qed.
 
 Lemma future_fulfill_step
       lc1 sc1 sc1' loc from to val releasedm releasedm' released ord lc2 sc2
-      (ORD: Ordering.le ord Ordering.relaxed)
       (REL_LE: View.opt_le releasedm' releasedm)
       (STEP: fulfill_step lc1 sc1 loc from to val releasedm released ord lc2 sc2):
   fulfill_step lc1 sc1' loc from to val releasedm' released ord lc2 sc1'.
@@ -315,6 +315,15 @@ Proof.
     + apply SimPromises.sem_bot.
   - unfold TView.write_fence_sc, TView.read_fence_tview.
     repeat condtac; aggrtac.
+Qed.
+
+Lemma reorder_read_abort
+      lc0 mem0 loc1 ts1 val1 released1 ord1 lc1
+      (STEP1: Local.read_step lc0 mem0 loc1 ts1 val1 released1 ord1 lc1)
+      (STEP2: Local.abort_step lc1):
+  <<STEP1: Local.abort_step lc0>>.
+Proof.
+  inv STEP2. hexploit read_step_promise_consistent; eauto.
 Qed.
 
 Lemma reorder_fulfill_read

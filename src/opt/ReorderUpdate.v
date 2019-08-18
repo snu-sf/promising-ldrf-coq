@@ -119,7 +119,6 @@ Proof.
   destruct vw1 as [vw1|]; cycle 1.
   { ss; des; subst. econs; [eauto|..]; s; eauto; etrans; eauto. }
   exploit future_fulfill_step; try exact FULFILL; eauto.
-  { by inv REORDER. }
   i. des.
   exploit sim_local_fulfill_bot; try apply x0; try exact LOCAL0; try refl;
     try exact WF0; try by viewtac.
@@ -171,7 +170,6 @@ Proof.
   exploit future_read_step; try exact READ; eauto. i. des.
   exploit Local.read_step_future; eauto. i. des.
   exploit future_fulfill_step; try exact FULFILL; eauto; try refl; try by viewtac.
-  { by inv REORDER. }
   i. des.
   exploit fulfill_step_future; try apply x1; try exact WF1; eauto; try by viewtac.
   { econs.

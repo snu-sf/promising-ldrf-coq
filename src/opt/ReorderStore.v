@@ -102,7 +102,6 @@ Lemma sim_store_mon
             st_tgt lc_tgt sc2_tgt mem2_tgt.
 Proof.
   inv SIM1. exploit future_fulfill_step; try exact FULFILL; eauto; try refl.
-  { by inv REORDER. }
   i. des. econs; eauto.
 Qed.
 
@@ -126,7 +125,6 @@ Proof.
   exploit fulfill_step_future; try exact WF_SRC;
     eauto using Memory.future_closed_timemap. i. des.
   exploit future_fulfill_step; try exact FULFILL; eauto.
-  { by inv REORDER. }
   i. des.
   exploit fulfill_step_cap; eauto. i.
   exploit SimPromises.cap; try exact MEM1; eauto.
