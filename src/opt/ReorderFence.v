@@ -48,6 +48,11 @@ Inductive reorder_fence (or1 ow1:Ordering.t): forall (i2:Instr.t), Prop :=
     (ORDW1: Ordering.le ow1 Ordering.relaxed)
     (ORDR2: Ordering.le or2 Ordering.plain \/ Ordering.le Ordering.acqrel or2):
     reorder_fence or1 ow1 (Instr.update r2 l2 rmw2 or2 ow2)
+| reorder_fence_assert
+    (ORDR1: Ordering.le or1 Ordering.acqrel)
+    (ORDW1: Ordering.le ow1 Ordering.relaxed)
+    e:
+    reorder_fence or1 ow1 (Instr.assert e)
 .
 
 Inductive sim_fence: forall (st_src:lang.(Language.state)) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t)
@@ -100,12 +105,13 @@ Lemma sim_fence_step
                      st1_src lc1_src sc1_src mem1_src
                      st1_tgt lc1_tgt sc1_tgt mem1_tgt.
 Proof.
-  inv SIM. ii. right.
+  inv SIM. ii.
   exploit future_fence_step; try apply FENCE; eauto; i.
   { inv REORDER; etrans; eauto. }
   inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
     try (inv STATE; inv INSTR; inv REORDER); ss.
   - (* promise *)
+    right.
     exploit sim_local_promise; eauto.
     { eapply Local.fence_step_future; eauto. }
     i. des.
@@ -116,7 +122,20 @@ Proof.
     + econs 2. econs 1. econs; eauto.
     + eauto.
     + right. econs; eauto.
+  - (* assert success *)
+    right.
+    esplits.
+    + ss.
+    + econs 2;[|econs 1]. econs.
+      * econs. econs 2. econs; [|econs 1]. ss. econs. econs. ss.
+      * ss.
+    + econs 2. econs 2. econs; [|econs 5]; eauto. econs. econs.
+    + eauto.
+    + eauto.
+    + eauto.
+    + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
   - (* load *)
+    right.
     guardH ORD2.
     exploit sim_local_read; try exact LOCAL0; try apply SC; eauto; try refl; viewtac.
     { eapply Local.fence_step_future; eauto. }
@@ -134,6 +153,7 @@ Proof.
     + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
       etrans; eauto.
   - (* update-load *)
+    right.
     guardH ORDR2.
     exploit sim_local_read; try exact LOCAL0; try apply SC; eauto; try refl; viewtac.
     { eapply Local.fence_step_future; eauto. }
@@ -151,6 +171,7 @@ Proof.
     + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
       etrans; eauto.
   - (* store *)
+    right.
     hexploit sim_local_write_bot; try exact LOCAL1; try apply SC; eauto; try refl; viewtac.
     { eapply Local.fence_step_future; eauto. }
     i. des.
@@ -167,6 +188,7 @@ Proof.
     + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
       etrans; eauto.
   - (* update *)
+    right.
     guardH ORDR2.
     exploit Local.read_step_future; eauto. i. des.
     exploit sim_local_read; try exact LOCAL1; try apply SC; eauto; try refl; viewtac.
@@ -190,6 +212,12 @@ Proof.
     + etrans; eauto.
     + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
       etrans; eauto.
+  - (* assert fail *)
+    left.
+    exploit sim_local_abort; eauto. i. des.
+    exploit reorder_fence_abort; try exact FENCE; eauto. i. des.
+    unfold Thread.steps_abort. esplits; eauto.
+    econs 2. econs; eauto. econs. econs. ss.
 Qed.
 
 Lemma sim_fence_sim_thread:

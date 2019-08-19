@@ -969,3 +969,17 @@ Proof.
   - unfold TView.write_fence_sc.
     repeat (try condtac; aggrtac; try apply WF0).
 Qed.
+
+Lemma reorder_fence_abort
+      ordr1 ordw1
+      lc0 sc0 mem0 lc1 sc1
+      (ORDR1: Ordering.le ordr1 Ordering.acqrel)
+      (ORDW1: Ordering.le ordw1 Ordering.relaxed)
+      (WF0: Local.wf lc0 mem0)
+      (STEP1: Local.fence_step lc0 sc0 ordr1 ordw1 lc1 sc1)
+      (STEP2: Local.abort_step lc1):
+    <<STEP1: Local.abort_step lc0>>.
+Proof.
+  inv STEP2. econs.
+  eapply fence_step_promise_consistent; eauto.
+Qed.

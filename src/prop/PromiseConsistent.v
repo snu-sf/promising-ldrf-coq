@@ -101,14 +101,19 @@ Lemma fence_step_promise_consistent
       lc1 sc1 mem1 ordr ordw lc2 sc2
       (STEP: Local.fence_step lc1 sc1 ordr ordw lc2 sc2)
       (WF: Local.wf lc1 mem1)
-      (SC: Memory.closed_timemap sc1 mem1)
-      (MEM: Memory.closed mem1)
       (CONS: Local.promise_consistent lc2):
   Local.promise_consistent lc1.
 Proof.
-  exploit Local.fence_step_future; eauto. i. des.
-  inversion STEP. subst. ii. exploit CONS; eauto. i.
-  eapply TimeFacts.le_lt_lt; eauto. apply TVIEW_FUTURE.
+  inv STEP. ii.
+  exploit CONS; eauto. i.
+  eapply TimeFacts.le_lt_lt; eauto.
+  cut (TView.le (Local.tview lc1)
+                (TView.write_fence_tview (TView.read_fence_tview (Local.tview lc1) ordr) sc1 ordw)).
+  { i. inv H. apply CUR. }
+  etrans.
+  - eapply TViewFacts.write_fence_tview_incr. apply WF.
+  - eapply TViewFacts.write_fence_tview_mon; try refl; try apply WF.
+    eapply TViewFacts.read_fence_tview_incr. apply WF.
 Qed.
 
 Lemma ordering_relaxed_dec
