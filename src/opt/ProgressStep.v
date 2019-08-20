@@ -63,9 +63,7 @@ Proof.
       i. des.
       esplits. econs; [|econs 6]; eauto. econs. econs.
     + hexploit Local.bot_promise_consistent; eauto. i.
-      destruct (Const.eq_dec (RegFile.eval_expr rs1 e) 0).
-      * esplits. econs; [|econs 7]; eauto. econs. econs. ss.
-      * esplits. econs; [|econs 1]; eauto. econs. econs. ss.
+      esplits. econs; [|econs 7]; eauto. econs. econs.
   - esplits. econs; [|econs 1]; eauto. econs.
   - esplits. econs; [|econs 1]; eauto. econs.
 Grab Existential Variables.

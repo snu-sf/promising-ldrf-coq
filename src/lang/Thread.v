@@ -133,17 +133,17 @@ Module Thread.
     .
     Hint Constructors opt_step.
 
-    Definition steps_abort (e1: t): Prop :=
+    Definition steps_failure (e1: t): Prop :=
       exists e2 e3,
         <<STEPS: rtc tau_step e1 e2>> /\
-        <<ABORT: step true ThreadEvent.abort e2 e3>>.
-    Hint Unfold steps_abort.
+        <<FAILURE: step true ThreadEvent.failure e2 e3>>.
+    Hint Unfold steps_failure.
 
     Definition consistent (e:t): Prop :=
       forall mem1 sc1
         (CAP: Memory.cap e.(local).(Local.promises) e.(memory) mem1)
         (SC_MAX: Memory.max_full_timemap mem1 sc1),
-        <<ABORT: steps_abort (mk e.(state) e.(local) sc1 mem1)>> \/
+        <<FAILURE: steps_failure (mk e.(state) e.(local) sc1 mem1)>> \/
         exists e2,
           <<STEPS: rtc tau_step (mk e.(state) e.(local) sc1 mem1) e2>> /\
           <<PROMISES: e2.(local).(Local.promises) = Memory.bot>>.

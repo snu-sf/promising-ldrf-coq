@@ -354,11 +354,11 @@ Proof.
           { apply RegSet.add_spec. left. eauto. }
           { apply RegSet.add_spec. left. eauto. }
         * etrans; eauto.
-    - (* assert fail *)
+    - (* assert failure *)
       left.
-      exploit sim_local_abort; eauto. i. des.
-      exploit reorder_read_abort; eauto. i. des.
-      unfold Thread.steps_abort. esplits; eauto.
+      exploit sim_local_failure; eauto. i. des.
+      exploit reorder_read_failure; eauto. i. des.
+      unfold Thread.steps_failure. esplits; eauto.
       econs 2. econs; eauto. econs. econs.
       erewrite <- RegFile.eq_except_expr; eauto.
       apply RegFile.eq_except_singleton.
@@ -511,12 +511,12 @@ Proof.
     + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
       * apply RegFun.add_add. ii. subst. apply REGS. apply RegSet.add_spec. auto.
       * etrans; eauto.
-  - (* assert fail *)
+  - (* assert failure *)
     left.
-    exploit sim_local_abort; eauto. i. des.
-    exploit reorder_fulfill_abort; eauto. i. des.
-    exploit reorder_read_abort; eauto. i. des.
-    unfold Thread.steps_abort. esplits; eauto.
+    exploit sim_local_failure; eauto. i. des.
+    exploit reorder_fulfill_failure; eauto. i. des.
+    exploit reorder_read_failure; eauto. i. des.
+    unfold Thread.steps_failure. esplits; eauto.
     econs 2. econs; eauto. econs. econs.
     erewrite <- RegFile.eq_except_expr; eauto.
     apply RegFile.eq_except_singleton.
@@ -547,7 +547,7 @@ Proof.
       punfold SIM. exploit SIM; try apply SC3; eauto; try refl. s. i. des.
       exploit PROMISES; eauto. i. des.
       * left.
-        unfold Thread.steps_abort in *. des.
+        unfold Thread.steps_failure in *. des.
         esplits; [|eauto].
         etrans; eauto. etrans; [|eauto].
         inv STEP_SRC; eauto. econs 2; eauto. econs.

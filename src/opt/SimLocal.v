@@ -497,12 +497,12 @@ Proof.
     + apply WF1_TGT.
 Qed.
 
-Lemma sim_local_abort
+Lemma sim_local_failure
       pview
       lc1_src lc1_tgt
-      (STEP_TGT: Local.abort_step lc1_tgt)
+      (STEP_TGT: Local.failure_step lc1_tgt)
       (LOCAL1: sim_local pview lc1_src lc1_tgt):
-    <<STEP_SRC: Local.abort_step lc1_src>>.
+    <<STEP_SRC: Local.failure_step lc1_src>>.
 Proof.
   inv STEP_TGT. inv LOCAL1. inv PROMISES. econs. ii.
   destruct (Memory.get loc ts lc1_tgt.(Local.promises)) as [[]|] eqn:GETP.
@@ -553,7 +553,7 @@ Proof.
     esplits; (try by econs; [|econs 5]; eauto); ss.
   - exploit sim_local_fence; eauto; try refl. i. des.
     esplits; (try by econs; [|econs 6]; eauto); ss.
-  - exploit sim_local_abort; eauto. i. des.
+  - exploit sim_local_failure; eauto. i. des.
     esplits; (try by econs; [|econs 7]; eauto); ss.
 Qed.
 

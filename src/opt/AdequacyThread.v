@@ -155,14 +155,14 @@ Proof.
     exploit TERMINAL_TGT; eauto. i. des.
     punfold x2. exploit x2; try exact x; try exact x0; try exact SC; try exact SC0; eauto. i. des.
     exploit TERMINAL; eauto. i. des.
-    + (* abort *)
-      left. unfold Thread.steps_abort in ABORT. des.
+    + (* failure *)
+      left. unfold Thread.steps_failure in FAILURE. des.
       exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
-      exploit Thread.step_future; try exact ABORT; eauto. s. i. des.
-      unfold Configuration.steps_abort.
+      exploit Thread.step_future; try exact FAILURE; eauto. s. i. des.
+      unfold Configuration.steps_failure.
       destruct e3. ss.
       esplits; [refl|]. econs; eauto.
-    + (* non-abort *)
+    + (* non-failure *)
       exploit thread_rtc_step_rtc_step; try exact STEPS; eauto; i.
       { guardH TID. exploit IN; try eapply TID; eauto. i. des.
         esplits. eapply sim_thread_future; try exact x1; eauto. }
@@ -183,7 +183,7 @@ Proof.
       { inv NODUP. ss. }
       des.
       * left.
-        unfold Configuration.steps_abort in *. des.
+        unfold Configuration.steps_failure in *. des.
         rewrite STEPS0 in x3. esplits; try exact x3; eauto.
       * right.
         rewrite x1 in x3. esplits; try exact x3; eauto.
@@ -199,8 +199,8 @@ Proof.
       exploit sim_thread_future; eauto. i.
       exploit sim_thread_plus_step; try exact STEPS; try exact x1; eauto. s. i. des; ss.
       left.
-      unfold Thread.steps_abort in ABORT. des.
-      unfold Configuration.steps_abort.
+      unfold Thread.steps_failure in FAILURE. des.
+      unfold Configuration.steps_failure.
       destruct e3. ss.
       esplits; eauto. econs; eauto.
     + destruct e2. ss.
@@ -213,8 +213,8 @@ Proof.
       exploit sim_thread_future; eauto. i.
       exploit sim_thread_plus_step; try exact STEPS; try exact x1; eauto. s. i. des.
       * left.
-        unfold Thread.steps_abort in ABORT. des.
-        unfold Configuration.steps_abort.
+        unfold Thread.steps_failure in FAILURE. des.
+        unfold Configuration.steps_failure.
         destruct e3. ss.
         esplits; eauto. econs; eauto.
       * right. inv STEP0.

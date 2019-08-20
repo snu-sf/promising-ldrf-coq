@@ -183,7 +183,7 @@ Proof.
   exploit Memory.max_full_timemap_exists; try apply x0. i. des.
   hexploit Memory.max_full_timemap_closed; eauto. i.
   exploit CONS; eauto. s. i. des.
-  - inv ABORT. des. inv ABORT; inv STEP. inv LOCAL. inv LOCAL0.
+  - inv FAILURE. des. inv FAILURE; inv STEP. inv LOCAL. inv LOCAL0.
     hexploit rtc_tau_step_promise_consistent; try exact STEPS; eauto.
   - hexploit rtc_tau_step_promise_consistent; try exact STEPS; eauto.
     ii. rewrite PROMISES, Memory.bot_get in *. congr.

@@ -317,11 +317,11 @@ Proof.
     repeat condtac; aggrtac.
 Qed.
 
-Lemma reorder_read_abort
+Lemma reorder_read_failure
       lc0 mem0 loc1 ts1 val1 released1 ord1 lc1
       (STEP1: Local.read_step lc0 mem0 loc1 ts1 val1 released1 ord1 lc1)
-      (STEP2: Local.abort_step lc1):
-  <<STEP1: Local.abort_step lc0>>.
+      (STEP2: Local.failure_step lc1):
+  <<STEP1: Local.failure_step lc0>>.
 Proof.
   inv STEP2. hexploit read_step_promise_consistent; eauto.
 Qed.
@@ -514,11 +514,11 @@ Proof.
   esplits; eauto.
 Qed.
 
-Lemma reorder_fulfill_abort
+Lemma reorder_fulfill_failure
       lc0 sc0 loc1 from1 to1 val1 releasedm1 released1 ord1 lc1 sc1
       (STEP1: fulfill_step lc0 sc0 loc1 from1 to1 val1 releasedm1 released1 ord1 lc1 sc1)
-      (STEP2: Local.abort_step lc1):
-  <<STEP1: Local.abort_step lc0>>.
+      (STEP2: Local.failure_step lc1):
+  <<STEP1: Local.failure_step lc0>>.
 Proof.
   inv STEP2. econs.
   eapply fulfill_step_promise_consistent; eauto.
@@ -970,15 +970,15 @@ Proof.
     repeat (try condtac; aggrtac; try apply WF0).
 Qed.
 
-Lemma reorder_fence_abort
+Lemma reorder_fence_failure
       ordr1 ordw1
       lc0 sc0 mem0 lc1 sc1
       (ORDR1: Ordering.le ordr1 Ordering.acqrel)
       (ORDW1: Ordering.le ordw1 Ordering.relaxed)
       (WF0: Local.wf lc0 mem0)
       (STEP1: Local.fence_step lc0 sc0 ordr1 ordw1 lc1 sc1)
-      (STEP2: Local.abort_step lc1):
-    <<STEP1: Local.abort_step lc0>>.
+      (STEP2: Local.failure_step lc1):
+    <<STEP1: Local.failure_step lc0>>.
 Proof.
   inv STEP2. econs.
   eapply fence_step_promise_consistent; eauto.

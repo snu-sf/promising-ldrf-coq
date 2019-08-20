@@ -281,11 +281,11 @@ Proof.
     + eauto.
     + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
       etrans; eauto.
-  - (* assert fail *)
+  - (* assert failure *)
     left.
-    exploit sim_local_abort; try exact LOCAL1; try exact SC; eauto; try refl. i. des.
-    exploit reorder_read_abort; try exact x0; eauto. i. des.
-    unfold Thread.steps_abort. esplits; eauto.
+    exploit sim_local_failure; try exact LOCAL1; try exact SC; eauto; try refl. i. des.
+    exploit reorder_read_failure; try exact x0; eauto. i. des.
+    unfold Thread.steps_failure. esplits; eauto.
     econs 2. econs; eauto. econs. econs.
     erewrite <- RegFile.eq_except_expr; eauto.
     apply RegFile.eq_except_singleton.

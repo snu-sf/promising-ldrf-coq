@@ -77,7 +77,7 @@ Module RegFile.
         (Instr.update lhs loc rmw ordr ordw)
         (ProgramEvent.update loc valr valw ordr ordw)
         (RegFun.add lhs valret rf)
-  | eval_update_fail
+  | eval_update_failure
       rf lhs loc rmw ordr ordw valr valret
       (RMW: eval_rmw rf rmw valr = (valret, None)):
       eval_instr
@@ -99,21 +99,12 @@ Module RegFile.
         (Instr.syscall lhs rhses)
         (ProgramEvent.syscall (Event.mk lhs_val (map (eval_value rf) rhses)))
         (RegFun.add lhs lhs_val rf)
-  | eval_assert_success
-      rf e
-      (ASSERT: eval_expr rf e <> 0):
+  | eval_abort
+      rf:
       eval_instr
         rf
-        (Instr.assert e)
-        (ProgramEvent.silent)
-        rf
-  | eval_assert_fail
-      rf e
-      (ASSERT: eval_expr rf e = 0):
-      eval_instr
-        rf
-        (Instr.assert e)
-        (ProgramEvent.abort)
+        Instr.abort
+        (ProgramEvent.failure)
         rf
   .
 
@@ -270,10 +261,7 @@ Module RegFile.
         unfold RegFun.add, RegFun.find. condtac; auto.
       + ii. eapply REGS; eauto.
         apply RegSet.add_spec. auto.
-    - erewrite <- eq_except_expr in ASSERT; eauto.
-      esplits; eauto. econs. auto.
-    - erewrite <- eq_except_expr in ASSERT; eauto.
-      esplits; eauto. econs. auto.
+    - esplits; eauto. econs.
   Qed.
 
   Lemma instr_ord_eval_instr

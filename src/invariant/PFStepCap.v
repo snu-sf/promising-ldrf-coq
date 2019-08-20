@@ -989,7 +989,7 @@ Module PFStepCap.
     - exploit fence_step; eauto. i. des.
       esplits; try exact LOCAL2; eauto.
       inv LOCAL. ss.
-    - exploit abort_step; eauto. i. des.
+    - exploit failure_step; eauto. i. des.
       esplits; eauto.
   Qed.
 

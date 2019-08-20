@@ -40,7 +40,7 @@ Section Simulation.
       (MEM_FUTURE_TGT: Memory.future mem0_tgt mem1_tgt),
       <<TERMINAL:
         forall (TERMINAL_TGT: Threads.is_terminal ths1_tgt),
-          <<ABORT: Configuration.steps_abort (Configuration.mk ths1_src sc1_src mem1_src)>> \/
+          <<FAILURE: Configuration.steps_failure (Configuration.mk ths1_src sc1_src mem1_src)>> \/
           exists ths2_src sc2_src mem2_src,
             <<STEPS_SRC: rtc Configuration.tau_step (Configuration.mk ths1_src sc1_src mem1_src) (Configuration.mk ths2_src sc2_src mem2_src)>> /\
             <<SC: TimeMap.le sc2_src sc1_tgt>> /\
@@ -49,7 +49,7 @@ Section Simulation.
       <<STEP:
         forall e tid_tgt ths3_tgt sc3_tgt mem3_tgt
           (STEP_TGT: Configuration.step e tid_tgt (Configuration.mk ths1_tgt sc1_tgt mem1_tgt) (Configuration.mk ths3_tgt sc3_tgt mem3_tgt)),
-          <<ABORT: Configuration.steps_abort (Configuration.mk ths1_src sc1_src mem1_src)>> \/
+          <<FAILURE: Configuration.steps_failure (Configuration.mk ths1_src sc1_src mem1_src)>> \/
           exists tid_src ths2_src sc2_src mem2_src ths3_src sc3_src mem3_src,
             <<STEPS_SRC: rtc Configuration.tau_step (Configuration.mk ths1_src sc1_src mem1_src) (Configuration.mk ths2_src sc2_src mem2_src)>> /\
             <<STEP_SRC: Configuration.opt_step e tid_src (Configuration.mk ths2_src sc2_src mem2_src) (Configuration.mk ths3_src sc3_src mem3_src)>> /\

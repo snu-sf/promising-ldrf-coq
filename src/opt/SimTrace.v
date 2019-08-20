@@ -210,10 +210,10 @@ Proof.
     + left.
       exploit STEP; eauto. i. des. inv SIM0; [|done].
       inv EVT. inv STEP_SRC.
-      exploit sim_local_abort;
+      exploit sim_local_failure;
         (try exact LOCAL);
         eauto. i. des.
-      unfold Thread.steps_abort.
+      unfold Thread.steps_failure.
       esplits;
         (try by apply rtc_lang_tau_step_rtc_thread_tau_step; eauto).
       econs 2. econs; [|econs 7]; eauto.
@@ -310,17 +310,7 @@ Proof.
       apply RegFile.eq_except_add. ss.
   - inv ORD. esplits; eauto.
     + econs.
-    + econs 2. econs.
-      ss. econs.
-      erewrite <- RegFile.eq_except_expr; eauto.
-      symmetry. ss.
-    + left. apply sim_trace_nil. ss.
-  - inv ORD. esplits; eauto.
-    + econs.
-    + econs 2. econs.
-      ss. econs.
-      erewrite <- RegFile.eq_except_expr; eauto.
-      symmetry. ss.
+    + econs 2. econs. econs.
     + left. apply sim_trace_nil. ss.
 Qed.
 

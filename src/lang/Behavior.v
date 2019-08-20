@@ -45,9 +45,9 @@ Inductive behaviors
     (STEP: step (MachineEvent.syscall e) tid c1 c2)
     (NEXT: behaviors step c2 beh):
     behaviors step c1 (e::beh)
-| behaviors_abort
+| behaviors_failure
     tid c1 c2 beh
-    (STEP: step MachineEvent.abort tid c1 c2):
+    (STEP: step MachineEvent.failure tid c1 c2):
     behaviors step c1 beh
 | behaviors_tau
     tid c1 c2 beh

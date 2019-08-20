@@ -96,10 +96,10 @@ Module Logic.
           (ST1: S tid lang st1)
           (STEP: lang.(Language.step) (ProgramEvent.syscall e) st1 st2),
           S tid lang st2;
-      ABORT:
+      FAILURE:
         forall tid lang st1 st2
           (ST1: S tid lang st1)
-          (STEP: lang.(Language.step) ProgramEvent.abort st1 st2),
+          (STEP: lang.(Language.step) ProgramEvent.failure st1 st2),
           <<ST2: forall tid lang st, S tid lang st>> /\
           <<ASSIGN2: forall assign, J assign>>;
     }.
@@ -254,7 +254,7 @@ Section Invariant.
       { hexploit sem_memory_write_step_neq; eauto. }
     - exploit FENCE; eauto.
     - exploit SYSCALL; eauto.
-    - exploit ABORT; eauto. i. des.
+    - exploit FAILURE; eauto. i. des.
       esplits; eauto.
   Qed.
 
@@ -364,9 +364,9 @@ Section Invariant.
     hexploit PFStepCap.sim_memory_inhabited; try apply SIM0; try apply WF_CAP; try apply CLOSED_CAP. s. i. des.
     apply vals_incl_sem_memory in VALS; auto.
     exploit CONSISTENT; eauto. i. des.
-    - unfold Thread.steps_abort in *. des.
+    - unfold Thread.steps_failure in *. des.
       exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
-      inv ABORT0; try by inv STEP.
+      inv FAILURE0; try by inv STEP.
       exploit PFStepCap.thread_rtc_tau_step; eauto.
       { inv STEP. inv LOCAL. inv LOCAL0. ss. }
       i. des.
@@ -375,7 +375,7 @@ Section Invariant.
       i. des.
       exploit thread_rtc_pf_step_sem; try exact STEPS_SRC; eauto. i. des.
       inv STEP_SRC. inv STEP0. inv LOGIC.
-      exploit ABORT; try exact STATE; eauto. i. des.
+      exploit FAILURE; try exact STATE; eauto. i. des.
       ii. eauto.
     - exploit Thread.rtc_tau_step_future; eauto. s. i. des.
       exploit PFStepCap.thread_rtc_tau_step; eauto.
@@ -388,11 +388,11 @@ Section Invariant.
       eapply future_sem_memory; eauto.
   Qed.
 
-  Lemma configuration_abort_step_sem
+  Lemma configuration_failure_step_sem
         tid c1 c2
         (WF: Configuration.wf c1)
         (SEM: sem c1)
-        (STEP: Configuration.step MachineEvent.abort tid c1 c2):
+        (STEP: Configuration.step MachineEvent.failure tid c1 c2):
     sem c2.
   Proof.
     inv SEM. inv STEP; try by (destruct e; ss).
@@ -417,7 +417,7 @@ Section Invariant.
     { inv SIM. ss. rewrite STATE. eauto. }
     i. des.
     inv STEP_SRC. inv LOGIC. ss.
-    exploit ABORT; try exact STATE; eauto. i. des.
+    exploit FAILURE; try exact STATE; eauto. i. des.
     econs; ss; ii; eauto.
   Qed.
 
@@ -426,7 +426,7 @@ Section Invariant.
         (WF: Configuration.wf c1)
         (SEM: sem c1)
         (STEP: Configuration.step e tid c1 c2)
-        (EVENT: e <> MachineEvent.abort):
+        (EVENT: e <> MachineEvent.failure):
     sem c2.
   Proof.
     inv SEM. inv STEP; ss.
@@ -467,7 +467,7 @@ Section Invariant.
     destruct e.
     - eapply configuration_normal_step_sem; eauto. ss.
     - eapply configuration_normal_step_sem; eauto. ss.
-    - eapply configuration_abort_step_sem; eauto.
+    - eapply configuration_failure_step_sem; eauto.
   Qed.
 
   Inductive Configuration_step_evt (c1 c2:Configuration.t): Prop :=

@@ -37,7 +37,7 @@ Proof.
   dependent induction PR; i.
   - punfold SIM. exploit SIM; eauto; try refl. i. des.
     exploit TERMINAL0; eauto. i. des.
-    + inv ABORT. des.
+    + inv FAILURE. des.
       eapply rtc_tau_step_behavior; eauto.
       econs 3. eauto.
     + eapply rtc_tau_step_behavior; eauto.
@@ -45,7 +45,7 @@ Proof.
   - destruct c2.
     punfold SIM. exploit SIM; eauto; try refl. i. des.
     exploit STEP0; eauto. i. des.
-    + inv ABORT. des.
+    + inv FAILURE. des.
       eapply rtc_tau_step_behavior; eauto.
       econs 3. eauto.
     + inv SIM0; [|done].
@@ -58,7 +58,7 @@ Proof.
   - destruct c2.
     punfold SIM. exploit SIM; eauto; try refl. i. des.
     exploit STEP0; eauto. i. des.
-    + inv ABORT. des.
+    + inv FAILURE. des.
       eapply rtc_tau_step_behavior; eauto.
       econs 3; eauto.
     + inv SIM0; [|done].
@@ -69,7 +69,7 @@ Proof.
   - destruct c2.
     punfold SIM. exploit SIM; eauto; try refl. i. des.
     exploit STEP0; eauto. i. des.
-    + inv ABORT. des.
+    + inv FAILURE. des.
       eapply rtc_tau_step_behavior; eauto.
       econs 3; eauto.
     + inv SIM0; [|done].

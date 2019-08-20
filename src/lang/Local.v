@@ -32,7 +32,7 @@ Module ThreadEvent.
   | update (loc:FLoc.t) (tsr tsw:Time.t) (valr valw:Const.t) (releasedr releasedw:option View.t) (ordr ordw:Ordering.t)
   | fence (ordr ordw:Ordering.t)
   | syscall (e:Event.t)
-  | abort
+  | failure
   .
   Hint Constructors t.
 
@@ -65,7 +65,7 @@ Module ThreadEvent.
     | _ => None
     end.
 
-  Definition get_program_event (e:t) : ProgramEvent.t :=
+  Definition get_program_event (e:t): ProgramEvent.t :=
     match e with
     | promise _ _ _ _ _  => ProgramEvent.silent
     | silent => ProgramEvent.silent
@@ -74,13 +74,13 @@ Module ThreadEvent.
     | update loc _ _ valr valw _ _ ordr ordw => ProgramEvent.update loc valr valw ordr ordw
     | fence ordr ordw => ProgramEvent.fence ordr ordw
     | syscall ev => ProgramEvent.syscall ev
-    | abort => ProgramEvent.abort
+    | failure => ProgramEvent.failure
     end.
 
   Definition get_machine_event (e: t): MachineEvent.t :=
     match e with
     | syscall e => MachineEvent.syscall e
-    | abort => MachineEvent.abort
+    | failure => MachineEvent.failure
     | _ => MachineEvent.silent
     end.
 
@@ -136,8 +136,8 @@ Module ThreadEvent.
       le (fence ordr ordw) (fence ordr ordw)
   | le_syscall e:
       le (syscall e) (syscall e)
-  | le_abort:
-      le abort abort
+  | le_failure:
+      le failure failure
   .
   Hint Constructors le.
 
@@ -156,8 +156,8 @@ Module ThreadEvent.
       fence (Ordering.join ord0 ordr) (Ordering.join ord0 ordw)
     | syscall e =>
       syscall e
-    | abort =>
-      abort
+    | failure =>
+      failure
     end.
 
   Lemma lift_plain e:
@@ -279,11 +279,11 @@ Module Local.
   .
   Hint Constructors fence_step.
 
-  Inductive abort_step (lc1:t): Prop :=
-  | abort_step_intro
+  Inductive failure_step (lc1:t): Prop :=
+  | failure_step_intro
       (CONSISTENT: promise_consistent lc1)
   .
-  Hint Constructors abort_step.
+  Hint Constructors failure_step.
 
   Inductive program_step: forall (e:ThreadEvent.t) lc1 sc1 mem1 lc2 sc2 mem2, Prop :=
   | step_silent
@@ -317,10 +317,10 @@ Module Local.
       e lc2 sc2
       (LOCAL: Local.fence_step lc1 sc1 Ordering.seqcst Ordering.seqcst lc2 sc2):
       program_step (ThreadEvent.syscall e) lc1 sc1 mem1 lc2 sc2 mem1
-  | step_abort
+  | step_failure
       lc1 sc1 mem1
-      (LOCAL: Local.abort_step lc1):
-      program_step ThreadEvent.abort lc1 sc1 mem1 lc1 sc1 mem1
+      (LOCAL: Local.failure_step lc1):
+      program_step ThreadEvent.failure lc1 sc1 mem1 lc1 sc1 mem1
   .
   Hint Constructors program_step.
 

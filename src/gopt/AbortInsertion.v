@@ -137,7 +137,7 @@ Section AssertInsertion.
       (SIM: sim_stmts tid stmts_src stmts_tgt)
       (SUCCESS: forall rs (SOUND: S tid lang (State.mk rs stmts_src)),
           RegFile.eval_expr rs e <> 0):
-      sim_stmts tid stmts_src ((Stmt.instr (Instr.assert e))::stmts_tgt)
+      sim_stmts tid stmts_src ((Stmt.ite e nil [Stmt.instr Instr.abort])::stmts_tgt)
   .
   Hint Constructors sim_stmts.
 
@@ -163,7 +163,7 @@ Section AssertInsertion.
         e st1_tgt st2_tgt
         (SIM1: sim_state tid st1_src st1_tgt)
         (STEP: lang.(Language.step) e st1_tgt st2_tgt)
-        (EVENT: e <> ProgramEvent.abort):
+        (EVENT: e <> ProgramEvent.failure):
     exists st2_src,
       <<STEP_SRC: opt_lang_step e st1_src st2_src>> /\
       <<SIM2: sim_state tid st2_src st2_tgt>>.
@@ -208,7 +208,7 @@ Section AssertInsertion.
         e e1_tgt e2_tgt
         (SIM1: sim_thread tid e1_src e1_tgt)
         (STEP_TGT: Thread.program_step e e1_tgt e2_tgt)
-        (EVENT: e <> ThreadEvent.abort):
+        (EVENT: e <> ThreadEvent.failure):
     exists e2_src,
       <<STEP_SRC: opt_program_step e e1_src e2_src>> /\
       <<SIM2: sim_thread tid e2_src e2_tgt>>.
@@ -248,7 +248,7 @@ Section AssertInsertion.
         pf e e1_tgt e2_tgt
         (SIM1: sim_thread tid e1_src e1_tgt)
         (STEP_TGT: Thread.step pf e e1_tgt e2_tgt)
-        (EVENT: e <> ThreadEvent.abort):
+        (EVENT: e <> ThreadEvent.failure):
     exists e2_src,
       <<STEP_SRC: Thread.opt_step e e1_src e2_src>> /\
       <<SIM2: sim_thread tid e2_src e2_tgt>>.
@@ -304,13 +304,13 @@ Section AssertInsertion.
     - esplits; try exact SIM0. econs 2; eauto.
   Qed.
 
-  Lemma sim_thread_abort_step
+  Lemma sim_thread_failure_step
         tid e1_src
         pf e1_tgt e2_tgt
         (SIM1: sim_thread tid e1_src e1_tgt)
-        (STEP_TGT: Thread.step pf ThreadEvent.abort e1_tgt e2_tgt):
+        (STEP_TGT: Thread.step pf ThreadEvent.failure e1_tgt e2_tgt):
     (exists e2_src,
-        <<STEP_SRC: Thread.step pf ThreadEvent.abort e1_src e2_src>> /\
+        <<STEP_SRC: Thread.step pf ThreadEvent.failure e1_src e2_src>> /\
         <<SIM2: sim_thread tid e2_src e2_tgt>>) \/
     (exists e stmts,
         <<STMTS: e1_tgt.(Thread.state).(State.stmts) = (Stmt.instr (Instr.assert e))::stmts>> /\
@@ -328,17 +328,17 @@ Section AssertInsertion.
     - right. esplits; eauto.
   Qed.
 
-  Lemma sim_thread_steps_abort
+  Lemma sim_thread_steps_failure
         tid e1_src e1_tgt
         pf e2_tgt e3_tgt
         (SIM1: sim_thread tid e1_src e1_tgt)
         (STEPS_TGT: rtc (@Thread.tau_step lang) e1_tgt e2_tgt)
-        (ABORT_TGT: Thread.step pf ThreadEvent.abort e2_tgt e3_tgt):
+        (FAILURE_TGT: Thread.step pf ThreadEvent.failure e2_tgt e3_tgt):
     exists e2_src,
       <<STEPS_SRC: rtc (@Thread.tau_step lang) e1_src e2_src>> /\
       <<SIM2: sim_thread tid e2_src e2_tgt>> /\
       ((exists e3_src,
-           <<ABORT_SRC: Thread.step pf ThreadEvent.abort e2_src e3_src>> /\
+           <<FAILURE_SRC: Thread.step pf ThreadEvent.failure e2_src e3_src>> /\
            <<SIM3: sim_thread tid e3_src e3_tgt>>) \/
        (exists e stmts,
            <<STMTS: e2_tgt.(Thread.state).(State.stmts) = (Stmt.instr (Instr.assert e))::stmts>> /\
@@ -347,7 +347,7 @@ Section AssertInsertion.
   Proof.
     exploit sim_thread_rtc_tau_step; eauto. i. des.
     exists e2_src. splits; auto.
-    exploit sim_thread_abort_step; try exact SIM2; eauto.
+    exploit sim_thread_failure_step; try exact SIM2; eauto.
   Qed.
 
 
@@ -443,7 +443,7 @@ Section AssertInsertion.
       inv STATE. inv STMTS. ss.
     }
     inv STEP_TGT.
-    { (* abort step *)
+    { (* failure step *)
       exploit sim_conf_find; eauto. i. des.
       exploit x1; eauto. i. des. clear x0 x1.
       destruct c_src as [ths1_src sc1_src mem1_src].
@@ -453,10 +453,10 @@ Section AssertInsertion.
       exploit FIND_TGT; eauto. i. subst.
       clear FIND_SRC FIND_TGT THREADS.
       exploit sim_conf_sim_thread; eauto. s. intro SIM_TH.
-      exploit sim_thread_steps_abort; eauto. i. des.
+      exploit sim_thread_steps_failure; eauto. i. des.
       - destruct e3_src. ss.
         assert (STEP_SRC: Configuration.step
-                            MachineEvent.abort tid
+                            MachineEvent.failure tid
                             (Configuration.mk ths1_src sc1 mem1)
                             (Configuration.mk
                                (IdentMap.add tid (existT (fun (lang: language) => lang.(Language.state)) lang state, local) ths1_src)
@@ -527,7 +527,7 @@ Section AssertInsertion.
     exploit Memory.max_full_timemap_exists; try apply CLOSED_CAP. i. des.
     hexploit Memory.max_full_timemap_closed; try exact x1; eauto. intro SC_MAX.
     exploit CONSISTENT; eauto. s. i. des.
-    { (* abort certification *)
+    { (* failure certification *)
       exploit sim_thread_rtc_tau_step; try exact STEPS; eauto. i. des.
       exploit sim_thread_step; try exact STEP; eauto. i. des.
       destruct e2_src0.
@@ -541,9 +541,9 @@ Section AssertInsertion.
         { dup SIM0. inv SIM1. ss. subst. ii. ss. left.
           exploit Memory.cap_inj; [exact CAP|exact CAP0|..]; eauto. i. subst.
           exploit Memory.max_full_timemap_inj; [exact x1|exact SC_MAX0|..]. i. subst.
-          unfold Thread.steps_abort in *. des.
-          exploit (@sim_thread_steps_abort tid (Thread.mk lang state lc3 sc0 mem0));
-            try exact STEPS0; try exact ABORT0; eauto.
+          unfold Thread.steps_failure in *. des.
+          exploit (@sim_thread_steps_failure tid (Thread.mk lang state lc3 sc0 mem0));
+            try exact STEPS0; try exact FAILURE0; eauto.
           i. des; try by (esplits; eauto).
           exfalso.
           exploit tau_opt_all; try exact STEPS_SRC; eauto. i.
@@ -555,7 +555,7 @@ Section AssertInsertion.
           exploit PFStepCap.sim_thread_exists; try exact SIM4; eauto. s. i. des.
           exploit PFStepCap.thread_rtc_tau_step; try exact STEPS_SRC0; eauto.
           { inv SIM1. rewrite LOCAL.
-            inv ABORT0; inv STEP0. inv LOCAL0. inv LOCAL1. ss. }
+            inv FAILURE0; inv STEP0. inv LOCAL0. inv LOCAL1. ss. }
           i. des.
           inv SEM. ss. exploit TH; eauto. i.
           exploit thread_rtc_all_step_sem; try exact STEPS_SRC; eauto.
@@ -573,7 +573,7 @@ Section AssertInsertion.
             - eapply Memory.cap_closed; eauto. }
           i. des.
           inv SIM6. rewrite STATE0 in *.
-          inv ABORT0; inv STEP0. inv STATE1. inv INSTR. inv STMTS.
+          inv FAILURE0; inv STEP0. inv STATE1. inv INSTR. inv STMTS.
           inv SIM1. ss. inv STATE1. ss. subst.
           eapply ASSERT; eauto.
         }

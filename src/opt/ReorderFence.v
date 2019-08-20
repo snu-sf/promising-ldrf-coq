@@ -212,11 +212,11 @@ Proof.
     + etrans; eauto.
     + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
       etrans; eauto.
-  - (* assert fail *)
+  - (* assert failure *)
     left.
-    exploit sim_local_abort; eauto. i. des.
-    exploit reorder_fence_abort; try exact FENCE; eauto. i. des.
-    unfold Thread.steps_abort. esplits; eauto.
+    exploit sim_local_failure; eauto. i. des.
+    exploit reorder_fence_failure; try exact FENCE; eauto. i. des.
+    unfold Thread.steps_failure. esplits; eauto.
     econs 2. econs; eauto. econs. econs. ss.
 Qed.
 
