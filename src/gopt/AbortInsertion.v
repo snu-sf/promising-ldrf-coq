@@ -135,9 +135,9 @@ Section AssertInsertion.
   | sim_stmts_assert
       e stmts_src stmts_tgt
       (SIM: sim_stmts tid stmts_src stmts_tgt)
-      (SUCCESS: forall rs (SOUND: S tid lang (State.mk rs stmts_src)),
+      (SUCCESS: forall rs (TH: S tid lang (State.mk rs stmts_src)),
           RegFile.eval_expr rs e <> 0):
-      sim_stmts tid stmts_src ((Stmt.ite e nil [Stmt.instr Instr.abort])::stmts_tgt)
+      sim_stmts tid stmts_src ((Stmt.ite e [Stmt.instr Instr.abort] nil)::stmts_tgt)
   .
   Hint Constructors sim_stmts.
 
@@ -162,6 +162,7 @@ Section AssertInsertion.
         tid st1_src
         e st1_tgt st2_tgt
         (SIM1: sim_state tid st1_src st1_tgt)
+        (TH: S tid lang st1_src)
         (STEP: lang.(Language.step) e st1_tgt st2_tgt)
         (EVENT: e <> ProgramEvent.failure):
     exists st2_src,
@@ -181,9 +182,10 @@ Section AssertInsertion.
     - inv STEP. esplits.
       + econs 2. econs; eauto.
       + ss.
-    - inv STEP; inv INSTR; ss. esplits.
-      + econs 1.
-      + ss.
+    - inv STEP.
+      condtac; ss.
+      + exploit SUCCESS; eauto. ss.
+      + esplits; [econs 1|]. ss.
   Qed.
 
   Lemma sim_thread_promise_step
