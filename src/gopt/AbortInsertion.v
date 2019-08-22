@@ -95,7 +95,7 @@ Proof.
 Qed.
 
 
-Section AssertInsertion.
+Section AbortInsertion.
   Variable
     (S:ThreadsProp)
     (J:MemoryProp)
@@ -737,7 +737,7 @@ Section AssertInsertion.
   Qed.
 
 
-  (* assert insertion *)
+  (* abort insertion *)
 
   Definition syntax_tids (pgm: Threads.syntax): IdentSet.t :=
     List.fold_right (fun p s => IdentSet.add (fst p) s) IdentSet.empty (IdentMap.elements pgm).
@@ -754,8 +754,8 @@ Section AssertInsertion.
            end; ss; congr.
   Qed.
 
-  Inductive insert_assert (program_tgt: Threads.syntax): Prop :=
-  | insert_assert_intro
+  Inductive insert_abort (program_tgt: Threads.syntax): Prop :=
+  | insert_abort_intro
       (TIDS: syntax_tids program_tgt = syntax_tids program)
       (FIND_SRC: forall tid l syn_src
                    (FIND: IdentMap.find tid program = Some (existT _ l syn_src)),
@@ -771,7 +771,7 @@ Section AssertInsertion.
 
   Theorem init_sim_conf
           program_tgt
-          (INSERT: insert_assert program_tgt):
+          (INSERT: insert_abort program_tgt):
     sim_conf (Configuration.init program) (Configuration.init program_tgt).
   Proof.
     inv INSERT. econs; ss; i.
@@ -821,4 +821,4 @@ Section AssertInsertion.
       unfold State.init. econs; ss.
       eapply THREADS; eauto.
   Qed.
-End AssertInsertion.
+End AbortInsertion.
