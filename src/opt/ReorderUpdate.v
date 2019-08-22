@@ -59,12 +59,6 @@ Inductive reorder_update r1 l1 rmw1 or1 ow1: forall (i2:Instr.t), Prop :=
     (REGS: RegSet.disjoint (Instr.regs_of (Instr.update r1 l1 rmw1 or1 ow1))
                            (Instr.regs_of (Instr.update r2 l2 rmw2 or2 ow2))):
     reorder_update r1 l1 rmw1 or1 ow1 (Instr.update r2 l2 rmw2 or2 ow2)
-| reorder_update_assert
-    e
-    (ORDW1: Ordering.le ow1 Ordering.relaxed)
-    (REGS: RegSet.disjoint (RegSet.singleton r1)
-                           (Instr.regs_of (Instr.assert e))):
-    reorder_update r1 l1 rmw1 or1 ow1 (Instr.assert e)
 .
 
 Inductive sim_update: forall (st_src:lang.(Language.state)) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t)
@@ -125,6 +119,7 @@ Proof.
   destruct vw1 as [vw1|]; cycle 1.
   { ss; des; subst. econs; [eauto|..]; s; eauto; etrans; eauto. }
   exploit future_fulfill_step; try exact FULFILL; eauto.
+  { by inv REORDER. }
   i. des.
   exploit sim_local_fulfill_bot; try apply x0; try exact LOCAL0; try refl;
     try exact WF0; try by viewtac.
@@ -176,6 +171,7 @@ Proof.
   exploit future_read_step; try exact READ; eauto. i. des.
   exploit Local.read_step_future; eauto. i. des.
   exploit future_fulfill_step; try exact FULFILL; eauto; try refl; try by viewtac.
+  { by inv REORDER. }
   i. des.
   exploit fulfill_step_future; try apply x1; try exact WF1; eauto; try by viewtac.
   { econs.
@@ -220,15 +216,13 @@ Lemma sim_update_step
                    st1_src lc1_src sc1_src mem1_src
                    st1_tgt lc1_tgt sc1_tgt mem1_tgt.
 Proof.
-  inv SIM. ii.
+  inv SIM. ii. right.
   exploit Local.read_step_future; eauto. i. des.
   destruct vw1 as [vw1|]; cycle 1.
   { ss. des. subst.
-    (* inv STEP_TGT. admit. inv STEP. inv LOCAL0. inv STATE. - inv INSTR; inv REORDER. *)
     inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
       try (inv STATE; inv INSTR; inv REORDER); ss.
     - (* promise *)
-      right.
       exploit Local.promise_step_future; eauto. i. des.
       exploit sim_local_promise_bot; eauto. i. des.
       exploit reorder_read_promise; try exact READ; try exact STEP_SRC; eauto. i. des.
@@ -238,22 +232,7 @@ Proof.
       + econs 2. econs. econs; eauto.
       + eauto.
       + right. econs; [eauto|..]; s; eauto. etrans; eauto.
-    - (* assert success *)
-      right.
-      esplits.
-      + ss.
-      + econs 2;[|econs 1]. econs.
-        * econs. econs 2. econs; [|econs 1]. ss. econs. econs.
-          erewrite <- RegFile.eq_except_expr; eauto.
-          apply RegFile.eq_except_singleton.
-        * ss.
-      + econs 2. econs 2. econs; [|econs 2]; eauto. econs. econs. eauto.
-      + eauto.
-      + eauto.
-      + eauto.
-      + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
     - (* load *)
-      right.
       exploit sim_local_read; (try by etrans; eauto); eauto; try refl. i. des.
       exploit reorder_read_read; try exact READ; try exact STEP_SRC; try by eauto. i. des.
       esplits.
@@ -274,7 +253,6 @@ Proof.
         * apply RegSet.singleton_spec. eauto.
         * apply RegSet.add_spec. auto.
     - (* update-load *)
-      right.
       guardH ORDW2.
       exploit sim_local_read; (try by etrans; eauto); eauto; try refl. i. des.
       exploit reorder_read_read; try exact READ; try exact STEP_SRC; try by eauto. i. des.
@@ -301,7 +279,6 @@ Proof.
         * apply RegSet.add_spec. left. eauto.
         * apply RegSet.add_spec. left. eauto.
     - (* store *)
-      right.
       guardH ORD2.
       hexploit sim_local_write_bot; try exact LOCAL1; try exact SC;
         try exact WF2; try refl; eauto; try by viewtac. i. des.
@@ -320,7 +297,6 @@ Proof.
       + etrans; eauto.
       + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss. etrans; eauto.
     - (* update *)
-      right.
       guardH ORDW2.
       exploit Local.read_step_future; try exact LOCAL1; eauto. i. des.
       exploit sim_local_read; try exact LOCAL1; eauto; try refl. i. des.
@@ -354,21 +330,12 @@ Proof.
           { apply RegSet.add_spec. left. eauto. }
           { apply RegSet.add_spec. left. eauto. }
         * etrans; eauto.
-    - (* assert failure *)
-      left.
-      exploit sim_local_failure; eauto. i. des.
-      exploit reorder_read_failure; eauto. i. des.
-      unfold Thread.steps_failure. esplits; eauto.
-      econs 2. econs; eauto. econs. econs.
-      erewrite <- RegFile.eq_except_expr; eauto.
-      apply RegFile.eq_except_singleton.
   }
 
   exploit fulfill_step_future; eauto. i. des.
   inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
     try (inv STATE; inv INSTR; inv REORDER); ss.
   - (* promise *)
-    right.
     exploit Local.promise_step_future; eauto. i. des.
     exploit sim_local_promise; try apply LOCAL0; (try by etrans; eauto); eauto. i. des.
     exploit reorder_update_promise; try exact READ; try exact FULFILL; try exact STEP_SRC; eauto. i. des.
@@ -383,23 +350,7 @@ Proof.
     + right. econs; [eauto|..]; s; eauto.
       * etrans; eauto.
       * eapply Memory.future_closed_timemap; eauto.
-  - (* assert success *)
-    right.
-    exploit fulfill_write; eauto. i. des.
-    esplits.
-    + ss.
-    + econs 2;[|econs 1]. econs.
-      * econs. econs 2. econs; [|econs 1]. ss. econs. econs.
-        erewrite <- RegFile.eq_except_expr; eauto.
-        apply RegFile.eq_except_singleton.
-      * ss.
-    + econs 2. econs 2. econs; [|econs 4]; eauto. econs. econs. eauto.
-    + eauto.
-    + eauto.
-    + etrans; eauto.
-    + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
   - (* load *)
-    right.
     apply RegSet.disjoint_add in REGS. des.
     exploit sim_local_read; try apply LOCAL0; (try by etrans; eauto); eauto; try refl. i. des.
     exploit reorder_update_read; try exact FULFILL; try exact READ; try exact STEP_SRC; eauto. i. des.
@@ -422,7 +373,6 @@ Proof.
       apply RegFun.add_add. ii. subst. eapply REGS.
       apply RegSet.Facts.singleton_iff. auto.
   - (* update-load *)
-    right.
     guardH ORDW2.
     apply RegSet.disjoint_add in REGS. des.
     exploit sim_local_read; try apply LOCAL0; (try by etrans; eauto); eauto; try refl. i. des.
@@ -450,7 +400,6 @@ Proof.
       apply RegFun.add_add. ii. subst.
       eapply REGS. apply RegSet.add_spec. auto.
   - (* store *)
-    right.
     guardH ORD2.
     apply RegSet.disjoint_add in REGS. des.
     hexploit sim_local_write_bot; try exact LOCAL1; try exact LOCAL; try exact SC; try exact WF0; try refl; eauto; try by viewtac. i. des.
@@ -476,7 +425,6 @@ Proof.
     + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
       etrans; eauto.
   - (* update *)
-    right.
     guardH ORDW2.
     apply RegSet.disjoint_add in REGS. des.
     symmetry in REGS0. apply RegSet.disjoint_add in REGS0. des.
@@ -511,15 +459,6 @@ Proof.
     + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
       * apply RegFun.add_add. ii. subst. apply REGS. apply RegSet.add_spec. auto.
       * etrans; eauto.
-  - (* assert failure *)
-    left.
-    exploit sim_local_failure; eauto. i. des.
-    exploit reorder_fulfill_failure; eauto. i. des.
-    exploit reorder_read_failure; eauto. i. des.
-    unfold Thread.steps_failure. esplits; eauto.
-    econs 2. econs; eauto. econs. econs.
-    erewrite <- RegFile.eq_except_expr; eauto.
-    apply RegFile.eq_except_singleton.
 Grab Existential Variables.
 { econs 2. }
 { econs. econs 3. }

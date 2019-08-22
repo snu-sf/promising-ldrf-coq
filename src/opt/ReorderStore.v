@@ -54,10 +54,6 @@ Inductive reorder_store l1 v1 o1: forall (i2:Instr.t), Prop :=
     (LOC: l1 <> l2)
     (REGS: RegSet.disjoint (Instr.regs_of (Instr.store l1 v1 o1)) (RegSet.singleton r2)):
     reorder_store l1 v1 o1 (Instr.update r2 l2 rmw2 or2 ow2)
-| reorder_store_assert
-    e
-    (ORD1: Ordering.le o1 Ordering.relaxed):
-    reorder_store l1 v1 o1 (Instr.assert e)
 .
 
 Inductive sim_store: forall (st_src:lang.(Language.state)) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t)
@@ -106,6 +102,7 @@ Lemma sim_store_mon
             st_tgt lc_tgt sc2_tgt mem2_tgt.
 Proof.
   inv SIM1. exploit future_fulfill_step; try exact FULFILL; eauto; try refl.
+  { by inv REORDER. }
   i. des. econs; eauto.
 Qed.
 
@@ -129,6 +126,7 @@ Proof.
   exploit fulfill_step_future; try exact WF_SRC;
     eauto using Memory.future_closed_timemap. i. des.
   exploit future_fulfill_step; try exact FULFILL; eauto.
+  { by inv REORDER. }
   i. des.
   exploit fulfill_step_cap; eauto. i.
   exploit SimPromises.cap; try exact MEM1; eauto.
@@ -151,12 +149,11 @@ Lemma sim_store_step
                      st1_src lc1_src sc1_src mem1_src
                      st1_tgt lc1_tgt sc1_tgt mem1_tgt.
 Proof.
-  inv SIM. ii.
+  inv SIM. ii. right.
   exploit fulfill_step_future; eauto; try viewtac. i. des.
   inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
     try (inv STATE; inv INSTR; inv REORDER); ss.
   - (* promise *)
-    right.
     exploit Local.promise_step_future; eauto. i. des.
     exploit sim_local_promise; try exact LOCAL0; (try by etrans; eauto); eauto. i. des.
     exploit reorder_fulfill_promise; try exact FULFILL; try exact STEP_SRC; eauto. i. des.
@@ -170,21 +167,7 @@ Proof.
     + auto.
     + right. econs; eauto.
       eapply Memory.future_closed_timemap; eauto.
-  - (* assert success *)
-    right.
-    exploit fulfill_write; eauto. i. des.
-    esplits.
-    + ss.
-    + econs 2;[|econs 1]. econs.
-      * econs. econs 2. econs; [|econs 1]. ss. econs. econs. ss.
-      * ss.
-    + econs 2. econs 2. econs; [|econs 3]; eauto. econs. econs.
-    + eauto.
-    + eauto.
-    + etrans; eauto.
-    + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
   - (* load *)
-    right.
     exploit sim_local_read; try exact LOCAL0; (try by etrans; eauto); eauto; try refl. i. des.
     exploit reorder_fulfill_read; try exact FULFILL; try exact STEP_SRC; eauto. i. des.
     exploit Local.read_step_future; try exact STEP1; eauto. i. des.
@@ -204,7 +187,6 @@ Proof.
     + etrans; eauto.
     + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
   - (* update-load *)
-    right.
     exploit sim_local_read; try exact LOCAL0; (try by etrans; eauto); eauto; try refl. i. des.
     exploit reorder_fulfill_read; try exact FULFILL; try exact STEP_SRC; eauto. i. des.
     exploit Local.read_step_future; try exact STEP1; eauto. i. des.
@@ -224,7 +206,6 @@ Proof.
     + etrans; eauto.
     + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
   - (* store *)
-    right.
     hexploit sim_local_write_bot; try exact LOCAL1; eauto; try refl; try by viewtac. i. des.
     hexploit reorder_fulfill_write; try exact FULFILL; try exact STEP_SRC; eauto; try by viewtac. i. des.
     exploit Local.write_step_future; try exact STEP1; eauto; try by viewtac. i. des.
@@ -241,7 +222,6 @@ Proof.
     + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
       etrans; eauto.
   - (* update *)
-    right.
     exploit fulfill_step_future; try exact FULFILL; eauto; try by viewtac. i. des.
     exploit Local.read_step_future; try exact LOCAL1; eauto; try by viewtac. i. des.
     exploit sim_local_read; try exact LOCAL1; (try by etrans; eauto); eauto; try refl. i. des.
@@ -266,12 +246,6 @@ Proof.
     + etrans; eauto. etrans; eauto.
     + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
       etrans; eauto.
-  - (* assert failure *)
-    left.
-    exploit sim_local_failure; try exact LOCAL1; eauto. i. des.
-    exploit reorder_fulfill_failure; eauto. i. des.
-    unfold Thread.steps_failure. esplits; eauto.
-    econs 2. econs; eauto. econs. econs. ss.
 Qed.
 
 Lemma sim_store_sim_thread:

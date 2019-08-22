@@ -31,7 +31,6 @@ Require Import SimThread.
 Require ReorderTView.
 Require Import MemoryReorder.
 Require Import MemoryMerge.
-Require Import PromiseConsistent.
 
 Require Import Syntax.
 Require Import Semantics.
@@ -65,6 +64,8 @@ Qed.
 
 Lemma future_fulfill_step
       lc1 sc1 sc1' loc from to val releasedm releasedm' released ord lc2 sc2
+      (* TODO: unnecessary premise *)
+      (ORD: Ordering.le ord Ordering.relaxed)
       (REL_LE: View.opt_le releasedm' releasedm)
       (STEP: fulfill_step lc1 sc1 loc from to val releasedm released ord lc2 sc2):
   fulfill_step lc1 sc1' loc from to val releasedm' released ord lc2 sc1'.
@@ -317,15 +318,6 @@ Proof.
     repeat condtac; aggrtac.
 Qed.
 
-Lemma reorder_read_failure
-      lc0 mem0 loc1 ts1 val1 released1 ord1 lc1
-      (STEP1: Local.read_step lc0 mem0 loc1 ts1 val1 released1 ord1 lc1)
-      (STEP2: Local.failure_step lc1):
-  <<STEP1: Local.failure_step lc0>>.
-Proof.
-  inv STEP2. hexploit read_step_promise_consistent; eauto.
-Qed.
-
 Lemma reorder_fulfill_read
       loc1 from1 to1 val1 releasedm1 released1 ord1
       loc2 ts2 val2 released2 ord2
@@ -512,16 +504,6 @@ Proof.
   hexploit sim_local_write_bot; try exact STEP3; try exact LOCAL; try refl; eauto. i. des.
   hexploit reorder_fulfill_write; try exact STEP4; try exact STEP3; eauto. i. des.
   esplits; eauto.
-Qed.
-
-Lemma reorder_fulfill_failure
-      lc0 sc0 loc1 from1 to1 val1 releasedm1 released1 ord1 lc1 sc1
-      (STEP1: fulfill_step lc0 sc0 loc1 from1 to1 val1 releasedm1 released1 ord1 lc1 sc1)
-      (STEP2: Local.failure_step lc1):
-  <<STEP1: Local.failure_step lc0>>.
-Proof.
-  inv STEP2. econs.
-  eapply fulfill_step_promise_consistent; eauto.
 Qed.
 
 Lemma reorder_update_read
@@ -968,18 +950,4 @@ Proof.
     + apply SimPromises.sem_bot.
   - unfold TView.write_fence_sc.
     repeat (try condtac; aggrtac; try apply WF0).
-Qed.
-
-Lemma reorder_fence_failure
-      ordr1 ordw1
-      lc0 sc0 mem0 lc1 sc1
-      (ORDR1: Ordering.le ordr1 Ordering.acqrel)
-      (ORDW1: Ordering.le ordw1 Ordering.relaxed)
-      (WF0: Local.wf lc0 mem0)
-      (STEP1: Local.fence_step lc0 sc0 ordr1 ordw1 lc1 sc1)
-      (STEP2: Local.failure_step lc1):
-    <<STEP1: Local.failure_step lc0>>.
-Proof.
-  inv STEP2. econs.
-  eapply fence_step_promise_consistent; eauto.
 Qed.
