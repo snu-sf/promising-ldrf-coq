@@ -2478,35 +2478,12 @@ Module Memory.
     rewrite bot_get in *. congr.
   Qed.
 
-  Lemma remove_max_ts
-        mem1 loc from to msg mem2
-        (REMOVE: remove mem1 loc from to msg mem2):
-    max_ts loc mem1 = max_ts loc mem2 \/
-    to = max_ts loc mem1 /\
-    Time.le (max_ts loc mem2) from.
-  Proof.
-    exploit remove_get0; eauto. i. des.
-    exploit max_ts_spec; try exact GET. i. des.
-    inv MAX.
-    - left.
-      destruct (get loc (max_ts loc mem1) mem2) as [[]|] eqn:GET2.
-      + exploit max_ts_spec; try exact GET2. i. des.
-        revert GET3. erewrite remove_o; eauto. condtac; ss. i.
-        guardH o.
-        exploit max_ts_spec; try exact GET3. i. des.
-        apply TimeFacts.antisym; eauto.
-      + revert GET2. erewrite remove_o; eauto. condtac; ss; i.
-        * des. subst. timetac.
-        * congr.
-    - right.
-  Admitted.
-
   Lemma promise_no_half_except
         promises1 promises2 mem1 mem2
         loc from to msg kind
         (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
-        (NOHALF1: no_half_except promises1 mem1)
-        (HALF1: half_wf promises1 mem1):
+        (HALF1: half_wf promises1 mem1)
+        (NOHALF1: no_half_except promises1 mem1):
     no_half_except promises2 mem2.
   Proof.
     ii. inv PROMISE.
