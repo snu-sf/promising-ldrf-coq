@@ -65,6 +65,7 @@ Module Threads.
       + apply TView.bot_wf.
       + apply TView.bot_closed.
       + ii. rewrite Memory.bot_get in LHS. congr.
+      + ii. rewrite Memory.bot_get in GET. congr.
   Qed.
 
   Lemma terminal_consistent

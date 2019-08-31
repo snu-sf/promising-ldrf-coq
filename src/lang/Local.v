@@ -186,6 +186,7 @@ Module Local.
       (TVIEW_CLOSED: TView.closed lc.(tview) mem)
       (PROMISES: Memory.le lc.(promises) mem)
       (BOT: Memory.bot_none lc.(promises))
+      (HALF: Memory.half_wf lc.(promises) mem)
   .
   Hint Constructors wf.
 
@@ -198,6 +199,7 @@ Module Local.
     inv WF. econs; eauto.
     - eapply TView.cap_closed; eauto.
     - eapply Memory.cap_le; eauto.
+    - eapply Memory.cap_half_wf; eauto.
   Qed.
 
   Inductive disjoint (lc1 lc2:t): Prop :=

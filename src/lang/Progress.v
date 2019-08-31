@@ -34,7 +34,7 @@ Proof.
   apply Memory.ext. i. rewrite Memory.bot_get.
   inv WRITE.
   erewrite Memory.remove_o; eauto. condtac; ss. guardH o.
-  inv PROMISE.
+  inv PROMISE; ss.
   - erewrite Memory.add_o; eauto. condtac; ss.
     apply Memory.bot_get.
   - erewrite Memory.split_o; eauto. repeat condtac; ss.
