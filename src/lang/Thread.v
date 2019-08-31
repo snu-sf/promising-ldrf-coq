@@ -436,107 +436,107 @@ Module Thread.
     Definition no_half_except (e: t) :=
       Memory.no_half_except e.(local).(Local.promises) e.(memory).
 
-    Lemma step_no_half_except
-          pf e e1 e2
-          (STEP: step pf e e1 e2)
-          (NOHALF1: no_half_except e1):
-      no_half_except e2.
-    Proof.
-      inv STEP; inv STEP0.
-      - eapply Local.promise_step_no_half_except; eauto.
-      - eapply Local.program_step_no_half_except; eauto.
-    Qed.
+    (* Lemma step_no_half_except *)
+    (*       pf e e1 e2 *)
+    (*       (STEP: step pf e e1 e2) *)
+    (*       (NOHALF1: no_half_except e1): *)
+    (*   no_half_except e2. *)
+    (* Proof. *)
+    (*   inv STEP; inv STEP0. *)
+    (*   - eapply Local.promise_step_no_half_except; eauto. *)
+    (*   - eapply Local.program_step_no_half_except; eauto. *)
+    (* Qed. *)
 
-    Lemma rtc_tau_step_no_half_except
-          e1 e2
-          (STEP: rtc tau_step e1 e2)
-          (NOHALF1: no_half_except e1):
-      no_half_except e2.
-    Proof.
-      induction STEP; ss; i.
-      eapply IHSTEP. inv H. inv TSTEP.
-      eapply step_no_half_except; eauto.
-    Qed.
+    (* Lemma rtc_tau_step_no_half_except *)
+    (*       e1 e2 *)
+    (*       (STEP: rtc tau_step e1 e2) *)
+    (*       (NOHALF1: no_half_except e1): *)
+    (*   no_half_except e2. *)
+    (* Proof. *)
+    (*   induction STEP; ss; i. *)
+    (*   eapply IHSTEP. inv H. inv TSTEP. *)
+    (*   eapply step_no_half_except; eauto. *)
+    (* Qed. *)
 
-    Lemma step_bot_no_half
-          pf e e1 e2
-          (STEP: step pf e e1 e2)
-          (WF1: Local.wf e1.(local) e1.(memory))
-          (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
-          (CLOSED1: Memory.closed e1.(memory))
-          (NOHALF1: Memory.no_half e1.(memory))
-          (PROMISES2: e2.(local).(Local.promises) = Memory.bot):
-      Memory.no_half e2.(memory).
-    Proof.
-      exploit step_future; eauto. i. des.
-      hexploit step_no_half_except; eauto; i.
-      { eapply Memory.no_half_no_half_except; eauto. }
-      unfold no_half_except in *. rewrite PROMISES2 in *.
-      eapply Memory.no_half_except_bot_no_half; eauto.
-      apply CLOSED2.
-    Qed.
+    (* Lemma step_bot_no_half *)
+    (*       pf e e1 e2 *)
+    (*       (STEP: step pf e e1 e2) *)
+    (*       (WF1: Local.wf e1.(local) e1.(memory)) *)
+    (*       (SC1: Memory.closed_timemap e1.(sc) e1.(memory)) *)
+    (*       (CLOSED1: Memory.closed e1.(memory)) *)
+    (*       (NOHALF1: Memory.no_half e1.(memory)) *)
+    (*       (PROMISES2: e2.(local).(Local.promises) = Memory.bot): *)
+    (*   Memory.no_half e2.(memory). *)
+    (* Proof. *)
+    (*   exploit step_future; eauto. i. des. *)
+    (*   hexploit step_no_half_except; eauto; i. *)
+    (*   { eapply Memory.no_half_no_half_except; eauto. } *)
+    (*   unfold no_half_except in *. rewrite PROMISES2 in *. *)
+    (*   eapply Memory.no_half_except_bot_no_half; eauto. *)
+    (*   apply CLOSED2. *)
+    (* Qed. *)
 
-    Lemma rtc_tau_step_bot_no_half
-          e1 e2
-          (STEP: rtc tau_step e1 e2)
-          (WF1: Local.wf e1.(local) e1.(memory))
-          (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
-          (CLOSED1: Memory.closed e1.(memory))
-          (NOHALF1: Memory.no_half e1.(memory))
-          (PROMISES2: e2.(local).(Local.promises) = Memory.bot):
-      Memory.no_half e2.(memory).
-    Proof.
-      exploit rtc_tau_step_future; eauto. i. des.
-      hexploit rtc_tau_step_no_half_except; eauto; i.
-      { eapply Memory.no_half_no_half_except; eauto. }
-      unfold no_half_except in *. rewrite PROMISES2 in *.
-      eapply Memory.no_half_except_bot_no_half; eauto.
-      apply CLOSED2.
-    Qed.
+    (* Lemma rtc_tau_step_bot_no_half *)
+    (*       e1 e2 *)
+    (*       (STEP: rtc tau_step e1 e2) *)
+    (*       (WF1: Local.wf e1.(local) e1.(memory)) *)
+    (*       (SC1: Memory.closed_timemap e1.(sc) e1.(memory)) *)
+    (*       (CLOSED1: Memory.closed e1.(memory)) *)
+    (*       (NOHALF1: Memory.no_half e1.(memory)) *)
+    (*       (PROMISES2: e2.(local).(Local.promises) = Memory.bot): *)
+    (*   Memory.no_half e2.(memory). *)
+    (* Proof. *)
+    (*   exploit rtc_tau_step_future; eauto. i. des. *)
+    (*   hexploit rtc_tau_step_no_half_except; eauto; i. *)
+    (*   { eapply Memory.no_half_no_half_except; eauto. } *)
+    (*   unfold no_half_except in *. rewrite PROMISES2 in *. *)
+    (*   eapply Memory.no_half_except_bot_no_half; eauto. *)
+    (*   apply CLOSED2. *)
+    (* Qed. *)
 
 
     (* step_non_promised *)
 
-    Lemma step_non_promised
-          pf e e1 e2
-          l f t m
-          (STEP: step pf e e1 e2)
-          (GETP1: Memory.get l t e1.(local).(Local.promises) = None)
-          (GET1: Memory.get l t e1.(memory) = Some (f, m)):
-      <<GETP2: Memory.get l t e2.(local).(Local.promises) = None>> /\
-      <<GET2: Memory.get l t e2.(memory) = Some (f, m)>>.
-    Proof.
-      inv STEP; inv STEP0.
-      - eapply Local.promise_step_non_promised; eauto.
-      - eapply Local.program_step_non_promised; eauto.
-    Qed.
+    (* Lemma step_non_promised *)
+    (*       pf e e1 e2 *)
+    (*       l f t m *)
+    (*       (STEP: step pf e e1 e2) *)
+    (*       (GETP1: Memory.get l t e1.(local).(Local.promises) = None) *)
+    (*       (GET1: Memory.get l t e1.(memory) = Some (f, m)): *)
+    (*   <<GETP2: Memory.get l t e2.(local).(Local.promises) = None>> /\ *)
+    (*   <<GET2: Memory.get l t e2.(memory) = Some (f, m)>>. *)
+    (* Proof. *)
+    (*   inv STEP; inv STEP0. *)
+    (*   - eapply Local.promise_step_non_promised; eauto. *)
+    (*   - eapply Local.program_step_non_promised; eauto. *)
+    (* Qed. *)
 
-    Lemma rtc_all_step_non_promised
-          e1 e2
-          l f t m
-          (STEP: rtc all_step e1 e2)
-          (GETP1: Memory.get l t e1.(local).(Local.promises) = None)
-          (GET1: Memory.get l t e1.(memory) = Some (f, m)):
-      <<GETP2: Memory.get l t e2.(local).(Local.promises) = None>> /\
-      <<GET2: Memory.get l t e2.(memory) = Some (f, m)>>.
-    Proof.
-      induction STEP; ss; i.
-      inv H. inv USTEP.
-      exploit step_non_promised; eauto. i. des. eauto.
-    Qed.
+    (* Lemma rtc_all_step_non_promised *)
+    (*       e1 e2 *)
+    (*       l f t m *)
+    (*       (STEP: rtc all_step e1 e2) *)
+    (*       (GETP1: Memory.get l t e1.(local).(Local.promises) = None) *)
+    (*       (GET1: Memory.get l t e1.(memory) = Some (f, m)): *)
+    (*   <<GETP2: Memory.get l t e2.(local).(Local.promises) = None>> /\ *)
+    (*   <<GET2: Memory.get l t e2.(memory) = Some (f, m)>>. *)
+    (* Proof. *)
+    (*   induction STEP; ss; i. *)
+    (*   inv H. inv USTEP. *)
+    (*   exploit step_non_promised; eauto. i. des. eauto. *)
+    (* Qed. *)
 
-    Lemma rtc_tau_step_non_promised
-          e1 e2
-          l f t m
-          (STEP: rtc tau_step e1 e2)
-          (GETP1: Memory.get l t e1.(local).(Local.promises) = None)
-          (GET1: Memory.get l t e1.(memory) = Some (f, m)):
-      <<GETP2: Memory.get l t e2.(local).(Local.promises) = None>> /\
-      <<GET2: Memory.get l t e2.(memory) = Some (f, m)>>.
-    Proof.
-      induction STEP; ss; i.
-      inv H. inv TSTEP.
-      exploit step_non_promised; eauto. i. des. eauto.
-    Qed.
+    (* Lemma rtc_tau_step_non_promised *)
+    (*       e1 e2 *)
+    (*       l f t m *)
+    (*       (STEP: rtc tau_step e1 e2) *)
+    (*       (GETP1: Memory.get l t e1.(local).(Local.promises) = None) *)
+    (*       (GET1: Memory.get l t e1.(memory) = Some (f, m)): *)
+    (*   <<GETP2: Memory.get l t e2.(local).(Local.promises) = None>> /\ *)
+    (*   <<GET2: Memory.get l t e2.(memory) = Some (f, m)>>. *)
+    (* Proof. *)
+    (*   induction STEP; ss; i. *)
+    (*   inv H. inv TSTEP. *)
+    (*   exploit step_non_promised; eauto. i. des. eauto. *)
+    (* Qed. *)
   End Thread.
 End Thread.

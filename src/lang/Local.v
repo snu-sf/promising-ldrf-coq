@@ -352,6 +352,7 @@ Module Local.
       + inv PROMISES0. inv ADD. auto.
       + inv PROMISES0. inv SPLIT. auto.
       + inv PROMISES0. inv LOWER. auto.
+      + econs.
     - by inv PROMISE.
   Qed.
 
@@ -401,7 +402,7 @@ Module Local.
     splits; eauto.
     - apply TViewFacts.write_tview_incr. auto.
     - refl.
-    - inv WRITE. inv PROMISE; try inv TS; auto.
+    - inv WRITE. inv PROMISE; try inv TS; ss.
   Qed.
 
   Lemma write_step_strong_relaxed
@@ -475,7 +476,7 @@ Module Local.
     <<INHABITED2: Memory.inhabited mem2>>.
   Proof.
     inv STEP.
-    inv PROMISE; eauto using Memory.add_inhabited, Memory.split_inhabited, Memory.lower_inhabited.
+    inv PROMISE; eauto using Memory.add_inhabited, Memory.split_inhabited, Memory.lower_inhabited, Memory.cancel_inhabited.
   Qed.
 
   Lemma program_step_inhabited
@@ -486,9 +487,9 @@ Module Local.
   Proof.
     inv STEP; eauto.
     - inv LOCAL. inv WRITE.
-      inv PROMISE; eauto using Memory.add_inhabited, Memory.split_inhabited, Memory.lower_inhabited.
+      inv PROMISE; eauto using Memory.add_inhabited, Memory.split_inhabited, Memory.lower_inhabited, Memory.cancel_inhabited.
     - inv LOCAL2. inv WRITE.
-      inv PROMISE; eauto using Memory.add_inhabited, Memory.split_inhabited, Memory.lower_inhabited.
+      inv PROMISE; eauto using Memory.add_inhabited, Memory.split_inhabited, Memory.lower_inhabited, Memory.cancel_inhabited.
   Qed.
 
 
@@ -588,63 +589,63 @@ Module Local.
 
   (* step_no_half_except *)
 
-  Lemma promise_step_no_half_except
-        lc1 mem1 loc from to msg lc2 mem2 kind
-        (STEP: promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
-        (NOHALF1: Memory.no_half_except lc1.(promises) mem1):
-    Memory.no_half_except lc2.(promises) mem2.
-  Proof.
-    ii. inv STEP. s.
-    eapply Memory.promise_no_half_except; eauto.
-  Qed.
+  (* Lemma promise_step_no_half_except *)
+  (*       lc1 mem1 loc from to msg lc2 mem2 kind *)
+  (*       (STEP: promise_step lc1 mem1 loc from to msg lc2 mem2 kind) *)
+  (*       (NOHALF1: Memory.no_half_except lc1.(promises) mem1): *)
+  (*   Memory.no_half_except lc2.(promises) mem2. *)
+  (* Proof. *)
+  (*   ii. inv STEP. s. *)
+  (*   eapply Memory.promise_no_half_except; eauto. *)
+  (* Qed. *)
 
-  Lemma program_step_no_half_except
-        e lc1 sc1 mem1 lc2 sc2 mem2
-        (STEP: program_step e lc1 sc1 mem1 lc2 sc2 mem2)
-        (NOHALF1: Memory.no_half_except lc1.(promises) mem1):
-    Memory.no_half_except lc2.(promises) mem2.
-  Proof.
-    ii. inv STEP; try inv LOCAL; eauto; ss.
-    - inv WRITE.
-      erewrite Memory.remove_o; eauto. condtac; ss.
-      + des. subst.
-        exploit Memory.promise_get0; eauto. i. des. congr.
-      + eapply Memory.promise_no_half_except; eauto.
-    - inv LOCAL1. inv LOCAL2. inv WRITE. ss.
-      erewrite Memory.remove_o; eauto. condtac; ss.
-      + des. subst.
-        exploit Memory.promise_get0; eauto. i. des. congr.
-      + eapply Memory.promise_no_half_except; eauto.
-  Qed.
+  (* Lemma program_step_no_half_except *)
+  (*       e lc1 sc1 mem1 lc2 sc2 mem2 *)
+  (*       (STEP: program_step e lc1 sc1 mem1 lc2 sc2 mem2) *)
+  (*       (NOHALF1: Memory.no_half_except lc1.(promises) mem1): *)
+  (*   Memory.no_half_except lc2.(promises) mem2. *)
+  (* Proof. *)
+  (*   ii. inv STEP; try inv LOCAL; eauto; ss. *)
+  (*   - inv WRITE. *)
+  (*     erewrite Memory.remove_o; eauto. condtac; ss. *)
+  (*     + des. subst. *)
+  (*       exploit Memory.promise_get0; eauto. i. des. congr. *)
+  (*     + eapply Memory.promise_no_half_except; eauto. *)
+  (*   - inv LOCAL1. inv LOCAL2. inv WRITE. ss. *)
+  (*     erewrite Memory.remove_o; eauto. condtac; ss. *)
+  (*     + des. subst. *)
+  (*       exploit Memory.promise_get0; eauto. i. des. congr. *)
+  (*     + eapply Memory.promise_no_half_except; eauto. *)
+  (* Qed. *)
 
 
   (* step_non_promised *)
 
-  Lemma promise_step_non_promised
-        lc1 mem1 loc from to msg lc2 mem2 kind
-        l f t m
-        (STEP: promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
-        (GETP1: Memory.get l t lc1.(promises) = None)
-        (GET1: Memory.get l t mem1 = Some (f, m)):
-    <<GETP2: Memory.get l t lc2.(promises) = None>> /\
-    <<GET2: Memory.get l t mem2 = Some (f, m)>>.
-  Proof.
-    inv STEP. ss.
-    eapply Memory.promise_get_None; eauto.
-  Qed.
+  (* Lemma promise_step_non_promised *)
+  (*       lc1 mem1 loc from to msg lc2 mem2 kind *)
+  (*       l f t m *)
+  (*       (STEP: promise_step lc1 mem1 loc from to msg lc2 mem2 kind) *)
+  (*       (GETP1: Memory.get l t lc1.(promises) = None) *)
+  (*       (GET1: Memory.get l t mem1 = Some (f, m)): *)
+  (*   <<GETP2: Memory.get l t lc2.(promises) = None>> /\ *)
+  (*   <<GET2: Memory.get l t mem2 = Some (f, m)>>. *)
+  (* Proof. *)
+  (*   inv STEP. ss. *)
+  (*   eapply Memory.promise_get_None; eauto. *)
+  (* Qed. *)
 
-  Lemma program_step_non_promised
-        e lc1 sc1 mem1 lc2 sc2 mem2
-        l f t m
-        (STEP: program_step e lc1 sc1 mem1 lc2 sc2 mem2)
-        (GETP1: Memory.get l t lc1.(promises) = None)
-        (GET1: Memory.get l t mem1 = Some (f, m)):
-    <<GETP2: Memory.get l t lc2.(promises) = None>> /\
-    <<GET2: Memory.get l t mem2 = Some (f, m)>>.
-  Proof.
-    inv STEP; try inv LOCAL; eauto; ss.
-    - eapply Memory.write_get_None; eauto.
-    - inv LOCAL1. inv LOCAL2. ss.
-      eapply Memory.write_get_None; eauto.
-  Qed.
+  (* Lemma program_step_non_promised *)
+  (*       e lc1 sc1 mem1 lc2 sc2 mem2 *)
+  (*       l f t m *)
+  (*       (STEP: program_step e lc1 sc1 mem1 lc2 sc2 mem2) *)
+  (*       (GETP1: Memory.get l t lc1.(promises) = None) *)
+  (*       (GET1: Memory.get l t mem1 = Some (f, m)): *)
+  (*   <<GETP2: Memory.get l t lc2.(promises) = None>> /\ *)
+  (*   <<GET2: Memory.get l t mem2 = Some (f, m)>>. *)
+  (* Proof. *)
+  (*   inv STEP; try inv LOCAL; eauto; ss. *)
+  (*   - eapply Memory.write_get_None; eauto. *)
+  (*   - inv LOCAL1. inv LOCAL2. ss. *)
+  (*     eapply Memory.write_get_None; eauto. *)
+  (* Qed. *)
 End Local.

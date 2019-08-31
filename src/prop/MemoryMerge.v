@@ -85,6 +85,9 @@ Module MemoryMerge.
     - econs; eauto.
       + eapply lower_lower_lower; eauto.
       + eapply lower_lower_lower; eauto.
+    - exploit Memory.remove_get0; try exact PROMISES0. i. des.
+      exploit Memory.lower_get0; try exact PROMISES. i. des.
+      congr.
   Qed.
 
   Lemma add_remove

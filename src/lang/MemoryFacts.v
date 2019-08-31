@@ -19,10 +19,11 @@ Set Implicit Arguments.
 Module MemoryFacts.
   Lemma promise_time_lt
         promises1 mem1 loc from to msg promises2 mem2 kind
-        (PROMISE: Memory.promise promises1 mem1 loc from to msg promises2 mem2 kind):
+        (PROMISE: Memory.promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (KIND: Memory.op_kind_is_cancel kind = false):
     Time.lt from to.
   Proof.
-    inv PROMISE.
+    inv PROMISE; ss.
     - inv MEM. inv ADD. auto.
     - inv MEM. inv SPLIT. auto.
     - inv MEM. inv LOWER. auto.
@@ -33,7 +34,8 @@ Module MemoryFacts.
         (WRITE: Memory.write promises1 mem1 loc from to val released promises2 mem2 kind):
     Time.lt from to.
   Proof.
-    inv WRITE. eapply promise_time_lt. eauto.
+    inv WRITE. eapply promise_time_lt; eauto.
+    inv PROMISE; ss.
   Qed.
 
   Lemma promise_get1_diff
@@ -55,6 +57,9 @@ Module MemoryFacts.
         rewrite GET in GET1. inv GET1. esplits; eauto.
       + esplits; eauto.
     - erewrite Memory.lower_o; eauto. condtac; ss.
+      + des. subst. congr.
+      + esplits; eauto.
+    - erewrite Memory.remove_o; eauto. condtac; ss.
       + des. subst. congr.
       + esplits; eauto.
   Qed.
@@ -79,6 +84,8 @@ Module MemoryFacts.
     - erewrite Memory.lower_o; eauto. condtac; ss.
       + des. subst. congr.
       + i. inv GET. esplits; eauto.
+    - erewrite Memory.remove_o; eauto. condtac; ss.
+      i. esplits; eauto.
   Qed.
 
   Lemma promise_get_promises_inv_diff
@@ -101,6 +108,8 @@ Module MemoryFacts.
     - erewrite Memory.lower_o; eauto. condtac; ss.
       + des. subst. congr.
       + i. inv GET. esplits; eauto.
+    - erewrite Memory.remove_o; eauto. condtac; ss.
+      i. esplits; eauto.
   Qed.
 
   Lemma remove_get_diff
@@ -164,7 +173,7 @@ Module MemoryFacts.
         (WRITE: Memory.write pm1 mem1 loc from to val released pm2 mem2 kind):
     to <> Time.bot.
   Proof.
-    ii. subst. inv WRITE. inv PROMISE.
+    ii. subst. inv WRITE. inv PROMISE; ss.
     - inv MEM. inv ADD. inv TO.
     - inv MEM. inv SPLIT. inv TS12.
     - inv MEM. inv LOWER. inv TS0.
@@ -215,6 +224,7 @@ Module MemoryFacts.
     inv CLOSED. rewrite INHABITED in GET. inv GET.
   Qed.
 
+  (* unused *)
   Lemma half_time_lt
         mem loc from to
         (CLOSED: Memory.closed mem)

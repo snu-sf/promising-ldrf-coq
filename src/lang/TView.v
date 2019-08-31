@@ -687,6 +687,8 @@ Module TViewFacts.
   Proof.
     hexploit Memory.op_inhabited; eauto; try by tac. i. des.
     unfold TView.write_tview.
+    destruct (Memory.op_kind_is_cancel kind) eqn:KIND.
+    { destruct kind; ss. inv OP. ss. }
     econs; repeat (try condtac; tac);
       (try by eapply Memory.op_closed_view; eauto; apply CLOSED2);
       (try by econs; tac; eapply Memory.op_closed_timemap; eauto; apply CLOSED0);
