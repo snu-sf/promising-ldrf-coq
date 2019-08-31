@@ -695,7 +695,7 @@ Module Memory.
         m1 loc from to msg m2 kind
         l f t m
         (OP: op m1 loc from to msg m2 kind)
-        (KIND: kind <> op_kind_cancel)
+        (KIND: op_kind_is_cancel kind = false)
         (GET: get l t m1 = Some (f, m)):
     exists f' m',
       <<GET: get l t m2 = Some (f', m')>> /\
@@ -711,7 +711,7 @@ Module Memory.
   Lemma op_get2
         m1 l f t msg m2 k
         (OP: op m1 l f t msg m2 k)
-        (KIND: k <> op_kind_cancel):
+        (KIND: op_kind_is_cancel k = false):
     get l t m2 = Some (f, msg).
   Proof.
     inv OP; ss.
@@ -725,7 +725,7 @@ Module Memory.
         mem1 loc from to msg mem2 kind
         l f t m
         (OP: op mem1 loc from to msg mem2 kind)
-        (KIND: kind <> op_kind_cancel)
+        (KIND: op_kind_is_cancel kind = false)
         (GET2: get l t mem2 = Some (f, m)):
     (l = loc /\ f = from /\ t = to /\ m = msg) \/
     (__guard__ (l <> loc \/ t <> to) /\
@@ -761,22 +761,30 @@ Module Memory.
     - eapply cancel_inhabited; eauto.
   Qed.
 
-  (* TODO: restrict to concrete messages *)
-  (* Lemma future_get1 *)
-  (*       loc from to msg mem1 mem2 *)
-  (*       (LE: future mem1 mem2) *)
-  (*       (GET: get loc to mem1 = Some (from, msg)): *)
-  (*   exists from' msg', *)
-  (*     <<GET: get loc to mem2 = Some (from', msg')>> /\ *)
-  (*     <<FROM: Time.le from from'>> /\ *)
-  (*     <<MSG_LE: Message.le msg' msg>>. *)
-  (* Proof. *)
-  (*   revert from msg GET. induction LE. *)
-  (*   { i. esplits; eauto; refl. } *)
-  (*   i. inv H. exploit op_get1; eauto. i. des. *)
-  (*   exploit IHLE; eauto. i. des. *)
-  (*   esplits; eauto. etrans; eauto. *)
-  (* Qed. *)
+  Lemma future_get1
+        loc from to val released mem1 mem2
+        (LE: future mem1 mem2)
+        (GET: get loc to mem1 = Some (from, Message.full val released)):
+    exists from' msg',
+      <<GET: get loc to mem2 = Some (from', msg')>> /\
+      <<FROM: Time.le from from'>> /\
+      <<MSG_LE: Message.le msg' (Message.full val released)>>.
+  Proof.
+    revert from val released GET. induction LE.
+    { i. esplits; eauto; refl. }
+    i. inv H.
+    destruct (op_kind_is_cancel kind) eqn:KIND.
+    - destruct kind; ss. inv OP.
+      exploit IHLE.
+      { erewrite remove_o; eauto. condtac; ss; eauto.
+        des. subst.
+        exploit remove_get0; eauto. i. des. congr. }
+      i. des.
+      esplits; eauto.
+    - exploit op_get1; eauto. i. des. inv MSG_LE.
+      exploit IHLE; eauto. i. des.
+      esplits; eauto. etrans; eauto.
+  Qed.
 
 
   (* Lemmas on closedness *)
@@ -1431,20 +1439,20 @@ Module Memory.
     etrans; eauto.
   Qed.
 
-  (* Lemma future_max_full_timemap *)
-  (*       mem1 mem2 mtm1 mtm2 *)
-  (*       (FUTURE: future mem1 mem2) *)
-  (*       (CLOSED1: closed mem1) *)
-  (*       (CLOSED2: closed mem2) *)
-  (*       (MAX1: max_full_timemap mem1 mtm1) *)
-  (*       (MAX2: max_full_timemap mem2 mtm2): *)
-  (*   TimeMap.le mtm1 mtm2. *)
-  (* Proof. *)
-  (*   eapply max_full_timemap_spec'; eauto. *)
-  (*   i. exploit max_full_timemap_closed; try eapply MAX1. i. des. *)
-  (*   exploit future_get1; eauto. i. des. *)
-  (*   inv MSG_LE. esplits; try refl; eauto. *)
-  (* Qed. *)
+  Lemma future_max_full_timemap
+        mem1 mem2 mtm1 mtm2
+        (FUTURE: future mem1 mem2)
+        (CLOSED1: closed mem1)
+        (CLOSED2: closed mem2)
+        (MAX1: max_full_timemap mem1 mtm1)
+        (MAX2: max_full_timemap mem2 mtm2):
+    TimeMap.le mtm1 mtm2.
+  Proof.
+    eapply max_full_timemap_spec'; eauto.
+    i. exploit max_full_timemap_closed; try eapply MAX1. i. des.
+    exploit future_get1; eauto. i. des.
+    inv MSG_LE. esplits; try refl; eauto.
+  Qed.
 
   Inductive max_full_view (mem: t): forall (view: View.t), Prop :=
   | max_full_view_intro
@@ -1789,62 +1797,66 @@ Module Memory.
 
   (* Lemmas on promise & remove *)
 
-  (* Lemma promise_get0 *)
-  (*       promises1 promises2 mem1 mem2 *)
-  (*       loc from to msg kind *)
-  (*       (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind): *)
-  (*   <<GET_PROMISES: get loc to promises2 = Some (from, msg)>> /\ *)
-  (*   <<GET_MEM: get loc to mem2 = Some (from, msg)>>. *)
-  (* Proof. *)
-  (*   inv PROMISE. *)
-  (*   - erewrite (add_o _ _ PROMISES). *)
-  (*     erewrite (add_o _ _ MEM). *)
-  (*     condtac; ss. des; congr. *)
-  (*   - erewrite (split_o _ _ PROMISES). *)
-  (*     erewrite (split_o _ _ MEM). *)
-  (*     repeat condtac; ss; des; intuition. *)
-  (*   - erewrite (lower_o _ _ PROMISES). *)
-  (*     erewrite (lower_o _ _ MEM). *)
-  (*     condtac; ss. des; congr. *)
-  (* Qed. *)
+  Lemma promise_get0
+        promises1 promises2 mem1 mem2
+        loc from to msg kind
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (KIND: op_kind_is_cancel kind = false):
+    <<GET_PROMISES: get loc to promises2 = Some (from, msg)>> /\
+    <<GET_MEM: get loc to mem2 = Some (from, msg)>>.
+  Proof.
+    inv PROMISE; ss.
+    - erewrite (add_o _ _ PROMISES).
+      erewrite (add_o _ _ MEM).
+      condtac; ss. des; congr.
+    - erewrite (split_o _ _ PROMISES).
+      erewrite (split_o _ _ MEM).
+      repeat condtac; ss; des; intuition.
+    - erewrite (lower_o _ _ PROMISES).
+      erewrite (lower_o _ _ MEM).
+      condtac; ss. des; congr.
+  Qed.
 
-  (* Lemma promise_get1 *)
-  (*       promises1 mem1 loc from to msg promises2 mem2 kind *)
-  (*       l t f m *)
-  (*       (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind) *)
-  (*       (GET: get l t mem1 = Some (f, m)): *)
-  (*   exists f' m', *)
-  (*     <<GET: get l t mem2 = Some (f', m')>> /\ *)
-  (*     <<FROM: Time.le f f'>> /\ *)
-  (*     <<MSG_LE: Message.le m' m>>. *)
-  (* Proof. *)
-  (*   inv PROMISE. *)
-  (*   - eapply op_get1; eauto. *)
-  (*   - eapply op_get1; eauto. *)
-  (*   - eapply op_get1; eauto. *)
-  (* Qed. *)
+  Lemma promise_get1
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        l t f m
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (KIND: op_kind_is_cancel kind = false)
+        (GET: get l t mem1 = Some (f, m)):
+    exists f' m',
+      <<GET: get l t mem2 = Some (f', m')>> /\
+      <<FROM: Time.le f f'>> /\
+      <<MSG_LE: Message.le m' m>>.
+  Proof.
+    inv PROMISE; ss.
+    - eapply op_get1; eauto.
+    - eapply op_get1; eauto.
+    - eapply op_get1; eauto.
+  Qed.
 
-  (* Lemma promise_get1_promise *)
-  (*       promises1 mem1 loc from to msg promises2 mem2 kind *)
-  (*       l t f m *)
-  (*       (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind) *)
-  (*       (GET: get l t promises1 = Some (f, m)): *)
-  (*   exists f' m', *)
-  (*     <<GET: get l t promises2 = Some (f', m')>> /\ *)
-  (*     <<FROM: Time.le f f'>> /\ *)
-  (*     <<MSG_LE: Message.le m' m>>. *)
-  (* Proof. *)
-  (*   inv PROMISE; eapply op_get1; eauto. *)
-  (* Qed. *)
+  Lemma promise_get1_promise
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        l t f m
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (KIND: op_kind_is_cancel kind = false)
+        (GET: get l t promises1 = Some (f, m)):
+    exists f' m',
+      <<GET: get l t promises2 = Some (f', m')>> /\
+      <<FROM: Time.le f f'>> /\
+      <<MSG_LE: Message.le m' m>>.
+  Proof.
+    inv PROMISE; eapply op_get1; eauto.
+  Qed.
 
-  (* Lemma promise_get2 *)
-  (*       promises1 mem1 loc from to msg promises2 mem2 kind *)
-  (*       (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind): *)
-  (*   <<GET_PROMISE: get loc to promises2 = Some (from, msg)>> /\ *)
-  (*   <<GET_MEM: get loc to mem2 = Some (from, msg)>>. *)
-  (* Proof. *)
-  (*   inv PROMISE; splits; eauto using op_get2. *)
-  (* Qed. *)
+  Lemma promise_get2
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (KIND: op_kind_is_cancel kind = false):
+    <<GET_PROMISE: get loc to promises2 = Some (from, msg)>> /\
+    <<GET_MEM: get loc to mem2 = Some (from, msg)>>.
+  Proof.
+    inv PROMISE; splits; eauto using op_get2.
+  Qed.
 
   (* Lemma promise_get_None *)
   (*       promises1 mem1 loc from to msg promises2 mem2 kind *)
@@ -2044,16 +2056,16 @@ Module Memory.
     i. eapply DISJOINT; eauto.
   Qed.
 
-  (* Lemma write_get2 *)
-  (*       promises1 mem1 loc from to val released promises2 mem2 kind *)
-  (*       (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind): *)
-  (*   <<GET_PROMISE: get loc to promises2 = None>> /\ *)
-  (*   <<GET_MEM: get loc to mem2 = Some (from, Message.full val released)>>. *)
-  (* Proof. *)
-  (*   inv WRITE. splits. *)
-  (*   - erewrite remove_o; eauto. condtac; ss. des; ss. *)
-  (*   - eapply promise_get2; eauto. *)
-  (* Qed. *)
+  Lemma write_get2
+        promises1 mem1 loc from to val released promises2 mem2 kind
+        (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind):
+    <<GET_PROMISE: get loc to promises2 = None>> /\
+    <<GET_MEM: get loc to mem2 = Some (from, Message.full val released)>>.
+  Proof.
+    inv WRITE. splits.
+    - erewrite remove_o; eauto. condtac; ss. des; ss.
+    - eapply promise_get2; eauto. inv PROMISE; ss.
+  Qed.
 
   (* Lemma write_get_None *)
   (*       promises1 mem1 loc from to val released promises2 mem2 kind *)
@@ -3135,32 +3147,31 @@ Module Memory.
         * refl.
   Qed.
 
-  (* Lemma cap_aux_exists *)
-  (*       promises mem1 dom view *)
-  (*       (CLOSED1: closed mem1) *)
-  (*       (DOM: forall loc to (IN: List.In (loc, to) dom), *)
-  (*           exists from msg, get loc to mem1 = Some (from, msg)) *)
-  (*       (VIEW: closed_view view mem1) *)
-  (*       (VIEW_WF: View.wf view): *)
-  (*   exists mem2, *)
-  (*     <<FUTURE: future mem1 mem2>> /\ *)
-  (*     <<CAP: cap_aux dom view promises mem1 mem2>>. *)
-  (* Proof. *)
-  (*   revert mem1 CLOSED1 DOM VIEW. *)
-  (*   induction dom; i. *)
-  (*   { exists mem1. split; eauto. *)
-  (*     econs; i; eauto; try inv IN; congr. } *)
-  (*   destruct a as [loc to]. *)
-  (*   exploit (@cap_imm_exists promises mem1 loc to view); eauto. i. des. *)
-  (*   exploit (IHdom mem2); eauto; i. *)
-  (*   { exploit DOM; try by econs 2; eauto. i. des. *)
-  (*     exploit future_get1; eauto. i. des. *)
-  (*     esplits; eauto. } *)
-  (*   { eapply future_closed_view; eauto. } *)
-  (*   des. exploit cap_imm_cap_aux_cap_aux; eauto; i. *)
-  (*   { eapply DOM; eauto. econs 2. auto. } *)
-  (*   exists mem0. split; auto. unnw. etrans; eauto. *)
-  (* Qed. *)
+  Lemma cap_aux_exists
+        promises mem1 dom view
+        (CLOSED1: closed mem1)
+        (DOM: forall loc to (IN: List.In (loc, to) dom),
+            exists from msg, get loc to mem1 = Some (from, msg))
+        (VIEW: closed_view view mem1)
+        (VIEW_WF: View.wf view):
+    exists mem2,
+      <<FUTURE: future mem1 mem2>> /\
+      <<CAP: cap_aux dom view promises mem1 mem2>>.
+  Proof.
+    revert mem1 CLOSED1 DOM VIEW.
+    induction dom; i.
+    { exists mem1. split; eauto.
+      econs; i; eauto; try inv IN; congr. }
+    destruct a as [loc to].
+    exploit (@cap_imm_exists promises mem1 loc to view); eauto. i. des.
+    exploit (IHdom mem2); eauto; i.
+    { exploit DOM; try by econs 2; eauto. i. des.
+      inv CAP. exploit SOUND; eauto. }
+    { eapply future_closed_view; eauto. }
+    des. exploit cap_imm_cap_aux_cap_aux; eauto; i.
+    { eapply DOM; eauto. econs 2. auto. }
+    exists mem0. split; auto. unnw. etrans; eauto.
+  Qed.
 
   Fixpoint finite_sound (dom: list (FLoc.t * Time.t)) (mem: t): list (FLoc.t * Time.t) :=
     match dom with
@@ -3193,46 +3204,46 @@ Module Memory.
       inv H. destruct p. eauto.
   Qed.
 
-  (* Lemma cap_exists *)
-  (*       promises mem1 *)
-  (*       (CLOSED1: closed mem1): *)
-  (*   exists mem2, *)
-  (*     <<CAP: cap promises mem1 mem2>> /\ *)
-  (*     <<FUTURE: future mem1 mem2>>. *)
-  (* Proof. *)
-  (*   destruct (finite_sound_exists mem1). des. *)
-  (*   exploit (@max_full_view_exists mem1); try apply CLOSED1. i. des. *)
-  (*   exploit (@cap_aux_exists promises mem1 x view); eauto. *)
-  (*   { eapply max_full_view_closed; eauto. } *)
-  (*   { eapply max_full_view_wf; eauto. } *)
-  (*   i. des. esplits; eauto. *)
-  (*   inv CAP. econs; i; eauto. *)
-  (*   - exploit MIDDLE; eauto. *)
-  (*     inv ADJ. eapply H; eauto. *)
-  (*   - exploit max_full_view_inj; [exact x1|exact MAX|..]. i. subst. *)
-  (*     exploit (@max_ts_spec loc); try eapply CLOSED1. i. des. *)
-  (*     exploit BACK; eauto. *)
-  (*   - exploit COMPLETE; eauto. i. des; eauto. *)
-  (* Qed. *)
+  Lemma cap_exists
+        promises mem1
+        (CLOSED1: closed mem1):
+    exists mem2,
+      <<CAP: cap promises mem1 mem2>> /\
+      <<FUTURE: future mem1 mem2>>.
+  Proof.
+    destruct (finite_sound_exists mem1). des.
+    exploit (@max_full_view_exists mem1); try apply CLOSED1. i. des.
+    exploit (@cap_aux_exists promises mem1 x view); eauto.
+    { eapply max_full_view_closed; eauto. }
+    { eapply max_full_view_wf; eauto. }
+    i. des. esplits; eauto.
+    inv CAP. econs; i; eauto.
+    - exploit MIDDLE; eauto.
+      inv ADJ. eapply H; eauto.
+    - exploit max_full_view_inj; [exact x1|exact MAX|..]. i. subst.
+      exploit (@max_ts_spec loc); try eapply CLOSED1. i. des.
+      exploit BACK; eauto.
+    - exploit COMPLETE; eauto. i. des; eauto.
+  Qed.
 
-  (* Lemma cap_future *)
-  (*       promises mem1 mem2 *)
-  (*       (CAP: cap promises mem1 mem2) *)
-  (*       (CLOSED1: closed mem1): *)
-  (*   future mem1 mem2. *)
-  (* Proof. *)
-  (*   exploit cap_exists; eauto. i. des. *)
-  (*   exploit cap_inj; [exact CAP|exact CAP0|..]; eauto. i. subst. *)
-  (*   auto. *)
-  (* Qed. *)
+  Lemma cap_future
+        promises mem1 mem2
+        (CAP: cap promises mem1 mem2)
+        (CLOSED1: closed mem1):
+    future mem1 mem2.
+  Proof.
+    exploit cap_exists; eauto. i. des.
+    exploit cap_inj; [exact CAP|exact CAP0|..]; eauto. i. subst.
+    auto.
+  Qed.
 
-  (* Lemma cap_closed *)
-  (*       promises mem1 mem2 *)
-  (*       (CAP: cap promises mem1 mem2) *)
-  (*       (CLOSED: closed mem1): *)
-  (*   closed mem2. *)
-  (* Proof. *)
-  (*   exploit cap_future; eauto. i. *)
-  (*   eapply future_closed; eauto. *)
-  (* Qed. *)
+  Lemma cap_closed
+        promises mem1 mem2
+        (CAP: cap promises mem1 mem2)
+        (CLOSED: closed mem1):
+    closed mem2.
+  Proof.
+    exploit cap_future; eauto. i.
+    eapply future_closed; eauto.
+  Qed.
 End Memory.
