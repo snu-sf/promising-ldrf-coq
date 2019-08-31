@@ -116,6 +116,7 @@ Proof.
   exploit Memory.promise_future; try apply PROMISE_SRC; eauto.
   { apply WF1_SRC. }
   { apply WF1_SRC. }
+  { apply WF1_SRC. }
   { unfold SimPromises.none_if, SimPromises.none_if_released.
     destruct msg; try condtac; eauto. }
   i. des.
@@ -281,6 +282,7 @@ Proof.
     inv STEP. inv PROMISE; ss.
     + exploit Memory.add_get0; try exact PROMISES; eauto. i. des. congr.
     + exploit Memory.split_get0; try exact PROMISES; eauto. i. des. congr.
+    + exploit Memory.remove_get0; try exact PROMISES; eauto. i. des. congr.
   - destruct kind; ss. destruct msg1; ss.
     inv STEP. inv PROMISE.
     exploit Memory.lower_get0; try exact PROMISES; eauto. i. des.
@@ -506,7 +508,9 @@ Lemma sim_local_failure
 Proof.
   inv STEP_TGT. inv LOCAL1. inv PROMISES. econs. ii.
   destruct (Memory.get loc ts lc1_tgt.(Local.promises)) as [[]|] eqn:GETP.
-  - exploit CONSISTENT; eauto. i.
+  - exploit LE; eauto. i. rewrite PROMISE in x. inv x.
+    destruct t0; ss.
+    exploit CONSISTENT; eauto. i.
     eapply TimeFacts.le_lt_lt; eauto.
     inv TVIEW. inv CUR. eauto.
   - exploit COMPLETE; eauto. i.

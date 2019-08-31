@@ -423,6 +423,29 @@ Proof.
       * rewrite HALF. ss.
 Qed.
 
+Lemma sim_memory_remove
+      mem1_src mem1_tgt
+      mem2_src mem2_tgt
+      loc from to msg_src msg_tgt
+      (SRC: Memory.remove mem1_src loc from to msg_src mem2_src)
+      (TGT: Memory.remove mem1_tgt loc from to msg_tgt mem2_tgt)
+      (SIM: sim_memory mem1_src mem1_tgt):
+  sim_memory mem2_src mem2_tgt.
+Proof.
+  dup SIM. inv SIM0. econs; i.
+  - rewrite remove_covered; [|eauto]. rewrite (@remove_covered mem2_tgt); [|eauto].
+    rewrite COVER. refl.
+  - revert GET. erewrite Memory.remove_o; eauto. condtac; ss.
+    erewrite (@Memory.remove_o mem2_src); eauto. condtac; ss. eauto.
+  - split; i.
+    + erewrite Memory.remove_o in H; try exact SRC.
+      erewrite Memory.remove_o; try exact TGT. condtac; ss.
+      rewrite <- HALF. ss.
+    + erewrite Memory.remove_o in H; try exact TGT.
+      erewrite Memory.remove_o; try exact SRC. condtac; ss.
+      rewrite HALF. ss.
+Qed.
+
 Lemma sim_memory_closed_timemap
       mem_src mem_tgt
       tm

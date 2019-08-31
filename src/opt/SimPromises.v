@@ -71,6 +71,7 @@ Module SimPromises.
     | Memory.op_kind_add => Memory.op_kind_add
     | Memory.op_kind_split ts msg => Memory.op_kind_split ts (none_if loc ts pview msg)
     | Memory.op_kind_lower msg => Memory.op_kind_lower (none_if loc ts pview msg)
+    | Memory.op_kind_cancel => Memory.op_kind_cancel
     end.
 
   Lemma kind_transf_bot loc ts kind:
@@ -222,6 +223,29 @@ Module SimPromises.
         * i. revert SRC TGT.
           erewrite Memory.lower_o; eauto. erewrite (@Memory.lower_o promises2_tgt); eauto.
           repeat condtac; ss. inv INV1. eapply COMPLETE; eauto.
+    - exploit Memory.remove_get0; try exact PROMISES. i. des.
+      exploit (@Memory.remove_exists promises1_src loc from to Message.half).
+      { inv INV1. exploit LE; eauto. }
+      i. des.
+      exploit (@Memory.remove_exists mem1_src loc from to Message.half).
+      { inv INV1. exploit LE; eauto. }
+      i. des.
+      exploit sim_memory_remove; try exact SIM1; eauto. i.
+      esplits; try exact x2; eauto.
+      inv INV1. econs; ii.
+      + erewrite Memory.remove_o in LHS; eauto.
+        erewrite Memory.remove_o; eauto.
+        condtac; ss. eauto.
+      + exploit PVIEW; eauto. i. des.
+        erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+        des. subst. congr.
+      + exploit SOUND; eauto. i. des. split.
+        * erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+        * erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+          des. subst. congr.
+      + erewrite Memory.remove_o in SRC; eauto.
+        erewrite Memory.remove_o in TGT; eauto.
+        des_ifs. eauto.
   Qed.
 
   Lemma promise_bot

@@ -60,8 +60,10 @@ Proof.
   { inv CLOSED1. exploit CLOSED; eauto. i. des. inv MSG_CLOSED. eauto. }
   i. des.
   esplits; eauto; try refl.
-  econs; eauto. ss.
-  ii. erewrite Memory.remove_o; eauto. condtac; ss.
+  econs; eauto; ss.
+  - ii. erewrite Memory.remove_o; eauto. condtac; ss.
+  - ii. revert GET1. erewrite Memory.remove_o; eauto. condtac; ss. i.
+    inv WF1. eauto.
 Qed.
 
 Lemma fulfill_step_cap
@@ -93,7 +95,8 @@ Proof.
   inv WRITE. inv WRITE0. esplits; eauto.
   refine (step_fulfill _ _ _ _ _ _ _); auto.
   - refl.
-  - eapply MemoryFacts.promise_time_lt. eauto.
+  - eapply MemoryFacts.promise_time_lt; eauto.
+    inv PROMISE; ss.
 Qed.
 
 Lemma fulfill_write
@@ -152,7 +155,7 @@ Proof.
   inv PROMISE. inv FULFILL. ss.
   exploit TViewFacts.write_future_fulfill; try exact REL_WF; eauto; try by apply WF2.
   { eapply Memory.future_closed_opt_view; eauto. }
-  { eapply Memory.promise_get2. eauto. }
+  { eapply Memory.promise_get2; eauto. inv PROMISE0; ss. }
   s. i. des.
   exploit MemorySplit.remove_promise_remove;
     try exact REMOVE; eauto; try apply WF2; try by econs; eauto.

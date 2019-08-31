@@ -851,6 +851,7 @@ Module MemoryReorder.
       revert GET. erewrite Memory.remove_o; eauto. condtac; ss. i. guardH o.
       exploit Memory.lower_exists; try exact GET; try by inv PROMISES; inv LOWER; eauto. i. des.
       exploit remove_lower; eauto.
+    - exploit remove_remove; try exact REMOVE; eauto. i. des. eauto.
   Qed.
 
   Lemma promise_add_promise_split_same
