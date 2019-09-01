@@ -30,7 +30,7 @@ Lemma progress_program_step
       (MEM1: Memory.closed mem1)
       (SC1: Memory.closed_timemap sc1 mem1)
       (PROMISES1: lc1.(Local.promises) = Memory.bot)
-      (NOHALF1: Memory.no_half mem1):
+      (NOHALF1: Memory.no_reserve mem1):
   exists e th2, <<STEP: Thread.program_step e (Thread.mk lang (State.mk rs1 (i1::s1)) lc1 sc1 mem1) th2>>.
 Proof.
   destruct i1.
@@ -44,7 +44,7 @@ Proof.
       { i. rewrite PROMISES1. apply Memory.bot_nonsynch_loc. }
       i. des. esplits. econs; [|econs 3]; eauto. econs. econs.
     + hexploit progress_read_step; eauto. i. des.
-      exploit Memory.no_half_max_ts; eauto; i.
+      exploit Memory.no_reserve_max_ts; eauto; i.
       exploit Local.read_step_future; eauto. i. des.
       destruct (RegFile.eval_rmw rs1 rmw val) as [? []] eqn: EQ.
       * hexploit progress_write_step; eauto.

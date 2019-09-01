@@ -186,7 +186,7 @@ Module Local.
       (TVIEW_CLOSED: TView.closed lc.(tview) mem)
       (PROMISES: Memory.le lc.(promises) mem)
       (BOT: Memory.bot_none lc.(promises))
-      (HALF: Memory.half_wf lc.(promises) mem)
+      (HALF: Memory.reserve_wf lc.(promises) mem)
   .
   Hint Constructors wf.
 
@@ -199,7 +199,7 @@ Module Local.
     inv WF. econs; eauto.
     - eapply TView.cap_closed; eauto.
     - eapply Memory.cap_le; eauto.
-    - eapply Memory.cap_half_wf; eauto.
+    - eapply Memory.cap_reserve_wf; eauto.
   Qed.
 
   Inductive disjoint (lc1 lc2:t): Prop :=
@@ -411,7 +411,7 @@ Module Local.
         lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
         (STEP: write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
         (ORD: Ordering.le Ordering.strong_relaxed ord):
-    negb (Memory.op_kind_is_lower kind) \/ (Memory.op_kind_is_lower_half kind).
+    negb (Memory.op_kind_is_lower kind) \/ (Memory.op_kind_is_lower_reserve kind).
   Proof.
     destruct kind; eauto.
     inv STEP. specialize (RELEASE ORD).
@@ -589,25 +589,25 @@ Module Local.
   Qed.
 
 
-  (* step_no_half_except *)
+  (* step_no_reserve_except *)
 
-  Lemma promise_step_no_half_except
+  Lemma promise_step_no_reserve_except
         lc1 mem1 loc from to msg lc2 mem2 kind
         (STEP: promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
-        (HALF1: Memory.half_wf lc1.(promises) mem1)
-        (NOHALF1: Memory.no_half_except lc1.(promises) mem1):
-    Memory.no_half_except lc2.(promises) mem2.
+        (HALF1: Memory.reserve_wf lc1.(promises) mem1)
+        (NOHALF1: Memory.no_reserve_except lc1.(promises) mem1):
+    Memory.no_reserve_except lc2.(promises) mem2.
   Proof.
     ii. inv STEP. s.
-    eapply Memory.promise_no_half_except; eauto.
+    eapply Memory.promise_no_reserve_except; eauto.
   Qed.
 
-  Lemma program_step_no_half_except
+  Lemma program_step_no_reserve_except
         e lc1 sc1 mem1 lc2 sc2 mem2
         (STEP: program_step e lc1 sc1 mem1 lc2 sc2 mem2)
-        (HALF1: Memory.half_wf lc1.(promises) mem1)
-        (NOHALF1: Memory.no_half_except lc1.(promises) mem1):
-    Memory.no_half_except lc2.(promises) mem2.
+        (HALF1: Memory.reserve_wf lc1.(promises) mem1)
+        (NOHALF1: Memory.no_reserve_except lc1.(promises) mem1):
+    Memory.no_reserve_except lc2.(promises) mem2.
   Proof.
     ii. inv STEP; try inv LOCAL; eauto; ss.
     - inv WRITE.
@@ -616,13 +616,13 @@ Module Local.
         exploit Memory.promise_get0; eauto.
         { inv PROMISE; ss. }
         i. des. congr.
-      + eapply Memory.promise_no_half_except; eauto.
+      + eapply Memory.promise_no_reserve_except; eauto.
     - inv LOCAL1. inv LOCAL2. inv WRITE. ss.
       erewrite Memory.remove_o; eauto. condtac; ss.
       + des. subst.
         exploit Memory.promise_get0; eauto.
         { inv PROMISE; ss. }
         i. des. congr.
-      + eapply Memory.promise_no_half_except; eauto.
+      + eapply Memory.promise_no_reserve_except; eauto.
   Qed.
 End Local.

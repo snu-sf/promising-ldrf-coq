@@ -20,7 +20,7 @@ Set Implicit Arguments.
 Module Message.
   Inductive t :=
   | full (val: Const.t) (released: option View.t)
-  | half
+  | reserve
   .
   Hint Constructors t.
 
@@ -31,9 +31,9 @@ Module Message.
       val released released'
       (RELEASED: View.opt_le released released'):
       le (full val released) (full val released')
-  | le_half
+  | le_reserve
       msg:
-      le msg half
+      le msg reserve
   .
   Hint Constructors le.
 
@@ -59,17 +59,17 @@ Module Message.
       val released
       (WF: View.opt_wf released):
       wf (full val released)
-  | wf_half:
-      wf half
+  | wf_reserve:
+      wf reserve
   .
 
   Definition elt_wf: wf elt.
   Proof. econs; ss. Qed.
 
-  Definition is_half (msg: t): bool :=
+  Definition is_reserve (msg: t): bool :=
     match msg with
     | full _ _ => false
-    | half => true
+    | reserve => true
     end.
 End Message.
 

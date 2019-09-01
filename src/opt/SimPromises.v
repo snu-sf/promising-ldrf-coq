@@ -43,7 +43,7 @@ Module SimPromises.
     match msg with
     | Message.full val released =>
       Message.full val (none_if_released loc ts pview released)
-    | Message.half => Message.half
+    | Message.reserve => Message.reserve
     end.
 
   Lemma none_if_bot loc ts msg:
@@ -224,10 +224,10 @@ Module SimPromises.
           erewrite Memory.lower_o; eauto. erewrite (@Memory.lower_o promises2_tgt); eauto.
           repeat condtac; ss. inv INV1. eapply COMPLETE; eauto.
     - exploit Memory.remove_get0; try exact PROMISES. i. des.
-      exploit (@Memory.remove_exists promises1_src loc from to Message.half).
+      exploit (@Memory.remove_exists promises1_src loc from to Message.reserve).
       { inv INV1. exploit LE; eauto. }
       i. des.
-      exploit (@Memory.remove_exists mem1_src loc from to Message.half).
+      exploit (@Memory.remove_exists mem1_src loc from to Message.reserve).
       { inv INV1. exploit LE; eauto. }
       i. des.
       exploit sim_memory_remove; try exact SIM1; eauto. i.
@@ -423,7 +423,7 @@ Module SimPromises.
   Qed.
 
 
-  Lemma latest_half
+  Lemma latest_reserve
         pview
         promises_src mem_src
         promises_tgt mem_tgt
@@ -432,10 +432,10 @@ Module SimPromises.
         (MEM: sim_memory mem_src mem_tgt)
         (MEM_SRC: Memory.closed mem_src)
         (MEM_TGT: Memory.closed mem_tgt):
-    Memory.latest_half loc promises_src mem_src <->
-    Memory.latest_half loc promises_tgt mem_tgt.
+    Memory.latest_reserve loc promises_src mem_src <->
+    Memory.latest_reserve loc promises_tgt mem_tgt.
   Proof.
-    inv INV. unfold Memory.latest_half.
+    inv INV. unfold Memory.latest_reserve.
     split; i.
     - erewrite <- sim_memory_max_ts; eauto. des_ifs.
       + exploit LE; eauto. i. ss. congr.
@@ -468,7 +468,7 @@ Module SimPromises.
       inv x3. apply EMPTY; eauto. refl.
     - subst.
       erewrite sim_memory_max_ts; eauto.
-      rewrite latest_half in *; eauto.
+      rewrite latest_reserve in *; eauto.
       exploit sim_memory_latest_val_src; eauto. i.
       exploit Memory.max_full_view_exists; try apply MEM1_TGT. i. des.
       exploit sim_memory_max_full_view; try exact MEM1; eauto. i. subst.
@@ -501,7 +501,7 @@ Module SimPromises.
       inv x3. apply EMPTY; eauto. refl.
     - subst.
       erewrite <- sim_memory_max_ts; eauto.
-      rewrite <- latest_half in *; eauto.
+      rewrite <- latest_reserve in *; eauto.
       exploit sim_memory_latest_val_tgt; eauto. i.
       exploit Memory.max_full_view_exists; try apply MEM1_SRC. i. des.
       exploit sim_memory_max_full_view; try exact MEM1; eauto. i. subst.

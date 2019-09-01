@@ -1128,10 +1128,10 @@ Module PFStepCap.
       (MIDDLE: forall loc from1 to1 from2 to2
                  (ADJ: Memory.adjacent loc from1 to1 from2 to2 mem1)
                  (TS: Time.lt to1 from2),
-          Memory.get loc from2 mem2 = Some (to1, Message.half))
+          Memory.get loc from2 mem2 = Some (to1, Message.reserve))
       (BACK: forall loc to
                (TO: to = Time.incr (Memory.max_ts loc mem1))
-               (PROMISE: Memory.latest_half loc promises mem1),
+               (PROMISE: Memory.latest_reserve loc promises mem1),
           exists f val r released,
             Memory.get loc (latests loc) mem1 = Some (f, Message.full val r) /\
             Memory.get loc to mem2 = Some (Memory.max_ts loc mem1, Message.full val released))
@@ -1140,12 +1140,12 @@ Module PFStepCap.
           <<GET1: Memory.get loc to mem1 = Some (from, msg)>> \/
           <<GET1: Memory.get loc to mem1 = None>> /\
           <<TS: Time.lt from to>> /\
-          <<MSG: msg = Message.half>> /\
+          <<MSG: msg = Message.reserve>> /\
           (exists from1 to1, <<ADJ: Memory.adjacent loc from1 from to to1 mem1>>) \/
           <<GET1: Memory.get loc to mem1 = None>> /\
           <<FROM: from = Memory.max_ts loc mem1>> /\
           <<TO: to = Time.incr (Memory.max_ts loc mem1)>> /\
-          <<PROMISE: Memory.latest_half loc promises mem1>>)
+          <<PROMISE: Memory.latest_reserve loc promises mem1>>)
   .
 
   Inductive sim_memory_aux (latests: TimeMap.t) (caps: FLoc.t -> option Time.t) (dom: list (FLoc.t * Time.t))
@@ -1165,8 +1165,8 @@ Module PFStepCap.
       (HALF: forall loc from to
                (IN: List.In (loc, to) dom)
                (GETP: Memory.get loc to promises = None)
-               (GET_TGT: Memory.get loc to mem_tgt = Some (from, Message.half)),
-          <<GET_SRC: Memory.get loc to mem_src = Some (from, Message.half)>>)
+               (GET_TGT: Memory.get loc to mem_tgt = Some (from, Message.reserve)),
+          <<GET_SRC: Memory.get loc to mem_src = Some (from, Message.reserve)>>)
       (LATESTS: forall loc to (CAP: Some to = caps loc), Time.lt (latests loc) to)
       (CAPS: forall loc to (CAP: Some to = caps loc),
           exists f val r from released,
@@ -1205,20 +1205,20 @@ Module PFStepCap.
     exists (caps: FLoc.t -> option Time.t),
     forall loc,
       if (caps loc)
-      then Memory.latest_half loc promises mem /\
+      then Memory.latest_reserve loc promises mem /\
            caps loc = Some (Time.incr (Memory.max_ts loc mem))
-      else ~ Memory.latest_half loc promises mem.
+      else ~ Memory.latest_reserve loc promises mem.
   Proof.
     cut (exists (caps: FLoc.t -> option Time.t),
             forall loc,
               (fun loc (cap: option Time.t) =>
                  if cap
-                 then Memory.latest_half loc promises mem /\
+                 then Memory.latest_reserve loc promises mem /\
                       cap = Some (Time.incr (Memory.max_ts loc mem))
-                 else ~ Memory.latest_half loc promises mem)
+                 else ~ Memory.latest_reserve loc promises mem)
                 loc (caps loc)); eauto.
     apply choice. intro loc.
-    destruct (@Memory.latest_half_dec loc promises mem).
+    destruct (@Memory.latest_reserve_dec loc promises mem).
     - eexists (Some _). esplits; eauto.
     - exists None. eauto.
   Qed.
@@ -1335,7 +1335,7 @@ Module PFStepCap.
         - exploit CAPS; eauto. i. des; esplits; eauto.
           right. split; ss. ii. des; ss. inv H1. congr.
       }
-      exploit (@Memory.add_exists mem2_src loc t to Message.half).
+      exploit (@Memory.add_exists mem2_src loc t to Message.reserve).
       { ii. inv IHdom.
         exploit SOUND; try exact GET2. i.
         exploit Memory.get_disjoint; [exact GETT|exact x0|..]. i. des.

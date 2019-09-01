@@ -197,9 +197,9 @@ Module Memory.
       val released loc to
       (TS: Time.le (released.(View.unwrap).(View.rlx) loc) to):
       message_to (Message.full val released) loc to
-  | message_to_half
+  | message_to_reserve
       loc to:
-      message_to Message.half loc to
+      message_to Message.reserve loc to
   .
   Hint Constructors message_to.
 
@@ -229,9 +229,9 @@ Module Memory.
       val released mem
       (CLOSED: closed_opt_view released mem):
       closed_message (Message.full val released) mem
-  | closed_message_half
+  | closed_message_reserve
       mem:
-      closed_message Message.half mem
+      closed_message Message.reserve mem
   .
   Hint Constructors closed_message.
 
@@ -350,8 +350,8 @@ Module Memory.
   Definition op_kind_is_lower (kind:op_kind): bool :=
     match kind with op_kind_lower _ => true | _ => false end.
 
-  Definition op_kind_is_lower_half (kind:op_kind): bool :=
-    match kind with op_kind_lower Message.half => true | _ => false end.
+  Definition op_kind_is_lower_reserve (kind:op_kind): bool :=
+    match kind with op_kind_lower Message.reserve => true | _ => false end.
 
   Definition op_kind_is_lower_full (kind:op_kind): bool :=
     match kind with op_kind_lower (Message.full _ _) => true | _ => false end.
@@ -372,7 +372,7 @@ Module Memory.
       (LOWER: lower mem1 loc from to msg0 msg mem2):
       op mem1 loc from to msg mem2 (op_kind_lower msg0)
   | op_cancel
-      (MSG: msg = Message.half)
+      (MSG: msg = Message.reserve)
       (REMOVE: remove mem1 loc from to msg mem2):
       op mem1 loc from to msg mem2 op_kind_cancel
   .
@@ -398,7 +398,7 @@ Module Memory.
       (PROMISES: add promises1 loc from to msg promises2)
       (MEM: add mem1 loc from to msg mem2)
       (TS: message_to msg loc to)
-      (HALF: msg = Message.half ->
+      (HALF: msg = Message.reserve ->
              exists from' val' released',
                get loc from mem1 = Some (from', Message.full val' released')):
       promise promises1 mem1 loc from to msg promises2 mem2 op_kind_add
@@ -407,10 +407,10 @@ Module Memory.
       (PROMISES: split promises1 loc from to ts3 msg msg3 promises2)
       (MEM: split mem1 loc from to ts3 msg msg3 mem2)
       (TS: message_to msg loc to)
-      (HALF1: msg = Message.half ->
+      (HALF1: msg = Message.reserve ->
               exists from' val' released',
                 get loc from mem1 = Some (from', Message.full val' released'))
-      (HALF2: msg3 = Message.half ->
+      (HALF2: msg3 = Message.reserve ->
               exists val' released', msg = Message.full val' released'):
       promise promises1 mem1 loc from to msg promises2 mem2 (op_kind_split ts3 msg3)
   | promise_lower
@@ -420,7 +420,7 @@ Module Memory.
       (TS: message_to msg loc to):
       promise promises1 mem1 loc from to msg promises2 mem2 (op_kind_lower msg0)
   | promise_cancel
-      (MSG: msg = Message.half)
+      (MSG: msg = Message.reserve)
       (PROMISES: remove promises1 loc from to msg promises2)
       (MEM: remove mem1 loc from to msg mem2):
       promise promises1 mem1 loc from to msg promises2 mem2 op_kind_cancel
@@ -626,7 +626,7 @@ Module Memory.
 
   Lemma cancel_bot_none
         mem1 mem2 loc from to
-        (CANCEL: remove mem1 loc from to Message.half mem2)
+        (CANCEL: remove mem1 loc from to Message.reserve mem2)
         (BOT: bot_none mem1):
     <<BOT: bot_none mem2>>.
   Proof.
@@ -1008,7 +1008,7 @@ Module Memory.
   Lemma cancel_closed_timemap
         times
         mem1 loc from to mem2
-        (CANCEL: remove mem1 loc from to Message.half mem2)
+        (CANCEL: remove mem1 loc from to Message.reserve mem2)
         (CLOSED: closed_timemap times mem1):
     closed_timemap times mem2.
   Proof.
@@ -1020,7 +1020,7 @@ Module Memory.
   Lemma cancel_closed_view
         view
         mem1 loc from to mem2
-        (CANCEL: remove mem1 loc from to Message.half mem2)
+        (CANCEL: remove mem1 loc from to Message.reserve mem2)
         (CLOSED: closed_view view mem1):
     closed_view view mem2.
   Proof.
@@ -1032,7 +1032,7 @@ Module Memory.
   Lemma cancel_closed_opt_view
         view
         mem1 loc from to mem2
-        (CANCEL: remove mem1 loc from to Message.half mem2)
+        (CANCEL: remove mem1 loc from to Message.reserve mem2)
         (CLOSED: closed_opt_view view mem1):
     closed_opt_view view mem2.
   Proof.
@@ -1042,7 +1042,7 @@ Module Memory.
   Lemma cancel_closed_message
         msg'
         mem1 loc from to mem2
-        (CANCEL: remove mem1 loc from to Message.half mem2)
+        (CANCEL: remove mem1 loc from to Message.reserve mem2)
         (CLOSED: closed_message msg' mem1):
     closed_message msg' mem2.
   Proof.
@@ -1052,7 +1052,7 @@ Module Memory.
 
   Lemma cancel_closed
         mem1 loc from to mem2
-        (CANCEL: remove mem1 loc from to Message.half mem2)
+        (CANCEL: remove mem1 loc from to Message.reserve mem2)
         (CLOSED: closed mem1):
     closed mem2.
   Proof.
@@ -1455,17 +1455,17 @@ Module Memory.
   Qed.
 
 
-  (* half_wf *)
+  (* reserve_wf *)
 
-  Definition half_wf (promises mem: t): Prop :=
-    forall loc from to (GET: get loc to promises = Some (from, Message.half)),
+  Definition reserve_wf (promises mem: t): Prop :=
+    forall loc from to (GET: get loc to promises = Some (from, Message.reserve)),
     exists f val released, get loc from mem = Some (f, Message.full val released).
 
-  Lemma promise_half_wf
+  Lemma promise_reserve_wf
         promises1 mem1 loc from to msg promises2 mem2 kind
         (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
-        (HALF1: half_wf promises1 mem1):
-    <<HALF2: half_wf promises2 mem2>>.
+        (HALF1: reserve_wf promises1 mem1):
+    <<HALF2: reserve_wf promises2 mem2>>.
   Proof.
     inv PROMISE; ii; revert GET.
     - erewrite add_o; eauto. condtac; ss; i.
@@ -1503,11 +1503,11 @@ Module Memory.
       exploit remove_get0; try exact MEM. i. des. congr.
   Qed.
 
-  Lemma future_half_wf
+  Lemma future_reserve_wf
         promises mem1 mem2
         (FUTURE: future mem1 mem2)
-        (HALF: half_wf promises mem1):
-    half_wf promises mem2.
+        (HALF: reserve_wf promises mem1):
+    reserve_wf promises mem2.
   Proof.
     ii. exploit HALF; eauto. i. des.
     exploit future_get1; eauto. i. des.
@@ -1627,13 +1627,13 @@ Module Memory.
         promises1 mem1 loc from to msg promises2 mem2 kind
         (LE_PROMISES1: le promises1 mem1)
         (BOT1: bot_none promises1)
-        (HALF1: half_wf promises1 mem1)
+        (HALF1: reserve_wf promises1 mem1)
         (CLOSED1: closed mem1)
         (MSG_CLOSED: closed_message msg mem2)
         (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind):
     <<LE_PROMISES2: le promises2 mem2>> /\
     <<BOT2: bot_none promises2>> /\
-    <<HALF2: half_wf promises2 mem2>> /\
+    <<HALF2: reserve_wf promises2 mem2>> /\
     <<CLOSED2: closed mem2>> /\
     <<FUTURE: future mem1 mem2>>.
   Proof.
@@ -1642,7 +1642,7 @@ Module Memory.
     { by inv PROMISE. }
     i. des.
     exploit promise_future0; try apply CLOSED1; eauto. i. des.
-    hexploit promise_half_wf; eauto. i. des.
+    hexploit promise_reserve_wf; eauto. i. des.
     splits; auto. inv PROMISE.
     - eapply add_bot_none; eauto.
     - eapply split_bot_none; eauto.
@@ -1656,11 +1656,11 @@ Module Memory.
         (CLOSED: closed mem1)
         (LE: le promises1 mem1)
         (LE_CTX: le ctx mem1)
-        (HALF_CTX: half_wf ctx mem1)
+        (HALF_CTX: reserve_wf ctx mem1)
         (DISJOINT: disjoint promises1 ctx):
     <<DISJOINT: disjoint promises2 ctx>> /\
     <<LE_CTX: le ctx mem2>> /\
-    <<HALF_CTX: half_wf ctx mem2>>.
+    <<HALF_CTX: reserve_wf ctx mem2>>.
   Proof.
     exploit promise_future0; try apply PROMISE; try apply CLOSED; eauto. i. des.
     inv PROMISE.
@@ -1795,11 +1795,11 @@ Module Memory.
         (MSG_CLOSED: closed_message (Message.full val released) mem2)
         (LE: le promises1 mem1)
         (BOT: bot_none promises1)
-        (HALF: half_wf promises1 mem1):
+        (HALF: reserve_wf promises1 mem1):
     <<CLOSED: closed mem2>> /\
     <<LE: le promises2 mem2>> /\
     <<BOT: bot_none promises2>> /\
-    <<HALF: half_wf promises2 mem2>> /\
+    <<HALF: reserve_wf promises2 mem2>> /\
     <<FUTURE: future mem1 mem2>>.
   Proof.
     inv WRITE.
@@ -1819,10 +1819,10 @@ Module Memory.
         (DISJOINT: disjoint promises1 ctx)
         (LE: le promises1 mem1)
         (LE_CTX: le ctx mem1)
-        (HALF_CTX: half_wf ctx mem1):
+        (HALF_CTX: reserve_wf ctx mem1):
     <<DISJOINT: disjoint promises2 ctx>> /\
     <<LE_CTX: le ctx mem2>> /\
-    <<HALF_CTX: half_wf ctx mem2>>.
+    <<HALF_CTX: reserve_wf ctx mem2>>.
   Proof.
     inv WRITE.
     hexploit promise_future0; try apply PROMISE; try apply CLOSED; eauto. i. des.
@@ -2045,7 +2045,7 @@ Module Memory.
     forall f t msg (GET: get loc t mem = Some (f, msg)),
       match msg with
       | Message.full _ rel => rel = None
-      | Message.half => True
+      | Message.reserve => True
       end.
 
   Definition nonsynch (mem:t): Prop :=
@@ -2058,16 +2058,16 @@ Module Memory.
   Proof. ii. eapply bot_nonsynch_loc. eauto. Qed.
 
 
-  (* no_half *)
+  (* no_reserve *)
 
-  Definition no_half (mem: t): Prop :=
+  Definition no_reserve (mem: t): Prop :=
     forall loc,
     exists from val released,
       get loc (max_ts loc mem) mem = Some (from, Message.full val released).
 
-  Lemma no_half_max_ts
+  Lemma no_reserve_max_ts
         mem loc mts
-        (NOHALF: no_half mem)
+        (NOHALF: no_reserve mem)
         (MAX: max_full_ts mem loc mts):
     mts = max_ts loc mem.
   Proof.
@@ -2078,24 +2078,24 @@ Module Memory.
       exploit MAX0; try exact NOHALF. i. auto.
   Qed.
 
-  Definition no_half_except (promises mem: t): Prop :=
+  Definition no_reserve_except (promises mem: t): Prop :=
     forall loc from
-      (GET: get loc (max_ts loc mem) mem = Some (from, Message.half)),
-      get loc (max_ts loc mem) promises = Some (from, Message.half).
+      (GET: get loc (max_ts loc mem) mem = Some (from, Message.reserve)),
+      get loc (max_ts loc mem) promises = Some (from, Message.reserve).
 
-  Lemma no_half_no_half_except
+  Lemma no_reserve_no_reserve_except
         promises mem
-        (NOHALF: no_half mem):
-    no_half_except promises mem.
+        (NOHALF: no_reserve mem):
+    no_reserve_except promises mem.
   Proof.
     ii. specialize (NOHALF loc). des. congr.
   Qed.
 
-  Lemma no_half_except_bot_no_half
+  Lemma no_reserve_except_bot_no_reserve
         mem
         (INHABITED: inhabited mem)
-        (NOHALF: no_half_except bot mem):
-    no_half mem.
+        (NOHALF: no_reserve_except bot mem):
+    no_reserve mem.
   Proof.
     ii. exploit (@max_ts_spec loc); try apply INHABITED. i. des.
     destruct msg; eauto.
@@ -2103,13 +2103,13 @@ Module Memory.
     rewrite bot_get in *. congr.
   Qed.
 
-  Lemma promise_no_half_except
+  Lemma promise_no_reserve_except
         promises1 promises2 mem1 mem2
         loc from to msg kind
         (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
-        (HALF1: half_wf promises1 mem1)
-        (NOHALF1: no_half_except promises1 mem1):
-    no_half_except promises2 mem2.
+        (HALF1: reserve_wf promises1 mem1)
+        (NOHALF1: no_reserve_except promises1 mem1):
+    no_reserve_except promises2 mem2.
   Proof.
     ii. inv PROMISE.
     - erewrite add_o; try exact PROMISES.
@@ -2334,17 +2334,17 @@ Module Memory.
     exists val. econs; eauto.
   Qed.
 
-  Definition latest_half (loc: FLoc.t) (promises mem: t): Prop :=
+  Definition latest_reserve (loc: FLoc.t) (promises mem: t): Prop :=
     match get loc (max_ts loc mem) promises with
-    | Some (_, Message.half) => False
+    | Some (_, Message.reserve) => False
     | _ => True
     end.
 
-  Lemma latest_half_dec loc promises mem:
-    latest_half loc promises mem \/
-    ~ latest_half loc promises mem.
+  Lemma latest_reserve_dec loc promises mem:
+    latest_reserve loc promises mem \/
+    ~ latest_reserve loc promises mem.
   Proof.
-    unfold latest_half.
+    unfold latest_reserve.
     destruct (get loc (max_ts loc mem) promises) eqn:PROMISE; auto.
     destruct p; ss. destruct t1; auto.
   Qed.
@@ -2357,9 +2357,9 @@ Module Memory.
       (MIDDLE: forall loc from1 to1 from2 to2
                  (ADJ: adjacent loc from1 to1 from2 to2 mem1)
                  (TO: Time.lt to1 from2),
-          get loc from2 mem2 = Some (to1, Message.half))
+          get loc from2 mem2 = Some (to1, Message.reserve))
       (BACK: forall loc val view
-               (PROMISE: latest_half loc promises mem1)
+               (PROMISE: latest_reserve loc promises mem1)
                (LATEST: latest_val loc mem1 val)
                (MAX: max_full_view mem1 view),
             get loc (Time.incr (max_ts loc mem1)) mem2 =
@@ -2368,7 +2368,7 @@ Module Memory.
                    (GET1: get loc to mem1 = None)
                    (GET2: get loc to mem2 = Some (from, msg)),
           (exists f m, get loc from mem1 = Some (f, m)) /\
-          (from = max_ts loc mem1 -> latest_half loc promises mem1))
+          (from = max_ts loc mem1 -> latest_reserve loc promises mem1))
   .
 
   Lemma cap_inv
@@ -2382,9 +2382,9 @@ Module Memory.
      exists from1 to2,
         adjacent loc from1 from to to2 mem1 /\
         Time.lt from to /\
-        msg = Message.half) \/
+        msg = Message.reserve) \/
     (get loc to mem1 = None /\
-     latest_half loc promises mem1 /\
+     latest_reserve loc promises mem1 /\
      from = max_ts loc mem1 /\
      to = Time.incr from /\
      exists val view,
@@ -2535,22 +2535,22 @@ Module Memory.
     ii. inv CAP. eauto.
   Qed.
 
-  Lemma cap_half_wf
+  Lemma cap_reserve_wf
         promises promises1 mem1 mem2
         (CAP: cap promises mem1 mem2)
-        (HALF1: half_wf promises1 mem1):
-    half_wf promises1 mem2.
+        (HALF1: reserve_wf promises1 mem1):
+    reserve_wf promises1 mem2.
   Proof.
     ii. exploit HALF1; eauto. i. des.
     inv CAP. eauto.
   Qed.
 
-  Lemma cap_no_half_except
+  Lemma cap_no_reserve_except
         promises mem1 mem2
         (CAP: cap promises mem1 mem2)
         (CLOSED: closed mem1)
         (LE: le promises mem1):
-    no_half_except promises mem2.
+    no_reserve_except promises mem2.
   Proof.
     ii. exploit cap_inv; eauto. i. des; try congr.
     - inv CAP.
@@ -2566,7 +2566,7 @@ Module Memory.
       exploit max_full_view_exists; try eapply CLOSED. i. des.
       exploit (@latest_val_exists loc mem1); try apply CLOSED. i. des.
       exploit (BACK loc); eauto; i.
-      { unfold latest_half. rewrite PROMISE. ss. }
+      { unfold latest_reserve. rewrite PROMISE. ss. }
       exploit max_ts_spec; try exact x4. i. des.
       specialize (Time.incr_spec (max_ts loc mem2)). i.
       rewrite x2 in *. timetac.
@@ -2586,13 +2586,13 @@ Module Memory.
   Proof.
     inv CAP1. econs; i; eauto.
     - eapply BACK; eauto.
-      unfold latest_half in *. des_ifs.
+      unfold latest_reserve in *. des_ifs.
       + revert Heq0. erewrite remove_o; eauto. condtac; ss; congr.
       + revert Heq0. erewrite remove_o; eauto. condtac; ss; try congr.
         des. subst. exploit remove_get0; eauto. i. des. congr.
     - exploit COMPLETE; eauto. i. des. splits; eauto. i.
       exploit x0; eauto. i.
-      unfold latest_half in *. des_ifs.
+      unfold latest_reserve in *. des_ifs.
       + revert Heq. erewrite remove_o; eauto. condtac; ss; congr.
       + revert Heq. erewrite remove_o; eauto. condtac; ss; try congr.
   Qed.
@@ -2607,10 +2607,10 @@ Module Memory.
       (MIDDLE: forall from from2 to2
                  (ADJ: adjacent loc from to from2 to2 mem1)
                  (TO: Time.lt to from2),
-          get loc from2 mem2 = Some (to, Message.half))
+          get loc from2 mem2 = Some (to, Message.reserve))
       (BACK: forall val
                (TO: to = max_ts loc mem1)
-               (PROMISE: latest_half loc promises mem1)
+               (PROMISE: latest_reserve loc promises mem1)
                (LATEST: latest_val loc mem1 val),
           get loc (Time.incr to) mem2 = Some (to, Message.full val (Some view)))
       (COMPLETE: forall loc' from' to' msg
@@ -2619,7 +2619,7 @@ Module Memory.
           loc' = loc /\
           from' = to /\
           (exists f m, get loc from' mem1 = Some (f, m)) /\
-          (from' = max_ts loc mem1 -> latest_half loc promises mem1))
+          (from' = max_ts loc mem1 -> latest_reserve loc promises mem1))
   .
 
   Inductive cap_aux (dom: list (FLoc.t * Time.t)) (view: View.t) (promises mem1 mem2: t): Prop :=
@@ -2630,10 +2630,10 @@ Module Memory.
                  (ADJ: adjacent loc from1 to1 from2 to2 mem1)
                  (TO: Time.lt to1 from2)
                  (IN: List.In (loc, to1) dom),
-          get loc from2 mem2 = Some (to1, Message.half))
+          get loc from2 mem2 = Some (to1, Message.reserve))
       (BACK: forall loc val
                (IN: List.In (loc, max_ts loc mem1) dom)
-               (PROMISE: latest_half loc promises mem1)
+               (PROMISE: latest_reserve loc promises mem1)
                (LATEST: latest_val loc mem1 val),
           get loc (Time.incr (max_ts loc mem1)) mem2 = Some (max_ts loc mem1, Message.full val (Some view)))
       (COMPLETE: forall loc from to msg
@@ -2641,7 +2641,7 @@ Module Memory.
                    (GET2: get loc to mem2 = Some (from, msg)),
           List.In (loc, from) dom /\
           (exists f m, get loc from mem1 = Some (f, m)) /\
-          (from = max_ts loc mem1 -> latest_half loc promises mem1))
+          (from = max_ts loc mem1 -> latest_reserve loc promises mem1))
   .
 
   Lemma cap_imm_exists
@@ -2669,7 +2669,7 @@ Module Memory.
         - exploit adjacent_inj; [exact x0|exact ADJ|..]. i. des.
           subst. timetac.
         - subst. timetac. }
-      exploit (@add_exists mem1 loc to from2 Message.half); auto.
+      exploit (@add_exists mem1 loc to from2 Message.reserve); auto.
       { ii. inv x0. inv LHS. inv RHS. ss.
         destruct (Time.le_lt_dec to0 from2).
         - exploit (EMPTY to0); try congr.
@@ -2703,7 +2703,7 @@ Module Memory.
         econs; eauto.
     - (* to = max_ts loc mem1 *)
       inv H.
-      destruct (@latest_half_dec loc promises mem1); cycle 1.
+      destruct (@latest_reserve_dec loc promises mem1); cycle 1.
       { exists mem1. splits; auto. econs; i; try congr.
         inv ADJ. exploit max_ts_spec; try exact GET2. i. des.
         exploit get_ts; try exact GET2. i. des.
@@ -2807,7 +2807,7 @@ Module Memory.
           - econs. auto. }
         rewrite -> TS in *.
         exploit (BACK0 loc0 val); eauto.
-        { unfold latest_half in *. rewrite TS in *. ss. }
+        { unfold latest_reserve in *. rewrite TS in *. ss. }
         { inv LATEST. exploit SOUND; eauto. i. econs; eauto.
           inv MAX. des. econs; eauto. i.
           destruct (get loc0 to0 mem1) as [[]|] eqn:GET2.
@@ -2864,7 +2864,7 @@ Module Memory.
       exploit SOUND; eauto. i. rewrite x2 in *. inv x0.
       esplits; eauto; try by econs 2; eauto. i. subst.
       cut (max_ts loc0 mem1 = max_ts loc0 mem2).
-      { i. unfold latest_half in *.
+      { i. unfold latest_reserve in *.
         rewrite H in *. eapply x1; ss. }
       exploit max_ts_spec; try exact x2. i. des.
       eapply TimeFacts.antisym; eauto.

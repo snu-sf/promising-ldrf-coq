@@ -94,7 +94,7 @@ Section SimulationThread.
           <<CAP_TGT: Memory.cap lc1_tgt.(Local.promises) mem1_tgt mem2_tgt>>>> /\
       <<PROMISES:
         forall (PROMISES_TGT: lc1_tgt.(Local.promises) = Memory.bot)
-          (NOHALF: Memory.no_half mem1_tgt),
+          (NOHALF: Memory.no_reserve mem1_tgt),
           <<FAILURE: Thread.steps_failure (Thread.mk _ st1_src lc1_src sc1_src mem1_src)>> \/
           exists st2_src lc2_src sc2_src mem2_src,
             <<STEPS: rtc (@Thread.tau_step _)
@@ -353,14 +353,14 @@ Lemma cap_property
   <<WF: Local.wf lc mem2>> /\
   <<SC: Memory.closed_timemap sc mem2>> /\
   <<CLOSED: Memory.closed mem2>> /\
-  <<NOHALF: Memory.no_half_except lc.(Local.promises) mem2>>.
+  <<NOHALF: Memory.no_reserve_except lc.(Local.promises) mem2>>.
 Proof.
   splits.
   - eapply Memory.cap_future; eauto.
   - eapply Local.cap_wf; eauto.
   - eapply Memory.cap_closed_timemap; eauto.
   - eapply Memory.cap_closed; eauto.
-  - eapply Memory.cap_no_half_except; eauto. apply WF.
+  - eapply Memory.cap_no_reserve_except; eauto. apply WF.
 Qed.
 
 Lemma sc_property
@@ -412,10 +412,10 @@ Proof.
     exploit sim_thread_rtc_step; try apply STEPS; try exact x1; eauto; try refl. i. des; eauto.
     destruct e2. ss.
     punfold SIM0. exploit SIM0; eauto; try refl. i. des.
-    hexploit Thread.rtc_tau_step_no_half_except; try exact STEPS; eauto. i.
-    unfold Thread.no_half_except in H. ss.
+    hexploit Thread.rtc_tau_step_no_reserve_except; try exact STEPS; eauto. i.
+    unfold Thread.no_reserve_except in H. ss.
     rewrite PROMISES0 in *.
-    hexploit Memory.no_half_except_bot_no_half; try apply MEM_TGT0; eauto. i.
+    hexploit Memory.no_reserve_except_bot_no_reserve; try apply MEM_TGT0; eauto. i.
     exploit PROMISES1; eauto. i. des.
     + left. unfold Thread.steps_failure in *. des.
       esplits; [|eauto]. etrans; eauto.

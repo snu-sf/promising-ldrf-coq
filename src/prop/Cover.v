@@ -27,10 +27,10 @@ Inductive covered (loc:FLoc.t) (ts:Time.t) (mem:Memory.t): Prop :=
     (ITV: Interval.mem (from, to) ts)
 .
 
-Inductive covered_half (loc: FLoc.t) (ts: Time.t) (mem: Memory.t): Prop :=
-| covered_half_intro
+Inductive covered_reserve (loc: FLoc.t) (ts: Time.t) (mem: Memory.t): Prop :=
+| covered_reserve_intro
     from to
-    (GET: Memory.get loc to mem = Some (from, Message.half))
+    (GET: Memory.get loc to mem = Some (from, Message.reserve))
     (ITV: Interval.mem (from, to) ts)
 .
 

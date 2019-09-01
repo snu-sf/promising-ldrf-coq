@@ -266,7 +266,7 @@ Proof.
       exploit Thread.rtc_tau_step_future; eauto. s. i. des.
       exploit Thread.opt_step_future; eauto. s. i. des.
       exploit Thread.program_step_future; eauto. s. i. des.
-      hexploit Thread.step_bot_no_half; [econs 2; eauto|..]; eauto. s. i. des.
+      hexploit Thread.step_bot_no_reserve; [econs 2; eauto|..]; eauto. s. i. des.
       punfold SIM. exploit SIM; try apply SC3; eauto; try refl. s. i. des.
       exploit PROMISES; eauto. i. des.
       * left.

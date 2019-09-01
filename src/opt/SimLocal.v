@@ -273,7 +273,7 @@ Lemma sim_local_promise_not_lower
       lc1_tgt mem1_tgt loc from to msg_tgt lc1 mem2_tgt kind
       (LOCAL: sim_local pview lc1_src lc1_tgt)
       (STEP: Local.promise_step lc1_tgt mem1_tgt loc from to msg_tgt lc1 mem2_tgt kind)
-      (KIND: negb (Memory.op_kind_is_lower kind) \/ Memory.op_kind_is_lower_half kind):
+      (KIND: negb (Memory.op_kind_is_lower kind) \/ Memory.op_kind_is_lower_reserve kind):
   SimPromises.mem loc to pview = false.
 Proof.
   des.

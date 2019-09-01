@@ -32,8 +32,8 @@ Inductive sim_message: forall (msg_src msg_tgt: Message.t), Prop :=
     val released_src released_tgt
     (RELEASED: View.opt_le released_src released_tgt):
     sim_message (Message.full val released_src) (Message.full val released_tgt)
-| sim_message_half:
-    sim_message Message.half Message.half
+| sim_message_reserve:
+    sim_message Message.reserve Message.reserve
 .
 Hint Constructors sim_message.
 
@@ -49,8 +49,8 @@ Inductive message_same_kind: forall (msg_src msg_tgt: Message.t), Prop :=
 | message_same_kind_full
     val_src val_tgt released_src released_tgt:
     message_same_kind (Message.full val_src released_src) (Message.full val_tgt released_tgt)
-| same_message_kine_half:
-    message_same_kind Message.half Message.half
+| same_message_kine_reserve:
+    message_same_kind Message.reserve Message.reserve
 .
 Hint Constructors sim_message.
 
@@ -82,8 +82,8 @@ Inductive sim_memory (mem_src mem_tgt:Memory.t): Prop :=
           <<GET: Memory.get loc to mem_src = Some (from_src, msg_src)>> /\
           <<MSG: sim_message msg_src msg_tgt>>)
     (HALF: forall loc from to,
-        Memory.get loc to mem_src = Some (from, Message.half) <->
-        Memory.get loc to mem_tgt = Some (from, Message.half))
+        Memory.get loc to mem_src = Some (from, Message.reserve) <->
+        Memory.get loc to mem_tgt = Some (from, Message.reserve))
 .
 
 Program Instance sim_memory_PreOrder: PreOrder sim_memory.
