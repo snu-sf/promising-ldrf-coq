@@ -129,6 +129,19 @@ Module PFStep.
         erewrite Memory.lower_o; eauto. condtac; ss; eauto. i.
         revert GET_TGT.
         erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+    - exploit Memory.remove_get0; try exact PROMISES. i. des.
+      exploit Memory.remove_get0; try exact MEM. i. des.
+      econs; ii.
+      + erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+        des. subst. exploit COMPLETE1; eauto. congr.
+      + revert GETP.
+        erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+      + revert GETP.
+        erewrite Memory.remove_o; eauto. condtac; ss; i.
+        * revert GET_TGT.
+          erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+        * revert GET_TGT.
+          erewrite Memory.remove_o; eauto. condtac; ss; eauto.
   Qed.
 
   Lemma read_step
@@ -266,6 +279,8 @@ Module PFStep.
           revert GET_TGT.
           erewrite Memory.lower_o; eauto. condtac; ss; i.
           erewrite Memory.add_o; eauto. condtac; ss. eauto.
+    - exploit Memory.remove_get0; try exact REMOVE_TGT. i. des.
+      exploit Memory.remove_get0; try exact PROMISES. i. des. congr.
   Qed.
 
   Lemma write_step

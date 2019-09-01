@@ -235,6 +235,35 @@ Module PFStepCap.
             des. subst. congr. }
           { erewrite Memory.lower_o; eauto. condtac; [|eauto]; ss.
             des. subst. congr. }
+    - (* cancel *)
+      exploit Memory.remove_get0; try exact PROMISES. i. des.
+      exploit Memory.remove_get0; try exact MEM. i. des.
+      econs; ii.
+      + erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+        des. subst. exploit COMPLETE1; eauto; try congr.
+        ii. exploit CAPS; eauto. i. des. congr.
+      + revert GETP.
+        erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+      + revert GETP.
+        erewrite Memory.remove_o; eauto. condtac; ss; i.
+        * revert GET_TGT.
+          erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+        * revert GET_TGT.
+          erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+      + auto.
+      + exploit CAPS; eauto. i. des.
+        erewrite Memory.remove_o; eauto. condtac; ss.
+        * des. subst.
+          rewrite GET1 in *. inv LATEST.
+        * guardH o. esplits; eauto.
+          { unfold cap_src in *. des_ifs; eauto.
+            - revert Heq.
+              erewrite Memory.remove_o; eauto. condtac; ss. congr.
+            - revert Heq.
+              erewrite Memory.remove_o; eauto. condtac; ss. congr. }
+          { erewrite Memory.remove_o; eauto. condtac; [|eauto]; ss.
+            des. subst. congr. }
+          { erewrite Memory.remove_o; eauto. condtac; [|eauto]; ss. }
   Qed.
 
   Lemma read_cap
@@ -248,7 +277,9 @@ Module PFStepCap.
     Memory.get loc (latests loc) lc1.(Local.promises) = None.
   Proof.
     destruct (Memory.get loc (latests loc) (Local.promises lc1)) as [[]|] eqn:PROMISE; ss.
-    exfalso.
+    exfalso. destruct t0; cycle 1.
+    { inv MEM1. exploit CAPS; eauto. i. des.
+      inv WF1. exploit PROMISES; eauto. i. congr. }
     inv STEP. exploit CONS; eauto. i.
     eapply Time.lt_strorder.
     etrans; eauto.
@@ -443,6 +474,9 @@ Module PFStepCap.
             - erewrite Memory.add_o; eauto. condtac; ss.
               guardH o. des. subst. congr. }
         * erewrite Memory.remove_o; eauto. condtac; ss.
+    - (* cancel *)
+      exploit Memory.remove_get0; try exact REMOVE_SRC. i. des.
+      exploit Memory.remove_get0; try exact PROMISES. i. des. congr.
   Qed.
 
   Lemma promise_remove_latest_Some
@@ -463,11 +497,16 @@ Module PFStepCap.
       <<ADD: Memory.add mem2_src loc from_cap to (Message.full val released_cap) mem3_src>> /\
       <<MEM2: sim_memory latests caps promises3 mem3_src mem2_tgt>>.
   Proof.
-    inv PROMISE_TGT.
-    { inv MEM1. exploit CAPS; eauto. i. des.
-      exploit Memory.add_get0; try exact MEM. i. des. congr. }
-    { inv MEM1. exploit CAPS; eauto. i. des.
-      exploit Memory.split_get0; try exact MEM. i. des. congr. }
+    inv PROMISE_TGT; ss.
+    { (* add *)
+      inv MEM1. exploit CAPS; eauto. i. des.
+      exploit Memory.add_get0; try exact MEM. i. des. congr.
+    }
+    { (* split *)
+      inv MEM1. exploit CAPS; eauto. i. des.
+      exploit Memory.split_get0; try exact MEM. i. des. congr.
+    }
+    (* lower *)
     clear TS.
     inv MEM1. exploit CAPS; eauto. i. des.
     exploit Memory.lower_get0; try exact PROMISES. i. des.
@@ -715,6 +754,9 @@ Module PFStepCap.
             - erewrite Memory.add_o; eauto. condtac; ss.
               guardH o. des. subst. congr. }
         * erewrite Memory.remove_o; eauto. condtac; ss.
+    - (* cancel *)
+      exploit Memory.remove_get0; try exact REMOVE_SRC. i. des.
+      exploit Memory.remove_get0; try exact PROMISES. i. des. congr.
   Qed.
 
   Lemma write_aux
@@ -733,7 +775,7 @@ Module PFStepCap.
     inv STEP_TGT. inv WRITE.
     exploit (@Memory.add_exists mem1_src loc from to
                                 (Message.full val (TView.write_released (Local.tview lc1_tgt) sc1 loc to releasedm ord))); eauto.
-    { inv MEM1. inv PROMISE; ii.
+    { inv MEM1. inv PROMISE; ss; ii.
       - clear TS HALF.
         exploit SOUND; eauto. i.
         exploit Memory.add_get1; eauto. i.
@@ -769,12 +811,12 @@ Module PFStepCap.
           i. des. congr.
         + eapply x2; eauto.
     }
-    { inv PROMISE.
+    { inv PROMISE; ss.
       - inv MEM. inv ADD. ss.
       - inv MEM. inv SPLIT. ss.
       - inv MEM. inv LOWER. ss.
     }
-    { inv PROMISE.
+    { inv PROMISE; ss.
       - inv MEM. inv ADD. ss.
       - inv MEM. inv SPLIT. ss.
       - inv MEM. inv LOWER. ss.

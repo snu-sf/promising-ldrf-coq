@@ -172,7 +172,7 @@ Section Invariant.
     - ii. rewrite FLocFun.add_spec. condtac.
       { specialize (INHABITED loc0). esplits; eauto. }
       specialize (SEM loc0). des. revert SEM.
-      inv STEP. inv WRITE. inv PROMISE.
+      inv STEP. inv WRITE. inv PROMISE; ss.
       + erewrite Memory.add_o; eauto. condtac; ss.
         * i. des. inv SEM. congr.
         * i. esplits; eauto.
@@ -195,7 +195,7 @@ Section Invariant.
     memory_assign mem1 assign.
   Proof.
     ii. specialize (SEM loc0). des. revert SEM.
-    inv STEP. inv WRITE. inv PROMISE.
+    inv STEP. inv WRITE. inv PROMISE; ss.
     - erewrite Memory.add_o; eauto. condtac; ss.
       + i. des. inv SEM. congr.
       + i. esplits; eauto.
@@ -337,10 +337,8 @@ Section Invariant.
         (SEM: sem_memory m2):
     sem_memory m1.
   Proof.
-    revert SEM. induction FUTURE; ss. i.
-    hexploit IHFUTURE; eauto. i.
-    ii. apply H0. ii. specialize (PR loc). des.
-    inv H. exploit Memory.op_get1; eauto. i. des.
+    ii. apply SEM. ii. specialize (PR loc). des.
+    exploit Memory.future_get1; eauto. i. des.
     inv MSG_LE. esplits; eauto.
   Qed.
 
