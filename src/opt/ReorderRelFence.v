@@ -78,6 +78,7 @@ Proof.
   exploit Memory.promise_future; try apply PROMISE_SRC; eauto.
   { apply WF1_SRC. }
   { apply WF1_SRC. }
+  { apply WF1_SRC. }
   { SimPromises.none_if_tac; econs; ss. inv CLOSED.
     eapply sim_memory_closed_opt_view; eauto. }
   i. des.
@@ -215,6 +216,7 @@ Proof.
   - destruct msg0; ss. inv PROMISES. inv LOWER.
     unfold Memory.get in x. unfold Cell.get in x.
     rewrite GET2 in x. inv x.
+  - exploit Memory.remove_get0; try exact PROMISES; eauto. i. des. congr.
 Qed.
 
 Lemma sim_local_write_relfenced

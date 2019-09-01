@@ -1843,6 +1843,17 @@ Module Memory.
       exploit remove_get0; try exact MEM. i. des. congr.
   Qed.
 
+  Lemma future_half_wf
+        promises mem1 mem2
+        (FUTURE: future mem1 mem2)
+        (HALF: half_wf promises mem1):
+    half_wf promises mem2.
+  Proof.
+    ii. exploit HALF; eauto. i. des.
+    exploit future_get1; eauto. i. des.
+    inv MSG_LE. eauto.
+  Qed.
+
 
   (* Lemmas on promise & remove *)
 

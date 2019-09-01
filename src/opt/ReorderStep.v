@@ -134,6 +134,18 @@ Lemma reorder_read_promise
 Proof.
   inv STEP1. inv STEP2. ss.
   exploit Memory.promise_future; try exact PROMISE; try apply WF0; eauto. i. des.
+  destruct (Memory.op_kind_is_cancel kind2) eqn:KIND.
+  { destruct kind2; ss. inv PROMISE.
+    esplits; [eauto|..].
+    - econs; eauto.
+      erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+      des. subst. exploit Memory.remove_get0; try exact MEM. i. des. congr.
+    - refl.
+    - s. econs; ss.
+      + apply TViewFacts.read_tview_mon; try refl; try apply WF0; eauto.
+        inv MEM0. exploit CLOSED0; eauto. i. des. inv MSG_WF. auto.
+      + apply SimPromises.sem_bot.
+  }
   exploit Memory.promise_get1; eauto. i. des. inv MSG_LE.
   esplits; eauto.
   - econs; eauto.
@@ -373,6 +385,9 @@ Proof.
   hexploit Memory.promise_future; eauto.
   { ii. inv WF0.
     erewrite Memory.remove_o; eauto. condtac; ss. }
+  { ii. inv WF0. revert GET.
+    erewrite Memory.remove_o; eauto. condtac; ss. i.
+    guardH o. exploit HALF; eauto. }
   i. des.
   exploit MemoryReorder.remove_promise; try apply WF0; eauto. i. des.
   esplits.

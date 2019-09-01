@@ -82,6 +82,7 @@ Proof.
     hexploit TViewFacts.write_future; try exact H; eauto; try apply WF0; try by viewtac. i. des.
     hexploit Memory.promise_future; try apply PROMISE; try apply WF0; eauto; try by viewtac. i. des.
     eapply Memory.promise_get2; eauto.
+    inv PROMISE; ss.
   - inv WRITABLE. unfold TView.write_released. s.
     econs; repeat (try condtac; aggrtac); (try by left; eauto).
     + etrans; [|left; eauto]. apply WF0.
@@ -418,7 +419,7 @@ Lemma write_step_nonsynch_loc
   Memory.nonsynch_loc l lc2.(Local.promises).
 Proof.
   inv STEP. inv WRITE. s. ii. revert GET.
-  erewrite Memory.remove_o; eauto. condtac; ss. inv PROMISE.
+  erewrite Memory.remove_o; eauto. condtac; ss. inv PROMISE; ss.
   - erewrite Memory.add_o; eauto. condtac; ss. apply PROMISES.
   - erewrite Memory.split_o; eauto. repeat condtac; ss.
     + guardH o. guardH o0. des. subst.
@@ -636,6 +637,7 @@ Proof.
   - (* lower *)
     exploit merge_write_write_lower; try apply TS12; eauto. i. des.
     esplits; try apply STEP2; eauto.
+  - inv STEP. inv WRITE. inv PROMISE; ss.
 Qed.
 
 Lemma merge_write_write_None

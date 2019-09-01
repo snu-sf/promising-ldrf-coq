@@ -128,6 +128,7 @@ Proof.
     - eapply TView.future_closed; eauto. apply WF2.
     - inv READ. apply WF_SRC.
     - apply WF2.
+    - eapply Memory.future_half_wf; eauto. apply WF2.
   }
   i. des.
   econs; [eauto|..]; s; eauto; etrans; eauto.
@@ -179,6 +180,7 @@ Proof.
     - eapply TView.future_closed; eauto. apply WF2.
     - inv READ. ss. apply WF.
     - apply WF2.
+    - eapply Memory.future_half_wf; eauto. apply WF2.
   }
   i. des.
   exploit sim_local_fulfill_bot; try exact x1; try exact LOCAL0; try refl; eauto.
@@ -187,6 +189,7 @@ Proof.
     - eapply TView.future_closed; eauto. apply WF2.
     - inv READ. apply WF.
     - apply WF2.
+    - eapply Memory.future_half_wf; eauto. apply WF2.
   }
   i. des.
   exploit fulfill_step_future; eauto. i. des.
