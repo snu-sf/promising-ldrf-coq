@@ -1247,6 +1247,221 @@ Module Memory.
     - eapply singleton_rw_closed_view; eauto.
   Qed.
 
+  (* future_weak *)
+
+  Inductive future_weak (mem1 mem2: t): Prop :=
+  | future_weak_intro
+      (SOUND: forall loc from to val released
+                 (GET: get loc to mem1 = Some (from, Message.full val released)),
+          exists f r,
+            get loc to mem2 = Some (f, Message.full val r) /\
+            Time.le from f /\
+            (r = released \/
+             View.opt_wf r /\
+             closed_opt_view r mem2 /\
+             View.opt_le r released))
+      (COMPLETE1: forall loc from to val released
+                     (GET1: get loc to mem1 = None)
+                     (GET2: get loc to mem2 = Some (from, Message.full val released)),
+          View.opt_wf released /\
+          closed_opt_view released mem2 /\
+          Time.le (released.(View.unwrap).(View.rlx) loc) to)
+      (COMPLETE2: forall loc from to val released f
+                     (GET1: get loc to mem1 = Some (f, Message.reserve))
+                     (GET2: get loc to mem2 = Some (from, Message.full val released)),
+          View.opt_wf released /\
+          closed_opt_view released mem2 /\
+          Time.le (released.(View.unwrap).(View.rlx) loc) to)
+  .
+  Hint Constructors future_weak.
+
+  Lemma future_weak_closed_timemap
+        times mem1 mem2
+        (FUTURE: future_weak mem1 mem2)
+        (CLOSED: closed_timemap times mem1):
+    closed_timemap times mem2.
+  Proof.
+    ii. specialize (CLOSED loc). des.
+    inv FUTURE. exploit SOUND; eauto. i. des; eauto.
+  Qed.
+
+  Lemma future_weak_closed_view
+        view mem1 mem2
+        (FUTURE: future_weak mem1 mem2)
+        (CLOSED: closed_view view mem1):
+    closed_view view mem2.
+  Proof.
+    inv CLOSED. econs; eauto using future_weak_closed_timemap.
+  Qed.
+
+  Lemma future_weak_closed_opt_view
+        view mem1 mem2
+        (FUTURE: future_weak mem1 mem2)
+        (CLOSED: closed_opt_view view mem1):
+    closed_opt_view view mem2.
+  Proof.
+    inv CLOSED; econs. eapply future_weak_closed_view; eauto.
+  Qed.
+
+  Lemma future_weak_closed_message
+        msg mem1 mem2
+        (FUTURE: future_weak mem1 mem2)
+        (CLOSED: closed_message msg mem1):
+    closed_message msg mem2.
+  Proof.
+    inv CLOSED; econs. eapply future_weak_closed_opt_view; eauto.
+  Qed.
+
+  Lemma future_weak_closed
+        mem1 mem2
+        (FUTURE: future_weak mem1 mem2)
+        (CLOSED: closed mem1):
+    closed mem2.
+  Proof.
+    inv FUTURE. inv CLOSED. econs; i.
+    - destruct msg; try by (splits; econs).
+      destruct (get loc to mem1) as [[f []]|] eqn:GET1.
+      + exploit CLOSED0; eauto. i. des.
+        exploit SOUND; eauto. i. des.
+        * rewrite MSG in *. inv x.
+          splits; auto. eapply future_weak_closed_message; eauto.
+        * rewrite MSG in *. inv x. splits; eauto.
+          { econs. ss. }
+          { econs. inv MSG_TS. etrans; eauto.
+            inv x3; ss; try apply LE.
+            unfold TimeMap.bot. apply Time.bot_spec. }
+      + exploit COMPLETE2; eauto. i. des.
+        splits; econs; eauto.
+      + exploit COMPLETE1; eauto. i. des.
+        splits; econs; eauto.
+    - ii. specialize (INHABITED loc).
+      exploit SOUND; eauto. i. des.
+      + subst. exploit get_ts; try exact x. i. des.
+        * subst. eauto.
+        * inv x2.
+      + exploit get_ts; try exact x. i. des.
+        * subst. inv x3. eauto.
+        * inv x5.
+  Qed.
+
+  Global Program Instance future_weak_PreOrder: PreOrder future_weak.
+  Next Obligation.
+    ii. econs; try congr; i.
+    esplits; eauto. refl.
+  Qed.
+  Next Obligation.
+    ii. inv H. inv H0. econs; i.
+    - exploit SOUND; eauto. i. des; subst.
+      + exploit SOUND0; eauto. i. des; subst.
+        * esplits; eauto.
+        * esplits; eauto.
+      + exploit SOUND0; eauto. i. des; subst.
+        * esplits; eauto. right. splits; eauto.
+          eapply future_weak_closed_opt_view; eauto.
+        * esplits; eauto.
+    - destruct (get loc to y) as [[f []]|] eqn:GET; eauto.
+      exploit COMPLETE1; eauto. i. des.
+      exploit SOUND0; eauto. i. des; subst.
+      + rewrite GET2 in *. inv x3. splits; eauto.
+        eapply future_weak_closed_opt_view; eauto.
+      + rewrite GET2 in *. inv x3. splits; eauto.
+        etrans; eauto.
+        inv x7; ss; try apply LE.
+        unfold TimeMap.bot. apply Time.bot_spec.
+    - destruct (get loc to y) as [[f' []]|] eqn:GET; eauto.
+      exploit COMPLETE2; eauto. i. des.
+      exploit SOUND0; eauto. i. des; subst.
+      + rewrite GET2 in *. inv x3. splits; eauto.
+        eapply future_weak_closed_opt_view; eauto.
+      + rewrite GET2 in *. inv x3. splits; eauto.
+        etrans; eauto.
+        inv x7; ss; try apply LE.
+        unfold TimeMap.bot. apply Time.bot_spec.
+  Qed.
+
+  Lemma future_future_weak
+        mem1 mem2
+        (FUTURE: future mem1 mem2):
+    future_weak mem1 mem2.
+  Proof.
+    induction FUTURE; try refl.
+    etrans; eauto. clear FUTURE IHFUTURE.
+    inv H. inv OP.
+    - econs; i.
+      + exploit add_get1; eauto. i.
+        esplits; eauto. refl.
+      + revert GET2. erewrite add_o; eauto. condtac; ss; i.
+        * des. subst. inv GET2.
+          inv TS. inv CLOSED. splits; auto.
+          inv ADD. inv ADD0. inv MSG_WF. ss.
+        * congr.
+      + revert GET2. erewrite add_o; eauto. condtac; ss; i.
+        * des. subst. inv GET2.
+          exploit add_get0; eauto. i. des. congr.
+        * congr.
+    - exploit split_get0; eauto. i. des.
+      econs; i.
+      + erewrite split_o; eauto. repeat condtac; ss; eauto.
+        * des. subst. congr.
+        * guardH o. des. subst.
+          rewrite GET0 in *. inv GET3. esplits; eauto.
+          inv SPLIT. inv SPLIT0. econs. ss.
+        * esplits; eauto. refl.
+      + revert GET4. erewrite split_o; eauto. repeat condtac; ss; i.
+        * des. subst. inv GET4.
+          inv TS. inv CLOSED. splits; auto.
+          inv SPLIT. inv SPLIT0. inv MSG_WF. ss.
+        * guardH o. des. subst. inv GET4. congr.
+        * congr.
+      + revert GET4. erewrite split_o; eauto. repeat condtac; ss; i.
+        * des. subst. inv GET4.
+          inv TS. inv CLOSED. splits; auto.
+          inv SPLIT. inv SPLIT0. inv MSG_WF. ss.
+        * guardH o. des. subst. inv GET4. congr.
+        * congr.
+    - exploit lower_get0; eauto. i. des.
+      econs; i.
+      + erewrite lower_o; eauto. condtac; ss.
+        * des. subst.
+          rewrite GET in *. inv GET1. inv MSG_LE.
+          esplits; eauto; try refl.
+          right. inv CLOSED. splits; auto.
+          inv LOWER. inv LOWER0. inv MSG_WF. ss.
+        * esplits; eauto. refl.
+      + revert GET2. erewrite lower_o; eauto. condtac; ss; i.
+        * des. subst. congr.
+        * congr.
+      + revert GET2. erewrite lower_o; eauto. condtac; ss; i.
+        * des. subst. inv GET2.
+          rewrite GET in *. inv GET1.
+          inv TS. inv CLOSED. splits; auto.
+          inv LOWER. inv LOWER0. inv MSG_WF. ss.
+        * congr.
+    - exploit remove_get0; eauto. i. des.
+      econs; i.
+      + erewrite Memory.remove_o; eauto. condtac; ss.
+        * des. subst. congr.
+        * esplits; eauto. refl.
+      + revert GET2. erewrite remove_o; eauto. condtac; ss; i.
+        congr.
+      + revert GET2. erewrite remove_o; eauto. condtac; ss; i.
+        congr.
+  Qed.
+
+  Lemma future_weak_get1
+        loc from to val released mem1 mem2
+        (FUTURE: future_weak mem1 mem2)
+        (GET: get loc to mem1 = Some (from, Message.full val released)):
+    exists from' msg',
+      <<GET: get loc to mem2 = Some (from', msg')>> /\
+      <<FROM: Time.le from from'>> /\
+      <<MSG_LE: Message.le msg' (Message.full val released)>>.
+  Proof.
+    inv FUTURE. exploit SOUND; eauto. i. des.
+    - subst. esplits; eauto. refl.
+    - esplits; eauto.
+  Qed.
+
 
   (* Lemmas on max_timemap *)
 
@@ -1511,6 +1726,17 @@ Module Memory.
   Proof.
     ii. exploit HALF; eauto. i. des.
     exploit future_get1; eauto. i. des.
+    inv MSG_LE. eauto.
+  Qed.
+
+  Lemma future_weak_reserve_wf
+        promises mem1 mem2
+        (FUTURE: future_weak mem1 mem2)
+        (HALF: reserve_wf promises mem1):
+    reserve_wf promises mem2.
+  Proof.
+    ii. exploit HALF; eauto. i. des.
+    exploit future_weak_get1; eauto. i. des.
     inv MSG_LE. eauto.
   Qed.
 
