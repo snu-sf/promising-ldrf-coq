@@ -223,15 +223,4 @@ Module MemoryFacts.
     destruct (mem loc).(Cell.WF). exploit VOLUME; eauto. i. des; ss. inv x.
     inv CLOSED. rewrite INHABITED in GET. inv GET.
   Qed.
-
-  (* unused *)
-  Lemma half_time_lt
-        mem loc from to
-        (CLOSED: Memory.closed mem)
-        (GET: Memory.get loc to mem = Some (from, Message.half)):
-    Time.lt from to.
-  Proof.
-    destruct (mem loc).(Cell.WF). exploit VOLUME; eauto. i. des; ss. inv x.
-    inv CLOSED. rewrite INHABITED in GET. inv GET.
-  Qed.
 End MemoryFacts.

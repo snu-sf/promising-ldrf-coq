@@ -517,7 +517,6 @@ Proof.
     rewrite MemoryDomain.bot_spec in x. ss.
 Qed.
 
-(* unused *)
 Lemma sim_local_program_step
       lang
       th1_src

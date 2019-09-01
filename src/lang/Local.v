@@ -625,35 +625,4 @@ Module Local.
         i. des. congr.
       + eapply Memory.promise_no_half_except; eauto.
   Qed.
-
-
-  (* step_non_promised *)
-
-  (* Lemma promise_step_non_promised *)
-  (*       lc1 mem1 loc from to msg lc2 mem2 kind *)
-  (*       l f t m *)
-  (*       (STEP: promise_step lc1 mem1 loc from to msg lc2 mem2 kind) *)
-  (*       (GETP1: Memory.get l t lc1.(promises) = None) *)
-  (*       (GET1: Memory.get l t mem1 = Some (f, m)): *)
-  (*   <<GETP2: Memory.get l t lc2.(promises) = None>> /\ *)
-  (*   <<GET2: Memory.get l t mem2 = Some (f, m)>>. *)
-  (* Proof. *)
-  (*   inv STEP. ss. *)
-  (*   eapply Memory.promise_get_None; eauto. *)
-  (* Qed. *)
-
-  (* Lemma program_step_non_promised *)
-  (*       e lc1 sc1 mem1 lc2 sc2 mem2 *)
-  (*       l f t m *)
-  (*       (STEP: program_step e lc1 sc1 mem1 lc2 sc2 mem2) *)
-  (*       (GETP1: Memory.get l t lc1.(promises) = None) *)
-  (*       (GET1: Memory.get l t mem1 = Some (f, m)): *)
-  (*   <<GETP2: Memory.get l t lc2.(promises) = None>> /\ *)
-  (*   <<GET2: Memory.get l t mem2 = Some (f, m)>>. *)
-  (* Proof. *)
-  (*   inv STEP; try inv LOCAL; eauto; ss. *)
-  (*   - eapply Memory.write_get_None; eauto. *)
-  (*   - inv LOCAL1. inv LOCAL2. ss. *)
-  (*     eapply Memory.write_get_None; eauto. *)
-  (* Qed. *)
 End Local.
