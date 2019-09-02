@@ -1,5 +1,7 @@
 Require Import Omega.
 Require Import RelationClasses.
+Require Import Decidable.
+Require Import Coq.Lists.ListDec.
 
 From sflib Require Import sflib.
 From Paco Require Import paco.
@@ -373,6 +375,20 @@ Module Cell.
     - generalize (Time.le_lteq from to). i. des. auto.
   Qed.
 
+  Lemma get_disjoint
+        f1 f2 t1 t2 msg1 msg2 cell
+        (GET1: get t1 cell = Some (f1, msg1))
+        (GET2: get t2 cell = Some (f2, msg2)):
+    (t1 = t2 /\ f1 = f2 /\ msg1 = msg2) \/
+    Interval.disjoint (f1, t1) (f2, t2).
+  Proof.
+    destruct (Time.eq_dec t1 t2).
+    { subst. rewrite GET1 in GET2. inv GET2. auto. }
+    unfold get in *. unfold Cell.get in *.
+    destruct cell; ss. inv WF0.
+    hexploit DISJOINT; [exact GET1|exact GET2|..]; eauto.
+  Qed.
+
   Definition le (lhs rhs:t): Prop :=
     forall to from msg
       (LHS: get to lhs = Some (from, msg)),
@@ -389,6 +405,16 @@ Module Cell.
 
   Lemma bot_le cell: le bot cell.
   Proof. ii. rewrite bot_get in LHS. congr. Qed.
+
+  Lemma finite cell:
+    exists dom,
+    forall from to msg (GET: get to cell = Some (from, msg)),
+      List.In to dom.
+  Proof.
+    exists (List.map (fun e => e.(fst)) (DOMap.elements cell.(Cell.raw))). i.
+    exploit DOMap.elements_correct; eauto. i.
+    eapply in_prod; eauto.
+  Qed.
 
   Definition singleton
              (from to:Time.t) (msg:Message.t)
@@ -637,6 +663,17 @@ Module Cell.
   Proof.
     inv REMOVE. splits; auto.
     unfold get. rewrite CELL2. rewrite DOMap.grspec. condtac; ss.
+  Qed.
+
+  Lemma add_get1
+        cell1 from to msg cell2
+        f t m
+        (ADD: add cell1 from to msg cell2)
+        (GET1: get t cell1 = Some (f, m)):
+    get t cell2 = Some (f, m).
+  Proof.
+    erewrite add_o; eauto. condtac; ss.
+    des. subst. exploit add_get0; eauto. i. des. congr.
   Qed.
 
   Lemma add_inhabited
@@ -1118,5 +1155,347 @@ Module Cell.
     - exploit DOMap.elements_correct; try exact INHABITED. i.
       exploit in_prod; try exact x0. i.
       exploit prev_spec_None; eauto. i. inv x2.
+  Qed.
+
+
+  (* adjacent *)
+
+  Inductive adjacent (from1 to1 from2 to2: Time.t) (cell: t): Prop :=
+  | adjacent_intro
+      m1 m2
+      (GET1: get to1 cell = Some (from1, m1))
+      (GET2: get to2 cell = Some (from2, m2))
+      (TS: Time.lt to1 to2)
+      (EMPTY: forall ts (TS1: Time.lt to1 ts) (TS2: Time.le ts from2),
+          get ts cell = None)
+  .
+
+  Lemma adjacent_ts
+        from1 to1 from2 to2 mem
+        (ADJ: adjacent from1 to1 from2 to2 mem):
+    Time.le to1 from2.
+  Proof.
+    destruct (Time.le_lt_dec to1 from2); auto.
+    exfalso. inv ADJ.
+    exploit get_ts; try exact GET1. i. des.
+    { subst. inv l. }
+    exploit get_ts; try exact GET2. i. des.
+    { subst. inv TS. }
+    exploit get_disjoint; [exact GET1|exact GET2|..]. i. des.
+    { subst. timetac. }
+    apply (x2 to1); econs; ss.
+    - refl.
+    - econs. auto.
+  Qed.
+
+  Lemma adjacent_inj
+        to mem
+        from1 from2 from3 to3 from4 to4
+        (ADJ1: adjacent from1 to from3 to3 mem)
+        (ADJ2: adjacent from2 to from4 to4 mem):
+    from1 = from2 /\ from3 = from4 /\ to3 = to4.
+  Proof.
+    inv ADJ1. inv ADJ2.
+    rewrite GET1 in GET0. inv GET0.
+    destruct (Time.le_lt_dec to3 to4); cycle 1.
+    { exfalso.
+      destruct (Time.le_lt_dec to4 from3).
+      - exploit EMPTY; try exact l0; eauto. i. congr.
+      - exploit get_ts; try exact GET2. i. des.
+        { subst. inv l. }
+        exploit get_ts; try exact GET3. i. des.
+        { subst. inv l0. }
+        exploit get_disjoint; [exact GET2|exact GET3|..]. i. des.
+        { subst. timetac. }
+        apply (x2 to4); econs; ss.
+        + econs. ss.
+        + refl. }
+    inv l.
+    { exfalso.
+      destruct (Time.le_lt_dec to3 from4).
+      - exploit EMPTY0; try exact l; eauto. i. congr.
+      - exploit get_ts; try exact GET2. i. des.
+        { subst. inv l. }
+        exploit get_ts; try exact GET3. i. des.
+        { subst. inv H. }
+        exploit get_disjoint; [exact GET2|exact GET3|..]. i. des.
+        { subst. timetac. }
+        apply (x2 to3); econs; ss.
+        + refl.
+        + econs. ss. }
+    inv H. rewrite GET2 in GET3. inv GET3.
+    splits; auto.
+  Qed.
+
+  Lemma adjacent_exists
+        from1 to1 msg cell
+        (GET: get to1 cell = Some (from1, msg))
+        (TO: Time.lt to1 (max_ts cell)):
+    exists from2 to2,
+      adjacent from1 to1 from2 to2 cell.
+  Proof.
+    exploit next_exists; eauto. i. des.
+    esplits. econs; try exact x0; eauto. i.
+    eapply x2; eauto.
+    exploit get_ts; try exact x0. i. des.
+    - subst. inv x1.
+    - eapply TimeFacts.le_lt_lt; eauto.
+  Qed.
+
+
+  (* cap *)
+
+  Inductive latest_val (cell: t) (val: Const.t): Prop :=
+  | latest_val_intro
+      ts from released
+      (MAX: max_full_ts cell ts)
+      (GET: get ts cell = Some (from, Message.full val released))
+  .
+
+  Lemma latest_val_inj
+        cell val1 val2
+        (LATEST1: latest_val cell val1)
+        (LATEST2: latest_val cell val2):
+    val1 = val2.
+  Proof.
+    inv LATEST1. inv LATEST2.
+    exploit max_full_ts_inj; [exact MAX|exact MAX0|..]. i. subst.
+    rewrite GET in GET0. inv GET0. ss.
+  Qed.
+
+  Lemma latest_val_exists
+        cell
+        (INHABITED: get Time.bot cell = Some (Time.bot, Message.elt)):
+    exists val, latest_val cell val.
+  Proof.
+    exploit (@max_full_ts_exists cell); eauto. i. des.
+    dup x0. inv x0. des.
+    exists val. econs; eauto.
+  Qed.
+
+  Definition latest_half (promises cell: t): Prop :=
+    match get (max_ts cell) promises with
+    | Some (_, Message.reserve) => False
+    | _ => True
+    end.
+
+  Lemma latest_half_dec promises cell:
+    latest_half promises cell \/
+    ~ latest_half promises cell.
+  Proof.
+    unfold latest_half.
+    destruct (get (max_ts cell) promises) eqn:PROMISE; auto.
+    destruct p; ss. destruct t1; auto.
+  Qed.
+
+  Inductive cap (view: View.t) (promises cell1 cell2: t): Prop :=
+  | cap_intro
+      (SOUND: le cell1 cell2)
+      (MIDDLE: forall from1 to1 from2 to2
+                 (ADJ: adjacent from1 to1 from2 to2 cell1)
+                 (TO: Time.lt to1 from2),
+          get from2 cell2 = Some (to1, Message.reserve))
+      (BACK: forall val
+               (PROMISE: latest_half promises cell1)
+               (LATEST: latest_val cell1 val),
+          get (Time.incr (max_ts cell1)) cell2 =
+          Some (max_ts cell1, Message.full val (Some view)))
+      (COMPLETE: forall from to msg
+                   (GET1: get to cell1 = None)
+                   (GET2: get to cell2 = Some (from, msg)),
+          (exists f m, get from cell1 = Some (f, m)) /\
+          (from = max_ts cell1 -> latest_half promises cell1))
+  .
+
+  Inductive cap_aux (dom: list Time.t) (view: View.t) (promises cell1 cell2: t): Prop :=
+  | cap_aux_intro
+      (SOUND: le cell1 cell2)
+      (MIDDLE: forall from1 to1 from2 to2
+                 (IN: List.In to1 dom)
+                 (ADJ: adjacent from1 to1 from2 to2 cell1)
+                 (TO: Time.lt to1 from2),
+          get from2 cell2 = Some (to1, Message.reserve))
+      (BACK: forall val
+               (IN: List.In (max_ts cell1) dom)
+               (PROMISE: latest_half promises cell1)
+               (LATEST: latest_val cell1 val),
+          get (Time.incr (max_ts cell1)) cell2 = Some (max_ts cell1, Message.full val (Some view)))
+      (COMPLETE: forall from to msg
+                   (GET1: get to cell1 = None)
+                   (GET2: get to cell2 = Some (from, msg)),
+          List.In from dom /\
+          (exists f m, get from cell1 = Some (f, m)) /\
+          (from = max_ts cell1 -> latest_half promises cell1))
+  .
+
+  Lemma time_decidable: decidable_eq Time.t.
+  Proof.
+    ii. destruct (Time.eq_dec x y); [left|right]; ss.
+  Qed.
+
+  Lemma cap_aux_exists
+        dom view promises cell1
+        (VIEW: View.wf view)
+        (INHABITED: get Time.bot cell1 = Some (Time.bot, Message.elt)):
+    exists cell2, cap_aux dom view promises cell1 cell2.
+  Proof.
+    revert cell1 INHABITED.
+    induction dom; i.
+    { exists cell1. econs; ss; i. congr. }
+    exploit IHdom; eauto. i. des. clear IHdom.
+    destruct (In_decidable time_decidable a dom).
+    { exists cell2. inv x. econs; ii; eauto.
+      - inv IN; eauto.
+      - inv IN; eauto.
+      - exploit COMPLETE; eauto. i. des.
+        split; eauto. econs 2; eauto.
+    }
+    destruct (get a cell1) as [[from msg]|] eqn:GET1; cycle 1.
+    { exists cell2. inv x. econs; ii; eauto.
+      - inv IN; eauto. inv ADJ. congr.
+      - inv IN; eauto.
+        exploit max_ts_spec; eauto. i. des. congr.
+      - exploit COMPLETE; eauto. i. des.
+        split; eauto. econs 2; eauto.
+    }
+    exploit max_ts_spec; eauto. i. des.
+    inv MAX.
+    { exploit adjacent_exists; try exact GET1; ss. i. des.
+      exploit adjacent_ts; eauto. i. inv x2; cycle 1.
+      { inv H1.
+        exists cell2. inv x. econs; ii; eauto.
+        - inv IN; eauto.
+          exploit adjacent_inj; [exact x1|exact ADJ|..]. i. des. subst.
+          timetac.
+        - inv IN; eauto. timetac.
+        - exploit COMPLETE; eauto. i. des.
+          split; eauto. econs 2; eauto.
+      }
+      exploit (@add_exists cell2 a from2 Message.reserve); ii.
+      { inv x. inv x1. inv LHS. inv RHS. ss.
+        clear MIDDLE BACK.
+        destruct (get to0 cell1) as [[]|] eqn:GET4.
+        - exploit SOUND; try exact GET4. i.
+          rewrite x in *. inv GET2.
+          destruct (Time.le_lt_dec to0 from2).
+          { exploit (EMPTY to0); try congr.
+            eapply TimeFacts.lt_le_lt; try exact FROM; ss. }
+          exploit get_ts; try exact GET3. i. des.
+          { subst. inv TS. }
+          exploit get_ts; try exact GET4. i. des.
+          { subst. inv l. }
+          exploit get_disjoint; [exact GET3|exact GET4|..]. i. des.
+          { subst. timetac. }
+          destruct (Time.le_lt_dec to0 to2).
+          + apply (x4 to0); econs; ss; try refl.
+          + apply (x4 to2); econs; ss; try refl.
+            * eapply TimeFacts.le_lt_lt; try exact x2.
+              etrans; try exact TO. econs. ss.
+            * econs. ss.
+        - exploit COMPLETE; try exact GET2; eauto. i. des.
+          cut (from1 = a); try by (i; subst; ss).
+          clear COMPLETE.
+          destruct (Time.le_lt_dec from1 a).
+          + inv l; try by (inv H2; ss).
+            exploit SOUND; try exact GET0. i.
+            exploit get_ts; try exact x3. i. des.
+            { subst. inv H2. }
+            exploit get_disjoint; [exact x3|exact GET2|..]. i. des.
+            { subst. timetac. }
+            exfalso.
+            apply (x6 a); econs; ss; try refl.
+            econs. eapply TimeFacts.lt_le_lt; try exact FROM. ss.
+          + exploit (EMPTY from1); try congr.
+            econs. eapply TimeFacts.lt_le_lt; try exact FROM0. ss.
+      }
+      { ss. }
+      { econs. }
+      des.
+      exists cell0. inv x. econs; ii; ss.
+      - exploit SOUND; eauto. i.
+        eapply add_get1; eauto.
+      - exploit add_get0; eauto. i. des.
+        des; subst.
+        + exploit adjacent_inj; [exact x1|exact ADJ|..]. i. des.
+          subst. ss.
+        + exploit MIDDLE; eauto. i.
+          eapply add_get1; eauto.
+      - des; subst; timetac.
+        exploit BACK; eauto. i.
+        eapply add_get1; eauto.
+      - revert GET2. erewrite add_o; eauto. condtac; ss; i.
+        + subst. inv GET2. splits; eauto.
+          i. subst. timetac.
+        + exploit COMPLETE; eauto. i. des.
+          esplits; eauto.
+    }
+    inv H0. clear from0 msg0 GET.
+    destruct (@latest_half_dec promises cell1); cycle 1.
+    { exists cell2. inv x. econs; ii; ss; eauto.
+      - inv IN; eauto. inv ADJ.
+        exploit max_ts_spec; try exact GET2. i. des.
+        timetac.
+      - exploit COMPLETE; eauto. i. des.
+        esplits; eauto.
+    }
+    exploit latest_val_exists; eauto. i. des.
+    exploit (@add_exists cell2 (max_ts cell1) (Time.incr (max_ts cell1))
+                         (Message.full val (Some view))); ii.
+    { inv x. inv LHS. inv RHS. ss.
+      destruct (get to2 cell1) as [[]|] eqn:GET3.
+      { exploit SOUND; eauto. i.
+        rewrite x in *. inv GET2.
+        exploit max_ts_spec; try exact GET3. i. des.
+        exploit TimeFacts.le_lt_lt; try exact FROM; try exact MAX. i.
+        timetac. }
+      exploit COMPLETE; eauto. i. des.
+      cut (from2 = max_ts cell1); try by (i; subst; ss).
+      destruct (Time.le_lt_dec from2 (max_ts cell1)).
+      - inv l; try by (inv H1; ss).
+        exploit SOUND; try exact GET1. i.
+        exploit get_ts; try exact x4. i. des.
+        { subst. rewrite x5 in *. inv H1. }
+        exploit get_ts; try exact GET2. i. des.
+        { subst. timetac. }
+        exploit get_disjoint; [exact x4|exact GET2|..]. i. des.
+        { subst. timetac. }
+        exfalso.
+        apply (x8 (max_ts cell1)); econs; ss; try refl.
+        econs. eapply TimeFacts.lt_le_lt; try exact FROM. ss.
+      - exploit max_ts_spec; try exact x2. i. des.
+        timetac.
+    }
+    { apply Time.incr_spec. }
+    { econs. econs. ss. }
+    des.
+    exists cell0. inv x. econs; ii; ss; eauto.
+    - exploit SOUND; eauto. i.
+      eapply add_get1; eauto.
+    - exploit add_get0; eauto. i. des.
+      + inv ADJ. exploit max_ts_spec; try exact GET3. i. des. timetac.
+      + eapply add_get1; eauto.
+    - des; ss.
+      exploit latest_val_inj; [exact x1|exact LATEST|..]. i. subst.
+      exploit add_get0; eauto. i. des. ss.
+    - revert GET2. erewrite add_o; eauto. condtac; ss; i.
+      + subst. inv GET2. esplits; eauto.
+      + exploit COMPLETE; eauto. i. des.
+        esplits; eauto.
+  Qed.
+
+  Lemma cap_exists
+        view promises cell1
+        (VIEW: View.wf view)
+        (INHABITED: get Time.bot cell1 = Some (Time.bot, Message.elt)):
+    exists cell2, cap view promises cell1 cell2.
+  Proof.
+    destruct (@finite cell1).
+    exploit (@cap_aux_exists x view promises); eauto. i. des.
+    exists cell2. inv x1. econs; i; ss; eauto.
+    - eapply MIDDLE; eauto. inv ADJ. eauto.
+    - eapply BACK; eauto.
+      exploit max_ts_spec; eauto. i. des. eauto.
+    - exploit COMPLETE; eauto. i. des.
+      esplits; eauto.
   Qed.
 End Cell.
