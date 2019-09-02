@@ -30,11 +30,7 @@ Module Memory.
     (t1 = t2 /\ f1 = f2 /\ msg1 = msg2) \/
     Interval.disjoint (f1, t1) (f2, t2).
   Proof.
-    destruct (Time.eq_dec t1 t2).
-    { subst. rewrite GET1 in GET2. inv GET2. auto. }
-    unfold get in *. unfold Cell.get in *.
-    destruct (m l); ss. inv WF.
-    hexploit DISJOINT; [exact GET1|exact GET2|..]; eauto.
+    eapply Cell.get_disjoint; eauto.
   Qed.
 
   Lemma ext
@@ -2236,6 +2232,7 @@ Module Memory.
     setoid_rewrite Memory.remove_o; eauto.
   Qed.
 
+  (* unused *)
   Lemma split_remove_eq
         mem loc ts1 ts2 ts3
         mem2 mem3 msg1 msg2
