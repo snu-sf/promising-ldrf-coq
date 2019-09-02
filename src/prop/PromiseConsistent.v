@@ -194,7 +194,7 @@ Lemma consistent_promise_consistent
 Proof.
   destruct th. ss.
   exploit Memory.cap_exists; eauto. i. des.
-  exploit Memory.future_closed; eauto. i.
+  exploit Memory.cap_closed; eauto. i.
   exploit Local.cap_wf; eauto. i.
   exploit Memory.max_full_timemap_exists; try apply x0. i. des.
   hexploit Memory.max_full_timemap_closed; eauto. i.

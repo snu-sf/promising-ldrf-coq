@@ -342,6 +342,17 @@ Section Invariant.
     inv MSG_LE. esplits; eauto.
   Qed.
 
+  Lemma future_weak_sem_memory
+        m1 m2
+        (FUTURE: Memory.future_weak m1 m2)
+        (SEM: sem_memory m2):
+    sem_memory m1.
+  Proof.
+    ii. apply SEM. ii. specialize (PR loc). des.
+    exploit Memory.future_weak_get1; eauto. i. des.
+    inv MSG_LE. esplits; eauto.
+  Qed.
+
   Lemma consistent_sem
         tid lang e_src e_tgt
         (TH: S tid lang e_src.(Thread.state))
@@ -382,7 +393,8 @@ Section Invariant.
       exploit thread_rtc_pf_step_sem; try exact STEPS_SRC; eauto. i. des.
       exploit PFStepCap.sim_memory_bot; try apply SIM2; eauto. i.
       rewrite x0 in *.
-      eapply future_sem_memory; eauto.
+      exploit Memory.cap_future_weak; eauto. i.
+      eapply future_weak_sem_memory; eauto.
       eapply future_sem_memory; eauto.
   Qed.
 
