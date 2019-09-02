@@ -1,4 +1,4 @@
-Require Import Axioms.
+From PromisingLib Require Import Axioms.
 
 Set Implicit Arguments.
 

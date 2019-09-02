@@ -1,14 +1,15 @@
 Require Import Omega.
 Require Import RelationClasses.
 
-Require Import sflib.
+From sflib Require Import sflib.
 
-Require Import Axioms.
-Require Import Basic.
-Require Import DataStructure.
+From PromisingLib Require Import Axioms.
+From PromisingLib Require Import Basic.
+From PromisingLib Require Import DataStructure.
+From PromisingLib Require Import Loc.
 Require Import Time.
 Require Import Event.
-Require Import Language.
+From PromisingLib Require Import Language.
 Require Import View.
 Require Import Cell.
 Require Import Memory.
@@ -24,7 +25,7 @@ Set Implicit Arguments.
 
 
 (* TODO unifiy and remove definitions in Event.v *)
-Definition ProgramEvent_is_updating (e:ProgramEvent.t): option (Loc.t * Const.t * Ordering.t) :=
+Definition ProgramEvent_is_updating (e:ProgramEvent.t): option (FLoc.t * Const.t * Ordering.t) :=
   match e with
   | ProgramEvent.update loc valr _ ordr _ => Some (loc, valr, ordr)
   | _ => None
@@ -88,3 +89,6 @@ Definition is_updating lang (st : Language.state lang) l o :=
   exists e v o', can_step _ st e /\
                  Ordering.le o' o /\
                  ProgramEvent_is_updating e = Some (l, v, o').
+
+Definition is_aborting lang (st : Language.state lang) :=
+  can_step _ st ProgramEvent.abort.

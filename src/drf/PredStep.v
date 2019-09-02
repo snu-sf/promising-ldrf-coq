@@ -2,14 +2,15 @@ Require Import Omega.
 Require Import RelationClasses.
 
 From Paco Require Import paco.
-Require Import sflib.
+From sflib Require Import sflib.
 
-Require Import Axioms.
-Require Import Basic.
-Require Import DataStructure.
+From PromisingLib Require Import Axioms.
+From PromisingLib Require Import Basic.
+From PromisingLib Require Import DataStructure.
+From PromisingLib Require Import Loc.
 Require Import Time.
 Require Import Event.
-Require Import Language.
+From PromisingLib Require Import Language.
 Require Import View.
 Require Import Cell.
 Require Import Memory.
@@ -100,7 +101,7 @@ Section PredStep.
     | _ => True
     end.
 
-  Definition no_read_msgs (MSGS : Loc.t -> Time.t -> Prop)
+  Definition no_read_msgs (MSGS : FLoc.t -> Time.t -> Prop)
              (e : ThreadEvent.t) : Prop :=
     match e with
     | ThreadEvent.read loc to _ _ _ => ~ (MSGS loc to)
@@ -108,7 +109,7 @@ Section PredStep.
     | _ => True
     end.
 
-  Definition write_not_in (MSGS : Loc.t -> Time.t -> Prop)
+  Definition write_not_in (MSGS : FLoc.t -> Time.t -> Prop)
              (e : ThreadEvent.t) : Prop :=
     match e with
     | ThreadEvent.write loc from to _ _ _ =>
@@ -118,7 +119,7 @@ Section PredStep.
     | _ => True
     end.
 
-  Definition no_update_on (MSGS : Loc.t -> Time.t -> Prop)
+  Definition no_update_on (MSGS : FLoc.t -> Time.t -> Prop)
              (e : ThreadEvent.t) : Prop :=
     match e with
     | ThreadEvent.update loc from to _ _ _ _ _ _ =>
@@ -134,7 +135,7 @@ Section PredStep.
     end
   .
 
-  Definition write_in (MSGS : Loc.t -> Time.t -> Prop)
+  Definition write_in (MSGS : FLoc.t -> Time.t -> Prop)
              (e : ThreadEvent.t) : Prop :=
     match e with
     | ThreadEvent.write loc from to _ _ _ =>
@@ -177,6 +178,22 @@ Section PredStep.
   Proof.
     i. unfold no_update_on in *. des_ifs.
     ii. eapply NOTIN; eauto.
+  Qed.
+
+  Lemma no_promise_program_step lang :
+    (@pred_step no_promise lang) <3= (@Thread.program_step lang).
+  Proof.
+    i. inv PR. inv STEP. inv STEP0; clarify.
+    inv STEP. ss.
+  Qed.
+
+  Lemma no_promise_program_step_rtc lang :
+    rtc (tau (@pred_step no_promise lang)) <2= rtc (tau (@Thread.program_step _)).
+  Proof.
+    i. induction PR.
+    - refl.
+    - econs; eauto. inv H. econs; eauto.
+      eapply no_promise_program_step; eauto.
   Qed.
 
 End PredStep.
