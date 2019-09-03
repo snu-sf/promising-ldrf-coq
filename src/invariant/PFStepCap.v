@@ -1121,75 +1121,124 @@ Module PFStepCap.
 
   (* existence of sim *)
 
-  Inductive cap_aux (latests: TimeMap.t) (promises mem1 mem2: Memory.t): Prop :=
-  | cap_aux_intro
-      (LATESTS: Memory.closed_timemap latests mem1)
-      (SOUND: Memory.le mem1 mem2)
-      (MIDDLE: forall loc from1 to1 from2 to2
-                 (ADJ: Memory.adjacent loc from1 to1 from2 to2 mem1)
+  Definition cap_src_cell (latest: Time.t) (promises: Cell.t)
+                          (from: Time.t) (val: Const.t) (released: option View.t):
+    option (Time.t * Message.t) :=
+    if Cell.get latest promises
+    then None
+    else Some (from, Message.full val released).
+
+  Inductive sim_cell (latest: Time.t) (cap: option Time.t) (promises cell_src cell_tgt: Cell.t): Prop :=
+  | sim_cell_intro
+      (LATEST: exists from val released,
+          Cell.get latest cell_tgt = Some (from, Message.full val released))
+      (SOUND: Cell.le cell_src cell_tgt)
+      (COMPLETE1: forall to from msg
+                   (CAP: Some to <> cap)
+                   (GETP: Cell.get to promises = Some (from, msg))
+                   (GET_TGT: Cell.get to cell_tgt = Some (from, msg)),
+          <<GET_SRC: Cell.get to cell_src = None>>)
+      (COMPLETE2: forall to from msg
+                   (CAP: Some to <> cap)
+                   (GETP: Cell.get to promises = None)
+                   (GET_TGT: Cell.get to cell_tgt = Some (from, msg)),
+          <<GET_SRC: Cell.get to cell_src = Some (from, msg)>>)
+      (LATEST: forall to (CAP: Some to = cap), Time.lt latest to)
+      (CAP: forall to (CAP: Some to = cap),
+          exists f val r from released,
+            <<LATEST: Cell.get latest cell_tgt = Some (f, Message.full val r)>> /\
+            <<CAP_SRC: Cell.get to cell_src = cap_src_cell latest promises from val released>> /\
+            <<CAP_TGT: Cell.get to cell_tgt = Some (from, Message.full val released)>> /\
+            <<CAPP: Cell.get to promises = None>>)
+  .
+
+  Inductive sim_cell_aux (latest: Time.t) (cap: option Time.t) (dom: list Time.t) (promises cell_src cell_tgt: Cell.t): Prop :=
+  | sim_cell_aux_intro
+      (LATEST: exists from val released,
+          Cell.get latest cell_tgt = Some (from, Message.full val released))
+      (SOUND: Cell.le cell_src cell_tgt)
+      (COMPLETE1: forall from to msg
+                    (CAP: Some to <> cap)
+                    (GETP: Cell.get to promises = Some (from, msg))
+                    (GET_TGT: Cell.get to cell_tgt = Some (from, msg)),
+          <<GET_SRC: Cell.get to cell_src = None>>)
+      (COMPLETE2: forall from to val released
+                    (CAP: Some to <> cap)
+                    (GETP: Cell.get to promises = None)
+                    (GET_TGT: Cell.get to cell_tgt = Some (from, Message.full val released)),
+          <<GET_SRC: Cell.get to cell_src = Some (from, Message.full val released)>>)
+      (HALF: forall from to
+               (IN: List.In to dom)
+               (GETP: Cell.get to promises = None)
+               (GET_TGT: Cell.get to cell_tgt = Some (from, Message.reserve)),
+          <<GET_SRC: Cell.get to cell_src = Some (from, Message.reserve)>>)
+      (LATESTS: forall to (CAP: Some to = cap), Time.lt latest to)
+      (CAP: forall to (CAP: Some to = cap),
+          exists f val r from released,
+            <<LATEST: Cell.get latest cell_tgt = Some (f, Message.full val r)>> /\
+            <<CAP_SRC: List.In to dom /\
+                       Cell.get to cell_src = cap_src_cell latest promises from val released \/
+                       ~ List.In to dom /\
+                       Cell.get to cell_src = None>> /\
+            <<CAP_TGT: Cell.get to cell_tgt = Some (from, Message.full val released)>> /\
+            <<CAPP: Cell.get to promises = None>>)
+  .
+
+  Inductive cap_cell (promises cell1 cell2: Cell.t): Prop :=
+  | cap_cell_intro
+      latest
+      (LATEST: Cell.max_full_ts cell1 latest)
+      (SOUND: Cell.le cell1 cell2)
+      (MIDDLE: forall from1 to1 from2 to2
+                 (ADJ: Cell.adjacent from1 to1 from2 to2 cell1)
                  (TS: Time.lt to1 from2),
-          Memory.get loc from2 mem2 = Some (to1, Message.reserve))
-      (BACK: forall loc to
-               (TO: to = Time.incr (Memory.max_ts loc mem1))
-               (PROMISE: Memory.latest_reserve loc promises mem1),
+          Cell.get from2 cell2 = Some (to1, Message.reserve))
+      (BACK: forall to
+               (TO: to = Time.incr (Cell.max_ts cell1))
+               (PROMISE: Cell.latest_reserve promises cell1),
           exists f val r released,
-            Memory.get loc (latests loc) mem1 = Some (f, Message.full val r) /\
-            Memory.get loc to mem2 = Some (Memory.max_ts loc mem1, Message.full val released))
-      (COMPLETE: forall loc from to msg
-                   (GET2: Memory.get loc to mem2 = Some (from, msg)),
-          <<GET1: Memory.get loc to mem1 = Some (from, msg)>> \/
-          <<GET1: Memory.get loc to mem1 = None>> /\
+            Cell.get latest cell1 = Some (f, Message.full val r) /\
+            Cell.get to cell2 = Some (Cell.max_ts cell1, Message.full val released))
+      (COMPLETE: forall from to msg
+                   (GET2: Cell.get to cell2 = Some (from, msg)),
+          <<GET1: Cell.get to cell1 = Some (from, msg)>> \/
+          <<GET1: Cell.get to cell1 = None>> /\
           <<TS: Time.lt from to>> /\
           <<MSG: msg = Message.reserve>> /\
-          (exists from1 to1, <<ADJ: Memory.adjacent loc from1 from to to1 mem1>>) \/
-          <<GET1: Memory.get loc to mem1 = None>> /\
-          <<FROM: from = Memory.max_ts loc mem1>> /\
-          <<TO: to = Time.incr (Memory.max_ts loc mem1)>> /\
-          <<PROMISE: Memory.latest_reserve loc promises mem1>>)
+          (exists from1 to1, <<ADJ: Cell.adjacent from1 from to to1 cell1>>) \/
+          <<GET1: Cell.get to cell1 = None>> /\
+          <<FROM: from = Cell.max_ts cell1>> /\
+          <<TO: to = Time.incr (Cell.max_ts cell1)>> /\
+          <<PROMISE: Cell.latest_reserve promises cell1>>)
   .
 
-  Inductive sim_memory_aux (latests: TimeMap.t) (caps: FLoc.t -> option Time.t) (dom: list (FLoc.t * Time.t))
-                           (promises mem_src mem_tgt: Memory.t): Prop :=
-  | sim_memory_aux_intro
-      (SOUND: Memory.le mem_src mem_tgt)
-      (COMPLETE1: forall loc from to msg
-                    (CAP: Some to <> caps loc)
-                    (GETP: Memory.get loc to promises = Some (from, msg))
-                    (GET_TGT: Memory.get loc to mem_tgt = Some (from, msg)),
-          <<GET_SRC: Memory.get loc to mem_src = None>>)
-      (COMPLETE2: forall loc from to val released
-                    (CAP: Some to <> caps loc)
-                    (GETP: Memory.get loc to promises = None)
-                    (GET_TGT: Memory.get loc to mem_tgt = Some (from, Message.full val released)),
-          <<GET_SRC: Memory.get loc to mem_src = Some (from, Message.full val released)>>)
-      (HALF: forall loc from to
-               (IN: List.In (loc, to) dom)
-               (GETP: Memory.get loc to promises = None)
-               (GET_TGT: Memory.get loc to mem_tgt = Some (from, Message.reserve)),
-          <<GET_SRC: Memory.get loc to mem_src = Some (from, Message.reserve)>>)
-      (LATESTS: forall loc to (CAP: Some to = caps loc), Time.lt (latests loc) to)
-      (CAPS: forall loc to (CAP: Some to = caps loc),
-          exists f val r from released,
-            <<LATEST: Memory.get loc (latests loc) mem_tgt = Some (f, Message.full val r)>> /\
-            <<CAP_SRC: List.In (loc, to) dom /\ Memory.get loc to mem_src = cap_src latests loc promises from val released \/
-                       ~ List.In (loc, to) dom /\ Memory.get loc to mem_src = None>> /\
-            <<CAP_TGT: Memory.get loc to mem_tgt = Some (from, Message.full val released)>> /\
-            <<CAPP: Memory.get loc to promises = None>>)
-  .
+  Definition vals_incl_cell (cell1 cell2: Cell.t): Prop :=
+    forall from to val released
+      (GET1: Cell.get to cell1 = Some (from, Message.full val released)),
+    exists f t r,
+      <<GET2: Cell.get t cell2 = Some (f, Message.full val r)>>.
 
-  Lemma cap_cap_aux
+  Program Instance vals_incl_cell_PreOrder: PreOrder vals_incl_cell.
+  Next Obligation.
+    ii. eauto.
+  Qed.
+  Next Obligation.
+    ii. exploit H; eauto. i. des. eauto.
+  Qed.
+
+  Lemma cap_cap_cell
         promises mem1 mem2
         (CAP: Memory.cap promises mem1 mem2)
         (CLOSED: Memory.closed mem1):
-    exists latests, cap_aux latests promises mem1 mem2.
+    forall loc, cap_cell (promises loc) (mem1 loc) (mem2 loc).
   Proof.
     exploit Memory.max_full_timemap_exists; try apply CLOSED. i. des.
     dup CAP. inv CAP0.
-    exists tm. econs; i; eauto.
-    - eapply Memory.max_full_timemap_closed; eauto.
+    econs; i; eauto.
+    - apply x0.
     - ii. eauto.
-    - subst.
-      exploit (@Memory.latest_val_exists loc mem1); try apply CLOSED. i. des.
+    - inv ADJ. eapply MIDDLE; eauto. econs; eauto.
+    - exploit (@Memory.latest_val_exists loc mem1); try apply CLOSED. i. des.
       exploit BACK; eauto. i.
       inv x1. specialize (x0 loc).
       exploit Memory.max_full_ts_inj; [exact MAX|exact x0|..]. i. subst.
@@ -1197,92 +1246,84 @@ Module PFStepCap.
       unfold Memory.get in GET. rewrite GET in *. inv GET0.
       esplits; eauto.
     - exploit Memory.cap_inv; eauto. i. des; eauto.
-      + subst. right. left. esplits; eauto.
+      + subst. right. left.
+        inv x2. esplits; eauto. econs; eauto.
       + subst. right. right. esplits; eauto.
   Qed.
 
-  Lemma caps_exists promises mem:
-    exists (caps: FLoc.t -> option Time.t),
-    forall loc,
-      if (caps loc)
+  Lemma cap_exists promises mem loc:
+    exists (cap: option Time.t),
+      if cap
       then Memory.latest_reserve loc promises mem /\
-           caps loc = Some (Time.incr (Memory.max_ts loc mem))
+           cap = Some (Time.incr (Memory.max_ts loc mem))
       else ~ Memory.latest_reserve loc promises mem.
   Proof.
-    cut (exists (caps: FLoc.t -> option Time.t),
-            forall loc,
-              (fun loc (cap: option Time.t) =>
-                 if cap
-                 then Memory.latest_reserve loc promises mem /\
-                      cap = Some (Time.incr (Memory.max_ts loc mem))
-                 else ~ Memory.latest_reserve loc promises mem)
-                loc (caps loc)); eauto.
-    apply choice. intro loc.
     destruct (@Memory.latest_reserve_dec loc promises mem).
     - eexists (Some _). esplits; eauto.
     - exists None. eauto.
   Qed.
 
-  Lemma loc_decidable: decidable_eq FLoc.t.
+  Lemma time_decidable: decidable_eq Time.t.
   Proof.
-    ii. destruct (FLoc.eq_dec x y); [left|right]; ss.
+    ii. destruct (Time.eq_dec x y); [left|right]; eauto.
   Qed.
 
-  Lemma loc_ts_decidable: decidable_eq (FLoc.t * Time.t).
-  Proof.
-    ii. destruct (loc_ts_eq_dec x y), x, y; ss.
-    - des. subst. left. ss.
-    - right. ii. inv H. des; congr.
-  Qed.
-
-  Lemma sim_memory_exists
-        latests promises mem1_src mem1_tgt mem2_tgt
+  Lemma sim_cell_exists
+        promises mem1_src mem1_tgt mem2_tgt latests
         (SIM: PFStep.sim_memory promises mem1_src mem1_tgt)
         (LE_TGT: Memory.le promises mem1_tgt)
+        (FINITE_TGT: Memory.finite promises)
         (CLOSED1_TGT: Memory.closed mem1_tgt)
         (CLOSED2_TGT: Memory.closed mem2_tgt)
-        (CAP: cap_aux latests promises mem1_tgt mem2_tgt):
-    exists caps mem2_src,
-      sim_memory latests caps promises mem2_src mem2_tgt /\
-      vals_incl mem2_src mem1_src.
+        (CAP: Memory.cap promises mem1_tgt mem2_tgt)
+        (MAX: Memory.max_full_timemap mem1_tgt latests):
+    forall loc,
+    exists cap cell_src,
+      sim_cell (latests loc) cap (promises loc) cell_src (mem2_tgt loc) /\
+      vals_incl_cell cell_src (mem1_src loc).
   Proof.
-    destruct (Memory.finite mem2_tgt).
+    i.
+    destruct (Cell.finite (mem2_tgt loc)).
     rename x into dom.
-    destruct (@caps_exists promises mem1_tgt).
-    rename x into caps.
-    cut (exists mem2_src,
-            sim_memory_aux latests caps dom promises mem2_src mem2_tgt /\
-            vals_incl mem2_src mem1_src).
-    { i. des. esplits; eauto.
-      instantiate (1 := caps).
+    destruct (@cap_exists promises mem1_tgt loc).
+    rename x into cap.
+    cut (exists cell_src,
+            sim_cell_aux (latests loc) cap dom (promises loc) cell_src (mem2_tgt loc) /\
+            vals_incl_cell cell_src (mem1_src loc)).
+    { i. des.
+      exists cap. exists cell_src. split; auto.
       inv H1. econs; ii; eauto.
       - destruct msg; eauto.
-      - exploit CAPS; eauto. i. des.
+      - exploit CAP0; eauto. i. des.
         + esplits; eauto.
         + exploit H; eauto. i. ss.
     }
     clear H. induction dom.
-    { exists mem1_src. split; try refl.
-      inv SIM. inv CAP. econs; ii; eauto.
+    { exists (mem1_src loc). split; try refl.
+      exploit cap_cap_cell; eauto. i.
+      instantiate (1 := loc) in x0.
+      inv SIM. inv x0.
+      specialize (MAX loc).
+      exploit Memory.max_full_ts_inj; [exact MAX|apply LATEST|..]. i. subst.
+      econs; ii; eauto.
+      - inv MAX. des. exploit SOUND0; eauto.
+      - eapply COMPLETE1; eauto.
       - exploit COMPLETE; eauto. i. des; eauto; ss.
-        subst. specialize (H0 loc).
-        destruct (caps loc); ss.
-        des.  inv H1. ss.
+        subst. destruct cap; ss.
+        des. inv H1. ss.
       - inv IN.
-      - specialize (H0 loc).
-        rewrite <- CAP in *. des. inv H1.
-        specialize (LATESTS loc). des.
-        exploit Memory.max_ts_spec; eauto. i. des.
+      - rewrite <- CAP0 in *. des. inv H1.
+        inv LATEST. des.
+        exploit Cell.max_ts_spec; eauto. i. des.
         eapply TimeFacts.le_lt_lt; eauto.
         apply Time.incr_spec.
-      - specialize (H0 loc).
-        rewrite <- CAP in *. des. inv H1.
-        specialize (LATESTS loc). des.
+      - rewrite <- CAP0 in *. des. inv H1.
+        inv LATEST. des.
         destruct (Memory.get loc (Time.incr (Memory.max_ts loc mem1_tgt)) mem1_tgt) as [[]|] eqn:GETT.
         { exploit Memory.max_ts_spec; try exact GETT. i. des.
           specialize (Time.incr_spec (Memory.max_ts loc mem1_tgt)). i.
           timetac. }
-        exploit (BACK loc); eauto. i. des.
+        exploit BACK; eauto. i. des.
         esplits; eauto.
         + right. split; ss.
           destruct (Memory.get loc (Time.incr (Memory.max_ts loc mem1_tgt)) mem1_src) as [[]|] eqn:GETS; ss.
@@ -1290,107 +1331,107 @@ Module PFStepCap.
         + destruct (Memory.get loc (Time.incr (Memory.max_ts loc mem1_tgt)) promises) as [[]|] eqn:GETP; ss.
           exploit LE_TGT; eauto. i. congr.
     }
-    des. destruct a as [loc to].
-    destruct (In_decidable loc_ts_decidable (loc, to) dom).
-    { exists mem2_src. split; auto.
+    des. rename a into to.
+    destruct (In_decidable time_decidable to dom).
+    { exists cell_src. split; auto.
       inv IHdom. econs; ii; eauto; ss.
-      - inv IN; eauto. inv H1. eauto.
-      - exploit CAPS; eauto. i. des.
+      - inv IN; eauto.
+      - exploit CAP0; eauto. i. des.
         + esplits; eauto.
         + esplits; eauto. right. split; ss.
           ii. des; ss. inv H1. ss.
     }
-    destruct (Memory.get loc to mem2_tgt) as [[]|] eqn:GETT; cycle 1.
-    { exists mem2_src. split; auto.
+    destruct (Cell.get to (mem2_tgt loc)) as [[]|] eqn:GETT; cycle 1.
+    { exists cell_src. split; auto.
       inv IHdom. econs; ii; eauto; ss.
-      - inv IN; eauto. inv H1. congr.
-      - exploit CAPS; eauto. i. des; esplits; eauto.
+      - inv IN; eauto. congr.
+      - exploit CAP0; eauto. i. des; esplits; eauto.
         right. split; ss.
         ii. des; ss. inv H1. congr.
     }
-    destruct (Memory.get loc to mem2_src) as [[]|] eqn:GETS.
-    { exists mem2_src. split; auto.
+    destruct (Cell.get to cell_src) as [[]|] eqn:GETS.
+    { exists cell_src. split; auto.
       inv IHdom. exploit SOUND; eauto. i.
       rewrite GETT in *. inv x.
       econs; ii; eauto; ss.
-      - inv IN; eauto. inv H1.
+      - inv IN; eauto.
         rewrite GET_TGT in *. inv GETT. ss.
-      - exploit CAPS; eauto. i. des; esplits; eauto.
+      - exploit CAP0; eauto. i. des; esplits; eauto.
         right. split; ss. ii. des; ss.
         inv H1. congr.
     }
-    destruct (Memory.get loc to promises) as [[]|] eqn:GETP.
-    { exists mem2_src. split; auto.
+    destruct (Cell.get to (promises loc)) as [[]|] eqn:GETP.
+    { exists cell_src. split; auto.
       inv IHdom. econs; ii; eauto; ss.
-      - inv IN; eauto. inv H1. congr.
-      - exploit CAPS; eauto. i. des; esplits; eauto.
+      - inv IN; eauto. congr.
+      - exploit CAP0; eauto. i. des; esplits; eauto.
         right. split; ss. ii. des; ss. inv H1. congr.
     }
-    destruct (opt_ts_eq_dec (caps loc) (Some to)); cycle 1.
+    destruct (opt_ts_eq_dec cap (Some to)); cycle 1.
     { destruct t0.
-      { exists mem2_src. split; auto.
+      { exists cell_src. split; auto.
         inv IHdom. econs; ii; eauto; ss.
-        - inv IN; eauto. inv H1.
+        - inv IN; eauto.
           exploit COMPLETE2; eauto. i. congr.
-        - exploit CAPS; eauto. i. des; esplits; eauto.
+        - exploit CAP0; eauto. i. des; esplits; eauto.
           right. split; ss. ii. des; ss. inv H1. congr.
       }
-      exploit (@Memory.add_exists mem2_src loc t to Message.reserve).
+      exploit (@Cell.add_exists cell_src t to Message.reserve).
       { ii. inv IHdom.
         exploit SOUND; try exact GET2. i.
-        exploit Memory.get_disjoint; [exact GETT|exact x0|..]. i. des.
+        exploit Cell.get_disjoint; [exact GETT|exact x0|..]. i. des.
         - subst. congr.
         - eapply x2; eauto. }
-      { exploit Memory.get_ts; try exact GETT. i. des; ss.
+      { exploit Cell.get_ts; try exact GETT. i. des; ss.
         subst. inv CLOSED1_TGT. specialize (INHABITED loc).
         inv CAP. exploit SOUND; try exact INHABITED. i.
-        rewrite x in *. inv GETT. }
+        unfold Memory.get in *. rewrite x in *. inv GETT. }
       { econs. }
       i. des.
-      exists mem2.
+      exists cell2.
       split; cycle 1.
       { etrans; eauto. ii. revert GET1.
-        erewrite Memory.add_o; eauto. condtac; ss; eauto. }
+        erewrite Cell.add_o; eauto. condtac; ss; eauto. }
       inv IHdom. econs; ii; eauto; ss.
       - revert LHS.
-        erewrite Memory.add_o; eauto. condtac; ss; eauto.
+        erewrite Cell.add_o; eauto. condtac; ss; eauto.
         i. des. subst. inv LHS. ss.
-      - erewrite Memory.add_o; eauto. condtac; ss; eauto.
+      - erewrite Cell.add_o; eauto. condtac; ss; eauto.
         des. subst. congr.
-      - erewrite Memory.add_o; eauto. condtac; ss; eauto.
+      - erewrite Cell.add_o; eauto. condtac; ss; eauto.
         des. subst. congr.
-      - erewrite Memory.add_o; eauto. condtac; ss; eauto.
+      - erewrite Cell.add_o; eauto. condtac; ss; eauto.
         + des; subst; ss.
           rewrite GETT in *. inv GET_TGT. ss.
-        + guardH o. des; eauto. inv IN. unguard. des; ss.
-      - exploit CAPS; eauto. i. des; esplits; eauto.
+        + guardH n0. des; eauto. inv IN. unguard. des; ss.
+      - exploit CAP0; eauto. i. des; esplits; eauto.
         + left. split; eauto.
-          erewrite Memory.add_o; eauto. condtac; ss; eauto.
+          erewrite Cell.add_o; eauto. condtac; ss; eauto.
           des. subst. congr.
         + right. split.
           * ii. des; ss. inv H1; eauto.
-          * erewrite Memory.add_o; eauto. condtac; ss.
+          * erewrite Cell.add_o; eauto. condtac; ss.
             des. subst. congr.
     }
-    specialize (H0 loc). rewrite e in *. des. inv H1.
-    dup CAP. inv CAP0. exploit (BACK loc); eauto. i. des.
-    clear LATESTS SOUND MIDDLE BACK COMPLETE.
-    rewrite GETT in *. inv x1.
-    destruct (Memory.get loc (latests loc) promises) as [[]|] eqn:LATESTP.
+    rewrite e in *. des. inv H1.
+    exploit cap_cap_cell; eauto. i.
+    instantiate (1 := loc) in x0. inv x0.
+    exploit BACK; eauto. i. des.
+    exploit Cell.max_full_ts_inj; [eapply MAX|exact LATEST|..]. i. subst.
+    clear LATEST SOUND MIDDLE BACK COMPLETE.
+    unfold Memory.max_ts in *. rewrite GETT in *. inv x0.
+    destruct (Cell.get (latests loc) (promises loc)) as [[]|] eqn:LATESTP.
     { exploit LE_TGT; try exact LATESTP. i.
-      rewrite x in *. inv x0.
-      exists mem2_src. split; ss.
+      unfold Memory.get in *. rewrite x in *. inv x0.
+      exists cell_src. split; auto.
       inv IHdom. econs; ii; eauto; ss.
-      - inv IN; eauto. inv H1. congr.
-      - exploit CAPS; eauto. i. des; esplits; eauto.
-        destruct (FLoc.eq_dec loc0 loc).
-        + subst. left. rewrite e in *. inv CAP0. split; eauto.
-          unfold cap_src. rewrite LATESTP. ss.
-        + right. split; ss. ii. inv H1; eauto.
-          inv H2. ss.
+      - inv IN; eauto. congr.
+      - exploit CAP0; eauto. i. des; esplits; eauto.
+        left. inv CAP1. split; eauto.
+        unfold cap_src_cell. rewrite LATESTP. ss.
     }
-    exploit (@Memory.add_exists mem2_src loc (Memory.max_ts loc mem1_tgt)
-                                (Time.incr (Memory.max_ts loc mem1_tgt)) (Message.full val released)).
+    exploit (@Cell.add_exists cell_src (Cell.max_ts (mem1_tgt loc))
+                              (Time.incr (Cell.max_ts (mem1_tgt loc))) (Message.full val released)).
     { ii. inv IHdom. exploit SOUND; try exact GET2. i.
       exploit Memory.get_disjoint; [exact GETT|exact x1|..]. i. des.
       - subst. congr.
@@ -1398,37 +1439,72 @@ Module PFStepCap.
     { apply Time.incr_spec. }
     { inv CLOSED2_TGT. exploit CLOSED; try exact GETT. i. des. ss. }
     i. des.
-    exists mem2.
+    exists cell2.
     split; cycle 1.
     { etrans; eauto. ii. revert GET1.
-      erewrite Memory.add_o; eauto. condtac; ss; eauto. i.
+      erewrite Cell.add_o; eauto. condtac; ss; eauto. i.
       des. subst. inv GET1.
-      inv CAP. exploit SOUND; try exact x0. i.
-      inv IHdom. exploit COMPLETE2; try exact x; eauto.
-      ii. exploit LATESTS0; eauto. i. timetac. }
+      inv CAP. exploit SOUND; try exact x. i.
+      inv IHdom. exploit COMPLETE2; try exact x0; eauto.
+      ii. exploit LATESTS; eauto. i. timetac. }
     inv IHdom. econs; ii; eauto; ss.
     - revert LHS.
-      erewrite Memory.add_o; eauto. condtac; ss; eauto.
+      erewrite Cell.add_o; eauto. condtac; ss; eauto.
       i. des. subst. inv LHS. ss.
-    - erewrite Memory.add_o; eauto. condtac; ss; eauto.
+    - erewrite Cell.add_o; eauto. condtac; ss; eauto.
       des. subst. congr.
-    - erewrite Memory.add_o; eauto. condtac; ss; eauto.
+    - erewrite Cell.add_o; eauto. condtac; ss; eauto.
       des. subst. congr.
-    - erewrite Memory.add_o; eauto. condtac; ss.
+    - erewrite Cell.add_o; eauto. condtac; ss.
       + des; subst; ss. congr.
-      + guardH o. des; eauto. inv IN. unguard. des; ss.
-    - exploit CAPS; eauto. i. des; esplits; eauto.
+      + guardH n. des; eauto. inv IN. unguard. des; ss.
+    - exploit CAP0; eauto. i. des; esplits; eauto.
       + left. split; eauto.
-        erewrite Memory.add_o; eauto. condtac; ss; eauto.
+        erewrite Cell.add_o; eauto. condtac; ss; eauto.
         des. subst. ss.
-      + destruct (FLoc.eq_dec loc0 loc).
-        * subst. left. rewrite e in *. inv CAP0. split; eauto.
-          rewrite GETT in *. inv CAP_TGT.
-          unfold cap_src. rewrite LATESTP.
-          exploit Memory.add_get0; eauto. i. des. ss.
-        * right. split.
-          { ii. des; ss. inv H1. ss. }
-          { erewrite Memory.add_o; eauto. condtac; des; ss. }
+      + left. inv CAP1. split; eauto.
+        rewrite GETT in *. inv CAP_TGT.
+        unfold cap_src_cell. rewrite LATESTP.
+        exploit Cell.add_get0; eauto. i. des. ss.
+  Qed.
+
+  Lemma sim_memory_exists
+        promises mem1_src mem1_tgt mem2_tgt
+        (SIM: PFStep.sim_memory promises mem1_src mem1_tgt)
+        (LE_TGT: Memory.le promises mem1_tgt)
+        (FINITE_TGT: Memory.finite promises)
+        (CLOSED1_TGT: Memory.closed mem1_tgt)
+        (CLOSED2_TGT: Memory.closed mem2_tgt)
+        (CAP: Memory.cap promises mem1_tgt mem2_tgt):
+    exists latests caps mem2_src,
+      sim_memory latests caps promises mem2_src mem2_tgt /\
+      vals_incl mem2_src mem1_src.
+  Proof.
+    exploit Memory.max_full_timemap_exists; try apply CLOSED1_TGT. i. des.
+    exists tm.
+    cut (exists (caps_mem: FLoc.t -> ((option Time.t) * Cell.t)),
+            forall loc,
+              (fun loc cap_cell =>
+                 sim_cell (tm loc) cap_cell.(fst) (promises loc) cap_cell.(snd) (mem2_tgt loc) /\
+                 vals_incl_cell cap_cell.(snd) (mem1_src loc))
+                loc (caps_mem loc)).
+    { i. des.
+      exists (fun loc => (caps_mem loc).(fst)).
+      exists (fun loc => (caps_mem loc).(snd)).
+      split.
+      - econs; ii; eauto.
+        + destruct (H loc). inv H0. eauto.
+        + destruct (H loc). inv H0. eapply COMPLETE1; eauto.
+        + destruct (H loc). inv H0. eauto.
+        + destruct (H loc). inv H0.
+          exploit LATEST0; eauto.
+        + destruct (H loc). inv H0. eauto.
+      - ii. destruct (H loc). eauto.
+    }
+    apply choice. intro loc.
+    exploit sim_cell_exists; eauto. i. des.
+    instantiate (1 := loc) in x1.
+    exists (cap, cell_src). ss.
   Qed.
 
   Lemma sim_thread_exists
@@ -1447,7 +1523,6 @@ Module PFStepCap.
       <<VALS: vals_incl mem1_src e_src.(Thread.memory)>>.
   Proof.
     exploit Memory.cap_closed; eauto. i.
-    exploit cap_cap_aux; eauto. i. des.
     exploit sim_memory_exists; try apply SIM; try apply WF1_TGT; eauto. i. des.
     esplits; eauto.
     econs; eauto.
