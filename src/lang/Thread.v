@@ -203,6 +203,7 @@ Module Thread.
       - eapply program_step_future; eauto.
     Qed.
 
+    (* TODO: unused *)
     Lemma step_nonpf_future
           e e1 e2
           (STEP: step false e e1 e2)
@@ -279,6 +280,7 @@ Module Thread.
       apply tau_union.
     Qed.
 
+    (* TODO: unused *)
     Lemma rtc_step_nonpf_future
           e1 e2
           (STEP: rtc (union (step false)) e1 e2)

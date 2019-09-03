@@ -1019,6 +1019,7 @@ Module Cell.
   Qed.
 
 
+  (* TODO: unused *)
   (* previous less timestamp *)
 
   Fixpoint prev (t: Time.t) (l: list Time.t) (res: option Time.t): option Time.t :=

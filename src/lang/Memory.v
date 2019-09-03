@@ -2235,6 +2235,7 @@ Module Memory.
     eapply Cell.remove_singleton.
   Qed.
 
+  (* TODO: unused *)
   Lemma add_inj
         mem loc to from msg mem1 mem2
         (REMOVE1: Memory.add mem loc from to msg mem1)
@@ -2245,6 +2246,7 @@ Module Memory.
     setoid_rewrite Memory.add_o; eauto.
   Qed.
 
+  (* TODO: unused *)
   Lemma split_inj
         mem loc to to' from msg1 msg2 mem1 mem2
         (REMOVE1: Memory.split mem loc from to to' msg1 msg2 mem1)
@@ -2255,6 +2257,7 @@ Module Memory.
     setoid_rewrite Memory.split_o; eauto.
   Qed.
 
+  (* TODO: unused *)
   Lemma lower_inj
         mem loc to from msg1 msg2 mem1 mem2
         (LOWER1: Memory.lower mem loc from to msg1 msg2 mem1)
@@ -2275,7 +2278,7 @@ Module Memory.
     setoid_rewrite Memory.remove_o; eauto.
   Qed.
 
-  (* unused *)
+  (* TODO: unused *)
   Lemma split_remove_eq
         mem loc ts1 ts2 ts3
         mem2 mem3 msg1 msg2
@@ -2466,6 +2469,7 @@ Module Memory.
     exploit Cell.next_exists; eauto.
   Qed.
 
+  (* TODO: unused *)
   Inductive prev (loc: Loc.t) (ts: Time.t) (mem: t) (from to: Time.t) (msg: Message.t): Prop :=
   | prev_intro
       (GET: get loc to mem = Some (from, msg))
@@ -2474,6 +2478,7 @@ Module Memory.
           get loc ts' mem = None)
   .
 
+  (* TODO: unused *)
   Lemma prev_exists
         loc ts mem
         (INHABITED: inhabited mem):
