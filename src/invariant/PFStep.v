@@ -450,7 +450,7 @@ Module PFStep.
 
   (* existence of sim *)
 
-  Inductive sim_memory_aux (dom: list (FLoc.t * Time.t)) (promises mem_src mem_tgt: Memory.t): Prop :=
+  Inductive sim_memory_aux (dom: list (Loc.t * Time.t)) (promises mem_src mem_tgt: Memory.t): Prop :=
   | sim_memory_aux_intro
       (SOUND: Memory.le mem_src mem_tgt)
       (COMPLETE1: forall loc from to msg

@@ -142,7 +142,7 @@ Proof.
       (try by etrans; [apply LOCAL1|aggrtac]);
       (try by rewrite <- ? View.join_r; econs; aggrtac);
       (try apply WF1_TGT).
-    + ss. i. unfold FLocFun.find. repeat (condtac; aggrtac).
+    + ss. i. unfold LocFun.find. repeat (condtac; aggrtac).
       * etrans; eauto. apply LOCAL1.
       * apply LOCAL1.
     + ss. aggrtac; try apply WF1_TGT. rewrite <- ? View.join_l. apply LOCAL1.

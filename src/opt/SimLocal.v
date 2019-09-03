@@ -641,7 +641,7 @@ Lemma sim_local_nonsynch_src
 Proof.
   inversion LOCAL1_SRC.
   destruct FINITE. rename x into dom.
-  assert (FINITE' : forall (loc : FLoc.t) (from to : Time.t) (msg : Message.t),
+  assert (FINITE' : forall (loc : Loc.t) (from to : Time.t) (msg : Message.t),
              Memory.get loc to (Local.promises lc1_src) = Some (from, msg) ->
              (match msg with
               | Message.full _ (Some _) => True

@@ -19,7 +19,7 @@ Set Implicit Arguments.
 
 
 Module MemoryDomain.
-  Definition t := FLoc.t -> DOSet.t.
+  Definition t := Loc.t -> DOSet.t.
 
   Definition mem loc ts (dom:t) := DOSet.mem ts (dom loc).
 
@@ -27,7 +27,7 @@ Module MemoryDomain.
         (EXT: forall loc ts, mem loc ts lhs = mem loc ts rhs):
     lhs = rhs.
   Proof.
-    apply FLocFun.ext. unfold FLocFun.find. i.
+    apply LocFun.ext. unfold LocFun.find. i.
     apply DOSet.eq_leibniz. ii.
     specialize (EXT i a). unfold mem in *. econs; i.
     - apply DOSet.mem_spec. erewrite <- EXT.
@@ -51,14 +51,14 @@ Module MemoryDomain.
 
   Lemma join_comm lhs rhs: join lhs rhs = join rhs lhs.
   Proof.
-    apply FLocFun.ext. unfold FLocFun.find, join. i.
+    apply LocFun.ext. unfold LocFun.find, join. i.
     apply DOSet.eq_leibniz. ii.
     rewrite ? DOSet.union_spec. econs; i; des; auto.
   Qed.
 
   Lemma join_assoc a b c: join (join a b) c = join a (join b c).
   Proof.
-    apply FLocFun.ext. unfold FLocFun.find, join. i.
+    apply LocFun.ext. unfold LocFun.find, join. i.
     apply DOSet.eq_leibniz. ii.
     rewrite ? DOSet.union_spec. econs; i; des; auto.
   Qed.
@@ -82,8 +82,8 @@ Module MemoryDomain.
     apply Bool.orb_true_iff in H. des; eauto.
   Qed.
 
-  Definition set (loc:FLoc.t) (ts:Time.t) (dom:t) :=
-    FLocFun.add loc (DOSet.add ts (dom loc)) dom.
+  Definition set (loc:Loc.t) (ts:Time.t) (dom:t) :=
+    LocFun.add loc (DOSet.add ts (dom loc)) dom.
 
   Lemma set_o loc1 ts1 loc2 ts2 dom:
     mem loc1 ts1 (set loc2 ts2 dom) =
@@ -91,7 +91,7 @@ Module MemoryDomain.
     then true
     else mem loc1 ts1 dom.
   Proof.
-    unfold mem, set, FLocFun.add, FLocFun.find.
+    unfold mem, set, LocFun.add, LocFun.find.
     repeat (try condtac; ss; des; subst; try congr).
     - rewrite DOSet.Facts.add_b.
       unfold DOSet.Facts.eqb. rewrite Time.eq_dec_eq. auto.
@@ -112,8 +112,8 @@ Module MemoryDomain.
     revert MEM. rewrite set_o. repeat condtac; ss; auto.
   Qed.
 
-  Definition unset (loc:FLoc.t) (ts:Time.t) (dom:t) :=
-    FLocFun.add loc (DOSet.remove ts (dom loc)) dom.
+  Definition unset (loc:Loc.t) (ts:Time.t) (dom:t) :=
+    LocFun.add loc (DOSet.remove ts (dom loc)) dom.
 
   Lemma unset_o loc1 ts1 loc2 ts2 dom:
     mem loc1 ts1 (unset loc2 ts2 dom) =
@@ -121,7 +121,7 @@ Module MemoryDomain.
     then false
     else mem loc1 ts1 dom.
   Proof.
-    unfold mem, unset, FLocFun.add, FLocFun.find.
+    unfold mem, unset, LocFun.add, LocFun.find.
     repeat (try condtac; ss; des; subst; try congr).
     - rewrite DOSet.Facts.remove_b.
       unfold DOSet.Facts.eqb. rewrite Time.eq_dec_eq.

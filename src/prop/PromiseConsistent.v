@@ -217,8 +217,8 @@ Proof.
   apply TimeFacts.join_lt_des in x. des.
   apply TimeFacts.join_lt_des in AC. des.
   revert BC0. unfold View.singleton_ur_if. condtac; ss.
-  - unfold TimeMap.singleton, FLocFun.add. condtac; ss.
-  - unfold TimeMap.singleton, FLocFun.add. condtac; ss.
+  - unfold TimeMap.singleton, LocFun.add. condtac; ss.
+  - unfold TimeMap.singleton, LocFun.add. condtac; ss.
 Qed.
 
 Lemma promise_consistent_promise_write
@@ -239,7 +239,7 @@ Proof.
     rewrite X0 in *. inv GET.
     exploit CONS; eauto. i. ss.
     apply TimeFacts.join_lt_des in x. des.
-    left. revert BC. unfold TimeMap.singleton, FLocFun.add. condtac; ss.
+    left. revert BC. unfold TimeMap.singleton, LocFun.add. condtac; ss.
   - inv STEP. inv WRITE.
     exploit Memory.promise_get1_promise; eauto.
     { inv PROMISE0; ss. }

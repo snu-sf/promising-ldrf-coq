@@ -18,9 +18,9 @@ Set Implicit Arguments.
 
 
 Module Memory.
-  Definition t := FLoc.t -> Cell.t.
+  Definition t := Loc.t -> Cell.t.
 
-  Definition get (loc:FLoc.t) (ts:Time.t) (mem:t): option (Time.t * Message.t) :=
+  Definition get (loc:Loc.t) (ts:Time.t) (mem:t): option (Time.t * Message.t) :=
     Cell.get ts (mem loc).
 
   Lemma get_disjoint
@@ -38,7 +38,7 @@ Module Memory.
         (EXT: forall loc ts, get loc ts lhs = get loc ts rhs):
     lhs = rhs.
   Proof.
-    apply FLocFun.ext. i.
+    apply LocFun.ext. i.
     apply Cell.ext. i.
     apply EXT.
   Qed.
@@ -137,10 +137,10 @@ Module Memory.
   Proof. ii. apply bot_get. Qed.
 
   Definition singleton
-             (loc:FLoc.t) (from to:Time.t) (msg:Message.t)
+             (loc:Loc.t) (from to:Time.t) (msg:Message.t)
              (LT: Time.lt from to)
              (WF: Message.wf msg): t :=
-    (FLocFun.add loc (Cell.singleton LT WF)
+    (LocFun.add loc (Cell.singleton LT WF)
                 (fun _ => Cell.bot)).
 
   Lemma singleton_get
@@ -148,13 +148,13 @@ Module Memory.
         (LT:Time.lt from to)
         (WF: Message.wf msg):
     get l t (singleton loc LT WF) =
-    if FLoc.eq_dec l loc
+    if Loc.eq_dec l loc
     then if Time.eq_dec t to
          then Some (from, msg)
          else None
     else None.
   Proof.
-    unfold get, singleton. unfold FLocFun.add, FLocFun.find.
+    unfold get, singleton. unfold LocFun.add, LocFun.find.
     repeat condtac; subst.
     - rewrite Cell.singleton_get. condtac; [|congr]. auto.
     - rewrite Cell.singleton_get. condtac; [congr|]. auto.
@@ -163,7 +163,7 @@ Module Memory.
 
   Definition init: t := fun _ => Cell.init.
 
-  Inductive message_to: forall (msg:Message.t) (loc:FLoc.t) (to:Time.t), Prop :=
+  Inductive message_to: forall (msg:Message.t) (loc:Loc.t) (to:Time.t), Prop :=
   | message_to_full
       val released loc to
       (TS: Time.le (released.(View.unwrap).(View.rlx) loc) to):
@@ -251,35 +251,35 @@ Module Memory.
     splits; try econs; ss. refl.
   Qed.
 
-  Inductive add (mem1:t) (loc:FLoc.t) (from to:Time.t) (msg:Message.t) (mem2:t): Prop :=
+  Inductive add (mem1:t) (loc:Loc.t) (from to:Time.t) (msg:Message.t) (mem2:t): Prop :=
   | add_intro
       r
       (ADD: Cell.add (mem1 loc) from to msg r)
-      (MEM2: mem2 = FLocFun.add loc r mem1)
+      (MEM2: mem2 = LocFun.add loc r mem1)
   .
   Hint Constructors add.
 
-  Inductive split (mem1:t) (loc:FLoc.t) (ts1 ts2 ts3:Time.t) (msg2 msg3:Message.t) (mem2:t): Prop :=
+  Inductive split (mem1:t) (loc:Loc.t) (ts1 ts2 ts3:Time.t) (msg2 msg3:Message.t) (mem2:t): Prop :=
   | split_intro
       r
       (SPLIT: Cell.split (mem1 loc) ts1 ts2 ts3 msg2 msg3 r)
-      (MEM2: mem2 = FLocFun.add loc r mem1)
+      (MEM2: mem2 = LocFun.add loc r mem1)
   .
   Hint Constructors split.
 
-  Inductive lower (mem1:t) (loc:FLoc.t) (from to:Time.t) (msg1 msg2:Message.t) (mem2:t): Prop :=
+  Inductive lower (mem1:t) (loc:Loc.t) (from to:Time.t) (msg1 msg2:Message.t) (mem2:t): Prop :=
   | lower_intro
       r
       (LOWER: Cell.lower (mem1 loc) from to msg1 msg2 r)
-      (MEM2: mem2 = FLocFun.add loc r mem1)
+      (MEM2: mem2 = LocFun.add loc r mem1)
   .
   Hint Constructors lower.
 
-  Inductive remove (mem1:t) (loc:FLoc.t) (from1 to1:Time.t) (msg1:Message.t) (mem2:t): Prop :=
+  Inductive remove (mem1:t) (loc:Loc.t) (from1 to1:Time.t) (msg1:Message.t) (mem2:t): Prop :=
   | remove_intro
       r
       (REMOVE: Cell.remove (mem1 loc) from1 to1 msg1 r)
-      (MEM2: mem2 = FLocFun.add loc r mem1)
+      (MEM2: mem2 = LocFun.add loc r mem1)
   .
   Hint Constructors remove.
 
@@ -363,7 +363,7 @@ Module Memory.
 
   Inductive promise
             (promises1 mem1:t)
-            (loc:FLoc.t) (from to:Time.t) (msg:Message.t)
+            (loc:Loc.t) (from to:Time.t) (msg:Message.t)
             (promises2 mem2:t): forall (kind:op_kind), Prop :=
   | promise_add
       (PROMISES: add promises1 loc from to msg promises2)
@@ -400,7 +400,7 @@ Module Memory.
 
   Inductive write
             (promises1 mem1:t)
-            (loc:FLoc.t) (from1 to1:Time.t) (val:Const.t) (released: option View.t)
+            (loc:Loc.t) (from1 to1:Time.t) (val:Const.t) (released: option View.t)
             (promises3 mem2:t) (kind:op_kind): Prop :=
   | write_intro
       promises2
@@ -421,7 +421,7 @@ Module Memory.
     then Some (from, msg)
     else get l t mem1.
   Proof.
-    inv ADD. unfold get, FLocFun.add. condtac.
+    inv ADD. unfold get, LocFun.add. condtac.
     - subst. erewrite Cell.add_o; eauto.
       repeat (condtac; subst; des; ss; try congr).
     - repeat (condtac; subst; des; ss; try congr).
@@ -438,7 +438,7 @@ Module Memory.
          then Some (ts2, msg3)
          else get l t mem1.
   Proof.
-    inv SPLIT. unfold get, FLocFun.add. condtac.
+    inv SPLIT. unfold get, LocFun.add. condtac.
     - subst. erewrite Cell.split_o; eauto.
       repeat (condtac; subst; des; ss; try congr).
     - repeat (condtac; subst; des; ss; try congr).
@@ -453,7 +453,7 @@ Module Memory.
     then Some (from, msg2)
     else get l t mem1.
   Proof.
-    inv LOWER. unfold get, FLocFun.add. condtac.
+    inv LOWER. unfold get, LocFun.add. condtac.
     - subst. erewrite Cell.lower_o; eauto.
       repeat (condtac; subst; des; ss; try congr).
     - repeat (condtac; subst; des; ss; try congr).
@@ -468,7 +468,7 @@ Module Memory.
     then None
     else get l t mem1.
   Proof.
-    inv REMOVE. unfold get, FLocFun.add. condtac.
+    inv REMOVE. unfold get, LocFun.add. condtac.
     - subst. erewrite Cell.remove_o; eauto.
       repeat (condtac; subst; des; ss; try congr).
     - repeat (condtac; subst; des; ss; try congr).
@@ -481,7 +481,7 @@ Module Memory.
     <<GET: get loc to1 mem2 = Some (from1, msg1)>>.
   Proof.
     inv ADD. eapply Cell.add_get0; eauto.
-    unfold get, Cell.get, FLocFun.add. condtac; ss.
+    unfold get, Cell.get, LocFun.add. condtac; ss.
   Qed.
 
   Lemma split_get0
@@ -493,7 +493,7 @@ Module Memory.
     <<GET: get loc ts3 mem2 = Some (ts2, msg3)>>.
   Proof.
     inv SPLIT. eapply Cell.split_get0; eauto.
-    unfold get, Cell.get, FLocFun.add. condtac; ss.
+    unfold get, Cell.get, LocFun.add. condtac; ss.
   Qed.
 
   Lemma lower_get0
@@ -504,7 +504,7 @@ Module Memory.
     <<MSG_LE: Message.le msg2 msg1>>.
   Proof.
     inv LOWER. eapply Cell.lower_get0; eauto.
-    unfold get, Cell.get, FLocFun.add. condtac; ss.
+    unfold get, Cell.get, LocFun.add. condtac; ss.
   Qed.
 
   Lemma remove_get0
@@ -514,7 +514,7 @@ Module Memory.
     <<GET: get loc to1 mem2 = None>>.
   Proof.
     inv REMOVE. eapply Cell.remove_get0; eauto.
-    unfold get, Cell.get, FLocFun.add. condtac; ss.
+    unfold get, Cell.get, LocFun.add. condtac; ss.
   Qed.
 
   Lemma add_get1
@@ -1192,7 +1192,7 @@ Module Memory.
         (INHABITED: inhabited mem):
     closed_timemap (TimeMap.singleton loc to) mem.
   Proof.
-    unfold TimeMap.singleton, FLocFun.add, FLocFun.find. ii. condtac.
+    unfold TimeMap.singleton, LocFun.add, LocFun.find. ii. condtac.
     - subst. eauto.
     - apply closed_timemap_bot. auto.
   Qed.
@@ -1517,7 +1517,7 @@ Module Memory.
 
   (* Lemmas on max_timemap *)
 
-  Definition max_ts (loc:FLoc.t) (mem:t): Time.t :=
+  Definition max_ts (loc:Loc.t) (mem:t): Time.t :=
     Cell.max_ts (mem loc).
 
   Lemma max_ts_spec
@@ -1586,7 +1586,7 @@ Module Memory.
 
   (* Lemmas on max_full_timemap *)
 
-  Definition max_full_ts (mem: t) (loc: FLoc.t) (ts: Time.t): Prop :=
+  Definition max_full_ts (mem: t) (loc: Loc.t) (ts: Time.t): Prop :=
     Cell.max_full_ts (mem loc) ts.
 
   Lemma max_full_ts_exists
@@ -2223,15 +2223,15 @@ Module Memory.
         (MSG_WF: Message.wf msg):
     remove (singleton loc LT MSG_WF) loc from to msg bot.
   Proof.
-    assert (bot = FLocFun.add loc Cell.bot (singleton loc LT MSG_WF)).
+    assert (bot = LocFun.add loc Cell.bot (singleton loc LT MSG_WF)).
     { apply ext. i. rewrite bot_get.
-      unfold get, FLocFun.add, FLocFun.find. condtac.
+      unfold get, LocFun.add, LocFun.find. condtac.
       - rewrite Cell.bot_get. auto.
-      - unfold singleton, FLocFun.add, FLocFun.find. condtac; [congr|].
+      - unfold singleton, LocFun.add, LocFun.find. condtac; [congr|].
         rewrite Cell.bot_get. auto.
     }
     rewrite H. econs; ss.
-    unfold singleton, FLocFun.add, FLocFun.find. condtac; [|congr].
+    unfold singleton, LocFun.add, LocFun.find. condtac; [|congr].
     eapply Cell.remove_singleton.
   Qed.
 
@@ -2307,7 +2307,7 @@ Module Memory.
     eexists. econs; ss. eauto.
   Qed.
 
-  Definition nonsynch_loc (loc:FLoc.t) (mem:t): Prop :=
+  Definition nonsynch_loc (loc:Loc.t) (mem:t): Prop :=
     forall f t msg (GET: get loc t mem = Some (f, msg)),
       match msg with
       | Message.full _ rel => rel = None
@@ -2409,7 +2409,7 @@ Module Memory.
       erewrite remove_o in GET; try exact MEM.
       condtac; ss.
       guardH o.
-      destruct (FLoc.eq_dec loc0 loc); cycle 1.
+      destruct (Loc.eq_dec loc0 loc); cycle 1.
       { cut (max_ts loc0 mem2 = max_ts loc0 mem1).
         { i. rewrite H in *. eapply NOHALF1; eauto. }
         exploit max_ts_spec; try exact GET. i. des.
@@ -2466,7 +2466,7 @@ Module Memory.
     exploit Cell.next_exists; eauto.
   Qed.
 
-  Inductive prev (loc: FLoc.t) (ts: Time.t) (mem: t) (from to: Time.t) (msg: Message.t): Prop :=
+  Inductive prev (loc: Loc.t) (ts: Time.t) (mem: t) (from to: Time.t) (msg: Message.t): Prop :=
   | prev_intro
       (GET: get loc to mem = Some (from, msg))
       (TO: Time.le to ts)
@@ -2487,7 +2487,7 @@ Module Memory.
 
   (* adjacent *)
 
-  Inductive adjacent (loc: FLoc.t) (from1 to1 from2 to2: Time.t) (mem: t): Prop :=
+  Inductive adjacent (loc: Loc.t) (from1 to1 from2 to2: Time.t) (mem: t): Prop :=
   | adjacent_intro
       m1 m2
       (GET1: get loc to1 mem = Some (from1, m1))
@@ -2572,7 +2572,7 @@ Module Memory.
 
   (* cap *)
 
-  Inductive latest_val (loc: FLoc.t) (mem: t) (val: Const.t): Prop :=
+  Inductive latest_val (loc: Loc.t) (mem: t) (val: Const.t): Prop :=
   | latest_val_intro
       ts from released
       (MAX: max_full_ts mem loc ts)
@@ -2600,7 +2600,7 @@ Module Memory.
     exists val. econs; eauto.
   Qed.
 
-  Definition latest_reserve (loc: FLoc.t) (promises mem: t): Prop :=
+  Definition latest_reserve (loc: Loc.t) (promises mem: t): Prop :=
     match get loc (max_ts loc mem) promises with
     | Some (_, Message.reserve) => False
     | _ => True

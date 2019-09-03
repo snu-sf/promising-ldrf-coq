@@ -110,7 +110,7 @@ Proof.
   esplits; eauto.
   - econs; eauto. eapply TViewFacts.readable_mon; eauto. apply TVIEW.
   - econs; eauto. inv TVIEW. ss. econs; s.
-    + i. unfold FLocFun.find. etrans; [by apply WF1_SRC|].
+    + i. unfold LocFun.find. etrans; [by apply WF1_SRC|].
       eauto using View.join_l.
     + repeat apply View.join_le; ss.
       * unfold View.singleton_ur_if. repeat condtac; viewtac.
@@ -186,11 +186,11 @@ Proof.
     + unfold SimPromises.none_if_released. condtac; viewtac.
     + eapply TViewFacts.writable_mon; try exact WRITABLE; eauto. apply LOCAL1.
   - econs; eauto. inv LOCAL1. inv TVIEW. ss. econs; s.
-    + i. rewrite FLocFun.add_spec. condtac; ss.
-      { subst. unfold FLocFun.find. condtac; apply View.join_le; viewtac.
+    + i. rewrite LocFun.add_spec. condtac; ss.
+      { subst. unfold LocFun.find. condtac; apply View.join_le; viewtac.
         etrans; eauto. refl.
       }
-      unfold FLocFun.find. etrans; [by apply WF1_SRC|].
+      unfold LocFun.find. etrans; [by apply WF1_SRC|].
       eauto using View.join_l.
     + apply View.join_le; viewtac.
     + apply View.join_le; viewtac.
@@ -344,7 +344,7 @@ Proof.
   inv STEP_TGT. esplits; eauto.
   - econs; eauto. i. eapply sim_local_nonsynch; eauto.
   - inv LOCAL1. inv TVIEW. econs; ss.
-    econs; s; unfold FLocFun.find; repeat condtac; aggrtac.
+    econs; s; unfold LocFun.find; repeat condtac; aggrtac.
     + etrans; eauto. apply WF1_TGT.
     + etrans; eauto. apply WF1_TGT.
     + etrans; eauto. apply WF1_TGT.

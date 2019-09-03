@@ -27,10 +27,10 @@ Module MemoryMerge.
     Memory.add mem0 loc from to msg2 mem2.
   Proof.
     inv ADD1. inv ADD. inv LOWER2. inv LOWER.
-    rewrite FLocFun.add_add_eq. econs; auto.
+    rewrite LocFun.add_add_eq. econs; auto.
     unfold Cell.add in *.
     destruct r, r0. ss. subst.
-    unfold FLocFun.add. condtac; [|congr]. s.
+    unfold LocFun.add. condtac; [|congr]. s.
     rewrite DOMap.add_add_eq. econs; auto.
   Qed.
 
@@ -41,10 +41,10 @@ Module MemoryMerge.
     Memory.split mem0 loc ts1 ts2 ts3 msg2' msg3 mem2.
   Proof.
     inv SPLIT1. inv SPLIT. inv LOWER2. inv LOWER.
-    rewrite FLocFun.add_add_eq. econs; auto.
+    rewrite LocFun.add_add_eq. econs; auto.
     unfold Cell.split in *.
     destruct r, r0. ss. subst.
-    unfold FLocFun.add. condtac; [|congr]. s.
+    unfold LocFun.add. condtac; [|congr]. s.
     rewrite DOMap.add_add_eq. econs; auto.
   Qed.
 
@@ -55,10 +55,10 @@ Module MemoryMerge.
     Memory.lower mem0 loc from to msg0 msg2 mem2.
   Proof.
     inv LOWER1. inv LOWER. inv LOWER2. inv LOWER.
-    rewrite FLocFun.add_add_eq. econs; auto.
+    rewrite LocFun.add_add_eq. econs; auto.
     unfold Cell.lower in *.
     destruct r, r0. ss. subst.
-    unfold FLocFun.add. condtac; [|congr]. s.
+    unfold LocFun.add. condtac; [|congr]. s.
     rewrite DOMap.add_add_eq. econs; auto.
     etrans; eauto.
   Qed.

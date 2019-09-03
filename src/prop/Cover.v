@@ -20,14 +20,14 @@ Require Import MemoryFacts.
 Set Implicit Arguments.
 
 
-Inductive covered (loc:FLoc.t) (ts:Time.t) (mem:Memory.t): Prop :=
+Inductive covered (loc:Loc.t) (ts:Time.t) (mem:Memory.t): Prop :=
 | covered_intro
     from to msg
     (GET: Memory.get loc to mem = Some (from, msg))
     (ITV: Interval.mem (from, to) ts)
 .
 
-Inductive covered_reserve (loc: FLoc.t) (ts: Time.t) (mem: Memory.t): Prop :=
+Inductive covered_reserve (loc: Loc.t) (ts: Time.t) (mem: Memory.t): Prop :=
 | covered_reserve_intro
     from to
     (GET: Memory.get loc to mem = Some (from, Message.reserve))
@@ -159,7 +159,7 @@ Proof.
   - inv H. revert GET. erewrite Memory.remove_o; eauto. condtac; ss.
     i. split.
     + econs; eauto.
-    + destruct (FLoc.eq_dec l loc); eauto. subst. des; ss.
+    + destruct (Loc.eq_dec l loc); eauto. subst. des; ss.
       right. ii.
       exploit Memory.remove_get0; eauto. i. des.
       exploit Memory.get_disjoint; [exact GET|exact GET0|..]. i. des; ss.

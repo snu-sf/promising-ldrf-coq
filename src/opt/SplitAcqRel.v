@@ -357,7 +357,7 @@ Proof.
       - rewrite <- ? View.join_l. apply LOCAL.
       - apply WF_TGT.
       - unfold TimeMap.join. rewrite <- Time.join_l. rewrite <- Time.join_l. rewrite <- Time.join_r.
-        unfold View.singleton_ur_if. condtac; ss. unfold TimeMap.singleton, FLocFun.add.
+        unfold View.singleton_ur_if. condtac; ss. unfold TimeMap.singleton, LocFun.add.
         condtac; ss. refl.
     }
     i. des.

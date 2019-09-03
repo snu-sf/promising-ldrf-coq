@@ -20,13 +20,13 @@ Set Implicit Arguments.
 
 Module TView <: JoinableType.
   Structure t_ := mk {
-    rel: FLocFun.t View.t;
+    rel: LocFun.t View.t;
     cur: View.t;
     acq: View.t;
   }.
   Definition t := t_.
 
-  Definition bot: t := mk (FLocFun.init View.bot) View.bot View.bot.
+  Definition bot: t := mk (LocFun.init View.bot) View.bot View.bot.
 
   Inductive wf (tview:t): Prop :=
   | wf_intro
@@ -95,7 +95,7 @@ Module TView <: JoinableType.
 
   Inductive le_ (lhs rhs:t): Prop :=
   | le_intro
-      (REL: forall (loc:FLoc.t), View.le (FLocFun.find loc lhs.(rel)) (FLocFun.find loc rhs.(rel)))
+      (REL: forall (loc:Loc.t), View.le (LocFun.find loc lhs.(rel)) (LocFun.find loc rhs.(rel)))
       (CUR: View.le lhs.(cur) rhs.(cur))
       (ACQ: View.le lhs.(acq) rhs.(acq))
   .
@@ -117,7 +117,7 @@ Module TView <: JoinableType.
   Lemma join_comm lhs rhs: join lhs rhs = join rhs lhs.
   Proof.
     unfold join. f_equal.
-    - apply FLocFun.ext. i. apply View.join_comm.
+    - apply LocFun.ext. i. apply View.join_comm.
     - apply View.join_comm.
     - apply View.join_comm.
   Qed.
@@ -125,7 +125,7 @@ Module TView <: JoinableType.
   Lemma join_assoc a b c: join (join a b) c = join a (join b c).
   Proof.
     unfold join. s. f_equal.
-    - apply FLocFun.ext. i. apply View.join_assoc.
+    - apply LocFun.ext. i. apply View.join_assoc.
     - apply View.join_assoc.
     - apply View.join_assoc.
   Qed.
@@ -158,7 +158,7 @@ Module TView <: JoinableType.
   Qed.
 
   Inductive readable
-            (view1:View.t) (loc:FLoc.t) (ts:Time.t) (released:option View.t) (ord:Ordering.t): Prop :=
+            (view1:View.t) (loc:Loc.t) (ts:Time.t) (released:option View.t) (ord:Ordering.t): Prop :=
   | readable_intro
       (PLN: Time.le (view1.(View.pln) loc) ts)
       (RLX: Ordering.le Ordering.relaxed ord ->
@@ -166,7 +166,7 @@ Module TView <: JoinableType.
   .
 
   Definition read_tview
-             (tview1:t) (loc:FLoc.t) (ts:Time.t) (released:option View.t) (ord:Ordering.t): t :=
+             (tview1:t) (loc:Loc.t) (ts:Time.t) (released:option View.t) (ord:Ordering.t): t :=
     mk tview1.(rel)
        (View.join
           (View.join
@@ -180,13 +180,13 @@ Module TView <: JoinableType.
           (if Ordering.le Ordering.relaxed ord then released.(View.unwrap) else View.bot)).
 
   Inductive writable
-            (view1:View.t) (sc1:TimeMap.t) (loc:FLoc.t) (ts:Time.t) (ord:Ordering.t): Prop :=
+            (view1:View.t) (sc1:TimeMap.t) (loc:Loc.t) (ts:Time.t) (ord:Ordering.t): Prop :=
   | writable_intro
       (TS: Time.lt (view1.(View.rlx) loc) ts)
   .
 
   Definition write_tview
-             (tview1:t) (sc1:TimeMap.t) (loc:FLoc.t) (ts:Time.t) (ord:Ordering.t): t :=
+             (tview1:t) (sc1:TimeMap.t) (loc:Loc.t) (ts:Time.t) (ord:Ordering.t): t :=
     let cur2 := View.join
                   tview1.(cur)
                   (View.singleton_ur loc ts)
@@ -195,7 +195,7 @@ Module TView <: JoinableType.
                   tview1.(acq)
                   (View.singleton_ur loc ts)
     in
-    let rel2 := FLocFun.add loc
+    let rel2 := LocFun.add loc
                      (if Ordering.le Ordering.acqrel ord then cur2 else View.join (tview1.(rel) loc) (View.singleton_ur loc ts))
                   tview1.(rel)
     in
@@ -241,7 +241,7 @@ Module TView <: JoinableType.
     l = r.
   Proof.
     destruct l, r. inv LR. inv RL. ss. f_equal.
-    - apply FLocFun.ext. i. apply View.antisym; auto.
+    - apply LocFun.ext. i. apply View.antisym; auto.
     - apply View.antisym; auto.
     - apply View.antisym; auto.
   Qed.
@@ -274,7 +274,7 @@ Module TViewFacts.
              apply TimeMap.bot_spec
            | [|- Time.le (TimeMap.bot _) _] =>
              apply Time.bot_spec
-           | [|- Time.le (FLocFun.init Time.bot _) _] =>
+           | [|- Time.le (LocFun.init Time.bot _) _] =>
              apply Time.bot_spec
            | [|- View.le ?s (View.join _ ?s)] =>
              apply View.join_r
@@ -403,20 +403,20 @@ Module TViewFacts.
              refl
            | [|- View.le (View.mk ?tm1 ?tm1) (View.mk ?tm2 ?tm2)] =>
              apply View.timemap_le_le
-           | [|- context[FLocFun.find _ (FLocFun.add _ _ _)]] =>
-             rewrite FLocFun.add_spec
+           | [|- context[LocFun.find _ (LocFun.add _ _ _)]] =>
+             rewrite LocFun.add_spec
            | [|- context[TimeMap.singleton ?l _ ?l]] =>
              unfold TimeMap.singleton
-           | [|- context[FLocFun.add ?l _ _ ?l]] =>
-             unfold FLocFun.add;
+           | [|- context[LocFun.add ?l _ _ ?l]] =>
+             unfold LocFun.add;
              match goal with
-             | [|- context[FLoc.eq_dec ?l ?l]] =>
-               destruct (FLoc.eq_dec l l); [|congr]
+             | [|- context[Loc.eq_dec ?l ?l]] =>
+               destruct (Loc.eq_dec l l); [|congr]
              end
-           | [|- context[FLocFun.find _ _]] =>
-             unfold FLocFun.find
-           | [|- context[FLocFun.add _ _ _]] =>
-             unfold FLocFun.add
+           | [|- context[LocFun.find _ _]] =>
+             unfold LocFun.find
+           | [|- context[LocFun.add _ _ _]] =>
+             unfold LocFun.add
 
            (* | [H: _ <> _ |- _] => inv H *)
            end; subst; ss; i).
@@ -426,7 +426,7 @@ Module TViewFacts.
       (tac;
        try match goal with
            | [|- Time.le ?t1 (TimeMap.singleton ?l ?t2 ?l)] =>
-             unfold TimeMap.singleton, FLocFun.add; condtac; [|congr]
+             unfold TimeMap.singleton, LocFun.add; condtac; [|congr]
            | [|- View.le _ (View.join _ _)] =>
              try (by rewrite <- View.join_l; aggrtac);
              try (by rewrite <- View.join_r; aggrtac)
@@ -741,7 +741,7 @@ Module TViewFacts.
     TView.closed (TView.write_tview tview1 sc1 loc to ord) mem1.
   Proof.
     econs; tac; (try by apply CLOSED2).
-    unfold FLocFun.add. repeat condtac; tac; (try by apply CLOSED2).
+    unfold LocFun.add. repeat condtac; tac; (try by apply CLOSED2).
   Qed.
 
   Lemma get_closed_released
@@ -768,7 +768,7 @@ Module TViewFacts.
   Proof.
     splits; tac.
     - econs; tac; try apply WF_TVIEW.
-      + unfold FLocFun.add, FLocFun.find. repeat condtac; tac; try apply WF_TVIEW.
+      + unfold LocFun.add, LocFun.find. repeat condtac; tac; try apply WF_TVIEW.
       + repeat condtac; aggrtac; rewrite <- ? View.join_l; try apply WF_TVIEW.
       + repeat condtac; tac; rewrite <- ? View.join_l; apply WF_TVIEW.
     - unfold TView.write_released. condtac; econs. repeat (try condtac; aggrtac; try apply WF_TVIEW).

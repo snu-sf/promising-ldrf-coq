@@ -25,11 +25,11 @@ Set Implicit Arguments.
 
 Module ThreadEvent.
   Inductive t :=
-  | promise (loc:FLoc.t) (from to:Time.t) (msg:Message.t) (kind:Memory.op_kind)
+  | promise (loc:Loc.t) (from to:Time.t) (msg:Message.t) (kind:Memory.op_kind)
   | silent
-  | read (loc:FLoc.t) (ts:Time.t) (val:Const.t) (released:option View.t) (ord:Ordering.t)
-  | write (loc:FLoc.t) (from to:Time.t) (val:Const.t) (released:option View.t) (ord:Ordering.t)
-  | update (loc:FLoc.t) (tsr tsw:Time.t) (valr valw:Const.t) (releasedr releasedw:option View.t) (ordr ordw:Ordering.t)
+  | read (loc:Loc.t) (ts:Time.t) (val:Const.t) (released:option View.t) (ord:Ordering.t)
+  | write (loc:Loc.t) (from to:Time.t) (val:Const.t) (released:option View.t) (ord:Ordering.t)
+  | update (loc:Loc.t) (tsr tsw:Time.t) (valr valw:Const.t) (releasedr releasedw:option View.t) (ordr ordw:Ordering.t)
   | fence (ordr ordw:Ordering.t)
   | syscall (e:Event.t)
   | failure
@@ -84,27 +84,27 @@ Module ThreadEvent.
     | _ => MachineEvent.silent
     end.
 
-  Definition is_promising (e:t) : option (FLoc.t * Time.t) :=
+  Definition is_promising (e:t) : option (Loc.t * Time.t) :=
     match e with
     | promise loc from to msg kind => Some (loc, to)
     | _ => None
     end.
 
-  Definition is_reading (e:t): option (FLoc.t * Time.t * Const.t * option View.t * Ordering.t) :=
+  Definition is_reading (e:t): option (Loc.t * Time.t * Const.t * option View.t * Ordering.t) :=
     match e with
     | read loc ts val released ord => Some (loc, ts, val, released, ord)
     | update loc tsr _ valr _ releasedr _ ordr _ => Some (loc, tsr, valr, releasedr, ordr)
     | _ => None
     end.
 
-  Definition is_writing (e:t): option (FLoc.t * Time.t * Time.t * Const.t * option View.t * Ordering.t) :=
+  Definition is_writing (e:t): option (Loc.t * Time.t * Time.t * Const.t * option View.t * Ordering.t) :=
     match e with
     | write loc from to val released ord => Some (loc, from, to, val, released, ord)
     | update loc tsr tsw _ valw _ releasedw _ ordw => Some (loc, tsr, tsw, valw, releasedw, ordw)
     | _ => None
     end.
 
-  Definition is_accessing (e:t): option (FLoc.t * Time.t) :=
+  Definition is_accessing (e:t): option (Loc.t * Time.t) :=
     match e with
     | read loc ts _ _ _ => Some (loc, ts)
     | write loc _ ts _ _ _ => Some (loc, ts)
@@ -236,7 +236,7 @@ Module Local.
   Qed.
 
 
-  Inductive promise_step (lc1:t) (mem1:Memory.t) (loc:FLoc.t) (from to:Time.t) (msg:Message.t) (lc2:t) (mem2:Memory.t) (kind:Memory.op_kind): Prop :=
+  Inductive promise_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (from to:Time.t) (msg:Message.t) (lc2:t) (mem2:Memory.t) (kind:Memory.op_kind): Prop :=
   | promise_step_intro
       promises2
       (PROMISE: Memory.promise lc1.(promises) mem1 loc from to msg promises2 mem2 kind)
@@ -246,7 +246,7 @@ Module Local.
   .
   Hint Constructors promise_step.
 
-  Inductive read_step (lc1:t) (mem1:Memory.t) (loc:FLoc.t) (to:Time.t) (val:Const.t) (released:option View.t) (ord:Ordering.t) (lc2:t): Prop :=
+  Inductive read_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (to:Time.t) (val:Const.t) (released:option View.t) (ord:Ordering.t) (lc2:t): Prop :=
   | read_step_intro
       from
       tview2
@@ -258,7 +258,7 @@ Module Local.
   .
   Hint Constructors read_step.
 
-  Inductive write_step (lc1:t) (sc1:TimeMap.t) (mem1:Memory.t) (loc:FLoc.t) (from to:Time.t) (val:Const.t) (releasedm released:option View.t) (ord:Ordering.t) (lc2:t) (sc2:TimeMap.t) (mem2:Memory.t) (kind:Memory.op_kind): Prop :=
+  Inductive write_step (lc1:t) (sc1:TimeMap.t) (mem1:Memory.t) (loc:Loc.t) (from to:Time.t) (val:Const.t) (releasedm released:option View.t) (ord:Ordering.t) (lc2:t) (sc2:TimeMap.t) (mem2:Memory.t) (kind:Memory.op_kind): Prop :=
   | write_step_intro
       promises2
       (RELEASED: released = TView.write_released lc1.(tview) sc1 loc to releasedm ord)

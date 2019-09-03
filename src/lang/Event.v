@@ -138,22 +138,22 @@ End MachineEvent.
 Module ProgramEvent.
   Inductive t :=
   | silent
-  | read (loc:FLoc.t) (val:Const.t) (ord:Ordering.t)
-  | write (loc:FLoc.t) (val:Const.t) (ord:Ordering.t)
-  | update (loc:FLoc.t) (valr valw:Const.t) (ordr ordw:Ordering.t)
+  | read (loc:Loc.t) (val:Const.t) (ord:Ordering.t)
+  | write (loc:Loc.t) (val:Const.t) (ord:Ordering.t)
+  | update (loc:Loc.t) (valr valw:Const.t) (ordr ordw:Ordering.t)
   | fence (ordr ordw:Ordering.t)
   | syscall (e:Event.t)
   | failure
   .
 
-  Definition is_reading (e:t): option (FLoc.t * Const.t * Ordering.t) :=
+  Definition is_reading (e:t): option (Loc.t * Const.t * Ordering.t) :=
     match e with
     | read loc val ord => Some (loc, val, ord)
     | update loc valr _ ordr _ => Some (loc, valr, ordr)
     | _ => None
     end.
 
-  Definition is_writing (e:t): option (FLoc.t * Const.t * Ordering.t) :=
+  Definition is_writing (e:t): option (Loc.t * Const.t * Ordering.t) :=
     match e with
     | write loc val ord => Some (loc, val, ord)
     | update loc _ valw _ ordw => Some (loc, valw, ordw)
