@@ -153,7 +153,10 @@ Proof.
     generalize WF_TGT. intro X. inv X. ss. inv WF. exploit THREADS0; eauto. i.
     exploit (IN a); eauto. i. des.
     exploit TERMINAL_TGT; eauto. i. des.
-    punfold x2. exploit x2; try exact x; try exact x0; try exact SC; try exact SC0; eauto. i. des.
+    punfold x2.
+    exploit x2; try exact x; try exact x0; try exact SC; try exact SC0;
+      eauto using Memory.future_future_weak.
+    i. des.
     exploit TERMINAL; eauto. i. des.
     + (* failure *)
       left. unfold Thread.steps_failure in FAILURE. des.
@@ -165,7 +168,9 @@ Proof.
     + (* non-failure *)
       exploit thread_rtc_step_rtc_step; try exact STEPS; eauto; i.
       { guardH TID. exploit IN; try eapply TID; eauto. i. des.
-        esplits. eapply sim_thread_future; try exact x1; eauto. }
+        esplits.
+        eapply sim_thread_future; try exact x1;
+          eauto using Memory.future_future_weak. }
       { inv THREAD. eapply sim_local_memory_bot; eauto. }
       exploit Configuration.rtc_step_future; try eapply x3; eauto. s. i. des.
       exploit IHl; [| |exact SC2|exact MEMORY|..]; try exact WF2; try exact WF_TGT;
@@ -196,8 +201,10 @@ Proof.
         exploit x1; eauto. i. des. rewrite FIND_SRC in x. inv x. }
       inv WF_SRC. inv WF_TGT. inv WF. inv WF0. ss.
       exploit SIM; eauto. i. des.
-      exploit sim_thread_future; eauto. i.
-      exploit sim_thread_plus_step; try exact STEPS; try exact x1; eauto. s. i. des; ss.
+      exploit sim_thread_future; eauto using Memory.future_future_weak. i.
+      exploit sim_thread_plus_step; try exact STEPS; try exact x1;
+        eauto using Memory.future_future_weak.
+      s. i. des; ss.
       left.
       unfold Thread.steps_failure in FAILURE. des.
       unfold Configuration.steps_failure.
@@ -210,8 +217,10 @@ Proof.
         exploit x1; eauto. i. des. rewrite FIND_SRC in x. inv x. }
       inv WF_SRC. inv WF_TGT. inv WF. inv WF0. ss.
       exploit SIM; eauto. i. des.
-      exploit sim_thread_future; eauto. i.
-      exploit sim_thread_plus_step; try exact STEPS; try exact x1; eauto. s. i. des.
+      exploit sim_thread_future; eauto using Memory.future_future_weak. i.
+      exploit sim_thread_plus_step; try exact STEPS; try exact x1;
+        eauto using Memory.future_future_weak.
+      s. i. des.
       * left.
         unfold Thread.steps_failure in FAILURE. des.
         unfold Configuration.steps_failure.
@@ -237,7 +246,8 @@ Proof.
                 exploit Thread.step_future; try exact STEP0; eauto. s. i. des.
                 exploit SIM; try eapply H; eauto. i. des.
                 eexists.
-                eapply sim_thread_future; try exact x0; try by (etrans; [eauto|etrans; eauto]).
+                eapply sim_thread_future; try exact x0;
+                  try by (etrans; [eauto using Memory.future_future_weak|etrans; eauto using Memory.future_future_weak]).
           - ss. inv X. esplits; eauto.
             + destruct e0; ss.
             + right. eapply CIH; ss.
@@ -251,7 +261,8 @@ Proof.
                   exploit Thread.step_future; try exact STEP; eauto. s. i. des.
                   exploit SIM; try eapply H; eauto. i. des.
                   eexists.
-                  eapply sim_thread_future; try exact x0; eauto; try by (etrans; [eauto|etrans; eauto]). }
+                  eapply sim_thread_future; try exact x0; eauto;
+                    try by (etrans; [eauto using Memory.future_future_weak|etrans; eauto using Memory.future_future_weak]). }
         }
         { esplits; eauto.
           - rewrite <- EVENT0.
@@ -271,7 +282,8 @@ Proof.
               exploit Thread.step_future; try exact STEP1; eauto. s. i. des.
               exploit SIM; try eapply H; eauto. i. des.
               eexists.
-              eapply sim_thread_future; try exact x0; try by (etrans; [eauto|etrans; eauto]). }
+              eapply sim_thread_future; try exact x0;
+                try by (etrans; [eauto using Memory.future_future_weak|etrans; eauto using Memory.future_future_weak]). }
 Grab Existential Variables.
   { auto. }
 Qed.

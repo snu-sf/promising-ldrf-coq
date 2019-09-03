@@ -99,8 +99,8 @@ Lemma sim_update_mon
                        st_tgt lc_tgt sc1_tgt mem1_tgt)
       (SC_FUTURE_SRC: TimeMap.le sc1_src sc2_src)
       (SC_FUTURE_TGT: TimeMap.le sc1_tgt sc2_tgt)
-      (MEM_FUTURE_SRC: Memory.future mem1_src mem2_src)
-      (MEM_FUTURE_TGT: Memory.future mem1_tgt mem2_tgt)
+      (MEM_FUTURE_SRC: Memory.future_weak mem1_src mem2_src)
+      (MEM_FUTURE_TGT: Memory.future_weak mem1_tgt mem2_tgt)
       (SC1: TimeMap.le sc2_src sc2_tgt)
       (MEM1: sim_memory mem2_src mem2_tgt)
       (WF_SRC: Local.wf lc_src mem2_src)
@@ -125,10 +125,10 @@ Proof.
     try exact WF0; try by viewtac.
   { econs.
     - apply WF2.
-    - eapply TView.future_closed; eauto. apply WF2.
+    - eapply TView.future_weak_closed; eauto. apply WF2.
     - inv READ. apply WF_SRC.
     - apply WF2.
-    - eapply Memory.future_reserve_wf; eauto. apply WF2.
+    - eapply Memory.future_weak_reserve_wf; eauto. apply WF2.
   }
   i. des.
   econs; [eauto|..]; s; eauto; etrans; eauto.
@@ -152,7 +152,7 @@ Lemma sim_update_cap
                        st_tgt lc_tgt sc1_tgt mem2_tgt>>.
 Proof.
   inv SIM1.
-  exploit Memory.cap_future; eauto. i.
+  exploit Memory.cap_future_weak; eauto. i.
   exploit cap_property; try exact CAP_SRC; eauto. i. des.
   destruct vw1 as [vw1|]; cycle 1.
   { ss. des. subst.
@@ -177,19 +177,19 @@ Proof.
   exploit fulfill_step_future; try apply x1; try exact WF1; eauto; try by viewtac.
   { econs.
     - apply WF2.
-    - eapply TView.future_closed; eauto. apply WF2.
+    - eapply TView.future_weak_closed; eauto. apply WF2.
     - inv READ. ss. apply WF.
     - apply WF2.
-    - eapply Memory.future_reserve_wf; eauto. apply WF2.
+    - eapply Memory.future_weak_reserve_wf; eauto. apply WF2.
   }
   i. des.
   exploit sim_local_fulfill_bot; try exact x1; try exact LOCAL0; try refl; eauto.
   { econs.
     - apply WF2.
-    - eapply TView.future_closed; eauto. apply WF2.
+    - eapply TView.future_weak_closed; eauto. apply WF2.
     - inv READ. apply WF.
     - apply WF2.
-    - eapply Memory.future_reserve_wf; eauto. apply WF2.
+    - eapply Memory.future_weak_reserve_wf; eauto. apply WF2.
   }
   i. des.
   exploit fulfill_step_future; eauto. i. des.

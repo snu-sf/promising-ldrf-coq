@@ -63,6 +63,15 @@ Module TView <: JoinableType.
     inv CLOSED. econs; i; eapply Memory.future_closed_view; eauto.
   Qed.
 
+  Lemma future_weak_closed
+        tview mem1 mem2
+        (CLOSED: closed tview mem1)
+        (FUTURE: Memory.future_weak mem1 mem2):
+    closed tview mem2.
+  Proof.
+    inv CLOSED. econs; i; eapply Memory.future_weak_closed_view; eauto.
+  Qed.
+
   Lemma cap_closed
         tview promises mem1 mem2
         (CLOSED: closed tview mem1)

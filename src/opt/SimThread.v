@@ -66,8 +66,8 @@ Section SimulationThread.
       (MEMORY: sim_memory mem1_src mem1_tgt)
       (SC_FUTURE_SRC: TimeMap.le sc0_src sc1_src)
       (SC_FUTURE_TGT: TimeMap.le sc0_tgt sc1_tgt)
-      (MEM_FUTURE_SRC: Memory.future mem0_src mem1_src)
-      (MEM_FUTURE_TGT: Memory.future mem0_tgt mem1_tgt)
+      (MEM_FUTURE_SRC: Memory.future_weak mem0_src mem1_src)
+      (MEM_FUTURE_TGT: Memory.future_weak mem0_tgt mem1_tgt)
       (WF_SRC: Local.wf lc1_src mem1_src)
       (WF_TGT: Local.wf lc1_tgt mem1_tgt)
       (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
@@ -334,8 +334,8 @@ Lemma sim_thread_future
       (SIM: @sim_thread lang_src lang_tgt sim_terminal st_src lc_src sc1_src mem1_src st_tgt lc_tgt sc1_tgt mem1_tgt)
       (SC_FUTURE_SRC: TimeMap.le sc1_src sc2_src)
       (SC_FUTURE_TGT: TimeMap.le sc1_tgt sc2_tgt)
-      (MEM_FUTURE_SRC: Memory.future mem1_src mem2_src)
-      (MEM_FUTURE_TGT: Memory.future mem1_tgt mem2_tgt):
+      (MEM_FUTURE_SRC: Memory.future_weak mem1_src mem2_src)
+      (MEM_FUTURE_TGT: Memory.future_weak mem1_tgt mem2_tgt):
   sim_thread sim_terminal st_src lc_src sc2_src mem2_src st_tgt lc_tgt sc2_tgt mem2_tgt.
 Proof.
   pfold. ii.
@@ -349,14 +349,14 @@ Lemma cap_property
       (WF: Local.wf lc mem1)
       (SC: Memory.closed_timemap sc mem1)
       (CLOSED: Memory.closed mem1):
-  <<FUTURE: Memory.future mem1 mem2>> /\
+  <<FUTURE: Memory.future_weak mem1 mem2>> /\
   <<WF: Local.wf lc mem2>> /\
   <<SC: Memory.closed_timemap sc mem2>> /\
   <<CLOSED: Memory.closed mem2>> /\
   <<NOHALF: Memory.no_reserve_except lc.(Local.promises) mem2>>.
 Proof.
   splits.
-  - eapply Memory.cap_future; eauto.
+  - eapply Memory.cap_future_weak; eauto.
   - eapply Local.cap_wf; eauto.
   - eapply Memory.cap_closed_timemap; eauto.
   - eapply Memory.cap_closed; eauto.

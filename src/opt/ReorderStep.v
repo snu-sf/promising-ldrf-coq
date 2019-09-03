@@ -42,14 +42,14 @@ Lemma future_read_step
       lc1 mem1 mem1' loc ts val released ord lc2
       (WF: Local.wf lc1 mem1)
       (MEM: Memory.closed mem1)
-      (FUTURE: Memory.future mem1 mem1')
+      (FUTURE: Memory.future_weak mem1 mem1')
       (STEP: Local.read_step lc1 mem1 loc ts val released ord lc2):
   exists released' lc2',
     <<STEP: Local.read_step lc1 mem1' loc ts val released' ord lc2'>> /\
     <<REL: View.opt_le released' released>> /\
     <<LOCAL: sim_local SimPromises.bot lc2' lc2>>.
 Proof.
-  inv STEP. exploit Memory.future_get1; eauto. i. des. inv MSG_LE.
+  inv STEP. exploit Memory.future_weak_get1; eauto. i. des. inv MSG_LE.
   esplits.
   - econs; eauto. eapply TViewFacts.readable_mon; eauto; refl.
   - auto.
@@ -78,6 +78,18 @@ Proof.
     + rewrite <- View.join_l. apply View.unwrap_opt_le. auto.
     + rewrite <- ? View.join_r. rewrite TVIEW. refl.
   - econs; try apply WRITABLE.
+Qed.
+
+Lemma future_fence_step
+      lc1 sc1 sc1' ordr ordw lc2 sc2
+      (ORDW: Ordering.le ordw Ordering.acqrel)
+      (SC_FUTURE: TimeMap.le sc1 sc1')
+      (STEP: Local.fence_step lc1 sc1 ordr ordw lc2 sc2):
+  Local.fence_step lc1 sc1' ordr ordw lc2 sc1'.
+Proof.
+  inv STEP.
+  erewrite TViewFacts.write_fence_tview_acqrel; auto.
+  erewrite <- TViewFacts.write_fence_sc_acqrel at 2; eauto.
 Qed.
 
 

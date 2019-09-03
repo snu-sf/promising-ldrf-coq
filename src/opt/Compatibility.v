@@ -336,7 +336,9 @@ Proof.
         exploit Thread.rtc_tau_step_future; eauto. s. i. des.
         inv TERMINAL0. ss.
         exploit SIM2; eauto. intro LC2.
-        exploit GF; try apply LC2; try apply SC0; eauto. s. i. des.
+        exploit GF; try apply LC2; try apply SC0;
+          eauto using Memory.future_future_weak.
+        s. i. des.
         exploit TERMINAL0; try by econs. i. des.
         + left.
           unfold Thread.steps_failure in *. des.
@@ -378,7 +380,7 @@ Proof.
         exploit Thread.rtc_tau_step_future; eauto. s. i. des.
         inv TERMINAL0. ss. subst.
         exploit SIM2; eauto. intro LC2.
-        exploit GF; try apply SC0; eauto. i. des.
+        exploit GF; try apply SC0; eauto using Memory.future_future_weak. i. des.
         exploit STEP0; eauto. i. des.
         { left.
           unfold Thread.steps_failure in *. des.

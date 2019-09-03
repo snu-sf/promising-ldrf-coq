@@ -65,18 +65,6 @@ Inductive sim_fence: forall (st_src:lang.(Language.state)) (lc_src:Local.t) (sc1
       (State.mk rs [Stmt.instr i2]) lc1_tgt sc1_tgt mem1_tgt
 .
 
-Lemma future_fence_step lc1 sc1 sc1' mem1 mem1' ordr ordw lc2 sc2
-      (ORDW: Ordering.le ordw Ordering.acqrel)
-      (SC_FUTURE: TimeMap.le sc1 sc1')
-      (MEM_FUTURE: Memory.future mem1 mem1')
-      (STEP: Local.fence_step lc1 sc1 ordr ordw lc2 sc2):
-  Local.fence_step lc1 sc1' ordr ordw lc2 sc1'.
-Proof.
-  inv STEP.
-  erewrite TViewFacts.write_fence_tview_acqrel; auto.
-  erewrite <- TViewFacts.write_fence_sc_acqrel at 2; eauto.
-Qed.
-
 Lemma sim_fence_step
       st1_src lc1_src sc0_src mem0_src
       st1_tgt lc1_tgt sc0_tgt mem0_tgt
@@ -88,8 +76,8 @@ Lemma sim_fence_step
     (MEMORY: sim_memory mem1_src mem1_tgt)
     (SC_FUTURE_SRC: TimeMap.le sc0_src sc1_src)
     (SC_FUTURE_TGT: TimeMap.le sc0_tgt sc1_tgt)
-    (MEM_FUTURE_SRC: Memory.future mem0_src mem1_src)
-    (MEM_FUTURE_TGT: Memory.future mem0_tgt mem1_tgt)
+    (MEM_FUTURE_SRC: Memory.future_weak mem0_src mem1_src)
+    (MEM_FUTURE_TGT: Memory.future_weak mem0_tgt mem1_tgt)
     (WF_SRC: Local.wf lc1_src mem1_src)
     (WF_TGT: Local.wf lc1_tgt mem1_tgt)
     (SC_SRC: Memory.closed_timemap sc1_src mem1_src)

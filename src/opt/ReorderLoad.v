@@ -92,8 +92,8 @@ Lemma sim_load_mon
                       st_tgt lc_tgt sc1_tgt mem1_tgt)
       (SC_FUTURE_SRC: TimeMap.le sc1_src sc2_src)
       (SC_FUTURE_TGT: TimeMap.le sc1_tgt sc2_tgt)
-      (MEM_FUTURE_SRC: Memory.future mem1_src mem2_src)
-      (MEM_FUTURE_TGT: Memory.future mem1_tgt mem2_tgt)
+      (MEM_FUTURE_SRC: Memory.future_weak mem1_src mem2_src)
+      (MEM_FUTURE_TGT: Memory.future_weak mem1_tgt mem2_tgt)
       (SC1: TimeMap.le sc2_src sc2_tgt)
       (MEM1: sim_memory mem2_src mem2_tgt)
       (WF_SRC: Local.wf lc_src mem2_src)
@@ -124,7 +124,7 @@ Lemma sim_load_cap
                      st_tgt lc_tgt sc1_tgt mem2_tgt>>.
 Proof.
   inv SIM1.
-  exploit Memory.cap_future; try exact CAP_SRC; eauto. i.
+  exploit Memory.cap_future_weak; try exact CAP_SRC; eauto. i.
   exploit future_read_step; try exact READ; eauto. i. des.
   exploit SimPromises.cap; try apply MEM1; eauto.
   { inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite <- PROMISES.
@@ -134,7 +134,7 @@ Proof.
   exploit cap_property; try exact CAP_SRC; eauto. i. des.
   exploit cap_property; try exact CAP_TGT; eauto. i. des.
   esplits; eauto.
-  econs; eauto using Memory.future_closed_timemap.
+  econs; eauto.
   etrans; eauto.
 Qed.
 
