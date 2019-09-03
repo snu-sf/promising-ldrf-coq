@@ -65,6 +65,7 @@ Module Threads.
       + apply TView.bot_wf.
       + apply TView.bot_closed.
       + ii. rewrite Memory.bot_get in LHS. congr.
+      + apply Memory.bot_finite.
       + ii. rewrite Memory.bot_get in GET. congr.
   Qed.
 

@@ -1876,21 +1876,13 @@ Module Memory.
       + econs.
   Qed.
 
-  Lemma promise_future0
+  Lemma promise_le
         promises1 mem1 loc from to msg promises2 mem2 kind
         (LE_PROMISES1: le promises1 mem1)
-        (FINITE1: finite promises1)
-        (INHABITED1: inhabited mem1)
         (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind):
-    <<LE_PROMISES2: le promises2 mem2>> /\
-    <<FINITE2: finite promises2>> /\
-    <<INHABITED2: inhabited mem2>>.
+    <<LE_PROMISES2: le promises2 mem2>>.
   Proof.
-    hexploit op_inhabited; eauto.
-    { eapply promise_op. eauto. }
-    hexploit op_finite; eauto.
-    { eapply promise_op_promise. eauto. }
-    i. splits; ss. inv PROMISE.
+    inv PROMISE.
     - ii. revert LHS.
       erewrite add_o; eauto. erewrite (@add_o mem2); try exact MEM; eauto.
       condtac; ss. auto.
@@ -1921,13 +1913,18 @@ Module Memory.
     <<CLOSED2: closed mem2>> /\
     <<FUTURE: future mem1 mem2>>.
   Proof.
+    hexploit promise_le; eauto. i. des.
+    hexploit op_inhabited; try apply CLOSED1.
+    { eapply promise_op. eauto. }
+    hexploit op_finite; eauto.
+    { eapply promise_op_promise. eauto. }
     hexploit op_future; eauto.
     { eapply promise_op. eauto. }
     { by inv PROMISE. }
     i. des.
-    exploit promise_future0; try apply CLOSED1; eauto. i. des.
     hexploit promise_reserve_wf; eauto. i. des.
-    splits; auto. inv PROMISE.
+    splits; auto.
+    inv PROMISE.
     - eapply add_bot_none; eauto.
     - eapply split_bot_none; eauto.
     - eapply lower_bot_none; eauto.
@@ -2056,22 +2053,6 @@ Module Memory.
     inv WRITE. splits.
     - erewrite remove_o; eauto. condtac; ss. des; ss.
     - eapply promise_get2; eauto. inv PROMISE; ss.
-  Qed.
-
-  Lemma write_future0
-        promises1 mem1 loc from to val released promises2 mem2 kind
-        (LE_PROMISES1: le promises1 mem1)
-        (FINITE1: finite promises1)
-        (INHABITED1: inhabited mem1)
-        (PROMISE: write promises1 mem1 loc from to val released promises2 mem2 kind):
-    <<LE_PROMISES2: le promises2 mem2>> /\
-    <<FINITE2: finite promises2>> /\
-    <<INHABITED2: inhabited mem2>>.
-  Proof.
-    inv PROMISE.
-    hexploit promise_future0; eauto. i. des.
-    hexploit remove_future; eauto. i. des.
-    splits; ss.
   Qed.
 
   Lemma write_future

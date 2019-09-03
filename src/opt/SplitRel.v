@@ -132,6 +132,7 @@ Proof.
   { econs. ss. }
   { apply WF1_SRC. }
   { apply WF1_TGT. }
+  { apply WF1_TGT. }
   i. des. esplits.
   - econs; eauto.
     inv WRITABLE. econs; ss. eapply TimeFacts.le_lt_lt; [apply LOCAL1|apply TS].

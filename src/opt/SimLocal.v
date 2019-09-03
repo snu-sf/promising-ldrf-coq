@@ -113,10 +113,7 @@ Proof.
   { apply WF1_TGT. }
   i. des.
   exploit sim_memory_closed_message; eauto. i.
-  exploit Memory.promise_future; try apply PROMISE_SRC; eauto.
-  { apply WF1_SRC. }
-  { apply WF1_SRC. }
-  { apply WF1_SRC. }
+  exploit Memory.promise_future; try apply PROMISE_SRC; try apply WF1_SRC; eauto.
   { unfold SimPromises.none_if, SimPromises.none_if_released.
     destruct msg; try condtac; eauto. }
   i. des.
@@ -221,6 +218,7 @@ Proof.
     try exact MEM1; try apply LOCAL1; eauto.
   { econs. ss. }
   { apply WF1_SRC. }
+  { apply WF1_TGT. }
   { apply WF1_TGT. }
   i. des. esplits.
   - econs; eauto.
@@ -642,7 +640,7 @@ Lemma sim_local_nonsynch_src
     <<MEM2: sim_memory mem2_src mem1_tgt>>.
 Proof.
   inversion LOCAL1_SRC.
-  destruct (Memory.finite lc1_src.(Local.promises)). rename x into dom.
+  destruct FINITE. rename x into dom.
   assert (FINITE' : forall (loc : FLoc.t) (from to : Time.t) (msg : Message.t),
              Memory.get loc to (Local.promises lc1_src) = Some (from, msg) ->
              (match msg with

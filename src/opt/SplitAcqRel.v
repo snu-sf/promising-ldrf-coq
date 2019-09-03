@@ -61,10 +61,7 @@ Proof.
   { apply WF1_SRC. }
   { apply WF1_TGT. }
   i. des.
-  exploit Memory.promise_future; try apply PROMISE_SRC; eauto.
-  { apply WF1_SRC. }
-  { apply WF1_SRC. }
-  { apply WF1_SRC. }
+  exploit Memory.promise_future; try apply PROMISE_SRC; try apply WF1_SRC; eauto.
   { destruct msg; ss. inv CLOSED. econs.
     eapply sim_memory_closed_opt_view; eauto. }
   i. des.
@@ -128,6 +125,7 @@ Proof.
     try exact MEM1; try apply LOCAL1; eauto.
   { econs. ss. }
   { apply WF1_SRC. }
+  { apply WF1_TGT. }
   { apply WF1_TGT. }
   i. des. esplits.
   - econs; eauto.

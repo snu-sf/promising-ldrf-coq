@@ -128,6 +128,7 @@ Proof.
     - eapply TView.future_weak_closed; eauto. apply WF2.
     - inv READ. apply WF_SRC.
     - apply WF2.
+    - apply WF2.
     - eapply Memory.future_weak_reserve_wf; eauto. apply WF2.
   }
   i. des.
@@ -180,6 +181,7 @@ Proof.
     - eapply TView.future_weak_closed; eauto. apply WF2.
     - inv READ. ss. apply WF.
     - apply WF2.
+    - apply WF2.
     - eapply Memory.future_weak_reserve_wf; eauto. apply WF2.
   }
   i. des.
@@ -188,6 +190,7 @@ Proof.
     - apply WF2.
     - eapply TView.future_weak_closed; eauto. apply WF2.
     - inv READ. apply WF.
+    - apply WF2.
     - apply WF2.
     - eapply Memory.future_weak_reserve_wf; eauto. apply WF2.
   }

@@ -185,6 +185,7 @@ Module Local.
       (TVIEW_WF: TView.wf lc.(tview))
       (TVIEW_CLOSED: TView.closed lc.(tview) mem)
       (PROMISES: Memory.le lc.(promises) mem)
+      (FINITE: Memory.finite lc.(promises))
       (BOT: Memory.bot_none lc.(promises))
       (HALF: Memory.reserve_wf lc.(promises) mem)
   .
@@ -538,7 +539,6 @@ Module Local.
     <<WF: wf lc mem2>>.
   Proof.
     inv WF1. inv DISJOINT1. inversion WF. inv STEP.
-    exploit Memory.write_future0; try apply WRITE; eauto; try by viewtac. i. des.
     exploit Memory.write_disjoint; try apply WRITE; eauto. i. des.
     splits; ss. econs; eauto.
     inv WRITE. eapply TView.promise_closed; eauto.

@@ -493,10 +493,11 @@ Module PFStep.
 
   Lemma sim_memory_exists
         promises mem_tgt
-        (LE: Memory.le promises mem_tgt):
+        (LE: Memory.le promises mem_tgt)
+        (FINITE: Memory.finite promises):
     exists mem_src, sim_memory promises mem_src mem_tgt.
   Proof.
-    destruct (@Memory.finite promises).
+    destruct FINITE.
     exploit (@sim_memory_aux_exists x promises mem_tgt); eauto. i. des.
     inv x1.
     exists mem_src. econs; eauto.
