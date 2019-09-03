@@ -96,6 +96,7 @@ Module Memory.
         exploit VOLUME; eauto. i. des; auto. inv x1. congr.
   Qed.
 
+  (* TODO: unused *)
   Lemma disjoint_get_general
         lhs rhs
         loc ts0 ts1 ts2 ts3 msgl msgr
@@ -2268,6 +2269,7 @@ Module Memory.
     setoid_rewrite Memory.lower_o; eauto.
   Qed.
 
+  (* TODO: unused *)
   Lemma remove_inj
         mem loc to from1 from2 msg1 msg2 mem1 mem2
         (REMOVE1: Memory.remove mem loc from1 to msg1 mem1)
@@ -2622,9 +2624,7 @@ Module Memory.
 
   Inductive cap (promises mem1 mem2: t): Prop :=
   | cap_intro
-      (SOUND: forall loc from to msg
-                (GET: get loc to mem1 = Some (from, msg)),
-          get loc to mem2 = Some (from, msg))
+      (SOUND: le mem1 mem2)
       (MIDDLE: forall loc from1 to1 from2 to2
                  (ADJ: adjacent loc from1 to1 from2 to2 mem1)
                  (TO: Time.lt to1 from2),
