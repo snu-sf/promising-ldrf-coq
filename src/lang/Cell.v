@@ -1273,17 +1273,17 @@ Module Cell.
     exists val. econs; eauto.
   Qed.
 
-  Definition latest_half (promises cell: t): Prop :=
+  Definition latest_reserve (promises cell: t): Prop :=
     match get (max_ts cell) promises with
     | Some (_, Message.reserve) => False
     | _ => True
     end.
 
-  Lemma latest_half_dec promises cell:
-    latest_half promises cell \/
-    ~ latest_half promises cell.
+  Lemma latest_reserve_dec promises cell:
+    latest_reserve promises cell \/
+    ~ latest_reserve promises cell.
   Proof.
-    unfold latest_half.
+    unfold latest_reserve.
     destruct (get (max_ts cell) promises) eqn:PROMISE; auto.
     destruct p; ss. destruct t1; auto.
   Qed.
@@ -1296,7 +1296,7 @@ Module Cell.
                  (TO: Time.lt to1 from2),
           get from2 cell2 = Some (to1, Message.reserve))
       (BACK: forall val
-               (PROMISE: latest_half promises cell1)
+               (PROMISE: latest_reserve promises cell1)
                (LATEST: latest_val cell1 val),
           get (Time.incr (max_ts cell1)) cell2 =
           Some (max_ts cell1, Message.full val (Some view)))
@@ -1304,7 +1304,7 @@ Module Cell.
                    (GET1: get to cell1 = None)
                    (GET2: get to cell2 = Some (from, msg)),
           (exists f m, get from cell1 = Some (f, m)) /\
-          (from = max_ts cell1 -> latest_half promises cell1))
+          (from = max_ts cell1 -> latest_reserve promises cell1))
   .
 
   Inductive cap_aux (dom: list Time.t) (view: View.t) (promises cell1 cell2: t): Prop :=
@@ -1317,7 +1317,7 @@ Module Cell.
           get from2 cell2 = Some (to1, Message.reserve))
       (BACK: forall val
                (IN: List.In (max_ts cell1) dom)
-               (PROMISE: latest_half promises cell1)
+               (PROMISE: latest_reserve promises cell1)
                (LATEST: latest_val cell1 val),
           get (Time.incr (max_ts cell1)) cell2 = Some (max_ts cell1, Message.full val (Some view)))
       (COMPLETE: forall from to msg
@@ -1325,7 +1325,7 @@ Module Cell.
                    (GET2: get to cell2 = Some (from, msg)),
           List.In from dom /\
           (exists f m, get from cell1 = Some (f, m)) /\
-          (from = max_ts cell1 -> latest_half promises cell1))
+          (from = max_ts cell1 -> latest_reserve promises cell1))
   .
 
   Lemma time_decidable: decidable_eq Time.t.
@@ -1430,7 +1430,7 @@ Module Cell.
           esplits; eauto.
     }
     inv H0. clear from0 msg0 GET.
-    destruct (@latest_half_dec promises cell1); cycle 1.
+    destruct (@latest_reserve_dec promises cell1); cycle 1.
     { exists cell2. inv x. econs; ii; ss; eauto.
       - inv IN; eauto. inv ADJ.
         exploit max_ts_spec; try exact GET2. i. des.
