@@ -163,31 +163,6 @@ Module Memory.
 
   Definition init: t := fun _ => Cell.init.
 
-  Fixpoint domain (locs: list FLoc.t) (mem: t): list (FLoc.t * Time.t) :=
-    match locs with
-    | [] => []
-    | hd::tl =>
-      List.app
-        (List.map (fun ts => (hd, ts)) (List.map (fun e => e.(fst)) (DOMap.elements (mem hd).(Cell.raw))))
-        (domain tl mem)
-    end.
-
-  Lemma finite mem:
-    exists dom,
-    forall loc from to msg (GET: get loc to mem = Some (from, msg)),
-      List.In (loc, to) dom.
-  Proof.
-    destruct FLoc.finite.
-    exists (domain x mem). i. specialize (H loc).
-    revert H from to msg GET.
-    induction x; ss; i. des.
-    - subst. apply List.in_or_app. left.
-      exploit DOMap.elements_correct; eauto. i.
-      exploit in_prod; eauto. i.
-      eapply prod_in; eauto.
-    - apply List.in_or_app. right. eauto.
-  Qed.
-
   Inductive message_to: forall (msg:Message.t) (loc:FLoc.t) (to:Time.t), Prop :=
   | message_to_full
       val released loc to
@@ -679,6 +654,18 @@ Module Memory.
         promises1 mem1 loc from to msg promises2 mem2 kind
         (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind):
     op mem1 loc from to msg mem2 kind.
+  Proof.
+    inv PROMISE.
+    - econs 1. ss.
+    - econs 2. ss.
+    - econs 3. ss.
+    - econs 4; ss.
+  Qed.
+
+  Lemma promise_op_promise
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind):
+    op promises1 loc from to msg promises2 kind.
   Proof.
     inv PROMISE.
     - econs 1. ss.
@@ -1242,6 +1229,75 @@ Module Memory.
     - eapply singleton_ur_closed_view; eauto.
     - eapply singleton_rw_closed_view; eauto.
   Qed.
+
+
+  (* finite *)
+
+  Definition finite (mem:t): Prop :=
+    exists dom,
+    forall loc from to msg (GET: get loc to mem = Some (from, msg)),
+      List.In (loc, to) dom.
+
+  Lemma bot_finite: finite bot.
+  Proof.
+    exists []. ii. rewrite bot_get in *. congr.
+  Qed.
+
+  Lemma add_finite
+        mem1 loc from to msg mem2
+        (ADD: add mem1 loc from to msg mem2)
+        (FINITE: finite mem1):
+    finite mem2.
+  Proof.
+    unfold finite in *. des. exists ((loc, to) :: dom). i.
+    revert GET. erewrite add_o; eauto. condtac; ss; eauto.
+    i. des. inv GET. auto.
+  Qed.
+
+  Lemma split_finite
+        mem1 loc ts1 ts2 ts3 msg2 msg3 mem2
+        (SPLIT: split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2)
+        (FINITE: finite mem1):
+    finite mem2.
+  Proof.
+    unfold finite in *. des. exists ((loc, ts2) :: dom). i.
+    revert GET. erewrite split_o; eauto. repeat condtac; ss; eauto.
+    - i. des. inv GET. auto.
+    - guardH o. i. des. inv GET. right. eapply FINITE.
+      hexploit split_get0; eauto. i. des. eauto.
+  Qed.
+
+  Lemma lower_finite
+        mem1 loc from to msg1 msg2 mem2
+        (LOWER: lower mem1 loc from to msg1 msg2 mem2)
+        (FINITE: finite mem1):
+    finite mem2.
+  Proof.
+    unfold finite in *. des. exists dom. i.
+    revert GET. erewrite lower_o; eauto. condtac; ss; eauto.
+    i. des. inv GET. eapply FINITE.
+    hexploit lower_get0; eauto. i. des. eauto.
+  Qed.
+
+  Lemma remove_finite
+        mem1 loc from to msg mem2
+        (REMOVE: remove mem1 loc from to msg mem2)
+        (FINITE: finite mem1):
+    finite mem2.
+  Proof.
+    unfold finite in *. des. exists dom. i.
+    revert GET. erewrite remove_o; eauto. condtac; ss; eauto.
+  Qed.
+
+  Lemma op_finite
+        mem1 loc from to msg mem2 kind
+        (OP: op mem1 loc from to msg mem2 kind)
+        (FINITE: finite mem1):
+    finite mem2.
+  Proof.
+    inv OP; eauto using add_finite, split_finite, lower_finite, remove_finite.
+  Qed.
+
 
   (* future_weak *)
 
@@ -1823,14 +1879,18 @@ Module Memory.
   Lemma promise_future0
         promises1 mem1 loc from to msg promises2 mem2 kind
         (LE_PROMISES1: le promises1 mem1)
+        (FINITE1: finite promises1)
         (INHABITED1: inhabited mem1)
         (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind):
     <<LE_PROMISES2: le promises2 mem2>> /\
+    <<FINITE2: finite promises2>> /\
     <<INHABITED2: inhabited mem2>>.
   Proof.
     hexploit op_inhabited; eauto.
     { eapply promise_op. eauto. }
-    i. split; ss. inv PROMISE.
+    hexploit op_finite; eauto.
+    { eapply promise_op_promise. eauto. }
+    i. splits; ss. inv PROMISE.
     - ii. revert LHS.
       erewrite add_o; eauto. erewrite (@add_o mem2); try exact MEM; eauto.
       condtac; ss. auto.
@@ -1848,12 +1908,14 @@ Module Memory.
   Lemma promise_future
         promises1 mem1 loc from to msg promises2 mem2 kind
         (LE_PROMISES1: le promises1 mem1)
+        (FINITE1: finite promises1)
         (BOT1: bot_none promises1)
         (HALF1: reserve_wf promises1 mem1)
         (CLOSED1: closed mem1)
         (MSG_CLOSED: closed_message msg mem2)
         (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind):
     <<LE_PROMISES2: le promises2 mem2>> /\
+    <<FINITE2: finite promises2>> /\
     <<BOT2: bot_none promises2>> /\
     <<HALF2: reserve_wf promises2 mem2>> /\
     <<CLOSED2: closed mem2>> /\
@@ -1875,8 +1937,6 @@ Module Memory.
   Lemma promise_disjoint
         promises1 mem1 loc from to msg promises2 mem2 ctx kind
         (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
-        (CLOSED: closed mem1)
-        (LE: le promises1 mem1)
         (LE_CTX: le ctx mem1)
         (HALF_CTX: reserve_wf ctx mem1)
         (DISJOINT: disjoint promises1 ctx):
@@ -1884,7 +1944,6 @@ Module Memory.
     <<LE_CTX: le ctx mem2>> /\
     <<HALF_CTX: reserve_wf ctx mem2>>.
   Proof.
-    exploit promise_future0; try apply PROMISE; try apply CLOSED; eauto. i. des.
     inv PROMISE.
     - splits.
       + inv DISJOINT. econs. i. revert GET1. erewrite add_o; eauto. condtac; ss.
@@ -1968,17 +2027,19 @@ Module Memory.
   Lemma remove_future
         promises1 mem1 loc from to msg promises2
         (REMOVE: remove promises1 loc from to msg promises2)
-        (LE: le promises1 mem1):
-    <<LE: le promises2 mem1>>.
+        (LE: le promises1 mem1)
+        (FINITE: finite promises1):
+    <<LE: le promises2 mem1>> /\
+    <<FINITE: finite promises2>>.
   Proof.
-    ii. revert LHS. erewrite remove_o; eauto. condtac; ss. eauto.
+    split.
+    - ii. revert LHS. erewrite remove_o; eauto. condtac; ss. eauto.
+    - eapply remove_finite; eauto.
   Qed.
 
   Lemma remove_disjoint
-        promises1 mem1 loc from to msg promises2 ctx
+        promises1 loc from to msg promises2 ctx
         (REMOVE: remove promises1 loc from to msg promises2)
-        (LE: le promises1 mem1)
-        (LE_CTX: le ctx mem1)
         (DISJOINT: disjoint promises1 ctx):
     <<DISJOINT: disjoint promises2 ctx>>.
   Proof.
@@ -2000,14 +2061,17 @@ Module Memory.
   Lemma write_future0
         promises1 mem1 loc from to val released promises2 mem2 kind
         (LE_PROMISES1: le promises1 mem1)
+        (FINITE1: finite promises1)
         (INHABITED1: inhabited mem1)
         (PROMISE: write promises1 mem1 loc from to val released promises2 mem2 kind):
     <<LE_PROMISES2: le promises2 mem2>> /\
+    <<FINITE2: finite promises2>> /\
     <<INHABITED2: inhabited mem2>>.
   Proof.
     inv PROMISE.
     hexploit promise_future0; eauto. i. des.
-    hexploit remove_future; eauto.
+    hexploit remove_future; eauto. i. des.
+    splits; ss.
   Qed.
 
   Lemma write_future
@@ -2016,10 +2080,12 @@ Module Memory.
         (CLOSED: closed mem1)
         (MSG_CLOSED: closed_message (Message.full val released) mem2)
         (LE: le promises1 mem1)
+        (FINITE: finite promises1)
         (BOT: bot_none promises1)
         (HALF: reserve_wf promises1 mem1):
     <<CLOSED: closed mem2>> /\
     <<LE: le promises2 mem2>> /\
+    <<FINITE: finite promises2>> /\
     <<BOT: bot_none promises2>> /\
     <<HALF: reserve_wf promises2 mem2>> /\
     <<FUTURE: future mem1 mem2>>.
@@ -2037,9 +2103,7 @@ Module Memory.
   Lemma write_disjoint
         promises1 mem1 loc from to val released promises2 mem2 ctx kind
         (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind)
-        (CLOSED: closed mem1)
         (DISJOINT: disjoint promises1 ctx)
-        (LE: le promises1 mem1)
         (LE_CTX: le ctx mem1)
         (HALF_CTX: reserve_wf ctx mem1):
     <<DISJOINT: disjoint promises2 ctx>> /\
@@ -2047,8 +2111,6 @@ Module Memory.
     <<HALF_CTX: reserve_wf ctx mem2>>.
   Proof.
     inv WRITE.
-    hexploit promise_future0; try apply PROMISE; try apply CLOSED; eauto. i. des.
-    hexploit remove_future; try apply REMOVE; eauto. i. des.
     hexploit promise_disjoint; try apply PROMISE; eauto. i. des.
     hexploit remove_disjoint; try apply REMOVE; eauto.
   Qed.
