@@ -312,6 +312,9 @@ Proof.
   - i. inv STEP_TGT.
 Qed.
 
+
+(* instr *)
+
 Lemma sim_trace_instr
       instr_src rs_src
       instr_tgt rs_tgt
@@ -393,7 +396,7 @@ Lemma sim_stmts_instr
       (REGS: RegSet.disjoint regs (Instr.regs_of instr_src)):
   sim_stmts (RegFile.eq_except regs) [Stmt.instr instr_src] [Stmt.instr instr_tgt] (RegFile.eq_except regs).
 Proof.
-  ii. apply sim_trace_sim_thread; ss.
+  apply sim_trace_sim_stmts; ss. i.
   apply sim_trace_instr; ss.
 Qed.
 
@@ -403,4 +406,56 @@ Lemma sim_stmts_instr_refl
   sim_stmts (RegFile.eq_except regs) [Stmt.instr instr] [Stmt.instr instr] (RegFile.eq_except regs).
 Proof.
   apply sim_stmts_instr; auto. refl.
+Qed.
+
+
+(* replacing abort with arbitrary instructions *)
+
+Lemma sim_trace_replace_abort
+      rs_src rs_tgt regs stmts_tgt
+      (RS: RegFile.eq_except regs rs_src rs_tgt):
+  sim_trace (RegFile.eq_except regs)
+            (State.mk rs_src [Stmt.instr Instr.abort])
+            (State.mk rs_tgt stmts_tgt).
+Proof.
+  pfold. unfold _sim_trace. splits; i.
+  - left.
+    unfold lang_steps_failure. esplits; eauto.
+    econs. econs.
+  - left.
+    unfold lang_steps_failure. esplits; eauto.
+    econs. econs.
+Qed.
+
+Lemma sim_stmts_replace_abort
+      regs stmts_tgt:
+  sim_stmts (RegFile.eq_except regs) [Stmt.instr Instr.abort] stmts_tgt (RegFile.eq_except regs).
+Proof.
+  apply sim_trace_sim_stmts. i.
+  apply sim_trace_replace_abort; ss.
+Qed.
+
+
+(* eliminating instructions after abort *)
+
+Lemma sim_trace_elim_after_abort
+      rs_src rs_tgt regs stmts_src
+      (RS: RegFile.eq_except regs rs_src rs_tgt):
+  sim_trace (RegFile.eq_except regs)
+            (State.mk rs_src ((Stmt.instr Instr.abort) :: stmts_src))
+            (State.mk rs_tgt [Stmt.instr Instr.abort]).
+Proof.
+  pfold. unfold _sim_trace. splits; i.
+  - inv TERMINAL_TGT.
+  - left.
+    unfold lang_steps_failure. esplits; eauto.
+    econs. econs.
+Qed.
+
+Lemma sim_stmts_elim_after_abort
+      regs stmts_src:
+  sim_stmts (RegFile.eq_except regs) ((Stmt.instr Instr.abort) :: stmts_src) [Stmt.instr Instr.abort] (RegFile.eq_except regs).
+Proof.
+  apply sim_trace_sim_stmts. i.
+  apply sim_trace_elim_after_abort; ss.
 Qed.
