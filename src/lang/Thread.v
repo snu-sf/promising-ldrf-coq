@@ -500,5 +500,15 @@ Module Thread.
       eapply Memory.no_reserve_except_bot_no_reserve; eauto.
       apply CLOSED2.
     Qed.
+
+
+    Lemma bot_program_step_bot
+          e e1 e2
+          (STEP: program_step e e1 e2)
+          (PROMISES: e1.(local).(Local.promises) = Memory.bot):
+      e2.(local).(Local.promises) = Memory.bot.
+    Proof.
+      inv STEP. eapply Local.bot_program_step_bot; eauto.
+    Qed.
   End Thread.
 End Thread.

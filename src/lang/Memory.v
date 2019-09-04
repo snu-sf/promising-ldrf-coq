@@ -2097,6 +2097,27 @@ Module Memory.
     hexploit remove_disjoint; try apply REMOVE; eauto.
   Qed.
 
+  Lemma bot_write_bot
+        promises1 mem1 loc from to val released promises2 mem2 kind
+        (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind)
+        (PROMISES: promises1 = Memory.bot):
+    promises2 = Memory.bot.
+  Proof.
+    subst. inv WRITE. inv PROMISE.
+    - apply ext. i.
+      exploit add_get0; try exact PROMISES. i. des.
+      exploit remove_get0; eauto. i. des.
+      erewrite remove_o; eauto. condtac; ss.
+      + des. subst. ss.
+      + erewrite add_o; eauto. condtac; ss.
+    - exploit split_get0; try exact PROMISES. i. des.
+      rewrite bot_get in *. ss.
+    - exploit lower_get0; try exact PROMISES. i. des.
+      rewrite bot_get in *. ss.
+    - exploit remove_get0; try exact PROMISES. i. des.
+      rewrite bot_get in *. ss.
+  Qed.
+
 
   (* Lemmas on existence of memory op *)
 

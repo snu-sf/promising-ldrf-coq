@@ -13,6 +13,8 @@ Require Import Local.
 Require Import Thread.
 Require Import Configuration.
 
+Require Import PromiseConsistent.
+
 Require Import SimMemory.
 Require Import SimPromises.
 Require Import SimLocal.
@@ -73,7 +75,8 @@ Section SimulationThread.
       (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
       (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
       (MEM_SRC: Memory.closed mem1_src)
-      (MEM_TGT: Memory.closed mem1_tgt),
+      (MEM_TGT: Memory.closed mem1_tgt)
+      (CONS_TGT: Local.promise_consistent lc1_tgt),
       <<TERMINAL:
         forall (TERMINAL_TGT: lang_tgt.(Language.is_terminal) st1_tgt),
           <<FAILURE: Thread.steps_failure (Thread.mk _ st1_src lc1_src sc1_src mem1_src)>> \/
@@ -152,6 +155,7 @@ Lemma sim_thread_step
       (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
       (MEM_SRC: Memory.closed mem1_src)
       (MEM_TGT: Memory.closed mem1_tgt)
+      (CONS_TGT: Local.promise_consistent lc3_tgt)
       (SIM: sim_thread sim_terminal st1_src lc1_src sc1_src mem1_src st1_tgt lc1_tgt sc1_tgt mem1_tgt):
   <<FAILURE: Thread.steps_failure (Thread.mk lang_src st1_src lc1_src sc1_src mem1_src)>> \/
   exists e_src st2_src lc2_src sc2_src mem2_src st3_src lc3_src sc3_src mem3_src,
@@ -173,6 +177,7 @@ Lemma sim_thread_step
     <<MEM_TGT: Memory.closed mem3_tgt>> /\
     <<SIM: sim_thread sim_terminal st3_src lc3_src sc3_src mem3_src st3_tgt lc3_tgt sc3_tgt mem3_tgt>>.
 Proof.
+  hexploit step_promise_consistent; eauto. s. i.
   punfold SIM. exploit SIM; eauto; try refl. i. des.
   exploit Thread.step_future; eauto. s. i. des.
   exploit STEP0; eauto. i. des; eauto.
@@ -200,6 +205,7 @@ Lemma sim_thread_opt_step
       (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
       (MEM_SRC: Memory.closed mem1_src)
       (MEM_TGT: Memory.closed mem1_tgt)
+      (CONS_TGT: Local.promise_consistent lc3_tgt)
       (SIM: sim_thread sim_terminal st1_src lc1_src sc1_src mem1_src st1_tgt lc1_tgt sc1_tgt mem1_tgt):
   <<FAILURE: Thread.steps_failure (Thread.mk lang_src st1_src lc1_src sc1_src mem1_src)>> \/
   exists e_src st2_src lc2_src sc2_src mem2_src st3_src lc3_src sc3_src mem3_src,
@@ -240,6 +246,7 @@ Lemma sim_thread_rtc_step
       (SC_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
       (MEM_SRC: Memory.closed mem1_src)
       (MEM_TGT: Memory.closed e1_tgt.(Thread.memory))
+      (CONS_TGT: Local.promise_consistent e2_tgt.(Thread.local))
       (SIM: sim_thread sim_terminal st1_src lc1_src sc1_src mem1_src e1_tgt.(Thread.state) e1_tgt.(Thread.local) e1_tgt.(Thread.sc) e1_tgt.(Thread.memory)):
   <<FAILURE: Thread.steps_failure (Thread.mk lang_src st1_src lc1_src sc1_src mem1_src)>> \/
   exists st2_src lc2_src sc2_src mem2_src,
@@ -261,6 +268,8 @@ Proof.
   induction STEPS; i.
   { right. esplits; eauto. }
   inv H. inv TSTEP. destruct x, y. ss.
+  exploit Thread.step_future; eauto. s. i. des.
+  hexploit rtc_tau_step_promise_consistent; eauto. s. i.
   exploit sim_thread_step; eauto. i. des; eauto.
   exploit IHSTEPS; eauto. i. des.
   - left. inv FAILURE0. des.
@@ -293,6 +302,7 @@ Lemma sim_thread_plus_step
       (SC_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
       (MEM_SRC: Memory.closed mem1_src)
       (MEM_TGT: Memory.closed e1_tgt.(Thread.memory))
+      (CONS_TGT: Local.promise_consistent e3_tgt.(Thread.local))
       (SIM: sim_thread sim_terminal st1_src lc1_src sc1_src mem1_src e1_tgt.(Thread.state) e1_tgt.(Thread.local) e1_tgt.(Thread.sc) e1_tgt.(Thread.memory)):
   <<FAILURE: Thread.steps_failure (Thread.mk lang_src st1_src lc1_src sc1_src mem1_src)>> \/
   exists e_src st2_src lc2_src sc2_src mem2_src st3_src lc3_src sc3_src mem3_src,
@@ -315,8 +325,9 @@ Lemma sim_thread_plus_step
     <<SIM: sim_thread sim_terminal st3_src lc3_src sc3_src mem3_src e3_tgt.(Thread.state) e3_tgt.(Thread.local) e3_tgt.(Thread.sc) e3_tgt.(Thread.memory)>>.
 Proof.
   destruct e1_tgt, e2_tgt, e3_tgt. ss.
+  exploit Thread.rtc_tau_step_future; eauto. s. i. des.
+  hexploit step_promise_consistent; eauto. s. i.
   exploit sim_thread_rtc_step; eauto. s. i. des; eauto.
-  exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
   exploit Thread.rtc_tau_step_future; try exact STEPS0; eauto. s. i. des.
   exploit sim_thread_step; try exact STEP; try exact SIM0; eauto. s. i. des.
   - left. inv FAILURE. des.
@@ -393,6 +404,7 @@ Lemma sim_thread_consistent
       (CONSISTENT: Thread.consistent (Thread.mk lang_tgt st_tgt lc_tgt sc_tgt mem_tgt)):
   Thread.consistent (Thread.mk lang_src st_src lc_src sc_src mem_src).
 Proof.
+  hexploit consistent_promise_consistent; eauto. s. i.
   generalize SIM. intro X.
   punfold X. exploit X; eauto; try refl. i. des.
   ii. ss.
@@ -407,13 +419,15 @@ Proof.
   - left. inv FAILURE. des.
     exploit sim_thread_future; try exact SIM; try exact LE; try exact LE0; eauto. i.
     exploit sim_thread_plus_step; try exact STEPS; try exact FAILURE; try exact x2; eauto; try refl.
+    { inv FAILURE; inv STEP0. inv LOCAL. inv LOCAL0. ss. }
     i. des; auto. ss.
-  - exploit sim_thread_future; try exact SIM; try exact LE; try exact LE0; eauto. i.
+  - hexploit Local.bot_promise_consistent; eauto. i.
+    exploit sim_thread_future; try exact SIM; try exact LE; try exact LE0; eauto. i.
     exploit sim_thread_rtc_step; try apply STEPS; try exact x1; eauto; try refl. i. des; eauto.
     destruct e2. ss.
     punfold SIM0. exploit SIM0; eauto; try refl. i. des.
     hexploit Thread.rtc_tau_step_no_reserve_except; try exact STEPS; eauto. i.
-    unfold Thread.no_reserve_except in H. ss.
+    unfold Thread.no_reserve_except in *. ss.
     rewrite PROMISES0 in *.
     hexploit Memory.no_reserve_except_bot_no_reserve; try apply MEM_TGT0; eauto. i.
     exploit PROMISES1; eauto. i. des.

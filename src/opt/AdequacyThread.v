@@ -13,6 +13,8 @@ Require Import Local.
 Require Import Thread.
 Require Import Configuration.
 
+Require Import PromiseConsistent.
+
 Require Import SimMemory.
 Require Import SimPromises.
 Require Import SimLocal.
@@ -153,6 +155,7 @@ Proof.
     generalize WF_TGT. intro X. inv X. ss. inv WF. exploit THREADS0; eauto. i.
     exploit (IN a); eauto. i. des.
     exploit TERMINAL_TGT; eauto. i. des.
+    hexploit Local.terminal_promise_consistent; eauto. i.
     punfold x2.
     exploit x2; try exact x; try exact x0; try exact SC; try exact SC0;
       eauto using Memory.future_future_weak.
@@ -182,7 +185,7 @@ Proof.
         - subst. Configuration.simplify. split; auto.
           inv THREAD. econs. eapply sim_local_memory_bot; eauto.
         - eapply NOTIN; eauto. ii. des; ss. subst. ss. }
-      { rewrite IdentMap.gsspec in H. revert H. condtac; ss; i.
+      { rewrite IdentMap.gsspec in H0. revert H0. condtac; ss; i.
         - subst. inv NODUP. congr.
         - exploit IN; eauto. }
       { inv NODUP. ss. }
@@ -204,6 +207,7 @@ Proof.
       exploit sim_thread_future; eauto using Memory.future_future_weak. i.
       exploit sim_thread_plus_step; try exact STEPS; try exact x1;
         eauto using Memory.future_future_weak.
+      { inv STEP; inv STEP0. inv LOCAL. inv LOCAL0. ss. }
       s. i. des; ss.
       left.
       unfold Thread.steps_failure in FAILURE. des.
@@ -216,6 +220,10 @@ Proof.
         exploit tids_find; [exact TIDS_SRC|exact TIDS_TGT|..]. i. des.
         exploit x1; eauto. i. des. rewrite FIND_SRC in x. inv x. }
       inv WF_SRC. inv WF_TGT. inv WF. inv WF0. ss.
+      assert (CONS: Local.promise_consistent lc3).
+      { exploit Thread.rtc_tau_step_future; eauto. s. i. des.
+        exploit Thread.step_future; eauto. s. i. des.
+        hexploit consistent_promise_consistent; eauto. }
       exploit SIM; eauto. i. des.
       exploit sim_thread_future; eauto using Memory.future_future_weak. i.
       exploit sim_thread_plus_step; try exact STEPS; try exact x1;

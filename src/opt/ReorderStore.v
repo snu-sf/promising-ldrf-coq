@@ -267,7 +267,10 @@ Proof.
       exploit Thread.opt_step_future; eauto. s. i. des.
       exploit Thread.program_step_future; eauto. s. i. des.
       hexploit Thread.step_bot_no_reserve; [econs 2; eauto|..]; eauto. s. i. des.
-      punfold SIM. exploit SIM; try apply SC3; eauto; try refl. s. i. des.
+      punfold SIM. exploit SIM; try apply SC3; eauto; try refl.
+      { exploit Thread.bot_program_step_bot; eauto. s. i.
+        eapply Local.bot_promise_consistent; eauto. }
+      s. i. des.
       exploit PROMISES; eauto. i. des.
       * left.
         unfold Thread.steps_failure in *. des.
