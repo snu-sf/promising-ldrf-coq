@@ -40,6 +40,12 @@ Inductive opt_lang_step: forall (e:ProgramEvent.t) (st1 st2:State.t), Prop :=
     opt_lang_step e st1 st2
 .
 
+Definition lang_steps_failure (st1: State.t): Prop :=
+  exists st2 st3,
+    <<STEPS: rtc (lang.(Language.step) ProgramEvent.silent) st1 st2>> /\
+    <<FAILURE: lang.(Language.step) ProgramEvent.failure st2 st3>>.
+
+
 Definition SIM_TRACE :=
   forall (sim_regs:SIM_REGS)
     (st1_src:lang.(Language.state))
@@ -52,23 +58,26 @@ Definition _sim_trace
            (st1_tgt:lang.(Language.state)): Prop :=
   <<TERMINAL:
     forall (TERMINAL_TGT: lang.(Language.is_terminal) st1_tgt),
-    exists st2_src,
-      <<STEPS: rtc (lang.(Language.step) ProgramEvent.silent) st1_src st2_src>> /\
-      <<TERMINAL_SRC: lang.(Language.is_terminal) st2_src>> /\
-      <<TERMINAL: sim_regs st2_src.(State.regs) st1_tgt.(State.regs)>>>> /\
+      <<FAILURE: lang_steps_failure st1_src>> \/
+      exists st2_src,
+        <<STEPS: rtc (lang.(Language.step) ProgramEvent.silent) st1_src st2_src>> /\
+        <<TERMINAL_SRC: lang.(Language.is_terminal) st2_src>> /\
+        <<TERMINAL: sim_regs st2_src.(State.regs) st1_tgt.(State.regs)>>>> /\
   <<STEP:
     forall e_tgt st3_tgt
       (STEP_TGT: lang.(Language.step) e_tgt st1_tgt st3_tgt),
-    exists e_src st2_src st3_src,
-      <<EVT: ProgramEvent.ord e_src e_tgt>> /\
-      <<STEPS: rtc (lang.(Language.step) ProgramEvent.silent) st1_src st2_src>> /\
-      <<STEP_SRC: opt_lang_step e_src st2_src st3_src>> /\
-      <<SIM: sim_trace sim_regs st3_src st3_tgt>>>>.
+      <<FAILURE: lang_steps_failure st1_src>> \/
+      exists e_src st2_src st3_src,
+        <<EVT: ProgramEvent.ord e_src e_tgt>> /\
+        <<STEPS: rtc (lang.(Language.step) ProgramEvent.silent) st1_src st2_src>> /\
+        <<STEP_SRC: opt_lang_step e_src st2_src st3_src>> /\
+        <<SIM: sim_trace sim_regs st3_src st3_tgt>>>>.
 
 Lemma _sim_trace_mon: monotone3 _sim_trace.
 Proof.
-  ii. unfold _sim_trace in *. des. splits; ss.
-  i. exploit STEP; eauto. i. des. esplits; eauto.
+  ii. unfold _sim_trace in *. des; splits; ss.
+  i. exploit STEP; eauto. i. des; eauto.
+  right. esplits; eauto.
 Qed.
 Hint Resolve _sim_trace_mon: paco.
 
@@ -100,10 +109,16 @@ Proof.
   revert_until sim_regs. pcofix CIH. i.
   generalize SIM. i. punfold SIM0. unfold _sim_trace in SIM0. des.
   pfold. ii. splits.
-  - i. exploit TERMINAL; eauto. i. des; eauto.
-    right.
-    exploit rtc_lang_tau_step_rtc_thread_tau_step; eauto. i.
-    esplits; eauto. econs. ss.
+  - i. exploit TERMINAL; eauto. i. des.
+    + left.
+      unfold lang_steps_failure, Thread.steps_failure in *. des.
+      exploit rtc_lang_tau_step_rtc_thread_tau_step; try exact STEPS. i.
+      esplits; eauto.
+      hexploit sim_local_promise_consistent; eauto. i. des.
+      econs 2. econs; eauto.
+    + right.
+      exploit rtc_lang_tau_step_rtc_thread_tau_step; eauto. i.
+      esplits; eauto. econs. ss.
   - i. exploit SimPromises.cap; try eapply LOCAL; eauto.
   - i. right.
     exploit sim_local_memory_bot; eauto. i.
@@ -113,23 +128,37 @@ Proof.
       exploit sim_local_promise_bot; eauto. i. des.
       esplits; (try exact SC); eauto; ss.
       econs 2. econs 1. econs; eauto.
-    + right.
-      exploit STEP; eauto. i. des. inv SIM0; [|done].
-      inv EVT. inv STEP_SRC.
-      { esplits;
-        (try by apply rtc_lang_tau_step_rtc_thread_tau_step; eauto);
-        (try exact SC);
-          eauto; ss.
-        econs 1.
-      }
-      { esplits;
-        (try by apply rtc_lang_tau_step_rtc_thread_tau_step; eauto);
-        (try exact SC);
-          eauto; ss.
-        econs 2. econs 2. econs; [|econs 1]; eauto.
-      }
-    + right.
-      exploit STEP; eauto. i. des. inv SIM0; ss.
+    + exploit STEP; eauto. i. des.
+      * left.
+        unfold lang_steps_failure, Thread.steps_failure in *. des.
+        exploit rtc_lang_tau_step_rtc_thread_tau_step; try exact STEPS. i.
+        esplits; eauto.
+        hexploit sim_local_promise_consistent; eauto. i. des.
+        econs 2. econs; eauto.
+      * right.
+        inv SIM0; [|done].
+        inv EVT. inv STEP_SRC.
+        { esplits;
+            (try by apply rtc_lang_tau_step_rtc_thread_tau_step; eauto);
+            (try exact SC);
+            eauto; ss.
+          econs 1.
+        }
+        { esplits;
+            (try by apply rtc_lang_tau_step_rtc_thread_tau_step; eauto);
+            (try exact SC);
+            eauto; ss.
+          econs 2. econs 2. econs; [|econs 1]; eauto.
+        }
+    + exploit STEP; eauto. i. des.
+      { left.
+        unfold lang_steps_failure, Thread.steps_failure in *. des.
+        exploit rtc_lang_tau_step_rtc_thread_tau_step; try exact STEPS. i.
+        esplits; eauto.
+        hexploit sim_local_promise_consistent; eauto. i. des.
+        econs 2. econs; eauto. }
+      right.
+      inv SIM0; ss.
       inv EVT. inv STEP_SRC.
       exploit sim_local_read; eauto. i. des.
       esplits;
@@ -140,8 +169,15 @@ Proof.
       * ss.
       * ss.
       * right. apply CIH; auto.
-    + right.
-      exploit STEP; eauto. i. des. inv SIM0; [|done].
+    + exploit STEP; eauto. i. des.
+      { left.
+        unfold lang_steps_failure, Thread.steps_failure in *. des.
+        exploit rtc_lang_tau_step_rtc_thread_tau_step; try exact STEPS. i.
+        esplits; eauto.
+        hexploit sim_local_promise_consistent; eauto. i. des.
+        econs 2. econs; eauto. }
+      right.
+      inv SIM0; [|done].
       inv EVT. inv STEP_SRC.
       hexploit sim_local_write_bot;
         (try exact LOCAL);
@@ -156,8 +192,15 @@ Proof.
       * ss.
       * ss.
       * right. apply CIH; auto.
-    + right.
-      exploit STEP; eauto. i. des. inv SIM0; [|done].
+    + exploit STEP; eauto. i. des.
+      { left.
+        unfold lang_steps_failure, Thread.steps_failure in *. des.
+        exploit rtc_lang_tau_step_rtc_thread_tau_step; try exact STEPS. i.
+        esplits; eauto.
+        hexploit sim_local_promise_consistent; eauto. i. des.
+        econs 2. econs; eauto. }
+      right.
+      inv SIM0; [|done].
       inv EVT. inv STEP_SRC.
       exploit Local.read_step_future; eauto. i. des.
       exploit sim_local_read; eauto; try refl. i. des.
@@ -175,8 +218,15 @@ Proof.
       * ss.
       * ss.
       * right. apply CIH; auto.
-    + right.
-      exploit STEP; eauto. i. des. inv SIM0; [|done].
+    + exploit STEP; eauto. i. des.
+      { left.
+        unfold lang_steps_failure, Thread.steps_failure in *. des.
+        exploit rtc_lang_tau_step_rtc_thread_tau_step; try exact STEPS. i.
+        esplits; eauto.
+        hexploit sim_local_promise_consistent; eauto. i. des.
+        econs 2. econs; eauto. }
+      right.
+      inv SIM0; [|done].
       inv EVT. inv STEP_SRC.
       exploit sim_local_fence;
         (try exact LOCAL);
@@ -191,8 +241,15 @@ Proof.
       * ss.
       * ss.
       * right. apply CIH; auto.
-    + right.
-      exploit STEP; eauto. i. des. inv SIM0; [|done].
+    + exploit STEP; eauto. i. des.
+      { left.
+        unfold lang_steps_failure, Thread.steps_failure in *. des.
+        exploit rtc_lang_tau_step_rtc_thread_tau_step; try exact STEPS. i.
+        esplits; eauto.
+        hexploit sim_local_promise_consistent; eauto. i. des.
+        econs 2. econs; eauto. }
+      right.
+      inv SIM0; [|done].
       inv EVT. inv STEP_SRC.
       exploit sim_local_fence;
         (try exact LOCAL);
@@ -207,8 +264,15 @@ Proof.
       * ss.
       * ss.
       * right. apply CIH; auto.
-    + left.
-      exploit STEP; eauto. i. des. inv SIM0; [|done].
+    + exploit STEP; eauto. i. des.
+      { left.
+        unfold lang_steps_failure, Thread.steps_failure in *. des.
+        exploit rtc_lang_tau_step_rtc_thread_tau_step; try exact STEPS. i.
+        esplits; eauto.
+        hexploit sim_local_promise_consistent; eauto. i. des.
+        econs 2. econs; eauto. }
+      left.
+      inv SIM0; [|done].
       inv EVT. inv STEP_SRC.
       exploit sim_local_failure;
         (try exact LOCAL);
@@ -262,53 +326,62 @@ Proof.
   pfold. unfold _sim_trace. splits.
   { i. inv TERMINAL_TGT. }
   i. inv STEP_TGT. inv INSTR.
-  - inv ORD. esplits; eauto.
+  - right.
+    inv ORD. esplits; eauto.
     + econs.
     + econs 2. econs. econs.
     + left. apply sim_trace_nil. ss.
-  - inv ORD. esplits; eauto.
+  - right.
+    inv ORD. esplits; eauto.
     + econs.
     + econs 2. econs. econs.
     + left. apply sim_trace_nil.
       ss. symmetry in REGS. apply RegSet.disjoint_add in REGS. des. symmetry in REGS0.
       erewrite RegFile.eq_except_expr; eauto.
       apply RegFile.eq_except_add. ss.
-  - inv ORD. esplits; eauto.
+  - right.
+    inv ORD. esplits; eauto.
     + econs. eauto.
     + econs 2. econs. econs.
     + left. apply sim_trace_nil.
       apply RegFile.eq_except_add. ss.
-  - inv ORD. esplits; eauto.
+  - right.
+    inv ORD. esplits; eauto.
     + econs. eauto.
     + econs 2. econs.
       erewrite <- RegFile.eq_except_value; eauto. econs.
     + left. apply sim_trace_nil. ss.
-  - inv ORD. esplits; eauto.
+  - right.
+    inv ORD. esplits; eauto.
     + econs; eauto.
     + econs 2. econs. econs.
       ss. symmetry in REGS. apply RegSet.disjoint_add in REGS. des. symmetry in REGS0.
       erewrite <- RegFile.eq_except_rmw; eauto. symmetry. ss.
     + left. apply sim_trace_nil.
       apply RegFile.eq_except_add. ss.
-  - inv ORD. esplits; eauto.
+  - right.
+    inv ORD. esplits; eauto.
     + econs; eauto.
     + econs 2. econs. econs.
       ss. symmetry in REGS. apply RegSet.disjoint_add in REGS. des. symmetry in REGS0.
       erewrite <- RegFile.eq_except_rmw; eauto. symmetry. ss.
     + left. apply sim_trace_nil.
       apply RegFile.eq_except_add. ss.
-  - inv ORD. esplits; eauto.
+  - right.
+    inv ORD. esplits; eauto.
     + econs; eauto.
     + econs 2. econs. econs.
     + left. apply sim_trace_nil. ss.
-  - inv ORD. esplits; eauto.
+  - right.
+    inv ORD. esplits; eauto.
     + econs.
     + econs 2. econs.
       ss. symmetry in REGS. apply RegSet.disjoint_add in REGS. des. symmetry in REGS0.
       erewrite <- RegFile.eq_except_value_list; eauto. econs.
     + left. apply sim_trace_nil.
       apply RegFile.eq_except_add. ss.
-  - inv ORD. esplits; eauto.
+  - right.
+    inv ORD. esplits; eauto.
     + econs.
     + econs 2. econs. econs.
     + left. apply sim_trace_nil. ss.

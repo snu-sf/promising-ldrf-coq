@@ -497,22 +497,33 @@ Proof.
     + apply WF1_TGT.
 Qed.
 
+Lemma sim_local_promise_consistent
+      pview
+      lc_src lc_tgt
+      (LOCAL: sim_local pview lc_src lc_tgt)
+      (CONS_TGT: Local.promise_consistent lc_tgt):
+  <<CONS_SRC: Local.promise_consistent lc_src>>.
+Proof.
+  inv LOCAL. inv PROMISES. ii.
+  destruct (Memory.get loc ts lc_tgt.(Local.promises)) as [[]|] eqn:GETP.
+  - exploit LE; eauto. i. rewrite PROMISE in x. inv x.
+    destruct t0; ss.
+    exploit CONS_TGT; eauto. i.
+    eapply TimeFacts.le_lt_lt; eauto.
+    inv TVIEW. inv CUR. eauto.
+  - exploit COMPLETE; eauto. i.
+    rewrite MemoryDomain.bot_spec in x. ss.
+Qed.
+
 Lemma sim_local_failure
       pview
       lc1_src lc1_tgt
       (STEP_TGT: Local.failure_step lc1_tgt)
       (LOCAL1: sim_local pview lc1_src lc1_tgt):
-    <<STEP_SRC: Local.failure_step lc1_src>>.
+  <<STEP_SRC: Local.failure_step lc1_src>>.
 Proof.
-  inv STEP_TGT. inv LOCAL1. inv PROMISES. econs. ii.
-  destruct (Memory.get loc ts lc1_tgt.(Local.promises)) as [[]|] eqn:GETP.
-  - exploit LE; eauto. i. rewrite PROMISE in x. inv x.
-    destruct t0; ss.
-    exploit CONSISTENT; eauto. i.
-    eapply TimeFacts.le_lt_lt; eauto.
-    inv TVIEW. inv CUR. eauto.
-  - exploit COMPLETE; eauto. i.
-    rewrite MemoryDomain.bot_spec in x. ss.
+  inv STEP_TGT.
+  hexploit sim_local_promise_consistent; eauto.
 Qed.
 
 Lemma sim_local_program_step
