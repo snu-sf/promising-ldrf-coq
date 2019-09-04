@@ -19,9 +19,10 @@ Require Import TView.
 Require Import Local.
 Require Import Thread.
 
-Require Import SimMemory.
 Require Import MemorySplit.
 Require Import MemoryMerge.
+
+Require Import SimMemory.
 
 Require Import Syntax.
 Require Import Semantics.
