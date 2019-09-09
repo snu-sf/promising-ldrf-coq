@@ -101,7 +101,7 @@ Section PredStep.
     | _ => True
     end.
 
-  Definition no_read_msgs (MSGS : FLoc.t -> Time.t -> Prop)
+  Definition no_read_msgs (MSGS : Loc.t -> Time.t -> Prop)
              (e : ThreadEvent.t) : Prop :=
     match e with
     | ThreadEvent.read loc to _ _ _ => ~ (MSGS loc to)
@@ -109,7 +109,7 @@ Section PredStep.
     | _ => True
     end.
 
-  Definition write_not_in (MSGS : FLoc.t -> Time.t -> Prop)
+  Definition write_not_in (MSGS : Loc.t -> Time.t -> Prop)
              (e : ThreadEvent.t) : Prop :=
     match e with
     | ThreadEvent.write loc from to _ _ _ =>
@@ -119,7 +119,7 @@ Section PredStep.
     | _ => True
     end.
 
-  Definition no_update_on (MSGS : FLoc.t -> Time.t -> Prop)
+  Definition no_update_on (MSGS : Loc.t -> Time.t -> Prop)
              (e : ThreadEvent.t) : Prop :=
     match e with
     | ThreadEvent.update loc from to _ _ _ _ _ _ =>
@@ -135,7 +135,7 @@ Section PredStep.
     end
   .
 
-  Definition write_in (MSGS : FLoc.t -> Time.t -> Prop)
+  Definition write_in (MSGS : Loc.t -> Time.t -> Prop)
              (e : ThreadEvent.t) : Prop :=
     match e with
     | ThreadEvent.write loc from to _ _ _ =>

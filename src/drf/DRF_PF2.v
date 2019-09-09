@@ -206,7 +206,7 @@ Proof.
 Qed.
 
 
-Inductive other_promises tid (ths: Threads.t): FLoc.t -> Time.t -> Prop :=
+Inductive other_promises tid (ths: Threads.t): Loc.t -> Time.t -> Prop :=
 | other_promises_intro
     loc to
     tid' lang st lc
@@ -217,8 +217,8 @@ Inductive other_promises tid (ths: Threads.t): FLoc.t -> Time.t -> Prop :=
     other_promises tid ths loc to
 .
 
-Inductive other_updates tid (updates: Ident.t -> FLoc.t -> Time.t -> Prop):
-  FLoc.t -> Time.t -> Prop :=
+Inductive other_updates tid (updates: Ident.t -> Loc.t -> Time.t -> Prop):
+  Loc.t -> Time.t -> Prop :=
 | other_updates_intro
     loc to tid'
     (NEQ: tid <> tid')
@@ -227,7 +227,7 @@ Inductive other_updates tid (updates: Ident.t -> FLoc.t -> Time.t -> Prop):
     other_updates tid updates loc to
 .
 
-Inductive other_space tid (ths: Threads.t) (mem: Memory.t): FLoc.t -> Time.t -> Prop :=
+Inductive other_space tid (ths: Threads.t) (mem: Memory.t): Loc.t -> Time.t -> Prop :=
 | other_space_intro
     loc to
     tid' lang st lc
@@ -697,9 +697,9 @@ Admitted.
 
 Inductive sim_pf
           (mlast: Ident.t -> Memory.t)
-          (spaces : Ident.t -> (FLoc.t -> Time.t -> Prop))
-          (updates: Ident.t -> (FLoc.t -> Time.t -> Prop))
-          (aupdates: Ident.t -> (FLoc.t -> Time.t -> Prop))
+          (spaces : Ident.t -> (Loc.t -> Time.t -> Prop))
+          (updates: Ident.t -> (Loc.t -> Time.t -> Prop))
+          (aupdates: Ident.t -> (Loc.t -> Time.t -> Prop))
           (c_src c_tgt: Configuration.t) : Prop :=
 | sim_pf_intro
     (FORGET: forget_config c_src c_tgt)
@@ -733,7 +733,7 @@ Lemma updates_list_exists
       (BOT: th0.(Thread.local).(Local.promises) = Memory.bot)
       (STEPS: rtc (tau (@pred_step (P /1\ no_promise) lang)) th0 th1)
   :
-    exists (updates: FLoc.t -> Prop),
+    exists (updates: Loc.t -> Prop),
       (<<COMPLETE:
          rtc (tau (@pred_step (P /1\ no_update_on (fun loc ts => Memory.max_ts loc th0.(Thread.memory) = ts /\ ~ updates loc)
                                  /1\ no_promise) lang)) th0 th1>>) /\
@@ -832,9 +832,9 @@ Qed.
 
 
 Inductive shifted_map mlast mcert
-          (updates: FLoc.t -> Prop)
+          (updates: Loc.t -> Prop)
           (sky gap: TimeMap.t)
-          (f: FLoc.t -> Time.t -> Time.t): Prop :=
+          (f: Loc.t -> Time.t -> Time.t): Prop :=
 | shifted_map_intro
     (PRSV: map_preserving (times_in_memory mcert) f)
     (SAME: forall l t (TLE: Time.le t (Memory.max_ts l mlast)),
@@ -884,10 +884,10 @@ Proof.
     + eauto.
 Qed.
 
-Definition cap (m mcap: Memory.t) (l: FLoc.t) (t: Time.t): Prop :=
+Definition cap (m mcap: Memory.t) (l: Loc.t) (t: Time.t): Prop :=
   (<<NINMEM: ~ promised m l t>>) /\ (<<INCAPPED: promised mcap l t>>).
 
-Definition no_acq_read_msgs (MSGS : FLoc.t -> Time.t -> Prop)
+Definition no_acq_read_msgs (MSGS : Loc.t -> Time.t -> Prop)
            (e : ThreadEvent.t) : Prop :=
   match e with
   | ThreadEvent.read loc to _ _ ordr => ~ (MSGS loc to) \/ Ordering.le ordr Ordering.relaxed
@@ -914,7 +914,7 @@ Admitted.
 (*       (BOT: th0.(Thread.local).(Local.promises) = Memory.bot) *)
 (*       (STEPS: rtc (tau (@pred_step (P /1\ no_promise) lang)) th0 th1) *)
 (*   : *)
-(*     exists (updates: FLoc.t -> Time.t -> Prop), *)
+(*     exists (updates: Loc.t -> Time.t -> Prop), *)
 (*       (<<COMPLETE: *)
 (*          rtc (tau (@pred_step (P /1\ no_update_on (fun loc ts => promised th0.(Thread.memory) loc ts /\ ~ updates loc ts) *)
 (*                                  /1\ no_promise) lang)) th0 th1>>) /\ *)

@@ -308,7 +308,7 @@ End MEMORYLEMMAS.
 
 Section PROMISED.
 
-  Inductive promised (mem: Memory.t) (loc: FLoc.t) (to: Time.t) : Prop :=
+  Inductive promised (mem: Memory.t) (loc: Loc.t) (to: Time.t) : Prop :=
   | promised_intro
       msg
       (GET: Memory.get loc to mem = Some msg)
@@ -363,7 +363,7 @@ Hint Constructors opt_pred_step.
 
 Section VIEWCONSISTENT.
 
-  Definition promise_view_consistent (prom: FLoc.t -> Time.t -> Prop) (view: TimeMap.t) : Prop :=
+  Definition promise_view_consistent (prom: Loc.t -> Time.t -> Prop) (view: TimeMap.t) : Prop :=
     forall
       loc to
       (GET: prom loc to),
@@ -732,20 +732,20 @@ End SELFPROMISEREMOVE.
 
 (* Section UNCHANGABLES. *)
 
-(*   Inductive unchangable (mem prom: Memory.t) (l: FLoc.t) (t: Time.t) (from: Time.t) (msg: Message.t): Prop := *)
+(*   Inductive unchangable (mem prom: Memory.t) (l: Loc.t) (t: Time.t) (from: Time.t) (msg: Message.t): Prop := *)
 (*   | unchangable_intro *)
 (*       (GET: Memory.get l t mem = Some (from, msg)) *)
 (*       (NPROM: ~ promised prom l t) *)
 (*   . *)
 
-(*   Inductive unwritable (mem prom: Memory.t) (l: FLoc.t) (t: Time.t): Prop := *)
+(*   Inductive unwritable (mem prom: Memory.t) (l: Loc.t) (t: Time.t): Prop := *)
 (*   | unwritable_intro *)
 (*       to from msg *)
 (*       (UNCH: unchangable mem prom l to from msg) *)
 (*       (ITV: Interval.mem (from, to) t) *)
 (*   . *)
 
-(*   Inductive unchangable_ts (mem prom: Memory.t) (l: FLoc.t) (t: Time.t): Prop := *)
+(*   Inductive unchangable_ts (mem prom: Memory.t) (l: Loc.t) (t: Time.t): Prop := *)
 (*   | unchangable_ts_intro *)
 (*       from msg *)
 (*       (UNCH: unchangable mem prom l t from msg) *)
@@ -836,7 +836,7 @@ End SELFPROMISEREMOVE.
 (*       + econs; ss; eauto. refl. *)
 (*   Qed. *)
 
-(*   Definition promise_not_in (MSGS : FLoc.t -> Time.t -> Prop) *)
+(*   Definition promise_not_in (MSGS : Loc.t -> Time.t -> Prop) *)
 (*              (e : ThreadEvent.t) : Prop := *)
 (*     match e with *)
 (*     | ThreadEvent.promise loc from to _ _ => *)
@@ -1134,9 +1134,9 @@ End OTHERPROMISEREMOVE.
 
 
 
-(* Section OTHERHALFREMOVE. *)
+(* Section OTHERRESERVEREMOVE. *)
 
-(*   Lemma other_half_remove *)
+(*   Lemma other_reserve_remove *)
 (*         P lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc' *)
 (*         mem_src mem_tgt mem_tgt' e_tgt others *)
 (*         (STEP: (@pred_step P lang) e_tgt th_tgt th_tgt') *)
@@ -1144,8 +1144,8 @@ End OTHERPROMISEREMOVE.
 (*         (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v prom) sc mem_tgt) *)
 (*         (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt') *)
 (*         (MEM: forget_memory others mem_src mem_tgt) *)
-(*         (HALF: forall l t (OTHERS: others l t), *)
-(*             (<<HALF: *)
+(*         (RESERVE: forall l t (OTHERS: others l t), *)
+(*             (<<RESERVE: *)
 (*     : *)
 (*       exists mem_src', *)
 (*         (<<STEP: (@pred_step *)
@@ -1267,7 +1267,7 @@ End OTHERPROMISEREMOVE.
 
 Section UNCHANGEDON.
 
-  Inductive unchanged_on (P: FLoc.t -> Time.t -> Prop) m0 m1 : Prop :=
+  Inductive unchanged_on (P: Loc.t -> Time.t -> Prop) m0 m1 : Prop :=
   | unchanged_on_intro
       (NCOV: forall l t (IN: P l t) (COV: covered l t m1), covered l t m0)
       (FUTURE : Memory.le m0 m1)
@@ -1414,7 +1414,7 @@ Qed.
 
 Section MAPPED.
 
-  Inductive map_preserving (P: FLoc.t -> Time.t -> Prop) (f: FLoc.t -> Time.t -> Time.t) :=
+  Inductive map_preserving (P: Loc.t -> Time.t -> Prop) (f: Loc.t -> Time.t -> Time.t) :=
   | map_preserving_intro
       (PRSVLT: forall loc t0 t1 (SAT0: P loc t0) (SAT1: P loc t1) (LT: Time.lt t0 t1),
           Time.lt (f loc t0) (f loc t1))
@@ -1479,26 +1479,26 @@ Section MAPPED.
   Qed.
   Hint Resolve map_preserving_bot.
 
-  Definition timemap_map (f: FLoc.t -> Time.t -> Time.t) (tm: TimeMap.t): TimeMap.t :=
+  Definition timemap_map (f: Loc.t -> Time.t -> Time.t) (tm: TimeMap.t): TimeMap.t :=
     fun l => f l (tm l).
 
-  Definition view_map (f: FLoc.t -> Time.t -> Time.t) (v: View.t): View.t :=
+  Definition view_map (f: Loc.t -> Time.t -> Time.t) (v: View.t): View.t :=
     View.mk (timemap_map f v.(View.pln)) (timemap_map f v.(View.rlx)).
 
-  Definition tview_map (f: FLoc.t -> Time.t -> Time.t) (v: TView.t): TView.t :=
+  Definition tview_map (f: Loc.t -> Time.t -> Time.t) (v: TView.t): TView.t :=
     TView.mk
       (fun loc => view_map f (v.(TView.rel) loc))
       (view_map f v.(TView.cur))
       (view_map f v.(TView.acq)).
 
-  Definition msg_map (f: FLoc.t -> Time.t -> Time.t) (msg: Message.t): Message.t :=
+  Definition msg_map (f: Loc.t -> Time.t -> Time.t) (msg: Message.t): Message.t :=
     match msg with
-    | Message.half => Message.half
+    | Message.reserve => Message.reserve
     | Message.full val released =>
       Message.full val (option_map (view_map f) released)
     end.
 
-  Definition tevent_map (f: FLoc.t -> Time.t -> Time.t) (te: ThreadEvent.t): ThreadEvent.t :=
+  Definition tevent_map (f: Loc.t -> Time.t -> Time.t) (te: ThreadEvent.t): ThreadEvent.t :=
     match te with
     | ThreadEvent.promise loc from to msg kind =>
       ThreadEvent.promise loc (f loc from) (f loc to) (msg_map f msg) kind
@@ -1523,14 +1523,14 @@ Section MAPPED.
             (<<GET: Memory.get loc to m_tgt = Some msg>>))
   .
 
-  Definition times_in_memory (m: Memory.t) (l: FLoc.t) (t: Time.t): Prop :=
+  Definition times_in_memory (m: Memory.t) (l: Loc.t) (t: Time.t): Prop :=
     (<<OFFROM: exists to msg,
         (<<GET: Memory.get l to m = Some (t, msg)>>)>>) \/
     (<<OFTO: exists from msg,
         (<<GET: Memory.get l t m = Some (from, msg)>>)>>)
   .
 
-  Definition times_in_memory_to (m: Memory.t) (l: FLoc.t) (t: Time.t): Prop :=
+  Definition times_in_memory_to (m: Memory.t) (l: Loc.t) (t: Time.t): Prop :=
     (<<OFTO: exists from val released,
         (<<GET: Memory.get l t m = Some (from, Message.full val released)>>)>>)
   .
@@ -1644,8 +1644,8 @@ Section MAPPED.
   Proof.
     extensionality l.
     unfold timemap_map, TimeMap.singleton.
-    setoid_rewrite FLocFun.add_spec. des_ifs.
-    rewrite FLocFun.init_spec. erewrite map_preserving_bot; eauto.
+    setoid_rewrite LocFun.add_spec. des_ifs.
+    rewrite LocFun.init_spec. erewrite map_preserving_bot; eauto.
   Qed.
 
   Lemma map_singleton_ur f P loc to
@@ -1806,7 +1806,7 @@ Section MAPPED.
     unfold TView.write_released in *. des_ifs. unfold option_map.
     erewrite map_viewjoin; eauto.
     - f_equal. erewrite map_unwrap; eauto. f_equal.
-      setoid_rewrite FLocFun.add_spec_eq.
+      setoid_rewrite LocFun.add_spec_eq.
       des_ifs.
       + erewrite map_viewjoin; eauto.
         * erewrite map_singleton_ur; eauto.
@@ -1835,13 +1835,13 @@ Section MAPPED.
   Proof.
     unfold TView.write_tview. ss. unfold tview_map at 1. ss. f_equal.
     - extensionality l. des_ifs.
-      + setoid_rewrite FLocFun.add_spec. des_ifs.
+      + setoid_rewrite LocFun.add_spec. des_ifs.
         erewrite map_viewjoin; eauto.
         * f_equal. erewrite map_singleton_ur; eauto.
         * inv CLOSED0. eauto.
         * unfold times_in_memory_to in *. des.
           eapply Memory.singleton_ur_closed_view; eauto.
-      + setoid_rewrite FLocFun.add_spec. des_ifs.
+      + setoid_rewrite LocFun.add_spec. des_ifs.
         erewrite map_viewjoin; eauto.
         * f_equal. erewrite map_singleton_ur; eauto.
         * inv CLOSED0. eauto.
@@ -2150,7 +2150,7 @@ End MAPPED.
 
 Section UNCHANGAGBLES.
 
-  Definition unchangables (mem prom: Memory.t) (l: FLoc.t) (t: Time.t) :=
+  Definition unchangables (mem prom: Memory.t) (l: Loc.t) (t: Time.t) :=
     (<<COV: covered l t mem>>) /\
     (<<NCOV: ~ covered l t prom>>).
 
@@ -2367,7 +2367,7 @@ End SHORTERMEMORY.
 
 Section NOTATTATCHED.
 
-  Definition not_attatched (L: FLoc.t -> Time.t -> Prop) (m: Memory.t) :=
+  Definition not_attatched (L: Loc.t -> Time.t -> Prop) (m: Memory.t) :=
     forall loc to (SAT: L loc to),
       (<<GET: exists msg, <<MSG: Memory.get loc to m = Some msg>> >>) /\
       (<<NOATTATCH: exists to',
@@ -2471,7 +2471,7 @@ Section NOTATTATCHED.
   Proof.
     inv ADD. inv PROMISE. ii.
     exploit NOATTATCH; eauto. i. des. destruct msg.
-    destruct (FLoc.eq_dec loc loc0); clarify.
+    destruct (Loc.eq_dec loc loc0); clarify.
     - esplit; eauto.
       + eexists. eapply Memory.add_get1; eauto.
       + exists (if (Time.le_lt_dec to from1)
@@ -2606,7 +2606,7 @@ Section FORGET.
       forget_statelocal (st, lc1) (st, lc2)
   .
 
-  Inductive pf_sim_memory (proms: FLoc.t -> Time.t -> Prop) (mem_src mem_tgt: Memory.t): Prop :=
+  Inductive pf_sim_memory (proms: Loc.t -> Time.t -> Prop) (mem_src mem_tgt: Memory.t): Prop :=
   | pf_sim_memory_intro
       mem_inter
       (FORGET: forget_memory proms mem_inter mem_tgt)
@@ -2625,7 +2625,7 @@ Section FORGET.
   .
 
   Inductive all_promises (ths: Threads.t) (P: IdentMap.key -> Prop)
-            (l: FLoc.t) (t: Time.t) : Prop :=
+            (l: Loc.t) (t: Time.t) : Prop :=
   | all_promises_intro
       tid st lc
       (TID1: IdentMap.find tid ths = Some (st, lc))
@@ -2633,7 +2633,7 @@ Section FORGET.
       (SAT: P tid)
   .
 
-  Inductive concrete_promised (mem: Memory.t) (loc: FLoc.t) (to: Time.t) : Prop :=
+  Inductive concrete_promised (mem: Memory.t) (loc: Loc.t) (to: Time.t) : Prop :=
   | concrete_promised_intro
       from val released
       (GET: Memory.get loc to mem = Some (from, Message.full val released))
@@ -2657,7 +2657,7 @@ End FORGET.
 
 Section UNUSEDYET.
 
-  Definition no_acq_read_msgs (MSGS : FLoc.t -> Time.t -> Prop)
+  Definition no_acq_read_msgs (MSGS : Loc.t -> Time.t -> Prop)
              (e : ThreadEvent.t) : Prop :=
     match e with
     | ThreadEvent.read loc to _ _ ord =>
@@ -2668,8 +2668,8 @@ Section UNUSEDYET.
     end
   .
 
-  Inductive capped_with_max_view mem (CAP: FLoc.t -> Time.t -> Prop)
-            (prom: FLoc.t -> Time.t -> Prop): Prop :=
+  Inductive capped_with_max_view mem (CAP: Loc.t -> Time.t -> Prop)
+            (prom: Loc.t -> Time.t -> Prop): Prop :=
   | capped_with_max_view_intro
       (GET: forall loc to from val view
                    (SAT: CAP loc to)
@@ -2680,10 +2680,10 @@ Section UNUSEDYET.
           end)
   .
 
-  Definition cap (m mcap: Memory.t) (l: FLoc.t) (t: Time.t): Prop :=
+  Definition cap (m mcap: Memory.t) (l: Loc.t) (t: Time.t): Prop :=
     (<<NCOV: ~ covered l t m>>) /\ (<<CAP: ~ covered l t mcap>>).
 
-  Definition cap_write_with_update (CAP : FLoc.t -> Time.t -> Prop)
+  Definition cap_write_with_update (CAP : Loc.t -> Time.t -> Prop)
              (e : ThreadEvent.t) : Prop :=
     match e with
     | ThreadEvent.write loc from to _ _ _ =>
@@ -2708,7 +2708,7 @@ End UNUSEDYET.
 
 Section CAPPED.
 
-  Inductive cap_timemap_le (cap: FLoc.t -> Time.t -> option Time.t)
+  Inductive cap_timemap_le (cap: Loc.t -> Time.t -> option Time.t)
             (tm_src tm_tgt: TimeMap.t): Prop :=
   | cap_timemap_le_intro
       (TLE: TimeMap.le tm_src tm_tgt)
@@ -2717,14 +2717,14 @@ Section CAPPED.
           (<<TLESRC: Time.le (tm_src loc) to_src>>))
   .
 
-  Inductive cap_view_le (cap: FLoc.t -> Time.t -> option Time.t)
+  Inductive cap_view_le (cap: Loc.t -> Time.t -> option Time.t)
             (vw_src vw_tgt: View.t): Prop :=
   | view_le_intro
       (PLN: cap_timemap_le cap vw_src.(View.pln) vw_tgt.(View.pln))
       (RLX: cap_timemap_le cap vw_src.(View.rlx) vw_tgt.(View.rlx))
   .
 
-  Inductive cap_tview_le (cap: FLoc.t -> Time.t -> option Time.t)
+  Inductive cap_tview_le (cap: Loc.t -> Time.t -> option Time.t)
             (tvw_src tvw_tgt: TView.t): Prop :=
   | tview_le_intro
       (REL: forall loc, cap_view_le cap (tvw_src.(TView.rel) loc) (tvw_tgt.(TView.rel) loc))
@@ -2744,7 +2744,7 @@ Section CAPPED.
       option_le R (Some a) (Some b)
   .
 
-  Definition wf_cap (cap: FLoc.t -> Time.t -> option Time.t): Prop :=
+  Definition wf_cap (cap: Loc.t -> Time.t -> option Time.t): Prop :=
     forall loc to_tgt to_src (CAP: cap loc to_tgt = Some to_src),
       (<<TLE: Time.lt to_src to_tgt>>) /\
       (<<DISJ: forall to (ITV: Interval.mem (to_src, to_tgt) to),
@@ -2769,7 +2769,7 @@ Section CAPPED.
     - i. clarify.
   Qed.
 
-  Definition wf_cap_mem (cap: FLoc.t -> Time.t -> option Time.t)
+  Definition wf_cap_mem (cap: Loc.t -> Time.t -> option Time.t)
              (mem_tgt: Memory.t): Prop :=
     forall loc to_tgt to_src (CAP: cap loc to_tgt = Some to_src),
     exists v vw_src vw_tgt from_tgt,
@@ -2779,7 +2779,7 @@ Section CAPPED.
       (<<ORIGINAL: Memory.get loc to_src mem_tgt = Some (from_tgt, Message.full v vw_src)>>)
   .
 
-  Inductive cap_memory (cap: FLoc.t -> Time.t -> option Time.t)
+  Inductive cap_memory (cap: Loc.t -> Time.t -> option Time.t)
             (mem_src mem_tgt: Memory.t): Prop :=
   | cap_memory_intro
       (COVER: forall loc to (COV: covered loc to mem_src), covered loc to mem_tgt)
@@ -2799,7 +2799,7 @@ Section CAPPED.
              (<<VLE: option_le (cap_view_le cap) vw_src vw_tgt>>)
            end).
 
-  Definition cap_event (cap: FLoc.t -> Time.t -> option Time.t)
+  Definition cap_event (cap: Loc.t -> Time.t -> option Time.t)
              (te_src te_tgt: ThreadEvent.t): Prop :=
     match te_src with
     | ThreadEvent.promise _ _ _ _ _ => False
@@ -2913,16 +2913,16 @@ Section CAPPED.
       cap_timemap_le cap (TimeMap.singleton loc to_src) (TimeMap.singleton loc to_tgt).
   Proof.
     econs.
-    - unfold TimeMap.singleton. ii. setoid_rewrite FLocFun.add_spec. des_ifs.
+    - unfold TimeMap.singleton. ii. setoid_rewrite LocFun.add_spec. des_ifs.
       + exploit WFCAP; eauto. i. des. left. eauto.
       + refl.
     - unfold TimeMap.singleton. ii. red.
-      setoid_rewrite FLocFun.add_spec.
-      setoid_rewrite FLocFun.add_spec in TLETGT. des_ifs.
+      setoid_rewrite LocFun.add_spec.
+      setoid_rewrite LocFun.add_spec in TLETGT. des_ifs.
       + destruct TLETGT.
         * left. eapply wf_cap_disjoint; eauto.
         * inv H. clarify. right. refl.
-      + rewrite FLocFun.init_spec. apply Time.bot_spec.
+      + rewrite LocFun.init_spec. apply Time.bot_spec.
   Qed.
 
   Lemma cap_singleton_le_normal cap loc to_tgt
@@ -2936,13 +2936,13 @@ Section CAPPED.
     econs.
     - refl.
     - unfold TimeMap.singleton. ii. red.
-      setoid_rewrite FLocFun.add_spec.
-      setoid_rewrite FLocFun.add_spec in TLETGT. des_ifs.
+      setoid_rewrite LocFun.add_spec.
+      setoid_rewrite LocFun.add_spec in TLETGT. des_ifs.
       + destruct TLETGT.
         * exploit WFCAP; eauto. i. des. left.
           exploit SPACE; eauto.
         * destruct H. clarify.
-      + rewrite FLocFun.init_spec. apply Time.bot_spec.
+      + rewrite LocFun.init_spec. apply Time.bot_spec.
   Qed.
 
   Lemma cap_timemap_bot_le cap tm
@@ -3165,15 +3165,15 @@ Section CAPPED.
 End CAPPED.
 
 
-Inductive concrete_covered (prom mem: Memory.t) (loc: FLoc.t) (ts: Time.t): Prop :=
+Inductive concrete_covered (prom mem: Memory.t) (loc: Loc.t) (ts: Time.t): Prop :=
 | concrete_covered_intro
     from to val released
     (GET: Memory.get loc to prom = Some (from, Message.full val released))
     (ITV: Interval.mem (from, to) ts)
-| concrete_covered_half
+| concrete_covered_reserve
     from to
     from1 to1 val released
-    (GET: Memory.get loc to prom = Some (from, Message.half))
+    (GET: Memory.get loc to prom = Some (from, Message.reserve))
     (GET1: Memory.get loc to1 mem = Some (from1, Message.full val released))
     (NOTLAST: Time.lt to to1)
     (ITV: Interval.mem (from, to) ts)
@@ -3194,9 +3194,9 @@ Module Inv.
 
   Record t mem lang (st: Language.state lang) lc
          (proms: Memory.t)
-         (spaces : FLoc.t -> Time.t -> Prop)
-         (aupdates : FLoc.t -> Time.t -> Prop)
-         (updates : FLoc.t -> Time.t -> Prop)
+         (spaces : Loc.t -> Time.t -> Prop)
+         (aupdates : Loc.t -> Time.t -> Prop)
+         (updates : Loc.t -> Time.t -> Prop)
          (mlast: Memory.t): Prop :=
     {
       SPACES: forall loc ts (IN: spaces loc ts), concrete_covered proms mem loc ts;
@@ -3247,9 +3247,9 @@ Section SIMPF.
 
   Inductive sim_pf
             (mlast: Ident.t -> Memory.t)
-            (spaces : Ident.t -> (FLoc.t -> Time.t -> Prop))
-            (updates: Ident.t -> (FLoc.t -> Time.t -> Prop))
-            (aupdates: Ident.t -> (FLoc.t -> Time.t -> Prop))
+            (spaces : Ident.t -> (Loc.t -> Time.t -> Prop))
+            (updates: Ident.t -> (Loc.t -> Time.t -> Prop))
+            (aupdates: Ident.t -> (Loc.t -> Time.t -> Prop))
             (c_src c_tgt: Configuration.t) : Prop :=
   | sim_pf_intro
       (FORGET: forget_config c_src c_tgt)

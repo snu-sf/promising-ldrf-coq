@@ -25,7 +25,7 @@ Set Implicit Arguments.
 
 
 (* TODO unifiy and remove definitions in Event.v *)
-Definition ProgramEvent_is_updating (e:ProgramEvent.t): option (FLoc.t * Const.t * Ordering.t) :=
+Definition ProgramEvent_is_updating (e:ProgramEvent.t): option (Loc.t * Const.t * Ordering.t) :=
   match e with
   | ProgramEvent.update loc valr _ ordr _ => Some (loc, valr, ordr)
   | _ => None
@@ -91,4 +91,4 @@ Definition is_updating lang (st : Language.state lang) l o :=
                  ProgramEvent_is_updating e = Some (l, v, o').
 
 Definition is_aborting lang (st : Language.state lang) :=
-  can_step _ st ProgramEvent.abort.
+  can_step _ st ProgramEvent.failure.
