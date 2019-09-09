@@ -55,3 +55,23 @@ Definition promote (l: Loc.t) (r: Reg.t) (stmt: Stmt.t): list Stmt.t :=
     else [stmt]
   | _ => [stmt]
   end.
+
+Definition loc_free_instr (l: Loc.t) (i: Instr.t): bool :=
+  match i with
+  | Instr.load _ loc _
+  | Instr.store loc _ _
+  | Instr.update _ loc _ _ _ =>
+    if Loc.eq_dec loc l then false else true
+  | _ => true
+  end.
+
+Fixpoint loc_free_stmt (l: Loc.t) (stmt: Stmt.t): bool :=
+  match stmt with
+  | Stmt.instr i => loc_free_instr l i
+  | Stmt.ite cond stmts1 stmts2 =>
+    andb
+      (List.fold_left andb (List.map (loc_free_stmt l) stmts1) true)
+      (List.fold_left andb (List.map (loc_free_stmt l) stmts2) true)
+  | Stmt.dowhile stmts cond =>
+    List.fold_left andb (List.map (loc_free_stmt l) stmts) true
+  end.
