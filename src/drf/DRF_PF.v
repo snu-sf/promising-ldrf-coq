@@ -2624,11 +2624,11 @@ Section FORGET.
         (Thread.mk lang st (Local.mk v prom) sc mem_tgt)
   .
 
-  Inductive all_promises (c: Configuration.t) (P: IdentMap.key -> Prop)
+  Inductive all_promises (ths: Threads.t) (P: IdentMap.key -> Prop)
             (l: FLoc.t) (t: Time.t) : Prop :=
   | all_promises_intro
       tid st lc
-      (TID1: IdentMap.find tid c.(Configuration.threads) = Some (st, lc))
+      (TID1: IdentMap.find tid ths = Some (st, lc))
       (PROMISED: promised lc.(Local.promises) l t)
       (SAT: P tid)
   .
@@ -2646,7 +2646,7 @@ Section FORGET.
                            (IdentMap.find tid csrc.(Configuration.threads))
                            (IdentMap.find tid ctgt.(Configuration.threads)))
       (SC : csrc.(Configuration.sc) = ctgt.(Configuration.sc))
-      (MEM : pf_sim_memory (all_promises ctgt (fun _ => True))
+      (MEM : pf_sim_memory (all_promises ctgt.(Configuration.threads) (fun _ => True))
                            (Configuration.memory csrc)
                            (Configuration.memory ctgt))
   .
@@ -3192,18 +3192,18 @@ Qed.
 
 Module Inv.
 
-  Inductive t mem lang (st: Language.state lang) lc
-            (proms: Memory.t)
-            (spaces : FLoc.t -> Time.t -> Prop)
-            (aupdates : FLoc.t -> Time.t -> Prop)
-            (updates : FLoc.t -> Time.t -> Prop)
-            (mlast: Memory.t): Prop :=
-  | inv_intro
-      (SPACES: forall loc ts (IN: spaces loc ts), concrete_covered proms mem loc ts)
-      (AUPDATES: forall loc ts (IN: aupdates loc ts),
+  Record t mem lang (st: Language.state lang) lc
+         (proms: Memory.t)
+         (spaces : FLoc.t -> Time.t -> Prop)
+         (aupdates : FLoc.t -> Time.t -> Prop)
+         (updates : FLoc.t -> Time.t -> Prop)
+         (mlast: Memory.t): Prop :=
+    {
+      SPACES: forall loc ts (IN: spaces loc ts), concrete_covered proms mem loc ts;
+      AUPDATES: forall loc ts (IN: aupdates loc ts),
           exists to,
-            (<<GET: Memory.get loc ts proms = Some (ts, to)>>))
-      (PROMS: forall
+            (<<GET: Memory.get loc ts proms = Some (ts, to)>>);
+      PROMS: forall
           loc to m sc (PROM : concrete_promised proms loc to)
           (FUTURE: unchanged_on spaces mlast m)
           (UNCHANGED: not_attatched (updates \2/ aupdates) m),
@@ -3212,8 +3212,8 @@ Module Inv.
                            (Thread.mk _ st lc sc m)
                            (Thread.mk _ st' lc' sc' m')>>) /\
             ((<<WRITING : is_writing _ st' loc Ordering.relaxed>>) \/
-             (<<ABORTING : is_aborting _ st'>>)))
-      (UPDATE : forall
+             (<<ABORTING : is_aborting _ st'>>));
+      UPDATE : forall
           loc to m sc (UPD : updates loc to)
           (FUTURE: unchanged_on spaces mlast m)
           (UNCHANGED: not_attatched (updates \2/ aupdates) m),
@@ -3221,8 +3221,8 @@ Module Inv.
             (<<STEPS : rtc (tau (@Thread.program_step _))
                            (Thread.mk _ st lc sc m)
                            (Thread.mk _ st' lc' sc' m')>>) /\
-            (<<READING : is_updating _ st' loc Ordering.relaxed>>))
-      (AUPDATE : forall
+            (<<READING : is_updating _ st' loc Ordering.relaxed>>);
+      AUPDATE : forall
           loc to m sc (UPD : aupdates loc to)
           (FUTURE: unchanged_on spaces mlast m)
           (UNCHANGED: not_attatched (updates \2/ aupdates) m),
@@ -3230,8 +3230,8 @@ Module Inv.
             (<<STEPS : rtc (tau (@Thread.program_step _))
                            (Thread.mk _ st lc sc m)
                            (Thread.mk _ st' lc' sc' m')>>) /\
-            (<<READING : is_updating _ st' loc Ordering.seqcst>>))
-  .
+            (<<READING : is_updating _ st' loc Ordering.seqcst>>);
+    }.
 
 End Inv.
 
@@ -3269,6 +3269,13 @@ Section SIMPF.
            (TIDTGT: IdentMap.find tid c_tgt.(Configuration.threads) =
                     Some (existT _ lang_tgt st_tgt, lc_tgt)),
            Inv.t c_tgt.(Configuration.memory) _ st_src lc_src lc_tgt.(Local.promises) (spaces tid) (updates tid) (aupdates tid) (mlast tid))
+      (INVBOT:
+         forall
+           tid
+           (TIDSRC: IdentMap.find tid c_src.(Configuration.threads) = None),
+           (<<SPACESBOT: spaces tid <2= bot2>>) /\
+           (<<UPDATESBOT: updates tid <2= bot2>>) /\
+           (<<AUPDATESBOT: aupdates tid <2= bot2>>))
 
       (RACEFREE: pf_racefree c_src)
       (WFSRC: Configuration.wf c_src)
@@ -3316,6 +3323,7 @@ Section SIMPF.
       exploit init_pf; try apply TIDTGT; eauto. i.
       rewrite x0 in *. inv PROM.
       rewrite Memory.bot_get in *. clarify.
+    - splits; ss.
     - eapply Configuration.init_wf.
     - eapply Configuration.init_wf.
   Qed.
