@@ -29,7 +29,7 @@ Require Import PromiseConsistent.
 Set Implicit Arguments.
 
 
-Definition promote (l: Loc.t) (r: Reg.t) (stmt: Stmt.t): list Stmt.t :=
+Definition promote_stmt (l: Loc.t) (r: Reg.t) (stmt: Stmt.t): list Stmt.t :=
   match stmt with
   | Stmt.instr (Instr.load lhs rhs _) =>
     if Loc.eq_dec rhs l
@@ -56,6 +56,10 @@ Definition promote (l: Loc.t) (r: Reg.t) (stmt: Stmt.t): list Stmt.t :=
   | _ => [stmt]
   end.
 
+Definition promote_stmts (l: Loc.t) (r: Reg.t) (stmts: list Stmt.t): list Stmt.t :=
+  List.fold_left (@List.app _) (List.map (promote_stmt l r) stmts) [].
+
+
 Definition loc_free_instr (l: Loc.t) (i: Instr.t): bool :=
   match i with
   | Instr.load _ loc _
@@ -75,3 +79,6 @@ Fixpoint loc_free_stmt (l: Loc.t) (stmt: Stmt.t): bool :=
   | Stmt.dowhile stmts cond =>
     List.fold_left andb (List.map (loc_free_stmt l) stmts) true
   end.
+
+Definition loc_free_stmts (l: Loc.t) (stmts: list Stmt.t): bool :=
+  List.fold_left andb (List.map (loc_free_stmt l) stmts) true.
