@@ -56,3 +56,39 @@ Inductive sim_tview (l: Loc.t) (tview_src tview_tgt: TView.t): Prop :=
     (ACQ: sim_view l tview_src.(TView.acq) tview_tgt.(TView.acq))
 .
 Hint Constructors sim_tview.
+
+
+Inductive sim_message (l: Loc.t): forall (msg_src msg_tgt: Message.t), Prop :=
+| sim_message_full
+    val released_src released_tgt
+    (RELEASED: sim_opt_view l released_src released_tgt):
+    sim_message l (Message.full val released_src) (Message.full val released_tgt)
+| sim_message_reserve:
+    sim_message l Message.reserve Message.reserve
+.
+Hint Constructors sim_message.
+
+Inductive sim_memory (certify: bool) (l: Loc.t) (mem_src mem_tgt: Memory.t): Prop :=
+| sim_memory_intro
+    (SOUND: forall loc from to msg_src
+              (LOC: loc <> l)
+              (GET_SRC: Memory.get loc to mem_src = Some (from, msg_src)),
+        exists msg_tgt,
+          <<GET_TGT: Memory.get loc to mem_tgt = Some (from, msg_tgt)>> /\
+          <<MSG: sim_message l msg_src msg_tgt>>)
+    (COMPLETE: forall loc from to msg_tgt
+                 (LOC: loc <> l)
+                 (GET_TGT: Memory.get loc to mem_tgt = Some (from, msg_tgt)),
+        exists msg_src,
+          <<GET_SRC: Memory.get loc to mem_src = Some (from, msg_src)>> /\
+          <<MSG: sim_message l msg_src msg_tgt>>)
+    (PROM: forall to,
+        <<GET_TGT: Memory.get l to mem_tgt =
+                   if Time.eq_dec to Time.bot
+                   then Some (Time.bot, Message.elt)
+                   else
+                     if andb certify (Time.eq_dec to (Time.incr Time.bot))
+                     then Some (Time.bot, Message.reserve)
+                     else None>>)
+.
+Hint Constructors sim_memory.
