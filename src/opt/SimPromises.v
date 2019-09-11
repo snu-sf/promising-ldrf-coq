@@ -124,7 +124,7 @@ Module SimPromises.
           hexploit Memory.add_get0; try exact PROMISES; eauto. i. des. congr.
         * econs 1; eauto; congr.
         * econs 1; eauto.
-          i. exploit HALF; eauto. i. des.
+          i. exploit RESERVE; eauto. i. des.
           inv SIM1. exploit MSG; eauto. i. des. inv MSG0. eauto.
       + econs.
         * ii. erewrite Memory.add_o; eauto.
@@ -162,7 +162,7 @@ Module SimPromises.
             hexploit Memory.split_get0; try exact PROMISES; eauto. congr. }
           { econs 2; eauto; congr. }
         * econs 2; eauto.
-          { i. exploit HALF1; eauto. i. des.
+          { i. exploit RESERVE1; eauto. i. des.
             inv SIM1. exploit MSG; eauto. i. des. inv MSG0. eauto. }
           { destruct msg3; ss. }
       + econs.
@@ -559,13 +559,13 @@ Module SimPromises.
     - destruct (Memory.get loc to mem1_src) as [[]|] eqn:GET1.
       + inv CAP_SRC. exploit SOUND; eauto. i.
         rewrite x in H. inv H.
-        inv MEM1. rewrite HALF in GET1.
+        inv MEM1. rewrite RESERVE in GET1.
         inv CAP. exploit SOUND0; eauto.
       + exploit cap_get_src; eauto. i. des. auto.
     - destruct (Memory.get loc to mem1_tgt) as [[]|] eqn:GET1.
       + inv CAP. exploit SOUND; eauto. i.
         rewrite x in H. inv H.
-        inv MEM1. rewrite <- HALF in GET1.
+        inv MEM1. rewrite <- RESERVE in GET1.
         inv CAP_SRC. exploit SOUND0; eauto.
       + exploit cap_get_tgt; eauto. i. des. auto.
   Qed.

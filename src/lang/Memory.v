@@ -370,7 +370,7 @@ Module Memory.
       (PROMISES: add promises1 loc from to msg promises2)
       (MEM: add mem1 loc from to msg mem2)
       (TS: message_to msg loc to)
-      (HALF: msg = Message.reserve ->
+      (RESERVE: msg = Message.reserve ->
              exists from' val' released',
                get loc from mem1 = Some (from', Message.full val' released')):
       promise promises1 mem1 loc from to msg promises2 mem2 op_kind_add
@@ -379,10 +379,10 @@ Module Memory.
       (PROMISES: split promises1 loc from to ts3 msg msg3 promises2)
       (MEM: split mem1 loc from to ts3 msg msg3 mem2)
       (TS: message_to msg loc to)
-      (HALF1: msg = Message.reserve ->
+      (RESERVE1: msg = Message.reserve ->
               exists from' val' released',
                 get loc from mem1 = Some (from', Message.full val' released'))
-      (HALF2: msg3 = Message.reserve ->
+      (RESERVE2: msg3 = Message.reserve ->
               exists val' released', msg = Message.full val' released'):
       promise promises1 mem1 loc from to msg promises2 mem2 (op_kind_split ts3 msg3)
   | promise_lower
@@ -1732,40 +1732,40 @@ Module Memory.
   Lemma promise_reserve_wf
         promises1 mem1 loc from to msg promises2 mem2 kind
         (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
-        (HALF1: reserve_wf promises1 mem1):
-    <<HALF2: reserve_wf promises2 mem2>>.
+        (RESERVE1: reserve_wf promises1 mem1):
+    <<RESERVE2: reserve_wf promises2 mem2>>.
   Proof.
     inv PROMISE; ii; revert GET.
     - erewrite add_o; eauto. condtac; ss; i.
       + des. subst. inv GET.
-        exploit HALF; eauto. i. des.
+        exploit RESERVE; eauto. i. des.
         exploit add_get1; try exact x; eauto.
       + guardH o.
-        exploit HALF1; eauto. i. des.
+        exploit RESERVE1; eauto. i. des.
         exploit add_get1; try exact x; eauto.
     - erewrite split_o; eauto. repeat condtac; ss; i.
       + des. subst. inv GET.
-        exploit HALF0; eauto. i. des.
+        exploit RESERVE0; eauto. i. des.
         exploit split_get1; try exact x; eauto. i. des. eauto.
       + guardH o. des. subst. inv GET.
-        exploit HALF2; eauto. i. des. subst.
+        exploit RESERVE2; eauto. i. des. subst.
         exploit split_get0; try exact MEM. i. des. eauto.
       + guardH o. guardH o0.
-        exploit HALF1; eauto. i. des.
+        exploit RESERVE1; eauto. i. des.
         exploit split_get1; try exact x; eauto. i. des. eauto.
     - erewrite lower_o; eauto. condtac; ss; i.
       + des. subst. inv GET.
         exploit lower_get0; try exact PROMISES. i. des. inv MSG_LE.
-        exploit HALF1; eauto. i. des.
+        exploit RESERVE1; eauto. i. des.
         exploit lower_get1; try exact x; eauto. i. des.
         inv MSG_LE. eauto.
       + guardH o.
-        exploit HALF1; eauto. i. des.
+        exploit RESERVE1; eauto. i. des.
         exploit lower_get1; try exact x; eauto. i. des.
         inv MSG_LE. eauto.
     - erewrite remove_o; eauto. condtac; ss. i.
       guardH o.
-      exploit HALF1; eauto. i. des.
+      exploit RESERVE1; eauto. i. des.
       erewrite Memory.remove_o; eauto. condtac; ss; eauto.
       des. subst.
       exploit remove_get0; try exact MEM. i. des. congr.
@@ -1774,10 +1774,10 @@ Module Memory.
   Lemma future_reserve_wf
         promises mem1 mem2
         (FUTURE: future mem1 mem2)
-        (HALF: reserve_wf promises mem1):
+        (RESERVE: reserve_wf promises mem1):
     reserve_wf promises mem2.
   Proof.
-    ii. exploit HALF; eauto. i. des.
+    ii. exploit RESERVE; eauto. i. des.
     exploit future_get1; eauto. i. des.
     inv MSG_LE. eauto.
   Qed.
@@ -1785,10 +1785,10 @@ Module Memory.
   Lemma future_weak_reserve_wf
         promises mem1 mem2
         (FUTURE: future_weak mem1 mem2)
-        (HALF: reserve_wf promises mem1):
+        (RESERVE: reserve_wf promises mem1):
     reserve_wf promises mem2.
   Proof.
-    ii. exploit HALF; eauto. i. des.
+    ii. exploit RESERVE; eauto. i. des.
     exploit future_weak_get1; eauto. i. des.
     inv MSG_LE. eauto.
   Qed.
@@ -1903,14 +1903,14 @@ Module Memory.
         (LE_PROMISES1: le promises1 mem1)
         (FINITE1: finite promises1)
         (BOT1: bot_none promises1)
-        (HALF1: reserve_wf promises1 mem1)
+        (RESERVE1: reserve_wf promises1 mem1)
         (CLOSED1: closed mem1)
         (MSG_CLOSED: closed_message msg mem2)
         (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind):
     <<LE_PROMISES2: le promises2 mem2>> /\
     <<FINITE2: finite promises2>> /\
     <<BOT2: bot_none promises2>> /\
-    <<HALF2: reserve_wf promises2 mem2>> /\
+    <<RESERVE2: reserve_wf promises2 mem2>> /\
     <<CLOSED2: closed mem2>> /\
     <<FUTURE: future mem1 mem2>>.
   Proof.
@@ -1936,11 +1936,11 @@ Module Memory.
         promises1 mem1 loc from to msg promises2 mem2 ctx kind
         (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
         (LE_CTX: le ctx mem1)
-        (HALF_CTX: reserve_wf ctx mem1)
+        (RESERVE_CTX: reserve_wf ctx mem1)
         (DISJOINT: disjoint promises1 ctx):
     <<DISJOINT: disjoint promises2 ctx>> /\
     <<LE_CTX: le ctx mem2>> /\
-    <<HALF_CTX: reserve_wf ctx mem2>>.
+    <<RESERVE_CTX: reserve_wf ctx mem2>>.
   Proof.
     inv PROMISE.
     - splits.
@@ -1955,7 +1955,7 @@ Module Memory.
         * apply Interval.mem_ub.
           destruct (mem1 loc).(Cell.WF). exploit VOLUME; eauto. i. des; auto.
           inv x. inv TO.
-      + ii. exploit HALF_CTX; eauto. i. des.
+      + ii. exploit RESERVE_CTX; eauto. i. des.
         exploit add_get1; try exact x; eauto.
     - splits.
       + inv DISJOINT. econs. i. revert GET1. erewrite split_o; eauto. repeat condtac; ss.
@@ -1993,7 +1993,7 @@ Module Memory.
             destruct (ctx loc).(Cell.WF). exploit VOLUME; eauto. i. des; auto.
             inv x1. inv MEM. inv SPLIT. inv TS23.
           }
-      + ii. exploit HALF_CTX; eauto. i. des.
+      + ii. exploit RESERVE_CTX; eauto. i. des.
         exploit split_get1; try exact x; eauto. i. des. eauto.
     - splits.
       + inv DISJOINT. econs. i. revert GET1. erewrite lower_o; eauto. condtac; ss.
@@ -2003,7 +2003,7 @@ Module Memory.
       + ii. erewrite lower_o; eauto. condtac; ss; eauto.
         des. subst. exfalso. eapply disjoint_get; eauto.
         hexploit lower_get0; try exact PROMISES; eauto. i. des. eauto.
-      + ii. exploit HALF_CTX; eauto. i. des.
+      + ii. exploit RESERVE_CTX; eauto. i. des.
         exploit lower_get1; try exact x; eauto. i. des.
         inv MSG_LE. eauto.
     - splits.
@@ -2013,7 +2013,7 @@ Module Memory.
       + ii. erewrite remove_o; eauto. condtac; ss; eauto.
         des. subst. exfalso. eapply disjoint_get; eauto.
         hexploit remove_get0; try exact PROMISES; eauto. i. des. eauto.
-      + ii. exploit HALF_CTX; eauto. i. des.
+      + ii. exploit RESERVE_CTX; eauto. i. des.
         destruct (get loc0 from0 mem2) as [[]|] eqn:GET2.
         * revert GET2. erewrite remove_o; eauto. condtac; ss. i.
           rewrite GET2 in *. inv x. eauto.
@@ -2064,12 +2064,12 @@ Module Memory.
         (LE: le promises1 mem1)
         (FINITE: finite promises1)
         (BOT: bot_none promises1)
-        (HALF: reserve_wf promises1 mem1):
+        (RESERVE: reserve_wf promises1 mem1):
     <<CLOSED: closed mem2>> /\
     <<LE: le promises2 mem2>> /\
     <<FINITE: finite promises2>> /\
     <<BOT: bot_none promises2>> /\
-    <<HALF: reserve_wf promises2 mem2>> /\
+    <<RESERVE: reserve_wf promises2 mem2>> /\
     <<FUTURE: future mem1 mem2>>.
   Proof.
     inv WRITE.
@@ -2079,7 +2079,7 @@ Module Memory.
     - ii. erewrite remove_o; eauto. condtac; ss.
     - ii. revert GET.
       erewrite remove_o; eauto. condtac; ss.
-      i. exploit HALF2; eauto.
+      i. exploit RESERVE2; eauto.
   Qed.
 
   Lemma write_disjoint
@@ -2087,10 +2087,10 @@ Module Memory.
         (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind)
         (DISJOINT: disjoint promises1 ctx)
         (LE_CTX: le ctx mem1)
-        (HALF_CTX: reserve_wf ctx mem1):
+        (RESERVE_CTX: reserve_wf ctx mem1):
     <<DISJOINT: disjoint promises2 ctx>> /\
     <<LE_CTX: le ctx mem2>> /\
-    <<HALF_CTX: reserve_wf ctx mem2>>.
+    <<RESERVE_CTX: reserve_wf ctx mem2>>.
   Proof.
     inv WRITE.
     hexploit promise_disjoint; try apply PROMISE; eauto. i. des.
@@ -2359,15 +2359,15 @@ Module Memory.
 
   Lemma no_reserve_max_ts
         mem loc mts
-        (NOHALF: no_reserve mem)
+        (NORESERVE: no_reserve mem)
         (MAX: max_full_ts mem loc mts):
     mts = max_ts loc mem.
   Proof.
     apply TimeFacts.antisym.
     - inv MAX. des.
       exploit max_ts_spec; eauto. i. des. auto.
-    - inv MAX. specialize (NOHALF loc). des.
-      exploit MAX0; try exact NOHALF. i. auto.
+    - inv MAX. specialize (NORESERVE loc). des.
+      exploit MAX0; try exact NORESERVE. i. auto.
   Qed.
 
   Definition no_reserve_except (promises mem: t): Prop :=
@@ -2377,21 +2377,21 @@ Module Memory.
 
   Lemma no_reserve_no_reserve_except
         promises mem
-        (NOHALF: no_reserve mem):
+        (NORESERVE: no_reserve mem):
     no_reserve_except promises mem.
   Proof.
-    ii. specialize (NOHALF loc). des. congr.
+    ii. specialize (NORESERVE loc). des. congr.
   Qed.
 
   Lemma no_reserve_except_bot_no_reserve
         mem
         (INHABITED: inhabited mem)
-        (NOHALF: no_reserve_except bot mem):
+        (NORESERVE: no_reserve_except bot mem):
     no_reserve mem.
   Proof.
     ii. exploit (@max_ts_spec loc); try apply INHABITED. i. des.
     destruct msg; eauto.
-    exploit NOHALF; eauto. i.
+    exploit NORESERVE; eauto. i.
     rewrite bot_get in *. congr.
   Qed.
 
@@ -2399,8 +2399,8 @@ Module Memory.
         promises1 promises2 mem1 mem2
         loc from to msg kind
         (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
-        (HALF1: reserve_wf promises1 mem1)
-        (NOHALF1: no_reserve_except promises1 mem1):
+        (RESERVE1: reserve_wf promises1 mem1)
+        (NORESERVE1: no_reserve_except promises1 mem1):
     no_reserve_except promises2 mem2.
   Proof.
     ii. inv PROMISE.
@@ -2437,7 +2437,7 @@ Module Memory.
       guardH o.
       destruct (Loc.eq_dec loc0 loc); cycle 1.
       { cut (max_ts loc0 mem2 = max_ts loc0 mem1).
-        { i. rewrite H in *. eapply NOHALF1; eauto. }
+        { i. rewrite H in *. eapply NORESERVE1; eauto. }
         exploit max_ts_spec; try exact GET. i. des.
         destruct (get loc0 (max_ts loc0 mem1) mem2) as [[]|] eqn:GET2.
         - exploit max_ts_spec; try exact GET2. i. des.
@@ -2448,7 +2448,7 @@ Module Memory.
       }
       subst. unguard. des; ss. clear COND.
       exploit max_ts_spec; eauto. i. des. inv MAX; cycle 1.
-      { inv H. rewrite H1 in *. eapply NOHALF1; eauto. }
+      { inv H. rewrite H1 in *. eapply NORESERVE1; eauto. }
       destruct (get loc (max_ts loc mem1) mem2) as [[]|] eqn:GET2.
       { exploit max_ts_spec; try exact GET2. i. des. timetac. }
       revert GET2. erewrite Memory.remove_o; eauto.
@@ -2456,7 +2456,7 @@ Module Memory.
       i. clear COND GET2 a.
       exploit remove_get0; try exact MEM. i. des.
       rewrite GET0 in *. inv GET1.
-      exploit HALF1; eauto. i. des.
+      exploit RESERVE1; eauto. i. des.
       cut (from = max_ts loc mem2); try congr.
       exploit get_ts; try exact GET0. i. des.
       { subst. rewrite x0 in *. congr. }
@@ -2861,10 +2861,10 @@ Module Memory.
   Lemma cap_reserve_wf
         promises promises1 mem1 mem2
         (CAP: cap promises mem1 mem2)
-        (HALF1: reserve_wf promises1 mem1):
+        (RESERVE1: reserve_wf promises1 mem1):
     reserve_wf promises1 mem2.
   Proof.
-    ii. exploit HALF1; eauto. i. des.
+    ii. exploit RESERVE1; eauto. i. des.
     inv CAP. eauto.
   Qed.
 

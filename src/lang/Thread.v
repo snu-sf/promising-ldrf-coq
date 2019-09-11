@@ -442,7 +442,7 @@ Module Thread.
           pf e e1 e2
           (STEP: step pf e e1 e2)
           (WF1: Local.wf e1.(local) e1.(memory))
-          (NOHALF1: no_reserve_except e1):
+          (NORESERVE1: no_reserve_except e1):
       no_reserve_except e2.
     Proof.
       inv STEP; inv STEP0.
@@ -456,7 +456,7 @@ Module Thread.
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
           (CLOSED1: Memory.closed e1.(memory))
-          (NOHALF1: no_reserve_except e1):
+          (NORESERVE1: no_reserve_except e1):
       no_reserve_except e2.
     Proof.
       induction STEP; ss; i.
@@ -471,7 +471,7 @@ Module Thread.
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
           (CLOSED1: Memory.closed e1.(memory))
-          (NOHALF1: Memory.no_reserve e1.(memory))
+          (NORESERVE1: Memory.no_reserve e1.(memory))
           (PROMISES2: e2.(local).(Local.promises) = Memory.bot):
       Memory.no_reserve e2.(memory).
     Proof.
@@ -489,7 +489,7 @@ Module Thread.
           (WF1: Local.wf e1.(local) e1.(memory))
           (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
           (CLOSED1: Memory.closed e1.(memory))
-          (NOHALF1: Memory.no_reserve e1.(memory))
+          (NORESERVE1: Memory.no_reserve e1.(memory))
           (PROMISES2: e2.(local).(Local.promises) = Memory.bot):
       Memory.no_reserve e2.(memory).
     Proof.

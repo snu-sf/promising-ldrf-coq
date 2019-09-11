@@ -399,7 +399,7 @@ Proof.
     erewrite Memory.remove_o; eauto. condtac; ss. }
   { ii. inv WF0. revert GET.
     erewrite Memory.remove_o; eauto. condtac; ss. i.
-    guardH o. exploit HALF; eauto. }
+    guardH o. exploit RESERVE; eauto. }
   i. des.
   exploit MemoryReorder.remove_promise; try apply WF0; eauto. i. des.
   esplits.

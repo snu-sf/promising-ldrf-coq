@@ -868,11 +868,11 @@ Module MemoryReorder.
     exploit add_split; try exact MEM; eauto. i. des; [|congr].
     esplits.
     - econs; eauto.
-      i. subst. exploit HALF1; eauto. i. des.
+      i. subst. exploit RESERVE1; eauto. i. des.
       revert x. erewrite Memory.add_o; eauto. condtac; ss; eauto.
       des. subst. inv MEM0. inv SPLIT. rewrite TS12 in TS23. timetac.
     - econs; eauto.
-      i. subst. exploit HALF2; eauto. i. des. subst.
+      i. subst. exploit RESERVE2; eauto. i. des. subst.
       exploit Memory.add_get0; try exact ADD0. i. des. eauto.
   Qed.
 

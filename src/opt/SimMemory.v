@@ -81,7 +81,7 @@ Inductive sim_memory (mem_src mem_tgt:Memory.t): Prop :=
         exists from_src msg_src,
           <<GET: Memory.get loc to mem_src = Some (from_src, msg_src)>> /\
           <<MSG: sim_message msg_src msg_tgt>>)
-    (HALF: forall loc from to,
+    (RESERVE: forall loc from to,
         Memory.get loc to mem_src = Some (from, Message.reserve) <->
         Memory.get loc to mem_tgt = Some (from, Message.reserve))
 .
@@ -122,10 +122,10 @@ Lemma sim_memory_get_message_same_kind
   message_same_kind msg_src msg_tgt.
 Proof.
   destruct msg_src, msg_tgt; try by econs.
-  - inv SIM. rewrite <- HALF in GET_TGT.
+  - inv SIM. rewrite <- RESERVE in GET_TGT.
     exploit Memory.get_disjoint; [exact GET_SRC|exact GET_TGT|..]. i. des; try congr.
     exfalso. apply (x0 ts); auto.
-  - inv SIM. rewrite HALF in GET_SRC.
+  - inv SIM. rewrite RESERVE in GET_SRC.
     exploit Memory.get_disjoint; [exact GET_SRC|exact GET_TGT|..]. i. des; try congr.
     exfalso. apply (x0 ts); auto.
 Qed.
@@ -198,7 +198,7 @@ Lemma sim_memory_max_ts
   Memory.max_ts loc mem_src = Memory.max_ts loc mem_tgt.
 Proof.
   inv SIM. inv CLOSED_SRC. inv CLOSED_TGT.
-  clear MSG HALF CLOSED CLOSED0.
+  clear MSG RESERVE CLOSED CLOSED0.
   apply TimeFacts.antisym.
   - specialize (COVER loc (Memory.max_ts loc mem_src)). des.
     exploit Memory.max_ts_spec; try eapply (INHABITED loc). i. des.
@@ -346,11 +346,11 @@ Proof.
     + erewrite Memory.add_o in H; try exact SRC.
       erewrite Memory.add_o; try exact TGT. condtac; ss.
       * des. subst. inv H. inv SIM_MSG. ss.
-      * rewrite <- HALF. ss.
+      * rewrite <- RESERVE. ss.
     + erewrite Memory.add_o in H; try exact TGT.
       erewrite Memory.add_o; try exact SRC. condtac; ss.
       * des. subst. inv H. inv SIM_MSG. ss.
-      * rewrite HALF. ss.
+      * rewrite RESERVE. ss.
 Qed.
 
 Lemma sim_memory_split
@@ -383,16 +383,16 @@ Proof.
       * guardH o. des. subst. inv H.
         exploit Memory.split_get0; try exact SRC. i. des.
         exploit Memory.split_get0; try exact TGT. i. des.
-        rewrite HALF in GET0. rewrite GET0 in GET4. inv GET4. ss.
-      * rewrite <- HALF. ss.
+        rewrite RESERVE in GET0. rewrite GET0 in GET4. inv GET4. ss.
+      * rewrite <- RESERVE. ss.
     + erewrite Memory.split_o in H; try exact TGT.
       erewrite Memory.split_o; try exact SRC. repeat condtac; ss.
       * des. subst. inv H. inv SIM_MSG. ss.
       * guardH o. des. subst. inv H.
         exploit Memory.split_get0; try exact SRC. i. des.
         exploit Memory.split_get0; try exact TGT. i. des.
-        rewrite <- HALF in GET4. rewrite GET0 in GET4. inv GET4. ss.
-      * rewrite HALF. ss.
+        rewrite <- RESERVE in GET4. rewrite GET0 in GET4. inv GET4. ss.
+      * rewrite RESERVE. ss.
 Qed.
 
 Lemma sim_memory_lower
@@ -416,11 +416,11 @@ Proof.
     + erewrite Memory.lower_o in H; try exact SRC.
       erewrite Memory.lower_o; try exact TGT. condtac; ss.
       * des. subst. inv H. inv SIM_MSG. ss.
-      * rewrite <- HALF. ss.
+      * rewrite <- RESERVE. ss.
     + erewrite Memory.lower_o in H; try exact TGT.
       erewrite Memory.lower_o; try exact SRC. condtac; ss.
       * des. subst. inv H. inv SIM_MSG. ss.
-      * rewrite HALF. ss.
+      * rewrite RESERVE. ss.
 Qed.
 
 Lemma sim_memory_remove
@@ -440,10 +440,10 @@ Proof.
   - split; i.
     + erewrite Memory.remove_o in H; try exact SRC.
       erewrite Memory.remove_o; try exact TGT. condtac; ss.
-      rewrite <- HALF. ss.
+      rewrite <- RESERVE. ss.
     + erewrite Memory.remove_o in H; try exact TGT.
       erewrite Memory.remove_o; try exact SRC. condtac; ss.
-      rewrite HALF. ss.
+      rewrite RESERVE. ss.
 Qed.
 
 Lemma sim_memory_closed_timemap
@@ -535,7 +535,7 @@ Lemma sim_memory_adjacent_src
   exists from1' to2',
     Memory.adjacent loc from1' to1 from2 to2' mem_tgt.
 Proof.
-  dup SIM. inv SIM0. inv ADJ. clear HALF TS0.
+  dup SIM. inv SIM0. inv ADJ. clear RESERVE TS0.
   assert (GET1_TGT: exists from1' m1', Memory.get loc to1 mem_tgt = Some (from1', m1')).
   { exploit Memory.get_ts; try exact GET1. i. des.
     { subst. esplits. eapply CLOSED_TGT. }
@@ -656,7 +656,7 @@ Lemma sim_memory_adjacent_tgt
   exists from1' to2',
     Memory.adjacent loc from1' to1 from2 to2' mem_src.
 Proof.
-  dup SIM. inv SIM0. inv ADJ. clear HALF TS0.
+  dup SIM. inv SIM0. inv ADJ. clear RESERVE TS0.
   assert (GET1_SRC: exists from1' m1', Memory.get loc to1 mem_src = Some (from1', m1')).
   { exploit MSG; try exact GET1. i. des. eauto. }
   assert (GET2_SRC: exists to2' m2', Memory.get loc to2' mem_src = Some (from2, m2')).

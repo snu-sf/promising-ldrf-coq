@@ -30,7 +30,7 @@ Lemma progress_program_step
       (MEM1: Memory.closed mem1)
       (SC1: Memory.closed_timemap sc1 mem1)
       (PROMISES1: lc1.(Local.promises) = Memory.bot)
-      (NOHALF1: Memory.no_reserve mem1):
+      (NORESERVE1: Memory.no_reserve mem1):
   exists e th2, <<STEP: Thread.program_step e (Thread.mk lang (State.mk rs1 (i1::s1)) lc1 sc1 mem1) th2>>.
 Proof.
   destruct i1.

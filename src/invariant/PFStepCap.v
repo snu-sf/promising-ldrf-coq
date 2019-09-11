@@ -121,7 +121,7 @@ Module PFStepCap.
   Proof.
     inv MEM1. inv PROMISE_TGT.
     - (* add *)
-      clear TS HALF.
+      clear TS RESERVE.
       exploit Memory.add_get0; try exact PROMISES. i. des.
       exploit Memory.add_get0; try exact MEM. i. des.
       econs; ii.
@@ -151,7 +151,7 @@ Module PFStepCap.
         * erewrite Memory.add_o; eauto. condtac; ss.
           des; subst; congr.
     - (* split *)
-      clear TS HALF1 HALF2.
+      clear TS RESERVE1 RESERVE2.
       exploit Memory.split_get0; try exact PROMISES. i. des.
       exploit Memory.split_get0; try exact MEM. i. des.
       econs; ii.
@@ -340,7 +340,7 @@ Module PFStepCap.
     exploit Memory.remove_get0; eauto. i. des.
     inv PROMISE_TGT.
     - (* add *)
-      clear TS HALF.
+      clear TS RESERVE.
       exploit MemoryMerge.add_remove; try exact PROMISES; eauto. i. subst.
       exploit Memory.add_get0; try exact MEM. i. des.
       econs; ii.
@@ -381,7 +381,7 @@ Module PFStepCap.
               guardH o. des. subst. congr. }
         * erewrite Memory.remove_o; eauto. condtac; ss.
     - (* SPLIT *)
-      clear TS HALF1 HALF2.
+      clear TS RESERVE1 RESERVE2.
       exploit Memory.split_get0; try exact PROMISES. i. des.
       exploit Memory.split_get0; try exact MEM. i. des.
       econs; ii.
@@ -621,7 +621,7 @@ Module PFStepCap.
     exploit Memory.remove_get0; eauto. i. des.
     inv PROMISE_TGT.
     - (* add *)
-      clear TS HALF.
+      clear TS RESERVE.
       exploit MemoryMerge.add_remove; try exact PROMISES; eauto. i. subst.
       exploit Memory.add_get0; try exact MEM. i. des.
       econs; ii.
@@ -661,7 +661,7 @@ Module PFStepCap.
               guardH o. des. subst. congr. }
         * erewrite Memory.remove_o; eauto. condtac; ss.
     - (* SPLIT *)
-      clear TS HALF1 HALF2.
+      clear TS RESERVE1 RESERVE2.
       exploit Memory.split_get0; try exact PROMISES. i. des.
       exploit Memory.split_get0; try exact MEM. i. des.
       econs; ii.
@@ -776,7 +776,7 @@ Module PFStepCap.
     exploit (@Memory.add_exists mem1_src loc from to
                                 (Message.full val (TView.write_released (Local.tview lc1_tgt) sc1 loc to releasedm ord))); eauto.
     { inv MEM1. inv PROMISE; ss; ii.
-      - clear TS HALF.
+      - clear TS RESERVE.
         exploit SOUND; eauto. i.
         exploit Memory.add_get1; eauto. i.
         exploit Memory.add_get0; try exact MEM. i. des.
@@ -787,7 +787,7 @@ Module PFStepCap.
           { ii. exploit CAPS; eauto. i. des. congr. }
           i. des. congr.
         + eapply x3; eauto.
-      - clear TS HALF1 HALF2.
+      - clear TS RESERVE1 RESERVE2.
         exploit SOUND; eauto. i.
         exploit Memory.split_get0; eauto. i. des.
         exploit Memory.get_disjoint; [exact x0|exact GET0|..]. i. des.
@@ -1167,7 +1167,7 @@ Module PFStepCap.
                     (GETP: Cell.get to promises = None)
                     (GET_TGT: Cell.get to cell_tgt = Some (from, Message.full val released)),
           <<GET_SRC: Cell.get to cell_src = Some (from, Message.full val released)>>)
-      (HALF: forall from to
+      (RESERVE: forall from to
                (IN: List.In to dom)
                (GETP: Cell.get to promises = None)
                (GET_TGT: Cell.get to cell_tgt = Some (from, Message.reserve)),

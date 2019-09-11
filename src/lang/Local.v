@@ -187,7 +187,7 @@ Module Local.
       (PROMISES: Memory.le lc.(promises) mem)
       (FINITE: Memory.finite lc.(promises))
       (BOT: Memory.bot_none lc.(promises))
-      (HALF: Memory.reserve_wf lc.(promises) mem)
+      (RESERVE: Memory.reserve_wf lc.(promises) mem)
   .
   Hint Constructors wf.
 
@@ -594,8 +594,8 @@ Module Local.
   Lemma promise_step_no_reserve_except
         lc1 mem1 loc from to msg lc2 mem2 kind
         (STEP: promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
-        (HALF1: Memory.reserve_wf lc1.(promises) mem1)
-        (NOHALF1: Memory.no_reserve_except lc1.(promises) mem1):
+        (RESERVE1: Memory.reserve_wf lc1.(promises) mem1)
+        (NORESERVE1: Memory.no_reserve_except lc1.(promises) mem1):
     Memory.no_reserve_except lc2.(promises) mem2.
   Proof.
     ii. inv STEP. s.
@@ -605,8 +605,8 @@ Module Local.
   Lemma program_step_no_reserve_except
         e lc1 sc1 mem1 lc2 sc2 mem2
         (STEP: program_step e lc1 sc1 mem1 lc2 sc2 mem2)
-        (HALF1: Memory.reserve_wf lc1.(promises) mem1)
-        (NOHALF1: Memory.no_reserve_except lc1.(promises) mem1):
+        (RESERVE1: Memory.reserve_wf lc1.(promises) mem1)
+        (NORESERVE1: Memory.no_reserve_except lc1.(promises) mem1):
     Memory.no_reserve_except lc2.(promises) mem2.
   Proof.
     ii. inv STEP; try inv LOCAL; eauto; ss.

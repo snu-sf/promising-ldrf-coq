@@ -81,7 +81,7 @@ Module PFStep.
     sim_memory promises2 mem1_src mem2_tgt.
   Proof.
     inv MEM1. inv PROMISE.
-    - clear TS HALF.
+    - clear TS RESERVE.
       exploit Memory.add_get0; try exact PROMISES. i. des.
       exploit Memory.add_get0; try exact MEM. i. des.
       econs; ii.
@@ -96,7 +96,7 @@ Module PFStep.
         erewrite Memory.add_o; eauto. condtac; ss; eauto. i.
         revert GET_TGT.
         erewrite Memory.add_o; eauto. condtac; ss; eauto.
-    - clear TS HALF1 HALF2.
+    - clear TS RESERVE1 RESERVE2.
       exploit Memory.split_get0; try exact PROMISES. i. des.
       exploit Memory.split_get0; try exact MEM. i. des.
       econs; ii.
@@ -178,7 +178,7 @@ Module PFStep.
   Proof.
     dup MEM1. inv MEM0. inv PROMISE_TGT.
     - (* add *)
-      clear TS HALF.
+      clear TS RESERVE.
       exploit (@Memory.add_exists mem1_src loc from to msg); eauto.
       { ii. exploit SOUND; eauto. i.
         inv MEM. inv ADD. eapply DISJOINT; eauto. }
@@ -206,7 +206,7 @@ Module PFStep.
           erewrite Memory.add_o; eauto. condtac; ss. i.
           erewrite Memory.add_o; eauto. condtac; ss. eauto.
     - (* split *)
-      clear TS HALF1 HALF2.
+      clear TS RESERVE1 RESERVE2.
       exploit (@Memory.add_exists mem1_src loc from to msg); eauto.
       { ii. exploit SOUND; eauto. i.
         exploit Memory.split_get0; try exact MEM. i. des.
