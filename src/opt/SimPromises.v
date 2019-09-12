@@ -55,6 +55,8 @@ Module SimPromises.
   Ltac none_if_tac :=
     repeat
       (try match goal with
+           | [ |- context[none_if _ _ _ (Message.full ?val ?released)]] =>
+             unfold none_if; ss
            | [ |- context[none_if _ _ _ ?msg]] =>
              unfold none_if; destruct msg; ss
            | [ |- context[none_if_released _ _ ?msg]] =>
@@ -157,14 +159,10 @@ Module SimPromises.
       exploit sim_memory_split; try apply SIM1; try refl; eauto. i.
       esplits; eauto.
       + unfold none_if. destruct msg; ss.
-        * unfold none_if_released. condtac; ss.
-          { inv INV1. exploit PVIEW; eauto. i. des.
-            hexploit Memory.split_get0; try exact PROMISES; eauto. congr. }
-          { econs 2; eauto; congr. }
-        * econs 2; eauto.
-          { i. exploit RESERVE1; eauto. i. des.
-            inv SIM1. exploit MSG; eauto. i. des. inv MSG0. eauto. }
-          { destruct msg3; ss. }
+        unfold none_if_released. condtac; ss.
+        * inv INV1. exploit PVIEW; eauto. i. des.
+          hexploit Memory.split_get0; try exact PROMISES; eauto. congr.
+        * econs 2; eauto; congr.
       + econs.
         * ii. revert LHS.
           erewrite Memory.split_o; eauto. erewrite (@Memory.split_o mem2); try exact x0.
@@ -176,8 +174,7 @@ Module SimPromises.
           { apply INV1. }
         * i. inv INV1. exploit PVIEW; eauto. i. des.
           erewrite Memory.split_o; eauto. repeat condtac; eauto.
-          { des. ss. subst. congr. }
-          { des; ss. subst. rewrite GET0 in x. inv x. eauto. }
+          des; ss. subst. rewrite GET0 in x. inv x. eauto.
         * i. inv INV1. exploit SOUND; eauto. i.
           erewrite Memory.split_o; eauto. erewrite (@Memory.split_o mem2); eauto.
           exploit Memory.split_get0; try exact x0; eauto. i. des.

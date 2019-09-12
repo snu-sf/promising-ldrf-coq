@@ -96,7 +96,7 @@ Module PFStep.
         erewrite Memory.add_o; eauto. condtac; ss; eauto. i.
         revert GET_TGT.
         erewrite Memory.add_o; eauto. condtac; ss; eauto.
-    - clear TS RESERVE1 RESERVE2.
+    - clear TS RESERVE.
       exploit Memory.split_get0; try exact PROMISES. i. des.
       exploit Memory.split_get0; try exact MEM. i. des.
       econs; ii.
@@ -206,7 +206,7 @@ Module PFStep.
           erewrite Memory.add_o; eauto. condtac; ss. i.
           erewrite Memory.add_o; eauto. condtac; ss. eauto.
     - (* split *)
-      clear TS RESERVE1 RESERVE2.
+      clear TS RESERVE.
       exploit (@Memory.add_exists mem1_src loc from to msg); eauto.
       { ii. exploit SOUND; eauto. i.
         exploit Memory.split_get0; try exact MEM. i. des.

@@ -73,6 +73,12 @@ Module Message.
     | full _ _ => false
     | reserve => true
     end.
+
+  Definition is_released_none (msg: t): bool :=
+    match msg with
+    | full _ None => true
+    | _ => false
+    end.
 End Message.
 
 Module Cell.

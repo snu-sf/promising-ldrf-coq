@@ -845,7 +845,8 @@ Module MemoryReorder.
     - exploit Memory.split_get0; try eexact PROMISES; eauto. i. des.
       revert GET0. erewrite Memory.remove_o; eauto. condtac; ss. i. guardH o.
       exploit Memory.split_exists; try exact GET0; try by inv PROMISES; inv SPLIT; eauto. i. des.
-      exploit remove_split; eauto.
+      exploit remove_split; eauto. i.
+      esplits; eauto.
     - exploit Memory.lower_get0; try eexact PROMISES; eauto. i. des.
       revert GET. erewrite Memory.remove_o; eauto. condtac; ss. i. guardH o.
       exploit Memory.lower_exists; try exact GET; try by inv PROMISES; inv LOWER; eauto. i. des.
@@ -867,12 +868,8 @@ Module MemoryReorder.
     exploit add_split; try exact PROMISES; eauto. i. des; [|congr].
     exploit add_split; try exact MEM; eauto. i. des; [|congr].
     esplits.
-    - econs; eauto.
-      i. subst. exploit RESERVE1; eauto. i. des.
-      revert x. erewrite Memory.add_o; eauto. condtac; ss; eauto.
-      des. subst. inv MEM0. inv SPLIT. rewrite TS12 in TS23. timetac.
-    - econs; eauto.
-      i. subst. exploit RESERVE2; eauto. i. des. subst.
+    - econs; eauto. i. subst. congr.
+    - econs; eauto. i. subst.
       exploit Memory.add_get0; try exact ADD0. i. des. eauto.
   Qed.
 
@@ -893,8 +890,7 @@ Module MemoryReorder.
     exploit split_split; try exact MEM; eauto. i. des; [|congr].
     esplits.
     - econs; eauto; congr.
-    - econs; eauto. i. subst.
-      exploit Memory.split_get0; try exact SPLIT0. i. des. eauto.
+    - econs; eauto.
   Qed.
 
   Lemma promise_lower_promise_split_same

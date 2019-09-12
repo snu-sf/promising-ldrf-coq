@@ -379,11 +379,7 @@ Module Memory.
       (PROMISES: split promises1 loc from to ts3 msg msg3 promises2)
       (MEM: split mem1 loc from to ts3 msg msg3 mem2)
       (TS: message_to msg loc to)
-      (RESERVE1: msg = Message.reserve ->
-              exists from' val' released',
-                get loc from mem1 = Some (from', Message.full val' released'))
-      (RESERVE2: msg3 = Message.reserve ->
-              exists val' released', msg = Message.full val' released'):
+      (RESERVE: exists val' released', msg = Message.full val' released'):
       promise promises1 mem1 loc from to msg promises2 mem2 (op_kind_split ts3 msg3)
   | promise_lower
       msg0
@@ -563,6 +559,17 @@ Module Memory.
       esplits; eauto.
     - esplits; eauto.
       refl.
+  Qed.
+
+  Lemma remove_get1
+        m1 loc from to msg m2
+        l f t m
+        (REMOVE: remove m1 loc from to msg m2)
+        (GET1: get l t m1 = Some (f, m)):
+    <<LOCTS: l = loc /\ t = to>> \/
+    <<GET2: get l t m2 = Some (f, m)>>.
+  Proof.
+    erewrite remove_o; eauto. condtac; eauto.
   Qed.
 
   Lemma add_bot_none
@@ -1745,10 +1752,7 @@ Module Memory.
         exploit add_get1; try exact x; eauto.
     - erewrite split_o; eauto. repeat condtac; ss; i.
       + des. subst. inv GET.
-        exploit RESERVE0; eauto. i. des.
-        exploit split_get1; try exact x; eauto. i. des. eauto.
       + guardH o. des. subst. inv GET.
-        exploit RESERVE2; eauto. i. des. subst.
         exploit split_get0; try exact MEM. i. des. eauto.
       + guardH o. guardH o0.
         exploit RESERVE1; eauto. i. des.

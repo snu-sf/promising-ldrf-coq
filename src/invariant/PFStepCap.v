@@ -151,7 +151,7 @@ Module PFStepCap.
         * erewrite Memory.add_o; eauto. condtac; ss.
           des; subst; congr.
     - (* split *)
-      clear TS RESERVE1 RESERVE2.
+      clear TS RESERVE.
       exploit Memory.split_get0; try exact PROMISES. i. des.
       exploit Memory.split_get0; try exact MEM. i. des.
       econs; ii.
@@ -381,7 +381,7 @@ Module PFStepCap.
               guardH o. des. subst. congr. }
         * erewrite Memory.remove_o; eauto. condtac; ss.
     - (* SPLIT *)
-      clear TS RESERVE1 RESERVE2.
+      clear TS RESERVE.
       exploit Memory.split_get0; try exact PROMISES. i. des.
       exploit Memory.split_get0; try exact MEM. i. des.
       econs; ii.
@@ -661,7 +661,7 @@ Module PFStepCap.
               guardH o. des. subst. congr. }
         * erewrite Memory.remove_o; eauto. condtac; ss.
     - (* SPLIT *)
-      clear TS RESERVE1 RESERVE2.
+      clear TS RESERVE.
       exploit Memory.split_get0; try exact PROMISES. i. des.
       exploit Memory.split_get0; try exact MEM. i. des.
       econs; ii.
@@ -787,7 +787,7 @@ Module PFStepCap.
           { ii. exploit CAPS; eauto. i. des. congr. }
           i. des. congr.
         + eapply x3; eauto.
-      - clear TS RESERVE1 RESERVE2.
+      - clear TS RESERVE.
         exploit SOUND; eauto. i.
         exploit Memory.split_get0; eauto. i. des.
         exploit Memory.get_disjoint; [exact x0|exact GET0|..]. i. des.

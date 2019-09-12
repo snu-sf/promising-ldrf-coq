@@ -53,8 +53,8 @@ Module MemoryFacts.
     - erewrite Memory.split_o; eauto. repeat condtac; ss.
       + des. subst. congr.
       + guardH o. des. subst.
-        exploit Memory.split_get0; eauto. i. des.
-        rewrite GET in GET1. inv GET1. esplits; eauto.
+        exploit Memory.split_get0; try exact MEM. i. des.
+        rewrite GET in *. inv GET1. esplits; eauto.
       + esplits; eauto.
     - erewrite Memory.lower_o; eauto. condtac; ss.
       + des. subst. congr.
