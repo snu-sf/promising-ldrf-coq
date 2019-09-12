@@ -74,8 +74,8 @@ Module Thread.
         loc from to msg kind
         lc2 mem2
         (LOCAL: Local.promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
-        (PF: pf = orb (Message.is_reserve msg)
-                      (orb (Memory.op_kind_is_lower_full kind) (Memory.op_kind_is_cancel kind))):
+        (PF: pf = orb (andb (Memory.op_kind_is_lower_full kind) (Message.is_released_none msg))
+                      (Memory.op_kind_is_cancel kind)):
         promise_step pf (ThreadEvent.promise loc from to msg kind) (mk st lc1 sc1 mem1) (mk st lc2 sc1 mem2)
     .
 
