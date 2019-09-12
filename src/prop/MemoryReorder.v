@@ -232,6 +232,23 @@ Module MemoryReorder.
     repeat (condtac; ss). des. repeat subst. congr.
   Qed.
 
+  Lemma add_remove_same
+        mem0 loc1 from1 to1 msg1
+        mem1 from2 msg2
+        mem2
+        (ADD1: Memory.add mem0 loc1 from1 to1 msg1 mem1)
+        (REMOVE2: Memory.remove mem1 loc1 from2 to1 msg2 mem2):
+    from1 = from2 /\ msg1 = msg2 /\ mem0 = mem2.
+  Proof.
+    exploit Memory.add_get0; eauto. i. des.
+    exploit Memory.remove_get0; eauto. i. des.
+    rewrite GET0 in *. inv GET1. splits; auto.
+    apply Memory.ext. i.
+    erewrite (@Memory.remove_o mem2); eauto. condtac; ss.
+    - des. subst. ss.
+    - erewrite (@Memory.add_o mem1); eauto. condtac; ss.
+  Qed.
+
   Lemma split_add
         mem0 loc1 ts11 ts12 ts13 msg12 msg13
         mem1 loc2 from2 to2 msg2
@@ -475,6 +492,41 @@ Module MemoryReorder.
     - guardH o. des. repeat subst. congr.
   Qed.
 
+  Lemma split_remove_same
+        mem0 loc1 ts11 ts12 ts13 msg12 msg13
+        mem1 from2 msg2
+        mem2
+        (SPLIT1: Memory.split mem0 loc1 ts11 ts12 ts13 msg12 msg13 mem1)
+        (REMOVE2: Memory.remove mem1 loc1 from2 ts13 msg2 mem2):
+    from2 = ts12 /\ msg13 = msg2 /\
+    exists mem1',
+      <<REMOVE1: Memory.remove mem0 loc1 ts11 ts13 msg13 mem1'>> /\
+      <<ADD2: Memory.add mem1' loc1 ts11 ts12 msg12 mem2>>.
+  Proof.
+    exploit Memory.split_get0; eauto. i. des.
+    exploit Memory.remove_get0; eauto. i. des.
+    rewrite GET3 in *. inv GET2. splits; auto.
+    exploit (@Memory.remove_exists mem0 loc1 ts11 ts13 msg13); eauto. i. des.
+    exploit (@Memory.add_exists mem3 loc1 ts11 ts12 msg12); eauto.
+    { ii. revert GET2.
+      erewrite Memory.remove_o; eauto. condtac; ss. i. des; ss.
+      exploit Memory.get_disjoint; [exact GET0|exact GET2|..]. i. des.
+      { subst. ss. }
+      inv LHS. inv RHS. ss.
+      apply (x2 x); econs; ss.
+      inv SPLIT1. inv SPLIT.
+      etrans; try exact TO. econs; ss. }
+    { inv SPLIT1. inv SPLIT. ss. }
+    { inv SPLIT1. inv SPLIT. ss. }
+    i. des. esplits; eauto.
+    cut (mem4 = mem2); [i; subst; eauto|].
+    apply Memory.ext. i.
+    erewrite Memory.add_o; eauto. erewrite Memory.remove_o; eauto.
+    erewrite (@Memory.remove_o mem2); eauto. erewrite (@Memory.split_o mem1); eauto.
+    repeat (condtac; ss).
+    des. subst. congr.
+  Qed.
+
   Lemma lower_add
         mem0 loc1 from1 to1 msg1 msg1'
         mem1 loc2 from2 to2 msg2
@@ -657,6 +709,27 @@ Module MemoryReorder.
     erewrite Memory.lower_o; eauto. erewrite Memory.remove_o; eauto.
     erewrite (@Memory.remove_o mem2); eauto. erewrite (@Memory.lower_o mem1); eauto.
     repeat (condtac; ss). des. repeat subst. congr.
+  Qed.
+
+  Lemma lower_remove_same
+        mem0 loc1 from1 to1 msg1 msg1'
+        mem1 from2 msg2
+        mem2
+        (LOWER1: Memory.lower mem0 loc1 from1 to1 msg1 msg1' mem1)
+        (REMOVE2: Memory.remove mem1 loc1 from2 to1 msg2 mem2):
+    from1 = from2 /\ msg1' = msg2 /\
+    <<REMOVE1: Memory.remove mem0 loc1 from1 to1 msg1 mem2>>.
+  Proof.
+    exploit Memory.lower_get0; eauto. i. des.
+    exploit Memory.remove_get0; eauto. i. des.
+    rewrite GET1 in *. inv GET0. splits; auto.
+    exploit (@Memory.remove_exists mem0 loc1 from1 to1 msg1); eauto. i. des.
+    cut (mem3 = mem2); [i; subst; eauto|].
+    apply Memory.ext. i.
+    erewrite Memory.remove_o; eauto.
+    erewrite (@Memory.remove_o mem2); try exact REMOVE2.
+    erewrite (@Memory.lower_o mem1); eauto.
+    repeat (condtac; ss).
   Qed.
 
   Lemma remove_add
