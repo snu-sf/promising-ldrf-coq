@@ -3,9 +3,10 @@ COQTHEORIES  :=	src/lang/*.v \
 	src/while/*.v \
 	src/prop/*.v \
 	src/opt/*.v \
+	src/attachable/*.v \
 	src/invariant/*.v \
 	src/gopt/*.v \
-	src/attachable/*.v
+	src/promotion/*.v
 
 .PHONY: all theories clean
 
@@ -22,9 +23,10 @@ Makefile.coq: Makefile $(COQTHEORIES)
    echo "-R src/while $(COQMODULE)"; \
    echo "-R src/prop $(COQMODULE)"; \
    echo "-R src/opt $(COQMODULE)"; \
+   echo "-R src/attachable $(COQMODULE)"; \
    echo "-R src/invariant $(COQMODULE)"; \
    echo "-R src/gopt $(COQMODULE)"; \
-   echo "-R src/attachable $(COQMODULE)"; \
+   echo "-R src/promotion $(COQMODULE)"; \
    \
    echo $(COQTHEORIES)) > _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq
