@@ -174,6 +174,26 @@ Inductive sim_thread_promotion (l: Loc.t) (r: Reg.t) (e_src e_tgt: Thread.t lang
     (LOCAL: sim_local l e_src.(Thread.local) e_tgt.(Thread.local))
     (SC: sim_timemap l e_src.(Thread.sc) e_tgt.(Thread.sc))
     (MEMORY: sim_memory l e_src.(Thread.memory) e_tgt.(Thread.memory))
-    (LATEST: Memory.latest_val l e_src.(Thread.memory) (e_tgt.(Thread.state).(State.regs) r))
+    (LATEST: exists from released,
+        Memory.get l (Memory.max_ts l e_src.(Thread.memory)) e_src.(Thread.memory) = 
+        Some (from, Message.full (e_tgt.(Thread.state).(State.regs) r) released))
 .
 Hint Constructors sim_thread_promotion.
+
+Inductive sim_thread_promotion_reserve (l: Loc.t) (r: Reg.t) (e_src e_tgt: Thread.t lang): Prop :=
+| sim_thread_promotion_reserve_intro
+    (REGFREE: reg_free_stmts r e_src.(Thread.state).(State.stmts))
+    (STMTS: sim_state_promotion l r e_src.(Thread.state) e_tgt.(Thread.state) \/
+            sim_state_fa l r e_src.(Thread.state) e_tgt.(Thread.state) \/
+            sim_state_cas_success1 l r e_src.(Thread.state) e_tgt.(Thread.state) \/
+            sim_state_cas_success2 l r e_src.(Thread.state) e_tgt.(Thread.state) \/
+            sim_state_cas_fail l r e_src.(Thread.state) e_tgt.(Thread.state))
+    (LOCAL: sim_local l e_src.(Thread.local) e_tgt.(Thread.local))
+    (SC: sim_timemap l e_src.(Thread.sc) e_tgt.(Thread.sc))
+    (MEMORY: sim_memory l e_src.(Thread.memory) e_tgt.(Thread.memory))
+    (LATEST: Memory.latest_val l e_src.(Thread.memory) (e_tgt.(Thread.state).(State.regs) r))
+    (RESERVE: exists from,
+        Memory.get l (Memory.max_ts l e_src.(Thread.memory)) e_src.(Thread.memory) = 
+        Some (from, Message.reserve))
+.
+Hint Constructors sim_thread_promotion_reserve.
