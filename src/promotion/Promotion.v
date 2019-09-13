@@ -82,3 +82,18 @@ Fixpoint loc_free_stmt (l: Loc.t) (stmt: Stmt.t): bool :=
 
 Definition loc_free_stmts (l: Loc.t) (stmts: list Stmt.t): bool :=
   List.fold_left andb (List.map (loc_free_stmt l) stmts) true.
+
+
+Fixpoint reg_free_stmt (r: Reg.t) (stmt: Stmt.t): Prop :=
+  match stmt with
+  | Stmt.instr i => RegSet.disjoint (RegSet.singleton r) (Instr.regs_of i)
+  | Stmt.ite cond stmts1 stmts2 =>
+    and
+      (List.fold_left and (List.map (reg_free_stmt r) stmts1) true)
+      (List.fold_left and (List.map (reg_free_stmt r) stmts2) true)
+  | Stmt.dowhile stmts cond =>
+    List.fold_left and (List.map (reg_free_stmt r) stmts) true
+  end.
+
+Definition reg_free_stmts (r: Reg.t) (stmts: list Stmt.t): Prop :=
+  List.fold_left and (List.map (reg_free_stmt r) stmts) true.

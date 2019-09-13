@@ -26,6 +26,8 @@ Require Import Semantics.
 
 Require Import PromiseConsistent.
 
+Require Import Promotion.
+
 Set Implicit Arguments.
 
 
@@ -68,7 +70,7 @@ Inductive sim_message (l: Loc.t): forall (msg_src msg_tgt: Message.t), Prop :=
 .
 Hint Constructors sim_message.
 
-Inductive sim_memory (certify: bool) (l: Loc.t) (mem_src mem_tgt: Memory.t): Prop :=
+Inductive sim_memory (l: Loc.t) (mem_src mem_tgt: Memory.t): Prop :=
 | sim_memory_intro
     (SOUND: forall loc from to msg_src
               (LOC: loc <> l)
@@ -82,13 +84,96 @@ Inductive sim_memory (certify: bool) (l: Loc.t) (mem_src mem_tgt: Memory.t): Pro
         exists msg_src,
           <<GET_SRC: Memory.get loc to mem_src = Some (from, msg_src)>> /\
           <<MSG: sim_message l msg_src msg_tgt>>)
-    (PROM: forall to,
-        <<GET_TGT: Memory.get l to mem_tgt =
-                   if Time.eq_dec to Time.bot
-                   then Some (Time.bot, Message.elt)
-                   else
-                     if andb certify (Time.eq_dec to (Time.incr Time.bot))
-                     then Some (Time.bot, Message.reserve)
-                     else None>>)
 .
 Hint Constructors sim_memory.
+
+Inductive sim_local (l: Loc.t) (lc_src lc_tgt: Local.t): Prop :=
+| sim_local_intro
+    (TVIEW: sim_tview l lc_src.(Local.tview) lc_tgt.(Local.tview))
+    (PROMISES1: sim_memory l lc_src.(Local.promises) lc_tgt.(Local.promises))
+    (PROMISES2: lc_tgt.(Local.promises) l = Cell.bot)
+.
+Hint Constructors sim_local.
+
+Inductive sim_thread (l: Loc.t) (e_src e_tgt: Thread.t lang): Prop :=
+| sim_thread_intro
+    (LOCFREE: loc_free_stmts l e_src.(Thread.state).(State.stmts))
+    (STATE: e_src.(Thread.state) = e_tgt.(Thread.state))
+    (LOCAL: sim_local l e_src.(Thread.local) e_tgt.(Thread.local))
+    (SC: sim_timemap l e_src.(Thread.sc) e_tgt.(Thread.sc))
+    (MEMORY: sim_memory l e_src.(Thread.memory) e_tgt.(Thread.memory))
+.
+Hint Constructors sim_thread.
+
+Inductive sim_state_promotion (l: Loc.t) (r: Reg.t) (st_src st_tgt: State.t): Prop :=
+| sim_state_promotion_intro
+    (STMTS: st_tgt.(State.stmts) = promote_stmts l r st_src.(State.stmts))
+    (REGS: RegFile.eq_except (RegSet.singleton r) st_src.(State.regs) st_tgt.(State.regs))
+.
+Hint Constructors sim_state_promotion.
+
+Inductive sim_state_fa (l: Loc.t) (r: Reg.t) (st_src st_tgt: State.t): Prop :=
+| sim_state_fa_intro
+    lhs addendum ordr ordw stmts_src stmts_tgt
+    (STMTS_SRC: st_src.(State.stmts) =
+                (Stmt.instr (Instr.update lhs l (Instr.fetch_add addendum) ordr ordw)) :: stmts_src)
+    (STMTS_TGT: st_tgt.(State.stmts) =
+                (Stmt.instr (Instr.assign r (Instr.expr_op2 Op2.add (Value.reg r) addendum))) :: stmts_tgt)
+    (REGS: RegFile.eq_except (RegSet.add lhs (RegSet.singleton r)) st_src.(State.regs) st_tgt.(State.regs))
+    (LHS: st_tgt.(State.regs) lhs = st_tgt.(State.regs) r)
+.
+Hint Constructors sim_state_fa.
+
+Inductive sim_state_cas_success1 (l: Loc.t) (r: Reg.t) (st_src st_tgt: State.t): Prop :=
+| sim_state_cas1_intro
+    lhs old new ordr ordw stmts_src stmts_tgt
+    (STMTS_SRC: st_src.(State.stmts) =
+                (Stmt.instr (Instr.update lhs l (Instr.cas old new) ordr ordw)) :: stmts_src)
+    (STMTS_TGT: st_tgt.(State.stmts) =
+                Stmt.instr (Instr.assign lhs (Instr.expr_val (Value.const 1)))
+                  :: (Stmt.instr (Instr.assign r new))
+                  :: stmts_tgt)
+    (REGS: RegFile.eq_except (RegSet.singleton r) st_src.(State.regs) st_tgt.(State.regs))
+    (SUCCESS: st_tgt.(State.regs) r = RegFile.eval_value st_tgt.(State.regs) old)
+.
+Hint Constructors sim_state_cas_success1.
+
+Inductive sim_state_cas_success2 (l: Loc.t) (r: Reg.t) (st_src st_tgt: State.t): Prop :=
+| sim_state_cas2_intro
+    lhs old new ordr ordw stmts_src stmts_tgt
+    (STMTS_SRC: st_src.(State.stmts) =
+                (Stmt.instr (Instr.update lhs l (Instr.cas old new) ordr ordw)) :: stmts_src)
+    (STMTS_TGT: st_tgt.(State.stmts) =
+                (Stmt.instr (Instr.assign r new)) :: stmts_tgt)
+    (REGS: RegFile.eq_except (RegSet.add lhs (RegSet.singleton r)) st_src.(State.regs) st_tgt.(State.regs))
+    (LHS: st_tgt.(State.regs) r = 1)
+    (SUCCESS: st_tgt.(State.regs) r = RegFile.eval_value st_tgt.(State.regs) old)
+.
+Hint Constructors sim_state_cas_success2.
+
+Inductive sim_state_cas_fail (l: Loc.t) (r: Reg.t) (st_src st_tgt: State.t): Prop :=
+| sim_state_cas_fail_intro
+    lhs old new ordr ordw stmts_src stmts_tgt
+    (REGS: RegFile.eq_except (RegSet.singleton r) st_src.(State.regs) st_tgt.(State.regs))
+    (STMTS_SRC: st_src.(State.stmts) =
+                (Stmt.instr (Instr.update lhs l (Instr.cas old new) ordr ordw)) :: stmts_src)
+    (STMTS_TGT: st_tgt.(State.stmts) =
+                Stmt.instr (Instr.assign lhs (Instr.expr_val (Value.const 0))) :: stmts_tgt)
+    (FAIL: st_tgt.(State.regs) r <> RegFile.eval_value st_tgt.(State.regs) old)
+.
+Hint Constructors sim_state_cas_fail.
+
+Inductive sim_thread_promotion (l: Loc.t) (r: Reg.t) (e_src e_tgt: Thread.t lang): Prop :=
+| sim_thread_promotion_intro
+    (REGFREE: reg_free_stmts r e_src.(Thread.state).(State.stmts))
+    (STMTS: sim_state_promotion l r e_src.(Thread.state) e_tgt.(Thread.state) \/
+            sim_state_fa l r e_src.(Thread.state) e_tgt.(Thread.state) \/
+            sim_state_cas_success1 l r e_src.(Thread.state) e_tgt.(Thread.state) \/
+            sim_state_cas_success2 l r e_src.(Thread.state) e_tgt.(Thread.state) \/
+            sim_state_cas_fail l r e_src.(Thread.state) e_tgt.(Thread.state))
+    (LOCAL: sim_local l e_src.(Thread.local) e_tgt.(Thread.local))
+    (SC: sim_timemap l e_src.(Thread.sc) e_tgt.(Thread.sc))
+    (MEMORY: sim_memory l e_src.(Thread.memory) e_tgt.(Thread.memory))
+    (LATEST: Memory.latest_val l e_src.(Thread.memory) (e_tgt.(Thread.state).(State.regs) r))
+.
+Hint Constructors sim_thread_promotion.
