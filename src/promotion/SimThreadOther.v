@@ -32,12 +32,17 @@ Require Import SimCommon.
 Set Implicit Arguments.
 
 
-Inductive sim_thread (l: Loc.t) (e_src e_tgt: Thread.t lang): Prop :=
-| sim_thread_intro
+Inductive sim_thread_other (l: Loc.t) (e_src e_tgt: Thread.t lang): Prop :=
+| sim_thread_other_intro
     (LOCFREE: loc_free_stmts l e_src.(Thread.state).(State.stmts))
     (STATE: e_src.(Thread.state) = e_tgt.(Thread.state))
     (LOCAL: sim_local l e_src.(Thread.local) e_tgt.(Thread.local))
     (SC: sim_timemap l e_src.(Thread.sc) e_tgt.(Thread.sc))
     (MEMORY: sim_memory l e_src.(Thread.memory) e_tgt.(Thread.memory))
+    (PROMISES: forall to, Memory.get l to e_src.(Thread.local).(Local.promises) = None)
+    (RELEASED: forall loc from to val released
+                 (GETP: Memory.get loc to e_src.(Thread.local).(Local.promises) =
+                        Some (from, Message.full val (Some released))),
+        released_eq_tview_loc l loc released e_src.(Thread.local).(Local.tview))
 .
-Hint Constructors sim_thread.
+Hint Constructors sim_thread_other.

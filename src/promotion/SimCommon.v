@@ -32,7 +32,7 @@ Set Implicit Arguments.
 
 
 Definition sim_timemap (l: Loc.t) (tm_src tm_tgt: TimeMap.t): Prop :=
-  tm_tgt = TimeMap.add l Time.bot tm_src.
+  forall loc (LOC: loc <> l), tm_src loc = tm_tgt loc.
 
 Inductive sim_view (l: Loc.t) (view_src view_tgt: View.t): Prop :=
 | sim_view_intro
@@ -94,3 +94,7 @@ Inductive sim_local (l: Loc.t) (lc_src lc_tgt: Local.t): Prop :=
     (PROMISES2: lc_tgt.(Local.promises) l = Cell.bot)
 .
 Hint Constructors sim_local.
+
+Definition released_eq_tview_loc (l loc: Loc.t) (released: View.t) (tview: TView.t): Prop :=
+  <<PLN: released.(View.pln) l = (tview.(TView.rel) loc).(View.pln) l>> /\
+  <<RLX: released.(View.rlx) l = (tview.(TView.rel) loc).(View.rlx) l>>.
