@@ -75,7 +75,7 @@ Inductive sim_thread_other (l: Loc.t) (e_src e_tgt: Thread.t lang): Prop :=
 Hint Constructors sim_thread_other.
 
 
-Lemma sim_thread_promise_step
+Lemma sim_thread_other_promise_step
       l e1_src
       pf e_tgt e1_tgt e2_tgt
       (SIM1: sim_thread_other l e1_src e1_tgt)
@@ -84,11 +84,12 @@ Lemma sim_thread_promise_step
       (STEP_TGT: Thread.promise_step pf e_tgt e1_tgt e2_tgt):
   exists e_src e2_src,
     <<STEP_SRC: opt_promise_step e_src e1_src e2_src>> /\
-    <<SIM2: sim_thread_other l e2_src e2_tgt>>.
+    <<SIM2: sim_thread_other l e2_src e2_tgt>> /\
+    <<MEMLOC: forall to, Memory.get l to e1_src.(Thread.memory) = Memory.get l to e2_src.(Thread.memory)>>.
 Proof.
   inversion STEP_TGT. subst. inv LOCAL; ss.
   destruct (Loc.eq_dec loc l).
-  { subst. esplits; [econs 1|].
+  { subst. esplits; [econs 1| |]; eauto.
     inv SIM1. ss.
     exploit sim_memory_promise_loc; try exact PROMISE; try apply LOCAL; eauto. i. des.
     econs; ss; eauto.
@@ -113,9 +114,16 @@ Proof.
         { des; subst; ss. }
       * erewrite Memory.lower_o; eauto. condtac; ss. des. subst. ss.
       * erewrite Memory.remove_o; eauto. condtac; ss.
+  - i. s. inv PROMISE_SRC.
+    + erewrite (@Memory.add_o mem2_src); eauto. condtac; ss. des. subst. ss.
+    + erewrite (@Memory.split_o mem2_src); eauto. repeat condtac; ss.
+      { des. subst. ss. }
+      { des; subst; ss. }
+    + erewrite (@Memory.lower_o mem2_src); eauto. condtac; ss. des. subst. ss.
+    + erewrite (@Memory.remove_o mem2_src); eauto. condtac; ss. des. subst. ss.
 Qed.
 
-Lemma sim_thread_step
+Lemma sim_thread_other_step
       l e1_src
       pf e_tgt e1_tgt e2_tgt
       (SIM1: sim_thread_other l e1_src e1_tgt)
@@ -123,6 +131,7 @@ Lemma sim_thread_step
   exists e_src e2_src,
     <<STEP_SRC: Thread.opt_step e_src e1_src e2_src>> /\
     <<SIM2: sim_thread_other l e2_src e2_tgt>> /\
-    <<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>>.
+    <<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>> /\
+    <<MEMLOC: forall to, Memory.get l to e1_src.(Thread.memory) = Memory.get l to e2_src.(Thread.memory)>>.
 Proof.
 Admitted.
