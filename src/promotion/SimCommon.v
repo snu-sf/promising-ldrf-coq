@@ -455,3 +455,68 @@ Proof.
       eapply RELEASED1; eauto.
   }
 Qed.
+
+Lemma sim_memory_promise_loc
+      l
+      promises1_src mem1_src
+      promises1_tgt mem1_tgt from to msg_tgt promises2_tgt mem2_tgt kind_tgt
+      (PROMISES1: sim_memory l promises1_src promises1_tgt)
+      (MEM1: sim_memory l mem1_src mem1_tgt)
+      (PROMISE_TGT: Memory.promise promises1_tgt mem1_tgt l from to msg_tgt promises2_tgt mem2_tgt kind_tgt):
+    <<PROMISES2: sim_memory l promises1_src promises2_tgt>> /\
+    <<MEM2: sim_memory l mem1_src mem2_tgt>>.
+Proof.
+  inv PROMISES1. inv MEM1. inv PROMISE_TGT.
+  { (* add *)
+    splits.
+    - econs; i.
+      + erewrite Memory.add_o; eauto.
+        condtac; [des|]; ss; i; eauto.
+      + revert GET_TGT. erewrite Memory.add_o; eauto.
+        condtac; [des|]; ss; i; eauto.
+    - econs; i.
+      + erewrite Memory.add_o; eauto.
+        condtac; [des|]; ss; i; eauto.
+      + revert GET_TGT. erewrite Memory.add_o; eauto.
+        condtac; [des|]; ss; i; eauto.
+  }
+  { (* split *)
+    splits.
+    - econs; i.
+      + erewrite Memory.split_o; eauto.
+        repeat condtac; [des|des|]; ss; i; eauto.
+      + revert GET_TGT. erewrite Memory.split_o; eauto.
+        repeat condtac; [des|des|]; ss; i; eauto.
+    - econs; i.
+      + erewrite Memory.split_o; eauto.
+        repeat condtac; [des|des|]; ss; i; eauto.
+      + revert GET_TGT. erewrite Memory.split_o; eauto.
+        repeat condtac; [des|des|]; ss; i; eauto.
+  }
+  { (* lower *)
+    splits.
+    - econs; i.
+      + erewrite Memory.lower_o; eauto.
+        condtac; [des|]; ss; i; eauto.
+      + revert GET_TGT. erewrite Memory.lower_o; eauto.
+        condtac; [des|]; ss; i; eauto.
+    - econs; i.
+      + erewrite Memory.lower_o; eauto.
+        condtac; [des|]; ss; i; eauto.
+      + revert GET_TGT. erewrite Memory.lower_o; eauto.
+        condtac; [des|]; ss; i; eauto.
+  }
+  { (* cancel *)
+    splits.
+    - econs; i.
+      + erewrite Memory.remove_o; eauto.
+        condtac; [des|]; ss; i; eauto.
+      + revert GET_TGT. erewrite Memory.remove_o; eauto.
+        condtac; [des|]; ss; i; eauto.
+    - econs; i.
+      + erewrite Memory.remove_o; eauto.
+        condtac; [des|]; ss; i; eauto.
+      + revert GET_TGT. erewrite Memory.remove_o; eauto.
+        condtac; [des|]; ss; i; eauto.
+  }
+Qed.
