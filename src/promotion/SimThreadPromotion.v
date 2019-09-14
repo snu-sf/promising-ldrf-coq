@@ -109,10 +109,6 @@ Inductive sim_thread_promotion (l: Loc.t) (r: Reg.t) (e_src e_tgt: Thread.t lang
         Memory.get l (Memory.max_ts l e_src.(Thread.memory)) e_src.(Thread.memory) = 
         Some (from, Message.full (e_tgt.(Thread.state).(State.regs) r) released))
     (PROMISES: forall to, Memory.get l to e_src.(Thread.local).(Local.promises) = None)
-    (RELEASED: forall loc from to val released
-                 (GETP: Memory.get loc to e_src.(Thread.local).(Local.promises) =
-                        Some (from, Message.full val (Some released))),
-        released_eq_tview_loc l loc released e_src.(Thread.local).(Local.tview))
 .
 Hint Constructors sim_thread_promotion.
 
@@ -126,10 +122,6 @@ Inductive sim_thread_promotion_reserve (l: Loc.t) (r: Reg.t) (e_src e_tgt: Threa
     (LATEST: Memory.latest_val l e_src.(Thread.memory) (e_tgt.(Thread.state).(State.regs) r))
     (PROMISES: forall to (TO: to <> Memory.max_ts l e_src.(Thread.memory)),
         Memory.get l to e_src.(Thread.local).(Local.promises) = None)
-    (RELEASED: forall loc from to val released
-                 (GETP: Memory.get loc to e_src.(Thread.local).(Local.promises) =
-                        Some (from, Message.full val (Some released))),
-        released_eq_tview_loc l loc released e_src.(Thread.local).(Local.tview))
     (MEM: exists from,
         Memory.get l (Memory.max_ts l e_src.(Thread.memory)) e_src.(Thread.memory) =
         Some (from, Message.reserve))

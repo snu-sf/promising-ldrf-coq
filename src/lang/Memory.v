@@ -2323,6 +2323,17 @@ Module Memory.
     eexists. econs; ss. eauto.
   Qed.
 
+  Lemma remove_exists_le
+        promises1 mem1 loc from to msg promises2
+        (LE: le promises1 mem1)
+        (LOWER: remove promises1 loc from to msg promises2):
+    exists mem2, remove mem1 loc from to msg mem2.
+  Proof.
+    exploit remove_get0; eauto. i. des.
+    exploit LE; eauto. i.
+    exploit remove_exists; try exact x. eauto.
+  Qed.
+
   Definition nonsynch_loc (loc:Loc.t) (mem:t): Prop :=
     forall f t msg (GET: get loc t mem = Some (f, msg)),
       match msg with
