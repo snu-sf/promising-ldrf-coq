@@ -127,6 +127,15 @@ Proof.
   - unfold LocFun.add. condtac; ss.
 Qed.
 
+Lemma get_released_src_sim_view
+      l loc released_tgt tview_src:
+  <<SIM: sim_view l (get_released_src l loc released_tgt tview_src) released_tgt>>.
+Proof.
+  unfold get_released_src. econs; ss.
+  - unfold sim_timemap, LocFun.add. i. condtac; ss.
+  - unfold sim_timemap, LocFun.add. i. condtac; ss.
+Qed.
+
 Lemma get_released_src_wf
       l loc released_tgt tview_src
       (RELEASED_TGT: View.wf released_tgt)
@@ -140,13 +149,26 @@ Proof.
   - inv RELEASED_TGT. apply PLN_RLX.
 Qed.
 
-Lemma get_released_src_sim_view
-      l loc released_tgt tview_src:
-  <<SIM: sim_view l (get_released_src l loc released_tgt tview_src) released_tgt>>.
+Lemma get_released_src_closed
+      l loc released_tgt tview_src
+      mem_src mem_tgt
+      (SIM: sim_memory l mem_src mem_tgt)
+      (CLOSED_SRC: TView.closed tview_src mem_src)
+      (CLOSED_TGT: Memory.closed_view released_tgt mem_tgt):
+  Memory.closed_view (get_released_src l loc released_tgt tview_src) mem_src.
 Proof.
+  inv CLOSED_SRC. inv CLOSED_TGT.
   unfold get_released_src. econs; ss.
-  - unfold sim_timemap, LocFun.add. i. condtac; ss.
-  - unfold sim_timemap, LocFun.add. i. condtac; ss.
+  - ii. unfold LocFun.add. condtac; ss.
+    + subst. destruct (REL loc). eauto.
+    + specialize (PLN loc0). des. inv SIM.
+      exploit COMPLETE; eauto. i. des.
+      inv MSG. inv RELEASED; eauto.
+  - ii. unfold LocFun.add. condtac; ss.
+    + subst. destruct (REL loc). eauto.
+    + specialize (RLX loc0). des. inv SIM.
+      exploit COMPLETE; eauto. i. des.
+      inv MSG. inv RELEASED; eauto.
 Qed.
 
 Lemma get_released_src_le
@@ -164,6 +186,16 @@ Proof.
   - ii. unfold LocFun.add. condtac; ss.
     + subst. rewrite H0. refl.
     + rewrite RLX0; ss. eauto.
+Qed.
+
+Lemma get_message_src_sim_message
+      l loc msg_tgt tview_src:
+  <<SIM: sim_message l (get_message_src l loc msg_tgt tview_src) msg_tgt>>.
+Proof.
+  unfold get_message_src.
+  destruct msg_tgt; ss. destruct released; ss.
+  - econs. econs. eapply get_released_src_sim_view.
+  - econs. econs.
 Qed.
 
 Lemma get_message_src_wf
@@ -190,15 +222,20 @@ Proof.
   unfold LocFun.add. condtac; ss.
 Qed.
 
-Lemma get_message_src_sim_message
-      l loc msg_tgt tview_src:
-  <<SIM: sim_message l (get_message_src l loc msg_tgt tview_src) msg_tgt>>.
+Lemma get_message_src_closed
+      l loc msg_tgt tview_src
+      mem_src mem_tgt
+      (SIM: sim_memory l mem_src mem_tgt)
+      (CLOSED_SRC: TView.closed tview_src mem_src)
+      (CLOSED_TGT: Memory.closed_message msg_tgt mem_tgt):
+  Memory.closed_message (get_message_src l loc msg_tgt tview_src) mem_src.
 Proof.
-  unfold get_message_src.
-  destruct msg_tgt; ss. destruct released; ss.
-  - econs. econs. eapply get_released_src_sim_view.
-  - econs. econs.
+  inv CLOSED_TGT; ss.
+  destruct released; eauto.
+  inv CLOSED. econs. econs.
+  eapply get_released_src_closed; eauto.
 Qed.
+
 
 Lemma sim_memory_promise
       l tview_src

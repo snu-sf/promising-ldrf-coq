@@ -79,21 +79,41 @@ Lemma sim_thread_promise_step
       l e1_src
       pf e_tgt e1_tgt e2_tgt
       (SIM1: sim_thread_other l e1_src e1_tgt)
+      (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
+      (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
       (STEP_TGT: Thread.promise_step pf e_tgt e1_tgt e2_tgt):
   exists e_src e2_src,
     <<STEP_SRC: opt_promise_step e_src e1_src e2_src>> /\
     <<SIM2: sim_thread_other l e2_src e2_tgt>>.
 Proof.
-  inv STEP_TGT. inv LOCAL.
+  inversion STEP_TGT. subst. inv LOCAL; ss.
   destruct (Loc.eq_dec loc l).
   { subst. esplits; [econs 1|].
-    destruct e1_src. inv SIM1. ss. econs; eauto; ss.
-    - destruct local, lc1. ss.
-      inv LOCAL. econs; eauto. ss.
-      admit.
-    - admit.
+    inv SIM1. ss.
+    exploit sim_memory_promise_loc; try exact PROMISE; try apply LOCAL; eauto. i. des.
+    econs; ss; eauto.
+    econs; ss; eauto; try apply LOCAL.
   }
-Admitted.
+  inv SIM1. ss.
+  exploit sim_memory_promise; try exact PROMISE; try apply LOCAL; try apply WF1_SRC; eauto.
+  { inv WF1_TGT. ss. }
+  i. des. destruct e1_src. ss.
+  esplits.
+  - econs 2. econs; eauto. econs; eauto.
+    eapply get_message_src_closed; eauto.
+    exploit Memory.promise_op; try exact PROMISE_SRC. i.
+    inv WF1_SRC. inv TVIEW_CLOSED.
+    econs; eauto using Memory.op_closed_view.
+  - econs; eauto; ss.
+    + econs; eauto; ss. apply LOCAL.
+    + i. inv PROMISE_SRC.
+      * erewrite Memory.add_o; eauto. condtac; ss. des. subst. ss.
+      * erewrite Memory.split_o; eauto. repeat condtac; ss.
+        { des. subst. ss. }
+        { des; subst; ss. }
+      * erewrite Memory.lower_o; eauto. condtac; ss. des. subst. ss.
+      * erewrite Memory.remove_o; eauto. condtac; ss.
+Qed.
 
 Lemma sim_thread_step
       l e1_src
