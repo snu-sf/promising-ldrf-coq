@@ -1443,58 +1443,32 @@ Section MAPPED.
 
   Inductive map_preserving (P: Loc.t -> Time.t -> Prop) (f: Loc.t -> Time.t -> Time.t) :=
   | map_preserving_intro
-      (PRSVLT: forall loc t0 t1 (SAT0: P loc t0) (SAT1: P loc t1) (LT: Time.lt t0 t1),
-          Time.lt (f loc t0) (f loc t1))
+      (PRSVLT: forall loc t0 t1 (SAT0: P loc t0) (SAT1: P loc t1) (LT: Time.le t0 t1),
+          Time.le (f loc t0) (f loc t1))
       (PRSVBOT: forall loc, f loc Time.bot = Time.bot)
   .
 
-  Definition map_preserving_lt_iff P f
-             (PRSV: map_preserving P f)
-             loc t0 t1
-             (SAT0: P loc t0) (SAT1: P loc t1)
-    :
-      Time.lt t0 t1 <-> Time.lt (f loc t0) (f loc t1).
-  Proof.
-    inv PRSV. split; eauto.
-    set (DenseOrder.DenseOrderFacts.OrderTac.TO.lt_total t0 t1). des; eauto.
-    - clarify. i. timetac.
-    - i. eapply PRSVLT in o; eauto. exfalso.
-      assert (LT: Time.lt (f loc t0) (f loc t0)).
-      + etrans; eauto.
-      + timetac.
-  Qed.
-  Hint Resolve map_preserving_lt_iff.
+  Notation collapsed f := (fun loc t0 t1 => f loc t0 = f loc t1).
+  (* Definition collapsed (f: Loc.t -> Time.t -> Time.t) (loc: Loc.t) (t0 t1: Time.t): Prop := *)
+  (*   f loc t0 = f loc t1. *)
 
-  Definition map_preserving_eq_iff P f
-             (PRSV: map_preserving P f)
-             loc t0 t1
-             (SAT0: P loc t0) (SAT1: P loc t1)
-    :
-      t0 = t1 <-> (f loc t0) = (f loc t1).
+  Global Program Instance collapsed_Equivalence (f: Loc.t -> Time.t -> Time.t) loc:
+    Equivalence (collapsed f loc).
+  Next Obligation.
   Proof.
-    split; i; clarify; eauto.
-    set (DenseOrder.DenseOrderFacts.OrderTac.TO.lt_total t0 t1). des; eauto.
-    - erewrite map_preserving_lt_iff in o; eauto.
-      rewrite H in *. timetac.
-    - erewrite map_preserving_lt_iff in o; eauto.
-      rewrite H in *. timetac.
+    ii. etrans; eauto.
   Qed.
-  Hint Resolve map_preserving_eq_iff.
 
-  Definition map_preserving_le_iff P f
+  Definition map_preserving_le_if P f
              (PRSV: map_preserving P f)
              loc t0 t1
              (SAT0: P loc t0) (SAT1: P loc t1)
     :
-      Time.le t0 t1 <-> Time.le (f loc t0) (f loc t1).
+      Time.le t0 t1 -> Time.le (f loc t0) (f loc t1).
   Proof.
-    repeat rewrite DenseOrder.DenseOrder.le_lteq.
-    split; i; des; clarify; eauto.
-    - left. erewrite <- map_preserving_lt_iff; eauto.
-    - left. eapply map_preserving_lt_iff; eauto.
-    - right. eapply map_preserving_eq_iff; eauto.
+    inv PRSV. eauto.
   Qed.
-  Hint Resolve map_preserving_le_iff.
+  Hint Resolve map_preserving_le_if.
 
   Definition map_preserving_bot P f
              (PRSV: map_preserving P f)
@@ -1505,6 +1479,116 @@ Section MAPPED.
     inv PRSV. eauto.
   Qed.
   Hint Resolve map_preserving_bot.
+
+  Lemma collapsed_inside P f
+        (PRSV: map_preserving P f)
+        loc t0 t3
+        (SAT0: P loc t0) (SAT3: P loc t3)
+        (CLPS: collapsed f loc t0 t3)
+        t1 t2
+        (SAT1: P loc t1)
+        (SAT2: P loc t2)
+        (TLE0: Time.le t0 t1)
+        (TLE1: Time.le t1 t2)
+        (TLE2: Time.le t2 t3)
+    :
+      collapsed f loc t1 t2.
+  Proof.
+    eapply map_preserving_le_if in TLE0; eauto.
+    eapply map_preserving_le_if in TLE1; eauto.
+    eapply map_preserving_le_if in TLE2; eauto.
+    ss. eapply TimeFacts.antisym; eauto.
+    etrans; eauto. rewrite <- CLPS. eauto.
+  Qed.
+
+  Lemma not_collapsed_outside P f
+        (PRSV: map_preserving P f)
+        loc t1 t2
+        (SAT1: P loc t1) (SAT2: P loc t2)
+        (TLE1: Time.le t1 t2)
+        (NCLPS: ~ collapsed f loc t1 t2)
+        t0 t3
+        (SAT0: P loc t0)
+        (SAT3: P loc t3)
+        (TLE0: Time.le t0 t1)
+        (TLE2: Time.le t2 t3)
+    :
+      ~ collapsed f loc t0 t3.
+  Proof.
+    ii. apply NCLPS. eapply collapsed_inside.
+    - apply PRSV.
+    - apply SAT0.
+    - apply SAT3.
+    - apply H.
+    - apply SAT1.
+    - apply SAT2.
+    - apply TLE0.
+    - apply TLE1.
+    - apply TLE2.
+  Qed.
+
+  Lemma map_preserving_lt_only_if P f
+             (PRSV: map_preserving P f)
+             loc t0 t1
+             (SAT0: P loc t0) (SAT1: P loc t1)
+    :
+      Time.lt (f loc t0) (f loc t1) -> Time.lt t0 t1.
+  Proof.
+    inv PRSV.
+    set (DenseOrder.DenseOrderFacts.OrderTac.TO.lt_total t0 t1). des; eauto.
+    - clarify. i. timetac.
+    - exploit PRSVLT.
+      + eapply SAT1.
+      + eapply SAT0.
+      + left. eauto.
+      + i. timetac.
+  Qed.
+  Hint Resolve map_preserving_lt_only_if.
+
+  Definition map_preserving_lt_iff P f
+             (PRSV: map_preserving P f)
+             loc t0 t1
+             (SAT0: P loc t0) (SAT1: P loc t1)
+             (CLPS: ~ collapsed f loc t0 t1)
+    :
+      Time.lt t0 t1 <-> Time.lt (f loc t0) (f loc t1).
+  Proof.
+    split; i; cycle 1.
+    { eapply map_preserving_lt_only_if; eauto. }
+    inv PRSV. exploit PRSVLT.
+    - eapply SAT0.
+    - eapply SAT1.
+    - left. eauto.
+    - i. destruct x; auto.
+      apply CLPS in H0. des; timetac.
+  Qed.
+  Hint Resolve map_preserving_lt_iff.
+
+  Definition map_preserving_eq_iff P f
+             (PRSV: map_preserving P f)
+             loc t0 t1
+             (SAT0: P loc t0) (SAT1: P loc t1)
+             (CLPS: ~ collapsed f loc t0 t1)
+    :
+      t0 = t1 <-> (f loc t0) = (f loc t1).
+  Proof.
+    split; i; clarify; eauto.
+  Qed.
+  Hint Resolve map_preserving_eq_iff.
+
+  Definition map_preserving_le_iff P f
+             (PRSV: map_preserving P f)
+             loc t0 t1
+             (SAT0: P loc t0) (SAT1: P loc t1)
+             (CLPS: ~ collapsed f loc t0 t1)
+    :
+      Time.le t0 t1 <-> Time.le (f loc t0) (f loc t1).
+  Proof.
+    repeat rewrite DenseOrder.DenseOrder.le_lteq.
+    split; i; des; clarify; eauto.
+    left. erewrite <- map_preserving_lt_iff; eauto.
+  Qed.
+  Hint Resolve map_preserving_le_iff.
 
   Definition timemap_map (f: Loc.t -> Time.t -> Time.t) (tm: TimeMap.t): TimeMap.t :=
     fun l => f l (tm l).
@@ -1550,34 +1634,6 @@ Section MAPPED.
             (<<GET: Memory.get loc to m_tgt = Some msg>>))
   .
 
-  Definition times_in_memory (m: Memory.t) (l: Loc.t) (t: Time.t): Prop :=
-    (<<OFFROM: exists to msg,
-        (<<GET: Memory.get l to m = Some (t, msg)>>)>>) \/
-    (<<OFTO: exists from msg,
-        (<<GET: Memory.get l t m = Some (from, msg)>>)>>)
-  .
-
-  Definition times_in_memory_to (m: Memory.t) (l: Loc.t) (t: Time.t): Prop :=
-    (<<OFTO: exists from val released,
-        (<<GET: Memory.get l t m = Some (from, Message.full val released)>>)>>)
-  .
-
-  Lemma times_in_memory_to_in_memory:
-    times_in_memory_to <3= times_in_memory.
-  Proof.
-    i. unfold times_in_memory_to in *. des. right. eauto.
-  Qed.
-  Hint Resolve times_in_memory_to_in_memory.
-
-  Lemma map_closed_timemap m f tm
-        (INMEMORY: map_preserving (times_in_memory m) f)
-        (CLOSED: Memory.closed_timemap tm m)
-    :
-      forall loc, times_in_memory m loc (tm loc).
-  Proof.
-    ii. right. specialize (CLOSED loc). unfold times_in_memory_to. des. eauto.
-  Qed.
-
   Lemma map_time_join P f loc t0 t1
         (PRSV: map_preserving P f)
         (SAT0: P loc t0) (SAT1: P loc t1)
@@ -1585,52 +1641,10 @@ Section MAPPED.
       f loc (Time.join t0 t1) = Time.join (f loc t0) (f loc t1).
   Proof.
     unfold Time.join. des_ifs.
-    - erewrite <- map_preserving_lt_iff in l0; eauto.
-      erewrite <- map_preserving_eq_iff; eauto.
-      timetac.
-    - erewrite <- map_preserving_le_iff in l0; eauto.
-      erewrite <- map_preserving_eq_iff; eauto.
-      timetac.
-  Qed.
-
-  Lemma map_timemap_join f m tm0 tm1
-        (INMEMORY: map_preserving (times_in_memory m) f)
-        (CLOSED0: Memory.closed_timemap tm0 m)
-        (CLOSED1: Memory.closed_timemap tm1 m)
-    :
-      timemap_map f (TimeMap.join tm0 tm1) = TimeMap.join (timemap_map f tm0) (timemap_map f tm1).
-  Proof.
-    extensionality t. unfold timemap_map, TimeMap.join.
-    eapply map_time_join; eauto.
-    - eapply map_closed_timemap; eauto.
-    - eapply map_closed_timemap; eauto.
-  Qed.
-
-  Lemma map_viewjoin f m v0 v1
-        (INMEMORY: map_preserving (times_in_memory m) f)
-        (CLOSED0: Memory.closed_view v0 m)
-        (CLOSED1: Memory.closed_view v1 m)
-    :
-      view_map f (View.join v0 v1) = View.join (view_map f v0) (view_map f v1).
-  Proof.
-    inv CLOSED0. inv CLOSED1.
-    unfold view_map, View.join. ss. f_equal.
-    - eapply map_timemap_join; eauto.
-    - eapply map_timemap_join; eauto.
-  Qed.
-
-  Lemma map_tviewjoin f m tv0 tv1
-        (INMEMORY: map_preserving (times_in_memory m) f)
-        (CLOSED0: TView.closed tv0 m)
-        (CLOSED1: TView.closed tv1 m)
-    :
-      tview_map f (TView.join tv0 tv1) = TView.join (tview_map f tv0) (tview_map f tv1).
-  Proof.
-    inv CLOSED0. inv CLOSED1.
-    unfold tview_map, TView.join. ss. f_equal.
-    - extensionality l. eapply map_viewjoin; eauto.
-    - eapply map_viewjoin; eauto.
-    - eapply map_viewjoin; eauto.
+    - eapply map_preserving_le_if in l; eauto. timetac.
+    - destruct l0; auto.
+      eapply map_preserving_lt_only_if in H; eauto.
+      exfalso. eapply Time.lt_strorder. etrans; eauto.
   Qed.
 
   Lemma map_timemap_bot P f
@@ -1650,16 +1664,6 @@ Section MAPPED.
     unfold view_map, View.bot. ss. f_equal.
     - eapply map_timemap_bot; eauto.
     - eapply map_timemap_bot; eauto.
-  Qed.
-
-  Lemma map_unwrap f m released
-        (INMEMORY: map_preserving (times_in_memory m) f)
-        (CLOSED0: Memory.closed_opt_view released m)
-    :
-      view_map f (View.unwrap released) =
-      View.unwrap (option_map (view_map f) released).
-  Proof.
-    unfold View.unwrap. des_ifs. eapply map_view_bot; eauto.
   Qed.
 
   Lemma map_timemap_singleton f P loc to
@@ -1710,6 +1714,310 @@ Section MAPPED.
     - erewrite <- map_singleton_rw; eauto.
   Qed.
 
+  Definition respecting_memory (P: Loc.t -> Time.t -> Prop) (m: Memory.t) :=
+    forall loc to from msg (GET: Memory.get loc to m = Some (from, msg)),
+      (<<FROM: P loc from>>) /\ (<<TO: P loc to>>).
+
+  (* Definition respecting_map (P: Loc.t -> Time.t -> Prop) (tm: TimeMap.t) := *)
+  (*   forall loc, P loc (tm loc). *)
+  Notation respecting_map P tm := (forall loc, P loc (tm loc)).
+
+  Inductive respecting_view P view: Prop :=
+  | respecting_view_intro
+      (PLN: respecting_map P (View.pln view))
+      (RLX: respecting_map P (View.rlx view))
+  .
+
+  Inductive respecting_opt_view P: option View.t -> Prop :=
+  | respecting_opt_view_some
+      vw
+      (SOME: respecting_view P vw)
+    :
+      respecting_opt_view P (Some vw)
+  | respecting_opt_view_none
+    :
+      respecting_opt_view P None
+  .
+
+  Inductive respecting_tview P tview: Prop :=
+  | respectin_tview_intro
+      (REL: forall loc : positive, respecting_view P (TView.rel tview loc))
+      (CUR: respecting_view P (TView.cur tview))
+      (ACQ: respecting_view P (TView.acq tview))
+  .
+
+  Lemma closed_timemap_respecting P m f tm
+        (RESPECT: respecting_memory P m)
+        (PRSV: map_preserving P f)
+        (CLOSED: Memory.closed_timemap tm m)
+    :
+      respecting_map P tm.
+  Proof.
+    ii. specialize (CLOSED loc). des.
+    eapply RESPECT in CLOSED. des. eauto.
+  Qed.
+
+  Lemma closed_view_respecting P m f vw
+        (RESPECT: respecting_memory P m)
+        (PRSV: map_preserving P f)
+        (CLOSED: Memory.closed_view vw m)
+    :
+      respecting_view P vw.
+  Proof.
+    inv CLOSED. econs.
+    - eapply closed_timemap_respecting; eauto.
+    - eapply closed_timemap_respecting; eauto.
+  Qed.
+
+  Lemma closed_opt_view_respecting P m f vw
+        (RESPECT: respecting_memory P m)
+        (PRSV: map_preserving P f)
+        (CLOSED: Memory.closed_opt_view vw m)
+    :
+      respecting_opt_view P vw.
+  Proof.
+    inv CLOSED.
+    - econs. eapply closed_view_respecting; eauto.
+    - econs.
+  Qed.
+
+  Lemma closed_tview_respecting P m f tvw
+        (RESPECT: respecting_memory P m)
+        (PRSV: map_preserving P f)
+        (CLOSED: TView.closed tvw m)
+    :
+      respecting_tview P tvw.
+  Proof.
+    inv CLOSED. econs.
+    - i. eapply closed_view_respecting; eauto.
+    - eapply closed_view_respecting; eauto.
+    - eapply closed_view_respecting; eauto.
+  Qed.
+
+  Definition memory_to (m: Memory.t) (l: Loc.t) (t: Time.t): Prop :=
+    exists from val released,
+      (<<GET: Memory.get l t m = Some (from, Message.full val released)>>)
+  .
+
+  Lemma memory_to_respecting P m loc to
+        (INMEMORY: respecting_memory P m)
+        (MEMORYTO: memory_to m loc to)
+    :
+      P loc to.
+  Proof.
+    unfold memory_to in *. des.
+    eapply INMEMORY in GET. des. auto.
+  Qed.
+
+  Lemma map_timemap_join P f tm0 tm1
+        (PRSV: map_preserving P f)
+        (CLOSED0: respecting_map P tm0)
+        (CLOSED1: respecting_map P tm1)
+    :
+      timemap_map f (TimeMap.join tm0 tm1) = TimeMap.join (timemap_map f tm0) (timemap_map f tm1).
+  Proof.
+    extensionality t. unfold timemap_map, TimeMap.join.
+    eapply map_time_join; eauto.
+  Qed.
+
+  Lemma map_viewjoin P f v0 v1
+        (PRSV: map_preserving P f)
+        (CLOSED0: respecting_view P v0)
+        (CLOSED1: respecting_view P v1)
+    :
+      view_map f (View.join v0 v1) = View.join (view_map f v0) (view_map f v1).
+  Proof.
+    inv CLOSED0. inv CLOSED1.
+    unfold view_map, View.join. ss. f_equal.
+    - eapply map_timemap_join; eauto.
+    - eapply map_timemap_join; eauto.
+  Qed.
+
+  Lemma map_tviewjoin P f tv0 tv1
+        (PRSV: map_preserving P f)
+        (CLOSED0: respecting_tview P tv0)
+        (CLOSED1: respecting_tview P tv1)
+    :
+      tview_map f (TView.join tv0 tv1) = TView.join (tview_map f tv0) (tview_map f tv1).
+  Proof.
+    inv CLOSED0. inv CLOSED1.
+    unfold tview_map, TView.join. ss. f_equal.
+    - extensionality l. eapply map_viewjoin; eauto.
+    - eapply map_viewjoin; eauto.
+    - eapply map_viewjoin; eauto.
+  Qed.
+
+  Lemma map_unwrap P f released
+        (PRSV: map_preserving P f)
+        (CLOSED0: respecting_opt_view P released)
+    :
+      view_map f (View.unwrap released) =
+      View.unwrap (option_map (view_map f) released).
+  Proof.
+    unfold View.unwrap. des_ifs. eapply map_view_bot; eauto.
+  Qed.
+
+  Lemma
+
+TView.readable
+TView.read_tview
+TView.writable
+TView.write_tview
+Memory.nonsynch_loc
+TView.write_released
+TView.read_fence_tview
+TView.write_fence_sc
+TView.write_fence_tview
+Local.promise_consistent
+
+Memory.promise
+Memory.closed_message
+
+Local.promise_step
+
+Local.fence_step
+
+Local.program_step
+
+Inductive
+read_step (lc1 : Local.t) (mem1 : Memory.t) (loc : Loc.t) (to : Time.t)
+(val : Const.t) (released : option View.t) (ord : Ordering.t) (lc2 : Local.t) : Prop :=
+    read_step_intro : forall (from : Time.t) (tview2 : TView.t),
+                      Memory.get loc to mem1 = Some (from, Message.full val released) ->
+                      TView.readable (TView.cur (Local.tview lc1)) loc to released ord ->
+                      TView.read_tview (Local.tview lc1) loc to released ord = tview2 ->
+                      lc2 = {| Local.tview := tview2; Local.promises := Local.promises lc1 |} ->
+                      Local.read_step lc1 mem1 loc to val released ord lc2
+
+
+
+
+
+  Local.write_step
+
+  Lemma map_read_tview P f m v loc to released ord
+        (PRSV: map_preserving P f)
+        (INMEMORY: respecting_memory P m)
+        (CLOSED0: TView.closed v m)
+        (CLOSED1: Memory.closed_opt_view released m)
+        (CLOSED2: memory_to m loc to)
+        (INHABITED: Memory.inhabited m)
+    :
+      tview_map f (TView.read_tview v loc to released ord) =
+      TView.read_tview (tview_map f v) loc (f loc to) (option_map (view_map f) released) ord.
+  Proof.
+    dup CLOSED0. dup CLOSED1. dup CLOSED0.
+    eapply closed_tview_respecting in CLOSED0; eauto.
+    eapply closed_opt_view_respecting in CLOSED1; eauto.
+    eapply memory_to_respecting in CLOSED2; eauto.
+    unfold tview_map, TView.read_tview. ss.
+    repeat (erewrite <- map_unwrap; eauto).
+    repeat (erewrite map_viewjoin; eauto).
+    - erewrite map_singleton_ur_if; eauto.
+      des_ifs; f_equal; erewrite map_view_bot; eauto.
+    - inv CLOSED0. auto.
+    - eapply
+
+      unfold times_in_memory_to in *. des.
+      eapply Memory.singleton_ur_if_closed_view; eauto.
+    - eapply Memory.join_closed_view; eauto.
+      + inv CLOSED0; eauto.
+      + unfold times_in_memory_to in *. des.
+        eapply Memory.singleton_ur_if_closed_view; eauto.
+    - des_ifs.
+      + eapply Memory.unwrap_closed_opt_view; eauto.
+      + eapply Memory.closed_view_bot; eauto.
+    - inv CLOSED0. eauto.
+    - unfold times_in_memory_to in *. des.
+      eapply Memory.singleton_ur_if_closed_view; eauto.
+    - eapply Memory.join_closed_view; eauto.
+      + inv CLOSED0; eauto.
+      + unfold times_in_memory_to in *. des.
+        eapply Memory.singleton_ur_if_closed_view; eauto.
+    - des_ifs.
+      + eapply Memory.unwrap_closed_opt_view; eauto.
+      + eapply Memory.closed_view_bot; eauto.
+  Qed.
+
+
+  (* Definition times_in_memory (m: Memory.t) (l: Loc.t) (t: Time.t): Prop := *)
+  (*   (<<OFFROM: exists to msg, *)
+  (*       (<<GET: Memory.get l to m = Some (t, msg)>>)>>) \/ *)
+  (*   (<<OFTO: exists from msg, *)
+  (*       (<<GET: Memory.get l t m = Some (from, msg)>>)>>) *)
+  (* . *)
+
+  (* Definition times_in_memory_to (m: Memory.t) (l: Loc.t) (t: Time.t): Prop := *)
+  (*   (<<OFTO: exists from val released, *)
+  (*       (<<GET: Memory.get l t m = Some (from, Message.full val released)>>)>>) *)
+  (* . *)
+
+  (* Lemma times_in_memory_to_in_memory: *)
+  (*   times_in_memory_to <3= times_in_memory. *)
+  (* Proof. *)
+  (*   i. unfold times_in_memory_to in *. des. right. eauto. *)
+  (* Qed. *)
+  (* Hint Resolve times_in_memory_to_in_memory. *)
+
+  (* Lemma map_closed_timemap m f tm *)
+  (*       (INMEMORY: map_preserving (times_in_memory m) f) *)
+  (*       (CLOSED: Memory.closed_timemap tm m) *)
+  (*   : *)
+  (*     forall loc, times_in_memory m loc (tm loc). *)
+  (* Proof. *)
+  (*   ii. right. specialize (CLOSED loc). unfold times_in_memory_to. des. eauto. *)
+  (* Qed. *)
+
+  (* Lemma map_timemap_join f m tm0 tm1 *)
+  (*       (INMEMORY: map_preserving (times_in_memory m) f) *)
+  (*       (CLOSED0: Memory.closed_timemap tm0 m) *)
+  (*       (CLOSED1: Memory.closed_timemap tm1 m) *)
+  (*   : *)
+  (*     timemap_map f (TimeMap.join tm0 tm1) = TimeMap.join (timemap_map f tm0) (timemap_map f tm1). *)
+  (* Proof. *)
+  (*   extensionality t. unfold timemap_map, TimeMap.join. *)
+  (*   eapply map_time_join; eauto. *)
+  (*   - eapply map_closed_timemap; eauto. *)
+  (*   - eapply map_closed_timemap; eauto. *)
+  (* Qed. *)
+
+  (* Lemma map_viewjoin f m v0 v1 *)
+  (*       (INMEMORY: map_preserving (times_in_memory m) f) *)
+  (*       (CLOSED0: Memory.closed_view v0 m) *)
+  (*       (CLOSED1: Memory.closed_view v1 m) *)
+  (*   : *)
+  (*     view_map f (View.join v0 v1) = View.join (view_map f v0) (view_map f v1). *)
+  (* Proof. *)
+  (*   inv CLOSED0. inv CLOSED1. *)
+  (*   unfold view_map, View.join. ss. f_equal. *)
+  (*   - eapply map_timemap_join; eauto. *)
+  (*   - eapply map_timemap_join; eauto. *)
+  (* Qed. *)
+
+  (* Lemma map_tviewjoin f m tv0 tv1 *)
+  (*       (INMEMORY: map_preserving (times_in_memory m) f) *)
+  (*       (CLOSED0: TView.closed tv0 m) *)
+  (*       (CLOSED1: TView.closed tv1 m) *)
+  (*   : *)
+  (*     tview_map f (TView.join tv0 tv1) = TView.join (tview_map f tv0) (tview_map f tv1). *)
+  (* Proof. *)
+  (*   inv CLOSED0. inv CLOSED1. *)
+  (*   unfold tview_map, TView.join. ss. f_equal. *)
+  (*   - extensionality l. eapply map_viewjoin; eauto. *)
+  (*   - eapply map_viewjoin; eauto. *)
+  (*   - eapply map_viewjoin; eauto. *)
+  (* Qed. *)
+
+  (* Lemma map_unwrap f m released *)
+  (*       (INMEMORY: map_preserving (times_in_memory m) f) *)
+  (*       (CLOSED0: Memory.closed_opt_view released m) *)
+  (*   : *)
+  (*     view_map f (View.unwrap released) = *)
+  (*     View.unwrap (option_map (view_map f) released). *)
+  (* Proof. *)
+  (*   unfold View.unwrap. des_ifs. eapply map_view_bot; eauto. *)
+  (* Qed. *)
+
   Lemma map_read_tview f m v loc to released ord
         (INMEMORY: map_preserving (times_in_memory m) f)
         (CLOSED0: TView.closed v m)
@@ -1748,38 +2056,38 @@ Section MAPPED.
   Qed.
 
   Lemma map_step_read
-        f v v' prom'
+        f v v' prom_src prom_tgt prom_tgt'
         mem_src mem_tgt loc to val released ord
-        (STEP: Local.read_step (Local.mk v Memory.bot) mem_tgt loc to val released ord
-                               (Local.mk v' prom'))
+        (STEP: Local.read_step (Local.mk v prom_tgt) mem_tgt loc to val released ord
+                               (Local.mk v' prom_tgt'))
         (INMEMORY0: map_preserving (times_in_memory mem_tgt) f)
         (CLOSED0: Memory.closed mem_tgt)
         (LCWF: Local.wf (Local.mk v Memory.bot) mem_tgt)
         (MEM: memory_map f mem_src mem_tgt)
         (INHABITED: Memory.inhabited mem_tgt)
     :
-      (<<STEP: Local.read_step (Local.mk (tview_map f v) Memory.bot) mem_src loc
+      (<<STEP: Local.read_step (Local.mk (tview_map f v) prom_src) mem_src loc
                                (f loc to) val (option_map (view_map f) released) ord
-                               (Local.mk (tview_map f v') Memory.bot)>>).
+                               (Local.mk (tview_map f v') prom_src)>>).
   Proof.
     inv STEP. ss. clarify. econs; eauto.
     + inv MEM. exploit MAPPED; eauto.
     + ss. inv READABLE. unfold view_map, option_map, timemap_map. des_ifs.
       * econs; ss; eauto.
-        { erewrite <- map_preserving_le_iff; eauto.
+        { eapply map_preserving_le_if; eauto.
           - inv LCWF. ss. inv TVIEW_CLOSED. inv CUR.
             eapply map_closed_timemap; eauto.
           - right. eauto. }
-        { i. erewrite <- map_preserving_le_iff; eauto.
+        { i. eapply map_preserving_le_if; eauto.
           - inv LCWF. ss. inv TVIEW_CLOSED. inv CUR.
             eapply map_closed_timemap; eauto.
           - right. eauto. }
       * econs; ss; eauto.
-        { erewrite <- map_preserving_le_iff; eauto.
+        { eapply map_preserving_le_if; eauto.
           - inv LCWF. ss. inv TVIEW_CLOSED. inv CUR.
             eapply map_closed_timemap; eauto.
           - right. eauto. }
-        { i. erewrite <- map_preserving_le_iff; eauto.
+        { i. eapply map_preserving_le_if; eauto.
           - inv LCWF. ss. inv TVIEW_CLOSED. inv CUR.
             eapply map_closed_timemap; eauto.
           - right. eauto. }
@@ -1788,6 +2096,10 @@ Section MAPPED.
       * eapply CLOSED0 in GET. des. inv MSG_CLOSED. eauto.
       * unfold times_in_memory_to. eauto.
   Qed.
+
+  Lemma map_lower
+
+  Memory.lower
 
   Lemma view_map_le f m tm0 tm1
         (INMEMORY: map_preserving (times_in_memory m) f)
@@ -1798,7 +2110,7 @@ Section MAPPED.
       TimeMap.le (timemap_map f tm0) (timemap_map f tm1).
   Proof.
     ii. unfold timemap_map.
-    erewrite <- map_preserving_le_iff; eauto.
+    eapply map_preserving_le_if; eauto.
     - right. specialize (CLOSED0 loc). des. eauto.
     - right. specialize (CLOSED1 loc). des. eauto.
   Qed.
@@ -1885,6 +2197,10 @@ Section MAPPED.
       + unfold times_in_memory_to in *. des.
         eapply Memory.singleton_ur_closed_view; eauto.
   Qed.
+
+  Lemma
+
+Memory.remove
 
   Lemma map_step_write f v v' prom'
         loc from to val releasedm released ord sc sc' mem_src
