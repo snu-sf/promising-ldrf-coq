@@ -32,6 +32,8 @@ Require Import Cell.
 Require Import Time.
 Require Import PredStep.
 
+Require Import PFConsistent.
+
 Set Implicit Arguments.
 
 
@@ -123,6 +125,17 @@ Inductive lower_memory (mem_src mem_tgt: Memory.t): Prop :=
         exists from_src vw_src,
           (<<GETSRC: Memory.get loc to mem_src = Some (from_src, Message.full val vw_src)>>) /\
           (<<VWLE: View.opt_le vw_src vw_tgt>>)).
+
+Definition pf_consistent_strong lang (e:Thread.t lang): Prop :=
+  forall mem1 sc1
+         (WF: Local.wf e.(Thread.local) e.(Thread.memory))
+         (MEM: Memory.closed e.(Thread.memory))
+         (CAP: Memory.cap e.(Thread.local).(Local.promises) e.(Thread.memory) mem1),
+    (<<FAILURE: Thread.steps_failure (Thread.mk _ e.(Thread.state) e.(Thread.local) sc1 mem1)>>) \/
+    exists e2,
+      (<<STEPS: rtc (tau (Thread.step true)) (Thread.mk _ e.(Thread.state) e.(Thread.local) sc1 mem1) e2>>) /\
+      (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>).
+
 
 
 Inductive lower_event: ThreadEvent.t -> ThreadEvent.t -> Prop :=
@@ -264,7 +277,6 @@ Proof.
     eapply lower_memory_closed_message; eauto.
   - inv STEP0. inv LOCAL.
     + exists ThreadEvent.silent. esplits; eauto.
-      econs 2; eauto. econs; eauto.
     + inv LOCAL0. ss. clarify. dup LOWMEM. inv LOWMEM.
       exploit MLE; eauto. i. des.
       exists (ThreadEvent.read loc ts val vw_src ord). esplits; eauto.
@@ -336,7 +348,7 @@ Proof.
           dup GET. eapply Cell.get_opt_wf in GET. inv GET. eauto. }
         { refl. }
     + inv LOCAL0. ss. clarify. esplits; eauto.
-      * econs 2; eauto. econs; eauto.
+      * econs 2; eauto.
       * ss. eapply TViewFacts.write_fence_tview_mon; eauto.
         { eapply TViewFacts.read_fence_tview_mon; eauto. refl. }
         { refl. }
@@ -345,7 +357,7 @@ Proof.
         { eapply TViewFacts.read_fence_tview_mon; eauto. refl. }
         { refl. }
     + inv LOCAL0. ss. clarify. esplits; eauto.
-      * econs 2; eauto. econs; eauto.
+      * econs 2; eauto.
       * ss. eapply TViewFacts.write_fence_tview_mon; eauto.
         { eapply TViewFacts.read_fence_tview_mon; eauto. }
         { eapply tview_read_fence_wf; eauto. }

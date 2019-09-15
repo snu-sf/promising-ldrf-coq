@@ -32,22 +32,44 @@ Require Import ReorderPromises.
 Set Implicit Arguments.
 
 
+Definition pf_steps_failure (lang : language) (e1 : Thread.t lang): Prop :=
+  exists e2 e3,
+    (<< STEPS: rtc (tau (Thread.step true)) e1 e2 >>) /\
+    (<< FAILURE: Thread.step true ThreadEvent.failure e2 e3 >>).
+
 Definition pf_consistent lang (e:Thread.t lang): Prop :=
   forall mem1 sc1
          (WF: Local.wf e.(Thread.local) e.(Thread.memory))
          (MEM: Memory.closed e.(Thread.memory))
          (CAP: Memory.cap e.(Thread.local).(Local.promises) e.(Thread.memory) mem1)
          (SC_MAX: Memory.max_full_timemap mem1 sc1),
-    (<<FAILURE: Thread.steps_failure (Thread.mk _ e.(Thread.state) e.(Thread.local) sc1 mem1)>>) \/
+    (<<FAILURE: pf_steps_failure (Thread.mk _ e.(Thread.state) e.(Thread.local) sc1 mem1)>>) \/
     exists e2,
       (<<STEPS: rtc (tau (Thread.step true)) (Thread.mk _ e.(Thread.state) e.(Thread.local) sc1 mem1) e2>>) /\
       (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>).
+
+Lemma rtc_union_step_nonpf_failure
+      lang e1 e2 e2'
+      (STEP: rtc (union (@Thread.step lang false)) e1 e2)
+      (FAILURE: Thread.step true ThreadEvent.failure e2 e2')
+  :
+    exists e1',
+      Thread.step true ThreadEvent.failure e1 e1'.
+Proof.
+  ginduction STEP; eauto.
+  i. exploit IHSTEP; eauto. i. des.
+  exists (Thread.mk _ e1'.(Thread.state) x.(Thread.local) x.(Thread.sc) x.(Thread.memory)).
+  inv x0; inv STEP0. inv LOCAL. inv LOCAL0.
+  inv H. inv USTEP. inv STEP0.
+  econs 2; eauto. econs; eauto. econs; eauto. econs; eauto.
+  ss. eapply promise_step_promise_consistent; eauto.
+Qed.
 
 Lemma consistent_pf_consistent:
   Thread.consistent <2= pf_consistent.
 Proof.
   s. ii. exploit PR; eauto. i. des.
-  - inv FAILURE. des. left. red. econs.
+  - inv FAILURE. des. left. red.
     hexploit tau_steps_pf_tau_steps; eauto; ss.
     { inv FAILURE; inv STEP. inv LOCAL. inv LOCAL0.
       hexploit rtc_tau_step_promise_consistent; eauto; ss.
@@ -58,6 +80,12 @@ Proof.
     { eapply Local.cap_wf; eauto. }
     { eapply Memory.max_full_timemap_closed; eauto. }
     { eapply Memory.cap_closed; eauto. }
+    i. des.
+    exploit rtc_union_step_nonpf_failure.
+    { eapply rtc_implies; [|eauto]. apply tau_union. }
+    { eauto. }
+    i. des.
+    exists e2, e1'. esplits; eauto.
   - exploit tau_steps_pf_tau_steps; eauto; ss.
     { ii. rewrite PROMISES, Memory.bot_get in *.  congr. }
     { eapply Local.cap_wf; eauto. }
