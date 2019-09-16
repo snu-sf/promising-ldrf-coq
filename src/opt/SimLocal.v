@@ -286,7 +286,6 @@ Proof.
     exploit Memory.lower_get0; try exact PROMISES; eauto. i. des.
     inv LOCAL. inv PROMISES0.
     destruct (SimPromises.mem loc to pview) eqn:H; ss.
-    exploit PVIEW; eauto. i. des. congr.
 Qed.
 
 Lemma sim_local_write

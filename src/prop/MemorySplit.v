@@ -50,16 +50,16 @@ Module MemorySplit.
   Qed.
 
   Lemma remove_promise_remove
-        promises0 mem0 loc from to msg1 msg2 promises2
+        promises0 mem0 loc from to val1 released1 msg2 promises2
         (PROMISES: Memory.le promises0 mem0)
-        (MSG_LE: Message.le msg2 msg1)
-        (MSG_WF1: Message.wf msg1)
+        (MSG_LE: Message.le msg2 (Message.full val1 released1))
+        (MSG_WF1: Message.wf (Message.full val1 released1))
         (MSG_WF2: Message.wf msg2)
         (MSG_TS: Memory.message_to msg2 loc to)
         (TS: Time.lt from to)
-        (REMOVE: Memory.remove promises0 loc from to msg1 promises2):
+        (REMOVE: Memory.remove promises0 loc from to (Message.full val1 released1) promises2):
     exists promises1' mem1',
-      <<PROMISE: Memory.promise promises0 mem0 loc from to msg2 promises1' mem1' (Memory.op_kind_lower msg1)>> /\
+      <<PROMISE: Memory.promise promises0 mem0 loc from to msg2 promises1' mem1' (Memory.op_kind_lower (Message.full val1 released1))>> /\
       <<REMOVE: Memory.remove promises1' loc from to msg2 promises2>>.
   Proof.
     exploit remove_lower_remove; eauto. i. des.

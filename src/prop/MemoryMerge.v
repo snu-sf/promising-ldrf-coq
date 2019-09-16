@@ -73,8 +73,8 @@ Module MemoryMerge.
     - econs; eauto.
       + eapply add_lower_add; eauto.
       + eapply add_lower_add; eauto.
-      + i. subst. inv MEM. inv LOWER. inv MSG_LE.
-        exploit RESERVE; eauto.
+      + i. subst. des. subst.
+        inv MEM. inv LOWER. inv MSG_LE.
     - econs; eauto.
       + eapply split_lower_split; eauto.
       + eapply split_lower_split; eauto.

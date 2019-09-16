@@ -372,7 +372,8 @@ Module Memory.
       (TS: message_to msg loc to)
       (RESERVE: msg = Message.reserve ->
              exists from' val' released',
-               get loc from mem1 = Some (from', Message.full val' released')):
+               get loc from mem1 = Some (from', Message.full val' released'))
+      (* (ATTACH: forall to' msg' (GET: get loc to' mem1 = Some (to, msg')), False) *):
       promise promises1 mem1 loc from to msg promises2 mem2 op_kind_add
   | promise_split
       ts3 msg3
@@ -385,12 +386,13 @@ Module Memory.
       msg0
       (PROMISES: lower promises1 loc from to msg0 msg promises2)
       (MEM: lower mem1 loc from to msg0 msg mem2)
-      (TS: message_to msg loc to):
+      (TS: message_to msg loc to)
+      (RESERVE: exists val released, msg0 = Message.full val released):
       promise promises1 mem1 loc from to msg promises2 mem2 (op_kind_lower msg0)
   | promise_cancel
-      (MSG: msg = Message.reserve)
       (PROMISES: remove promises1 loc from to msg promises2)
-      (MEM: remove mem1 loc from to msg mem2):
+      (MEM: remove mem1 loc from to msg mem2)
+      (RESERVE: msg = Message.reserve):
       promise promises1 mem1 loc from to msg promises2 mem2 op_kind_cancel
   .
   Hint Constructors promise.
@@ -1760,9 +1762,6 @@ Module Memory.
     - erewrite lower_o; eauto. condtac; ss; i.
       + des. subst. inv GET.
         exploit lower_get0; try exact PROMISES. i. des. inv MSG_LE.
-        exploit RESERVE1; eauto. i. des.
-        exploit lower_get1; try exact x; eauto. i. des.
-        inv MSG_LE. eauto.
       + guardH o.
         exploit RESERVE1; eauto. i. des.
         exploit lower_get1; try exact x; eauto. i. des.
@@ -2226,21 +2225,6 @@ Module Memory.
     { i. subst. auto. }
     apply ext. i.
     erewrite lower_o; eauto. condtac; ss. des. subst. auto.
-  Qed.
-
-  Lemma promise_exists_same
-        promises1 mem1 loc from to msg
-        (MSG_WF: Message.wf msg)
-        (LE: le promises1 mem1)
-        (MEM: closed mem1)
-        (GET: get loc to promises1 = Some (from, msg))
-        (LT: Time.lt from to):
-    promise promises1 mem1 loc from to msg promises1 mem1 (op_kind_lower msg).
-  Proof.
-    exploit lower_exists_same; eauto. i.
-    exploit lower_exists_same; try apply LE; eauto. i.
-    econs; eauto.
-    eapply MEM. eauto.
   Qed.
 
   Lemma remove_singleton

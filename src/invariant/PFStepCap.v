@@ -507,7 +507,7 @@ Module PFStepCap.
       exploit Memory.split_get0; try exact MEM. i. des. congr.
     }
     (* lower *)
-    clear TS.
+    clear TS RESERVE.
     inv MEM1. exploit CAPS; eauto. i. des.
     exploit Memory.lower_get0; try exact PROMISES. i. des.
     exploit Memory.lower_get0; try exact MEM. i. des.

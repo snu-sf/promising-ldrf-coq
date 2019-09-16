@@ -102,14 +102,20 @@ Proof.
   hexploit Memory.add_inhabited; try apply x0; [viewtac|]. i. des.
   esplits. econs; eauto.
   - econs; eauto; try congr.
-    econs. unfold TView.write_released.
-    viewtac; repeat (condtac; viewtac);
-      (try by apply Time.bot_spec);
-      (try by unfold TimeMap.singleton, LocFun.add; condtac; [refl|congr]);
-      (try by left; eapply TimeFacts.le_lt_lt; [|eauto];
-       eapply closed_timemap_max_ts; apply WF1).
-    left. eapply TimeFacts.le_lt_lt; [|eauto].
-    eapply closed_timemap_max_ts. apply Memory.unwrap_closed_opt_view; viewtac.
+    + econs. unfold TView.write_released.
+      viewtac; repeat (condtac; viewtac);
+        (try by apply Time.bot_spec);
+        (try by unfold TimeMap.singleton, LocFun.add; condtac; [refl|congr]);
+        (try by left; eapply TimeFacts.le_lt_lt; [|eauto];
+         eapply closed_timemap_max_ts; apply WF1).
+      left. eapply TimeFacts.le_lt_lt; [|eauto].
+      eapply closed_timemap_max_ts. apply Memory.unwrap_closed_opt_view; viewtac.
+    (* + i. inv x0. inv ADD. clear DISJOINT MSG_WF CELL2. *)
+    (*   exploit Memory.get_ts; try exact GET. i. des. *)
+    (*   { subst. inv TO. } *)
+    (*   exploit Memory.max_ts_spec; try exact GET. i. des. *)
+    (*   eapply Time.lt_strorder. etrans; try exact TO. *)
+    (*   eapply TimeFacts.lt_le_lt; eauto. *)
   - econs. unfold TView.write_released. condtac; econs.
     viewtac;
       repeat condtac; viewtac;

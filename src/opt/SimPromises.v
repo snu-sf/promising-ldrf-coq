@@ -200,7 +200,8 @@ Module SimPromises.
       { none_if_tac; try refl. econs. econs. }
       i. esplits; eauto.
       + econs 3; eauto.
-        none_if_tac; viewtac. econs. viewtac.
+        * none_if_tac; viewtac. econs. viewtac.
+        * subst. ss. esplits; eauto.
       + econs.
         * ii. revert LHS.
           erewrite Memory.lower_o; eauto. erewrite (@Memory.lower_o mem2); try exact x0.
