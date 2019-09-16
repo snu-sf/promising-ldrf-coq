@@ -928,7 +928,7 @@ Module PFStepCap.
   Inductive add_cap (caps: Loc.t -> option Time.t): forall (mem1 mem2: Memory.t), Prop :=
   | add_cap_refl mem:
       add_cap caps mem mem
-  | lower_cap_lower
+  | add_cap_add
       mem1 mem2
       loc from to val released
       from_cap to_cap released_cap
