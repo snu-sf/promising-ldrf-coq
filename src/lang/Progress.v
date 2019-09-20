@@ -110,12 +110,12 @@ Proof.
          eapply closed_timemap_max_ts; apply WF1).
       left. eapply TimeFacts.le_lt_lt; [|eauto].
       eapply closed_timemap_max_ts. apply Memory.unwrap_closed_opt_view; viewtac.
-    (* + i. inv x0. inv ADD. clear DISJOINT MSG_WF CELL2. *)
-    (*   exploit Memory.get_ts; try exact GET. i. des. *)
-    (*   { subst. inv TO. } *)
-    (*   exploit Memory.max_ts_spec; try exact GET. i. des. *)
-    (*   eapply Time.lt_strorder. etrans; try exact TO. *)
-    (*   eapply TimeFacts.lt_le_lt; eauto. *)
+    + i. inv x0. inv ADD. clear DISJOINT MSG_WF CELL2.
+      exploit Memory.get_ts; try exact GET. i. des.
+      { subst. inv TO. }
+      exploit Memory.max_ts_spec; try exact GET. i. des.
+      eapply Time.lt_strorder. etrans; try exact TO.
+      eapply TimeFacts.lt_le_lt; eauto.
   - econs. unfold TView.write_released. condtac; econs.
     viewtac;
       repeat condtac; viewtac;

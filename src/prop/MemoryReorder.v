@@ -942,9 +942,28 @@ Module MemoryReorder.
     exploit add_split; try exact PROMISES; eauto. i. des; [|congr].
     exploit add_split; try exact MEM; eauto. i. des; [|congr].
     esplits.
-    - econs; eauto. i. subst. congr.
-    - econs; eauto. i. subst.
-      exploit Memory.add_get0; try exact ADD0. i. des. eauto.
+    - econs; eauto.
+      + i. subst. congr.
+      + i. exploit Memory.add_get0; try exact MEM. i. des.
+        exploit Memory.add_get1; try exact GET; try exact MEM. i.
+        exploit Memory.get_ts; try exact GET1. i. des.
+        { subst. inv ADD3. inv ADD. inv TO. }
+        exploit Memory.get_ts; try exact x8. i. des.
+        { subst. inv ADD0. inv ADD. inv TO. }
+        exploit Memory.get_disjoint; [exact GET1|exact x8|..]. i. des.
+        { subst. inv ADD0. inv ADD. timetac. }
+        destruct (TimeFacts.le_lt_dec ts3 to').
+        * apply (x11 ts3); econs; ss; try refl.
+          inv ADD3. inv ADD. ss.
+        * apply (x11 to'); econs; ss; try refl.
+          { etrans; try exact x10. inv ADD0. inv ADD. ss. }
+          { econs. ss. }
+    - econs; eauto.
+      + i. subst.
+        exploit Memory.add_get0; try exact ADD0. i. des. eauto.
+      + i. revert GET.
+        erewrite Memory.add_o; eauto. condtac; ss; eauto.
+        i. des. subst. inv GET. inv MEM. inv ADD. timetac.
   Qed.
 
   Lemma promise_split_promise_split_same

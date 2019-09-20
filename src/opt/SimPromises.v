@@ -105,7 +105,9 @@ Module SimPromises.
         (INV1: sem pview inv promises1_src promises1_tgt)
         (SIM1: sim_memory mem1_src mem1_tgt)
         (LE1_SRC: Memory.le promises1_src mem1_src)
-        (LE1_TGT: Memory.le promises1_tgt mem1_tgt):
+        (LE1_TGT: Memory.le promises1_tgt mem1_tgt)
+        (MEM1_SRC: Memory.closed mem1_src)
+        (MEM1_TGT: Memory.closed mem1_tgt):
     exists promises2_src mem2_src,
       <<PROMISE_SRC: Memory.promise promises1_src mem1_src loc from to (none_if loc to pview msg) promises2_src mem2_src (kind_transf loc to pview kind_tgt)>> /\
       <<INV2: sem pview inv promises2_src promises2_tgt>> /\
@@ -124,10 +126,46 @@ Module SimPromises.
       + none_if_tac.
         * inv INV1. exploit PVIEW; eauto. i. des.
           hexploit Memory.add_get0; try exact PROMISES; eauto. i. des. congr.
-        * econs 1; eauto; congr.
+        * econs 1; eauto; try congr.
+          i. exploit sim_memory_get_inv; try exact GET; eauto.
+          { apply MEM1_SRC. }
+          { apply MEM1_TGT. }
+          i. des. inv FROM; cycle 1.
+          { inv H. eauto. }
+          exploit Memory.add_get0; try exact MEM. i. des.
+          exploit Memory.add_get1; try exact GET_TGT; eauto. i.
+          exploit Memory.get_ts; try exact GET1. i. des.
+          { subst. inv H. }
+          exploit Memory.get_ts; try exact x3. i. des.
+          { subst. inv TO; inv H0.
+            exploit Memory.get_ts; try exact GET. i. des; timetac. inv x5. }
+          exploit Memory.get_disjoint; [exact GET1|exact x3|..]. i. des.
+          { subst. congr. }
+          apply (x6 to); econs; ss; try refl.
+          exploit Memory.get_ts; try exact GET. i. des.
+          { subst. eauto. }
+          { etrans; eauto. econs. ss. }
         * econs 1; eauto.
-          i. exploit RESERVE; eauto. i. des.
-          inv SIM1. exploit MSG; eauto. i. des. inv MSG0. eauto.
+          { i. exploit RESERVE; eauto. i. des.
+            inv SIM1. exploit MSG; eauto. i. des. inv MSG0. eauto. }
+          i. exploit sim_memory_get_inv; try exact GET; eauto.
+          { apply MEM1_SRC. }
+          { apply MEM1_TGT. }
+          i. des. inv FROM; cycle 1.
+          { inv H. eauto. }
+          exploit Memory.add_get0; try exact MEM. i. des.
+          exploit Memory.add_get1; try exact GET_TGT; eauto. i.
+          exploit Memory.get_ts; try exact GET1. i. des.
+          { subst. inv H. }
+          exploit Memory.get_ts; try exact x3. i. des.
+          { subst. inv TO; inv H0.
+            exploit Memory.get_ts; try exact GET. i. des; timetac. inv x5. }
+          exploit Memory.get_disjoint; [exact GET1|exact x3|..]. i. des.
+          { subst. congr. }
+          apply (x6 to); econs; ss; try refl.
+          exploit Memory.get_ts; try exact GET. i. des.
+          { subst. eauto. }
+          { etrans; eauto. econs. ss. }
       + econs.
         * ii. erewrite Memory.add_o; eauto.
           erewrite (@Memory.add_o promises2_tgt) in LHS; try exact PROMISES. revert LHS.
@@ -256,7 +294,9 @@ Module SimPromises.
         (INV1: sem bot inv promises1_src promises1_tgt)
         (SIM1: sim_memory mem1_src mem1_tgt)
         (LE1_SRC: Memory.le promises1_src mem1_src)
-        (LE1_TGT: Memory.le promises1_tgt mem1_tgt):
+        (LE1_TGT: Memory.le promises1_tgt mem1_tgt)
+        (MEM1_SRC: Memory.closed mem1_src)
+        (MEM1_TGT: Memory.closed mem1_tgt):
     exists promises2_src mem2_src,
       <<PROMISE_SRC: Memory.promise promises1_src mem1_src loc from to msg promises2_src mem2_src kind>> /\
       <<INV2: sem bot inv promises2_src promises2_tgt>> /\
