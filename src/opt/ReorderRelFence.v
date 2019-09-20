@@ -211,9 +211,7 @@ Proof.
   inv STEP. inv PROMISE; des; ss.
   - exploit Memory.add_get0; try exact PROMISES; eauto. i. des. congr.
   - exploit Memory.split_get0; try exact PROMISES; eauto. i. des. congr.
-  - destruct msg0; ss. inv PROMISES. inv LOWER.
-    unfold Memory.get in x. unfold Cell.get in x.
-    rewrite GET2 in x. inv x.
+  - destruct msg0; ss.
   - exploit Memory.remove_get0; try exact PROMISES; eauto. i. des. congr.
 Qed.
 

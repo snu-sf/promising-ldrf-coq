@@ -70,7 +70,9 @@ Lemma reorder_promise_promise_lower_None
       <<STEP1: Local.promise_step lc0 mem0 loc2 from2' to2 (Message.full val2 None) lc1' mem1' kind2>> /\
       <<STEP2: Local.promise_step lc1' mem1' loc1 from1 to1 msg1 lc2 mem2 kind1'>>).
 Proof.
-  inv STEP1. inv STEP2. ss. inv PROMISE0; inv KIND2. inv PROMISE; ss.
+  inv STEP1. inv STEP2. ss.
+  inv PROMISE0; inv KIND2. des. subst.
+  inv PROMISE; ss.
   - exploit MemoryReorder.add_lower; try exact PROMISES0; try exact PROMISES; eauto. i. des.
     + subst.
       exploit MemoryReorder.add_lower; try exact MEM1; try exact MEM; eauto. i. des; [|congr].
@@ -78,31 +80,34 @@ Proof.
       * inv MEM. inv LOWER. ss.
       * econs; eauto. econs; eauto; congr.
     + exploit MemoryReorder.add_lower; try exact MEM1; try exact MEM; eauto. i. des; [congr|].
-      right. esplits; eauto. econs; eauto.
+      right. esplits; eauto; econs; eauto.
       * econs; eauto.
         i. subst. exploit RESERVE; eauto. i. des.
         erewrite Memory.lower_o; eauto. condtac; ss; eauto.
       * eapply Memory.lower_closed_message; eauto.
-  - destruct (classic ((loc1, ts3) = (loc2, to2))).
+  - des. subst.
+    destruct (classic ((loc1, ts3) = (loc2, to2))).
     { inv H.
       exploit MemoryReorder.split_lower_same; try exact PROMISES0; try exact PROMISES; eauto. i. des.
       exploit MemoryReorder.split_lower_same; try exact MEM1; try exact MEM; eauto. i. des.
-      subst. right. esplits; eauto. econs; eauto.
+      subst. right. esplits; eauto; econs; eauto.
       eapply Memory.lower_closed_message; eauto.
     }
     { exploit MemoryReorder.split_lower_diff; try exact PROMISES0; try exact PROMISES; eauto. i. des.
-      - subst. exploit MemoryReorder.split_lower_diff; try exact MEM1; try exact MEM; eauto. i. des; [|congr].
+      - subst. inv x3.
+        exploit MemoryReorder.split_lower_diff; try exact MEM1; try exact MEM; eauto. i. des; [|congr].
         left. esplits; eauto. inv MEM. inv LOWER. ss.
       - exploit MemoryReorder.split_lower_diff; try exact MEM1; try exact MEM; eauto. i. des; [congr|].
-        right. esplits; eauto. econs; eauto.
+        right. esplits; eauto; econs; eauto.
         eapply Memory.lower_closed_message; eauto.
     }
-  - exploit MemoryReorder.lower_lower; try exact PROMISES0; try exact PROMISES; eauto. i. des.
+  - des. subst.
+    exploit MemoryReorder.lower_lower; try exact PROMISES0; try exact PROMISES; eauto. i. des.
     + subst.
       exploit MemoryReorder.lower_lower; try exact MEM1; try exact MEM; eauto. i. des; [|congr].
       left. esplits; eauto. inv MEM. inv LOWER. ss.
     + exploit MemoryReorder.lower_lower; try exact MEM1; try exact MEM; eauto. i. des; [congr|].
-      right. esplits; eauto. econs; eauto.
+      right. esplits; eauto; econs; eauto.
       eapply Memory.lower_closed_message; cycle 1; eauto.
 Qed.
 
@@ -155,12 +160,12 @@ Proof.
       exploit MemoryReorder.split_remove; try exact MEM1; eauto. i. des.
       right. right. esplits; eauto. econs; eauto.
       eapply Memory.cancel_closed_message; eauto.
-  - destruct (classic ((loc1, to1) = (loc2, to2))).
+  - des. subst.
+    destruct (classic ((loc1, to1) = (loc2, to2))).
     + inv H.
       exploit MemoryReorder.lower_remove_same; try exact PROMISES0; eauto. i. des. subst.
       exploit MemoryReorder.lower_remove_same; try exact MEM1; eauto. i. des. subst.
-      exploit Memory.lower_get0; try exact MEM1. i. des. inv MSG_LE. ss.
-      right. left. splits; auto. econs; eauto.
+      exploit Memory.lower_get0; try exact MEM1. i. des. inv MSG_LE.
     + exploit MemoryReorder.lower_remove; try exact PROMISES0; eauto. i. des.
       exploit MemoryReorder.lower_remove; try exact MEM1; eauto. i. des.
       right. right. esplits; eauto. econs; eauto.
@@ -248,7 +253,8 @@ Proof.
               rewrite x in GET0. inv GET0. esplits; eauto.
             - eapply Memory.split_closed_message; eauto. }
         * auto.
-    - exploit MemoryReorder.add_lower; try exact PROMISES; try exact PROMISES0; eauto. i. des.
+    - des. subst.
+      exploit MemoryReorder.add_lower; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       + subst.
         exploit MemoryReorder.add_lower; try exact MEM; try exact MEM0; eauto. i. des; [|congr].
         esplits.
@@ -258,6 +264,7 @@ Proof.
       + exploit MemoryReorder.add_lower; try exact MEM; try exact MEM0; eauto. i. des; [congr|].
         esplits.
         * econs; eauto.
+          econs. eapply REL_CLOSED; eauto.
         * right. esplits; eauto. econs; eauto.
           { econs; eauto. i. subst.
             erewrite Memory.lower_o; eauto. condtac; ss; eauto. }
@@ -306,10 +313,12 @@ Proof.
           { econs; eauto.
             eapply Memory.split_closed_message; cycle 1; eauto. }
         * auto.
-    - exploit MemoryReorder.split_lower_diff; try exact PROMISES; try exact PROMISES0; eauto.
+    - des. subst.
+      exploit MemoryReorder.split_lower_diff; try exact PROMISES; try exact PROMISES0; eauto.
       { ii. inv H. exploit LOCTS; eauto. i. des. congr. }
       i. des.
-      + subst. exploit MemoryReorder.split_lower_diff; try exact MEM; try exact MEM0; eauto.
+      + subst. inv x3.
+        exploit MemoryReorder.split_lower_diff; try exact MEM; try exact MEM0; eauto.
         { ii. inv H. exploit LOCTS; eauto. i. des. congr. }
         i. des; [|congr].
         esplits.
@@ -323,12 +332,12 @@ Proof.
         { ii. inv H. exploit LOCTS; eauto. i. des. congr. }
         i. des; [congr|].
         esplits.
-        * econs; eauto.
+        * econs; eauto. econs; eauto.
         * right. esplits; eauto. econs; eauto.
           eapply Memory.lower_closed_message; eauto.
         * congr.
   }
-  { inv PROMISE0; ss.
+  { des. subst. inv PROMISE0; ss.
     - exploit MemoryReorder.lower_add; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       exploit MemoryReorder.lower_add; try exact MEM; try exact MEM0; eauto. i. des.
       esplits.
@@ -339,7 +348,8 @@ Proof.
       + right. esplits; eauto. econs; eauto.
         eapply Memory.add_closed_message; eauto.
       + auto.
-    - exploit MemoryReorder.lower_split; try exact PROMISES; try exact PROMISES0; eauto. i. des.
+    - des. inv RESERVE.
+      exploit MemoryReorder.lower_split; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       exploit MemoryReorder.lower_split; try exact MEM; try exact MEM0; eauto. i. des.
       unguardH FROM1. des.
       + inv FROM1. unguardH FROM0. des; [|congr]. inv FROM0.
@@ -363,7 +373,8 @@ Proof.
             exploit Memory.split_get0; try exact SPLIT0; eauto. i. des. congr. }
           { econs; eauto. eapply Memory.split_closed_message; eauto. }
         * auto.
-    - exploit MemoryReorder.lower_lower; try exact PROMISES; try exact PROMISES0; eauto. i. des.
+    - des. subst.
+      exploit MemoryReorder.lower_lower; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       + subst.
         exploit MemoryReorder.lower_lower; try exact MEM; try exact MEM0; eauto. i. des; [|congr].
         esplits.
@@ -372,7 +383,7 @@ Proof.
         * congr.
       + exploit MemoryReorder.lower_lower; try exact MEM; try exact MEM0; eauto. i. des; [congr|].
         esplits.
-        * econs; eauto.
+        * econs; eauto. econs; eauto.
         * right. esplits; eauto. econs; eauto.
           eapply Memory.lower_closed_message; cycle 1; eauto.
         * auto.
@@ -410,10 +421,11 @@ Proof.
     esplits.
     + econs; eauto.
     + econs; ss. econs; ss. eauto.
-  - exploit MemoryReorder.lower_remove; try exact REMOVE; eauto. i. des.
+  - des. subst.
+    exploit MemoryReorder.lower_remove; try exact REMOVE; eauto. i. des.
     esplits.
     + econs; eauto.
-    + econs; ss. econs; ss.
+    + econs; ss. econs; eauto.
   - exploit MemoryReorder.remove_remove; try exact PROMISES; eauto. i. des.
     esplits.
     + econs; eauto.
@@ -440,9 +452,6 @@ Proof.
     + i. des. subst. exploit NONSYNCH; eauto.
       destruct msg; destruct msg0; ss.
       * i. subst. unguard. des; ss.
-        exploit Memory.lower_get0; try exact MEM. i. des.
-        inv WF1. exploit PROMISES0; eauto. i.
-        rewrite GET0 in x. inv x. ss.
       * exploit Memory.lower_get0; try exact PROMISES. i. des.
         rewrite GET in GET0. inv GET0.
         inv MEM. inv LOWER. inv MSG_LE0.
