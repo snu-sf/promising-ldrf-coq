@@ -217,10 +217,12 @@ Lemma reorder_promise_promise
                 (KIND: kind1 = Memory.op_kind_split to1' msg1'),
           to1' <> to2 /\
           (forall msg2', kind2 <> Memory.op_kind_split to1' msg2'))
-      (LOCTS2: loc1 = loc2 ->
-               kind1 = Memory.op_kind_add ->
-               kind2 = Memory.op_kind_add ->
-               Time.lt to1 to2):
+      (LOCTS2: forall val released
+                 (LOC: loc1 = loc2)
+                 (KIND1: kind1 = Memory.op_kind_add)
+                 (KIND2: kind2 = Memory.op_kind_add)
+                 (MSG1: msg1 = Message.full val released),
+               Time.lt to2 to1):
   exists lc1' mem1' kind2',
     <<STEP1: Local.promise_step lc0 mem0 loc2 from2 to2 (Message.full val2 released2) lc1' mem1' kind2'>> /\
     <<STEP2: __guard__
@@ -238,35 +240,65 @@ Proof.
   inv STEP1. inv STEP2. ss.
   inv PROMISE; ss.
   { inv PROMISE0; ss.
-    - exploit MemoryReorder.add_add; try exact PROMISES; try exact PROMISES0; eauto. i. des.
+    - (* add/add *)
+      exploit MemoryReorder.add_add; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       exploit MemoryReorder.add_add; try exact MEM; try exact MEM0; eauto. i. des.
       esplits.
-      + econs.
-        * econs; eauto. congr.
-        * econs. eapply REL_CLOSED. econs; eauto. i. inv H.
-        * eauto.
+      + cut (Memory.promise (Local.promises lc0) mem0 loc2 from2 to2 (Message.full val2 released2)
+                            mem1' mem1'0 Memory.op_kind_add).
+        { i. econs; eauto. }
+        econs; eauto; try congr.
+        i. exploit Memory.add_get1; try exact MEM; eauto.
       + right. esplits; eauto. econs; eauto.
-        * econs; eauto. i. subst.
-          erewrite Memory.add_o; eauto. condtac; ss; eauto.
+        * econs; eauto.
+          { i. subst.
+            erewrite Memory.add_o; eauto. condtac; ss; eauto. }
+          { i. revert GET.
+            erewrite Memory.add_o; eauto. condtac; ss; eauto.
+            i. des. inv GET.
+            exploit LOCTS2; eauto. i.
+            inv ADD0. inv ADD. rewrite x in TO. timetac.
+          }
         * eapply Memory.add_closed_message; cycle 1; eauto.
       + auto.
-    - exploit MemoryReorder.add_split; try exact PROMISES; try exact PROMISES0; eauto. i. des.
-      + subst.
+    - (* add/split *)
+      exploit MemoryReorder.add_split; try exact PROMISES; try exact PROMISES0; eauto. i. des.
+      + subst. inv RESERVE0.
         exploit MemoryReorder.add_split; try exact MEM; try exact MEM0; eauto. i. des; [|congr].
         esplits.
-        * econs.
-          { econs; eauto. congr. }
-          { econs. eapply REL_CLOSED. econs; eauto. congr. }
-          { auto. }
+        * cut (Memory.promise (Local.promises lc0) mem0 loc2 from2 to2 (Message.full val' released')
+                              mem1' mem1'0 Memory.op_kind_add).
+          { i. econs; eauto. }
+          econs; eauto; try congr.
+          i. exploit Memory.add_get1; try exact GET; try exact MEM. i.
+          exploit Memory.add_get0; try exact MEM. i. des.
+          clear GET GET0.
+          exploit Memory.get_ts; try exact x4. i. des.
+          { subst. inv ADD0. inv ADD. inv TO. }
+          exploit Memory.get_ts; try exact GET1. i. des.
+          { subst. inv ADD3. inv ADD. inv TO. }
+          exploit Memory.get_disjoint; [exact x4|exact GET1|..]. i. des.
+          { subst. inv ADD0. inv ADD. timetac. }
+          destruct (TimeFacts.le_lt_dec to' ts3).
+          { apply (x7 to'); econs; ss; try refl.
+            inv ADD0. inv ADD. etrans; eauto. }
+          { apply (x7 ts3); econs; ss; try refl.
+            - inv ADD3. inv ADD. ss.
+            - econs. ss. }
         * right. esplits; eauto.
           { ii. inv H. inv ADD3. inv ADD. timetac. }
           { econs.
-            - econs; eauto. i. subst.
-              erewrite Memory.add_o; eauto. condtac; ss; eauto. des; congr.
+            - econs; eauto.
+              + i. subst.
+                erewrite Memory.add_o; eauto. condtac; ss; eauto. des; congr.
+              + i. revert GET.
+                erewrite Memory.add_o; eauto. condtac; ss; eauto. i. des. inv GET.
+                inv ADD0. inv ADD. inv ADD3. inv ADD. rewrite TO in TO0. timetac.
             - eapply Memory.split_closed_message; eauto.
             - auto. }
         * auto.
-      + exploit MemoryReorder.add_split; try exact MEM; try exact MEM0; eauto. i. des; [congr|].
+      + inv RESERVE0.
+        exploit MemoryReorder.add_split; try exact MEM; try exact MEM0; eauto. i. des; [congr|].
         esplits.
         * econs.
           { econs 2; eauto. }
@@ -276,14 +308,38 @@ Proof.
           { ii. inv H. exploit Memory.split_get0; try exact MEM0; eauto. i. des.
             revert GET. erewrite Memory.add_o; eauto. condtac; ss. des; congr. }
           { econs; eauto.
-            - econs; eauto. i. subst.
-              erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
-              guardH o. des. subst. exploit RESERVE; eauto. i. des.
-              exploit Memory.split_get0; try exact SPLIT0. i. des.
-              rewrite x in GET0. inv GET0. esplits; eauto.
+            - econs; eauto.
+              + i. subst.
+                erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
+                guardH o. des. subst. exploit RESERVE; eauto. i. des.
+                exploit Memory.split_get0; try exact SPLIT0. i. des.
+                rewrite x in GET0. inv GET0. esplits; eauto.
+              + i. revert GET.
+                erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
+                * i. des. inv GET.
+                  exploit Memory.split_get0; try exact MEM0. i. des.
+                  revert GET0. erewrite Memory.add_o; eauto. condtac; ss; eauto.
+                  i. des. inv GET0.
+                  inv MEM0. inv SPLIT. rewrite TS12 in TS23. timetac.
+                * guardH o. i. des. inv GET.
+                  exploit Memory.split_get0; try exact SPLIT0. i. des.
+                  exploit Memory.add_get0; try exact ADD0. i. des.
+                  exploit Memory.add_get1; try exact GET1; eauto. i.
+                  clear GET GET0 GET1 GET2 GET3.
+                  exploit Memory.get_ts; try exact GET4. i. des.
+                  { subst. inv SPLIT0. inv SPLIT. inv TS12. }
+                  exploit Memory.get_ts; try exact x0. i. des.
+                  { subst. inv ADD0. inv ADD. inv TO. }
+                  exploit Memory.get_disjoint; [exact GET4|exact x0|..]. i. des.
+                  { subst. exploit Memory.split_get0; try exact SPLIT0. i. des.
+                    inv ADD0. inv ADD.
+                    hexploit DISJOINT; try eapply GET1. i.
+                    apply (H to1); econs; ss; try refl. }
+                  apply (x3 to1); econs; ss; try refl.
             - eapply Memory.split_closed_message; eauto. }
         * auto.
-    - des. subst.
+    - (* add/lower *)
+      des. subst.
       exploit MemoryReorder.add_lower; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       + subst.
         exploit MemoryReorder.add_lower; try exact MEM; try exact MEM0; eauto. i. des; [|congr].
@@ -296,24 +352,42 @@ Proof.
         * econs; eauto.
           econs. eapply REL_CLOSED; eauto.
         * right. esplits; eauto. econs; eauto.
-          { econs; eauto. i. subst.
-            erewrite Memory.lower_o; eauto. condtac; ss; eauto. }
+          { econs; eauto.
+            - i. subst.
+              erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+            - i. revert GET.
+              erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+              i. des. inv GET.
+              exploit Memory.lower_get0; try exact LOWER0. i. des. eauto. }
           { eapply Memory.lower_closed_message; eauto. }
         * auto.
   }
-  { inv PROMISE0; ss.
-    - exploit MemoryReorder.split_add; try exact PROMISES; try exact PROMISES0; eauto. i. des.
+  { des. subst. inv PROMISE0; ss.
+    - (* split/add *)
+      exploit MemoryReorder.split_add; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       exploit MemoryReorder.split_add; try exact MEM; try exact MEM0; eauto. i. des.
       esplits.
-      + econs.
-        * econs; eauto. congr.
-        * econs. eapply REL_CLOSED; eauto. econs; eauto. congr.
-        * auto.
+      + cut (Memory.promise (Local.promises lc0) mem0 loc2 from2 to2 (Message.full val2 released2)
+                            mem1' mem1'0 Memory.op_kind_add).
+        { i. econs; eauto. }
+        econs; eauto; try congr.
+        i. exploit Memory.split_get1; try exact GET; eauto. i. des.
+        dup GET2. revert GET2.
+        erewrite Memory.split_o; eauto. repeat condtac; ss.
+        * i. des. inv GET2.
+          exploit Memory.split_get0; try exact MEM. i. des.
+          rewrite GET in *. ss.
+        * guardH o. i. des. inv GET2.
+          exploit Memory.split_get0; try exact MEM. i. des.
+          rewrite GET in *. inv GET2. eauto.
+        * i. rewrite GET in *. inv GET2. eauto.
       + right. esplits; eauto. econs; eauto.
         eapply Memory.add_closed_message; eauto.
       + auto.
-    - exploit MemoryReorder.split_split; try exact PROMISES; try exact PROMISES0; eauto.
-      { ii. inv H. eapply LOCTS; eauto. }
+    - (* split/split *)
+      des. inv RESERVE.
+      exploit MemoryReorder.split_split; try exact PROMISES; try exact PROMISES0; eauto.
+      { ii. inv H. eapply LOCTS1; eauto. }
       i. des.
       + subst. exploit MemoryReorder.split_split; try exact MEM; try exact MEM0; eauto.
         { ii. inv H. inv SPLIT2. inv SPLIT. timetac. }
@@ -329,7 +403,7 @@ Proof.
             eapply Memory.split_closed_message; cycle 1; eauto. }
         * congr.
       + exploit MemoryReorder.split_split; try exact MEM; try exact MEM0; eauto.
-        { ii. inv H. eapply LOCTS; eauto. }
+        { ii. inv H. eapply LOCTS1; eauto. }
         i. des; [congr|].
         esplits.
         * econs.
@@ -343,13 +417,14 @@ Proof.
           { econs; eauto.
             eapply Memory.split_closed_message; cycle 1; eauto. }
         * auto.
-    - des. subst.
+    - (* split/lower *)
+      des. subst.
       exploit MemoryReorder.split_lower_diff; try exact PROMISES; try exact PROMISES0; eauto.
-      { ii. inv H. exploit LOCTS; eauto. i. des. congr. }
+      { ii. inv H. exploit LOCTS1; eauto. i. des. congr. }
       i. des.
       + subst. inv x3.
         exploit MemoryReorder.split_lower_diff; try exact MEM; try exact MEM0; eauto.
-        { ii. inv H. exploit LOCTS; eauto. i. des. congr. }
+        { ii. inv H. exploit LOCTS1; eauto. i. des. congr. }
         i. des; [|congr].
         esplits.
         * econs.
@@ -359,7 +434,7 @@ Proof.
         * left. auto.
         * congr.
       + subst. exploit MemoryReorder.split_lower_diff; try exact MEM; try exact MEM0; eauto.
-        { ii. inv H. exploit LOCTS; eauto. i. des. congr. }
+        { ii. inv H. exploit LOCTS1; eauto. i. des. congr. }
         i. des; [congr|].
         esplits.
         * econs; eauto. econs; eauto.
@@ -368,17 +443,20 @@ Proof.
         * congr.
   }
   { des. subst. inv PROMISE0; ss.
-    - exploit MemoryReorder.lower_add; try exact PROMISES; try exact PROMISES0; eauto. i. des.
+    - (* lower/add *)
+      exploit MemoryReorder.lower_add; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       exploit MemoryReorder.lower_add; try exact MEM; try exact MEM0; eauto. i. des.
       esplits.
-      + econs.
-        * econs; eauto. congr.
-        * econs. eapply REL_CLOSED. econs; eauto. congr.
-        * auto.
+      + cut (Memory.promise (Local.promises lc0) mem0 loc2 from2 to2 (Message.full val2 released2)
+                            mem1' mem1'0 Memory.op_kind_add).
+        { i. econs; eauto. }
+        econs; eauto; try congr.
+        i. exploit Memory.lower_get1; try exact GET; eauto. i. des. eauto.
       + right. esplits; eauto. econs; eauto.
         eapply Memory.add_closed_message; eauto.
       + auto.
-    - des. inv RESERVE.
+    - (* lower/split *)
+      des. inv RESERVE.
       exploit MemoryReorder.lower_split; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       exploit MemoryReorder.lower_split; try exact MEM; try exact MEM0; eauto. i. des.
       unguardH FROM1. des.
@@ -403,7 +481,8 @@ Proof.
             exploit Memory.split_get0; try exact SPLIT0; eauto. i. des. congr. }
           { econs; eauto. eapply Memory.split_closed_message; eauto. }
         * auto.
-    - des. subst.
+    - (* lower/lower *)
+      des. subst.
       exploit MemoryReorder.lower_lower; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       + subst.
         exploit MemoryReorder.lower_lower; try exact MEM; try exact MEM0; eauto. i. des; [|congr].
@@ -507,11 +586,17 @@ Lemma reorder_promise_write
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
       (KIND1: Memory.op_kind_is_cancel kind1 = false)
-      (LOCTS: forall to1' msg1'
+      (LOCTS1: forall to1' msg1'
                 (LOC: loc1 = loc2)
                 (KIND: kind1 = Memory.op_kind_split to1' msg1'),
           to1' <> to2 /\
-          (forall msg2', kind2 <> Memory.op_kind_split to1' msg2')):
+          (forall msg2', kind2 <> Memory.op_kind_split to1' msg2'))
+      (LOCTS2: forall val released
+                 (LOC: loc1 = loc2)
+                 (KIND1: kind1 = Memory.op_kind_add)
+                 (KIND2: kind2 = Memory.op_kind_add)
+                 (MSG1: msg1 = Message.full val released),
+               Time.lt to2 to1):
   exists kind2' lc1' mem1',
     <<STEP1: Local.write_step lc0 sc0 mem0 loc2 from2 to2 val2 releasedm2 released2 ord2 lc1' sc2 mem1' kind2'>> /\
     <<STEP2: __guard__
@@ -586,6 +671,12 @@ Proof.
     + i. des. inv GET0. inv MEM1. inv SPLIT. timetac.
     + guardH o. i. des. inv GET0. inv MEM. inv SPLIT. auto.
     + guardH o. des; congr.
+  - i. subst. destruct (TimeFacts.le_lt_dec to2 to1); cycle 1.
+    { exfalso. apply H; eauto. }
+    inv l; ss. inv H0. exfalso.
+    inv STEP1. inv PROMISE. inv STEP2. inv WRITE. inv PROMISE. ss.
+    exploit Memory.add_get0; try exact MEM. i. des.
+    exploit Memory.add_get0; try exact MEM1. i. des. congr.
 Qed.
 
 Hint Constructors Thread.program_step.
@@ -641,25 +732,19 @@ Proof.
         exploit Memory.split_get0; try exact PROMISES0. i. des.
         rewrite GET2 in *. inv GET4.
         inv MEM0. inv SPLIT. timetac. }
+    { i. subst. inv LOCAL0. inv PROMISE.
+      exploit Memory.add_get0; try exact PROMISES. i. des.
+      exploit promise_consistent_promise_write; try exact GET0; eauto. i.
+      inv x0; ss. inv H.
+      inv LOCAL2. inv WRITE. inv PROMISE. ss.
+      exploit Memory.add_get0; try exact MEM. i. des.
+      exploit Memory.add_get0; try exact MEM0. i. des. congr. }
     i. des.
     esplits.
     + econs; eauto.
     + unguardH STEP2. des.
       * inv STEP2. left. auto.
       * right. esplits. econs; eauto.
-    (* i. des. *)
-    (* { subst. inv LOCAL0. exploit Memory.promise_get2; eauto. *)
-    (*   { destruct kind, msg; ss. } *)
-    (*   i. des. *)
-    (*   exploit promise_consistent_promise_write; eauto. i. *)
-    (*   exfalso. eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt; eauto. *)
-    (* } *)
-    (* esplits. *)
-    (* + econs; eauto. *)
-    (* + unguardH STEP2. des. *)
-    (*   * inv STEP2. left. auto. *)
-    (*   * right. esplits. econs; eauto. *)
-    (* +  *)
   - (* update *)
     exploit reorder_promise_read; try exact LOCAL1; eauto; try by viewtac.
     { ii. inv H.
@@ -692,24 +777,20 @@ Proof.
         exploit Memory.split_get0; try exact PROMISES0. i. des.
         rewrite GET2 in *. inv GET4.
         inv MEM0. inv SPLIT. timetac. }
+    { i. subst. inv LOCAL0. inv PROMISE.
+      inv LOCAL2. ss.
+      exploit Memory.add_get0; try exact PROMISES. i. des.
+      exploit promise_consistent_promise_write; try exact GET1; eauto. i.
+      inv x0; ss. inv H.
+      inv LOCAL3. inv WRITE. inv PROMISE. ss.
+      exploit Memory.add_get0; try exact MEM. i. des.
+      exploit Memory.add_get0; try exact MEM0. i. des. congr. }
     i. des.
     esplits.
     + econs; eauto.
     + unguardH STEP3. des.
       * inv STEP3. left. auto.
       * right. esplits. econs; eauto.
-    (* i. des. *)
-    (* { subst. inv STEP2. exploit Memory.promise_get2; eauto. *)
-    (*   { destruct kind; ss. } *)
-    (*   i. des. *)
-    (*   exploit promise_consistent_promise_write; eauto. i. *)
-    (*   exfalso. eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt; eauto. *)
-    (* } *)
-    (* esplits. *)
-    (* + econs; eauto. *)
-    (* + unguardH STEP3. des. *)
-    (*   * inv STEP3. left. auto. *)
-    (*   * right. esplits. econs; eauto. *)
   - inv LOCAL0. inv LOCAL2.
     esplits; eauto.
     + econs; eauto. econs 5; eauto. econs; eauto. ss.
@@ -750,8 +831,6 @@ Lemma reorder_nonpf_pf
 Proof.
   inv STEP2; ss.
   - inv STEP. ss.
-    (* symmetry in PF. apply promise_pf_inv in PF. des. subst. *)
-    (* destruct msg; ss. destruct released0; ss. *)
     inv STEP1. inv STEP. ss.
     destruct kind; ss.
     + destruct msg1, msg; ss. destruct released0; ss.
