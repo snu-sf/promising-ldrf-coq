@@ -145,27 +145,9 @@ Module SimPromises.
           exploit Memory.get_ts; try exact GET. i. des.
           { subst. eauto. }
           { etrans; eauto. econs. ss. }
-        * econs 1; eauto.
-          { i. exploit RESERVE; eauto. i. des.
-            inv SIM1. exploit MSG; eauto. i. des. inv MSG0. eauto. }
-          i. exploit sim_memory_get_inv; try exact GET; eauto.
-          { apply MEM1_SRC. }
-          { apply MEM1_TGT. }
-          i. des. inv FROM; cycle 1.
-          { inv H. eauto. }
-          exploit Memory.add_get0; try exact MEM. i. des.
-          exploit Memory.add_get1; try exact GET_TGT; eauto. i.
-          exploit Memory.get_ts; try exact GET1. i. des.
-          { subst. inv H. }
-          exploit Memory.get_ts; try exact x3. i. des.
-          { subst. inv TO; inv H0.
-            exploit Memory.get_ts; try exact GET. i. des; timetac. inv x5. }
-          exploit Memory.get_disjoint; [exact GET1|exact x3|..]. i. des.
-          { subst. congr. }
-          apply (x6 to); econs; ss; try refl.
-          exploit Memory.get_ts; try exact GET. i. des.
-          { subst. eauto. }
-          { etrans; eauto. econs. ss. }
+        * econs 1; eauto; ss.
+          i. exploit RESERVE; eauto. i. des.
+          inv SIM1. exploit MSG; eauto. i. des. inv MSG0. eauto.
       + econs.
         * ii. erewrite Memory.add_o; eauto.
           erewrite (@Memory.add_o promises2_tgt) in LHS; try exact PROMISES. revert LHS.

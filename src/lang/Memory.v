@@ -373,7 +373,9 @@ Module Memory.
       (RESERVE: msg = Message.reserve ->
              exists from' val' released',
                get loc from mem1 = Some (from', Message.full val' released'))
-      (ATTACH: forall to' msg' (GET: get loc to' mem1 = Some (to, msg')), False):
+      (ATTACH: forall val released to' msg'
+                 (MSG: msg = Message.full val released)
+                 (GET: get loc to' mem1 = Some (to, msg')), False):
       promise promises1 mem1 loc from to msg promises2 mem2 op_kind_add
   | promise_split
       ts3 msg3
