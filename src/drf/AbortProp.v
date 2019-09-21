@@ -31,6 +31,7 @@ Require Import Program.
 Require Import Cell.
 Require Import Time.
 Require Import PredStep.
+Require Import DRF_PF.
 
 Require Import PFConsistent.
 
@@ -115,6 +116,127 @@ Proof.
     + eapply IHdom; eauto.
       i. exploit FINITE; eauto. i. des; clarify.
 Qed.
+
+Inductive concreter_memory (mem_src mem_tgt: Memory.t): Prop :=
+| concreter_memory_intro
+    (COVER: forall loc to (COV: covered loc to mem_src),
+        covered loc to mem_tgt)
+    (MSG: forall loc to from vw val
+                 (GETTGT: Memory.get loc to mem_tgt = Some (from, Message.full val vw)),
+        Memory.get loc to mem_src = Some (from, Message.full val vw))
+.
+
+Lemma concreter_memory_write mem_src0 mem_tgt0 prom0
+      loc from to val vw_src vw_tgt prom1 mem_tgt1 kind
+      (CONCRETE: concreter_memory mem_src0 mem_tgt0)
+      (MLESRC: Memory.le prom0 mem_src0)
+      (MLETGT: Memory.le prom0 mem_tgt0)
+      (VWLE: View.opt_le vw_src vw_tgt)
+      (VWWF: View.opt_wf vw_src)
+      (WRITE: Memory.write prom0 mem_tgt0 loc from to val vw_tgt prom1 mem_tgt1 kind)
+  :
+    exists mem_src1,
+      (<<PROMISE: Memory.write prom0 mem_src0 loc from to val vw_src prom1 mem_src1 kind>>) /\
+      (<<CONCRETE: concreter_memory mem_src1 mem_tgt1>>).
+Proof.
+  inv WRITE. inv PROMISE.
+  -
+
+
+
+Lemma concret
+
+Lemma concreter_memory_step
+      lang prom th_src th_tgt th_tgt' st st' vw vw' prom' sc sc'
+      mem_src mem_tgt mem_tgt' tf e
+      (VWF: TView.wf vw)
+      (TH_SRC: th_src = Thread.mk lang st (Local.mk vw prom) sc mem_src)
+      (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk vw prom) sc mem_tgt)
+      (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk vw' prom') sc' mem_tgt')
+      (CONCRETE: concreter_memory mem_src mem_tgt)
+      (MLESRC: Memory.le prom mem_src)
+      (MLETGT: Memory.le prom mem_tgt)
+      (STEP: Thread.step tf e th_tgt th_tgt')
+  :
+    exists v_src' mem_src' sc_src',
+      (<<STEP: Thread.step
+                 tf e th_src
+                 (Thread.mk lang st' (Local.mk v_src' prom') sc_src' mem_src')>>) /\
+      (<<CONCRETE: concreter_memory mem_src' mem_tgt'>>)
+.
+Proof.
+
+
+
+
+Lemma concreter_memory_promise mem_src0 mem_tgt0 prom0
+      loc from to val vw_src vw_tgt prom1 mem_tgt1 kind
+      (CONCRETE: concreter_memory mem_src0 mem_tgt0)
+      (MLESRC: Memory.le prom0 mem_src0)
+      (MLETGT: Memory.le prom0 mem_tgt0)
+      (VWLE: View.opt_le vw_src vw_tgt)
+      (VWWF: View.opt_wf vw_src)
+      (PROMO: Memory.promise prom0 mem_tgt0 loc from to val vw_tgt prom1 mem_tgt1 kind)
+  :
+    exists mem_src1,
+      (<<PROMISE: Memory.write prom0 mem_src0 loc from to val vw_src prom1 mem_src1 kind>>) /\
+      (<<CONCRETE: concreter_memory mem_src1 mem_tgt1>>).
+Proof.
+  inv WRITE. inv PROMISE.
+  -
+
+
+Lemma concreter_memory_step mem_src0 mem_tgt0 prom0
+      loc from to val vw_src vw_tgt prom1 mem_tgt1 kind
+      (CONCRETE: concreter_memory mem_src0 mem_tgt0)
+      (MLESRC: Memory.le prom0 mem_src0)
+      (MLETGT: Memory.le prom0 mem_tgt0)
+      (VWLE: View.opt_le vw_src vw_tgt)
+      (VWWF: View.opt_wf vw_src)
+      (PROMO: Memory.promise prom0 mem_tgt0 loc from to val vw_tgt prom1 mem_tgt1 kind)
+  :
+    exists mem_src1,
+      (<<PROMISE: Memory.write prom0 mem_src0 loc from to val vw_src prom1 mem_src1 kind>>) /\
+      (<<CONCRETE: concreter_memory mem_src1 mem_tgt1>>).
+Proof.
+  inv WRITE. inv PROMISE.
+  -
+
+
+Lemma concreter_memory_promise mem_src0 mem_tgt0 prom0
+      loc from to val vw_src vw_tgt prom1 mem_tgt1 kind
+      (CONCRETE: concreter_memory mem_src0 mem_tgt0)
+      (MLESRC: Memory.le prom0 mem_src0)
+      (MLETGT: Memory.le prom0 mem_tgt0)
+      (VWLE: View.opt_le vw_src vw_tgt)
+      (VWWF: View.opt_wf vw_src)
+      (PROMO: Memory.promise prom0 mem_tgt0 loc from to val vw_tgt prom1 mem_tgt1 kind)
+  :
+    exists mem_src1,
+      (<<PROMISE: Memory.write prom0 mem_src0 loc from to val vw_src prom1 mem_src1 kind>>) /\
+      (<<CONCRETE: concreter_memory mem_src1 mem_tgt1>>).
+Proof.
+  inv WRITE. inv PROMISE.
+  -
+
+
+
+Admitted.
+
+
+
+
+
+
+        exists from_src vw_src,
+          (<<GETSRC: Memory.get loc to mem_src = Some (from_src, Message.full val vw_src)>>) /\
+          (<<VWLE: View.opt_le vw_src vw_tgt>>)).
+
+
+    ()
+
+
+
 
 Inductive lower_memory (mem_src mem_tgt: Memory.t): Prop :=
 | lower_memory_intro

@@ -196,4 +196,31 @@ Section PredStep.
       eapply no_promise_program_step; eauto.
   Qed.
 
+  Definition promise_free (e: ThreadEvent.t): Prop :=
+    match e with
+    | ThreadEvent.promise loc from to msg kind =>
+      (Memory.op_kind_is_lower_full kind && Message.is_released_none msg
+       || Memory.op_kind_is_cancel kind)%bool
+    | _ => True
+    end.
+
+  Lemma promise_free_step_pf_step lang:
+    @pred_step promise_free lang <3= @Thread.step lang true.
+  Proof.
+    i. inv PR. inv STEP. inv STEP0; ss.
+    - unfold promise_free in *.
+      econs 1. replace pf with true in *; ss.
+      inv STEP; ss.
+    - econs 2; eauto.
+  Qed.
+
+  Lemma promise_free_step_pf_step_rtc lang :
+    rtc (tau (@pred_step promise_free lang)) <2= rtc (tau (@Thread.step _ true)).
+  Proof.
+    i. induction PR.
+    - refl.
+    - econs; eauto. inv H. econs; eauto.
+      eapply promise_free_step_pf_step; eauto.
+  Qed.
+
 End PredStep.
