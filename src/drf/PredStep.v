@@ -223,4 +223,15 @@ Section PredStep.
       eapply promise_free_step_pf_step; eauto.
   Qed.
 
+  Definition no_acq_read_msgs (MSGS : Loc.t -> Time.t -> Prop)
+             (e : ThreadEvent.t) : Prop :=
+    match e with
+    | ThreadEvent.read loc to _ _ ord =>
+      forall (SAT: MSGS loc to), ~ Ordering.le Ordering.acqrel ord
+    | ThreadEvent.update loc from _ _ _ _ _ ordr _ =>
+      forall (SAT: MSGS loc from), ~ Ordering.le Ordering.acqrel ordr
+    | _ => True
+    end
+  .
+
 End PredStep.
