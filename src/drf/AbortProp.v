@@ -31,7 +31,8 @@ Require Import Program.
 Require Import Cell.
 Require Import Time.
 Require Import PredStep.
-Require Import DRF_PF.
+
+(* Require Import DRF_PF. *)
 
 Require Import PFConsistent.
 
@@ -257,7 +258,8 @@ Proof.
   - clarify.
 Qed.
 
-Lemma pf_step_promises_decrease
+Lemma pf_step_promises_decrease lang (th0 th1: Thread.t lang)
+      (STEP:
 
 
 

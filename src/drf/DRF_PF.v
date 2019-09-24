@@ -199,11 +199,16 @@ Section MEMORYLEMMAS.
     + i. des; clarify. eauto.
   Qed.
 
+  Definition not_attatched_time (mem: Memory.t) (loc: Loc.t) (to: Time.t) :=
+    forall to' msg (GET: Memory.get loc to' mem = Some (to, msg)),
+      False.
+
   Lemma write_succeed mem1 loc from1 to1 val released
         (NCOVER: forall t (COVER: covered loc t mem1),
             ~ Interval.mem (from1, to1) t)
         (TO: Time.le (View.rlx (View.unwrap released) loc) to1)
         (FROMTO: Time.lt from1 to1)
+        (NOATTATCH: not_attatched_time mem1 loc to1)
         (MSGWF: Message.wf (Message.full val released))
     :
       exists mem2,
@@ -256,13 +261,14 @@ Section MEMORYLEMMAS.
       (<<TLE: Time.le
                 (View.rlx (View.unwrap (TView.write_released v sc loc to releasedm ord)) loc) to>>) /\
       (<<FROMTO: Time.lt from to>>) /\
-      (<<MSGWF: Message.wf (Message.full val (TView.write_released v sc loc to releasedm ord))>>)
+      (<<MSGWF: Message.wf (Message.full val (TView.write_released v sc loc to releasedm ord))>>) /\
+      (<<NOATTATCH: forall (KIND: kind = Memory.op_kind_add), not_attatched_time mem_tgt loc to>>)
   .
   Proof.
     inv WRITE. inv WRITE0. inv PROMISE.
-    - inv TS. inv MEM. inv ADD. esplits; eauto.
-    - inv TS. inv MEM. inv SPLIT. esplits; eauto.
-    - inv TS. inv MEM. inv LOWER. esplits; eauto.
+    - inv TS. inv MEM. inv ADD. esplits; eauto. ii. eauto.
+    - inv TS. inv MEM. inv SPLIT. esplits; eauto. ii. clarify.
+    - inv TS. inv MEM. inv LOWER. esplits; eauto. ii. clarify.
     - clarify.
   Qed.
 
@@ -640,6 +646,7 @@ Section SELFPROMISEREMOVE.
         + i. des; clarify; eauto.
           eapply NPRM. econs; eauto.
       - eapply NEWMSG. eapply memory_le_covered; try apply MEM0; eauto. }
+    {
     i. des. exists mem2. esplits; ss.
     - econs 1; ss; eauto.
       ii. rewrite Memory.bot_get in *. clarify.

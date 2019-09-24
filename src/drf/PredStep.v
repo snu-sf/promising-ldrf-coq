@@ -204,23 +204,25 @@ Section PredStep.
     | _ => True
     end.
 
-  Lemma promise_free_step_pf_step lang:
-    @pred_step promise_free lang <3= @Thread.step lang true.
+  Lemma pf_step_promise_free_step lang:
+    @Thread.step lang true <3= @pred_step promise_free lang.
   Proof.
-    i. inv PR. inv STEP. inv STEP0; ss.
-    - unfold promise_free in *.
-      econs 1. replace pf with true in *; ss.
-      inv STEP; ss.
-    - econs 2; eauto.
+    i. inv PR.
+    - econs; eauto.
+      + econs; eauto. econs 1; eauto.
+      + inv STEP. ss.
+    - econs; eauto.
+      + econs; eauto. econs 2; eauto.
+      + inv STEP. inv LOCAL; ss.
   Qed.
 
-  Lemma promise_free_step_pf_step_rtc lang :
-    rtc (tau (@pred_step promise_free lang)) <2= rtc (tau (@Thread.step _ true)).
+  Lemma pf_step_promise_free_step_rtc lang :
+    rtc (tau (@Thread.step _ true)) <2= rtc (tau (@pred_step promise_free lang)).
   Proof.
     i. induction PR.
     - refl.
     - econs; eauto. inv H. econs; eauto.
-      eapply promise_free_step_pf_step; eauto.
+      eapply pf_step_promise_free_step; eauto.
   Qed.
 
   Definition no_acq_read_msgs (MSGS : Loc.t -> Time.t -> Prop)
