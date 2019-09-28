@@ -32,21 +32,15 @@ Require Import ReorderPromises.
 Set Implicit Arguments.
 
 
-Definition pf_steps_failure (lang : language) (e1 : Thread.t lang): Prop :=
-  exists e2 e3,
-    (<< STEPS: rtc (tau (Thread.step true)) e1 e2 >>) /\
-    (<< FAILURE: Thread.step true ThreadEvent.failure e2 e3 >>).
-
 Definition pf_consistent lang (e:Thread.t lang): Prop :=
   forall mem1 sc1
-         (WF: Local.wf e.(Thread.local) e.(Thread.memory))
-         (MEM: Memory.closed e.(Thread.memory))
          (CAP: Memory.cap e.(Thread.local).(Local.promises) e.(Thread.memory) mem1)
          (SC_MAX: Memory.max_full_timemap mem1 sc1),
-    (<<FAILURE: pf_steps_failure (Thread.mk _ e.(Thread.state) e.(Thread.local) sc1 mem1)>>) \/
-    exists e2,
-      (<<STEPS: rtc (tau (Thread.step true)) (Thread.mk _ e.(Thread.state) e.(Thread.local) sc1 mem1) e2>>) /\
-      (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>).
+  exists e2,
+    (<<STEPS: rtc (tau (Thread.step true)) (Thread.mk _ e.(Thread.state) e.(Thread.local) sc1 mem1) e2>>) /\
+    ((exists e3,
+         (<< FAILURE: Thread.step true ThreadEvent.failure e2 e3 >>)) \/
+     (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>)).
 
 Lemma rtc_union_step_nonpf_failure
       lang e1 e2 e2'
@@ -65,11 +59,15 @@ Proof.
   ss. eapply promise_step_promise_consistent; eauto.
 Qed.
 
-Lemma consistent_pf_consistent:
-  Thread.consistent <2= pf_consistent.
+Lemma consistent_pf_consistent lang (e:Thread.t lang)
+      (WF: Local.wf e.(Thread.local) e.(Thread.memory))
+      (MEM: Memory.closed e.(Thread.memory))
+      (CONSISTENT: Thread.consistent e)
+  :
+    pf_consistent e.
 Proof.
-  s. ii. exploit PR; eauto. i. des.
-  - inv FAILURE. des. left. red.
+  ii. exploit CONSISTENT; eauto. i. des.
+  - inv FAILURE. des.
     hexploit tau_steps_pf_tau_steps; eauto; ss.
     { inv FAILURE; inv STEP. inv LOCAL. inv LOCAL0.
       hexploit rtc_tau_step_promise_consistent; eauto; ss.
@@ -85,7 +83,7 @@ Proof.
     { eapply rtc_implies; [|eauto]. apply tau_union. }
     { eauto. }
     i. des.
-    exists e2, e1'. esplits; eauto.
+    esplits; eauto.
   - exploit tau_steps_pf_tau_steps; eauto; ss.
     { ii. rewrite PROMISES, Memory.bot_get in *.  congr. }
     { eapply Local.cap_wf; eauto. }

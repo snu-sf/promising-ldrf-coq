@@ -208,7 +208,7 @@ Section MEMORYLEMMAS.
             ~ Interval.mem (from1, to1) t)
         (TO: Time.le (View.rlx (View.unwrap released) loc) to1)
         (FROMTO: Time.lt from1 to1)
-        (NOATTATCH: not_attatched_time mem1 loc to1)
+        (* (NOATTATCH: not_attatched_time mem1 loc to1) *)
         (MSGWF: Message.wf (Message.full val released))
     :
       exists mem2,
@@ -223,11 +223,14 @@ Section MEMORYLEMMAS.
       ii. rewrite Memory.bot_get in *. clarify. } i. des.
     econs.
     - econs; eauto; ss.
+      admit.
+    (* not provable *)
+
     - exploit Memory.remove_exists; eauto.
       { eapply Memory.add_get0 in x1. des. eauto. } i. des.
       exploit MemoryFacts.MemoryFacts.add_remove_eq; eauto.
       i. clarify.
-  Qed.
+  Admitted.
 
   Lemma write_disjoint promises1 mem1 loc from1 to1 val released promises3 mem2 kind
         (MLE: Memory.le promises1 mem1)
@@ -646,7 +649,6 @@ Section SELFPROMISEREMOVE.
         + i. des; clarify; eauto.
           eapply NPRM. econs; eauto.
       - eapply NEWMSG. eapply memory_le_covered; try apply MEM0; eauto. }
-    {
     i. des. exists mem2. esplits; ss.
     - econs 1; ss; eauto.
       ii. rewrite Memory.bot_get in *. clarify.
@@ -698,7 +700,7 @@ Section SELFPROMISEREMOVE.
             erewrite Memory.remove_o in GET; eauto.
             erewrite Memory.lower_o in GET; eauto. des_ifs. eauto. }
       + clarify.
-  Qed.
+  Admitted.
 
   Lemma self_promise_remove
         P lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc'
