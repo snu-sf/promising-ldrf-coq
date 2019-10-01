@@ -31,7 +31,7 @@ Require Import ALocal.
 Require Import ATView.
 Require Import AThread.
 
-Require Import PFStepCommon.
+Require Import PFCommon.
 Require Import PFStep.
 Require Import PFCertify.
 Require Import Invariant.

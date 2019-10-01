@@ -26,13 +26,13 @@ Require Import ALocal.
 Require Import ATView.
 Require Import AThread.
 
-Require Import PFStepCommon.
+Require Import PFCommon.
 
 Set Implicit Arguments.
 
 
 Module PFStep.
-  Include PFStepCommon.
+  Include PFCommon.
 
   Inductive sim_memory (promises mem_src mem_tgt: Memory.t): Prop :=
   | sim_memory_intro

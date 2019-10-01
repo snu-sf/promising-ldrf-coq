@@ -24,7 +24,7 @@ Require Import PromiseConsistent.
 Set Implicit Arguments.
 
 
-Module PFStepCommon.
+Module PFCommon.
   Inductive sim_local (lc_src lc_tgt: Local.t): Prop :=
   | sim_local_intro
       (TVIEW: lc_src.(Local.tview) = lc_tgt.(Local.tview))
@@ -75,4 +75,4 @@ Module PFStepCommon.
     subst. econs; eauto.
     eapply Local.bot_promise_consistent; ss.
   Qed.
-End PFStepCommon.
+End PFCommon.

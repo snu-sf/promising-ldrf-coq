@@ -28,7 +28,7 @@ Require Import ALocal.
 Require Import ATView.
 Require Import AThread.
 
-Require Import PFStepCommon.
+Require Import PFCommon.
 Require Import PFStep.
 Require Import PFCertify.
 
@@ -142,7 +142,7 @@ Section Invariant.
 
   Lemma vals_incl_sem_memory
         mem1 mem2
-        (VALS: PFStepCommon.vals_incl mem1 mem2)
+        (VALS: PFCommon.vals_incl mem1 mem2)
         (MEM2: sem_memory mem2):
     sem_memory mem1.
   Proof.

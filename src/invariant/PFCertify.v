@@ -27,14 +27,14 @@ Require Import ALocal.
 Require Import ATView.
 Require Import AThread.
 
-Require Import PFStepCommon.
+Require Import PFCommon.
 Require Import PFStep.
 
 Set Implicit Arguments.
 
 
 Module PFCertify.
-  Include PFStepCommon.
+  Include PFCommon.
 
   Definition cap_src (latests: TimeMap.t) (loc: Loc.t) (promises: Memory.t)
                      (from: Time.t) (val: Const.t) (released: option View.t):
