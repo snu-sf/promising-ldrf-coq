@@ -33,7 +33,7 @@ Require Import PFStep.
 Set Implicit Arguments.
 
 
-Module PFStepCap.
+Module PFCertify.
   Include PFStepCommon.
 
   Definition cap_src (latests: TimeMap.t) (loc: Loc.t) (promises: Memory.t)
@@ -1566,4 +1566,4 @@ Module PFStepCap.
     - exploit COMPLETE2; eauto; try congr.
       apply Memory.bot_get.
   Qed.
-End PFStepCap.
+End PFCertify.

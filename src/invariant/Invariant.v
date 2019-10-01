@@ -30,7 +30,7 @@ Require Import AThread.
 
 Require Import PFStepCommon.
 Require Import PFStep.
-Require Import PFStepCap.
+Require Import PFCertify.
 
 Set Implicit Arguments.
 
@@ -441,14 +441,14 @@ Section Invariant.
         (TH1: S tid lang st1)
         (MEM1: sem_memory mem1)
         (INHABITED1: Memory.inhabited mem1)
-        (STEP: PFStepCap.pf_step caps e (Thread.mk lang st1 lc1 sc1 mem1) (Thread.mk lang st2 lc2 sc2 mem2)):
+        (STEP: PFCertify.pf_step caps e (Thread.mk lang st1 lc1 sc1 mem1) (Thread.mk lang st2 lc2 sc2 mem2)):
     <<TH2: S tid lang st2>> /\
     <<MEM2: sem_memory mem2>>.
   Proof.
     inv STEP.
     exploit aprogram_step_sem; try exact STEP0; eauto. i. des.
     split; auto.
-    hexploit PFStepCap.add_cap_vals_incl; eauto. i.
+    hexploit PFCertify.add_cap_vals_incl; eauto. i.
     eapply vals_incl_sem_memory; eauto.
   Qed.
 
@@ -458,14 +458,14 @@ Section Invariant.
         (TH1: S tid lang th1.(Thread.state))
         (MEM1: sem_memory th1.(Thread.memory))
         (INHABITED1: Memory.inhabited th1.(Thread.memory))
-        (STEP: rtc (union (PFStepCap.pf_step caps)) th1 th2):
+        (STEP: rtc (union (PFCertify.pf_step caps)) th1 th2):
     <<TH2: S tid lang th2.(Thread.state)>> /\
     <<MEM2: sem_memory th2.(Thread.memory)>>.
   Proof.
     move STEP after TH1. revert_until STEP.
     induction STEP; ss.
     i. inv H.
-    hexploit PFStepCap.pf_step_inhabited; eauto. i. des.
+    hexploit PFCertify.pf_step_inhabited; eauto. i. des.
     destruct x, y. ss.
     exploit pf_step_sem; eauto. i. des.
     eapply IHSTEP; eauto.
@@ -512,17 +512,17 @@ Section Invariant.
     exploit Memory.max_full_timemap_exists; try apply CLOSED_CAP. intro MAX. des.
     hexploit Memory.max_full_timemap_closed; eauto. intro SC_CAP.
     exploit Local.cap_wf; eauto. intro WF_CAP.
-    exploit PFStepCap.sim_thread_exists; eauto. i. des.
-    hexploit PFStepCap.sim_memory_inhabited; try apply SIM0; try apply WF_CAP; try apply CLOSED_CAP. s. i. des.
+    exploit PFCertify.sim_thread_exists; eauto. i. des.
+    hexploit PFCertify.sim_memory_inhabited; try apply SIM0; try apply WF_CAP; try apply CLOSED_CAP. s. i. des.
     apply vals_incl_sem_memory in VALS; auto.
     exploit CONSISTENT; eauto. i. des.
     - unfold Thread.steps_failure in *. des.
       exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
       inv FAILURE0; try by inv STEP.
-      exploit PFStepCap.thread_rtc_tau_step; eauto.
+      exploit PFCertify.thread_rtc_tau_step; eauto.
       { inv STEP. inv LOCAL. inv LOCAL0. ss. }
       i. des.
-      exploit PFStepCap.thread_program_step; try exact STEP; eauto.
+      exploit PFCertify.thread_program_step; try exact STEP; eauto.
       { inv STEP. inv LOCAL. inv LOCAL0. ss. }
       i. des.
       exploit rtc_pf_step_sem; try exact STEPS_SRC; eauto. i. des.
@@ -530,11 +530,11 @@ Section Invariant.
       exploit FAILURE; try exact STATE; eauto. i. des.
       ii. eauto.
     - exploit Thread.rtc_tau_step_future; eauto. s. i. des.
-      exploit PFStepCap.thread_rtc_tau_step; eauto.
+      exploit PFCertify.thread_rtc_tau_step; eauto.
       { eapply Local.bot_promise_consistent; ss. }
       i. des.
       exploit rtc_pf_step_sem; try exact STEPS_SRC; eauto. i. des.
-      exploit PFStepCap.sim_memory_bot; try apply SIM2; eauto. i.
+      exploit PFCertify.sim_memory_bot; try apply SIM2; eauto. i.
       rewrite x0 in *.
       exploit Memory.cap_future_weak; eauto. i.
       eapply future_weak_sem_memory; eauto.

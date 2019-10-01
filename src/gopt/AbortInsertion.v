@@ -33,7 +33,7 @@ Require Import AThread.
 
 Require Import PFStepCommon.
 Require Import PFStep.
-Require Import PFStepCap.
+Require Import PFCertify.
 Require Import Invariant.
 
 Require Import GSimulation.
@@ -601,8 +601,8 @@ Section AbortInsertion.
           exploit PFStep.thread_rtc_all_step; try exact x2; eauto.
           { hexploit consistent_promise_consistent; eauto. }
           i. des.
-          exploit PFStepCap.sim_thread_exists; try exact SIM4; eauto. s. i. des.
-          exploit PFStepCap.thread_rtc_tau_step; try exact STEPS_SRC0; eauto.
+          exploit PFCertify.sim_thread_exists; try exact SIM4; eauto. s. i. des.
+          exploit PFCertify.thread_rtc_tau_step; try exact STEPS_SRC0; eauto.
           { exploit Thread.rtc_tau_step_future; try exact STEPS1_TGT; eauto. s. i. des.
             inv SIM1. rewrite LOCAL.
             eapply rtc_tau_step_promise_consistent; eauto.
@@ -619,7 +619,7 @@ Section AbortInsertion.
           i. des.
           exploit rtc_pf_step_sem; try exact STEPS_SRC2; eauto; s.
           { eapply vals_incl_sem_memory; eauto. }
-          { eapply PFStepCap.sim_memory_inhabited; try eapply SIM5.
+          { eapply PFCertify.sim_memory_inhabited; try eapply SIM5.
             - apply WF0.
             - eapply Memory.cap_closed; eauto. }
           i. des.
@@ -633,8 +633,8 @@ Section AbortInsertion.
           exploit PFStep.thread_rtc_all_step; try exact x2; eauto.
           { hexploit consistent_promise_consistent; eauto. }
           i. des.
-          exploit PFStepCap.sim_thread_exists; try exact SIM4; eauto. s. i. des.
-          exploit PFStepCap.thread_rtc_tau_step; try exact STEPS_SRC0; eauto.
+          exploit PFCertify.sim_thread_exists; try exact SIM4; eauto. s. i. des.
+          exploit PFCertify.thread_rtc_tau_step; try exact STEPS_SRC0; eauto.
           { exploit Thread.rtc_tau_step_future; try exact STEPS0; eauto. s. i. des.
             inv SIM1. rewrite LOCAL.
             eapply rtc_tau_step_promise_consistent; eauto.
@@ -651,7 +651,7 @@ Section AbortInsertion.
           i. des.
           exploit rtc_pf_step_sem; try exact STEPS_SRC2; eauto; s.
           { eapply vals_incl_sem_memory; eauto. }
-          { eapply PFStepCap.sim_memory_inhabited; try eapply SIM5.
+          { eapply PFCertify.sim_memory_inhabited; try eapply SIM5.
             - apply WF0.
             - eapply Memory.cap_closed; eauto. }
           i. des.
@@ -670,8 +670,8 @@ Section AbortInsertion.
           exploit PFStep.thread_rtc_all_step; try exact x2; eauto.
           { hexploit consistent_promise_consistent; eauto. }
           i. des.
-          exploit PFStepCap.sim_thread_exists; try exact SIM4; eauto. s. i. des.
-          exploit PFStepCap.thread_rtc_tau_step; try exact STEPS_SRC0; eauto.
+          exploit PFCertify.sim_thread_exists; try exact SIM4; eauto. s. i. des.
+          exploit PFCertify.thread_rtc_tau_step; try exact STEPS_SRC0; eauto.
           { exploit Thread.rtc_tau_step_future; try exact STEPS1_TGT; eauto. s. i. des.
             inv SIM1. rewrite LOCAL.
             eapply rtc_tau_step_promise_consistent; eauto.
@@ -688,7 +688,7 @@ Section AbortInsertion.
           i. des.
           exploit rtc_pf_step_sem; try exact STEPS_SRC2; eauto; s.
           { eapply vals_incl_sem_memory; eauto. }
-          { eapply PFStepCap.sim_memory_inhabited; try eapply SIM5.
+          { eapply PFCertify.sim_memory_inhabited; try eapply SIM5.
             - apply WF0.
             - eapply Memory.cap_closed; eauto. }
           i. des.
