@@ -3,8 +3,9 @@ COQTHEORIES  :=	src/lang/*.v \
 	src/while/*.v \
 	src/prop/*.v \
 	src/opt/*.v \
-  src/invariant/*.v \
-  src/gopt/*.v
+	src/invariant/*.v \
+	src/gopt/*.v \
+	src/attachable/*.v
 
 .PHONY: all theories clean
 
@@ -23,6 +24,7 @@ Makefile.coq: Makefile $(COQTHEORIES)
    echo "-R src/opt $(COQMODULE)"; \
    echo "-R src/invariant $(COQMODULE)"; \
    echo "-R src/gopt $(COQMODULE)"; \
+   echo "-R src/attachable $(COQMODULE)"; \
    \
    echo $(COQTHEORIES)) > _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq
