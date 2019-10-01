@@ -278,6 +278,8 @@ Proof.
         exploit RESERVE; eauto. i. des.
         exploit COMPLETE0; try exact x; eauto. i. des.
         inv MSG. eauto.
+      + i. exploit SOUND0; try exact GET; eauto. i. des.
+        destruct msg_tgt; ss. eauto.
     - econs; i.
       + revert GET_SRC. erewrite Memory.add_o; eauto. condtac; ss; i.
         * des. subst. inv GET_SRC.
@@ -394,32 +396,31 @@ Proof.
       + guardH o. des. subst. i. inv GETP. eauto.
   }
   { (* lower *)
-    exploit Memory.lower_get0; try exact PROMISES. i. des. clear GET0.
+    exploit Memory.lower_get0; try exact PROMISES. i. des. subst.
+    inv MSG_LE. clear GET0.
     exploit COMPLETE; eauto. i. des.
     exploit (@Memory.lower_exists promises1_src loc from to msg_src
-                                  (get_message_src l loc msg_tgt tview_src)); eauto.
+                                  (get_message_src l loc (Message.full val released0) tview_src)); eauto.
     { inv MEM. inv LOWER. ss. }
     { eapply get_message_src_wf; eauto.
       inv MEM. inv LOWER. ss. }
-    { unfold get_message_src.
-      destruct msg_tgt; try destruct released.
-      - inv MSG_LE.
-        + inv RELEASED. inv MSG. inv RELEASED. econs. econs.
-          eapply get_released_src_le; eauto.
-        + inv MSG. eauto.
-      - inv MSG_LE; inv MSG; eauto.
-      - inv MSG_LE. inv MSG. eauto. }
+    { ss. destruct released0.
+      - inv RELEASED. inv MSG. inv RELEASED. econs. econs.
+        eapply get_released_src_le; eauto.
+      - inv MSG. eauto. }
     i. des.
     exploit Memory.lower_exists_le; try exact x0; eauto. i. des.
     esplits.
     - econs 3; eauto.
-      eapply get_message_src_message_to; eauto.
+      + eapply get_message_src_message_to; eauto.
+      + inv MSG. eauto.
     - econs; i.
       + revert GET_SRC0. erewrite Memory.lower_o; eauto. condtac; ss; i.
         * des. subst. inv GET_SRC0.
           exploit Memory.lower_get0; try exact PROMISES. i. des.
           esplits; eauto.
-          eapply get_message_src_sim_message; eauto.
+          destruct released0; eauto. econs. econs.
+          eapply get_released_src_sim_view; eauto.
         * guardH o.
           exploit SOUND; eauto. i. des.
           erewrite Memory.lower_o; eauto. condtac; ss.
@@ -428,7 +429,8 @@ Proof.
         * des. subst. inv GET_TGT.
           exploit Memory.lower_get0; try exact x0. i. des.
           esplits; eauto.
-          eapply get_message_src_sim_message; eauto.
+          destruct released0; eauto. econs. econs.
+          eapply get_released_src_sim_view; eauto.
         * guardH o.
           exploit COMPLETE; eauto. i. des.
           erewrite Memory.lower_o; eauto. condtac; ss.
@@ -438,7 +440,8 @@ Proof.
         * des. subst. inv GET_SRC0.
           exploit Memory.lower_get0; try exact MEM. i. des.
           esplits; eauto.
-          eapply get_message_src_sim_message; eauto.
+          destruct released0; eauto. econs. econs.
+          eapply get_released_src_sim_view; eauto.
         * guardH o.
           exploit SOUND0; eauto. i. des.
           erewrite Memory.lower_o; eauto. condtac; ss.
@@ -447,15 +450,14 @@ Proof.
         * des. subst. inv GET_TGT.
           exploit Memory.lower_get0; try exact x1. i. des.
           esplits; eauto.
-          eapply get_message_src_sim_message; eauto.
+          destruct released0; eauto. econs. econs.
+          eapply get_released_src_sim_view; eauto.
         * guardH o.
           exploit COMPLETE0; eauto. i. des.
           erewrite Memory.lower_o; eauto. condtac; ss.
           esplits; eauto.
     - ii. revert GETP. erewrite Memory.lower_o; eauto. condtac; ss.
-      + des. subst.
-        unfold get_message_src.
-        destruct msg_tgt; try destruct released0; ss. i. inv GETP.
+      + des. subst. destruct released0; ss. i. inv GETP.
         eapply get_released_src_released_eq_tview_loc; eauto.
       + i. eapply RELEASED1; eauto.
   }
