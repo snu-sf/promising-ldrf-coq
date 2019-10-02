@@ -87,154 +87,176 @@ Inductive sim_memory (l: Loc.t) (mem_src mem_tgt: Memory.t): Prop :=
 .
 Hint Constructors sim_memory.
 
-Definition released_eq_tview_loc (l loc: Loc.t) (released: View.t) (tview: TView.t): Prop :=
-  <<PLN: released.(View.pln) l = (tview.(TView.rel) loc).(View.pln) l>> /\
-  <<RLX: released.(View.rlx) l = (tview.(TView.rel) loc).(View.rlx) l>>.
 
-Definition promises_released (l: Loc.t) (promises: Memory.t) (tview:TView.t): Prop :=
+Definition view_le_loc (l: Loc.t) (view1 view2: View.t): Prop :=
+  <<PLN: Time.le (view1.(View.pln) l) (view2.(View.pln) l)>> /\
+  <<RLX: Time.le (view1.(View.rlx) l) (view2.(View.rlx) l)>>.
+
+Definition tview_released_le_loc (l loc: Loc.t) (tview: TView.t) (released: View.t): Prop :=
+  view_le_loc l (tview.(TView.rel) loc) released.
+
+Definition prev_released_le_loc (l loc: Loc.t) (from: Time.t) (mem: Memory.t) (released: View.t): Prop :=
+  match Memory.get loc from mem with
+  | Some (_, Message.full _ (Some r)) => view_le_loc l r released
+  | _ => True
+  end.
+
+Definition fulfillable (l: Loc.t) (tview: TView.t) (mem promises: Memory.t): Prop :=
   forall loc from to val released
-    (GETP: Memory.get loc to promises =
-           Some (from, Message.full val (Some released))),
-    released_eq_tview_loc l loc released tview.
+     (GETP: Memory.get loc to promises =
+            Some (from, Message.full val (Some released))),
+    <<TVIEW: tview_released_le_loc l loc tview released>> /\
+    <<PREV: prev_released_le_loc l loc from mem released>>.
 
 Inductive sim_local (l: Loc.t) (lc_src lc_tgt: Local.t): Prop :=
 | sim_local_intro
     (TVIEW: sim_tview l lc_src.(Local.tview) lc_tgt.(Local.tview))
     (PROMISES1: sim_memory l lc_src.(Local.promises) lc_tgt.(Local.promises))
-    (RELEASED: promises_released l lc_src.(Local.promises) lc_src.(Local.tview))
 .
 Hint Constructors sim_local.
 
-Definition get_released_src (l loc: Loc.t) (released_tgt: View.t) (tview_src: TView.t): View.t :=
-  View.mk
-    (LocFun.add l ((tview_src.(TView.rel) loc).(View.pln) l) released_tgt.(View.pln))
-    (LocFun.add l ((tview_src.(TView.rel) loc).(View.rlx) l) released_tgt.(View.rlx)).
 
-Definition get_message_src (l loc: Loc.t) (msg_tgt: Message.t) (tview_src: TView.t): Message.t :=
-  match msg_tgt with
-  | Message.full val (Some released_tgt) =>
-    Message.full val (Some (get_released_src l loc released_tgt tview_src))
-  | _ => msg_tgt
-  end.
+(* Definition get_released_src (l loc: Loc.t) (released_tgt: View.t) (tview_src: TView.t) (mem_src: Memory.t): View.t := *)
+(*   View.join *)
+(*     released_tgt *)
+(*     (View.join *)
+(*        (View.mk *)
+(*           (TimeMap.singleton l ((tview_src.(TView.rel) loc).(View.pln) l)) *)
+(*           (TimeMap.singleton l ((tview_src.(TView.rel) loc).(View.rlx) l))) *)
+(*        (View.mk *)
+(*           (TimeMap.singleton l *)
 
 
-Lemma get_released_src_released_eq_tview_loc
-      l loc released_tgt tview_src:
-  <<RELEASED: released_eq_tview_loc l loc (get_released_src l loc released_tgt tview_src) tview_src>>.
-Proof.
-  unfold get_released_src. econs; ss.
-  - unfold LocFun.add. condtac; ss.
-  - unfold LocFun.add. condtac; ss.
-Qed.
+(* Definition get_released_src (l loc: Loc.t) (released_tgt: View.t) (tview_src: TView.t) (mem_src: Memory.t): View.t := *)
+(*   View.mk *)
+(*     (LocFun.add l ((tview_src.(TView.rel) loc).(View.pln) l) released_tgt.(View.pln)) *)
+(*     (LocFun.add l ((tview_src.(TView.rel) loc).(View.rlx) l) released_tgt.(View.rlx)). *)
 
-Lemma get_released_src_sim_view
-      l loc released_tgt tview_src:
-  <<SIM: sim_view l (get_released_src l loc released_tgt tview_src) released_tgt>>.
-Proof.
-  unfold get_released_src. econs; ss.
-  - unfold sim_timemap, LocFun.add. i. condtac; ss.
-  - unfold sim_timemap, LocFun.add. i. condtac; ss.
-Qed.
+(* Definition get_message_src (l loc: Loc.t) (msg_tgt: Message.t) (tview_src: TView.t): Message.t := *)
+(*   match msg_tgt with *)
+(*   | Message.full val (Some released_tgt) => *)
+(*     Message.full val (Some (get_released_src l loc released_tgt tview_src)) *)
+(*   | _ => msg_tgt *)
+(*   end. *)
 
-Lemma get_released_src_wf
-      l loc released_tgt tview_src
-      (RELEASED_TGT: View.wf released_tgt)
-      (TVIEW_SRC: TView.wf tview_src):
-  View.wf (get_released_src l loc released_tgt tview_src).
-Proof.
-  econs. ii.
-  unfold get_released_src, LocFun.add. ss. condtac.
-  - subst. inv TVIEW_SRC.
-    destruct (REL loc). apply PLN_RLX.
-  - inv RELEASED_TGT. apply PLN_RLX.
-Qed.
 
-Lemma get_released_src_closed
-      l loc released_tgt tview_src
-      mem_src mem_tgt
-      (SIM: sim_memory l mem_src mem_tgt)
-      (CLOSED_SRC: TView.closed tview_src mem_src)
-      (CLOSED_TGT: Memory.closed_view released_tgt mem_tgt):
-  Memory.closed_view (get_released_src l loc released_tgt tview_src) mem_src.
-Proof.
-  inv CLOSED_SRC. inv CLOSED_TGT.
-  unfold get_released_src. econs; ss.
-  - ii. unfold LocFun.add. condtac; ss.
-    + subst. destruct (REL loc). eauto.
-    + specialize (PLN loc0). des. inv SIM.
-      exploit COMPLETE; eauto. i. des.
-      inv MSG. inv RELEASED; eauto.
-  - ii. unfold LocFun.add. condtac; ss.
-    + subst. destruct (REL loc). eauto.
-    + specialize (RLX loc0). des. inv SIM.
-      exploit COMPLETE; eauto. i. des.
-      inv MSG. inv RELEASED; eauto.
-Qed.
+(* Lemma get_released_src_released_eq_tview_loc *)
+(*       l loc released_tgt tview_src: *)
+(*   <<RELEASED: released_eq_tview_loc l loc (get_released_src l loc released_tgt tview_src) tview_src>>. *)
+(* Proof. *)
+(*   unfold get_released_src. econs; ss. *)
+(*   - unfold LocFun.add. condtac; ss. *)
+(*   - unfold LocFun.add. condtac; ss. *)
+(* Qed. *)
 
-Lemma get_released_src_le
-      l loc released2_src released1_tgt released2_tgt tview_src
-      (LE: View.le released1_tgt released2_tgt)
-      (SIM: sim_view l released2_src released2_tgt)
-      (RELEASED_SRC: released_eq_tview_loc l loc released2_src tview_src):
-  <<LE: View.le (get_released_src l loc released1_tgt tview_src) released2_src>>.
-Proof.
-  inv LE. inv SIM. inv RELEASED_SRC. des.
-  unfold get_released_src. econs; ss.
-  - ii. unfold LocFun.add. condtac; ss.
-    + subst. rewrite H. refl.
-    + rewrite PLN0; ss. eauto.
-  - ii. unfold LocFun.add. condtac; ss.
-    + subst. rewrite H0. refl.
-    + rewrite RLX0; ss. eauto.
-Qed.
+(* Lemma get_released_src_sim_view *)
+(*       l loc released_tgt tview_src: *)
+(*   <<SIM: sim_view l (get_released_src l loc released_tgt tview_src) released_tgt>>. *)
+(* Proof. *)
+(*   unfold get_released_src. econs; ss. *)
+(*   - unfold sim_timemap, LocFun.add. i. condtac; ss. *)
+(*   - unfold sim_timemap, LocFun.add. i. condtac; ss. *)
+(* Qed. *)
 
-Lemma get_message_src_sim_message
-      l loc msg_tgt tview_src:
-  <<SIM: sim_message l (get_message_src l loc msg_tgt tview_src) msg_tgt>>.
-Proof.
-  unfold get_message_src.
-  destruct msg_tgt; ss. destruct released; ss.
-  - econs. econs. eapply get_released_src_sim_view.
-  - econs. econs.
-Qed.
+(* Lemma get_released_src_wf *)
+(*       l loc released_tgt tview_src *)
+(*       (RELEASED_TGT: View.wf released_tgt) *)
+(*       (TVIEW_SRC: TView.wf tview_src): *)
+(*   View.wf (get_released_src l loc released_tgt tview_src). *)
+(* Proof. *)
+(*   econs. ii. *)
+(*   unfold get_released_src, LocFun.add. ss. condtac. *)
+(*   - subst. inv TVIEW_SRC. *)
+(*     destruct (REL loc). apply PLN_RLX. *)
+(*   - inv RELEASED_TGT. apply PLN_RLX. *)
+(* Qed. *)
 
-Lemma get_message_src_wf
-      l loc msg_tgt tview_src
-      (MSG_TGT: Message.wf msg_tgt)
-      (TVIEW_SRC: TView.wf tview_src):
-  Message.wf (get_message_src l loc msg_tgt tview_src).
-Proof.
-  unfold get_message_src.
-  destruct msg_tgt; ss. destruct released; ss.
-  inv MSG_TGT. inv WF. econs. econs.
-  apply get_released_src_wf; eauto.
-Qed.
+(* Lemma get_released_src_closed *)
+(*       l loc released_tgt tview_src *)
+(*       mem_src mem_tgt *)
+(*       (SIM: sim_memory l mem_src mem_tgt) *)
+(*       (CLOSED_SRC: TView.closed tview_src mem_src) *)
+(*       (CLOSED_TGT: Memory.closed_view released_tgt mem_tgt): *)
+(*   Memory.closed_view (get_released_src l loc released_tgt tview_src) mem_src. *)
+(* Proof. *)
+(*   inv CLOSED_SRC. inv CLOSED_TGT. *)
+(*   unfold get_released_src. econs; ss. *)
+(*   - ii. unfold LocFun.add. condtac; ss. *)
+(*     + subst. destruct (REL loc). eauto. *)
+(*     + specialize (PLN loc0). des. inv SIM. *)
+(*       exploit COMPLETE; eauto. i. des. *)
+(*       inv MSG. inv RELEASED; eauto. *)
+(*   - ii. unfold LocFun.add. condtac; ss. *)
+(*     + subst. destruct (REL loc). eauto. *)
+(*     + specialize (RLX loc0). des. inv SIM. *)
+(*       exploit COMPLETE; eauto. i. des. *)
+(*       inv MSG. inv RELEASED; eauto. *)
+(* Qed. *)
 
-Lemma get_message_src_message_to
-      l loc to msg_tgt tview_src
-      (MSG_TGT: Memory.message_to msg_tgt loc to)
-      (LOC: loc <> l):
-  Memory.message_to (get_message_src l loc msg_tgt tview_src) loc to.
-Proof.
-  unfold get_message_src.
-  destruct msg_tgt; ss. destruct released; ss.
-  inv MSG_TGT. econs. ss.
-  unfold LocFun.add. condtac; ss.
-Qed.
+(* Lemma get_released_src_le *)
+(*       l loc released2_src released1_tgt released2_tgt tview_src *)
+(*       (LE: View.le released1_tgt released2_tgt) *)
+(*       (SIM: sim_view l released2_src released2_tgt) *)
+(*       (RELEASED_SRC: released_eq_tview_loc l loc released2_src tview_src): *)
+(*   <<LE: View.le (get_released_src l loc released1_tgt tview_src) released2_src>>. *)
+(* Proof. *)
+(*   inv LE. inv SIM. inv RELEASED_SRC. des. *)
+(*   unfold get_released_src. econs; ss. *)
+(*   - ii. unfold LocFun.add. condtac; ss. *)
+(*     + subst. rewrite H. refl. *)
+(*     + rewrite PLN0; ss. eauto. *)
+(*   - ii. unfold LocFun.add. condtac; ss. *)
+(*     + subst. rewrite H0. refl. *)
+(*     + rewrite RLX0; ss. eauto. *)
+(* Qed. *)
 
-Lemma get_message_src_closed
-      l loc msg_tgt tview_src
-      mem_src mem_tgt
-      (SIM: sim_memory l mem_src mem_tgt)
-      (CLOSED_SRC: TView.closed tview_src mem_src)
-      (CLOSED_TGT: Memory.closed_message msg_tgt mem_tgt):
-  Memory.closed_message (get_message_src l loc msg_tgt tview_src) mem_src.
-Proof.
-  inv CLOSED_TGT; ss.
-  destruct released; eauto.
-  inv CLOSED. econs. econs.
-  eapply get_released_src_closed; eauto.
-Qed.
+(* Lemma get_message_src_sim_message *)
+(*       l loc msg_tgt tview_src: *)
+(*   <<SIM: sim_message l (get_message_src l loc msg_tgt tview_src) msg_tgt>>. *)
+(* Proof. *)
+(*   unfold get_message_src. *)
+(*   destruct msg_tgt; ss. destruct released; ss. *)
+(*   - econs. econs. eapply get_released_src_sim_view. *)
+(*   - econs. econs. *)
+(* Qed. *)
+
+(* Lemma get_message_src_wf *)
+(*       l loc msg_tgt tview_src *)
+(*       (MSG_TGT: Message.wf msg_tgt) *)
+(*       (TVIEW_SRC: TView.wf tview_src): *)
+(*   Message.wf (get_message_src l loc msg_tgt tview_src). *)
+(* Proof. *)
+(*   unfold get_message_src. *)
+(*   destruct msg_tgt; ss. destruct released; ss. *)
+(*   inv MSG_TGT. inv WF. econs. econs. *)
+(*   apply get_released_src_wf; eauto. *)
+(* Qed. *)
+
+(* Lemma get_message_src_message_to *)
+(*       l loc to msg_tgt tview_src *)
+(*       (MSG_TGT: Memory.message_to msg_tgt loc to) *)
+(*       (LOC: loc <> l): *)
+(*   Memory.message_to (get_message_src l loc msg_tgt tview_src) loc to. *)
+(* Proof. *)
+(*   unfold get_message_src. *)
+(*   destruct msg_tgt; ss. destruct released; ss. *)
+(*   inv MSG_TGT. econs. ss. *)
+(*   unfold LocFun.add. condtac; ss. *)
+(* Qed. *)
+
+(* Lemma get_message_src_closed *)
+(*       l loc msg_tgt tview_src *)
+(*       mem_src mem_tgt *)
+(*       (SIM: sim_memory l mem_src mem_tgt) *)
+(*       (CLOSED_SRC: TView.closed tview_src mem_src) *)
+(*       (CLOSED_TGT: Memory.closed_message msg_tgt mem_tgt): *)
+(*   Memory.closed_message (get_message_src l loc msg_tgt tview_src) mem_src. *)
+(* Proof. *)
+(*   inv CLOSED_TGT; ss. *)
+(*   destruct released; eauto. *)
+(*   inv CLOSED. econs. econs. *)
+(*   eapply get_released_src_closed; eauto. *)
+(* Qed. *)
 
 
 Lemma sim_memory_promise
@@ -243,7 +265,7 @@ Lemma sim_memory_promise
       promises1_tgt mem1_tgt loc from to msg_tgt promises2_tgt mem2_tgt kind_tgt
       (PROMISES1: sim_memory l promises1_src promises1_tgt)
       (MEM1: sim_memory l mem1_src mem1_tgt)
-      (RELEASED1: promises_released l promises1_src tview_src)
+      (FULFILL1: fulfillable l tview_src mem1_src promises1_src)
       (TVIEW_SRC: TView.wf tview_src)
       (LE1_SRC: Memory.le promises1_src mem1_src)
       (LE1_TGT: Memory.le promises1_tgt mem1_tgt)
@@ -254,7 +276,7 @@ Lemma sim_memory_promise
                                   (get_message_src l loc msg_tgt tview_src) promises2_src mem2_src kind_src>> /\
     <<PROMISES2: sim_memory l promises2_src promises2_tgt>> /\
     <<MEM2: sim_memory l mem2_src mem2_tgt>> /\
-    <<RELEASED2: promises_released l promises2_src tview_src>>.
+    <<FULFILL2: fulfillable l tview_src mem2_src promises2_src>>.
 Proof.
   inv PROMISES1. inv MEM1. inv PROMISE_TGT.
   { (* add *)
