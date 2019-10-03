@@ -784,11 +784,58 @@ Definition pf_consistent_strong2 lang (e0:Thread.t lang): Prop :=
          (CAP: Memory.cap e0.(Thread.local).(Local.promises) e0.(Thread.memory) mem1),
   exists e1 e2,
     (<<STEPS0: rtc (tau (@pred_step is_cancel lang)) e0 e1>>) /\
-    (<<NORESERVE: no_reserves e1.(Thread.memory)>>) /\
+    (<<NORESERVE: no_reserves e1.(Thread.local).(Local.promises)>>) /\
     (<<STEPS1: rtc (tau (@pred_step ((promise_free /1\ (fun e => ~ is_cancel e) /1\ no_acq_read_msgs (caps_loc e0.(Thread.memory) e0.(Thread.local).(Local.promises))) /1\ no_sc) lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc1 mem1) e2>>) /\
     ((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
      (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>)).
 
+Lemma reserves_cancelable2 lang st vw proms0 sc mem0
+      (FINITE: Memory.finite proms0)
+      (MLE: Memory.le proms0 mem0)
+  :
+    exists proms1 mem1,
+      (<<STEPS: rtc (tau (@pred_step is_cancel lang))
+                    (Thread.mk lang st (Local.mk vw proms0) sc mem0)
+                    (Thread.mk lang st (Local.mk vw Memory.bot) sc mem1)>>) /\
+      (<<NORESERVES: no_reserves proms1>>).
+Proof.
+  unfold Memory.finite in *. des.
+  ginduction dom; ss; i.
+  - exists proms0, mem0. replace proms0 with Memory.bot.
+    + esplits; eauto. ii. erewrite Memory.bot_get in GET. clarify.
+    + eapply Memory.ext. i. rewrite Memory.bot_get.
+      destruct (Memory.get loc ts proms0) as [[from msg]|] eqn:GET; auto.
+      exfalso. eauto.
+  - destruct a as [loc' to'].
+    destruct (Memory.get loc' to' proms0) as [[from' msg']|] eqn:GET.
+    +
+Admitted.
+(* exploit RESERVES0; eauto. i. clarify. *)
+(*       exploit Memory.remove_exists. *)
+(*       { eapply GET. } *)
+(*       intros [prom1 REMOVE0]. *)
+(*       exploit Memory.remove_exists. *)
+(*       { eapply MLE. eapply GET. } *)
+(*       intros [mem1 REMOVE1]. hexploit IHdom. *)
+(*       * instantiate (1:=mem1). instantiate (1:=prom1). *)
+(*         ii. erewrite Memory.remove_o in LHS; eauto. des_ifs. *)
+(*         eapply MLE in LHS. erewrite Memory.remove_o; eauto. des_ifs. *)
+(*         ss. des; clarify. *)
+(*       * i. erewrite Memory.remove_o in GET0; eauto. des_ifs. *)
+(*         eapply RESERVES0; eauto. *)
+(*       * i. erewrite Memory.remove_o in GET0; eauto. des_ifs. *)
+(*         exploit FINITE; eauto. i. ss. *)
+(*         des; ss; clarify. *)
+(*       * i. des. exists mem2. econs 2. *)
+(*         { econs. *)
+(*           - instantiate (2:=ThreadEvent.promise loc' from' to' Message.reserve Memory.op_kind_cancel). *)
+(*             econs; ss. econs. econs 1. econs; ss. *)
+(*             econs; ss. econs; eauto. *)
+(*           - ss. } *)
+(*         eapply H. *)
+(*     + eapply IHdom; eauto. *)
+(*       i. exploit FINITE; eauto. i. des; clarify. *)
+(* Qed. *)
 
 Lemma pf_consistent_pf_consistent_strong2 lang (th: Thread.t lang)
       (WF: Local.wf th.(Thread.local) th.(Thread.memory))
@@ -798,17 +845,50 @@ Lemma pf_consistent_pf_consistent_strong2 lang (th: Thread.t lang)
   :
     pf_consistent_strong2 th.
 Proof.
+
   ii. exploit Memory.max_full_timemap_exists; eauto. intros MAX. des.
   ii. exploit Memory.max_full_timemap_exists.
   { eapply le_inhabited; eauto. eapply Memory.cap_le; eauto. refl. }
   i. des. exploit CONSISTENT; eauto. i.
+  assert (exists e2,
+             (<<STEPS: rtc (tau (Thread.step true))
+                           (Thread.mk _ (Thread.state th) (Thread.local th)
+                                      tm0 mem1) e2 >>) /\
+             (<<NORESERVES: no_reserves e2.(Thread.memory)>>) /\
+             ((exists e3, (<< FAILURE: Thread.step true ThreadEvent.failure e2 e3 >>)) \/
+              (<<PROMISES: Local.promises (Thread.local e2) = Memory.bot >>))).
+  { des.
+    - esplits; eauto. admit.
+    - esplits; eauto. rewrite PROMISES.
+
+
+    )
+
+
+Definition pf_consistent lang (e:Thread.t lang): Prop :=
+  forall mem1 sc1
+         (CAP: Memory.cap e.(Thread.local).(Local.promises) e.(Thread.memory) mem1)
+         (SC_MAX: Memory.max_full_timemap mem1 sc1),
+  exists e2,
+    (<<STEPS: rtc (tau (Thread.step true)) (Thread.mk _ e.(Thread.state) e.(Thread.local) sc1 mem1) e2>>) /\
+    ((exists e3,
+         (<< FAILURE: Thread.step true ThreadEvent.failure e2 e3 >>)) \/
+     (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>)).
+
+
+  assert (
+
   destruct x as [e2 [STEPS GOOD]]. guardH GOOD. des.
   eapply pf_step_promise_free_step_rtc in STEPS.
-  eapply pf_steps_cancels_not_cancels in STEPS. des.
-  assert (NORESERVE: no_reserves th1.(Thread.memory)).
-  { ii. clarify. exploit steps_not_cancel_reserves_same; eauto.
-    i. des. clarify.
 
+
+  (* eapply pf_steps_cancels_not_cancels in STEPS. des. *)
+  (* assert (NORESERVE: no_reserves th1.(Thread.memory)). *)
+  (* { ii. clarify. exploit steps_not_cancel_reserves_same; eauto. *)
+  (*   i. des. *)
+
+
+reserves_cancelable2
 
   destruct th1. ss.
   eapply hold_or_not with (Q := no_acq_read_msgs (caps_loc (Thread.memory th) (Local.promises (Thread.local th))) /1\ no_sc) in STEPS2. des.

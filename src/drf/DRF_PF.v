@@ -84,6 +84,121 @@ Section FORGETMEMORY.
       i. rewrite LHS in *. auto.
   Qed.
 
+  Inductive times_sorted: list Time.t -> Prop :=
+  | times_sorted_nil
+    :
+      times_sorted []
+  | times_sorted_cons
+      hd tl
+      (HD: List.Forall (Time.lt hd) tl)
+      (TL: times_sorted tl)
+    :
+      times_sorted (hd :: tl)
+  .
+  Hint Constructors times_sorted.
+
+  Fixpoint insert (to: Time.t) (l: list Time.t): list Time.t :=
+    match l with
+    | [] => [to]
+    | hd :: tl =>
+      match (Time.le_lt_dec to hd) with
+      | left LE => match (Time.eq_dec to hd) with
+                   | left EQ => hd :: tl
+                   | right LT => to :: hd :: tl
+                   end
+      | right LT => hd :: (insert to tl)
+      end
+    end.
+
+  Fixpoint sorting (l: list Time.t): list Time.t :=
+    match l with
+    | [] => []
+    | hd :: tl => insert hd (sorting tl)
+    end.
+
+  Lemma insert_complete a l
+    :
+      forall b, List.In b (insert a l) <-> (a = b \/ List.In b l).
+  Proof.
+    ginduction l; ss. i. des_ifs; ss.
+    - split; i; des; eauto.
+    - split; i; des; eauto.
+      + eapply IHl in H. des; eauto.
+      + clarify. right. eapply IHl; eauto.
+      + right. eapply IHl; eauto.
+  Qed.
+
+  Lemma insert_sorted a l
+        (SORTED: times_sorted l)
+    :
+      times_sorted (insert a l).
+  Proof.
+    ginduction l; ss.
+    - i. econs; ss.
+    - i. des_ifs.
+      + econs; eauto. inv SORTED. econs.
+        * destruct l0; clarify.
+        * eapply List.Forall_impl; cycle 1; eauto.
+          i. eapply TimeFacts.le_lt_lt; eauto.
+      + econs.
+        * inv SORTED.
+          eapply List.Forall_forall. i.
+          eapply insert_complete in H. des; clarify.
+          eapply List.Forall_forall in HD; eauto.
+        * inv SORTED. eapply IHl; eauto.
+  Qed.
+
+  Lemma sorting_sorted l
+    :
+      (<<COMPLETE: forall a, List.In a l <-> List.In a (sorting l)>>) /\
+      (<<SORTED: times_sorted (sorting l)>>).
+  Proof.
+    induction l; ss.
+    - split; i; ss.
+    - i. des. splits.
+      + i. erewrite insert_complete.
+        split; i; des; eauto.
+        * right. eapply COMPLETE; eauto.
+        * right. eapply COMPLETE; eauto.
+      + eapply insert_sorted; eauto.
+  Qed.
+
+  Inductive disjoint_cell_msgs: list (Time.t * Time.t * Message.t) -> Prop :=
+  | disjoint_cell_msgs_nil
+    :
+      disjoint_cell_msgs []
+  | disjoint_cell_msgs_cons
+      from to msg tl
+      (HD: List.Forall (fun ftm =>
+                          match ftm with
+                          | (f, t, m) => Time.le to f
+                          end) tl)
+      (TL: disjoint_cell_msgs tl)
+    :
+      disjoint_cell_msgs ((from, to, msg) :: tl)
+  .
+
+  Definition wf_cell_msgs l :=
+    (<<DISJOINT: disjoint_cell_msgs l>>) /\
+    (<<MSGSWF: List.Forall (fun ftm =>
+                              match ftm with
+                              | (from, to, msg) =>
+                                (<<MSGWF: Message.wf msg>>) /\
+                                (<<TS: (from = Time.bot /\ to = Time.bot) \/ (Time.lt from to)>>)
+                              end) l>>)
+  .
+
+  Lemma list_map_ext2 A B (f g: A -> B) l
+        (EXT: forall a (IN: List.In a l),
+            f a = g a)
+    :
+      List.map f l = List.map g l.
+  Proof.
+    ginduction l; eauto. i; ss. f_equal.
+    - eapply EXT; eauto.
+    - eapply IHl; eauto.
+  Qed.
+
   Lemma list_filter_exists A (P: A -> Prop) (l: list A)
     :
       exists l',
@@ -103,40 +218,172 @@ Section FORGETMEMORY.
         * eapply COMPLETE in H0. des; eauto.
   Qed.
 
-  Lemma forget_exists_list l mem_tgt:
-    exists mem_src, <<FORGET: forget_memory (fun loc to => List.In (loc, to) l)
-                                            mem_src mem_tgt>>.
+  Lemma cell_finite_sound_exists c
+    :
+      exists dom,
+        (<<COMPLETE: forall to,
+            (List.In to dom <-> exists from msg,
+                (<<GET: Cell.get to c = Some (from, msg)>>))>>).
+  Proof.
+    generalize (Cell.finite c). i. des.
+    generalize (list_filter_exists (fun to => exists from msg, (<<GET: Cell.get to c = Some (from, msg)>>)) dom). i. des.
+    exists l'. i. split; i.
+    - eapply COMPLETE in H0. des. eauto.
+    - eapply COMPLETE. splits; eauto.
+      des. eapply H; eauto.
+  Qed.
+
+  Lemma wf_cell_msgs_exists c
+    :
+      exists l,
+        (<<COMPLETE:
+           forall from to msg,
+             (<<GET: Cell.get to c = Some (from, msg)>>) <->
+             (<<IN: List.In (from, to, msg) l>>)>>) /\
+        (<<WFMSGS: wf_cell_msgs l>>).
+  Proof.
+    generalize (cell_finite_sound_exists c). i. des.
+    generalize (sorting_sorted dom). i. des.
+    assert (COMPLETE1: forall a, List.In a (sorting dom) <->
+                                 exists from msg,
+                                   (<<GET: Cell.get a c = Some (from, msg)>>)).
+    { i. split; i.
+      - eapply COMPLETE0 in H. eapply COMPLETE in H. eauto.
+      - eapply COMPLETE0. eapply COMPLETE. eauto. }
+    remember (sorting dom). clear - SORTED COMPLETE1.
+    exists (List.map (fun to => match (Cell.get to c) with
+                                | Some (from, msg) => (from, to, msg)
+                                | None => (to, Time.bot, Message.reserve)
+                                end) l).
+    ginduction l; ss.
+    - i. splits.
+      + ii. split; clarify.
+        i. eapply COMPLETE1. eauto.
+      + econs.
+        * econs.
+        * econs.
+    - i. hexploit (proj1 (COMPLETE1 a)); eauto. i. des.
+      hexploit Cell.remove_exists; eauto. i. des.
+      hexploit (IHl cell2).
+      { inv SORTED. eauto. }
+      { i. split; i.
+        - hexploit (proj1 (COMPLETE1 a0)); eauto. i. des.
+          exists from0, msg0. erewrite Cell.remove_o; eauto. des_ifs.
+          exfalso. inv SORTED.
+          eapply List.Forall_forall in H0; eauto.
+          eapply Time.lt_strorder; eauto.
+        - des. erewrite Cell.remove_o in GET0; eauto. des_ifs.
+          hexploit (proj2 (COMPLETE1 a0)); eauto.
+          i. des; clarify. }
+      i. des. rewrite GET in *.
+      replace (List.map
+                 (fun to0 =>
+                    match Cell.get to0 c with
+                    | Some (from1, msg1) => (from1, to0, msg1)
+                    | None => (to0, Time.bot, Message.reserve)
+                    end) l) with
+          (List.map
+             (fun to0 =>
+                match Cell.get to0 cell2 with
+                | Some (from1, msg1) => (from1, to0, msg1)
+                | None => (to0, Time.bot, Message.reserve)
+                end) l); cycle 1.
+      { eapply list_map_ext2. i.
+        erewrite (@Cell.remove_o cell2); eauto.
+        des_ifs. exfalso. inv SORTED.
+        eapply List.Forall_forall in IN; eauto.
+        eapply Time.lt_strorder; eauto. }
+      assert (COMPLETE2:
+                forall from0 to msg0,
+                  Cell.get to c = Some (from0, msg0) <->
+                  (from, a, msg) = (from0, to, msg0) \/
+                  List.In (from0, to, msg0)
+                          (List.map
+                             (fun to0 =>
+                                match Cell.get to0 cell2 with
+                                | Some (from1, msg1) => (from1, to0, msg1)
+                                | None => (to0, Time.bot, Message.reserve)
+                                end) l)).
+      { i. split; i.
+        - generalize (Cell.remove_o to H). intros GET0.
+          des_ifs; eauto. right.
+          rewrite H0 in GET0. eapply COMPLETE in GET0. eauto.
+        - des; clarify.
+          eapply (proj2 (COMPLETE from0 to msg0)) in H0.
+          erewrite Cell.remove_o in H0; eauto. des_ifs. }
+      splits; auto.
+      unfold wf_cell_msgs in WFMSGS. des. econs; eauto.
+      + econs; eauto. inv SORTED.
+        eapply List.Forall_forall. i.
+        eapply List.in_map_iff in H0. des.
+        erewrite Cell.remove_o in H0; eauto. des_ifs.
+        * dup GET. eapply Cell.get_ts in GET0. des; clarify.
+          { eapply Time.bot_spec. }
+          destruct (Time.le_lt_dec a t0); auto. exfalso.
+          exploit Cell.get_disjoint.
+          { eapply GET. }
+          { eapply Heq0. }
+          i. des; clarify. eapply x0.
+          { instantiate (1:=a). econs; ss. refl. }
+          { econs; ss.
+            eapply List.Forall_forall in HD; eauto. left. auto. }
+        * refl.
+        * exfalso. hexploit (proj1 (COMPLETE1 t0)); eauto.
+          i. des. clarify.
+      + econs; eauto. splits.
+        { eapply Cell.get_opt_wf; eauto. }
+        { eapply Cell.get_ts; eauto. }
+  Qed.
+
+  Inductive forget_cell (P: Time.t -> Prop) cell_src cell_tgt : Prop :=
+  | forget_cell_intro
+      (COMPLETE: forall t (NPROMS: ~ P t),
+          Cell.get t cell_src = Cell.get t cell_tgt)
+      (FORGET: forall t (PROMS: P t), Cell.get t cell_src = None)
+  .
+
+  Lemma forget_exists_list l cell_tgt:
+    exists cell_src,
+      (<<FORGET: forget_cell (fun to => List.In to l) cell_src cell_tgt>>).
   Proof.
     induction l; ss.
-    - exists mem_tgt. econs; ss.
-    - i. destruct a as [loc to]. des.
-      destruct (Memory.get loc to mem_src) as [[from msg]|] eqn:GET.
-      + exploit Memory.remove_exists; eauto. i. des. exists mem2.
+    - exists cell_tgt. econs; ss.
+    - des. destruct (Cell.get a cell_src) as [[from msg]|] eqn:GET.
+      + exploit Cell.remove_exists; eauto. i. des. exists cell2.
         inv FORGET. econs; i.
-        * erewrite Memory.remove_o; eauto. des_ifs; eauto.
+        * erewrite Cell.remove_o; eauto. des_ifs; eauto.
           ss; des; clarify. exfalso. eauto.
-        * erewrite Memory.remove_o; eauto. des_ifs; clarify.
+        * erewrite Cell.remove_o; eauto. des_ifs; clarify.
           eapply FORGET0; eauto. ss. des; clarify; eauto.
-      + exists mem_src. inv FORGET.
+      + exists cell_src. inv FORGET.
         econs; eauto. i. des; clarify; eauto.
   Qed.
 
-  Lemma forget_exists P mem_tgt:
-    exists mem_src, <<FORGET: forget_memory P mem_src mem_tgt>>.
+  Lemma forget_cell_exists P cell_tgt:
+    exists cell_src, (<<FORGET: forget_cell P cell_src cell_tgt>>).
   Proof.
-  Admitted.
-  (*   hexploit (Memory.finite_sound_exists mem_tgt); eauto. i. des. *)
-  (*   hexploit (list_filter_exists (fun locto => P (fst locto) (snd locto)) dom). i. des. *)
-  (*   hexploit (forget_exists_list l' mem_tgt). i. des. *)
-  (*   exists mem_src. inv FORGET. econs; eauto. *)
-  (*   - i. eapply COMPLETE0. ii. eapply COMPLETE in H1. des; eauto. *)
-  (*   - i. destruct (classic (List.In (l, t) dom)). *)
-  (*     + eapply FORGET0; eauto. eapply COMPLETE; eauto. *)
-  (*     + rewrite COMPLETE0; eauto. *)
-  (*       * destruct (Memory.get l t mem_tgt) as [[from msg]|] eqn:GET; auto. *)
-  (*         exfalso. exploit H; eauto. *)
-  (*       * ii. eapply COMPLETE in H2. des; clarify. *)
-  (* Qed. *)
+    hexploit (cell_finite_sound_exists cell_tgt); eauto. i. des.
+    hexploit (list_filter_exists P dom). i. des.
+    hexploit (forget_exists_list l' cell_tgt). i. des.
+    exists cell_src. inv FORGET. econs; eauto.
+    - i. eapply COMPLETE1. ii. apply COMPLETE0 in H. des. clarify.
+    - i. destruct (classic (List.In t dom)).
+      + eapply FORGET0; eauto. eapply COMPLETE0; eauto.
+      + rewrite COMPLETE1; eauto.
+        * destruct (Cell.get t cell_tgt) as [[from msg]|] eqn:GET; auto.
+          exfalso. eapply H. eapply COMPLETE; eauto.
+        * ii. eapply COMPLETE0 in H0. des; clarify.
+  Qed.
+
+  Lemma forget_exists P mem_tgt:
+    exists mem_src, (<<FORGET: forget_memory P mem_src mem_tgt>>).
+  Proof.
+    hexploit (choice (fun loc cell => forget_cell (P loc) cell (mem_tgt loc))).
+    { i. eapply forget_cell_exists. } i. des.
+    exists f. econs.
+    - i. destruct (H l). eapply COMPLETE; eauto.
+    - i. destruct (H l). eapply FORGET; eauto.
+  Qed.
 
   Lemma forget_unique P mem_tgt mem_src0 mem_src1
         (FORGET0: forget_memory P mem_src0 mem_tgt)
