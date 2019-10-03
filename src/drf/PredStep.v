@@ -236,4 +236,10 @@ Section PredStep.
     end
   .
 
+  Definition is_cancel (e: ThreadEvent.t) : Prop :=
+    match e with
+    | ThreadEvent.promise _ _ _ _ Memory.op_kind_cancel => True
+    | _ => False
+    end.
+
 End PredStep.

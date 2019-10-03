@@ -1085,7 +1085,7 @@ Section UNCHANGABLES.
 (*         eapply unchangables_remove; eauto. *)
 (*   Qed. *)
 
-(* End UNCHANGAGBLES. *)
+End UNCHANGABLES.
 
 
 
@@ -3544,7 +3544,7 @@ Section UNCHANGAGBLES.
         ii. eapply NCOV. des; auto.
   Qed.
 
-  Lemma other_promise_unchangable c tid1 tid2 st1 st2 lc1 lc2
+  Lemma other_promise_unchangables c tid1 tid2 st1 st2 lc1 lc2
         (CWF: Configuration.wf c)
         (TID1: IdentMap.find tid1 c.(Configuration.threads) = Some (st1, lc1))
         (TID2: IdentMap.find tid2 c.(Configuration.threads) = Some (st2, lc2))
