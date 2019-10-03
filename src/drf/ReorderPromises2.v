@@ -26,7 +26,6 @@ Require Import ReorderPromises.
 Require Import PredStep.
 Require Import MemoryReorder.
 Require Import MemoryFacts.
-Require Import AbortProp.
 Require Import DRF_PF.
 
 Set Implicit Arguments.
