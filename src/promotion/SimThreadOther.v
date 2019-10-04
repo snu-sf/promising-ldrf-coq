@@ -71,6 +71,8 @@ Inductive sim_thread_other (l: Loc.t) (e_src e_tgt: Thread.t lang): Prop :=
     (SC: sim_timemap l e_src.(Thread.sc) e_tgt.(Thread.sc))
     (MEMORY: sim_memory l e_src.(Thread.memory) e_tgt.(Thread.memory))
     (PROMISES: forall to, Memory.get l to e_src.(Thread.local).(Local.promises) = None)
+    (FULFILLABLE: fulfillable l e_src.(Thread.local).(Local.tview) e_src.(Thread.memory)
+                              e_src.(Thread.local).(Local.promises))
 .
 Hint Constructors sim_thread_other.
 
@@ -81,6 +83,7 @@ Lemma sim_thread_other_promise_step
       (SIM1: sim_thread_other l e1_src e1_tgt)
       (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
       (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
+      (CLOSED1_SRC: Memory.closed e1_src.(Thread.memory))
       (STEP_TGT: Thread.promise_step pf e_tgt e1_tgt e2_tgt):
   exists e_src e2_src,
     <<STEP_SRC: opt_promise_step e_src e1_src e2_src>> /\
@@ -96,15 +99,14 @@ Proof.
     econs; ss; eauto; try apply LOCAL.
   }
   inv SIM1. ss.
-  exploit sim_memory_promise; try exact PROMISE; try apply LOCAL; try apply WF1_SRC; eauto.
-  { inv WF1_TGT. ss. }
+  exploit sim_memory_promise; try exact PROMISE; try apply LOCAL;
+    try apply WF1_SRC; try apply WF1_TGT; eauto.
   i. des. destruct e1_src. ss.
   esplits.
   - econs 2. econs; eauto. econs; eauto.
-    eapply get_message_src_closed; eauto.
+    eapply get_message_src_closed; eauto; try apply WF1_SRC. i.
     exploit Memory.promise_op; try exact PROMISE_SRC. i.
-    inv WF1_SRC. inv TVIEW_CLOSED.
-    econs; eauto using Memory.op_closed_view.
+    eapply Memory.op_closed_view; eauto.
   - econs; eauto; ss.
     + econs; eauto; ss. apply LOCAL.
     + i. inv PROMISE_SRC.
