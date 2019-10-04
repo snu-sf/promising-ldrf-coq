@@ -159,7 +159,10 @@ Lemma get_released_src_tview_released_le_loc
       l loc released_tgt tview_src released_prev:
   <<TVIEW: tview_released_le_loc l loc tview_src (get_released_src l loc released_tgt tview_src released_prev)>>.
 Proof.
-Admitted.
+  econs; ss.
+  - unfold LocFun.add. condtac; ss. eapply Time.join_l.
+  - unfold LocFun.add. condtac; ss. eapply Time.join_l.
+Qed.
 
 Lemma get_released_src_prev_released_le_loc
       l loc released_tgt tview_src released_prev
@@ -167,16 +170,20 @@ Lemma get_released_src_prev_released_le_loc
       (GET: Memory.get loc from mem_src = Some (from', Message.full val (Some released_prev))):
   <<PREV: prev_released_le_loc l loc from mem_src (get_released_src l loc released_tgt tview_src released_prev)>>.
 Proof.
-Admitted.
+  unfold prev_released_le_loc. rewrite GET.
+  econs; ss.
+  - unfold LocFun.add. condtac; ss. eapply Time.join_r.
+  - unfold LocFun.add. condtac; ss. eapply Time.join_r.
+Qed.
 
 Lemma get_released_src_sim_view
       l loc released_tgt tview_src released_prev:
   <<SIM: sim_view l (get_released_src l loc released_tgt tview_src released_prev) released_tgt>>.
 Proof.
-  (* unfold get_released_src. econs; ss. *)
-  (* - unfold sim_timemap, LocFun.add. i. condtac; ss. *)
-  (* - unfold sim_timemap, LocFun.add. i. condtac; ss. *)
-Admitted.
+  unfold get_released_src. econs; ss.
+  - unfold sim_timemap, LocFun.add. i. condtac; ss.
+  - unfold sim_timemap, LocFun.add. i. condtac; ss.
+Qed.
 
 Lemma get_released_src_wf
       l loc released_tgt tview_src released_prev
@@ -185,35 +192,42 @@ Lemma get_released_src_wf
       (RELEASED_PREV: View.wf released_prev):
   View.wf (get_released_src l loc released_tgt tview_src released_prev).
 Proof.
-  (* econs. ii. *)
-  (* unfold get_released_src, LocFun.add. ss. condtac. *)
-  (* - subst. inv TVIEW_SRC. *)
-  (*   destruct (REL loc). apply PLN_RLX. *)
-  (* - inv RELEASED_TGT. apply PLN_RLX. *)
-Admitted.
+  econs. ii.
+  unfold get_released_src, LocFun.add. ss. condtac.
+  - subst. inv TVIEW_SRC. destruct (REL loc).
+    inv RELEASED_PREV.
+    apply Time.join_spec.
+    + etrans; eauto. apply Time.join_l.
+    + etrans; eauto. apply Time.join_r.
+  - inv RELEASED_TGT. apply PLN_RLX.
+Qed.
 
 Lemma get_released_src_closed
       l loc released_tgt tview_src released_prev
       mem_src mem_tgt
       (SIM: sim_memory l mem_src mem_tgt)
-      (CLOSED_TGT: Memory.closed_view released_tgt mem_tgt)
-      (CLOSED_TVIEW: TView.closed tview_src mem_src)
-      (CLOSED_PREV: Memory.closed_view released_prev mem_src):
+      (MSG_TGT: Memory.closed_view released_tgt mem_tgt)
+      (TVIEW_SRC: TView.closed tview_src mem_src)
+      (PREV_SRC: Memory.closed_view released_prev mem_src):
   Memory.closed_view (get_released_src l loc released_tgt tview_src released_prev) mem_src.
 Proof.
-  (* inv CLOSED_SRC. inv CLOSED_TGT. *)
-  (* unfold get_released_src. econs; ss. *)
-  (* - ii. unfold LocFun.add. condtac; ss. *)
-  (*   + subst. destruct (REL loc). eauto. *)
-  (*   + specialize (PLN loc0). des. inv SIM. *)
-  (*     exploit COMPLETE; eauto. i. des. *)
-  (*     inv MSG. inv RELEASED; eauto. *)
-  (* - ii. unfold LocFun.add. condtac; ss. *)
-  (*   + subst. destruct (REL loc). eauto. *)
-  (*   + specialize (RLX loc0). des. inv SIM. *)
-  (*     exploit COMPLETE; eauto. i. des. *)
-  (*     inv MSG. inv RELEASED; eauto. *)
-Admitted.
+  inv MSG_TGT. inv TVIEW_SRC. inv PREV_SRC.
+  unfold get_released_src. econs; ss.
+  - ii. unfold LocFun.add. condtac; ss.
+    + subst.
+      edestruct Time.join_cases; rewrite H; eauto.
+      destruct (REL loc). eauto.
+    + specialize (PLN loc0). des. inv SIM.
+      exploit COMPLETE; eauto. i. des.
+      inv MSG. inv RELEASED; eauto.
+  - ii. unfold LocFun.add. condtac; ss.
+    + subst.
+      edestruct Time.join_cases; rewrite H; eauto.
+      destruct (REL loc). eauto.
+    + specialize (RLX loc0). des. inv SIM.
+      exploit COMPLETE; eauto. i. des.
+      inv MSG. inv RELEASED; eauto.
+Qed.
 
 Lemma get_message_src_fulfillable
       l loc msg_tgt tview_src from mem_src
@@ -223,17 +237,25 @@ Lemma get_message_src_fulfillable
   <<TVIEW: tview_released_le_loc l loc tview_src released>> /\
   <<PREV: prev_released_le_loc l loc from mem_src released>>.
 Proof.
-Admitted.
+  unfold get_message_src.
+  destruct msg_tgt; ss. destruct released0; ss.
+  destruct (Memory.get loc from mem_src) as [[? [? []|]]|] eqn:GET;
+    inv MSG; split;
+      eauto using get_released_src_tview_released_le_loc;
+      eauto using get_released_src_prev_released_le_loc;
+      unfold prev_released_le_loc; rewrite GET; ss.
+Qed.
 
 Lemma get_message_src_sim_message
       l loc msg_tgt tview_src from mem_src:
   <<SIM: sim_message l (get_message_src l loc msg_tgt tview_src from mem_src) msg_tgt>>.
 Proof.
-  (* unfold get_message_src. *)
-  (* destruct msg_tgt; ss. destruct released; ss. *)
-  (* - econs. econs. eapply get_released_src_sim_view. *)
-  (* - econs. econs. *)
-Admitted.
+  unfold get_message_src.
+  destruct msg_tgt; ss. destruct released; ss.
+  - destruct (Memory.get loc from mem_src) as [[? [? []|]]|];
+      econs; econs; eapply get_released_src_sim_view.
+  - econs. econs.
+Qed.
 
 Lemma get_message_src_wf
       l loc msg_tgt tview_src from mem_src
@@ -242,11 +264,16 @@ Lemma get_message_src_wf
       (CLOSED_SRC: Memory.closed mem_src):
   Message.wf (get_message_src l loc msg_tgt tview_src from mem_src).
 Proof.
-  (* unfold get_message_src. *)
-  (* destruct msg_tgt; ss. destruct released; ss. *)
-  (* inv MSG_TGT. inv WF. econs. econs. *)
-  (* apply get_released_src_wf; eauto. *)
-Admitted.
+  unfold get_message_src.
+  destruct msg_tgt; ss. destruct released; ss.
+  inv MSG_TGT. inv WF.
+  specialize View.bot_wf. i.
+  destruct (Memory.get loc from mem_src) as [[? [? []|]]|] eqn:GET;
+    econs; econs; eauto using get_released_src_wf.
+  inv CLOSED_SRC. exploit CLOSED; eauto. i. des.
+  inv MSG_WF. inv WF.
+  eauto using get_released_src_wf.
+Qed.
 
 Lemma get_message_src_message_to
       l loc to msg_tgt tview_src from mem_src
@@ -254,25 +281,33 @@ Lemma get_message_src_message_to
       (LOC: loc <> l):
   Memory.message_to (get_message_src l loc msg_tgt tview_src from mem_src) loc to.
 Proof.
-  (* unfold get_message_src. *)
-  (* destruct msg_tgt; ss. destruct released; ss. *)
-  (* inv MSG_TGT. econs. ss. *)
-  (* unfold LocFun.add. condtac; ss. *)
-Admitted.
+  unfold get_message_src.
+  destruct msg_tgt; ss. destruct released; ss.
+  inv MSG_TGT.
+  destruct (Memory.get loc from mem_src) as [[? [? []|]]|] eqn:GET;
+    econs; ss; unfold LocFun.add; condtac; ss.
+Qed.
 
 Lemma get_message_src_closed
-      l loc msg_tgt tview_src from mem_src mem_tgt
-      (SIM: sim_memory l mem_src mem_tgt)
-      (CLOSED_TVIEW_SRC: TView.closed tview_src mem_src)
-      (CLOSED_MEM_SRC: Memory.closed mem_src)
-      (CLOSED_MSG_TGT: Memory.closed_message msg_tgt mem_tgt):
-  Memory.closed_message (get_message_src l loc msg_tgt tview_src from mem_src) mem_src.
+      l loc msg_tgt tview_src from mem1_src mem2_src mem2_tgt
+      (SIM: sim_memory l mem2_src mem2_tgt)
+      (MSG_TGT: Memory.closed_message msg_tgt mem2_tgt)
+      (TVIEW1_SRC: TView.closed tview_src mem1_src)
+      (MEM1_SRC: Memory.closed mem1_src)
+      (OP_SRC: forall v (CLOSED: Memory.closed_view v mem1_src),
+          Memory.closed_view v mem2_src):
+  Memory.closed_message (get_message_src l loc msg_tgt tview_src from mem1_src) mem2_src.
 Proof.
-  (* inv CLOSED_TGT; ss. *)
-  (* destruct released; eauto. *)
-  (* inv CLOSED. econs. econs. *)
-  (* eapply get_released_src_closed; eauto. *)
-Admitted.
+  inv MSG_TGT; ss. inv CLOSED; eauto.
+  exploit Memory.closed_view_bot; try eapply MEM1_SRC. i.
+  exploit OP_SRC; eauto. i.
+  assert (TVIEW2_SRC: TView.closed tview_src mem2_src).
+  { inv TVIEW1_SRC. econs; eauto. }
+  destruct (Memory.get loc from mem1_src) as [[? [? []|]]|] eqn:GET;
+    econs; econs; eapply get_released_src_closed; eauto.
+  inv MEM1_SRC. exploit CLOSED; eauto. i. des.
+  inv MSG_CLOSED. inv CLOSED1. eauto.
+Qed.
 
 Lemma get_message_src_full
       l loc msg_tgt tview_src from mem_src
@@ -605,7 +640,6 @@ Proof.
       + des. subst. inv GETP.
         exploit get_message_src_fulfillable; eauto. i. des.
         split; auto.
-        (* unguard. des. subst. inv MSG_LE. inv MSG. ss. *)
         unfold prev_released_le_loc.
         erewrite Memory.lower_o; eauto. condtac; ss. des. subst.
         inv x0. inv LOWER. timetac.
