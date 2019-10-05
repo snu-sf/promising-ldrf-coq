@@ -133,58 +133,15 @@ Proof.
       { eauto. }
 Qed.
 
-(* Lemma reserves_cancelable lang st vw proms sc mem0 *)
-(*       (RESERVES: only_reserves proms) *)
-(*       (MLE: Memory.le proms mem0) *)
-(*   : *)
-(*     exists mem1, *)
-(*       rtc (tau (@pred_step is_cancel lang)) *)
-(*           (Thread.mk lang st (Local.mk vw proms) sc mem0) *)
-(*           (Thread.mk lang st (Local.mk vw Memory.bot) sc mem1). *)
-(* Proof. *)
-(*   inv RESERVES. unfold Memory.finite in *. des. *)
-(*   ginduction dom; ss; i. *)
-(*   - exists mem0. replace proms with Memory.bot; auto. *)
-(*     eapply Memory.ext. i. rewrite Memory.bot_get. *)
-(*     destruct (Memory.get loc ts proms) as [[from msg]|] eqn:GET; auto. *)
-(*     exfalso. eauto. *)
-(*   - destruct a as [loc' to']. *)
-(*     destruct (Memory.get loc' to' proms) as [[from' msg']|] eqn:GET. *)
-(*     + exploit RESERVES0; eauto. i. clarify. *)
-(*       exploit Memory.remove_exists. *)
-(*       { eapply GET. } *)
-(*       intros [prom1 REMOVE0]. *)
-(*       exploit Memory.remove_exists. *)
-(*       { eapply MLE. eapply GET. } *)
-(*       intros [mem1 REMOVE1]. hexploit IHdom. *)
-(*       * instantiate (1:=mem1). instantiate (1:=prom1). *)
-(*         ii. erewrite Memory.remove_o in LHS; eauto. des_ifs. *)
-(*         eapply MLE in LHS. erewrite Memory.remove_o; eauto. des_ifs. *)
-(*         ss. des; clarify. *)
-(*       * i. erewrite Memory.remove_o in GET0; eauto. des_ifs. *)
-(*         eapply RESERVES0; eauto. *)
-(*       * i. erewrite Memory.remove_o in GET0; eauto. des_ifs. *)
-(*         exploit FINITE; eauto. i. ss. *)
-(*         des; ss; clarify. *)
-(*       * i. des. exists mem2. econs 2. *)
-(*         { econs. *)
-(*           - instantiate (2:=ThreadEvent.promise loc' from' to' Message.reserve Memory.op_kind_cancel). *)
-(*             econs; ss. econs. econs 1. econs; ss. *)
-(*             econs; ss. econs; eauto. *)
-(*           - ss. } *)
-(*         eapply H. *)
-(*     + eapply IHdom; eauto. *)
-(*       i. exploit FINITE; eauto. i. des; clarify. *)
-(* Qed. *)
-
 Lemma promise_free_no_promise P lang (th0 th1: Thread.t lang) e
       (NOPROMISE: th0.(Thread.local).(Local.promises) = Memory.bot)
-      (STEP: pred_step (P /1\ promise_free) e th0 th1)
+      (STEP: pred_step P e th0 th1)
+      (PRED: P <1= promise_free)
   :
-    (<<STEP: pred_step (P /1\ no_promise) e th0 th1>>) /\
+    (<<STEP: pred_step P e th0 th1>>) /\
     (<<NOPROMISE: th1.(Thread.local).(Local.promises) = Memory.bot>>).
 Proof.
-  inv STEP. inv STEP0. inv STEP.
+  inv STEP. dup SAT. eapply PRED in SAT. inv STEP0. inv STEP.
   - inv STEP0. inv LOCAL. inv PROMISE; ss; des; clarify.
     + rewrite NOPROMISE in *.
       eapply Memory.lower_get0 in PROMISES. des.
@@ -223,17 +180,6 @@ Definition caps (mem0 prom : Memory.t) (l : Loc.t) (t from : Time.t) (msg : Mess
   forall mem1 (CAP: Memory.cap prom mem0 mem1),
     (<<GET0: Memory.get l t mem0 = None>>) /\
     (<<GET1: Memory.get l t mem1 = Some (from, msg)>>).
-
-(* Inductive my_caps (mem0 prom : Memory.t) (l : Loc.t) (t from : Time.t) (msg : Message.t) := *)
-(*   (<<CAPS: caps mem0 prom l t from msg>>) /\ *)
-(*   (<< *)
-
-
-
-(*   forall mem1 (CAP: Memory.cap prom mem0 mem1), *)
-(*     (<<GET0: Memory.get l t mem0 = None>>) /\ *)
-(*     (<<GET1: Memory.get l t mem1 = Some (from, msg)>>). *)
-
 
 Definition caps_loc (mem0 prom : Memory.t) (l : Loc.t) (t : Time.t): Prop :=
   exists from msg, (<<CAPS: caps mem0 prom l t from msg>>).
@@ -434,16 +380,6 @@ Proof.
         { econs; ss. left. auto. }
 Qed.
 
-(* Lemma memory_get_from_mon2 mem loc from0 from1 to0 to1 msg0 msg1 *)
-(*       (GET0: Memory.get loc to0 mem = Some (from0, msg0)) *)
-(*       (GET1: Memory.get loc to1 mem = Some (from1, msg1)) *)
-(*       (TO: Time.lt to0 to1) *)
-(*   : *)
-(*     (<<FROM: Time.lt from0 from1>>) \/ *)
-(*     ((<<FROM0: from0 = Time.bot>>) /\ (<<FROM1: from1 = Time.bot>>) /\ (<<TO: to0 = Time.bot>>)). *)
-(* Proof. *)
-(* Admitted. *)
-
 Lemma caps_concrete_last mem0 prom mem1 tm l t from val released
       (RESERVE: Memory.reserve_wf prom mem0)
       (INHABITED: Memory.inhabited mem0)
@@ -526,14 +462,6 @@ Proof.
   - erewrite INHABITED in GET0. clarify.
 Qed.
 
-Definition pf_consistent_strong lang (e:Thread.t lang): Prop :=
-  forall mem1 sc1
-         (CAP: Memory.cap e.(Thread.local).(Local.promises) e.(Thread.memory) mem1),
-  exists e2,
-    (<<STEPS: rtc (tau (@pred_step ((promise_free /1\ no_acq_read_msgs (caps_loc e.(Thread.memory) e.(Thread.local).(Local.promises))) /1\ no_sc) lang)) (Thread.mk _ e.(Thread.state) e.(Thread.local) sc1 mem1) e2>>) /\
-    ((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
-     (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>)).
-
 Lemma write_promises_decrease prom0 mem0 loc from to val realeased prom1 mem1 kind
       (WRITE: Memory.write prom0 mem0 loc from to val realeased prom1 mem1 kind)
   :
@@ -561,12 +489,13 @@ Proof.
 Qed.
 
 Lemma pf_step_promises_decrease P lang e (th0 th1: Thread.t lang)
-      (STEP: (@pred_step (promise_free /1\ P) lang) e th0 th1)
+      (STEP: (@pred_step P lang) e th0 th1)
+      (PRED: P <1= promise_free)
   :
     concrete_promised (th1.(Thread.local).(Local.promises)) <2=
     concrete_promised (th0.(Thread.local).(Local.promises)).
 Proof.
-  i. inv STEP. inv STEP0. des. inv STEP.
+  i. inv STEP. eapply PRED in SAT. inv STEP0. des. inv STEP.
   - inv STEP0. ss. inv LOCAL. ss. inv PROMISE; clarify.
     + inv PR. erewrite Memory.lower_o in GET; eauto. des_ifs.
       * ss; des. clarify. eapply Memory.lower_get0 in PROMISES.
@@ -583,7 +512,8 @@ Proof.
 Qed.
 
 Lemma pf_step_rtc_promises_decrease P lang (th0 th1: Thread.t lang)
-      (STEP: rtc (tau (@pred_step (promise_free /1\ P) lang)) th0 th1)
+      (STEP: rtc (tau (@pred_step P lang)) th0 th1)
+      (PRED: P <1= promise_free)
   :
     concrete_promised (th1.(Thread.local).(Local.promises)) <2=
     concrete_promised (th0.(Thread.local).(Local.promises)).
@@ -631,13 +561,14 @@ Qed.
 Lemma no_sc_any_sc_rtc
       P lang th_src th_tgt th_tgt' st st' lc lc' sc sc_src sc'
       mem mem'
-      (STEP: rtc (tau (@pred_step (P /1\ no_sc) lang)) th_tgt th_tgt')
+      (STEP: rtc (tau (@pred_step P lang)) th_tgt th_tgt')
       (TH_SRC: th_src = Thread.mk lang st lc sc_src mem)
       (TH_TGT0: th_tgt = Thread.mk lang st lc sc mem)
       (TH_TGT1: th_tgt' = Thread.mk lang st' lc' sc' mem')
+      (PRED: P <1= no_sc)
   :
     exists sc_src',
-      (<<STEP: rtc (tau (@pred_step (P /1\ no_sc) lang))
+      (<<STEP: rtc (tau (@pred_step P lang))
                    th_src
                    (Thread.mk lang st' lc' sc_src' mem')>>).
 Proof.
@@ -669,169 +600,84 @@ Proof.
   inv H. inv TSTEP. inv STEP. eapply unchangable_increase; eauto.
 Qed.
 
-(* Lemma pf_consistent_pf_consistent_strong lang (th: Thread.t lang) *)
-(*       (WF: Local.wf th.(Thread.local) th.(Thread.memory)) *)
-(*       (MEM: Memory.closed th.(Thread.memory)) *)
-(*       (INHABITED: Memory.inhabited th.(Thread.memory)) *)
-(*       (CONSISTENT: pf_consistent th) *)
-(*   : *)
-(*     pf_consistent_strong th. *)
-(* Proof. *)
-(*   ii. exploit Memory.max_full_timemap_exists; eauto. intros MAX. des. *)
-(*   ii. exploit Memory.max_full_timemap_exists. *)
-(*   { eapply le_inhabited; eauto. eapply Memory.cap_le; eauto. refl. } *)
-(*   i. des. exploit CONSISTENT; eauto. i. *)
-(*   destruct x as [e2 [STEPS GOOD]]. guardH GOOD. des. *)
-(*   eapply pf_step_promise_free_step_rtc in STEPS. *)
-(*   eapply hold_or_not with (Q := no_acq_read_msgs (caps_loc (Thread.memory th) (Local.promises (Thread.local th))) /1\ no_sc) in STEPS. des. *)
-
-(*   - destruct th. destruct e2. ss. *)
-(*     eapply pred_step_rtc_mon with (Q:=(promise_free /1\ no_acq_read_msgs (caps_loc memory (Local.promises local))) /1\ no_sc) in HOLD; cycle 1. *)
-(*     { i. des. esplits; eauto. } *)
-(*     exploit no_sc_any_sc_rtc; try eapply HOLD; eauto. i. des. *)
-(*     esplits; eauto. unguard. des. *)
-(*     + left. ss. inv FAILURE; inv STEP0. inv LOCAL. eauto. *)
-(*     + right. esplits; eauto. *)
-
-(*   - exploit Thread.rtc_tau_step_future. *)
-(*     { eapply thread_steps_pred_steps. eapply STEPS0. } *)
-(*     { ss. eapply Local.cap_wf; eauto. } *)
-(*     { ss. eapply Memory.max_full_timemap_closed; eauto. } *)
-(*     { ss. eapply Memory.cap_closed; eauto. } *)
-(*     i. des. ss. inv STEP. *)
-(*     exploit Thread.step_future; eauto. *)
-(*     i. des. *)
-
-(*     hexploit (@rtc_tau_step_promise_consistent _ e3 e2); eauto. *)
-(*     { eapply thread_steps_pred_steps; eauto. } *)
-(*     { unguard. des. *)
-(*       - inv FAILURE; inv STEP. inv LOCAL. inv LOCAL0. ss. *)
-(*       - ii. rewrite PROMISES in *. *)
-(*         erewrite Memory.bot_get in PROMISE. clarify. } intros PROMS. *)
-
-(*     assert (RESERVES: only_reserves e2'.(Thread.local).(Local.promises)). *)
-(*     { econs. *)
-(*       - i. destruct msg; auto. exfalso. dup STEPS0. *)
-(*         eapply pf_step_rtc_promises_decrease in STEPS0; cycle 1. *)
-(*         { econs; eauto. } *)
-(*         ss. inv STEPS0. *)
-(*         unfold no_sc, no_acq_read_msgs in BREAKQ. des_ifs; try by (exfalso; eauto). *)
-(*         + apply not_and_or in BREAKQ. des; clarify. *)
-(*           apply imply_to_and in BREAKQ. des. apply NNPP in BREAKQ0. *)
-(*           unfold caps_loc in *. des. dup CAPS. *)
-(*           eapply caps_unchangable in CAPS; eauto; cycle 1. *)
-(*           { inv WF. eauto. } *)
-(*           eapply unchangable_rtc_increase in STEPS2; eauto. inv STEPS2. *)
-(*           inv STEP0; inv STEP. ss. inv LOCAL. *)
-(*           inv LOCAL0. clarify. eapply caps_max_view in CAPS0; eauto; cycle 1. *)
-(*           { inv WF. eauto. } des. *)
-(*           clarify. eapply PROMS in GET. ss. des_ifs. ss. *)
-(*           exploit max_full_timemap_get. *)
-(*           * apply MAX. *)
-(*           * inv WF. eapply PROMISES. eauto. *)
-(*           * i. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto. *)
-(*             etrans; eauto. eapply TimeMap.join_r. *)
-(*         + apply not_and_or in BREAKQ. des; clarify. *)
-(*           apply imply_to_and in BREAKQ. des. apply NNPP in BREAKQ0. *)
-(*           unfold caps_loc in *. des. dup CAPS. *)
-(*           eapply caps_unchangable in CAPS; eauto; cycle 1. *)
-(*           { inv WF. eauto. } *)
-(*           eapply unchangable_rtc_increase in STEPS2; eauto. inv STEPS2. *)
-(*           inv STEP0; inv STEP. ss. inv LOCAL. *)
-(*           eapply write_step_promise_consistent in LOCAL2; eauto. *)
-(*           inv LOCAL1. clarify. eapply caps_max_view in CAPS0; eauto; cycle 1. *)
-(*           { inv WF. eauto. } des. *)
-(*           clarify. eapply LOCAL2 in GET. ss. des_ifs. ss. *)
-(*           exploit max_full_timemap_get. *)
-(*           * apply MAX. *)
-(*           * inv WF. eapply PROMISES. eauto. *)
-(*           * i. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto. *)
-(*             etrans; eauto. eapply TimeMap.join_r. *)
-(*         + apply not_and_or in BREAKQ. des; clarify. apply NNPP in BREAKQ. *)
-(*           inv STEP0; inv STEP. ss. inv LOCAL. inv LOCAL0. ss. *)
-(*           eapply PROMS in GET. ss. des_ifs. ss. *)
-(*           hexploit max_full_timemap_get; eauto. *)
-(*           * inv WF. eapply Memory.cap_le; eauto. *)
-(*           * i. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto. *)
-(*         + inv STEP0; inv STEP. ss. inv LOCAL. inv LOCAL0. ss. *)
-(*           eapply PROMS in GET. ss. des_ifs. ss. *)
-(*           hexploit max_full_timemap_get; eauto. *)
-(*           * inv WF. eapply Memory.cap_le; eauto. *)
-(*           * i. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto. *)
-(*       - inv WF2. eauto. } *)
-
-(*     destruct e2'. destruct local. ss. *)
-(*     eapply pred_step_rtc_mon with (Q:=(promise_free /1\ no_acq_read_msgs (caps_loc (Thread.memory th) (Local.promises (Thread.local th)))) /1\ no_sc) in STEPS0; cycle 1. *)
-(*     { i. des. esplits; eauto. } *)
-(*     eapply no_sc_any_sc_rtc in STEPS0; ss. des. *)
-(*       exploit reserves_cancelable; eauto. *)
-(*       { inv WF2. eauto. } *)
-(*       i. des. esplits. *)
-(*       * etrans. *)
-(*         { eapply STEP. } *)
-(*         { eapply pred_step_rtc_mon; eauto. *)
-(*           unfold is_cancel. i. des_ifs. } *)
-(*       * ss. eauto. *)
-(* Qed. *)
-
 Lemma promise_not_cacncel_reserves_same prom0 mem0 loc from to msg prom1 mem1 kind
       (PROM: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
       (NOTCANCEL: kind <> Memory.op_kind_cancel)
       loc0 to0 from0
-      (GET: Memory.get loc0 to0 mem0 = Some (from0, Message.reserve))
+      (GET: Memory.get loc0 to0 prom0 = Some (from0, Message.reserve))
   :
     exists from1,
-      Memory.get loc0 to0 mem1 = Some (from1, Message.reserve).
+      Memory.get loc0 to0 prom1 = Some (from1, Message.reserve).
 Proof.
   inv PROM.
   - eapply Memory.add_get1 in GET; eauto.
   - des. clarify. erewrite Memory.split_o; eauto.
-    dup MEM. eapply Memory.split_get0 in MEM0.
-    eapply split_succeed_wf in MEM. des. des_ifs.
+    dup PROMISES. eapply Memory.split_get0 in PROMISES0.
+    eapply split_succeed_wf in PROMISES. des. des_ifs.
     + ss. des. clarify.
     + ss. guardH o. des. clarify.
       esplits; eauto.
     + esplits; eauto.
   - des. clarify. erewrite Memory.lower_o; eauto. des_ifs.
     + ss. des. clarify.
-      eapply lower_succeed_wf in MEM. des. clarify.
+      eapply lower_succeed_wf in PROMISES. des. clarify.
     + esplits; eauto.
   - clarify.
 Qed.
 
-Lemma step_not_cancel_reserves_same lang e th0 th1
-      (STEPS: (@pred_step (promise_free /1\ (fun e => ~ is_cancel e)) lang) e th0 th1)
+Lemma remove_not_cacncel_reserves_same prom0 loc from to val released prom1
+      (REMOVE: Memory.remove prom0 loc from to (Message.full val released) prom1)
+      loc0 to0 from0
+      (GET: Memory.get loc0 to0 prom0 = Some (from0, Message.reserve))
+  :
+    exists from1,
+      Memory.get loc0 to0 prom1 = Some (from1, Message.reserve).
+Proof.
+  dup REMOVE. eapply Memory.remove_get0 in REMOVE. des.
+  eapply Memory.remove_o in REMOVE0.
+  instantiate (1:=to0) in REMOVE0.
+  instantiate (1:=loc0) in REMOVE0. des_ifs.
+  - ss. des. clarify.
+  - esplits. etrans; eauto.
+Qed.
+
+Lemma step_not_cancel_reserves_same P lang e th0 th1
+      (STEPS: (@pred_step P lang) e th0 th1)
+      (PRED: P <1= (promise_free /1\ (fun e => ~ is_cancel e)))
       loc to from
-      (GET: Memory.get loc to th0.(Thread.memory) = Some (from, Message.reserve))
+      (GET: Memory.get loc to th0.(Thread.local).(Local.promises) = Some (from, Message.reserve))
   :
     exists from',
-      Memory.get loc to th1.(Thread.memory) = Some (from', Message.reserve).
+      Memory.get loc to th1.(Thread.local).(Local.promises) = Some (from', Message.reserve).
 Proof.
-  inv STEPS. inv STEP. inv STEP0.
+  inv STEPS. eapply PRED in SAT. inv STEP. inv STEP0.
   - inv STEP. des. ss. inv LOCAL.
     eapply promise_not_cacncel_reserves_same; eauto.
     ii. clarify.
   - inv STEP. inv LOCAL; ss.
     + esplits; eauto.
-    + esplits; eauto.
-    + inv LOCAL0. inv WRITE.
-      eapply promise_not_cacncel_reserves_same; eauto.
-      ii. clarify. inv PROMISE. clarify.
-    + inv LOCAL2. inv WRITE.
-      eapply promise_not_cacncel_reserves_same; eauto.
-      ii. clarify. inv PROMISE. clarify.
-    + esplits; eauto.
-    + esplits; eauto.
-    + esplits; eauto.
+    + inv LOCAL0. esplits; eauto.
+    + inv LOCAL0. inv WRITE. ss.
+      eapply promise_not_cacncel_reserves_same in GET; cycle 1; eauto.
+      { ii. clarify. inv PROMISE. clarify. } des.
+      eapply remove_not_cacncel_reserves_same in GET; cycle 1; eauto.
+    + inv LOCAL2. inv WRITE. ss. inv LOCAL1. ss.
+      eapply promise_not_cacncel_reserves_same in GET; cycle 1; eauto.
+      { ii. clarify. inv PROMISE. clarify. } des.
+      eapply remove_not_cacncel_reserves_same in GET; cycle 1; eauto.
+    + inv LOCAL0. esplits; eauto.
+    + inv LOCAL0. esplits; eauto.
+    + inv LOCAL0. esplits; eauto.
 Qed.
 
-Lemma steps_not_cancel_reserves_same lang th0 th1
-      (STEPS: rtc (tau (@pred_step (promise_free /1\ (fun e => ~ is_cancel e)) lang)) th0 th1)
+Lemma steps_not_cancel_reserves_same P lang th0 th1
+      (STEPS: rtc (tau (@pred_step P lang)) th0 th1)
+      (PRED: P <1= (promise_free /1\ (fun e => ~ is_cancel e)))
       loc to from
-      (GET: Memory.get loc to th0.(Thread.memory) = Some (from, Message.reserve))
+      (GET: Memory.get loc to th0.(Thread.local).(Local.promises) = Some (from, Message.reserve))
   :
     exists from',
-      Memory.get loc to th1.(Thread.memory) = Some (from', Message.reserve).
+      Memory.get loc to th1.(Thread.local).(Local.promises) = Some (from', Message.reserve).
 Proof.
   ginduction STEPS; i.
   - esplits; eauto.
@@ -839,30 +685,22 @@ Proof.
     exploit IHSTEPS; eauto.
 Qed.
 
-Definition pf_consistent_strong2 lang (e0:Thread.t lang): Prop :=
-  forall mem1 sc1
-         (CAP: Memory.cap e0.(Thread.local).(Local.promises) e0.(Thread.memory) mem1),
-  exists e1 e2,
-    (<<STEPS0: rtc (tau (@pred_step is_cancel lang)) e0 e1>>) /\
-    (<<NORESERVE: no_reserves e1.(Thread.local).(Local.promises)>>) /\
-    (<<STEPS1: rtc (tau (@pred_step ((promise_free /1\ (fun e => ~ is_cancel e) /1\ no_acq_read_msgs (caps_loc e0.(Thread.memory) e0.(Thread.local).(Local.promises))) /1\ no_sc) lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc1 mem1) e2>>) /\
-    ((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
-     (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>)).
-
-Lemma cancel_promises_decrease lang e th0 th1
-      (STEP: (@pred_step is_cancel lang) e th0 th1)
+Lemma cancel_promises_decrease P lang e th0 th1
+      (STEP: (@pred_step P lang) e th0 th1)
+      (PRED: P <1= is_cancel)
   :
     Memory.le th1.(Thread.local).(Local.promises) th0.(Thread.local).(Local.promises).
 Proof.
-  inv STEP. unfold is_cancel in SAT. des_ifs.
+  inv STEP. eapply PRED in SAT. unfold is_cancel in SAT. des_ifs.
   inv STEP0. inv STEP; inv STEP0; ss.
   - inv LOCAL. inv PROMISE; ss.
     ii. erewrite Memory.remove_o in LHS; eauto. des_ifs.
   - inv LOCAL.
 Qed.
 
-Lemma cancels_promises_decrease lang th0 th1
-      (STEP: rtc (tau (@pred_step is_cancel lang)) th0 th1)
+Lemma cancels_promises_decrease P lang th0 th1
+      (STEP: rtc (tau (@pred_step P lang)) th0 th1)
+      (PRED: P <1= is_cancel)
   :
     Memory.le th1.(Thread.local).(Local.promises) th0.(Thread.local).(Local.promises).
 Proof.
@@ -895,33 +733,39 @@ Lemma step_times_list_exists P lang th0 th1 e
       (STEPS: (@pred_step P lang) e th0 th1)
   :
     exists times,
-      (@pred_step (P /1\ wf_time_evt (fun loc to => List.In (loc, to) times)) lang) e th0 th1.
+      (@pred_step (P /1\ wf_time_evt (fun loc to => List.In to (times loc))) lang) e th0 th1.
 Proof.
   inv STEPS. destruct e.
-  - exists [(loc, from); (loc, to)]. econs; eauto.
-    ss. splits; ss; eauto.
-  - exists []. econs; eauto. ss.
-  - exists []. econs; eauto. ss.
-  - exists [(loc, from); (loc, to)]. econs; eauto.
-    ss. splits; ss; eauto.
-  - exists [(loc, tsw)]. econs; eauto.
-    ss. splits; ss; eauto.
-  - exists []. econs; eauto. ss.
-  - exists []. econs; eauto. ss.
-  - exists []. econs; eauto. ss.
+  - exists (fun l => if Loc.eq_dec l loc then
+                       [from; to] else []).
+    econs; eauto.
+    ss. splits; auto; des_ifs; ss; eauto.
+  - exists (fun _ => []). econs; eauto. ss.
+  - exists (fun _ => []). econs; eauto. ss.
+  - exists (fun l => if Loc.eq_dec l loc then
+                       [from; to] else []).
+    econs; eauto.
+    ss. splits; auto; des_ifs; ss; eauto.
+  - exists (fun l => if Loc.eq_dec l loc then
+                       [tsw] else []).
+    econs; eauto.
+    ss. splits; auto; des_ifs; ss; eauto.
+  - exists (fun _ => []). econs; eauto. ss.
+  - exists (fun _ => []). econs; eauto. ss.
+  - exists (fun _ => []). econs; eauto. ss.
 Qed.
 
 Lemma times_list_exists P lang th0 th1
       (STEPS: rtc (tau (@pred_step P lang)) th0 th1)
   :
     exists times,
-      rtc (tau (@pred_step (P /1\ wf_time_evt (fun loc to => List.In (loc, to) times)) lang)) th0 th1.
+      rtc (tau (@pred_step (P /1\ wf_time_evt (fun loc to => List.In to (times loc))) lang)) th0 th1.
 Proof.
   ginduction STEPS.
-  - exists []. refl.
+  - exists (fun _ => []). refl.
   - dup H. inv H0.
     eapply step_times_list_exists in TSTEP. des.
-    exists (times ++ times0). econs 2.
+    exists (fun loc => times loc ++ times0 loc). econs 2.
     + econs; eauto. eapply pred_step_mon; eauto.
       i. ss. des. split; auto.
       eapply wf_time_evt_mon; eauto.
@@ -932,25 +776,37 @@ Proof.
       i. ss. eapply List.in_or_app; eauto.
 Qed.
 
-Lemma pf_consistent_pf_consistent_strong2 lang (th: Thread.t lang)
+Definition pf_consistent_strong lang (e0:Thread.t lang): Prop :=
+  forall mem1 sc1
+         (CAP: Memory.cap e0.(Thread.local).(Local.promises) e0.(Thread.memory) mem1),
+  exists e1,
+    (<<STEPS0: rtc (tau (@pred_step is_cancel lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc1 mem1) e1>>) /\
+    (<<NORESERVE: no_reserves e1.(Thread.local).(Local.promises)>>) /\
+    exists e2,
+      (<<STEPS1: rtc (tau (@pred_step ((promise_free /1\ (fun e => ~ is_cancel e) /1\ no_acq_read_msgs (caps_loc e0.(Thread.memory) e0.(Thread.local).(Local.promises))) /1\ no_sc) lang)) e1 e2>>) /\
+      ((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
+       (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>)).
+
+Lemma pf_consistent_pf_consistent_strong lang (th: Thread.t lang)
       (WF: Local.wf th.(Thread.local) th.(Thread.memory))
       (MEM: Memory.closed th.(Thread.memory))
       (INHABITED: Memory.inhabited th.(Thread.memory))
       (CONSISTENT: pf_consistent th)
   :
-    pf_consistent_strong2 th.
+    pf_consistent_strong th.
 Proof.
   ii. exploit Memory.max_full_timemap_exists; eauto. intros MAX. des.
   ii. exploit Memory.max_full_timemap_exists.
   { eapply le_inhabited; eauto. eapply Memory.cap_le; eauto. refl. }
   i. des. exploit CONSISTENT; eauto. i.
+
   assert (exists e2,
              (<<STEPS: rtc (tau (Thread.step true))
                            (Thread.mk _ (Thread.state th) (Thread.local th)
                                       tm0 mem1) e2 >>) /\
-             ((exists e3, ((<< FAILURE: Thread.step true ThreadEvent.failure e2 e3 >>))
-                          /\ (<<NORESERVES: no_reserves e2.(Thread.local).(Local.promises)>>)) \/
-              (<<PROMISES: Local.promises (Thread.local e2) = Memory.bot >>))).
+             (<<NORESERVES: no_reserves e2.(Thread.local).(Local.promises)>>) /\
+             (__guard__ ((exists e3, (<< FAILURE: Thread.step true ThreadEvent.failure e2 e3 >>)) \/
+                         (<<PROMISES: Local.promises (Thread.local e2) = Memory.bot >>)))).
   { des.
     - exploit Thread.rtc_tau_step_future.
       + eapply rtc_implies; [|apply STEPS].
@@ -970,55 +826,103 @@ Proof.
             inv STEP0; inv STEP.
             - econs; eauto. econs; eauto. econs; eauto.
             - inv LOCAL. }
+        * ss.
         * left. inv FAILURE; inv STEP. inv LOCAL. inv LOCAL0.
           exists (Thread.mk _ st2 (Local.mk tview proms1) sc2 mem0).
-          ss. split; eauto.
-          econs 2. econs; eauto. econs; eauto. econs; eauto.
-          eapply cancels_promises_decrease in STEPS0. ss.
+          ss. econs 2. econs; eauto. econs; eauto. econs; eauto.
+          eapply cancels_promises_decrease in STEPS0; auto. ss.
           ii. eapply CONSISTENT0; eauto.
-    - esplits; eauto. }
+    - unguard. esplits; eauto. rewrite PROMISES. ii.
+      rewrite Memory.bot_get in GET. clarify. }
 
-  destruct th1. ss.
+  clear x. des.
+  eapply pf_step_promise_free_step_rtc in STEPS.
+  eapply pf_steps_cancels_not_cancels in STEPS; cycle 1.
+  { ss. eapply Local.cap_wf; eauto. }
+  { ss. eapply Memory.cap_closed; eauto. }
+  { ss. eapply Memory.max_full_timemap_closed; eauto. } des.
+
+  exploit Thread.rtc_tau_step_future.
+  { eapply thread_steps_pred_steps. eapply STEPS1. }
+  { ss. eapply Local.cap_wf; eauto. }
+  { ss. eapply Memory.max_full_timemap_closed; eauto. }
+  { ss. eapply Memory.cap_closed; eauto. }
+  i. des. ss.
+
+  destruct th1. exploit no_sc_any_sc_rtc; try apply STEPS1; ss.
+  { i. unfold is_cancel in PR. des_ifs. }
+  i. des. instantiate (1:=sc1) in STEP. clear STEPS1.
+
+  eexists. splits.
+  { eapply STEP. }
+  { ss. ii. clarify.
+    eapply steps_not_cancel_reserves_same in STEPS2; eauto.
+    unguard. des.
+    - eapply NORESERVES; eauto.
+    - rewrite PROMISES in *. erewrite Memory.bot_get in STEPS2. clarify. }
+
   eapply hold_or_not with (Q := no_acq_read_msgs (caps_loc (Thread.memory th) (Local.promises (Thread.local th))) /1\ no_sc) in STEPS2. des.
 
   - destruct e2. ss.
-    eapply pred_step_rtc_mon with (Q:=(promise_free /1\ (fun e => ~ is_cancel e) /1\ no_acq_read_msgs (caps_loc memory (Local.promises local))) /1\ no_sc) in HOLD; cycle 1.
-    { i. des. esplits; eauto. }
-    exploit no_sc_any_sc_rtc; try eapply HOLD; eauto. i. des.
-    esplits; eauto. unguard. des.
-    + left. ss. inv FAILURE; inv STEP0. inv LOCAL. eauto.
-    + right. esplits; eauto.
+    exploit no_sc_any_sc_rtc; try eapply HOLD; eauto.
+    { ss. i. des. auto. } i. des.
+    esplits.
+    + eapply pred_step_rtc_mon; try eapply STEP0.
+      i. ss. des. splits; eauto.
+    + ss. unguard. des.
+      * left. ss. inv FAILURE; inv STEP1. inv LOCAL. eauto.
+      * right. esplits; eauto.
 
   - exploit Thread.rtc_tau_step_future.
     { eapply thread_steps_pred_steps. eapply STEPS0. }
-    { ss. eapply Local.cap_wf; eauto. }
-    { ss. eapply Memory.max_full_timemap_closed; eauto. }
-    { ss. eapply Memory.cap_closed; eauto. }
-    i. des. ss. inv STEP.
-    exploit Thread.step_future; eauto.
-    i. des.
+    { ss. }
+    { ss. }
+    { ss. } i. des.
+    inv STEP0.
+    exploit Thread.step_future; eauto. i. des.
 
-    hexploit (@rtc_tau_step_promise_consistent _ e3 e2); eauto.
-    { eapply thread_steps_pred_steps; eauto. }
-    { unguard. des.
-      - inv FAILURE; inv STEP. inv LOCAL. inv LOCAL0. ss.
-      - ii. rewrite PROMISES in *.
-        erewrite Memory.bot_get in PROMISE. clarify. } intros PROMS.
+    assert (PROMS: Local.promise_consistent e3.(Thread.local)).
+    { eapply rtc_tau_step_promise_consistent.
+      - eapply thread_steps_pred_steps. eapply STEPS1.
+      - unguard. des.
+        + inv FAILURE; inv STEP0. inv LOCAL. inv LOCAL0. ss.
+        + ii. rewrite PROMISES in PROMISE.
+          rewrite Memory.bot_get in PROMISE. clarify.
+      - eauto.
+      - eauto.
+      - eauto. }
 
-    assert (RESERVES: only_reserves e2'.(Thread.local).(Local.promises)).
-    { econs.
-      - i. destruct msg; auto. exfalso. dup STEPS0.
-        eapply pf_step_rtc_promises_decrease in STEPS0; cycle 1.
-        { econs; eauto. }
-        ss. inv STEPS0.
-        unfold no_sc, no_acq_read_msgs in BREAKQ. des_ifs; try by (exfalso; eauto).
+    assert (NOPROMISE: e2'.(Thread.local).(Local.promises) = Memory.bot).
+    { apply Memory.ext. i. rewrite Memory.bot_get.
+      destruct (Memory.get loc ts (Local.promises (Thread.local e2')))
+        as [[from [val released|]]|] eqn:GET; auto; cycle 1.
+      - exfalso.
+        eapply step_not_cancel_reserves_same in GET; cycle 1.
+        + econs.
+          * econs; eauto.
+          * instantiate (1:=promise_free /1\ (fun e => ~ is_cancel e)). ss.
+        + ss.
+        + des. eapply steps_not_cancel_reserves_same in GET; eauto.
+          des. eapply NORESERVES; eauto.
+      - exfalso.
+        exploit pf_step_rtc_promises_decrease.
+        { eapply STEPS0. }
+        { i. ss. des. auto. }
+        { econs; eauto. } ss. i.
+        exploit pf_step_rtc_promises_decrease.
+        { eapply STEP. }
+        { i. unfold is_cancel in *. des_ifs. }
+        { ss. eauto. }
+        ss. i. inv x2.
+        ss. unfold no_sc, no_acq_read_msgs in BREAKQ. des_ifs; try by (exfalso; eauto).
         + apply not_and_or in BREAKQ. des; clarify.
           apply imply_to_and in BREAKQ. des. apply NNPP in BREAKQ0.
           unfold caps_loc in *. des. dup CAPS.
           eapply caps_unchangable in CAPS; eauto; cycle 1.
           { inv WF. eauto. }
-          eapply unchangable_rtc_increase in STEPS2; eauto. inv STEPS2.
-          inv STEP0; inv STEP. ss. inv LOCAL.
+          eapply unchangable_rtc_increase in STEP; eauto. ss.
+          eapply unchangable_rtc_increase in STEPS0; eauto. inv STEPS0.
+          inv STEP1; inv STEP0. ss. inv LOCAL.
           inv LOCAL0. clarify. eapply caps_max_view in CAPS0; eauto; cycle 1.
           { inv WF. eauto. } des.
           clarify. eapply PROMS in GET. ss. des_ifs. ss.
@@ -1032,8 +936,9 @@ Proof.
           unfold caps_loc in *. des. dup CAPS.
           eapply caps_unchangable in CAPS; eauto; cycle 1.
           { inv WF. eauto. }
-          eapply unchangable_rtc_increase in STEPS2; eauto. inv STEPS2.
-          inv STEP0; inv STEP. ss. inv LOCAL.
+          eapply unchangable_rtc_increase in STEP; eauto. ss.
+          eapply unchangable_rtc_increase in STEPS0; eauto. inv STEPS0.
+          inv STEP1; inv STEP0. ss. inv LOCAL.
           eapply write_step_promise_consistent in LOCAL2; eauto.
           inv LOCAL1. clarify. eapply caps_max_view in CAPS0; eauto; cycle 1.
           { inv WF. eauto. } des.
@@ -1044,32 +949,26 @@ Proof.
           * i. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto.
             etrans; eauto. eapply TimeMap.join_r.
         + apply not_and_or in BREAKQ. des; clarify. apply NNPP in BREAKQ.
-          inv STEP0; inv STEP. ss. inv LOCAL. inv LOCAL0. ss.
+          inv STEP1; inv STEP0. ss. inv LOCAL. inv LOCAL0. ss.
           eapply PROMS in GET. ss. des_ifs. ss.
           hexploit max_full_timemap_get; eauto.
           * inv WF. eapply Memory.cap_le; eauto.
           * i. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto.
-        + inv STEP0; inv STEP. ss. inv LOCAL. inv LOCAL0. ss.
+        + inv STEP1; inv STEP0. ss. inv LOCAL. inv LOCAL0. ss.
           eapply PROMS in GET. ss. des_ifs. ss.
           hexploit max_full_timemap_get; eauto.
           * inv WF. eapply Memory.cap_le; eauto.
           * i. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto.
-      - inv WF2. eauto. }
+    }
 
     destruct e2'. destruct local. ss.
-    eapply pred_step_rtc_mon with (Q:=(promise_free /1\ no_acq_read_msgs (caps_loc (Thread.memory th) (Local.promises (Thread.local th)))) /1\ no_sc) in STEPS0; cycle 1.
-    { i. des. esplits; eauto. }
-    eapply no_sc_any_sc_rtc in STEPS0; ss. des.
-      exploit reserves_cancelable; eauto.
-      { inv WF2. eauto. }
-      i. des. esplits.
-      * etrans.
-        { eapply STEP. }
-        { eapply pred_step_rtc_mon; eauto.
-          unfold is_cancel. i. des_ifs. }
-      * ss. eauto.
+    eapply no_sc_any_sc_rtc in STEPS0; ss; cycle 1.
+    { i. des; ss. } des.
+    esplits.
+    * eapply pred_step_rtc_mon; eauto.
+      i. ss. des; auto.
+    * ss. eauto.
 Qed.
-
 
 Lemma progressable_in_added_rtc
       lang st lc sc0 sc1 m0 m1 tm
@@ -1099,44 +998,7 @@ Inductive diff_after_promises (prom mem0 mem1: Memory.t)
             (<<TLE: Time.le to' from>>) >>))
 .
 
-(* Memory.future *)
 
-(* Memory.future_get1 *)
-
-(* Lemma diff_after_promises_step st lc mem0 mem1 caps sc sc' *)
-(*       (CONSISTENT: Local.promise_consistent (Local.mk vw prom)) *)
-
-(*       Thread.state *)
-
-
-
-
-(* rtc_tau_step_promise_consistent *)
-(*      : forall (lang : language) (th1 th2 : Thread.t lang), *)
-(*        rtc (Thread.tau_step (lang:=lang)) th1 th2 -> *)
-(*        Local.promise_consistent (Thread.local th2) -> *)
-(*        Local.wf (Thread.local th1) (Thread.memory th1) -> *)
-(*        Memory.closed_timemap (Thread.sc th1) (Thread.memory th1) -> *)
-(*        Memory.closed (Thread.memory th1) -> Local.promise_consistent (Thread.local th1) *)
-
-
-
-
-
-(* Definition caps (mem0 prom : Memory.t) (l : Loc.t) (t from : Time.t) (msg : Message.t) := *)
-(*   forall mem1 (CAP: Memory.cap prom mem0 mem1), *)
-(*     (<<GET0: Memory.get l t mem0 = None>>) /\ *)
-(*     (<<GET1: Memory.get l t mem1 = Some (from, msg)>>). *)
-
-
-
-
-(* pf_ *)
-
-(* Definition pf_consistent_strong lang (e:Thread.t lang): Prop := *)
-(*   forall mem1 sc1 *)
-(*          (CAP: Memory.cap e.(Thread.local).(Local.promises) e.(Thread.memory) mem1), *)
-(*   exists e2, *)
-(*     (<<STEPS: rtc (tau (@pred_step ((promise_free /1\ no_acq_read_msgs (caps_loc e.(Thread.memory) e.(Thread.local).(Local.promises))) /1\ no_sc) lang)) (Thread.mk _ e.(Thread.state) e.(Thread.local) sc1 mem1) e2>>) /\ *)
-(*     ((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/ *)
-(*      (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>)). *)
+(* Inductive my_caps (mem0 prom : Memory.t) (l : Loc.t) (t from : Time.t) (msg : Message.t) := *)
+(*   (<<CAPS: caps mem0 prom l t from msg>>) /\ *)
+(*   (<< *)

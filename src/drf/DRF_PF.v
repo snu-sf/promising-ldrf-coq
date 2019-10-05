@@ -538,12 +538,13 @@ Section MEMORYLEMMAS.
   Qed.
 
   Lemma promise_bot_no_promise P lang (th0 th1: Thread.t lang) e
-        (STEP: (@pred_step (P /1\ no_promise) lang) e th0 th1)
+        (STEP: (@pred_step P lang) e th0 th1)
+        (NOPROMISE: P <1= no_promise)
         (BOT: th0.(Thread.local).(Local.promises) = Memory.bot)
     :
       th1.(Thread.local).(Local.promises) = Memory.bot.
   Proof.
-    inv STEP. inv STEP0. inv STEP.
+    inv STEP. eapply NOPROMISE in SAT. inv STEP0. inv STEP.
     - inv STEP0; des; clarify.
     - inv STEP0. ss. inv LOCAL; try inv LOCAL0; ss.
       + rewrite BOT in *. exploit memory_write_bot_add; eauto. i. clarify.
@@ -554,7 +555,8 @@ Section MEMORYLEMMAS.
   Qed.
 
   Lemma promise_bot_no_promise_rtc P lang (th0 th1: Thread.t lang)
-        (STEP: rtc (tau (@pred_step (P /1\ no_promise) lang)) th0 th1)
+        (STEP: rtc (tau (@pred_step P lang)) th0 th1)
+        (NOPROMISE: P <1= no_promise)
         (BOT: th0.(Thread.local).(Local.promises) = Memory.bot)
     :
       th1.(Thread.local).(Local.promises) = Memory.bot.
@@ -726,17 +728,19 @@ Section NOSC.
   Lemma no_sc_any_sc
         P lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc_src sc'
         mem mem' e
-        (STEP: (@pred_step (P /1\ no_sc) lang) e th_tgt th_tgt')
+        (STEP: (@pred_step P lang) e th_tgt th_tgt')
+        (NOSC: P <1= no_sc)
         (TH_SRC: th_src = Thread.mk lang st (Local.mk v prom) sc_src mem)
         (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v prom) sc mem)
         (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem')
   :
     exists sc_src',
-      (<<STEP: (@pred_step (P /1\ no_sc) lang)
+      (<<STEP: (@pred_step P lang)
                  e th_src
                  (Thread.mk lang st' (Local.mk v' prom') sc_src' mem')>>).
   Proof.
-    clarify. inv STEP. inv STEP0. des. inv STEP.
+    clarify. inv STEP. dup SAT. eapply NOSC in SAT.
+    inv STEP0. des. inv STEP.
     - inv STEP0. inv LOCAL. ss. clarify.
       esplits. econs; eauto. econs; eauto. econs 1; eauto. econs; eauto.
     - inv STEP0. inv LOCAL; ss.
@@ -757,14 +761,16 @@ Section NOSC.
       + esplits. econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
   Qed.
 
+  (* TODO: unused *)
   Lemma consistent_certification_no_sc
         P lang th_tgt th_tgt' st st' v v' prom prom' sc sc'
         mem_tgt mem_tgt' e_tgt
         (SCMAX: ~ promise_view_consistent prom sc)
+        (NOPROMISE: P <1= no_promise)
         (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v Memory.bot) sc mem_tgt)
         (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
         (CONSISTENT: promise_view_consistent prom v'.(TView.cur).(View.rlx))
-        (STEP: (@pred_step (P /1\ no_promise) lang) e_tgt th_tgt th_tgt')
+        (STEP: (@pred_step P lang) e_tgt th_tgt th_tgt')
     :
       no_sc e_tgt.
   Proof.
@@ -947,12 +953,26 @@ Section SELFPROMISEREMOVE.
             erewrite Memory.remove_o in GET; eauto.
             erewrite Memory.lower_o in GET; eauto. des_ifs. eauto. }
       + clarify.
-  Admitted.
+  Qed.
+
+  Definition forget_event e_src e_tgt: Prop :=
+    match e_tgt with
+    | ThreadEvent.promise _ _ _ _ _ => e_src = ThreadEvent.silent
+    | _ => e_src = e_tgt
+    end.
+
+  Lemma forget_event_same_machine_event
+    :
+      forget_event <2= same_machine_event.
+  Proof.
+    ii. unfold forget_event in *. des_ifs.
+  Qed.
 
   Lemma self_promise_remove
         P lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc'
         mem_src mem_tgt mem_tgt' e_tgt
-        (STEP: (@pred_step (P /1\ no_read_msgs prom.(promised)) lang) e_tgt th_tgt th_tgt')
+        (NOREAD: P <1= no_read_msgs prom.(promised))
+        (STEP: (@pred_step P lang) e_tgt th_tgt th_tgt')
         (TH_SRC: th_src = Thread.mk lang st (Local.mk v Memory.bot) sc mem_src)
         (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v prom) sc mem_tgt)
         (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
@@ -964,11 +984,12 @@ Section SELFPROMISEREMOVE.
         (<<STEP: opt_pred_step
                    (P /1\ no_promise) e_src th_src
                    (Thread.mk lang st' (Local.mk v' Memory.bot) sc' mem_src')>>) /\
-        (<<EVT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>>) /\
+        (<<EVT: forget_event e_src e_tgt>>) /\
         (<<MEM: forget_memory (promised prom') mem_src' mem_tgt'>>).
   Proof.
     dup MEM. eapply forget_memory_le in MEM0.
-    clarify. inv STEP. des. inv STEP0. inv STEP.
+    clarify. inv STEP. dup SAT. eapply NOREAD in SAT.
+    des. inv STEP0. inv STEP.
     - inv STEP0. ss. inv LOCAL. clarify. ss.
       exists mem_src, ThreadEvent.silent. esplits; eauto.
       eapply self_promise_remove_promise; eauto.
@@ -1376,21 +1397,22 @@ Section OTHERPROMISEREMOVE.
   Lemma other_promise_remove
         P lang th_src th_tgt th_tgt' st st' v v' prom' sc sc'
         mem_src mem_tgt mem_tgt' e_tgt others
-        (STEP: (@pred_step (P /1\ no_read_msgs others /1\ write_not_in others /1\ no_promise) lang) e_tgt th_tgt th_tgt')
+        (PRED: P <1= (no_read_msgs others /1\ write_not_in others /1\ no_promise))
+        (STEP: (@pred_step P) lang e_tgt th_tgt th_tgt')
         (TH_SRC: th_src = Thread.mk lang st (Local.mk v Memory.bot) sc mem_src)
         (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v Memory.bot) sc mem_tgt)
         (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
         (MEM: forget_memory others mem_src mem_tgt)
     :
       exists mem_src',
-        (<<STEP: (@pred_step
-                    (P /1\ no_promise) lang)
+        (<<STEP: (@pred_step P lang)
                    e_tgt th_src
                    (Thread.mk lang st' (Local.mk v' Memory.bot) sc' mem_src')>>) /\
         (<<MEM: forget_memory others mem_src' mem_tgt'>>).
   Proof.
     dup MEM. eapply forget_memory_le in MEM0.
-    clarify. inv STEP. des. inv STEP0. inv STEP.
+    clarify. inv STEP. des. inv STEP0.
+    dup SAT. eapply PRED in SAT. des. inv STEP.
     { inv STEP0. ss; clarify. }
     inv STEP0. inv LOCAL; ss.
     - exists mem_src. esplits; eauto. econs; eauto. econs; eauto.
@@ -1401,13 +1423,13 @@ Section OTHERPROMISEREMOVE.
       inv MEM. erewrite COMPLETE; eauto.
     - ss. exploit other_promise_remove_write; eauto.
       { exploit write_msg_wf; eauto. i. des.
-        eapply SAT1. econs; eauto. refl. }
+        eapply SAT2. econs; eauto. refl. }
       i. des. exists mem_src'. esplits; eauto.
       econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
     - ss. inv LOCAL1. ss.
       exploit other_promise_remove_write; eauto.
       { exploit write_msg_wf; eauto. i. des.
-        eapply SAT1. econs; eauto. refl. }
+        eapply SAT2. econs; eauto. refl. }
       i. des. exists mem_src'. esplits; eauto.
       econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
       econs; eauto. econs; eauto. inv MEM. erewrite COMPLETE; eauto.
@@ -1621,20 +1643,22 @@ Section UNCHANGEDON.
   Lemma unchanged_on_step
         P L lang th_src th_tgt th_tgt' st st' v v' prom' sc sc'
         mem_src mem_tgt mem_tgt' e_tgt
-        (STEP: (@pred_step (P /1\ write_in L /1\ no_promise) lang) e_tgt th_tgt th_tgt')
+        (PRED: P <1= (write_in L /1\ no_promise))
+        (STEP: (@pred_step P lang) e_tgt th_tgt th_tgt')
         (TH_SRC: th_src = Thread.mk lang st (Local.mk v Memory.bot) sc mem_src)
         (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v Memory.bot) sc mem_tgt)
         (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
         (MEM: unchanged_on L mem_tgt mem_src)
     :
       exists mem_src',
-        (<<STEP: (@pred_step (P /1\ write_in L /1\ no_promise) lang)
+        (<<STEP: (@pred_step P lang)
                    e_tgt th_src
                    (Thread.mk lang st' (Local.mk v' Memory.bot) sc' mem_src')>>) /\
         (<<MEM: unchanged_on L mem_tgt' mem_src'>>).
   Proof.
     dup MEM. inv MEM.
-    clarify. inv STEP. des. inv STEP0. inv STEP.
+    clarify. inv STEP. des. inv STEP0.
+    dup SAT. eapply PRED in SAT. des. inv STEP.
     { inv STEP0. ss; clarify. }
     inv STEP0. inv LOCAL; ss.
     - exists mem_src. esplits; eauto. econs; eauto. econs; eauto.
@@ -1675,12 +1699,13 @@ Section UNCHANGEDON.
   Qed.
 
   Lemma write_not_in_unchanged_on P L e lang (th0 th1: Thread.t lang)
-        (STEP: pred_step (P /1\ write_not_in L /1\ no_promise) e th0 th1)
+        (STEP: pred_step P e th0 th1)
+        (PRED: P <1= (write_not_in L /1\ no_promise))
         (BOT: th0.(Thread.local).(Local.promises) = Memory.bot)
     :
       unchanged_on L th0.(Thread.memory) th1.(Thread.memory).
   Proof.
-    inv STEP. inv STEP0. inv STEP.
+    inv STEP. eapply PRED in SAT. des. inv STEP0. inv STEP.
     - inv STEP0; ss; des; clarify.
     - des. inv STEP0. ss. inv LOCAL; try refl.
       + destruct lc1, lc2. ss. clarify. exploit write_not_in_unchanged_on_write; eauto.
@@ -1697,8 +1722,7 @@ Lemma pf_step_memory_le lang (th0 th1: Thread.t lang) e
     Memory.le th0.(Thread.memory) th1.(Thread.memory).
 Proof.
   exploit write_not_in_unchanged_on; eauto.
-  - eapply pred_step_mon; eauto.
-    i. instantiate (1:=fun _ _ => False). instantiate (1:=fun _ => True).
+  - i. instantiate (1:=fun _ _ => False).
     ss. splits; eauto. unfold write_not_in. des_ifs.
   - i. inv x0. auto.
 Qed.
@@ -2928,10 +2952,11 @@ Section MAPPED.
     end.
 
   Lemma step_map
-        lang th_src th_tgt th_tgt' st st' v_src v_tgt v_tgt' prom_src prom_tgt prom_tgt'
+        P lang th_src th_tgt th_tgt' st st' v_src v_tgt v_tgt' prom_src prom_tgt prom_tgt'
         sc_src sc_tgt sc_tgt'
         mem_src mem_tgt mem_tgt' e_tgt
-        (STEP: (@pred_step wf_mappable_evt lang) e_tgt th_tgt th_tgt')
+        (MAPPABLE: P <1= wf_mappable_evt)
+        (STEP: (@pred_step P lang) e_tgt th_tgt th_tgt')
         (TH_SRC: th_src = Thread.mk lang st (Local.mk v_src prom_src)
                                     sc_src mem_src)
         (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v_tgt prom_tgt)
@@ -3937,19 +3962,21 @@ Section SHORTERMEMORY.
   Lemma shorter_memory_step
         P lang th_src th_tgt th_tgt' st st' v v' prom' sc sc'
         mem_tgt mem_tgt' mem_src e
-        (STEP: (@pred_step (P /1\ no_promise) lang) e th_tgt th_tgt')
+        (PRED: P <1= no_promise)
+        (STEP: (@pred_step P lang) e th_tgt th_tgt')
         (TH_SRC: th_src = Thread.mk lang st (Local.mk v Memory.bot) sc mem_src)
         (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v Memory.bot) sc mem_tgt)
         (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
         (SHORTER: shorter_memory mem_src mem_tgt)
     :
       exists mem_src',
-        (<<STEP: (@pred_step (P /1\ no_promise) lang)
+        (<<STEP: (@pred_step P lang)
                    e th_src
                    (Thread.mk lang st' (Local.mk v' prom') sc' mem_src')>>) /\
         (<<SHORTER: shorter_memory mem_src' mem_tgt'>>).
   Proof.
-    dup SHORTER. inv SHORTER. inv STEP. inv STEP0. des. inv STEP.
+    dup SHORTER. inv SHORTER. inv STEP.
+    dup SAT. eapply PRED in SAT. inv STEP0. des. inv STEP.
     - inv STEP0. ss.
     - inv STEP0. inv LOCAL.
       + exists mem_src; eauto. econs; eauto. econs; eauto.
@@ -3988,28 +4015,27 @@ Section SHORTERMEMORY.
   Proof.
   Admitted.
 
-  Lemma shorter_memory_step2
-        P lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc'
-        mem_tgt mem_tgt' mem_src e
-        (MLETGT: Memory.le prom mem_tgt)
-        (MLESRC: Memory.le prom mem_src)
-        (STEP: (@pred_step P lang) e th_tgt th_tgt')
-        (TH_SRC: th_src = Thread.mk lang st (Local.mk v prom) sc mem_src)
-        (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v prom) sc mem_tgt)
-        (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
-        (SHORTER: shorter_memory mem_src mem_tgt)
-    :
-      exists mem_src',
-        (<<STEP: (@pred_step (P /1\ no_promise) lang)
-                   e th_src
-                   (Thread.mk lang st' (Local.mk v' prom') sc' mem_src')>>) /\
-        (<<SHORTER: shorter_memory mem_src' mem_tgt'>>).
-  Proof.
-  Admitted.
+  (* Lemma shorter_memory_step2 *)
+  (*       P lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc' *)
+  (*       mem_tgt mem_tgt' mem_src e *)
+  (*       (MLETGT: Memory.le prom mem_tgt) *)
+  (*       (MLESRC: Memory.le prom mem_src) *)
+  (*       (STEP: (@pred_step P lang) e th_tgt th_tgt') *)
+  (*       (TH_SRC: th_src = Thread.mk lang st (Local.mk v prom) sc mem_src) *)
+  (*       (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v prom) sc mem_tgt) *)
+  (*       (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt') *)
+  (*       (SHORTER: shorter_memory mem_src mem_tgt) *)
+  (*   : *)
+  (*     exists mem_src', *)
+  (*       (<<STEP: (@pred_step (P /1\ no_promise) lang) *)
+  (*                  e th_src *)
+  (*                  (Thread.mk lang st' (Local.mk v' prom') sc' mem_src')>>) /\ *)
+  (*       (<<SHORTER: shorter_memory mem_src' mem_tgt'>>). *)
+  (* Proof. *)
+  (* Admitted. *)
 
 
 End SHORTERMEMORY.
-
 
 
 Section NOTATTATCHED.
@@ -4057,14 +4083,15 @@ Section NOTATTATCHED.
   Qed.
 
   Lemma attatched_preserve P updates lang (th0 th1: Thread.t lang) e
-        (STEP: (@pred_step (P /1\ no_promise) lang) e th0 th1)
+        (PRED: P <1= no_promise)
+        (STEP: (@pred_step P lang) e th0 th1)
         (BOT: th0.(Thread.local).(Local.promises) = Memory.bot)
         (NOATTATCHED: not_attatched updates th1.(Thread.memory))
         (PROMISED: updates <2= concrete_promised th0.(Thread.memory))
     :
       not_attatched updates th0.(Thread.memory).
   Proof.
-    inv STEP. inv STEP0. inv STEP.
+    inv STEP. inv STEP0. eapply PRED in SAT. inv STEP.
     - inv STEP0; des; clarify.
     - inv STEP0. ss. inv LOCAL; ss.
       + inv LOCAL0. destruct lc1. ss. clarify.
@@ -4095,7 +4122,8 @@ Section NOTATTATCHED.
   Qed.
 
   Lemma attatched_preserve_rtc P updates lang (th0 th1: Thread.t lang)
-        (STEP: rtc (tau (@pred_step (P /1\ no_promise) lang)) th0 th1)
+        (PRED: P <1= no_promise)
+        (STEP: rtc (tau (@pred_step P lang)) th0 th1)
         (BOT: th0.(Thread.local).(Local.promises) = Memory.bot)
         (NOATTATCHED: not_attatched updates th1.(Thread.memory))
         (PROMISED: updates <2= concrete_promised th0.(Thread.memory))
@@ -4160,10 +4188,67 @@ Section NOTATTATCHED.
         eapply EMPTY; eauto.
   Qed.
 
+  Inductive shorter_event: ThreadEvent.t -> ThreadEvent.t -> Prop :=
+  | shorter_event_read
+      loc to val released ordr
+    :
+      shorter_event
+        (ThreadEvent.read loc to val released ordr)
+        (ThreadEvent.read loc to val released ordr)
+  | shorter_event_write
+      loc from ffrom to val released ordw
+      (FROM: Time.le from ffrom)
+    :
+      shorter_event
+        (ThreadEvent.write loc ffrom to val released ordw)
+        (ThreadEvent.write loc from to val released ordw)
+  | shorter_event_update
+      loc from to valr valw releasedr releasedw ordr ordw
+    :
+      shorter_event
+        (ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw)
+        (ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw)
+  | shorter_event_fence
+      or ow
+    :
+      shorter_event
+        (ThreadEvent.fence or ow)
+        (ThreadEvent.fence or ow)
+  | shorter_event_syscall
+      e
+    :
+      shorter_event
+        (ThreadEvent.syscall e)
+        (ThreadEvent.syscall e)
+  | shorter_event_silent
+    :
+      shorter_event
+        (ThreadEvent.silent)
+        (ThreadEvent.silent)
+  | shorter_event_failure
+    :
+      shorter_event
+        (ThreadEvent.failure)
+        (ThreadEvent.failure)
+  .
+
+  Lemma shorter_event_shift L
+        e_src e_tgt
+        (SAT: (write_not_in L /1\ no_promise) e_tgt)
+        (EVT: shorter_event e_src e_tgt)
+    :
+      (write_not_in L /1\ no_promise) e_src.
+  Proof.
+    ss. des. inv EVT; ss. split; auto. i.
+    eapply SAT. inv IN. econs; ss.
+    eapply TimeFacts.le_lt_lt; eauto.
+  Qed.
+
   Lemma no_update_on_step
         P L0 L1 lang th_src th_tgt th_tgt' st st' v v' prom' sc sc'
         mem_tgt mem_tgt' mem_src e_tgt
-        (STEP: (@pred_step (P /1\ write_not_in L0 /1\ no_update_on L1 /1\ no_promise) lang) e_tgt th_tgt th_tgt')
+        (PRED: P <1= (write_not_in L0 /1\ no_update_on L1 /1\ no_promise))
+        (STEP: (@pred_step P lang) e_tgt th_tgt th_tgt')
         (TH_SRC: th_src = Thread.mk lang st (Local.mk v Memory.bot) sc mem_src)
         (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v Memory.bot) sc mem_tgt)
         (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
@@ -4171,21 +4256,25 @@ Section NOTATTATCHED.
         (NOATTATCH: not_attatched L1 mem_src)
     :
       exists e_src mem_src',
-        (<<STEP: (@pred_step ((fun _ => True) /1\ write_not_in L0 /1\ no_promise) lang)
+        (<<STEP: Thread.step_allpf
                    e_src th_src
                    (Thread.mk lang st' (Local.mk v' prom') sc' mem_src')>>) /\
-        (<<EVT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>>) /\
+        (<<EVT: shorter_event e_src e_tgt>>) /\
         (<<SHORTER: shorter_memory mem_src' mem_tgt'>>) /\
         (<<NOATTATCH: not_attatched L1 mem_src'>>).
   Proof.
-    dup SHORTER. inv SHORTER. inv STEP. inv STEP0. des. inv STEP.
+    dup SHORTER. inv SHORTER. inv STEP.
+    eapply PRED in SAT. inv STEP0. des. inv STEP.
     - inv STEP0. ss.
     - inv STEP0. inv LOCAL.
-      + eexists. exists mem_src; eauto. econs; eauto. econs; eauto.
-        econs; eauto. econs 2; eauto. econs; eauto.
+      + eexists. exists mem_src; eauto. econs; eauto.
+        * econs; eauto. econs 2; eauto. econs; eauto.
+        * esplits; eauto. econs.
       + inv LOCAL0. ss. clarify. exploit COMPLETE; eauto. i. des.
         exists (ThreadEvent.read loc ts val released ord). exists mem_src; eauto.
-        econs; eauto. econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+        econs; eauto.
+        * econs; eauto. econs 2; eauto. econs; eauto.
+        * esplits; eauto. econs.
       + exploit write_msg_wf; eauto. i. des.
         exists (ThreadEvent.write loc (Time.middle from to) to val released ord).
         inv LOCAL0. ss. clarify.
@@ -4198,9 +4287,8 @@ Section NOTATTATCHED.
         { auto. }
         i. des. esplits; eauto.
         * econs; eauto.
-          { econs; eauto. econs 2; eauto. econs; eauto. }
-          ss. esplits; eauto. i. eapply SAT2; eauto.
-          inv IN; ss. econs; eauto.
+          { econs 2; eauto. econs; eauto. }
+        * econs; eauto. left. eauto.
         * eapply not_attatch_write; eauto. ii.
           exploit NOATTATCH; eauto. i. des.
           exploit memory_add_cover_disjoint; auto.
@@ -4225,17 +4313,20 @@ Section NOTATTATCHED.
         dup WRITE. exploit shorter_memory_write; eauto.
         { refl. }
         i. des. esplits; eauto.
-        * econs; eauto. econs; eauto.
-          econs 2; eauto. econs; eauto.
+        * econs; eauto. econs 2; eauto. econs; eauto.
+        * econs; eauto.
         * eapply not_attatch_write; eauto.
       + inv LOCAL0. exists (ThreadEvent.fence ordr ordw).
-        ss. clarify. esplits; eauto. econs; eauto.
-        econs; eauto. econs 2; eauto. econs; eauto.
+        ss. clarify. esplits; eauto.
+        * econs; eauto. econs 2; eauto. econs; eauto.
+        * econs.
       + inv LOCAL0. exists (ThreadEvent.syscall e).
-        ss. clarify. esplits; eauto. econs; eauto.
-        econs; eauto. econs 2; eauto. econs; eauto.
-      + eexists. exists mem_src; eauto. econs; eauto. econs; eauto.
-        econs; eauto. econs 2; eauto. econs; eauto.
+        ss. clarify. esplits; eauto.
+        * econs; eauto. econs 2; eauto. econs; eauto.
+        * econs.
+      + eexists. exists mem_src; eauto. esplits; eauto.
+        * econs; eauto. econs 2; eauto. econs; eauto.
+        * econs.
   Qed.
 
 End NOTATTATCHED.
@@ -4296,514 +4387,463 @@ End FORGET.
 
 
 
-Section UNUSEDYET.
+(* Section CAPPED. *)
 
-  Definition no_acq_read_msgs (MSGS : Loc.t -> Time.t -> Prop)
-             (e : ThreadEvent.t) : Prop :=
-    match e with
-    | ThreadEvent.read loc to _ _ ord =>
-      forall (SAT: MSGS loc to), ~ Ordering.le Ordering.acqrel ord
-    | ThreadEvent.update loc from _ _ _ _ _ ordr _ =>
-      forall (SAT: MSGS loc from), ~ Ordering.le Ordering.acqrel ordr
-    | _ => True
-    end
-  .
+(*   Inductive cap_timemap_le (cap: Loc.t -> Time.t -> option Time.t) *)
+(*             (tm_src tm_tgt: TimeMap.t): Prop := *)
+(*   | cap_timemap_le_intro *)
+(*       (TLE: TimeMap.le tm_src tm_tgt) *)
+(*       (CAPSPACE: forall loc to_src to_tgt (CAP: cap loc to_tgt = Some to_src) *)
+(*                         (TLETGT: Time.le (tm_tgt loc) to_tgt), *)
+(*           (<<TLESRC: Time.le (tm_src loc) to_src>>)) *)
+(*   . *)
 
-  Inductive capped_with_max_view mem (CAP: Loc.t -> Time.t -> Prop)
-            (prom: Loc.t -> Time.t -> Prop): Prop :=
-  | capped_with_max_view_intro
-      (GET: forall loc to from val view
-                   (SAT: CAP loc to)
-                   (GET: Memory.get loc to mem = Some (from, Message.full val view)),
-          match view with
-          | None => False
-          | Some view' => ~ promise_view_consistent prom view'.(View.rlx)
-          end)
-  .
+(*   Inductive cap_view_le (cap: Loc.t -> Time.t -> option Time.t) *)
+(*             (vw_src vw_tgt: View.t): Prop := *)
+(*   | view_le_intro *)
+(*       (PLN: cap_timemap_le cap vw_src.(View.pln) vw_tgt.(View.pln)) *)
+(*       (RLX: cap_timemap_le cap vw_src.(View.rlx) vw_tgt.(View.rlx)) *)
+(*   . *)
 
-  Definition cap (m mcap: Memory.t) (l: Loc.t) (t: Time.t): Prop :=
-    (<<NCOV: ~ covered l t m>>) /\ (<<CAP: ~ covered l t mcap>>).
+(*   Inductive cap_tview_le (cap: Loc.t -> Time.t -> option Time.t) *)
+(*             (tvw_src tvw_tgt: TView.t): Prop := *)
+(*   | tview_le_intro *)
+(*       (REL: forall loc, cap_view_le cap (tvw_src.(TView.rel) loc) (tvw_tgt.(TView.rel) loc)) *)
+(*       (CUR: cap_view_le cap (tvw_src.(TView.cur)) (tvw_tgt.(TView.cur))) *)
+(*       (ACQ: cap_view_le cap (tvw_src.(TView.acq)) (tvw_tgt.(TView.acq))) *)
+(*   . *)
 
-  Definition cap_write_with_update (CAP : Loc.t -> Time.t -> Prop)
-             (e : ThreadEvent.t) : Prop :=
-    match e with
-    | ThreadEvent.write loc from to _ _ _ =>
-      forall t (IN: Interval.mem (from, to) t), (~ CAP loc t)
-    | _ => True
-    end.
+(*   Inductive option_le A B (R: A -> B -> Prop): option A -> option B -> Prop := *)
+(*   | opt_le_none *)
+(*       b *)
+(*     : *)
+(*       option_le R None b *)
+(*   | opt_le_some *)
+(*       a b *)
+(*       (LE: R a b) *)
+(*     : *)
+(*       option_le R (Some a) (Some b) *)
+(*   . *)
 
-  Inductive capped (mem_src mem_tgt: Memory.t): Prop :=
-  | capped_intro
-      (COVERLE: forall l t (COVER: covered l t mem_src), covered l t mem_tgt)
-      (MLE: forall loc to from val released
-                   (GET: Memory.get loc to mem_tgt = Some (from, Message.full val released)),
-          exists to_src from_src released_src,
-            (<<GET: Memory.get loc to_src mem_src =
-                    Some (from_src, Message.full val released_src)>>) /\
-            (<<EMPTY: forall l t (IN: Interval.mem (to_src, to) t), ~ covered l t mem_src>>) /\
-            (<<TOLE: Time.le to_src to>>) /\
-            (<<VIEWLE: View.opt_le released_src released>>))
-  .
+(*   Definition wf_cap (cap: Loc.t -> Time.t -> option Time.t): Prop := *)
+(*     forall loc to_tgt to_src (CAP: cap loc to_tgt = Some to_src), *)
+(*       (<<TLE: Time.lt to_src to_tgt>>) /\ *)
+(*       (<<DISJ: forall to (ITV: Interval.mem (to_src, to_tgt) to), *)
+(*           cap loc to = None>>) *)
+(*   . *)
 
-End UNUSEDYET.
+(*   Lemma wf_cap_disjoint cap loc to_tgt0 to_tgt1 to_src0 to_src1 *)
+(*         (WFCAP: wf_cap cap) *)
+(*         (CAP0: cap loc to_tgt0 = Some to_src0) *)
+(*         (CAP1: cap loc to_tgt1 = Some to_src1) *)
+(*         (TLT: Time.lt to_tgt0 to_tgt1) *)
+(*     : *)
+(*       Time.lt to_src0 to_src1. *)
+(*   Proof. *)
+(*     exploit WFCAP; try apply CAP0; eauto. i. des. *)
+(*     exploit WFCAP; try apply CAP1; eauto. i. des. *)
+(*     destruct (Time.le_lt_dec to_src1 to_src0); auto. *)
+(*     exploit DISJ0. *)
+(*     - instantiate (1:=to_tgt0). econs; ss. *)
+(*       + eapply TimeFacts.le_lt_lt; eauto. *)
+(*       + left. auto. *)
+(*     - i. clarify. *)
+(*   Qed. *)
 
-Section CAPPED.
+(*   Definition wf_cap_mem (cap: Loc.t -> Time.t -> option Time.t) *)
+(*              (mem_tgt: Memory.t): Prop := *)
+(*     forall loc to_tgt to_src (CAP: cap loc to_tgt = Some to_src), *)
+(*     exists v vw_src vw_tgt from_tgt, *)
+(*       (<<TGTGET: Memory.get loc to_tgt mem_tgt = Some (from_tgt, Message.full v vw_tgt)>>) /\ *)
+(*       (<<CAPSPACE: forall t (ITV: Interval.mem (to_src, to_tgt) t), *)
+(*           covered loc to_tgt mem_tgt>>) /\ *)
+(*       (<<ORIGINAL: Memory.get loc to_src mem_tgt = Some (from_tgt, Message.full v vw_src)>>) *)
+(*   . *)
 
-  Inductive cap_timemap_le (cap: Loc.t -> Time.t -> option Time.t)
-            (tm_src tm_tgt: TimeMap.t): Prop :=
-  | cap_timemap_le_intro
-      (TLE: TimeMap.le tm_src tm_tgt)
-      (CAPSPACE: forall loc to_src to_tgt (CAP: cap loc to_tgt = Some to_src)
-                        (TLETGT: Time.le (tm_tgt loc) to_tgt),
-          (<<TLESRC: Time.le (tm_src loc) to_src>>))
-  .
+(*   Inductive cap_memory (cap: Loc.t -> Time.t -> option Time.t) *)
+(*             (mem_src mem_tgt: Memory.t): Prop := *)
+(*   | cap_memory_intro *)
+(*       (COVER: forall loc to (COV: covered loc to mem_src), covered loc to mem_tgt) *)
+(*       (COMPLETE: *)
+(*          forall loc to_tgt from_tgt v vw_tgt (TGTGET: Memory.get loc to_tgt mem_tgt = Some (from_tgt, Message.full v vw_tgt)), *)
+(*            match cap loc to_tgt with *)
+(*            | Some to_src => *)
+(*              exists from_src vw_src, *)
+(*              (<<SRCGET: Memory.get loc to_src mem_src = Some (from_src, Message.full v vw_src)>>) /\ *)
+(*              (<<VLE: option_le (cap_view_le cap) vw_src vw_tgt>>) /\ *)
+(*              (<<TGTUPDATABLE: *)
+(*                 forall (SRCUPDATABLE: forall msg to, Memory.get loc to mem_tgt <> Some (to_tgt, msg)), *)
+(*                 forall msg to, Memory.get loc to mem_src <> Some (to_src, msg)>>) *)
+(*            | None => *)
+(*              exists from_src vw_src, *)
+(*              (<<SRCGET: Memory.get loc to_tgt mem_src = Some (from_src, Message.full v vw_src)>>) /\ *)
+(*              (<<VLE: option_le (cap_view_le cap) vw_src vw_tgt>>) *)
+(*            end). *)
 
-  Inductive cap_view_le (cap: Loc.t -> Time.t -> option Time.t)
-            (vw_src vw_tgt: View.t): Prop :=
-  | view_le_intro
-      (PLN: cap_timemap_le cap vw_src.(View.pln) vw_tgt.(View.pln))
-      (RLX: cap_timemap_le cap vw_src.(View.rlx) vw_tgt.(View.rlx))
-  .
+(*   Definition cap_event (cap: Loc.t -> Time.t -> option Time.t) *)
+(*              (te_src te_tgt: ThreadEvent.t): Prop := *)
+(*     match te_src with *)
+(*     | ThreadEvent.promise _ _ _ _ _ => False *)
+(*     | ThreadEvent.read _ _ _ _ _ => False *)
+(*     | ThreadEvent.write _ _ _ _ _ _ => False *)
+(*     | ThreadEvent.update _ _ _ _ _ _ _ _ _ => False *)
+(*     | _ => te_src = te_tgt *)
+(*     end. *)
 
-  Inductive cap_tview_le (cap: Loc.t -> Time.t -> option Time.t)
-            (tvw_src tvw_tgt: TView.t): Prop :=
-  | tview_le_intro
-      (REL: forall loc, cap_view_le cap (tvw_src.(TView.rel) loc) (tvw_tgt.(TView.rel) loc))
-      (CUR: cap_view_le cap (tvw_src.(TView.cur)) (tvw_tgt.(TView.cur)))
-      (ACQ: cap_view_le cap (tvw_src.(TView.acq)) (tvw_tgt.(TView.acq)))
-  .
+(*   Lemma wf_cap_add cap mem0 mem1 loc from to msg *)
+(*         (ADD: Memory.add mem0 loc from to msg mem1) *)
+(*         (WFCAP: wf_cap_mem cap mem0) *)
+(*     : *)
+(*       wf_cap_mem cap mem1. *)
+(*   Proof. *)
+(*     ii. exploit WFCAP; eauto. i. des. *)
+(*     esplits; eauto. *)
+(*     - eapply Memory.add_get1; eauto. *)
+(*     - i. eapply add_covered; eauto. *)
+(*     - eapply Memory.add_get1; eauto. *)
+(*   Qed. *)
 
-  Inductive option_le A B (R: A -> B -> Prop): option A -> option B -> Prop :=
-  | opt_le_none
-      b
-    :
-      option_le R None b
-  | opt_le_some
-      a b
-      (LE: R a b)
-    :
-      option_le R (Some a) (Some b)
-  .
+(*   Lemma cap_tview_readable_cap cap loc to_tgt to_src released_src released_tgt ord *)
+(*         vw_tgt vw_src *)
+(*         (READABLE: TView.readable vw_tgt loc to_tgt released_tgt ord) *)
+(*         (CAP: cap loc to_tgt = Some to_src) *)
+(*         (VLE: cap_view_le cap vw_src vw_tgt) *)
+(*     : *)
+(*       TView.readable vw_src loc to_src released_src ord. *)
+(*   Proof. *)
+(*     inv VLE. inv READABLE. econs. *)
+(*     - inv PLN. eapply CAPSPACE; eauto. *)
+(*     - inv RLX. i. specialize (RLX0 H). eapply CAPSPACE; eauto. *)
+(*   Qed. *)
 
-  Definition wf_cap (cap: Loc.t -> Time.t -> option Time.t): Prop :=
-    forall loc to_tgt to_src (CAP: cap loc to_tgt = Some to_src),
-      (<<TLE: Time.lt to_src to_tgt>>) /\
-      (<<DISJ: forall to (ITV: Interval.mem (to_src, to_tgt) to),
-          cap loc to = None>>)
-  .
+(*   Lemma cap_tview_readable_normal cap loc to_tgt released_src released_tgt ord *)
+(*         vw_tgt vw_src *)
+(*         (READABLE: TView.readable vw_tgt loc to_tgt released_tgt ord) *)
+(*         (CAP: cap loc to_tgt = None) *)
+(*         (VLE: cap_view_le cap vw_src vw_tgt) *)
+(*     : *)
+(*       TView.readable vw_src loc to_tgt released_src ord. *)
+(*   Proof. *)
+(*     inv VLE. inv READABLE. econs. *)
+(*     - inv PLN. etrans; eauto. *)
+(*     - inv RLX. i. specialize (RLX0 H). etrans; eauto. *)
+(*   Qed. *)
 
-  Lemma wf_cap_disjoint cap loc to_tgt0 to_tgt1 to_src0 to_src1
-        (WFCAP: wf_cap cap)
-        (CAP0: cap loc to_tgt0 = Some to_src0)
-        (CAP1: cap loc to_tgt1 = Some to_src1)
-        (TLT: Time.lt to_tgt0 to_tgt1)
-    :
-      Time.lt to_src0 to_src1.
-  Proof.
-    exploit WFCAP; try apply CAP0; eauto. i. des.
-    exploit WFCAP; try apply CAP1; eauto. i. des.
-    destruct (Time.le_lt_dec to_src1 to_src0); auto.
-    exploit DISJ0.
-    - instantiate (1:=to_tgt0). econs; ss.
-      + eapply TimeFacts.le_lt_lt; eauto.
-      + left. auto.
-    - i. clarify.
-  Qed.
+(*   Lemma cap_tview_writable_cap cap loc to sc_tgt sc_src ord *)
+(*         vw_tgt vw_src *)
+(*         (READABLE: TView.writable vw_tgt sc_tgt loc to ord) *)
+(*         (VLE: cap_view_le cap vw_src vw_tgt) *)
+(*         (WFCAP: wf_cap cap) *)
+(*     : *)
+(*       TView.writable vw_src sc_src loc to ord. *)
+(*   Proof. *)
+(*     inv VLE. inv READABLE. econs. inv RLX. *)
+(*     eapply TimeFacts.le_lt_lt; eauto. *)
+(*   Qed. *)
 
-  Definition wf_cap_mem (cap: Loc.t -> Time.t -> option Time.t)
-             (mem_tgt: Memory.t): Prop :=
-    forall loc to_tgt to_src (CAP: cap loc to_tgt = Some to_src),
-    exists v vw_src vw_tgt from_tgt,
-      (<<TGTGET: Memory.get loc to_tgt mem_tgt = Some (from_tgt, Message.full v vw_tgt)>>) /\
-      (<<CAPSPACE: forall t (ITV: Interval.mem (to_src, to_tgt) t),
-          covered loc to_tgt mem_tgt>>) /\
-      (<<ORIGINAL: Memory.get loc to_src mem_tgt = Some (from_tgt, Message.full v vw_src)>>)
-  .
+(*   Lemma time_join_le t_src0 t_src1 t_tgt0 t_tgt1 *)
+(*         (TLE0: Time.le t_src0 t_tgt0) *)
+(*         (TLE1: Time.le t_src1 t_tgt1) *)
+(*     : *)
+(*       Time.le (Time.join t_src0 t_src1) (Time.join t_tgt0 t_tgt1). *)
+(*   Proof. *)
+(*     unfold Time.join. des_ifs. *)
+(*     - etrans; eauto. left. auto. *)
+(*     - etrans; eauto. *)
+(*   Qed. *)
 
-  Inductive cap_memory (cap: Loc.t -> Time.t -> option Time.t)
-            (mem_src mem_tgt: Memory.t): Prop :=
-  | cap_memory_intro
-      (COVER: forall loc to (COV: covered loc to mem_src), covered loc to mem_tgt)
-      (COMPLETE:
-         forall loc to_tgt from_tgt v vw_tgt (TGTGET: Memory.get loc to_tgt mem_tgt = Some (from_tgt, Message.full v vw_tgt)),
-           match cap loc to_tgt with
-           | Some to_src =>
-             exists from_src vw_src,
-             (<<SRCGET: Memory.get loc to_src mem_src = Some (from_src, Message.full v vw_src)>>) /\
-             (<<VLE: option_le (cap_view_le cap) vw_src vw_tgt>>) /\
-             (<<TGTUPDATABLE:
-                forall (SRCUPDATABLE: forall msg to, Memory.get loc to mem_tgt <> Some (to_tgt, msg)),
-                forall msg to, Memory.get loc to mem_src <> Some (to_src, msg)>>)
-           | None =>
-             exists from_src vw_src,
-             (<<SRCGET: Memory.get loc to_tgt mem_src = Some (from_src, Message.full v vw_src)>>) /\
-             (<<VLE: option_le (cap_view_le cap) vw_src vw_tgt>>)
-           end).
+(*   Lemma timemap_join_le tm_src0 tm_src1 tm_tgt0 tm_tgt1 *)
+(*         (VLE0: TimeMap.le tm_src0 tm_tgt0) *)
+(*         (VLE1: TimeMap.le tm_src1 tm_tgt1) *)
+(*     : *)
+(*       TimeMap.le (TimeMap.join tm_src0 tm_src1) (TimeMap.join tm_tgt0 tm_tgt1). *)
+(*   Proof. *)
+(*     ii. unfold TimeMap.join. eapply time_join_le; eauto. *)
+(*   Qed. *)
 
-  Definition cap_event (cap: Loc.t -> Time.t -> option Time.t)
-             (te_src te_tgt: ThreadEvent.t): Prop :=
-    match te_src with
-    | ThreadEvent.promise _ _ _ _ _ => False
-    | ThreadEvent.read _ _ _ _ _ => False
-    | ThreadEvent.write _ _ _ _ _ _ => False
-    | ThreadEvent.update _ _ _ _ _ _ _ _ _ => False
-    | _ => te_src = te_tgt
-    end.
+(*   Lemma cap_timemap_join_le cap tm_src0 tm_src1 tm_tgt0 tm_tgt1 *)
+(*         (VLE0: cap_timemap_le cap tm_src0 tm_tgt0) *)
+(*         (VLE1: cap_timemap_le cap tm_src1 tm_tgt1) *)
+(*     : *)
+(*       cap_timemap_le cap (TimeMap.join tm_src0 tm_src1) (TimeMap.join tm_tgt0 tm_tgt1). *)
+(*   Proof. *)
+(*     inv VLE0. inv VLE1. econs. *)
+(*     - eapply timemap_join_le; eauto. *)
+(*     - i. unfold TimeMap.join in *. eapply Time.join_spec. *)
+(*       + eapply CAPSPACE; eauto. *)
+(*         etrans; eauto. eapply Time.join_l. *)
+(*       + eapply CAPSPACE0; eauto. *)
+(*         etrans; eauto. eapply Time.join_r. *)
+(*   Qed. *)
 
-  Lemma wf_cap_add cap mem0 mem1 loc from to msg
-        (ADD: Memory.add mem0 loc from to msg mem1)
-        (WFCAP: wf_cap_mem cap mem0)
-    :
-      wf_cap_mem cap mem1.
-  Proof.
-    ii. exploit WFCAP; eauto. i. des.
-    esplits; eauto.
-    - eapply Memory.add_get1; eauto.
-    - i. eapply add_covered; eauto.
-    - eapply Memory.add_get1; eauto.
-  Qed.
+(*   Lemma cap_view_join_le cap v_src0 v_src1 v_tgt0 v_tgt1 *)
+(*         (VLE0: cap_view_le cap v_src0 v_tgt0) *)
+(*         (VLE1: cap_view_le cap v_src1 v_tgt1) *)
+(*     : *)
+(*       cap_view_le cap (View.join v_src0 v_src1) (View.join v_tgt0 v_tgt1). *)
+(*   Proof. *)
+(*     inv VLE0. inv VLE1. econs. *)
+(*     - eapply cap_timemap_join_le; eauto. *)
+(*     - eapply cap_timemap_join_le; eauto. *)
+(*   Qed. *)
 
-  Lemma cap_tview_readable_cap cap loc to_tgt to_src released_src released_tgt ord
-        vw_tgt vw_src
-        (READABLE: TView.readable vw_tgt loc to_tgt released_tgt ord)
-        (CAP: cap loc to_tgt = Some to_src)
-        (VLE: cap_view_le cap vw_src vw_tgt)
-    :
-      TView.readable vw_src loc to_src released_src ord.
-  Proof.
-    inv VLE. inv READABLE. econs.
-    - inv PLN. eapply CAPSPACE; eauto.
-    - inv RLX. i. specialize (RLX0 H). eapply CAPSPACE; eauto.
-  Qed.
+(*   Lemma cap_singleton_le_cap cap loc to_tgt to_src *)
+(*         (CAP: cap loc to_tgt = Some to_src) *)
+(*         (WFCAP: wf_cap cap) *)
+(*     : *)
+(*       cap_timemap_le cap (TimeMap.singleton loc to_src) (TimeMap.singleton loc to_tgt). *)
+(*   Proof. *)
+(*     econs. *)
+(*     - unfold TimeMap.singleton. ii. setoid_rewrite LocFun.add_spec. des_ifs. *)
+(*       + exploit WFCAP; eauto. i. des. left. eauto. *)
+(*       + refl. *)
+(*     - unfold TimeMap.singleton. ii. red. *)
+(*       setoid_rewrite LocFun.add_spec. *)
+(*       setoid_rewrite LocFun.add_spec in TLETGT. des_ifs. *)
+(*       + destruct TLETGT. *)
+(*         * left. eapply wf_cap_disjoint; eauto. *)
+(*         * inv H. clarify. right. refl. *)
+(*       + rewrite LocFun.init_spec. apply Time.bot_spec. *)
+(*   Qed. *)
 
-  Lemma cap_tview_readable_normal cap loc to_tgt released_src released_tgt ord
-        vw_tgt vw_src
-        (READABLE: TView.readable vw_tgt loc to_tgt released_tgt ord)
-        (CAP: cap loc to_tgt = None)
-        (VLE: cap_view_le cap vw_src vw_tgt)
-    :
-      TView.readable vw_src loc to_tgt released_src ord.
-  Proof.
-    inv VLE. inv READABLE. econs.
-    - inv PLN. etrans; eauto.
-    - inv RLX. i. specialize (RLX0 H). etrans; eauto.
-  Qed.
+(*   Lemma cap_singleton_le_normal cap loc to_tgt *)
+(*         (CAP: cap loc to_tgt = None) *)
+(*         (SPACE: forall to to_src (CAP: cap loc to = Some to_src) (TLE: Time.lt to_tgt to), *)
+(*             Time.lt to_tgt to_src) *)
+(*         (WFCAP: wf_cap cap) *)
+(*     : *)
+(*       cap_timemap_le cap (TimeMap.singleton loc to_tgt) (TimeMap.singleton loc to_tgt). *)
+(*   Proof. *)
+(*     econs. *)
+(*     - refl. *)
+(*     - unfold TimeMap.singleton. ii. red. *)
+(*       setoid_rewrite LocFun.add_spec. *)
+(*       setoid_rewrite LocFun.add_spec in TLETGT. des_ifs. *)
+(*       + destruct TLETGT. *)
+(*         * exploit WFCAP; eauto. i. des. left. *)
+(*           exploit SPACE; eauto. *)
+(*         * destruct H. clarify. *)
+(*       + rewrite LocFun.init_spec. apply Time.bot_spec. *)
+(*   Qed. *)
 
-  Lemma cap_tview_writable_cap cap loc to sc_tgt sc_src ord
-        vw_tgt vw_src
-        (READABLE: TView.writable vw_tgt sc_tgt loc to ord)
-        (VLE: cap_view_le cap vw_src vw_tgt)
-        (WFCAP: wf_cap cap)
-    :
-      TView.writable vw_src sc_src loc to ord.
-  Proof.
-    inv VLE. inv READABLE. econs. inv RLX.
-    eapply TimeFacts.le_lt_lt; eauto.
-  Qed.
+(*   Lemma cap_timemap_bot_le cap tm *)
+(*     : *)
+(*       cap_timemap_le cap TimeMap.bot tm. *)
+(*   Proof. *)
+(*     econs; ss. *)
+(*     - apply TimeMap.bot_spec. *)
+(*     - i. red. apply Time.bot_spec. *)
+(*   Qed. *)
 
-  Lemma time_join_le t_src0 t_src1 t_tgt0 t_tgt1
-        (TLE0: Time.le t_src0 t_tgt0)
-        (TLE1: Time.le t_src1 t_tgt1)
-    :
-      Time.le (Time.join t_src0 t_src1) (Time.join t_tgt0 t_tgt1).
-  Proof.
-    unfold Time.join. des_ifs.
-    - etrans; eauto. left. auto.
-    - etrans; eauto.
-  Qed.
+(*   Lemma cap_view_bot_le cap v *)
+(*     : *)
+(*       cap_view_le cap View.bot v. *)
+(*   Proof. *)
+(*     econs; ss. *)
+(*     - apply cap_timemap_bot_le. *)
+(*     - apply cap_timemap_bot_le. *)
+(*   Qed. *)
 
-  Lemma timemap_join_le tm_src0 tm_src1 tm_tgt0 tm_tgt1
-        (VLE0: TimeMap.le tm_src0 tm_tgt0)
-        (VLE1: TimeMap.le tm_src1 tm_tgt1)
-    :
-      TimeMap.le (TimeMap.join tm_src0 tm_src1) (TimeMap.join tm_tgt0 tm_tgt1).
-  Proof.
-    ii. unfold TimeMap.join. eapply time_join_le; eauto.
-  Qed.
+(*   Lemma cap_singleton_ur_le_cap cap loc to_tgt to_src *)
+(*         (CAP: cap loc to_tgt = Some to_src) *)
+(*         (WFCAP: wf_cap cap) *)
+(*     : *)
+(*       cap_view_le cap (View.singleton_ur loc to_src) (View.singleton_ur loc to_tgt). *)
+(*   Proof. *)
+(*     econs; ss. *)
+(*     - eapply cap_singleton_le_cap; eauto. *)
+(*     - eapply cap_singleton_le_cap; eauto. *)
+(*   Qed. *)
 
-  Lemma cap_timemap_join_le cap tm_src0 tm_src1 tm_tgt0 tm_tgt1
-        (VLE0: cap_timemap_le cap tm_src0 tm_tgt0)
-        (VLE1: cap_timemap_le cap tm_src1 tm_tgt1)
-    :
-      cap_timemap_le cap (TimeMap.join tm_src0 tm_src1) (TimeMap.join tm_tgt0 tm_tgt1).
-  Proof.
-    inv VLE0. inv VLE1. econs.
-    - eapply timemap_join_le; eauto.
-    - i. unfold TimeMap.join in *. eapply Time.join_spec.
-      + eapply CAPSPACE; eauto.
-        etrans; eauto. eapply Time.join_l.
-      + eapply CAPSPACE0; eauto.
-        etrans; eauto. eapply Time.join_r.
-  Qed.
+(*   Lemma cap_singleton_rw_le_cap cap loc to_tgt to_src *)
+(*         (CAP: cap loc to_tgt = Some to_src) *)
+(*         (WFCAP: wf_cap cap) *)
+(*     : *)
+(*       cap_view_le cap (View.singleton_rw loc to_src) (View.singleton_rw loc to_tgt). *)
+(*   Proof. *)
+(*     econs; ss. *)
+(*     - eapply cap_timemap_bot_le. *)
+(*     - eapply cap_singleton_le_cap; eauto. *)
+(*   Qed. *)
 
-  Lemma cap_view_join_le cap v_src0 v_src1 v_tgt0 v_tgt1
-        (VLE0: cap_view_le cap v_src0 v_tgt0)
-        (VLE1: cap_view_le cap v_src1 v_tgt1)
-    :
-      cap_view_le cap (View.join v_src0 v_src1) (View.join v_tgt0 v_tgt1).
-  Proof.
-    inv VLE0. inv VLE1. econs.
-    - eapply cap_timemap_join_le; eauto.
-    - eapply cap_timemap_join_le; eauto.
-  Qed.
+(*   Lemma cap_singleton_ur_le_normal cap loc to_tgt *)
+(*         (CAP: cap loc to_tgt = None) *)
+(*         (SPACE: forall to to_src (CAP: cap loc to = Some to_src) (TLE: Time.lt to_tgt to), *)
+(*             Time.lt to_tgt to_src) *)
+(*         (WFCAP: wf_cap cap) *)
+(*     : *)
+(*       cap_view_le cap (View.singleton_ur loc to_tgt) (View.singleton_ur loc to_tgt). *)
+(*   Proof. *)
+(*     econs; ss. *)
+(*     - eapply cap_singleton_le_normal; eauto. *)
+(*     - eapply cap_singleton_le_normal; eauto. *)
+(*   Qed. *)
 
-  Lemma cap_singleton_le_cap cap loc to_tgt to_src
-        (CAP: cap loc to_tgt = Some to_src)
-        (WFCAP: wf_cap cap)
-    :
-      cap_timemap_le cap (TimeMap.singleton loc to_src) (TimeMap.singleton loc to_tgt).
-  Proof.
-    econs.
-    - unfold TimeMap.singleton. ii. setoid_rewrite LocFun.add_spec. des_ifs.
-      + exploit WFCAP; eauto. i. des. left. eauto.
-      + refl.
-    - unfold TimeMap.singleton. ii. red.
-      setoid_rewrite LocFun.add_spec.
-      setoid_rewrite LocFun.add_spec in TLETGT. des_ifs.
-      + destruct TLETGT.
-        * left. eapply wf_cap_disjoint; eauto.
-        * inv H. clarify. right. refl.
-      + rewrite LocFun.init_spec. apply Time.bot_spec.
-  Qed.
+(*   Lemma cap_singleton_rw_le_normal cap loc to_tgt *)
+(*         (CAP: cap loc to_tgt = None) *)
+(*         (SPACE: forall to to_src (CAP: cap loc to = Some to_src) (TLE: Time.lt to_tgt to), *)
+(*             Time.lt to_tgt to_src) *)
+(*         (WFCAP: wf_cap cap) *)
+(*     : *)
+(*       cap_view_le cap (View.singleton_rw loc to_tgt) (View.singleton_rw loc to_tgt). *)
+(*   Proof. *)
+(*     econs; ss. *)
+(*     - eapply cap_timemap_bot_le. *)
+(*     - eapply cap_singleton_le_normal; eauto. *)
+(*   Qed. *)
 
-  Lemma cap_singleton_le_normal cap loc to_tgt
-        (CAP: cap loc to_tgt = None)
-        (SPACE: forall to to_src (CAP: cap loc to = Some to_src) (TLE: Time.lt to_tgt to),
-            Time.lt to_tgt to_src)
-        (WFCAP: wf_cap cap)
-    :
-      cap_timemap_le cap (TimeMap.singleton loc to_tgt) (TimeMap.singleton loc to_tgt).
-  Proof.
-    econs.
-    - refl.
-    - unfold TimeMap.singleton. ii. red.
-      setoid_rewrite LocFun.add_spec.
-      setoid_rewrite LocFun.add_spec in TLETGT. des_ifs.
-      + destruct TLETGT.
-        * exploit WFCAP; eauto. i. des. left.
-          exploit SPACE; eauto.
-        * destruct H. clarify.
-      + rewrite LocFun.init_spec. apply Time.bot_spec.
-  Qed.
+(*   Lemma cap_unwrap_le cap released_src released_tgt *)
+(*         (RELEASEDLE : option_le (cap_view_le cap) released_src released_tgt) *)
+(*     : *)
+(*       cap_view_le cap (View.unwrap released_src) (View.unwrap released_tgt). *)
+(*   Proof. *)
+(*     inv RELEASEDLE; ss. apply cap_view_bot_le. *)
+(*   Qed. *)
 
-  Lemma cap_timemap_bot_le cap tm
-    :
-      cap_timemap_le cap TimeMap.bot tm.
-  Proof.
-    econs; ss.
-    - apply TimeMap.bot_spec.
-    - i. red. apply Time.bot_spec.
-  Qed.
+(*   Lemma read_tview_cap_le_cap cap loc to_tgt to_src released_src released_tgt ord *)
+(*         tvw_tgt tvw_src *)
+(*         (WFCAP: wf_cap cap) *)
+(*         (CAP: cap loc to_tgt = Some to_src) *)
+(*         (TVLE: cap_tview_le cap tvw_src tvw_tgt) *)
+(*         (RELEASEDLE: option_le (cap_view_le cap) released_src released_tgt) *)
+(*     : *)
+(*       cap_tview_le cap (TView.read_tview tvw_src loc to_src released_src ord) *)
+(*                    (TView.read_tview tvw_tgt loc to_tgt released_tgt ord). *)
+(*   Proof. *)
+(*     inv TVLE. econs; ss; eauto. *)
+(*     - eapply cap_view_join_le. *)
+(*       + eapply cap_view_join_le; eauto. *)
+(*         unfold View.singleton_ur_if. des_ifs. *)
+(*         * eapply cap_singleton_ur_le_cap; eauto. *)
+(*         * eapply cap_singleton_rw_le_cap; eauto. *)
+(*       + des_ifs. *)
+(*         * eapply cap_unwrap_le; eauto. *)
+(*         * eapply cap_view_bot_le. *)
+(*     - eapply cap_view_join_le. *)
+(*       + eapply cap_view_join_le; eauto. *)
+(*         unfold View.singleton_ur_if. des_ifs. *)
+(*         * eapply cap_singleton_ur_le_cap; eauto. *)
+(*         * eapply cap_singleton_rw_le_cap; eauto. *)
+(*       + des_ifs. *)
+(*         * eapply cap_unwrap_le; eauto. *)
+(*         * eapply cap_view_bot_le. *)
+(*   Qed. *)
 
-  Lemma cap_view_bot_le cap v
-    :
-      cap_view_le cap View.bot v.
-  Proof.
-    econs; ss.
-    - apply cap_timemap_bot_le.
-    - apply cap_timemap_bot_le.
-  Qed.
+(*   Lemma read_tview_cap_le_normal cap loc to_tgt released_src released_tgt ord *)
+(*         tvw_tgt tvw_src *)
+(*         (WFCAP: wf_cap cap) *)
+(*         (CAP: cap loc to_tgt = None) *)
+(*         (SPACE: forall to to_src (CAP: cap loc to = Some to_src) (TLE: Time.lt to_tgt to), *)
+(*             Time.lt to_tgt to_src) *)
+(*         (TVLE: cap_tview_le cap tvw_src tvw_tgt) *)
+(*         (RELEASEDLE: option_le (cap_view_le cap) released_src released_tgt) *)
+(*     : *)
+(*       cap_tview_le cap (TView.read_tview tvw_src loc to_tgt released_src ord) *)
+(*                    (TView.read_tview tvw_tgt loc to_tgt released_tgt ord). *)
+(*   Proof. *)
+(*     inv TVLE. econs; ss; eauto. *)
+(*     - eapply cap_view_join_le. *)
+(*       + eapply cap_view_join_le; eauto. *)
+(*         unfold View.singleton_ur_if. des_ifs. *)
+(*         * eapply cap_singleton_ur_le_normal; eauto. *)
+(*         * eapply cap_singleton_rw_le_normal; eauto. *)
+(*       + des_ifs. *)
+(*         * eapply cap_unwrap_le; eauto. *)
+(*         * eapply cap_view_bot_le. *)
+(*     - eapply cap_view_join_le. *)
+(*       + eapply cap_view_join_le; eauto. *)
+(*         unfold View.singleton_ur_if. des_ifs. *)
+(*         * eapply cap_singleton_ur_le_normal; eauto. *)
+(*         * eapply cap_singleton_rw_le_normal; eauto. *)
+(*       + des_ifs. *)
+(*         * eapply cap_unwrap_le; eauto. *)
+(*         * eapply cap_view_bot_le. *)
+(*   Qed. *)
 
-  Lemma cap_singleton_ur_le_cap cap loc to_tgt to_src
-        (CAP: cap loc to_tgt = Some to_src)
-        (WFCAP: wf_cap cap)
-    :
-      cap_view_le cap (View.singleton_ur loc to_src) (View.singleton_ur loc to_tgt).
-  Proof.
-    econs; ss.
-    - eapply cap_singleton_le_cap; eauto.
-    - eapply cap_singleton_le_cap; eauto.
-  Qed.
+(*   Lemma cap_step *)
+(*         lang cap th_src th_tgt th_tgt' st st' v_src v_tgt v_tgt' prom' sc sc' *)
+(*         mem_src mem_tgt mem_tgt' e_tgt *)
+(*         (VWF: TView.wf v_src) *)
+(*         (TH_SRC: th_src = Thread.mk lang st (Local.mk v_src Memory.bot) sc mem_src) *)
+(*         (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v_tgt Memory.bot) sc mem_tgt) *)
+(*         (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v_tgt' prom') sc' mem_tgt') *)
+(*         (WFCAP: wf_cap cap) *)
+(*         (WFCAPMEM: wf_cap_mem cap mem_tgt) *)
+(*         (VIEW: cap_tview_le cap v_src v_tgt) *)
+(*         (MEM: cap_memory cap mem_src mem_tgt) *)
+(*         (STEP: pred_step (no_promise /1\ no_sc) e_tgt th_tgt th_tgt') *)
+(*     : *)
+(*       exists e_src v_src' mem_src', *)
+(*         (<<STEP: (@pred_step *)
+(*                     (no_promise /1\ no_sc) lang) *)
+(*                    e_src th_src *)
+(*                    (Thread.mk lang st' (Local.mk v_src' Memory.bot) sc mem_src')>>) /\ *)
+(*         (<<VIEW: cap_tview_le cap v_src' v_tgt'>>) /\ *)
+(*         (<<MEM: cap_memory cap mem_src' mem_tgt'>>) /\ *)
+(*         (<<EVT: cap_event cap e_src e_tgt>>). *)
+(*   Proof. *)
+(*     clarify. inv STEP. inv STEP0. des. inv STEP; inv STEP0; ss. inv LOCAL; ss. *)
+(*     - exists ThreadEvent.silent, v_src, mem_src. esplits; eauto. *)
+(*       + econs; eauto. econs; eauto. econs 2; eauto. econs; eauto. *)
+(*       + admit. *)
+(*     - inv LOCAL0. ss. clarify. inv MEM. *)
+(*       exploit COMPLETE; eauto. i. des_ifs. *)
+(*       + des. exists (ThreadEvent.read loc t val vw_src ord). esplits. *)
+(*         * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto. *)
+(*           econs; eauto. econs; eauto. ss. *)
+(*           inv VIEW. eapply cap_tview_readable_cap; eauto. *)
+(*         * ss. eapply read_tview_cap_le_cap; eauto. *)
+(*         * ss. *)
+(*         * admit. *)
+(*           (* event *) *)
+(*       + des. exists (ThreadEvent.read loc ts val vw_src ord). esplits. *)
+(*         * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto. *)
+(*           econs; eauto. econs; eauto. ss. *)
+(*           (* cap_view_le => Tview.readable *) *)
+(*           inv VIEW. eapply cap_tview_readable_normal; eauto. *)
+(*         * ss. eapply read_tview_cap_le_normal; eauto. i. *)
+(*           (* difficult.. *) *)
+(*           admit. *)
+(*         * ss. *)
+(*         * admit. *)
+(*           (* event *) *)
+(*     - exploit write_msg_wf; eauto. i. des. *)
+(*       inv LOCAL0. ss. clarify. *)
+(*       exploit memory_write_bot_add; eauto. i. clarify. inv WRITE. inv PROMISE. *)
 
-  Lemma cap_singleton_rw_le_cap cap loc to_tgt to_src
-        (CAP: cap loc to_tgt = Some to_src)
-        (WFCAP: wf_cap cap)
-    :
-      cap_view_le cap (View.singleton_rw loc to_src) (View.singleton_rw loc to_tgt).
-  Proof.
-    econs; ss.
-    - eapply cap_timemap_bot_le.
-    - eapply cap_singleton_le_cap; eauto.
-  Qed.
+(*       exploit write_succeed. *)
+(*       + instantiate (1:=to). instantiate (1:=from). instantiate (1:=mem_src). *)
+(*         instantiate (1:=loc). *)
+(*         admit. *)
+(*       + instantiate (1:= (TView.write_released v_src sc loc to None ord)). *)
+(*         etrans; eauto. *)
+(*         admit. *)
+(*         (* exploit View.unwrap_opt_le. *) *)
+(*         (* * eapply TViewFacts.write_released_mon. *) *)
+(*         (*   { eappl *) *)
+(*       + ss. *)
+(*       + eapply Message.wf_view. *)
+(*         exploit TViewFacts.write_future0; eauto. *)
+(*         i. des. eapply WF_RELEASED. *)
+(*       + i. des. *)
+(*         exists (ThreadEvent.write loc from to val (TView.write_released v_src sc loc to None ord) ord). *)
+(*         esplits; eauto. *)
+(*         * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto. econs; eauto. *)
+(*           econs; eauto. ss. *)
+(*           eapply TViewFacts.writable_mon; eauto. *)
+(*           { inv VIEW. inv CUR. inv PLN. inv RLX. econs; eauto. } *)
+(*           { refl. } *)
+(*           { refl. } *)
+(*         * ss. *)
+(*           admit. *)
+(*         * admit. *)
+(*         * admit. *)
+(*     - admit. *)
+(*     - admit. *)
+(*     - admit. *)
+(*   Admitted. *)
 
-  Lemma cap_singleton_ur_le_normal cap loc to_tgt
-        (CAP: cap loc to_tgt = None)
-        (SPACE: forall to to_src (CAP: cap loc to = Some to_src) (TLE: Time.lt to_tgt to),
-            Time.lt to_tgt to_src)
-        (WFCAP: wf_cap cap)
-    :
-      cap_view_le cap (View.singleton_ur loc to_tgt) (View.singleton_ur loc to_tgt).
-  Proof.
-    econs; ss.
-    - eapply cap_singleton_le_normal; eauto.
-    - eapply cap_singleton_le_normal; eauto.
-  Qed.
-
-  Lemma cap_singleton_rw_le_normal cap loc to_tgt
-        (CAP: cap loc to_tgt = None)
-        (SPACE: forall to to_src (CAP: cap loc to = Some to_src) (TLE: Time.lt to_tgt to),
-            Time.lt to_tgt to_src)
-        (WFCAP: wf_cap cap)
-    :
-      cap_view_le cap (View.singleton_rw loc to_tgt) (View.singleton_rw loc to_tgt).
-  Proof.
-    econs; ss.
-    - eapply cap_timemap_bot_le.
-    - eapply cap_singleton_le_normal; eauto.
-  Qed.
-
-  Lemma cap_unwrap_le cap released_src released_tgt
-        (RELEASEDLE : option_le (cap_view_le cap) released_src released_tgt)
-    :
-      cap_view_le cap (View.unwrap released_src) (View.unwrap released_tgt).
-  Proof.
-    inv RELEASEDLE; ss. apply cap_view_bot_le.
-  Qed.
-
-  Lemma read_tview_cap_le_cap cap loc to_tgt to_src released_src released_tgt ord
-        tvw_tgt tvw_src
-        (WFCAP: wf_cap cap)
-        (CAP: cap loc to_tgt = Some to_src)
-        (TVLE: cap_tview_le cap tvw_src tvw_tgt)
-        (RELEASEDLE: option_le (cap_view_le cap) released_src released_tgt)
-    :
-      cap_tview_le cap (TView.read_tview tvw_src loc to_src released_src ord)
-                   (TView.read_tview tvw_tgt loc to_tgt released_tgt ord).
-  Proof.
-    inv TVLE. econs; ss; eauto.
-    - eapply cap_view_join_le.
-      + eapply cap_view_join_le; eauto.
-        unfold View.singleton_ur_if. des_ifs.
-        * eapply cap_singleton_ur_le_cap; eauto.
-        * eapply cap_singleton_rw_le_cap; eauto.
-      + des_ifs.
-        * eapply cap_unwrap_le; eauto.
-        * eapply cap_view_bot_le.
-    - eapply cap_view_join_le.
-      + eapply cap_view_join_le; eauto.
-        unfold View.singleton_ur_if. des_ifs.
-        * eapply cap_singleton_ur_le_cap; eauto.
-        * eapply cap_singleton_rw_le_cap; eauto.
-      + des_ifs.
-        * eapply cap_unwrap_le; eauto.
-        * eapply cap_view_bot_le.
-  Qed.
-
-  Lemma read_tview_cap_le_normal cap loc to_tgt released_src released_tgt ord
-        tvw_tgt tvw_src
-        (WFCAP: wf_cap cap)
-        (CAP: cap loc to_tgt = None)
-        (SPACE: forall to to_src (CAP: cap loc to = Some to_src) (TLE: Time.lt to_tgt to),
-            Time.lt to_tgt to_src)
-        (TVLE: cap_tview_le cap tvw_src tvw_tgt)
-        (RELEASEDLE: option_le (cap_view_le cap) released_src released_tgt)
-    :
-      cap_tview_le cap (TView.read_tview tvw_src loc to_tgt released_src ord)
-                   (TView.read_tview tvw_tgt loc to_tgt released_tgt ord).
-  Proof.
-    inv TVLE. econs; ss; eauto.
-    - eapply cap_view_join_le.
-      + eapply cap_view_join_le; eauto.
-        unfold View.singleton_ur_if. des_ifs.
-        * eapply cap_singleton_ur_le_normal; eauto.
-        * eapply cap_singleton_rw_le_normal; eauto.
-      + des_ifs.
-        * eapply cap_unwrap_le; eauto.
-        * eapply cap_view_bot_le.
-    - eapply cap_view_join_le.
-      + eapply cap_view_join_le; eauto.
-        unfold View.singleton_ur_if. des_ifs.
-        * eapply cap_singleton_ur_le_normal; eauto.
-        * eapply cap_singleton_rw_le_normal; eauto.
-      + des_ifs.
-        * eapply cap_unwrap_le; eauto.
-        * eapply cap_view_bot_le.
-  Qed.
-
-  Lemma cap_step
-        lang cap th_src th_tgt th_tgt' st st' v_src v_tgt v_tgt' prom' sc sc'
-        mem_src mem_tgt mem_tgt' e_tgt
-        (VWF: TView.wf v_src)
-        (TH_SRC: th_src = Thread.mk lang st (Local.mk v_src Memory.bot) sc mem_src)
-        (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v_tgt Memory.bot) sc mem_tgt)
-        (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v_tgt' prom') sc' mem_tgt')
-        (WFCAP: wf_cap cap)
-        (WFCAPMEM: wf_cap_mem cap mem_tgt)
-        (VIEW: cap_tview_le cap v_src v_tgt)
-        (MEM: cap_memory cap mem_src mem_tgt)
-        (STEP: pred_step (no_promise /1\ no_sc) e_tgt th_tgt th_tgt')
-    :
-      exists e_src v_src' mem_src',
-        (<<STEP: (@pred_step
-                    (no_promise /1\ no_sc) lang)
-                   e_src th_src
-                   (Thread.mk lang st' (Local.mk v_src' Memory.bot) sc mem_src')>>) /\
-        (<<VIEW: cap_tview_le cap v_src' v_tgt'>>) /\
-        (<<MEM: cap_memory cap mem_src' mem_tgt'>>) /\
-        (<<EVT: cap_event cap e_src e_tgt>>).
-  Proof.
-    clarify. inv STEP. inv STEP0. des. inv STEP; inv STEP0; ss. inv LOCAL; ss.
-    - exists ThreadEvent.silent, v_src, mem_src. esplits; eauto.
-      + econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
-      + admit.
-    - inv LOCAL0. ss. clarify. inv MEM.
-      exploit COMPLETE; eauto. i. des_ifs.
-      + des. exists (ThreadEvent.read loc t val vw_src ord). esplits.
-        * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
-          econs; eauto. econs; eauto. ss.
-          inv VIEW. eapply cap_tview_readable_cap; eauto.
-        * ss. eapply read_tview_cap_le_cap; eauto.
-        * ss.
-        * admit.
-          (* event *)
-      + des. exists (ThreadEvent.read loc ts val vw_src ord). esplits.
-        * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
-          econs; eauto. econs; eauto. ss.
-          (* cap_view_le => Tview.readable *)
-          inv VIEW. eapply cap_tview_readable_normal; eauto.
-        * ss. eapply read_tview_cap_le_normal; eauto. i.
-          (* difficult.. *)
-          admit.
-        * ss.
-        * admit.
-          (* event *)
-    - exploit write_msg_wf; eauto. i. des.
-      inv LOCAL0. ss. clarify.
-      exploit memory_write_bot_add; eauto. i. clarify. inv WRITE. inv PROMISE.
-
-      exploit write_succeed.
-      + instantiate (1:=to). instantiate (1:=from). instantiate (1:=mem_src).
-        instantiate (1:=loc).
-        admit.
-      + instantiate (1:= (TView.write_released v_src sc loc to None ord)).
-        etrans; eauto.
-        admit.
-        (* exploit View.unwrap_opt_le. *)
-        (* * eapply TViewFacts.write_released_mon. *)
-        (*   { eappl *)
-      + ss.
-      + eapply Message.wf_view.
-        exploit TViewFacts.write_future0; eauto.
-        i. des. eapply WF_RELEASED.
-      + i. des.
-        exists (ThreadEvent.write loc from to val (TView.write_released v_src sc loc to None ord) ord).
-        esplits; eauto.
-        * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto. econs; eauto.
-          econs; eauto. ss.
-          eapply TViewFacts.writable_mon; eauto.
-          { inv VIEW. inv CUR. inv PLN. inv RLX. econs; eauto. }
-          { refl. }
-          { refl. }
-        * ss.
-          admit.
-        * admit.
-        * admit.
-    - admit.
-    - admit.
-    - admit.
-  Admitted.
-
-End CAPPED.
+(* End CAPPED. *)
 
 
 Inductive concrete_covered (prom mem: Memory.t) (loc: Loc.t) (ts: Time.t): Prop :=

@@ -242,4 +242,21 @@ Section PredStep.
     | _ => False
     end.
 
+  Definition te_rel := ThreadEvent.t -> ThreadEvent.t -> Prop.
+
+  Lemma pred_step_shift (P_src P_tgt: te_pred) (R: te_rel)
+        (SHIFT: forall e_src e_tgt (SAT: P_tgt e_tgt) (REL: R e_src e_tgt), P_src e_src)
+        e_src e_tgt lang (th0 th1: Thread.t lang)
+        (SAT: P_tgt e_tgt)
+        (REL: R e_src e_tgt)
+        (STEP: Thread.step_allpf e_src th0 th1)
+    :
+      pred_step P_src e_src th0 th1.
+  Proof.
+    econs; eauto.
+  Qed.
+
+  Definition same_machine_event e_src e_tgt :=
+    ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt.
+
 End PredStep.
