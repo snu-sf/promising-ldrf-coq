@@ -135,7 +135,7 @@ Lemma step_lifting
 Proof.
   eapply step_lifting_raw; ss; eauto.
   dup STEP. inv STEP. econs; auto. inv STEP1. des.
-  exploit step_wirte_not_in; eauto. ss. i.
+  exploit step_write_not_in; eauto. ss. i.
   splits; eauto.
   - eapply write_not_in_mon; eauto.
   - eapply write_not_in_mon; eauto.
@@ -326,16 +326,6 @@ Proof.
         { eauto. }
         { eauto. }
       * eauto.
-Qed.
-
-Lemma rtc_unchangables_increase lang (th0 th1: Thread.t lang)
-      (STEP: rtc (Thread.tau_step (lang:=lang)) th0 th1)
-  :
-    unchangables th0.(Thread.memory) th0.(Thread.local).(Local.promises) <2=
-    unchangables th1.(Thread.memory) th1.(Thread.local).(Local.promises).
-Proof.
-  induction STEP; eauto.
-  i. inv H. inv TSTEP. eapply IHSTEP. eapply unchangables_increase; eauto.
 Qed.
 
 Lemma inv_step mem0 mem1 lang (st: Language.state lang)
@@ -883,31 +873,6 @@ Proof.
     + erewrite SAME; eauto.
     + eauto.
 Qed.
-
-Definition cap (m mcap: Memory.t) (l: Loc.t) (t: Time.t): Prop :=
-  (<<NINMEM: ~ promised m l t>>) /\ (<<INCAPPED: promised mcap l t>>).
-
-Definition no_acq_read_msgs (MSGS : Loc.t -> Time.t -> Prop)
-           (e : ThreadEvent.t) : Prop :=
-  match e with
-  | ThreadEvent.read loc to _ _ ordr => ~ (MSGS loc to) \/ Ordering.le ordr Ordering.relaxed
-  | ThreadEvent.update loc from _ _ _ _ _ ordr _ => ~ (MSGS loc from) \/ Ordering.le ordr Ordering.relaxed
-  | _ => True
-  end.
-
-Lemma consistent_no_sc_no_acq lang (th: Thread.t lang)
-      (CONSISTENT: Thread.consistent th)
-      mem1 sc1
-      (CAP: Memory.cap th.(Thread.local).(Local.promises) th.(Thread.memory) mem1)
-      (SC_MAX: Memory.max_full_timemap mem1 sc1)
-  :
-    exists th',
-      (<<STEPS: rtc (tau (@pred_step (no_sc /1\ no_acq_read_msgs (cap th.(Thread.memory) mem1)) lang)) th th'>>) /\
-      (<<CONSISTENT: Local.promise_consistent th'.(Thread.local)>>) /\
-      (<<PROMISES: forall l t (PROM: promised th.(Thread.local).(Local.promises) l t),
-          ~ promised th'.(Thread.local).(Local.promises) l t>>).
-Proof.
-Admitted.
 
 (* Lemma future_lifting *)
 (*       P lang th0 th1 *)
