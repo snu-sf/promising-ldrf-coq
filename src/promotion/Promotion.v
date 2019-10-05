@@ -60,40 +60,50 @@ Definition promote_stmts (l: Loc.t) (r: Reg.t) (stmts: list Stmt.t): list Stmt.t
   List.fold_left (@List.app _) (List.map (promote_stmt l r) stmts) [].
 
 
-Definition loc_free_instr (l: Loc.t) (i: Instr.t): bool :=
+Definition loc_free_instr (l: Loc.t) (i: Instr.t): Prop :=
   match i with
   | Instr.load _ loc _
   | Instr.store loc _ _
-  | Instr.update _ loc _ _ _ =>
-    if Loc.eq_dec loc l then false else true
+  | Instr.update _ loc _ _ _ => loc <> l
   | _ => true
   end.
 
-Fixpoint loc_free_stmt (l: Loc.t) (stmt: Stmt.t): bool :=
-  match stmt with
-  | Stmt.instr i => loc_free_instr l i
-  | Stmt.ite cond stmts1 stmts2 =>
-    andb
-      (List.fold_left andb (List.map (loc_free_stmt l) stmts1) true)
-      (List.fold_left andb (List.map (loc_free_stmt l) stmts2) true)
-  | Stmt.dowhile stmts cond =>
-    List.fold_left andb (List.map (loc_free_stmt l) stmts) true
-  end.
+Inductive loc_free_stmt (l: Loc.t): forall (stmt: Stmt.t), Prop :=
+| loc_free_stmt_instr
+    i
+    (LOCFREE: loc_free_instr l i):
+    loc_free_stmt l (Stmt.instr i)
+| loc_free_stmt_ite
+    cond stmts1 stmts2
+    (LOCFREE1: List.Forall (loc_free_stmt l) stmts1)
+    (LOCFREE2: List.Forall (loc_free_stmt l) stmts2):
+    loc_free_stmt l (Stmt.ite cond stmts1 stmts2)
+| loc_free_stmt_dowhile
+    stmts cond
+    (LOCFREE: List.Forall (loc_free_stmt l) stmts):
+    loc_free_stmt l (Stmt.dowhile stmts cond)
+.
+Hint Constructors loc_free_stmt.
 
-Definition loc_free_stmts (l: Loc.t) (stmts: list Stmt.t): bool :=
-  List.fold_left andb (List.map (loc_free_stmt l) stmts) true.
+Definition loc_free_stmts (l: Loc.t) (stmts: list Stmt.t): Prop :=
+  List.Forall (loc_free_stmt l) stmts.
 
 
-Fixpoint reg_free_stmt (r: Reg.t) (stmt: Stmt.t): Prop :=
-  match stmt with
-  | Stmt.instr i => RegSet.disjoint (RegSet.singleton r) (Instr.regs_of i)
-  | Stmt.ite cond stmts1 stmts2 =>
-    and
-      (List.fold_left and (List.map (reg_free_stmt r) stmts1) true)
-      (List.fold_left and (List.map (reg_free_stmt r) stmts2) true)
-  | Stmt.dowhile stmts cond =>
-    List.fold_left and (List.map (reg_free_stmt r) stmts) true
-  end.
+Inductive reg_free_stmt (r: Reg.t): forall (stmt: Stmt.t), Prop :=
+| reg_free_stmt_instr
+    i
+    (REGFREE: RegSet.disjoint (RegSet.singleton r) (Instr.regs_of i)):
+    reg_free_stmt r (Stmt.instr i)
+| reg_free_stmt_ite
+    cond stmts1 stmts2
+    (REGFREE1: List.Forall (reg_free_stmt r) stmts1)
+    (REGFREE2: List.Forall (reg_free_stmt r) stmts2):
+    reg_free_stmt r (Stmt.ite cond stmts1 stmts2)
+| reg_free_stmt_dowhile
+    stmts cond
+    (REGFREE: List.Forall (reg_free_stmt r) stmts):
+    reg_free_stmt r (Stmt.dowhile stmts cond)
+.
 
 Definition reg_free_stmts (r: Reg.t) (stmts: list Stmt.t): Prop :=
-  List.fold_left and (List.map (reg_free_stmt r) stmts) true.
+  List.Forall (reg_free_stmt r) stmts.
