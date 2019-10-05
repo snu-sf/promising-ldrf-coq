@@ -179,17 +179,29 @@ Proof.
     erewrite promise_eq_mem; try exact PROMISE; eauto.
 Qed.
 
-Lemma fold_andb_impl
-      l (a b: bool)
-      (FOLD: List.fold_left andb l a)
-      (IMPL: a -> b):
-  List.fold_left andb l b.
+Lemma Forall_app
+      A
+      (P: A -> Prop)
+      (l1 l2: list A)
+      (FORALL1: List.Forall P l1)
+      (FORALL2: List.Forall P l2):
+  List.Forall P (l1 ++ l2).
 Proof.
-  revert a b IMPL FOLD.
-  induction l; i; ss; eauto.
-  eapply IHl; try exact FOLD. i.
-  destruct a0, b, a; ss.
-  apply IMPL. ss.
+  induction l1; ss.
+  inv FORALL1. eauto.
+Qed.
+
+Lemma Forall_app_inv
+      A
+      (P: A -> Prop)
+      (l1 l2: list A)
+      (FORALL: List.Forall P (l1 ++ l2)):
+  <<FORALL1: List.Forall P l1>> /\
+  <<FORALL2: List.Forall P l2>>.
+Proof.
+  induction l1; split; ss.
+  - inv FORALL. exploit IHl1; eauto. i. des. eauto.
+  - inv FORALL. exploit IHl1; eauto. i. des. ss.
 Qed.
 
 Lemma step_loc_free
@@ -198,7 +210,14 @@ Lemma step_loc_free
       (STEP: State.step e st1 st2):
   loc_free_stmts l st2.(State.stmts).
 Proof.
-Admitted.
+  inv STEP; ss.
+  - inv LOCFREE. ss.
+  - inv LOCFREE. condtac.
+    + inv H1. eapply Forall_app; eauto.
+    + inv H1. eapply Forall_app; eauto.
+  - inv LOCFREE. inv H1.
+    eapply Forall_app; eauto.
+Qed.
 
 Lemma sim_thread_other_step
       l e1_src
@@ -230,7 +249,8 @@ Proof.
   inv STEP; ss. inv LOCAL; ss.
   - inv SIM1. ss. subst. esplits.
     + refl.
-    + econs 2. econs 2. econs 1; eauto. s. eapply STATE.
+    + econs 2. econs 2.
+      econs; eauto. s. eapply STATE.
     + econs; s; eauto.
       eapply step_loc_free; eauto.
     + ss.
