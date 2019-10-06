@@ -60,6 +60,8 @@ Definition promote_stmts (l: Loc.t) (r: Reg.t) (stmts: list Stmt.t): list Stmt.t
   List.fold_left (@List.app _) (List.map (promote_stmt l r) stmts) [].
 
 
+(* loc_free *)
+
 Definition loc_free_instr (l: Loc.t) (i: Instr.t): Prop :=
   match i with
   | Instr.load _ loc _
@@ -89,6 +91,8 @@ Definition loc_free_stmts (l: Loc.t) (stmts: list Stmt.t): Prop :=
   List.Forall (loc_free_stmt l) stmts.
 
 
+(* reg_free *)
+
 Inductive reg_free_stmt (r: Reg.t): forall (stmt: Stmt.t), Prop :=
 | reg_free_stmt_instr
     i
@@ -107,3 +111,19 @@ Inductive reg_free_stmt (r: Reg.t): forall (stmt: Stmt.t), Prop :=
 
 Definition reg_free_stmts (r: Reg.t) (stmts: list Stmt.t): Prop :=
   List.Forall (reg_free_stmt r) stmts.
+
+
+Lemma step_loc_free
+      l e st1 st2
+      (LOCFREE: loc_free_stmts l st1.(State.stmts))
+      (STEP: State.step e st1 st2):
+  loc_free_stmts l st2.(State.stmts).
+Proof.
+  inv STEP; ss.
+  - inv LOCFREE. ss.
+  - inv LOCFREE. condtac.
+    + inv H1. eapply Forall_app; eauto.
+    + inv H1. eapply Forall_app; eauto.
+  - inv LOCFREE. inv H1.
+    eapply Forall_app; eauto.
+Qed.

@@ -32,6 +32,8 @@ Set Implicit Arguments.
 
 
 Module SimCommon.
+  (* simulation relations *)
+
   Definition sim_timemap (l: Loc.t) (tm_src tm_tgt: TimeMap.t): Prop :=
     forall loc (LOC: loc <> l), tm_src loc = tm_tgt loc.
 
@@ -59,7 +61,6 @@ Module SimCommon.
       (ACQ: sim_view l tview_src.(TView.acq) tview_tgt.(TView.acq))
   .
   Hint Constructors sim_tview.
-
 
   Inductive sim_message (l: Loc.t): forall (msg_src msg_tgt: Message.t), Prop :=
   | sim_message_full
@@ -96,6 +97,8 @@ Module SimCommon.
   Hint Constructors sim_local.
 
 
+  (* fulfillable *)
+
   Definition view_le_loc (l: Loc.t) (view1 view2: View.t): Prop :=
     <<PLN: Time.le (view1.(View.pln) l) (view2.(View.pln) l)>> /\
     <<RLX: Time.le (view1.(View.rlx) l) (view2.(View.rlx) l)>>.
@@ -126,6 +129,8 @@ Module SimCommon.
       <<PREV: prev_released_le_loc l loc from mem released>>.
 
 
+  (* generating source message *)
+
   Definition get_released_src (l loc: Loc.t) (released_tgt: View.t) (tview_src: TView.t) (released_prev: View.t): View.t :=
     View.mk
       (LocFun.add
@@ -146,15 +151,6 @@ Module SimCommon.
       end
     | _ => msg_tgt
     end.
-
-  Ltac des_get_message_src :=
-    try match goal with
-        | [H: _ |- context[get_message_src _ ?loc ?msg_tgt _ ?from ?mem_src]] =>
-          unfold get_message_src;
-          destruct msg_tgt as [? []|];
-          [destruct (Memory.get loc from mem_src) as [[? [? []|]]|] eqn:GET_SRC|..]
-        end;
-    ss; subst.
 
   Lemma get_released_src_tview_released_le_loc
         l loc released_tgt tview_src released_prev:
@@ -763,6 +759,38 @@ Module SimCommon.
         + revert GET_TGT. erewrite Memory.remove_o; eauto.
           condtac; [des|]; ss; i; eauto.
     }
+  Qed.
+
+  Lemma promise_eq_promises
+        l
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (PROMISE: Memory.promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (LOC: loc <> l):
+    forall to, Memory.get l to promises1 = Memory.get l to promises2.
+  Proof.
+    i. inv PROMISE.
+    - erewrite (@Memory.add_o promises2); eauto. condtac; ss. des. subst. ss.
+    - erewrite (@Memory.split_o promises2); eauto. repeat condtac; ss.
+      { des. subst. ss. }
+      { des; subst; ss. }
+    - erewrite (@Memory.lower_o promises2); eauto. condtac; ss. des. subst. ss.
+    - erewrite (@Memory.remove_o promises2); eauto. condtac; ss. des. subst. ss.
+  Qed.
+
+  Lemma promise_eq_mem
+        l
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (PROMISE: Memory.promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (LOC: loc <> l):
+    forall to, Memory.get l to mem1 = Memory.get l to mem2.
+  Proof.
+    i. inv PROMISE.
+    - erewrite (@Memory.add_o mem2); eauto. condtac; ss. des. subst. ss.
+    - erewrite (@Memory.split_o mem2); eauto. repeat condtac; ss.
+      { des. subst. ss. }
+      { des; subst; ss. }
+    - erewrite (@Memory.lower_o mem2); eauto. condtac; ss. des. subst. ss.
+    - erewrite (@Memory.remove_o mem2); eauto. condtac; ss. des. subst. ss.
   Qed.
 
 
