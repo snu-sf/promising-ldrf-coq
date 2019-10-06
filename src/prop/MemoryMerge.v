@@ -90,6 +90,16 @@ Module MemoryMerge.
       congr.
   Qed.
 
+  Lemma promise_write_write
+        loc from to msg1 val released promises0 promises1 promises2 mem0 mem1 mem2 kind
+        (PROMISE1: Memory.promise promises0 mem0 loc from to msg1 promises1 mem1 kind)
+        (PROMISE2: Memory.write promises1 mem1 loc from to val released promises2 mem2 (Memory.op_kind_lower msg1)):
+    Memory.write promises0 mem0 loc from to val released promises2 mem2 kind.
+  Proof.
+    inv PROMISE2.
+    exploit promise_promise_promise; try exact PROMISE1; eauto.
+  Qed.
+
   Lemma add_remove
         loc from to msg mem0 mem1 mem2
         (ADD1: Memory.add mem0 loc from to msg mem1)

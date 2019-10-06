@@ -25,6 +25,9 @@ Require Import Syntax.
 Require Import Semantics.
 
 Require Import PromiseConsistent.
+Require Import MemoryMerge.
+
+Require Import FulfillStep.
 
 Require Import Promotion.
 
@@ -852,6 +855,108 @@ Module SimCommon.
       admit.
     - admit.
     - ss.
+  Admitted.
+
+  Lemma write_step_aux
+        l
+        lc1_src sc1_src mem1_src releasedm_src
+        lc1_tgt sc1_tgt mem1_tgt loc from to val releasedm_tgt released_tgt ord lc2_tgt sc2_tgt
+        (LC1: sim_local l lc1_src lc1_tgt)
+        (MEM1: sim_memory l mem1_src mem1_tgt)
+        (RELEASED: sim_opt_view l releasedm_src releasedm_tgt)
+        (REL_WF: View.opt_wf releasedm_src)
+        (REL_CLOSED: Memory.closed_opt_view releasedm_src mem1_src)
+        (WF1_SRC: Local.wf lc1_src mem1_src)
+        (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
+        (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
+        (CLOSED1_SRC: Memory.closed mem1_src)
+        (LOC: loc <> l)
+        (STEP_TGT: fulfill_step lc1_tgt sc1_tgt loc from to val releasedm_tgt released_tgt ord lc2_tgt sc2_tgt):
+    exists released_src promises2_src mem2_src,
+      <<PROMISE_SRC: Memory.write lc1_src.(Local.promises) mem1_src loc from to
+                                  val (TView.write_released lc1_src.(Local.tview) sc1_src loc to releasedm_src ord)
+                                  promises2_src mem2_src
+                                  (Memory.op_kind_lower (Message.full val released_src))>> /\
+      <<PROMISES2: sim_memory l promises2_src lc2_tgt.(Local.promises)>> /\
+      <<MEM2: sim_memory l mem2_src mem1_tgt>>.
+  Proof.
+    inv STEP_TGT.
+    exploit Memory.remove_get0; eauto. i. des.
+    destruct lc1_src as [tview1_src promises1_src]. ss.
+    dup LC1. inv LC0. inv PROMISES1. ss.
+    exploit COMPLETE; eauto. i. des. inv MSG.
+    clear TVIEW SOUND COMPLETE.
+    exploit (@Memory.lower_exists promises1_src loc from to
+                                  (Message.full val released_src)
+                                  (Message.full val (TView.write_released tview1_src sc1_src loc to releasedm_src ord))); ss.
+    { econs.
+      eapply TViewFacts.write_future0; try eapply WF1_SRC; eauto. }
+    { econs. destruct released_src; ss.
+      - admit.
+      - inv RELEASED0. inv REL_LE.
+        revert H0. unfold TView.write_released. condtac; ss. }
+    i. des.
+    exploit Memory.lower_get0; try exact x0. i. des.
+    exploit Memory.remove_exists; try exact GET2. i. des.
+    exploit Memory.lower_exists_le; try eapply WF1_SRC; eauto. i. des.
+    esplits.
+    - econs; eauto; ss. econs 3; eauto.
+      admit.
+    - admit.
+    - admit.
+  Admitted.
+
+  Lemma write_step
+        l
+        lc1_src sc1_src mem1_src releasedm_src
+        lc1_tgt sc1_tgt mem1_tgt loc from to val releasedm_tgt released_tgt
+                                    ord lc2_tgt sc2_tgt mem2_tgt kind_tgt
+        (LC1: sim_local l lc1_src lc1_tgt)
+        (MEM1: sim_memory l mem1_src mem1_tgt)
+        (RELEASED: sim_opt_view l releasedm_src releasedm_tgt)
+        (REL_WF_SRC: View.opt_wf releasedm_src)
+        (REL_CLOSED_SRC: Memory.closed_opt_view releasedm_src mem1_src)
+        (REL_WF_TGT: View.opt_wf releasedm_tgt)
+        (REL_CLOSED_TGT: Memory.closed_opt_view releasedm_tgt mem1_tgt)
+        (REL_LE: forall from val released_src
+                   (GET: Memory.get loc to mem1_src = Some (from, Message.full val released_src)),
+            view_le_loc l releasedm_src.(View.unwrap) released_src.(View.unwrap))
+        (WF1_SRC: Local.wf lc1_src mem1_src)
+        (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
+        (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
+        (SC1_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
+        (CLOSED1_SRC: Memory.closed mem1_src)
+        (CLOSED1_TGT: Memory.closed mem1_tgt)
+        (FULFILLABLE1: fulfillable l lc1_src.(Local.tview) mem1_src lc1_src.(Local.promises))
+        (LOC: loc <> l)
+        (STEP_TGT: Local.write_step lc1_tgt sc1_tgt mem1_tgt loc from to val releasedm_tgt released_tgt
+                                    ord lc2_tgt sc2_tgt mem2_tgt kind_tgt):
+    exists released_src lc2_src sc2_src mem2_src kind_src,
+      <<STEP_SRC: Local.write_step lc1_src sc1_src mem1_src loc from to val releasedm_src released_src
+                                    ord lc2_src sc2_src mem2_src kind_src>> /\
+      <<LC2: sim_local l lc2_src lc2_tgt>> /\
+      <<MEM2: sim_memory l mem2_src mem2_tgt>> /\
+      <<FULFILLABLE2: fulfillable l lc2_src.(Local.tview) mem1_src lc2_src.(Local.promises)>>.
+  Proof.
+    exploit write_promise_fulfill; eauto. i. des.
+    exploit promise_step; try exact STEP1; eauto. i. des.
+    exploit Local.promise_step_future; try exact STEP_SRC; eauto. i. des.
+    exploit Local.promise_step_future; try exact STEP1; eauto. i. des.
+    exploit write_step_aux; try exact STEP2; eauto.
+    { eapply Memory.future_closed_opt_view; eauto. }
+    i. des.
+    inv STEP_SRC; ss.
+    replace msg_src with (Message.full val released_src) in *; cycle 1.
+    { admit. }
+    exploit MemoryMerge.promise_write_write; try exact PROMISE; eauto. intro WRITE_SRC.
+    esplits.
+    - econs; eauto.
+      + admit.
+      + admit.
+    - econs; ss.
+      admit.
+    - ss.
+    - admit.
   Admitted.
 
   Lemma fence_step
