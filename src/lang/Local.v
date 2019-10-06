@@ -408,19 +408,20 @@ Module Local.
     - inv WRITE. inv PROMISE; try inv TS; ss.
   Qed.
 
+  (* TODO: refactor *)
   Lemma write_step_strong_relaxed
         lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
         (STEP: write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
         (ORD: Ordering.le Ordering.strong_relaxed ord):
-    negb (Memory.op_kind_is_lower kind) \/ (Memory.op_kind_is_lower_reserve kind).
+    negb (Memory.op_kind_is_lower kind).
   Proof.
-    destruct kind; eauto.
-    inv STEP. specialize (RELEASE ORD).
-    inv WRITE. inv PROMISE.
-    exploit Memory.lower_get0; try exact PROMISES; eauto. i. des.
-    exploit RELEASE; eauto. inv MSG_LE; eauto; i.
-    subst. inv RELEASED.
-    revert H0. unfold TView.write_released. condtac; ss. by destruct ord.
+    inv STEP. inv WRITE. ss.
+    destruct kind; ss.
+    inv PROMISE. des. subst.
+    exploit Memory.lower_get0; try exact PROMISES. i. des.
+    exploit RELEASE; eauto. inv MSG_LE; eauto. i. subst.
+    inv RELEASED. revert H0.
+    unfold TView.write_released. condtac; ss. destruct ord; ss.
   Qed.
 
   Lemma fence_step_future
