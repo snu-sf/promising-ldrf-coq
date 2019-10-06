@@ -111,39 +111,6 @@ Proof.
   - erewrite (@Memory.remove_o mem2); eauto. condtac; ss. des. subst. ss.
 Qed.
 
-
-Lemma promise_step
-      l
-      lc1_src mem1_src
-      lc1_tgt mem1_tgt loc from to msg_tgt lc2_tgt mem2_tgt kind_tgt
-      (LC1: sim_local l lc1_src lc1_tgt)
-      (MEM1: sim_memory l mem1_src mem1_tgt)
-      (WF1_SRC: Local.wf lc1_src mem1_src)
-      (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
-      (CLOSED1_SRC: Memory.closed mem1_src)
-      (FULFILLABLE1: fulfillable l lc1_src.(Local.tview) mem1_src lc1_src.(Local.promises))
-      (LOC: loc <> l)
-      (STEP_TGT: Local.promise_step lc1_tgt mem1_tgt loc from to msg_tgt lc2_tgt mem2_tgt kind_tgt):
-  exists msg_src lc2_src mem2_src kind_src,
-    <<STEP_SRC: Local.promise_step lc1_src mem1_src loc from to msg_src lc2_src mem2_src kind_src>> /\
-    <<LC2: sim_local l lc2_src lc2_tgt>> /\
-    <<MEM2: sim_memory l mem2_src mem2_tgt>> /\
-    <<FULFILLABLE2: fulfillable l lc2_src.(Local.tview) mem2_src lc2_src.(Local.promises)>>.
-Proof.
-  inv STEP_TGT.
-  exploit sim_memory_promise; try exact PROMISE; try apply LC1;
-    try apply WF1_SRC; try apply WF1_TGT; eauto.
-  i. des.
-  esplits.
-  - econs; eauto.
-    eapply get_message_src_closed; eauto; try apply WF1_SRC. i.
-    exploit Memory.promise_op; try exact PROMISE_SRC. i.
-    eapply Memory.op_closed_view; eauto.
-  - inv LC1. econs; eauto.
-  - ss.
-  - ss.
-Qed.
-
 Lemma sim_thread_other_promise_step
       l e1_src
       pf e_tgt e1_tgt e2_tgt
