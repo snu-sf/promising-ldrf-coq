@@ -134,66 +134,91 @@ Module SimCommon.
 
   (* generating source message *)
 
-  Definition get_released_src (l loc: Loc.t) (released_tgt: View.t) (tview_src: TView.t) (released_prev: View.t): View.t :=
-    View.mk
-      (LocFun.add
-         l (Time.join ((tview_src.(TView.rel) loc).(View.pln) l) (released_prev.(View.pln) l))
-         released_tgt.(View.pln))
-      (LocFun.add
-         l (Time.join ((tview_src.(TView.rel) loc).(View.rlx) l) (released_prev.(View.rlx) l))
-         released_tgt.(View.rlx)).
+  Definition get_released_src (strong: bool) (l loc: Loc.t) (released_tgt: View.t)
+             (tview_src: TView.t) (released_prev: View.t): View.t :=
+    if strong
+    then
+      View.mk
+        (LocFun.add
+           l (Time.join (tview_src.(TView.cur).(View.pln) l) (released_prev.(View.pln) l))
+           released_tgt.(View.pln))
+        (LocFun.add
+           l (Time.join (tview_src.(TView.cur).(View.rlx) l) (released_prev.(View.rlx) l))
+           released_tgt.(View.rlx))
+    else
+      View.mk
+        (LocFun.add
+           l (Time.join ((tview_src.(TView.rel) loc).(View.pln) l) (released_prev.(View.pln) l))
+           released_tgt.(View.pln))
+        (LocFun.add
+           l (Time.join ((tview_src.(TView.rel) loc).(View.rlx) l) (released_prev.(View.rlx) l))
+           released_tgt.(View.rlx)).
 
-  Definition get_message_src (l loc: Loc.t) (msg_tgt: Message.t) (tview_src: TView.t) (from: Time.t) (mem_src: Memory.t): Message.t :=
+  Definition get_message_src (strong: bool) (l loc: Loc.t) (msg_tgt: Message.t)
+             (tview_src: TView.t) (from: Time.t) (mem_src: Memory.t): Message.t :=
     match msg_tgt with
     | Message.full val (Some released_tgt) =>
       match (Memory.get loc from mem_src) with
       | Some (_, Message.full _ (Some released_prev)) =>
-        Message.full val (Some (get_released_src l loc released_tgt tview_src released_prev))
+        Message.full val (Some (get_released_src strong l loc released_tgt tview_src released_prev))
       | _ =>
-        Message.full val (Some (get_released_src l loc released_tgt tview_src View.bot))
+        Message.full val (Some (get_released_src strong l loc released_tgt tview_src View.bot))
       end
     | _ => msg_tgt
     end.
 
   Lemma get_released_src_tview_released_le_loc
-        l loc released_tgt tview_src released_prev:
-    <<TVIEW: tview_released_le_loc l loc tview_src (get_released_src l loc released_tgt tview_src released_prev)>>.
+        strong l loc released_tgt tview_src released_prev
+        (TVIEW: TView.wf tview_src):
+    <<TVIEW: tview_released_le_loc l loc tview_src (get_released_src strong l loc released_tgt tview_src released_prev)>>.
   Proof.
-    econs; ss.
-    - unfold LocFun.add. condtac; ss. eapply Time.join_l.
-    - unfold LocFun.add. condtac; ss. eapply Time.join_l.
+    unfold get_released_src. condtac; ss.
+    - inv TVIEW. destruct (REL_CUR loc).
+      econs; ss.
+      + unfold LocFun.add. condtac; ss. unnw.
+        etrans; try eapply PLN. eapply Time.join_l.
+      + unfold LocFun.add. condtac; ss. unnw.
+        etrans; try eapply RLX. eapply Time.join_l.
+    - econs; ss.
+      + unfold LocFun.add. condtac; ss. eapply Time.join_l.
+      + unfold LocFun.add. condtac; ss. eapply Time.join_l.
   Qed.
 
   Lemma get_released_src_prev_released_le_loc
-        l loc released_tgt tview_src released_prev
+        strong l loc released_tgt tview_src released_prev
         from mem_src from' val
         (GET: Memory.get loc from mem_src = Some (from', Message.full val (Some released_prev))):
-    <<PREV: prev_released_le_loc l loc from mem_src (get_released_src l loc released_tgt tview_src released_prev)>>.
+    <<PREV: prev_released_le_loc l loc from mem_src (get_released_src strong l loc released_tgt tview_src released_prev)>>.
   Proof.
     unfold prev_released_le_loc. rewrite GET.
-    econs; ss.
-    - unfold LocFun.add. condtac; ss. eapply Time.join_r.
-    - unfold LocFun.add. condtac; ss. eapply Time.join_r.
+    unfold get_released_src, LocFun.add. 
+    econs; repeat (condtac; ss); eauto using Time.join_r.
   Qed.
 
   Lemma get_released_src_sim_view
-        l loc released_tgt tview_src released_prev:
-    <<SIM: sim_view l (get_released_src l loc released_tgt tview_src released_prev) released_tgt>>.
+        strong l loc released_tgt tview_src released_prev:
+    <<SIM: sim_view l (get_released_src strong l loc released_tgt tview_src released_prev) released_tgt>>.
   Proof.
     unfold get_released_src. econs; ss.
-    - unfold sim_timemap, LocFun.add. i. condtac; ss.
-    - unfold sim_timemap, LocFun.add. i. condtac; ss.
+    - unfold sim_timemap, LocFun.add. i. repeat (condtac; ss).
+    - unfold sim_timemap, LocFun.add. i. repeat (condtac; ss).
   Qed.
 
   Lemma get_released_src_wf
-        l loc released_tgt tview_src released_prev
+        strong l loc released_tgt tview_src released_prev
         (RELEASED_TGT: View.wf released_tgt)
         (TVIEW_SRC: TView.wf tview_src)
         (RELEASED_PREV: View.wf released_prev):
-    View.wf (get_released_src l loc released_tgt tview_src released_prev).
+    View.wf (get_released_src strong l loc released_tgt tview_src released_prev).
   Proof.
     econs. ii.
-    unfold get_released_src, LocFun.add. ss. condtac.
+    unfold get_released_src, LocFun.add. repeat (condtac; ss).
+    - subst. inv TVIEW_SRC. inv CUR.
+      inv RELEASED_PREV.
+      apply Time.join_spec.
+      + etrans; eauto. apply Time.join_l.
+      + etrans; eauto. apply Time.join_r.
+    - inv RELEASED_TGT. apply PLN_RLX.
     - subst. inv TVIEW_SRC. destruct (REL loc).
       inv RELEASED_PREV.
       apply Time.join_spec.
@@ -203,36 +228,49 @@ Module SimCommon.
   Qed.
 
   Lemma get_released_src_closed
-        l loc released_tgt tview_src released_prev
+        strong l loc released_tgt tview_src released_prev
         mem_src mem_tgt
         (SIM: sim_memory l mem_src mem_tgt)
         (MSG_TGT: Memory.closed_view released_tgt mem_tgt)
         (TVIEW_SRC: TView.closed tview_src mem_src)
         (PREV_SRC: Memory.closed_view released_prev mem_src):
-    Memory.closed_view (get_released_src l loc released_tgt tview_src released_prev) mem_src.
+    Memory.closed_view (get_released_src strong l loc released_tgt tview_src released_prev) mem_src.
   Proof.
     inv MSG_TGT. inv TVIEW_SRC. inv PREV_SRC.
-    unfold get_released_src. econs; ss.
-    - ii. unfold LocFun.add. condtac; ss.
-      + subst.
-        edestruct Time.join_cases; rewrite H; eauto.
-        destruct (REL loc). eauto.
-      + specialize (PLN loc0). des. inv SIM.
-        exploit COMPLETE; eauto. i. des.
-        inv MSG. inv RELEASED; eauto.
-    - ii. unfold LocFun.add. condtac; ss.
-      + subst.
-        edestruct Time.join_cases; rewrite H; eauto.
-        destruct (REL loc). eauto.
-      + specialize (RLX loc0). des. inv SIM.
-        exploit COMPLETE; eauto. i. des.
-        inv MSG. inv RELEASED; eauto.
+    unfold get_released_src. condtac; ss.
+    - econs; ss; ii.
+      + unfold LocFun.add. condtac; ss.
+        * subst. inv CUR.
+          edestruct Time.join_cases; rewrite H; eauto.
+        * specialize (PLN loc0). des. inv SIM.
+          exploit COMPLETE; eauto. i. des.
+          inv MSG. inv RELEASED; eauto.
+      + unfold LocFun.add. condtac; ss.
+        * subst. inv CUR.
+          edestruct Time.join_cases; rewrite H; eauto.
+        * specialize (RLX loc0). des. inv SIM.
+          exploit COMPLETE; eauto. i. des.
+          inv MSG. inv RELEASED; eauto.
+    - econs; ss; ii.
+      + unfold LocFun.add. condtac; ss.
+        * subst. destruct (REL loc).
+          edestruct Time.join_cases; rewrite H; eauto.
+        * specialize (PLN loc0). des. inv SIM.
+          exploit COMPLETE; eauto. i. des.
+          inv MSG. inv RELEASED; eauto.
+      + unfold LocFun.add. condtac; ss.
+        * subst. destruct (REL loc).
+          edestruct Time.join_cases; rewrite H; eauto.
+        * specialize (RLX loc0). des. inv SIM.
+          exploit COMPLETE; eauto. i. des.
+          inv MSG. inv RELEASED; eauto.
   Qed.
 
   Lemma get_message_src_fulfillable
-        l loc msg_tgt tview_src from mem_src
+        strong l loc msg_tgt tview_src from mem_src
         val released
-        (MSG: get_message_src l loc msg_tgt tview_src from mem_src =
+        (TVIEW: TView.wf tview_src)
+        (MSG: get_message_src strong l loc msg_tgt tview_src from mem_src =
               Message.full val (Some released)):
     <<TVIEW: tview_released_le_loc l loc tview_src released>> /\
     <<PREV: prev_released_le_loc l loc from mem_src released>>.
@@ -247,8 +285,8 @@ Module SimCommon.
   Qed.
 
   Lemma get_message_src_sim_message
-        l loc msg_tgt tview_src from mem_src:
-    <<SIM: sim_message l (get_message_src l loc msg_tgt tview_src from mem_src) msg_tgt>>.
+        strong l loc msg_tgt tview_src from mem_src:
+    <<SIM: sim_message l (get_message_src strong l loc msg_tgt tview_src from mem_src) msg_tgt>>.
   Proof.
     unfold get_message_src.
     destruct msg_tgt; ss. destruct released; ss.
@@ -258,11 +296,11 @@ Module SimCommon.
   Qed.
 
   Lemma get_message_src_wf
-        l loc msg_tgt tview_src from mem_src
+        strong l loc msg_tgt tview_src from mem_src
         (MSG_TGT: Message.wf msg_tgt)
         (TVIEW_SRC: TView.wf tview_src)
         (CLOSED_SRC: Memory.closed mem_src):
-    Message.wf (get_message_src l loc msg_tgt tview_src from mem_src).
+    Message.wf (get_message_src strong l loc msg_tgt tview_src from mem_src).
   Proof.
     unfold get_message_src.
     destruct msg_tgt; ss. destruct released; ss.
@@ -276,27 +314,27 @@ Module SimCommon.
   Qed.
 
   Lemma get_message_src_message_to
-        l loc to msg_tgt tview_src from mem_src
+        strong l loc to msg_tgt tview_src from mem_src
         (MSG_TGT: Memory.message_to msg_tgt loc to)
         (LOC: loc <> l):
-    Memory.message_to (get_message_src l loc msg_tgt tview_src from mem_src) loc to.
+    Memory.message_to (get_message_src strong l loc msg_tgt tview_src from mem_src) loc to.
   Proof.
     unfold get_message_src.
     destruct msg_tgt; ss. destruct released; ss.
     inv MSG_TGT.
     destruct (Memory.get loc from mem_src) as [[? [? []|]]|] eqn:GET;
-      econs; ss; unfold LocFun.add; condtac; ss.
+      econs; ss; unfold get_released_src, LocFun.add; repeat (condtac; ss).
   Qed.
 
   Lemma get_message_src_closed
-        l loc msg_tgt tview_src from mem1_src mem2_src mem2_tgt
+        strong l loc msg_tgt tview_src from mem1_src mem2_src mem2_tgt
         (SIM: sim_memory l mem2_src mem2_tgt)
         (MSG_TGT: Memory.closed_message msg_tgt mem2_tgt)
         (TVIEW1_SRC: TView.closed tview_src mem1_src)
         (MEM1_SRC: Memory.closed mem1_src)
         (OP_SRC: forall v (CLOSED: Memory.closed_view v mem1_src),
             Memory.closed_view v mem2_src):
-    Memory.closed_message (get_message_src l loc msg_tgt tview_src from mem1_src) mem2_src.
+    Memory.closed_message (get_message_src strong l loc msg_tgt tview_src from mem1_src) mem2_src.
   Proof.
     inv MSG_TGT; ss. inv CLOSED; eauto.
     exploit Memory.closed_view_bot; try eapply MEM1_SRC. i.
@@ -310,9 +348,9 @@ Module SimCommon.
   Qed.
 
   Lemma get_message_src_full
-        l loc msg_tgt tview_src from mem_src
+        strong l loc msg_tgt tview_src from mem_src
         val released
-        (MSG: get_message_src l loc msg_tgt tview_src from mem_src = Message.full val released):
+        (MSG: get_message_src strong l loc msg_tgt tview_src from mem_src = Message.full val released):
     exists released_tgt, msg_tgt = Message.full val released_tgt.
   Proof.
     destruct msg_tgt; ss.
@@ -321,8 +359,8 @@ Module SimCommon.
   Qed.
 
   Lemma get_message_src_reserve
-        l loc msg_tgt tview_src from mem_src
-        (MSG: get_message_src l loc msg_tgt tview_src from mem_src = Message.reserve):
+        strong l loc msg_tgt tview_src from mem_src
+        (MSG: get_message_src strong l loc msg_tgt tview_src from mem_src = Message.reserve):
     msg_tgt = Message.reserve.
   Proof.
     destruct msg_tgt; ss.
@@ -348,7 +386,7 @@ Module SimCommon.
         (LOC: loc <> l):
     exists promises2_src mem2_src kind_src,
       <<PROMISE_SRC: Memory.promise promises1_src mem1_src loc from to
-                                    (get_message_src l loc msg_tgt tview_src from mem1_src)
+                                    (get_message_src false l loc msg_tgt tview_src from mem1_src)
                                     promises2_src mem2_src kind_src>> /\
       <<PROMISES2: sim_memory l promises2_src promises2_tgt>> /\
       <<MEM2: sim_memory l mem2_src mem2_tgt>> /\
@@ -357,7 +395,7 @@ Module SimCommon.
     inv PROMISES1. inv MEM1. inv PROMISE_TGT.
     { (* add *)
       exploit (@Memory.add_exists mem1_src loc from to
-                                  (get_message_src l loc msg_tgt tview_src from mem1_src)).
+                                  (get_message_src false l loc msg_tgt tview_src from mem1_src)).
       { ii. exploit SOUND0; eauto. i. des.
         exploit Memory.add_get1; try exact GET_TGT; eauto. i.
         exploit Memory.add_get0; try exact MEM. i. des.
@@ -423,7 +461,7 @@ Module SimCommon.
           exploit FULFILL1; eauto. i. des. split; auto.
           unfold prev_released_le_loc.
           erewrite Memory.add_o; eauto. condtac; ss. des. subst.
-          destruct (get_message_src l loc msg_tgt tview_src from mem1_src) eqn:GET; ss.
+          destruct (get_message_src false l loc msg_tgt tview_src from mem1_src) eqn:GET; ss.
           exploit get_message_src_full; eauto. i. des. subst.
           exploit LE1_SRC; try exact GETP. i.
           exploit SOUND0; try exact x; eauto. i. des. inv MSG.
@@ -436,7 +474,7 @@ Module SimCommon.
       clear GET GET1 GET2.
       exploit COMPLETE; eauto. i. des.
       exploit (@Memory.split_exists promises1_src loc from to ts3
-                                    (get_message_src l loc msg_tgt tview_src from mem1_src) msg_src); eauto.
+                                    (get_message_src false l loc msg_tgt tview_src from mem1_src) msg_src); eauto.
       { inv MEM. inv SPLIT. ss. }
       { inv MEM. inv SPLIT. ss. }
       { eapply get_message_src_wf; eauto.
@@ -514,7 +552,7 @@ Module SimCommon.
           exploit Memory.split_get0; try exact x1. i. des.
           unfold prev_released_le_loc. rewrite GET2.
           destruct msg_tgt as [? []|]; ss.
-          assert (BOT: view_le_loc l (get_released_src l loc t tview_src View.bot) released).
+          assert (BOT: view_le_loc l (get_released_src false l loc t tview_src View.bot) released).
           { exploit FULFILL1; try exact GET_SRC. i. des.
             inv TVIEW0. econs; ss.
             - unfold LocFun.add. condtac; ss.
@@ -561,7 +599,7 @@ Module SimCommon.
       exploit Memory.lower_get0; try exact PROMISES. i. des.
       exploit COMPLETE; eauto. i. des. clear GET GET0.
       exploit (@Memory.lower_exists promises1_src loc from to msg_src
-                                    (get_message_src l loc msg_tgt tview_src from mem1_src)); eauto.
+                                    (get_message_src false l loc msg_tgt tview_src from mem1_src)); eauto.
       { inv MEM. inv LOWER. ss. }
       { eapply get_message_src_wf; eauto.
         inv MEM. inv LOWER. ss. }
@@ -573,7 +611,7 @@ Module SimCommon.
           rewrite GET_TGT in *. inv GET. inv MSG. inv RELEASED.
           inv MSG_LE. inv RELEASED; [econs|]; ss.
           exploit FULFILL1; eauto. i. des.
-          assert (BOT: View.le (get_released_src l loc lhs tview_src View.bot) view_src).
+          assert (BOT: View.le (get_released_src false l loc lhs tview_src View.bot) view_src).
           { inv SIM. inv TVIEW. econs; ss.
             - unfold TimeMap.bot.
               ii. unfold LocFun.add. condtac; ss.
@@ -696,6 +734,217 @@ Module SimCommon.
         exploit FULFILL1; eauto. i. des. split; auto.
         unfold prev_released_le_loc in *.
         erewrite Memory.remove_o; eauto. condtac; ss.
+    }
+  Qed.
+
+  Lemma promise_strong_relaxed
+        l tview_src
+        promises1_src mem1_src
+        promises1_tgt mem1_tgt loc from to msg_tgt promises2_tgt mem2_tgt kind_tgt
+        (PROMISES1: sim_memory l promises1_src promises1_tgt)
+        (MEM1: sim_memory l mem1_src mem1_tgt)
+        (FULFILL1: fulfillable l tview_src mem1_src promises1_src)
+        (TVIEW_SRC: TView.wf tview_src)
+        (LE1_SRC: Memory.le promises1_src mem1_src)
+        (LE1_TGT: Memory.le promises1_tgt mem1_tgt)
+        (MEM1_SRC: Memory.closed mem1_src)
+        (PROMISE_TGT: Memory.promise promises1_tgt mem1_tgt loc from to msg_tgt promises2_tgt mem2_tgt kind_tgt)
+        (KIND_TGT: negb (Memory.op_kind_is_lower kind_tgt) /\ negb (Memory.op_kind_is_cancel kind_tgt))
+        (SPLIT_TGT: Memory.op_kind_is_split kind_tgt ->
+                         (exists ts3 val, kind_tgt = Memory.op_kind_split ts3 (Message.full val None)) \/
+                         (exists ts3, kind_tgt = Memory.op_kind_split ts3 Message.reserve))
+        (LOC: loc <> l):
+    exists promises2_src mem2_src kind_src,
+      <<PROMISE_SRC: Memory.promise promises1_src mem1_src loc from to
+                                    (get_message_src true l loc msg_tgt tview_src from mem1_src)
+                                    promises2_src mem2_src kind_src>> /\
+      <<PROMISES2: sim_memory l promises2_src promises2_tgt>> /\
+      <<MEM2: sim_memory l mem2_src mem2_tgt>> /\
+      <<FULFILL2: fulfillable l tview_src mem2_src promises2_src>>.
+  Proof.
+    des. inv PROMISES1. inv MEM1. inv PROMISE_TGT; ss.
+    { (* add *)
+      exploit (@Memory.add_exists mem1_src loc from to
+                                  (get_message_src true l loc msg_tgt tview_src from mem1_src)).
+      { ii. exploit SOUND0; eauto. i. des.
+        exploit Memory.add_get1; try exact GET_TGT; eauto. i.
+        exploit Memory.add_get0; try exact MEM. i. des.
+        exploit Memory.get_disjoint; [exact x1|exact GET0|..]. i. des.
+        { subst. congr. }
+        apply (x2 x); eauto. }
+      { inv MEM. inv ADD. ss. }
+      { eapply get_message_src_wf; eauto.
+        inv MEM. inv ADD. ss. }
+      i. des.
+      exploit Memory.add_exists_le; try exact x0; eauto. i. des.
+      esplits.
+      - econs; eauto.
+        + eapply get_message_src_message_to; eauto.
+        + i. exploit get_message_src_reserve; eauto. i. subst.
+          exploit RESERVE; eauto. i. des.
+          exploit COMPLETE0; try exact x; eauto. i. des.
+          inv MSG. eauto.
+        + i. exploit SOUND0; try exact GET; eauto. i. des.
+          destruct msg_tgt; ss. eauto.
+      - econs; i.
+        + revert GET_SRC. erewrite Memory.add_o; eauto. condtac; ss; i.
+          * des. subst. inv GET_SRC.
+            exploit Memory.add_get0; try exact PROMISES. i. des.
+            esplits; eauto.
+            eapply get_message_src_sim_message; eauto.
+          * guardH o.
+            exploit SOUND; eauto. i. des.
+            exploit Memory.add_get1; try exact GET_TGT; eauto.
+        + revert GET_TGT. erewrite Memory.add_o; eauto. condtac; ss; i.
+          * des. subst. inv GET_TGT.
+            exploit Memory.add_get0; try exact x1. i. des.
+            esplits; eauto.
+            eapply get_message_src_sim_message; eauto.
+          * guardH o.
+            exploit COMPLETE; eauto. i. des.
+            exploit Memory.add_get1; try exact GET_SRC; eauto.
+      - econs; i.
+        + revert GET_SRC. erewrite Memory.add_o; eauto. condtac; ss; i.
+          * des. subst. inv GET_SRC.
+            exploit Memory.add_get0; try exact MEM. i. des.
+            esplits; eauto.
+            eapply get_message_src_sim_message; eauto.
+          * guardH o.
+            exploit SOUND0; eauto. i. des.
+            exploit Memory.add_get1; try exact GET_TGT; eauto.
+        + revert GET_TGT. erewrite Memory.add_o; eauto. condtac; ss; i.
+          * des. subst. inv GET_TGT.
+            exploit Memory.add_get0; try exact x0. i. des.
+            esplits; eauto.
+            eapply get_message_src_sim_message; eauto.
+          * guardH o.
+            exploit COMPLETE0; eauto. i. des.
+            exploit Memory.add_get1; try exact GET_SRC; eauto.
+      - ii. revert GETP. erewrite Memory.add_o; eauto. condtac; ss; i.
+        + des. subst. inv GETP.
+          exploit get_message_src_fulfillable; eauto. i. des.
+          split; auto.
+          unfold prev_released_le_loc.
+          erewrite Memory.add_o; eauto. condtac; ss.
+          des. subst. inv x0. inv ADD. timetac.
+        + guardH o.
+          exploit FULFILL1; eauto. i. des. split; auto.
+          unfold prev_released_le_loc.
+          erewrite Memory.add_o; eauto. condtac; ss. des. subst.
+          destruct (get_message_src true l loc msg_tgt tview_src from mem1_src) eqn:GET; ss.
+          exploit get_message_src_full; eauto. i. des. subst.
+          exploit LE1_SRC; try exact GETP. i.
+          exploit SOUND0; try exact x; eauto. i. des. inv MSG.
+          exploit ATTACH; eauto; ss.
+    }
+
+    { (* split *)
+      guardH RESERVE.
+      exploit Memory.split_get0; try exact PROMISES. i. des.
+      clear GET GET1 GET2.
+      exploit COMPLETE; eauto. i. des.
+      exploit (@Memory.split_exists promises1_src loc from to ts3
+                                    (get_message_src true l loc msg_tgt tview_src from mem1_src) msg_src); eauto.
+      { inv MEM. inv SPLIT. ss. }
+      { inv MEM. inv SPLIT. ss. }
+      { eapply get_message_src_wf; eauto.
+        inv MEM. inv SPLIT. ss. }
+      i. des.
+      exploit Memory.split_exists_le; try exact x0; eauto. i. des.
+      esplits.
+      - econs 2; eauto.
+        + eapply get_message_src_message_to; eauto.
+        + unguard. des. subst.
+          unfold get_message_src.
+          destruct released'; eauto.
+          destruct (Memory.get loc from mem1_src) as [[? [? []|]]|]; eauto.
+      - econs; i.
+        + revert GET_SRC0. erewrite Memory.split_o; eauto. repeat condtac; ss; i.
+          * des. subst. inv GET_SRC0.
+            exploit Memory.split_get0; try exact PROMISES. i. des.
+            esplits; eauto.
+            eapply get_message_src_sim_message; eauto.
+          * guardH o. des. subst. inv GET_SRC0.
+            exploit Memory.split_get0; try exact PROMISES. i. des.
+            esplits; eauto.
+          * guardH o. guardH o0.
+            exploit SOUND; eauto. i. des.
+            erewrite Memory.split_o; eauto. repeat condtac; ss.
+            esplits; eauto.
+        + revert GET_TGT. erewrite Memory.split_o; eauto. repeat condtac; ss; i.
+          * des. subst. inv GET_TGT.
+            exploit Memory.split_get0; try exact x0. i. des.
+            esplits; eauto.
+            eapply get_message_src_sim_message; eauto.
+          * guardH o. des. subst. inv GET_TGT.
+            exploit Memory.split_get0; try exact x0. i. des.
+            esplits; eauto.
+          * guardH o. guardH o0.
+            exploit COMPLETE; eauto. i. des.
+            erewrite Memory.split_o; eauto. repeat condtac; ss.
+            esplits; eauto.
+      - econs; i.
+        + revert GET_SRC0. erewrite Memory.split_o; eauto. repeat condtac; ss; i.
+          * des. subst. inv GET_SRC0.
+            exploit Memory.split_get0; try exact MEM. i. des.
+            esplits; eauto.
+            eapply get_message_src_sim_message; eauto.
+          * guardH o. des. subst. inv GET_SRC0.
+            exploit Memory.split_get0; try exact MEM. i. des.
+            esplits; eauto.
+          * guardH o. guardH o0.
+            exploit SOUND0; eauto. i. des.
+            erewrite Memory.split_o; eauto. repeat condtac; ss.
+            esplits; eauto.
+        + revert GET_TGT. erewrite Memory.split_o; eauto. repeat condtac; ss; i.
+          * des. subst. inv GET_TGT.
+            exploit Memory.split_get0; try exact x1. i. des.
+            esplits; eauto.
+            eapply get_message_src_sim_message; eauto.
+          * guardH o. des. subst. inv GET_TGT.
+            exploit Memory.split_get0; try exact x1. i. des.
+            esplits; eauto.
+          * guardH o. guardH o0.
+            exploit COMPLETE0; eauto. i. des.
+            erewrite Memory.split_o; eauto. repeat condtac; ss.
+            esplits; eauto.
+      - ii. revert GETP. erewrite Memory.split_o; eauto. repeat condtac; ss; i.
+        + des. subst. inv GETP.
+          exploit get_message_src_fulfillable; eauto. i. des.
+          split; auto.
+          unfold prev_released_le_loc.
+          erewrite Memory.split_o; eauto. repeat condtac; ss.
+          * des. subst. inv x0. inv SPLIT. timetac.
+          * guardH o. des. subst.
+            inv x0. inv SPLIT. rewrite TS12 in TS23. timetac.
+        + guardH o. des. subst. inv GETP.
+          exploit LE1_SRC; eauto. i.
+          exploit SOUND0; eauto. i. des. inv MSG0. inv RELEASED.
+          exploit SPLIT_TGT; eauto. i. des.
+          * inv x2. exploit LE1_TGT; eauto. i. congr.
+          * inv x2. exploit LE1_TGT; eauto. i. congr.
+        + guardH o. guardH o0.
+          exploit FULFILL1; eauto. i. des. split; auto.
+          unfold prev_released_le_loc.
+          erewrite Memory.split_o; eauto. repeat condtac; ss.
+          * des. subst. exfalso.
+            exploit Memory.split_get0; try exact x0. i. des.
+            exploit Memory.get_ts; try exact GETP. i. des.
+            { subst. inv x0. inv SPLIT. inv TS12. }
+            exploit Memory.get_ts; try exact GET1. i. des.
+            { subst. inv x0. inv SPLIT. inv TS23. }
+            exploit Memory.get_disjoint; [exact GETP|exact GET1|..]. i. des.
+            { subst. inv x0. inv SPLIT. timetac. }
+            destruct (TimeFacts.le_lt_dec to0 ts3).
+            { apply (x4 to0); econs; ss; try refl.
+              inv x0. inv SPLIT. etrans; eauto. }
+            { apply (x4 ts3); econs; ss; try refl.
+              - inv x0. inv SPLIT. ss.
+              - econs. ss. }
+          * guardH o1. des. subst.
+            exploit Memory.split_get0; try exact x1. i. des.
+            unfold prev_released_le_loc in PREV.
+            rewrite GET1 in *. ss.
     }
   Qed.
 
@@ -831,6 +1080,84 @@ Module SimCommon.
     - ss.
   Qed.
 
+  Lemma promise_step_release
+        l
+        lc1_src mem1_src
+        lc1_tgt mem1_tgt loc from to val released_tgt lc2_tgt mem2_tgt kind_tgt
+        (LC1: sim_local l lc1_src lc1_tgt)
+        (MEM1: sim_memory l mem1_src mem1_tgt)
+        (WF1_SRC: Local.wf lc1_src mem1_src)
+        (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
+        (CLOSED1_SRC: Memory.closed mem1_src)
+        (FULFILLABLE1: fulfillable l lc1_src.(Local.tview) mem1_src lc1_src.(Local.promises))
+        (LOC: loc <> l)
+        (STEP_TGT: Local.promise_step lc1_tgt mem1_tgt loc from to
+                                      (Message.full val (Some (released_tgt))) lc2_tgt mem2_tgt kind_tgt)
+        (KIND_TGT: negb (Memory.op_kind_is_lower kind_tgt) /\ negb (Memory.op_kind_is_cancel kind_tgt))
+        (SPLIT_TGT: Memory.op_kind_is_split kind_tgt ->
+                         (exists ts3 val, kind_tgt = Memory.op_kind_split ts3 (Message.full val None)) \/
+                         (exists ts3, kind_tgt = Memory.op_kind_split ts3 Message.reserve)):
+    exists released_src lc2_src mem2_src kind_src,
+      <<STEP_SRC: Local.promise_step lc1_src mem1_src loc from to
+                                     (Message.full val (Some (released_src))) lc2_src mem2_src kind_src>> /\
+      <<LC2: sim_local l lc2_src lc2_tgt>> /\
+      <<MEM2: sim_memory l mem2_src mem2_tgt>> /\
+      <<FULFILLABLE2: fulfillable l lc2_src.(Local.tview) mem2_src lc2_src.(Local.promises)>> /\
+      <<STRONG: view_le_loc l lc1_src.(Local.tview).(TView.cur) released_src>>.
+  Proof.
+    inv STEP_TGT.
+    exploit promise_strong_relaxed; try exact PROMISE; try apply LC1;
+      try apply WF1_SRC; try apply WF1_TGT; eauto.
+    i. des.
+    exploit (@get_message_src_closed true l loc (Message.full val (Some released_tgt))
+                                     lc1_src.(Local.tview) from mem1_src mem2_src mem2_tgt); eauto.
+    { apply WF1_SRC. }
+    { exploit Memory.promise_op; try exact PROMISE_SRC. i.
+      eapply Memory.op_closed_view; eauto. }
+    i. ss.
+    destruct (Memory.get loc from mem1_src) as [[? [? []|]]|]; ss.
+    - esplits.
+      + econs; eauto.
+      + inv LC1. econs; eauto.
+      + ss.
+      + ss.
+      + econs; ss.
+        * unfold LocFun.add. condtac; ss. unnw.
+          etrans; [|eapply Time.join_l]. refl.
+        * unfold LocFun.add. condtac; ss. unnw.
+          etrans; [|eapply Time.join_l]. refl.
+    - esplits.
+      + econs; eauto.
+      + inv LC1. econs; eauto.
+      + ss.
+      + ss.
+      + econs; ss.
+        * unfold LocFun.add. condtac; ss. unnw.
+          etrans; [|eapply Time.join_l]. refl.
+        * unfold LocFun.add. condtac; ss. unnw.
+          etrans; [|eapply Time.join_l]. refl.
+    - esplits.
+      + econs; eauto.
+      + inv LC1. econs; eauto.
+      + ss.
+      + ss.
+      + econs; ss.
+        * unfold LocFun.add. condtac; ss. unnw.
+          etrans; [|eapply Time.join_l]. refl.
+        * unfold LocFun.add. condtac; ss. unnw.
+          etrans; [|eapply Time.join_l]. refl.
+    - esplits.
+      + econs; eauto.
+      + inv LC1. econs; eauto.
+      + ss.
+      + ss.
+      + econs; ss.
+        * unfold LocFun.add. condtac; ss. unnw.
+          etrans; [|eapply Time.join_l]. refl.
+        * unfold LocFun.add. condtac; ss. unnw.
+          etrans; [|eapply Time.join_l]. refl.
+  Qed.
+
   Lemma read_step
         l
         lc1_src mem1_src
@@ -857,7 +1184,7 @@ Module SimCommon.
     - ss.
   Admitted.
 
-  Lemma write_step_relaxed_aux
+  Lemma fulfill_step_relaxed
         l
         lc1_src sc1_src mem1_src releasedm_src
         lc1_tgt sc1_tgt mem1_tgt loc from to val releasedm_tgt released_tgt ord lc2_tgt sc2_tgt
@@ -865,7 +1192,6 @@ Module SimCommon.
         (MEM1: sim_memory l mem1_src mem1_tgt)
         (REL: sim_opt_view l releasedm_src releasedm_tgt)
         (REL_WF: View.opt_wf releasedm_src)
-        (REL_CLOSED: Memory.closed_opt_view releasedm_src mem1_src)
         (REL_GET: __guard__ (
                       Time.le (releasedm_src.(View.unwrap).(View.rlx) loc) to /\
                       (releasedm_src = None \/
@@ -873,11 +1199,9 @@ Module SimCommon.
                          Memory.get loc from mem1_src = Some (from', Message.full val' releasedm_src))))
         (WF1_SRC: Local.wf lc1_src mem1_src)
         (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
-        (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
-        (CLOSED1_SRC: Memory.closed mem1_src)
         (FULFILLABLE1: fulfillable l lc1_src.(Local.tview) mem1_src lc1_src.(Local.promises))
         (LOC: loc <> l)
-        (ORD: Ordering.le ord Ordering.relaxed)
+        (ORD: Ordering.le ord Ordering.strong_relaxed)
         (STEP_TGT: fulfill_step lc1_tgt sc1_tgt loc from to val releasedm_tgt released_tgt ord lc2_tgt sc2_tgt):
     exists released_src promises2_src mem2_src,
       <<WRITE_SRC: Memory.write lc1_src.(Local.promises) mem1_src loc from to
@@ -900,7 +1224,8 @@ Module SimCommon.
       eapply TViewFacts.write_future0; try eapply WF1_SRC; eauto. }
     { econs. destruct released_src; ss.
       - revert REL_LE. unfold TView.write_released.
-        destruct ord; ss. repeat condtac; ss. i.
+        condtac; ss. repeat condtac; ss; i.
+        { destruct ord; ss. }
         inv REL_LE. econs.
         exploit View.join_l. i. erewrite LE in x0.
         exploit View.join_r. i. erewrite LE in x1.
@@ -954,8 +1279,7 @@ Module SimCommon.
     esplits.
     - econs; eauto; ss. econs 3; eauto.
       econs. unfold TView.write_released.
-      destruct ord; ss; repeat (condtac; ss).
-      + unfold TimeMap.bot. apply Time.bot_spec.
+      repeat (condtac; ss); try by (destruct ord; ss).
       + unfold TimeMap.join.
         unfold LocFun.add. condtac; ss.
         unfold TimeMap.join.
@@ -967,6 +1291,119 @@ Module SimCommon.
           exploit RLX; eauto. i. rewrite x.
           inv WRITABLE. etrans; [|econs; eauto].
           inv WF1_TGT. inv TVIEW_WF. destruct (REL_CUR loc). ss.
+      + unfold TimeMap.bot. apply Time.bot_spec.
+    - admit.
+    - admit.
+  Admitted.
+
+  Lemma fulfill_step_release
+        l
+        lc1_src sc1_src mem1_src releasedm_src val released_src
+        lc1_tgt sc1_tgt mem1_tgt loc from to releasedm_tgt released_tgt ord lc2_tgt sc2_tgt
+        (LC1: sim_local l lc1_src lc1_tgt)
+        (MEM1: sim_memory l mem1_src mem1_tgt)
+        (REL: sim_opt_view l releasedm_src releasedm_tgt)
+        (REL_WF: View.opt_wf releasedm_src)
+        (REL_GET: __guard__ (
+                      Time.le (releasedm_src.(View.unwrap).(View.rlx) loc) to /\
+                      (releasedm_src = None \/
+                       exists from' val',
+                         Memory.get loc from mem1_src = Some (from', Message.full val' releasedm_src))))
+        (WF1_SRC: Local.wf lc1_src mem1_src)
+        (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
+        (FULFILLABLE1: fulfillable l lc1_src.(Local.tview) mem1_src lc1_src.(Local.promises))
+        (GET_SRC: Memory.get loc to lc1_src.(Local.promises) = Some (from, Message.full val (Some released_src)))
+        (STRONG: view_le_loc l lc1_src.(Local.tview).(TView.cur) released_src)
+        (LOC: loc <> l)
+        (ORD: Ordering.le Ordering.acqrel ord)
+        (STEP_TGT: fulfill_step lc1_tgt sc1_tgt loc from to val releasedm_tgt released_tgt ord lc2_tgt sc2_tgt):
+    exists released_src promises2_src mem2_src,
+      <<WRITE_SRC: Memory.write lc1_src.(Local.promises) mem1_src loc from to
+                                val (TView.write_released lc1_src.(Local.tview) sc1_src loc to releasedm_src ord)
+                                promises2_src mem2_src
+                                (Memory.op_kind_lower (Message.full val (Some released_src)))>> /\
+      <<PROMISES2: sim_memory l promises2_src lc2_tgt.(Local.promises)>> /\
+      <<MEM2: sim_memory l mem2_src mem1_tgt>>.
+  Proof.
+    inv STEP_TGT.
+    exploit Memory.remove_get0; eauto. i. des.
+    destruct lc1_src as [tview1_src promises1_src]. ss.
+    dup LC1. inv LC0. inv PROMISES1. ss.
+    exploit COMPLETE; eauto. i. des.
+    rewrite GET_SRC in *. inv GET_SRC0. inv MSG. inv RELEASED.
+    clear TVIEW SOUND COMPLETE.
+    exploit (@Memory.lower_exists promises1_src loc from to
+                                  (Message.full val (Some released_src))
+                                  (Message.full val (TView.write_released tview1_src sc1_src loc to releasedm_src ord))); ss.
+    { econs.
+      eapply TViewFacts.write_future0; try eapply WF1_SRC; eauto. }
+    { econs.
+      revert REL_LE. unfold TView.write_released.
+      condtac; try by (destruct ord; ss). ss.
+      repeat condtac; ss. i.
+      inv REL_LE. econs.
+      exploit View.join_l. i. erewrite LE in x0.
+      exploit View.join_r. i. erewrite LE in x1.
+      clear LE. eapply View.join_spec.
+      - unguard. des; subst; eauto using View.bot_spec.
+        inv REL; eauto using View.bot_spec. inv SIM.
+        inv SIM0. inv x0. ss.
+        exploit FULFILLABLE1; eauto. i. des.
+        unfold prev_released_le_loc in *.
+        rewrite REL_GET0 in PREV. inv PREV.
+        econs; ii.
+        + destruct (Loc.eq_dec loc0 l); subst; ss.
+          exploit PLN; eauto. i.
+          exploit PLN0; eauto. i.
+          rewrite x. rewrite x0. ss.
+        + destruct (Loc.eq_dec loc0 l); subst; ss.
+          exploit RLX; eauto. i.
+          exploit RLX0; eauto. i.
+          rewrite x. rewrite x0. ss.
+      - revert x1. unfold LocFun.add. condtac; ss. i.
+        inv SIM. inv LC1. inv TVIEW. inv CUR. inv STRONG. ss.
+        exploit View.join_l. i. erewrite x1 in x2.
+        exploit View.join_r. i. erewrite x1 in x3.
+        inv x2. inv x3. ss.
+        exploit FULFILLABLE1; eauto. i. des. inv TVIEW.
+        eapply View.join_spec.
+        + econs; ii.
+          * destruct (Loc.eq_dec loc0 l); subst; ss.
+            exploit PLN; eauto. i.
+            exploit PLN0; eauto. i.
+            rewrite x. rewrite x2. ss.
+          * destruct (Loc.eq_dec loc0 l); subst; ss.
+            exploit RLX; eauto. i.
+            exploit RLX0; eauto. i.
+            rewrite x. rewrite x2. ss.
+        + econs; ss; ii.
+          * specialize (PLN2 loc0). revert PLN2.
+            unfold TimeMap.singleton, LocFun.add. condtac; ss; i.
+            { subst. exploit PLN; eauto. i. rewrite x. ss. }
+            { unfold LocFun.find, LocFun.init. apply Time.bot_spec. }
+          * specialize (RLX2 loc0). revert RLX2.
+            unfold TimeMap.singleton, LocFun.add. condtac; ss; i.
+            { subst. exploit RLX; eauto. i. rewrite x. ss. }
+            { unfold LocFun.find, LocFun.init. apply Time.bot_spec. }
+    }
+    i. des.
+    exploit Memory.lower_get0; try exact x0. i. des.
+    exploit Memory.remove_exists; try exact GET2. i. des.
+    exploit Memory.lower_exists_le; try eapply WF1_SRC; eauto. i. des.
+    esplits.
+    - econs; eauto; ss. econs 3; eauto.
+      econs. unfold TView.write_released.
+      repeat (condtac; ss; try by (destruct ord; ss)).
+      unfold TimeMap.join.
+      unfold LocFun.add. condtac; ss.
+      unfold TimeMap.join.
+      unfold TimeMap.singleton, LocFun.add. condtac; ss.
+      eapply Time.join_spec.
+      + unguard. des; ss.
+      + eapply Time.join_spec; try refl.
+        inv LC1. inv TVIEW. inv CUR. ss.
+        exploit RLX; eauto. i. rewrite x.
+        inv WRITABLE. etrans; [|econs; eauto]. refl.
     - admit.
     - admit.
   Admitted.
@@ -1005,14 +1442,13 @@ Module SimCommon.
       <<MEM2: sim_memory l mem2_src mem2_tgt>> /\
       <<FULFILLABLE2: fulfillable l lc2_src.(Local.tview) mem1_src lc2_src.(Local.promises)>>.
   Proof.
-    destruct (Ordering.le ord Ordering.relaxed) eqn:ORD.
+    destruct (Ordering.le ord Ordering.strong_relaxed) eqn:ORD.
     { (* relaxed *)
       exploit write_promise_fulfill; eauto. i. des.
       exploit promise_step; try exact STEP1; eauto. i. des.
       exploit Local.promise_step_future; try exact STEP_SRC; eauto. i. des.
       exploit Local.promise_step_future; try exact STEP1; eauto. i. des.
-      exploit write_step_relaxed_aux; try exact STEP2; eauto.
-      { eapply Memory.future_closed_opt_view; eauto. }
+      exploit fulfill_step_relaxed; try exact STEP2; eauto.
       { unguard. des; eauto. split; auto. right.
         inv STEP_SRC. inv PROMISE.
         - erewrite Memory.add_o; eauto. condtac; ss; eauto.
@@ -1045,8 +1481,53 @@ Module SimCommon.
       - ss.
       - admit.
     }
-    { (* strong relaxed *)
-      admit.
+    { (* release *)
+      destruct released_tgt as [released_tgt|]; cycle 1.
+      { inv STEP_TGT. revert RELEASED0.
+        unfold TView.write_released. condtac; ss.
+        destruct ord; ss. }
+      exploit write_promise_fulfill; eauto. i. des.
+      exploit promise_step_release; try exact STEP1; eauto.
+      { exploit Local.write_step_strong_relaxed; eauto; try by destruct ord. i.
+        exploit Local.write_step_non_cancel; eauto. }
+      { i. destruct kind_tgt; ss. inv STEP_TGT.
+        hexploit RELEASE; try by destruct ord. i.
+        destruct msg3 as [? []|]; eauto.
+        inv WRITE. inv PROMISE.
+        exploit Memory.split_get0; try exact PROMISES. i. des.
+        exploit H0; eauto; ss. }
+      i. des.
+      exploit Local.promise_step_future; try exact STEP_SRC; eauto. i. des.
+      exploit Local.promise_step_future; try exact STEP1; eauto. i. des.
+      dup STEP_SRC. inv STEP_SRC0. clear CLOSED.
+      exploit Memory.promise_get2; try exact PROMISE; try by inv PROMISE. i. des.
+      exploit fulfill_step_release; try exact STEP2; eauto.
+      { unguard. des; eauto. split; auto. right.
+        inv STEP_SRC. inv PROMISE.
+        - erewrite Memory.add_o; eauto. condtac; ss; eauto.
+          des. subst. inv MEM. inv ADD. timetac.
+        - erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
+          + des. subst. inv MEM. inv SPLIT. timetac.
+          + guardH o. des. subst.
+            inv MEM. inv SPLIT. rewrite TS12 in TS23. timetac.
+        - erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+          des. subst. inv MEM. inv LOWER. timetac.
+        - erewrite Memory.remove_o; eauto. condtac; ss; eauto. }
+      { destruct ord; ss. }
+      i. des.
+      replace released_src0 with released_src in *; cycle 1.
+      { inv WRITE_SRC. inv PROMISE0.
+        exploit Memory.lower_get0; try exact MEM. i. des.
+        rewrite GET in *. inv GET_MEM. ss. }
+      exploit MemoryMerge.promise_write_write; try exact PROMISE; eauto. i.
+      esplits.
+      - econs; eauto.
+        + admit.
+        + admit.
+      - econs; ss.
+        admit.
+      - ss.
+      - admit.
     }
   Admitted.
 

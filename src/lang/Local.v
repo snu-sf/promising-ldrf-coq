@@ -408,6 +408,14 @@ Module Local.
     - inv WRITE. inv PROMISE; try inv TS; ss.
   Qed.
 
+  Lemma write_step_non_cancel
+        lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
+        (STEP: write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind):
+    negb (Memory.op_kind_is_cancel kind).
+  Proof.
+    inv STEP. inv WRITE. inv PROMISE; ss.
+  Qed.
+
   (* TODO: refactor *)
   Lemma write_step_strong_relaxed
         lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
