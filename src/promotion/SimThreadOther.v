@@ -116,46 +116,6 @@ Module SimThreadOther.
       erewrite promise_eq_mem; try exact PROMISE; eauto.
   Qed.
 
-  Lemma Forall_app
-        A
-        (P: A -> Prop)
-        (l1 l2: list A)
-        (FORALL1: List.Forall P l1)
-        (FORALL2: List.Forall P l2):
-    List.Forall P (l1 ++ l2).
-  Proof.
-    induction l1; ss.
-    inv FORALL1. eauto.
-  Qed.
-
-  Lemma Forall_app_inv
-        A
-        (P: A -> Prop)
-        (l1 l2: list A)
-        (FORALL: List.Forall P (l1 ++ l2)):
-    <<FORALL1: List.Forall P l1>> /\
-               <<FORALL2: List.Forall P l2>>.
-  Proof.
-    induction l1; split; ss.
-    - inv FORALL. exploit IHl1; eauto. i. des. eauto.
-    - inv FORALL. exploit IHl1; eauto. i. des. ss.
-  Qed.
-
-  Lemma step_loc_free
-        l e st1 st2
-        (LOCFREE: loc_free_stmts l st1.(State.stmts))
-        (STEP: State.step e st1 st2):
-    loc_free_stmts l st2.(State.stmts).
-  Proof.
-    inv STEP; ss.
-    - inv LOCFREE. ss.
-    - inv LOCFREE. condtac.
-      + inv H1. eapply Forall_app; eauto.
-      + inv H1. eapply Forall_app; eauto.
-    - inv LOCFREE. inv H1.
-      eapply Forall_app; eauto.
-  Qed.
-
   Lemma sim_thread_other_step
         l e1_src
         pf e_tgt e1_tgt e3_tgt
