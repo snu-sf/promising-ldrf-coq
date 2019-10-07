@@ -271,21 +271,15 @@ Lemma sim_local_promise_not_lower
       lc1_tgt mem1_tgt loc from to msg_tgt lc1 mem2_tgt kind
       (LOCAL: sim_local pview lc1_src lc1_tgt)
       (STEP: Local.promise_step lc1_tgt mem1_tgt loc from to msg_tgt lc1 mem2_tgt kind)
-      (KIND: negb (Memory.op_kind_is_lower kind) \/ Memory.op_kind_is_lower_reserve kind):
+      (KIND: negb (Memory.op_kind_is_lower kind)):
   SimPromises.mem loc to pview = false.
 Proof.
-  des.
-  - destruct (SimPromises.mem loc to pview) eqn:X; ss.
-    inv LOCAL. inv PROMISES. exploit PVIEW; eauto. i. des.
-    inv STEP. inv PROMISE; ss.
-    + exploit Memory.add_get0; try exact PROMISES; eauto. i. des. congr.
-    + exploit Memory.split_get0; try exact PROMISES; eauto. i. des. congr.
-    + exploit Memory.remove_get0; try exact PROMISES; eauto. i. des. congr.
-  - destruct kind; ss. destruct msg1; ss.
-    inv STEP. inv PROMISE.
-    exploit Memory.lower_get0; try exact PROMISES; eauto. i. des.
-    inv LOCAL. inv PROMISES0.
-    destruct (SimPromises.mem loc to pview) eqn:H; ss.
+  destruct (SimPromises.mem loc to pview) eqn:X; ss.
+  inv LOCAL. inv PROMISES. exploit PVIEW; eauto. i. des.
+  inv STEP. inv PROMISE; ss.
+  - exploit Memory.add_get0; try exact PROMISES; eauto. i. des. congr.
+  - exploit Memory.split_get0; try exact PROMISES; eauto. i. des. congr.
+  - exploit Memory.remove_get0; try exact PROMISES; eauto. i. des. congr.
 Qed.
 
 Lemma sim_local_write
