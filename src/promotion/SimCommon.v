@@ -1706,7 +1706,7 @@ Module SimCommon.
       <<LC2: sim_local l lc2_src lc2_tgt>> /\
       <<SC2: sim_timemap l sc2_src sc2_tgt>> /\
       <<MEM2: sim_memory l mem2_src mem2_tgt>> /\
-      <<FULFILLABLE2: fulfillable l lc2_src.(Local.tview) mem1_src lc2_src.(Local.promises)>>.
+      <<FULFILLABLE2: fulfillable l lc2_src.(Local.tview) mem2_src lc2_src.(Local.promises)>>.
   Proof.
     destruct (Ordering.le ord Ordering.strong_relaxed) eqn:ORD.
     { (* relaxed *)
@@ -1742,13 +1742,45 @@ Module SimCommon.
       esplits.
       - econs; eauto.
         + inv STEP_TGT. eapply sim_writable; eauto. apply LC1.
-        + admit.
+        + inv STEP_TGT. ii. destruct msg; ss.
+          inv LC1. inv PROMISES1.
+          exploit SOUND; try exact GET; eauto. i. des. inv MSG.
+          exploit RELEASE; eauto. s. i. subst.
+          inv RELEASED1. ss.
       - inv STEP_TGT. econs; ss.
         eapply sim_write_tview; eauto. apply LC1.
       - by inv STEP_TGT.
       - ss.
-      - admit.
+      - s. ii. inv WRITE_SRC. inv PROMISE0. revert GETP.
+        erewrite Memory.remove_o; eauto. condtac; ss.
+        erewrite Memory.lower_o; eauto. condtac; ss. i.
+        guardH o. guardH o0.
+        exploit FULFILLABLE2; eauto. i. des. split.
+        + unfold TView.write_tview. condtac; try by destruct ord; ss.
+          inv TVIEW. econs; ss.
+          * unfold LocFun.add. condtac; ss.
+            subst. unfold TimeMap.join, TimeMap.singleton, LocFun.add. condtac; subst; ss.
+            unfold LocFun.find, LocFun.init.
+            eapply Time.join_spec; ss. apply Time.bot_spec.
+          * unfold LocFun.add. condtac; ss.
+            subst. unfold TimeMap.join, TimeMap.singleton, LocFun.add. condtac; subst; ss.
+            unfold LocFun.find, LocFun.init.
+            eapply Time.join_spec; ss. apply Time.bot_spec.
+        + unfold prev_released_le_loc.
+          destruct (Memory.get loc0 from0 mem2_src0) as [[? [? []|]]|] eqn:GET; ss.
+          revert GET.
+          erewrite Memory.lower_o; eauto. condtac; ss; cycle 1.
+          { i. unfold prev_released_le_loc in PREV.
+            rewrite GET in *. ss. }
+          i. des. subst. inv GET.
+          exploit Memory.lower_get0; try exact MEM. i. des.
+          unfold prev_released_le_loc in PREV.
+          rewrite GET in *.
+          rewrite H2 in MSG_LE. inv MSG_LE. inv RELEASED0.
+          unnw. etrans; try exact PREV.
+          inv LE. econs; eauto.
     }
+
     { (* release *)
       destruct released_tgt as [released_tgt|]; cycle 1.
       { inv STEP_TGT. revert RELEASED0.
@@ -1792,14 +1824,91 @@ Module SimCommon.
       esplits.
       - econs; eauto.
         + inv STEP_TGT. eapply sim_writable; eauto. apply LC1.
-        + admit.
+        + inv STEP_TGT. ii. destruct msg; ss.
+          inv LC1. inv PROMISES1.
+          exploit SOUND; try exact GET; eauto. i. des. inv MSG.
+          exploit RELEASE; eauto. s. i. subst.
+          inv RELEASED1. ss.
       - inv STEP_TGT. econs; ss.
         eapply sim_write_tview; eauto. apply LC1.
       - by inv STEP_TGT.
       - ss.
-      - admit.
+      - s. ii. inv WRITE_SRC. inv PROMISE0. revert GETP.
+        erewrite Memory.remove_o; eauto. condtac; ss.
+        erewrite Memory.lower_o; eauto. condtac; ss. i.
+        guardH o. guardH o0.
+        exploit FULFILLABLE2; eauto. i. des. split.
+        + unfold TView.write_tview. condtac; try by destruct ord; ss.
+          inv TVIEW. econs; ss.
+          * unfold LocFun.add. condtac; ss.
+            subst. unfold TimeMap.join, TimeMap.singleton, LocFun.add. condtac; subst; ss.
+            unfold LocFun.find, LocFun.init.
+            eapply Time.join_spec; eauto using Time.bot_spec.
+            inv LC2. inv PROMISES1. ss.
+            exploit SOUND; try exact GETP; eauto. i. des.
+            inv MSG. inv RELEASED0. inv STEP1. ss.
+            clear - COND1 ORD0 PROMISE0 o GET_TGT.
+            exfalso. revert GET_TGT. inv PROMISE0.
+            { erewrite Memory.add_o; eauto. condtac; ss; i.
+              - des. subst. unguard. des; ss.
+              - guardH o0. exploit ORD0; eauto; ss.
+                destruct ord; ss. }
+            { erewrite Memory.split_o; eauto. repeat condtac; ss; i.
+              - des. subst. unguard. des; ss.
+              - guardH o0. des. subst. inv GET_TGT. inv RESERVE.
+                exploit Memory.split_get0; try exact PROMISES. i. des.
+                exploit ORD0; eauto; ss.
+                destruct ord; ss.
+              - guardH o0. guardH o1.
+                exploit ORD0; eauto; ss.
+                destruct ord; ss. }
+            { erewrite Memory.lower_o; eauto. condtac; ss; i.
+              - des. subst. unguard. des; ss.
+              - guardH o0. exploit ORD0; eauto; ss.
+                destruct ord; ss. }
+            { erewrite Memory.remove_o; eauto. condtac; ss. }
+          * unfold LocFun.add. condtac; ss.
+            subst. unfold TimeMap.join, TimeMap.singleton, LocFun.add. condtac; subst; ss.
+            unfold LocFun.find, LocFun.init.
+            eapply Time.join_spec; eauto using Time.bot_spec.
+            inv LC2. inv PROMISES1. ss.
+            exploit SOUND; try exact GETP; eauto. i. des.
+            inv MSG. inv RELEASED0. inv STEP1. ss.
+            clear - COND1 ORD0 PROMISE0 o GET_TGT.
+            exfalso. revert GET_TGT. inv PROMISE0.
+            { erewrite Memory.add_o; eauto. condtac; ss; i.
+              - des. subst. unguard. des; ss.
+              - guardH o0. exploit ORD0; eauto; ss.
+                destruct ord; ss. }
+            { erewrite Memory.split_o; eauto. repeat condtac; ss; i.
+              - des. subst. unguard. des; ss.
+              - guardH o0. des. subst. inv GET_TGT. inv RESERVE.
+                exploit Memory.split_get0; try exact PROMISES. i. des.
+                exploit ORD0; eauto; ss.
+                destruct ord; ss.
+              - guardH o0. guardH o1.
+                exploit ORD0; eauto; ss.
+                destruct ord; ss. }
+            { erewrite Memory.lower_o; eauto. condtac; ss; i.
+              - des. subst. unguard. des; ss.
+              - guardH o0. exploit ORD0; eauto; ss.
+                destruct ord; ss. }
+            { erewrite Memory.remove_o; eauto. condtac; ss. }
+        + unfold prev_released_le_loc.
+          destruct (Memory.get loc0 from0 mem2_src0) as [[? [? []|]]|] eqn:GET; ss.
+          revert GET.
+          erewrite Memory.lower_o; eauto. condtac; ss; cycle 1.
+          { i. unfold prev_released_le_loc in PREV.
+            rewrite GET in *. ss. }
+          i. des. subst. inv GET.
+          exploit Memory.lower_get0; try exact MEM. i. des.
+          unfold prev_released_le_loc in PREV.
+          rewrite GET in *.
+          rewrite H2 in MSG_LE. inv MSG_LE. inv RELEASED0.
+          unnw. etrans; try exact PREV.
+          inv LE. econs; eauto.
     }
-  Admitted.
+  Qed.
 
   Lemma fence_step
         l
@@ -1891,7 +2000,7 @@ Module SimCommon.
       <<LC2: sim_local l lc2_src lc2_tgt>> /\
       <<SC2: sim_timemap l sc2_src sc2_tgt>> /\
       <<MEM2: sim_memory l mem2_src mem2_tgt>> /\
-      <<FULFILLABLE2: fulfillable l lc2_src.(Local.tview) mem1_src lc2_src.(Local.promises)>>.
+      <<FULFILLABLE2: fulfillable l lc2_src.(Local.tview) mem2_src lc2_src.(Local.promises)>>.
   Proof.
     unfold is_accessing_loc in *.
     inv STEP_TGT; ss.
@@ -1899,15 +2008,25 @@ Module SimCommon.
     - exploit read_step; eauto. i. des.
       esplits; [econs 2|..]; eauto.
     - hexploit write_step; eauto.
-      { admit. }
+      { unguard. split; eauto. ss.
+        unfold TimeMap.bot. apply Time.bot_spec. }
       i. des.
       esplits; [econs 3|..]; eauto.
     - exploit read_step; eauto. i. des.
       exploit Local.read_step_future; try exact LOCAL1; eauto. i. des.
       exploit Local.read_step_future; try exact STEP_SRC; eauto. i. des.
       hexploit write_step; try exact LOCAL2; eauto.
-      { admit. }
-      { admit. }
+      { inv MEM1. inv LOCAL1. inv STEP_SRC. ss.
+        exploit SOUND; eauto. i. des. inv MSG.
+        rewrite GET_TGT in *. inv GET. ss. }
+      { unguard. inv STEP_SRC. ss. split; eauto.
+        inv CLOSED1_SRC. exploit CLOSED; eauto. i. des.
+        inv MSG_TS. etrans; eauto. econs.
+        inv LOCAL2. inv WRITE. inv PROMISE; inv MEM.
+        - by inv ADD.
+        - by inv SPLIT.
+        - by inv LOWER.
+        - by inv REMOVE. }
       i. des.
       esplits; [econs 4|..]; eauto.
     - exploit fence_step; eauto. i. des.
@@ -1916,5 +2035,5 @@ Module SimCommon.
       esplits; [econs 6|..]; eauto. refl.
     - exploit failure_step; eauto. i. des.
       esplits; [econs 7|..]; eauto.
-  Admitted.
+  Qed.
 End SimCommon.
