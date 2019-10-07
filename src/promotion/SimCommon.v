@@ -1971,6 +1971,7 @@ Module SimCommon.
     rewrite x0. ss.
   Qed.
 
+  (* TODO: move to Local.v *)
   Definition is_accessing_loc (l: Loc.t) (e: ThreadEvent.t): Prop :=
     match ThreadEvent.is_accessing e with
     | Some (loc, _) => loc <> l
@@ -1996,7 +1997,8 @@ Module SimCommon.
         (STEP_TGT: Local.program_step e_tgt lc1_tgt sc1_tgt mem1_tgt lc2_tgt sc2_tgt mem2_tgt):
     exists e_src lc2_src sc2_src mem2_src,
       <<STEP_SRC: Local.program_step e_src lc1_src sc1_src mem1_src lc2_src sc2_src mem2_src>> /\
-      <<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>> /\
+      <<EVENT1: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>> /\
+      <<EVENT2: ThreadEvent.get_program_event e_src = ThreadEvent.get_program_event e_tgt>> /\
       <<LC2: sim_local l lc2_src lc2_tgt>> /\
       <<SC2: sim_timemap l sc2_src sc2_tgt>> /\
       <<MEM2: sim_memory l mem2_src mem2_tgt>> /\
@@ -2032,8 +2034,66 @@ Module SimCommon.
     - exploit fence_step; eauto. i. des.
       esplits; [econs 5|..]; eauto.
     - exploit fence_step; eauto. i. des.
-      esplits; [econs 6|..]; eauto. refl.
+      esplits; [econs 6|..]; eauto; refl.
     - exploit failure_step; eauto. i. des.
       esplits; [econs 7|..]; eauto.
+  Qed.
+
+  Lemma program_step_eq_promises
+        l
+        e lc1 sc1 mem1 lc2 sc2 mem2
+        (STEP: Local.program_step e lc1 sc1 mem1 lc2 sc2 mem2)
+        (LOC: is_accessing_loc l e):
+    forall to, Memory.get l to lc1.(Local.promises) = Memory.get l to lc2.(Local.promises).
+  Proof.
+    inv STEP; ss; try by inv LOCAL.
+    - i. inv LOCAL. inv WRITE. ss.
+      erewrite (@Memory.remove_o promises2); eauto. condtac; ss.
+      + des. subst. ss.
+      + guardH o. inv PROMISE.
+        * erewrite (@Memory.add_o promises0); eauto. condtac; ss.
+        * erewrite (@Memory.split_o promises0); eauto. repeat condtac; ss.
+          guardH o0. des. subst. ss.
+        * erewrite (@Memory.lower_o promises0); eauto. condtac; ss.
+        * erewrite (@Memory.remove_o promises0); eauto. condtac; ss.
+    - i. inv LOCAL1. inv LOCAL2. inv WRITE. ss.
+      erewrite (@Memory.remove_o promises2); eauto. condtac; ss.
+      + des. subst. ss.
+      + guardH o. inv PROMISE.
+        * erewrite (@Memory.add_o promises0); eauto. condtac; ss.
+        * erewrite (@Memory.split_o promises0); eauto. repeat condtac; ss.
+          guardH o0. des. subst. ss.
+        * erewrite (@Memory.lower_o promises0); eauto. condtac; ss.
+        * erewrite (@Memory.remove_o promises0); eauto. condtac; ss.
+  Qed.
+
+  Lemma program_step_eq_mem
+        l
+        e lc1 sc1 mem1 lc2 sc2 mem2
+        (STEP: Local.program_step e lc1 sc1 mem1 lc2 sc2 mem2)
+        (LOC: is_accessing_loc l e):
+    forall to, Memory.get l to mem1 = Memory.get l to mem2.
+  Proof.
+    inv STEP; ss; try by inv LOCAL.
+    - i. inv LOCAL. inv WRITE. ss.
+      inv PROMISE.
+      + erewrite (@Memory.add_o mem2); eauto. condtac; ss.
+        des. subst. ss.
+      + erewrite (@Memory.split_o mem2); eauto. repeat condtac; ss.
+        * des. subst. ss.
+        * guardH o. des. subst. ss.
+      + erewrite (@Memory.lower_o mem2); eauto. condtac; ss.
+        des. subst. ss.
+      + erewrite (@Memory.remove_o mem2); eauto. condtac; ss.
+    - i. inv LOCAL1. inv LOCAL2. inv WRITE. ss.
+      inv PROMISE.
+      + erewrite (@Memory.add_o mem2); eauto. condtac; ss.
+        des. subst. ss.
+      + erewrite (@Memory.split_o mem2); eauto. repeat condtac; ss.
+        * des. subst. ss.
+        * guardH o. des. subst. ss.
+      + erewrite (@Memory.lower_o mem2); eauto. condtac; ss.
+        des. subst. ss.
+      + erewrite (@Memory.remove_o mem2); eauto. condtac; ss.
   Qed.
 End SimCommon.
