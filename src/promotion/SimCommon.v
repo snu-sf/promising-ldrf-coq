@@ -1414,6 +1414,7 @@ Module SimCommon.
         lc1_tgt sc1_tgt mem1_tgt loc from to val releasedm_tgt released_tgt
                                     ord lc2_tgt sc2_tgt mem2_tgt kind_tgt
         (LC1: sim_local l lc1_src lc1_tgt)
+        (SC1: sim_timemap l sc1_src sc1_tgt)
         (MEM1: sim_memory l mem1_src mem1_tgt)
         (RELEASED: sim_opt_view l releasedm_src releasedm_tgt)
         (REL_WF_SRC: View.opt_wf releasedm_src)
@@ -1439,6 +1440,7 @@ Module SimCommon.
       <<STEP_SRC: Local.write_step lc1_src sc1_src mem1_src loc from to val releasedm_src released_src
                                     ord lc2_src sc2_src mem2_src kind_src>> /\
       <<LC2: sim_local l lc2_src lc2_tgt>> /\
+      <<SC2: sim_timemap l sc2_src sc2_tgt>> /\
       <<MEM2: sim_memory l mem2_src mem2_tgt>> /\
       <<FULFILLABLE2: fulfillable l lc2_src.(Local.tview) mem1_src lc2_src.(Local.promises)>>.
   Proof.
@@ -1478,6 +1480,7 @@ Module SimCommon.
         + admit.
       - econs; ss.
         admit.
+      - by inv STEP_TGT.
       - ss.
       - admit.
     }
@@ -1526,6 +1529,7 @@ Module SimCommon.
         + admit.
       - econs; ss.
         admit.
+      - by inv STEP_TGT.
       - ss.
       - admit.
     }
@@ -1547,6 +1551,7 @@ Module SimCommon.
     exists lc2_src sc2_src,
       <<STEP_SRC: Local.fence_step lc1_src sc1_src ordr ordw lc2_src sc2_src>> /\
       <<LC2: sim_local l lc2_src lc2_tgt>> /\
+      <<SC2: sim_timemap l sc2_src sc2_tgt>> /\
       <<FULFILLABLE2: fulfillable l lc2_src.(Local.tview) mem1_src lc2_src.(Local.promises)>>.
   Proof.
     inv STEP_TGT. esplits.
@@ -1556,6 +1561,7 @@ Module SimCommon.
       { ii. subst. congr. }
       i. des. inv MSG; ss.
       exploit H0; eauto. i. inv RELEASED; ss.
+    - admit.
     - admit.
     - unfold TView.write_fence_tview. repeat condtac; ss; ii.
       + destruct ordw; ss.
@@ -1587,4 +1593,60 @@ Module SimCommon.
     inv TVIEW. inv CUR. exploit RLX; eauto. i.
     rewrite x0. ss.
   Qed.
+
+  Definition is_accessing_loc (l: Loc.t) (e: ThreadEvent.t): Prop :=
+    match ThreadEvent.is_accessing e with
+    | Some (loc, _) => loc <> l
+    | None => True
+    end.
+
+  Lemma program_step
+        l
+        lc1_src sc1_src mem1_src
+        e_tgt lc1_tgt sc1_tgt mem1_tgt lc2_tgt sc2_tgt mem2_tgt
+        (LC1: sim_local l lc1_src lc1_tgt)
+        (SC1: sim_timemap l sc1_src sc1_tgt)
+        (MEM1: sim_memory l mem1_src mem1_tgt)
+        (WF1_SRC: Local.wf lc1_src mem1_src)
+        (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
+        (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
+        (SC1_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
+        (CLOSED1_SRC: Memory.closed mem1_src)
+        (CLOSED1_TGT: Memory.closed mem1_tgt)
+        (PROMISES1: forall to, Memory.get l to lc1_src.(Local.promises) = None)
+        (FULFILLABLE1: fulfillable l lc1_src.(Local.tview) mem1_src lc1_src.(Local.promises))
+        (LOC: is_accessing_loc l e_tgt)
+        (STEP_TGT: Local.program_step e_tgt lc1_tgt sc1_tgt mem1_tgt lc2_tgt sc2_tgt mem2_tgt):
+    exists e_src lc2_src sc2_src mem2_src,
+      <<STEP_SRC: Local.program_step e_src lc1_src sc1_src mem1_src lc2_src sc2_src mem2_src>> /\
+      <<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>> /\
+      <<LC2: sim_local l lc2_src lc2_tgt>> /\
+      <<SC2: sim_timemap l sc2_src sc2_tgt>> /\
+      <<MEM2: sim_memory l mem2_src mem2_tgt>> /\
+      <<FULFILLABLE2: fulfillable l lc2_src.(Local.tview) mem1_src lc2_src.(Local.promises)>>.
+  Proof.
+    unfold is_accessing_loc in *.
+    inv STEP_TGT; ss.
+    - esplits; eauto.
+    - exploit read_step; eauto. i. des.
+      esplits; [econs 2|..]; eauto.
+    - hexploit write_step; eauto.
+      { admit. }
+      i. des.
+      esplits; [econs 3|..]; eauto.
+    - exploit read_step; eauto. i. des.
+      exploit Local.read_step_future; try exact LOCAL1; eauto. i. des.
+      exploit Local.read_step_future; try exact STEP_SRC; eauto. i. des.
+      hexploit write_step; try exact LOCAL2; eauto.
+      { admit. }
+      { admit. }
+      i. des.
+      esplits; [econs 4|..]; eauto.
+    - exploit fence_step; eauto. i. des.
+      esplits; [econs 5|..]; eauto.
+    - exploit fence_step; eauto. i. des.
+      esplits; [econs 6|..]; eauto. refl.
+    - exploit failure_step; eauto. i. des.
+      esplits; [econs 7|..]; eauto.
+  Admitted.
 End SimCommon.
