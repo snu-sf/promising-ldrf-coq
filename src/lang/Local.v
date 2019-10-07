@@ -112,6 +112,21 @@ Module ThreadEvent.
     | _ => None
     end.
 
+  Definition is_accessing_loc (l: Loc.t) (e: t): Prop :=
+    match is_accessing e with
+    | Some (loc, _) => loc = l
+    | None => False
+    end.
+
+  Lemma eq_program_event_eq_loc
+        e1 e2 loc
+        (EVENT: get_program_event e1 = get_program_event e2):
+    is_accessing_loc loc e1 <-> is_accessing_loc loc e2.
+  Proof.
+    unfold is_accessing_loc.
+    destruct e1, e2; ss; inv EVENT; ss.
+  Qed.
+
   Inductive le: forall (lhs rhs:t), Prop :=
   | le_promise
       loc from to msg1 msg2 kind1 kind2

@@ -81,15 +81,6 @@ Module SimThreadOther.
   .
   Hint Constructors sim_thread_other.
 
-  Lemma eq_program_event_eq_loc
-        e1 e2 loc
-        (EVENT: ThreadEvent.get_program_event e1 = ThreadEvent.get_program_event e2):
-    is_accessing_loc loc e1 <-> is_accessing_loc loc e2.
-  Proof.
-    unfold is_accessing_loc.
-    destruct e1, e2; ss; inv EVENT; ss.
-  Qed.
-
   Lemma sim_thread_promise_step
         l e1_src
         pf e_tgt e1_tgt e2_tgt
@@ -135,7 +126,7 @@ Module SimThreadOther.
         (SC1_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
         (CLOSED1_SRC: Memory.closed e1_src.(Thread.memory))
         (CLOSED1_TGT: Memory.closed e1_tgt.(Thread.memory))
-        (LOC: is_accessing_loc l e_tgt)
+        (LOC: ~ ThreadEvent.is_accessing_loc l e_tgt)
         (STEP_TGT: Thread.step pf e_tgt e1_tgt e2_tgt):
     exists e_src e1_src e2_src,
       <<STEP_SRC: Thread.opt_step e_src e1_src e2_src>> /\
@@ -166,8 +157,9 @@ Module SimThreadOther.
         inv SIM1. ss. subst. ss.
       + s. i. inv SIM1.
         erewrite <- program_step_eq_promises; eauto.
-        eapply eq_program_event_eq_loc; eauto.
-    - s. i. eapply program_step_eq_mem; eauto.
-      eapply eq_program_event_eq_loc; eauto.
+        erewrite ThreadEvent.eq_program_event_eq_loc; eauto.
+    - s. i.
+      eapply program_step_eq_mem; eauto.
+      erewrite ThreadEvent.eq_program_event_eq_loc; eauto.
   Qed.
 End SimThreadOther.

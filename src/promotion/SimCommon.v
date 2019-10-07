@@ -1971,13 +1971,6 @@ Module SimCommon.
     rewrite x0. ss.
   Qed.
 
-  (* TODO: move to Local.v *)
-  Definition is_accessing_loc (l: Loc.t) (e: ThreadEvent.t): Prop :=
-    match ThreadEvent.is_accessing e with
-    | Some (loc, _) => loc <> l
-    | None => True
-    end.
-
   Lemma program_step
         l
         lc1_src sc1_src mem1_src
@@ -1993,7 +1986,7 @@ Module SimCommon.
         (CLOSED1_TGT: Memory.closed mem1_tgt)
         (PROMISES1: forall to, Memory.get l to lc1_src.(Local.promises) = None)
         (FULFILLABLE1: fulfillable l lc1_src.(Local.tview) mem1_src lc1_src.(Local.promises))
-        (LOC: is_accessing_loc l e_tgt)
+        (LOC: ~ ThreadEvent.is_accessing_loc l e_tgt)
         (STEP_TGT: Local.program_step e_tgt lc1_tgt sc1_tgt mem1_tgt lc2_tgt sc2_tgt mem2_tgt):
     exists e_src lc2_src sc2_src mem2_src,
       <<STEP_SRC: Local.program_step e_src lc1_src sc1_src mem1_src lc2_src sc2_src mem2_src>> /\
@@ -2004,7 +1997,7 @@ Module SimCommon.
       <<MEM2: sim_memory l mem2_src mem2_tgt>> /\
       <<FULFILLABLE2: fulfillable l lc2_src.(Local.tview) mem2_src lc2_src.(Local.promises)>>.
   Proof.
-    unfold is_accessing_loc in *.
+    unfold ThreadEvent.is_accessing_loc in *.
     inv STEP_TGT; ss.
     - esplits; eauto.
     - exploit read_step; eauto. i. des.
@@ -2043,9 +2036,10 @@ Module SimCommon.
         l
         e lc1 sc1 mem1 lc2 sc2 mem2
         (STEP: Local.program_step e lc1 sc1 mem1 lc2 sc2 mem2)
-        (LOC: is_accessing_loc l e):
+        (LOC: ~ ThreadEvent.is_accessing_loc l e):
     forall to, Memory.get l to lc1.(Local.promises) = Memory.get l to lc2.(Local.promises).
   Proof.
+    unfold ThreadEvent.is_accessing_loc in *.
     inv STEP; ss; try by inv LOCAL.
     - i. inv LOCAL. inv WRITE. ss.
       erewrite (@Memory.remove_o promises2); eauto. condtac; ss.
@@ -2071,9 +2065,10 @@ Module SimCommon.
         l
         e lc1 sc1 mem1 lc2 sc2 mem2
         (STEP: Local.program_step e lc1 sc1 mem1 lc2 sc2 mem2)
-        (LOC: is_accessing_loc l e):
+        (LOC: ~ ThreadEvent.is_accessing_loc l e):
     forall to, Memory.get l to mem1 = Memory.get l to mem2.
   Proof.
+    unfold ThreadEvent.is_accessing_loc in *.
     inv STEP; ss; try by inv LOCAL.
     - i. inv LOCAL. inv WRITE. ss.
       inv PROMISE.
