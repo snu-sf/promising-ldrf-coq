@@ -26,16 +26,18 @@ Require Import Semantics.
 
 Require Import PromiseConsistent.
 Require Import MemoryMerge.
+Require Import MemoryReorder.
 
 Require Import FulfillStep.
 
 Require Import Promotion.
 
 Set Implicit Arguments.
+Set Nested Proofs Allowed.
 
 
 Module SimCommon.
-  (* simulation relations *)
+  (* sim_view *)
 
   Definition sim_timemap (l: Loc.t) (tm_src tm_tgt: TimeMap.t): Prop :=
     forall loc (LOC: loc <> l), tm_src loc = tm_tgt loc.
@@ -64,6 +66,211 @@ Module SimCommon.
       (ACQ: sim_view l tview_src.(TView.acq) tview_tgt.(TView.acq))
   .
   Hint Constructors sim_tview.
+
+
+  (* lemmas on sim view *)
+
+  Lemma sim_view_bot l: sim_view l View.bot View.bot.
+  Proof.
+    econs; ss.
+  Qed.
+
+  Lemma sim_view_join
+        l
+        v1_src v2_src
+        v1_tgt v2_tgt
+        (SIM1: sim_view l v1_src v1_tgt)
+        (SIM2: sim_view l v2_src v2_tgt):
+    sim_view l (View.join v1_src v2_src) (View.join v1_tgt v2_tgt).
+  Proof.
+    inv SIM1. inv SIM2.
+    unfold View.join, TimeMap.join.
+    econs; ss; ii.
+    - exploit PLN; eauto. i.
+      exploit PLN0; eauto. i.
+      rewrite x. rewrite x0. refl.
+    - exploit RLX; eauto. i.
+      exploit RLX0; eauto. i.
+      rewrite x. rewrite x0. refl.
+  Qed.
+
+  Lemma sim_opt_view_unwrap
+        l view_src view_tgt
+        (SIM: sim_opt_view l view_src view_tgt):
+    sim_view l view_src.(View.unwrap) view_tgt.(View.unwrap).
+  Proof.
+    inv SIM; ss.
+  Qed.
+
+  Lemma sim_readable
+        l
+        tview_src released_src
+        tview_tgt loc to released_tgt ord
+        (TVIEW: sim_tview l tview_src tview_tgt)
+        (RELEASED: sim_opt_view l released_src released_tgt)
+        (LOC: loc <> l)
+        (READABLE_TGT: TView.readable tview_tgt.(TView.cur) loc to released_tgt ord):
+    TView.readable tview_src.(TView.cur) loc to released_src ord.
+  Proof.
+    inv TVIEW. inv CUR. inv READABLE_TGT. econs; i.
+    - exploit PLN; eauto. i. rewrite x. ss.
+    - exploit RLX0; eauto. i.
+      exploit RLX; eauto. i. rewrite x0. ss.
+  Qed.
+
+  Lemma sim_read_tview
+        l
+        tview_src released_src
+        tview_tgt loc to released_tgt ord
+        (TVIEW: sim_tview l tview_src tview_tgt)
+        (RELEASED: sim_opt_view l released_src released_tgt)
+        (LOC: loc <> l):
+    sim_tview l
+              (TView.read_tview tview_src loc to released_src ord)
+              (TView.read_tview tview_tgt loc to released_tgt ord).
+  Proof.
+    inv TVIEW. econs; ss.
+    - condtac; ss.
+      + apply sim_view_join; eauto using sim_opt_view_unwrap.
+        apply sim_view_join; ss.
+      + apply sim_view_join; eauto using sim_opt_view_unwrap.
+        apply sim_view_join; ss.
+        apply sim_view_bot.
+    - condtac; ss.
+      + apply sim_view_join; eauto using sim_opt_view_unwrap.
+        apply sim_view_join; ss.
+      + apply sim_view_join; eauto using sim_opt_view_unwrap.
+        apply sim_view_join; ss.
+        apply sim_view_bot.
+  Qed.
+
+  Lemma sim_write_released
+        l
+        tview_src sc_src releasedm_src
+        tview_tgt sc_tgt releasedm_tgt
+        loc to ord
+        (TVIEW: sim_tview l tview_src tview_tgt)
+        (RELEASEDM: sim_opt_view l releasedm_src releasedm_tgt):
+    sim_opt_view l
+                 (TView.write_released tview_src sc_src loc to releasedm_src ord)
+                 (TView.write_released tview_tgt sc_tgt loc to releasedm_tgt ord).
+  Proof.
+    inv TVIEW. inv CUR. destruct (REL loc).
+    unfold TView.write_released. condtac; ss.
+    econs. apply sim_view_join; eauto using sim_opt_view_unwrap.
+    condtac; econs; ss; ii; unfold LocFun.add;
+      condtac; ss; unfold TimeMap.join.
+    - exploit PLN; eauto. i. rewrite x. refl.
+    - exploit RLX; eauto. i. rewrite x. refl.
+    - exploit PLN0; eauto. i. rewrite x. refl.
+    - exploit RLX0; eauto. i. rewrite x. refl.
+  Qed.
+
+  Lemma sim_writable
+        l
+        tview_src sc_src
+        tview_tgt sc_tgt
+        loc to ord
+        (TVIEW: sim_tview l tview_src tview_tgt)
+        (LOC: loc <> l)
+        (WRITABLE_TGT: TView.writable tview_tgt.(TView.cur) sc_tgt loc to ord):
+    TView.writable tview_src.(TView.cur) sc_src loc to ord.
+  Proof.
+    inv TVIEW. inv CUR. inv WRITABLE_TGT. econs; i.
+    exploit RLX; eauto. i. rewrite x. ss.
+  Qed.
+
+  Lemma sim_write_tview
+        l
+        tview_src sc_src
+        tview_tgt sc_tgt
+        loc to ord
+        (TVIEW: sim_tview l tview_src tview_tgt)
+        (LOC: loc <> l):
+    sim_tview l
+              (TView.write_tview tview_src sc_src loc to ord)
+              (TView.write_tview tview_tgt sc_tgt loc to ord).
+  Proof.
+    inv TVIEW. econs; ss.
+    - i. condtac; ss.
+      + unfold LocFun.add, LocFun.find. condtac; ss.
+        subst. apply sim_view_join; eauto.
+        econs; ss.
+      + unfold LocFun.add, LocFun.find. condtac; ss.
+        subst. apply sim_view_join; eauto.
+        econs; ss.
+    - apply sim_view_join; eauto. econs; ss.
+    - apply sim_view_join; eauto. econs; ss.
+  Qed.
+
+  Lemma sim_read_fence_tview
+        l tview_src tview_tgt ordr
+        (TVIEW: sim_tview l tview_src tview_tgt):
+    sim_tview l
+              (TView.read_fence_tview tview_src ordr)
+              (TView.read_fence_tview tview_tgt ordr).
+  Proof.
+    inv TVIEW. econs; ss. condtac; ss.
+  Qed.
+
+  Lemma sim_write_fence_sc
+        l
+        tview_src sc_src
+        tview_tgt sc_tgt
+        ordw
+        (TVIEW: sim_tview l tview_src tview_tgt)
+        (SC: sim_timemap l sc_src sc_tgt):
+    sim_timemap l
+                (TView.write_fence_sc tview_src sc_src ordw)
+                (TView.write_fence_sc tview_tgt sc_tgt ordw).
+  Proof.
+    inv TVIEW. inv CUR.
+    unfold TView.write_fence_sc. condtac; ss.
+    ii. unfold TimeMap.join.
+    exploit SC; eauto. i.
+    exploit RLX; eauto. i.
+    rewrite x. rewrite x0. refl.
+  Qed.
+
+  Lemma sim_write_fence_tview
+        l
+        tview_src sc_src
+        tview_tgt sc_tgt
+        ordw
+        (TVIEW: sim_tview l tview_src tview_tgt)
+        (SC: sim_timemap l sc_src sc_tgt):
+    sim_tview l
+              (TView.write_fence_tview tview_src sc_src ordw)
+              (TView.write_fence_tview tview_tgt sc_tgt ordw).
+  Proof.
+    inv TVIEW. econs; ss; i.
+    - repeat (condtac; ss).
+      econs; eauto using sim_write_fence_sc.
+    - repeat (condtac; ss).
+      econs; eauto using sim_write_fence_sc.
+    - repeat (condtac; ss).
+      + apply sim_view_join; ss.
+        econs; eauto using sim_write_fence_sc.
+      + apply sim_view_join; ss.
+  Qed.
+
+  Lemma sim_fence_tview
+        l
+        tview_src sc_src
+        tview_tgt sc_tgt
+        ordr ordw
+        (TVIEW: sim_tview l tview_src tview_tgt)
+        (SC: sim_timemap l sc_src sc_tgt):
+    sim_tview l
+              (TView.write_fence_tview (TView.read_fence_tview tview_src ordr) sc_src ordw)
+              (TView.write_fence_tview (TView.read_fence_tview tview_tgt ordr) sc_tgt ordw).
+  Proof.
+    eapply sim_write_fence_tview; eauto.
+    eapply sim_read_fence_tview; eauto.
+  Qed.
+
+
+  (* sim_memory *)
 
   Inductive sim_message (l: Loc.t): forall (msg_src msg_tgt: Message.t), Prop :=
   | sim_message_full
@@ -98,6 +305,28 @@ Module SimCommon.
       (PROMISES1: sim_memory l lc_src.(Local.promises) lc_tgt.(Local.promises))
   .
   Hint Constructors sim_local.
+
+
+  (* lemmas on sim_memory *)
+
+  Lemma sim_memory_remove
+        l mem1_src mem1_tgt mem2_src mem2_tgt
+        loc from to msg_src msg_tgt
+        (SIM: sim_memory l mem1_src mem1_tgt)
+        (REMOVE_SRC: Memory.remove mem1_src loc from to msg_src mem2_src)
+        (REMOVE_TGT: Memory.remove mem1_tgt loc from to msg_tgt mem2_tgt):
+    sim_memory l mem2_src mem2_tgt.
+  Proof.
+    inv SIM. econs; i.
+    - revert GET_SRC.
+      erewrite Memory.remove_o; eauto.
+      erewrite (@Memory.remove_o mem2_tgt); eauto.
+      condtac; ss; eauto.
+    - revert GET_TGT.
+      erewrite Memory.remove_o; eauto.
+      erewrite (@Memory.remove_o mem2_src); eauto.
+      condtac; ss; eauto.
+  Qed.
 
 
   (* fulfillable *)
@@ -1179,10 +1408,11 @@ Module SimCommon.
     inv MEM1. exploit COMPLETE; eauto. i. des. inv MSG.
     esplits.
     - econs; eauto.
-      admit.
-    - admit.
+      eapply sim_readable; eauto. apply LC1.
+    - econs; s; try apply LC1.
+      eapply sim_read_tview; eauto. apply LC1.
     - ss.
-  Admitted.
+  Qed.
 
   Lemma fulfill_step_relaxed
         l
@@ -1202,6 +1432,9 @@ Module SimCommon.
         (FULFILLABLE1: fulfillable l lc1_src.(Local.tview) mem1_src lc1_src.(Local.promises))
         (LOC: loc <> l)
         (ORD: Ordering.le ord Ordering.strong_relaxed)
+        (RELEASED_TGT: __guard__ (
+                           released_tgt =
+                           TView.write_released lc1_tgt.(Local.tview) sc1_tgt loc to releasedm_tgt ord))
         (STEP_TGT: fulfill_step lc1_tgt sc1_tgt loc from to val releasedm_tgt released_tgt ord lc2_tgt sc2_tgt):
     exists released_src promises2_src mem2_src,
       <<WRITE_SRC: Memory.write lc1_src.(Local.promises) mem1_src loc from to
@@ -1292,9 +1525,23 @@ Module SimCommon.
           inv WRITABLE. etrans; [|econs; eauto].
           inv WF1_TGT. inv TVIEW_WF. destruct (REL_CUR loc). ss.
       + unfold TimeMap.bot. apply Time.bot_spec.
-    - admit.
-    - admit.
-  Admitted.
+    - exploit MemoryReorder.lower_remove_same; try exact x0; eauto. i. des.
+      eapply sim_memory_remove; try apply LC1; eauto.
+    - unguardH RELEASED_TGT. subst.
+      exploit Memory.remove_get0; try exact REMOVE. i. des.
+      dup WF1_TGT. inv WF1_TGT0. exploit PROMISES; try exact GET3. i.
+      clear GET4 TVIEW_WF TVIEW_CLOSED PROMISES FINITE BOT RESERVE.
+      inv MEM1. econs; i.
+      + revert GET_SRC0.
+        erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+        i. des. subst. inv GET_SRC0.
+        esplits; eauto. econs.
+        eapply sim_write_released; eauto. apply LC1.
+      + erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+        des. subst. rewrite GET_TGT in *. inv x.
+        esplits; eauto. econs.
+        eapply sim_write_released; eauto. apply LC1.
+  Qed.
 
   Lemma fulfill_step_release
         l
@@ -1316,6 +1563,9 @@ Module SimCommon.
         (STRONG: view_le_loc l lc1_src.(Local.tview).(TView.cur) released_src)
         (LOC: loc <> l)
         (ORD: Ordering.le Ordering.acqrel ord)
+        (RELEASED_TGT: __guard__ (
+                           released_tgt =
+                           TView.write_released lc1_tgt.(Local.tview) sc1_tgt loc to releasedm_tgt ord))
         (STEP_TGT: fulfill_step lc1_tgt sc1_tgt loc from to val releasedm_tgt released_tgt ord lc2_tgt sc2_tgt):
     exists released_src promises2_src mem2_src,
       <<WRITE_SRC: Memory.write lc1_src.(Local.promises) mem1_src loc from to
@@ -1404,9 +1654,23 @@ Module SimCommon.
         inv LC1. inv TVIEW. inv CUR. ss.
         exploit RLX; eauto. i. rewrite x.
         inv WRITABLE. etrans; [|econs; eauto]. refl.
-    - admit.
-    - admit.
-  Admitted.
+    - exploit MemoryReorder.lower_remove_same; try exact x0; eauto. i. des.
+      eapply sim_memory_remove; try apply LC1; eauto.
+    - unguardH RELEASED_TGT.
+      exploit Memory.remove_get0; try exact REMOVE. i. des.
+      dup WF1_TGT. inv WF1_TGT0. exploit PROMISES; try exact GET3. i.
+      clear GET4 TVIEW_WF TVIEW_CLOSED PROMISES FINITE BOT RESERVE.
+      inv MEM1. econs; i.
+      + revert GET_SRC0.
+        erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+        i. des. subst. inv GET_SRC0.
+        esplits; eauto. econs. rewrite RELEASED_TGT.
+        eapply sim_write_released; eauto. apply LC1.
+      + erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+        des. subst. rewrite GET_TGT in *. inv x.
+        esplits; eauto. econs. rewrite RELEASED_TGT.
+        eapply sim_write_released; eauto. apply LC1.
+  Qed.
 
   Lemma write_step
         l
@@ -1463,6 +1727,7 @@ Module SimCommon.
           des. subst. inv MEM. inv LOWER. timetac.
         - erewrite Memory.remove_o; eauto. condtac; ss; eauto.
           des. subst. exploit Memory.remove_get0; try exact MEM. i. des. congr. }
+      { inv STEP1. ss. }
       i. des.
       inv STEP_SRC; ss.
       replace msg_src with (Message.full val released_src) in *; cycle 1.
@@ -1476,10 +1741,10 @@ Module SimCommon.
       exploit MemoryMerge.promise_write_write; try exact PROMISE; eauto. i.
       esplits.
       - econs; eauto.
+        + inv STEP_TGT. eapply sim_writable; eauto. apply LC1.
         + admit.
-        + admit.
-      - econs; ss.
-        admit.
+      - inv STEP_TGT. econs; ss.
+        eapply sim_write_tview; eauto. apply LC1.
       - by inv STEP_TGT.
       - ss.
       - admit.
@@ -1517,6 +1782,7 @@ Module SimCommon.
           des. subst. inv MEM. inv LOWER. timetac.
         - erewrite Memory.remove_o; eauto. condtac; ss; eauto. }
       { destruct ord; ss. }
+      { inv STEP1. ss. }
       i. des.
       replace released_src0 with released_src in *; cycle 1.
       { inv WRITE_SRC. inv PROMISE0.
@@ -1525,10 +1791,10 @@ Module SimCommon.
       exploit MemoryMerge.promise_write_write; try exact PROMISE; eauto. i.
       esplits.
       - econs; eauto.
+        + inv STEP_TGT. eapply sim_writable; eauto. apply LC1.
         + admit.
-        + admit.
-      - econs; ss.
-        admit.
+      - inv STEP_TGT. econs; ss.
+        eapply sim_write_tview; eauto. apply LC1.
       - by inv STEP_TGT.
       - ss.
       - admit.
@@ -1561,8 +1827,10 @@ Module SimCommon.
       { ii. subst. congr. }
       i. des. inv MSG; ss.
       exploit H0; eauto. i. inv RELEASED; ss.
-    - admit.
-    - admit.
+    - econs; try apply LC1; s.
+      eapply sim_fence_tview; eauto. apply LC1.
+    - eapply sim_write_fence_sc; eauto.
+      eapply sim_read_fence_tview; eauto. apply LC1.
     - unfold TView.write_fence_tview. repeat condtac; ss; ii.
       + destruct ordw; ss.
         inv LC1. inv PROMISES0. exploit SOUND; eauto.
@@ -1574,7 +1842,7 @@ Module SimCommon.
         { ii. subst. congr. }
         i. des. inv MSG. inv RELEASED.
         exploit RELEASE; eauto. ss.
-  Admitted.
+  Qed.
 
   Lemma failure_step
         l
