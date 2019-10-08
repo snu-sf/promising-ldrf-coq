@@ -325,6 +325,7 @@ Module SimThreadPromotion.
     { (* cas_fail *)
       admit.
     }
+
     (* synch *)
     inv STATE. ss.
     exploit promote_stmts_cases; eauto. i. des.
@@ -430,9 +431,67 @@ Module SimThreadPromotion.
       - econs; eauto; ss.
         + eapply step_reg_free; eauto. ss.
         + left. econs; eauto.
-        + admit.
-        + admit.
-        + admit.
+        + assert (VAL: regs1_tgt r = st2.(State.regs) r).
+          { inv STATE; ss. destruct i; inv INSTR; ss.
+            - unfold RegFun.add. condtac; ss. subst.
+              exfalso. inv REGFREE. inv H1. ss.
+              symmetry in REGFREE.
+              apply RegSet.disjoint_add in REGFREE. des.
+              apply REGFREE.
+              eapply RegSet.Facts.singleton_2; ss.
+            - unfold RegFun.add. condtac; ss. subst.
+              exfalso. inv REGFREE. inv H1. ss.
+              unfold RegSet.disjoint in REGFREE.
+              apply (REGFREE lhs); eauto using RegSet.Facts.singleton_2.
+            - unfold RegFun.add. condtac; ss. subst.
+              exfalso. inv REGFREE. inv H1. ss.
+              symmetry in REGFREE.
+              apply RegSet.disjoint_add in REGFREE. des.
+              apply REGFREE.
+              eapply RegSet.Facts.singleton_2; ss.
+            - unfold RegFun.add. condtac; ss. subst.
+              exfalso. inv REGFREE. inv H1. ss.
+              symmetry in REGFREE.
+              apply RegSet.disjoint_add in REGFREE. des.
+              apply REGFREE.
+              eapply RegSet.Facts.singleton_2; ss.
+            - unfold RegFun.add. condtac; ss. subst.
+              exfalso. inv REGFREE. inv H1. ss.
+              symmetry in REGFREE.
+              apply RegSet.disjoint_add in REGFREE. des.
+              apply REGFREE.
+              eapply RegSet.Facts.singleton_2; ss.
+          }
+          cut (forall to, Memory.get l to mem1_src = Memory.get l to mem2_src).
+          { i. exploit eq_loc_max_ts; eauto. i.
+            rewrite <- VAL. rewrite <- x1. rewrite <- H.
+            inv SIM1. ss. }
+          rewrite <- ThreadEvent.eq_program_event_eq_loc in *; eauto.
+          unfold ThreadEvent.is_accessing_loc in *. inv STEP_SRC; ss.
+          * inv LOCAL0. inv WRITE. eapply promise_eq_mem; eauto.
+          * inv LOCAL2. inv WRITE. eapply promise_eq_mem; eauto.
+        + i. inv SIM1. ss.
+          rewrite <- ThreadEvent.eq_program_event_eq_loc in *; eauto.
+          unfold ThreadEvent.is_accessing_loc in *.
+          inv STEP_SRC; ss; try by inv LOCAL1; ss.
+          * inv LOCAL1. inv WRITE. ss.
+            erewrite Memory.remove_o; eauto. condtac; ss.
+            erewrite <- promise_eq_promises; eauto.
+          * inv LOCAL1. inv LOCAL2. inv WRITE. ss.
+            erewrite Memory.remove_o; eauto. condtac; ss.
+            erewrite <- promise_eq_promises; eauto.
+        + ii. exploit Local.program_step_future; try exact STEP_SRC; eauto. i. des.
+          etrans; try eapply TVIEW_FUTURE.
+          inv SIM1. ss. revert GET.
+          rewrite <- ThreadEvent.eq_program_event_eq_loc in *; eauto.
+          unfold ThreadEvent.is_accessing_loc in *.
+          inv STEP_SRC; ss; eauto; try by inv LOCAL1; ss; eauto.
+          * inv LOCAL1. inv WRITE. ss.
+            erewrite Memory.remove_o; eauto. condtac; ss.
+            erewrite <- promise_eq_promises; eauto.
+          * inv LOCAL1. inv LOCAL2. inv WRITE. ss.
+            erewrite Memory.remove_o; eauto. condtac; ss.
+            erewrite <- promise_eq_promises; eauto.
     }
   Admitted.
 End SimThreadPromotion.
