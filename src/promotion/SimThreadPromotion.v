@@ -244,5 +244,57 @@ Module SimThreadPromotion.
       <<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>> /\
       <<SIM2: sim_thread l r e2_src e2_tgt>>.
   Proof.
+    destruct e1_src as [[regs1_src stmts1_src] lc1_src sc1_src mem1_src].
+    destruct e1_tgt as [[regs1_tgt stmts1_tgt] lc1_tgt sc1_tgt mem1_tgt].
+    dup SIM1. inv SIM0. ss.
+    clear LOCAL SC MEMORY FULFILLABLE LATEST PROMISES SAFE.
+    unfold sim_state in *. des; cycle 1.
+    { (* fa *)
+      admit.
+    }
+    { (* cas_sucess1 *)
+      admit.
+    }
+    { (* cas_success2 *)
+      admit.
+    }
+    { (* cas_fail *)
+      admit.
+    }
+    (* synch *)
+    inv STATE. ss.
+    exploit promote_stmts_cases; eauto. i. des.
+    { (* nil *)
+      subst. inv STEP_TGT.
+      unfold promote_stmts in *. ss. inv STATE.
+    }
+    { (* load *)
+      admit.
+    }
+    { (* store *)
+      admit.
+    }
+    { (* fa *)
+      admit.
+    }
+    { (* cas *)
+      admit.
+    }
+    { (* ite *)
+      admit.
+    }
+    { (* dowhile *)
+      admit.
+    }
+    { (* locfree *)
+      inv STEP_TGT.
+      exploit program_step; try eapply SIM1; try exact LOCAL; eauto.
+      { admit. }
+      s. i. des.
+      esplits.
+      - econs 2. econs; try exact STEP_SRC. admit.
+      - ss.
+      - admit.
+    }
   Admitted.
 End SimThreadPromotion.
