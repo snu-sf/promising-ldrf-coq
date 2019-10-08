@@ -95,7 +95,6 @@ Module SimThreadOther.
         (SC1_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
         (CLOSED1_SRC: Memory.closed e1_src.(Thread.memory))
         (CLOSED1_TGT: Memory.closed e1_tgt.(Thread.memory))
-        (LOC: ~ ThreadEvent.is_accessing_loc l e_tgt)
         (STEP_TGT: Thread.step pf e_tgt e1_tgt e2_tgt):
     exists e_src e1_src e2_src,
       <<STEP_SRC: Thread.opt_step e_src e1_src e2_src>> /\
@@ -116,6 +115,8 @@ Module SimThreadOther.
     }
     (* program step *)
     inv STEP; ss.
+    hexploit loc_free_step_is_accessing_loc; eauto; i.
+    { inv SIM1. ss. subst. eauto. }
     exploit program_step; try exact LOCAL; try eapply SIM1; eauto. i. des.
     esplits.
     - econs 2. econs 2. econs; try exact STEP_SRC.

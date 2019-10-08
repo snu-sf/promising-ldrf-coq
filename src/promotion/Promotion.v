@@ -127,3 +127,17 @@ Proof.
   - inv LOCFREE. inv H1.
     eapply Forall_app; eauto.
 Qed.
+
+Lemma loc_free_step_is_accessing_loc
+      l e st1 st2
+      (LOCFREE: loc_free_stmts l st1.(State.stmts))
+      (STEP: State.step (ThreadEvent.get_program_event e) st1 st2):
+  ~ ThreadEvent.is_accessing_loc l e.
+Proof.
+  inv STEP; try (by destruct e); ss.
+  inv INSTR; destruct e; ss.
+  - inv H2. inv LOCFREE. inv H1. ss.
+  - inv H2. inv LOCFREE. inv H1. ss.
+  - inv H2. inv LOCFREE. inv H1. ss.
+  - inv H2. inv LOCFREE. inv H1. ss.
+Qed.

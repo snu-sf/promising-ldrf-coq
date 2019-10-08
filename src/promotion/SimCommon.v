@@ -30,10 +30,7 @@ Require Import MemoryReorder.
 
 Require Import FulfillStep.
 
-Require Import Promotion.
-
 Set Implicit Arguments.
-Set Nested Proofs Allowed.
 
 
 Module SimCommon.
