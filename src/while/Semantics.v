@@ -308,6 +308,16 @@ Module State.
            (mk rf ((Stmt.dowhile s cond)::stmts))
            (mk rf (s ++ (Stmt.ite cond ((Stmt.dowhile s cond)::nil) nil) :: stmts))
   .
+
+  Inductive opt_step: forall (e:ProgramEvent.t) (st1 st2:t), Prop :=
+  | opt_step_none
+      st:
+      opt_step ProgramEvent.silent st st
+  | opt_step_some
+      e st1 st2
+      (STEP: step e st1 st2):
+      opt_step e st1 st2
+  .
 End State.
 
 Program Definition lang: Language.t ProgramEvent.t :=

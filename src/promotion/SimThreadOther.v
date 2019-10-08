@@ -34,37 +34,6 @@ Require Import SimCommon.
 Set Implicit Arguments.
 
 
-Inductive opt_lang_step: forall (e:ProgramEvent.t) (st1 st2:State.t), Prop :=
-| opt_lang_step_none
-    st:
-    opt_lang_step ProgramEvent.silent st st
-| opt_lang_step_some
-    e st1 st2
-    (STEP: lang.(Language.step) e st1 st2):
-    opt_lang_step e st1 st2
-.
-
-Inductive opt_promise_step: forall (e:ThreadEvent.t) (e1 e2:Thread.t lang), Prop :=
-| opt_promise_step_none
-    e1:
-    opt_promise_step ThreadEvent.silent e1 e1
-| opt_promise_step_some
-    pf e e1 e2
-    (STEP: Thread.promise_step pf e e1 e2):
-    opt_promise_step e e1 e2
-.
-
-Inductive opt_program_step: forall (e:ThreadEvent.t) (e1 e2:Thread.t lang), Prop :=
-| opt_program_step_none
-    e1:
-    opt_program_step ThreadEvent.silent e1 e1
-| opt_program_step_some
-    e e1 e2
-    (STEP: Thread.program_step e e1 e2):
-    opt_program_step e e1 e2
-.
-
-
 Module SimThreadOther.
   Import SimCommon.
 
@@ -90,7 +59,7 @@ Module SimThreadOther.
         (CLOSED1_SRC: Memory.closed e1_src.(Thread.memory))
         (STEP_TGT: Thread.promise_step pf e_tgt e1_tgt e2_tgt):
     exists e_src e2_src,
-      <<STEP_SRC: opt_promise_step e_src e1_src e2_src>> /\
+      <<STEP_SRC: Thread.opt_promise_step e_src e1_src e2_src>> /\
       <<SIM2: sim_thread_other l e2_src e2_tgt>> /\
       <<MEMLOC: forall to, Memory.get l to e1_src.(Thread.memory) = Memory.get l to e2_src.(Thread.memory)>>.
   Proof.

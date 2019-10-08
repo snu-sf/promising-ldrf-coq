@@ -41,26 +41,6 @@ Require Import GSimulation.
 Set Implicit Arguments.
 
 
-Inductive opt_lang_step: forall (e:ProgramEvent.t) (st1 st2:State.t), Prop :=
-| opt_lang_step_none
-    st:
-    opt_lang_step ProgramEvent.silent st st
-| opt_lang_step_some
-    e st1 st2
-    (STEP: lang.(Language.step) e st1 st2):
-    opt_lang_step e st1 st2
-.
-
-Inductive opt_program_step: forall (e:ThreadEvent.t) (e1 e2:Thread.t lang), Prop :=
-| opt_program_step_none
-    e1:
-    opt_program_step ThreadEvent.silent e1 e1
-| opt_program_step_some
-    e e1 e2
-    (STEP: Thread.program_step e e1 e2):
-    opt_program_step e e1 e2
-.
-
 Lemma inj_option_pair
       A B
       (a1 a2: A)
@@ -84,20 +64,6 @@ Ltac simplify :=
            apply inj_pair2 in H
          end;
      ss; subst).
-
-Lemma tau_opt_all
-      e1 e2 e3 e
-      (STEPS: rtc (@Thread.tau_step lang) e1 e2)
-      (STEP: Thread.opt_step e e2 e3):
-  rtc (@Thread.all_step lang) e1 e3.
-Proof.
-  induction STEPS.
-  - inv STEP; eauto.
-    econs 2; eauto. econs. econs. eauto.
-  - exploit IHSTEPS; eauto. i.
-    econs 2; eauto.
-    inv H. inv TSTEP. econs. econs. eauto.
-Qed.
 
 
 Section AbortInsertion.
@@ -169,7 +135,7 @@ Section AbortInsertion.
         (SIM1: sim_state tid st1_src st1_tgt)
         (STEP: lang.(Language.step) e st1_tgt st2_tgt):
     (exists st2_src,
-        <<STEP_SRC: opt_lang_step e st1_src st2_src>> /\
+        <<STEP_SRC: State.opt_step e st1_src st2_src>> /\
         <<SIM2: sim_state tid st2_src st2_tgt>>) \/
     (exists c stmts,
         <<STMTS: st1_tgt.(State.stmts) =
@@ -222,7 +188,7 @@ Section AbortInsertion.
         (SIM1: sim_thread tid e1_src e1_tgt)
         (STEP_TGT: Thread.program_step e e1_tgt e2_tgt):
     (exists e2_src,
-        <<STEP_SRC: opt_program_step e e1_src e2_src>> /\
+        <<STEP_SRC: Thread.opt_program_step e e1_src e2_src>> /\
         <<SIM2: sim_thread tid e2_src e2_tgt>>) \/
     (exists c stmts,
         <<STMTS: e1_tgt.(Thread.state).(State.stmts) =
@@ -596,7 +562,7 @@ Section AbortInsertion.
           try exact STEPS0; eauto.
         i. des; cycle 1.
         { exfalso.
-          exploit tau_opt_all; try exact STEPS_SRC; eauto. i.
+          exploit Thread.tau_opt_all; try exact STEPS_SRC; eauto. i.
           exploit (@PFStep.sim_thread_exists lang (Thread.mk lang st_src lc_src sc1 mem1)); ss; eauto. i. des.
           exploit PFStep.thread_rtc_all_step; try exact x2; eauto.
           { hexploit consistent_promise_consistent; eauto. }
@@ -628,7 +594,7 @@ Section AbortInsertion.
         }
         exploit sim_thread_step; try exact SIM1; eauto. i. des; cycle 1.
         { exfalso.
-          exploit tau_opt_all; try exact STEPS_SRC; eauto. i.
+          exploit Thread.tau_opt_all; try exact STEPS_SRC; eauto. i.
           exploit (@PFStep.sim_thread_exists lang (Thread.mk lang st_src lc_src sc1 mem1)); ss; eauto. i. des.
           exploit PFStep.thread_rtc_all_step; try exact x2; eauto.
           { hexploit consistent_promise_consistent; eauto. }
@@ -665,7 +631,7 @@ Section AbortInsertion.
         exploit (@sim_thread_rtc_tau_step tid (Thread.mk lang state lc3 sc0 mem0));
           try exact STEPS0; eauto. i. des; cycle 1.
         { exfalso.
-          exploit tau_opt_all; try exact STEPS_SRC; eauto. i.
+          exploit Thread.tau_opt_all; try exact STEPS_SRC; eauto. i.
           exploit (@PFStep.sim_thread_exists lang (Thread.mk lang st_src lc_src sc1 mem1)); ss; eauto. i. des.
           exploit PFStep.thread_rtc_all_step; try exact x2; eauto.
           { hexploit consistent_promise_consistent; eauto. }

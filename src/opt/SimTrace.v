@@ -29,17 +29,6 @@ Require Import Semantics.
 
 Set Implicit Arguments.
 
-
-Inductive opt_lang_step: forall (e:ProgramEvent.t) (st1 st2:State.t), Prop :=
-| opt_lang_step_none
-    st:
-    opt_lang_step ProgramEvent.silent st st
-| opt_lang_step_some
-    e st1 st2
-    (STEP: lang.(Language.step) e st1 st2):
-    opt_lang_step e st1 st2
-.
-
 Definition lang_steps_failure (st1: State.t): Prop :=
   exists st2 st3,
     <<STEPS: rtc (lang.(Language.step) ProgramEvent.silent) st1 st2>> /\
@@ -70,7 +59,7 @@ Definition _sim_trace
       exists e_src st2_src st3_src,
         <<EVT: ProgramEvent.ord e_src e_tgt>> /\
         <<STEPS: rtc (lang.(Language.step) ProgramEvent.silent) st1_src st2_src>> /\
-        <<STEP_SRC: opt_lang_step e_src st2_src st3_src>> /\
+        <<STEP_SRC: State.opt_step e_src st2_src st3_src>> /\
         <<SIM: sim_trace sim_regs st3_src st3_tgt>>>>.
 
 Lemma _sim_trace_mon: monotone3 _sim_trace.

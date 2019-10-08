@@ -134,11 +134,48 @@ Module Thread.
     .
     Hint Constructors opt_step.
 
+    Inductive opt_promise_step: forall (e:ThreadEvent.t) (e1 e2:t), Prop :=
+    | opt_promise_step_none
+        e1:
+        opt_promise_step ThreadEvent.silent e1 e1
+    | opt_promise_step_some
+        pf e e1 e2
+        (STEP: Thread.promise_step pf e e1 e2):
+        opt_promise_step e e1 e2
+    .
+
+    Inductive opt_program_step: forall (e:ThreadEvent.t) (e1 e2:t), Prop :=
+    | opt_program_step_none
+        e1:
+        opt_program_step ThreadEvent.silent e1 e1
+    | opt_program_step_some
+        e e1 e2
+        (STEP: Thread.program_step e e1 e2):
+        opt_program_step e e1 e2
+    .
+
+    Lemma tau_opt_all
+          e1 e2 e3 e
+          (STEPS: rtc Thread.tau_step e1 e2)
+          (STEP: Thread.opt_step e e2 e3):
+      rtc Thread.all_step e1 e3.
+    Proof.
+      induction STEPS.
+      - inv STEP; eauto.
+      - exploit IHSTEPS; eauto. i.
+        econs 2; eauto.
+        inv H. inv TSTEP. econs. econs. eauto.
+    Qed.
+
+
     Definition steps_failure (e1: t): Prop :=
       exists e2 e3,
         <<STEPS: rtc tau_step e1 e2>> /\
         <<FAILURE: step true ThreadEvent.failure e2 e3>>.
     Hint Unfold steps_failure.
+
+
+    (* consistency *)
 
     Definition consistent (e:t): Prop :=
       forall mem1 sc1
@@ -302,6 +339,9 @@ Module Thread.
         exploit IHSTEP; eauto. i. des.
         splits; ss; etrans; eauto.
     Qed.
+
+
+    (* step_inhabited *)
 
     Lemma promise_step_inhabited
           pf e e1 e2
