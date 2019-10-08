@@ -29,7 +29,7 @@ Require Import PromiseConsistent.
 Set Implicit Arguments.
 
 
-Definition promote_stmt (l: Loc.t) (r: Reg.t) (stmt: Stmt.t): list Stmt.t :=
+Fixpoint promote_stmt (l: Loc.t) (r: Reg.t) (stmt: Stmt.t): list Stmt.t :=
   match stmt with
   | Stmt.instr (Instr.load lhs rhs _) =>
     if Loc.eq_dec rhs l
@@ -53,11 +53,19 @@ Definition promote_stmt (l: Loc.t) (r: Reg.t) (stmt: Stmt.t): list Stmt.t :=
             [Stmt.instr (Instr.assign lhs (Instr.expr_val (Value.const 0)))]
          ]
     else [stmt]
+  | Stmt.ite cond stmts1 stmts2 =>
+    [Stmt.ite cond
+              (List.fold_right (@List.app _) [] (List.map (promote_stmt l r) stmts1))
+              (List.fold_right (@List.app _) [] (List.map (promote_stmt l r) stmts2))]
+  | Stmt.dowhile stmts cond =>
+    [Stmt.dowhile
+       (List.fold_right (@List.app _) [] (List.map (promote_stmt l r) stmts))
+       cond]
   | _ => [stmt]
   end.
 
 Definition promote_stmts (l: Loc.t) (r: Reg.t) (stmts: list Stmt.t): list Stmt.t :=
-  List.fold_left (@List.app _) (List.map (promote_stmt l r) stmts) [].
+  List.fold_right (@List.app _) [] (List.map (promote_stmt l r) stmts).
 
 
 (* loc_free *)
@@ -140,4 +148,86 @@ Proof.
   - inv H2. inv LOCFREE. inv H1. ss.
   - inv H2. inv LOCFREE. inv H1. ss.
   - inv H2. inv LOCFREE. inv H1. ss.
+Qed.
+
+
+Lemma promote_stmts_cons l r stmt stmts:
+  promote_stmts l r (stmt :: stmts) =
+  (promote_stmt l r stmt) ++ (promote_stmts l r stmts).
+Proof.
+  unfold promote_stmts. ss.
+Qed.
+
+Lemma promote_stmts_cases
+      l r stmts_src stmts_tgt
+      (PROMOTE: stmts_tgt = promote_stmts l r stmts_src):
+  <<NIL: stmts_src = [] /\ stmts_tgt = []>> \/
+  <<LOAD: exists lhs ord stmts'_src stmts'_tgt,
+    <<STMTS_SRC: stmts_src = (Stmt.instr (Instr.load lhs l ord)) :: stmts'_src>> /\
+    <<STMTS_TGT: stmts_tgt = (Stmt.instr (Instr.assign lhs (Instr.expr_val (Value.reg r)))) :: stmts'_tgt>> /\
+    <<STMTS: stmts'_tgt = promote_stmts l r stmts'_src>>>> \/
+  <<STORE: exists rhs ord stmts'_src stmts'_tgt,
+    <<STMTS_SRC: stmts_src = (Stmt.instr (Instr.store l rhs ord)) :: stmts'_src>> /\
+    <<STMTS_TGT: stmts_tgt = (Stmt.instr (Instr.assign r rhs)) :: stmts'_tgt>> /\
+    <<STMTS: stmts'_tgt = promote_stmts l r stmts'_src>>>> \/
+  <<FA: exists lhs addendum ordr ordw stmts'_src stmts'_tgt,
+    <<STMTS_SRC: stmts_src = (Stmt.instr (Instr.update lhs l (Instr.fetch_add addendum) ordr ordw)) :: stmts'_src>> /\
+    <<STMTS_TGT: stmts_tgt =
+                 [Stmt.instr (Instr.assign lhs (Instr.expr_val (Value.reg r)));
+                    Stmt.instr (Instr.assign r (Instr.expr_op2 Op2.add (Value.reg r) addendum))] ++ stmts'_tgt>> /\
+    <<STMTS: stmts'_tgt = promote_stmts l r stmts'_src>>>> \/
+  <<CAS: exists lhs old new ordr ordw stmts'_src stmts'_tgt,
+    <<STMTS_SRC: stmts_src = (Stmt.instr (Instr.update lhs l (Instr.cas old new) ordr ordw)) :: stmts'_src>> /\
+    <<STMTS_TGT: stmts_tgt =
+                 [Stmt.ite
+                    (Instr.expr_op2 Op2.sub (Value.reg r) old)
+                    [Stmt.instr (Instr.assign lhs (Instr.expr_val (Value.const 1)));
+                       Stmt.instr (Instr.assign r new)]
+                    [Stmt.instr (Instr.assign lhs (Instr.expr_val (Value.const 0)))]
+                 ] ++ stmts'_tgt>> /\
+    <<STMTS: stmts'_tgt = promote_stmts l r stmts'_src>>>> \/
+  <<ITE: exists cond stmts1 stmts2 stmts'_src stmts'_tgt,
+    <<STMTS_SRC: stmts_src = (Stmt.ite cond stmts1 stmts2) :: stmts'_src>> /\
+    <<STMTS_TGT: stmts_tgt = (Stmt.ite cond (promote_stmts l r stmts1) (promote_stmts l r stmts2)) :: stmts'_tgt>> /\
+    <<STMTS: stmts'_tgt = promote_stmts l r stmts'_src>>>> \/
+  <<DOWHILE: exists stmts cond stmts'_src stmts'_tgt,
+    <<STMTS_SRC: stmts_src = (Stmt.dowhile stmts cond) :: stmts'_src>> /\
+    <<STMTS_TGT: stmts_tgt = (Stmt.dowhile (promote_stmts l r stmts) cond) :: stmts'_tgt>> /\
+    <<STMTS: stmts'_tgt = promote_stmts l r stmts'_src>>>> \/
+  <<LOCFREE: exists stmt stmts'_src stmts'_tgt,
+    <<STMTS_SRC: stmts_src = stmt :: stmts'_src>> /\
+    <<STMTS_TGT: stmts_tgt = stmt :: stmts'_tgt>> /\
+    <<STMTS: stmts'_tgt = promote_stmts l r stmts'_src>> /\
+    <<STMT: loc_free_stmt l stmt>>>>.
+Proof.
+  destruct stmts_src as [|stmt stmts'_src]; eauto. right.
+  destruct stmt; ss.
+  - destruct i.
+    + rewrite promote_stmts_cons in PROMOTE. ss. subst.
+      repeat right. esplits; eauto. econs. ss.
+    + rewrite promote_stmts_cons in PROMOTE. ss. subst.
+      repeat right. esplits; eauto. econs. ss.
+    + rewrite promote_stmts_cons in PROMOTE. ss. des_ifs; ss.
+      * left. esplits; eauto.
+      * repeat right. esplits; eauto.
+    + rewrite promote_stmts_cons in PROMOTE. ss. des_ifs; ss.
+      * right. left. esplits; eauto.
+      * repeat right. esplits; eauto.
+    + rewrite promote_stmts_cons in PROMOTE. ss. destruct rmw; ss.
+      * des_ifs; ss.
+        { right. right. left. esplits; eauto. }
+        { repeat right. esplits; eauto. }
+      * des_ifs; ss.
+        { right. right. right. left. esplits; eauto. }
+        { repeat right. esplits; eauto. }
+    + rewrite promote_stmts_cons in PROMOTE. ss. subst.
+      repeat right. esplits; eauto. econs. ss.
+    + rewrite promote_stmts_cons in PROMOTE. ss. subst.
+      repeat right. esplits; eauto. econs. ss.
+    + rewrite promote_stmts_cons in PROMOTE. ss. subst.
+      repeat right. esplits; eauto. econs. ss.
+  - rewrite promote_stmts_cons in PROMOTE. ss. subst.
+    do 4 right. left. esplits; eauto.
+  - rewrite promote_stmts_cons in PROMOTE. ss. subst.
+    do 5 right. left. esplits; eauto.
 Qed.
