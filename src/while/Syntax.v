@@ -59,13 +59,18 @@ Module Op2.
   | add
   | sub
   | mul
+  | eq
   .
+
+  Definition const_eq (op1 op2: Const.t): Const.t :=
+    if Const.eq_dec op1 op2 then 0 else 1.
 
   Definition eval (op:t): forall (op1 op2:Const.t), Const.t :=
     match op with
     | add => Const.add
     | sub => Const.sub
     | mul => Const.mul
+    | eq => const_eq
     end.
 End Op2.
 
