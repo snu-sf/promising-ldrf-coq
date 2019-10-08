@@ -228,6 +228,48 @@ Module SimThreadPromotion.
       + erewrite <- promise_eq_promises in GET; eauto.
   Qed.
 
+  Lemma promote_stmts_step
+        l r stmt
+        regs1_src stmts1_src
+        e regs1_tgt stmts1_tgt st2_tgt
+        (REGS1: RegFile.eq_except (RegSet.singleton r) regs1_src regs1_tgt)
+        (STMTS1: stmts1_tgt = promote_stmts l r stmts1_src)
+        (STMT: promote_stmt l r stmt = [stmt])
+        (REGFREE: reg_free_stmt r stmt)
+        (STEP_TGT: State.step e (State.mk regs1_tgt (stmt :: stmts1_tgt)) st2_tgt):
+    exists st2_src,
+      <<STEP_SRC: State.step e (State.mk regs1_src (stmt :: stmts1_src)) st2_src>> /\
+      <<REGS2: RegFile.eq_except (RegSet.singleton r) st2_src.(State.regs) st2_tgt.(State.regs)>> /\
+      <<STMTS2: st2_tgt.(State.stmts) = promote_stmts l r st2_src.(State.stmts)>>.
+  Proof.
+    subst. inv STEP_TGT.
+    - inv REGFREE.
+      exploit RegFile.eq_except_instr; eauto. i. des.
+      esplits.
+      + econs; eauto.
+      + ss.
+      + ss.
+    - inv REGFREE.
+      esplits.
+      + econs; eauto.
+      + ss.
+      + s. rewrite promote_stmts_app.
+        exploit RegFile.eq_except_expr; eauto. i. rewrite x0.
+        repeat condtac; ss.
+        * unfold promote_stmts. inv STMT.
+          repeat rewrite H0. refl.
+        * unfold promote_stmts. inv STMT.
+          repeat rewrite H1. refl.
+    - inv REGFREE.
+      esplits.
+      + econs; eauto.
+      + ss.
+      + s. rewrite promote_stmts_app.
+        rewrite promote_stmts_cons.
+        unfold promote_stmts. inv STMT. ss.
+        repeat rewrite H0. refl.
+  Qed.
+
   Lemma sim_thread_program_step
         l r e1_src
         e_tgt e1_tgt e2_tgt
@@ -291,10 +333,23 @@ Module SimThreadPromotion.
       exploit program_step; try eapply SIM1; try exact LOCAL; eauto.
       { admit. }
       s. i. des.
+      rewrite promote_stmts_cons in STMTS_TGT.
+      replace (stmt :: promote_stmts l r stmts'_src) with
+          ([stmt] ++ promote_stmts l r stmts'_src) in STMTS_TGT by ss.
+      exploit List.app_inv_tail; try exact STMTS_TGT. i.
+      rewrite promote_stmts_cons in STATE.
+      rewrite x0 in STATE. ss.
+      exploit promote_stmts_step; try eapply STATE; eauto; try by inv REGFREE. i. des.
       esplits.
-      - econs 2. econs; try exact STEP_SRC. admit.
+      - econs 2. econs; try exact STEP_SRC.
+        rewrite EVENT2. exact STEP_SRC0.
       - ss.
-      - admit.
+      - econs; eauto; ss.
+        + eapply step_reg_free; eauto. ss.
+        + left. econs; eauto.
+        + admit.
+        + admit.
+        + admit.
     }
   Admitted.
 End SimThreadPromotion.

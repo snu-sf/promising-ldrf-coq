@@ -29,6 +29,8 @@ Require Import PromiseConsistent.
 Set Implicit Arguments.
 
 
+(* promotion *)
+
 Fixpoint promote_stmt (l: Loc.t) (r: Reg.t) (stmt: Stmt.t): list Stmt.t :=
   match stmt with
   | Stmt.instr (Instr.load lhs rhs _) =>
@@ -108,12 +110,14 @@ Inductive reg_free_stmt (r: Reg.t): forall (stmt: Stmt.t), Prop :=
     reg_free_stmt r (Stmt.instr i)
 | reg_free_stmt_ite
     cond stmts1 stmts2
+    (REGFREE0: RegSet.disjoint (RegSet.singleton r) (Instr.regs_of_expr cond))
     (REGFREE1: List.Forall (reg_free_stmt r) stmts1)
     (REGFREE2: List.Forall (reg_free_stmt r) stmts2):
     reg_free_stmt r (Stmt.ite cond stmts1 stmts2)
 | reg_free_stmt_dowhile
     stmts cond
-    (REGFREE: List.Forall (reg_free_stmt r) stmts):
+    (REGFREE1: List.Forall (reg_free_stmt r) stmts)
+    (REGFREE2: RegSet.disjoint (RegSet.singleton r) (Instr.regs_of_expr cond)):
     reg_free_stmt r (Stmt.dowhile stmts cond)
 .
 
@@ -121,41 +125,21 @@ Definition reg_free_stmts (r: Reg.t) (stmts: list Stmt.t): Prop :=
   List.Forall (reg_free_stmt r) stmts.
 
 
-Lemma step_loc_free
-      l e st1 st2
-      (LOCFREE: loc_free_stmts l st1.(State.stmts))
-      (STEP: State.step e st1 st2):
-  loc_free_stmts l st2.(State.stmts).
-Proof.
-  inv STEP; ss.
-  - inv LOCFREE. ss.
-  - inv LOCFREE. condtac.
-    + inv H1. eapply Forall_app; eauto.
-    + inv H1. eapply Forall_app; eauto.
-  - inv LOCFREE. inv H1.
-    eapply Forall_app; eauto.
-Qed.
-
-Lemma loc_free_step_is_accessing_loc
-      l e st1 st2
-      (LOCFREE: loc_free_stmts l st1.(State.stmts))
-      (STEP: State.step (ThreadEvent.get_program_event e) st1 st2):
-  ~ ThreadEvent.is_accessing_loc l e.
-Proof.
-  inv STEP; try (by destruct e); ss.
-  inv INSTR; destruct e; ss.
-  - inv H2. inv LOCFREE. inv H1. ss.
-  - inv H2. inv LOCFREE. inv H1. ss.
-  - inv H2. inv LOCFREE. inv H1. ss.
-  - inv H2. inv LOCFREE. inv H1. ss.
-Qed.
-
-
 Lemma promote_stmts_cons l r stmt stmts:
   promote_stmts l r (stmt :: stmts) =
   (promote_stmt l r stmt) ++ (promote_stmts l r stmts).
 Proof.
   unfold promote_stmts. ss.
+Qed.
+
+Lemma promote_stmts_app l r stmts1 stmts2:
+  promote_stmts l r (stmts1 ++ stmts2) =
+  (promote_stmts l r stmts1) ++ (promote_stmts l r stmts2).
+Proof.
+  induction stmts1; ss.
+  repeat rewrite promote_stmts_cons.
+  rewrite IHstmts1.
+  apply List.app_assoc.
 Qed.
 
 Lemma promote_stmts_cases
@@ -230,4 +214,51 @@ Proof.
     do 4 right. left. esplits; eauto.
   - rewrite promote_stmts_cons in PROMOTE. ss. subst.
     do 5 right. left. esplits; eauto.
+Qed.
+
+
+Lemma step_loc_free
+      l e st1 st2
+      (LOCFREE: loc_free_stmts l st1.(State.stmts))
+      (STEP: State.step e st1 st2):
+  loc_free_stmts l st2.(State.stmts).
+Proof.
+  inv STEP; ss.
+  - inv LOCFREE. ss.
+  - inv LOCFREE. condtac.
+    + inv H1. eapply Forall_app; eauto.
+    + inv H1. eapply Forall_app; eauto.
+  - inv LOCFREE. inv H1.
+    eapply Forall_app; eauto.
+Qed.
+
+Lemma loc_free_step_is_accessing_loc
+      l e st1 st2
+      (LOCFREE: loc_free_stmts l st1.(State.stmts))
+      (STEP: State.step (ThreadEvent.get_program_event e) st1 st2):
+  ~ ThreadEvent.is_accessing_loc l e.
+Proof.
+  inv STEP; try (by destruct e); ss.
+  inv INSTR; destruct e; ss.
+  - inv H2. inv LOCFREE. inv H1. ss.
+  - inv H2. inv LOCFREE. inv H1. ss.
+  - inv H2. inv LOCFREE. inv H1. ss.
+  - inv H2. inv LOCFREE. inv H1. ss.
+Qed.
+
+
+Lemma step_reg_free
+      r e st1 st2
+      (REGFREE: reg_free_stmts r st1.(State.stmts))
+      (STEP: State.step e st1 st2):
+  reg_free_stmts r st2.(State.stmts).
+Proof.
+  inv STEP; ss.
+  - inv REGFREE. ss.
+  - inv REGFREE. condtac.
+    + inv H1. eapply Forall_app; eauto.
+    + inv H1. eapply Forall_app; eauto.
+  - inv REGFREE. inv H1.
+    eapply Forall_app; eauto.
+    repeat (econs; eauto).
 Qed.
