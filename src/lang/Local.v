@@ -431,7 +431,6 @@ Module Local.
     inv STEP. inv WRITE. inv PROMISE; ss.
   Qed.
 
-  (* TODO: refactor *)
   Lemma write_step_strong_relaxed
         lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
         (STEP: write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
