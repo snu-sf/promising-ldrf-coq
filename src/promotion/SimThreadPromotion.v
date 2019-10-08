@@ -70,7 +70,7 @@ Module SimThreadPromotion.
                              :: stmts_tgt)
       (STMTS: stmts_tgt = promote_stmts l r stmts_src)
       (REGS: RegFile.eq_except (RegSet.singleton r) st_src.(State.regs) st_tgt.(State.regs))
-      (SUCCESS: st_tgt.(State.regs) r = RegFile.eval_value st_tgt.(State.regs) old)
+      (SUCCESS: st_tgt.(State.regs) r = RegFile.eval_value st_src.(State.regs) old)
   .
   Hint Constructors sim_state_cas_success1.
 
@@ -83,8 +83,8 @@ Module SimThreadPromotion.
                   (Stmt.instr (Instr.assign r new)) :: stmts_tgt)
       (STMTS: stmts_tgt = promote_stmts l r stmts_src)
       (REGS: RegFile.eq_except (RegSet.add lhs (RegSet.singleton r)) st_src.(State.regs) st_tgt.(State.regs))
-      (LHS: st_tgt.(State.regs) r = 1)
-      (SUCCESS: st_tgt.(State.regs) r = RegFile.eval_value st_tgt.(State.regs) old)
+      (LHS: st_tgt.(State.regs) lhs = 1)
+      (SUCCESS: st_tgt.(State.regs) r = RegFile.eval_value st_src.(State.regs) old)
   .
   Hint Constructors sim_state_cas_success2.
 
@@ -97,7 +97,7 @@ Module SimThreadPromotion.
                   Stmt.instr (Instr.assign lhs (Instr.expr_val (Value.const 0))) :: stmts_tgt)
       (STMTS: stmts_tgt = promote_stmts l r stmts_src)
       (REGS: RegFile.eq_except (RegSet.singleton r) st_src.(State.regs) st_tgt.(State.regs))
-      (FAIL: st_tgt.(State.regs) r <> RegFile.eval_value st_tgt.(State.regs) old)
+      (FAIL: st_tgt.(State.regs) r <> RegFile.eval_value st_src.(State.regs) old)
   .
   Hint Constructors sim_state_cas_fail.
 
@@ -281,7 +281,7 @@ Module SimThreadPromotion.
         (CLOSED1_SRC: Memory.closed e1_src.(Thread.memory))
         (CLOSED1_TGT: Memory.closed e1_tgt.(Thread.memory))
         (STEP_TGT: Thread.program_step e_tgt e1_tgt e2_tgt):
-    exists e_src e1_src e2_src,
+    exists e_src e2_src,
       <<STEP_SRC: Thread.opt_program_step e_src e1_src e2_src>> /\
       <<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>> /\
       <<SIM2: sim_thread l r e2_src e2_tgt>>.
@@ -295,7 +295,29 @@ Module SimThreadPromotion.
       admit.
     }
     { (* cas_sucess1 *)
-      admit.
+      inv STATE. ss. subst.
+      inv STEP_TGT. inv STATE. inv INSTR. ss.
+      destruct e_tgt; ss; inv LOCAL.
+      esplits.
+      - econs 1.
+      - ss.
+      - inv SIM1. ss. econs; s; eauto.
+        + do 3 right. left. econs; ss.
+          * admit.
+          * unfold RegFun.add. condtac; ss.
+          * rewrite <- SUCCESS.
+            unfold RegFun.add. condtac; ss. subst.
+            inv REGFREE. inv H1. ss.
+            symmetry in REGFREE.
+            rewrite RegSet.disjoint_add in REGFREE. des.
+            exfalso. apply REGFREE.
+            eapply RegSet.Facts.singleton_2; ss.
+        + unfold RegFun.add. condtac; ss; eauto. subst.
+          inv REGFREE. inv H1. ss.
+          symmetry in REGFREE.
+          rewrite RegSet.disjoint_add in REGFREE. des.
+          exfalso. apply REGFREE.
+          eapply RegSet.Facts.singleton_2; ss.
     }
     { (* cas_success2 *)
       admit.
@@ -317,16 +339,71 @@ Module SimThreadPromotion.
       admit.
     }
     { (* fa *)
-      admit.
+      ss. subst. rewrite STMTS_TGT in *.
+      inv STEP_TGT. inv STATE. inv INSTR. ss.
+      destruct e_tgt; ss; inv LOCAL.
+      esplits.
+      - econs 1.
+      - ss.
+      - inv SIM1. ss. econs; s; eauto.
+        + right. left. econs; ss.
+          * admit.
+          * unfold RegFun.add. repeat condtac; ss.
+        + unfold RegFun.add. condtac; ss; eauto.
     }
     { (* cas *)
-      admit.
+      ss. subst. rewrite STMTS_TGT in *.
+      inv STEP_TGT. inv STATE.
+      destruct e_tgt; ss; inv LOCAL.
+      esplits.
+      - econs 1.
+      - ss.
+      - inv SIM1. ss. econs; s; eauto. condtac; ss.
+        + right. right. left. econs; ss.
+          unfold Op2.const_eq, RegFun.find in *. des_ifs; ss.
+          rewrite e. symmetry.
+          eapply RegFile.eq_except_value; eauto.
+          inv REGFREE. inv H2. ss.
+          symmetry in REGFREE.
+          apply RegSet.disjoint_add in REGFREE. des.
+          admit.
+        + do 4 right. econs; ss.
+          unfold Op2.const_eq, RegFun.find in *. des_ifs; ss.
+          ii. rewrite H in *. apply n.
+          eapply RegFile.eq_except_value; eauto.
+          inv REGFREE. inv H3. ss.
+          symmetry in REGFREE.
+          apply RegSet.disjoint_add in REGFREE. des.
+          admit.
     }
     { (* ite *)
-      admit.
+      ss. subst. rewrite STMTS_TGT in *.
+      inv STEP_TGT. inv STATE.
+      destruct e_tgt; ss; inv LOCAL.
+      esplits.
+      - econs 2. econs; [|eauto]. econs 2.
+      - ss.
+      - inv SIM1. ss. econs; s; eauto.
+        + inv REGFREE. inv H2.
+          eapply Forall_app; ss. condtac; ss.
+        + left. erewrite RegFile.eq_except_expr; eauto; cycle 1.
+          { inv REGFREE. inv H2. ss. }
+          condtac; ss.
+          * econs; ss. rewrite promote_stmts_app. ss.
+          * econs; ss. rewrite promote_stmts_app. ss.
     }
     { (* dowhile *)
-      admit.
+      ss. subst. rewrite STMTS_TGT in *.
+      inv STEP_TGT. inv STATE.
+      destruct e_tgt; ss; inv LOCAL.
+      esplits.
+      - econs 2. econs; [|eauto]. econs 3.
+      - ss.
+      - inv SIM1. ss. econs; s; eauto.
+        + inv REGFREE. inv H2.
+          eapply Forall_app; ss. repeat econs; ss.
+        + left. econs; ss.
+          rewrite promote_stmts_app. ss.
     }
     { (* locfree *)
       inv STEP_TGT.

@@ -49,7 +49,7 @@ Fixpoint promote_stmt (l: Loc.t) (r: Reg.t) (stmt: Stmt.t): list Stmt.t :=
   | Stmt.instr (Instr.update lhs loc (Instr.cas old new) _ _) =>
     if Loc.eq_dec loc l
     then [Stmt.ite
-            (Instr.expr_op2 Op2.sub (Value.reg r) old)
+            (Instr.expr_op2 Op2.eq (Value.reg r) old)
             [Stmt.instr (Instr.assign lhs (Instr.expr_val (Value.const 1)));
                Stmt.instr (Instr.assign r new)]
             [Stmt.instr (Instr.assign lhs (Instr.expr_val (Value.const 0)))]
@@ -164,7 +164,7 @@ Lemma promote_stmts_cases
     <<STMTS_SRC: stmts_src = (Stmt.instr (Instr.update lhs l (Instr.cas old new) ordr ordw)) :: stmts'_src>> /\
     <<STMTS_TGT: stmts_tgt =
                  [Stmt.ite
-                    (Instr.expr_op2 Op2.sub (Value.reg r) old)
+                    (Instr.expr_op2 Op2.eq (Value.reg r) old)
                     [Stmt.instr (Instr.assign lhs (Instr.expr_val (Value.const 1)));
                        Stmt.instr (Instr.assign r new)]
                     [Stmt.instr (Instr.assign lhs (Instr.expr_val (Value.const 0)))]
