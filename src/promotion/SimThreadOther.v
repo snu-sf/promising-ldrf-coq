@@ -37,8 +37,8 @@ Set Implicit Arguments.
 Module SimThreadOther.
   Import SimCommon.
 
-  Inductive sim_thread_other (l: Loc.t) (e_src e_tgt: Thread.t lang): Prop :=
-  | sim_thread_other_intro
+  Inductive sim_thread (l: Loc.t) (e_src e_tgt: Thread.t lang): Prop :=
+  | sim_thread_intro
       (LOCFREE: loc_free_stmts l e_src.(Thread.state).(State.stmts))
       (STATE: e_src.(Thread.state) = e_tgt.(Thread.state))
       (LOCAL: sim_local l e_src.(Thread.local) e_tgt.(Thread.local))
@@ -48,19 +48,19 @@ Module SimThreadOther.
       (FULFILLABLE: fulfillable l e_src.(Thread.local).(Local.tview) e_src.(Thread.memory)
                                   e_src.(Thread.local).(Local.promises))
   .
-  Hint Constructors sim_thread_other.
+  Hint Constructors sim_thread.
 
   Lemma sim_thread_promise_step
         l e1_src
         pf e_tgt e1_tgt e2_tgt
-        (SIM1: sim_thread_other l e1_src e1_tgt)
+        (SIM1: sim_thread l e1_src e1_tgt)
         (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
         (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
         (CLOSED1_SRC: Memory.closed e1_src.(Thread.memory))
         (STEP_TGT: Thread.promise_step pf e_tgt e1_tgt e2_tgt):
     exists e_src e2_src,
       <<STEP_SRC: Thread.opt_promise_step e_src e1_src e2_src>> /\
-      <<SIM2: sim_thread_other l e2_src e2_tgt>> /\
+      <<SIM2: sim_thread l e2_src e2_tgt>> /\
       <<MEMLOC: forall to, Memory.get l to e1_src.(Thread.memory) = Memory.get l to e2_src.(Thread.memory)>>.
   Proof.
     inversion STEP_TGT. subst.
@@ -85,10 +85,10 @@ Module SimThreadOther.
       erewrite promise_eq_mem; try exact PROMISE; eauto.
   Qed.
 
-  Lemma sim_thread_other_step
+  Lemma sim_thread_step
         l e1_src
         pf e_tgt e1_tgt e2_tgt
-        (SIM1: sim_thread_other l e1_src e1_tgt)
+        (SIM1: sim_thread l e1_src e1_tgt)
         (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
         (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
         (SC1_SRC: Memory.closed_timemap e1_src.(Thread.sc) e1_src.(Thread.memory))
@@ -99,7 +99,7 @@ Module SimThreadOther.
     exists e_src e1_src e2_src,
       <<STEP_SRC: Thread.opt_step e_src e1_src e2_src>> /\
       <<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>> /\
-      <<SIM2: sim_thread_other l e2_src e2_tgt>> /\
+      <<SIM2: sim_thread l e2_src e2_tgt>> /\
       <<MEMLOC: forall to, Memory.get l to e1_src.(Thread.memory) = Memory.get l to e2_src.(Thread.memory)>>.
   Proof.
     inv STEP_TGT.
