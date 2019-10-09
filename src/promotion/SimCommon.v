@@ -39,12 +39,34 @@ Module SimCommon.
   Definition sim_timemap (l: Loc.t) (tm_src tm_tgt: TimeMap.t): Prop :=
     forall loc (LOC: loc <> l), tm_src loc = tm_tgt loc.
 
+  Program Instance sim_timemap_Equivalence: forall l, Equivalence (sim_timemap l).
+  Next Obligation.
+    ii. ss.
+  Qed.
+  Next Obligation.
+    ii. rewrite H; eauto.
+  Qed.
+  Next Obligation.
+    ii. rewrite H; eauto.
+  Qed.
+
   Inductive sim_view (l: Loc.t) (view_src view_tgt: View.t): Prop :=
   | sim_view_intro
       (PLN: sim_timemap l view_src.(View.pln) view_tgt.(View.pln))
       (RLX: sim_timemap l view_src.(View.rlx) view_tgt.(View.rlx))
   .
   Hint Constructors sim_view.
+
+  Program Instance sim_view_Equivalence: forall l, Equivalence (sim_view l).
+  Next Obligation.
+    ii. ss.
+  Qed.
+  Next Obligation.
+    ii. inv H. symmetry in PLN, RLX. econs; ss.
+  Qed.
+  Next Obligation.
+    ii. inv H. inv H0. econs; etrans; eauto.
+  Qed.
 
   Inductive sim_opt_view (l: Loc.t): forall (view_src view_tgt: option View.t), Prop :=
   | sim_opt_view_some
@@ -56,6 +78,17 @@ Module SimCommon.
   .
   Hint Constructors sim_opt_view.
 
+  Program Instance sim_opt_view_Equivalence: forall l, Equivalence (sim_opt_view l).
+  Next Obligation.
+    ii. destruct x; ss. econs; ss.
+  Qed.
+  Next Obligation.
+    ii. inv H; ss. econs. symmetry. ss.
+  Qed.
+  Next Obligation.
+    ii. inv H; inv H0; ss. econs; etrans; eauto.
+  Qed.
+
   Inductive sim_tview (l: Loc.t) (tview_src tview_tgt: TView.t): Prop :=
   | sim_tview_intro
       (REL: forall loc, sim_view l (tview_src.(TView.rel) loc) (tview_tgt.(TView.rel) loc))
@@ -63,6 +96,17 @@ Module SimCommon.
       (ACQ: sim_view l tview_src.(TView.acq) tview_tgt.(TView.acq))
   .
   Hint Constructors sim_tview.
+
+  Program Instance sim_tview_Equivalence: forall l, Equivalence (sim_tview l).
+  Next Obligation.
+    ii. destruct x; ss.
+  Qed.
+  Next Obligation.
+    ii. inv H. symmetry in REL, CUR, ACQ. econs; ss.
+  Qed.
+  Next Obligation.
+    ii. inv H. inv H0. econs; etrans; eauto.
+  Qed.
 
 
   (* lemmas on sim view *)
@@ -279,6 +323,17 @@ Module SimCommon.
   .
   Hint Constructors sim_message.
 
+  Program Instance sim_message_Equivalence: forall l, Equivalence (sim_message l).
+  Next Obligation.
+    ii. destruct x; ss. econs. refl.
+  Qed.
+  Next Obligation.
+    ii. inv H; ss. econs. symmetry. ss.
+  Qed.
+  Next Obligation.
+    ii. inv H; ss. inv H0. econs; etrans; eauto.
+  Qed.
+
   Inductive sim_memory (l: Loc.t) (mem_src mem_tgt: Memory.t): Prop :=
   | sim_memory_intro
       (SOUND: forall loc from to msg_src
@@ -296,12 +351,46 @@ Module SimCommon.
   .
   Hint Constructors sim_memory.
 
+  Program Instance sim_memory_Equivalence: forall l, Equivalence (sim_memory l).
+  Next Obligation.
+    ii. econs; i.
+    - esplits; eauto. refl.
+    - esplits; eauto. refl.
+  Qed.
+  Next Obligation.
+    ii. inv H. econs; i.
+    - exploit COMPLETE; eauto. i. des.
+      esplits; eauto. symmetry. ss.
+    - exploit SOUND; eauto. i. des.
+      esplits; eauto. symmetry. ss.
+  Qed.
+  Next Obligation.
+    ii. inv H. inv H0. econs; i.
+    - exploit SOUND; eauto. i. des.
+      exploit SOUND0; eauto. i. des.
+      esplits; eauto. etrans; eauto.
+    - exploit COMPLETE0; eauto. i. des.
+      exploit COMPLETE; eauto. i. des.
+      esplits; eauto. etrans; eauto.
+  Qed.
+
   Inductive sim_local (l: Loc.t) (lc_src lc_tgt: Local.t): Prop :=
   | sim_local_intro
       (TVIEW: sim_tview l lc_src.(Local.tview) lc_tgt.(Local.tview))
       (PROMISES1: sim_memory l lc_src.(Local.promises) lc_tgt.(Local.promises))
   .
   Hint Constructors sim_local.
+
+  Program Instance sim_local_Equivalence: forall l, Equivalence (sim_local l).
+  Next Obligation.
+    ii. econs; refl.
+  Qed.
+  Next Obligation.
+    ii. inv H. econs; symmetry; ss.
+  Qed.
+  Next Obligation.
+    ii. inv H. inv H0. econs; etrans; eauto.
+  Qed.
 
 
   (* lemmas on sim_memory *)
