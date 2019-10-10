@@ -91,7 +91,8 @@ Module SimCommon.
 
   Inductive sim_tview (l: Loc.t) (tview_src tview_tgt: TView.t): Prop :=
   | sim_tview_intro
-      (REL: forall loc, sim_view l (tview_src.(TView.rel) loc) (tview_tgt.(TView.rel) loc))
+      (REL: forall loc (LOC: loc <> l),
+          sim_view l (tview_src.(TView.rel) loc) (tview_tgt.(TView.rel) loc))
       (CUR: sim_view l tview_src.(TView.cur) tview_tgt.(TView.cur))
       (ACQ: sim_view l tview_src.(TView.acq) tview_tgt.(TView.acq))
   .
@@ -190,13 +191,15 @@ Module SimCommon.
         tview_src sc_src releasedm_src
         tview_tgt sc_tgt releasedm_tgt
         loc to ord
+        (LOC: loc <> l)
         (TVIEW: sim_tview l tview_src tview_tgt)
         (RELEASEDM: sim_opt_view l releasedm_src releasedm_tgt):
     sim_opt_view l
                  (TView.write_released tview_src sc_src loc to releasedm_src ord)
                  (TView.write_released tview_tgt sc_tgt loc to releasedm_tgt ord).
   Proof.
-    inv TVIEW. inv CUR. destruct (REL loc).
+    inv TVIEW. inv CUR.
+    exploit REL; eauto. i. inv x.
     unfold TView.write_released. condtac; ss.
     econs. apply sim_view_join; eauto using sim_opt_view_unwrap.
     condtac; econs; ss; ii; unfold LocFun.add;
@@ -212,8 +215,8 @@ Module SimCommon.
         tview_src sc_src
         tview_tgt sc_tgt
         loc to ord
-        (TVIEW: sim_tview l tview_src tview_tgt)
         (LOC: loc <> l)
+        (TVIEW: sim_tview l tview_src tview_tgt)
         (WRITABLE_TGT: TView.writable tview_tgt.(TView.cur) sc_tgt loc to ord):
     TView.writable tview_src.(TView.cur) sc_src loc to ord.
   Proof.
@@ -226,18 +229,18 @@ Module SimCommon.
         tview_src sc_src
         tview_tgt sc_tgt
         loc to ord
-        (TVIEW: sim_tview l tview_src tview_tgt)
-        (LOC: loc <> l):
+        (LOC: loc <> l)
+        (TVIEW: sim_tview l tview_src tview_tgt):
     sim_tview l
               (TView.write_tview tview_src sc_src loc to ord)
               (TView.write_tview tview_tgt sc_tgt loc to ord).
   Proof.
     inv TVIEW. econs; ss.
     - i. condtac; ss.
-      + unfold LocFun.add, LocFun.find. condtac; ss.
+      + unfold LocFun.add, LocFun.find. condtac; ss; eauto.
         subst. apply sim_view_join; eauto.
         econs; ss.
-      + unfold LocFun.add, LocFun.find. condtac; ss.
+      + unfold LocFun.add, LocFun.find. condtac; ss; eauto.
         subst. apply sim_view_join; eauto.
         econs; ss.
     - apply sim_view_join; eauto. econs; ss.
@@ -285,7 +288,7 @@ Module SimCommon.
               (TView.write_fence_tview tview_tgt sc_tgt ordw).
   Proof.
     inv TVIEW. econs; ss; i.
-    - repeat (condtac; ss).
+    - repeat (condtac; ss; eauto).
       econs; eauto using sim_write_fence_sc.
     - repeat (condtac; ss).
       econs; eauto using sim_write_fence_sc.
@@ -1606,7 +1609,8 @@ Module SimCommon.
         eapply Time.join_spec.
         * unguard. des; ss.
         * eapply Time.join_spec; try refl.
-          inv LC1. inv TVIEW. destruct (REL0 loc). ss.
+          inv LC1. inv TVIEW.
+          exploit REL0; eauto. i. inv x. ss.
           exploit RLX; eauto. i. rewrite x.
           inv WRITABLE. etrans; [|econs; eauto].
           inv WF1_TGT. inv TVIEW_WF. destruct (REL_CUR loc). ss.
