@@ -28,6 +28,7 @@ Require Import PromiseConsistent.
 
 Require Import Promotion.
 Require Import SimCommon.
+Require Import PromotionProgress.
 
 Set Implicit Arguments.
 Set Nested Proofs Allowed.
@@ -112,10 +113,9 @@ Module SimThreadPromotion.
 
   (* sim_thread *)
 
-  Definition promises_safe (l: Loc.t) (lc: Local.t): Prop :=
+  Definition safe (l: Loc.t) (lc: Local.t) (mem: Memory.t): Prop :=
     forall from to val released
-      (GET: Memory.get l to lc.(Local.promises) =
-            Some (from, Message.full val (Some released))),
+      (GET: Memory.get l to mem = Some (from, Message.full val (Some released))),
       View.le released lc.(Local.tview).(TView.cur).
 
   Inductive sim_thread (l: Loc.t) (r: Reg.t) (e_src e_tgt: Thread.t lang): Prop :=
@@ -131,7 +131,7 @@ Module SimThreadPromotion.
           Memory.get l (Memory.max_ts l e_src.(Thread.memory)) e_src.(Thread.memory) =
           Some (from, Message.full (e_tgt.(Thread.state).(State.regs) r) released))
       (PROMISES: forall to, Memory.get l to e_src.(Thread.local).(Local.promises) = None)
-      (SAFE: promises_safe l e_src.(Thread.local))
+      (SAFE: safe l e_src.(Thread.local) e_src.(Thread.memory))
   .
   Hint Constructors sim_thread.
 
@@ -153,7 +153,7 @@ Module SimThreadPromotion.
                     Some (from', Message.full (e_tgt.(Thread.state).(State.regs) r) released)>>)
       (PROMISES: forall to (TO: to <> Memory.max_ts l e_src.(Thread.memory)),
           Memory.get l to e_src.(Thread.local).(Local.promises) = None)
-      (SAFE: promises_safe l e_src.(Thread.local))
+      (SAFE: safe l e_src.(Thread.local) e_src.(Thread.memory))
   .
   Hint Constructors sim_thread_reserve.
 
@@ -225,7 +225,7 @@ Module SimThreadPromotion.
         erewrite <- eq_loc_max_ts; eauto.
         eapply promise_eq_mem; eauto.
       + erewrite <- promise_eq_promises; eauto.
-      + erewrite <- promise_eq_promises in GET; eauto.
+      + erewrite <- promise_eq_mem in GET; eauto.
   Qed.
 
   Lemma promote_stmts_step
@@ -334,10 +334,80 @@ Module SimThreadPromotion.
       unfold promote_stmts in *. ss. inv STATE.
     }
     { (* load *)
-      admit.
+      inv SIM1. ss. des. clear STATE.
+      rewrite STMTS_TGT in *.
+      inv STEP_TGT. inv STATE. inv INSTR.
+      destruct e_tgt; ss; try by inv LOCAL0.
+      exploit PromotionProgress.progress_read; try eapply LATEST; eauto.
+      { destruct released; eauto using View.bot_spec. }
+      i. des. esplits.
+      - econs 2. econs; cycle 1.
+        + econs 2; eauto.
+        + econs. econs.
+      - ss.
+      - inv LOCAL0. econs; ss; eauto.
+        + inv REGFREE. ss.
+        + left. econs; eauto. ss.
+          admit.
+        + etrans; eauto. symmetry. ss.
+        + ii. inv STEP. inv LC. ss.
+          exploit FULFILLABLE; eauto.
+        + unfold RegFun.add. condtac; ss; eauto.
+        + inv STEP. inv LC. ss.
+        + ii. etrans; try eapply SAFE; eauto.
+          exploit Local.read_step_future; eauto. i. des.
+          apply TVIEW_FUTURE.
     }
     { (* store *)
-      admit.
+      inv SIM1. ss. des. clear STATE.
+      rewrite STMTS_TGT in *.
+      inv STEP_TGT. inv STATE. inv INSTR.
+      destruct e_tgt; ss; try by inv LOCAL0.
+      exploit PromotionProgress.progress_write; try exact WF1_SRC; try exact SC1_SRC; eauto.
+      { ss. apply View.bot_spec. }
+      i. des. esplits.
+      - econs 2. econs; cycle 1.
+        + econs 3; eauto.
+        + econs. econs.
+      - ss.
+      - inv LOCAL0. econs; ss; eauto.
+        + inv REGFREE. ss.
+        + left. econs; eauto. ss.
+          admit.
+        + etrans; eauto. symmetry. ss.
+        + etrans; eauto. symmetry. ss.
+        + ii. inv STEP. inv LC. ss.
+          inv WRITE. inv PROMISE. revert GETP.
+          erewrite Memory.remove_o; eauto. condtac; ss.
+          erewrite Memory.add_o; eauto. condtac; ss. i.
+          guardH o. guardH o0.
+          destruct (Loc.eq_dec loc l); try by subst; congr.
+          exploit FULFILLABLE; eauto. i. des. split.
+          * unfold tview_released_le_loc in *.
+            unfold TView.write_tview. ss.
+            unfold LocFun.add. condtac; ss.
+          * unfold prev_released_le_loc in *.
+            erewrite Memory.add_o; eauto. condtac; ss.
+            des. subst. ss.
+        + unfold RegFun.add. condtac; ss.
+          inv STEP. inv WRITE. inv PROMISE. ss.
+          exploit Memory.add_get0; try exact MEM0. i. des.
+          erewrite <- RegFile.eq_except_value; eauto; cycle 1.
+          { inv REGFREE0. inv H1. ss. }
+          replace (Memory.max_ts l mem0) with (Time.incr (Memory.max_ts l mem1_src)); eauto.
+          exploit Memory.max_ts_spec; try exact GET0. i. des. inv MAX; ss.
+          revert GET1. erewrite Memory.add_o; eauto. condtac; ss; try by des.
+          guardH o. i.
+          exploit Memory.max_ts_spec; try exact GET1. i. des.
+          exploit TimeFacts.lt_le_lt; try exact H; try exact MAX. i.
+          specialize (Time.incr_spec (Memory.max_ts l mem1_src)). i.
+          rewrite x0 in H0. timetac.
+        + exploit Local.write_step_future; eauto. i. des.
+          inv STEP. inv WRITE. inv PROMISE. ss.
+          ii. revert GET.
+          erewrite Memory.add_o; eauto. condtac; ss; i.
+          * inv GET. rewrite H2 in *. ss.
+          * etrans; try eapply TVIEW_FUTURE; eauto.
     }
     { (* fa *)
       ss. subst. rewrite STMTS_TGT in *.
@@ -482,11 +552,9 @@ Module SimThreadPromotion.
           unfold ThreadEvent.is_accessing_loc in *.
           inv STEP_SRC; ss; eauto; try by inv LOCAL1; ss; eauto.
           * inv LOCAL1. inv WRITE. ss.
-            erewrite Memory.remove_o; eauto. condtac; ss.
-            erewrite <- promise_eq_promises; eauto.
+            erewrite <- promise_eq_mem; eauto.
           * inv LOCAL1. inv LOCAL2. inv WRITE. ss.
-            erewrite Memory.remove_o; eauto. condtac; ss.
-            erewrite <- promise_eq_promises; eauto.
+            erewrite <- promise_eq_mem; eauto.
     }
   Admitted.
 End SimThreadPromotion.

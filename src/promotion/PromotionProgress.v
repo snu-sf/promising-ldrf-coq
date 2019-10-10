@@ -36,8 +36,6 @@ Set Implicit Arguments.
 Module PromotionProgress.
   Import SimCommon.
 
-  Set Nested Proofs Allowed.
-
   Lemma progress_read_aux
         l view released b ts
         (RELEASED: View.le released view):
@@ -121,6 +119,7 @@ Module PromotionProgress.
                                val releasedm released ord lc2 sc2 mem2 Memory.op_kind_add>> /\
       <<LC: sim_local l lc1 lc2>> /\
       <<SC: sc1 = sc2>> /\
+      <<MEM: sim_memory l mem1 mem2>> /\
       <<PROMISES2: forall to, Memory.get l to lc2.(Local.promises) = None>> /\
       <<SAFE2: View.le released.(View.unwrap) lc2.(Local.tview).(TView.cur)>>.
   Proof.
@@ -143,6 +142,14 @@ Module PromotionProgress.
       econs; ss; eauto using progress_write_aux; i.
       unfold LocFun.add. condtac; ss.
     - inv x0. ss.
+    - inv x0. inv WRITE. inv PROMISE. ss.
+      econs; i.
+      + erewrite Memory.add_o; eauto. condtac; ss.
+        * des. ss.
+        * esplits; eauto. refl.
+      + revert GET_TGT. erewrite Memory.add_o; eauto. condtac; ss; i.
+        * des. ss.
+        * esplits; eauto. refl.
     - inv x0. inv LC2. ss.
       unfold TView.write_released. condtac; ss; try apply View.bot_spec.
       apply View.join_spec.
