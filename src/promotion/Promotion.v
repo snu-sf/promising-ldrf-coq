@@ -100,26 +100,6 @@ Hint Constructors loc_free_stmt.
 Definition loc_free_stmts (l: Loc.t) (stmts: list Stmt.t): Prop :=
   List.Forall (loc_free_stmt l) stmts.
 
-Lemma stmt_ind_principle (P: Stmt.t -> Prop)
-      (INSTR: forall i, P (Stmt.instr i))
-      (ITE: forall e l0 l1 (THEN: List.Forall P l0) (ELSE: List.Forall P l1), P (Stmt.ite e l0 l1))
-      (WHILE: forall e l (LOOP: List.Forall P l), P (Stmt.dowhile l e))
-  :
-    forall l, P l.
-Proof.
-  fix IH 1.
-  i. destruct l.
-  - eapply INSTR.
-  - eapply ITE.
-    + induction c1; ss.
-      econs; eauto.
-    + induction c2; ss.
-      econs; eauto.
-  - eapply WHILE.
-    induction c; ss.
-    econs; eauto.
-Qed.
-
 
 (* reg_free *)
 

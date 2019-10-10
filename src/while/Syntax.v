@@ -168,6 +168,26 @@ Module Stmt.
   | ite (cond:Instr.expr) (c1 c2:list t)
   | dowhile (c:list t) (cond:Instr.expr)
   .
+
+  Lemma ind
+        (P: Stmt.t -> Prop)
+        (INSTR: forall i, P (Stmt.instr i))
+        (ITE: forall cond c1 c2 (THEN: List.Forall P c1) (ELSE: List.Forall P c2), P (Stmt.ite cond c1 c2))
+        (WHILE: forall c cond (LOOP: List.Forall P c), P (Stmt.dowhile c cond)):
+    forall stmt, P stmt.
+  Proof.
+    fix IH 1.
+    i. destruct stmt.
+    - eapply INSTR.
+    - eapply ITE.
+      + induction c1; ss.
+        econs; eauto.
+      + induction c2; ss.
+        econs; eauto.
+    - eapply WHILE.
+      induction c; ss.
+      econs; eauto.
+  Qed.
 End Stmt.
 Coercion Stmt.instr: Instr.t >-> Stmt.t.
 
