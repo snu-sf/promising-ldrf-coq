@@ -20,6 +20,7 @@ Require Import TView.
 Require Import Local.
 Require Import Thread.
 Require Import Configuration.
+Require Import Progress.
 
 Require Import Syntax.
 Require Import Semantics.
@@ -90,8 +91,24 @@ Module PromotionProgress.
         etrans; eauto. apply WF1.
   Qed.
 
+  Lemma progress_write_aux l view ts:
+    sim_view l view (View.join view (View.singleton_ur l ts)).
+  Proof.
+    unfold View.singleton_ur, TimeMap.singleton, LocFun.init,
+    LocFun.add, LocFun.find, View.join, TimeMap.join.
+    econs; ss; ii.
+    - condtac; ss.
+      apply TimeFacts.antisym; try apply Time.join_l.
+      apply Time.join_spec; try refl.
+      apply Time.bot_spec.
+    - condtac; ss.
+      apply TimeFacts.antisym; try apply Time.join_l.
+      apply Time.join_spec; try refl.
+      apply Time.bot_spec.
+  Qed.
+
   Lemma progress_write
-        l lc1 sc1 mem1 val releasedm released ord
+        l lc1 sc1 mem1 val releasedm ord
         (WF1: Local.wf lc1 mem1)
         (SC1: Memory.closed_timemap sc1 mem1)
         (MEM1: Memory.closed mem1)
@@ -99,12 +116,40 @@ Module PromotionProgress.
         (CLOSED_REL: Memory.closed_opt_view releasedm mem1)
         (PROMISES1: forall to, Memory.get l to lc1.(Local.promises) = None)
         (SAFE1: View.le releasedm.(View.unwrap) lc1.(Local.tview).(TView.cur)):
-    exists lc2 mem2,
+    exists released lc2 sc2 mem2,
       <<STEP: Local.write_step lc1 sc1 mem1 l (Memory.max_ts l mem1) (Time.incr (Memory.max_ts l mem1))
-                               val releasedm released ord lc2 sc1 mem2 Memory.op_kind_add>> /\
+                               val releasedm released ord lc2 sc2 mem2 Memory.op_kind_add>> /\
       <<LC: sim_local l lc1 lc2>> /\
+      <<SC: sc1 = sc2>> /\
       <<PROMISES2: forall to, Memory.get l to lc2.(Local.promises) = None>> /\
-      <<SAFE2: View.le released.(View.unwrap) lc1.(Local.tview).(TView.cur)>>.
+      <<SAFE2: View.le released.(View.unwrap) lc2.(Local.tview).(TView.cur)>>.
   Proof.
-  Admitted.
+    exploit (@progress_write_step lc1 sc1 mem1 l (Time.incr (Memory.max_ts l mem1)) val releasedm ord); eauto.
+    { apply Time.incr_spec. }
+    { ii. rewrite PROMISES1 in GET. ss. }
+    i. des.
+    destruct lc1, lc2. ss.
+    replace promises0 with promises in *; cycle 1.
+    { apply Memory.ext. i.
+      inv x0. inv WRITE. inv PROMISE. ss. inv LC2.
+      erewrite (@Memory.remove_o promises2); eauto. condtac; ss.
+      - des. subst.
+        exploit Memory.add_get0; try exact PROMISES. i. des. ss.
+      - erewrite (@Memory.add_o promises1); eauto. condtac; ss.
+    }
+    esplits; eauto.
+    - econs; try refl. ss.
+      inv x0. inv LC2. ss.
+      econs; ss; eauto using progress_write_aux; i.
+      unfold LocFun.add. condtac; ss.
+    - inv x0. ss.
+    - inv x0. inv LC2. ss.
+      unfold TView.write_released. condtac; ss; try apply View.bot_spec.
+      apply View.join_spec.
+      + etrans; eauto. apply View.join_l.
+      + unfold LocFun.add. condtac; ss.
+        condtac; ss; try refl.
+        apply View.join_spec; try apply View.join_r.
+        etrans; try eapply WF1. apply View.join_l.
+  Qed.
 End PromotionProgress.
