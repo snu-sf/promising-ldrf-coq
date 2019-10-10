@@ -408,14 +408,9 @@ Module SimThreadPromotion.
     }
     { (* locfree *)
       inv STEP_TGT.
-      assert (LOC: ~ ThreadEvent.is_accessing_loc l e_tgt).
-      { rewrite STMTS_TGT in *.
-        inv STATE; try (by destruct e_tgt); ss.
-        inv INSTR; destruct e_tgt; ss.
-        - inv H2. inv STMT. ss.
-        - inv H2. inv STMT. ss.
-        - inv H2. inv STMT. ss.
-        - inv H2. inv STMT. ss. }
+      hexploit loc_free_step_is_accessing_loc; eauto.
+      { eapply promote_stmts_loc_free. }
+      intro LOC.
       exploit program_step; try eapply SIM1; try exact LOCAL; eauto. s. i. des.
       rewrite promote_stmts_cons in STMTS_TGT.
       replace (stmt :: promote_stmts l r stmts'_src) with

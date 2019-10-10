@@ -142,6 +142,35 @@ Proof.
   apply List.app_assoc.
 Qed.
 
+Lemma promote_stmt_loc_free l r stmt:
+  loc_free_stmts l (promote_stmt l r stmt).
+Proof.
+  revert stmt. apply Stmt.ind; i.
+  - destruct i; ss; try by repeat (econs; ss).
+    + condtac; ss; repeat econs; ss.
+    + condtac; ss; repeat econs; ss.
+    + destruct rmw; ss.
+      * condtac; ss; repeat econs; ss.
+      * condtac; ss; repeat econs; ss.
+  - ss. repeat econs; ss.
+    + induction c1; ss.
+      inv THEN. apply Forall_app; eauto.
+    + induction c2; ss.
+      inv ELSE. apply Forall_app; eauto.
+  - ss. repeat econs; ss.
+    induction c; ss.
+    inv LOOP. apply Forall_app; eauto.
+Qed.
+
+Lemma promote_stmts_loc_free l r stmts:
+  loc_free_stmts l (promote_stmts l r stmts).
+Proof.
+  unfold promote_stmts.
+  induction stmts; ss; i.
+  apply Forall_app; ss.
+  apply promote_stmt_loc_free.
+Qed.
+
 Lemma promote_stmts_cases
       l r stmts_src stmts_tgt
       (PROMOTE: stmts_tgt = promote_stmts l r stmts_src):
