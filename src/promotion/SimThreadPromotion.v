@@ -40,56 +40,58 @@ Module SimThreadPromotion.
 
   (* sim_state *)
 
-  Inductive sim_state_synch (l: Loc.t) (r: Reg.t) (st_src st_tgt: State.t): Prop :=
+  Inductive sim_state_synch (l: Loc.t) (r: Reg.t) (val: Const.t) (st_src st_tgt: State.t): Prop :=
   | sim_state_synch_intro
       (STMTS: st_tgt.(State.stmts) = promote_stmts l r st_src.(State.stmts))
       (REGS: RegFile.eq_except (RegSet.singleton r) st_src.(State.regs) st_tgt.(State.regs))
+      (REGR: st_tgt.(State.regs) r = val)
   .
   Hint Constructors sim_state_synch.
 
-  Inductive sim_state_fa (l: Loc.t) (r: Reg.t) (st_src st_tgt: State.t): Prop :=
+  Inductive sim_state_fa (l: Loc.t) (r: Reg.t) (val: Const.t) (st_src st_tgt: State.t): Prop :=
   | sim_state_fa_intro
       lhs addendum ordr ordw stmts_src stmts_tgt
       (STMTS_SRC: st_src.(State.stmts) =
                   (Stmt.instr (Instr.update lhs l (Instr.fetch_add addendum) ordr ordw)) :: stmts_src)
       (STMTS_TGT: st_tgt.(State.stmts) =
-                  (Stmt.instr (Instr.assign r (Instr.expr_op2 Op2.add (Value.reg r) addendum))) :: stmts_tgt)
+                  (Stmt.instr (Instr.assign r (Instr.expr_val (Value.reg r)))) :: stmts_tgt)
       (STMTS: stmts_tgt = promote_stmts l r stmts_src)
-      (REGS: RegFile.eq_except (RegSet.add lhs (RegSet.singleton r)) st_src.(State.regs) st_tgt.(State.regs))
-      (LHS: st_tgt.(State.regs) lhs = st_tgt.(State.regs) r)
+      (REGS: RegFile.eq_except (RegSet.singleton r) st_src.(State.regs) st_tgt.(State.regs))
+      (REGR: st_tgt.(State.regs) r = val + RegFile.eval_value st_src.(State.regs) addendum)
   .
   Hint Constructors sim_state_fa.
 
-  Inductive sim_state_cas_success1 (l: Loc.t) (r: Reg.t) (st_src st_tgt: State.t): Prop :=
+  Inductive sim_state_cas_success1 (l: Loc.t) (r: Reg.t) (val: Const.t) (st_src st_tgt: State.t): Prop :=
   | sim_state_cas1_intro
       lhs old new ordr ordw stmts_src stmts_tgt
       (STMTS_SRC: st_src.(State.stmts) =
                   (Stmt.instr (Instr.update lhs l (Instr.cas old new) ordr ordw)) :: stmts_src)
       (STMTS_TGT: st_tgt.(State.stmts) =
-                  Stmt.instr (Instr.assign lhs (Instr.expr_val (Value.const 1)))
-                             :: (Stmt.instr (Instr.assign r new))
+                  Stmt.instr (Instr.assign r new) ::
+                             Stmt.instr (Instr.assign lhs (Instr.expr_val (Value.const 1)))
                              :: stmts_tgt)
       (STMTS: stmts_tgt = promote_stmts l r stmts_src)
       (REGS: RegFile.eq_except (RegSet.singleton r) st_src.(State.regs) st_tgt.(State.regs))
-      (SUCCESS: st_tgt.(State.regs) r = RegFile.eval_value st_src.(State.regs) old)
+      (REGR: st_tgt.(State.regs) r = val)
+      (SUCCESS: val = RegFile.eval_value st_src.(State.regs) old)
   .
   Hint Constructors sim_state_cas_success1.
 
-  Inductive sim_state_cas_success2 (l: Loc.t) (r: Reg.t) (st_src st_tgt: State.t): Prop :=
+  Inductive sim_state_cas_success2 (l: Loc.t) (r: Reg.t) (val: Const.t) (st_src st_tgt: State.t): Prop :=
   | sim_state_cas2_intro
       lhs old new ordr ordw stmts_src stmts_tgt
       (STMTS_SRC: st_src.(State.stmts) =
                   (Stmt.instr (Instr.update lhs l (Instr.cas old new) ordr ordw)) :: stmts_src)
       (STMTS_TGT: st_tgt.(State.stmts) =
-                  (Stmt.instr (Instr.assign r new)) :: stmts_tgt)
+                  Stmt.instr (Instr.assign lhs (Instr.expr_val (Value.const 1))) :: stmts_tgt)
       (STMTS: stmts_tgt = promote_stmts l r stmts_src)
-      (REGS: RegFile.eq_except (RegSet.add lhs (RegSet.singleton r)) st_src.(State.regs) st_tgt.(State.regs))
-      (LHS: st_tgt.(State.regs) lhs = 1)
-      (SUCCESS: st_tgt.(State.regs) r = RegFile.eval_value st_src.(State.regs) old)
+      (REGS: RegFile.eq_except (RegSet.singleton r) st_src.(State.regs) st_tgt.(State.regs))
+      (REGR: st_tgt.(State.regs) r = RegFile.eval_value st_src.(State.regs) new)
+      (SUCCESS: val = RegFile.eval_value st_src.(State.regs) old)
   .
   Hint Constructors sim_state_cas_success2.
 
-  Inductive sim_state_cas_fail (l: Loc.t) (r: Reg.t) (st_src st_tgt: State.t): Prop :=
+  Inductive sim_state_cas_fail (l: Loc.t) (r: Reg.t) (val: Const.t) (st_src st_tgt: State.t): Prop :=
   | sim_state_cas_fail_intro
       lhs old new ordr ordw stmts_src stmts_tgt
       (STMTS_SRC: st_src.(State.stmts) =
@@ -98,16 +100,17 @@ Module SimThreadPromotion.
                   Stmt.instr (Instr.assign lhs (Instr.expr_val (Value.const 0))) :: stmts_tgt)
       (STMTS: stmts_tgt = promote_stmts l r stmts_src)
       (REGS: RegFile.eq_except (RegSet.singleton r) st_src.(State.regs) st_tgt.(State.regs))
-      (FAIL: st_tgt.(State.regs) r <> RegFile.eval_value st_src.(State.regs) old)
+      (REGR: st_tgt.(State.regs) r = val)
+      (FAIL: val <> RegFile.eval_value st_src.(State.regs) old)
   .
   Hint Constructors sim_state_cas_fail.
 
-  Definition sim_state (l: Loc.t) (r: Reg.t) (st_src st_tgt: State.t): Prop :=
-    sim_state_synch l r st_src st_tgt \/
-    sim_state_fa l r st_src st_tgt \/
-    sim_state_cas_success1 l r st_src st_tgt \/
-    sim_state_cas_success2 l r st_src st_tgt \/
-    sim_state_cas_fail l r st_src st_tgt
+  Definition sim_state (l: Loc.t) (r: Reg.t) (val: Const.t) (st_src st_tgt: State.t): Prop :=
+    sim_state_synch l r val st_src st_tgt \/
+    sim_state_fa l r val st_src st_tgt \/
+    sim_state_cas_success1 l r val st_src st_tgt \/
+    sim_state_cas_success2 l r val st_src st_tgt \/
+    sim_state_cas_fail l r val st_src st_tgt
   .
 
 
@@ -120,8 +123,9 @@ Module SimThreadPromotion.
 
   Inductive sim_thread (l: Loc.t) (r: Reg.t) (e_src e_tgt: Thread.t lang): Prop :=
   | sim_thread_intro
+      val
       (REGFREE: reg_free_stmts r e_src.(Thread.state).(State.stmts))
-      (STATE: sim_state l r e_src.(Thread.state) e_tgt.(Thread.state))
+      (STATE: sim_state l r val e_src.(Thread.state) e_tgt.(Thread.state))
       (LOCAL: sim_local l e_src.(Thread.local) e_tgt.(Thread.local))
       (SC: sim_timemap l e_src.(Thread.sc) e_tgt.(Thread.sc))
       (MEMORY: sim_memory l e_src.(Thread.memory) e_tgt.(Thread.memory))
@@ -129,7 +133,7 @@ Module SimThreadPromotion.
                                   e_src.(Thread.local).(Local.promises))
       (LATEST: exists from released,
           Memory.get l (Memory.max_ts l e_src.(Thread.memory)) e_src.(Thread.memory) =
-          Some (from, Message.full (e_tgt.(Thread.state).(State.regs) r) released))
+          Some (from, Message.full val released))
       (PROMISES: forall to, Memory.get l to e_src.(Thread.local).(Local.promises) = None)
       (SAFE: safe l e_src.(Thread.local) e_src.(Thread.memory))
   .
@@ -137,8 +141,9 @@ Module SimThreadPromotion.
 
   Inductive sim_thread_reserve (l: Loc.t) (r: Reg.t) (e_src e_tgt: Thread.t lang): Prop :=
   | sim_thread_reserve_intro
+      val
       (REGFREE: reg_free_stmts r e_src.(Thread.state).(State.stmts))
-      (STATE: sim_state l r e_src.(Thread.state) e_tgt.(Thread.state))
+      (STATE: sim_state l r val e_src.(Thread.state) e_tgt.(Thread.state))
       (LOCAL: sim_local l e_src.(Thread.local) e_tgt.(Thread.local))
       (SC: sim_timemap l e_src.(Thread.sc) e_tgt.(Thread.sc))
       (MEMORY: sim_memory l e_src.(Thread.memory) e_tgt.(Thread.memory))
@@ -150,7 +155,7 @@ Module SimThreadPromotion.
           <<PROMISE: Memory.get l (Memory.max_ts l e_src.(Thread.memory)) e_src.(Thread.local).(Local.promises) =
                      Some (from, Message.reserve)>> /\
           <<LATEST: Memory.get l from e_src.(Thread.memory) =
-                    Some (from', Message.full (e_tgt.(Thread.state).(State.regs) r) released)>>)
+                    Some (from', Message.full val released)>>)
       (PROMISES: forall to (TO: to <> Memory.max_ts l e_src.(Thread.memory)),
           Memory.get l to e_src.(Thread.local).(Local.promises) = None)
       (SAFE: safe l e_src.(Thread.local) e_src.(Thread.memory))
@@ -292,7 +297,70 @@ Module SimThreadPromotion.
     clear LOCAL SC MEMORY FULFILLABLE LATEST PROMISES SAFE.
     unfold sim_state in *. des; cycle 1.
     { (* fa *)
-      admit.
+      inv STATE. ss. subst.
+      inv SIM1. ss. des. clear STATE.
+      inv STEP_TGT. inv STATE. inv INSTR.
+      destruct e_tgt; ss; try by inv LOCAL0.
+      exploit PromotionProgress.progress_read; try eapply LATEST; eauto.
+      { destruct released; eauto using View.bot_spec. }
+      i. des.
+      exploit Local.read_step_future; eauto. i. des.
+      exploit PromotionProgress.progress_write; try exact WF2; eauto.
+      { inv STEP. ss. }
+      { etrans; try eapply TVIEW_FUTURE.
+        destruct released; try apply View.bot_spec.
+        eapply SAFE; eauto. }
+      i. des. esplits.
+      - econs 2. econs; cycle 1.
+        + econs 4; eauto.
+        + econs. econs. ss.
+      - ss.
+      - inv LOCAL0. econs; ss; eauto.
+        + inv REGFREE. ss.
+        + left. econs; eauto. ss.
+          unfold RegFun.find.
+          admit.
+        + etrans; eauto. symmetry. etrans; eauto.
+        + etrans; eauto. symmetry. ss.
+        + ii. inv STEP. inv LC0. ss. inv STEP0. ss.
+          inv WRITE. inv PROMISE. revert GETP.
+          erewrite Memory.remove_o; eauto. condtac; ss.
+          erewrite Memory.add_o; eauto. condtac; ss. i.
+          guardH o. guardH o0.
+          destruct (Loc.eq_dec loc l); try by subst; congr.
+          exploit FULFILLABLE; eauto. i. des. split.
+          * unfold tview_released_le_loc in *.
+            unfold TView.write_tview. ss.
+            unfold LocFun.add. condtac; ss.
+          * unfold prev_released_le_loc in *.
+            erewrite Memory.add_o; eauto. condtac; ss.
+            des. subst. ss.
+        + unfold RegFun.add. condtac; ss; eauto.
+          unfold RegFun.find.
+          inv STEP0. inv WRITE. inv PROMISE. ss.
+          exploit Memory.add_get0; try exact MEM0. i. des.
+          erewrite <- RegFile.eq_except_value; eauto; cycle 1.
+          { inv REGFREE0. inv H1. ss.
+            symmetry in REGFREE0.
+            rewrite RegSet.disjoint_add in REGFREE0. des.
+            exfalso. apply REGFREE.
+            eapply RegSet.Facts.singleton_2; ss.
+          }
+          replace (Memory.max_ts l mem0) with (Time.incr (Memory.max_ts l mem1_src)); eauto.
+          exploit Memory.max_ts_spec; try exact GET0. i. des. inv MAX; ss.
+          revert GET1. erewrite Memory.add_o; eauto. condtac; ss; try by des.
+          guardH o. i.
+          exploit Memory.max_ts_spec; try exact GET1. i. des.
+          exploit TimeFacts.lt_le_lt; try exact H; try exact MAX. i.
+          specialize (Time.incr_spec (Memory.max_ts l mem1_src)). i.
+          rewrite x0 in H0. timetac.
+        + inv STEP. inv LC. ss.
+        + ii. etrans; try eapply SAFE; eauto.
+          exploit Local.read_step_future; eauto. i. des.
+          apply TVIEW_FUTURE.
+          admit.
+        + admit.
+        + admit.
     }
     { (* cas_sucess1 *)
       inv STATE. ss. subst.
@@ -323,7 +391,34 @@ Module SimThreadPromotion.
       admit.
     }
     { (* cas_fail *)
-      admit.
+      inv STATE. ss. subst.
+      inv SIM1. ss. des. clear STATE.
+      inv STEP_TGT. inv STATE. inv INSTR.
+      destruct e_tgt; ss; try by inv LOCAL0.
+      exploit PromotionProgress.progress_read; try eapply LATEST; eauto.
+      { destruct released; eauto using View.bot_spec. }
+      i. des. esplits.
+      - econs 2. econs; cycle 1.
+        + econs 2; eauto.
+        + econs. econs. ss. condtac; ss. congr.
+      - ss.
+      - inv LOCAL0. econs; ss; eauto.
+        + inv REGFREE. ss.
+        + left. econs; eauto. ss.
+          apply RegFile.eq_except_add; auto.
+        + etrans; eauto. symmetry. ss.
+        + ii. inv STEP. inv LC. ss.
+          exploit FULFILLABLE; eauto.
+        + unfold RegFun.add. condtac; ss; eauto.
+          subst. inv REGFREE. inv H1. ss.
+          symmetry in REGFREE.
+          rewrite RegSet.disjoint_add in REGFREE. des.
+          exfalso. apply REGFREE.
+          eapply RegSet.Facts.singleton_2; ss.
+        + inv STEP. inv LC. ss.
+        + ii. etrans; try eapply SAFE; eauto.
+          exploit Local.read_step_future; eauto. i. des.
+          apply TVIEW_FUTURE.
     }
 
     (* synch *)
