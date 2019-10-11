@@ -949,6 +949,34 @@ Module SimThreadPromotion.
         eapply CONSISTENT; eauto.
   Qed.
 
+  Lemma sim_thread_rtc_tau_step_wrap
+        l r e1_src
+        e1_tgt e2_tgt
+        (SIM1: sim_thread_reserve l r e1_src e1_tgt)
+        (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
+        (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
+        (SC1_SRC: Memory.closed_timemap e1_src.(Thread.sc) e1_src.(Thread.memory))
+        (SC1_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
+        (CLOSED1_SRC: Memory.closed e1_src.(Thread.memory))
+        (CLOSED1_TGT: Memory.closed e1_tgt.(Thread.memory))
+        (STEPS_TGT: rtc (@Thread.tau_step lang) e1_tgt e2_tgt):
+    exists e2_src,
+      <<STEPS_SRC: rtc (@Thread.tau_step lang) e1_src e2_src>> /\
+      <<SIM2: sim_thread_reserve l r e2_src e2_tgt>>.
+  Proof.
+    exploit step_reserve_sim_thread; try exact SIM1; eauto. i. des.
+    exploit Thread.step_future; eauto. i. des.
+    exploit sim_thread_rtc_tau_step; try exact SIM2; eauto. i. des.
+    exploit Thread.rtc_tau_step_future; try exact STEPS_SRC; eauto. i. des.
+    exploit step_sim_thread_reserve; try exact SIM0; eauto. i. des.
+    esplits.
+    - econs 2.
+      + econs; [econs; eauto|]. ss.
+      + eapply rtc_n1; try exact STEPS_SRC.
+        econs; [econs; eauto|]. ss.
+    - ss.
+  Qed.
+
   Lemma sim_thread_plus_step_wrap
         l r e1_src
         e_tgt e1_tgt e2_tgt e3_tgt
@@ -990,7 +1018,7 @@ Module SimThreadPromotion.
       + econs 2.
         * econs; [econs; eauto|]. ss.
         * eapply rtc_n1; try exact STEPS_SRC.
-          econs; [econs; exact STEP2|]. ss.
+          econs; [econs; eauto|]. ss.
       + econs 2. apply STEP3.
       + ss.
       + ss.
