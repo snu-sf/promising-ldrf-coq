@@ -163,7 +163,7 @@ Module SimThreadPromotion.
   Hint Constructors sim_thread_reserve.
 
 
-  Lemma step_sim_thread_promotion_reserve
+  Lemma step_sim_thread_reserve
         l r e1_src e_tgt
         (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
         (SIM1: sim_thread l r e1_src e_tgt):
@@ -226,7 +226,7 @@ Module SimThreadPromotion.
         erewrite Memory.add_o; eauto. condtac; ss; eauto.
   Qed.
 
-  Lemma step_sim_thread_promotion
+  Lemma step_reserve_sim_thread
         l r e1_src e_tgt
         (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
         (CLOSED1_SRC: Memory.closed e1_src.(Thread.memory))
@@ -917,5 +917,82 @@ Module SimThreadPromotion.
     exploit Thread.rtc_tau_step_future; try exact STEPS_TGT; eauto. i. des.
     exploit sim_thread_opt_step; eauto. i. des.
     esplits; eauto.
+  Qed.
+
+  Lemma reorder_cancel
+        lang e e1 e2 e3
+        l from to
+        (STEP1: @Thread.step lang true e e1 e2)
+        (STEP2: Thread.step false (ThreadEvent.promise l from to Message.reserve Memory.op_kind_add) e2 e3)
+        (EVENT: ThreadEvent.get_machine_event e <> MachineEvent.silent):
+    exists e2',
+      <<STEP1: Thread.step false (ThreadEvent.promise l from to Message.reserve Memory.op_kind_add) e1 e2'>> /\
+      <<STEP2: Thread.step true e e2' e3>>.
+  Proof.
+    destruct e; ss.
+    - inv STEP1; inv STEP. inv LOCAL. inv LOCAL0. ss.
+      inv STEP2. inv STEP. inv LOCAL. ss.
+      esplits.
+      + econs. econs; ss. econs; eauto.
+      + econs 2. econs; ss. econs. econs; eauto.
+        ii. inv PROMISE. ss. revert GET.
+        erewrite Memory.add_o; eauto. condtac; ss; i.
+        * inv GET. ss.
+        * eapply RELEASE; eauto.
+    - inv STEP1; inv STEP. inv LOCAL. inv LOCAL0. ss.
+      inv STEP2. inv STEP. inv LOCAL. ss.
+      esplits.
+      + econs. econs; ss. econs; eauto.
+      + econs 2. econs; ss. econs. econs; eauto.
+        ii. inv PROMISE. ss. revert PROMISE0.
+        erewrite Memory.add_o; eauto. condtac; ss; i.
+        eapply CONSISTENT; eauto.
+  Qed.
+
+  Lemma sim_thread_plus_step_wrap
+        l r e1_src
+        e_tgt e1_tgt e2_tgt e3_tgt
+        (SIM1: sim_thread_reserve l r e1_src e1_tgt)
+        (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
+        (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
+        (SC1_SRC: Memory.closed_timemap e1_src.(Thread.sc) e1_src.(Thread.memory))
+        (SC1_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
+        (CLOSED1_SRC: Memory.closed e1_src.(Thread.memory))
+        (CLOSED1_TGT: Memory.closed e1_tgt.(Thread.memory))
+        (STEPS_TGT: rtc (@Thread.tau_step lang) e1_tgt e2_tgt)
+        (STEP_TGT: Thread.opt_step e_tgt e2_tgt e3_tgt):
+    exists e_src e2_src e3_src,
+      <<STEPS_SRC: rtc (@Thread.tau_step lang) e1_src e2_src>> /\
+      <<STEP_SRC: Thread.opt_step e_src e2_src e3_src>> /\
+      <<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>> /\
+      <<SIM3: sim_thread_reserve l r e3_src e3_tgt>>.
+  Proof.
+    exploit step_reserve_sim_thread; try exact SIM1; eauto. i. des.
+    exploit Thread.step_future; eauto. i. des.
+    exploit sim_thread_plus_step; try exact SIM2; eauto. i. des.
+    exploit Thread.rtc_tau_step_future; try exact STEPS_SRC; eauto. i. des.
+    exploit Thread.opt_step_future; try exact STEP_SRC; eauto. i. des.
+    exploit step_sim_thread_reserve; try exact SIM3; eauto. i. des.
+    destruct (classic (ThreadEvent.get_machine_event e_tgt = MachineEvent.silent)).
+    - exploit Thread.tau_opt_tau; try exact STEPS_SRC; eauto; i.
+      { rewrite EVENT. ss. }
+      esplits.
+      + econs 2; try exact x0. econs; [econs; eauto|]. ss.
+      + econs 2; eauto.
+      + ss.
+      + ss.
+    - inv STEP_SRC; try by (ss; congr).
+      rewrite <- EVENT in H.
+      destruct pf; cycle 1.
+      { inv STEP1. inv STEP2. ss. }
+      exploit reorder_cancel; try exact STEP1; eauto. i. des.
+      esplits.
+      + econs 2.
+        * econs; [econs; eauto|]. ss.
+        * eapply rtc_n1; try exact STEPS_SRC.
+          econs; [econs; exact STEP2|]. ss.
+      + econs 2. apply STEP3.
+      + ss.
+      + ss.
   Qed.
 End SimThreadPromotion.

@@ -154,6 +154,18 @@ Module Thread.
         opt_program_step e e1 e2
     .
 
+    Lemma tau_opt_tau
+          e1 e2 e3 e
+          (STEPS: rtc Thread.tau_step e1 e2)
+          (STEP: Thread.opt_step e e2 e3)
+          (EVENT: ThreadEvent.get_machine_event e = MachineEvent.silent):
+      rtc Thread.tau_step e1 e3.
+    Proof.
+      induction STEPS.
+      - inv STEP; eauto.
+      - exploit IHSTEPS; eauto.
+    Qed.
+
     Lemma tau_opt_all
           e1 e2 e3 e
           (STEPS: rtc Thread.tau_step e1 e2)
