@@ -2423,4 +2423,26 @@ Module SimCommon.
         * apply CLOSED_SRC.
         * apply CLOSED_TGT.
   Qed.
+
+  Lemma cap_fulfillable
+        l tview promises mem1 mem2
+        (CAP: Memory.cap promises mem1 mem2)
+        (LE: Memory.le promises mem1)
+        (CLOSED: Memory.closed mem1)
+        (FULFILLABLE: fulfillable l tview mem1 promises):
+    <<FULFILLABLE: fulfillable l tview mem2 promises>>.
+  Proof.
+    ii. exploit FULFILLABLE; eauto. i. des. split; ss.
+    unfold prev_released_le_loc in *.
+    destruct (Memory.get loc from mem2) as [[? [? []|]]|] eqn:GET2; ss.
+    exploit Memory.cap_inv; try exact CAP; eauto. i. des; ss.
+    - rewrite x0 in *. ss.
+    - subst. exploit LE; eauto. i.
+      specialize (Time.incr_spec (Memory.max_ts loc mem1)). i.
+      exploit Memory.get_ts; try exact x. i. des.
+      { subst. rewrite x3 in *. inv H. }
+      exploit Memory.max_ts_spec; try exact x. i. des.
+      exploit TimeFacts.lt_le_lt; try exact x3; eauto. i.
+      rewrite x7 in H. timetac.
+  Qed.
 End SimCommon.

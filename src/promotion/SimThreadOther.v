@@ -239,4 +239,75 @@ Module SimThreadOther.
     esplits; eauto.
     i. rewrite MEMLOC. ss.
   Qed.
+
+
+  (* consistency *)
+
+  Lemma sim_thread_cap
+        l e_src e_tgt
+        sc_src sc_tgt
+        cap_src cap_tgt
+        (SIM: sim_thread l e_src e_tgt)
+        (WF_SRC: Local.wf e_src.(Thread.local) e_src.(Thread.memory))
+        (WF_TGT: Local.wf e_tgt.(Thread.local) e_tgt.(Thread.memory))
+        (CLOSED_SRC: Memory.closed e_src.(Thread.memory))
+        (CLOSED_TGT: Memory.closed e_tgt.(Thread.memory))
+        (SC_SRC: Memory.max_full_timemap cap_src sc_src)
+        (SC_TGT: Memory.max_full_timemap cap_tgt sc_tgt)
+        (CAP_SRC: Memory.cap e_src.(Thread.local).(Local.promises) e_src.(Thread.memory) cap_src)
+        (CAP_TGT: Memory.cap e_tgt.(Thread.local).(Local.promises) e_tgt.(Thread.memory) cap_tgt):
+    sim_thread l
+               (Thread.mk lang e_src.(Thread.state) e_src.(Thread.local) sc_src cap_src)
+               (Thread.mk lang e_tgt.(Thread.state) e_tgt.(Thread.local) sc_tgt cap_tgt).
+  Proof.
+    inv SIM. inv LOCAL.
+    exploit sim_memory_cap; [apply PROMISES1|exact MEMORY|..]; eauto. i. des.
+    hexploit sim_memory_max_full_timemap; try exact x0; eauto. i. des.
+    econs; eauto.
+    s. eapply cap_fulfillable; eauto. apply WF_SRC.
+  Qed.
+
+  Lemma sim_thread_consistent
+        l e_src e_tgt
+        (SIM: sim_thread l e_src e_tgt)
+        (WF_SRC: Local.wf e_src.(Thread.local) e_src.(Thread.memory))
+        (WF_TGT: Local.wf e_tgt.(Thread.local) e_tgt.(Thread.memory))
+        (SC_SRC: Memory.closed_timemap e_src.(Thread.sc) e_src.(Thread.memory))
+        (SC_TGT: Memory.closed_timemap e_tgt.(Thread.sc) e_tgt.(Thread.memory))
+        (CLOSED_SRC: Memory.closed e_src.(Thread.memory))
+        (CLOSED_TGT: Memory.closed e_tgt.(Thread.memory))
+        (CONSISTENT_TGT: Thread.consistent e_tgt):
+    <<CONSISTENT_SRC: Thread.consistent e_src>>.
+  Proof.
+    exploit Memory.cap_exists; try exact CLOSED_TGT. i. des.
+    exploit Memory.cap_closed; eauto. i.
+    exploit Memory.max_full_timemap_exists; try apply x0. i. des.
+    ii.
+    exploit sim_thread_cap; try exact SIM; try exact CAP0; try exact CAP; eauto. i.
+    exploit Local.cap_wf; try exact WF_SRC; eauto. intro WF_CAP_SRC.
+    exploit Local.cap_wf; try exact WF_TGT; eauto. intro WF_CAP_TGT.
+    hexploit Memory.max_full_timemap_closed; try exact SC_MAX. intro SC_MAX_SRC.
+    hexploit Memory.max_full_timemap_closed; try exact x1. intro SC_MAX_TGT.
+    exploit Memory.cap_closed; try exact CLOSED_SRC; eauto. intro CLOSED_CAP_SRC.
+    exploit Memory.cap_closed; try exact CLOSED_TGT; eauto. intro CLOSED_CAP_TGT.
+    exploit CONSISTENT_TGT; eauto. i. des.
+    - left. unfold Thread.steps_failure in *. des.
+      exploit sim_thread_rtc_tau_step; try exact STEPS; eauto. i. des.
+      exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
+      exploit Thread.rtc_tau_step_future; try exact STEPS_SRC; eauto. s. i. des.
+      exploit sim_thread_step; try exact FAILURE0; eauto. i. des.
+      destruct e_src0; ss. inv STEP_SRC.
+      destruct pf; try by (inv STEP; inv STEP0).
+      esplits; eauto.
+    - right.
+      exploit sim_thread_rtc_tau_step; try exact STEPS; eauto. i. des.
+      esplits; eauto.
+      inv SIM2. apply Memory.ext. i.
+      rewrite Memory.bot_get.
+      destruct (Loc.eq_dec loc l); subst; ss.
+      destruct (Memory.get loc ts (Local.promises (Thread.local e2_src))) as [[]|] eqn:GETP; ss.
+      inv LOCAL. inv PROMISES1.
+      exploit SOUND; eauto. i. des.
+      rewrite PROMISES, Memory.bot_get in GET_TGT. ss.
+  Qed.
 End SimThreadOther.
