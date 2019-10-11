@@ -2181,4 +2181,246 @@ Module SimCommon.
         des. subst. ss.
       + erewrite (@Memory.remove_o mem2); eauto. condtac; ss.
   Qed.
+
+
+  (* max_timemap *)
+
+  Lemma sim_memory_max_full_ts
+        l loc
+        mem_src mem_tgt
+        max_src max_tgt
+        (SIM: sim_memory l mem_src mem_tgt)
+        (LOC: loc <> l)
+        (MAX_SRC: Memory.max_full_ts mem_src loc max_src)
+        (MAX_TGT: Memory.max_full_ts mem_tgt loc max_tgt):
+    <<TS: max_src = max_tgt>>.
+  Proof.
+    inv SIM. inv MAX_SRC. inv MAX_TGT. des.
+    apply TimeFacts.antisym.
+    - exploit SOUND; eauto. i. des. inv MSG.
+      exploit MAX0; try eapply GET_TGT. ss.
+    - exploit COMPLETE; eauto. i. des. inv MSG.
+      exploit MAX; try eapply GET_SRC. ss.
+  Qed.
+
+  Lemma sim_memory_max_full_timemap
+        l
+        mem_src mem_tgt
+        max_src max_tgt
+        (SIM: sim_memory l mem_src mem_tgt)
+        (MAX_SRC: Memory.max_full_timemap mem_src max_src)
+        (MAX_TGT: Memory.max_full_timemap mem_tgt max_tgt):
+    <<SIM_TIMEMAP: sim_timemap l max_src max_tgt>>.
+  Proof.
+    ii. specialize (MAX_SRC loc). specialize (MAX_TGT loc).
+    eapply sim_memory_max_full_ts; eauto.
+  Qed.
+
+  Lemma sim_memory_max_full_view
+        l
+        mem_src mem_tgt
+        max_src max_tgt
+        (SIM: sim_memory l mem_src mem_tgt)
+        (MAX_SRC: Memory.max_full_view mem_src max_src)
+        (MAX_TGT: Memory.max_full_view mem_tgt max_tgt):
+    <<SIM_VIEW: sim_view l max_src max_tgt>>.
+  Proof.
+    inv MAX_SRC. inv MAX_TGT.
+    econs; eapply sim_memory_max_full_timemap; eauto.
+  Qed.
+
+
+  (* cap *)
+
+  Lemma sim_memory_get_None_src
+        l mem_src mem_tgt
+        loc to
+        (SIM: sim_memory l mem_src mem_tgt)
+        (LOC: loc <> l)
+        (GET_SRC: Memory.get loc to mem_src = None):
+    Memory.get loc to mem_tgt = None.
+  Proof.
+    inv SIM.
+    destruct (Memory.get loc to mem_tgt) as [[]|] eqn:GET; ss.
+    exploit COMPLETE; eauto. i. des. congr.
+  Qed.
+
+  Lemma sim_memory_get_None_tgt
+        l mem_src mem_tgt
+        loc to
+        (SIM: sim_memory l mem_src mem_tgt)
+        (LOC: loc <> l)
+        (GET_TGT: Memory.get loc to mem_tgt = None):
+    Memory.get loc to mem_src = None.
+  Proof.
+    symmetry in SIM.
+    eapply sim_memory_get_None_src; eauto.
+  Qed.
+
+  Lemma sim_memory_adjacent_src
+      l mem_src mem_tgt
+      loc from1 to1 from2 to2
+      (SIM: sim_memory l mem_src mem_tgt)
+      (LOC: loc <> l)
+      (ADJ: Memory.adjacent loc from1 to1 from2 to2 mem_src):
+    Memory.adjacent loc from1 to1 from2 to2 mem_tgt.
+  Proof.
+    dup SIM. inv SIM0. inv ADJ.
+    exploit SOUND; try exact GET1; eauto. i. des.
+    exploit SOUND; try exact GET2; eauto. i. des.
+    econs; eauto. i.
+    exploit EMPTY; eauto. i.
+    eapply sim_memory_get_None_src; eauto.
+  Qed.
+
+  Lemma sim_memory_adjacent_tgt
+        l mem_src mem_tgt
+        loc from1 to1 from2 to2
+        (SIM: sim_memory l mem_src mem_tgt)
+        (LOC: loc <> l)
+        (ADJ: Memory.adjacent loc from1 to1 from2 to2 mem_tgt):
+    Memory.adjacent loc from1 to1 from2 to2 mem_src.
+  Proof.
+    symmetry in SIM.
+    eapply sim_memory_adjacent_src; eauto.
+  Qed.
+
+  Lemma sim_memory_max_ts
+        l loc
+        mem_src mem_tgt
+        (SIM: sim_memory l mem_src mem_tgt)
+        (INHABITED_SRC: Memory.inhabited mem_src)
+        (INHABITED_TGT: Memory.inhabited mem_tgt)
+        (LOC: loc <> l):
+    <<TS: Memory.max_ts loc mem_src = Memory.max_ts loc mem_tgt>>.
+  Proof.
+    inv SIM. apply TimeFacts.antisym.
+    - exploit Memory.max_ts_spec; try exact (INHABITED_SRC loc). i. des.
+      exploit SOUND; eauto. i. des.
+      exploit Memory.max_ts_spec; try exact GET_TGT. i. des. ss.
+    - exploit Memory.max_ts_spec; try exact (INHABITED_TGT loc). i. des.
+      exploit COMPLETE; eauto. i. des.
+      exploit Memory.max_ts_spec; try exact GET_SRC. i. des. ss.
+  Qed.
+
+  Lemma sim_memory_latest_reserve_src
+        l
+        promises_src promises_tgt
+        mem_src mem_tgt
+        loc
+        (PROMISES: sim_memory l promises_src promises_tgt)
+        (MEM: sim_memory l mem_src mem_tgt)
+        (INHABITED_SRC: Memory.inhabited mem_src)
+        (INHABITED_TGT: Memory.inhabited mem_tgt)
+        (LOC: loc <> l)
+        (LATEST: Memory.latest_reserve loc promises_src mem_src):
+    Memory.latest_reserve loc promises_tgt mem_tgt.
+  Proof.
+    unfold Memory.latest_reserve in *. des_ifs.
+    - inv PROMISES.
+      erewrite <- sim_memory_max_ts in Heq; eauto.
+      exploit SOUND; eauto. i. des. inv MSG. congr.
+    - erewrite <- sim_memory_max_ts in Heq; eauto.
+      exploit sim_memory_get_None_src; try exact Heq0; eauto. i. congr.
+  Qed.
+
+  Lemma sim_memory_latest_reserve_tgt
+        l
+        promises_src promises_tgt
+        mem_src mem_tgt
+        loc
+        (PROMISES: sim_memory l promises_src promises_tgt)
+        (MEM: sim_memory l mem_src mem_tgt)
+        (INHABITED_SRC: Memory.inhabited mem_src)
+        (INHABITED_TGT: Memory.inhabited mem_tgt)
+        (LOC: loc <> l)
+        (LATEST: Memory.latest_reserve loc promises_tgt mem_tgt):
+    Memory.latest_reserve loc promises_src mem_src.
+  Proof.
+    symmetry in PROMISES, MEM.
+    eapply sim_memory_latest_reserve_src; eauto.
+  Qed.
+
+  Lemma sim_memory_latest_val_src
+        l mem_src mem_tgt
+        loc val
+        (MEM: sim_memory l mem_src mem_tgt)
+        (INHABITED_SRC: Memory.inhabited mem_src)
+        (INHABITED_TGT: Memory.inhabited mem_tgt)
+        (LOC: loc <> l)
+        (LATEST: Memory.latest_val loc mem_src val):
+    Memory.latest_val loc mem_tgt val.
+  Proof.
+    inv MEM. inv LATEST.
+    exploit SOUND; eauto. i. des. inv MSG.
+    exploit Memory.max_full_ts_exists; try exact INHABITED_TGT. i. des.
+    exploit sim_memory_max_full_ts; eauto. i. des. subst.
+    econs; eauto.
+  Qed.
+
+  Lemma sim_memory_latest_val_tgt
+        l mem_src mem_tgt
+        loc val
+        (MEM: sim_memory l mem_src mem_tgt)
+        (INHABITED_SRC: Memory.inhabited mem_src)
+        (INHABITED_TGT: Memory.inhabited mem_tgt)
+        (LOC: loc <> l)
+        (LATEST: Memory.latest_val loc mem_tgt val):
+    Memory.latest_val loc mem_src val.
+  Proof.
+    symmetry in MEM.
+    eapply sim_memory_latest_val_src; eauto.
+  Qed.
+
+  Lemma sim_memory_cap
+        l
+        promises_src promises_tgt
+        mem_src mem_tgt
+        cap_src cap_tgt
+        (PROMISES: sim_memory l promises_src promises_tgt)
+        (MEM: sim_memory l mem_src mem_tgt)
+        (CLOSED_SRC: Memory.closed mem_src)
+        (CLOSED_TGT: Memory.closed mem_tgt)
+        (CAP_SRC: Memory.cap promises_src mem_src cap_src)
+        (CAP_TGT: Memory.cap promises_tgt mem_tgt cap_tgt):
+    <<SIM_CAP: sim_memory l cap_src cap_tgt>>.
+  Proof.
+    inv PROMISES. inv MEM. econs; ii.
+    - exploit Memory.cap_inv; try exact CAP_SRC; eauto. i. des.
+      + inv CAP_TGT.
+        exploit SOUND0; eauto. i. des. eauto.
+      + subst. inv CAP_TGT.
+        exploit sim_memory_adjacent_src; eauto. i.
+        exploit MIDDLE; eauto.
+      + subst. inv CAP_TGT.
+        exploit sim_memory_latest_reserve_src; try exact x1; eauto;
+          try apply CLOSED_SRC; try apply CLOSED_TGT; i.
+        exploit sim_memory_latest_val_src; try exact x1; eauto;
+          try apply CLOSED_SRC; try apply CLOSED_TGT; i.
+        exploit Memory.max_full_view_exists; try eapply CLOSED_TGT. i. des.
+        exploit sim_memory_max_full_view; try exact MEM; eauto. i. des.
+        exploit BACK; eauto. i.
+        erewrite sim_memory_max_ts; eauto.
+        esplits; eauto.
+        * apply CLOSED_SRC.
+        * apply CLOSED_TGT.
+    - exploit Memory.cap_inv; try exact CAP_TGT; eauto. i. des.
+      + inv CAP_SRC.
+        exploit COMPLETE0; eauto. i. des. eauto.
+      + subst. inv CAP_SRC.
+        exploit sim_memory_adjacent_tgt; eauto. i.
+        exploit MIDDLE; eauto.
+      + subst. inv CAP_SRC.
+        exploit sim_memory_latest_reserve_tgt; try exact x1; eauto;
+          try apply CLOSED_SRC; try apply CLOSED_TGT; i.
+        exploit sim_memory_latest_val_tgt; try exact x1; eauto;
+          try apply CLOSED_SRC; try apply CLOSED_TGT; i.
+        exploit Memory.max_full_view_exists; try eapply CLOSED_SRC. i. des.
+        exploit sim_memory_max_full_view; try exact MEM; eauto. i. des.
+        exploit BACK; eauto. i.
+        erewrite <- sim_memory_max_ts; eauto.
+        esplits; eauto.
+        * apply CLOSED_SRC.
+        * apply CLOSED_TGT.
+  Qed.
 End SimCommon.
