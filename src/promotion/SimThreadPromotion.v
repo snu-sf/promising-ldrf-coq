@@ -317,7 +317,7 @@ Module SimThreadPromotion.
         + inv REGFREE. ss.
         + left. econs; eauto. ss.
           unfold RegFun.find. rewrite REGR.
-          admit.
+          apply RegFile.eq_except_add; ss.
         + etrans; eauto. symmetry. etrans; eauto.
         + etrans; eauto. symmetry. ss.
         + ii. inv STEP. inv LC0. ss. inv STEP0. ss.
@@ -367,11 +367,14 @@ Module SimThreadPromotion.
       - ss.
       - econs; s; eauto.
         do 3 right. left. econs; ss.
-        + admit.
+        + etrans; eauto. symmetry.
+          apply RegFile.eq_except_singleton.
         + unfold RegFun.add. condtac; ss.
           symmetry. eapply RegFile.eq_except_value; eauto.
           inv REGFREE. inv H1. ss.
-          admit.
+          symmetry in REGFREE.
+          apply RegSet.disjoint_add in REGFREE. des.
+          symmetry. eapply RegSet.disjoint_union_inv_r; eauto.
     }
     { (* cas_success2 *)
       inv STATE. ss. subst.
@@ -510,7 +513,8 @@ Module SimThreadPromotion.
       - inv LOCAL0. econs; ss; eauto.
         + inv REGFREE. ss.
         + left. econs; eauto; ss.
-          admit.
+          etrans; eauto. symmetry.
+          apply RegFile.eq_except_singleton.
         + etrans; eauto. symmetry. ss.
         + etrans; eauto. symmetry. ss.
         + ii. inv STEP. inv LC. ss.
@@ -555,7 +559,8 @@ Module SimThreadPromotion.
       - ss.
       - econs; s; eauto.
         right. left. econs; ss.
-        + admit.
+        + etrans; eauto. symmetry.
+          apply RegFile.eq_except_singleton.
         + unfold RegFun.add. condtac; ss.
           erewrite <- RegFile.eq_except_value; eauto.
           inv REGFREE. inv H1. ss.
@@ -578,7 +583,7 @@ Module SimThreadPromotion.
           inv REGFREE. inv H2. ss.
           symmetry in REGFREE.
           apply RegSet.disjoint_add in REGFREE. des.
-          admit.
+          symmetry. eapply RegSet.disjoint_union_inv_l; eauto.
         + do 4 right. econs; ss.
           unfold Op2.const_eq, RegFun.find in *. des_ifs; ss.
           ii. rewrite H in *. apply n.
@@ -586,7 +591,7 @@ Module SimThreadPromotion.
           inv REGFREE. inv H3. ss.
           symmetry in REGFREE.
           apply RegSet.disjoint_add in REGFREE. des.
-          admit.
+          symmetry. eapply RegSet.disjoint_union_inv_l; eauto.
     }
     { (* ite *)
       ss. subst. rewrite STMTS_TGT in *.
@@ -696,5 +701,5 @@ Module SimThreadPromotion.
           * inv LOCAL2. inv LOCAL3. inv WRITE. ss.
             erewrite <- promise_eq_mem; eauto.
     }
-  Admitted.
+  Qed.
 End SimThreadPromotion.
