@@ -164,28 +164,135 @@ Module SimThreadPromotion.
 
 
   Lemma step_sim_thread_promotion_reserve
-        l r e_src e_tgt
-        (SIM: sim_thread l r e_src e_tgt):
-    exists from to e1_src,
+        l r e1_src e_tgt
+        (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
+        (SIM1: sim_thread l r e1_src e_tgt):
+    exists from to e2_src,
       <<STEP: Thread.step false (ThreadEvent.promise l from to Message.reserve Memory.op_kind_add)
-                          e_src e1_src>> /\
-      <<SIM: sim_thread_reserve l r e1_src e_tgt>>.
+                          e1_src e2_src>> /\
+      <<SIM2: sim_thread_reserve l r e2_src e_tgt>>.
   Proof.
-    destruct e_src, e_tgt. inv SIM. ss.
-    guardH STATE. des.
-  Admitted.
+    destruct e1_src as [st1_src [tview1_src promises1_src] sc1_src mem1_src].
+    destruct e_tgt as [st_tgt [tview_tgt promises_tgt] sc_tgt mem_tgt].
+    inv SIM1. ss. des.
+    dup WF1_SRC. inv WF1_SRC0. ss.
+    clear TVIEW_WF TVIEW_CLOSED FINITE BOT RESERVE.
+    exploit (@Memory.add_exists_max_ts mem1_src l (Time.incr (Memory.max_ts l mem1_src)) Message.reserve).
+    { apply Time.incr_spec. }
+    { econs. }
+    i. des.
+    exploit Memory.add_exists_le; eauto. i. des.
+    assert (MAX: Memory.max_ts l mem2 = Time.incr (Memory.max_ts l mem1_src)).
+    { exploit Memory.add_get0; try exact x0. i. des.
+      exploit Memory.max_ts_spec; try exact GET0. i. des.
+      inv MAX; ss.
+      revert GET1. erewrite Memory.add_o; eauto. condtac; ss; try by des; ss.
+      guardH o. i.
+      exploit Memory.max_ts_spec; try exact GET1. i. des.
+      specialize (Time.incr_spec (Memory.max_ts l mem1_src)). i.
+      rewrite H in H0. timetac.
+    }
+    esplits.
+    - econs 1. econs; ss. econs; eauto. econs 1; eauto. ss.
+    - econs; s; eauto.
+      + inv LOCAL. econs; ss.
+        etrans; eauto. econs; i.
+        * revert GET_SRC. erewrite Memory.add_o; eauto. condtac; ss.
+          { des. subst. ss. }
+          { esplits; eauto. refl. }
+        * erewrite Memory.add_o; eauto. condtac; ss.
+          { des. subst. ss. }
+          { esplits; eauto. refl. }
+      + etrans; eauto. econs; i.
+        * revert GET_SRC. erewrite Memory.add_o; eauto. condtac; ss.
+          { des. subst. ss. }
+          { esplits; eauto. refl. }
+        * erewrite Memory.add_o; eauto. condtac; ss.
+          { des. subst. ss. }
+          { esplits; eauto. refl. }
+      + ii. revert GETP.
+        erewrite Memory.add_o; eauto. condtac; ss. i. guardH o.
+        exploit FULFILLABLE; eauto. i. des. split; ss.
+        unfold prev_released_le_loc in *.
+        erewrite Memory.add_o; eauto. condtac; ss.
+      + exploit Memory.add_get0; try exact x0. i. des.
+        exploit Memory.add_get0; try exact x1. i. des.
+        exploit Memory.add_get1; try exact LATEST; eauto. i.
+        rewrite MAX. esplits; eauto.
+      + i. rewrite MAX in *.
+        erewrite Memory.add_o; eauto. condtac; ss.
+        des. subst. ss.
+      + ii. revert GET.
+        erewrite Memory.add_o; eauto. condtac; ss; eauto.
+  Qed.
 
   Lemma step_sim_thread_promotion
-        l r e_src e_tgt
-        (SIM: sim_thread_reserve l r e_src e_tgt):
-    exists from to e1_src,
-      <<STEP: Thread.step false (ThreadEvent.promise l from to Message.reserve Memory.op_kind_cancel)
-                          e_src e1_src>> /\
-      <<SIM: sim_thread l r e1_src e_tgt>>.
+        l r e1_src e_tgt
+        (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
+        (CLOSED1_SRC: Memory.closed e1_src.(Thread.memory))
+        (SIM1: sim_thread_reserve l r e1_src e_tgt):
+    exists from to e2_src,
+      <<STEP: Thread.step true (ThreadEvent.promise l from to Message.reserve Memory.op_kind_cancel)
+                          e1_src e2_src>> /\
+      <<SIM2: sim_thread l r e2_src e_tgt>>.
   Proof.
-    destruct e_src, e_tgt. inv SIM. ss.
-    guardH STATE. des.
-  Admitted.
+    destruct e1_src as [st1_src [tview1_src promises1_src] sc1_src mem1_src].
+    destruct e_tgt as [st_tgt [tview_tgt promises_tgt] sc_tgt mem_tgt].
+    inv SIM1. ss. des.
+    dup WF1_SRC. inv WF1_SRC0. ss.
+    clear TVIEW_WF TVIEW_CLOSED FINITE BOT RESERVE.
+    exploit (@Memory.remove_exists promises1_src l from (Memory.max_ts l mem1_src) Message.reserve); ss.
+    i. des.
+    exploit Memory.remove_exists_le; eauto. i. des.
+    assert (MAX: Memory.max_ts l mem0 = from).
+    { exploit Memory.get_ts; try exact MEM. i. des.
+      { rewrite x3 in *.
+        inv CLOSED1_SRC. rewrite INHABITED in *. ss. }
+      exploit Memory.remove_get0; try exact x1. i. des.
+      exploit Memory.remove_get1; try exact LATEST; eauto. i. des.
+      { subst. timetac. }
+      exploit Memory.max_ts_spec; try exact GET2. i. des.
+      inv MAX; ss.
+      revert GET1. erewrite Memory.remove_o; eauto. condtac; ss.
+      i. des; ss.
+      exploit Memory.max_ts_spec; try exact GET1. i. des.
+      exploit Memory.get_ts; try exact GET1. i. des.
+      { subst. rewrite x4 in *. inv H. }
+      exploit Memory.get_disjoint; [exact MEM|exact GET1|..]. i. des.
+      { subst. rewrite x4 in *. congr. }
+      exfalso.
+      apply (x4 (Memory.max_ts l mem0)); econs; ss. refl.
+    }
+    esplits.
+    - econs. econs; ss. econs; eauto.
+    - econs; s; eauto.
+      + inv LOCAL. econs; ss.
+        etrans; eauto. econs; i.
+        * revert GET_SRC. erewrite Memory.remove_o; eauto. condtac; ss. i.
+          esplits; eauto. refl.
+        * erewrite Memory.remove_o; eauto. condtac; ss; try by des; ss.
+          esplits; eauto. refl.
+      + etrans; eauto. econs; i.
+        * revert GET_SRC. erewrite Memory.remove_o; eauto. condtac; ss. i.
+          esplits; eauto. refl.
+        * erewrite Memory.remove_o; eauto. condtac; ss; try by des; ss.
+          esplits; eauto. refl.
+      + ii. revert GETP.
+        erewrite Memory.remove_o; eauto. condtac; ss. i. guardH o.
+        exploit FULFILLABLE; eauto. i. des. split; ss.
+        unfold prev_released_le_loc in *.
+        erewrite Memory.remove_o; eauto. condtac; ss.
+      + rewrite MAX.
+        erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+        des. subst. rewrite a0 in *.
+        exploit Memory.get_ts; try exact MEM. i. des; timetac.
+        rewrite x2 in *.
+        inv CLOSED1_SRC. rewrite INHABITED in MEM. ss.
+      + i. erewrite Memory.remove_o; eauto. condtac; ss.
+        apply PROMISES. des; ss.
+      + ii. revert GET.
+        erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+  Qed.
 
   Lemma eq_loc_max_ts
         loc mem1 mem2
