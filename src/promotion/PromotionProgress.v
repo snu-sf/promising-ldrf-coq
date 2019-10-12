@@ -27,7 +27,6 @@ Require Import Semantics.
 
 Require Import PromiseConsistent.
 
-Require Import Promotion.
 Require Import SimCommon.
 
 Set Implicit Arguments.

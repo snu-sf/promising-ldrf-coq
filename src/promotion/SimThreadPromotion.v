@@ -26,12 +26,11 @@ Require Import Semantics.
 
 Require Import PromiseConsistent.
 
-Require Import Promotion.
+Require Import PromotionDef.
 Require Import SimCommon.
 Require Import PromotionProgress.
 
 Set Implicit Arguments.
-Set Nested Proofs Allowed.
 
 
 Module SimThreadPromotion.
