@@ -295,7 +295,7 @@ Module SimThreadPromotion.
 
   Lemma eq_loc_max_ts
         loc mem1 mem2
-        (EQLOC: forall to, Memory.get loc to mem1 = Memory.get loc to mem2):
+        (MEMLOC: forall to, Memory.get loc to mem1 = Memory.get loc to mem2):
     Memory.max_ts loc mem1 = Memory.max_ts loc mem2.
   Proof.
     unfold Memory.max_ts.
@@ -1019,6 +1019,81 @@ Module SimThreadPromotion.
   Qed.
 
 
+  (* future *)
+
+  Lemma sim_thread_reserve_future
+        l r
+        st_src lc_src sc1_src mem1_src sc2_src mem2_src
+        st_tgt lc_tgt sc1_tgt mem1_tgt sc2_tgt mem2_tgt
+        (SIM1: sim_thread_reserve l r
+                          (Thread.mk lang st_src lc_src sc1_src mem1_src)
+                          (Thread.mk lang st_tgt lc_tgt sc1_tgt mem1_tgt))
+        (WF1_SRC: Local.wf lc_src mem1_src)
+        (MEM_SRC: Memory.future mem1_src mem2_src)
+        (SC: sim_timemap l sc2_src sc2_tgt)
+        (MEM: sim_memory l mem2_src mem2_tgt)
+        (PREV: Memory.prev_None mem1_src mem2_src)
+        (MEMLOC: forall to, Memory.get l to mem1_src = Memory.get l to mem2_src):
+    sim_thread_reserve l r
+               (Thread.mk lang st_src lc_src sc2_src mem2_src)
+               (Thread.mk lang st_tgt lc_tgt sc2_tgt mem2_tgt).
+  Proof.
+    inv SIM1. des. ss. econs; s; eauto.
+    - ii. exploit FULFILLABLE; eauto. i. des. split; ss.
+      unfold prev_released_le_loc in *. des_ifs; ss.
+      + exploit Memory.future_get1; try exact Heq0; eauto. i. des.
+        inv MSG_LE. inv RELEASED; try congr.
+        rewrite Heq in *. inv GET.
+        unnw. etrans; eauto. split; apply LE.
+      + exploit Memory.future_get1; try exact Heq0; eauto. i. des.
+        inv MSG_LE. inv RELEASED; try congr.
+      + inv WF1_SRC. exploit PROMISES0; eauto. i.
+        exploit PREV; eauto; ss. ii. congr.
+      + inv WF1_SRC. exploit PROMISES0; eauto. i.
+        exploit PREV; eauto; ss. ii. congr.
+    - erewrite <- eq_loc_max_ts; eauto.
+      rewrite MEMLOC in *.
+      esplits; eauto.
+    - erewrite <- eq_loc_max_ts; eauto.
+    - ii. rewrite <- MEMLOC in *. eauto.
+  Qed.
+
+
+  (* terminal *)
+
+  Lemma sim_thread_promises_bot
+        l r e_src e_tgt
+        (SIM: sim_thread l r e_src e_tgt)
+        (PROMISES_TGT: e_tgt.(Thread.local).(Local.promises) = Memory.bot):
+    <<PROMISES_SRC: e_src.(Thread.local).(Local.promises) = Memory.bot>>.
+  Proof.
+    inv SIM. inv LOCAL. apply Memory.ext. i.
+    rewrite Memory.bot_get.
+    destruct (Loc.eq_dec loc l); subst; ss.
+    symmetry in PROMISES1.
+    exploit sim_memory_get_None_src; eauto.
+    rewrite PROMISES_TGT. rewrite Memory.bot_get. ss.
+  Qed.
+
+  Lemma sim_thread_terminal
+        l r e_src e_tgt
+        (SIM: sim_thread l r e_src e_tgt)
+        (TERMINAL_TGT: lang.(Language.is_terminal) e_tgt.(Thread.state)):
+    <<TERMINAL_SRC: lang.(Language.is_terminal) e_src.(Thread.state)>>.
+  Proof.
+    unfold Language.is_terminal in *. ss.
+    unfold State.is_terminal in *.
+    inv SIM.
+    clear - TERMINAL_TGT STATE.
+    destruct e_src, e_tgt. ss.
+    destruct state, state0. ss.
+    unfold sim_state in *. des; inv STATE; ss.
+    unfold promote_stmts in *.
+    destruct stmts; ss. destruct t; ss.
+    destruct i; ss; des_ifs; ss.
+  Qed.
+
+
   (* certification *)
 
   Lemma sim_thread_reserve_cap_max_ts
@@ -1114,12 +1189,6 @@ Module SimThreadPromotion.
     - right.
       exploit sim_thread_rtc_tau_step_reserve; try exact STEPS; eauto. i. des.
       esplits; eauto.
-      inv SIM2. apply Memory.ext. i.
-      rewrite Memory.bot_get.
-      destruct (Loc.eq_dec loc l); subst; ss.
-      destruct (Memory.get loc ts (Local.promises (Thread.local e2_src))) as [[]|] eqn:GETP; ss.
-      inv LOCAL. inv PROMISES1.
-      exploit SOUND; eauto. i. des.
-      rewrite PROMISES, Memory.bot_get in GET_TGT. ss.
+      eapply sim_thread_promises_bot; eauto.
   Qed.
 End SimThreadPromotion.

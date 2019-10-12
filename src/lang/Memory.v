@@ -2950,4 +2950,74 @@ Module Memory.
     apply choice. i.
     apply Cell.cap_exists; try apply CLOSED1; ss.
   Qed.
+
+
+  (* prev_None *)
+
+  Definition prev_None (mem1 mem2: t): Prop :=
+    forall loc from to val released
+      (GET: get loc to mem1 = Some (from, Message.full val released))
+      (GET_PREV: forall from' val' released',
+          get loc from mem1 <> Some (from', Message.full val' released')),
+    forall from' val' released',
+      get loc from mem2 <> Some (from', Message.full val' released').
+
+  Lemma promise_prev_None
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind):
+    prev_None mem1 mem2.
+  Proof.
+    ii. revert H. inv PROMISE.
+    - erewrite add_o; eauto. condtac; ss.
+      + i. des. subst. inv H. eauto.
+      + i. eapply GET_PREV; eauto.
+    - des. subst.
+      erewrite split_o; eauto. repeat condtac; ss.
+      + i. des. subst. inv H.
+        exploit split_get0; try exact MEM. i. des.
+        inv MEM. inv SPLIT.
+        exploit get_ts; try exact GET. i. des.
+        { subst. inv TS12. }
+        exploit get_disjoint; [exact GET|exact GET1|..]. i. des.
+        { subst. rewrite GET in *. inv GET1. timetac. }
+        destruct (TimeFacts.le_lt_dec to0 ts3).
+        * apply (x1 to0); econs; ss; try refl.
+          etrans; try exact TS12. ss.
+        * apply (x1 ts3); econs; ss; try refl.
+          { econs; ss. }
+          { etrans; eauto. }
+      + guardH o. i. des. subst. inv H.
+        exploit split_get0; try exact MEM. i. des. congr.
+      + i. eapply GET_PREV; eauto.
+    - des. subst.
+      erewrite lower_o; eauto. condtac; ss.
+      + i. des. subst. inv H.
+        exploit lower_get0; try exact MEM. i. des. congr.
+      + i. eapply GET_PREV; eauto.
+    - erewrite remove_o; eauto. condtac; ss.
+      i. eapply GET_PREV; eauto.
+  Qed.
+
+  Lemma promise_get_from
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        l t f v r
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (GET: get l t mem1 = Some (f, Message.full v r)):
+    exists t' v' r',
+      get l t' mem2 = Some (f, Message.full v' r').
+  Proof.
+    inv PROMISE.
+    - exploit add_get1; eauto.
+    - exploit split_get1; eauto. i. des.
+      exploit split_get0; eauto. i. des.
+      dup GET2. revert GET2.
+      erewrite split_o; eauto. repeat condtac; ss; i.
+      + des. subst. inv GET2. congr.
+      + guardH o. des. subst. inv GET2.
+        rewrite GET in *. inv GET1. eauto.
+      + rewrite GET in *. inv GET2. eauto.
+    - exploit lower_get1; eauto. i. des. inv MSG_LE. eauto.
+    - exploit remove_get1; try exact GET; eauto. i. des; eauto.
+      subst. exploit remove_get0; try exact MEM. i. des. congr.
+  Qed.
 End Memory.

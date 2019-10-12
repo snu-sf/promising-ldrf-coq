@@ -28,7 +28,7 @@ Require Import PromiseConsistent.
 
 Require Import FulfillStep.
 
-Require Import Promotion.
+Require Import PromotionDef.
 Require Import SimCommon.
 
 Set Implicit Arguments.
@@ -241,6 +241,66 @@ Module SimThreadOther.
   Qed.
 
 
+  (* future *)
+
+  Lemma sim_thread_future
+        l
+        st_src lc_src sc1_src mem1_src sc2_src mem2_src
+        st_tgt lc_tgt sc1_tgt mem1_tgt sc2_tgt mem2_tgt
+        (SIM1: sim_thread l
+                          (Thread.mk lang st_src lc_src sc1_src mem1_src)
+                          (Thread.mk lang st_tgt lc_tgt sc1_tgt mem1_tgt))
+        (WF1_SRC: Local.wf lc_src mem1_src)
+        (MEM_SRC: Memory.future mem1_src mem2_src)
+        (SC: sim_timemap l sc2_src sc2_tgt)
+        (MEM: sim_memory l mem2_src mem2_tgt)
+        (PREV: Memory.prev_None mem1_src mem2_src):
+    sim_thread l
+               (Thread.mk lang st_src lc_src sc2_src mem2_src)
+               (Thread.mk lang st_tgt lc_tgt sc2_tgt mem2_tgt).
+  Proof.
+    inv SIM1. ss. econs; s; eauto. ii.
+    exploit FULFILLABLE; eauto. i. des. split; ss.
+    unfold prev_released_le_loc in *. des_ifs; ss.
+    - exploit Memory.future_get1; try exact Heq0; eauto. i. des.
+      inv MSG_LE. inv RELEASED; try congr.
+      rewrite Heq in *. inv GET.
+      unnw. etrans; eauto. split; apply LE.
+    - exploit Memory.future_get1; try exact Heq0; eauto. i. des.
+      inv MSG_LE. inv RELEASED; try congr.
+    - inv WF1_SRC. exploit PROMISES0; eauto. i.
+      exploit PREV; eauto; ss. ii. congr.
+    - inv WF1_SRC. exploit PROMISES0; eauto. i.
+      exploit PREV; eauto; ss. ii. congr.
+  Qed.
+
+
+  (* terminal *)
+
+  Lemma sim_thread_promises_bot
+        l e_src e_tgt
+        (SIM: sim_thread l e_src e_tgt)
+        (PROMISES_TGT: e_tgt.(Thread.local).(Local.promises) = Memory.bot):
+    <<PROMISES_SRC: e_src.(Thread.local).(Local.promises) = Memory.bot>>.
+  Proof.
+    inv SIM. inv LOCAL. apply Memory.ext. i.
+    rewrite Memory.bot_get.
+    destruct (Loc.eq_dec loc l); subst; ss.
+    symmetry in PROMISES1.
+    exploit sim_memory_get_None_src; eauto.
+    rewrite PROMISES_TGT. rewrite Memory.bot_get. ss.
+  Qed.
+
+  Lemma sim_thread_terminal
+        l e_src e_tgt
+        (SIM: sim_thread l e_src e_tgt)
+        (TERMINAL_TGT: lang.(Language.is_terminal) e_tgt.(Thread.state)):
+    <<TERMINAL_SRC: lang.(Language.is_terminal) e_src.(Thread.state)>>.
+  Proof.
+    inv SIM. rewrite STATE. ss.
+  Qed.
+
+
   (* certification *)
 
   Lemma sim_thread_cap
@@ -301,12 +361,6 @@ Module SimThreadOther.
     - right.
       exploit sim_thread_rtc_tau_step; try exact STEPS; eauto. i. des.
       esplits; eauto.
-      inv SIM2. apply Memory.ext. i.
-      rewrite Memory.bot_get.
-      destruct (Loc.eq_dec loc l); subst; ss.
-      destruct (Memory.get loc ts (Local.promises (Thread.local e2_src))) as [[]|] eqn:GETP; ss.
-      inv LOCAL. inv PROMISES1.
-      exploit SOUND; eauto. i. des.
-      rewrite PROMISES, Memory.bot_get in GET_TGT. ss.
+      eapply sim_thread_promises_bot; eauto.
   Qed.
 End SimThreadOther.
