@@ -1155,7 +1155,7 @@ Module SimThreadPromotion.
       rewrite PROMISE in *. ss.
   Qed.
 
-  Lemma sim_thread_consistent
+  Lemma sim_thread_reserve_consistent
         l r e_src e_tgt
         (SIM: sim_thread_reserve l r e_src e_tgt)
         (WF_SRC: Local.wf e_src.(Thread.local) e_src.(Thread.memory))

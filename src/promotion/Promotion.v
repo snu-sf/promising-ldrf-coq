@@ -257,7 +257,7 @@ Module Promotion.
             * exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
               exploit Thread.step_future; try exact STEP; eauto. s. i. des.
               exploit Thread.rtc_tau_step_future; try exact STEPS_SRC; eauto. s. i. des.
-              eapply SimThreadPromotion.sim_thread_consistent; eauto.
+              eapply SimThreadPromotion.sim_thread_reserve_consistent; eauto.
           + inv H.
             replace (IdentMap.add p (existT (fun lang : language => Language.state lang) lang state, local) ths1_src)
               with ths1_src; auto.
@@ -269,7 +269,7 @@ Module Promotion.
             exploit Thread.step_future; try exact STEP; eauto. s. i. des.
             exploit Thread.rtc_tau_step_future; try exact STEPS_SRC; eauto. s. i. des.
             exploit Thread.step_future; try exact STEP0; eauto. s. i. des.
-            eapply SimThreadPromotion.sim_thread_consistent; eauto.
+            eapply SimThreadPromotion.sim_thread_reserve_consistent; eauto.
       }
       rewrite <- EVENT0. esplits; eauto.
       exploit Configuration.opt_step_future; try exact CSTEP; eauto. s. i. des.
