@@ -36,32 +36,6 @@ Set Implicit Arguments.
 
 
 Module Promotion.
-  Lemma inj_option_pair
-        A B
-        (a1 a2: A)
-        (b1 b2: B)
-        (EQ: Some (a1, b1) = Some (a2, b2)):
-    a1 = a2 /\ b1 = b2.
-  Proof.
-    inv EQ. ss.
-  Qed.
-
-  Ltac simplify :=
-    repeat
-      (try match goal with
-           | [H: context[IdentMap.find _ (IdentMap.add _ _ _)] |- _] =>
-             rewrite IdentMap.Facts.add_o in H
-           | [H: context[if ?c then _ else _] |- _] =>
-             destruct c
-           | [H: Some (_, _) = Some (_, _) |- _] =>
-             apply inj_option_pair in H; des
-           | [H: existT ?P ?p _ = existT ?Q ?q _ |- _] =>
-             apply inj_pair2 in H
-           | [H: existT ?P ?p _ = existT ?Q ?q _ |- _] =>
-             exploit eq_sigT_fst; try exact H; i; subst
-           end;
-       ss; subst).
-
   Inductive sim_conf (p: Ident.t) (l: Loc.t) (r: Reg.t) (c_src c_tgt: Configuration.t): Prop :=
   | sim_conf_intro
       (TIDS: Threads.tids c_src.(Configuration.threads) = Threads.tids c_tgt.(Configuration.threads))
@@ -163,13 +137,13 @@ Module Promotion.
         exploit TERMINAL_TGT; eauto. i. des. inv THREAD.
         exploit SimThreadPromotion.sim_thread_promises_bot; eauto.
       - s. ii. destruct (Ident.eq_dec tid p).
-        + subst. simplify.
+        + subst. Configuration.simplify2.
           exploit TERMINAL_TGT; eauto. i. des.
           split.
           * exploit SimThreadPromotion.sim_thread_terminal; eauto.
           * inv THREAD. unnw. econs.
             exploit SimThreadPromotion.sim_thread_promises_bot; eauto.
-        + simplify.
+        + Configuration.simplify2.
           clear st_src lc_src st_tgt lc_tgt x from to state local sc memory
                 FIND_SRC0 FIND_TGT0 SIM_THREAD SC MEM STEP SIM2.
           exploit sim_conf_find; eauto. i. des.
@@ -191,7 +165,7 @@ Module Promotion.
       destruct c_tgt as [ths1_tgt sc1_tgt mem1_tgt].
       dup SIM. inv SIM0. des. ss.
       clear FIND_SRC FIND_TGT OTHER.
-      rewrite TID in FIND_TGT0. simplify.
+      rewrite TID in FIND_TGT0. Configuration.simplify2.
       dup WF_SRC. inv WF_SRC0. inv WF. ss.
       exploit THREADS; eauto. intro WF1_SRC. clear DISJOINT THREADS.
       dup WF_TGT. inv WF_TGT0. inv WF. ss.
@@ -236,7 +210,7 @@ Module Promotion.
       destruct c_tgt as [ths1_tgt sc1_tgt mem1_tgt].
       dup SIM. inv SIM0. des. ss.
       clear FIND_SRC FIND_TGT OTHER.
-      rewrite TID in FIND_TGT0. simplify.
+      rewrite TID in FIND_TGT0. Configuration.simplify2.
       dup WF_SRC. inv WF_SRC0. inv WF. ss.
       exploit THREADS; eauto. intro WF1_SRC. clear DISJOINT THREADS.
       dup WF_TGT. inv WF_TGT0. inv WF. ss.
@@ -339,7 +313,7 @@ Module Promotion.
         eapply SimThreadPromotion.sim_thread_reserve_future; eauto; try apply SIM3.
         inv WF_SRC. inv WF. ss. exploit THREADS; eauto.
       - i. revert FIND_SRC. rewrite IdentMap.gsspec. condtac; ss; i.
-        + subst. revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i. simplify.
+        + subst. revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i. Configuration.simplify2.
         + revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i.
           exploit sim_conf_sim_thread_other; eauto. s. i.
           eapply SimThreadOther.sim_thread_future; eauto; try apply SIM3.
@@ -409,7 +383,7 @@ Module Promotion.
         eapply SimThreadPromotion.sim_thread_reserve_future; eauto; try apply SIM3.
         inv WF_SRC. inv WF. ss. exploit THREADS; eauto.
       - i. revert FIND_SRC. rewrite IdentMap.gsspec. condtac; ss; i.
-        + subst. revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i. simplify.
+        + subst. revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i. Configuration.simplify2.
         + revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i.
           exploit sim_conf_sim_thread_other; eauto. s. i.
           eapply SimThreadOther.sim_thread_future; eauto; try apply SIM3.
@@ -552,7 +526,7 @@ Module Promotion.
                     (@sigT _ (@Language.syntax ProgramEvent.t)) tid program_src) eqn:SRC;
           destruct (@UsualFMapPositive.UsualPositiveMap'.find
                       (@sigT _ (@Language.syntax ProgramEvent.t)) tid program_tgt) eqn:TGT; ss.
-        destruct s, s0; ss.  simplify.
+        destruct s, s0; ss.  Configuration.simplify2.
         exploit OTHER; eauto. i. des.
         unfold State.init. econs; ss; try refl.
         + f_equal. ss.
@@ -579,7 +553,7 @@ Module Promotion.
       rewrite IdentMap.Facts.map_o in *.
       destruct (@UsualFMapPositive.UsualPositiveMap'.find
                   (@sigT _ (@Language.syntax ProgramEvent.t)) p program_tgt) eqn:TGT; ss.
-      destruct s; ss. simplify.
+      destruct s; ss. Configuration.simplify2.
     - econs; ss.
       + repeat rewrite Threads.tids_add.
         repeat rewrite IdentSet.add_mem; ss.

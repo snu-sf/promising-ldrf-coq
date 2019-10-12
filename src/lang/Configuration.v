@@ -196,6 +196,16 @@ Module Configuration.
       (GET: Memory.get loc to lc.(Local.promises) = Some (from, msg))
   .
 
+  Lemma inj_option_pair
+        A B
+        (a1 a2: A)
+        (b1 b2: B)
+        (EQ: Some (a1, b1) = Some (a2, b2)):
+    a1 = a2 /\ b1 = b2.
+  Proof.
+    inv EQ. ss.
+  Qed.
+
   Ltac simplify :=
     repeat
       (try match goal with
@@ -211,6 +221,22 @@ Module Configuration.
              apply inj_pair2 in H
            | [H: existT ?P ?p _ = existT ?P ?q _ |- _] =>
              apply eq_sigT_sig_eq in H; inv H
+           end;
+       ss; subst).
+
+  Ltac simplify2 :=
+    repeat
+      (try match goal with
+           | [H: context[IdentMap.find _ (IdentMap.add _ _ _)] |- _] =>
+             rewrite IdentMap.Facts.add_o in H
+           | [H: context[if ?c then _ else _] |- _] =>
+             destruct c
+           | [H: Some (_, _) = Some (_, _) |- _] =>
+             apply inj_option_pair in H; des
+           | [H: existT ?P ?p _ = existT ?Q ?q _ |- _] =>
+             apply inj_pair2 in H
+           | [H: existT ?P ?p _ = existT ?Q ?q _ |- _] =>
+             exploit eq_sigT_fst; try exact H; i; subst
            end;
        ss; subst).
 
