@@ -895,7 +895,7 @@ Module SimThreadPromotion.
 
   Lemma sim_thread_plus_step
         l r e1_src
-        e_tgt e1_tgt e2_tgt e3_tgt
+        pf e_tgt e1_tgt e2_tgt e3_tgt
         (SIM1: sim_thread l r e1_src e1_tgt)
         (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
         (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
@@ -904,7 +904,7 @@ Module SimThreadPromotion.
         (CLOSED1_SRC: Memory.closed e1_src.(Thread.memory))
         (CLOSED1_TGT: Memory.closed e1_tgt.(Thread.memory))
         (STEPS_TGT: rtc (@Thread.tau_step lang) e1_tgt e2_tgt)
-        (STEP_TGT: Thread.opt_step e_tgt e2_tgt e3_tgt):
+        (STEP_TGT: Thread.step pf e_tgt e2_tgt e3_tgt):
     exists e_src e2_src e3_src,
       <<STEPS_SRC: rtc (@Thread.tau_step lang) e1_src e2_src>> /\
       <<STEP_SRC: Thread.opt_step e_src e2_src e3_src>> /\
@@ -914,7 +914,7 @@ Module SimThreadPromotion.
     exploit sim_thread_rtc_tau_step; eauto. i. des.
     exploit Thread.rtc_tau_step_future; try exact STEPS_SRC; eauto. i. des.
     exploit Thread.rtc_tau_step_future; try exact STEPS_TGT; eauto. i. des.
-    exploit sim_thread_opt_step; eauto. i. des.
+    exploit sim_thread_step; eauto. i. des.
     esplits; eauto.
   Qed.
 
@@ -948,7 +948,7 @@ Module SimThreadPromotion.
         eapply CONSISTENT; eauto.
   Qed.
 
-  Lemma sim_thread_rtc_tau_step_reserve
+  Lemma sim_thread_reserve_rtc_tau_step
         l r e1_src
         e1_tgt e2_tgt
         (SIM1: sim_thread_reserve l r e1_src e1_tgt)
@@ -971,9 +971,9 @@ Module SimThreadPromotion.
     - ss.
   Qed.
 
-  Lemma sim_thread_plus_step_reserve
+  Lemma sim_thread_reserve_plus_step
         l r e1_src
-        e_tgt e1_tgt e2_tgt e3_tgt
+        pf e_tgt e1_tgt e2_tgt e3_tgt
         (SIM1: sim_thread_reserve l r e1_src e1_tgt)
         (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
         (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
@@ -982,7 +982,7 @@ Module SimThreadPromotion.
         (CLOSED1_SRC: Memory.closed e1_src.(Thread.memory))
         (CLOSED1_TGT: Memory.closed e1_tgt.(Thread.memory))
         (STEPS_TGT: rtc (@Thread.tau_step lang) e1_tgt e2_tgt)
-        (STEP_TGT: Thread.opt_step e_tgt e2_tgt e3_tgt):
+        (STEP_TGT: Thread.step pf e_tgt e2_tgt e3_tgt):
     exists e_src e2_src e3_src,
       <<STEPS_SRC: rtc (@Thread.tau_step lang) e1_src e2_src>> /\
       <<STEP_SRC: Thread.opt_step e_src e2_src e3_src>> /\
@@ -1005,7 +1005,7 @@ Module SimThreadPromotion.
       + ss.
     - inv STEP_SRC; try by (ss; congr).
       rewrite <- EVENT in H.
-      destruct pf; cycle 1.
+      destruct pf0; cycle 1.
       { inv STEP1. inv STEP2. ss. }
       exploit reorder_cancel; try exact STEP1; eauto. i. des.
       esplits.
@@ -1180,14 +1180,12 @@ Module SimThreadPromotion.
     exploit Memory.cap_closed; try exact CLOSED_TGT; eauto. intro CLOSED_CAP_TGT.
     exploit CONSISTENT_TGT; eauto. i. des.
     - left. unfold Thread.steps_failure in *. des.
-      exploit sim_thread_plus_step_reserve; eauto.
-      { econs 2; eauto. }
-      s. i. des.
+      exploit sim_thread_reserve_plus_step; eauto. s. i. des.
       destruct e_src0; ss. inv STEP_SRC.
       destruct pf; try by (inv STEP; inv STEP0).
       esplits; eauto.
     - right.
-      exploit sim_thread_rtc_tau_step_reserve; try exact STEPS; eauto. i. des.
+      exploit sim_thread_reserve_rtc_tau_step; try exact STEPS; eauto. i. des.
       esplits; eauto.
       eapply sim_thread_promises_bot; eauto.
   Qed.

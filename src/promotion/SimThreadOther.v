@@ -215,7 +215,7 @@ Module SimThreadOther.
 
   Lemma sim_thread_plus_step
         l e1_src
-        e_tgt e1_tgt e2_tgt e3_tgt
+        pf e_tgt e1_tgt e2_tgt e3_tgt
         (SIM1: sim_thread l e1_src e1_tgt)
         (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
         (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
@@ -224,7 +224,7 @@ Module SimThreadOther.
         (CLOSED1_SRC: Memory.closed e1_src.(Thread.memory))
         (CLOSED1_TGT: Memory.closed e1_tgt.(Thread.memory))
         (STEPS_TGT: rtc (@Thread.tau_step lang) e1_tgt e2_tgt)
-        (STEP_TGT: Thread.opt_step e_tgt e2_tgt e3_tgt):
+        (STEP_TGT: Thread.step pf e_tgt e2_tgt e3_tgt):
     exists e_src e2_src e3_src,
       <<STEPS_SRC: rtc (@Thread.tau_step lang) e1_src e2_src>> /\
       <<STEP_SRC: Thread.opt_step e_src e2_src e3_src>> /\
@@ -235,7 +235,7 @@ Module SimThreadOther.
     exploit sim_thread_rtc_tau_step; eauto. i. des.
     exploit Thread.rtc_tau_step_future; try exact STEPS_SRC; eauto. i. des.
     exploit Thread.rtc_tau_step_future; try exact STEPS_TGT; eauto. i. des.
-    exploit sim_thread_opt_step; eauto. i. des.
+    exploit sim_thread_step; eauto. i. des.
     esplits; eauto.
     i. rewrite MEMLOC. ss.
   Qed.
@@ -352,9 +352,7 @@ Module SimThreadOther.
     exploit Memory.cap_closed; try exact CLOSED_TGT; eauto. intro CLOSED_CAP_TGT.
     exploit CONSISTENT_TGT; eauto. i. des.
     - left. unfold Thread.steps_failure in *. des.
-      exploit sim_thread_plus_step; eauto.
-      { econs 2; eauto. }
-      s. i. des.
+      exploit sim_thread_plus_step; eauto. s. i. des.
       destruct e_src0; ss. inv STEP_SRC.
       destruct pf; try by (inv STEP; inv STEP0).
       esplits; eauto.
