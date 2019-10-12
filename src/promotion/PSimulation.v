@@ -27,7 +27,9 @@ Section Simulation.
       (WF_TGT: Configuration.wf c1_tgt),
       <<TERMINAL:
         forall (TERMINAL_TGT: Threads.is_terminal c1_tgt.(Configuration.threads)),
-          <<TERMINAL_SRC: Threads.is_terminal c1_src.(Configuration.threads)>>>> /\
+        exists c2_src,
+          <<STEPS_SRC: rtc Configuration.tau_step c1_src c2_src>> /\
+          <<TERMINAL_SRC: Threads.is_terminal c2_src.(Configuration.threads)>>>> /\
       <<STEP:
         forall e tid c2_tgt
           (STEP_TGT: Configuration.step e tid c1_tgt c2_tgt),
@@ -60,6 +62,7 @@ Proof.
   induction PR; i.
   - punfold SIM0. exploit SIM0; eauto. i. des.
     hexploit TERMINAL0; eauto. i. des.
+    eapply rtc_tau_step_behavior; eauto.
     econs 1. eauto.
   - punfold SIM0. exploit SIM0; eauto. i. des.
     exploit STEP0; eauto. i. des.
