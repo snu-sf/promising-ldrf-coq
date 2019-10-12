@@ -20,6 +20,7 @@ Require Import TView.
 Require Import Local.
 Require Import Thread.
 Require Import Configuration.
+Require Import Behavior.
 
 Require Import Syntax.
 Require Import Semantics.
@@ -542,5 +543,20 @@ Module Promotion.
         eapply SimThreadOther.sim_thread_future; eauto; try apply SIM2.
         * inv WF_SRC. inv WF. ss. exploit THREADS; eauto.
         * hexploit Thread.step_prev_None; eauto.
+  Qed.
+
+  Theorem promotion_behavior
+          p l r program_src program_tgt
+          (PROMOTE: promote_program p l r program_src program_tgt):
+    behaviors Configuration.step (Configuration.init program_tgt) <1=
+    behaviors Configuration.step (Configuration.init program_src).
+  Proof.
+    exploit init_sim_conf; eauto. i. des.
+    specialize (Configuration.init_wf program_src). intro WF_SRC.
+    specialize (Configuration.init_wf program_tgt). intro WF_TGT.
+    exploit Configuration.step_future; eauto. i. des.
+    hexploit sim_conf_sim; eauto. i.
+    exploit sim_adequacy; try exact H; eauto. i.
+    econs 4; eauto.
   Qed.
 End Promotion.
