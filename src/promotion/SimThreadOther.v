@@ -241,7 +241,7 @@ Module SimThreadOther.
   Qed.
 
 
-  (* consistency *)
+  (* certification *)
 
   Lemma sim_thread_cap
         l e_src e_tgt
@@ -292,10 +292,9 @@ Module SimThreadOther.
     exploit Memory.cap_closed; try exact CLOSED_TGT; eauto. intro CLOSED_CAP_TGT.
     exploit CONSISTENT_TGT; eauto. i. des.
     - left. unfold Thread.steps_failure in *. des.
-      exploit sim_thread_rtc_tau_step; try exact STEPS; eauto. i. des.
-      exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
-      exploit Thread.rtc_tau_step_future; try exact STEPS_SRC; eauto. s. i. des.
-      exploit sim_thread_step; try exact FAILURE0; eauto. i. des.
+      exploit sim_thread_plus_step; eauto.
+      { econs 2; eauto. }
+      s. i. des.
       destruct e_src0; ss. inv STEP_SRC.
       destruct pf; try by (inv STEP; inv STEP0).
       esplits; eauto.
