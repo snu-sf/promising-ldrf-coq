@@ -41,31 +41,6 @@ Require Import GSimulation.
 Set Implicit Arguments.
 
 
-Lemma inj_option_pair
-      A B
-      (a1 a2: A)
-      (b1 b2: B)
-      (EQ: Some (a1, b1) = Some (a2, b2)):
-  a1 = a2 /\ b1 = b2.
-Proof.
-  inv EQ. ss.
-Qed.
-
-Ltac simplify :=
-  repeat
-    (try match goal with
-         | [H: context[IdentMap.find _ (IdentMap.add _ _ _)] |- _] =>
-           rewrite IdentMap.Facts.add_o in H
-         | [H: context[if ?c then _ else _] |- _] =>
-           destruct c
-         | [H: Some (_, _) = Some (_, _) |- _] =>
-           apply inj_option_pair in H; des
-         | [H: existT ?P ?p _ = existT ?Q ?q _ |- _] =>
-           apply inj_pair2 in H
-         end;
-     ss; subst).
-
-
 Section AbortInsertion.
   Variable
     (S:ThreadsProp)
@@ -353,29 +328,6 @@ Section AbortInsertion.
   Hint Constructors sim_conf.
 
 
-  Lemma tids_find
-        ths_src ths_tgt tid
-        (TIDS: Threads.tids ths_src = Threads.tids ths_tgt):
-    (exists lang_src st_src lc_src, IdentMap.find tid ths_src = Some (existT _ lang_src st_src, lc_src)) <->
-    (exists lang_tgt st_tgt lc_tgt, IdentMap.find tid ths_tgt = Some (existT _ lang_tgt st_tgt, lc_tgt)).
-  Proof.
-    split; i; des.
-    - destruct (IdentSet.mem tid (Threads.tids ths_src)) eqn:MEM.
-      + rewrite TIDS in MEM.
-        rewrite Threads.tids_o in MEM.
-        destruct (IdentMap.find tid ths_tgt); ss.
-        destruct p. destruct s. esplits; eauto.
-      + rewrite Threads.tids_o in MEM.
-        destruct (IdentMap.find tid ths_src); ss.
-    - destruct (IdentSet.mem tid (Threads.tids ths_tgt)) eqn:MEM.
-      + rewrite <- TIDS in MEM.
-        rewrite Threads.tids_o in MEM.
-        destruct (IdentMap.find tid ths_src); ss.
-        destruct p. destruct s. esplits; eauto.
-      + rewrite Threads.tids_o in MEM.
-        destruct (IdentMap.find tid ths_tgt); ss.
-  Qed.
-
   Lemma sim_conf_find
         c_src c_tgt tid
         (SIM: sim_conf c_src c_tgt):
@@ -385,7 +337,7 @@ Section AbortInsertion.
         IdentMap.find tid c_tgt.(Configuration.threads) = Some (existT _ lang_tgt st_tgt, lc_tgt)).
   Proof.
     inv SIM. destruct c_src, c_tgt. ss.
-    eapply tids_find; eauto.
+    eapply Threads.tids_find; eauto.
   Qed.
 
   Lemma sim_conf_sim_thread
@@ -459,7 +411,7 @@ Section AbortInsertion.
           * inv SIM. eapply FIND_TGT; eauto.
         + i. revert FIND_SRC. rewrite IdentMap.gsspec. condtac; ss; i.
           * subst. revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i.
-            simplify. inv SIM0. ss.
+            Configuration.simplify2. inv SIM0. ss.
           * revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i.
             inv SIM. eauto.
       - exfalso.
@@ -702,7 +654,7 @@ Section AbortInsertion.
       + inv SIM. eapply FIND_TGT; eauto.
     - i. revert FIND_SRC. rewrite IdentMap.gsspec. condtac; ss; i.
       + subst. revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i.
-        simplify. inv SIM0. ss.
+        Configuration.simplify2. inv SIM0. ss.
       + revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i.
         inv SIM. eauto.
   Qed.
@@ -788,7 +740,7 @@ Section AbortInsertion.
         destruct (@UsualFMapPositive.UsualPositiveMap'.find
                     (@sigT _ (@Language.syntax ProgramEvent.t)) tid program_tgt) eqn:TGT; ss.
       destruct s, s0; ss.
-      inv FIND_SRC0. inv FIND_TGT0. split; ss. simplify.
+      inv FIND_SRC0. inv FIND_TGT0. split; ss. Configuration.simplify2.
       unfold State.init. econs; ss.
       eapply THREADS; eauto.
   Qed.

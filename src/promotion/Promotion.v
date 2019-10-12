@@ -63,31 +63,6 @@ Module Promotion.
   .
   Hint Constructors sim_conf.
 
-
-  (* TODO: move to Configuration.v *)
-  Lemma tids_find
-        ths_src ths_tgt tid
-        (TIDS: Threads.tids ths_src = Threads.tids ths_tgt):
-    (exists lang_src st_src lc_src, IdentMap.find tid ths_src = Some (existT _ lang_src st_src, lc_src)) <->
-    (exists lang_tgt st_tgt lc_tgt, IdentMap.find tid ths_tgt = Some (existT _ lang_tgt st_tgt, lc_tgt)).
-  Proof.
-    split; i; des.
-    - destruct (IdentSet.mem tid (Threads.tids ths_src)) eqn:MEM.
-      + rewrite TIDS in MEM.
-        rewrite Threads.tids_o in MEM.
-        destruct (IdentMap.find tid ths_tgt); ss.
-        destruct p. destruct s. esplits; eauto.
-      + rewrite Threads.tids_o in MEM.
-        destruct (IdentMap.find tid ths_src); ss.
-    - destruct (IdentSet.mem tid (Threads.tids ths_tgt)) eqn:MEM.
-      + rewrite <- TIDS in MEM.
-        rewrite Threads.tids_o in MEM.
-        destruct (IdentMap.find tid ths_src); ss.
-        destruct p. destruct s. esplits; eauto.
-      + rewrite Threads.tids_o in MEM.
-        destruct (IdentMap.find tid ths_tgt); ss.
-  Qed.
-
   Lemma sim_conf_find
         p l r c_src c_tgt tid
         (SIM: sim_conf p l r c_src c_tgt):
@@ -97,7 +72,7 @@ Module Promotion.
         IdentMap.find tid c_tgt.(Configuration.threads) = Some (existT _ lang_tgt st_tgt, lc_tgt)).
   Proof.
     inv SIM. destruct c_src, c_tgt. ss.
-    eapply tids_find; eauto.
+    eapply Threads.tids_find; eauto.
   Qed.
 
   Lemma sim_conf_sim_thread_other

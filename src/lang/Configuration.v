@@ -124,6 +124,29 @@ Module Threads.
     - destruct (IdentMap.find tid ths) eqn:X; inv FIND.
       eapply H; eauto. rewrite tids_o, X. ss.
   Qed.
+
+  Lemma tids_find
+        ths_src ths_tgt tid
+        (TIDS: tids ths_src = tids ths_tgt):
+    (exists lang_src st_src lc_src, IdentMap.find tid ths_src = Some (existT _ lang_src st_src, lc_src)) <->
+    (exists lang_tgt st_tgt lc_tgt, IdentMap.find tid ths_tgt = Some (existT _ lang_tgt st_tgt, lc_tgt)).
+  Proof.
+    split; i; des.
+    - destruct (IdentSet.mem tid (tids ths_src)) eqn:MEM.
+      + rewrite TIDS in MEM.
+        rewrite tids_o in MEM.
+        destruct (IdentMap.find tid ths_tgt); ss.
+        destruct p. destruct s. esplits; eauto.
+      + rewrite tids_o in MEM.
+        destruct (IdentMap.find tid ths_src); ss.
+    - destruct (IdentSet.mem tid (tids ths_tgt)) eqn:MEM.
+      + rewrite <- TIDS in MEM.
+        rewrite tids_o in MEM.
+        destruct (IdentMap.find tid ths_src); ss.
+        destruct p. destruct s. esplits; eauto.
+      + rewrite tids_o in MEM.
+        destruct (IdentMap.find tid ths_tgt); ss.
+  Qed.
 End Threads.
 
 
