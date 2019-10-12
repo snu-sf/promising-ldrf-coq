@@ -416,4 +416,182 @@ Module Promotion.
           inv WF_SRC. inv WF. ss. exploit THREADS; eauto.
     }
   Qed.
+
+
+  (* promotion *)
+
+  Definition syntax_tids (pgm: Threads.syntax): IdentSet.t :=
+    List.fold_right (fun p s => IdentSet.add (fst p) s) IdentSet.empty (IdentMap.elements pgm).
+
+  Lemma syntax_tids_o tid pgm:
+    IdentSet.mem tid (syntax_tids pgm) = IdentMap.find tid pgm.
+  Proof.
+    unfold syntax_tids. rewrite IdentMap.Facts.elements_o.
+    induction (IdentMap.elements pgm); ss. destruct a. s.
+    rewrite IdentSet.Facts.add_b, IHl.
+    unfold IdentSet.Facts.eqb, IdentMap.Facts.eqb.
+    repeat match goal with
+           | [|- context[if ?c then true else false]] => destruct c
+           end; ss; congr.
+  Qed.
+
+  Inductive promote_program (p: Ident.t) (l: Loc.t) (r: Reg.t) (program_src program_tgt: Threads.syntax): Prop :=
+  | promote_program_intro
+      (TIDS: syntax_tids program_src = syntax_tids program_tgt)
+      (FIND_SRC: forall tid lang_src syn_src
+                   (FIND: IdentMap.find tid program_src = Some (existT _ lang_src syn_src)),
+          lang_src = lang)
+      (FIND_TGT: forall tid lang_tgt syn_tgt
+                   (FIND: IdentMap.find tid program_tgt = Some (existT _ lang_tgt syn_tgt)),
+          lang_tgt = lang)
+      (PROMOTION: exists syn_src syn_tgt,
+          <<FIND_SRC: IdentMap.find p program_src = Some (existT _ lang syn_src)>> /\
+          <<FIND_TGT: IdentMap.find p program_tgt = Some (existT _ lang syn_tgt)>> /\
+          <<REGFREE: reg_free_stmts r syn_src>> /\
+          <<PROMOTE: syn_tgt = promote_stmts l r syn_src>>)
+      (OTHER: forall tid syn_src syn_tgt
+                (TID: tid <> p)
+                (FIND_SRC: IdentMap.find tid program_src = Some (existT _ lang syn_src))
+                (FIND_TGT: IdentMap.find tid program_tgt = Some (existT _ lang syn_tgt)),
+          <<LOCFREE: loc_free_stmts l syn_src>> /\
+          <<SYNTAX: syn_src = syn_tgt>>)
+  .
+
+  Inductive sim_conf_init (p: Ident.t) (l: Loc.t) (r: Reg.t) (c_src c_tgt: Configuration.t): Prop :=
+  | sim_conf_init_intro
+      (TIDS: Threads.tids c_src.(Configuration.threads) = Threads.tids c_tgt.(Configuration.threads))
+      (FIND_SRC: forall tid lang_src st_src lc_src
+                   (FIND: IdentMap.find tid c_src.(Configuration.threads) = Some (existT _ lang_src st_src, lc_src)),
+          lang_src = lang)
+      (FIND_TGT: forall tid lang_tgt st_tgt lc_tgt
+                   (FIND: IdentMap.find tid c_tgt.(Configuration.threads) = Some (existT _ lang_tgt st_tgt, lc_tgt)),
+          lang_tgt = lang)
+      (PROMOTION: exists st_src lc_src st_tgt lc_tgt,
+          <<FIND_SRC: IdentMap.find p c_src.(Configuration.threads) = Some (existT _ lang st_src, lc_src)>> /\
+          <<FIND_TGT: IdentMap.find p c_tgt.(Configuration.threads) = Some (existT _ lang st_tgt, lc_tgt)>> /\
+          <<SIM_THREAD: SimThreadPromotion.sim_thread
+                          l r
+                          (Thread.mk lang st_src lc_src c_src.(Configuration.sc) c_src.(Configuration.memory))
+                          (Thread.mk lang st_tgt lc_tgt c_tgt.(Configuration.sc) c_tgt.(Configuration.memory))>>)
+      (OTHER: forall tid st_src lc_src st_tgt lc_tgt
+                (TID: tid <> p)
+                (FIND_SRC: IdentMap.find tid c_src.(Configuration.threads) = Some (existT _ lang st_src, lc_src))
+                (FIND_TGT: IdentMap.find tid c_tgt.(Configuration.threads) = Some (existT _ lang st_tgt, lc_tgt)),
+          <<SIM_THREAD: SimThreadOther.sim_thread
+                          l
+                          (Thread.mk lang st_src lc_src c_src.(Configuration.sc) c_src.(Configuration.memory))
+                          (Thread.mk lang st_tgt lc_tgt c_tgt.(Configuration.sc) c_tgt.(Configuration.memory))>>)
+  .
+  Hint Constructors sim_conf_init.
+
+  Theorem init_sim_conf
+          p l r program_src program_tgt
+          (PROMOTE: promote_program p l r program_src program_tgt):
+    exists c_src,
+      <<STEP: Configuration.step MachineEvent.silent p (Configuration.init program_src) c_src>> /\
+      <<SIM: sim_conf p l r c_src (Configuration.init program_tgt)>>.
+  Proof.
+    assert (INIT: sim_conf_init p l r (Configuration.init program_src) (Configuration.init program_tgt)).
+    { inv PROMOTE. econs; ss; i.
+      - apply IdentSet.ext. i.
+        repeat rewrite Threads.tids_o.
+        unfold Threads.init.
+        repeat rewrite IdentMap.Facts.map_o.
+        specialize (@syntax_tids_o i program_src). i.
+        specialize (@syntax_tids_o i program_tgt). i.
+        destruct (@UsualFMapPositive.UsualPositiveMap'.find
+                    (@sigT _ (@Language.syntax ProgramEvent.t)) i program_src) eqn:SRC;
+          destruct (@UsualFMapPositive.UsualPositiveMap'.find
+                      (@sigT _ (@Language.syntax ProgramEvent.t)) i program_tgt) eqn:TGT; ss.
+        + assert (@UsualFMapPositive.UsualPositiveMap'.find
+                    (@sigT _ (@Language.syntax ProgramEvent.t)) i program_src = IdentMap.find i program_src) by ss.
+          rewrite <- H1 in *. rewrite SRC in *. ss.
+          assert (@UsualFMapPositive.UsualPositiveMap'.find
+                    (@sigT _ (@Language.syntax ProgramEvent.t)) i program_tgt = IdentMap.find i program_tgt) by ss.
+          rewrite <- H2 in *. rewrite TGT in *. ss.
+          rewrite TIDS in *. congr.
+        + assert (@UsualFMapPositive.UsualPositiveMap'.find
+                    (@sigT _ (@Language.syntax ProgramEvent.t)) i program_src = IdentMap.find i program_src) by ss.
+          rewrite <- H1 in *. rewrite SRC in *. ss.
+          assert (@UsualFMapPositive.UsualPositiveMap'.find
+                    (@sigT _ (@Language.syntax ProgramEvent.t)) i program_tgt = IdentMap.find i program_tgt) by ss.
+          rewrite <- H2 in *. rewrite TGT in *. ss.
+          rewrite TIDS in *. congr.
+      - unfold Threads.init in *.
+        rewrite IdentMap.Facts.map_o in *.
+        destruct (@UsualFMapPositive.UsualPositiveMap'.find
+                    (@sigT _ (@Language.syntax ProgramEvent.t)) tid program_src) eqn:SRC; ss.
+        destruct s. ss. inv FIND. eapply FIND_SRC; eauto.
+      - unfold Threads.init in *.
+        rewrite IdentMap.Facts.map_o in *.
+        destruct (@UsualFMapPositive.UsualPositiveMap'.find
+                    (@sigT _ (@Language.syntax ProgramEvent.t)) tid program_tgt) eqn:SRC; ss.
+        destruct s. ss. inv FIND. eapply FIND_TGT; eauto.
+      - unfold Threads.init in *.
+        repeat rewrite IdentMap.Facts.map_o in *. des.
+        replace (@UsualFMapPositive.UsualPositiveMap'.find
+                   (@sigT _ (@Language.syntax ProgramEvent.t)) p program_src) with
+            (IdentMap.find p program_src) by ss.
+        replace (@UsualFMapPositive.UsualPositiveMap'.find
+                   (@sigT _ (@Language.syntax ProgramEvent.t)) p program_tgt) with
+            (IdentMap.find p program_tgt) by ss.
+        rewrite FIND_SRC0. rewrite FIND_TGT0. ss.
+        esplits; eauto.
+        unfold State.init. econs; ss; try refl.
+        + instantiate (1 := 0). left. econs; eauto. refl.
+        + ii. rewrite Memory.bot_get in *. ss.
+        + replace (Memory.max_ts l Memory.init) with Time.bot by ss.
+          unfold Memory.get, Memory.init, Cell.get, Cell.init, Cell.Raw.init. ss.
+          rewrite DOMap.singleton_eq. unfold Message.elt. eauto.
+        + i. rewrite Memory.bot_get. ss.
+        + ii. unfold Memory.get, Memory.init, Cell.get, Cell.init in GET.
+          apply DOMap.singleton_find_inv in GET. des. inv GET0.
+      - unfold Threads.init in *.
+        rewrite IdentMap.Facts.map_o in *.
+        destruct (@UsualFMapPositive.UsualPositiveMap'.find
+                    (@sigT _ (@Language.syntax ProgramEvent.t)) tid program_src) eqn:SRC;
+          destruct (@UsualFMapPositive.UsualPositiveMap'.find
+                      (@sigT _ (@Language.syntax ProgramEvent.t)) tid program_tgt) eqn:TGT; ss.
+        destruct s, s0; ss.  simplify.
+        exploit OTHER; eauto. i. des.
+        unfold State.init. econs; ss; try refl.
+        + f_equal. ss.
+        + i. rewrite Memory.bot_get. ss.
+        + ii. rewrite Memory.bot_get in *. ss.
+    }
+    inv INIT. des.
+    specialize (Configuration.init_wf program_src). intro WF_SRC.
+    specialize (Configuration.init_wf program_tgt). intro WF_TGT.
+    dup WF_SRC. inv WF_SRC0. inv WF.
+    exploit THREADS; eauto. intro WF_SRC1. clear DISJOINT THREADS.
+    dup WF_TGT. inv WF_TGT0. inv WF.
+    exploit THREADS; eauto. intro WF_TGT1. clear DISJOINT THREADS.
+    exploit SimThreadPromotion.step_sim_thread_reserve; eauto; ss. i. des.
+    destruct e2_src. ss.
+    exploit Thread.step_future; eauto. s. i. des.
+    esplits.
+    - replace MachineEvent.silent with
+          (ThreadEvent.get_machine_event (ThreadEvent.promise l from to Message.reserve Memory.op_kind_add)) by ss.
+      econs 2; eauto; ss.
+      eapply SimThreadPromotion.sim_thread_reserve_consistent; eauto. ii. ss.
+      right. esplits; eauto. ss.
+      unfold Threads.init in *.
+      rewrite IdentMap.Facts.map_o in *.
+      destruct (@UsualFMapPositive.UsualPositiveMap'.find
+                  (@sigT _ (@Language.syntax ProgramEvent.t)) p program_tgt) eqn:TGT; ss.
+      destruct s; ss. simplify.
+    - econs; ss.
+      + repeat rewrite Threads.tids_add.
+        repeat rewrite IdentSet.add_mem; ss.
+        rewrite Threads.tids_o. rewrite FIND_SRC0. ss.
+      + i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i.
+        * inv FIND. ss.
+        * eauto.
+      + repeat rewrite IdentMap.gsspec. condtac; ss. esplits; eauto.
+      + i. revert FIND_SRC1. rewrite IdentMap.gsspec. condtac; ss; i.
+        exploit OTHER; eauto. i.
+        eapply SimThreadOther.sim_thread_future; eauto; try apply SIM2.
+        * inv WF_SRC. inv WF. ss. exploit THREADS; eauto.
+        * hexploit Thread.step_prev_None; eauto.
+  Qed.
 End Promotion.
