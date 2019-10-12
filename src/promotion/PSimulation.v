@@ -18,6 +18,7 @@ Require Import Behavior.
 Set Implicit Arguments.
 
 
+(* TODO: Merge with GSimulation *)
 Section Simulation.
   Definition SIM := forall (c1_src c1_tgt: Configuration.t), Prop.
 
