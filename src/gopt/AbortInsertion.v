@@ -25,6 +25,7 @@ Require Import Syntax.
 Require Import Semantics.
 
 Require Import PromiseConsistent.
+Require Import SimpleSimulation.
 
 Require Import AMemory.
 Require Import ALocal.
@@ -35,8 +36,6 @@ Require Import PFCommon.
 Require Import PFStep.
 Require Import PFCertify.
 Require Import Invariant.
-
-Require Import GSimulation.
 
 Set Implicit Arguments.
 
@@ -362,6 +361,7 @@ Section AbortInsertion.
     revert c_src c_tgt SIM.
     pcofix CIH. i. pfold. econs; ii.
     { (* terminal *)
+      esplits; eauto. ii.
       exploit sim_conf_find; eauto. i. des.
       exploit x0; eauto. i. des.
       inv SIM. ss.

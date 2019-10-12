@@ -26,12 +26,12 @@ Require Import Syntax.
 Require Import Semantics.
 
 Require Import PromiseConsistent.
+Require Import SimpleSimulation.
 
 Require Import PromotionDef.
 Require Import SimCommon.
 Require Import SimThreadPromotion.
 Require Import SimThreadOther.
-Require Import PSimulation.
 
 Set Implicit Arguments.
 
