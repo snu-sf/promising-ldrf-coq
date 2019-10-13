@@ -91,9 +91,9 @@ Module Promotion.
     inv SIM. exploit OTHER; eauto.
   Qed.
 
-  Theorem sim_conf_sim
-          p l r c_src c_tgt
-          (SIM: sim_conf p l r c_src c_tgt):
+  Lemma sim_conf_sim
+        p l r c_src c_tgt
+        (SIM: sim_conf p l r c_src c_tgt):
     sim c_src c_tgt.
   Proof.
     revert c_src c_tgt SIM.
@@ -434,9 +434,9 @@ Module Promotion.
   .
   Hint Constructors sim_conf_init.
 
-  Theorem init_sim_conf
-          p l r program_src program_tgt
-          (PROMOTE: promote_program p l r program_src program_tgt):
+  Lemma init_sim_conf
+        p l r program_src program_tgt
+        (PROMOTE: promote_program p l r program_src program_tgt):
     exists c_src,
       <<STEP: Configuration.step MachineEvent.silent p (Configuration.init program_src) c_src>> /\
       <<SIM: sim_conf p l r c_src (Configuration.init program_tgt)>>.
@@ -545,7 +545,7 @@ Module Promotion.
         * hexploit Thread.step_prev_None; eauto.
   Qed.
 
-  Theorem promotion_behavior
+  Theorem promote_behavior
           p l r program_src program_tgt
           (PROMOTE: promote_program p l r program_src program_tgt):
     behaviors Configuration.step (Configuration.init program_tgt) <1=

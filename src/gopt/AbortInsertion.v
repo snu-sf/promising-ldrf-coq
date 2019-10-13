@@ -20,6 +20,7 @@ Require Import TView.
 Require Import Local.
 Require Import Thread.
 Require Import Configuration.
+Require Import Behavior.
 
 Require Import Syntax.
 Require Import Semantics.
@@ -353,9 +354,9 @@ Section AbortInsertion.
     econs; eauto.
   Qed.
 
-  Theorem sim_conf_sim
-          c_src c_tgt
-          (SIM: sim_conf c_src c_tgt):
+  Lemma sim_conf_sim
+        c_src c_tgt
+        (SIM: sim_conf c_src c_tgt):
     sim c_src c_tgt.
   Proof.
     revert c_src c_tgt SIM.
@@ -692,9 +693,9 @@ Section AbortInsertion.
           sim_stmts tid syn_src syn_tgt)
   .
 
-  Theorem init_sim_conf
-          program_tgt
-          (INSERT: insert_abort program_tgt):
+  Lemma init_sim_conf
+        program_tgt
+        (INSERT: insert_abort program_tgt):
     sim_conf (Configuration.init program) (Configuration.init program_tgt).
   Proof.
     inv INSERT. econs; ss; i.
@@ -743,5 +744,18 @@ Section AbortInsertion.
       inv FIND_SRC0. inv FIND_TGT0. split; ss. Configuration.simplify2.
       unfold State.init. econs; ss.
       eapply THREADS; eauto.
+  Qed.
+
+  Theorem insert_abort_behavior
+          program_tgt
+          (INSERT: insert_abort program_tgt):
+    behaviors Configuration.step (Configuration.init program_tgt) <1=
+    behaviors Configuration.step (Configuration.init program).
+  Proof.
+    exploit init_sim_conf; eauto. i.
+    specialize (Configuration.init_wf program). intro WF_SRC.
+    specialize (Configuration.init_wf program_tgt). intro WF_TGT.
+    hexploit sim_conf_sim; eauto. i.
+    exploit sim_adequacy; try exact H; eauto.
   Qed.
 End AbortInsertion.
