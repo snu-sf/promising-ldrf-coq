@@ -64,8 +64,6 @@ Qed.
 
 Lemma future_fulfill_step
       lc1 sc1 sc1' loc from to val releasedm releasedm' released ord lc2 sc2
-      (* TODO: unnecessary premise *)
-      (ORD: Ordering.le ord Ordering.relaxed)
       (REL_LE: View.opt_le releasedm' releasedm)
       (STEP: fulfill_step lc1 sc1 loc from to val releasedm released ord lc2 sc2):
   fulfill_step lc1 sc1' loc from to val releasedm' released ord lc2 sc1'.
