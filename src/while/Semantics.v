@@ -33,7 +33,6 @@ Module RegFile.
   Definition eval_rmw (rf:t) (rmw:Instr.rmw) (val:Const.t): Const.t * option Const.t :=
     match rmw with
     | Instr.fetch_add addendum =>
-      (* TODO: update to return the original value? *)
       (Const.add val (eval_value rf addendum), Some (Const.add val (eval_value rf addendum)))
     | Instr.cas o n =>
       if Const.eq_dec (eval_value rf o) val
