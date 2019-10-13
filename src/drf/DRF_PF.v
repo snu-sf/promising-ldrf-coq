@@ -188,17 +188,6 @@ Section FORGETMEMORY.
                               end) l>>)
   .
 
-  Lemma list_map_ext2 A B (f g: A -> B) l
-        (EXT: forall a (IN: List.In a l),
-            f a = g a)
-    :
-      List.map f l = List.map g l.
-  Proof.
-    ginduction l; eauto. i; ss. f_equal.
-    - eapply EXT; eauto.
-    - eapply IHl; eauto.
-  Qed.
-
   Lemma list_filter_exists A (P: A -> Prop) (l: list A)
     :
       exists l',
@@ -288,10 +277,10 @@ Section FORGETMEMORY.
                 | Some (from1, msg1) => (from1, to0, msg1)
                 | None => (to0, Time.bot, Message.reserve)
                 end) l); cycle 1.
-      { eapply list_map_ext2. i.
+      { eapply List.map_ext_in. i.
         erewrite (@Cell.remove_o cell2); eauto.
         des_ifs. exfalso. inv SORTED.
-        eapply List.Forall_forall in IN; eauto.
+        eapply List.Forall_forall in H0; eauto.
         eapply Time.lt_strorder; eauto. }
       assert (COMPLETE2:
                 forall from0 to msg0,
@@ -533,8 +522,7 @@ Section FORGETMEMORY.
         (GET1: Memory.get loc to1 mem = Some (from1, msg1))
         (TO: Time.lt to0 to1)
     :
-      (<<FROMTO: Time.le to0 from1>>) \/
-      ((<<FROM0: from0 = Time.bot>>) /\ (<<FROM1: from1 = Time.bot>>) /\ (<<TO: to0 = Time.bot>>)).
+      Time.le to0 from1.
   Proof.
     exploit Memory.get_disjoint.
     - eapply GET0.
@@ -549,8 +537,8 @@ Section FORGETMEMORY.
           eapply TimeFacts.lt_le_lt; eauto. eapply Time.bot_spec.
         * exfalso. eapply Time.lt_strorder.
           eapply TimeFacts.lt_le_lt; eauto. eapply Time.bot_spec.
-        * left. apply Time.bot_spec.
-        * left. destruct (Time.le_lt_dec to0 from1); auto. exfalso.
+        * apply Time.bot_spec.
+        * destruct (Time.le_lt_dec to0 from1); auto. exfalso.
           eapply x0.
           { instantiate (1:=to0).
             econs; ss. refl. }

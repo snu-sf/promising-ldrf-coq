@@ -227,21 +227,20 @@ End CANCEL.
 
 Section CAP.
 
-  Definition caps (mem0 prom : Memory.t) (l : Loc.t) (t from : Time.t) (msg : Message.t) :=
-    forall mem1 (CAP: Memory.cap prom mem0 mem1),
-      (<<GET0: Memory.get l t mem0 = None>>) /\
-      (<<GET1: Memory.get l t mem1 = Some (from, msg)>>).
+  Definition caps (mem0 mem1 : Memory.t) (l : Loc.t) (t from : Time.t) (msg : Message.t) :=
+    (<<GET0: Memory.get l t mem0 = None>>) /\
+    (<<GET1: Memory.get l t mem1 = Some (from, msg)>>).
 
-  Definition caps_loc (mem0 prom : Memory.t) (l : Loc.t) (t : Time.t): Prop :=
-    exists from msg, (<<CAPS: caps mem0 prom l t from msg>>).
+  Definition caps_loc (mem0 mem1 : Memory.t) (l : Loc.t) (t : Time.t): Prop :=
+    exists from msg, (<<CAPS: caps mem0 mem1 l t from msg>>).
 
   Lemma caps_unchangable mem0 prom mem1
         (MLE: Memory.le prom mem0)
         (CAP: Memory.cap prom mem0 mem1)
     :
-      caps mem0 prom <4= unchangable mem1 prom.
+      caps mem0 mem1 <4= unchangable mem1 prom.
   Proof.
-    i. exploit PR; eauto. i. des. inv CAP.
+    i. unfold caps in PR. des. inv CAP.
     econs; eauto. ii. inv H.
     destruct msg. eapply MLE in GET. clarify.
   Qed.
@@ -251,11 +250,11 @@ Section CAP.
         (INHABITED: Memory.inhabited mem0)
         (MAX: Memory.max_full_timemap mem0 tm)
         (CAP: Memory.cap prom mem0 mem1)
-        (CAPS: caps mem0 prom l t from (Message.full val released))
+        (CAPS: caps mem0 mem1 l t from (Message.full val released))
     :
       from = Memory.max_ts l mem0.
   Proof.
-    exploit CAPS; eauto. i. des. inv CAP.
+    unfold caps in CAPS. des. inv CAP.
     exploit COMPLETE; eauto. i. des.
     destruct (classic (Memory.max_ts l mem0 = from)); eauto. exfalso.
     set (@cell_elements_least
@@ -269,7 +268,7 @@ Section CAP.
         - eapply x.
         - eapply GET2.
         - eauto.
-        - i. des; clarify. refl. }
+        - i. des; clarify. }
       destruct TLE.
       * exploit MIDDLE; eauto.
         econs.
@@ -305,7 +304,7 @@ Section CAP.
         (INHABITED: Memory.inhabited mem0)
         (MAX: Memory.max_full_timemap mem0 tm)
         (CAP: Memory.cap prom mem0 mem1)
-        (CAPS: caps mem0 prom l t from (Message.full val released))
+        (CAPS: caps mem0 mem1 l t from (Message.full val released))
     :
       (<<FROM: from = Memory.max_ts l mem0>>) /\
       (<<RESERVE: Memory.latest_reserve l prom mem0>>) /\
@@ -314,7 +313,7 @@ Section CAP.
       (<<TO: t = Time.incr (Memory.max_ts l mem0)>>).
   Proof.
     exploit caps_concrete_last; eauto. i. clarify.
-    exploit CAPS; eauto. i. des. inv CAP.
+    unfold caps in CAPS. des. inv CAP.
     exploit COMPLETE; eauto. i. des.
     exploit Memory.latest_val_exists; eauto. i. des.
     exploit BACK; eauto. i.
