@@ -89,24 +89,6 @@ Proof.
     apply WRITABLE.
 Qed.
 
-(* TODO: unused *)
-(* Lemma fulfill_step_promise_consistent *)
-(*       lc1 sc1 loc from to val releasedm released ord lc2 sc2 *)
-(*       (STEP: fulfill_step lc1 sc1 loc from to val releasedm released ord lc2 sc2) *)
-(*       (CONS: Local.promise_consistent lc2): *)
-(*   Local.promise_consistent lc1. *)
-(* Proof. *)
-(*   inv STEP. ii. *)
-(*   destruct (Memory.get loc0 ts promises2) as [[]|] eqn:X. *)
-(*   - dup X. revert X0. *)
-(*     erewrite Memory.remove_o; eauto. condtac; ss; i. *)
-(*     rewrite PROMISE in *. inv X0. *)
-(*     apply CONS in X. eapply TimeFacts.le_lt_lt; eauto. *)
-(*     s. etrans; [|apply Time.join_l]. refl. *)
-(*   - exploit fulfill_unset_promises; eauto. i. des. subst. *)
-(*     apply WRITABLE. *)
-(* Qed. *)
-
 Lemma fence_step_promise_consistent
       lc1 sc1 mem1 ordr ordw lc2 sc2
       (STEP: Local.fence_step lc1 sc1 ordr ordw lc2 sc2)

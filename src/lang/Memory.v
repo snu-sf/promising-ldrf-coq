@@ -96,7 +96,6 @@ Module Memory.
         exploit VOLUME; eauto. i. des; auto. inv x1. congr.
   Qed.
 
-  (* TODO: unused *)
   Lemma disjoint_get_general
         lhs rhs
         loc ts0 ts1 ts2 ts3 msgl msgr
@@ -2102,7 +2101,7 @@ Module Memory.
     hexploit remove_disjoint; try apply REMOVE; eauto.
   Qed.
 
-  Lemma bot_write_bot
+  Lemma write_promises_bot
         promises1 mem1 loc from to val released promises2 mem2 kind
         (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind)
         (PROMISES: promises1 = Memory.bot):
@@ -2247,7 +2246,6 @@ Module Memory.
     eapply Cell.remove_singleton.
   Qed.
 
-  (* TODO: unused *)
   Lemma add_inj
         mem loc to from msg mem1 mem2
         (REMOVE1: Memory.add mem loc from to msg mem1)
@@ -2258,7 +2256,6 @@ Module Memory.
     setoid_rewrite Memory.add_o; eauto.
   Qed.
 
-  (* TODO: unused *)
   Lemma split_inj
         mem loc to to' from msg1 msg2 mem1 mem2
         (REMOVE1: Memory.split mem loc from to to' msg1 msg2 mem1)
@@ -2269,7 +2266,6 @@ Module Memory.
     setoid_rewrite Memory.split_o; eauto.
   Qed.
 
-  (* TODO: unused *)
   Lemma lower_inj
         mem loc to from msg1 msg2 mem1 mem2
         (LOWER1: Memory.lower mem loc from to msg1 msg2 mem1)
@@ -2280,7 +2276,6 @@ Module Memory.
     setoid_rewrite Memory.lower_o; eauto.
   Qed.
 
-  (* TODO: unused *)
   Lemma remove_inj
         mem loc to from1 from2 msg1 msg2 mem1 mem2
         (REMOVE1: Memory.remove mem loc from1 to msg1 mem1)
@@ -2289,29 +2284,6 @@ Module Memory.
   Proof.
     apply Memory.ext. i.
     setoid_rewrite Memory.remove_o; eauto.
-  Qed.
-
-  (* TODO: unused *)
-  Lemma split_remove_eq
-        mem loc ts1 ts2 ts3
-        mem2 mem3 msg1 msg2
-        mem'2 mem'3 msg'1 msg'2
-        (SPLIT : Memory.split mem loc ts1 ts2 ts3 msg1 msg2 mem2)
-        (REMOVE: Memory.remove mem2 loc ts1 ts2 msg1 mem3)
-        (SPLIT' : Memory.split mem loc ts1 ts2 ts3 msg'1 msg'2 mem'2)
-        (REMOVE': Memory.remove mem'2 loc ts1 ts2 msg'1 mem'3):
-    mem3 = mem'3.
-  Proof.
-    apply Memory.ext. i.
-    setoid_rewrite Memory.remove_o; cycle 1; eauto.
-    condtac; eauto. guardH o.
-    setoid_rewrite Memory.split_o; cycle 1; eauto.
-    repeat condtac; subst; ss; eauto. guardH o0.
-    des. subst.
-
-    exploit Memory.split_get0; try exact SPLIT; eauto. i. des.
-    exploit Memory.split_get0; try exact SPLIT'; eauto. i. des.
-    rewrite GET0 in GET4. inv GET4. ss.
   Qed.
 
   Lemma remove_exists
@@ -2491,26 +2463,6 @@ Module Memory.
         get loc ts' mem = None.
   Proof.
     exploit Cell.next_exists; eauto.
-  Qed.
-
-  (* TODO: unused *)
-  Inductive prev (loc: Loc.t) (ts: Time.t) (mem: t) (from to: Time.t) (msg: Message.t): Prop :=
-  | prev_intro
-      (GET: get loc to mem = Some (from, msg))
-      (TO: Time.le to ts)
-      (EMPTY: forall ts' (TS1: Time.lt to ts') (TS2: Time.le ts' ts),
-          get loc ts' mem = None)
-  .
-
-  (* TODO: unused *)
-  Lemma prev_exists
-        loc ts mem
-        (INHABITED: inhabited mem):
-    exists from to msg,
-      prev loc ts mem from to msg.
-  Proof.
-    exploit Cell.prev_exists; eauto. i. des.
-    esplits; econs; eauto.
   Qed.
 
 

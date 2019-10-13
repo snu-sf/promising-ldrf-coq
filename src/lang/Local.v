@@ -650,15 +650,15 @@ Module Local.
   Qed.
 
 
-  Lemma bot_program_step_bot
+  Lemma program_step_promises_bot
         e lc1 sc1 mem1 lc2 sc2 mem2
         (STEP: program_step e lc1 sc1 mem1 lc2 sc2 mem2)
         (PROMISES: lc1.(promises) = Memory.bot):
     lc2.(promises) = Memory.bot.
   Proof.
     inv STEP; try inv LOCAL; ss.
-    - eapply Memory.bot_write_bot; eauto.
+    - eapply Memory.write_promises_bot; eauto.
     - inv LOCAL1. inv LOCAL2.
-      eapply Memory.bot_write_bot; eauto.
+      eapply Memory.write_promises_bot; eauto.
   Qed.
 End Local.
