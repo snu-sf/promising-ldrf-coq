@@ -30,6 +30,7 @@ Require Import ReorderLoad.
 Require Import ReorderStore.
 Require Import ReorderUpdate.
 Require Import ReorderFence.
+Require Import ReorderAbort.
 
 Require Import Syntax.
 Require Import Semantics.
@@ -53,6 +54,10 @@ Inductive reorder: forall (i1 i2:Instr.t), Prop :=
     or1 ow1 i2
     (REORDER: reorder_fence or1 ow1 i2):
     reorder (Instr.fence or1 ow1) i2
+| reorder_intro_abort
+    i2
+    (REORDER: reorder_abort i2):
+    reorder Instr.abort i2
 .
 
 Lemma reorder_sim_stmts
@@ -68,14 +73,15 @@ Proof.
   { right. esplits; eauto.
     inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   }
-  right.
   inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
     try (inv STATE; inv INSTR; inv REORDER); ss.
   - (* promise *)
+    right.
     exploit sim_local_promise; eauto. i. des.
     esplits; try apply SC; eauto; ss.
     econs 2. econs 1; eauto. econs; eauto. eauto.
   - (* load *)
+    right.
     exploit sim_local_read; eauto; try refl. i. des.
     esplits; try apply SC; eauto; ss.
     + econs 1.
@@ -84,6 +90,7 @@ Proof.
       econs; eauto.
       eapply Local.read_step_future; eauto.
   - (* update-load *)
+    right.
     exploit sim_local_read; eauto; try refl. i. des.
     esplits; try apply SC; eauto; ss.
     + econs 1.
@@ -92,6 +99,7 @@ Proof.
       econs; [eauto|..]; s; eauto.
       eapply Local.read_step_future; eauto.
   - (* store *)
+    right.
     exploit Local.write_step_future; eauto; try by viewtac. i. des.
     hexploit sim_local_write_bot; try exact LOCAL1; try exact SC;
       try exact WF_SRC; try refl; viewtac. i. des.
@@ -107,6 +115,7 @@ Proof.
     + left. eapply paco9_mon; [apply sim_store_sim_thread|done].
       econs; eauto.
   - (* update *)
+    right.
     exploit Local.read_step_future; eauto. i. des.
     exploit Local.write_step_future; eauto. i. des.
     exploit sim_local_read; eauto; try refl. i. des.
@@ -130,6 +139,7 @@ Proof.
       econs; [eauto|..]; s; eauto.
       etrans; eauto.
   - (* fence *)
+    right.
     exploit sim_local_fence; try apply SC; eauto; try refl. i. des.
     esplits.
     + ss.
@@ -140,6 +150,10 @@ Proof.
     + auto.
     + left. eapply paco9_mon; [apply sim_fence_sim_thread|]; ss.
       econs; eauto.
+  - (* abort *)
+    left.
+    eapply sim_abort_steps_failure. econs; eauto.
+    eapply sim_local_failure; eauto.
 Grab Existential Variables.
   { econs 2. }
   { econs. econs 3. }
