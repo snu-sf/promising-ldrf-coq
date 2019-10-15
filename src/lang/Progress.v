@@ -142,6 +142,20 @@ Proof.
   econs; i; eapply Memory.max_full_ts_spec2; eauto; apply WF1.
 Qed.
 
+Lemma progress_read_step_cur
+      lc1 mem1
+      loc ord
+      (WF1: Local.wf lc1 mem1)
+      (MEM1: Memory.closed mem1):
+  exists val released lc2,
+    <<READ: Local.read_step lc1 mem1 loc (lc1.(Local.tview).(TView.cur).(View.rlx) loc) val released ord lc2>>.
+Proof.
+  dup WF1. inv WF0. inv TVIEW_CLOSED. inv CUR.
+  specialize (RLX loc). des.
+  esplits. econs; eauto.
+  econs; try apply TVIEW_WF; try refl.
+Qed.
+
 Lemma progress_write_step
       lc1 sc1 mem1
       loc to val releasedm ord

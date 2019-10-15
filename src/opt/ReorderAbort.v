@@ -5,8 +5,10 @@ From sflib Require Import sflib.
 From Paco Require Import paco.
 
 From PromisingLib Require Import Basic.
-Require Import Event.
+From PromisingLib Require Import Loc.
 From PromisingLib Require Import Language.
+
+Require Import Event.
 Require Import Time.
 Require Import View.
 Require Import Cell.
@@ -15,6 +17,7 @@ Require Import TView.
 Require Import Local.
 Require Import Thread.
 Require Import Configuration.
+Require Import Progress.
 
 Require Import SimMemory.
 Require Import SimPromises.
@@ -126,6 +129,29 @@ Qed.
 (*   econs; eauto. *)
 (* Qed. *)
 
+Lemma read_step_cur_future
+      lc1 mem1 loc val released ord lc2
+      (WF1: Local.wf lc1 mem1)
+      (ORD: Ordering.le ord Ordering.relaxed)
+      (READ: Local.read_step lc1 mem1 loc (lc1.(Local.tview).(TView.cur).(View.rlx) loc) val released ord lc2):
+  <<PROMISES: lc1.(Local.promises) = lc2.(Local.promises)>> /\
+  <<TVIEW: lc1.(Local.tview).(TView.cur).(View.rlx) = lc2.(Local.tview).(TView.cur).(View.rlx)>>.
+Proof.
+  destruct lc1 as [tview1 promises1]. inv READ. ss.
+  esplits; eauto. condtac; ss; try by destruct ord.
+  apply TimeMap.antisym.
+  - etrans; [|apply TimeMap.join_l]. apply TimeMap.join_l.
+  - apply TimeMap.join_spec; auto using TimeMap.bot_spec.
+    apply TimeMap.join_spec; try refl.
+    unfold View.singleton_ur_if. condtac; ss.
+    + ii. unfold TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
+      condtac; try apply Time.bot_spec.
+      subst. refl.
+    + ii. unfold TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
+      condtac; try apply Time.bot_spec.
+      subst. refl.
+Qed.
+
 Lemma sim_abort_steps_failure
       st1_src lc1_src sc1_src mem1_src
       st1_tgt lc1_tgt sc1_tgt mem1_tgt
@@ -133,4 +159,20 @@ Lemma sim_abort_steps_failure
                       st1_tgt lc1_tgt sc1_tgt mem1_tgt):
   Thread.steps_failure (Thread.mk lang st1_src lc1_src sc1_src mem1_src).
 Proof.
+  inv SIM. inv REORDER.
+  - (* load *)
+    exploit progress_read_step_cur; try exact WF_SRC; eauto. i. des.
+    exploit read_step_cur_future; try exact READ; eauto. i. des.
+    unfold Thread.steps_failure. esplits.
+    + econs 2; try refl. econs.
+      * econs. econs 2. econs; [|econs 2]; eauto. econs. econs.
+      * ss.
+    + econs 2. econs.
+      * econs. econs.
+      * econs. econs. inv FAILURE. ii.
+        rewrite <- TVIEW. rewrite <- PROMISES in *. eauto.
+  - (* store *)
+    admit.
+  - (* fence *)
+    admit.
 Admitted.
