@@ -25,6 +25,15 @@ Require Import Thread.
 Set Implicit Arguments.
 
 
+Lemma loc_time_decidable: decidable_eq (Loc.t * Time.t).
+Proof.
+  ii. destruct x, y.
+  destruct (loc_ts_eq_dec (t, t0) (t1, t2)); ss.
+  - left. des. subst. ss.
+  - right. ii. inv H. des; ss.
+Qed.
+
+
 Module LowerPromises.
   Inductive message_rel: forall (msg1 msg2: Message.t), Prop :=
   | message_rel_full
@@ -73,14 +82,28 @@ Module LowerPromises.
   Proof.
   Admitted.
 
-  Lemma promises_rel_aux_promises_rel
+  Lemma promises_rel_aux_nil
         promises1 promises2
         (REL: promises_rel_aux [] promises1 promises2):
     promises_rel promises1 promises2.
   Proof.
   Admitted.
 
-  Lemma promises_rel_promises
+  Lemma promises_rel_trans
+        dom promises1 promises2 promises3
+        (REL1: promises_rel_aux dom promises1 promises2)
+        (REL2: promises_rel promises2 promises3):
+    promises_rel promises1 promises3.
+  Proof.
+    inv REL1. inv REL2. econs; i.
+    - exploit SOUND; eauto. i. des; eauto.
+    - exploit COMPLETE; eauto. i. des.
+      destruct (In_decidable loc_time_decidable (loc, to) dom); eauto.
+      exploit COMPLETE2; eauto. i. des.
+      inv MSG; inv MSG0; eauto.
+  Qed.
+
+  Lemma promises_rel_nonsynch
         promises1 promises2
         (REL: promises_rel promises1 promises2):
     Memory.nonsynch promises2.
@@ -89,22 +112,13 @@ Module LowerPromises.
     exploit COMPLETE; eauto. i. des. inv MSG; ss.
   Qed.
 
-
-  Lemma loc_time_decidable: decidable_eq (Loc.t * Time.t).
-  Proof.
-    ii. destruct x, y.
-    destruct (loc_ts_eq_dec (t, t0) (t1, t2)); ss.
-    - left. des. subst. ss.
-    - right. ii. inv H. des; ss.
-  Qed.
-
   Lemma promises_rel_aux_lower
         promises1 loc to dom
         (REL: promises_rel_aux ((loc, to)::dom) promises1 promises1):
     <<REL1: promises_rel_aux dom promises1 promises1>> \/
     exists promises2 from val released,
       <<LOWER: Memory.lower promises1 loc from to (Message.full val released) (Message.full val None) promises2>> /\
-      <<REL: promises_rel_aux dom promises2 promises2>> /\
+      <<REL: promises_rel_aux dom promises1 promises2>> /\
       <<REL2: promises_rel_aux dom promises2 promises2>>.
   Proof.
   Admitted.
@@ -112,17 +126,42 @@ Module LowerPromises.
   Lemma steps_promises_rel
         lang e1
         (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+        (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
         (CLOSED1: Memory.closed e1.(Thread.memory)):
     exists e2,
       <<STEPS: rtc (union (@Thread.opt_promise_step lang)) e1 e2>> /\
       <<REL: promises_rel e1.(Thread.local).(Local.promises) e2.(Thread.local).(Local.promises)>>.
   Proof.
     exploit promises_rel_aux_exists; try eapply WF1. i. des.
-    revert e1 WF1 CLOSED1 x0.
+    revert e1 WF1 SC1 CLOSED1 x0.
     induction dom; i.
-    { esplits; eauto. apply promises_rel_aux_promises_rel; ss. }
+    { esplits; eauto. apply promises_rel_aux_nil; ss. }
     destruct a as [loc to].
-  Admitted.
+    exploit promises_rel_aux_lower; try exact x0. i. des; eauto.
+    exploit Memory.lower_exists_le; try eapply WF1; eauto. i. des.
+    cut (exists pf e e2,
+            <<STEP: Thread.promise_step pf e e1 e2>> /\
+            <<REL: promises_rel_aux dom e1.(Thread.local).(Local.promises) e2.(Thread.local).(Local.promises)>> /\
+            <<REL: promises_rel_aux dom e2.(Thread.local).(Local.promises) e2.(Thread.local).(Local.promises)>>).
+    { i. des.
+      exploit Thread.step_future; eauto.
+      { econs; eauto. }
+      i. des.
+      exploit IHdom; eauto. i. des.
+      esplits.
+      - econs 2; try exact STEPS. econs. econs. eauto.
+      - eapply promises_rel_trans; eauto.
+    }
+    destruct e1. ss.
+    esplits.
+    - econs; eauto. econs.
+      + econs 3; eauto. econs. ss.
+        unfold TimeMap.bot. apply Time.bot_spec.
+      + econs. ss.
+      + eauto.
+    - ss.
+    - ss.
+  Qed.
 
   Lemma rtc_opt_promise_step_future
         lang e1 e2
