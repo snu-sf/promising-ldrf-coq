@@ -1,5 +1,6 @@
 Require Import Omega.
 Require Import RelationClasses.
+Require Import Coq.Lists.ListDec Decidable.
 
 From sflib Require Import sflib.
 From Paco Require Import paco.
@@ -89,6 +90,25 @@ Module LowerPromises.
   Qed.
 
 
+  Lemma loc_time_decidable: decidable_eq (Loc.t * Time.t).
+  Proof.
+    ii. destruct x, y.
+    destruct (loc_ts_eq_dec (t, t0) (t1, t2)); ss.
+    - left. des. subst. ss.
+    - right. ii. inv H. des; ss.
+  Qed.
+
+  Lemma promises_rel_aux_lower
+        promises1 loc to dom
+        (REL: promises_rel_aux ((loc, to)::dom) promises1 promises1):
+    <<REL1: promises_rel_aux dom promises1 promises1>> \/
+    exists promises2 from val released,
+      <<LOWER: Memory.lower promises1 loc from to (Message.full val released) (Message.full val None) promises2>> /\
+      <<REL: promises_rel_aux dom promises2 promises2>> /\
+      <<REL2: promises_rel_aux dom promises2 promises2>>.
+  Proof.
+  Admitted.
+
   Lemma steps_promises_rel
         lang e1
         (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
@@ -101,6 +121,7 @@ Module LowerPromises.
     revert e1 WF1 CLOSED1 x0.
     induction dom; i.
     { esplits; eauto. apply promises_rel_aux_promises_rel; ss. }
+    destruct a as [loc to].
   Admitted.
 
   Lemma rtc_opt_promise_step_future
