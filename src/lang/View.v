@@ -1,5 +1,6 @@
 Require Import Omega.
 Require Import RelationClasses.
+Require Import Coq.Lists.ListDec Decidable.
 
 From sflib Require Import sflib.
 From Paco Require Import paco.
@@ -16,6 +17,11 @@ Require Import Time.
 Set Implicit Arguments.
 
 
+Lemma time_decidable: decidable_eq Time.t.
+Proof.
+  ii. destruct (Time.eq_dec x y); [left|right]; eauto.
+Qed.
+
 Definition loc_ts_eq_dec (lhs rhs:Loc.t * Time.t):
   {lhs.(fst) = rhs.(fst) /\ lhs.(snd) = rhs.(snd)} +
   {lhs.(fst) <> rhs.(fst) \/ lhs.(snd) <> rhs.(snd)}.
@@ -24,6 +30,15 @@ Proof.
   destruct (Loc.eq_dec t t1), (Time.eq_dec t0 t2); subst; auto.
 Defined.
 Global Opaque loc_ts_eq_dec.
+
+Lemma loc_time_decidable: decidable_eq (Loc.t * Time.t).
+Proof.
+  ii. destruct x, y.
+  destruct (loc_ts_eq_dec (t, t0) (t1, t2)); ss.
+  - left. des. subst. ss.
+  - right. ii. inv H. des; ss.
+Qed.
+
 
 Module TimeMap <: JoinableType.
   Definition t := Loc.t -> Time.t.

@@ -1269,11 +1269,6 @@ Module PFCertify.
     - exists None. eauto.
   Qed.
 
-  Lemma time_decidable: decidable_eq Time.t.
-  Proof.
-    ii. destruct (Time.eq_dec x y); [left|right]; eauto.
-  Qed.
-
   Lemma sim_cell_exists
         promises mem1_src mem1_tgt mem2_tgt latests
         (SIM: PFStep.sim_memory promises mem1_src mem1_tgt)

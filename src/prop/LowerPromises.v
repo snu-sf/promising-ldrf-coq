@@ -25,15 +25,6 @@ Require Import Thread.
 Set Implicit Arguments.
 
 
-Lemma loc_time_decidable: decidable_eq (Loc.t * Time.t).
-Proof.
-  ii. destruct x, y.
-  destruct (loc_ts_eq_dec (t, t0) (t1, t2)); ss.
-  - left. des. subst. ss.
-  - right. ii. inv H. des; ss.
-Qed.
-
-
 Module LowerPromises.
   Inductive message_rel: forall (msg1 msg2: Message.t), Prop :=
   | message_rel_full

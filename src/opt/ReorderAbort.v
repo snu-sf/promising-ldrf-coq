@@ -28,8 +28,6 @@ Require Import SimLocal.
 Require Import Compatibility.
 Require Import SimThread.
 
-Require Import ReorderStep.
-
 Require Import Syntax.
 Require Import Semantics.
 
@@ -45,12 +43,6 @@ Inductive reorder_abort: forall (i2:Instr.t), Prop :=
     l2 v2 o2
     (ORD: Ordering.le o2 Ordering.acqrel):
     reorder_abort (Instr.store l2 v2 o2)
-(* TODO: update should be handeled as global *)
-(* | reorder_abort_update *)
-(*     r2 l2 rmw2 or2 ow2 *)
-(*     (ORDR2: Ordering.le or2 Ordering.relaxed) *)
-(*     (ORDW2: Ordering.le ow2 Ordering.acqrel): *)
-(*     reorder_abort (Instr.update r2 l2 rmw2 or2 ow2) *)
 | reorder_abort_fence
     or2 ow2
     (ORDR2: Ordering.le or2 Ordering.relaxed)
