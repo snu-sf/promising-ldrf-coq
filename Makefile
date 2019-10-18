@@ -39,4 +39,4 @@ Makefile.coq: Makefile $(COQTHEORIES)
 
 clean:
 	$(MAKE) -f Makefile.coq clean
-	rm -f _CoqProject Makefile.coq
+	rm -f _CoqProject Makefile.coq Makefile.coq.conf
