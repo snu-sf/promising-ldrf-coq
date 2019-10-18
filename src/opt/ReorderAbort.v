@@ -147,23 +147,22 @@ Lemma sim_abort_steps_failure
                       st1_tgt lc1_tgt sc1_tgt mem1_tgt):
   Thread.steps_failure (Thread.mk lang st1_src lc1_src sc1_src mem1_src).
 Proof.
-  inv SIM. inv REORDER.
+  inv SIM. inv FAILURE. unfold Thread.steps_failure.
+  inv REORDER.
   - (* load *)
     exploit progress_read_step_cur; try exact WF_SRC; eauto. i. des.
     exploit read_step_cur_future; try exact READ; eauto. i. des.
-    unfold Thread.steps_failure. esplits.
+    esplits.
     + econs 2; try refl. econs.
       * econs. econs 2. econs; [|econs 2]; eauto. econs. econs.
       * ss.
     + econs 2. econs.
       * econs. econs.
-      * econs. econs. inv FAILURE. ii.
+      * econs. econs. ii.
         rewrite <- TVIEW. rewrite <- PROMISES in *. eauto.
   - (* store *)
     admit.
   - (* fence *)
-    inv FAILURE.
-    unfold Thread.steps_failure.
     exploit (@LowerPromises.steps_promises_rel
                lang (Thread.mk lang (State.mk rs [Stmt.instr (Instr.fence or2 ow2); Stmt.instr Instr.abort])
                                lc1_src sc1_src mem1_src)); s; eauto.

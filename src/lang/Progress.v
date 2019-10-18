@@ -181,6 +181,72 @@ Proof.
   apply Memory.max_ts_spec2. apply WF1.
 Qed.
 
+Lemma progress_write_step_split
+      lc1 sc1 mem1
+      loc from to msg val releasedm ord
+      (GET: Memory.get loc to lc1.(Local.promises) = Some (from, msg))
+      (CONS: Time.lt (lc1.(Local.tview).(TView.cur).(View.rlx) loc) to)
+      (WF1: Local.wf lc1 mem1)
+      (SC1: Memory.closed_timemap sc1 mem1)
+      (MEM1: Memory.closed mem1)
+      (WF_REL: View.opt_wf releasedm)
+      (TS_REL: Time.le (releasedm.(View.unwrap).(View.rlx) loc) from)
+      (CLOSED_REL: Memory.closed_opt_view releasedm mem1)
+      (PROMISES1: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc lc1.(Local.promises)):
+  exists released lc2 sc2 mem2,
+    Local.write_step lc1 sc1 mem1 loc from (Time.middle from to) val releasedm
+                     released ord lc2 sc2 mem2 (Memory.op_kind_split to msg).
+Proof.
+  exploit Memory.get_ts; try exact GET. i. des.
+  { subst. inv WF1. rewrite BOT in GET. ss. }
+  exploit (@Memory.split_exists
+             lc1.(Local.promises) loc from (Time.middle from to) to
+             (Message.full val (TView.write_released (Local.tview lc1) sc1 loc (Time.middle from to) releasedm ord))
+             msg);
+    try apply Time.middle_spec; auto.
+  { econs. eapply TViewFacts.write_future0; eauto. apply WF1. }
+  i. des.
+  exploit Memory.split_exists_le; try apply WF1; eauto. i. des.
+  exploit Memory.split_get0; try exact x1. i. des.
+  exploit Memory.remove_exists; try exact GET2. i. des.
+  clear GET0 GET1 GET2 GET3.
+  assert (TS: Time.le (lc1.(Local.tview).(TView.cur).(View.rlx) loc) from).
+  { destruct (TimeFacts.le_lt_dec (lc1.(Local.tview).(TView.cur).(View.rlx) loc) from); ss.
+    inv WF1. inv TVIEW_CLOSED. inv CUR.
+    specialize (RLX loc). des.
+    clear REL ACQ PLN.
+    exploit PROMISES; try exact GET. i.
+    exploit Memory.get_ts; try exact RLX. i. des.
+    { subst. rewrite x4 in l. inv l. }
+    exploit Memory.get_disjoint; [exact RLX|exact x|..]. i. des.
+    { subst. timetac. }
+    exfalso.
+    eapply x6; econs; [|refl|..]; ss. econs. ss.
+  }
+  esplits. econs; eauto.
+  - econs; ss.
+    eapply TimeFacts.le_lt_lt; eauto.
+    apply Time.middle_spec. ss.
+  - econs; eauto. econs; eauto.
+    econs. unfold TView.write_released. ss.
+    condtac; ss; try by unfold TimeMap.bot; apply Time.bot_spec.
+    unfold LocFun.add. condtac; ss.
+    unfold TimeMap.join. condtac; ss.
+    + unfold TimeMap.join, TimeMap.singleton.
+      unfold LocFun.add, LocFun.init, LocFun.find.
+      condtac; ss.
+      repeat apply Time.join_spec; ss; try refl.
+      * etrans; eauto. econs. apply Time.middle_spec; ss.
+      * etrans; eauto. econs. apply Time.middle_spec; ss.
+    + unfold TimeMap.join, TimeMap.singleton.
+      unfold LocFun.add, LocFun.init, LocFun.find.
+      condtac; ss.
+      repeat apply Time.join_spec; ss; try refl.
+      * etrans; eauto. econs. apply Time.middle_spec; ss.
+      * inv WF1. inv TVIEW_WF. etrans; try eapply REL_CUR.
+        etrans; eauto. econs. apply Time.middle_spec; ss.
+Qed.
+
 Lemma progress_fence_step
       lc1 sc1
       ordr ordw
