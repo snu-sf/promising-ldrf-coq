@@ -19,6 +19,8 @@ Require Import Thread.
 Require Import Configuration.
 Require Import Progress.
 
+Require Import LowerPromises.
+
 Require Import SimMemory.
 Require Import SimPromises.
 Require Import SimLocal.
@@ -42,7 +44,7 @@ Inductive reorder_abort: forall (i2:Instr.t), Prop :=
     l2 v2 o2
     (ORD: Ordering.le o2 Ordering.acqrel):
     reorder_abort (Instr.store l2 v2 o2)
-(* update should be handeled as global *)
+(* TODO: update should be handeled as global *)
 (* | reorder_abort_update *)
 (*     r2 l2 rmw2 or2 ow2 *)
 (*     (ORDR2: Ordering.le or2 Ordering.relaxed) *)
@@ -125,6 +127,19 @@ Proof.
       subst. refl.
 Qed.
 
+Lemma fence_step_future
+      lc1 sc1 ordr ordw lc2 sc2
+      (ORDR: Ordering.le ordr Ordering.relaxed)
+      (ORDW: Ordering.le ordw Ordering.acqrel)
+      (FENCE: Local.fence_step lc1 sc1 ordr ordw lc2 sc2):
+  <<PROMISES: lc1.(Local.promises) = lc2.(Local.promises)>> /\
+  <<TVIEW: lc1.(Local.tview).(TView.cur) = lc2.(Local.tview).(TView.cur)>>.
+Proof.
+  destruct lc1 as [tview1 promises1]. inv FENCE. split; ss.
+  condtac; try by destruct ordw.
+  condtac; try by destruct ordr.
+Qed.
+
 Lemma sim_abort_steps_failure
       st1_src lc1_src sc1_src mem1_src
       st1_tgt lc1_tgt sc1_tgt mem1_tgt
@@ -147,5 +162,21 @@ Proof.
   - (* store *)
     admit.
   - (* fence *)
-    admit.
+    inv FAILURE.
+    unfold Thread.steps_failure.
+    exploit (@LowerPromises.steps_promises_rel
+               lang (Thread.mk lang (State.mk rs [Stmt.instr (Instr.fence or2 ow2); Stmt.instr Instr.abort])
+                               lc1_src sc1_src mem1_src)); s; eauto.
+    i. des. destruct e2, state. ss.
+    exploit LowerPromises.rtc_opt_promise_step_future; eauto. s. i. des. inv STATE.
+    hexploit LowerPromises.promises_rel_promise_consistent; eauto. i.
+    hexploit LowerPromises.promises_rel_nonsynch; eauto. i.
+    exploit progress_fence_step; eauto. i. des.
+    esplits.
+    + eapply rtc_n1; eauto. econs.
+      * econs. econs 2. econs; [|econs 5; eauto]. econs. econs.
+      * ss.
+    + econs 2. econs; [econs; econs|]. econs. econs.
+      exploit fence_step_future; eauto. i. des.
+      ii. rewrite <- PROMISES in *. rewrite <- TVIEW0. eauto.
 Admitted.
