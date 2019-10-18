@@ -80,14 +80,17 @@ Module LowerPromises.
         (FINITE: Memory.finite promises):
     exists dom, promises_rel_aux dom promises promises.
   Proof.
-  Admitted.
+    inv FINITE. exists x. econs; i; eauto.
+    exploit H; eauto. ss.
+  Qed.
 
   Lemma promises_rel_aux_nil
         promises1 promises2
         (REL: promises_rel_aux [] promises1 promises2):
     promises_rel promises1 promises2.
   Proof.
-  Admitted.
+    inv REL. econs; i; eauto.
+  Qed.
 
   Lemma promises_rel_trans
         dom promises1 promises2 promises3
@@ -114,6 +117,7 @@ Module LowerPromises.
 
   Lemma promises_rel_aux_lower
         promises1 loc to dom
+        (BOT: Memory.bot_none promises1)
         (REL: promises_rel_aux ((loc, to)::dom) promises1 promises1):
     <<REL1: promises_rel_aux dom promises1 promises1>> \/
     exists promises2 from val released,
@@ -121,7 +125,54 @@ Module LowerPromises.
       <<REL: promises_rel_aux dom promises1 promises2>> /\
       <<REL2: promises_rel_aux dom promises2 promises2>>.
   Proof.
-  Admitted.
+    inv REL.
+    destruct (Memory.get loc to promises1) as [[from msg1]|] eqn:GET1; cycle 1.
+    { left. econs; i; eauto.
+      exploit COMPLETE2; eauto. ii. inv H; ss.
+      inv H0. congr.
+    }
+    destruct (In_decidable loc_time_decidable (loc, to) dom).
+    { left. econs; i; eauto.
+      exploit COMPLETE2; eauto. ii. inv H0; ss.
+      inv H1. ss.
+    }
+    destruct msg1 as [val released|]; cycle 1.
+    { left. econs; i; eauto.
+      destruct (loc_ts_eq_dec (loc, to) (loc0, to0)).
+      - ss. des. subst.
+        rewrite GET1 in *. inv GET2.
+        esplits; eauto.
+      - ss. exploit COMPLETE2; eauto. ii. inv H0; ss.
+        inv H1. des; ss.
+    }
+    right.
+    exploit (@Memory.lower_exists promises1 loc from to (Message.full val released)
+                                  (Message.full val None)); eauto.
+    { exploit Memory.get_ts; eauto. i. des; ss.
+      subst. rewrite BOT in GET1. ss. }
+    { econs. ss. }
+    i. des.
+    esplits; eauto.
+    - econs; i.
+      + erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+        des. subst. rewrite GET1 in *. inv GET0. eauto.
+      + revert GET2.
+        erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+        des. subst. congr.
+      + revert GET2.
+        erewrite Memory.lower_o; eauto. condtac; ss; i.
+        * des. subst. inv GET2. esplits; eauto.
+        * guardH o.
+          exploit COMPLETE2; eauto. ii. des; ss.
+          inv H0. unguard. des; ss.
+    - econs; i; eauto.
+      revert GET2.
+      erewrite Memory.lower_o; eauto. condtac; ss; i.
+      + des. subst. inv GET2. esplits; eauto.
+      + guardH o.
+        exploit COMPLETE2; eauto. ii. inv H0; ss.
+        inv H1. unguard. des; ss.
+  Qed.
 
   Lemma steps_promises_rel
         lang e1
@@ -137,7 +188,7 @@ Module LowerPromises.
     induction dom; i.
     { esplits; eauto. apply promises_rel_aux_nil; ss. }
     destruct a as [loc to].
-    exploit promises_rel_aux_lower; try exact x0. i. des; eauto.
+    exploit promises_rel_aux_lower; try exact x0; try apply WF1. i. des; eauto.
     exploit Memory.lower_exists_le; try eapply WF1; eauto. i. des.
     cut (exists pf e e2,
             <<STEP: Thread.promise_step pf e e1 e2>> /\
@@ -177,5 +228,17 @@ Module LowerPromises.
       inv STEP. ss.
     - rewrite <- STATE. inv STEP. ss.
     - rewrite <- TVIEW. inv STEP. inv LOCAL. ss.
+  Qed.
+
+  Lemma promises_rel_promise_consistent
+        lc1 lc2
+        (TVIEW: lc1.(Local.tview) = lc2.(Local.tview))
+        (REL: promises_rel lc1.(Local.promises) lc2.(Local.promises))
+        (CONS: Local.promise_consistent lc1):
+    Local.promise_consistent lc2.
+  Proof.
+    inv REL. ii. rewrite <- TVIEW.
+    exploit COMPLETE; eauto. i. des. inv MSG.
+    eapply CONS; eauto.
   Qed.
 End LowerPromises.
