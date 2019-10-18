@@ -2980,8 +2980,8 @@ Module Memory.
     Cell.min_full_ts (mem loc) ts.
 
   Lemma min_full_ts_exists
-        mem loc
-        (INHABITED: inhabited mem):
+        mem loc from to val released
+        (INHABITED: get loc to mem = Some (from, Message.full val released)):
     exists ts, min_full_ts mem loc ts.
   Proof.
     eapply Cell.min_full_ts_exists. apply INHABITED.

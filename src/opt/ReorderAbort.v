@@ -4,6 +4,7 @@ Require Import List.
 From sflib Require Import sflib.
 From Paco Require Import paco.
 
+From PromisingLib Require Import Axioms.
 From PromisingLib Require Import Basic.
 From PromisingLib Require Import Loc.
 From PromisingLib Require Import Language.
@@ -140,6 +141,76 @@ Proof.
   condtac; try by destruct ordr.
 Qed.
 
+Lemma write_step_consistent
+      lc1 sc1 mem1
+      loc val ord
+      (WF1: Local.wf lc1 mem1)
+      (SC1: Memory.closed_timemap sc1 mem1)
+      (MEM1: Memory.closed mem1)
+      (PROMISES1: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc lc1.(Local.promises))
+      (CONS1: Local.promise_consistent lc1):
+  exists from to released lc2 sc2 mem2 kind,
+    <<STEP: Local.write_step lc1 sc1 mem1 loc from to val None released ord lc2 sc2 mem2 kind>> /\
+    <<CONS2: Local.promise_consistent lc2>>.
+Proof.
+  destruct (classic (exists f t v r, Memory.get loc t lc1.(Local.promises) =
+                                Some (f, Message.full v r))).
+  { des.
+    exploit Memory.min_full_ts_exists; eauto. i. des.
+    exploit Memory.min_full_ts_spec; eauto. i. des.
+    exploit Memory.get_ts; try exact GET. i. des.
+    { subst. inv WF1. rewrite BOT in *. ss. }
+    clear f t v r H MIN.
+    exploit progress_write_step_split; try exact GET; eauto.
+    { ss. unfold TimeMap.bot. apply Time.bot_spec. }
+    i. des.
+    esplits; eauto. ii.
+    assert (TS: loc0 = loc -> Time.le ts ts0).
+    { i. subst. inv x2. inv WRITE. inv PROMISE0. ss.
+      revert PROMISE.
+      erewrite Memory.remove_o; eauto. condtac; ss. des; ss.
+      erewrite Memory.split_o; eauto. repeat condtac; ss; i.
+      - des; ss. subst. refl.
+      - des; ss.
+        exploit Memory.min_full_ts_spec; eauto. i. des. ss. }
+    inv x2. inv WRITE. inv PROMISE0. ss.
+    clear RESERVE.
+    unfold TimeMap.join, TimeMap.singleton.
+    unfold LocFun.add, LocFun.init, LocFun.find.
+    condtac; ss.
+    - subst. apply TimeFacts.join_spec_lt.
+      + eapply TimeFacts.lt_le_lt; try eapply TS; eauto.
+      + eapply TimeFacts.lt_le_lt; try eapply TS; eauto.
+        apply Time.middle_spec. ss.
+    - revert PROMISE.
+      erewrite Memory.remove_o; eauto. condtac; ss.
+      erewrite Memory.split_o; eauto. repeat condtac; ss; try by des; ss.
+      guardH o. guardH o0. guardH o1. i.
+      apply TimeFacts.join_spec_lt; eauto.
+      destruct (TimeFacts.le_lt_dec ts0 Time.bot); ss.
+      inv l; inv H.
+      inv WF1. rewrite BOT in *. ss.
+  }
+  { exploit progress_write_step; eauto.
+    { apply Time.incr_spec. }
+    i. des.
+    esplits; eauto. ii.
+    inv x0. inv WRITE. inv PROMISE0. ss.
+    revert PROMISE.
+    erewrite Memory.remove_o; eauto. condtac; ss.
+    erewrite Memory.add_o; eauto. condtac; ss. i.
+    destruct (Loc.eq_dec loc0 loc).
+    - subst. exfalso. apply H; eauto.
+    - unfold TimeMap.join, TimeMap.singleton.
+      unfold LocFun.add, LocFun.init, LocFun.find.
+      condtac; ss.
+      apply TimeFacts.join_spec_lt; eauto.
+      destruct (TimeFacts.le_lt_dec ts Time.bot); ss.
+      inv l; inv H0.
+      inv WF1. rewrite BOT in *. ss.
+  }
+Qed.
+
 Lemma sim_abort_steps_failure
       st1_src lc1_src sc1_src mem1_src
       st1_tgt lc1_tgt sc1_tgt mem1_tgt
@@ -161,7 +232,20 @@ Proof.
       * econs. econs. ii.
         rewrite <- TVIEW. rewrite <- PROMISES in *. eauto.
   - (* store *)
-    admit.
+    exploit (@LowerPromises.steps_promises_rel
+               lang (Thread.mk lang (State.mk rs [Stmt.instr (Instr.store l2 v2 o2); Stmt.instr Instr.abort])
+                               lc1_src sc1_src mem1_src)); s; eauto.
+    i. des. destruct e2, state. ss.
+    exploit LowerPromises.rtc_opt_promise_step_future; eauto. s. i. des. inv STATE.
+    hexploit LowerPromises.promises_rel_promise_consistent; eauto. i.
+    hexploit LowerPromises.promises_rel_nonsynch; eauto. i.
+    exploit Thread.rtc_tau_step_future; try exact STEPS0; eauto. s. i. des.
+    exploit write_step_consistent; try exact WF2; eauto. i. des.
+    esplits.
+    + eapply rtc_n1; eauto. econs.
+      * econs. econs 2. econs; [|econs 3; eauto]. econs. econs.
+      * ss.
+    + econs 2. econs; [econs; econs|]. econs. econs. ss.
   - (* fence *)
     exploit (@LowerPromises.steps_promises_rel
                lang (Thread.mk lang (State.mk rs [Stmt.instr (Instr.fence or2 ow2); Stmt.instr Instr.abort])
@@ -178,4 +262,4 @@ Proof.
     + econs 2. econs; [econs; econs|]. econs. econs.
       exploit fence_step_future; eauto. i. des.
       ii. rewrite <- PROMISES in *. rewrite <- TVIEW0. eauto.
-Admitted.
+Qed.
