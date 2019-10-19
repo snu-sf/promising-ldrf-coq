@@ -214,10 +214,9 @@ Inductive other_collapsing (L: Loc.t -> Prop)
   :
     other_collapsing L mem loc max t
 | other_collapsing_outer_memory
-    loc t max
+    loc t
     (SAT: L loc)
-    (MAX: max = Memory.max_ts loc mem)
-    (TLE: Time.lt max t)
+    (TLE: Time.lt (Time.incr (Memory.max_ts loc mem)) t)
   :
     other_collapsing L mem loc t t
 .
@@ -811,7 +810,33 @@ Proof.
       * econs 1; eauto.
 Qed.
 
-
+Inductive self_collapsing (L: Loc.t -> Prop)
+          (mem: Memory.t): Loc.t -> Time.t -> Time.t -> Prop :=
+| self_collapsing_not_in
+    loc t
+    (NSAT: ~ L loc)
+  :
+    self_collapsing L mem loc t t
+| self_collapsing_in_memory
+    loc t
+    (SAT: L loc)
+    (TLE: Time.le t (Memory.max_ts loc mem))
+  :
+    self_collapsing L mem loc t t
+| self_collapsing_cap
+    loc t max
+    (SAT: L loc)
+    (FULL: max = Memory.max_ts loc mem)
+    (CAP: t = Time.incr (Memory.max_ts loc mem))
+  :
+    self_collapsing L mem loc max t
+| self_collapsing_outer_memory
+    loc t
+    (SAT: L loc)
+    (TLE: Time.lt (Time.incr (Memory.max_ts loc mem)) t)
+  :
+    self_collapsing L mem loc t t
+.
 
 Lemma other_collapsing_memory
       mem0 mem1 mem2 prom (L: Loc.t -> Prop)
@@ -829,6 +854,390 @@ Proof.
   dup CLOSED. inv CLOSED0. econs.
   - i. destruct (classic (L loc)).
     + dup GET. eapply forget_memory_get in GET0; eauto. des.
+Admitted.
+
+(* Inductive diff_after_promises (caps: Loc.t -> option (Time.t * Time.t * Message.t)) *)
+(*           (prom mem0 mem1: Memory.t): Prop := *)
+(* | diff_after_promises_intro *)
+(*     (MLE: Memory.le mem0 mem1) *)
+(*     (DIFF: forall loc to from msg *)
+(*                   (GET: Memory.get loc to mem1 = Some (from, msg)) *)
+(*                   (NONE: Memory.get loc to mem0 = None), *)
+(*         caps loc = Some (from, to, msg)) *)
+(*     (CAPS: forall loc to from msg *)
+(*                   (CAPS: caps loc = Some (from, to, msg)), *)
+(*         exists  *)
+(*           (<<PROMNONE: Memory.get prom loc to = None>>) /\ *)
+(*           (<<GETTGT: Memory.get mem1 loc to = Some (from, msg)>>) /\ *)
+(*           (<<GETPROM:  *)
+
+(*     ) *)
+(* . *)
+
+
+Inductive diff_after_promises (caps: Loc.t -> option (Time.t * Time.t * Message.t))
+          (prom mem0 mem1: Memory.t): Prop :=
+| diff_after_promises_intro
+    (MLE: Memory.le mem0 mem1)
+    (DIFF: forall loc to from msg
+                  (GET: Memory.get loc to mem1 = Some (from, msg))
+                  (NONE: Memory.get loc to mem0 = None),
+        (<<CAP: caps loc = Some (from, to, msg)>>) /\
+        (exists from' to' val released,
+            (<<PROM: Memory.get loc to' prom = Some (from', Message.full val released)>>) /\
+            (<<TLE: Time.le to' from>>)))
+.
+
+
+Inductive add_cap (caps: Loc.t -> option (Time.t * Time.t * Message.t)): Memory.t -> Memory.t -> Prop :=
+| add_cap_refl mem0
+  :
+    add_cap caps mem0 mem0
+| add_cap_add
+    loc from to msg mem0 mem1
+    (CAP: caps loc = Some (from, to, msg))
+    (ADD: Memory.add mem0 loc from to msg mem1)
+  :
+    add_cap caps mem0 mem1
+.
+Hint Constructors add_cap.
+
+Lemma memory_op_le mem_src0 mem_tgt0 loc from to msg mem_src1 mem_tgt1 kind
+      (MLE: Memory.le mem_src0 mem_tgt0)
+      (OPSRC: Memory.op mem_src0 loc from to msg mem_src1 kind)
+      (OPTGT: Memory.op mem_tgt0 loc from to msg mem_tgt1 kind)
+  :
+    Memory.le mem_src1 mem_tgt1.
+Proof.
+  inv OPSRC; inv OPTGT.
+  - ii. erewrite Memory.add_o in LHS; eauto.
+    erewrite Memory.add_o; cycle 1; eauto. des_ifs; eauto.
+  - ii. erewrite Memory.split_o in LHS; eauto.
+    erewrite Memory.split_o; cycle 1; eauto. des_ifs; eauto.
+  - ii. erewrite Memory.lower_o in LHS; eauto.
+    erewrite Memory.lower_o; cycle 1; eauto. des_ifs; eauto.
+  - ii. erewrite Memory.remove_o in LHS; eauto.
+    erewrite Memory.remove_o; cycle 1; eauto. des_ifs; eauto.
+Qed.
+
+Lemma diff_after_promise_promise caps prom0 mem_src0 mem_tgt0
+      loc from to msg kind prom1 mem_tgt1
+      (DIFF: diff_after_promises caps prom0 mem_src0 mem_tgt0)
+      (MLE: Memory.le prom0 mem_src0)
+      (PROMISE: Memory.promise prom0 mem_tgt0 loc from to msg prom1 mem_tgt1 kind)
+      (PF: (Memory.op_kind_is_lower_full kind && Message.is_released_none msg
+            || Memory.op_kind_is_cancel kind)%bool)
+  :
+    exists mem_src1,
+      (<<PROMISE: Memory.promise prom0 mem_src0 loc from to msg prom1 mem_src1 kind>>) /\
+      (<<DIFF: diff_after_promises caps prom1 mem_src1 mem_tgt1>>).
+Proof.
+  inv DIFF. inv PROMISE; ss.
+  - unfold Message.is_released_none in *. des_ifs. des. clarify.
+    dup MEM. eapply lower_succeed_wf in MEM0. des.
+    exploit Memory.lower_exists.
+    { eapply MLE. eapply lower_succeed_wf in PROMISES. des. eapply GET0. }
+    { eauto. }
+    { eauto. }
+    { eauto. }
+    i. des. exists mem2. split.
+    + econs; eauto.
+    + econs.
+      * eapply memory_op_le; eauto.
+      * i. erewrite Memory.lower_o in GET0; eauto.
+        erewrite Memory.lower_o in NONE; eauto. des_ifs. guardH o.
+        exploit DIFF0; eauto. i. des.
+        eapply Memory.lower_get1 in PROM; eauto. des. inv MSG_LE0.
+        esplits; eauto.
+  - exploit Memory.remove_exists.
+    { eapply Memory.remove_get0 in PROMISES. des.
+      eapply MLE. eauto. }
+    i. des. exists mem2. split.
+    + econs; eauto.
+    + econs.
+      * eapply memory_op_le; eauto.
+      * i. erewrite Memory.remove_o in GET; eauto.
+        erewrite Memory.remove_o in NONE; eauto. des_ifs. guardH o.
+        exploit DIFF0; eauto. i. des. splits; auto.
+        exists from', to', val, released. splits; auto.
+        erewrite Memory.remove_o; eauto. des_ifs. ss. des; clarify.
+        eapply Memory.remove_get0 in PROMISES. des. clarify.
+Qed.
+
+
+Lemma diff_after_promise_write caps prom0 mem_src0 mem_tgt0
+      loc from to val released kind prom1 mem_tgt1
+      (DIFF: diff_after_promises caps prom0 mem_src0 mem_tgt0)
+      (MLE: Memory.le prom0 mem_src0)
+      (WRITE: Memory.write prom0 mem_tgt0 loc from to val released prom1 mem_tgt1 kind)
+  :
+    exists mem_src1' mem_src1,
+      (<<WRITE: Memory.write prom0 mem_src0 loc from to val released prom1 mem_src1' kind>>) /\
+      (<<ADD: add_cap caps mem_src1' mem_src1>>) /\
+      (<<DIFF: diff_after_promises caps prom1 mem_src1 mem_tgt1>>).
+Proof.
+  inv DIFF. inv WRITE; ss. inv PROMISE; ss.
+  - exploit Memory.add_exists_le.
+    { eapply MLE0. }
+    { eapply MEM. }
+    intros [mem_src' ADD]. exists mem_src', mem_src'. splits; auto.
+    + econs; eauto. econs; eauto. i. clarify.
+    + assert (PROM: prom1 = prom0).
+      { eapply MemoryFacts.MemoryFacts.add_remove_eq; eauto. } clarify.
+      econs.
+      * eapply memory_op_le; eauto.
+      * i. erewrite Memory.add_o in GET; eauto.
+        erewrite Memory.add_o in NONE; eauto. des_ifs. guardH o.
+        exploit DIFF0; eauto.
+  - exploit Memory.split_exists_le.
+    { eapply MLE. }
+    { eapply PROMISES. }
+    intros [mem_src' SPLIT]. exists mem_src', mem_src'. splits; auto.
+    + econs; eauto.
+    + econs.
+      * eapply memory_op_le; eauto.
+      * i. erewrite Memory.split_o in GET; eauto.
+        erewrite Memory.split_o in NONE; eauto. des_ifs. guardH o. guardH o0.
+        exploit DIFF0; eauto. i. des. splits; auto.
+        dup PROM. eapply Memory.split_get1 in PROM0; eauto.
+        des. eapply Memory.remove_get1 in GET2; eauto. des; clarify.
+        { eapply Memory.split_get0 in PROMISES. des. clarify. }
+        { esplits; eauto. }
+
+  - des. clarify.
+    exploit Memory.lower_exists_le.
+    { eapply MLE. }
+    { eapply PROMISES. }
+    intros [mem_src' LOWER]. exists mem_src'.
+
+    destruct (classic (exists from' to' val released,
+                          (<< Memory.get loc to' prom0 = Some (from', Message.full val released) >> /\
+                          << Time.le to' from >>)
+
+
+    mem_src'. splits; auto.
+    + econs; eauto.
+    + econs.
+      * eapply memory_op_le; eauto.
+      * i. erewrite Memory.split_o in GET; eauto.
+        erewrite Memory.split_o in NONE; eauto. des_ifs. guardH o. guardH o0.
+        exploit DIFF0; eauto. i. des. splits; auto.
+        dup PROM. eapply Memory.split_get1 in PROM0; eauto.
+        des. eapply Memory.remove_get1 in GET2; eauto. des; clarify.
+        { eapply Memory.split_get0 in PROMISES. des. clarify. }
+        { esplits; eauto. }
+
+
+        esplits; eauto.
+        erewrite Memory.
+
+        exists f', val0, released0.
+        exists
+
+
+
+
+
+    admit.
+  -
+
+
+
+        i. des. splits; auto.
+        exists from', to', val, released. splits; auto.
+        erewrite Memory.remove_o; eauto. des_ifs. ss. des; clarify.
+        eapply Memory.remove_get0 in PROMISES. des. clarify.
+Memory.le
+
+
+        ; eauto.
+
+
+    i. destruc des. exists promises0. e
+
+      Memory
+
+
+    unfold Message.is_released_none in *. des_ifs. des. clarify.
+    dup MEM. eapply lower_succeed_wf in MEM0. des.
+    exploit Memory.lower_exists.
+    { eapply MLE. eapply lower_succeed_wf in PROMISES. des. eapply GET0. }
+    { eauto. }
+    { eauto. }
+    { eauto. }
+    i. des. exists mem2. split.
+    + econs; eauto.
+    + econs.
+      * ii. erewrite Memory.lower_o in LHS; eauto.
+        erewrite Memory.lower_o; cycle 1; eauto. des_ifs. eauto.
+      * i. erewrite Memory.lower_o in GET0; eauto.
+        erewrite Memory.lower_o in NONE; eauto. des_ifs. guardH o.
+        exploit DIFF0; eauto. i. des.
+        eapply Memory.lower_get1 in PROM; eauto. des. inv MSG_LE0.
+        esplits; eauto.
+  - exploit Memory.remove_exists.
+    { eapply Memory.remove_get0 in PROMISES. des.
+      eapply MLE. eauto. }
+    i. des. exists mem2. split.
+    + econs; eauto.
+    + econs.
+      * ii. erewrite Memory.remove_o in LHS; eauto.
+        erewrite Memory.remove_o; cycle 1; eauto. des_ifs. eauto.
+      * i. erewrite Memory.remove_o in GET; eauto.
+        erewrite Memory.remove_o in NONE; eauto. des_ifs. guardH o.
+        exploit DIFF0; eauto. i. des. splits; auto.
+        exists from', to', val, released. splits; auto.
+        erewrite Memory.remove_o; eauto. des_ifs. ss. des; clarify.
+        eapply Memory.remove_get0 in PROMISES. des. clarify.
+Qed.
+
+Memory.write
+
+  add => ez
+  split => maybe ez
+  lower
+
+        des_ifs.
+        { ss. des; clarify.
+
+          in GET
+
+        eapply Memory.remove_get1 in PROM; eauto. des; clarify.
+        { splits; eauto.
+
+          admit. }
+        {
+
+        inv MSG_LE0.
+        esplits; eauto.
+
+
+
+      eauto.
+
+
+        eauto.
+        des_ifs.
+        { ss. des; clarify.
+
+    assert (GETSRC: Memory.get loc to mem_src0 = Some (from, Message.full val1 released0)).
+    { destruct (Memory.get loc to mem_src0) eqn:GET0.
+      - dup GET0. destruct p. eapply MLE in GET0. clarify.
+      - exploit DIFF0; eauto. i. des.
+
+
+      inv DIFF.
+
+
+
+
+
+
+Lemma diff_after_promises_read caps P lang
+      th_src th_tgt th_tgt' st st' v v' prom prom' sc sc'
+      mem_src mem_tgt mem_tgt' e
+      (STEP: (@pred_step P lang) e th_tgt th_tgt')
+      (PROMISEFREE: P <1= promise_free)
+      (TH_SRC: th_src = Thread.mk lang st (Local.mk v prom) sc mem_src)
+      (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v prom) sc mem_tgt)
+      (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
+      (DIFF: diff_after_promises prom mem_src mem_tgt caps)
+  :
+    exists mem_src' mem_src'',
+      (<<STEP: (@pred_step P lang)
+                 e th_src
+                 (Thread.mk lang st' (Local.mk v' prom') sc' mem_src')>>) /\
+      (<<ADD: add_cap caps mem_src' mem_src''>>) /\
+      (<<DIFF: diff_after_promises prom' mem_src'' mem_tgt' caps>>)
+.
+Proof.
+  inv STEP. dup SAT. eapply PROMISEFREE in SAT0.
+  inv STEP0. inv STEP.
+  - inv STEP0. inv LOCAL. ss. clarify. inv PROMISE; ss.
+    + unfold Message.is_released_none in *. des_ifs. des. clarify.
+
+
+          diff
+
+          Memory.promise
+
+
+      Thread.promise_step
+
+(Memory.op_kind_is_lower_full kind && Message.is_released_none msg
+                          || Memory.op_kind_is_cancel kind)%bool
+
+      Memory.promise
+
+      lower_succeed_wf
+
+
+      destruct msg0; ss.
+
+      destruct msg; ss.
+
+      unfold orb in *. destruct des_ifs. ss. unfo
+
+    admit.
+  - inv STEP0. inv LOCAL; ss.
+    + exists mem_src, mem_src. splits; eauto.
+      * econs; eauto. econs; eauto.
+      * econs 1.
+    + dup LOCAL0. inv LOCAL1. ss. clarify.
+      exists mem_src, mem_src. splits; eauto.
+      * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+        econs; eauto. econs; eauto. instantiate (1:=from).
+
+
+      *
+
+      inv LOCAL0. ss. clarify.
+
+
+promise_consistent_promise_read
+
+
+Lemma diff_after_promises_step caps P lang
+      th_src th_tgt th_tgt' st st' v v' prom prom' sc sc'
+      mem_src mem_tgt mem_tgt' e
+      (STEP: (@pred_step P lang) e th_tgt th_tgt')
+      (NOSC: P <1= promise_free)
+      (TH_SRC: th_src = Thread.mk lang st (Local.mk v prom) sc mem_src)
+      (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v prom) sc mem_tgt)
+      (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
+      (DIFF: diff_after_promises prom mem_src mem_tgt caps)
+  :
+    exists mem_src' mem_src'',
+      (<<STEP: (@pred_step P lang)
+                 e th_src
+                 (Thread.mk lang st' (Local.mk v' prom') sc' mem_src')>>) /\
+      (<<ADD: add_cap caps mem_src' mem_src''>>) /\
+      (<<DIFF: diff_after_promises prom' mem_src'' mem_tgt' caps>>)
+.
+Proof.
+  inv STEP. inv STEP0. inv STEP.
+  - admit.
+  - inv STEP0. inv LOCAL; ss.
+    + exists mem_src, mem_src. splits; eauto.
+      * econs; eauto. econs; eauto.
+      * econs 1.
+    +
+
+Memory.add
+
+  add_succeed_wf
+
+               Thread.step pf e (Thread.mk st lc0 sc0 mem0)
+
+                        (STEP:
+
+
+
+         (CONSISTENT: Local.promise_consistent th1.(Thread.local))
+
+                        Thread.step
+
+
 
 
       dup FORGET.
@@ -1187,21 +1596,6 @@ Proof.
     + eauto.
 Qed.
 
-
-Inductive diff_after_promises (prom mem0 mem1: Memory.t)
-          (caps: Loc.t -> Time.t -> Time.t -> Message.t -> Prop): Prop :=
-| diff_after_promises_intro
-    (MLE: Memory.le mem0 mem1)
-    (DIFF: forall loc to from msg
-                  (GET: Memory.get loc to mem1 = Some (from, msg))
-                  (NONE: Memory.get loc to mem0 = None),
-        (<<CAP: caps loc to from msg>>) /\
-        (exists from' to' val released,
-            (<<PROM: Memory.get loc to' prom = Some (from', Message.full val released)>>)) /\
-        (<<AFTER: forall from' to' val released
-                         (PROM: Memory.get loc to' prom = Some (from', Message.full val released)),
-            (<<TLE: Time.le to' from>>) >>))
-.
 
 
 Lemma steps_write_not_in P lang (th0 th1: Thread.t lang)
