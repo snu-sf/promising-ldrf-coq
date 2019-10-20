@@ -3024,42 +3024,42 @@ Section MAPPED.
     | _ => True
     end.
 
-  Lemma step_map
-        P lang th_src th_tgt th_tgt' st st' v_src v_tgt v_tgt' prom_src prom_tgt prom_tgt'
-        sc_src sc_tgt sc_tgt'
-        mem_src mem_tgt mem_tgt' e_tgt
-        (MAPPABLE: P <1= wf_mappable_evt)
-        (* (PRED: P <1= promise_free) *)
-        (STEP: (@pred_step P lang) e_tgt th_tgt th_tgt')
-        (TH_SRC: th_src = Thread.mk lang st (Local.mk v_src prom_src)
-                                    sc_src mem_src)
-        (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v_tgt prom_tgt)
-                                     sc_tgt mem_tgt)
-        (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v_tgt' prom_tgt')
-                                      sc_tgt' mem_tgt')
+  (* Lemma step_map *)
+  (*       P lang th_src th_tgt th_tgt' st st' v_src v_tgt v_tgt' prom_src prom_tgt prom_tgt' *)
+  (*       sc_src sc_tgt sc_tgt' *)
+  (*       mem_src mem_tgt mem_tgt' e_tgt *)
+  (*       (MAPPABLE: P <1= wf_mappable_evt) *)
+  (*       (* (PRED: P <1= promise_free) *) *)
+  (*       (STEP: (@pred_step P lang) e_tgt th_tgt th_tgt') *)
+  (*       (TH_SRC: th_src = Thread.mk lang st (Local.mk v_src prom_src) *)
+  (*                                   sc_src mem_src) *)
+  (*       (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v_tgt prom_tgt) *)
+  (*                                    sc_tgt mem_tgt) *)
+  (*       (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v_tgt' prom_tgt') *)
+  (*                                     sc_tgt' mem_tgt') *)
 
-        (CLOSEDMAP0: Memory.closed_timemap sc_tgt mem_tgt)
-        (CLOSED0: Memory.closed mem_tgt)
-        (LCWF: Local.wf (Local.mk v_tgt prom_tgt) mem_tgt)
-        (INHABITED: Memory.inhabited mem_tgt)
+  (*       (CLOSEDMAP0: Memory.closed_timemap sc_tgt mem_tgt) *)
+  (*       (CLOSED0: Memory.closed mem_tgt) *)
+  (*       (LCWF: Local.wf (Local.mk v_tgt prom_tgt) mem_tgt) *)
+  (*       (INHABITED: Memory.inhabited mem_tgt) *)
 
-        (TVIEW: tview_map v_src v_tgt)
-        (MEM: memory_map mem_src mem_tgt)
-        (PROM: promises_map prom_src prom_tgt)
-        (SC: timemap_map sc_src sc_tgt)
-    :
-      exists e_src prom_src' v_src' sc_src' mem_src',
-        (<<STEP: Thread.step_allpf
-                   e_src th_src
-                   (Thread.mk lang st' (Local.mk v_src' prom_src') sc_src' mem_src')>>) /\
-        (<<SC: timemap_map sc_src' sc_tgt'>>) /\
-        (<<PROM: promises_map prom_src' prom_tgt'>>) /\
-        (<<MEM: memory_map mem_src' mem_tgt'>>) /\
-        (<<TVIEW: tview_map v_src' v_tgt'>>) /\
-        (<<EVT: tevent_map e_src e_tgt>>)
-  .
-  Proof.
-  Admitted.
+  (*       (TVIEW: tview_map v_src v_tgt) *)
+  (*       (MEM: memory_map mem_src mem_tgt) *)
+  (*       (PROM: promises_map prom_src prom_tgt) *)
+  (*       (SC: timemap_map sc_src sc_tgt) *)
+  (*   : *)
+  (*     exists e_src prom_src' v_src' sc_src' mem_src', *)
+  (*       (<<STEP: Thread.step_allpf *)
+  (*                  e_src th_src *)
+  (*                  (Thread.mk lang st' (Local.mk v_src' prom_src') sc_src' mem_src')>>) /\ *)
+  (*       (<<SC: timemap_map sc_src' sc_tgt'>>) /\ *)
+  (*       (<<PROM: promises_map prom_src' prom_tgt'>>) /\ *)
+  (*       (<<MEM: memory_map mem_src' mem_tgt'>>) /\ *)
+  (*       (<<TVIEW: tview_map v_src' v_tgt'>>) /\ *)
+  (*       (<<EVT: tevent_map e_src e_tgt>>) *)
+  (* . *)
+  (* Proof. *)
+  (* Admitted. *)
 
   (* Lemma remove_memory_map mem0 fmem0 loc from to msg mem1 *)
   (*       (REMOVE: Memory.remove mem0 loc from to msg mem1) *)

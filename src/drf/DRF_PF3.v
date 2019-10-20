@@ -554,14 +554,14 @@ Inductive caps_collapsing (L: Loc.t -> Prop)
     (FULL: Memory.max_full_ts mem loc max)
     (MAX: t = Memory.max_ts loc mem)
   :
-    caps_collapsing L mem loc max t
+    caps_collapsing L mem loc t max
 | caps_collapsing_cap
     loc t max
     (SAT: L loc)
     (FULL: Memory.max_full_ts mem loc max)
     (CAP: t = Time.incr (Memory.max_ts loc mem))
   :
-    caps_collapsing L mem loc max t
+    caps_collapsing L mem loc t max
 | caps_collapsing_outer_memory
     loc t
     (SAT: L loc)
@@ -1004,7 +1004,7 @@ Qed.
 
 Lemma caps_collapsing_ident2 L mem maxts loc ts fts
       (MAX: Memory.max_full_ts mem loc maxts)
-      (TS: Time.le fts maxts)
+      (TS: Time.le ts maxts)
       (MAP: (caps_collapsing L mem) loc ts fts)
   :
     ts = fts.
@@ -1027,7 +1027,7 @@ Lemma caps_collapsing_ident3 L mem maxts loc ts fts
       (RESERVEWF : memory_reserve_wf mem)
       (INHABITED : Memory.inhabited mem)
       (MAX: Memory.max_full_ts mem loc maxts)
-      (TS: Time.lt ts maxts)
+      (TS: Time.lt fts maxts)
       (MAP: (caps_collapsing L mem) loc ts fts)
   :
     ts = fts.
@@ -1098,6 +1098,31 @@ Proof.
   - eapply caps_collapsing_view; eauto.
 Qed.
 
+Lemma memory_cap_message_closed prom mem0 mem1
+      (CLOSED: Memory.closed mem0)
+      (CAP: Memory.cap prom mem0 mem1)
+      loc to from msg
+      (GET: Memory.get loc to mem1 = Some (from, msg))
+  :
+    Memory.closed_message msg mem0.
+Proof.
+  eapply Memory.cap_inv in GET; eauto. des.
+  - eapply CLOSED in GET. des; auto.
+  - clarify.
+  - clarify. econs. econs.
+    eapply Memory.max_full_view_closed; eauto.
+Qed.
+
+Lemma memory_get_ts_le loc to mem from msg
+      (GET: Memory.get loc to mem = Some (from, msg))
+  :
+    Time.le from to.
+Proof.
+  eapply Memory.get_ts in GET. des; clarify.
+  - refl.
+  - left. auto.
+Qed.
+
 Lemma caps_collapsing_promises (L: Loc.t -> Prop) mem prom
       (MLE: Memory.le prom mem)
       (CLOSED: Memory.closed mem)
@@ -1121,23 +1146,10 @@ Proof.
       eapply or_strengthen in GET0. des; clarify.
       * esplits; eauto.
         { ii. unfold collapsed in *. des.
-          eapply caps_collapsing_ident3 in MAP0; eauto; cycle 1.
-          { eapply TimeFacts.lt_le_lt; eauto. } clarify.
-          assert (TO: to = ft).
-          { destruct TLE.
-            - eapply caps_collapsing_ident3 in MAP1; eauto.
-            - unfold Time.eq in *. clarify. inv MAP1; clarify.
-              + exfalso. eapply Time.lt_strorder.
-                eapply TimeFacts.lt_le_lt.
-                * eapply TLE0.
-                * eapply max_full_ts_le_max_ts; eauto.
-              + exfalso. eapply Time.lt_strorder.
-                eapply TimeFacts.lt_le_lt.
-                * etrans.
-                  { eapply Time.incr_spec. }
-                  { eapply TLE0. }
-                * eapply max_full_ts_le_max_ts; eauto. }
-          clarify. eapply Time.lt_strorder; eauto. }
+          eapply caps_collapsing_ident2 in MAP1; eauto; cycle 1.
+          eapply caps_collapsing_ident2 in MAP0; eauto; cycle 1.
+          { etrans; eauto. left. auto. } clarify.
+          eapply Time.lt_strorder; eauto. }
         { econs 2; eauto. }
         { eapply caps_collapsing_message; eauto. }
       * exfalso. exploit LATESTRESERVE; eauto.
@@ -1165,37 +1177,47 @@ Proof.
       * econs 1; eauto.
 Qed.
 
-Lemma memory_cap_message_closed prom mem0 mem1
-      (CLOSED: Memory.closed mem0)
+Lemma max_full_ts_not_collapsed L prom mem0 mem1 loc max
+      (INHABITED: Memory.inhabited mem0)
       (CAP: Memory.cap prom mem0 mem1)
-      loc to from msg
-      (GET: Memory.get loc to mem1 = Some (from, msg))
+      (MAX: Memory.max_full_ts mem0 loc max)
   :
-    Memory.closed_message msg mem0.
+    ~ (collapsing_latest_reserves_times L mem0 \2/ collapsing_caps_times L mem0 mem1) loc max.
 Proof.
-  eapply Memory.cap_inv in GET; eauto. des.
-  - eapply CLOSED in GET. des; auto.
-  - clarify.
-  - clarify. econs. econs.
-    eapply Memory.max_full_view_closed; eauto.
+  ii. des.
+  - inv H. inv H0. des. clarify.
+    exploit Memory.max_full_ts_spec; eauto. i. des. clarify.
+  - inv H. inv H0. des. inv CAP0.
+    exploit Memory.max_full_ts_spec; eauto. i. des.
+    exploit Memory.max_full_ts_inj.
+    { eapply MAX. }
+    { eapply H. }
+    i. clarify.
 Qed.
 
-Lemma memory_get_ts_le loc to mem from msg
-      (GET: Memory.get loc to mem = Some (from, msg))
+Lemma max_ts_reserve_from_full_ts mem0 loc from
+      (INHABITED: Memory.inhabited mem0)
+      (RESERVEWF0: memory_reserve_wf mem0)
+      (GET: Memory.get loc (Memory.max_ts loc mem0) mem0 = Some (from, Message.reserve))
   :
-    Time.le from to.
+    Memory.max_full_ts mem0 loc from.
 Proof.
-  eapply Memory.get_ts in GET. des; clarify.
-  - refl.
-  - left. auto.
+  exploit Memory.max_full_ts_exists; eauto. intros [max MAX].
+  dup GET. eapply not_latest_reserve_le_max_full_ts in GET; eauto.
+  des; clarify. exfalso.
+  exploit Memory.max_full_ts_spec; eauto. i. des.
+  exploit TimeFacts.antisym.
+  { eapply TLE. }
+  { eapply Memory.max_ts_spec; eauto. }
+  i. clarify.
 Qed.
 
 Lemma caps_collapsing_memory
       mem0 mem1 mem2 mem3 prom (L0 L1: Loc.t -> Prop)
       (MLE: Memory.le prom mem0)
       (CLOSED: Memory.closed mem0)
-      (RESERVEWF: Memory.reserve_wf prom mem0)
       (RESERVEWF0: memory_reserve_wf mem0)
+      (RESERVEWF1: Memory.reserve_wf prom mem0)
       (INHABITED: Memory.inhabited mem0)
       (COLLAPSABLE0: collapsable_cap L0 prom mem0)
       (COLLAPSABLE1: collapsable_cap L1 prom mem0)
@@ -1204,59 +1226,55 @@ Lemma caps_collapsing_memory
       (FORGET0: forget_memory (collapsing_latest_reserves_times L0 mem0 \2/ collapsing_caps_times L0 mem0 mem1) mem2 mem1)
       (FORGET1: forget_memory (collapsing_latest_reserves_times L1 mem0 \2/ collapsing_caps_times L1 mem0 mem1) mem3 mem2)
   :
-    memory_map (caps_collapsing L1 mem0) mem3 mem2.
+    memory_map (caps_collapsing L1 mem0) mem2 mem3.
 Proof.
   exploit Memory.max_full_timemap_exists; eauto. intros [tm MAX].
   dup FORGET0. inv FORGET0. dup FORGET1. inv FORGET1.
   dup CLOSED. inv CLOSED0. econs.
   - i. dup GET. eapply forget_memory_get in GET0; eauto. des.
-    exists to, from, msg, msg.
     destruct (classic (L1 loc)).
-    + esplits; eauto.
-      * econs 2; eauto.
-        eapply forget_memory_get in GET1; eauto. des.
-        apply not_or_and in NOT. apply not_or_and in NOT0. des.
-        dup GET0. eapply Memory.cap_inv in GET0; eauto. des; clarify.
-        { dup GET0. eapply not_latest_reserve_le_max_full_ts in GET0; eauto.
-          des; clarify. exfalso. eapply NOT. econs; eauto. econs; eauto. }
-        { inv GET2. dup GET5. eapply memory_get_ts_le in GET2.
-          eapply not_latest_reserve_le_max_full_ts in GET5; eauto. des.
-          - etrans; eauto.
-          - clarify. refl. }
-        { exfalso. eapply NOT2. econs; eauto. econs; eauto.
-          esplits; eauto. econs; eauto. }
-      * eapply caps_collapsing_message; eauto.
-        eapply forget_memory_get in GET1; eauto. des.
-        eapply memory_cap_message_closed in GET0; eauto.
-      * refl.
-    + esplits; eauto.
-      * econs 1; eauto.
-      * eapply caps_collapsing_message; eauto.
-        eapply forget_memory_get in GET1; eauto. des.
-        eapply memory_cap_message_closed in GET0; eauto.
-      * refl.
-  - i. destruct (classic (L1 loc)).
-    + destruct (classic ((collapsing_latest_reserves_times L1 mem0 \2/ collapsing_caps_times L1 mem0 mem1) loc fto)).
+    + destruct (classic ((collapsing_latest_reserves_times L1 mem0 \2/ collapsing_caps_times L1 mem0 mem1) loc to)).
       * des.
         { inv H0. inv H1. des. clarify.
-          dup GET. eapply forget_memory_get in GET0; eauto. des.
-          dup RESERVE. eapply Memory.cap_le in RESERVE; eauto; [|refl]. clarify.
-
-
-          memory_map
-
-            Memory.get
-
-
-          dup GET1. eapply forget_memory_get in GET1; eauto. des.
-
-
-        admit.
+          dup RESERVE. eapply Memory.cap_le in RESERVE0; eauto; [|refl]. clarify.
+          replace from with (tm loc) in *; cycle 1.
+          { eapply Memory.max_full_ts_inj; eauto.
+            eapply max_ts_reserve_from_full_ts; eauto. }
+          dup RESERVE0. eapply RESERVEWF0 in RESERVE. des.
+          eapply Memory.cap_le in RESERVE; eauto; [|refl]. clarify.
+          exists (tm loc), f, Message.reserve, (Message.full val released).
+          splits; auto.
+          - econs 3; eauto.
+          - econs.
+          - erewrite COMPLETE0; eauto.
+            + erewrite COMPLETE; eauto.
+              eapply max_full_ts_not_collapsed; eauto.
+            + eapply max_full_ts_not_collapsed; eauto. }
+        { inv H0. inv H1. des. clear H0.
+          dup CAP0. eapply caps_max_view in CAP0; eauto. des. clarify.
+          unfold caps in CAP1. des. clarify.
+          inv VAL.
+          exploit Memory.max_full_ts_inj.
+          { eapply MAX0. }
+          { eapply MAX. } i. clarify.
+          exploit Memory.max_full_ts_spec; eauto. i. des. clarify.
+          exists (tm loc), from, (Message.full val (Some (View.mk tm tm))), (Message.full val released).
+          splits.
+          - econs 4; eauto.
+          - eapply caps_collapsing_message; eauto. econs. econs.
+            eapply Memory.max_full_view_closed. econs; eauto.
+          - econs. eapply CLOSED1 in GET3. des. inv MSG_CLOSED.
+            inv CLOSED0; eauto. inv CLOSED2. econs. econs; ss.
+            + eapply Memory.max_full_timemap_spec; eauto.
+            + eapply Memory.max_full_timemap_spec; eauto.
+          - erewrite COMPLETE0; eauto.
+            + erewrite COMPLETE; eauto.
+              * eapply Memory.cap_le in GET3; eauto. refl.
+              * eapply max_full_ts_not_collapsed; eauto.
+            + eapply max_full_ts_not_collapsed; eauto. }
       * apply not_or_and in H0. des.
-        exists fto, ffrom, fmsg.
-        assert (TS: Time.le  fto (tm loc)).
-        { dup GET. eapply forget_memory_get in GET0; eauto. des.
-          dup GET1. eapply Memory.cap_inv in GET1; eauto. des; clarify.
+        assert (TS: Time.le to (tm loc)).
+        { dup GET1. eapply Memory.cap_inv in GET1; eauto. des; clarify.
           - dup GET1. eapply not_latest_reserve_le_max_full_ts in GET1; eauto.
             des; clarify. exfalso. eapply H0. econs; eauto. econs; eauto.
           - inv GET2. dup GET5. eapply not_latest_reserve_le_max_full_ts in GET5; eauto.
@@ -1265,269 +1283,43 @@ Proof.
             + refl.
           - exfalso. eapply H1. econs; eauto. econs; eauto.
             esplits; eauto. econs; eauto. }
-        splits.
+        exists to, from, msg, msg. splits; auto.
         { econs 2; eauto. }
+        { eapply caps_collapsing_message; eauto.
+          eapply memory_cap_message_closed; eauto. }
+        { refl. }
         { erewrite COMPLETE0; eauto. ii. des; clarify. }
-        { econs 2; eauto. etrans; eauto. eapply memory_get_ts_le; eauto. }
-    + exists fto, ffrom, fmsg. esplits.
+    + exists to, from, msg, msg. esplits; eauto.
       * econs 1; eauto.
+      * eapply caps_collapsing_message; eauto.
+        eapply memory_cap_message_closed in GET1; eauto.
+      * refl.
       * erewrite COMPLETE0; eauto. ii. des.
         { inv H0. inv H1. des. clarify. }
         { inv H0. inv H1. des. clarify. }
-      * econs 1; eauto.
-
-
-
-
-
-        Lemma caps_collapsing_memory
-      mem0 mem1 mem2 mem3 prom (L0 L1: Loc.t -> Prop)
-      (MLE: Memory.le prom mem0)
-      (CLOSED: Memory.closed mem0)
-      (RESERVEWF: Memory.reserve_wf prom mem0)
-      (INHABITED: Memory.inhabited mem0)
-      (COLLAPSABLE0: collapsable_cap L0 prom mem0)
-      (COLLAPSABLE1: collapsable_cap L1 prom mem0)
-      (DISJOINTLOC: forall l (SAT0: L0 l) (SAT1: L1 l) , False)
-      (CAP: Memory.cap prom mem0 mem1)
-      (FORGET0: forget_memory (collapsing_latest_reserves_times L0 mem0 \2/ collapsing_caps_times L0 mem0 mem1) mem2 mem1)
-      (FORGET1: forget_memory (collapsing_latest_reserves_times L1 mem0 \2/ collapsing_caps_times L1 mem0 mem1) mem3 mem2)
-  :
-    memory_map (caps_collapsing L1 mem0) mem3 mem2.
-Proof.
-  exploit Memory.max_full_timemap_exists; eauto. intros [tm MAX].
-  dup FORGET0. inv FORGET0. dup FORGET1. inv FORGET1.
-  dup CLOSED. inv CLOSED0. econs.
-  - i.
-
-
-    destruct (classic (L1 loc)).
-    + dup GET. eapply forget_memory_get in GET0; eauto. des.
-      e
-
-
-
-      admit.
-    + dup GET. eapply forget_memory_get in GET0; eauto. des.
-      exists to, from, msg, msg. esplits; eauto.
-      * econs 1; eauto.
-      * eapply caps_collapsing_message; eauto.
-        eapply forget_memory_get in GET1; eauto. des.
-        eapply memory_cap_message_closed in GET0; eauto.
-      * refl.
-  -  i.
-
-        eapply memory_concrete_le_closed_msg.
-        { eapply collapsing_caps_forget_le; eauto.
-
-        eapply forget_memory_get in GET1; eauto.
-
-      esplits; eauto.
-      * econs 1; eauto.
-      *
-
-
-      des.
-      dup GET1. erewrite <- COMPLETE0 in GET1; eauto. esplits; eauto.
-
-      admit.
-    +
-
-      dup inv FO
-
-Admitted.
-
-
-Lemma caps_collapsing_memory
-      mem0 mem1 mem2 mem3 prom (L0 L1: Loc.t -> Prop)
-      (MLE: Memory.le prom mem0)
-      (CLOSED: Memory.closed mem0)
-      (RESERVEWF: Memory.reserve_wf prom mem0)
-      (INHABITED: Memory.inhabited mem0)
-      (COLLAPSABLE0: collapsable_cap L0 prom mem0)
-      (COLLAPSABLE1: collapsable_cap L1 prom mem0)
-      (DISJOINTLOC: forall l (SAT0: L0 l) (SAT1: L1 l) , False)
-      (CAP: Memory.cap prom mem0 mem1)
-      (FORGET0: forget_memory (collapsing_latest_reserves_times L0 mem0 \2/ collapsing_caps_times L0 mem0 mem1) mem2 mem1)
-      (FORGET1: forget_memory (collapsing_latest_reserves_times (L0 \1/ L1) mem0 \2/ collapsing_caps_times (L0 \1/ L1) mem0 mem1) mem3 mem1)
-  :
-    memory_map (caps_collapsing L1 mem0) mem3 mem2.
-Proof.
-  (* exploit Memory.max_full_timemap_exists; eauto. intros [tm MAX]. *)
-  (* dup CLOSED. inv CLOSED0. econs. *)
-  (* - i. destruct (classic (L loc)). *)
-  (*   + dup GET. eapply forget_memory_get in GET0; eauto. des. *)
-Admitted.
-
-Lemma other_collapsing_memory
-      mem0 mem1 mem2 prom (L: Loc.t -> Prop)
-      (MLE: Memory.le prom mem0)
-      (CLOSED: Memory.closed mem0)
-      (RESERVEWF: Memory.reserve_wf prom mem0)
-      (INHABITED: Memory.inhabited mem0)
-      (COLLAPSABLE: collapsable_cap L prom mem0)
-      (CAP: Memory.cap prom mem0 mem1)
-      (FORGET: forget_memory (collapsing_latest_reserves_times L mem0 \2/ collapsing_caps_times L mem0 mem1) mem2 mem1)
-  :
-    memory_map (caps_collapsing L mem0) mem2 mem1.
-Proof.
-  exploit Memory.max_full_timemap_exists; eauto. intros [tm MAX].
-  dup CLOSED. inv CLOSED0. econs.
-  - i. destruct (classic (L loc)).
-    + dup GET. eapply forget_memory_get in GET0; eauto. des.
-Admitted.
-
-
-Lemma other_collapsing_memory
-      mem0 mem1 mem2 prom (L: Loc.t -> Prop)
-      (MLE: Memory.le prom mem0)
-      (CLOSED: Memory.closed mem0)
-      (RESERVEWF: Memory.reserve_wf prom mem0)
-      (INHABITED: Memory.inhabited mem0)
-      (SELF: forall loc (SAT: L loc),
-          match Memory.get loc (Memory.max_ts loc mem) prom with
-          | Some (_, Message.full _ _) => True
-          | _ => False
-          end)
-      (CAP: Memory.cap prom mem0 mem1)
-      (FORGET0: forget_memory (other_latest_reserves_times L mem0 \2/ other_caps_times L mem0 mem1) mem2 mem1)
-      (FORGET1: forget_memory (other_latest_reserves_times L mem0 \2/ other_caps_times L mem0 mem1 \2/ ) mem3 mem2)
-  :
-    memory_map (caps_collapsing L mem0) mem2 mem1.
-Proof.
-  exploit Memory.max_full_timemap_exists; eauto. intros [tm MAX].
-  dup CLOSED. inv CLOSED0. econs.
-  - i. destruct (classic (L loc)).
-    + dup GET. eapply forget_memory_get in GET0; eauto. des.
-Admitted.
-
-
-Definition self_latest_reseves_loc (mem prom: Memory.t) (loc: Loc.t): Prop :=
-  Memory.latest_reserve loc mem prom.
-
-(* Inductive self_collapsing (L: Loc.t -> Prop) *)
-(*           (mem: Memory.t): Loc.t -> Time.t -> Time.t -> Prop := *)
-(* | self_collapsing_not_in *)
-(*     loc t *)
-(*     (NSAT: ~ L loc) *)
-(*   : *)
-(*     self_collapsing L mem loc t t *)
-(* | self_collapsing_in_memory *)
-(*     loc t *)
-(*     (SAT: L loc) *)
-(*     (TLE: Time.le t (Memory.max_ts loc mem)) *)
-(*   : *)
-(*     self_collapsing L mem loc t t *)
-(* | self_collapsing_cap *)
-(*     loc t max *)
-(*     (SAT: L loc) *)
-(*     (FULL: max = Memory.max_ts loc mem) *)
-(*     (CAP: t = Time.incr (Memory.max_ts loc mem)) *)
-(*   : *)
-(*     self_collapsing L mem loc max t *)
-(* | self_collapsing_outer_memory *)
-(*     loc t *)
-(*     (SAT: L loc) *)
-(*     (TLE: Time.lt (Time.incr (Memory.max_ts loc mem)) t) *)
-(*   : *)
-(*     self_collapsing L mem loc t t *)
-(* . *)
-
-Lemma self_collapsing_promises (L: Loc.t -> Prop) mem prom
-      (MLE: Memory.le prom mem)
-      (CLOSED: Memory.closed mem)
-      (RESERVEWF: memory_reserve_wf mem)
-      (INHABITED: Memory.inhabited mem)
-      (SELF: forall loc (SAT: L loc),
-          match Memory.get loc (Memory.max_ts loc mem) prom with
-          | Some (_, Message.full _ _) => True
-          | _ => False
-          end)
-  :
-    promises_map (self_collapsing L mem) prom prom.
-Proof.
-  exploit Memory.max_full_timemap_exists; eauto. intros [tm MAX].
-  dup CLOSED. inv CLOSED0. econs.
-  - i. dup GET. eapply MLE in GET0. eapply CLOSED1 in GET0. des.
-    exists to, from, msg.
-    destruct (classic (L loc)).
-    + dup GET. eapply MLE in GET0.
-      eapply not_latest_reserve_le_max_full_ts in GET0; eauto.
-      eapply or_strengthen in GET0. des; clarify.
-      * esplits; eauto.
-        { ii. unfold collapsed in *. des.
-          eapply caps_collapsing_ident3 in MAP0; eauto; cycle 1.
-          { eapply TimeFacts.lt_le_lt; eauto. } clarify.
-          assert (TO: to = ft).
-          { destruct TLE.
-            - eapply caps_collapsing_ident3 in MAP1; eauto.
-            - unfold Time.eq in *. clarify. inv MAP1; clarify.
-              + exfalso. eapply Time.lt_strorder.
-                eapply TimeFacts.lt_le_lt.
-                * eapply TLE0.
-                * eapply max_full_ts_le_max_ts; eauto.
-              + exfalso. eapply Time.lt_strorder.
-                eapply TimeFacts.lt_le_lt.
-                * etrans.
-                  { eapply Time.incr_spec. }
-                  { eapply TLE0. }
-                * eapply max_full_ts_le_max_ts; eauto. }
-          clarify. eapply Time.lt_strorder; eauto. }
-        { econs 2; eauto. }
-        { eapply caps_collapsing_message; eauto. }
-      * exfalso. exploit OTHERS; eauto.
-        unfold Memory.latest_reserve. rewrite GET. auto.
+  - i. dup GET. eapply forget_memory_get in GET0; eauto. des.
+    apply not_or_and in NOT. des.
+    exists fto, ffrom, fmsg. destruct (classic (L1 loc)).
+    + assert (TS: Time.le fto (tm loc)).
+      { dup GET1. eapply forget_memory_get in GET1; eauto. des.
+        dup GET2. eapply Memory.cap_inv in GET2; eauto. des; clarify.
+        - dup GET2. eapply not_latest_reserve_le_max_full_ts in GET2; eauto.
+          des; clarify. exfalso. eapply NOT. econs; eauto. econs; eauto.
+        - inv GET3. dup GET6. eapply not_latest_reserve_le_max_full_ts in GET6; eauto.
+          des; clarify.
+          + eapply memory_get_ts_le in GET3. etrans; eauto.
+          + refl.
+        - exfalso. eapply NOT0. econs; eauto. econs; eauto.
+          esplits; eauto. econs; eauto. }
+      splits; auto.
+      * econs 2; eauto.
+      * econs 2; eauto. etrans; eauto.
+        eapply memory_get_ts_le; eauto.
     + splits; auto.
-      * ii. unfold collapsed in *. des.
-        inv MAP0; clarify. inv MAP1; clarify.
-        eapply Time.lt_strorder. eauto.
       * econs 1; eauto.
-      * eapply caps_collapsing_message; eauto.
+      * econs 1; eauto.
+Qed.
 
-
-Lemma caps_collapsing_memory
-      mem0 mem1 mem2 prom (L: Loc.t -> Prop)
-      (MLE: Memory.le prom mem0)
-      (CLOSED: Memory.closed mem0)
-      (RESERVEWF: Memory.reserve_wf prom mem0)
-      (INHABITED: Memory.inhabited mem0)
-      (OTHERS: forall loc (SAT: L loc), Memory.latest_reserve loc prom mem0)
-      (CAP: Memory.cap prom mem0 mem1)
-      (FORGET: forget_memory (other_latest_reserves_times L mem0 \2/ other_caps_times L mem0 mem1) mem2 mem1)
-  :
-    memory_map (caps_collapsing L mem0) mem2 mem1.
-Proof.
-  exploit Memory.max_full_timemap_exists; eauto. intros [tm MAX].
-  dup CLOSED. inv CLOSED0. econs.
-  - i. destruct (classic (L loc)).
-    + dup GET. eapply forget_memory_get in GET0; eauto. des.
-Admitted.
-
-
-Definition other_latest_reserves (L: Loc.t -> Prop)
-           (mem: Memory.t) (loc: Loc.t) (to: Time.t) (from: Time.t) :=
-  (<<LATEST: to = Memory.max_ts loc mem>>) /\
-  (<<RESERVE: Memory.get loc to mem = Some (from, Message.reserve)>>) /\
-  (<<OTHER: L loc>>)
-.
-
-Definition other_latest_reserves_times (L: Loc.t -> Prop)
-           (mem: Memory.t) (loc: Loc.t) (to: Time.t): Prop :=
-  exists from,
-    (<<RESERVE: other_latest_reserves L mem loc to from>>).
-
-Definition other_caps (L: Loc.t -> Prop)
-           (mem0 mem1: Memory.t) (loc: Loc.t) (to: Time.t) (from: Time.t) :=
-  (<<FULL: Memory.max_full_ts mem0 loc from>>) /\
-  (<<LATEST: exists from0 val released,
-      (<<CAP: caps mem0 mem1 loc to from0 (Message.full val released)>>)>>) /\
-  (<<OTHER: L loc>>)
-.
-
-Definition other_caps_times (L: Loc.t -> Prop)
-           (mem0 mem1: Memory.t) (loc: Loc.t) (to: Time.t) :=
-  exists from,
-    (<<CAP: other_caps L mem0 mem1 loc to from>>).
 
 
 Inductive shifted_map mlast mcert
