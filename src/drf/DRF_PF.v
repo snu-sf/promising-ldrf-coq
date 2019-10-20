@@ -1323,7 +1323,7 @@ Section UNCHANGABLES.
   Inductive unchangable (mem prom: Memory.t) (l: Loc.t) (t: Time.t) (from: Time.t) (msg: Message.t): Prop :=
   | unchangable_intro
       (GET: Memory.get l t mem = Some (from, msg))
-      (NPROM: ~ promised prom l t)
+      (NPROM: Memory.get l t prom = None)
   .
 
   Inductive unwritable (mem prom: Memory.t) (l: Loc.t) (t: Time.t): Prop :=
@@ -1347,41 +1347,30 @@ Section UNCHANGABLES.
     ii. inv PR. inv PROMISE.
     - econs.
       + eapply Memory.add_get1; eauto.
-      + ii. inv H. destruct msg0.
-        erewrite Memory.add_o in GET0; eauto. des_ifs.
-        * ss. des. clarify.
-          eapply Memory.add_get0 in MEM. des. clarify.
-        * eapply NPROM. econs; eauto.
+      + eapply Memory.add_get0 in MEM. erewrite Memory.add_o; eauto.
+        des_ifs. ss. des. clarify.
     - econs.
       + erewrite Memory.split_o; eauto. eapply Memory.split_get0 in MEM.
         des. des_ifs.
         * ss. des. clarify.
         * ss. destruct a. clarify. eapply Memory.split_get0 in PROMISES. des; clarify.
-          exfalso. eapply NPROM. econs; eauto.
-      + ii. inv H. destruct msg0.
-        erewrite Memory.split_o in GET0; eauto. des_ifs.
-        * ss. des. clarify.
-          eapply Memory.split_get0 in MEM. des. clarify.
-        * eapply NPROM. ss. destruct a. clarify.
-          eapply Memory.split_get0 in PROMISES. clear o. des. econs; eauto.
-        * eapply NPROM.
-          eapply Memory.split_get0 in PROMISES. clear o o0. des. econs; eauto.
+      + eapply Memory.split_get0 in MEM. des.
+        erewrite Memory.split_o; eauto.
+        eapply Memory.split_get0 in PROMISES.
+        des_ifs; ss; des; clarify.
     - econs.
       + erewrite Memory.lower_o; eauto. eapply Memory.lower_get0 in MEM.
-        des. des_ifs. ss. des. clarify. exfalso. eapply NPROM.
-        eapply Memory.lower_get0 in PROMISES. des. econs; eauto.
-      + ii. inv H. destruct msg1. eapply NPROM.
-        erewrite Memory.lower_o in GET0; eauto. des_ifs.
-        * ss. des. clarify.
-          eapply Memory.lower_get0 in PROMISES. des. econs; eauto.
-        * econs; eauto.
+        des. des_ifs. ss. des. clarify. exfalso.
+        eapply Memory.lower_get0 in PROMISES. des. clarify.
+      + erewrite Memory.lower_o; eauto.
+        eapply Memory.lower_get0 in PROMISES.
+        des_ifs. ss. des. clarify.
     - econs.
       + erewrite Memory.remove_o; eauto. eapply Memory.remove_get0 in MEM.
-        des. des_ifs. ss. des. clarify. exfalso. eapply NPROM.
-        eapply Memory.remove_get0 in PROMISES. des. econs; eauto.
-      + ii. inv H. destruct msg. eapply NPROM.
-        erewrite Memory.remove_o in GET0; eauto. des_ifs.
-        econs; eauto.
+        des. des_ifs. ss. des. clarify. exfalso.
+        eapply Memory.remove_get0 in PROMISES. des. clarify.
+      + erewrite Memory.remove_o; eauto.
+        eapply Memory.remove_get0 in PROMISES. des_ifs.
   Qed.
 
   Lemma unchangable_remove mem prom0 loc from to msg prom1
@@ -1390,8 +1379,7 @@ Section UNCHANGABLES.
       unchangable mem prom0 <4= unchangable mem prom1.
   Proof.
     ii. inv PR. econs; eauto.
-    ii. eapply NPROM. inv H. erewrite Memory.remove_o in GET0; eauto.
-    des_ifs. econs; eauto.
+    erewrite Memory.remove_o; eauto. des_ifs.
   Qed.
 
   Lemma unchangable_increase pf e lang (th0 th1: Thread.t lang)
@@ -1434,7 +1422,8 @@ Section UNCHANGABLES.
   Proof.
     inv CWF. inv WF. destruct st1, st2. econs; eauto.
     - exploit THREADS; try apply TID2; eauto. intros LCWF. inv LCWF. eauto.
-    - ii. inv H. exploit DISJOINT; eauto. intros LCDISJ. inv LCDISJ. destruct msg0.
+    - destruct (Memory.get l t (Local.promises lc1)) eqn:GET0; eauto. exfalso.
+      exploit DISJOINT; eauto. intros LCDISJ. inv LCDISJ. destruct p.
       inv DISJOINT0. exploit DISJOINT1; eauto. i. des.
       eapply Memory.get_ts in GET. eapply Memory.get_ts in GET0. des; clarify.
       eapply x1; eauto.
@@ -1456,15 +1445,15 @@ Section UNCHANGABLES.
     :
       ~ unchangable_ts mem1 promises1 loc to1.
   Proof.
-    ii. inv H. inv UNCH. eapply NPROM. inv PROMISE.
+    ii. inv H. inv UNCH. inv PROMISE.
     - dup GET. eapply Memory.add_get1 in GET; eauto.
       eapply Memory.add_get0 in MEM. des. clarify.
     - dup GET. eapply Memory.split_get1 in GET; eauto.
       eapply Memory.split_get0 in MEM. des. clarify.
     - dup GET. eapply Memory.lower_get1 in GET; eauto.
       eapply Memory.lower_get0 in MEM. des. clarify.
-      eapply Memory.lower_get0 in PROMISES. des. econs; eauto.
-    - eapply Memory.remove_get0 in PROMISES. des. econs; eauto.
+      eapply Memory.lower_get0 in PROMISES. des. clarify.
+    - eapply Memory.remove_get0 in PROMISES. des. clarify.
   Qed.
 
   Definition unwritable2 (mem prom: Memory.t) (l: Loc.t) (t: Time.t) :=
@@ -1480,16 +1469,15 @@ Section UNCHANGABLES.
     split; i.
     - inv H. inv UNCH. econs.
       + econs; eauto.
-      + ii. eapply NPROM. inv H.
+      + ii. inv H.
         exploit Memory.get_disjoint.
         { eapply MLE. eapply GET0. }
         { eapply GET. }
         i. des; clarify.
-        * econs; eauto.
-        * exfalso. eapply x0; eauto.
+        eapply x0; eauto.
     - inv H. inv H0. econs; eauto. econs; eauto.
-      ii. inv H. destruct msg0. eapply H1.
-      econs; eauto. eapply MLE in GET0. clarify.
+      destruct (Memory.get l to prom) eqn:GET0; auto. destruct p. exfalso.
+      dup GET0. eapply MLE in GET0. clarify. eapply H1. econs; eauto.
   Qed.
 
   Lemma step_write_not_in_write promises1 mem1 loc from1 to1 val released promises3 mem2 kind

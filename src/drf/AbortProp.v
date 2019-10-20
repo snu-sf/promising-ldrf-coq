@@ -241,8 +241,8 @@ Section CAP.
       caps mem0 mem1 <4= unchangable mem1 prom.
   Proof.
     i. unfold caps in PR. des. inv CAP.
-    econs; eauto. ii. inv H.
-    destruct msg. eapply MLE in GET. clarify.
+    econs; eauto. destruct (Memory.get x0 x1 prom) eqn:GET; auto.
+    destruct p. exfalso. eapply MLE in GET. clarify.
   Qed.
 
   Lemma caps_concrete_last mem0 prom mem1 tm l t from val released
@@ -447,7 +447,7 @@ Section PFCONSISTENT.
       (<<STEPS0: rtc (tau (@pred_step is_cancel lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc1 mem1) e1>>) /\
       (<<NORESERVE: no_reserves e1.(Thread.local).(Local.promises)>>) /\
       exists e2,
-        (<<STEPS1: rtc (tau (@pred_step ((promise_free /1\ (fun e => ~ is_cancel e) /1\ no_acq_read_msgs (caps_loc e0.(Thread.memory) e0.(Thread.local).(Local.promises))) /1\ no_sc) lang)) e1 e2>>) /\
+        (<<STEPS1: rtc (tau (@pred_step ((promise_free /1\ (fun e => ~ is_cancel e) /1\ no_acq_read_msgs (caps_loc e0.(Thread.memory) mem1)) /1\ no_sc) lang)) e1 e2>>) /\
         ((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
          (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>)).
 
@@ -525,7 +525,7 @@ Section PFCONSISTENT.
       - eapply NORESERVES; eauto.
       - rewrite PROMISES in *. erewrite Memory.bot_get in STEPS2. clarify. }
 
-    eapply hold_or_not with (Q := no_acq_read_msgs (caps_loc (Thread.memory th) (Local.promises (Thread.local th))) /1\ no_sc) in STEPS2. des.
+    eapply hold_or_not with (Q := no_acq_read_msgs (caps_loc (Thread.memory th) mem1) /1\ no_sc) in STEPS2. des.
 
     - destruct e2. ss.
       exploit no_sc_any_sc_rtc; try eapply HOLD; eauto.
@@ -579,6 +579,7 @@ Section PFCONSISTENT.
           { ss. eauto. }
           ss. i. inv x2.
           ss. unfold no_sc, no_acq_read_msgs in BREAKQ. des_ifs; try by (exfalso; eauto).
+
           + apply not_and_or in BREAKQ. des; clarify.
             apply imply_to_and in BREAKQ. des. apply NNPP in BREAKQ0.
             unfold caps_loc in *. des. dup CAPS.
