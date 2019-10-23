@@ -2105,49 +2105,6 @@ Section MAPPED.
     - eapply map_lt_only_if; eauto.
   Qed.
 
-  Inductive memory_map m fm: Prop :=
-  | memory_map_intro
-      (MAPPED: forall loc to from msg (GET: Memory.get loc to m = Some (from, msg)),
-          exists fto ffrom fmsg' fmsg,
-            (<<TO: f loc to fto>>) /\
-            (<<MSG: msg_map msg fmsg'>>) /\
-            (<<MSGLE: Message.le fmsg fmsg'>>) /\
-            (<<GET: Memory.get loc fto fm = Some (ffrom, fmsg)>>))
-      (ONLY: forall loc fto ffrom fmsg
-                    (GET: Memory.get loc fto fm = Some (ffrom, fmsg)),
-          exists to from msg,
-            (<<TO: f loc to fto>>) /\
-            (<<GET: Memory.get loc to m = Some (from, msg)>>) /\
-            (<<FROM: f loc from ffrom>>))
-  .
-
-  Inductive promises_map m fm: Prop :=
-  | promises_map_intro
-      (MAPPED: forall loc to from msg (GET: Memory.get loc to m = Some (from, msg)),
-          exists fto ffrom fmsg,
-            (<<NCLPS: non_collapsable loc to>>) /\
-            (<<TO: f loc to fto>>) /\
-            (<<MSG: msg_map msg fmsg>>) /\
-            (<<GET: Memory.get loc fto fm = Some (ffrom, fmsg)>>))
-      (ONLY: forall loc fto ffrom fmsg
-                    (GET: Memory.get loc fto fm = Some (ffrom, fmsg)),
-          exists to from msg,
-            (<<TO: f loc to fto>>) /\
-            (<<GET: Memory.get loc to m = Some (from, msg)>>) /\
-            (<<FROM: f loc from ffrom>>))
-  .
-
-  Lemma promises_map_memory_map m fm
-        (PROMISES: promises_map m fm)
-    :
-      memory_map m fm.
-  Proof.
-    inv PROMISES. econs; eauto.
-    i. exploit MAPPED; eauto. i. des.
-    esplits; eauto. refl.
-  Qed.
-  Hint Resolve promises_map_memory_map.
-
   (* Inductive memory_map m fm: Prop := *)
   (* | memory_map_intro *)
   (*     (MAPPED: forall loc to from msg (GET: Memory.get loc to m = Some (from, msg)), *)
@@ -2259,6 +2216,66 @@ Section MAPPED.
     ii. eapply map_le; eauto.
   Qed.
 
+  Inductive memory_map m fm: Prop :=
+  | memory_map_intro
+      (MAPPED: forall loc to from msg (GET: Memory.get loc to m = Some (from, msg)),
+          exists fto ffrom fmsg' fmsg,
+            (<<TO: f loc to fto>>) /\
+            (<<MSG: msg_map msg fmsg'>>) /\
+            (<<MSGLE: Message.le fmsg fmsg'>>) /\
+            (<<GET: Memory.get loc fto fm = Some (ffrom, fmsg)>>))
+      (ONLY: forall loc fto ffrom fmsg
+                    (GET: Memory.get loc fto fm = Some (ffrom, fmsg)),
+          exists to from msg,
+            (<<TO: f loc to fto>>) /\
+            (<<GET: Memory.get loc to m = Some (from, msg)>>) /\
+            (<<FROM: f loc from ffrom>>))
+  .
+
+  Inductive promises_map m fm: Prop :=
+  | promises_map_intro
+      (MAPPED: forall loc to from msg (GET: Memory.get loc to m = Some (from, msg)),
+          exists fto ffrom fmsg,
+            (<<NCLPS: non_collapsable loc to>>) /\
+            (<<TO: f loc to fto>>) /\
+            (<<MSG: msg_map msg fmsg>>) /\
+            (<<GET: Memory.get loc fto fm = Some (ffrom, fmsg)>>))
+      (ONLY: forall loc fto ffrom fmsg
+                    (GET: Memory.get loc fto fm = Some (ffrom, fmsg)),
+          exists to from msg,
+            (<<TO: f loc to fto>>) /\
+            (<<GET: Memory.get loc to m = Some (from, msg)>>) /\
+            (<<FROM: f loc from ffrom>>))
+  .
+
+  Definition wf_mappable_mem (mem prom: Memory.t): Prop :=
+    forall loc to0 to1 fto
+           (TO0: f loc to0 fto)
+           (TO1: f loc to1 fto)
+           ts
+           (ITV: Interval.mem (to0, to1) ts),
+      unwritable mem prom loc ts.             
+
+  Lemma wf_mappable_mem_step pf e lang (th0 th1: Thread.t lang)
+        (STEP: Thread.step pf e th0 th1)
+        (WFMEM: wf_mappable_mem th0.(Thread.memory) th0.(Thread.local).(Local.promises))
+    :
+      wf_mappable_mem th1.(Thread.memory) th1.(Thread.local).(Local.promises).
+  Proof.
+    ii. eapply unwritable_increase; eauto.
+  Qed.
+  
+  Lemma promises_map_memory_map m fm
+        (PROMISES: promises_map m fm)
+    :
+      memory_map m fm.
+  Proof.
+    inv PROMISES. econs; eauto.
+    i. exploit MAPPED; eauto. i. des.
+    esplits; eauto. refl.
+  Qed.
+  Hint Resolve promises_map_memory_map.
+  
   Lemma closed_timemap_map m fm tm ftm
         (MEM: memory_map m fm)
         (TM: timemap_map tm ftm)
@@ -2721,6 +2738,51 @@ Section MAPPED.
       + eapply time_meet_map; eauto.
   Qed.
 
+  Lemma view_le_map vw0 vw1 fvw0 fvw1
+        (VIEW0: view_map vw0 fvw0)
+        (VIEW1: view_map vw1 fvw1)
+        (VIEWLE: View.le vw0 vw1)
+    :
+      View.le fvw0 fvw1.
+  Proof.
+    inv VIEWLE. econs; eauto.
+    - eapply timemap_le_map.
+      + eapply map_pln; eauto.
+      + eapply map_pln; eauto.
+      + eauto.
+    - eapply timemap_le_map.
+      + eapply map_rlx; eauto.
+      + eapply map_rlx; eauto.
+      + eauto.
+  Qed.
+
+  Lemma opt_view_le_map vw0 vw1 fvw0 fvw1
+        (VIEW0: opt_view_map vw0 fvw0)
+        (VIEW1: opt_view_map vw1 fvw1)
+        (VIEWLE: View.opt_le vw0 vw1)
+    :
+      View.opt_le fvw0 fvw1.
+  Proof.
+    inv VIEWLE.
+    - inv VIEW0. econs.
+    - inv VIEW0. inv VIEW1. econs.
+      eapply view_le_map; eauto.
+  Qed.
+
+  Lemma msg_le_map msg0 msg1 fmsg0 fmsg1
+        (MSG0: msg_map msg0 fmsg0)
+        (MSG1: msg_map msg1 fmsg1)
+        (MSGLE: Message.le msg1 msg0)
+    :
+      Message.le fmsg1 fmsg0.
+  Proof.
+    inv MSGLE.
+    - inv MSG0. inv MSG1. econs; eauto.
+      eapply opt_view_le_map; eauto.
+    - inv MSG0. econs; eauto.
+  Qed.
+
+  
   Lemma msg_get_promises_map m fm loc to from msg
         (MEM: promises_map m fm)
         (GET: Memory.get loc to m = Some (from, msg))
@@ -2768,50 +2830,6 @@ Section MAPPED.
     exploit MAPPED; try apply GET1; eauto. i. des.
     hexploit (map_eq TO0 TO1). i. clarify.
     esplits; eauto.
-  Qed.
-
-  Lemma view_le_map vw0 vw1 fvw0 fvw1
-        (VIEW0: view_map vw0 fvw0)
-        (VIEW1: view_map vw1 fvw1)
-        (VIEWLE: View.le vw0 vw1)
-    :
-      View.le fvw0 fvw1.
-  Proof.
-    inv VIEWLE. econs; eauto.
-    - eapply timemap_le_map.
-      + eapply map_pln; eauto.
-      + eapply map_pln; eauto.
-      + eauto.
-    - eapply timemap_le_map.
-      + eapply map_rlx; eauto.
-      + eapply map_rlx; eauto.
-      + eauto.
-  Qed.
-
-  Lemma opt_view_le_map vw0 vw1 fvw0 fvw1
-        (VIEW0: opt_view_map vw0 fvw0)
-        (VIEW1: opt_view_map vw1 fvw1)
-        (VIEWLE: View.opt_le vw0 vw1)
-    :
-      View.opt_le fvw0 fvw1.
-  Proof.
-    inv VIEWLE.
-    - inv VIEW0. econs.
-    - inv VIEW0. inv VIEW1. econs.
-      eapply view_le_map; eauto.
-  Qed.
-
-  Lemma msg_le_map msg0 msg1 fmsg0 fmsg1
-        (MSG0: msg_map msg0 fmsg0)
-        (MSG1: msg_map msg1 fmsg1)
-        (MSGLE: Message.le msg1 msg0)
-    :
-      Message.le fmsg1 fmsg0.
-  Proof.
-    inv MSGLE.
-    - inv MSG0. inv MSG1. econs; eauto.
-      eapply opt_view_le_map; eauto.
-    - inv MSG0. econs; eauto.
   Qed.
 
   Lemma add_promises_map0 mem0 fmem0 loc from ffrom to fto msg fmsg mem1 fmem1
@@ -2994,6 +3012,7 @@ Section MAPPED.
 
   Lemma remove_memory_map mem0 fmem0 loc from to msg mem1
         fto ffrom fmsg' fmsg
+        (WFMEM: wf_mappable_mem
         (REMOVE: Memory.remove mem0 loc from to msg mem1)
         (TO: f loc to fto)
         (FROM: f loc from ffrom)
