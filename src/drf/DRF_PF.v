@@ -2105,29 +2105,6 @@ Section MAPPED.
     - eapply map_lt_only_if; eauto.
   Qed.
 
-  (* Inductive memory_map m fm: Prop := *)
-  (* | memory_map_intro *)
-  (*     (MAPPED: forall loc to from msg (GET: Memory.get loc to m = Some (from, msg)), *)
-  (*         exists fto ffrom fmsg, *)
-  (*           (<<TO: f loc to fto>>) /\ *)
-  (*           (<<MSG: msg_map msg fmsg>>) /\ *)
-  (*           (<<GET: Memory.get loc fto fm = Some (ffrom, fmsg)>>)) *)
-  (*     (ONLY: forall loc fto ffrom fmsg *)
-  (*                   (GET: Memory.get loc fto fm = Some (ffrom, fmsg)), *)
-  (*         exists to from msg, *)
-  (*           (<<TO: f loc to fto>>) /\ *)
-  (*           (<<GET: Memory.get loc to m = Some (from, msg)>>)) *)
-  (* . *)
-
-  (* Record promises_map (prom fprom: Memory.t): Prop := *)
-  (*   promises_map_intro *)
-  (*     { promises_memory_map: memory_map prom fprom; *)
-  (*       promises_non_collapsable: *)
-  (*         forall loc to from msg *)
-  (*                (GET: Memory.get loc to prom = Some (from, msg)), *)
-  (*           non_collapsable loc to; } *)
-  (* . *)
-
   Lemma time_join_map loc t0 t1 ft0 ft1
         (MAP0: f loc t0 ft0)
         (MAP1: f loc t1 ft1)
@@ -2219,6 +2196,7 @@ Section MAPPED.
   Inductive memory_map m fm: Prop :=
   | memory_map_intro
       (MAPPED: forall loc to from msg (GET: Memory.get loc to m = Some (from, msg)),
+          msg = Message.reserve \/
           exists fto ffrom fmsg' fmsg,
             (<<TO: f loc to fto>>) /\
             (<<MSG: msg_map msg fmsg'>>) /\
@@ -2254,7 +2232,7 @@ Section MAPPED.
            (TO1: f loc to1 fto)
            ts
            (ITV: Interval.mem (to0, to1) ts),
-      unwritable mem prom loc ts.             
+      unwritable mem prom loc ts.
 
   Lemma wf_mappable_mem_step pf e lang (th0 th1: Thread.t lang)
         (STEP: Thread.step pf e th0 th1)
@@ -2264,7 +2242,7 @@ Section MAPPED.
   Proof.
     ii. eapply unwritable_increase; eauto.
   Qed.
-  
+
   Lemma promises_map_memory_map m fm
         (PROMISES: promises_map m fm)
     :
@@ -2272,10 +2250,10 @@ Section MAPPED.
   Proof.
     inv PROMISES. econs; eauto.
     i. exploit MAPPED; eauto. i. des.
-    esplits; eauto. refl.
+    right. esplits; eauto. refl.
   Qed.
   Hint Resolve promises_map_memory_map.
-  
+
   Lemma closed_timemap_map m fm tm ftm
         (MEM: memory_map m fm)
         (TM: timemap_map tm ftm)
@@ -2284,7 +2262,7 @@ Section MAPPED.
       Memory.closed_timemap ftm fm.
   Proof.
     inv MEM. ii. specialize (CLOSED loc). des.
-    eapply MAPPED in CLOSED. des. inv MSG.
+    eapply MAPPED in CLOSED. des; clarify. inv MSG.
     specialize (TM loc).
     hexploit (map_eq TM TO). i. subst.
     inv MSGLE. esplits; eauto.
@@ -2498,13 +2476,15 @@ Section MAPPED.
         (MEM: memory_map m fm)
         (GET: Memory.get loc to m = Some (from, msg))
     :
+      msg = Message.reserve \/
       exists ffrom fto fmsg fmsg',
         (<<GET: Memory.get loc fto fm = Some (ffrom, fmsg)>>) /\
         (<<TO: f loc to fto>>) /\
         (<<MSG: msg_map msg fmsg'>>) /\
         (<<MSGLE: Message.le fmsg fmsg'>>).
   Proof.
-    inv MEM. eapply MAPPED in GET. des. esplits; eauto.
+    inv MEM. eapply MAPPED in GET. des; auto.
+    right. esplits; eauto.
   Qed.
 
   Lemma msg_get_map_if m fm loc to fto from msg
@@ -2512,12 +2492,13 @@ Section MAPPED.
         (TO: f loc to fto)
         (GET: Memory.get loc to m = Some (from, msg))
     :
+      msg = Message.reserve \/
       exists ffrom fmsg fmsg',
         (<<GET: Memory.get loc fto fm = Some (ffrom, fmsg)>>) /\
         (<<MSG: msg_map msg fmsg'>>) /\
         (<<MSGLE: Message.le fmsg fmsg'>>).
   Proof.
-    inv MEM. eapply MAPPED in GET. des.
+    inv MEM. eapply MAPPED in GET. des; auto. right.
     hexploit (map_eq TO TO0). i. subst.
     esplits; eauto.
   Qed.
@@ -2538,8 +2519,9 @@ Section MAPPED.
     inv MEM.
     dup GET. eapply ONLY in GET. des.
     dup GET. eapply MAPPED in GET1. des.
-    hexploit (map_eq TO TO0). i. clarify.
-    esplits; eauto.
+    - clarify. esplits; eauto. econs.
+    - hexploit (map_eq TO TO0). i. clarify.
+      esplits; eauto.
   Qed.
 
   Lemma promise_consistent_map tvw ftvw prom fprom
@@ -2600,7 +2582,8 @@ Section MAPPED.
                         exists from val released,
                           Memory.get loc to fmem = Some (from, Message.full val released))).
     { intros loc. specialize (CLOSED loc). des.
-      inv MEM. eapply MAPPED in CLOSED. des. inv MSG. inv MSGLE.
+      inv MEM. eapply MAPPED in CLOSED. des; clarify.
+      inv MSG. inv MSGLE.
       esplits; eauto. }
     i. des. esplits; eauto.
     - ii. specialize (H loc). des. eauto.
@@ -2782,7 +2765,7 @@ Section MAPPED.
     - inv MSG0. econs; eauto.
   Qed.
 
-  
+
   Lemma msg_get_promises_map m fm loc to from msg
         (MEM: promises_map m fm)
         (GET: Memory.get loc to m = Some (from, msg))
@@ -2811,25 +2794,6 @@ Section MAPPED.
       + exfalso. exploit NCLPS1; eauto. econs; eauto.
       + exfalso. exploit NCLPS; eauto. econs; eauto.
     - exfalso. exploit NCLPS; eauto. econs; eauto.
-  Qed.
-
-  Lemma msg_get_memory_map m fm loc to from msg
-        (MEM: memory_map m fm)
-        (GET: Memory.get loc to m = Some (from, msg))
-    :
-      exists ffrom fto fmsg' fmsg,
-        (<<GET: Memory.get loc fto fm = Some (ffrom, fmsg)>>) /\
-        (<<TO: f loc to fto>>) /\
-        (<<MSG: msg_map msg fmsg'>>) /\
-        (<<MSGLE: Message.le fmsg fmsg'>>)
-  .
-  Proof.
-    inv MEM.
-    exploit MAPPED; eauto. i. des.
-    exploit ONLY; eauto. i. des.
-    exploit MAPPED; try apply GET1; eauto. i. des.
-    hexploit (map_eq TO0 TO1). i. clarify.
-    esplits; eauto.
   Qed.
 
   Lemma add_promises_map0 mem0 fmem0 loc from ffrom to fto msg fmsg mem1 fmem1
@@ -3010,34 +2974,29 @@ Section MAPPED.
       hexploit (map_eq TO0 TO). i. clarify.
   Qed.
 
-  Lemma remove_memory_map mem0 fmem0 loc from to msg mem1
-        fto ffrom fmsg' fmsg
-        (WFMEM: wf_mappable_mem
-        (REMOVE: Memory.remove mem0 loc from to msg mem1)
+  Lemma remove_memory_map mem0 fmem0 loc from to mem1
+        fto ffrom
+        (REMOVE: Memory.remove mem0 loc from to Message.reserve mem1)
         (TO: f loc to fto)
         (FROM: f loc from ffrom)
-        (SRCGET: Memory.get loc fto fmem0 = Some (ffrom, fmsg))
-        (MSG: msg_map msg fmsg')
-        (MSGLE: Message.le fmsg fmsg')       
+        (SRCGET: Memory.get loc fto fmem0 = Some (ffrom, Message.reserve))
         (MEM: memory_map mem0 fmem0)
     :
       exists fmem1,
         (<<MEM: memory_map mem1 fmem1>>) /\
-        (<<REMOVE: Memory.remove fmem0 loc ffrom fto fmsg fmem1>>).
+        (<<REMOVE: Memory.remove fmem0 loc ffrom fto Message.reserve fmem1>>).
   Proof.
     exploit Memory.remove_get0; eauto. i. des.
-    hexploit (@Memory.remove_exists fmem0 loc ffrom fto fmsg); eauto.
+    hexploit (@Memory.remove_exists fmem0 loc ffrom fto Message.reserve); eauto.
     i. des. esplits; eauto.
     econs.
     - i. erewrite Memory.remove_o in GET1; eauto. des_ifs. ss.
-      dup GET1. eapply msg_get_memory_map in GET1; eauto.
-      guardH o. des. unguard.
-      exists fto0, ffrom0, fmsg'0, fmsg0. esplits; eauto.
+      dup GET1. eapply msg_get_map in GET1; eauto.
+      guardH o. des;auto. unguard.
+      destruct msg; auto. right.
+      exists fto0, ffrom0, fmsg', fmsg. esplits; eauto.
       erewrite Memory.remove_o; eauto. des_ifs; ss. des; clarify.
-      exfalso.
-
-      
-      admit.
+      exfalso. inv MSGLE. inv MSG.
     - i. erewrite Memory.remove_o in GET1; eauto. des_ifs.
       dup MEM. inv MEM. eapply ONLY in GET1.
       guardH o. des.
@@ -3071,11 +3030,11 @@ Section MAPPED.
     i. des. esplits; eauto.
     econs.
     - i. erewrite Memory.add_o in GET; eauto. des_ifs.
-      + ss. des; clarify.
+      + ss. des; clarify. right.
         esplits; eauto.
         eapply Memory.add_get0; eauto.
       + eapply msg_get_map in GET; eauto.
-        guardH o. des. unguard.
+        guardH o. des; auto. right. unguard.
         esplits; eauto.
         eapply Memory.add_get1; eauto.
     - i. erewrite Memory.add_o in GET; eauto. des_ifs.
@@ -3183,11 +3142,11 @@ Section MAPPED.
     i. des. esplits; eauto.
     econs.
     - i. erewrite Memory.lower_o in GET2; eauto. des_ifs.
-      + ss. des; clarify.
+      + ss. des; clarify. right.
         esplits; eauto.
         eapply Memory.lower_get0; eauto.
-      + eapply msg_get_memory_map in GET2; eauto.
-        guardH o. ss. des.
+      + eapply msg_get_map in GET2; eauto.
+        guardH o. ss. des; auto. right.
         eapply Memory.lower_get1 in GET3; eauto. des.
         exists fto0, ffrom0, fmsg', m'. esplits; eauto.
         etrans; eauto.
@@ -3341,11 +3300,13 @@ Section MAPPED.
     - i. erewrite Memory.split_o in GET4; eauto. des_ifs.
       + ss. des; clarify.
         exploit Memory.split_get0; eauto. i. des.
-        esplits; eauto.
-      + guardH o. eapply msg_get_memory_map in GET3; eauto. des.
+        right. esplits; eauto.
+      + guardH o. eapply msg_get_map in GET3; eauto.
+        des; auto. right.
         eapply Memory.split_get1 in GET4; eauto. des.
         ss. des; clarify. esplits; eauto.
-      + guardH o. guardH o0. eapply msg_get_memory_map in GET4; eauto. des.
+      + guardH o. guardH o0. eapply msg_get_map in GET4; eauto.
+        des; auto. right.
         eapply Memory.split_get1 in GET5; eauto. des.
         ss. esplits; eauto.
     - i. erewrite Memory.split_o in GET4; eauto. des_ifs.
@@ -3429,7 +3390,6 @@ Section MAPPED.
     dup PROMISES. eapply Memory.split_get0 in PROMISES0. des. clarify.
     eapply msg_get_promises_map in GET0; eauto. des.
     hexploit (map_eq FROM0 FROM). i. clarify.
-
     exploit split_memory_map.
     { apply MEM0. }
     { apply MEM. }
@@ -3442,9 +3402,7 @@ Section MAPPED.
     { econs; eauto. }
     { auto. }
     { auto. }
-
     i. des.
-
     exploit split_succeed_wf; try eapply SPLIT. i. des.
     exploit split_remove_exists.
     { apply GET0. }
@@ -3499,7 +3457,8 @@ Section MAPPED.
       + inv MSG. econs.
     - i. clarify. inv MSG.
       inv MEM0. exploit RESERVE; eauto. i. des.
-      eapply msg_get_memory_map in x; eauto. des. inv MSG. inv MSGLE.
+      eapply msg_get_map in x; eauto. des; clarify.
+      inv MSG. inv MSGLE.
       hexploit (map_eq TO0 FROM). i. clarify.
       esplits; eauto.
     - i. clarify.
@@ -3531,7 +3490,7 @@ Section MAPPED.
     exploit lower_memory_map; try apply MEM0; try eassumption.
     { eapply MLE. eauto. }
     { refl. }
-    i. des. esplits; eauto. 
+    i. des. esplits; eauto.
     inv MSG0. inv MSG_LE. inv MSG.
     econs; eauto. econs; eauto.
     inv TS. eapply map_le; eauto. eapply map_rlx. eapply unwrap_map; eauto.
@@ -3569,272 +3528,31 @@ Section MAPPED.
     eapply map_rlx. eapply unwrap_map; eauto.
   Qed.
 
-
-
-      esplits; eauto.
-
-
-
-      econs.
-
-    { refl. }
-    { eapply msg_wf_map; eauto.
-      exploit add_succeed_wf; try apply MEM0. i. des. auto. }
-    i. des.
-
-msg_map
-
-      econs. eauto. }
-    { econs 1. eauto. }
-    { econs; eauto. }
-    i. des.
-    exploit Memory.add_exists_le.
-    { eapply MLE. }
-    { eapply ADD. }
-    i. des.
-    exploit Memory.remove_exists.
-    { eapply Memory.add_get0 in x0. des. apply GET0. }
-    i. des.
-    exploit (@MemoryFacts.MemoryFacts.add_remove_eq fprom0 promises0 mem2); eauto. i. clarify.
-    exploit (@MemoryFacts.MemoryFacts.add_remove_eq prom0 promises2 prom1); eauto. i. clarify.
-    esplits; eauto. econs; eauto. econs; eauto.
-    - inv TS. econs.
-      eapply View.unwrap_opt_le in VIEWLE.
-      eapply unwrap_map in VIEW.
-      eapply map_rlx in VIEW. specialize (VIEW loc).
-      eapply map_le in TS0; cycle 1; eauto.
-      etrans; eauto. inv VIEWLE. eauto.
-    - i. clarify.
-    - admit.
-      (* not provable *)
-  Admitted.
-
-  Lemma write_lower_map mem0 fmem0 prom0 fprom0 loc from ffrom to fto val released freleased' freleased msg mem1 prom1
+  Lemma promise_cancel_map mem0 fmem0 prom0 fprom0 loc from ffrom to fto msg fmsg mem1 prom1
         (MLE: Memory.le fprom0 fmem0)
-        (LOWER: Memory.write prom0 mem0 loc from to val released prom1 mem1 (Memory.op_kind_lower msg))
+        (CANCEL: Memory.promise prom0 mem0 loc from to msg prom1 mem1 Memory.op_kind_cancel)
         (MEM: memory_map mem0 fmem0)
         (PROM: promises_map prom0 fprom0)
         (FROM: f loc from ffrom)
         (TO: f loc to fto)
-        (VIEW: opt_view_map released freleased')
-        (VIEWLE: View.opt_le freleased freleased')
-        (VIEWWF: View.opt_wf freleased)
-    :
-      exists fmsg fprom1 fmem1,
-        (<<MSG: msg_map msg fmsg>>) /\
-        (<<MEM: memory_map mem1 fmem1>>) /\
-        (<<PROM: promises_map prom1 fprom1>>) /\
-        (<<LOWER: Memory.write fprom0 fmem0 loc ffrom fto val freleased fprom1 fmem1 (Memory.op_kind_lower fmsg)>>).
-  Proof.
-    inv LOWER. inv PROMISE.
-    dup PROMISES. eapply Memory.lower_get0 in PROMISES0. des. clarify.
-    eapply msg_get_promises_map in GET; eauto. des.
-
-    exploit lower_memory_map.
-    { apply MEM0. }
-    { apply MEM. }
-    { apply MLE. apply GET. }
-    { apply MSG. }
-    { econs. eapply VIEW. }
-    { econs. apply VIEWLE. }
-    { econs; eauto. }
-    { apply FROM0. }
-    { apply TO0. }
-    { apply NCLPS. }
-    i. des.
-
-    exploit lower_succeed_wf; try eapply LOWER. i. des.
-    exploit Memory.lower_exists; try apply GET; eauto. i. des.
-    exploit Memory.remove_exists.
-    { eapply Memory.lower_get0 in x0. des. eapply GET3. } i. des.
-    exploit lower_remove_remove.
-    { eapply PROMISES. }
-    { eapply REMOVE. } intros REMOVETGT.
-    exploit lower_remove_remove.
-    { eapply x0. }
-    { eapply x1. } intros REMOVESRC.
-    exploit remove_promises_map; try apply REMOVETGT; eauto.
-    i. des.
-    hexploit (map_eq TO1 TO0). i. clarify.
-    hexploit (map_eq FROM1 FROM0). i. clarify.
-    hexploit (map_eq TO0 TO). i. clarify.
-    hexploit (map_eq FROM0 FROM). i. clarify.
-    exploit Memory.remove_inj.
-    { eapply REMOVESRC. }
-    { eapply REMOVE0. } i. clarify.
-
-    inv MSG.
-    esplits; cycle 1.
-    { eauto. }
-    { eauto. }
-    { econs; eauto.  econs; eauto. econs.
-      inv TS. eapply View.unwrap_opt_le in VIEWLE.
-      eapply unwrap_map in VIEW.
-      eapply map_rlx in VIEW. specialize (VIEW loc).
-      eapply map_le in TS1; cycle 1; eauto.
-      etrans; eauto. inv VIEWLE. eauto. }
-    { econs; eauto. }
-  Qed.
-
-  Lemma split_memory_map mem0 fmem0 loc ts1 ts2 ts3 msg0 msg1 fmsg0 mem1 fts2
-        fts1 fts3 fmsg0' fmsg1
-        (SPLIT: Memory.split mem0 loc ts1 ts2 ts3 msg0 msg1 mem1)
-        (MEM: memory_map mem0 fmem0)
-        (SRCGET: Memory.get loc fts3 fmem0 = Some (fts1, fmsg1))
-        (TS1: f loc ts1 fts1)
-        (TS2: f loc ts2 fts2)
-        (TS3: f loc ts3 fts3)
-        (MSG: msg_map msg0 fmsg0')
-        (MSGLE: Message.le fmsg0 fmsg0')
-        (MSGWF: Message.wf fmsg0)
-        (NCLPS2: non_collapsable loc ts2)
-        (NCLPS3: non_collapsable loc ts3)
-    :
-      exists fmem1,
-        (<<MEM: memory_map mem1 fmem1>>) /\
-        (<<SPLIT: Memory.split fmem0 loc fts1 fts2 fts3 fmsg0 fmsg1 fmem1>>).
-  Proof.
-    exploit Memory.split_get0; eauto. i. des.
-    hexploit split_succeed_wf; eauto. i. des.
-    hexploit (@Memory.split_exists fmem0 loc fts1 fts2 fts3 fmsg0 fmsg1); eauto.
-    { erewrite <- map_lt_non_collapsable; try apply TS12; eauto. }
-    { erewrite <- map_lt_non_collapsable; try apply TS23; eauto. }
-    i. des. esplits; eauto.
-    econs.
-    - i. erewrite Memory.split_o in GET4; eauto. des_ifs.
-      + ss. des; clarify.
-        exploit Memory.split_get0; eauto. i. des.
-        esplits; eauto.
-      + guardH o. eapply msg_get_memory_map in GET3; eauto. des.
-        eapply Memory.split_get1 in GET4; eauto. des.
-        ss. des; clarify. esplits; eauto.
-      + guardH o. guardH o0. eapply msg_get_memory_map in GET4; eauto. des.
-        eapply Memory.split_get1 in GET5; eauto. des.
-        ss. esplits; eauto.
-    - i. erewrite Memory.split_o in GET4; eauto. des_ifs.
-      + ss. des; clarify.
-        esplits; eauto.
-      + ss. des; clarify.
-        esplits; eauto.
-      + dup MEM. inv MEM. eapply ONLY in GET4.
-        guardH o. guardH o0. des.
-        esplits; eauto.
-        erewrite Memory.split_o; eauto.
-        unguard. ss. des_ifs; ss; eauto.
-        * ss; des; clarify.
-        * ss; des; clarify. exfalso.
-          hexploit (map_eq TS3 TO). i. clarify.
-  Qed.
-
-  Lemma shorten_promises_map mem0 fmem0 loc from from' ffrom ffrom' to fto mem1 msg fmsg fmem1
-        (GET0: Memory.get loc to mem0 = Some (from, msg))
-        (GET1: Memory.get loc fto fmem0 = Some (ffrom, fmsg))
-        (SHORTEN0:
-           forall l t,
-             Memory.get l t fmem1 =
-             if loc_ts_eq_dec (l, t) (loc, fto) then Some (ffrom', fmsg) else Memory.get l t fmem0)
-        (SHORTEN1:
-           forall l t,
-             Memory.get l t mem1 =
-             if loc_ts_eq_dec (l, t) (loc, to) then Some (from', msg) else Memory.get l t mem0)
-        (MEM: promises_map mem0 fmem0)
-        (TO: f loc to fto)
-        (FROM': f loc from' ffrom')
-    :
-      promises_map mem1 fmem1.
-  Proof.
-    dup GET0. eapply msg_get_promises_map in GET0; eauto. des.
-    hexploit (map_eq TO0 TO). i. clarify.
-    inv MEM. econs.
-    - i. erewrite SHORTEN1 in GET0. des_ifs.
-      + ss. des; clarify.
-        esplits; cycle 1; eauto.
-        erewrite SHORTEN0. des_ifs. ss. des; clarify.
-      + guardH o. apply MAPPED in GET0. des.
-        esplits; eauto.
-        rewrite SHORTEN0. des_ifs; eauto.
-        unguard. ss; des; clarify. exfalso.
-        destruct (Time.le_lt_dec to0 to).
-        { destruct l; clarify.
-          erewrite map_lt_non_collapsable in H; eauto.
-          eapply Time.lt_strorder; eauto. }
-        { erewrite map_lt_non_collapsable in l; eauto.
-          eapply Time.lt_strorder; eauto. }
-    - i. erewrite SHORTEN0 in GET0. des_ifs.
-      + ss. des; clarify. esplits; eauto.
-        erewrite SHORTEN1. des_ifs. ss. des; clarify.
-      + guardH o. eapply ONLY in GET0. des.
-        esplits; eauto. erewrite SHORTEN1; eauto.
-        des_ifs; eauto. unguard. ss; des; clarify.
-        hexploit (map_eq TO TO1). i. clarify.
-  Qed.
-
-  Lemma write_split_map mem0 fmem0 prom0 fprom0 loc from ffrom to fto val released freleased' freleased msg mem1 prom1 ts3
-        (MLE: Memory.le fprom0 fmem0)
-        (SPLIT: Memory.write prom0 mem0 loc from to val released prom1 mem1 (Memory.op_kind_split ts3 msg))
-        (MEM: memory_map mem0 fmem0)
-        (PROM: promises_map prom0 fprom0)
-        (FROM: f loc from ffrom)
-        (TO: f loc to fto)
-        (VIEW: opt_view_map released freleased')
-        (VIEWLE: View.opt_le freleased freleased')
-        (VIEWWF: View.opt_wf freleased)
         (NCLPS: non_collapsable loc to)
+        (MSG: msg_map msg fmsg)
     :
-      exists fmsg fts3 fprom1 fmem1,
-        (<<MSG: msg_map msg fmsg>>) /\
-        (<<SPLIT: memory_map mem1 fmem1>>) /\
-        (<<TS3: f loc ts3 fts3>>) /\
+      exists fprom1 fmem1,
+        (<<MEM: memory_map mem1 fmem1>>) /\
         (<<PROM: promises_map prom1 fprom1>>) /\
-        (<<LOWER: Memory.write fprom0 fmem0 loc ffrom fto val freleased fprom1 fmem1 (Memory.op_kind_split fts3 fmsg)>>).
+        (<<CANCEL: Memory.promise fprom0 fmem0 loc ffrom fto fmsg fprom1 fmem1 Memory.op_kind_cancel>>).
   Proof.
-    inv SPLIT. inv PROMISE.
-    dup PROMISES. eapply Memory.split_get0 in PROMISES0. des. clarify.
-    eapply msg_get_promises_map in GET0; eauto. des.
-    hexploit (map_eq FROM0 FROM). i. clarify.
-
-    exploit split_memory_map.
-    { apply MEM0. }
-    { apply MEM. }
-    { apply MLE. apply GET0. }
-    { apply FROM. }
-    { apply TO. }
-    { apply TO0. }
-    { econs. apply VIEW. }
-    { econs. apply VIEWLE. }
-    { econs; eauto. }
-    { auto. }
-    { auto. }
-
+    inv CANCEL.
+    exploit remove_promises_map; try apply PROMISES; try eassumption.
     i. des.
-
-    exploit split_succeed_wf; try eapply SPLIT. i. des.
-    exploit split_remove_exists.
-    { apply GET0. }
-    { eapply TS12. }
-    { eapply TS23. }
-    { eapply MSG_WF. }
-    i. des.
-    exists fmsg, fto0, mem3, fmem1. esplits; eauto.
-    - eapply shorten_promises_map; cycle 2.
-      + eapply split_remove_shorten; eauto.
-      + eapply split_remove_shorten; eauto.
-      + eauto.
-      + eauto.
-      + eauto.
-      + eapply Memory.split_get0 in PROMISES. des. eauto.
-      + eapply Memory.split_get0 in SPLIT0. des. eauto.
-    - econs; eauto. econs; eauto. econs.
-      inv TS. eapply View.unwrap_opt_le in VIEWLE.
-      eapply unwrap_map in VIEW.
-      eapply map_rlx in VIEW. specialize (VIEW loc).
-      eapply map_le in TS0; cycle 1; eauto.
-      etrans; eauto. inv VIEWLE. eauto.
+    hexploit (map_eq FROM FROM0). i. clarify.
+    hexploit (map_eq TO TO0). i. clarify.
+    inv MSG. inv MSG0.
+    exploit remove_memory_map; try apply MEM0; try eassumption.
+    { eapply MLE. eapply Memory.remove_get0 in REMOVE. des. auto. }
+    i. des. esplits; eauto.
   Qed.
-
-
-  Lemma promise_add_map
-
 
   Inductive memory_op_kind_map (loc: Loc.t) : Memory.op_kind -> Memory.op_kind -> Prop :=
   | memory_op_kind_map_add
@@ -3857,139 +3575,295 @@ msg_map
   .
   Hint Constructors memory_op_kind_map.
 
-  Lemma promise_map mem0 fmem0 prom0 fprom0 loc from ffrom to fto val released freleased' freleased mem1 prom1 kind
+  Lemma promise_map mem0 fmem0 prom0 fprom0 loc from ffrom to fto msg fmsg mem1 prom1 kind
         (MLE: Memory.le fprom0 fmem0)
-        (WRITE: Memory.write prom0 mem0 loc from to val released prom1 mem1 kind)
+        (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
         (MEM: memory_map mem0 fmem0)
         (PROM: promises_map prom0 fprom0)
         (FROM: f loc from ffrom)
         (TO: f loc to fto)
         (NCLPS: non_collapsable loc to)
-        (VIEW: opt_view_map released freleased')
-        (VIEWLE: View.opt_le freleased freleased')
-        (VIEWWF: View.opt_wf freleased)
+        (MSG: msg_map msg fmsg)
     :
       exists fkind fprom1 fmem1,
         (<<MEM: memory_map mem1 fmem1>>) /\
         (<<KIND: memory_op_kind_map loc kind fkind>>) /\
         (<<PROM: promises_map prom1 fprom1>>) /\
-        (<<WRITE: Memory.write fprom0 fmem0 loc ffrom fto val freleased fprom1 fmem1 fkind>>).
+        (<<PROMISE: Memory.promise fprom0 fmem0 loc ffrom fto fmsg fprom1 fmem1 fkind>>).
   Proof.
-    inv WRITE. inv PROMISE.
-    - exploit write_add_map; eauto. i. des.
+    inv PROMISE.
+    - exploit promise_add_map; try apply PROM; eauto. i. des.
       esplits; eauto.
-    - exploit write_split_map; eauto. i. des.
+    - exploit promise_split_map; try apply PROM; eauto. i. des.
       esplits; eauto.
-    - exploit write_lower_map; eauto. i. des.
+    - exploit promise_lower_map; try apply PROM; eauto. i. des.
       esplits; eauto.
-    - i. clarify.
+    - exploit promise_cancel_map; try apply PROM; try apply MEM; eauto. i. des.
+      esplits; eauto.
+  Qed.
+
+  Lemma time_join_mon t0 t1 t0' t1'
+        (TS0: Time.le t0 t0')
+        (TS1: Time.le t1 t1')
+    :
+      Time.le (Time.join t0 t1) (Time.join t0' t1').
+  Proof.
+    unfold Time.join. des_ifs.
+    - left. eapply TimeFacts.le_lt_lt; eauto.
+    - etrans; eauto.
+  Qed.
+
+  Lemma timemap_join_mon tm0 tm1 tm0' tm1'
+        (TM0: TimeMap.le tm0 tm0')
+        (TM1: TimeMap.le tm1 tm1')
+    :
+      TimeMap.le (TimeMap.join tm0 tm1) (TimeMap.join tm0' tm1').
+  Proof.
+    unfold TimeMap.join. ii.
+    eapply time_join_mon; eauto.
+  Qed.
+
+  Lemma view_join_mon vw0 vw1 vw0' vw1'
+        (VW0: View.le vw0 vw0')
+        (VW1: View.le vw1 vw1')
+    :
+      View.le (View.join vw0 vw1) (View.join vw0' vw1').
+  Proof.
+    inv VW0. inv VW1. econs.
+    - eapply timemap_join_mon; eauto.
+    - eapply timemap_join_mon; eauto.
+  Qed.
+
+  Lemma view_ur_rw_le loc ts
+    :
+      View.le (View.singleton_rw loc ts) (View.singleton_ur loc ts).
+  Proof.
+    unfold View.singleton_rw, View.singleton_ur. econs; ss; eauto.
+    - eapply TimeMap.bot_spec.
+    - refl.
+  Qed.
+
+  Lemma read_tview_mon
+        tview1 tview2 loc ts released1 released2 ord1 ord2
+        (TVIEW: TView.le tview1 tview2)
+        (REL: View.opt_le released1 released2)
+        (ORD: Ordering.le ord1 ord2):
+    TView.le
+      (TView.read_tview tview1 loc ts released1 ord1)
+      (TView.read_tview tview2 loc ts released2 ord2).
+  Proof.
+    unfold TView.read_tview, View.singleton_ur_if.
+    inv TVIEW. econs; ss.
+    - eapply view_join_mon.
+      + eapply view_join_mon; eauto. inv ORD.
+        des_ifs; eauto.
+        * refl.
+        * exfalso. destruct ord1, ord2; ss.
+        * apply view_ur_rw_le.
+        * refl.
+      + des_ifs.
+        * eapply View.unwrap_opt_le; eauto.
+        * exfalso. destruct ord1, ord2; ss.
+        * apply View.bot_spec.
+        * refl.
+    - eapply view_join_mon.
+      + eapply view_join_mon; eauto. inv ORD.
+        des_ifs; eauto.
+        * refl.
+        * exfalso. destruct ord1, ord2; ss.
+        * apply view_ur_rw_le.
+        * refl.
+      + des_ifs.
+        * eapply View.unwrap_opt_le; eauto.
+        * exfalso. destruct ord1, ord2; ss.
+        * apply View.bot_spec.
+        * refl.
+  Qed.
+
+  Lemma write_tview_mon_same_ord
+        tview1 tview2 sc1 sc2 loc ts ord
+        (TVIEW: TView.le tview1 tview2)
+        (SC: TimeMap.le sc1 sc2)
+    :
+      TView.le
+        (TView.write_tview tview1 sc1 loc ts ord)
+        (TView.write_tview tview2 sc1 loc ts ord).
+  Proof.
+    unfold TView.write_tview.
+    inv TVIEW. econs; ss.
+    - i. unfold LocFun.find, LocFun.add. des_ifs.
+      + eapply view_join_mon; eauto. refl.
+      + eapply view_join_mon; eauto. refl.
+    - eapply view_join_mon; eauto. refl.
+    - eapply view_join_mon; eauto. refl.
+  Qed.
+
+  Lemma read_fence_tview_mon_same_ord
+        tview1 tview2 ord
+        (TVIEW: TView.le tview1 tview2)
+    :
+      TView.le
+        (TView.read_fence_tview tview1 ord)
+        (TView.read_fence_tview tview2 ord).
+  Proof.
+    unfold TView.read_fence_tview.
+    inv TVIEW. econs; ss.
+    des_ifs.
+  Qed.
+
+  Lemma write_fence_fc_mon_same_ord
+        tview1 tview2 ord sc1 sc2
+        (SC: TimeMap.le sc1 sc2)
+        (TVIEW: TView.le tview1 tview2)
+    :
+      TimeMap.le
+        (TView.write_fence_sc tview1 sc1 ord)
+        (TView.write_fence_sc tview2 sc2 ord).
+  Proof.
+    inv TVIEW. inv CUR.
+    unfold TView.write_fence_sc. des_ifs.
+    eapply timemap_join_mon; eauto.
+  Qed.
+
+  Lemma write_fence_tview_mon_same_ord
+        tview1 tview2 ord sc1 sc2
+        (SC: TimeMap.le sc1 sc2)
+        (TVIEW: TView.le tview1 tview2)
+    :
+      TView.le
+        (TView.write_fence_tview tview1 sc1 ord)
+        (TView.write_fence_tview tview2 sc2 ord).
+  Proof.
+    unfold TView.write_fence_tview.
+    dup TVIEW. inv TVIEW. econs; ss.
+    - i. unfold LocFun.find, LocFun.add. des_ifs; eauto.
+      econs; ss.
+      + eapply write_fence_fc_mon_same_ord; eauto.
+      + eapply write_fence_fc_mon_same_ord; eauto.
+    - des_ifs.
+      econs; ss.
+      + eapply write_fence_fc_mon_same_ord; eauto.
+      + eapply write_fence_fc_mon_same_ord; eauto.
+    - des_ifs.
+      + eapply view_join_mon; eauto.
+        econs; ss.
+        * eapply write_fence_fc_mon_same_ord; eauto.
+        * eapply write_fence_fc_mon_same_ord; eauto.
+      + eapply view_join_mon; eauto. refl.
   Qed.
 
 
-  Lemma write_map mem0 fmem0 prom0 fprom0 loc from ffrom to fto val released freleased' freleased mem1 prom1 kind
-        (MLE: Memory.le fprom0 fmem0)
-        (WRITE: Memory.write prom0 mem0 loc from to val released prom1 mem1 kind)
+  Inductive local_map (lc flc: Local.t): Prop :=
+  | local_map_intro
+      ftv'
+      (TVIEWLE: TView.le flc.(Local.tview) ftv')
+      (TVIEW: tview_map lc.(Local.tview) ftv')
+      (* (TVWF: TView.wf ftv') *)
+      (PROMISES: promises_map lc.(Local.promises) flc.(Local.promises))
+  .
+
+  Lemma read_step_map lc0 flc0 mem0 fmem0 loc to val released ord lc1
+        (LOCAL: local_map lc0 flc0)
+        (TVWF: TView.wf flc0.(Local.tview))
         (MEM: memory_map mem0 fmem0)
-        (PROM: promises_map prom0 fprom0)
-        (FROM: f loc from ffrom)
-        (TO: f loc to fto)
-        (NCLPS: non_collapsable loc to)
-        (VIEW: opt_view_map released freleased')
-        (VIEWLE: View.opt_le freleased freleased')
-        (VIEWWF: View.opt_wf freleased)
+        (READ: Local.read_step lc0 mem0 loc to val released ord lc1)
     :
-      exists fkind fprom1 fmem1,
-        (<<MEM: memory_map mem1 fmem1>>) /\
-        (<<KIND: memory_op_kind_map loc kind fkind>>) /\
-        (<<PROM: promises_map prom1 fprom1>>) /\
-        (<<WRITE: Memory.write fprom0 fmem0 loc ffrom fto val freleased fprom1 fmem1 fkind>>).
-  Proof.
-    inv WRITE. inv PROMISE.
-    - exploit write_add_map; eauto. i. des.
-      esplits; eauto.
-    - exploit write_split_map; eauto. i. des.
-      esplits; eauto.
-    - exploit write_lower_map; eauto. i. des.
-      esplits; eauto.
-    - i. clarify.
-  Qed.
-
-  Lemma split_promises_map mem0 fmem0 loc ts1 ts2 ts3 msg0 msg1 fmsg0 mem1 fts2
-        (SPLIT: Memory.split mem0 loc ts1 ts2 ts3 msg0 msg1 mem1)
-        (MEM: promises_map mem0 fmem0)
-        (TS2: f loc ts2 fts2)
-        (MSG: msg_map msg0 fmsg0)
-        (NCLPS: non_collapsable loc ts2)
-    :
-      exists fts1 fts3 fmsg1 fmem1,
-        (<<TS1: f loc ts1 fts1>>) /\
-        (<<TS3: f loc ts3 fts3>>) /\
-        (<<MSG: msg_map msg1 fmsg1>>) /\
-        (<<MEM: promises_map mem1 fmem1>>) /\
-        (<<SPLIT: Memory.split fmem0 loc fts1 fts2 fts3 fmsg0 fmsg1 fmem1>>).
-
-
-  Lemma add_memory_map mem0 fmem0 loc from ffrom to fto msg fmsg' fmsg mem1
-        (ADD: Memory.add mem0 loc from to msg mem1)
-        (MEM: memory_map mem0 fmem0)
-        (FROM: f loc from ffrom)
-        (TO: f loc to fto)
-        (NCLPS: non_collapsable loc to)
-        (MSG: msg_map msg fmsg')
-        (MSGLE: Message.le fmsg fmsg')
-        (MSGWF: Message.wf fmsg)
-    :
-      exists fmem1,
-        (<<MEM: memory_map mem1 fmem1>>) /\
-        (<<ADD: Memory.add fmem0 loc ffrom fto fmsg fmem1>>).
-
-
-
-
-  Lemma lower_memory_map mem0 fmem0 loc from to msg0 msg1 fmsg1 fmsg0' fmsg0 mem1
-        (LOWER: Memory.lower mem0 loc from to msg0 msg1 mem1)
-        (MEM: memory_map mem0 fmem0)
-        (MSG: msg_map msg0 fmsg0')
-        (MSGLE: Message.le fmsg0 fmsg0')
-        (MSGWF: Message.wf fmsg0)
-    :
-      exists ffrom fto fmem1,
+      exists fto freleased' freleased flc1,
+        (<<READ: Local.read_step flc0 fmem0 loc fto val freleased ord flc1>>) /\
         (<<TO: f loc to fto>>) /\
-        (<<MEM: memory_map mem1 fmem1>>) /\
-        (<<LOWER: Memory.lower fmem0 loc ffrom fto fmsg0 fmsg1 fmem1>>).
+        (<<RELEASED: opt_view_map released freleased'>>) /\
+        (<<RELEASEDLE: View.opt_le freleased freleased'>>) /\
+        (<<LOCAL: local_map lc1 flc1>>).
   Proof.
-    exploit Memory.lower_get0; eauto. i. des.
-    hexploit lower_succeed_wf; eauto. i. des.
-    eapply msg_get_memory_map in GET; eauto. des.
-    hexploit (@Memory.lower_exists fmem0 loc ffrom fto fmsg fmsg1); eauto.
-    { erewrite <- map_lt_non_collapsable; eauto. }
-    { eapply msg_wf_map; eauto. }
-    { eapply msg_le_map; eauto. }
-    i. des. esplits; eauto.
-    econs.
-    - i. erewrite Memory.lower_o in GET2; eauto. des_ifs.
-      + ss. des; clarify.
-        esplits; eauto.
-        eapply Memory.lower_get0; eauto.
-      + eapply msg_get_promises_map in GET2; eauto.
-        guardH o. des. unguard.
-        exists fto0, ffrom0, fmsg0. esplits; eauto.
-        erewrite Memory.lower_o; eauto. des_ifs.
-        ss. des; clarify. exfalso. eauto.
-    - i. erewrite Memory.lower_o in GET2; eauto. des_ifs.
-      + ss. des; clarify.
-        esplits; eauto.
-      + dup MEM. inv MEM. eapply ONLY in GET2.
-        guardH o. des. unguard.
-        exists to0, from0, msg.
-        esplits; eauto. erewrite Memory.lower_o; eauto.
-        des_ifs. ss; des; clarify.
-        hexploit (map_eq TO0 TO). i. clarify.
+    inv LOCAL. inv READ. exploit msg_get_map; eauto. i. des; clarify.
+    inv MSG. inv MSGLE.
+    eapply readable_map in READABLE; eauto; cycle 1.
+    { eapply map_cur; eauto. }
+    esplits.
+    - econs; eauto. eapply TViewFacts.readable_mon; eauto.
+      + inv TVIEWLE. auto.
+      + refl.
+    - auto.
+    - eauto.
+    - eauto.
+    - econs; ss.
+      + eapply read_tview_mon.
+        * eapply TVIEWLE.
+        * eauto.
+        * refl.
+      + eapply read_tview_map; eauto.
+  Qed.
+
+  Lemma write_step_map lc0 flc0 mem0 fmem0 loc to val released ord lc1
+        (LOCAL: local_map lc0 flc0)
+        (TVWF: TView.wf flc0.(Local.tview))
+        (MEM: memory_map mem0 fmem0)
+        (READ: Local.write_step lc0 sc0 mem0 loc from to val releasedr releasedw ord lc1 sc1 mem1 kind)
+    :
+      exists fto freleased' freleased flc1,
+        (<<READ: Local.read_step flc0 fmem0 loc fto val freleased ord flc1>>) /\
+        (<<TO: f loc to fto>>) /\
+        (<<RELEASED: opt_view_map released freleased'>>) /\
+        (<<RELEASEDLE: View.opt_le freleased freleased'>>) /\
+        (<<LOCAL: local_map lc1 flc1>>).
+  Proof.
+    inv LOCAL. inv READ. exploit msg_get_map; eauto. i. des; clarify.
+    inv MSG. inv MSGLE.
+    eapply readable_map in READABLE; eauto; cycle 1.
+    { eapply map_cur; eauto. }
+    esplits.
+    - econs; eauto. eapply TViewFacts.readable_mon; eauto.
+      + inv TVIEWLE. auto.
+      + refl.
+    - auto.
+    - eauto.
+    - eauto.
+    - econs; ss.
+      + eapply read_tview_mon.
+        * eapply TVIEWLE.
+        * eauto.
+        * refl.
+      + eapply read_tview_map; eauto.
   Qed.
 
 
+  Lemma read_tview_map tvw ftvw loc to fto released freleased ord
 
 
+
+Local.read_step
+     : Local.t ->
+       Memory.t -> Loc.t -> Time.t -> Const.t -> option View.t -> Ordering.t -> Local.t -> Prop
+
+
+  Local.read_step
+
+  Lemma read_map mem0 fmem0 prom0 fprom0 loc from ffrom to fto msg fmsg mem1 prom1 kind
+        (MLE: Memory.le fprom0 fmem0)
+        (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
+        (MEM: memory_map mem0 fmem0)
+        (PROM: promises_map prom0 fprom0)
+        (FROM: f loc from ffrom)
+        (TO: f loc to fto)
+        (NCLPS: non_collapsable loc to)
+        (MSG: msg_map msg fmsg)
+    :
+      exists fkind fprom1 fmem1,
+        (<<MEM: memory_map mem1 fmem1>>) /\
+        (<<KIND: memory_op_kind_map loc kind fkind>>) /\
+        (<<PROM: promises_map prom1 fprom1>>) /\
+        (<<PROMISE: Memory.promise fprom0 fmem0 loc ffrom fto fmsg fprom1 fmem1 fkind>>).
+  Proof.
+    inv PROMISE.
+    - exploit promise_add_map; try apply PROM; eauto. i. des.
+      esplits; eauto.
+    - exploit promise_split_map; try apply PROM; eauto. i. des.
+      esplits; eauto.
+    - exploit promise_lower_map; try apply PROM; eauto. i. des.
+      esplits; eauto.
+    - exploit promise_cancel_map; try apply PROM; try apply MEM; eauto. i. des.
+      esplits; eauto.
+  Qed.
 
   Definition mapped_time loc fto :=
     exists to, (<<MAPPED: f loc to fto>>).
