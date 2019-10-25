@@ -1480,16 +1480,16 @@ Section UNCHANGABLES.
       dup GET0. eapply MLE in GET0. clarify. eapply H1. econs; eauto.
   Qed.
 
-  Lemma step_write_not_in_write promises1 mem1 loc from1 to1 val released promises3 mem2 kind
+  Lemma step_write_not_in_promise promises1 mem1 loc from1 to1 msg promises3 mem2 kind
         (MLE: Memory.le promises1 mem1)
-        (WRITE: Memory.write promises1 mem1 loc from1 to1 val released promises3 mem2 kind)
+        (PROMISE: Memory.promise promises1 mem1 loc from1 to1 msg promises3 mem2 kind)
         t
         (IN: Interval.mem (from1, to1) t)
     :
       ~ unwritable mem1 promises1 loc t.
   Proof.
     rewrite unwritable_eq; auto.
-    unfold unwritable2. inv WRITE. apply or_not_and. inv PROMISE.
+    unfold unwritable2. apply or_not_and. inv PROMISE.
     - left. ii. inv H. dup GET. eapply Memory.add_get1 in GET; eauto.
       eapply Memory.add_get0 in MEM. des.
       exploit Memory.get_disjoint.
@@ -1505,6 +1505,17 @@ Section UNCHANGABLES.
       econs; eauto.
   Qed.
 
+  Lemma step_write_not_in_write promises1 mem1 loc from1 to1 val released promises3 mem2 kind
+        (MLE: Memory.le promises1 mem1)
+        (WRITE: Memory.write promises1 mem1 loc from1 to1 val released promises3 mem2 kind)
+        t
+        (IN: Interval.mem (from1, to1) t)
+    :
+      ~ unwritable mem1 promises1 loc t.
+  Proof.
+    inv WRITE. eapply step_write_not_in_promise; eauto.
+  Qed.
+
   Lemma step_write_not_in lang (th_tgt th_tgt': Thread.t lang) e_tgt pf
         (MLE: Memory.le th_tgt.(Thread.local).(Local.promises) th_tgt.(Thread.memory))
         (STEP: Thread.step pf e_tgt th_tgt th_tgt')
@@ -1513,7 +1524,8 @@ Section UNCHANGABLES.
                    e_tgt.
   Proof.
     inv STEP.
-    - inv STEP0; ss.
+    - inv STEP0; ss. inv LOCAL.
+      ii. exploit step_write_not_in_promise; eauto.
     - inv STEP0; ss. inv LOCAL; ss.
       + inv LOCAL0. ii. exploit step_write_not_in_write; eauto.
       + inv LOCAL1. inv LOCAL2. ss. ii. exploit step_write_not_in_write; eauto.
@@ -2258,19 +2270,18 @@ Section MAPPED.
             (<<FROM: f loc from ffrom>>))
   .
 
-  Definition wf_mappable_mem (mem prom: Memory.t): Prop :=
-    forall loc to0 to1 fto
-           (TO0: f loc to0 fto)
-           (TO1: f loc to1 fto)
-           ts
-           (ITV: Interval.mem (to0, to1) ts),
-      unwritable mem prom loc ts.
+  Definition collapsable_unwritable prom mem: Prop :=
+    forall loc t
+           (SAT: (fun loc t => exists loc ts0 ts1,
+                      (<<CLPS: collapsed loc ts0 ts1>>) /\
+                      (<<ITV: Interval.mem (ts0, ts1) t>>)) loc t),
+      unwritable mem prom loc t.
 
-  Lemma wf_mappable_mem_step pf e lang (th0 th1: Thread.t lang)
+  Lemma collapsable_unwritable_step pf e lang (th0 th1: Thread.t lang)
         (STEP: Thread.step pf e th0 th1)
-        (WFMEM: wf_mappable_mem th0.(Thread.memory) th0.(Thread.local).(Local.promises))
+        (WFMEM: collapsable_unwritable th0.(Thread.local).(Local.promises) th0.(Thread.memory))
     :
-      wf_mappable_mem th1.(Thread.memory) th1.(Thread.local).(Local.promises).
+      collapsable_unwritable th1.(Thread.local).(Local.promises) th1.(Thread.memory) .
   Proof.
     ii. eapply unwritable_increase; eauto.
   Qed.
@@ -3930,23 +3941,6 @@ Section MAPPED.
   Definition mappable_time loc to :=
     exists fto, (<<MAPPED: f loc to fto>>).
 
-  Definition mappable_evt (e: ThreadEvent.t) : Prop :=
-    match e with
-    | ThreadEvent.promise loc from to msg kind =>
-      (<<FROM: mappable_time loc from>>) /\
-      (<<TO: mappable_time loc to>>) /\
-      (<<NCLPS: non_collapsable loc to>>)
-    | ThreadEvent.write loc from to val released ordw =>
-      (<<FROM: mappable_time loc from>>) /\
-      (<<TO: mappable_time loc to>>) /\
-      (<<NCLPS: non_collapsable loc to>>)
-    | ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw =>
-      (<<FROM: mappable_time loc from>>) /\
-      (<<TO: mappable_time loc to>>) /\
-      (<<NCLPS: non_collapsable loc to>>)
-    | _ => True
-    end.
-
   Definition mappable_memory mem :=
     forall loc to from val released (GET: Memory.get loc to mem = Some (from, Message.full val released)),
       mappable_time loc to.
@@ -4097,6 +4091,99 @@ Section MAPPED.
     eapply TimeFacts.le_lt_lt; eauto. inv VIEW. inv CUR. ss.
   Qed.
 
+  Definition mappable_evt (e: ThreadEvent.t) : Prop :=
+    match e with
+    | ThreadEvent.promise loc from to msg kind =>
+      (<<FROM: mappable_time loc from>>) /\
+      (<<TO: mappable_time loc to>>)
+    | ThreadEvent.write loc from to val released ordw =>
+      (<<FROM: mappable_time loc from>>) /\
+      (<<TO: mappable_time loc to>>)
+    | ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw =>
+      (<<FROM: mappable_time loc from>>) /\
+      (<<TO: mappable_time loc to>>)
+    | _ => True
+    end.
+
+  Definition write_not_to (MSGS : Loc.t -> Time.t -> Prop)
+             (e : ThreadEvent.t) : Prop :=
+    match e with
+    | ThreadEvent.write loc from to _ _ _ =>
+      ~ MSGS loc to
+    | ThreadEvent.update loc from to _ _ _ _ _ _ =>
+      ~ MSGS loc to
+    | ThreadEvent.promise loc from to _ _ =>
+      ~ MSGS loc to
+    | _ => True
+    end.
+
+  Lemma promise_include_boundary prom0 mem0 loc from to msg prom1 mem1 kind
+        (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
+        (BOTNONE: Memory.bot_none prom0)
+    :
+      Interval.mem (from, to) to.
+  Proof.
+    econs; ss; [|refl]. inv PROMISE.
+    - eapply add_succeed_wf in MEM. des. auto.
+    - eapply split_succeed_wf in MEM. des. auto.
+    - eapply Memory.lower_get0 in PROMISES. des.
+      dup GET. eapply Memory.get_ts in GET1. des; clarify.
+      rewrite BOTNONE in *. clarify.
+    - eapply Memory.remove_get0 in PROMISES. des.
+      dup GET. eapply Memory.get_ts in GET1. des; clarify.
+      rewrite BOTNONE in *. clarify.
+  Qed.
+
+  Lemma step_write_not_in_boundary
+        MSGS lang (th0 th1: Thread.t lang) pf e
+        (STEP: Thread.step pf e th0 th1)
+        (WRITENOTIN: write_not_in MSGS e)
+        (LCWF0: Local.wf th0.(Thread.local) th0.(Thread.memory))
+    :
+      write_not_to MSGS e.
+  Proof.
+    inv LCWF0. inv STEP.
+    - inv STEP0. inv LOCAL. ii. ss. eapply WRITENOTIN; eauto.
+      eapply promise_include_boundary; eauto.
+    - inv STEP0; ss. inv LOCAL; ss.
+      + inv LOCAL0. inv WRITE. eapply WRITENOTIN; eauto.
+        eapply promise_include_boundary; eauto.
+      + inv LOCAL1. inv LOCAL2. inv WRITE. eapply WRITENOTIN; eauto.
+        eapply promise_include_boundary; eauto.
+  Qed.
+
+  (* Lemma collapsable_in loc to  *)
+  (*       (CLPS: ~ non_collapsable loc to) *)
+  (*   : *)
+  (*     forall loc ts0 ts1 *)
+  (*            (CLPS: collapsed loc ts0 ts1), *)
+  (*       ~ Interval.mem (ts0, ts1) t). *)
+
+  (*     unwrita *)
+  (*     collapsable_unwritable *)
+
+
+  (* Definition collapsable_unwritable prom mem: Prop := *)
+  (*   forall loc ts0 ts1 *)
+  (*          (CLPS: collapsed loc ts0 ts1) *)
+  (*          t (ITV: Interval.mem (ts0, ts1) t), *)
+  (*     unwritable mem prom loc t. *)
+
+
+  (* Lemma step_write_not_in_boundary *)
+  (*       MSGS lang (th0 th1: Thread.t lang) pf e *)
+  (*       (STEP: Thread.step pf e th0 th1) *)
+  (*       (WRITENOTIN: write_not_in MSGS e) *)
+  (*       (LCWF0: Local.wf th0.(Thread.local) th0.(Thread.memory)) *)
+  (*       (INHABITED: Memory.inhabited th0.(Thread.memory)) *)
+  (*   : *)
+  (*     write_not_to MSGS e. *)
+  (* Proof. *)
+  (*   inv STEP. *)
+  (*   - inv STEP0. admit. *)
+  (*   - inv STEP0; ss. *)
+
+
   Lemma step_map
         P lang th0 th1 fth0 st0 st1 lc0 lc1 flc0
         sc0 sc1 fsc0 fsc0' mem0 mem1 fmem0 e
@@ -4106,12 +4193,14 @@ Section MAPPED.
         (TH_TGT0: th0 = Thread.mk lang st0 lc0 sc0 mem0)
         (TH_TGT1: th1 = Thread.mk lang st1 lc1 sc1 mem1)
         (TH_SRC: fth0 = Thread.mk lang st0 flc0 fsc0 fmem0)
-        (LCWF: Local.wf flc0 fmem0)
+        (LCWF0: Local.wf lc0 mem0)
+        (LCWF1: Local.wf flc0 fmem0)
         (CLOSED: Memory.closed fmem0)
         (LOCAL: local_map lc0 flc0)
         (MEM: memory_map mem0 fmem0)
         (SC: timemap_map sc0 fsc0')
         (SCLE: TimeMap.le fsc0 fsc0')
+        (MEMWF: collapsable_unwritable lc0.(Local.promises) mem0)
     :
       exists flc1 fmem1 fsc1 fsc1' fe,
         (<<EVT: tevent_map e fe>>) /\
@@ -4124,8 +4213,16 @@ Section MAPPED.
         (<<LOCAL: local_map lc1 flc1>>)
   .
   Proof.
-    clarify. inv STEP. eapply MAPPABLE in SAT. inv STEP0. inv STEP.
-    - inv STEP0. ss. inv LOCAL. inv LOCAL0. inv LCWF. des.
+    clarify. inv STEP. eapply MAPPABLE in SAT. inv STEP0.
+    exploit step_write_not_in; eauto.
+    { inv LCWF0. auto. } intros WRITENOTIN. ss.
+
+    eapply write_not_in_mon in WRITENOTIN; cycle 1.
+    { apply MEMWF. }
+    eapply step_write_not_in_boundary in WRITENOTIN; eauto.
+
+    inv STEP.
+    - inv STEP0. ss. inv LOCAL. inv LOCAL0. inv LCWF1. des.
       exploit mappable_memory_closed_msg_exists; eauto.
       { eapply mappable_memory_op.
         - eapply Memory.promise_op; eauto.
@@ -4133,13 +4230,16 @@ Section MAPPED.
         - eauto.
         - eapply memory_map_mappable; eauto. }
       i. des. unfold mappable_time in FROM, TO. des.
-      exploit promise_map; eauto. i. des.
+      exploit promise_map; eauto.
+      { ii. unfold collapsed in H. des. apply WRITENOTIN.
+        exists loc, to', to. esplits; ss; econs; eauto. refl. }
+      i. des.
       exists (Local.mk (Local.tview flc0) fprom1). esplits; eauto.
       + econs; eauto.
       + econs; eauto. econs; eauto. econs; eauto. econs; eauto.
         eapply closed_message_map; eauto.
       + ss. econs; eauto.
-    - inv LCWF. inv STEP0. inv LOCAL0; ss.
+    - inv LCWF1. inv STEP0. inv LOCAL0; ss.
       + esplits; eauto.
         * econs; eauto.
         * econs; eauto. econs 2; eauto. econs; eauto.
@@ -4152,6 +4252,8 @@ Section MAPPED.
         { econs. }
         { econs. }
         { econs. }
+        { ii. unfold collapsed in H. des. apply WRITENOTIN.
+          exists loc, to', to. esplits; ss; econs; eauto. refl. }
         i. des. esplits; eauto.
         * econs; eauto.
         * econs; eauto. econs 2; eauto. econs; eauto.
@@ -4161,6 +4263,8 @@ Section MAPPED.
         hexploit write_step_map; try apply LOCAL2; try eassumption.
         { inv READ. ss. }
         { inv WF2. auto. }
+        { ii. unfold collapsed in H. des. apply WRITENOTIN.
+          exists loc, to', tsw. esplits; ss; econs; eauto. refl. }
         i. des. esplits; eauto.
         * econs; eauto.
         * econs; eauto. econs 2; eauto. econs; eauto.
@@ -4181,6 +4285,7 @@ Section MAPPED.
           { ss. }
           { refl. }
   Qed.
+
 
 End MAPPED.
 

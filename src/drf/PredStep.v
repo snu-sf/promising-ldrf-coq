@@ -116,6 +116,8 @@ Section PredStep.
       forall t (IN: Interval.mem (from, to) t), ~ (MSGS loc t)
     | ThreadEvent.update loc from to _ _ _ _ _ _ =>
       forall t (IN: Interval.mem (from, to) t), ~ (MSGS loc t)
+    | ThreadEvent.promise loc from to _ _ =>
+      forall t (IN: Interval.mem (from, to) t), ~ (MSGS loc t)
     | _ => True
     end.
 
@@ -153,6 +155,7 @@ Section PredStep.
       write_not_in L0 e.
   Proof.
     i. unfold write_not_in in *. des_ifs.
+    - ii. eapply NOTIN; eauto.
     - ii. eapply NOTIN; eauto.
     - ii. eapply NOTIN; eauto.
   Qed.
