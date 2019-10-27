@@ -3187,10 +3187,96 @@ Section MAPPED.
         hexploit (map_eq TO0 TO). i. clarify.
   Qed.
 
+  Lemma memory_get_ts_le loc to mem from msg
+        (GET: Memory.get loc to mem = Some (from, msg))
+    :
+      Time.le from to.
+  Proof.
+    eapply Memory.get_ts in GET. des; clarify.
+    - refl.
+    - left. auto.
+  Qed.
+
+  Lemma closed_point mem loc from
+        to
+        (TS: Time.lt from to)
+        (COVERED: forall t (ITV: Interval.mem (from, to) t), covered loc t mem)
+    :
+      exists from' to' msg,
+        (<<GET: Memory.get loc to' mem = Some (from', msg)>>) /\
+        (<<TS0: Time.le from' from>>) /\
+        (<<TS1: Time.lt from to'>>).
+  Proof.
+    hexploit (cell_elements_least
+                (mem loc)
+                (fun to' =>
+                   exists from' msg',
+                     (<<GET: Memory.get loc to' mem = Some (from', msg')>>) /\
+                     (<<FROMLE: Time.lt from to'>>))). i. des.
+    - destruct (Time.le_lt_dec from' from).
+      + esplits; eauto.
+      + exfalso. exploit (COVERED (Time.meet from' to)).
+        * unfold Time.meet. des_ifs; econs; ss. refl.
+        * i. inv x0. inv ITV. ss.
+          exploit LEAST; try apply GET1; eauto.
+          { esplits; try apply GET1.
+            eapply TimeFacts.lt_le_lt; [|apply TO].
+            unfold Time.meet. des_ifs. }
+          { i. setoid_rewrite GET0 in GET. clarify.
+            exploit memory_get_to_mon.
+            - eapply GET1.
+            - eapply GET0.
+            - unfold Time.meet in FROM. des_ifs. etrans; eauto.
+            - i. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto. }
+    - exfalso. exploit (COVERED to).
+      + econs; ss. refl.
+      + i. inv x0. inv ITV. ss.
+        eapply EMPTY; eauto. esplits; eauto.
+        eapply TimeFacts.lt_le_lt; eauto.
+  Qed.
+
+  Lemma unwritable_covered prom mem loc to
+        (UNWRITABLE: unwritable mem prom loc to)
+    :
+      covered loc to mem.
+  Proof.
+    inv UNWRITABLE. inv UNCH. econs; eauto.
+  Qed.
+
+  Lemma no_attatch_map prom mem fmem from ffrom loc
+        (EMPTY: ~ covered loc from mem)
+        (MEM: memory_map mem fmem)
+        (FROM: f loc from ffrom)
+        (UNWRITABLE: collapsable_unwritable prom mem)
+        (NOATTATCH: forall to msg (GET: Memory.get loc to mem = Some (from, msg)), False)
+    :
+      forall to msg (GET: Memory.get loc to fmem = Some (ffrom, msg)), False.
+  Proof.
+    i. eapply msg_get_map_only_if in GET; eauto. des.
+    destruct (Time.le_lt_dec from from0).
+    - destruct l; auto.
+      + hexploit closed_point.
+        * apply H.
+        * i. hexploit (UNWRITABLE loc t).
+          { exists loc, from, from0. unfold collapsed. esplits; eauto. }
+          { i. eapply unwritable_covered; eauto. }
+        * i. des. destruct TS0.
+          { eapply EMPTY. econs; [apply GET0|]. econs; ss.
+            left. auto. }
+          { destruct H0. eapply NOATTATCH; eauto. }
+      + destruct H. eapply NOATTATCH; eauto.
+    - eapply EMPTY. exploit UNWRITABLE.
+      + exists loc, from0, from. esplits; eauto.
+        * eexists. esplits; eauto.
+        * econs; eauto. refl.
+      + ii. inv x. inv UNCH. econs; eauto.
+  Qed.
+
   Lemma write_add_map mem0 fmem0 prom0 fprom0 loc from ffrom to fto val released freleased' freleased mem1 prom1
         (MLE: Memory.le fprom0 fmem0)
         (ADD: Memory.write prom0 mem0 loc from to val released prom1 mem1 Memory.op_kind_add)
         (MEM: memory_map mem0 fmem0)
+        (UNWRITABLE: collapsable_unwritable prom0 mem0)
         (PROM: promises_map prom0 fprom0)
         (FROM: f loc from ffrom)
         (TO: f loc to fto)
@@ -3227,9 +3313,13 @@ Section MAPPED.
       eapply map_le in TS0; cycle 1; eauto.
       etrans; eauto. inv VIEWLE. eauto.
     - i. clarify.
-    - admit.
-      (* not provable *)
-  Admitted.
+    - i. clarify. exploit no_attatch_map; try apply MEM; eauto.
+      ii. inv H. eapply add_succeed_wf in MEM0. des.
+      eapply DISJOINT.
+      + eapply GET0.
+      + instantiate (1:=to). econs; ss. refl.
+      + eauto.
+  Qed.
 
   Lemma write_lower_map mem0 fmem0 prom0 fprom0 loc from ffrom to fto val released freleased' freleased msg mem1 prom1
         (MLE: Memory.le fprom0 fmem0)
@@ -3458,6 +3548,7 @@ Section MAPPED.
         (ADD: Memory.promise prom0 mem0 loc from to msg prom1 mem1 Memory.op_kind_add)
         (MEM: memory_map mem0 fmem0)
         (PROM: promises_map prom0 fprom0)
+        (UNWRITABLE: collapsable_unwritable prom0 mem0)
         (FROM: f loc from ffrom)
         (TO: f loc to fto)
         (NCLPS: non_collapsable loc to)
@@ -3487,9 +3578,13 @@ Section MAPPED.
       inv MSG. inv MSGLE.
       hexploit (map_eq TO0 FROM). i. clarify.
       esplits; eauto.
-    - i. clarify.
-      (* not provable *)
-  Admitted.
+    - i. clarify. inv MSG. exploit no_attatch_map; try apply MEM; eauto.
+      ii. inv H. eapply add_succeed_wf in MEM0. des.
+      eapply DISJOINT.
+      + eapply GET0.
+      + instantiate (1:=to). econs; ss. refl.
+      + eauto.
+  Qed.
 
   Lemma promise_lower_map mem0 fmem0 prom0 fprom0 loc from ffrom to fto msg fmsg mem1 prom1 msg0
         (MLE: Memory.le fprom0 fmem0)
@@ -3585,6 +3680,7 @@ Section MAPPED.
         (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
         (MEM: memory_map mem0 fmem0)
         (PROM: promises_map prom0 fprom0)
+        (UNWRITABLE: collapsable_unwritable prom0 mem0)
         (FROM: f loc from ffrom)
         (TO: f loc to fto)
         (NCLPS: non_collapsable loc to)
@@ -3613,6 +3709,7 @@ Section MAPPED.
         (WRITE: Memory.write prom0 mem0 loc from to val released prom1 mem1 kind)
         (MEM: memory_map mem0 fmem0)
         (PROM: promises_map prom0 fprom0)
+        (UNWRITABLE: collapsable_unwritable prom0 mem0)
         (FROM: f loc from ffrom)
         (TO: f loc to fto)
         (NCLPS: non_collapsable loc to)
@@ -3851,6 +3948,7 @@ Section MAPPED.
         (MLE: Memory.le flc0.(Local.promises) fmem0)
         (TVWF: TView.wf flc0.(Local.tview))
         (MEM: memory_map mem0 fmem0)
+        (UNWRITABLE: collapsable_unwritable lc0.(Local.promises) mem0)
         (RELEASEDR: opt_view_map releasedr freleasedr')
         (RELEASEDRLE: View.opt_le freleasedr freleasedr')
         (RELEASEDRWF: View.opt_wf freleasedr)
@@ -4198,9 +4296,9 @@ Section MAPPED.
         (CLOSED: Memory.closed fmem0)
         (LOCAL: local_map lc0 flc0)
         (MEM: memory_map mem0 fmem0)
+        (UNWRITABLE: collapsable_unwritable lc0.(Local.promises) mem0)
         (SC: timemap_map sc0 fsc0')
         (SCLE: TimeMap.le fsc0 fsc0')
-        (MEMWF: collapsable_unwritable lc0.(Local.promises) mem0)
     :
       exists flc1 fmem1 fsc1 fsc1' fe,
         (<<EVT: tevent_map e fe>>) /\
@@ -4218,7 +4316,7 @@ Section MAPPED.
     { inv LCWF0. auto. } intros WRITENOTIN. ss.
 
     eapply write_not_in_mon in WRITENOTIN; cycle 1.
-    { apply MEMWF. }
+    { apply UNWRITABLE. }
     eapply step_write_not_in_boundary in WRITENOTIN; eauto.
 
     inv STEP.
@@ -4263,6 +4361,7 @@ Section MAPPED.
         hexploit write_step_map; try apply LOCAL2; try eassumption.
         { inv READ. ss. }
         { inv WF2. auto. }
+        { inv LOCAL1. auto. }
         { ii. unfold collapsed in H. des. apply WRITENOTIN.
           exists loc, to', tsw. esplits; ss; econs; eauto. refl. }
         i. des. esplits; eauto.
