@@ -262,4 +262,24 @@ Section PredStep.
   Definition same_machine_event e_src e_tgt :=
     ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt.
 
+  Definition write_not_to (MSGS : Loc.t -> Time.t -> Prop)
+             (e : ThreadEvent.t) : Prop :=
+    match e with
+    | ThreadEvent.write loc from to _ _ _ =>
+      ~ MSGS loc to
+    | ThreadEvent.update loc from to _ _ _ _ _ _ =>
+      ~ MSGS loc to
+    | ThreadEvent.promise loc from to _ _ =>
+      ~ MSGS loc to
+    | _ => True
+    end.
+
+  Definition wf_event (e: ThreadEvent.t): Prop :=
+    match e with
+    | ThreadEvent.write loc from to _ _ _ => Time.lt from to
+    | ThreadEvent.update loc from to _ _ _ _ _ _ => Time.lt from to
+    | ThreadEvent.promise loc from to _ _ => Time.lt from to
+    | _ => True
+    end.
+
 End PredStep.
