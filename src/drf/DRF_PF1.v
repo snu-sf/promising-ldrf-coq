@@ -1097,6 +1097,42 @@ Proof.
   eapply memory_reserve_wf_tsteps in STEPS; eauto.
 Qed.
 
+Lemma max_ts_reserve_from_full_ts mem0 loc from
+      (INHABITED: Memory.inhabited mem0)
+      (RESERVEWF0: memory_reserve_wf mem0)
+      (GET: Memory.get loc (Memory.max_ts loc mem0) mem0 = Some (from, Message.reserve))
+  :
+    Memory.max_full_ts mem0 loc from.
+Proof.
+  exploit Memory.max_full_ts_exists; eauto. intros [max MAX].
+  dup GET. eapply not_latest_reserve_le_max_full_ts in GET; eauto.
+  des; clarify. exfalso.
+  exploit Memory.max_full_ts_spec; eauto. i. des.
+  exploit TimeFacts.antisym.
+  { eapply TLE. }
+  { eapply Memory.max_ts_spec; eauto. }
+  i. clarify.
+Qed.
+
+Lemma max_full_ts_max_ts loc mem ts
+      (RESERVEWF : memory_reserve_wf mem)
+      (INHABITED : Memory.inhabited mem)
+      (MAX : Memory.max_full_ts mem loc ts)
+  :
+    (<<FULL: ts = Memory.max_ts loc mem>>) \/
+    ((<<TLT: Time.lt ts (Memory.max_ts loc mem)>>) /\
+     (<<GET: Memory.get loc (Memory.max_ts loc mem) mem = Some (ts, Message.reserve)>>)).
+Proof.
+  dup MAX. inv MAX. des.
+  eapply Memory.max_ts_spec in GET. des.
+  dup GET0. eapply not_latest_reserve_le_max_full_ts in GET0; eauto.
+  des; clarify.
+  - left. eapply TimeFacts.antisym; eauto.
+  - right. split; eauto. dup GET1.
+    eapply memory_get_ts_strong in GET1. des; clarify.
+    erewrite GET2 in *.
+    erewrite INHABITED in GET0. clarify.
+Qed.
 
 Section SIMPF.
 
@@ -1191,3 +1227,101 @@ Section SIMPF.
   Qed.
 
 End SIMPF.
+
+
+Inductive diff_after_promises (caps: Loc.t -> option (Time.t * Time.t * Message.t))
+          (prom mem0 mem1: Memory.t): Prop :=
+| diff_after_promises_intro
+    (MLE: Memory.le mem0 mem1)
+
+    (DIFF: forall loc to from msg
+                  (GET: Memory.get loc to mem1 = Some (from, msg))
+                  (NONE: Memory.get loc to mem0 = None),
+        caps loc = Some (from, to, msg))
+
+    (CAPS: forall loc to from msg
+                  (CAP: caps loc = Some (from, to, msg)),
+        (<<TGTGET: Memory.get loc to mem1 = Some (from, msg)>>) /\
+        (<<PROMGET: Memory.get loc to prom = None>>) /\
+        (<<SRCGET: forall (NONE: Memory.get loc to mem0 = None),
+            exists from' to' val released,
+              (<<PROM: Memory.get loc to' prom = Some (from', Message.full val released)>>)>>) /\
+        (<<PROM: forall from' to' val released
+                        (PROM: Memory.get loc to' prom = Some (from', Message.full val released)),
+            (<<TLT: Time.lt to' to>>) /\ (<<GET: Memory.get loc to mem0 = None>>)>>))
+.
+
+Lemma diff_after_promise_unchangable caps prom0 mem_src0 mem_tgt0
+      (MLE: Memory.le prom0 mem_src0)
+      (DIFF: diff_after_promises caps prom0 mem_src0 mem_tgt0)
+      loc from to msg
+      (CAP: caps loc = Some (from, to, msg))
+  :
+    unchangable mem_tgt0 prom0 loc to from msg.
+Proof.
+  inv DIFF. eapply CAPS in CAP. des. econs; eauto.
+Qed.
+
+Lemma diff_after_promise_promise caps prom0 mem_src0 mem_tgt0
+      loc from to msg kind prom1 mem_tgt1
+      (DIFF: diff_after_promises caps prom0 mem_src0 mem_tgt0)
+      (MLE: Memory.le prom0 mem_src0)
+      (PROMISE: Memory.promise prom0 mem_tgt0 loc from to msg prom1 mem_tgt1 kind)
+      (PF: (Memory.op_kind_is_lower_full kind && Message.is_released_none msg
+            || Memory.op_kind_is_cancel kind)%bool)
+  :
+    exists mem_src1,
+      (<<PROMISE: Memory.promise prom0 mem_src0 loc from to msg prom1 mem_src1 kind>>) /\
+      (<<DIFF: diff_after_promises caps prom1 mem_src1 mem_tgt1>>).
+Proof.
+  generalize (unchangable_promise PROMISE). intros UNCH.
+  dup DIFF. inv DIFF. inv PROMISE; ss.
+  - unfold Message.is_released_none in *. des_ifs. des. clarify.
+    dup MEM. eapply lower_succeed_wf in MEM0. des.
+    exploit Memory.lower_exists.
+    { eapply MLE. eapply lower_succeed_wf in PROMISES. des. eapply GET0. }
+    { eauto. }
+    { eauto. }
+    { eauto. }
+    i. des. exists mem2. split.
+    + econs; eauto.
+    + econs.
+      * eapply memory_op_le; eauto.
+      * i. erewrite Memory.lower_o in GET0; eauto.
+        erewrite Memory.lower_o in NONE; eauto. des_ifs. guardH o.
+        exploit DIFF1; eauto.
+      * i. exploit UNCH.
+        { eapply diff_after_promise_unchangable; eauto. } i. inv x.
+        eapply CAPS in CAP. des. splits; eauto.
+        { i. erewrite Memory.lower_o in NONE; eauto. des_ifs. guardH o.
+          eapply SRCGET in NONE. des. eapply Memory.lower_get1 in PROM0; eauto.
+          des. inv MSG_LE0. esplits; eauto. }
+        { i. erewrite Memory.lower_o in PROM0; eauto. des_ifs.
+          - ss. des; clarify. exploit PROM.
+            + eapply Memory.lower_get0 in PROMISES. des. eauto.
+            + i. des. split; auto. eapply Memory.lower_get0 in PROMISES.
+              erewrite Memory.lower_o; eauto. des_ifs. ss; des; clarify.
+          - guardH o. dup PROM0. eapply PROM in PROM0. des. split; auto.
+            erewrite Memory.lower_o; eauto. des_ifs. ss. des; clarify.
+            exfalso. eapply Memory.lower_get0 in PROMISES. des. clarify. }
+  - exploit Memory.remove_exists.
+    { eapply Memory.remove_get0 in PROMISES. des.
+      eapply MLE. eauto. }
+    i. des. exists mem2. split.
+    + econs; eauto.
+    + econs.
+      * eapply memory_op_le; eauto.
+      * i. erewrite Memory.remove_o in GET; eauto.
+        erewrite Memory.remove_o in NONE; eauto. des_ifs. eauto.
+      * i. exploit UNCH.
+        { eapply diff_after_promise_unchangable; eauto. } i. inv x.
+        eapply CAPS in CAP. des. splits; eauto.
+        { i. erewrite Memory.remove_o in NONE; eauto. des_ifs.
+          - ss. eapply Memory.remove_get0 in PROMISES. des; clarify.
+          - guardH o. eapply SRCGET in NONE. des.
+            exists from', to', val, released. erewrite Memory.remove_o; eauto.
+            eapply Memory.remove_get0 in PROMISES. des_ifs. ss; des; clarify. }
+        { i. erewrite Memory.remove_o in PROM0; eauto. des_ifs.
+          guardH o. eapply PROM in PROM0. des. split; auto.
+          erewrite Memory.remove_o; eauto. des_ifs. }
+Qed.

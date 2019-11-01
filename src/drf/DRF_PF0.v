@@ -461,6 +461,17 @@ Section FORGETMEMORY.
     - erewrite COMPLETE; auto. erewrite COMPLETE0; auto.
   Qed.
 
+  Lemma forget_memory_get P mem0 mem1 loc to msg
+        (FORGET: forget_memory P mem0 mem1)
+        (GET: Memory.get loc to mem0 = Some msg)
+    :
+      (<<NOT: ~ P loc to>>) /\ (<<GET: Memory.get loc to mem1 = Some msg>>).
+  Proof.
+    inv FORGET. destruct (classic (P loc to)).
+    - exfalso. rewrite FORGET0 in GET; auto. clarify.
+    - esplits; eauto.
+      rewrite <- COMPLETE; auto.
+  Qed.
 
 End FORGETMEMORY.
 
@@ -1080,6 +1091,32 @@ Section MEMORYLEMMAS.
     erewrite (@Memory.split_o mem2 mem1); eauto. des_ifs; ss; des; clarify.
   Qed.
 
+  Lemma memory_op_le mem_src0 mem_tgt0 loc from to msg mem_src1 mem_tgt1 kind
+        (MLE: Memory.le mem_src0 mem_tgt0)
+        (OPSRC: Memory.op mem_src0 loc from to msg mem_src1 kind)
+        (OPTGT: Memory.op mem_tgt0 loc from to msg mem_tgt1 kind)
+    :
+      Memory.le mem_src1 mem_tgt1.
+  Proof.
+    inv OPSRC; inv OPTGT.
+    - ii. erewrite Memory.add_o in LHS; eauto.
+      erewrite Memory.add_o; cycle 1; eauto. des_ifs; eauto.
+    - ii. erewrite Memory.split_o in LHS; eauto.
+      erewrite Memory.split_o; cycle 1; eauto. des_ifs; eauto.
+    - ii. erewrite Memory.lower_o in LHS; eauto.
+      erewrite Memory.lower_o; cycle 1; eauto. des_ifs; eauto.
+    - ii. erewrite Memory.remove_o in LHS; eauto.
+      erewrite Memory.remove_o; cycle 1; eauto. des_ifs; eauto.
+  Qed.
+
+  Lemma max_full_ts_le_max_ts mem loc ts
+        (MAX: Memory.max_full_ts mem loc ts)
+    :
+      Time.le ts (Memory.max_ts loc mem).
+  Proof.
+    inv MAX. des.
+    eapply Memory.max_ts_spec in GET. des; auto.
+  Qed.
 
 End MEMORYLEMMAS.
 
@@ -1758,4 +1795,30 @@ Proof.
   - i. instantiate (1:=fun _ _ => False).
     ss. splits; eauto. unfold write_not_in. des_ifs.
   - i. inv x0. auto.
+Qed.
+
+Inductive configuration_step: forall (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
+| configuration_step_intro
+    pf e tid c1 lang st1 lc1 e2 st3 lc3 sc3 memory3
+    (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
+    (STEPS: rtc (@Thread.tau_step _) (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
+    (STEP: Thread.step pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
+    (CONSISTENT: forall (EVENT: e <> ThreadEvent.failure),
+        Thread.consistent (Thread.mk _ st3 lc3 sc3 memory3))
+  :
+    configuration_step (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
+.
+
+Lemma configuration_step_equivalent e tid c1 c2
+  :
+    Configuration.step e tid c1 c2 <-> configuration_step e tid c1 c2.
+Proof.
+  split.
+  - i. inv H.
+    + replace MachineEvent.failure with (ThreadEvent.get_machine_event ThreadEvent.failure); auto.
+      econs; eauto. i. clarify.
+    + econs; eauto.
+  - i. inv H. destruct (classic (e0 = ThreadEvent.failure)).
+    + clarify. econs 1; eauto.
+    + econs 2; eauto.
 Qed.

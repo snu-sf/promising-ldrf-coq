@@ -282,4 +282,70 @@ Section PredStep.
     | _ => True
     end.
 
+  Definition wf_time_evt (P: Loc.t -> Time.t -> Prop) (e: ThreadEvent.t) : Prop :=
+    match e with
+    | ThreadEvent.promise loc from to msg kind =>
+      (<<FROM: P loc from>>) /\ (<<TO: P loc to>>)
+    | ThreadEvent.write loc from to val released ordw =>
+      (<<FROM: P loc from>>) /\ (<<TO: P loc to>>)
+    | ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw =>
+      (<<TO: P loc to>>)
+    | _ => True
+    end.
+
+  Lemma wf_time_evt_mon P0 P1
+        (LE: P0 <2= P1)
+    :
+      wf_time_evt P0 <1= wf_time_evt P1.
+  Proof.
+    ii. unfold wf_time_evt in *. des_ifs; des; splits; eauto.
+  Qed.
+
+  Lemma step_times_list_exists P lang th0 th1 e
+        (STEPS: (@pred_step P lang) e th0 th1)
+    :
+      exists times,
+        (@pred_step (P /1\ wf_time_evt (fun loc to => List.In to (times loc))) lang) e th0 th1.
+  Proof.
+    inv STEPS. destruct e.
+    - exists (fun l => if Loc.eq_dec l loc then
+                         [from; to] else []).
+      econs; eauto.
+      ss. splits; auto; des_ifs; ss; eauto.
+    - exists (fun _ => []). econs; eauto. ss.
+    - exists (fun _ => []). econs; eauto. ss.
+    - exists (fun l => if Loc.eq_dec l loc then
+                         [from; to] else []).
+      econs; eauto.
+      ss. splits; auto; des_ifs; ss; eauto.
+    - exists (fun l => if Loc.eq_dec l loc then
+                         [tsw] else []).
+      econs; eauto.
+      ss. splits; auto; des_ifs; ss; eauto.
+    - exists (fun _ => []). econs; eauto. ss.
+    - exists (fun _ => []). econs; eauto. ss.
+    - exists (fun _ => []). econs; eauto. ss.
+  Qed.
+
+  Lemma times_list_exists P lang th0 th1
+        (STEPS: rtc (tau (@pred_step P lang)) th0 th1)
+    :
+      exists times,
+        rtc (tau (@pred_step (P /1\ wf_time_evt (fun loc to => List.In to (times loc))) lang)) th0 th1.
+  Proof.
+    ginduction STEPS.
+    - exists (fun _ => []). refl.
+    - dup H. inv H0.
+      eapply step_times_list_exists in TSTEP. des.
+      exists (fun loc => times loc ++ times0 loc). econs 2.
+      + econs; eauto. eapply pred_step_mon; eauto.
+        i. ss. des. split; auto.
+        eapply wf_time_evt_mon; eauto.
+        i. ss. eapply List.in_or_app; eauto.
+      + eapply pred_step_rtc_mon; eauto.
+        i. ss. des. split; auto.
+        eapply wf_time_evt_mon; eauto.
+        i. ss. eapply List.in_or_app; eauto.
+  Qed.
+
 End PredStep.
