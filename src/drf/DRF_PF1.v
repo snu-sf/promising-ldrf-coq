@@ -1019,6 +1019,85 @@ Module Inv.
 End Inv.
 
 
+
+Definition memory_reserve_wf mem := Memory.reserve_wf mem mem.
+
+Lemma memory_reserve_wf_promise
+      prom0 mem0 loc from to msg prom1 mem1 kind
+      (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
+      (RESERVE: memory_reserve_wf mem0)
+  :
+    memory_reserve_wf mem1.
+Proof.
+  inv PROMISE.
+  - ii. erewrite Memory.add_o in GET; eauto. des_ifs.
+    + ss; des; clarify. exploit RESERVE0; eauto.
+      i. des. eapply Memory.add_get1 in x; eauto.
+    + eapply RESERVE in GET; eauto. clear o. des.
+      eapply Memory.add_get1 in GET; eauto.
+  - ii. des. clarify. erewrite Memory.split_o in GET; eauto. des_ifs.
+    + ss; des; clarify. eapply Memory.split_get0 in MEM. des.
+      esplits; eauto.
+    + eapply RESERVE in GET; eauto. clear o o0. des.
+      eapply Memory.split_get1 in GET; eauto. des. esplits; eauto.
+  - ii. erewrite Memory.lower_o in GET; eauto. des_ifs.
+    + ss; des; clarify. inv MEM. inv LOWER. inv MSG_LE.
+    + eapply RESERVE in GET; eauto. clear o. des.
+      eapply Memory.lower_get1 in GET; eauto. des.
+      inv MSG_LE. esplits; eauto.
+  - ii. erewrite Memory.remove_o in GET; eauto. des_ifs. guardH o.
+    dup MEM. eapply Memory.remove_get0 in MEM0. des.
+    eapply RESERVE in GET; eauto. des. dup GET.
+    eapply Memory.remove_get1 in GET2; eauto. ss. des; clarify.
+    esplits; eauto.
+Qed.
+
+Lemma memory_reserve_wf_tstep lang (th0 th1: Thread.t lang) tf e
+      (RESERVE: memory_reserve_wf th0.(Thread.memory))
+      (STEP: Thread.step tf e th0 th1)
+  :
+    memory_reserve_wf th1.(Thread.memory).
+Proof.
+  inv STEP; inv STEP0; ss.
+  - inv LOCAL. eapply memory_reserve_wf_promise; eauto.
+  - inv LOCAL; eauto.
+    + inv LOCAL0. inv WRITE.
+      eapply memory_reserve_wf_promise; eauto.
+    + inv LOCAL1. inv LOCAL2. inv WRITE.
+      eapply memory_reserve_wf_promise; eauto.
+Qed.
+
+Lemma memory_reserve_wf_tsteps lang (th0 th1: Thread.t lang)
+      (RESERVE: memory_reserve_wf th0.(Thread.memory))
+      (STEP: rtc (tau (@Thread.step_allpf lang)) th0 th1)
+  :
+    memory_reserve_wf th1.(Thread.memory).
+Proof.
+  ginduction STEP; eauto.
+  i. eapply IHSTEP; eauto. inv H. inv TSTEP.
+  eapply memory_reserve_wf_tstep; eauto.
+Qed.
+
+Lemma memory_reserve_wf_init
+  :
+    memory_reserve_wf Memory.init.
+Proof.
+  ii. unfold Memory.get, Memory.init in *. ss.
+  rewrite Cell.init_get in GET. des_ifs.
+Qed.
+
+Lemma memory_reserve_wf_configuration_step c0 c1 e tid
+      (RESERVE: memory_reserve_wf c0.(Configuration.memory))
+      (STEP: Configuration.step e tid c0 c1)
+  :
+    memory_reserve_wf c1.(Configuration.memory).
+Proof.
+  eapply configuration_step_equivalent in STEP. inv STEP. ss.
+  eapply memory_reserve_wf_tstep in STEP0; eauto.
+  eapply memory_reserve_wf_tsteps in STEPS; eauto.
+Qed.
+
+
 Section SIMPF.
 
   Inductive thread_wf lang (th: Thread.t lang): Prop :=

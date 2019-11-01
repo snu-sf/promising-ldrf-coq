@@ -660,32 +660,6 @@ Proof.
   econs. ss. eapply Time.bot_spec.
 Qed.
 
-Inductive configuration_step: forall (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
-| configuration_step_intro
-    pf e tid c1 lang st1 lc1 e2 st3 lc3 sc3 memory3
-    (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
-    (STEPS: rtc (@Thread.tau_step _) (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
-    (STEP: Thread.step pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
-    (CONSISTENT: forall (EVENT: e <> ThreadEvent.failure),
-        Thread.consistent (Thread.mk _ st3 lc3 sc3 memory3))
-  :
-    configuration_step (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
-.
-
-Lemma configuration_step_equivalent e tid c1 c2
-  :
-    Configuration.step e tid c1 c2 <-> configuration_step e tid c1 c2.
-Proof.
-  split.
-  - i. inv H.
-    + replace MachineEvent.failure with (ThreadEvent.get_machine_event ThreadEvent.failure); auto.
-      econs; eauto. i. clarify.
-    + econs; eauto.
-  - i. inv H. destruct (classic (e0 = ThreadEvent.failure)).
-    + clarify. econs 1; eauto.
-    + econs 2; eauto.
-Qed.
-
 Lemma progressable_in_added_rtc
       lang st lc sc0 sc1 m0 m1 tm
       (CONSISTENT: Thread.consistent (Thread.mk lang st lc sc0 m0))

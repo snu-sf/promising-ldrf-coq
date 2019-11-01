@@ -32,9 +32,11 @@ Require Import Cell.
 Require Import Time.
 Require Import PredStep.
 Require Import ReorderPromises2.
-Require Import AbortProp.
 
-Require Import DRF_PF.
+Require Import DRF_PF0.
+Require Import DRF_PF1.
+Require Import DRF_PF4.
+Require Import Mapping.
 
 Require Import PFConsistent.
 
@@ -847,83 +849,6 @@ Proof.
   - econs 1; eauto.
 Qed.
 
-Definition memory_reserve_wf mem := Memory.reserve_wf mem mem.
-
-Lemma memory_reserve_wf_promise
-      prom0 mem0 loc from to msg prom1 mem1 kind
-      (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
-      (RESERVE: memory_reserve_wf mem0)
-  :
-    memory_reserve_wf mem1.
-Proof.
-  inv PROMISE.
-  - ii. erewrite Memory.add_o in GET; eauto. des_ifs.
-    + ss; des; clarify. exploit RESERVE0; eauto.
-      i. des. eapply Memory.add_get1 in x; eauto.
-    + eapply RESERVE in GET; eauto. clear o. des.
-      eapply Memory.add_get1 in GET; eauto.
-  - ii. des. clarify. erewrite Memory.split_o in GET; eauto. des_ifs.
-    + ss; des; clarify. eapply Memory.split_get0 in MEM. des.
-      esplits; eauto.
-    + eapply RESERVE in GET; eauto. clear o o0. des.
-      eapply Memory.split_get1 in GET; eauto. des. esplits; eauto.
-  - ii. erewrite Memory.lower_o in GET; eauto. des_ifs.
-    + ss; des; clarify. inv MEM. inv LOWER. inv MSG_LE.
-    + eapply RESERVE in GET; eauto. clear o. des.
-      eapply Memory.lower_get1 in GET; eauto. des.
-      inv MSG_LE. esplits; eauto.
-  - ii. erewrite Memory.remove_o in GET; eauto. des_ifs. guardH o.
-    dup MEM. eapply Memory.remove_get0 in MEM0. des.
-    eapply RESERVE in GET; eauto. des. dup GET.
-    eapply Memory.remove_get1 in GET2; eauto. ss. des; clarify.
-    esplits; eauto.
-Qed.
-
-Lemma memory_reserve_wf_tstep lang (th0 th1: Thread.t lang) tf e
-      (RESERVE: memory_reserve_wf th0.(Thread.memory))
-      (STEP: Thread.step tf e th0 th1)
-  :
-    memory_reserve_wf th1.(Thread.memory).
-Proof.
-  inv STEP; inv STEP0; ss.
-  - inv LOCAL. eapply memory_reserve_wf_promise; eauto.
-  - inv LOCAL; eauto.
-    + inv LOCAL0. inv WRITE.
-      eapply memory_reserve_wf_promise; eauto.
-    + inv LOCAL1. inv LOCAL2. inv WRITE.
-      eapply memory_reserve_wf_promise; eauto.
-Qed.
-
-Lemma memory_reserve_wf_tsteps lang (th0 th1: Thread.t lang)
-      (RESERVE: memory_reserve_wf th0.(Thread.memory))
-      (STEP: rtc (tau (@Thread.step_allpf lang)) th0 th1)
-  :
-    memory_reserve_wf th1.(Thread.memory).
-Proof.
-  ginduction STEP; eauto.
-  i. eapply IHSTEP; eauto. inv H. inv TSTEP.
-  eapply memory_reserve_wf_tstep; eauto.
-Qed.
-
-Lemma memory_reserve_wf_init
-  :
-    memory_reserve_wf Memory.init.
-Proof.
-  ii. unfold Memory.get, Memory.init in *. ss.
-  rewrite Cell.init_get in GET. des_ifs.
-Qed.
-
-Lemma memory_reserve_wf_configuration_step c0 c1 e tid
-      (RESERVE: memory_reserve_wf c0.(Configuration.memory))
-      (STEP: Configuration.step e tid c0 c1)
-  :
-    memory_reserve_wf c1.(Configuration.memory).
-Proof.
-  eapply configuration_step_equivalent in STEP. inv STEP. ss.
-  eapply memory_reserve_wf_tstep in STEP0; eauto.
-  eapply memory_reserve_wf_tsteps in STEPS; eauto.
-Qed.
-
 Lemma not_latest_reserve_le_max_full_ts loc mem ts to from msg
       (RESERVEWF : memory_reserve_wf mem)
       (INHABITED : Memory.inhabited mem)
@@ -1113,16 +1038,6 @@ Proof.
     eapply Memory.max_full_view_closed; eauto.
 Qed.
 
-Lemma memory_get_ts_le loc to mem from msg
-      (GET: Memory.get loc to mem = Some (from, msg))
-  :
-    Time.le from to.
-Proof.
-  eapply Memory.get_ts in GET. des; clarify.
-  - refl.
-  - left. auto.
-Qed.
-
 Lemma caps_collapsing_promises (L: Loc.t -> Prop) mem prom
       (MLE: Memory.le prom mem)
       (CLOSED: Memory.closed mem)
@@ -1310,55 +1225,55 @@ Qed.
 
 
 
-Inductive shifted_map mlast mcert
-          (updates: Loc.t -> Prop)
-          (sky gap: TimeMap.t)
-          (f: Loc.t -> Time.t -> Time.t): Prop :=
-| shifted_map_intro
-    (PRSV: map_preserving (times_in_memory mcert) f)
-    (SAME: forall l t (TLE: Time.le t (Memory.max_ts l mlast)),
-        f l t = t)
-    (INGAP: forall l t (TLT: Time.lt (Memory.max_ts l mcert) t),
-        Time.lt (f l t) (gap l))
-    (AFTERSKY: forall l t (TLT: Time.lt (Memory.max_ts l mcert) t),
-        Time.lt (sky l) (f l t))
-.
+(* Inductive shifted_map mlast mcert *)
+(*           (updates: Loc.t -> Prop) *)
+(*           (sky gap: TimeMap.t) *)
+(*           (f: Loc.t -> Time.t -> Time.t): Prop := *)
+(* | shifted_map_intro *)
+(*     (PRSV: map_preserving (times_in_memory mcert) f) *)
+(*     (SAME: forall l t (TLE: Time.le t (Memory.max_ts l mlast)), *)
+(*         f l t = t) *)
+(*     (INGAP: forall l t (TLT: Time.lt (Memory.max_ts l mcert) t), *)
+(*         Time.lt (f l t) (gap l)) *)
+(*     (AFTERSKY: forall l t (TLT: Time.lt (Memory.max_ts l mcert) t), *)
+(*         Time.lt (sky l) (f l t)) *)
+(* . *)
 
-Lemma shifted_map_exists mlast mcert updates
-      (MLE: Memory.le mlast mcert)
-      (sky gap: TimeMap.t)
-      (SKY: forall l, Time.lt (Memory.max_ts l mlast) (sky l))
-      (GAP: forall l, Time.lt (Memory.max_ts l mlast) (gap l))
-  :
-    exists f, (<<SHIFTED: shifted_map mlast mcert updates sky gap f>>).
-Proof.
-  (* may be very hard... *)
-Admitted.
+(* Lemma shifted_map_exists mlast mcert updates *)
+(*       (MLE: Memory.le mlast mcert) *)
+(*       (sky gap: TimeMap.t) *)
+(*       (SKY: forall l, Time.lt (Memory.max_ts l mlast) (sky l)) *)
+(*       (GAP: forall l, Time.lt (Memory.max_ts l mlast) (gap l)) *)
+(*   : *)
+(*     exists f, (<<SHIFTED: shifted_map mlast mcert updates sky gap f>>). *)
+(* Proof. *)
+(*   (* may be very hard... *) *)
+(* Admitted. *)
 
-Lemma shifted_map_preserving_last_mem  mlast mcert updates sky gap f
-      (CLOSED: Memory.closed mlast)
-      (SHIFTED: shifted_map mlast mcert updates sky gap f)
-  :
-    memory_map f mlast mlast.
-Proof.
-  inv SHIFTED. inv PRSV. econs; i.
-  - exploit Memory.max_ts_spec; eauto. i. des.
-    repeat erewrite SAME; eauto.
-    + rewrite GET. unfold msg_map. des_ifs. repeat f_equal.
-      inv CLOSED. exploit CLOSED0; try apply GET; eauto. i. des.
-      inv MSG_CLOSED. inv CLOSED; ss. f_equal.
-      destruct view. inv CLOSED1. unfold view_map, timemap_map. ss. f_equal.
-      * extensionality l. erewrite SAME; auto.
-        specialize (PLN l). des.
-        exploit Memory.max_ts_spec; eauto. i. des. auto.
-      * extensionality l. erewrite SAME; auto.
-        specialize (RLX l). des.
-        exploit Memory.max_ts_spec; eauto. i. des. auto.
-    + exploit Memory.get_ts; try apply GET; eauto. i. des.
-      * clarify.
-      * left. eapply TimeFacts.lt_le_lt; eauto.
-  - destruct msg_src as [from msg]. exploit Memory.max_ts_spec; eauto. i. des.
-    esplits.
-    + erewrite SAME; eauto.
-    + eauto.
-Qed.
+(* Lemma shifted_map_preserving_last_mem  mlast mcert updates sky gap f *)
+(*       (CLOSED: Memory.closed mlast) *)
+(*       (SHIFTED: shifted_map mlast mcert updates sky gap f) *)
+(*   : *)
+(*     memory_map f mlast mlast. *)
+(* Proof. *)
+(*   inv SHIFTED. inv PRSV. econs; i. *)
+(*   - exploit Memory.max_ts_spec; eauto. i. des. *)
+(*     repeat erewrite SAME; eauto. *)
+(*     + rewrite GET. unfold msg_map. des_ifs. repeat f_equal. *)
+(*       inv CLOSED. exploit CLOSED0; try apply GET; eauto. i. des. *)
+(*       inv MSG_CLOSED. inv CLOSED; ss. f_equal. *)
+(*       destruct view. inv CLOSED1. unfold view_map, timemap_map. ss. f_equal. *)
+(*       * extensionality l. erewrite SAME; auto. *)
+(*         specialize (PLN l). des. *)
+(*         exploit Memory.max_ts_spec; eauto. i. des. auto. *)
+(*       * extensionality l. erewrite SAME; auto. *)
+(*         specialize (RLX l). des. *)
+(*         exploit Memory.max_ts_spec; eauto. i. des. auto. *)
+(*     + exploit Memory.get_ts; try apply GET; eauto. i. des. *)
+(*       * clarify. *)
+(*       * left. eapply TimeFacts.lt_le_lt; eauto. *)
+(*   - destruct msg_src as [from msg]. exploit Memory.max_ts_spec; eauto. i. des. *)
+(*     esplits. *)
+(*     + erewrite SAME; eauto. *)
+(*     + eauto. *)
+(* Qed. *)
