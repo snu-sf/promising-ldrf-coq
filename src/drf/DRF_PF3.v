@@ -1128,11 +1128,7 @@ Lemma caps_collapsing_promises (L: Loc.t -> Prop) mem prom
       (CLOSED: Memory.closed mem)
       (RESERVEWF: memory_reserve_wf mem)
       (INHABITED: Memory.inhabited mem)
-      (LATESTRESERVE: forall
-          loc (SAT: L loc)
-          from msg
-          (GET: Memory.get loc (Memory.max_ts loc mem) prom = Some (from, msg)),
-          msg <> Message.reserve)
+      (COLLAPSABLE: collapsable_cap L prom mem)
   :
     promises_map (caps_collapsing L mem) prom prom.
 Proof.
@@ -1152,7 +1148,7 @@ Proof.
           eapply Time.lt_strorder; eauto. }
         { econs 2; eauto. }
         { eapply caps_collapsing_message; eauto. }
-      * exfalso. exploit LATESTRESERVE; eauto.
+      * exfalso. exploit COLLAPSABLE; eauto.
     + splits; auto.
       * ii. unfold collapsed in *. des.
         inv MAP0; clarify. inv MAP1; clarify.
@@ -1171,7 +1167,7 @@ Proof.
           eapply memory_get_ts_strong in GET0. des; clarify.
           { refl. }
           { left. auto. } }
-      * exfalso. exploit LATESTRESERVE; eauto.
+      * exfalso. exploit COLLAPSABLE; eauto.
     + splits; auto.
       * econs 1; eauto.
       * econs 1; eauto.
@@ -1221,7 +1217,6 @@ Lemma caps_collapsing_memory
       (INHABITED: Memory.inhabited mem0)
       (COLLAPSABLE0: collapsable_cap L0 prom mem0)
       (COLLAPSABLE1: collapsable_cap L1 prom mem0)
-      (DISJOINTLOC: forall l (SAT0: L0 l) (SAT1: L1 l) , False)
       (CAP: Memory.cap prom mem0 mem1)
       (FORGET0: forget_memory (collapsing_latest_reserves_times L0 mem0 \2/ collapsing_caps_times L0 mem0 mem1) mem2 mem1)
       (FORGET1: forget_memory (collapsing_latest_reserves_times L1 mem0 \2/ collapsing_caps_times L1 mem0 mem1) mem3 mem2)
@@ -1241,15 +1236,8 @@ Proof.
           { eapply Memory.max_full_ts_inj; eauto.
             eapply max_ts_reserve_from_full_ts; eauto. }
           dup RESERVE0. eapply RESERVEWF0 in RESERVE. des.
-          eapply Memory.cap_le in RESERVE; eauto; [|refl]. clarify.
-          exists (tm loc), f, Message.reserve, (Message.full val released).
-          splits; auto.
-          - econs 3; eauto.
-          - econs.
-          - erewrite COMPLETE0; eauto.
-            + erewrite COMPLETE; eauto.
-              eapply max_full_ts_not_collapsed; eauto.
-            + eapply max_full_ts_not_collapsed; eauto. }
+          eapply Memory.cap_le in RESERVE; eauto. refl.
+        }
         { inv H0. inv H1. des. clear H0.
           dup CAP0. eapply caps_max_view in CAP0; eauto. des. clarify.
           unfold caps in CAP1. des. clarify.
@@ -1257,7 +1245,7 @@ Proof.
           exploit Memory.max_full_ts_inj.
           { eapply MAX0. }
           { eapply MAX. } i. clarify.
-          exploit Memory.max_full_ts_spec; eauto. i. des. clarify.
+          exploit Memory.max_full_ts_spec; eauto. i. des. clarify. right.
           exists (tm loc), from, (Message.full val (Some (View.mk tm tm))), (Message.full val released).
           splits.
           - econs 4; eauto.
@@ -1283,13 +1271,13 @@ Proof.
             + refl.
           - exfalso. eapply H1. econs; eauto. econs; eauto.
             esplits; eauto. econs; eauto. }
-        exists to, from, msg, msg. splits; auto.
+        right. exists to, from, msg, msg. splits; auto.
         { econs 2; eauto. }
         { eapply caps_collapsing_message; eauto.
           eapply memory_cap_message_closed; eauto. }
         { refl. }
         { erewrite COMPLETE0; eauto. ii. des; clarify. }
-    + exists to, from, msg, msg. esplits; eauto.
+    + right. exists to, from, msg, msg. esplits; eauto.
       * econs 1; eauto.
       * eapply caps_collapsing_message; eauto.
         eapply memory_cap_message_closed in GET1; eauto.

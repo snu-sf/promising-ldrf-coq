@@ -653,16 +653,15 @@ Section MEMORYLEMMAS.
     + i. des; clarify. eauto.
   Qed.
 
-  Definition not_attatched_time (mem: Memory.t) (loc: Loc.t) (to: Time.t) :=
-    forall to' msg (GET: Memory.get loc to' mem = Some (to, msg)),
-      False.
+  Definition attatched_time (mem: Memory.t) (loc: Loc.t) (to: Time.t) :=
+    exists to' msg, <<GET: Memory.get loc to' mem = Some (to, msg)>>.
 
   Lemma write_succeed mem1 loc from1 to1 val released
         (NCOVER: forall t (COVER: covered loc t mem1),
             ~ Interval.mem (from1, to1) t)
         (TO: Time.le (View.rlx (View.unwrap released) loc) to1)
         (FROMTO: Time.lt from1 to1)
-        (* (NOATTATCH: not_attatched_time mem1 loc to1) *)
+        (* (NOATTATCH: ~ attatched_time mem1 loc to1) *)
         (MSGWF: Message.wf (Message.full val released))
     :
       exists mem2,
@@ -719,11 +718,12 @@ Section MEMORYLEMMAS.
                 (View.rlx (View.unwrap (TView.write_released v sc loc to releasedm ord)) loc) to>>) /\
       (<<FROMTO: Time.lt from to>>) /\
       (<<MSGWF: Message.wf (Message.full val (TView.write_released v sc loc to releasedm ord))>>) /\
-      (<<NOATTATCH: forall (KIND: kind = Memory.op_kind_add), not_attatched_time mem_tgt loc to>>)
+      (<<NOATTATCH: forall (KIND: kind = Memory.op_kind_add), ~ attatched_time mem_tgt loc to>>)
   .
   Proof.
     inv WRITE. inv WRITE0. inv PROMISE.
-    - inv TS. inv MEM. inv ADD. esplits; eauto. ii. eauto.
+    - inv TS. inv MEM. inv ADD. esplits; eauto. ii. clarify.
+      unfold attatched_time in *. des. exploit ATTACH; eauto.
     - inv TS. inv MEM. inv SPLIT. esplits; eauto. ii. clarify.
     - inv TS. inv MEM. inv LOWER. esplits; eauto. ii. clarify.
     - clarify.
@@ -826,6 +826,145 @@ Section MEMORYLEMMAS.
       esplits; eauto.
   Qed.
 
+  Lemma add_succeed_wf mem1 loc from to msg mem2
+        (ADD: Memory.add mem1 loc from to msg mem2)
+    :
+      (<<DISJOINT: forall to2 from2 msg2
+                          (GET2: Memory.get loc to2 mem1 = Some (from2, msg2)),
+          Interval.disjoint (from, to) (from2, to2)>>) /\
+      (<<TO1: Time.lt from to>>) /\
+      (<<MSG_WF: Message.wf msg>>).
+  Proof.
+    inv ADD. inv ADD0. esplits; eauto.
+  Qed.
+
+  Lemma lower_succeed_wf mem1 loc from to msg1 msg2 mem2
+        (LOWER: Memory.lower mem1 loc from to msg1 msg2 mem2)
+    :
+      (<<GET: Memory.get loc to mem1 = Some (from, msg1)>>) /\
+      (<<TS: Time.lt from to>>) /\
+      (<<MSG_WF: Message.wf msg2>>) /\
+      (<<MSG_LE: Message.le msg2 msg1>>).
+  Proof.
+    inv LOWER. inv LOWER0. esplits; eauto.
+  Qed.
+
+  Lemma split_succeed_wf mem1 loc ts1 ts2 ts3 msg2 msg3 mem2
+        (SPLIT: Memory.split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2)
+    :
+      (<<GET2: Memory.get loc ts3 mem1 = Some (ts1, msg3)>>) /\
+      (<<TS12: Time.lt ts1 ts2>>) /\
+      (<<TS23: Time.lt ts2 ts3>>) /\
+      (<<MSG_WF: Message.wf msg2>>).
+  Proof.
+    inv SPLIT. inv SPLIT0. esplits; eauto.
+  Qed.
+
+  Definition write_not_to (MSGS : Loc.t -> Time.t -> Prop)
+             (e : ThreadEvent.t) : Prop :=
+    match e with
+    | ThreadEvent.write loc from to _ _ _ =>
+      ~ MSGS loc to
+    | ThreadEvent.update loc from to _ _ _ _ _ _ =>
+      ~ MSGS loc to
+    | ThreadEvent.promise loc from to _ _ =>
+      ~ MSGS loc to
+    | _ => True
+    end.
+
+  Lemma promise_include_boundary prom0 mem0 loc from to msg prom1 mem1 kind
+        (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
+        (BOTNONE: Memory.bot_none prom0)
+    :
+      Interval.mem (from, to) to.
+  Proof.
+    econs; ss; [|refl]. inv PROMISE.
+    - eapply add_succeed_wf in MEM. des. auto.
+    - eapply split_succeed_wf in MEM. des. auto.
+    - eapply Memory.lower_get0 in PROMISES. des.
+      dup GET. eapply Memory.get_ts in GET1. des; clarify.
+      rewrite BOTNONE in *. clarify.
+    - eapply Memory.remove_get0 in PROMISES. des.
+      dup GET. eapply Memory.get_ts in GET1. des; clarify.
+      rewrite BOTNONE in *. clarify.
+  Qed.
+
+  Lemma step_write_not_in_boundary
+        MSGS lang (th0 th1: Thread.t lang) pf e
+        (STEP: Thread.step pf e th0 th1)
+        (WRITENOTIN: write_not_in MSGS e)
+        (LCWF0: Local.wf th0.(Thread.local) th0.(Thread.memory))
+    :
+      write_not_to MSGS e.
+  Proof.
+    inv LCWF0. inv STEP.
+    - inv STEP0. inv LOCAL. ii. ss. eapply WRITENOTIN; eauto.
+      eapply promise_include_boundary; eauto.
+    - inv STEP0; ss. inv LOCAL; ss.
+      + inv LOCAL0. inv WRITE. eapply WRITENOTIN; eauto.
+        eapply promise_include_boundary; eauto.
+      + inv LOCAL1. inv LOCAL2. inv WRITE. eapply WRITENOTIN; eauto.
+        eapply promise_include_boundary; eauto.
+  Qed.
+
+  Definition wf_event (e: ThreadEvent.t): Prop :=
+    match e with
+    | ThreadEvent.write loc from to _ _ _ => Time.lt from to
+    | ThreadEvent.update loc from to _ _ _ _ _ _ => Time.lt from to
+    | ThreadEvent.promise loc from to _ _ => Time.lt from to
+    | _ => True
+    end.
+
+  Lemma promise_wf_event prom0 mem0 loc from to msg prom1 mem1 kind
+        (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
+        (INHABITED: Memory.inhabited mem0)
+    :
+      Time.lt from to.
+  Proof.
+    inv PROMISE.
+    - eapply add_succeed_wf in PROMISES. des. eauto.
+    - eapply split_succeed_wf in PROMISES. des. eauto.
+    - eapply lower_succeed_wf in PROMISES. des. eauto.
+    - eapply Memory.remove_get0 in MEM. des. dup GET.
+      eapply memory_get_ts_strong in GET. des; auto.
+      clarify. erewrite INHABITED in GET1. clarify.
+  Qed.
+
+  Lemma write_wf_event prom0 mem0 loc from to val released prom1 mem1 kind
+        (WRITE: Memory.write prom0 mem0 loc from to val released prom1 mem1 kind)
+        (INHABITED: Memory.inhabited mem0)
+    :
+      Time.lt from to.
+  Proof.
+    inv WRITE. eapply promise_wf_event; eauto.
+  Qed.
+
+  Lemma step_wf_event lang P (th0 th1: Thread.t lang) e
+        (INHABITED: Memory.inhabited th0.(Thread.memory))
+        (STEP: pred_step P e th0 th1)
+    :
+      wf_event e.
+  Proof.
+    inv STEP. inv STEP0. inv STEP.
+    - inv STEP0. inv LOCAL. ss.
+      eapply promise_wf_event; eauto.
+    - inv STEP0. inv LOCAL; ss.
+      + inv LOCAL0. eapply write_wf_event; eauto.
+      + inv LOCAL1. inv LOCAL2. eapply write_wf_event; eauto.
+  Qed.
+
+  Lemma steps_wf_event lang P (th0 th1: Thread.t lang)
+        (INHABITED: Memory.inhabited th0.(Thread.memory))
+        (STEP: rtc (tau (@pred_step P lang)) th0 th1)
+    :
+      rtc (tau (@pred_step (P /1\ wf_event) lang)) th0 th1.
+  Proof.
+    ginduction STEP.
+    - i. refl.
+    - i. inv H. hexploit step_wf_event; eauto. i. inv TSTEP. econs.
+      + econs; eauto. econs; eauto.
+      + eapply IHSTEP; eauto. inv STEP0. eapply Thread.step_inhabited; eauto.
+  Qed.
 
 End MEMORYLEMMAS.
 
@@ -2650,40 +2789,6 @@ Section MAPPED.
     - exists None. esplits; eauto. econs.
   Qed.
 
-  Lemma add_succeed_wf mem1 loc from to msg mem2
-        (ADD: Memory.add mem1 loc from to msg mem2)
-    :
-      (<<DISJOINT: forall to2 from2 msg2
-                          (GET2: Memory.get loc to2 mem1 = Some (from2, msg2)),
-          Interval.disjoint (from, to) (from2, to2)>>) /\
-      (<<TO1: Time.lt from to>>) /\
-      (<<MSG_WF: Message.wf msg>>).
-  Proof.
-    inv ADD. inv ADD0. esplits; eauto.
-  Qed.
-
-  Lemma lower_succeed_wf mem1 loc from to msg1 msg2 mem2
-        (LOWER: Memory.lower mem1 loc from to msg1 msg2 mem2)
-    :
-      (<<GET: Memory.get loc to mem1 = Some (from, msg1)>>) /\
-      (<<TS: Time.lt from to>>) /\
-      (<<MSG_WF: Message.wf msg2>>) /\
-      (<<MSG_LE: Message.le msg2 msg1>>).
-  Proof.
-    inv LOWER. inv LOWER0. esplits; eauto.
-  Qed.
-
-  Lemma split_succeed_wf mem1 loc ts1 ts2 ts3 msg2 msg3 mem2
-        (SPLIT: Memory.split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2)
-    :
-      (<<GET2: Memory.get loc ts3 mem1 = Some (ts1, msg3)>>) /\
-      (<<TS12: Time.lt ts1 ts2>>) /\
-      (<<TS23: Time.lt ts2 ts3>>) /\
-      (<<MSG_WF: Message.wf msg2>>).
-  Proof.
-    inv SPLIT. inv SPLIT0. esplits; eauto.
-  Qed.
-
   Lemma view_wf_map vw fvw
         (VIEW: view_map vw fvw)
         (VIEWWF: View.wf vw)
@@ -4202,53 +4307,6 @@ Section MAPPED.
       (<<TO: mappable_time loc to>>)
     | _ => True
     end.
-
-  Definition write_not_to (MSGS : Loc.t -> Time.t -> Prop)
-             (e : ThreadEvent.t) : Prop :=
-    match e with
-    | ThreadEvent.write loc from to _ _ _ =>
-      ~ MSGS loc to
-    | ThreadEvent.update loc from to _ _ _ _ _ _ =>
-      ~ MSGS loc to
-    | ThreadEvent.promise loc from to _ _ =>
-      ~ MSGS loc to
-    | _ => True
-    end.
-
-  Lemma promise_include_boundary prom0 mem0 loc from to msg prom1 mem1 kind
-        (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
-        (BOTNONE: Memory.bot_none prom0)
-    :
-      Interval.mem (from, to) to.
-  Proof.
-    econs; ss; [|refl]. inv PROMISE.
-    - eapply add_succeed_wf in MEM. des. auto.
-    - eapply split_succeed_wf in MEM. des. auto.
-    - eapply Memory.lower_get0 in PROMISES. des.
-      dup GET. eapply Memory.get_ts in GET1. des; clarify.
-      rewrite BOTNONE in *. clarify.
-    - eapply Memory.remove_get0 in PROMISES. des.
-      dup GET. eapply Memory.get_ts in GET1. des; clarify.
-      rewrite BOTNONE in *. clarify.
-  Qed.
-
-  Lemma step_write_not_in_boundary
-        MSGS lang (th0 th1: Thread.t lang) pf e
-        (STEP: Thread.step pf e th0 th1)
-        (WRITENOTIN: write_not_in MSGS e)
-        (LCWF0: Local.wf th0.(Thread.local) th0.(Thread.memory))
-    :
-      write_not_to MSGS e.
-  Proof.
-    inv LCWF0. inv STEP.
-    - inv STEP0. inv LOCAL. ii. ss. eapply WRITENOTIN; eauto.
-      eapply promise_include_boundary; eauto.
-    - inv STEP0; ss. inv LOCAL; ss.
-      + inv LOCAL0. inv WRITE. eapply WRITENOTIN; eauto.
-        eapply promise_include_boundary; eauto.
-      + inv LOCAL1. inv LOCAL2. inv WRITE. eapply WRITENOTIN; eauto.
-        eapply promise_include_boundary; eauto.
-  Qed.
 
   (* Lemma collapsable_in loc to  *)
   (*       (CLPS: ~ non_collapsable loc to) *)
