@@ -81,13 +81,6 @@ Inductive caps_collapsing (L: Loc.t -> Prop)
     (TLE: Time.le t max)
   :
     caps_collapsing L mem loc t t
-| caps_collapsing_latest_reserve
-    loc t max
-    (SAT: L loc)
-    (FULL: Memory.max_full_ts mem loc max)
-    (MAX: t = Memory.max_ts loc mem)
-  :
-    caps_collapsing L mem loc t max
 | caps_collapsing_cap
     loc t max
     (SAT: L loc)
@@ -443,17 +436,12 @@ Lemma caps_collapsing_ident2 L mem maxts loc ts fts
     ts = fts.
 Proof.
   inv MAP; eauto.
-  - exploit Memory.max_full_ts_inj.
-    { eapply FULL. }
-    { eapply MAX. }
-    i. clarify. eapply TimeFacts.antisym; auto.
-    eapply max_full_ts_le_max_ts in FULL; auto.
-  - exfalso. eapply max_full_ts_le_max_ts in FULL. exfalso.
-    eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
-    + eapply DenseOrder.DenseOrder.incr_spec.
-    + etrans.
-      * eapply TS.
-      * eapply max_full_ts_le_max_ts; eauto.
+  exfalso. eapply max_full_ts_le_max_ts in FULL. exfalso.
+  eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+  - eapply DenseOrder.DenseOrder.incr_spec.
+  - etrans.
+    + eapply TS.
+    + eapply max_full_ts_le_max_ts; eauto.
 Qed.
 
 Lemma caps_collapsing_ident3 L mem maxts loc ts fts
@@ -466,14 +454,10 @@ Lemma caps_collapsing_ident3 L mem maxts loc ts fts
     ts = fts.
 Proof.
   inv MAP; eauto.
-  - exploit Memory.max_full_ts_inj.
-    { eapply FULL. }
-    { eapply MAX. }
-    i. clarify. exfalso. eapply Time.lt_strorder; eauto.
-  - exploit Memory.max_full_ts_inj.
-    { eapply FULL. }
-    { eapply MAX. }
-    i. clarify. exfalso. eapply Time.lt_strorder; eauto.
+  exploit Memory.max_full_ts_inj.
+  { eapply FULL. }
+  { eapply MAX. }
+  i. clarify. exfalso. eapply Time.lt_strorder; eauto.
 Qed.
 
 Lemma caps_collapsing_timemap L mem tm
@@ -636,7 +620,7 @@ Proof.
           exploit Memory.max_full_ts_spec; eauto. i. des. clarify. right.
           exists (tm loc), from, (Message.full val (Some (View.mk tm tm))), (Message.full val released).
           splits.
-          - econs 4; eauto.
+          - econs 3; eauto.
           - eapply caps_collapsing_message; eauto. econs. econs.
             eapply Memory.max_full_view_closed. econs; eauto.
           - econs. eapply CLOSED1 in GET3. des. inv MSG_CLOSED.
@@ -725,38 +709,140 @@ Definition pf_consistent_drf lang (e0:Thread.t lang): Prop :=
                  (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>))).
 
 Lemma caps_collapsing_collapsable_unwritable L prom mem0 mem1
+      (MLE: Memory.le prom mem0)
+      (RESERVEWF : memory_reserve_wf mem0)
+      (INHABITED : Memory.inhabited mem0)
       (COLLAPSABLE: collapsable_cap L prom mem0)
       (CAP: Memory.cap prom mem0 mem1)
   :
-    collapsable_unwritable (caps_collapsing L mem0) prom mem0.
+    collapsable_unwritable (caps_collapsing L mem0) prom mem1.
 Proof.
   ii. des. unfold collapsed in *. des. inv ITV. ss.
   inv MAP0; inv MAP1; clarify.
   - exfalso; eapply Time.lt_strorder; eapply TimeFacts.lt_le_lt; eauto.
   - exfalso; eapply Time.lt_strorder; eapply TimeFacts.lt_le_lt; eauto.
-  - exploit Memory.max_full_ts_inj; [apply FULL|apply FULL0|].
-Admitted.
+  - exploit Memory.max_full_ts_inj; [apply FULL|apply FULL0|i; clarify].
+    inv CAP. destruct (Time.le_lt_dec t (Memory.max_ts loc mem0)).
+    + exploit max_full_ts_max_ts; eauto. i. des; clarify.
+      * exfalso; eapply Time.lt_strorder; eapply TimeFacts.lt_le_lt; eauto.
+      * econs; eauto.
+        { econs; eauto.
+          destruct (Memory.get loc (Memory.max_ts loc mem0) prom) eqn:GETPROM; eauto.
+          exfalso. destruct p as [from []].
+          - eapply MLE in GETPROM. clarify.
+          - eapply COLLAPSABLE in GETPROM; eauto. }
+        { econs; ss. }
+    + exploit Memory.latest_val_exists; eauto. i. des.
+      exploit Memory.max_full_view_exists; eauto. i. des.
+      exploit BACK; eauto.
+      { instantiate (1:=loc). unfold Memory.latest_reserve. des_ifs.
+        eapply COLLAPSABLE in Heq; eauto. }
+      i. econs; eauto.
+      * econs; eauto.
+        destruct (Memory.get loc (Time.incr (Memory.max_ts loc mem0)) prom) eqn:GETPROM; eauto.
+        exfalso. destruct p as [from msg].
+        eapply MLE in GETPROM.
+        eapply Memory.max_ts_spec in GETPROM; eauto. des.
+        exfalso; eapply Time.lt_strorder; eapply TimeFacts.lt_le_lt; eauto.
+      * econs; eauto.
+  - clear - FROM TO. exfalso; eapply Time.lt_strorder; eapply TimeFacts.lt_le_lt; eauto.
+  - exfalso; eapply Time.lt_strorder; eapply TimeFacts.le_lt_lt.
+    { eapply TO. }
+    eapply TimeFacts.le_lt_lt.
+    { eapply max_full_ts_le_max_ts; eauto. }
+    etrans.
+    { eapply DenseOrder.DenseOrder.incr_spec. }
+    { eauto. }
+  - clear - FROM TO. exfalso; eapply Time.lt_strorder; eapply TimeFacts.lt_le_lt; eauto.
+  - exfalso; eapply Time.lt_strorder; eapply TimeFacts.le_lt_lt.
+    { eapply max_full_ts_le_max_ts; eauto. }
+    etrans.
+    { eapply DenseOrder.DenseOrder.incr_spec. }
+    { eauto. }
+  - clear - FROM TO. exfalso; eapply Time.lt_strorder; eapply TimeFacts.lt_le_lt; eauto.
+  - exfalso; eapply Time.lt_strorder;eapply TimeFacts.lt_le_lt.
+    { eapply TLE. }
+    { etrans; eauto. left. auto. }
+  - clear - FROM TO. exfalso; eapply Time.lt_strorder; eapply TimeFacts.lt_le_lt; eauto.
+Qed.
 
 Lemma caps_collapsing_mapping_map_le L prom mem0 mem1
       (COLLAPSABLE: collapsable_cap L prom mem0)
       (CAP: Memory.cap prom mem0 mem1)
   :
     mapping_map_le (caps_collapsing L mem0).
-Admitted.
+Proof.
+  ii. inv MAP0; inv MAP1; clarify.
+  - exploit Memory.max_full_ts_inj; [apply FULL|apply FULL0|i; clarify].
+  - exploit Memory.max_full_ts_inj; [apply FULL|apply FULL0|i; clarify].
+    exfalso; eapply Time.lt_strorder; eapply TimeFacts.le_lt_lt.
+    { eapply TLE. }
+    eapply TimeFacts.le_lt_lt.
+    { eapply max_full_ts_le_max_ts; eauto. }
+    eapply TimeFacts.lt_le_lt.
+    { eapply DenseOrder.DenseOrder.incr_spec. }
+    { eauto. }
+  - exploit Memory.max_full_ts_inj; [apply FULL|apply FULL0|i; clarify]. refl.
+  - etrans; eauto. transitivity (Memory.max_ts loc mem0).
+    + eapply max_full_ts_le_max_ts; eauto.
+    + left. apply Time.incr_spec.
+  - exfalso; eapply Time.lt_strorder; eapply TimeFacts.lt_le_lt; eauto.
+Qed.
 
 Lemma caps_collapsing_mapping_map_bot L prom mem0 mem1
       (COLLAPSABLE: collapsable_cap L prom mem0)
+      (INHABITED: Memory.inhabited mem0)
       (CAP: Memory.cap prom mem0 mem1)
   :
     mapping_map_bot (caps_collapsing L mem0).
-Admitted.
+Proof.
+  ii. destruct (classic (L loc)).
+  - exploit Memory.max_full_ts_exists; eauto. i. des.
+    econs 2; eauto. eapply Time.bot_spec.
+  - econs 1; eauto.
+Qed.
 
 Lemma caps_collapsing_mapping_map_eq L prom mem0 mem1
       (COLLAPSABLE: collapsable_cap L prom mem0)
       (CAP: Memory.cap prom mem0 mem1)
   :
     mapping_map_eq (caps_collapsing L mem0).
-Admitted.
+Proof.
+  ii. inv MAP0; inv MAP1; clarify.
+  - exfalso; eapply Time.lt_strorder; eapply TimeFacts.le_lt_lt.
+    { eapply max_full_ts_le_max_ts. eapply FULL. }
+    eapply TimeFacts.lt_le_lt.
+    { eapply DenseOrder.DenseOrder.incr_spec. }
+    { eapply TLE. }
+  - exfalso; eapply Time.lt_strorder; eapply TimeFacts.le_lt_lt.
+    { eapply TLE. }
+    eapply TimeFacts.le_lt_lt.
+    { eapply max_full_ts_le_max_ts; eauto. }
+    { eapply DenseOrder.DenseOrder.incr_spec. }
+  - exploit Memory.max_full_ts_inj; [apply FULL|apply FULL0|i; clarify].
+  - exfalso; eapply Time.lt_strorder; eauto.
+  - exfalso; eapply Time.lt_strorder; eauto.
+Qed.
+
+Lemma caps_collapsing_total L mem0 loc to
+      (INHABITED: Memory.inhabited mem0)
+  :
+    exists fto,
+      <<MAP: caps_collapsing L mem0 loc to fto >>.
+Proof.
+  destruct (classic (L loc)).
+  - exploit Memory.max_full_ts_exists; eauto. i. des.
+    destruct (Time.le_lt_dec to ts).
+    { eexists. econs 2; eauto. }
+    destruct (Time.le_lt_dec to (Time.incr (Memory.max_ts loc mem0))).
+    { eexists. econs 3. ; eauto.
+
+
+    admit.
+  - eexists. econs 1; eauto.
+
+    esplits; eauto.
+    admit.
 
 Lemma pf_consistent_pf_consistent_drf' lang (th: Thread.t lang)
       (WF: Local.wf th.(Thread.local) th.(Thread.memory))
@@ -767,6 +853,7 @@ Lemma pf_consistent_pf_consistent_drf' lang (th: Thread.t lang)
     pf_consistent_drf' th.
 Proof.
   ii. exploit CONSISTENT; eauto. i. des.
+
 
   exploit Memory.cap_exists; eauto. i. des.
   exploit CONSISTENT; eauto. i. des.

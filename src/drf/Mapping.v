@@ -452,9 +452,9 @@ Section MAPPED.
 
   Definition collapsable_unwritable prom mem: Prop :=
     forall loc t
-           (SAT: (fun loc t => exists loc ts0 ts1,
-                      (<<CLPS: collapsed loc ts0 ts1>>) /\
-                      (<<ITV: Interval.mem (ts0, ts1) t>>)) loc t),
+           (SAT: (fun loc' t' => exists ts0 ts1,
+                      (<<CLPS: collapsed loc' ts0 ts1>>) /\
+                      (<<ITV: Interval.mem (ts0, ts1) t'>>)) loc t),
       unwritable mem prom loc t.
 
   Lemma collapsable_unwritable_step pf e lang (th0 th1: Thread.t lang)
@@ -1277,7 +1277,7 @@ Section MAPPED.
       + hexploit closed_point.
         * apply H.
         * i. hexploit (UNWRITABLE loc t).
-          { exists loc, from, from0. unfold collapsed. esplits; eauto. }
+          { exists from, from0. unfold collapsed. esplits; eauto. }
           { i. eapply unwritable_covered; eauto. }
         * i. des. destruct TS0.
           { eapply EMPTY. econs; [apply GET0|]. econs; ss.
@@ -1285,7 +1285,7 @@ Section MAPPED.
           { destruct H0. eapply NOATTATCH; eauto. }
       + destruct H. eapply NOATTATCH; eauto.
     - eapply EMPTY. exploit UNWRITABLE.
-      + exists loc, from0, from. esplits; eauto.
+      + exists from0, from. esplits; eauto.
         * eexists. esplits; eauto.
         * econs; eauto. refl.
       + ii. inv x. inv UNCH. econs; eauto.
@@ -2096,7 +2096,7 @@ Section MAPPED.
       i. des. unfold mappable_time in FROM, TO. des.
       exploit promise_map; eauto.
       { ii. unfold collapsed in H. des. apply WRITENOTIN.
-        exists loc, to', to. esplits; ss; econs; eauto. refl. }
+        exists to', to. esplits; ss; econs; eauto. refl. }
       i. des.
       exists (Local.mk (Local.tview flc0) fprom1). esplits; eauto.
       + econs; eauto.
@@ -2117,7 +2117,7 @@ Section MAPPED.
         { econs. }
         { econs. }
         { ii. unfold collapsed in H. des. apply WRITENOTIN.
-          exists loc, to', to. esplits; ss; econs; eauto. refl. }
+          exists to', to. esplits; ss; econs; eauto. refl. }
         i. des. esplits; eauto.
         * econs; eauto.
         * econs; eauto. econs 2; eauto. econs; eauto.
@@ -2129,7 +2129,7 @@ Section MAPPED.
         { inv WF2. auto. }
         { inv LOCAL1. auto. }
         { ii. unfold collapsed in H. des. apply WRITENOTIN.
-          exists loc, to', tsw. esplits; ss; econs; eauto. refl. }
+          exists to', tsw. esplits; ss; econs; eauto. refl. }
         i. des. esplits; eauto.
         * econs; eauto.
         * econs; eauto. econs 2; eauto. econs; eauto.
