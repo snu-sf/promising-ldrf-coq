@@ -448,8 +448,8 @@ Section PFCONSISTENT.
       (<<NORESERVE: no_reserves e1.(Thread.local).(Local.promises)>>) /\
       exists e2,
         (<<STEPS1: rtc (tau (@pred_step ((promise_free /1\ (fun e => ~ is_cancel e) /1\ no_acq_read_msgs (caps_loc e0.(Thread.memory) mem1)) /1\ no_sc) lang)) e1 e2>>) /\
-        ((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
-         (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>)).
+        (__guard__((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
+                   (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>))).
 
   Lemma pf_consistent_pf_consistent_strong lang (th: Thread.t lang)
         (WF: Local.wf th.(Thread.local) th.(Thread.memory))
@@ -632,7 +632,7 @@ Section PFCONSISTENT.
       esplits.
       * eapply pred_step_rtc_mon; eauto.
         i. ss. des; auto.
-      * ss. eauto.
+      * unguard. ss. eauto.
   Qed.
 
 End PFCONSISTENT.

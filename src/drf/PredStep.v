@@ -247,8 +247,11 @@ Section PredStep.
 
   Definition te_rel := ThreadEvent.t -> ThreadEvent.t -> Prop.
 
+  Definition te_pred_shift (P_src P_tgt: te_pred) (R: te_rel) :=
+    forall e_src e_tgt (SAT: P_tgt e_tgt) (REL: R e_src e_tgt), P_src e_src.
+
   Lemma pred_step_shift (P_src P_tgt: te_pred) (R: te_rel)
-        (SHIFT: forall e_src e_tgt (SAT: P_tgt e_tgt) (REL: R e_src e_tgt), P_src e_src)
+        (SHIFT: te_pred_shift P_src P_tgt R)
         e_src e_tgt lang (th0 th1: Thread.t lang)
         (SAT: P_tgt e_tgt)
         (REL: R e_src e_tgt)
@@ -347,5 +350,14 @@ Section PredStep.
         eapply wf_time_evt_mon; eauto.
         i. ss. eapply List.in_or_app; eauto.
   Qed.
+
+  Definition no_acq_update_msgs (MSGS : Loc.t -> Time.t -> Prop)
+             (e : ThreadEvent.t) : Prop :=
+    match e with
+    | ThreadEvent.update loc from _ _ _ _ _ ordr _ =>
+      forall (SAT: MSGS loc from), ~ Ordering.le Ordering.acqrel ordr
+    | _ => True
+    end
+  .
 
 End PredStep.

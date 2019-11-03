@@ -696,6 +696,121 @@ Proof.
       * econs 1; eauto.
 Qed.
 
+(* Definition memory_last_reserves (prom mem: Memory.t) := (fun loc => Memory.latest_reserve loc prom mem). *)
+
+Definition pf_consistent_drf' lang (e0:Thread.t lang): Prop :=
+  let L := (fun loc => Memory.latest_reserve loc e0.(Thread.local).(Local.promises) e0.(Thread.memory)) in
+  forall mem1 mem2
+         (CAP: Memory.cap e0.(Thread.local).(Local.promises) e0.(Thread.memory) mem1)
+         (FORGET: forget_memory (collapsing_latest_reserves_times L e0.(Thread.memory) \2/ collapsing_caps_times L e0.(Thread.memory) mem1) mem2 mem1),
+  exists e1,
+    (<<STEPS0: rtc (tau (@pred_step is_cancel lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot mem2) e1>>) /\
+    (<<NORESERVE: no_reserves e1.(Thread.local).(Local.promises)>>) /\
+    exists e2,
+      (<<STEPS1: rtc (tau (@pred_step ((promise_free /1\ (fun e => ~ is_cancel e) /1\ no_acq_update_msgs ((fun loc to => L loc) /2\ Memory.max_full_ts e0.(Thread.memory))) /1\ no_sc) lang)) e1 e2>>) /\
+      (__guard__((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
+                 (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>))).
+
+Definition pf_consistent_drf lang (e0:Thread.t lang): Prop :=
+  let L := (fun loc => Memory.latest_reserve loc e0.(Thread.local).(Local.promises) e0.(Thread.memory)) in
+  forall mem1 mem2 sc1
+         (CAP: Memory.cap e0.(Thread.local).(Local.promises) e0.(Thread.memory) mem1)
+         (FORGET: forget_memory (collapsing_latest_reserves_times L e0.(Thread.memory) \2/ collapsing_caps_times L e0.(Thread.memory) mem1) mem2 mem1),
+  exists e1,
+    (<<STEPS0: rtc (tau (@pred_step is_cancel lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc1 mem2) e1>>) /\
+    (<<NORESERVE: no_reserves e1.(Thread.local).(Local.promises)>>) /\
+    exists e2,
+      (<<STEPS1: rtc (tau (@pred_step ((promise_free /1\ (fun e => ~ is_cancel e) /1\ no_acq_update_msgs ((fun loc to => L loc) /2\ Memory.max_full_ts e0.(Thread.memory))) /1\ no_sc) lang)) e1 e2>>) /\
+      (__guard__((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
+                 (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>))).
+
+Lemma caps_collapsing_collapsable_unwritable L prom mem0 mem1
+      (COLLAPSABLE: collapsable_cap L prom mem0)
+      (CAP: Memory.cap prom mem0 mem1)
+  :
+    collapsable_unwritable (caps_collapsing L mem0) prom mem0.
+Proof.
+  ii. des. unfold collapsed in *. des. inv ITV. ss.
+  inv MAP0; inv MAP1; clarify.
+  - exfalso; eapply Time.lt_strorder; eapply TimeFacts.lt_le_lt; eauto.
+  - exfalso; eapply Time.lt_strorder; eapply TimeFacts.lt_le_lt; eauto.
+  - exploit Memory.max_full_ts_inj; [apply FULL|apply FULL0|].
+Admitted.
+
+Lemma caps_collapsing_mapping_map_le L prom mem0 mem1
+      (COLLAPSABLE: collapsable_cap L prom mem0)
+      (CAP: Memory.cap prom mem0 mem1)
+  :
+    mapping_map_le (caps_collapsing L mem0).
+Admitted.
+
+Lemma caps_collapsing_mapping_map_bot L prom mem0 mem1
+      (COLLAPSABLE: collapsable_cap L prom mem0)
+      (CAP: Memory.cap prom mem0 mem1)
+  :
+    mapping_map_bot (caps_collapsing L mem0).
+Admitted.
+
+Lemma caps_collapsing_mapping_map_eq L prom mem0 mem1
+      (COLLAPSABLE: collapsable_cap L prom mem0)
+      (CAP: Memory.cap prom mem0 mem1)
+  :
+    mapping_map_eq (caps_collapsing L mem0).
+Admitted.
+
+Lemma pf_consistent_pf_consistent_drf' lang (th: Thread.t lang)
+      (WF: Local.wf th.(Thread.local) th.(Thread.memory))
+      (MEM: Memory.closed th.(Thread.memory))
+      (INHABITED: Memory.inhabited th.(Thread.memory))
+      (CONSISTENT: pf_consistent_strong th)
+  :
+    pf_consistent_drf' th.
+Proof.
+  ii. exploit CONSISTENT; eauto. i. des.
+
+  exploit Memory.cap_exists; eauto. i. des.
+  exploit CONSISTENT; eauto. i. des.
+
+
+  forall mem1 mem2 sc1
+         (CAP: Memory.cap e0.(Thread.local).(Local.promises) e0.(Thread.memory) mem1)
+         (FORGET: forget_memory (collapsing_latest_reserves_times L e0.(Thread.memory) \2/ collapsing_caps_times L e0.(Thread.memory) mem1) mem2 mem1),
+  exists e1,
+    (<<STEPS0: rtc (tau (@pred_step is_cancel lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc1 mem2) e1>>) /\
+    (<<NORESERVE: no_reserves e1.(Thread.local).(Local.promises)>>) /\
+    exists e2,
+      (<<STEPS1: rtc (tau (@pred_step ((promise_free /1\ (fun e => ~ is_cancel e) /1\ no_acq_update_msgs ((fun loc to => L loc) /2\ Memory.max_full_ts e0.(Thread.memory))) /1\ no_sc) lang)) e1 e2>>) /\
+      ((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
+       (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>)).
+
+
+  ii.
+
+  eapply pf_consistent_pf_consistent_strong in CON
+
+Lemma
+
+
+
+Memory.latest_reserve loc promises mem1
+                    Memory.cap
+      (FORGET0: forget_memory (collapsing_latest_reserves_times L0 mem0 \2/ collapsing_caps_times L0 mem0 mem1) mem2 mem1)
+
+
+collapsing_latest_reserves_times L0 mem0
+
+  ,
+  exists e1,
+    (<<STEPS0: rtc (tau (@pred_step is_cancel lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc1 mem1) e1>>) /\
+    (<<NORESERVE: no_reserves e1.(Thread.local).(Local.promises)>>) /\
+    exists e2,
+      (<<STEPS1: rtc (tau (@pred_step ((promise_free /1\ (fun e => ~ is_cancel e) /1\ no_acq_read_msgs (caps_loc e0.(Thread.memory) mem1)) /1\ no_sc) lang)) e1 e2>>) /\
+      ((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
+       (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>)).
+
+
+
+
 Definition times_in_memory (mem: Memory.t) (L: Loc.t -> list Time.t): Prop :=
   forall loc t,
     (<<SAT: List.In t (L loc)>>) <->

@@ -39,19 +39,26 @@ Set Implicit Arguments.
 Section MAPPED.
 
   Variable f: Loc.t -> Time.t -> Time.t -> Prop.
-  Hypothesis map_le:
+
+  Definition mapping_map_le:=
     forall loc t0 t1 ft0 ft1
            (MAP0: f loc t0 ft0)
            (MAP1: f loc t1 ft1),
       Time.le t0 t1 -> Time.le ft0 ft1.
-  Hypothesis map_bot:
+
+  Definition mapping_map_bot :=
     forall loc,
       f loc Time.bot Time.bot.
-  Hypothesis map_eq:
+
+  Definition mapping_map_eq :=
     forall loc to ft0 ft1
            (MAP0: f loc to ft0)
            (MAP1: f loc to ft1),
       ft0 = ft1.
+
+  Hypothesis map_le: mapping_map_le.
+  Hypothesis map_bot: mapping_map_bot.
+  Hypothesis map_eq: mapping_map_eq.
 
   Definition dom loc to: Prop :=
     exists fto, f loc to fto.
@@ -247,8 +254,8 @@ Section MAPPED.
       (KIND: memory_op_kind_map loc kind fkind)
     :
       tevent_map
-        (ThreadEvent.promise loc from to msg kind)
         (ThreadEvent.promise loc ffrom fto fmsg fkind)
+        (ThreadEvent.promise loc from to msg kind)
   | tevent_map_read
       loc to fto val released freleased freleased' ordr
       (TO: f loc to fto)
@@ -256,8 +263,8 @@ Section MAPPED.
       (RELEASEDLE: View.opt_le freleased freleased')
     :
       tevent_map
-        (ThreadEvent.read loc to val released ordr)
         (ThreadEvent.read loc fto val freleased ordr)
+        (ThreadEvent.read loc to val released ordr)
   | tevent_map_write
       loc from ffrom to fto val released freleased freleased' ordw
       (FROM: f loc from ffrom)
@@ -266,8 +273,8 @@ Section MAPPED.
       (RELEASEDLE: View.opt_le freleased freleased')
     :
       tevent_map
-        (ThreadEvent.write loc from to val released ordw)
         (ThreadEvent.write loc ffrom fto val freleased ordw)
+        (ThreadEvent.write loc from to val released ordw)
   | tevent_map_update
       loc from ffrom to fto valr valw releasedr freleasedr freleasedr'
       releasedw freleasedw freleasedw' ordr ordw
@@ -279,8 +286,8 @@ Section MAPPED.
       (RELEASEDWLE: View.opt_le freleasedw freleasedw')
     :
       tevent_map
-        (ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw)
         (ThreadEvent.update loc ffrom fto valr valw freleasedr freleasedw ordr ordw)
+        (ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw)
   | tevent_map_fence
       or ow
     :
@@ -2060,7 +2067,7 @@ Section MAPPED.
         (SCLE: TimeMap.le fsc0 fsc0')
     :
       exists flc1 fmem1 fsc1 fsc1' fe,
-        (<<EVT: tevent_map e fe>>) /\
+        (<<EVT: tevent_map fe e>>) /\
         (<<STEP: Thread.step_allpf
                    fe fth0
                    (Thread.mk lang st1 flc1 fsc1 fmem1)>>) /\
@@ -2144,5 +2151,59 @@ Section MAPPED.
           { refl. }
   Qed.
 
+  Lemma tevent_map_same_machine_event e fe
+        (TEVENT: tevent_map e fe)
+    :
+      same_machine_event e fe.
+  Proof.
+    inv TEVENT; ss; eauto.
+  Qed.
+
+  Lemma steps_map
+        P0 P1 lang th0 th1 fth0 st0 st1 lc0 lc1 flc0
+        sc0 sc1 fsc0 fsc0' mem0 mem1 fmem0
+        (MAPPABLE: P0 <1= mappable_evt)
+        (STEP: rtc (tau (@pred_step P0 lang)) th0 th1)
+        (TH_TGT0: th0 = Thread.mk lang st0 lc0 sc0 mem0)
+        (TH_TGT1: th1 = Thread.mk lang st1 lc1 sc1 mem1)
+        (TH_SRC: fth0 = Thread.mk lang st0 flc0 fsc0 fmem0)
+        (LCWF0: Local.wf lc0 mem0)
+        (LCWF1: Local.wf flc0 fmem0)
+        (CLOSED0: Memory.closed fmem0)
+        (CLOSED1: Memory.closed mem0)
+        (CLOSEDSC0: Memory.closed_timemap fsc0 fmem0)
+        (CLOSEDSC1: Memory.closed_timemap sc0 mem0)
+        (LOCAL: local_map lc0 flc0)
+        (MEM: memory_map mem0 fmem0)
+        (UNWRITABLE: collapsable_unwritable lc0.(Local.promises) mem0)
+        (SC: timemap_map sc0 fsc0')
+        (SCLE: TimeMap.le fsc0 fsc0')
+        (SHIFT: te_pred_shift P1 P0 tevent_map)
+    :
+      exists flc1 fmem1 fsc1 fsc1',
+        (<<STEP: rtc (tau (@pred_step P1 lang))
+                     fth0
+                     (Thread.mk lang st1 flc1 fsc1 fmem1)>>) /\
+        (<<SC: timemap_map sc1 fsc1'>>) /\
+        (<<SCLE: TimeMap.le fsc1 fsc1'>>) /\
+        (<<MEM: memory_map mem1 fmem1>>) /\
+        (<<LOCAL: local_map lc1 flc1>>)
+  .
+  Proof.
+    ginduction STEP; i; ss; clarify.
+    - esplits; eauto.
+    - inv H. destruct y. exploit step_map; try apply TSTEP; ss; eauto.
+      i. des.
+      dup TSTEP. inv TSTEP0. inv STEP1.
+      exploit Thread.step_future; try apply STEP2; ss. i. des.
+      dup STEP0. inv STEP1.
+      exploit Thread.step_future; try apply STEP3; ss. i. des.
+      exploit IHSTEP; try apply MEM0; eauto.
+      { eapply collapsable_unwritable_step in STEP2; eauto. }
+      i. des.
+      esplits; eauto. econs 2; eauto. econs.
+      + econs; eauto.
+      + erewrite tevent_map_same_machine_event; eauto.
+  Qed.
 
 End MAPPED.
