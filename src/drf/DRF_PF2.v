@@ -32,7 +32,8 @@ Require Import Cell.
 Require Import Time.
 Require Import PredStep.
 
-Require Import DRF_PF.
+Require Import DRF_PF0.
+Require Import DRF_PF1.
 
 Set Implicit Arguments.
 

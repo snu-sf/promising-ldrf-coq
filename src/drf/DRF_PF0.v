@@ -527,6 +527,15 @@ Section FORGETMEMORY.
       rewrite <- COMPLETE; auto.
   Qed.
 
+  Lemma bot_forget P mem0
+        (BOT: P <2= bot2)
+    :
+      forget_memory P mem0 mem0.
+  Proof.
+    econs; eauto. i. eapply BOT in PROMS. clarify.
+  Qed.
+
+  
 End FORGETMEMORY.
 
 
