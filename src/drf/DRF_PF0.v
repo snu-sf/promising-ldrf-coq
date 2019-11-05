@@ -291,6 +291,60 @@ Section CELL.
         { eapply Cell.get_ts; eauto. }
   Qed.
 
+  Lemma finite_greatest P (l: list Time.t)
+    :
+      (exists to,
+          (<<SAT: P to>>) /\
+          (<<IN: List.In to l>>) /\
+          (<<GREATEST: forall to'
+                              (IN: List.In to' l)
+                              (SAT: P to'),
+              Time.le to' to>>)) \/
+      (<<EMPTY: forall to (IN: List.In to l), ~ P to>>).
+  Proof.
+    induction l.
+    - right. ii. inv IN.
+    - destruct (classic (P a)).
+      + des.
+        * destruct (Time.le_lt_dec to a).
+          { left. exists a. esplits; ss; eauto.
+            i. des; clarify; eauto. refl. }
+          { left. exists to. esplits; ss; eauto.
+            i. des; clarify; eauto. left. eauto. }
+        * left. exists a. esplits; ss; eauto.
+          i. des; clarify.
+          { refl. }
+          { exfalso. eapply EMPTY; eauto. }
+      + des.
+        * left. esplits; ss; eauto.
+          i. des; clarify. eapply GREATEST; eauto.
+        * right. ii. ss. des; clarify.
+          eapply EMPTY; eauto.
+  Qed.
+
+  Lemma cell_elements_greatest cell P
+    :
+      (exists to from msg,
+          (<<GET: Cell.get to cell = Some (from, msg)>>) /\
+          (<<SAT: P to>>) /\
+          (<<GREATEST: forall to' from' msg'
+                              (GET': Cell.get to' cell = Some (from', msg'))
+                              (SAT: P to'),
+              Time.le to' to>>)) \/
+      (<<EMPTY: forall to from msg
+                       (GET: Cell.get to cell = Some (from, msg)),
+          ~ P to>>).
+  Proof.
+    hexploit (Cell.finite cell). i. des.
+    hexploit (finite_greatest (fun to => P to /\ exists from msg, Cell.get to cell = Some (from, msg)) dom).
+    i. des.
+    - left. esplits; eauto. i.
+      dup GET'. eapply H in GET'. eauto.
+    - right. ii. dup GET. eapply H in GET0.
+      eapply EMPTY in GET0. eapply GET0.
+      esplits; eauto.
+  Qed.
+
   Lemma finite_least P (l: list Time.t)
     :
       (exists to,
@@ -1822,3 +1876,7 @@ Proof.
     + clarify. econs 1; eauto.
     + econs 2; eauto.
 Qed.
+
+Definition no_reserves (proms: Memory.t): Prop :=
+  forall loc to from msg (GET: Memory.get loc to proms = Some (from, msg)),
+    msg <> Message.reserve.

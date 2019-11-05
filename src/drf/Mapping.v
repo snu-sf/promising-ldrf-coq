@@ -466,6 +466,17 @@ Section MAPPED.
     ii. eapply unwritable_increase; eauto.
   Qed.
 
+  Lemma collapsable_unwritable_steps P lang (th0 th1: Thread.t lang)
+        (STEP: rtc (tau (@pred_step P lang)) th0 th1)
+        (WFMEM: collapsable_unwritable th0.(Thread.local).(Local.promises) th0.(Thread.memory))
+    :
+      collapsable_unwritable th1.(Thread.local).(Local.promises) th1.(Thread.memory) .
+  Proof.
+    revert WFMEM. induction STEP; auto.
+    i. eapply IHSTEP. inv H. inv TSTEP. inv STEP0.
+    eapply collapsable_unwritable_step; eauto.
+  Qed.
+
   Lemma promises_map_memory_map m fm
         (PROMISES: promises_map m fm)
     :
@@ -693,6 +704,19 @@ Section MAPPED.
     destruct (Memory.get loc ts fprom) eqn:GET; auto.
     destruct p. eapply ONLY in GET. des.
     rewrite Memory.bot_get in GET; eauto. clarify.
+  Qed.
+
+  Lemma no_reserves_map prom fprom
+        (RESERVES: no_reserves prom)
+        (MEM: promises_map prom fprom)
+    :
+      no_reserves fprom.
+  Proof.
+    inv MEM. ii. clarify. dup GET.
+    eapply ONLY in GET0. des.
+    dup GET0. eapply MAPPED in GET1. des.
+    hexploit (map_eq TO TO0). i. clarify. inv MSG.
+    eapply RESERVES in GET0. clarify.
   Qed.
 
   Lemma msg_get_map m fm loc to from msg

@@ -33,7 +33,8 @@ Require Import Time.
 Require Import PredStep.
 Require Import ReorderPromises2.
 
-Require Import DRF_PF.
+Require Import DRF_PF0.
+Require Import DRF_PF1.
 
 Require Import PFConsistent.
 
@@ -41,10 +42,6 @@ Set Implicit Arguments.
 
 
 Section CANCEL.
-
-  Definition no_reserves (proms: Memory.t): Prop :=
-    forall loc to from msg (GET: Memory.get loc to proms = Some (from, msg)),
-      msg <> Message.reserve.
 
   Inductive only_reserves (proms: Memory.t): Prop :=
   | only_reserves_intro
