@@ -1306,6 +1306,22 @@ Qed.
 Definition later_times (tm: TimeMap.t) (loc: Loc.t) (to: Time.t): Prop :=
   Time.lt (tm loc) to.
 
+Lemma forget_covered L mem0 mem1
+      (FORGET: forget_memory L mem1 mem0)
+      loc ts
+      (COVERED: covered loc ts mem0)
+      (KEEP: forall to from msg (SAT: L loc to)
+                    (GET: Memory.get loc to mem0 = Some (from, msg)),
+          ~ Interval.mem (from, to) ts)
+  :
+    covered loc ts mem1.
+Proof.
+  inv COVERED. inv FORGET.
+  erewrite <- COMPLETE in GET.
+  - econs; eauto.
+  - ii. eapply KEEP in H; eauto.
+Qed.
+
 Lemma collapsing_last_reserves_promise_or_later
       L prom mem0 mem1 mem2 max
       (LOC: L = (fun loc => Memory.latest_reserve loc prom mem0))
@@ -1318,7 +1334,7 @@ Lemma collapsing_last_reserves_promise_or_later
       loc to
       (UNWRITABLE: ~ unwritable mem2 prom loc to)
   :
-      <<COVERED: covered loc to prom>> \/ <<LATER: later_times max loc to>>.
+      <<COVERED: covered loc to prom>> \/ <<LATER: later_times max loc to>> \/ <<BOT: to = Time.bot>>.
 Proof.
   clarify.
   assert (MLE0: Memory.le prom mem2).
@@ -1326,9 +1342,15 @@ Proof.
     ii. clarify. unfold Memory.latest_reserve in SAT. des_ifs. }
   erewrite unwritable_eq in UNWRITABLE; eauto.
   eapply not_and_or in UNWRITABLE. des.
-  - right. destruct (Time.le_lt_dec to (max loc)); auto. exfalso.
+  - destruct (Time.le_lt_dec to Time.bot).
+    { right. right. destruct l; auto. exfalso.
+      eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto.
+      eapply Time.bot_spec. }
+    right. left.
+    destruct (Time.le_lt_dec to (max loc)); auto. exfalso.
     eapply UNWRITABLE. red.
 
+    c
     admit.
   - apply NNPP in UNWRITABLE. auto.
 
