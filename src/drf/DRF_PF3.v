@@ -190,6 +190,9 @@ Definition memory_concrete_le (lhs rhs: Memory.t): Prop :=
   forall loc to from val released
          (GET: Memory.get loc to lhs = Some (from, Message.full val released)),
     Memory.get loc to rhs = Some (from, Message.full val released).
+Global Program Instance le_PreOrder: PreOrder memory_concrete_le.
+Next Obligation. ii. ss. Qed.
+Next Obligation. ii. eauto. Qed.
 
 Lemma memory_concrete_le_le
   :
@@ -532,12 +535,13 @@ Lemma caps_collapsing_promises (L: Loc.t -> Prop) mem prom
       (MLE: Memory.le prom mem)
       (CLOSED: Memory.closed mem)
       (RESERVEWF: memory_reserve_wf mem)
-      (INHABITED: Memory.inhabited mem)
       (COLLAPSABLE: collapsable_cap L prom mem)
   :
     promises_map (caps_collapsing L mem) prom prom.
 Proof.
-  exploit Memory.max_full_timemap_exists; eauto. intros [tm MAX].
+  exploit Memory.max_full_timemap_exists; eauto.
+  { inv CLOSED. eauto. }
+  intros [tm MAX].
   dup CLOSED. inv CLOSED0. econs.
   - i. dup GET. eapply MLE in GET0. eapply CLOSED1 in GET0. des.
     exists to, from, msg.
@@ -584,7 +588,6 @@ Lemma caps_collapsing_memory' (L0 L1: Loc.t -> Prop)
       (CLOSED: Memory.closed mem0)
       (RESERVEWF0: memory_reserve_wf mem0)
       (RESERVEWF1: Memory.reserve_wf prom mem0)
-      (INHABITED: Memory.inhabited mem0)
       (COLLAPSABLE0: collapsable_cap L0 prom mem0)
       (COLLAPSABLE1: collapsable_cap L1 prom mem0)
       (CAP: Memory.cap prom mem0 mem1)
@@ -593,7 +596,9 @@ Lemma caps_collapsing_memory' (L0 L1: Loc.t -> Prop)
   :
     memory_map (caps_collapsing L1 mem0) mem2 mem3.
 Proof.
-  exploit Memory.max_full_timemap_exists; eauto. intros [tm MAX].
+  exploit Memory.max_full_timemap_exists; eauto.
+  { inv CLOSED. eauto. }
+  intros [tm MAX].
   dup FORGET0. inv FORGET0. dup FORGET1. inv FORGET1.
   dup CLOSED. inv CLOSED0. econs.
   - i. dup GET. eapply forget_memory_get in GET0; eauto. des.
@@ -697,7 +702,6 @@ Lemma caps_collapsing_memory
       (CLOSED: Memory.closed mem0)
       (RESERVEWF0: memory_reserve_wf mem0)
       (RESERVEWF1: Memory.reserve_wf prom mem0)
-      (INHABITED: Memory.inhabited mem0)
       (COLLAPSABLE: collapsable_cap L prom mem0)
       (CAP: Memory.cap prom mem0 mem1)
       (FORGET: forget_memory (collapsing_latest_reserves_times L mem0 \2/ collapsing_caps_times L mem0 mem1) mem2 mem1)
@@ -912,12 +916,13 @@ Qed.
 Lemma pf_consistent_pf_consistent_drf' lang (th: Thread.t lang)
       (WF: Local.wf th.(Thread.local) th.(Thread.memory))
       (MEM: Memory.closed th.(Thread.memory))
-      (INHABITED: Memory.inhabited th.(Thread.memory))
       (CONSISTENT: pf_consistent_strong th)
       (RESERVEWF: memory_reserve_wf (Thread.memory th))
   :
     pf_consistent_drf' th.
 Proof.
+  assert (INHABITED: Memory.inhabited th.(Thread.memory)).
+  { inv MEM. auto. }
   ii.
   set (L:=fun loc : Loc.t =>
                       Memory.latest_reserve loc (Local.promises (Thread.local th)) (Thread.memory th)).
@@ -1061,6 +1066,36 @@ Proof.
       eapply bot_promises_map; eauto.
 Qed.
 
+
+Definition pf_consistent_drf'' lang (e0:Thread.t lang): Prop :=
+  let L := (fun loc => Memory.latest_reserve loc e0.(Thread.local).(Local.promises) e0.(Thread.memory)) in
+  forall mem1 mem2
+         (CAP: Memory.cap e0.(Thread.local).(Local.promises) e0.(Thread.memory) mem1)
+         (FORGET: forget_memory (collapsing_latest_reserves_times L e0.(Thread.memory) \2/ collapsing_caps_times L e0.(Thread.memory) mem1) mem2 mem1),
+  exists e1,
+    (<<STEPS0: rtc (tau (@pred_step ((promise_free /1\ no_acq_update_msgs ((fun loc to => L loc) /2\ Memory.max_full_ts e0.(Thread.memory))) /1\ no_sc) lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot mem2) e1>>) /\
+    (__guard__((<<FAILURE: Local.failure_step e1.(Thread.local)>>) \/
+               (<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>))).
+
+
+Lemma pf_consistent_pf_consistent_drf'' lang (th: Thread.t lang)
+      (WF: Local.wf th.(Thread.local) th.(Thread.memory))
+      (MEM: Memory.closed th.(Thread.memory))
+      (CONSISTENT: pf_consistent_drf' th)
+      (RESERVEWF: memory_reserve_wf (Thread.memory th))
+  :
+    pf_consistent_drf'' th.
+Proof.
+  ii. exploit CONSISTENT; eauto. i. des.
+  eexists. esplits.
+  - etrans.
+    + eapply pred_step_rtc_mon; try apply STEPS0.
+      i. destruct x1; ss. destruct kind; ss.
+    + eapply pred_step_rtc_mon; try apply STEPS1.
+      i. ss. des. split; auto.
+  - eauto.
+Qed.
+
 Inductive latest_other_reserves (prom mem: Memory.t) (loc: Loc.t) (to: Time.t): Prop :=
 | latest_other_reserves_intro
     from
@@ -1069,19 +1104,20 @@ Inductive latest_other_reserves (prom mem: Memory.t) (loc: Loc.t) (to: Time.t): 
     (NONE: Memory.get loc to prom = None)
 .
 
-Definition pf_consistent_drf lang (e0:Thread.t lang): Prop :=
-  forall mem1 sc1
-         (CAP: Memory.cap e0.(Thread.local).(Local.promises) e0.(Thread.memory) mem1)
-         (FORGET: forget_memory (latest_other_reserves e0.(Thread.local).(Local.promises) e0.(Thread.memory)) mem1 e0.(Thread.memory)),
-  exists e1,
-    (<<STEPS0: rtc (tau (@pred_step ((promise_free /1\ no_acq_update_msgs ((fun loc to => Memory.latest_reserve loc e0.(Thread.local).(Local.promises) e0.(Thread.memory)) /2\ Memory.max_full_ts e0.(Thread.memory))) /1\ no_sc) lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc1 mem1) e1>>) /\
-    (__guard__((<<FAILURE: Local.failure_step e1.(Thread.local)>>) \/
-               (<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>)))
-.
-(* TODO: write in  *)
-
+Definition mapping_map_lt (f: Loc.t -> Time.t -> Time.t -> Prop): Prop :=
+  forall loc t0 t1 ft0 ft1
+         (MAP0: f loc t0 ft0)
+         (MAP1: f loc t1 ft1),
+    Time.lt t0 t1 -> Time.lt ft0 ft1.
 
 Definition ident_map (loc: Loc.t) := @eq Time.t.
+
+Lemma ident_map_lt
+  :
+    mapping_map_lt ident_map.
+Proof.
+  unfold ident_map in *. ii. clarify.
+Qed.
 
 Lemma ident_map_le
   :
@@ -1113,13 +1149,14 @@ Proof.
   esplits; eauto. refl.
 Qed.
 
-Lemma ident_map_non_collapsable
+Lemma mapping_map_lt_non_collapsable f
+      (MAPLT: mapping_map_lt f)
       loc to
   :
-    non_collapsable ident_map loc to.
+    non_collapsable f loc to.
 Proof.
   ii. unfold collapsed in *. des.
-  inv MAP0. inv MAP1. eapply Time.lt_strorder; eauto.
+  eapply MAPLT in TLE; eauto. eapply Time.lt_strorder; eauto.
 Qed.
 
 Lemma ident_map_timemap
@@ -1154,7 +1191,8 @@ Lemma ident_map_promises
 Proof.
   econs; i.
   - esplits; eauto.
-    + eapply ident_map_non_collapsable.
+    + eapply mapping_map_lt_non_collapsable.
+      eapply ident_map_lt.
     + refl.
     + eapply ident_map_message.
   - esplits; eauto; refl.
@@ -1169,6 +1207,16 @@ Proof.
   - refl.
   - econs; i; eapply ident_map_view.
   - eapply ident_map_promises.
+Qed.
+
+Lemma mapping_map_lt_collapsable_unwritable f prom mem
+      (MAPLT: mapping_map_lt f)
+  :
+    collapsable_unwritable f prom mem.
+Proof.
+  ii. exfalso. des.
+  eapply mapping_map_lt_non_collapsable; try eassumption.
+  inv ITV. eapply TimeFacts.lt_le_lt; eauto.
 Qed.
 
 Lemma ident_map_collapsing_latest_memory L prom mem0 mem1 mem2 mem3
@@ -1212,6 +1260,70 @@ Proof.
         eapply MLE in Heq. clarify.
       * unfold collapsing_caps_times, collapsing_caps, Memory.latest_reserve in H.
         des. inv CAP0. des. clarify.
+Qed.
+
+Lemma collapsing_latest_memory_concrete_le L prom mem0 mem1 mem2 mem3
+      (MLE: Memory.le prom mem0)
+      (CLOSED: Memory.closed mem0)
+      (LOCS: L = (fun loc => Memory.latest_reserve loc prom mem0))
+      (CAP: Memory.cap prom mem0 mem1)
+      (FORGET0: forget_memory (collapsing_latest_reserves_times L mem0 \2/ collapsing_caps_times L mem0 mem1) mem2 mem1)
+      (FORGET1: forget_memory (latest_other_reserves prom mem0) mem3 mem0)
+  :
+    memory_concrete_le mem2 mem3.
+Proof.
+  ii. dup GET. eapply forget_memory_get in GET0; eauto. des.
+  apply not_or_and in NOT. des.
+  dup GET1. eapply Memory.cap_inv in GET0; eauto. des; clarify.
+  - inv FORGET1.
+    erewrite <- COMPLETE in GET0; eauto.
+    ii. inv H. clarify.
+  - exfalso. eapply NOT0.
+    eexists. econs; eauto. esplits. econs; eauto.
+Qed.
+
+Lemma forget_latest_other_reserves_promises_le prom mem0 mem1
+      (MLE: Memory.le prom mem0)
+      (FORGET: forget_memory (latest_other_reserves prom mem0) mem1 mem0)
+  :
+    Memory.le prom mem1.
+Proof.
+  ii. inv FORGET. erewrite COMPLETE; eauto.
+  ii. inv H. clarify.
+Qed.
+
+Lemma forget_latest_other_reserves_concrete_le prom mem0 mem1
+      (FORGET: forget_memory (latest_other_reserves prom mem0) mem1 mem0)
+  :
+    memory_concrete_le mem0 mem1.
+Proof.
+  ii. inv FORGET. erewrite COMPLETE; eauto.
+  ii. inv H. clarify.
+Qed.
+
+Lemma concrete_le_inhabited mem0 mem1
+      (INHABITED: Memory.inhabited mem0)
+      (MLE: memory_concrete_le mem0 mem1)
+  :
+    Memory.inhabited mem1.
+Proof.
+  ii. eapply MLE; eauto.
+Qed.
+
+Lemma forget_latest_other_reserves_closed prom mem0 mem1
+      (CLOSED: Memory.closed mem0)
+      (MLE: Memory.le prom mem0)
+      (FORGET: forget_memory (latest_other_reserves prom mem0) mem1 mem0)
+  :
+    Memory.closed mem1.
+Proof.
+  inv CLOSED. econs; eauto.
+  - i. dup MSG. eapply forget_memory_get in MSG; eauto. des.
+    dup GET. eapply CLOSED0 in GET0. des. splits; auto.
+    eapply memory_concrete_le_closed_msg; eauto.
+    eapply forget_latest_other_reserves_concrete_le; eauto.
+  - eapply concrete_le_inhabited; eauto.
+    eapply forget_latest_other_reserves_concrete_le; eauto.
 Qed.
 
 Definition my_max_timemap (prom mem: Memory.t) (tm: TimeMap.t): Prop :=
@@ -1322,11 +1434,27 @@ Proof.
   - ii. eapply KEEP in H; eauto.
 Qed.
 
+Lemma memory_reserve_wf_mon prom0 prom1 mem
+      (RESERVEWF: Memory.reserve_wf prom1 mem)
+      (MLE: Memory.le prom0 prom1)
+  :
+    Memory.reserve_wf prom0 mem.
+Proof.
+  ii. eauto.
+Qed.
+
+Lemma ident_map_mappable_any_event e
+  :
+    mappable_evt ident_map e.
+Proof.
+  destruct e; ss; split; eapply ident_map_total.
+Qed.
+  
 Lemma collapsing_last_reserves_promise_or_later
       L prom mem0 mem1 mem2 max
       (LOC: L = (fun loc => Memory.latest_reserve loc prom mem0))
       (MLE: Memory.le prom mem0)
-      (RESERVEWF: Memory.reserve_wf prom mem0)
+      (RESERVEWF: memory_reserve_wf mem0)
       (CLOSED: Memory.closed mem0)
       (CAP: Memory.cap prom mem0 mem1)
       (MAX: my_max_timemap prom mem0 max)
@@ -1334,9 +1462,13 @@ Lemma collapsing_last_reserves_promise_or_later
       loc to
       (UNWRITABLE: ~ unwritable mem2 prom loc to)
   :
-      <<COVERED: covered loc to prom>> \/ <<LATER: later_times max loc to>> \/ <<BOT: to = Time.bot>>.
+    <<COVERED: covered loc to prom>> \/ <<LATER: later_times max loc to>> \/ <<BOT: to = Time.bot>>.
 Proof.
   clarify.
+  assert (RESERVEWF0: Memory.reserve_wf prom mem0).
+  { eapply memory_reserve_wf_mon; eauto. }
+  assert (INHABITED: Memory.inhabited mem0).
+  { inv CLOSED. eauto. }
   assert (MLE0: Memory.le prom mem2).
   { eapply collapsing_caps_forget_prom_le; eauto.
     ii. clarify. unfold Memory.latest_reserve in SAT. des_ifs. }
@@ -1349,364 +1481,143 @@ Proof.
     right. left.
     destruct (Time.le_lt_dec to (max loc)); auto. exfalso.
     eapply UNWRITABLE. red.
-
-    c
-    admit.
+    eapply forget_covered; eauto.
+    + eapply memory_cap_covered; eauto.
+      etrans; eauto. specialize (MAX loc). des; clarify.
+      { eapply max_full_ts_le_max_ts; eauto. }
+      { rewrite <- MAX0. refl. }
+    + ii. inv H. ss. des.
+      * unfold collapsing_latest_reserves_times, collapsing_latest_reserves in SAT.
+        des. clarify. specialize (MAX loc). des; clarify.
+        dup RESERVE. eapply Memory.cap_le in RESERVE0; eauto; [|refl]. clarify.
+        eapply max_ts_reserve_from_full_ts in RESERVE; eauto.
+        exploit Memory.max_full_ts_inj.
+        { eapply RESERVE. }
+        { eapply MAX0. }
+        i. clarify. eapply Time.lt_strorder.
+        eapply TimeFacts.lt_le_lt; eauto.
+      * unfold collapsing_caps_times, collapsing_caps, caps in SAT. des. clarify.
+        exploit Memory.cap_inv; eauto. i. des; clarify.
+        eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+        { eapply FROM. }
+        etrans.
+        { eapply l0. }
+        { specialize (MAX loc). des; clarify.
+          eapply max_full_ts_le_max_ts; eauto. }
   - apply NNPP in UNWRITABLE. auto.
+Qed.
 
-
-  eapply
-
-
-  inv UNWRITABLE. des; clarify.
-  inv FORGET. unfold later_times in *. specialize (MAX loc). des.
-  - inv H. erewrite FORGET0 in GET; clarify.
-    admit.
-  - inv H. inv ITV. ss.
-    eapply Memory.max_ts_spec in GET. des.
+Lemma write_not_in_write_in L0 L1
+      (LOCS: forall loc to (NSAT: ~ L0 loc to),
+          <<SAT: L1 loc to>> \/ <<BOT: to = Time.bot>>)
+  :
+    write_not_in L0 <1= write_in L1.
+Proof.
+  i. destruct x0; ss.
+  - i. dup IN. eapply PR in IN. eapply LOCS in IN. des; auto.
+    clarify. inv IN0. ss. exfalso.
     eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
-    { eapply LATER. }
-    etrans.
-    { eapply TO. }
-    { replace
-
-Lemma collapsing_last_reserves_promise_or_later
-      L prom mem0 mem1 mem2 max
-      (LOC: L = (fun loc => Memory.latest_reserve loc prom mem0))
-      (MLE: Memory.le prom mem0)
-      (RESERVEWF: Memory.reserve_wf prom mem0)
-      (CLOSED: Memory.closed mem0)
-      (CAP: Memory.cap prom mem0 mem1)
-      (MAX: my_max_timemap prom mem0 max)
-      (FORGET: forget_memory (collapsing_latest_reserves_times L mem0 \2/ collapsing_caps_times L mem0 mem1) mem2 mem1)
-      loc to
-      (UNWRITABLE: unwritable mem2 prom loc to)
-      (SPACES: <<COVERED: covered loc to prom>> \/ <<LATER: later_times max loc to>>)
-  :
-    False.
-Proof.
-  clarify.
-  assert (MLE0: Memory.le prom mem2).
-  { eapply collapsing_caps_forget_prom_le; eauto.
-    ii. clarify. unfold Memory.latest_reserve in SAT. des_ifs. }
-  erewrite unwritable_eq in UNWRITABLE; eauto. inv UNWRITABLE. des; clarify.
-  inv FORGET. unfold later_times in *. specialize (MAX loc). des.
-  - inv H. erewrite FORGET0 in GET; clarify.
-    admit.
-  - inv H. inv ITV. ss.
-    eapply Memory.max_ts_spec in GET. des.
+    + eapply FROM.
+    + eapply Time.bot_spec.
+  - i. dup IN. eapply PR in IN. eapply LOCS in IN. des; auto.
+    clarify. inv IN0. ss. exfalso.
     eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
-    { eapply LATER. }
-    etrans.
-    { eapply TO. }
-    { replace
+    + eapply FROM.
+    + eapply Time.bot_spec.
+Qed.
 
-      erewrite <- MAX0. eauto.
-
-
-      admit.
-    +
-
-
-    admit.
-  -
-
-
-
-    - eaut
-
-
-  Lemma collapsing_caps_forget_prom_le
-      mem0 mem1 mem2 prom (L: Loc.t -> Prop)
-      (COLLAPSABLE: collapsable_cap L prom mem0)
-      (MLE: Memory.le prom mem0)
-      (CLOSED: Memory.closed mem0)
-      (RESERVEWF: Memory.reserve_wf prom mem0)
-      (CAP: Memory.cap prom mem0 mem2)
-      (FORGET: forget_memory (collapsing_latest_reserves_times L mem0 \2/ collapsing_caps_times L mem0 mem2) mem1 mem2)
-  :
-    Memory.le prom mem1.
-
-
-  - unfold unwritable2, promise_or_later in *. des; clarify.
-    + admit.
-    +
-
-
-Lemma memory_cap_covered prom mem0 mem1
-      (CAP: Memory.cap prom mem0 mem1)
-      loc to
-      (TS: Time.le to (Memory.max_ts loc mem0))
-  :
-    covered loc to mem1.
-Proof.
-  inv CAP.
-
-
-  set (@cell_elements_least
-         (mem0 l)
-         (fun to => Time.lt from to)). des.
-
-
-
-
-Lemma collapsing_last_reserves_promise_or_later
-      L prom mem0 mem1 mem2
-      (LOC: L = (fun loc => Memory.latest_reserve loc prom mem0))
-      (CAP: Memory.cap prom mem0 mem1)
-      (FORGET: forget_memory (collapsing_latest_reserves_times L mem0 \2/ collapsing_caps_times L mem0 mem1) mem2 mem1)
-      loc to
-      (UNWRITABLE: unwritable mem2 prom loc to)
-      (SPACES: promise_or_later prom mem0 loc to)
-  :
-    False.
-Proof.
-  erewrite unwritable_eq in UNWRITABLE.
-  - unfold unwritable2, promise_or_later in *. des; clarify.
-    + admit.
-    +
-
-
-  Lemma collapsing_caps_forget_prom_le
-      mem0 mem1 mem2 prom (L: Loc.t -> Prop)
-      (COLLAPSABLE: collapsable_cap L prom mem0)
-      (MLE: Memory.le prom mem0)
-      (CLOSED: Memory.closed mem0)
-      (RESERVEWF: Memory.reserve_wf prom mem0)
-      (CAP: Memory.cap prom mem0 mem2)
-      (FORGET: forget_memory (collapsing_latest_reserves_times L mem0 \2/ collapsing_caps_times L mem0 mem2) mem1 mem2)
-  :
-    Memory.le prom mem1.
-
-
-
-  ; eauto.
-
-  inv UNWRITABLE. inv UNCH. unfold promise_or_later in *. des.
-  -
-
-
-
-      (prom mem: Memory.t) (loc: Loc.t) (to: Time.t): Prop :=
-  (<<PROM: covered loc to prom>>) \/
-  (exists max,
-      (<<MAX: Memory.max_full_ts mem loc max>>) /\
-      (<<TS: Time.lt max to>>) /\
-      (<<LATEST: Memory.latest_reserve loc prom mem>>)) /\
-  ((<<TS: Time.lt (Memory.max_ts loc mem) to>>) /\
-   (<<LATEST: ~ Memory.latest_reserve loc prom mem>>))
-.
-
-
-Definition promise_or_later (prom mem: Memory.t) (loc: Loc.t) (to: Time.t): Prop :=
-  <<PROM: covered loc to prom>> \/ <<MAX: Time.lt (Memory.max_ts loc mem) to>>.
-
-Lemma
-
-Lemma write_in_promise_or_later P lang (th_tgt th_tgt': Thread.t lang)
-      (MLE: Memory.le th_tgt.(Thread.local).(Local.promises) th_tgt.(Thread.memory))
-      (STEP: rtc (tau (@pred_step P lang)) th_tgt th_tgt')
-  :
-    rtc (tau (@pred_step (P /1\ write_in (promise_or_later th_tgt.(Thread.local).(Local.promises) th_tgt.(Thread.memory))) lang)) th_tgt th_tgt'.
-Proof.
-  eapply steps_write_not_in in STEP; eauto.
-  eapply pred_step_rtc_mon; eauto. i. ss. des. split; auto.
-
-
-
-
-
-  :
-
-
-
-Definition pf_consistent_drf'' lang (e0:Thread.t lang): Prop :=
+Definition pf_consistent_drf lang (e0:Thread.t lang): Prop :=
   let L := (fun loc => Memory.latest_reserve loc e0.(Thread.local).(Local.promises) e0.(Thread.memory)) in
-  forall mem1
-         (FORGET: forget_memory (latest_other_reserves e0.(Thread.local).(Local.promises) e0.(Thread.memory)) mem1 e0.(Thread.memory)),
+  forall mem1 max sc
+         (FORGET: forget_memory (latest_other_reserves e0.(Thread.local).(Local.promises) e0.(Thread.memory)) mem1 e0.(Thread.memory))
+         (MAX: my_max_timemap e0.(Thread.local).(Local.promises) e0.(Thread.memory) max),
   exists e1,
-    (<<STEPS0: rtc (tau (@pred_step ((promise_free /1\ no_acq_update_msgs ((fun loc to => L loc) /2\ Memory.max_full_ts e0.(Thread.memory))) /1\ no_sc /1\ write_in
-
-                                    ) lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot mem1) e1>>) /\
+    (<<STEPS0: rtc (tau (@pred_step ((promise_free /1\ no_acq_update_msgs ((fun loc to => L loc) /2\ Memory.max_full_ts e0.(Thread.memory))) /1\ no_sc /1\ write_in (later_times max \2/ fun loc to => covered loc to e0.(Thread.local).(Local.promises))) lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc mem1) e1>>) /\
     (__guard__((<<FAILURE: Local.failure_step e1.(Thread.local)>>) \/
                (<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>))).
-
 
 Lemma pf_consistent_pf_consistent_drf lang (th: Thread.t lang)
       (WF: Local.wf th.(Thread.local) th.(Thread.memory))
       (MEM: Memory.closed th.(Thread.memory))
-      (INHABITED: Memory.inhabited th.(Thread.memory))
-      (CONSISTENT: pf_consistent_strong th)
+      (CONSISTENT: pf_consistent th)
       (RESERVEWF: memory_reserve_wf (Thread.memory th))
   :
-    pf_consistent_drf' th.
+    pf_consistent_drf th.
 Proof.
-
-
-Definition pf_consistent_drf'' lang (e0:Thread.t lang): Prop :=
-  let L := (fun loc => Memory.latest_reserve loc e0.(Thread.local).(Local.promises) e0.(Thread.memory)) in
-  forall mem1 mem2 TimeMap.
-         (CAP: Memory.cap e0.(Thread.local).(Local.promises) e0.(Thread.memory) mem1)
-         (FORGET: forget_memory (collapsing_latest_reserves_times L e0.(Thread.memory) \2/ collapsing_caps_times L e0.(Thread.memory) mem1) mem2 mem1),
-  exists e1,
-    (<<STEPS0: rtc (tau (@pred_step ((promise_free /1\ no_acq_update_msgs ((fun loc to => L loc) /2\ Memory.max_full_ts e0.(Thread.memory))) /1\ no_sc) lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc1 mem2) e1>>) /\
-    (__guard__((<<FAILURE: Local.failure_step e1.(Thread.local)>>) \/
-               (<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>))).
-
-Lemma pf_consistent_pf_consistent_drf'' lang (th: Thread.t lang)
-      (WF: Local.wf th.(Thread.local) th.(Thread.memory))
-      (MEM: Memory.closed th.(Thread.memory))
-      (INHABITED: Memory.inhabited th.(Thread.memory))
-      (CONSISTENT: pf_consistent_strong th)
-      (RESERVEWF: memory_reserve_wf (Thread.memory th))
-  :
-    pf_consistent_drf'' th.
-Proof.
+  eapply pf_consistent_pf_consistent_strong in CONSISTENT; eauto.
   eapply pf_consistent_pf_consistent_drf' in CONSISTENT; eauto.
+  eapply pf_consistent_pf_consistent_drf'' in CONSISTENT; eauto.
+  
+  set (L:=fun loc : Loc.t =>
+            Memory.latest_reserve loc (Local.promises (Thread.local th)) (Thread.memory th)).
+  exploit Memory.cap_exists; eauto. i. des.
+  exploit forget_exists; eauto. i. des.
   ii. exploit CONSISTENT; eauto. i. des.
+  assert (MLE0: Memory.le (Local.promises (Thread.local th)) (Thread.memory th)).
+  { inv WF. auto. }
+  assert (COLLAPSABLE: collapsable_cap L (Local.promises (Thread.local th)) (Thread.memory th)).
+  { ii. clarify. unfold L, Memory.latest_reserve in SAT.
+    rewrite GET in SAT. clarify. }
+  assert (MEMORY: memory_map ident_map mem_src mem1).
+  { eapply ident_map_collapsing_latest_memory; cycle 3; eauto. }
+  assert (MLE1: memory_concrete_le mem_src mem1).
+  { eapply collapsing_latest_memory_concrete_le; cycle 3; eauto. }
+  assert (CONCRETELE: memory_concrete_le th.(Thread.memory) mem_src).
+  { eapply collapsing_caps_forget_le; eauto. }
+  assert (LCWFTGT: Local.wf th.(Thread.local) mem_src).
+  { eapply memory_concrete_le_local_wf; eauto. inv WF.
+    eapply collapsing_caps_forget_prom_le; eauto. } 
+  assert (LCWFSRC: Local.wf th.(Thread.local) mem1).
+  { eapply memory_concrete_le_local_wf; eauto. inv WF.
+    eapply forget_latest_other_reserves_promises_le; eauto. }
+  assert (CLOSEDSRC: Memory.closed mem1).
+  { eapply forget_latest_other_reserves_closed; cycle 1; eauto. }
+  assert (CLOSEDTGT: Memory.closed mem_src).
+  { eapply collapsing_caps_forget_closed; cycle 1; eauto. }
+  eapply steps_write_not_in in STEPS0; ss; cycle 1.
+  { eauto. inv LCWFTGT. auto. }
+  eapply steps_wf_event in STEPS0; ss; cycle 1.
+  { inv CLOSEDTGT. auto. }
+  
   destruct e1.
-  eapply no_sc_any_sc_rtc in STEPS0; ss; cycle 1.
-  { i. destruct x1; ss. }
-  des. destruct e2.
-  eapply no_sc_any_sc_rtc in STEPS1; ss; cycle 1.
-  { i. des. auto. }
-  des. eexists. esplits.
-  - etrans.
-    + eapply pred_step_rtc_mon; try apply STEP.
-      i. destruct x1; ss. destruct kind; ss.
-    + eapply pred_step_rtc_mon; try apply STEP0.
-      i. ss. des. split; auto.
-  - eauto.
+  hexploit (@steps_map ident_map); try apply STEPS0; try apply MEMORY; eauto.
+  { eapply ident_map_le. }
+  { eapply ident_map_bot. }
+  { eapply ident_map_eq. }
+  { ss. i. eapply ident_map_mappable_any_event. }
+  { eapply Memory.closed_timemap_bot; eauto. inv CLOSEDSRC. auto. }
+  { eapply Memory.closed_timemap_bot; eauto. inv CLOSEDTGT. auto. }
+  { eapply ident_map_local; eauto. }
+  { eapply mapping_map_lt_collapsable_unwritable. eapply ident_map_lt. }
+  { eapply ident_map_timemap. }
+  { refl. }
+  { instantiate (1:=(promise_free /1\ no_acq_update_msgs ((fun loc to => L loc) /2\ Memory.max_full_ts th.(Thread.memory))) /1\ no_sc /1\ write_in (later_times max \2/ fun loc to => covered loc to th.(Thread.local).(Local.promises))).
+    ii. ss. des. splits.
+    - inv REL; ss. inv KIND; ss. inv MSG0; ss. inv MSG; ss. inv MAP0; ss.
+    - inv REL; ss. inv FROM. ss.
+    - inv REL; ss.
+    - eapply write_not_in_write_in in SAT1.
+      + instantiate (1:=later_times max \2/ fun loc to => covered loc to th.(Thread.local).(Local.promises)) in SAT1.
+        inv REL; ss.
+        * inv FROM. inv TO. eauto.
+        * inv FROM. inv TO. eauto.
+      + i. eapply collapsing_last_reserves_promise_or_later in NSAT; ss; eauto.
+        des; auto. }
+  i. des.
+  eapply no_sc_any_sc_rtc in STEP; ss; cycle 1.
+  { i. destruct x1; ss; des; auto. } des.
+  esplits; eauto.
+  unguard. des; ss.
+  - left. econs. inv FAILURE. inv LOCAL.
+    eapply promise_consistent_mon.
+    { eapply promise_consistent_map; eauto.
+      - eapply ident_map_le.
+      - eapply ident_map_eq. }
+    { ss. }
+    { ss. }
+  - right. inv LOCAL. rewrite PROMISES in *.
+    eapply bot_promises_map; eauto.
 Qed.
-
-
-
-apply NOT. econs; eauto. des_ifs.
-
-
-
-        clarify.
-
-        inv H.
-
-      *
-
-
-    esplits; eauto.
-      apply not_or_and in NOT. des.
-    dup GET1. eapply Memory.cap_inv in GET0; eauto. des.
-    + inv FORGET1.
-      erewrite <- COMPLETE in GET0.
-      * right. esplits.
-        { refl. }
-        { eapply ident_map_message. }
-        { refl. }
-        { eauto. }
-      * intros LATEST. inv LATEST.
-        eapply NOT. eexists. econs; eauto. splits; eauto.
-        unfold Memory.latest_reserve. des_ifs.
-    + clarify. left. auto.
-    + clarify. exfalso. eapply NOT0.
-      eexists. econs; eauto. esplits. econs; eauto.
-
-
-
-
-      inv FORGET1.
-      erewrite <- COMPLETE in GET0.
-      * right. esplits.
-        { refl. }
-        { eapply ident_map_message. }
-        { refl. }
-        { eauto. }
-      * intros LATEST. inv LATEST.
-        eapply NOT. eexists. econs; eauto. splits; eauto.
-        unfold Memory.latest_reserve. des_ifs.
-
-
-
-
-
-
-
-        ii.
-
-          refl.
-
-
-Definition pf_consistent_drf' lang (e0:Thread.t lang): Prop :=
-  let L := (fun loc => Memory.latest_reserve loc e0.(Thread.local).(Local.promises) e0.(Thread.memory)) in
-  forall mem1 mem2
-         (CAP: Memory.cap e0.(Thread.local).(Local.promises) e0.(Thread.memory) mem1)
-         (FORGET: forget_memory (collapsing_latest_reserves_times L e0.(Thread.memory) \2/ collapsing_caps_times L e0.(Thread.memory) mem1) mem2 mem1),
-
-
-
-
-
-
-step_map
-
-
-write_
-
-
-Lemma caps_loc_forget mem0 mem1
-      (MLE: Memory.le
-
-
-Lemma for
-
-
-caps_loc loc to
-
-Definition middle_reserves (prom mem0: Memory.t) :=
-  forall mem1 (CAP: Memory.cap prom mem0 mem1),
-
-
-
-       (exists from1 to2 : Time.t,
-          Memory.adjacent loc from1 from to to2 mem1 /\ Time.lt from to /\ msg = Message.reserve) \/
-
-
-           Memory.cap_inv
-
-caps
-
-Lemma
-
-Lemma nor_re
-
-Lemma pred_ste
-
-Memory.closed fmem0 ->
-       local_map f lc0 flc0 ->
-       memory_map f mem0 fmem0 ->
-
-
-Lemma caps_collapsing_mapping_map_eq L prom mem0 mem1
-      (COLLAPSABLE: collapsable_cap L prom mem0)
-      (CAP: Memory.cap prom mem0 mem1)
-  :
-    mapping_map_eq (caps_collapsing L mem0).
-Proof.
-  ii. inv MAP0; inv MAP1; clarify.
-  - exploit Memory.max_full_ts_inj; [apply FULL|apply FULL0|i; clarify].
-    exfalso; eapply Time.lt_strorder; eapply TimeFacts.lt_le_lt; eauto.
-  - exploit Memory.max_full_ts_inj; [apply FULL|apply FULL0|i; clarify].
-    exfalso; eapply Time.lt_strorder; eapply TimeFacts.le_lt_lt; eauto.
-  - exploit Memory.max_full_ts_inj; [apply FULL|apply FULL0|i; clarify].
-  - exfalso; eapply Time.lt_strorder; eapply TimeFacts.lt_le_lt; eauto.
-  - clear - TLE TS1. exfalso; eapply Time.lt_strorder; eapply TimeFacts.lt_le_lt; eauto.
-Qed.
-
-
-Lemma
-
-Memory.latest_reserve l prom mem0
-
-
-
 
 
 Definition times_in_memory (mem: Memory.t) (L: Loc.t -> list Time.t): Prop :=

@@ -451,11 +451,12 @@ Section PFCONSISTENT.
   Lemma pf_consistent_pf_consistent_strong lang (th: Thread.t lang)
         (WF: Local.wf th.(Thread.local) th.(Thread.memory))
         (MEM: Memory.closed th.(Thread.memory))
-        (INHABITED: Memory.inhabited th.(Thread.memory))
         (CONSISTENT: pf_consistent th)
     :
       pf_consistent_strong th.
   Proof.
+    assert (INHABITED: Memory.inhabited th.(Thread.memory)).
+    { inv MEM. auto. }
     ii. exploit Memory.max_full_timemap_exists; eauto. intros MAX. des.
     ii. exploit Memory.max_full_timemap_exists.
     { eapply le_inhabited; eauto. eapply Memory.cap_le; eauto. refl. }
