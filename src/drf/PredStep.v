@@ -351,7 +351,7 @@ Section PredStep.
         i. ss. eapply List.in_or_app; eauto.
   Qed.
 
-  Definition no_acq_update_msgs (MSGS : Loc.t -> Time.t -> Prop)
+  Definition no_acq_update_on (MSGS : Loc.t -> Time.t -> Prop)
              (e : ThreadEvent.t) : Prop :=
     match e with
     | ThreadEvent.update loc from _ _ _ _ _ ordr _ =>

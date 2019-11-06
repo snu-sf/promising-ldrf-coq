@@ -815,6 +815,12 @@ Section NOTATTATCHED.
       shorter_event
         (ThreadEvent.failure)
         (ThreadEvent.failure)
+  | shorter_event_promise
+      loc from to msg kind
+    :
+      shorter_event
+        (ThreadEvent.silent)
+        (ThreadEvent.promise loc from to msg kind)
   .
 
   Lemma shorter_event_shift L

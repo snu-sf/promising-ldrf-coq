@@ -37,17 +37,49 @@ Require Import DRF_PF1.
 
 Set Implicit Arguments.
 
-Lemma step_lifting_raw
-      lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc'
-      mem_src mem_tgt mem_tgt' e_tgt others updates otherspace
+Lemma forget_event_no_promise e_src e_tgt
+      (FORGET: forget_event e_src e_tgt)
+  :
+    no_promise e_src.
+Proof.
+  unfold forget_event in *. des_ifs.
+Qed.
 
-      (STEP: (@pred_step
-                ((fun _ => True)
-                   /1\ (write_not_in otherspace)
-                   /1\ (no_update_on updates)
-                   /1\ (no_read_msgs others)
-                   /1\ (write_not_in others)
-                   /1\ (no_read_msgs prom.(promised))) lang) e_tgt th_tgt th_tgt')
+Lemma forget_event_write_not_in L e_src e_tgt
+      (FORGET: forget_event e_src e_tgt)
+      (WRITENOTIN: write_not_in L e_tgt)
+  :
+    write_not_in L e_src.
+Proof.
+  unfold forget_event in *. des_ifs.
+Qed.
+
+Lemma shorter_event_same_machine_event e_src e_tgt
+      (SHORTER: shorter_event e_src e_tgt)
+  :
+    same_machine_event e_src e_tgt.
+Proof.
+  inv SHORTER; ss.
+Qed.
+
+Lemma pred_step_pred P lang th0 th1 e
+      (STEP: @pred_step P lang e th0 th1)
+  :
+    P e.
+Proof.
+  inv STEP; auto.
+Qed.
+  
+Lemma step_lifting_raw
+      P lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc'
+      mem_src mem_tgt mem_tgt' e_tgt others updates otherspace
+      (STEP: (@pred_step P lang) e_tgt th_tgt th_tgt')
+
+      (PRED: P <1= ((write_not_in otherspace)
+                      /1\ (no_update_on updates)
+                      /1\ (no_read_msgs others)
+                      /1\ (no_read_msgs prom.(promised))))
+      (OTHERS: others <2= otherspace)
 
       (TH_SRC: th_src = Thread.mk lang st (Local.mk v Memory.bot) sc mem_src)
       (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v prom) sc mem_tgt)
@@ -60,17 +92,19 @@ Lemma step_lifting_raw
       (LCWF: Local.wf (Local.mk v prom) mem_tgt)
   :
     exists mem_src' e_src,
-      (<<STEP: opt_pred_step
-                 (no_promise) e_src th_src
+      (<<STEP: Thread.opt_step
+                 e_src th_src
                  (Thread.mk lang st' (Local.mk v' Memory.bot) sc' mem_src')>>) /\
-      (<<EVT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>>) /\
+      (<<EVT: shorter_event e_src e_tgt>>) /\
       (<<MEM: pf_sim_memory (others \2/ promised prom') mem_src' mem_tgt'>>) /\
       (<<NOATTATCH: not_attatched updates mem_src'>>) /\
       (<<UNCHANGED: unchanged_on otherspace mem_src mem_src'>>).
 Proof.
+  exploit pred_step_pred; eauto. intros SAT.
+  apply PRED in SAT. des.
   hexploit (forget_exists prom.(promised) mem_tgt); eauto. i. des.
-
-  exploit self_promise_remove; try apply FORGET; eauto.
+  exploit self_promise_remove; try apply FORGET; try apply STEP; eauto.
+  { i. eapply PRED. auto. }
   i. des.
 
   inv MEM.
@@ -79,89 +113,97 @@ Proof.
 
   inv STEP0.
   { exists mem_src, ThreadEvent.silent. esplits; eauto.
+    - econs 1.
+    - unfold forget_event in EVT. des_ifs; econs.
     - econs; eauto. eapply forget_compose; eauto.
     - refl. }
 
   exploit other_promise_remove; try eapply STEP1; eauto.
+  { i. ss. des. apply PRED in PR. des. splits; auto.
+    eapply write_not_in_mon; eauto. }
   i. des.
 
   exploit shorter_memory_step; try apply STEP0; eauto.
+  { i. ss. des. auto. }
   i. des.
 
   exploit no_update_on_step; try apply STEP2; eauto.
+  { i. ss. des. apply PRED in PR. des. splits; eauto. }
   { refl. }
   i. des.
 
   exists mem_src'2, e_src0. esplits.
-  - econs 2. eapply pred_step_mon; cycle 1; eauto.
-    ss. i. des. eauto.
-  - etrans; eauto.
+  - inv STEP3. econs 2. eapply pred_step_mon; cycle 1; eauto.
+  - unfold forget_event in EVT. des_ifs. inv EVT0; econs.
   - econs.
     + eapply forget_compose; eauto.
     + etrans; eauto.
   - eauto.
-  - exploit write_not_in_unchanged_on; try apply STEP3; eauto.
+  - exploit write_not_in_unchanged_on.
+    + econs; try apply STEP3.
+      instantiate (1:=write_not_in otherspace /1\ no_promise).
+      eapply shorter_event_shift; eauto. split.
+      * eapply forget_event_write_not_in; eauto.
+      * eapply forget_event_no_promise; eauto.
+    + i. apply PR.
+    + ss.
+    + ss.
 Qed.
 
 Lemma step_lifting
-      lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc'
+      P lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc'
       mem_src mem_tgt mem_tgt' e_tgt others updates otherspace
-
-      (STEP: (@pred_step
-                ((fun _ => True)
-                   /1\ (no_update_on updates)
-                   /1\ (no_read_msgs others)) lang) e_tgt th_tgt th_tgt')
-
+      (STEP: (@pred_step P lang) e_tgt th_tgt th_tgt')
+      (PRED: P <1= ((no_update_on updates)
+                      /1\ (no_read_msgs others)))
+      (OTHERS: others <2= otherspace)      
       (TH_SRC: th_src = Thread.mk lang st (Local.mk v Memory.bot) sc mem_src)
       (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v prom) sc mem_tgt)
       (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
       (MEM: pf_sim_memory (others \2/ promised prom) mem_src mem_tgt)
       (NOATTATCH: not_attatched updates mem_src)
-
       (CONSISTENT: Local.promise_consistent (Local.mk v' prom'))
-      (OTHERSPACE: others \2/ otherspace <2= unchangables mem_tgt prom)
-
+      (OTHERSPACE: otherspace <2= unwritable mem_tgt prom)
       (SC: Memory.closed_timemap sc mem_tgt)
       (CLOSED: Memory.closed mem_tgt)
       (LCWF: Local.wf (Local.mk v prom) mem_tgt)
   :
     exists mem_src' e_src,
-      (<<STEP: opt_pred_step
-                 (no_promise) e_src th_src
+      (<<STEP: Thread.opt_step
+                 e_src th_src
                  (Thread.mk lang st' (Local.mk v' Memory.bot) sc' mem_src')>>) /\
-      (<<EVT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>>) /\
+      (<<EVT: shorter_event e_src e_tgt>>) /\
       (<<MEM: pf_sim_memory (others \2/ promised prom') mem_src' mem_tgt'>>) /\
       (<<NOATTATCH: not_attatched updates mem_src'>>) /\
       (<<UNCHANGED: unchanged_on otherspace mem_src mem_src'>>).
 Proof.
-  eapply step_lifting_raw; ss; eauto.
-  dup STEP. inv STEP. econs; auto. inv STEP1. des.
-  exploit step_write_not_in; eauto. ss. i.
-  splits; eauto.
-  - eapply write_not_in_mon; eauto.
-  - eapply write_not_in_mon; eauto.
-  - eapply consistent_read_no_self_promise; eauto.
+  eapply step_lifting_raw with
+      (P := P /1\ ((write_not_in otherspace)
+                     /1\ (no_read_msgs prom.(promised)))); eauto.
+  { inv STEP. econs; eauto. splits; auto.
+    - inv STEP0. eapply step_write_not_in in STEP; ss.
+      + eapply write_not_in_mon; eauto.
+      + inv LCWF. auto.
+    - inv STEP0. eapply consistent_read_no_self_promise in STEP; eauto. }
+  { i. ss. des. apply PRED in
+        PR. des. splits; eauto. }
 Qed.
 
-
-
 Lemma step_lifting_rtc
-      lang others otherspace updates th_src th_tgt th_tgt'
-
-      (STEP: rtc (tau (@pred_step
-                         ((fun _ => True)
-                            /1\ (no_update_on updates)
-                            /1\ (no_read_msgs others)) lang)) th_tgt th_tgt')
-
+      P0 P1 lang others otherspace updates th_src th_tgt th_tgt'
+      (STEP: rtc (tau (@pred_step P0 lang)) th_tgt th_tgt')
+      (PRED: P0 <1= ((no_update_on updates)
+                       /1\ (no_read_msgs others)))
+      (OTHERS: others <2= otherspace)
       (FORGET: forget_thread others th_src th_tgt)
-
       (NOATTATCH: not_attatched updates th_src.(Thread.memory))
       (THWF: thread_wf th_tgt)
       (CONSISTENT: Local.promise_consistent th_tgt'.(Thread.local))
-      (OTHERSPACE: others \2/ otherspace <2= unchangables th_tgt.(Thread.memory) th_tgt.(Thread.local).(Local.promises))
+      (OTHERSPACE: otherspace <2= unwritable th_tgt.(Thread.memory) th_tgt.(Thread.local).(Local.promises))
+      (SHIFT: te_pred_shift P1 P0 shorter_event)
   :
     exists th_src',
-      (<<STEP: rtc (tau (@pred_step (no_promise) lang))
+      (<<STEP: rtc (tau (@pred_step P1 lang))
                    th_src th_src'>>) /\
       (<<FORGET: forget_thread others th_src' th_tgt'>>) /\
       (<<NOATTATCH: not_attatched updates th_src'.(Thread.memory)>>) /\
@@ -192,7 +234,7 @@ Proof.
     exploit IHSTEP; eauto; ss.
     { econs; eauto. }
     { ss. }
-    { i. exploit unchangables_increase.
+    { i. exploit unwritable_increase.
       - eapply STEP1.
       - eauto.
       - ss. }
@@ -201,8 +243,11 @@ Proof.
     exists th_src'. inv STEP0.
     { esplits; eauto. }
     { esplits; eauto.
-      - eapply Relation_Operators.rt1n_trans; eauto.
-        econs; eauto. etrans; eauto.
+      - eapply Relation_Operators.rt1n_trans; eauto. econs.
+        + econs.
+          * econs. eapply STEP3.
+          * eapply SHIFT; eauto.
+        + erewrite shorter_event_same_machine_event; eauto.
       - etrans; eauto. }
 Qed.
 
@@ -340,6 +385,23 @@ Proof.
   i. eapply concrete_covered_same; eauto.
 Qed.
 
+Lemma other_promises_in_space c tid
+      (WF: Configuration.wf c)
+  :
+    (all_promises c.(Configuration.threads) (fun tid' => tid <> tid'))
+    <2=
+    (other_space tid (Configuration.threads c) (Configuration.memory c)).
+Proof.
+  i. inv PR. destruct st. econs; eauto.
+  
+
+  Set Printing All.
+  
+  all_promises c_tgt0.(Configuration.threads) (fun tid' => tid <> tid')
+
+other_space tid (Configuration.threads c_tgt0) (Configuration.memory c_tgt0)
+
+
 Lemma sim_pf_step
       c_src0 c_tgt0 c_tgt1 tid e mlast spaces updates aupdates
       (SIM: sim_pf mlast spaces updates aupdates c_src0 c_tgt0)
@@ -365,66 +427,76 @@ Lemma sim_pf_step
 (* (<<ABORT: Configuration.step MachineEvent.abort tid c_src0 c_src1>>) *)
 .
 Proof.
-  inv SIM. inv FORGET. dup THS. specialize (THS tid). inv STEP; ss.
+  inv SIM. inv FORGET. dup THS. specialize (THS tid).
+  eapply configuration_step_equivalent in STEP. inv STEP; ss.
+
+  rewrite TID in THS. unfold option_rel in *. des_ifs. inv THS.
+  dup WFTGT. inv WFTGT.
+  exploit Thread.rtc_tau_step_future; eauto; ss.
+  { inv WF. eauto. }
+  i. des.
+  exploit Thread.step_future; eauto.
+  i. des. ss.
+
+  assert (CONSISTENT1: Local.promise_consistent lc3).
+  { destruct (classic (e0 = ThreadEvent.failure)).
+    - inv STEP0; inv STEP; ss. inv LOCAL. inv LOCAL0. ss. 
+    - hexploit consistent_promise_consistent; eauto. }
+  assert (CONSISTENT0: Local.promise_consistent e2.(Thread.local)).
+  { hexploit step_promise_consistent; eauto. }
+
+  set (oproms := all_promises c_tgt0.(Configuration.threads) (fun tid' => tid <> tid')).
+  (* set (oproms := other_promises tid (Configuration.threads c_tgt0)). *)
+  set (oupdates := other_updates tid updates).
+  set (ospace := other_space tid (Configuration.threads c_tgt0) (Configuration.memory c_tgt0)).
+  destruct lc0, lc1. ss. clarify.
+
+  assert (OPROMS: (oproms \2/ promised promises0) = (all_promises c_tgt0.(Configuration.threads) (fun _ => True))).
+  { extensionality loc. extensionality to.
+    apply Coq.Logic.PropExtensionality.propositional_extensionality.
+    unfold oproms. split; i.
+    - des.
+      + inv H. econs; eauto.
+      + econs; eauto.
+    - inv H. destruct (classic (tid = tid0)).
+      + right. clarify.
+      + left. econs; eauto. }
+
+all_promises c_tgt0.(Configuration.threads) (fun tid' => tid <> tid')
+
+other_space tid (Configuration.threads c_tgt0) (Configuration.memory c_tgt0)
+                                            
+  assert (OTHER: oproms <2= ospace).
   { admit. }
-  { rewrite TID in THS. unfold option_rel in *. des_ifs. inv THS.
-    dup WFTGT. inv WFTGT.
-    exploit Thread.rtc_tau_step_future; eauto; ss.
-    { inv WF. eauto. }
-    i. des.
-    exploit Thread.step_future; eauto.
-    i. des.
-
-    assert (CONSISTENT1: Local.promise_consistent lc3).
-    { hexploit consistent_promise_consistent; eauto. }
-    assert (CONSISTENT0: Local.promise_consistent e2.(Thread.local)).
-    { hexploit step_promise_consistent; eauto. }
-
-    set (oproms := all_promises c_tgt0.(Configuration.threads) (fun tid' => tid <> tid')).
-    (* set (oproms := other_promises tid (Configuration.threads c_tgt0)). *)
-    set (oupdates := other_updates tid updates).
-    set (ospace := other_space tid (Configuration.threads c_tgt0) (Configuration.memory c_tgt0)).
-    destruct lc0, lc1. ss. clarify.
-
-    assert (OPROMS: (oproms \2/ promised promises0) = (all_promises c_tgt0.(Configuration.threads) (fun _ => True))).
-    { extensionality loc. extensionality to.
-      apply Coq.Logic.PropExtensionality.propositional_extensionality.
-      unfold oproms. split; i.
-      - des.
-        + inv H. econs; eauto.
-        + econs; eauto.
-      - inv H. destruct (classic (tid = tid0)).
-        + right. clarify.
-        + left. econs; eauto. }
-
-    assert (OSPACE: oproms \2/ ospace <2= unchangables (Configuration.memory c_tgt0) promises0).
-    { i. des.
-      - inv PR. inv WF. destruct st.
-        exploit THREADS; eauto. i. inv x2.
-        inv PROMISED. destruct msg.
-        exploit Memory.get_ts; eauto. i. des.
-        { clarify. erewrite BOT in GET. clarify. }
-        econs.
-        + red. econs; eauto. econs; eauto; ss. refl.
-        + ii. inv H. exploit DISJOINT; try eassumption.
-          i. inv x2. ss. inv DISJOINT0.
+  
+  assert (OSPACE: oproms <2= unwritable (Configuration.memory c_tgt0) promises0).
+  { i. des.
+    - inv PR. inv WF. destruct st.
+      exploit THREADS; eauto. i. inv x2.
+      inv PROMISED. destruct msg.
+      exploit Memory.get_ts; eauto. i. des.
+      { clarify. erewrite BOT in GET. clarify. }
+      econs.
+      + red. econs; eauto. econs; eauto; ss. refl.
+      + ii. inv H. exploit DISJOINT; try eassumption.
+        i. inv x2. ss. inv DISJOINT0.
+        exploit DISJOINT1; try eassumption. i. des.
+        eapply x2; eauto. econs; ss; eauto. refl.
+    - inv PR. inv WF.
+      exploit THREADS; eauto. i. inv x.
+      inv SPACE.
+      + econs.
+        * red. econs; eauto.
+        * ii. inv H. exploit DISJOINT; try eassumption.
+          i. inv x. ss. inv DISJOINT0.
           exploit DISJOINT1; try eassumption. i. des.
-          eapply x2; eauto. econs; ss; eauto. refl.
-      - inv PR. inv WF.
-        exploit THREADS; eauto. i. inv x.
-        inv SPACE.
-        + econs.
-          * red. econs; eauto.
-          * ii. inv H. exploit DISJOINT; try eassumption.
-            i. inv x. ss. inv DISJOINT0.
-            exploit DISJOINT1; try eassumption. i. des.
-            eapply x; eauto.
-        + econs.
-          * red. econs; [eapply PROMISES|]; eauto.
-          * ii. inv H. exploit DISJOINT; try eassumption.
-            i. inv x. ss. inv DISJOINT0.
-            exploit DISJOINT1; try eassumption. i. des.
-            eapply x; eauto. }
+          eapply x; eauto.
+      + econs.
+        * red. econs; [eapply PROMISES|]; eauto.
+        * ii. inv H. exploit DISJOINT; try eassumption.
+          i. inv x. ss. inv DISJOINT0.
+          exploit DISJOINT1; try eassumption. i. des.
+          eapply x; eauto. }
 
     hexploit (@hold_or_not (fun _ => True) ((no_update_on oupdates) /1\ (no_read_msgs oproms))).
     { eapply pred_steps_thread_steps. eapply STEPS. }
