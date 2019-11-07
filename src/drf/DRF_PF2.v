@@ -69,7 +69,7 @@ Lemma pred_step_pred P lang th0 th1 e
 Proof.
   inv STEP; auto.
 Qed.
-  
+
 Lemma step_lifting_raw
       P lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc'
       mem_src mem_tgt mem_tgt' e_tgt others updates otherspace
@@ -149,6 +149,8 @@ Proof.
     + ss.
     + ss.
 Qed.
+
+
 
 Lemma step_lifting
       P lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc'
@@ -393,6 +395,7 @@ Lemma other_promises_in_space c tid
     (other_space tid (Configuration.threads c) (Configuration.memory c)).
 Proof.
   i. inv PR. destruct st. econs; eauto.
+  eapply concrete_covered_covered.
   
 
   Set Printing All.

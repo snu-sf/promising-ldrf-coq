@@ -978,6 +978,13 @@ End FORGET.
 
 
 
+Lemma concrete_covered_covered prom mem loc to
+      (COVERED: concrete_covered prom mem loc to)
+  :
+    covered loc to prom.
+Proof.
+  inv COVERED; econs; eauto.
+Qed.
 
 Module Inv.
 
@@ -1101,6 +1108,55 @@ Proof.
   eapply configuration_step_equivalent in STEP. inv STEP. ss.
   eapply memory_reserve_wf_tstep in STEP0; eauto.
   eapply memory_reserve_wf_tsteps in STEPS; eauto.
+Qed.
+
+Lemma not_latest_reserve_le_max_full_ts loc mem ts to from msg
+      (RESERVEWF : memory_reserve_wf mem)
+      (INHABITED : Memory.inhabited mem)
+      (MAX : Memory.max_full_ts mem loc ts)
+      (GET: Memory.get loc to mem = Some (from, msg))
+  :
+    (<<TLE: Time.le to ts>>) \/
+    ((<<TO: to = Memory.max_ts loc mem>>) /\
+     (<<FROM: from = ts>>) /\
+     (<<MSG: msg = Message.reserve>>)).
+Proof.
+  inv MAX. des.
+  destruct msg.
+  - left. eapply MAX0; eauto.
+  - exploit RESERVEWF; eauto. i. des.
+    destruct (TimeFacts.le_lt_dec to ts); auto.
+    dup x. eapply MAX0 in x; eauto. destruct x.
+    + exfalso. exploit memory_get_from_mon.
+      { eapply GET0. }
+      { eapply GET. }
+      { auto. }
+      i. eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt.
+      * eapply x1.
+      * eapply H.
+    + unfold Time.eq in *. subst. right. esplits; eauto.
+      setoid_rewrite GET0 in x0. clarify.
+      dup GET. eapply Memory.max_ts_spec in GET1. des.
+      destruct MAX; auto. exfalso.
+      destruct msg.
+      * eapply MAX0 in GET2. eapply Time.lt_strorder.
+        eapply TimeFacts.lt_le_lt.
+        { etrans.
+          - eapply l.
+          - eapply H. }
+        { eauto. }
+      * dup GET2. eapply RESERVEWF in GET2. des.
+        eapply MAX0 in GET2.
+        exploit memory_get_from_mon.
+        { eapply GET. }
+        { eapply GET1. }
+        { eapply H. }
+        i. eapply Time.lt_strorder.
+        eapply TimeFacts.lt_le_lt.
+        { eapply l. }
+        { etrans.
+          - eapply x0.
+          - eapply Memory.get_ts in GET1. des; clarify. }
 Qed.
 
 Lemma max_ts_reserve_from_full_ts mem0 loc from
