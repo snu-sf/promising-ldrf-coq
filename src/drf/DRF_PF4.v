@@ -380,55 +380,6 @@ Proof.
   - econs 1; eauto.
 Qed.
 
-Lemma not_latest_reserve_le_max_full_ts loc mem ts to from msg
-      (RESERVEWF : memory_reserve_wf mem)
-      (INHABITED : Memory.inhabited mem)
-      (MAX : Memory.max_full_ts mem loc ts)
-      (GET: Memory.get loc to mem = Some (from, msg))
-  :
-    (<<TLE: Time.le to ts>>) \/
-    ((<<TO: to = Memory.max_ts loc mem>>) /\
-     (<<FROM: from = ts>>) /\
-     (<<MSG: msg = Message.reserve>>)).
-Proof.
-  inv MAX. des.
-  destruct msg.
-  - left. eapply MAX0; eauto.
-  - exploit RESERVEWF; eauto. i. des.
-    destruct (TimeFacts.le_lt_dec to ts); auto.
-    dup x. eapply MAX0 in x; eauto. destruct x.
-    + exfalso. exploit memory_get_from_mon.
-      { eapply GET0. }
-      { eapply GET. }
-      { auto. }
-      i. eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt.
-      * eapply x1.
-      * eapply H.
-    + unfold Time.eq in *. subst. right. esplits; eauto.
-      setoid_rewrite GET0 in x0. clarify.
-      dup GET. eapply Memory.max_ts_spec in GET1. des.
-      destruct MAX; auto. exfalso.
-      destruct msg.
-      * eapply MAX0 in GET2. eapply Time.lt_strorder.
-        eapply TimeFacts.lt_le_lt.
-        { etrans.
-          - eapply l.
-          - eapply H. }
-        { eauto. }
-      * dup GET2. eapply RESERVEWF in GET2. des.
-        eapply MAX0 in GET2.
-        exploit memory_get_from_mon.
-        { eapply GET. }
-        { eapply GET1. }
-        { eapply H. }
-        i. eapply Time.lt_strorder.
-        eapply TimeFacts.lt_le_lt.
-        { eapply l. }
-        { etrans.
-          - eapply x0.
-          - eapply Memory.get_ts in GET1. des; clarify. }
-Qed.
-
 Lemma caps_collapsing_ident2 L mem maxts loc ts fts
       (MAX: Memory.max_full_ts mem loc maxts)
       (TS: Time.le ts maxts)
@@ -596,6 +547,7 @@ Lemma caps_collapsing_memory' (L0 L1: Loc.t -> Prop)
   :
     memory_map (caps_collapsing L1 mem0) mem2 mem3.
 Proof.
+  apply memory_map2_memory_map.
   exploit Memory.max_full_timemap_exists; eauto.
   { inv CLOSED. eauto. }
   intros [tm MAX].
@@ -1220,6 +1172,7 @@ Lemma ident_map_collapsing_latest_memory L prom mem0 mem1 mem2 mem3
   :
     memory_map ident_map mem2 mem3.
 Proof.
+  eapply memory_map2_memory_map.
   econs.
   - i. dup GET. eapply forget_memory_get in GET0; eauto. des.
     apply not_or_and in NOT. des.
@@ -1440,7 +1393,7 @@ Lemma ident_map_mappable_any_event e
 Proof.
   destruct e; ss; split; eapply ident_map_total.
 Qed.
-  
+
 Lemma collapsing_last_reserves_promise_or_later
       L prom mem0 mem1 mem2 max
       (LOC: L = (fun loc => Memory.latest_reserve loc prom mem0))
@@ -1538,7 +1491,7 @@ Proof.
   eapply pf_consistent_pf_consistent_strong in CONSISTENT; eauto.
   eapply pf_consistent_pf_consistent_drf' in CONSISTENT; eauto.
   eapply pf_consistent_pf_consistent_drf'' in CONSISTENT; eauto.
-  
+
   set (L:=fun loc : Loc.t =>
             Memory.latest_reserve loc (Local.promises (Thread.local th)) (Thread.memory th)).
   exploit Memory.cap_exists; eauto. i. des.
@@ -1557,7 +1510,7 @@ Proof.
   { eapply collapsing_caps_forget_le; eauto. }
   assert (LCWFTGT: Local.wf th.(Thread.local) mem_src).
   { eapply memory_concrete_le_local_wf; eauto. inv WF.
-    eapply collapsing_caps_forget_prom_le; eauto. } 
+    eapply collapsing_caps_forget_prom_le; eauto. }
   assert (LCWFSRC: Local.wf th.(Thread.local) mem1).
   { eapply memory_concrete_le_local_wf; eauto. inv WF.
     eapply forget_latest_other_reserves_promises_le; eauto. }
@@ -1569,7 +1522,7 @@ Proof.
   { eauto. inv LCWFTGT. auto. }
   eapply steps_wf_event in STEPS0; ss; cycle 1.
   { inv CLOSEDTGT. auto. }
-  
+
   destruct e1.
   hexploit (@steps_map ident_map); try apply STEPS0; try apply MEMORY; eauto.
   { eapply ident_map_le. }

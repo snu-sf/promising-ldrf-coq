@@ -67,6 +67,11 @@ Section MAPPED.
     exists ft,
       (<<MAP0: f loc t0 ft>>) /\ (<<MAP1: f loc t1 ft>>).
 
+  Global Program Instance collapsed_Symmetric (loc: Loc.t): Symmetric (collapsed loc).
+  Next Obligation.
+    destruct H. eexists. des. splits; eauto.
+  Qed.
+
   Lemma collapsed_inside
         loc
         t0 t1 t2 t3
@@ -417,8 +422,8 @@ Section MAPPED.
     ii. eapply map_le; eauto.
   Qed.
 
-  Inductive memory_map m fm: Prop :=
-  | memory_map_intro
+  Inductive memory_map2 m fm: Prop :=
+  | memory_map2_intro
       (MAPPED: forall loc to from msg (GET: Memory.get loc to m = Some (from, msg)),
           msg = Message.reserve \/
           exists fto ffrom fmsg' fmsg,
@@ -433,6 +438,41 @@ Section MAPPED.
             (<<GET: Memory.get loc to m = Some (from, msg)>>) /\
             (<<FROM: f loc from ffrom>>))
   .
+
+  Inductive memory_map m fm: Prop :=
+  | memory_map_intro
+      (MAPPED: forall loc to from msg (GET: Memory.get loc to m = Some (from, msg)),
+          msg = Message.reserve \/
+          exists fto ffrom fmsg' fmsg,
+            (<<TO: f loc to fto>>) /\
+            (<<MSG: msg_map msg fmsg'>>) /\
+            (<<MSGLE: Message.le fmsg fmsg'>>) /\
+            (<<GET: Memory.get loc fto fm = Some (ffrom, fmsg)>>))
+      (ONLY: forall loc fto ffrom fmsg
+                    (GET: Memory.get loc fto fm = Some (ffrom, fmsg)),
+          (exists to from fto' ffrom',
+              (<<TO: f loc to fto'>>) /\
+              (<<TS0: Time.le ffrom' ffrom>>) /\
+              (<<TS1: Time.le fto fto'>>) /\
+              (<<FROM: f loc from ffrom'>>) /\
+              (<<COVERED: forall ts (ITV: Interval.mem (from, to) ts),
+                  covered loc ts m>>)) \/
+          (<<OUT: forall ts fts (MAP: f loc ts fts), Time.lt fts ffrom>>))
+  .
+
+  Lemma memory_map2_memory_map
+    :
+      memory_map2 <2= memory_map.
+  Proof.
+    ii. inv PR. econs; eauto.
+    i. exploit ONLY; eauto. i. des.
+    left. esplits.
+    - eapply TO.
+    - refl.
+    - refl.
+    - eapply FROM.
+    - i. econs; eauto.
+  Qed.
 
   Inductive promises_map m fm: Prop :=
   | promises_map_intro
@@ -477,14 +517,23 @@ Section MAPPED.
     eapply collapsable_unwritable_step; eauto.
   Qed.
 
+  Lemma promises_map_memory_map2 m fm
+        (PROMISES: promises_map m fm)
+    :
+      memory_map2 m fm.
+  Proof.
+    inv PROMISES. econs; eauto.
+    i. exploit MAPPED; eauto. i. des.
+    right. esplits; eauto. refl.
+  Qed.
+
   Lemma promises_map_memory_map m fm
         (PROMISES: promises_map m fm)
     :
       memory_map m fm.
   Proof.
-    inv PROMISES. econs; eauto.
-    i. exploit MAPPED; eauto. i. des.
-    right. esplits; eauto. refl.
+    eapply memory_map2_memory_map.
+    eapply promises_map_memory_map2; eauto.
   Qed.
   Hint Resolve promises_map_memory_map.
 
@@ -750,26 +799,26 @@ Section MAPPED.
     esplits; eauto.
   Qed.
 
-  Lemma msg_get_map_only_if m fm
-        (MEM: memory_map m fm)
-        loc fto ffrom fmsg
-        (GET: Memory.get loc fto fm = Some (ffrom, fmsg))
-    :
-      exists to from msg fmsg',
-        (<<TO: f loc to fto>>) /\
-        (<<GET: Memory.get loc to m = Some (from, msg)>>) /\
-        (<<FROM: f loc from ffrom>>) /\
-        (<<MSG: msg_map msg fmsg'>>) /\
-        (<<MSGLE: Message.le fmsg fmsg' >>)
-  .
-  Proof.
-    inv MEM.
-    dup GET. eapply ONLY in GET. des.
-    dup GET. eapply MAPPED in GET1. des.
-    - clarify. esplits; eauto. econs.
-    - hexploit (map_eq TO TO0). i. clarify.
-      esplits; eauto.
-  Qed.
+  (* Lemma msg_get_map_only_if m fm *)
+  (*       (MEM: memory_map m fm) *)
+  (*       loc fto ffrom fmsg *)
+  (*       (GET: Memory.get loc fto fm = Some (ffrom, fmsg)) *)
+  (*   : *)
+  (*     exists to from msg fmsg', *)
+  (*       (<<TO: f loc to fto>>) /\ *)
+  (*       (<<GET: Memory.get loc to m = Some (from, msg)>>) /\ *)
+  (*       (<<FROM: f loc from ffrom>>) /\ *)
+  (*       (<<MSG: msg_map msg fmsg'>>) /\ *)
+  (*       (<<MSGLE: Message.le fmsg fmsg' >>) *)
+  (* . *)
+  (* Proof. *)
+  (*   inv MEM. *)
+  (*   dup GET. eapply ONLY in GET. des. *)
+  (*   dup GET. eapply MAPPED in GET1. des. *)
+  (*   - clarify. esplits; eauto. econs. *)
+  (*   - hexploit (map_eq TO TO0). i. clarify. *)
+  (*     esplits; eauto. *)
+  (* Qed. *)
 
   Lemma promise_consistent_map tvw ftvw prom fprom
         (TVIEW: tview_map tvw ftvw)
@@ -1015,9 +1064,8 @@ Section MAPPED.
     - i. erewrite Memory.add_o in GET; eauto. des_ifs.
       + ss. des; clarify. exists to. esplits; eauto.
         eapply Memory.add_get0; eauto.
-      + eapply msg_get_map_only_if in GET; eauto.
-        guardH o. des. unguard.
-        exists to0. esplits; eauto.
+      + inv PROMS. eapply ONLY in GET; eauto.
+        guardH o. des. esplits; eauto.
         eapply Memory.add_get1; eauto.
   Qed.
 
@@ -1035,7 +1083,7 @@ Section MAPPED.
   Proof.
     hexploit add_succeed_wf; eauto. i. des.
     hexploit (@Memory.add_exists fmem0 loc ffrom fto fmsg).
-    { i. dup GET2. eapply msg_get_map_only_if in GET2; eauto. des.
+    { i. dup GET2. dup PROMS. inv PROMS. eapply ONLY in GET2; eauto. des.
       eapply disjoint_map; eauto. }
     { erewrite <- map_lt_non_collapsable; eauto. }
     { eapply msg_wf_map; eauto. }
@@ -1174,6 +1222,7 @@ Section MAPPED.
         fto ffrom
         (REMOVE: Memory.remove mem0 loc from to Message.reserve mem1)
         (TO: f loc to fto)
+        (NCLPS: non_collapsable loc to)
         (FROM: f loc from ffrom)
         (SRCGET: Memory.get loc fto fmem0 = Some (ffrom, Message.reserve))
         (MEM: memory_map mem0 fmem0)
@@ -1194,13 +1243,73 @@ Section MAPPED.
       erewrite Memory.remove_o; eauto. des_ifs; ss. des; clarify.
       exfalso. inv MSGLE. inv MSG.
     - i. erewrite Memory.remove_o in GET1; eauto. des_ifs.
-      dup MEM. inv MEM. eapply ONLY in GET1.
-      guardH o. des.
-      esplits; eauto.
-      erewrite Memory.remove_o; eauto.
-      unguard. ss. des_ifs; ss; eauto.
-      des; clarify. exfalso.
-      hexploit (map_eq TO0 TO). i. clarify.
+      apply or_strengthen in o. ss. des.
+      { dup MEM. inv MEM. dup GET1. eapply ONLY in GET1.
+        des; auto. left.
+        exists to0, from0, fto', ffrom'. splits; auto.
+        i. erewrite remove_covered; eauto. }
+      apply NNPP in NOT. clarify.
+      dup MEM. inv MEM. dup GET1. eapply ONLY in GET1.
+      des; auto. left.
+      destruct (Time.le_lt_dec to from0).
+      { exists to0, from0, fto', ffrom'. splits; auto.
+        i. erewrite remove_covered; [|eauto]. splits; auto.
+        right. ii. inv ITV. inv H0. ss.
+        eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+        { eapply FROM1. }
+        etrans; eauto. }
+      destruct (Time.le_lt_dec to0 from).
+      { exists to0, from0, fto', ffrom'. splits; auto.
+        i. erewrite remove_covered; [|eauto]. splits; auto.
+        right. ii. inv ITV. inv H0. ss.
+        eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+        { eapply FROM2. }
+        etrans.
+        { eapply TO1. }
+        { eauto. } }
+      dup GET2. apply memory_get_ts_strong in GET1. des; clarify.
+      { exists Time.bot, Time.bot, Time.bot, Time.bot. splits; auto.
+        - refl.
+        - refl.
+        - i. inv ITV. ss. exfalso. eapply Time.lt_strorder.
+          eapply TimeFacts.lt_le_lt; eauto. }
+      dup SRCGET. apply memory_get_ts_strong in SRCGET0. des; clarify.
+      { assert (BOT: to = Time.bot).
+        { destruct (Time.le_lt_dec to Time.bot).
+          - destruct l1; auto. exfalso. eapply Time.lt_strorder.
+            eapply TimeFacts.lt_le_lt.
+            + apply H0.
+            + apply Time.bot_spec.
+          - exfalso. eapply NCLPS; eauto. econs; eauto. }
+        clarify. exfalso. eapply Time.lt_strorder.
+        eapply TimeFacts.lt_le_lt.
+        - eapply l.
+        - eapply Time.bot_spec. }
+      assert (DISJOINT: Time.le fto ffrom0 \/ Time.le fto0 ffrom).
+      { destruct (Time.le_lt_dec fto ffrom0); auto.
+        destruct (Time.le_lt_dec fto0 ffrom); auto.
+        exfalso. exploit Memory.get_disjoint.
+        { eapply GET2. }
+        { eapply SRCGET. }
+        i. des; clarify.
+        revert x0. eapply disjoint_equivalent. splits; auto.
+        unfold Time.join, Time.meet. des_ifs. }
+      des.
+      + exists to0, to, fto', fto. splits; auto.
+        i. erewrite remove_covered; [|eauto]. splits; auto.
+        * eapply COVERED. inv ITV. econs; ss. etrans; eauto.
+        * right. ii. inv ITV. inv H0. ss.
+          eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+          { eapply FROM1. }
+          { eapply TO4. }
+      + exists from, from0, ffrom, ffrom'. splits; auto.
+        i. erewrite remove_covered; [|eauto]. splits; auto.
+        * eapply COVERED. inv ITV. econs; ss. etrans; eauto.
+          left. auto.
+        * right. ii. inv ITV. inv H0. ss.
+          eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+          { eapply FROM2. }
+          { eapply TO3. }
   Qed.
 
   Lemma add_memory_map mem0 fmem0 loc from ffrom to fto msg fmsg' fmsg mem1
@@ -1219,8 +1328,21 @@ Section MAPPED.
   Proof.
     hexploit add_succeed_wf; eauto. i. des.
     hexploit (@Memory.add_exists fmem0 loc ffrom fto fmsg).
-    { i. dup GET2. eapply msg_get_map_only_if in GET2; eauto. des.
-      eapply disjoint_map; eauto. }
+    { i. dup GET2. dup MEM. inv MEM0. eapply ONLY in GET2. des.
+      - hexploit disjoint_map.
+        + eapply FROM.
+        + eapply TO.
+        + eapply FROM0.
+        + eapply TO0.
+        + ii. eapply COVERED in RHS. inv RHS.
+          eapply DISJOINT in GET. eapply GET; eauto.
+        + ii. eapply H; eauto. inv RHS. econs; ss.
+          * eapply TimeFacts.le_lt_lt; eauto.
+          * etrans; eauto.
+      - eapply OUT in TO. ii. inv LHS. inv RHS. ss.
+        eapply Time.lt_strorder. etrans.
+        { eapply TO. }
+        eapply TimeFacts.lt_le_lt; eauto. }
     { erewrite <- map_lt_non_collapsable; eauto. }
     { auto. }
     i. des. esplits; eauto.
@@ -1234,12 +1356,15 @@ Section MAPPED.
         esplits; eauto.
         eapply Memory.add_get1; eauto.
     - i. erewrite Memory.add_o in GET; eauto. des_ifs.
-      + ss. des; clarify. exists to. esplits; eauto.
-        eapply Memory.add_get0; eauto.
-      + eapply msg_get_map_only_if in GET; eauto.
-        guardH o. des. unguard.
-        exists to0. esplits; eauto.
-        eapply Memory.add_get1; eauto.
+      + ss. des; clarify. left.
+        exists to, from, fto, ffrom0. splits; auto.
+        * refl.
+        * refl.
+        * i. econs; eauto.
+          eapply Memory.add_get0; eauto.
+      + guardH o. inv MEM. eapply ONLY in GET. des; auto.
+        left. exists to0, from0, fto', ffrom'. splits; auto.
+        i. eapply add_covered; eauto.
   Qed.
 
   Lemma lower_memory_map mem0 fmem0 loc from to ffrom fto msg0 fmsg0 msg1 fmsg1 fmsg1' mem1
@@ -1276,17 +1401,19 @@ Section MAPPED.
         exists fto0, ffrom0, fmsg', m'. esplits; eauto.
         etrans; eauto.
     - i. erewrite Memory.lower_o in GET2; eauto. des_ifs.
-      + ss. des; clarify.
-        esplits; eauto.
-      + dup MEM. inv MEM. eapply ONLY in GET2.
-        guardH o. des. unguard.
-        exists to0, from0, msg.
-        esplits; eauto. erewrite Memory.lower_o; eauto.
-        des_ifs. ss; des; clarify.
-        hexploit (map_eq TO0 TO). i. clarify.
+      + ss. des; clarify. left.
+        exists to, from, fto, ffrom0. splits; auto.
+        * refl.
+        * refl.
+        * i. erewrite lower_covered; eauto.
+          econs; eauto.
+      + guardH o. inv MEM. eapply ONLY in GET2. des; auto.
+        left.  exists to0, from0, fto', ffrom'. splits; auto.
+        i. erewrite lower_covered; eauto.
   Qed.
 
   Lemma no_attatch_map prom mem fmem from ffrom loc
+        (NBOT: Time.lt Time.bot ffrom)
         (EMPTY: ~ covered loc from mem)
         (MEM: memory_map mem fmem)
         (FROM: f loc from ffrom)
@@ -1295,24 +1422,34 @@ Section MAPPED.
     :
       forall to msg (GET: Memory.get loc to fmem = Some (ffrom, msg)), False.
   Proof.
-    i. eapply msg_get_map_only_if in GET; eauto. des.
-    destruct (Time.le_lt_dec from from0).
-    - destruct l; auto.
-      + hexploit closed_point.
-        * apply H.
-        * i. hexploit (UNWRITABLE loc t).
-          { exists from, from0. unfold collapsed. esplits; eauto. }
-          { i. eapply unwritable_covered; eauto. }
-        * i. des. destruct TS0.
-          { eapply EMPTY. econs; [apply GET0|]. econs; ss.
-            left. auto. }
-          { destruct H0. eapply NOATTATCH; eauto. }
-      + destruct H. eapply NOATTATCH; eauto.
-    - eapply EMPTY. exploit UNWRITABLE.
-      + exists from0, from. esplits; eauto.
-        * eexists. esplits; eauto.
-        * econs; eauto. refl.
-      + ii. inv x. inv UNCH. econs; eauto.
+    i. inv MEM. dup GET. eapply ONLY in GET. des.
+    - destruct (Time.le_lt_dec to0 from).
+      + dup l. eapply map_le in l; eauto.
+        dup GET0. eapply memory_get_ts_strong in GET1. des; clarify.
+        * eapply Time.lt_strorder; eauto.
+        * eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+          { apply TS. }
+          etrans; eauto.
+      + hexploit (@closed_point mem loc from to0); auto.
+        { destruct (Time.le_lt_dec from0 from).
+          - i. eapply COVERED; eauto. inv ITV. econs; ss.
+            eapply TimeFacts.le_lt_lt; eauto.
+          - i. destruct (Time.le_lt_dec t from0).
+            + exploit UNWRITABLE.
+              * exists from, from0. splits.
+                { apply NNPP. ii.
+                  erewrite <- map_le_iff in TS0; eauto.
+                  - eapply Time.lt_strorder.
+                    eapply TimeFacts.lt_le_lt; eauto.
+                  - ii. symmetry in H0. eauto. }
+                { inv ITV. econs; eauto. }
+              * i. eapply unwritable_covered; eauto.
+            + eapply COVERED; eauto. inv ITV. econs; ss. }
+        i. des. destruct TS2.
+        { eapply EMPTY. econs; eauto. econs; ss.
+          left. auto. }
+        { inv H. eauto. }
+    - eapply OUT in FROM. eapply Time.lt_strorder; eauto.
   Qed.
 
   Lemma write_add_map mem0 fmem0 prom0 fprom0 loc from ffrom to fto val released freleased' freleased mem1 prom1
@@ -1356,7 +1493,11 @@ Section MAPPED.
       eapply map_le in TS0; cycle 1; eauto.
       etrans; eauto. inv VIEWLE. eauto.
     - i. clarify.
-    - i. clarify. exploit no_attatch_map; try apply MEM; eauto.
+    - i. clarify.
+      assert (TS0: Time.lt Time.bot fto).
+      { inv ADD. inv ADD0. eapply TimeFacts.le_lt_lt; eauto.
+        eapply Time.bot_spec. }
+      exploit no_attatch_map; try apply MEM; eauto.
       ii. inv H. eapply add_succeed_wf in MEM0. des.
       eapply DISJOINT.
       + eapply GET0.
@@ -1468,19 +1609,22 @@ Section MAPPED.
         des; auto. right.
         eapply Memory.split_get1 in GET5; eauto. des.
         ss. esplits; eauto.
+
+
     - i. erewrite Memory.split_o in GET4; eauto. des_ifs.
-      + ss. des; clarify.
-        esplits; eauto.
-      + ss. des; clarify.
-        esplits; eauto.
-      + dup MEM. inv MEM. eapply ONLY in GET4.
-        guardH o. guardH o0. des.
-        esplits; eauto.
-        erewrite Memory.split_o; eauto.
-        unguard. ss. des_ifs; ss; eauto.
-        * ss; des; clarify.
-        * ss; des; clarify. exfalso.
-          hexploit (map_eq TS3 TO). i. clarify.
+      + ss. des; clarify. left.
+        exists ts2, ts1, fts2, ffrom. esplits; eauto.
+        * refl.
+        * refl.
+        * i. econs; cycle 1; eauto.
+      + ss. guardH o. des; clarify. left.
+        exists ts3, ts2, fts3, ffrom. esplits; eauto.
+        * refl.
+        * refl.
+        * i. econs; cycle 1; eauto.
+      + guardH o. guardH o0. inv MEM. eapply ONLY in GET4. des; auto.
+        left. exists to, from, fto', ffrom'. splits; auto.
+        i. eapply split_covered; eauto.
   Qed.
 
   Lemma shorten_promises_map mem0 fmem0 loc from from' ffrom ffrom' to fto mem1 msg fmsg fmem1
@@ -1621,7 +1765,11 @@ Section MAPPED.
       inv MSG. inv MSGLE.
       hexploit (map_eq TO0 FROM). i. clarify.
       esplits; eauto.
-    - i. clarify. inv MSG. exploit no_attatch_map; try apply MEM; eauto.
+    - i. clarify. inv MSG.
+      assert (TS0: Time.lt Time.bot fto).
+      { inv ADD. inv ADD1. eapply TimeFacts.le_lt_lt; eauto.
+        eapply Time.bot_spec. }
+      exploit no_attatch_map; try apply MEM; eauto.
       ii. inv H. eapply add_succeed_wf in MEM0. des.
       eapply DISJOINT.
       + eapply GET0.
