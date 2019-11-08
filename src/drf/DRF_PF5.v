@@ -42,3 +42,26 @@ Require Import Mapping.
 Require Import PFConsistent.
 
 Set Implicit Arguments.
+
+Definition tgt_consistent_drf
+           lang (e0:Thread.t lang) max
+           (
+
+
+           (space: Loc.t -> Time.t -> Prop)
+
+
+
+
+
+                                                         Prop :=
+
+
+  let L := (fun loc => Memory.latest_reserve loc e0.(Thread.local).(Local.promises) e0.(Thread.memory)) in
+  forall mem1 max sc
+         (FORGET: forget_memory (latest_other_reserves e0.(Thread.local).(Local.promises) e0.(Thread.memory)) mem1 e0.(Thread.memory))
+         (MAX: my_max_timemap e0.(Thread.local).(Local.promises) e0.(Thread.memory) max),
+  exists e1,
+    (<<STEPS0: rtc (tau (@pred_step ((promise_free /1\ no_acq_update_on ((fun loc to => L loc) /2\ Memory.max_full_ts e0.(Thread.memory))) /1\ no_sc /1\ write_in (later_times max \2/ fun loc to => covered loc to e0.(Thread.local).(Local.promises))) lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc mem1) e1>>) /\
+    (__guard__((<<FAILURE: Local.failure_step e1.(Thread.local)>>) \/
+               (<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>))).

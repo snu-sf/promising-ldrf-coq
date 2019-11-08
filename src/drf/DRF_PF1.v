@@ -625,12 +625,12 @@ End SHORTERMEMORY.
 
 Section NOTATTATCHED.
 
-  Definition not_attatched (L: Loc.t -> Time.t -> Prop) (m: Memory.t) :=
+  Definition not_attatched (L: Loc.t -> Time.t -> Prop) (mem: Memory.t) :=
     forall loc to (SAT: L loc to),
-      (<<GET: exists msg, <<MSG: Memory.get loc to m = Some msg>> >>) /\
+      (<<CONCRETE: concrete_promised mem loc to>>) /\
       (<<NOATTATCH: exists to',
           (<<TLE: Time.lt to to'>>) /\
-          (<<EMPTY: forall t (ITV: Interval.mem (to, to') t), ~ covered loc t m>>)>>).
+          (<<EMPTY: forall t (ITV: Interval.mem (to, to') t), ~ covered loc t mem>>)>>).
 
   Lemma not_attatched_sum L0 L1 mem
         (NOATTATCH0: not_attatched L0 mem)
@@ -658,11 +658,7 @@ Section NOTATTATCHED.
       not_attatched updates mem0.
   Proof.
     ii. exploit NOATTATCHED; eauto. i. des. split.
-    - dup MSG. erewrite Memory.add_o in MSG; eauto. des_ifs.
-      + ss. des. clarify. exfalso.
-        eapply PROMISED in SAT. inv SAT.
-        eapply Memory.add_get0 in ADD. des. clarify.
-      + esplits; eauto.
+    - auto.
     - esplits; eauto. ii. eapply EMPTY; eauto.
       eapply add_covered; eauto.
   Qed.
@@ -703,7 +699,8 @@ Section NOTATTATCHED.
       inv LOCAL1. inv LOCAL2. ss. clarify.
       exploit memory_write_bot_add; eauto. i. clarify.
       ii. des. clarify. esplits; eauto.
-      ii. inv WRITE. inv PROMISE. eapply memory_add_cover_disjoint in MEM; eauto.
+      + econs; eauto.
+      + ii. inv WRITE. inv PROMISE. eapply memory_add_cover_disjoint in MEM; eauto.
   Qed.
 
   Lemma attatched_preserve_rtc P updates lang (th0 th1: Thread.t lang)
@@ -722,23 +719,25 @@ Section NOTATTATCHED.
     - i. inv H. eapply attatched_preserve; eauto.
   Qed.
 
-  Lemma not_attatch_write L prom mem_src loc from1 to1 val released mem_src'
-        (ADD: Memory.write Memory.bot mem_src loc from1 to1 val released prom mem_src' Memory.op_kind_add)
+  Lemma not_attatch_promise L prom mem_src loc from1 to1 msg prom' mem_src' kind
+        (PROMISE: Memory.promise prom mem_src loc from1 to1 msg prom' mem_src' kind)
         (NOATTATCH: not_attatched L mem_src)
-        (FROM: ~ L loc from1)
+        (FROM: kind = Memory.op_kind_add -> ~ L loc from1)
     :
       (<<NOATTATCH: not_attatched L mem_src'>>).
   Proof.
-    inv ADD. inv PROMISE. ii.
-    exploit NOATTATCH; eauto. i. des. destruct msg.
-    destruct (Loc.eq_dec loc loc0); clarify.
-    - esplit; eauto.
-      + eexists. eapply Memory.add_get1; eauto.
-      + exists (if (Time.le_lt_dec to from1)
+    ii. exploit NOATTATCH; eauto. i. des.
+    dup CONCRETE.
+    eapply concrete_promised_increase_promise in CONCRETE0; eauto. inv CONCRETE.
+    inv PROMISE.
+    - clear PROMISES.
+      destruct (Loc.eq_dec loc loc0); clarify.
+      + esplit; eauto. clear CONCRETE0.
+        exists (if (Time.le_lt_dec to from1)
                 then (Time.meet to' from1)
                 else to'). esplits; eauto.
         * unfold Time.meet. des_ifs.
-          destruct l; eauto. destruct H. clarify.
+          destruct l; eauto. inv H. exfalso. eapply FROM; auto.
         * ii. erewrite add_covered in H; eauto. des.
           { eapply EMPTY; eauto. unfold Time.meet in *. des_ifs.
             inv ITV. econs; ss; eauto.
@@ -754,23 +753,30 @@ Section NOTATTATCHED.
               eapply TimeFacts.lt_le_lt; eauto.
             - dup MEM. eapply Memory.add_get0 in MEM. des.
               exploit Memory.get_disjoint.
-              { eapply Memory.add_get1; try apply MSG; eauto. }
-              { eapply GET0. }
-              i. des; clarify. eapply x0.
-              { instantiate (1:=to).
-                exploit Memory.get_ts; eauto. i. des; clarify.
-                - exfalso. eapply DenseOrder.DenseOrder.lt_strorder.
-                  instantiate (1:=from1).
-                  eapply TimeFacts.lt_le_lt; try apply l; eauto.
-                  eapply Time.bot_spec.
-                - econs; ss; eauto. refl. }
-              { econs; ss; eauto. left.
-                eapply TimeFacts.lt_le_lt; eauto. }
+              { eapply GET1. }
+              { eapply Memory.add_get1; try apply GET; eauto. }
+              exploit memory_get_ts_strong; try apply GET. i. des; clarify.
+              + exfalso. eapply DenseOrder.DenseOrder.lt_strorder.
+                eapply TimeFacts.lt_le_lt.
+                * eapply l.
+                * eapply Time.bot_spec.
+              + eapply x1.
+                { instantiate (1:=to).
+                  econs; ss; eauto. etrans; eauto. left. auto. }
+                { econs; ss; eauto. refl. }
           }
-    - esplits; eauto.
-      + eapply Memory.add_get1; eauto.
-      + ii. erewrite add_covered in H; eauto. des; clarify.
+      + esplits; eauto. ii.
+        erewrite add_covered in H; eauto. des; clarify.
         eapply EMPTY; eauto.
+
+    - esplits; eauto. ii. erewrite split_covered in H; eauto.
+      eapply EMPTY; eauto.
+
+    - esplits; eauto. ii. erewrite lower_covered in H; eauto.
+      eapply EMPTY; eauto.
+
+    - esplits; eauto. ii. erewrite remove_covered in H; eauto.
+      destruct H. eapply EMPTY; eauto.
   Qed.
 
   Inductive shorter_event: ThreadEvent.t -> ThreadEvent.t -> Prop :=
@@ -977,14 +983,6 @@ Section FORGET.
 End FORGET.
 
 
-
-Lemma concrete_covered_covered prom mem loc to
-      (COVERED: concrete_covered prom mem loc to)
-  :
-    covered loc to prom.
-Proof.
-  inv COVERED; econs; eauto.
-Qed.
 
 Module Inv.
 

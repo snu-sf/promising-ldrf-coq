@@ -1359,6 +1359,9 @@ Proof.
     + econs; eauto.
 Qed.
 
+Definition earlier_times (tm: TimeMap.t) (loc: Loc.t) (to: Time.t): Prop :=
+  Time.le to (tm loc).
+
 Definition later_times (tm: TimeMap.t) (loc: Loc.t) (to: Time.t): Prop :=
   Time.lt (tm loc) to.
 
@@ -1401,7 +1404,7 @@ Lemma collapsing_last_reserves_promise_or_later
       (RESERVEWF: memory_reserve_wf mem0)
       (CLOSED: Memory.closed mem0)
       (CAP: Memory.cap prom mem0 mem1)
-      (MAX: my_max_timemap prom mem0 max)
+      (MAX: Memory.max_full_timemap mem0 max)
       (FORGET: forget_memory (collapsing_latest_reserves_times L mem0 \2/ collapsing_caps_times L mem0 mem1) mem2 mem1)
       loc to
       (UNWRITABLE: ~ unwritable mem2 prom loc to)
@@ -1427,9 +1430,8 @@ Proof.
     eapply UNWRITABLE. red.
     eapply forget_covered; eauto.
     + eapply memory_cap_covered; eauto.
-      etrans; eauto. specialize (MAX loc). des; clarify.
-      { eapply max_full_ts_le_max_ts; eauto. }
-      { rewrite <- MAX0. refl. }
+      etrans; eauto. specialize (MAX loc).
+      eapply max_full_ts_le_max_ts; eauto.
     + ii. inv H. ss. des.
       * unfold collapsing_latest_reserves_times, collapsing_latest_reserves in SAT.
         des. clarify. specialize (MAX loc). des; clarify.
@@ -1437,7 +1439,7 @@ Proof.
         eapply max_ts_reserve_from_full_ts in RESERVE; eauto.
         exploit Memory.max_full_ts_inj.
         { eapply RESERVE. }
-        { eapply MAX0. }
+        { eapply MAX. }
         i. clarify. eapply Time.lt_strorder.
         eapply TimeFacts.lt_le_lt; eauto.
       * unfold collapsing_caps_times, collapsing_caps, caps in SAT. des. clarify.
@@ -1474,9 +1476,9 @@ Definition pf_consistent_drf lang (e0:Thread.t lang): Prop :=
   let L := (fun loc => Memory.latest_reserve loc e0.(Thread.local).(Local.promises) e0.(Thread.memory)) in
   forall mem1 max sc
          (FORGET: forget_memory (latest_other_reserves e0.(Thread.local).(Local.promises) e0.(Thread.memory)) mem1 e0.(Thread.memory))
-         (MAX: my_max_timemap e0.(Thread.local).(Local.promises) e0.(Thread.memory) max),
+         (MAX: Memory.max_full_timemap e0.(Thread.memory) max),
   exists e1,
-    (<<STEPS0: rtc (tau (@pred_step ((promise_free /1\ no_acq_update_on ((fun loc to => L loc) /2\ Memory.max_full_ts e0.(Thread.memory))) /1\ no_sc /1\ write_in (later_times max \2/ fun loc to => covered loc to e0.(Thread.local).(Local.promises))) lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc mem1) e1>>) /\
+    (<<STEPS0: rtc (tau (@pred_step ((promise_free /1\ no_acq_update_on ((fun loc to => L loc) /2\ Memory.max_full_ts e0.(Thread.memory))) /1\ no_sc /1\ write_in (later_times max \2/ concrete_covered e0.(Thread.local).(Local.promises) e0.(Thread.memory))) lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc mem1) e1>>) /\
     (__guard__((<<FAILURE: Local.failure_step e1.(Thread.local)>>) \/
                (<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>))).
 
@@ -1535,18 +1537,20 @@ Proof.
   { eapply mapping_map_lt_collapsable_unwritable. eapply ident_map_lt. }
   { eapply ident_map_timemap. }
   { refl. }
-  { instantiate (1:=(promise_free /1\ no_acq_update_on ((fun loc to => L loc) /2\ Memory.max_full_ts th.(Thread.memory))) /1\ no_sc /1\ write_in (later_times max \2/ fun loc to => covered loc to th.(Thread.local).(Local.promises))).
+  { instantiate (1:=((promise_free /1\ no_acq_update_on ((fun loc to => L loc) /2\ Memory.max_full_ts th.(Thread.memory))) /1\ no_sc /1\ write_in (later_times max \2/ concrete_covered th.(Thread.local).(Local.promises) th.(Thread.memory)))).
     ii. ss. des. splits.
     - inv REL; ss. inv KIND; ss. inv MSG0; ss. inv MSG; ss. inv MAP0; ss.
     - inv REL; ss. inv FROM. ss.
     - inv REL; ss.
     - eapply write_not_in_write_in in SAT1.
-      + instantiate (1:=later_times max \2/ fun loc to => covered loc to th.(Thread.local).(Local.promises)) in SAT1.
+      + instantiate (1:=later_times max \2/ concrete_covered th.(Thread.local).(Local.promises) th.(Thread.memory)) in SAT1.
         inv REL; ss.
         * inv FROM. inv TO. eauto.
         * inv FROM. inv TO. eauto.
       + i. eapply collapsing_last_reserves_promise_or_later in NSAT; ss; eauto.
-        des; auto. }
+        des; auto.
+        destruct (Time.le_lt_dec to (max loc)); auto.
+        left. right. econs; eauto. }
   i. des.
   eapply no_sc_any_sc_rtc in STEP; ss; cycle 1.
   { i. destruct x1; ss; des; auto. } des.

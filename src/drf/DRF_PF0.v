@@ -535,7 +535,7 @@ Section FORGETMEMORY.
     econs; eauto. i. eapply BOT in PROMS. clarify.
   Qed.
 
-  
+
 End FORGETMEMORY.
 
 
@@ -1354,30 +1354,40 @@ Section PROMISED.
       (GET: Memory.get loc to mem = Some (from, Message.full val released))
   .
 
-  Inductive concrete_covered (prom mem: Memory.t) (loc: Loc.t) (ts: Time.t): Prop :=
+  Inductive concrete_covered (prom mem: Memory.t) (loc: Loc.t) (to: Time.t): Prop :=
   | concrete_covered_intro
-      from to val released
-      (GET: Memory.get loc to prom = Some (from, Message.full val released))
-      (ITV: Interval.mem (from, to) ts)
-  | concrete_covered_reserve
-      from to
-      from1 to1 val released
-      (GET: Memory.get loc to prom = Some (from, Message.reserve))
-      (GET1: Memory.get loc to1 mem = Some (from1, Message.full val released))
-      (NOTLAST: Time.lt to to1)
-      (ITV: Interval.mem (from, to) ts)
+      max
+      (MAX: Memory.max_full_ts mem loc max)
+      (COVERED: covered loc to prom)
+      (TS: Time.le to max)
   .
 
-  Lemma concrete_covered_same prom mem0 mem1
-        (FUTURE: Memory.future mem0 mem1)
+  Lemma concrete_covered_covered prom mem loc to
+        (COVERED: concrete_covered prom mem loc to)
     :
-      concrete_covered prom mem0 <2= concrete_covered prom mem1.
+      covered loc to prom.
   Proof.
-    i. inv PR.
-    - econs 1; eauto.
-    - exploit Memory.future_get1; eauto. i. des.
-      inv MSG_LE. econs 2; eauto.
+    inv COVERED. auto.
   Qed.
+
+  (* Lemma max_full_ts_increase mem0 mem1 loc max0 *)
+  (*       (FUTURE: Memory.future mem0 mem1) *)
+  (*       (MAX0: Memory.max_full_ts mem0 loc max0) *)
+  (*   : *)
+  (*     exists max1, *)
+  (*       (<<MAX1: Memory.max_full_ts mem1 loc max1>>). *)
+  (* Proof.         *)
+  (*   ginduction FUTURE; eauto. i. inv H. inv OP. *)
+  (*   -  *)
+  (* Admitted. *)
+
+
+  (* Lemma concrete_covered_same prom mem0 mem1 *)
+  (*       (FUTURE: Memory.future mem0 mem1) *)
+  (*   : *)
+  (*     concrete_covered prom mem0 <2= concrete_covered prom mem1. *)
+  (* Proof. *)
+  (* Admitted. *)
 
   Lemma concrete_promised_increase_promise promises1 mem1 loc from to msg promises2 mem2 kind
         (STEP: Memory.promise promises1 mem1 loc from to msg promises2 mem2 kind)
