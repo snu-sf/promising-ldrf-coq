@@ -846,6 +846,32 @@ Section MEMORYLEMMAS.
   Definition attatched_time (mem: Memory.t) (loc: Loc.t) (to: Time.t) :=
     exists to' msg, <<GET: Memory.get loc to' mem = Some (to, msg)>>.
 
+  Lemma write_succeed_valid prom mem1 loc from1 to1 val released
+        (MLE: Memory.le prom mem1)
+        (NCOVER: forall t (COVER: covered loc t mem1),
+            ~ Interval.mem (from1, to1) t)
+        (TO: Time.le (View.rlx (View.unwrap released) loc) to1)
+        (FROMTO: Time.lt from1 to1)
+        (NOATTATCH: ~ attatched_time mem1 loc to1)
+        (MSGWF: Message.wf (Message.full val released))
+    :
+      exists mem2,
+        (<<WRITE: Memory.write prom mem1 loc from1 to1 val released prom mem2 Memory.op_kind_add>>).
+  Proof.
+    exploit Memory.add_exists; eauto.
+    { instantiate (1:=mem1). instantiate (1:=loc).
+      ii. eapply NCOVER; eauto. econs; eauto. }
+    i. des. exists mem2.
+    exploit Memory.add_exists_le; eauto. i. des.
+    econs.
+    - econs; eauto; ss.
+      i. eapply NOATTATCH; eauto. econs; eauto.
+    - exploit Memory.remove_exists; eauto.
+      { eapply Memory.add_get0 in x1. des. eauto. } i. des.
+      exploit MemoryFacts.MemoryFacts.add_remove_eq; eauto.
+      i. clarify.
+  Qed.
+
   Lemma write_succeed mem1 loc from1 to1 val released
         (NCOVER: forall t (COVER: covered loc t mem1),
             ~ Interval.mem (from1, to1) t)
