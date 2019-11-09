@@ -1884,6 +1884,49 @@ Section UNCHANGEDON.
 
 End UNCHANGEDON.
 
+Lemma promise_memory_le prom0 mem0 loc from to msg prom1 mem1 kind
+      (MLE: Memory.le prom0 mem0)
+      (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
+  :
+    Memory.le prom1 mem1.
+Proof.
+  inv PROMISE.
+  - ii. erewrite Memory.add_o in LHS; eauto.
+    erewrite Memory.add_o; cycle 1; eauto. des_ifs; eauto.
+  - ii. erewrite Memory.split_o in LHS; eauto.
+    erewrite Memory.split_o; cycle 1; eauto. des_ifs; eauto.
+  - ii. erewrite Memory.lower_o in LHS; eauto.
+    erewrite Memory.lower_o; cycle 1; eauto. des_ifs; eauto.
+  - ii. erewrite Memory.remove_o in LHS; eauto.
+    erewrite Memory.remove_o; cycle 1; eauto. des_ifs; eauto.
+Qed.
+
+Lemma write_memory_le prom0 mem0 loc from to val released prom1 mem1 kind
+      (MLE: Memory.le prom0 mem0)
+      (PROMISE: Memory.write prom0 mem0 loc from to val released prom1 mem1 kind)
+  :
+    Memory.le prom1 mem1.
+Proof.
+  inv PROMISE. etrans.
+  - eapply remove_le; eauto.
+  - eapply promise_memory_le; eauto.
+Qed.
+
+Lemma step_memory_le lang (th0 th1: Thread.t lang) pf e
+      (STEP: Thread.step pf e th0 th1)
+      (MLE: Memory.le th0.(Thread.local).(Local.promises) th0.(Thread.memory))
+  :
+    Memory.le th1.(Thread.local).(Local.promises) th1.(Thread.memory).
+Proof.
+  inv STEP.
+  - inv STEP0. ss. inv LOCAL.
+    eapply promise_memory_le; eauto.
+  - inv STEP0. ss. inv LOCAL; ss; try (inv LOCAL0; ss).
+    + eapply write_memory_le; eauto.
+    + inv LOCAL1. inv LOCAL2. ss.
+      eapply write_memory_le; eauto.
+Qed.
+
 Lemma pf_step_memory_le lang (th0 th1: Thread.t lang) e
       (STEP: pred_step no_promise e th0 th1)
       (BOT: th0.(Thread.local).(Local.promises) = Memory.bot)
