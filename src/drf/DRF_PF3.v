@@ -195,6 +195,58 @@ Section CANCEL.
       exploit IHSTEPS; eauto.
   Qed.
 
+  Lemma cancel_memory_decrease P lang e th0 th1
+        (STEP: (@pred_step P lang) e th0 th1)
+        (PRED: P <1= is_cancel)
+    :
+      Memory.le th1.(Thread.memory) th0.(Thread.memory).
+  Proof.
+    inv STEP. eapply PRED in SAT. unfold is_cancel in SAT. des_ifs.
+    inv STEP0. inv STEP; inv STEP0; ss.
+    - inv LOCAL. inv PROMISE; ss.
+      ii. erewrite Memory.remove_o in LHS; eauto. des_ifs.
+    - inv LOCAL.
+  Qed.
+
+  Lemma cancels_memory_decrease P lang th0 th1
+        (STEP: rtc (tau (@pred_step P lang)) th0 th1)
+        (PRED: P <1= is_cancel)
+    :
+      Memory.le th1.(Thread.memory) th0.(Thread.memory).
+  Proof.
+    ginduction STEP.
+    - refl.
+    - etrans; eauto. inv H.
+      eapply cancel_memory_decrease; eauto.
+  Qed.
+
+  Lemma cancel_concrete_same P lang e th0 th1
+        (STEP: (@pred_step P lang) e th0 th1)
+        (PRED: P <1= is_cancel)
+    :
+      memory_concrete_le th0.(Thread.memory) th1.(Thread.memory).
+  Proof.
+    inv STEP. eapply PRED in SAT. unfold is_cancel in SAT. des_ifs.
+    inv STEP0. inv STEP; inv STEP0; ss.
+    - inv LOCAL. inv PROMISE; ss.
+      ii. erewrite Memory.remove_o; eauto. des_ifs.
+      ss. des. clarify.
+      eapply Memory.remove_get0 in MEM. des. clarify.
+    - inv LOCAL.
+  Qed.
+
+  Lemma cancels_concrete_same P lang th0 th1
+        (STEP: rtc (tau (@pred_step P lang)) th0 th1)
+        (PRED: P <1= is_cancel)
+    :
+      memory_concrete_le th0.(Thread.memory) th1.(Thread.memory).
+  Proof.
+    ginduction STEP.
+    - refl.
+    - etrans; eauto. inv H.
+      eapply cancel_concrete_same; eauto.
+  Qed.
+
   Lemma cancel_promises_decrease P lang e th0 th1
         (STEP: (@pred_step P lang) e th0 th1)
         (PRED: P <1= is_cancel)
@@ -218,6 +270,51 @@ Section CANCEL.
     - refl.
     - etrans; eauto. inv H.
       eapply cancel_promises_decrease; eauto.
+  Qed.
+
+  Lemma cancel_remove_only P lang e th0 th1
+        (STEP: (@pred_step P lang) e th0 th1)
+        (PRED: P <1= is_cancel)
+        loc from to msg
+        (GET: Memory.get loc to th0.(Thread.local).(Local.promises) = Some (from, msg))
+        (NONE: Memory.get loc to th1.(Thread.local).(Local.promises) = None)
+    :
+      (<<GET: Memory.get loc to th0.(Thread.memory) = Some (from, msg)>>) /\
+      (<<NONE: Memory.get loc to th1.(Thread.memory) = None>>) /\
+      (<<RESERVE: msg = Message.reserve>>).
+  Proof.
+    inv STEP. eapply PRED in SAT. unfold is_cancel in SAT. des_ifs.
+    inv STEP0. inv STEP; inv STEP0; ss.
+    - inv LOCAL. inv PROMISE; ss.
+      dup NONE. erewrite Memory.remove_o in NONE; eauto. des_ifs. ss. clarify.
+      dup MEM. eapply Memory.remove_get0 in MEM.
+      dup PROMISES. eapply Memory.remove_get0 in PROMISES. des. clarify.
+    - inv LOCAL.
+  Qed.
+
+  Lemma cancels_remove_only P lang th0 th1
+        (STEP: rtc (tau (@pred_step P lang)) th0 th1)
+        (PRED: P <1= is_cancel)
+        loc from to msg
+        (GET: Memory.get loc to th0.(Thread.local).(Local.promises) = Some (from, msg))
+        (NONE: Memory.get loc to th1.(Thread.local).(Local.promises) = None)
+    :
+      (<<GET: Memory.get loc to th0.(Thread.memory) = Some (from, msg)>>) /\
+      (<<NONE: Memory.get loc to th1.(Thread.memory) = None>>) /\
+      (<<RESERVE: msg = Message.reserve>>).
+  Proof.
+    ginduction STEP.
+    - i. clarify.
+    - i. inv H.
+      destruct (Memory.get loc to (Local.promises (Thread.local y))) eqn:GET0; auto.
+      + destruct p. dup GET0.
+        eapply cancel_promises_decrease in GET1; eauto.  clarify.
+        exploit IHSTEP; eauto. i. des. splits; auto.
+        eapply cancel_memory_decrease; eauto.
+      + exploit cancel_remove_only; eauto. i. des.
+        splits; auto.
+        eapply cancels_memory_decrease in STEP; eauto.
+        eapply memory_le_get_none; eauto.
   Qed.
 
 End CANCEL.

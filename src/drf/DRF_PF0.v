@@ -1968,3 +1968,95 @@ Qed.
 Definition no_reserves (proms: Memory.t): Prop :=
   forall loc to from msg (GET: Memory.get loc to proms = Some (from, msg)),
     msg <> Message.reserve.
+
+
+Definition memory_concrete_le (lhs rhs: Memory.t): Prop :=
+  forall loc to from val released
+         (GET: Memory.get loc to lhs = Some (from, Message.full val released)),
+    Memory.get loc to rhs = Some (from, Message.full val released).
+Global Program Instance concrete_le_PreOrder: PreOrder memory_concrete_le.
+Next Obligation. ii. ss. Qed.
+Next Obligation. ii. eauto. Qed.
+
+Lemma memory_concrete_le_le
+  :
+    Memory.le <2= memory_concrete_le.
+Proof.
+  ii. eauto.
+Qed.
+Hint Resolve memory_concrete_le_le.
+
+Lemma memory_concrete_le_closed_timemap tm mem0 mem1
+      (MLE: memory_concrete_le mem0 mem1)
+      (TM: Memory.closed_timemap tm mem0)
+  :
+    Memory.closed_timemap tm mem1.
+Proof.
+  ii. hexploit (TM loc). i. des.
+  esplits; eauto.
+Qed.
+
+Lemma memory_concrete_le_closed_view vw mem0 mem1
+      (MLE: memory_concrete_le mem0 mem1)
+      (VW: Memory.closed_view vw mem0)
+  :
+    Memory.closed_view vw mem1.
+Proof.
+  inv VW. econs.
+  - eapply memory_concrete_le_closed_timemap; eauto.
+  - eapply memory_concrete_le_closed_timemap; eauto.
+Qed.
+
+Lemma memory_concrete_le_closed_opt_view vw mem0 mem1
+      (MLE: memory_concrete_le mem0 mem1)
+      (VW: Memory.closed_opt_view vw mem0)
+  :
+    Memory.closed_opt_view vw mem1.
+Proof.
+  inv VW; econs.
+  eapply memory_concrete_le_closed_view; eauto.
+Qed.
+
+Lemma memory_concrete_le_closed_msg msg mem0 mem1
+      (MLE: memory_concrete_le mem0 mem1)
+      (MSG: Memory.closed_message msg mem0)
+  :
+    Memory.closed_message msg mem1.
+Proof.
+  inv MSG; econs.
+  eapply memory_concrete_le_closed_opt_view; eauto.
+Qed.
+
+Lemma memory_concrete_le_closed_tview vw mem0 mem1
+      (MLE: memory_concrete_le mem0 mem1)
+      (VW: TView.closed vw mem0)
+  :
+    TView.closed vw mem1.
+Proof.
+  inv VW. econs.
+  - i. eapply memory_concrete_le_closed_view; eauto.
+  - eapply memory_concrete_le_closed_view; eauto.
+  - eapply memory_concrete_le_closed_view; eauto.
+Qed.
+
+Lemma memory_concrete_le_reserve_wf prom mem0 mem1
+      (MLE: memory_concrete_le mem0 mem1)
+      (RESERVE: Memory.reserve_wf prom mem0)
+  :
+    Memory.reserve_wf prom mem1.
+Proof.
+  ii. eapply RESERVE in GET. des.
+  esplits; eauto.
+Qed.
+
+Lemma memory_concrete_le_local_wf lc mem0 mem1
+      (MLE: memory_concrete_le mem0 mem1)
+      (PROM: Memory.le (Local.promises lc) mem1)
+      (LOCAL: Local.wf lc mem0)
+  :
+    Local.wf lc mem1.
+Proof.
+  inv LOCAL. econs; eauto.
+  - eapply memory_concrete_le_closed_tview; eauto.
+  - eapply memory_concrete_le_reserve_wf; eauto.
+Qed.
