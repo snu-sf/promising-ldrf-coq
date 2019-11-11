@@ -766,16 +766,16 @@ Section MEMORYLEMMAS.
     ii. erewrite Memory.remove_o in LHS; eauto. des_ifs.
   Qed.
 
-  Lemma step_promises_le lang (th0 th1: Thread.t lang) tf e
+  Lemma step_promises_le lang (th0 th1: Thread.t lang) e
         (MLE: Memory.le th0.(Thread.local).(Local.promises) th0.(Thread.memory))
-        (STEP: Thread.step tf e th0 th1)
+        (STEP: Thread.step_allpf e th0 th1)
   :
     Memory.le th1.(Thread.local).(Local.promises) th1.(Thread.memory).
   Proof.
-    inv STEP.
-    - inv STEP0. inv LOCAL. ss.
+    inv STEP. inv STEP0.
+    - inv STEP. inv LOCAL. ss.
       eapply Memory.promise_le; eauto.
-    - inv STEP0. inv LOCAL; ss.
+    - inv STEP. inv LOCAL; ss.
       + inv LOCAL0; ss.
       + inv LOCAL0. ss. inv WRITE.
         eapply Memory.promise_le in PROMISE; eauto. red in PROMISE.
@@ -789,6 +789,16 @@ Section MEMORYLEMMAS.
       + inv LOCAL0; ss.
   Qed.
 
+  Lemma traced_step_promises_le lang tr (th0 th1: Thread.t lang)
+        (MLE: Memory.le th0.(Thread.local).(Local.promises) th0.(Thread.memory))
+        (STEP: traced_step tr th0 th1)
+  :
+    Memory.le th1.(Thread.local).(Local.promises) th1.(Thread.memory).
+  Proof.
+    ginduction STEP; ss.
+    i. eapply IHSTEP. eapply step_promises_le; eauto.
+  Qed.
+
   Lemma steps_promises_le P lang (th0 th1: Thread.t lang)
         (MLE: Memory.le th0.(Thread.local).(Local.promises) th0.(Thread.memory))
         (STEP: rtc (tau (@pred_step P lang)) th0 th1)
@@ -797,7 +807,17 @@ Section MEMORYLEMMAS.
   Proof.
     ginduction STEP; ss.
     i. eapply IHSTEP.
-    inv H. inv TSTEP. inv STEP0. eapply step_promises_le; eauto.
+    inv H. inv TSTEP. eapply step_promises_le; eauto.
+  Qed.
+
+  Lemma traced_steps_promises_le lang (th0 th1: Thread.t lang) events
+        (MLE: Memory.le th0.(Thread.local).(Local.promises) th0.(Thread.memory))
+        (STEP: traced_step events th0 th1)
+  :
+    Memory.le th1.(Thread.local).(Local.promises) th1.(Thread.memory).
+  Proof.
+    ginduction STEP; ss.
+    i. eapply IHSTEP. eapply step_promises_le; eauto.
   Qed.
 
   Lemma inhabited_future mem1 mem2

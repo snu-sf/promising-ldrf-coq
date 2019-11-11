@@ -2378,4 +2378,56 @@ Section MAPPED.
       + erewrite tevent_map_same_machine_event; eauto.
   Qed.
 
+  Lemma traced_steps_map
+        lang (th0 th1 fth0: Thread.t lang) st0 st1 lc0 lc1 flc0
+        sc0 sc1 fsc0 fsc0' mem0 mem1 fmem0 tr
+        (PRED: List.Forall (fun em => mappable_evt (fst em)) tr)
+        (STEPS: traced_step tr th0 th1)
+        (TH_TGT0: th0 = Thread.mk lang st0 lc0 sc0 mem0)
+        (TH_TGT1: th1 = Thread.mk lang st1 lc1 sc1 mem1)
+        (TH_SRC: fth0 = Thread.mk lang st0 flc0 fsc0 fmem0)
+        (LCWF0: Local.wf lc0 mem0)
+        (LCWF1: Local.wf flc0 fmem0)
+        (CLOSED0: Memory.closed fmem0)
+        (CLOSED1: Memory.closed mem0)
+        (CLOSEDSC0: Memory.closed_timemap fsc0 fmem0)
+        (CLOSEDSC1: Memory.closed_timemap sc0 mem0)
+        (LOCAL: local_map lc0 flc0)
+        (MEM: memory_map mem0 fmem0)
+        (UNWRITABLE: collapsable_unwritable lc0.(Local.promises) mem0)
+        (SC: timemap_map sc0 fsc0')
+        (SCLE: TimeMap.le fsc0 fsc0')
+    :
+      exists ftr flc1 fmem1 fsc1 fsc1',
+        (<<STEPS: traced_step ftr fth0 (Thread.mk lang st1 flc1 fsc1 fmem1)>>) /\
+        (<<SC: timemap_map sc1 fsc1'>>) /\
+        (<<SCLE: TimeMap.le fsc1 fsc1'>>) /\
+        (<<MEM: memory_map mem1 fmem1>>) /\
+        (<<LOCAL: local_map lc1 flc1>>) /\
+        (<<TRACE: List.Forall2 (fun em fem => <<EVENT: tevent_map (fst fem) (fst em)>> /\ <<MEM: memory_map (snd em) (snd fem)>>) tr ftr>>)
+  .
+  Proof.
+    ginduction STEPS; i; ss; clarify.
+    - esplits; eauto. econs.
+    - ss. destruct th1. inv PRED. exploit step_map; ss.
+      { instantiate (1:=mappable_evt). ss. }
+      { econs; eauto. }
+      { eauto. }
+      { eapply LCWF1. }
+      { eauto. }
+      { eauto. }
+      { eauto. }
+      { eauto. }
+      i. des.
+      dup HD. inv HD.
+      exploit Thread.step_future; try apply STEP0; ss. i. des.
+      dup STEP. inv STEP1.
+      exploit Thread.step_future; try apply STEP2; ss. i. des.
+      exploit IHSTEPS; try apply STEPS; eauto.
+      { eapply collapsable_unwritable_step in STEP0; eauto. }
+      i. des. esplits; eauto.
+      + econs; eauto.
+      + econs; eauto.
+  Qed.
+
 End MAPPED.

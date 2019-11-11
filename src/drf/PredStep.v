@@ -34,6 +34,125 @@ Section PredStep.
   | pred_step_intro (STEP : Thread.step_allpf e e1 e2) (SAT : P e)
   .
 
+  Inductive traced_step lang: list (ThreadEvent.t * Memory.t) -> (Thread.t lang) -> (Thread.t lang) -> Prop :=
+  | traced_step_refl
+      th0
+    :
+      traced_step [] th0 th0
+  | traced_step_step
+      th0 th1 th2 hde hdm tl
+      (HD: Thread.step_allpf hde th0 th1)
+      (TL: traced_step tl th1 th2)
+      (MEM: hdm = th0.(Thread.memory))
+    :
+      traced_step ((hde, hdm)::tl) th0 th2
+  .
+
+  Inductive traced_step_n1 lang: list (ThreadEvent.t * Memory.t) -> (Thread.t lang) -> (Thread.t lang) -> Prop :=
+  | traced_step_n1_refl
+      th0
+    :
+      traced_step_n1 [] th0 th0
+  | traced_step_n1_step
+      th0 th1 th2 hds tle tlm
+      (HD: traced_step_n1 hds th0 th1)
+      (TL: Thread.step_allpf tle th1 th2)
+      (MEM: tlm = th1.(Thread.memory))
+    :
+      traced_step_n1 (hds++[(tle, tlm)]) th0 th2
+  .
+
+  Lemma traced_step_n1_one lang (th0 th1: Thread.t lang) e
+        (STEP: Thread.step_allpf e th0 th1)
+    :
+      traced_step_n1 [(e, th0.(Thread.memory))] th0 th1.
+  Proof.
+    erewrite <- List.app_nil_l at 1. econs; eauto. econs 1.
+  Qed.
+
+  Lemma traced_step_n1_trans lang (th0 th1 th2: Thread.t lang) tr0 tr1
+        (STEPS0: traced_step_n1 tr0 th0 th1)
+        (STEPS1: traced_step_n1 tr1 th1 th2)
+    :
+      traced_step_n1 (tr0 ++ tr1) th0 th2.
+  Proof.
+    ginduction STEPS1; i; ss.
+    - erewrite List.app_nil_r. auto.
+    - rewrite List.app_assoc. econs; eauto.
+  Qed.
+
+  Lemma traced_step_one lang (th0 th1: Thread.t lang) e
+        (STEP: Thread.step_allpf e th0 th1)
+    :
+      traced_step [(e, th0.(Thread.memory))] th0 th1.
+  Proof.
+    econs 2; eauto. econs 1.
+  Qed.
+
+  Lemma traced_step_trans lang (th0 th1 th2: Thread.t lang) tr0 tr1
+        (STEPS0: traced_step tr0 th0 th1)
+        (STEPS1: traced_step tr1 th1 th2)
+    :
+      traced_step (tr0 ++ tr1) th0 th2.
+  Proof.
+    ginduction STEPS0; i; ss.
+    econs; eauto.
+  Qed.
+
+  Lemma traced_step_equivalent lang (th0 th1: Thread.t lang) tr
+    :
+        traced_step tr th0 th1 <-> traced_step_n1 tr th0 th1.
+  Proof.
+    split; intros STEP.
+    - ginduction STEP.
+      + econs.
+      + exploit traced_step_n1_trans.
+        * apply traced_step_n1_one; eauto.
+        * eauto.
+        * ss. clarify.
+    - ginduction STEP.
+      + econs.
+      + eapply traced_step_trans; eauto.
+        clarify. eapply traced_step_one; eauto.
+  Qed.
+
+  Lemma traced_step_separate lang (th0 th2: Thread.t lang) tr0 tr1
+        (STEPS: traced_step (tr0++tr1) th0 th2)
+    :
+      exists th1,
+        (<<STEPS0: traced_step tr0 th0 th1>>) /\
+        (<<STEPS1: traced_step tr1 th1 th2>>).
+  Proof.
+    ginduction tr0; i; ss.
+    - exists th0. splits; ss. econs.
+    - inv STEPS. eapply IHtr0 in TL. des.
+      exists th1. splits; ss.
+      econs; eauto.
+  Qed.
+
+  Lemma traced_step_in P lang (th0 th1: Thread.t lang) tr e m
+        (STEPS: traced_step tr th0 th1)
+        (IN: List.In (e, m) tr)
+        (PRED: List.Forall P tr)
+    :
+      exists th' th'' tr0 tr1,
+        (<<STEPS0: traced_step tr0 th0 th'>>) /\
+        (<<STEP: Thread.step_allpf e th' th''>>) /\
+        (<<MEM: m = th'.(Thread.memory)>>) /\
+        (<<STEPS1: traced_step tr1 th'' th1>>) /\
+        (<<TRACES: tr = tr0 ++ [(e, m)] ++ tr1>>) /\
+        (<<SAT: P (e, m)>>).
+  Proof.
+    ginduction STEPS; i; ss. inv PRED. des.
+    - clarify. exists th0, th1. esplits; eauto.
+      + econs 1.
+      + ss.
+    - exploit IHSTEPS; eauto. i. des.
+      esplits; eauto.
+      + econs 2; eauto.
+      + clarify.
+  Qed.
+
   Lemma pred_step_program_step P:
         @pred_step P <4= @Thread.step_allpf.
   Proof.
@@ -197,6 +316,28 @@ Section PredStep.
     - refl.
     - econs; eauto. inv H. econs; eauto.
       eapply no_promise_program_step; eauto.
+  Qed.
+
+  Lemma pred_steps_traced_step P lang
+        th0 th1
+    :
+      rtc (tau (@pred_step P lang)) th0 th1 <->
+      exists tr,
+        (<<STEPS: traced_step tr th0 th1>>) /\
+        (<<EVENTS: List.Forall (fun em => <<SAT: P (fst em)>> /\ <<TAU: ThreadEvent.get_machine_event (fst em) = MachineEvent.silent>>) tr >>)
+  .
+  Proof.
+    split; i.
+    - ginduction H; i.
+      + exists []. splits; eauto. econs 1.
+      + des. inv H. inv TSTEP. exists ((e, x.(Thread.memory))::tr). splits.
+        * econs; eauto.
+        * i. ss. des; clarify. eauto.
+    - des. ginduction STEPS; i.
+      + refl.
+      + inv EVENTS. des. econs.
+        * econs; eauto. econs; eauto.
+        * eauto.
   Qed.
 
   Definition promise_free (e: ThreadEvent.t): Prop :=

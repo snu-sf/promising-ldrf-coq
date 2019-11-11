@@ -1368,116 +1368,162 @@ Next Obligation.
   ii. inv H. inv H0. econs. etrans; eauto.
 Qed.
 
+Lemma shorter_thread_shorter_memory lang (th_src th_tgt: Thread.t lang)
+      (THREAD: shorter_thread th_src th_tgt)
+  :
+    shorter_memory th_src.(Thread.memory) th_tgt.(Thread.memory).
+Proof. inv THREAD; eauto. Qed.
+
 Lemma no_update_on_step2
-      L P0 P1 lang e_tgt th_src th_tgt th_tgt'
+      L lang e_tgt (th_src th_tgt th_tgt': Thread.t lang)
       (LCWF: Memory.le th_src.(Thread.local).(Local.promises) th_src.(Thread.memory))
-      (PRED: P0 <1= (no_update_on L /1\ promise_free))
-      (STEPS: (@pred_step P0 lang) e_tgt th_tgt th_tgt')
+      (PRED: (no_update_on L /1\ promise_free) e_tgt)
+      (STEPS: Thread.step_allpf e_tgt th_tgt th_tgt')
       (SHORTER: shorter_thread th_src th_tgt)
       (NOATTATCH: not_attatched L th_src.(Thread.memory))
-      (SHIFT: te_pred_shift P1 P0 shorter_event)
   :
     exists e_src th_src',
-      (<<STEPS: (@pred_step P1 lang) e_src th_src th_src'>>) /\
+      (<<STEPS: Thread.step_allpf e_src th_src th_src'>>) /\
       (<<SHORTER: shorter_thread th_src' th_tgt'>>) /\
       (<<EVENT: shorter_event e_src e_tgt>>) /\
       (<<NOATTATCH: not_attatched L th_src'.(Thread.memory)>>).
 Proof.
+  assert (TSTEP0: pred_step (no_update_on L /1\ promise_free) e_tgt th_tgt th_tgt').
+  { econs; eauto. }
   destruct th_src, th_tgt, th_tgt'. destruct local0, local1. inv SHORTER. ss.
-  exploit no_update_on_step; try apply STEPS; eauto. i. des.
-  esplits; eauto.
-  - econs; eauto. inv STEPS. eapply SHIFT; eauto.
-  - econs; eauto.
-  - ss.
-Qed.
-
-Lemma no_update_on_steps2
-      P0 P1 L lang th_src th_tgt th_tgt'
-      (LCWF: Memory.le th_src.(Thread.local).(Local.promises) th_src.(Thread.memory))
-      (PRED: P0 <1= (no_update_on L /1\ promise_free))
-      (STEPS: rtc (tau (@pred_step P0 lang)) th_tgt th_tgt')
-      (SHORTER: shorter_thread th_src th_tgt)
-      (NOATTATCH: not_attatched L th_src.(Thread.memory))
-      (SHIFT: te_pred_shift P1 P0 shorter_event)
-  :
-    exists th_src',
-      (<<STEPS: rtc (tau (@pred_step P1 lang)) th_src th_src'>>) /\
-      (<<SHORTER: shorter_thread th_src' th_tgt'>>) /\
-      (<<NOATTATCH: not_attatched L th_src'.(Thread.memory)>>).
-Proof.
-  destruct th_src, th_tgt, th_tgt'. destruct local0, local1. inv SHORTER. ss.
-  exploit no_update_on_steps; try apply STEPS; eauto. i. des.
+  exploit no_update_on_step; try apply STEPS; eauto; ss. i. des.
   esplits; eauto. econs; eauto.
 Qed.
 
-Lemma updates_list_exists L
-      P0 P1 lang th0 th1
-      (LCWF: Memory.le th0.(Thread.local).(Local.promises) th0.(Thread.memory))
-      (STEPS: rtc (tau (@pred_step P0 lang)) th0 th1)
-      (ATTATCHED: not_attatched L th0.(Thread.memory))
-      (SHIFT: te_pred_shift P1 P0 shorter_event)
-      (PROMISEFREE: P0 <1= promise_free)
+Lemma list_Forall_app A P (l0 l1: list A)
   :
-    exists (updates: list (Loc.t * Time.t)) th1',
-      (<<UPDATESWF: forall loc to (IN: List.In (loc, to) updates), L loc to>>) /\
-      (<<STEPS: rtc (tau (@pred_step P1 lang)) th0 th1'>>) /\
+    List.Forall P (l0 ++ l1) <-> (<<FORALL0: List.Forall P l0>> /\ <<FORALL1: List.Forall P l1>>).
+Proof.
+  induction l0; split; i; ss.
+  - split; auto.
+  - des. auto.
+  - inv H. apply IHl0 in H3. des. split; auto.
+  - des. inv FORALL0. econs; eauto.
+Qed.
+
+Lemma list_Forall2_app A B P (lhd0 ltl0: list A) (lhd1 ltl1: list B)
+      (FORALL0: List.Forall2 P lhd0 lhd1)
+      (FORALL1: List.Forall2 P ltl0 ltl1)
+  :
+    List.Forall2 P (lhd0 ++ ltl0) (lhd1 ++ ltl1).
+Proof.
+  ginduction FORALL0; eauto. i. ss. econs; eauto.
+Qed.
+
+Lemma updates_list_exists L
+      lang (th0 th1: Thread.t lang) tr
+      (PRED: List.Forall (fun em => promise_free (fst em)) tr)
+      (LCWF: Memory.le th0.(Thread.local).(Local.promises) th0.(Thread.memory))
+      (STEPS: traced_step tr th0 th1)
+      (ATTATCHED: not_attatched L th0.(Thread.memory))
+  :
+    exists (updates: list (Loc.t * Time.t)) th1' tr',
+      (<<UPDATESWF: List.Forall (fun locto => L (fst locto) (snd locto)) updates>>) /\
+      (<<STEPS: traced_step tr' th0 th1'>>) /\
       (<<SHORTER: shorter_thread th1' th1>>) /\
       (<<ATTATCHED: not_attatched (fun loc to => L loc to /\ ~ List.In (loc, to) updates) th1'.(Thread.memory)>>) /\
+      (<<TRACE: List.Forall2 (fun em em' => <<EVENT: shorter_event (fst em') (fst em)>> /\ <<MEM: shorter_memory (snd em') (snd em)>>) tr tr'>>) /\
+      (<<MEMORY: List.Forall (fun em => not_attatched (fun loc to => L loc to /\ ~ List.In (loc, to) updates) (snd em)) tr'>>) /\
       (<<COMPLETE:
          forall loc from (SAT: List.In (loc, from) updates),
-         exists th' th'' to valr valw releasedr releasedw ordr ordw,
-           (<<STEPS: rtc (tau (@pred_step P1 lang)) th0 th'>>) /\
-           (<<ATTATCHED: not_attatched (fun loc to => L loc to /\ ~ List.In (loc, to) updates) th'.(Thread.memory)>>) /\
-           (<<STEP: (@pred_step P1 lang)
-                      (ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw)
-                      th' th''>>)>>)
-
-
-.
+         exists to valr valw releasedr releasedw ordr ordw mem,
+           <<IN: List.In (ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw, mem) tr'>> >>).
 Proof.
-  eapply Operators_Properties.clos_rt_rt1n_iff in STEPS.
-  eapply Operators_Properties.clos_rt_rtn1_iff in STEPS.
-  ginduction STEPS. i.
-  - exists [], th0. splits; ss.
-    + refl.
+  apply traced_step_equivalent in STEPS.
+  setoid_rewrite traced_step_equivalent. ginduction STEPS; i.
+  - exists [], th0, []. esplits; eauto.
+    + econs.
     + refl.
     + eapply not_attatched_mon; eauto. i. des. auto.
-  - i. exploit IHSTEPS; eauto. i. des.
-    inv H. destruct (classic (no_update_on (fun loc to => L loc to /\ ~ List.In (loc, to) updates) e)).
-    + assert (TSTEP0: pred_step (P0 /1\ (no_update_on (fun loc to => L loc to /\ ~ List.In (loc, to) updates))) e y z).
-      { inv TSTEP. econs; eauto. } clear TSTEP.
-      exists updates.
-      hexploit (@no_update_on_step2 (fun loc to => L loc to /\ ~ List.In (loc, to) updates)); try apply TSTEP0; try apply SHORTER.
-      { eapply steps_promises_le; eauto. }
-      { i. ss. des. split; auto. }
-      { eauto. }
-      { instantiate (1:=P1). ii. des. eapply SHIFT; eauto. }
-      i. des.
-      exists th_src'. splits; auto.
-      eapply rtc_n1; eauto. econs; eauto.
-      inv EVENT0; eauto.
+    + i. ss.
+  - rewrite list_Forall_app in PRED. des. inv FORALL1. ss.
+    exploit IHSTEPS; eauto. i. des. clear IHSTEPS.
+    destruct (classic (no_update_on (fun loc to => L loc to /\ ~ List.In (loc, to) updates) tle)).
+    + exploit no_update_on_step2; try apply SHORTER; eauto.
+      { eapply traced_step_promises_le; eauto.
+        apply traced_step_equivalent; eauto. }
+      i. des. exists updates, th_src', (tr'++[(e_src, th1'.(Thread.memory))]).
+      esplits; eauto.
+      * econs; eauto.
+      * eapply list_Forall2_app; eauto. econs; eauto. ss. split; auto.
+        apply shorter_thread_shorter_memory; auto.
+      * eapply list_Forall_app; eauto.
+      * i. exploit COMPLETE; eauto. i. des.
+        esplits. eapply List.in_or_app; eauto.
 
     + unfold no_update_on in H. des_ifs. apply NNPP in H. des.
-
-      assert (TSTEP0: pred_step (P0 /1\ (no_update_on (fun loc0 to => L loc0 to /\ ~ List.In (loc0, to) ((loc, tsr) :: updates)))) (ThreadEvent.update loc tsr tsw valr valw releasedr releasedw ordr ordw) y z).
-      { inv TSTEP. econs; eauto. ss. split; auto.
-        ii. des. apply H2. auto. }
-      exists ((loc, tsr) :: updates).
-      hexploit (@no_update_on_step2 (fun loc0 to => L loc0 to /\ ~ List.In (loc0, to) ((loc, tsr) :: updates))); try apply TSTEP0; try apply SHORTER.
-      { eapply steps_promises_le; eauto. }
-      { i. ss. des. split; auto. }
+      hexploit (@no_update_on_step2 (fun loc0 to => L loc0 to /\ ~ List.In (loc0, to) ((loc, tsr) :: updates))); try apply TL; try apply SHORTER; eauto.
+      { eapply traced_step_promises_le; eauto.
+        apply traced_step_equivalent; eauto. }
+      { ss. split; auto. ii. des; auto. }
       { eapply not_attatched_mon; [eauto|]. i. ss. des; auto. }
-      { instantiate (1:=P1). ii. des. eapply SHIFT; eauto. }
-      i. des. inv EVENT0.
-      exists th_src'. splits; auto.
-      * i. ss. des; auto. clarify.
-      * eapply rtc_n1; eauto.
-      * i. ss. des.
-        { clarify. exists th1', th_src'. esplits; eauto.
-          eapply not_attatched_mon; [eauto|]. i. ss. des; auto. }
-        { exploit COMPLETE; eauto. i. des. esplits; eauto.
-          eapply not_attatched_mon; [eauto|]. i. ss. des; auto. }
+      i. des. exists ((loc, tsr) :: updates), th_src', (tr'++[(e_src, th1'.(Thread.memory))]).
+      esplits; eauto.
+      * econs; eauto.
+      * eapply list_Forall2_app; eauto. econs; eauto. ss. split; auto.
+        apply shorter_thread_shorter_memory; auto.
+      * eapply List.Forall_impl; cycle 1.
+        { eapply list_Forall_app; eauto. }
+        { i. ss. eapply not_attatched_mon; eauto. i. ss. des. split; auto. }
+      * i. inv SAT; clarify.
+        { inv EVENT. esplits. apply List.in_or_app. right. econs; eauto. }
+        { exploit COMPLETE; eauto. i. des.
+          esplits. apply List.in_or_app. left. eauto. }
 Qed.
+
+Definition pf_consistent_drf'' lang (e0:Thread.t lang): Prop :=
+  let L := (fun loc => Memory.latest_reserve loc e0.(Thread.local).(Local.promises) e0.(Thread.memory)) in
+  forall mem1 mem2 max
+         (CAP: Memory.cap e0.(Thread.local).(Local.promises) e0.(Thread.memory) mem1)
+         (FORGET: forget_memory (collapsing_latest_reserves_times L e0.(Thread.memory) \2/ collapsing_caps_times L e0.(Thread.memory) mem1) mem2 mem1)
+         (MAX: Memory.max_full_timemap e0.(Thread.memory) max),
+  exists e1 (U: list Loc.t) (AU: list Loc.t),
+    (<<DISJOINT: forall loc (INU: List.In loc U) (INAU: List.In loc AU), False>>) /\
+    (<<AUPDATES: forall loc (INAU: List.In loc AU), ~ L loc>>) /\
+
+    (<<STEPS0: rtc (tau (@pred_step is_cancel lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot mem2) e1>>) /\
+    (<<NORESERVE: no_reserves e1.(Thread.local).(Local.promises)>>) /\
+    (<<NOATTATCH: not_attatched (Memory.max_full_ts e0.(Thread.memory)) e1.(Thread.memory)>>) /\
+    (<<MAXMAP: TimeMap.le (Memory.max_timemap e1.(Thread.memory)) max>>) /\
+    exists e2 tr,
+      (<<STEPS1: traced_step tr e1 e2>>) /\
+      (<<ATTATCHED: not_attatched (fun loc to => (<<MAX: Memory.max_full_ts e0.(Thread.memory) loc to>>) /\
+                                                 (<<NUPDATES: ~ List.In loc (U ++ AU)>>))
+                                  e2.(Thread.memory)>>) /\
+      (<<MEMORY: List.Forall (fun em => not_attatched (fun loc to => L loc to /\ ~ List.In (loc, to) updates) (snd em)) tr>>) /\
+      (<<COMPLETE:
+         forall loc from (SAT: List.In (loc, from) updates),
+         exists to valr valw releasedr releasedw ordr ordw mem,
+           <<IN: List.In (ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw, mem) tr'>> >>).
+
+
+
+
+      (<<UCOMPLETE:
+         forall loc (SAT: List.In loc U),
+         exists e2',
+           (<<STEPS1: rtc (tau (@pred_step (promise_free /1\ (fun e => ~ is_cancel e) /1\ no_sc) lang)) e1 e2'>>) /\
+           (<<ATTATCHED: not_attatched (fun loc to => (<<MAX: Memory.max_full_ts e0.(Thread.memory) loc to>>) /\
+                                                      (<<NUPDATES: ~ List.In loc (U ++ AU)>>))
+                                       e2'.(Thread.memory)>>) /\
+           (<<UPDATING: is_updating _ e2'.(Thread.state) loc Ordering.strong_relaxed>>)>>) /\
+      (<<AUCOMPLETE:
+         forall loc (SAT: List.In loc AU),
+         exists e2',
+           (<<STEPS1: rtc (tau (@pred_step (promise_free /1\ (fun e => ~ is_cancel e) /1\ no_sc) lang)) e1 e2'>>) /\
+           (<<ATTATCHED: not_attatched (fun loc to => (<<MAX: Memory.max_full_ts e0.(Thread.memory) loc to>>) /\
+                                                      (<<NUPDATES: ~ List.In loc (U ++ AU)>>))
+                                       e2'.(Thread.memory)>>) /\
+           (<<UPDATING: is_updating _ e2'.(Thread.state) loc Ordering.seqcst>>)>>) /\
+      (__guard__((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
+                 (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>)))
+.
+
 
 Definition pf_consistent_drf'' lang (e0:Thread.t lang): Prop :=
   let L := (fun loc => Memory.latest_reserve loc e0.(Thread.local).(Local.promises) e0.(Thread.memory)) in
@@ -1605,6 +1651,10 @@ Proof.
 Qed.
 
 Lemma memory_shifting
+
+
+
+
 
 
 

@@ -111,6 +111,31 @@ Section NOSC.
       + esplits. econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
   Qed.
 
+  Lemma no_sc_any_sc_traced
+        lang th_src th_tgt th_tgt' st st' lc lc' sc sc_src sc'
+        mem mem' events
+        (STEPS: traced_step events th_tgt th_tgt')
+        (TH_SRC: th_src = Thread.mk lang st lc sc_src mem)
+        (TH_TGT0: th_tgt = Thread.mk lang st lc sc mem)
+        (TH_TGT1: th_tgt' = Thread.mk lang st' lc' sc' mem')
+        (EVENTS: forall e (IN: List.In e events), <<SAT: no_sc (fst e)>>)
+    :
+      exists sc_src',
+        (<<STEPS: traced_step events
+                              th_src
+                              (Thread.mk lang st' lc' sc_src' mem')>>).
+  Proof.
+    ginduction STEPS.
+    - i. clarify. esplits; eauto. econs.
+    - i. clarify. destruct th1. destruct local, lc, lc'. ss.
+      exploit no_sc_any_sc; ss.
+      { econs; eauto. instantiate (1:=no_sc).
+        exploit EVENTS; eauto. }
+      { ss. }
+      i. des. inv STEP.
+      exploit IHSTEPS; eauto. i. des. eexists. econs; eauto.
+  Qed.
+
   Lemma no_sc_any_sc_rtc
         P lang th_src th_tgt th_tgt' st st' lc lc' sc sc_src sc'
         mem mem'
@@ -1072,7 +1097,7 @@ Section NOTATTATCHED.
     :
       exists mem_src',
         (<<STEPS: rtc (tau (@pred_step P1 lang)) th_src
-                     (Thread.mk lang st' (Local.mk v' prom') sc' mem_src')>>) /\
+                      (Thread.mk lang st' (Local.mk v' prom') sc' mem_src')>>) /\
         (<<SHORTER: shorter_memory mem_src' mem_tgt'>>) /\
         (<<NOATTATCH: not_attatched L mem_src'>>).
   Proof.
@@ -1086,6 +1111,40 @@ Section NOTATTATCHED.
           inv TSTEP. eauto.
         * inv EVT; auto.
       + inv STEP. eapply step_promises_le in STEP0; eauto.
+  Qed.
+
+  Lemma no_update_on_traced_step
+        L lang th_src th_tgt th_tgt' st st' lc lc' sc sc'
+        mem_tgt mem_tgt' mem_src tr_tgt
+        (PRED: List.Forall (fun em => (no_update_on L /1\ promise_free) (fst em)) tr_tgt)
+        (LCWF: Memory.le lc.(Local.promises) mem_src)
+        (STEPS: traced_step tr_tgt th_tgt th_tgt')
+        (TH_SRC: th_src = Thread.mk lang st lc sc mem_src)
+        (TH_TGT0: th_tgt = Thread.mk lang st lc sc mem_tgt)
+        (TH_TGT1: th_tgt' = Thread.mk lang st' lc' sc' mem_tgt')
+        (SHORTER: shorter_memory mem_src mem_tgt)
+        (NOATTATCH: not_attatched L mem_src)
+    :
+      exists mem_src' tr_src,
+        (<<STEPS: traced_step tr_src th_src (Thread.mk lang st' lc' sc' mem_src')>>) /\
+        (<<SHORTER: shorter_memory mem_src' mem_tgt'>>) /\
+        (<<NOATTATCH: not_attatched L mem_src'>>) /\
+        (<<TRACE: List.Forall2 (fun em_src em_tgt => <<EVENT: shorter_event (fst em_src) (fst em_tgt)>> /\ <<MEM: shorter_memory (snd em_src) (snd em_tgt)>>) tr_src tr_tgt>>)
+  .
+  Proof.
+    ss. ginduction STEPS; i; ss; clarify.
+    - esplits; eauto. econs.
+    - ss. destruct th1. destruct lc, local. ss. inv PRED. ss. des.
+      exploit no_update_on_step; ss; eauto.
+      { instantiate (1:= no_update_on L /1\ promise_free). ss. }
+      { econs; eauto. }
+      i. des.
+      exploit IHSTEPS; eauto.
+      { inv STEP. eapply step_promises_le in STEP0; eauto. }
+      i. des.
+      esplits; eauto.
+      + econs; eauto.
+      + econs; eauto.
   Qed.
 
 End NOTATTATCHED.
