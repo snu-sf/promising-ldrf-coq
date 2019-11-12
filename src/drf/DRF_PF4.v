@@ -1415,6 +1415,19 @@ Proof.
   ginduction FORALL0; eauto. i. ss. econs; eauto.
 Qed.
 
+Lemma list_Forall2_in A B P (l0: list A) (l1: list B)
+      (FORALL: List.Forall2 P l0 l1)
+      b
+      (IN: List.In b l1)
+  :
+    exists a,
+      (<<IN: List.In a l0>>) /\ (<<SAT: P a b>>).
+Proof.
+  ginduction FORALL; eauto; i; ss. des; clarify.
+  - esplits; eauto.
+  - eapply IHFORALL in IN; eauto. des. esplits; eauto.
+Qed.
+
 Lemma updates_list_exists L
       lang (th0 th1: Thread.t lang) tr
       (PRED: List.Forall (fun em => promise_free (fst em)) tr)
@@ -1495,34 +1508,97 @@ Definition pf_consistent_drf'' lang (e0:Thread.t lang): Prop :=
       (<<ATTATCHED: not_attatched (fun loc to => (<<MAX: Memory.max_full_ts e0.(Thread.memory) loc to>>) /\
                                                  (<<NUPDATES: ~ List.In loc (U ++ AU)>>))
                                   e2.(Thread.memory)>>) /\
-      (<<MEMORY: List.Forall (fun em => not_attatched (fun loc to => L loc to /\ ~ List.In (loc, to) updates) (snd em)) tr>>) /\
-      (<<COMPLETE:
-         forall loc from (SAT: List.In (loc, from) updates),
-         exists to valr valw releasedr releasedw ordr ordw mem,
-           <<IN: List.In (ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw, mem) tr'>> >>).
-
-
-
-
-      (<<UCOMPLETE:
+      (<<MEMORY: List.Forall (fun em => not_attatched (fun loc to => (<<MAX: Memory.max_full_ts e0.(Thread.memory) loc to>>) /\
+                                                                     (<<NUPDATES: ~ List.In loc (U ++ AU)>>)) (snd em)) tr>>) /\
+      (<<COMPLETEU:
          forall loc (SAT: List.In loc U),
-         exists e2',
-           (<<STEPS1: rtc (tau (@pred_step (promise_free /1\ (fun e => ~ is_cancel e) /1\ no_sc) lang)) e1 e2'>>) /\
-           (<<ATTATCHED: not_attatched (fun loc to => (<<MAX: Memory.max_full_ts e0.(Thread.memory) loc to>>) /\
-                                                      (<<NUPDATES: ~ List.In loc (U ++ AU)>>))
-                                       e2'.(Thread.memory)>>) /\
-           (<<UPDATING: is_updating _ e2'.(Thread.state) loc Ordering.strong_relaxed>>)>>) /\
-      (<<AUCOMPLETE:
+         exists to valr valw releasedr releasedw ordr ordw mem,
+           <<IN: List.In (ThreadEvent.update loc (max loc) to valr valw releasedr releasedw ordr ordw, mem) tr>> /\ <<ORDR: Ordering.le ordr Ordering.strong_relaxed>> >>) /\
+      (<<COMPLETEAU:
          forall loc (SAT: List.In loc AU),
-         exists e2',
-           (<<STEPS1: rtc (tau (@pred_step (promise_free /1\ (fun e => ~ is_cancel e) /1\ no_sc) lang)) e1 e2'>>) /\
-           (<<ATTATCHED: not_attatched (fun loc to => (<<MAX: Memory.max_full_ts e0.(Thread.memory) loc to>>) /\
-                                                      (<<NUPDATES: ~ List.In loc (U ++ AU)>>))
-                                       e2'.(Thread.memory)>>) /\
-           (<<UPDATING: is_updating _ e2'.(Thread.state) loc Ordering.seqcst>>)>>) /\
-      (__guard__((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
-                 (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>)))
+         exists to valr valw releasedr releasedw ordr ordw mem,
+           <<IN: List.In (ThreadEvent.update loc (max loc) to valr valw releasedr releasedw ordr ordw, mem) tr>> >>)
 .
+
+
+Lemma pf_consistent_pf_consistent_drf'' lang (th: Thread.t lang)
+      (WF: Local.wf th.(Thread.local) th.(Thread.memory))
+      (MEM: Memory.closed th.(Thread.memory))
+      (CONSISTENT: pf_consistent_drf' th)
+      (RESERVEWF: memory_reserve_wf (Thread.memory th))
+  :
+    pf_consistent_drf'' th.
+Proof.
+  set (L := (fun loc => Memory.latest_reserve loc th.(Thread.local).(Local.promises) th.(Thread.memory))).
+  ii. exploit CONSISTENT; eauto. i. des.
+
+  assert (LCWFSRC: Local.wf th.(Thread.local) mem2).
+  { dup WF. inv WF.
+    eapply memory_concrete_le_local_wf; eauto.
+    - eapply collapsing_caps_forget_le; eauto.
+    - eapply collapsing_caps_forget_prom_le; eauto.
+      ii. clarify. unfold Memory.latest_reserve in SAT.
+      rewrite GET in SAT. clarify. }
+
+  eapply pred_steps_traced_step in STEPS1. des.
+
+  exploit updates_list_exists; try apply STEPS.
+  { eapply List.Forall_impl; eauto. i. ss. des; auto. }
+  { eapply steps_promises_le in STEPS0; eauto. ss.
+    inv LCWFSRC. auto. }
+  { eauto. }
+  i. des.
+
+  hexploit (list_filter_exists (fun locto => L (fst locto)) updates). i. des.
+  hexploit (list_filter_exists (fun locto => ~ L (fst locto)) updates). i. des.
+
+  assert (LOCS: forall loc to
+                       (NUPDATES: Memory.max_full_ts (Thread.memory th) loc to /\
+                                  ~ List.In loc (List.map fst l' ++ List.map fst l'0)),
+             Memory.max_full_ts (Thread.memory th) loc to /\ ~ List.In (loc, to) updates).
+  { i. des. split; auto.
+    intros IN. apply NUPDATES0. apply List.in_or_app.
+    dup IN. eapply List.Forall_forall in UPDATESWF; eauto.
+    destruct (classic (L loc)).
+    - left. hexploit (proj1 (@COMPLETE0 (loc, to))); auto.
+      i. eapply (List.in_map fst) in H0. ss.
+    - right. hexploit (proj1 (@COMPLETE1 (loc, to))); auto.
+      i. eapply (List.in_map fst) in H0. ss. }
+
+  exists e1, (List.map fst l'), (List.map fst l'0). splits; auto.
+  { i. apply List.in_map_iff in INAU. apply List.in_map_iff in INU. des. clarify.
+    apply (proj2 (@COMPLETE0 x1)) in INU0.
+    apply (proj2 (@COMPLETE1 x)) in INAU0. des.
+    rewrite INAU in *. clarify. }
+  { i. apply List.in_map_iff in INAU. des. clarify.
+    apply (proj2 (@COMPLETE1 x)) in INAU0. des. auto. }
+  exists th1'. esplits; eauto.
+
+  - eapply not_attatched_mon; eauto.
+  - eapply List.Forall_impl; eauto. i. ss.
+    eapply not_attatched_mon; eauto.
+
+  - i. eapply List.in_map_iff in SAT. des. clarify.
+    apply COMPLETE0 in SAT0. des. destruct x as [loc to]. ss.
+    exploit COMPLETE; eauto.
+    i. des. eapply List.Forall_forall in UPDATESWF; eauto.
+    exploit Memory.max_full_ts_inj.
+    { eapply UPDATESWF. }
+    { eapply MAX. } i. ss. clarify.
+    esplits; eauto.
+    exploit list_Forall2_in; eauto. i. des. ss. inv EVENT.
+    eapply List.Forall_forall in IN1; eauto. ss. des.
+    rewrite <- H in *. ss. hexploit SAT2; eauto.
+    destruct ordr; ss.
+  - i. eapply List.in_map_iff in SAT. des. clarify.
+    apply COMPLETE1 in SAT0. des. destruct x as [loc to]. ss.
+    exploit COMPLETE; eauto.
+    i. des. eapply List.Forall_forall in UPDATESWF; eauto.
+    exploit Memory.max_full_ts_inj.
+    { eapply UPDATESWF. }
+    { eapply MAX. } i. ss. clarify.
+    esplits; eauto.
+Qed.
 
 
 Definition pf_consistent_drf'' lang (e0:Thread.t lang): Prop :=
