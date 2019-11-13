@@ -1433,6 +1433,16 @@ Proof.
   - eapply IHFORALL in IN; eauto. des. esplits; eauto.
 Qed.
 
+Lemma list_Forall_sum A (P Q R: A -> Prop) (l: list A)
+      (FORALL0: List.Forall P l)
+      (FORALL1: List.Forall Q l)
+      (SUM: forall a (SAT0: P a) (SAT1: Q a), R a)
+  :
+    List.Forall R l.
+Proof.
+  ginduction l; eauto. i. inv FORALL0. inv FORALL1. econs; eauto.
+Qed.
+
 Lemma updates_list_exists L
       lang (th0 th1: Thread.t lang) tr
       (PRED: List.Forall (fun em => promise_free (fst em)) tr)
@@ -1513,8 +1523,8 @@ Definition pf_consistent_drf'' lang (e0:Thread.t lang): Prop :=
       (<<ATTATCHED: not_attatched (fun loc to => (<<MAX: Memory.max_full_ts e0.(Thread.memory) loc to>>) /\
                                                  (<<NUPDATES: ~ List.In loc (U ++ AU)>>))
                                   e2.(Thread.memory)>>) /\
-      (<<MEMORY: List.Forall (fun em => not_attatched (fun loc to => (<<MAX: Memory.max_full_ts e0.(Thread.memory) loc to>>) /\
-                                                                     (<<NUPDATES: ~ List.In loc (U ++ AU)>>)) (snd em)) tr>>) /\
+      (<<TRACE: List.Forall (fun em => <<EVENT: (promise_free /1\ (fun e => ~ is_cancel e) /1\ no_sc) (fst em)>> /\ <<MEMORY: not_attatched (fun loc to => (<<MAX: Memory.max_full_ts e0.(Thread.memory) loc to>>) /\
+                                                                                                                                                           (<<NUPDATES: ~ List.In loc (U ++ AU)>>)) (snd em)>>) tr>>) /\
       (<<COMPLETEU:
          forall loc (SAT: List.In loc U),
          exists to valr valw releasedr releasedw ordr ordw mem,
@@ -1522,9 +1532,10 @@ Definition pf_consistent_drf'' lang (e0:Thread.t lang): Prop :=
       (<<COMPLETEAU:
          forall loc (SAT: List.In loc AU),
          exists to valr valw releasedr releasedw ordr ordw mem,
-           <<IN: List.In (ThreadEvent.update loc (max loc) to valr valw releasedr releasedw ordr ordw, mem) tr>> >>)
+           <<IN: List.In (ThreadEvent.update loc (max loc) to valr valw releasedr releasedw ordr ordw, mem) tr>> >>) /\
+      (__guard__((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
+                 (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>)))
 .
-
 
 Lemma pf_consistent_pf_consistent_drf'' lang (th: Thread.t lang)
       (WF: Local.wf th.(Thread.local) th.(Thread.memory))
@@ -1580,8 +1591,15 @@ Proof.
   exists th1'. esplits; eauto.
 
   - eapply not_attatched_mon; eauto.
-  - eapply List.Forall_impl; eauto. i. ss.
-    eapply not_attatched_mon; eauto.
+  - eapply list_Forall_sum.
+    + eapply MEMORY.
+    + instantiate (1:=fun em => (promise_free /1\ (fun e => ~ is_cancel e) /1\ no_sc) (fst em)).
+      eapply List.Forall_forall. i.
+      eapply list_Forall2_in in H; eauto. des.
+      eapply List.Forall_forall in IN; eauto. destruct a, x. ss. des.
+      inv EVENT; split; ss.
+    + i. ss. des. splits; auto.
+      eapply not_attatched_mon; eauto.
 
   - i. eapply List.in_map_iff in SAT. des. clarify.
     apply COMPLETE0 in SAT0. des. destruct x as [loc to]. ss.
@@ -1603,7 +1621,172 @@ Proof.
     { eapply UPDATESWF. }
     { eapply MAX. } i. ss. clarify.
     esplits; eauto.
+
+  - inv SHORTER. eauto.
 Qed.
+
+Lemma after_promise_covered
+      prom0 mem0 loc from to msg prom1 mem1 kind
+      (CANCEL: Memory.op_kind_is_cancel kind = false)
+      (PROMISE: AMemory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
+      ts (ITV: Interval.mem (from, to) ts)
+  :
+    covered loc ts mem1.
+Proof.
+  dup PROMISE. eapply AMemory.promise_get2 in PROMISE0; auto. des.
+  econs; eauto.
+Qed.
+
+Lemma after_write_covered
+      prom0 mem0 loc from to val released prom1 mem1 kind
+      (WRITE: AMemory.write prom0 mem0 loc from to val released prom1 mem1 kind)
+      ts (ITV: Interval.mem (from, to) ts)
+  :
+    covered loc ts mem1.
+Proof.
+  inv WRITE. eapply after_promise_covered; eauto.
+  inv PROMISE; clarify.
+Qed.
+
+Lemma blank_write_write_not_in (L: Loc.t -> Time.t -> Prop)
+      prom0 mem0 loc from to val released prom1 mem1 kind
+      (WRITE: AMemory.write prom0 mem0 loc from to val released prom1 mem1 kind)
+      (COVERED: forall loc' ts' (SAT: L loc' ts'), ~ covered loc' ts' mem1)
+      ts (ITV: Interval.mem (from, to) ts)
+  :
+    ~ L loc ts.
+Proof.
+  ii. eapply COVERED; eauto. eapply after_write_covered; eauto.
+Qed.
+
+Lemma not_cancel_promise_covered
+      prom0 mem0 loc from to msg prom1 mem1 kind
+      (CANCEL: Memory.op_kind_is_cancel kind = false)
+      (PROMISE: AMemory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
+  :
+    forall loc to (COVERED: covered loc to mem0),
+      covered loc to mem1.
+Proof.
+  inv PROMISE; i; clarify.
+  - eapply add_covered; eauto.
+  - eapply split_covered; eauto.
+  - eapply lower_covered; eauto.
+Qed.
+
+Lemma write_covered
+      prom0 mem0 loc from to val released prom1 mem1 kind
+      (WRITE: AMemory.write prom0 mem0 loc from to val released prom1 mem1 kind)
+  :
+    forall loc to (COVERED: covered loc to mem0),
+      covered loc to mem1.
+Proof.
+  inv WRITE. eapply not_cancel_promise_covered; eauto.
+  inv PROMISE; clarify.
+Qed.
+
+Lemma not_cancel_step_covered
+      lang (th0 th1: Thread.t lang) e
+      (STEP: AThread.step_allpf e th0 th1)
+      (CANCEL: ~ is_cancel e)
+  :
+    forall loc to (COVERED: covered loc to th0.(Thread.memory)),
+      covered loc to th1.(Thread.memory).
+Proof.
+  inv STEP. inv STEP0.
+  - inv STEP. inv LOCAL. ss.
+    eapply not_cancel_promise_covered; eauto. des_ifs.
+  - inv STEP. inv LOCAL; ss.
+    + inv LOCAL0. eapply write_covered; eauto.
+    + inv LOCAL2. eapply write_covered; eauto.
+Qed.
+
+Lemma not_cancel_steps_covered
+      lang (th0 th1: Thread.t lang) tr
+      (STEP: traced_step tr th0 th1)
+      (CANCEL: List.Forall (fun em => ~ is_cancel (fst em)) tr)
+  :
+    forall loc to (COVERED: covered loc to th0.(Thread.memory)),
+      covered loc to th1.(Thread.memory).
+Proof.
+  ginduction STEP; auto. i. inv CANCEL.
+  eapply IHSTEP; eauto. eapply not_cancel_step_covered; eauto.
+Qed.
+
+Lemma blank_promise_write_not_in (L: Loc.t -> Time.t -> Prop)
+      prom0 mem0 loc from to msg prom1 mem1 kind
+      (CANCEL: Memory.op_kind_is_cancel kind = false)
+      (PROMISE: AMemory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
+      (COVERED: forall loc' ts' (SAT: L loc' ts'), ~ covered loc' ts' mem1)
+      ts (ITV: Interval.mem (from, to) ts)
+  :
+    ~ L loc ts.
+Proof.
+  ii. eapply COVERED; eauto. eapply after_promise_covered; eauto.
+Qed.
+
+Lemma blank_step_write_not_in (L: Loc.t -> Time.t -> Prop)
+      lang (th0 th1: Thread.t lang) e
+      (STEP: AThread.step_allpf e th0 th1)
+      (COVERED: forall loc' ts' (SAT: L loc' ts'), ~ covered loc' ts' th1.(Thread.memory))
+  :
+    write_not_in L e.
+Proof.
+  inv STEP. inv STEP0; inv STEP; ss.
+  - inv LOCAL. des_ifs.
+    eapply blank_promise_write_not_in; eauto.
+  - inv LOCAL; ss.
+    + inv LOCAL0. eapply blank_write_write_not_in; eauto.
+    + inv LOCAL2. eapply blank_write_write_not_in; eauto.
+Qed.
+
+Lemma blank_steps_write_not_in (L: Loc.t -> Time.t -> Prop)
+      lang (th0 th1: Thread.t lang) tr
+      (STEP: traced_step tr th0 th1)
+      (CANCEL: List.Forall (fun em => ~ is_cancel (fst em)) tr)
+      (COVERED: forall loc' ts' (SAT: L loc' ts'), ~ covered loc' ts' th1.(Thread.memory))
+  :
+    List.Forall (fun em => write_not_in L (fst em)) tr.
+Proof.
+  ginduction STEP; auto. i. inv CANCEL. econs; eauto.
+  eapply blank_step_write_not_in; eauto.
+  ii. eapply COVERED; eauto.
+  eapply not_cancel_steps_covered; eauto.
+Qed.
+
+Definition pf_consistent_drf''' lang (e0:Thread.t lang): Prop :=
+  let L := (fun loc => Memory.latest_reserve loc e0.(Thread.local).(Local.promises) e0.(Thread.memory)) in
+  forall mem1 mem2 max
+         (CAP: Memory.cap e0.(Thread.local).(Local.promises) e0.(Thread.memory) mem1)
+         (FORGET: forget_memory (collapsing_latest_reserves_times L e0.(Thread.memory) \2/ collapsing_caps_times L e0.(Thread.memory) mem1) mem2 mem1)
+         (MAX: Memory.max_full_timemap e0.(Thread.memory) max),
+  exists e1 (U: list Loc.t) (AU: list Loc.t),
+    (<<DISJOINT: forall loc (INU: List.In loc U) (INAU: List.In loc AU), False>>) /\
+    (<<AUPDATES: forall loc (INAU: List.In loc AU), ~ L loc>>) /\
+
+    (<<STEPS0: rtc (tau (@pred_step is_cancel lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot mem2) e1>>) /\
+    (<<NORESERVE: no_reserves e1.(Thread.local).(Local.promises)>>) /\
+    (<<NOATTATCH: not_attatched (Memory.max_full_ts e0.(Thread.memory)) e1.(Thread.memory)>>) /\
+    (<<MAXMAP: TimeMap.le (Memory.max_timemap e1.(Thread.memory)) max>>) /\
+    exists e2 tr,
+      (<<STEPS1: traced_step tr e1 e2>>) /\
+      (<<ATTATCHED: not_attatched (fun loc to => (<<MAX: Memory.max_full_ts e0.(Thread.memory) loc to>>) /\
+                                                 (<<NUPDATES: ~ List.In loc (U ++ AU)>>))
+                                  e2.(Thread.memory)>>) /\
+      (<<MEMORY: List.Forall (fun em => not_attatched (fun loc to => (<<MAX: Memory.max_full_ts e0.(Thread.memory) loc to>>) /\
+                                                                     (<<NUPDATES: ~ List.In loc (U ++ AU)>>)) (snd em)) tr>>) /\
+      (<<COMPLETEU:
+         forall loc (SAT: List.In loc U),
+         exists to valr valw releasedr releasedw ordr ordw mem,
+           <<IN: List.In (ThreadEvent.update loc (max loc) to valr valw releasedr releasedw ordr ordw, mem) tr>> /\ <<ORDR: Ordering.le ordr Ordering.strong_relaxed>> >>) /\
+      (<<COMPLETEAU:
+         forall loc (SAT: List.In loc AU),
+         exists to valr valw releasedr releasedw ordr ordw mem,
+           <<IN: List.In (ThreadEvent.update loc (max loc) to valr valw releasedr releasedw ordr ordw, mem) tr>> >>) /\
+      (__guard__((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
+                 (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>)))
+.
+
+
 
 
 Definition pf_consistent_drf'' lang (e0:Thread.t lang): Prop :=

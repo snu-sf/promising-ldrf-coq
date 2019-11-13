@@ -114,8 +114,9 @@ Section Pred.
       forall t (IN: Interval.mem (from, to) t), ~ (MSGS loc t)
     | ThreadEvent.update loc from to _ _ _ _ _ _ =>
       forall t (IN: Interval.mem (from, to) t), ~ (MSGS loc t)
-    | ThreadEvent.promise loc from to _ _ =>
-      forall t (IN: Interval.mem (from, to) t), ~ (MSGS loc t)
+    | ThreadEvent.promise loc from to _ kind =>
+      if Memory.op_kind_is_cancel kind then True
+      else (forall t (IN: Interval.mem (from, to) t), ~ (MSGS loc t))
     | _ => True
     end.
 
