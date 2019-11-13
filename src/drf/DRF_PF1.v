@@ -1217,7 +1217,8 @@ Module Inv.
       SPACES: forall loc ts (IN: spaces loc ts), concrete_covered proms mem loc ts;
       AUPDATES: forall loc ts (IN: aupdates loc ts),
           exists to,
-            (<<GET: Memory.get loc ts proms = Some (ts, to)>>);
+            (<<TS: Time.lt ts to>>) /\
+            (<<GET: Memory.get loc to proms = Some (ts, to)>>);
       PROMS: forall
           loc to m sc (PROM : concrete_promised proms loc to)
           (FUTURE: unchanged_on spaces mlast m)
@@ -1226,8 +1227,7 @@ Module Inv.
             (<<STEPS : rtc (tau (@Thread.program_step _))
                            (Thread.mk _ st lc sc m)
                            (Thread.mk _ st' lc' sc' m')>>) /\
-            ((<<WRITING : is_writing _ st' loc Ordering.relaxed>>) \/
-             (<<ABORTING : is_aborting _ st'>>));
+            (<<WRITING : is_writing _ st' loc Ordering.relaxed>>));
       UPDATE : forall
           loc to m sc (UPD : updates loc to)
           (FUTURE: unchanged_on spaces mlast m)
@@ -1236,7 +1236,7 @@ Module Inv.
             (<<STEPS : rtc (tau (@Thread.program_step _))
                            (Thread.mk _ st lc sc m)
                            (Thread.mk _ st' lc' sc' m')>>) /\
-            (<<READING : is_updating _ st' loc Ordering.relaxed>>);
+            (<<READING : is_updating _ st' loc Ordering.strong_relaxed>>);
       AUPDATE : forall
           loc to m sc (UPD : aupdates loc to)
           (FUTURE: unchanged_on spaces mlast m)
