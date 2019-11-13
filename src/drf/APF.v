@@ -21,14 +21,18 @@ Require Import Progress.
 
 Require Import Race.
 
+Require Import AMemory.
+Require Import ALocal.
+Require Import AThread.
+
 Set Implicit Arguments.
 
 Inductive pftstep: forall (e:MachineEvent.t) (tid:Ident.t) (c1 c2: Configuration.t), Prop :=
 | pftstep_intro
     e tid c1 lang st1 lc1 e2 st3 lc3 sc3 memory3
     (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
-    (STEPS: rtc (tau (@Thread.program_step _)) (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
-    (STEP: Thread.program_step e e2 (Thread.mk _ st3 lc3 sc3 memory3)):
+    (STEPS: rtc (tau (@AThread.program_step _)) (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
+    (STEP: AThread.program_step e e2 (Thread.mk _ st3 lc3 sc3 memory3)):
     pftstep (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
 .
 Hint Constructors pftstep.

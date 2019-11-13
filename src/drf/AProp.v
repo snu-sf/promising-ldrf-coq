@@ -25,6 +25,8 @@ From PromisingLib Require Import Loc.
 Require Import AMemory.
 Require Import ALocal.
 Require Import AThread.
+Require Import PredStep.
+Require Import APredStep.
 
 Lemma promise_apromise
   :
@@ -58,4 +60,28 @@ Proof.
     + econs; eauto. econs 2; eauto. econs; eauto.
     + econs; eauto. econs 2; eauto. econs; eauto.
     + econs; eauto. econs 2; eauto. econs; eauto.
+Qed.
+
+Lemma thread_steps_athread_steps lang
+  :
+    rtc (tau (@Thread.step_allpf lang)) <2= rtc (tau (@AThread.step_allpf lang)).
+Proof.
+  eapply rtc_implies. i. inv PR. econs; eauto.
+  eapply thread_step_athread_step; eauto.
+Qed.
+
+Lemma pred_step_apred_step
+  :
+    PredStep.pred_step <5= APredStep.pred_step.
+Proof.
+  i. inv PR. econs; eauto.
+  eapply thread_step_athread_step; eauto.
+Qed.
+
+Lemma pred_steps_apred_steps P lang
+  :
+    rtc (tau (@PredStep.pred_step P lang)) <2= rtc (tau (@APredStep.pred_step P lang)).
+Proof.
+  eapply rtc_implies. i. inv PR. econs; eauto.
+  eapply pred_step_apred_step; eauto.
 Qed.

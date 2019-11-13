@@ -19,7 +19,7 @@ Require Import Local.
 Require Import Thread.
 Require Import Configuration.
 Require Import Progress.
-Require Import APromiseConsistent.
+Require Import PromiseConsistent.
 From PromisingLib Require Import Loc.
 
 Require Import PF.
@@ -31,8 +31,13 @@ Require Import Program.
 Require Import Cell.
 Require Import Time.
 Require Import Pred.
-Require Import PredStep.
-Require Import DRF_PF0.
+Require Import APredStep.
+
+Require Import ALocal.
+Require Import AThread.
+Require Import AMemory.
+
+Require Import ADRF_PF0.
 
 
 Set Implicit Arguments.
@@ -499,7 +504,7 @@ Section MAPPED.
       unwritable mem prom loc t.
 
   Lemma collapsable_unwritable_step pf e lang (th0 th1: Thread.t lang)
-        (STEP: Thread.step pf e th0 th1)
+        (STEP: AThread.step pf e th0 th1)
         (WFMEM: collapsable_unwritable th0.(Thread.local).(Local.promises) th0.(Thread.memory))
     :
       collapsable_unwritable th1.(Thread.local).(Local.promises) th1.(Thread.memory) .
@@ -1455,7 +1460,7 @@ Section MAPPED.
 
   Lemma write_add_map mem0 fmem0 prom0 fprom0 loc from ffrom to fto val released freleased' freleased mem1 prom1
         (MLE: Memory.le fprom0 fmem0)
-        (ADD: Memory.write prom0 mem0 loc from to val released prom1 mem1 Memory.op_kind_add)
+        (ADD: AMemory.write prom0 mem0 loc from to val released prom1 mem1 Memory.op_kind_add)
         (MEM: memory_map mem0 fmem0)
         (UNWRITABLE: collapsable_unwritable prom0 mem0)
         (PROM: promises_map prom0 fprom0)
@@ -1469,7 +1474,7 @@ Section MAPPED.
       exists fprom1 fmem1,
         (<<MEM: memory_map mem1 fmem1>>) /\
         (<<PROM: promises_map prom1 fprom1>>) /\
-        (<<ADD: Memory.write fprom0 fmem0 loc ffrom fto val freleased fprom1 fmem1 Memory.op_kind_add>>).
+        (<<ADD: AMemory.write fprom0 fmem0 loc ffrom fto val freleased fprom1 fmem1 Memory.op_kind_add>>).
   Proof.
     inv ADD. inv PROMISE.
     exploit add_memory_map; try apply MEM0; try eassumption.
@@ -1494,21 +1499,21 @@ Section MAPPED.
       eapply map_le in TS0; cycle 1; eauto.
       etrans; eauto. inv VIEWLE. eauto.
     - i. clarify.
-    - i. clarify.
-      assert (TS0: Time.lt Time.bot fto).
-      { inv ADD. inv ADD0. eapply TimeFacts.le_lt_lt; eauto.
-        eapply Time.bot_spec. }
-      exploit no_attatch_map; try apply MEM; eauto.
-      ii. inv H. eapply add_succeed_wf in MEM0. des.
-      eapply DISJOINT.
-      + eapply GET0.
-      + instantiate (1:=to). econs; ss. refl.
-      + eauto.
+  (*   - i. clarify. *)
+  (*     assert (TS0: Time.lt Time.bot fto). *)
+  (*     { inv ADD. inv ADD0. eapply TimeFacts.le_lt_lt; eauto. *)
+  (*       eapply Time.bot_spec. } *)
+  (*     exploit no_attatch_map; try apply MEM; eauto. *)
+  (*     ii. inv H. eapply add_succeed_wf in MEM0. des. *)
+  (*     eapply DISJOINT. *)
+  (*     + eapply GET0. *)
+  (*     + instantiate (1:=to). econs; ss. refl. *)
+  (*     + eauto. *)
   Qed.
 
   Lemma write_lower_map mem0 fmem0 prom0 fprom0 loc from ffrom to fto val released freleased' freleased msg mem1 prom1
         (MLE: Memory.le fprom0 fmem0)
-        (LOWER: Memory.write prom0 mem0 loc from to val released prom1 mem1 (Memory.op_kind_lower msg))
+        (LOWER: AMemory.write prom0 mem0 loc from to val released prom1 mem1 (Memory.op_kind_lower msg))
         (MEM: memory_map mem0 fmem0)
         (PROM: promises_map prom0 fprom0)
         (FROM: f loc from ffrom)
@@ -1521,7 +1526,7 @@ Section MAPPED.
         (<<MSG: msg_map msg fmsg>>) /\
         (<<MEM: memory_map mem1 fmem1>>) /\
         (<<PROM: promises_map prom1 fprom1>>) /\
-        (<<LOWER: Memory.write fprom0 fmem0 loc ffrom fto val freleased fprom1 fmem1 (Memory.op_kind_lower fmsg)>>).
+        (<<LOWER: AMemory.write fprom0 fmem0 loc ffrom fto val freleased fprom1 fmem1 (Memory.op_kind_lower fmsg)>>).
   Proof.
     inv LOWER. inv PROMISE.
     dup PROMISES. eapply Memory.lower_get0 in PROMISES0. des. clarify.
@@ -1673,7 +1678,7 @@ Section MAPPED.
 
   Lemma write_split_map mem0 fmem0 prom0 fprom0 loc from ffrom to fto val released freleased' freleased msg mem1 prom1 ts3
         (MLE: Memory.le fprom0 fmem0)
-        (SPLIT: Memory.write prom0 mem0 loc from to val released prom1 mem1 (Memory.op_kind_split ts3 msg))
+        (SPLIT: AMemory.write prom0 mem0 loc from to val released prom1 mem1 (Memory.op_kind_split ts3 msg))
         (MEM: memory_map mem0 fmem0)
         (PROM: promises_map prom0 fprom0)
         (FROM: f loc from ffrom)
@@ -1688,7 +1693,7 @@ Section MAPPED.
         (<<SPLIT: memory_map mem1 fmem1>>) /\
         (<<TS3: f loc ts3 fts3>>) /\
         (<<PROM: promises_map prom1 fprom1>>) /\
-        (<<LOWER: Memory.write fprom0 fmem0 loc ffrom fto val freleased fprom1 fmem1 (Memory.op_kind_split fts3 fmsg)>>).
+        (<<LOWER: AMemory.write fprom0 fmem0 loc ffrom fto val freleased fprom1 fmem1 (Memory.op_kind_split fts3 fmsg)>>).
   Proof.
     inv SPLIT. inv PROMISE.
     dup PROMISES. eapply Memory.split_get0 in PROMISES0. des. clarify.
@@ -1733,7 +1738,7 @@ Section MAPPED.
 
   Lemma promise_add_map mem0 fmem0 prom0 fprom0 loc from ffrom to fto msg fmsg mem1 prom1
         (MLE: Memory.le fprom0 fmem0)
-        (ADD: Memory.promise prom0 mem0 loc from to msg prom1 mem1 Memory.op_kind_add)
+        (ADD: AMemory.promise prom0 mem0 loc from to msg prom1 mem1 Memory.op_kind_add)
         (MEM: memory_map mem0 fmem0)
         (PROM: promises_map prom0 fprom0)
         (UNWRITABLE: collapsable_unwritable prom0 mem0)
@@ -1745,7 +1750,7 @@ Section MAPPED.
       exists fprom1 fmem1,
         (<<MEM: memory_map mem1 fmem1>>) /\
         (<<PROM: promises_map prom1 fprom1>>) /\
-        (<<ADD: Memory.promise fprom0 fmem0 loc ffrom fto fmsg fprom1 fmem1 Memory.op_kind_add>>).
+        (<<ADD: AMemory.promise fprom0 fmem0 loc ffrom fto fmsg fprom1 fmem1 Memory.op_kind_add>>).
   Proof.
     inv ADD.
     exploit add_memory_map; try apply MEM0; try eassumption.
@@ -1766,21 +1771,21 @@ Section MAPPED.
       inv MSG. inv MSGLE.
       hexploit (map_eq TO0 FROM). i. clarify.
       esplits; eauto.
-    - i. clarify. inv MSG.
-      assert (TS0: Time.lt Time.bot fto).
-      { inv ADD. inv ADD1. eapply TimeFacts.le_lt_lt; eauto.
-        eapply Time.bot_spec. }
-      exploit no_attatch_map; try apply MEM; eauto.
-      ii. inv H. eapply add_succeed_wf in MEM0. des.
-      eapply DISJOINT.
-      + eapply GET0.
-      + instantiate (1:=to). econs; ss. refl.
-      + eauto.
+    (* - i. clarify. inv MSG. *)
+    (*   assert (TS0: Time.lt Time.bot fto). *)
+    (*   { inv ADD. inv ADD1. eapply TimeFacts.le_lt_lt; eauto. *)
+    (*     eapply Time.bot_spec. } *)
+    (*   exploit no_attatch_map; try apply MEM; eauto. *)
+    (*   ii. inv H. eapply add_succeed_wf in MEM0. des. *)
+    (*   eapply DISJOINT. *)
+    (*   + eapply GET0. *)
+    (*   + instantiate (1:=to). econs; ss. refl. *)
+    (*   + eauto. *)
   Qed.
 
   Lemma promise_lower_map mem0 fmem0 prom0 fprom0 loc from ffrom to fto msg fmsg mem1 prom1 msg0
         (MLE: Memory.le fprom0 fmem0)
-        (LOWER: Memory.promise prom0 mem0 loc from to msg prom1 mem1 (Memory.op_kind_lower msg0))
+        (LOWER: AMemory.promise prom0 mem0 loc from to msg prom1 mem1 (Memory.op_kind_lower msg0))
         (MEM: memory_map mem0 fmem0)
         (PROM: promises_map prom0 fprom0)
         (FROM: f loc from ffrom)
@@ -1792,7 +1797,7 @@ Section MAPPED.
         (<<MEM: memory_map mem1 fmem1>>) /\
         (<<MSG: msg_map msg0 fmsg0>>) /\
         (<<PROM: promises_map prom1 fprom1>>) /\
-        (<<LOWER: Memory.promise fprom0 fmem0 loc ffrom fto fmsg fprom1 fmem1 (Memory.op_kind_lower fmsg0)>>).
+        (<<LOWER: AMemory.promise fprom0 fmem0 loc ffrom fto fmsg fprom1 fmem1 (Memory.op_kind_lower fmsg0)>>).
   Proof.
     inv LOWER.
     exploit lower_promises_map; try apply PROMISES; try eassumption.
@@ -1811,7 +1816,7 @@ Section MAPPED.
 
   Lemma promise_split_map mem0 fmem0 prom0 fprom0 loc from ffrom to fto msg fmsg mem1 prom1 ts3 msg0
         (MLE: Memory.le fprom0 fmem0)
-        (SPLIT: Memory.promise prom0 mem0 loc from to msg prom1 mem1 (Memory.op_kind_split ts3 msg0))
+        (SPLIT: AMemory.promise prom0 mem0 loc from to msg prom1 mem1 (Memory.op_kind_split ts3 msg0))
         (MEM: memory_map mem0 fmem0)
         (PROM: promises_map prom0 fprom0)
         (FROM: f loc from ffrom)
@@ -1824,7 +1829,7 @@ Section MAPPED.
         (<<TS3: f loc ts3 fts3>>) /\
         (<<MSG: msg_map msg0 fmsg0>>) /\
         (<<PROM: promises_map prom1 fprom1>>) /\
-        (<<SPLIT: Memory.promise fprom0 fmem0 loc ffrom fto fmsg fprom1 fmem1 (Memory.op_kind_split fts3 fmsg0)>>).
+        (<<SPLIT: AMemory.promise fprom0 fmem0 loc ffrom fto fmsg fprom1 fmem1 (Memory.op_kind_split fts3 fmsg0)>>).
   Proof.
     inv SPLIT.
     exploit split_promises_map; try apply PROMISES; try eassumption.
@@ -1843,7 +1848,7 @@ Section MAPPED.
 
   Lemma promise_cancel_map mem0 fmem0 prom0 fprom0 loc from ffrom to fto msg fmsg mem1 prom1
         (MLE: Memory.le fprom0 fmem0)
-        (CANCEL: Memory.promise prom0 mem0 loc from to msg prom1 mem1 Memory.op_kind_cancel)
+        (CANCEL: AMemory.promise prom0 mem0 loc from to msg prom1 mem1 Memory.op_kind_cancel)
         (MEM: memory_map mem0 fmem0)
         (PROM: promises_map prom0 fprom0)
         (FROM: f loc from ffrom)
@@ -1854,7 +1859,7 @@ Section MAPPED.
       exists fprom1 fmem1,
         (<<MEM: memory_map mem1 fmem1>>) /\
         (<<PROM: promises_map prom1 fprom1>>) /\
-        (<<CANCEL: Memory.promise fprom0 fmem0 loc ffrom fto fmsg fprom1 fmem1 Memory.op_kind_cancel>>).
+        (<<CANCEL: AMemory.promise fprom0 fmem0 loc ffrom fto fmsg fprom1 fmem1 Memory.op_kind_cancel>>).
   Proof.
     inv CANCEL.
     exploit remove_promises_map; try apply PROMISES; try eassumption.
@@ -1869,7 +1874,7 @@ Section MAPPED.
 
   Lemma promise_map mem0 fmem0 prom0 fprom0 loc from ffrom to fto msg fmsg mem1 prom1 kind
         (MLE: Memory.le fprom0 fmem0)
-        (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
+        (PROMISE: AMemory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
         (MEM: memory_map mem0 fmem0)
         (PROM: promises_map prom0 fprom0)
         (UNWRITABLE: collapsable_unwritable prom0 mem0)
@@ -1882,7 +1887,7 @@ Section MAPPED.
         (<<MEM: memory_map mem1 fmem1>>) /\
         (<<KIND: memory_op_kind_map loc kind fkind>>) /\
         (<<PROM: promises_map prom1 fprom1>>) /\
-        (<<PROMISE: Memory.promise fprom0 fmem0 loc ffrom fto fmsg fprom1 fmem1 fkind>>).
+        (<<PROMISE: AMemory.promise fprom0 fmem0 loc ffrom fto fmsg fprom1 fmem1 fkind>>).
   Proof.
     inv PROMISE.
     - exploit promise_add_map; try apply PROM; eauto. i. des.
@@ -1898,7 +1903,7 @@ Section MAPPED.
   Lemma write_map mem0 fmem0 prom0 fprom0 loc from ffrom to fto mem1 prom1 kind
         val released freleased' freleased
         (MLE: Memory.le fprom0 fmem0)
-        (WRITE: Memory.write prom0 mem0 loc from to val released prom1 mem1 kind)
+        (WRITE: AMemory.write prom0 mem0 loc from to val released prom1 mem1 kind)
         (MEM: memory_map mem0 fmem0)
         (PROM: promises_map prom0 fprom0)
         (UNWRITABLE: collapsable_unwritable prom0 mem0)
@@ -1913,7 +1918,7 @@ Section MAPPED.
         (<<MEM: memory_map mem1 fmem1>>) /\
         (<<KIND: memory_op_kind_map loc kind fkind>>) /\
         (<<PROM: promises_map prom1 fprom1>>) /\
-        (<<WRITE: Memory.write fprom0 fmem0 loc ffrom fto val freleased fprom1 fmem1 fkind>>).
+        (<<WRITE: AMemory.write fprom0 fmem0 loc ffrom fto val freleased fprom1 fmem1 fkind>>).
   Proof.
     destruct kind.
     - exploit write_add_map; try apply WRITE; eauto. i. des.
@@ -1999,10 +2004,10 @@ Section MAPPED.
         (NCLPS: non_collapsable loc to)
         (SC: timemap_map sc0 fsc0')
         (SCLE: TimeMap.le fsc0 fsc0')
-        (WRITE: Local.write_step lc0 sc0 mem0 loc from to val releasedr releasedw ord lc1 sc1 mem1 kind)
+        (WRITE: ALocal.write_step lc0 sc0 mem0 loc from to val releasedr releasedw ord lc1 sc1 mem1 kind)
     :
       exists flc1 fmem1 fsc1' fsc1 freleasedw' freleasedw fkind,
-        (<<WRITE: Local.write_step flc0 fsc0 fmem0 loc ffrom fto val freleasedr freleasedw ord flc1 fsc1 fmem1 fkind>>) /\
+        (<<WRITE: ALocal.write_step flc0 fsc0 fmem0 loc ffrom fto val freleasedr freleasedw ord flc1 fsc1 fmem1 fkind>>) /\
         (<<RELEASEDW: opt_view_map releasedw freleasedw'>>) /\
         (<<RELEASEDWLE: View.opt_le freleasedw freleasedw'>>) /\
         (<<LOCAL: local_map lc1 flc1>>) /\
@@ -2241,7 +2246,7 @@ Section MAPPED.
     :
       exists flc1 fmem1 fsc1 fsc1' fe,
         (<<EVT: tevent_map fe e>>) /\
-        (<<STEP: Thread.step_allpf
+        (<<STEP: AThread.step_allpf
                    fe fth0
                    (Thread.mk lang st1 flc1 fsc1 fmem1)>>) /\
         (<<SC: timemap_map sc1 fsc1'>>) /\
@@ -2262,7 +2267,7 @@ Section MAPPED.
     - inv STEP0. ss. inv LOCAL. inv LOCAL0. inv LCWF1. des.
       exploit mappable_memory_closed_msg_exists; eauto.
       { eapply mappable_memory_op.
-        - eapply Memory.promise_op; eauto.
+        - eapply AMemory.promise_op; eauto.
         - eauto.
         - eauto.
         - eapply memory_map_mappable; eauto. }
@@ -2368,9 +2373,9 @@ Section MAPPED.
     - inv H. destruct y. exploit step_map; try apply TSTEP; ss; eauto.
       i. des.
       dup TSTEP. inv TSTEP0. inv STEP1.
-      exploit Thread.step_future; try apply STEP2; ss. i. des.
+      exploit AThread.step_future; try apply STEP2; ss. i. des.
       dup STEP0. inv STEP1.
-      exploit Thread.step_future; try apply STEP3; ss. i. des.
+      exploit AThread.step_future; try apply STEP3; ss. i. des.
       exploit IHSTEP; try apply MEM0; eauto.
       { eapply collapsable_unwritable_step in STEP2; eauto. }
       i. des.
@@ -2421,9 +2426,9 @@ Section MAPPED.
       { eauto. }
       i. des.
       dup HD. inv HD.
-      exploit Thread.step_future; try apply STEP0; ss. i. des.
+      exploit AThread.step_future; try apply STEP0; ss. i. des.
       dup STEP. inv STEP1.
-      exploit Thread.step_future; try apply STEP2; ss. i. des.
+      exploit AThread.step_future; try apply STEP2; ss. i. des.
       exploit IHSTEPS; try apply STEPS; eauto.
       { eapply collapsable_unwritable_step in STEP0; eauto. }
       i. des. esplits; eauto.

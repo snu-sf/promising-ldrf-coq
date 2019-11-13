@@ -19,7 +19,7 @@ Require Import Local.
 Require Import Thread.
 Require Import Configuration.
 Require Import Progress.
-Require Import PromiseConsistent.
+Require Import APromiseConsistent.
 From PromisingLib Require Import Loc.
 
 Require Import PF.
@@ -31,15 +31,19 @@ Require Import Program.
 Require Import Cell.
 Require Import Time.
 Require Import Pred.
-Require Import PredStep.
 Require Import ReorderPromises2.
 
-Require Import DRF_PF0.
-Require Import DRF_PF1.
-Require Import DRF_PF3.
-Require Import Mapping.
+Require Import APredStep.
+Require Import ALocal.
+Require Import AThread.
+Require Import AMemory.
 
-Require Import PFConsistent.
+Require Import ADRF_PF0.
+Require Import ADRF_PF1.
+Require Import ADRF_PF3.
+Require Import AMapping.
+
+(* Require Import PFConsistent. *)
 
 Set Implicit Arguments.
 
@@ -1165,9 +1169,9 @@ Proof.
   { instantiate (1:=is_cancel). ii. inv REL; ss. inv KIND; ss. }
   i. des.
 
-  exploit Thread.rtc_tau_step_future.
+  exploit AThread.rtc_tau_step_future.
   { eapply thread_steps_pred_steps. eapply STEPS0. } all: eauto. i. des. ss.
-  exploit Thread.rtc_tau_step_future.
+  exploit AThread.rtc_tau_step_future.
   { eapply thread_steps_pred_steps. eapply STEP. } all: eauto. i. des. ss.
 
   destruct e2.
@@ -1379,12 +1383,12 @@ Lemma no_update_on_step2
       L lang e_tgt (th_src th_tgt th_tgt': Thread.t lang)
       (LCWF: Memory.le th_src.(Thread.local).(Local.promises) th_src.(Thread.memory))
       (PRED: (no_update_on L /1\ promise_free) e_tgt)
-      (STEPS: Thread.step_allpf e_tgt th_tgt th_tgt')
+      (STEPS: AThread.step_allpf e_tgt th_tgt th_tgt')
       (SHORTER: shorter_thread th_src th_tgt)
       (NOATTATCH: not_attatched L th_src.(Thread.memory))
   :
     exists e_src th_src',
-      (<<STEPS: Thread.step_allpf e_src th_src th_src'>>) /\
+      (<<STEPS: AThread.step_allpf e_src th_src th_src'>>) /\
       (<<SHORTER: shorter_thread th_src' th_tgt'>>) /\
       (<<EVENT: shorter_event e_src e_tgt>>) /\
       (<<NOATTATCH: not_attatched L th_src'.(Thread.memory)>>).

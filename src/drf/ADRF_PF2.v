@@ -19,7 +19,7 @@ Require Import Local.
 Require Import Thread.
 Require Import Configuration.
 Require Import Progress.
-Require Import PromiseConsistent.
+Require Import APromiseConsistent.
 From PromisingLib Require Import Loc.
 
 Require Import PF.
@@ -30,11 +30,14 @@ Require Import yjtac.
 Require Import Program.
 Require Import Cell.
 Require Import Time.
-Require Import Pred.
-Require Import PredStep.
 
-Require Import DRF_PF0.
-Require Import DRF_PF1.
+Require Import Pred.
+Require Import AMemory.
+Require Import ALocal.
+Require Import AThread.
+Require Import APredStep.
+Require Import ADRF_PF0.
+Require Import ADRF_PF1.
 
 Set Implicit Arguments.
 
@@ -219,7 +222,7 @@ Proof.
     dup TSTEP. inv TSTEP. inv STEP0.
 
     inv THWF.
-    exploit Thread.step_future; eauto.
+    exploit AThread.step_future; eauto.
     ss. i. des.
 
     hexploit rtc_tau_step_promise_consistent.
@@ -439,7 +442,7 @@ Proof.
   exploit Thread.rtc_tau_step_future; eauto; ss.
   { inv WF. eauto. }
   i. des.
-  exploit Thread.step_future; eauto.
+  exploit AThread.step_future; eauto.
   i. des. ss.
 
   assert (CONSISTENT1: Local.promise_consistent lc3).
@@ -1583,13 +1586,13 @@ Qed.
 (*       (<<STEP: opt (pred_step P lang) e th_src th_src'>>) *)
 
 
-(*       Thread.step Thread.t st lc sc mem1  *)
+(*       AThread.step Thread.t st lc sc mem1  *)
 
 (*       Thread.t *)
-(*       Thread.step *)
+(*       AThread.step *)
 (* Configuration.step *)
 
-(* opt (Thread.step *)
+(* opt (AThread.step *)
 
 
 (* Lemma sim_pf_sim_whole: *)

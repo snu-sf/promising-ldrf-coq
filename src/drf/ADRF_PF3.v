@@ -19,7 +19,7 @@ Require Import Local.
 Require Import Thread.
 Require Import Configuration.
 Require Import Progress.
-Require Import PromiseConsistent.
+Require Import APromiseConsistent.
 From PromisingLib Require Import Loc.
 
 Require Import PF.
@@ -30,12 +30,19 @@ Require Import yjtac.
 Require Import Program.
 Require Import Cell.
 Require Import Time.
-Require Import Pred.
-Require Import PredStep.
+(* Require Import PredStep. *)
 Require Import ReorderPromises2.
 
-Require Import DRF_PF0.
-Require Import DRF_PF1.
+Require Import Pred.
+Require Import PredStep.
+Require Import AMemory.
+Require Import ALocal.
+Require Import AThread.
+Require Import APredStep.
+Require Import AProp.
+
+Require Import ADRF_PF0.
+Require Import ADRF_PF1.
 
 Require Import PFConsistent.
 
@@ -51,7 +58,7 @@ Section CANCEL.
       (FINITE: Memory.finite proms)
   .
 
-  Lemma reserves_cancelable lang st vw proms0 sc mem0
+  Lemma areserves_cancelable lang st vw proms0 sc mem0
         (FINITE: Memory.finite proms0)
         (MLE: Memory.le proms0 mem0)
     :
@@ -111,8 +118,68 @@ Section CANCEL.
         { eauto. }
   Qed.
 
+  Lemma reserves_cancelable lang st vw proms0 sc mem0
+        (FINITE: Memory.finite proms0)
+        (MLE: Memory.le proms0 mem0)
+    :
+      exists proms1 mem1,
+        (<<STEPS: rtc (tau (@PredStep.pred_step is_cancel lang))
+                      (Thread.mk lang st (Local.mk vw proms0) sc mem0)
+                      (Thread.mk lang st (Local.mk vw proms1) sc mem1)>>) /\
+        (<<NORESERVES: no_reserves proms1>>).
+  Proof.
+    assert (exists dom,
+               (<<COMPLETE: forall loc to,
+                   (exists from, (<<GET: Memory.get loc to proms0 = Some (from, Message.reserve)>>))
+                   <-> (<<IN: List.In (loc, to) dom>>)>>)).
+    { unfold Memory.finite in *. des.
+      generalize (list_filter_exists (fun locto =>
+                                        match locto with
+                                        | (loc, to) =>
+                                          exists from, Memory.get loc to proms0 = Some (from, Message.reserve)
+                                        end) dom).
+      i. des. exists l'. split; i.
+      - eapply COMPLETE. des. esplits; eauto.
+      - eapply COMPLETE in H. des. esplits; eauto. }
+    des. ginduction dom; ss; i.
+    - exists proms0, mem0. esplits; eauto.
+      ii. clarify. eapply COMPLETE. eauto.
+    - destruct a as [loc to].
+      exploit (proj2 (COMPLETE loc to)); eauto. i. des.
+      destruct (classic (List.In (loc, to) dom)).
+      { exploit IHdom; eauto. i. split; i.
+        - des. exploit (proj1 (COMPLETE loc0 to0)); eauto.
+          i. des; clarify.
+        - exploit (proj2 (COMPLETE loc0 to0)); eauto. }
+      exploit Memory.remove_exists; eauto.
+      intros [prom1 REMOVE0].
+      exploit Memory.remove_exists.
+      { eapply MLE. eapply GET. }
+      intros [mem1 REMOVE1]. hexploit IHdom.
+      * instantiate (1:=prom1).
+        eapply Memory.remove_finite; eauto.
+      * instantiate (1:=mem1).
+        ii. erewrite Memory.remove_o in LHS; eauto. des_ifs.
+        eapply MLE in LHS. erewrite Memory.remove_o; eauto. des_ifs.
+        ss. des; clarify.
+      * i. split; i.
+        { des. erewrite Memory.remove_o in GET0; eauto. des_ifs.
+          exploit (proj1 (COMPLETE loc0 to0)); eauto. i. des; clarify. }
+        { exploit (proj2 (COMPLETE loc0 to0)); eauto. i. des; clarify.
+          exists from0. erewrite Memory.remove_o; eauto. des_ifs.
+          ss. des; clarify. }
+      * i. des. exists proms1, mem2. split; eauto.
+        econs 2.
+        { econs.
+          - instantiate (2:=ThreadEvent.promise loc from to Message.reserve Memory.op_kind_cancel).
+            econs; ss. econs. econs 1. econs; ss.
+            econs; ss. econs; eauto.
+          - eauto. }
+        { eauto. }
+  Qed.
+
   Lemma promise_not_cacncel_reserves_same prom0 mem0 loc from to msg prom1 mem1 kind
-        (PROM: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
+        (PROM: AMemory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
         (NOTCANCEL: kind <> Memory.op_kind_cancel)
         loc0 to0 from0
         (GET: Memory.get loc0 to0 prom0 = Some (from0, Message.reserve))
@@ -271,6 +338,31 @@ Section CANCEL.
     - refl.
     - etrans; eauto. inv H.
       eapply cancel_promises_decrease; eauto.
+  Qed.
+
+  Lemma nacancel_promises_decrease P lang e th0 th1
+        (STEP: (@PredStep.pred_step P lang) e th0 th1)
+        (PRED: P <1= is_cancel)
+    :
+      Memory.le th1.(Thread.local).(Local.promises) th0.(Thread.local).(Local.promises).
+  Proof.
+    inv STEP. eapply PRED in SAT. unfold is_cancel in SAT. des_ifs.
+    inv STEP0. inv STEP; inv STEP0; ss.
+    - inv LOCAL. inv PROMISE; ss.
+      ii. erewrite Memory.remove_o in LHS; eauto. des_ifs.
+    - inv LOCAL.
+  Qed.
+
+  Lemma nacancels_promises_decrease P lang th0 th1
+        (STEP: rtc (tau (@PredStep.pred_step P lang)) th0 th1)
+        (PRED: P <1= is_cancel)
+    :
+      Memory.le th1.(Thread.local).(Local.promises) th0.(Thread.local).(Local.promises).
+  Proof.
+    ginduction STEP.
+    - refl.
+    - etrans; eauto. inv H.
+      eapply nacancel_promises_decrease; eauto.
   Qed.
 
   Lemma cancel_remove_only P lang e th0 th1
@@ -443,34 +535,34 @@ Section PROMISEFREE.
         eapply Memory.remove_get0 in PROMISES. des.
         erewrite Memory.bot_get in *. clarify.
     - inv STEP0. inv LOCAL.
-      + ss. esplits; eauto. econs; eauto. econs; eauto.
+      + ss. esplits; eauto. econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
       + ss. esplits; eauto.
-        * econs; eauto. econs; eauto.
+        * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
         * inv LOCAL0. ss.
       + ss. esplits; eauto.
-        * econs; eauto. econs; eauto.
+        * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
         * inv LOCAL0. rewrite NOPROMISE in *.
           exploit memory_write_bot_add; eauto. i. clarify.
           inv WRITE. inv PROMISE. ss.
           symmetry. eapply MemoryMerge.MemoryMerge.add_remove; eauto.
       + ss. esplits; eauto.
-        * econs; eauto. econs; eauto.
+        * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
         * inv LOCAL1. inv LOCAL2. rewrite NOPROMISE in *.
           exploit memory_write_bot_add; eauto. i. clarify.
           inv WRITE. inv PROMISE. ss.
           symmetry. eapply MemoryMerge.MemoryMerge.add_remove; eauto.
       + ss. esplits; eauto.
-        * econs; eauto. econs; eauto.
+        * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
         * inv LOCAL0. ss.
       + ss. esplits; eauto.
-        * econs; eauto. econs; eauto.
+        * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
         * inv LOCAL0. ss.
       + ss. esplits; eauto.
-        * econs; eauto. econs; eauto.
+        * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
   Qed.
 
   Lemma write_promises_decrease prom0 mem0 loc from to val realeased prom1 mem1 kind
-        (WRITE: Memory.write prom0 mem0 loc from to val realeased prom1 mem1 kind)
+        (WRITE: AMemory.write prom0 mem0 loc from to val realeased prom1 mem1 kind)
     :
       concrete_promised prom1 <2= concrete_promised prom0.
   Proof.
@@ -546,6 +638,25 @@ Section PFCONSISTENT.
         (__guard__((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
                    (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>))).
 
+  Lemma step_promise_consistent
+        lang pf e th1 th2
+        (STEP: @AThread.step lang pf e th1 th2)
+        (CONS: Local.promise_consistent th2.(Thread.local))
+        (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
+        (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory))
+        (MEM1: Memory.closed th1.(Thread.memory)):
+    Local.promise_consistent th1.(Thread.local).
+  Proof.
+    inv STEP; [inv STEP0|inv STEP0; inv LOCAL]; ss.
+    - eapply promise_step_promise_consistent; eauto.
+    - eapply read_step_promise_consistent; eauto.
+    - eapply write_step_promise_consistent; eauto.
+    - eapply read_step_promise_consistent; eauto.
+      eapply write_step_promise_consistent; eauto.
+    - eapply fence_step_promise_consistent; eauto.
+    - eapply fence_step_promise_consistent; eauto.
+  Qed.
+
   Lemma pf_consistent_pf_consistent_strong lang (th: Thread.t lang)
         (WF: Local.wf th.(Thread.local) th.(Thread.memory))
         (MEM: Memory.closed th.(Thread.memory))
@@ -590,19 +701,22 @@ Section PFCONSISTENT.
           * left. inv FAILURE; inv STEP. inv LOCAL. inv LOCAL0.
             exists (Thread.mk _ st2 (Local.mk tview proms1) sc2 mem0).
             ss. econs 2. econs; eauto. econs; eauto. econs; eauto.
-            eapply cancels_promises_decrease in STEPS0; auto. ss.
+            eapply nacancels_promises_decrease in STEPS0; auto. ss.
             ii. eapply CONSISTENT0; eauto.
       - unguard. esplits; eauto. rewrite PROMISES. ii.
         rewrite Memory.bot_get in GET. clarify. }
 
     clear x. des.
-    eapply pf_step_promise_free_step_rtc in STEPS.
+    eapply PredStep.pf_step_promise_free_step_rtc in STEPS.
     eapply pf_steps_cancels_not_cancels in STEPS; cycle 1.
     { ss. eapply Local.cap_wf; eauto. }
     { ss. eapply Memory.cap_closed; eauto. }
     { ss. eapply Memory.max_full_timemap_closed; eauto. } des.
 
-    exploit Thread.rtc_tau_step_future.
+    eapply pred_steps_apred_steps in STEPS1.
+    eapply pred_steps_apred_steps in STEPS2.
+
+    exploit AThread.rtc_tau_step_future.
     { eapply thread_steps_pred_steps. eapply STEPS1. }
     { ss. eapply Local.cap_wf; eauto. }
     { ss. eapply Memory.max_full_timemap_closed; eauto. }
@@ -633,13 +747,13 @@ Section PFCONSISTENT.
         * left. ss. inv FAILURE; inv STEP1. inv LOCAL. eauto.
         * right. esplits; eauto.
 
-    - exploit Thread.rtc_tau_step_future.
+    - exploit AThread.rtc_tau_step_future.
       { eapply thread_steps_pred_steps. eapply STEPS0. }
       { ss. }
       { ss. }
       { ss. } i. des.
       inv STEP0.
-      exploit Thread.step_future; eauto. i. des.
+      exploit AThread.step_future; eauto. i. des.
 
       assert (PROMS: Local.promise_consistent e3.(Thread.local)).
       { eapply rtc_tau_step_promise_consistent.

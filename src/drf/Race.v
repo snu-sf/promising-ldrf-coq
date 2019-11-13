@@ -19,8 +19,6 @@ Require Import Thread.
 Require Import Configuration.
 Require Import Progress.
 
-Require Import PF.
-
 Set Implicit Arguments.
 
 
@@ -48,33 +46,6 @@ Hint Constructors pf_race_condition.
 Definition can_step lang (st : Language.state lang) (e : ProgramEvent.t) : Prop :=
   exists st', Language.step _ e st st'.
 
-Inductive pf_race (c:Configuration.t): Prop :=
-| race_intro
-    tid1 e1 lang1 st1 lc1
-    tid2 e2 lang2 st2 lc2
-    (TID1: IdentMap.find tid1 c.(Configuration.threads) = Some (existT _ lang1 st1, lc1))
-    (TID2: IdentMap.find tid2 c.(Configuration.threads) = Some (existT _ lang2 st2, lc2))
-    (TIDDIFF: tid1 <> tid2)
-    (PROEVT1: can_step _ st1 e1)
-    (PROEVT2: can_step _ st2 e2)
-    (RACE: pf_race_condition e1 e2)
-.
-Hint Constructors pf_race.
-
-Definition pf_racefree (c1:Configuration.t): Prop :=
-  forall c2
-         (STEPS: rtc pftstep_all c1 c2)
-         (RACE: pf_race c2), False.
-
-Lemma pf_racefree_step c1 c2
-      (RACEFREE : pf_racefree c1)
-      (STEP : rtc pftstep_all c1 c2) :
-  pf_racefree c2.
-Proof.
-  intros c3 STEPS RACE.
-  apply (RACEFREE c3); auto. etrans; eauto.
-Qed.
-
 Definition is_reading lang (st : Language.state lang) l o :=
   exists e v o', can_step _ st e /\
                  Ordering.le o' o /\
@@ -92,3 +63,16 @@ Definition is_updating lang (st : Language.state lang) l o :=
 
 Definition is_aborting lang (st : Language.state lang) :=
   can_step _ st ProgramEvent.failure.
+
+Inductive pf_race (c:Configuration.t): Prop :=
+| race_intro
+    tid1 e1 lang1 st1 lc1
+    tid2 e2 lang2 st2 lc2
+    (TID1: IdentMap.find tid1 c.(Configuration.threads) = Some (existT _ lang1 st1, lc1))
+    (TID2: IdentMap.find tid2 c.(Configuration.threads) = Some (existT _ lang2 st2, lc2))
+    (TIDDIFF: tid1 <> tid2)
+    (PROEVT1: can_step _ st1 e1)
+    (PROEVT2: can_step _ st2 e2)
+    (RACE: pf_race_condition e1 e2)
+.
+Hint Constructors pf_race.

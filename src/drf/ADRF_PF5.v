@@ -19,7 +19,7 @@ Require Import Local.
 Require Import Thread.
 Require Import Configuration.
 Require Import Progress.
-Require Import PromiseConsistent.
+Require Import APromiseConsistent.
 From PromisingLib Require Import Loc.
 
 Require Import PF.
@@ -30,10 +30,10 @@ Require Import yjtac.
 Require Import Program.
 Require Import Cell.
 Require Import Time.
-Require Import Pred.
 Require Import PredStep.
 Require Import ReorderPromises2.
 
+Require Import Pred.
 Require Import DRF_PF0.
 Require Import DRF_PF1.
 Require Import DRF_PF3.
