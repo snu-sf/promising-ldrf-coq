@@ -1915,7 +1915,7 @@ Definition pf_consistent_drf'' lang (e0:Thread.t lang): Prop :=
       (<<TRACE: List.Forall (fun em => <<EVENT: (promise_free /1\ (fun e => ~ is_cancel e) /1\ no_sc
 
                                                               /1\
-                                                              (write_in (later_times max' \2/ concrete_covered e0.(Thread.local).(Local.promises) e0.(Thread.memory)))
+                                                              (write_in (later_times max' \2/ (concrete_covered e0.(Thread.local).(Local.promises) e0.(Thread.memory) /2\ earlier_times max)))
 
                                                 ) (fst em)>> /\ <<MEMORY: not_attatched (fun loc to => (<<MAX: Memory.max_full_ts e0.(Thread.memory) loc to>>) /\
                                                                                                                                                            (<<NUPDATES: ~ List.In loc (U ++ AU)>>)) (snd em)>>) tr>>) /\
@@ -2098,7 +2098,7 @@ Proof.
   - eapply not_attatched_mon; eauto.
   - eapply list_Forall_sum.
     + eapply MEMORY.
-    + instantiate (1:=fun em => (write_in (later_times max' \2/ concrete_covered (Local.promises (Thread.local th)) (Thread.memory th)) /1\ (promise_free /1\ (fun e => ~ is_cancel e) /1\ no_sc)) (fst em)).
+    + instantiate (1:=fun em => (write_in (later_times max' \2/ (concrete_covered (Local.promises (Thread.local th)) (Thread.memory th) /2\ earlier_times max)) /1\ (promise_free /1\ (fun e => ~ is_cancel e) /1\ no_sc)) (fst em)).
       eapply List.Forall_forall. i. ss. dup H.
       eapply list_Forall2_in in H; eauto. des.
       eapply List.Forall_forall in IN; eauto. destruct a, x. ss. des.
@@ -2119,9 +2119,12 @@ Proof.
         { inv WF. auto. }
         { ii. eapply thread_steps_pred_steps in STEPS0.
           eapply rtc_unwritable_increase in STEPS0; eauto. }
-        i. des; auto.
-        destruct (Time.le_lt_dec to (max' loc)).
-        { exfalso. eapply NSAT0. esplits; eauto. econs; eauto. }
+        i. destruct (Time.le_lt_dec to (max' loc)).
+        { des; auto.
+          - left. right. split; auto.
+            destruct (Time.le_lt_dec to (max loc)); auto.
+            exfalso. eapply NSAT0. esplits; eauto. econs; eauto.
+          - left. left. exfalso. eapply NSAT0. esplits; eauto. econs; eauto. }
         { left. left. auto. }
       * inv EVENT; split; ss.
     + i. ss. des. splits; auto.
@@ -2412,7 +2415,7 @@ Definition pf_consistent_drf lang (e0:Thread.t lang): Prop :=
                                   e2.(Thread.memory)>>) /\
       (<<TRACE: List.Forall (fun em => <<EVENT: (promise_free /1\ (fun e => ~ is_cancel e) /1\ no_sc
                                                               /1\
-                                                              (write_in (later_times max' \2/ concrete_covered e0.(Thread.local).(Local.promises) e0.(Thread.memory)))
+                                                              (write_in (later_times max' \2/ (concrete_covered e0.(Thread.local).(Local.promises) e0.(Thread.memory) /2\ earlier_times max)))
                                                 ) (fst em)>> /\ <<MEMORY: not_attatched (fun loc to => (<<MAX: Memory.max_full_ts e0.(Thread.memory) loc to>>) /\
                                                                                                                                                            (<<NUPDATES: ~ List.In loc (U ++ AU)>>)) (snd em)>>) tr>>) /\
       (<<COMPLETEU:

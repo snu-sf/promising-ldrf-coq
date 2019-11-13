@@ -1210,53 +1210,6 @@ End FORGET.
 
 
 
-Module Inv.
-
-  Record t mem lang (st: Language.state lang) lc
-         (proms: Memory.t)
-         (spaces : Loc.t -> Time.t -> Prop)
-         (aupdates : Loc.t -> Time.t -> Prop)
-         (updates : Loc.t -> Time.t -> Prop)
-         (mlast: Memory.t): Prop :=
-    {
-      SPACES: forall loc ts (IN: spaces loc ts), concrete_covered proms mem loc ts;
-      AUPDATES: forall loc ts (IN: aupdates loc ts),
-          exists to,
-            (<<GET: Memory.get loc ts proms = Some (ts, to)>>);
-      PROMS: forall
-          loc to m sc (PROM : concrete_promised proms loc to)
-          (FUTURE: unchanged_on spaces mlast m)
-          (UNCHANGED: not_attatched (updates \2/ aupdates) m),
-          exists st' lc' sc' m',
-            (<<STEPS : rtc (tau (@AThread.program_step _))
-                           (Thread.mk _ st lc sc m)
-                           (Thread.mk _ st' lc' sc' m')>>) /\
-            ((<<WRITING : is_writing _ st' loc Ordering.relaxed>>) \/
-             (<<ABORTING : is_aborting _ st'>>));
-      UPDATE : forall
-          loc to m sc (UPD : updates loc to)
-          (FUTURE: unchanged_on spaces mlast m)
-          (UNCHANGED: not_attatched (updates \2/ aupdates) m),
-          exists st' lc' sc' m',
-            (<<STEPS : rtc (tau (@AThread.program_step _))
-                           (Thread.mk _ st lc sc m)
-                           (Thread.mk _ st' lc' sc' m')>>) /\
-            (<<READING : is_updating _ st' loc Ordering.relaxed>>);
-      AUPDATE : forall
-          loc to m sc (UPD : aupdates loc to)
-          (FUTURE: unchanged_on spaces mlast m)
-          (UNCHANGED: not_attatched (updates \2/ aupdates) m),
-          exists st' lc' sc' m',
-            (<<STEPS : rtc (tau (@AThread.program_step _))
-                           (Thread.mk _ st lc sc m)
-                           (Thread.mk _ st' lc' sc' m')>>) /\
-            (<<READING : is_updating _ st' loc Ordering.seqcst>>);
-    }.
-
-End Inv.
-
-
-
 Definition memory_reserve_wf mem := Memory.reserve_wf mem mem.
 
 Lemma memory_reserve_wf_promise
@@ -1420,6 +1373,54 @@ Proof.
     erewrite INHABITED in GET0. clarify.
 Qed.
 
+
+Module Inv.
+
+  Record t mem lang (st: Language.state lang) lc
+         (proms: Memory.t)
+         (spaces : Loc.t -> Time.t -> Prop)
+         (updates : Loc.t -> Time.t -> Prop)
+         (aupdates : Loc.t -> Time.t -> Prop)
+         (mlast: Memory.t): Prop :=
+    {
+      SPACES: forall loc ts (IN: spaces loc ts), concrete_covered proms mem loc ts;
+      AUPDATES: forall loc ts (IN: aupdates loc ts),
+          exists to msg,
+            (<<TS: Time.lt ts to>>) /\
+            (<<GET: Memory.get loc to proms = Some (ts, msg)>>);
+      PROMS: forall
+          loc to m sc (PROM : concrete_promised proms loc to)
+          (FUTURE: unchanged_on spaces mlast m)
+          (UNCHANGED: not_attatched (updates \2/ aupdates) m),
+          exists st' lc' sc' m',
+            (<<STEPS : rtc (tau (@AThread.program_step _))
+                           (Thread.mk _ st lc sc m)
+                           (Thread.mk _ st' lc' sc' m')>>) /\
+            (<<WRITING : is_writing _ st' loc Ordering.relaxed>>);
+      UPDATE : forall
+          loc to m sc (UPD : updates loc to)
+          (FUTURE: unchanged_on spaces mlast m)
+          (UNCHANGED: not_attatched (updates \2/ aupdates) m),
+          exists st' lc' sc' m',
+            (<<STEPS : rtc (tau (@AThread.program_step _))
+                           (Thread.mk _ st lc sc m)
+                           (Thread.mk _ st' lc' sc' m')>>) /\
+            (<<READING : is_updating _ st' loc Ordering.relaxed>>);
+      AUPDATE : forall
+          loc to m sc (UPD : aupdates loc to)
+          (FUTURE: unchanged_on spaces mlast m)
+          (UNCHANGED: not_attatched (updates \2/ aupdates) m),
+          exists st' lc' sc' m',
+            (<<STEPS : rtc (tau (@AThread.program_step _))
+                           (Thread.mk _ st lc sc m)
+                           (Thread.mk _ st' lc' sc' m')>>) /\
+            (<<READING : is_updating _ st' loc Ordering.seqcst>>);
+    }.
+
+End Inv.
+
+
+
 Section SIMPF.
 
   Inductive thread_wf lang (th: Thread.t lang): Prop :=
@@ -1429,7 +1430,34 @@ Section SIMPF.
       (LCWF: Local.wf th.(Thread.local) th.(Thread.memory))
   .
 
+  Inductive sim_pf_one
+            (tid: Ident.t)
+            (mlast: Memory.t)
+            (spaces : (Loc.t -> Time.t -> Prop))
+            (updates: (Loc.t -> Time.t -> Prop))
+            (aupdates: (Loc.t -> Time.t -> Prop))
+            (c_src c_tgt: Configuration.t) : Prop :=
+  | sim_pf_one_intro
+      (FUTURE: unchanged_on spaces mlast c_src.(Configuration.memory))
+      (NOATTATCH: not_attatched (updates \2/ aupdates) c_src.(Configuration.memory))
+      (INV:
+         forall
+           lang_src st_src lc_src lang_tgt st_tgt lc_tgt
+           (TIDSRC: IdentMap.find tid c_src.(Configuration.threads) =
+                    Some (existT _ lang_src st_src, lc_src))
+           (TIDTGT: IdentMap.find tid c_tgt.(Configuration.threads) =
+                    Some (existT _ lang_tgt st_tgt, lc_tgt)),
+           Inv.t c_tgt.(Configuration.memory) _ st_src lc_src lc_tgt.(Local.promises) spaces updates aupdates mlast)
+      (INVBOT:
+         forall
+           (TIDSRC: IdentMap.find tid c_src.(Configuration.threads) = None),
+           (<<SPACESBOT: spaces <2= bot2>>) /\
+           (<<UPDATESBOT: updates <2= bot2>>) /\
+           (<<AUPDATESBOT: aupdates <2= bot2>>))
+  .
+
   Inductive sim_pf
+            (idents: Ident.t -> Prop)
             (mlast: Ident.t -> Memory.t)
             (spaces : Ident.t -> (Loc.t -> Time.t -> Prop))
             (updates: Ident.t -> (Loc.t -> Time.t -> Prop))
@@ -1437,38 +1465,25 @@ Section SIMPF.
             (c_src c_tgt: Configuration.t) : Prop :=
   | sim_pf_intro
       (FORGET: forget_config c_src c_tgt)
-
-      (FUTURE:
-         forall tid,
-           unchanged_on (spaces tid) (mlast tid) c_src.(Configuration.memory))
-      (NOATTATCH:
-         forall tid,
-           not_attatched (updates tid) c_src.(Configuration.memory))
-
-      (INV:
-         forall
-           tid lang_src st_src lc_src lang_tgt st_tgt lc_tgt
-           (TIDSRC: IdentMap.find tid c_src.(Configuration.threads) =
-                    Some (existT _ lang_src st_src, lc_src))
-           (TIDTGT: IdentMap.find tid c_tgt.(Configuration.threads) =
-                    Some (existT _ lang_tgt st_tgt, lc_tgt)),
-           Inv.t c_tgt.(Configuration.memory) _ st_src lc_src lc_tgt.(Local.promises) (spaces tid) (updates tid) (aupdates tid) (mlast tid))
-      (INVBOT:
-         forall
-           tid
-           (TIDSRC: IdentMap.find tid c_src.(Configuration.threads) = None),
-           (<<SPACESBOT: spaces tid <2= bot2>>) /\
-           (<<UPDATESBOT: updates tid <2= bot2>>) /\
-           (<<AUPDATESBOT: aupdates tid <2= bot2>>))
-
+      (THREADS: forall tid (IDENT: idents tid),
+          sim_pf_one tid (mlast tid) (spaces tid) (updates tid) (aupdates tid) c_src c_tgt)
       (RACEFREE: pf_racefree c_src)
       (WFSRC: Configuration.wf c_src)
       (WFTGT: Configuration.wf c_tgt)
   .
 
+  Definition sim_pf_minus_one
+             (tid: Ident.t)
+             (mlast: Ident.t -> Memory.t)
+             (spaces : Ident.t -> (Loc.t -> Time.t -> Prop))
+             (updates: Ident.t -> (Loc.t -> Time.t -> Prop))
+             (aupdates: Ident.t -> (Loc.t -> Time.t -> Prop))
+             (c_src c_tgt: Configuration.t) : Prop :=
+    sim_pf (fun tid' => tid <> tid') mlast spaces updates aupdates c_src c_tgt.
+
   Inductive sim_pf_all c_src c_tgt: Prop :=
   | sim_pf_all_intro mlast spaces updates aupdates
-                     (SIM : sim_pf mlast spaces updates aupdates c_src c_tgt)
+                     (SIM : sim_pf (fun _ => True) mlast spaces updates aupdates c_src c_tgt)
   .
 
   Lemma init_pf s tid st lc
@@ -1503,11 +1518,13 @@ Section SIMPF.
           inv PROMISED. rewrite Memory.bot_get in *. clarify.
         * refl.
     - econs; ss.
-    - econs; eauto; ii; clarify.
-      exploit init_pf; try apply TIDTGT; eauto. i.
-      rewrite x0 in *. inv PROM.
-      rewrite Memory.bot_get in *. clarify.
-    - splits; ss.
+      + refl.
+      + ii. des; clarify.
+      + i. econs; eauto; ii; clarify.
+        exploit init_pf; try apply TIDTGT; eauto. i.
+        rewrite x0 in *. inv PROM.
+        rewrite Memory.bot_get in *. clarify.
+      + i; splits; i; clarify.
     - eapply Configuration.init_wf.
     - eapply Configuration.init_wf.
   Qed.
