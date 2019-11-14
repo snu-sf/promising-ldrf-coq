@@ -992,10 +992,10 @@ Lemma sim_pf_step_minus
       (<<STEP: opt_pftstep e tid c_src0 c_src1>>) /\
       (<<FORGET: forget_config c_src1 c_tgt1>>) /\
       (<<SIM: forall tid' (NEQ: tid <> tid'),
-          sim_pf_one tid (mlast tid) (spaces tid) (updates tid)
-                     (aupdates tid) c_src1 c_tgt1>>).
+          sim_pf_one tid' (mlast tid') (spaces tid') (updates tid')
+                     (aupdates tid') c_src1 c_tgt1>>).
 Proof.
-  eapply configuration_step_equivalent in STEP. inv STEP; ss.
+  dup STEP. rename STEP0 into CSTEP. eapply configuration_step_equivalent in STEP. inv STEP; ss.
   eapply thread_steps_athread_steps in STEPS.
   assert (STEP: AThread.step_allpf e0 e2 (Thread.mk _ st3 lc3 sc3 memory3)).
   { eapply thread_step_athread_step. econs; eauto. }
@@ -1052,17 +1052,25 @@ Proof.
   { eapply sim_pf_not_attatched; eauto. }
   i. des.
 
-  exploit step_lifting; eauto.
+  exploit step_lifting; try eassumption.
+  { eauto. }
   { i. eapply OTHERPROMISE in SAT. des.
     hexploit unchangable_rtc_increase.
     - eapply HOLD.
     - eauto.
     - i. esplits; eauto.
     - eauto. }
+  { instantiate (1:= other_spaces tid spaces).
+    i. eapply sim_pf_other_spaces in SIM; eauto.
+    eapply rtc_unwritable_increase; eauto. }
   i. des.
 
   inv STEP1.
-  { admit. }
+  {
+
+
+
+    admit. }
   { dup STEP2. inv STEP2.
     { inv EVT; inv STEP3. }
     erewrite <- drf_sim_event_same_machine_event; eauto.
@@ -1085,8 +1093,33 @@ Proof.
             - eauto. }
         * inv H0. erewrite IdentMap.gsspec in TID1. des_ifs; eauto.
           left. econs; eauto.
-    - i. econs; ss.
-      +
+    - i. exploit THREADS; eauto. intros []. econs; ss.
+      + etrans; eauto.
+        eapply unchanged_on_mon.
+        * etrans; eauto.
+        * i. econs; eauto.
+      + eapply not_attatched_mon; eauto. i. des.
+        * left. econs; eauto.
+        * right. econs; eauto.
+      + i. erewrite IdentMap.gso in TIDTGT, TIDSRC0; auto.
+        exploit INV; eauto. i.
+        eapply inv_step; eauto.
+        eapply Configuration.step_future in CSTEP; eauto. ss. des. auto.
+      + i. erewrite IdentMap.gso in TIDSRC0; auto.
+
+
+        , TIDSRC0; auto.
+        ex
+
+        econs;
+
+
+          etrans; eauto.
+
+        etrans; eauto.
+
+
+
 
     -
 
