@@ -1913,7 +1913,7 @@ Definition pf_consistent_drf'' lang (e0:Thread.t lang): Prop :=
                                                  (<<NUPDATES: ~ List.In loc (U ++ AU)>>))
                                   e2.(Thread.memory)>>) /\
       (<<TRACE: List.Forall (fun em => <<EVENT: (promise_free /1\ (fun e => ~ is_cancel e) /1\ no_sc
-
+                                                              /1\ no_acq_update_on ((fun loc to => L loc) /2\ Memory.max_full_ts e0.(Thread.memory))
                                                               /1\
                                                               (write_in (later_times max' \2/ (concrete_covered e0.(Thread.local).(Local.promises) e0.(Thread.memory) /2\ earlier_times max)))
 
@@ -2098,7 +2098,7 @@ Proof.
   - eapply not_attatched_mon; eauto.
   - eapply list_Forall_sum.
     + eapply MEMORY.
-    + instantiate (1:=fun em => (write_in (later_times max' \2/ (concrete_covered (Local.promises (Thread.local th)) (Thread.memory th) /2\ earlier_times max)) /1\ (promise_free /1\ (fun e => ~ is_cancel e) /1\ no_sc)) (fst em)).
+    + instantiate (1:=fun em => (write_in (later_times max' \2/ (concrete_covered (Local.promises (Thread.local th)) (Thread.memory th) /2\ earlier_times max)) /1\ (promise_free /1\ (fun e => ~ is_cancel e) /1\ no_sc /1\ no_acq_update_on ((fun loc to => L loc) /2\ Memory.max_full_ts th.(Thread.memory)))) (fst em)).
       eapply List.Forall_forall. i. ss. dup H.
       eapply list_Forall2_in in H; eauto. des.
       eapply List.Forall_forall in IN; eauto. destruct a, x. ss. des.
@@ -2392,49 +2392,6 @@ Proof.
     eapply forget_latest_other_reserves_concrete_le; eauto.
 Qed.
 
-
-Definition pf_consistent_drf lang (e0:Thread.t lang): Prop :=
-  let L := (fun loc => Memory.latest_reserve loc e0.(Thread.local).(Local.promises) e0.(Thread.memory)) in
-  forall mem2 max
-         (FORGET: forget_memory (latest_other_reserves e0.(Thread.local).(Local.promises) e0.(Thread.memory)) mem2 e0.(Thread.memory))
-         (MAX: Memory.max_full_timemap e0.(Thread.memory) max),
-  exists e1 (U: list Loc.t) (AU: list Loc.t),
-    (<<DISJOINT: forall loc (INU: List.In loc U) (INAU: List.In loc AU), False>>) /\
-    (<<AUPDATES: forall loc (INAU: List.In loc AU), ~ L loc>>) /\
-    (<<STEPS0: rtc (tau (@pred_step is_cancel lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot mem2) e1>>) /\
-    (<<NORESERVE: no_reserves e1.(Thread.local).(Local.promises)>>) /\
-    (* (<<NOATTATCH: not_attatched (Memory.max_full_ts e0.(Thread.memory)) e1.(Thread.memory)>>) /\ *)
-    (<<MAXMAP: TimeMap.le (Memory.max_timemap e1.(Thread.memory)) max>>) /\
-    exists e2 tr max',
-      (<<STEPS1: traced_step tr e1 e2>>) /\
-      (<<TIMEMAP: TimeMap.le max max'>>) /\
-      (<<GAP: forall loc (NUPDATES: ~ List.In loc (U ++ AU)),
-          Time.lt (max loc) (max' loc)>>) /\
-      (<<ATTATCHED: not_attatched (fun loc to => (<<MAX: Memory.max_full_ts e0.(Thread.memory) loc to>>) /\
-                                                 (<<NUPDATES: ~ List.In loc (U ++ AU)>>))
-                                  e2.(Thread.memory)>>) /\
-      (<<TRACE: List.Forall (fun em => <<EVENT: (promise_free /1\ (fun e => ~ is_cancel e) /1\ no_sc
-                                                              /1\
-                                                              (write_in (later_times max' \2/ (concrete_covered e0.(Thread.local).(Local.promises) e0.(Thread.memory) /2\ earlier_times max)))
-                                                ) (fst em)>> /\ <<MEMORY: not_attatched (fun loc to => (<<MAX: Memory.max_full_ts e0.(Thread.memory) loc to>>) /\
-                                                                                                                                                           (<<NUPDATES: ~ List.In loc (U ++ AU)>>)) (snd em)>>) tr>>) /\
-      (<<COMPLETEU:
-         forall loc (SAT: List.In loc U),
-         exists to valr valw releasedr releasedw ordr ordw mem,
-           <<IN: List.In (ThreadEvent.update loc (max loc) to valr valw releasedr releasedw ordr ordw, mem) tr>> /\ <<ORDR: Ordering.le ordr Ordering.strong_relaxed>> >>) /\
-      (<<COMPLETEAU:
-         forall loc (SAT: List.In loc AU),
-         exists to valr valw releasedr releasedw ordr ordw mem,
-           <<IN: List.In (ThreadEvent.update loc (max loc) to valr valw releasedr releasedw ordr ordw, mem) tr>> >>) /\
-      (__guard__((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
-                 ((<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>) /\
-                  (<<COMPLETEW:
-                     forall loc to (PROMISED: concrete_promised e0.(Thread.local).(Local.promises) loc to),
-                     exists e m,
-                       (<<IN: List.In (e, m) tr>>) /\
-                       (<<WRITETO: write_to loc to e>>)>>))))
-.
-
 Lemma ident_map_mappable_any_event e
   :
     mappable_evt ident_map e.
@@ -2457,6 +2414,15 @@ Proof.
     inv FROM. inv TO. econs; eauto.
   - ii. eapply NOTIN; eauto. inv IN. ss.
     inv FROM. inv TO. econs; eauto.
+Qed.
+
+Lemma ident_map_event_no_acq_update_on L e0 e1
+      (EVENT: tevent_map ident_map e1 e0)
+      (ACQU: no_acq_update_on L e0)
+  :
+    no_acq_update_on L e1.
+Proof.
+  inv EVENT; ss. inv FROM. inv TO. auto.
 Qed.
 
 Lemma ident_map_event_write_in L e0 e1
@@ -2549,13 +2515,58 @@ Proof.
   - eapply IHFORALL in IN; eauto. des. esplits; eauto.
 Qed.
 
-Lemma pf_consistent_pf_consistent_drf lang (th: Thread.t lang)
+
+Definition pf_consistent_drf_complete lang (e0:Thread.t lang): Prop :=
+  let L := (fun loc => Memory.latest_reserve loc e0.(Thread.local).(Local.promises) e0.(Thread.memory)) in
+  forall mem2 max
+         (FORGET: forget_memory (latest_other_reserves e0.(Thread.local).(Local.promises) e0.(Thread.memory)) mem2 e0.(Thread.memory))
+         (MAX: Memory.max_full_timemap e0.(Thread.memory) max),
+  exists e1 (U: list Loc.t) (AU: list Loc.t),
+    (<<DISJOINT: forall loc (INU: List.In loc U) (INAU: List.In loc AU), False>>) /\
+    (<<AUPDATES: forall loc (INAU: List.In loc AU), ~ L loc>>) /\
+    (<<STEPS0: rtc (tau (@pred_step is_cancel lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot mem2) e1>>) /\
+    (<<NORESERVE: no_reserves e1.(Thread.local).(Local.promises)>>) /\
+    (* (<<NOATTATCH: not_attatched (Memory.max_full_ts e0.(Thread.memory)) e1.(Thread.memory)>>) /\ *)
+    (<<MAXMAP: TimeMap.le (Memory.max_timemap e1.(Thread.memory)) max>>) /\
+    exists e2 tr max',
+      (<<STEPS1: traced_step tr e1 e2>>) /\
+      (<<TIMEMAP: TimeMap.le max max'>>) /\
+      (<<GAP: forall loc (NUPDATES: ~ List.In loc (U ++ AU)),
+          Time.lt (max loc) (max' loc)>>) /\
+      (<<ATTATCHED: not_attatched (fun loc to => (<<MAX: Memory.max_full_ts e0.(Thread.memory) loc to>>) /\
+                                                 (<<NUPDATES: ~ List.In loc (U ++ AU)>>))
+                                  e2.(Thread.memory)>>) /\
+      (<<TRACE: List.Forall (fun em => <<EVENT: (promise_free /1\ (fun e => ~ is_cancel e) /1\ no_sc
+                                                              /1\
+                                                              (no_acq_update_on ((fun loc to => L loc) /2\ Memory.max_full_ts e0.(Thread.memory)))
+                                                              /1\
+                                                              (write_in (later_times max' \2/ (concrete_covered e0.(Thread.local).(Local.promises) e0.(Thread.memory) /2\ earlier_times max)))
+                                                ) (fst em)>> /\ <<MEMORY: not_attatched (fun loc to => (<<MAX: Memory.max_full_ts e0.(Thread.memory) loc to>>) /\
+                                                                                                                                                           (<<NUPDATES: ~ List.In loc (U ++ AU)>>)) (snd em)>>) tr>>) /\
+      (<<COMPLETEU:
+         forall loc (SAT: List.In loc U),
+         exists to valr valw releasedr releasedw ordr ordw mem,
+           <<IN: List.In (ThreadEvent.update loc (max loc) to valr valw releasedr releasedw ordr ordw, mem) tr>> /\ <<ORDR: Ordering.le ordr Ordering.strong_relaxed>> >>) /\
+      (<<COMPLETEAU:
+         forall loc (SAT: List.In loc AU),
+         exists to valr valw releasedr releasedw ordr ordw mem,
+           <<IN: List.In (ThreadEvent.update loc (max loc) to valr valw releasedr releasedw ordr ordw, mem) tr>> >>) /\
+      (__guard__((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
+                 ((<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>) /\
+                  (<<COMPLETEW:
+                     forall loc to (PROMISED: concrete_promised e0.(Thread.local).(Local.promises) loc to),
+                     exists e m,
+                       (<<IN: List.In (e, m) tr>>) /\
+                       (<<WRITETO: write_to loc to e>>)>>))))
+.
+
+Lemma pf_consistent_pf_consistent_drf_complete lang (th: Thread.t lang)
       (WF: Local.wf th.(Thread.local) th.(Thread.memory))
       (MEM: Memory.closed th.(Thread.memory))
       (CONSISTENT: pf_consistent th)
       (RESERVEWF: memory_reserve_wf (Thread.memory th))
   :
-    pf_consistent_drf th.
+    pf_consistent_drf_complete th.
 Proof.
   eapply pf_consistent_pf_consistent_strong in CONSISTENT; eauto.
   eapply pf_consistent_pf_consistent_drf' in CONSISTENT; eauto.
@@ -2656,6 +2667,7 @@ Proof.
     - eapply map_event_promise_free; eauto.
     - inv EVENT; ss. inv KIND; ss.
     - eapply map_event_no_sc; eauto.
+    - eapply ident_map_event_no_acq_update_on; eauto.
     - eapply ident_map_event_write_in; eauto.
     - eapply ident_map_memory_not_attatched; eauto. }
   { i. exploit COMPLETEU; eauto. i. des.
@@ -2721,6 +2733,69 @@ Proof.
       eapply List.in_map_iff. esplits; eauto. ss.
     + left. eapply COMPLETE in GET.
       eapply List.in_map_iff. esplits; eauto. ss.
+Qed.
+
+
+Definition pf_consistent_drf lang (e0:Thread.t lang): Prop :=
+  let L := (fun loc => Memory.latest_reserve loc e0.(Thread.local).(Local.promises) e0.(Thread.memory)) in
+  forall mem2 max
+         (FORGET: forget_memory (latest_other_reserves e0.(Thread.local).(Local.promises) e0.(Thread.memory)) mem2 e0.(Thread.memory))
+         (MAX: Memory.max_full_timemap e0.(Thread.memory) max),
+  exists e2 (U: list Loc.t) (AU: list Loc.t) tr max',
+    (<<DISJOINT: forall loc (INU: List.In loc U) (INAU: List.In loc AU), False>>) /\
+    (<<AUPDATES: forall loc (INAU: List.In loc AU), ~ L loc>>) /\
+    (<<STEPS: traced_step tr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot mem2) e2>>) /\
+    (<<TIMEMAP: TimeMap.le max max'>>) /\
+    (<<GAP: forall loc (NUPDATES: ~ List.In loc (U ++ AU)),
+        Time.lt (max loc) (max' loc)>>) /\
+    (<<ATTATCHED: not_attatched (fun loc to => (<<MAX: Memory.max_full_ts e0.(Thread.memory) loc to>>) /\
+                                               (<<NUPDATES: ~ List.In loc (U ++ AU)>>))
+                                e2.(Thread.memory)>>) /\
+    (<<TRACE: List.Forall (fun em => (no_sc /1\
+                                            (no_acq_update_on ((fun loc to => L loc) /2\ Memory.max_full_ts e0.(Thread.memory)))
+                                            /1\
+                                            (write_in (later_times max' \2/ (concrete_covered e0.(Thread.local).(Local.promises) e0.(Thread.memory) /2\ earlier_times max)))) (fst em)) tr>>) /\
+    (<<COMPLETEU:
+       forall loc (SAT: List.In loc U),
+       exists to valr valw releasedr releasedw ordr ordw mem,
+         <<IN: List.In (ThreadEvent.update loc (max loc) to valr valw releasedr releasedw ordr ordw, mem) tr>> /\ <<ORDR: Ordering.le ordr Ordering.strong_relaxed>> >>) /\
+    (<<COMPLETEAU:
+       forall loc (SAT: List.In loc AU),
+       exists to valr valw releasedr releasedw ordr ordw mem,
+         <<IN: List.In (ThreadEvent.update loc (max loc) to valr valw releasedr releasedw ordr ordw, mem) tr>> >>) /\
+    (__guard__((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
+               ((<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>) /\
+                (<<COMPLETEW:
+                   forall loc to (PROMISED: concrete_promised e0.(Thread.local).(Local.promises) loc to),
+                   exists e m,
+                     (<<IN: List.In (e, m) tr>>) /\
+                     (<<WRITETO: write_to loc to e>>)>>))))
+.
+
+Lemma pf_consistent_pf_consistent_drf lang (th: Thread.t lang)
+      (WF: Local.wf th.(Thread.local) th.(Thread.memory))
+      (MEM: Memory.closed th.(Thread.memory))
+      (CONSISTENT: pf_consistent th)
+      (RESERVEWF: memory_reserve_wf (Thread.memory th))
+  :
+    pf_consistent_drf th.
+Proof.
+  eapply pf_consistent_pf_consistent_drf_complete in CONSISTENT; eauto.
+  ii. exploit CONSISTENT; eauto. i. des.
+  eapply pred_steps_traced_step in STEPS0. des.
+  exists e2, U, AU, (tr0 ++ tr), max'. esplits; auto.
+  - eapply traced_step_trans; eauto.
+  - eapply Forall_app.
+    + eapply List.Forall_impl; eauto. i. ss. des; auto. destruct a. ss.
+      unfold is_cancel in SAT. des_ifs; ss.
+    + eapply List.Forall_impl; eauto. i. ss. des; auto.
+  - i. exploit COMPLETEU; eauto. i. des. esplits; eauto.
+    eapply List.in_or_app; eauto.
+  - i. exploit COMPLETEAU; eauto. i. des. esplits; eauto.
+    eapply List.in_or_app; eauto.
+  - unguard. des; auto. right. splits; auto.
+    i. exploit COMPLETEW; eauto. i. des.
+    esplits; eauto. eapply List.in_or_app; eauto.
 Qed.
 
 
