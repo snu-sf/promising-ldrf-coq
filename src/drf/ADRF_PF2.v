@@ -988,12 +988,17 @@ Lemma sim_pf_step_minus
       (SIM: sim_pf_minus_one tid mlast spaces updates aupdates c_src0 c_tgt0)
       (STEP: Configuration.step e tid c_tgt0 c_tgt1)
   :
-    exists c_src1,
-      (<<STEP: opt_pftstep e tid c_src0 c_src1>>) /\
-      (<<FORGET: forget_config c_src1 c_tgt1>>) /\
-      (<<SIM: forall tid' (NEQ: tid <> tid'),
-          sim_pf_one tid' (mlast tid') (spaces tid') (updates tid')
-                     (aupdates tid') c_src1 c_tgt1>>).
+    (exists c_src1,
+        (<<STEP: opt_pftstep e tid c_src0 c_src1>>) /\
+        (<<FORGET: forget_config c_src1 c_tgt1>>) /\
+        (<<SIM: forall tid' (NEQ: tid <> tid'),
+            sim_pf_one tid' (mlast tid') (spaces tid') (updates tid')
+                       (aupdates tid') c_src1 c_tgt1>>)) /\
+    __guard__((<<CONSISTENT: forall lang st_tgt lc_tgt
+                                    (FIND: IdentMap.find tid c_tgt1.(Configuration.threads) = Some (existT _ lang st_tgt, lc_tgt)),
+                  pf_consistent_drf (Thread.mk _ st_tgt lc_tgt c_tgt1.(Configuration.sc) c_tgt1.(Configuration.memory))>>) \/
+              (<<ABORT: e = MachineEvent.failure>>))
+.
 Proof.
   dup STEP. rename STEP0 into CSTEP. eapply configuration_step_equivalent in STEP. inv STEP; ss.
   eapply thread_steps_athread_steps in STEPS.
@@ -1007,13 +1012,19 @@ Proof.
   exploit AThread.rtc_tau_step_future; try apply STEPS; ss. i. des.
   exploit Thread.step_future; eauto. i. des. ss. clear STEP0.
   assert (CONSISTENT1: Local.promise_consistent lc3).
-  { destruct (classic (e0 <> ThreadEvent.failure)).
+  { destruct (classic (e0 = ThreadEvent.failure)).
+    - clarify. inv STEP. inv STEP0; inv STEP.
+      inv LOCAL0. inv LOCAL1. auto.
     - hexploit CONSISTENT; eauto. intros CONSISTENT2.
-      eapply PromiseConsistent.consistent_promise_consistent in CONSISTENT2; eauto.
-    - apply NNPP in H. clarify. inv STEP. inv STEP0; inv STEP.
-      inv LOCAL0. inv LOCAL1. auto. }
+      eapply PromiseConsistent.consistent_promise_consistent in CONSISTENT2; eauto. }
   assert (CONSISTENT0: Local.promise_consistent e2.(Thread.local)).
   { inv STEP. eapply step_promise_consistent; eauto. }
+
+  split; cycle 1.
+  { destruct (classic (e0 = ThreadEvent.failure)).
+    - right. clarify.
+    - right.
+
 
   destruct (classic (((no_update_on (other_updates tid updates aupdates))
                         /1\ (no_read_msgs (other_promises c_tgt0 tid))) e0)); cycle 1.
@@ -1023,7 +1034,7 @@ Proof.
     - eapply pred_steps_thread_steps; eauto.
     - eauto.
     - ss.
-    - refl.
+    - instantiate (2:=fun _ => True). refl.
     - eauto.
     - ss. }
 
@@ -1065,12 +1076,59 @@ Proof.
     eapply rtc_unwritable_increase; eauto. }
   i. des.
 
+  assert (NEWPROMS: all_promises
+                      (IdentMap.add tid (existT _ lang st3, lc3)
+                                    c_tgt0.(Configuration.threads)) (fun _ => True) =
+                    (other_promises c_tgt0 tid \2/ promised lc3.(Local.promises))).
+  { extensionality loc. extensionality to.
+    apply Coq.Logic.PropExtensionality.propositional_extensionality.
+    split; i.
+    - inv H0. erewrite IdentMap.gsspec in TID1. des_ifs; eauto.
+      left. econs; eauto.
+    - des.
+      + inv H0. econs; eauto. erewrite IdentMap.gso; eauto.
+      + econs; eauto. erewrite IdentMap.gss. ss.
+  }
+
   inv STEP1.
-  {
+  { eapply rtc_tail in STEP0. des.
+
+    { inv STEP1. erewrite <- drf_sim_event_same_machine_event; eauto. ss.
+      rewrite <- EVENT. inv FORGET. inv FORGET2. esplits.
+      - econs; eauto. econs; eauto.
+      - econs; ss.
+        + i. repeat erewrite IdentMap.gsspec. des_ifs.
+        + rewrite NEWPROMS. auto.
+      - i. exploit THREADS; eauto. intros []. econs; ss.
+        + etrans; eauto.
+          eapply unchanged_on_mon.
+          * etrans; eauto.
+          * i. econs; eauto.
+        + eapply not_attatched_mon; eauto. i. des.
+          * left. econs; eauto.
+          * right. econs; eauto.
+        + i. erewrite IdentMap.gso in TIDTGT, TIDSRC0; auto.
+          exploit INV; eauto. i.
+          eapply inv_step; eauto.
+          eapply Configuration.step_future in CSTEP; eauto. ss. des. auto.
+        + i. erewrite IdentMap.gso in TIDSRC0; auto. }
+
+    { clarify. ss.
+      erewrite <- drf_sim_event_same_machine_event; eauto. ss.
+      inv FORGET. inv FORGET2. exists c_src0. splits.
+      - econs.
+      - econs; ss.
+        + i. erewrite IdentMap.gsspec. des_ifs.
+          rewrite TIDSRC. econs; eauto.
+        + rewrite NEWPROMS. auto.
+      - i. exploit THREADS; eauto. intros []. econs; ss.
+        i. erewrite IdentMap.gso in TIDTGT; auto.
+        exploit INV; eauto. i.
+        eapply inv_step; eauto.
+        eapply Configuration.step_future in CSTEP; eauto. ss. des; auto. }
+  }
 
 
-
-    admit. }
   { dup STEP2. inv STEP2.
     { inv EVT; inv STEP3. }
     erewrite <- drf_sim_event_same_machine_event; eauto.
@@ -1078,21 +1136,7 @@ Proof.
     - econs; eauto. econs; eauto.
     - econs; ss.
       + i. repeat erewrite IdentMap.gsspec. des_ifs.
-      + replace (all_promises
-                   (IdentMap.add tid (existT _ lang st3, Local.mk v prom)
-                                 c_tgt0.(Configuration.threads)) (fun _ => True)) with
-            (other_promises c_tgt0 tid \2/ promised prom); auto.
-        extensionality loc. extensionality to.
-        apply Coq.Logic.PropExtensionality.propositional_extensionality.
-        split; i.
-        * des.
-          { inv H0. econs; eauto. erewrite IdentMap.gsspec. des_ifs.
-            exfalso. eapply SAT; eauto. }
-          { econs; eauto.
-            - erewrite IdentMap.gsspec. des_ifs.
-            - eauto. }
-        * inv H0. erewrite IdentMap.gsspec in TID1. des_ifs; eauto.
-          left. econs; eauto.
+      + rewrite NEWPROMS. auto.
     - i. exploit THREADS; eauto. intros []. econs; ss.
       + etrans; eauto.
         eapply unchanged_on_mon.
@@ -1105,8 +1149,8 @@ Proof.
         exploit INV; eauto. i.
         eapply inv_step; eauto.
         eapply Configuration.step_future in CSTEP; eauto. ss. des. auto.
-      + i. erewrite IdentMap.gso in TIDSRC0; auto.
-
+      + i. erewrite IdentMap.gso in TIDSRC0; auto. }
+Qed.
 
         , TIDSRC0; auto.
         ex

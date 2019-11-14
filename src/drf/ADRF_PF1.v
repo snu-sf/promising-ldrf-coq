@@ -1470,6 +1470,7 @@ Section SIMPF.
       (RACEFREE: pf_racefree c_src)
       (WFSRC: Configuration.wf c_src)
       (WFTGT: Configuration.wf c_tgt)
+      (RESERVEWF: memory_reserve_wf c_tgt.(Configuration.memory))
   .
 
   Definition sim_pf_minus_one
@@ -1527,6 +1528,8 @@ Section SIMPF.
       + i; splits; i; clarify.
     - eapply Configuration.init_wf.
     - eapply Configuration.init_wf.
+    - ii. unfold Memory.get in GET. rewrite Cell.init_get in GET.
+      des_ifs.
   Qed.
 
 End SIMPF.
