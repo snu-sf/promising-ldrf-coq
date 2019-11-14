@@ -786,6 +786,31 @@ Qed.
 Lemma already_updated lang (th0 th1: Thread.t lang) (L: Loc.t -> Time.t -> Prop) e
       (MLE: Memory.le th0.(Thread.local).(Local.promises) th0.(Thread.memory))
       (STEP: AThread.step_allpf e th0 th1)
+      loc from to msg
+      (TS: Time.lt from to)
+      (UNCH: unchangable th0.(Thread.memory) th0.(Thread.local).(Local.promises) loc to from msg)
+  :
+    match e with
+    | ThreadEvent.update loc0 from0 _ _ _ _ _ _ _ => (loc0, from0) <> (loc, from)
+    | _ => True
+    end.
+Proof.
+  des_ifs. ii. clarify.
+  inv STEP. dup STEP0. eapply step_write_not_in in STEP1; auto.
+  assert (TSRW: Time.lt from tsw).
+  { inv STEP0; inv STEP. ss. inv LOCAL. destruct lc3, lc2.
+    eapply write_msg_wf in LOCAL2. des. auto. }
+  ss. eapply (STEP1 (Time.meet to tsw)).
+  - unfold Time.meet. des_ifs; econs; ss. refl.
+  - econs; eauto.
+    unfold Time.meet. des_ifs; econs; ss.
+    + refl.
+    + left. auto.
+Qed.
+
+Lemma already_updated_locs lang (th0 th1: Thread.t lang) (L: Loc.t -> Time.t -> Prop) e
+      (MLE: Memory.le th0.(Thread.local).(Local.promises) th0.(Thread.memory))
+      (STEP: AThread.step_allpf e th0 th1)
       (UNCH: forall loc from (SAT: L loc from),
           exists to msg,
             (<<TS: Time.lt from to>>) /\
@@ -806,7 +831,643 @@ Proof.
     + left. auto.
 Qed.
 
+
 Lemma sim_pf_read_promise_race
+      P Q c_src0 c_tgt0 tid mlast spaces updates aupdates
+      (SIM: sim_pf_minus_one tid mlast spaces updates aupdates c_src0 c_tgt0)
+      lang st0 lc0
+      (TIDTGT:
+         IdentMap.find tid c_tgt0.(Configuration.threads) =
+         Some (existT _ lang st0, lc0))
+      th0'
+      (STEPS0': rtc (tau (@pred_step P lang))
+                    (Thread.mk _ st0 lc0 c_tgt0.(Configuration.sc) c_tgt0.(Configuration.memory))
+                    th0')
+      e' th1' th2'
+      (STEP': AThread.step_allpf e' th0' th1')
+      (RACE': ~ ((no_update_on (other_updates tid updates aupdates))
+                   /1\ (no_read_msgs (other_promises c_tgt0 tid))) e')
+      (STEPS1': rtc (tau (@pred_step Q lang)) th1' th2')
+      (CONSISTENT': Local.promise_consistent th2'.(Thread.local))
+  :
+    False.
+Proof.
+  assert (WF: Configuration.wf c_tgt0).
+  { inv SIM. auto. }
+  inv WF. inv WF0. exploit THREADS; eauto. intros LOCAL.
+  clear DISJOINT THREADS.
+
+  assert (CONSISTENT0: Local.promise_consistent th0'.(Thread.local)).
+  { exploit AThread.rtc_tau_step_future.
+    { eapply thread_steps_pred_steps; try apply STEPS0'. } all: ss. i. des.
+    dup STEP'. inv STEP'. exploit AThread.step_future; eauto. i. des. clear STEP.
+    hexploit rtc_tau_step_promise_consistent.
+    { eapply thread_steps_pred_steps; try apply STEPS1'. } all: ss.
+    intros CONSISTENT1.
+    inv STEP'0. hexploit step_promise_consistent; eauto. }
+
+  assert (exists e th1 th2,
+             (<<STEPS: rtc (tau (@pred_step ((no_update_on (other_updates tid updates aupdates))
+                                               /1\ (no_read_msgs (other_promises c_tgt0 tid))) lang))
+                           (Thread.mk _ st0 lc0 c_tgt0.(Configuration.sc) c_tgt0.(Configuration.memory))
+                           th1>>) /\
+             (<<CONSISTENT: Local.promise_consistent th1.(Thread.local)>>) /\
+             (<<STEP: AThread.step_allpf e th1 th2>>) /\
+             (<<RACE: ~ ((no_update_on (other_updates tid updates aupdates))
+                           /1\ (no_read_msgs (other_promises c_tgt0 tid))) e>>)).
+  { hexploit (@hold_or_not P ((no_update_on (other_updates tid updates aupdates))
+                                /1\ (no_read_msgs (other_promises c_tgt0 tid))));
+      try apply STEPS0'; eauto.
+    i. des.
+    - esplits.
+      + eapply pred_step_rtc_mon; try apply HOLD. i. ss. des. split; auto.
+      + ss.
+      + eauto.
+      + ss.
+    - esplits.
+      + eapply pred_step_rtc_mon; try apply STEPS0. i. ss. des. split; auto.
+      + exploit AThread.rtc_tau_step_future.
+        { eapply thread_steps_pred_steps; try apply STEPS0. } all: ss. i. des.
+        dup STEP. inv STEP0. exploit AThread.step_future; eauto. i. des. clear STEP1.
+        hexploit rtc_tau_step_promise_consistent.
+        { eapply thread_steps_pred_steps; try apply STEPS1. } all: ss.
+        intros CONSISTENT1.
+        inv STEP. hexploit step_promise_consistent; eauto.
+      + eauto.
+      + ss. }
+  clear th0' STEPS0' e' th1' th2' STEP' RACE' STEPS1' CONSISTENT' CONSISTENT0. des.
+
+  generalize (sim_pf_other_promises SIM). intros OTHERPROMISE.
+
+  dup SIM. inv SIM0.
+  exploit forget_config_forget_thread; eauto. i. des.
+  hexploit rtc_tau_step_lifting; try eassumption.
+  { i. ss. des. split; eauto. }
+  { eapply OTHERPROMISE; eauto. }
+  { ss. eapply sim_pf_other_spaces; eauto. }
+  { eapply sim_pf_not_attatched; eauto. }
+
+  i. des. ss. apply not_and_or in RACE. des.
+
+  - unfold no_update_on in RACE. des_ifs. apply NNPP in RACE.
+    inv RACE.
+
+    + inv H. exploit THREADS; eauto. intros [].
+      inv FORGET. specialize (THS tid').
+      unfold option_rel in THS. des_ifs.
+      { inv THS. destruct st as [lang0 st].
+        exploit INV; ss. intros [].
+        exploit UPDATE.
+        { eauto. }
+        { etrans; eauto.
+          eapply unchanged_on_mon; eauto.
+          i. econs; eauto. }
+        { eapply not_attatched_mon; eauto. i. des.
+          - left. econs; eauto.
+          - right. econs; eauto. }
+        i. des.
+        inv FORGET1. ss. unfold is_updating, is_updating in *. des.
+        inv STEP. inv STEP1; inv STEP.
+        exploit race_lemma; try eassumption; ss.
+        - econs; eauto.
+        - econs 2; eauto. ss. }
+      { exfalso. exploit INVBOT; eauto. i. des. eapply UPDATESBOT; eauto. }
+
+    + inv H. exploit THREADS; eauto. intros [].
+      inv FORGET. specialize (THS tid').
+      unfold option_rel in THS. des_ifs.
+      { inv THS. destruct st as [lang0 st].
+        exploit INV; ss. intros [].
+        assert (AUALREADY:
+                  forall loc from (SAT: (aupdates tid') loc from),
+                  exists to msg,
+                    (<<TS: Time.lt from to>>) /\
+                    (<<UNCH: unchangable c_tgt0.(Configuration.memory) lc0.(Local.promises) loc to from msg>>)).
+        { i. exploit AUPDATES; eauto. i. des.
+          esplits; eauto.
+          hexploit sim_pf_other_promise; eauto. }
+        hexploit already_updated_locs; cycle 1.
+        - eapply STEP.
+        - instantiate (1:=aupdates tid'). i. eapply AUALREADY in SAT. des.
+          eapply unchangable_rtc_increase in STEPS; try eassumption.
+          esplits; eauto.
+        - ss.
+        - eapply steps_promises_le in STEPS; auto. ss.
+          inv LOCAL. ss. }
+      { exfalso. exploit INVBOT; eauto. i. des. eapply AUPDATESBOT; eauto. }
+
+  - assert (exists loc to from val released,
+               (<<OPROMS: other_promises c_tgt0 tid loc to>>) /\
+               (<<READING: is_reading _ th1.(Thread.state) loc Ordering.seqcst>>) /\
+               (<<CONCRETE: Memory.get loc to th1.(Thread.memory) = Some (from, Message.full val released)>>)).
+    { unfold no_read_msgs in RACE. des_ifs.
+      - apply NNPP in RACE. inv STEP. inv STEP1; inv STEP.
+        inv LOCAL0. inv LOCAL1.
+        esplits; eauto. ss. econs. esplits.
+        + econs; eauto.
+        + instantiate (1:=ord). destruct ord; ss.
+        + ss.
+      - apply NNPP in RACE. inv STEP. inv STEP1; inv STEP.
+        inv LOCAL0. inv LOCAL1.
+        esplits; eauto. ss. econs. esplits.
+        + econs; eauto.
+        + instantiate (1:=ordr). destruct ordr; ss.
+        + ss. } des.
+
+    exploit OTHERPROMISE; [eauto|eauto|]. i. des.
+    eapply unchangable_rtc_increase in STEPS; [|eauto].
+    inv UNCH. inv STEPS. clarify.
+
+    inv OPROMS. destruct st as [lang0 st].
+    exploit forget_config_forget_thread.
+    { eauto. }
+    { eapply TID1. }
+    i. des.
+    dup TID1. eapply configuration_wf_promises_le in TID1; auto.
+    inv PROMISED. destruct msg as [from0 msg].
+    dup GET1. eapply TID1 in GET1; auto. clarify.
+
+    inv SIM. exploit THREADS0; [eauto|]. intros [].
+    exploit INV.
+    { eapply TIDSRC0. }
+    { eapply TID0. }
+    intros []. ss.
+    clear UPDATE AUPDATE INV INVBOT. exploit PROMS.
+    { econs; eauto. }
+    { etrans; eauto.
+      eapply unchanged_on_mon; eauto.
+      i. econs; eauto. }
+    { eapply not_attatched_mon; eauto. i. des.
+      - left. econs; eauto.
+      - right. econs; eauto. }
+    i. des.
+    inv FORGET1. ss. unfold is_reading, is_writing in *. des.
+    exploit race_lemma; try eassumption; ss.
+    econs; eauto.
+Qed.
+
+
+Lemma sim_pf_other_promise_unreserved
+      c_src0 c_tgt0 tid mlast spaces updates aupdates L
+      (SIM: sim_pf_minus_one tid mlast spaces updates aupdates c_src0 c_tgt0)
+      lang st0 lc0
+      (TIDTGT:
+         IdentMap.find tid c_tgt0.(Configuration.threads) =
+         Some (existT _ lang st0, lc0))
+      mem
+      (FORGET: forget_memory L mem (Configuration.memory c_tgt0))
+      tid' st1 lc1
+      (NEQ: tid <> tid')
+      (TIDTGT':
+         IdentMap.find tid' c_tgt0.(Configuration.threads) =
+         Some (st1, lc1))
+      loc from to msg
+      (GET: Memory.get loc to lc1.(Local.promises) = Some (from, msg))
+      (NOT: ~ L loc to)
+  :
+    unchangable mem lc0.(Local.promises) loc to from msg.
+Proof.
+  inv SIM. exploit THREADS; eauto. i.
+  inv WFTGT. inv WF. destruct st1 as [lang1 st1].
+  exploit THREADS0; try apply TIDTGT'. intros LCWF. inv LCWF.
+  dup GET. eapply PROMISES in GET0.
+  inv FORGET. erewrite <- COMPLETE in GET0; auto.
+  esplits. econs; eauto.
+  exploit DISJOINT; eauto. intros [].
+  destruct (Memory.get loc to (Local.promises lc0)) eqn: GET1; auto.
+  destruct p. exfalso.
+  eapply Memory.disjoint_get; eauto.
+Qed.
+
+
+Lemma sim_pf_other_promises_unreserved
+      L c_src0 c_tgt0 tid mlast spaces updates aupdates
+      (SIM: sim_pf_minus_one tid mlast spaces updates aupdates c_src0 c_tgt0)
+      lang st0 lc0
+      (TIDTGT:
+         IdentMap.find tid c_tgt0.(Configuration.threads) =
+         Some (existT _ lang st0, lc0))
+      mem
+      (FORGET: forget_memory L mem (Configuration.memory c_tgt0))
+  :
+    forall loc to (SAT: ((other_promises c_tgt0 tid) -2 L) loc to),
+    exists from msg,
+      (<<UNCH: unchangable mem (Local.promises lc0) loc to from msg >>).
+Proof.
+  dup SIM. inv SIM. i. des. inv SAT. inv PROMISED.
+  destruct msg as [from msg]. eapply sim_pf_other_promise_unreserved in GET; eauto.
+Qed.
+
+Lemma forget_memory_equivalent L0 L1 mem0 mem1
+      (EQUIV: forall loc to, L0 loc to <-> L1 loc to)
+      (FORGET: forget_memory L0 mem0 mem1)
+  :
+    forget_memory L1 mem0 mem1.
+Proof.
+  inv FORGET. econs; eauto.
+  - ii. eapply COMPLETE; eauto. ii. eapply NPROMS. eapply EQUIV; auto.
+  - ii. eapply FORGET0; eauto. eapply EQUIV; auto.
+Qed.
+
+Lemma forget_memory_overlap L0 L1 P mem0 mem1 mem2
+      (FORGET0: forget_memory P mem1 mem2)
+      (EQUIV: forall loc to (NSAT: ~ P loc to), L0 loc to <-> L1 loc to)
+      (FORGET1: forget_memory L0 mem0 mem1)
+  :
+    forget_memory L1 mem0 mem1.
+Proof.
+  dup FORGET0. dup FORGET1.
+  inv FORGET0. inv FORGET1. econs.
+  - i. destruct (Memory.get l t mem1) eqn:GET.
+    + erewrite <- GET. eapply COMPLETE0.
+      ii. eapply NPROMS. apply EQUIV; auto.
+      ii. erewrite FORGET in GET; auto. clarify.
+    + eapply memory_le_get_none; eauto. eapply forget_memory_le; eauto.
+  - i. destruct (Memory.get l t mem1) eqn:GET.
+    + eapply FORGET0. eapply EQUIV; auto. ii.
+      erewrite FORGET in GET; auto. clarify.
+    + eapply memory_le_get_none; eauto. eapply forget_memory_le; eauto.
+Qed.
+
+Lemma pf_sim_memory_middle P L mem_src mem_tgt mem_tgt'
+      (SIM: pf_sim_memory P mem_src mem_tgt)
+      (LE: L <2= P)
+      (FORGET: forget_memory L mem_tgt' mem_tgt)
+  :
+    pf_sim_memory (P -2 L) mem_src mem_tgt'.
+Proof.
+  inv SIM. econs; eauto.
+  eapply forget_compose_middle; eauto.
+  eapply forget_memory_equivalent; eauto.
+  i. split; i.
+  - destruct (classic (L loc to)); auto.
+  - des; auto.
+Qed.
+
+Lemma latest_other_reserves_promised tid mlast spaces updates aupdates c_src0 c_tgt0
+      (SIM: sim_pf_minus_one tid mlast spaces updates aupdates c_src0 c_tgt0)
+      lang st0 lc0
+      (TIDTGT:
+         IdentMap.find tid c_tgt0.(Configuration.threads) =
+         Some (existT _ lang st0, lc0))
+  :
+    latest_other_reserves lc0.(Local.promises) c_tgt0.(Configuration.memory)
+    <2= other_promises c_tgt0 tid.
+Proof.
+  inv SIM. i. inv PR.
+  eapply RESERVERTGT in GET. des. econs.
+  - eauto.
+  - econs; eauto.
+  - ii. clarify.
+Qed.
+
+Lemma aupates_already_updated_unreserved tid mlast spaces updates aupdates c_src0 c_tgt0
+      (SIM: sim_pf_minus_one tid mlast spaces updates aupdates c_src0 c_tgt0)
+      lang st0 lc0
+      (TIDTGT:
+         IdentMap.find tid c_tgt0.(Configuration.threads) =
+         Some (existT _ lang st0, lc0))
+      mem
+      (FORGET: forget_memory (latest_other_reserves lc0.(Local.promises) c_tgt0.(Configuration.memory)) mem (Configuration.memory c_tgt0))
+      loc ts
+      (AUPDATES: other_union tid aupdates loc ts)
+  :
+    (exists to msg,
+        (<<TS: Time.lt ts to>>) /\
+        (<<UNCH: unchangable mem lc0.(Local.promises) loc to ts msg>>)) \/
+    ((<<LATSEST: Memory.latest_reserve loc lc0.(Local.promises) (Configuration.memory c_tgt0)>>) /\
+     (<<MAX: Memory.max_full_ts (Configuration.memory c_tgt0) loc ts>>)).
+Proof.
+  dup SIM. inv SIM. inv WFTGT. inv WF.
+  inv AUPDATES. exploit THREADS; eauto. intros [].
+  inv FORGET0. specialize (THS tid'). unfold option_rel in THS. des_ifs; cycle 1.
+  { exfalso. exploit INVBOT; auto. i. des. eapply AUPDATESBOT; eauto. }
+  inv THS. destruct st as [lang' st']. exploit INV; eauto. intros [].
+  exploit AUPDATES; eauto. i. des.
+  destruct (classic ((latest_other_reserves lc0.(Local.promises) c_tgt0.(Configuration.memory)) loc to)).
+  - right. inv H. unfold Memory.latest_reserve. rewrite NONE. split; auto.
+    exploit THREADS0; eauto. intros LCWF. inv LCWF. eapply PROMISES in GET.
+    inv MEM. exploit Memory.max_full_ts_exists; eauto.
+    instantiate (1:=loc). i. des.
+    exploit max_full_ts_max_ts; eauto. i. des; clarify.
+    inv x0. des. unfold Memory.get in GET0. rewrite GET0 in *. clarify.
+  - left. exploit THREADS0; eauto. intros LCWF. inv LCWF. dup GET. eapply PROMISES in GET.
+    inv FORGET. esplits; eauto.
+    hexploit sim_pf_other_promise; try eassumption. intros UNCH. inv UNCH.
+    econs; eauto. erewrite COMPLETE; eauto.
+Qed.
+
+    + destruct (Memory.get loc to (Local.promises lc0)) eqn:GET1; eauto. destruct p.
+      exploit sim_pf_other_promise; eauto.
+
+      eauto.
+
+      * eauto.
+      * auto.
+
+      ; eauto.
+
+sim_pf_other_promise
+
+    inv LCWF. eapply PROMISES in GET.
+
+
+    inv FORGET.
+
+
+  exploit ().
+
+  unfold FORGET0.
+
+
+  destruct
+
+
+  ii.
+
+.
+
+
+        (<<GET: Memory.get loc to proms = Some (ts, msg)>>)) \/
+    True.
+
+
+
+
+    latest_other_reserves lc0.(Local.promises) c_tgt0.(Configuration.memory)
+    <2= other_promises c_tgt0 tid.
+
+
+
+      (th0 th1: Thread.t lang) (L: Loc.t -> Time.t -> Prop) e
+      (MLE: Memory.le th0.(Thread.local).(Local.promises) th0.(Thread.memory))
+      (STEP: AThread.step_allpf e th0 th1)
+      (UNCH: forall loc from (SAT: L loc from),
+          exists to msg,
+            (<<TS: Time.lt from to>>) /\
+            (<<UNCH: unchangable th0.(Thread.memory) th0.(Thread.local).(Local.promises) loc to from msg>>))
+  :
+    no_update_on L e.
+Proof.
+  unfold no_update_on. des_ifs. ii. eapply UNCH in H. des.
+  inv STEP. dup STEP0. eapply step_write_not_in in STEP1; auto.
+  assert (TSRW: Time.lt tsr tsw).
+  { inv STEP0; inv STEP. ss. inv LOCAL. destruct lc3, lc2.
+    eapply write_msg_wf in LOCAL2. des. auto. }
+  ss. eapply (STEP1 (Time.meet to tsw)).
+  - unfold Time.meet. des_ifs; econs; ss. refl.
+  - econs; eauto.
+    unfold Time.meet. des_ifs; econs; ss.
+    + refl.
+    + left. auto.
+Qed.
+
+
+Lemma sim_pf_other_promises_unreserved
+      L c_src0 c_tgt0 tid mlast spaces updates aupdates
+      (SIM: sim_pf_minus_one tid mlast spaces updates aupdates c_src0 c_tgt0)
+      lang st0 lc0
+      (TIDTGT:
+         IdentMap.find tid c_tgt0.(Configuration.threads) =
+         Some (existT _ lang st0, lc0))
+      mem
+      (FORGET: forget_memory L mem (Configuration.memory c_tgt0))
+  :
+    forall loc to (SAT: ((other_promises c_tgt0 tid) -2 L) loc to),
+    exists from msg,
+      (<<UNCH: unchangable mem (Local.promises lc0) loc to from msg >>).
+Proof.
+  dup SIM. inv SIM. i. des. inv SAT. inv PROMISED.
+  destruct msg as [from msg]. eapply sim_pf_other_promise_unreserved in GET; eauto.
+Qed.
+
+
+
+
+  latest_other_reserves e0.(Thread.local).(Local.promises) e0.(Thread.memory)
+
+  }
+
+  exploit forget_compose_middle.
+  { eapply forget_memory_equivalent; eauto.
+    instantiate (1:=P -2 L). instantiate (1:=L).
+    i. split; i.
+    - destruct (classic (L loc to)); auto.
+    - des; auto. }
+
+  exploit forget_compose_middle.
+  { eapply forget_memory_equivalent; eauto.
+    instantiate (1:=P /2\ L). instantiate (1:=P).
+    i. split; i.
+    - destruct (classic (L loc to)); auto.
+    - des; auto. }
+
+
+    eapply FORGET. }
+  { inst
+
+  eapply forget_compose_middle; eauto.
+  eapply forget_memory_equivalent; eauto.
+
+
+  eapply forget_compose_middle; eauto.
+  eapply forget_memory_overlap; eauto.
+
+
+  cycle 1.
+
+
+  exploit forget_compose_middle; cycle 1.
+  { eapply FORGET. }
+  { inst
+
+  eapply forget_compose_middle; eauto.
+  eapply forget_memory_equivalent; eauto.
+
+  try apply FORGET0.
+    instantiate (1:= P). instantiate (1:= P -2 L).
+    i. split; i.
+    - destruct (classic (L loc to)); auto.
+    - des; auto. }
+   { eauto. }
+  i.
+
+    inst
+
+
+  hexploit (forget_exists (P -2 L) mem_tgt'). i. des.
+  econs; eauto.
+
+
+  econs; try apply FOGET.
+  eauto.
+
+
+  econs.
+
+
+Lemma sim_pf_other_spaces
+      c_src0 c_tgt0 tid mlast spaces updates aupdates
+      lang st0 lc0
+      (TIDTGT:
+         IdentMap.find tid c_tgt0.(Configuration.threads) =
+         Some (existT _ lang st0, lc0))
+      (SIM: sim_pf_minus_one tid mlast spaces updates aupdates c_src0 c_tgt0)
+  :
+    other_spaces tid spaces <2= unwritable (Configuration.memory c_tgt0) (Local.promises lc0).
+Proof.
+  ii. inv PR. inv SIM. exploit THREADS; eauto. intros [].
+  inv FORGET. specialize (THS tid').
+  unfold option_rel in THS. des_ifs.
+  { inv THS. destruct st. exploit INV; eauto. intros [].
+    exploit SPACES; eauto. intros CONCRETE.
+    inv CONCRETE. inv COVERED. dup GET.
+    dup Heq0. eapply configuration_wf_promises_le in Heq0; eauto.
+    eapply Heq0 in GET. econs; eauto. econs; eauto.
+    inv WFTGT. inv WF.
+    destruct (Memory.get x0 to (Local.promises lc0)) eqn: GET1; auto.
+    destruct p. exfalso.
+    exploit DISJOINT; try eassumption. intros [].
+    eapply Memory.disjoint_get; eauto. }
+  { exfalso. exploit INVBOT; eauto. i. des. eapply SPACESBOT; eauto. }
+Qed.
+
+
+
+(latest_other_reserves e0.(Thread.local).(Local.promises) e0.(Thread.memory))
+
+
+
+
+(OTHERS: forall loc to (SAT: others loc to),
+    exists from msg, <<UNCH: unchangable th_tgt.(Thread.memory) th_tgt.(Thread.local).(Local.promises) loc to from msg>>)
+(OTHERSPACE: otherspace <2= unwritable th_tgt.(Thread.memory) th_tgt.(Thread.local).(Local.promises))
+(CONSISTENT: Local.promise_consistent th_tgt'.(Thread.local))
+(NOATTATCH: not_attatched updates th_src.(Thread.memory))
+
+
+Lemma sim_pf_other_promise
+      c_src0 c_tgt0 tid mlast spaces updates aupdates
+      (SIM: sim_pf_minus_one tid mlast spaces updates aupdates c_src0 c_tgt0)
+      lang st0 lc0
+      (TIDTGT:
+         IdentMap.find tid c_tgt0.(Configuration.threads) =
+         Some (existT _ lang st0, lc0))
+      tid' st1 lc1
+      (NEQ: tid <> tid')
+      (TIDTGT':
+         IdentMap.find tid' c_tgt0.(Configuration.threads) =
+         Some (st1, lc1))
+      loc from to msg
+      (GET: Memory.get loc to lc1.(Local.promises) = Some (from, msg))
+  :
+    unchangable (Configuration.memory c_tgt0) (Local.promises lc0) loc to from msg.
+Proof.
+  inv SIM. exploit THREADS; eauto. i.
+  inv WFTGT. inv WF. destruct st1 as [lang1 st1].
+  exploit THREADS0; try apply TIDTGT'. intros LCWF. inv LCWF.
+  dup GET. eapply PROMISES in GET0. esplits. econs; eauto.
+  exploit DISJOINT; eauto. intros [].
+  destruct (Memory.get loc to (Local.promises lc0)) eqn: GET1; auto.
+  destruct p. exfalso.
+  eapply Memory.disjoint_get; eauto.
+Qed.
+
+
+
+
+Lemma sim_pf_other_promises
+      c_src0 c_tgt0 tid mlast spaces updates aupdates
+      (SIM: sim_pf_minus_one tid mlast spaces updates aupdates c_src0 c_tgt0)
+      lang st0 lc0
+      (TIDTGT:
+         IdentMap.find tid c_tgt0.(Configuration.threads) =
+         Some (existT _ lang st0, lc0))
+  :
+    forall loc to (SAT: other_promises c_tgt0 tid loc to),
+    exists from msg,
+      (<<UNCH: unchangable (Configuration.memory c_tgt0) (Local.promises lc0) loc to from msg >>).
+Proof.
+  dup SIM. inv SIM. i. inv SAT. inv PROMISED.
+  destruct msg as [from msg]. eapply sim_pf_other_promise in GET; eauto.
+Qed.
+
+Lemma sim_pf_not_attatched
+      c_src0 c_tgt0 tid mlast spaces updates aupdates
+      (SIM: sim_pf_minus_one tid mlast spaces updates aupdates c_src0 c_tgt0)
+  :
+    not_attatched (other_updates tid updates aupdates) (Configuration.memory c_src0).
+Proof.
+  inv SIM. ii. inv SAT.
+  - inv H. exploit THREADS; eauto. intros [].
+    eapply NOATTATCH; eauto.
+  - inv H. exploit THREADS; eauto. intros [].
+    eapply NOATTATCH; eauto.
+Qed.
+
+Lemma configuration_wf_promises_le c tid lang st lc
+      (WF: Configuration.wf c)
+      (TID: IdentMap.find tid c.(Configuration.threads) =
+            Some (existT _ lang st, lc))
+  :
+    Memory.le lc.(Local.promises) c.(Configuration.memory).
+Proof.
+  inv WF. inv WF0. exploit THREADS; eauto. intros []. auto.
+Qed.
+
+Lemma sim_pf_other_spaces
+      c_src0 c_tgt0 tid mlast spaces updates aupdates
+      lang st0 lc0
+      (TIDTGT:
+         IdentMap.find tid c_tgt0.(Configuration.threads) =
+         Some (existT _ lang st0, lc0))
+      (SIM: sim_pf_minus_one tid mlast spaces updates aupdates c_src0 c_tgt0)
+  :
+    other_spaces tid spaces <2= unwritable (Configuration.memory c_tgt0) (Local.promises lc0).
+Proof.
+  ii. inv PR. inv SIM. exploit THREADS; eauto. intros [].
+  inv FORGET. specialize (THS tid').
+  unfold option_rel in THS. des_ifs.
+  { inv THS. destruct st. exploit INV; eauto. intros [].
+    exploit SPACES; eauto. intros CONCRETE.
+    inv CONCRETE. inv COVERED. dup GET.
+    dup Heq0. eapply configuration_wf_promises_le in Heq0; eauto.
+    eapply Heq0 in GET. econs; eauto. econs; eauto.
+    inv WFTGT. inv WF.
+    destruct (Memory.get x0 to (Local.promises lc0)) eqn: GET1; auto.
+    destruct p. exfalso.
+    exploit DISJOINT; try eassumption. intros [].
+    eapply Memory.disjoint_get; eauto. }
+  { exfalso. exploit INVBOT; eauto. i. des. eapply SPACESBOT; eauto. }
+Qed.
+
+Lemma already_updated lang (th0 th1: Thread.t lang) (L: Loc.t -> Time.t -> Prop) e
+      (MLE: Memory.le th0.(Thread.local).(Local.promises) th0.(Thread.memory))
+      (STEP: AThread.step_allpf e th0 th1)
+      (UNCH: forall loc from (SAT: L loc from),
+          exists to msg,
+            (<<TS: Time.lt from to>>) /\
+            (<<UNCH: unchangable th0.(Thread.memory) th0.(Thread.local).(Local.promises) loc to from msg>>))
+  :
+    no_update_on L e.
+Proof.
+  unfold no_update_on. des_ifs. ii. eapply UNCH in H. des.
+  inv STEP. dup STEP0. eapply step_write_not_in in STEP1; auto.
+  assert (TSRW: Time.lt tsr tsw).
+  { inv STEP0; inv STEP. ss. inv LOCAL. destruct lc3, lc2.
+    eapply write_msg_wf in LOCAL2. des. auto. }
+  ss. eapply (STEP1 (Time.meet to tsw)).
+  - unfold Time.meet. des_ifs; econs; ss. refl.
+  - econs; eauto.
+    unfold Time.meet. des_ifs; econs; ss.
+    + refl.
+    + left. auto.
+Qed.
+
+
+
+
+Lemma sim_pf_read_promise_race_certification
       P Q c_src0 c_tgt0 tid mlast spaces updates aupdates
       (SIM: sim_pf_minus_one tid mlast spaces updates aupdates c_src0 c_tgt0)
       lang st0 lc0
@@ -979,6 +1640,7 @@ Proof.
     exploit race_lemma; try eassumption; ss.
     econs; eauto.
 Qed.
+
 
 
 Require Import AProp.
@@ -1155,498 +1817,65 @@ Proof.
 Qed.
 
 
-
-
-        , TIDSRC0; auto.
-        ex
-
-        econs;
-
-
-          etrans; eauto.
-
-        etrans; eauto.
-
-
-
-
-    -
-
-            exfalso. eapply SAT; eauto. }
-            rewrite
-
-      + econs; eauto.
-
-
-        * inv H0. destruct (classic (tid = tid0)).
-          right. clarify.
-      + left. econs; eauto.
-    - des.
-      + inv H. econs; eauto.
-      + econs; eauto.
+Inductive pf_consistent_drf_src'
+          (prom: Loc.t -> Time.t -> Prop)
+          (max: TimeMap.t)
+          lang
+          (th0:Thread.t lang)
+          (spaces updates aupdates: Loc.t -> Time.t -> Prop)
+  : Prop :=
+  exists tr th1,
+    (<<STEPS: traced_step tr th0 th1>>) /\
+    (<<NOPROMISE:
 
 
 
-  with
 
 
-
-      + eauto.
-      + eapply STEP0.
-      + eapply STEP3.
-    -
-
-  rtc
-
-{|
-                      Configuration.threads := IdentMap.add tid
-                                                 (existT (Language.state (E:=ProgramEvent.t))
-                                                    lang st3, lc3) (Configuration.threads c1);
-                      Configuration.sc := sc3;
-                      Configuration.memory := memory3 |}
-
-
-  assert (opt_pftstep e tid c_src0 c_src1
-
-      in HOLD; ss.
-
-    ; ss. ss.
-
-
-             ; eauto.
-
-  (RACE': ~ ((no_update_on (other_updates tid updates aupdates))
-                   /1\ (no_read_msgs (other_promises c_tgt0 tid))) e')
-
-
-
-       (<<SAT: forall tid' (NEQ: tid <> tid') lang_src st_src lc_src lang_tgt st_tgt lc_tgt
-                      (TIDSRC: IdentMap.find tid' c_src1.(Configuration.threads) =
-                               Some (existT _ lang_src st_src, lc_src))
-                      (TIDTGT: IdentMap.find tid' c_tgt1.(Configuration.threads) =
-                               Some (existT _ lang_tgt st_tgt, lc_tgt)),
-           (<<FUTURE: unchanged_on (spaces tid') (mlast tid') c_src1.(Configuration.memory)>>) /\
-           (<<NOATTATCH: not_attatched (updates tid') c_src1.(Configuration.memory)>>) /\
-           (<<INV: Inv.t c_tgt1.(Configuration.memory) _ st_src lc_src lc_tgt.(Local.promises) (spaces tid') (updates tid') (aupdates tid') (mlast tid')>>)>>))
+  : Prop :=
+  let L := (fun loc => Memory.latest_reserve loc e0.(Thread.local).(Local.promises) e0.(Thread.memory)) in
+  forall mem2 max
+         (FORGET: forget_memory (latest_other_reserves e0.(Thread.local).(Local.promises) e0.(Thread.memory)) mem2 e0.(Thread.memory))
+         (MAX: Memory.max_full_timemap e0.(Thread.memory) max),
+  exists e1 (U: list Loc.t) (AU: list Loc.t),
+    (<<DISJOINT: forall loc (INU: List.In loc U) (INAU: List.In loc AU), False>>) /\
+    (<<AUPDATES: forall loc (INAU: List.In loc AU), ~ L loc>>) /\
+    (<<STEPS0: rtc (tau (@pred_step is_cancel lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot mem2) e1>>) /\
+    (<<NORESERVE: no_reserves e1.(Thread.local).(Local.promises)>>) /\
+    (* (<<NOATTATCH: not_attatched (Memory.max_full_ts e0.(Thread.memory)) e1.(Thread.memory)>>) /\ *)
+    (<<MAXMAP: TimeMap.le (Memory.max_timemap e1.(Thread.memory)) max>>) /\
+    exists e2 tr max',
+      (<<STEPS1: traced_step tr e1 e2>>) /\
+      (<<TIMEMAP: TimeMap.le max max'>>) /\
+      (<<GAP: forall loc (NUPDATES: ~ List.In loc (U ++ AU)),
+          Time.lt (max loc) (max' loc)>>) /\
+      (<<ATTATCHED: not_attatched (fun loc to => (<<MAX: Memory.max_full_ts e0.(Thread.memory) loc to>>) /\
+                                                 (<<NUPDATES: ~ List.In loc (U ++ AU)>>))
+                                  e2.(Thread.memory)>>) /\
+      (<<TRACE: List.Forall (fun em => <<EVENT: (promise_free /1\ (fun e => ~ is_cancel e) /1\ no_sc
+                                                              /1\
+                                                              (write_in (later_times max' \2/ (concrete_covered e0.(Thread.local).(Local.promises) e0.(Thread.memory) /2\ earlier_times max)))
+                                                ) (fst em)>> /\ <<MEMORY: not_attatched (fun loc to => (<<MAX: Memory.max_full_ts e0.(Thread.memory) loc to>>) /\
+                                                                                                                                                           (<<NUPDATES: ~ List.In loc (U ++ AU)>>)) (snd em)>>) tr>>) /\
+      (<<COMPLETEU:
+         forall loc (SAT: List.In loc U),
+         exists to valr valw releasedr releasedw ordr ordw mem,
+           <<IN: List.In (ThreadEvent.update loc (max loc) to valr valw releasedr releasedw ordr ordw, mem) tr>> /\ <<ORDR: Ordering.le ordr Ordering.strong_relaxed>> >>) /\
+      (<<COMPLETEAU:
+         forall loc (SAT: List.In loc AU),
+         exists to valr valw releasedr releasedw ordr ordw mem,
+           <<IN: List.In (ThreadEvent.update loc (max loc) to valr valw releasedr releasedw ordr ordw, mem) tr>> >>) /\
+      (__guard__((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
+                 ((<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>) /\
+                  (<<COMPLETEW:
+                     forall loc to (PROMISED: concrete_promised e0.(Thread.local).(Local.promises) loc to),
+                     exists e m,
+                       (<<IN: List.In (e, m) tr>>) /\
+                       (<<WRITETO: write_to loc to e>>)>>))))
 .
-Proof.
-  inv SIM. inv FORGET. dup THS. specialize (THS tid).
-  eapply configuration_step_equivalent in STEP. inv STEP; ss.
-
-  rewrite TID in THS. unfold option_rel in *. des_ifs. inv THS.
-  dup WFTGT. inv WFTGT.
-  exploit Thread.rtc_tau_step_future; eauto; ss.
-  { inv WF. eauto. }
-  i. des.
-  exploit Thread.step_future; eauto.
-  i. des. ss.
-
-  assert (CONSISTENT1: Local.promise_consistent lc3).
-  { destruct (classic (e0 = ThreadEvent.failure)).
-    - inv STEP0; inv STEP; ss. inv LOCAL. inv LOCAL0. ss.
-    - hexploit PromiseConsistent.consistent_promise_consistent; eauto. }
-  assert (CONSISTENT0: Local.promise_consistent e2.(Thread.local)).
-  { hexploit PromiseConsistent.step_promise_consistent; eauto. }
-
-  set (oproms := all_promises c_tgt0.(Configuration.threads) (fun tid' => tid <> tid')).
-  (* set (oproms := other_promises tid (Configuration.threads c_tgt0)). *)
-  set (oupdates := other_updates tid updates \2/ other_updates tid aupdates).
-  set (ospace := other_space tid (Configuration.threads c_tgt0) (Configuration.memory c_tgt0)).
-
-  assert (OPROMS: (oproms \2/ promised lc1.(Local.promises)) = (all_promises c_tgt0.(Configuration.threads) (fun _ => True))).
-  { extensionality loc. extensionality to.
-    apply Coq.Logic.PropExtensionality.propositional_extensionality.
-    unfold oproms. split; i.
-    - des.
-      + inv H. econs; eauto.
-      + econs; eauto.
-    - inv H. destruct (classic (tid = tid0)).
-      + right. clarify.
-      + left. econs; eauto. }
-
-  assert (OSPACE: oproms <2= unwritable (Configuration.memory c_tgt0) lc1.(Local.promises)).
-  { admit. }
-
-    (* i. des. *)
-    (* - inv PR. inv WF. destruct st. *)
-    (*   exploit THREADS; eauto. i. inv x2. *)
-    (*   inv PROMISED. destruct msg. *)
-    (*   exploit Memory.get_ts; eauto. i. des. *)
-    (*   { clarify. erewrite BOT in GET. clarify. } *)
-    (*   econs. *)
-    (*   + red. econs; eauto. econs; eauto; ss. refl. *)
-    (*   + ii. inv H. exploit DISJOINT; try eassumption. *)
-    (*     i. inv x2. ss. inv DISJOINT0. *)
-    (*     exploit DISJOINT1; try eassumption. i. des. *)
-    (*     eapply x2; eauto. econs; ss; eauto. refl. *)
-    (* - inv PR. inv WF. *)
-    (*   exploit THREADS; eauto. i. inv x. *)
-    (*   inv SPACE. *)
-    (*   + econs. *)
-    (*     * red. econs; eauto. *)
-    (*     * ii. inv H. exploit DISJOINT; try eassumption. *)
-    (*       i. inv x. ss. inv DISJOINT0. *)
-    (*       exploit DISJOINT1; try eassumption. i. des. *)
-    (*       eapply x; eauto. *)
-    (*   + econs. *)
-    (*     * red. econs; [eapply PROMISES|]; eauto. *)
-    (*     * ii. inv H. exploit DISJOINT; try eassumption. *)
-    (*       i. inv x. ss. inv DISJOINT0. *)
-    (*       exploit DISJOINT1; try eassumption. i. des. *)
-    (*       eapply x; eauto. } *)
-
-    hexploit (@hold_or_not (fun _ => True) ((no_update_on oupdates) /1\ (no_read_msgs oproms))).
-    { eapply pred_steps_thread_steps. eapply STEPS. }
-    i. des.
-
-    - exploit step_lifting_rtc.
-      + eapply pred_step_rtc_mon; [|apply HOLD]. i. ss. des.
-        instantiate (1:=oproms). instantiate (1:=oupdates). eauto.
-      + instantiate (1:=Thread.mk _ st1 (Local.mk tview0 Memory.bot) (Configuration.sc c_src0) (Configuration.memory c_src0)).
-        rewrite SC. econs. rewrite OPROMS. auto.
-      + ss. unfold oupdates. ii. inv SAT.
-        eapply NOATTATCH; eauto.
-      + inv WF. econs; eauto.
-      + eauto.
-      + eauto.
-      + i. des. inv FORGET. destruct lc3. ss.
-        destruct (classic (((no_update_on oupdates) /1\ (no_read_msgs oproms)) e0)).
-        * exploit step_lifting.
-          { econs. econs. eapply STEP0.
-            splits; ss; eapply H. }
-          { ss. }
-          { ss. }
-          { ss. }
-          { eauto. }
-          { eauto. }
-          { eauto. }
-          { i. eapply rtc_unchangables_increase in STEPS; ss; eauto. }
-          { eauto. }
-          { eauto. }
-          { eauto. }
-          { i. des.
-            assert (OPROMS': (oproms \2/ promised promises) =
-                             (all_promises
-                                (IdentMap.add
-                                   tid
-                                   (existT (Language.state (E:=ProgramEvent.t)) lang st3,
-                                    (Local.mk tview promises))
-                                   (Configuration.threads c_tgt0)))
-                               (fun _ => True)).
-            { extensionality loc. extensionality to.
-              apply Coq.Logic.PropExtensionality.propositional_extensionality.
-              unfold oproms. split; i.
-              - des.
-                + inv H1. econs; eauto. ss.
-                  erewrite IdentMap.gso; eauto.
-                + econs; eauto. ss.
-                  erewrite IdentMap.gss; eauto. ss.
-              - inv H1. ss. rewrite IdentMap.gsspec in *. des_ifs.
-                + right. ss.
-                + left. econs; eauto. }
-            inv STEP1.
-            - eapply rtc_tail in STEP. des; ss.
-              + inv STEP1. esplits.
-                * rewrite <- EVT. rewrite <- EVENT0.
-                  econs 2. econs.
-                  { eauto. }
-                  { eapply no_promise_program_step_rtc; eauto. }
-                  { eapply no_promise_program_step; eauto. }
-                * econs; ss.
-                  { i. repeat rewrite IdentMap.gsspec. des_ifs.
-                    eapply THS0. }
-                  { rewrite OPROMS' in *. ss. }
-                * i. ss.
-                  rewrite IdentMap.gso in TIDSRC; auto.
-                  rewrite IdentMap.gso in TIDTGT; auto.
-                  exploit INV; eauto. i.
-                  splits.
-                  { etrans; eauto.
-                    eapply unchanged_on_mon; eauto. i.
-                    eapply x.(Inv.SPACES) in PR.
-                    econs; eauto. }
-                  { eapply not_attatched_mon; eauto.
-                    i. econs; eauto. }
-                  { eapply inv_step; eauto. etrans; eauto. }
-              + clarify. esplits.
-                * rewrite <- EVT. econs.
-                * econs; ss.
-                  { i. rewrite IdentMap.gsspec. des_ifs.
-                    - rewrite Heq. ss.
-                    - eapply THS0. }
-                  { rewrite OPROMS' in *. ss. }
-                * i. splits.
-                  { etrans; eauto. refl. }
-                  { i. eapply not_attatched_mon; eauto.
-                    i. econs; eauto. }
-                  { i. rewrite IdentMap.gso in TIDTGT; eauto.
-                    exploit INV; eauto. i.
-                    eapply inv_step; eauto. etrans; eauto. }
-            - esplits.
-              * rewrite <- EVT. econs 2. econs.
-                { eauto. }
-                { eapply no_promise_program_step_rtc; eauto. }
-                { eapply no_promise_program_step; eauto. }
-              * econs; ss.
-                { i. repeat rewrite IdentMap.gsspec. des_ifs.
-                  eapply THS0. }
-                { rewrite OPROMS' in *. ss. }
-              * i. ss.
-                rewrite IdentMap.gso in TIDSRC; auto.
-                rewrite IdentMap.gso in TIDTGT; auto.
-                exploit INV; eauto. i.
-                splits.
-                { etrans; eauto.
-                  eapply unchanged_on_mon.
-                  - etrans; eauto.
-                  - i. eapply x.(Inv.SPACES) in PR.
-                    econs; eauto. }
-                { eapply not_attatched_mon; eauto.
-                  i. econs; eauto. }
-                { eapply inv_step; eauto. etrans; eauto. }
-          }
-        * apply not_and_or in H. des.
-          { unfold no_update_on in H. des_ifs.
-            apply NNPP in H. inv H.
-            destruct (IdentMap.find tid' (Configuration.threads c_src0)) as
-                [[[? ?] lc]|] eqn:FIND; cycle 1.
-            { exfalso. eapply INVBOT in FIND. des.
-              eapply UPDATESBOT; eauto. }
-            specialize (THS0 tid'). rewrite FIND in *. des_ifs. inv THS0.
-            exploit INV; eauto. i. inv x0.
-
-            exploit AUPDATE.
-            { eauto. }
-            { etrans; eauto. eapply unchanged_on_mon; eauto.
-              i. econs; eauto. }
-            { eapply not_attatched_sum.
-              - admit.
-              - eapply not_attatched_mon; eauto.
-                i. econs; eauto. }
-            i. des. exfalso. eapply race_lemma; try eassumption.
-            - eapply no_promise_program_step_rtc. eapply STEP.
-            -
-Admitted.
 
 
 
-Lemma sim_pf_step
-      c_src0 c_tgt0 c_tgt1 tid e mlast spaces updates aupdates
-      (SIM: sim_pf mlast spaces updates aupdates c_src0 c_tgt0)
-      (STEP: Configuration.step e tid c_tgt0 c_tgt1)
-  :
-    exists c_src1,
-      (<<STEP: opt_pftstep e tid c_src0 c_src1>>) /\
-      (<<FORGET: forget_config c_src1 c_tgt1>>) /\
-
-
-       (<<SAT: forall tid' (NEQ: tid <> tid') lang_src st_src lc_src lang_tgt st_tgt lc_tgt
-                      (TIDSRC: IdentMap.find tid' c_src1.(Configuration.threads) =
-                               Some (existT _ lang_src st_src, lc_src))
-                      (TIDTGT: IdentMap.find tid' c_tgt1.(Configuration.threads) =
-                               Some (existT _ lang_tgt st_tgt, lc_tgt)),
-           (<<FUTURE: unchanged_on (spaces tid') (mlast tid') c_src1.(Configuration.memory)>>) /\
-           (<<NOATTATCH: not_attatched (updates tid') c_src1.(Configuration.memory)>>) /\
-           (<<INV: Inv.t c_tgt1.(Configuration.memory) _ st_src lc_src lc_tgt.(Local.promises) (spaces tid') (updates tid') (aupdates tid') (mlast tid')>>)>>))
-.
-Proof.
-  inv SIM. inv FORGET. dup THS. specialize (THS tid).
-  eapply configuration_step_equivalent in STEP. inv STEP; ss.
-
-  rewrite TID in THS. unfold option_rel in *. des_ifs. inv THS.
-  dup WFTGT. inv WFTGT.
-  exploit Thread.rtc_tau_step_future; eauto; ss.
-  { inv WF. eauto. }
-  i. des.
-  exploit Thread.step_future; eauto.
-  i. des. ss.
-
-  assert (CONSISTENT1: Local.promise_consistent lc3).
-  { destruct (classic (e0 = ThreadEvent.failure)).
-    - inv STEP0; inv STEP; ss. inv LOCAL. inv LOCAL0. ss.
-    - hexploit PromiseConsistent.consistent_promise_consistent; eauto. }
-  assert (CONSISTENT0: Local.promise_consistent e2.(Thread.local)).
-  { hexploit PromiseConsistent.step_promise_consistent; eauto. }
-
-  set (oproms := all_promises c_tgt0.(Configuration.threads) (fun tid' => tid <> tid')).
-  (* set (oproms := other_promises tid (Configuration.threads c_tgt0)). *)
-  set (oupdates := other_updates tid updates \2/ other_updates tid aupdates).
-  set (ospace := other_space tid (Configuration.threads c_tgt0) (Configuration.memory c_tgt0)).
-
-  assert (OPROMS: (oproms \2/ promised lc1.(Local.promises)) = (all_promises c_tgt0.(Configuration.threads) (fun _ => True))).
-  { extensionality loc. extensionality to.
-    apply Coq.Logic.PropExtensionality.propositional_extensionality.
-    unfold oproms. split; i.
-    - des.
-      + inv H. econs; eauto.
-      + econs; eauto.
-    - inv H. destruct (classic (tid = tid0)).
-      + right. clarify.
-      + left. econs; eauto. }
-
-  assert (OSPACE: oproms <2= unwritable (Configuration.memory c_tgt0) lc1.(Local.promises)).
-  { admit. }
-
-    (* i. des. *)
-    (* - inv PR. inv WF. destruct st. *)
-    (*   exploit THREADS; eauto. i. inv x2. *)
-    (*   inv PROMISED. destruct msg. *)
-    (*   exploit Memory.get_ts; eauto. i. des. *)
-    (*   { clarify. erewrite BOT in GET. clarify. } *)
-    (*   econs. *)
-    (*   + red. econs; eauto. econs; eauto; ss. refl. *)
-    (*   + ii. inv H. exploit DISJOINT; try eassumption. *)
-    (*     i. inv x2. ss. inv DISJOINT0. *)
-    (*     exploit DISJOINT1; try eassumption. i. des. *)
-    (*     eapply x2; eauto. econs; ss; eauto. refl. *)
-    (* - inv PR. inv WF. *)
-    (*   exploit THREADS; eauto. i. inv x. *)
-    (*   inv SPACE. *)
-    (*   + econs. *)
-    (*     * red. econs; eauto. *)
-    (*     * ii. inv H. exploit DISJOINT; try eassumption. *)
-    (*       i. inv x. ss. inv DISJOINT0. *)
-    (*       exploit DISJOINT1; try eassumption. i. des. *)
-    (*       eapply x; eauto. *)
-    (*   + econs. *)
-    (*     * red. econs; [eapply PROMISES|]; eauto. *)
-    (*     * ii. inv H. exploit DISJOINT; try eassumption. *)
-    (*       i. inv x. ss. inv DISJOINT0. *)
-    (*       exploit DISJOINT1; try eassumption. i. des. *)
-    (*       eapply x; eauto. } *)
-
-    hexploit (@hold_or_not (fun _ => True) ((no_update_on oupdates) /1\ (no_read_msgs oproms))).
-    { eapply pred_steps_thread_steps. eapply STEPS. }
-    i. des.
-
-    - exploit step_lifting_rtc.
-      + eapply pred_step_rtc_mon; [|apply HOLD]. i. ss. des.
-        instantiate (1:=oproms). instantiate (1:=oupdates). eauto.
-      + instantiate (1:=Thread.mk _ st1 (Local.mk tview0 Memory.bot) (Configuration.sc c_src0) (Configuration.memory c_src0)).
-        rewrite SC. econs. rewrite OPROMS. auto.
-      + ss. unfold oupdates. ii. inv SAT.
-        eapply NOATTATCH; eauto.
-      + inv WF. econs; eauto.
-      + eauto.
-      + eauto.
-      + i. des. inv FORGET. destruct lc3. ss.
-        destruct (classic (((no_update_on oupdates) /1\ (no_read_msgs oproms)) e0)).
-        * exploit step_lifting.
-          { econs. econs. eapply STEP0.
-            splits; ss; eapply H. }
-          { ss. }
-          { ss. }
-          { ss. }
-          { eauto. }
-          { eauto. }
-          { eauto. }
-          { i. eapply rtc_unchangables_increase in STEPS; ss; eauto. }
-          { eauto. }
-          { eauto. }
-          { eauto. }
-          { i. des.
-            assert (OPROMS': (oproms \2/ promised promises) =
-                             (all_promises
-                                (IdentMap.add
-                                   tid
-                                   (existT (Language.state (E:=ProgramEvent.t)) lang st3,
-                                    (Local.mk tview promises))
-                                   (Configuration.threads c_tgt0)))
-                               (fun _ => True)).
-            { extensionality loc. extensionality to.
-              apply Coq.Logic.PropExtensionality.propositional_extensionality.
-              unfold oproms. split; i.
-              - des.
-                + inv H1. econs; eauto. ss.
-                  erewrite IdentMap.gso; eauto.
-                + econs; eauto. ss.
-                  erewrite IdentMap.gss; eauto. ss.
-              - inv H1. ss. rewrite IdentMap.gsspec in *. des_ifs.
-                + right. ss.
-                + left. econs; eauto. }
-            inv STEP1.
-            - eapply rtc_tail in STEP. des; ss.
-              + inv STEP1. esplits.
-                * rewrite <- EVT. rewrite <- EVENT0.
-                  econs 2. econs.
-                  { eauto. }
-                  { eapply no_promise_program_step_rtc; eauto. }
-                  { eapply no_promise_program_step; eauto. }
-                * econs; ss.
-                  { i. repeat rewrite IdentMap.gsspec. des_ifs.
-                    eapply THS0. }
-                  { rewrite OPROMS' in *. ss. }
-                * i. ss.
-                  rewrite IdentMap.gso in TIDSRC; auto.
-                  rewrite IdentMap.gso in TIDTGT; auto.
-                  exploit INV; eauto. i.
-                  splits.
-                  { etrans; eauto.
-                    eapply unchanged_on_mon; eauto. i.
-                    eapply x.(Inv.SPACES) in PR.
-                    econs; eauto. }
-                  { eapply not_attatched_mon; eauto.
-                    i. econs; eauto. }
-                  { eapply inv_step; eauto. etrans; eauto. }
-              + clarify. esplits.
-                * rewrite <- EVT. econs.
-                * econs; ss.
-                  { i. rewrite IdentMap.gsspec. des_ifs.
-                    - rewrite Heq. ss.
-                    - eapply THS0. }
-                  { rewrite OPROMS' in *. ss. }
-                * i. splits.
-                  { etrans; eauto. refl. }
-                  { i. eapply not_attatched_mon; eauto.
-                    i. econs; eauto. }
-                  { i. rewrite IdentMap.gso in TIDTGT; eauto.
-                    exploit INV; eauto. i.
-                    eapply inv_step; eauto. etrans; eauto. }
-            - esplits.
-              * rewrite <- EVT. econs 2. econs.
-                { eauto. }
-                { eapply no_promise_program_step_rtc; eauto. }
-                { eapply no_promise_program_step; eauto. }
-              * econs; ss.
-                { i. repeat rewrite IdentMap.gsspec. des_ifs.
-                  eapply THS0. }
-                { rewrite OPROMS' in *. ss. }
-              * i. ss.
-                rewrite IdentMap.gso in TIDSRC; auto.
-                rewrite IdentMap.gso in TIDTGT; auto.
-                exploit INV; eauto. i.
-                splits.
-                { etrans; eauto.
-                  eapply unchanged_on_mon.
-                  - etrans; eauto.
-                  - i. eapply x.(Inv.SPACES) in PR.
-                    econs; eauto. }
-                { eapply not_attatched_mon; eauto.
-                  i. econs; eauto. }
-                { eapply inv_step; eauto. etrans; eauto. }
-          }
-        * apply not_and_or in H. des.
-          { unfold no_update_on in H. des_ifs.
-            apply NNPP in H. inv H.
-            destruct (IdentMap.find tid' (Configuration.threads c_src0)) as
-                [[[? ?] lc]|] eqn:FIND; cycle 1.
-            { exfalso. eapply INVBOT in FIND. des.
-              eapply UPDATESBOT; eauto. }
-            specialize (THS0 tid'). rewrite FIND in *. des_ifs. inv THS0.
-            exploit INV; eauto. i. inv x0.
-
-            exploit AUPDATE.
-            { eauto. }
-            { etrans; eauto. eapply unchanged_on_mon; eauto.
-              i. econs; eauto. }
-            { eapply not_attatched_sum.
-              - admit.
-              - eapply not_attatched_mon; eauto.
-                i. econs; eauto. }
-            i. des. exfalso. eapply race_lemma; try eassumption.
-            - eapply no_promise_program_step_rtc. eapply STEP.
-            -
-Admitted.
 
 
 (*               eapply pred_step_rtc_mon; cycle 1. *)
