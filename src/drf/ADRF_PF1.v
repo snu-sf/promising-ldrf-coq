@@ -1373,6 +1373,136 @@ Proof.
     erewrite INHABITED in GET0. clarify.
 Qed.
 
+Definition reserver_exists (c: Configuration.t) :=
+  forall loc to from
+         (RESERVE: Memory.get loc to c.(Configuration.memory) = Some (from, Message.reserve)),
+  exists tid st lc,
+    (<<TIDSRC: IdentMap.find tid c.(Configuration.threads) =
+               Some (st, lc)>>) /\
+    (<<PROM: Memory.get loc to lc.(Local.promises) = Some (from, Message.reserve)>>).
+
+Require Import AProp.
+
+
+
+
+Lemma promise_new_reserve prom0 mem0 loc from to msg prom1 mem1 kind
+      (PROMISE: AMemory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
+      loc0 to0 from0
+      (GET: Memory.get loc0 to0 mem1 = Some (from0, Message.reserve))
+      (NONE: Memory.get loc0 to0 prom1 <> Some (from0, Message.reserve))
+  :
+    (<<GET: Memory.get loc0 to0 mem0 = Some (from0, Message.reserve)>>) /\
+    (<<NONE: Memory.get loc0 to0 prom0 <> Some (from0, Message.reserve)>>)
+.
+Proof.
+  inv PROMISE.
+  - erewrite Memory.add_o in GET; eauto.
+    erewrite Memory.add_o in NONE; eauto. des_ifs.
+  - erewrite Memory.split_o in GET; eauto.
+    erewrite Memory.split_o in NONE; eauto. des_ifs.
+  - erewrite Memory.lower_o in GET; eauto.
+    erewrite Memory.lower_o in NONE; eauto. des_ifs.
+  - erewrite Memory.remove_o in GET; eauto.
+    erewrite Memory.remove_o in NONE; eauto. des_ifs.
+Qed.
+
+Lemma write_new_reserve prom0 mem0 loc from to val released prom1 mem1 kind
+      (wRITE: AMemory.write prom0 mem0 loc from to val released prom1 mem1 kind)
+      loc0 to0 from0
+      (GET: Memory.get loc0 to0 mem1 = Some (from0, Message.reserve))
+      (NONE: Memory.get loc0 to0 prom1 <> Some (from0, Message.reserve))
+  :
+    (<<GET: Memory.get loc0 to0 mem0 = Some (from0, Message.reserve)>>) /\
+    (<<NONE: Memory.get loc0 to0 prom0 <> Some (from0, Message.reserve)>>)
+.
+Proof.
+  inv wRITE. erewrite Memory.remove_o in NONE; eauto. des_ifs.
+  - ss. des; clarify.
+    destruct (Memory.op_kind_is_cancel kind) eqn:KIND.
+    + inv PROMISE; ss; clarify.
+    + eapply AMemory.promise_get2 in PROMISE; auto. des. clarify.
+  - eapply promise_new_reserve; eauto.
+Qed.
+
+Lemma step_new_reserve lang (th0 th1: Thread.t lang) e
+      (STEP: AThread.step_allpf e th0 th1)
+      loc0 to0 from0
+      (GET: Memory.get loc0 to0 th1.(Thread.memory) = Some (from0, Message.reserve))
+      (NONE: Memory.get loc0 to0 th1.(Thread.local).(Local.promises) <> Some (from0, Message.reserve))
+  :
+    (<<GET: Memory.get loc0 to0 th0.(Thread.memory) = Some (from0, Message.reserve)>>) /\
+    (<<NONE: Memory.get loc0 to0 th0.(Thread.local).(Local.promises) <> Some (from0, Message.reserve)>>)
+.
+Proof.
+  inv STEP. inv STEP0; inv STEP.
+  - inv LOCAL. ss.
+    eapply promise_new_reserve in PROMISE; eauto.
+  - inv LOCAL; ss; try by inv LOCAL0; ss.
+    + inv LOCAL0. ss. eapply write_new_reserve in WRITE; eauto.
+    + inv LOCAL1. inv LOCAL2. eapply write_new_reserve in WRITE; eauto.
+Qed.
+
+Lemma steps_new_reserve lang (th0 th1: Thread.t lang)
+      (STEPS: rtc (tau (@AThread.step_allpf _)) th0 th1)
+      loc0 to0 from0
+      (GET: Memory.get loc0 to0 th1.(Thread.memory) = Some (from0, Message.reserve))
+      (NONE: Memory.get loc0 to0 th1.(Thread.local).(Local.promises) <> Some (from0, Message.reserve))
+  :
+    (<<GET: Memory.get loc0 to0 th0.(Thread.memory) = Some (from0, Message.reserve)>>) /\
+    (<<NONE: Memory.get loc0 to0 th0.(Thread.local).(Local.promises) <> Some (from0, Message.reserve)>>)
+.
+Proof.
+  ginduction STEPS.
+  - i. clarify.
+  - i. exploit IHSTEPS; eauto. i. des.
+    inv H. exploit step_new_reserve; eauto.
+Qed.
+
+Lemma step_reserver_exists_tgt c0 c1 tid e
+      (RESERVES: reserver_exists c0)
+      (STEP: Configuration.step e tid c0 c1)
+  :
+    reserver_exists c1.
+Proof.
+  apply configuration_step_equivalent in STEP. inv STEP. ii. ss.
+  destruct (classic (Memory.get loc to lc3.(Local.promises) = Some (from, Message.reserve))).
+  - exists tid. erewrite IdentMap.gss. esplits; eauto.
+  - exploit step_new_reserve.
+    { eapply thread_step_athread_step. econs; eauto. } all: eauto.
+    i. des.
+    exploit steps_new_reserve.
+    { eapply thread_steps_athread_steps. eauto. } all: eauto.
+    i. des. ss.
+    eapply RESERVES in GET0. des.
+    assert (NEQ: tid <> tid0).
+    { ii. clarify. }
+    exists tid0. esplits; eauto.
+    erewrite IdentMap.gso; eauto.
+Qed.
+
+Lemma step_reserver_exists_src c0 c1 tid e
+      (RESERVES: reserver_exists c0)
+      (STEP: pftstep e tid c0 c1)
+  :
+    reserver_exists c1.
+Proof.
+  inv STEP. ii. ss.
+  destruct (classic (Memory.get loc to lc3.(Local.promises) = Some (from, Message.reserve))).
+  - exists tid. erewrite IdentMap.gss. esplits; eauto.
+  - exploit step_new_reserve.
+    { econs. econs 2; eauto. } all: eauto.
+    i. des.
+    exploit steps_new_reserve.
+    { eapply rtc_implies; try apply STEPS.
+      eapply tau_mon. i. econs. econs 2; eauto. } all: eauto.
+    i. des. ss.
+    eapply RESERVES in GET0. des.
+    assert (NEQ: tid <> tid0).
+    { ii. clarify. }
+    exists tid0. esplits; eauto.
+    erewrite IdentMap.gso; eauto.
+Qed.
 
 Module Inv.
 
@@ -1471,6 +1601,8 @@ Section SIMPF.
       (WFSRC: Configuration.wf c_src)
       (WFTGT: Configuration.wf c_tgt)
       (RESERVEWF: memory_reserve_wf c_tgt.(Configuration.memory))
+      (RESERVERTGT: reserver_exists c_tgt)
+      (RESERVERSRC: reserver_exists c_src)
   .
 
   Definition sim_pf_minus_one
@@ -1530,7 +1662,94 @@ Section SIMPF.
     - eapply Configuration.init_wf.
     - ii. unfold Memory.get in GET. rewrite Cell.init_get in GET.
       des_ifs.
+    - ii. unfold Memory.get in RESERVE. rewrite Cell.init_get in RESERVE.
+      des_ifs.
+    - ii. unfold Memory.get in RESERVE. rewrite Cell.init_get in RESERVE.
+      des_ifs.
   Qed.
+
+  Lemma sim_pf_src_no_promise idents mlast spaces updates aupdates c_src c_tgt
+        (SIM: sim_pf idents mlast spaces updates aupdates c_src c_tgt)
+        tid st lc
+        (TIDSRC: IdentMap.find tid c_src.(Configuration.threads) =
+                 Some (st, lc))
+    :
+      lc.(Local.promises) = Memory.bot.
+  Proof.
+    inv SIM. inv FORGET. specialize (THS tid).
+    unfold option_rel in THS. des_ifs. inv THS. auto.
+  Qed.
+
+  Lemma sim_pf_src_no_reserve idents mlast spaces updates aupdates c_src c_tgt
+        (SIM: sim_pf idents mlast spaces updates aupdates c_src c_tgt)
+        loc to from
+        (RESERVE: Memory.get loc to c_src.(Configuration.memory) = Some (from, Message.reserve))
+    :
+      False.
+  Proof.
+    dup SIM. inv SIM. eapply RESERVERSRC in RESERVE; eauto.
+    des. eapply sim_pf_src_no_promise in TIDSRC; eauto.
+    rewrite TIDSRC in *. erewrite Memory.bot_get in *; clarify.
+  Qed.
+
+  Lemma less_covered_max_ts mem0 mem1
+        (INHABITED: Memory.inhabited mem0)
+        (SHORTER: forall loc to (COVER: covered loc to mem0), covered loc to mem1)
+        loc
+    :
+      Time.le (Memory.max_ts loc mem0) (Memory.max_ts loc mem1).
+  Proof.
+    specialize (INHABITED loc). eapply Memory.max_ts_spec in INHABITED.
+    des. dup GET. eapply memory_get_ts_strong in GET. des; clarify.
+    - erewrite GET1. eapply Time.bot_spec.
+    - exploit SHORTER.
+      { econs; eauto. econs; [|refl]. eauto. }
+      intros COVER. inv COVER. inv ITV.
+      eapply Memory.max_ts_spec in GET. des. ss.
+      etrans; eauto.
+  Qed.
+
+  Lemma sim_pf_max_timemap idents mlast spaces updates aupdates c_src c_tgt max
+        (SIM: sim_pf idents mlast spaces updates aupdates c_src c_tgt)
+        (MAX: Memory.max_full_timemap c_tgt.(Configuration.memory) max)
+    :
+      TimeMap.le (Memory.max_timemap c_src.(Configuration.memory)) max.
+  Proof.
+    inv SIM. inv WFTGT. inv MEM. inv WFSRC. inv MEM. inv FORGET. ii.
+    inv MEM. inv SHORTER. eapply less_covered_max_ts in COVER; eauto. etrans; eauto.
+    exploit Memory.max_ts_spec.
+    { inv FORGET. erewrite COMPLETE0.
+      - eapply (INHABITED loc).
+      - ii. inv H. destruct st as [lang st]. inv PROMISED. destruct msg.
+        inv WF. exploit THREADS0; eauto. intros []. erewrite BOT in GET. clarify. }
+    i. des. eapply forget_memory_get in GET; eauto. des. destruct msg.
+    - eapply Memory.max_full_ts_spec in GET0; eauto. des. auto.
+    - exfalso. eapply NOT.
+      eapply RESERVERTGT in GET0. des. destruct st as [lang st].
+      econs; eauto. econs; eauto.
+  Qed.
+
+  Lemma pf_sim_memory_exists_or_blank L mem_src mem_tgt
+        (MEM: pf_sim_memory L mem_src mem_tgt)
+        loc to from val released
+        (GET: Memory.get loc to mem_tgt = Some (from, Message.full val released))
+    :
+      (exists from', (<<GET: Memory.get loc to mem_src = Some (from', Message.full val released)>>)) \/
+      (<<BLANK: forall ts (ITV: Interval.mem (from, to) ts),
+          (<<NCOVER: ~ covered loc ts mem_src>>) /\ (<<FORGET: L loc to>>)>>).
+  Proof.
+    inv MEM. dup FORGET. inv FORGET. destruct (classic (L loc to)).
+    - right. ii. split; auto. ii.
+      inv SHORTER. eapply COVER in H0. inv H0.
+      eapply forget_memory_get in GET0; eauto. des; clarify.
+      exploit Memory.get_disjoint.
+      { eapply GET1. }
+      { eapply GET. }
+      i. des; clarify. eapply x0; eauto.
+    - left. erewrite <- COMPLETE in GET; eauto.
+      inv SHORTER. eapply COMPLETE0 in GET. des. eauto.
+  Qed.
+
 
 End SIMPF.
 

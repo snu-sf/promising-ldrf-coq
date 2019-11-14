@@ -1023,8 +1023,10 @@ Proof.
   split; cycle 1.
   { destruct (classic (e0 = ThreadEvent.failure)).
     - right. clarify.
-    - right.
-
+    - left. red. i. rewrite IdentMap.gss in FIND. dependent destruction FIND.
+      eapply pf_consistent_pf_consistent_drf; eauto.
+      + eapply PFConsistent.consistent_pf_consistent; eauto.
+      + inv SIM. eapply memory_reserve_wf_configuration_step in CSTEP; ss. }
 
   destruct (classic (((no_update_on (other_updates tid updates aupdates))
                         /1\ (no_read_msgs (other_promises c_tgt0 tid))) e0)); cycle 1.
@@ -1151,6 +1153,9 @@ Proof.
         eapply Configuration.step_future in CSTEP; eauto. ss. des. auto.
       + i. erewrite IdentMap.gso in TIDSRC0; auto. }
 Qed.
+
+
+
 
         , TIDSRC0; auto.
         ex

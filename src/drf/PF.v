@@ -65,3 +65,41 @@ Proof.
   intros c3 STEPS RACE.
   apply (RACEFREE c3); auto. etrans; eauto.
 Qed.
+
+Lemma pftstep_future
+      e tid c1 c2
+      (STEP: pftstep e tid c1 c2)
+      (WF1: Configuration.wf c1):
+  Configuration.wf c2.
+Proof.
+  inv WF1. inv WF. inv STEP; s.
+  exploit THREADS; ss; eauto. i.
+  exploit AThread.rtc_tau_step_future.
+  { eapply rtc_implies; try apply STEPS. eapply tau_mon.
+    i. econs. econs 2; eauto. } all: eauto. s. i. des.
+  exploit AThread.step_future.
+  { econs 2; eauto. } all: eauto. s. i. des.
+  econs; ss. econs.
+  i. Configuration.simplify.
+  - exploit THREADS; try apply TH1; eauto. i. des.
+    exploit AThread.rtc_tau_step_disjoint.
+    { eapply rtc_implies; try apply STEPS. eapply tau_mon.
+      i. econs. econs 2; eauto. } all: eauto. i. des.
+    exploit AThread.step_disjoint.
+    { econs 2; eauto. } all: eauto. i. des. ss.
+    symmetry. auto.
+  - exploit THREADS; try apply TH2; eauto. i. des.
+    exploit AThread.rtc_tau_step_disjoint.
+    { eapply rtc_implies; try apply STEPS. eapply tau_mon.
+      i. econs. econs 2; eauto. } all: eauto. i. des.
+    exploit AThread.step_disjoint.
+    { econs 2; eauto. } all: eauto. i. des. ss.
+  - eapply DISJOINT; [|eauto|eauto]. auto.
+  - i. Configuration.simplify.
+    exploit THREADS; try apply TH; eauto. i.
+    exploit AThread.rtc_tau_step_disjoint.
+    { eapply rtc_implies; try apply STEPS. eapply tau_mon.
+      i. econs. econs 2; eauto. } all: eauto. i. des.
+    exploit AThread.step_disjoint.
+    { econs 2; eauto. } all: eauto. i. des. ss.
+Qed.
