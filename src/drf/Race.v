@@ -39,7 +39,7 @@ Inductive pf_race_condition e1 e2: Prop :=
     loc val1 val2 ordu1 ordu2
     (EVENT1: ProgramEvent_is_updating e1 = Some (loc, val1, ordu1))
     (EVENT2: ProgramEvent_is_updating e2 = Some (loc, val2, ordu2))
-    (ORDU: Ordering.le ordu1 Ordering.relaxed \/ Ordering.le ordu2 Ordering.relaxed)
+    (ORDU: Ordering.le ordu1 Ordering.strong_relaxed \/ Ordering.le ordu2 Ordering.strong_relaxed)
 .
 Hint Constructors pf_race_condition.
 
