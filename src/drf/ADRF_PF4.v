@@ -1685,10 +1685,11 @@ Proof.
     + inv LOCAL1. inv LOCAL2. eapply promise_should_be_written_write; eauto.
 Qed.
 
-Definition write_to (loc: Loc.t) (to: Time.t) (e: ThreadEvent.t): Prop :=
+Definition rlx_write_to (loc: Loc.t) (to: Time.t) (e: ThreadEvent.t): Prop :=
   match e with
-  | ThreadEvent.write loc0 _ to0 _ _ _
-  | ThreadEvent.update loc0 _ to0 _ _ _ _ _ _ => (loc, to) = (loc0, to0)
+  | ThreadEvent.write loc0 _ to0 _ _ ordw
+  | ThreadEvent.update loc0 _ to0 _ _ _ _ _ ordw =>
+    (loc, to) = (loc0, to0) /\ Ordering.le ordw Ordering.relaxed
   | _ => False
   end.
 
@@ -1701,7 +1702,7 @@ Lemma promise_should_be_written_steps
   :
     exists e m,
       (<<IN: List.In (e, m) tr>>) /\
-      (<<WRITETO: write_to loc to e>>).
+      (<<WRITETO: rlx_write_to loc to e>>).
 Proof.
   ginduction STEP; i.
   - exfalso. clarify.
@@ -1712,7 +1713,11 @@ Proof.
       * ss. left. auto.
       * apply NNPP. intros WRITETO. apply H.
         eapply promise_should_be_written_step; eauto.
-        unfold write_to in *. des_ifs.
+        unfold rlx_write_to in *. des_ifs.
+        { ii. clarify. eapply WRITETO; e
+
+                                         WIP
+
 Qed.
 
 Lemma cancel_concrete_promises_same P lang e th0 th1
@@ -1933,7 +1938,7 @@ Definition pf_consistent_drf'' lang (e0:Thread.t lang): Prop :=
                      forall loc to (PROMISED: concrete_promised e0.(Thread.local).(Local.promises) loc to),
                      exists e m,
                        (<<IN: List.In (e, m) tr>>) /\
-                       (<<WRITETO: write_to loc to e>>)>>))))
+                       (<<WRITETO: rlx_write_to loc to e>>)>>))))
 .
 
 Lemma traced_steps_unwritable_increase lang (th0 th1: Thread.t lang) tr
@@ -2557,7 +2562,7 @@ Definition pf_consistent_drf_complete lang (e0:Thread.t lang): Prop :=
                      forall loc to (PROMISED: concrete_promised e0.(Thread.local).(Local.promises) loc to),
                      exists e m,
                        (<<IN: List.In (e, m) tr>>) /\
-                       (<<WRITETO: write_to loc to e>>)>>))))
+                       (<<WRITETO: rlx_write_to loc to e>>)>>))))
 .
 
 Lemma pf_consistent_pf_consistent_drf_complete lang (th: Thread.t lang)
@@ -2769,7 +2774,7 @@ Definition pf_consistent_drf lang (e0:Thread.t lang): Prop :=
                    forall loc to (PROMISED: concrete_promised e0.(Thread.local).(Local.promises) loc to),
                    exists e m,
                      (<<IN: List.In (e, m) tr>>) /\
-                     (<<WRITETO: write_to loc to e>>)>>))))
+                     (<<WRITETO: rlx_write_to loc to e>>)>>))))
 .
 
 Lemma pf_consistent_pf_consistent_drf lang (th: Thread.t lang)
@@ -2797,58 +2802,3 @@ Proof.
     i. exploit COMPLETEW; eauto. i. des.
     esplits; eauto. eapply List.in_or_app; eauto.
 Qed.
-
-
-
-(* Inductive shifted_map mlast mcert *)
-(*           (updates: Loc.t -> Prop) *)
-(*           (sky gap: TimeMap.t) *)
-(*           (f: Loc.t -> Time.t -> Time.t): Prop := *)
-(* | shifted_map_intro *)
-(*     (PRSV: map_preserving (times_in_memory mcert) f) *)
-(*     (SAME: forall l t (TLE: Time.le t (Memory.max_ts l mlast)), *)
-(*         f l t = t) *)
-(*     (INGAP: forall l t (TLT: Time.lt (Memory.max_ts l mcert) t), *)
-(*         Time.lt (f l t) (gap l)) *)
-(*     (AFTERSKY: forall l t (TLT: Time.lt (Memory.max_ts l mcert) t), *)
-(*         Time.lt (sky l) (f l t)) *)
-(* . *)
-
-(* Lemma shifted_map_exists mlast mcert updates *)
-(*       (MLE: Memory.le mlast mcert) *)
-(*       (sky gap: TimeMap.t) *)
-(*       (SKY: forall l, Time.lt (Memory.max_ts l mlast) (sky l)) *)
-(*       (GAP: forall l, Time.lt (Memory.max_ts l mlast) (gap l)) *)
-(*   : *)
-(*     exists f, (<<SHIFTED: shifted_map mlast mcert updates sky gap f>>). *)
-(* Proof. *)
-(*   (* may be very hard... *) *)
-(* Admitted. *)
-
-(* Lemma shifted_map_preserving_last_mem  mlast mcert updates sky gap f *)
-(*       (CLOSED: Memory.closed mlast) *)
-(*       (SHIFTED: shifted_map mlast mcert updates sky gap f) *)
-(*   : *)
-(*     memory_map f mlast mlast. *)
-(* Proof. *)
-(*   inv SHIFTED. inv PRSV. econs; i. *)
-(*   - exploit Memory.max_ts_spec; eauto. i. des. *)
-(*     repeat erewrite SAME; eauto. *)
-(*     + rewrite GET. unfold msg_map. des_ifs. repeat f_equal. *)
-(*       inv CLOSED. exploit CLOSED0; try apply GET; eauto. i. des. *)
-(*       inv MSG_CLOSED. inv CLOSED; ss. f_equal. *)
-(*       destruct view. inv CLOSED1. unfold view_map, timemap_map. ss. f_equal. *)
-(*       * extensionality l. erewrite SAME; auto. *)
-(*         specialize (PLN l). des. *)
-(*         exploit Memory.max_ts_spec; eauto. i. des. auto. *)
-(*       * extensionality l. erewrite SAME; auto. *)
-(*         specialize (RLX l). des. *)
-(*         exploit Memory.max_ts_spec; eauto. i. des. auto. *)
-(*     + exploit Memory.get_ts; try apply GET; eauto. i. des. *)
-(*       * clarify. *)
-(*       * left. eapply TimeFacts.lt_le_lt; eauto. *)
-(*   - destruct msg_src as [from msg]. exploit Memory.max_ts_spec; eauto. i. des. *)
-(*     esplits. *)
-(*     + erewrite SAME; eauto. *)
-(*     + eauto. *)
-(* Qed. *)
