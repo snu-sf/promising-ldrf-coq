@@ -22,7 +22,7 @@ Require Import Progress.
 Require Import APromiseConsistent.
 From PromisingLib Require Import Loc.
 
-Require Import PF.
+Require Import APF.
 Require Import Race.
 Require Import Behavior.
 Require Import SimMemory.

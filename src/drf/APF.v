@@ -19,11 +19,11 @@ Require Import Thread.
 Require Import Configuration.
 Require Import Progress.
 
-Require Import Race.
-
 Require Import AMemory.
 Require Import ALocal.
 Require Import AThread.
+
+Require Import Race.
 
 Set Implicit Arguments.
 
@@ -57,11 +57,117 @@ Definition pf_racefree (c1:Configuration.t): Prop :=
          (STEPS: rtc pftstep_all c1 c2)
          (RACE: pf_race c2), False.
 
-Lemma pf_racefree_step c1 c2
+Lemma pf_racefree_step c1 c2 e tid
       (RACEFREE : pf_racefree c1)
-      (STEP : rtc pftstep_all c1 c2) :
+      (STEP : pftstep e tid c1 c2) :
   pf_racefree c2.
 Proof.
-  intros c3 STEPS RACE.
-  apply (RACEFREE c3); auto. etrans; eauto.
+  ii. eapply RACEFREE.
+  - econs 2; eauto.
+  - auto.
+Qed.
+
+Lemma pftstep_future
+      e tid c1 c2
+      (STEP: pftstep e tid c1 c2)
+      (WF1: Configuration.wf c1):
+  Configuration.wf c2.
+Proof.
+  inv WF1. inv WF. inv STEP; s.
+  exploit THREADS; ss; eauto. i.
+  exploit AThread.rtc_tau_step_future.
+  { eapply rtc_implies; try apply STEPS. eapply tau_mon.
+    i. econs. econs 2; eauto. } all: eauto. s. i. des.
+  exploit AThread.step_future.
+  { econs 2; eauto. } all: eauto. s. i. des.
+  econs; ss. econs.
+  i. Configuration.simplify.
+  - exploit THREADS; try apply TH1; eauto. i. des.
+    exploit AThread.rtc_tau_step_disjoint.
+    { eapply rtc_implies; try apply STEPS. eapply tau_mon.
+      i. econs. econs 2; eauto. } all: eauto. i. des.
+    exploit AThread.step_disjoint.
+    { econs 2; eauto. } all: eauto. i. des. ss.
+    symmetry. auto.
+  - exploit THREADS; try apply TH2; eauto. i. des.
+    exploit AThread.rtc_tau_step_disjoint.
+    { eapply rtc_implies; try apply STEPS. eapply tau_mon.
+      i. econs. econs 2; eauto. } all: eauto. i. des.
+    exploit AThread.step_disjoint.
+    { econs 2; eauto. } all: eauto. i. des. ss.
+  - eapply DISJOINT; [|eauto|eauto]. auto.
+  - i. Configuration.simplify.
+    exploit THREADS; try apply TH; eauto. i.
+    exploit AThread.rtc_tau_step_disjoint.
+    { eapply rtc_implies; try apply STEPS. eapply tau_mon.
+      i. econs. econs 2; eauto. } all: eauto. i. des.
+    exploit AThread.step_disjoint.
+    { econs 2; eauto. } all: eauto. i. des. ss.
+Qed.
+
+Lemma write_no_promise mem0 loc from to val released prom1 mem1 kind
+      (WRITE: AMemory.write Memory.bot mem0 loc from to val released prom1 mem1 kind)
+  :
+    <<NOPROMISE: prom1 = Memory.bot>> /\ <<ADD: kind = Memory.op_kind_add>>.
+Proof.
+  inv WRITE. inv PROMISE.
+  - split; auto. eapply MemoryFacts.add_remove_eq; eauto.
+  - eapply Memory.split_get0 in PROMISES. des.
+    erewrite Memory.bot_get in GET0. clarify.
+  - eapply Memory.lower_get0 in PROMISES. des.
+    erewrite Memory.bot_get in GET. clarify.
+  - eapply Memory.remove_get0 in PROMISES. des.
+    erewrite Memory.bot_get in GET. clarify.
+Qed.
+
+Lemma program_step_no_promise lang (th0 th1: Thread.t lang) e
+      (STEP: AThread.program_step e th0 th1)
+      (NOPROMISE: th0.(Thread.local).(Local.promises) = Memory.bot)
+  :
+    th1.(Thread.local).(Local.promises) = Memory.bot.
+Proof.
+  inv STEP. inv LOCAL; ss.
+  - inv LOCAL0. ss.
+  - inv LOCAL0. rewrite NOPROMISE in WRITE.
+    eapply write_no_promise in WRITE. des. auto.
+  - inv LOCAL1. inv LOCAL2. rewrite NOPROMISE in WRITE.
+    eapply write_no_promise in WRITE. des. auto.
+  - inv LOCAL0. ss.
+  - inv LOCAL0. ss.
+Qed.
+
+Lemma program_steps_no_promise lang (th0 th1: Thread.t lang)
+      (STEP: rtc (tau (@AThread.program_step lang)) th0 th1)
+      (NOPROMISE: th0.(Thread.local).(Local.promises) = Memory.bot)
+  :
+    th1.(Thread.local).(Local.promises) = Memory.bot.
+Proof.
+  ginduction STEP; ss. i. eapply IHSTEP. inv H.
+  eapply program_step_no_promise; eauto.
+Qed.
+
+Lemma no_promise_spec c
+      (NOPROMISE: ~ Configuration.has_promise c)
+      tid st lc
+      (FIND: IdentMap.find tid (Configuration.threads c) = Some (st, lc))
+  :
+    lc.(Local.promises) = Memory.bot.
+Proof.
+  eapply Memory.ext. i. rewrite Memory.bot_get.
+  destruct (Memory.get loc ts (Local.promises lc)) as [[from msg]|] eqn:GET; auto.
+  exfalso. eapply NOPROMISE. econs; eauto.
+Qed.
+
+Lemma configuration_step_no_promise c0 c1 tid e
+      (NOPROMISE: ~ Configuration.has_promise c0)
+      (STEP: pftstep tid e c0 c1)
+  :
+    ~ Configuration.has_promise c1.
+Proof.
+  inv STEP. ii. inv H. ss. rewrite IdentMap.gsspec in FIND. des_ifs.
+  - eapply no_promise_spec in TID; eauto.
+    eapply program_steps_no_promise in STEPS; eauto.
+    eapply program_step_no_promise in STEP0; eauto.
+    ss. rewrite STEP0 in *. rewrite Memory.bot_get in *. clarify.
+  - eapply NOPROMISE. econs; eauto.
 Qed.
