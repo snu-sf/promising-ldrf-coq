@@ -883,10 +883,10 @@ Section NOTATTATCHED.
           { clarify. unfold Time.meet in *.
             dup ITV. dup H0. inv ITV. inv H0. ss. des_ifs.
             - clear - FROM1 TO l0.
-              eapply DenseOrder.DenseOrder.lt_strorder.
+              eapply Time.lt_strorder.
               instantiate (1:=from1).
               eapply TimeFacts.lt_le_lt; eauto.
-            - eapply DenseOrder.DenseOrder.lt_strorder.
+            - eapply Time.lt_strorder.
               instantiate (1:=from1).
               eapply TimeFacts.lt_le_lt; eauto.
             - dup MEM. eapply Memory.add_get0 in MEM. des.
@@ -894,7 +894,7 @@ Section NOTATTATCHED.
               { eapply GET1. }
               { eapply Memory.add_get1; try apply GET; eauto. }
               exploit memory_get_ts_strong; try apply GET. i. des; clarify.
-              + exfalso. eapply DenseOrder.DenseOrder.lt_strorder.
+              + exfalso. eapply Time.lt_strorder.
                 eapply TimeFacts.lt_le_lt.
                 * eapply l.
                 * eapply Time.bot_spec.
@@ -1061,9 +1061,9 @@ Section NOTATTATCHED.
             econs; ss; eauto.
             - exploit memory_get_ts_strong; eauto. i. des; clarify.
               exfalso. rewrite x3 in *.
-              eapply DenseOrder.DenseOrder.lt_strorder.
+              eapply Time.lt_strorder.
               instantiate (1:=Time.bot).
-              eapply DenseOrder.DenseOrderFacts.le_lt_lt; eauto.
+              eapply TimeFacts.le_lt_lt; eauto.
               apply Time.bot_spec.
             - refl. }
       + inv LOCAL1. ss.
@@ -1624,7 +1624,7 @@ Section SIMPF.
     :
       Local.promises lc = Memory.bot.
   Proof.
-    unfold Threads.init in *. erewrite UsualFMapPositive.UsualPositiveMap.Facts.map_o in *.
+    unfold Threads.init in *. erewrite IdentMap.Properties.F.map_o in *.
     unfold option_map in *. des_ifs.
   Qed.
 
@@ -1642,7 +1642,7 @@ Section SIMPF.
     instantiate (1:=fun _ => Memory.init).
     econs; eauto; ss; i.
     - econs; i; ss.
-      + unfold Threads.init in *. erewrite UsualFMapPositive.UsualPositiveMap.Facts.map_o in *.
+      + unfold Threads.init in *. erewrite IdentMap.Properties.F.map_o in *.
         unfold option_map in *. des_ifs.
       + econs.
         * instantiate (1:= Memory.init). econs; ss; eauto.

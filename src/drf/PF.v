@@ -1,6 +1,7 @@
 Require Import Omega.
 Require Import RelationClasses.
 
+From Paco Require Import paco.
 From sflib Require Import sflib.
 
 From PromisingLib Require Import Axioms.
@@ -18,6 +19,8 @@ Require Import Local.
 Require Import Thread.
 Require Import Configuration.
 Require Import Progress.
+Require Import Behavior.
+Require Import AProp.
 
 Require Import Race.
 
@@ -167,4 +170,58 @@ Proof.
     eapply program_step_no_promise in STEP0; eauto.
     ss. rewrite STEP0 in *. rewrite Memory.bot_get in *. clarify.
   - eapply NOPROMISE. econs; eauto.
+Qed.
+
+Lemma pftstep_no_promise_step c0 c1 e tid
+      (NOPROMISE: ~ Configuration.has_promise c0)
+      (STEP: pftstep e tid c0 c1)
+  :
+    Configuration.step e tid c0 c1.
+Proof.
+  inv STEP.
+  exploit no_promise_spec; eauto. intros LCBOT0.
+  exploit program_steps_no_promise; eauto. intros LCBOT1.
+  exploit program_step_no_promise; eauto. intros LCBOT2. ss.
+  destruct (classic (e0 <> ThreadEvent.failure)).
+  - econs 2.
+    + eauto.
+    + eapply rtc_implies; cycle 1.
+      * eapply STEPS.
+      * eapply tau_mon. i. econs. econs 2; eauto.
+    + econs 2; eauto.
+    + auto.
+    + ii. ss. right. esplits; eauto.
+  - apply NNPP in H. subst. econs 1.
+    + eauto.
+    + eapply rtc_implies; cycle 1.
+      * eapply STEPS.
+      * eapply tau_mon. i. econs. econs 2; eauto.
+    + econs 2; eauto.
+Qed.
+
+Lemma pftstep_no_promise_adequacy c0 beh
+      (NOPROMISE: ~ Configuration.has_promise c0)
+      (BEH: behaviors pftstep c0 beh)
+  :
+    behaviors Configuration.step c0 beh.
+Proof.
+  ginduction BEH; i.
+  - econs; ss.
+  - exploit pftstep_no_promise_step; eauto. i. econs 2; eauto.
+    eapply IHBEH. eapply configuration_step_no_promise; eauto.
+  - exploit pftstep_no_promise_step; eauto. i. econs 3; eauto.
+  - exploit pftstep_no_promise_step; eauto. i. econs 4; eauto.
+    eapply IHBEH. eapply configuration_step_no_promise; eauto.
+Qed.
+
+Lemma pftstep_promise_behavior s
+  :
+    behaviors pftstep (Configuration.init s) <1=
+    behaviors Configuration.step (Configuration.init s).
+Proof.
+  i. eapply pftstep_no_promise_adequacy; auto.
+  ii. inv H. ss. unfold Threads.init in FIND.
+  erewrite IdentMap.Properties.F.map_o in *.
+  unfold option_map in *. des_ifs. ss.
+  rewrite Memory.bot_get in GET. clarify.
 Qed.

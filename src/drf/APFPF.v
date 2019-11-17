@@ -24,9 +24,19 @@ Require Import Behavior.
 Require Import AMemory.
 Require Import ALocal.
 Require Import AThread.
+Require Import AProp.
 
 Require Import APF.
 Require Import PF.
+
+Lemma pftstep_apftstep:
+  PF.pftstep <4= APF.pftstep.
+Proof.
+  ii. inv PR.
+  eapply program_steps_aprogram_steps in STEPS.
+  eapply program_step_aprogram_step in STEP.
+  econs; eauto.
+Qed.
 
 Record shorter (mem_src mem_tgt: Memory.t): Prop :=
   shorter_intro
@@ -276,10 +286,10 @@ Lemma sim_apf_pf_init s
 Proof.
   econs; ss.
   - ii. inv H. ss. unfold Threads.init in FIND.
-    erewrite UsualFMapPositive.UsualPositiveMap.Facts.map_o in *.
+    erewrite IdentMap.Properties.F.map_o in *.
     unfold option_map, Local.init in *. des_ifs. ss. erewrite Memory.bot_get in GET. clarify.
   - ii. inv H. ss. unfold Threads.init in FIND.
-    erewrite UsualFMapPositive.UsualPositiveMap.Facts.map_o in *.
+    erewrite IdentMap.Properties.F.map_o in *.
     unfold option_map, Local.init in *. des_ifs. ss. erewrite Memory.bot_get in GET. clarify.
   - econs; i.
     + unfold Memory.init, Memory.get in *. erewrite Cell.init_get in *.
@@ -319,4 +329,13 @@ Lemma apf_pf_equiv s
 Proof.
   eapply sim_apf_pf_adequacy.
   eapply sim_apf_pf_init; auto.
+Qed.
+
+Lemma apf_pf_equiv2 c
+  :
+    behaviors PF.pftstep c <1=
+    behaviors APF.pftstep c.
+Proof.
+  eapply le_step_behavior_improve; eauto.
+  i. eapply pftstep_apftstep; eauto.
 Qed.

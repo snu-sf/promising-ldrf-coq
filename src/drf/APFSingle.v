@@ -22,7 +22,11 @@ Require Import Progress.
 Require Import Behavior.
 Require Import AProp.
 
-Require Import PF.
+Require Import ALocal.
+Require Import AThread.
+Require Import AMemory.
+
+Require Import APF.
 
 Set Implicit Arguments.
 
@@ -31,7 +35,7 @@ Inductive pftstep_single: forall (e:MachineEvent.t) (tid:Ident.t) (c1 c2: Config
 | pftstep_single_intro
     e tid c1 lang st1 lc1 st3 lc3 sc3 memory3
     (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
-    (STEP: Thread.program_step e (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) (Thread.mk _ st3 lc3 sc3 memory3))
+    (STEP: AThread.program_step e (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) (Thread.mk _ st3 lc3 sc3 memory3))
     c2
     (CONFIG: c2 = Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
   :
@@ -52,7 +56,7 @@ Qed.
 
 Lemma tau_steps_single_steps c tid lang st1 lc1 st2 lc2 sc2 mem2
       (TID: IdentMap.find tid c.(Configuration.threads) = Some (existT _ lang st1, lc1))
-      (STEPS: Relation_Operators.clos_refl_trans_n1 _ (tau (@Thread.program_step _)) (Thread.mk _ st1 lc1 c.(Configuration.sc) c.(Configuration.memory)) (Thread.mk _ st2 lc2 sc2 mem2))
+      (STEPS: Relation_Operators.clos_refl_trans_n1 _ (tau (@AThread.program_step _)) (Thread.mk _ st1 lc1 c.(Configuration.sc) c.(Configuration.memory)) (Thread.mk _ st2 lc2 sc2 mem2))
   :
     exists ths',
       (<<STEPS: Relation_Operators.clos_refl_trans_n1 _ (tau_pftstep_single tid) c (Configuration.mk ths' sc2 mem2)>>) /\

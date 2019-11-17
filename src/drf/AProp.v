@@ -45,6 +45,22 @@ Proof.
   eapply promise_apromise; eauto.
 Qed.
 
+Lemma program_step_aprogram_step
+  :
+    Thread.program_step <4= AThread.program_step.
+Proof.
+  i. inv PR. inv LOCAL.
+  - econs; eauto.
+  - econs; eauto.
+  - inv LOCAL0. econs; eauto. econs; eauto.
+    econs; eauto. eapply write_awrite; eauto.
+  - inv LOCAL2. econs; eauto. econs; eauto.
+    econs; eauto. eapply write_awrite; eauto.
+  - econs; eauto.
+  - econs; eauto.
+  - econs; eauto.
+Qed.
+
 Lemma thread_step_athread_step
   :
     Thread.step_allpf <4= AThread.step_allpf.
@@ -52,16 +68,7 @@ Proof.
   i. inv PR. inv STEP.
   - inv STEP0. inv LOCAL. econs; eauto. econs; eauto.
     econs; eauto. econs; eauto. eapply promise_apromise; eauto.
-  - inv STEP0. inv LOCAL.
-    + econs; eauto. econs 2; eauto. econs; eauto.
-    + econs; eauto. econs 2; eauto. econs; eauto.
-    + inv LOCAL0. econs; eauto. econs 2; eauto. econs; eauto.
-      econs; eauto. econs; eauto. eapply write_awrite; eauto.
-    + inv LOCAL2. econs; eauto. econs 2; eauto. econs; eauto.
-      econs; eauto. econs; eauto. eapply write_awrite; eauto.
-    + econs; eauto. econs 2; eauto. econs; eauto.
-    + econs; eauto. econs 2; eauto. econs; eauto.
-    + econs; eauto. econs 2; eauto. econs; eauto.
+  - econs. econs 2. eapply program_step_aprogram_step; eauto.
 Qed.
 
 Lemma thread_steps_athread_steps lang
@@ -70,6 +77,14 @@ Lemma thread_steps_athread_steps lang
 Proof.
   eapply rtc_implies. i. inv PR. econs; eauto.
   eapply thread_step_athread_step; eauto.
+Qed.
+
+Lemma program_steps_aprogram_steps lang
+  :
+    rtc (tau (@Thread.program_step lang)) <2= rtc (tau (@AThread.program_step lang)).
+Proof.
+  eapply rtc_implies. i. inv PR. econs; eauto.
+  eapply program_step_aprogram_step; eauto.
 Qed.
 
 Lemma pred_step_apred_step

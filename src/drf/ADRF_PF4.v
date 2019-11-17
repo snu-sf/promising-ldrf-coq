@@ -522,7 +522,7 @@ Proof.
           - econs 3; eauto.
             { eapply TimeFacts.le_lt_lt.
               - eapply max_full_ts_le_max_ts; eauto.
-              - eapply DenseOrder.DenseOrder.incr_spec. }
+              - eapply Time.incr_spec. }
             { refl. }
           - eapply caps_collapsing_message; eauto. econs. econs.
             eapply Memory.max_full_view_closed. econs; eauto.

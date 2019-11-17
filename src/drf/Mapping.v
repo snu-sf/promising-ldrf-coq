@@ -132,7 +132,7 @@ Section MAPPED.
     :
       Time.lt ft0 ft1 -> Time.lt t0 t1.
   Proof.
-    set (DenseOrder.DenseOrderFacts.OrderTac.TO.lt_total t0 t1). des; eauto.
+    set (TimeFacts.OrderTac.TO.lt_total t0 t1). des; eauto.
     - clarify. i.
       hexploit (map_eq MAP0 MAP1). i. subst.
       timetac.
@@ -184,7 +184,7 @@ Section MAPPED.
     :
       Time.le t0 t1 <-> Time.le ft0 ft1.
   Proof.
-    repeat rewrite DenseOrder.DenseOrder.le_lteq.
+    repeat rewrite Time.le_lteq.
     split; i; des; clarify; eauto.
     - left. erewrite <- map_lt_iff; eauto.
     - right. eapply map_eq_iff; eauto.
