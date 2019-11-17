@@ -2268,8 +2268,24 @@ Section MAPPED.
         - eapply memory_map_mappable; eauto. }
       i. des. unfold mappable_time in FROM, TO. des.
       exploit promise_map; eauto.
-      { ii. unfold collapsed in H. des. apply WRITENOTIN.
-        exists to', to. esplits; ss; econs; eauto. refl. }
+      { ii. unfold collapsed in H. des. des_ifs.
+        - destruct kind; ss. exploit UNWRITABLE.
+          + exists to', to. unfold collapsed. esplits; eauto.
+            instantiate (1:=to). econs; ss. refl.
+          + ii. inv x. inv UNCH. inv PROMISE.
+            eapply Memory.remove_get0 in MEM0.
+            eapply Memory.remove_get0 in PROMISES1. des.
+            exploit Memory.get_disjoint.
+            { eapply GET2. }
+            { eapply GET. } i. des; clarify.
+            eapply x0; eauto. econs; ss.
+            * eapply Memory.get_ts in GET2. des; clarify.
+              exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+              { eapply TLE. }
+              { eapply Time.bot_spec. }
+            * refl.
+        - apply WRITENOTIN.
+          exists to', to. esplits; ss; econs; eauto. refl. }
       i. des.
       exists (Local.mk (Local.tview flc0) fprom1). esplits; eauto.
       + econs; eauto.

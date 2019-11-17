@@ -43,55 +43,67 @@ Proof.
   i. inv PR. econs; eauto.
 Qed.
 
-Lemma tau_steps_single_steps c
-      (FIND
-
-Lemma pftstep_single_sim c0 c1 e tid
-      (STEP: pftstep e tid c0 c1)
-  :
-    exists c',
-      (<<STEPS: rtc (tau_pftstep_single tid) c0 c'>>) /\
-      (<<STEP: pftstep_single e tid c' c1>>).
-Proof.
-  inv STEP.
-  remember (Thread.mk _ st1 lc1 (Configuration.sc c0) (Configuration.memory c0)) as th1.
-  remember (Thread.mk _ st3 lc3 sc3 memory3) as th3. ginduction STEPS; i; clarify.
-  - exists c0. splits; auto. econs; eauto.
-  - IdentMap.add
-
-
-Inductive almost_same tid: Configuration.t -> Configuration.t -> Prop :=
-| almost_same_refl
-    ths sc mem
-  :
-    Configuration.mk
-
-
-    Configuration.mk
-
-
-Lemma pftstep_single_sim c0 c1 e tid
-      (STEP: pftstep e tid c0 c1)
-  :
-    exists c',
-      (<<STEPS: rtc (tau_pftstep_single tid) c0 c'>>) /\
-      (<<STEP: pftstep_single e tid c' c1>>).
-Proof.
-  inv STEP.
-  remember (Thread.mk _ st1 lc1 (Configuration.sc c0) (Configuration.memory c0)) as th1.
-  remember (Thread.mk _ st3 lc3 sc3 memory3) as th3. ginduction STEPS; i; clarify.
-  - exists c0. splits; auto. econs; eauto.
-  - IdentMap.add
-
-IdentMap.add_add_eq:
-  forall (V : Type) (k : IdentMap.key) (v1 v2 : V) (m : IdentMap.t V),
-  IdentMap.add k v1 (IdentMap.add k v2 m) = IdentMap.add k v1 m
+(* Lemma tau_steps_single_steps c st1 lc1 *)
+(*       (TID: IdentMap.find tid c.(Configuration.threads) = Some (existT _ lang st1, lc1)) *)
+(*       (STEPS: rtc (tau (@Thread.program_step _)) (Thread.mk _ st1 lc1 c.(Configuration.sc) c.(Configuration.memory)) (Thread.mk _ st2 lc2 sc2 mem2)) *)
+(*   : *)
+(*     exists ths', *)
+(*       rtc (tau *)
 
 
 
+(*            (TIDSRC: IdentMap.find tid c_src.(Configuration.threads) = *)
+(*                     Some (existT _ lang_src st_src, lc_src)) *)
+
+
+(*       (FIND *)
+
+(* Lemma pftstep_single_sim c0 c1 e tid *)
+(*       (STEP: pftstep e tid c0 c1) *)
+(*   : *)
+(*     exists c', *)
+(*       (<<STEPS: rtc (tau_pftstep_single tid) c0 c'>>) /\ *)
+(*       (<<STEP: pftstep_single e tid c' c1>>). *)
+(* Proof. *)
+(*   inv STEP. *)
+(*   remember (Thread.mk _ st1 lc1 (Configuration.sc c0) (Configuration.memory c0)) as th1. *)
+(*   remember (Thread.mk _ st3 lc3 sc3 memory3) as th3. ginduction STEPS; i; clarify. *)
+(*   - exists c0. splits; auto. econs; eauto. *)
+(*   - IdentMap.add *)
+
+
+(* Inductive almost_same tid: Configuration.t -> Configuration.t -> Prop := *)
+(* | almost_same_refl *)
+(*     ths sc mem *)
+(*   : *)
+(*     Configuration.mk *)
+
+
+(*     Configuration.mk *)
+
+
+(* Lemma pftstep_single_sim c0 c1 e tid *)
+(*       (STEP: pftstep e tid c0 c1) *)
+(*   : *)
+(*     exists c', *)
+(*       (<<STEPS: rtc (tau_pftstep_single tid) c0 c'>>) /\ *)
+(*       (<<STEP: pftstep_single e tid c' c1>>). *)
+(* Proof. *)
+(*   inv STEP. *)
+(*   remember (Thread.mk _ st1 lc1 (Configuration.sc c0) (Configuration.memory c0)) as th1. *)
+(*   remember (Thread.mk _ st3 lc3 sc3 memory3) as th3. ginduction STEPS; i; clarify. *)
+(*   - exists c0. splits; auto. econs; eauto. *)
+(*   - IdentMap.add *)
+
+(* IdentMap.add_add_eq: *)
+(*   forall (V : Type) (k : IdentMap.key) (v1 v2 : V) (m : IdentMap.t V), *)
+(*   IdentMap.add k v1 (IdentMap.add k v2 m) = IdentMap.add k v1 m *)
 
 
 
-  dd
 
-  -
+
+
+(*   dd *)
+
+(*   - *)

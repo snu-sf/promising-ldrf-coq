@@ -1040,7 +1040,7 @@ Section MEMORYLEMMAS.
       write_not_to MSGS e.
   Proof.
     inv LCWF0. inv STEP.
-    - inv STEP0. inv LOCAL. ii. ss. eapply WRITENOTIN; eauto.
+    - inv STEP0. inv LOCAL. ii. ss. des_ifs. eapply WRITENOTIN; eauto.
       eapply promise_include_boundary; eauto.
     - inv STEP0; ss. inv LOCAL; ss.
       + inv LOCAL0. inv WRITE. eapply WRITENOTIN; eauto.
@@ -1670,7 +1670,7 @@ Section UNCHANGABLES.
   Proof.
     inv STEP.
     - inv STEP0; ss. inv LOCAL.
-      ii. exploit step_write_not_in_promise; eauto.
+      ii. des_ifs. ii. eapply step_write_not_in_promise in PROMISE; eauto.
     - inv STEP0; ss. inv LOCAL; ss.
       + inv LOCAL0. ii. exploit step_write_not_in_write; eauto.
       + inv LOCAL1. inv LOCAL2. ss. ii. exploit step_write_not_in_write; eauto.
