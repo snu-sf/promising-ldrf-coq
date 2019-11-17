@@ -21,6 +21,7 @@ Require Import Configuration.
 Require Import Progress.
 Require Import Behavior.
 Require Import AProp.
+Require Import Race.
 
 Require Import PF.
 
@@ -131,3 +132,12 @@ Proof.
   eapply le_step_behavior_improve; eauto.
   eapply pftstep_single_pftstep.
 Qed.
+
+Definition pftstep_single_all (c0 c1: Configuration.t) :=
+  union (fun e => union (pftstep_single e)) c0 c1.
+Hint Unfold pftstep_single_all.
+
+Definition pf_racefree (c1:Configuration.t): Prop :=
+  forall c2
+         (STEPS: rtc pftstep_single_all c1 c2)
+         (RACE: pf_race c2), False.
