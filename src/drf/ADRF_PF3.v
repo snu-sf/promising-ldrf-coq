@@ -635,7 +635,9 @@ Section PFCONSISTENT.
       (<<NORESERVE: no_reserves e1.(Thread.local).(Local.promises)>>) /\
       exists e2,
         (<<STEPS1: rtc (tau (@pred_step ((promise_free /1\ (fun e => ~ is_cancel e) /1\ no_acq_read_msgs (caps_loc e0.(Thread.memory) mem1)) /1\ no_sc) lang)) e1 e2>>) /\
-        (__guard__((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
+        (__guard__((exists st',
+                       (<<LOCAL: Local.failure_step e2.(Thread.local)>>) /\
+                       (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e2) st'>>)) \/
                    (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>))).
 
   Lemma step_promise_consistent

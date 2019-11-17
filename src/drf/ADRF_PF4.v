@@ -639,7 +639,9 @@ Definition pf_consistent_drf' lang (e0:Thread.t lang): Prop :=
     (<<MAXMAP: TimeMap.le (Memory.max_timemap e1.(Thread.memory)) max>>) /\
     exists e2,
       (<<STEPS1: rtc (tau (@pred_step ((promise_free /1\ (fun e => ~ is_cancel e) /1\ no_acq_update_on ((fun loc to => L loc) /2\ Memory.max_full_ts e0.(Thread.memory))) /1\ no_sc) lang)) e1 e2>>) /\
-      (__guard__((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
+      (__guard__((exists st',
+                     (<<LOCAL: Local.failure_step e2.(Thread.local)>>) /\
+                     (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e2) st'>>)) \/
                  (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>))).
 
 Lemma caps_collapsing_collapsable_unwritable L prom mem0 mem1
@@ -1349,7 +1351,7 @@ Proof.
           ss. i. clarify. eapply NORESERVES in GET3. clarify. }
         { i. ss. des. rewrite H3 in *. clarify. }
   - ss. unguard. des.
-    + left. econs. inv FAILURE. inv LOCAL0.
+    + left. esplits; eauto. econs. inv LOCAL1. inv LOCAL0.
       eapply promise_consistent_mon.
       { eapply promise_consistent_map; eauto. }
       { ss. }
@@ -1944,7 +1946,7 @@ Definition pf_consistent_drf'' lang (e0:Thread.t lang): Prop :=
                                                               (fun e => ThreadEvent.get_machine_event e = MachineEvent.silent)
 
                                                 ) (fst em)>> /\ <<MEMORY: not_attatched (fun loc to => (<<MAX: Memory.max_full_ts e0.(Thread.memory) loc to>>) /\
-                                                                                                                                                           (<<NUPDATES: ~ List.In loc (U ++ AU)>>)) (snd em)>>) tr>>) /\
+                                                                                                       (<<NUPDATES: ~ List.In loc (U ++ AU)>>)) (snd em)>>) tr>>) /\
       (<<COMPLETEU:
          forall loc (SAT: List.In loc U),
          exists to valr valw releasedr releasedw ordr ordw mem,
@@ -1953,7 +1955,9 @@ Definition pf_consistent_drf'' lang (e0:Thread.t lang): Prop :=
          forall loc (SAT: List.In loc AU),
          exists to valr valw releasedr releasedw ordr ordw mem,
            <<IN: List.In (ThreadEvent.update loc (max loc) to valr valw releasedr releasedw ordr ordw, mem) tr>> >>) /\
-      (__guard__((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
+      (__guard__((exists st',
+                     (<<LOCAL: Local.failure_step e2.(Thread.local)>>) /\
+                     (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e2) st'>>)) \/
                  ((<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>) /\
                   (<<COMPLETEW:
                      forall loc to (PROMISED: concrete_promised e0.(Thread.local).(Local.promises) loc to),
@@ -2178,7 +2182,7 @@ Proof.
     esplits; eauto.
 
   - inv SHORTER. unguard. des.
-    + left. auto.
+    + left. esplits; eauto.
     + right. split; auto. i.
       eapply cancels_concrete_promises_same in STEPS0; ss.
       * eapply promise_should_be_written_steps in STEPS0; eauto.
@@ -2195,11 +2199,50 @@ Inductive latest_other_reserves (prom mem: Memory.t) (loc: Loc.t) (to: Time.t): 
     (NONE: Memory.get loc to prom = None)
 .
 
+Definition mapping_map_lt_loc (f: Time.t -> Time.t -> Prop):=
+  forall t0 t1 ft0 ft1
+         (MAP0: f t0 ft0)
+         (MAP1: f t1 ft1),
+    Time.lt t0 t1 <-> Time.lt ft0 ft1.
+
 Definition mapping_map_lt (f: Loc.t -> Time.t -> Time.t -> Prop): Prop :=
   forall loc t0 t1 ft0 ft1
          (MAP0: f loc t0 ft0)
          (MAP1: f loc t1 ft1),
-    Time.lt t0 t1 -> Time.lt ft0 ft1.
+    Time.lt t0 t1 <-> Time.lt ft0 ft1.
+
+Lemma mapping_map_lt_locwise f
+      (MAPLT: forall loc, mapping_map_lt_loc (f loc))
+  :
+    mapping_map_lt f.
+Proof.
+  eauto.
+Qed.
+
+Lemma mapping_map_lt_map_eq f
+      (MAPLT: mapping_map_lt f)
+  :
+    mapping_map_eq f.
+Proof.
+  ii. destruct (Time.le_lt_dec ft0 ft1).
+  - inv l; auto.
+    erewrite <- (@MAPLT loc to to) in H; eauto.
+    exfalso. eapply Time.lt_strorder; eauto.
+  - erewrite <- (@MAPLT loc to to) in l; eauto.
+    exfalso. eapply Time.lt_strorder; eauto.
+Qed.
+
+Lemma mapping_map_lt_map_le f
+      (MAPLT: mapping_map_lt f)
+  :
+    mapping_map_le f.
+Proof.
+  ii. inv H.
+  - left. erewrite (@MAPLT loc t0 t1) in H0; eauto.
+  - right. inv H0.
+    eapply mapping_map_lt_map_eq; eauto.
+Qed.
+
 
 Definition ident_map (loc: Loc.t) := @eq Time.t.
 
@@ -2214,7 +2257,7 @@ Lemma ident_map_le
   :
     mapping_map_le ident_map.
 Proof.
-  unfold ident_map in *. ii. clarify.
+  apply mapping_map_lt_map_le, ident_map_lt.
 Qed.
 
 Lemma ident_map_bot
@@ -2228,7 +2271,7 @@ Lemma ident_map_eq
   :
     mapping_map_eq ident_map.
 Proof.
-  unfold ident_map in *. ii. clarify.
+  apply mapping_map_lt_map_eq, ident_map_lt.
 Qed.
 
 Lemma ident_map_total
@@ -2247,7 +2290,7 @@ Lemma mapping_map_lt_non_collapsable f
     non_collapsable f loc to.
 Proof.
   ii. unfold collapsed in *. des.
-  eapply MAPLT in TLE; eauto. eapply Time.lt_strorder; eauto.
+  erewrite (MAPLT loc to' to) in TLE; eauto. eapply Time.lt_strorder; eauto.
 Qed.
 
 Lemma ident_map_timemap
@@ -2570,7 +2613,7 @@ Definition pf_consistent_drf_complete lang (e0:Thread.t lang): Prop :=
                                                               /1\
                                                               (fun e => ThreadEvent.get_machine_event e = MachineEvent.silent)
                                                 ) (fst em)>> /\ <<MEMORY: not_attatched (fun loc to => (<<MAX: Memory.max_full_ts e0.(Thread.memory) loc to>>) /\
-                                                                                                                                                           (<<NUPDATES: ~ List.In loc (U ++ AU)>>)) (snd em)>>) tr>>) /\
+                                                                                                       (<<NUPDATES: ~ List.In loc (U ++ AU)>>)) (snd em)>>) tr>>) /\
       (<<COMPLETEU:
          forall loc (SAT: List.In loc U),
          exists to valr valw releasedr releasedw ordr ordw mem,
@@ -2579,7 +2622,9 @@ Definition pf_consistent_drf_complete lang (e0:Thread.t lang): Prop :=
          forall loc (SAT: List.In loc AU),
          exists to valr valw releasedr releasedw ordr ordw mem,
            <<IN: List.In (ThreadEvent.update loc (max loc) to valr valw releasedr releasedw ordr ordw, mem) tr>> >>) /\
-      (__guard__((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
+      (__guard__((exists st',
+                     (<<LOCAL: Local.failure_step e2.(Thread.local)>>) /\
+                     (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e2) st'>>)) \/
                  ((<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>) /\
                   (<<COMPLETEW:
                      forall loc to (PROMISED: concrete_promised e0.(Thread.local).(Local.promises) loc to),
@@ -2706,7 +2751,7 @@ Proof.
     eapply list_Forall2_in2 in IN; eauto. des. destruct b. ss. inv EVENT.
     inv FROM. esplits; eauto. }
   { unguard. des.
-    - left. inv FAILURE. inv LOCAL0. destruct local0. ss. econs.
+    - left. esplits; eauto. inv LOCAL1. inv LOCAL0. destruct local0. ss. econs.
       hexploit promise_consistent_map; try apply PROMISES; eauto.
       i. destruct flc0. eapply promise_consistent_mon; eauto. ss.
     - right. split.
@@ -2795,7 +2840,9 @@ Definition pf_consistent_drf lang (e0:Thread.t lang): Prop :=
        forall loc (SAT: List.In loc AU),
        exists to valr valw releasedr releasedw ordr ordw mem,
          <<IN: List.In (ThreadEvent.update loc (max loc) to valr valw releasedr releasedw ordr ordw, mem) tr>> >>) /\
-    (__guard__((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
+    (__guard__((exists st',
+                     (<<LOCAL: Local.failure_step e2.(Thread.local)>>) /\
+                     (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e2) st'>>)) \/
                ((<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>) /\
                 (<<COMPLETEW:
                    forall loc to (PROMISED: concrete_promised e0.(Thread.local).(Local.promises) loc to),
@@ -2834,7 +2881,9 @@ Proof.
     eapply List.in_or_app; eauto.
   - i. exploit COMPLETEAU; eauto. i. des. esplits; eauto.
     eapply List.in_or_app; eauto.
-  - unguard. des; auto. right. splits; auto.
-    i. exploit COMPLETEW; eauto. i. des.
-    esplits; eauto. eapply List.in_or_app; eauto.
+  - unguard. des.
+    + left. esplits; eauto.
+    + right. splits; auto.
+      i. exploit COMPLETEW; eauto. i. des.
+      esplits; eauto. eapply List.in_or_app; eauto.
 Qed.

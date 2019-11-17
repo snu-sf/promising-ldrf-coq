@@ -1699,48 +1699,6 @@ Definition rlx_write_loc (loc: Loc.t) (e: ThreadEvent.t): Prop :=
   | _ => False
   end.
 
-Definition pf_consistent_drf_src lang (e0:Thread.t lang)
-           (spaces: Loc.t -> Time.t -> Prop)
-           (promises: Loc.t -> Time.t -> Prop)
-           (max: TimeMap.t)
-           (U AU: Loc.t -> Prop)
-           (MU: Loc.t -> Prop): Prop :=
-  exists e2 tr max',
-    (* (<<DISJOINT: forall loc (INU: U loc) (INAU: AU loc), False>>) /\ *)
-    (<<STEPS: traced_step tr e0 e2>>) /\
-    (<<MAX: TimeMap.le e0.(Thread.memory).(Memory.max_timemap) max>>) /\
-    (<<SPACES: spaces <2= earlier_times max>>) /\
-
-    (<<TIMEMAP: TimeMap.le max max'>>) /\
-    (<<GAP: forall loc (NUPDATES: ~ U loc /\ ~ AU loc /\ ~ MU loc),
-        Time.lt (max loc) (max' loc)>>) /\
-
-    (<<TRACE: List.Forall (fun em => (no_sc /1\
-                                            (write_in (later_times max' \2/ (spaces /2\ earlier_times max)))) (fst em)) tr>>) /\
-
-    (<<COMPLETEU:
-       forall loc (SAT: U loc),
-       exists to from valr valw releasedr releasedw ordr ordw mem,
-         <<IN: List.In (ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw, mem) tr>> /\ <<ORDR: Ordering.le ordr Ordering.strong_relaxed>> >>) /\
-
-    (<<COMPLETEAU:
-       forall loc (SAT: AU loc),
-       exists to from valr valw releasedr releasedw ordr ordw mem,
-         <<IN: List.In (ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw, mem) tr>> >>) /\
-
-    (<<MYUPDATES: forall loc (SAT: MU loc),
-        exists to,
-          (<<TS0: Time.le (Memory.max_ts loc e0.(Thread.memory)) to>>) /\
-          (<<TS1: Time.lt to (max loc)>>) /\
-          (<<BLANK: Interval.mem (to, (max loc)) <1= spaces loc>>)>>) /\
-
-    (__guard__((<<FAILURE: Local.failure_step e2.(Thread.local)>>) \/
-               (<<COMPLETEW:
-                  forall loc to (PROMISED: promises loc to),
-                  exists e m,
-                    (<<IN: List.In (e, m) tr>>) /\
-                    (<<WRITETO: rlx_write_loc loc e>>)>>)))
-.
 
 Lemma drf_sim_event_shift2 L
       e_src e_tgt
@@ -1764,6 +1722,49 @@ Proof.
   eapply TimeFacts.le_lt_lt; eauto.
 Qed.
 
+
+
+Definition pf_consistent_drf_src lang (e0:Thread.t lang)
+           (spaces: Loc.t -> Time.t -> Prop)
+           (promises: Loc.t -> Time.t -> Prop)
+           (max: TimeMap.t)
+           (U AU: Loc.t -> Prop): Prop :=
+  exists (MU: Loc.t -> Prop) e2 tr max',
+    (* (<<DISJOINT: forall loc (INU: U loc) (INAU: AU loc), False>>) /\ *)
+    (<<STEPS: traced_step tr e0 e2>>) /\
+    (<<MAX: TimeMap.le e0.(Thread.memory).(Memory.max_timemap) max>>) /\
+    (<<SPACES: spaces <2= earlier_times max>>) /\
+
+    (<<TIMEMAP: TimeMap.le max max'>>) /\
+    (<<GAP: forall loc (NUPDATES: ~ U loc /\ ~ AU loc /\ ~ MU loc),
+        Time.lt (max loc) (max' loc)>>) /\
+
+    (<<TRACE: List.Forall (fun em => (no_sc /1\ no_promise /1\ (write_in (later_times max' \2/ (spaces /2\ earlier_times max)))) (fst em)) tr>>) /\
+
+    (<<COMPLETEU:
+       forall loc (SAT: U loc),
+       exists to from valr valw releasedr releasedw ordr ordw mem,
+         <<IN: List.In (ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw, mem) tr>> /\ <<ORDR: Ordering.le ordr Ordering.strong_relaxed>> >>) /\
+
+    (<<COMPLETEAU:
+       forall loc (SAT: AU loc),
+       exists to from valr valw releasedr releasedw ordr ordw mem,
+         <<IN: List.In (ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw, mem) tr>> >>) /\
+
+    (<<MYUPDATES: forall loc (SAT: MU loc),
+        (<<NOTUPDATES: ~ U loc /\ ~ AU loc>>) /\
+        exists to,
+          (<<TS0: Time.le (Memory.max_ts loc e0.(Thread.memory)) to>>) /\
+          (<<TS1: Time.lt to (max loc)>>) /\
+          (<<BLANK: Interval.mem (to, (max loc)) <1= spaces loc>>)>>) /\
+
+    (<<COMPLETEW: forall loc to (PROMISED: promises loc to),
+        exists e m,
+          (<<IN: List.In (e, m) tr>>) /\
+          (<<WRITETO: rlx_write_loc loc e>>)>>)
+.
+
+
 Lemma sim_pf_step_pf_consistent
       c_src0 c_tgt0 tid mlast spaces updates aupdates
       (SIM: sim_pf_minus_one tid mlast spaces updates aupdates c_src0 c_tgt0)
@@ -1771,16 +1772,18 @@ Lemma sim_pf_step_pf_consistent
       (FIND: IdentMap.find tid c_tgt0.(Configuration.threads) = Some (existT _ lang st_tgt, lc_tgt))
       (CONSISTENT: pf_consistent_drf (Thread.mk _ st_tgt lc_tgt c_tgt0.(Configuration.sc) c_tgt0.(Configuration.memory)))
   :
-    exists st_src lc_src max U AU MU,
+    (exists st_src lc_src max U AU,
       (<<FIND: IdentMap.find tid c_src0.(Configuration.threads) = Some (existT _ lang st_src, lc_src)>>) /\
       (<<MAX: Memory.max_full_timemap c_tgt0.(Configuration.memory) max>>) /\
       (<<CONSISTENT: pf_consistent_drf_src
                        (Thread.mk _ st_src lc_src c_src0.(Configuration.sc) c_src0.(Configuration.memory))
                        (concrete_covered lc_tgt.(Local.promises) c_tgt0.(Configuration.memory))
                        (concrete_promised lc_tgt.(Local.promises))
-                       max U AU MU>>) /\
+                       max U AU>>) /\
       (<<AUPDATES: forall loc (SAT: AU loc),
-          ~ Memory.latest_reserve loc lc_tgt.(Local.promises) c_tgt0.(Configuration.memory)>>)
+          ~ Memory.latest_reserve loc lc_tgt.(Local.promises) c_tgt0.(Configuration.memory)>>)) \/
+    (exists c_src1,
+        (<<STEP: pftstep MachineEvent.failure tid c_src0 c_src1>>))
 .
 Proof.
   assert (WF: Configuration.wf c_tgt0).
@@ -1815,7 +1818,7 @@ Proof.
 
   assert (CONSISTENT0: Local.promise_consistent e2.(Thread.local)).
   { unguard. des.
-    - inv FAILURE. auto.
+    - inv LOCAL0. auto.
     - ii. rewrite PROMISES in *. rewrite Memory.bot_get in PROMISE. clarify. }
 
   assert (NORACE:
@@ -1841,20 +1844,40 @@ Proof.
       eapply List.Forall_forall in TRACE; cycle 1.
       + apply List.in_or_app. right. ss. right. eauto.
       + ss. des. auto. } ss.
+
   hexploit traced_step_lifting; try eassumption.
   { ss. eapply sim_pf_other_spaces_unreserved; eauto. }
   { eapply sim_pf_not_attatched; eauto. }
-
   i. des.
+
+  unguard. des.
+  { inv FORGET0. ss.
+    right. eapply pred_steps_traced_step2 in STEP; cycle 1.
+    - instantiate (1:=no_promise).
+      apply List.Forall_forall. i. destruct x.
+      (* dup EVT. eapply drf_sim_trace_no_promise in EVT. *)
+      apply List.in_map with (f := fst) in H. ss.
+      eapply drf_sim_trace_in in H; eauto. des.
+      eapply List.in_map_iff in IN. des. clarify.
+      eapply List.Forall_forall in TRACE; eauto.
+      ss. des. destruct x. ss. inv EVENT; ss.
+    - esplits.
+      replace MachineEvent.failure with
+                   (ThreadEvent.get_machine_event ThreadEvent.failure); auto. econs.
+      + eauto.
+      + eapply no_promise_program_step_rtc. eapply STEP.
+      + econs; eauto. econs; eauto. econs. ii.
+        rewrite Memory.bot_get in PROMISE. clarify. }
+
   set (U_src := fun loc => List.In loc U /\ Memory.get loc (max loc) (Configuration.memory c_src0) <> None).
   set (AU_src := fun loc => List.In loc AU /\ Memory.get loc (max loc) (Configuration.memory c_src0) <> None).
   set (MU_src := fun loc => (List.In loc (AU ++ U)) /\ ~ Memory.get loc (max loc) (Configuration.memory c_src0) <> None).
 
   hexploit sim_pf_max_timemap; eauto. intros MAXLE.
 
-  exists st_src, lc_src, max, U_src, AU_src, MU_src. esplits; eauto.
+  left. exists st_src, lc_src, max, U_src, AU_src. esplits; eauto.
   { unfold pf_consistent_drf_src.
-    exists th_src', tr_src, max'. splits; auto.
+    exists MU_src, th_src', tr_src, max'. splits; auto.
     - i. inv PR.
       exploit Memory.max_full_ts_inj.
       { eapply MAX0. }
@@ -1871,7 +1894,7 @@ Proof.
       eapply drf_sim_trace_in in H; eauto. des.
       eapply List.in_map_iff in IN. des. clarify.
       eapply List.Forall_forall in TRACE; eauto. ss. des.
-      destruct x, x1. split.
+      destruct x, x0. split.
       + ss. inv EVENT; ss.
       + eapply drf_sim_event_write_in; eauto.
 
@@ -1892,6 +1915,8 @@ Proof.
       esplits; eauto. rewrite IN1 in IN2. esplits; eauto.
 
     - unfold MU_src. i. ss. des. apply NNPP in SAT0.
+      split.
+      { unfold U_src, AU_src. split; ii; des; clarify. }
       destruct (MAX loc). des.
       assert (PROMISED: all_promises (Configuration.threads c_tgt0) (fun _ => True) loc (max loc)).
       { apply NNPP. intros NPROM.
@@ -1928,77 +1953,15 @@ Proof.
           { intros LATEST. inv LATEST. unfold Memory.get in GET0.
             rewrite GET0 in *. inv GET. }
 
-    - inv FORGET0. unguard. ss. des.
-      + inv FAILURE. left. econs; ss. ii.
-        erewrite Memory.bot_get in PROMISE. clarify.
-      + right. ii.
-        exploit COMPLETEW; eauto. i. des.
-        dup IN. apply List.in_map with (f := fst) in IN. ss.
-        eapply drf_sim_trace_in2 in IN; eauto; cycle 1.
-        { ii. inv H; ss. } des.
-        eapply List.in_map_iff in IN1. des. destruct x; ss. subst.
-        esplits; eauto. inv EVENT; ss.
-        * des. inv WRITETO. split; auto.
-        * des. inv WRITETO. split; auto.
+    - inv FORGET0. ii.
+      exploit COMPLETEW; eauto. i. des.
+      dup IN. apply List.in_map with (f := fst) in IN. ss.
+      eapply drf_sim_trace_in2 in IN; eauto; cycle 1.
+      { ii. inv H; ss. } des.
+      eapply List.in_map_iff in IN1. des. destruct x; ss. subst.
+      esplits; eauto. inv EVENT; ss.
+      + des. inv WRITETO. split; auto.
+      + des. inv WRITETO. split; auto.
   }
   { unfold AU_src. i. des. apply AUPDATES in SAT. auto. }
 Qed.
-
-
-
-
-
-
-
-(* Inductive shifted_map mlast mcert *)
-(*           (updates: Loc.t -> Prop) *)
-(*           (sky gap: TimeMap.t) *)
-(*           (f: Loc.t -> Time.t -> Time.t): Prop := *)
-(* | shifted_map_intro *)
-(*     (PRSV: map_preserving (times_in_memory mcert) f) *)
-(*     (SAME: forall l t (TLE: Time.le t (Memory.max_ts l mlast)), *)
-(*         f l t = t) *)
-(*     (INGAP: forall l t (TLT: Time.lt (Memory.max_ts l mcert) t), *)
-(*         Time.lt (f l t) (gap l)) *)
-(*     (AFTERSKY: forall l t (TLT: Time.lt (Memory.max_ts l mcert) t), *)
-(*         Time.lt (sky l) (f l t)) *)
-(* . *)
-
-(* Lemma shifted_map_exists mlast mcert updates *)
-(*       (MLE: Memory.le mlast mcert) *)
-(*       (sky gap: TimeMap.t) *)
-(*       (SKY: forall l, Time.lt (Memory.max_ts l mlast) (sky l)) *)
-(*       (GAP: forall l, Time.lt (Memory.max_ts l mlast) (gap l)) *)
-(*   : *)
-(*     exists f, (<<SHIFTED: shifted_map mlast mcert updates sky gap f>>). *)
-(* Proof. *)
-(*   (* may be very hard... *) *)
-(* Admitted. *)
-
-(* Lemma shifted_map_preserving_last_mem  mlast mcert updates sky gap f *)
-(*       (CLOSED: Memory.closed mlast) *)
-(*       (SHIFTED: shifted_map mlast mcert updates sky gap f) *)
-(*   : *)
-(*     memory_map f mlast mlast. *)
-(* Proof. *)
-(*   inv SHIFTED. inv PRSV. econs; i. *)
-(*   - exploit Memory.max_ts_spec; eauto. i. des. *)
-(*     repeat erewrite SAME; eauto. *)
-(*     + rewrite GET. unfold msg_map. des_ifs. repeat f_equal. *)
-(*       inv CLOSED. exploit CLOSED0; try apply GET; eauto. i. des. *)
-(*       inv MSG_CLOSED. inv CLOSED; ss. f_equal. *)
-(*       destruct view. inv CLOSED1. unfold view_map, timemap_map. ss. f_equal. *)
-(*       * extensionality l. erewrite SAME; auto. *)
-(*         specialize (PLN l). des. *)
-(*         exploit Memory.max_ts_spec; eauto. i. des. auto. *)
-(*       * extensionality l. erewrite SAME; auto. *)
-(*         specialize (RLX l). des. *)
-(*         exploit Memory.max_ts_spec; eauto. i. des. auto. *)
-(*     + exploit Memory.get_ts; try apply GET; eauto. i. des. *)
-(*       * clarify. *)
-(*       * left. eapply TimeFacts.lt_le_lt; eauto. *)
-(*   - destruct msg_src as [from msg]. exploit Memory.max_ts_spec; eauto. i. des. *)
-(*     esplits. *)
-(*     + erewrite SAME; eauto. *)
-(*     + eauto. *)
-(* Qed. *)
