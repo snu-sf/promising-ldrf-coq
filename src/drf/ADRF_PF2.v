@@ -1739,7 +1739,7 @@ Definition pf_consistent_drf_src lang (e0:Thread.t lang)
     (<<GAP: forall loc (NUPDATES: ~ U loc /\ ~ AU loc /\ ~ MU loc),
         Time.lt (max loc) (max' loc)>>) /\
 
-    (<<TRACE: List.Forall (fun em => (no_sc /1\ no_promise /1\ (write_in (later_times max' \2/ (spaces /2\ earlier_times max)))) (fst em)) tr>>) /\
+    (<<TRACE: List.Forall (fun em => (no_sc /1\ no_promise /1\ __guard__(write_in (later_times max') \1/ write_in (spaces /2\ earlier_times max))) (fst em)) tr>>) /\
 
     (<<COMPLETEU:
        forall loc (SAT: U loc),
@@ -1836,14 +1836,15 @@ Proof.
       apply List.Forall_forall. i. destruct x.
       eapply List.Forall_forall in TRACE; cycle 1.
       + apply List.in_or_app. left. eauto.
-      + ss. des. split; auto.
+      + ss. des; split; auto.
     - ss.
     - eapply pred_steps_traced_step2; eauto.
       instantiate (1:=fun _ => True).
       apply List.Forall_forall. i. destruct x. split; ss.
       eapply List.Forall_forall in TRACE; cycle 1.
       + apply List.in_or_app. right. ss. right. eauto.
-      + ss. des. auto. } ss.
+      + ss. des; auto.
+  } ss.
 
   hexploit traced_step_lifting; try eassumption.
   { ss. eapply sim_pf_other_spaces_unreserved; eauto. }
@@ -1860,7 +1861,7 @@ Proof.
       eapply drf_sim_trace_in in H; eauto. des.
       eapply List.in_map_iff in IN. des. clarify.
       eapply List.Forall_forall in TRACE; eauto.
-      ss. des. destruct x. ss. inv EVENT; ss.
+      ss. destruct x. ss. des; ss; inv EVENT; ss.
     - esplits.
       replace MachineEvent.failure with
                    (ThreadEvent.get_machine_event ThreadEvent.failure); auto. econs.
@@ -1893,10 +1894,12 @@ Proof.
     - apply List.Forall_forall. i. dup H. apply List.in_map with (f := fst) in H.
       eapply drf_sim_trace_in in H; eauto. des.
       eapply List.in_map_iff in IN. des. clarify.
-      eapply List.Forall_forall in TRACE; eauto. ss. des.
-      destruct x, x0. split.
+      eapply List.Forall_forall in TRACE; eauto. ss.
+      destruct x, x0. ss. des; split.
       + ss. inv EVENT; ss.
-      + eapply drf_sim_event_write_in; eauto.
+      + unguard. left. eapply drf_sim_event_write_in; eauto.
+      + ss. inv EVENT; ss.
+      + unguard. right. eapply drf_sim_event_write_in; eauto.
 
     - unfold U_src. i. des. ss.
       apply COMPLETEU in SAT. des.

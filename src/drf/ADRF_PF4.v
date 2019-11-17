@@ -2584,6 +2584,100 @@ Proof.
   - eapply IHFORALL in IN; eauto. des. esplits; eauto.
 Qed.
 
+Lemma write_not_cross_concrete_promise
+      prom0 mem0 loc from to msg prom1 mem1 kind
+      to0
+      (CONCRETE: concrete_promised mem0 loc to0)
+      (PROMISE: AMemory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
+  :
+    Time.le to to0 \/ Time.le to0 from.
+Proof.
+  inv CONCRETE. dup GET. eapply memory_get_ts_strong in GET0. des; clarify.
+  { right. apply Time.bot_spec. }
+  inv PROMISE.
+  - eapply add_succeed_wf in MEM. des.
+    hexploit DISJOINT; eauto. i.
+    eapply disjoint_equivalent2 in H. des; auto; clarify.
+    unfold Time.meet, Time.join in *. des_ifs; eauto.
+    exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+    { eapply TS. }
+    { eapply TS2. }
+
+  - eapply split_succeed_wf in MEM. des.
+    exploit Memory.get_disjoint.
+    { eapply GET. }
+    { eapply GET2. } i. des; clarify.
+    + left. left. auto.
+    + eapply disjoint_equivalent2 in x0. des; auto; clarify.
+      { eapply memory_get_ts_strong in GET2. des; clarify.
+        exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+        - eapply TS23.
+        - eapply Time.bot_spec. }
+      unfold Time.meet, Time.join in *. des_ifs; eauto.
+      * exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+        { eapply TS. }
+        { eapply TS2. }
+      * left. left. etrans; eauto.
+      * left. left. etrans; eauto.
+
+  - eapply lower_succeed_wf in MEM. des.
+    exploit Memory.get_disjoint.
+    { eapply GET. }
+    { eapply GET0. } i. des; clarify.
+    + left. refl.
+    + eapply disjoint_equivalent2 in x0. des; auto; clarify.
+      unfold Time.meet, Time.join in *. des_ifs; eauto.
+      * exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+        { eapply TS. }
+        { eapply TS3. }
+      * left. left. auto.
+      * left. left. auto.
+
+  - eapply Memory.remove_get0 in MEM. des.
+    exploit Memory.get_disjoint.
+    { eapply GET. }
+    { eapply GET0. } i. des; clarify.
+    eapply disjoint_equivalent2 in x0. des; auto; clarify.
+    + eapply memory_get_ts_strong in GET0. des; clarify.
+      left. apply Time.bot_spec.
+    + unfold Time.meet, Time.join in *. des_ifs; eauto.
+      * exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+        { eapply TS. }
+        { eapply TS0. }
+      * left. left. auto.
+      * left. left. auto.
+Qed.
+
+Lemma write_not_cross_concrete_write
+      prom0 mem0 loc from to val released prom1 mem1 kind
+      to0
+      (CONCRETE: concrete_promised mem0 loc to0)
+      (WRITE: AMemory.write prom0 mem0 loc from to val released prom1 mem1 kind)
+  :
+    Time.le to to0 \/ Time.le to0 from.
+Proof.
+  inv WRITE. eapply write_not_cross_concrete_promise; eauto.
+Qed.
+
+Lemma write_not_cross_concrete_step (tm: TimeMap.t)
+      lang (th0 th1: Thread.t lang) e
+      (CONCRETE: forall loc, concrete_promised th0.(Thread.memory) loc (tm loc))
+      (STEP: AThread.step_allpf e th0 th1)
+  :
+    (write_in (earlier_times tm) \1/ write_in (later_times tm)) e.
+Proof.
+  inv STEP. inv STEP0.
+  - inv STEP. inv LOCAL. ss. auto.
+  - inv STEP. inv LOCAL; ss; auto.
+    + inv LOCAL0. eapply write_not_cross_concrete_write in WRITE; eauto. des.
+      * left. i. inv IN; ss. unfold earlier_times. etrans; eauto.
+      * right. i. inv IN; ss. unfold later_times.
+        eapply TimeFacts.le_lt_lt; eauto.
+    + inv LOCAL1. inv LOCAL2. eapply write_not_cross_concrete_write in WRITE; eauto. des.
+      * left. i. inv IN; ss. unfold earlier_times. etrans; eauto.
+      * right. i. inv IN; ss. unfold later_times.
+        eapply TimeFacts.le_lt_lt; eauto.
+Qed.
 
 Definition pf_consistent_drf_complete lang (e0:Thread.t lang): Prop :=
   let L := (fun loc => Memory.latest_reserve loc e0.(Thread.local).(Local.promises) e0.(Thread.memory)) in
@@ -2809,6 +2903,31 @@ Proof.
       eapply List.in_map_iff. esplits; eauto. ss.
 Qed.
 
+Lemma concrete_promised_increase_steps
+      lang (th0 th1: Thread.t lang) tr
+      (STEPS: traced_step tr th0 th1)
+  :
+    concrete_promised th0.(Thread.memory) <2= concrete_promised th1.(Thread.memory).
+Proof.
+  ginduction STEPS; i; auto.
+  eapply IHSTEPS. inv HD.  eapply concrete_promised_increase; eauto.
+Qed.
+
+
+Lemma write_not_cross_concrete_steps (tm: TimeMap.t)
+      lang (th0 th1: Thread.t lang) tr
+      (CONCRETE: forall loc, concrete_promised th0.(Thread.memory) loc (tm loc))
+      (STEPS: traced_step tr th0 th1)
+  :
+    List.Forall (fun em => (write_in (earlier_times tm) \1/ write_in (later_times tm)) (fst em)) tr.
+Proof.
+  ginduction STEPS.
+  - i. econs.
+  - i. econs.
+    + eapply write_not_cross_concrete_step; eauto.
+    + eapply IHSTEPS. i. inv HD.
+      eapply concrete_promised_increase; eauto.
+Qed.
 
 Definition pf_consistent_drf lang (e0:Thread.t lang): Prop :=
   let L := (fun loc => Memory.latest_reserve loc e0.(Thread.local).(Local.promises) e0.(Thread.memory)) in
@@ -2828,7 +2947,8 @@ Definition pf_consistent_drf lang (e0:Thread.t lang): Prop :=
     (<<TRACE: List.Forall (fun em => (no_sc /1\
                                             (no_acq_update_on ((fun loc to => L loc) /2\ Memory.max_full_ts e0.(Thread.memory)))
                                             /1\
-                                            (write_in (later_times max' \2/ (concrete_covered e0.(Thread.local).(Local.promises) e0.(Thread.memory) /2\ earlier_times max)))
+                                            __guard__((write_in (later_times max')) \1/ (write_in (concrete_covered e0.(Thread.local).(Local.promises) e0.(Thread.memory) /2\ earlier_times max)))
+                                            (* (write_in (later_times max' \2/ (concrete_covered e0.(Thread.local).(Local.promises) e0.(Thread.memory) /2\ earlier_times max))) *)
                                             /1\
                                             (fun e => ThreadEvent.get_machine_event e = MachineEvent.silent)
                                      ) (fst em)) tr>>) /\
@@ -2851,6 +2971,32 @@ Definition pf_consistent_drf lang (e0:Thread.t lang): Prop :=
                      (<<WRITETO: rlx_write_to loc to e>>)>>))))
 .
 
+
+Lemma write_in_sum L0 L1 L2
+      e
+      (WRITEIN0: write_in L0 e)
+      (WRITEIN1: write_in L1 e)
+      (IMPL: (L0 /2\ L1) <2= L2)
+  :
+    write_in L2 e.
+Proof.
+  i. unfold write_in in *. des_ifs.
+  - ii. eapply IMPL; eauto.
+  - ii. eapply IMPL; eauto.
+Qed.
+
+Lemma write_in_mon L0 L1
+      e
+      (NOTIN: write_in L1 e)
+      (LE: L1 <2= L0)
+  :
+    write_in L0 e.
+Proof.
+  i. unfold write_in in *. des_ifs.
+  - ii. eapply LE. eapply NOTIN; eauto.
+  - ii. eapply LE. eapply NOTIN; eauto.
+Qed.
+
 Lemma pf_consistent_pf_consistent_drf lang (th: Thread.t lang)
       (WF: Local.wf th.(Thread.local) th.(Thread.memory))
       (MEM: Memory.closed th.(Thread.memory))
@@ -2870,13 +3016,41 @@ Proof.
   destruct e2. eapply no_sc_any_sc_traced in STEPS1; ss; cycle 1.
   { ii. eapply List.Forall_forall in IN; eauto. ss. des. ss. } des.
 
+  exploit write_not_cross_concrete_steps; try apply STEPS; eauto.
+  { ss. instantiate (1:=max). i.
+    eapply concrete_promised_increase_steps in STEPS0; eauto. ss.
+    inv FORGET. specialize (MAX loc). inv MAX. des.
+    unfold Memory.get in COMPLETE. erewrite <- COMPLETE in GET.
+    - econs; eauto.
+    - intros LATEST. inv LATEST. unfold Memory.get in GET0. clarify. }
+  intros NOTCROSS.
+
   exists (Thread.mk _ state0 local0 sc_src'0 memory0), U, AU, (tr0 ++ tr), max'.
   esplits; auto.
   - eapply traced_step_trans; eauto.
   - eapply Forall_app.
-    + eapply List.Forall_impl; eauto. i. ss. des; auto. destruct a. ss.
-      unfold is_cancel in SAT. des_ifs; ss.
-    + eapply List.Forall_impl; eauto. i. ss. des; auto.
+    + eapply List.Forall_impl; try apply EVENTS; eauto. i. ss. des; auto. destruct a. ss.
+      unfold is_cancel in SAT. des_ifs; ss. unguard. splits; auto.
+    + eapply List.Forall_forall. i.
+      eapply List.Forall_forall in NOTCROSS; eauto.
+      eapply List.Forall_forall in TRACE; eauto.
+      ss. des; splits; auto.
+      * right. eapply write_in_sum.
+        { eapply EVENT1. }
+        { eapply NOTCROSS. }
+        i. ss. des; auto.
+        exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+        { eapply PR. }
+        etrans.
+        { eapply PR0. }
+        { eauto. }
+      * left. eapply write_in_sum.
+        { eapply EVENT1. }
+        { eapply NOTCROSS. }
+        i. ss. des; auto.
+        exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+        { eapply PR0. }
+        eauto.
   - i. exploit COMPLETEU; eauto. i. des. esplits; eauto.
     eapply List.in_or_app; eauto.
   - i. exploit COMPLETEAU; eauto. i. des. esplits; eauto.

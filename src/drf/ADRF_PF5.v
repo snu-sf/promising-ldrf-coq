@@ -533,6 +533,8 @@ Proof.
   }
   assert (MAPEQ: mapping_map_eq f).
   { eapply mapping_map_lt_map_eq; eauto. }
+  assert (MAPLE: mapping_map_le f).
+  { eapply mapping_map_lt_map_le; eauto. }
 
   assert (MAPPABLE: List.Forall (fun em => mappable_evt f (fst em)) tr).
   { eapply wf_time_mapped_mappable; eauto. i.
@@ -551,7 +553,6 @@ Proof.
   destruct e0 as [st0 lc0 sc0 mem0].
   destruct e2 as [st1 lc1 sc1 mem1]. ss.
   hexploit traced_steps_map; try apply STEPS; eauto.
-  { eapply mapping_map_lt_map_le; eauto. }
   { eapply map_ident_in_memory_bot; eauto. }
   { eapply map_ident_in_memory_local; eauto. }
   { eapply map_ident_in_memory_memory; eauto. }
@@ -570,90 +571,219 @@ Proof.
       specialize (FSPEC loc). des.
       destruct (classic (MU loc)).
       { exploit MUS; eauto. i. des.
-        exploit MYUPDATES; eauto. i. des.
-        destruct (Time.le_lt_dec to (mu loc)).
-        - left. left. exploit SAME.
-          { instantiate (1:=from). etrans.
-            { left. eauto. }
-            { eauto. } } intros MAPFROM.
-          exploit SAME.
-          { eapply l. } intros MAPTO.
-          hexploit (MAPEQ _ _ _ _ MAPTO TO). i. subst.
-          hexploit (MAPEQ _ _ _ _ MAPFROM FROM). i. subst.
-          hexploit (TRACE1 t); eauto. i. des; auto.
-          { unfold later_times in H0.
-            exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
-            { eapply H0. }
-            etrans; eauto. etrans.
-            { inv IN0. eauto. } etrans; eauto.
-            left. auto. }
-        - left.
-          admit.
+        exploit MYUPDATES; eauto. i. des. unguard. des.
+        - left. left. eapply BLANK. inv IN0. ss.
+          assert (TS: Time.le (mu loc) from).
+          { destruct (Time.le_lt_dec (mu loc) from); auto. exfalso.
+            exploit (TRACE1 (Time.meet (mu loc) to)).
+            - unfold Time.meet. des_ifs; econs; ss. refl.
+            - unfold later_times. i. eapply Time.lt_strorder.
+              eapply TimeFacts.lt_le_lt.
+              { eapply x0. } etrans.
+              { eapply Time.meet_l. } etrans.
+              { left. eauto. }
+              eauto.
+          }
+          econs; ss.
+          + eapply TimeFacts.le_lt_lt; [|eapply FROM0].
+            eapply MAPLE.
+            * eapply SAME; eauto. refl.
+            * eauto.
+            * eauto.
+          + etrans; eauto.
+            left. eapply RANGE.
+            * eauto.
+            * eapply TimeFacts.le_lt_lt; eauto.
+        - ss. inv IN0. destruct (Time.le_lt_dec t (mu loc)).
+          + dup l. eapply SAME in l; eauto.
+            exploit (TRACE1 t).
+            { econs; ss.
+              - eapply MAPLT; eauto.
+              - destruct (Time.le_lt_dec t to); auto.
+                erewrite (MAPLT loc) in l1; try eassumption.
+                exfalso. eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt.
+                { eapply TO0. }
+                { auto. }
+            }
+            i. des. auto.
+          + dup l. left. left. eapply BLANK. econs; ss.
+            exploit RANGE.
+            * eapply TO.
+            * eapply MAPLT.
+              { eapply SAME. refl. }
+              { eauto. }
+              eapply TimeFacts.lt_le_lt; eauto.
+            * i. des. etrans.
+              { eapply TO0. }
+              { left. auto. }
       }
-
       destruct (classic (__guard__(U loc \/ AU loc))).
-      { exploit UAUS; eauto. i. des.
-
-
-      }
-      { exploit NUS; eauto.
-        unguard. apply not_or_and in H0. des. split; auto. }
-  }
-
-
-
-              left. eauto. }
+      { exploit UAUS; eauto. i. des. unguard. guardH H0. des.
+        - left. right. split; auto. ss.
+          assert (TS: Time.le (max loc) from).
+          { destruct (Time.le_lt_dec (max loc) from); eauto. exfalso.
+            exploit (TRACE1 (Time.meet to (max loc))).
+            { unfold Time.meet. des_ifs; econs; ss.
+              - refl.
+              - left. auto. }
+            unfold later_times. i.
+            eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+            { eapply x0. } etrans.
+            { eapply Time.meet_r. }
             eauto. }
-          left. left.
-
-
+          exploit RANGE; try apply TO.
+          { eapply TimeFacts.le_lt_lt.
+            - eapply TS.
+            - eauto. } i. des. inv IN0. split.
+          + eapply TimeFacts.le_lt_lt; [|eapply FROM0]. ss.
+            eapply MAPLE.
+            * eapply SAME. refl.
+            * eauto.
+            * eauto.
+          + eapply TimeFacts.le_lt_lt; eauto.
+        - left. left. ss. exploit (TRACE1 to).
           { econs; ss. refl. } i. des.
-          { unfold later_times in H0.
-            exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
-            { eapply H0. }
-            etrans; eauto. etrans.
-            { left. eauto. }
-            eauto. }
-          left. left.
+          exploit (SAME to); eauto. i.
+          hexploit (MAPEQ _ _ _ _ x2 TO). i. subst.
+          exploit (SAME from); eauto.
+          { etrans; eauto. left. auto. } i.
+          hexploit (MAPEQ _ _ _ _ x3 FROM). i. subst.
+          eapply TRACE1; eauto. }
+      { exploit NUS; eauto.
+        { unguard. guardH TRACE1. apply not_or_and in H0. des. split; auto. }
+        i. des. unguard. apply not_or_and in H0. des.
+        - right. splits; auto. inv IN0. ss.
+          transitivity ffrom; auto. eapply RANGE; eauto.
+          destruct (Time.le_lt_dec from (max loc)); auto. exfalso.
+          exploit (TRACE1 (Time.middle (max loc) (max' loc))).
+          { econs; ss.
+            - eapply TimeFacts.le_lt_lt; eauto.
+              eapply Time.middle_spec; eauto.
+            - etrans.
+              + left. eapply Time.middle_spec; eauto.
+              + left. eapply TRACE1; eauto. econs; ss. refl. }
+          unfold later_times. i.
+          eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+          { eapply x0. }
+          { left. eapply Time.middle_spec; eauto. }
+        - left. left. ss. exploit (TRACE1 to).
+          { econs; ss. refl. } i. des.
+          exploit (SAME to); eauto. i.
+          hexploit (MAPEQ _ _ _ _ x2 TO). i. subst.
+          exploit (SAME from); eauto.
+          { etrans; eauto. left. auto. } i.
+          hexploit (MAPEQ _ _ _ _ x3 FROM). i. subst.
+          eapply TRACE1; eauto. }
 
-          exploit SAME.
-          { instantiate (1:=from). etrans.
-            { left. eauto. }
-            { eauto. } } intros MAPFROM.
-          exploit SAME.
-          { eapply l. } intros MAPTO.
-          hexploit (MAPEQ _ _ _ _ MAPTO TO). i. subst.
-          left.
 
-            instantiate (1:=from). etrans.
-            { left. eauto. }
-            { eauto. } } intros MAPFROM.
-
-
-            from
-
-
-        - admit.
-
-        -
-
-        - left. left.
-
-        Lemma s: True.
-
-
+    + (* TODO: exactly same *)
+      splits; auto.
+      specialize (FSPEC loc). des.
+      destruct (classic (MU loc)).
+      { exploit MUS; eauto. i. des.
+        exploit MYUPDATES; eauto. i. des. unguard. des.
+        - left. left. eapply BLANK. inv IN0. ss.
+          assert (TS: Time.le (mu loc) from).
+          { destruct (Time.le_lt_dec (mu loc) from); auto. exfalso.
+            exploit (TRACE1 (Time.meet (mu loc) to)).
+            - unfold Time.meet. des_ifs; econs; ss. refl.
+            - unfold later_times. i. eapply Time.lt_strorder.
+              eapply TimeFacts.lt_le_lt.
+              { eapply x0. } etrans.
+              { eapply Time.meet_l. } etrans.
+              { left. eauto. }
+              eauto.
+          }
+          econs; ss.
+          + eapply TimeFacts.le_lt_lt; [|eapply FROM0].
+            eapply MAPLE.
+            * eapply SAME; eauto. refl.
+            * eauto.
+            * eauto.
+          + etrans; eauto.
+            left. eapply RANGE.
+            * eauto.
+            * eapply TimeFacts.le_lt_lt; eauto.
+        - ss. inv IN0. destruct (Time.le_lt_dec t (mu loc)).
+          + dup l. eapply SAME in l; eauto.
+            exploit (TRACE1 t).
+            { econs; ss.
+              - eapply MAPLT; eauto.
+              - destruct (Time.le_lt_dec t to); auto.
+                erewrite (MAPLT loc) in l1; try eassumption.
+                exfalso. eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt.
+                { eapply TO0. }
+                { auto. }
+            }
+            i. des. auto.
+          + dup l. left. left. eapply BLANK. econs; ss.
+            exploit RANGE.
+            * eapply TO.
+            * eapply MAPLT.
+              { eapply SAME. refl. }
+              { eauto. }
+              eapply TimeFacts.lt_le_lt; eauto.
+            * i. des. etrans.
+              { eapply TO0. }
+              { left. auto. }
       }
       destruct (classic (__guard__(U loc \/ AU loc))).
-      { exploit UAUS; eauto. }
+      { exploit UAUS; eauto. i. des. unguard. guardH H0. des.
+        - left. right. split; auto. ss.
+          assert (TS: Time.le (max loc) from).
+          { destruct (Time.le_lt_dec (max loc) from); eauto. exfalso.
+            exploit (TRACE1 (Time.meet to (max loc))).
+            { unfold Time.meet. des_ifs; econs; ss.
+              - refl.
+              - left. auto. }
+            unfold later_times. i.
+            eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+            { eapply x0. } etrans.
+            { eapply Time.meet_r. }
+            eauto. }
+          exploit RANGE; try apply TO.
+          { eapply TimeFacts.le_lt_lt.
+            - eapply TS.
+            - eauto. } i. des. inv IN0. split.
+          + eapply TimeFacts.le_lt_lt; [|eapply FROM0]. ss.
+            eapply MAPLE.
+            * eapply SAME. refl.
+            * eauto.
+            * eauto.
+          + eapply TimeFacts.le_lt_lt; eauto.
+        - left. left. ss. exploit (TRACE1 to).
+          { econs; ss. refl. } i. des.
+          exploit (SAME to); eauto. i.
+          hexploit (MAPEQ _ _ _ _ x2 TO). i. subst.
+          exploit (SAME from); eauto.
+          { etrans; eauto. left. auto. } i.
+          hexploit (MAPEQ _ _ _ _ x3 FROM). i. subst.
+          eapply TRACE1; eauto. }
       { exploit NUS; eauto.
-        unguard. apply not_or_and in H0. des. split; auto. }
-
-
-      intros ts. dest
-
-    destruct b. ss.
-
-    admit.
+        { unguard. guardH TRACE1. apply not_or_and in H0. des. split; auto. }
+        i. des. unguard. apply not_or_and in H0. des.
+        - right. splits; auto. inv IN0. ss.
+          transitivity ffrom; auto. eapply RANGE; eauto.
+          destruct (Time.le_lt_dec from (max loc)); auto. exfalso.
+          exploit (TRACE1 (Time.middle (max loc) (max' loc))).
+          { econs; ss.
+            - eapply TimeFacts.le_lt_lt; eauto.
+              eapply Time.middle_spec; eauto.
+            - etrans.
+              + left. eapply Time.middle_spec; eauto.
+              + left. eapply TRACE1; eauto. econs; ss. refl. }
+          unfold later_times. i.
+          eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+          { eapply x0. }
+          { left. eapply Time.middle_spec; eauto. }
+        - left. left. ss. exploit (TRACE1 to).
+          { econs; ss. refl. } i. des.
+          exploit (SAME to); eauto. i.
+          hexploit (MAPEQ _ _ _ _ x2 TO). i. subst.
+          exploit (SAME from); eauto.
+          { etrans; eauto. left. auto. } i.
+          hexploit (MAPEQ _ _ _ _ x3 FROM). i. subst.
+          eapply TRACE1; eauto. }
 
   - i. eapply COMPLETEU in SAT. des.
     eapply list_Forall2_in2 in IN; eauto. des. ss. destruct b. ss.
@@ -671,308 +801,39 @@ Proof.
 
 Qed.
 
-  Lemma sorting_sorted l
-    :
-      (<<COMPLETE: forall a, List.In a l <-> List.In a (sorting l)>>) /\
-      (<<SORTED: times_sorted (sorting l)>>).
-  Proof.
-    induction l; ss.
-    - split; i; ss.
-    - i. des. splits.
-      + i. erewrite insert_complete.
-        split; i; des; eauto.
-        * right. eapply COMPLETE; eauto.
-        * right. eapply COMPLETE; eauto.
-      + eapply insert_sorted; eauto.
-  Qed.
 
 
+Definition pf_consistent_drf_future lang (e0:Thread.t lang)
+           (spaces: Loc.t -> Time.t -> Prop)
+           (promises: Loc.t -> Time.t -> Prop)
+           (max: TimeMap.t)
+           (U AU: Loc.t -> Prop): Prop :=
+  forall mem_future sc_future
+         (UNCH: unchanged_on spaces e0.(Thread.memory) mem_future)
+         (ATTATCH: not_attatched (fun loc to => (<<UPDATES: (U \1/ AU) loc>>) /\ (<<MAX: Memory.max_ts loc e0.(Thread.memory) = to>>)) mem_future),
+  exists e2 tr,
+    (<<STEPS: traced_step tr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc_future mem_future) e2>>) /\
 
-  Lemma sorting_sorted l
-    :
-      (<<COMPLETE: forall a, List.In a l <-> List.In a (sorting l)>>) /\
-      (<<SORTED: times_sorted (sorting l)>>).
-  Proof.
-    induction l; ss.
-    - split; i; ss.
-    - i. des. splits.
-      + i. erewrite insert_complete.
-        split; i; des; eauto.
-        * right. eapply COMPLETE; eauto.
-        * right. eapply COMPLETE; eauto.
-      + eapply insert_sorted; eauto.
-  Qed.
+    (<<TRACE: List.Forall (fun em => no_promise (fst em)) tr>>) /\
 
+    (<<COMPLETEU:
+       forall loc (SAT: U loc),
+       exists to from valr valw releasedr releasedw ordr ordw mem,
+         <<IN: List.In (ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw, mem) tr>> /\ <<ORDR: Ordering.le ordr Ordering.strong_relaxed>> >>) /\
 
-Lemma shift_map_exists f0 t0 t1
-      (TS: Time.lt t0 t1)
-      (MAPLT0: mapping_map_lt_loc f)
-  :
-    forall (T: list Time.t),
-    exists (f: Time.t -> Time.t -> Prop),
-      (<<COMPLETE: forall to (IN: List.In to T), exists fto, (<<MAPPED: f to fto>>)>>) /\
-      (<<ONLY: forall to fto (MAPPED: f to fto),
-          (<<TS: Time.le to t0>>) \/ (<<IN: List.In to T>>)>>) /\
-      (<<SAME: forall ts (TS: Time.le ts t0), f ts ts>>) /\
-      (<<BOUND: forall to fto (MAPPED: f to fto), Time.lt fto t1>>) /\
-      (<<MAPLT: mapping_map_lt_loc f>>)
+    (<<COMPLETEAU:
+       forall loc (SAT: AU loc),
+       exists to from valr valw releasedr releasedw ordr ordw mem,
+         <<IN: List.In (ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw, mem) tr>> >>) /\
 
-
-Lemma shift_map_exists f0 t0 t1
-      (TS: Time.lt t0 t1)
-      (MAPLT0: mapping_map_lt_loc f)
-  :
-    forall (T: list Time.t),
-    exists (f: Time.t -> Time.t -> Prop),
-      (<<COMPLETE: forall to (IN: List.In to T), exists fto, (<<MAPPED: f to fto>>)>>) /\
-      (<<ONLY: forall to fto (MAPPED: f to fto),
-          (<<TS: Time.le to t0>>) \/ (<<IN: List.In to T>>)>>) /\
-      (<<SAME: forall ts (TS: Time.le ts t0), f ts ts>>) /\
-      (<<BOUND: forall to fto (MAPPED: f to fto), Time.lt fto t1>>) /\
-      (<<MAPLT: mapping_map_lt_loc f>>)
-
-
-  :
-    exists (f: Time.t -> Time.t -> Prop),
-      (<<COMPLETE: forall to (IN: List.In to T), exists fto, (<<MAPPED: f to fto>>)>>) /\
-      (<<ONLY: forall to fto (MAPPED: f to fto),
-          (<<TS: Time.le to t0>>) \/ (<<IN: List.In to T>>)>>) /\
-      (<<SAME: forall ts (TS: Time.le ts t0), f ts ts>>) /\
-      (<<BOUND: forall to fto (MAPPED: f to fto), Time.lt fto t1>>) /\
-      (<<MAPLT: mapping_map_lt_loc f>>)
+    (<<COMPLETEW: forall loc to (PROMISED: promises loc to),
+        exists e m,
+          (<<IN: List.In (e, m) tr>>) /\
+          (<<WRITETO: rlx_write_loc loc e>>)>>)
 .
-Proof.
-  ginduction T.
-  - i. exists (fun to fto => to = fto /\ Time.le to t0). splits.
-    + i. inv IN.
-    + i. des; auto.
-    + i. split; auto.
-    + i. des. subst. eapply TimeFacts.le_lt_lt; eauto.
-    + ii. des. subst. auto.
 
-  - i. exploit IHT; eauto. i. des. clear IHT.
-
-    destruct (Time.le_lt_dec a t0).
-    { exists f. splits; auto.
-      - i. ss. des; eauto. subst. esplits. eapply SAME. auto.
-      - i. eapply ONLY in MAPPED. ss. des; auto. }
-
-    destruct (classic (List.In a T)).
-    { exists f. splits; auto.
-      - i. ss. des; subst; eauto.
-      - i. ss. eapply ONLY in MAPPED. des; auto. }
-
-
-
-Lemma compress_map_exists t0 t1 (T: list Time.t)
-      (TS: Time.lt t0 t1)
-  :
-    exists (f: Time.t -> Time.t -> Prop),
-      (<<COMPLETE: forall to (IN: List.In to T), exists fto, (<<MAPPED: f to fto>>)>>) /\
-      (<<ONLY: forall to fto (MAPPED: f to fto),
-          (<<TS: Time.le to t0>>) \/ (<<IN: List.In to T>>)>>) /\
-      (<<SAME: forall ts (TS: Time.le ts t0), f ts ts>>) /\
-      (<<BOUND: forall to fto (MAPPED: f to fto), Time.lt fto t1>>) /\
-      (<<MAPLT: mapping_map_lt_loc f>>)
-.
-Proof.
-  ginduction T.
-  - i. exists (fun to fto => to = fto /\ Time.le to t0). splits.
-    + i. inv IN.
-    + i. des; auto.
-    + i. split; auto.
-    + i. des. subst. eapply TimeFacts.le_lt_lt; eauto.
-    + ii. des. subst. auto.
-
-  - i. exploit IHT; eauto. i. des. clear IHT.
-
-    destruct (Time.le_lt_dec a t0).
-    { exists f. splits; auto.
-      - i. ss. des; eauto. subst. esplits. eapply SAME. auto.
-      - i. eapply ONLY in MAPPED. ss. des; auto. }
-
-    destruct (classic (List.In a T)).
-    { exists f. splits; auto.
-      - i. ss. des; subst; eauto.
-      - i. ss. eapply ONLY in MAPPED. des; auto. }
-
-
-    exploit (fun ts => Time.l
-
-
-      Lemma finite_greatest P (l: list Time.t)
-    :
-      (exists to,
-          (<<SAT: P to>>) /\
-          (<<IN: List.In to l>>) /\
-          (<<GREATEST: forall to'
-                              (IN: List.In to' l)
-                              (SAT: P to'),
-              Time.le to' to>>)) \/
-      (<<EMPTY: forall to (IN: List.In to l), ~ P to>>).
-
-
-
-      etrans; eauto.
-
-
-
-      (<<BOUND: forall ts
-
-
-
-                          exists fto, (<<MAPPED: f loc to fto>>)
-
-
-
-
-
-
-
-Lemma ident_map_local
-      lc
-  :
-    local_map ident_map lc lc.
-Proof.
-  econs; i.
-  - refl.
-  - econs; i; eapply ident_map_view.
-  - eapply ident_map_promises.
-Qed.
-
-
-Definition mapping_map_lt_loc (f: Time.t -> Time.t -> Prop):=
-  forall t0 t1 ft0 ft1
-         (MAP0: f t0 ft0)
-         (MAP1: f t1 ft1),
-    Time.lt t0 t1 <-> Time.lt ft0 ft1.
-
-Lemma mapping_map_lt_locwise f
-      (MAPLT: forall loc, mapping_map_lt_loc (f loc))
-  :
-    mapping_map_lt f.
-Proof.
-  ii. eapply MAPLT; eauto.
-
-
-
-
-Lemma ident_map_bot
-  :
-    mapping_map_bot ident_map.
-Proof.
-  unfold ident_map in *. ii. clarify.
-Qed.
-
-Lemma ident_map_eq
-  :
-    mapping_map_eq ident_map.
-Proof.
-  unfold ident_map in *. ii. clarify.
-Qed.
-
-Lemma ident_map_total
-      loc to
-  :
-    exists fto,
-      <<MAP: ident_map loc to fto >>.
-Proof.
-  esplits; eauto. refl.
-Qed.
-
-Lemma mapping_map_lt_non_collapsable f
-      (MAPLT: mapping_map_lt f)
-      loc to
-  :
-    non_collapsable f loc to.
-Proof.
-  ii. unfold collapsed in *. des.
-  eapply MAPLT in TLE; eauto. eapply Time.lt_strorder; eauto.
-Qed.
-
-Lemma ident_map_timemap
-      tm
-  :
-    timemap_map ident_map tm tm.
-Proof.
-  ii. refl.
-Qed.
-
-Lemma ident_map_view
-      vw
-  :
-    view_map ident_map vw vw.
-Proof.
-  econs; eapply ident_map_timemap.
-Qed.
-
-Lemma ident_map_message
-      msg
-  :
-    msg_map ident_map msg msg.
-Proof.
-  destruct msg; econs. destruct released; econs.
-  apply ident_map_view.
-Qed.
-
-Lemma ident_map_promises
-      prom
-  :
-    promises_map ident_map prom prom.
-Proof.
-  econs; i.
-  - esplits; eauto.
-    + eapply mapping_map_lt_non_collapsable.
-      eapply ident_map_lt.
-    + refl.
-    + eapply ident_map_message.
-  - esplits; eauto; refl.
-Qed.
-
-Lemma ident_map_local
-      lc
-  :
-    local_map ident_map lc lc.
-Proof.
-  econs; i.
-  - refl.
-  - econs; i; eapply ident_map_view.
-  - eapply ident_map_promises.
-Qed.
-
-Lemma mapping_map_lt_collapsable_unwritable f prom mem
-      (MAPLT: mapping_map_lt f)
-  :
-    collapsable_unwritable f prom mem.
-Proof.
-  ii. exfalso. des.
-  eapply mapping_map_lt_non_collapsable; try eassumption.
-  inv ITV. eapply TimeFacts.lt_le_lt; eauto.
-Qed.
-
-
-Lemma mapping_map_lt_map_le f
-      (MAPLT: forall loc, mapping_map_lt_loc (f loc))
-      (MAPLE: forall loc, mapping_map_lt_loc (f loc))
-  :
-    mapping_map_le f.
-Proof.
-  ii.
-
-
-Definition mapping_map_lt_loc (f: Time.t -> Time.t -> Prop):=
-  forall t0 t1 ft0 ft1
-         (MAP0: f t0 ft0)
-         (MAP1: f t1 ft1),
-    Time.lt t0 t1 -> Time.lt ft0 ft1.
-
-Lemma mapping_map_lt_map_le f
-      (MAPLT: forall loc, mapping_map_lt_loc (f loc))
-      (MAPLE: forall loc, mapping_map_lt_loc (f loc))
-  :
-    mapping_map_le f.
-Proof.
-  ii.
+Lemma pf_consistent_shift_future lang (e0: Thread.t lang)
+      spaces promises max U AU
 
 Definition pf_consistent_drf_src_future lang (e0:Thread.t lang)
            (spaces: Loc.t -> Time.t -> Prop)
