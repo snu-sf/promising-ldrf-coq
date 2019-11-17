@@ -61,8 +61,9 @@ Section Pred.
       ~ MSGS loc to
     | ThreadEvent.update loc from to _ _ _ _ _ _ =>
       ~ MSGS loc to
-    | ThreadEvent.promise loc from to _ _ =>
-      ~ MSGS loc to
+    | ThreadEvent.promise loc from to _ kind =>
+      if Memory.op_kind_is_cancel kind then True
+      else ~ MSGS loc to
     | _ => True
     end.
 
