@@ -1535,7 +1535,7 @@ Module Inv.
             (<<STEPS : rtc (tau (@AThread.program_step _))
                            (Thread.mk _ st lc sc m)
                            (Thread.mk _ st' lc' sc' m')>>) /\
-            (<<READING : is_updating _ st' loc Ordering.relaxed>>);
+            (<<READING : is_updating _ st' loc Ordering.strong_relaxed>>);
       AUPDATE : forall
           loc to m sc (UPD : aupdates loc to)
           (FUTURE: unchanged_on spaces mlast m)

@@ -1739,7 +1739,9 @@ Definition pf_consistent_drf_src lang (e0:Thread.t lang)
     (<<GAP: forall loc (NUPDATES: ~ U loc /\ ~ AU loc /\ ~ MU loc),
         Time.lt (max loc) (max' loc)>>) /\
 
-    (<<TRACE: List.Forall (fun em => (no_sc /1\ no_promise /1\ __guard__(write_in (later_times max') \1/ write_in (spaces /2\ earlier_times max))) (fst em)) tr>>) /\
+    (<<TRACE: List.Forall (fun em => (no_sc /1\ no_promise /1\ (fun e => ThreadEvent.get_machine_event e = MachineEvent.silent) /1\ __guard__(write_in (later_times max') \1/ write_in (spaces /2\ earlier_times max))) (fst em)) tr>>) /\
+
+    (<<UPDATESMAX: forall loc (UPDATES: (U \1/ AU) loc), max loc = Memory.max_ts loc e0.(Thread.memory)>>) /\
 
     (<<COMPLETEU:
        forall loc (SAT: U loc),
@@ -1900,6 +1902,16 @@ Proof.
       + unguard. left. eapply drf_sim_event_write_in; eauto.
       + ss. inv EVENT; ss.
       + unguard. right. eapply drf_sim_event_write_in; eauto.
+
+    - unfold U_src, AU_src. i. ss. des.
+      + apply TimeFacts.antisym.
+        * destruct (Memory.get loc (max loc) (Configuration.memory c_src0)) eqn:GET; clarify.
+          destruct p. apply Memory.max_ts_spec in GET. des. auto.
+        * eapply MAXLE.
+      + apply TimeFacts.antisym.
+        * destruct (Memory.get loc (max loc) (Configuration.memory c_src0)) eqn:GET; clarify.
+          destruct p. apply Memory.max_ts_spec in GET. des. auto.
+        * eapply MAXLE.
 
     - unfold U_src. i. des. ss.
       apply COMPLETEU in SAT. des.

@@ -2945,6 +2945,7 @@ Definition pf_consistent_drf lang (e0:Thread.t lang): Prop :=
                                                (<<NUPDATES: ~ List.In loc (U ++ AU)>>))
                                 e2.(Thread.memory)>>) /\
     (<<TRACE: List.Forall (fun em => (no_sc /1\
+                                            (fun e => ThreadEvent.get_machine_event e = MachineEvent.silent) /1\
                                             (no_acq_update_on ((fun loc to => L loc) /2\ Memory.max_full_ts e0.(Thread.memory)))
                                             /1\
                                             __guard__((write_in (later_times max')) \1/ (write_in (concrete_covered e0.(Thread.local).(Local.promises) e0.(Thread.memory) /2\ earlier_times max)))

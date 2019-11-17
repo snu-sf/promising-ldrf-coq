@@ -310,29 +310,32 @@ Definition pf_consistent_drf_shift lang (e0:Thread.t lang)
            (promises: Loc.t -> Time.t -> Prop)
            (max: TimeMap.t)
            (U AU: Loc.t -> Prop): Prop :=
-  forall (gap newmax: TimeMap.t)
-         (GAP: forall loc (UPDATES: U loc \/ AU loc),
-             Time.lt (max loc) (gap loc))
-         (NEWMAX: TimeMap.le max newmax),
-  exists e2 tr,
-    (<<STEPS: traced_step tr e0 e2>>) /\
+  (<<UPDATESMAX: forall loc (UPDATES: (U \1/ AU) loc), max loc = Memory.max_ts loc e0.(Thread.memory)>>) /\
+  (<<CONSISTENT:
+     forall (gap newmax: TimeMap.t)
+            (GAP: forall loc (UPDATES: U loc \/ AU loc),
+                Time.lt (max loc) (gap loc))
+            (NEWMAX: TimeMap.le max newmax),
+     exists e2 tr,
+       (<<STEPS: traced_step tr e0 e2>>) /\
 
-    (<<TRACE: List.Forall (fun em => (no_sc /1\ no_promise /1\ (write_in (spaces \2/ (fun loc to => (__guard__(U loc \/ AU loc) /\ Time.lt (max loc) to /\ Time.lt to (gap loc))) \2/                 (fun loc to => ~ U loc /\ ~ AU loc /\ Time.lt (newmax loc) to)))) (fst em)) tr>>) /\
+       (<<TRACE: List.Forall (fun em => (no_sc /1\ no_promise /1\ (fun e => ThreadEvent.get_machine_event e = MachineEvent.silent)/1\ (write_in (spaces \2/ (fun loc to => (__guard__(U loc \/ AU loc) /\ Time.lt (max loc) to /\ Time.lt to (gap loc))) \2/                 (fun loc to => ~ U loc /\ ~ AU loc /\ Time.lt (newmax loc) to)))) (fst em)) tr>>) /\
 
-    (<<COMPLETEU:
-       forall loc (SAT: U loc),
-       exists to from valr valw releasedr releasedw ordr ordw mem,
-         <<IN: List.In (ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw, mem) tr>> /\ <<ORDR: Ordering.le ordr Ordering.strong_relaxed>> >>) /\
+       (<<COMPLETEU:
+          forall loc (SAT: U loc),
+          exists to from valr valw releasedr releasedw ordr ordw mem,
+            <<IN: List.In (ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw, mem) tr>> /\ <<ORDR: Ordering.le ordr Ordering.strong_relaxed>> >>) /\
 
-    (<<COMPLETEAU:
-       forall loc (SAT: AU loc),
-       exists to from valr valw releasedr releasedw ordr ordw mem,
-         <<IN: List.In (ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw, mem) tr>> >>) /\
+       (<<COMPLETEAU:
+          forall loc (SAT: AU loc),
+          exists to from valr valw releasedr releasedw ordr ordw mem,
+            <<IN: List.In (ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw, mem) tr>> >>) /\
 
-    (<<COMPLETEW: forall loc to (PROMISED: promises loc to),
-        exists e m,
-          (<<IN: List.In (e, m) tr>>) /\
-          (<<WRITETO: rlx_write_loc loc e>>)>>)
+       (<<COMPLETEW: forall loc to (PROMISED: promises loc to),
+           exists e m,
+             (<<IN: List.In (e, m) tr>>) /\
+             (<<WRITETO: rlx_write_loc loc e>>)>>)
+         >>)
 .
 
 (* TODO: change definition in Pred.v *)
@@ -459,6 +462,8 @@ Lemma pf_consistent_drf_src_shift lang (e0: Thread.t lang) spaces promises max U
     pf_consistent_drf_shift e0 spaces promises max U AU.
 Proof.
   ii. unfold pf_consistent_drf_src in CONSISTENT. des.
+  split.
+  { auto. } red.
   exploit (choice
              (fun loc to =>
                 forall (SAT: MU loc),
@@ -806,7 +811,6 @@ Qed.
 Definition pf_consistent_drf_future lang (e0:Thread.t lang)
            (spaces: Loc.t -> Time.t -> Prop)
            (promises: Loc.t -> Time.t -> Prop)
-           (max: TimeMap.t)
            (U AU: Loc.t -> Prop): Prop :=
   forall mem_future sc_future
          (UNCH: unchanged_on spaces e0.(Thread.memory) mem_future)
@@ -814,7 +818,7 @@ Definition pf_consistent_drf_future lang (e0:Thread.t lang)
   exists e2 tr,
     (<<STEPS: traced_step tr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc_future mem_future) e2>>) /\
 
-    (<<TRACE: List.Forall (fun em => no_promise (fst em)) tr>>) /\
+    (<<TRACE: List.Forall (fun em => no_promise (fst em) /\ ThreadEvent.get_machine_event (fst em) = MachineEvent.silent) tr>>) /\
 
     (<<COMPLETEU:
        forall loc (SAT: U loc),
@@ -831,105 +835,268 @@ Definition pf_consistent_drf_future lang (e0:Thread.t lang)
           (<<IN: List.In (e, m) tr>>) /\
           (<<WRITETO: rlx_write_loc loc e>>)>>)
 .
+
+
+Lemma unchanged_on_traced_step
+      L lang th_src th_tgt th_tgt' st st' v v' prom' sc sc'
+      mem_src mem_tgt mem_tgt' tr_tgt
+      (PRED: List.Forall (fun em => (write_in L /1\ no_promise) (fst em)) tr_tgt)
+      (STEPS: traced_step tr_tgt th_tgt th_tgt')
+      (TH_SRC: th_src = Thread.mk lang st (Local.mk v Memory.bot) sc mem_src)
+      (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v Memory.bot) sc mem_tgt)
+      (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem_tgt')
+      (MEM: unchanged_on L mem_tgt mem_src)
+  :
+    exists tr_src mem_src',
+      (<<STEP: traced_step
+                 tr_src
+                 th_src
+                 (Thread.mk lang st' (Local.mk v' Memory.bot) sc' mem_src')>>) /\
+      (<<TRACE: List.map fst tr_src = List.map fst tr_tgt>>) /\
+      (<<MEM: unchanged_on L mem_tgt' mem_src'>>).
+Proof.
+  ginduction STEPS; i; clarify.
+  - esplits.
+    + econs 1.
+    + ss.
+    + auto.
+  - inv PRED. destruct th1. destruct local.
+    exploit unchanged_on_step; eauto.
+    { instantiate (1:=write_in L /1\ no_promise). ss. }
+    { econs; eauto. } i. des. inv STEP.
+    exploit IHSTEPS; ss.
+    + eauto.
+    + f_equal. f_equal.
+      exploit promise_bot_no_promise.
+      * econs.
+        { eapply HD. }
+        { apply SAT. }
+      * i. auto.
+      * ss.
+      * ss.
+    + eauto.
+    + i. des. esplits; eauto.
+      * econs; eauto.
+      * ss. f_equal. auto.
+Qed.
+
 
 Lemma pf_consistent_shift_future lang (e0: Thread.t lang)
       spaces promises max U AU
+      (CONSISTENT: pf_consistent_drf_shift e0 spaces promises max U AU)
+      (BOT: e0.(Thread.local).(Local.promises) = Memory.bot)
+  :
+    pf_consistent_drf_future e0 spaces promises U AU.
+Proof.
+  ii.
+  unfold pf_consistent_drf_shift in CONSISTENT. des.
+  exploit (choice (fun loc ts =>
+                     forall (UPDATES: U loc \/ AU loc),
+                       (<<TS: Time.lt (max loc) ts>>) /\
+                       (<<NCOVER: forall to (TS0: Time.lt (max loc) to) (TS1: Time.le to ts),
+                           ~ covered loc to mem_future>>))).
+  { intros loc. destruct (classic (__guard__(U loc \/ AU loc))).
+    - exploit ATTATCH.
+      { splits; eauto. } i. des.
+      exists to'. i. rewrite UPDATESMAX in *; auto. splits; auto.
+      i. eapply EMPTY. econs; ss.
+    - exists Time.bot. i. clarify. }
+  intros [gap GAP].
 
-Definition pf_consistent_drf_src_future lang (e0:Thread.t lang)
-           (spaces: Loc.t -> Time.t -> Prop)
-           (promises: Loc.t -> Time.t -> Prop)
-           (max: TimeMap.t)
-           (U AU: Loc.t -> Prop): Prop :=
-  forall
+  set (newmax := TimeMap.join (Memory.max_timemap mem_future) max).
+  set (L := (spaces \2/ (fun loc to => (__guard__(U loc \/ AU loc) /\ Time.lt (max loc) to /\ Time.lt to (gap loc))) \2/                 (fun loc to => ~ U loc /\ ~ AU loc /\ Time.lt (newmax loc) to))).
+  assert (NEWMAX: TimeMap.le (Memory.max_timemap mem_future) newmax).
+  { unfold newmax. eapply TimeMap.join_l. }
 
-  exists e2 tr max',
+  hexploit (CONSISTENT0 gap newmax).
+  { i. eapply GAP in UPDATES. des. auto. }
+  { unfold newmax. eapply TimeMap.join_r. }
+  i. des.
+  destruct e0, e2. destruct local, local0. ss. clarify.
+  hexploit (@unchanged_on_traced_step L); try apply STEPS; eauto.
+  { eapply List.Forall_impl; eauto. i. ss. des. auto. }
+  { instantiate (1:=mem_future). inv UNCH. econs; eauto. unfold L. i. des.
+    - eauto.
+    - exploit GAP; eauto. i. des.
+      exfalso. eapply NCOVER in COV; eauto. left. auto.
+    - inv COV. eapply Memory.max_ts_spec in GET. des. inv ITV. ss.
+      exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+      { eapply IN1. } etrans.
+      { eapply TO. } etrans.
+      { eapply MAX. }
+      { eapply NEWMAX. }
+  }
+  i. des. eapply no_sc_any_sc_traced in STEP; eauto; cycle 1.
+  { i. eapply List.in_map in IN; eauto.
+    erewrite TRACE0 in IN.
+    eapply List.in_map_iff in IN; eauto. des. destruct x, e. ss. clarify.
+    eapply List.Forall_forall in IN0; eauto. ss. des; auto. }
+  des. esplits; eauto.
+  - eapply List.Forall_forall. i.
+    eapply List.in_map in H; eauto.
+    erewrite TRACE0 in H.
+    eapply List.in_map_iff in H; eauto. des. destruct x0, x. ss. clarify.
+    eapply List.Forall_forall in H0; eauto. ss. des; auto.
+  - i. eapply COMPLETEU in SAT. des.
+    eapply List.in_map in IN. erewrite <- TRACE0 in IN.
+    eapply List.in_map_iff in IN; eauto. des. destruct x. ss. subst.
+    esplits; eauto.
+  - i. eapply COMPLETEAU in SAT. des.
+    eapply List.in_map in IN. erewrite <- TRACE0 in IN.
+    eapply List.in_map_iff in IN; eauto. des. destruct x. ss. subst.
+    esplits; eauto.
+  - i. eapply COMPLETEW in PROMISED. des.
+    eapply List.in_map in IN. erewrite <- TRACE0 in IN.
+    eapply List.in_map_iff in IN; eauto. des. destruct x. ss. subst.
+    esplits; eauto.
+Qed.
+
+Lemma sim_pf_impl tids0 tids1 mlast spaces updates aupdates c_src c_tgt
+      (SIM: sim_pf tids1 mlast spaces updates aupdates c_src c_tgt)
+      (IMPL: tids0 <1= tids1)
+  :
+    sim_pf tids0 mlast spaces updates aupdates c_src c_tgt.
+Proof.
+  inv SIM. econs; eauto.
+Qed.
+
+Lemma sim_pf_minus_plus_one
+      tid mlast spaces updates aupdates c_src c_tgt
+      (SIM: sim_pf_minus_one tid mlast spaces updates aupdates c_src c_tgt)
+      mlast_one spaces_one updates_one aupdates_one
+      (ONE: sim_pf_one tid mlast_one spaces_one updates_one aupdates_one c_src c_tgt)
+  :
+    sim_pf
+      (fun _ => True)
+      (fun tid' => if Ident.eq_dec tid tid' then mlast_one else mlast tid')
+      (fun tid' => if Ident.eq_dec tid tid' then spaces_one else spaces tid')
+      (fun tid' => if Ident.eq_dec tid tid' then updates_one else updates tid')
+      (fun tid' => if Ident.eq_dec tid tid' then aupdates_one else aupdates tid')
+      c_src c_tgt.
+Proof.
+  inv SIM. econs; eauto. i. des_ifs. eapply THREADS; eauto.
+Qed.
 
 
+Lemma no_promise_traces_step_program_step lang (th0 th1: Thread.t lang) tr
+      (STEPS: traced_step tr th0 th1)
+      (NOPROMISE: List.Forall (fun em => no_promise (fst em) /\ ThreadEvent.get_machine_event (fst em) = MachineEvent.silent) tr)
+  :
+    rtc (tau (@AThread.program_step lang)) th0 th1.
+Proof.
+  ginduction STEPS; auto. i. inv NOPROMISE. inv HD. des. inv STEP.
+  { inv STEP0; ss. }
+  econs.
+  - econs; eauto.
+  - eapply IHSTEPS; eauto.
+Qed.
 
-    (<<STEPS: traced_step tr e0 e2>>) /\
-    (<<MAX: TimeMap.le e0.(Thread.memory).(Memory.max_timemap) max>>) /\
-    (<<SPACES: spaces <2= earlier_times max>>) /\
+Lemma sim_pf_step
+      c_src0 c_tgt0 c_tgt1 tid e
+      (SIM: sim_pf_all c_src0 c_tgt0)
+      (STEP: Configuration.step e tid c_tgt0 c_tgt1)
+  :
+    exists c_src1,
+      (<<STEP: opt_pftstep e tid c_src0 c_src1>>) /\
+      ((<<FAIL: e = MachineEvent.failure>>) \/
+       (exists c_src2,
+           (<<FAIL: pftstep MachineEvent.failure tid c_src1 c_src2>>)) \/
+       (<<SIM: sim_pf_all c_src1 c_tgt1>>)).
+Proof.
+  inv SIM.
+  eapply sim_pf_impl with (tids0 := fun tid0 => tid <> tid0) in SIM0; ss.
+  exploit sim_pf_step_minus_full; eauto. i. des.
+  unguard. des; cycle 1.
+  { exists c_src1. esplits; eauto. }
+  exploit sim_pf_step_pf_consistent; eauto. i. des; cycle 1.
+  { esplits; eauto. }
+  dup SIM. inv SIM1. inv WFSRC. inv WF. exploit THREADS0; eauto. intros LCWF.
+  exploit pf_consistent_drf_src_shift; eauto; ss.
+  intros CONSISTENTSHIFT.
+  hexploit pf_consistent_shift_future; eauto.
+  { inv FORGET. specialize (THS tid).
+    rewrite FIND in *. rewrite FIND0 in *. inv THS. ss. }
+  intros CONSISTENTFUTURE.
 
-    (<<TIMEMAP: TimeMap.le max max'>>) /\
-    (<<GAP: forall loc (NUPDATES: ~ U loc /\ ~ AU loc /\ ~ MU loc),
-        Time.lt (max loc) (max' loc)>>) /\
+  esplits; eauto. right. right. econs.
+  eapply sim_pf_minus_plus_one; [eauto|].
 
-    (<<TRACE: List.Forall (fun em => (no_sc /1\ no_promise /1\ (write_in (later_times max' \2/ (spaces /2\ earlier_times max)))) (fst em)) tr>>) /\
+  instantiate (1:=fun loc to => (<<UPDATES: AU loc>>) /\ (<<MAX: Memory.max_ts loc (Configuration.memory c_src1) = to>>)).
+  instantiate (1:=fun loc to => (<<UPDATES: U loc>>) /\ (<<MAX: Memory.max_ts loc (Configuration.memory c_src1) = to>>)).
+  instantiate (1:=concrete_covered (Local.promises lc_tgt) (Configuration.memory c_tgt1)).
+  instantiate (1:=Configuration.memory c_src1). econs.
 
-    (<<COMPLETEU:
-       forall loc (SAT: U loc),
-       exists to from valr valw releasedr releasedw ordr ordw mem,
-         <<IN: List.In (ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw, mem) tr>> /\ <<ORDR: Ordering.le ordr Ordering.strong_relaxed>> >>) /\
+  - refl.
+  - ii. assert (MAXTS: to = Memory.max_ts loc (Configuration.memory c_src1)).
+    { des; auto. } clear SAT. clarify. split.
+    + inv MEM. specialize (INHABITED loc).
+      eapply Memory.max_ts_spec in INHABITED. des. destruct msg.
+      * econs; eauto.
+      * exfalso. eapply sim_pf_src_no_reserve; eauto.
+    + esplits.
+      * eapply Time.incr_spec.
+      * ii. inv H. inv ITV. inv ITV0. ss.
+        eapply Memory.max_ts_spec in GET. des.
+        eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+        { eapply FROM. } etrans; eauto.
+  - i. clarify. dependent destruction H0. dependent destruction H1. econs; eauto.
+    + i. des. dup UPDATES. eapply AUPDATES in UPDATES.
+      unfold Memory.latest_reserve in UPDATES.
+      des_ifs. inv WFTGT. inv WF. exploit THREADS1; eauto. intros LCWFTGT.
+      inv LCWFTGT. dup Heq. eapply PROMISES in Heq0.
+      exploit max_full_ts_max_ts; eauto.
+      { inv MEM0. auto. }
+      i. des.
+      * destruct (MAX loc). des. unfold Memory.get in Heq0.
+        rewrite FULL in GET. clarify .
+      * clarify. unfold pf_consistent_drf_shift in *. des.
+        exploit UPDATESMAX; eauto. i. ss. rewrite x in *. esplits; eauto.
 
-    (<<COMPLETEAU:
-       forall loc (SAT: AU loc),
-       exists to from valr valw releasedr releasedw ordr ordw mem,
-         <<IN: List.In (ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw, mem) tr>> >>) /\
+    + i. hexploit (CONSISTENTFUTURE m sc); eauto.
+      { eapply not_attatched_mon; eauto. i. des; ss; auto. }
+      i. des. ss.
+      exploit COMPLETEW; eauto. i. des.
+      exploit traced_step_in; eauto. i. des. clarify.
+      eapply no_promise_traces_step_program_step in STEPS0.
+      * destruct th'. destruct local. ss. esplits; eauto.
+        clear - STEP1 WRITETO. inv STEP1. inv STEP; inv STEP0; ss.
+        unfold is_writing. inv LOCAL; ss; des; subst.
+        { esplits; eauto.
+          - econs; eauto.
+          - ss. }
+        { esplits; eauto.
+          - econs; eauto.
+          - ss. }
+      * eapply Forall_app_inv in TRACE. des. auto.
 
-    (<<MYUPDATES: forall loc (SAT: MU loc),
-        exists to,
-          (<<TS0: Time.le (Memory.max_ts loc e0.(Thread.memory)) to>>) /\
-          (<<TS1: Time.lt to (max loc)>>) /\
-          (<<BLANK: Interval.mem (to, (max loc)) <1= spaces loc>>)>>) /\
+    + i. hexploit (CONSISTENTFUTURE m sc); eauto.
+      { eapply not_attatched_mon; eauto. i. des; ss; auto. }
+      i. des. ss.
+      exploit COMPLETEU; eauto. i. des.
+      exploit traced_step_in; eauto. i. des. subst.
+      eapply no_promise_traces_step_program_step in STEPS0.
+      * destruct th'. destruct local. ss. esplits; eauto.
+        clear - STEP1 ORDR. inv STEP1. inv STEP; inv STEP0; ss.
+        unfold is_updating. inv LOCAL; ss; des; subst.
+        esplits; eauto.
+        { econs; eauto. }
+        { ss. }
+      * eapply Forall_app_inv in TRACE. des. auto.
 
-    (<<COMPLETEW: forall loc to (PROMISED: promises loc to),
-        exists e m,
-          (<<IN: List.In (e, m) tr>>) /\
-          (<<WRITETO: rlx_write_loc loc e>>)>>)
-.
+    + i. hexploit (CONSISTENTFUTURE m sc); eauto.
+      { eapply not_attatched_mon; eauto. i. des; ss; auto. }
+      i. des. ss.
+      exploit COMPLETEAU; eauto. i. des.
+      exploit traced_step_in; eauto. i. des. subst.
+      eapply no_promise_traces_step_program_step in STEPS0.
+      * destruct th'. destruct local. ss. esplits; eauto.
+        clear - STEP1. inv STEP1. inv STEP; inv STEP0; ss.
+        unfold is_updating. inv LOCAL; ss; des; subst.
+        esplits; eauto.
+        { econs; eauto. }
+        { instantiate (1:=ordr). destruct ordr; ss. }
+        { ss. }
+      * eapply Forall_app_inv in TRACE. des. auto.
 
-
-
-
-(* Inductive shifted_map mlast mcert *)
-(*           (updates: Loc.t -> Prop) *)
-(*           (sky gap: TimeMap.t) *)
-(*           (f: Loc.t -> Time.t -> Time.t): Prop := *)
-(* | shifted_map_intro *)
-(*     (PRSV: map_preserving (times_in_memory mcert) f) *)
-(*     (SAME: forall l t (TLE: Time.le t (Memory.max_ts l mlast)), *)
-(*         f l t = t) *)
-(*     (INGAP: forall l t (TLT: Time.lt (Memory.max_ts l mcert) t), *)
-(*         Time.lt (f l t) (gap l)) *)
-(*     (AFTERSKY: forall l t (TLT: Time.lt (Memory.max_ts l mcert) t), *)
-(*         Time.lt (sky l) (f l t)) *)
-(* . *)
-
-(* Lemma shifted_map_exists mlast mcert updates *)
-(*       (MLE: Memory.le mlast mcert) *)
-(*       (sky gap: TimeMap.t) *)
-(*       (SKY: forall l, Time.lt (Memory.max_ts l mlast) (sky l)) *)
-(*       (GAP: forall l, Time.lt (Memory.max_ts l mlast) (gap l)) *)
-(*   : *)
-(*     exists f, (<<SHIFTED: shifted_map mlast mcert updates sky gap f>>). *)
-(* Proof. *)
-(*   (* may be very hard... *) *)
-(* Admitted. *)
-
-(* Lemma shifted_map_preserving_last_mem  mlast mcert updates sky gap f *)
-(*       (CLOSED: Memory.closed mlast) *)
-(*       (SHIFTED: shifted_map mlast mcert updates sky gap f) *)
-(*   : *)
-(*     memory_map f mlast mlast. *)
-(* Proof. *)
-(*   inv SHIFTED. inv PRSV. econs; i. *)
-(*   - exploit Memory.max_ts_spec; eauto. i. des. *)
-(*     repeat erewrite SAME; eauto. *)
-(*     + rewrite GET. unfold msg_map. des_ifs. repeat f_equal. *)
-(*       inv CLOSED. exploit CLOSED0; try apply GET; eauto. i. des. *)
-(*       inv MSG_CLOSED. inv CLOSED; ss. f_equal. *)
-(*       destruct view. inv CLOSED1. unfold view_map, timemap_map. ss. f_equal. *)
-(*       * extensionality l. erewrite SAME; auto. *)
-(*         specialize (PLN l). des. *)
-(*         exploit Memory.max_ts_spec; eauto. i. des. auto. *)
-(*       * extensionality l. erewrite SAME; auto. *)
-(*         specialize (RLX l). des. *)
-(*         exploit Memory.max_ts_spec; eauto. i. des. auto. *)
-(*     + exploit Memory.get_ts; try apply GET; eauto. i. des. *)
-(*       * clarify. *)
-(*       * left. eapply TimeFacts.lt_le_lt; eauto. *)
-(*   - destruct msg_src as [from msg]. exploit Memory.max_ts_spec; eauto. i. des. *)
-(*     esplits. *)
-(*     + erewrite SAME; eauto. *)
-(*     + eauto. *)
-(* Qed. *)
+  - i. clarify.
+Qed.
