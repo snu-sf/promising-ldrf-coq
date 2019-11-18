@@ -620,7 +620,7 @@ Lemma race_lemma c tid0 tid1 lang0 lang1 st0 st1 lc0 lc1 th0 th1 e1 e2
       (STEP1: rtc (tau (@AThread.program_step _)) (Thread.mk _ st1 lc1 th0.(Thread.sc) th0.(Thread.memory)) th1)
       (PROEVT0: can_step _ th0.(Thread.state) e1)
       (PROEVT1: can_step _ th1.(Thread.state) e2)
-      (RACE: pf_race_condition e1 e2)
+      (RACE: __guard__(pf_race_condition e1 e2 \/ pf_race_condition e2 e1))
   :
     False.
 Proof.
@@ -638,30 +638,54 @@ Proof.
             + eauto.
           - eapply STEP1.
           - eauto. }
-      * econs; ss.
-        { erewrite IdentMap.gso.
-          - erewrite IdentMap.gss. eauto.
-          - eauto. }
-        { erewrite IdentMap.gss. eauto. }
-        { eauto. }
-        { eauto. }
-        { eauto. }
-        { eauto. }
+      * unguard. des.
+        { econs; ss.
+          { erewrite IdentMap.gso.
+            - erewrite IdentMap.gss. eauto.
+            - eauto. }
+          { erewrite IdentMap.gss. eauto. }
+          { eauto. }
+          { eauto. }
+          { eauto. }
+          { eauto. }
+        }
+        { econs; ss.
+          { erewrite IdentMap.gss. eauto. }
+          { erewrite IdentMap.gso.
+            - erewrite IdentMap.gss. eauto.
+            - eauto. }
+          { eauto. }
+          { eauto. }
+          { eauto. }
+          { eauto. }
+        }
       * ss.
     + inv STEP2. destruct th0. exploit RACEFREE.
       * econs 2; [|refl]. econs. econs. econs.
         { eapply FIND0. }
         { eapply STEP0. }
         { eauto. }
-      * econs; ss.
-        { erewrite IdentMap.gss. eauto. }
-        { erewrite IdentMap.gso.
-          - eapply FIND1.
-          - eauto. }
-        { eauto. }
-        { eauto. }
-        { eauto. }
-        { eauto. }
+      * unguard. des.
+        { econs; ss.
+          { erewrite IdentMap.gss. eauto. }
+          { erewrite IdentMap.gso.
+            - eapply FIND1.
+            - eauto. }
+          { eauto. }
+          { eauto. }
+          { eauto. }
+          { eauto. }
+        }
+        { econs; ss.
+          { erewrite IdentMap.gso.
+            - eapply FIND1.
+            - eauto. }
+          { erewrite IdentMap.gss. eauto. }
+          { eauto. }
+          { eauto. }
+          { eauto. }
+          { eauto. }
+        }
       * ss.
   - eapply rtc_tail in STEP1. des; ss; clarify.
     + inv STEP0. destruct th1. exploit RACEFREE.
@@ -669,25 +693,47 @@ Proof.
         { eapply FIND1. }
         { eapply STEP1. }
         { eauto. }
-      * econs; ss.
-        { erewrite IdentMap.gso.
-          - eapply FIND0.
-          - eauto. }
-        { erewrite IdentMap.gss. eauto. }
-        { eauto. }
-        { eauto. }
-        { eauto. }
-        { eauto. }
+      * unguard. des.
+        { econs; ss.
+          { erewrite IdentMap.gso.
+            - eapply FIND0.
+            - eauto. }
+          { erewrite IdentMap.gss. eauto. }
+          { eauto. }
+          { eauto. }
+          { eauto. }
+          { eauto. }
+        }
+        { econs; ss.
+          { erewrite IdentMap.gss. eauto. }
+          { erewrite IdentMap.gso.
+            - eapply FIND0.
+            - eauto. }
+          { eauto. }
+          { eauto. }
+          { eauto. }
+          { eauto. }
+        }
       * ss.
     + exploit RACEFREE.
       * refl.
-      * econs.
-        { eapply FIND0. }
-        { eapply FIND1. }
-        { eauto. }
-        { eauto. }
-        { eauto. }
-        { eauto. }
+      * unguard. des.
+        { econs.
+          { eapply FIND0. }
+          { eapply FIND1. }
+          { eauto. }
+          { eauto. }
+          { eauto. }
+          { eauto. }
+        }
+        { econs.
+          { eapply FIND1. }
+          { eapply FIND0. }
+          { eauto. }
+          { eauto. }
+          { eauto. }
+          { eauto. }
+        }
       * eauto.
 Qed.
 
@@ -972,7 +1018,7 @@ Proof.
         inv STEP. inv STEP1; inv STEP.
         exploit race_lemma; try eassumption; ss.
         - econs; eauto.
-        - econs 2; eauto. ss. }
+        - right. econs 2; eauto. ss. }
       { exfalso. exploit INVBOT; eauto. i. des. eapply UPDATESBOT; eauto. }
 
     + inv H. exploit THREADS; eauto. intros [].
@@ -1311,7 +1357,6 @@ Proof.
   dup SIM. inv SIM. i. des. inv SAT. inv PROMISED.
   destruct msg as [from msg]. eapply sim_pf_other_promise_unreserved in GET; eauto.
 Qed.
-Arguments sim_pf_other_promises_unreserved L _ _ _ _ _ _ _ SIM.
 
 Lemma forget_memory_equivalent L0 L1 mem0 mem1
       (EQUIV: forall loc to, L0 loc to <-> L1 loc to)
@@ -1564,7 +1609,7 @@ Proof.
         inv STEP. inv STEP1; inv STEP.
         exploit race_lemma; try eassumption; ss.
         - econs; eauto.
-        - econs 2; eauto. ss. }
+        - right. econs 2; eauto. ss. }
       { exfalso. exploit INVBOT; eauto. i. des. eapply UPDATESBOT; eauto. }
 
     + hexploit aupates_already_updated_unreserved; try eassumption. i. des.
@@ -1599,7 +1644,7 @@ Proof.
           inv STEP. inv STEP1; inv STEP.
           exploit race_lemma; try eassumption; ss.
           - econs; eauto.
-          - econs 2; eauto. ss.
+          - left. econs 2; eauto. ss.
             dup NOACQU. hexploit NOACQU0; eauto.
             intros. destruct ordr; ss; auto. }
         { exfalso. exploit INVBOT; eauto. i. des. eapply AUPDATESBOT; eauto. }

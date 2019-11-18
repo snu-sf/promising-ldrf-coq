@@ -39,7 +39,7 @@ Inductive pf_race_condition e1 e2: Prop :=
     loc val1 val2 ordu1 ordu2
     (EVENT1: ProgramEvent_is_updating e1 = Some (loc, val1, ordu1))
     (EVENT2: ProgramEvent_is_updating e2 = Some (loc, val2, ordu2))
-    (ORDU: Ordering.le ordu1 Ordering.strong_relaxed \/ Ordering.le ordu2 Ordering.strong_relaxed)
+    (ORDU: Ordering.le ordu1 Ordering.strong_relaxed)
 .
 Hint Constructors pf_race_condition.
 
@@ -60,9 +60,6 @@ Definition is_updating lang (st : Language.state lang) l o :=
   exists e v o', can_step _ st e /\
                  Ordering.le o' o /\
                  ProgramEvent_is_updating e = Some (l, v, o').
-
-Definition is_aborting lang (st : Language.state lang) :=
-  can_step _ st ProgramEvent.failure.
 
 Inductive pf_race (c:Configuration.t): Prop :=
 | race_intro
