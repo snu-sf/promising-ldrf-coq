@@ -7,10 +7,8 @@ COQTHEORIES  :=	src/lang/*.v \
 	src/attachable/*.v \
 	src/invariant/*.v \
 	src/gopt/*.v \
-	src/promotion/*.v
-	src/drf/*.v \
-  src/invariant/*.v \
-  src/gopt/*.v
+	src/promotion/*.v \
+	src/drf/*.v
 
 .PHONY: all theories clean
 
