@@ -20,7 +20,6 @@ Require Import Thread.
 Require Import Configuration.
 Require Import Progress.
 Require Import Behavior.
-Require Import AProp.
 Require Import Race.
 
 Require Import PF.
@@ -44,6 +43,10 @@ Module PFSingle.
   | tau_step_intro
       (STEP: step MachineEvent.silent tid c1 c2)
   .
+
+  Definition step_all (c0 c1: Configuration.t) :=
+    union (fun e => union (step e)) c0 c1.
+  Hint Unfold step_all.
 
   Lemma step_long_step
     :
@@ -108,7 +111,7 @@ Module PFSingle.
     eapply IHTAUS in BEH. inv H. econs 4; eauto.
   Qed.
 
-  Lemma long_step_equiv c
+  Theorem long_step_equiv c
     :
       behaviors PFConfiguration.step c
       <1=
@@ -124,7 +127,7 @@ Module PFSingle.
       eapply taus_step in STEPS; eauto. econs 4; eauto.
   Qed.
 
-  Lemma long_step_equiv2 c
+  Theorem long_step_equiv2 c
     :
       behaviors step c
       <1=
@@ -133,10 +136,6 @@ Module PFSingle.
     eapply le_step_behavior_improve; eauto.
     eapply step_long_step.
   Qed.
-
-  Definition step_all (c0 c1: Configuration.t) :=
-    union (fun e => union (step e)) c0 c1.
-  Hint Unfold step_all.
 
   Definition pf_racefree (c1:Configuration.t): Prop :=
     forall c2

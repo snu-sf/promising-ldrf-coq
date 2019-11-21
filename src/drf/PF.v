@@ -20,7 +20,6 @@ Require Import Thread.
 Require Import Configuration.
 Require Import Progress.
 Require Import Behavior.
-Require Import AProp.
 
 Require Import Race.
 

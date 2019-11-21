@@ -39,7 +39,7 @@ Require Import AMemory.
 Require Import ALocal.
 Require Import AThread.
 Require Import APredStep.
-Require Import AProp.
+Require Import APFPF.
 
 Require Import ADRF_PF0.
 Require Import ADRF_PF1.

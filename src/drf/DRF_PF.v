@@ -54,13 +54,13 @@ Proof.
     eapply PFConfiguration.pf_racefree_step; eauto.
 Qed.
 
-Lemma drf_pf s
+Theorem drf_pf s
       (RACEFREE: PFConfiguration.pf_racefree (Configuration.init s))
   :
     behaviors Configuration.step (Configuration.init s) <1=
     behaviors PFConfiguration.step (Configuration.init s).
 Proof.
-  ii. eapply ADRF_PF.drf_pf in PR.
+  ii. eapply drf_apf in PR.
   - eapply apf_pf_equiv; eauto.
   - eapply sim_apf_pf_racefree; eauto.
     eapply sim_apf_pf_init; eauto.

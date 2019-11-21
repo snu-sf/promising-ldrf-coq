@@ -83,7 +83,7 @@ Proof.
       * econs 4; eauto.
 Qed.
 
-Lemma drf_pf s
+Theorem drf_apf s
       (RACEFREE: APFConfiguration.pf_racefree (Configuration.init s))
   :
     behaviors Configuration.step (Configuration.init s) <1=

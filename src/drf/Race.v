@@ -23,11 +23,6 @@ Set Implicit Arguments.
 
 
 (* TODO unifiy and remove definitions in Event.v *)
-Definition ProgramEvent_is_updating (e:ProgramEvent.t): option (Loc.t * Const.t * Ordering.t) :=
-  match e with
-  | ProgramEvent.update loc valr _ ordr _ => Some (loc, valr, ordr)
-  | _ => None
-  end.
 
 Inductive pf_race_condition e1 e2: Prop :=
 | pf_race_condition_rw
@@ -37,8 +32,8 @@ Inductive pf_race_condition e1 e2: Prop :=
     (ORDW: Ordering.le ordw Ordering.relaxed)
 | pf_race_condition_uu
     loc val1 val2 ordu1 ordu2
-    (EVENT1: ProgramEvent_is_updating e1 = Some (loc, val1, ordu1))
-    (EVENT2: ProgramEvent_is_updating e2 = Some (loc, val2, ordu2))
+    (EVENT1: ProgramEvent.is_updating e1 = Some (loc, val1, ordu1))
+    (EVENT2: ProgramEvent.is_updating e2 = Some (loc, val2, ordu2))
     (ORDU: Ordering.le ordu1 Ordering.strong_relaxed)
 .
 Hint Constructors pf_race_condition.
@@ -59,7 +54,7 @@ Definition is_writing lang (st : Language.state lang) l o :=
 Definition is_updating lang (st : Language.state lang) l o :=
   exists e v o', can_step _ st e /\
                  Ordering.le o' o /\
-                 ProgramEvent_is_updating e = Some (l, v, o').
+                 ProgramEvent.is_updating e = Some (l, v, o').
 
 Inductive pf_race (c:Configuration.t): Prop :=
 | race_intro

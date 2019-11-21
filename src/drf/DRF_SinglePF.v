@@ -44,13 +44,13 @@ Proof.
     + econs; eauto.
 Qed.
 
-Lemma drf_pf s
+Theorem drf_single_pf s
       (RACEFREE: PFSingle.pf_racefree (Configuration.init s))
   :
     behaviors Configuration.step (Configuration.init s) <1=
     behaviors PFSingle.step (Configuration.init s).
 Proof.
   ii. eapply PFSingle.long_step_equiv.
-  eapply DRF_PF.drf_pf; eauto.
+  eapply drf_pf; eauto.
   eapply sim_apf_pf_racefree; eauto.
 Qed.

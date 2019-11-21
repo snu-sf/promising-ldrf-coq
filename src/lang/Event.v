@@ -160,6 +160,12 @@ Module ProgramEvent.
     | _ => None
     end.
 
+  Definition is_updating (e:t): option (Loc.t * Const.t * Ordering.t) :=
+    match e with
+    | update loc valr _ ordr _ => Some (loc, valr, ordr)
+    | _ => None
+    end.
+
   Inductive ord: forall (e1 e2:t), Prop :=
   | ord_silent:
       ord silent silent

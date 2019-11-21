@@ -65,3 +65,15 @@ Proof.
   revert BEH. induction STEPS; auto. inv H.
   i. specialize (IHSTEPS BEH). econs 4; eauto.
 Qed.
+
+Lemma le_step_behavior_improve sem0 sem1
+      (STEPLE: sem0 <4= sem1)
+  :
+    behaviors sem0 <2= behaviors sem1.
+Proof.
+  i. ginduction PR; i.
+  - econs 1; eauto.
+  - econs 2; eauto.
+  - econs 3; eauto.
+  - econs 4; eauto.
+Qed.

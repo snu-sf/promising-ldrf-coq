@@ -24,10 +24,67 @@ Require Import Behavior.
 Require Import AMemory.
 Require Import ALocal.
 Require Import AThread.
-Require Import AProp.
 
 Require Import APF.
 Require Import PF.
+
+
+Lemma promise_apromise
+  :
+    Memory.promise <9= AMemory.promise.
+Proof.
+  i. inv PR; econs; eauto.
+Qed.
+
+Lemma write_awrite
+  :
+    Memory.write <10= AMemory.write.
+Proof.
+  i. inv PR; econs; eauto.
+  eapply promise_apromise; eauto.
+Qed.
+
+Lemma program_step_aprogram_step
+  :
+    Thread.program_step <4= AThread.program_step.
+Proof.
+  i. inv PR. inv LOCAL.
+  - econs; eauto.
+  - econs; eauto.
+  - inv LOCAL0. econs; eauto. econs; eauto.
+    econs; eauto. eapply write_awrite; eauto.
+  - inv LOCAL2. econs; eauto. econs; eauto.
+    econs; eauto. eapply write_awrite; eauto.
+  - econs; eauto.
+  - econs; eauto.
+  - econs; eauto.
+Qed.
+
+Lemma thread_step_athread_step
+  :
+    Thread.step_allpf <4= AThread.step_allpf.
+Proof.
+  i. inv PR. inv STEP.
+  - inv STEP0. inv LOCAL. econs; eauto. econs; eauto.
+    econs; eauto. econs; eauto. eapply promise_apromise; eauto.
+  - econs. econs 2. eapply program_step_aprogram_step; eauto.
+Qed.
+
+Lemma thread_steps_athread_steps lang
+  :
+    rtc (tau (@Thread.step_allpf lang)) <2= rtc (tau (@AThread.step_allpf lang)).
+Proof.
+  eapply rtc_implies. i. inv PR. econs; eauto.
+  eapply thread_step_athread_step; eauto.
+Qed.
+
+Lemma program_steps_aprogram_steps lang
+  :
+    rtc (tau (@Thread.program_step lang)) <2= rtc (tau (@AThread.program_step lang)).
+Proof.
+  eapply rtc_implies. i. inv PR. econs; eauto.
+  eapply program_step_aprogram_step; eauto.
+Qed.
 
 Lemma pfstep_apfstep:
   PFConfiguration.step <4= APFConfiguration.step.
@@ -322,7 +379,7 @@ Proof.
   - exploit sim_apf_pf_step; eauto. i. des. econs 4; eauto.
 Qed.
 
-Lemma apf_pf_equiv s
+Theorem apf_pf_equiv s
   :
     behaviors APFConfiguration.step (Configuration.init s) <1=
     behaviors PFConfiguration.step (Configuration.init s).
@@ -331,7 +388,7 @@ Proof.
   eapply sim_apf_pf_init; auto.
 Qed.
 
-Lemma apf_pf_equiv2 c
+Theorem apf_pf_equiv2 c
   :
     behaviors PFConfiguration.step c <1=
     behaviors APFConfiguration.step c.

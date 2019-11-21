@@ -1381,7 +1381,7 @@ Definition reserver_exists (c: Configuration.t) :=
                Some (st, lc)>>) /\
     (<<PROM: Memory.get loc to lc.(Local.promises) = Some (from, Message.reserve)>>).
 
-Require Import AProp.
+Require Import APFPF.
 
 
 
