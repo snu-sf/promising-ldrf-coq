@@ -52,21 +52,6 @@ Module PFConfiguration.
   .
   Hint Constructors opt_step.
 
-  Definition pf_racefree (c1:Configuration.t): Prop :=
-    forall c2
-           (STEPS: rtc step_all c1 c2)
-           (RACE: pf_race c2), False.
-
-  Lemma pf_racefree_step c1 c2 e tid
-        (RACEFREE : pf_racefree c1)
-        (STEP : step e tid c1 c2) :
-    pf_racefree c2.
-  Proof.
-    ii. eapply RACEFREE.
-    - econs 2; eauto.
-    - auto.
-  Qed.
-
   Lemma step_future
         e tid c1 c2
         (STEP: step e tid c1 c2)

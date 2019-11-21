@@ -22,8 +22,6 @@ Require Import Progress.
 Set Implicit Arguments.
 
 
-(* TODO unifiy and remove definitions in Event.v *)
-
 Inductive pf_race_condition e1 e2: Prop :=
 | pf_race_condition_rw
     loc val1 val2 ordr ordw
@@ -68,3 +66,26 @@ Inductive pf_race (c:Configuration.t): Prop :=
     (RACE: pf_race_condition e1 e2)
 .
 Hint Constructors pf_race.
+
+Inductive step_all A B C D (step: A -> B -> C -> D -> Prop): C -> D -> Prop :=
+| step_all_intro
+    a b c d
+    (STEP: step a b c d)
+  :
+    step_all step c d.
+
+Definition racefree
+           (step : MachineEvent.t -> Ident.t -> Configuration.t -> Configuration.t -> Prop) (c1:Configuration.t): Prop :=
+  forall c2
+         (STEPS: rtc (step_all step) c1 c2)
+         (RACE: pf_race c2), False.
+
+Lemma racefree_step step c1 c2 e tid
+      (RACEFREE : racefree step c1)
+      (STEP : step e tid c1 c2) :
+  racefree step c2.
+Proof.
+  ii. eapply RACEFREE.
+  - econs 2; eauto. econs; eauto.
+  - auto.
+Qed.

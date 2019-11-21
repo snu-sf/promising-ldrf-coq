@@ -137,9 +137,4 @@ Module PFSingle.
     eapply step_long_step.
   Qed.
 
-  Definition pf_racefree (c1:Configuration.t): Prop :=
-    forall c2
-           (STEPS: rtc step_all c1 c2)
-           (RACE: pf_race c2), False.
-
 End PFSingle.
