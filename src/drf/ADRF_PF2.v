@@ -612,7 +612,7 @@ Definition other_spaces (tid: Ident.t)
 
 Lemma race_lemma c tid0 tid1 lang0 lang1 st0 st1 lc0 lc1 th0 th1 e1 e2
       (NEQ: tid0 <> tid1)
-      (RACEFREE: APFConfiguration.pf_racefree c)
+      (RACEFREE: pf_racefree APFConfiguration.step c)
       (WF: Configuration.wf c)
       (FIND0: IdentMap.find tid0 (Configuration.threads c) = Some (existT _ lang0 st0, lc0))
       (FIND1: IdentMap.find tid1 (Configuration.threads c) = Some (existT _ lang1 st1, lc1))
@@ -628,11 +628,11 @@ Proof.
   - eapply rtc_tail in STEP1. des; ss; clarify.
     + inv STEP2. inv STEP3. destruct th0, th1. exploit RACEFREE.
       * econs 2; [|econs 2; [|refl]].
-        { econs. econs. econs.
+        { econs. econs.
           - eapply FIND0.
           - eapply STEP0.
           - eauto. }
-        { econs. econs. econs.
+        { econs. econs.
           - ss. erewrite IdentMap.gso.
             + eapply FIND1.
             + eauto.
@@ -661,7 +661,7 @@ Proof.
         }
       * ss.
     + inv STEP2. destruct th0. exploit RACEFREE.
-      * econs 2; [|refl]. econs. econs. econs.
+      * econs 2; [|refl]. econs. econs.
         { eapply FIND0. }
         { eapply STEP0. }
         { eauto. }
@@ -689,7 +689,7 @@ Proof.
       * ss.
   - eapply rtc_tail in STEP1. des; ss; clarify.
     + inv STEP0. destruct th1. exploit RACEFREE.
-      * econs 2; [|refl]. econs. econs. econs.
+      * econs 2; [|refl]. econs. econs.
         { eapply FIND1. }
         { eapply STEP1. }
         { eauto. }
@@ -1726,7 +1726,7 @@ Proof.
     + eapply memory_reserve_wf_configuration_step; eauto.
     + eapply step_reserver_exists_tgt; cycle 1; eauto.
   - econs; eauto.
-    + eapply APFConfiguration.pf_racefree_step; eauto.
+    + eapply pf_racefree_step; eauto.
     + eapply APFConfiguration.step_future; eauto.
     + eapply Configuration.step_future; eauto.
     + eapply memory_reserve_wf_configuration_step; eauto.

@@ -21,8 +21,6 @@ Require Import Configuration.
 Require Import Progress.
 Require Import Behavior.
 
-Require Import Race.
-
 Set Implicit Arguments.
 
 Module PFConfiguration.

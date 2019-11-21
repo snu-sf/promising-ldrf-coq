@@ -27,30 +27,29 @@ Require Import AThread.
 Require Import Race.
 
 Require Import APF.
-Require Import PF.
-Require Import PFSingle.
-Require Import DRF_PF.
+Require Import APFSingle.
+Require Import ADRF_PF.
 
 Lemma sim_apf_pf_racefree c
-      (RACEFREE: PFSingle.pf_racefree c)
+      (RACEFREE: pf_racefree APFSingle.step c)
   :
-    PFConfiguration.pf_racefree c.
+    pf_racefree APFConfiguration.step c.
 Proof.
   ii. ginduction STEPS; i.
   - eapply RACEFREE; eauto.
-  - inv H. inv USTEP. exploit PFSingle.step_sim; eauto. i. des.
+  - inv H. exploit APFSingle.step_sim; eauto. i. des.
     eapply IHSTEPS; auto. ii. eapply RACEFREE; cycle 1; eauto. etrans.
     + eapply rtc_implies; try apply STEPS0. i. inv PR. econs; eauto.
-    + econs; eauto.
+    + econs; eauto. econs; eauto.
 Qed.
 
-Theorem drf_single_pf s
-      (RACEFREE: PFSingle.pf_racefree (Configuration.init s))
+Theorem drf_single_apf s
+      (RACEFREE: pf_racefree APFSingle.step (Configuration.init s))
   :
     behaviors Configuration.step (Configuration.init s) <1=
-    behaviors PFSingle.step (Configuration.init s).
+    behaviors APFSingle.step (Configuration.init s).
 Proof.
-  ii. eapply PFSingle.long_step_equiv.
-  eapply drf_pf; eauto.
+  ii. eapply APFSingle.long_step_equiv; eauto.
+  eapply drf_apf; eauto.
   eapply sim_apf_pf_racefree; eauto.
 Qed.

@@ -37,9 +37,25 @@ Require Import AMemory.
 Require Import ALocal.
 Require Import AThread.
 Require Import APredStep.
+Require Import APFPF.
 
 Set Implicit Arguments.
 
+Lemma pred_step_apred_step
+  :
+    PredStep.pred_step <5= APredStep.pred_step.
+Proof.
+  i. inv PR. econs; eauto.
+  eapply thread_step_athread_step; eauto.
+Qed.
+
+Lemma pred_steps_apred_steps P lang
+  :
+    rtc (tau (@PredStep.pred_step P lang)) <2= rtc (tau (@APredStep.pred_step P lang)).
+Proof.
+  eapply rtc_implies. i. inv PR. econs; eauto.
+  eapply pred_step_apred_step; eauto.
+Qed.
 
 Section GENERAL.
 

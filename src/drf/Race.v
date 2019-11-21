@@ -74,16 +74,16 @@ Inductive step_all A B C D (step: A -> B -> C -> D -> Prop): C -> D -> Prop :=
   :
     step_all step c d.
 
-Definition racefree
+Definition pf_racefree
            (step : MachineEvent.t -> Ident.t -> Configuration.t -> Configuration.t -> Prop) (c1:Configuration.t): Prop :=
   forall c2
          (STEPS: rtc (step_all step) c1 c2)
          (RACE: pf_race c2), False.
 
-Lemma racefree_step step c1 c2 e tid
-      (RACEFREE : racefree step c1)
+Lemma pf_racefree_step step c1 c2 e tid
+      (RACEFREE : pf_racefree step c1)
       (STEP : step e tid c1 c2) :
-  racefree step c2.
+  pf_racefree step c2.
 Proof.
   ii. eapply RACEFREE.
   - econs 2; eauto. econs; eauto.

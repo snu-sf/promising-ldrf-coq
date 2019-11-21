@@ -1597,7 +1597,7 @@ Section SIMPF.
       (FORGET: forget_config c_src c_tgt)
       (THREADS: forall tid (IDENT: idents tid),
           sim_pf_one tid (mlast tid) (spaces tid) (updates tid) (aupdates tid) c_src c_tgt)
-      (RACEFREE: APFConfiguration.pf_racefree c_src)
+      (RACEFREE: pf_racefree APFConfiguration.step c_src)
       (WFSRC: Configuration.wf c_src)
       (WFTGT: Configuration.wf c_tgt)
       (RESERVEWF: memory_reserve_wf c_tgt.(Configuration.memory))
@@ -1630,7 +1630,7 @@ Section SIMPF.
 
   Lemma sim_pf_init
         s
-        (RACEFREE: APFConfiguration.pf_racefree (Configuration.init s))
+        (RACEFREE: pf_racefree APFConfiguration.step (Configuration.init s))
     :
       sim_pf_all (Configuration.init s) (Configuration.init s)
   .

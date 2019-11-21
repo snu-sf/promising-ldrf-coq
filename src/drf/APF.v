@@ -23,8 +23,6 @@ Require Import AMemory.
 Require Import ALocal.
 Require Import AThread.
 
-Require Import Race.
-
 Set Implicit Arguments.
 
 Module APFConfiguration.
