@@ -34,11 +34,11 @@ Require Import DRF_PF.
 Lemma sim_apf_pf_racefree c
       (RACEFREE: PFSingle.pf_racefree c)
   :
-    PF.pf_racefree c.
+    PFConfiguration.pf_racefree c.
 Proof.
   ii. ginduction STEPS; i.
   - eapply RACEFREE; eauto.
-  - inv H. inv USTEP. exploit pftstep_single_sim; eauto. i. des.
+  - inv H. inv USTEP. exploit PFSingle.step_sim; eauto. i. des.
     eapply IHSTEPS; auto. ii. eapply RACEFREE; cycle 1; eauto. etrans.
     + eapply rtc_implies; try apply STEPS0. i. inv PR. econs; eauto.
     + econs; eauto.
@@ -48,9 +48,9 @@ Lemma drf_pf s
       (RACEFREE: PFSingle.pf_racefree (Configuration.init s))
   :
     behaviors Configuration.step (Configuration.init s) <1=
-    behaviors pftstep_single (Configuration.init s).
+    behaviors PFSingle.step (Configuration.init s).
 Proof.
-  ii. eapply pftstep_equiv.
+  ii. eapply PFSingle.long_step_equiv.
   eapply DRF_PF.drf_pf; eauto.
   eapply sim_apf_pf_racefree; eauto.
 Qed.

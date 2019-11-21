@@ -63,7 +63,7 @@ Lemma sim_pf_all_adequacy c_src c_tgt
       (SIM: sim_pf_all c_src c_tgt)
   :
     behaviors Configuration.step c_tgt <1=
-    behaviors pftstep c_src.
+    behaviors APFConfiguration.step c_src.
 Proof.
   i. ginduction PR; i.
   - inv SIM. inv SIM0. econs 1. eapply forget_config_terminal; eauto.
@@ -84,10 +84,10 @@ Proof.
 Qed.
 
 Lemma drf_pf s
-      (RACEFREE: pf_racefree (Configuration.init s))
+      (RACEFREE: APFConfiguration.pf_racefree (Configuration.init s))
   :
     behaviors Configuration.step (Configuration.init s) <1=
-    behaviors pftstep (Configuration.init s).
+    behaviors APFConfiguration.step (Configuration.init s).
 Proof.
   eapply sim_pf_all_adequacy.
   eapply sim_pf_init; auto.

@@ -1483,7 +1483,7 @@ Qed.
 
 Lemma step_reserver_exists_src c0 c1 tid e
       (RESERVES: reserver_exists c0)
-      (STEP: pftstep e tid c0 c1)
+      (STEP: APFConfiguration.step e tid c0 c1)
   :
     reserver_exists c1.
 Proof.
@@ -1597,7 +1597,7 @@ Section SIMPF.
       (FORGET: forget_config c_src c_tgt)
       (THREADS: forall tid (IDENT: idents tid),
           sim_pf_one tid (mlast tid) (spaces tid) (updates tid) (aupdates tid) c_src c_tgt)
-      (RACEFREE: pf_racefree c_src)
+      (RACEFREE: APFConfiguration.pf_racefree c_src)
       (WFSRC: Configuration.wf c_src)
       (WFTGT: Configuration.wf c_tgt)
       (RESERVEWF: memory_reserve_wf c_tgt.(Configuration.memory))
@@ -1630,7 +1630,7 @@ Section SIMPF.
 
   Lemma sim_pf_init
         s
-        (RACEFREE: pf_racefree (Configuration.init s))
+        (RACEFREE: APFConfiguration.pf_racefree (Configuration.init s))
     :
       sim_pf_all (Configuration.init s) (Configuration.init s)
   .

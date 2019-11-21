@@ -29,8 +29,8 @@ Require Import AProp.
 Require Import APF.
 Require Import PF.
 
-Lemma pftstep_apftstep:
-  PF.pftstep <4= APF.pftstep.
+Lemma pfstep_apfstep:
+  PFConfiguration.step <4= APFConfiguration.step.
 Proof.
   ii. inv PR.
   eapply program_steps_aprogram_steps in STEPS.
@@ -61,7 +61,7 @@ Lemma shorter_write mem_src0 mem_tgt0 loc from to val released prom1 mem_tgt1 ki
       (<<WRITE: Memory.write Memory.bot mem_src0 loc from' to val released prom1 mem_src1 kind>>) /\
       (<<SHORT: shorter mem_src1 mem_tgt1>>).
 Proof.
-  exploit APF.write_no_promise; eauto. i. des. clarify.
+  exploit APFConfiguration.write_no_promise; eauto. i. des. clarify.
   inv WRITE. inv PROMISE. exists (Time.middle from to).
   assert (WF: (<<MSG_WF: Message.wf (Message.full val released)>>) /\
               (<<TO: Time.lt from to>>) /\
@@ -130,7 +130,7 @@ Lemma shorter_update mem_src0 mem_tgt0 loc from to val released prom1 mem_tgt1 k
       (<<WRITE: Memory.write Memory.bot mem_src0 loc from to val released prom1 mem_src1 kind>>) /\
       (<<SHORT: shorter mem_src1 mem_tgt1>>).
 Proof.
-  exploit APF.write_no_promise; eauto. i. des. clarify.
+  exploit APFConfiguration.write_no_promise; eauto. i. des. clarify.
   inv WRITE. inv PROMISE.
   assert (WF: (<<MSG_WF: Message.wf (Message.full val released)>>) /\
               (<<TO: Time.lt from to>>) /\
@@ -239,7 +239,7 @@ Proof.
   - i. clarify. esplits; eauto.
   - i. clarify. inv H. destruct y. destruct local.
     exploit shorter_program_step; eauto. i. des.
-    exploit program_step_no_promise; eauto. i. ss. clarify.
+    exploit PFConfiguration.program_step_no_promise; eauto. i. ss. clarify.
     exploit IHSTEPS; eauto. i. des. esplits; eauto.
     econs; eauto. econs; eauto. rewrite <- EVENT. auto.
 Qed.
@@ -259,25 +259,25 @@ Inductive sim_apf_pf: Configuration.t -> Configuration.t -> Prop :=
 
 Lemma sim_apf_pf_step c_tgt0 c_tgt1 c_src0 tid e
       (SIM: sim_apf_pf c_src0 c_tgt0)
-      (STEP: APF.pftstep tid e c_tgt0 c_tgt1)
+      (STEP: APFConfiguration.step tid e c_tgt0 c_tgt1)
   :
     exists c_src1,
-      (<<STEP: PF.pftstep tid e c_src0 c_src1>>) /\
+      (<<STEP: PFConfiguration.step tid e c_src0 c_src1>>) /\
       (<<SIM: sim_apf_pf c_src1 c_tgt1>>).
 Proof.
   inv SIM. dup STEP. inv STEP. ss. destruct e2. destruct lc1, local, lc3.
-  exploit no_promise_spec; eauto. i. ss. clarify.
+  exploit APFConfiguration.no_promise_spec; eauto. i. ss. clarify.
   exploit shorter_program_steps; eauto. i. des.
-  exploit program_steps_no_promise; eauto. i. ss. clarify.
+  exploit APFConfiguration.program_steps_no_promise; eauto. i. ss. clarify.
   exploit shorter_program_step; eauto. i. des.
-  assert (STEPSRC: pftstep
+  assert (STEPSRC: PFConfiguration.step
                      (ThreadEvent.get_machine_event e_src) e
                      (Configuration.mk ths sc mem_src)
                      (Configuration.mk (IdentMap.add e (existT _ lang st3, Local.mk tview1 promises1) ths) sc3 mem_src'0)).
   { econs; eauto. }
   rewrite EVENT. esplits; eauto. econs; eauto.
-  - eapply PF.configuration_step_no_promise in STEPSRC; eauto.
-  - eapply APF.configuration_step_no_promise in STEP0; eauto.
+  - eapply PFConfiguration.configuration_step_no_promise in STEPSRC; eauto.
+  - eapply APFConfiguration.configuration_step_no_promise in STEP0; eauto.
 Qed.
 
 Lemma sim_apf_pf_init s
@@ -312,8 +312,8 @@ Qed.
 Lemma sim_apf_pf_adequacy c_src c_tgt
       (SIM: sim_apf_pf c_src c_tgt)
   :
-    behaviors APF.pftstep c_tgt <1=
-    behaviors PF.pftstep c_src.
+    behaviors APFConfiguration.step c_tgt <1=
+    behaviors PFConfiguration.step c_src.
 Proof.
   i. ginduction PR; i.
   - econs 1. eapply sim_apf_pf_terminal; eauto.
@@ -324,8 +324,8 @@ Qed.
 
 Lemma apf_pf_equiv s
   :
-    behaviors APF.pftstep (Configuration.init s) <1=
-    behaviors PF.pftstep (Configuration.init s).
+    behaviors APFConfiguration.step (Configuration.init s) <1=
+    behaviors PFConfiguration.step (Configuration.init s).
 Proof.
   eapply sim_apf_pf_adequacy.
   eapply sim_apf_pf_init; auto.
@@ -333,9 +333,9 @@ Qed.
 
 Lemma apf_pf_equiv2 c
   :
-    behaviors PF.pftstep c <1=
-    behaviors APF.pftstep c.
+    behaviors PFConfiguration.step c <1=
+    behaviors APFConfiguration.step c.
 Proof.
   eapply le_step_behavior_improve; eauto.
-  i. eapply pftstep_apftstep; eauto.
+  i. eapply pfstep_apfstep; eauto.
 Qed.

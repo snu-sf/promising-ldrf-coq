@@ -43,22 +43,22 @@ Qed.
 
 Lemma sim_apf_pf_racefree c_src c_tgt
       (SIM: sim_apf_pf c_src c_tgt)
-      (RACEFREE: PF.pf_racefree c_src)
+      (RACEFREE: PFConfiguration.pf_racefree c_src)
   :
-    APF.pf_racefree c_tgt.
+    APFConfiguration.pf_racefree c_tgt.
 Proof.
   ii. ginduction STEPS.
   - i. erewrite <- sim_apf_pf_race in RACE; eauto.
   - i. inv H. inv USTEP. exploit sim_apf_pf_step; eauto.
     i. des. eapply IHSTEPS; eauto.
-    eapply pf_racefree_step; eauto.
+    eapply PFConfiguration.pf_racefree_step; eauto.
 Qed.
 
 Lemma drf_pf s
-      (RACEFREE: pf_racefree (Configuration.init s))
+      (RACEFREE: PFConfiguration.pf_racefree (Configuration.init s))
   :
     behaviors Configuration.step (Configuration.init s) <1=
-    behaviors pftstep (Configuration.init s).
+    behaviors PFConfiguration.step (Configuration.init s).
 Proof.
   ii. eapply ADRF_PF.drf_pf in PR.
   - eapply apf_pf_equiv; eauto.

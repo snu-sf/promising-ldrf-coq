@@ -997,10 +997,10 @@ Lemma sim_pf_step
       (STEP: Configuration.step e tid c_tgt0 c_tgt1)
   :
     exists c_src1,
-      (<<STEP: opt_pftstep e tid c_src0 c_src1>>) /\
+      (<<STEP: APFConfiguration.opt_step e tid c_src0 c_src1>>) /\
       ((<<FAIL: e = MachineEvent.failure>>) \/
        (exists c_src2,
-           (<<FAIL: pftstep MachineEvent.failure tid c_src1 c_src2>>)) \/
+           (<<FAIL: APFConfiguration.step MachineEvent.failure tid c_src1 c_src2>>)) \/
        (<<SIM: sim_pf_all c_src1 c_tgt1>>)).
 Proof.
   inv SIM.

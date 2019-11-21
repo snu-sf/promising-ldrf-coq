@@ -612,7 +612,7 @@ Definition other_spaces (tid: Ident.t)
 
 Lemma race_lemma c tid0 tid1 lang0 lang1 st0 st1 lc0 lc1 th0 th1 e1 e2
       (NEQ: tid0 <> tid1)
-      (RACEFREE: pf_racefree c)
+      (RACEFREE: APFConfiguration.pf_racefree c)
       (WF: Configuration.wf c)
       (FIND0: IdentMap.find tid0 (Configuration.threads c) = Some (existT _ lang0 st0, lc0))
       (FIND1: IdentMap.find tid1 (Configuration.threads c) = Some (existT _ lang1 st1, lc1))
@@ -1142,7 +1142,7 @@ Lemma sim_pf_step_minus
       (STEP: Configuration.step e tid c_tgt0 c_tgt1)
   :
     (exists c_src1,
-        (<<STEP: opt_pftstep e tid c_src0 c_src1>>) /\
+        (<<STEP: APFConfiguration.opt_step e tid c_src0 c_src1>>) /\
         (<<FORGET: forget_config c_src1 c_tgt1>>) /\
         (<<SIM: forall tid' (NEQ: tid <> tid'),
             sim_pf_one tid' (mlast tid') (spaces tid') (updates tid')
@@ -1711,7 +1711,7 @@ Lemma sim_pf_step_minus_full
       (STEP: Configuration.step e tid c_tgt0 c_tgt1)
   :
     exists c_src1,
-      (<<STEP: opt_pftstep e tid c_src0 c_src1>>) /\
+      (<<STEP: APFConfiguration.opt_step e tid c_src0 c_src1>>) /\
       (<<SIM: sim_pf_minus_one tid mlast spaces updates aupdates c_src1 c_tgt1>>) /\
       (<<CONSISTENT: __guard__((exists lang st_tgt lc_tgt,
                                    (<<FIND: IdentMap.find tid c_tgt1.(Configuration.threads) = Some (existT _ lang st_tgt, lc_tgt)>>) /\
@@ -1726,8 +1726,8 @@ Proof.
     + eapply memory_reserve_wf_configuration_step; eauto.
     + eapply step_reserver_exists_tgt; cycle 1; eauto.
   - econs; eauto.
-    + eapply pf_racefree_step; eauto.
-    + eapply pftstep_future; eauto.
+    + eapply APFConfiguration.pf_racefree_step; eauto.
+    + eapply APFConfiguration.step_future; eauto.
     + eapply Configuration.step_future; eauto.
     + eapply memory_reserve_wf_configuration_step; eauto.
     + eapply step_reserver_exists_tgt; cycle 1; eauto.
@@ -1830,7 +1830,7 @@ Lemma sim_pf_step_pf_consistent
       (<<AUPDATES: forall loc (SAT: AU loc),
           ~ Memory.latest_reserve loc lc_tgt.(Local.promises) c_tgt0.(Configuration.memory)>>)) \/
     (exists c_src1,
-        (<<STEP: pftstep MachineEvent.failure tid c_src0 c_src1>>))
+        (<<STEP: APFConfiguration.step MachineEvent.failure tid c_src0 c_src1>>))
 .
 Proof.
   assert (WF: Configuration.wf c_tgt0).
