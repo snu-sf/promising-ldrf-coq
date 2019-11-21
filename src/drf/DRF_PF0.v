@@ -1690,7 +1690,7 @@ Section UNCHANGABLES.
       + econs; eauto. econs; eauto.
         split; auto. inv STEP0. eapply step_write_not_in; eauto.
       + inv STEP0. exploit IHSTEP.
-        * eapply step_promises_le in MLE; eauto.
+        * eapply step_promises_le in MLE; eauto. econs; eauto.
         * i. eapply pred_step_rtc_mon; eauto.
           i. ss. des. split; auto. eapply write_not_in_mon; eauto.
           i. eapply unwritable_increase; eauto.
