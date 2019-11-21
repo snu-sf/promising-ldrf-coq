@@ -55,7 +55,7 @@ Proof.
 Qed.
 
 Theorem drf_pf s
-      (RACEFREE: pf_racefree PFConfiguration.step (Configuration.init s))
+        (RACEFREE: pf_racefree PFConfiguration.step (Configuration.init s))
   :
     behaviors Configuration.step (Configuration.init s) <1=
     behaviors PFConfiguration.step (Configuration.init s).

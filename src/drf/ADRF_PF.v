@@ -84,7 +84,7 @@ Proof.
 Qed.
 
 Theorem drf_apf s
-      (RACEFREE: pf_racefree APFConfiguration.step (Configuration.init s))
+        (RACEFREE: pf_racefree APFConfiguration.step (Configuration.init s))
   :
     behaviors Configuration.step (Configuration.init s) <1=
     behaviors APFConfiguration.step (Configuration.init s).

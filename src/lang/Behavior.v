@@ -66,10 +66,10 @@ Proof.
   i. specialize (IHSTEPS BEH). econs 4; eauto.
 Qed.
 
-Lemma le_step_behavior_improve sem0 sem1
-      (STEPLE: sem0 <4= sem1)
-  :
-    behaviors sem0 <2= behaviors sem1.
+Lemma le_step_behavior_improve
+      sem0 sem1
+      (STEPLE: sem0 <4= sem1):
+  behaviors sem0 <2= behaviors sem1.
 Proof.
   i. ginduction PR; i.
   - econs 1; eauto.
