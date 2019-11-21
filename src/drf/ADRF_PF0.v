@@ -1425,25 +1425,6 @@ Section PROMISED.
     inv COVERED. auto.
   Qed.
 
-  (* Lemma max_full_ts_increase mem0 mem1 loc max0 *)
-  (*       (FUTURE: Memory.future mem0 mem1) *)
-  (*       (MAX0: Memory.max_full_ts mem0 loc max0) *)
-  (*   : *)
-  (*     exists max1, *)
-  (*       (<<MAX1: Memory.max_full_ts mem1 loc max1>>). *)
-  (* Proof.         *)
-  (*   ginduction FUTURE; eauto. i. inv H. inv OP. *)
-  (*   -  *)
-  (* Admitted. *)
-
-
-  (* Lemma concrete_covered_same prom mem0 mem1 *)
-  (*       (FUTURE: Memory.future mem0 mem1) *)
-  (*   : *)
-  (*     concrete_covered prom mem0 <2= concrete_covered prom mem1. *)
-  (* Proof. *)
-  (* Admitted. *)
-
   Lemma concrete_promised_increase_promise promises1 mem1 loc from to msg promises2 mem2 kind
         (STEP: AMemory.promise promises1 mem1 loc from to msg promises2 mem2 kind)
     :

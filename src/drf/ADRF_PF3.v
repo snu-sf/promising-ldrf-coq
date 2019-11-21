@@ -848,39 +848,3 @@ Section PFCONSISTENT.
   Qed.
 
 End PFCONSISTENT.
-
-
-
-Inductive added_memory_imm (tm: TimeMap.t): Memory.t -> Memory.t -> Prop :=
-| added_memory_imm_intro
-    m0 loc to from val m1
-    (TLE: Time.le (tm loc) to)
-    (ADD: Memory.add m0 loc to from (Message.full val None) m1)
-  :
-    added_memory_imm tm m0 m1
-.
-
-Definition added_memory (tm: TimeMap.t) := rtc (added_memory_imm tm).
-
-Lemma added_memory_future tm m0 m1
-      (ADDED: added_memory tm m0 m1)
-  :
-    Memory.future m0 m1.
-Proof.
-  ginduction ADDED; auto. etrans; [| apply IHADDED].
-  inv H. econs; eauto. econs; eauto.
-  econs. ss. eapply Time.bot_spec.
-Qed.
-
-Lemma progressable_in_added_rtc
-      lang st lc sc0 sc1 m0 m1 tm
-      (CONSISTENT: Thread.consistent (Thread.mk lang st lc sc0 m0))
-      (FUTURE: Memory.future m0 m1)
-  :
-    exists m2 e2,
-      (<<ADDED: rtc (added_memory tm) m1 m2>>) /\
-      (<<STEPS: rtc (Thread.tau_step (lang:=lang))
-                    (Thread.mk _ st lc sc1 m1) e2>>) /\
-      (<<PROMISES: Local.promises (Thread.local e2) = Memory.bot>>).
-Proof.
-Admitted.
