@@ -41,7 +41,7 @@ Require Import Invariant.
 Set Implicit Arguments.
 
 
-Section AbortInsertion.
+Section AssertInsertion.
   Variable
     (S:ThreadsProp)
     (J:MemoryProp)
@@ -52,44 +52,44 @@ Section AbortInsertion.
 
   (* simulation relations on threads *)
 
-  Inductive sim_stmts (tid: Ident.t): forall (stmts_src stmts_tgt: list Stmt.t), Prop :=
-  | sim_stmts_nil:
-      sim_stmts tid [] []
-  | sim_stmts_instr
+  Inductive insert_assertion (tid: Ident.t): forall (stmts_src stmts_tgt: list Stmt.t), Prop :=
+  | insert_assertion_nil:
+      insert_assertion tid [] []
+  | insert_assertion_instr
       (i: Instr.t) stmts_src stmts_tgt
-      (SIM: sim_stmts tid stmts_src stmts_tgt):
-      sim_stmts tid ((Stmt.instr i)::stmts_src) ((Stmt.instr i)::stmts_tgt)
-  | sim_stmts_ite
+      (SIM: insert_assertion tid stmts_src stmts_tgt):
+      insert_assertion tid ((Stmt.instr i)::stmts_src) ((Stmt.instr i)::stmts_tgt)
+  | insert_assertion_ite
       cond
       stmts1_src stmts2_src stmts_src
       stmts1_tgt stmts2_tgt stmts_tgt
-      (SIM1: sim_stmts tid (stmts1_src ++ stmts_src) (stmts1_tgt ++ stmts_tgt))
-      (SIM2: sim_stmts tid (stmts2_src ++ stmts_src) (stmts2_tgt ++ stmts_tgt)):
-      sim_stmts tid
-                ((Stmt.ite cond stmts1_src stmts2_src)::stmts_src)
-                ((Stmt.ite cond stmts1_tgt stmts2_tgt)::stmts_tgt)
-  | sim_stmts_dowhile
+      (SIM1: insert_assertion tid (stmts1_src ++ stmts_src) (stmts1_tgt ++ stmts_tgt))
+      (SIM2: insert_assertion tid (stmts2_src ++ stmts_src) (stmts2_tgt ++ stmts_tgt)):
+      insert_assertion tid
+                       ((Stmt.ite cond stmts1_src stmts2_src)::stmts_src)
+                       ((Stmt.ite cond stmts1_tgt stmts2_tgt)::stmts_tgt)
+  | insert_assertion_dowhile
       cond
       stmts1_src stmts_src
       stmts1_tgt stmts_tgt
-      (SIM: sim_stmts tid
-                      (stmts1_src ++ (Stmt.ite cond ((Stmt.dowhile stmts1_src cond)::nil) nil) :: stmts_src)
-                      (stmts1_tgt ++ (Stmt.ite cond ((Stmt.dowhile stmts1_tgt cond)::nil) nil) :: stmts_tgt)):
-      sim_stmts tid
-                ((Stmt.dowhile stmts1_src cond)::stmts_src)
-                ((Stmt.dowhile stmts1_tgt cond)::stmts_tgt)
-  | sim_stmts_assert
+      (SIM: insert_assertion tid
+                             (stmts1_src ++ (Stmt.ite cond ((Stmt.dowhile stmts1_src cond)::nil) nil) :: stmts_src)
+                             (stmts1_tgt ++ (Stmt.ite cond ((Stmt.dowhile stmts1_tgt cond)::nil) nil) :: stmts_tgt)):
+      insert_assertion tid
+                       ((Stmt.dowhile stmts1_src cond)::stmts_src)
+                       ((Stmt.dowhile stmts1_tgt cond)::stmts_tgt)
+  | insert_assertion_assert
       c stmts_src stmts_tgt
-      (SIM: sim_stmts tid stmts_src stmts_tgt)
+      (SIM: insert_assertion tid stmts_src stmts_tgt)
       (SUCCESS: forall rs (TH: S tid lang (State.mk rs stmts_src)),
           RegFile.eval_expr rs c <> 0):
-      sim_stmts tid stmts_src ((Stmt.ite c [Stmt.instr Instr.abort] nil)::stmts_tgt)
+      insert_assertion tid stmts_src ((Stmt.ite c [Stmt.instr Instr.abort] nil)::stmts_tgt)
   .
-  Hint Constructors sim_stmts.
+  Hint Constructors insert_assertion.
 
   Inductive sim_state (tid: Ident.t) (st_src st_tgt: State.t): Prop :=
   | sim_state_intro
-      (STMTS: sim_stmts tid st_src.(State.stmts) st_tgt.(State.stmts))
+      (STMTS: insert_assertion tid st_src.(State.stmts) st_tgt.(State.stmts))
       (REGS: st_src.(State.regs) = st_tgt.(State.regs))
   .
   Hint Constructors sim_state.
@@ -690,7 +690,7 @@ Section AbortInsertion.
       (THREADS: forall tid syn_src syn_tgt
                   (FIND_SRC: IdentMap.find tid program = Some (existT _ lang syn_src))
                   (FIND_TGT: IdentMap.find tid program_tgt = Some (existT _ lang syn_tgt)),
-          sim_stmts tid syn_src syn_tgt)
+          insert_assertion tid syn_src syn_tgt)
   .
 
   Lemma init_sim_conf
@@ -758,4 +758,4 @@ Section AbortInsertion.
     hexploit sim_conf_sim; eauto. i.
     exploit sim_adequacy; try exact H; eauto.
   Qed.
-End AbortInsertion.
+End AssertInsertion.
