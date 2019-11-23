@@ -338,7 +338,6 @@ Definition pf_consistent_drf_shift lang (e0:Thread.t lang)
          >>)
 .
 
-(* TODO: change definition in Pred.v *)
 Definition wf_time_evt (P: Loc.t -> Time.t -> Prop) (e: ThreadEvent.t) : Prop :=
   match e with
   | ThreadEvent.promise loc from to msg kind =>
@@ -423,7 +422,6 @@ Proof.
     + apply COMPLETE in TO. des. esplit. eauto.
 Qed.
 
-(* TODO: unify with ADRF_PF0.v *)
 Lemma step_wf_event lang (th0 th1: Thread.t lang) e
       (INHABITED: Memory.inhabited th0.(Thread.memory))
       (STEP: AThread.step_allpf e th0 th1)
@@ -438,7 +436,6 @@ Proof.
     + inv LOCAL1. inv LOCAL2. eapply write_wf_event; eauto.
 Qed.
 
-(* TODO: unify with ADRF_PF0.v *)
 Lemma traced_step_wf_event lang (th0 th1: Thread.t lang) tr
       (INHABITED: Memory.inhabited th0.(Thread.memory))
       (STEPS: traced_step tr th0 th1)
@@ -681,8 +678,7 @@ Proof.
           eapply TRACE1; eauto. }
 
 
-    + (* TODO: exactly same *)
-      splits; auto.
+    + splits; auto.
       specialize (FSPEC loc). des.
       destruct (classic (MU loc)).
       { exploit MUS; eauto. i. des.
