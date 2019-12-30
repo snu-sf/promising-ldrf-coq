@@ -1595,6 +1595,39 @@ Module Memory.
   Qed.
 
 
+  (* lemmas on min_full_ts *)
+
+  Definition min_full_ts (mem: t) (loc: Loc.t) (ts: Time.t): Prop :=
+    Cell.min_full_ts (mem loc) ts.
+
+  Lemma min_full_ts_exists
+        mem loc from to val released
+        (INHABITED: get loc to mem = Some (from, Message.full val released)):
+    exists ts, min_full_ts mem loc ts.
+  Proof.
+    eapply Cell.min_full_ts_exists. apply INHABITED.
+  Qed.
+
+  Lemma min_full_ts_inj
+        mem loc ts1 ts2
+        (MIN1: min_full_ts mem loc ts1)
+        (MIN2: min_full_ts mem loc ts2):
+    ts1 = ts2.
+  Proof.
+    eapply Cell.min_full_ts_inj; eauto.
+  Qed.
+
+  Lemma min_full_ts_spec
+        loc ts from val released mem mts
+        (MIN: min_full_ts mem loc mts)
+        (GET: get loc ts mem = Some (from, Message.full val released)):
+    <<GET: exists from val' released', get loc mts mem = Some (from, Message.full val' released')>> /\
+    <<MIN: Time.le mts ts>>.
+  Proof.
+    eapply Cell.min_full_ts_spec; eauto.
+  Qed.
+
+
   (* Lemmas on max_full_timemap *)
 
   Definition max_full_ts (mem: t) (loc: Loc.t) (ts: Time.t): Prop :=
@@ -2736,7 +2769,7 @@ Module Memory.
 
   Lemma cap_closed_opt_view
         promises mem1 mem2 view
-        (cap: cap promises mem1 mem2)
+        (CAP: cap promises mem1 mem2)
         (CLOSED: closed_opt_view view mem1):
     closed_opt_view view mem2.
   Proof.
@@ -2971,38 +3004,5 @@ Module Memory.
     - exploit lower_get1; eauto. i. des. inv MSG_LE. eauto.
     - exploit remove_get1; try exact GET; eauto. i. des; eauto.
       subst. exploit remove_get0; try exact MEM. i. des. congr.
-  Qed.
-
-
-  (* lemmas on min_full_ts *)
-
-  Definition min_full_ts (mem: t) (loc: Loc.t) (ts: Time.t): Prop :=
-    Cell.min_full_ts (mem loc) ts.
-
-  Lemma min_full_ts_exists
-        mem loc from to val released
-        (INHABITED: get loc to mem = Some (from, Message.full val released)):
-    exists ts, min_full_ts mem loc ts.
-  Proof.
-    eapply Cell.min_full_ts_exists. apply INHABITED.
-  Qed.
-
-  Lemma min_full_ts_inj
-        mem loc ts1 ts2
-        (MIN1: min_full_ts mem loc ts1)
-        (MIN2: min_full_ts mem loc ts2):
-    ts1 = ts2.
-  Proof.
-    eapply Cell.min_full_ts_inj; eauto.
-  Qed.
-
-  Lemma min_full_ts_spec
-        loc ts from val released mem mts
-        (MIN: min_full_ts mem loc mts)
-        (GET: get loc ts mem = Some (from, Message.full val released)):
-    <<GET: exists from val' released', get loc mts mem = Some (from, Message.full val' released')>> /\
-    <<MIN: Time.le mts ts>>.
-  Proof.
-    eapply Cell.min_full_ts_spec; eauto.
   Qed.
 End Memory.
