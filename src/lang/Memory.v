@@ -2586,75 +2586,27 @@ Module Memory.
 
   (* cap *)
 
-  Inductive latest_val (loc: Loc.t) (mem: t) (val: Const.t): Prop :=
-  | latest_val_intro
-      ts from released
-      (MAX: max_concrete_ts mem loc ts)
-      (GET: get loc ts mem = Some (from, Message.concrete val released))
-  .
-
-  Lemma latest_val_inj
-        loc mem val1 val2
-        (LATEST1: latest_val loc mem val1)
-        (LATEST2: latest_val loc mem val2):
-    val1 = val2.
-  Proof.
-    inv LATEST1. inv LATEST2.
-    exploit max_concrete_ts_inj; [exact MAX|exact MAX0|..]. i. subst.
-    rewrite GET in GET0. inv GET0. ss.
-  Qed.
-
-  Lemma latest_val_exists
-        loc mem
-        (INHABITED: inhabited mem):
-    exists val, latest_val loc mem val.
-  Proof.
-    exploit (@max_concrete_ts_exists mem loc); eauto. i. des.
-    dup x0. inv x0. des.
-    exists val. econs; eauto.
-  Qed.
-
-  Definition latest_reserve (loc: Loc.t) (promises mem: t): Prop :=
-    match get loc (max_ts loc mem) promises with
-    | Some (_, Message.reserve) => False
-    | _ => True
-    end.
-
-  Lemma latest_reserve_dec loc promises mem:
-    latest_reserve loc promises mem \/
-    ~ latest_reserve loc promises mem.
-  Proof.
-    unfold latest_reserve.
-    destruct (get loc (max_ts loc mem) promises) eqn:PROMISE; auto.
-    destruct p; ss. destruct t1; auto.
-  Qed.
-
-  Inductive cap (promises mem1 mem2: t): Prop :=
+  Inductive cap (mem1 mem2: t): Prop :=
   | cap_intro
       (SOUND: le mem1 mem2)
       (MIDDLE: forall loc from1 to1 from2 to2
                  (ADJ: adjacent loc from1 to1 from2 to2 mem1)
                  (TO: Time.lt to1 from2),
           get loc from2 mem2 = Some (to1, Message.reserve))
-      (BACK: forall loc val view
-               (PROMISE: latest_reserve loc promises mem1)
-               (LATEST: latest_val loc mem1 val)
-               (MAX: max_concrete_view mem1 view),
-            get loc (Time.incr (max_ts loc mem1)) mem2 =
-            Some (max_ts loc mem1, Message.concrete val (Some view)))
+      (BACK: forall loc, get loc (Time.incr (max_ts loc mem1)) mem2 =
+                    Some (max_ts loc mem1, Message.reserve))
       (COMPLETE: forall loc from to msg
                    (GET1: get loc to mem1 = None)
                    (GET2: get loc to mem2 = Some (from, msg)),
-          (exists f m, get loc from mem1 = Some (f, m)) /\
-          (from = max_ts loc mem1 -> latest_reserve loc promises mem1))
+          (exists f m, get loc from mem1 = Some (f, m)))
   .
   Hint Constructors cap.
 
   Lemma cap_inv
-        promises mem1 mem2
+        mem1 mem2
         loc from to msg
         (CLOSED: closed mem1)
-        (CAP: cap promises mem1 mem2)
+        (CAP: cap mem1 mem2)
         (GET: get loc to mem2 = Some (from, msg)):
     get loc to mem1 = Some (from, msg) \/
     (get loc to mem1 = None /\
@@ -2663,13 +2615,9 @@ Module Memory.
         Time.lt from to /\
         msg = Message.reserve) \/
     (get loc to mem1 = None /\
-     latest_reserve loc promises mem1 /\
      from = max_ts loc mem1 /\
      to = Time.incr from /\
-     exists val view,
-       latest_val loc mem1 val /\
-       max_concrete_view mem1 view /\
-       msg = Message.concrete val (Some view)).
+     msg = Message.reserve).
   Proof.
     inv CAP. move GET at bottom.
     destruct (get loc to mem1) as [[]|] eqn:GET1.
@@ -2677,7 +2625,7 @@ Module Memory.
       rewrite GET in x. inv x. auto. }
     right. exploit COMPLETE; eauto. i. des.
     exploit max_ts_spec; eauto. i. des. inv MAX.
-    - left. clear x0.
+    - left.
       exploit adjacent_exists; try eapply H; eauto. i. des.
       assert (LT: Time.lt from from2).
       { clear MIDDLE BACK COMPLETE GET0 H.
@@ -2728,27 +2676,23 @@ Module Memory.
         * apply (x4 from2); econs; ss.
           { econs. auto. }
           { refl. }
-    - right. inv H. do 3 (split; auto).
-      exploit max_concrete_view_exists; try apply CLOSED. i. des.
+    - right. inv H. do 2 (split; auto).
       rewrite GET0 in x. inv x.
-      exploit (@latest_val_exists loc mem1); try apply CLOSED. i. des.
-      exploit BACK; eauto. i.
+      specialize (BACK loc).
       exploit get_ts; try exact GET. i. des; try congr.
-      exploit get_ts; try exact x. i. des.
-      { rewrite x5 in x3. inv x3. }
-      exploit get_disjoint; [exact GET|exact x|..]. i. des.
+      exploit get_disjoint; [exact GET|exact BACK|..]. i. des.
       { subst. esplits; eauto. }
       exfalso.
       destruct (Time.le_lt_dec to (Time.incr (max_ts loc mem1))).
-      + apply (x6 to); econs; ss. refl.
-      + apply (x6 (Time.incr (max_ts loc mem1))); econs; ss.
-        * econs. ss.
-        * refl.
+      + apply (x1 to); econs; ss. refl.
+      + apply (x1 (Time.incr (max_ts loc mem1))); econs; s;
+          eauto using Time.incr_spec; try refl.
+        econs. ss.
   Qed.
 
   Lemma cap_closed_timemap
-        promises mem1 mem2 tm
-        (CAP: cap promises mem1 mem2)
+        mem1 mem2 tm
+        (CAP: cap mem1 mem2)
         (CLOSED: closed_timemap tm mem1):
     closed_timemap tm mem2.
   Proof.
@@ -2758,8 +2702,8 @@ Module Memory.
   Qed.
 
   Lemma cap_closed_view
-        promises mem1 mem2 view
-        (CAP: cap promises mem1 mem2)
+        mem1 mem2 view
+        (CAP: cap mem1 mem2)
         (CLOSED: closed_view view mem1):
     closed_view view mem2.
   Proof.
@@ -2768,8 +2712,8 @@ Module Memory.
   Qed.
 
   Lemma cap_closed_opt_view
-        promises mem1 mem2 view
-        (CAP: cap promises mem1 mem2)
+        mem1 mem2 view
+        (CAP: cap mem1 mem2)
         (CLOSED: closed_opt_view view mem1):
     closed_opt_view view mem2.
   Proof.
@@ -2777,8 +2721,8 @@ Module Memory.
   Qed.
 
   Lemma cap_closed_message
-        promises mem1 mem2 msg
-        (CAP: cap promises mem1 mem2)
+        mem1 mem2 msg
+        (CAP: cap mem1 mem2)
         (CLOSED: closed_message msg mem1):
     closed_message msg mem2.
   Proof.
@@ -2786,28 +2730,21 @@ Module Memory.
   Qed.
 
   Lemma cap_future_weak
-        promises mem1 mem2
-        (CAP: cap promises mem1 mem2)
+        mem1 mem2
+        (CAP: cap mem1 mem2)
         (CLOSED: closed mem1):
     future_weak mem1 mem2.
   Proof.
-    inv CAP. econs; ii.
+    dup CAP. inv CAP. econs; ii.
     - exploit SOUND; eauto. i.
       esplits; eauto. refl.
-    - exploit cap_inv; eauto. i. des; try congr. inv x6.
-      exploit max_concrete_view_closed; eauto. i.
-      exploit max_concrete_view_wf; eauto. i.
-      splits; auto.
-      + econs. eapply cap_closed_view; eauto.
-      + inv x5. ss. specialize (MAX loc). inv MAX. des.
-        exploit max_ts_spec; try exact GET. i. des.
-        etrans; eauto. econs. apply Time.incr_spec.
+    - exploit cap_inv; eauto. i. des; try congr.
     - exploit SOUND; eauto. congr.
   Qed.
 
   Lemma cap_closed
-        promises mem1 mem2
-        (CAP: cap promises mem1 mem2)
+        mem1 mem2
+        (CAP: cap mem1 mem2)
         (CLOSED: closed mem1):
     closed mem2.
   Proof.
@@ -2816,9 +2753,9 @@ Module Memory.
   Qed.
 
   Lemma cap_inj
-        promises mem mem1 mem2
-        (CAP1: cap promises mem mem1)
-        (CAP2: cap promises mem mem2)
+        mem mem1 mem2
+        (CAP1: cap mem mem1)
+        (CAP2: cap mem mem2)
         (CLOSED: closed mem):
     mem1 = mem2.
   Proof.
@@ -2832,103 +2769,69 @@ Module Memory.
       inv CAP1. exploit cap_inv; try exact GET2; eauto. i. des.
       + exploit SOUND; eauto. i. congr.
       + subst. exploit MIDDLE; eauto. i. congr.
-      + subst. exploit BACK; eauto. i. congr.
+      + subst. congr.
   Qed.
 
   Lemma cap_le
-        promises' promises mem1 mem2
-        (CAP: cap promises mem1 mem2)
-        (LE: le promises' mem1):
-    le promises' mem2.
+        promises mem1 mem2
+        (CAP: cap mem1 mem2)
+        (LE: le promises mem1):
+    le promises mem2.
   Proof.
     ii. inv CAP. eauto.
   Qed.
 
   Lemma cap_reserve_wf
-        promises promises1 mem1 mem2
-        (CAP: cap promises mem1 mem2)
-        (RESERVE1: reserve_wf promises1 mem1):
-    reserve_wf promises1 mem2.
+        promises mem1 mem2
+        (CAP: cap mem1 mem2)
+        (RESERVE: reserve_wf promises mem1):
+    reserve_wf promises mem2.
   Proof.
-    ii. exploit RESERVE1; eauto. i. des.
+    ii. exploit RESERVE; eauto. i. des.
     inv CAP. eauto.
   Qed.
 
-  Lemma cap_no_reserve_except
-        promises mem1 mem2
-        (CAP: cap promises mem1 mem2)
+  Lemma cap_max_ts
+        mem1 mem2
         (CLOSED: closed mem1)
-        (LE: le promises mem1):
-    no_reserve_except promises mem2.
+        (CAP: cap mem1 mem2):
+    forall loc, max_ts loc mem2 = Time.incr (max_ts loc mem1).
   Proof.
-    ii. exploit cap_inv; eauto. i. des; try congr.
-    - inv CAP.
-      exploit max_ts_spec; try exact x0. i. des.
-      exploit SOUND; try exact GET0. i.
-      exploit max_ts_spec; try exact x. i. des.
-      exploit TimeFacts.antisym; eauto. i.
-      clear from0 msg GET0 MAX x from1 msg0 GET1 MAX0.
-      destruct (get loc (max_ts loc mem2) promises) as [[]|] eqn:PROMISE.
-      { exploit LE; eauto. i.
-        rewrite x0 in x. inv x. ss. }
-      rewrite <- x2 in *.
-      exploit max_concrete_view_exists; try eapply CLOSED. i. des.
-      exploit (@latest_val_exists loc mem1); try apply CLOSED. i. des.
-      exploit (BACK loc); eauto; i.
-      { unfold latest_reserve. rewrite PROMISE. ss. }
-      exploit max_ts_spec; try exact x4. i. des.
-      specialize (Time.incr_spec (max_ts loc mem2)). i.
-      rewrite x2 in *. timetac.
-    - inv CAP. inv x1.
-      exploit get_ts; try exact GET2. i. des.
-      { subst. inv TS. }
-      exploit SOUND; try exact GET2. i.
-      exploit max_ts_spec; try exact x. i. des. timetac.
-  Qed.
-
-  Lemma remove_cap
-        promises1 mem1 mem2
-        loc from to val released promises2
-        (CAP1: cap promises1 mem1 mem2)
-        (REMOVE: remove promises1 loc from to (Message.concrete val released) promises2):
-    cap promises2 mem1 mem2.
-  Proof.
-    inv CAP1. econs; i; eauto.
-    - eapply BACK; eauto.
-      unfold latest_reserve in *. des_ifs.
-      + revert Heq0. erewrite remove_o; eauto. condtac; ss; congr.
-      + revert Heq0. erewrite remove_o; eauto. condtac; ss; try congr.
-        des. subst. exploit remove_get0; eauto. i. des. congr.
-    - exploit COMPLETE; eauto. i. des. splits; eauto. i.
-      exploit x0; eauto. i.
-      unfold latest_reserve in *. des_ifs.
-      + revert Heq. erewrite remove_o; eauto. condtac; ss; congr.
-      + revert Heq. erewrite remove_o; eauto. condtac; ss; try congr.
+    i. dup CAP. inv CAP0. specialize (BACK loc).
+    exploit max_ts_spec; try exact BACK. i. des.
+    apply TimeFacts.antisym; ss.
+    destruct (Time.le_lt_dec (max_ts loc mem2) (Time.incr (max_ts loc mem1))); ss.
+    specialize (Time.incr_spec (max_ts loc mem1)). i.
+    exploit cap_inv; try exact GET; eauto. i. des.
+    - exploit max_ts_spec; try exact x0. i. des.
+      exploit TimeFacts.lt_le_lt; try exact l; try exact MAX0. i.
+      rewrite x1 in H. timetac.
+    - inv x1. exploit get_ts; try exact GET2. i. des.
+      { rewrite x1 in *. inv l. }
+      exploit max_ts_spec; try exact GET2. i. des.
+      exploit TimeFacts.lt_le_lt; try exact x1; try exact MAX0. i.
+      rewrite x3 in l. rewrite l in H. timetac.
+    - subst. rewrite x2 in *. timetac.
   Qed.
 
 
   (* Existence of cap *)
 
   Lemma cap_exists
-        promises mem1
+        mem1
         (CLOSED1: closed mem1):
-    exists mem2, <<CAP: cap promises mem1 mem2>>.
+    exists mem2, <<CAP: cap mem1 mem2>>.
   Proof.
-    exploit max_concrete_view_exists; try apply CLOSED1. i. des.
-    exploit max_concrete_view_wf; eauto. i.
     cut (exists mem2,
             forall loc,
               (fun loc cell =>
-                 Cell.cap view (promises loc) (mem1 loc) cell) loc (mem2 loc)).
+                 Cell.cap (mem1 loc) cell) loc (mem2 loc)).
     { i. des.
       exists mem2. econs; ii.
       - destruct (H loc). eauto.
       - destruct (H loc). inv ADJ.
         eapply MIDDLE; eauto. econs; eauto.
-      - destruct (H loc).
-        exploit max_concrete_view_inj; [exact x0|exact MAX|..]. i. subst.
-        eapply BACK; eauto.
-        inv LATEST. econs; eauto.
+      - destruct (H loc). eauto.
       - destruct (H loc).
         exploit COMPLETE; eauto.
     }
