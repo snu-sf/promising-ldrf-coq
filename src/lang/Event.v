@@ -10,10 +10,7 @@ From PromisingLib Require Import Basic.
 From PromisingLib Require Import Loc.
 From PromisingLib Require Import Language.
 
-Require Import Time.
-
 Set Implicit Arguments.
-Import ListNotations.
 
 
 Module Const := Nat.
@@ -139,8 +136,8 @@ Module ProgramEvent.
   Inductive t :=
   | silent
   | read (loc:Loc.t) (val:Const.t) (ord:Ordering.t)
-  | write (loc:Loc.t) (val:Const.t) (ord:Ordering.t)
-  | update (loc:Loc.t) (valr valw:Const.t) (ordr ordw:Ordering.t)
+  | write (loc:Loc.t) (val:Const.t) (ord:Ordering.t) (pf:bool)
+  | update (loc:Loc.t) (valr valw:Const.t) (ordr ordw:Ordering.t) (pf:bool)
   | fence (ordr ordw:Ordering.t)
   | syscall (e:Event.t)
   | failure
@@ -149,20 +146,20 @@ Module ProgramEvent.
   Definition is_reading (e:t): option (Loc.t * Const.t * Ordering.t) :=
     match e with
     | read loc val ord => Some (loc, val, ord)
-    | update loc valr _ ordr _ => Some (loc, valr, ordr)
+    | update loc valr _ ordr _ _ => Some (loc, valr, ordr)
     | _ => None
     end.
 
-  Definition is_writing (e:t): option (Loc.t * Const.t * Ordering.t) :=
+  Definition is_writing (e:t): option (Loc.t * Const.t * Ordering.t * bool) :=
     match e with
-    | write loc val ord => Some (loc, val, ord)
-    | update loc _ valw _ ordw => Some (loc, valw, ordw)
+    | write loc val ord pf => Some (loc, val, ord, pf)
+    | update loc _ valw _ ordw pf => Some (loc, valw, ordw, pf)
     | _ => None
     end.
 
   Definition is_updating (e:t): option (Loc.t * Const.t * Ordering.t) :=
     match e with
-    | update loc valr _ ordr _ => Some (loc, valr, ordr)
+    | update loc valr _ ordr _ _ => Some (loc, valr, ordr)
     | _ => None
     end.
 
@@ -174,14 +171,16 @@ Module ProgramEvent.
       (O: Ordering.le o1 o2):
       ord (read l v o1) (read l v o2)
   | ord_write
-      l v o1 o2
-      (O: Ordering.le o1 o2):
-      ord (write l v o1) (write l v o2)
+      l v o1 o2 pf1 pf2
+      (O: Ordering.le o1 o2)
+      (PF: Ordering.le Ordering.acqrel o2 \/ implb pf1 pf2):
+      ord (write l v o1 pf1) (write l v o2 pf2)
   | ord_update
-      l vr vw or1 or2 ow1 ow2
+      l vr vw or1 or2 ow1 ow2 pf1 pf2
       (OR: Ordering.le or1 or2)
-      (OW: Ordering.le ow1 ow2):
-      ord (update l vr vw or1 ow1) (update l vr vw or2 ow2)
+      (OW: Ordering.le ow1 ow2)
+      (PF: Ordering.le Ordering.acqrel ow2 \/ implb pf1 pf2):
+      ord (update l vr vw or1 ow1 pf1) (update l vr vw or2 ow2 pf2)
   | ord_fence
       or1 or2 ow1 ow2
       (OR: Ordering.le or1 or2)
