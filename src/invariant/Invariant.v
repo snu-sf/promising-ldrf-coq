@@ -129,7 +129,7 @@ Section Invariant.
     forall loc,
     exists from to released,
       Memory.get loc to m =
-      Some (from, Message.full (LocFun.find loc assign) released).
+      Some (from, Message.concrete (LocFun.find loc assign) released).
 
   Definition sem_memory (m:Memory.t): Prop :=
     memory_assign m <1= J.
@@ -509,8 +509,8 @@ Section Invariant.
   Proof.
     exploit Memory.cap_exists; try apply CLOSED. i. des.
     exploit Memory.cap_closed; eauto. intro CLOSED_CAP.
-    exploit Memory.max_full_timemap_exists; try apply CLOSED_CAP. intro MAX. des.
-    hexploit Memory.max_full_timemap_closed; eauto. intro SC_CAP.
+    exploit Memory.max_concrete_timemap_exists; try apply CLOSED_CAP. intro MAX. des.
+    hexploit Memory.max_concrete_timemap_closed; eauto. intro SC_CAP.
     exploit Local.cap_wf; eauto. intro WF_CAP.
     exploit PFCertify.sim_thread_exists; eauto. i. des.
     hexploit PFCertify.sim_memory_inhabited; try apply SIM0; try apply WF_CAP; try apply CLOSED_CAP. s. i. des.

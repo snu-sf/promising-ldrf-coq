@@ -204,7 +204,7 @@ Section CANCEL.
   Qed.
 
   Lemma remove_not_cacncel_reserves_same prom0 loc from to val released prom1
-        (REMOVE: Memory.remove prom0 loc from to (Message.full val released) prom1)
+        (REMOVE: Memory.remove prom0 loc from to (Message.concrete val released) prom1)
         loc0 to0 from0
         (GET: Memory.get loc0 to0 prom0 = Some (from0, Message.reserve))
     :
@@ -435,9 +435,9 @@ Section CAP.
   Lemma caps_concrete_last mem0 prom mem1 tm l t from val released
         (RESERVE: Memory.reserve_wf prom mem0)
         (INHABITED: Memory.inhabited mem0)
-        (MAX: Memory.max_full_timemap mem0 tm)
+        (MAX: Memory.max_concrete_timemap mem0 tm)
         (CAP: Memory.cap prom mem0 mem1)
-        (CAPS: caps mem0 mem1 l t from (Message.full val released))
+        (CAPS: caps mem0 mem1 l t from (Message.concrete val released))
     :
       from = Memory.max_ts l mem0.
   Proof.
@@ -489,9 +489,9 @@ Section CAP.
   Lemma caps_max_view mem0 prom mem1 tm l t from val released
         (RESERVE: Memory.reserve_wf prom mem0)
         (INHABITED: Memory.inhabited mem0)
-        (MAX: Memory.max_full_timemap mem0 tm)
+        (MAX: Memory.max_concrete_timemap mem0 tm)
         (CAP: Memory.cap prom mem0 mem1)
-        (CAPS: caps mem0 mem1 l t from (Message.full val released))
+        (CAPS: caps mem0 mem1 l t from (Message.concrete val released))
     :
       (<<FROM: from = Memory.max_ts l mem0>>) /\
       (<<RESERVE: Memory.latest_reserve l prom mem0>>) /\
@@ -668,8 +668,8 @@ Section PFCONSISTENT.
   Proof.
     assert (INHABITED: Memory.inhabited th.(Thread.memory)).
     { inv MEM. auto. }
-    ii. exploit Memory.max_full_timemap_exists; eauto. intros MAX. des.
-    ii. exploit Memory.max_full_timemap_exists.
+    ii. exploit Memory.max_concrete_timemap_exists; eauto. intros MAX. des.
+    ii. exploit Memory.max_concrete_timemap_exists.
     { eapply le_inhabited; eauto. eapply Memory.cap_le; eauto. refl. }
     i. des. exploit CONSISTENT; eauto. i.
 
@@ -685,7 +685,7 @@ Section PFCONSISTENT.
         + eapply rtc_implies; [|apply STEPS].
           i. inv PR. econs; eauto. econs; eauto.
         + ss. eapply Local.cap_wf; eauto.
-        + ss. eapply Memory.max_full_timemap_closed; eauto.
+        + ss. eapply Memory.max_concrete_timemap_closed; eauto.
         + ss. eapply Memory.cap_closed; eauto.
         + i. des.
           destruct e2. destruct local. inv WF2. ss.
@@ -713,7 +713,7 @@ Section PFCONSISTENT.
     eapply pf_steps_cancels_not_cancels in STEPS; cycle 1.
     { ss. eapply Local.cap_wf; eauto. }
     { ss. eapply Memory.cap_closed; eauto. }
-    { ss. eapply Memory.max_full_timemap_closed; eauto. } des.
+    { ss. eapply Memory.max_concrete_timemap_closed; eauto. } des.
 
     eapply pred_steps_apred_steps in STEPS1.
     eapply pred_steps_apred_steps in STEPS2.
@@ -721,7 +721,7 @@ Section PFCONSISTENT.
     exploit AThread.rtc_tau_step_future.
     { eapply thread_steps_pred_steps. eapply STEPS1. }
     { ss. eapply Local.cap_wf; eauto. }
-    { ss. eapply Memory.max_full_timemap_closed; eauto. }
+    { ss. eapply Memory.max_concrete_timemap_closed; eauto. }
     { ss. eapply Memory.cap_closed; eauto. }
     i. des. ss.
 
@@ -803,7 +803,7 @@ Section PFCONSISTENT.
             inv LOCAL0. clarify. eapply caps_max_view in CAPS0; eauto; cycle 1.
             { inv WF. eauto. } des.
             clarify. eapply PROMS in GET. ss. des_ifs. ss.
-            exploit max_full_timemap_get.
+            exploit max_concrete_timemap_get.
             * apply MAX.
             * inv WF. eapply PROMISES. eauto.
             * i. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto.
@@ -820,7 +820,7 @@ Section PFCONSISTENT.
             inv LOCAL1. clarify. eapply caps_max_view in CAPS0; eauto; cycle 1.
             { inv WF. eauto. } des.
             clarify. eapply LOCAL2 in GET. ss. des_ifs. ss.
-            exploit max_full_timemap_get.
+            exploit max_concrete_timemap_get.
             * apply MAX.
             * inv WF. eapply PROMISES. eauto.
             * i. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto.
@@ -828,12 +828,12 @@ Section PFCONSISTENT.
           + apply not_and_or in BREAKQ. des; clarify. apply NNPP in BREAKQ.
             inv STEP1; inv STEP0. ss. inv LOCAL. inv LOCAL0. ss.
             eapply PROMS in GET. ss. des_ifs. ss.
-            hexploit max_full_timemap_get; eauto.
+            hexploit max_concrete_timemap_get; eauto.
             * inv WF. eapply Memory.cap_le; eauto.
             * i. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto.
           + inv STEP1; inv STEP0. ss. inv LOCAL. inv LOCAL0. ss.
             eapply PROMS in GET. ss. des_ifs. ss.
-            hexploit max_full_timemap_get; eauto.
+            hexploit max_concrete_timemap_get; eauto.
             * inv WF. eapply Memory.cap_le; eauto.
             * i. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto.
       }

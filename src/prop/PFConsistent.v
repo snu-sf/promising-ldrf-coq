@@ -35,7 +35,7 @@ Set Implicit Arguments.
 Definition pf_consistent lang (e:Thread.t lang): Prop :=
   forall mem1 sc1
          (CAP: Memory.cap e.(Thread.local).(Local.promises) e.(Thread.memory) mem1)
-         (SC_MAX: Memory.max_full_timemap mem1 sc1),
+         (SC_MAX: Memory.max_concrete_timemap mem1 sc1),
   exists e2,
     (<<STEPS: rtc (tau (Thread.step true)) (Thread.mk _ e.(Thread.state) e.(Thread.local) sc1 mem1) e2>>) /\
     ((exists e3,
@@ -72,11 +72,11 @@ Proof.
     { inv FAILURE; inv STEP. inv LOCAL. inv LOCAL0.
       hexploit rtc_tau_step_promise_consistent; eauto; ss.
       { eapply Local.cap_wf; eauto. }
-      { eapply Memory.max_full_timemap_closed; eauto. }
+      { eapply Memory.max_concrete_timemap_closed; eauto. }
       { eapply Memory.cap_closed; eauto. }
     }
     { eapply Local.cap_wf; eauto. }
-    { eapply Memory.max_full_timemap_closed; eauto. }
+    { eapply Memory.max_concrete_timemap_closed; eauto. }
     { eapply Memory.cap_closed; eauto. }
     i. des.
     exploit rtc_union_step_nonpf_failure.
@@ -87,7 +87,7 @@ Proof.
   - exploit tau_steps_pf_tau_steps; eauto; ss.
     { ii. rewrite PROMISES, Memory.bot_get in *.  congr. }
     { eapply Local.cap_wf; eauto. }
-    { eapply Memory.max_full_timemap_closed; eauto. }
+    { eapply Memory.max_concrete_timemap_closed; eauto. }
     { eapply Memory.cap_closed; eauto. }
     i. des.
     exploit rtc_union_step_nonpf_bot; [|eauto|].

@@ -52,14 +52,14 @@ Module MemorySplit.
   Lemma remove_promise_remove
         promises0 mem0 loc from to val1 released1 msg2 promises2
         (PROMISES: Memory.le promises0 mem0)
-        (MSG_LE: Message.le msg2 (Message.full val1 released1))
-        (MSG_WF1: Message.wf (Message.full val1 released1))
+        (MSG_LE: Message.le msg2 (Message.concrete val1 released1))
+        (MSG_WF1: Message.wf (Message.concrete val1 released1))
         (MSG_WF2: Message.wf msg2)
         (MSG_TS: Memory.message_to msg2 loc to)
         (TS: Time.lt from to)
-        (REMOVE: Memory.remove promises0 loc from to (Message.full val1 released1) promises2):
+        (REMOVE: Memory.remove promises0 loc from to (Message.concrete val1 released1) promises2):
     exists promises1' mem1',
-      <<PROMISE: Memory.promise promises0 mem0 loc from to msg2 promises1' mem1' (Memory.op_kind_lower (Message.full val1 released1))>> /\
+      <<PROMISE: Memory.promise promises0 mem0 loc from to msg2 promises1' mem1' (Memory.op_kind_lower (Message.concrete val1 released1))>> /\
       <<REMOVE: Memory.remove promises1' loc from to msg2 promises2>>.
   Proof.
     exploit remove_lower_remove; eauto. i. des.
@@ -104,13 +104,13 @@ Module MemorySplit.
         promises3
         (TS12: Time.lt ts1 ts2)
         (TS23: Time.lt ts2 ts3)
-        (MSG_WF2: Message.wf (Message.full val2 released2))
-        (MSG_TS2: Memory.message_to (Message.full val2 released2) loc ts2)
+        (MSG_WF2: Message.wf (Message.concrete val2 released2))
+        (MSG_TS2: Memory.message_to (Message.concrete val2 released2) loc ts2)
         (LE: Memory.le promises0 mem0)
         (REMOVE: Memory.remove promises0 loc ts1 ts3 msg3 promises3):
     exists promises1 promises2 mem1,
-      <<STEP1: Memory.promise promises0 mem0 loc ts1 ts2 (Message.full val2 released2) promises1 mem1 (Memory.op_kind_split ts3 msg3)>> /\
-      <<STEP2: Memory.remove promises1 loc ts1 ts2 (Message.full val2 released2) promises2>> /\
+      <<STEP1: Memory.promise promises0 mem0 loc ts1 ts2 (Message.concrete val2 released2) promises1 mem1 (Memory.op_kind_split ts3 msg3)>> /\
+      <<STEP2: Memory.remove promises1 loc ts1 ts2 (Message.concrete val2 released2) promises2>> /\
       <<STEP3: Memory.remove promises2 loc ts2 ts3 msg3 promises3>>.
   Proof.
     exploit Memory.remove_get0; eauto. i. des.

@@ -547,30 +547,30 @@ Proof.
         eapply List.Forall_forall in EVENTS; eauto. des. auto.
 Qed.
 
-Lemma future_max_full_ts mem0 mem1
+Lemma future_max_concrete_ts mem0 mem1
       (FUTURE: Memory.future mem0 mem1)
       loc max0 max1
-      (MAX0: Memory.max_full_ts mem0 loc max0)
-      (MAX1: Memory.max_full_ts mem1 loc max1)
+      (MAX0: Memory.max_concrete_ts mem0 loc max0)
+      (MAX1: Memory.max_concrete_ts mem1 loc max1)
   :
     Time.le max0 max1.
 Proof.
   inv MAX0. des.
   eapply Memory.future_get1 in GET; eauto. des. inv MSG_LE.
-  eapply Memory.max_full_ts_spec in GET0; eauto.
+  eapply Memory.max_concrete_ts_spec in GET0; eauto.
   des; eauto.
 Qed.
 
-Lemma max_full_ts_exists mem0
+Lemma max_concrete_ts_exists mem0
       loc to from val released
-      (GET: Memory.get loc to mem0 = Some (from, Message.full val released))
+      (GET: Memory.get loc to mem0 = Some (from, Message.concrete val released))
   :
-    exists max, <<MAX: Memory.max_full_ts mem0 loc max>>.
+    exists max, <<MAX: Memory.max_concrete_ts mem0 loc max>>.
 Proof.
   hexploit (@cell_elements_greatest
               (mem0 loc)
               (fun ts => exists from' val' released',
-                   Memory.get loc ts mem0 = Some (from', Message.full val' released'))).
+                   Memory.get loc ts mem0 = Some (from', Message.concrete val' released'))).
   i. des.
   - exists to0. econs; eauto.
   - exfalso. eapply EMPTY; eauto.
@@ -583,9 +583,9 @@ Lemma concrete_covered_same prom mem0 mem1
 Proof.
   i. inv PR. dup MAX. inv MAX0. des.
   eapply Memory.future_get1 in GET; eauto. des. inv MSG_LE.
-  eapply max_full_ts_exists in GET0; eauto. des.
+  eapply max_concrete_ts_exists in GET0; eauto. des.
   econs; eauto. etrans; eauto.
-  eapply future_max_full_ts; eauto.
+  eapply future_max_concrete_ts; eauto.
 Qed.
 
 Definition other_promises (c_tgt: Configuration.t) (tid: Ident.t) :=
@@ -1047,7 +1047,7 @@ Proof.
   - assert (exists loc to from val released,
                (<<OPROMS: other_promises c_tgt0 tid loc to>>) /\
                (<<READING: is_reading _ th1.(Thread.state) loc Ordering.seqcst>>) /\
-               (<<CONCRETE: Memory.get loc to th1.(Thread.memory) = Some (from, Message.full val released)>>)).
+               (<<CONCRETE: Memory.get loc to th1.(Thread.memory) = Some (from, Message.concrete val released)>>)).
     { unfold no_read_msgs in RACE. des_ifs.
       - apply NNPP in RACE. inv STEP. inv STEP1; inv STEP.
         inv LOCAL0. inv LOCAL1.
@@ -1110,7 +1110,7 @@ Lemma aupates_already_updated_unreserved tid mlast spaces updates aupdates c_src
         (<<TS: Time.lt ts to>>) /\
         (<<UNCH: unchangable mem lc0.(Local.promises) loc to ts msg>>)) \/
     ((<<LATSEST: Memory.latest_reserve loc lc0.(Local.promises) (Configuration.memory c_tgt0)>>) /\
-     (<<MAX: Memory.max_full_ts (Configuration.memory c_tgt0) loc ts>>)).
+     (<<MAX: Memory.max_concrete_ts (Configuration.memory c_tgt0) loc ts>>)).
 Proof.
   dup SIM. inv SIM. inv WFTGT. inv WF.
   inv AUPDATES. exploit THREADS; eauto. intros [].
@@ -1121,9 +1121,9 @@ Proof.
   destruct (classic ((latest_other_reserves lc0.(Local.promises) c_tgt0.(Configuration.memory)) loc to)).
   - right. inv H. unfold Memory.latest_reserve. rewrite NONE. split; auto.
     exploit THREADS0; eauto. intros LCWF. inv LCWF. eapply PROMISES in GET.
-    inv MEM. exploit Memory.max_full_ts_exists; eauto.
+    inv MEM. exploit Memory.max_concrete_ts_exists; eauto.
     instantiate (1:=loc). i. des.
-    exploit max_full_ts_max_ts; eauto. i. des; clarify.
+    exploit max_concrete_ts_max_ts; eauto. i. des; clarify.
     inv x0. des. unfold Memory.get in GET0. rewrite GET0 in *. clarify.
   - left. exploit THREADS0; eauto. intros LCWF. inv LCWF. dup GET. eapply PROMISES in GET.
     inv FORGET. esplits; eauto.
@@ -1475,7 +1475,7 @@ Proof.
       { eapply GET0. }
       { eapply GET. }
       i. des; clarify.
-      * exploit max_full_ts_max_ts; try eassumption.
+      * exploit max_concrete_ts_max_ts; try eassumption.
         i. des; clarify.
         { inv MAX. des. unfold Memory.get in GET. clarify. }
         { inv ITV. inv ITV0. ss.
@@ -1500,8 +1500,8 @@ Lemma sim_pf_read_promise_race_unreserved
                     th0')
       e' th1' th2'
       (STEP': AThread.step_allpf e' th0' th1')
-      (PREDS': P <1= (no_acq_update_on (fun loc to => Memory.latest_reserve loc lc0.(Local.promises) c_tgt0.(Configuration.memory) /\ Memory.max_full_ts c_tgt0.(Configuration.memory) loc to)))
-      (PRED': no_acq_update_on (fun loc to => Memory.latest_reserve loc lc0.(Local.promises) c_tgt0.(Configuration.memory) /\ Memory.max_full_ts c_tgt0.(Configuration.memory) loc to) e')
+      (PREDS': P <1= (no_acq_update_on (fun loc to => Memory.latest_reserve loc lc0.(Local.promises) c_tgt0.(Configuration.memory) /\ Memory.max_concrete_ts c_tgt0.(Configuration.memory) loc to)))
+      (PRED': no_acq_update_on (fun loc to => Memory.latest_reserve loc lc0.(Local.promises) c_tgt0.(Configuration.memory) /\ Memory.max_concrete_ts c_tgt0.(Configuration.memory) loc to) e')
       (RACE': ~ ((no_update_on (other_updates tid updates aupdates))
                    (* /1\ (no_acq_update_on (other_union tid aupdates)) *)
                    /1\ (no_read_msgs (((other_promises c_tgt0 tid) -2 (latest_other_reserves lc0.(Local.promises) c_tgt0.(Configuration.memory)))))) e')
@@ -1539,7 +1539,7 @@ Proof.
   assert (exists e th1 th2,
              (<<STEPS: rtc (tau (@pred_step ((no_update_on (other_updates tid updates aupdates))
                                                /1\
-                                               (no_acq_update_on (fun loc to => Memory.latest_reserve loc lc0.(Local.promises) c_tgt0.(Configuration.memory) /\ Memory.max_full_ts c_tgt0.(Configuration.memory) loc to))
+                                               (no_acq_update_on (fun loc to => Memory.latest_reserve loc lc0.(Local.promises) c_tgt0.(Configuration.memory) /\ Memory.max_concrete_ts c_tgt0.(Configuration.memory) loc to))
                                                /1\ (no_read_msgs ((other_promises c_tgt0 tid) -2 (latest_other_reserves lc0.(Local.promises) c_tgt0.(Configuration.memory))))) lang))
                            (Thread.mk _ st0 lc0 c_tgt0.(Configuration.sc) mem_unreserved)
                            th1>>) /\
@@ -1547,7 +1547,7 @@ Proof.
              (<<STEP: AThread.step_allpf e th1 th2>>) /\
              (<<RACE: ~ ((no_update_on (other_updates tid updates aupdates))
                            /1\ (no_read_msgs ((other_promises c_tgt0 tid) -2 (latest_other_reserves lc0.(Local.promises) c_tgt0.(Configuration.memory))))) e>>) /\
-             (<<NOACQU: no_acq_update_on (fun loc to => Memory.latest_reserve loc lc0.(Local.promises) c_tgt0.(Configuration.memory) /\ Memory.max_full_ts c_tgt0.(Configuration.memory) loc to) e>>)).
+             (<<NOACQU: no_acq_update_on (fun loc to => Memory.latest_reserve loc lc0.(Local.promises) c_tgt0.(Configuration.memory) /\ Memory.max_concrete_ts c_tgt0.(Configuration.memory) loc to) e>>)).
   { hexploit (@hold_or_not P ((no_update_on (other_updates tid updates aupdates))
                                 /1\ (no_read_msgs ((other_promises c_tgt0 tid) -2 (latest_other_reserves lc0.(Local.promises) c_tgt0.(Configuration.memory))))));
       try apply STEPS0'; eauto.
@@ -1653,7 +1653,7 @@ Proof.
                (<<OPROMS: other_promises c_tgt0 tid loc to>>) /\
                (<<NOTLATEST: ~ latest_other_reserves (Local.promises lc0) (Configuration.memory c_tgt0) loc to>>) /\
                (<<READING: is_reading _ th1.(Thread.state) loc Ordering.seqcst>>) /\
-               (<<CONCRETE: Memory.get loc to th1.(Thread.memory) = Some (from, Message.full val released)>>)).
+               (<<CONCRETE: Memory.get loc to th1.(Thread.memory) = Some (from, Message.concrete val released)>>)).
     { unfold no_read_msgs in RACE. des_ifs.
       - apply NNPP in RACE. des. inv STEP. inv STEP1; inv STEP.
         inv LOCAL0. inv LOCAL1.
@@ -1705,7 +1705,7 @@ Proof.
 Qed.
 
 
-Lemma sim_pf_step_minus_full
+Lemma sim_pf_step_minus_concrete
       c_src0 c_tgt0 c_tgt1 tid e mlast spaces updates aupdates
       (SIM: sim_pf_minus_one tid mlast spaces updates aupdates c_src0 c_tgt0)
       (STEP: Configuration.step e tid c_tgt0 c_tgt1)
@@ -1821,7 +1821,7 @@ Lemma sim_pf_step_pf_consistent
   :
     (exists st_src lc_src max U AU,
       (<<FIND: IdentMap.find tid c_src0.(Configuration.threads) = Some (existT _ lang st_src, lc_src)>>) /\
-      (<<MAX: Memory.max_full_timemap c_tgt0.(Configuration.memory) max>>) /\
+      (<<MAX: Memory.max_concrete_timemap c_tgt0.(Configuration.memory) max>>) /\
       (<<CONSISTENT: pf_consistent_drf_src
                        (Thread.mk _ st_src lc_src c_src0.(Configuration.sc) c_src0.(Configuration.memory))
                        (concrete_covered lc_tgt.(Local.promises) c_tgt0.(Configuration.memory))
@@ -1838,7 +1838,7 @@ Proof.
   inv WF. inv WF0. exploit THREADS; eauto. intros LOCAL.
   clear DISJOINT THREADS.
 
-  exploit Memory.max_full_timemap_exists.
+  exploit Memory.max_concrete_timemap_exists.
   { inv MEM. eauto. } intros [max MAX].
 
   hexploit (forget_exists
@@ -1879,7 +1879,7 @@ Proof.
     apply NNPP. ii.
     exploit sim_pf_read_promise_race_unreserved; try eassumption; ss.
     - eapply pred_steps_traced_step2; eauto.
-      instantiate (1:=no_acq_update_on (fun loc to => Memory.latest_reserve loc lc_tgt.(Local.promises) c_tgt0.(Configuration.memory) /\ Memory.max_full_ts c_tgt0.(Configuration.memory) loc to)).
+      instantiate (1:=no_acq_update_on (fun loc to => Memory.latest_reserve loc lc_tgt.(Local.promises) c_tgt0.(Configuration.memory) /\ Memory.max_concrete_ts c_tgt0.(Configuration.memory) loc to)).
       apply List.Forall_forall. i. destruct x.
       eapply List.Forall_forall in TRACE; cycle 1.
       + apply List.in_or_app. left. eauto.
@@ -1927,7 +1927,7 @@ Proof.
   { unfold pf_consistent_drf_src.
     exists MU_src, th_src', tr_src, max'. splits; auto.
     - i. inv PR.
-      exploit Memory.max_full_ts_inj.
+      exploit Memory.max_concrete_ts_inj.
       { eapply MAX0. }
       { eapply MAX. } i. clarify.
     - unfold U_src, AU_src, MU_src. ii. des. apply GAP.

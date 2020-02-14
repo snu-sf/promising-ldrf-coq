@@ -741,9 +741,9 @@ Section MEMORYLEMMAS.
     - left. auto.
   Qed.
 
-  Lemma max_full_timemap_get mem tm loc to from val released
-        (MAX: Memory.max_full_timemap mem tm)
-        (GET: Memory.get loc to mem = Some (from, Message.full val released))
+  Lemma max_concrete_timemap_get mem tm loc to from val released
+        (MAX: Memory.max_concrete_timemap mem tm)
+        (GET: Memory.get loc to mem = Some (from, Message.concrete val released))
     :
       Time.le to (tm loc).
   Proof.
@@ -874,7 +874,7 @@ Section MEMORYLEMMAS.
         (TO: Time.le (View.rlx (View.unwrap released) loc) to1)
         (FROMTO: Time.lt from1 to1)
         (NOATTATCH: ~ attatched_time mem1 loc to1)
-        (MSGWF: Message.wf (Message.full val released))
+        (MSGWF: Message.wf (Message.concrete val released))
     :
       exists mem2,
         (<<WRITE: Memory.write prom mem1 loc from1 to1 val released prom mem2 Memory.op_kind_add>>).
@@ -925,7 +925,7 @@ Section MEMORYLEMMAS.
       (<<TLE: Time.le
                 (View.rlx (View.unwrap (TView.write_released v sc loc to releasedm ord)) loc) to>>) /\
       (<<FROMTO: Time.lt from to>>) /\
-      (<<MSGWF: Message.wf (Message.full val (TView.write_released v sc loc to releasedm ord))>>) /\
+      (<<MSGWF: Message.wf (Message.concrete val (TView.write_released v sc loc to releasedm ord))>>) /\
       (<<NOATTATCH: forall (KIND: kind = Memory.op_kind_add), ~ attatched_time mem_tgt loc to>>)
   .
   Proof.
@@ -1190,8 +1190,8 @@ Section MEMORYLEMMAS.
       erewrite Memory.remove_o; cycle 1; eauto. des_ifs; eauto.
   Qed.
 
-  Lemma max_full_ts_le_max_ts mem loc ts
-        (MAX: Memory.max_full_ts mem loc ts)
+  Lemma max_concrete_ts_le_max_ts mem loc ts
+        (MAX: Memory.max_concrete_ts mem loc ts)
     :
       Time.le ts (Memory.max_ts loc mem).
   Proof.
@@ -1369,13 +1369,13 @@ Section PROMISED.
   Inductive concrete_promised (mem: Memory.t) (loc: Loc.t) (to: Time.t) : Prop :=
   | concrete_promised_intro
       from val released
-      (GET: Memory.get loc to mem = Some (from, Message.full val released))
+      (GET: Memory.get loc to mem = Some (from, Message.concrete val released))
   .
 
   Inductive concrete_covered (prom mem: Memory.t) (loc: Loc.t) (to: Time.t): Prop :=
   | concrete_covered_intro
       max
-      (MAX: Memory.max_full_ts mem loc max)
+      (MAX: Memory.max_concrete_ts mem loc max)
       (COVERED: covered loc to prom)
       (TS: Time.le to max)
   .
@@ -1865,8 +1865,8 @@ Definition no_reserves (proms: Memory.t): Prop :=
 
 Definition memory_concrete_le (lhs rhs: Memory.t): Prop :=
   forall loc to from val released
-         (GET: Memory.get loc to lhs = Some (from, Message.full val released)),
-    Memory.get loc to rhs = Some (from, Message.full val released).
+         (GET: Memory.get loc to lhs = Some (from, Message.concrete val released)),
+    Memory.get loc to rhs = Some (from, Message.concrete val released).
 Global Program Instance concrete_le_PreOrder: PreOrder memory_concrete_le.
 Next Obligation. ii. ss. Qed.
 Next Obligation. ii. eauto. Qed.

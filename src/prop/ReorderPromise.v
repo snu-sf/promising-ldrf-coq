@@ -59,15 +59,15 @@ Lemma reorder_promise_promise_lower_None
       loc1 from1 to1 msg1 kind1
       loc2 from2 to2 val2 kind2
       (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 msg1 lc1 mem1 kind1)
-      (STEP2: Local.promise_step lc1 mem1 loc2 from2 to2 (Message.full val2 None) lc2 mem2 kind2)
+      (STEP2: Local.promise_step lc1 mem1 loc2 from2 to2 (Message.concrete val2 None) lc2 mem2 kind2)
       (LOCAL0: Local.wf lc0 mem0)
       (MEM0: Memory.closed mem0)
       (KIND1: Memory.op_kind_is_cancel kind1 = false)
       (KIND2: Memory.op_kind_is_lower kind2 = true):
-  (loc1 = loc2 /\ from1 = from2 /\ to1 = to2 /\ Message.le (Message.full val2 None) msg1 /\ kind2 = Memory.op_kind_lower msg1 /\
-   exists kind1', <<STEP: Local.promise_step lc0 mem0 loc1 from1 to1 (Message.full val2 None) lc2 mem2 kind1'>>) \/
+  (loc1 = loc2 /\ from1 = from2 /\ to1 = to2 /\ Message.le (Message.concrete val2 None) msg1 /\ kind2 = Memory.op_kind_lower msg1 /\
+   exists kind1', <<STEP: Local.promise_step lc0 mem0 loc1 from1 to1 (Message.concrete val2 None) lc2 mem2 kind1'>>) \/
   (exists lc1' mem1' from2' kind1',
-      <<STEP1: Local.promise_step lc0 mem0 loc2 from2' to2 (Message.full val2 None) lc1' mem1' kind2>> /\
+      <<STEP1: Local.promise_step lc0 mem0 loc2 from2' to2 (Message.concrete val2 None) lc1' mem1' kind2>> /\
       <<STEP2: Local.promise_step lc1' mem1' loc1 from1 to1 msg1 lc2 mem2 kind1'>>).
 Proof.
   inv STEP1. inv STEP2. ss.
@@ -205,9 +205,9 @@ Lemma reorder_promise_promise
       loc1 from1 to1 msg1 kind1
       loc2 from2 to2 val2 released2 kind2
       (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 msg1 lc1 mem1 kind1)
-      (STEP2: Local.promise_step lc1 mem1 loc2 from2 to2 (Message.full val2 released2) lc2 mem2 kind2)
+      (STEP2: Local.promise_step lc1 mem1 loc2 from2 to2 (Message.concrete val2 released2) lc2 mem2 kind2)
       (REL_CLOSED: forall promises1' mem1' kind1'
-                     (PROMISE1: Memory.promise (Local.promises lc0) mem0 loc2 from2 to2 (Message.full val2 released2) promises1' mem1' kind1'),
+                     (PROMISE1: Memory.promise (Local.promises lc0) mem0 loc2 from2 to2 (Message.concrete val2 released2) promises1' mem1' kind1'),
           Memory.closed_opt_view released2 mem1')
       (LOCAL0: Local.wf lc0 mem0)
       (CLOSED0: Memory.closed mem0)
@@ -221,10 +221,10 @@ Lemma reorder_promise_promise
                  (LOC: loc1 = loc2)
                  (KIND1: kind1 = Memory.op_kind_add)
                  (KIND2: kind2 = Memory.op_kind_add)
-                 (MSG1: msg1 = Message.full val released),
+                 (MSG1: msg1 = Message.concrete val released),
                Time.lt to2 to1):
   exists lc1' mem1' kind2',
-    <<STEP1: Local.promise_step lc0 mem0 loc2 from2 to2 (Message.full val2 released2) lc1' mem1' kind2'>> /\
+    <<STEP1: Local.promise_step lc0 mem0 loc2 from2 to2 (Message.concrete val2 released2) lc1' mem1' kind2'>> /\
     <<STEP2: __guard__
                ((lc2, mem2, loc1, from1, to1) = (lc1', mem1', loc2, from2, to2) \/
                 (exists from1' kind1',
@@ -244,7 +244,7 @@ Proof.
       exploit MemoryReorder.add_add; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       exploit MemoryReorder.add_add; try exact MEM; try exact MEM0; eauto. i. des.
       esplits.
-      + cut (Memory.promise (Local.promises lc0) mem0 loc2 from2 to2 (Message.full val2 released2)
+      + cut (Memory.promise (Local.promises lc0) mem0 loc2 from2 to2 (Message.concrete val2 released2)
                             mem1' mem1'0 Memory.op_kind_add).
         { i. econs; eauto. }
         econs; eauto; try congr.
@@ -266,7 +266,7 @@ Proof.
       + subst. inv RESERVE0.
         exploit MemoryReorder.add_split; try exact MEM; try exact MEM0; eauto. i. des; [|congr].
         esplits.
-        * cut (Memory.promise (Local.promises lc0) mem0 loc2 from2 to2 (Message.full val' released')
+        * cut (Memory.promise (Local.promises lc0) mem0 loc2 from2 to2 (Message.concrete val' released')
                               mem1' mem1'0 Memory.op_kind_add).
           { i. econs; eauto. }
           econs; eauto; try congr.
@@ -367,7 +367,7 @@ Proof.
       exploit MemoryReorder.split_add; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       exploit MemoryReorder.split_add; try exact MEM; try exact MEM0; eauto. i. des.
       esplits.
-      + cut (Memory.promise (Local.promises lc0) mem0 loc2 from2 to2 (Message.full val2 released2)
+      + cut (Memory.promise (Local.promises lc0) mem0 loc2 from2 to2 (Message.concrete val2 released2)
                             mem1' mem1'0 Memory.op_kind_add).
         { i. econs; eauto. }
         econs; eauto; try congr.
@@ -447,7 +447,7 @@ Proof.
       exploit MemoryReorder.lower_add; try exact PROMISES; try exact PROMISES0; eauto. i. des.
       exploit MemoryReorder.lower_add; try exact MEM; try exact MEM0; eauto. i. des.
       esplits.
-      + cut (Memory.promise (Local.promises lc0) mem0 loc2 from2 to2 (Message.full val2 released2)
+      + cut (Memory.promise (Local.promises lc0) mem0 loc2 from2 to2 (Message.concrete val2 released2)
                             mem1' mem1'0 Memory.op_kind_add).
         { i. econs; eauto. }
         econs; eauto; try congr.
@@ -545,7 +545,7 @@ Lemma promise_step_nonsynch_loc_inv
       lc1 mem1 loc from to msg lc2 mem2 kind l
       (WF1: Local.wf lc1 mem1)
       (STEP: Local.promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
-      (NONPF: Memory.op_kind_is_lower_full kind = false \/ ~ Message.is_released_none msg)
+      (NONPF: Memory.op_kind_is_lower_concrete kind = false \/ ~ Message.is_released_none msg)
       (NONSYNCH: Memory.nonsynch_loc l lc2.(Local.promises)):
   Memory.nonsynch_loc l lc1.(Local.promises).
 Proof.
@@ -579,7 +579,7 @@ Lemma reorder_promise_write
       loc2 from2 to2 val2 releasedm2 released2 ord2 kind2
       (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 msg1 lc1 mem1 kind1)
       (STEP2: Local.write_step lc1 sc0 mem1 loc2 from2 to2 val2 releasedm2 released2 ord2 lc2 sc2 mem2 kind2)
-      (NONPF: Memory.op_kind_is_lower_full kind1 = false \/ ~ Message.is_released_none msg1)
+      (NONPF: Memory.op_kind_is_lower_concrete kind1 = false \/ ~ Message.is_released_none msg1)
       (REL_WF: View.opt_wf releasedm2)
       (REL_CLOSED: Memory.closed_opt_view releasedm2 mem0)
       (LOCAL0: Local.wf lc0 mem0)
@@ -595,7 +595,7 @@ Lemma reorder_promise_write
                  (LOC: loc1 = loc2)
                  (KIND1: kind1 = Memory.op_kind_add)
                  (KIND2: kind2 = Memory.op_kind_add)
-                 (MSG1: msg1 = Message.full val released),
+                 (MSG1: msg1 = Message.concrete val released),
                Time.lt to2 to1):
   exists kind2' lc1' mem1',
     <<STEP1: Local.write_step lc0 sc0 mem0 loc2 from2 to2 val2 releasedm2 released2 ord2 lc1' sc2 mem1' kind2'>> /\
@@ -644,7 +644,7 @@ Lemma reorder_promise_write'
       loc2 from2 to2 val2 releasedm2 released2 ord2 kind2
       (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 msg1 lc1 mem1 kind1)
       (STEP2: Local.write_step lc1 sc0 mem1 loc2 from2 to2 val2 releasedm2 released2 ord2 lc2 sc2 mem2 kind2)
-      (NONPF: Memory.op_kind_is_lower_full kind1 = false \/ ~ Message.is_released_none msg1)
+      (NONPF: Memory.op_kind_is_lower_concrete kind1 = false \/ ~ Message.is_released_none msg1)
       (REL_WF: View.opt_wf releasedm2)
       (REL_CLOSED: Memory.closed_opt_view releasedm2 mem0)
       (LOCAL0: Local.wf lc0 mem0)

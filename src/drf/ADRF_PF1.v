@@ -511,9 +511,9 @@ Section SHORTERMEMORY.
   Inductive shorter_memory (mem_src mem_tgt: Memory.t): Prop :=
   | shorter_memory_intro
       (COMPLETE: forall loc to from_tgt val released
-                        (GET: Memory.get loc to mem_tgt = Some (from_tgt, Message.full val released)),
+                        (GET: Memory.get loc to mem_tgt = Some (from_tgt, Message.concrete val released)),
           exists from_src,
-            (<<GET: Memory.get loc to mem_src = Some (from_src, Message.full val released)>>))
+            (<<GET: Memory.get loc to mem_src = Some (from_src, Message.concrete val released)>>))
       (COVER: forall l t (COV: covered l t mem_src), covered l t mem_tgt)
   .
   Global Program Instance shorter_memory_PreOrder: PreOrder shorter_memory.
@@ -1287,10 +1287,10 @@ Proof.
   eapply memory_reserve_wf_tsteps in STEPS; eauto.
 Qed.
 
-Lemma not_latest_reserve_le_max_full_ts loc mem ts to from msg
+Lemma not_latest_reserve_le_max_concrete_ts loc mem ts to from msg
       (RESERVEWF : memory_reserve_wf mem)
       (INHABITED : Memory.inhabited mem)
-      (MAX : Memory.max_full_ts mem loc ts)
+      (MAX : Memory.max_concrete_ts mem loc ts)
       (GET: Memory.get loc to mem = Some (from, msg))
   :
     (<<TLE: Time.le to ts>>) \/
@@ -1336,27 +1336,27 @@ Proof.
           - eapply Memory.get_ts in GET1. des; clarify. }
 Qed.
 
-Lemma max_ts_reserve_from_full_ts mem0 loc from
+Lemma max_ts_reserve_from_concrete_ts mem0 loc from
       (INHABITED: Memory.inhabited mem0)
       (RESERVEWF0: memory_reserve_wf mem0)
       (GET: Memory.get loc (Memory.max_ts loc mem0) mem0 = Some (from, Message.reserve))
   :
-    Memory.max_full_ts mem0 loc from.
+    Memory.max_concrete_ts mem0 loc from.
 Proof.
-  exploit Memory.max_full_ts_exists; eauto. intros [max MAX].
-  dup GET. eapply not_latest_reserve_le_max_full_ts in GET; eauto.
+  exploit Memory.max_concrete_ts_exists; eauto. intros [max MAX].
+  dup GET. eapply not_latest_reserve_le_max_concrete_ts in GET; eauto.
   des; clarify. exfalso.
-  exploit Memory.max_full_ts_spec; eauto. i. des.
+  exploit Memory.max_concrete_ts_spec; eauto. i. des.
   exploit TimeFacts.antisym.
   { eapply TLE. }
   { eapply Memory.max_ts_spec; eauto. }
   i. clarify.
 Qed.
 
-Lemma max_full_ts_max_ts loc mem ts
+Lemma max_concrete_ts_max_ts loc mem ts
       (RESERVEWF : memory_reserve_wf mem)
       (INHABITED : Memory.inhabited mem)
-      (MAX : Memory.max_full_ts mem loc ts)
+      (MAX : Memory.max_concrete_ts mem loc ts)
   :
     (<<FULL: ts = Memory.max_ts loc mem>>) \/
     ((<<TLT: Time.lt ts (Memory.max_ts loc mem)>>) /\
@@ -1364,7 +1364,7 @@ Lemma max_full_ts_max_ts loc mem ts
 Proof.
   dup MAX. inv MAX. des.
   eapply Memory.max_ts_spec in GET. des.
-  dup GET0. eapply not_latest_reserve_le_max_full_ts in GET0; eauto.
+  dup GET0. eapply not_latest_reserve_le_max_concrete_ts in GET0; eauto.
   des; clarify.
   - left. eapply TimeFacts.antisym; eauto.
   - right. split; eauto. dup GET1.
@@ -1711,7 +1711,7 @@ Section SIMPF.
 
   Lemma sim_pf_max_timemap idents mlast spaces updates aupdates c_src c_tgt max
         (SIM: sim_pf idents mlast spaces updates aupdates c_src c_tgt)
-        (MAX: Memory.max_full_timemap c_tgt.(Configuration.memory) max)
+        (MAX: Memory.max_concrete_timemap c_tgt.(Configuration.memory) max)
     :
       TimeMap.le (Memory.max_timemap c_src.(Configuration.memory)) max.
   Proof.
@@ -1723,7 +1723,7 @@ Section SIMPF.
       - ii. inv H. destruct st as [lang st]. inv PROMISED. destruct msg.
         inv WF. exploit THREADS0; eauto. intros []. erewrite BOT in GET. clarify. }
     i. des. eapply forget_memory_get in GET; eauto. des. destruct msg.
-    - eapply Memory.max_full_ts_spec in GET0; eauto. des. auto.
+    - eapply Memory.max_concrete_ts_spec in GET0; eauto. des. auto.
     - exfalso. eapply NOT.
       eapply RESERVERTGT in GET0. des. destruct st as [lang st].
       econs; eauto. econs; eauto.
@@ -1732,9 +1732,9 @@ Section SIMPF.
   Lemma pf_sim_memory_exists_or_blank L mem_src mem_tgt
         (MEM: pf_sim_memory L mem_src mem_tgt)
         loc to from val released
-        (GET: Memory.get loc to mem_tgt = Some (from, Message.full val released))
+        (GET: Memory.get loc to mem_tgt = Some (from, Message.concrete val released))
     :
-      (exists from', (<<GET: Memory.get loc to mem_src = Some (from', Message.full val released)>>)) \/
+      (exists from', (<<GET: Memory.get loc to mem_src = Some (from', Message.concrete val released)>>)) \/
       (<<BLANK: forall ts (ITV: Interval.mem (from, to) ts),
           (<<NCOVER: ~ covered loc ts mem_src>>) /\ (<<FORGET: L loc to>>)>>).
   Proof.
@@ -1770,9 +1770,9 @@ Inductive diff_after_promises (caps: Loc.t -> option (Time.t * Time.t * Message.
         (<<PROMGET: Memory.get loc to prom = None>>) /\
         (<<SRCGET: forall (NONE: Memory.get loc to mem0 = None),
             exists from' to' val released,
-              (<<PROM: Memory.get loc to' prom = Some (from', Message.full val released)>>)>>) /\
+              (<<PROM: Memory.get loc to' prom = Some (from', Message.concrete val released)>>)>>) /\
         (<<PROM: forall from' to' val released
-                        (PROM: Memory.get loc to' prom = Some (from', Message.full val released)),
+                        (PROM: Memory.get loc to' prom = Some (from', Message.concrete val released)),
             (<<TLT: Time.lt to' to>>) /\ (<<GET: Memory.get loc to mem0 = None>>)>>))
 .
 
@@ -1792,7 +1792,7 @@ Lemma diff_after_promise_promise caps prom0 mem_src0 mem_tgt0
       (DIFF: diff_after_promises caps prom0 mem_src0 mem_tgt0)
       (MLE: Memory.le prom0 mem_src0)
       (PROMISE: AMemory.promise prom0 mem_tgt0 loc from to msg prom1 mem_tgt1 kind)
-      (PF: (Memory.op_kind_is_lower_full kind && Message.is_released_none msg
+      (PF: (Memory.op_kind_is_lower_concrete kind && Message.is_released_none msg
             || Memory.op_kind_is_cancel kind)%bool)
   :
     exists mem_src1,

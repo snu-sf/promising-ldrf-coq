@@ -971,9 +971,9 @@ Module MemoryReorder.
         promises1 mem1
         promises2 mem2
         (SPLIT1: Memory.promise promises0 mem0 loc ts1 ts3 msg3 promises1 mem1 (Memory.op_kind_split ts4 msg4))
-        (SPLIT2: Memory.promise promises1 mem1 loc ts1 ts2 (Message.full val2 released2) promises2 mem2 (Memory.op_kind_split ts3 msg3)):
+        (SPLIT2: Memory.promise promises1 mem1 loc ts1 ts2 (Message.concrete val2 released2) promises2 mem2 (Memory.op_kind_split ts3 msg3)):
     exists promises1' mem1',
-      <<SPLIT1: Memory.promise promises0 mem0 loc ts1 ts2 (Message.full val2 released2) promises1' mem1' (Memory.op_kind_split ts4 msg4)>> /\
+      <<SPLIT1: Memory.promise promises0 mem0 loc ts1 ts2 (Message.concrete val2 released2) promises1' mem1' (Memory.op_kind_split ts4 msg4)>> /\
       <<SPLIT2: Memory.promise promises1' mem1' loc ts2 ts3 msg3 promises2 mem2 (Memory.op_kind_split ts4 msg4)>>.
   Proof.
     assert (LOCTS: (loc, ts4) <> (loc, ts3)).
@@ -991,9 +991,9 @@ Module MemoryReorder.
         promises1 mem1
         promises2 mem2
         (LOWER1: Memory.promise promises0 mem0 loc ts1 ts3 msg3 promises1 mem1 (Memory.op_kind_lower msg0))
-        (SPLIT2: Memory.promise promises1 mem1 loc ts1 ts2 (Message.full val2 released2) promises2 mem2 (Memory.op_kind_split ts3 msg3)):
+        (SPLIT2: Memory.promise promises1 mem1 loc ts1 ts2 (Message.concrete val2 released2) promises2 mem2 (Memory.op_kind_split ts3 msg3)):
     exists promises1' mem1',
-      <<SPLIT1: Memory.promise promises0 mem0 loc ts1 ts2 (Message.full val2 released2) promises1' mem1' (Memory.op_kind_split ts3 msg0)>> /\
+      <<SPLIT1: Memory.promise promises0 mem0 loc ts1 ts2 (Message.concrete val2 released2) promises1' mem1' (Memory.op_kind_split ts3 msg0)>> /\
       <<LOWER2: Memory.promise promises1' mem1' loc ts2 ts3 msg3 promises2 mem2 (Memory.op_kind_lower msg0)>>.
   Proof.
     inv LOWER1. inv SPLIT2.

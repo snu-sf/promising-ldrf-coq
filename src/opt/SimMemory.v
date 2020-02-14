@@ -28,10 +28,10 @@ Set Implicit Arguments.
 
 
 Inductive sim_message: forall (msg_src msg_tgt: Message.t), Prop :=
-| sim_message_full
+| sim_message_concrete
     val released_src released_tgt
     (RELEASED: View.opt_le released_src released_tgt):
-    sim_message (Message.full val released_src) (Message.full val released_tgt)
+    sim_message (Message.concrete val released_src) (Message.concrete val released_tgt)
 | sim_message_reserve:
     sim_message Message.reserve Message.reserve
 .
@@ -46,9 +46,9 @@ Next Obligation.
 Qed.
 
 Inductive message_same_kind: forall (msg_src msg_tgt: Message.t), Prop :=
-| message_same_kind_full
+| message_same_kind_concrete
     val_src val_tgt released_src released_tgt:
-    message_same_kind (Message.full val_src released_src) (Message.full val_tgt released_tgt)
+    message_same_kind (Message.concrete val_src released_src) (Message.concrete val_tgt released_tgt)
 | same_message_kine_reserve:
     message_same_kind Message.reserve Message.reserve
 .
@@ -218,14 +218,14 @@ Proof.
     inv ITV. ss. etrans; eauto.
 Qed.
 
-Lemma sim_memory_max_full_ts
+Lemma sim_memory_max_concrete_ts
       mem_src mem_tgt
       loc mts_src mts_tgt
       (SIM: sim_memory mem_src mem_tgt)
       (CLOSED_SRC: Memory.closed mem_src)
       (CLOSED_TGT: Memory.closed mem_tgt)
-      (MAX_SRC: Memory.max_full_ts mem_src loc mts_src)
-      (MAX_TGT: Memory.max_full_ts mem_tgt loc mts_tgt):
+      (MAX_SRC: Memory.max_concrete_ts mem_src loc mts_src)
+      (MAX_TGT: Memory.max_concrete_ts mem_tgt loc mts_tgt):
   mts_src = mts_tgt.
 Proof.
   apply TimeFacts.antisym.
@@ -234,45 +234,45 @@ Proof.
     { apply CLOSED_SRC. }
     { apply CLOSED_TGT. }
     i. des. inv MSG.
-    exploit Memory.max_full_ts_spec; eauto. i. des.
+    exploit Memory.max_concrete_ts_spec; eauto. i. des.
     etrans; eauto.
   - inv MAX_TGT. des.
     inv SIM. exploit MSG; eauto. i. des. inv MSG0.
-    exploit Memory.max_full_ts_spec; eauto. i. des. ss.
+    exploit Memory.max_concrete_ts_spec; eauto. i. des. ss.
 Qed.
 
-Lemma sim_memory_max_full_timemap
+Lemma sim_memory_max_concrete_timemap
       mem_src mem_tgt mtm_src mtm_tgt
       (CLOSED_SRC: Memory.closed mem_src)
       (CLOSED_TGT: Memory.closed mem_tgt)
       (SIM: sim_memory mem_src mem_tgt)
-      (MAX_SRC: Memory.max_full_timemap mem_src mtm_src)
-      (MAX_TGT: Memory.max_full_timemap mem_tgt mtm_tgt):
+      (MAX_SRC: Memory.max_concrete_timemap mem_src mtm_src)
+      (MAX_TGT: Memory.max_concrete_timemap mem_tgt mtm_tgt):
   mtm_src = mtm_tgt.
 Proof.
   extensionality loc.
   specialize (MAX_SRC loc).
   specialize (MAX_TGT loc).
-  eapply sim_memory_max_full_ts; eauto.
+  eapply sim_memory_max_concrete_ts; eauto.
 Qed.
 
-Lemma sim_memory_max_full_view
+Lemma sim_memory_max_concrete_view
       mem_src mem_tgt mview_src mview_tgt
       (CLOSED_SRC: Memory.closed mem_src)
       (CLOSED_TGT: Memory.closed mem_tgt)
       (SIM: sim_memory mem_src mem_tgt)
-      (MAX_SRC: Memory.max_full_view mem_src mview_src)
-      (MAX_TGT: Memory.max_full_view mem_tgt mview_tgt):
+      (MAX_SRC: Memory.max_concrete_view mem_src mview_src)
+      (MAX_TGT: Memory.max_concrete_view mem_tgt mview_tgt):
   mview_src = mview_tgt.
 Proof.
   inv MAX_SRC. inv MAX_TGT.
-  exploit sim_memory_max_full_timemap; try exact SIM; eauto. i.
+  exploit sim_memory_max_concrete_timemap; try exact SIM; eauto. i.
   subst. ss.
 Qed.
 
 Lemma split_sim_memory
       mem0 loc ts1 ts2 ts3 val2 released2 val3 released3 mem1
-      (SPLIT: Memory.split mem0 loc ts1 ts2 ts3 (Message.full val2 released2) (Message.full val3 released3) mem1):
+      (SPLIT: Memory.split mem0 loc ts1 ts2 ts3 (Message.concrete val2 released2) (Message.concrete val3 released3) mem1):
   sim_memory mem1 mem0.
 Proof.
   econs; i.
@@ -499,8 +499,8 @@ Lemma sim_memory_latest_val_src
   Memory.latest_val loc mem_tgt val.
 Proof.
   inv LATEST.
-  exploit Memory.max_full_ts_exists; try apply CLOSED_TGT. i. des.
-  exploit sim_memory_max_full_ts; eauto. i. subst.
+  exploit Memory.max_concrete_ts_exists; try apply CLOSED_TGT. i. des.
+  exploit sim_memory_max_concrete_ts; eauto. i. subst.
   dup x0. inv x1. des.
   inv SIM. exploit MSG; eauto. i. des. inv MSG0.
   rewrite GET1 in GET. inv GET.
@@ -516,8 +516,8 @@ Lemma sim_memory_latest_val_tgt
   Memory.latest_val loc mem_src val.
 Proof.
   inv LATEST.
-  exploit Memory.max_full_ts_exists; try apply CLOSED_SRC. i. des.
-  exploit sim_memory_max_full_ts; eauto. i. subst.
+  exploit Memory.max_concrete_ts_exists; try apply CLOSED_SRC. i. des.
+  exploit sim_memory_max_concrete_ts; eauto. i. subst.
   dup x0. inv x1. des.
   inv SIM. exploit MSG; eauto. i. des. inv MSG0.
   unfold Memory.get in *. rewrite GET0 in GET1. inv GET1.

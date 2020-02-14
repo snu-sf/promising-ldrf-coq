@@ -71,7 +71,7 @@ Module PromotionProgress.
         l lc1 mem1 from val released ord
         (WF1: Local.wf lc1 mem1)
         (MEM1: Memory.closed mem1)
-        (LATEST: Memory.get l (Memory.max_ts l mem1) mem1 = Some (from, Message.full val released))
+        (LATEST: Memory.get l (Memory.max_ts l mem1) mem1 = Some (from, Message.concrete val released))
         (SAFE: View.le released.(View.unwrap) lc1.(Local.tview).(TView.cur)):
     exists lc2,
       <<STEP: Local.read_step lc1 mem1 l (Memory.max_ts l mem1) val released ord lc2>> /\

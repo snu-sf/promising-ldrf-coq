@@ -41,8 +41,8 @@ Module SimPromises.
 
   Definition none_if loc ts (pview:t) (msg:Message.t): Message.t :=
     match msg with
-    | Message.full val released =>
-      Message.full val (none_if_released loc ts pview released)
+    | Message.concrete val released =>
+      Message.concrete val (none_if_released loc ts pview released)
     | Message.reserve => Message.reserve
     end.
 
@@ -55,7 +55,7 @@ Module SimPromises.
   Ltac none_if_tac :=
     repeat
       (try match goal with
-           | [ |- context[none_if _ _ _ (Message.full ?val ?released)]] =>
+           | [ |- context[none_if _ _ _ (Message.concrete ?val ?released)]] =>
              unfold none_if; ss
            | [ |- context[none_if _ _ _ ?msg]] =>
              unfold none_if; destruct msg; ss
@@ -85,7 +85,7 @@ Module SimPromises.
   Inductive sem (pview:t) (inv:t) (promises_src promises_tgt:Memory.t): Prop :=
   | sem_intro
       (LE: mem_le_transf pview promises_tgt promises_src)
-      (PVIEW: forall l t (MEM: mem l t pview), exists f val released, Memory.get l t promises_tgt = Some (f, Message.full val released))
+      (PVIEW: forall l t (MEM: mem l t pview), exists f val released, Memory.get l t promises_tgt = Some (f, Message.concrete val released))
       (SOUND: forall l t (INV: mem l t inv),
           Memory.get l t promises_tgt = None /\
           exists f m, Memory.get l t promises_src = Some (f, m))
@@ -493,8 +493,8 @@ Module SimPromises.
       erewrite sim_memory_max_ts; eauto.
       rewrite latest_reserve in *; eauto.
       exploit sim_memory_latest_val_src; eauto. i.
-      exploit Memory.max_full_view_exists; try apply MEM1_TGT. i. des.
-      exploit sim_memory_max_full_view; try exact MEM1; eauto. i. subst.
+      exploit Memory.max_concrete_view_exists; try apply MEM1_TGT. i. des.
+      exploit sim_memory_max_concrete_view; try exact MEM1; eauto. i. subst.
       inv CAP_TGT. exploit BACK; eauto. i. splits; auto.
       destruct (Memory.get loc (Time.incr (Memory.max_ts loc mem1_tgt)) mem1_tgt) as [[]|] eqn:MAX; ss.
       exploit Memory.max_ts_spec; eauto. i. des.
@@ -526,8 +526,8 @@ Module SimPromises.
       erewrite <- sim_memory_max_ts; eauto.
       rewrite <- latest_reserve in *; eauto.
       exploit sim_memory_latest_val_tgt; eauto. i.
-      exploit Memory.max_full_view_exists; try apply MEM1_SRC. i. des.
-      exploit sim_memory_max_full_view; try exact MEM1; eauto. i. subst.
+      exploit Memory.max_concrete_view_exists; try apply MEM1_SRC. i. des.
+      exploit sim_memory_max_concrete_view; try exact MEM1; eauto. i. subst.
       inv CAP_SRC. exploit BACK; eauto. i. splits; auto.
       destruct (Memory.get loc (Time.incr (Memory.max_ts loc mem1_src)) mem1_src) as [[]|] eqn:MAX; ss.
       exploit Memory.max_ts_spec; eauto. i. des.

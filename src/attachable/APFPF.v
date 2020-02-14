@@ -120,13 +120,13 @@ Lemma shorter_write mem_src0 mem_tgt0 loc from to val released prom1 mem_tgt1 ki
 Proof.
   exploit APFConfiguration.write_no_promise; eauto. i. des. clarify.
   inv WRITE. inv PROMISE. exists (Time.middle from to).
-  assert (WF: (<<MSG_WF: Message.wf (Message.full val released)>>) /\
+  assert (WF: (<<MSG_WF: Message.wf (Message.concrete val released)>>) /\
               (<<TO: Time.lt from to>>) /\
               (<<DISJOINT: forall to2 from2 msg2
                                   (GET: Memory.get loc to2 mem_tgt0 = Some (from2, msg2)),
                   Interval.disjoint (from, to) (from2, to2)>>)).
   { inv MEM. inv ADD. splits; auto. } des.
-  exploit (@Memory.add_exists mem_src0 loc (Time.middle from to) to (Message.full val released)).
+  exploit (@Memory.add_exists mem_src0 loc (Time.middle from to) to (Message.concrete val released)).
   { ii. inv LHS. inv RHS. ss.
     eapply shorter_get_iff in GET2; eauto. des.
     eapply DISJOINT; eauto.
@@ -189,13 +189,13 @@ Lemma shorter_update mem_src0 mem_tgt0 loc from to val released prom1 mem_tgt1 k
 Proof.
   exploit APFConfiguration.write_no_promise; eauto. i. des. clarify.
   inv WRITE. inv PROMISE.
-  assert (WF: (<<MSG_WF: Message.wf (Message.full val released)>>) /\
+  assert (WF: (<<MSG_WF: Message.wf (Message.concrete val released)>>) /\
               (<<TO: Time.lt from to>>) /\
               (<<DISJOINT: forall to2 from2 msg2
                                   (GET: Memory.get loc to2 mem_tgt0 = Some (from2, msg2)),
                   Interval.disjoint (from, to) (from2, to2)>>)).
   { inv MEM. inv ADD. splits; auto. } des.
-  exploit (@Memory.add_exists mem_src0 loc from to (Message.full val released)).
+  exploit (@Memory.add_exists mem_src0 loc from to (Message.concrete val released)).
   { ii. inv LHS. inv RHS. ss.
     eapply shorter_get_iff in GET2; eauto. des.
     eapply DISJOINT; eauto.

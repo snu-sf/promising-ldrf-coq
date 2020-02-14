@@ -376,15 +376,15 @@ Qed.
 
 Lemma sc_property
       sc1 sc2 mem
-      (MAX: Memory.max_full_timemap mem sc2)
+      (MAX: Memory.max_concrete_timemap mem sc2)
       (SC1: Memory.closed_timemap sc1 mem)
       (MEM: Memory.closed mem):
   <<SC2: Memory.closed_timemap sc2 mem>> /\
   <<LE: TimeMap.le sc1 sc2>>.
 Proof.
   splits.
-  - eapply Memory.max_full_timemap_closed; eauto.
-  - eapply Memory.max_full_timemap_spec; eauto.
+  - eapply Memory.max_concrete_timemap_closed; eauto.
+  - eapply Memory.max_concrete_timemap_spec; eauto.
 Qed.
 
 Lemma sim_thread_consistent
@@ -411,8 +411,8 @@ Proof.
   exploit CAP; eauto. i. des.
   exploit cap_property; try exact CAP0; eauto. i. des.
   exploit cap_property; try exact CAP_TGT; eauto. i. des.
-  exploit Memory.max_full_timemap_exists; try apply CLOSED0. i. des.
-  exploit sim_memory_max_full_timemap; try exact MEMORY0; eauto. i. subst.
+  exploit Memory.max_concrete_timemap_exists; try apply CLOSED0. i. des.
+  exploit sim_memory_max_concrete_timemap; try exact MEMORY0; eauto. i. subst.
   exploit sc_property; try exact SC_MAX; eauto. i. des.
   exploit sc_property; try exact x0; eauto. i. des.
   exploit CONSISTENT; eauto. s. i. des.

@@ -21,18 +21,18 @@ Set Implicit Arguments.
 
 Module Message.
   Inductive t :=
-  | full (val: Const.t) (released: option View.t)
+  | concrete (val: Const.t) (released: option View.t)
   | reserve
   .
   Hint Constructors t.
 
-  Definition elt: t := full 0 None.
+  Definition elt: t := concrete 0 None.
 
   Inductive le : t -> t -> Prop :=
   | le_view
       val released released'
       (RELEASED: View.opt_le released released'):
-      le (full val released) (full val released')
+      le (concrete val released) (concrete val released')
   | le_reserve
       msg:
       le msg reserve
@@ -60,7 +60,7 @@ Module Message.
   | wf_view
       val released
       (WF: View.opt_wf released):
-      wf (full val released)
+      wf (concrete val released)
   | wf_reserve:
       wf reserve
   .
@@ -70,13 +70,13 @@ Module Message.
 
   Definition is_reserve (msg: t): bool :=
     match msg with
-    | full _ _ => false
+    | concrete _ _ => false
     | reserve => true
     end.
 
   Definition is_released_none (msg: t): bool :=
     match msg with
-    | full _ None => true
+    | concrete _ None => true
     | _ => false
     end.
 End Message.
@@ -768,17 +768,17 @@ Module Cell.
   Qed.
 
 
-  (* min_full_ts *)
+  (* min_concrete_ts *)
 
-  Inductive min_full_ts (cell: t) (ts: Time.t): Prop :=
-  | min_full_ts_intro
-      (GET: exists from val released, get ts cell = Some (from, Message.full val released))
+  Inductive min_concrete_ts (cell: t) (ts: Time.t): Prop :=
+  | min_concrete_ts_intro
+      (GET: exists from val released, get ts cell = Some (from, Message.concrete val released))
       (MIN: forall to from' val' released'
-              (GET: get to cell = Some (from', Message.full val' released')),
+              (GET: get to cell = Some (from', Message.concrete val' released')),
           Time.le ts to)
   .
 
-  Lemma min_full_ts_exists_aux
+  Lemma min_concrete_ts_exists_aux
         A t a
         (l: list (Time.t * A))
         (f: A -> bool)
@@ -838,17 +838,17 @@ Module Cell.
         eapply x2; eauto.
   Qed.
 
-  Lemma min_full_ts_exists
+  Lemma min_concrete_ts_exists
         from to val released cell
-        (INHABITED: get to cell = Some (from, Message.full val released)):
-    exists ts, min_full_ts cell ts.
+        (INHABITED: get to cell = Some (from, Message.concrete val released)):
+    exists ts, min_concrete_ts cell ts.
   Proof.
     destruct cell. unfold get in *. ss.
     remember (DOMap.elements raw0) as l eqn:DOM.
-    exploit (min_full_ts_exists_aux
-               to (from, Message.full val released) l
+    exploit (min_concrete_ts_exists_aux
+               to (from, Message.concrete val released) l
                (fun (a: Time.t * Message.t) => match a with
-                                            | (_, Message.full _ _) => true
+                                            | (_, Message.concrete _ _) => true
                                             | _ => false
                                             end)).
     { ss. }
@@ -862,10 +862,10 @@ Module Cell.
       eapply x2; eauto.
   Qed.
 
-  Lemma min_full_ts_inj
+  Lemma min_concrete_ts_inj
         cell ts1 ts2
-        (MIN1: min_full_ts cell ts1)
-        (MIN2: min_full_ts cell ts2):
+        (MIN1: min_concrete_ts cell ts1)
+        (MIN2: min_concrete_ts cell ts2):
     ts1 = ts2.
   Proof.
     inv MIN1. inv MIN2. des.
@@ -873,28 +873,28 @@ Module Cell.
     apply TimeFacts.antisym; auto.
   Qed.
 
-  Lemma min_full_ts_spec
+  Lemma min_concrete_ts_spec
         ts from val released cell mts
-        (MIN: min_full_ts cell mts)
-        (GET: get ts cell = Some (from, Message.full val released)):
-    <<GET: exists f v r, get mts cell = Some (f, Message.full v r)>> /\
+        (MIN: min_concrete_ts cell mts)
+        (GET: get ts cell = Some (from, Message.concrete val released)):
+    <<GET: exists f v r, get mts cell = Some (f, Message.concrete v r)>> /\
     <<MIN: Time.le mts ts>>.
   Proof.
     inv MIN. des. esplits; eauto.
   Qed.
 
 
-  (* max_full_ts *)
+  (* max_concrete_ts *)
 
-  Inductive max_full_ts (cell: t) (ts: Time.t): Prop :=
-  | max_full_ts_intro
-      (GET: exists from val released, get ts cell = Some (from, Message.full val released))
+  Inductive max_concrete_ts (cell: t) (ts: Time.t): Prop :=
+  | max_concrete_ts_intro
+      (GET: exists from val released, get ts cell = Some (from, Message.concrete val released))
       (MAX: forall to from' val' released'
-              (GET: get to cell = Some (from', Message.full val' released')),
+              (GET: get to cell = Some (from', Message.concrete val' released')),
           Time.le to ts)
   .
 
-  Lemma max_full_ts_exists_aux
+  Lemma max_concrete_ts_exists_aux
         A t a
         (l: list (Time.t * A))
         (f: A -> bool)
@@ -954,17 +954,17 @@ Module Cell.
         eapply x2; eauto.
   Qed.
 
-  Lemma max_full_ts_exists
+  Lemma max_concrete_ts_exists
         cell
         (INHABITED: get Time.bot cell = Some (Time.bot, Message.elt)):
-    exists ts, max_full_ts cell ts.
+    exists ts, max_concrete_ts cell ts.
   Proof.
     destruct cell. unfold get in *. ss.
     remember (DOMap.elements raw0) as l eqn:DOM.
-    exploit (max_full_ts_exists_aux
+    exploit (max_concrete_ts_exists_aux
                Time.bot (Time.bot, Message.elt) l
                (fun (a: Time.t * Message.t) => match a with
-                                            | (_, Message.full _ _) => true
+                                            | (_, Message.concrete _ _) => true
                                             | _ => false
                                             end)).
     { ss. }
@@ -978,10 +978,10 @@ Module Cell.
       eapply x2; eauto.
   Qed.
 
-  Lemma max_full_ts_inj
+  Lemma max_concrete_ts_inj
         cell ts1 ts2
-        (MAX1: max_full_ts cell ts1)
-        (MAX2: max_full_ts cell ts2):
+        (MAX1: max_concrete_ts cell ts1)
+        (MAX2: max_concrete_ts cell ts2):
     ts1 = ts2.
   Proof.
     inv MAX1. inv MAX2. des.
@@ -989,11 +989,11 @@ Module Cell.
     apply TimeFacts.antisym; auto.
   Qed.
 
-  Lemma max_full_ts_spec
+  Lemma max_concrete_ts_spec
         ts from val released cell mts
-        (MAX: max_full_ts cell mts)
-        (GET: get ts cell = Some (from, Message.full val released)):
-    <<GET: exists f v r, get mts cell = Some (f, Message.full v r)>> /\
+        (MAX: max_concrete_ts cell mts)
+        (GET: get ts cell = Some (from, Message.concrete val released)):
+    <<GET: exists f v r, get mts cell = Some (f, Message.concrete v r)>> /\
     <<MAX: Time.le ts mts>>.
   Proof.
     inv MAX. des. esplits; eauto.
@@ -1231,8 +1231,8 @@ Module Cell.
   Inductive latest_val (cell: t) (val: Const.t): Prop :=
   | latest_val_intro
       ts from released
-      (MAX: max_full_ts cell ts)
-      (GET: get ts cell = Some (from, Message.full val released))
+      (MAX: max_concrete_ts cell ts)
+      (GET: get ts cell = Some (from, Message.concrete val released))
   .
 
   Lemma latest_val_inj
@@ -1242,7 +1242,7 @@ Module Cell.
     val1 = val2.
   Proof.
     inv LATEST1. inv LATEST2.
-    exploit max_full_ts_inj; [exact MAX|exact MAX0|..]. i. subst.
+    exploit max_concrete_ts_inj; [exact MAX|exact MAX0|..]. i. subst.
     rewrite GET in GET0. inv GET0. ss.
   Qed.
 
@@ -1251,7 +1251,7 @@ Module Cell.
         (INHABITED: get Time.bot cell = Some (Time.bot, Message.elt)):
     exists val, latest_val cell val.
   Proof.
-    exploit (@max_full_ts_exists cell); eauto. i. des.
+    exploit (@max_concrete_ts_exists cell); eauto. i. des.
     dup x0. inv x0. des.
     exists val. econs; eauto.
   Qed.
@@ -1282,7 +1282,7 @@ Module Cell.
                (PROMISE: latest_reserve promises cell1)
                (LATEST: latest_val cell1 val),
           get (Time.incr (max_ts cell1)) cell2 =
-          Some (max_ts cell1, Message.full val (Some view)))
+          Some (max_ts cell1, Message.concrete val (Some view)))
       (COMPLETE: forall from to msg
                    (GET1: get to cell1 = None)
                    (GET2: get to cell2 = Some (from, msg)),
@@ -1302,7 +1302,7 @@ Module Cell.
                (IN: List.In (max_ts cell1) dom)
                (PROMISE: latest_reserve promises cell1)
                (LATEST: latest_val cell1 val),
-          get (Time.incr (max_ts cell1)) cell2 = Some (max_ts cell1, Message.full val (Some view)))
+          get (Time.incr (max_ts cell1)) cell2 = Some (max_ts cell1, Message.concrete val (Some view)))
       (COMPLETE: forall from to msg
                    (GET1: get to cell1 = None)
                    (GET2: get to cell2 = Some (from, msg)),
@@ -1423,7 +1423,7 @@ Module Cell.
     }
     exploit latest_val_exists; eauto. i. des.
     exploit (@add_exists cell2 (max_ts cell1) (Time.incr (max_ts cell1))
-                         (Message.full val (Some view))); ii.
+                         (Message.concrete val (Some view))); ii.
     { inv x. inv LHS. inv RHS. ss.
       destruct (get to2 cell1) as [[]|] eqn:GET3.
       { exploit SOUND; eauto. i.

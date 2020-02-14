@@ -503,11 +503,11 @@ Section AssertInsertion.
     { exploit Memory.cap_exists; try exact CLOSED0. i. des.
       exploit Memory.cap_closed; eauto. intro CLOSED_CAP.
       exploit Local.cap_wf; try exact WF0; eauto. intro WF_CAP.
-      exploit Memory.max_full_timemap_exists; try apply CLOSED_CAP. i. des.
-      hexploit Memory.max_full_timemap_closed; try exact x1; eauto. intro SC_MAX.
+      exploit Memory.max_concrete_timemap_exists; try apply CLOSED_CAP. i. des.
+      hexploit Memory.max_concrete_timemap_closed; try exact x1; eauto. intro SC_MAX.
       dup SIM0. inv SIM1. ss. subst. ii. ss.
       exploit Memory.cap_inj; [exact CAP|exact CAP0|..]; eauto. i. subst.
-      exploit Memory.max_full_timemap_inj; [exact x1|exact SC_MAX0|..]. i. subst.
+      exploit Memory.max_concrete_timemap_inj; [exact x1|exact SC_MAX0|..]. i. subst.
       exploit CONSISTENT; eauto. s. i. des.
       - (* failure certification *)
         left. unfold Thread.steps_failure in *. des.

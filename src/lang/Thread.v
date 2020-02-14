@@ -74,7 +74,7 @@ Module Thread.
         loc from to msg kind
         lc2 mem2
         (LOCAL: Local.promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
-        (PF: pf = orb (andb (Memory.op_kind_is_lower_full kind) (Message.is_released_none msg))
+        (PF: pf = orb (andb (Memory.op_kind_is_lower_concrete kind) (Message.is_released_none msg))
                       (Memory.op_kind_is_cancel kind)):
         promise_step pf (ThreadEvent.promise loc from to msg kind) (mk st lc1 sc1 mem1) (mk st lc2 sc1 mem2)
     .
@@ -192,7 +192,7 @@ Module Thread.
     Definition consistent (e:t): Prop :=
       forall mem1 sc1
         (CAP: Memory.cap e.(local).(Local.promises) e.(memory) mem1)
-        (SC_MAX: Memory.max_full_timemap mem1 sc1),
+        (SC_MAX: Memory.max_concrete_timemap mem1 sc1),
         <<FAILURE: steps_failure (mk e.(state) e.(local) sc1 mem1)>> \/
         exists e2,
           <<STEPS: rtc tau_step (mk e.(state) e.(local) sc1 mem1) e2>> /\

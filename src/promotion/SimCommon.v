@@ -317,10 +317,10 @@ Module SimCommon.
   (* sim_memory *)
 
   Inductive sim_message (l: Loc.t): forall (msg_src msg_tgt: Message.t), Prop :=
-  | sim_message_full
+  | sim_message_concrete
       val released_src released_tgt
       (RELEASED: sim_opt_view l released_src released_tgt):
-      sim_message l (Message.full val released_src) (Message.full val released_tgt)
+      sim_message l (Message.concrete val released_src) (Message.concrete val released_tgt)
   | sim_message_reserve:
       sim_message l Message.reserve Message.reserve
   .
@@ -438,14 +438,14 @@ Module SimCommon.
 
   Definition prev_released_le_loc (l loc: Loc.t) (from: Time.t) (mem: Memory.t) (released: View.t): Prop :=
     match Memory.get loc from mem with
-    | Some (_, Message.full _ (Some r)) => view_le_loc l r released
+    | Some (_, Message.concrete _ (Some r)) => view_le_loc l r released
     | _ => True
     end.
 
   Definition fulfillable (l: Loc.t) (tview: TView.t) (mem promises: Memory.t): Prop :=
     forall loc from to val released
       (GETP: Memory.get loc to promises =
-             Some (from, Message.full val (Some released))),
+             Some (from, Message.concrete val (Some released))),
       <<TVIEW: tview_released_le_loc l loc tview released>> /\
       <<PREV: prev_released_le_loc l loc from mem released>>.
 
@@ -475,12 +475,12 @@ Module SimCommon.
   Definition get_message_src (strong: bool) (l loc: Loc.t) (msg_tgt: Message.t)
              (tview_src: TView.t) (from: Time.t) (mem_src: Memory.t): Message.t :=
     match msg_tgt with
-    | Message.full val (Some released_tgt) =>
+    | Message.concrete val (Some released_tgt) =>
       match (Memory.get loc from mem_src) with
-      | Some (_, Message.full _ (Some released_prev)) =>
-        Message.full val (Some (get_released_src strong l loc released_tgt tview_src released_prev))
+      | Some (_, Message.concrete _ (Some released_prev)) =>
+        Message.concrete val (Some (get_released_src strong l loc released_tgt tview_src released_prev))
       | _ =>
-        Message.full val (Some (get_released_src strong l loc released_tgt tview_src View.bot))
+        Message.concrete val (Some (get_released_src strong l loc released_tgt tview_src View.bot))
       end
     | _ => msg_tgt
     end.
@@ -505,7 +505,7 @@ Module SimCommon.
   Lemma get_released_src_prev_released_le_loc
         strong l loc released_tgt tview_src released_prev
         from mem_src from' val
-        (GET: Memory.get loc from mem_src = Some (from', Message.full val (Some released_prev))):
+        (GET: Memory.get loc from mem_src = Some (from', Message.concrete val (Some released_prev))):
     <<PREV: prev_released_le_loc l loc from mem_src (get_released_src strong l loc released_tgt tview_src released_prev)>>.
   Proof.
     unfold prev_released_le_loc. rewrite GET.
@@ -589,7 +589,7 @@ Module SimCommon.
         val released
         (TVIEW: TView.wf tview_src)
         (MSG: get_message_src strong l loc msg_tgt tview_src from mem_src =
-              Message.full val (Some released)):
+              Message.concrete val (Some released)):
     <<TVIEW: tview_released_le_loc l loc tview_src released>> /\
     <<PREV: prev_released_le_loc l loc from mem_src released>>.
   Proof.
@@ -665,11 +665,11 @@ Module SimCommon.
     inv MSG_CLOSED. inv CLOSED1. eauto.
   Qed.
 
-  Lemma get_message_src_full
+  Lemma get_message_src_concrete
         strong l loc msg_tgt tview_src from mem_src
         val released
-        (MSG: get_message_src strong l loc msg_tgt tview_src from mem_src = Message.full val released):
-    exists released_tgt, msg_tgt = Message.full val released_tgt.
+        (MSG: get_message_src strong l loc msg_tgt tview_src from mem_src = Message.concrete val released):
+    exists released_tgt, msg_tgt = Message.concrete val released_tgt.
   Proof.
     destruct msg_tgt; ss.
     destruct released0; try by inv MSG; eauto.
@@ -780,7 +780,7 @@ Module SimCommon.
           unfold prev_released_le_loc.
           erewrite Memory.add_o; eauto. condtac; ss. des. subst.
           destruct (get_message_src false l loc msg_tgt tview_src from mem1_src) eqn:GET; ss.
-          exploit get_message_src_full; eauto. i. des. subst.
+          exploit get_message_src_concrete; eauto. i. des. subst.
           exploit LE1_SRC; try exact GETP. i.
           exploit SOUND0; try exact x; eauto. i. des. inv MSG.
           exploit ATTACH; eauto; ss.
@@ -1069,7 +1069,7 @@ Module SimCommon.
         (PROMISE_TGT: Memory.promise promises1_tgt mem1_tgt loc from to msg_tgt promises2_tgt mem2_tgt kind_tgt)
         (KIND_TGT: negb (Memory.op_kind_is_lower kind_tgt) /\ negb (Memory.op_kind_is_cancel kind_tgt))
         (SPLIT_TGT: Memory.op_kind_is_split kind_tgt ->
-                         (exists ts3 val, kind_tgt = Memory.op_kind_split ts3 (Message.full val None)) \/
+                         (exists ts3 val, kind_tgt = Memory.op_kind_split ts3 (Message.concrete val None)) \/
                          (exists ts3, kind_tgt = Memory.op_kind_split ts3 Message.reserve))
         (LOC: loc <> l):
     exists promises2_src mem2_src kind_src,
@@ -1150,7 +1150,7 @@ Module SimCommon.
           unfold prev_released_le_loc.
           erewrite Memory.add_o; eauto. condtac; ss. des. subst.
           destruct (get_message_src true l loc msg_tgt tview_src from mem1_src) eqn:GET; ss.
-          exploit get_message_src_full; eauto. i. des. subst.
+          exploit get_message_src_concrete; eauto. i. des. subst.
           exploit LE1_SRC; try exact GETP. i.
           exploit SOUND0; try exact x; eauto. i. des. inv MSG.
           exploit ATTACH; eauto; ss.
@@ -1410,14 +1410,14 @@ Module SimCommon.
         (FULFILLABLE1: fulfillable l lc1_src.(Local.tview) mem1_src lc1_src.(Local.promises))
         (LOC: loc <> l)
         (STEP_TGT: Local.promise_step lc1_tgt mem1_tgt loc from to
-                                      (Message.full val (Some (released_tgt))) lc2_tgt mem2_tgt kind_tgt)
+                                      (Message.concrete val (Some (released_tgt))) lc2_tgt mem2_tgt kind_tgt)
         (KIND_TGT: negb (Memory.op_kind_is_lower kind_tgt) /\ negb (Memory.op_kind_is_cancel kind_tgt))
         (SPLIT_TGT: Memory.op_kind_is_split kind_tgt ->
-                         (exists ts3 val, kind_tgt = Memory.op_kind_split ts3 (Message.full val None)) \/
+                         (exists ts3 val, kind_tgt = Memory.op_kind_split ts3 (Message.concrete val None)) \/
                          (exists ts3, kind_tgt = Memory.op_kind_split ts3 Message.reserve)):
     exists released_src lc2_src mem2_src kind_src,
       <<STEP_SRC: Local.promise_step lc1_src mem1_src loc from to
-                                     (Message.full val (Some (released_src))) lc2_src mem2_src kind_src>> /\
+                                     (Message.concrete val (Some (released_src))) lc2_src mem2_src kind_src>> /\
       <<LC2: sim_local l lc2_src lc2_tgt>> /\
       <<MEM2: sim_memory l mem2_src mem2_tgt>> /\
       <<FULFILLABLE2: fulfillable l lc2_src.(Local.tview) mem2_src lc2_src.(Local.promises)>> /\
@@ -1427,7 +1427,7 @@ Module SimCommon.
     exploit promise_strong_relaxed; try exact PROMISE; try apply LC1;
       try apply WF1_SRC; try apply WF1_TGT; eauto.
     i. des.
-    exploit (@get_message_src_closed true l loc (Message.full val (Some released_tgt))
+    exploit (@get_message_src_closed true l loc (Message.concrete val (Some released_tgt))
                                      lc1_src.(Local.tview) from mem1_src mem2_src mem2_tgt); eauto.
     { apply WF1_SRC. }
     { exploit Memory.promise_op; try exact PROMISE_SRC. i.
@@ -1515,7 +1515,7 @@ Module SimCommon.
                       Time.le (releasedm_src.(View.unwrap).(View.rlx) loc) to /\
                       (releasedm_src = None \/
                        exists from' val',
-                         Memory.get loc from mem1_src = Some (from', Message.full val' releasedm_src))))
+                         Memory.get loc from mem1_src = Some (from', Message.concrete val' releasedm_src))))
         (WF1_SRC: Local.wf lc1_src mem1_src)
         (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
         (FULFILLABLE1: fulfillable l lc1_src.(Local.tview) mem1_src lc1_src.(Local.promises))
@@ -1529,7 +1529,7 @@ Module SimCommon.
       <<WRITE_SRC: Memory.write lc1_src.(Local.promises) mem1_src loc from to
                                 val (TView.write_released lc1_src.(Local.tview) sc1_src loc to releasedm_src ord)
                                 promises2_src mem2_src
-                                (Memory.op_kind_lower (Message.full val released_src))>> /\
+                                (Memory.op_kind_lower (Message.concrete val released_src))>> /\
       <<PROMISES2: sim_memory l promises2_src lc2_tgt.(Local.promises)>> /\
       <<MEM2: sim_memory l mem2_src mem1_tgt>>.
   Proof.
@@ -1540,8 +1540,8 @@ Module SimCommon.
     exploit COMPLETE; eauto. i. des. inv MSG.
     clear TVIEW SOUND COMPLETE.
     exploit (@Memory.lower_exists promises1_src loc from to
-                                  (Message.full val released_src)
-                                  (Message.full val (TView.write_released tview1_src sc1_src loc to releasedm_src ord))); ss.
+                                  (Message.concrete val released_src)
+                                  (Message.concrete val (TView.write_released tview1_src sc1_src loc to releasedm_src ord))); ss.
     { econs.
       eapply TViewFacts.write_future0; try eapply WF1_SRC; eauto. }
     { econs. destruct released_src; ss.
@@ -1645,11 +1645,11 @@ Module SimCommon.
                       Time.le (releasedm_src.(View.unwrap).(View.rlx) loc) to /\
                       (releasedm_src = None \/
                        exists from' val',
-                         Memory.get loc from mem1_src = Some (from', Message.full val' releasedm_src))))
+                         Memory.get loc from mem1_src = Some (from', Message.concrete val' releasedm_src))))
         (WF1_SRC: Local.wf lc1_src mem1_src)
         (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
         (FULFILLABLE1: fulfillable l lc1_src.(Local.tview) mem1_src lc1_src.(Local.promises))
-        (GET_SRC: Memory.get loc to lc1_src.(Local.promises) = Some (from, Message.full val (Some released_src)))
+        (GET_SRC: Memory.get loc to lc1_src.(Local.promises) = Some (from, Message.concrete val (Some released_src)))
         (STRONG: view_le_loc l lc1_src.(Local.tview).(TView.cur) released_src)
         (LOC: loc <> l)
         (ORD: Ordering.le Ordering.acqrel ord)
@@ -1661,7 +1661,7 @@ Module SimCommon.
       <<WRITE_SRC: Memory.write lc1_src.(Local.promises) mem1_src loc from to
                                 val (TView.write_released lc1_src.(Local.tview) sc1_src loc to releasedm_src ord)
                                 promises2_src mem2_src
-                                (Memory.op_kind_lower (Message.full val (Some released_src)))>> /\
+                                (Memory.op_kind_lower (Message.concrete val (Some released_src)))>> /\
       <<PROMISES2: sim_memory l promises2_src lc2_tgt.(Local.promises)>> /\
       <<MEM2: sim_memory l mem2_src mem1_tgt>>.
   Proof.
@@ -1673,8 +1673,8 @@ Module SimCommon.
     rewrite GET_SRC in *. inv GET_SRC0. inv MSG. inv RELEASED.
     clear TVIEW SOUND COMPLETE.
     exploit (@Memory.lower_exists promises1_src loc from to
-                                  (Message.full val (Some released_src))
-                                  (Message.full val (TView.write_released tview1_src sc1_src loc to releasedm_src ord))); ss.
+                                  (Message.concrete val (Some released_src))
+                                  (Message.concrete val (TView.write_released tview1_src sc1_src loc to releasedm_src ord))); ss.
     { econs.
       eapply TViewFacts.write_future0; try eapply WF1_SRC; eauto. }
     { econs.
@@ -1779,7 +1779,7 @@ Module SimCommon.
                       Time.le (releasedm_src.(View.unwrap).(View.rlx) loc) to /\
                       (releasedm_src = None \/
                        exists from' val',
-                         Memory.get loc from mem1_src = Some (from', Message.full val' releasedm_src))))
+                         Memory.get loc from mem1_src = Some (from', Message.concrete val' releasedm_src))))
         (WF1_SRC: Local.wf lc1_src mem1_src)
         (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
         (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
@@ -1820,7 +1820,7 @@ Module SimCommon.
       { inv STEP1. ss. }
       i. des.
       inv STEP_SRC; ss.
-      replace msg_src with (Message.full val released_src) in *; cycle 1.
+      replace msg_src with (Message.concrete val released_src) in *; cycle 1.
       { inv WRITE_SRC. inv PROMISE0.
         exploit Memory.lower_get0; try exact MEM. i. des.
         exploit Memory.promise_get2; try exact PROMISE.
@@ -2185,14 +2185,14 @@ Module SimCommon.
 
   (* max_timemap *)
 
-  Lemma sim_memory_max_full_ts
+  Lemma sim_memory_max_concrete_ts
         l loc
         mem_src mem_tgt
         max_src max_tgt
         (SIM: sim_memory l mem_src mem_tgt)
         (LOC: loc <> l)
-        (MAX_SRC: Memory.max_full_ts mem_src loc max_src)
-        (MAX_TGT: Memory.max_full_ts mem_tgt loc max_tgt):
+        (MAX_SRC: Memory.max_concrete_ts mem_src loc max_src)
+        (MAX_TGT: Memory.max_concrete_ts mem_tgt loc max_tgt):
     <<TS: max_src = max_tgt>>.
   Proof.
     inv SIM. inv MAX_SRC. inv MAX_TGT. des.
@@ -2203,30 +2203,30 @@ Module SimCommon.
       exploit MAX; try eapply GET_SRC. ss.
   Qed.
 
-  Lemma sim_memory_max_full_timemap
+  Lemma sim_memory_max_concrete_timemap
         l
         mem_src mem_tgt
         max_src max_tgt
         (SIM: sim_memory l mem_src mem_tgt)
-        (MAX_SRC: Memory.max_full_timemap mem_src max_src)
-        (MAX_TGT: Memory.max_full_timemap mem_tgt max_tgt):
+        (MAX_SRC: Memory.max_concrete_timemap mem_src max_src)
+        (MAX_TGT: Memory.max_concrete_timemap mem_tgt max_tgt):
     <<SIM_TIMEMAP: sim_timemap l max_src max_tgt>>.
   Proof.
     ii. specialize (MAX_SRC loc). specialize (MAX_TGT loc).
-    eapply sim_memory_max_full_ts; eauto.
+    eapply sim_memory_max_concrete_ts; eauto.
   Qed.
 
-  Lemma sim_memory_max_full_view
+  Lemma sim_memory_max_concrete_view
         l
         mem_src mem_tgt
         max_src max_tgt
         (SIM: sim_memory l mem_src mem_tgt)
-        (MAX_SRC: Memory.max_full_view mem_src max_src)
-        (MAX_TGT: Memory.max_full_view mem_tgt max_tgt):
+        (MAX_SRC: Memory.max_concrete_view mem_src max_src)
+        (MAX_TGT: Memory.max_concrete_view mem_tgt max_tgt):
     <<SIM_VIEW: sim_view l max_src max_tgt>>.
   Proof.
     inv MAX_SRC. inv MAX_TGT.
-    econs; eapply sim_memory_max_full_timemap; eauto.
+    econs; eapply sim_memory_max_concrete_timemap; eauto.
   Qed.
 
 
@@ -2353,8 +2353,8 @@ Module SimCommon.
   Proof.
     inv MEM. inv LATEST.
     exploit SOUND; eauto. i. des. inv MSG.
-    exploit Memory.max_full_ts_exists; try exact INHABITED_TGT. i. des.
-    exploit sim_memory_max_full_ts; eauto. i. des. subst.
+    exploit Memory.max_concrete_ts_exists; try exact INHABITED_TGT. i. des.
+    exploit sim_memory_max_concrete_ts; eauto. i. des. subst.
     econs; eauto.
   Qed.
 
@@ -2397,8 +2397,8 @@ Module SimCommon.
           try apply CLOSED_SRC; try apply CLOSED_TGT; i.
         exploit sim_memory_latest_val_src; try exact x1; eauto;
           try apply CLOSED_SRC; try apply CLOSED_TGT; i.
-        exploit Memory.max_full_view_exists; try eapply CLOSED_TGT. i. des.
-        exploit sim_memory_max_full_view; try exact MEM; eauto. i. des.
+        exploit Memory.max_concrete_view_exists; try eapply CLOSED_TGT. i. des.
+        exploit sim_memory_max_concrete_view; try exact MEM; eauto. i. des.
         exploit BACK; eauto. i.
         erewrite sim_memory_max_ts; eauto.
         esplits; eauto.
@@ -2415,8 +2415,8 @@ Module SimCommon.
           try apply CLOSED_SRC; try apply CLOSED_TGT; i.
         exploit sim_memory_latest_val_tgt; try exact x1; eauto;
           try apply CLOSED_SRC; try apply CLOSED_TGT; i.
-        exploit Memory.max_full_view_exists; try eapply CLOSED_SRC. i. des.
-        exploit sim_memory_max_full_view; try exact MEM; eauto. i. des.
+        exploit Memory.max_concrete_view_exists; try eapply CLOSED_SRC. i. des.
+        exploit sim_memory_max_concrete_view; try exact MEM; eauto. i. des.
         exploit BACK; eauto. i.
         erewrite <- sim_memory_max_ts; eauto.
         esplits; eauto.

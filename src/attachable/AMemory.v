@@ -29,21 +29,21 @@ Module AMemory.
       (TS: Memory.message_to msg loc to)
       (RESERVE: msg = Message.reserve ->
              exists from' val' released',
-               Memory.get loc from mem1 = Some (from', Message.full val' released')):
+               Memory.get loc from mem1 = Some (from', Message.concrete val' released')):
       promise promises1 mem1 loc from to msg promises2 mem2 Memory.op_kind_add
   | promise_split
       ts3 msg3
       (PROMISES: Memory.split promises1 loc from to ts3 msg msg3 promises2)
       (MEM: Memory.split mem1 loc from to ts3 msg msg3 mem2)
       (TS: Memory.message_to msg loc to)
-      (RESERVE: exists val' released', msg = Message.full val' released'):
+      (RESERVE: exists val' released', msg = Message.concrete val' released'):
       promise promises1 mem1 loc from to msg promises2 mem2 (Memory.op_kind_split ts3 msg3)
   | promise_lower
       msg0
       (PROMISES: Memory.lower promises1 loc from to msg0 msg promises2)
       (MEM: Memory.lower mem1 loc from to msg0 msg mem2)
       (TS: Memory.message_to msg loc to)
-      (RESERVE: exists val released, msg0 = Message.full val released):
+      (RESERVE: exists val released, msg0 = Message.concrete val released):
       promise promises1 mem1 loc from to msg promises2 mem2 (Memory.op_kind_lower msg0)
   | promise_cancel
       (PROMISES: Memory.remove promises1 loc from to msg promises2)
@@ -59,8 +59,8 @@ Module AMemory.
             (promises3 mem2:Memory.t) (kind:Memory.op_kind): Prop :=
   | write_intro
       promises2
-      (PROMISE: promise promises1 mem1 loc from1 to1 (Message.full val released) promises2 mem2 kind)
-      (REMOVE: Memory.remove promises2 loc from1 to1 (Message.full val released) promises3)
+      (PROMISE: promise promises1 mem1 loc from1 to1 (Message.concrete val released) promises2 mem2 kind)
+      (REMOVE: Memory.remove promises2 loc from1 to1 (Message.concrete val released) promises3)
   .
   Hint Constructors write.
 
@@ -382,7 +382,7 @@ Module AMemory.
         promises1 mem1 loc from to val released promises2 mem2 kind
         (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind):
     <<GET_PROMISE: Memory.get loc to promises2 = None>> /\
-    <<GET_MEM: Memory.get loc to mem2 = Some (from, Message.full val released)>>.
+    <<GET_MEM: Memory.get loc to mem2 = Some (from, Message.concrete val released)>>.
   Proof.
     inv WRITE. splits.
     - erewrite Memory.remove_o; eauto. condtac; ss. des; ss.
@@ -393,7 +393,7 @@ Module AMemory.
         promises1 mem1 loc from to val released promises2 mem2 kind
         (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind)
         (CLOSED: Memory.closed mem1)
-        (MSG_CLOSED: Memory.closed_message (Message.full val released) mem2)
+        (MSG_CLOSED: Memory.closed_message (Message.concrete val released) mem2)
         (LE: Memory.le promises1 mem1)
         (FINITE: Memory.finite promises1)
         (BOT: Memory.bot_none promises1)

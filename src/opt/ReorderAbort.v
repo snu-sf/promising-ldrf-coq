@@ -146,10 +146,10 @@ Lemma write_step_consistent
     <<CONS2: Local.promise_consistent lc2>>.
 Proof.
   destruct (classic (exists f t v r, Memory.get loc t lc1.(Local.promises) =
-                                Some (f, Message.full v r))).
+                                Some (f, Message.concrete v r))).
   { des.
-    exploit Memory.min_full_ts_exists; eauto. i. des.
-    exploit Memory.min_full_ts_spec; eauto. i. des.
+    exploit Memory.min_concrete_ts_exists; eauto. i. des.
+    exploit Memory.min_concrete_ts_spec; eauto. i. des.
     exploit Memory.get_ts; try exact GET. i. des.
     { subst. inv WF1. rewrite BOT in *. ss. }
     clear f t v r H MIN.
@@ -164,7 +164,7 @@ Proof.
       erewrite Memory.split_o; eauto. repeat condtac; ss; i.
       - des; ss. subst. refl.
       - des; ss.
-        exploit Memory.min_full_ts_spec; eauto. i. des. ss. }
+        exploit Memory.min_concrete_ts_spec; eauto. i. des. ss. }
     inv x2. inv WRITE. inv PROMISE0. ss.
     clear RESERVE.
     unfold TimeMap.join, TimeMap.singleton.

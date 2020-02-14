@@ -231,7 +231,7 @@ Module Local.
 
   Definition promise_consistent (lc:t): Prop :=
     forall loc ts from val released
-       (PROMISE: Memory.get loc ts lc.(promises) = Some (from, Message.full val released)),
+       (PROMISE: Memory.get loc ts lc.(promises) = Some (from, Message.concrete val released)),
       Time.lt (lc.(tview).(TView.cur).(View.rlx) loc) ts.
 
   Lemma bot_promise_consistent
@@ -265,7 +265,7 @@ Module Local.
   | read_step_intro
       from
       tview2
-      (GET: Memory.get loc to mem1 = Some (from, Message.full val released))
+      (GET: Memory.get loc to mem1 = Some (from, Message.concrete val released))
       (READABLE: TView.readable lc1.(tview).(TView.cur) loc to released ord)
       (TVIEW: TView.read_tview lc1.(tview) loc to released ord = tview2)
       (LC2: lc2 = mk tview2 lc1.(promises)):

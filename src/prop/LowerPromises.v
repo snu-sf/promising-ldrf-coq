@@ -27,9 +27,9 @@ Set Implicit Arguments.
 
 Module LowerPromises.
   Inductive message_rel: forall (msg1 msg2: Message.t), Prop :=
-  | message_rel_full
+  | message_rel_concrete
       val released:
-      message_rel (Message.full val released) (Message.full val None)
+      message_rel (Message.concrete val released) (Message.concrete val None)
   | message_rel_reserve:
       message_rel Message.reserve Message.reserve
   .
@@ -112,7 +112,7 @@ Module LowerPromises.
         (REL: promises_rel_aux ((loc, to)::dom) promises1 promises1):
     <<REL1: promises_rel_aux dom promises1 promises1>> \/
     exists promises2 from val released,
-      <<LOWER: Memory.lower promises1 loc from to (Message.full val released) (Message.full val None) promises2>> /\
+      <<LOWER: Memory.lower promises1 loc from to (Message.concrete val released) (Message.concrete val None) promises2>> /\
       <<REL: promises_rel_aux dom promises1 promises2>> /\
       <<REL2: promises_rel_aux dom promises2 promises2>>.
   Proof.
@@ -137,8 +137,8 @@ Module LowerPromises.
         inv H1. des; ss.
     }
     right.
-    exploit (@Memory.lower_exists promises1 loc from to (Message.full val released)
-                                  (Message.full val None)); eauto.
+    exploit (@Memory.lower_exists promises1 loc from to (Message.concrete val released)
+                                  (Message.concrete val None)); eauto.
     { exploit Memory.get_ts; eauto. i. des; ss.
       subst. rewrite BOT in GET1. ss. }
     { econs. ss. }

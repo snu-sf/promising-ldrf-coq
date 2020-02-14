@@ -312,8 +312,8 @@ Module SimThreadOther.
         (WF_TGT: Local.wf e_tgt.(Thread.local) e_tgt.(Thread.memory))
         (CLOSED_SRC: Memory.closed e_src.(Thread.memory))
         (CLOSED_TGT: Memory.closed e_tgt.(Thread.memory))
-        (SC_SRC: Memory.max_full_timemap cap_src sc_src)
-        (SC_TGT: Memory.max_full_timemap cap_tgt sc_tgt)
+        (SC_SRC: Memory.max_concrete_timemap cap_src sc_src)
+        (SC_TGT: Memory.max_concrete_timemap cap_tgt sc_tgt)
         (CAP_SRC: Memory.cap e_src.(Thread.local).(Local.promises) e_src.(Thread.memory) cap_src)
         (CAP_TGT: Memory.cap e_tgt.(Thread.local).(Local.promises) e_tgt.(Thread.memory) cap_tgt):
     sim_thread l
@@ -322,7 +322,7 @@ Module SimThreadOther.
   Proof.
     inv SIM. inv LOCAL.
     exploit sim_memory_cap; [apply PROMISES1|exact MEMORY|..]; eauto. i. des.
-    hexploit sim_memory_max_full_timemap; try exact x0; eauto. i. des.
+    hexploit sim_memory_max_concrete_timemap; try exact x0; eauto. i. des.
     econs; eauto.
     s. eapply cap_fulfillable; eauto. apply WF_SRC.
   Qed.
@@ -341,13 +341,13 @@ Module SimThreadOther.
   Proof.
     exploit Memory.cap_exists; try exact CLOSED_TGT. i. des.
     exploit Memory.cap_closed; eauto. i.
-    exploit Memory.max_full_timemap_exists; try apply x0. i. des.
+    exploit Memory.max_concrete_timemap_exists; try apply x0. i. des.
     ii.
     exploit sim_thread_cap; try exact SIM; try exact CAP0; try exact CAP; eauto. i.
     exploit Local.cap_wf; try exact WF_SRC; eauto. intro WF_CAP_SRC.
     exploit Local.cap_wf; try exact WF_TGT; eauto. intro WF_CAP_TGT.
-    hexploit Memory.max_full_timemap_closed; try exact SC_MAX. intro SC_MAX_SRC.
-    hexploit Memory.max_full_timemap_closed; try exact x1. intro SC_MAX_TGT.
+    hexploit Memory.max_concrete_timemap_closed; try exact SC_MAX. intro SC_MAX_SRC.
+    hexploit Memory.max_concrete_timemap_closed; try exact x1. intro SC_MAX_TGT.
     exploit Memory.cap_closed; try exact CLOSED_SRC; eauto. intro CLOSED_CAP_SRC.
     exploit Memory.cap_closed; try exact CLOSED_TGT; eauto. intro CLOSED_CAP_TGT.
     exploit CONSISTENT_TGT; eauto. i. des.

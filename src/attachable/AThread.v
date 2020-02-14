@@ -37,7 +37,7 @@ Module AThread.
         loc from to msg kind
         lc2 mem2
         (LOCAL: ALocal.promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
-        (PF: pf = orb (andb (Memory.op_kind_is_lower_full kind) (Message.is_released_none msg))
+        (PF: pf = orb (andb (Memory.op_kind_is_lower_concrete kind) (Message.is_released_none msg))
                       (Memory.op_kind_is_cancel kind)):
         promise_step pf (ThreadEvent.promise loc from to msg kind) (Thread.mk lang st lc1 sc1 mem1) (Thread.mk lang st lc2 sc1 mem2)
     .
@@ -106,7 +106,7 @@ Module AThread.
     Definition consistent (e:Thread.t lang): Prop :=
       forall mem1 sc1
         (CAP: Memory.cap e.(Thread.local).(Local.promises) e.(Thread.memory) mem1)
-        (SC_MAX: Memory.max_full_timemap mem1 sc1),
+        (SC_MAX: Memory.max_concrete_timemap mem1 sc1),
         <<FAILURE: steps_failure (Thread.mk lang e.(Thread.state) e.(Thread.local) sc1 mem1)>> \/
         exists e2,
           <<STEPS: rtc tau_step (Thread.mk lang e.(Thread.state) e.(Thread.local) sc1 mem1) e2>> /\

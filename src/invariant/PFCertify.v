@@ -41,7 +41,7 @@ Module PFCertify.
     option (Time.t * Message.t) :=
     if Memory.get loc (latests loc) promises
     then None
-    else Some (from, Message.full val released).
+    else Some (from, Message.concrete val released).
 
   Inductive sim_memory (latests: TimeMap.t) (caps: Loc.t -> option Time.t) (promises mem_src mem_tgt: Memory.t): Prop :=
   | sim_memory_intro
@@ -59,9 +59,9 @@ Module PFCertify.
       (LATESTS: forall loc to (CAP: Some to = caps loc), Time.lt (latests loc) to)
       (CAPS: forall loc to (CAP: Some to = caps loc),
           exists f val r from released,
-            <<LATEST: Memory.get loc (latests loc) mem_tgt = Some (f, Message.full val r)>> /\
+            <<LATEST: Memory.get loc (latests loc) mem_tgt = Some (f, Message.concrete val r)>> /\
             <<CAP_SRC: Memory.get loc to mem_src = cap_src latests loc promises from val released>> /\
-            <<CAP_TGT: Memory.get loc to mem_tgt = Some (from, Message.full val released)>> /\
+            <<CAP_TGT: Memory.get loc to mem_tgt = Some (from, Message.concrete val released)>> /\
             <<CAPP: Memory.get loc to promises = None>>)
   .
 
@@ -494,13 +494,13 @@ Module PFCertify.
         (MEM1: sim_memory latests caps promises1 mem1_src mem1_tgt)
         (LE1_TGT: Memory.le promises1 mem1_tgt)
         (CLOSED1_TGT: Memory.closed mem1_tgt)
-        (ADD_SRC: Memory.add mem1_src loc from (latests loc) (Message.full val released) mem2_src)
-        (PROMISE_TGT: Memory.promise promises1 mem1_tgt loc from (latests loc) (Message.full val released) promises2 mem2_tgt kind)
-        (REMOVE_SRC: Memory.remove promises2 loc from (latests loc) (Message.full val released) promises3)
+        (ADD_SRC: Memory.add mem1_src loc from (latests loc) (Message.concrete val released) mem2_src)
+        (PROMISE_TGT: Memory.promise promises1 mem1_tgt loc from (latests loc) (Message.concrete val released) promises2 mem2_tgt kind)
+        (REMOVE_SRC: Memory.remove promises2 loc from (latests loc) (Message.concrete val released) promises3)
         (TO: caps loc = Some to):
     exists from_cap released_cap mem3_src,
-      <<CAP_TGT: Memory.get loc to mem2_tgt = Some (from_cap, Message.full val released_cap)>> /\
-      <<ADD: Memory.add mem2_src loc from_cap to (Message.full val released_cap) mem3_src>> /\
+      <<CAP_TGT: Memory.get loc to mem2_tgt = Some (from_cap, Message.concrete val released_cap)>> /\
+      <<ADD: Memory.add mem2_src loc from_cap to (Message.concrete val released_cap) mem3_src>> /\
       <<MEM2: sim_memory latests caps promises3 mem3_src mem2_tgt>>.
   Proof.
     inv PROMISE_TGT; ss.
@@ -520,7 +520,7 @@ Module PFCertify.
     rewrite GET1 in *. inv LATEST. inv MSG_LE. clear MSG_LE0.
     unfold cap_src in CAP_SRC. rewrite GET in *.
     exploit LATESTS; eauto. intro LATEST_LT.
-    exploit (@Memory.add_exists mem2_src loc from0 to (Message.full val0 released0)).
+    exploit (@Memory.add_exists mem2_src loc from0 to (Message.concrete val0 released0)).
     { ii. revert GET3.
       erewrite Memory.add_o; eauto. condtac; ss; i.
       - des. subst. inv GET3.
@@ -776,11 +776,11 @@ Module PFCertify.
                                     releasedm released ord lc2_tgt sc2 mem2_tgt kind):
     exists mem2_src,
       Memory.add mem1_src loc from to
-                 (Message.full val (TView.write_released (Local.tview lc1_tgt) sc1 loc to releasedm ord)) mem2_src.
+                 (Message.concrete val (TView.write_released (Local.tview lc1_tgt) sc1 loc to releasedm ord)) mem2_src.
   Proof.
     inv STEP_TGT. inv WRITE.
     exploit (@Memory.add_exists mem1_src loc from to
-                                (Message.full val (TView.write_released (Local.tview lc1_tgt) sc1 loc to releasedm ord))); eauto.
+                                (Message.concrete val (TView.write_released (Local.tview lc1_tgt) sc1 loc to releasedm ord))); eauto.
     { inv MEM1. inv PROMISE; ss; ii.
       - clear TS RESERVE.
         exploit SOUND; eauto. i.
@@ -877,7 +877,7 @@ Module PFCertify.
     exists lc2_src mem2_src mem3_src from_cap released_cap,
       <<STEP_SRC: ALocal.write_step lc1_src sc1 mem1_src loc from (latests loc) val
                                     releasedm released ord lc2_src sc2 mem2_src Memory.op_kind_add>> /\
-      <<ADD: Memory.add mem2_src loc from_cap to (Message.full val released_cap) mem3_src>> /\
+      <<ADD: Memory.add mem2_src loc from_cap to (Message.concrete val released_cap) mem3_src>> /\
       <<LOCAL2: sim_local lc2_src lc2_tgt>> /\
       <<MEM2: sim_memory latests caps lc2_tgt.(Local.promises) mem3_src mem2_tgt>>.
   Proof.
@@ -938,9 +938,9 @@ Module PFCertify.
       mem1 mem2
       loc from to val released
       from_cap to_cap released_cap
-      (GET: Memory.get loc to mem1 = Some (from, Message.full val released))
+      (GET: Memory.get loc to mem1 = Some (from, Message.concrete val released))
       (CAPTS: caps loc = Some to_cap)
-      (LOWER: Memory.add mem1 loc from_cap to_cap (Message.full val released_cap) mem2):
+      (LOWER: Memory.add mem1 loc from_cap to_cap (Message.concrete val released_cap) mem2):
       add_cap caps mem1 mem2
   .
   Hint Constructors add_cap.
@@ -1132,12 +1132,12 @@ Module PFCertify.
     option (Time.t * Message.t) :=
     if Cell.get latest promises
     then None
-    else Some (from, Message.full val released).
+    else Some (from, Message.concrete val released).
 
   Inductive sim_cell (latest: Time.t) (cap: option Time.t) (promises cell_src cell_tgt: Cell.t): Prop :=
   | sim_cell_intro
       (LATEST: exists from val released,
-          Cell.get latest cell_tgt = Some (from, Message.full val released))
+          Cell.get latest cell_tgt = Some (from, Message.concrete val released))
       (SOUND: Cell.le cell_src cell_tgt)
       (COMPLETE1: forall to from msg
                    (CAP: Some to <> cap)
@@ -1152,16 +1152,16 @@ Module PFCertify.
       (LATEST: forall to (CAP: Some to = cap), Time.lt latest to)
       (CAP: forall to (CAP: Some to = cap),
           exists f val r from released,
-            <<LATEST: Cell.get latest cell_tgt = Some (f, Message.full val r)>> /\
+            <<LATEST: Cell.get latest cell_tgt = Some (f, Message.concrete val r)>> /\
             <<CAP_SRC: Cell.get to cell_src = cap_src_cell latest promises from val released>> /\
-            <<CAP_TGT: Cell.get to cell_tgt = Some (from, Message.full val released)>> /\
+            <<CAP_TGT: Cell.get to cell_tgt = Some (from, Message.concrete val released)>> /\
             <<CAPP: Cell.get to promises = None>>)
   .
 
   Inductive sim_cell_aux (latest: Time.t) (cap: option Time.t) (dom: list Time.t) (promises cell_src cell_tgt: Cell.t): Prop :=
   | sim_cell_aux_intro
       (LATEST: exists from val released,
-          Cell.get latest cell_tgt = Some (from, Message.full val released))
+          Cell.get latest cell_tgt = Some (from, Message.concrete val released))
       (SOUND: Cell.le cell_src cell_tgt)
       (COMPLETE1: forall from to msg
                     (CAP: Some to <> cap)
@@ -1171,8 +1171,8 @@ Module PFCertify.
       (COMPLETE2: forall from to val released
                     (CAP: Some to <> cap)
                     (GETP: Cell.get to promises = None)
-                    (GET_TGT: Cell.get to cell_tgt = Some (from, Message.full val released)),
-          <<GET_SRC: Cell.get to cell_src = Some (from, Message.full val released)>>)
+                    (GET_TGT: Cell.get to cell_tgt = Some (from, Message.concrete val released)),
+          <<GET_SRC: Cell.get to cell_src = Some (from, Message.concrete val released)>>)
       (RESERVE: forall from to
                (IN: List.In to dom)
                (GETP: Cell.get to promises = None)
@@ -1181,19 +1181,19 @@ Module PFCertify.
       (LATESTS: forall to (CAP: Some to = cap), Time.lt latest to)
       (CAP: forall to (CAP: Some to = cap),
           exists f val r from released,
-            <<LATEST: Cell.get latest cell_tgt = Some (f, Message.full val r)>> /\
+            <<LATEST: Cell.get latest cell_tgt = Some (f, Message.concrete val r)>> /\
             <<CAP_SRC: List.In to dom /\
                        Cell.get to cell_src = cap_src_cell latest promises from val released \/
                        ~ List.In to dom /\
                        Cell.get to cell_src = None>> /\
-            <<CAP_TGT: Cell.get to cell_tgt = Some (from, Message.full val released)>> /\
+            <<CAP_TGT: Cell.get to cell_tgt = Some (from, Message.concrete val released)>> /\
             <<CAPP: Cell.get to promises = None>>)
   .
 
   Inductive cap_cell (promises cell1 cell2: Cell.t): Prop :=
   | cap_cell_intro
       latest
-      (LATEST: Cell.max_full_ts cell1 latest)
+      (LATEST: Cell.max_concrete_ts cell1 latest)
       (SOUND: Cell.le cell1 cell2)
       (MIDDLE: forall from1 to1 from2 to2
                  (ADJ: Cell.adjacent from1 to1 from2 to2 cell1)
@@ -1203,8 +1203,8 @@ Module PFCertify.
                (TO: to = Time.incr (Cell.max_ts cell1))
                (PROMISE: Cell.latest_reserve promises cell1),
           exists f val r released,
-            Cell.get latest cell1 = Some (f, Message.full val r) /\
-            Cell.get to cell2 = Some (Cell.max_ts cell1, Message.full val released))
+            Cell.get latest cell1 = Some (f, Message.concrete val r) /\
+            Cell.get to cell2 = Some (Cell.max_ts cell1, Message.concrete val released))
       (COMPLETE: forall from to msg
                    (GET2: Cell.get to cell2 = Some (from, msg)),
           <<GET1: Cell.get to cell1 = Some (from, msg)>> \/
@@ -1220,9 +1220,9 @@ Module PFCertify.
 
   Definition vals_incl_cell (cell1 cell2: Cell.t): Prop :=
     forall from to val released
-      (GET1: Cell.get to cell1 = Some (from, Message.full val released)),
+      (GET1: Cell.get to cell1 = Some (from, Message.concrete val released)),
     exists f t r,
-      <<GET2: Cell.get t cell2 = Some (f, Message.full val r)>>.
+      <<GET2: Cell.get t cell2 = Some (f, Message.concrete val r)>>.
 
   Program Instance vals_incl_cell_PreOrder: PreOrder vals_incl_cell.
   Next Obligation.
@@ -1238,7 +1238,7 @@ Module PFCertify.
         (CLOSED: Memory.closed mem1):
     forall loc, cap_cell (promises loc) (mem1 loc) (mem2 loc).
   Proof.
-    exploit Memory.max_full_timemap_exists; try apply CLOSED. i. des.
+    exploit Memory.max_concrete_timemap_exists; try apply CLOSED. i. des.
     dup CAP. inv CAP0.
     econs; i; eauto.
     - apply x0.
@@ -1247,7 +1247,7 @@ Module PFCertify.
     - exploit (@Memory.latest_val_exists loc mem1); try apply CLOSED. i. des.
       exploit BACK; eauto. i.
       inv x1. specialize (x0 loc).
-      exploit Memory.max_full_ts_inj; [exact MAX|exact x0|..]. i. subst.
+      exploit Memory.max_concrete_ts_inj; [exact MAX|exact x0|..]. i. subst.
       inv x0. des.
       unfold Memory.get in GET. rewrite GET in *. inv GET0.
       esplits; eauto.
@@ -1277,7 +1277,7 @@ Module PFCertify.
         (CLOSED1_TGT: Memory.closed mem1_tgt)
         (CLOSED2_TGT: Memory.closed mem2_tgt)
         (CAP: Memory.cap promises mem1_tgt mem2_tgt)
-        (MAX: Memory.max_full_timemap mem1_tgt latests):
+        (MAX: Memory.max_concrete_timemap mem1_tgt latests):
     forall loc,
     exists cap cell_src,
       sim_cell (latests loc) cap (promises loc) cell_src (mem2_tgt loc) /\
@@ -1305,7 +1305,7 @@ Module PFCertify.
       instantiate (1 := loc) in x0.
       inv SIM. inv x0.
       specialize (MAX loc).
-      exploit Memory.max_full_ts_inj; [exact MAX|apply LATEST|..]. i. subst.
+      exploit Memory.max_concrete_ts_inj; [exact MAX|apply LATEST|..]. i. subst.
       econs; ii; eauto.
       - inv MAX. des. exploit SOUND0; eauto.
       - eapply COMPLETE1; eauto.
@@ -1418,7 +1418,7 @@ Module PFCertify.
     exploit cap_cap_cell; eauto. i.
     instantiate (1 := loc) in x0. inv x0.
     exploit BACK; eauto. i. des.
-    exploit Cell.max_full_ts_inj; [eapply MAX|exact LATEST|..]. i. subst.
+    exploit Cell.max_concrete_ts_inj; [eapply MAX|exact LATEST|..]. i. subst.
     clear LATEST SOUND MIDDLE BACK COMPLETE.
     unfold Memory.max_ts in *. rewrite GETT in *. inv x0.
     destruct (Cell.get (latests loc) (promises loc)) as [[]|] eqn:LATESTP.
@@ -1432,7 +1432,7 @@ Module PFCertify.
         unfold cap_src_cell. rewrite LATESTP. ss.
     }
     exploit (@Cell.add_exists cell_src (Cell.max_ts (mem1_tgt loc))
-                              (Time.incr (Cell.max_ts (mem1_tgt loc))) (Message.full val released)).
+                              (Time.incr (Cell.max_ts (mem1_tgt loc))) (Message.concrete val released)).
     { ii. inv IHdom. exploit SOUND; try exact GET2. i.
       exploit Memory.get_disjoint; [exact GETT|exact x1|..]. i. des.
       - subst. congr.
@@ -1481,7 +1481,7 @@ Module PFCertify.
       sim_memory latests caps promises mem2_src mem2_tgt /\
       vals_incl mem2_src mem1_src.
   Proof.
-    exploit Memory.max_full_timemap_exists; try apply CLOSED1_TGT. i. des.
+    exploit Memory.max_concrete_timemap_exists; try apply CLOSED1_TGT. i. des.
     exists tm.
     cut (exists (caps_mem: Loc.t -> ((option Time.t) * Cell.t)),
             forall loc,
@@ -1515,7 +1515,7 @@ Module PFCertify.
         (WF1_TGT: Local.wf e_tgt.(Thread.local) e_tgt.(Thread.memory))
         (SC1_TGT: Memory.closed_timemap e_tgt.(Thread.sc) e_tgt.(Thread.memory))
         (MEM1_TGT: Memory.closed e_tgt.(Thread.memory))
-        (SC_TGT: Memory.max_full_timemap mem1_tgt sc1)
+        (SC_TGT: Memory.max_concrete_timemap mem1_tgt sc1)
         (CAP_TGT: Memory.cap e_tgt.(Thread.local).(Local.promises) e_tgt.(Thread.memory) mem1_tgt):
     exists latests caps mem1_src,
       <<SIM: sim_thread latests caps

@@ -69,14 +69,14 @@ Proof.
   eapply Memory.max_ts_spec. eauto.
 Qed.
 
-Lemma closed_timemap_max_full_ts
+Lemma closed_timemap_max_concrete_ts
       loc tm mem mts
       (CLOSED: Memory.closed_timemap tm mem)
-      (MAX: Memory.max_full_ts mem loc mts):
+      (MAX: Memory.max_concrete_ts mem loc mts):
   Time.le (tm loc) mts.
 Proof.
   specialize (CLOSED loc). des.
-  eapply Memory.max_full_ts_spec; eauto.
+  eapply Memory.max_concrete_ts_spec; eauto.
 Qed.
 
 Lemma progress_promise_step
@@ -90,12 +90,12 @@ Lemma progress_promise_step
       (CLOSED_REL: Memory.closed_opt_view releasedm mem1):
   exists promises2 mem2,
     Local.promise_step lc1 mem1 loc (Memory.max_ts loc mem1) to
-                       (Message.full val (TView.write_released (Local.tview lc1) sc1 loc to releasedm ord))
+                       (Message.concrete val (TView.write_released (Local.tview lc1) sc1 loc to releasedm ord))
                        (Local.mk lc1.(Local.tview) promises2) mem2 Memory.op_kind_add.
 Proof.
   exploit (@Memory.add_exists_max_ts
              mem1 loc to
-             (Message.full val (TView.write_released (Local.tview lc1) sc1 loc to releasedm ord))); eauto.
+             (Message.concrete val (TView.write_released (Local.tview lc1) sc1 loc to releasedm ord))); eauto.
   { econs. eapply TViewFacts.write_future0; eauto. apply WF1. }
   i. des.
   exploit Memory.add_exists_le; try apply WF1; eauto. i. des.
@@ -132,14 +132,14 @@ Lemma progress_read_step
       (WF1: Local.wf lc1 mem1)
       (MEM1: Memory.closed mem1):
   exists val released lc2 mts,
-    <<MAX: Memory.max_full_ts mem1 loc mts>> /\
+    <<MAX: Memory.max_concrete_ts mem1 loc mts>> /\
     <<READ: Local.read_step lc1 mem1 loc mts val released ord lc2>>.
 Proof.
   dup MEM1. inv MEM0.
-  exploit (Memory.max_full_ts_exists); eauto. i. des.
-  exploit (Memory.max_full_ts_spec); eauto. i. des.
+  exploit (Memory.max_concrete_ts_exists); eauto. i. des.
+  exploit (Memory.max_concrete_ts_spec); eauto. i. des.
   esplits; eauto. econs; eauto.
-  econs; i; eapply Memory.max_full_ts_spec2; eauto; apply WF1.
+  econs; i; eapply Memory.max_concrete_ts_spec2; eauto; apply WF1.
 Qed.
 
 Lemma progress_read_step_cur
@@ -201,7 +201,7 @@ Proof.
   { subst. inv WF1. rewrite BOT in GET. ss. }
   exploit (@Memory.split_exists
              lc1.(Local.promises) loc from (Time.middle from to) to
-             (Message.full val (TView.write_released (Local.tview lc1) sc1 loc (Time.middle from to) releasedm ord))
+             (Message.concrete val (TView.write_released (Local.tview lc1) sc1 loc (Time.middle from to) releasedm ord))
              msg);
     try apply Time.middle_spec; auto.
   { econs. eapply TViewFacts.write_future0; eauto. apply WF1. }

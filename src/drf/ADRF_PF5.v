@@ -1001,7 +1001,7 @@ Lemma sim_pf_step
 Proof.
   inv SIM.
   eapply sim_pf_impl with (tids0 := fun tid0 => tid <> tid0) in SIM0; ss.
-  exploit sim_pf_step_minus_full; eauto. i. des.
+  exploit sim_pf_step_minus_concrete; eauto. i. des.
   unguard. des; cycle 1.
   { exists c_src1. esplits; eauto. }
   exploit sim_pf_step_pf_consistent; eauto. i. des; cycle 1.
@@ -1040,7 +1040,7 @@ Proof.
       unfold Memory.latest_reserve in UPDATES.
       des_ifs. inv WFTGT. inv WF. exploit THREADS1; eauto. intros LCWFTGT.
       inv LCWFTGT. dup Heq. eapply PROMISES in Heq0.
-      exploit max_full_ts_max_ts; eauto.
+      exploit max_concrete_ts_max_ts; eauto.
       { inv MEM0. auto. }
       i. des.
       * destruct (MAX loc). des. unfold Memory.get in Heq0.

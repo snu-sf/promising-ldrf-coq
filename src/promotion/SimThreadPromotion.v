@@ -117,7 +117,7 @@ Module SimThreadPromotion.
 
   Definition safe (l: Loc.t) (lc: Local.t) (mem: Memory.t): Prop :=
     forall from to val released
-      (GET: Memory.get l to mem = Some (from, Message.full val (Some released))),
+      (GET: Memory.get l to mem = Some (from, Message.concrete val (Some released))),
       View.le released lc.(Local.tview).(TView.cur).
 
   Inductive sim_thread (l: Loc.t) (r: Reg.t) (e_src e_tgt: Thread.t lang): Prop :=
@@ -132,7 +132,7 @@ Module SimThreadPromotion.
                                   e_src.(Thread.local).(Local.promises))
       (LATEST: exists from released,
           Memory.get l (Memory.max_ts l e_src.(Thread.memory)) e_src.(Thread.memory) =
-          Some (from, Message.full val released))
+          Some (from, Message.concrete val released))
       (PROMISES: forall to, Memory.get l to e_src.(Thread.local).(Local.promises) = None)
       (SAFE: safe l e_src.(Thread.local) e_src.(Thread.memory))
   .
@@ -154,7 +154,7 @@ Module SimThreadPromotion.
           <<PROMISE: Memory.get l (Memory.max_ts l e_src.(Thread.memory)) e_src.(Thread.local).(Local.promises) =
                      Some (from, Message.reserve)>> /\
           <<LATEST: Memory.get l from e_src.(Thread.memory) =
-                    Some (from', Message.full val released)>>)
+                    Some (from', Message.concrete val released)>>)
       (PROMISES: forall to (TO: to <> Memory.max_ts l e_src.(Thread.memory)),
           Memory.get l to e_src.(Thread.local).(Local.promises) = None)
       (SAFE: safe l e_src.(Thread.local) e_src.(Thread.memory))
@@ -1102,7 +1102,7 @@ Module SimThreadPromotion.
         (CLOSED: Memory.closed mem1)
         (MEM : Memory.get l (Memory.max_ts l mem1) mem1 = Some (from, Message.reserve))
         (PROMISE : Memory.get l (Memory.max_ts l mem1) promises = Some (from, Message.reserve))
-        (LATEST : Memory.get l from mem1 = Some (from', Message.full val released)):
+        (LATEST : Memory.get l from mem1 = Some (from', Message.concrete val released)):
     Memory.max_ts l mem1 = Memory.max_ts l mem2.
   Proof.
     dup CAP. inv CAP.
@@ -1131,8 +1131,8 @@ Module SimThreadPromotion.
         (WF_TGT: Local.wf e_tgt.(Thread.local) e_tgt.(Thread.memory))
         (CLOSED_SRC: Memory.closed e_src.(Thread.memory))
         (CLOSED_TGT: Memory.closed e_tgt.(Thread.memory))
-        (SC_SRC: Memory.max_full_timemap cap_src sc_src)
-        (SC_TGT: Memory.max_full_timemap cap_tgt sc_tgt)
+        (SC_SRC: Memory.max_concrete_timemap cap_src sc_src)
+        (SC_TGT: Memory.max_concrete_timemap cap_tgt sc_tgt)
         (CAP_SRC: Memory.cap e_src.(Thread.local).(Local.promises) e_src.(Thread.memory) cap_src)
         (CAP_TGT: Memory.cap e_tgt.(Thread.local).(Local.promises) e_tgt.(Thread.memory) cap_tgt):
     sim_thread_reserve l r
@@ -1141,7 +1141,7 @@ Module SimThreadPromotion.
   Proof.
     inv SIM. inv LOCAL.
     exploit sim_memory_cap; [apply PROMISES1|exact MEMORY|..]; eauto. i. des.
-    hexploit sim_memory_max_full_timemap; try exact x0; eauto. i. des.
+    hexploit sim_memory_max_concrete_timemap; try exact x0; eauto. i. des.
     exploit sim_thread_reserve_cap_max_ts; try exact CAP_SRC; eauto. i.
     econs; eauto; s.
     - eapply cap_fulfillable; eauto. apply WF_SRC.
@@ -1169,13 +1169,13 @@ Module SimThreadPromotion.
   Proof.
     exploit Memory.cap_exists; try exact CLOSED_TGT. i. des.
     exploit Memory.cap_closed; eauto. i.
-    exploit Memory.max_full_timemap_exists; try apply x0. i. des.
+    exploit Memory.max_concrete_timemap_exists; try apply x0. i. des.
     ii.
     exploit sim_thread_reserve_cap; try exact SIM; try exact CAP0; try exact CAP; eauto. i.
     exploit Local.cap_wf; try exact WF_SRC; eauto. intro WF_CAP_SRC.
     exploit Local.cap_wf; try exact WF_TGT; eauto. intro WF_CAP_TGT.
-    hexploit Memory.max_full_timemap_closed; try exact SC_MAX. intro SC_MAX_SRC.
-    hexploit Memory.max_full_timemap_closed; try exact x1. intro SC_MAX_TGT.
+    hexploit Memory.max_concrete_timemap_closed; try exact SC_MAX. intro SC_MAX_SRC.
+    hexploit Memory.max_concrete_timemap_closed; try exact x1. intro SC_MAX_TGT.
     exploit Memory.cap_closed; try exact CLOSED_SRC; eauto. intro CLOSED_CAP_SRC.
     exploit Memory.cap_closed; try exact CLOSED_TGT; eauto. intro CLOSED_CAP_TGT.
     exploit CONSISTENT_TGT; eauto. i. des.

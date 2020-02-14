@@ -223,11 +223,11 @@ Section MAPPED.
   | msg_map_reserve
     :
       msg_map Message.reserve Message.reserve
-  | msg_map_full
+  | msg_map_concrete
       val released freleased
       (MAP: opt_view_map released freleased)
     :
-      msg_map (Message.full val released) (Message.full val freleased)
+      msg_map (Message.concrete val released) (Message.concrete val freleased)
   .
 
   Inductive memory_op_kind_map (loc: Loc.t) : Memory.op_kind -> Memory.op_kind -> Prop :=
@@ -877,7 +877,7 @@ Section MAPPED.
     hexploit (choice (fun loc to =>
                         (<<MAP: f loc (tm loc) to>>) /\
                         exists from val released,
-                          Memory.get loc to fmem = Some (from, Message.full val released))).
+                          Memory.get loc to fmem = Some (from, Message.concrete val released))).
     { intros loc. specialize (CLOSED loc). des.
       inv MEM. eapply MAPPED in CLOSED. des; clarify.
       inv MSG. inv MSGLE.
@@ -2082,7 +2082,7 @@ Section MAPPED.
     exists fto, (<<MAPPED: f loc to fto>>).
 
   Definition mappable_memory mem :=
-    forall loc to from val released (GET: Memory.get loc to mem = Some (from, Message.full val released)),
+    forall loc to from val released (GET: Memory.get loc to mem = Some (from, Message.concrete val released)),
       mappable_time loc to.
 
   Lemma mappable_memory_op mem0 loc from to msg mem1 kind
@@ -2178,7 +2178,7 @@ Section MAPPED.
   Proof.
     inv CLOSED.
     - exploit opt_view_map_exists; eauto. i. des.
-      exists (Message.full val fvw).
+      exists (Message.concrete val fvw).
       esplits; eauto. econs; eauto.
     - exists Message.reserve.
       esplits; eauto. econs; eauto.

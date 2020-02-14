@@ -34,9 +34,9 @@ Module PFCommon.
 
   Definition vals_incl (mem1 mem2: Memory.t): Prop :=
     forall loc from to val released
-      (GET1: Memory.get loc to mem1 = Some (from, Message.full val released)),
+      (GET1: Memory.get loc to mem1 = Some (from, Message.concrete val released)),
     exists f t r,
-      <<GET2: Memory.get loc t mem2 = Some (f, Message.full val r)>>.
+      <<GET2: Memory.get loc t mem2 = Some (f, Message.concrete val r)>>.
 
   Program Instance vals_incl_PreOrder: PreOrder vals_incl.
   Next Obligation.

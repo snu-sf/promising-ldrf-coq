@@ -164,10 +164,10 @@ Module Memory.
   Definition init: t := fun _ => Cell.init.
 
   Inductive message_to: forall (msg:Message.t) (loc:Loc.t) (to:Time.t), Prop :=
-  | message_to_full
+  | message_to_concrete
       val released loc to
       (TS: Time.le (released.(View.unwrap).(View.rlx) loc) to):
-      message_to (Message.full val released) loc to
+      message_to (Message.concrete val released) loc to
   | message_to_reserve
       loc to:
       message_to Message.reserve loc to
@@ -175,7 +175,7 @@ Module Memory.
   Hint Constructors message_to.
 
   Definition closed_timemap (times:TimeMap.t) (mem:t): Prop :=
-    forall loc, exists from val released, get loc (times loc) mem = Some (from, Message.full val released).
+    forall loc, exists from val released, get loc (times loc) mem = Some (from, Message.concrete val released).
 
   Inductive closed_view (view:View.t) (mem:t): Prop :=
   | closed_view_intro
@@ -196,10 +196,10 @@ Module Memory.
   Hint Constructors closed_opt_view.
 
   Inductive closed_message: forall (msg:Message.t) (mem:t), Prop :=
-  | closed_message_full
+  | closed_message_concrete
       val released mem
       (CLOSED: closed_opt_view released mem):
-      closed_message (Message.full val released) mem
+      closed_message (Message.concrete val released) mem
   | closed_message_reserve
       mem:
       closed_message Message.reserve mem
@@ -324,8 +324,8 @@ Module Memory.
   Definition op_kind_is_lower_reserve (kind:op_kind): bool :=
     match kind with op_kind_lower Message.reserve => true | _ => false end.
 
-  Definition op_kind_is_lower_full (kind:op_kind): bool :=
-    match kind with op_kind_lower (Message.full _ _) => true | _ => false end.
+  Definition op_kind_is_lower_concrete (kind:op_kind): bool :=
+    match kind with op_kind_lower (Message.concrete _ _) => true | _ => false end.
 
   Definition op_kind_is_cancel kind :=
     match kind with op_kind_cancel => true | _ => false end.
@@ -371,9 +371,9 @@ Module Memory.
       (TS: message_to msg loc to)
       (RESERVE: msg = Message.reserve ->
              exists from' val' released',
-               get loc from mem1 = Some (from', Message.full val' released'))
+               get loc from mem1 = Some (from', Message.concrete val' released'))
       (ATTACH: forall val released to' msg'
-                 (MSG: msg = Message.full val released)
+                 (MSG: msg = Message.concrete val released)
                  (GET: get loc to' mem1 = Some (to, msg')), False):
       promise promises1 mem1 loc from to msg promises2 mem2 op_kind_add
   | promise_split
@@ -381,14 +381,14 @@ Module Memory.
       (PROMISES: split promises1 loc from to ts3 msg msg3 promises2)
       (MEM: split mem1 loc from to ts3 msg msg3 mem2)
       (TS: message_to msg loc to)
-      (RESERVE: exists val' released', msg = Message.full val' released'):
+      (RESERVE: exists val' released', msg = Message.concrete val' released'):
       promise promises1 mem1 loc from to msg promises2 mem2 (op_kind_split ts3 msg3)
   | promise_lower
       msg0
       (PROMISES: lower promises1 loc from to msg0 msg promises2)
       (MEM: lower mem1 loc from to msg0 msg mem2)
       (TS: message_to msg loc to)
-      (RESERVE: exists val released, msg0 = Message.full val released):
+      (RESERVE: exists val released, msg0 = Message.concrete val released):
       promise promises1 mem1 loc from to msg promises2 mem2 (op_kind_lower msg0)
   | promise_cancel
       (PROMISES: remove promises1 loc from to msg promises2)
@@ -404,8 +404,8 @@ Module Memory.
             (promises3 mem2:t) (kind:op_kind): Prop :=
   | write_intro
       promises2
-      (PROMISE: promise promises1 mem1 loc from1 to1 (Message.full val released) promises2 mem2 kind)
-      (REMOVE: remove promises2 loc from1 to1 (Message.full val released) promises3)
+      (PROMISE: promise promises1 mem1 loc from1 to1 (Message.concrete val released) promises2 mem2 kind)
+      (REMOVE: remove promises2 loc from1 to1 (Message.concrete val released) promises3)
   .
   Hint Constructors write.
 
@@ -730,11 +730,11 @@ Module Memory.
   Lemma future_get1
         loc from to val released mem1 mem2
         (LE: future mem1 mem2)
-        (GET: get loc to mem1 = Some (from, Message.full val released)):
+        (GET: get loc to mem1 = Some (from, Message.concrete val released)):
     exists from' msg',
       <<GET: get loc to mem2 = Some (from', msg')>> /\
       <<FROM: Time.le from from'>> /\
-      <<MSG_LE: Message.le msg' (Message.full val released)>>.
+      <<MSG_LE: Message.le msg' (Message.concrete val released)>>.
   Proof.
     revert from val released GET. induction LE.
     { i. esplits; eauto; refl. }
@@ -1199,7 +1199,7 @@ Module Memory.
 
   Lemma singleton_closed_timemap
         loc from to val released mem
-        (GET: get loc to mem = Some (from, Message.full val released))
+        (GET: get loc to mem = Some (from, Message.concrete val released))
         (INHABITED: inhabited mem):
     closed_timemap (TimeMap.singleton loc to) mem.
   Proof.
@@ -1210,7 +1210,7 @@ Module Memory.
 
   Lemma singleton_ur_closed_view
         loc from to val released mem
-        (GET: get loc to mem = Some (from, Message.full val released))
+        (GET: get loc to mem = Some (from, Message.concrete val released))
         (INHABITED: inhabited mem):
     closed_view (View.singleton_ur loc to) mem.
   Proof.
@@ -1221,7 +1221,7 @@ Module Memory.
 
   Lemma singleton_rw_closed_view
         loc from to val released mem
-        (GET: get loc to mem = Some (from, Message.full val released))
+        (GET: get loc to mem = Some (from, Message.concrete val released))
         (INHABITED: inhabited mem):
     closed_view (View.singleton_rw loc to) mem.
   Proof.
@@ -1232,7 +1232,7 @@ Module Memory.
 
   Lemma singleton_ur_if_closed_view
         cond loc from to val released mem
-        (GET: get loc to mem = Some (from, Message.full val released))
+        (GET: get loc to mem = Some (from, Message.concrete val released))
         (INHABITED: inhabited mem):
     closed_view (View.singleton_ur_if cond loc to) mem.
   Proof.
@@ -1315,9 +1315,9 @@ Module Memory.
   Inductive future_weak (mem1 mem2: t): Prop :=
   | future_weak_intro
       (SOUND: forall loc from to val released
-                 (GET: get loc to mem1 = Some (from, Message.full val released)),
+                 (GET: get loc to mem1 = Some (from, Message.concrete val released)),
           exists f r,
-            get loc to mem2 = Some (f, Message.full val r) /\
+            get loc to mem2 = Some (f, Message.concrete val r) /\
             Time.le from f /\
             (r = released \/
              View.opt_wf r /\
@@ -1325,13 +1325,13 @@ Module Memory.
              View.opt_le r released))
       (COMPLETE1: forall loc from to val released
                      (GET1: get loc to mem1 = None)
-                     (GET2: get loc to mem2 = Some (from, Message.full val released)),
+                     (GET2: get loc to mem2 = Some (from, Message.concrete val released)),
           View.opt_wf released /\
           closed_opt_view released mem2 /\
           Time.le (released.(View.unwrap).(View.rlx) loc) to)
       (COMPLETE2: forall loc from to val released f
                      (GET1: get loc to mem1 = Some (f, Message.reserve))
-                     (GET2: get loc to mem2 = Some (from, Message.full val released)),
+                     (GET2: get loc to mem2 = Some (from, Message.concrete val released)),
           View.opt_wf released /\
           closed_opt_view released mem2 /\
           Time.le (released.(View.unwrap).(View.rlx) loc) to)
@@ -1514,11 +1514,11 @@ Module Memory.
   Lemma future_weak_get1
         loc from to val released mem1 mem2
         (FUTURE: future_weak mem1 mem2)
-        (GET: get loc to mem1 = Some (from, Message.full val released)):
+        (GET: get loc to mem1 = Some (from, Message.concrete val released)):
     exists from' msg',
       <<GET: get loc to mem2 = Some (from', msg')>> /\
       <<FROM: Time.le from from'>> /\
-      <<MSG_LE: Message.le msg' (Message.full val released)>>.
+      <<MSG_LE: Message.le msg' (Message.concrete val released)>>.
   Proof.
     inv FUTURE. exploit SOUND; eauto. i. des.
     - subst. esplits; eauto. refl.
@@ -1561,7 +1561,7 @@ Module Memory.
   Qed.
 
   Lemma max_timemap_spec' tm mem
-        (TIMEMAP: forall loc, exists from to val released, Time.le (tm loc) to /\ get loc to mem = Some (from, Message.full val released))
+        (TIMEMAP: forall loc, exists from to val released, Time.le (tm loc) to /\ get loc to mem = Some (from, Message.concrete val released))
         (INHABITED: inhabited mem):
     TimeMap.le tm (max_timemap mem).
   Proof.
@@ -1585,7 +1585,7 @@ Module Memory.
 
   Lemma closed_timemap_add
         loc from to val released mem tm
-        (GET: get loc to mem = Some (from, Message.full val released))
+        (GET: get loc to mem = Some (from, Message.concrete val released))
         (CLOSED: closed_timemap tm mem):
     closed_timemap (TimeMap.add loc to tm) mem.
   Proof.
@@ -1595,174 +1595,174 @@ Module Memory.
   Qed.
 
 
-  (* lemmas on min_full_ts *)
+  (* lemmas on min_concrete_ts *)
 
-  Definition min_full_ts (mem: t) (loc: Loc.t) (ts: Time.t): Prop :=
-    Cell.min_full_ts (mem loc) ts.
+  Definition min_concrete_ts (mem: t) (loc: Loc.t) (ts: Time.t): Prop :=
+    Cell.min_concrete_ts (mem loc) ts.
 
-  Lemma min_full_ts_exists
+  Lemma min_concrete_ts_exists
         mem loc from to val released
-        (INHABITED: get loc to mem = Some (from, Message.full val released)):
-    exists ts, min_full_ts mem loc ts.
+        (INHABITED: get loc to mem = Some (from, Message.concrete val released)):
+    exists ts, min_concrete_ts mem loc ts.
   Proof.
-    eapply Cell.min_full_ts_exists. apply INHABITED.
+    eapply Cell.min_concrete_ts_exists. apply INHABITED.
   Qed.
 
-  Lemma min_full_ts_inj
+  Lemma min_concrete_ts_inj
         mem loc ts1 ts2
-        (MIN1: min_full_ts mem loc ts1)
-        (MIN2: min_full_ts mem loc ts2):
+        (MIN1: min_concrete_ts mem loc ts1)
+        (MIN2: min_concrete_ts mem loc ts2):
     ts1 = ts2.
   Proof.
-    eapply Cell.min_full_ts_inj; eauto.
+    eapply Cell.min_concrete_ts_inj; eauto.
   Qed.
 
-  Lemma min_full_ts_spec
+  Lemma min_concrete_ts_spec
         loc ts from val released mem mts
-        (MIN: min_full_ts mem loc mts)
-        (GET: get loc ts mem = Some (from, Message.full val released)):
-    <<GET: exists from val' released', get loc mts mem = Some (from, Message.full val' released')>> /\
+        (MIN: min_concrete_ts mem loc mts)
+        (GET: get loc ts mem = Some (from, Message.concrete val released)):
+    <<GET: exists from val' released', get loc mts mem = Some (from, Message.concrete val' released')>> /\
     <<MIN: Time.le mts ts>>.
   Proof.
-    eapply Cell.min_full_ts_spec; eauto.
+    eapply Cell.min_concrete_ts_spec; eauto.
   Qed.
 
 
-  (* Lemmas on max_full_timemap *)
+  (* Lemmas on max_concrete_timemap *)
 
-  Definition max_full_ts (mem: t) (loc: Loc.t) (ts: Time.t): Prop :=
-    Cell.max_full_ts (mem loc) ts.
+  Definition max_concrete_ts (mem: t) (loc: Loc.t) (ts: Time.t): Prop :=
+    Cell.max_concrete_ts (mem loc) ts.
 
-  Lemma max_full_ts_exists
+  Lemma max_concrete_ts_exists
         mem loc
         (INHABITED: inhabited mem):
-    exists ts, max_full_ts mem loc ts.
+    exists ts, max_concrete_ts mem loc ts.
   Proof.
-    eapply Cell.max_full_ts_exists. apply INHABITED.
+    eapply Cell.max_concrete_ts_exists. apply INHABITED.
   Qed.
 
-  Lemma max_full_ts_inj
+  Lemma max_concrete_ts_inj
         mem loc ts1 ts2
-        (MAX1: max_full_ts mem loc ts1)
-        (MAX2: max_full_ts mem loc ts2):
+        (MAX1: max_concrete_ts mem loc ts1)
+        (MAX2: max_concrete_ts mem loc ts2):
     ts1 = ts2.
   Proof.
-    eapply Cell.max_full_ts_inj; eauto.
+    eapply Cell.max_concrete_ts_inj; eauto.
   Qed.
 
-  Lemma max_full_ts_spec
+  Lemma max_concrete_ts_spec
         loc ts from val released mem mts
-        (MAX: max_full_ts mem loc mts)
-        (GET: get loc ts mem = Some (from, Message.full val released)):
-    <<GET: exists from val' released', get loc mts mem = Some (from, Message.full val' released')>> /\
+        (MAX: max_concrete_ts mem loc mts)
+        (GET: get loc ts mem = Some (from, Message.concrete val released)):
+    <<GET: exists from val' released', get loc mts mem = Some (from, Message.concrete val' released')>> /\
     <<MAX: Time.le ts mts>>.
   Proof.
-    eapply Cell.max_full_ts_spec; eauto.
+    eapply Cell.max_concrete_ts_spec; eauto.
   Qed.
 
-  Lemma max_full_ts_spec2
+  Lemma max_concrete_ts_spec2
         tm mem loc mts
-        (MAX: max_full_ts mem loc mts)
+        (MAX: max_concrete_ts mem loc mts)
         (CLOSED: closed_timemap tm mem):
     Time.le (tm loc) mts.
   Proof.
     exploit CLOSED. i. des.
-    eapply max_full_ts_spec; eauto.
+    eapply max_concrete_ts_spec; eauto.
   Qed.
 
-  Definition max_full_timemap (mem: t) (tm: TimeMap.t): Prop :=
-    forall loc, max_full_ts mem loc (tm loc).
+  Definition max_concrete_timemap (mem: t) (tm: TimeMap.t): Prop :=
+    forall loc, max_concrete_ts mem loc (tm loc).
 
-  Lemma max_full_timemap_exists
+  Lemma max_concrete_timemap_exists
         mem
         (INHABITED: inhabited mem):
-    exists tm, max_full_timemap mem tm.
+    exists tm, max_concrete_timemap mem tm.
   Proof.
-    apply choice. i. apply max_full_ts_exists. auto.
+    apply choice. i. apply max_concrete_ts_exists. auto.
   Qed.
 
-  Lemma max_full_timemap_inj
+  Lemma max_concrete_timemap_inj
         mem tm1 tm2
-        (MAX1: max_full_timemap mem tm1)
-        (MAX2: max_full_timemap mem tm2):
+        (MAX1: max_concrete_timemap mem tm1)
+        (MAX2: max_concrete_timemap mem tm2):
     tm1 = tm2.
   Proof.
     extensionality l.
     specialize (MAX1 l). specialize (MAX2 l).
-    eapply max_full_ts_inj; eauto.
+    eapply max_concrete_ts_inj; eauto.
   Qed.
 
-  Lemma max_full_timemap_closed
+  Lemma max_concrete_timemap_closed
         mem tm
-        (MAX: max_full_timemap mem tm):
+        (MAX: max_concrete_timemap mem tm):
     closed_timemap tm mem.
   Proof.
     ii. specialize (MAX loc). inv MAX. des.
     esplits; eauto.
   Qed.
 
-  Lemma max_full_timemap_spec
+  Lemma max_concrete_timemap_spec
         tm mem mtm
-        (MAX: max_full_timemap mem mtm)
+        (MAX: max_concrete_timemap mem mtm)
         (TIMEMAP: closed_timemap tm mem):
     TimeMap.le tm mtm.
   Proof.
     ii. specialize (MAX loc). specialize (TIMEMAP loc).
-    des. eapply max_full_ts_spec; eauto.
+    des. eapply max_concrete_ts_spec; eauto.
   Qed.
 
-  Inductive max_full_view (mem: t): forall (view: View.t), Prop :=
-  | max_full_view_intro
+  Inductive max_concrete_view (mem: t): forall (view: View.t), Prop :=
+  | max_concrete_view_intro
       tm
-      (MAX: max_full_timemap mem tm):
-      max_full_view mem (View.mk tm tm)
+      (MAX: max_concrete_timemap mem tm):
+      max_concrete_view mem (View.mk tm tm)
   .
-  Hint Constructors max_full_view.
+  Hint Constructors max_concrete_view.
 
-  Lemma max_full_view_exists
+  Lemma max_concrete_view_exists
         mem
         (INHABITED: inhabited mem):
-    exists view, max_full_view mem view.
+    exists view, max_concrete_view mem view.
   Proof.
-    exploit max_full_timemap_exists; eauto. i. des.
+    exploit max_concrete_timemap_exists; eauto. i. des.
     esplits. econs; eauto.
   Qed.
 
-  Lemma max_full_view_inj
+  Lemma max_concrete_view_inj
         mem view1 view2
-        (MAX1: max_full_view mem view1)
-        (MAX2: max_full_view mem view2):
+        (MAX1: max_concrete_view mem view1)
+        (MAX2: max_concrete_view mem view2):
     view1 = view2.
   Proof.
     inv MAX1. inv MAX2.
-    exploit max_full_timemap_inj; [exact MAX|exact MAX0|..].
+    exploit max_concrete_timemap_inj; [exact MAX|exact MAX0|..].
     i. subst. refl.
   Qed.
 
-  Lemma max_full_view_wf
+  Lemma max_concrete_view_wf
         mem view
-        (MAX: max_full_view mem view):
+        (MAX: max_concrete_view mem view):
     View.wf view.
   Proof.
     inv MAX. econs. refl.
   Qed.
 
-  Lemma max_full_view_closed
+  Lemma max_concrete_view_closed
         mem view
-        (MAX: max_full_view mem view):
+        (MAX: max_concrete_view mem view):
     closed_view view mem.
   Proof.
-    inv MAX. econs; apply max_full_timemap_closed; auto.
+    inv MAX. econs; apply max_concrete_timemap_closed; auto.
   Qed.
 
-  Lemma max_full_view_spec
+  Lemma max_concrete_view_spec
         view mem mview
-        (MAX: max_full_view mem mview)
+        (MAX: max_concrete_view mem mview)
         (VIEW: closed_view view mem):
     View.le view mview.
   Proof.
     inv MAX. inv VIEW.
-    econs; eapply max_full_timemap_spec; eauto.
+    econs; eapply max_concrete_timemap_spec; eauto.
   Qed.
 
 
@@ -1770,7 +1770,7 @@ Module Memory.
 
   Definition reserve_wf (promises mem: t): Prop :=
     forall loc from to (GET: get loc to promises = Some (from, Message.reserve)),
-    exists f val released, get loc from mem = Some (f, Message.full val released).
+    exists f val released, get loc from mem = Some (f, Message.concrete val released).
 
   Lemma promise_reserve_wf
         promises1 mem1 loc from to msg promises2 mem2 kind
@@ -2086,7 +2086,7 @@ Module Memory.
         promises1 mem1 loc from to val released promises2 mem2 kind
         (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind):
     <<GET_PROMISE: get loc to promises2 = None>> /\
-    <<GET_MEM: get loc to mem2 = Some (from, Message.full val released)>>.
+    <<GET_MEM: get loc to mem2 = Some (from, Message.concrete val released)>>.
   Proof.
     inv WRITE. splits.
     - erewrite remove_o; eauto. condtac; ss. des; ss.
@@ -2097,7 +2097,7 @@ Module Memory.
         promises1 mem1 loc from to val released promises2 mem2 kind
         (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind)
         (CLOSED: closed mem1)
-        (MSG_CLOSED: closed_message (Message.full val released) mem2)
+        (MSG_CLOSED: closed_message (Message.concrete val released) mem2)
         (LE: le promises1 mem1)
         (FINITE: finite promises1)
         (BOT: bot_none promises1)
@@ -2342,7 +2342,7 @@ Module Memory.
   Definition nonsynch_loc (loc:Loc.t) (mem:t): Prop :=
     forall f t msg (GET: get loc t mem = Some (f, msg)),
       match msg with
-      | Message.full _ rel => rel = None
+      | Message.concrete _ rel => rel = None
       | Message.reserve => True
       end.
 
@@ -2361,12 +2361,12 @@ Module Memory.
   Definition no_reserve (mem: t): Prop :=
     forall loc,
     exists from val released,
-      get loc (max_ts loc mem) mem = Some (from, Message.full val released).
+      get loc (max_ts loc mem) mem = Some (from, Message.concrete val released).
 
   Lemma no_reserve_max_ts
         mem loc mts
         (NORESERVE: no_reserve mem)
-        (MAX: max_full_ts mem loc mts):
+        (MAX: max_concrete_ts mem loc mts):
     mts = max_ts loc mem.
   Proof.
     apply TimeFacts.antisym.
@@ -2589,8 +2589,8 @@ Module Memory.
   Inductive latest_val (loc: Loc.t) (mem: t) (val: Const.t): Prop :=
   | latest_val_intro
       ts from released
-      (MAX: max_full_ts mem loc ts)
-      (GET: get loc ts mem = Some (from, Message.full val released))
+      (MAX: max_concrete_ts mem loc ts)
+      (GET: get loc ts mem = Some (from, Message.concrete val released))
   .
 
   Lemma latest_val_inj
@@ -2600,7 +2600,7 @@ Module Memory.
     val1 = val2.
   Proof.
     inv LATEST1. inv LATEST2.
-    exploit max_full_ts_inj; [exact MAX|exact MAX0|..]. i. subst.
+    exploit max_concrete_ts_inj; [exact MAX|exact MAX0|..]. i. subst.
     rewrite GET in GET0. inv GET0. ss.
   Qed.
 
@@ -2609,7 +2609,7 @@ Module Memory.
         (INHABITED: inhabited mem):
     exists val, latest_val loc mem val.
   Proof.
-    exploit (@max_full_ts_exists mem loc); eauto. i. des.
+    exploit (@max_concrete_ts_exists mem loc); eauto. i. des.
     dup x0. inv x0. des.
     exists val. econs; eauto.
   Qed.
@@ -2639,9 +2639,9 @@ Module Memory.
       (BACK: forall loc val view
                (PROMISE: latest_reserve loc promises mem1)
                (LATEST: latest_val loc mem1 val)
-               (MAX: max_full_view mem1 view),
+               (MAX: max_concrete_view mem1 view),
             get loc (Time.incr (max_ts loc mem1)) mem2 =
-            Some (max_ts loc mem1, Message.full val (Some view)))
+            Some (max_ts loc mem1, Message.concrete val (Some view)))
       (COMPLETE: forall loc from to msg
                    (GET1: get loc to mem1 = None)
                    (GET2: get loc to mem2 = Some (from, msg)),
@@ -2668,8 +2668,8 @@ Module Memory.
      to = Time.incr from /\
      exists val view,
        latest_val loc mem1 val /\
-       max_full_view mem1 view /\
-       msg = Message.full val (Some view)).
+       max_concrete_view mem1 view /\
+       msg = Message.concrete val (Some view)).
   Proof.
     inv CAP. move GET at bottom.
     destruct (get loc to mem1) as [[]|] eqn:GET1.
@@ -2729,7 +2729,7 @@ Module Memory.
           { econs. auto. }
           { refl. }
     - right. inv H. do 3 (split; auto).
-      exploit max_full_view_exists; try apply CLOSED. i. des.
+      exploit max_concrete_view_exists; try apply CLOSED. i. des.
       rewrite GET0 in x. inv x.
       exploit (@latest_val_exists loc mem1); try apply CLOSED. i. des.
       exploit BACK; eauto. i.
@@ -2795,8 +2795,8 @@ Module Memory.
     - exploit SOUND; eauto. i.
       esplits; eauto. refl.
     - exploit cap_inv; eauto. i. des; try congr. inv x6.
-      exploit max_full_view_closed; eauto. i.
-      exploit max_full_view_wf; eauto. i.
+      exploit max_concrete_view_closed; eauto. i.
+      exploit max_concrete_view_wf; eauto. i.
       splits; auto.
       + econs. eapply cap_closed_view; eauto.
       + inv x5. ss. specialize (MAX loc). inv MAX. des.
@@ -2872,7 +2872,7 @@ Module Memory.
       { exploit LE; eauto. i.
         rewrite x0 in x. inv x. ss. }
       rewrite <- x2 in *.
-      exploit max_full_view_exists; try eapply CLOSED. i. des.
+      exploit max_concrete_view_exists; try eapply CLOSED. i. des.
       exploit (@latest_val_exists loc mem1); try apply CLOSED. i. des.
       exploit (BACK loc); eauto; i.
       { unfold latest_reserve. rewrite PROMISE. ss. }
@@ -2890,7 +2890,7 @@ Module Memory.
         promises1 mem1 mem2
         loc from to val released promises2
         (CAP1: cap promises1 mem1 mem2)
-        (REMOVE: remove promises1 loc from to (Message.full val released) promises2):
+        (REMOVE: remove promises1 loc from to (Message.concrete val released) promises2):
     cap promises2 mem1 mem2.
   Proof.
     inv CAP1. econs; i; eauto.
@@ -2914,8 +2914,8 @@ Module Memory.
         (CLOSED1: closed mem1):
     exists mem2, <<CAP: cap promises mem1 mem2>>.
   Proof.
-    exploit max_full_view_exists; try apply CLOSED1. i. des.
-    exploit max_full_view_wf; eauto. i.
+    exploit max_concrete_view_exists; try apply CLOSED1. i. des.
+    exploit max_concrete_view_wf; eauto. i.
     cut (exists mem2,
             forall loc,
               (fun loc cell =>
@@ -2926,7 +2926,7 @@ Module Memory.
       - destruct (H loc). inv ADJ.
         eapply MIDDLE; eauto. econs; eauto.
       - destruct (H loc).
-        exploit max_full_view_inj; [exact x0|exact MAX|..]. i. subst.
+        exploit max_concrete_view_inj; [exact x0|exact MAX|..]. i. subst.
         eapply BACK; eauto.
         inv LATEST. econs; eauto.
       - destruct (H loc).
@@ -2941,11 +2941,11 @@ Module Memory.
 
   Definition prev_None (mem1 mem2: t): Prop :=
     forall loc from to val released
-      (GET: get loc to mem1 = Some (from, Message.full val released))
+      (GET: get loc to mem1 = Some (from, Message.concrete val released))
       (GET_PREV: forall from' val' released',
-          get loc from mem1 <> Some (from', Message.full val' released')),
+          get loc from mem1 <> Some (from', Message.concrete val' released')),
     forall from' val' released',
-      get loc from mem2 <> Some (from', Message.full val' released').
+      get loc from mem2 <> Some (from', Message.concrete val' released').
 
   Lemma promise_prev_None
         promises1 mem1 loc from to msg promises2 mem2 kind
@@ -2987,9 +2987,9 @@ Module Memory.
         promises1 mem1 loc from to msg promises2 mem2 kind
         l t f v r
         (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
-        (GET: get l t mem1 = Some (f, Message.full v r)):
+        (GET: get l t mem1 = Some (f, Message.concrete v r)):
     exists t' v' r',
-      get l t' mem2 = Some (f, Message.full v' r').
+      get l t' mem2 = Some (f, Message.concrete v' r').
   Proof.
     inv PROMISE.
     - exploit add_get1; eauto.

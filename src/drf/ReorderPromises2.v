@@ -96,9 +96,9 @@ Lemma reorder_promise_promise_cancel2
       (<<STEP1: Local.promise_step lc0 mem0 loc2 from2' to2 msg2 lc1' mem1' kind2>>) /\
       (<<STEP2: Local.promise_step lc1' mem1' loc1 from1 to1 msg1 lc2 mem2 kind1'>>) /\
       (<<KIND1': Memory.op_kind_is_cancel kind1 = false>>) /\
-      (<<KINDEQ: (Memory.op_kind_is_lower_full kind1' && Message.is_released_none msg1
+      (<<KINDEQ: (Memory.op_kind_is_lower_concrete kind1' && Message.is_released_none msg1
                   || Memory.op_kind_is_cancel kind1')%bool =
-                 (Memory.op_kind_is_lower_full kind1 && Message.is_released_none msg1
+                 (Memory.op_kind_is_lower_concrete kind1 && Message.is_released_none msg1
                   || Memory.op_kind_is_cancel kind1)%bool>>) /\
       (<<CANCEL: Memory.op_kind_is_cancel kind1' = false>>))
 .

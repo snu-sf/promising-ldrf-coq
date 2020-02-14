@@ -176,8 +176,8 @@ Proof.
   exploit Memory.cap_exists; eauto. i. des.
   exploit Memory.cap_closed; eauto. i.
   exploit Local.cap_wf; eauto. i.
-  exploit Memory.max_full_timemap_exists; try apply x0. i. des.
-  hexploit Memory.max_full_timemap_closed; eauto. i.
+  exploit Memory.max_concrete_timemap_exists; try apply x0. i. des.
+  hexploit Memory.max_concrete_timemap_closed; eauto. i.
   exploit CONS; eauto. s. i. des.
   - inv FAILURE. des. inv FAILURE; inv STEP. inv LOCAL. inv LOCAL0.
     hexploit rtc_tau_step_promise_consistent; try exact STEPS; eauto.
@@ -189,7 +189,7 @@ Lemma promise_consistent_promise_read
       lc1 mem1 loc to val ord released lc2
       f t v r
       (STEP: Local.read_step lc1 mem1 loc to val released ord lc2)
-      (PROMISE: Memory.get loc t lc1.(Local.promises) = Some (f, Message.full v r))
+      (PROMISE: Memory.get loc t lc1.(Local.promises) = Some (f, Message.concrete v r))
       (CONS: Local.promise_consistent lc2):
   Time.lt to t.
 Proof.
@@ -205,7 +205,7 @@ Lemma promise_consistent_promise_write
       lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
       f t v r
       (STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
-      (PROMISE: Memory.get loc t lc1.(Local.promises) = Some (f, Message.full v r))
+      (PROMISE: Memory.get loc t lc1.(Local.promises) = Some (f, Message.concrete v r))
       (CONS: Local.promise_consistent lc2):
   Time.le to t.
 Proof.
