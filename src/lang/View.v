@@ -11,7 +11,6 @@ From PromisingLib Require Import DataStructure.
 From PromisingLib Require Import DenseOrder.
 From PromisingLib Require Import Loc.
 
-Require Import Event.
 Require Import Time.
 
 Set Implicit Arguments.
@@ -157,6 +156,7 @@ Module TimeMap <: JoinableType.
     extensionality loc. apply TimeFacts.antisym; auto.
   Qed.
 End TimeMap.
+
 
 Module View <: JoinableType.
   Structure t_ := mk {
