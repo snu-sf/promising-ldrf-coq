@@ -81,6 +81,7 @@ Module Message.
     end.
 End Message.
 
+
 Module Cell.
   Module Raw.
     Definition t := DOMap.t (DenseOrder.t * Message.t).
@@ -608,6 +609,7 @@ Module Cell.
     inv LOWER. apply lower_exists; auto.
   Qed.
 
+  
   (* Lemmas on add, split, lower & remove *)
 
   Lemma add_get0
@@ -768,6 +770,7 @@ Module Cell.
   Qed.
 
 
+  (* TODO *)
   (* min_concrete_ts *)
 
   Inductive min_concrete_ts (cell: t) (ts: Time.t): Prop :=
@@ -1228,69 +1231,22 @@ Module Cell.
 
   (* cap *)
 
-  Inductive latest_val (cell: t) (val: Const.t): Prop :=
-  | latest_val_intro
-      ts from released
-      (MAX: max_concrete_ts cell ts)
-      (GET: get ts cell = Some (from, Message.concrete val released))
-  .
-
-  Lemma latest_val_inj
-        cell val1 val2
-        (LATEST1: latest_val cell val1)
-        (LATEST2: latest_val cell val2):
-    val1 = val2.
-  Proof.
-    inv LATEST1. inv LATEST2.
-    exploit max_concrete_ts_inj; [exact MAX|exact MAX0|..]. i. subst.
-    rewrite GET in GET0. inv GET0. ss.
-  Qed.
-
-  Lemma latest_val_exists
-        cell
-        (INHABITED: get Time.bot cell = Some (Time.bot, Message.elt)):
-    exists val, latest_val cell val.
-  Proof.
-    exploit (@max_concrete_ts_exists cell); eauto. i. des.
-    dup x0. inv x0. des.
-    exists val. econs; eauto.
-  Qed.
-
-  Definition latest_reserve (promises cell: t): Prop :=
-    match get (max_ts cell) promises with
-    | Some (_, Message.reserve) => False
-    | _ => True
-    end.
-
-  Lemma latest_reserve_dec promises cell:
-    latest_reserve promises cell \/
-    ~ latest_reserve promises cell.
-  Proof.
-    unfold latest_reserve.
-    destruct (get (max_ts cell) promises) eqn:PROMISE; auto.
-    destruct p; ss. destruct t1; auto.
-  Qed.
-
-  Inductive cap (view: View.t) (promises cell1 cell2: t): Prop :=
+  Inductive cap (cell1 cell2: t): Prop :=
   | cap_intro
       (SOUND: le cell1 cell2)
       (MIDDLE: forall from1 to1 from2 to2
                  (ADJ: adjacent from1 to1 from2 to2 cell1)
                  (TO: Time.lt to1 from2),
           get from2 cell2 = Some (to1, Message.reserve))
-      (BACK: forall val
-               (PROMISE: latest_reserve promises cell1)
-               (LATEST: latest_val cell1 val),
-          get (Time.incr (max_ts cell1)) cell2 =
-          Some (max_ts cell1, Message.concrete val (Some view)))
+      (BACK: get (Time.incr (max_ts cell1)) cell2 =
+             Some (max_ts cell1, Message.reserve))
       (COMPLETE: forall from to msg
                    (GET1: get to cell1 = None)
                    (GET2: get to cell2 = Some (from, msg)),
-          (exists f m, get from cell1 = Some (f, m)) /\
-          (from = max_ts cell1 -> latest_reserve promises cell1))
+          (exists f m, get from cell1 = Some (f, m)))
   .
 
-  Inductive cap_aux (dom: list Time.t) (view: View.t) (promises cell1 cell2: t): Prop :=
+  Inductive cap_aux (dom: list Time.t) (cell1 cell2: t): Prop :=
   | cap_aux_intro
       (SOUND: le cell1 cell2)
       (MIDDLE: forall from1 to1 from2 to2
@@ -1298,29 +1254,20 @@ Module Cell.
                  (ADJ: adjacent from1 to1 from2 to2 cell1)
                  (TO: Time.lt to1 from2),
           get from2 cell2 = Some (to1, Message.reserve))
-      (BACK: forall val
-               (IN: List.In (max_ts cell1) dom)
-               (PROMISE: latest_reserve promises cell1)
-               (LATEST: latest_val cell1 val),
-          get (Time.incr (max_ts cell1)) cell2 = Some (max_ts cell1, Message.concrete val (Some view)))
+      (BACK: forall (IN: List.In (max_ts cell1) dom),
+          get (Time.incr (max_ts cell1)) cell2 =
+          Some (max_ts cell1, Message.reserve))
       (COMPLETE: forall from to msg
                    (GET1: get to cell1 = None)
                    (GET2: get to cell2 = Some (from, msg)),
           List.In from dom /\
-          (exists f m, get from cell1 = Some (f, m)) /\
-          (from = max_ts cell1 -> latest_reserve promises cell1))
+          (exists f m, get from cell1 = Some (f, m)))
   .
 
-  Lemma time_decidable: decidable_eq Time.t.
-  Proof.
-    ii. destruct (Time.eq_dec x y); [left|right]; ss.
-  Qed.
-
   Lemma cap_aux_exists
-        dom view promises cell1
-        (VIEW: View.wf view)
+        dom cell1
         (INHABITED: get Time.bot cell1 = Some (Time.bot, Message.elt)):
-    exists cell2, cap_aux dom view promises cell1 cell2.
+    exists cell2, cap_aux dom cell1 cell2.
   Proof.
     revert cell1 INHABITED.
     induction dom; i.
@@ -1381,12 +1328,12 @@ Module Cell.
           destruct (Time.le_lt_dec from1 a).
           + inv l; try by (inv H2; ss).
             exploit SOUND; try exact GET0. i.
-            exploit get_ts; try exact x3. i. des.
+            exploit get_ts; try exact x2. i. des.
             { subst. inv H2. }
-            exploit get_disjoint; [exact x3|exact GET2|..]. i. des.
+            exploit get_disjoint; [exact x2|exact GET2|..]. i. des.
             { subst. timetac. }
             exfalso.
-            apply (x6 a); econs; ss; try refl.
+            apply (x5 a); econs; ss; try refl.
             econs. eapply TimeFacts.lt_le_lt; try exact FROM. ss.
           + exploit (EMPTY from1); try congr.
             econs. eapply TimeFacts.lt_le_lt; try exact FROM0. ss.
@@ -1408,22 +1355,11 @@ Module Cell.
         eapply add_get1; eauto.
       - revert GET2. erewrite add_o; eauto. condtac; ss; i.
         + subst. inv GET2. splits; eauto.
-          i. subst. timetac.
         + exploit COMPLETE; eauto. i. des.
           esplits; eauto.
     }
     inv H0. clear from0 msg0 GET.
-    destruct (@latest_reserve_dec promises cell1); cycle 1.
-    { exists cell2. inv x. econs; ii; ss; eauto.
-      - inv IN; eauto. inv ADJ.
-        exploit max_ts_spec; try exact GET2. i. des.
-        timetac.
-      - exploit COMPLETE; eauto. i. des.
-        esplits; eauto.
-    }
-    exploit latest_val_exists; eauto. i. des.
-    exploit (@add_exists cell2 (max_ts cell1) (Time.incr (max_ts cell1))
-                         (Message.concrete val (Some view))); ii.
+    exploit (@add_exists cell2 (max_ts cell1) (Time.incr (max_ts cell1)) Message.reserve); ii.
     { inv x. inv LHS. inv RHS. ss.
       destruct (get to2 cell1) as [[]|] eqn:GET3.
       { exploit SOUND; eauto. i.
@@ -1434,22 +1370,22 @@ Module Cell.
       exploit COMPLETE; eauto. i. des.
       cut (from2 = max_ts cell1); try by (i; subst; ss).
       destruct (Time.le_lt_dec from2 (max_ts cell1)).
-      - inv l; try by (inv H1; ss).
+      - inv l; try by (inv H0; ss).
         exploit SOUND; try exact GET1. i.
-        exploit get_ts; try exact x4. i. des.
-        { subst. rewrite x5 in *. inv H1. }
+        exploit get_ts; try exact x2. i. des.
+        { subst. rewrite x3 in *. inv H0. }
         exploit get_ts; try exact GET2. i. des.
         { subst. timetac. }
-        exploit get_disjoint; [exact x4|exact GET2|..]. i. des.
+        exploit get_disjoint; [exact x2|exact GET2|..]. i. des.
         { subst. timetac. }
         exfalso.
-        apply (x8 (max_ts cell1)); econs; ss; try refl.
+        apply (x6 (max_ts cell1)); econs; ss; try refl.
         econs. eapply TimeFacts.lt_le_lt; try exact FROM. ss.
-      - exploit max_ts_spec; try exact x2. i. des.
+      - exploit max_ts_spec; try exact x1. i. des.
         timetac.
     }
     { apply Time.incr_spec. }
-    { econs. econs. ss. }
+    { econs. }
     des.
     exists cell0. inv x. econs; ii; ss; eauto.
     - exploit SOUND; eauto. i.
@@ -1457,9 +1393,7 @@ Module Cell.
     - exploit add_get0; eauto. i. des.
       + inv ADJ. exploit max_ts_spec; try exact GET3. i. des. timetac.
       + eapply add_get1; eauto.
-    - des; ss.
-      exploit latest_val_inj; [exact x1|exact LATEST|..]. i. subst.
-      exploit add_get0; eauto. i. des. ss.
+    - eapply add_get0; eauto.
     - revert GET2. erewrite add_o; eauto. condtac; ss; i.
       + subst. inv GET2. esplits; eauto.
       + exploit COMPLETE; eauto. i. des.
@@ -1467,13 +1401,12 @@ Module Cell.
   Qed.
 
   Lemma cap_exists
-        view promises cell1
-        (VIEW: View.wf view)
+        cell1
         (INHABITED: get Time.bot cell1 = Some (Time.bot, Message.elt)):
-    exists cell2, cap view promises cell1 cell2.
+    exists cell2, cap cell1 cell2.
   Proof.
     destruct (@finite cell1).
-    exploit (@cap_aux_exists x view promises); eauto. i. des.
+    exploit (@cap_aux_exists x); eauto. i. des.
     exists cell2. inv x1. econs; i; ss; eauto.
     - eapply MIDDLE; eauto. inv ADJ. eauto.
     - eapply BACK; eauto.
