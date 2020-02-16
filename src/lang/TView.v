@@ -7,10 +7,10 @@ From PromisingLib Require Import Axioms.
 From PromisingLib Require Import Basic.
 From PromisingLib Require Import DataStructure.
 From PromisingLib Require Import Loc.
+From PromisingLib Require Import Language.
 
 Require Import Event.
 Require Import Time.
-From PromisingLib Require Import Language.
 Require Import View.
 Require Import Cell.
 Require Import Memory.
@@ -73,9 +73,9 @@ Module TView <: JoinableType.
   Qed.
 
   Lemma cap_closed
-        tview promises mem1 mem2
+        tview mem1 mem2
         (CLOSED: closed tview mem1)
-        (CAP: Memory.cap promises mem1 mem2):
+        (CAP: Memory.cap mem1 mem2):
     closed tview mem2.
   Proof.
     inv CLOSED. econs; i; eapply Memory.cap_closed_view; eauto.
@@ -246,6 +246,7 @@ Module TView <: JoinableType.
     - apply View.antisym; auto.
   Qed.
 End TView.
+
 
 Module TViewFacts.
   Lemma rlx_le_view_le
