@@ -10,11 +10,10 @@ From PromisingLib Require Import Basic.
 From PromisingLib Require Import DataStructure.
 From PromisingLib Require Import DenseOrder.
 From PromisingLib Require Import Loc.
+From PromisingLib Require Import Language.
 
 Require Import Event.
 Require Import Time.
-From PromisingLib Require Import Language.
-
 Require Import View.
 Require Import Cell.
 Require Import Memory.
@@ -28,8 +27,8 @@ Module ThreadEvent.
   | promise (loc:Loc.t) (from to:Time.t) (msg:Message.t) (kind:Memory.op_kind)
   | silent
   | read (loc:Loc.t) (ts:Time.t) (val:Const.t) (released:option View.t) (ord:Ordering.t)
-  | write (loc:Loc.t) (from to:Time.t) (val:Const.t) (released:option View.t) (ord:Ordering.t)
-  | update (loc:Loc.t) (tsr tsw:Time.t) (valr valw:Const.t) (releasedr releasedw:option View.t) (ordr ordw:Ordering.t)
+  | write (loc:Loc.t) (from to:Time.t) (val:Const.t) (released:option View.t) (ord:Ordering.t) (pf:bool)
+  | update (loc:Loc.t) (tsr tsw:Time.t) (valr valw:Const.t) (releasedr releasedw:option View.t) (ordr ordw:Ordering.t) (pf:bool)
   | fence (ordr ordw:Ordering.t)
   | syscall (e:Event.t)
   | failure
@@ -70,8 +69,8 @@ Module ThreadEvent.
     | promise _ _ _ _ _  => ProgramEvent.silent
     | silent => ProgramEvent.silent
     | read loc _ val _ ord => ProgramEvent.read loc val ord
-    | write loc _ _ val _ ord => ProgramEvent.write loc val ord
-    | update loc _ _ valr valw _ _ ordr ordw => ProgramEvent.update loc valr valw ordr ordw
+    | write loc _ _ val _ ord pf => ProgramEvent.write loc val ord pf
+    | update loc _ _ valr valw _ _ ordr ordw pf => ProgramEvent.update loc valr valw ordr ordw pf
     | fence ordr ordw => ProgramEvent.fence ordr ordw
     | syscall ev => ProgramEvent.syscall ev
     | failure => ProgramEvent.failure
@@ -93,22 +92,22 @@ Module ThreadEvent.
   Definition is_reading (e:t): option (Loc.t * Time.t * Const.t * option View.t * Ordering.t) :=
     match e with
     | read loc ts val released ord => Some (loc, ts, val, released, ord)
-    | update loc tsr _ valr _ releasedr _ ordr _ => Some (loc, tsr, valr, releasedr, ordr)
+    | update loc tsr _ valr _ releasedr _ ordr _ _ => Some (loc, tsr, valr, releasedr, ordr)
     | _ => None
     end.
 
-  Definition is_writing (e:t): option (Loc.t * Time.t * Time.t * Const.t * option View.t * Ordering.t) :=
+  Definition is_writing (e:t): option (Loc.t * Time.t * Time.t * Const.t * option View.t * Ordering.t * bool) :=
     match e with
-    | write loc from to val released ord => Some (loc, from, to, val, released, ord)
-    | update loc tsr tsw _ valw _ releasedw _ ordw => Some (loc, tsr, tsw, valw, releasedw, ordw)
+    | write loc from to val released ord pf => Some (loc, from, to, val, released, ord, pf)
+    | update loc tsr tsw _ valw _ releasedw _ ordw pf => Some (loc, tsr, tsw, valw, releasedw, ordw, pf)
     | _ => None
     end.
 
   Definition is_accessing (e:t): option (Loc.t * Time.t) :=
     match e with
     | read loc ts _ _ _ => Some (loc, ts)
-    | write loc _ ts _ _ _ => Some (loc, ts)
-    | update loc _ ts _ _ _ _ _ _ => Some (loc, ts)
+    | write loc _ ts _ _ _ _ => Some (loc, ts)
+    | update loc _ ts _ _ _ _ _ _ _ => Some (loc, ts)
     | _ => None
     end.
 
@@ -127,6 +126,8 @@ Module ThreadEvent.
     destruct e1, e2; ss; inv EVENT; ss.
   Qed.
 
+  (* TODO: unused *)
+
   Inductive le: forall (lhs rhs:t), Prop :=
   | le_promise
       loc from to msg1 msg2 kind1 kind2
@@ -139,14 +140,15 @@ Module ThreadEvent.
       (LEREL: View.opt_le rel1 rel2):
       le (read loc ts val rel1 ord) (read loc ts val rel2 ord)
   | le_write
-      loc from to val rel1 rel2 ord
+      loc from to val rel1 rel2 ord pf
       (LEREL: View.opt_le rel1 rel2):
-      le (write loc from to val rel1 ord) (write loc from to val rel2 ord)
+      le (write loc from to val rel1 ord pf) (write loc from to val rel2 ord pf)
   | le_update
-      loc tsr tsw valr valw relr1 relr2 relw1 relw2 ordr ordw
+      loc tsr tsw valr valw relr1 relr2 relw1 relw2 ordr ordw pf
       (LEREL: View.opt_le relr1 relr2)
       (LEREL: View.opt_le relw1 relw2):
-      le (update loc tsr tsw valr valw relr1 relw1 ordr ordw) (update loc tsr tsw valr valw relr2 relw2 ordr ordw)
+      le (update loc tsr tsw valr valw relr1 relw1 ordr ordw pf)
+         (update loc tsr tsw valr valw relr2 relw2 ordr ordw pf)
   | le_fence ordr ordw:
       le (fence ordr ordw) (fence ordr ordw)
   | le_syscall e:
@@ -156,29 +158,30 @@ Module ThreadEvent.
   .
   Hint Constructors le.
 
-  Definition lift (ord0:Ordering.t) (e:t): t :=
-    match e with
-    | promise loc from to msg kind =>
-      promise loc from to msg kind
-    | silent => silent
-    | read loc ts val released ord =>
-      read loc ts val released (Ordering.join ord0 ord)
-    | write loc from to val released ord =>
-      write loc from to val released (Ordering.join ord0 ord)
-    | update loc tsr tsw valr valw releasedr releasedw ordr ordw =>
-      update loc tsr tsw valr valw releasedr releasedw (Ordering.join ord0 ordr) (Ordering.join ord0 ordw)
-    | fence ordr ordw =>
-      fence (Ordering.join ord0 ordr) (Ordering.join ord0 ordw)
-    | syscall e =>
-      syscall e
-    | failure =>
-      failure
-    end.
+  (* TODO: unused *)
 
-  Lemma lift_plain e:
-    lift Ordering.plain e = e.
-  Proof. destruct e; ss. Qed.
+  (* Definition lift (ord0:Ordering.t) (e:t): t := *)
+  (*   match e with *)
+  (*   | promise loc from to msg kind => *)
+  (*     promise loc from to msg kind *)
+  (*   | silent => silent *)
+  (*   | read loc ts val released ord => *)
+  (*     read loc ts val released (Ordering.join ord0 ord) *)
+  (*   | write loc from to val released ord => *)
+  (*     write loc from to val released (Ordering.join ord0 ord) *)
+  (*   | update loc tsr tsw valr valw releasedr releasedw ordr ordw => *)
+  (*     update loc tsr tsw valr valw releasedr releasedw (Ordering.join ord0 ordr) (Ordering.join ord0 ordw) *)
+  (*   | fence ordr ordw => *)
+  (*     fence (Ordering.join ord0 ordr) (Ordering.join ord0 ordw) *)
+  (*   | syscall e => *)
+  (*     syscall e *)
+  (*   | failure => *)
+  (*     failure *)
+  (*   end. *)
 
+  (* Lemma lift_plain e: *)
+  (*   lift Ordering.plain e = e. *)
+  (* Proof. destruct e; ss. Qed. *)
 End ThreadEvent.
 
 Module Local.
@@ -207,8 +210,8 @@ Module Local.
   Hint Constructors wf.
 
   Lemma cap_wf
-        lc promises mem1 mem2
-        (CAP: Memory.cap promises mem1 mem2)
+        lc mem1 mem2
+        (CAP: Memory.cap mem1 mem2)
         (WF: wf lc mem1):
     wf lc mem2.
   Proof.
@@ -273,16 +276,19 @@ Module Local.
   .
   Hint Constructors read_step.
 
-  Inductive write_step (lc1:t) (sc1:TimeMap.t) (mem1:Memory.t) (loc:Loc.t) (from to:Time.t) (val:Const.t) (releasedm released:option View.t) (ord:Ordering.t) (lc2:t) (sc2:TimeMap.t) (mem2:Memory.t) (kind:Memory.op_kind): Prop :=
+  Inductive write_step (lc1:t) (sc1:TimeMap.t) (mem1:Memory.t)
+                       (loc:Loc.t) (from to:Time.t) (val:Const.t) (releasedm released:option View.t) (ord:Ordering.t) (pf:bool)
+                       (lc2:t) (sc2:TimeMap.t) (mem2:Memory.t) (kind:Memory.op_kind): Prop :=
   | write_step_intro
       promises2
       (RELEASED: released = TView.write_released lc1.(tview) sc1 loc to releasedm ord)
       (WRITABLE: TView.writable lc1.(tview).(TView.cur) sc1 loc to ord)
       (WRITE: Memory.write lc1.(promises) mem1 loc from to val released promises2 mem2 kind)
       (RELEASE: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc lc1.(promises))
+      (PF: pf -> lc1.(promises) loc = Cell.bot)
       (LC2: lc2 = mk (TView.write_tview lc1.(tview) sc1 loc to ord) promises2)
       (SC2: sc2 = sc1):
-      write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
+      write_step lc1 sc1 mem1 loc from to val releasedm released ord pf lc2 sc2 mem2 kind
   .
   Hint Constructors write_step.
 
@@ -314,17 +320,18 @@ Module Local.
       program_step (ThreadEvent.read loc ts val released ord) lc1 sc1 mem1 lc2 sc1 mem1
   | step_write
       lc1 sc1 mem1
-      loc from to val released ord lc2 sc2 mem2 kind
-      (LOCAL: Local.write_step lc1 sc1 mem1 loc from to val None released ord lc2 sc2 mem2 kind):
-      program_step (ThreadEvent.write loc from to val released ord) lc1 sc1 mem1 lc2 sc2 mem2
+      loc from to val released ord pf lc2 sc2 mem2 kind
+      (LOCAL: Local.write_step lc1 sc1 mem1 loc from to val None released ord pf lc2 sc2 mem2 kind):
+      program_step (ThreadEvent.write loc from to val released ord pf) lc1 sc1 mem1 lc2 sc2 mem2
   | step_update
       lc1 sc1 mem1
-      loc ordr ordw
+      loc ordr ordw pf
       tsr valr releasedr releasedw lc2
       tsw valw lc3 sc3 mem3 kind
       (LOCAL1: Local.read_step lc1 mem1 loc tsr valr releasedr ordr lc2)
-      (LOCAL2: Local.write_step lc2 sc1 mem1 loc tsr tsw valw releasedr releasedw ordw lc3 sc3 mem3 kind):
-      program_step (ThreadEvent.update loc tsr tsw valr valw releasedr releasedw ordr ordw) lc1 sc1 mem1 lc3 sc3 mem3
+      (LOCAL2: Local.write_step lc2 sc1 mem1 loc tsr tsw valw releasedr releasedw ordw pf lc3 sc3 mem3 kind):
+      program_step (ThreadEvent.update loc tsr tsw valr valw releasedr releasedw ordr ordw pf)
+                   lc1 sc1 mem1 lc3 sc3 mem3
   | step_fence
       lc1 sc1 mem1
       ordr ordw lc2 sc2
@@ -394,8 +401,8 @@ Module Local.
   Qed.
 
   Lemma write_step_future
-        lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
-        (STEP: write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
+        lc1 sc1 mem1 loc from to val releasedm released ord pf lc2 sc2 mem2 kind
+        (STEP: write_step lc1 sc1 mem1 loc from to val releasedm released ord pf lc2 sc2 mem2 kind)
         (REL_WF: View.opt_wf releasedm)
         (REL_CLOSED: Memory.closed_opt_view releasedm mem1)
         (WF1: wf lc1 mem1)
@@ -424,26 +431,30 @@ Module Local.
   Qed.
 
   Lemma write_step_non_cancel
-        lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
-        (STEP: write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind):
+        lc1 sc1 mem1 loc from to val releasedm released ord pf lc2 sc2 mem2 kind
+        (STEP: write_step lc1 sc1 mem1 loc from to val releasedm released ord pf lc2 sc2 mem2 kind):
     negb (Memory.op_kind_is_cancel kind).
   Proof.
     inv STEP. inv WRITE. inv PROMISE; ss.
   Qed.
 
   Lemma write_step_strong_relaxed
-        lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
-        (STEP: write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
-        (ORD: Ordering.le Ordering.strong_relaxed ord):
+        lc1 sc1 mem1 loc from to val releasedm released ord pf lc2 sc2 mem2 kind
+        (STEP: write_step lc1 sc1 mem1 loc from to val releasedm released ord pf lc2 sc2 mem2 kind)
+        (ORD: Ordering.le Ordering.strong_relaxed ord \/ pf):
     negb (Memory.op_kind_is_lower kind).
   Proof.
-    inv STEP. inv WRITE. ss.
-    destruct kind; ss.
+    guardH ORD.
+    inv STEP. inv WRITE. destruct kind; ss.
     inv PROMISE. des. subst.
     exploit Memory.lower_get0; try exact PROMISES. i. des.
-    exploit RELEASE; eauto. inv MSG_LE; eauto. i. subst.
-    inv RELEASED. revert H0.
-    unfold TView.write_released. condtac; ss. destruct ord; ss.
+    unguard. des.
+    - exploit RELEASE; eauto. inv MSG_LE; eauto. i. subst.
+      inv RELEASED. revert H0.
+      unfold TView.write_released. condtac; ss. destruct ord; ss.
+    - destruct pf; ss.
+      unfold Memory.get in *. rewrite PF in *; ss.
+      rewrite Cell.bot_get in *. ss.
   Qed.
 
   Lemma fence_step_future
@@ -551,8 +562,8 @@ Module Local.
   Qed.
 
   Lemma write_step_disjoint
-        lc1 sc1 mem1 lc2 sc2 loc from to val releasedm released ord mem2 kind lc
-        (STEP: write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
+        lc1 sc1 mem1 lc2 sc2 loc from to val releasedm released ord pf mem2 kind lc
+        (STEP: write_step lc1 sc1 mem1 loc from to val releasedm released ord pf lc2 sc2 mem2 kind)
         (WF1: wf lc1 mem1)
         (SC1: Memory.closed_timemap sc1 mem1)
         (CLOSED1: Memory.closed mem1)
