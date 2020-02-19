@@ -6,9 +6,10 @@ From Paco Require Import paco.
 
 From PromisingLib Require Import Axioms.
 From PromisingLib Require Import Basic.
+From PromisingLib Require Import Language.
+
 Require Import Event.
 Require Import Time.
-From PromisingLib Require Import Language.
 Require Import View.
 Require Import Cell.
 Require Import Memory.
@@ -18,6 +19,7 @@ Require Import Thread.
 Require Import Configuration.
 
 Require Import FulfillStep.
+
 Require Import SimMemory.
 Require Import SimPromises.
 Require Import SimLocal.
@@ -305,7 +307,6 @@ Proof.
     destruct lc_src, lc_tgt. ss. subst.
     splits; s; ii.
     { right. inv TERMINAL_TGT. ss. esplits; eauto; ss. }
-    { exploit SimPromises.cap; try eapply LOCAL; eauto. }
     { right. subst. esplits; eauto. }
     inv STEP_TGT; try by inv STEP; inv STATE.
     inv STEP; ss.
@@ -353,7 +354,6 @@ Proof.
           * etrans; [|eauto].
             eapply rtc_internal_step_seq in STEPS. eauto.
     }
-    { eapply CAP; eauto. }
     { exploit PROMISES; eauto. i. des.
       - left.
         unfold Thread.steps_failure in *. des.
@@ -418,7 +418,6 @@ Proof.
     destruct lc_src, lc_tgt. ss. subst.
     splits; s; ii.
     { inv TERMINAL_TGT. }
-    { exploit SimPromises.cap; try apply LOCAL; eauto. }
     { right. subst. esplits; eauto. }
     right. inv STEP_TGT; ss.
     + (* promise *)
@@ -451,7 +450,6 @@ Proof.
     destruct lc_src, lc_tgt. ss. subst.
     splits; s; ii.
     { inv TERMINAL_TGT. }
-    { exploit SimPromises.cap; try apply LOCAL; eauto. }
     { right. subst. esplits; eauto. }
     right. inv STEP_TGT; ss.
     + (* promise *)

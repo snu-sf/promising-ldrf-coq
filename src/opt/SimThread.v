@@ -3,8 +3,9 @@ From Paco Require Import paco.
 
 From PromisingLib Require Import Axioms.
 From PromisingLib Require Import Basic.
-Require Import Event.
 From PromisingLib Require Import Language.
+
+Require Import Event.
 Require Import View.
 Require Import Cell.
 Require Import Memory.
@@ -89,15 +90,8 @@ Section SimulationThread.
             <<TERMINAL_SRC: lang_src.(Language.is_terminal) st2_src>> /\
             <<LOCAL: sim_local SimPromises.bot lc2_src lc1_tgt>> /\
             <<TERMINAL: sim_terminal st2_src st1_tgt>>>> /\
-      <<CAP:
-        forall mem2_src
-          (CAP_SRC: Memory.cap lc1_src.(Local.promises) mem1_src mem2_src),
-        exists mem2_tgt,
-          <<MEMORY: sim_memory mem2_src mem2_tgt>> /\
-          <<CAP_TGT: Memory.cap lc1_tgt.(Local.promises) mem1_tgt mem2_tgt>>>> /\
       <<PROMISES:
-        forall (PROMISES_TGT: lc1_tgt.(Local.promises) = Memory.bot)
-          (NORESERVE: Memory.no_reserve mem1_tgt),
+        forall (PROMISES_TGT: lc1_tgt.(Local.promises) = Memory.bot),
           <<FAILURE: Thread.steps_failure (Thread.mk _ st1_src lc1_src sc1_src mem1_src)>> \/
           exists st2_src lc2_src sc2_src mem2_src,
             <<STEPS: rtc (@Thread.tau_step _)
@@ -356,22 +350,20 @@ Qed.
 
 Lemma cap_property
       mem1 mem2 lc sc
-      (CAP: Memory.cap lc.(Local.promises) mem1 mem2)
+      (CAP: Memory.cap mem1 mem2)
       (WF: Local.wf lc mem1)
       (SC: Memory.closed_timemap sc mem1)
       (CLOSED: Memory.closed mem1):
   <<FUTURE: Memory.future_weak mem1 mem2>> /\
   <<WF: Local.wf lc mem2>> /\
   <<SC: Memory.closed_timemap sc mem2>> /\
-  <<CLOSED: Memory.closed mem2>> /\
-  <<NORESERVE: Memory.no_reserve_except lc.(Local.promises) mem2>>.
+  <<CLOSED: Memory.closed mem2>>.
 Proof.
   splits.
   - eapply Memory.cap_future_weak; eauto.
   - eapply Local.cap_wf; eauto.
   - eapply Memory.cap_closed_timemap; eauto.
   - eapply Memory.cap_closed; eauto.
-  - eapply Memory.cap_no_reserve_except; eauto. apply WF.
 Qed.
 
 Lemma sc_property
@@ -408,28 +400,25 @@ Proof.
   generalize SIM. intro X.
   punfold X. exploit X; eauto; try refl. i. des.
   ii. ss.
-  exploit CAP; eauto. i. des.
+  exploit Memory.cap_exists; try exact MEM_TGT. i. des.
+  exploit cap_property; try exact CAP; eauto. i. des.
   exploit cap_property; try exact CAP0; eauto. i. des.
-  exploit cap_property; try exact CAP_TGT; eauto. i. des.
+  exploit sim_memory_cap; try exact MEMORY; eauto. i. des.
   exploit Memory.max_concrete_timemap_exists; try apply CLOSED0. i. des.
-  exploit sim_memory_max_concrete_timemap; try exact MEMORY0; eauto. i. subst.
+  exploit sim_memory_max_concrete_timemap; try exact x0; eauto. i. subst.
   exploit sc_property; try exact SC_MAX; eauto. i. des.
   exploit sc_property; try exact x0; eauto. i. des.
   exploit CONSISTENT; eauto. s. i. des.
   - left. inv FAILURE. des.
     exploit sim_thread_future; try exact SIM; try exact LE; try exact LE0; eauto. i.
-    exploit sim_thread_plus_step; try exact STEPS; try exact FAILURE; try exact x2; eauto; try refl.
+    exploit sim_thread_plus_step; try exact STEPS; try exact FAILURE; try exact x3; eauto; try refl.
     { inv FAILURE; inv STEP0. inv LOCAL. inv LOCAL0. ss. }
     i. des; auto. ss.
   - hexploit Local.bot_promise_consistent; eauto. i.
     exploit sim_thread_future; try exact SIM; try exact LE; try exact LE0; eauto. i.
-    exploit sim_thread_rtc_step; try apply STEPS; try exact x1; eauto; try refl. i. des; eauto.
+    exploit sim_thread_rtc_step; try apply STEPS; try exact x2; eauto; try refl. i. des; eauto.
     destruct e2. ss.
     punfold SIM0. exploit SIM0; eauto; try refl. i. des.
-    hexploit Thread.rtc_tau_step_no_reserve_except; try exact STEPS; eauto. i.
-    unfold Thread.no_reserve_except in *. ss.
-    rewrite PROMISES0 in *.
-    hexploit Memory.no_reserve_except_bot_no_reserve; try apply MEM_TGT0; eauto. i.
     exploit PROMISES1; eauto. i. des.
     + left. unfold Thread.steps_failure in *. des.
       esplits; [|eauto]. etrans; eauto.
