@@ -1,14 +1,12 @@
-Require Import Bool.
-Require Import List.
-
 From sflib Require Import sflib.
 From Paco Require Import paco.
 
 From PromisingLib Require Import Axioms.
 From PromisingLib Require Import Basic.
+From PromisingLib Require Import Language.
+
 Require Import Event.
 Require Import Time.
-From PromisingLib Require Import Language.
 Require Import View.
 Require Import Cell.
 Require Import Memory.
@@ -18,6 +16,7 @@ Require Import Thread.
 Require Import Configuration.
 
 Require Import FulfillStep.
+
 Require Import SimMemory.
 Require Import SimPromises.
 Require Import SimLocal.
@@ -28,6 +27,7 @@ Require Import Syntax.
 Require Import Semantics.
 
 Set Implicit Arguments.
+
 
 Definition lang_steps_failure (st1: State.t): Prop :=
   exists st2 st3,
@@ -108,7 +108,6 @@ Proof.
     + right.
       exploit rtc_lang_tau_step_rtc_thread_tau_step; eauto. i.
       esplits; eauto. econs. ss.
-  - i. exploit SimPromises.cap; try eapply LOCAL; eauto.
   - i. right.
     exploit sim_local_memory_bot; eauto. i.
     esplits; eauto.

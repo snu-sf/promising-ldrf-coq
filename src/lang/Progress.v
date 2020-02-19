@@ -1,6 +1,3 @@
-Require Import Omega.
-Require Import RelationClasses.
-
 From sflib Require Import sflib.
 From Paco Require Import paco.
 
@@ -9,10 +6,10 @@ From PromisingLib Require Import Basic.
 From PromisingLib Require Import DataStructure.
 From PromisingLib Require Import DenseOrder.
 From PromisingLib Require Import Loc.
+From PromisingLib Require Import Language.
 
 Require Import Event.
 Require Import Time.
-From PromisingLib Require Import Language.
 Require Import View.
 Require Import Cell.
 Require Import Memory.
@@ -78,6 +75,7 @@ Proof.
   specialize (CLOSED loc). des.
   eapply Memory.max_concrete_ts_spec; eauto.
 Qed.
+
 
 Lemma progress_promise_step
       lc1 sc1 mem1

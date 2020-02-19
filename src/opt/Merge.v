@@ -1,12 +1,10 @@
-Require Import Bool.
-Require Import List.
-
 From sflib Require Import sflib.
 From Paco Require Import paco.
 
 From PromisingLib Require Import Basic.
-Require Import Event.
 From PromisingLib Require Import Language.
+
+Require Import Event.
 Require Import Time.
 Require Import View.
 Require Import Cell.
@@ -20,8 +18,9 @@ Require Import Configuration.
 Require Import SimMemory.
 Require Import SimPromises.
 Require Import SimLocal.
-Require Import Compatibility.
 Require Import SimThread.
+Require Import Compatibility.
+
 Require Import MergeStep.
 Require Import ReorderStep.
 
@@ -29,6 +28,7 @@ Require Import Syntax.
 Require Import Semantics.
 
 Set Implicit Arguments.
+
 
 Lemma assign_sim_thread:
   forall v1 r2
@@ -42,7 +42,6 @@ Lemma assign_sim_thread:
 Proof.
   pcofix CIH. i. pfold. ii. splits; ii.
   { right. inv TERMINAL_TGT. }
-  { exploit SimPromises.cap; try eapply LOCAL; eauto. }
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
@@ -74,7 +73,6 @@ Lemma merge_load_load_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { right. inv TERMINAL_TGT. }
-  { exploit SimPromises.cap; try eapply LOCAL; eauto. }
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
@@ -115,7 +113,6 @@ Lemma merge_store_load_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { right. inv TERMINAL_TGT. }
-  { exploit SimPromises.cap; try eapply LOCAL; eauto. }
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
@@ -155,7 +152,6 @@ Lemma merge_store_store_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { right. inv TERMINAL_TGT. }
-  { exploit SimPromises.cap; try eapply LOCAL; eauto. }
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
@@ -218,7 +214,6 @@ Lemma merge_store_update_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { right. inv TERMINAL_TGT. }
-  { exploit SimPromises.cap; try eapply LOCAL; eauto. }
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
@@ -287,7 +282,6 @@ Lemma merge_update_load_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { right. inv TERMINAL_TGT. }
-  { exploit SimPromises.cap; try eapply LOCAL; eauto. }
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
@@ -344,7 +338,6 @@ Lemma merge_update_update_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { right. inv TERMINAL_TGT. }
-  { exploit SimPromises.cap; try eapply LOCAL; eauto. }
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
@@ -441,7 +434,6 @@ Lemma merge_fence_fence_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { right. inv TERMINAL_TGT. }
-  { exploit SimPromises.cap; try eapply LOCAL; eauto. }
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }

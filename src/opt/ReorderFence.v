@@ -1,12 +1,10 @@
-Require Import Bool.
-Require Import List.
-
 From sflib Require Import sflib.
 From Paco Require Import paco.
 
 From PromisingLib Require Import Basic.
-Require Import Event.
 From PromisingLib Require Import Language.
+
+Require Import Event.
 Require Import Time.
 Require Import View.
 Require Import Cell.
@@ -19,8 +17,8 @@ Require Import Configuration.
 Require Import SimMemory.
 Require Import SimPromises.
 Require Import SimLocal.
-Require Import Compatibility.
 Require Import SimThread.
+Require Import Compatibility.
 
 Require Import ReorderStep.
 
@@ -185,8 +183,6 @@ Lemma sim_fence_sim_thread:
 Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss; ii.
   - right. inv TERMINAL_TGT. inv PR; ss.
-  - eapply SimPromises.cap; eauto.
-    inv PR. inv FENCE. apply LOCAL.
   - right. esplits; eauto.
     inv PR. inversion FENCE. subst lc2_src. inversion LOCAL. ss.
     apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.

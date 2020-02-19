@@ -1,12 +1,10 @@
-Require Import Bool.
-Require Import List.
-
 From sflib Require Import sflib.
 From Paco Require Import paco.
 
 From PromisingLib Require Import Basic.
-Require Import Event.
 From PromisingLib Require Import Language.
+
+Require Import Event.
 Require Import Time.
 Require Import View.
 Require Import Cell.
@@ -37,7 +35,6 @@ Lemma intro_load_sim_stmts
             (RegFile.eq_except (RegSet.singleton r)).
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; try done; i.
-  { exploit SimPromises.cap; try apply LOCAL; eauto. }
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }

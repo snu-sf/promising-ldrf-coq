@@ -1,12 +1,10 @@
-Require Import Bool.
-Require Import List.
-
 From sflib Require Import sflib.
 From Paco Require Import paco.
 
 From PromisingLib Require Import Basic.
-Require Import Event.
 From PromisingLib Require Import Language.
+
+Require Import Event.
 Require Import Time.
 Require Import View.
 Require Import Cell.
@@ -18,11 +16,12 @@ Require Import Configuration.
 Require Import Progress.
 
 Require Import FulfillStep.
+
 Require Import SimMemory.
 Require Import SimPromises.
 Require Import SimLocal.
-Require Import Compatibility.
 Require Import SimThread.
+Require Import Compatibility.
 
 Require Import ReorderStep.
 Require Import ProgressStep.
@@ -47,13 +46,14 @@ Inductive reorder_store l1 v1 o1: forall (i2:Instr.t), Prop :=
     (ORD1: Ordering.le o1 Ordering.relaxed)
     (LOC: l1 <> l2):
     reorder_store l1 v1 o1 (Instr.store l2 v2 o2)
-| reorder_store_update
-    r2 l2 rmw2 or2 ow2
-    (ORD1: Ordering.le o1 Ordering.relaxed)
-    (ORDR2: Ordering.le or2 Ordering.relaxed)
-    (LOC: l1 <> l2)
-    (REGS: RegSet.disjoint (Instr.regs_of (Instr.store l1 v1 o1)) (RegSet.singleton r2)):
-    reorder_store l1 v1 o1 (Instr.update r2 l2 rmw2 or2 ow2)
+(* reordering update; store is unsound *)
+(* | reorder_store_update *)
+(*     r2 l2 rmw2 or2 ow2 *)
+(*     (ORD1: Ordering.le o1 Ordering.relaxed) *)
+(*     (ORDR2: Ordering.le or2 Ordering.relaxed) *)
+(*     (LOC: l1 <> l2) *)
+(*     (REGS: RegSet.disjoint (Instr.regs_of (Instr.store l1 v1 o1)) (RegSet.singleton r2)): *)
+(*     reorder_store l1 v1 o1 (Instr.update r2 l2 rmw2 or2 ow2) *)
 .
 
 Inductive sim_store: forall (st_src:lang.(Language.state)) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t)
@@ -105,38 +105,6 @@ Proof.
   i. des. econs; eauto.
 Qed.
 
-Lemma sim_store_cap
-      st_src lc_src sc1_src mem1_src
-      st_tgt lc_tgt sc1_tgt mem1_tgt
-      mem2_src
-      (MEM1: sim_memory mem1_src mem1_tgt)
-      (SIM1: sim_store st_src lc_src sc1_src mem1_src
-                       st_tgt lc_tgt sc1_tgt mem1_tgt)
-      (CAP_SRC: Memory.cap lc_src.(Local.promises) mem1_src mem2_src):
-  exists lc'_src mem2_tgt,
-    <<MEM2: sim_memory mem2_src mem2_tgt>> /\
-    <<CAP_TGT: Memory.cap lc_tgt.(Local.promises) mem1_tgt mem2_tgt>> /\
-    <<SIM2: sim_store st_src lc'_src sc1_src mem2_src
-                      st_tgt lc_tgt sc1_tgt mem2_tgt>>.
-Proof.
-  inv SIM1.
-  exploit Memory.cap_future_weak; eauto. i.
-  exploit fulfill_step_future; eauto; try by viewtac. i. des.
-  exploit fulfill_step_future; try exact WF_SRC;
-    eauto using Memory.future_closed_timemap. i. des.
-  exploit future_fulfill_step; try exact FULFILL; eauto. i. des.
-  exploit fulfill_step_cap; eauto. i.
-  exploit SimPromises.cap; try exact MEM1; eauto.
-  { inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite <- PROMISES.
-    apply SimPromises.sem_bot.
-  }
-  i. des.
-  exploit cap_property; try exact CAP_SRC; eauto. i. des.
-  exploit cap_property; try exact CAP_TGT; eauto. i. des.
-  esplits; eauto.
-  econs; eauto using Memory.future_weak_closed_timemap.
-Qed.
-
 Lemma sim_store_step
       st1_src lc1_src sc1_src mem1_src
       st1_tgt lc1_tgt sc1_tgt mem1_tgt
@@ -183,25 +151,6 @@ Proof.
     + auto.
     + etrans; eauto.
     + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
-  - (* update-load *)
-    exploit sim_local_read; try exact LOCAL0; (try by etrans; eauto); eauto; try refl. i. des.
-    exploit reorder_fulfill_read; try exact FULFILL; try exact STEP_SRC; eauto. i. des.
-    exploit Local.read_step_future; try exact STEP1; eauto. i. des.
-    exploit fulfill_write_sim_memory; eauto; try by viewtac. i. des.
-    esplits.
-    + ss.
-    + econs 2; eauto. econs.
-      * econs. econs 2. econs; [|econs 2]; eauto. econs. econs. eauto.
-      * auto.
-    + econs 2. econs 2. econs; [|econs 3]; eauto. econs.
-      erewrite <- RegFile.eq_except_value; eauto.
-      * econs.
-      * symmetry. eauto.
-      * apply RegFile.eq_except_singleton.
-    + auto.
-    + auto.
-    + etrans; eauto.
-    + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
   - (* store *)
     hexploit sim_local_write_bot; try exact LOCAL1; eauto; try refl; try by viewtac. i. des.
     hexploit reorder_fulfill_write_sim_memory; try exact FULFILL; try exact STEP_SRC; eauto; try by viewtac. i. des.
@@ -218,31 +167,6 @@ Proof.
     + etrans; eauto. etrans; eauto.
     + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
       etrans; eauto.
-  - (* update *)
-    exploit fulfill_step_future; try exact FULFILL; eauto; try by viewtac. i. des.
-    exploit Local.read_step_future; try exact LOCAL1; eauto; try by viewtac. i. des.
-    exploit sim_local_read; try exact LOCAL1; (try by etrans; eauto); eauto; try refl. i. des.
-    exploit Local.read_step_future; try exact STEP_SRC; eauto. i. des.
-    hexploit sim_local_write_bot; try exact LOCAL2; eauto; try refl; try by viewtac. i. des.
-    hexploit reorder_fulfill_update; try exact FULFILL; try exact STEP_SRC; try exact STEP_SRC0; eauto; try by viewtac. i. des.
-    exploit Local.read_step_future; try apply STEP1; eauto. i. des.
-    exploit Local.write_step_future; try apply STEP2; eauto. i. des.
-    exploit fulfill_write_sim_memory; eauto; try exact STEP3; try by viewtac. i. des.
-    esplits.
-    + ss.
-    + econs 2; eauto. econs.
-      * econs. econs 2. econs; [|econs 4]; eauto. econs. econs. eauto.
-      * auto.
-    + econs 2. econs 2. econs; [|econs 3]; eauto. econs.
-      erewrite <- RegFile.eq_except_value; eauto.
-      * econs.
-      * symmetry. eauto.
-      * apply RegFile.eq_except_singleton.
-    + auto.
-    + etrans; eauto.
-    + etrans; eauto. etrans; eauto.
-    + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
-      etrans; eauto.
 Qed.
 
 Lemma sim_store_sim_thread:
@@ -251,11 +175,10 @@ Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss; ii.
   - inv TERMINAL_TGT. inv PR; ss.
   - exploit sim_store_mon; eauto. i.
-    exploit sim_store_cap; try apply x0; eauto. i. des.
-    esplits; eauto.
-  - exploit sim_store_mon; eauto. i.
-    inversion x0. subst. i.
-    exploit (progress_program_step rs i2 nil); eauto. i. des.
+    inversion x0. subst.
+    exploit (progress_program_step_non_update rs i2 nil); eauto.
+    { inv x0. inv REORDER0; ss. }
+    i. des.
     destruct th2. exploit sim_store_step; eauto.
     { econs 2. eauto. }
     i. des; eauto.
@@ -263,7 +186,6 @@ Proof.
       exploit Thread.rtc_tau_step_future; eauto. s. i. des.
       exploit Thread.opt_step_future; eauto. s. i. des.
       exploit Thread.program_step_future; eauto. s. i. des.
-      hexploit Thread.step_bot_no_reserve; [econs 2; eauto|..]; eauto. s. i. des.
       punfold SIM. exploit SIM; try apply SC3; eauto; try refl.
       { exploit Thread.program_step_promises_bot; eauto. s. i.
         eapply Local.bot_promise_consistent; eauto. }

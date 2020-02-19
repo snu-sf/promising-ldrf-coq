@@ -1,15 +1,12 @@
-Require Import Bool.
-Require Import List.
-
 From sflib Require Import sflib.
 From Paco Require Import paco.
 
 From PromisingLib Require Import Basic.
 From PromisingLib Require Import DenseOrder.
 From PromisingLib Require Import Loc.
+From PromisingLib Require Import Language.
 
 Require Import Event.
-From PromisingLib Require Import Language.
 Require Import Time.
 Require Import View.
 Require Import Cell.
@@ -21,20 +18,15 @@ Require Import Thread.
 Require Import Configuration.
 Require Import Progress.
 
+Require Import MemoryReorder.
+Require Import MemoryMerge.
 Require Import FulfillStep.
+
 Require Import SimMemory.
 Require Import SimPromises.
 Require Import SimLocal.
-Require Import Compatibility.
-Require Import SimThread.
 
-Require ReorderTView.
-Require Import MemoryReorder.
-Require Import MemoryMerge.
-
-Require Import Syntax.
-Require Import Semantics.
-Require Import ProgressStep.
+Require Import ReorderTView.
 
 Set Implicit Arguments.
 

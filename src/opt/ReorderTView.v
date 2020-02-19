@@ -1,12 +1,10 @@
-Require Import Bool.
-Require Import List.
-
 From sflib Require Import sflib.
 From Paco Require Import paco.
 
 From PromisingLib Require Import Basic.
-Require Import Event.
 From PromisingLib Require Import Language.
+
+Require Import Event.
 Require Import Time.
 Require Import View.
 Require Import Cell.
@@ -16,13 +14,6 @@ Require Import Local.
 Require Import Thread.
 Require Import Configuration.
 Require Import Progress.
-
-Require Import SimPromises.
-Require Import Compatibility.
-Require Import SimThread.
-
-Require Import Syntax.
-Require Import Semantics.
 
 Set Implicit Arguments.
 

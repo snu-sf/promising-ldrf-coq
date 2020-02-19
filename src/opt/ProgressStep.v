@@ -1,13 +1,11 @@
-Require Import Bool.
-Require Import List.
-
 From sflib Require Import sflib.
 From Paco Require Import paco.
 
 From PromisingLib Require Import Basic.
 From PromisingLib Require Import DenseOrder.
-Require Import Event.
 From PromisingLib Require Import Language.
+
+Require Import Event.
 Require Import Time.
 Require Import View.
 Require Import Cell.
@@ -24,17 +22,18 @@ Require Import Semantics.
 
 Set Implicit Arguments.
 
-Lemma progress_program_step
+
+Lemma progress_program_step_non_update
       rs1 i1 s1 lc1 sc1 mem1
       (WF1: Local.wf lc1 mem1)
       (MEM1: Memory.closed mem1)
       (SC1: Memory.closed_timemap sc1 mem1)
       (PROMISES1: lc1.(Local.promises) = Memory.bot)
-      (NORESERVE1: Memory.no_reserve mem1):
+      (UPDATE: match i1 with Stmt.instr (Instr.update _ _ _ _ _) => False | _ => True end):
   exists e th2, <<STEP: Thread.program_step e (Thread.mk lang (State.mk rs1 (i1::s1)) lc1 sc1 mem1) th2>>.
 Proof.
   destruct i1.
-  - destruct i.
+  - destruct i; ss; clear UPDATE.
     + esplits. econs; [|econs 1]; eauto. econs. econs.
     + esplits. econs; [|econs 1]; eauto. econs. econs.
     + hexploit progress_read_step; eauto. i. des.
@@ -43,17 +42,6 @@ Proof.
       { apply Time.incr_spec. }
       { i. rewrite PROMISES1. apply Memory.bot_nonsynch_loc. }
       i. des. esplits. econs; [|econs 3]; eauto. econs. econs.
-    + hexploit progress_read_step; eauto. i. des.
-      exploit Memory.no_reserve_max_ts; eauto; i.
-      exploit Local.read_step_future; eauto. i. des.
-      destruct (RegFile.eval_rmw rs1 rmw val) as [? []] eqn: EQ.
-      * hexploit progress_write_step; eauto.
-        { apply Time.incr_spec. }
-        { i. inv READ. s. rewrite PROMISES1. apply Memory.bot_nonsynch_loc. }
-        i. des. esplits. econs; [|econs 4]; eauto.
-        { econs. econs. rewrite EQ. eauto. }
-        { rewrite x0. eauto. }
-      * esplits. econs; [|econs 2]; eauto. econs. econs. rewrite EQ; eauto.
     + hexploit progress_fence_step; eauto.
       { i. rewrite PROMISES1. apply Memory.bot_nonsynch. }
       i. des.

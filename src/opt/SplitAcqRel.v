@@ -1,14 +1,11 @@
-Require Import Bool.
-Require Import List.
-
 From sflib Require Import sflib.
 From Paco Require Import paco.
 
 From PromisingLib Require Import Basic.
 From PromisingLib Require Import Loc.
+From PromisingLib Require Import Language.
 
 Require Import Event.
-From PromisingLib Require Import Language.
 Require Import Time.
 Require Import View.
 Require Import Cell.
@@ -19,15 +16,17 @@ Require Import Thread.
 Require Import Configuration.
 
 Require Import FulfillStep.
+
 Require Import SimMemory.
 Require Import SimPromises.
 Require Import SimLocal.
-Require Import Compatibility.
 Require Import SimThread.
+Require Import Compatibility.
+
+Require Import SplitAcq.
 
 Require Import Syntax.
 Require Import Semantics.
-Require Import SplitAcq.
 
 Set Implicit Arguments.
 
@@ -287,8 +286,6 @@ Lemma sim_acqrel_sim_thread:
 Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss; ii.
   - inv TERMINAL_TGT. inv PR; ss.
-  - eapply SimPromises.cap; eauto.
-    inv PR. apply LOCAL.
   - right. esplits; eauto.
     inv PR. eapply sim_local_memory_bot; eauto.
   - exploit sim_acqrel_mon; eauto. i. des.
@@ -308,7 +305,6 @@ Lemma split_acqrel_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { inv TERMINAL_TGT. }
-  { exploit SimPromises.cap; try eapply LOCAL; eauto. }
   { right. esplits; eauto.
     inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   }

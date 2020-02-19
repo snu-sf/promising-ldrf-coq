@@ -1,12 +1,10 @@
-Require Import Bool.
-Require Import List.
-
 From sflib Require Import sflib.
 From Paco Require Import paco.
 
 From PromisingLib Require Import Basic.
-Require Import Event.
 From PromisingLib Require Import Language.
+
+Require Import Event.
 Require Import Time.
 Require Import View.
 Require Import Cell.
@@ -19,11 +17,12 @@ Require Import Configuration.
 Require Import Progress.
 
 Require Import FulfillStep.
+
 Require Import SimMemory.
 Require Import SimPromises.
 Require Import SimLocal.
-Require Import Compatibility.
 Require Import SimThread.
+Require Import Compatibility.
 
 Require Import ReorderStep.
 Require Import ReorderLoad.
@@ -36,6 +35,7 @@ Require Import Syntax.
 Require Import Semantics.
 
 Set Implicit Arguments.
+
 
 Inductive reorder: forall (i1 i2:Instr.t), Prop :=
 | reorder_intro_load
@@ -69,7 +69,6 @@ Lemma reorder_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { inv TERMINAL_TGT. }
-  { exploit SimPromises.cap; try eapply LOCAL; eauto. }
   { right. esplits; eauto.
     inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   }

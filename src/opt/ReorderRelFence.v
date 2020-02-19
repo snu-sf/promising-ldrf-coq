@@ -1,15 +1,12 @@
-Require Import Bool.
-Require Import List.
-
 From sflib Require Import sflib.
 From Paco Require Import paco.
 
 From PromisingLib Require Import Axioms.
 From PromisingLib Require Import Basic.
 From PromisingLib Require Import Loc.
+From PromisingLib Require Import Language.
 
 Require Import Event.
-From PromisingLib Require Import Language.
 Require Import Time.
 Require Import View.
 Require Import Cell.
@@ -23,8 +20,8 @@ Require Import Progress.
 Require Import SimMemory.
 Require Import SimPromises.
 Require Import SimLocal.
-Require Import Compatibility.
 Require Import SimThread.
+Require Import Compatibility.
 
 Require Import FulfillStep.
 Require Import ReorderStep.
@@ -493,8 +490,6 @@ Lemma sim_release_fenceF_sim_thread:
 Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss; ii.
   - right. inv TERMINAL_TGT. inv PR; ss.
-  - inv PR.
-    exploit SimPromises.cap; (try by apply LOCALF); eauto using local_relfenced_wf.
   - right. inv PR.
     esplits; eauto.
     eapply sim_local_memory_bot; eauto.
@@ -513,7 +508,6 @@ Lemma reorder_release_fenceF_sim_stmts
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { inv TERMINAL_TGT. }
-  { exploit SimPromises.cap; try apply LOCAL; eauto. }
   { right. esplits; eauto.
     inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   }
