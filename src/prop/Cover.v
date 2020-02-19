@@ -8,10 +8,10 @@ From PromisingLib Require Import Basic.
 From PromisingLib Require Import DataStructure.
 From PromisingLib Require Import DenseOrder.
 From PromisingLib Require Import Loc.
+From PromisingLib Require Import Language.
 
 Require Import Event.
 Require Import Time.
-From PromisingLib Require Import Language.
 Require Import View.
 Require Import Cell.
 Require Import Memory.
@@ -176,8 +176,8 @@ Proof.
 Qed.
 
 Lemma cap_cover
-      promises mem1 mem2 loc ts
-      (CAP: Memory.cap promises mem1 mem2)
+      mem1 mem2 loc ts
+      (CAP: Memory.cap mem1 mem2)
       (COVER: covered loc ts mem1):
   covered loc ts mem2.
 Proof.

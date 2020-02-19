@@ -9,22 +9,16 @@ From PromisingLib Require Import Basic.
 From PromisingLib Require Import DataStructure.
 From PromisingLib Require Import DenseOrder.
 From PromisingLib Require Import Loc.
+From PromisingLib Require Import Language.
 
 Require Import Event.
 Require Import Time.
-From PromisingLib Require Import Language.
 Require Import View.
 Require Import Cell.
 Require Import Memory.
 Require Import TView.
 Require Import Local.
 Require Import Thread.
-
-Require Import SimMemory.
-Require Import SimPromises.
-Require Import SimLocal.
-Require Import FulfillStep.
-Require Import MemoryReorder.
 
 Require Import PromiseConsistent.
 Require Import ReorderPromises.
@@ -38,8 +32,7 @@ Definition pf_consistent lang (e:Thread.t lang): Prop :=
          (SC_MAX: Memory.max_concrete_timemap mem1 sc1),
   exists e2,
     (<<STEPS: rtc (tau (Thread.step true)) (Thread.mk _ e.(Thread.state) e.(Thread.local) sc1 mem1) e2>>) /\
-    ((exists e3,
-         (<< FAILURE: Thread.step true ThreadEvent.failure e2 e3 >>)) \/
+    ((<<FAILURE: exists e3, Thread.step true ThreadEvent.failure e2 e3 >>) \/
      (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>)).
 
 Lemma rtc_union_step_nonpf_failure
