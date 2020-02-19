@@ -175,7 +175,7 @@ Proof.
       rewrite GET in *. inv GET0. ss.
 Qed.
 
-Lemma cap_cover
+Lemma cap_covered
       mem1 mem2 loc ts
       (CAP: Memory.cap mem1 mem2)
       (COVER: covered loc ts mem1):

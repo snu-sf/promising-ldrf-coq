@@ -1,6 +1,3 @@
-Require Import Bool.
-Require Import List.
-
 From sflib Require Import sflib.
 From Paco Require Import paco.
 

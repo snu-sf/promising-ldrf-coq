@@ -1,5 +1,3 @@
-Require Import Omega.
-Require Import RelationClasses.
 Require Import Coq.Lists.ListDec Decidable.
 
 From sflib Require Import sflib.

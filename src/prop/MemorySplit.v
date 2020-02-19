@@ -1,6 +1,3 @@
-Require Import Omega.
-Require Import RelationClasses.
-
 From sflib Require Import sflib.
 From Paco Require Import paco.
 

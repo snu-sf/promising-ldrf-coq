@@ -554,7 +554,7 @@ Module SimPromises.
       destruct (Memory.get loc to mem1_src) as [[]|] eqn:GET1.
       + inv CAP_SRC. exploit SOUND; eauto. i.
         rewrite x in GET. inv GET.
-        eapply cap_cover; eauto.
+        eapply cap_covered; eauto.
         inv MEM1. rewrite <- COVER.
         econs; eauto.
       + exploit cap_get_src; eauto. i. des.
@@ -563,7 +563,7 @@ Module SimPromises.
       destruct (Memory.get loc to mem1_tgt) as [[]|] eqn:GET1.
       + inv CAP. exploit SOUND; eauto. i.
         rewrite x in GET. inv GET.
-        eapply cap_cover; eauto.
+        eapply cap_covered; eauto.
         inv MEM1. rewrite COVER.
         econs; eauto.
       + exploit cap_get_tgt; eauto. i. des.
