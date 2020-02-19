@@ -241,14 +241,14 @@ Proof.
   { eapply fulfill_step_lc_from; eauto. }
   i. des.
   exploit Local.promise_step_future; try exact STEP0; eauto. i. des.
-  exploit promise_fulfill_write; try eexact STEP3; eauto; try by viewtac.
+  exploit promise_fulfill_write_sim_memory; try eexact STEP3; eauto; try by viewtac.
   { i. destruct ord; inv ORD; inv H. }
   i. des.
   exploit Local.write_step_future; eauto; try by viewtac. i. des.
   exploit sim_local_fulfill_bot; try eexact STEP4; try exact REL_LE; try refl; eauto.
   { inv MSG_WF0. eauto. }
   i. des.
-  exploit (@fulfill_write lc2' sc2' mem2'); try eexact STEP_SRC; eauto. i. des.
+  exploit (@fulfill_write_sim_memory lc2' sc2' mem2'); try eexact STEP_SRC; eauto. i. des.
   esplits; eauto.
   - etrans; eauto.
   - etrans; eauto. etrans; eauto.
@@ -469,9 +469,9 @@ Proof.
   { ii. inv H. exfalso. eapply Time.lt_strorder. eauto. }
   i. des.
   exploit fulfill_step_future; try eexact STEP7; try exact WF3; eauto; try by viewtac. i. des.
-  exploit promise_fulfill_write; try eexact STEP5; eauto. i. des.
+  exploit promise_fulfill_write_sim_memory; try eexact STEP5; eauto. i. des.
   exploit Local.write_step_future; eauto. i. des.
-  exploit promise_fulfill_write; try eexact STEP8; eauto.
+  exploit promise_fulfill_write_sim_memory; try eexact STEP8; eauto.
   { inv MSG_WF0. ss. }
   { inv MSG_CLOSED0. ss. }
   { i. hexploit ORD; eauto. i. des. splits; auto.
@@ -528,9 +528,9 @@ Proof.
   { ii. inv H. inv STEP5. inv PROMISE. inv MEM. inv SPLIT. eapply Time.lt_strorder. eauto. }
   i. des.
   exploit fulfill_step_future; try eexact STEP7; try exact WF3; eauto; try by viewtac. i. des.
-  exploit promise_fulfill_write; try eexact STEP5; eauto. i. des.
+  exploit promise_fulfill_write_sim_memory; try eexact STEP5; eauto. i. des.
   exploit Local.write_step_future; eauto. i. des.
-  exploit promise_fulfill_write; try eexact STEP8; eauto.
+  exploit promise_fulfill_write_sim_memory; try eexact STEP8; eauto.
   { inv MSG_WF0. ss. }
   { inv MSG_CLOSED0. ss. }
   { i. hexploit ORD; eauto. i. des. splits; auto.
@@ -587,9 +587,9 @@ Proof.
   { ii. inv H. exfalso. eapply Time.lt_strorder. eauto. }
   i. des.
   exploit fulfill_step_future; try eexact STEP7; try exact WF3; eauto; try by viewtac. i. des.
-  exploit promise_fulfill_write; try eexact STEP5; eauto. i. des.
+  exploit promise_fulfill_write_sim_memory; try eexact STEP5; eauto. i. des.
   exploit Local.write_step_future; eauto. i. des.
-  exploit promise_fulfill_write; try eexact STEP8; eauto.
+  exploit promise_fulfill_write_sim_memory; try eexact STEP8; eauto.
   { inv MSG_WF0. ss. }
   { inv MSG_CLOSED0. ss. }
   { i. hexploit ORD; eauto. i. des. splits; auto.

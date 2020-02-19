@@ -358,7 +358,7 @@ Proof.
     exploit reorder_update_read; try exact FULFILL; try exact READ; try exact STEP_SRC; eauto. i. des.
     exploit Local.read_step_future; try exact STEP1; eauto. i. des.
     exploit Local.read_step_future; try exact STEP2; eauto. i. des.
-    exploit fulfill_write; eauto. i. des.
+    exploit fulfill_write_sim_memory; eauto. i. des.
     esplits.
     + ss.
     + econs 2; eauto. econs.
@@ -381,7 +381,7 @@ Proof.
     exploit reorder_update_read; try exact FULFILL; try exact READ; try exact STEP_SRC; eauto. i. des.
     exploit Local.read_step_future; try exact STEP1; eauto. i. des.
     exploit Local.read_step_future; try exact STEP2; eauto. i. des.
-    exploit fulfill_write; eauto. i. des.
+    exploit fulfill_write_sim_memory; eauto. i. des.
     esplits.
     + ss.
     + econs 2; eauto. econs.
@@ -410,7 +410,7 @@ Proof.
     i. des.
     exploit Local.write_step_future; try exact STEP1; eauto; try by viewtac. i. des.
     exploit Local.read_step_future; try exact STEP2; eauto; try by viewtac. i. des.
-    exploit fulfill_write; eauto. i. des.
+    exploit fulfill_write_sim_memory; eauto. i. des.
     esplits.
     + ss.
     + econs 2; eauto. econs.
@@ -441,7 +441,7 @@ Proof.
     exploit Local.read_step_future; try exact STEP1; eauto. i. des.
     exploit Local.write_step_future; try exact STEP2; eauto. i. des.
     exploit Local.read_step_future; try exact STEP3; eauto. i. des.
-    exploit fulfill_write; eauto. i. des.
+    exploit fulfill_write_sim_memory; eauto. i. des.
     esplits.
     + ss.
     + econs 2; eauto. econs.

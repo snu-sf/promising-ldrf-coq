@@ -330,7 +330,7 @@ Proof.
     left. eapply sim_local_promise_not_lower; try exact STEP1; eauto.
   }
   i. des.
-  exploit promise_fulfill_write; try exact STEP_SRC; try exact STEP_SRC0; eauto.
+  exploit promise_fulfill_write_sim_memory; try exact STEP_SRC; try exact STEP_SRC0; eauto.
   { i. hexploit ORD0; eauto.
     eapply sim_local_nonsynch_loc; eauto.
   }

@@ -265,7 +265,7 @@ Proof.
     try apply LOCAL2; try apply MEM2; eauto.
   { eapply Memory.future_closed_opt_view; eauto. }
   i. des.
-  exploit promise_fulfill_write; try exact STEP_SRC; try exact STEP_SRC0; eauto.
+  exploit promise_fulfill_write_sim_memory; try exact STEP_SRC; try exact STEP_SRC0; eauto.
   { i. hexploit ORD0; eauto.
     i. des. subst. splits; auto. eapply sim_local_nonsynch_loc; eauto.
   }

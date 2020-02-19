@@ -254,7 +254,7 @@ Proof.
   i. des.
   exploit Local.promise_step_future; eauto. i. des.
   exploit reorder_read_fulfill; try exact STEP5; try exact STEP3; eauto; try by viewtac. i. des.
-  exploit promise_fulfill_write; try exact x4; try exact STEP6; eauto; try by viewtac.
+  exploit promise_fulfill_write_sim_memory; try exact x4; try exact STEP6; eauto; try by viewtac.
   { i. hexploit ORD0; eauto. i. des.
     splits; auto. inv STEP1. auto.
   }
@@ -449,7 +449,7 @@ Proof.
   - refl.
 Qed.
 
-Lemma reorder_fulfill_write
+Lemma reorder_fulfill_write_sim_memory
       loc1 from1 to1 val1 releasedm1 released1 ord1
       loc2 from2 to2 val2 releasedm2 released2 ord2 kind2
       lc0 sc0 mem0
@@ -483,7 +483,7 @@ Proof.
     eauto using Memory.future_closed_opt_view, Memory.future_closed_timemap. i. des.
   exploit reorder_fulfill_fulfill; try exact STEP5; try exact STEP3;
     eauto using Memory.future_closed_opt_view, Memory.future_closed_timemap. i. des.
-  exploit promise_fulfill_write; eauto.
+  exploit promise_fulfill_write_sim_memory; eauto.
   { i. hexploit ORD; eauto. i. des. splits; ss.
     ii. unfold Memory.get in GET.
     erewrite fulfill_step_promises_diff in GET; eauto.
@@ -527,7 +527,7 @@ Proof.
   exploit Local.read_step_future; try exact STEP0; eauto. i. des.
   exploit fulfill_step_future; try exact STEP4; eauto. i. des.
   hexploit sim_local_write_bot; try exact STEP3; try exact LOCAL; try refl; eauto. i. des.
-  hexploit reorder_fulfill_write; try exact STEP4; try exact STEP3; eauto. i. des.
+  hexploit reorder_fulfill_write_sim_memory; try exact STEP4; try exact STEP3; eauto. i. des.
   esplits; eauto.
 Qed.
 
@@ -706,7 +706,7 @@ Proof.
     eauto using Memory.future_closed_opt_view, Memory.future_closed_timemap. i. des.
   exploit fulfill_step_future; try exact STEP8; try exact WF3;
     eauto using Memory.future_closed_opt_view, Memory.future_closed_timemap. i. des.
-  exploit promise_fulfill_write; eauto.
+  exploit promise_fulfill_write_sim_memory; eauto.
   { i. hexploit ORD; eauto. i. des.
     splits; auto.
     erewrite Local.read_step_promises; [|eauto].
@@ -936,7 +936,7 @@ Proof.
   exploit Local.promise_step_future; eauto. i. des.
   exploit reorder_fence_fulfill; try exact STEP5; try exact STEP3;
     eauto using Memory.future_closed_opt_view, Memory.future_closed_timemap. i. des.
-  exploit promise_fulfill_write; eauto.
+  exploit promise_fulfill_write_sim_memory; eauto.
   { i. hexploit ORD; eauto. i. des.
     splits; auto. inv STEP1. auto.
   }

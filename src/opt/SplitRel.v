@@ -187,7 +187,7 @@ Proof.
   { eapply Memory.future_closed_opt_view; eauto. }
   { by inv STEP1. }
   i. des.
-  exploit promise_fulfill_write; try exact STEP_SRC; try exact STEP_SRC0; eauto.
+  exploit promise_fulfill_write_sim_memory; try exact STEP_SRC; try exact STEP_SRC0; eauto.
   { i. hexploit ORD; eauto. i. des. splits; ss.
     eapply sim_local_nonsynch_loc; eauto.
   }

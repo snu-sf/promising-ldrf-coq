@@ -28,7 +28,7 @@ Set Implicit Arguments.
 
 Definition pf_consistent lang (e:Thread.t lang): Prop :=
   forall mem1 sc1
-         (CAP: Memory.cap e.(Thread.local).(Local.promises) e.(Thread.memory) mem1)
+         (CAP: Memory.cap e.(Thread.memory) mem1)
          (SC_MAX: Memory.max_concrete_timemap mem1 sc1),
   exists e2,
     (<<STEPS: rtc (tau (Thread.step true)) (Thread.mk _ e.(Thread.state) e.(Thread.local) sc1 mem1) e2>>) /\

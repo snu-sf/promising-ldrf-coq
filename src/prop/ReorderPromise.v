@@ -21,13 +21,9 @@ Require Import TView.
 Require Import Local.
 Require Import Thread.
 
-Require Import SimMemory.
-Require Import SimPromises.
-Require Import SimLocal.
-Require Import FulfillStep.
 Require Import MemoryReorder.
-
 Require Import PromiseConsistent.
+Require Import FulfillStep.
 
 Set Implicit Arguments.
 
@@ -617,7 +613,7 @@ Proof.
   i. des.
   unguardH STEP5. des.
   - inv STEP5.
-    exploit promise_fulfill_write_exact; try exact STEP4; eauto.
+    exploit promise_fulfill_write; try exact STEP4; eauto.
     { i. hexploit ORD; eauto. i.
       eapply promise_step_nonsynch_loc_inv; try exact STEP1; eauto.
     }
@@ -628,7 +624,7 @@ Proof.
     { i. eapply STEP6; eauto. }
     i. des.
     exploit fulfill_step_future; try exact STEP7; try exact WF0; eauto; try by viewtac. i. des.
-    exploit promise_fulfill_write_exact; try exact STEP4; eauto; try by viewtac.
+    exploit promise_fulfill_write; try exact STEP4; eauto; try by viewtac.
     { i. hexploit ORD; eauto. i.
       eapply promise_step_nonsynch_loc_inv; try exact STEP1; eauto.
     }
