@@ -172,14 +172,12 @@ Module ProgramEvent.
       ord (read l v o1) (read l v o2)
   | ord_write
       l v o1 o2
-      (O: Ordering.le o1 o2)
-      (PF: Ordering.le Ordering.acqrel o2):
+      (O: Ordering.le o1 o2):
       ord (write l v o1) (write l v o2)
   | ord_update
       l vr vw or1 or2 ow1 ow2
       (OR: Ordering.le or1 or2)
-      (OW: Ordering.le ow1 ow2)
-      (PF: Ordering.le Ordering.acqrel ow2):
+      (OW: Ordering.le ow1 ow2):
       ord (update l vr vw or1 ow1) (update l vr vw or2 ow2)
   | ord_fence
       or1 or2 ow1 ow2
