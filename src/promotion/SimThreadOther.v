@@ -1,6 +1,3 @@
-Require Import Omega.
-Require Import RelationClasses.
-
 From sflib Require Import sflib.
 From Paco Require Import paco.
 
@@ -314,14 +311,14 @@ Module SimThreadOther.
         (CLOSED_TGT: Memory.closed e_tgt.(Thread.memory))
         (SC_SRC: Memory.max_concrete_timemap cap_src sc_src)
         (SC_TGT: Memory.max_concrete_timemap cap_tgt sc_tgt)
-        (CAP_SRC: Memory.cap e_src.(Thread.local).(Local.promises) e_src.(Thread.memory) cap_src)
-        (CAP_TGT: Memory.cap e_tgt.(Thread.local).(Local.promises) e_tgt.(Thread.memory) cap_tgt):
+        (CAP_SRC: Memory.cap e_src.(Thread.memory) cap_src)
+        (CAP_TGT: Memory.cap e_tgt.(Thread.memory) cap_tgt):
     sim_thread l
                (Thread.mk lang e_src.(Thread.state) e_src.(Thread.local) sc_src cap_src)
                (Thread.mk lang e_tgt.(Thread.state) e_tgt.(Thread.local) sc_tgt cap_tgt).
   Proof.
     inv SIM. inv LOCAL.
-    exploit sim_memory_cap; [apply PROMISES1|exact MEMORY|..]; eauto. i. des.
+    exploit sim_memory_cap; try exact MEMORY; eauto. i. des.
     hexploit sim_memory_max_concrete_timemap; try exact x0; eauto. i. des.
     econs; eauto.
     s. eapply cap_fulfillable; eauto. apply WF_SRC.

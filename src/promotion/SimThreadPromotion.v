@@ -1,6 +1,3 @@
-Require Import Omega.
-Require Import RelationClasses.
-
 From sflib Require Import sflib.
 From Paco Require Import paco.
 
@@ -25,6 +22,7 @@ Require Import Syntax.
 Require Import Semantics.
 
 Require Import PromiseConsistent.
+Require Import CompressSteps.
 
 Require Import PromotionDef.
 Require Import SimCommon.
@@ -1096,33 +1094,121 @@ Module SimThreadPromotion.
 
   (* certification *)
 
-  Lemma sim_thread_reserve_cap_max_ts
-        l promises mem1 mem2 from from' val released
-        (CAP: Memory.cap promises mem1 mem2)
-        (CLOSED: Memory.closed mem1)
-        (MEM : Memory.get l (Memory.max_ts l mem1) mem1 = Some (from, Message.reserve))
-        (PROMISE : Memory.get l (Memory.max_ts l mem1) promises = Some (from, Message.reserve))
-        (LATEST : Memory.get l from mem1 = Some (from', Message.concrete val released)):
-    Memory.max_ts l mem1 = Memory.max_ts l mem2.
+  Lemma cap_sim_thread_reserve
+        l r
+        st_src lc_src sc_src mem_src
+        st_tgt lc_tgt sc_tgt mem_tgt
+        scm_src scm_tgt
+        cap_src cap_tgt
+        (SIM: sim_thread_reserve l r
+                                 (Thread.mk lang st_src lc_src sc_src mem_src)
+                                 (Thread.mk lang st_tgt lc_tgt sc_tgt mem_tgt))
+        (WF_SRC: Local.wf lc_src mem_src)
+        (WF_TGT: Local.wf lc_tgt mem_tgt)
+        (CLOSED_SRC: Memory.closed mem_src)
+        (CLOSED_TGT: Memory.closed mem_tgt)
+        (CAP_SRC: Memory.cap mem_src cap_src)
+        (CAP_TGT: Memory.cap mem_tgt cap_tgt)
+        (SC_SRC: Memory.max_concrete_timemap cap_src scm_src)
+        (SC_TGT: Memory.max_concrete_timemap cap_tgt scm_tgt):
+    exists mem1_src,
+      <<REMOVE: Memory.remove cap_src l (Memory.max_ts l mem_src)
+                              (Time.incr (Memory.max_ts l mem_src)) Message.reserve mem1_src>> /\
+      <<SIM: sim_thread_reserve l r
+                                (Thread.mk lang st_src lc_src scm_src mem1_src)
+                                (Thread.mk lang st_tgt lc_tgt scm_tgt cap_tgt)>> /\
+      <<WF_SRC: Local.wf lc_src mem1_src>> /\
+      <<SC_SRC: Memory.closed_timemap scm_src mem1_src>> /\
+      <<CLOSED_SRC: Memory.closed mem1_src>>.
   Proof.
-    dup CAP. inv CAP.
-    exploit SOUND; try exact MEM. i.
-    exploit SOUND; try exact LATEST. i.
-    exploit Memory.max_ts_spec; try exact x. i. des.
-    inv MAX; ss.
-    exploit Memory.cap_inv; try exact GET; eauto. i. des.
-    - exploit Memory.max_ts_spec; try exact x2. i. des.
-      exploit TimeFacts.le_lt_lt; try exact MAX; eauto. i. timetac.
-    - inv x1. exploit Memory.get_ts; try exact GET2. i. des.
-      { subst. inv TS. }
+    exploit sim_memory_cap; try eapply SIM; eauto. i. des.
+    hexploit sim_memory_max_concrete_timemap; try exact x0; eauto. i. des.
+    exploit (@Memory.remove_exists cap_src l (Memory.max_ts l mem_src)
+                                   (Time.incr (Memory.max_ts l mem_src)) Message.reserve);
+      try apply CAP_SRC.
+    i. des.
+    assert (MAX: Memory.max_ts l mem2 = Memory.max_ts l mem_src).
+    { inv SIM. ss. des.
+      dup CAP_SRC. inv CAP_SRC0.
+      exploit Memory.cap_max_ts; try exact CAP_SRC; eauto.
+      instantiate (1 := l). i.
+      exploit SOUND; try exact MEM. i.
+      exploit Memory.remove_get1; try exact x; eauto. i. des.
+      { specialize (Time.incr_spec (Memory.max_ts l mem_src)). i.
+        rewrite <- LOCTS0 in *. timetac. }
       exploit Memory.max_ts_spec; try exact GET2. i. des.
-      exploit TimeFacts.lt_le_lt; try exact MAX; eauto. i.
-      rewrite H in x5. timetac.
-    - subst. unfold Memory.latest_reserve in *.
-      rewrite PROMISE in *. ss.
+      apply TimeFacts.antisym; ss.
+      destruct (TimeFacts.le_lt_dec (Memory.max_ts l mem2) (Memory.max_ts l mem_src)); ss.
+      exfalso.
+      exploit Memory.max_ts_spec; try exact GET. i. des.
+      revert GET0. erewrite Memory.remove_o; eauto. condtac; ss. des; ss. i.
+      exploit Memory.cap_inv; try exact GET0; try exact CAP_SRC; eauto. i. des.
+      - exploit Memory.max_ts_spec; try exact x4. i. des. timetac.
+      - inv x3. exploit Memory.max_ts_spec; try exact GET3. i. des.
+        exploit Memory.get_ts; try exact GET3. i. des.
+        { rewrite x6 in *. inv l0. }
+        { exploit TimeFacts.lt_le_lt; try exact x6; try exact MAX1. i. timetac. }
+      - subst. ss.
+    }
+    esplits; eauto.
+    - inv SIM. ss. des. econs; ss; eauto.
+      + inv x0. econs; i.
+        * revert GET_SRC.
+          erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+        * erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+          des. subst. ss.
+      + des. ii.
+        exploit FULFILLABLE; eauto. i. des. splits; ss.
+        unfold prev_released_le_loc in *. des_ifs; ss; revert Heq.
+        * erewrite Memory.remove_o; eauto. condtac; ss. i. guardH o.
+          exploit Memory.cap_inv; try exact CAP_SRC; eauto. i. des; congr.
+        * erewrite Memory.remove_o; eauto. condtac; ss. i. guardH o.
+          exploit Memory.cap_inv; try exact CAP_SRC; eauto. i. des; congr.
+        * erewrite Memory.remove_o; eauto. condtac; ss. i. guardH o.
+          exploit Memory.cap_inv; try exact CAP_SRC; eauto. i. des; congr.
+        * erewrite Memory.remove_o; eauto. condtac; ss. i. guardH o.
+          exploit Memory.cap_inv; try exact CAP_SRC; eauto. i. des; congr.
+      + rewrite MAX. inv CAP_SRC.
+        exploit SOUND; try exact MEM. i.
+        exploit Memory.remove_get1; try exact x; eauto. i. des.
+        { specialize (Time.incr_spec (Memory.max_ts l mem_src)). i.
+          rewrite <- LOCTS0 in *. timetac. }
+        esplits; eauto.
+        instantiate (1 := released).
+        instantiate (1 := from').
+        erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+        des. subst.
+        exploit Memory.get_ts; try exact MEM. i. des.
+        * specialize (Time.incr_spec (Memory.max_ts l mem_src)). i.
+          rewrite x3 in H0. inv H0.
+        * specialize (Time.incr_spec (Memory.max_ts l mem_src)). i.
+          rewrite x3 in H0. timetac.
+      + ii. revert GET.
+        erewrite Memory.remove_o; eauto. condtac; ss. des; ss. i.
+        exploit Memory.cap_inv; try exact GET; try exact CAP_SRC; eauto. i. des; ss.
+        eapply SAFE; eauto.
+    - exploit Local.cap_wf; try exact CAP_SRC; eauto. i.
+      inv x2. econs; ii; eauto.
+      + inv TVIEW_CLOSED.
+        econs; i; eauto using Memory.cancel_closed_view.
+      + inv WF_SRC. exploit PROMISES0; eauto. i.
+        erewrite Memory.remove_o; eauto. condtac; ss; cycle 1.
+        { apply CAP_SRC. ss. }
+        des. subst.
+        exploit Memory.max_ts_spec; try exact x. i. des.
+        specialize (Time.incr_spec (Memory.max_ts l mem_src)). i.
+        exploit TimeFacts.le_lt_lt; try exact MAX0; try exact H0. i. timetac.
+      + exploit RESERVE; eauto. i. des.
+        exploit Memory.remove_get0; eauto. i. des.
+        exploit Memory.remove_get1; try exact x; eauto. i. des; eauto.
+        subst. congr.
+    - hexploit Memory.max_concrete_timemap_closed; try exact SC_SRC.
+      eapply Memory.cancel_closed_timemap; eauto.
+    - exploit Memory.cap_closed; try exact CAP_SRC; eauto. i.
+      eapply Memory.cancel_closed; eauto.
   Qed.
 
-  Lemma sim_thread_reserve_cap
+  Lemma cap_sim_thread
         l r e_src e_tgt
         sc_src sc_tgt
         cap_src cap_tgt
@@ -1131,28 +1217,103 @@ Module SimThreadPromotion.
         (WF_TGT: Local.wf e_tgt.(Thread.local) e_tgt.(Thread.memory))
         (CLOSED_SRC: Memory.closed e_src.(Thread.memory))
         (CLOSED_TGT: Memory.closed e_tgt.(Thread.memory))
+        (CAP_SRC: Memory.cap e_src.(Thread.memory) cap_src)
+        (CAP_TGT: Memory.cap e_tgt.(Thread.memory) cap_tgt)
         (SC_SRC: Memory.max_concrete_timemap cap_src sc_src)
-        (SC_TGT: Memory.max_concrete_timemap cap_tgt sc_tgt)
-        (CAP_SRC: Memory.cap e_src.(Thread.local).(Local.promises) e_src.(Thread.memory) cap_src)
-        (CAP_TGT: Memory.cap e_tgt.(Thread.local).(Local.promises) e_tgt.(Thread.memory) cap_tgt):
-    sim_thread_reserve l r
-                       (Thread.mk lang e_src.(Thread.state) e_src.(Thread.local) sc_src cap_src)
-                       (Thread.mk lang e_tgt.(Thread.state) e_tgt.(Thread.local) sc_tgt cap_tgt).
+        (SC_TGT: Memory.max_concrete_timemap cap_tgt sc_tgt):
+    exists from e2_src mem_src,
+      <<STEP: Thread.step true (ThreadEvent.promise l from (Memory.max_ts l e_src.(Thread.memory)) Message.reserve Memory.op_kind_cancel)
+                          (Thread.mk lang e_src.(Thread.state) e_src.(Thread.local) sc_src cap_src) e2_src>> /\
+      <<SPACE: CompressSteps.spatial_mem e2_src.(Thread.memory) mem_src>> /\
+      <<SIM: sim_thread l r
+                        (Thread.mk lang e2_src.(Thread.state) e2_src.(Thread.local) e2_src.(Thread.sc) mem_src)
+                        (Thread.mk lang e_tgt.(Thread.state) e_tgt.(Thread.local) sc_tgt cap_tgt)>> /\
+      <<WF_SRC: Local.wf e2_src.(Thread.local) mem_src>> /\
+      <<SC_SRC: Memory.closed_timemap e2_src.(Thread.sc) mem_src>> /\
+      <<MEM_SRC: Memory.closed mem_src>>.
   Proof.
-    inv SIM. inv LOCAL.
-    exploit sim_memory_cap; [apply PROMISES1|exact MEMORY|..]; eauto. i. des.
-    hexploit sim_memory_max_concrete_timemap; try exact x0; eauto. i. des.
-    exploit sim_thread_reserve_cap_max_ts; try exact CAP_SRC; eauto. i.
-    econs; eauto; s.
-    - eapply cap_fulfillable; eauto. apply WF_SRC.
-    - inv CAP_SRC.
-      exploit SOUND; try exact MEM. i.
-      exploit SOUND; try exact LATEST. i.
-      rewrite <- x1. esplits; eauto.
-    - rewrite <- x1. eauto.
-    - ii. exploit Memory.cap_inv; try exact CAP_SRC; eauto. i. des; ss; eauto.
-      inv x8. unfold Memory.latest_reserve in *.
-      rewrite PROMISE in *. ss.
+    destruct e_src as [st1_src lc1_src sc1_src mem1_src].
+    destruct e_tgt as [st1_tgt lc1_tgt sc1_tgt mem1_tgt].
+    ss.
+    exploit cap_sim_thread_reserve; eauto. i. des.
+    exploit step_reserve_sim_thread; try exact SIM0; eauto. i. des.
+    assert (to = Memory.max_ts l mem1_src); subst.
+    { inv SIM. ss. des.
+      inv STEP; inv STEP0; inv LOCAL; inv LOCAL0. inv PROMISE0.
+      exploit Memory.remove_get0; try exact PROMISES0. i. des.
+      destruct (Time.eq_dec to (Memory.max_ts l mem1_src)); ss.
+      exploit PROMISES; eauto. i. congr.
+    }
+    destruct e2_src as [st2_src lc2_src sc2_src mem2_src]. ss.
+    cut (exists mem'_src,
+            <<STEP': Thread.step true (ThreadEvent.promise l from (Memory.max_ts l mem1_src) Message.reserve Memory.op_kind_cancel)
+                                 (Thread.mk lang st1_src lc1_src sc_src cap_src)
+                                 (Thread.mk lang st1_src lc2_src sc_src mem'_src)>> /\
+            <<SPACE: CompressSteps.spatial_mem mem'_src mem2_src>>).
+    { i. des.
+      exploit Thread.step_future; try exact STEP; eauto. s. i. des.
+      inv STEP; inv STEP0; inv LOCAL. ss.
+      esplits; try exact STEP'; eauto.
+    }
+    inv SIM. ss. des. dup CAP_SRC. inv CAP_SRC0.
+    inv STEP; inv STEP0; inv LOCAL0. inv PROMISE0. ss.
+    replace from0 with from in *; cycle 1.
+    { exploit SOUND; try exact MEM. i.
+      exploit Memory.remove_get0; try exact MEM0. i. des.
+      revert GET. erewrite Memory.remove_o; eauto. condtac; ss. i.
+      rewrite GET in *. inv x. ss. }
+    exploit (@Memory.remove_exists cap_src l from (Memory.max_ts l mem1_src) Message.reserve).
+    { exploit SOUND; try exact MEM. ss. }
+    i. des. exists mem2. split.
+    - econs 1. econs; eauto.
+    - move MEM0 at bottom. move REMOVE at bottom.
+      exploit (@Memory.add_exists mem2_src l (Memory.max_ts l mem1_src)
+                                  (Time.incr (Memory.max_ts l mem1_src)) Message.reserve).
+      { ii. revert GET2.
+        erewrite Memory.remove_o; eauto. condtac; ss.
+        erewrite Memory.remove_o; eauto. condtac; ss.
+        i. des; ss.
+        exploit Memory.remove_get0; try exact REMOVE. i. des.
+        exploit Memory.get_disjoint; [exact GET2|exact GET|..]. i. des; eauto. }
+      { apply Time.incr_spec. }
+      { econs. }
+      i. des.
+      cut (mem2 = mem0).
+      { i. subst. econs; eauto.
+        destruct (TimeFacts.le_lt_dec (Memory.max_ts l mem1_src) (Memory.max_ts l mem2_src)); ss.
+        inv CLOSED_SRC0. clear CLOSED0.
+        specialize (INHABITED l).
+        exploit Memory.remove_get1; try exact INHABITED; eauto. i. des.
+        { rewrite <- LOCTS0 in *.
+          inv CLOSED_SRC. rewrite INHABITED0 in *. congr. }
+        exploit Memory.max_ts_spec; try exact GET2. i. des.
+        revert GET.
+        erewrite Memory.remove_o; eauto. condtac; ss.
+        erewrite Memory.remove_o; eauto. condtac; ss.
+        des; ss. i.
+        exploit Memory.cap_inv; try exact GET; try exact CAP_SRC; eauto. i. des.
+        - exploit Memory.max_ts_spec; try exact x2. i. des.
+          exploit TimeFacts.antisym; [exact l0|exact MAX0|..]. i. congr.
+        - inv x3. exploit Memory.get_ts; try exact GET0. i. des.
+          + subst. rewrite x3 in *. inv x4.
+          + exploit Memory.max_ts_spec; try exact GET0. i. des.
+            rewrite l0 in MAX0.
+            exploit TimeFacts.lt_le_lt; try exact x3; try exact MAX0. i. timetac.
+        - subst. rewrite x4 in *. ss.
+      }
+      apply Memory.ext. i.
+      erewrite Memory.remove_o; eauto. condtac; ss.
+      + des. subst.
+        erewrite Memory.add_o; eauto. condtac; ss.
+        * des. specialize (Time.incr_spec (Memory.max_ts l mem1_src)). i.
+          rewrite <- a0 in *. timetac.
+        * des; ss.
+          exploit Memory.remove_get0; try exact MEM0. i. des. ss.
+      + erewrite (@Memory.add_o mem0); eauto. condtac; ss.
+        * des; ss. subst.
+          exploit Memory.remove_get0; try exact REMOVE. i. des. ss.
+        * erewrite (@Memory.remove_o mem2_src); eauto. condtac; ss.
+          erewrite (@Memory.remove_o mem1_src0); eauto. condtac; ss.
   Qed.
 
   Lemma sim_thread_reserve_consistent
@@ -1170,23 +1331,45 @@ Module SimThreadPromotion.
     exploit Memory.cap_exists; try exact CLOSED_TGT. i. des.
     exploit Memory.cap_closed; eauto. i.
     exploit Memory.max_concrete_timemap_exists; try apply x0. i. des.
-    ii.
-    exploit sim_thread_reserve_cap; try exact SIM; try exact CAP0; try exact CAP; eauto. i.
+    ii. rename mem1 into cap_src, mem2 into cap_tgt.
     exploit Local.cap_wf; try exact WF_SRC; eauto. intro WF_CAP_SRC.
     exploit Local.cap_wf; try exact WF_TGT; eauto. intro WF_CAP_TGT.
-    hexploit Memory.max_concrete_timemap_closed; try exact SC_MAX. intro SC_MAX_SRC.
-    hexploit Memory.max_concrete_timemap_closed; try exact x1. intro SC_MAX_TGT.
-    exploit Memory.cap_closed; try exact CLOSED_SRC; eauto. intro CLOSED_CAP_SRC.
-    exploit Memory.cap_closed; try exact CLOSED_TGT; eauto. intro CLOSED_CAP_TGT.
+    hexploit Memory.max_concrete_timemap_closed; try exact x1. intro SCM_TGT.
+    hexploit Memory.max_concrete_timemap_closed; try exact SC_MAX. intro SCM_SRC.
+    exploit Memory.cap_closed; try exact CAP0; eauto. i.
+    exploit cap_sim_thread; try exact SIM; eauto. i. des.
+    exploit Thread.step_future; try exact STEP; eauto. s. i. des.
     exploit CONSISTENT_TGT; eauto. i. des.
     - left. unfold Thread.steps_failure in *. des.
-      exploit sim_thread_reserve_plus_step; eauto. s. i. des.
-      destruct e_src0; ss. inv STEP_SRC.
-      destruct pf; try by (inv STEP; inv STEP0).
-      esplits; eauto.
+      exploit sim_thread_plus_step; try exact STEPS; eauto. s. i. des.
+      exploit (@CompressSteps.compress_steps_failure
+                 lang e2_src
+                 (Thread.mk lang e2_src.(Thread.state) e2_src.(Thread.local) e2_src.(Thread.sc) mem_src)); eauto.
+      { econs; eauto. }
+      { unfold Thread.steps_failure.
+        inv STEP_SRC; ss. destruct e_src0; ss.
+        destruct pf; try by inv STEP0; inv STEP1.
+        esplits; eauto. }
+      unfold Thread.steps_failure. i. des.
+      esplits; [|exact FAILURE].
+      econs 2.
+      + econs; [econs; exact STEP|]. ss.
+      + ss.
     - right.
-      exploit sim_thread_reserve_rtc_tau_step; try exact STEPS; eauto. i. des.
-      esplits; eauto.
-      eapply sim_thread_promises_bot; eauto.
+      exploit sim_thread_rtc_tau_step; try exact STEPS; eauto. i. des.
+      exploit (@CompressSteps.compress_steps_fulfill
+                 lang e2_src
+                 (Thread.mk lang e2_src.(Thread.state) e2_src.(Thread.local) e2_src.(Thread.sc) mem_src)); eauto.
+      { econs; eauto. }
+      { inv SIM2. apply Memory.ext. i.
+        rewrite Memory.bot_get.
+        destruct (Loc.eq_dec loc l); subst; ss.
+        inv LOCAL. eapply sim_memory_get_None_tgt; eauto.
+        rewrite PROMISES. apply Memory.bot_get. }
+      i. des.
+      esplits; [|exact PROMISES_SRC].
+      econs 2.
+      + econs; [econs; exact STEP|]. ss.
+      + ss.
   Qed.
 End SimThreadPromotion.
