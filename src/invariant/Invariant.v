@@ -9,10 +9,10 @@ From PromisingLib Require Import Basic.
 From PromisingLib Require Import DataStructure.
 From PromisingLib Require Import DenseOrder.
 From PromisingLib Require Import Loc.
+From PromisingLib Require Import Language.
 
 Require Import Event.
 Require Import Time.
-From PromisingLib Require Import Language.
 Require Import View.
 Require Import Cell.
 Require Import Memory.
@@ -434,43 +434,6 @@ Section Invariant.
     hexploit AThread.program_step_inhabited; eauto.
   Qed.
 
-  Lemma pf_step_sem
-        tid lang caps e
-        st1 lc1 sc1 mem1
-        st2 lc2 sc2 mem2
-        (TH1: S tid lang st1)
-        (MEM1: sem_memory mem1)
-        (INHABITED1: Memory.inhabited mem1)
-        (STEP: PFCertify.pf_step caps e (Thread.mk lang st1 lc1 sc1 mem1) (Thread.mk lang st2 lc2 sc2 mem2)):
-    <<TH2: S tid lang st2>> /\
-    <<MEM2: sem_memory mem2>>.
-  Proof.
-    inv STEP.
-    exploit aprogram_step_sem; try exact STEP0; eauto. i. des.
-    split; auto.
-    hexploit PFCertify.add_cap_vals_incl; eauto. i.
-    eapply vals_incl_sem_memory; eauto.
-  Qed.
-
-  Lemma rtc_pf_step_sem
-        tid lang caps
-        th1 th2
-        (TH1: S tid lang th1.(Thread.state))
-        (MEM1: sem_memory th1.(Thread.memory))
-        (INHABITED1: Memory.inhabited th1.(Thread.memory))
-        (STEP: rtc (union (PFCertify.pf_step caps)) th1 th2):
-    <<TH2: S tid lang th2.(Thread.state)>> /\
-    <<MEM2: sem_memory th2.(Thread.memory)>>.
-  Proof.
-    move STEP after TH1. revert_until STEP.
-    induction STEP; ss.
-    i. inv H.
-    hexploit PFCertify.pf_step_inhabited; eauto. i. des.
-    destruct x, y. ss.
-    exploit pf_step_sem; eauto. i. des.
-    eapply IHSTEP; eauto.
-  Qed.
-
 
   (* future_sem_memory *)
 
@@ -509,31 +472,31 @@ Section Invariant.
   Proof.
     exploit Memory.cap_exists; try apply CLOSED. i. des.
     exploit Memory.cap_closed; eauto. intro CLOSED_CAP.
-    exploit Memory.max_concrete_timemap_exists; try apply CLOSED_CAP. intro MAX. des.
-    hexploit Memory.max_concrete_timemap_closed; eauto. intro SC_CAP.
+    exploit Memory.max_concrete_timemap_exists; try eapply CLOSED_CAP. intro MAX. des.
+    hexploit Memory.max_concrete_timemap_closed; eauto. i.
     exploit Local.cap_wf; eauto. intro WF_CAP.
-    exploit PFCertify.sim_thread_exists; eauto. i. des.
+    exploit PFCertify.cap_sim_thread_exists; eauto. i. des.
     hexploit PFCertify.sim_memory_inhabited; try apply SIM0; try apply WF_CAP; try apply CLOSED_CAP. s. i. des.
-    apply vals_incl_sem_memory in VALS; auto.
+    eapply vals_incl_sem_memory in VALS; eauto.
     exploit CONSISTENT; eauto. i. des.
     - unfold Thread.steps_failure in *. des.
       exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
       inv FAILURE0; try by inv STEP.
-      exploit PFCertify.thread_rtc_tau_step; eauto.
+      exploit PFStep.thread_rtc_tau_step; eauto.
       { inv STEP. inv LOCAL. inv LOCAL0. ss. }
       i. des.
-      exploit PFCertify.thread_program_step; try exact STEP; eauto.
+      exploit PFStep.thread_program_step; try exact STEP; eauto.
       { inv STEP. inv LOCAL. inv LOCAL0. ss. }
       i. des.
-      exploit rtc_pf_step_sem; try exact STEPS_SRC; eauto. i. des.
-      inv STEP_SRC. inv STEP0. inv LOGIC.
+      exploit rtc_tau_aprogram_step_sem; try exact STEPS_SRC; eauto. i. des.
+      inv STEP_SRC. inv LOGIC.
       exploit FAILURE; try exact STATE; eauto. i. des.
       ii. eauto.
     - exploit Thread.rtc_tau_step_future; eauto. s. i. des.
-      exploit PFCertify.thread_rtc_tau_step; eauto.
+      exploit PFStep.thread_rtc_tau_step; eauto.
       { eapply Local.bot_promise_consistent; ss. }
       i. des.
-      exploit rtc_pf_step_sem; try exact STEPS_SRC; eauto. i. des.
+      exploit rtc_tau_aprogram_step_sem; try exact STEPS_SRC; eauto. i. des.
       exploit PFCertify.sim_memory_bot; try apply SIM2; eauto. i.
       rewrite x0 in *.
       exploit Memory.cap_future_weak; eauto. i.
@@ -558,7 +521,7 @@ Section Invariant.
                _ (Thread.mk lang st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory))); ss.
     i. des.
     hexploit PFStep.sim_memory_vals_incl; try eapply SIM; eauto. s. i.
-    apply vals_incl_sem_memory in H; auto.
+    eapply vals_incl_sem_memory in H; eauto.
     hexploit PFStep.sim_memory_inhabited; try apply SIM; try apply WF; try apply MEM0. i. des.
     exploit PFStep.thread_rtc_tau_step; try exact SIM; try eapply STEPS; eauto.
     { inv STEP. inv LOCAL. inv LOCAL0. ss. }
@@ -594,7 +557,7 @@ Section Invariant.
                _ (Thread.mk lang st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory))); ss.
     i. des.
     hexploit PFStep.sim_memory_vals_incl; try eapply SIM; eauto. s. i.
-    apply vals_incl_sem_memory in H; auto.
+    eapply vals_incl_sem_memory in H; eauto.
     hexploit PFStep.sim_memory_inhabited; try apply SIM; try apply WF; try apply MEM0. i. des.
     exploit PFStep.thread_rtc_all_step; try exact SIM; try eapply STEPS; eauto.
     { eapply consistent_promise_consistent; eauto. }
@@ -647,13 +610,13 @@ Section Invariant.
 
   Lemma sound
         c
-        (STEPS: rtc Configuration_step_evt (Configuration.init program) c):
+        (STEPS: rtc Configuration.all_step (Configuration.init program) c):
     sem c.
   Proof.
     cut (forall c1 c2
            (WF: Configuration.wf c1)
            (SEM: sem c1)
-           (STEPS: rtc Configuration_step_evt c1 c2),
+           (STEPS: rtc Configuration.all_step c1 c2),
             sem c2).
     { i. eapply H; eauto.
       - apply Configuration.init_wf.

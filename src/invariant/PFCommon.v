@@ -1,4 +1,3 @@
-Require Import Omega.
 Require Import RelationClasses.
 
 From sflib Require Import sflib.
@@ -8,10 +7,10 @@ From PromisingLib Require Import Basic.
 From PromisingLib Require Import DataStructure.
 From PromisingLib Require Import DenseOrder.
 From PromisingLib Require Import Loc.
+From PromisingLib Require Import Language.
 
 Require Import Time.
 Require Import Event.
-From PromisingLib Require Import Language.
 Require Import View.
 Require Import Cell.
 Require Import Memory.

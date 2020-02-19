@@ -2356,6 +2356,7 @@ Module Memory.
   Proof. ii. eapply bot_nonsynch_loc. eauto. Qed.
 
 
+  (* TODO: unused *)
   (* no_reserve *)
 
   Definition no_reserve (mem: t): Prop :=

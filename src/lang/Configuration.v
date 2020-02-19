@@ -196,6 +196,13 @@ Module Configuration.
       step (ThreadEvent.get_machine_event e) tid c1 (mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(threads)) sc3 memory3)
   .
 
+  Inductive all_step (c1 c2: t): Prop :=
+  | all_step_intro
+      e tid
+      (STEP: step e tid c1 c2)
+  .
+  Hint Constructors all_step.
+
   Inductive opt_step: forall (e: MachineEvent.t) (tid: Ident.t) (c1 c2: t), Prop :=
   | step_none
       tid c:
