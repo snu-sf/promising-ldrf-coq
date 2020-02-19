@@ -9,10 +9,10 @@ From PromisingLib Require Import Basic.
 From PromisingLib Require Import DataStructure.
 From PromisingLib Require Import DenseOrder.
 From PromisingLib Require Import Loc.
+From PromisingLib Require Import Language.
 
 Require Import Event.
 Require Import Time.
-From PromisingLib Require Import Language.
 Require Import View.
 Require Import Cell.
 Require Import Memory.
