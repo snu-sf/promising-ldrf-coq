@@ -9,10 +9,10 @@ From PromisingLib Require Import Axioms.
 From PromisingLib Require Import Basic.
 From PromisingLib Require Import DataStructure.
 From PromisingLib Require Import DenseOrder.
-Require Import Event.
-Require Import Time.
 From PromisingLib Require Import Language.
 
+Require Import Event.
+Require Import Time.
 Require Import View.
 Require Import Cell.
 Require Import Memory.
@@ -191,7 +191,7 @@ Module Thread.
 
     Definition consistent (e:t): Prop :=
       forall mem1 sc1
-        (CAP: Memory.cap e.(local).(Local.promises) e.(memory) mem1)
+        (CAP: Memory.cap e.(memory) mem1)
         (SC_MAX: Memory.max_concrete_timemap mem1 sc1),
         <<FAILURE: steps_failure (mk e.(state) e.(local) sc1 mem1)>> \/
         exists e2,
