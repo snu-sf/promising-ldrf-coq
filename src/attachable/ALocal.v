@@ -277,45 +277,6 @@ Module ALocal.
     - esplits; eauto.
   Qed.
 
-
-  (* step_no_reserve_except *)
-
-  Lemma promise_step_no_reserve_except
-        lc1 mem1 loc from to msg lc2 mem2 kind
-        (STEP: promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
-        (RESERVE1: Memory.reserve_wf lc1.(Local.promises) mem1)
-        (NORESERVE1: Memory.no_reserve_except lc1.(Local.promises) mem1):
-    Memory.no_reserve_except lc2.(Local.promises) mem2.
-  Proof.
-    ii. inv STEP. s.
-    eapply AMemory.promise_no_reserve_except; eauto.
-  Qed.
-
-  Lemma program_step_no_reserve_except
-        e lc1 sc1 mem1 lc2 sc2 mem2
-        (STEP: program_step e lc1 sc1 mem1 lc2 sc2 mem2)
-        (RESERVE1: Memory.reserve_wf lc1.(Local.promises) mem1)
-        (NORESERVE1: Memory.no_reserve_except lc1.(Local.promises) mem1):
-    Memory.no_reserve_except lc2.(Local.promises) mem2.
-  Proof.
-    ii. inv STEP; try inv LOCAL; eauto; ss.
-    - inv WRITE.
-      erewrite Memory.remove_o; eauto. condtac; ss.
-      + des. subst.
-        exploit AMemory.promise_get0; eauto.
-        { inv PROMISE; ss. }
-        i. des. congr.
-      + eapply AMemory.promise_no_reserve_except; eauto.
-    - inv LOCAL1. inv LOCAL2. inv WRITE. ss.
-      erewrite Memory.remove_o; eauto. condtac; ss.
-      + des. subst.
-        exploit AMemory.promise_get0; eauto.
-        { inv PROMISE; ss. }
-        i. des. congr.
-      + eapply AMemory.promise_no_reserve_except; eauto.
-  Qed.
-
-
   Lemma bot_program_step_bot
         e lc1 sc1 mem1 lc2 sc2 mem2
         (STEP: program_step e lc1 sc1 mem1 lc2 sc2 mem2)
