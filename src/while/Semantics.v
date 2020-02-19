@@ -13,6 +13,7 @@ Require Import Syntax.
 
 Set Implicit Arguments.
 
+
 Module RegFile.
   Definition t := RegFun.t Const.t.
 
@@ -277,6 +278,7 @@ Module RegFile.
   Qed.
 End RegFile.
 
+
 Module State.
   Structure t := mk {
     regs: RegFile.t;
@@ -320,6 +322,7 @@ Module State.
       opt_step e st1 st2
   .
 End State.
+
 
 Program Definition lang: Language.t ProgramEvent.t :=
   Language.mk

@@ -10,6 +10,7 @@ Require Import Event.
 
 Set Implicit Arguments.
 
+
 Module Reg := Ident.
 Module RegSet := IdentSet.
 Module RegMap := IdentMap.
@@ -40,6 +41,7 @@ Coercion Value.reg: Reg.t >-> Value.t.
 Coercion Value.const: Const.t >-> Value.t.
 Coercion Value.of_nat: nat >-> Value.t.
 
+
 Module Op1.
   Inductive t :=
   | not
@@ -53,6 +55,7 @@ Module Op1.
       else Const.zero
     end.
 End Op1.
+
 
 Module Op2.
   Inductive t :=
@@ -73,6 +76,7 @@ Module Op2.
     | eq => const_eq
     end.
 End Op2.
+
 
 Module Instr.
   Inductive expr :=
@@ -162,6 +166,7 @@ Module Instr.
 End Instr.
 Coercion Instr.expr_val: Value.t >-> Instr.expr.
 
+
 Module Stmt.
   Inductive t :=
   | instr (i:Instr.t)
@@ -190,6 +195,7 @@ Module Stmt.
   Qed.
 End Stmt.
 Coercion Stmt.instr: Instr.t >-> Stmt.t.
+
 
 Module SyntaxNotations.
   Export ListNotations.
