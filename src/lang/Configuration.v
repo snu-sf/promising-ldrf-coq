@@ -87,6 +87,9 @@ Module Threads.
       (PROMISES: Memory.get loc to lc.(Local.promises) = Some (from, msg))
   .
 
+
+  (* tids *)
+
   Definition tids (ths: t): IdentSet.t :=
     List.fold_right (fun p s => IdentSet.add (fst p) s) IdentSet.empty (IdentMap.elements ths).
 
