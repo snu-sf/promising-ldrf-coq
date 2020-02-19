@@ -509,7 +509,7 @@ Section AssertInsertion.
       - (* failure certification *)
         left. unfold Thread.steps_failure in *. des.
         exploit (@sim_thread_rtc_tau_step tid (Thread.mk lang state lc3 sc0 mem0));
-          try exact STEPS0; eauto.
+          try exact STEPS0; try by (econs; eauto).
         i. des; cycle 1.
         { exfalso.
           exploit Thread.tau_opt_all; try exact STEPS_SRC; eauto. i.
@@ -517,8 +517,8 @@ Section AssertInsertion.
           exploit PFStep.thread_rtc_all_step; try exact x2; eauto.
           { hexploit consistent_promise_consistent; eauto. }
           i. des.
-          exploit PFCertify.sim_thread_exists; try exact SIM4; eauto. s. i. des.
-          exploit PFCertify.thread_rtc_tau_step; try exact STEPS_SRC0; eauto.
+          exploit PFCertify.cap_sim_thread_exists; try exact SIM4; eauto. s. i. des.
+          exploit PFStep.thread_rtc_tau_step; try exact STEPS_SRC0; eauto.
           { exploit Thread.rtc_tau_step_future; try exact STEPS1_TGT; eauto. s. i. des.
             inv SIM1. rewrite LOCAL.
             eapply rtc_tau_step_promise_consistent; eauto.
@@ -533,9 +533,9 @@ Section AssertInsertion.
             - apply WF1_SRC.
             - apply MEM. }
           i. des.
-          exploit rtc_pf_step_sem; try exact STEPS_SRC2; eauto; s.
+          exploit rtc_tau_aprogram_step_sem; try exact STEPS_SRC2; eauto; s.
           { eapply vals_incl_sem_memory; eauto. }
-          { eapply PFCertify.sim_memory_inhabited; try eapply SIM5.
+          { eapply PFStep.sim_memory_inhabited; try eapply SIM5.
             - apply WF0.
             - eapply Memory.cap_closed; eauto. }
           i. des.
@@ -549,8 +549,8 @@ Section AssertInsertion.
           exploit PFStep.thread_rtc_all_step; try exact x2; eauto.
           { hexploit consistent_promise_consistent; eauto. }
           i. des.
-          exploit PFCertify.sim_thread_exists; try exact SIM4; eauto. s. i. des.
-          exploit PFCertify.thread_rtc_tau_step; try exact STEPS_SRC0; eauto.
+          exploit PFCertify.cap_sim_thread_exists; try exact SIM4; eauto. s. i. des.
+          exploit PFStep.thread_rtc_tau_step; try exact STEPS_SRC0; eauto.
           { exploit Thread.rtc_tau_step_future; try exact STEPS0; eauto. s. i. des.
             inv SIM1. rewrite LOCAL.
             eapply rtc_tau_step_promise_consistent; eauto.
@@ -565,9 +565,9 @@ Section AssertInsertion.
             - apply WF1_SRC.
             - apply MEM. }
           i. des.
-          exploit rtc_pf_step_sem; try exact STEPS_SRC2; eauto; s.
+          exploit rtc_tau_aprogram_step_sem; try exact STEPS_SRC2; eauto; s.
           { eapply vals_incl_sem_memory; eauto. }
-          { eapply PFCertify.sim_memory_inhabited; try eapply SIM5.
+          { eapply PFStep.sim_memory_inhabited; try eapply SIM5.
             - apply WF0.
             - eapply Memory.cap_closed; eauto. }
           i. des.
@@ -579,15 +579,16 @@ Section AssertInsertion.
       - (* normal certification *)
         right.
         exploit (@sim_thread_rtc_tau_step tid (Thread.mk lang state lc3 sc0 mem0));
-          try exact STEPS0; eauto. i. des; cycle 1.
+          try exact STEPS0; try by (econs; eauto).
+        i. des; cycle 1.
         { exfalso.
           exploit Thread.tau_opt_all; try exact STEPS_SRC; eauto. i.
           exploit (@PFStep.sim_thread_exists lang (Thread.mk lang st_src lc_src sc1 mem1)); ss; eauto. i. des.
           exploit PFStep.thread_rtc_all_step; try exact x2; eauto.
           { hexploit consistent_promise_consistent; eauto. }
           i. des.
-          exploit PFCertify.sim_thread_exists; try exact SIM4; eauto. s. i. des.
-          exploit PFCertify.thread_rtc_tau_step; try exact STEPS_SRC0; eauto.
+          exploit PFCertify.cap_sim_thread_exists; try exact SIM4; eauto. s. i. des.
+          exploit PFStep.thread_rtc_tau_step; try exact STEPS_SRC0; eauto.
           { exploit Thread.rtc_tau_step_future; try exact STEPS1_TGT; eauto. s. i. des.
             inv SIM1. rewrite LOCAL.
             eapply rtc_tau_step_promise_consistent; eauto.
@@ -602,9 +603,9 @@ Section AssertInsertion.
             - apply WF1_SRC.
             - apply MEM. }
           i. des.
-          exploit rtc_pf_step_sem; try exact STEPS_SRC2; eauto; s.
+          exploit rtc_tau_aprogram_step_sem; try exact STEPS_SRC2; eauto; s.
           { eapply vals_incl_sem_memory; eauto. }
-          { eapply PFCertify.sim_memory_inhabited; try eapply SIM5.
+          { eapply PFStep.sim_memory_inhabited; try eapply SIM5.
             - apply WF0.
             - eapply Memory.cap_closed; eauto. }
           i. des.
