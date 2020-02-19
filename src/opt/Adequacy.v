@@ -1,10 +1,12 @@
 Require Import Program.
+
 From sflib Require Import sflib.
 From Paco Require Import paco.
 
 From PromisingLib Require Import Basic.
-Require Import Event.
 From PromisingLib Require Import Language.
+
+Require Import Event.
 Require Import View.
 Require Import Cell.
 Require Import Memory.

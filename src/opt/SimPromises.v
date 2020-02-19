@@ -21,8 +21,6 @@ Require Import Local.
 Require Import Thread.
 Require Import Configuration.
 
-Require Import MemorySplit.
-Require Import MemoryMerge.
 Require Import Cover.
 
 Require Import SimMemory.

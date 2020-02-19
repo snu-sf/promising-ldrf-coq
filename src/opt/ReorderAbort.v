@@ -1,6 +1,3 @@
-Require Import Bool.
-Require Import List.
-
 From sflib Require Import sflib.
 From Paco Require Import paco.
 
@@ -25,8 +22,8 @@ Require Import LowerPromises.
 Require Import SimMemory.
 Require Import SimPromises.
 Require Import SimLocal.
-Require Import Compatibility.
 Require Import SimThread.
+Require Import Compatibility.
 
 Require Import Syntax.
 Require Import Semantics.

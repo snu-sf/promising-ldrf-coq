@@ -18,8 +18,8 @@ Require Import Progress.
 Require Import SimMemory.
 Require Import SimPromises.
 Require Import SimLocal.
-Require Import Compatibility.
 Require Import SimThread.
+Require Import Compatibility.
 
 Require Import Syntax.
 Require Import Semantics.

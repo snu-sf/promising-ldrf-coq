@@ -3,8 +3,9 @@ From Paco Require Import paco.
 
 From PromisingLib Require Import Axioms.
 From PromisingLib Require Import Basic.
-Require Import Event.
 From PromisingLib Require Import Language.
+
+Require Import Event.
 Require Import View.
 Require Import Cell.
 Require Import Memory.
@@ -14,7 +15,6 @@ Require Import Thread.
 Require Import Configuration.
 
 Require Import SimMemory.
-Require Import SimPromises.
 
 Set Implicit Arguments.
 
