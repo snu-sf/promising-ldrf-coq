@@ -1,6 +1,4 @@
 Require Import RelationClasses.
-Require Import Bool.
-Require Import List.
 
 From sflib Require Import sflib.
 From Paco Require Import paco.
@@ -8,11 +6,11 @@ From Paco Require Import paco.
 From PromisingLib Require Import Axioms.
 From PromisingLib Require Import Basic.
 From PromisingLib Require Import Loc.
+From PromisingLib Require Import DenseOrder.
+From PromisingLib Require Import Language.
 
 Require Import Event.
-From PromisingLib Require Import DenseOrder.
 Require Import Time.
-From PromisingLib Require Import Language.
 Require Import View.
 Require Import Cell.
 Require Import Memory.
@@ -443,150 +441,5 @@ Module SimPromises.
       + inv SEM. exploit COMPLETE; eauto. i. inv x.
       + inv SEM. exploit COMPLETE; eauto. i. inv x.
       + ss.
-  Qed.
-
-
-  Lemma latest_reserve
-        pview
-        promises_src mem_src
-        promises_tgt mem_tgt
-        loc
-        (INV: sem pview bot promises_src promises_tgt)
-        (MEM: sim_memory mem_src mem_tgt)
-        (MEM_SRC: Memory.closed mem_src)
-        (MEM_TGT: Memory.closed mem_tgt):
-    Memory.latest_reserve loc promises_src mem_src <->
-    Memory.latest_reserve loc promises_tgt mem_tgt.
-  Proof.
-    inv INV. unfold Memory.latest_reserve.
-    split; i.
-    - erewrite <- sim_memory_max_ts; eauto. des_ifs.
-      + exploit LE; eauto. i. ss. congr.
-      + exploit LE; eauto. i. ss. congr.
-    - erewrite sim_memory_max_ts; eauto. des_ifs.
-      + exploit LE; eauto. i. ss. congr.
-      + exploit COMPLETE; eauto.
-  Qed.
-
-  Lemma cap_get_src
-        pview
-        promises_src mem1_src mem2_src
-        promises_tgt mem1_tgt mem2_tgt
-        loc from to msg
-        (INV1: sem pview bot promises_src promises_tgt)
-        (MEM1: sim_memory mem1_src mem1_tgt)
-        (CAP_SRC: Memory.cap promises_src mem1_src mem2_src)
-        (CAP_TGT: Memory.cap promises_tgt mem1_tgt mem2_tgt)
-        (MEM1_SRC: Memory.closed mem1_src)
-        (MEM1_TGT: Memory.closed mem1_tgt)
-        (GET1_SRC: Memory.get loc to mem1_src = None)
-        (GET2_SRC: Memory.get loc to mem2_src = Some (from, msg)):
-    <<GET1_TGT: Memory.get loc to mem1_tgt = None>> /\
-    <<GET2_TGT: Memory.get loc to mem2_tgt = Some (from, msg)>>.
-  Proof.
-    exploit Memory.cap_inv; try exact CAP_SRC; eauto. i. des; try congr.
-    - subst.
-      exploit sim_memory_adjacent_src; try exact x1; eauto. i. des.
-      inv CAP_TGT. exploit MIDDLE; eauto. i. splits; auto.
-      inv x3. apply EMPTY; eauto. refl.
-    - subst.
-      erewrite sim_memory_max_ts; eauto.
-      rewrite latest_reserve in *; eauto.
-      exploit sim_memory_latest_val_src; eauto. i.
-      exploit Memory.max_concrete_view_exists; try apply MEM1_TGT. i. des.
-      exploit sim_memory_max_concrete_view; try exact MEM1; eauto. i. subst.
-      inv CAP_TGT. exploit BACK; eauto. i. splits; auto.
-      destruct (Memory.get loc (Time.incr (Memory.max_ts loc mem1_tgt)) mem1_tgt) as [[]|] eqn:MAX; ss.
-      exploit Memory.max_ts_spec; eauto. i. des.
-      specialize (Time.incr_spec (Memory.max_ts loc mem1_tgt)). i. timetac.
-  Qed.
-
-  Lemma cap_get_tgt
-        pview
-        promises_src mem1_src mem2_src
-        promises_tgt mem1_tgt mem2_tgt
-        loc from to msg
-        (INV1: sem pview bot promises_src promises_tgt)
-        (MEM1: sim_memory mem1_src mem1_tgt)
-        (CAP_SRC: Memory.cap promises_src mem1_src mem2_src)
-        (CAP_TGT: Memory.cap promises_tgt mem1_tgt mem2_tgt)
-        (MEM1_SRC: Memory.closed mem1_src)
-        (MEM1_TGT: Memory.closed mem1_tgt)
-        (GET1_TGT: Memory.get loc to mem1_tgt = None)
-        (GET2_TGT: Memory.get loc to mem2_tgt = Some (from, msg)):
-    <<GET1_SRC: Memory.get loc to mem1_src = None>> /\
-    <<GET2_SRC: Memory.get loc to mem2_src = Some (from, msg)>>.
-  Proof.
-    exploit Memory.cap_inv; try exact CAP_TGT; eauto. i. des; try congr.
-    - subst.
-      exploit sim_memory_adjacent_tgt; try exact x1; eauto. i. des.
-      inv CAP_SRC. exploit MIDDLE; eauto. i. splits; auto.
-      inv x3. apply EMPTY; eauto. refl.
-    - subst.
-      erewrite <- sim_memory_max_ts; eauto.
-      rewrite <- latest_reserve in *; eauto.
-      exploit sim_memory_latest_val_tgt; eauto. i.
-      exploit Memory.max_concrete_view_exists; try apply MEM1_SRC. i. des.
-      exploit sim_memory_max_concrete_view; try exact MEM1; eauto. i. subst.
-      inv CAP_SRC. exploit BACK; eauto. i. splits; auto.
-      destruct (Memory.get loc (Time.incr (Memory.max_ts loc mem1_src)) mem1_src) as [[]|] eqn:MAX; ss.
-      exploit Memory.max_ts_spec; eauto. i. des.
-      specialize (Time.incr_spec (Memory.max_ts loc mem1_src)). i. timetac.
-  Qed.
-
-  Lemma cap
-        pview
-        lc_src mem1_src mem2_src
-        lc_tgt mem1_tgt
-        (INV1: sem pview bot lc_src.(Local.promises) lc_tgt.(Local.promises))
-        (MEM1: sim_memory mem1_src mem1_tgt)
-        (CAP_SRC: Memory.cap lc_src.(Local.promises) mem1_src mem2_src)
-        (MEM1_SRC: Memory.closed mem1_src)
-        (MEM1_TGT: Memory.closed mem1_tgt):
-    exists mem2_tgt,
-      <<MEM2: sim_memory mem2_src mem2_tgt>> /\
-      <<CAP_TGT: Memory.cap lc_tgt.(Local.promises) mem1_tgt mem2_tgt>>.
-  Proof.
-    exploit Memory.cap_exists; try exact MEM1_TGT; eauto. i. des.
-    esplits; eauto.
-    rename mem2 into mem2_tgt. econs; i; try split; i.
-    - inv H.
-      destruct (Memory.get loc to mem1_src) as [[]|] eqn:GET1.
-      + inv CAP_SRC. exploit SOUND; eauto. i.
-        rewrite x in GET. inv GET.
-        eapply cap_covered; eauto.
-        inv MEM1. rewrite <- COVER.
-        econs; eauto.
-      + exploit cap_get_src; eauto. i. des.
-        econs; eauto.
-    - inv H.
-      destruct (Memory.get loc to mem1_tgt) as [[]|] eqn:GET1.
-      + inv CAP. exploit SOUND; eauto. i.
-        rewrite x in GET. inv GET.
-        eapply cap_covered; eauto.
-        inv MEM1. rewrite COVER.
-        econs; eauto.
-      + exploit cap_get_tgt; eauto. i. des.
-        econs; eauto.
-    - destruct (Memory.get loc to mem1_tgt) as [[]|] eqn:GET1.
-      + inv CAP. exploit SOUND; eauto. i.
-        rewrite x in GET. inv GET.
-        inv MEM1. exploit MSG; eauto. i. des.
-        inv CAP_SRC. exploit SOUND; eauto. i.
-        esplits; eauto.
-      + exploit cap_get_tgt; eauto. i. des.
-        esplits; eauto. refl.
-    - destruct (Memory.get loc to mem1_src) as [[]|] eqn:GET1.
-      + inv CAP_SRC. exploit SOUND; eauto. i.
-        rewrite x in H. inv H.
-        inv MEM1. rewrite RESERVE in GET1.
-        inv CAP. exploit SOUND0; eauto.
-      + exploit cap_get_src; eauto. i. des. auto.
-    - destruct (Memory.get loc to mem1_tgt) as [[]|] eqn:GET1.
-      + inv CAP. exploit SOUND; eauto. i.
-        rewrite x in H. inv H.
-        inv MEM1. rewrite <- RESERVE in GET1.
-        inv CAP_SRC. exploit SOUND0; eauto.
-      + exploit cap_get_tgt; eauto. i. des. auto.
   Qed.
 End SimPromises.
