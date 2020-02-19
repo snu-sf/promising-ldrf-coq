@@ -21,6 +21,9 @@ Require Import Thread.
 Require Import Configuration.
 
 Require Import Cover.
+Require Import MemorySplit.
+Require Import MemoryMerge.
+Require Import FulfillStep.
 
 Set Implicit Arguments.
 
@@ -813,4 +816,82 @@ Proof.
       inv MEM1. rewrite <- RESERVE in GET1.
       inv CAP_SRC. exploit SOUND0; eauto.
     + exploit sim_memory_cap_get_tgt; eauto. i. des. auto.
+Qed.
+
+
+(* fulfill_step *)
+
+Lemma fulfill_write_sim_memory
+      lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2
+      (FULFILL: fulfill_step lc1 sc1 loc from to val releasedm released ord lc2 sc2)
+      (REL_WF: View.opt_wf releasedm)
+      (REL_CLOSED: Memory.closed_opt_view releasedm mem1)
+      (ORD: Ordering.le ord Ordering.relaxed)
+      (WF1: Local.wf lc1 mem1)
+      (SC1: Memory.closed_timemap sc1 mem1)
+      (MEM1: Memory.closed mem1):
+  exists released' mem2',
+    <<STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released' ord lc2 sc2 mem2' (Memory.op_kind_lower (Message.concrete val released))>> /\
+    <<REL_LE: View.opt_le released' released>> /\
+    <<MEM: sim_memory mem2' mem1>>.
+Proof.
+  inv FULFILL.
+  exploit TViewFacts.write_future_fulfill;
+    try exact REL_CLOSED; try exact SC1; eauto; try by apply WF1.
+  { apply WF1. eapply Memory.remove_get0. eauto. }
+  i. des.
+  exploit MemorySplit.remove_promise_remove;
+    try exact REMOVE; eauto; try apply WF1; try by econs; eauto.
+  { econs. inv REL_LE; try apply Time.bot_spec.
+    cut (Time.le (View.rlx (View.unwrap (Some lhs)) loc)
+                 (View.rlx (View.unwrap (Some rhs)) loc)).
+    { i. etrans; eauto.
+      cut (Memory.message_to (Message.concrete val (Some rhs)) loc to).
+      { i. inv H1. auto. }
+      eapply MEM1. apply WF1. eapply Memory.remove_get0. eauto. }
+    destruct lhs; destruct rhs; inv LE; ss. }
+  i. des.
+  esplits; eauto.
+  - econs; eauto.
+    i. destruct ord; inv ORD; inv H.
+  - eapply promise_lower_sim_memory; eauto. econs.
+Qed.
+
+Lemma promise_fulfill_write_sim_memory
+      lc0 sc0 mem0 loc from to val releasedm released ord lc1 lc2 sc2 mem2 kind
+      (PROMISE: Local.promise_step lc0 mem0 loc from to (Message.concrete val released) lc1 mem2 kind)
+      (FULFILL: fulfill_step lc1 sc0 loc from to val releasedm released ord lc2 sc2)
+      (REL_WF: View.opt_wf releasedm)
+      (REL_CLOSED: Memory.closed_opt_view releasedm mem0)
+      (ORD: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc lc0.(Local.promises))
+      (WF0: Local.wf lc0 mem0)
+      (SC0: Memory.closed_timemap sc0 mem0)
+      (MEM0: Memory.closed mem0):
+  exists released' mem2',
+    <<STEP: Local.write_step lc0 sc0 mem0 loc from to val releasedm released' ord lc2 sc2 mem2' kind>> /\
+    <<REL_LE: View.opt_le released' released>> /\
+    <<MEM: sim_memory mem2' mem2>> /\
+    <<REL: released' = TView.write_released lc0.(Local.tview) sc0 loc to releasedm ord>>.
+Proof.
+  exploit Local.promise_step_future; eauto. i. des.
+  inv PROMISE. inv FULFILL. ss.
+  exploit TViewFacts.write_future_fulfill; try exact REL_WF; eauto; try by apply WF2.
+  { eapply Memory.future_closed_opt_view; eauto. }
+  { eapply Memory.promise_get2; eauto. inv PROMISE0; ss. }
+  s. i. des.
+  exploit MemorySplit.remove_promise_remove;
+    try exact REMOVE; eauto; try apply WF2; try by econs; eauto.
+  { econs. inv REL_LE; try apply Time.bot_spec.
+    cut (Time.le (View.rlx (View.unwrap (Some lhs)) loc)
+                 (View.rlx (View.unwrap (Some rhs)) loc)).
+    { i. etrans; eauto.
+      cut (Memory.message_to (Message.concrete val (Some rhs)) loc to).
+      { i. inv H1. auto. }
+      eapply CLOSED2. apply WF2. eapply Memory.remove_get0. eauto. }
+    destruct lhs; destruct rhs; inv LE; ss. }
+  i. des.
+  esplits; eauto.
+  - econs; eauto. econs; eauto.
+    eapply MemoryMerge.promise_promise_promise; eauto.
+  - eapply promise_lower_sim_memory; eauto. econs.
 Qed.

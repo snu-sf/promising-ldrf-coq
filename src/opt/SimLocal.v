@@ -1,5 +1,4 @@
 Require Import RelationClasses.
-Require Import Bool.
 Require Import List.
 
 From sflib Require Import sflib.
@@ -8,10 +7,10 @@ From Paco Require Import paco.
 From PromisingLib Require Import Axioms.
 From PromisingLib Require Import Basic.
 From PromisingLib Require Import Loc.
+From PromisingLib Require Import Language.
 
 Require Import Event.
 Require Import Time.
-From PromisingLib Require Import Language.
 Require Import View.
 Require Import Cell.
 Require Import Memory.
@@ -23,11 +22,9 @@ Require Import Thread.
 Require Import Configuration.
 
 Require Import FulfillStep.
+
 Require Import SimMemory.
 Require Import SimPromises.
-
-Require Import Syntax.
-Require Import Semantics.
 
 Set Implicit Arguments.
 
