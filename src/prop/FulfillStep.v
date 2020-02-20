@@ -19,9 +19,6 @@ Require Import Thread.
 Require Import MemorySplit.
 Require Import MemoryMerge.
 
-Require Import Syntax.
-Require Import Semantics.
-
 Set Implicit Arguments.
 
 
