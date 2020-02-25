@@ -24,7 +24,7 @@ Require Import Pred.
 Require Import MemoryMerge.
 Require Import PromiseConsistent.
 Require Import PFConsistent.
-Require Import ReorderPromises2.
+Require Import ReorderCancel.
 Require Import MemoryProps.
 
 Set Implicit Arguments.
