@@ -2216,6 +2216,25 @@ Section MAPPED.
     | _ => True
     end.
 
+  Lemma wf_time_mapped_mappable (tr: list (ThreadEvent.t * Memory.t)) times
+        (WFTIME: List.Forall (fun em => wf_time_evt (fun loc to => List.In to (times loc)) (fst em)) tr)
+        (COMPLETE: forall loc to (IN: List.In to (times loc)),
+            exists fto, (<<MAPPED: f loc to fto>>))
+    :
+      List.Forall (fun em => mappable_evt (fst em)) tr.
+  Proof.
+    eapply List.Forall_impl; eauto. i. ss. destruct a. destruct t; ss.
+    - des. split.
+      + apply COMPLETE in FROM. des. esplit. eauto.
+      + apply COMPLETE in TO. des. esplit. eauto.
+    - des. split.
+      + apply COMPLETE in FROM. des. esplit. eauto.
+      + apply COMPLETE in TO. des. esplit. eauto.
+    - des. split.
+      + apply COMPLETE in FROM. des. esplit. eauto.
+      + apply COMPLETE in TO. des. esplit. eauto.
+  Qed.
+
   Lemma step_map
         P lang th0 th1 fth0 st0 st1 lc0 lc1 flc0
         sc0 sc1 fsc0 fsc0' mem0 mem1 fmem0 e
@@ -2442,3 +2461,432 @@ Section MAPPED.
   Qed.
 
 End MAPPED.
+
+
+Section MAPLT.
+
+  Definition mapping_map_lt (f: Loc.t -> Time.t -> Time.t -> Prop): Prop :=
+    forall loc t0 t1 ft0 ft1
+           (MAP0: f loc t0 ft0)
+           (MAP1: f loc t1 ft1),
+      Time.lt t0 t1 <-> Time.lt ft0 ft1.
+
+  Definition mapping_map_lt_loc (f: Time.t -> Time.t -> Prop):=
+    forall t0 t1 ft0 ft1
+           (MAP0: f t0 ft0)
+           (MAP1: f t1 ft1),
+      Time.lt t0 t1 <-> Time.lt ft0 ft1.
+
+  Lemma mapping_map_lt_locwise f
+        (MAPLT: forall loc, mapping_map_lt_loc (f loc))
+    :
+      mapping_map_lt f.
+  Proof.
+    eauto.
+  Qed.
+
+  Lemma mapping_map_lt_map_eq f
+        (MAPLT: mapping_map_lt f)
+    :
+      mapping_map_eq f.
+  Proof.
+    ii. destruct (Time.le_lt_dec ft0 ft1).
+    - inv l; auto.
+      erewrite <- (@MAPLT loc to to) in H; eauto.
+      exfalso. eapply Time.lt_strorder; eauto.
+    - erewrite <- (@MAPLT loc to to) in l; eauto.
+      exfalso. eapply Time.lt_strorder; eauto.
+  Qed.
+
+  Lemma mapping_map_lt_map_le f
+        (MAPLT: mapping_map_lt f)
+    :
+      mapping_map_le f.
+  Proof.
+    ii. inv H.
+    - left. erewrite (@MAPLT loc t0 t1) in H0; eauto.
+    - right. inv H0.
+      eapply mapping_map_lt_map_eq; eauto.
+  Qed.
+
+  Lemma mapping_map_lt_non_collapsable f
+        (MAPLT: mapping_map_lt f)
+        loc to
+    :
+      non_collapsable f loc to.
+  Proof.
+    ii. unfold collapsed in *. des.
+    erewrite (MAPLT loc to' to) in TLE; eauto. eapply Time.lt_strorder; eauto.
+  Qed.
+
+  Lemma mapping_map_lt_collapsable_unwritable f prom mem
+        (MAPLT: mapping_map_lt f)
+    :
+      collapsable_unwritable f prom mem.
+  Proof.
+    ii. exfalso. des.
+    eapply mapping_map_lt_non_collapsable; try eassumption.
+    inv ITV. eapply TimeFacts.lt_le_lt; eauto.
+  Qed.
+
+End MAPLT.
+
+
+Section IDENTMAP.
+
+  Definition ident_map (loc: Loc.t) := @eq Time.t.
+
+  Lemma ident_map_lt
+    :
+      mapping_map_lt ident_map.
+  Proof.
+    unfold ident_map in *. ii. clarify.
+  Qed.
+
+  Lemma ident_map_le
+    :
+      mapping_map_le ident_map.
+  Proof.
+    apply mapping_map_lt_map_le, ident_map_lt.
+  Qed.
+
+  Lemma ident_map_bot
+    :
+      mapping_map_bot ident_map.
+  Proof.
+    unfold ident_map in *. ii. clarify.
+  Qed.
+
+  Lemma ident_map_eq
+    :
+      mapping_map_eq ident_map.
+  Proof.
+    apply mapping_map_lt_map_eq, ident_map_lt.
+  Qed.
+
+  Lemma ident_map_total
+        loc to
+    :
+      exists fto,
+        <<MAP: ident_map loc to fto >>.
+  Proof.
+    esplits; eauto. refl.
+  Qed.
+
+  Lemma ident_map_timemap
+        tm
+    :
+      timemap_map ident_map tm tm.
+  Proof.
+    ii. refl.
+  Qed.
+
+  Lemma ident_map_view
+        vw
+    :
+      view_map ident_map vw vw.
+  Proof.
+    econs; eapply ident_map_timemap.
+  Qed.
+
+  Lemma ident_map_message
+        msg
+    :
+      msg_map ident_map msg msg.
+  Proof.
+    destruct msg; econs. destruct released; econs.
+    apply ident_map_view.
+  Qed.
+
+  Lemma ident_map_promises
+        prom
+    :
+      promises_map ident_map prom prom.
+  Proof.
+    econs; i.
+    - esplits; eauto.
+      + eapply mapping_map_lt_non_collapsable.
+        eapply ident_map_lt.
+      + refl.
+      + eapply ident_map_message.
+    - esplits; eauto; refl.
+  Qed.
+
+  Lemma ident_map_local
+        lc
+    :
+      local_map ident_map lc lc.
+  Proof.
+    econs; i.
+    - refl.
+    - econs; i; eapply ident_map_view.
+    - eapply ident_map_promises.
+  Qed.
+
+End IDENTMAP.
+
+
+Section MAPIDENT.
+
+  Definition map_ident_in_memory (f: Loc.t -> Time.t -> Time.t -> Prop)
+             (mem: Memory.t): Prop :=
+    forall loc to
+           (TS: Time.le to (Memory.max_ts loc mem)),
+      f loc to to.
+
+  Definition map_ident_in_memory_bot
+             f mem
+             (MAP: map_ident_in_memory f mem)
+    :
+      mapping_map_bot f.
+  Proof.
+    ii. eapply MAP. eapply Time.bot_spec.
+  Qed.
+
+  Lemma map_ident_in_memory_closed_timemap
+        f mem tm
+        (MAP: map_ident_in_memory f mem)
+        (CLOSED: Memory.closed_timemap tm mem)
+    :
+      timemap_map f tm tm.
+  Proof.
+    ii. eapply MAP; eauto.
+    exploit CLOSED; eauto. i. des.
+    eapply Memory.max_ts_spec in x. des. eauto.
+  Qed.
+
+  Lemma map_ident_in_memory_closed_view
+        f mem vw
+        (MAP: map_ident_in_memory f mem)
+        (CLOSED: Memory.closed_view vw mem)
+    :
+      view_map f vw vw.
+  Proof.
+    inv CLOSED. econs.
+    - eapply map_ident_in_memory_closed_timemap; eauto.
+    - eapply map_ident_in_memory_closed_timemap; eauto.
+  Qed.
+
+  Lemma map_ident_in_memory_closed_tview
+        f mem tvw
+        (MAP: map_ident_in_memory f mem)
+        (CLOSED: TView.closed tvw mem)
+    :
+      tview_map f tvw tvw.
+  Proof.
+    inv CLOSED. econs.
+    - i. eapply map_ident_in_memory_closed_view; eauto.
+    - eapply map_ident_in_memory_closed_view; eauto.
+    - eapply map_ident_in_memory_closed_view; eauto.
+  Qed.
+
+  Lemma map_ident_in_memory_closed_opt_view
+        f mem vw
+        (MAP: map_ident_in_memory f mem)
+        (CLOSED: Memory.closed_opt_view vw mem)
+    :
+      opt_view_map f vw vw.
+  Proof.
+    inv CLOSED; econs.
+    eapply map_ident_in_memory_closed_view; eauto.
+  Qed.
+
+  Lemma map_ident_in_memory_closed_message
+        f mem msg
+        (MAP: map_ident_in_memory f mem)
+        (CLOSED: Memory.closed_message msg mem)
+    :
+      msg_map f msg msg.
+  Proof.
+    inv CLOSED; econs.
+    eapply map_ident_in_memory_closed_opt_view; eauto.
+  Qed.
+
+  Lemma map_ident_in_memory_promises
+        f mem0 mem
+        (MAP: map_ident_in_memory f mem)
+        (MAPLT: mapping_map_lt f)
+        (CLOSED: Memory.closed mem)
+        (MLE: Memory.le mem0 mem)
+    :
+      promises_map f mem0 mem0.
+  Proof.
+    inv CLOSED. econs.
+    - i. esplits; eauto.
+      + eapply mapping_map_lt_non_collapsable; auto.
+      + eapply MLE in GET. eapply Memory.max_ts_spec in GET. des.
+        eapply MAP; eauto.
+      + eapply MLE in GET. eapply CLOSED0 in GET. des.
+        eapply map_ident_in_memory_closed_message; eauto.
+    - i. esplits; eauto.
+      + eapply MLE in GET. eapply Memory.max_ts_spec in GET. des.
+        eapply MAP; eauto.
+      + eapply MLE in GET. eapply MAP. etrans.
+        * eapply memory_get_ts_le; eauto.
+        * eapply Memory.max_ts_spec in GET. des. auto.
+  Qed.
+
+  Lemma map_ident_in_memory_memory
+        f mem
+        (MAP: map_ident_in_memory f mem)
+        (MAPLT: mapping_map_lt f)
+        (CLOSED: Memory.closed mem)
+    :
+      memory_map f mem mem.
+  Proof.
+    eapply promises_map_memory_map.
+    eapply map_ident_in_memory_promises; eauto. refl.
+  Qed.
+
+  Lemma map_ident_in_memory_local
+        f mem lc
+        (MAP: map_ident_in_memory f mem)
+        (MAPLT: mapping_map_lt f)
+        (LOCAL: Local.wf lc mem)
+        (CLOSED: Memory.closed mem)
+    :
+      local_map f lc lc.
+  Proof.
+    inv LOCAL. econs.
+    - refl.
+    - eapply map_ident_in_memory_closed_tview; eauto.
+    - eapply map_ident_in_memory_promises; eauto.
+  Qed.
+
+End MAPIDENT.
+
+
+Section SHIFTMAP.
+
+  Lemma update_map_lt (f: Time.t -> Time.t -> Prop) to fto
+        (MAPLT: mapping_map_lt_loc f)
+        (NOMAPPED: forall fts (MAPPED: f to fts), False)
+        (LEFT: forall ts fts (TS: Time.lt ts to) (MAPPED: f ts fts),
+            Time.lt fts fto)
+        (RIGHT: forall ts fts (TS: Time.lt to ts) (MAPPED: f ts fts),
+            Time.lt fto fts)
+  :
+    mapping_map_lt_loc (fun ts fts => <<ORIG: f ts fts>> \/ <<NEW: to = ts /\ fto = fts>>).
+  Proof.
+    ii. des; clarify.
+    - eapply MAPLT; eauto.
+    - split; i.
+      + eapply RIGHT; eauto.
+      + destruct (Time.le_lt_dec t1 t0); auto. destruct l.
+        * eapply LEFT in H0; eauto.
+          exfalso. eapply Time.lt_strorder. etrans; eauto.
+        * inv H0. exfalso. eapply NOMAPPED; eauto.
+    - split; i.
+      + eapply LEFT; eauto.
+      + destruct (Time.le_lt_dec t1 t0); auto. destruct l.
+        * eapply RIGHT in H0; eauto.
+          exfalso. eapply Time.lt_strorder. etrans; eauto.
+        * inv H0. exfalso. eapply NOMAPPED; eauto.
+    - split; i.
+      + exfalso. eapply Time.lt_strorder; eauto.
+      + exfalso. eapply Time.lt_strorder; eauto.
+  Qed.
+
+  Fixpoint compressing_map (ts0 ts1: Time.t) (T: list Time.t) :=
+    match T with
+    | [] => bot2
+    | hd :: tl => (fun ts fts => ts = hd /\ fts = Time.middle ts0 ts1)
+                    \2/ compressing_map (Time.middle ts0 ts1) ts1 tl
+    end.
+
+  Lemma compressing_map_spec ts0 ts1 T
+        (TS: Time.lt ts0 ts1)
+        (SORTED: times_sorted T)
+    :
+      (<<MAPLT: mapping_map_lt_loc (compressing_map ts0 ts1 T)>>) /\
+      (<<COMPLETE: forall to (IN: List.In to T), exists fto, (<<MAPPED: (compressing_map ts0 ts1 T) to fto>>)>>) /\
+      (<<BOUND: forall to fto (MAPPED: (compressing_map ts0 ts1 T) to fto),
+          (<<IN: List.In to T>>) /\ (<<TS0: Time.lt ts0 fto>>) /\ (<<TS1: Time.lt fto ts1>>)>>).
+  Proof.
+    i. ginduction T.
+    - i. ss. splits.
+      + ii. clarify.
+      + i. clarify.
+      + i. clarify.
+    - i. ss. inv SORTED. exploit IHT.
+      { instantiate (1:=ts1). instantiate (1:=Time.middle ts0 ts1).
+        eapply Time.middle_spec; eauto. }
+      { eauto. }
+      i. des. clear IHT. splits.
+      + ii. des; clarify.
+        * split; i.
+          { exfalso. eapply Time.lt_strorder; eauto. }
+          { exfalso. eapply Time.lt_strorder; eauto. }
+        * eapply BOUND in MAP0. des.
+          eapply List.Forall_forall in HD; eauto. split; i.
+          { exfalso. eapply Time.lt_strorder; eauto. }
+          { exfalso. eapply Time.lt_strorder; eauto. }
+        * eapply BOUND in MAP1. des. split; i; auto.
+          eapply List.Forall_forall in HD; eauto.
+        * eapply MAPLT; eauto.
+      + i. des; clarify.
+        * esplits; eauto.
+        * eapply COMPLETE in IN. des. esplits; eauto.
+      + i. des; clarify.
+        * split; auto. eapply Time.middle_spec; auto.
+        * eapply BOUND in MAPPED. des. splits; auto.
+          etrans.
+          { eapply Time.middle_spec; eauto. }
+          { eauto. }
+  Qed.
+
+  Lemma shift_map_exists max ts0 ts1 (T: list Time.t)
+        (MAX: Time.le max ts0)
+        (TS: Time.lt ts0 ts1)
+    :
+      exists (f: Time.t -> Time.t -> Prop),
+        (<<COMPLETE: forall to (IN: List.In to T), exists fto, (<<MAPPED: f to fto>>)>>) /\
+        (<<SAME: forall ts (TS: Time.le ts max), f ts ts>>) /\
+        (<<BOUND: forall to fto (MAPPED: f to fto) (TS: Time.lt max to),
+            (Time.lt ts0 fto /\ Time.lt fto ts1)>>) /\
+        (<<MAPLT: mapping_map_lt_loc f>>)
+  .
+  Proof.
+    hexploit (list_filter_exists (fun ts => Time.lt max ts) T). i. des.
+    hexploit (sorting_sorted l'). i. des.
+    hexploit (@compressing_map_spec ts0 ts1 (sorting l')); eauto. i. des.
+    exists ((fun ts fts => Time.le ts max /\ ts = fts) \2/ (compressing_map ts0 ts1 (sorting l'))).
+    splits.
+
+    - i. destruct (Time.le_lt_dec to max).
+      + esplits; eauto.
+      + hexploit (proj1 (COMPLETE to)).
+        { split; auto. } intros IN'. des.
+        eapply COMPLETE0 in IN'.
+        eapply COMPLETE1 in IN'. des. esplits; eauto.
+    - i. eauto.
+    - i. apply or_strengthen in MAPPED. des; clarify; eauto.
+      + exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto.
+      + eapply BOUND in SAT. des. auto.
+
+    - ii. des; clarify.
+      + apply BOUND in MAP0. des.
+        eapply COMPLETE0 in IN. eapply COMPLETE in IN. des.
+        split; i.
+        * exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+          { eapply H. } etrans.
+          { eapply MAP1. }
+          { left. auto. }
+        * exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+          { eapply H. } etrans.
+          { eapply MAP1. } etrans.
+          { eapply MAX. }
+          { left. auto. }
+
+      + apply BOUND in MAP1. des.
+        apply COMPLETE0 in IN. eapply COMPLETE in IN. des.
+        split; i.
+        * eapply TimeFacts.le_lt_lt.
+          { eapply MAP0. }
+          eapply TimeFacts.le_lt_lt; eauto.
+        * eapply TimeFacts.le_lt_lt; eauto.
+
+      + eapply MAPLT; eauto.
+  Qed.
+
+End SHIFTMAP.

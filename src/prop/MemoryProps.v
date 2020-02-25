@@ -62,6 +62,49 @@ Section GENERAL.
     destruct (classic A); eauto. des; eauto.
   Qed.
 
+  Lemma list_Forall_app A P (l0 l1: list A)
+    :
+      List.Forall P (l0 ++ l1) <-> (<<FORALL0: List.Forall P l0>> /\ <<FORALL1: List.Forall P l1>>).
+  Proof.
+    induction l0; split; i; ss.
+    - split; auto.
+    - des. auto.
+    - inv H. apply IHl0 in H3. des. split; auto.
+    - des. inv FORALL0. econs; eauto.
+  Qed.
+
+  Lemma list_Forall2_app A B P (lhd0 ltl0: list A) (lhd1 ltl1: list B)
+        (FORALL0: List.Forall2 P lhd0 lhd1)
+        (FORALL1: List.Forall2 P ltl0 ltl1)
+    :
+      List.Forall2 P (lhd0 ++ ltl0) (lhd1 ++ ltl1).
+  Proof.
+    ginduction FORALL0; eauto. i. ss. econs; eauto.
+  Qed.
+
+  Lemma list_Forall2_in A B P (l0: list A) (l1: list B)
+        (FORALL: List.Forall2 P l0 l1)
+        b
+        (IN: List.In b l1)
+    :
+      exists a,
+        (<<IN: List.In a l0>>) /\ (<<SAT: P a b>>).
+  Proof.
+    ginduction FORALL; eauto; i; ss. des; clarify.
+    - esplits; eauto.
+    - eapply IHFORALL in IN; eauto. des. esplits; eauto.
+  Qed.
+
+  Lemma list_Forall_sum A (P Q R: A -> Prop) (l: list A)
+        (FORALL0: List.Forall P l)
+        (FORALL1: List.Forall Q l)
+        (SUM: forall a (SAT0: P a) (SAT1: Q a), R a)
+    :
+      List.Forall R l.
+  Proof.
+    ginduction l; eauto. i. inv FORALL0. inv FORALL1. econs; eauto.
+  Qed.
+
 End GENERAL.
 
 
@@ -1633,6 +1676,117 @@ Section UNCHANGEDON.
 
 End UNCHANGEDON.
 
+
+Section PROMISEFREE.
+
+  Lemma promise_free_no_promise P lang (th0 th1: Thread.t lang) e
+        (NOPROMISE: th0.(Thread.local).(Local.promises) = Memory.bot)
+        (STEP: pred_step P e th0 th1)
+        (PRED: P <1= promise_free)
+  :
+    (<<STEP: pred_step P e th0 th1>>) /\
+    (<<NOPROMISE: th1.(Thread.local).(Local.promises) = Memory.bot>>).
+  Proof.
+    inv STEP. dup SAT. eapply PRED in SAT. inv STEP0. inv STEP.
+    - inv STEP0. inv LOCAL. inv PROMISE; ss; des; clarify.
+      + rewrite NOPROMISE in *.
+        eapply Memory.lower_get0 in PROMISES. des.
+        erewrite Memory.bot_get in *. clarify.
+      + rewrite NOPROMISE in *.
+        eapply Memory.remove_get0 in PROMISES. des.
+        erewrite Memory.bot_get in *. clarify.
+    - inv STEP0. inv LOCAL.
+      + ss. esplits; eauto. econs; eauto. econs; eauto.
+        econs 2; eauto. econs; eauto.
+      + ss. esplits; eauto.
+        * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+        * inv LOCAL0. ss.
+      + ss. esplits; eauto.
+        * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+        * inv LOCAL0. rewrite NOPROMISE in *.
+          exploit memory_write_bot_add; eauto. i. clarify.
+          inv WRITE. inv PROMISE. ss.
+          symmetry. eapply MemoryMerge.MemoryMerge.add_remove; eauto.
+      + ss. esplits; eauto.
+        * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+        * inv LOCAL1. inv LOCAL2. rewrite NOPROMISE in *.
+          exploit memory_write_bot_add; eauto. i. clarify.
+          inv WRITE. inv PROMISE. ss.
+          symmetry. eapply MemoryMerge.MemoryMerge.add_remove; eauto.
+      + ss. esplits; eauto.
+        * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+        * inv LOCAL0. ss.
+      + ss. esplits; eauto.
+        * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+        * inv LOCAL0. ss.
+      + ss. esplits; eauto.
+        * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+  Qed.
+
+  Lemma write_promises_decrease prom0 mem0 loc from to val realeased prom1 mem1 kind
+        (WRITE: Memory.write prom0 mem0 loc from to val realeased prom1 mem1 kind)
+    :
+      concrete_promised prom1 <2= concrete_promised prom0.
+  Proof.
+    inv WRITE. inv PROMISE.
+    - exploit MemoryMerge.MemoryMerge.add_remove.
+      + eapply PROMISES.
+      + eapply REMOVE.
+      + i. clarify.
+    - ii. inv PR.
+      erewrite Memory.remove_o in GET; eauto. des_ifs.
+      erewrite Memory.split_o in GET; eauto. des_ifs.
+      + ss; des; clarify.
+      + ss. des; clarify. eapply Memory.split_get0 in PROMISES.
+        des. econs; eauto.
+      + eapply Memory.split_get0 in PROMISES.
+        guardH o. guardH o0. guardH o1. des. econs; eauto.
+    - ii. inv PR.
+      erewrite Memory.remove_o in GET; eauto. des_ifs.
+      erewrite Memory.lower_o in GET; eauto. des_ifs.
+      + ss; des; clarify.
+      + econs; eauto.
+    - clarify.
+  Qed.
+
+  Lemma pf_step_promises_decrease P lang e (th0 th1: Thread.t lang)
+        (STEP: (@pred_step P lang) e th0 th1)
+        (PRED: P <1= promise_free)
+    :
+      concrete_promised (th1.(Thread.local).(Local.promises)) <2=
+      concrete_promised (th0.(Thread.local).(Local.promises)).
+  Proof.
+    i. inv STEP. eapply PRED in SAT. inv STEP0. des. inv STEP.
+    - inv STEP0. ss. inv LOCAL. ss. inv PROMISE; clarify.
+      + inv PR. erewrite Memory.lower_o in GET; eauto. des_ifs.
+        * ss; des. clarify. eapply Memory.lower_get0 in PROMISES.
+          des. econs; eauto.
+        * econs; eauto.
+      + inv PR. erewrite Memory.remove_o in GET; eauto. des_ifs.
+        econs; eauto.
+    - inv STEP0. ss. inv LOCAL; eauto.
+      + inv LOCAL0. ss.
+      + inv LOCAL0. ss. eapply write_promises_decrease; eauto.
+      + inv LOCAL1. inv LOCAL2. ss. eapply write_promises_decrease; eauto.
+      + inv LOCAL0. ss.
+      + inv LOCAL0. ss.
+  Qed.
+
+  Lemma pf_step_rtc_promises_decrease P lang (th0 th1: Thread.t lang)
+        (STEP: rtc (tau (@pred_step P lang)) th0 th1)
+        (PRED: P <1= promise_free)
+    :
+      concrete_promised (th1.(Thread.local).(Local.promises)) <2=
+      concrete_promised (th0.(Thread.local).(Local.promises)).
+  Proof.
+    ginduction STEP; ss.
+    i. eapply IHSTEP in PR; eauto. inv H.
+    eapply pf_step_promises_decrease; eauto.
+  Qed.
+
+End PROMISEFREE.
+
+
 Lemma promise_memory_le prom0 mem0 loc from to msg prom1 mem1 kind
       (MLE: Memory.le prom0 mem0)
       (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
@@ -1713,7 +1867,6 @@ Proof.
     + clarify. econs 1; eauto.
     + econs 2; eauto.
 Qed.
-
 
 Definition no_reserves (proms: Memory.t): Prop :=
   forall loc to from msg (GET: Memory.get loc to proms = Some (from, msg)),
@@ -1811,6 +1964,396 @@ Proof.
 Qed.
 
 
+Section CANCEL.
+
+  Inductive only_reserves (proms: Memory.t): Prop :=
+  | only_reserves_intro
+      (RESERVES: forall loc to from msg (GET: Memory.get loc to proms = Some (from, msg)),
+          msg = Message.reserve)
+      (FINITE: Memory.finite proms)
+  .
+
+  Lemma reserves_cancelable lang st vw proms0 sc mem0
+        (FINITE: Memory.finite proms0)
+        (MLE: Memory.le proms0 mem0)
+    :
+      exists proms1 mem1,
+        (<<STEPS: rtc (tau (@pred_step is_cancel lang))
+                      (Thread.mk lang st (Local.mk vw proms0) sc mem0)
+                      (Thread.mk lang st (Local.mk vw proms1) sc mem1)>>) /\
+        (<<NORESERVES: no_reserves proms1>>).
+  Proof.
+    assert (exists dom,
+               (<<COMPLETE: forall loc to,
+                   (exists from, (<<GET: Memory.get loc to proms0 = Some (from, Message.reserve)>>))
+                   <-> (<<IN: List.In (loc, to) dom>>)>>)).
+    { unfold Memory.finite in *. des.
+      generalize (list_filter_exists (fun locto =>
+                                        match locto with
+                                        | (loc, to) =>
+                                          exists from, Memory.get loc to proms0 = Some (from, Message.reserve)
+                                        end) dom).
+      i. des. exists l'. split; i.
+      - eapply COMPLETE. des. esplits; eauto.
+      - eapply COMPLETE in H. des. esplits; eauto. }
+    des. ginduction dom; ss; i.
+    - exists proms0, mem0. esplits; eauto.
+      ii. clarify. eapply COMPLETE. eauto.
+    - destruct a as [loc to].
+      exploit (proj2 (COMPLETE loc to)); eauto. i. des.
+      destruct (classic (List.In (loc, to) dom)).
+      { exploit IHdom; eauto. i. split; i.
+        - des. exploit (proj1 (COMPLETE loc0 to0)); eauto.
+          i. des; clarify.
+        - exploit (proj2 (COMPLETE loc0 to0)); eauto. }
+      exploit Memory.remove_exists; eauto.
+      intros [prom1 REMOVE0].
+      exploit Memory.remove_exists.
+      { eapply MLE. eapply GET. }
+      intros [mem1 REMOVE1]. hexploit IHdom.
+      * instantiate (1:=prom1).
+        eapply Memory.remove_finite; eauto.
+      * instantiate (1:=mem1).
+        ii. erewrite Memory.remove_o in LHS; eauto. des_ifs.
+        eapply MLE in LHS. erewrite Memory.remove_o; eauto. des_ifs.
+        ss. des; clarify.
+      * i. split; i.
+        { des. erewrite Memory.remove_o in GET0; eauto. des_ifs.
+          exploit (proj1 (COMPLETE loc0 to0)); eauto. i. des; clarify. }
+        { exploit (proj2 (COMPLETE loc0 to0)); eauto. i. des; clarify.
+          exists from0. erewrite Memory.remove_o; eauto. des_ifs.
+          ss. des; clarify. }
+      * i. des. exists proms1, mem2. split; eauto.
+        econs 2.
+        { econs.
+          - instantiate (2:=ThreadEvent.promise loc from to Message.reserve Memory.op_kind_cancel).
+            econs; ss. econs. econs 1. econs; ss.
+            econs; ss. econs; eauto.
+          - eauto. }
+        { eauto. }
+  Qed.
+
+  Lemma promise_not_cacncel_reserves_same prom0 mem0 loc from to msg prom1 mem1 kind
+        (PROM: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
+        (NOTCANCEL: kind <> Memory.op_kind_cancel)
+        loc0 to0 from0
+        (GET: Memory.get loc0 to0 prom0 = Some (from0, Message.reserve))
+    :
+      exists from1,
+        Memory.get loc0 to0 prom1 = Some (from1, Message.reserve).
+  Proof.
+    inv PROM.
+    - eapply Memory.add_get1 in GET; eauto.
+    - des. clarify. erewrite Memory.split_o; eauto.
+      dup PROMISES. eapply Memory.split_get0 in PROMISES0.
+      eapply split_succeed_wf in PROMISES. des. des_ifs.
+      + ss. des. clarify.
+      + ss. guardH o. des. clarify.
+        esplits; eauto.
+      + esplits; eauto.
+    - des. clarify. erewrite Memory.lower_o; eauto. des_ifs.
+      + ss. des. clarify.
+        eapply lower_succeed_wf in PROMISES. des. clarify.
+      + esplits; eauto.
+    - clarify.
+  Qed.
+
+  Lemma remove_not_cacncel_reserves_same prom0 loc from to val released prom1
+        (REMOVE: Memory.remove prom0 loc from to (Message.concrete val released) prom1)
+        loc0 to0 from0
+        (GET: Memory.get loc0 to0 prom0 = Some (from0, Message.reserve))
+    :
+      exists from1,
+        Memory.get loc0 to0 prom1 = Some (from1, Message.reserve).
+  Proof.
+    dup REMOVE. eapply Memory.remove_get0 in REMOVE. des.
+    eapply Memory.remove_o in REMOVE0.
+    instantiate (1:=to0) in REMOVE0.
+    instantiate (1:=loc0) in REMOVE0. des_ifs.
+    - ss. des. clarify.
+    - esplits. etrans; eauto.
+  Qed.
+
+  Lemma step_not_cancel_reserves_same P lang e th0 th1
+        (STEPS: (@pred_step P lang) e th0 th1)
+        (PRED: P <1= (promise_free /1\ (fun e => ~ is_cancel e)))
+        loc to from
+        (GET: Memory.get loc to th0.(Thread.local).(Local.promises) = Some (from, Message.reserve))
+    :
+      exists from',
+        Memory.get loc to th1.(Thread.local).(Local.promises) = Some (from', Message.reserve).
+  Proof.
+    inv STEPS. eapply PRED in SAT. inv STEP. inv STEP0.
+    - inv STEP. des. ss. inv LOCAL.
+      eapply promise_not_cacncel_reserves_same; eauto.
+      ii. clarify.
+    - inv STEP. inv LOCAL; ss.
+      + esplits; eauto.
+      + inv LOCAL0. esplits; eauto.
+      + inv LOCAL0. inv WRITE. ss.
+        eapply promise_not_cacncel_reserves_same in GET; cycle 1; eauto.
+        { ii. clarify. inv PROMISE. clarify. } des.
+        eapply remove_not_cacncel_reserves_same in GET; cycle 1; eauto.
+      + inv LOCAL2. inv WRITE. ss. inv LOCAL1. ss.
+        eapply promise_not_cacncel_reserves_same in GET; cycle 1; eauto.
+        { ii. clarify. inv PROMISE. clarify. } des.
+        eapply remove_not_cacncel_reserves_same in GET; cycle 1; eauto.
+      + inv LOCAL0. esplits; eauto.
+      + inv LOCAL0. esplits; eauto.
+      + inv LOCAL0. esplits; eauto.
+  Qed.
+
+  Lemma steps_not_cancel_reserves_same P lang th0 th1
+        (STEPS: rtc (tau (@pred_step P lang)) th0 th1)
+        (PRED: P <1= (promise_free /1\ (fun e => ~ is_cancel e)))
+        loc to from
+        (GET: Memory.get loc to th0.(Thread.local).(Local.promises) = Some (from, Message.reserve))
+    :
+      exists from',
+        Memory.get loc to th1.(Thread.local).(Local.promises) = Some (from', Message.reserve).
+  Proof.
+    ginduction STEPS; i.
+    - esplits; eauto.
+    - inv H. exploit step_not_cancel_reserves_same; eauto. i. des.
+      exploit IHSTEPS; eauto.
+  Qed.
+
+  Lemma cancel_memory_decrease P lang e th0 th1
+        (STEP: (@pred_step P lang) e th0 th1)
+        (PRED: P <1= is_cancel)
+    :
+      Memory.le th1.(Thread.memory) th0.(Thread.memory).
+  Proof.
+    inv STEP. eapply PRED in SAT. unfold is_cancel in SAT. des_ifs.
+    inv STEP0. inv STEP; inv STEP0; ss.
+    - inv LOCAL. inv PROMISE; ss.
+      ii. erewrite Memory.remove_o in LHS; eauto. des_ifs.
+    - inv LOCAL.
+  Qed.
+
+  Lemma cancels_memory_decrease P lang th0 th1
+        (STEP: rtc (tau (@pred_step P lang)) th0 th1)
+        (PRED: P <1= is_cancel)
+    :
+      Memory.le th1.(Thread.memory) th0.(Thread.memory).
+  Proof.
+    ginduction STEP.
+    - refl.
+    - etrans; eauto. inv H.
+      eapply cancel_memory_decrease; eauto.
+  Qed.
+
+  Lemma cancel_concrete_same P lang e th0 th1
+        (STEP: (@pred_step P lang) e th0 th1)
+        (PRED: P <1= is_cancel)
+    :
+      memory_concrete_le th0.(Thread.memory) th1.(Thread.memory).
+  Proof.
+    inv STEP. eapply PRED in SAT. unfold is_cancel in SAT. des_ifs.
+    inv STEP0. inv STEP; inv STEP0; ss.
+    - inv LOCAL. inv PROMISE; ss.
+      ii. erewrite Memory.remove_o; eauto. des_ifs.
+      ss. des. clarify.
+      eapply Memory.remove_get0 in MEM. des. clarify.
+    - inv LOCAL.
+  Qed.
+
+  Lemma cancels_concrete_same P lang th0 th1
+        (STEP: rtc (tau (@pred_step P lang)) th0 th1)
+        (PRED: P <1= is_cancel)
+    :
+      memory_concrete_le th0.(Thread.memory) th1.(Thread.memory).
+  Proof.
+    ginduction STEP.
+    - refl.
+    - etrans; eauto. inv H.
+      eapply cancel_concrete_same; eauto.
+  Qed.
+
+  Lemma cancel_promises_decrease P lang e th0 th1
+        (STEP: (@pred_step P lang) e th0 th1)
+        (PRED: P <1= is_cancel)
+    :
+      Memory.le th1.(Thread.local).(Local.promises) th0.(Thread.local).(Local.promises).
+  Proof.
+    inv STEP. eapply PRED in SAT. unfold is_cancel in SAT. des_ifs.
+    inv STEP0. inv STEP; inv STEP0; ss.
+    - inv LOCAL. inv PROMISE; ss.
+      ii. erewrite Memory.remove_o in LHS; eauto. des_ifs.
+    - inv LOCAL.
+  Qed.
+
+  Lemma cancels_promises_decrease P lang th0 th1
+        (STEP: rtc (tau (@pred_step P lang)) th0 th1)
+        (PRED: P <1= is_cancel)
+    :
+      Memory.le th1.(Thread.local).(Local.promises) th0.(Thread.local).(Local.promises).
+  Proof.
+    ginduction STEP.
+    - refl.
+    - etrans; eauto. inv H.
+      eapply cancel_promises_decrease; eauto.
+  Qed.
+
+  Lemma nacancel_promises_decrease P lang e th0 th1
+        (STEP: (@pred_step P lang) e th0 th1)
+        (PRED: P <1= is_cancel)
+    :
+      Memory.le th1.(Thread.local).(Local.promises) th0.(Thread.local).(Local.promises).
+  Proof.
+    inv STEP. eapply PRED in SAT. unfold is_cancel in SAT. des_ifs.
+    inv STEP0. inv STEP; inv STEP0; ss.
+    - inv LOCAL. inv PROMISE; ss.
+      ii. erewrite Memory.remove_o in LHS; eauto. des_ifs.
+    - inv LOCAL.
+  Qed.
+
+  Lemma nacancels_promises_decrease P lang th0 th1
+        (STEP: rtc (tau (@pred_step P lang)) th0 th1)
+        (PRED: P <1= is_cancel)
+    :
+      Memory.le th1.(Thread.local).(Local.promises) th0.(Thread.local).(Local.promises).
+  Proof.
+    ginduction STEP.
+    - refl.
+    - etrans; eauto. inv H.
+      eapply nacancel_promises_decrease; eauto.
+  Qed.
+
+  Lemma cancel_remove_only P lang e th0 th1
+        (STEP: (@pred_step P lang) e th0 th1)
+        (PRED: P <1= is_cancel)
+        loc from to msg
+        (GET: Memory.get loc to th0.(Thread.local).(Local.promises) = Some (from, msg))
+        (NONE: Memory.get loc to th1.(Thread.local).(Local.promises) = None)
+    :
+      (<<GET: Memory.get loc to th0.(Thread.memory) = Some (from, msg)>>) /\
+      (<<NONE: Memory.get loc to th1.(Thread.memory) = None>>) /\
+      (<<RESERVE: msg = Message.reserve>>).
+  Proof.
+    inv STEP. eapply PRED in SAT. unfold is_cancel in SAT. des_ifs.
+    inv STEP0. inv STEP; inv STEP0; ss.
+    - inv LOCAL. inv PROMISE; ss.
+      dup NONE. erewrite Memory.remove_o in NONE; eauto. des_ifs. ss. clarify.
+      dup MEM. eapply Memory.remove_get0 in MEM.
+      dup PROMISES. eapply Memory.remove_get0 in PROMISES. des. clarify.
+    - inv LOCAL.
+  Qed.
+
+  Lemma cancels_remove_only P lang th0 th1
+        (STEP: rtc (tau (@pred_step P lang)) th0 th1)
+        (PRED: P <1= is_cancel)
+        loc from to msg
+        (GET: Memory.get loc to th0.(Thread.local).(Local.promises) = Some (from, msg))
+        (NONE: Memory.get loc to th1.(Thread.local).(Local.promises) = None)
+    :
+      (<<GET: Memory.get loc to th0.(Thread.memory) = Some (from, msg)>>) /\
+      (<<NONE: Memory.get loc to th1.(Thread.memory) = None>>) /\
+      (<<RESERVE: msg = Message.reserve>>).
+  Proof.
+    ginduction STEP.
+    - i. clarify.
+    - i. inv H.
+      destruct (Memory.get loc to (Local.promises (Thread.local y))) eqn:GET0; auto.
+      + destruct p. dup GET0.
+        eapply cancel_promises_decrease in GET1; eauto.  clarify.
+        exploit IHSTEP; eauto. i. des. splits; auto.
+        eapply cancel_memory_decrease; eauto.
+      + exploit cancel_remove_only; eauto. i. des.
+        splits; auto.
+        eapply cancels_memory_decrease in STEP; eauto.
+        eapply memory_le_get_none; eauto.
+  Qed.
+
+End CANCEL.
+
+
+Section NOSC.
+
+  Lemma no_sc_any_sc
+        P lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc_src sc'
+        mem mem' e
+        (STEP: (@pred_step P lang) e th_tgt th_tgt')
+        (NOSC: P <1= no_sc)
+        (TH_SRC: th_src = Thread.mk lang st (Local.mk v prom) sc_src mem)
+        (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v prom) sc mem)
+        (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem')
+  :
+    exists sc_src',
+      (<<STEP: (@pred_step P lang)
+                 e th_src
+                 (Thread.mk lang st' (Local.mk v' prom') sc_src' mem')>>).
+  Proof.
+    clarify. inv STEP. dup SAT. eapply NOSC in SAT.
+    inv STEP0. des. inv STEP.
+    - inv STEP0. inv LOCAL. ss. clarify.
+      esplits. econs; eauto. econs; eauto. econs 1; eauto. econs; eauto.
+    - inv STEP0. inv LOCAL; ss.
+      + esplits. econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+      + esplits. econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+      + inv LOCAL0. ss. clarify. exists sc_src.
+        econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+        econs; eauto. econs; eauto. ss.
+        inv WRITABLE. econs; eauto.
+      + inv LOCAL1. ss. inv LOCAL2. ss. clarify. exists sc_src.
+        econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+        econs; eauto. econs; eauto. ss.
+        inv WRITABLE. econs; eauto.
+      + inv LOCAL0. ss. clarify.
+        esplits. econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+        econs; eauto. econs; eauto. ss. f_equal.
+        unfold TView.write_fence_tview. ss. des_ifs.
+      + esplits. econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+  Qed.
+
+  Lemma no_sc_any_sc_traced
+        lang th_src th_tgt th_tgt' st st' lc lc' sc sc_src sc'
+        mem mem' events
+        (STEPS: traced_step events th_tgt th_tgt')
+        (TH_SRC: th_src = Thread.mk lang st lc sc_src mem)
+        (TH_TGT0: th_tgt = Thread.mk lang st lc sc mem)
+        (TH_TGT1: th_tgt' = Thread.mk lang st' lc' sc' mem')
+        (EVENTS: forall e (IN: List.In e events), <<SAT: no_sc (fst e)>>)
+    :
+      exists sc_src',
+        (<<STEPS: traced_step events
+                              th_src
+                              (Thread.mk lang st' lc' sc_src' mem')>>).
+  Proof.
+    ginduction STEPS.
+    - i. clarify. esplits; eauto. econs.
+    - i. clarify. destruct th1. destruct local, lc, lc'. ss.
+      exploit no_sc_any_sc; ss.
+      { econs; eauto. instantiate (1:=no_sc).
+        exploit EVENTS; eauto. }
+      { ss. }
+      i. des. inv STEP.
+      exploit IHSTEPS; eauto. i. des. eexists. econs; eauto.
+  Qed.
+
+  Lemma no_sc_any_sc_rtc
+        P lang th_src th_tgt th_tgt' st st' lc lc' sc sc_src sc'
+        mem mem'
+        (STEP: rtc (tau (@pred_step P lang)) th_tgt th_tgt')
+        (TH_SRC: th_src = Thread.mk lang st lc sc_src mem)
+        (TH_TGT0: th_tgt = Thread.mk lang st lc sc mem)
+        (TH_TGT1: th_tgt' = Thread.mk lang st' lc' sc' mem')
+        (PRED: P <1= no_sc)
+    :
+      exists sc_src',
+        (<<STEP: rtc (tau (@pred_step P lang))
+                     th_src
+                     (Thread.mk lang st' lc' sc_src' mem')>>).
+  Proof.
+    ginduction STEP.
+    - i. clarify. esplits; eauto.
+    - i. clarify. destruct y. destruct local, lc, lc'. ss.
+      inv H. exploit no_sc_any_sc; eauto. i. des.
+      exploit IHSTEP; eauto. i. des.
+      exists sc_src'0. esplits. econs; eauto.
+  Qed.
+
+End NOSC.
 
 Section FORGETMEMORY.
 
@@ -1942,6 +2485,5 @@ Section FORGETMEMORY.
   Proof.
     econs; eauto. i. eapply BOT in PROMS. clarify.
   Qed.
-
 
 End FORGETMEMORY.

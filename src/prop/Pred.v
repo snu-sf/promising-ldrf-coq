@@ -82,7 +82,7 @@ Section Pred.
     | ThreadEvent.write loc from to val released ordw =>
       (<<FROM: P loc from>>) /\ (<<TO: P loc to>>)
     | ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw =>
-      (<<TO: P loc to>>)
+      (<<FROM: P loc from>>) /\ (<<TO: P loc to>>)
     | _ => True
     end.
 
@@ -427,6 +427,16 @@ Section PredStep.
         * eauto.
   Qed.
 
+  Lemma pred_steps_traced_step2 P lang
+        th0 th1 tr
+        (STEPS: traced_step tr th0 th1)
+        (EVENTS: List.Forall (fun em => <<SAT: P (fst em)>> /\ <<TAU: ThreadEvent.get_machine_event (fst em) = MachineEvent.silent>>) tr)
+  :
+    rtc (tau (@pred_step P lang)) th0 th1.
+  Proof.
+    eapply pred_steps_traced_step; eauto.
+  Qed.
+
   Lemma pf_step_promise_free_step lang:
     @Thread.step lang true <3= @pred_step promise_free lang.
   Proof.
@@ -468,50 +478,49 @@ Section PredStep.
   Definition same_machine_event e_src e_tgt :=
     ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt.
 
-  Lemma step_times_list_exists P lang th0 th1 e
-        (STEPS: (@pred_step P lang) e th0 th1)
+  Lemma step_times_list_exists lang (th0 th1: Thread.t lang) e
+        (STEP: Thread.step_allpf e th0 th1)
     :
-      exists times,
-        (@pred_step (P /1\ wf_time_evt (fun loc to => List.In to (times loc))) lang) e th0 th1.
+      exists (times: Loc.t -> list Time.t),
+        (<<WFTIME: wf_time_evt (fun loc to => List.In to (times loc)) e>>).
   Proof.
-    inv STEPS. destruct e.
+    destruct e.
     - exists (fun l => if Loc.eq_dec l loc then
                          [from; to] else []).
       econs; eauto.
-      ss. splits; auto; des_ifs; ss; eauto.
-    - exists (fun _ => []). econs; eauto. ss.
-    - exists (fun _ => []). econs; eauto. ss.
+      + ss. splits; auto; des_ifs; ss; eauto.
+      + ss. splits; auto; des_ifs; ss; eauto.
+    - exists (fun _ => []). econs; eauto.
+    - exists (fun _ => []). econs; eauto.
     - exists (fun l => if Loc.eq_dec l loc then
                          [from; to] else []).
       econs; eauto.
-      ss. splits; auto; des_ifs; ss; eauto.
+      + ss. splits; auto; des_ifs; ss; eauto.
+      + ss. splits; auto; des_ifs; ss; eauto.
     - exists (fun l => if Loc.eq_dec l loc then
-                         [tsw] else []).
+                         [tsr; tsw] else []).
       econs; eauto.
-      ss. splits; auto; des_ifs; ss; eauto.
-    - exists (fun _ => []). econs; eauto. ss.
-    - exists (fun _ => []). econs; eauto. ss.
-    - exists (fun _ => []). econs; eauto. ss.
+      + ss. splits; auto; des_ifs; ss; eauto.
+      + ss. splits; auto; des_ifs; ss; eauto.
+    - exists (fun _ => []). econs; eauto.
+    - exists (fun _ => []). econs; eauto.
+    - exists (fun _ => []). econs; eauto.
   Qed.
 
-  Lemma times_list_exists P lang th0 th1
-        (STEPS: rtc (tau (@pred_step P lang)) th0 th1)
+  Lemma traced_times_list_exists lang (th0 th1: Thread.t lang) tr
+        (STEPS: traced_step tr th0 th1)
     :
-      exists times,
-        rtc (tau (@pred_step (P /1\ wf_time_evt (fun loc to => List.In to (times loc))) lang)) th0 th1.
+      exists (times: Loc.t -> list Time.t),
+        (<<WFTIME: List.Forall (fun em => wf_time_evt (fun loc to => List.In to (times loc)) (fst em)) tr>>).
   Proof.
     ginduction STEPS.
-    - exists (fun _ => []). refl.
-    - dup H. inv H0.
-      eapply step_times_list_exists in TSTEP. des.
-      exists (fun loc => times loc ++ times0 loc). econs 2.
-      + econs; eauto. eapply pred_step_mon; eauto.
-        i. ss. des. split; auto.
-        eapply wf_time_evt_mon; eauto.
+    - exists (fun _ => []). econs.
+    - des. eapply step_times_list_exists in HD. des.
+      exists (fun loc => (times0 loc ++ times loc)). econs.
+      + eapply wf_time_evt_mon; eauto.
         i. ss. eapply List.in_or_app; eauto.
-      + eapply pred_step_rtc_mon; eauto.
-        i. ss. des. split; auto.
-        eapply wf_time_evt_mon; eauto.
+      + eapply List.Forall_impl; eauto.
+        i. ss. eapply wf_time_evt_mon; eauto.
         i. ss. eapply List.in_or_app; eauto.
   Qed.
 
