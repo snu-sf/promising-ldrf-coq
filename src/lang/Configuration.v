@@ -66,6 +66,11 @@ Module Threads.
       + ii. rewrite Memory.bot_get in GET. congr.
   Qed.
 
+  Definition consistent (ths:t) (sc:TimeMap.t) (mem:Memory.t): Prop :=
+    forall tid lang st lc
+      (TH: IdentMap.find tid ths = Some (existT _ lang st, lc)),
+      Thread.consistent (Thread.mk lang st lc sc mem).
+
   Lemma terminal_consistent
         ths sc mem
         tid lang st lc
@@ -176,6 +181,14 @@ Module Configuration.
     - apply Memory.init_closed.
   Qed.
 
+  Definition consistent (c: t): Prop :=
+    Threads.consistent c.(threads) c.(sc) c.(memory).
+
+  Definition no_promise (c: t): Prop :=
+    forall tid lang st lc (FIND: IdentMap.find tid c.(threads) = Some (existT _ lang st, lc)),
+      lc.(Local.promises) = Memory.bot.
+
+
   Inductive step: forall (e:MachineEvent.t) (tid:Ident.t) (c1 c2:t), Prop :=
   | step_failure
       pf tid c1 lang st1 lc1 e2 st3 lc3 sc3 memory3
@@ -192,6 +205,14 @@ Module Configuration.
       (CONSISTENT: Thread.consistent (Thread.mk _ st3 lc3 sc3 memory3)):
       step (ThreadEvent.get_machine_event e) tid c1 (mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(threads)) sc3 memory3)
   .
+
+  Inductive normal_step (c1 c2: t): Prop :=
+  | normal_step_intro
+      e tid
+      (STEP: step e tid c1 c2)
+      (EVENT: e <> MachineEvent.failure)
+  .
+  Hint Constructors normal_step.
 
   Inductive all_step (c1 c2: t): Prop :=
   | all_step_intro
@@ -334,9 +355,63 @@ Module Configuration.
     - eapply step_future; eauto.
   Qed.
 
+  Lemma normal_step_future
+        c1 c2
+        (STEP: normal_step c1 c2)
+        (WF1: wf c1):
+    <<WF2: wf c2>> /\
+    <<SC_FUTURE: TimeMap.le c1.(sc) c2.(sc)>> /\
+    <<MEM_FUTURE: Memory.future c1.(memory) c2.(memory)>>.
+  Proof.
+    inv STEP. eauto using step_future.
+  Qed.
+
+  Lemma all_step_future
+        c1 c2
+        (STEP: all_step c1 c2)
+        (WF1: wf c1):
+    <<WF2: wf c2>> /\
+    <<SC_FUTURE: TimeMap.le c1.(sc) c2.(sc)>> /\
+    <<MEM_FUTURE: Memory.future c1.(memory) c2.(memory)>>.
+  Proof.
+    inv STEP. eauto using step_future.
+  Qed.
+
   Lemma rtc_step_future
         c1 c2
         (STEPS: rtc tau_step c1 c2)
+        (WF1: wf c1):
+    <<WF2: wf c2>> /\
+    <<SC_FUTURE: TimeMap.le c1.(sc) c2.(sc)>> /\
+    <<MEM_FUTURE: Memory.future c1.(memory) c2.(memory)>>.
+  Proof.
+    induction STEPS; i.
+    - splits; auto; refl.
+    - inv H.
+      exploit step_future; eauto. i. des.
+      exploit IHSTEPS; eauto. i. des.
+      splits; eauto; etrans; eauto.
+  Qed.
+
+  Lemma rtc_normal_step_future
+        c1 c2
+        (STEPS: rtc normal_step c1 c2)
+        (WF1: wf c1):
+    <<WF2: wf c2>> /\
+    <<SC_FUTURE: TimeMap.le c1.(sc) c2.(sc)>> /\
+    <<MEM_FUTURE: Memory.future c1.(memory) c2.(memory)>>.
+  Proof.
+    induction STEPS; i.
+    - splits; auto; refl.
+    - inv H.
+      exploit step_future; eauto. i. des.
+      exploit IHSTEPS; eauto. i. des.
+      splits; eauto; etrans; eauto.
+  Qed.
+
+  Lemma rtc_all_step_future
+        c1 c2
+        (STEPS: rtc all_step c1 c2)
         (WF1: wf c1):
     <<WF2: wf c2>> /\
     <<SC_FUTURE: TimeMap.le c1.(sc) c2.(sc)>> /\

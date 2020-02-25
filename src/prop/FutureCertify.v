@@ -143,7 +143,7 @@ Module FutureCertify.
       - ii. specialize (FSPEC loc). des. eapply COMPLETE; ss; eauto.
     Qed.
 
-    Definition future_consistent lang (e:Thread.t lang): Prop :=
+    Definition future_certify lang (e:Thread.t lang): Prop :=
       forall sc1 mem1
         (FUTURE: Memory.future_weak e.(Thread.memory) mem1)
         (FUTURE: TimeMap.le e.(Thread.sc) sc1)
@@ -155,13 +155,13 @@ Module FutureCertify.
           (<<STEPS: rtc (@Thread.tau_step lang) (Thread.mk lang e.(Thread.state) e.(Thread.local) sc1 mem1) e2>>) /\
           (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>).
 
-    Lemma future_certify
+    Lemma future_certify_exists
           e
           (LOCAL: Local.wf e.(Thread.local) e.(Thread.memory))
           (MEMORY: Memory.closed e.(Thread.memory))
           (SC: Memory.closed_timemap e.(Thread.sc) e.(Thread.memory))
           (CONSISTENT: @Thread.consistent lang e):
-      future_consistent e.
+      future_certify e.
     Proof.
       eapply consistent_pf_consistent in CONSISTENT; eauto.
       eapply pf_consistent_pf_consistent_strong in CONSISTENT; eauto.
@@ -238,7 +238,7 @@ Module FutureCertify.
           destruct a, x. ss. inv EVENT; auto.
     Qed.
 
-    Lemma future_sconsistent
+    Lemma future_consistent
           e sc' mem'
           (LOCAL: Local.wf e.(Thread.local) e.(Thread.memory))
           (MEMORY: Memory.closed e.(Thread.memory))
@@ -252,7 +252,7 @@ Module FutureCertify.
       Thread.consistent (Thread.mk lang e.(Thread.state) e.(Thread.local) sc' mem').
     Proof.
       ii. ss.
-      eapply future_certify; try exact CONSISTENT; eauto.
+      eapply future_certify_exists; try exact CONSISTENT; eauto.
       - etrans; eauto. eapply Memory.cap_future_weak; eauto.
       - etrans; eauto.
         hexploit Memory.cap_closed_timemap; try exact SC'; eauto. i.
