@@ -146,7 +146,7 @@ Module CompressSteps.
         + eauto.
         + refl.
     Qed.
-    
+
     Lemma compress_steps_fulfill
           e1_src e1_tgt
           e2_tgt
@@ -190,6 +190,5 @@ Module CompressSteps.
       - ss. inv LOCAL. rewrite PROMISES_TGT in *.
         eapply bot_promises_map; eauto.
     Qed.
-
   End CompressSteps.
 End CompressSteps.

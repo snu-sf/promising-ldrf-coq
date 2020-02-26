@@ -769,7 +769,6 @@ Module Cell.
   Qed.
 
 
-  (* TODO *)
   (* min_concrete_ts *)
 
   Inductive min_concrete_ts (cell: t) (ts: Time.t): Prop :=
