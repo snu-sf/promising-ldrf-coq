@@ -7,6 +7,7 @@ COQTHEORIES  := \
 	src/invariant/*.v \
 	src/gopt/*.v \
 	src/promotion/*.v \
+	src/localdrf/*.v \
 #	src/pf/*.v \
 #	src/drf/*.v
 
@@ -28,6 +29,7 @@ Makefile.coq: Makefile $(COQTHEORIES)
    echo "-R src/invariant $(COQMODULE)"; \
    echo "-R src/gopt $(COQMODULE)"; \
    echo "-R src/promotion $(COQMODULE)"; \
+   echo "-R src/localdrf $(COQMODULE)"; \
 #   echo "-R src/pf $(COQMODULE)"; \
 #   echo "-R src/drf $(COQMODULE)"; \
    \
