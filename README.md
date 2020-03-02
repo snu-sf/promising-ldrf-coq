@@ -1,4 +1,11 @@
-# Promising 2.0
+# Promising 2.0: Global Optimizations in Relaxed Memory Concurrency (Stronger Model)
+
+Sung-Hwan Lee, Minki Cho, Anton Podkopaev, Soham Chakraborty, Chung-Kil Hur, Ori Lahav, Viktor Vafeiadis.
+
+Proceedings of the 41st annual ACM SIGPLAN conference on Programming Languages Design and Implementation ([PLDI 2020](https://conf.researchr.org/home/pldi-2020))
+
+Please visit the [project website](https://sf.snu.ac.kr/promising2.0/) for more information.
+
 
 ## Build
 
@@ -30,7 +37,7 @@
     + `Local.v`, `Thread.v`: thread and its execution
       (`PROMISE`, `RESERVE`, `CANCEL`, `READ`, `WRITE`, `UPDATE`, `FENCE`, `SYSTEM CALL`, `SILENT`, `FAILURE` rules in Figure 2 and 4,
        note that `PROMISE`, `RESERVE`, and `CANCEL` is covered by one operation, `promise_step`)
-    + `Configuration.v`: configuration (machine state) and its execution (`MACHINE STEP` rule in Figure 2 and 3)
+    + `Configuration.v`: configuration (machine state) and its execution (`MACHINE STEP` rule in Figure 2 and 4)
     + `Behavior.v`: the behaviors of a configuration
 
 - `promising2/src/pf`: Definition of promise-free machine
@@ -74,3 +81,6 @@
 
 - `promising2/src/attachable`
     + Equivalence between PF and promise-free fragment of PS (Theorem 6.4): `apf_pf_equiv`, `apf_pf_equiv2` (`APFPF.v`)
+
+- `promising2/src/drf`: DRF theorems (Section 6.4)
+    + DRF-Promise (Theorem 6.5): `drf_pf` (`DRF_PF.v`)
