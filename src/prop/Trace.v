@@ -27,9 +27,9 @@ Set Implicit Arguments.
 
 Module Trace.
 
-  Definition t := list ThreadEvent.t.
+  Definition t lang := list (Thread.t lang * ThreadEvent.t).
 
-  Inductive steps lang: forall (tr: list ThreadEvent.t) (th0 th1: Thread.t lang), Prop :=
+  Inductive steps lang: forall (tr: t lang) (th0 th1: Thread.t lang), Prop :=
   | steps_refl
       th0
     :
@@ -38,7 +38,7 @@ Module Trace.
       tr tr' th0 th1 th2 pf e
       (STEP: Thread.step pf e th0 th1)
       (STEPS: steps tr th1 th2)
-      (TR: tr' = e :: tr)
+      (TR: tr' = (th0, e) :: tr)
     :
       steps tr' th0 th2
   .
@@ -46,7 +46,7 @@ Module Trace.
 
   Lemma silent_steps_tau_steps lang tr (th0 th1: Thread.t lang)
         (STEPS: steps tr th0 th1)
-        (SILENT: List.Forall (fun e => ThreadEvent.get_machine_event e = MachineEvent.silent) tr)
+        (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr)
     :
       rtc (Thread.tau_step (lang:=lang)) th0 th1.
   Proof.
@@ -60,20 +60,20 @@ Module Trace.
     :
       exists tr,
         (<<STEPS: steps tr th0 th1>>) /\
-        (<<SILENT: List.Forall (fun e => ThreadEvent.get_machine_event e = MachineEvent.silent) tr>>).
+        (<<SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr>>).
   Proof.
     ginduction STEPS; eauto. inv H. inv TSTEP. des.
-    exists (e::tr). splits; eauto.
+    exists ((x, e)::tr). splits; eauto.
   Qed.
 
-  Inductive configuration_step: forall (tr: list ThreadEvent.t) (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
+  Inductive configuration_step: forall lang (tr: t lang) (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
   | step_intro
-      tr e tr' pf tid c1 lang st1 lc1 e2 st3 lc3 sc3 memory3
+      lang tr e tr' pf tid c1 st1 lc1 e2 st3 lc3 sc3 memory3
       (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
       (STEPS: steps tr (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
-      (SILENT: List.Forall (fun e => ThreadEvent.get_machine_event e = MachineEvent.silent) tr)
+      (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr)
       (STEP: Thread.step pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
-      (TR: tr' = tr++[e])
+      (TR: tr' = tr++[(e2, e)])
       (CONSISTENT: forall (EVENT: e <> ThreadEvent.failure),
           Thread.consistent (Thread.mk _ st3 lc3 sc3 memory3))
     :
