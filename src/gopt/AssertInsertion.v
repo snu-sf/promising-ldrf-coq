@@ -482,70 +482,38 @@ Section AssertInsertion.
         exploit (@sim_thread_rtc_tau_step tid (Thread.mk lang state lc3 sc0 mem0));
           try exact STEPS0; try by (econs; eauto).
         i. des; cycle 1.
-        { (* exfalso. *)
-          (* exploit Thread.tau_opt_all; try exact STEPS_SRC; eauto. i. *)
-          (* exploit (@PFStep.sim_thread_exists lang (Thread.mk lang st_src lc_src sc1 mem1)); ss; eauto. i. des. *)
-          (* exploit PFStep.thread_rtc_all_step; try exact x2; eauto. *)
-          (* { hexploit consistent_promise_consistent; eauto. } *)
-          (* i. des. *)
-          (* exploit PFCertify.cap_sim_thread_exists; try exact SIM4; eauto. s. i. des. *)
-          (* exploit PFStep.thread_rtc_tau_step; try exact STEPS_SRC0; eauto. *)
-          (* { exploit Thread.rtc_tau_step_future; try exact STEPS1_TGT; eauto. s. i. des. *)
-          (*   inv SIM1. rewrite LOCAL. *)
-          (*   eapply rtc_tau_step_promise_consistent; eauto. *)
-          (*   inv FAILURE0; inv STEP0. inv LOCAL0. inv LOCAL1. ss. } *)
-          (* i. des. *)
-          (* inv SEM. ss. exploit TH; eauto. i. *)
-          (* exploit rtc_all_aprogram_step_sem; try exact STEPS_SRC; eauto. *)
-          (* { inv SIM3. ss. rewrite STATE0. eauto. } *)
-          (* { eapply vals_incl_sem_memory; eauto. *)
-          (*   eapply PFStep.sim_memory_vals_incl; try eapply SIM3. } *)
-          (* { eapply PFStep.sim_memory_inhabited; try eapply SIM3; ss. *)
-          (*   - apply WF1_SRC. *)
-          (*   - apply MEM. } *)
-          (* i. des. *)
-          (* exploit rtc_tau_aprogram_step_sem; try exact STEPS_SRC2; eauto; s. *)
-          (* { eapply vals_incl_sem_memory; eauto. } *)
-          (* { eapply PFStep.sim_memory_inhabited; try eapply SIM5. *)
-          (*   - apply WF0. *)
-          (*   - eapply Memory.cap_closed; eauto. } *)
-          (* i. des. *)
-          (* inv SIM6. rewrite STATE0 in *. *)
-          (* eapply ASSERT; eauto. *)
-          admit.
+        { exfalso.
+          exploit (@FutureCertify.cap_steps_current_steps lang (Thread.mk lang state lc3 sc3 memory3));
+            try exact STEPS_SRC0; eauto.
+          { exploit Thread.rtc_tau_step_future; try exact STEPS1_TGT; eauto. s. i. des.
+            inv SIM1. rewrite LOCAL.
+            eapply rtc_tau_step_promise_consistent; eauto.
+            inv FAILURE0; inv STEP0. inv LOCAL0. inv LOCAL1. ss. }
+          i. des.
+          exploit Thread.tau_opt_all; try exact STEPS_SRC; eauto. i.
+          exploit rtc_implies; try eapply STEPS1; i; [|erewrite x2 in x1].
+          { inv H. econs. eauto. }
+          exploit steps_pf_steps_state; try exact x1; eauto. i. des.
+          inv SEM. ss. exploit TH; eauto. i.
+          exploit rtc_thread_step_sem; try exact STEPS2; eauto. i. des.
+          rewrite STATE0 in *. eapply ASSERT; eauto.
         }
         exploit sim_thread_step; try exact SIM1; eauto. i. des; cycle 1.
         { exfalso.
-          (* exploit Thread.tau_opt_all; try exact STEPS_SRC; eauto. i. *)
-          (* exploit (@PFStep.sim_thread_exists lang (Thread.mk lang st_src lc_src sc1 mem1)); ss; eauto. i. des. *)
-          (* exploit PFStep.thread_rtc_all_step; try exact x2; eauto. *)
-          (* { hexploit consistent_promise_consistent; eauto. } *)
-          (* i. des. *)
-          (* exploit PFCertify.cap_sim_thread_exists; try exact SIM4; eauto. s. i. des. *)
-          (* exploit PFStep.thread_rtc_tau_step; try exact STEPS_SRC0; eauto. *)
-          (* { exploit Thread.rtc_tau_step_future; try exact STEPS0; eauto. s. i. des. *)
-          (*   inv SIM1. rewrite LOCAL. *)
-          (*   eapply rtc_tau_step_promise_consistent; eauto. *)
-          (*   inv FAILURE0; inv STEP0. inv LOCAL0. inv LOCAL1. ss. } *)
-          (* i. des. *)
-          (* inv SEM. ss. exploit TH; eauto. i. *)
-          (* exploit rtc_all_aprogram_step_sem; try exact STEPS_SRC; eauto. *)
-          (* { inv SIM3. ss. rewrite STATE0. eauto. } *)
-          (* { eapply vals_incl_sem_memory; eauto. *)
-          (*   eapply PFStep.sim_memory_vals_incl; try eapply SIM3. } *)
-          (* { eapply PFStep.sim_memory_inhabited; try eapply SIM3; ss. *)
-          (*   - apply WF1_SRC. *)
-          (*   - apply MEM. } *)
-          (* i. des. *)
-          (* exploit rtc_tau_aprogram_step_sem; try exact STEPS_SRC2; eauto; s. *)
-          (* { eapply vals_incl_sem_memory; eauto. } *)
-          (* { eapply PFStep.sim_memory_inhabited; try eapply SIM5. *)
-          (*   - apply WF0. *)
-          (*   - eapply Memory.cap_closed; eauto. } *)
-          (* i. des. *)
-          (* inv SIM6. rewrite STATE0 in *. *)
-          (* eapply ASSERT; eauto. *)
-          admit.
+          exploit (@FutureCertify.cap_steps_current_steps lang (Thread.mk lang state lc3 sc3 memory3));
+            try exact STEPS_SRC0; eauto.
+          { exploit Thread.rtc_tau_step_future; try exact STEPS0; eauto. s. i. des.
+            inv SIM1. rewrite LOCAL.
+            eapply rtc_tau_step_promise_consistent; eauto.
+            inv FAILURE0; inv STEP0. inv LOCAL0. inv LOCAL1. ss. }
+          i. des.
+          exploit Thread.tau_opt_all; try exact STEPS_SRC; eauto. i.
+          exploit rtc_implies; try eapply STEPS1; i; [|erewrite x2 in x1].
+          { inv H. econs. eauto. }
+          exploit steps_pf_steps_state; try exact x1; eauto. i. des.
+          inv SEM. ss. exploit TH; eauto. i.
+          exploit rtc_thread_step_sem; try exact STEPS2; eauto. i. des.
+          rewrite STATE0 in *. eapply ASSERT; eauto.
         }
         inv STEP_SRC0. destruct pf0; try by (inv STEP0; inv STEP1).
         esplits; eauto.
@@ -555,36 +523,20 @@ Section AssertInsertion.
           try exact STEPS0; try by (econs; eauto).
         i. des; cycle 1.
         { exfalso.
-          (* exploit Thread.tau_opt_all; try exact STEPS_SRC; eauto. i. *)
-          (* exploit (@PFStep.sim_thread_exists lang (Thread.mk lang st_src lc_src sc1 mem1)); ss; eauto. i. des. *)
-          (* exploit PFStep.thread_rtc_all_step; try exact x2; eauto. *)
-          (* { hexploit consistent_promise_consistent; eauto. } *)
-          (* i. des. *)
-          (* exploit PFCertify.cap_sim_thread_exists; try exact SIM4; eauto. s. i. des. *)
-          (* exploit PFStep.thread_rtc_tau_step; try exact STEPS_SRC0; eauto. *)
-          (* { exploit Thread.rtc_tau_step_future; try exact STEPS1_TGT; eauto. s. i. des. *)
-          (*   inv SIM1. rewrite LOCAL. *)
-          (*   eapply rtc_tau_step_promise_consistent; eauto. *)
-          (*   eapply Local.bot_promise_consistent; eauto. } *)
-          (* i. des. *)
-          (* inv SEM. ss. exploit TH; eauto. i. *)
-          (* exploit rtc_all_aprogram_step_sem; try exact STEPS_SRC; eauto. *)
-          (* { inv SIM3. ss. rewrite STATE0. eauto. } *)
-          (* { eapply vals_incl_sem_memory; eauto. *)
-          (*   eapply PFStep.sim_memory_vals_incl; try eapply SIM3. } *)
-          (* { eapply PFStep.sim_memory_inhabited; try eapply SIM3; ss. *)
-          (*   - apply WF1_SRC. *)
-          (*   - apply MEM. } *)
-          (* i. des. *)
-          (* exploit rtc_tau_aprogram_step_sem; try exact STEPS_SRC2; eauto; s. *)
-          (* { eapply vals_incl_sem_memory; eauto. } *)
-          (* { eapply PFStep.sim_memory_inhabited; try eapply SIM5. *)
-          (*   - apply WF0. *)
-          (*   - eapply Memory.cap_closed; eauto. } *)
-          (* i. des. *)
-          (* inv SIM6. rewrite STATE0 in *. *)
-          (* eapply ASSERT; eauto. *)
-          admit.
+          exploit (@FutureCertify.cap_steps_current_steps lang (Thread.mk lang state lc3 sc3 memory3));
+            try exact STEPS_SRC0; eauto.
+          { exploit Thread.rtc_tau_step_future; try exact STEPS1_TGT; eauto. s. i. des.
+            inv SIM1. rewrite LOCAL.
+            eapply rtc_tau_step_promise_consistent; eauto.
+            ii. rewrite PROMISES in *. rewrite Memory.bot_get in *. ss. }
+          i. des.
+          exploit Thread.tau_opt_all; try exact STEPS_SRC; eauto. i.
+          exploit rtc_implies; try eapply STEPS1; i; [|erewrite x2 in x1].
+          { inv H. econs. eauto. }
+          exploit steps_pf_steps_state; try exact x1; eauto. i. des.
+          inv SEM. ss. exploit TH; eauto. i.
+          exploit rtc_thread_step_sem; try exact STEPS2; eauto. i. des.
+          rewrite STATE0 in *. eapply ASSERT; eauto.
         }
         esplits; eauto.
         inv SIM1. rewrite LOCAL. ss.
@@ -630,7 +582,7 @@ Section AssertInsertion.
         Configuration.simplify2. inv SIM0. ss.
       + revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i.
         inv SIM. eauto.
-  Admitted.
+  Qed.
 
 
   (* assert insertion *)
