@@ -86,7 +86,7 @@ Proof.
   { des.
     - exploit Thread.rtc_tau_step_future.
       + eapply rtc_implies; [|apply STEPS].
-        i. inv PR. econs; eauto. econs; eauto.
+        i. inv H. econs; eauto. econs; eauto.
       + ss. eapply Local.cap_wf; eauto.
       + ss. eapply Memory.max_concrete_timemap_closed; eauto.
       + ss. eapply Memory.cap_closed; eauto.
@@ -97,7 +97,7 @@ Proof.
         * etrans.
           { eapply STEPS. }
           { eapply rtc_implies; [|apply STEPS0].
-            i. inv PR. inv TSTEP. inv STEP.
+            i. inv H. inv TSTEP. inv STEP.
             unfold is_cancel in SAT. des_ifs.
             inv STEP0; inv STEP.
             - econs; eauto. econs; eauto. econs; eauto.
