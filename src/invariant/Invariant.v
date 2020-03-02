@@ -22,15 +22,8 @@ Require Import Thread.
 Require Import Configuration.
 
 Require Import PromiseConsistent.
-
-Require Import AMemory.
-Require Import ALocal.
-Require Import ATView.
-Require Import AThread.
-
-Require Import PFCommon.
-Require Import PFStep.
-Require Import PFCertify.
+Require Import ReorderPromises.
+Require Import FutureCertify.
 
 Set Implicit Arguments.
 
@@ -140,22 +133,12 @@ Section Invariant.
       (MEM: sem_memory c.(Configuration.memory))
   .
 
-  Lemma vals_incl_sem_memory
-        mem1 mem2
-        (VALS: PFCommon.vals_incl mem1 mem2)
-        (MEM2: sem_memory mem2):
-    sem_memory mem1.
-  Proof.
-    ii. apply MEM2. ii. specialize (PR loc). des.
-    exploit VALS; eauto.
-  Qed.
-
 
   (* sem_memory_step *)
 
   Lemma sem_memory_read_step
         lc1 mem1 loc to val released ord lc2
-        (INHABITED: Memory.inhabited mem1)
+        (CLOSED: Memory.closed mem1)
         (STEP: Local.read_step lc1 mem1 loc to val released ord lc2)
         (SEM: sem_memory mem1):
     exists assign,
@@ -167,16 +150,16 @@ Section Invariant.
       destruct (Loc.eq_dec loc loc0).
       + subst. rewrite LocFun.add_spec_eq.
         inv STEP. esplits; eauto.
-      + rewrite LocFun.add_spec_neq, LocFun.init_spec.
-        specialize (INHABITED loc0).
-        esplits; eauto. congr.
+      + rewrite LocFun.add_spec_neq, LocFun.init_spec; eauto.
+        inv CLOSED. specialize (INHABITED loc0).
+        esplits; eauto.
     - apply LocFun.add_spec_eq.
   Qed.
 
   Lemma sem_memory_write_step_eq
         lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
         assign
-        (INHABITED: Memory.inhabited mem1)
+        (CLOSED: Memory.closed mem1)
         (STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
         (SEM: memory_assign mem2 assign)
         (LOC: LocFun.find loc assign = val):
@@ -188,7 +171,7 @@ Section Invariant.
     - rewrite LocFun.add_add_eq. apply LocFun.ext. i.
       rewrite LocFun.add_spec. condtac; subst; ss.
     - ii. rewrite LocFun.add_spec. condtac.
-      { specialize (INHABITED loc0). esplits; eauto. }
+      { inv CLOSED. specialize (INHABITED loc). esplits; eauto. }
       specialize (SEM loc0). des. revert SEM.
       inv STEP. inv WRITE. inv PROMISE; ss.
       + erewrite Memory.add_o; eauto. condtac; ss.
@@ -230,25 +213,38 @@ Section Invariant.
       + i. esplits; eauto.
   Qed.
 
-  Lemma program_step_sem
+  Lemma thread_step_sem
         tid lang e
         st1 lc1 sc1 mem1
         st2 lc2 sc2 mem2
         (TH1: S tid lang st1)
         (MEM1: sem_memory mem1)
-        (INHABITED1: Memory.inhabited mem1)
-        (STEP: Thread.program_step e (Thread.mk lang st1 lc1 sc1 mem1) (Thread.mk lang st2 lc2 sc2 mem2)):
+        (CLOSED1: Memory.closed mem1)
+        (STEP: Thread.step true e (Thread.mk lang st1 lc1 sc1 mem1) (Thread.mk lang st2 lc2 sc2 mem2)):
     <<TH2: S tid lang st2>> /\
     <<MEM2: sem_memory mem2>>.
   Proof.
-    inv LOGIC. inv STEP. inv LOCAL.
+    inv STEP.
+    { inv STEP0. symmetry in PF.
+      destruct kind; ss.
+      - destruct msg1; ss. destruct msg; ss. destruct released0; ss.
+        splits; ss. inv LOCAL. inv PROMISE. des. inv RESERVE.
+        ii. apply MEM1. ii. specialize (PR loc0). des.
+        revert PR. erewrite Memory.lower_o; eauto. condtac; eauto.
+        ss. i. des. inv PR. exploit Memory.lower_get0; eauto. i. des.
+        inv MSG_LE. eauto.
+      - inv LOCAL. inv PROMISE. splits; ss. ii.
+        apply MEM1. ii. specialize (PR loc0). des.
+        revert PR. erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+    }
+    inv LOGIC. inv STEP0. inv LOCAL.
     - esplits; eauto.
     - exploit sem_memory_read_step; eauto. i. des.
       exploit READ; eauto.
     - exploit WRITE; eauto. i. des.
       esplits; eauto. ii.
       destruct (Const.eq_dec (LocFun.find loc x0) val).
-      { subst. hexploit sem_memory_write_step_eq; eauto. i. des.
+      { subst. hexploit sem_memory_write_step_eq; try apply CLOSED1; eauto. i. des.
         rewrite H0. eauto.
       }
       { hexploit sem_memory_write_step_neq; eauto. }
@@ -262,176 +258,48 @@ Section Invariant.
       { hexploit sem_memory_write_step_neq; eauto. }
     - exploit FENCE; eauto.
     - exploit SYSCALL; eauto.
-    - exploit FAILURE; eauto. i. des.
-      esplits; eauto.
+    - exploit FAILURE; eauto. i. des. eauto.
   Qed.
 
-  Lemma rtc_all_program_step_sem
+  Lemma rtc_thread_step_sem
         tid lang
         th1 th2
         (TH1: S tid lang th1.(Thread.state))
         (MEM1: sem_memory th1.(Thread.memory))
-        (INHABITED1: Memory.inhabited th1.(Thread.memory))
-        (STEP: rtc (union (@Thread.program_step lang)) th1 th2):
+        (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
+        (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory))
+        (CLOSED1: Memory.closed th1.(Thread.memory))
+        (STEPS: rtc (union (Thread.step true)) th1 th2):
     <<TH2: S tid lang th2.(Thread.state)>> /\
     <<MEM2: sem_memory th2.(Thread.memory)>>.
   Proof.
-    move STEP after TH1. revert_until STEP. induction STEP; ss.
+    move STEPS after TH1. revert_until STEPS. induction STEPS; ss.
     i. inv H.
+    exploit Thread.step_future; eauto. i. des.
     destruct x, y. ss.
-    exploit program_step_sem; eauto. i. des.
-    eapply IHSTEP; eauto.
-    hexploit Thread.program_step_inhabited; eauto.
+    exploit thread_step_sem; eauto. i. des.
+    eapply IHSTEPS; eauto.
   Qed.
 
-  Lemma rtc_tau_program_step_sem
+  Lemma rtc_thread_step_sem_thread
         tid lang
         th1 th2
         (TH1: S tid lang th1.(Thread.state))
         (MEM1: sem_memory th1.(Thread.memory))
-        (INHABITED1: Memory.inhabited th1.(Thread.memory))
-        (STEP: rtc (tau (@Thread.program_step lang)) th1 th2):
-    <<TH2: S tid lang th2.(Thread.state)>> /\
-    <<MEM2: sem_memory th2.(Thread.memory)>>.
+        (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
+        (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory))
+        (CLOSED1: Memory.closed th1.(Thread.memory))
+        (STEPS: rtc (@Thread.all_step lang) th1 th2)
+        (CONS: Local.promise_consistent th2.(Thread.local)):
+    <<TH2: S tid lang th2.(Thread.state)>>.
   Proof.
-    move STEP after TH1. revert_until STEP. induction STEP; ss.
-    i. inv H.
-    destruct x, y. ss.
-    exploit program_step_sem; eauto. i. des.
-    eapply IHSTEP; eauto.
-    hexploit Thread.program_step_inhabited; eauto.
-  Qed.
-
-
-  (* sem_memory_astep *)
-
-  Lemma sem_memory_awrite_step_eq
-        lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
-        assign
-        (INHABITED: Memory.inhabited mem1)
-        (STEP: ALocal.write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
-        (SEM: memory_assign mem2 assign)
-        (LOC: LocFun.find loc assign = val):
-    exists assign0,
-      memory_assign mem1 assign0 /\
-      assign = LocFun.add loc val assign0.
-  Proof.
-    exists (LocFun.add loc 0 assign). splits; cycle 1.
-    - rewrite LocFun.add_add_eq. apply LocFun.ext. i.
-      rewrite LocFun.add_spec. condtac; subst; ss.
-    - ii. rewrite LocFun.add_spec. condtac.
-      { specialize (INHABITED loc0). esplits; eauto. }
-      specialize (SEM loc0). des. revert SEM.
-      inv STEP. inv WRITE. inv PROMISE; ss.
-      + erewrite Memory.add_o; eauto. condtac; ss.
-        * i. des. inv SEM. congr.
-        * i. esplits; eauto.
-      + erewrite Memory.split_o; eauto. condtac; ss.
-        { i. des. inv SEM. congr. }
-        condtac; ss.
-        { guardH o. des. subst. congr. }
-        i. esplits; eauto.
-      + erewrite Memory.lower_o; eauto. condtac; ss.
-        * i. des. inv SEM. congr.
-        * i. esplits; eauto.
-  Qed.
-
-  Lemma sem_memory_awrite_step_neq
-        lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
-        assign
-        (STEP: ALocal.write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
-        (SEM: memory_assign mem2 assign)
-        (LOC: LocFun.find loc assign <> val):
-    memory_assign mem1 assign.
-  Proof.
-    ii. specialize (SEM loc0). des. revert SEM.
-    inv STEP. inv WRITE. inv PROMISE; ss.
-    - erewrite Memory.add_o; eauto. condtac; ss.
-      + i. des. inv SEM. congr.
-      + i. esplits; eauto.
-    - erewrite Memory.split_o; eauto. condtac; ss.
-      { i. des. inv SEM. congr. }
-      condtac; ss.
-      { guardH o. i. des. inv SEM.
-        exploit Memory.split_get0; try exact MEM; eauto. i. des.
-        esplits; eauto.
-      }
-      i. esplits; eauto.
-    - erewrite Memory.lower_o; eauto. condtac; ss.
-      + i. des. inv SEM. congr.
-      + i. esplits; eauto.
-  Qed.
-
-  Lemma aprogram_step_sem
-        tid lang e
-        st1 lc1 sc1 mem1
-        st2 lc2 sc2 mem2
-        (TH1: S tid lang st1)
-        (MEM1: sem_memory mem1)
-        (INHABITED1: Memory.inhabited mem1)
-        (STEP: AThread.program_step e (Thread.mk lang st1 lc1 sc1 mem1) (Thread.mk lang st2 lc2 sc2 mem2)):
-    <<TH2: S tid lang st2>> /\
-    <<MEM2: sem_memory mem2>>.
-  Proof.
-    inv LOGIC. inv STEP. inv LOCAL.
-    - esplits; eauto.
-    - exploit sem_memory_read_step; eauto. i. des.
-      exploit READ; eauto.
-    - exploit WRITE; eauto. i. des.
-      esplits; eauto. ii.
-      destruct (Const.eq_dec (LocFun.find loc x0) val).
-      { subst. hexploit sem_memory_awrite_step_eq; eauto. i. des.
-        rewrite H0. eauto.
-      }
-      { hexploit sem_memory_awrite_step_neq; eauto. }
-    - exploit sem_memory_read_step; eauto. i. des.
-      exploit UPDATE; eauto. i. des.
-      esplits; eauto. ii.
-      destruct (Const.eq_dec (LocFun.find loc x2) valw).
-      { subst. hexploit sem_memory_awrite_step_eq; eauto. i. des.
-        rewrite H0. eauto.
-      }
-      { hexploit sem_memory_awrite_step_neq; eauto. }
-    - exploit FENCE; eauto.
-    - exploit SYSCALL; eauto.
-    - exploit FAILURE; eauto. i. des.
-      esplits; eauto.
-  Qed.
-
-  Lemma rtc_all_aprogram_step_sem
-        tid lang
-        th1 th2
-        (TH1: S tid lang th1.(Thread.state))
-        (MEM1: sem_memory th1.(Thread.memory))
-        (INHABITED1: Memory.inhabited th1.(Thread.memory))
-        (STEP: rtc (union (@AThread.program_step lang)) th1 th2):
-    <<TH2: S tid lang th2.(Thread.state)>> /\
-    <<MEM2: sem_memory th2.(Thread.memory)>>.
-  Proof.
-    move STEP after TH1. revert_until STEP. induction STEP; ss.
-    i. inv H.
-    destruct x, y. ss.
-    exploit aprogram_step_sem; eauto. i. des.
-    eapply IHSTEP; eauto.
-    hexploit AThread.program_step_inhabited; eauto.
-  Qed.
-
-  Lemma rtc_tau_aprogram_step_sem
-        tid lang
-        th1 th2
-        (TH1: S tid lang th1.(Thread.state))
-        (MEM1: sem_memory th1.(Thread.memory))
-        (INHABITED1: Memory.inhabited th1.(Thread.memory))
-        (STEP: rtc (tau (@AThread.program_step lang)) th1 th2):
-    <<TH2: S tid lang th2.(Thread.state)>> /\
-    <<MEM2: sem_memory th2.(Thread.memory)>>.
-  Proof.
-    move STEP after TH1. revert_until STEP. induction STEP; ss.
-    i. inv H.
-    destruct x, y. ss.
-    exploit aprogram_step_sem; eauto. i. des.
-    eapply IHSTEP; eauto.
-    hexploit AThread.program_step_inhabited; eauto.
+    exploit steps_pf_steps; eauto. i. des.
+    exploit Thread.rtc_all_step_future; try eapply rtc_implies; try exact STEPS1; eauto.
+    { i. inv H. econs. econs. eauto. }
+    i. des.
+    exploit Thread.rtc_step_nonpf_future; eauto. i. des.
+    rewrite <- STATE.
+    exploit rtc_thread_step_sem; eauto. i. des. ss.
   Qed.
 
 
@@ -459,118 +327,58 @@ Section Invariant.
     inv MSG_LE. esplits; eauto.
   Qed.
 
+
+  (* configuration *)
+
   Lemma consistent_sem
-        tid lang e_src e_tgt
-        (TH: S tid lang e_src.(Thread.state))
-        (MEM: sem_memory e_src.(Thread.memory))
-        (SIM: @PFStep.sim_thread lang e_src e_tgt)
-        (CONSISTENT: Thread.consistent e_tgt)
-        (WF: Local.wf e_tgt.(Thread.local) e_tgt.(Thread.memory))
-        (SC: Memory.closed_timemap e_tgt.(Thread.sc) e_tgt.(Thread.memory))
-        (CLOSED: Memory.closed e_tgt.(Thread.memory)):
-    sem_memory e_tgt.(Thread.memory).
+        tid lang
+        pf e th1 th2 th3
+        (TH1: S tid lang th1.(Thread.state))
+        (MEM1: sem_memory th1.(Thread.memory))
+        (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
+        (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory))
+        (CLOSED1: Memory.closed th1.(Thread.memory))
+        (STEPS: rtc (@Thread.tau_step lang) th1 th2)
+        (STEP: Thread.step pf e th2 th3)
+        (CONSISTENT: Thread.consistent th3):
+    <<TH3: S tid lang th3.(Thread.state)>> /\
+    <<MEM3: sem_memory th3.(Thread.memory)>>.
   Proof.
-    exploit Memory.cap_exists; try apply CLOSED. i. des.
-    exploit Memory.cap_closed; eauto. intro CLOSED_CAP.
-    exploit Memory.max_concrete_timemap_exists; try eapply CLOSED_CAP. intro MAX. des.
-    hexploit Memory.max_concrete_timemap_closed; eauto. i.
-    exploit Local.cap_wf; eauto. intro WF_CAP.
-    exploit PFCertify.cap_sim_thread_exists; eauto. i. des.
-    hexploit PFCertify.sim_memory_inhabited; try apply SIM0; try apply WF_CAP; try apply CLOSED_CAP. s. i. des.
-    eapply vals_incl_sem_memory in VALS; eauto.
-    exploit CONSISTENT; eauto. i. des.
-    - unfold Thread.steps_failure in *. des.
-      exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
-      inv FAILURE0; try by inv STEP.
-      exploit PFStep.thread_rtc_tau_step; eauto.
-      { inv STEP. inv LOCAL. inv LOCAL0. ss. }
-      i. des.
-      exploit PFStep.thread_program_step; try exact STEP; eauto.
-      { inv STEP. inv LOCAL. inv LOCAL0. ss. }
-      i. des.
-      exploit rtc_tau_aprogram_step_sem; try exact STEPS_SRC; eauto. i. des.
-      inv STEP_SRC. inv LOGIC.
-      exploit FAILURE; try exact STATE; eauto. i. des.
-      ii. eauto.
-    - exploit Thread.rtc_tau_step_future; eauto. s. i. des.
-      exploit PFStep.thread_rtc_tau_step; eauto.
-      { eapply Local.bot_promise_consistent; ss. }
-      i. des.
-      exploit rtc_tau_aprogram_step_sem; try exact STEPS_SRC; eauto. i. des.
-      exploit PFCertify.sim_memory_bot; try apply SIM2; eauto. i.
-      rewrite x0 in *.
-      exploit Memory.cap_future_weak; eauto. i.
-      eapply future_weak_sem_memory; eauto.
-      eapply future_sem_memory; eauto.
-  Qed.
-
-  Lemma configuration_failure_step_sem
-        tid c1 c2
-        (WF: Configuration.wf c1)
-        (SEM: sem c1)
-        (STEP: Configuration.step MachineEvent.failure tid c1 c2):
-    sem c2.
-  Proof.
-    inv SEM. inv STEP; try by (destruct e; ss).
-    inv STEP0; try by inv STEP.
-    exploit TH; eauto. intro TH1.
-    inv WF. inv WF0. clear DISJOINT.
-    exploit THREADS; eauto. intro WF. clear THREADS.
     exploit Thread.rtc_tau_step_future; eauto. s. i. des.
-    exploit (@PFStep.sim_thread_exists
-               _ (Thread.mk lang st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory))); ss.
-    i. des.
-    hexploit PFStep.sim_memory_vals_incl; try eapply SIM; eauto. s. i.
-    eapply vals_incl_sem_memory in H; eauto.
-    hexploit PFStep.sim_memory_inhabited; try apply SIM; try apply WF; try apply MEM0. i. des.
-    exploit PFStep.thread_rtc_tau_step; try exact SIM; try eapply STEPS; eauto.
-    { inv STEP. inv LOCAL. inv LOCAL0. ss. }
-    i. des.
-    exploit PFStep.thread_program_step; try exact SIM2; try eapply STEP; eauto.
-    { inv STEP. inv LOCAL. inv LOCAL0. ss. }
-    i. des.
-    exploit rtc_tau_aprogram_step_sem; try exact STEPS_SRC; eauto.
-    { inv SIM. ss. rewrite STATE. eauto. }
-    i. des.
-    inv STEP_SRC. inv LOGIC. ss.
-    exploit FAILURE; try exact STATE; eauto. i. des.
-    econs; ss; ii; eauto.
-  Qed.
-
-  Lemma configuration_normal_step_sem
-        tid e c1 c2
-        (WF: Configuration.wf c1)
-        (SEM: sem c1)
-        (STEP: Configuration.step e tid c1 c2)
-        (EVENT: e <> MachineEvent.failure):
-    sem c2.
-  Proof.
-    inv SEM. inv STEP; ss.
-    eapply rtc_implies in STEPS; [|by apply tau_union].
-    exploit rtc_n1; eauto.
-    { econs. econs. eauto. }
-    clear EVENT EVENT0 STEPS STEP0. intro STEPS.
-    inv WF. inv WF0. clear DISJOINT.
-    exploit THREADS; eauto. intro WF. clear THREADS.
-    exploit Thread.rtc_all_step_future; eauto. s. i. des.
-    exploit (@PFStep.sim_thread_exists
-               _ (Thread.mk lang st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory))); ss.
-    i. des.
-    hexploit PFStep.sim_memory_vals_incl; try eapply SIM; eauto. s. i.
-    eapply vals_incl_sem_memory in H; eauto.
-    hexploit PFStep.sim_memory_inhabited; try apply SIM; try apply WF; try apply MEM0. i. des.
-    exploit PFStep.thread_rtc_all_step; try exact SIM; try eapply STEPS; eauto.
-    { eapply consistent_promise_consistent; eauto. }
-    i. des.
-    exploit rtc_all_aprogram_step_sem; try exact STEPS_SRC; eauto.
-    { inv SIM. ss. rewrite STATE. eauto. }
-    i. des.
-    econs; s.
-    - ii. revert FIND.
-      rewrite IdentMap.gsspec. condtac; ss; [|by apply TH]. subst.
-      i. inv FIND. apply inj_pair2 in H3. subst.
-      inv SIM2. ss. rewrite <- STATE. ss.
-    - hexploit consistent_sem; eauto.
+    exploit Thread.step_future; eauto. s. i. des.
+    split.
+    { hexploit consistent_promise_consistent; eauto. intro CONS.
+      eapply rtc_thread_step_sem_thread; eauto.
+      eapply rtc_n1; try eapply rtc_implies; try exact STEPS.
+      - i. inv H. econs. eauto.
+      - econs. econs. eauto.
+    }
+    hexploit FutureCertify.future_certify_exists; try exact CONSISTENT; eauto. i.
+    destruct th3 as [st3 lc3 sc3 mem3]. ss.
+    exploit H; try refl; ss. i. des.
+    - unfold Thread.steps_failure in *. des.
+      eapply rtc_implies in STEPS; [|apply tau_union].
+      eapply rtc_implies in STEPS0; [|apply tau_union].
+      exploit rtc_n1; try exact STEPS; i.
+      { econs. econs. eauto. }
+      rewrite STEPS0 in x0.
+      exploit steps_failure_pf_steps_failure; try exact x0; eauto. i. des.
+      exploit rtc_thread_step_sem; try exact STEPS'; eauto. i. des.
+      inv FAILURE'; inv STEP0. ss.
+      inv LOGIC. exploit FAILURE; try exact STATE0; eauto. i. des.
+      ii. ss.
+    - exploit Thread.rtc_tau_step_future; try exact STEPS0; eauto. s. i. des.
+      eapply rtc_implies in STEPS; [|apply tau_union].
+      eapply rtc_implies in STEPS0; [|apply tau_union].
+      exploit rtc_n1; try exact STEPS; i.
+      { econs. econs. eauto. }
+      rewrite STEPS0 in x0.
+      exploit steps_pf_steps; try exact x0; eauto.
+      { ii. rewrite PROMISES in *. rewrite Memory.bot_get in *. ss. }
+      i. des.
+      exploit rtc_union_step_nonpf_bot; try exact STEPS2; eauto. i. subst.
+      exploit rtc_thread_step_sem; try exact STEPS1; eauto. i. des.
+      eapply future_sem_memory; eauto.
   Qed.
 
   Lemma configuration_step_sem
@@ -580,10 +388,23 @@ Section Invariant.
         (STEP: Configuration.step e tid c1 c2):
     sem c2.
   Proof.
-    destruct e.
-    - eapply configuration_normal_step_sem; eauto. ss.
-    - eapply configuration_normal_step_sem; eauto. ss.
-    - eapply configuration_failure_step_sem; eauto.
+    inv STEP.
+    - inv SEM. exploit TH; eauto. i.
+      inv WF. inv WF0. exploit THREADS; eauto. i.
+      clear DISJOINT THREADS TID.
+      exploit steps_failure_pf_steps_failure; try eapply rtc_implies; try exact STEPS; eauto.
+      { i. inv H. econs. eauto. }
+      i. des.
+      exploit rtc_thread_step_sem; try exact STEPS'; eauto. i. des.
+      inv FAILURE'; inv STEP.
+      inv LOGIC. exploit FAILURE; try exact STATE0; eauto. i. des.
+      econs; ii; eauto.
+    - inv SEM. exploit TH; eauto. i.
+      inv WF. inv WF0. exploit THREADS; eauto. i.
+      exploit consistent_sem; try exact STEPS; eauto. s. i. des.
+      econs; eauto. ss. ii. revert FIND.
+      rewrite IdentMap.gsspec. condtac; ss; [|by apply TH].
+      i. subst. inv FIND. apply inj_pair2 in H1. subst. ss.
   Qed.
 
   Inductive Configuration_step_evt (c1 c2:Configuration.t): Prop :=

@@ -211,6 +211,136 @@ Proof.
   exploit rtcn_rtc; eauto.
 Qed.
 
+Lemma steps_pf_steps_state
+      lang
+      e1 e3
+      (STEPS: rtc (@Thread.all_step lang) e1 e3)
+      (CONS: Local.promise_consistent e3.(Thread.local))
+      (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+      (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+      (MEM1: Memory.closed e1.(Thread.memory)):
+  exists e2,
+    <<STEPS1: rtc (union (Thread.step true)) e1 e2>> /\
+    <<STATE: e3.(Thread.state) = e2.(Thread.state)>>.
+Proof.
+  exploit steps_pf_steps; eauto. i. des.
+  esplits; eauto.
+  exploit Thread.rtc_all_step_future; try eapply rtc_implies; try exact STEPS1; eauto.
+  { i. inv H. econs. econs. eauto. }
+  i. des.
+  exploit Thread.rtc_step_nonpf_future; try exact STEPS2; eauto. i. des. ss.
+Qed.
+
+Lemma tau_steps_pf_tau_steps_state
+      lang
+      e1 e3
+      (STEPS: rtc (@Thread.tau_step lang) e1 e3)
+      (CONS: Local.promise_consistent e3.(Thread.local))
+      (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+      (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+      (MEM1: Memory.closed e1.(Thread.memory)):
+  exists e2,
+    <<STEPS1: rtc (tau (Thread.step true)) e1 e2>> /\
+    <<STATE: e3.(Thread.state) = e2.(Thread.state)>>.
+Proof.
+  exploit tau_steps_pf_tau_steps; eauto. i. des.
+  esplits; eauto.
+  exploit Thread.rtc_all_step_future; try eapply rtc_implies; try exact STEPS1; eauto.
+  { i. inv H. econs. econs. eauto. }
+  i. des.
+  exploit Thread.rtc_step_nonpf_future; try eapply rtc_implies; try exact STEPS2; eauto.
+  { i. inv H. econs. eauto. }
+  i. des. ss.
+Qed.
+
+
+Lemma nonpf_steps_failure
+      lang
+      pf e1 e2 e3
+      (STEPS: rtc (union (@Thread.step lang false)) e1 e2)
+      (FAILURE: Thread.step pf ThreadEvent.failure e2 e3)
+      (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+      (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+      (MEM1: Memory.closed e1.(Thread.memory)):
+  exists e2', <<FAILURE: Thread.step true ThreadEvent.failure e1 e2'>>.
+Proof.
+  revert_until STEPS. revert e3. induction STEPS; i.
+  { dup FAILURE. inv FAILURE0; inv STEP. eauto. }
+  inv H. exploit Thread.step_future; try exact USTEP; eauto. i. des.
+  exploit IHSTEPS; eauto. i. des.
+  inv FAILURE0; try by inv STEP.
+  exploit reorder_nonpf_program; try exact USTEP; eauto.
+  { inv STEP. inv LOCAL. inv LOCAL0. ss. }
+  i. unguard. des.
+  - subst. esplits. econs 2; eauto.
+  - esplits. econs 2; eauto.
+Qed.
+
+Lemma nonpf_tau_steps_failure
+      lang
+      pf e1 e2 e3
+      (STEPS: rtc (tau (@Thread.step lang false)) e1 e2)
+      (FAILURE: Thread.step pf ThreadEvent.failure e2 e3)
+      (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+      (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+      (MEM1: Memory.closed e1.(Thread.memory)):
+  exists e2', <<FAILURE: Thread.step true ThreadEvent.failure e1 e2'>>.
+Proof.
+  exploit rtc_implies; try apply tau_union; eauto. i.
+  eapply nonpf_steps_failure; eauto.
+Qed.
+
+Lemma steps_failure_pf_steps_failure
+      lang
+      pf e1 e2 e3
+      (STEPS: rtc (@Thread.all_step lang) e1 e2)
+      (FAILURE: Thread.step pf ThreadEvent.failure e2 e3)
+      (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+      (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+      (MEM1: Memory.closed e1.(Thread.memory)):
+  exists e2' e3',
+    <<STEPS': rtc (union (@Thread.step lang true)) e1 e2'>> /\
+    <<FAILURE': Thread.step true ThreadEvent.failure e2' e3'>> /\
+    <<STATE: e2.(Thread.state) = e2'.(Thread.state)>>.
+Proof.
+  exploit steps_pf_steps; try exact STEPS; eauto.
+  { inv FAILURE; inv STEP. inv LOCAL. inv LOCAL0. ss. }
+  i. des.
+  exploit Thread.rtc_all_step_future; try eapply rtc_implies; try exact STEPS1; eauto.
+  { i. inv H. econs. econs. eauto. }
+  i. des.
+  exploit nonpf_steps_failure; try exact STEPS2; eauto. i. des.
+  esplits; eauto.
+  exploit Thread.rtc_step_nonpf_future; try exact STEPS2; eauto. i. des. ss.
+Qed.
+
+Lemma tau_steps_failure_pf_tau_steps_failure
+      lang
+      pf e1 e2 e3
+      (STEPS: rtc (@Thread.tau_step lang) e1 e2)
+      (FAILURE: Thread.step pf ThreadEvent.failure e2 e3)
+      (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+      (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+      (MEM1: Memory.closed e1.(Thread.memory)):
+  exists e2' e3',
+    <<STEPS': rtc (tau (@Thread.step lang true)) e1 e2'>> /\
+    <<FAILURE': Thread.step true ThreadEvent.failure e2' e3'>> /\
+    <<STATE: e2.(Thread.state) = e2'.(Thread.state)>>.
+Proof.
+  exploit tau_steps_pf_tau_steps; try exact STEPS; eauto.
+  { inv FAILURE; inv STEP. inv LOCAL. inv LOCAL0. ss. }
+  i. des.
+  exploit Thread.rtc_tau_step_future; try eapply rtc_implies; try exact STEPS1; eauto.
+  { i. inv H. econs; eauto. econs. eauto. }
+  i. des.
+  exploit nonpf_tau_steps_failure; try exact STEPS2; eauto. i. des.
+  esplits; eauto.
+  exploit Thread.rtc_step_nonpf_future; try eapply rtc_implies; try exact STEPS2; eauto.
+  { i. inv H. econs. eauto. }
+  i. des. ss.
+Qed.
+
+
 Lemma union_step_nonpf_bot
       lang e1 e2
       (STEP: union (@Thread.step lang false) e1 e2)

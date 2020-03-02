@@ -310,6 +310,46 @@ Module Thread.
       apply tau_union.
     Qed.
 
+    Lemma step_nonpf_future
+          e e1 e2
+          (STEP: step false e e1 e2)
+          (WF1: Local.wf e1.(local) e1.(memory))
+          (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
+          (CLOSED1: Memory.closed e1.(memory)):
+      <<WF2: Local.wf e2.(local) e2.(memory)>> /\
+      <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
+      <<CLOSED2: Memory.closed e2.(memory)>> /\
+      <<TVIEW_FUTURE: TView.le e1.(local).(Local.tview) e2.(local).(Local.tview)>> /\
+      <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
+      <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>> /\
+      <<STATE: e1.(state) = e2.(state)>>.
+    Proof.
+      inv STEP. inv STEP0. ss.
+      exploit Local.promise_step_future; eauto. i. des.
+      esplits; ss. refl.
+    Qed.
+
+    Lemma rtc_step_nonpf_future
+          e1 e2
+          (STEP: rtc (union (step false)) e1 e2)
+          (WF1: Local.wf e1.(local) e1.(memory))
+          (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
+          (CLOSED1: Memory.closed e1.(memory)):
+      <<WF2: Local.wf e2.(local) e2.(memory)>> /\
+      <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
+      <<CLOSED2: Memory.closed e2.(memory)>> /\
+      <<TVIEW_FUTURE: TView.le e1.(local).(Local.tview) e2.(local).(Local.tview)>> /\
+      <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
+      <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>> /\
+      <<STATE: e1.(state) = e2.(state)>>.
+    Proof.
+      revert WF1. induction STEP.
+      - i. splits; ss; refl.
+      - inv H. i. exploit step_nonpf_future; eauto. i. des.
+        exploit IHSTEP; eauto. i. des.
+        splits; ss; etrans; eauto.
+    Qed.
+
 
     (* step_inhabited *)
 

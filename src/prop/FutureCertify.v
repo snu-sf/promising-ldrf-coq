@@ -34,9 +34,9 @@ Set Implicit Arguments.
 
 Lemma memory_cap_covered
       mem0 mem1
+      loc to
       (CAP: Memory.cap mem0 mem1)
       (INHABITED: Memory.inhabited mem0)
-      loc to
       (ITV: Interval.mem (Time.bot, Time.incr (Memory.max_ts loc mem0)) to):
   covered loc to mem1.
 Proof.
@@ -85,6 +85,7 @@ Proof.
     + eapply Memory.cap_le; try apply GET; eauto. refl.
     + econs; eauto.
 Qed.
+
 
 Module FutureCertify.
   Section FutureCertify.

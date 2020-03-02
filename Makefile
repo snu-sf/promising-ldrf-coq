@@ -1,7 +1,6 @@
 COQMODULE    := Promising2
 COQTHEORIES  := \
 	src/lang/*.v \
-	src/attachable/*.v \
 	src/while/*.v \
 	src/prop/*.v \
 	src/opt/*.v \
@@ -23,7 +22,6 @@ quick: Makefile.coq
 
 Makefile.coq: Makefile $(COQTHEORIES)
 	(echo "-R src/lang $(COQMODULE)"; \
-   echo "-R src/attachable $(COQMODULE)"; \
    echo "-R src/while $(COQMODULE)"; \
    echo "-R src/prop $(COQMODULE)"; \
    echo "-R src/opt $(COQMODULE)"; \
