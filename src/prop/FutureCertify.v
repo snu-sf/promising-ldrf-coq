@@ -144,6 +144,70 @@ Module FutureCertify.
       - ii. specialize (FSPEC loc). des. eapply COMPLETE; ss; eauto.
     Qed.
 
+    Lemma cap_steps_current_steps
+          th0 th1 mem1 sc1
+          (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
+          (MEMORY: Memory.closed th0.(Thread.memory))
+          (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
+          (CAP: Memory.cap th0.(Thread.memory) mem1)
+          (SC_MAX: Memory.max_concrete_timemap mem1 sc1)
+          (STEPS: rtc (@Thread.tau_step lang)
+                      (Thread.mk lang th0.(Thread.state) th0.(Thread.local) sc1 mem1)
+                      th1)
+          (CONSISTENT: Local.promise_consistent th1.(Thread.local))
+      :
+        exists lc' sc' mem',
+          (<<STEPS: rtc (@Thread.tau_step lang)
+                        th0
+                        (Thread.mk lang th1.(Thread.state) lc' sc' mem')>>) /\
+          (<<CONSISTENT: Local.promise_consistent lc'>>)
+    .
+    Proof.
+      eapply pred_steps_thread_steps in STEPS.
+      eapply pred_steps_traced_step in STEPS. des.
+      hexploit traced_times_list_exists; eauto. i. des.
+      exploit (@future_memory_map _ _ th0.(Thread.memory) times CAP); eauto.
+      { refl. } i. des.
+      destruct th0, th1. ss.
+      hexploit traced_steps_map.
+      { eapply mapping_map_lt_map_le; eauto. }
+      { eapply map_ident_in_memory_bot; eauto. }
+      { eapply mapping_map_lt_map_eq; eauto. }
+      { eapply wf_time_mapped_mappable; eauto. }
+      { eauto. }
+      { ss. }
+      { ss. }
+      { ss. }
+      { eapply Local.cap_wf; eauto. }
+      { eapply LOCAL. }
+      { eauto. }
+      { eapply Memory.cap_closed; eauto. }
+      { eauto. }
+      { eapply Memory.max_concrete_timemap_closed; eauto. }
+      { eapply map_ident_in_memory_local; eauto. }
+      { eauto. }
+      { eapply mapping_map_lt_collapsable_unwritable. eauto. }
+      { eapply map_ident_in_memory_closed_timemap; eauto.
+        ss. eapply memory_concrete_le_closed_timemap; cycle 1.
+        - eapply Memory.max_concrete_timemap_closed; eauto.
+        - ii. eapply Memory.cap_inv in GET; eauto. des; clarify. }
+      { eapply Memory.max_concrete_timemap_spec; eauto.
+        eapply Memory.cap_closed_timemap; eauto. }
+      i. des. eapply pred_steps_traced_step2 in STEPS.
+      - exists flc1, fsc1, fmem1. split.
+        + eapply thread_steps_pred_steps; eauto.
+        + inv LOCAL0. eapply promise_consistent_mon; cycle 1; eauto.
+          { refl. }
+          eapply promise_consistent_map; eauto.
+          { eapply mapping_map_lt_map_le; eauto. }
+          { eapply mapping_map_lt_map_eq; eauto. }
+      - apply List.Forall_forall. ii.
+        eapply list_Forall2_in in H; eauto. des. split.
+        { instantiate (1:=fun _ => True). ss. }
+        eapply List.Forall_forall in EVENTS; eauto. des.
+        destruct a, x. ss. inv EVENT; auto.
+    Qed.
+
     Definition future_certify lang (e:Thread.t lang): Prop :=
       forall sc1 mem1
         (FUTURE: Memory.future_weak e.(Thread.memory) mem1)
