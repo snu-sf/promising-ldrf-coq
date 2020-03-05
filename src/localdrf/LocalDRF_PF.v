@@ -155,8 +155,9 @@ Section SIM.
                 Memory.future_weak past' past>>)
       )
       (ONLY: forall loc ts past (PAST: pasts loc ts = Some past),
-          (<<CLOSED: concrete_promised mem loc ts>>) /\
-          (<<CURR: Memory.future_weak past mem>>)
+          (<<CONCRETE: concrete_promised mem loc ts>>) /\
+          (<<CURR: Memory.future_weak past mem>>) /\
+          (<<CLOSED: Memory.closed past>>)
       )
   .
 
@@ -168,17 +169,82 @@ Section SIM.
   Inductive sim_timemap (past: Memory.t) (tm_src tm_tgt: TimeMap.t): Prop :=
   | sim_timemap_intro
       (IN: forall loc (LOC: ~ L loc), tm_src loc = tm_tgt loc)
-      (NIN: forall loc (LOC: L loc) ts
-                   (PAST: concrete_promised past loc ts)
-                   (LE: Time.le ts (tm_tgt loc)),
-          Time.le ts (tm_src loc))
+      (NIN: forall loc (LOC: L loc),
+          (<<GREATEST:
+             forall ts
+                    (PAST: concrete_promised past loc ts)
+                    (LE: Time.le ts (tm_tgt loc)),
+               Time.le ts (tm_src loc)>>) /\
+          (<<CLOSED: concrete_promised past loc (tm_src loc)>>) /\
+          (<<TLE: Time.le (tm_src loc) (tm_tgt loc)>>)
+      )
   .
+
+  Lemma sim_timemap_le past tm_src tm_tgt
+        (SIM: sim_timemap past tm_src tm_tgt)
+    :
+      TimeMap.le tm_src tm_tgt.
+  Proof.
+    ii. inv SIM. destruct (classic (L loc)) as [LOC|NLOC].
+    - apply NIN. auto.
+    - right. apply IN. auto.
+  Qed.
+
+  Lemma sim_timemap_exists past tm_tgt
+        (CLOSED: Memory.closed past)
+    :
+      exists tm_src, <<SIM: sim_timemap past tm_src tm_tgt>>.
+  Proof.
+    exploit (@choice _ _ (fun loc ts_src =>
+                            (<<IN: forall (LOC: ~ L loc), ts_src = tm_tgt loc>>) /\
+                            (<<NIN: forall (LOC: L loc),
+                                (<<GREATEST:
+                                   forall ts
+                                          (PAST: concrete_promised past loc ts)
+                                          (LE: Time.le ts (tm_tgt loc)),
+                                     Time.le ts ts_src>>) /\
+                                (<<CLOSED: concrete_promised past loc ts_src>>) /\
+                                (<<TLE: Time.le ts_src (tm_tgt loc)>>)>>))).
+    - intros loc. destruct (classic (L loc)) as [LOC|NLOC].
+      + hexploit (cell_elements_greatest (past loc) (fun ts => concrete_promised past loc ts /\ Time.le ts (tm_tgt loc))).
+        i. des.
+        * exists to. split; clarify. ii. splits; auto.
+          i. dup PAST. inv PAST. exploit GREATEST; eauto.
+        * exfalso. inv CLOSED. eapply EMPTY; eauto. split.
+          { econs; eauto. }
+          { eapply Time.bot_spec. }
+      + esplits; clarify.
+    - intros [f FSPEC]. des. exists f. econs; i.
+      + eapply FSPEC; eauto.
+      + hexploit (FSPEC loc); eauto. i. des. exploit NIN; eauto.
+  Qed.
 
   Inductive sim_view (past: Memory.t) (view_src view_tgt: View.t): Prop :=
   | sim_view_intro
       (PLN: sim_timemap past view_src.(View.pln) view_tgt.(View.pln))
       (RLX: sim_timemap past view_src.(View.rlx) view_tgt.(View.rlx))
   .
+  Hint Constructors sim_view.
+
+  Lemma sim_view_le past vw_src vw_tgt
+        (SIM: sim_view past vw_src vw_tgt)
+    :
+      View.le vw_src vw_tgt.
+  Proof.
+    inv SIM. econs.
+    - eapply sim_timemap_le; eauto.
+    - eapply sim_timemap_le; eauto.
+  Qed.
+
+  Lemma sim_view_exists past vw_tgt
+        (CLOSED: Memory.closed past)
+    :
+      exists vw_src, <<SIM: sim_view past vw_src vw_tgt>>.
+  Proof.
+    exploit (@sim_timemap_exists past vw_tgt.(View.pln)); auto. i. des.
+    exploit (@sim_timemap_exists past vw_tgt.(View.rlx)); auto. i. des.
+    exists (View.mk tm_src tm_src0). econs; eauto.
+  Qed.
 
   Inductive sim_opt_view (past: Memory.t): forall (view_src view_tgt: option View.t), Prop :=
   | sim_opt_view_some
@@ -190,6 +256,27 @@ Section SIM.
   .
   Hint Constructors sim_opt_view.
 
+  Lemma sim_opt_view_le past vw_src vw_tgt
+        (SIM: sim_opt_view past vw_src vw_tgt)
+    :
+      View.opt_le vw_src vw_tgt.
+  Proof.
+    inv SIM. econs; eauto.
+    - eapply sim_view_le; eauto.
+    - econs.
+  Qed.
+
+  Lemma sim_opt_view_exists past vw_tgt
+        (CLOSED: Memory.closed past)
+    :
+      exists vw_src, <<SIM: sim_opt_view past vw_src vw_tgt>>.
+  Proof.
+    destruct vw_tgt.
+    - exploit sim_view_exists; eauto. i. des.
+      esplits. econs; eauto.
+    - esplits; eauto.
+  Qed.
+
   Inductive sim_promise P (pasts: Loc.t -> Time.t -> option Memory.t)
             (rel_src rel_tgt: LocFun.t View.t) (prom_src prom_tgt: Memory.t): Prop :=
   | sim_promise_intro
@@ -200,8 +287,8 @@ Section SIM.
                         (PAST: pasts loc to = Some past)
         ,
           (<<SIM: sim_opt_view past released_src released_tgt>>) /\
-          (<<REL: forall (VLE: View.le (rel_tgt loc) (View.unwrap released_tgt)),
-              View.le (rel_src loc) (View.unwrap released_src)>>))
+          (<<CLOSED: forall (SOME: released_src <> None), Memory.closed_view (rel_src loc) past>>)
+      )
       (MEMORY: sim_memory P prom_src prom_tgt)
       (NOPROMS: forall loc (LOC: L loc)
                        to from msg (GET: Memory.get loc to prom_src = Some (from, msg)), msg = Message.reserve)
@@ -314,19 +401,16 @@ Section SIM.
       { eapply FORGET in PROM. des. clarify. }
       hexploit COMPLETE0; eauto. i.
       rewrite GETSRC in *. rewrite GETTGT in *. inv H; clarify. inv MESSAGE.
-      inv TVIEWLE. des_ifs; ss; eauto.
+      inv TVIEWLE. ss. des_ifs; ss; eauto.
       + exploit RELEASE; eauto.
         { destruct ordw; eauto. }
         ss. i. clarify. ss. inv RELEASED. split; ss.
-        ii. etrans; eauto.
       + exploit RELEASE; eauto.
         { destruct ordw; eauto. }
         ss. i. clarify. ss. inv RELEASED. split; ss.
-        ii. etrans; eauto.
       + exploit RELEASE; eauto.
         { destruct ordw; eauto. }
         ss. i. clarify. ss. inv RELEASED. split; ss.
-        ii. etrans; eauto.
   Qed.
 
   Lemma sim_promise_consistent prom_self pasts lc_src lc_tgt
