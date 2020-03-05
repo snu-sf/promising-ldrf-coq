@@ -123,6 +123,7 @@ Section SIM.
       from_tgt from_src msg_src msg_tgt
       (FROM: Time.le from_tgt from_src)
       (MESSAGE: Message.le msg_src msg_tgt)
+      (RESERVE: msg_tgt = Message.reserve -> msg_src = Message.reserve)
     :
       sim_memory_content
         (Some (from_src, msg_src))
@@ -139,8 +140,8 @@ Section SIM.
             (Memory.get l t mem_src) (Memory.get l t mem_tgt))
       (FORGET: forall l t (PROMS: P l t),
           exists from msg,
-            (<<SRCGET: Memory.get l t mem_src = Some (from, msg)>>) /\
-            (<<TGTGET: Memory.get l t mem_tgt = Some (from, Message.reserve)>>))
+            (<<SRCGET: Memory.get l t mem_src = Some (from, Message.reserve)>>) /\
+            (<<TGTGET: Memory.get l t mem_tgt = Some (from, msg)>>))
   .
 
   Inductive wf_pasts_memory (mem: Memory.t) (pasts: Loc.t -> Time.t -> option Memory.t): Prop :=
@@ -257,6 +258,103 @@ Section SIM.
   (* TODO: can remove all promises *)
   .
 
+  Lemma sim_read_step prom_self prom_others pasts lc_src lc_tgt mem_src mem_tgt loc to val released_tgt ord
+        lc_tgt'
+        (STEPTGT: Local.read_step lc_tgt mem_tgt loc to val released_tgt ord lc_tgt')
+        (NOREAD: ~ (prom_others \2/ prom_self) loc to)
+        (MEM: sim_memory (prom_others \2/ prom_self) mem_src mem_tgt)
+        (SIM: sim_local prom_self pasts lc_src lc_tgt)
+    :
+      exists lc_src' released_src,
+        (<<STEPTGT: Local.read_step lc_src mem_src loc to val released_src ord lc_src'>>) /\
+        (<<SIM: sim_local prom_self pasts lc_src' lc_tgt'>>)
+  .
+  Proof.
+    inv MEM. inv SIM. inv STEPTGT.
+    hexploit COMPLETE; eauto. i. inv H; rewrite GET in *; clarify. inv MESSAGE. esplits.
+    - econs; eauto. eapply TViewFacts.readable_mon; eauto.
+      + eapply TVIEW.
+      + refl.
+    - econs; ss; eauto. eapply read_tview_mon; eauto. refl.
+  Qed.
+
+  Lemma sim_fence_step prom_self pasts lc_src lc_tgt sc_src sc_tgt ordr ordw
+        sc_tgt' lc_tgt'
+        (STEPTGT: Local.fence_step lc_tgt sc_tgt ordr ordw lc_tgt' sc_tgt')
+        (SC: TimeMap.le sc_src sc_tgt)
+        (SIM: sim_local prom_self pasts lc_src lc_tgt)
+    :
+      exists lc_src' sc_src',
+        (<<STEPTGT: Local.fence_step lc_src sc_src ordr ordw lc_src' sc_src'>>) /\
+        (<<SC: TimeMap.le sc_src' sc_tgt'>>) /\
+        (<<SIM: sim_local prom_self pasts lc_src' lc_tgt'>>)
+  .
+  Proof.
+    inv SIM. inv PROMS. inv MEMORY. inv STEPTGT.
+    assert (TVIEWLE:
+              TView.le
+                (TView.write_fence_tview
+                   (TView.read_fence_tview (Local.tview lc_src) ordr) sc_src ordw)
+                (TView.write_fence_tview
+                   (TView.read_fence_tview (Local.tview lc_tgt) ordr) sc_tgt ordw)).
+    { eapply write_fence_tview_mon_same_ord; eauto.
+      eapply read_fence_tview_mon_same_ord; eauto. }
+    esplits.
+    - econs; ss; eauto. ii.
+      destruct (classic (prom_self loc t)) as [PROM|NPROM].
+      { eapply FORGET in PROM. des. clarify. }
+      eapply COMPLETE0 in NPROM. rewrite GET in *. inv NPROM. clarify.
+      exploit RELEASE; eauto. i. inv MESSAGE.
+      + clarify. inv RELEASED. auto.
+      + rewrite RESERVE; auto.
+    - eapply write_fence_fc_mon_same_ord; eauto.
+      eapply read_fence_tview_mon_same_ord; eauto.
+    - econs; ss; eauto. econs; ss. i.
+      destruct (classic (prom_self loc to)) as [PROM|NPROM].
+      { eapply FORGET in PROM. des. clarify. }
+      hexploit COMPLETE0; eauto. i.
+      rewrite GETSRC in *. rewrite GETTGT in *. inv H; clarify. inv MESSAGE.
+      inv TVIEWLE. des_ifs; ss; eauto.
+      + exploit RELEASE; eauto.
+        { destruct ordw; eauto. }
+        ss. i. clarify. ss. inv RELEASED. split; ss.
+        ii. etrans; eauto.
+      + exploit RELEASE; eauto.
+        { destruct ordw; eauto. }
+        ss. i. clarify. ss. inv RELEASED. split; ss.
+        ii. etrans; eauto.
+      + exploit RELEASE; eauto.
+        { destruct ordw; eauto. }
+        ss. i. clarify. ss. inv RELEASED. split; ss.
+        ii. etrans; eauto.
+  Qed.
+
+  Lemma sim_promise_consistent prom_self pasts lc_src lc_tgt
+        (CONSISTENT: Local.promise_consistent lc_tgt)
+        (SIM: sim_local prom_self pasts lc_src lc_tgt)
+    :
+      Local.promise_consistent lc_src.
+  Proof.
+    inv SIM. inv PROMS. inv MEMORY. ii.
+    destruct (classic (prom_self loc ts)) as [PROM|NPROM].
+    { eapply FORGET in PROM. des. clarify. }
+    exploit COMPLETE0; eauto. i. rewrite PROMISE in *. inv x.
+    inv MESSAGE; clarify.
+    - exploit CONSISTENT; eauto. i. eapply TimeFacts.le_lt_lt; eauto.
+      inv TVIEW. inv CUR. auto.
+    - exploit RESERVE; eauto. clarify.
+  Qed.
+
+  Lemma sim_failure_step prom_self pasts lc_src lc_tgt
+        (STEPTGT: Local.failure_step lc_tgt)
+        (SIM: sim_local prom_self pasts lc_src lc_tgt)
+    :
+      Local.failure_step lc_src.
+  Proof.
+    inv STEPTGT. econs.
+    eapply sim_promise_consistent; eauto.
+  Qed.
+
   Lemma sim_thread_step prom_self prom_others pasts lang st lc_src lc_tgt sc_src sc_tgt mem_src mem_tgt pf e_tgt
         st' lc_tgt' sc_tgt' mem_tgt'
         (STEPTGT: @Thread.step lang pf e_tgt (Thread.mk _ st lc_tgt sc_tgt mem_tgt) (Thread.mk _ st' lc_tgt' sc_tgt' mem_tgt'))
@@ -281,6 +379,7 @@ Section SIM.
         (<<SIM: sim_local prom_self' pasts' lc_src' lc_tgt'>>) /\
         (<<PAST: wf_pasts_memory mem_src' pasts'>>) /\
         (<<PASTLE: pasts_le pasts pasts'>>)
+          (* TODO: condition about event *)
   .
   Proof.
   Admitted.
