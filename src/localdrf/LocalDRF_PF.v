@@ -21,6 +21,7 @@ Require Import Configuration.
 Require Import Progress.
 Require Import Behavior.
 
+Require Import Pred.
 Require Import Trace.
 
 Set Implicit Arguments.
@@ -109,6 +110,9 @@ Section LOCALDRF.
 
 End LOCALDRF.
 
+
+Require Import MemoryProps.
+
 Section SIM.
 
   Variable L: Loc.t -> Prop.
@@ -133,320 +137,152 @@ Section SIM.
       (COMPLETE: forall l t (NPROMS: ~ P l t),
           sim_memory_content
             (Memory.get l t mem_src) (Memory.get l t mem_tgt))
-      (FORGET: forall l t (PROMS: P l t), Memory.get l t mem_src = None)
+      (FORGET: forall l t (PROMS: P l t),
+          exists from msg,
+            (<<SRCGET: Memory.get l t mem_src = Some (from, msg)>>) /\
+            (<<TGTGET: Memory.get l t mem_tgt = Some (from, Message.reserve)>>))
   .
 
-  Inductive sim_memory P mem_src mem_tgt : Prop :=
-  | sim_memory_intro
-      (COMPLETE: forall l t (NPROMS: ~ P l t),
-          sim_memory_content
-            (Memory.get l t mem_src) (Memory.get l t mem_tgt))
-      (FORGET: forall l t (PROMS: P l t), Memory.get l t mem_src = None)
+  Inductive wf_pasts_memory (mem: Memory.t) (pasts: Loc.t -> Time.t -> option Memory.t): Prop :=
+  | wf_pasts_memory_intro
+      (COMPLETE: forall loc from to val released
+                        (GET: Memory.get loc to mem = Some (from, Message.concrete val released)),
+          exists past,
+            (<<PAST: pasts loc to = Some past>>) /\
+            (<<GET: Memory.closed_opt_view released past>>) /\
+            (<<PREV: forall past' (PAST: pasts loc from = Some past'),
+                Memory.future_weak past' past>>)
+      )
+      (ONLY: forall loc ts past (PAST: pasts loc ts = Some past),
+          (<<CLOSED: concrete_promised mem loc ts>>) /\
+          (<<CURR: Memory.future_weak past mem>>)
+      )
   .
 
+  Definition pasts_le
+             (pasts0: Loc.t -> Time.t -> option Memory.t)
+             (pasts1: Loc.t -> Time.t -> option Memory.t): Prop :=
+    forall loc to past (PAST0: pasts0 loc to = Some past), pasts1 loc to = Some past.
 
-  Inductive sim_promise
+  Inductive sim_timemap (past: Memory.t) (tm_src tm_tgt: TimeMap.t): Prop :=
+  | sim_timemap_intro
+      (IN: forall loc (LOC: ~ L loc), tm_src loc = tm_tgt loc)
+      (NIN: forall loc (LOC: L loc) ts
+                   (PAST: concrete_promised past loc ts)
+                   (LE: Time.le ts (tm_tgt loc)),
+          Time.le ts (tm_src loc))
+  .
 
-  Inductive sim_statelocal:
+  Inductive sim_view (past: Memory.t) (view_src view_tgt: View.t): Prop :=
+  | sim_view_intro
+      (PLN: sim_timemap past view_src.(View.pln) view_tgt.(View.pln))
+      (RLX: sim_timemap past view_src.(View.rlx) view_tgt.(View.rlx))
+  .
+
+  Inductive sim_opt_view (past: Memory.t): forall (view_src view_tgt: option View.t), Prop :=
+  | sim_opt_view_some
+      view_src view_tgt
+      (SIM: sim_view past view_src view_tgt):
+      sim_opt_view past (Some view_src) (Some view_tgt)
+  | sim_opt_view_none:
+      sim_opt_view past None None
+  .
+  Hint Constructors sim_opt_view.
+
+  Inductive sim_promise P (pasts: Loc.t -> Time.t -> option Memory.t)
+            (rel_src rel_tgt: LocFun.t View.t) (prom_src prom_tgt: Memory.t): Prop :=
+  | sim_promise_intro
+      (COMPLETE: forall loc to past from_src from_tgt val_src val_tgt released_src released_tgt
+                        (PAST: pasts loc to = Some past)
+                        (GETSRC: Memory.get loc to prom_src = Some (from_src, Message.concrete val_src released_src))
+                        (GETTGT: Memory.get loc to prom_tgt = Some (from_tgt, Message.concrete val_tgt released_tgt))
+                        (PAST: pasts loc to = Some past)
+        ,
+          (<<SIM: sim_opt_view past released_src released_tgt>>) /\
+          (<<REL: forall (VLE: View.le (rel_tgt loc) (View.unwrap released_tgt)),
+              View.le (rel_src loc) (View.unwrap released_src)>>))
+      (MEMORY: sim_memory P prom_src prom_tgt)
+      (NOPROMS: forall loc (LOC: L loc)
+                       to from msg (GET: Memory.get loc to prom_src = Some (from, msg)), msg = Message.reserve)
+  .
+
+  Inductive sim_local P (pasts: Loc.t -> Time.t -> option Memory.t) (lc_src lc_tgt: Local.t): Prop :=
+  | forget_local_intro
+      (TVIEW : TView.le lc_src.(Local.tview) lc_tgt.(Local.tview))
+      (PROMS: sim_promise P pasts lc_src.(Local.tview).(TView.rel) lc_tgt.(Local.tview).(TView.rel) lc_src.(Local.promises) lc_tgt.(Local.promises))
+    :
+      sim_local P pasts lc_src lc_tgt
+  .
+
+  Inductive sim_statelocal P (pasts: Loc.t -> Time.t -> option Memory.t):
     sigT (@Language.state ProgramEvent.t) * Local.t -> sigT (@Language.state ProgramEvent.t) * Local.t -> Prop :=
   | forget_statelocal_intro
       st lc_src lc_tgt
-      (TVIEW : TView.le lc_src.(Local.tview) lc_tgt.(Local.tview))
-      (PROMS : lc1.(Local.promises) = Memory.bot)
+      (LOCAL: sim_local P pasts lc_src lc_tgt)
     :
-      forget_statelocal (st, lc1) (st, lc2)
+      sim_statelocal P pasts (st, lc_src) (st, lc_tgt)
   .
 
+  Inductive all_promises (proms: Ident.t -> Loc.t -> Time.t -> Prop): Loc.t -> Time.t -> Prop :=
+  | all_promises_intro
+      tid loc ts
+      (PROMS: proms tid loc ts)
+    :
+      all_promises proms loc ts
+  .
+  Hint Constructors all_promises.
 
-  Require Import MemoryProps.
-
-
-concrete_promised
-
-Inductive sim_statelocal:
-  sigT (@Language.state ProgramEvent.t) * Local.t -> sigT (@Language.state ProgramEvent.t) * Local.t -> Prop :=
-| forget_statelocal_intro
-    st lc1 lc2
-    (TVIEW : TView.le lc1.(Local.tview) lc2.(Local.tview))
-    (PROMS : lc1.(Local.promises) = Memory.bot)
-  :
-    forget_statelocal (st, lc1) (st, lc2)
-.
-
-
-View.
-
-Inductive forget_memory P msrc mtgt : Prop :=
-| forget_memory_intro
-    (COMPLETE: forall l t (NPROMS: ~ P l t),
-        Memory.get l t msrc = Memory.get l t mtgt)
-    (FORGET: forall l t (PROMS: P l t), Memory.get l t msrc = None)
-.
-
-
-option
-option_rel Message.le
-
-
-Inductive forget_memory P msrc mtgt : Prop :=
-| forget_memory_intro
-    (COMPLETE: forall l t (NPROMS: ~ P l t),
-        Memory.get l t msrc = Memory.get l t mtgt)
-    (FORGET: forall l t (PROMS: P l t), Memory.get l t msrc = None)
-.
-
-
-
-low view
-shorter
-
-
-
-Module Inv.
-
-  Record t mem lang (st: Language.state lang) lc
-         (proms: Memory.t)
-         (spaces : Loc.t -> Time.t -> Prop)
-         (updates : Loc.t -> Time.t -> Prop)
-         (aupdates : Loc.t -> Time.t -> Prop)
-         (mlast: Memory.t): Prop :=
-    {
-      SPACES: forall loc ts (IN: spaces loc ts), concrete_covered proms mem loc ts;
-      AUPDATES: forall loc ts (IN: aupdates loc ts),
-          exists to msg,
-            (<<TS: Time.lt ts to>>) /\
-            (<<GET: Memory.get loc to proms = Some (ts, msg)>>);
-      PROMS: forall
-          loc to m sc (PROM : concrete_promised proms loc to)
-          (FUTURE: unchanged_on spaces mlast m)
-          (UNCHANGED: not_attatched (updates \2/ aupdates) m),
-          exists st' lc' sc' m',
-            (<<STEPS : rtc (tau (@AThread.program_step _))
-                           (Thread.mk _ st lc sc m)
-                           (Thread.mk _ st' lc' sc' m')>>) /\
-            (<<WRITING : is_writing _ st' loc Ordering.relaxed>>);
-      UPDATE : forall
-          loc to m sc (UPD : updates loc to)
-          (FUTURE: unchanged_on spaces mlast m)
-          (UNCHANGED: not_attatched (updates \2/ aupdates) m),
-          exists st' lc' sc' m',
-            (<<STEPS : rtc (tau (@AThread.program_step _))
-                           (Thread.mk _ st lc sc m)
-                           (Thread.mk _ st' lc' sc' m')>>) /\
-            (<<READING : is_updating _ st' loc Ordering.strong_relaxed>>);
-      AUPDATE : forall
-          loc to m sc (UPD : aupdates loc to)
-          (FUTURE: unchanged_on spaces mlast m)
-          (UNCHANGED: not_attatched (updates \2/ aupdates) m),
-          exists st' lc' sc' m',
-            (<<STEPS : rtc (tau (@AThread.program_step _))
-                           (Thread.mk _ st lc sc m)
-                           (Thread.mk _ st' lc' sc' m')>>) /\
-            (<<READING : is_updating _ st' loc Ordering.seqcst>>);
-    }.
-
-End Inv.
-
-
-
-Section SIMPF.
-
-  Inductive thread_wf lang (th: Thread.t lang): Prop :=
-  | thread_wf_intro
-      (SC: Memory.closed_timemap th.(Thread.sc) th.(Thread.memory))
-      (CLOSED: Memory.closed th.(Thread.memory))
-      (LCWF: Local.wf th.(Thread.local) th.(Thread.memory))
+  Definition not_attached (P: Loc.t -> Time.t -> Prop) (mem: Memory.t) :=
+    forall loc to (SAT: P loc to)
+           val released to'
+           (GET: Memory.get loc to' mem = Some (to, Message.concrete val released)), False
   .
 
-  Inductive sim_pf_one
-            (tid: Ident.t)
-            (mlast: Memory.t)
-            (spaces : (Loc.t -> Time.t -> Prop))
-            (updates: (Loc.t -> Time.t -> Prop))
-            (aupdates: (Loc.t -> Time.t -> Prop))
-            (c_src c_tgt: Configuration.t) : Prop :=
-  | sim_pf_one_intro
-      (FUTURE: unchanged_on spaces mlast c_src.(Configuration.memory))
-      (NOATTATCH: not_attatched (updates \2/ aupdates) c_src.(Configuration.memory))
-      (INV:
-         forall
-           lang_src st_src lc_src lang_tgt st_tgt lc_tgt
-           (TIDSRC: IdentMap.find tid c_src.(Configuration.threads) =
-                    Some (existT _ lang_src st_src, lc_src))
-           (TIDTGT: IdentMap.find tid c_tgt.(Configuration.threads) =
-                    Some (existT _ lang_tgt st_tgt, lc_tgt)),
-           Inv.t c_tgt.(Configuration.memory) _ st_src lc_src lc_tgt.(Local.promises) spaces updates aupdates mlast)
-      (INVBOT:
-         forall
-           (TIDSRC: IdentMap.find tid c_src.(Configuration.threads) = None),
-           (<<SPACESBOT: spaces <2= bot2>>) /\
-           (<<UPDATESBOT: updates <2= bot2>>) /\
-           (<<AUPDATESBOT: aupdates <2= bot2>>))
-  .
-
-  Inductive sim_pf
-            (idents: Ident.t -> Prop)
-            (mlast: Ident.t -> Memory.t)
-            (spaces : Ident.t -> (Loc.t -> Time.t -> Prop))
-            (updates: Ident.t -> (Loc.t -> Time.t -> Prop))
-            (aupdates: Ident.t -> (Loc.t -> Time.t -> Prop))
-            (c_src c_tgt: Configuration.t) : Prop :=
-  | sim_pf_intro
-      (FORGET: forget_config c_src c_tgt)
-      (THREADS: forall tid (IDENT: idents tid),
-          sim_pf_one tid (mlast tid) (spaces tid) (updates tid) (aupdates tid) c_src c_tgt)
-      (RACEFREE: pf_racefree APFConfiguration.step c_src)
+  Inductive sim_config
+            (proms: Ident.t -> Loc.t -> Time.t -> Prop)
+            (pasts: Loc.t -> Time.t -> option Memory.t)
+            (c_src c_tgt: Configuration.t)
+    : Prop :=
+  | sim_config_intro
+      (THS: forall tid, option_rel
+                          (sim_statelocal (proms tid) pasts)
+                          (IdentMap.find tid c_src.(Configuration.threads))
+                          (IdentMap.find tid c_tgt.(Configuration.threads)))
+      (PAST: wf_pasts_memory c_src.(Configuration.memory) pasts)
+      (MEM: sim_memory (all_promises proms) c_src.(Configuration.memory) c_tgt.(Configuration.memory))
+      (SC: TimeMap.le c_src.(Configuration.sc) c_tgt.(Configuration.sc))
+      (ATTACH: not_attached (all_promises proms) c_src.(Configuration.memory))
       (WFSRC: Configuration.wf c_src)
       (WFTGT: Configuration.wf c_tgt)
-      (RESERVEWF: memory_reserve_wf c_tgt.(Configuration.memory))
-      (RESERVERTGT: reserver_exists c_tgt)
-      (RESERVERSRC: reserver_exists c_src)
+  (* TODO: can remove all promises *)
   .
 
-  Definition sim_pf_minus_one
-             (tid: Ident.t)
-             (mlast: Ident.t -> Memory.t)
-             (spaces : Ident.t -> (Loc.t -> Time.t -> Prop))
-             (updates: Ident.t -> (Loc.t -> Time.t -> Prop))
-             (aupdates: Ident.t -> (Loc.t -> Time.t -> Prop))
-             (c_src c_tgt: Configuration.t) : Prop :=
-    sim_pf (fun tid' => tid <> tid') mlast spaces updates aupdates c_src c_tgt.
-
-  Inductive sim_pf_all c_src c_tgt: Prop :=
-  | sim_pf_all_intro mlast spaces updates aupdates
-                     (SIM : sim_pf (fun _ => True) mlast spaces updates aupdates c_src c_tgt)
-  .
-
-  Lemma init_pf s tid st lc
-        (TID: IdentMap.find tid (Threads.init s) = Some (st, lc))
+  Lemma sim_thread_step prom_self prom_others pasts lang st lc_src lc_tgt sc_src sc_tgt mem_src mem_tgt pf e_tgt
+        st' lc_tgt' sc_tgt' mem_tgt'
+        (STEPTGT: @Thread.step lang pf e_tgt (Thread.mk _ st lc_tgt sc_tgt mem_tgt) (Thread.mk _ st' lc_tgt' sc_tgt' mem_tgt'))
+        (NOREAD: no_read_msgs (prom_others \2/ prom_self) e_tgt)
+        (SC: TimeMap.le sc_src sc_tgt)
+        (MEM: sim_memory (prom_others \2/ prom_self) mem_src mem_tgt)
+        (ATTACH: not_attached (prom_others \2/ prom_self) mem_src)
+        (SCSRC: Memory.closed_timemap sc_src mem_src)
+        (SCTGT: Memory.closed_timemap sc_tgt mem_tgt)
+        (MEMSRC: Memory.closed mem_src)
+        (MEMTGT: Memory.closed mem_tgt)
+        (LOCALSRC: Local.wf lc_src mem_src)
+        (LOCALTGT: Local.wf lc_tgt mem_tgt)
+        (SIM: sim_local prom_self pasts lc_src lc_tgt)
+        (PAST: wf_pasts_memory mem_src pasts)
     :
-      Local.promises lc = Memory.bot.
-  Proof.
-    unfold Threads.init in *. erewrite IdentMap.Properties.F.map_o in *.
-    unfold option_map in *. des_ifs.
-  Qed.
-
-  Lemma sim_pf_init
-        s
-        (RACEFREE: pf_racefree APFConfiguration.step (Configuration.init s))
-    :
-      sim_pf_all (Configuration.init s) (Configuration.init s)
+      exists tr prom_self' pasts' lc_src' sc_src' mem_src',
+        (<<STEPSRC: Trace.steps tr (Thread.mk _ st lc_src sc_src mem_src) (Thread.mk _ st' lc_src' sc_src' mem_src')>>) /\
+        (<<MEM: sim_memory (prom_others \2/ prom_self') mem_src' mem_tgt'>>) /\
+        (<<ATTACH: not_attached (prom_others \2/ prom_self') mem_src'>>) /\
+        (<<SC: TimeMap.le sc_src' sc_tgt'>>) /\
+        (<<SIM: sim_local prom_self' pasts' lc_src' lc_tgt'>>) /\
+        (<<PAST: wf_pasts_memory mem_src' pasts'>>) /\
+        (<<PASTLE: pasts_le pasts pasts'>>)
   .
   Proof.
-    econs.
-    instantiate (1:=fun _ _ _ => False).
-    instantiate (1:=fun _ _ _ => False).
-    instantiate (1:=fun _ _ _ => False).
-    instantiate (1:=fun _ => Memory.init).
-    econs; eauto; ss; i.
-    - econs; i; ss.
-      + unfold Threads.init in *. erewrite IdentMap.Properties.F.map_o in *.
-        unfold option_map in *. des_ifs.
-      + econs.
-        * instantiate (1:= Memory.init). econs; ss; eauto.
-          ii. inv PROMS. ss.
-          exploit init_pf; eauto. i. rewrite x0 in *.
-          inv PROMISED. rewrite Memory.bot_get in *. clarify.
-        * refl.
-    - econs; ss.
-      + refl.
-      + ii. des; clarify.
-      + i. econs; eauto; ii; clarify.
-        exploit init_pf; try apply TIDTGT; eauto. i.
-        rewrite x0 in *. inv PROM.
-        rewrite Memory.bot_get in *. clarify.
-      + i; splits; i; clarify.
-    - eapply Configuration.init_wf.
-    - eapply Configuration.init_wf.
-    - ii. unfold Memory.get in GET. rewrite Cell.init_get in GET.
-      des_ifs.
-    - ii. unfold Memory.get in RESERVE. rewrite Cell.init_get in RESERVE.
-      des_ifs.
-    - ii. unfold Memory.get in RESERVE. rewrite Cell.init_get in RESERVE.
-      des_ifs.
-  Qed.
+  Admitted.
 
-  Lemma sim_pf_src_no_promise idents mlast spaces updates aupdates c_src c_tgt
-        (SIM: sim_pf idents mlast spaces updates aupdates c_src c_tgt)
-        tid st lc
-        (TIDSRC: IdentMap.find tid c_src.(Configuration.threads) =
-                 Some (st, lc))
-    :
-      lc.(Local.promises) = Memory.bot.
-  Proof.
-    inv SIM. inv FORGET. specialize (THS tid).
-    unfold option_rel in THS. des_ifs. inv THS. auto.
-  Qed.
-
-  Lemma sim_pf_src_no_reserve idents mlast spaces updates aupdates c_src c_tgt
-        (SIM: sim_pf idents mlast spaces updates aupdates c_src c_tgt)
-        loc to from
-        (RESERVE: Memory.get loc to c_src.(Configuration.memory) = Some (from, Message.reserve))
-    :
-      False.
-  Proof.
-    dup SIM. inv SIM. eapply RESERVERSRC in RESERVE; eauto.
-    des. eapply sim_pf_src_no_promise in TIDSRC; eauto.
-    rewrite TIDSRC in *. erewrite Memory.bot_get in *; clarify.
-  Qed.
-
-  Lemma less_covered_max_ts mem0 mem1
-        (INHABITED: Memory.inhabited mem0)
-        (SHORTER: forall loc to (COVER: covered loc to mem0), covered loc to mem1)
-        loc
-    :
-      Time.le (Memory.max_ts loc mem0) (Memory.max_ts loc mem1).
-  Proof.
-    specialize (INHABITED loc). eapply Memory.max_ts_spec in INHABITED.
-    des. dup GET. eapply memory_get_ts_strong in GET. des; clarify.
-    - erewrite GET1. eapply Time.bot_spec.
-    - exploit SHORTER.
-      { econs; eauto. econs; [|refl]. eauto. }
-      intros COVER. inv COVER. inv ITV.
-      eapply Memory.max_ts_spec in GET. des. ss.
-      etrans; eauto.
-  Qed.
-
-  Lemma sim_pf_max_timemap idents mlast spaces updates aupdates c_src c_tgt max
-        (SIM: sim_pf idents mlast spaces updates aupdates c_src c_tgt)
-        (MAX: Memory.max_concrete_timemap c_tgt.(Configuration.memory) max)
-    :
-      TimeMap.le (Memory.max_timemap c_src.(Configuration.memory)) max.
-  Proof.
-    inv SIM. inv WFTGT. inv MEM. inv WFSRC. inv MEM. inv FORGET. ii.
-    inv MEM. inv SHORTER. eapply less_covered_max_ts in COVER; eauto. etrans; eauto.
-    exploit Memory.max_ts_spec.
-    { inv FORGET. erewrite COMPLETE0.
-      - eapply (INHABITED loc).
-      - ii. inv H. destruct st as [lang st]. inv PROMISED. destruct msg.
-        inv WF. exploit THREADS0; eauto. intros []. erewrite BOT in GET. clarify. }
-    i. des. eapply forget_memory_get in GET; eauto. des. destruct msg.
-    - eapply Memory.max_concrete_ts_spec in GET0; eauto. des. auto.
-    - exfalso. eapply NOT.
-      eapply RESERVERTGT in GET0. des. destruct st as [lang st].
-      econs; eauto. econs; eauto.
-  Qed.
-
-  Lemma pf_sim_memory_exists_or_blank L mem_src mem_tgt
-        (MEM: pf_sim_memory L mem_src mem_tgt)
-        loc to from val released
-        (GET: Memory.get loc to mem_tgt = Some (from, Message.concrete val released))
-    :
-      (exists from', (<<GET: Memory.get loc to mem_src = Some (from', Message.concrete val released)>>)) \/
-      (<<BLANK: forall ts (ITV: Interval.mem (from, to) ts),
-          (<<NCOVER: ~ covered loc ts mem_src>>) /\ (<<FORGET: L loc to>>)>>).
-  Proof.
-    inv MEM. dup FORGET. inv FORGET. destruct (classic (L loc to)).
-    - right. ii. split; auto. ii.
-      inv SHORTER. eapply COVER in H0. inv H0.
-      eapply forget_memory_get in GET0; eauto. des; clarify.
-      exploit Memory.get_disjoint.
-      { eapply GET1. }
-      { eapply GET. }
-      i. des; clarify. eapply x0; eauto.
-    - left. erewrite <- COMPLETE in GET; eauto.
-      inv SHORTER. eapply COMPLETE0 in GET. des. eauto.
-  Qed.
-
-
-End SIMPF.
+End SIM.
