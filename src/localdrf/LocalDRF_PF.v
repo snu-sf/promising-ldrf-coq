@@ -440,6 +440,36 @@ Section SIM.
     eapply sim_promise_consistent; eauto.
   Qed.
 
+  Lemma sim_memory_max_ts P mem_src mem_tgt loc
+        (CLOSEDSRC: Memory.closed mem_src)
+        (CLOSEDTGT: Memory.closed mem_tgt)
+        (SIM: sim_memory P mem_src mem_tgt)
+    :
+      Memory.max_ts loc mem_src = Memory.max_ts loc mem_tgt.
+  Proof.
+    inv SIM.
+    assert (LEFT: Time.le (Memory.max_ts loc mem_src) (Memory.max_ts loc mem_tgt)).
+    { exploit Memory.max_ts_spec.
+      { try apply CLOSEDSRC. }
+      i.  des. destruct (classic (P loc (Memory.max_ts loc mem_src))) as [PROM|NPROM].
+      - exploit FORGET; eauto. i. des.
+        eapply Memory.max_ts_spec; eauto.
+      - exploit COMPLETE; eauto. rewrite GET. i. inv x.
+        eapply Memory.max_ts_spec; eauto.
+    }
+    assert (RIGHT: Time.le (Memory.max_ts loc mem_tgt) (Memory.max_ts loc mem_src)).
+    { exploit Memory.max_ts_spec.
+      { try apply CLOSEDTGT. }
+      i.  des. destruct (classic (P loc (Memory.max_ts loc mem_tgt))) as [PROM|NPROM].
+      - exploit FORGET; eauto. i. des.
+        eapply Memory.max_ts_spec; eauto.
+      - exploit COMPLETE; eauto. rewrite GET. i. inv x.
+        eapply Memory.max_ts_spec; eauto.
+    }
+    destruct LEFT; auto. exfalso. eapply Time.lt_strorder.
+    eapply TimeFacts.le_lt_lt; eauto.
+  Qed.
+
   Lemma sim_memory_max_concrete_timemap P mem_src mem_tgt sc_src sc_tgt
         (SIM: sim_memory P mem_src mem_tgt)
         (SCSRC: Memory.max_concrete_timemap mem_src sc_src)
@@ -458,42 +488,95 @@ Section SIM.
       + exploit RESERVE; eauto. clarify.
   Qed.
 
-
-  Lemma sim_promise_pasts_le P pasts0 pasts1 rel_src rel_tgt prom_src prom_tgt
-        (SIM: sim_promise P pasts0 rel_src rel_tgt prom_src prom_tgt)
-        (PASTLE: pasts_le pasts0 pasts1)
-    :
-      sim_promise P pasts1 rel_src rel_tgt prom_src prom_tgt.
-  Proof.
-    inv SIM. econs; eauto.
-    i.
-
-
-
-  Lemma pasts_le_all_pasts_memory mem pasts0 pasts1
-        (ALL: all_pasts_memory mem pasts0)
-        (PASTLE: pasts_le pasts0 pasts1)
-    :
-      all_pasts_memory mem pasts1.
-  Proof.
-    ii. exploit ALL; eauto. i. des.
-    apply PASTLE in PAST. esplits; eauto.
-    i. apply
-
-
-
-            (PAST: wf_pasts_memory mem_src pasts)
-        (<<PAST: wf_pasts_memory mem_src' pasts'>>) /\
-        (<<PASTLE: pasts_le pasts pasts'>>)
-
-
-  Lemma sim_memory_max_concrete_timemap P mem_src mem_tgt sc_src sc_tgt
+  Lemma sim_memory_cap P mem_src mem_tgt cap_src cap_tgt
         (SIM: sim_memory P mem_src mem_tgt)
-        (SCSRC: Memory.max_concrete_timemap mem_src sc_src)
-        (SCTGT: Memory.max_concrete_timemap mem_tgt sc_tgt)
+        (CLOSEDSRC: Memory.closed mem_src)
+        (CLOSEDTGT: Memory.closed mem_tgt)
+        (CAPSRC: Memory.cap mem_src cap_src)
+        (CAPTGT: Memory.cap mem_tgt cap_tgt)
     :
-      TimeMap.le sc_src sc_tgt.
-  Proof.
+      sim_memory P cap_src cap_tgt.
+ Proof.
+   dup SIM. inv SIM. econs.
+   - i. destruct (Memory.get l t cap_src) as [[from msg]|] eqn:GETSRC.
+     + hexploit (@Memory.cap_inv mem_src cap_src); eauto. i. des; clarify.
+       * destruct (classic (P l t)) as [PROM|NPROM].
+         { exploit FORGET; eauto. i. des. clarify. }
+         { inv CAPTGT. exploit COMPLETE; eauto. i. rewrite H in *. inv x.
+           symmetry in H3. apply SOUND in H3. rewrite H3. econs; eauto. }
+       * clarify.
+
+
+         admit.
+       * inv CAPTGT. erewrite sim_memory_max_ts; eauto.
+         rewrite BACK. econs; eauto. refl.
+     + admit.
+   -
+
+
+       exploit COMPLETE; eauto.
+       destruct (Memory.get l t cap_tgt) as [[from msg]|] eqn:GETTGT.
+       * exfalso. hexploit (@Memory.cap_inv mem_tgt cap_tgt); eauto. i. des; clarify.
+         {
+
+       * destruct (classic (P l t)) as [PROM|NPROM].
+         { exploit FORGET; eauto. i. des. clarify. }
+         { inv CAPTGT. exploit COMPLETE; eauto. i. rewrite H in *. inv x.
+           symmetry in H3. apply SOUND in H3. rewrite H3. econs; eauto. }
+       * clarify. admit.
+       * inv CAPTGT. erewrite sim_memory_max_ts; eauto.
+         rewrite BACK. econs; eauto. refl.
+     + destruct (Memory.get l t cap_tgt) as [[from msg]|] eqn:GETTGT.
+
+
+         admit.
+       * econs.
+
+
+     + hexploit (@Memory.cap_inv mem_src cap_src); eauto. i. des; clarify.
+       * destruct (classic (P l t)) as [PROM|NPROM].
+         { exploit FORGET; eauto. i. des. clarify. }
+         { inv CAPTGT. exploit COMPLETE; eauto. i. rewrite H in *. inv x.
+           symmetry in H3. apply SOUND in H3. rewrite H3. econs; eauto. }
+       * clarify. admit.
+       * inv CAPTGT. erewrite sim_memory_max_ts; eauto.
+         rewrite BACK. econs; eauto. refl.
+
+
+
+         rewrite.
+
+
+                       erewrite BACK.
+
+
+           rewrite H in *. clarify. econs; eauto.
+           -
+
+             econs; eaut
+
+             clarify. econs; eauto.
+
+           inv CAPTGT. apply SOUND in
+
+           inv CAPTGT. apply SOUND in TGTGET. rewrite TGTGET. econs; eauto.
+
+
+       try apply CAPSRC.
+       apply CLOSEDSRC. apply CAPSRC. apply GETSRC.
+
+       ; try apply CAPSRC; eauto.
+
+
+       hexploit Memory.cap_inv; try apply CAPSRC; eauto.
+       apply CAPSRC.
+       eapply
+       eauto.
+
+                try apply CAPSRC; auto.
+
+       ; eauto. i. des.
+       x
 
     Memory.cap
     inv SIM. ii. specialize (SCSRC loc). specialize (SCTGT loc).
@@ -506,6 +589,35 @@ Section SIM.
       + eapply MAX0; eauto.
       + exploit RESERVE; eauto. clarify.
   Qed.
+
+
+  (* Lemma sim_promise_pasts_le P pasts0 pasts1 rel_src rel_tgt prom_src prom_tgt *)
+  (*       (SIM: sim_promise P pasts0 rel_src rel_tgt prom_src prom_tgt) *)
+  (*       (PASTLE: pasts_le pasts0 pasts1) *)
+  (*   : *)
+  (*     sim_promise P pasts1 rel_src rel_tgt prom_src prom_tgt. *)
+  (* Proof. *)
+  (*   inv SIM. econs; eauto. *)
+  (*   i. *)
+
+
+
+  (* Lemma pasts_le_all_pasts_memory mem pasts0 pasts1 *)
+  (*       (ALL: all_pasts_memory mem pasts0) *)
+  (*       (PASTLE: pasts_le pasts0 pasts1) *)
+  (*   : *)
+  (*     all_pasts_memory mem pasts1. *)
+  (* Proof. *)
+  (*   ii. exploit ALL; eauto. i. des. *)
+  (*   apply PASTLE in PAST. esplits; eauto. *)
+  (*   i. apply *)
+
+
+
+            (PAST: wf_pasts_memory mem_src pasts)
+        (<<PAST: wf_pasts_memory mem_src' pasts'>>) /\
+        (<<PASTLE: pasts_le pasts pasts'>>)
+
 
   Inductive sim_memory P mem_src mem_tgt : Prop :=
   | sim_memory_intro
