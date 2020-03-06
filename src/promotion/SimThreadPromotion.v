@@ -34,7 +34,6 @@ Set Implicit Arguments.
 Module SimThreadPromotion.
   Import SimCommon.
 
-
   (* sim_state *)
 
   Inductive sim_state_synch (l: Loc.t) (r: Reg.t) (val: Const.t) (st_src st_tgt: State.t): Prop :=
@@ -173,7 +172,7 @@ Module SimThreadPromotion.
     destruct e_tgt as [st_tgt [tview_tgt promises_tgt] sc_tgt mem_tgt].
     inv SIM1. ss. des.
     dup WF1_SRC. inv WF1_SRC0. ss.
-    clear TVIEW_WF TVIEW_CLOSED FINITE BOT RESERVE.
+    clear TVIEW_WF TVIEW_CLOSED FINITE BOT.
     exploit (@Memory.add_exists_max_ts mem1_src l (Time.incr (Memory.max_ts l mem1_src)) Message.reserve).
     { apply Time.incr_spec. }
     { econs. }
@@ -237,7 +236,7 @@ Module SimThreadPromotion.
     destruct e_tgt as [st_tgt [tview_tgt promises_tgt] sc_tgt mem_tgt].
     inv SIM1. ss. des.
     dup WF1_SRC. inv WF1_SRC0. ss.
-    clear TVIEW_WF TVIEW_CLOSED FINITE BOT RESERVE.
+    clear TVIEW_WF TVIEW_CLOSED FINITE BOT.
     exploit (@Memory.remove_exists promises1_src l from (Memory.max_ts l mem1_src) Message.reserve); ss.
     i. des.
     exploit Memory.remove_exists_le; eauto. i. des.
@@ -1198,10 +1197,6 @@ Module SimThreadPromotion.
         exploit Memory.max_ts_spec; try exact x. i. des.
         specialize (Time.incr_spec (Memory.max_ts l mem_src)). i.
         exploit TimeFacts.le_lt_lt; try exact MAX0; try exact H0. i. timetac.
-      + exploit RESERVE; eauto. i. des.
-        exploit Memory.remove_get0; eauto. i. des.
-        exploit Memory.remove_get1; try exact x; eauto. i. des; eauto.
-        subst. congr.
     - hexploit Memory.max_concrete_timemap_closed; try exact SC_SRC.
       eapply Memory.cancel_closed_timemap; eauto.
     - exploit Memory.cap_closed; try exact CAP_SRC; eauto. i.

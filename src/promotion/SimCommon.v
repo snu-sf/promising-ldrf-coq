@@ -727,10 +727,6 @@ Module SimCommon.
       esplits.
       - econs; eauto.
         + eapply get_message_src_message_to; eauto.
-        + i. exploit get_message_src_reserve; eauto. i. subst.
-          exploit RESERVE; eauto. i. des.
-          exploit COMPLETE0; try exact x; eauto. i. des.
-          inv MSG. eauto.
         + i. exploit SOUND0; try exact GET; eauto. i. des.
           destruct msg_tgt; ss. eauto.
       - econs; i.
@@ -1097,10 +1093,6 @@ Module SimCommon.
       esplits.
       - econs; eauto.
         + eapply get_message_src_message_to; eauto.
-        + i. exploit get_message_src_reserve; eauto. i. subst.
-          exploit RESERVE; eauto. i. des.
-          exploit COMPLETE0; try exact x; eauto. i. des.
-          inv MSG. eauto.
         + i. exploit SOUND0; try exact GET; eauto. i. des.
           destruct msg_tgt; ss. eauto.
       - econs; i.
@@ -1619,7 +1611,7 @@ Module SimCommon.
     - unguardH RELEASED_TGT. subst.
       exploit Memory.remove_get0; try exact REMOVE. i. des.
       dup WF1_TGT. inv WF1_TGT0. exploit PROMISES; try exact GET3. i.
-      clear GET4 TVIEW_WF TVIEW_CLOSED PROMISES FINITE BOT RESERVE.
+      clear GET4 TVIEW_WF TVIEW_CLOSED PROMISES FINITE BOT.
       inv MEM1. econs; i.
       + revert GET_SRC0.
         erewrite Memory.lower_o; eauto. condtac; ss; eauto.
@@ -1748,7 +1740,7 @@ Module SimCommon.
     - unguardH RELEASED_TGT.
       exploit Memory.remove_get0; try exact REMOVE. i. des.
       dup WF1_TGT. inv WF1_TGT0. exploit PROMISES; try exact GET3. i.
-      clear GET4 TVIEW_WF TVIEW_CLOSED PROMISES FINITE BOT RESERVE.
+      clear GET4 TVIEW_WF TVIEW_CLOSED PROMISES FINITE BOT.
       inv MEM1. econs; i.
       + revert GET_SRC0.
         erewrite Memory.lower_o; eauto. condtac; ss; eauto.

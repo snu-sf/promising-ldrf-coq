@@ -148,7 +148,6 @@ Module Local.
       (PROMISES: Memory.le lc.(promises) mem)
       (FINITE: Memory.finite lc.(promises))
       (BOT: Memory.bot_none lc.(promises))
-      (RESERVE: Memory.reserve_wf lc.(promises) mem)
   .
   Hint Constructors wf.
 
@@ -161,7 +160,6 @@ Module Local.
     inv WF. econs; eauto.
     - eapply TView.cap_closed; eauto.
     - eapply Memory.cap_le; eauto.
-    - eapply Memory.cap_reserve_wf; eauto.
   Qed.
 
   Inductive disjoint (lc1 lc2:t): Prop :=

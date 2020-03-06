@@ -143,8 +143,6 @@ Module SimPromises.
           { subst. eauto. }
           { etrans; eauto. econs. ss. }
         * econs 1; eauto; ss.
-          i. exploit RESERVE; eauto. i. des.
-          inv SIM1. exploit MSG; eauto. i. des. inv MSG0. eauto.
       + econs.
         * ii. erewrite Memory.add_o; eauto.
           erewrite (@Memory.add_o promises2_tgt) in LHS; try exact PROMISES. revert LHS.

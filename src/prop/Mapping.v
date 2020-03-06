@@ -28,8 +28,8 @@ Require Import Time.
 Require Import Pred.
 Require Import MemoryProps.
 
-
 Set Implicit Arguments.
+
 
 Section MAPPED.
 
@@ -1488,7 +1488,6 @@ Section MAPPED.
       eapply map_le in TS0; cycle 1; eauto.
       etrans; eauto. inv VIEWLE. eauto.
     - i. clarify.
-    - i. clarify.
       assert (TS0: Time.lt Time.bot fto).
       { inv ADD. inv ADD0. eapply TimeFacts.le_lt_lt; eauto.
         eapply Time.bot_spec. }
@@ -1754,12 +1753,6 @@ Section MAPPED.
       + inv MSG. econs.
         eapply map_le; eauto. eapply map_rlx. eapply unwrap_map; eauto.
       + inv MSG. econs.
-    - i. clarify. inv MSG.
-      inv MEM0. exploit RESERVE; eauto. i. des.
-      eapply msg_get_map in x; eauto. des; clarify.
-      inv MSG. inv MSGLE.
-      hexploit (map_eq TO0 FROM). i. clarify.
-      esplits; eauto.
     - i. clarify. inv MSG.
       assert (TS0: Time.lt Time.bot fto).
       { inv ADD. inv ADD1. eapply TimeFacts.le_lt_lt; eauto.

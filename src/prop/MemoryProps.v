@@ -1,5 +1,6 @@
 Require Import Omega.
 Require Import RelationClasses.
+Require Import Program.
 
 From Paco Require Import paco.
 From sflib Require Import sflib.
@@ -7,26 +8,24 @@ From sflib Require Import sflib.
 From PromisingLib Require Import Axioms.
 From PromisingLib Require Import Basic.
 From PromisingLib Require Import DataStructure.
+From PromisingLib Require Import Language.
+From PromisingLib Require Import Loc.
+
 Require Import Time.
 Require Import Event.
-From PromisingLib Require Import Language.
 Require Import View.
 Require Import Cell.
 Require Import Memory.
-Require Import Cover.
 Require Import TView.
 Require Import Local.
 Require Import Thread.
 Require Import Configuration.
-Require Import Progress.
-Require Import PromiseConsistent.
-From PromisingLib Require Import Loc.
-
 Require Import Behavior.
-Require Import SimMemory.
-Require Import Program.
-Require Import Cell.
-Require Import Time.
+Require Import Progress.
+
+Require Import PromiseConsistent.
+Require Import MemoryMerge.
+Require Import Cover.
 Require Import Pred.
 
 
@@ -1706,13 +1705,13 @@ Section PROMISEFREE.
         * inv LOCAL0. rewrite NOPROMISE in *.
           exploit memory_write_bot_add; eauto. i. clarify.
           inv WRITE. inv PROMISE. ss.
-          symmetry. eapply MemoryMerge.MemoryMerge.add_remove; eauto.
+          symmetry. eapply MemoryMerge.add_remove; eauto.
       + ss. esplits; eauto.
         * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
         * inv LOCAL1. inv LOCAL2. rewrite NOPROMISE in *.
           exploit memory_write_bot_add; eauto. i. clarify.
           inv WRITE. inv PROMISE. ss.
-          symmetry. eapply MemoryMerge.MemoryMerge.add_remove; eauto.
+          symmetry. eapply MemoryMerge.add_remove; eauto.
       + ss. esplits; eauto.
         * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
         * inv LOCAL0. ss.
@@ -1729,7 +1728,7 @@ Section PROMISEFREE.
       concrete_promised prom1 <2= concrete_promised prom0.
   Proof.
     inv WRITE. inv PROMISE.
-    - exploit MemoryMerge.MemoryMerge.add_remove.
+    - exploit MemoryMerge.add_remove.
       + eapply PROMISES.
       + eapply REMOVE.
       + i. clarify.
@@ -1941,16 +1940,6 @@ Proof.
   - eapply memory_concrete_le_closed_view; eauto.
 Qed.
 
-Lemma memory_concrete_le_reserve_wf prom mem0 mem1
-      (MLE: memory_concrete_le mem0 mem1)
-      (RESERVE: Memory.reserve_wf prom mem0)
-  :
-    Memory.reserve_wf prom mem1.
-Proof.
-  ii. eapply RESERVE in GET. des.
-  esplits; eauto.
-Qed.
-
 Lemma memory_concrete_le_local_wf lc mem0 mem1
       (MLE: memory_concrete_le mem0 mem1)
       (PROM: Memory.le (Local.promises lc) mem1)
@@ -1959,8 +1948,7 @@ Lemma memory_concrete_le_local_wf lc mem0 mem1
     Local.wf lc mem1.
 Proof.
   inv LOCAL. econs; eauto.
-  - eapply memory_concrete_le_closed_tview; eauto.
-  - eapply memory_concrete_le_reserve_wf; eauto.
+  eapply memory_concrete_le_closed_tview; eauto.
 Qed.
 
 

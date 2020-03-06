@@ -54,9 +54,7 @@ Proof.
   i. des.
   esplits; eauto; try refl.
   econs; eauto; ss.
-  - ii. erewrite Memory.remove_o; eauto. condtac; ss.
-  - ii. revert GET1. erewrite Memory.remove_o; eauto. condtac; ss. i.
-    inv WF1. eauto.
+  ii. erewrite Memory.remove_o; eauto. condtac; ss.
 Qed.
 
 Lemma fulfill_step_cap

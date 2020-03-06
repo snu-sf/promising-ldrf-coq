@@ -70,19 +70,17 @@ Proof.
       exploit MemoryReorder.add_lower; try exact MEM1; try exact MEM; eauto. i. des; [|congr].
       left. esplits; ss.
       * inv MEM. inv LOWER. ss.
-      * econs; eauto. econs; eauto; congr.
+      * econs; eauto.
     + exploit MemoryReorder.add_lower; try exact MEM1; try exact MEM; eauto. i. des; [congr|].
       right. esplits; eauto; econs; eauto.
       * econs; eauto.
-        { i. subst. exploit RESERVE; eauto. i. des.
-          erewrite Memory.lower_o; eauto. condtac; ss; eauto. }
-        { i. revert GET.
-          erewrite Memory.lower_o; eauto. condtac; ss.
-          - i. des. subst. inv GET.
-            exploit Memory.lower_get0; try exact MEM. i. des.
-            revert GET. erewrite Memory.add_o; eauto. condtac; ss; eauto.
-            des. subst. inv MEM. inv LOWER. timetac.
-          - i. exploit Memory.lower_get1; try exact GET; eauto. }
+        i. revert GET.
+        erewrite Memory.lower_o; eauto. condtac; ss.
+        { i. des. subst. inv GET.
+          exploit Memory.lower_get0; try exact MEM. i. des.
+          revert GET. erewrite Memory.add_o; eauto. condtac; ss; eauto.
+          des. subst. inv MEM. inv LOWER. timetac. }
+        { i. exploit Memory.lower_get1; try exact GET; eauto. }
       * eapply Memory.lower_closed_message; eauto.
   - des. subst.
     destruct (classic ((loc1, ts3) = (loc2, to2))).
@@ -140,12 +138,8 @@ Proof.
       exploit MemoryReorder.add_remove; try exact MEM1; eauto. i. des.
       right. right. esplits; eauto. econs; eauto.
       * econs; eauto.
-        { i. subst.
-          exploit RESERVE; eauto. i. des.
-          exploit Memory.remove_get1; try exact x; eauto. i. des; eauto.
-          subst. exploit Memory.remove_get0; try exact REMOVE0; eauto. i. des. congr. }
-        { i. revert GET.
-          erewrite Memory.remove_o; eauto. condtac; ss. eauto. }
+        i. revert GET.
+        erewrite Memory.remove_o; eauto. condtac; ss. eauto.
       * eapply Memory.cancel_closed_message; eauto.
   - destruct (classic ((loc1, ts3) = (loc2, to2))).
     + des. subst. inv H.
@@ -242,20 +236,16 @@ Proof.
         econs; eauto; try congr.
         i. exploit Memory.add_get1; try exact MEM; eauto.
       + right. esplits; eauto. econs; eauto.
-        * econs; eauto.
-          { i. subst.
-            erewrite Memory.add_o; eauto. condtac; ss; eauto. }
-          { i. revert GET.
-            erewrite Memory.add_o; eauto. condtac; ss; eauto.
-            i. des. inv GET.
-            exploit LOCTS2; eauto. i.
-            inv ADD0. inv ADD. rewrite x in TO. timetac.
-          }
+        * econs; eauto. i. revert GET.
+          erewrite Memory.add_o; eauto. condtac; ss; eauto.
+          i. des. inv GET.
+          exploit LOCTS2; eauto. i.
+          inv ADD0. inv ADD. rewrite x in TO. timetac.
         * eapply Memory.add_closed_message; cycle 1; eauto.
       + auto.
     - (* add/split *)
       exploit MemoryReorder.add_split; try exact PROMISES; try exact PROMISES0; eauto. i. des.
-      + subst. inv RESERVE0.
+      + subst. inv RESERVE.
         exploit MemoryReorder.add_split; try exact MEM; try exact MEM0; eauto. i. des; [|congr].
         esplits.
         * cut (Memory.promise (Local.promises lc0) mem0 loc2 from2 to2 (Message.concrete val' released')
@@ -281,15 +271,13 @@ Proof.
           { ii. inv H. inv ADD3. inv ADD. timetac. }
           { econs.
             - econs; eauto.
-              + i. subst.
-                erewrite Memory.add_o; eauto. condtac; ss; eauto. des; congr.
-              + i. revert GET.
-                erewrite Memory.add_o; eauto. condtac; ss; eauto. i. des. inv GET.
-                inv ADD0. inv ADD. inv ADD3. inv ADD. rewrite TO in TO0. timetac.
+              i. revert GET.
+              erewrite Memory.add_o; eauto. condtac; ss; eauto. i. des. inv GET.
+              inv ADD0. inv ADD. inv ADD3. inv ADD. rewrite TO in TO0. timetac.
             - eapply Memory.split_closed_message; eauto.
             - auto. }
         * auto.
-      + inv RESERVE0.
+      + inv RESERVE.
         exploit MemoryReorder.add_split; try exact MEM; try exact MEM0; eauto. i. des; [congr|].
         esplits.
         * econs.
@@ -301,33 +289,28 @@ Proof.
             revert GET. erewrite Memory.add_o; eauto. condtac; ss. des; congr. }
           { econs; eauto.
             - econs; eauto.
-              + i. subst.
-                erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
-                guardH o. des. subst. exploit RESERVE; eauto. i. des.
+              i. revert GET.
+              erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
+              + i. des. inv GET.
+                exploit Memory.split_get0; try exact MEM0. i. des.
+                revert GET0. erewrite Memory.add_o; eauto. condtac; ss; eauto.
+                i. des. inv GET0.
+                inv MEM0. inv SPLIT. rewrite TS12 in TS23. timetac.
+              + guardH o. i. des. inv GET.
                 exploit Memory.split_get0; try exact SPLIT0. i. des.
-                rewrite x in GET0. inv GET0. esplits; eauto.
-              + i. revert GET.
-                erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
-                * i. des. inv GET.
-                  exploit Memory.split_get0; try exact MEM0. i. des.
-                  revert GET0. erewrite Memory.add_o; eauto. condtac; ss; eauto.
-                  i. des. inv GET0.
-                  inv MEM0. inv SPLIT. rewrite TS12 in TS23. timetac.
-                * guardH o. i. des. inv GET.
-                  exploit Memory.split_get0; try exact SPLIT0. i. des.
-                  exploit Memory.add_get0; try exact ADD0. i. des.
-                  exploit Memory.add_get1; try exact GET1; eauto. i.
-                  clear GET GET0 GET1 GET2 GET3.
-                  exploit Memory.get_ts; try exact GET4. i. des.
-                  { subst. inv SPLIT0. inv SPLIT. inv TS12. }
-                  exploit Memory.get_ts; try exact x0. i. des.
-                  { subst. inv ADD0. inv ADD. inv TO. }
-                  exploit Memory.get_disjoint; [exact GET4|exact x0|..]. i. des.
-                  { subst. exploit Memory.split_get0; try exact SPLIT0. i. des.
-                    inv ADD0. inv ADD.
-                    hexploit DISJOINT; try eapply GET1. i.
-                    apply (H to1); econs; ss; try refl. }
-                  apply (x3 to1); econs; ss; try refl.
+                exploit Memory.add_get0; try exact ADD0. i. des.
+                exploit Memory.add_get1; try exact GET1; eauto. i.
+                clear GET GET0 GET1 GET2 GET3.
+                exploit Memory.get_ts; try exact GET4. i. des.
+                { subst. inv SPLIT0. inv SPLIT. inv TS12. }
+                exploit Memory.get_ts; try exact x0. i. des.
+                { subst. inv ADD0. inv ADD. inv TO. }
+                exploit Memory.get_disjoint; [exact GET4|exact x0|..]. i. des.
+                { subst. exploit Memory.split_get0; try exact SPLIT0. i. des.
+                  inv ADD0. inv ADD.
+                  hexploit DISJOINT; try eapply GET1. i.
+                  apply (H to1); econs; ss; try refl. }
+                apply (x3 to1); econs; ss; try refl.
             - eapply Memory.split_closed_message; eauto. }
         * auto.
     - (* add/lower *)
@@ -336,7 +319,7 @@ Proof.
       + subst.
         exploit MemoryReorder.add_lower; try exact MEM; try exact MEM0; eauto. i. des; [|congr].
         esplits.
-        * econs; eauto. econs; eauto. congr.
+        * econs; eauto.
         * left. auto.
         * auto.
       + exploit MemoryReorder.add_lower; try exact MEM; try exact MEM0; eauto. i. des; [congr|].
@@ -345,12 +328,10 @@ Proof.
           econs. eapply REL_CLOSED; eauto.
         * right. esplits; eauto. econs; eauto.
           { econs; eauto.
-            - i. subst.
-              erewrite Memory.lower_o; eauto. condtac; ss; eauto.
-            - i. revert GET.
-              erewrite Memory.lower_o; eauto. condtac; ss; eauto.
-              i. des. inv GET.
-              exploit Memory.lower_get0; try exact LOWER0. i. des. eauto. }
+            i. revert GET.
+            erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+            i. des. inv GET.
+            exploit Memory.lower_get0; try exact LOWER0. i. des. eauto. }
           { eapply Memory.lower_closed_message; eauto. }
         * auto.
   }

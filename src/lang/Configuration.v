@@ -63,7 +63,6 @@ Module Threads.
       + apply TView.bot_closed.
       + ii. rewrite Memory.bot_get in LHS. congr.
       + apply Memory.bot_finite.
-      + ii. rewrite Memory.bot_get in GET. congr.
   Qed.
 
   Definition consistent (ths:t) (sc:TimeMap.t) (mem:Memory.t): Prop :=

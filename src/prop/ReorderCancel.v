@@ -111,13 +111,8 @@ Proof.
     + exploit MemoryReorder.add_remove; try exact PROMISES0; eauto. i. des.
       exploit MemoryReorder.add_remove; try exact MEM1; eauto. i. des.
       right. right. esplits; ss; [eauto|econs; eauto|..].
-      * econs; eauto.
-        { i. subst.
-          exploit RESERVE; eauto. i. des.
-          exploit Memory.remove_get1; try exact x; eauto. i. des; eauto.
-          subst. exploit Memory.remove_get0; try exact REMOVE0; eauto. i. des. congr. }
-        { i. revert GET.
-          erewrite Memory.remove_o; eauto. condtac; ss. eauto. }
+      * econs; eauto. i. revert GET.
+        erewrite Memory.remove_o; eauto. condtac; ss. eauto.
       * eapply Memory.cancel_closed_message; eauto.
       * ss.
       * ss.
@@ -228,9 +223,8 @@ Proof.
     + econs; ss.
       * econs.
         { econs 1; eauto.
-          - i. clarify.
-          - i. erewrite Memory.remove_o in GET; eauto.
-            des_ifs. eapply ATTACH; eauto. }
+          i. erewrite Memory.remove_o in GET; eauto.
+          des_ifs. eapply ATTACH; eauto. }
         { eauto. }
       * intros ORD. eapply RELEASE in ORD.
         eapply remove_non_synch_loc; eauto.
@@ -246,27 +240,26 @@ Proof.
       + econs; ss.
         * econs.
           { econs 1; eauto.
-            - i. clarify.
-            - i. clarify.
-              eapply split_succeed_wf in MEM0. des.
-              erewrite Memory.remove_o in GET; eauto. des_ifs.
-              exploit Memory.get_disjoint.
-              + eapply GET.
-              + eapply GET2.
-              + i. des; clarify.
-                eapply Memory.get_ts in GET. des; ss; clarify.
-                * eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
-                  { eapply TS12. }
-                  { eapply Time.bot_spec. }
-                * eapply x2.
-                  { instantiate (1:=Time.meet to' to1). econs; ss.
-                    - unfold Time.meet. des_ifs.
-                    - eapply Time.meet_l. }
-                  { econs; ss.
-                    - unfold Time.meet. des_ifs.
-                      + etrans; eauto.
-                      + etrans; eauto.
-                    - eapply Time.meet_r. }
+            i. clarify.
+            eapply split_succeed_wf in MEM0. des.
+            erewrite Memory.remove_o in GET; eauto. des_ifs.
+            exploit Memory.get_disjoint.
+            - eapply GET.
+            - eapply GET2.
+            - i. des; clarify.
+              eapply Memory.get_ts in GET. des; ss; clarify.
+              + eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+                * eapply TS12.
+                * eapply Time.bot_spec.
+              + eapply x2.
+                { instantiate (1:=Time.meet to' to1). econs; ss.
+                  - unfold Time.meet. des_ifs.
+                  - eapply Time.meet_l. }
+                { econs; ss.
+                  - unfold Time.meet. des_ifs.
+                    + etrans; eauto.
+                    + etrans; eauto.
+                  - eapply Time.meet_r. }
           }
           { eauto. }
         * intros ORD. eapply RELEASE in ORD.
