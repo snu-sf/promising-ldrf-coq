@@ -31,62 +31,6 @@ Require Import PFConsistentStrong.
 
 Set Implicit Arguments.
 
-
-Lemma memory_cap_covered
-      mem0 mem1
-      loc to
-      (CAP: Memory.cap mem0 mem1)
-      (INHABITED: Memory.inhabited mem0)
-      (ITV: Interval.mem (Time.bot, Time.incr (Memory.max_ts loc mem0)) to):
-  covered loc to mem1.
-Proof.
-  inv ITV. inv CAP. set (@cell_elements_least
-         (mem0 loc)
-         (fun to' => Time.le to to')). des; cycle 1.
-  { destruct (Time.le_lt_dec to (Memory.max_ts loc mem0)).
-    - exfalso. exploit Memory.max_ts_spec.
-      + eapply INHABITED.
-      + i. des. exploit EMPTY; eauto.
-    - econs.
-      + eapply BACK.
-      + econs; eauto. }
-  set (@cell_elements_greatest
-         (mem0 loc)
-         (fun to' => Time.lt to' to)). des; cycle 1.
-  { exfalso. exploit EMPTY.
-    - eapply INHABITED.
-    - eauto.
-    - ss. }
-  destruct (Time.le_lt_dec to from).
-  - exploit MIDDLE.
-    + econs.
-      * eapply GET0.
-      * eapply GET.
-      * eapply TimeFacts.lt_le_lt; eauto.
-      * i. destruct (Memory.get loc ts mem0) eqn:GET1; auto.
-        exfalso. destruct p.
-        destruct (Time.le_lt_dec to ts).
-        { exploit LEAST; eauto. i.
-          eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt.
-          { eapply x. }
-          eapply TimeFacts.le_lt_lt.
-          { eapply TS2. }
-          { eapply memory_get_ts_strong in GET. des; clarify; ss.
-            exfalso. eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt.
-            - eapply l.
-            - eauto. } }
-        { exploit GREATEST; eauto. i.
-          eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt.
-          { eapply x. }
-          { eauto. } }
-    + eapply TimeFacts.lt_le_lt; eauto.
-    + i. econs; eauto. econs; eauto.
-  - econs.
-    + eapply Memory.cap_le; try apply GET; eauto. refl.
-    + econs; eauto.
-Qed.
-
-
 Module FutureCertify.
   Section FutureCertify.
     Variable (lang: language).

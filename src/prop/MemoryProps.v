@@ -2475,3 +2475,68 @@ Section FORGETMEMORY.
   Qed.
 
 End FORGETMEMORY.
+
+Lemma memory_cap_covered
+      mem0 mem1
+      (CAP: Memory.cap mem0 mem1)
+      (CLOSED: Memory.closed mem0)
+      loc to
+  :
+    Interval.mem (Time.bot, Time.incr (Memory.max_ts loc mem0)) to
+    <->
+    covered loc to mem1.
+Proof.
+  split; i.
+  {
+    inv H. inv CAP. set (@cell_elements_least
+                           (mem0 loc)
+                           (fun to' => Time.le to to')). des; cycle 1.
+    { destruct (Time.le_lt_dec to (Memory.max_ts loc mem0)).
+      - exfalso. exploit Memory.max_ts_spec.
+        + eapply CLOSED.
+        + i. des. exploit EMPTY; eauto.
+      - econs.
+        + eapply BACK.
+        + econs; eauto. }
+    set (@cell_elements_greatest
+           (mem0 loc)
+           (fun to' => Time.lt to' to)). des; cycle 1.
+    { exfalso. exploit EMPTY.
+      - eapply CLOSED.
+      - eauto.
+      - ss. }
+    destruct (Time.le_lt_dec to from).
+    - exploit MIDDLE.
+      + econs.
+        * eapply GET0.
+        * eapply GET.
+        * eapply TimeFacts.lt_le_lt; eauto.
+        * i. destruct (Memory.get loc ts mem0) eqn:GET1; auto.
+          exfalso. destruct p.
+          destruct (Time.le_lt_dec to ts).
+          { exploit LEAST; eauto. i.
+            eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt.
+            { eapply x. }
+            eapply TimeFacts.le_lt_lt.
+            { eapply TS2. }
+            { eapply memory_get_ts_strong in GET. des; clarify; ss.
+              exfalso. eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt.
+              - eapply l.
+              - eauto. } }
+          { exploit GREATEST; eauto. i.
+            eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt.
+            { eapply x. }
+            { eauto. } }
+      + eapply TimeFacts.lt_le_lt; eauto.
+      + i. econs; eauto. econs; eauto.
+    - econs.
+      + eapply Memory.cap_le; try apply GET; eauto. refl.
+      + econs; eauto.
+  }
+  {
+    inv H. apply Memory.max_ts_spec in GET. des.
+    inv ITV. ss. econs; ss.
+    - eapply TimeFacts.le_lt_lt; eauto. apply Time.bot_spec.
+    - etrans; eauto. erewrite <- Memory.cap_max_ts; eauto.
+  }
+Qed.
