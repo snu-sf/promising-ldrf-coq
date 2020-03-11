@@ -631,9 +631,7 @@ Section SIM.
     { econs. } intros [mem_mid1 MEM1].
     exploit Memory.add_exists_le; eauto. intros [prom_mid1 PROM11].
     assert (STEP1: Memory.promise prom_mid0 mem_mid0 loc ts2 ts3 Message.reserve prom_mid1 mem_mid1 Memory.op_kind_add).
-    { econs; eauto.
-      - admit.
-      - i. clarify.
+    { econs; eauto. i. clarify.
     }
     hexploit promise_memory_le; eauto. intros MLE1.
     exploit (@Memory.add_exists mem_mid1 loc ts1 ts2 Message.reserve).
@@ -655,9 +653,7 @@ Section SIM.
     { econs. } intros [mem2 MEM2].
     exploit Memory.add_exists_le; eauto. intros [prom2 PROM2].
     assert (STEP2: Memory.promise prom_mid1 mem_mid1 loc ts1 ts2 Message.reserve prom2 mem2 Memory.op_kind_add).
-    { econs; eauto.
-      - admit.
-      - i. clarify.
+    { econs; eauto. i. clarify.
     }
     assert (NEQ23: ts2 <> ts3).
     { ii. clarify. eapply Time.lt_strorder. eauto. }
@@ -705,9 +701,7 @@ Section SIM.
       exploit Memory.add_exists_le; try apply x0; eauto. i. des.
       assert (FUTURE: reserve_future_memory prom_src mem_src promises2 mem2).
       { econs.
-        - econs 1; eauto.
-          { admit. (* will be removed *) }
-          i. clarify.
+        - econs 1; eauto. i. clarify.
         - econs 1. }
       destruct msg.
       { exists (fun loc' to' => prom_self loc' to' \/ (loc' = loc /\ to' = to)), promises2, mem2.
@@ -1012,7 +1006,6 @@ Section SIM.
           inv RELEASEDLE. apply RLX.
         * inv MEMTGT. apply WFTGT in GETTGT.
           eapply CLOSED in GETTGT. des. inv MSG_TS. auto.
-      + i. clarify.
       + i. destruct msg'; cycle 1.
         { admit. }
         clarify. erewrite Memory.remove_o in GET; eauto. des_ifs.
