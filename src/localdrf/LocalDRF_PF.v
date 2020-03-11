@@ -36,7 +36,7 @@ Inductive step_all A B C D (step: A -> B -> C -> D -> Prop): C -> D -> Prop :=
 
 Section LOCALDRF.
 
-  Variable L: Loc.t -> Prop.
+  Variable L: Loc.t -> bool.
 
   Definition valid_event (e: ThreadEvent.t): Prop :=
     forall loc from to msg kind (PROMISE: e = ThreadEvent.promise loc from to msg kind) (LOC: L loc),
