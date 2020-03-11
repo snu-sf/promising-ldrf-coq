@@ -44,9 +44,24 @@ Section LOCALDRF.
 
   Definition valid_step (e: MachineEvent.t) (tid: Ident.t)
              (c0 c1: Configuration.t): Prop :=
-    exists lang (tr: Trace.t lang),
-      (<<STEP: Trace.configuration_step tr e tid c0 c1>>) /\
+    exists lang tr,
+      (<<STEP: @Trace.configuration_step lang tr e tid c0 c1>>) /\
       (<<VALID: List.Forall (compose valid_event snd) tr>>).
+
+  Inductive configuration_steps_trace:
+    forall (c0 c1: Configuration.t) (tr: list (Ident.t * sigT Trace.t)), Prop :=
+  | configuration_steps_trace_nil
+      c0
+    :
+      configuration_steps_trace c0 c0 []
+  | configuration_steps_trace_cons
+      c0 c1 c2 trs lang tr e tid
+      (STEPS: configuration_steps_trace c0 c1 trs)
+      (STEP: @Trace.configuration_step lang tr e tid c0 c1)
+      (VALID: List.Forall (compose valid_event snd) tr)
+    :
+      configuration_steps_trace c0 c2 (trs ++ [(tid, existT _ _ tr)]) (* add at "last" *)
+  .
 
   Inductive racy_read (loc: Loc.t) (ts: Time.t):
     forall lang (th: Thread.t lang) (e: ThreadEvent.t), Prop :=
@@ -81,23 +96,15 @@ Section LOCALDRF.
   .
 
   Definition racefree (s: Threads.syntax): Prop :=
-    forall c0 c1 c2 c3
+    forall c0 c1 trs
            loc ts
-           tid0 lang0 (th0: Thread.t lang0) e0 tr0 me0
-           tid1 lang1 (th1: Thread.t lang1) e1 tr1 me1
-
-           (CSTEPS0: rtc (step_all valid_step) (Configuration.init s) c0)
-
-           (CSTEP0: Trace.configuration_step tr0 me0 tid0 c0 c1)
-           (VALID0: List.Forall (compose valid_event snd) tr0)
+           tid0 tid1 lang0 lang1 tr0 tr1 th0 th1 e0 e1
+           (CSTEPS: configuration_steps_trace c0 c1 trs)
+           (TRACE0: List.In (tid0, existT _ lang0 tr0) trs)
+           (TRACE1: List.In (tid1, existT _ lang1 tr1) trs)
            (EVENT0: List.In (th0, e0) tr0)
-           (WRITE: racy_write loc ts th0 e0)
-
-           (CSTEPS1: rtc (step_all valid_step) c1 c2)
-
-           (CSTEP1: Trace.configuration_step tr1 me1 tid1 c2 c3)
-           (VALID1: List.Forall (compose valid_event snd) tr1)
            (EVENT1: List.In (th1, e1) tr1)
+           (WRITE: racy_write loc ts th0 e0)
            (READ: racy_read loc ts th1 e1),
       False.
 
