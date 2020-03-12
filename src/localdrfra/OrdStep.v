@@ -222,5 +222,40 @@ Module OrdThread.
         step true e e1 e2
     .
     Hint Constructors step.
+
+
+    Lemma program_step_future
+          e e1 e2
+          (STEP: program_step e e1 e2)
+          (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+          (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+          (CLOSED1: Memory.closed e1.(Thread.memory)):
+      <<WF2: Local.wf e2.(Thread.local) e2.(Thread.memory)>> /\
+      <<SC2: Memory.closed_timemap e2.(Thread.sc) e2.(Thread.memory)>> /\
+      <<CLOSED2: Memory.closed e2.(Thread.memory)>> /\
+      <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
+      <<SC_FUTURE: TimeMap.le e1.(Thread.sc) e2.(Thread.sc)>> /\
+      <<MEM_FUTURE: Memory.future e1.(Thread.memory) e2.(Thread.memory)>>.
+    Proof.
+      inv STEP. ss. eapply OrdLocal.program_step_future; eauto.
+    Qed.
+
+    Lemma step_future
+          pf e e1 e2
+          (STEP: step pf e e1 e2)
+          (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+          (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+          (CLOSED1: Memory.closed e1.(Thread.memory)):
+      <<WF2: Local.wf e2.(Thread.local) e2.(Thread.memory)>> /\
+      <<SC2: Memory.closed_timemap e2.(Thread.sc) e2.(Thread.memory)>> /\
+      <<CLOSED2: Memory.closed e2.(Thread.memory)>> /\
+      <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
+      <<SC_FUTURE: TimeMap.le e1.(Thread.sc) e2.(Thread.sc)>> /\
+      <<MEM_FUTURE: Memory.future e1.(Thread.memory) e2.(Thread.memory)>>.
+    Proof.
+      inv STEP.
+      - eapply Thread.promise_step_future; eauto.
+      - eapply program_step_future; eauto.
+    Qed.
   End OrdThread.
 End OrdThread.
