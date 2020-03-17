@@ -523,21 +523,43 @@ Module RASimThread.
         + econs; [econs; eauto|..]; ss.
           * i. subst. exploit SOUND; eauto. i. des. eauto.
           * eapply sim_memory_closed_message; eauto.
-        + admit.
+        + econs; ss.
+          * ii. revert PROMISE.
+            erewrite Memory.add_o; eauto. condtac; ss; eauto.
+            i. des. subst. congr.
+          * i. erewrite Memory.add_o; eauto. condtac; ss; eauto.
+            des. subst. exploit REL_WRITES; eauto. i. des.
+            exploit Memory.add_get0; try exact MEM. i. des. congr.
         + ss.
       - (* split *)
         exploit sim_memory_split; eauto. i. des.
         inv MEM1. esplits.
         + econs; [econs; eauto|..]; ss.
           eapply sim_memory_closed_message; eauto.
-        + admit.
+        + econs; ss.
+          * ii. revert PROMISE.
+            erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
+            { i. des. subst. congr. }
+            { guardH o. i. des. subst. congr. }
+          * i. erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
+            { des. subst. exploit REL_WRITES; eauto. i. des.
+              exploit Memory.split_get0; try exact MEM. i. des. congr. }
+            { guardH o. des. subst.
+              exploit REL_WRITES_NONE; eauto. i.
+              exploit Memory.split_get0; try exact PROMISES0. i. des. congr. }
         + ss.
       - (* lower *)
         exploit sim_memory_lower; eauto. i. des.
         inv MEM1. esplits.
         + econs; [econs; eauto|..]; ss.
           eapply sim_memory_closed_message; eauto.
-        + admit.
+        + econs; ss.
+          * ii. revert PROMISE.
+            erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+            i. des. subst. congr.
+          * i. erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+            des. subst. exploit REL_WRITES_NONE; eauto. i.
+            exploit Memory.lower_get0; try exact PROMISES0. i. des. congr.
         + ss.
       - (* cancel *)
         exploit sim_memory_remove; eauto.
@@ -546,9 +568,12 @@ Module RASimThread.
         i. des.
         inv MEM1. esplits.
         + econs; [econs; eauto|..]; ss.
-        + admit.
+        + econs; ss.
+          * ii. revert PROMISE.
+            erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+          * i. erewrite Memory.remove_o; eauto. condtac; ss; eauto.
         + ss.
-    Admitted.
+    Qed.
 
     Lemma sim_thread_step
           tr e1_src e1_tgt
