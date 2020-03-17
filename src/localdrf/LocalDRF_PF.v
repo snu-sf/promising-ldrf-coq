@@ -1382,7 +1382,72 @@ Section SIM.
         eapply PROMATTACH; eauto.
   Qed.
 
+  Lemma sim_write_step_normal
+        others pasts lc_src lc_tgt sc_src sc_tgt mem_src mem_tgt e_tgt
+        lc_tgt' sc_tgt' mem_tgt' loc from to val ord releasedm_tgt released_tgt kind_tgt
+        releasedm_src
+        (NLOC: ~ L loc)
+        (STEPTGT: Local.write_step lc_tgt sc_tgt mem_tgt loc from to val releasedm_tgt released_tgt ord lc_tgt' sc_tgt' mem_tgt' kind_tgt)
+        (NOREAD: no_read_msgs (others \2/ promised lc_src.(Local.promises)) e_tgt)
+        (SC: TimeMap.le sc_src sc_tgt)
+        (MEM: sim_memory (others \2/ (in_L /2\ promised lc_src.(Local.promises))) mem_src mem_tgt)
+        (SCSRC: Memory.closed_timemap sc_src mem_src)
+        (SCTGT: Memory.closed_timemap sc_tgt mem_tgt)
+        (MEMSRC: Memory.closed mem_src)
+        (MEMTGT: Memory.closed mem_tgt)
+        (LOCALSRC: Local.wf lc_src mem_src)
+        (LOCALTGT: Local.wf lc_tgt mem_tgt)
+        (SIM: sim_local others pasts lc_src lc_tgt)
+        (PAST: wf_pasts_memory mem_src pasts)
+        (PROMATTACH: promises_not_attached lc_src.(Local.promises) mem_src)
+        (OTHERSWF: forall loc' to', others loc' to' -> L loc')
+        (RELEASEDMCLOSED: forall past (PAST: pasts loc from = Some past),
+            Memory.closed_opt_view releasedm_src past)
+        (RELEASEDMLE: View.opt_le releasedm_src released_tgt)
+    :
+      exists pasts' lc_src' sc_src' mem_src' released_src kind_src,
+        (<<STEPSRC: Local.write_step lc_src sc_src mem_src loc from to val releasedm_src released_src ord lc_src' sc_src' mem_src' kind_src>>) /\
+        (<<MEM: sim_memory (others \2/ (in_L /2\ promised lc_src'.(Local.promises))) mem_src' mem_tgt'>>) /\
+        (<<ATTACHEDLE: not_attached_le others mem_src mem_src'>>) /\
+        (<<PROMATTACH: promises_not_attached lc_src'.(Local.promises) mem_src'>>) /\
+        (<<SC: TimeMap.le sc_src' sc_tgt'>>) /\
+        (<<SIM: sim_local others pasts' lc_src' lc_tgt'>>) /\
+        (<<PAST: wf_pasts_memory mem_src' pasts'>>) /\
+        (<<PASTLE: pasts_le pasts pasts'>>)
+  (* TODO: condition about event *)
+  .
+  Proof.
+    inv STEPTGT. inv WRITE. inv SIM.
+    exploit sim_promise_step_forget; try apply MEM; eauto.
+    { inv LOCALSRC. eauto. }
+    { inv LOCALTGT. eauto. }
+    { inv LOCALSRC. inv TVIEW_CLOSED. eauto. } i. des.
+    hexploit (@Memory.remove_exists
+                prom_src' loc from to
+                (Message.concrete val (TView.write_released (Local.tview lc_src) sc_src loc to releasedm_src ord))).
+    { apply Memory.remove_get0 in REMOVE. des.
+      specialize (PROMISE0 loc to). rewrite GET in PROMISE0.
 
+
+    promises2
+
+    { eapply MEM. } eauto.
+
+    ; eauto.
+
+
+
+
+        (STEPTGT: Local.read_step lc_tgt mem_tgt loc to val released_tgt ord lc_tgt')
+
+
+
+  Local.write_step
+
+  Memory.write
+
+
+    ddddd
 
 
   Lemma sim_promise_step_normal
@@ -1452,6 +1517,8 @@ Section SIM.
         * econs 2; [|econs 1|ss]. econs 2. econs; eauto.
         * refl.
   Admitted.
+
+
 
 
   Lemma split_reserve_exists prom1 mem1 loc ts1 ts2 ts3
