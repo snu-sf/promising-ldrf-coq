@@ -1290,7 +1290,6 @@ Section SIM.
           eapply sim_message_closed; eauto.
       }
 
-
       (* split reserve *)
       { exploit sim_message_exists.
         { apply MEMSRC. } instantiate (1:=Message.concrete val' released'). i. des.
@@ -1511,9 +1510,9 @@ Section SIM.
         erewrite (@Memory.remove_o mem_src' mem_src) in GET1; eauto. des_ifs.
         exploit PROMATTACH; eauto.
         { econs; eauto. }
-        i. inv x. econs. erewrite Memory.remove_o; eauto. des_ifs.
-        * guardH o0. guardH o. ss. des; clarify.
-        * exploit PROMATTACH; eauto.
+        i. inv x. econs. instantiate (1:=msg1).
+        erewrite Memory.remove_o; eauto. des_ifs.
+        ss. des; clarify.
   Qed.
 
   Lemma sim_write_step_normal
