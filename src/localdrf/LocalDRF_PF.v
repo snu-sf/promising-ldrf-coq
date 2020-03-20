@@ -182,33 +182,116 @@ Section SIM.
   Next Obligation.
   Proof. ii. apply H0, H. auto. Qed.
 
-  Record sim_timemap (past: Memory.t) (tm_src tm_tgt: TimeMap.t): Prop :=
+  Definition add_closed_timemap
+             (times: TimeMap.t)
+             (mem: Memory.t) (loc: Loc.t) (ts: Time.t): Prop
+    :=
+      forall loc',
+        (<<GET: exists from val released,
+            Memory.get loc (times loc) mem = Some (from, Message.concrete val released)>>) \/
+        (<<ADDED: loc' = loc /\ times loc = ts>>)
+  .
+
+  Lemma closed_add_closed_timemap
+        times mem loc ts
+        (CLOSED: Memory.closed_timemap times mem)
+    :
+      add_closed_timemap times mem loc ts.
+  Proof. ii. auto. Qed.
+
+  Record add_closed_view (view:View.t) (mem:Memory.t) (loc: Loc.t) (ts: Time.t)
+    : Prop :=
+    add_closed_view_intro
+      {
+        add_closed_view_pln: add_closed_timemap view.(View.pln) mem loc ts;
+        add_closed_view_rlx: add_closed_timemap view.(View.rlx) mem loc ts;
+      }
+  .
+  Hint Constructors add_closed_view.
+
+  Lemma closed_add_closed_view
+        view mem loc ts
+        (CLOSED: Memory.closed_view view mem)
+    :
+      add_closed_view view mem loc ts.
+  Proof.
+    inv CLOSED. econs.
+    - eapply closed_add_closed_timemap; eauto.
+    - eapply closed_add_closed_timemap; eauto.
+  Qed.
+
+  Inductive add_closed_opt_view: forall (view:option View.t) (mem:Memory.t)
+                                        (loc: Loc.t) (ts: Time.t), Prop :=
+  | add_closed_opt_view_some
+      view mem loc ts
+      (CLOSED: add_closed_view view mem loc ts):
+      add_closed_opt_view (Some view) mem loc ts
+  | add_closed_opt_view_none
+      mem loc ts:
+      add_closed_opt_view None mem loc ts
+  .
+  Hint Constructors add_closed_opt_view.
+
+  Lemma closed_add_closed_opt_view
+        view mem loc ts
+        (CLOSED: Memory.closed_opt_view view mem)
+    :
+      add_closed_opt_view view mem loc ts.
+  Proof.
+    inv CLOSED; econs.
+    eapply closed_add_closed_view; eauto.
+  Qed.
+
+  Inductive add_closed_message: forall (msg:Message.t) (mem:Memory.t)
+                                       (loc: Loc.t) (ts: Time.t), Prop :=
+  | add_closed_message_concrete
+      val released mem loc ts
+      (CLOSED: add_closed_opt_view released mem loc ts):
+      add_closed_message (Message.concrete val released) mem loc ts
+  | add_closed_message_reserve
+      mem loc ts:
+      add_closed_message Message.reserve mem loc ts
+  .
+  Hint Constructors add_closed_message.
+
+  Lemma closed_add_closed_message
+        msg mem loc ts
+        (CLOSED: Memory.closed_message msg mem)
+    :
+      add_closed_message msg mem loc ts.
+  Proof.
+    inv CLOSED; econs.
+    eapply closed_add_closed_opt_view; eauto.
+  Qed.
+
+  Record sim_timemap (past: Memory.t) (loc: Loc.t) (ts: Time.t)
+         (tm_src tm_tgt: TimeMap.t): Prop :=
     sim_timemap_intro
       {
         sim_timemap_le: TimeMap.le tm_src tm_tgt;
-        sim_timemap_closed: Memory.closed_timemap tm_src past;
-        sim_timemap_max: forall tm (CLOSED: Memory.closed_timemap tm past)
+        sim_timemap_closed: add_closed_timemap tm_src past loc ts;
+        sim_timemap_max: forall tm (CLOSED: add_closed_timemap tm past loc ts)
                                 (TMLE: TimeMap.le tm tm_tgt)
           ,
             TimeMap.le tm tm_src;
       }.
   Hint Constructors sim_timemap.
 
-  Lemma sim_timemap_exists past tm_tgt
+  Lemma sim_timemap_exists past loc ts tm_tgt
         (CLOSED: Memory.closed past)
     :
-      exists tm_src, <<SIM: sim_timemap past tm_src tm_tgt>>.
+      exists tm_src, <<SIM: sim_timemap past loc ts tm_src tm_tgt>>.
   Proof.
-    exploit (@choice _ _ (fun loc ts_src =>
+    exploit (@choice _ _ (fun loc' ts_src =>
                             (<<GREATEST:
                                forall ts
-                                      (PAST: concrete_promised past loc ts)
-                                      (LE: Time.le ts (tm_tgt loc)),
+                                      (PAST: concrete_promised past loc' ts)
+                                      (LE: Time.le ts (tm_tgt loc')),
                                  Time.le ts ts_src>>) /\
-                            (<<CLOSED: concrete_promised past loc ts_src>>) /\
-                            (<<TLE: Time.le ts_src (tm_tgt loc)>>))).
-    - intros loc.
-      hexploit (cell_elements_greatest (past loc) (fun ts => concrete_promised past loc ts /\ Time.le ts (tm_tgt loc))).
+                            (<<CLOSED: concrete_promised past loc' ts_src>>) /\
+                            (<<TLE: Time.le ts_src (tm_tgt loc')>>))).
+    - intros loc'.
+      hexploit (cell_elements_greatest (past loc') (fun ts => concrete_promised past loc' ts /\ Time.le ts (tm_tgt loc'))).
       i. des.
       + exists to. split; clarify. ii. splits; auto.
         i. dup PAST. inv PAST. exploit GREATEST; eauto.
@@ -216,10 +299,10 @@ Section SIM.
         { econs; eauto. }
         { eapply Time.bot_spec. }
     - intros [f FSPEC]. des. exists f. econs.
-      + ii. specialize (FSPEC loc). des. auto.
-      + ii. specialize (FSPEC loc). des. inv CLOSED0. esplits; eauto.
-      + ii. specialize (FSPEC loc). des.
-        specialize (CLOSED0 loc). des.
+      + ii. specialize (FSPEC loc'). des. auto.
+      + ii. specialize (FSPEC loc'). des. inv CLOSED0. esplits; eauto.
+      + ii. specialize (FSPEC loc'). des.
+        specialize (CLOSED0 loc'). des.
         exploit GREATEST.
         { econs; eauto. }
         { apply TMLE. }
@@ -1556,13 +1639,16 @@ Section SIM.
     inv STEPTGT. inv WRITE. inv SIM. inv LOCALSRC. inv LOCALTGT.
     set (msg_src := (Message.concrete val (TView.write_released (Local.tview lc_src) sc_src loc to releasedm_src ord))).
 
-    assert (CLOSEDMSGSRC: Memory.closed_message msg_src mem_src).
+    assert (CLOSEDMSGSRC: Ordering.le Ordering.acqrel ord = false -> Memory.closed_message msg_src mem_src).
     { unfold msg_src. econs. unfold TView.write_released. des_ifs. econs.
       eapply Memory.join_closed_view.
       - inv MEMSRC. eapply Memory.unwrap_closed_opt_view; eauto.
       - unfold TView.write_tview. ss. des_ifs.
         + setoid_rewrite LocFun.add_spec_eq. apply Memory.join_closed_view.
+          * inv TVIEW_CLOSED. auto.
           *
+
+            clarify.
 
           Set Printing All. ii.
 
