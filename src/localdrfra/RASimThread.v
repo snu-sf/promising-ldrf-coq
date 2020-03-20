@@ -23,6 +23,8 @@ Require Import Thread.
 
 Require Import Trace.
 
+Require Import OrdStep.
+
 Set Implicit Arguments.
 
 
@@ -34,7 +36,7 @@ Module RASimThread.
     (* normal *)
 
     Definition normal_view (view: View.t): Prop :=
-      forall loc (LOC: L loc), view.(View.pln) loc = view.(View.pln) loc.
+      forall loc (LOC: L loc), view.(View.rlx) loc = view.(View.pln) loc.
 
     Inductive normal_tview (tview:TView.t): Prop :=
     | normal_tview_intro
@@ -42,9 +44,6 @@ Module RASimThread.
         (CUR: normal_view tview.(TView.cur))
         (ACQ: normal_view tview.(TView.acq))
     .
-
-    Definition normal_thread (e: Thread.t lang): Prop :=
-      normal_tview e.(Thread.local).(Local.tview).
 
 
     (* stable *)
@@ -154,6 +153,8 @@ Module RASimThread.
         (TVIEW: sim_tview lc_src.(Local.tview) lc_tgt.(Local.tview))
         (PROMISES: lc_src.(Local.promises) = lc_tgt.(Local.promises))
         (RESERVE: reserve_only lc_src.(Local.promises))
+        (NORMAL_SRC: normal_tview lc_src.(Local.tview))
+        (NORMAL_TGT: normal_tview lc_tgt.(Local.tview))
         (REL_WRITES_NONE: forall loc to th e
                             (IN: List.In (th, e) tr)
                             (REL: rel_write e = Some (loc, to)),
@@ -203,8 +204,6 @@ Module RASimThread.
     Inductive sim_thread (tr: Trace.t lang) (e_src e_tgt: Thread.t lang): Prop :=
     | sim_thread_intro
         (STABLE: stable_thread e_src)
-        (NORMAL_SRC: normal_thread e_src)
-        (NORMAL_TGT: normal_thread e_tgt)
         (STATE: e_src.(Thread.state) = e_tgt.(Thread.state))
         (LOCAL: sim_local tr e_src.(Thread.local) e_tgt.(Thread.local))
         (SC: e_src.(Thread.sc) = e_tgt.(Thread.sc))
@@ -249,26 +248,6 @@ Module RASimThread.
     Proof.
       inv CLOSED_TGT; eauto using sim_memory_closed_opt_view.
     Qed.
-
-
-    (* step *)
-
-    (* Lemma promise *)
-    (*       tr promises1 mem1_src mem1_tgt *)
-    (*       loc from to msg promises2 mem2_tgt kind *)
-    (*       (SIM1: sim_memory tr mem1_src mem1_tgt) *)
-    (*       (REL_WRITES_NONE: forall loc to th e *)
-    (*                           (IN: List.In (th, e) tr) *)
-    (*                           (REL: rel_write e = Some (loc, to)), *)
-    (*           Memory.get loc to promises1 = None) *)
-    (*       (LE1_SRC: Memory.le promises1 mem1_src) *)
-    (*       (LE1_TGT: Memory.le promises1 mem1_tgt) *)
-    (*       (PROMISE_TGT: Memory.promise promises1 mem1_tgt loc from to msg promises2 mem2_tgt kind): *)
-    (*   exists mem2_src, *)
-    (*     <<PROMISE_SRC: Memory.promise promises1 mem1_src loc from to msg promises2 mem2_src kind>> /\ *)
-    (*     <<SIM2: sim_memory tr mem2_src mem2_tgt>>. *)
-    (* Proof. *)
-    (* Admitted. *)
 
     Lemma sim_memory_add
           tr mem1_src
@@ -426,6 +405,21 @@ Module RASimThread.
         des. subst. exploit REL_WRITE; eauto. ss.
     Qed.
 
+
+    (* race condition *)
+
+    Definition ra_race (tr: Trace.t lang) (lc: Local.t) (loc: Loc.t) (to: Time.t) (ordr: Ordering.t): Prop :=
+      <<LOC: L loc>> /\
+      <<HIGHER: Time.lt (lc.(Local.tview).(TView.cur).(View.rlx) loc) to>> /\
+      (<<ORDW: forall th e
+                 (IN: List.In (th, e) tr)
+                 (REL: rel_write e = Some (loc, to)),
+          False>> \/
+       <<ORDR: Ordering.le ordr Ordering.strong_relaxed>>).
+
+
+    (* step *)
+
     Lemma promise_step
           tr lc1_src mem1_src
           lc1_tgt mem1_tgt loc from to msg lc2_tgt mem2_tgt kind
@@ -574,6 +568,41 @@ Module RASimThread.
           * i. erewrite Memory.remove_o; eauto. condtac; ss; eauto.
         + ss.
     Qed.
+
+    Lemma read_step
+          tr lc1_src mem1_src
+          lc1_tgt mem1_tgt loc to val released_tgt ord lc2_tgt
+          (LC1: sim_local tr lc1_src lc1_tgt)
+          (MEM1: sim_memory tr mem1_src mem1_tgt)
+          (WF1_SRC: Local.wf lc1_src mem1_src)
+          (WF1_TGT: Local.wf lc1_src mem1_tgt)
+          (STEP_TGT: Local.read_step lc1_tgt mem1_tgt loc to val released_tgt ord lc2_tgt):
+      exists released_src lc2_src,
+        <<STEP_SRC: OrdLocal.read_step L Ordering.acqrel lc1_src mem1_src loc to val released_src ord lc2_src>> /\
+        (<<LC2: sim_local tr lc2_src lc2_tgt>> \/
+         <<RACE: ra_race tr lc1_src loc to ord>>).
+    Proof.
+      destruct (L loc) eqn:LOC; cycle 1.
+      { (* read from other loc *)
+        inv LC1. inv TVIEW. inv MEM1. inv STEP_TGT.
+        exploit COMPLETE; eauto. i. des. inv MSG.
+        rewrite LOC in *. subst.
+        esplits.
+        { econs; eauto. econs; eauto. rewrite CUR, LOC in *. ss. }
+        left. rewrite LOC in *. econs; eauto; ss.
+        - econs; eauto; ss; congr.
+        - admit.
+        - admit.
+      }
+
+      (* read from L *)
+      inv LC1. inv TVIEW. inv MEM1. inv STEP_TGT.
+      exploit COMPLETE; eauto. i. des. inv MSG. clear RELEASED.
+      esplits.
+      { econs; eauto. econs; eauto.
+        rewrite CUR in *. inv READABLE. econs; eauto. i.
+        inv NORMAL_TGT. rewrite CUR0; ss. }
+    Admitted.
 
     Lemma sim_thread_step
           tr e1_src e1_tgt
