@@ -131,7 +131,7 @@ Section ADDCLOSED.
       forall loc',
         (<<GET: exists from val released,
             Memory.get loc' (times loc') mem = Some (from, Message.concrete val released)>>) \/
-        (<<ADDED: loc' = loc /\ times loc = ts>>)
+        (<<ADDED: loc' = loc /\ times loc' = ts>>)
   .
 
   Lemma closed_add_closed_timemap
@@ -204,53 +204,6 @@ Section ADDCLOSED.
   Proof.
     inv CLOSED; econs.
     eapply closed_add_closed_opt_view; eauto.
-  Qed.
-
-  Lemma add_closed_timemap_future_closed tm mem0 loc ts mem1
-        (FUTURE: Memory.future mem0 mem1)
-        (CONCRETE: concrete_promised mem1 loc ts)
-        (CLOSED: add_closed_timemap tm mem0 loc ts)
-    :
-      Memory.closed_timemap tm mem1.
-  Proof.
-    ii. specialize (CLOSED loc0). des.
-    - eapply Memory.future_get1 in GET; eauto. des.
-      inv MSG_LE. eauto.
-    - clarify. inv CONCRETE. eauto.
-  Qed.
-
-  Lemma add_closed_view_future_closed vw mem0 loc ts mem1
-        (FUTURE: Memory.future mem0 mem1)
-        (CONCRETE: concrete_promised mem1 loc ts)
-        (CLOSED: add_closed_view vw mem0 loc ts)
-    :
-      Memory.closed_view vw mem1.
-  Proof.
-    inv CLOSED. econs.
-    - eapply add_closed_timemap_future_closed; eauto.
-    - eapply add_closed_timemap_future_closed; eauto.
-  Qed.
-
-  Lemma add_closed_opt_view_future_closed vw mem0 loc ts mem1
-        (FUTURE: Memory.future mem0 mem1)
-        (CONCRETE: concrete_promised mem1 loc ts)
-        (CLOSED: add_closed_opt_view vw mem0 loc ts)
-    :
-      Memory.closed_opt_view vw mem1.
-  Proof.
-    inv CLOSED; econs.
-    eapply add_closed_view_future_closed; eauto.
-  Qed.
-
-  Lemma add_closed_message_future_closed msg mem0 loc ts mem1
-        (FUTURE: Memory.future mem0 mem1)
-        (CONCRETE: concrete_promised mem1 loc ts)
-        (CLOSED: add_closed_message msg mem0 loc ts)
-    :
-      Memory.closed_message msg mem1.
-  Proof.
-    inv CLOSED; econs.
-    eapply add_closed_opt_view_future_closed; eauto.
   Qed.
 
   Lemma add_closed_timemap_add_closed tm mem0 loc from ts val released mem1
@@ -433,14 +386,6 @@ Section ADDCLOSED.
   Proof.
     ii. specialize (CLOSED0 loc'). specialize (CLOSED1 loc').
     unfold TimeMap.join, Time.join. des_ifs.
-    - des; clarify; eauto.
-      + left. eauto.
-      + exfalso. eapply Time.lt_strorder.
-        eapply TimeFacts.le_lt_lt; eauto.
-    - des; clarify; eauto.
-      + left. eauto.
-      + exfalso. eapply Time.lt_strorder.
-        eapply TimeFacts.le_lt_lt; eauto.
   Qed.
 
   Lemma join_view_add_closed vw0 vw1 mem loc ts
@@ -482,34 +427,154 @@ Section ADDCLOSED.
     apply bot_view_add_closed; eauto.
   Qed.
 
-  Lemma singleton_join_timemap_add_closed mem loc from ts tm
-        (CLOSED: add_closed_timemap tm mem loc from)
-        (TS: Time.le from ts)
+  Definition add_weak_closed_timemap
+             (times: TimeMap.t)
+             (mem: Memory.t) (loc: Loc.t) (ts: Time.t): Prop
+    :=
+      forall loc',
+        (<<GET: exists from val released,
+            Memory.get loc' (times loc') mem = Some (from, Message.concrete val released)>>) \/
+        (<<ADDED: loc' = loc /\ (<<TS: Time.le (times loc') ts>>)>>)
+  .
+
+  Record add_weak_closed_view (view:View.t) (mem:Memory.t) (loc: Loc.t) (ts: Time.t)
+    : Prop :=
+    add_weak_closed_view_intro
+      {
+        add_weak_closed_view_pln: add_weak_closed_timemap view.(View.pln) mem loc ts;
+        add_weak_closed_view_rlx: add_weak_closed_timemap view.(View.rlx) mem loc ts;
+      }
+  .
+  Hint Constructors add_weak_closed_view.
+
+  Lemma add_closed_add_weak_closed_timemap tm mem loc ts
+        (CLOSED: add_closed_timemap tm mem loc ts)
+    :
+      add_weak_closed_timemap tm mem loc ts.
+  Proof.
+    ii. specialize (CLOSED loc'). des; subst.
+    - left. eauto.
+    - right. split; auto. red. refl.
+  Qed.
+
+  Lemma add_closed_add_weak_closed_view vw mem loc ts
+        (CLOSED: add_closed_view vw mem loc ts)
+    :
+      add_weak_closed_view vw mem loc ts.
+  Proof.
+    inv CLOSED; econs.
+    - eapply add_closed_add_weak_closed_timemap; eauto.
+    - eapply add_closed_add_weak_closed_timemap; eauto.
+  Qed.
+
+  Lemma add_weak_closed_timemap_ts_le tm mem loc ts0 ts1
+        (CLOSED: add_weak_closed_timemap tm mem loc ts0)
+        (TS: Time.le ts0 ts1)
+    :
+      add_weak_closed_timemap tm mem loc ts1.
+  Proof.
+    ii. specialize (CLOSED loc'). des.
+    - left. eauto.
+    - right. split; eauto.
+  Qed.
+
+  Lemma add_weak_closed_view_ts_le vw mem loc ts0 ts1
+        (CLOSED: add_weak_closed_view vw mem loc ts0)
+        (TS: Time.le ts0 ts1)
+    :
+      add_weak_closed_view vw mem loc ts1.
+  Proof.
+    inv CLOSED. econs.
+    - eapply add_weak_closed_timemap_ts_le; eauto.
+    - eapply add_weak_closed_timemap_ts_le; eauto.
+  Qed.
+
+  Lemma add_weak_closed_timemap_consistent tm mem loc ts0 ts1
+        (CLOSED: add_weak_closed_timemap tm mem loc ts0)
+        (TS: Time.le (tm loc) ts1)
+    :
+      add_weak_closed_timemap tm mem loc ts1.
+  Proof.
+    ii. specialize (CLOSED loc'). des; subst.
+    - left. eauto.
+    - right. split; eauto.
+  Qed.
+
+  Lemma add_weak_closed_view_consistent vw mem loc ts0 ts1
+        (CLOSED: add_weak_closed_view vw mem loc ts0)
+        (VWWF: View.wf vw)
+        (TS: Time.le (vw.(View.rlx) loc) ts1)
+    :
+      add_weak_closed_view vw mem loc ts1.
+  Proof.
+    inv CLOSED. econs.
+    - eapply add_weak_closed_timemap_consistent; eauto.
+      inv VWWF. etrans; eauto.
+    - eapply add_weak_closed_timemap_consistent; eauto.
+  Qed.
+
+  Lemma join_timemap_add_weak_closed tm0 tm1 mem loc ts
+        (CLOSED0: add_weak_closed_timemap tm0 mem loc ts)
+        (CLOSED1: add_weak_closed_timemap tm1 mem loc ts)
+    :
+      add_weak_closed_timemap (TimeMap.join tm0 tm1) mem loc ts.
+  Proof.
+    ii. unfold TimeMap.join, Time.join. des_ifs.
+  Qed.
+
+  Lemma join_view_add_weak_closed vw0 vw1 mem loc ts
+        (CLOSED0: add_weak_closed_view vw0 mem loc ts)
+        (CLOSED1: add_weak_closed_view vw1 mem loc ts)
+    :
+      add_weak_closed_view (View.join vw0 vw1) mem loc ts.
+  Proof.
+    inv CLOSED0. inv CLOSED1. unfold View.join. econs; ss.
+    - eapply join_timemap_add_weak_closed; eauto.
+    - eapply join_timemap_add_weak_closed; eauto.
+  Qed.
+
+  Lemma singleton_timemap_add_closed mem loc ts
+        (MEM: Memory.closed mem)
+    :
+      add_closed_timemap (TimeMap.singleton loc ts) mem loc ts.
+  Proof.
+    ii. unfold TimeMap.singleton. destruct (Loc.eq_dec loc' loc).
+    - subst. right. split; auto. setoid_rewrite LocFun.add_spec_eq. auto.
+    - left. inv MEM. red.
+      setoid_rewrite LocFun.add_spec_neq; auto. eauto.
+  Qed.
+
+  Lemma singleton_view_add_closed mem loc ts
+        (MEM: Memory.closed mem)
+    :
+      add_closed_view (View.singleton_ur loc ts) mem loc ts.
+  Proof.
+    econs.
+    - eapply singleton_timemap_add_closed; eauto.
+    - eapply singleton_timemap_add_closed; eauto.
+  Qed.
+
+  Lemma singleton_join_timemap_add_closed mem loc ts tm
+        (CLOSED: add_weak_closed_timemap tm mem loc ts)
     :
       add_closed_timemap (TimeMap.join (TimeMap.singleton loc ts) tm) mem loc ts.
   Proof.
     ii. specialize (CLOSED loc'). unfold TimeMap.join, Time.join, TimeMap.singleton.
-    destruct (Loc.eq_dec loc loc').
-    - clarify. des.
-      + des_ifs.
-        * left. eauto.
-        * right. split; auto.
-          setoid_rewrite LocFun.add_spec_eq. auto.
-      + right. split; auto. des_ifs.
-        * setoid_rewrite LocFun.add_spec_eq in l. destruct TS; auto.
-          exfalso. eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt; eauto.
-        * eapply LocFun.add_spec_eq.
-    - des.
-      + left. exists from0, val, released. des_ifs.
-        exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
-        * eapply l.
-        * setoid_rewrite LocFun.add_spec_neq; auto. apply Time.bot_spec.
-      + clarify.
+    des_ifs.
+    - des; subst.
+      + left. eauto.
+      + right. split; auto.
+        setoid_rewrite LocFun.add_spec_eq in l. destruct l; auto.
+        exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto.
+    - setoid_rewrite LocFun.add_spec in l. des_ifs.
+      + right. split; auto.
+        setoid_rewrite LocFun.add_spec. des_ifs.
+      + exfalso. eapply Time.lt_strorder.
+        eapply TimeFacts.lt_le_lt; eauto. eapply Time.bot_spec.
   Qed.
 
-  Lemma singleton_ur_join_view_add_closed mem loc from ts vw
-        (CLOSED: add_closed_view vw mem loc from)
-        (TS: Time.le from ts)
+  Lemma singleton_ur_join_view_add_closed mem loc ts vw
+        (CLOSED: add_weak_closed_view vw mem loc ts)
     :
       add_closed_view (View.join (View.singleton_ur loc ts) vw) mem loc ts.
   Proof.
@@ -531,20 +596,26 @@ Section ADDCLOSED.
     setoid_rewrite LocFun.add_spec_eq. des_ifs.
     - econs. erewrite <- View.join_assoc. erewrite View.join_comm.
       eapply singleton_ur_join_view_add_closed; eauto.
-      eapply join_view_add_closed.
-      + eapply unwrap_add_closed; eauto.
-      + inv TVIEW. eapply closed_add_closed_view; eauto.
+      eapply join_view_add_weak_closed.
+      + eapply add_weak_closed_view_ts_le; eauto.
+        eapply add_closed_add_weak_closed_view; eauto.
+        eapply unwrap_add_closed; eauto.
+      + eapply add_closed_add_weak_closed_view; eauto.
+        inv TVIEW. eapply closed_add_closed_view; eauto.
     - econs. erewrite <- View.join_assoc. erewrite View.join_comm.
       eapply singleton_ur_join_view_add_closed; eauto.
-      eapply join_view_add_closed.
-      + eapply unwrap_add_closed; eauto.
-      + inv TVIEW. eapply closed_add_closed_view; eauto.
+      eapply join_view_add_weak_closed.
+      + eapply add_weak_closed_view_ts_le; eauto.
+        eapply add_closed_add_weak_closed_view; eauto.
+        eapply unwrap_add_closed; eauto.
+      + eapply add_closed_add_weak_closed_view; eauto.
+        inv TVIEW. eapply closed_add_closed_view; eauto.
   Qed.
 
   Lemma write_released_add_closed_relaxed
         mem tvw sc loc to releasedm ord from
         (MEM: Memory.closed mem)
-        (TVIEW: Memory.closed_view (tvw.(TView.rel) loc) mem)
+        (TVIEW: add_weak_closed_view (tvw.(TView.rel) loc) mem loc to)
         (RELEASEDM: add_closed_opt_view releasedm mem loc from)
         (TS: Time.le from to)
         (ORD: Ordering.le Ordering.strong_relaxed ord = false)
@@ -556,9 +627,11 @@ Section ADDCLOSED.
     - destruct ord; ss.
     - econs. erewrite <- View.join_assoc. erewrite View.join_comm.
       eapply singleton_ur_join_view_add_closed; eauto.
-      eapply join_view_add_closed.
-      + eapply unwrap_add_closed; eauto.
-      + inv TVIEW. eapply closed_add_closed_view; eauto.
+      eapply join_view_add_weak_closed.
+      + eapply add_weak_closed_view_ts_le; eauto.
+        eapply add_closed_add_weak_closed_view; eauto.
+        eapply unwrap_add_closed; eauto.
+      + eauto.
   Qed.
 
 End ADDCLOSED.
@@ -886,7 +959,7 @@ Section SIM.
       past from val released_src released_tgt
       (MSG: sim_opt_view past loc ts released_src released_tgt)
       (RELVIEW: forall released (MSG: released_src = Some released),
-          Memory.closed_view rel_src past)
+          add_weak_closed_view rel_src past loc ts)
     :
       sim_promise_content loc ts LOC others rel_src
                           (Some past)
@@ -1247,6 +1320,7 @@ Section SIM.
         (PAST: wf_pasts_memory mem_src pasts)
         (PROMATTACH: promises_not_attached (promised lc_src.(Local.promises)) mem_src)
         (OTHERSWF: forall loc' to', others loc' to' -> L loc')
+        (CONSISTENT: Local.promise_consistent lc_tgt')
     :
       exists tr pasts' lc_src' sc_src' mem_src',
         (<<STEPSRC: Trace.steps tr (Thread.mk _ st lc_src sc_src mem_src) (Thread.mk _ st' lc_src' sc_src' mem_src')>>) /\
@@ -1410,7 +1484,10 @@ Section SIM.
         (MEMTGT: Memory.closed mem_tgt)
         (WFSRC: Memory.le prom_src mem_src)
         (WFTGT: Memory.le prom_tgt mem_tgt)
-        (RELSRC: forall (loc: Loc.t), Memory.closed_view (rel_src loc) mem_src)
+        (RELWF: View.wf (rel_src loc))
+        (RELCONSISTENT: forall val released (MSG: msg_tgt = Message.concrete val released),
+            Time.le ((rel_src loc).(View.rlx) loc) to)
+        (RELSRC: Memory.closed_view (rel_src loc) mem_src)
         (PROMISE: sim_promise others rel_src pasts prom_src prom_tgt)
         (PAST: wf_pasts_memory mem_src pasts)
         (PROMATTACH: promises_not_attached (promised prom_src) mem_src)
@@ -1491,6 +1568,7 @@ Section SIM.
       + ii. erewrite (@Memory.add_o prom_src'); eauto.
         erewrite (@Memory.add_o prom_tgt'); eauto. des_ifs.
         * ss. des; clarify. inv SIM; econs; eauto.
+          i. eapply add_closed_add_weak_closed_view, closed_add_closed_view. auto.
         * ss. des; clarify. inv SIM; econs; eauto.
       + inv PAST. econs.
         * ii. erewrite (@Memory.add_o mem_src') in GET; eauto.
@@ -1585,6 +1663,7 @@ Section SIM.
         + ii. erewrite (@Memory.split_o prom_src'); eauto.
           erewrite (@Memory.split_o prom_tgt'); eauto. des_ifs.
           * ss. des; clarify. inv SIM; econs; eauto.
+            i. eapply add_weak_closed_view_consistent; eauto.
           * guardH o. ss. des; clarify. inv SIM.
             rewrite <- H0. econs; eauto.
         + econs.
@@ -1704,6 +1783,7 @@ Section SIM.
         + ii. erewrite (@Memory.split_o prom_src'); eauto.
           erewrite (@Memory.split_o prom_tgt'); eauto. des_ifs.
           * ss. des; clarify. inv SIM; econs; eauto.
+            i. eapply add_closed_add_weak_closed_view, closed_add_closed_view. auto.
           * guardH o. ss. des; clarify. inv SIM.
             rewrite <- H0. econs; eauto.
         + econs.
@@ -1815,6 +1895,7 @@ Section SIM.
         + ii. erewrite (@Memory.split_o prom_src'); eauto.
           erewrite (@Memory.split_o prom_tgt'); eauto. des_ifs.
           * ss. des; clarify. inv SIM; econs; eauto.
+            i. eapply add_closed_add_weak_closed_view, closed_add_closed_view. auto.
           * guardH o. ss. des; clarify. inv SIM. econs; eauto.
         + econs.
           * ii. erewrite (@Memory.split_o mem_src') in GET; eauto.
@@ -2014,6 +2095,7 @@ Section SIM.
         (RELEASEDMLE: View.opt_le releasedm_src releasedm_tgt)
         (RELEASEDMWFSRC: View.opt_wf releasedm_src)
         (RELEASEDMWFTGT: View.opt_wf releasedm_tgt)
+        (CONSISTENT: Local.promise_consistent lc_tgt')
     :
       exists pasts' lc_src' sc_src' mem_src' released_src kind_src,
         (<<STEPSRC: Local.write_step lc_src sc_src mem_src loc from to val releasedm_src released_src ord lc_src' sc_src' mem_src' kind_src>>) /\
@@ -2052,6 +2134,15 @@ Section SIM.
                      msg_src
                      (Message.concrete val (TView.write_released (Local.tview lc_tgt) sc_tgt loc to releasedm_tgt ord))).
     { unfold msg_src. econs. eapply TViewFacts.write_released_mon; eauto. refl. }
+
+    assert (CONSISTENTTGT:
+              forall to' val' released' from'
+                     (GET: Memory.get loc to' promises2
+                           = Some (from', Message.concrete val' released')),
+                Time.le to to').
+    { i. exploit CONSISTENT; eauto. i. ss. left. eapply TimeFacts.le_lt_lt; eauto.
+      unfold TimeMap.join, TimeMap.singleton. setoid_rewrite LocFun.add_spec_eq.
+      eapply Time.join_r; eauto. }
 
     (* add case *)
     - exploit add_succeed_wf; try apply MEM0. i. des.
@@ -2116,26 +2207,39 @@ Section SIM.
         * eapply TViewFacts.write_tview_mon; eauto. refl.
         * ii. specialize (PROMS loc0 ts). dup PROMS.
           setoid_rewrite LocFun.add_spec.
-          destruct (LocSet.Facts.eq_dec loc0 loc).
-          {
-
-            admit. }
+          destruct (LocSet.Facts.eq_dec loc0 loc); clarify.
+          { destruct (loc_ts_eq_dec (loc, ts) (loc, to)).
+            - ss. des; clarify.
+              eapply Memory.add_get0 in PROMISES1.
+              eapply Memory.add_get0 in ADDPROMSRC. des.
+              erewrite GET. erewrite GET1. econs.
+            - inv PROMS0; econs; eauto.
+              i. des_ifs.
+              + exfalso. exploit RELEASE; eauto.
+                { destruct ord; ss. }
+                ss. i. subst. inv MSG.
+              + eapply join_view_add_weak_closed; eauto.
+                eapply add_weak_closed_view_consistent.
+                * eapply add_closed_add_weak_closed_view.
+                  eapply singleton_view_add_closed; eauto.
+                  inv PAST. exploit ONLY; eauto. i. des; auto.
+                * apply View.singleton_ur_wf.
+                * ss. unfold TimeMap.singleton.
+                  setoid_rewrite LocFun.add_spec_eq. eauto.
+          }
           { des_ifs. ss. des; clarify. }
-
-          des_ifs.
-          { ss. des; clarify. admit. }
-          { admit. }
-          { ss. des; clarify. admit. }
-          { ss. des; clarify. admit. }
-          { ss.
-
-
-
       + inv PAST. econs.
         * ii. erewrite (@Memory.add_o mem_src') in GET; eauto.
           destruct (loc_ts_eq_dec (loc0, to0) (loc, to)).
           { ss. des; clarify. esplits; eauto.
-            - eapply sim_message_closed in SIM. inv SIM. inv CLOSED. auto.
+            - exploit write_released_add_closed.
+              { eapply MEMSRC. }
+              {
+
+              try apply MEMSRC; eauto.
+              +
+
+              eapply sim_message_closed in SIM. inv SIM. inv CLOSED. auto.
             - i. des_ifs.
               { exfalso. ss. des; clarify. eapply Time.lt_strorder; eauto. }
               guardH o. exploit ONLY; eauto. i. des; auto.
