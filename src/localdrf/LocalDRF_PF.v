@@ -2276,8 +2276,7 @@ Section SIM.
         apply Memory.add_get0 in ADDMEMSRC. des. clarify.
 
     - exploit split_succeed_wf; try apply PROMISES1. i. des. clarify.
-      dup PROMS. specialize (PROMS0 loc ts3). erewrite GET2 in PROMS0.
-      inv PAST.
+      dup PROMS. specialize (PROMS0 loc ts3). erewrite GET2 in PROMS0. inv PAST.
 
       assert (GETSRC: exists msg3_src,
                  Memory.get loc ts3 (Local.promises lc_src) = Some (from, msg3_src)).
@@ -2329,6 +2328,15 @@ Section SIM.
             * ss. des; clarify.
             * econs; eauto. }
 
+      set (pasts' := fun loc' to' => if loc_ts_eq_dec (loc', to') (loc, to)
+                                     then
+                                       (match msg3_src with
+                                        | Message.concrete _ (Some _) => Some mem_src
+                                        | _ => pasts loc ts3
+                                        end)
+                                     else pasts loc' to').
+
+
       inv PROMS0; ss; [destruct released_src as [released_src|]|];
         rewrite GETSRC in *; clarify.
 
@@ -2366,44 +2374,60 @@ Section SIM.
         + auto.
         + econs; ss.
           * eapply TViewFacts.write_tview_mon; eauto. refl.
-          * ii. erewrite (split_remove_shorten REMOVE); eauto.
+          * ii. dup PROMS. specialize (PROMS0 loc0 ts).
+            setoid_rewrite LocFun.add_spec.
             erewrite (split_remove_shorten REMOVESRC); eauto.
-            destruct (loc_ts_eq_dec (loc0, ts) (loc, to)).
-            { ss. des; clarify. destruct (loc_ts_eq_dec (loc, to) (loc, ts3)).
-              - ss. des; clarify. exfalso. eapply Time.lt_strorder; eauto.
-              - guardH o.
-                apply Memory.split_get0 in PROMISES1. des. erewrite GET.
-                apply Memory.split_get0 in SPLITPROMSRC. des. erewrite GET4. econs. }
-            guardH o. destruct (loc_ts_eq_dec (loc0, ts) (loc, ts3)).
-            { ss. des; clarify.
-
-
-              ss. des; clarify. destruct (loc_ts_eq_dec (loc, to) (loc, ts3)).
-              - ss. des; clarify. exfalso. eapply Time.lt_strorder; eauto.
-              - admit. }
-
-
-
-            (Local.promises lc_tgt)); eauto.
-
-
-            at 2; eauto.
-
-              in GET; eauto. des_ifs.
-
-
-
-        + ii. ss. erewrite (@Memory.split_o prom_src'); eauto.
-          erewrite (@Memory.split_o prom_tgt'); eauto. des_ifs.
-          * ss. des; clarify. inv SIM; econs; eauto.
-            i. eapply add_weak_closed_view_consistent; eauto.
-          * guardH o. ss. des; clarify. inv SIM.
-            rewrite <- H0. econs; eauto.
+            erewrite (split_remove_shorten REMOVE); eauto.
+            destruct (LocSet.Facts.eq_dec loc0 loc); clarify.
+            { specialize (CONSISTENTTGT ts).
+              erewrite (split_remove_shorten REMOVE) in CONSISTENTTGT; eauto.
+              destruct (loc_ts_eq_dec (loc, ts) (loc, ts3)).
+              - ss. des; clarify. erewrite GET2 in PROMS0. erewrite GETSRC in PROMS0.
+                inv PROMS0; try (econs; eauto).
+                destruct (loc_ts_eq_dec (loc, ts3) (loc, to)).
+                { ss. des; clarify. exfalso. eapply Time.lt_strorder; eauto. }
+                ss. des; clarify. econs; eauto.
+                i. des_ifs.
+                + exfalso. exploit RELEASE; eauto.
+                  { destruct ord; ss. }
+                  ss. i. subst. inv MSG.
+                + eapply join_view_add_weak_closed; eauto.
+                  eapply add_weak_closed_view_consistent.
+                  * eapply add_closed_add_weak_closed_view.
+                    eapply singleton_view_add_closed; eauto.
+                    exploit ONLY; eauto. i. des; auto.
+                  * apply View.singleton_ur_wf.
+                  * ss. unfold TimeMap.singleton.
+                    setoid_rewrite LocFun.add_spec_eq.
+                    exploit CONSISTENTTGT; eauto.
+              - ss. des; clarify. inv PROMS0; try (econs; eauto).
+                destruct (loc_ts_eq_dec (loc, ts) (loc, to)).
+                { ss. des; clarify.
+                  apply Memory.split_get0 in SPLITPROMSRC. des. erewrite GET in *. clarify. }
+                ss. des; clarify. econs; eauto.
+                i. des_ifs.
+                + exfalso. exploit RELEASE; eauto.
+                  { destruct ord; ss. }
+                  ss. i. subst. inv MSG.
+                + eapply join_view_add_weak_closed; eauto.
+                  eapply add_weak_closed_view_consistent.
+                  * eapply add_closed_add_weak_closed_view.
+                    eapply singleton_view_add_closed; eauto.
+                    exploit ONLY; eauto. i. des; auto.
+                  * apply View.singleton_ur_wf.
+                  * ss. unfold TimeMap.singleton.
+                    setoid_rewrite LocFun.add_spec_eq.
+                    exploit CONSISTENTTGT; eauto.
+            }
+            { des_ifs; ss; des; clarify. }
         + econs.
           * ii. erewrite (@Memory.split_o mem_src') in GET; eauto.
             destruct (loc_ts_eq_dec (loc0, to0) (loc, to)).
             { ss. des; clarify. esplits; eauto.
-              - eapply sim_message_closed in SIM. inv SIM. inv CLOSED0; econs; auto.
+              -
+
+
+                eapply sim_message_closed in SIM. inv SIM. inv CLOSED0; econs; auto.
               - i. des_ifs.
                 { exfalso. ss. des; clarify. eapply Time.lt_strorder; eauto. }
                 guardH o. exploit COMPLETE; eauto. i. des.
