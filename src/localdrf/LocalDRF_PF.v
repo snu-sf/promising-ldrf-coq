@@ -2283,7 +2283,6 @@ Section SIM.
                  Memory.get loc ts3 (Local.promises lc_src) = Some (from, msg3_src)).
       { inv PROMS0; eauto. exploit NOTHERS; eauto. i. subst. eauto. } des.
 
-
       hexploit (@Memory.split_exists lc_src.(Local.promises) loc from to ts3 msg_src); ss.
       { eauto. }
       intros [prom_src' SPLITPROMSRC].
@@ -2360,6 +2359,40 @@ Section SIM.
         + ii. erewrite (@Memory.split_o mem_src') in GET; eauto. des_ifs; eauto.
           * ss. des; clarify. eapply OTHERSWF in OTHER; ss.
           * guardH o. ss. des; clarify. eapply OTHERSWF in OTHER; ss.
+        + ii. ss. erewrite <- PROMISEDSAME in *.
+          erewrite (@Memory.split_o mem_src') in GET; eauto. des_ifs; eauto.
+          * ss. des; clarify.
+          * ss. des; clarify.
+        + auto.
+        + econs; ss.
+          * eapply TViewFacts.write_tview_mon; eauto. refl.
+          * ii. erewrite (split_remove_shorten REMOVE); eauto.
+            erewrite (split_remove_shorten REMOVESRC); eauto.
+            destruct (loc_ts_eq_dec (loc0, ts) (loc, to)).
+            { ss. des; clarify. destruct (loc_ts_eq_dec (loc, to) (loc, ts3)).
+              - ss. des; clarify. exfalso. eapply Time.lt_strorder; eauto.
+              - guardH o.
+                apply Memory.split_get0 in PROMISES1. des. erewrite GET.
+                apply Memory.split_get0 in SPLITPROMSRC. des. erewrite GET4. econs. }
+            guardH o. destruct (loc_ts_eq_dec (loc0, ts) (loc, ts3)).
+            { ss. des; clarify.
+
+
+              ss. des; clarify. destruct (loc_ts_eq_dec (loc, to) (loc, ts3)).
+              - ss. des; clarify. exfalso. eapply Time.lt_strorder; eauto.
+              - admit. }
+
+
+
+            (Local.promises lc_tgt)); eauto.
+
+
+            at 2; eauto.
+
+              in GET; eauto. des_ifs.
+
+
+
         + ii. ss. erewrite (@Memory.split_o prom_src'); eauto.
           erewrite (@Memory.split_o prom_tgt'); eauto. des_ifs.
           * ss. des; clarify. inv SIM; econs; eauto.
