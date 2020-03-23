@@ -2331,17 +2331,170 @@ Section SIM.
       set (pasts' := fun loc' to' => if loc_ts_eq_dec (loc', to') (loc, to)
                                      then
                                        (match msg3_src with
-                                        | Message.concrete _ (Some _) => Some mem_src
-                                        | _ => pasts loc ts3
+                                        | Message.concrete _ (Some _) => pasts loc ts3
+                                        | _ => Some mem_src
                                         end)
                                      else pasts loc' to').
 
+      eexists pasts', _, _, mem_src', _, _.
+      splits; auto.
+      + econs; eauto.
+      + ii. erewrite (@Memory.split_o mem_src'); eauto.
+        erewrite (@Memory.split_o mem_tgt'); eauto.
+        ss. erewrite <- PROMISEDSAME.
+        destruct (loc_ts_eq_dec (loc0, ts) (loc, to)).
+        { ss. des; clarify. econs; eauto.
+          * ii. des; ss. eapply OTHERSWF in H; eauto.
+          * refl.
+          * unfold msg_src. i. clarify.
+        }
+        guardH o. destruct (loc_ts_eq_dec (loc0, ts) (loc, ts3)).
+        { ss. des; clarify. specialize (MEM loc ts3).
+          eapply PROMISES in GETSRC. erewrite GETSRC in *.
+          eapply PROMISES0 in GET2. erewrite GET2 in *. inv MEM.
+          - econs; eauto. refl.
+          - des.
+            + eapply OTHERSWF in PROM. clarify.
+            + clear - PROM NLOC. clarify. }
+        { eauto. }
+      + ii. erewrite (@Memory.split_o mem_src') in GET; eauto. des_ifs; eauto.
+        * ss. des; clarify. eapply OTHERSWF in OTHER; ss.
+        * guardH o. ss. des; clarify. eapply OTHERSWF in OTHER; ss.
+      + ii. ss. erewrite <- PROMISEDSAME in *.
+        erewrite (@Memory.split_o mem_src') in GET; eauto. des_ifs; eauto.
+        * ss. des; clarify.
+        * ss. des; clarify.
+      + auto.
+      + econs; ss.
+        * eapply TViewFacts.write_tview_mon; eauto. refl.
+        * ii. dup PROMS. specialize (PROMS1 loc0 ts).
+          unfold pasts'. setoid_rewrite LocFun.add_spec.
+          erewrite (split_remove_shorten REMOVESRC); eauto.
+          erewrite (split_remove_shorten REMOVE); eauto.
+          destruct (LocSet.Facts.eq_dec loc0 loc); clarify.
+          { specialize (CONSISTENTTGT ts).
+            erewrite (split_remove_shorten REMOVE) in CONSISTENTTGT; eauto.
+            destruct (loc_ts_eq_dec (loc, ts) (loc, ts3)).
+            - ss. des; clarify. erewrite GET2 in PROMS1. erewrite GETSRC in PROMS1.
+              inv PROMS1; try (econs; eauto); cycle 1.
+              { i. apply OTHERSWF in OTHER. clarify. }
+              destruct (loc_ts_eq_dec (loc, ts3) (loc, to)).
+              { ss. des; clarify. exfalso. eapply Time.lt_strorder; eauto. }
+              ss. des; clarify. econs; eauto.
+              i. des_ifs.
+              + exfalso. exploit RELEASE; eauto.
+                { destruct ord; ss. }
+                ss. i. subst. inv MSG.
+              + eapply join_view_add_weak_closed; eauto.
+                eapply add_weak_closed_view_consistent.
+                * eapply add_closed_add_weak_closed_view.
+                  eapply singleton_view_add_closed; eauto.
+                  exploit ONLY; eauto. i. des; auto.
+                * apply View.singleton_ur_wf.
+                * ss. unfold TimeMap.singleton.
+                  setoid_rewrite LocFun.add_spec_eq.
+                  exploit CONSISTENTTGT; eauto.
+            - ss. des; clarify. inv PROMS1; try (econs; eauto).
+              destruct (loc_ts_eq_dec (loc, ts) (loc, to)).
+              { ss. des; clarify.
+                apply Memory.split_get0 in SPLITPROMSRC. des. erewrite GET in *. clarify. }
+              ss. des; clarify. econs; eauto.
+              i. subst. des_ifs.
+              + exfalso. exploit RELEASE.
+                { destruct ord; ss. }
+                { symmetry. eapply H2. }
+                i. des_ifs. inv MSG.
+              + eapply join_view_add_weak_closed; eauto.
+                eapply add_weak_closed_view_consistent.
+                * eapply add_closed_add_weak_closed_view.
+                  eapply singleton_view_add_closed; eauto.
+                  exploit ONLY; eauto. i. des; auto.
+                * apply View.singleton_ur_wf.
+                * ss. unfold TimeMap.singleton.
+                  setoid_rewrite LocFun.add_spec_eq.
+                  exploit CONSISTENTTGT; eauto.
+          }
+          { des_ifs; ss; des; clarify. }
+      + econs.
+        * ii. erewrite (@Memory.split_o mem_src') in GET; eauto.
+          destruct (loc_ts_eq_dec (loc0, to0) (loc, to)).
+          { ss. des; clarify. unfold pasts'. des_ifs.
 
-      inv PROMS0; ss; [destruct released_src as [released_src|]|];
-        rewrite GETSRC in *; clarify.
+            admit. }
+          {
+
+
+            esplits; eauto.
+            -
+
+
+                eapply sim_message_closed in SIM. inv SIM. inv CLOSED0; econs; auto.
+              - i. des_ifs.
+                { exfalso. ss. des; clarify. eapply Time.lt_strorder; eauto. }
+                guardH o. exploit COMPLETE; eauto. i. des.
+                eapply PREV in PAST; eauto. rewrite PAST0 in *. clarify.
+            }
+            guardH o. destruct (loc_ts_eq_dec (loc0, to0) (loc, ts3)).
+            { ss. des; clarify. rewrite <- H0 in *. esplits; eauto.
+              - inv MSG. econs. eapply sim_view_closed; eauto.
+              - i. des_ifs.
+                + refl.
+                + ss. des; clarify.
+            }
+            { guardH o0. exploit COMPLETE; eauto. i. des.
+              esplits; eauto. i. des_ifs.
+              - ss. des; clarify. exfalso.
+                exploit memory_get_from_inj.
+                { eapply Memory.split_get0 in SPLITMEMSRC. des. eapply GET5. }
+                { instantiate (1:=Message.concrete val0 (Some released'0)).
+                  instantiate (1:=to0). erewrite Memory.split_o; [|eauto]. des_ifs.
+                  - ss. unguard. des; clarify.
+                  - ss. unguard. des; clarify. }
+                { i. des; clarify.
+                  - unguard. des; clarify.
+                  - eapply Time.lt_strorder; eauto.
+                  - eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+                    + eapply TS12.
+                    + eapply Time.bot_spec. }
+              - guardH o1. exploit COMPLETE; eauto.
+            }
+          * i. des_ifs.
+            { ss. des; clarify. splits; auto.
+              - eapply Memory.split_get0 in SPLITMEMSRC. des.
+                inv SIM. econs; eauto.
+              - etrans; eauto. apply Memory.future_future_weak. auto.
+            }
+            { guardH o. exploit ONLY; eauto. i. des. splits; auto.
+              - eapply concrete_promised_increase_promise; eauto.
+              - etrans; eauto. apply Memory.future_future_weak. auto. }
+        + ii. destruct (loc_ts_eq_dec (loc0, to0) (loc, to)); auto.
+          ss. des; clarify. exfalso.
+          apply ONLY in PAST0. des. inv CONCRETE0.
+          apply Memory.split_get0 in SPLITMEMSRC. des. clarify.
+        + ii. inv PROMISED.
+          erewrite (@Memory.split_o mem_src' mem_src) in GET; eauto. des_ifs.
+          * ss. des; clarify.
+          * guardH o. ss. des; clarify.
+          * guardH o. guardH o0.
+            ss. erewrite (@Memory.split_o prom_src') in GET0; eauto. des_ifs.
+            { ss. des; clarify. }
+            { ss. des; clarify. }
+            guardH o1. guardH o2. exploit PROMATTACH; eauto.
+            { econs; eauto. }
+            i. inv x.
+            econs. erewrite (@Memory.split_o prom_src'); eauto.
+            instantiate (1:=msg1). des_ifs.
+            { ss. des; clarify. }
+            { ss. des; clarify. }
+      }
+
+
+
+      (* inv PROMS0; ss; [destruct released_src as [released_src|]|]; *)
+      (*   rewrite GETSRC in *; clarify. *)
 
       (* split normal message with non-none view *)
-      { exploit ONLY; eauto. i. des. clarify.
+      exploit ONLY; eauto. i. des. clarify.
 
         eexists (fun loc' to' => if loc_ts_eq_dec (loc', to') (loc, to)
                                  then (Some past)
