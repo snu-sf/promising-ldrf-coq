@@ -2418,7 +2418,10 @@ Section SIM.
       + econs.
         * ii. erewrite (@Memory.split_o mem_src') in GET; eauto.
           destruct (loc_ts_eq_dec (loc0, to0) (loc, to)).
-          { ss. des; clarify. unfold pasts'. des_ifs.
+          { ss. des; clarify.
+
+
+            unfold pasts'. des_ifs.
 
             admit. }
           {
