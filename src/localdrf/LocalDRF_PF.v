@@ -2435,14 +2435,26 @@ Section SIM.
                 exploit PREV; eauto. i.
                 esplits; eauto.
                 * eapply write_released_add_closed_relaxed; ss.
-                  { admit. }
+                  { inv TVIEW_WF. inv WRITABLE.
+                    eapply add_weak_closed_view_consistent; eauto.
+                    transitivity (View.rlx (TView.cur (Local.tview lc_tgt)) loc).
+                    - transitivity (View.rlx (TView.cur (Local.tview lc_src)) loc).
+                      + specialize (REL_CUR loc). inv REL_CUR. auto.
+                      + inv TVIEW. inv CUR0. auto.
+                    - left. auto. }
                   { eapply add_closed_opt_view_future_add_closed; eauto. }
                   { left. auto. }
               + destruct releasedm_src as [releasedm_src|].
                 { exploit RELEASEDMSOME; eauto. i. des. clarify. }
                 esplits; eauto.
                 eapply write_released_add_closed_relaxed; ss.
-                { admit. }
+                  { inv TVIEW_WF. inv WRITABLE.
+                    eapply add_weak_closed_view_consistent; eauto.
+                    transitivity (View.rlx (TView.cur (Local.tview lc_tgt)) loc).
+                    - transitivity (View.rlx (TView.cur (Local.tview lc_src)) loc).
+                      + specialize (REL_CUR loc). inv REL_CUR. auto.
+                      + inv TVIEW. inv CUR0. auto.
+                    - left. auto. }
                 { econs. }
                 { refl. }
             - destruct (pasts loc from0) as [past'|] eqn:PAST.
@@ -2474,7 +2486,35 @@ Section SIM.
                   { left. eauto. } econs.
                 * i. clarify.
           }
-          { guardH o. admit. }
+          { guardH o.
+            destruct (loc_ts_eq_dec (loc0, to0) (loc, ts3)).
+            - ss. des; clarify. exploit COMPLETE.
+              { eapply PROMISES. eauto. } i. des.
+              esplits; eauto. i.
+              destruct (loc_ts_eq_dec (loc, from0) (loc, from0)); cycle 1.
+              { ss. des; clarify. } des_ifs. refl.
+            - guardH o0.
+              exploit COMPLETE; eauto. i. des. esplits; eauto.
+
+              i. destruct (loc_ts_eq_dec (loc0, from0) (loc, to)).
+              + ss. des; clarify. exfalso.
+                exploit memory_get_from_inj.
+                { eapply Memory.split_get0 in SPLITMEMSRC. des. eapply GET5. }
+                { instantiate (2:=to0). erewrite Memory.split_o; eauto.
+                  destruct (loc_ts_eq_dec (loc, to0) (loc, to)).
+                  { ss. unguard. des; clarify. }
+                  destruct (loc_ts_eq_dec (loc, to0) (loc, ts3)).
+                  { simpl in *. unguard. exfalso. guardH o1. des; clarify. }
+                  eapply GET. }
+                i. des.
+                * unguard. des; clarify.
+                * clarify. exfalso. eapply Time.lt_strorder; eauto.
+                * clarify. exfalso. eapply Time.lt_strorder.
+                  eapply TimeFacts.lt_le_lt.
+                  { eapply TS12. }
+                  { eapply Time.bot_spec; eauto. }
+              + guardH o1. eapply PREV; eauto.
+          }
 
         * unfold pasts'. i. des_ifs.
           { ss. des; clarify.
