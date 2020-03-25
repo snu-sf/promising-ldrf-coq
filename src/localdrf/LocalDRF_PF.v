@@ -1074,7 +1074,10 @@ Section SIM.
     :
       exists lc_src' released_src,
         (<<STEPSRC: Local.read_step lc_src mem_src loc to val released_src ord lc_src'>>) /\
-        (<<SIM: sim_local others pasts lc_src' lc_tgt'>>)
+        (<<SIM: sim_local others pasts lc_src' lc_tgt'>>) /\
+        (<<RELEASEDMLE: View.opt_le released_src released_tgt>>) /\
+        (<<GETSRC: exists from, Memory.get loc to mem_src = Some (from, Message.concrete val released_src)>>) /\
+        (<<GETSRC: exists from, Memory.get loc to mem_tgt = Some (from, Message.concrete val released_tgt)>>)
   .
   Proof.
     inv LOCAL. inv STEPTGT.
@@ -1084,6 +1087,9 @@ Section SIM.
       + eapply TVIEW.
       + refl.
     - econs; ss; eauto. eapply read_tview_mon; eauto. refl.
+    - auto.
+    - eauto.
+    - eauto.
   Qed.
 
   Lemma sim_fence_step others pasts lc_src lc_tgt sc_src sc_tgt ordr ordw
@@ -1904,12 +1910,11 @@ Section SIM.
   Qed.
 
   Lemma sim_write_step_normal
-        others pasts lc_src lc_tgt sc_src sc_tgt mem_src mem_tgt e_tgt
+        others pasts lc_src lc_tgt sc_src sc_tgt mem_src mem_tgt
         lc_tgt' sc_tgt' mem_tgt' loc from to val ord releasedm_tgt released_tgt kind_tgt
         releasedm_src
         (NLOC: ~ L loc)
         (STEPTGT: Local.write_step lc_tgt sc_tgt mem_tgt loc from to val releasedm_tgt released_tgt ord lc_tgt' sc_tgt' mem_tgt' kind_tgt)
-        (NOREAD: no_read_msgs (others \2/ promised lc_src.(Local.promises)) e_tgt)
         (SC: TimeMap.le sc_src sc_tgt)
         (MEM: sim_memory (others \2/ (in_L /2\ promised lc_src.(Local.promises))) mem_src mem_tgt)
         (SCSRC: Memory.closed_timemap sc_src mem_src)
@@ -2548,37 +2553,39 @@ Section SIM.
       + inv LOCAL. inv SIM. inv LOCALSRC. inv LOCALTGT.
         exploit sim_promise_step_normal; try apply MEM; eauto.
         { inv TVIEW_WF. eauto. }
-        { i. clarify. admit. }
+        { i. clarify. transitivity (View.rlx (TView.cur (Local.tview lc_tgt)) loc).
+          - transitivity (View.rlx (TView.rel (Local.tview lc_tgt) loc) loc).
+            + inv TVIEW. specialize (REL loc). inv REL. auto.
+            + inv TVIEW_WF0. specialize (REL_CUR loc). inv REL_CUR. auto.
+          - exploit CONSISTENT; ss; eauto.
+            + eapply Memory.promise_get0 in PROMISE.
+              * des. eauto.
+              * inv PROMISE; clarify.
+            + i. left. auto. }
         { inv TVIEW_CLOSED. eauto. }
         i. des.
-        eexists [(_, ThreadEvent.promise loc from to msg_src kind_src)], pasts', _, _, mem_src'.
-        splits.
-        * econs 2; [|econs 1|ss]. econs 1. econs; eauto.
-        * ss. eauto.
-
-
-
+        replace (fun x0 x1 => others x0 x1 \/ in_L x0 x1 /\ promised lc_src.(Local.promises) x0 x1) with
+            (fun x0 x1 => others x0 x1 \/ in_L x0 x1 /\ promised prom_src' x0 x1) in MEM0; cycle 1.
+        { extensionality loc'. extensionality to'.
+          apply Coq.Logic.PropExtensionality.propositional_extensionality. split; i.
+          { des; eauto. right. split; auto.
+            inv H1. destruct msg0.
+            eapply MemoryFacts.promise_get_promises_inv_diff in GET; eauto.
+            - des. econs; eauto.
+            - ii. inv H1. unfold in_L in *. ss. }
+          { des; auto. right. split; auto. inv H1. destruct msg0. inv STEPSRC.
+            - eapply Memory.add_get1 in GET; eauto. econs; eauto.
+            - eapply Memory.split_get1 in GET; eauto. des. econs; eauto.
+            - eapply Memory.lower_get1 in GET; eauto. des. econs; eauto.
+            - eapply Memory.remove_get1 in GET; eauto. des.
+              + subst. ss.
+              + econs; eauto. }
+        }
+        eexists [(_, ThreadEvent.promise loc from to msg_src kind_src)], pasts', (Local.mk _ _), _, mem_src'.
         splits; ss.
+        * econs 2; [|econs 1|ss]. econs 1. econs; eauto.
+        * ss.
 
-
-        pasts, lc_src, sc_src, mem_src. splits; ss.
-
-
-
-          exploit CONSISTENT; eauto.
-
-        [eauto|eauto|eauto|..].
-
-        Set Printing All.
-        eapply MEM.
-
-eauto.         eauto. eauto.
-        { instantiate (1:=loc). destruct (L loc); ss. }
-        { eapply PROMISE. }
-        { eapply MEM. }
-
-
-        admit.
     - inv STEP. inv LOCAL.
       + eexists [(_, ThreadEvent.silent)], pasts, lc_src, sc_src, mem_src. splits; ss.
         * econs 2; [|econs 1|ss]. econs 2. econs; eauto.
@@ -2590,8 +2597,33 @@ eauto.         eauto. eauto.
         * inv STEPSRC. ss.
         * refl.
         * inv STEPSRC. ss.
-      + admit.
-      + admit.
+      + destruct (classic (L loc)).
+        * admit.
+        * hexploit sim_write_step_normal; try eassumption.
+          { eapply MEM. }
+          { i. instantiate (1:=None). econs. }
+          { i. clarify. }
+          { econs. }
+          { econs. }
+          { econs. }
+          { econs. } i. des.
+          eexists [(_, ThreadEvent.write loc from to val _ ord)], pasts', lc_src', _, mem_src'.
+          splits; ss.
+          econs 2; [|econs 1|ss]. econs 2. econs; eauto.
+      + destruct (classic (L loc)).
+        * admit.
+        * exploit sim_read_step; eauto. i. des.
+          dup PAST. inv PAST0. exploit COMPLETE; eauto. i. des.
+          exploit Local.read_step_future; try apply LOCAL1; eauto. i. des.
+          exploit Local.read_step_future; try apply STEPSRC; eauto. i. des.
+          hexploit sim_write_step_normal; try eassumption.
+          { inv STEPSRC. ss. }
+          { inv STEPSRC. ss. }
+          { i. clarify. }
+          { i. eauto. } i. des.
+          eexists [(_, ThreadEvent.update loc tsr tsw valr valw released_src released_src0 ordr ordw)],
+          pasts', lc_src'0, sc_src', mem_src'. splits; ss.
+          { econs 2; [|econs 1|ss]. econs 2. econs; eauto. }
       + exploit sim_fence_step; eauto. i. des.
         eexists [(_, ThreadEvent.fence ordr ordw)],
         pasts, lc_src', sc_src', mem_src. splits; ss.
