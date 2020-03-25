@@ -2417,11 +2417,173 @@ Section SIM.
           { des_ifs; ss; des; clarify. }
       + econs.
         * ii. erewrite (@Memory.split_o mem_src') in GET; eauto.
-          destruct (loc_ts_eq_dec (loc0, to0) (loc, to)).
+          unfold pasts'. destruct (loc_ts_eq_dec (loc0, to0) (loc, to)).
           { ss. des; clarify.
+            destruct (loc_ts_eq_dec (loc, from0) (loc, to)); ss.
+            { des; clarify. exfalso. eapply Time.lt_strorder; eauto. }
+            guardH o. rewrite GETSRC in *.
+            inv PROMS0; clarify; [destruct released_src as [released_src|]|].
+            - exploit ONLY; eauto. i. des.
+              assert (ORD: Ordering.le Ordering.strong_relaxed ord = false).
+              { destruct (Ordering.le Ordering.strong_relaxed ord) eqn:ORD; ss.
+                exfalso. exploit RELEASE; eauto. ss.
+                i. inv MSG. ss. }
+              exploit COMPLETE.
+              { apply PROMISES. eauto. } i. des. rewrite PAST in *. clarify.
+              destruct (pasts loc from0) as [past'|] eqn:PAST0.
+              + exploit ONLY; eauto. i. des.
+                exploit PREV; eauto. i.
+                esplits; eauto.
+                * eapply write_released_add_closed_relaxed; ss.
+                  { admit. }
+                  { eapply add_closed_opt_view_future_add_closed; eauto. }
+                  { left. auto. }
+              + destruct releasedm_src as [releasedm_src|].
+                { exploit RELEASEDMSOME; eauto. i. des. clarify. }
+                esplits; eauto.
+                eapply write_released_add_closed_relaxed; ss.
+                { admit. }
+                { econs. }
+                { refl. }
+            - destruct (pasts loc from0) as [past'|] eqn:PAST.
+              + exploit ONLY; eauto. i. des.
+                esplits; eauto.
+                * eapply write_released_add_closed; eauto; cycle 1.
+                  { left. eauto. }
+                  exploit RELEASEDMCLOSEDPAST; eauto. i.
+                  eapply add_closed_opt_view_future_add_closed; eauto.
+                * i. clarify.
+              + destruct releasedm_src as [releasedm_src|].
+                { exploit RELEASEDMSOME; eauto. i. des. clarify. }
+                esplits; eauto.
+                * eapply write_released_add_closed; eauto; cycle 1.
+                  { left. eauto. } econs.
+                * i. clarify.
+            - destruct (pasts loc from0) as [past'|] eqn:PAST.
+              + exploit ONLY; eauto. i. des.
+                esplits; eauto.
+                * eapply write_released_add_closed; eauto; cycle 1.
+                  { left. eauto. }
+                  exploit RELEASEDMCLOSEDPAST; eauto. i.
+                  eapply add_closed_opt_view_future_add_closed; eauto.
+                * i. clarify.
+              + destruct releasedm_src as [releasedm_src|].
+                { exploit RELEASEDMSOME; eauto. i. des. clarify. }
+                esplits; eauto.
+                * eapply write_released_add_closed; eauto; cycle 1.
+                  { left. eauto. } econs.
+                * i. clarify.
+          }
+          { guardH o. admit. }
+
+        * unfold pasts'. i. des_ifs.
+          { ss. des; clarify.
+            exploit ONLY; eauto. i. des. splits; auto.
+            - eapply Memory.split_get0 in SPLITMEMSRC. des. econs; eauto.
+            - etrans; eauto. eapply Memory.future_future_weak; eauto.
+          }
+          { ss. des; clarify. esplits; eauto.
+            - eapply Memory.split_get0 in SPLITMEMSRC. des. econs; eauto.
+            - eapply Memory.future_future_weak; eauto.
+          }
+          { ss. des; clarify. esplits; eauto.
+            - eapply Memory.split_get0 in SPLITMEMSRC. des. econs; eauto.
+            - eapply Memory.future_future_weak; eauto.
+          }
+          { guardH o. ss.
+            exploit ONLY; eauto. i. des. splits; auto.
+            - eapply concrete_promised_increase_promise; eauto.
+            - etrans; eauto. eapply Memory.future_future_weak; eauto.
+          }
+
+      + unfold pasts'. ii.
+        destruct (loc_ts_eq_dec (loc0, to0) (loc, to)); auto.
+        ss. des; clarify. exfalso.
+        exploit ONLY; eauto. i. des. inv CONCRETE.
+        eapply Memory.split_get0 in SPLITMEMSRC. des. clarify.
+
+    -
+
+        * auto.
+
+          ss. des; clarify.
+
+          {
+
+              admit.
+              =
+
+            -
 
 
-            unfold pasts'. des_ifs.
+
+                admit.
+              +
+
+
+              admit.
+
+            -
+
+
+            -
+
+
+                  admit.
+
+
+                  {/ eapply
+
+                  ; ss.
+                * admit.
+                * instantiate (1:=from0). destruct releasedm_src; [|econs].
+                  exploit RELEASEDMSOME; eauto. i. des.
+                  exploit RELEASEDMCLOSEDPAST; eauto.
+                  i. eapply add_closed_opt_view_future_add_closed; eauto.
+                  admit.
+                * left. auto.
+                * admit.
+              + i.
+
+
+
+              esplits; eauto.
+              + eapply write_released_add_closed_relaxed; ss.
+                * admit.
+                * instantiate (1:=from0). destruct releasedm_src; [|econs].
+                  exploit RELEASEDMSOME; eauto. i. des.
+                  exploit RELEASEDMCLOSEDPAST; eauto.
+                  i. eapply add_closed_opt_view_future_add_closed; eauto.
+                  admit.
+                * left. auto.
+                * admit.
+              + i.
+
+                  ss.
+admit.                                           ss. ; econs.
+
+              +
+
+
+            - admit.
+
+            - admit.
+
+            - clarify.
+
+
+            des_ifs.
+
+            - admit.
+            - esplits; eauto.
+              + eapply write_released_add_closed; eauto.
+
+
+
+            unfold pasts'
+
+
+             unfold pasts'. des_ifs.
 
             admit. }
           {
