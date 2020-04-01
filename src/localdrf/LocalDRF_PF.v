@@ -1901,7 +1901,7 @@ Section SIM.
         (MEMTGT: Memory.closed mem_tgt)
         (LOCALSRC: Local.wf lc_src mem_src)
         (LOCALTGT: Local.wf lc_tgt mem_tgt)
-        (SIM: sim_local others pasts lc_src lc_tgt)
+        (SIM: sim_local self pasts lc_src lc_tgt)
         (PAST: wf_pasts_memory mem_src pasts)
         (PROMATTACH: promises_not_attached self mem_src)
         (PROMSWF: forall loc' to', others loc' to' -> L loc')
@@ -1922,7 +1922,7 @@ Section SIM.
         (<<ATTACHEDLE: not_attached_le others mem_src mem_src'>>) /\
         (<<PROMATTACH: promises_not_attached self mem_src'>>) /\
         (<<SC: TimeMap.le sc_src' sc_tgt'>>) /\
-        (<<SIM: sim_local others pasts' lc_src' lc_tgt'>>) /\
+        (<<SIM: sim_local self pasts' lc_src' lc_tgt'>>) /\
         (<<PAST: wf_pasts_memory mem_src' pasts'>>) /\
         (<<PASTLE: pasts_le pasts pasts'>>)
   (* TODO: condition about event *)
@@ -1977,7 +1977,7 @@ Section SIM.
     - exploit add_succeed_wf; try apply MEM0. i. des.
       hexploit (@Memory.add_exists mem_src loc from to msg_src); ss.
       { i. specialize (MEM loc to2). rewrite GET2 in *. inv MEM; cycle 1.
-        { exfalso. apply NLOC. exfalso. eauto. }
+        { exfalso. apply NLOC. des; eauto. }
         ii. eapply DISJOINT; eauto.
         inv RHS. econs; ss. eapply TimeFacts.le_lt_lt; eauto. }
       intros [mem_src' ADDMEMSRC].
@@ -1987,7 +1987,7 @@ Section SIM.
       assert (ATTACHSRC: forall to' msg'
                                 (GET: Memory.get loc to' mem_src = Some (to, msg')), False).
       { i. specialize (MEM loc to'). rewrite GET in *. inv MEM; cycle 1.
-        { exfalso. apply NLOC. exfalso. eauto. }
+        { exfalso. des; eauto. }
         inv FROM.
         { exploit DISJOINT; auto.
           - symmetry. eapply H.
@@ -2023,6 +2023,7 @@ Section SIM.
       + ii. erewrite (@Memory.add_o mem_src'); eauto.
         erewrite (@Memory.add_o mem_tgt'); eauto. des_ifs.
         ss. des; clarify. econs; eauto.
+        * ii. des; eauto.
         * refl.
         * i. unfold msg_src. clarify.
       + ii. erewrite (@Memory.add_o mem_src') in GET; eauto. des_ifs; eauto.
@@ -2134,6 +2135,7 @@ Section SIM.
         erewrite (@Memory.split_o mem_tgt'); eauto.
         destruct (loc_ts_eq_dec (loc0, ts) (loc, to)).
         { ss. des; clarify. econs; eauto.
+          * ii. des; eauto.
           * refl.
           * unfold msg_src. i. clarify.
         }
@@ -2142,7 +2144,7 @@ Section SIM.
           eapply PROMISES in GETSRC. erewrite GETSRC in *.
           eapply PROMISES0 in GET2. erewrite GET2 in *. inv MEM.
           - econs; eauto. refl.
-          - exfalso. eauto. }
+          - exfalso. des; eauto. }
         { eauto. }
       + ii. erewrite (@Memory.split_o mem_src') in GET; eauto. des_ifs; eauto.
         * ss. des; clarify. exfalso. eauto.
@@ -2384,6 +2386,7 @@ Section SIM.
       + ss. ii. erewrite (@Memory.lower_o mem_src'); eauto.
         erewrite (@Memory.lower_o mem_tgt'); eauto. des_ifs.
         * ss. des; clarify. econs; eauto.
+          { ii. des; eauto. }
           { refl. }
           { unfold msg_src. ii. clarify. }
       + ii. erewrite Memory.lower_o in GET1; eauto. des_ifs; eauto.
@@ -2465,20 +2468,19 @@ Section SIM.
         (MEMTGT: Memory.closed mem_tgt)
         (LOCALSRC: Local.wf lc_src mem_src)
         (LOCALTGT: Local.wf lc_tgt mem_tgt)
-        (SIM: sim_local others pasts lc_src lc_tgt)
+        (SIM: sim_local self pasts lc_src lc_tgt)
         (PAST: wf_pasts_memory mem_src pasts)
         (PROMATTACH: promises_not_attached self mem_src)
-        (PROMSWF: forall loc' to', (others \2/ self) loc' to' -> L loc')
+        (PROMSWF: forall loc' to', others loc' to' -> L loc')
         (CONSISTENT: Local.promise_consistent lc_tgt')
     :
       exists tr self' pasts' lc_src' sc_src' mem_src',
         (<<STEPSRC: Trace.steps tr (Thread.mk _ st lc_src sc_src mem_src) (Thread.mk _ st' lc_src' sc_src' mem_src')>>) /\
         (<<MEM: sim_memory (others \2/ self') mem_src' mem_tgt'>>) /\
-        (<<PROMSWF: forall loc' to', self' loc' to' -> L loc'>>) /\
         (<<ATTACHEDLE: not_attached_le others mem_src mem_src'>>) /\
         (<<PROMATTACH: promises_not_attached self' mem_src'>>) /\
         (<<SC: TimeMap.le sc_src' sc_tgt'>>) /\
-        (<<SIM: sim_local others pasts' lc_src' lc_tgt'>>) /\
+        (<<SIM: sim_local self' pasts' lc_src' lc_tgt'>>) /\
         (<<PAST: wf_pasts_memory mem_src' pasts'>>) /\
         (<<PASTLE: pasts_le pasts pasts'>>)
   (* TODO: condition about event *)
@@ -2504,19 +2506,16 @@ Section SIM.
         eexists [(_, ThreadEvent.promise loc from to msg_src kind_src)], self, pasts', (Local.mk _ _), _, mem_src'.
         splits; ss.
         * econs 2; [|econs 1|ss]. econs 1. econs; eauto.
-        * i. eapply PROMSWF; eauto.
         * ss.
 
     - inv STEP. inv LOCAL.
       + eexists [(_, ThreadEvent.silent)], self, pasts, lc_src, sc_src, mem_src. splits; ss.
         * econs 2; [|econs 1|ss]. econs 2. econs; eauto.
-        * i. eapply PROMSWF; eauto.
         * refl.
       + exploit sim_read_step; eauto. i. des.
         eexists [(_, ThreadEvent.read loc ts val released_src ord)],
         self, pasts, lc_src', sc_src, mem_src. splits; ss.
         * econs 2; [|econs 1|ss]. econs 2. econs; eauto.
-        * i. eapply PROMSWF; eauto.
         * refl.
       + destruct (classic (L loc)).
         * admit.
@@ -2530,7 +2529,6 @@ Section SIM.
           eexists [(_, ThreadEvent.write loc from to val _ ord)], self, pasts', lc_src', _, mem_src'.
           splits; ss.
           { econs 2; [|econs 1|ss]. econs 2. econs; eauto. }
-          { i. eapply PROMSWF; eauto. }
       + destruct (classic (L loc)).
         * admit.
         * exploit sim_read_step; eauto. i. des.
@@ -2543,24 +2541,20 @@ Section SIM.
           eexists [(_, ThreadEvent.update loc tsr tsw valr valw released_src released_src0 ordr ordw)],
           self, pasts', lc_src'0, sc_src', mem_src'. splits; ss.
           { econs 2; [|econs 1|ss]. econs 2. econs; eauto. }
-          { i. eapply PROMSWF; eauto. }
       + exploit sim_fence_step; eauto. i. des.
         eexists [(_, ThreadEvent.fence ordr ordw)],
         self, pasts, lc_src', sc_src', mem_src. splits; ss.
         * econs 2; [|econs 1|ss]. econs 2. econs; eauto.
-        * i. eapply PROMSWF; eauto.
         * refl.
       + exploit sim_fence_step; eauto. i. des.
         eexists [(_, ThreadEvent.syscall e)],
         self, pasts, lc_src', sc_src', mem_src. splits; ss.
         * econs 2; [|econs 1|ss]. econs 2. econs; eauto.
-        * eauto.
         * refl.
       + exploit sim_failure_step; eauto. i. des.
         eexists [(_, ThreadEvent.failure)],
         self, pasts, lc_src, sc_src, mem_src. splits; ss.
         * econs 2; [|econs 1|ss]. econs 2. econs; eauto.
-        * eauto.
         * refl.
   Admitted.
 
@@ -2583,17 +2577,18 @@ Section SIM.
           add_weak_closed_view rel_src past loc ts)
     :
       sim_promise_content_strong loc ts P others rel_src
-                               (Some past)
-                               (Some (from, Message.concrete val released_src))
-                               (Some (from, Message.concrete val released_tgt))
+                                 (Some past)
+                                 (Some (from, Message.concrete val released_src))
+                                 (Some (from, Message.concrete val released_tgt))
   | sim_promise_content_strong_normal_reserve
       (NPROM: ~ P)
+      (NLOC: ~ L loc)
       past from
     :
       sim_promise_content_strong loc ts P others rel_src
-                               past
-                               (Some (from, Message.reserve))
-                               (Some (from, Message.reserve))
+                                 past
+                                 (Some (from, Message.reserve))
+                                 (Some (from, Message.reserve))
   | sim_promise_content_strong_forget
       (PROM: P)
       past from_src from_tgt msg
@@ -2601,9 +2596,9 @@ Section SIM.
       (NOTHERS: forall (NOTHER: ~ others from_tgt), from_tgt = from_src)
     :
       sim_promise_content_strong loc ts P others rel_src
-                               past
-                               (Some (from_src, Message.reserve))
-                               (Some (from_tgt, msg))
+                                 past
+                                 (Some (from_src, Message.reserve))
+                                 (Some (from_tgt, msg))
   .
   Hint Constructors sim_promise_content_strong.
 
