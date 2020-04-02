@@ -1040,34 +1040,36 @@ Section SIM.
 
   Definition in_L (loc: Loc.t) (ts: Time.t) := L loc.
 
-  Inductive sim_memory_content P
+  Inductive sim_memory_content P (loc: Loc.t)
             (messages: Time.t -> Prop)
     : option (Time.t * Message.t) -> option (Time.t * Message.t) -> Prop :=
   | sim_memory_content_none
       (NPROM: ~ P)
     :
-      sim_memory_content P messages None None
+      sim_memory_content P loc messages None None
   | sim_memory_content_normal
       from_src from_tgt msg_src msg_tgt
       (NPROM: ~ P)
       (FROM: Time.le from_tgt from_src)
+      (SHORT: L loc -> ~ messages from_tgt -> Time.lt from_tgt from_src)
       (MSG: Message.le msg_src msg_tgt)
       (RESERVE: msg_src = Message.reserve -> msg_tgt = Message.reserve)
     :
-      sim_memory_content P messages (Some (from_src, msg_src)) (Some (from_tgt, msg_tgt))
+      sim_memory_content P loc messages (Some (from_src, msg_src)) (Some (from_tgt, msg_tgt))
   | sim_memory_content_forget
       from_src from_tgt msg
       (PROM: P)
+      (NLOC: L loc)
       (FROM: Time.le from_tgt from_src)
-      (MSG: ~ messages from_tgt -> Time.lt from_tgt from_src)
+      (SHORT: ~ messages from_tgt -> Time.lt from_tgt from_src)
    :
-      sim_memory_content P messages (Some (from_src, Message.reserve)) (Some (from_tgt, msg))
+      sim_memory_content P loc messages (Some (from_src, Message.reserve)) (Some (from_tgt, msg))
   .
   Hint Constructors sim_memory_content.
 
   Definition sim_memory P mem_src mem_tgt : Prop :=
     forall loc ts,
-      sim_memory_content (P loc ts) (promised mem_src loc) (Memory.get loc ts mem_src) (Memory.get loc ts mem_tgt).
+      sim_memory_content (P loc ts) loc (promised mem_src loc) (Memory.get loc ts mem_src) (Memory.get loc ts mem_tgt).
 
   Inductive sim_promise_content (loc: Loc.t) (ts: Time.t)
             (P: Prop)
@@ -1512,9 +1514,10 @@ Section SIM.
         * econs; eauto.
           { ii. des; eauto. }
           { refl. }
+          { i. clarify. }
           { eapply sim_message_le; eauto. }
           { i. clarify. inv SIM. auto. }
-        * specialize (MEM loc ts). inv MEM; eauto. exfalso. des; eauto.
+        * specialize (MEM loc ts). inv MEM; eauto.
       + ii. erewrite (@Memory.add_o mem_src') in GET; eauto. des_ifs; eauto.
         ss. des; clarify. exfalso. eauto.
       + ii. erewrite (@Memory.add_o prom_src'); eauto.
@@ -1598,16 +1601,18 @@ Section SIM.
           { ss. des; clarify. econs; eauto.
             * ii. des; eauto.
             * refl.
+            * i. clarify.
             * eapply sim_message_le; eauto.
             * i. clarify. inv SIM.
           }
           { guardH o. ss. des; clarify. econs; eauto.
             * ii. des; eauto.
             * refl.
+            * i. clarify.
             * econs. eapply sim_opt_view_le; eauto.
             * i. clarify.
           }
-          { specialize (MEM loc ts). inv MEM; eauto. exfalso. des; eauto. }
+          { specialize (MEM loc ts). inv MEM; eauto. }
         + ii. erewrite (@Memory.split_o mem_src') in GET; eauto. des_ifs; eauto.
           * ss. des; clarify. exfalso. eauto.
           * guardH o. ss. des; clarify. exfalso. eauto.
@@ -1711,6 +1716,7 @@ Section SIM.
           { ss. des; clarify. econs; eauto.
             * ii. des; eauto.
             * refl.
+            * i. clarify.
             * eapply sim_message_le; eauto.
             * i. clarify. inv SIM.
           }
@@ -1718,8 +1724,9 @@ Section SIM.
             * ii. des; eauto.
             * refl.
             * i. clarify.
+            * i. clarify.
           }
-          { specialize (MEM loc ts). inv MEM; eauto. exfalso. des; eauto. }
+          { specialize (MEM loc ts). inv MEM; eauto. }
         + ii. erewrite (@Memory.split_o mem_src') in GET; eauto. des_ifs; eauto.
           * ss. des; clarify. exfalso. eauto.
           * guardH o. ss. des; clarify. exfalso. eauto.
@@ -1818,14 +1825,16 @@ Section SIM.
           { ss. des; clarify. econs; eauto.
             * ii. des; eauto.
             * refl.
+            * i. clarify.
             * eapply sim_message_le; eauto.
             * i. clarify. inv SIM.
           }
           { guardH o. ss. des; clarify. econs; eauto.
             * ii. des; eauto.
             * refl.
+            * i. clarify.
           }
-          { specialize (MEM loc ts). inv MEM; eauto. exfalso. des; eauto. }
+          { specialize (MEM loc ts). inv MEM; eauto. }
         + ii. erewrite (@Memory.split_o mem_src') in GET; eauto. des_ifs; eauto.
           * ss. des; clarify. exfalso. eauto.
           * guardH o. ss. des; clarify. exfalso. eauto.
@@ -1927,6 +1936,7 @@ Section SIM.
         ss. des; clarify. econs; eauto.
         * ii. des; eauto.
         * refl.
+        * i. clarify.
         * eapply sim_message_le; eauto.
         * i. clarify.
       + ii. erewrite (@Memory.lower_o mem_src') in GET0; eauto. des_ifs; eauto.
@@ -1975,7 +1985,7 @@ Section SIM.
         erewrite (@Memory.remove_o mem_tgt'); eauto.
         des_ifs; try by (des; ss; clarify).
         * ss. des; clarify. econs; eauto. ii. des; eauto.
-        * specialize (MEM loc ts). inv MEM; eauto. exfalso. des; eauto.
+        * specialize (MEM loc ts). inv MEM; eauto.
       + ii. erewrite (@Memory.remove_o mem_src') in GET1; eauto. des_ifs; eauto.
       + ii. erewrite (@Memory.remove_o prom_src'); eauto.
         erewrite (@Memory.remove_o prom_tgt'); eauto. des_ifs.
@@ -2133,8 +2143,9 @@ Section SIM.
         * ss. des; clarify. econs; eauto.
           { ii. des; eauto. }
           { refl. }
+          { i. clarify. }
           { i. unfold msg_src. clarify. }
-        * specialize (MEM loc ts). inv MEM; eauto. exfalso. des; eauto.
+        * specialize (MEM loc ts). inv MEM; eauto.
       + ii. erewrite (@Memory.add_o mem_src') in GET; eauto. des_ifs; eauto.
         ss. des; clarify. exfalso. eauto.
       + ii. ss. erewrite (@Memory.add_o mem_src') in GET; eauto. des_ifs.
@@ -2247,16 +2258,19 @@ Section SIM.
         { ss. des; clarify. econs; eauto.
           * ii. des; eauto.
           * refl.
+          * i. clarify.
           * unfold msg_src. i. clarify.
         }
         guardH o. destruct (loc_ts_eq_dec (loc0, ts) (loc, ts3)).
         { ss. des; clarify. specialize (MEM loc ts3).
           eapply PROMISES in GETSRC. erewrite GETSRC in *.
           eapply PROMISES0 in GET2. erewrite GET2 in *. inv MEM.
-          - econs; eauto. refl.
+          - econs; eauto.
+            + refl.
+            + i. clarify.
           - exfalso. des; eauto. }
         { des_ifs. unguard. ss. des; clarify.
-          specialize (MEM loc ts). inv MEM; eauto. exfalso. des; eauto. }
+          specialize (MEM loc ts). inv MEM; eauto. }
       + ii. erewrite (@Memory.split_o mem_src') in GET; eauto. des_ifs; eauto.
         * ss. des; clarify. exfalso. eauto.
         * guardH o. ss. des; clarify. exfalso. eauto.
@@ -2499,6 +2513,7 @@ Section SIM.
         * ss. des; clarify. econs; eauto.
           { ii. des; eauto. }
           { refl. }
+          { i. clarify. }
           { unfold msg_src. ii. clarify. }
       + ii. erewrite Memory.lower_o in GET1; eauto. des_ifs; eauto.
         ss. eapply Memory.lower_get0 in LOWERMEMSRC. des. clarify. eauto.
@@ -3611,7 +3626,11 @@ Section SIM.
     inv STEPTGT.
 
     - hexploit add_succeed_wf; try apply MEM0. i. des.
-      hexploit (@Memory.add_exists mem_src loc (Time.middle from to) to Message.reserve).
+
+      assert (DISJOINTSRC:
+                forall to2 from2 msg2
+                       (GET2: Memory.get loc to2 mem_src = Some (from2, msg2)),
+                  Interval.disjoint (Time.middle from to, to) (from2, to2)).
       { ii. specialize (MEM loc to2). inv MEM.
         - rewrite GET2 in *. clarify.
         - rewrite GET2 in *. clarify. eapply DISJOINT; eauto.
@@ -3624,6 +3643,8 @@ Section SIM.
             transitivity (Time.middle from to); auto.
             eapply Time.middle_spec; auto.
           + inv RHS. econs; ss. eapply TimeFacts.le_lt_lt; eauto. }
+      hexploit (@Memory.add_exists mem_src loc (Time.middle from to) to Message.reserve).
+      { auto. }
       { eapply Time.middle_spec; auto. }
       { econs. }
       intros [mem_src' ADDMEM].
@@ -3661,7 +3682,8 @@ Section SIM.
           { i. eapply Time.middle_spec; eauto. }
         * ss. des; clarify.
           dup MEM. specialize (MEM1 loc ts). inv MEM1; eauto.
-          econs 3; eauto. i. des_ifs. auto.
+          { econs 2; eauto. i. des_ifs. eapply SHORT; eauto. }
+          { econs 3; eauto. i. des_ifs. auto. }
       + ii. erewrite Memory.add_o in GET; eauto. des_ifs; eauto.
         ss. des; clarify. exfalso.
         specialize (MEM loc (Time.middle from to)). inv MEM.
@@ -3692,6 +3714,37 @@ Section SIM.
         * ss. des; clarify.
           specialize (MEM loc ts1). rewrite GET in *. inv MEM.
           { apply not_or_and in NPROM. des.
+            assert (FROMTO: Time.lt from_tgt to).
+            { destruct (Time.le_lt_dec to from_tgt); auto. ii.
+              exploit SHORT; eauto.
+              { ii. inv H0. destruct msg0. exploit DISJOINTSRC; eauto.
+                - instantiate (1:=to). econs; ss.
+                  + eapply Time.middle_spec; eauto.
+                  + refl.
+                - econs; ss.
+                  + apply memory_get_ts_strong in GET0. des; clarify.
+                    * eapply (@TimeFacts.le_lt_lt _ from); eauto.
+                      eapply Time.bot_spec.
+                    * eapply TimeFacts.lt_le_lt; eauto. }
+            }
+            admit.
+          }
+          {
+
+
+            clarify.
+
+                  + auto.
+
+            }
+
+              eapply DISJIN
+
+            destruct FROM.
+            - admit.
+
+              admit.
+            -
 
 
             admit. }
