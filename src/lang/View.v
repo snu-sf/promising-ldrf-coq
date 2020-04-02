@@ -451,6 +451,13 @@ Module View <: JoinableType.
     - apply join_r.
   Qed.
 
+  Lemma join_bot_r lhs:
+    join lhs bot = lhs.
+  Proof.
+    rewrite join_comm.
+    apply join_bot_l.
+  Qed.
+
   Lemma join_le
         v1 v2 w1 w2
         (LE1: le v1 w1)
