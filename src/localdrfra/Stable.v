@@ -212,6 +212,26 @@ Module Stable.
       - apply singleton_rw_stable_view; ss.
     Qed.
 
+    Lemma stable_view_stable_timemap
+          mem view
+          (VIEW: View.wf view)
+          (STABLE: stable_view mem view):
+      stable_timemap mem view.(View.rlx).
+    Proof.
+      ii. etrans; [eapply STABLE|]; eauto.
+      econs; ss; try refl. apply VIEW.
+    Qed.
+
+    Lemma join_stable_timemap
+          mem tm1 tm2
+          (STABLE1: stable_timemap mem tm1)
+          (STABLE2: stable_timemap mem tm2):
+      stable_timemap mem (TimeMap.join tm1 tm2).
+    Proof.
+      unfold stable_timemap in *.
+      hexploit join_stable_view; [exact STABLE1|exact STABLE2|]. ss.
+    Qed.
+
 
     (* step *)
 
@@ -934,9 +954,10 @@ Module Stable.
           (STABLE_MEM1: stable_memory mem1)
           (STEP: Local.fence_step lc1 sc1 ordr ordw lc2 sc2):
       <<NORMAL_TVIEW2: normal_tview lc2.(Local.tview)>> /\
-      <<STABLE_TVIEW2: stable_tview mem1 lc2.(Local.tview)>>.
+      <<STABLE_TVIEW2: stable_tview mem1 lc2.(Local.tview)>> /\
+      <<STABLE_SC2: stable_timemap mem1 sc2>>.
     Proof.
-      inv STEP. ss. split.
+      inv STEP. ss. splits.
       - inv NORMAL_TVIEW1.
         econs; ss; i; repeat (condtac; ss).
         + apply join_normal_view; ss.
@@ -991,6 +1012,15 @@ Module Stable.
             { apply TimeMap.join_l. }
             { etrans; [|apply TimeMap.join_r]. apply WF1. }
         + rewrite View.le_join_l; try by apply View.bot_spec. ss.
+      - unfold TView.write_fence_sc. repeat (condtac; ss).
+        + eapply join_stable_timemap; ss.
+          apply stable_view_stable_timemap.
+          * apply WF1.
+          * apply STABLE_TVIEW1.
+        + eapply join_stable_timemap; ss.
+          apply stable_view_stable_timemap.
+          * apply WF1.
+          * apply STABLE_TVIEW1.
     Qed.
   End Stable.
 End Stable.
