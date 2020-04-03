@@ -21,10 +21,6 @@ Require Import TView.
 Require Import Local.
 Require Import Thread.
 
-Require Import Trace.
-
-Require Import OrdStep.
-
 Set Implicit Arguments.
 
 
