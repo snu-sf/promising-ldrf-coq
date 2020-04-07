@@ -918,9 +918,9 @@ End PAST.
 
 Section ATTACHED.
 
-  Definition promises_not_attached (prom: Loc.t -> Time.t -> Prop) (mem: Memory.t): Prop :=
+  Definition promises_not_attached (self prom: Loc.t -> Time.t -> Prop) (mem: Memory.t): Prop :=
     forall loc ts0 ts1 msg
-           (PROMISED: prom loc ts0)
+           (PROMISED: self loc ts0)
            (GET: Memory.get loc ts1 mem = Some (ts0, msg)),
       prom loc ts1.
 
