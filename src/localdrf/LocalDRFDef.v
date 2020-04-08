@@ -29,6 +29,182 @@ Require Import MemoryProps.
 Set Implicit Arguments.
 
 
+
+Lemma promised_add mem1 loc from to msg mem2
+      (ADD: Memory.add mem1 loc from to msg mem2)
+  :
+    promised mem2 =
+    fun loc' =>
+      if (Loc.eq_dec loc' loc)
+      then fun ts' => if (Time.eq_dec ts' to) then True else promised mem1 loc' ts'
+      else promised mem1 loc'.
+Proof.
+  extensionality loc'. extensionality ts'.
+  apply Coq.Logic.PropExtensionality.propositional_extensionality.
+  split; i.
+  - inv H. destruct msg0. erewrite Memory.add_o in GET; eauto.
+    des_ifs.
+    + ss. des; clarify.
+    + econs; eauto.
+    + ss. des; clarify.
+    + econs; eauto.
+  - des_ifs.
+    + ss. des; clarify. econs. eapply Memory.add_get0; eauto.
+    + inv H. destruct msg0.
+      eapply Memory.add_get1 in GET; eauto. econs; eauto.
+    + inv H. destruct msg0.
+      eapply Memory.add_get1 in GET; eauto. econs; eauto.
+Qed.
+
+Lemma concrete_promised_add mem1 loc from to msg mem2
+      (ADD: Memory.add mem1 loc from to msg mem2)
+  :
+    concrete_promised mem2 =
+    fun loc' =>
+      if (Loc.eq_dec loc' loc)
+      then fun ts' => if (Time.eq_dec ts' to) then (msg <> Message.reserve) else concrete_promised mem1 loc' ts'
+      else concrete_promised mem1 loc'.
+Proof.
+  extensionality loc'. extensionality ts'.
+  apply Coq.Logic.PropExtensionality.propositional_extensionality.
+  split; i.
+  - inv H. erewrite Memory.add_o in GET; eauto.
+    des_ifs.
+    + ss. des; clarify.
+    + ss. des; clarify.
+    + econs; eauto.
+    + ss. des; clarify.
+    + econs; eauto.
+  - des_ifs.
+    + destruct msg; ss. econs. eapply Memory.add_get0; eauto.
+    + inv H.
+      eapply Memory.add_get1 in GET; eauto. econs; eauto.
+    + inv H.
+      eapply Memory.add_get1 in GET; eauto. econs; eauto.
+Qed.
+
+Lemma promised_lower mem1 loc from to msg1 msg2 mem2
+      (LOWER: Memory.lower mem1 loc from to msg1 msg2 mem2)
+  :
+    promised mem2 = promised mem1.
+Proof.
+  extensionality loc'. extensionality ts'.
+  apply Coq.Logic.PropExtensionality.propositional_extensionality.
+  split; i.
+  - inv H. destruct msg. erewrite Memory.lower_o in GET; eauto. des_ifs.
+    + ss. des; clarify. econs. eapply (Memory.lower_get0 LOWER); eauto.
+    + econs; eauto.
+  - inv H. destruct msg. eapply Memory.lower_get1 in GET; eauto.
+    des. econs; eauto.
+Qed.
+
+Lemma concrete_promised_lower mem1 loc from to msg1 msg2 mem2
+      (LOWER: Memory.lower mem1 loc from to msg1 msg2 mem2)
+      (MSG: msg1 <> Message.reserve)
+  :
+    concrete_promised mem2 = concrete_promised mem1.
+Proof.
+  extensionality loc'. extensionality ts'.
+  apply Coq.Logic.PropExtensionality.propositional_extensionality.
+  split; i.
+  - inv H. erewrite Memory.lower_o in GET; eauto. des_ifs.
+    + ss. des; clarify.
+      exploit lower_succeed_wf; eauto. i. des. inv MSG_LE; clarify.
+      econs; eauto.
+    + econs; eauto.
+  - inv H. eapply Memory.lower_get1 in GET; eauto.
+    des. inv MSG_LE. econs; eauto.
+Qed.
+
+Lemma promised_split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2
+      (SPLIT: Memory.split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2)
+  :
+    promised mem2 =
+    fun loc' =>
+      if (Loc.eq_dec loc' loc)
+      then fun ts' => if (Time.eq_dec ts' ts2) then True else promised mem1 loc' ts'
+      else promised mem1 loc'.
+Proof.
+  extensionality loc'. extensionality ts'.
+  apply Coq.Logic.PropExtensionality.propositional_extensionality.
+  split; i.
+  - inv H. destruct msg. erewrite Memory.split_o in GET; eauto.
+    des_ifs; try by (des; ss; clarify).
+    + ss. des; clarify. econs. eapply (Memory.split_get0 SPLIT); eauto.
+    + econs; eauto.
+    + econs; eauto.
+  - des_ifs.
+    + ss. des; clarify. econs. eapply (Memory.split_get0 SPLIT); eauto.
+    + inv H. destruct msg. eapply Memory.split_get1 in GET; eauto.
+      des. econs; eauto.
+    + inv H. destruct msg. eapply Memory.split_get1 in GET; eauto.
+      des. econs; eauto.
+Qed.
+
+Lemma concrete_promised_split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2
+      (SPLIT: Memory.split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2)
+  :
+    concrete_promised mem2 =
+    fun loc' =>
+      if (Loc.eq_dec loc' loc)
+      then fun ts' => if (Time.eq_dec ts' ts2) then (msg2 <> Message.reserve) else concrete_promised mem1 loc' ts'
+      else concrete_promised mem1 loc'.
+Proof.
+  extensionality loc'. extensionality ts'.
+  apply Coq.Logic.PropExtensionality.propositional_extensionality.
+  split; i.
+  - inv H. erewrite Memory.split_o in GET; eauto.
+    des_ifs; try by (des; ss; clarify).
+    + ss. des; clarify. econs. eapply (Memory.split_get0 SPLIT); eauto.
+    + econs; eauto.
+    + econs; eauto.
+  - des_ifs.
+    + destruct msg2; ss. econs. eapply (Memory.split_get0 SPLIT); eauto.
+    + inv H. eapply Memory.split_get1 in GET; eauto.
+      des. econs; eauto.
+    + inv H. eapply Memory.split_get1 in GET; eauto.
+      des. econs; eauto.
+Qed.
+
+Lemma promised_remove mem1 loc from to msg mem2
+      (REMOVE: Memory.remove mem1 loc from to msg mem2)
+  :
+    promised mem2 =
+    fun loc' =>
+      if (Loc.eq_dec loc' loc)
+      then fun ts' => if (Time.eq_dec ts' to) then False else promised mem1 loc' ts'
+      else promised mem1 loc'.
+Proof.
+  extensionality loc'. extensionality ts'.
+  apply Coq.Logic.PropExtensionality.propositional_extensionality.
+  split; i.
+  - inv H. destruct msg0. erewrite Memory.remove_o in GET; eauto.
+    des_ifs; try by (des; ss; clarify).
+    + econs; eauto.
+    + econs; eauto.
+  - des_ifs.
+    + inv H. destruct msg0. eapply Memory.remove_get1 in GET; eauto.
+      des; clarify. econs; eauto.
+    + inv H. destruct msg0. eapply Memory.remove_get1 in GET; eauto.
+      des; clarify. econs; eauto.
+Qed.
+
+Lemma concrete_promised_remove mem1 loc from to mem2
+      (REMOVE: Memory.remove mem1 loc from to Message.reserve mem2)
+  :
+    concrete_promised mem2 = concrete_promised mem1.
+Proof.
+  extensionality loc'. extensionality ts'.
+  apply Coq.Logic.PropExtensionality.propositional_extensionality.
+  split; i.
+  - inv H. erewrite Memory.remove_o in GET; eauto.
+    des_ifs; try by (des; ss; clarify). econs; eauto.
+  - inv H. dup GET. eapply Memory.remove_get1 in GET; eauto. des.
+    + clarify. eapply Memory.remove_get0 in REMOVE. des. clarify.
+    + econs; eauto.
+Qed.
+
+
 Inductive step_all A B C D (step: A -> B -> C -> D -> Prop): C -> D -> Prop :=
 | step_all_intro
     a b c d
@@ -202,6 +378,53 @@ Section ADDCLOSED.
   Proof.
     inv CLOSED; econs.
     eapply closed_add_closed_opt_view; eauto.
+  Qed.
+
+  Lemma add_closed_timemap_concrete_closed tm mem0 loc ts mem1
+        (CONCRETELE: concrete_promised mem0 <2= concrete_promised mem1)
+        (CONCRETE: concrete_promised mem1 loc ts)
+        (CLOSED: add_closed_timemap tm mem0 loc ts)
+    :
+      Memory.closed_timemap tm mem1.
+  Proof.
+    ii. specialize (CLOSED loc0). des; clarify.
+    - exploit CONCRETELE.
+      { econs; eauto. } i. inv x. eauto.
+    - inv CONCRETE. eauto.
+  Qed.
+
+  Lemma add_closed_view_concrete_closed vw mem0 loc ts mem1
+        (CONCRETELE: concrete_promised mem0 <2= concrete_promised mem1)
+        (CONCRETE: concrete_promised mem1 loc ts)
+        (CLOSED: add_closed_view vw mem0 loc ts)
+    :
+      Memory.closed_view vw mem1.
+  Proof.
+    inv CLOSED. econs.
+    - eapply add_closed_timemap_concrete_closed; eauto.
+    - eapply add_closed_timemap_concrete_closed; eauto.
+  Qed.
+
+  Lemma add_closed_opt_view_concrete_closed vw mem0 loc ts mem1
+        (CONCRETELE: concrete_promised mem0 <2= concrete_promised mem1)
+        (CONCRETE: concrete_promised mem1 loc ts)
+        (CLOSED: add_closed_opt_view vw mem0 loc ts)
+    :
+      Memory.closed_opt_view vw mem1.
+  Proof.
+    inv CLOSED; econs.
+    eapply add_closed_view_concrete_closed; eauto.
+  Qed.
+
+  Lemma add_closed_message_concrete_closed msg mem0 loc ts mem1
+        (CONCRETELE: concrete_promised mem0 <2= concrete_promised mem1)
+        (CONCRETE: concrete_promised mem1 loc ts)
+        (CLOSED: add_closed_message msg mem0 loc ts)
+    :
+      Memory.closed_message msg mem1.
+  Proof.
+    inv CLOSED; econs.
+    eapply add_closed_opt_view_concrete_closed; eauto.
   Qed.
 
   Lemma add_closed_timemap_add_closed tm mem0 loc from ts val released mem1
@@ -943,180 +1166,6 @@ Section ATTACHED.
 End ATTACHED.
 
 
-Lemma promised_add mem1 loc from to msg mem2
-      (ADD: Memory.add mem1 loc from to msg mem2)
-  :
-    promised mem2 =
-    fun loc' =>
-      if (Loc.eq_dec loc' loc)
-      then fun ts' => if (Time.eq_dec ts' to) then True else promised mem1 loc' ts'
-      else promised mem1 loc'.
-Proof.
-  extensionality loc'. extensionality ts'.
-  apply Coq.Logic.PropExtensionality.propositional_extensionality.
-  split; i.
-  - inv H. destruct msg0. erewrite Memory.add_o in GET; eauto.
-    des_ifs.
-    + ss. des; clarify.
-    + econs; eauto.
-    + ss. des; clarify.
-    + econs; eauto.
-  - des_ifs.
-    + ss. des; clarify. econs. eapply Memory.add_get0; eauto.
-    + inv H. destruct msg0.
-      eapply Memory.add_get1 in GET; eauto. econs; eauto.
-    + inv H. destruct msg0.
-      eapply Memory.add_get1 in GET; eauto. econs; eauto.
-Qed.
-
-Lemma concrete_promised_add mem1 loc from to msg mem2
-      (ADD: Memory.add mem1 loc from to msg mem2)
-  :
-    concrete_promised mem2 =
-    fun loc' =>
-      if (Loc.eq_dec loc' loc)
-      then fun ts' => if (Time.eq_dec ts' to) then (msg <> Message.reserve) else concrete_promised mem1 loc' ts'
-      else concrete_promised mem1 loc'.
-Proof.
-  extensionality loc'. extensionality ts'.
-  apply Coq.Logic.PropExtensionality.propositional_extensionality.
-  split; i.
-  - inv H. erewrite Memory.add_o in GET; eauto.
-    des_ifs.
-    + ss. des; clarify.
-    + ss. des; clarify.
-    + econs; eauto.
-    + ss. des; clarify.
-    + econs; eauto.
-  - des_ifs.
-    + destruct msg; ss. econs. eapply Memory.add_get0; eauto.
-    + inv H.
-      eapply Memory.add_get1 in GET; eauto. econs; eauto.
-    + inv H.
-      eapply Memory.add_get1 in GET; eauto. econs; eauto.
-Qed.
-
-Lemma promised_lower mem1 loc from to msg1 msg2 mem2
-      (LOWER: Memory.lower mem1 loc from to msg1 msg2 mem2)
-  :
-    promised mem2 = promised mem1.
-Proof.
-  extensionality loc'. extensionality ts'.
-  apply Coq.Logic.PropExtensionality.propositional_extensionality.
-  split; i.
-  - inv H. destruct msg. erewrite Memory.lower_o in GET; eauto. des_ifs.
-    + ss. des; clarify. econs. eapply (Memory.lower_get0 LOWER); eauto.
-    + econs; eauto.
-  - inv H. destruct msg. eapply Memory.lower_get1 in GET; eauto.
-    des. econs; eauto.
-Qed.
-
-Lemma concrete_promised_lower mem1 loc from to msg1 msg2 mem2
-      (LOWER: Memory.lower mem1 loc from to msg1 msg2 mem2)
-      (MSG: msg1 <> Message.reserve)
-  :
-    concrete_promised mem2 = concrete_promised mem1.
-Proof.
-  extensionality loc'. extensionality ts'.
-  apply Coq.Logic.PropExtensionality.propositional_extensionality.
-  split; i.
-  - inv H. erewrite Memory.lower_o in GET; eauto. des_ifs.
-    + ss. des; clarify.
-      exploit lower_succeed_wf; eauto. i. des. inv MSG_LE; clarify.
-      econs; eauto.
-    + econs; eauto.
-  - inv H. eapply Memory.lower_get1 in GET; eauto.
-    des. inv MSG_LE. econs; eauto.
-Qed.
-
-Lemma promised_split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2
-      (SPLIT: Memory.split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2)
-  :
-    promised mem2 =
-    fun loc' =>
-      if (Loc.eq_dec loc' loc)
-      then fun ts' => if (Time.eq_dec ts' ts2) then True else promised mem1 loc' ts'
-      else promised mem1 loc'.
-Proof.
-  extensionality loc'. extensionality ts'.
-  apply Coq.Logic.PropExtensionality.propositional_extensionality.
-  split; i.
-  - inv H. destruct msg. erewrite Memory.split_o in GET; eauto.
-    des_ifs; try by (des; ss; clarify).
-    + ss. des; clarify. econs. eapply (Memory.split_get0 SPLIT); eauto.
-    + econs; eauto.
-    + econs; eauto.
-  - des_ifs.
-    + ss. des; clarify. econs. eapply (Memory.split_get0 SPLIT); eauto.
-    + inv H. destruct msg. eapply Memory.split_get1 in GET; eauto.
-      des. econs; eauto.
-    + inv H. destruct msg. eapply Memory.split_get1 in GET; eauto.
-      des. econs; eauto.
-Qed.
-
-Lemma concrete_promised_split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2
-      (SPLIT: Memory.split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2)
-  :
-    concrete_promised mem2 =
-    fun loc' =>
-      if (Loc.eq_dec loc' loc)
-      then fun ts' => if (Time.eq_dec ts' ts2) then (msg2 <> Message.reserve) else concrete_promised mem1 loc' ts'
-      else concrete_promised mem1 loc'.
-Proof.
-  extensionality loc'. extensionality ts'.
-  apply Coq.Logic.PropExtensionality.propositional_extensionality.
-  split; i.
-  - inv H. erewrite Memory.split_o in GET; eauto.
-    des_ifs; try by (des; ss; clarify).
-    + ss. des; clarify. econs. eapply (Memory.split_get0 SPLIT); eauto.
-    + econs; eauto.
-    + econs; eauto.
-  - des_ifs.
-    + destruct msg2; ss. econs. eapply (Memory.split_get0 SPLIT); eauto.
-    + inv H. eapply Memory.split_get1 in GET; eauto.
-      des. econs; eauto.
-    + inv H. eapply Memory.split_get1 in GET; eauto.
-      des. econs; eauto.
-Qed.
-
-Lemma promised_remove mem1 loc from to msg mem2
-      (REMOVE: Memory.remove mem1 loc from to msg mem2)
-  :
-    promised mem2 =
-    fun loc' =>
-      if (Loc.eq_dec loc' loc)
-      then fun ts' => if (Time.eq_dec ts' to) then False else promised mem1 loc' ts'
-      else promised mem1 loc'.
-Proof.
-  extensionality loc'. extensionality ts'.
-  apply Coq.Logic.PropExtensionality.propositional_extensionality.
-  split; i.
-  - inv H. destruct msg0. erewrite Memory.remove_o in GET; eauto.
-    des_ifs; try by (des; ss; clarify).
-    + econs; eauto.
-    + econs; eauto.
-  - des_ifs.
-    + inv H. destruct msg0. eapply Memory.remove_get1 in GET; eauto.
-      des; clarify. econs; eauto.
-    + inv H. destruct msg0. eapply Memory.remove_get1 in GET; eauto.
-      des; clarify. econs; eauto.
-Qed.
-
-Lemma concrete_promised_remove mem1 loc from to mem2
-      (REMOVE: Memory.remove mem1 loc from to Message.reserve mem2)
-  :
-    concrete_promised mem2 = concrete_promised mem1.
-Proof.
-  extensionality loc'. extensionality ts'.
-  apply Coq.Logic.PropExtensionality.propositional_extensionality.
-  split; i.
-  - inv H. erewrite Memory.remove_o in GET; eauto.
-    des_ifs; try by (des; ss; clarify). econs; eauto.
-  - inv H. dup GET. eapply Memory.remove_get1 in GET; eauto. des.
-    + clarify. eapply Memory.remove_get0 in REMOVE. des. clarify.
-    + econs; eauto.
-Qed.
-
 
 Inductive reserve_future_memory:
   forall (prom0 mem0 prom1 mem1: Memory.t), Prop :=
@@ -1240,4 +1289,21 @@ Proof.
   - eapply Memory.split_finite; eauto.
   - eapply Memory.lower_finite; eauto.
   - eapply Memory.remove_finite; eauto.
+Qed.
+
+Lemma reserve_future_concrete_same prom0 mem0 prom1 mem1 loc from to val released
+      (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
+      (GET: Memory.get loc to mem0 = Some (from, Message.concrete val released))
+  :
+    Memory.get loc to mem1 = Some (from, Message.concrete val released).
+Proof.
+  ginduction FUTURE; auto. i. apply IHFUTURE.
+  inv HD; des; clarify.
+  - erewrite Memory.add_o; eauto.
+    des_ifs. ss. des; clarify.
+    eapply Memory.add_get0 in MEM. des. clarify.
+  - apply lower_succeed_wf in MEM. des. inv MSG_LE.
+  - erewrite Memory.remove_o; eauto.
+    des_ifs. ss. des; clarify.
+    eapply Memory.remove_get0 in MEM. des. clarify.
 Qed.
