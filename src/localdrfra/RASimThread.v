@@ -513,10 +513,8 @@ Module RASimThread.
           (MEM1: sim_memory tr mem1_src mem1_tgt)
           (NORMAL_TVIEW1_SRC: normal_tview L lc1_src.(Local.tview))
           (NORMAL_TVIEW1_TGT: normal_tview L lc1_tgt.(Local.tview))
-          (NORMAL_MEM1_SRC: normal_memory L mem1_src)
           (STABLE_TVIEW1_SRC: stable_tview L mem1_src lc1_src.(Local.tview))
           (STABLE_TVIEW1_TGT: stable_tview L mem1_tgt lc1_tgt.(Local.tview))
-          (STABLE_MEM1_SRC: stable_memory L mem1_src)
           (WF1_SRC: Local.wf lc1_src mem1_src)
           (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
           (LOC: L loc)
@@ -526,18 +524,6 @@ Module RASimThread.
         (<<LC2: sim_local tr lc2_src lc2_tgt>> \/
          <<RACE: ra_race tr lc1_src.(Local.tview) loc to ord>>).
     Proof.
-      (* destruct (L loc) eqn:LOC; cycle 1. *)
-      (* { (* read from other loc *) *)
-      (*   inv LC1. inv TVIEW. inv MEM1. inv STEP_TGT. *)
-      (*   exploit COMPLETE; eauto. i. des. inv MSG. *)
-      (*   rewrite LOC in *. subst. *)
-      (*   esplits. *)
-      (*   { econs; eauto. econs; eauto. rewrite CUR, LOC in *. ss. } *)
-      (*   left. rewrite LOC in *. econs; eauto; ss. *)
-      (*   - econs; eauto; ss; congr. *)
-      (*   - admit. *)
-      (*   - admit. *)
-      (* } *)
       inv LC1. inv TVIEW. inv MEM1. inv STEP_TGT.
       exploit COMPLETE; eauto. i. des. inv MSG. clear RELEASED.
       inv READABLE. dup NORMAL_TVIEW1_SRC. inv NORMAL_TVIEW1_SRC0.
@@ -573,6 +559,32 @@ Module RASimThread.
       - replace (Ordering.join ord Ordering.acqrel) with ord by (destruct ord; ss).
         condtac; try by (destruct ord; ss).
         rewrite ACQ. refl.
+    Qed.
+
+    Lemma read_step_other
+          tr lc1_src mem1_src
+          lc1_tgt mem1_tgt loc to val released_tgt ord lc2_tgt
+          (LC1: sim_local tr lc1_src lc1_tgt)
+          (MEM1: sim_memory tr mem1_src mem1_tgt)
+          (NORMAL_TVIEW1_SRC: normal_tview L lc1_src.(Local.tview))
+          (NORMAL_TVIEW1_TGT: normal_tview L lc1_tgt.(Local.tview))
+          (STABLE_TVIEW1_SRC: stable_tview L mem1_src lc1_src.(Local.tview))
+          (STABLE_TVIEW1_TGT: stable_tview L mem1_tgt lc1_tgt.(Local.tview))
+          (WF1_SRC: Local.wf lc1_src mem1_src)
+          (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
+          (LOC: ~ L loc)
+          (STEP_TGT: Local.read_step lc1_tgt mem1_tgt loc to val released_tgt ord lc2_tgt):
+      exists released_src lc2_src,
+        <<STEP_SRC: OrdLocal.read_step L Ordering.acqrel lc1_src mem1_src loc to val released_src ord lc2_src>> /\
+        <<LC2: sim_local tr lc2_src lc2_tgt>>.
+    Proof.
+      inv LC1. inv TVIEW. inv MEM1. inv STEP_TGT.
+      exploit COMPLETE; eauto. i. des. inv MSG.
+      destruct (L loc) eqn:LOC0; ss. subst.
+      esplits.
+      { econs; eauto. econs; eauto. rewrite CUR, LOC0 in *. ss. }
+      rewrite LOC0 in *. econs; eauto; ss.
+      econs; eauto; ss; congr.
     Qed.
 
     (* Lemma sim_thread_step *)
