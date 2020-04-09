@@ -232,6 +232,53 @@ Module Stable.
       hexploit join_stable_view; [exact STABLE1|exact STABLE2|]. ss.
     Qed.
 
+    Lemma stable_tview_read_tview
+          mem tview
+          loc from val released ord
+          (WF: TView.wf tview)
+          (NORMAL: normal_tview tview)
+          (STABLE: stable_tview mem tview)
+          (LOC: L loc)
+          (GET: Memory.get loc (tview.(TView.cur).(View.rlx) loc) mem =
+                Some (from, Message.concrete val released)):
+      TView.read_tview tview loc (tview.(TView.cur).(View.rlx) loc) released ord = tview.
+    Proof.
+      inv STABLE. inv NORMAL.
+      destruct tview. unfold TView.read_tview. ss. f_equal.
+      - rewrite (@View.le_join_l cur); cycle 1.
+        { unfold View.singleton_ur_if. condtac; ss.
+          - unfold View.singleton_ur. econs; ss.
+            + ii. unfold TimeMap.singleton, LocFun.add, LocFun.find, LocFun.init.
+              condtac; try apply Time.bot_spec. subst.
+              rewrite CUR0; ss. refl.
+            + ii. unfold TimeMap.singleton, LocFun.add, LocFun.find, LocFun.init.
+              condtac; try apply Time.bot_spec. subst. refl.
+          - unfold View.singleton_rw. econs; ss; try apply TimeMap.bot_spec.
+            ii. unfold TimeMap.singleton, LocFun.add, LocFun.find, LocFun.init.
+            condtac; try apply Time.bot_spec. subst. refl.
+        }
+        condtac; try apply View.join_bot_r.
+        apply View.le_join_l.
+        destruct released; eauto. apply View.bot_spec.
+      - rewrite (@View.le_join_l acq); cycle 1.
+        { etrans; [|eapply WF]. ss.
+          unfold View.singleton_ur_if. condtac; ss.
+          - unfold View.singleton_ur. econs; ss.
+            + ii. unfold TimeMap.singleton, LocFun.add, LocFun.find, LocFun.init.
+              condtac; try apply Time.bot_spec. subst.
+              rewrite CUR0; ss. refl.
+            + ii. unfold TimeMap.singleton, LocFun.add, LocFun.find, LocFun.init.
+              condtac; try apply Time.bot_spec. subst. refl.
+          - unfold View.singleton_rw. econs; ss; try apply TimeMap.bot_spec.
+            ii. unfold TimeMap.singleton, LocFun.add, LocFun.find, LocFun.init.
+            condtac; try apply Time.bot_spec. subst. refl.
+        }
+        condtac; try apply View.join_bot_r.
+        apply View.le_join_l.
+        etrans; [|eapply WF]. ss.
+        destruct released; eauto. apply View.bot_spec.
+    Qed.
+
 
     (* step *)
 
