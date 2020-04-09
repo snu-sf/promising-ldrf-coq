@@ -66,6 +66,15 @@ Module Trace.
     exists ((x, e)::tr). splits; eauto.
   Qed.
 
+  Lemma steps_app lang tr0 tr1 (th0 th1 th2: Thread.t lang)
+        (STEPS0: steps tr0 th0 th1)
+        (STEPS1: steps tr1 th1 th2)
+    :
+      steps (tr0 ++ tr1) th0 th2.
+  Proof.
+    ginduction STEPS0; eauto. i. subst. econs; eauto.
+  Qed.
+
   Inductive configuration_step: forall lang (tr: t lang) (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
   | step_intro
       lang tr e tr' pf tid c1 st1 lc1 e2 st3 lc3 sc3 memory3

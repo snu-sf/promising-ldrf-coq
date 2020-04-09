@@ -1307,3 +1307,20 @@ Proof.
     des_ifs. ss. des; clarify.
     eapply Memory.remove_get0 in MEM. des. clarify.
 Qed.
+
+Lemma reserve_future_concrete_same_promise prom0 mem0 prom1 mem1 loc from to val released
+      (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
+      (GET: Memory.get loc to prom0 = Some (from, Message.concrete val released))
+  :
+    Memory.get loc to prom1 = Some (from, Message.concrete val released).
+Proof.
+  ginduction FUTURE; auto. i. apply IHFUTURE.
+  inv HD; des; clarify.
+  - erewrite Memory.add_o; eauto.
+    des_ifs. ss. des; clarify.
+    eapply Memory.add_get0 in PROMISES. des. clarify.
+  - apply lower_succeed_wf in PROMISES. des. inv MSG_LE.
+  - erewrite Memory.remove_o; eauto.
+    des_ifs. ss. des; clarify.
+    eapply Memory.remove_get0 in PROMISES. des. clarify.
+Qed.
