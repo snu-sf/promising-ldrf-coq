@@ -2182,8 +2182,6 @@ Section SIM.
         (MEMTGT: Memory.closed mem_tgt)
         (WFSRC: Memory.le prom_src mem_src)
         (WFTGT: Memory.le prom_tgt mem_tgt)
-        (RELWF: View.wf (rel_src loc))
-        (RELSRC: Memory.closed_view (rel_src loc) mem_src)
         (PROMISE: sim_promise self rel_src pasts prom_src prom_tgt)
         (PAST: wf_pasts_memory mem_src pasts)
         (PROMATTACH: promises_not_attached self (promised prom_src) mem_src)
@@ -2629,6 +2627,20 @@ Section SIM.
   Qed.
 
 
+  Lemma reserve_future_memory_steps
+        lang st vw sc prom0 mem0 prom1 mem1
+        (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
+    :
+      exists tr,
+        (<<STEPS: Trace.steps tr
+                              (Thread.mk lang st (Local.mk vw prom0) sc mem0)
+                              (Thread.mk lang st (Local.mk vw prom1) sc mem1)>>).
+  Proof.
+    ginduction FUTURE; eauto. i. exploit IHFUTURE; eauto. i. des.
+    esplits. eapply Trace.steps_trans; [|apply STEPS|ss].
+    econs 1. econs; eauto.
+  Qed.
+
 
   Lemma sim_thread_step others self pasts lang st lc_src lc_tgt sc_src sc_tgt mem_src mem_tgt pf e_tgt
         st' lc_tgt' sc_tgt' mem_tgt'
@@ -2665,9 +2677,13 @@ Section SIM.
     - inv STEP. destruct (classic (L loc)).
       + inv LOCAL. inv SIM. inv LOCALSRC. inv LOCALTGT.
         exploit sim_promise_step_forget; eauto.
-
-
-        admit.
+        { i. exploit EXCLUSIVE; eauto. i. des. inv UNCH. inv SELF. clarify. }
+        i. des. destruct lc_src.
+        exploit reserve_future_memory_steps; eauto. i. des.
+        eexists _, self', pasts, (Local.mk _ _), _, mem_src'. splits; eauto.
+        * econs; ss.
+        * eapply reserve_future_wf_pasts_memory; eauto.
+        * refl.
       + inv LOCAL. inv SIM. inv LOCALSRC. inv LOCALTGT.
         exploit sim_promise_step_normal; try apply MEM; eauto.
         { inv TVIEW_WF. eauto. }
