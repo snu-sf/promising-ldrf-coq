@@ -29,6 +29,11 @@ Require Import Stable.
 Set Implicit Arguments.
 
 
+Module ReleaseWrites.
+  Definition t: Type := list (Loc.t * Time.t).
+End ReleaseWrites.
+
+
 Module RASimThread.
   Section RASimThread.
     Variable lang: language.
@@ -88,14 +93,12 @@ Module RASimThread.
       | _ => None
       end.
 
-    Inductive sim_local (tr: Trace.t lang) (lc_src lc_tgt: Local.t): Prop :=
+    Inductive sim_local (rels: ReleaseWrites.t) (lc_src lc_tgt: Local.t): Prop :=
     | sim_local_intro
         (TVIEW: sim_tview lc_src.(Local.tview) lc_tgt.(Local.tview))
         (PROMISES: lc_src.(Local.promises) = lc_tgt.(Local.promises))
         (RESERVE: reserve_only lc_src.(Local.promises))
-        (REL_WRITES_NONE: forall loc to th e
-                            (IN: List.In (th, e) tr)
-                            (REL: rel_write e = Some (loc, to)),
+        (REL_WRITES_NONE: forall loc to (IN: List.In (loc, to) rels),
             Memory.get loc to lc_src.(Local.promises) = None)
     .
 
@@ -119,7 +122,7 @@ Module RASimThread.
       ii. inv H; inv H0; ss; econs; eauto. des_ifs.
     Qed.
 
-    Inductive sim_memory (tr: Trace.t lang) (mem_src mem_tgt: Memory.t): Prop :=
+    Inductive sim_memory (rels: ReleaseWrites.t) (mem_src mem_tgt: Memory.t): Prop :=
     | sim_memory_intro
         (SOUND: forall loc from to msg_src
                   (GET_SRC: Memory.get loc to mem_src = Some (from, msg_src)),
@@ -131,25 +134,23 @@ Module RASimThread.
             exists msg_src,
               <<GET_SRC: Memory.get loc to mem_src = Some (from, msg_src)>> /\
               <<MSG: sim_message loc msg_src msg_tgt>>)
-        (REL_WRITES: forall loc to th e
-                       (IN: List.In (th, e) tr)
-                       (REL: rel_write e = Some (loc, to)),
+        (REL_WRITES: forall loc to (IN: List.In (loc, to) rels),
             exists from msg,
               <<GET_SRC: Memory.get loc to mem_src = Some (from, msg)>> /\
               <<GET_TGT: Memory.get loc to mem_tgt = Some (from, msg)>>)
     .
 
-    Inductive sim_thread (tr: Trace.t lang) (e_src e_tgt: Thread.t lang): Prop :=
+    Inductive sim_thread (rels: ReleaseWrites.t) (e_src e_tgt: Thread.t lang): Prop :=
     | sim_thread_intro
         (STATE: e_src.(Thread.state) = e_tgt.(Thread.state))
-        (LOCAL: sim_local tr e_src.(Thread.local) e_tgt.(Thread.local))
+        (LOCAL: sim_local rels e_src.(Thread.local) e_tgt.(Thread.local))
         (SC: e_src.(Thread.sc) = e_tgt.(Thread.sc))
-        (MEMORY: sim_memory tr e_src.(Thread.memory) e_tgt.(Thread.memory))
+        (MEMORY: sim_memory rels e_src.(Thread.memory) e_tgt.(Thread.memory))
     .
 
     Lemma sim_memory_closed_timemap
-          tr mem_src mem_tgt tm
-          (SIM: sim_memory tr mem_src mem_tgt)
+          rels mem_src mem_tgt tm
+          (SIM: sim_memory rels mem_src mem_tgt)
           (CLOSED_TGT: Memory.closed_timemap tm mem_tgt):
       Memory.closed_timemap tm mem_src.
     Proof.
@@ -160,8 +161,8 @@ Module RASimThread.
     Qed.
 
     Lemma sim_memory_closed_view
-          tr mem_src mem_tgt view
-          (SIM: sim_memory tr mem_src mem_tgt)
+          rels mem_src mem_tgt view
+          (SIM: sim_memory rels mem_src mem_tgt)
           (CLOSED_TGT: Memory.closed_view view mem_tgt):
       Memory.closed_view view mem_src.
     Proof.
@@ -169,8 +170,8 @@ Module RASimThread.
     Qed.
 
     Lemma sim_memory_closed_opt_view
-          tr mem_src mem_tgt view
-          (SIM: sim_memory tr mem_src mem_tgt)
+          rels mem_src mem_tgt view
+          (SIM: sim_memory rels mem_src mem_tgt)
           (CLOSED_TGT: Memory.closed_opt_view view mem_tgt):
       Memory.closed_opt_view view mem_src.
     Proof.
@@ -178,8 +179,8 @@ Module RASimThread.
     Qed.
 
     Lemma sim_memory_closed_message
-          tr mem_src mem_tgt msg
-          (SIM: sim_memory tr mem_src mem_tgt)
+          rels mem_src mem_tgt msg
+          (SIM: sim_memory rels mem_src mem_tgt)
           (CLOSED_TGT: Memory.closed_message msg mem_tgt):
       Memory.closed_message msg mem_src.
     Proof.
@@ -187,13 +188,13 @@ Module RASimThread.
     Qed.
 
     Lemma sim_memory_add
-          tr mem1_src
+          rels mem1_src
           mem1_tgt loc from to msg mem2_tgt
-          (SIM1: sim_memory tr mem1_src mem1_tgt)
+          (SIM1: sim_memory rels mem1_src mem1_tgt)
           (ADD_TGT: Memory.add mem1_tgt loc from to msg mem2_tgt):
       exists mem2_src,
         <<ADD_SRC: Memory.add mem1_src loc from to msg mem2_src>> /\
-        <<SIM2: sim_memory tr mem2_src mem2_tgt>>.
+        <<SIM2: sim_memory rels mem2_src mem2_tgt>>.
     Proof.
       inv SIM1.
       exploit (@Memory.add_exists mem1_src loc from to msg).
@@ -230,14 +231,14 @@ Module RASimThread.
     Qed.
 
     Lemma sim_memory_split
-          tr mem1_src
+          rels mem1_src
           mem1_tgt loc ts1 ts2 ts3 msg2 msg3 mem2_tgt
-          (SIM1: sim_memory tr mem1_src mem1_tgt)
+          (SIM1: sim_memory rels mem1_src mem1_tgt)
           (LOC: L loc = false)
           (SPLIT_TGT: Memory.split mem1_tgt loc ts1 ts2 ts3 msg2 msg3 mem2_tgt):
       exists mem2_src,
         <<SPLIT_SRC: Memory.split mem1_src loc ts1 ts2 ts3 msg2 msg3 mem2_src>> /\
-        <<SIM2: sim_memory tr mem2_src mem2_tgt>>.
+        <<SIM2: sim_memory rels mem2_src mem2_tgt>>.
     Proof.
       inv SIM1.
       exploit (@Memory.split_exists mem1_src loc ts1 ts2 ts3 msg2 msg3).
@@ -274,14 +275,14 @@ Module RASimThread.
     Qed.
 
     Lemma sim_memory_lower
-          tr mem1_src
+          rels mem1_src
           mem1_tgt loc from to msg1 msg2 mem2_tgt
-          (SIM1: sim_memory tr mem1_src mem1_tgt)
+          (SIM1: sim_memory rels mem1_src mem1_tgt)
           (LOC: L loc = false)
           (LOWER_TGT: Memory.lower mem1_tgt loc from to msg1 msg2 mem2_tgt):
       exists mem2_src,
         <<LOWER_SRC: Memory.lower mem1_src loc from to msg1 msg2 mem2_src>> /\
-        <<SIM2: sim_memory tr mem2_src mem2_tgt>>.
+        <<SIM2: sim_memory rels mem2_src mem2_tgt>>.
     Proof.
       inv SIM1.
       exploit (@Memory.lower_exists mem1_src loc from to msg1 msg2).
@@ -311,18 +312,15 @@ Module RASimThread.
     Qed.
 
     Lemma sim_memory_remove
-          tr mem1_src
+          rels mem1_src
           mem1_tgt loc from to msg mem2_tgt
-          (SIM1: sim_memory tr mem1_src mem1_tgt)
+          (SIM1: sim_memory rels mem1_src mem1_tgt)
           (LOC: L loc = false)
-          (REL_WRITE: forall th e
-                        (IN: List.In (th, e) tr)
-                        (REL_WRITE: rel_write e = Some (loc, to)),
-              False)
+          (REL: ~ List.In (loc, to) rels)
           (REMOVE_TGT: Memory.remove mem1_tgt loc from to msg mem2_tgt):
       exists mem2_src,
         <<REMOVE_SRC: Memory.remove mem1_src loc from to msg mem2_src>> /\
-        <<SIM2: sim_memory tr mem2_src mem2_tgt>>.
+        <<SIM2: sim_memory rels mem2_src mem2_tgt>>.
     Proof.
       inv SIM1.
       exploit (@Memory.remove_exists mem1_src loc from to msg).
@@ -339,42 +337,43 @@ Module RASimThread.
         erewrite Memory.remove_o; eauto.
         erewrite (@Memory.remove_o mem2_tgt); eauto.
         condtac; ss; eauto.
-        des. subst. exploit REL_WRITE; eauto. ss.
+        des. subst. exploit REL; eauto. ss.
     Qed.
 
 
     (* race condition *)
 
-    Definition ra_race (tr: Trace.t lang) (tview: TView.t) (loc: Loc.t) (to: Time.t) (ordr: Ordering.t): Prop :=
+    Definition ra_race (rels: ReleaseWrites.t) (tview: TView.t) (loc: Loc.t) (to: Time.t) (ordr: Ordering.t): Prop :=
       <<LOC: L loc>> /\
       <<HIGHER: Time.lt (tview.(TView.cur).(View.rlx) loc) to>> /\
-      (<<ORDW: forall th e
-                 (IN: List.In (th, e) tr)
-                 (REL: rel_write e = Some (loc, to)),
-          False>> \/
+      (<<ORDW: ~ List.In (loc, to) rels>> \/
        <<ORDR: Ordering.le ordr Ordering.strong_relaxed>>).
 
 
     (* step *)
 
-    Lemma promise_step
-          tr lc1_src mem1_src
-          lc1_tgt mem1_tgt loc from to msg lc2_tgt mem2_tgt kind
-          (LC1: sim_local tr lc1_src lc1_tgt)
-          (MEM1: sim_memory tr mem1_src mem1_tgt)
-          (WF1_SRC: Local.wf lc1_src mem1_src)
-          (WF1_TGT: Local.wf lc1_src mem1_tgt)
-          (STEP_TGT: Local.promise_step lc1_tgt mem1_tgt loc from to msg lc2_tgt mem2_tgt kind)
+    Lemma promise
+          rels mem1_src
+          promises1 mem1_tgt loc from to msg promises2 mem2_tgt kind
+          (PROMISES1: reserve_only promises1)
+          (REL1: forall loc to (IN: List.In (loc, to) rels),
+              Memory.get loc to promises1 = None)
+          (MEM1: sim_memory rels mem1_src mem1_tgt)
+          (LE1_SRC: Memory.le promises1 mem1_src)
+          (LE1_TGT: Memory.le promises1 mem1_tgt)
+          (STEP_TGT: Memory.promise promises1 mem1_tgt loc from to msg promises2 mem2_tgt kind)
           (MSG: L loc -> msg = Message.reserve):
-      exists lc2_src mem2_src,
-        <<STEP_SRC: Local.promise_step lc1_src mem1_src loc from to msg lc2_src mem2_src kind>> /\
-        <<LC2: sim_local tr lc2_src lc2_tgt>> /\
-        <<MEM2: sim_memory tr mem2_src mem2_tgt>>.
+      exists mem2_src,
+        <<STEP_SRC: Memory.promise promises1 mem1_src loc from to msg promises2 mem2_src kind>> /\
+        <<PROMISES2: reserve_only promises2>> /\
+        <<REL2: forall loc to (IN: List.In (loc, to) rels),
+            Memory.get loc to promises2 = None>> /\
+        <<MEM2: sim_memory rels mem2_src mem2_tgt>>.
     Proof.
       destruct (L loc) eqn:LOC.
       { (* promise on L *)
         rewrite MSG in *; ss.
-        inv LC1. inv MEM1. inv STEP_TGT. inv PROMISE.
+        inv MEM1. inv STEP_TGT.
         - (* add *)
           exploit (@Memory.add_exists mem1_src loc from to Message.reserve).
           { ii. inv LHS. inv RHS. ss.
@@ -391,17 +390,14 @@ Module RASimThread.
           { inv MEM. inv ADD. ss. }
           { econs. }
           i. des.
-          exploit Memory.add_exists_le; try eapply WF1_SRC; eauto. i. des.
+          exploit Memory.add_exists_le; try apply LE1_SRC; eauto. i. des.
           esplits.
-          + econs; [econs; eauto|..]; ss.
-          + econs; ss.
-            * rewrite PROMISES in *.
-              eapply Memory.add_inj; eauto.
-            * ii. revert PROMISE.
-              erewrite Memory.add_o; eauto. condtac; ss. eauto.
-            * i. erewrite Memory.add_o; eauto. condtac; ss; eauto. des. subst.
-              exploit REL_WRITES; eauto. i. des.
-              exploit Memory.add_get0; try exact MEM. i. des. congr.
+          + econs; eauto. ss.
+          + ii. revert PROMISE.
+            erewrite Memory.add_o; eauto. condtac; ss. eauto.
+          + i. erewrite Memory.add_o; eauto. condtac; ss; eauto. des. subst.
+            exploit REL_WRITES; eauto. i. des.
+            exploit Memory.add_get0; try exact MEM. i. des. congr.
           + econs; i.
             * revert GET_SRC. erewrite Memory.add_o; eauto. condtac; ss.
               { i. des. inv GET_SRC.
@@ -423,15 +419,13 @@ Module RASimThread.
         - (* lower *)
           des. subst. inv MEM. inv LOWER. inv MSG_LE.
         - (* cancel *)
-          rewrite <- PROMISES in *.
-          exploit Memory.remove_get0; try exact PROMISES0. i. des.
-          exploit Memory.remove_exists_le; try eapply WF1_SRC; eauto. i. des.
+          exploit Memory.remove_get0; try exact PROMISES. i. des.
+          exploit Memory.remove_exists_le; try apply LE1_SRC; eauto. i. des.
           esplits.
-          + econs; [econs; eauto|..]; ss.
-          + econs; ss.
-            * ii. revert PROMISE.
-              erewrite Memory.remove_o; eauto. condtac; ss; eauto.
-            * i. erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+          + econs; eauto.
+          + ii. revert PROMISE.
+            erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+          + i. erewrite Memory.remove_o; eauto. condtac; ss; eauto.
           + econs; i.
             * revert GET_SRC. erewrite Memory.remove_o; eauto. condtac; ss. i.
               erewrite Memory.remove_o; eauto. condtac; ss. eauto.
@@ -441,76 +435,92 @@ Module RASimThread.
               erewrite Memory.remove_o; eauto.
               erewrite (@Memory.remove_o mem2_tgt); eauto.
               condtac; ss; eauto. des. subst.
-              exploit REL_WRITES_NONE; eauto. i.
-              exploit Memory.remove_get0; try exact PROMISES0. i. des. congr.
+              exploit REL1; eauto. i.
+              exploit Memory.remove_get0; try exact PROMISES. i. des. congr.
       }
 
       (* promises on other loc *)
-      clear MSG. inv LC1. inv STEP_TGT.
-      rewrite <- PROMISES in *. inv PROMISE.
+      clear MSG. inv STEP_TGT.
       - (* add *)
         exploit sim_memory_add; eauto. i. des.
         inv MEM1. esplits.
-        + econs; [econs; eauto|..]; ss.
-          * i. subst. exploit SOUND; eauto. i. des. eauto.
-          * eapply sim_memory_closed_message; eauto.
-        + econs; ss.
-          * ii. revert PROMISE.
-            erewrite Memory.add_o; eauto. condtac; ss; eauto.
-            i. des. subst. congr.
-          * i. erewrite Memory.add_o; eauto. condtac; ss; eauto.
-            des. subst. exploit REL_WRITES; eauto. i. des.
-            exploit Memory.add_get0; try exact MEM. i. des. congr.
+        + econs; eauto.
+          i. subst. exploit SOUND; eauto. i. des. eauto.
+        + ii. revert PROMISE.
+          erewrite Memory.add_o; eauto. condtac; ss; eauto.
+          i. des. subst. congr.
+        + i. erewrite Memory.add_o; eauto. condtac; ss; eauto.
+          des. subst. exploit REL_WRITES; eauto. i. des.
+          exploit Memory.add_get0; try exact MEM. i. des. congr.
         + ss.
       - (* split *)
         exploit sim_memory_split; eauto. i. des.
         inv MEM1. esplits.
-        + econs; [econs; eauto|..]; ss.
-          eapply sim_memory_closed_message; eauto.
-        + econs; ss.
-          * ii. revert PROMISE.
-            erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
-            { i. des. subst. congr. }
-            { guardH o. i. des. subst. congr. }
-          * i. erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
-            { des. subst. exploit REL_WRITES; eauto. i. des.
-              exploit Memory.split_get0; try exact MEM. i. des. congr. }
-            { guardH o. des. subst.
-              exploit REL_WRITES_NONE; eauto. i.
-              exploit Memory.split_get0; try exact PROMISES0. i. des. congr. }
+        + econs; eauto.
+        + ii. revert PROMISE.
+          erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
+          * i. des. subst. congr.
+          * guardH o. i. des. subst. congr.
+        + i. erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
+          * des. subst. exploit REL_WRITES; eauto. i. des.
+            exploit Memory.split_get0; try exact MEM. i. des. congr.
+          * guardH o. des. subst.
+            exploit REL1; eauto. i.
+            exploit Memory.split_get0; try exact PROMISES. i. des. congr.
         + ss.
       - (* lower *)
         exploit sim_memory_lower; eauto. i. des.
         inv MEM1. esplits.
-        + econs; [econs; eauto|..]; ss.
-          eapply sim_memory_closed_message; eauto.
-        + econs; ss.
-          * ii. revert PROMISE.
-            erewrite Memory.lower_o; eauto. condtac; ss; eauto.
-            i. des. subst. congr.
-          * i. erewrite Memory.lower_o; eauto. condtac; ss; eauto.
-            des. subst. exploit REL_WRITES_NONE; eauto. i.
-            exploit Memory.lower_get0; try exact PROMISES0. i. des. congr.
+        + econs; eauto.
+        + ii. revert PROMISE.
+          erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+          i. des. subst. congr.
+        + i. erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+          des. subst. exploit REL1; eauto. i.
+          exploit Memory.lower_get0; try exact PROMISES. i. des. congr.
         + ss.
       - (* cancel *)
         exploit sim_memory_remove; eauto.
-        { i. exploit REL_WRITES_NONE; eauto. i.
-          exploit Memory.remove_get0; try exact PROMISES0. i. des. congr. }
+        { ii. exploit REL1; eauto. i.
+          exploit Memory.remove_get0; try exact PROMISES. i. des. congr. }
         i. des.
         inv MEM1. esplits.
-        + econs; [econs; eauto|..]; ss.
-        + econs; ss.
-          * ii. revert PROMISE.
-            erewrite Memory.remove_o; eauto. condtac; ss; eauto.
-          * i. erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+        + econs; eauto.
+        + ii. revert PROMISE.
+          erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+        + i. erewrite Memory.remove_o; eauto. condtac; ss; eauto.
         + ss.
     Qed.
 
+    Lemma promise_step
+          rels lc1_src mem1_src
+          lc1_tgt mem1_tgt loc from to msg lc2_tgt mem2_tgt kind
+          (LC1: sim_local rels lc1_src lc1_tgt)
+          (MEM1: sim_memory rels mem1_src mem1_tgt)
+          (WF1_SRC: Local.wf lc1_src mem1_src)
+          (WF1_TGT: Local.wf lc1_src mem1_tgt)
+          (STEP_TGT: Local.promise_step lc1_tgt mem1_tgt loc from to msg lc2_tgt mem2_tgt kind)
+          (MSG: L loc -> msg = Message.reserve):
+      exists lc2_src mem2_src,
+        <<STEP_SRC: Local.promise_step lc1_src mem1_src loc from to msg lc2_src mem2_src kind>> /\
+        <<LC2: sim_local rels lc2_src lc2_tgt>> /\
+        <<MEM2: sim_memory rels mem2_src mem2_tgt>>.
+    Proof.
+      inv LC1. inv STEP_TGT. destruct lc1_src, lc1_tgt. ss. subst.
+      exploit promise; try exact PROMISE; eauto.
+      { apply WF1_SRC. }
+      { apply WF1_TGT. }
+      i. des. esplits; try exact MEM2.
+      - econs; eauto.
+        eapply sim_memory_closed_message; eauto.
+      - econs; eauto.
+    Qed.
+
     Lemma read_step_loc
-          tr lc1_src mem1_src
+          rels lc1_src mem1_src
           lc1_tgt mem1_tgt loc to val released_tgt ord lc2_tgt
-          (LC1: sim_local tr lc1_src lc1_tgt)
-          (MEM1: sim_memory tr mem1_src mem1_tgt)
+          (LC1: sim_local rels lc1_src lc1_tgt)
+          (MEM1: sim_memory rels mem1_src mem1_tgt)
           (NORMAL_TVIEW1_SRC: normal_tview L lc1_src.(Local.tview))
           (NORMAL_TVIEW1_TGT: normal_tview L lc1_tgt.(Local.tview))
           (STABLE_TVIEW1_SRC: stable_tview L mem1_src lc1_src.(Local.tview))
@@ -521,8 +531,8 @@ Module RASimThread.
           (STEP_TGT: Local.read_step lc1_tgt mem1_tgt loc to val released_tgt ord lc2_tgt):
       exists released_src lc2_src,
         <<STEP_SRC: OrdLocal.read_step L Ordering.acqrel lc1_src mem1_src loc to val released_src ord lc2_src>> /\
-        (<<LC2: sim_local tr lc2_src lc2_tgt>> \/
-         <<RACE: ra_race tr lc1_src.(Local.tview) loc to ord>>).
+        (<<LC2: sim_local rels lc2_src lc2_tgt>> \/
+         <<RACE: ra_race rels lc1_src.(Local.tview) loc to ord>>).
     Proof.
       inv LC1. inv TVIEW. inv MEM1. inv STEP_TGT.
       exploit COMPLETE; eauto. i. des. inv MSG. clear RELEASED.
@@ -538,14 +548,13 @@ Module RASimThread.
         erewrite stable_tview_read_tview; eauto; try apply WF1_TGT.
         econs; eauto.
       }
-      destruct (classic (exists th e, List.In (th, e) tr /\ rel_write e = Some (loc, to))); cycle 1.
+      destruct (classic (List.In (loc, to) rels)); cycle 1.
       { (* non release write *)
-        right. unfold ra_race. splits; auto. left. eauto.
+        right. unfold ra_race. auto.
       }
-      des.
       destruct (Ordering.le ord Ordering.strong_relaxed) eqn:ORDR.
       { (* non acquire read *)
-        right. unfold ra_race. splits; auto.
+        right. unfold ra_race. auto.
       }
 
       (* RA synchronized *)
@@ -562,10 +571,10 @@ Module RASimThread.
     Qed.
 
     Lemma read_step_other
-          tr lc1_src mem1_src
+          rels lc1_src mem1_src
           lc1_tgt mem1_tgt loc to val released_tgt ord lc2_tgt
-          (LC1: sim_local tr lc1_src lc1_tgt)
-          (MEM1: sim_memory tr mem1_src mem1_tgt)
+          (LC1: sim_local rels lc1_src lc1_tgt)
+          (MEM1: sim_memory rels mem1_src mem1_tgt)
           (NORMAL_TVIEW1_SRC: normal_tview L lc1_src.(Local.tview))
           (NORMAL_TVIEW1_TGT: normal_tview L lc1_tgt.(Local.tview))
           (STABLE_TVIEW1_SRC: stable_tview L mem1_src lc1_src.(Local.tview))
@@ -576,7 +585,7 @@ Module RASimThread.
           (STEP_TGT: Local.read_step lc1_tgt mem1_tgt loc to val released_tgt ord lc2_tgt):
       exists released_src lc2_src,
         <<STEP_SRC: OrdLocal.read_step L Ordering.acqrel lc1_src mem1_src loc to val released_src ord lc2_src>> /\
-        <<LC2: sim_local tr lc2_src lc2_tgt>>.
+        <<LC2: sim_local rels lc2_src lc2_tgt>>.
     Proof.
       inv LC1. inv TVIEW. inv MEM1. inv STEP_TGT.
       exploit COMPLETE; eauto. i. des. inv MSG.
@@ -586,6 +595,33 @@ Module RASimThread.
       rewrite LOC0 in *. econs; eauto; ss.
       econs; eauto; ss; congr.
     Qed.
+
+    Lemma write_step_loc
+          rels lc1_src mem1_src releasedm_src
+          lc1_tgt sc1 mem1_tgt loc from to val releasedm_tgt released_tgt ord lc2_tgt sc2 mem2_tgt kind
+          (LC1: sim_local rels lc1_src lc1_tgt)
+          (MEM1: sim_memory rels mem1_src mem1_tgt)
+          (NORMAL_TVIEW1_SRC: normal_tview L lc1_src.(Local.tview))
+          (NORMAL_TVIEW1_TGT: normal_tview L lc1_tgt.(Local.tview))
+          (STABLE_TVIEW1_SRC: stable_tview L mem1_src lc1_src.(Local.tview))
+          (STABLE_TVIEW1_TGT: stable_tview L mem1_tgt lc1_tgt.(Local.tview))
+          (WF1_SRC: Local.wf lc1_src mem1_src)
+          (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
+          (LOC: L loc)
+          (RELEASEDM: __guard__ (releasedm_src = releasedm_tgt \/
+                                (View.opt_le releasedm_src (Some lc1_src.(Local.tview).(TView.cur)) /\
+                                 View.opt_le releasedm_tgt (Some lc1_tgt.(Local.tview).(TView.cur)))))
+          (STEP_TGT: Local.write_step lc1_tgt sc1 mem1_tgt loc from to val releasedm_tgt released_tgt ord
+                                      lc2_tgt sc2 mem2_tgt kind):
+      exists rels' released_src lc2_src mem2_src,
+        <<STEP_SRC: OrdLocal.write_step L Ordering.acqrel
+                                        lc1_src sc1 mem1_src loc from to val releasedm_src released_src ord
+                                        lc2_src sc2 mem2_src kind>> /\
+        <<REL_WRITES: rels' = if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels>> /\
+        <<LC2: sim_local rels' lc2_src lc2_tgt>> /\
+        <<MEM2: sim_memory rels' mem2_src mem2_tgt>>.
+    Proof.
+    Admitted.
 
     (* Lemma sim_thread_step *)
     (*       tr e1_src e1_tgt *)
