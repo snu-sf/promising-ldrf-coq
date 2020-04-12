@@ -512,7 +512,7 @@ Module RASimThread.
           (LC1: sim_local rels lc1_src lc1_tgt)
           (MEM1: sim_memory rels mem1_src mem1_tgt)
           (WF1_SRC: Local.wf lc1_src mem1_src)
-          (WF1_TGT: Local.wf lc1_src mem1_tgt)
+          (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
           (STEP_TGT: Local.promise_step lc1_tgt mem1_tgt loc from to msg lc2_tgt mem2_tgt kind)
           (MSG: L loc -> msg = Message.reserve):
       exists lc2_src mem2_src,
@@ -545,8 +545,9 @@ Module RASimThread.
           (STEP_TGT: Local.read_step lc1_tgt mem1_tgt loc to val released_tgt ord lc2_tgt):
       exists released_src lc2_src,
         <<STEP_SRC: OrdLocal.read_step L Ordering.acqrel lc1_src mem1_src loc to val released_src ord lc2_src>> /\
-        (<<LC2: sim_local rels lc2_src lc2_tgt>> \/
-         <<RACE: ra_race rels lc1_src.(Local.tview) loc to ord>>).
+        __guard__ (
+            <<LC2: sim_local rels lc2_src lc2_tgt>> \/
+            <<RACE: ra_race rels lc1_src.(Local.tview) loc to ord>>).
     Proof.
       inv LC1. inv TVIEW. inv MEM1. inv STEP_TGT.
       exploit COMPLETE; eauto. i. des. inv MSG. clear RELEASED.
@@ -624,7 +625,7 @@ Module RASimThread.
         <<STEP_SRC: OrdLocal.write_step L Ordering.acqrel
                                         lc1_src sc1 mem1_src loc from to val releasedm_src released_src ord
                                         lc2_src sc2 mem2_src kind>> /\
-        <<REL_WRITES: rels' = if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels>> /\
+        <<REL: rels' = if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels>> /\
         <<LC2: sim_local rels' lc2_src lc2_tgt>> /\
         <<MEM2: sim_memory rels' mem2_src mem2_tgt>>.
     Proof.
@@ -965,7 +966,7 @@ Module RASimThread.
         <<STEP_SRC: OrdLocal.write_step L Ordering.acqrel
                                         lc1_src sc1 mem1_src loc from to val releasedm released_src ord
                                         lc2_src sc2 mem2_src kind>> /\
-        <<REL_WRITES: rels' = if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels>> /\
+        <<REL: rels' = if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels>> /\
         <<LC2: sim_local rels' lc2_src lc2_tgt>> /\
         <<MEM2: sim_memory rels' mem2_src mem2_tgt>>.
     Proof.
@@ -1053,24 +1054,89 @@ Module RASimThread.
       rewrite CUR. eauto.
     Qed.
 
-    (* Lemma sim_thread_step *)
-    (*       tr e1_src e1_tgt *)
+    (* Lemma thread_step *)
+    (*       rels e1_src e1_tgt *)
     (*       pf e_tgt e2_tgt *)
-    (*       (SIM1: sim_thread tr e1_src e1_tgt) *)
+    (*       (SIM1: sim_thread rels e1_src e1_tgt) *)
+    (*       (STABLE1_SRC: stable_thread e1_src) *)
+    (*       (STABLE1_TGT: stable_thread e1_tgt) *)
     (*       (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory)) *)
     (*       (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory)) *)
     (*       (SC1_SRC: Memory.closed_timemap e1_src.(Thread.sc) e1_src.(Thread.memory)) *)
     (*       (SC1_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory)) *)
     (*       (MEM1_SRC: Memory.closed e1_src.(Thread.memory)) *)
     (*       (MEM1_TGT: Memory.closed e1_tgt.(Thread.memory)) *)
-    (*       (STEP_TGT: Thread.step pf e_tgt e1_tgt e2_tgt) *)
-    (*       (PROMISES_TGT: reserve_only e2_tgt.(Thread.local).(Local.promises)): *)
-    (*   (True) \/ *)
-    (*   (exists e_src e2_src, *)
-    (*       <<STEP_SRC: Thread.step pf e_src e1_src e2_src>> /\ *)
-    (*       <<SIM2: sim_thread ((e1_src, e_src) :: tr) e2_src e2_tgt>> /\ *)
-    (*       <<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>>). *)
+    (*       (PROMISE: forall loc from to msg kind *)
+    (*                   (EVENT: e_tgt = ThreadEvent.promise loc from to msg kind) *)
+    (*                   (LOC: L loc), *)
+    (*           msg = Message.reserve) *)
+    (*       (STEP_TGT: Thread.step pf e_tgt e1_tgt e2_tgt): *)
+    (*   exists rels' e_src e2_src, *)
+    (*     <<STEP_SRC: OrdThread.step L Ordering.acqrel pf e_src e1_src e2_src>> /\ *)
+    (*     __guard__ (<<REL: rels' = match ThreadEvent.is_writing e_src with *)
+    (*                               | Some (loc, from, to, val, released, ord)  => *)
+    (*                                 if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels *)
+    (*                               | _ => rels *)
+    (*                               end>> /\ *)
+    (*                <<SIM2: sim_thread rels' e2_src e2_tgt>> /\ *)
+    (*                <<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>> \/ *)
+    (*                <<RACE: exists loc to val released ord, *)
+    (*                    ThreadEvent.is_reading e_src = Some (loc, to, val, released, ord) /\ *)
+    (*                    ra_race rels e1_src.(Thread.local).(Local.tview) loc to ord>>). *)
     (* Proof. *)
+    (*   destruct e1_src as [st1_src lc1_src sc1_src mem1_src]. *)
+    (*   destruct e1_tgt as [st1_tgt lc1_tgt sc1_tgt mem1_tgt]. *)
+    (*   inv SIM1. inv STABLE1_SRC. inv STABLE1_TGT. ss. subst. *)
+    (*   inv STEP_TGT; inv STEP; [|inv LOCAL0]; ss. *)
+    (*   - (* promise step *) *)
+    (*     exploit promise_step; try exact LOCAL0; try exact LOCAL; try exact MEMORY; eauto. *)
+    (*     i. des. esplits. *)
+    (*     + econs 1. econs; eauto. *)
+    (*     + left. splits; ss. *)
+    (*   - (* silent step *) *)
+    (*     esplits. *)
+    (*     + econs 2. econs; [|econs 1]. eauto. *)
+    (*     + left. splits; ss. *)
+    (*   - (* read step *) *)
+    (*     destruct (L loc) eqn:LOC. *)
+    (*     + exploit read_step_loc; try exact LOCAL0; try exact LOCAL; try exact MEMORY; eauto. *)
+    (*       i. des. esplits. *)
+    (*       * econs 2. econs; [|econs 2]; eauto. *)
+    (*       * unguard. des. *)
+    (*         { left. splits; ss. } *)
+    (*         { right. esplits; ss. } *)
+    (*     + exploit read_step_other; try exact LOCAL0; try exact LOCAL; try exact MEMORY; eauto. *)
+    (*       i. des. esplits. *)
+    (*       * econs 2. econs; [|econs 2]; eauto. *)
+    (*       * left. splits; ss. *)
+    (*   - (* write step *) *)
+    (*     destruct (L loc) eqn:LOC. *)
+    (*     + exploit write_step_loc; try exact LOCAL0; try exact LOCAL; try exact MEMORY; eauto. *)
+    (*       { apply Time.bot_spec. } *)
+    (*       { left. auto. } *)
+    (*       i. des. esplits. *)
+    (*       * econs 2. econs; [|econs 3]; eauto. *)
+    (*       * left. rewrite REL in *. splits; ss. *)
+    (*     + exploit write_step_other; try exact LOCAL0; try exact LOCAL; try exact MEMORY; eauto. *)
+    (*       i. des. esplits. *)
+    (*       * econs 2. econs; [|econs 3]; eauto. *)
+    (*       * left. rewrite REL in *. splits; ss. *)
+    (*   - (* update step *) *)
+    (*     destruct (L loc) eqn:LOC. *)
+    (*     + exploit read_step_loc; try exact LOCAL0; try exact LOCAL; try exact MEMORY; eauto. i. des. *)
+    (*       exploit Local.read_step_future; try exact LOCAL1; eauto. i. des. *)
+    (*       dup STEP_SRC. inv STEP_SRC0. *)
+    (*       exploit Local.read_step_future; try exact STEP; eauto. i. des. *)
+    (*       clear STEP. unguard. des. *)
+    (*       * exploit write_step_loc; try exact LOCAL2; try exact LC2; try exact MEMORY; eauto. *)
+    (*         { inv STEP_SRC. inv STEP. inv MEM1_SRC. *)
+    (*           exploit CLOSED; eauto. i. des. inv MSG_TS. *)
+    (*           etrans; eauto. *)
+    (*           inv LOCAL2. inv WRITE. inv PROMISE0; inv MEM; ss. *)
+    (*           - inv ADD. econs. ss. *)
+    (*           - inv SPLIT. econs. ss. *)
+    (*           - inv LOWER. econs. ss. } *)
+    (*         {  *)
     (* Admitted. *)
   End RASimThread.
 End RASimThread.
