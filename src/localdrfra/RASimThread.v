@@ -589,12 +589,6 @@ Module RASimThread.
           lc1_tgt mem1_tgt loc to val released_tgt ord lc2_tgt
           (LC1: sim_local rels lc1_src lc1_tgt)
           (MEM1: sim_memory rels mem1_src mem1_tgt)
-          (NORMAL_TVIEW1_SRC: Stable.normal_tview L lc1_src.(Local.tview))
-          (NORMAL_TVIEW1_TGT: Stable.normal_tview L lc1_tgt.(Local.tview))
-          (STABLE_TVIEW1_SRC: Stable.stable_tview L mem1_src lc1_src.(Local.tview))
-          (STABLE_TVIEW1_TGT: Stable.stable_tview L mem1_tgt lc1_tgt.(Local.tview))
-          (WF1_SRC: Local.wf lc1_src mem1_src)
-          (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
           (LOC: L loc = false)
           (STEP_TGT: Local.read_step lc1_tgt mem1_tgt loc to val released_tgt ord lc2_tgt):
       exists released_src lc2_src,
@@ -615,10 +609,6 @@ Module RASimThread.
           lc1_tgt sc1 mem1_tgt loc from to val releasedm_tgt released_tgt ord lc2_tgt sc2 mem2_tgt kind
           (LC1: sim_local rels lc1_src lc1_tgt)
           (MEM1: sim_memory rels mem1_src mem1_tgt)
-          (NORMAL_TVIEW1_SRC: Stable.normal_tview L lc1_src.(Local.tview))
-          (NORMAL_TVIEW1_TGT: Stable.normal_tview L lc1_tgt.(Local.tview))
-          (STABLE_TVIEW1_SRC: Stable.stable_tview L mem1_src lc1_src.(Local.tview))
-          (STABLE_TVIEW1_TGT: Stable.stable_tview L mem1_tgt lc1_tgt.(Local.tview))
           (WF1_SRC: Local.wf lc1_src mem1_src)
           (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
           (RELEASEDM_SRC: View.opt_wf releasedm_src)
@@ -966,10 +956,6 @@ Module RASimThread.
           lc1_tgt sc1 mem1_tgt loc from to val releasedm released_tgt ord lc2_tgt sc2 mem2_tgt kind
           (LC1: sim_local rels lc1_src lc1_tgt)
           (MEM1: sim_memory rels mem1_src mem1_tgt)
-          (NORMAL_TVIEW1_SRC: Stable.normal_tview L lc1_src.(Local.tview))
-          (NORMAL_TVIEW1_TGT: Stable.normal_tview L lc1_tgt.(Local.tview))
-          (STABLE_TVIEW1_SRC: Stable.stable_tview L mem1_src lc1_src.(Local.tview))
-          (STABLE_TVIEW1_TGT: Stable.stable_tview L mem1_tgt lc1_tgt.(Local.tview))
           (WF1_SRC: Local.wf lc1_src mem1_src)
           (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
           (LOC: L loc = false)
@@ -1024,6 +1010,47 @@ Module RASimThread.
         { inv STEP_SRC; ss. }
         i. des.
         esplits; eauto.
+    Qed.
+
+    Lemma fence_step
+          rels lc1_src
+          lc1_tgt sc1 ordr ordw lc2_tgt sc2
+          (LC1: sim_local rels lc1_src lc1_tgt)
+          (STEP_TGT: Local.fence_step lc1_tgt sc1 ordr ordw lc2_tgt sc2):
+      exists lc2_src,
+        <<STEP_SRC: Local.fence_step lc1_src sc1 ordr ordw lc2_src sc2>> /\
+        <<LC2: sim_local rels lc2_src lc2_tgt>>.
+    Proof.
+      destruct lc1_src, lc1_tgt.
+      inv LC1. inv TVIEW. ss. subst.
+      inv STEP_TGT. ss.
+      esplits.
+      - econs; ss.
+        unfold TView.write_fence_sc.
+        repeat (condtac; ss); congr.
+      - econs; ss. econs; ss; i.
+        + repeat (condtac; ss); eauto.
+          unfold TView.write_fence_sc.
+          repeat (condtac; ss); congr.
+        + repeat (condtac; ss); eauto.
+          unfold TView.write_fence_sc.
+          repeat (condtac; ss); congr.
+        + repeat (condtac; ss); eauto; try congr.
+          unfold TView.write_fence_sc.
+          repeat (condtac; ss); congr.
+    Qed.
+
+    Lemma failure_step
+          rels lc1_src lc1_tgt
+          (LC1: sim_local rels lc1_src lc1_tgt)
+          (STEP_TGT: Local.failure_step lc1_tgt):
+      <<STEP_SRC: Local.failure_step lc1_src>>.
+    Proof.
+      destruct lc1_src, lc1_tgt.
+      inv LC1. inv TVIEW. ss. subst.
+      inv STEP_TGT. ss.
+      econs. ii. ss.
+      rewrite CUR. eauto.
     Qed.
 
     (* Lemma sim_thread_step *)
