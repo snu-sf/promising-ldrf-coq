@@ -1090,18 +1090,20 @@ Module RASimThread.
                       (LOC: L loc),
               msg = Message.reserve)
           (STEP_TGT: Thread.step pf e_tgt e1_tgt e2_tgt):
-      exists rels' e_src e2_src,
+      exists e_src e2_src,
         <<STEP_SRC: OrdThread.step L Ordering.acqrel pf e_src e1_src e2_src>> /\
-        __guard__ (<<REL: rels' = match ThreadEvent.is_writing e_src with
-                                  | Some (loc, from, to, val, released, ord)  =>
-                                    if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels
-                                  | _ => rels
-                                  end>> /\
-                   <<SIM2: sim_thread rels' e2_src e2_tgt>> /\
-                   <<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>> \/
-                   <<RACE: exists loc to val released ord,
-                       ThreadEvent.is_reading e_src = Some (loc, to, val, released, ord) /\
-                       ra_race rels e1_src.(Thread.local).(Local.tview) loc to ord>>).
+        __guard__ (
+            (exists rels',
+                <<REL: rels' = match ThreadEvent.is_writing e_src with
+                               | Some (loc, from, to, val, released, ord)  =>
+                                 if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels
+                               | _ => rels
+                               end>> /\
+                <<SIM2: sim_thread rels' e2_src e2_tgt>> /\
+                <<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>>) \/
+            <<RACE: exists loc to val released ord,
+              ThreadEvent.is_reading e_src = Some (loc, to, val, released, ord) /\
+              ra_race rels e1_src.(Thread.local).(Local.tview) loc to ord>>).
     Proof.
       destruct e1_src as [st1_src lc1_src sc1_src mem1_src].
       destruct e1_tgt as [st1_tgt lc1_tgt sc1_tgt mem1_tgt].
@@ -1111,24 +1113,24 @@ Module RASimThread.
         exploit promise_step; try exact LOCAL0; try exact LOCAL; try exact MEMORY; eauto.
         i. des. esplits.
         + econs 1. econs; eauto.
-        + left. splits; ss.
+        + left. esplits; ss.
       - (* silent step *)
         esplits.
         + econs 2. econs; [|econs 1]. eauto.
-        + left. splits; ss.
+        + left. esplits; ss.
       - (* read step *)
         destruct (L loc) eqn:LOC.
         + exploit read_step_loc; try exact LOCAL0; try exact LOCAL; try exact MEMORY; eauto.
           i. des. esplits.
           * econs 2. econs; [|econs 2]; eauto.
           * unguard. des.
-            { left. splits; ss. }
-            { left. splits; ss. }
+            { left. esplits; ss. }
+            { left. esplits; ss. }
             { right. esplits; ss. }
         + exploit read_step_other; try exact LOCAL0; try exact LOCAL; try exact MEMORY; eauto.
           i. des. esplits.
           * econs 2. econs; [|econs 2]; eauto.
-          * left. splits; ss.
+          * left. esplits; ss.
       - (* write step *)
         destruct (L loc) eqn:LOC.
         + exploit write_step_loc; try exact LOCAL0; try exact LOCAL; try exact MEMORY; eauto.
@@ -1136,11 +1138,11 @@ Module RASimThread.
           { left. auto. }
           i. des. esplits.
           * econs 2. econs; [|econs 3]; eauto.
-          * left. rewrite REL in *. splits; ss.
+          * left. rewrite REL in *. esplits; ss.
         + exploit write_step_other; try exact LOCAL0; try exact LOCAL; try exact MEMORY; eauto.
           i. des. esplits.
           * econs 2. econs; [|econs 3]; eauto.
-          * left. rewrite REL in *. splits; ss.
+          * left. rewrite REL in *. esplits; ss.
 
       - (* update step *)
         destruct (L loc) eqn:LOC.
@@ -1159,7 +1161,7 @@ Module RASimThread.
               - inv LOWER. econs. ss. }
             clear H1. i. des. esplits.
             { econs 2. econs; [|econs 4]; eauto. }
-            { left. rewrite REL in *. splits; ss. }
+            { left. rewrite REL in *. esplits; ss. }
           * cut (exists releasedw_src lc3_src mem2_src,
                     OrdLocal.write_step L Ordering.acqrel lc2_src sc1_tgt mem1_src
                                         loc tsr tsw valw released_src releasedw_src ordw
@@ -1197,14 +1199,109 @@ Module RASimThread.
               { instantiate (1 := Ordering.join ordw Ordering.acqrel).
                 condtac; ss. }
               econs; ss.
-              - admit.
+              - inv WRITABLE. econs. condtac; [|destruct ordr; ss].
+                unfold View.singleton_ur_if. condtac; [|destruct ordr; ss].
+                unfold View.singleton_ur. ss.
+                unfold TimeMap.join, TimeMap.singleton, LocFun.add. condtac; ss.
+                unfold TimeMap.join in TS0.
+                exploit TimeFacts.le_lt_lt; [eapply Time.join_l|exact TS0|]. i.
+                exploit TimeFacts.le_lt_lt; [eapply Time.join_l|exact x3|]. i.
+                exploit TimeFacts.le_lt_lt; [eapply Time.join_r|exact x3|]. i.
+                repeat apply TimeFacts.join_spec_lt.
+                + inv TVIEW. rewrite CUR. ss.
+                + revert x5. unfold View.singleton_ur_if. condtac; ss.
+                  * unfold TimeMap.singleton, LocFun.add. condtac; ss.
+                  * unfold TimeMap.singleton, LocFun.add. condtac; ss.
+                + inv MEM1_SRC. exploit CLOSED; eauto. i. des.
+                  inv MSG_TS. eapply TimeFacts.le_lt_lt; eauto.
+                  inv MEM. inv ADD. ss.
               - econs; eauto. econs 1; eauto.
-                + admit.
-                + admit.
-              - admit.
+                + econs. unfold TView.write_released.
+                  condtac; [|destruct ordw]; ss.
+                  unfold LocFun.add. condtac; ss.
+                  condtac; [|destruct ordw]; ss.
+                  condtac; [|destruct ordr]; ss.
+                  unfold View.singleton_ur_if.
+                  condtac; [|destruct ordr]; ss.
+                  unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.find.
+                  condtac; ss.
+                  repeat apply Time.join_spec.
+                  * inv MEM1_SRC. exploit CLOSED; eauto. i. des.
+                    inv MSG_TS. etrans; eauto. econs.
+                    inv MEM. inv ADD. ss.
+                  * inv WRITABLE. revert TS0.
+                    unfold View.join, TimeMap.join. ss. i.
+                    exploit TimeFacts.le_lt_lt; [eapply Time.join_l|exact TS0|]. i.
+                    exploit TimeFacts.le_lt_lt; [eapply Time.join_l|exact x3|]. i.
+                    econs. inv TVIEW. congr.
+                  * econs. inv MEM. inv ADD. ss.
+                  * inv MEM1_SRC. exploit CLOSED; eauto. i. des.
+                    inv MSG_TS. etrans; eauto. econs.
+                    inv MEM. inv ADD. ss.
+                  * refl.
+                + i. inv MEMORY. exploit SOUND; try exact GET3. i. des. eauto.
+              - ii. destruct msg; ss. exploit RESERVE; eauto. ss.
             }
             { (* split *)
-              admit.
+              exploit (@Memory.split_exists
+                         promises1_tgt loc tsr tsw ts3
+                         (Message.concrete valw
+                                           (TView.write_released (TView.read_tview tview1_src loc tsr released_src (Ordering.join ordr Ordering.acqrel))
+                                                                 sc1_tgt loc tsw released_src (Ordering.join ordw Ordering.acqrel)))
+                      msg3).
+              { exploit Memory.split_get0; try exact PROMISES. i. des. ss. }
+              { inv PROMISES. inv SPLIT. ss. }
+              { inv PROMISES. inv SPLIT. ss. }
+              { econs. eapply TViewFacts.write_future0; eauto. apply WF3. }
+              i. des.
+              exploit Memory.split_exists_le; try exact x0; try eapply WF0. i. des.
+              exploit Memory.split_get0; try exact x0. i. des.
+              exploit Memory.remove_exists; try exact GET3. i. des.
+              esplits. econs.
+              { instantiate (1 := Ordering.join ordw Ordering.acqrel).
+                condtac; ss. }
+              econs; ss.
+              - inv WRITABLE. econs. condtac; [|destruct ordr; ss].
+                unfold View.singleton_ur_if. condtac; [|destruct ordr; ss].
+                unfold View.singleton_ur. ss.
+                unfold TimeMap.join, TimeMap.singleton, LocFun.add. condtac; ss.
+                unfold TimeMap.join in TS0.
+                exploit TimeFacts.le_lt_lt; [eapply Time.join_l|exact TS0|]. i.
+                exploit TimeFacts.le_lt_lt; [eapply Time.join_l|exact x3|]. i.
+                exploit TimeFacts.le_lt_lt; [eapply Time.join_r|exact x3|]. i.
+                repeat apply TimeFacts.join_spec_lt.
+                + inv TVIEW. rewrite CUR. ss.
+                + revert x5. unfold View.singleton_ur_if. condtac; ss.
+                  * unfold TimeMap.singleton, LocFun.add. condtac; ss.
+                  * unfold TimeMap.singleton, LocFun.add. condtac; ss.
+                + inv MEM1_SRC. exploit CLOSED; eauto. i. des.
+                  inv MSG_TS. eapply TimeFacts.le_lt_lt; eauto.
+                  inv MEM. inv SPLIT. ss.
+              - econs; eauto. econs 2; eauto.
+                + econs. unfold TView.write_released.
+                  condtac; [|destruct ordw]; ss.
+                  unfold LocFun.add. condtac; ss.
+                  condtac; [|destruct ordw]; ss.
+                  condtac; [|destruct ordr]; ss.
+                  unfold View.singleton_ur_if.
+                  condtac; [|destruct ordr]; ss.
+                  unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.find.
+                  condtac; ss.
+                  repeat apply Time.join_spec.
+                  * inv MEM1_SRC. exploit CLOSED; eauto. i. des.
+                    inv MSG_TS. etrans; eauto. econs.
+                    inv MEM. inv SPLIT. ss.
+                  * inv WRITABLE. revert TS0.
+                    unfold View.join, TimeMap.join. ss. i.
+                    exploit TimeFacts.le_lt_lt; [eapply Time.join_l|exact TS0|]. i.
+                    exploit TimeFacts.le_lt_lt; [eapply Time.join_l|exact x3|]. i.
+                    econs. inv TVIEW. congr.
+                  * econs. inv MEM. inv SPLIT. ss.
+                  * inv MEM1_SRC. exploit CLOSED; eauto. i. des.
+                    inv MSG_TS. etrans; eauto. econs.
+                    inv MEM. inv SPLIT. ss.
+                  * refl.
+              - ii. destruct msg; ss. exploit RESERVE; eauto. ss.
             }
             { (* lower *)
               des. subst.
@@ -1219,23 +1316,23 @@ Module RASimThread.
           exploit write_step_other; try exact LOCAL2; try exact LC2; try exact MEMORY; eauto.
           i. des. esplits.
           * econs 2. econs; [|econs 4]; eauto.
-          * left. rewrite REL in *. splits; ss.
+          * left. rewrite REL in *. esplits; ss.
 
       - (* fence step *)
         exploit fence_step; try exact LOCAL1; try exact LOCAL.
         i. des. esplits.
         + econs 2. econs; [|econs 5]; eauto.
-        + left. splits; ss.
+        + left. esplits; ss.
       - (* syscall step *)
         exploit fence_step; try exact LOCAL1; try exact LOCAL.
         i. des. esplits.
         + econs 2. econs; [|econs 6]; eauto.
-        + left. splits; ss.
+        + left. esplits; ss.
       - (* failure step *)
         exploit failure_step; try exact LOCAL1; try exact LOCAL.
         i. des. esplits.
         + econs 2. econs; [|econs 7]; eauto.
-        + left. splits; ss.
-    Admitted.
+        + left. esplits; ss.
+    Qed.
   End RASimThread.
 End RASimThread.
