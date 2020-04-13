@@ -130,6 +130,25 @@ Section CONCRETEIDENT.
     eauto.
   Qed.
 
+  Lemma compose_map_le f0 f1
+        (MAPLE0: mapping_map_le f0)
+        (MAPLE1: mapping_map_le f1)
+    :
+      mapping_map_le (compose_map f0 f1).
+  Proof.
+    unfold mapping_map_le in *. i. inv MAP0. inv MAP1.
+    hexploit (@MAPLE0 _ _ _ _ _ MAP2 MAP0); eauto.
+  Qed.
+
+  Lemma compose_map_bot f0 f1
+        (MAPBOT0: mapping_map_bot f0)
+        (MAPBOT1: mapping_map_bot f1)
+    :
+      mapping_map_bot (compose_map f0 f1).
+  Proof.
+    ii. econs; eauto.
+  Qed.
+
   Lemma compose_map_lt f0 f1
         (MAPLT0: mapping_map_lt f0)
         (MAPLT1: mapping_map_lt f1)
@@ -203,7 +222,44 @@ Section CONCRETEIDENT.
     eexists. eauto.
   Qed.
 
+  Lemma compose_map_memory2 f0 f1 m0 m1 m2
+        (MAPEQ0: mapping_map_eq f0)
+        (MAPEQ1: mapping_map_eq f1)
+        (MAPLT1: mapping_map_lt f1)
+        (MAPBOT0: mapping_map_bot f0)
+        (MAPBOT1: mapping_map_bot f1)
+        (MAPLE: mapping_map_le f1)
+        (MEM0: memory_map2 f0 m0 m1)
+        (CLOSED0: Memory.closed m0)
+        (MEM1: memory_map2 f1 m1 m2)
+    :
+      memory_map2 (compose_map f0 f1) m0 m2.
+  Proof.
+    dup MEM0. dup MEM1.
+    inv MEM0. inv MEM1. econs.
+    - ii. exploit MAPPED; eauto. i. des; auto.
+      exploit MAPPED0; eauto. i. des; auto.
+      + subst. inv MSGLE. inv MSG. auto.
+      + right. inv CLOSED0. exploit CLOSED; eauto. i. des.
+        exploit closed_message_map; try apply MSG; eauto.
+        { eapply memory_map2_memory_map; eauto. } intros MSG_CLOSED1.
+        exploit msg_map_exists; try apply MSG_CLSOED1; eauto.
+        { eapply memory_map2_memory_map; eauto. } i. des.
+        esplits; [..|eauto].
+        * eauto.
+        * eapply compose_map_msg; eauto.
+        * etrans; eauto. eapply msg_le_map; eauto.
+    - i. exploit ONLY0; eauto. i. des.
+      exploit ONLY; eauto. i. des. esplits; eauto.
+  Qed.
+
   Lemma compose_map_memory f0 f1 m0 m1 m2
+        (MAPEQ0: mapping_map_eq f0)
+        (MAPEQ1: mapping_map_eq f1)
+        (MAPLT1: mapping_map_lt f1)
+        (MAPBOT0: mapping_map_bot f0)
+        (MAPBOT1: mapping_map_bot f1)
+        (MAPLE: mapping_map_le f1)
         (MEM0: memory_map f0 m0 m1)
         (CLOSED0: Memory.closed m0)
         (MEM1: memory_map f1 m1 m2)
@@ -216,12 +272,160 @@ Section CONCRETEIDENT.
       exploit MAPPED0; eauto. i. des; auto.
       + subst. inv MSGLE. inv MSG. auto.
       + right. inv CLOSED0. exploit CLOSED; eauto. i. des.
-        exploit msg_map_exists; try apply MSG_CLOSED; eauto. i. des.
-        exploit msg_map_exists; try apply CLOSED0; eauto. i. des.
+        exploit closed_message_map; try apply MSG; eauto. intros MSG_CLOSED1.
+        exploit msg_map_exists; try apply MSG_CLSOED1; eauto. i. des.
         esplits; [..|eauto].
         * eauto.
         * eapply compose_map_msg; eauto.
-        *
+        * etrans; eauto. eapply msg_le_map; eauto.
+    - i. exploit ONLY0; eauto. i. des.
+      + dup GET. eapply memory_get_ts_strong in GET0. des; clarify.
+        { left. exists Time.bot, Time.bot, Time.bot, Time.bot. splits; try refl.
+          - econs; eauto.
+          - econs; eauto.
+          - ii. inv ITV. ss. exfalso. eapply Time.lt_strorder.
+            eapply TimeFacts.lt_le_lt; eauto. }
+        assert (FROMTO: Time.lt from to).
+        { eapply map_lt_only_if; eauto.
+          eapply TimeFacts.le_lt_lt; eauto.
+          eapply TimeFacts.lt_le_lt; eauto. }
+        hexploit (cell_elements_least
+                    (m1 loc)
+                    (fun ts => Time.le from ts)). i. des; cycle 1.
+        { exfalso. hexploit (COVERED to).
+          { econs; ss. refl. }
+          i. inv H. eapply EMPTY; eauto.
+          inv ITV; ss. etrans; eauto. left. auto. }
+        assert (FROMLE: Time.le from0 from).
+        { destruct (Time.le_lt_dec from0 from); auto. exfalso.
+          hexploit (COVERED (Time.meet (Time.middle from from0) to)).
+          { econs; ss.
+            - unfold Time.meet. des_ifs.
+              eapply Time.middle_spec; eauto.
+            - unfold Time.meet. des_ifs. refl. }
+          i. inv H. dup GET1. eapply LEAST in GET1.
+          { destruct GET1.
+            { dup H. eapply memory_get_from_mon in H; eauto.
+              inv ITV. ss. eapply Time.lt_strorder.
+              eapply TimeFacts.le_lt_lt.
+              { eapply memory_get_ts_le in GET0. apply GET0. }
+              eapply TimeFacts.le_lt_lt.
+              { eapply H. }
+              eapply TimeFacts.lt_le_lt.
+              { eapply FROM0. }
+              unfold Time.meet. des_ifs.
+              - left. eapply Time.middle_spec; eauto.
+              - left. etrans; eauto. eapply Time.middle_spec; eauto. }
+            inv H. setoid_rewrite GET2 in GET0. clarify.
+            inv ITV. ss. eapply Time.lt_strorder.
+            eapply TimeFacts.lt_le_lt.
+            { eapply FROM0. }
+            unfold Time.meet. des_ifs.
+            - left. eapply Time.middle_spec; eauto.
+            - left. etrans; eauto. eapply Time.middle_spec; eauto. }
+          { inv ITV. ss. etrans; [|apply TO1].
+            unfold Time.meet. left. des_ifs. apply Time.middle_spec; eauto. }
+        }
+        hexploit (cell_elements_greatest
+                    (m1 loc)
+                    (fun ts => exists from' msg',
+                         (<<GET: Memory.get loc ts m1 = Some (from', msg')>>) /\
+                         (<<TS: Time.lt from' to>>))). i. des; cycle 1.
+        { exfalso. hexploit (COVERED to).
+          { econs; ss. refl. }
+          i. inv H. eapply EMPTY; eauto. esplits; eauto.
+          inv ITV. auto. } setoid_rewrite GET2 in GET1. clarify.
+        assert (TOLE: Time.le to to1).
+        { destruct (Time.le_lt_dec to to1); auto. exfalso.
+          hexploit (COVERED to).
+          { econs; ss. refl. } i. inv H.
+          dup GET1. apply GREATEST in GET3.
+          { eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt.
+            { eapply GET3. } eapply TimeFacts.lt_le_lt.
+            { eapply l. } inv ITV. ss. }
+          { esplits; eauto. inv ITV; ss. }
+        }
+        hexploit ONLY; try apply GET0. i. des; cycle 1.
+        { right. ii. inv MAP. eapply OUT in MAP0.
+          eapply TimeFacts.lt_le_lt; eauto.
+          erewrite <-(MAPLT1 loc); cycle 1; eauto.
+          eapply TimeFacts.lt_le_lt; eauto. }
+        hexploit ONLY; try apply GET2. i. des; cycle 1.
+        { exfalso.
+          rename to into xxxxxxxxxxx.
+          eapply OUT in TO.
+
+          apply OUT in
+
+          right. ii. inv MAP. eapply OUT in MAP0.
+          eapply TimeFacts.lt_le_lt; eauto.
+          erewrite <-(MAPLT1 loc); cycle 1; eauto.
+          eapply TimeFacts.lt_le_lt; eauto. }
+
+ts1 from0 from
+
+
+          ts1 from0 ? from
+
+          exploit mapping_map_
+
+          exfalso. admit. }
+        hexploit ONLY; try apply GET2. i. des; cycle 1.
+        { exfalso. admit. }
+        left.
+
+
+
+
+
+        inv ITV; ss. etrans; eauto. left. auto. }
+
+
+          eapply EMPTY.
+
+
+
+                       Time.le from ts)). i. des; cycle 1.
+        { exfalso. hexploit (COVERED to).
+          { econs; ss. refl. }
+          i. inv H. eapply EMPTY; eauto.
+          inv ITV; ss. etrans; eauto. left. auto. }
+
+
+
+
+          left.
+          eapply map_lt_only_if; eauto.
+
+          c
+
+            { eapply
+
+            admit. }
+
+
+
+                       exists fts, <<MAP: f0 loc ts fts>> /\ <<LE: Time.le from fts>>)).
+
+
+        apply NNPP. ii.
+        apply not_or_and in H. des. apply H.
+
+
+        hexploit (cell_elements_least
+                    (m0 loc)
+                    (fun ts => exists fts, <<MAP: f0 loc ts fts>> /\ <<LE: Time.le from fts>>)).
+        i. des.
+        * admit.
+        * right. ii.
+
+
+        apply NNPP. ii.
+        apply not_or_and in H. des. apply H.
+
+
+        admit.
+      + right. ii. inv MAP. eauto.
 
 
           { eauto. }
