@@ -224,10 +224,6 @@ Section CONCRETEIDENT.
 
   Lemma compose_map_memory2 f0 f1 m0 m1 m2
         (MAPEQ0: mapping_map_eq f0)
-        (MAPEQ1: mapping_map_eq f1)
-        (MAPLT1: mapping_map_lt f1)
-        (MAPBOT0: mapping_map_bot f0)
-        (MAPBOT1: mapping_map_bot f1)
         (MAPLE: mapping_map_le f1)
         (MEM0: memory_map2 f0 m0 m1)
         (CLOSED0: Memory.closed m0)
@@ -253,235 +249,74 @@ Section CONCRETEIDENT.
       exploit ONLY; eauto. i. des. esplits; eauto.
   Qed.
 
-  Lemma compose_map_memory f0 f1 m0 m1 m2
-        (MAPEQ0: mapping_map_eq f0)
-        (MAPEQ1: mapping_map_eq f1)
+  Lemma compose_map_promise f0 f1 m0 m1 m2
+        (MAPLT0: mapping_map_lt f0)
         (MAPLT1: mapping_map_lt f1)
-        (MAPBOT0: mapping_map_bot f0)
-        (MAPBOT1: mapping_map_bot f1)
-        (MAPLE: mapping_map_le f1)
-        (MEM0: memory_map f0 m0 m1)
+        (MEM0: promises_map f0 m0 m1)
         (CLOSED0: Memory.closed m0)
-        (MEM1: memory_map f1 m1 m2)
+        (MEM1: promises_map f1 m1 m2)
     :
-      memory_map (compose_map f0 f1) m0 m2.
+      promises_map (compose_map f0 f1) m0 m2.
   Proof.
     dup MEM0. dup MEM1.
     inv MEM0. inv MEM1. econs.
     - ii. exploit MAPPED; eauto. i. des; auto.
-      exploit MAPPED0; eauto. i. des; auto.
-      + subst. inv MSGLE. inv MSG. auto.
-      + right. inv CLOSED0. exploit CLOSED; eauto. i. des.
-        exploit closed_message_map; try apply MSG; eauto. intros MSG_CLOSED1.
-        exploit msg_map_exists; try apply MSG_CLSOED1; eauto. i. des.
-        esplits; [..|eauto].
-        * eauto.
-        * eapply compose_map_msg; eauto.
-        * etrans; eauto. eapply msg_le_map; eauto.
-    - i. exploit ONLY0; eauto. i. des.
-      + dup GET. eapply memory_get_ts_strong in GET0. des; clarify.
-        { left. exists Time.bot, Time.bot, Time.bot, Time.bot. splits; try refl.
-          - econs; eauto.
-          - econs; eauto.
-          - ii. inv ITV. ss. exfalso. eapply Time.lt_strorder.
-            eapply TimeFacts.lt_le_lt; eauto. }
-        assert (FROMTO: Time.lt from to).
-        { eapply map_lt_only_if; eauto.
-          eapply TimeFacts.le_lt_lt; eauto.
-          eapply TimeFacts.lt_le_lt; eauto. }
-        hexploit (cell_elements_least
-                    (m1 loc)
-                    (fun ts => Time.le from ts)). i. des; cycle 1.
-        { exfalso. hexploit (COVERED to).
-          { econs; ss. refl. }
-          i. inv H. eapply EMPTY; eauto.
-          inv ITV; ss. etrans; eauto. left. auto. }
-        assert (FROMLE: Time.le from0 from).
-        { destruct (Time.le_lt_dec from0 from); auto. exfalso.
-          hexploit (COVERED (Time.meet (Time.middle from from0) to)).
-          { econs; ss.
-            - unfold Time.meet. des_ifs.
-              eapply Time.middle_spec; eauto.
-            - unfold Time.meet. des_ifs. refl. }
-          i. inv H. dup GET1. eapply LEAST in GET1.
-          { destruct GET1.
-            { dup H. eapply memory_get_from_mon in H; eauto.
-              inv ITV. ss. eapply Time.lt_strorder.
-              eapply TimeFacts.le_lt_lt.
-              { eapply memory_get_ts_le in GET0. apply GET0. }
-              eapply TimeFacts.le_lt_lt.
-              { eapply H. }
-              eapply TimeFacts.lt_le_lt.
-              { eapply FROM0. }
-              unfold Time.meet. des_ifs.
-              - left. eapply Time.middle_spec; eauto.
-              - left. etrans; eauto. eapply Time.middle_spec; eauto. }
-            inv H. setoid_rewrite GET2 in GET0. clarify.
-            inv ITV. ss. eapply Time.lt_strorder.
-            eapply TimeFacts.lt_le_lt.
-            { eapply FROM0. }
-            unfold Time.meet. des_ifs.
-            - left. eapply Time.middle_spec; eauto.
-            - left. etrans; eauto. eapply Time.middle_spec; eauto. }
-          { inv ITV. ss. etrans; [|apply TO1].
-            unfold Time.meet. left. des_ifs. apply Time.middle_spec; eauto. }
-        }
-        hexploit (cell_elements_greatest
-                    (m1 loc)
-                    (fun ts => exists from' msg',
-                         (<<GET: Memory.get loc ts m1 = Some (from', msg')>>) /\
-                         (<<TS: Time.lt from' to>>))). i. des; cycle 1.
-        { exfalso. hexploit (COVERED to).
-          { econs; ss. refl. }
-          i. inv H. eapply EMPTY; eauto. esplits; eauto.
-          inv ITV. auto. } setoid_rewrite GET2 in GET1. clarify.
-        assert (TOLE: Time.le to to1).
-        { destruct (Time.le_lt_dec to to1); auto. exfalso.
-          hexploit (COVERED to).
-          { econs; ss. refl. } i. inv H.
-          dup GET1. apply GREATEST in GET3.
-          { eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt.
-            { eapply GET3. } eapply TimeFacts.lt_le_lt.
-            { eapply l. } inv ITV. ss. }
-          { esplits; eauto. inv ITV; ss. }
-        }
-        hexploit ONLY; try apply GET0. i. des; cycle 1.
-        { right. ii. inv MAP. eapply OUT in MAP0.
-          eapply TimeFacts.lt_le_lt; eauto.
-          erewrite <-(MAPLT1 loc); cycle 1; eauto.
-          eapply TimeFacts.lt_le_lt; eauto. }
-        hexploit ONLY; try apply GET2. i. des; cycle 1.
-        { exfalso.
-          rename to into xxxxxxxxxxx.
-          eapply OUT in TO.
+      exploit MAPPED0; eauto. i. des; auto. esplits; eauto.
+      + eapply mapping_map_lt_non_collapsable.
+        eapply compose_map_lt; eauto.
+      + eapply compose_map_msg; eauto.
+    - ii. exploit ONLY0; eauto. i. des.
+      exploit ONLY; eauto. i. des. esplits; eauto.
+  Qed.
 
-          apply OUT in
-
-          right. ii. inv MAP. eapply OUT in MAP0.
-          eapply TimeFacts.lt_le_lt; eauto.
-          erewrite <-(MAPLT1 loc); cycle 1; eauto.
-          eapply TimeFacts.lt_le_lt; eauto. }
-
-ts1 from0 from
+End CONCRETEIDENT.
 
 
-          ts1 from0 ? from
+Section MIDDLE.
 
-          exploit mapping_map_
+  Definition middle_mem (mem_src mem_tgt: Memory.t)
 
-          exfalso. admit. }
-        hexploit ONLY; try apply GET2. i. des; cycle 1.
-        { exfalso. admit. }
-        left.
+  Lemma
+
+  memory_map2
+
+  mappable_memory
+
+memory_map2
+
+  Variable L: Loc.t -> bool.
+
+  Inductive sim_memory_content_mid P (loc: Loc.t)
+    (* (messages: Time.t -> Prop) *)
+    : option (Time.t * Message.t) -> option (Time.t * Message.t) -> Prop :=
+  | sim_memory_content_mid_none
+      (NPROM: ~ P)
+    :
+      sim_memory_content_mid P loc None None
+  | sim_memory_content_mid_normal
+      from_src from_tgt msg_src msg_tgt
+      (NPROM: ~ P)
+      (FROM: Time.le from_tgt from_src)
+      (MSG: Message.le msg_src msg_tgt)
+      (RESERVE: msg_src = Message.reserve -> msg_tgt = Message.reserve)
+      (NLOC: ~ L loc -> from_src = from_tgt)
+    :
+      sim_memory_content_mid P loc (Some (from_src, msg_src)) (Some (from_tgt, msg_tgt))
+  | sim_memory_content_mid_forget
+      from_src from_tgt val released
+      (PROM: P)
+      (NLOC: L loc)
+      (FROM: Time.le from_tgt from_src)
+    (* (SHORT: ~ messages from_tgt -> Time.lt from_tgt from_src) *)
+    :
+      sim_memory_content_mid P loc (Some (from_src, Message.reserve)) (Some (from_tgt, Message.concrete val released))
+  .
+  Hint Constructors sim_memory_content_mid.
 
 
 
 
 
-        inv ITV; ss. etrans; eauto. left. auto. }
-
-
-          eapply EMPTY.
-
-
-
-                       Time.le from ts)). i. des; cycle 1.
-        { exfalso. hexploit (COVERED to).
-          { econs; ss. refl. }
-          i. inv H. eapply EMPTY; eauto.
-          inv ITV; ss. etrans; eauto. left. auto. }
-
-
-
-
-          left.
-          eapply map_lt_only_if; eauto.
-
-          c
-
-            { eapply
-
-            admit. }
-
-
-
-                       exists fts, <<MAP: f0 loc ts fts>> /\ <<LE: Time.le from fts>>)).
-
-
-        apply NNPP. ii.
-        apply not_or_and in H. des. apply H.
-
-
-        hexploit (cell_elements_least
-                    (m0 loc)
-                    (fun ts => exists fts, <<MAP: f0 loc ts fts>> /\ <<LE: Time.le from fts>>)).
-        i. des.
-        * admit.
-        * right. ii.
-
-
-        apply NNPP. ii.
-        apply not_or_and in H. des. apply H.
-
-
-        admit.
-      + right. ii. inv MAP. eauto.
-
-
-          { eauto. }
-          {
-
-          ; eauto.
-
-mappable_memory_closed_msg_exists
-
-mappable_memory_closed_msg_exists
-
-
-        esplits; eauto.
-        eapply compose_map_msg; eauto.
-
-        * econs; eauto.
-
-
-  Definition mapping_map_le:=
-    forall loc t0 t1 ft0 ft1
-           (MAP0: f loc t0 ft0)
-           (MAP1: f loc t1 ft1),
-      Time.le t0 t1 -> Time.le ft0 ft1.
-
-  Definition mapping_map_bot :=
-    forall loc,
-      f loc Time.bot Time.bot.
-
-  Definition mapping_map_eq :=
-    forall loc to ft0 ft1
-           (MAP0: f loc to ft0)
-           (MAP1: f loc to ft1),
-      ft0 = ft1.
-
-
-  Definition mapping_map_lt (f: Loc.t -> Time.t -> Time.t -> Prop): Prop :=
-    forall loc t0 t1 ft0 ft1
-           (MAP0: f loc t0 ft0)
-           (MAP1: f loc t1 ft1),
-      Time.lt t0 t1 <-> Time.lt ft0 ft1.
-
-
-  Definition map_ident_concrete (f: Loc.t -> Time.t -> Time.t -> Prop)
-             (mem: Memory.t): Prop :=
-    forall loc to
-           (CONCRETE: concrete_promised mem loc to),
-      f loc to to.
-
-
-
-  Definition map_ident_concrete_compose_memory
-             (f0 f1: Loc.t -> Time.t -> Time.t -> Prop)
-             (mem: Memory.t): Prop :=
-    forall loc to
-           (CONCRETE: concrete_promised mem loc to),
-      f loc to to.
 
 
 
