@@ -57,6 +57,16 @@ Qed.
 
 Section JOINED.
 
+  Definition views_le
+             (views0 views1: Loc.t -> Time.t -> list View.t): Prop :=
+    forall loc ts (VIEW0: views0 loc ts <> []), views1 loc ts = views0 loc ts.
+
+  Global Program Instance views_le_PreOrder: PreOrder views_le.
+  Next Obligation.
+  Proof. ii. auto. Qed.
+  Next Obligation.
+  Proof. ii. erewrite <- H in *; auto. Qed.
+
   Definition wf_views (views: Loc.t -> Time.t -> list View.t): Prop :=
     forall loc ts, List.Forall View.wf (views loc ts).
 
@@ -145,6 +155,36 @@ Section JOINED.
   .
   Hint Constructors joined_view.
 
+  Definition semi_contain_view (view: View.t) (vw0: View.t) (views1: list View.t): Prop :=
+    forall (VIEWLE: View.le vw0 view),
+    exists vw1,
+      (<<IN: joined_view views1 vw1>>) /\
+      (<<VIEWLE0: View.le vw0 vw1>>) /\
+      (<<VIEWLE1: View.le vw1 view>>).
+
+  Definition semi_sub_views (view: View.t) (views0 views1: list View.t): Prop :=
+    forall vw0
+           (IN: List.In vw0 views0),
+      semi_contain_view view vw0 views1.
+
+  Lemma contain_semi_contain_view view vw0 views1
+        (IN: List.In vw0 views1)
+    :
+      semi_contain_view view vw0 views1.
+  Proof.
+    ii. exists vw0. splits; auto.
+    - apply joined_view_exact; eauto.
+    - refl.
+  Qed.
+
+  Lemma sub_semi_sub_views view views0 views1
+        (INCL: forall vw (IN: List.In vw views0), List.In vw views1)
+    :
+      semi_sub_views view views0 views1.
+  Proof.
+    ii. eapply contain_semi_contain_view; eauto.
+  Qed.
+
   Inductive joined_memory
             (views: Loc.t -> Time.t -> list View.t)
             (mem: Memory.t): Prop :=
@@ -157,8 +197,9 @@ Section JOINED.
 
           (<<JOINED: joined_view ((View.singleton_ur loc ts)::(views loc ts)) released>>) /\
 
-          (<<INCL: forall view (IN: List.In view (views loc from)),
-              List.In view (views loc ts)>>)
+          (<<INCL: semi_sub_views released (views loc from) ((View.singleton_ur loc ts)::(views loc ts))>>)
+      (* (<<INCL: forall view (IN: List.In view (views loc from)), *)
+      (*     List.In view (views loc ts)>>) *)
       )
       (ONLY: forall loc ts (SOME: views loc ts <> []),
           exists from val released,
@@ -209,16 +250,6 @@ Section JOINED.
   Proof.
     inv JOINED; econs. eapply joined_view_closed; eauto.
   Qed.
-
-  Definition views_le
-             (views0 views1: Loc.t -> Time.t -> list View.t): Prop :=
-    forall loc ts (VIEW0: views0 loc ts <> []), views1 loc ts = views0 loc ts.
-
-  Global Program Instance views_le_PreOrder: PreOrder views_le.
-  Next Obligation.
-  Proof. ii. auto. Qed.
-  Next Obligation.
-  Proof. ii. erewrite <- H in *; auto. Qed.
 
   Record max_le_joined_view
          (views: list View.t)
@@ -393,14 +424,53 @@ Section JOINED.
     inv MAX; eauto. inv MAXLE; eauto. inv MAXLE0; eauto.
   Qed.
 
+  Lemma joined_view_sub views0 views1 view
+        (VIEWSWF: List.Forall View.wf views1)
+        (JOINED: joined_view views0 view)
+        (INCL: semi_sub_views view views0 views1)
+    :
+      joined_view views1 view.
+  Proof.
+    unfold semi_sub_views in *.
+    hexploit (@max_le_joined_view_exists views1 view); auto. i. des.
+    assert (JOINED1: joined_view views1 max).
+    { eapply max_le_joined_view_joined; eauto. }
+    replace view with (View.join max view); cycle 1.
+    { apply View.le_join_r.
+      eapply max_le_joined_view_le; eauto. }
+    assert (INCL1: forall vw0
+                          (VIEWLE: View.le vw0 view)
+                          (IN: List.In vw0 views0),
+               exists vw1,
+                 (<<IN: joined_view views1 vw1>>) /\
+                 (<<VIEWLE0: View.le vw0 vw1>>) /\
+                 (<<VIEWLE1: View.le vw1 max>>)).
+    { i. exploit INCL; eauto. i. des. esplits; eauto.
+      eapply max_le_joined_view_max; eauto. } clear INCL.
+    clear MAX. ginduction JOINED; ss; i.
+    - erewrite View.join_bot_r. auto.
+    - exploit IHJOINED; eauto.
+      { i. exploit INCL1; eauto. etrans; eauto. eapply View.join_r. }
+      i. erewrite (@View.join_comm vw0 vw1).
+      erewrite <- View.join_assoc.
+      erewrite (View.join_comm).
+      rewrite View.le_join_r; eauto.
+      hexploit (INCL1 vw0); eauto.
+      { eapply View.join_l. } i. des.
+      etrans; eauto. etrans; eauto. eapply View.join_l.
+  Qed.
+
   Definition joined_released
              (views: Loc.t -> Time.t -> list View.t)
              (prom: Memory.t)
              (rel: Loc.t -> View.t): Prop :=
     forall loc ts from val released
            (GET: Memory.get loc ts prom = Some (from, Message.concrete val (Some released))),
-      List.In (rel loc) (views loc ts)
-  .
+      semi_contain_view released (rel loc) (views loc ts).
+
+  (* joined_view *)
+  (*   ((View.singleton_ur loc ts)::(views loc ts)) *)
+  (*   (View.join (View.singleton_ur loc ts) (rel loc)). *)
 
 End JOINED.
 
@@ -595,12 +665,13 @@ Section SIMULATION.
     :
       joined_released views1 prom rel.
   Proof.
-    ii. exploit REL; eauto. i.
+    ii. exploit REL; eauto. i. des.
     destruct (views0 loc ts) eqn:VIEW.
-    - ss.
+    - eapply joined_view_nil in IN. subst.
+      exists View.bot. splits; auto. econs.
     - exploit VIEWSLE; eauto.
       { erewrite VIEW. ss. }
-      i. rewrite x0. rewrite VIEW. auto.
+      i. rewrite x. rewrite VIEW. eauto.
   Qed.
 
   Require Import SimLocal.
@@ -900,7 +971,8 @@ Section SIMULATION.
           - i. erewrite Memory.add_o in GET; eauto. unfold views2. des_ifs.
             + ss. des; clarify. exfalso. eapply Time.lt_strorder; eauto.
             + ss. des; clarify. splits; auto.
-              inv MAX. inv MAXLE. auto.
+              * inv MAX. inv MAXLE. auto.
+              * apply sub_semi_sub_views. i. ss; auto.
             + ss. des; clarify. exfalso. eauto.
             + eapply COMPLETE; eauto.
           - unfold views2. i. des_ifs.
@@ -935,7 +1007,8 @@ Section SIMULATION.
             ss. des; clarify. econs; eauto. ss.
           - ss. ii. unfold views2.
             erewrite (@Memory.add_o prom2_src) in *; eauto. des_ifs; eauto.
-            ss. des; clarify. auto. }
+            ss. des; clarify. econs; ss; auto.
+            eapply joined_view_exact; ss. auto. }
         { eapply sim_memory_add; cycle 1; eauto. econs.
           eapply max_le_joined_opt_view_le; eauto. }
         { assumption. }
@@ -1013,9 +1086,22 @@ Section SIMULATION.
           + ss. des; clarify. exfalso. eapply Time.lt_strorder; eauto.
           + ss. des; clarify. splits.
             * inv MAX. eapply max_le_joined_view_joined; eauto.
-            * ii. auto.
+            * eapply sub_semi_sub_views. ii; ss; auto.
           + ss. des; clarify. exploit COMPLETE; eauto. i. des. splits; auto.
-            i. des; auto. subst. inv LOCAL1. hexploit PROMISES0; eauto.
+
+            unfold views. ii. ss; des; auto. subst.
+
+            exploit INCL; eauto.
+
+
+
+            ii.
+
+            ii. exploit INCL.
+
+            i. des; auto. subst. inv LOCAL1.
+
+            hexploit PROMISES0; eauto.
           + ss. des; clarify. exfalso.
             hexploit Memory.get_disjoint.
             { eapply GETMEMSRC. }
@@ -1161,46 +1247,6 @@ Section SIMULATION.
       { assumption. }
       { auto. }
     }
-  Qed.
-
-  Lemma joined_view_sub views0 views1 view
-        (VIEWSWF: List.Forall View.wf views1)
-        (JOINED: joined_view views0 view)
-        (INCL: forall vw0 (IN: List.In vw0 views0),
-            (<<IN: List.In vw0 views1>>) \/
-            (exists vw1,
-                (<<IN: List.In vw1 views1>>) /\
-                (<<VIEWLE0: View.le vw0 vw1>>) /\
-                (<<VIEWLE1: View.le vw1 view>>)))
-    :
-      joined_view views1 view.
-  Proof.
-    hexploit (@max_le_joined_view_exists views1 view); auto. i. des.
-    assert (JOINED1: joined_view views1 max).
-    { eapply max_le_joined_view_joined; eauto. }
-    replace view with (View.join max view); cycle 1.
-    { apply View.le_join_r.
-      eapply max_le_joined_view_le; eauto. }
-    assert (INCL1: forall vw0 (IN: List.In vw0 views0),
-               (<<IN: List.In vw0 views1>>) \/
-               (exists vw1,
-                   (<<IN: List.In vw1 views1>>) /\
-                   (<<VIEWLE0: View.le vw0 vw1>>) /\
-                   (<<VIEWLE1: View.le vw1 max>>))).
-    { i. exploit INCL; eauto. i. des; eauto.
-      right. esplits; eauto.
-      eapply max_le_joined_view_max; eauto.
-      eapply joined_view_exact; eauto. } clear INCL.
-    clear MAX. ginduction JOINED; ss; i.
-    - erewrite View.join_bot_r. auto.
-    - exploit IHJOINED; eauto. i.
-      erewrite (@View.join_comm vw0 vw1).
-      erewrite <- View.join_assoc.
-      erewrite (View.join_comm).
-      exploit INCL1; eauto. i. des.
-      + econs; eauto.
-      + rewrite View.le_join_r; eauto.
-        etrans; eauto. etrans; eauto. eapply View.join_l.
   Qed.
 
   Lemma sim_local_write
