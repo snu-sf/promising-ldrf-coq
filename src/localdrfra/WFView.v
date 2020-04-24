@@ -1375,8 +1375,7 @@ Section SIMULATION.
                              (GET: Memory.get loc0 ts0 (Local.promises lc1_src) = Some (from, Message.concrete val released)),
                (<<EQ: loc0 = loc /\ ts0 = to>>) \/
                ((<<TS: Time.lt (View.rlx (TView.cur write_tview) loc0) ts0>>) /\
-                (<<NEQ: __guard__(loc0 <> loc \/ ts0 <> to)>>))
-           ).
+                (<<NEQ: __guard__(loc0 <> loc \/ loc0 = loc /\ Time.lt to ts0)>>))).
     { i. inv LOCAL1. ss. specialize (PROMISES0 loc0 ts0).
       erewrite GET in *. inv PROMISES0. symmetry in H.
       assert (((<<NEQ: __guard__(loc0 <> loc \/ ts0 <> to)>>) /\
@@ -1390,7 +1389,7 @@ Section SIMULATION.
         inv STEP_TGT. ss. inv WRITE. inv PROMISE.
         - eapply Memory.add_get1 in H; cycle 1; eauto.
           eapply Memory.remove_get1 in H; eauto. des; eauto.
-          subst. unguard. exfalso. des; auto.
+          unguard. subst. des; ss.
         - eapply Memory.split_get1 in H; cycle 1; eauto. des.
           eapply Memory.remove_get1 in GET2; eauto. des; eauto.
           subst. unguard. exfalso. des; auto.
@@ -1398,10 +1397,14 @@ Section SIMULATION.
           eapply Memory.remove_get1 in GET2; eauto. des; eauto.
           subst. unguard. exfalso. des; auto.
         - ss. }
-      des; auto. right. split; auto.
-      exploit CONS_TGT; eauto. i. inv STEP_TGT. ss.
-      eapply TimeFacts.le_lt_lt; eauto. eapply timemap_join_mon; [|refl].
-      inv TVIEW. inv CUR. ss.
+      des; auto. right. apply or_strengthen in NEQ.
+      exploit CONS_TGT; eauto. i. inv STEP_TGT. ss. splits.
+      - eapply TimeFacts.le_lt_lt; eauto. eapply timemap_join_mon; [|refl].
+        inv TVIEW. inv CUR. ss.
+      - unguard. des; auto. apply NNPP in NOT. subst. right. split; auto.
+        eapply TimeFacts.le_lt_lt; eauto. unfold TimeMap.join.
+        unfold TimeMap.singleton. setoid_rewrite LocFun.add_spec_eq.
+        eapply Time.join_r.
     }
 
     assert (RELEASE_SRC:
@@ -1426,6 +1429,9 @@ Section SIMULATION.
         eapply Memory.remove_get1 in GET2; eauto. des; eauto.
         exploit NONSYNCH; eauto. ss.
    }
+
+   assert (RELEASED_JOINED:
+             semi_joined_view loc ts (
 
     assert (SIMMSG: sim_message (Message.concrete val released_src) (Message.concrete val released_tgt)).
     { econs; eauto. inv STEP_TGT. inv LOCAL1. inv WF1_TGT.
@@ -1490,6 +1496,8 @@ Section SIMULATION.
             ss. des; ss. splits.
             -
 
+
+
               admit.
 
             - ii. unfold views. econs; ss; auto.
@@ -1523,16 +1531,18 @@ Section SIMULATION.
           eapply Memory.remove_get0 in PROMISES_SRC.
           eapply Memory.remove_get0 in REMOVE. des.
           rewrite GET0. rewrite GET2. econs.
-        + unfold views2. ii. condtac; auto.
-          * ss. des; subst.
-
-
-
-            admit.
-          * ss. destruct (Loc.eq_dec loc0 loc).
-            { subst. des; ss.
-              setoid_rewrite LocFun.add_spec_eq. condtac.
-              { exfalso. eapply RELEASE_SRC in GET; auto. }
+        + unfold views2. ii. ss.
+          exploit CONS_SRC; eauto. i. des.
+          * subst. eapply Memory.add_get0 in PROMISES_SRC'. des.
+            erewrite GET in *. inv GET0.
+          * destruct (loc_ts_eq_dec (loc0, ts) (loc, to)).
+            { exfalso. ss. unguard. des; subst; ss.
+              eapply Time.lt_strorder; eauto. }
+            ss. unguard. guardH o. des; subst.
+            { setoid_rewrite LocFun.add_spec_neq; eauto. }
+            { setoid_rewrite LocFun.add_spec_eq. condtac.
+              { exfalso. eapply RELEASE_SRC in GET; auto.
+                subst. eapply Time.lt_strorder; eauto. }
               exploit REL; eauto. i.
               eapply semi_joined_view_join; eauto.
               eapply joined_view_exact. ss. left.
@@ -1540,17 +1550,7 @@ Section SIMULATION.
               eapply View.singleton_ur_spec.
               - eapply View.singleton_ur_wf.
               - ss. unfold TimeMap.singleton.
-                setoid_rewrite LocFun.add_spec_eq.
-
-                eapply CONS_SRC in GET. des; ss.
-
-
-                admit.
-
-
-
-            }
-            { setoid_rewrite LocFun.add_spec_neq; eauto. }
+                setoid_rewrite LocFun.add_spec_eq. left. auto. }
       - eauto.
       - eapply sim_memory_add; cycle 1; eauto.
       - eauto.
