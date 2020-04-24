@@ -185,6 +185,46 @@ Section JOINED.
     ii. eapply contain_semi_contain_view; eauto.
   Qed.
 
+  Definition semi_joined_view (loc: Loc.t) (ts: Time.t)
+             (views: list View.t) (view: View.t): Prop :=
+    joined_view
+      ((View.singleton_ur loc ts)::views)
+      (View.join (View.singleton_ur loc ts) view)
+  .
+
+  Lemma semi_joined_view_bot loc ts views
+    :
+      semi_joined_view loc ts views View.bot.
+  Proof.
+    econs; ss; eauto.
+  Qed.
+
+  Lemma semi_joined_view_join loc ts views view0 view1
+        (JOINED0: semi_joined_view loc ts views view0)
+        (JOINED1: semi_joined_view loc ts views view1)
+    :
+      semi_joined_view loc ts views (View.join view0 view1).
+  Proof.
+    unfold semi_joined_view in *.
+    exploit joined_view_join; [apply JOINED0|apply JOINED1|].
+    intros JOINED.
+    replace (View.join (View.singleton_ur loc ts) (View.join view0 view1)) with
+        (View.join (View.join (View.singleton_ur loc ts) view0)
+                   (View.join (View.singleton_ur loc ts) view1)); auto.
+    erewrite (@View.join_comm (View.singleton_ur loc ts) view1).
+    erewrite View.join_assoc.
+    erewrite View.le_join_r; cycle 1.
+    { erewrite <- View.join_assoc. eapply View.join_r. }
+    erewrite <- View.join_assoc. eapply View.join_comm.
+  Qed.
+
+  Definition semi_incl_views (loc: Loc.t) (ts: Time.t)
+             (views0 views1: list View.t): Prop :=
+    forall vw
+           (IN: List.In vw views0),
+      semi_joined_view loc ts views1 vw
+  .
+
   Inductive joined_memory
             (views: Loc.t -> Time.t -> list View.t)
             (mem: Memory.t): Prop :=
@@ -195,9 +235,11 @@ Section JOINED.
           (* (<<SINGLETON: joined_view (views loc ts) (View.singleton_ur loc ts)>>) /\ *)
           (* (<<JOINED: joined_view (views loc ts) released>>) /\ *)
 
-          (<<JOINED: joined_view ((View.singleton_ur loc ts)::(views loc ts)) released>>) /\
+          (* (<<JOINED: joined_view ((View.singleton_ur loc ts)::(views loc ts)) released>>) /\ *)
 
-          (<<INCL: semi_sub_views released (views loc from) ((View.singleton_ur loc ts)::(views loc ts))>>)
+          (<<JOINED: semi_joined_view loc ts (views loc ts) released>>) /\
+
+          (<<INCL: semi_incl_views loc ts (views loc from) (views loc ts)>>)
       (* (<<INCL: forall view (IN: List.In view (views loc from)), *)
       (*     List.In view (views loc ts)>>) *)
       )
@@ -466,11 +508,14 @@ Section JOINED.
              (rel: Loc.t -> View.t): Prop :=
     forall loc ts from val released
            (GET: Memory.get loc ts prom = Some (from, Message.concrete val (Some released))),
-      semi_contain_view released (rel loc) (views loc ts).
+      semi_joined_view loc ts (views loc ts) (rel loc)
+  .
 
-  (* joined_view *)
-  (*   ((View.singleton_ur loc ts)::(views loc ts)) *)
-  (*   (View.join (View.singleton_ur loc ts) (rel loc)). *)
+      (* semi_contain_view released (rel loc) (views loc ts). *)
+
+                       (* joined_view *)
+                       (*   ((View.singleton_ur loc ts)::(views loc ts)) *)
+                       (*   (View.join (View.singleton_ur loc ts) (rel loc)). *)
 
 End JOINED.
 
@@ -503,6 +548,7 @@ Section STEP.
              exists from,
                (<<CONS: views2 loc ts = (e2.(Thread.local).(Local.tview).(TView.rel) loc)::(views2 loc from)>>)>>))
       (VIEWSWF: wf_views views2)
+      (VIEWSTO: forall loc ts, List.Forall (fun vw => Time.le (View.rlx vw loc) ts) (views2 loc ts))
 
       (MEMORY: joined_memory views2 e2.(Thread.memory))
       (RELEASED: joined_released views2 e2.(Thread.local).(Local.promises) e2.(Thread.local).(Local.tview).(TView.rel))
@@ -667,11 +713,14 @@ Section SIMULATION.
   Proof.
     ii. exploit REL; eauto. i. des.
     destruct (views0 loc ts) eqn:VIEW.
-    - eapply joined_view_nil in IN. subst.
-      exists View.bot. splits; auto. econs.
+    - unfold semi_joined_view in *.
+      eapply joined_view_cons in x. des.
+      + eapply joined_view_nil in JOINEDTL. rewrite JOINEDTL. econs.
+      + eapply joined_view_nil in JOINEDTL. subst.
+        rewrite JOIN. econs; ss; eauto. econs.
     - exploit VIEWSLE; eauto.
       { erewrite VIEW. ss. }
-      i. rewrite x. rewrite VIEW. eauto.
+      i. rewrite x0. rewrite VIEW. eauto.
   Qed.
 
   Require Import SimLocal.
@@ -906,14 +955,16 @@ Section SIMULATION.
         (MEM1_SRC: Memory.closed mem1_src)
         (MEM1_TGT: Memory.closed mem1_tgt)
         (WFVIEWS1: wf_views views1)
-    (* (CONS_TGT: Local.promise_consistent lc1_tgt) *)
+        (CONS_TGT: Local.promise_consistent lc2_tgt)
+        (VIEWSTO: forall loc ts, List.Forall (fun vw => Time.le (View.rlx vw loc) ts) (views1 loc ts))
     :
       exists msg_src views2 kind_src lc2_src mem2_src,
         (<<STEP_SRC: Local.promise_step lc1_src mem1_src loc from to msg_src lc2_src mem2_src kind_src>>) /\
         (<<LOCAL2: sim_local views2 lc2_src lc2_tgt>>) /\
         (<<MEM2: sim_memory mem2_src mem2_tgt>>) /\
         (<<JOINMEM2: joined_memory views2 mem2_src>>) /\
-        (<<WFVIEWS2: wf_views views2>>)
+        (<<WFVIEWS2: wf_views views2>>) /\
+        (<<VIEWSTO: forall loc ts, List.Forall (fun vw => Time.le (View.rlx vw loc) ts) (views2 loc ts)>>)
   .
   Proof.
     inv STEP_TGT. inv PROMISE.
@@ -971,8 +1022,10 @@ Section SIMULATION.
           - i. erewrite Memory.add_o in GET; eauto. unfold views2. des_ifs.
             + ss. des; clarify. exfalso. eapply Time.lt_strorder; eauto.
             + ss. des; clarify. splits; auto.
-              * inv MAX. inv MAXLE. auto.
-              * apply sub_semi_sub_views. i. ss; auto.
+              * inv MAX. econs; ss; auto.
+                eapply max_le_joined_view_joined; eauto.
+              * unfold views. ii. econs; ss; auto.
+                eapply joined_view_exact; ss; auto.
             + ss. des; clarify. exfalso. eauto.
             + eapply COMPLETE; eauto.
           - unfold views2. i. des_ifs.
@@ -985,7 +1038,8 @@ Section SIMULATION.
               eapply List.Forall_impl; try apply CLOSED0. ss.
               i. eapply Memory.add_closed_view; eauto.
             + eapply List.Forall_impl; try apply CLOSED0. ss.
-              i. eapply Memory.add_closed_view; eauto. }
+              i. eapply Memory.add_closed_view; eauto.
+        }
 
         esplits.
         { econs.
@@ -1013,6 +1067,17 @@ Section SIMULATION.
           eapply max_le_joined_opt_view_le; eauto. }
         { assumption. }
         { ii. unfold views2. des_ifs. }
+        { unfold views2. ii. des_ifs. ss. des; clarify. econs; ss.
+          - exploit CONS_TGT.
+            { eapply Memory.add_get0; eauto. }
+            i. ss. left. eapply TimeFacts.le_lt_lt; eauto.
+            inv LOCAL1. inv TVIEW. ss. specialize (REL0 loc). inv REL0.
+            etrans; eauto. inv WF1_TGT. ss. inv TVIEW_WF.
+            specialize (REL_CUR loc). inv REL_CUR. ss.
+          - eapply List.Forall_impl; cycle 1.
+            * eapply VIEWSTO.
+            * ss. i. etrans; eauto. left. auto.
+        }
       }
       {
         hexploit (@Memory.add_exists mem1_src loc from to Message.reserve); auto.
@@ -1044,6 +1109,7 @@ Section SIMULATION.
             eapply Memory.add_get1 in GET; eauto.
           - i. eapply List.Forall_impl; try apply CLOSED0. ss.
             i. eapply Memory.add_closed_view; eauto. }
+        { auto. }
         { auto. }
       }
     }
@@ -1084,24 +1150,13 @@ Section SIMULATION.
       { inv JOINMEM1. econs.
         - i. erewrite Memory.split_o in GET; eauto. unfold views2. des_ifs.
           + ss. des; clarify. exfalso. eapply Time.lt_strorder; eauto.
-          + ss. des; clarify. splits.
-            * inv MAX. eapply max_le_joined_view_joined; eauto.
-            * eapply sub_semi_sub_views. ii; ss; auto.
+          + ss. des; clarify. splits; auto.
+            * inv MAX. econs; ss; auto.
+              eapply max_le_joined_view_joined; eauto.
+            * unfold views. ii. econs; ss; auto.
+              eapply joined_view_exact; ss; auto.
           + ss. des; clarify. exploit COMPLETE; eauto. i. des. splits; auto.
-
-            unfold views. ii. ss; des; auto. subst.
-
-            exploit INCL; eauto.
-
-
-
-            ii.
-
-            ii. exploit INCL.
-
-            i. des; auto. subst. inv LOCAL1.
-
-            hexploit PROMISES0; eauto.
+            ii; ss. des; auto. subst. inv LOCAL1. exploit REL; eauto.
           + ss. des; clarify. exfalso.
             hexploit Memory.get_disjoint.
             { eapply GETMEMSRC. }
@@ -1154,7 +1209,12 @@ Section SIMULATION.
             inv PROMISES0; eauto.
         - ss. ii. erewrite (@Memory.split_o prom2_src) in *; eauto. unfold views2.
           des_ifs; eauto.
-          + ss. des; clarify. auto.
+          + ss. des; clarify. unfold views.
+
+
+
+            admit.
+
           + ss. des; clarify. eapply REL; eauto. }
       { eapply sim_memory_split; cycle 1; eauto. econs.
         eapply max_le_joined_opt_view_le; eauto. }
