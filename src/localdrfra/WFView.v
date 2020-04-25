@@ -1430,9 +1430,6 @@ Section SIMULATION.
         exploit NONSYNCH; eauto. ss.
    }
 
-   assert (RELEASED_JOINED:
-             semi_joined_view loc ts (
-
     assert (SIMMSG: sim_message (Message.concrete val released_src) (Message.concrete val released_tgt)).
     { econs; eauto. inv STEP_TGT. inv LOCAL1. inv WF1_TGT.
       eapply TViewFacts.write_released_mon; eauto. }
@@ -1494,7 +1491,37 @@ Section SIMULATION.
             destruct (loc_ts_eq_dec (loc, from0) (loc, to)).
             { ss. des; subst. exfalso. eapply Time.lt_strorder; eauto. }
             ss. des; ss. splits.
+
+            - unfold TView.write_released in released_src.
+              unfold released_src in H2.
+              destruct (Ordering.le Ordering.relaxed ord_src) eqn:ORDSRC; inv H2.
+              eapply semi_joined_view_join.
+
+              + dup RELM_JOINED. inv RELM_JOINED; ss; eauto.
+                * econs; ss; auto. eapply
+
+                  admit.
+                * eapply semi_joined_view_bot.
+
+                  s.
+
+                admit.
+
+              + econs; ss; auto. eapply joined_view_exact. ss. auto.
+
             -
+
+                eapply semi_joined_
+
+                     econs.
+
+
+
+    set (released_src := (TView.write_released (Local.tview lc1_src) sc1_src loc to releasedm_src ord_src)).
+    exists released_src.
+    set (write_tview := TView.write_tview (Local.tview lc1_src) sc1_src loc to ord_src).
+
+              unfold views.
 
 
 
