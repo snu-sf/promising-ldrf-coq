@@ -208,10 +208,10 @@ Section JOINED.
       (CLOSED: forall loc ts, List.Forall (fun vw => Memory.closed_view vw mem) (views loc ts))
   .
 
-  Lemma joined_view_closed_aux
-        views view mem loc ts
-        (MEM: joined_memory views mem)
-        (JOINED: joined_view (views loc ts) view)
+  Lemma joined_view_closed
+        views view mem
+        (MEM: List.Forall (fun vw => Memory.closed_view vw mem) views)
+        (JOINED: joined_view views view)
         (INHABITED: Memory.inhabited mem)
     :
       Memory.closed_view view mem.
@@ -219,41 +219,54 @@ Section JOINED.
     ginduction JOINED; eauto.
     - i. eapply Memory.closed_view_bot; auto.
     - i. eapply Memory.join_closed_view; eauto.
-      inv MEM. eapply List.Forall_forall in VIEW; [|eauto]. ss.
+      eapply List.Forall_forall in VIEW; [|eauto]. ss.
   Qed.
 
-  Lemma joined_view_closed
-        views view mem loc from ts rel
-        (JOINED: joined_view ((View.join rel (View.singleton_ur loc ts))::(views loc from)) view)
+  Lemma joined_memory_get_closed
+        views mem loc to from msg
         (MEM: joined_memory views mem)
-        (RELEASE: Memory.closed_view rel mem)
+        (GET: Memory.get loc to mem = Some (from, msg))
         (INHABITED: Memory.inhabited mem)
-        val released
-        (CLOSED: Memory.get loc ts mem = Some (from, (Message.concrete val released)))
     :
-      Memory.closed_view view mem.
+      Memory.closed_message msg mem.
   Proof.
-    apply joined_view_cons in JOINED. des.
-    - eapply joined_view_closed_aux; eauto.
-    - subst. eapply Memory.join_closed_view.
-      + eapply Memory.join_closed_view; eauto.
-        eapply Memory.singleton_ur_closed_view; eauto.
-      + eapply joined_view_closed_aux; eauto.
+    inv MEM. destruct msg as [val [released|]|]; eauto. econs. econs.
+    exploit COMPLETE; eauto. i. des.
+    eapply joined_view_closed; eauto.
   Qed.
 
-  Lemma joined_opt_view_closed
-        views view mem loc from ts rel
-        (JOINED: joined_opt_view ((View.join rel (View.singleton_ur loc ts))::(views loc from)) view)
-        (MEM: joined_memory views mem)
-        (RELEASE: Memory.closed_view rel mem)
-        (INHABITED: Memory.inhabited mem)
-        val released
-        (CLOSED: Memory.get loc ts mem = Some (from, (Message.concrete val released)))
-    :
-      Memory.closed_opt_view view mem.
-  Proof.
-    inv JOINED; econs. eapply joined_view_closed; eauto.
-  Qed.
+  (* Lemma joined_view_closed *)
+  (*       views view mem loc from ts rel *)
+  (*       (JOINED: joined_view ((View.join rel (View.singleton_ur loc ts))::(views loc from)) view) *)
+  (*       (MEM: joined_memory views mem) *)
+  (*       (RELEASE: Memory.closed_view rel mem) *)
+  (*       (INHABITED: Memory.inhabited mem) *)
+  (*       val released *)
+  (*       (CLOSED: Memory.get loc ts mem = Some (from, (Message.concrete val released))) *)
+  (*   : *)
+  (*     Memory.closed_view view mem. *)
+  (* Proof. *)
+  (*   apply joined_view_cons in JOINED. des. *)
+  (*   - eapply joined_view_closed_aux; eauto. *)
+  (*   - subst. eapply Memory.join_closed_view. *)
+  (*     + eapply Memory.join_closed_view; eauto. *)
+  (*       eapply Memory.singleton_ur_closed_view; eauto. *)
+  (*     + eapply joined_view_closed_aux; eauto. *)
+  (* Qed. *)
+
+  (* Lemma joined_opt_view_closed *)
+  (*       views view mem loc from ts rel *)
+  (*       (JOINED: joined_opt_view ((View.join rel (View.singleton_ur loc ts))::(views loc from)) view) *)
+  (*       (MEM: joined_memory views mem) *)
+  (*       (RELEASE: Memory.closed_view rel mem) *)
+  (*       (INHABITED: Memory.inhabited mem) *)
+  (*       val released *)
+  (*       (CLOSED: Memory.get loc ts mem = Some (from, (Message.concrete val released))) *)
+  (*   : *)
+  (*     Memory.closed_opt_view view mem. *)
+  (* Proof. *)
+  (*   inv JOINED; econs. eapply joined_view_closed; eauto. *)
+  (* Qed. *)
 
   Record max_le_joined_view
          (views: list View.t)
@@ -470,7 +483,8 @@ Section JOINED.
              (rel: Loc.t -> View.t): Prop :=
     forall loc ts from val released
            (GET: Memory.get loc ts prom = Some (from, Message.concrete val (Some released))),
-      joined_view (views loc ts) (View.join (rel loc) (View.singleton_ur loc ts))
+      List.In (View.join (rel loc) (View.singleton_ur loc ts)) (views loc ts)
+  (* joined_view (views loc ts) (View.join (rel loc) (View.singleton_ur loc ts)) *)
   .
 
 End JOINED.
@@ -667,11 +681,10 @@ Section SIMULATION.
       joined_released views1 prom rel.
   Proof.
     ii. exploit REL; eauto. i. des.
-    destruct (views0 loc ts) eqn:VIEW.
-    - eapply joined_view_incl; eauto. i. ss.
-    - exploit VIEWSLE; eauto.
-      { erewrite VIEW. ss. }
-      i. rewrite x0. rewrite VIEW. eauto.
+    destruct (views0 loc ts) eqn:VIEW; ss.
+    exploit VIEWSLE; eauto.
+    { erewrite VIEW. ss. }
+    i. rewrite x0. rewrite VIEW. eauto.
   Qed.
 
   Require Import SimLocal.
@@ -907,15 +920,13 @@ Section SIMULATION.
         (MEM1_TGT: Memory.closed mem1_tgt)
         (WFVIEWS1: wf_views views1)
         (CONS_TGT: Local.promise_consistent lc2_tgt)
-        (VIEWSTO: forall loc ts, List.Forall (fun vw => Time.le (View.rlx vw loc) ts) (views1 loc ts))
     :
       exists msg_src views2 kind_src lc2_src mem2_src,
         (<<STEP_SRC: Local.promise_step lc1_src mem1_src loc from to msg_src lc2_src mem2_src kind_src>>) /\
         (<<LOCAL2: sim_local views2 lc2_src lc2_tgt>>) /\
         (<<MEM2: sim_memory mem2_src mem2_tgt>>) /\
         (<<JOINMEM2: joined_memory views2 mem2_src>>) /\
-        (<<WFVIEWS2: wf_views views2>>) /\
-        (<<VIEWSTO: forall loc ts, List.Forall (fun vw => Time.le (View.rlx vw loc) ts) (views2 loc ts)>>)
+        (<<WFVIEWS2: wf_views views2>>)
   .
   Proof.
     inv STEP_TGT. inv PROMISE.
@@ -1002,21 +1013,9 @@ Section SIMULATION.
           - econs; eauto.
             eapply sim_message_to; eauto.
             eapply max_le_joined_message_le. econs; eauto.
-          - econs.
-            inv MAX; econs. inv MAXLE.
-            eapply joined_view_closed; try apply max_le_joined_view_joined0; eauto.
-            + unfold views in *. eapply max_le_joined_view_joined0.
-
-            ; eauto.
-            +
-
-              unfold views in MAX.
-
-              instantiate (1:=to). instantiate (1:=loc).
-              eapply max_le_joined_opt_view_joined; eauto.
-              unfold views2. des_ifs; ss; des; clarify. eauto.
-            + inv MEM1_SRC. eapply Memory.add_inhabited; eauto.
+          - eapply joined_memory_get_closed; eauto.
             + eapply Memory.add_get0; eauto.
+            + inv MEM1_SRC. eapply Memory.add_inhabited; eauto.
           - ss.
         }
         { inv LOCAL1. econs; eauto.
@@ -1026,23 +1025,11 @@ Section SIMULATION.
             ss. des; clarify. econs; eauto. ss.
           - ss. ii. unfold views2.
             erewrite (@Memory.add_o prom2_src) in *; eauto. des_ifs; eauto.
-            ss. des; clarify. econs; ss; auto.
-            eapply joined_view_exact; ss. auto. }
+            ss. des; clarify. auto. }
         { eapply sim_memory_add; cycle 1; eauto. econs.
           eapply max_le_joined_opt_view_le; eauto. }
         { assumption. }
         { ii. unfold views2. des_ifs. }
-        { unfold views2. ii. des_ifs. ss. des; clarify. econs; ss.
-          - exploit CONS_TGT.
-            { eapply Memory.add_get0; eauto. }
-            i. ss. left. eapply TimeFacts.le_lt_lt; eauto.
-            inv LOCAL1. inv TVIEW. ss. specialize (REL0 loc). inv REL0.
-            etrans; eauto. inv WF1_TGT. ss. inv TVIEW_WF.
-            specialize (REL_CUR loc). inv REL_CUR. ss.
-          - eapply List.Forall_impl; cycle 1.
-            * eapply VIEWSTO.
-            * ss. i. etrans; eauto. left. auto.
-        }
       }
 
       (* add reserve *)
@@ -1077,15 +1064,18 @@ Section SIMULATION.
           - i. eapply List.Forall_impl; try apply CLOSED0. ss.
             i. eapply Memory.add_closed_view; eauto. }
         { auto. }
-        { auto. }
       }
     }
 
     (* split *)
     { hexploit split_succeed_wf; try apply PROMISES; eauto. i. des. subst.
 
-      set (views :=(lc1_src.(Local.tview).(TView.rel) loc)
+      set (views :=(View.join (lc1_src.(Local.tview).(TView.rel) loc)
+                              (View.singleton_ur loc to))
                      ::(views1 loc from)).
+      assert (VIEWWF: View.wf (View.join (TView.rel (Local.tview lc1_src) loc) (View.singleton_ur loc to))).
+      { inv WF1_SRC. inv TVIEW_WF.
+        eapply View.join_wf; eauto. eapply View.singleton_ur_wf. }
       assert (VIEWSWF: List.Forall View.wf views).
       { unfold views. econs.
         { inv WF1_SRC. inv TVIEW_WF. ss. }
@@ -1094,8 +1084,8 @@ Section SIMULATION.
       set (views2 := fun l t => if (loc_ts_eq_dec (l, t) (loc, to))
                                 then views
                                 else views1 l t).
-      hexploit (@max_le_joined_opt_view_exists ((View.singleton_ur loc to)::views) released').
-      { econs; auto. eapply View.singleton_ur_wf. } i. des.
+      hexploit (@max_le_joined_opt_view_exists views released').
+      { econs; auto. } i. des.
 
       assert (exists msg3_src,
                  (<<GETSRC: Memory.get loc ts3 lc1_src.(Local.promises) = Some (from, msg3_src)>>) /\
@@ -1114,17 +1104,24 @@ Section SIMULATION.
       { inv WF1_SRC. auto. }
       intros [mem2_src MEM_SRC].
 
+      assert (MSGCLOSED: Memory.closed_view (View.join (TView.rel (Local.tview lc1_src) loc) (View.singleton_ur loc to))
+                                            mem2_src).
+      { inv WF1_SRC. inv TVIEW_CLOSED.
+        eapply Memory.join_closed_view.
+        - eapply Memory.split_closed_view; eauto.
+        - eapply Memory.singleton_ur_closed_view.
+          + eapply Memory.split_get0 in MEM_SRC. des. eauto.
+          + inv MEM1_SRC. eapply Memory.split_inhabited; eauto. }
+
       assert (JOINMEM2: joined_memory views2 mem2_src).
       { inv JOINMEM1. econs.
         - i. erewrite Memory.split_o in GET; eauto. unfold views2. des_ifs.
           + ss. des; clarify. exfalso. eapply Time.lt_strorder; eauto.
           + ss. des; clarify. splits; auto.
-            * inv MAX. econs; ss; auto.
-              eapply max_le_joined_view_joined; eauto.
-            * unfold views. ii. econs; ss; auto.
-              eapply joined_view_exact; ss; auto.
+            inv MAX. eapply max_le_joined_view_joined; eauto.
           + ss. des; clarify. exploit COMPLETE; eauto. i. des. splits; auto.
-            ii; ss. des; auto. subst. inv LOCAL1. exploit REL; eauto.
+            ii; ss. des; auto. subst. inv LOCAL1. exploit REL; eauto. ss.
+            i.
           + ss. des; clarify. exfalso.
             hexploit Memory.get_disjoint.
             { eapply GETMEMSRC. }
