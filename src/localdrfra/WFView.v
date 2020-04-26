@@ -185,46 +185,6 @@ Section JOINED.
     ii. eapply contain_semi_contain_view; eauto.
   Qed.
 
-  Definition semi_joined_view (loc: Loc.t) (ts: Time.t)
-             (views: list View.t) (view: View.t): Prop :=
-    joined_view
-      ((View.singleton_ur loc ts)::views)
-      (View.join (View.singleton_ur loc ts) view)
-  .
-
-  Lemma semi_joined_view_bot loc ts views
-    :
-      semi_joined_view loc ts views View.bot.
-  Proof.
-    econs; ss; eauto.
-  Qed.
-
-  Lemma semi_joined_view_join loc ts views view0 view1
-        (JOINED0: semi_joined_view loc ts views view0)
-        (JOINED1: semi_joined_view loc ts views view1)
-    :
-      semi_joined_view loc ts views (View.join view0 view1).
-  Proof.
-    unfold semi_joined_view in *.
-    exploit joined_view_join; [apply JOINED0|apply JOINED1|].
-    intros JOINED.
-    replace (View.join (View.singleton_ur loc ts) (View.join view0 view1)) with
-        (View.join (View.join (View.singleton_ur loc ts) view0)
-                   (View.join (View.singleton_ur loc ts) view1)); auto.
-    erewrite (@View.join_comm (View.singleton_ur loc ts) view1).
-    erewrite View.join_assoc.
-    erewrite View.le_join_r; cycle 1.
-    { erewrite <- View.join_assoc. eapply View.join_r. }
-    erewrite <- View.join_assoc. eapply View.join_comm.
-  Qed.
-
-  Definition semi_incl_views (loc: Loc.t) (ts: Time.t)
-             (views0 views1: list View.t): Prop :=
-    forall vw
-           (IN: List.In vw views0),
-      semi_joined_view loc ts views1 vw
-  .
-
   Inductive joined_memory
             (views: Loc.t -> Time.t -> list View.t)
             (mem: Memory.t): Prop :=
@@ -237,11 +197,10 @@ Section JOINED.
 
           (* (<<JOINED: joined_view ((View.singleton_ur loc ts)::(views loc ts)) released>>) /\ *)
 
-          (<<JOINED: semi_joined_view loc ts (views loc ts) released>>) /\
+          (<<JOINED: joined_view (views loc ts) released>>) /\
 
-          (<<INCL: semi_incl_views loc ts (views loc from) (views loc ts)>>)
-      (* (<<INCL: forall view (IN: List.In view (views loc from)), *)
-      (*     List.In view (views loc ts)>>) *)
+          (<<INCL: forall view (IN: List.In view (views loc from)),
+              List.In view (views loc ts)>>)
       )
       (ONLY: forall loc ts (SOME: views loc ts <> []),
           exists from val released,
@@ -264,9 +223,10 @@ Section JOINED.
   Qed.
 
   Lemma joined_view_closed
-        views view mem loc ts
+        views view mem loc ts rel
+        (JOINED: joined_view ((View.join rel (View.singleton_ur loc ts))::(views loc ts)) view)
         (MEM: joined_memory views mem)
-        (JOINED: joined_view ((View.singleton_ur loc ts)::(views loc ts)) view)
+        (RELEASE: Memory.closed_view rel mem)
         (INHABITED: Memory.inhabited mem)
         from val released
         (CLOSED: Memory.get loc ts mem = Some (from, (Message.concrete val released)))
@@ -276,14 +236,16 @@ Section JOINED.
     apply joined_view_cons in JOINED. des.
     - eapply joined_view_closed_aux; eauto.
     - subst. eapply Memory.join_closed_view.
-      + eapply Memory.singleton_ur_closed_view; eauto.
+      + eapply Memory.join_closed_view; eauto.
+        eapply Memory.singleton_ur_closed_view; eauto.
       + eapply joined_view_closed_aux; eauto.
   Qed.
 
   Lemma joined_opt_view_closed
-        views view mem loc ts
+        views view mem loc ts rel
+        (JOINED: joined_opt_view ((View.join rel (View.singleton_ur loc ts))::(views loc ts)) view)
         (MEM: joined_memory views mem)
-        (JOINED: joined_opt_view ((View.singleton_ur loc ts)::(views loc ts)) view)
+        (RELEASE: Memory.closed_view rel mem)
         (INHABITED: Memory.inhabited mem)
         from val released
         (CLOSED: Memory.get loc ts mem = Some (from, (Message.concrete val released)))
@@ -508,14 +470,8 @@ Section JOINED.
              (rel: Loc.t -> View.t): Prop :=
     forall loc ts from val released
            (GET: Memory.get loc ts prom = Some (from, Message.concrete val (Some released))),
-      semi_joined_view loc ts (views loc ts) (rel loc)
+      joined_view (views loc ts) (View.join (rel loc) (View.singleton_ur loc ts))
   .
-
-      (* semi_contain_view released (rel loc) (views loc ts). *)
-
-                       (* joined_view *)
-                       (*   ((View.singleton_ur loc ts)::(views loc ts)) *)
-                       (*   (View.join (View.singleton_ur loc ts) (rel loc)). *)
 
 End JOINED.
 
@@ -665,7 +621,7 @@ Section SIMULATION.
   : forall (msg_src msg_tgt: option (Time.t * Message.t)), Prop :=
   | joined_promise_content_concrete
       from val released_src released_tgt
-      (RELEASED: max_le_joined_opt_view ((View.singleton_ur loc ts)::views) released_tgt released_src)
+      (RELEASED: max_le_joined_opt_view views released_tgt released_src)
       (NIL: views <> [])
     :
       joined_promise_content
@@ -713,11 +669,7 @@ Section SIMULATION.
   Proof.
     ii. exploit REL; eauto. i. des.
     destruct (views0 loc ts) eqn:VIEW.
-    - unfold semi_joined_view in *.
-      eapply joined_view_cons in x. des.
-      + eapply joined_view_nil in JOINEDTL. rewrite JOINEDTL. econs.
-      + eapply joined_view_nil in JOINEDTL. subst.
-        rewrite JOIN. econs; ss; eauto. econs.
+    - eapply joined_view_incl; eauto. i. ss.
     - exploit VIEWSLE; eauto.
       { erewrite VIEW. ss. }
       i. rewrite x0. rewrite VIEW. eauto.
@@ -994,18 +946,18 @@ Section SIMULATION.
           { etrans; eauto. econs. ss. }
         }
 
-        set (views :=(lc1_src.(Local.tview).(TView.rel) loc)
-                       ::(views1 loc from)).
+        set (views := (View.join (lc1_src.(Local.tview).(TView.rel) loc) (View.singleton_ur loc to))
+                        ::(views1 loc from)).
+        assert (VIEWWF: View.wf (View.join (TView.rel (Local.tview lc1_src) loc) (View.singleton_ur loc to))).
+        { inv WF1_SRC. inv TVIEW_WF.
+          eapply View.join_wf; eauto. eapply View.singleton_ur_wf. }
         assert (VIEWSWF: List.Forall View.wf views).
-        { unfold views. econs.
-          { inv WF1_SRC. inv TVIEW_WF. ss. }
-          eauto.
-        }
+        { unfold views. econs; eauto. }
         set (views2 := fun l t => if (loc_ts_eq_dec (l, t) (loc, to))
                                   then views
                                   else views1 l t).
-        hexploit (@max_le_joined_opt_view_exists ((View.singleton_ur loc to)::views) released_tgt).
-        { econs; auto. eapply View.singleton_ur_wf. } i. des.
+        hexploit (@max_le_joined_opt_view_exists views released_tgt).
+        { econs; auto. } i. des.
 
         hexploit (@Memory.add_exists mem1_src loc from to (Message.concrete val max)); auto.
         { ii. inv MEM1. hexploit (proj1 (COVER loc x)).
@@ -1023,10 +975,7 @@ Section SIMULATION.
           - i. erewrite Memory.add_o in GET; eauto. unfold views2. des_ifs.
             + ss. des; clarify. exfalso. eapply Time.lt_strorder; eauto.
             + ss. des; clarify. splits; auto.
-              * inv MAX. econs; ss; auto.
-                eapply max_le_joined_view_joined; eauto.
-              * unfold views. ii. econs; ss; auto.
-                eapply joined_view_exact; ss; auto.
+              inv MAX. eapply max_le_joined_view_joined; eauto.
             + ss. des; clarify. exfalso. eauto.
             + eapply COMPLETE; eauto.
           - unfold views2. i. des_ifs.
