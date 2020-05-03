@@ -55,6 +55,31 @@ Proof.
   - apply timemap_join_idempotent.
 Qed.
 
+Lemma view_join_dist vw0 vw1 vw2
+  :
+    View.join vw0 (View.join vw1 vw2) = View.join (View.join vw0 vw1) (View.join vw0 vw2).
+Proof.
+  erewrite <- (@view_join_idempotent vw0) at 1.
+  erewrite View.join_assoc. erewrite View.join_assoc. f_equal.
+  erewrite <- View.join_assoc. erewrite <- View.join_assoc. f_equal.
+  eapply View.join_comm.
+Qed.
+
+Lemma singleton_ur_join loc ts0 ts1
+  :
+    View.join (View.singleton_ur loc ts0) (View.singleton_ur loc ts1)
+    =
+    View.singleton_ur loc (Time.join ts0 ts1).
+Proof.
+  unfold Time.join. des_ifs.
+  - eapply View.le_join_r. eapply View.singleton_ur_spec.
+    + eapply View.singleton_ur_wf.
+    + ss. unfold TimeMap.singleton. setoid_rewrite LocFun.add_spec_eq. auto.
+  - eapply View.le_join_l. eapply View.singleton_ur_spec.
+    + eapply View.singleton_ur_wf.
+    + ss. unfold TimeMap.singleton. setoid_rewrite LocFun.add_spec_eq. left. auto.
+Qed.
+
 Section JOINED.
 
   Definition views_le
@@ -155,47 +180,12 @@ Section JOINED.
   .
   Hint Constructors joined_view.
 
-  Definition semi_contain_view (view: View.t) (vw0: View.t) (views1: list View.t): Prop :=
-    forall (VIEWLE: View.le vw0 view),
-    exists vw1,
-      (<<IN: joined_view views1 vw1>>) /\
-      (<<VIEWLE0: View.le vw0 vw1>>) /\
-      (<<VIEWLE1: View.le vw1 view>>).
-
-  Definition semi_sub_views (view: View.t) (views0 views1: list View.t): Prop :=
-    forall vw0
-           (IN: List.In vw0 views0),
-      semi_contain_view view vw0 views1.
-
-  Lemma contain_semi_contain_view view vw0 views1
-        (IN: List.In vw0 views1)
-    :
-      semi_contain_view view vw0 views1.
-  Proof.
-    ii. exists vw0. splits; auto.
-    - apply joined_view_exact; eauto.
-    - refl.
-  Qed.
-
-  Lemma sub_semi_sub_views view views0 views1
-        (INCL: forall vw (IN: List.In vw views0), List.In vw views1)
-    :
-      semi_sub_views view views0 views1.
-  Proof.
-    ii. eapply contain_semi_contain_view; eauto.
-  Qed.
-
   Inductive joined_memory
             (views: Loc.t -> Time.t -> list View.t)
             (mem: Memory.t): Prop :=
   | joined_memory_intro
       (COMPLETE: forall loc ts from val released
                         (GET: Memory.get loc ts mem = Some (from, Message.concrete val (Some released))),
-
-          (* (<<SINGLETON: joined_view (views loc ts) (View.singleton_ur loc ts)>>) /\ *)
-          (* (<<JOINED: joined_view (views loc ts) released>>) /\ *)
-
-          (* (<<JOINED: joined_view ((View.singleton_ur loc ts)::(views loc ts)) released>>) /\ *)
 
           (<<JOINED: joined_view (views loc ts) released>>) /\
 
@@ -234,39 +224,6 @@ Section JOINED.
     exploit COMPLETE; eauto. i. des.
     eapply joined_view_closed; eauto.
   Qed.
-
-  (* Lemma joined_view_closed *)
-  (*       views view mem loc from ts rel *)
-  (*       (JOINED: joined_view ((View.join rel (View.singleton_ur loc ts))::(views loc from)) view) *)
-  (*       (MEM: joined_memory views mem) *)
-  (*       (RELEASE: Memory.closed_view rel mem) *)
-  (*       (INHABITED: Memory.inhabited mem) *)
-  (*       val released *)
-  (*       (CLOSED: Memory.get loc ts mem = Some (from, (Message.concrete val released))) *)
-  (*   : *)
-  (*     Memory.closed_view view mem. *)
-  (* Proof. *)
-  (*   apply joined_view_cons in JOINED. des. *)
-  (*   - eapply joined_view_closed_aux; eauto. *)
-  (*   - subst. eapply Memory.join_closed_view. *)
-  (*     + eapply Memory.join_closed_view; eauto. *)
-  (*       eapply Memory.singleton_ur_closed_view; eauto. *)
-  (*     + eapply joined_view_closed_aux; eauto. *)
-  (* Qed. *)
-
-  (* Lemma joined_opt_view_closed *)
-  (*       views view mem loc from ts rel *)
-  (*       (JOINED: joined_opt_view ((View.join rel (View.singleton_ur loc ts))::(views loc from)) view) *)
-  (*       (MEM: joined_memory views mem) *)
-  (*       (RELEASE: Memory.closed_view rel mem) *)
-  (*       (INHABITED: Memory.inhabited mem) *)
-  (*       val released *)
-  (*       (CLOSED: Memory.get loc ts mem = Some (from, (Message.concrete val released))) *)
-  (*   : *)
-  (*     Memory.closed_opt_view view mem. *)
-  (* Proof. *)
-  (*   inv JOINED; econs. eapply joined_view_closed; eauto. *)
-  (* Qed. *)
 
   Record max_le_joined_view
          (views: list View.t)
@@ -441,42 +398,6 @@ Section JOINED.
     inv MAX; eauto. inv MAXLE; eauto. inv MAXLE0; eauto.
   Qed.
 
-  Lemma joined_view_sub views0 views1 view
-        (VIEWSWF: List.Forall View.wf views1)
-        (JOINED: joined_view views0 view)
-        (INCL: semi_sub_views view views0 views1)
-    :
-      joined_view views1 view.
-  Proof.
-    unfold semi_sub_views in *.
-    hexploit (@max_le_joined_view_exists views1 view); auto. i. des.
-    assert (JOINED1: joined_view views1 max).
-    { eapply max_le_joined_view_joined; eauto. }
-    replace view with (View.join max view); cycle 1.
-    { apply View.le_join_r.
-      eapply max_le_joined_view_le; eauto. }
-    assert (INCL1: forall vw0
-                          (VIEWLE: View.le vw0 view)
-                          (IN: List.In vw0 views0),
-               exists vw1,
-                 (<<IN: joined_view views1 vw1>>) /\
-                 (<<VIEWLE0: View.le vw0 vw1>>) /\
-                 (<<VIEWLE1: View.le vw1 max>>)).
-    { i. exploit INCL; eauto. i. des. esplits; eauto.
-      eapply max_le_joined_view_max; eauto. } clear INCL.
-    clear MAX. ginduction JOINED; ss; i.
-    - erewrite View.join_bot_r. auto.
-    - exploit IHJOINED; eauto.
-      { i. exploit INCL1; eauto. etrans; eauto. eapply View.join_r. }
-      i. erewrite (@View.join_comm vw0 vw1).
-      erewrite <- View.join_assoc.
-      erewrite (View.join_comm).
-      rewrite View.le_join_r; eauto.
-      hexploit (INCL1 vw0); eauto.
-      { eapply View.join_l. } i. des.
-      etrans; eauto. etrans; eauto. eapply View.join_l.
-  Qed.
-
   Definition joined_released
              (views: Loc.t -> Time.t -> list View.t)
              (prom: Memory.t)
@@ -484,16 +405,83 @@ Section JOINED.
     forall loc ts from val released
            (GET: Memory.get loc ts prom = Some (from, Message.concrete val (Some released))),
       List.In (View.join (rel loc) (View.singleton_ur loc ts)) (views loc ts)
-  (* joined_view (views loc ts) (View.join (rel loc) (View.singleton_ur loc ts)) *)
   .
+
+  Lemma joined_released_le
+        prom rel views0 views1
+        (REL: joined_released views0 prom rel)
+        (VIEWSLE: views_le views0 views1)
+    :
+      joined_released views1 prom rel.
+  Proof.
+    ii. exploit REL; eauto. i. des.
+    destruct (views0 loc ts) eqn:VIEW; ss.
+    exploit VIEWSLE; eauto.
+    { erewrite VIEW. ss. }
+    i. rewrite x0. rewrite VIEW. eauto.
+  Qed.
+
+  Definition all_join_views (view: View.t) (views: list View.t) :=
+    List.map (fun vw => View.join vw view) views.
+
+  Lemma all_join_views_in view views
+        vw
+        (IN: List.In vw views)
+    :
+      List.In (View.join vw view) (all_join_views view views).
+  Proof.
+    eapply List.in_map with (f:= fun vw => View.join vw view) in IN. ss.
+  Qed.
+
+  Lemma all_join_views_in_iff view views
+        vw
+        (IN: List.In vw (all_join_views view views))
+    :
+      exists vw',
+        (<<IN: List.In vw' views>>) /\
+        (<<VIEW: vw = View.join vw' view>>)
+  .
+  Proof.
+    eapply List.in_map_iff in IN; eauto. des. subst. eauto.
+  Qed.
+
+  Lemma all_join_views_wf view views
+        (VIEWWF: View.wf view)
+        (VIEWSWF: List.Forall View.wf views)
+    :
+      List.Forall View.wf (all_join_views view views).
+  Proof.
+    ginduction views; eauto. i. ss. inv VIEWSWF. econs; eauto.
+    eapply View.join_wf; eauto.
+  Qed.
+
+  Lemma all_join_views_closed view views mem
+        (VIEWCLOSED: Memory.closed_view view mem)
+        (VIEWSCLOSED: List.Forall (fun vw => Memory.closed_view vw mem) views)
+    :
+      List.Forall (fun vw => Memory.closed_view vw mem) (all_join_views view views).
+  Proof.
+    ginduction views; eauto. i. ss. inv VIEWSCLOSED. econs; eauto.
+    eapply Memory.join_closed_view; eauto.
+  Qed.
+
+  Lemma all_join_views_joined view views vw
+        (JOINED: joined_view views vw)
+    :
+      (<<BOT: vw = View.bot>>) \/
+      (<<JOINED: joined_view (all_join_views view views) (View.join view vw)>>).
+  Proof.
+    ginduction JOINED; i; auto. hexploit IHJOINED; eauto. i. des.
+    - subst. erewrite View.join_bot_r. right. erewrite View.join_comm.
+      eapply joined_view_exact. eapply all_join_views_in; eauto.
+    - right. erewrite view_join_dist. eapply joined_view_join; eauto.
+      eapply joined_view_exact. erewrite View.join_comm. eapply all_join_views_in; eauto.
+  Qed.
 
 End JOINED.
 
 
-Section STEP.
-
-  Definition all_join_views (view: View.t) (views: list View.t) :=
-    List.map (fun vw => View.join vw view) views.
+Module JThread.
 
   Inductive step lang: forall (pf:bool) (e:ThreadEvent.t)
                               (e1 e2:Thread.t lang)
@@ -581,38 +569,155 @@ Section STEP.
       + eauto.
   Qed.
 
-  Inductive configuration_step: forall (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t)
-                                       (views1 views2: Loc.t -> Time.t -> list View.t), Prop :=
-  | configuration_step_intro
+  Lemma step_future lang pf e th0 th1 views0 views1
+        (STEP: @JThread.step lang pf e th0 th1 views0 views1)
+        (WF: Local.wf th0.(Thread.local) th0.(Thread.memory))
+        (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
+        (MEM: Memory.closed th0.(Thread.memory))
+        (REL: joined_released views0 th0.(Thread.local).(Local.promises) th0.(Thread.local).(Local.tview).(TView.rel))
+        (JOINED: joined_memory views0 th0.(Thread.memory))
+        (VIEWS: wf_views views0)
+    :
+      (<<WF: Local.wf th1.(Thread.local) th1.(Thread.memory)>>) /\
+      (<<SC: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory)>>) /\
+      (<<MEM: Memory.closed th1.(Thread.memory)>>)/\
+      (<<REL: joined_released views1 th1.(Thread.local).(Local.promises) th1.(Thread.local).(Local.tview).(TView.rel)>>)/\
+      (<<JOINED: joined_memory views1 th1.(Thread.memory)>>) /\
+      (<<VIEWS: wf_views views1>>) /\
+      (<<TVIEW_FUTURE: TView.le th0.(Thread.local).(Local.tview) th1.(Thread.local).(Local.tview)>>) /\
+      (<<SC_FUTURE: TimeMap.le th0.(Thread.sc) th1.(Thread.sc)>>) /\
+      (<<VIEWS_FUTURE: views_le views0 views1>>)
+  .
+  Proof.
+    inv STEP. exploit Thread.step_future; eauto. i. des. splits; auto.
+    ii. apply NNPP. ii. exploit VIEWSLE; eauto. i. des. ss.
+  Qed.
+
+  Lemma tau_steps_future lang th0 th1 views0 views1
+        (STEPS: @JThread.rtc_tau lang th0 th1 views0 views1)
+        (WF: Local.wf th0.(Thread.local) th0.(Thread.memory))
+        (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
+        (MEM: Memory.closed th0.(Thread.memory))
+        (REL: joined_released views0 th0.(Thread.local).(Local.promises) th0.(Thread.local).(Local.tview).(TView.rel))
+        (JOINED: joined_memory views0 th0.(Thread.memory))
+        (VIEWS: wf_views views0)
+    :
+      (<<WF: Local.wf th1.(Thread.local) th1.(Thread.memory)>>) /\
+      (<<SC: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory)>>) /\
+      (<<MEM: Memory.closed th1.(Thread.memory)>>)/\
+      (<<REL: joined_released views1 th1.(Thread.local).(Local.promises) th1.(Thread.local).(Local.tview).(TView.rel)>>)/\
+      (<<JOINED: joined_memory views1 th1.(Thread.memory)>>) /\
+      (<<VIEWS: wf_views views1>>) /\
+      (<<TVIEW_FUTURE: TView.le th0.(Thread.local).(Local.tview) th1.(Thread.local).(Local.tview)>>) /\
+      (<<SC_FUTURE: TimeMap.le th0.(Thread.sc) th1.(Thread.sc)>>) /\
+      (<<VIEWS_FUTURE: views_le views0 views1>>)
+  .
+  Proof.
+    ginduction STEPS; i.
+    - splits; eauto; try by refl.
+    - exploit step_future; eauto. i. des.
+      exploit IHSTEPS; eauto. i. des. splits; auto; try by (etrans; eauto).
+  Qed.
+
+End JThread.
+
+Module JConfiguration.
+
+  Inductive step: forall (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t)
+                         (views1 views2: Loc.t -> Time.t -> list View.t), Prop :=
+  | step_intro
       pf e tid c1 lang st1 lc1 e2 st3 lc3 sc3 memory3
       views1 views2 views3
       (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
-      (STEPS: rtc_tau (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2 views1 views2)
-      (STEP: step pf e e2 (Thread.mk _ st3 lc3 sc3 memory3) views2 views3)
+      (STEPS: JThread.rtc_tau (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2 views1 views2)
+      (STEP: JThread.step pf e e2 (Thread.mk _ st3 lc3 sc3 memory3) views2 views3)
       (CONSISTENT: forall (NORMAL: e <> ThreadEvent.failure),
-          consistent (Thread.mk _ st3 lc3 sc3 memory3) views3)
+          JThread.consistent (Thread.mk _ st3 lc3 sc3 memory3) views3)
     :
-      configuration_step (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3) views1 views3
+      step (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3) views1 views3
   .
+  Hint Constructors step.
 
   Lemma step_configuration_step e tid c1 c2 views1 views2
-        (STEP: configuration_step e tid c1 c2 views1 views2)
+        (STEP: step e tid c1 c2 views1 views2)
     :
       Configuration.step e tid c1 c2.
   Proof.
     inv STEP. destruct (classic (e0 = ThreadEvent.failure)).
     - subst. ss. econs; try eassumption.
-      + eapply tau_steps_thread_tau_steps; eauto.
-      + eapply step_thread_step; eauto.
+      + eapply JThread.tau_steps_thread_tau_steps; eauto.
+      + eapply JThread.step_thread_step; eauto.
     - econs; try eassumption.
-      + eapply tau_steps_thread_tau_steps; eauto.
-      + eapply step_thread_step; eauto.
-      + eapply consistent_thread_consistent; eauto.
+      + eapply JThread.tau_steps_thread_tau_steps; eauto.
+      + eapply JThread.step_thread_step; eauto.
+      + eapply JThread.consistent_thread_consistent; eauto.
   Qed.
 
-End STEP.
+  Inductive wf (views: Loc.t -> Time.t -> list View.t)
+            (conf:Configuration.t): Prop :=
+  | wf_intro
+      (WF: Configuration.wf conf)
+      (REL: forall tid lang st lc
+                   (TH: IdentMap.find tid conf.(Configuration.threads) = Some (existT _ lang st, lc)),
+          joined_released views lc.(Local.promises) lc.(Local.tview).(TView.rel))
+      (JOINMEM: joined_memory views conf.(Configuration.memory))
+      (VIEWS: wf_views views)
+  .
 
-Section SIMULATION.
+  Definition init_views: Loc.t -> Time.t -> list View.t :=
+    fun _ ts => if (Time.eq_dec Time.bot ts) then [View.bot] else [].
+
+  Lemma init_wf syn: wf init_views (Configuration.init syn).
+  Proof.
+    econs.
+    - eapply Configuration.init_wf.
+    - i. ss. unfold Threads.init in TH.
+      erewrite IdentMap.Facts.map_o in TH.
+      unfold option_map in TH. des_ifs. ss.
+      ii. erewrite Memory.bot_get in GET. clarify.
+    - ss. econs.
+      + ii. splits; auto.
+        * unfold Memory.init in *. setoid_rewrite Cell.init_get in GET. des_ifs.
+        * i. unfold init_views in *. des_ifs. ss. des; auto.
+          subst. unfold Memory.init in *. setoid_rewrite Cell.init_get in GET. des_ifs.
+      + i. unfold init_views in *. des_ifs.
+        hexploit Memory.init_closed. intros []. eauto.
+      + ii. unfold init_views. des_ifs. econs; eauto.
+        hexploit TView.bot_closed. intros []. auto.
+    - ii. unfold init_views. des_ifs. econs; eauto. eapply View.bot_wf.
+  Qed.
+
+  Lemma step_future
+        e tid c1 c2 views1 views2
+        (STEP: step e tid c1 c2 views1 views2)
+        (WF1: wf views1 c1)
+    :
+      (<<WF2: wf views2 c2>>) /\
+      (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
+      (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
+      (<<VIEWS_FUTURE: views_le views1 views2>>)
+  .
+  Proof.
+    inv WF1.
+    dup STEP. exploit Configuration.step_future; eauto.
+    { eapply step_configuration_step; eauto. }
+    i. des.
+    inv STEP0. inv WF. ss.
+    hexploit JThread.tau_steps_future; try apply STEPS; ss; eauto.
+    { inv WF0. eapply THREADS in TID. ss. }
+    i. des.
+    hexploit JThread.step_future; eauto. ss. i. des. splits; auto.
+    - econs; eauto. i. ss. erewrite IdentMap.gsspec in TH. des_ifs.
+      hexploit REL; eauto. i.
+      eapply joined_released_le; eauto. etrans; eauto.
+    - etrans; eauto.
+  Qed.
+
+End JConfiguration.
+
+
+
+Module JSim.
 
   Inductive joined_promise_content
             (views: list View.t)
@@ -658,22 +763,6 @@ Section SIMULATION.
     ii. specialize (PROM loc ts). inv PROM; eauto.
     exploit VIEWSLE; eauto. i. rewrite x. auto.
   Qed.
-
-  Lemma joined_released_le
-        prom rel views0 views1
-        (REL: joined_released views0 prom rel)
-        (VIEWSLE: views_le views0 views1)
-    :
-      joined_released views1 prom rel.
-  Proof.
-    ii. exploit REL; eauto. i. des.
-    destruct (views0 loc ts) eqn:VIEW; ss.
-    exploit VIEWSLE; eauto.
-    { erewrite VIEW. ss. }
-    i. rewrite x0. rewrite VIEW. eauto.
-  Qed.
-
-  Require Import SimLocal.
 
   Inductive sim_local (views: Loc.t -> Time.t -> list View.t):
     forall (lc_src lc_tgt: Local.t), Prop :=
@@ -731,8 +820,6 @@ Section SIMULATION.
       mem_src mem_tgt sc_src sc_tgt
       (LOCAL: sim_local views lc_src lc_tgt)
       (MEM: sim_memory mem_src mem_tgt)
-      (* (REL: joined_released views prom_src vw_src.(TView.rel)) *)
-      (* (MEMORY: joined_memory views mem_src) *)
       (SC: TimeMap.le sc_src sc_tgt)
     :
       sim_thread
@@ -873,85 +960,6 @@ Section SIMULATION.
   Proof.
     inv MSGTO; inv MSG; econs. etrans; eauto.
     eapply View.unwrap_opt_le in RELEASED. inv RELEASED. auto.
-  Qed.
-
-  Lemma all_join_views_in view views
-        vw
-        (IN: List.In vw views)
-    :
-      List.In (View.join vw view) (all_join_views view views).
-  Proof.
-    eapply List.in_map with (f:= fun vw => View.join vw view) in IN. ss.
-  Qed.
-
-  Lemma all_join_views_in_iff view views
-        vw
-        (IN: List.In vw (all_join_views view views))
-    :
-      exists vw',
-        (<<IN: List.In vw' views>>) /\
-        (<<VIEW: vw = View.join vw' view>>)
-  .
-  Proof.
-    eapply List.in_map_iff in IN; eauto. des. subst. eauto.
-  Qed.
-
-  Lemma all_join_views_wf view views
-        (VIEWWF: View.wf view)
-        (VIEWSWF: List.Forall View.wf views)
-    :
-      List.Forall View.wf (all_join_views view views).
-  Proof.
-    ginduction views; eauto. i. ss. inv VIEWSWF. econs; eauto.
-    eapply View.join_wf; eauto.
-  Qed.
-
-  Lemma all_join_views_closed view views mem
-        (VIEWCLOSED: Memory.closed_view view mem)
-        (VIEWSCLOSED: List.Forall (fun vw => Memory.closed_view vw mem) views)
-    :
-      List.Forall (fun vw => Memory.closed_view vw mem) (all_join_views view views).
-  Proof.
-    ginduction views; eauto. i. ss. inv VIEWSCLOSED. econs; eauto.
-    eapply Memory.join_closed_view; eauto.
-  Qed.
-
-  Lemma view_join_dist vw0 vw1 vw2
-    :
-      View.join vw0 (View.join vw1 vw2) = View.join (View.join vw0 vw1) (View.join vw0 vw2).
-  Proof.
-    erewrite <- (@view_join_idempotent vw0) at 1.
-    erewrite View.join_assoc. erewrite View.join_assoc. f_equal.
-    erewrite <- View.join_assoc. erewrite <- View.join_assoc. f_equal.
-    eapply View.join_comm.
-  Qed.
-
-  Lemma all_join_views_joined view views vw
-        (JOINED: joined_view views vw)
-    :
-      (<<BOT: vw = View.bot>>) \/
-      (<<JOINED: joined_view (all_join_views view views) (View.join view vw)>>).
-  Proof.
-    ginduction JOINED; i; auto. hexploit IHJOINED; eauto. i. des.
-    - subst. erewrite View.join_bot_r. right. erewrite View.join_comm.
-      eapply joined_view_exact. eapply all_join_views_in; eauto.
-    - right. erewrite view_join_dist. eapply joined_view_join; eauto.
-      eapply joined_view_exact. erewrite View.join_comm. eapply all_join_views_in; eauto.
-  Qed.
-
-  Lemma singleton_ur_join loc ts0 ts1
-    :
-      View.join (View.singleton_ur loc ts0) (View.singleton_ur loc ts1)
-      =
-      View.singleton_ur loc (Time.join ts0 ts1).
-  Proof.
-    unfold Time.join. des_ifs.
-    - eapply View.le_join_r. eapply View.singleton_ur_spec.
-      + eapply View.singleton_ur_wf.
-      + ss. unfold TimeMap.singleton. setoid_rewrite LocFun.add_spec_eq. auto.
-    - eapply View.le_join_l. eapply View.singleton_ur_spec.
-      + eapply View.singleton_ur_wf.
-      + ss. unfold TimeMap.singleton. setoid_rewrite LocFun.add_spec_eq. left. auto.
   Qed.
 
   Lemma sim_local_promise
@@ -1906,28 +1914,6 @@ Section SIMULATION.
     { ss. }
   Qed.
 
-  Lemma step_wf lang pf e th0 th1 views0 views1
-        (STEP: @step lang pf e th0 th1 views0 views1)
-        (WF: Local.wf th0.(Thread.local) th0.(Thread.memory))
-        (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
-        (MEM: Memory.closed th0.(Thread.memory))
-        (REL: joined_released views0 th0.(Thread.local).(Local.promises) th0.(Thread.local).(Local.tview).(TView.rel))
-        (JOINED: joined_memory views0 th0.(Thread.memory))
-        (VIEWS: wf_views views0)
-    :
-      (<<WF: Local.wf th1.(Thread.local) th1.(Thread.memory)>>) /\
-      (<<SC: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory)>>) /\
-      (<<MEM: Memory.closed th1.(Thread.memory)>>)/\
-      (<<REL: joined_released views1 th1.(Thread.local).(Local.promises) th1.(Thread.local).(Local.tview).(TView.rel)>>)/\
-      (<<JOINED: joined_memory views1 th1.(Thread.memory)>>) /\
-      (<<VIEWS: wf_views views1>>) /\
-      (<<VIEWSLE: views_le views0 views1>>)
-  .
-  Proof.
-    inv STEP. exploit Thread.step_future; eauto. i. des. splits; auto.
-    ii. apply NNPP. ii. exploit VIEWSLE; eauto. i. des. ss.
-  Qed.
-
   Lemma sim_thread_step views0 lang_src lang_tgt
         th0_src th0_tgt th1_tgt e_tgt pf_tgt
         (STEP: Thread.step pf_tgt e_tgt th0_tgt th1_tgt)
@@ -1946,7 +1932,7 @@ Section SIMULATION.
         (VIEWS: wf_views views0)
     :
       exists e_src pf_src th1_src views1,
-        (<<STEP: step pf_src e_src th0_src th1_src views0 views1>>) /\
+        (<<STEP: JThread.step pf_src e_src th0_src th1_src views0 views1>>) /\
         (<<SIM: sim_thread views1 th1_src th1_tgt>>) /\
         (<<EVENT: ThreadEvent.get_machine_event e_src =
                   ThreadEvent.get_machine_event e_tgt>>)
@@ -2067,30 +2053,6 @@ Section SIMULATION.
         * ss.
   Qed.
 
-  Lemma tau_steps_wf lang th0 th1 views0 views1
-        (STEPS: @rtc_tau lang th0 th1 views0 views1)
-        (WF: Local.wf th0.(Thread.local) th0.(Thread.memory))
-        (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
-        (MEM: Memory.closed th0.(Thread.memory))
-        (REL: joined_released views0 th0.(Thread.local).(Local.promises) th0.(Thread.local).(Local.tview).(TView.rel))
-        (JOINED: joined_memory views0 th0.(Thread.memory))
-        (VIEWS: wf_views views0)
-    :
-      (<<WF: Local.wf th1.(Thread.local) th1.(Thread.memory)>>) /\
-      (<<SC: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory)>>) /\
-      (<<MEM: Memory.closed th1.(Thread.memory)>>)/\
-      (<<REL: joined_released views1 th1.(Thread.local).(Local.promises) th1.(Thread.local).(Local.tview).(TView.rel)>>)/\
-      (<<JOINED: joined_memory views1 th1.(Thread.memory)>>) /\
-      (<<VIEWS: wf_views views1>>) /\
-      (<<VIEWSLE: views_le views0 views1>>)
-  .
-  Proof.
-    ginduction STEPS; i.
-    - splits; eauto. refl.
-    - exploit step_wf; eauto. i. des.
-      exploit IHSTEPS; eauto. i. des. splits; auto. etrans; eauto.
-  Qed.
-
   Lemma sim_thread_tau_steps views0 lang_src lang_tgt
         th0_src th0_tgt th1_tgt
         (STEPS: rtc (@Thread.tau_step lang_tgt) th0_tgt th1_tgt)
@@ -2109,7 +2071,7 @@ Section SIMULATION.
         (VIEWS: wf_views views0)
     :
       exists th1_src views1,
-        (<<STEPS: rtc_tau th0_src th1_src views0 views1>>) /\
+        (<<STEPS: JThread.rtc_tau th0_src th1_src views0 views1>>) /\
         (<<SIM: sim_thread views1 th1_src th1_tgt>>).
   Proof.
     ginduction STEPS; i.
@@ -2121,96 +2083,10 @@ Section SIMULATION.
       hexploit PromiseConsistent.rtc_tau_step_promise_consistent; try apply STEPS; eauto.
       intros CONS_TGT'.
       exploit sim_thread_step; eauto. i. des.
-      hexploit step_wf; eauto. i. des.
+      hexploit JThread.step_future; eauto. i. des.
       exploit IHSTEPS; eauto. i. des. esplits.
       + econs 2; eauto. etrans; eauto.
       + eauto.
-  Qed.
-
-  Inductive configuration_wf (views: Loc.t -> Time.t -> list View.t)
-            (conf:Configuration.t): Prop :=
-  | configuration_wf_intro
-      (WF: Configuration.wf conf)
-      (REL: forall tid lang st lc
-                   (TH: IdentMap.find tid conf.(Configuration.threads) = Some (existT _ lang st, lc)),
-          joined_released views lc.(Local.promises) lc.(Local.tview).(TView.rel))
-      (JOINMEM: joined_memory views conf.(Configuration.memory))
-      (VIEWS: wf_views views)
-  .
-
-  Definition init_views: Loc.t -> Time.t -> list View.t :=
-    fun _ ts => if (Time.eq_dec Time.bot ts) then [View.bot] else [].
-
-  Lemma configuration_init_wf syn: configuration_wf init_views (Configuration.init syn).
-  Proof.
-    econs.
-    - eapply Configuration.init_wf.
-    - i. ss. unfold Threads.init in TH.
-      erewrite IdentMap.Facts.map_o in TH.
-      unfold option_map in TH. des_ifs. ss.
-      ii. erewrite Memory.bot_get in GET. clarify.
-    - ss. econs.
-      + ii. splits; auto.
-        * unfold Memory.init in *. setoid_rewrite Cell.init_get in GET. des_ifs.
-        * i. unfold init_views in *. des_ifs. ss. des; auto.
-          subst. unfold Memory.init in *. setoid_rewrite Cell.init_get in GET. des_ifs.
-      + i. unfold init_views in *. des_ifs.
-        hexploit Memory.init_closed. intros []. eauto.
-      + ii. unfold init_views. des_ifs. econs; eauto.
-        hexploit TView.bot_closed. intros []. auto.
-    - ii. unfold init_views. des_ifs. econs; eauto. eapply View.bot_wf.
-  Qed.
-
-  Lemma configuration_step_future
-        e tid c1 c2 views1 views2
-        (STEP: configuration_step e tid c1 c2 views1 views2)
-        (WF1: configuration_wf views1 c1)
-    :
-      (<<WF2: configuration_wf views2 c2>>) /\
-      (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-      (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
-      (<<VIEWS_FUTURE: views_le views1 views2>>)
-  .
-  Proof.
-    inv WF1.
-    dup STEP. exploit Configuration.step_future; eauto.
-    { eapply step_configuration_step; eauto. }
-    i. des.
-    inv STEP0. inv WF. ss.
-    hexploit tau_steps_wf; ss; eauto.
-    { inv WF0. eapply THREADS in TID. ss. }
-    i. des.
-    hexploit step_wf; eauto. ss. i. des. splits; auto.
-    - econs; eauto. i. ss. erewrite IdentMap.gsspec in TH. des_ifs.
-      hexploit REL; eauto. i.
-      eapply joined_released_le; eauto. etrans; eauto.
-    - etrans; eauto.
-  Qed.
-
-  Lemma sim_configuration_step
-        e tid c1 c2 views1 views2
-        (STEP: configuration_step e tid c1 c2 views1 views2)
-        (WF1: configuration_wf views1 c1)
-    :
-      (<<WF2: configuration_wf views2 c2>>) /\
-      (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-      (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
-      (<<VIEWS_FUTURE: views_le views1 views2>>)
-  .
-  Proof.
-    inv WF1.
-    dup STEP. exploit Configuration.step_future; eauto.
-    { eapply step_configuration_step; eauto. }
-    i. des.
-    inv STEP0. inv WF. ss.
-    hexploit tau_steps_wf; ss; eauto.
-    { inv WF0. eapply THREADS in TID. ss. }
-    i. des.
-    hexploit step_wf; eauto. ss. i. des. splits; auto.
-    - econs; eauto. i. ss. erewrite IdentMap.gsspec in TH. des_ifs.
-      hexploit REL; eauto. i.
-      eapply joined_released_le; eauto. etrans; eauto.
-    - etrans; eauto.
   Qed.
 
   Inductive sim_configuration
@@ -2275,7 +2151,7 @@ Section SIMULATION.
         (JOINED: joined_memory views th_src.(Thread.memory))
         (VIEWS: wf_views views)
     :
-      consistent th_src views.
+      JThread.consistent th_src views.
   Proof.
     ii. hexploit (@Memory.cap_exists th_tgt.(Thread.memory)); eauto. i. des.
     hexploit (@Memory.max_concrete_timemap_exists mem2).
@@ -2342,11 +2218,11 @@ Section SIMULATION.
   Lemma step_sim_configuration views0 c_src0 c_tgt0 c_tgt1 e tid
         (STEP: Configuration.step e tid c_tgt0 c_tgt1)
         (SIM: sim_configuration views0 c_src0 c_tgt0)
-        (WF_SRC: configuration_wf views0 c_src0)
+        (WF_SRC: JConfiguration.wf views0 c_src0)
         (WF_TGT: Configuration.wf c_tgt0)
     :
       exists c_src1 views1,
-        (<<STEP: configuration_step e tid c_src0 c_src1 views0 views1>>) /\
+        (<<STEP: JConfiguration.step e tid c_src0 c_src1 views0 views1>>) /\
         (<<SIM: sim_configuration views1 c_src1 c_tgt1>>).
   Proof.
     inv SIM. inv STEP.
@@ -2365,17 +2241,20 @@ Section SIMULATION.
       hexploit PromiseConsistent.rtc_tau_step_promise_consistent; eauto. i. ss.
       hexploit sim_thread_tau_steps; ss; eauto. i. des.
 
-      hexploit tau_steps_wf; eauto. i. des.
+      hexploit JThread.tau_steps_future; eauto. i. des.
       hexploit Thread.rtc_tau_step_future; eauto. i. ss. des.
       hexploit sim_thread_step; eauto. i. des.
       dup SIM0. inv SIM0.
       apply inj_pair2 in H6. apply inj_pair2 in H5. ss. subst.
 
-      hexploit step_wf; eauto. ss. i. des.
+      hexploit JThread.step_future; eauto. ss. i. des.
 
       esplits.
-      + ss. erewrite <- EVENT. econs; ss; eauto.
-        i. destruct e_src; ss.
+      + ss. erewrite <- EVENT. econs.
+        * eauto.
+        * eapply STEPS0.
+        * eauto.
+        * i. destruct e_src; ss.
       + econs; eauto. i. ss.
         erewrite IdentMap.gsspec. erewrite IdentMap.gsspec. des_ifs.
         specialize (THS0 tid0). unfold option_rel in *. des_ifs.
@@ -2400,20 +2279,23 @@ Section SIMULATION.
       hexploit PromiseConsistent.rtc_tau_step_promise_consistent; eauto. i. ss.
 
       hexploit sim_thread_tau_steps; try apply STEPS; eauto. i. des.
-      hexploit tau_steps_wf; eauto. i. des.
+      hexploit JThread.tau_steps_future; eauto. i. des.
       hexploit sim_thread_step; eauto. i. des.
 
       dup SIM0. inv SIM0.
       apply inj_pair2 in H7. apply inj_pair2 in H8. ss. subst.
-      hexploit step_wf; eauto. ss. i. des.
+      hexploit JThread.step_future; eauto. ss. i. des.
 
       esplits.
-      + ss. erewrite <- EVENT0. econs; ss; eauto.
-        i. eapply sim_thread_consistent; eauto.
+      + ss. erewrite <- EVENT0. econs.
+        * eauto.
+        * eapply STEPS0.
+        * eauto.
+        * i. eapply sim_thread_consistent; eauto.
       + econs; eauto. i. ss.
         erewrite IdentMap.gsspec. erewrite IdentMap.gsspec. des_ifs.
         specialize (THS0 tid0). unfold option_rel in *. des_ifs.
         eapply sim_statelocal_le; eauto. etrans; eauto.
   Qed.
 
-End SIMULATION.
+End JSim.
