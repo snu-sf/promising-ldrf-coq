@@ -1934,8 +1934,8 @@ Module JSim.
       exists e_src pf_src th1_src views1,
         (<<STEP: JThread.step pf_src e_src th0_src th1_src views0 views1>>) /\
         (<<SIM: sim_thread views1 th1_src th1_tgt>>) /\
-        (<<EVENT: ThreadEvent.get_machine_event e_src =
-                  ThreadEvent.get_machine_event e_tgt>>)
+        (<<EVENT: ThreadEvent.get_program_event e_src =
+                  ThreadEvent.get_program_event e_tgt>>)
   .
   Proof.
     dup SIM. inv SIM.
@@ -2085,7 +2085,7 @@ Module JSim.
       exploit sim_thread_step; eauto. i. des.
       hexploit JThread.step_future; eauto. i. des.
       exploit IHSTEPS; eauto. i. des. esplits.
-      + econs 2; eauto. etrans; eauto.
+      + econs 2; eauto. destruct e, e_src; ss.
       + eauto.
   Qed.
 
@@ -2250,11 +2250,13 @@ Module JSim.
       hexploit JThread.step_future; eauto. ss. i. des.
 
       esplits.
-      + ss. erewrite <- EVENT. econs.
+      + replace MachineEvent.failure with (ThreadEvent.get_machine_event e_src).
+        econs.
         * eauto.
         * eapply STEPS0.
         * eauto.
         * i. destruct e_src; ss.
+        * destruct e_src; ss.
       + econs; eauto. i. ss.
         erewrite IdentMap.gsspec. erewrite IdentMap.gsspec. des_ifs.
         specialize (THS0 tid0). unfold option_rel in *. des_ifs.
@@ -2287,7 +2289,7 @@ Module JSim.
       hexploit JThread.step_future; eauto. ss. i. des.
 
       esplits.
-      + ss. erewrite <- EVENT0. econs.
+      + erewrite <- ThreadEvent.eq_program_event_eq_machine_event; eauto. econs.
         * eauto.
         * eapply STEPS0.
         * eauto.

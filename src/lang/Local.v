@@ -125,6 +125,14 @@ Module ThreadEvent.
     unfold is_accessing_loc.
     destruct e1, e2; ss; inv EVENT; ss.
   Qed.
+
+  Lemma eq_program_event_eq_machine_event
+        e1 e2
+        (EVENT: get_program_event e1 = get_program_event e2):
+    get_machine_event e1 = get_machine_event e2.
+  Proof.
+    destruct e1, e2; ss. inv EVENT. ss.
+  Qed.
 End ThreadEvent.
 
 Module Local.
