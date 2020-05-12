@@ -23,6 +23,7 @@ Require Import Behavior.
 Require Import Cover.
 Require Import Pred.
 Require Import Trace.
+Require Import JoinedView.
 
 Require Import MemoryProps.
 
@@ -31,11 +32,269 @@ Require Import LocalDRFDef.
 Set Implicit Arguments.
 
 
+Section SEMICLOSED.
+
+  Definition semi_closed_timemap
+             (tm: TimeMap.t)
+             (mem: Memory.t)
+             (loc: Loc.t)
+             (ts: Time.t): Prop :=
+    forall l,
+      (exists from val released,
+          (<<GET: Memory.get l (tm l) mem = Some (from, Message.concrete val released)>>)) \/
+      (<<EQ: l = loc /\ tm l = ts>>)
+  .
+
+  Lemma closed_timemap_semi_closed tm mem loc ts
+        (CLOSED: Memory.closed_timemap tm mem)
+    :
+      semi_closed_timemap tm mem loc ts.
+  Proof.
+    ii. left. eauto.
+  Qed.
+
+  Lemma semi_closed_timemap_join tm0 tm1 mem loc ts
+        (CLOSED0: semi_closed_timemap tm0 mem loc ts)
+        (CLOSED1: semi_closed_timemap tm1 mem loc ts)
+    :
+      semi_closed_timemap (TimeMap.join tm0 tm1) mem loc ts.
+  Proof.
+    ii. specialize (CLOSED0 l). specialize (CLOSED1 l).
+    unfold TimeMap.join, Time.join. des; des_ifs; eauto.
+  Qed.
+
+  Lemma semi_closed_timemap_singleton mem loc ts
+        (INHABITED: Memory.inhabited mem)
+    :
+      semi_closed_timemap (TimeMap.singleton loc ts) mem loc ts.
+  Proof.
+    ii. unfold TimeMap.singleton.
+    destruct (Loc.eq_dec loc l).
+    - subst. right. split; auto. setoid_rewrite LocFun.add_spec_eq. auto.
+    - left. esplits. setoid_rewrite LocFun.add_spec_neq; eauto.
+  Qed.
+
+  Lemma semi_closed_timemap_add tm mem0 loc from ts val released mem1
+        (CLOSED: semi_closed_timemap tm mem0 loc ts)
+        (ADD: Memory.add mem0 loc from ts (Message.concrete val released) mem1)
+    :
+      Memory.closed_timemap tm mem1.
+  Proof.
+    ii. specialize (CLOSED loc0). des.
+    - esplits. eapply Memory.add_get1 in GET; eauto.
+    - subst. eapply Memory.add_get0 in ADD. des. eauto.
+  Qed.
+
+  Lemma semi_closed_timemap_split tm mem0 loc ts1 ts2 ts3 msg val released mem1
+        (CLOSED: semi_closed_timemap tm mem0 loc ts2)
+        (SPLIT: Memory.split mem0 loc ts1 ts2 ts3 (Message.concrete val released) msg mem1)
+    :
+      Memory.closed_timemap tm mem1.
+  Proof.
+    ii. specialize (CLOSED loc0). des.
+    - eapply Memory.split_get1 in GET; eauto. des. eauto.
+    - subst. eapply Memory.split_get0 in SPLIT. des. eauto.
+  Qed.
+
+  Lemma semi_closed_timemap_lower tm mem0 loc from to msg val released mem1
+        (CLOSED: semi_closed_timemap tm mem0 loc to)
+        (LOWER: Memory.lower mem0 loc from to msg (Message.concrete val released) mem1)
+    :
+      Memory.closed_timemap tm mem1.
+  Proof.
+    ii. specialize (CLOSED loc0). des.
+    - eapply Memory.lower_get1 in GET; eauto. des. inv MSG_LE. eauto.
+    - subst. eapply Memory.lower_get0 in LOWER. des. eauto.
+  Qed.
+
+  Inductive semi_closed_view (view:View.t) (mem:Memory.t) (loc: Loc.t) (ts: Time.t): Prop :=
+  | semi_closed_view_intro
+      (PLN: semi_closed_timemap view.(View.pln) mem loc ts)
+      (RLX: semi_closed_timemap view.(View.rlx) mem loc ts)
+  .
+  Hint Constructors semi_closed_view.
+
+  Lemma closed_view_semi_closed vw mem loc ts
+        (CLOSED: Memory.closed_view vw mem)
+    :
+      semi_closed_view vw mem loc ts.
+  Proof.
+    inv CLOSED. econs.
+    - eapply closed_timemap_semi_closed; eauto.
+    - eapply closed_timemap_semi_closed; eauto.
+  Qed.
+
+  Lemma semi_closed_view_join vw0 vw1 mem loc ts
+        (CLOSED0: semi_closed_view vw0 mem loc ts)
+        (CLOSED1: semi_closed_view vw1 mem loc ts)
+    :
+      semi_closed_view (View.join vw0 vw1) mem loc ts.
+  Proof.
+    inv CLOSED0. inv CLOSED1. econs.
+    - eapply semi_closed_timemap_join; eauto.
+    - eapply semi_closed_timemap_join; eauto.
+  Qed.
+
+  Lemma semi_closed_view_singleton mem loc ts
+        (INHABITED: Memory.inhabited mem)
+    :
+      semi_closed_view (View.singleton_ur loc ts) mem loc ts.
+  Proof.
+    econs; ss.
+    - eapply semi_closed_timemap_singleton; eauto.
+    - eapply semi_closed_timemap_singleton; eauto.
+  Qed.
+
+  Lemma semi_closed_view_add vw mem0 loc from ts val released mem1
+        (CLOSED: semi_closed_view vw mem0 loc ts)
+        (ADD: Memory.add mem0 loc from ts (Message.concrete val released) mem1)
+    :
+      Memory.closed_view vw mem1.
+  Proof.
+    inv CLOSED. econs.
+    - eapply semi_closed_timemap_add; eauto.
+    - eapply semi_closed_timemap_add; eauto.
+  Qed.
+
+  Lemma semi_closed_view_split vw mem0 loc ts1 ts2 ts3 msg val released mem1
+        (CLOSED: semi_closed_view vw mem0 loc ts2)
+        (SPLIT: Memory.split mem0 loc ts1 ts2 ts3 (Message.concrete val released) msg mem1)
+    :
+      Memory.closed_view vw mem1.
+  Proof.
+    inv CLOSED. econs.
+    - eapply semi_closed_timemap_split; eauto.
+    - eapply semi_closed_timemap_split; eauto.
+  Qed.
+
+  Lemma semi_closed_view_lower vw mem0 loc from to msg val released mem1
+        (CLOSED: semi_closed_view vw mem0 loc to)
+        (LOWER: Memory.lower mem0 loc from to msg (Message.concrete val released) mem1)
+    :
+      Memory.closed_view vw mem1.
+  Proof.
+    inv CLOSED. econs.
+    - eapply semi_closed_timemap_lower; eauto.
+    - eapply semi_closed_timemap_lower; eauto.
+  Qed.
+
+  Inductive semi_closed_opt_view: forall (view:option View.t) (mem:Memory.t)
+                                         (loc: Loc.t) (ts: Time.t), Prop :=
+  | semi_closed_opt_view_some
+      view mem loc ts
+      (CLOSED: semi_closed_view view mem loc ts):
+      semi_closed_opt_view (Some view) mem loc ts
+  | semi_closed_opt_view_none
+      mem loc ts:
+      semi_closed_opt_view None mem loc ts
+  .
+  Hint Constructors semi_closed_opt_view.
+
+  Lemma closed_opt_view_semi_closed vw mem loc ts
+        (CLOSED: Memory.closed_opt_view vw mem)
+    :
+      semi_closed_opt_view vw mem loc ts.
+  Proof.
+    inv CLOSED; econs.
+    eapply closed_view_semi_closed; eauto.
+  Qed.
+
+  Lemma unwrap_closed_opt_view
+        view mem loc ts
+        (CLOSED: semi_closed_opt_view view mem loc ts)
+        (INHABITED: Memory.inhabited mem):
+    semi_closed_view view.(View.unwrap) mem loc ts.
+  Proof.
+    inv CLOSED; ss.
+    eapply closed_view_semi_closed. apply Memory.closed_view_bot. ss.
+  Qed.
+
+  Lemma semi_closed_opt_view_add vw mem0 loc from ts val released mem1
+        (CLOSED: semi_closed_opt_view vw mem0 loc ts)
+        (ADD: Memory.add mem0 loc from ts (Message.concrete val released) mem1)
+    :
+      Memory.closed_opt_view vw mem1.
+  Proof.
+    inv CLOSED; econs.
+    eapply semi_closed_view_add; eauto.
+  Qed.
+
+  Lemma semi_closed_opt_view_split vw mem0 loc ts1 ts2 ts3 msg val released mem1
+        (CLOSED: semi_closed_opt_view vw mem0 loc ts2)
+        (SPLIT: Memory.split mem0 loc ts1 ts2 ts3 (Message.concrete val released) msg mem1)
+    :
+      Memory.closed_opt_view vw mem1.
+  Proof.
+    inv CLOSED; econs.
+    eapply semi_closed_view_split; eauto.
+  Qed.
+
+  Lemma semi_closed_opt_view_lower vw mem0 loc from to msg val released mem1
+        (CLOSED: semi_closed_opt_view vw mem0 loc to)
+        (LOWER: Memory.lower mem0 loc from to msg (Message.concrete val released) mem1)
+    :
+      Memory.closed_opt_view vw mem1.
+  Proof.
+    inv CLOSED; econs.
+    eapply semi_closed_view_lower; eauto.
+  Qed.
+
+  Inductive semi_closed_message: forall (msg:Message.t) (mem:Memory.t)
+                                        (loc: Loc.t) (ts: Time.t), Prop :=
+  | semi_closed_message_concrete
+      val released mem loc ts
+      (CLOSED: semi_closed_opt_view released mem loc ts):
+      semi_closed_message (Message.concrete val released) mem loc ts
+  | semi_closed_message_reserve
+      mem loc ts:
+      semi_closed_message Message.reserve mem loc ts
+  .
+  Hint Constructors semi_closed_message.
+
+  Lemma closed_message_semi_closed msg mem loc ts
+        (CLOSED: Memory.closed_message msg mem)
+    :
+      semi_closed_message msg mem loc ts.
+  Proof.
+    inv CLOSED; econs. eapply closed_opt_view_semi_closed; eauto.
+  Qed.
+
+  Lemma semi_closed_message_add vw mem0 loc from ts val released mem1
+        (CLOSED: semi_closed_message vw mem0 loc ts)
+        (ADD: Memory.add mem0 loc from ts (Message.concrete val released) mem1)
+    :
+      Memory.closed_message vw mem1.
+  Proof.
+    inv CLOSED; econs.
+    eapply semi_closed_opt_view_add; eauto.
+  Qed.
+
+  Lemma semi_closed_message_split vw mem0 loc ts1 ts2 ts3 msg val released mem1
+        (CLOSED: semi_closed_message vw mem0 loc ts2)
+        (SPLIT: Memory.split mem0 loc ts1 ts2 ts3 (Message.concrete val released) msg mem1)
+    :
+      Memory.closed_message vw mem1.
+  Proof.
+    inv CLOSED; econs.
+    eapply semi_closed_opt_view_split; eauto.
+  Qed.
+
+  Lemma semi_closed_message_lower vw mem0 loc from to msg val released mem1
+        (CLOSED: semi_closed_message vw mem0 loc to)
+        (LOWER: Memory.lower mem0 loc from to msg (Message.concrete val released) mem1)
+    :
+      Memory.closed_message vw mem1.
+  Proof.
+    inv CLOSED; econs.
+    eapply semi_closed_opt_view_lower; eauto.
+  Qed.
+
+End SEMICLOSED.
+
+
 Section SIM.
 
   Variable L: Loc.t -> bool.
-
-  Definition in_L (loc: Loc.t) (ts: Time.t) := L loc.
 
   Inductive sim_memory_content P (loc: Loc.t)
             (* (messages: Time.t -> Prop) *)
@@ -45,20 +304,17 @@ Section SIM.
     :
       sim_memory_content P loc None None
   | sim_memory_content_normal
-      from_src from_tgt msg_src msg_tgt
+      from_src from_tgt msg
       (NPROM: ~ P)
       (FROM: Time.le from_tgt from_src)
-      (MSG: Message.le msg_src msg_tgt)
-      (RESERVE: msg_src = Message.reserve -> msg_tgt = Message.reserve)
       (NLOC: ~ L loc -> from_src = from_tgt)
     :
-      sim_memory_content P loc (Some (from_src, msg_src)) (Some (from_tgt, msg_tgt))
+      sim_memory_content P loc (Some (from_src, msg)) (Some (from_tgt, msg))
   | sim_memory_content_forget
       from_src from_tgt val released
       (PROM: P)
       (NLOC: L loc)
       (FROM: Time.le from_tgt from_src)
-      (* (SHORT: ~ messages from_tgt -> Time.lt from_tgt from_src) *)
    :
       sim_memory_content P loc (Some (from_src, Message.reserve)) (Some (from_tgt, Message.concrete val released))
   .
@@ -70,42 +326,34 @@ Section SIM.
 
   Inductive sim_promise_content (loc: Loc.t) (ts: Time.t)
             (P: Prop)
-            (rel_src: View.t)
     :
-      option Memory.t -> option (Time.t * Message.t) -> option (Time.t * Message.t) -> Prop :=
+      option (Time.t * Message.t) -> option (Time.t * Message.t) -> Prop :=
   | sim_promise_content_none
       (NPROM: ~ P)
-      past
     :
-      sim_promise_content loc ts P rel_src past None None
+      sim_promise_content loc ts P None None
   | sim_promise_content_normal_concrete
       (NPROM: ~ P)
       (NLOC: ~ L loc)
-      past from val released_src released_tgt
-      (MSG: sim_opt_view past loc ts released_src released_tgt)
-      (RELVIEW: forall released (MSG: released_src = Some released),
-          add_weak_closed_view rel_src past loc ts)
+      from val released
     :
-      sim_promise_content loc ts P rel_src
-                          (Some past)
-                          (Some (from, Message.concrete val released_src))
-                          (Some (from, Message.concrete val released_tgt))
+      sim_promise_content loc ts P
+                          (Some (from, Message.concrete val released))
+                          (Some (from, Message.concrete val released))
   | sim_promise_content_normal_reserve
       (NPROM: ~ P)
       (* (NLOC: ~ L loc) *)
-      past from_src from_tgt
+      from_src from_tgt
     :
-      sim_promise_content loc ts P rel_src
-                          past
+      sim_promise_content loc ts P
                           (Some (from_src, Message.reserve))
                           (Some (from_tgt, Message.reserve))
   | sim_promise_content_forget
       (PROM: P)
       (LOC: L loc)
-      past from_src from_tgt val released
+      from_src from_tgt val released
     :
-      sim_promise_content loc ts P rel_src
-                          past
+      sim_promise_content loc ts P
                           (Some (from_src, Message.reserve))
                           (Some (from_tgt, Message.concrete val released))
   .
@@ -113,31 +361,30 @@ Section SIM.
 
   Definition sim_promise
              (self: Loc.t -> Time.t -> Prop)
-             (rel_src: LocFun.t View.t)
-             (pasts: Loc.t -> Time.t -> option Memory.t)
              (prom_src prom_tgt: Memory.t): Prop :=
     forall loc ts,
-      sim_promise_content loc ts (self loc ts) (rel_src loc) (pasts loc ts)
+      sim_promise_content loc ts (self loc ts)
                           (Memory.get loc ts prom_src)
                           (Memory.get loc ts prom_tgt).
 
-  Inductive sim_local (self: Loc.t -> Time.t -> Prop) (pasts: Loc.t -> Time.t -> option Memory.t)
-            (lc_src lc_tgt: Local.t): Prop :=
-  | forget_local_intro
-      (TVIEW : TView.le lc_src.(Local.tview) lc_tgt.(Local.tview))
-      (PROMS: sim_promise self lc_src.(Local.tview).(TView.rel) pasts lc_src.(Local.promises) lc_tgt.(Local.promises))
+  Inductive sim_local (self: Loc.t -> Time.t -> Prop)
     :
-      sim_local self pasts lc_src lc_tgt
+      forall (lc_src lc_tgt: Local.t), Prop :=
+  | sim_local_intro
+      tvw prom_src prom_tgt
+      (PROMS: sim_promise self prom_src prom_tgt)
+    :
+      sim_local self (Local.mk tvw prom_src) (Local.mk tvw prom_tgt)
   .
+  Hint Constructors sim_local.
 
-  Inductive sim_statelocal (self: Loc.t -> Time.t -> Prop)
-            (pasts: Loc.t -> Time.t -> option Memory.t):
+  Inductive sim_statelocal (self: Loc.t -> Time.t -> Prop):
     sigT (@Language.state ProgramEvent.t) * Local.t -> sigT (@Language.state ProgramEvent.t) * Local.t -> Prop :=
   | forget_statelocal_intro
       st lc_src lc_tgt
-      (LOCAL: sim_local self pasts lc_src lc_tgt)
+      (LOCAL: sim_local self lc_src lc_tgt)
     :
-      sim_statelocal self pasts (st, lc_src) (st, lc_tgt)
+      sim_statelocal self (st, lc_src) (st, lc_tgt)
   .
 
   Inductive all_promises (proms: Ident.t -> Loc.t -> Time.t -> Prop): Loc.t -> Time.t -> Prop :=
@@ -149,88 +396,55 @@ Section SIM.
   .
   Hint Constructors all_promises.
 
-  Lemma sim_read_step P self pasts lc_src lc_tgt mem_src mem_tgt loc to val released_tgt ord
+  Lemma sim_read_step P self lc_src lc_tgt mem_src mem_tgt loc to val released ord
         lc_tgt'
-        (STEPTGT: Local.read_step lc_tgt mem_tgt loc to val released_tgt ord lc_tgt')
+        (STEPTGT: Local.read_step lc_tgt mem_tgt loc to val released ord lc_tgt')
         (NOREAD: ~ P loc to)
         (MEM: sim_memory P mem_src mem_tgt)
-        (LOCAL: sim_local self pasts lc_src lc_tgt)
+        (LOCAL: sim_local self lc_src lc_tgt)
     :
-      exists lc_src' released_src,
-        (<<STEPSRC: Local.read_step lc_src mem_src loc to val released_src ord lc_src'>>) /\
-        (<<SIM: sim_local self pasts lc_src' lc_tgt'>>) /\
-        (<<RELEASEDMLE: View.opt_le released_src released_tgt>>) /\
-        (<<GETSRC: exists from, Memory.get loc to mem_src = Some (from, Message.concrete val released_src)>>) /\
-        (<<GETSRC: exists from, Memory.get loc to mem_tgt = Some (from, Message.concrete val released_tgt)>>)
+      exists lc_src' released,
+        (<<STEPSRC: Local.read_step lc_src mem_src loc to val released ord lc_src'>>) /\
+        (<<SIM: sim_local self lc_src' lc_tgt'>>) /\
+        (<<GETSRC: exists from, Memory.get loc to mem_src = Some (from, Message.concrete val released)>>) /\
+        (<<GETTGT: exists from, Memory.get loc to mem_tgt = Some (from, Message.concrete val released)>>)
   .
   Proof.
     inv LOCAL. inv STEPTGT.
-    specialize (MEM loc to). rewrite GET in *. inv MEM; ss. inv MSG.
-    esplits.
-    - econs; eauto. eapply TViewFacts.readable_mon; eauto.
-      + eapply TVIEW.
-      + refl.
-    - econs; ss; eauto. eapply read_tview_mon; eauto. refl.
-    - auto.
-    - eauto.
-    - eauto.
+    specialize (MEM loc to). rewrite GET in *. inv MEM; ss.
+    esplits; eauto.
   Qed.
 
-  Lemma sim_fence_step self pasts lc_src lc_tgt sc_src sc_tgt ordr ordw
-        sc_tgt' lc_tgt'
-        (STEPTGT: Local.fence_step lc_tgt sc_tgt ordr ordw lc_tgt' sc_tgt')
-        (SC: TimeMap.le sc_src sc_tgt)
-        (LOCAL: sim_local self pasts lc_src lc_tgt)
+  Lemma sim_fence_step self lc_src lc_tgt sc ordr ordw
+        sc' lc_tgt'
+        (STEPTGT: Local.fence_step lc_tgt sc ordr ordw lc_tgt' sc')
+        (LOCAL: sim_local self lc_src lc_tgt)
     :
-      exists lc_src' sc_src',
-        (<<STEPSRC: Local.fence_step lc_src sc_src ordr ordw lc_src' sc_src'>>) /\
-        (<<SC: TimeMap.le sc_src' sc_tgt'>>) /\
-        (<<SIM: sim_local self pasts lc_src' lc_tgt'>>)
+      exists lc_src',
+        (<<STEPSRC: Local.fence_step lc_src sc ordr ordw lc_src' sc'>>) /\
+        (<<SIM: sim_local self lc_src' lc_tgt'>>)
   .
   Proof.
-    inv LOCAL. inv STEPTGT.
-    assert (TVIEWLE:
-              TView.le
-                (TView.write_fence_tview
-                   (TView.read_fence_tview (Local.tview lc_src) ordr) sc_src ordw)
-                (TView.write_fence_tview
-                   (TView.read_fence_tview (Local.tview lc_tgt) ordr) sc_tgt ordw)).
-    { eapply write_fence_tview_mon_same_ord; eauto.
-      eapply read_fence_tview_mon_same_ord; eauto. }
-    esplits.
+    inv LOCAL. inv STEPTGT. esplits.
     - econs; ss; eauto. ii.
       specialize (PROMS loc t). rewrite GET in *. inv PROMS; ss.
-      exploit RELEASE; eauto. ss. ii. inv MSG; ss.
-    - eapply write_fence_fc_mon_same_ord; eauto.
-      eapply read_fence_tview_mon_same_ord; eauto.
-    - econs; ss; eauto. ii.
-      specialize (PROMS loc ts). des_ifs.
-      + inv PROMS; econs; ss; eauto. i.
-        exfalso. inv MSG; ss. exploit RELEASE; eauto; ss.
-        destruct ordw; eauto.
-      + inv PROMS; econs; ss; eauto. i.
-        exfalso. inv MSG; ss. exploit RELEASE; eauto; ss.
-        destruct ordw; eauto.
-      + inv PROMS; econs; ss; eauto. i.
-        exfalso. inv MSG; ss. exploit RELEASE; eauto; ss.
-        destruct ordw; eauto.
+      exploit RELEASE; eauto.
+    - econs; ss; eauto.
   Qed.
 
-  Lemma sim_promise_consistent prom_self pasts lc_src lc_tgt
+  Lemma sim_promise_consistent prom_self lc_src lc_tgt
         (CONSISTENT: Local.promise_consistent lc_tgt)
-        (SIM: sim_local prom_self pasts lc_src lc_tgt)
+        (SIM: sim_local prom_self lc_src lc_tgt)
     :
       Local.promise_consistent lc_src.
   Proof.
-    inv SIM. ii.
-    specialize (PROMS loc ts). rewrite PROMISE in *. inv PROMS.
-    exploit CONSISTENT; eauto. i. eapply TimeFacts.le_lt_lt; eauto.
-    inv TVIEW. inv CUR. auto.
+    inv SIM. ii. ss.
+    specialize (PROMS loc ts). rewrite PROMISE in *. inv PROMS. eauto.
   Qed.
 
-  Lemma sim_failure_step prom_self pasts lc_src lc_tgt
+  Lemma sim_failure_step prom_self lc_src lc_tgt
         (STEPTGT: Local.failure_step lc_tgt)
-        (SIM: sim_local prom_self pasts lc_src lc_tgt)
+        (SIM: sim_local prom_self lc_src lc_tgt)
     :
       Local.failure_step lc_src.
   Proof.
@@ -247,56 +461,47 @@ Section SIM.
     ii. specialize (MEMORY loc' to'). inv MEMORY; clarify.
   Qed.
 
-  Lemma sim_promise_step_normal others self pasts mem_src mem_tgt rel_src prom_src prom_tgt
-        loc from to msg_tgt prom_tgt' mem_tgt' kind_tgt
+  Lemma sim_promise_step_normal others self mem_src mem_tgt prom_src prom_tgt
+        loc from to msg prom_tgt' mem_tgt' kind
         (NLOC: ~ L loc)
-        (STEPTGT: Memory.promise prom_tgt mem_tgt loc from to msg_tgt prom_tgt' mem_tgt' kind_tgt)
+        (STEPTGT: Memory.promise prom_tgt mem_tgt loc from to msg prom_tgt' mem_tgt' kind)
         (MEM: sim_memory (others \2/ self) mem_src mem_tgt)
         (MEMSRC: Memory.closed mem_src)
         (MEMTGT: Memory.closed mem_tgt)
         (WFSRC: Memory.le prom_src mem_src)
         (WFTGT: Memory.le prom_tgt mem_tgt)
-        (RELWF: View.wf (rel_src loc))
-        (RELCONSISTENT: forall val released (MSG: msg_tgt = Message.concrete val released),
-            Time.le ((rel_src loc).(View.rlx) loc) to)
-        (RELSRC: Memory.closed_view (rel_src loc) mem_src)
-        (PROMISE: sim_promise self rel_src pasts prom_src prom_tgt)
-        (PAST: wf_pasts_memory mem_src pasts)
+        (PROMISE: sim_promise self prom_src prom_tgt)
         (PROMATTACH: promises_not_attached self (promised prom_src) mem_src)
-        (* (PROMSWF: forall loc' to', others loc' to' -> L loc') *)
+        (SEMI: semi_closed_message msg mem_src loc to)
     :
-      exists msg_src kind_src pasts' prom_src' mem_src',
-        (<<STEPSRC: Memory.promise prom_src mem_src loc from to msg_src prom_src' mem_src' kind_src>>) /\
+      exists prom_src' mem_src',
+        (<<STEPSRC: Memory.promise prom_src mem_src loc from to msg prom_src' mem_src' kind>>) /\
         (<<MEM: sim_memory (others \2/ self) mem_src' mem_tgt'>>) /\
         (<<ATTACHEDLE: not_attached_le others mem_src mem_src'>>) /\
-        (<<PROMISE: sim_promise self rel_src pasts' prom_src' prom_tgt'>>) /\
-        (<<PAST: wf_pasts_memory mem_src' pasts'>>) /\
-        (<<PASTLE: pasts_le pasts pasts'>>) /\
+        (<<PROMISE: sim_promise self prom_src' prom_tgt'>>) /\
         (<<PROMATTACH: promises_not_attached self (promised prom_src') mem_src'>>) /\
-        (<<CLOSED: Memory.closed_message msg_src mem_src'>>)
+        (<<CLOSED: Memory.closed_message msg mem_src'>>)
   .
   Proof.
     generalize (sim_memory_others_self_wf MEM). intros PROMSWF.
     inv STEPTGT.
 
     (* add case *)
-    - hexploit (@sim_message_exists mem_src loc to msg_tgt); eauto. i. des.
-
+    -
       exploit add_succeed_wf; try apply MEM0. i. des.
-      hexploit (@Memory.add_exists mem_src loc from to msg_src); ss.
+      hexploit (@Memory.add_exists mem_src loc from to msg); ss.
       { i. specialize (MEM loc to2). rewrite GET2 in *. inv MEM; cycle 1.
         { exfalso. apply NLOC. des; eauto. }
         ii. eapply DISJOINT; eauto.
         inv RHS. econs; ss. eapply TimeFacts.le_lt_lt; eauto. }
-      { eapply sim_message_wf; eauto. }
       intros [mem_src' ADDMEMSRC].
       exploit Memory.add_exists_le; try apply ADDMEMSRC; eauto.
       intros [prom_src' ADDPROMSRC].
 
       assert (ATTACHSRC: forall val released to' msg'
-                                (MSG: msg_src = Message.concrete val released)
+                                (MSG: msg = Message.concrete val released)
                                 (GET: Memory.get loc to' mem_src = Some (to, msg')), False).
-      { i. clarify. inv SIM.
+      { i. clarify.
         specialize (MEM loc to'). rewrite GET in *. inv MEM; cycle 1.
         { exfalso. apply NLOC. des; eauto. }
         inv FROM.
@@ -308,66 +513,28 @@ Section SIM.
         { inv H0. exploit ATTACH; eauto. }
       }
 
-      assert (MSGTO: Memory.message_to msg_src loc to).
-      { inv SIM; econs. inv TS. etrans; eauto.
-        apply sim_opt_view_le in SIM0. apply View.unwrap_opt_le in SIM0.
-        inv SIM0. auto.
-      }
-
-      assert (PROMISESRC: Memory.promise prom_src mem_src loc from to msg_src prom_src' mem_src' Memory.op_kind_add).
+      assert (PROMISESRC: Memory.promise prom_src mem_src loc from to msg prom_src' mem_src' Memory.op_kind_add).
       { econs; eauto. }
 
-      assert (CLOSEDMSG: Memory.closed_message msg_src mem_src').
-      { destruct msg_src; auto.
-        eapply add_closed_message_add_closed; eauto.
-        eapply sim_message_closed; eauto. }
+      assert (CLOSEDMSG: Memory.closed_message msg mem_src').
+      { destruct msg; auto.
+        eapply semi_closed_message_add; eauto. }
 
       assert (FUTURE: Memory.future mem_src mem_src').
       { econs; [|refl]. econs; eauto. }
 
-      exists msg_src, Memory.op_kind_add,
-      (fun loc' to' => if loc_ts_eq_dec (loc', to') (loc, to) then (if msg_src then (Some mem_src) else None) else pasts loc' to'),
-      prom_src', mem_src'. splits; auto.
+      exists prom_src', mem_src'. splits; auto.
       + ii. erewrite (@Memory.add_o mem_src'); eauto.
         erewrite (@Memory.add_o mem_tgt'); eauto.
         des_ifs; try by (ss; des; clarify).
         * econs; eauto.
           { ii. ss. des; clarify; eauto. }
           { refl. }
-          { eapply sim_message_le; eauto. }
-          { i. clarify. inv SIM. auto. }
       + ii. erewrite (@Memory.add_o mem_src') in GET; eauto. des_ifs; eauto.
         ss. des; clarify. exfalso. eauto.
       + ii. erewrite (@Memory.add_o prom_src'); eauto.
         erewrite (@Memory.add_o prom_tgt'); eauto. des_ifs.
-        * ss. des; clarify. inv SIM; econs; eauto.
-          i. eapply add_closed_add_weak_closed_view, closed_add_closed_view. auto.
-        * ss. des; clarify. inv SIM; econs; eauto.
-      + inv PAST. econs.
-        * ii. erewrite (@Memory.add_o mem_src') in GET; eauto.
-          destruct (loc_ts_eq_dec (loc0, to0) (loc, to)).
-          { ss. des; clarify. esplits; eauto.
-            - eapply sim_message_closed in SIM. inv SIM. inv CLOSED; econs; auto.
-            - i. des_ifs.
-              { exfalso. ss. des; clarify. eapply Time.lt_strorder; eauto. }
-              guardH o. exploit ONLY; eauto. i. des; auto.
-          }
-          { guardH o. exploit COMPLETE; eauto. i. des.
-            esplits; eauto. des_ifs. ss. des; clarify.
-            exfalso. inv SIM. eapply ATTACHSRC; eauto.
-          }
-        * i. des_ifs.
-          { ss. des; clarify. splits; auto.
-            - econs. eapply Memory.add_get0; eauto.
-            - apply Memory.future_future_weak. auto.
-          }
-          { guardH o. exploit ONLY; eauto. i. des. splits; auto.
-            - eapply concrete_promised_increase_promise; eauto.
-            - etrans; eauto. apply Memory.future_future_weak. auto. }
-      + ii. destruct (loc_ts_eq_dec (loc0, to0) (loc, to)); auto.
-        ss. des; clarify. exfalso.
-        inv PAST. apply ONLY in PAST0. des. inv CONCRETE.
-        apply Memory.add_get0 in ADDMEMSRC. des. clarify.
+        * ss. des; clarify. destruct msg; econs; eauto.
       + ii. erewrite promised_add; eauto.
         erewrite (@Memory.add_o mem_src' mem_src) in GET; eauto.
         des_ifs; try by (des; ss; clarify).
@@ -376,8 +543,7 @@ Section SIM.
 
     - exploit split_succeed_wf; try apply PROMISES. i. des. clarify.
       dup PROMISE. specialize (PROMISE0 loc ts3). rewrite GET2 in *.
-      inv PAST.
-      inv PROMISE0; ss; [destruct released_src as [released_src|]|].
+      inv PROMISE0; ss. [destruct released_src as [released_src|]|].
 
       (* split normal message with non-none view *)
       { exploit ONLY; eauto. i. des.
