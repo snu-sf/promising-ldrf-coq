@@ -2819,6 +2819,76 @@ Section SHIFTMAP.
       + left. ii. des; subst. eapply TimeFacts.le_lt_lt; eauto.
   Qed.
 
+  Lemma mapping_mat_lt_loc_closed_add_one f max ts fts
+        (MAPLT: mapping_map_lt_closed_loc f max)
+        (NMAP: forall fts, ~ f ts fts)
+        (LEFT: forall ts' fts' (TS: Time.lt ts' ts) (MAP: f ts' fts'), Time.lt fts' fts)
+        (RIGHT: forall ts' fts' (TS: Time.lt ts ts') (MAP: f ts' fts'), Time.lt fts fts')
+        (MAX: forall max' (MAX: max = Some max'), Time.lt fts max')
+    :
+      mapping_map_lt_closed_loc
+        (fun t ft => (<<ORIG: f t ft>>) \/ (<<NEW: t = ts /\ ft = fts>>))
+        max
+  .
+  Proof.
+    econs.
+    - ii. des; subst.
+      + apply MAPLT; eauto.
+      + split; i; eauto.
+        destruct (Time.le_lt_dec t1 ts); auto.
+        exfalso. destruct l.
+        * eapply Time.lt_strorder. etrans.
+          { eapply H. }
+          { eapply LEFT; eauto. }
+        * inv H0. exfalso. eapply NMAP; eauto.
+      + split; i; eauto.
+        destruct (Time.le_lt_dec ts t0); auto.
+        exfalso. destruct l.
+        * eapply Time.lt_strorder. etrans.
+          { eapply H. }
+          { eapply RIGHT; eauto. }
+        * inv H0. exfalso. eapply NMAP; eauto.
+      + split; i; exfalso; eapply Time.lt_strorder; eauto.
+    - left. eapply MAPLT.
+    - i. des.
+      + eapply MAPLT.(mapping_map_lt_closed_loc_max); eauto.
+      + subst. auto.
+    - i. hexploit (MAPLT.(mapping_map_lt_closed_loc_closed) ts0).
+      { i. eapply NMAP0. eauto. } i.
+      destruct H. guardH H0. des. split.
+      { destruct (Time.le_lt_dec ts ts_left).
+        { exists ts_left, fts_left. splits; auto.
+          i. des; eauto. subst. auto. }
+        destruct (Time.le_lt_dec ts0 ts).
+        { exists ts_left, fts_left. splits; auto.
+          i. des; eauto. subst.
+          exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto. }
+        exists ts, fts. splits; auto.
+        i. des; subst; [..|refl]. etrans.
+        - eapply INF; eauto.
+        - left. eapply l. }
+      unguard. des.
+      { destruct (Time.le_lt_dec ts0 ts); cycle 1.
+        { left. ii. des; subst; eauto. }
+        destruct l; cycle 1.
+        { inv H. exfalso. eapply NMAP0; eauto. }
+        right. exists ts, fts.
+        splits; auto. i. des; subst; [..|refl].
+        exfalso. eapply Time.lt_strorder. etrans; eauto. }
+      { right. destruct (Time.le_lt_dec ts_right ts).
+        { exists ts_right, fts_right. splits; auto.
+          i. des; eauto. subst. auto. }
+        destruct (Time.le_lt_dec ts ts0).
+        { exists ts_right, fts_right. splits; auto.
+          i. des; eauto. subst. exfalso.
+          eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt; eauto. }
+        { exists ts, fts. splits; auto.
+          i. des; subst; [..|refl]. etrans.
+          - left. eapply l.
+          - eapply SUP; eauto. }
+      }
+  Qed.
+
   Lemma mapping_mat_lt_loc_closed_extend_one f max ts
         (MAPLT: mapping_map_lt_closed_loc f max)
     :
@@ -2830,176 +2900,48 @@ Section SHIFTMAP.
     destruct (classic (exists fts, f ts fts)) as [MAPPED|NMAPPED].
     { des. exists f. splits; eauto. }
     exploit mapping_map_lt_closed_loc_closed; eauto. i. des.
-    - set (fts := match max with
+    { set (fts := match max with
                   | Some max' => Time.middle fts_left max'
                   | None => Time.incr fts_left
                   end).
-      assert (FTSLEFT: Time.lt fts_left fts).
-      { unfold fts. des_ifs.
-        - eapply Time.middle_spec.
+      esplits.
+      - eapply mapping_mat_lt_loc_closed_add_one.
+        + eauto.
+        + eauto.
+        + instantiate (1:=fts). i. exploit INF; eauto. i.
+          eapply (@TimeFacts.le_lt_lt _ fts_left).
+          { eapply mapping_map_lt_loc_map_le; try apply MAPLT; eauto. }
+          { unfold fts. des_ifs.
+            - eapply Time.middle_spec.
+              eapply MAPLT.(mapping_map_lt_closed_loc_max); eauto.
+            - eapply Time.incr_spec. }
+        + i. exploit MAX; eauto. i.
+          exfalso. eapply Time.lt_strorder. etrans; eauto.
+        + i. subst. unfold fts. eapply Time.middle_spec.
           eapply MAPLT.(mapping_map_lt_closed_loc_max); eauto.
-        - eapply Time.incr_spec. }
-      assert (FTSMAX: forall t ft (MAP: f t ft), Time.lt ft fts).
-      { i. eapply TimeFacts.le_lt_lt; [|eauto].
-        eapply mapping_map_lt_loc_map_le; try apply MAPLT; eauto. }
-      exists (fun t ft => (<<ORIG: f t ft>>) \/ (<<NEW: t = ts /\ ft = fts>>)).
-      splits; eauto. econs.
-      + ii. des; subst.
-        * apply MAPLT; eauto.
-        * split; i.
-          { exfalso. exploit MAX; eauto. i.
-            eapply Time.lt_strorder; eauto. }
-          { exfalso. exploit MAX; eauto. i.
-            eapply Time.lt_strorder; eauto. }
-        * split; i.
-          { eapply FTSMAX; eauto. }
-          { eauto. }
-        * split; i; exfalso; eapply Time.lt_strorder; eauto.
-      + left. eapply MAPLT.
-      + i. des.
-        * eapply MAPLT.(mapping_map_lt_closed_loc_max); eauto.
-        * subst. eapply Time.middle_spec.
-          eapply MAPLT.(mapping_map_lt_closed_loc_max); eauto.
-      + i. hexploit (MAPLT.(mapping_map_lt_closed_loc_closed) ts0).
-        { i. eapply NMAP; eauto. } i. des.
-        * split.
-          { destruct (Time.le_lt_dec ts ts_left0).
-            { exists ts_left0, fts_left0. splits; auto.
-              i. des; eauto. subst. auto. }
-            destruct (Time.le_lt_dec ts0 ts).
-            { exists ts_left0, fts_left0. splits; auto.
-              i. des; eauto. subst.
-              exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto. }
-            exists ts, fts. splits; auto.
-            i. des; auto.
-            - etrans.
-              + eapply INF0; eauto.
-              + left. eapply l.
-            - subst. refl. }
-          { destruct (Time.le_lt_dec ts0 ts); cycle 1.
-            { left. ii. des; eauto. subst. auto. }
-            destruct l; cycle 1.
-            { inv H. exfalso. eapply NMAP; eauto. }
-            right. exists ts, fts.
-            splits; auto. i. des; subst; [..|refl].
-            exfalso. eapply Time.lt_strorder. etrans; eauto. }
-        * split.
-          { destruct (Time.le_lt_dec ts ts_left0).
-            { exists ts_left0, fts_left0. splits; auto.
-              i. des; eauto. subst. auto. }
-            destruct (Time.le_lt_dec ts0 ts).
-            { exists ts_left0, fts_left0. splits; auto.
-              i. des; eauto. subst.
-              exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto. }
-            exists ts, fts. splits; auto.
-            i. des; auto.
-            - etrans.
-              + eapply INF0; eauto.
-              + left. eapply l.
-            - subst. refl. }
-          { right. destruct (Time.le_lt_dec ts_right ts).
-            { exists ts_right, fts_right. splits; auto.
-              i. des; eauto. subst. auto. }
-            destruct (Time.le_lt_dec ts ts0).
-            { exists ts_right, fts_right. splits; auto.
-              i. des; eauto. subst.
-              exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto. }
-            exists ts, fts. splits; auto.
-            i. des; auto.
-            - etrans.
-              + left. eapply l.
-              + eapply SUP; eauto.
-            - subst. refl. }
-    - assert (LEFTRIGHT: Time.lt fts_left fts_right).
+      - i. ss. auto.
+      - ss. eauto.
+    }
+    { assert (LEFTRIGHT: Time.lt fts_left fts_right).
       { erewrite <- (MAPLT.(mapping_map_lt_closed_loc_map_lt) ts_left ts_right); eauto. }
-      exists (fun t ft => (<<ORIG: f t ft>>) \/ (<<NEW: t = ts /\ Time.middle fts_left fts_right = ft>>)).
-      splits; eauto. econs.
-      + ii. des; subst.
-        * apply MAPLT; eauto.
-        * split; i.
-          { eapply TimeFacts.lt_le_lt.
-            - eapply Time.middle_spec; eauto.
-            - eapply mapping_map_lt_loc_map_le; try apply MAPLT; eauto. }
-          { destruct (Time.le_lt_dec t1 ts); auto. exfalso. destruct l.
-            - exploit INF; eauto. i.
-              eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt.
-              { eapply x. }
-              erewrite (MAPLT.(mapping_map_lt_closed_loc_map_lt) ts_left t1); cycle 1; eauto.
-              etrans.
-              { eapply Time.middle_spec. eauto. }
-              { eauto. }
-            - inv H0. eauto. }
-        * split; i.
-          { eapply TimeFacts.le_lt_lt.
-            - instantiate (1:=fts_left).
-              eapply mapping_map_lt_loc_map_le; try apply MAPLT; eauto.
-            - eapply Time.middle_spec; eauto. }
-          { destruct (Time.le_lt_dec ts t0); auto. exfalso. destruct l.
-            - exploit SUP; eauto. i.
-              eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; cycle 1.
-              { eapply x. }
-              erewrite (MAPLT.(mapping_map_lt_closed_loc_map_lt) t0 ts_right); cycle 1; eauto.
-              etrans.
-              { eauto. }
-              { eapply Time.middle_spec. eauto. }
-            - inv H0. eauto. }
-        * split; i; exfalso; eapply Time.lt_strorder; eauto.
-      + left. eapply MAPLT.
-      + i. des.
-        * eapply MAPLT.(mapping_map_lt_closed_loc_max); eauto.
-        * etrans; cycle 1.
+      esplits.
+      - eapply mapping_mat_lt_loc_closed_add_one.
+        + eauto.
+        + eauto.
+        + instantiate (1:=Time.middle fts_left fts_right). i. exploit INF; eauto. i.
+          eapply (@TimeFacts.le_lt_lt _ fts_left).
+          { eapply mapping_map_lt_loc_map_le; try apply MAPLT; eauto. }
+          { eapply Time.middle_spec; eauto. }
+        + i. exploit SUP; eauto. i.
+          eapply (@TimeFacts.lt_le_lt _ fts_right).
+          { eapply Time.middle_spec; eauto. }
+          { eapply mapping_map_lt_loc_map_le; try apply MAPLT; eauto. }
+        + i. etrans.
+          { eapply Time.middle_spec. auto. }
           { eapply MAPLT.(mapping_map_lt_closed_loc_max); eauto. }
-          { subst. eapply Time.middle_spec. auto. }
-      + i. hexploit (MAPLT.(mapping_map_lt_closed_loc_closed) ts0).
-        { i. eapply NMAP; eauto. } i. des.
-        * split.
-          { destruct (Time.le_lt_dec ts ts_left0).
-            { exists ts_left0, fts_left0. splits; auto.
-              i. des; eauto. subst. auto. }
-            destruct (Time.le_lt_dec ts0 ts).
-            { exists ts_left0, fts_left0. splits; auto.
-              i. des; eauto. subst.
-              exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto. }
-            exists ts, (Time.middle fts_left fts_right). splits; auto.
-            i. des; auto.
-            - etrans.
-              + eapply INF0; eauto.
-              + left. eapply l.
-            - subst. refl. }
-          { destruct (Time.le_lt_dec ts0 ts); cycle 1.
-            { left. ii. des; eauto. subst. auto. }
-            destruct l; cycle 1.
-            { inv H. exfalso. eapply NMAP; eauto. }
-            right. exists ts, (Time.middle fts_left fts_right).
-            splits; auto. i. des; subst; [..|refl].
-            exfalso. eapply Time.lt_strorder. etrans; eauto. }
-        * split.
-          { destruct (Time.le_lt_dec ts ts_left0).
-            { exists ts_left0, fts_left0. splits; auto.
-              i. des; eauto. subst. auto. }
-            destruct (Time.le_lt_dec ts0 ts).
-            { exists ts_left0, fts_left0. splits; auto.
-              i. des; eauto. subst.
-              exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto. }
-            exists ts, (Time.middle fts_left fts_right). splits; auto.
-            i. des; auto.
-            - etrans.
-              + eapply INF0; eauto.
-              + left. eapply l.
-            - subst. refl. }
-          { right. destruct (Time.le_lt_dec ts_right0 ts).
-            { exists ts_right0, fts_right0. splits; auto.
-              i. des; eauto. subst. auto. }
-            destruct (Time.le_lt_dec ts ts0).
-            { exists ts_right0, fts_right0. splits; auto.
-              i. des; eauto. subst.
-              exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto. }
-            exists ts, (Time.middle fts_left fts_right). splits; auto.
-            i. des; auto.
-            - etrans.
-              + left. eapply l.
-              + eapply SUP0; eauto.
-            - subst. refl. }
+      - i. ss. auto.
+      - ss. eauto.
+    }
   Qed.
 
   Lemma mapping_mat_lt_loc_closed_extend f max (times: list Time.t)
@@ -3096,7 +3038,7 @@ Section SHIFTMAP.
       - eapply bound_mapping_map_lt_closed_loc.
         i. clarify. eapply TimeFacts.le_lt_lt; eauto. }
     { inv SORTED.
-      set (f:=(fun ts fts => ts = fts /\ <<TS: Time.le ts max>>)
+      set (f:=(fun ts fts => ts = fts /\ <<TS: Time.le ts max>>).
 
 
       exploit mapping_mat_lt_loc_closed_extend.
