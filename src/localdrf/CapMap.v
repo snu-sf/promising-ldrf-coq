@@ -274,103 +274,57 @@ End CONCRETEIDENT.
 
 Section MIDDLE.
 
-  Definition middle_mem (mem_src mem_tgt: Memory.t)
-
-  Lemma
-
-  memory_map2
-
-  mappable_memory
-
-memory_map2
-
   Variable L: Loc.t -> bool.
 
-  Inductive sim_memory_content_mid P (loc: Loc.t)
-    (* (messages: Time.t -> Prop) *)
-    : option (Time.t * Message.t) -> option (Time.t * Message.t) -> Prop :=
-  | sim_memory_content_mid_none
-      (NPROM: ~ P)
+  Lemma middle_state_exists
+        others self lc_src lc_tgt sc mem_src mem_tgt
+        (views: Loc.t -> Time.t -> list View.t)
+        times
+        (MEM: sim_memory L (others \2/ self) mem_src mem_tgt)
+        (SCSRC: Memory.closed_timemap sc mem_src)
+        (SCTGT: Memory.closed_timemap sc mem_tgt)
+        (MEMSRC: Memory.closed mem_src)
+        (MEMTGT: Memory.closed mem_tgt)
+        (LOCALSRC: Local.wf lc_src mem_src)
+        (LOCALTGT: Local.wf lc_tgt mem_tgt)
+        (SIM: sim_local L self lc_src lc_tgt)
+        (PROMATTACH: promises_not_attached self (promised lc_src.(Local.promises)) mem_src)
+        (EXCLUSIVE: forall loc' ts' (OTHER: others loc' ts'),
+            exists from msg, <<UNCH: unchangable mem_src lc_src.(Local.promises) loc' ts' from msg>>)
+        (JOINED: forall loc ts (NLOC: ~ L loc), List.Forall (fun vw => Memory.closed_view vw mem_src) (views loc ts))
+
+        cap_src cap_tgt max_src max_tgt
+        (CAPSRC: Memory.cap mem_src cap_src)
+        (CAPTGT: Memory.cap mem_src cap_src)
+        (MAXSRC: Memory.max_concrete_timemap cap_src max_src)
+        (MAXTGT: Memory.max_concrete_timemap cap_tgt max_tgt)
     :
-      sim_memory_content_mid P loc None None
-  | sim_memory_content_mid_normal
-      from_src from_tgt msg_src msg_tgt
-      (NPROM: ~ P)
-      (FROM: Time.le from_tgt from_src)
-      (MSG: Message.le msg_src msg_tgt)
-      (RESERVE: msg_src = Message.reserve -> msg_tgt = Message.reserve)
-      (NLOC: ~ L loc -> from_src = from_tgt)
-    :
-      sim_memory_content_mid P loc (Some (from_src, msg_src)) (Some (from_tgt, msg_tgt))
-  | sim_memory_content_mid_forget
-      from_src from_tgt val released
-      (PROM: P)
-      (NLOC: L loc)
-      (FROM: Time.le from_tgt from_src)
-    (* (SHORT: ~ messages from_tgt -> Time.lt from_tgt from_src) *)
-    :
-      sim_memory_content_mid P loc (Some (from_src, Message.reserve)) (Some (from_tgt, Message.concrete val released))
-  .
-  Hint Constructors sim_memory_content_mid.
+      exists f prom_src' cap_src' max_mid
+             lc_mid cap_mid self'
+      ,
+        (<<FUTURE: reserve_future_memory lc_src.(Local.promises) cap_src prom_src' cap_src'>>) /\
 
+        (<<SCMID: Memory.closed_timemap max_src cap_mid>>) /\
+        (<<MEMMID: Memory.closed cap_mid>>) /\
+        (<<LOCALMID: Local.wf lc_mid cap_mid>>) /\
 
+        (<<COMPLETE: forall loc to (IN: List.In (loc, to) times), mappable_time f loc to>>) /\
 
+        (<<MEMORYMAP: memory_map f cap_tgt cap_mid>>) /\
+        (<<LOCALMAP: local_map f lc_tgt lc_mid>>) /\
+        (<<SCMAP: timemap_map f max_tgt max_mid>>) /\
+        (<<SCLE: TimeMap.le max_src max_mid>>) /\
 
+        (<<MEM: sim_memory L (others \2/ self') cap_src' cap_mid>>) /\
+        (<<SIM: sim_local L self' (Local.mk lc_src.(Local.tview) cap_src) lc_mid>>) /\
 
-
-
-
-
-  Lemma map_ident_concrete_promises
-        f mem0 mem
-        (MAP: map_ident_concrete f mem)
-        (MAPLT: mapping_map_lt f)
-        (CLOSED: Memory.closed mem)
-        (MLE: Memory.le mem0 mem)
-    :
-      promises_map f mem0 mem0.
+        (<<PROMATTACH: promises_not_attached self' (promised prom_src') cap_src'>>) /\
+        (<<EXCLUSIVE: forall loc' ts' (OTHER: others loc' ts'),
+            exists from msg, (<<UNCH: unchangable cap_src prom_src' loc' ts' from msg>>)>>) /\
+        (<<JOINED: forall loc ts (NLOC: ~ L loc), List.Forall (fun vw => Memory.closed_view vw cap_src') (views loc ts)>>).
   Proof.
-    inv CLOSED. econs.
-    - i. esplits; eauto.
-      + eapply mapping_map_lt_non_collapsable; auto.
-      + eapply MLE in GET. eapply Memory.max_ts_spec in GET. des.
-        eapply MAP; eauto.
-      + eapply MLE in GET. eapply CLOSED0 in GET. des.
-        eapply map_ident_concrete_closed_message; eauto.
-    - i. esplits; eauto.
-      + eapply MLE in GET. eapply Memory.max_ts_spec in GET. des.
-        eapply MAP; eauto.
-      + eapply MLE in GET. eapply MAP. etrans.
-        * eapply memory_get_ts_le; eauto.
-        * eapply Memory.max_ts_spec in GET. des. auto.
-  Qed.
+  Admitted.
 
-  Lemma map_ident_concrete_memory
-        f mem
-        (MAP: map_ident_concrete f mem)
-        (MAPLT: mapping_map_lt f)
-        (CLOSED: Memory.closed mem)
-    :
-      memory_map f mem mem.
-  Proof.
-    eapply promises_map_memory_map.
-    eapply map_ident_concrete_promises; eauto. refl.
-  Qed.
-
-  Lemma map_ident_concrete_local
-        f mem lc
-        (MAP: map_ident_concrete f mem)
-        (MAPLT: mapping_map_lt f)
-        (LOCAL: Local.wf lc mem)
-        (CLOSED: Memory.closed mem)
-    :
-      local_map f lc lc.
-  Proof.
-    inv LOCAL. econs.
-    - refl.
-    - eapply map_ident_concrete_closed_tview; eauto.
-    - eapply map_ident_concrete_promises; eauto.
-  Qed.
 
 
 End CONCRETEIDENT.

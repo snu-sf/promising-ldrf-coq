@@ -2882,4 +2882,57 @@ Section SHIFTMAP.
       + eapply MAPLT; eauto.
   Qed.
 
+  Record map_lt_loc_str (f: Time.t -> Time.t -> Prop) (max: option Time.t) :=
+    {
+      map_lt_loc_str_map_lt: mapping_map_lt_loc f;
+      map_lt_loc_sr_bot: f Time.bot Time.bot;
+      map_lt_loc_str_max:
+        forall ts fts max' (MAP: f ts fts) (MAX: max = Some max'),
+          Time.lt fts max';
+      map_lt_loc_str_mid: forall ts,
+          exists fts,
+            (<<BOUND: forall max' (MAX: max = Some max'), Time.lt fts max'>>) /\
+            (<<RIGHT: forall ts' fts' (TS: Time.lt ts ts') (MAP: f ts' fts'),
+                Time.lt fts fts'>>) /\
+            (<<LEFT: forall ts' fts' (TS: Time.lt ts' ts) (MAP: f ts' fts'),
+                Time.lt fts' fts>>);
+    }.
+
+  Lemma mat_lt_loc_str_extend f max ts
+        (MAPLT: map_lt_loc_str f max)
+    :
+      exists f',
+        (<<MAPLT: map_lt_loc_str f' max>>) /\
+        (<<INCR: f <2= f'>>) /\
+        (<<MAPPED: exists fts, f' ts fts>>).
+  Proof.
+    destruct (classic (exists fts, f ts fts)) as [MAPPED|NMAPPED].
+    { des. exists f. splits; eauto. }
+    exploit map_lt_loc_str_mid; eauto. i. des.
+    exists (fun t ft => (<<ORIG: f t ft>>) \/ (<<NEW: t = ts /\ ft = fts>>)).
+    splits; eauto. econs.
+    - ii. des; subst.
+      + apply MAPLT; eauto.
+      + split; i.
+        * eapply RIGHT in H; eauto.
+        * destruct (Time.le_lt_dec t1 ts); auto. exfalso. destruct l.
+          { eapply LEFT in H0; eauto.
+            exfalso. eapply Time.lt_strorder. etrans; eauto. }
+          { inv H0. eauto. }
+      + split; i.
+        * eapply LEFT in H; eauto.
+        * destruct (Time.le_lt_dec ts t0); auto. exfalso. destruct l.
+          { eapply RIGHT in H0; eauto.
+            exfalso. eapply Time.lt_strorder. etrans; eauto. }
+          { inv H0. eauto. }
+      + split; i; exfalso; eapply Time.lt_strorder; eauto.
+    - left. eapply map_lt_loc_sr_bot; eauto.
+    - i. des; subst.
+      + eapply map_lt_loc_str_max; eauto.
+      + auto.
+    - i. destruct (Time.le_lt_dec
+
+
+
+
 End SHIFTMAP.
