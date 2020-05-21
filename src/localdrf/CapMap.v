@@ -325,6 +325,460 @@ Section MIDDLE.
   Proof.
   Admitted.
 
+  Record deattached_memory
+         (f: Loc.t -> Time.t -> Time.t -> Prop)
+         (mem mem_d: Memory.t): Prop :=
+    {
+      deattached_memory_get_normal:
+        forall loc to
+               (NMAP0: forall fto, ~ f loc to fto)
+               (NMAP1: forall f_1to, ~ f loc f_1to to),
+          Memory.get loc to mem = Memory.get loc to mem_d;
+      deattached_memory_get_new:
+        forall loc to fto
+               (MAP: f loc to fto),
+        exists from,
+          (<<GETORIG: Memory.get loc to mem = Some (from, Message.reserve)>>) /\
+          (<<GETDNEW: Memory.get loc fto mem_d = Some (from, Message.reserve)>>) /\
+          (<<GETDORIG: Memory.get loc to mem_d = None>>) /\
+          (<<TS0: Time.lt from fto>>) /\
+          (<<TS1: Time.lt fto to>>);
+    }.
+
+  Lemma deattached_memory_map_eq
+        f mem mem_d
+        (DEATTACH: deattached_memory f mem mem_d)
+        loc to fto0 fto1
+        (MAP0: f loc to fto0)
+        (MAP1: f loc to fto1)
+    :
+      fto0 = fto1.
+  Proof.
+    hexploit deattached_memory_get_new; try apply MAP0; eauto. i. des.
+    hexploit deattached_memory_get_new; try apply MAP1; eauto. i. des. clarify.
+    exploit Memory.get_disjoint.
+    { eapply GETDNEW. }
+    { eapply GETDNEW0. } i. des; subst; auto.
+    exfalso. eapply x0.
+    { instantiate (1:=Time.meet fto0 fto1). unfold Time.meet. des_ifs.
+      - econs; ss. refl.
+      - econs; ss. left. auto. }
+    { unfold Time.meet. des_ifs. econs; ss. refl. }
+  Qed.
+
+  Lemma deattached_memory_map_inj
+        f mem mem_d
+        (DEATTACH: deattached_memory f mem mem_d)
+        loc to0 to1 fto
+        (MAP0: f loc to0 fto)
+        (MAP1: f loc to1 fto)
+    :
+      to0 = to1.
+  Proof.
+    hexploit deattached_memory_get_new; try apply MAP0; eauto. i. des.
+    hexploit deattached_memory_get_new; try apply MAP1; eauto. i. des. clarify.
+    exploit Memory.get_disjoint.
+    { eapply GETORIG. }
+    { eapply GETORIG0. } i. des; subst; auto.
+    exfalso. eapply x0.
+    { instantiate (1:=fto). econs; ss. left. auto. }
+    { econs; ss. left. auto. }
+  Qed.
+
+  Lemma deattached_memory_get_orig_unmap
+        f mem mem_d
+        (DEATTACH: deattached_memory f mem mem_d)
+        loc to fto
+        (MAP: f loc to fto)
+    :
+      Memory.get loc fto mem = None.
+  Proof.
+    hexploit deattached_memory_get_new; eauto. i. des.
+    destruct (Memory.get loc fto mem) as [[from' msg]|] eqn:GET; auto. exfalso.
+    exploit Memory.get_disjoint.
+    { eapply GETORIG. }
+    { eapply GET. } i. des; subst.
+    - eapply Time.lt_strorder; eauto.
+    - eapply x0.
+      + instantiate (1:=fto). econs; ss. left. auto.
+      + econs; ss.
+        * eapply memory_get_ts_strong in GET. des; subst; auto.
+          exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+          { eapply TS0. }
+          { eapply Time.bot_spec. }
+        * refl.
+  Qed.
+
+  Lemma deattaching_promises
+        (self: Loc.t -> Time.t -> Prop) mem prom
+        (SELF: forall loc to (SELF: self loc to),
+            exists from,
+              (<<GET: Memory.get loc to prom = Some (from, Message.reserve)>>))
+        (MLE: Memory.le prom mem)
+        (FIN: Memory.finite prom)
+        (CLOSED: Memory.closed mem)
+    :
+      exists f mem' prom',
+        (<<FUTURE: reserve_future_memory prom mem prom' mem'>>) /\
+        (<<DEATTACHMEM: deattached_memory f mem mem'>>) /\
+        (<<DEATTACHPROM: deattached_memory f prom prom'>>) /\
+        (<<COMPLETE: forall loc to (SELF: self loc to),
+            exists fto, (<<MAP: f loc to fto>>)>>) /\
+        (<<SOUND: forall loc to fto (MAP: f loc to fto), self loc to>>).
+  Proof.
+    assert (exists (l: list (Loc.t * Time.t)),
+               (<<COMPLETE: forall loc to,
+                   self loc to <-> List.In (loc, to) l>>)).
+    { unfold Memory.finite in *. des.
+      hexploit list_filter_exists.
+      instantiate (2:=fun locto => self (fst locto) (snd locto)).
+      instantiate (1:=dom). i. des. exists l'.
+      i. split.
+      - i. eapply COMPLETE. splits; auto.
+        exploit SELF; eauto. i. des. eapply FIN; eauto.
+      - i. eapply COMPLETE in H. des. auto.
+    }
+    des. ginduction l.
+    { i. exists (fun _ _ _ => False), mem, prom. splits.
+      - econs 1.
+      - econs; i; ss.
+      - econs; i; ss.
+      - i. eapply COMPLETE in SELF0. ss.
+      - i. ss. }
+    { i. destruct a as [loc to].
+      destruct (classic (List.In (loc, to) l)) as [IN|NIN].
+      { eapply IHl; eauto. i. rewrite COMPLETE. ss.
+        split; i; auto. des; auto. clarify. }
+      hexploit (IHl L (fun loc' to' => (<<SELF: self loc' to'>>)
+                                       /\ (<<REMOVE: (loc, to) <> (loc', to')>>))); eauto.
+      { i. des. eauto. }
+      { i. split; i.
+        - des. eapply COMPLETE in SELF0. ss. des; auto. clarify.
+        - split.
+          + eapply COMPLETE. ss. auto.
+          + ii. clarify. }
+      i. des.
+
+      assert (SELFTS: self loc to).
+      { eapply COMPLETE. ss. auto. }
+      assert (NMAP0: forall fto, ~ f loc to fto).
+      { ii. eapply SOUND in H. des. clarify. }
+      assert (NMAP1: forall f_1to, ~ f loc f_1to to).
+      { ii. dup H. eapply SOUND in H. des.
+        hexploit (DEATTACHPROM.(deattached_memory_get_new)); eauto. i. des.
+        exploit SELF; try apply SELFTS. i. des.
+        exploit Memory.get_disjoint.
+        { eapply GET. }
+        { eapply GETORIG. }
+        i. des; subst; clarify. eapply x0.
+        { instantiate (1:=to). econs; ss.
+          - apply memory_get_ts_strong in GET. des; subst; auto.
+            exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+            { eapply TS0. }
+            { eapply Time.bot_spec. }
+          - refl. }
+        { econs; ss. left. auto. }
+      }
+
+      hexploit SELF.
+      { eauto. } i. des.
+      rewrite DEATTACHPROM.(deattached_memory_get_normal) in GET; eauto.
+      assert (GETMEM: Memory.get loc to mem' = Some (from, Message.reserve)).
+      { eapply reserve_future_memory_le; eauto. }
+
+      assert (FROMTO: Time.lt from to).
+      { apply memory_get_ts_strong in GET. des; auto. subst.
+        exploit Memory.future_closed.
+        { eapply reserve_future_future; eauto. }
+        { eauto. }
+        intros []. erewrite INHABITED in GETMEM. clarify. }
+      set (fto := Time.middle from to).
+
+      hexploit (@Memory.remove_exists prom' loc from to Message.reserve); eauto.
+      intros [prom0 REMOVEPROM].
+      hexploit (@Memory.remove_exists_le prom' mem' loc from to Message.reserve); eauto.
+      { eapply reserve_future_memory_le; eauto. }
+      intros [mem0 REMOVEMEM].
+
+      assert (PROMISE0: Memory.promise prom' mem' loc from to Message.reserve prom0 mem0 Memory.op_kind_cancel).
+      { econs; eauto. }
+
+      hexploit (@Memory.add_exists mem0 loc from fto Message.reserve).
+      { ii. exploit Memory.get_disjoint.
+        { instantiate (4:=to2).
+          erewrite Memory.remove_o in GET2; eauto. des_ifs. eauto. }
+        { eapply GETMEM. }
+        i. des; subst.
+        { eapply Memory.remove_get0 in REMOVEMEM. des. clarify. }
+        { eapply x1; eauto. inv LHS. econs; ss.
+          transitivity fto; auto. left. eapply Time.middle_spec; auto. }
+      }
+      { eapply Time.middle_spec; eauto. }
+      { econs. }
+      intros [mem1 ADDMEM].
+      hexploit (@Memory.add_exists_le prom0 mem0 loc from fto Message.reserve); eauto.
+      { eapply promise_memory_le; cycle 1; eauto.
+        eapply reserve_future_memory_le; eauto. }
+      intros [prom1 ADDPROM].
+      assert (PROMISE1: Memory.promise prom0 mem0 loc from fto Message.reserve prom1 mem1 Memory.op_kind_add).
+      { econs; eauto. i. clarify. }
+
+      assert (NMAP2: forall fto', ~ f loc fto fto').
+      { i. intros MAP.
+        exploit deattached_memory_get_new; try apply DEATTACHPROM; eauto. i. des.
+        exploit Memory.get_disjoint.
+        { eapply GETORIG. }
+        { instantiate (3:=to).
+          erewrite deattached_memory_get_normal; try apply DEATTACHPROM; eauto. }
+        i. des.
+        { exfalso. eapply Time.lt_strorder.
+          instantiate (1:=to). rewrite <- x0 at 1.
+          eapply Time.middle_spec; auto. }
+        { eapply x0.
+          { instantiate (1:=fto). econs; ss.
+            - etrans; eauto.
+            - refl. }
+          { econs; ss.
+            - eapply Time.middle_spec; auto.
+            - left. eapply Time.middle_spec; auto. }
+        }
+      }
+
+      assert (NMAP3: forall to', ~ f loc to' fto).
+      { i. intros MAP.
+        exploit deattached_memory_get_new; try apply DEATTACHPROM; eauto. i. des.
+        exploit Memory.get_disjoint.
+        { eapply GETORIG. }
+        { instantiate (3:=to).
+          erewrite deattached_memory_get_normal; try apply DEATTACHPROM; eauto. }
+        i. des; subst.
+        { eapply NMAP0; eauto. }
+        { eapply x0.
+          { instantiate (1:=fto). econs; ss. left. auto. }
+          { econs; ss.
+            - eapply Time.middle_spec; auto.
+            - left. eapply Time.middle_spec; auto. }
+        }
+      }
+
+      exists (fun l t ft => (<<ORIG: f l t ft>>) \/ (<<NEW: l = loc /\ t = to /\ ft = fto>>)),
+      mem1, prom1. splits.
+      { eapply reserve_future_memory_trans; eauto. }
+      { econs.
+        { i. erewrite (@Memory.add_o mem1); eauto.
+          erewrite (@Memory.remove_o mem0); eauto. des_ifs.
+          - ss. des; clarify. exfalso.
+            eapply NMAP5; eauto.
+          - ss. des; clarify. exfalso.
+            eapply NMAP4; eauto.
+          - eapply deattached_memory_get_normal; eauto.
+            { ii. eapply NMAP4; eauto. }
+            { ii. eapply NMAP5; eauto. }
+        }
+        { i. des.
+          { exploit deattached_memory_get_new; try apply DEATTACHMEM; eauto. i. des. esplits; eauto.
+            - erewrite (@Memory.add_o mem1); eauto.
+              erewrite (@Memory.remove_o mem0); eauto. des_ifs.
+              + ss. des; clarify. exfalso. eapply NMAP3; eauto.
+              + ss. des; clarify. exfalso. eapply NMAP1; eauto.
+            - erewrite (@Memory.add_o mem1); eauto.
+              erewrite (@Memory.remove_o mem0); eauto. des_ifs.
+              ss. des; clarify. exfalso. eapply NMAP2; eauto.
+          }
+          { subst. exists from. splits; auto.
+            { erewrite deattached_memory_get_normal; try apply DEATTACHMEM; eauto. }
+            { eapply Memory.add_get0; eauto. }
+            { erewrite (@Memory.add_o mem1); eauto.
+              erewrite (@Memory.remove_o mem0); eauto. des_ifs.
+              - ss. des; clarify.
+                exfalso. eapply Time.lt_strorder.
+                instantiate (1:=to). rewrite a0 at 1. eapply Time.middle_spec; auto.
+              - ss. des; clarify. }
+            { eapply Time.middle_spec; eauto. }
+            { eapply Time.middle_spec; eauto. }
+          }
+        }
+      }
+      { econs.
+        { i. erewrite (@Memory.add_o prom1); eauto.
+          erewrite (@Memory.remove_o prom0); eauto. des_ifs.
+          - ss. des; clarify. exfalso.
+            eapply NMAP5; eauto.
+          - ss. des; clarify. exfalso.
+            eapply NMAP4; eauto.
+          - eapply deattached_memory_get_normal; eauto.
+            { ii. eapply NMAP4; eauto. }
+            { ii. eapply NMAP5; eauto. }
+        }
+        { i. des.
+          { exploit deattached_memory_get_new; try apply DEATTACHPROM; eauto. i. des. esplits; eauto.
+            - erewrite (@Memory.add_o prom1); eauto.
+              erewrite (@Memory.remove_o prom0); eauto. des_ifs.
+              + ss. des; clarify. exfalso. eapply NMAP3; eauto.
+              + ss. des; clarify. exfalso. eapply NMAP1; eauto.
+            - erewrite (@Memory.add_o prom1); eauto.
+              erewrite (@Memory.remove_o prom0); eauto. des_ifs.
+              ss. des; clarify. exfalso. eapply NMAP2; eauto.
+          }
+          { subst. exists from. splits; auto.
+            { erewrite deattached_memory_get_normal; try apply DEATTACHPROM; eauto. }
+            { eapply Memory.add_get0; eauto. }
+            { erewrite (@Memory.add_o prom1); eauto.
+              erewrite (@Memory.remove_o prom0); eauto. des_ifs.
+              - ss. des; clarify.
+                exfalso. eapply Time.lt_strorder.
+                instantiate (1:=to). rewrite a0 at 1. eapply Time.middle_spec; auto.
+              - ss. des; clarify. }
+            { eapply Time.middle_spec; eauto. }
+            { eapply Time.middle_spec; eauto. }
+          }
+        }
+      }
+      { i. destruct (classic ((loc0, to0) = (loc, to))).
+        - clarify. eauto.
+        - exploit COMPLETE0; eauto. i. des. eauto. }
+      { i. des.
+        - eapply SOUND in MAP. des. auto.
+        - subst. auto. }
+    }
+  Qed.
+
+  Definition attached_promises (self prom: Loc.t -> Time.t -> Prop) (mem: Memory.t)
+             (loc: Loc.t) (ts0: Time.t): Prop :=
+    (<<SELF: self loc ts0>>) /\
+    (<<ATTACH: exists ts1 msg,
+        (<<GET: Memory.get loc ts1 mem = Some (ts0, msg)>>) /\
+        (<<OTHERS: ~ prom loc ts1>>)>>).
+
+  Inductive mapped_self_promises (self: Loc.t -> Time.t -> Prop)
+            (f: Loc.t -> Time.t -> Time.t -> Prop)
+    :
+      forall (loc: Loc.t) (ts: Time.t), Prop:=
+  | mapped_self_promises_unmap
+      loc ts
+      (SELF: self loc ts)
+      (UNMAP: forall fts, ~ f loc ts fts)
+    :
+      mapped_self_promises self f loc ts
+  | mapped_self_promises_map
+      loc ts fts
+      (MAP: f loc ts fts)
+      (SELF: self loc ts)
+    :
+      mapped_self_promises self f loc fts
+  .
+
+  Inductive mid_map (mem: Memory.t)
+            (f: Loc.t -> Time.t -> Time.t -> Prop)
+    :
+      Loc.t -> Time.t -> Time.t -> Prop :=
+  | mid_map_normal
+      loc ts
+      (NMAP: forall fts, ~ f loc ts fts)
+      (PROMISED: promised mem loc ts)
+    :
+      mid_map mem f loc ts ts
+  | mid_map_map
+      loc ts fts
+      (MAP: f loc ts fts)
+    :
+      mid_map mem f loc ts fts
+  .
+  Hint Constructors mid_map.
+
+  Lemma mid_map_map_bot f mem mem'
+        (DEATTACHMEM: deattached_memory f mem mem')
+        (CLOSED: Memory.closed mem)
+    :
+      mapping_map_bot (mid_map mem f).
+  Proof.
+    ii. econs 1.
+    - ii. exploit deattached_memory_get_new; eauto. i. des.
+      exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+      { eapply TS1. }
+      { eapply Time.bot_spec. }
+    - inv CLOSED. econs; eauto.
+  Qed.
+
+  Lemma mid_map_map_lt f mem mem'
+        (DEATTACHMEM: deattached_memory f mem mem')
+    :
+      mapping_map_lt (mid_map mem f).
+  Proof.
+    ii. inv MAP0; inv MAP1.
+    - auto.
+    - exploit deattached_memory_get_new; eauto. i. des. split.
+      + i. inv PROMISED. destruct msg.
+        exploit memory_get_from_mon.
+        { eapply GET. }
+        { eapply GETORIG. }
+        { eauto. }
+        i. eapply TimeFacts.le_lt_lt; eauto.
+      + i. etrans; eauto.
+    - exploit deattached_memory_get_new; eauto. i. des. split.
+      + i. etrans; eauto.
+      + i. inv PROMISED. destruct msg.
+        destruct (Time.le_lt_dec ft1 t0); auto. destruct l.
+        { exfalso. exploit memory_get_from_mon.
+          { eapply GET. }
+          { eapply GETORIG. }
+          { eauto. }
+          i. eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt.
+          { eapply x0. }
+          { transitivity ft0; auto. }
+        }
+        { inv H0. exfalso. eapply NMAP; eauto. }
+    - exploit deattached_memory_get_new; try apply MAP; eauto.
+      exploit deattached_memory_get_new; try apply MAP0; eauto. i. des.
+      destruct (Time.le_lt_dec t0 t1); cycle 1.
+      { split; i.
+        - exfalso. eapply Time.lt_strorder. transitivity t0; eauto.
+        - exploit memory_get_from_mon.
+          { eapply GETORIG0. }
+          { eapply GETORIG. }
+          { eauto. }
+          i. exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+          { eapply TS3. } etrans.
+          { eapply x0. } etrans.
+          { left. eapply TS0. }
+          { left. auto. }
+      }
+      destruct l.
+      { split; i; auto.
+        exploit memory_get_from_mon.
+        { eapply GETORIG. }
+        { eapply GETORIG0. }
+        { eauto. }
+        i. etrans.
+        { eapply TS1. } eapply TimeFacts.le_lt_lt.
+        { eapply x0. }
+        { eauto. }
+      }
+      { inv H. clarify. hexploit deattached_memory_map_eq.
+        { eauto. }
+        { eapply MAP. }
+        { eapply MAP0. }
+        i. subst. split; i; exfalso; eapply Time.lt_strorder; eauto.
+      }
+  Qed.
+
+
+  Lemma deattached_promises_not_attached (self: Loc.t -> Time.t -> Prop)
+        f prom mem prom' mem'
+        (MLE: Memory.le prom' mem')
+        (DEATTACHMEM: deattached_memory f mem mem')
+        (DEATTACHPROM: deattached_memory f prom prom')
+        (COMPLETE: forall loc to (SELF: attached_promises self (promised prom) mem loc to),
+            exists fto, (<<MAP: f loc to fto>>))
+    :
+      promises_not_attached (mapped_self_promises self f) (promised prom') mem'.
+  Proof.
+    ii. inv PROMISED.
+    - admit.
+    - hexploit deattached_memory_get_new; try apply DEATTACHMEM; eauto. i. des.
+  Admitted.
+
+
 
 
 End CONCRETEIDENT.
