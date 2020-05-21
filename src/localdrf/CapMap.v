@@ -668,7 +668,7 @@ Section MIDDLE.
       mapped_self_promises self f loc fts
   .
 
-  Inductive mid_map (mem: Memory.t)
+  Inductive mid_map (mem: Memory.t) (prom: Memory.t)
             (f: Loc.t -> Time.t -> Time.t -> Prop)
     :
       Loc.t -> Time.t -> Time.t -> Prop :=
@@ -677,20 +677,26 @@ Section MIDDLE.
       (NMAP: forall fts, ~ f loc ts fts)
       (PROMISED: promised mem loc ts)
     :
-      mid_map mem f loc ts ts
+      mid_map mem prom f loc ts ts
+  | mid_map_promise
+      loc from to msg
+      (NMAP: forall fts, ~ f loc to fts)
+      (PROMISED: Memory.get loc to prom = Some (from, msg))
+    :
+      mid_map mem prom f loc from from
   | mid_map_map
       loc ts fts
       (MAP: f loc ts fts)
     :
-      mid_map mem f loc ts fts
+      mid_map mem prom f loc ts fts
   .
   Hint Constructors mid_map.
 
-  Lemma mid_map_map_bot f mem mem'
+  Lemma mid_map_map_bot f mem mem' prom
         (DEATTACHMEM: deattached_memory f mem mem')
         (CLOSED: Memory.closed mem)
     :
-      mapping_map_bot (mid_map mem f).
+      mapping_map_bot (mid_map mem prom f).
   Proof.
     ii. econs 1.
     - ii. exploit deattached_memory_get_new; eauto. i. des.
@@ -700,12 +706,13 @@ Section MIDDLE.
     - inv CLOSED. econs; eauto.
   Qed.
 
-  Lemma mid_map_map_lt f mem mem'
+  Lemma mid_map_map_lt f mem mem' prom
         (DEATTACHMEM: deattached_memory f mem mem')
     :
-      mapping_map_lt (mid_map mem f).
+      mapping_map_lt (mid_map mem prom f).
   Proof.
     ii. inv MAP0; inv MAP1.
+    - auto.
     - auto.
     - exploit deattached_memory_get_new; eauto. i. des. split.
       + i. inv PROMISED. destruct msg.
@@ -715,6 +722,11 @@ Section MIDDLE.
         { eauto. }
         i. eapply TimeFacts.le_lt_lt; eauto.
       + i. etrans; eauto.
+    - auto.
+    - auto.
+    -
+
+      admit.
     - exploit deattached_memory_get_new; eauto. i. des. split.
       + i. etrans; eauto.
       + i. inv PROMISED. destruct msg.
@@ -728,6 +740,7 @@ Section MIDDLE.
           { transitivity ft0; auto. }
         }
         { inv H0. exfalso. eapply NMAP; eauto. }
+    - admit.
     - exploit deattached_memory_get_new; try apply MAP; eauto.
       exploit deattached_memory_get_new; try apply MAP0; eauto. i. des.
       destruct (Time.le_lt_dec t0 t1); cycle 1.
@@ -760,8 +773,7 @@ Section MIDDLE.
         { eapply MAP0. }
         i. subst. split; i; exfalso; eapply Time.lt_strorder; eauto.
       }
-  Qed.
-
+  Admitted.
 
   Lemma deattached_promises_not_attached (self: Loc.t -> Time.t -> Prop)
         f prom mem prom' mem'
@@ -778,7 +790,4 @@ Section MIDDLE.
     - hexploit deattached_memory_get_new; try apply DEATTACHMEM; eauto. i. des.
   Admitted.
 
-
-
-
-End CONCRETEIDENT.
+End MIDDLE.
