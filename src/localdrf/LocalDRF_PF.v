@@ -150,13 +150,21 @@ Section SIM.
   (*             (<<ITV: Interval.mem (from, to) ts>>)); *)
   (*   }. *)
 
-  Definition sim_memory
-             (F: Loc.t -> Time.t -> Prop)
-             (extra: Loc.t -> Time.t -> Time.t -> Prop)
-             (mem_src mem_tgt: Memory.t): Prop :=
-    forall loc ts,
-      sim_memory_content (F loc ts) (extra loc ts)
-                         loc ts (Memory.get loc ts mem_src) (Memory.get loc ts mem_tgt).
+  Record sim_memory
+         (F: Loc.t -> Time.t -> Prop)
+         (extra: Loc.t -> Time.t -> Time.t -> Prop)
+         (mem_src mem_tgt: Memory.t): Prop :=
+    {
+      sim_memory_contents:
+        forall loc ts,
+          sim_memory_content (F loc ts) (extra loc ts)
+                             loc ts (Memory.get loc ts mem_src) (Memory.get loc ts mem_tgt);
+      sim_memory_wf:
+        forall loc from ts (EXTRA: extra loc ts from),
+          (<<FORGET: F loc from>>) /\
+          (<<LB: lb_time (times loc) from ts>>) /\
+          (<<TS: Time.lt from ts>>);
+    }.
 
   Inductive sim_promise_content
             (F: Prop)
@@ -217,6 +225,11 @@ Section SIM.
                               (Memory.get loc ts prom_src)
                               (Memory.get loc ts prom_tgt);
       sim_promise_wf:
+        forall loc from ts (EXTRA: extra loc ts from),
+          (<<FORGET: self loc from>>) /\
+          (<<LB: lb_time (times loc) from ts>>) /\
+          (<<TS: Time.lt from ts>>);
+      sim_promise_extra:
         forall loc ts (SELF: self loc ts),
         exists to,
           (<<GET: Memory.get loc to prom_src = Some (ts, Message.reserve)>>) /\
@@ -272,7 +285,7 @@ Section SIM.
   .
   Proof.
     inv LOCAL. inv STEPTGT.
-    specialize (MEM loc to). rewrite GET in *. inv MEM; ss.
+    set (MEM0:= MEM.(sim_memory_contents) loc to). rewrite GET in *. inv MEM0; ss.
     esplits; eauto.
   Qed.
 
@@ -321,7 +334,7 @@ Section SIM.
     :
       forall loc' to', F loc' to' -> L loc'.
   Proof.
-    ii. specialize (MEMORY loc' to'). inv MEMORY; clarify.
+    ii. set (MEMORY0:=MEMORY.(sim_memory_contents) loc' to'). inv MEMORY0; clarify.
   Qed.
 
   Lemma sim_memory_extra_others_self_wf
@@ -330,8 +343,8 @@ Section SIM.
     :
       forall loc' from to', extra loc' to' from -> L loc'.
   Proof.
-    ii. specialize (MEMORY loc' to').
-    inv MEMORY; clarify; (exfalso; eapply NEXTRA; eauto).
+    ii. set (MEMORY0:=MEMORY.(sim_memory_contents) loc' to').
+    inv MEMORY0; clarify; (exfalso; eapply NEXTRA; eauto).
   Qed.
 
   Lemma sim_promise_step_normal others self extra_others extra_self
@@ -345,15 +358,12 @@ Section SIM.
         (WFSRC: Memory.le prom_src mem_src)
         (WFTGT: Memory.le prom_tgt mem_tgt)
         (PROMISE: sim_promise self extra_self prom_src prom_tgt)
-        (PROMATTACH: promises_not_attached self (promised prom_src) mem_src)
         (SEMI: semi_closed_message msg mem_src loc to)
     :
       exists prom_src' mem_src',
         (<<STEPSRC: Memory.promise prom_src mem_src loc from to msg prom_src' mem_src' kind>>) /\
         (<<MEM: sim_memory (others \2/ self) (extra_others \3/ extra_self) mem_src' mem_tgt'>>) /\
-        (<<ATTACHEDLE: not_attached_le others mem_src mem_src'>>) /\
         (<<PROMISE: sim_promise self extra_self prom_src' prom_tgt'>>) /\
-        (<<PROMATTACH: promises_not_attached self (promised prom_src') mem_src'>>) /\
         (<<CLOSED: Memory.closed_message msg mem_src'>>)
   .
   Proof.
@@ -364,7 +374,8 @@ Section SIM.
     (* add case *)
     - exploit add_succeed_wf; try apply MEM0. i. des.
       hexploit (@Memory.add_exists mem_src loc from to msg); ss.
-      { i. specialize (MEM loc to2). rewrite GET2 in *. inv MEM; cycle 1.
+      { i. set (MEM1:= MEM.(sim_memory_contents) loc to2).
+        rewrite GET2 in *. inv MEM1; cycle 1.
         { exfalso. apply NLOC. des; eauto. }
         { exfalso. apply NLOC. des; eauto. }
         ii. eapply DISJOINT; eauto.
@@ -375,7 +386,7 @@ Section SIM.
 
       assert (PROMISESRC: Memory.promise prom_src mem_src loc from to msg prom_src' mem_src' Memory.op_kind_add).
       { econs; eauto. i. subst.
-        specialize (MEM loc to'). rewrite GET in MEM. inv MEM; ss.
+        set (MEM1:= MEM.(sim_memory_contents) loc to'). rewrite GET in MEM1. inv MEM1; ss.
         eapply ATTACH; eauto. erewrite NLOC0; eauto. }
 
       assert (CLOSEDMSG: Memory.closed_message msg mem_src').
@@ -383,30 +394,28 @@ Section SIM.
         eapply semi_closed_message_add; eauto. }
 
       exists prom_src', mem_src'. splits; auto.
-      + ii. erewrite (@Memory.add_o mem_src'); eauto.
-        erewrite (@Memory.add_o mem_tgt'); eauto.
-        des_ifs; try by (ss; des; clarify).
-        * econs; eauto.
-          { ii. ss. des; clarify; eauto. }
-          { ii. ss. des; clarify; eauto. }
-          { refl. }
-      + ii. erewrite (@Memory.add_o mem_src') in GET; eauto. des_ifs; eauto.
-        ss. des; clarify. exfalso. eauto.
+      + econs.
+        { ii. set (MEM1:= MEM.(sim_memory_contents) loc0 ts).
+          erewrite (@Memory.add_o mem_src'); eauto.
+          erewrite (@Memory.add_o mem_tgt'); eauto.
+          des_ifs; try by (ss; des; clarify).
+          * econs; eauto.
+            { ii. ss. des; clarify; eauto. }
+            { ii. ss. des; clarify; eauto. }
+            { refl. }
+        }
+        { eapply MEM.(sim_memory_wf); eauto. }
       + econs.
         { ii. set (PROM:= PROMISE.(sim_promise_contents) loc0 ts).
           erewrite (@Memory.add_o prom_src'); eauto.
           erewrite (@Memory.add_o prom_tgt'); eauto. des_ifs.
           ss. des; clarify. econs; eauto.
         }
-        { i. hexploit PROMISE.(sim_promise_wf); eauto. i. des.
+        { apply PROMISE. }
+        { i. hexploit PROMISE.(sim_promise_extra); eauto. i. des.
           esplits; eauto. erewrite (@Memory.add_o prom_src'); eauto.
           des_ifs. ss. des; clarify.
           exfalso. eapply NLOC. eapply PROMSWF; eauto. }
-      + ii. erewrite promised_add; eauto.
-        erewrite (@Memory.add_o mem_src' mem_src) in GET; eauto.
-        des_ifs; try by (des; ss; clarify).
-        { ss. des; clarify. exfalso. eauto. }
-        { eapply PROMATTACH; eauto. }
 
     (* split case *)
     - exploit split_succeed_wf; try apply PROMISES. i. des. clarify.
@@ -425,32 +434,28 @@ Section SIM.
       { eapply semi_closed_message_split; eauto. }
 
       exists prom_src', mem_src'. splits; auto.
-      + ii. erewrite (@Memory.split_o mem_src'); eauto.
-        erewrite (@Memory.split_o mem_tgt'); eauto.
-        des_ifs; try by (ss; des; clarify).
-        { ss. des; clarify. econs; eauto.
-          * refl. }
-        { guardH o. ss. des; clarify. econs; eauto.
-          * refl. }
-      + ii. erewrite (@Memory.split_o mem_src') in GET; eauto. des_ifs; eauto.
-        * ss. des; clarify. exfalso. eauto.
-        * guardH o. ss. des; clarify. exfalso. eauto.
+      + econs.
+        { ii. set (MEM1:=MEM.(sim_memory_contents) loc0 ts).
+          erewrite (@Memory.split_o mem_src'); eauto.
+          erewrite (@Memory.split_o mem_tgt'); eauto.
+          des_ifs; try by (ss; des; clarify).
+          { ss. des; clarify. econs; eauto.
+            * refl. }
+          { guardH o. ss. des; clarify. econs; eauto.
+            * refl. }
+        }
+        { apply MEM.(sim_memory_wf); eauto. }
       + econs.
         { ii. set (PROM:= PROMISE.(sim_promise_contents) loc0 ts).
           erewrite (@Memory.split_o prom_src'); eauto.
           erewrite (@Memory.split_o prom_tgt'); eauto. des_ifs.
           * ss. des; clarify. econs; eauto.
           * guardH o. ss. des; clarify. econs; eauto. }
-        { i. hexploit PROMISE.(sim_promise_wf); eauto. i. des.
+        { apply PROMISE. }
+        { i. hexploit PROMISE.(sim_promise_extra); eauto. i. des.
           esplits; eauto. erewrite (@Memory.split_o prom_src'); eauto. des_ifs.
           - ss. des; clarify. exfalso. eapply NLOC. eapply PROMSWF; eauto.
           - ss. des; clarify. exfalso. eapply NLOC. eapply PROMSWF; eauto. }
-      + ii. erewrite promised_split; eauto.
-        erewrite (@Memory.split_o mem_src' mem_src) in GET; eauto.
-        des_ifs; try by (des; ss; clarify).
-        * ss. des; clarify. exfalso. eauto.
-        * guardH o. ss. des; clarify. exfalso. eauto.
-        * eapply PROMATTACH; eauto.
 
     (* lower case *)
     - exploit lower_succeed_wf; try apply PROMISES. i. des. clarify.
@@ -470,25 +475,22 @@ Section SIM.
         eapply semi_closed_message_lower; eauto. }
 
       exists prom_src', mem_src'. splits; auto.
-      + ii. erewrite (@Memory.lower_o mem_src'); eauto.
-        erewrite (@Memory.lower_o mem_tgt'); eauto. des_ifs.
-        ss. des; clarify. econs; eauto.
-        * refl.
-      + ii. erewrite (@Memory.lower_o mem_src') in GET0; eauto. des_ifs; eauto.
-        ss. des; clarify. exfalso. eauto.
+      + econs.
+        { ii. set (MEM1:=MEM.(sim_memory_contents) loc0 ts).
+          erewrite (@Memory.lower_o mem_src'); eauto.
+          erewrite (@Memory.lower_o mem_tgt'); eauto. des_ifs.
+          ss. des; clarify. econs; eauto.
+          * refl. }
+        { apply MEM.(sim_memory_wf); eauto. }
       + econs.
         { ii. set (PROM:= PROMISE.(sim_promise_contents) loc0 ts).
           erewrite (@Memory.lower_o prom_src'); eauto.
           erewrite (@Memory.lower_o prom_tgt'); eauto. des_ifs.
           ss. des; clarify. econs; eauto. }
-        { i. hexploit PROMISE.(sim_promise_wf); eauto. i. des.
+        { apply PROMISE. }
+        { i. hexploit PROMISE.(sim_promise_extra); eauto. i. des.
           esplits; eauto. erewrite (@Memory.lower_o prom_src'); eauto. des_ifs.
           ss. des; clarify. }
-      + ii. erewrite promised_lower; eauto.
-        erewrite Memory.lower_o in GET0; eauto.
-        des_ifs; try by (des; ss; clarify).
-        * ss. des; clarify. exfalso; eauto.
-        * eapply PROMATTACH; eauto.
 
     (* cancel case *)
     - exploit Memory.remove_get0; try apply PROMISES. i. des.
@@ -505,24 +507,22 @@ Section SIM.
 
       exists prom_src', mem_src'.
       splits; auto.
-      + ii. erewrite (@Memory.remove_o mem_src'); eauto.
-        erewrite (@Memory.remove_o mem_tgt'); eauto.
-        des_ifs; try by (des; ss; clarify).
-        * ss. des; clarify. econs; eauto.
-      + ii. erewrite (@Memory.remove_o mem_src') in GET1; eauto. des_ifs; eauto.
+      + econs.
+        { ii. set (MEM1:=MEM.(sim_memory_contents) loc0 ts).
+          erewrite (@Memory.remove_o mem_src'); eauto.
+          erewrite (@Memory.remove_o mem_tgt'); eauto.
+          des_ifs; try by (des; ss; clarify).
+          * ss. des; clarify. econs; eauto. }
+        { apply MEM. }
       + econs.
         { ii. set (PROM:= PROMISE.(sim_promise_contents) loc0 ts).
           erewrite (@Memory.remove_o prom_src'); eauto.
           erewrite (@Memory.remove_o prom_tgt'); eauto. des_ifs.
           ss. des; clarify. econs 2; eauto. }
-        { i. hexploit PROMISE.(sim_promise_wf); eauto. i. des.
+        { apply PROMISE. }
+        { i. hexploit PROMISE.(sim_promise_extra); eauto. i. des.
           esplits; eauto. erewrite (@Memory.remove_o prom_src'); eauto. des_ifs.
           ss. des; clarify. exfalso. eapply NLOC. eapply PROMSWF; eauto. }
-      + ii. erewrite promised_remove; eauto.
-        erewrite (@Memory.remove_o mem_src') in GET1; eauto.
-        des_ifs; try by (des; ss; clarify).
-        * eapply PROMATTACH; eauto.
-        * eapply PROMATTACH; eauto.
   Qed.
 
   Lemma sim_write_step_normal
@@ -538,7 +538,6 @@ Section SIM.
         (LOCALSRC: Local.wf lc_src mem_src)
         (LOCALTGT: Local.wf lc_tgt mem_tgt)
         (SIM: sim_local self extra_self lc_src lc_tgt)
-        (PROMATTACH: promises_not_attached self (promised lc_src.(Local.promises)) mem_src)
 
         (RELEASEDMCLOSED: Memory.closed_opt_view releasedm mem_src)
         (RELEASEDMWF: View.opt_wf releasedm)
@@ -546,8 +545,6 @@ Section SIM.
       exists lc_src' mem_src',
         (<<STEPSRC: Local.write_step lc_src sc mem_src loc from to val releasedm released ord lc_src' sc' mem_src' kind>>) /\
         (<<MEM: sim_memory (others \2/ self) (extra_others \3/ extra_self) mem_src' mem_tgt'>>) /\
-        (<<ATTACHEDLE: not_attached_le others mem_src mem_src'>>) /\
-        (<<PROMATTACH: promises_not_attached self (promised lc_src'.(Local.promises)) mem_src'>>) /\
         (<<SIM: sim_local self extra_self lc_src' lc_tgt'>>)
   .
   Proof.
@@ -578,135 +575,190 @@ Section SIM.
 
     assert (NSELF: forall ts, ~ self loc ts).
     { ii. set (PROM:= PROMISE0.(sim_promise_contents) loc to). inv PROM; ss.
-      eapply NLOC. eapply NPROMSWF.
-      exfalso.
-
-      specialize (PROMISE0 loc ts). inv PROMISE0; ss. }
+      eapply NLOC. eapply sim_memory_others_self_wf; eauto. ss. eauto. }
 
     esplits; eauto.
 
     - econs; ss.
       + econs; eauto.
-      + ii. specialize (PROMS loc t).
-        rewrite GET in *. inv PROMS; ss.
+      + ii. set (PROM:=PROMS.(sim_promise_contents) loc t).
+        rewrite GET in *. inv PROM; ss.
         exploit RELEASE; eauto.
-    - ss. ii. exploit PROMATTACH0; eauto. i.
-      erewrite promised_remove; eauto. des_ifs. eapply NSELF; eauto.
 
-    - econs; auto. ii.
-      erewrite (@Memory.remove_o prom_src''); eauto.
-      erewrite (@Memory.remove_o promises2); eauto. des_ifs.
-      ss. des; subst. econs 2; eauto.
-      ii. exploit sim_memory_extra_others_self_wf.
-      { eapply MEM0. }
-      { right. eauto. }
-      { ii. ss. }
+    - econs; auto. econs.
+      { ii. set (PROM:=PROMISE0.(sim_promise_contents) loc0 ts).
+        erewrite (@Memory.remove_o prom_src''); eauto.
+        erewrite (@Memory.remove_o promises2); eauto. des_ifs.
+        ss. des; subst. econs 2; eauto.
+        ii. exploit sim_memory_extra_others_self_wf.
+        { eapply MEM0. }
+        { right. eauto. }
+        { ii. ss. }
+      }
+      { apply PROMISE0. }
+      { i. set (PROM:=PROMISE0.(sim_promise_extra) loc0 ts SELF). des.
+        esplits; eauto. erewrite (@Memory.remove_o prom_src''); eauto.
+        des_ifs. ss. des; clarify. exfalso. eapply NSELF; eauto. }
   Qed.
 
-  Inductive sim_promise_content_strong (loc: Loc.t) (ts: Time.t)
-            (P: Prop) (messages: Time.t -> Prop)
+
+  Inductive sim_promise_content_strong
+            (F: Prop)
+            (extra: Time.t -> Prop)
+            (messages: Time.t -> Prop)
+            (loc: Loc.t) (ts: Time.t)
     :
       option (Time.t * Message.t) -> option (Time.t * Message.t) -> Prop :=
   | sim_promise_content_strong_none
-      (NPROM: ~ P)
+      (NPROM: ~ F)
+      (NEXTRA: forall t, ~ extra t)
+      (NLOC: L loc)
     :
-      sim_promise_content_strong loc ts F messages None None
-  | sim_promise_content_strong_normal_concrete
-      (NPROM: ~ P)
+      sim_promise_content_strong F extra messages loc ts None None
+  | sim_promise_content_strong_normal
+      (NPROM: ~ F)
+      (NEXTRA: forall t, ~ extra t)
       (NLOC: ~ L loc)
-      from msg
+      cnt
     :
-      sim_promise_content_strong loc ts F messages
-                                 (Some (from, msg))
-                                 (Some (from, msg))
-  | sim_promise_content_strong_normal_reserve
-      (NPROM: ~ P)
+      sim_promise_content_strong F extra messages loc ts cnt cnt
+  | sim_promise_content_strong_reserve
+      (NPROM: ~ F)
+      (NEXTRA: forall t, ~ extra t)
       (LOC: L loc)
       from_src from_tgt
-      (NOTHERS: forall (LOC: L loc) (MSG: messages from_tgt), from_tgt = from_src)
+      (NOTHERS: forall (MSG: messages from_tgt), from_tgt = from_src)
     :
-      sim_promise_content_strong loc ts F messages
-                                 (Some (from_src, Message.reserve))
-                                 (Some (from_tgt, Message.reserve))
+      sim_promise_content_strong F extra messages loc ts
+                          (Some (from_src, Message.reserve))
+                          (Some (from_tgt, Message.reserve))
   | sim_promise_content_strong_forget
-      (PROM: P)
+      (NPROM: ~ F)
+      (NEXTRA: forall t, ~ extra t)
       (LOC: L loc)
       from_src from_tgt val released
       (NOTHERS: forall (MSG: messages from_tgt), from_tgt = from_src)
     :
-      sim_promise_content_strong loc ts F messages
-                                 (Some (from_src, Message.reserve))
-                                 (Some (from_tgt, Message.concrete val released))
+      sim_promise_content_strong F extra messages loc ts
+                          (Some (from_src, Message.reserve))
+                          (Some (from_tgt, Message.concrete val released))
+  | sim_promise_content_strong_extra
+      from
+      (NPROM: ~ F)
+      (LOC: L loc)
+      (EXTRA: extra from)
+    :
+      sim_promise_content_strong F extra messages loc ts (Some (from, Message.reserve)) None
   .
   Hint Constructors sim_promise_content_strong.
 
+
   Lemma sim_promise_content_strong_sim_promise_content
-        loc ts F get0 get1 messages
-        (SIM: sim_promise_content_strong loc ts F messages get0 get1)
+        loc ts F extra get0 get1 messages
+        (SIM: sim_promise_content_strong F extra messages loc ts  get0 get1)
     :
-      sim_promise_content loc ts F get0 get1.
+      sim_promise_content F extra loc ts get0 get1.
   Proof.
     inv SIM; econs; eauto.
   Qed.
 
-  Definition sim_promise_strong
-             (self messages: Loc.t -> Time.t -> Prop)
-             (prom_src prom_tgt: Memory.t): Prop :=
-    forall loc ts,
-      sim_promise_content_strong loc ts (self loc ts)
-                                 (messages loc)
-                                 (Memory.get loc ts prom_src)
-                                 (Memory.get loc ts prom_tgt).
+  Record sim_promise_strong
+         (self: Loc.t -> Time.t -> Prop)
+         (extra: Loc.t -> Time.t -> Time.t -> Prop)
+         (messages: Loc.t -> Time.t -> Prop)
+         (prom_src prom_tgt: Memory.t): Prop :=
+    {
+      sim_promise_strong_contents:
+        forall loc ts,
+          sim_promise_content_strong (self loc ts) (extra loc ts) (messages loc)
+                                     loc ts
+                                     (Memory.get loc ts prom_src)
+                                     (Memory.get loc ts prom_tgt);
+      sim_promise_strong_wf:
+        forall loc from ts (EXTRA: extra loc ts from),
+          (<<FORGET: self loc from>>) /\
+          (<<LB: lb_time (times loc) from ts>>) /\
+          (<<TS: Time.lt from ts>>);
+      sim_promise_strong_extra:
+        forall loc ts (SELF: self loc ts),
+        exists to,
+          (<<GET: Memory.get loc to prom_src = Some (ts, Message.reserve)>>) /\
+          (<<TS: Time.lt to ts>>);
+    }.
 
   Lemma sim_promise_strong_sim_promise
-        self messages prom_src prom_tgt
-        (SIM: sim_promise_strong self messages prom_src prom_tgt)
+        self extra messages prom_src prom_tgt
+        (SIM: sim_promise_strong self extra messages prom_src prom_tgt)
     :
-      sim_promise self prom_src prom_tgt.
+      sim_promise self extra prom_src prom_tgt.
   Proof.
-    ii. eapply sim_promise_content_strong_sim_promise_content; eauto.
+    econs.
+    - ii. eapply sim_promise_content_strong_sim_promise_content; eauto.
+      eapply SIM; eauto.
+    - apply SIM.
+    - apply SIM.
   Qed.
 
-  Definition sim_promise_list (self messages: Loc.t -> Time.t -> Prop)
-             (prom_src prom_tgt: Memory.t)
-             (l: list (Loc.t * Time.t)): Prop :=
-    forall loc ts,
-      (<<NORMAL: sim_promise_content_strong loc ts (self loc ts) (messages loc)
-                                            (Memory.get loc ts prom_src)
-                                            (Memory.get loc ts prom_tgt)>>) \/
-      ((<<LIN: List.In (loc, ts) l>>) /\
-       (<<WEAK: sim_promise_content loc ts (self loc ts)
-                                    (Memory.get loc ts prom_src)
-                                    (Memory.get loc ts prom_tgt)>>)).
+  Record sim_promise_list
+         (self: Loc.t -> Time.t -> Prop)
+         (extra: Loc.t -> Time.t -> Time.t -> Prop)
+         (messages: Loc.t -> Time.t -> Prop)
+         (prom_src prom_tgt: Memory.t)
+         (l: list (Loc.t * Time.t)): Prop :=
+    {
+      sim_promise_list_contents:
+        forall loc ts,
+          (<<NORMAL: sim_promise_content_strong (self loc ts) (extra loc ts) (messages loc) loc ts
+                                                (Memory.get loc ts prom_src)
+                                                (Memory.get loc ts prom_tgt)>>) \/
+          ((<<LIN: List.In (loc, ts) l>>) /\
+           (<<WEAK: sim_promise_content (self loc ts) (extra loc ts) loc ts
+                                        (Memory.get loc ts prom_src)
+                                        (Memory.get loc ts prom_tgt)>>));
+      sim_promise_list_wf:
+        forall loc from ts (EXTRA: extra loc ts from),
+          (<<FORGET: self loc from>>) /\
+          (<<LB: lb_time (times loc) from ts>>) /\
+          (<<TS: Time.lt from ts>>);
+      sim_promise_list_extra:
+        forall loc ts (SELF: self loc ts),
+        exists to,
+          (<<GET: Memory.get loc to prom_src = Some (ts, Message.reserve)>>) /\
+          (<<TS: Time.lt to ts>>);
+    }.
 
-  Lemma sim_promise_list_nil self messages prom_src prom_tgt
-        (SIM: sim_promise_list self messages prom_src prom_tgt [])
+  Lemma sim_promise_list_nil self extra messages prom_src prom_tgt
+        (SIM: sim_promise_list self extra messages prom_src prom_tgt [])
     :
-      sim_promise_strong self messages prom_src prom_tgt.
+      sim_promise_strong self extra messages prom_src prom_tgt.
   Proof.
-    ii. exploit SIM; eauto. i. des; eauto. ss.
+    econs.
+    - ii. hexploit SIM.(sim_promise_list_contents); eauto. i. des; eauto. ss.
+    - apply SIM.
+    - apply SIM.
   Qed.
 
-  Lemma sim_promise_weak_list_exists self messages prom_src prom_tgt
-        (SIM: sim_promise self prom_src prom_tgt)
+  Lemma sim_promise_weak_list_exists self extra messages prom_src prom_tgt
+        (SIM: sim_promise self extra prom_src prom_tgt)
         (FIN: Memory.finite prom_src)
     :
       exists l,
-        (<<SIM: sim_promise_list self messages prom_src prom_tgt l>>).
+        (<<SIM: sim_promise_list self extra messages prom_src prom_tgt l>>).
   Proof.
     unfold Memory.finite in *. des.
     hexploit (@list_filter_exists
                 (Loc.t * Time.t)
                 (fun locts =>
                    let (loc, ts) := locts in
-                   ~ sim_promise_content_strong loc ts (self loc ts) (messages loc)
+                   ~ sim_promise_content_strong (self loc ts) (extra loc ts) (messages loc) loc ts
                      (Memory.get loc ts prom_src)
                      (Memory.get loc ts prom_tgt))
                 dom).
-    i. des. exists l'.
-    ii. destruct (classic (List.In (loc,ts) l')).
+    i. des. exists l'. econs; [|apply SIM|apply SIM].
+    ii. set (PROM:= SIM.(sim_promise_contents) loc ts).
+    destruct (classic (List.In (loc,ts) l')).
     - right. splits; auto.
-    - left. specialize (SIM loc ts). red. inv SIM; try by (econs; eauto).
+    - left. red. inv PROM; try by (econs; eauto).
       + apply NNPP. ii. exploit FIN; eauto. i.
         hexploit (proj1 (@COMPLETE (loc, ts))); auto.
         splits; auto. ii. rewrite H1 in *. rewrite H2 in *. auto.
@@ -714,6 +766,297 @@ Section SIM.
         hexploit (proj1 (@COMPLETE (loc, ts))); auto.
         splits; auto. ii. rewrite H1 in *. rewrite H2 in *. auto.
   Qed.
+
+  Lemma sim_promise_weak_stengthen others self extra_others extra_self
+        prom_src prom_tgt mem_src mem_tgt
+        (MEM: sim_memory (others \2/ self) (extra_others \3/ extra_self) mem_src mem_tgt)
+        (MLETGT: Memory.le prom_tgt mem_tgt)
+        (MLESRC: Memory.le prom_src mem_src)
+        (FIN: Memory.finite prom_src)
+        (BOTNONE: Memory.bot_none prom_src)
+        (PROM: sim_promise self extra_self prom_src prom_tgt)
+        (* (SELF: self <2= promised prom_src) *)
+        (EXCLUSIVE: forall loc' ts' (SELF: self loc' ts') (OTHER: others loc' ts'), False)
+    :
+      exists prom_src' mem_src',
+        (<<FUTURE: reserve_future_memory prom_src mem_src prom_src' mem_src'>>) /\
+        (<<MEM: sim_memory (others \2/ self) (extra_others \3/ extra_self) mem_src' mem_tgt>>) /\
+        (<<PROM: sim_promise_strong
+                   self extra_self (concrete_promised mem_src' \2/ self)
+                   prom_src' prom_tgt>>).
+  Proof.
+    exploit sim_promise_weak_list_exists; eauto. i. des.
+    clear PROM. ginduction l.
+    { i. exists prom_src, mem_src. splits; auto.
+      eapply sim_promise_list_nil; eauto. }
+    i. destruct a as [loc ts].
+
+    cut (sim_promise_content_strong (self loc ts) (extra_self loc ts) ((concrete_promised mem_src \2/ self) loc)
+                                    loc ts
+                                    (Memory.get loc ts prom_src)
+                                    (Memory.get loc ts prom_tgt) \/
+         exists prom_src' mem_src',
+           (<<FUTURE: reserve_future_memory prom_src mem_src prom_src' mem_src'>>) /\
+           (<<MEM: sim_memory (others \2/ self) (extra_others \3/ extra_self) mem_src' mem_tgt>>) /\
+           (<<PROM: sim_promise_list
+                      self extra_self (concrete_promised mem_src' \2/ self)
+                      prom_src' prom_tgt l>>)).
+    { intros H. match goal with
+                | [H:?A \/ ?B |- _ ] => cut B
+                end.
+      { clear H. i. des. exploit IHl.
+        { eapply MEM0. }
+        { eauto. }
+        { eapply reserve_future_memory_le; eauto. }
+        { eapply reserve_future_memory_finite; eauto. }
+        { eapply reserve_future_memory_bot_none; eauto. }
+        { eauto. }
+        { eauto. }
+        i. des. exists prom_src'0, mem_src'0. splits; eauto.
+        eapply reserve_future_memory_trans; eauto. }
+      { des; eauto. exists prom_src, mem_src. splits; auto.
+        econs; [|apply SIM|apply SIM]. ii.
+        set (PROM:=SIM.(sim_promise_list_contents) loc0 ts0).
+        ss. des; clarify; auto. }
+    }
+
+    set (SIM0:= SIM.(sim_promise_list_contents) loc ts). des; auto.
+    inv WEAK.
+    { left. econs 1; eauto. }
+    { left. econs 2; eauto. }
+    { right.
+
+
+
+
+
+      left. econs 3; eauto.
+
+      admit. }
+    { admit. }
+    { left. econs 5; eauto. }
+
+      exploit IHl; eauto. econs; [|apply SIM|apply SIM]. ii.
+      destruct (loc_ts_eq_dec (loc0, ts0) (loc, ts)).
+      - ss. des; clarify. left. eauto.
+      - set (SIM.(sim_promise_list_contents) loc0 ts0). ss. des; auto; clarify. }
+    clear LIN.
+
+
+
+
+
+      admit. }
+    des. exploit IHl.
+    { eapply MEM0. }
+    { eauto. }
+    { eapply reserve_future_memory_le; eauto. }
+    { eapply reserve_future_memory_finite; eauto. }
+    { eapply reserve_future_memory_bot_none; eauto. }
+    { eauto. }
+    { eauto. }
+    i. des. exists prom_src'0, mem_src'0. splits; eauto.
+    eapply reserve_future_memory_trans; eauto.
+  Qed.
+
+    des.
+
+
+         ; eauto.
+    i.
+
+    dess.
+
+
+    exploit (IHl others self extra_others extra_self prom_src prom_tgt mem_src mem_tgt); eauto.
+
+             ; eauto. econs; [|apply SIM|apply SIM]. ii.
+      destruct (loc_ts_eq_dec (loc0, ts0) (loc, ts)).
+      - ss. des; clarify. left. eauto.
+      - set (SIM.(sim_promise_list_contents) loc0 ts0). ss. des; auto; clarify. }
+    clear LIN.
+
+
+
+    set (SIM0:= SIM.(sim_promise_list_contents) loc ts). des.
+    { exploit IHl; eauto. econs; [|apply SIM|apply SIM]. ii.
+      destruct (loc_ts_eq_dec (loc0, ts0) (loc, ts)).
+      - ss. des; clarify. left. eauto.
+      - set (SIM.(sim_promise_list_contents) loc0 ts0). ss. des; auto; clarify. }
+    clear LIN.
+
+    inv WEAK.
+    { exploit IHl; eauto. econs; [|apply SIM|apply SIM]. ii.
+      destruct (loc_ts_eq_dec (loc0, ts0) (loc, ts)).
+      - ss. des. clarify. left.
+
+        erewrite H.
+
+        econs; eauto. eauto.
+
+        admit.
+
+        (* ss. des; clarify. left. eauto. *)
+      - set (SIM.(sim_promise_list_contents) loc0 ts0). ss. des; auto; clarify. }
+    { exploit IHl; eauto.
+
+      e
+
+
+    hexploit (IHl others self extra_others extra_self prom; eauto.
+
+    inv WEAK.
+    { e
+
+
+    set (SIM0:= SIM.(sim_promise_list_contents) loc0 ts0). ss. des; auto; clarify.
+
+
+
+    destruct (Memory.get loc ts prom_src) as [[from_src [val released|]]|] eqn:GETSRC; cycle 2.
+    { inv WEAK.
+      { exploit IHl; eauto. econs; [|apply SIM|apply SIM]. ii.
+        set (SIM0:= SIM.(sim_promise_list_contents) loc0 ts0). ss. des; auto; clarify.
+        left. rewrite <- H. rewrite GETSRC. econs; eauto. }
+      { exploit IHl; eauto. econs; [|apply SIM|apply SIM]. ii.
+        set (SIM0:= SIM.(sim_promise_list_contents) loc0 ts0). ss. des; auto; clarify.
+        left. rewrite <- H1. rewrite GETSRC. econs 2; eauto. }
+    }
+    { inv WEAK.
+      { exploit IHl; eauto. econs; [|apply SIM|apply SIM]. ii.
+        set (SIM0:= SIM.(sim_promise_list_contents) loc0 ts0). ss. des; auto; clarify.
+        left. rewrite <- H1. rewrite GETSRC. econs; eauto. }
+    }
+
+    assert (exists from_tgt msg, <<GETTGT: Memory.get loc ts prom_tgt = Some (from_tgt, msg)>>).
+    { inv WEAK; eauto. } des. rewrite GETTGT in *.
+
+    destruct (classic ((concrete_promised mem_src \2/ self) loc from_tgt)) as [OTHER|NOTHER]; cycle 1.
+    { exploit IHl; eauto. ii.
+      specialize (SIM loc0 ts0). ss. des; auto; clarify.
+      left. rewrite GETTGT. rewrite GETSRC. inv WEAK.
+      - econs 2; eauto.
+      - econs 3; eauto. clarify.
+      - econs 4; eauto. clarify. }
+    guardH OTHER.
+
+    assert (NBOT: Time.lt Time.bot ts).
+    { destruct (Time.le_lt_dec ts Time.bot); auto. destruct l0.
+      - exfalso. eapply Time.lt_strorder.
+        eapply TimeFacts.lt_le_lt; eauto. eapply Time.bot_spec.
+      - inv H. erewrite BOTNONE in GETSRC. clarify. }
+
+    destruct (classic (L loc)) as [LOC|NLOC]; cycle 1.
+    { hexploit (@IHl others self prom_src prom_tgt mem_src mem_tgt); eauto.
+      ii. specialize (SIM loc0 ts0). ss. des; eauto. clarify.
+      left. inv WEAK; eauto.
+      - rewrite GETSRC. rewrite GETTGT. econs 2; eauto.
+      - rewrite GETSRC. rewrite GETTGT. econs 3; eauto. i. clarify.
+      - rewrite GETSRC. rewrite GETTGT. econs 4; eauto. i. clarify. }
+
+    exploit promises_not_attached_replace_add.
+    { eauto. }
+    { eauto. }
+    { ii. specialize (SIM loc to). rewrite GET in *. des.
+      - inv NORMAL; eauto; try by (exfalso; eauto).
+      - inv WEAK0; eauto; try by (exfalso; eauto). }
+    { eauto. }
+    { eauto. }
+    { eauto. }
+    { instantiate (1:=from_tgt).
+      apply memory_get_ts_strong in GETTGT. des; clarify. }
+    { ii. inv H. specialize (MEM loc to). rewrite GET in MEM.
+      inv MEM; clarify.
+      - exploit Memory.get_disjoint.
+        { symmetry. apply H. }
+        { eapply MLETGT. eapply GETTGT. }
+        i. des; clarify.
+        + eapply MLESRC in GETSRC. clarify.
+          inv ITV. inv ITV0. ss. clear - TO FROM1.
+          eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt; eauto.
+        + eapply x0.
+          * instantiate (1:=ts0). econs; ss.
+            { inv ITV0. eapply TimeFacts.le_lt_lt; eauto. }
+            { inv ITV0. ss. }
+          * inv ITV. econs; ss. etrans; eauto.
+            eapply memory_get_ts_le; eauto.
+      - guardH PROM. exploit Memory.get_disjoint.
+        { symmetry. apply H. }
+        { eapply MLETGT. eapply GETTGT. }
+        i. des; clarify.
+        + eapply MLESRC in GETSRC. clarify.
+          inv ITV. inv ITV0. ss. clear - TO FROM1.
+          eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt; eauto.
+        + eapply x0.
+          * instantiate (1:=ts0). econs; ss.
+            { inv ITV0. eapply TimeFacts.le_lt_lt; eauto. }
+            { inv ITV0. ss. }
+          * inv ITV. econs; ss. etrans; eauto.
+            eapply memory_get_ts_le; eauto.
+    }
+    i. des.
+    assert (PROMISEDSAME: promised prom1 = promised prom_src).
+    { extensionality loc'. extensionality ts'.
+      apply Coq.Logic.PropExtensionality.propositional_extensionality.
+      split; i.
+      - inv H. erewrite PROMSPEC in GET. des_ifs.
+        + ss. des; clarify. econs; eauto.
+        + econs; eauto.
+      - inv H. specialize (PROMSPEC loc' ts'). des_ifs.
+        + ss. des; clarify. econs; eauto.
+        + erewrite <- PROMSPEC in *. econs; eauto. }
+    assert (CONCRETESAME: concrete_promised mem1 = concrete_promised mem_src).
+    { extensionality loc'. extensionality ts'.
+      apply Coq.Logic.PropExtensionality.propositional_extensionality.
+      split; i.
+      - inv H. erewrite MEMSPEC in GET. des_ifs. econs; eauto.
+      - inv H. specialize (MEMSPEC loc' ts'). des_ifs.
+        + ss. des; clarify. apply MLESRC in GETSRC. clarify.
+        + erewrite <- MEMSPEC in *. econs; eauto. }
+
+    assert (PROMISEDSAMEMEM: promised mem1 = promised mem_src).
+    { extensionality loc'. extensionality ts'.
+      apply Coq.Logic.PropExtensionality.propositional_extensionality.
+      split; i.
+      - inv H. erewrite MEMSPEC in GET. des_ifs.
+        + ss. des; clarify. econs; eauto.
+        + econs; eauto.
+      - inv H. specialize (MEMSPEC loc' ts'). des_ifs.
+        + ss. des; clarify. econs; eauto.
+        + erewrite <- MEMSPEC in *. econs; eauto. }
+
+    hexploit (@IHl others self prom1 prom_tgt mem1 mem_tgt); eauto.
+    { ii.
+      dup MEM. specialize (MEM0 loc0 ts0). erewrite MEMSPEC. des_ifs.
+      - ss. des; clarify. apply MLETGT in GETTGT. rewrite GETTGT.
+        rewrite GETTGT in *. apply MLESRC in GETSRC. rewrite GETSRC in *.
+        inv MEM0; eauto.
+        + econs 2; eauto. refl.
+        + econs 3; eauto. refl.
+    }
+    { eapply reserve_future_memory_le; eauto. }
+    { eapply reserve_future_memory_finite; eauto. }
+    { eapply reserve_future_memory_bot_none; eauto. }
+    { ii. rewrite MEMSPEC in GET.
+      erewrite PROMISEDSAME. des_ifs.
+      - ss. des; clarify. econs; eauto.
+      - exploit PROMATTACH; eauto. }
+    { ii. erewrite PROMSPEC. des_ifs.
+      - left. ss. des. clarify. erewrite GETTGT. inv WEAK; eauto.
+      - guardH o. specialize (SIM loc0 ts0).
+        ss. rewrite CONCRETESAME. des; eauto.
+        unguard. des; clarify. }
+    i. des. exists prom_src', mem_src'. splits; auto.
+    - eapply reserve_future_memory_trans; eauto.
+    - etrans; eauto. ii.
+      erewrite MEMSPEC in GET. des_ifs.
+      + ss. des; clarify. exfalso.
+        specialize (MEM loc from). unguard. des.
+        * inv OTHER. erewrite GET in MEM. inv MEM. eauto.
+        * eauto.
+      + eauto.
+  Qed.
+
 
   Lemma promises_not_attached_replaces self loc ts prom0 mem0
         (LIN: L loc)
