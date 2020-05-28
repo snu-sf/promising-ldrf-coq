@@ -81,6 +81,16 @@ Section SIM.
     }
   Qed.
 
+  Lemma lb_time_lower l ts ts'0 ts'1
+        (LB: lb_time l ts ts'0)
+        (TS: Time.le ts'1 ts'0)
+    :
+      lb_time l ts ts'1.
+  Proof.
+    ii. exploit LB; eauto.
+    i. eapply TimeFacts.le_lt_lt; eauto.
+  Qed.
+
 
 
   Inductive sim_memory_content
@@ -796,6 +806,37 @@ Section SIM.
       - erewrite Memory.remove_o; eauto. des_ifs. }
   Qed.
 
+  Lemma sim_memory_get_larger F extra mem_src mem_tgt loc from_src ts msg_src
+        (MEM: sim_memory F extra mem_src mem_tgt)
+        (GETSRC: Memory.get loc ts mem_src = Some (from_src, msg_src))
+    :
+      (exists from_tgt msg_tgt,
+          (<<TS: Time.le from_tgt from_src>>) /\
+          (<<GETTGT: Memory.get loc ts mem_tgt = Some (from_tgt, msg_tgt)>>)) \/
+      (<<EXTRA: extra loc ts from_src>>).
+  Proof.
+    set (MEM0 := MEM.(sim_memory_contents) loc ts).
+    rewrite GETSRC in *. inv MEM0; eauto.
+    { esplits; eauto. }
+    { esplits; eauto. }
+  Qed.
+
+  Lemma memory_get_disjoint_strong mem loc from0 to0 from1 to1 msg0 msg1
+        (GET0: Memory.get loc to0 mem = Some (from0, msg0))
+        (GET1: Memory.get loc to1 mem = Some (from1, msg1))
+    :
+      (to0 = to1 /\ from0 = from1 /\ msg0 = msg1) \/
+      (<<TS: Time.le to0 from1>>) \/
+      (<<TS: Time.le to1 from0>>).
+  Proof.
+    destruct (Time.le_lt_dec to0 to1).
+    { destruct l.
+      { eapply memory_get_from_mon in H; eauto. }
+      { inv H. clarify. auto. }
+    }
+    { eapply memory_get_from_mon in l; eauto. }
+  Qed.
+
   Lemma sim_promise_weak_stengthen others self extra_others extra_self
         prom_src prom_tgt mem_src mem_tgt
         (MEM: sim_memory (others \2/ self) (extra_others \3/ extra_self) mem_src mem_tgt)
@@ -948,7 +989,45 @@ Section SIM.
 
       { hexploit (@Memory.add_exists mem_src' loc from_tgt ts Message.reserve).
         { ii. erewrite Memory.remove_o in GET2; eauto. des_ifs. guardH o.
-          admit.
+          dup GET2. eapply sim_memory_get_larger in GET2; eauto.
+          destruct GET2 as [|EXTRA].
+          { des. exploit Memory.get_disjoint.
+            { eapply GETTGT. }
+            { eapply MLETGT. eapply H. }
+            i. des; subst.
+            { destruct o; ss. }
+            { eapply x1.
+              { instantiate (1:=x). inv RHS. econs; ss.
+                eapply TimeFacts.le_lt_lt; eauto. }
+              { eauto. }
+            }
+          }
+          { guardH EXTRA.
+            destruct (Time.le_lt_dec to2 ts).
+            { destruct l0.
+              { exploit memory_get_from_mon.
+                { eapply GET0. }
+                { eapply MLESRC. eapply H0. }
+                { eauto. }
+                intros TS.
+
+                Memory.get
+
+
+                admit. }
+              { inv H2. unguard. des; ss. }
+            }
+            { exploit memory_get_from_mon.
+              { eapply MLESRC. eapply H0. }
+              { eapply GET0. }
+              { eauto. }
+              i. inv LHS. inv RHS. ss.
+              eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+              { eapply FROM0. } etrans.
+              { eapply TO. }
+              { eauto. }
+            }
+          }
         }
         { apply memory_get_ts_strong in H. des; auto. subst.
           erewrite BOTNONESRC in H0. clarify. }
@@ -1112,6 +1191,130 @@ Section SIM.
     }
     { left. econs 5; eauto. }
   Admitted.
+
+
+
+
+  Lemma promise_replace_write self loc from from' to prom0 mem0 val released
+        (LIN: L loc)
+        (* (SELF: self <2= promised prom0) *)
+        (LOC: forall from to msg (GET: Memory.get loc to prom0 = Some (from, msg)),
+            msg = Message.reserve)
+        (MLE0: Memory.le prom0 mem0)
+        (NBOT: Time.lt Time.bot to)
+        (PROMISED: self loc to)
+        (GET: Memory.get loc to prom0 = Some (from, Message.reserve))
+        (FROM: Time.lt from' to)
+        (EMPTY: forall ts (ITV: Interval.mem (from', from) ts), ~ covered loc ts mem0)
+        (VIEWWF: View.opt_wf released)
+        (MSGTO: Time.le (View.rlx (View.unwrap released) loc) to)
+    :
+      exists prom1 mem1 prom2 mem2 prom3 mem3,
+        (<<FUTURE01: reserve_future_memory prom0 mem0 prom1 mem1>>) /\
+        (<<WRITE: Memory.write prom1 mem1 loc from' to val released prom2 mem2 Memory.op_kind_add>>) /\
+        (<<FUTURE23: reserve_future_memory prom2 mem2 prom3 mem3>>) /\
+        (<<MEMSPEC: forall loc' ts',
+            Memory.get loc' ts' mem3 =
+            if loc_ts_eq_dec (loc', ts') (loc, to)
+            then Some (from', Message.concrete val released)
+            else Memory.get loc' ts' mem0>>) /\
+        (<<PROMSPEC: forall loc' ts',
+            Memory.get loc' ts' prom3 =
+            if loc_ts_eq_dec (loc', ts') (loc, to)
+            then None
+            else Memory.get loc' ts' prom0>>).
+  Proof.
+    hexploit promises_not_attached_replaces; eauto.
+    { econs; eauto. }
+    i. des.
+    hexploit (@Memory.remove_exists prom1 loc from to Message.reserve).
+    { hexploit (@UNCH01 loc to); eauto.
+      { i. refl. }
+      i. des. erewrite PROM. eauto. }
+    intros [prom2 REMOVEPROM].
+    hexploit Memory.remove_exists_le; eauto.
+    intros [mem2 REMOVEMEM].
+    assert (PROMISE0: Memory.promise prom1 mem1 loc from to Message.reserve prom2 mem2 Memory.op_kind_cancel).
+    { econs; eauto. }
+    hexploit (@Memory.add_exists mem2 loc from' to (Message.concrete val released)); eauto.
+
+    { ii. erewrite Memory.remove_o in GET2; eauto. des_ifs. guardH o.
+      hexploit (@Memory.get_disjoint loc from2 from to2 to).
+      { eapply GET2. }
+      { hexploit (@UNCH01 loc to).
+        { i. refl. }
+        i. des. rewrite MEM. eauto. }
+      i. ss. unguard. des; clarify.
+      eapply H; eauto. inv LHS. econs; ss.
+      destruct (Time.le_lt_dec x from); auto. exfalso.
+      hexploit memory_get_to_mon.
+      { eapply GET2. }
+      { hexploit (@UNCH01 loc to).
+        { i. refl. }
+        i. des. rewrite MEM. eauto. }
+      { inv RHS. ss. eapply TimeFacts.lt_le_lt; eauto. }
+      i. hexploit (@UNCH01 loc to2).
+      { i. left. auto. }
+      i. des. erewrite MEM in *. eapply (EMPTY x).
+      { econs; ss. }
+      { econs; eauto. }
+    }
+    { econs; eauto. }
+    intros [mem2' ADDMEM].
+    hexploit (@Memory.add_exists_le prom2 mem2 loc from' to (Message.concrete val released)); eauto.
+    { eapply promise_memory_le; eauto. }
+    intros [prom2' ADDPROM].
+
+    assert (PROMISE1: Memory.write prom2 mem2 loc from' to val released prom2 mem2' Memory.op_kind_add).
+    { econs; eauto.
+      - econs; eauto. i.
+        erewrite (@Memory.remove_o mem2) in GET0; eauto.
+        des_ifs. eauto.
+      - exploit Memory.remove_exists.
+        { eapply Memory.add_get0 in ADDPROM. des. eapply GET1. }
+        i. des.
+        exploit MemoryFacts.add_remove_eq; eauto. i. subst. auto.
+    }
+
+    hexploit (@RESTORE prom2 mem2'); eauto.
+    { i. erewrite (@Memory.add_o mem2'); eauto.
+      erewrite (@Memory.remove_o mem2); eauto.
+      erewrite (@Memory.remove_o prom2); eauto. des_ifs.
+      ss. des; clarify. exfalso. eapply Time.lt_strorder; eauto. }
+    { eapply write_memory_le; cycle 1; eauto.
+      eapply promise_memory_le; cycle 1; eauto. }
+    i. des.
+    exists prom2, mem2, prom2, mem2', prom3, mem3. splits; auto.
+    { eapply reserve_future_memory_trans; eauto. }
+    { i. destruct (classic (loc' = loc -> Time.lt to ts')).
+      - hexploit UNCHANGED; eauto. i. des. rewrite MEM. des_ifs.
+        ss. des; clarify. exfalso. eapply Time.lt_strorder; eauto.
+      - apply imply_to_and in H. des. clarify.
+        hexploit (@CHANGED ts'); eauto.
+        { destruct (Time.le_lt_dec ts' to); eauto. exfalso. auto. }
+        i. des. rewrite MEM.
+        erewrite (@Memory.add_o mem2' mem2); eauto.
+        erewrite (@Memory.remove_o mem2 mem1); eauto.
+        des_ifs. guardH o. hexploit (@UNCH01 loc ts'); eauto.
+        { i. destruct (Time.le_lt_dec ts' to); eauto. exfalso. auto. }
+        i. des; clarify.
+    }
+    { i. destruct (classic (loc' = loc -> Time.lt to ts')).
+      - hexploit UNCHANGED; eauto. i. des. rewrite PROM. des_ifs.
+        ss. des; clarify. exfalso. eapply Time.lt_strorder; eauto.
+      - apply imply_to_and in H. des. clarify.
+        hexploit (@CHANGED ts'); eauto.
+        { destruct (Time.le_lt_dec ts' to); eauto. exfalso. auto. }
+        i. des. rewrite PROM.
+        erewrite (@Memory.remove_o prom2 prom1); eauto.
+        des_ifs. guardH o. hexploit (@UNCH01 loc ts'); eauto.
+        { i. destruct (Time.le_lt_dec ts' to); eauto. exfalso. auto. }
+        i. des; clarify.
+    }
+  Qed.
+
+
+
 
   Lemma promises_not_attached_replaces self loc ts prom0 mem0
         (LIN: L loc)
