@@ -176,7 +176,7 @@ Section SIM.
           (<<FORGET: F loc from>>) /\
           (<<LB: lb_time (times loc) from ts>>) /\
           (<<TS: Time.lt from ts>>) /\
-          (<<UNIQUE: forall loc from' (EXTRA: extra loc ts from'),
+          (<<UNIQUE: forall from' (EXTRA: extra loc ts from'),
               from' = from>>);
     }.
 
@@ -361,12 +361,20 @@ Section SIM.
     inv MEMORY0; clarify; (exfalso; eapply NEXTRA; eauto).
   Qed.
 
+  Notation "p \\2// q" :=
+    (fun x0 x1 => __guard__(p x0 x1 \/ q x0 x1))
+      (at level 50, no associativity).
+
+  Notation "p \\3// q" :=
+    (fun x0 x1 x2 => __guard__(p x0 x1 x2 \/ q x0 x1 x2))
+      (at level 50, no associativity).
+
   Lemma sim_promise_step_normal others self extra_others extra_self
         mem_src mem_tgt prom_src prom_tgt
         loc from to msg prom_tgt' mem_tgt' kind
         (NLOC: ~ L loc)
         (STEPTGT: Memory.promise prom_tgt mem_tgt loc from to msg prom_tgt' mem_tgt' kind)
-        (MEM: sim_memory (others \2/ self) (extra_others \3/ extra_self) mem_src mem_tgt)
+        (MEM: sim_memory (others \\2// self) (extra_others \\3// extra_self) mem_src mem_tgt)
         (MEMSRC: Memory.closed mem_src)
         (MEMTGT: Memory.closed mem_tgt)
         (WFSRC: Memory.le prom_src mem_src)
@@ -376,7 +384,7 @@ Section SIM.
     :
       exists prom_src' mem_src',
         (<<STEPSRC: Memory.promise prom_src mem_src loc from to msg prom_src' mem_src' kind>>) /\
-        (<<MEM: sim_memory (others \2/ self) (extra_others \3/ extra_self) mem_src' mem_tgt'>>) /\
+        (<<MEM: sim_memory (others \\2// self) (extra_others \\3// extra_self) mem_src' mem_tgt'>>) /\
         (<<PROMISE: sim_promise self extra_self prom_src' prom_tgt'>>) /\
         (<<CLOSED: Memory.closed_message msg mem_src'>>)
   .
@@ -425,12 +433,14 @@ Section SIM.
           erewrite (@Memory.add_o prom_src'); eauto.
           erewrite (@Memory.add_o prom_tgt'); eauto. des_ifs.
           ss. des; clarify. econs; eauto.
+          { ii. eapply NLOC. eapply PROMSWF; ss. right. eauto. }
+          { ii. eapply NLOC. eapply EXTRAWF; ss. right. eauto. }
         }
         { apply PROMISE. }
         { i. hexploit PROMISE.(sim_promise_extra); eauto. i. des.
           esplits; eauto. erewrite (@Memory.add_o prom_src'); eauto.
           des_ifs. ss. des; clarify.
-          exfalso. eapply NLOC. eapply PROMSWF; eauto. }
+          exfalso. eapply NLOC. eapply PROMSWF; eauto. right. eauto. }
 
     (* split case *)
     - exploit split_succeed_wf; try apply PROMISES. i. des. clarify.
@@ -467,12 +477,14 @@ Section SIM.
           erewrite (@Memory.split_o prom_src'); eauto.
           erewrite (@Memory.split_o prom_tgt'); eauto. des_ifs.
           * ss. des; clarify. econs; eauto.
+            { ii. eapply NLOC. eapply PROMSWF. right. eauto. }
+            { ii. eapply NLOC. eapply EXTRAWF. right. eauto. }
           * guardH o. ss. des; clarify. econs; eauto. }
         { apply PROMISE. }
         { i. hexploit PROMISE.(sim_promise_extra); eauto. i. des.
           esplits; eauto. erewrite (@Memory.split_o prom_src'); eauto. des_ifs.
-          - ss. des; clarify. exfalso. eapply NLOC. eapply PROMSWF; eauto.
-          - ss. des; clarify. exfalso. eapply NLOC. eapply PROMSWF; eauto. }
+          - ss. des; clarify. exfalso. eapply NLOC. eapply PROMSWF; eauto. right. eauto.
+          - ss. des; clarify. exfalso. eapply NLOC. eapply PROMSWF; eauto. right. eauto. }
 
     (* lower case *)
     - exploit lower_succeed_wf; try apply PROMISES. i. des. clarify.
@@ -540,7 +552,7 @@ Section SIM.
         { apply PROMISE. }
         { i. hexploit PROMISE.(sim_promise_extra); eauto. i. des.
           esplits; eauto. erewrite (@Memory.remove_o prom_src'); eauto. des_ifs.
-          ss. des; clarify. exfalso. eapply NLOC. eapply PROMSWF; eauto. }
+          ss. des; clarify. exfalso. eapply NLOC. eapply PROMSWF; eauto. right. eauto. }
   Qed.
 
   Lemma sim_write_step_normal
@@ -548,7 +560,7 @@ Section SIM.
         lc_tgt' sc' mem_tgt' loc from to val ord releasedm released kind
         (NLOC: ~ L loc)
         (STEPTGT: Local.write_step lc_tgt sc mem_tgt loc from to val releasedm released ord lc_tgt' sc' mem_tgt' kind)
-        (MEM: sim_memory (others \2/ self) (extra_others \3/ extra_self) mem_src mem_tgt)
+        (MEM: sim_memory (others \\2// self) (extra_others \\3// extra_self) mem_src mem_tgt)
         (SCSRC: Memory.closed_timemap sc mem_src)
         (SCTGT: Memory.closed_timemap sc mem_tgt)
         (MEMSRC: Memory.closed mem_src)
@@ -562,7 +574,7 @@ Section SIM.
     :
       exists lc_src' mem_src',
         (<<STEPSRC: Local.write_step lc_src sc mem_src loc from to val releasedm released ord lc_src' sc' mem_src' kind>>) /\
-        (<<MEM: sim_memory (others \2/ self) (extra_others \3/ extra_self) mem_src' mem_tgt'>>) /\
+        (<<MEM: sim_memory (others \\2// self) (extra_others \\3// extra_self) mem_src' mem_tgt'>>) /\
         (<<SIM: sim_local self extra_self lc_src' lc_tgt'>>)
   .
   Proof.
@@ -593,7 +605,7 @@ Section SIM.
 
     assert (NSELF: forall ts, ~ self loc ts).
     { ii. set (PROM:= PROMISE0.(sim_promise_contents) loc to). inv PROM; ss.
-      eapply NLOC. eapply sim_memory_others_self_wf; eauto. ss. eauto. }
+      eapply NLOC. eapply sim_memory_others_self_wf; eauto. ss. right. eauto. }
 
     esplits; eauto.
 
@@ -1042,9 +1054,24 @@ Section SIM.
     rewrite GETSRC in MEM0. inv MEM0. splits; auto.
   Qed.
 
+  Lemma sim_promise_src_none F extra prom_src prom_tgt
+        (PROMISE: sim_promise F extra prom_src prom_tgt)
+        loc to
+        (GETSRC: Memory.get loc to prom_src = None)
+    :
+      (<<GETTGT: Memory.get loc to prom_tgt = None>>) /\
+      (<<NPROM: ~ F loc to >>) /\
+      (<<NEXTRA: forall t, ~ extra loc to t>>).
+  Proof.
+    set (PROM:=PROMISE.(sim_promise_contents) loc to).
+    rewrite GETSRC in PROM. inv PROM.
+    - splits; auto.
+    - splits; auto.
+  Qed.
+
   Lemma sim_promise_weak_stengthen others self extra_others extra_self
         prom_src prom_tgt mem_src mem_tgt
-        (MEM: sim_memory (others \2/ self) (extra_others \3/ extra_self) mem_src mem_tgt)
+        (MEM: sim_memory (others \\2// self) (extra_others \\3// extra_self) mem_src mem_tgt)
         (MLETGT: Memory.le prom_tgt mem_tgt)
         (MLESRC: Memory.le prom_src mem_src)
         (FIN: Memory.finite prom_src)
@@ -1055,9 +1082,9 @@ Section SIM.
     :
       exists prom_src' mem_src',
         (<<FUTURE: reserve_future_memory prom_src mem_src prom_src' mem_src'>>) /\
-        (<<MEM: sim_memory (others \2/ self) (extra_others \3/ extra_self) mem_src' mem_tgt>>) /\
+        (<<MEM: sim_memory (others \\2// self) (extra_others \\3// extra_self) mem_src' mem_tgt>>) /\
         (<<PROM: sim_promise_strong
-                   self extra_self (extra_others \3/ extra_self)
+                   self extra_self (extra_others \\3// extra_self)
                    prom_src' prom_tgt>>).
   Proof.
     exploit sim_promise_weak_list_exists; eauto. i. des.
@@ -1067,15 +1094,15 @@ Section SIM.
     i. destruct a as [loc ts].
 
     cut (sim_promise_content_strong (self loc ts) (extra_self loc ts)
-                                    ((extra_others \3/ extra_self) loc)
+                                    ((extra_others \\3// extra_self) loc)
                                     loc ts
                                     (Memory.get loc ts prom_src)
                                     (Memory.get loc ts prom_tgt) \/
          exists prom_src' mem_src',
            (<<FUTURE: reserve_future_memory prom_src mem_src prom_src' mem_src'>>) /\
-           (<<MEM: sim_memory (others \2/ self) (extra_others \3/ extra_self) mem_src' mem_tgt>>) /\
+           (<<MEM: sim_memory (others \\2// self) (extra_others \\3// extra_self) mem_src' mem_tgt>>) /\
            (<<PROM: sim_promise_list
-                      self extra_self (extra_others \3/ extra_self)
+                      self extra_self (extra_others \\3// extra_self)
                       prom_src' prom_tgt l>>)).
     { intros H. match goal with
                 | [H:?A \/ ?B |- _ ] => cut B
@@ -1107,7 +1134,7 @@ Section SIM.
       set (MEM0:=MEM.(sim_memory_contents) loc ts).
       rewrite MEMSRC in MEM0. rewrite MEMTGT in MEM0. inv MEM0; ss.
       destruct (classic (self loc from_src)) as [SELF|NSELF].
-      { left. exploit sim_memory_from_forget; eauto. ss. auto. }
+      { left. exploit sim_memory_from_forget; eauto. ss. right. auto. }
 
       hexploit (@Memory.remove_exists prom_src); eauto.
       intros [prom_src' REMOVEPROM].
@@ -1115,7 +1142,7 @@ Section SIM.
       intros [mem_src' REMOVEMEM].
       assert (REMOVE: Memory.promise prom_src mem_src loc from_src ts Message.reserve prom_src' mem_src' Memory.op_kind_cancel).
       { econs; eauto. }
-      destruct (classic (exists from_src', (extra_others \3/ extra_self) loc from_src' from_tgt))
+      destruct (classic (exists from_src', (extra_others \\3// extra_self) loc from_src' from_tgt))
         as [[from_src' EXTRA]|].
       { guardH EXTRA.
         hexploit (@Memory.add_exists mem_src' loc from_src' ts Message.reserve).
@@ -1233,7 +1260,7 @@ Section SIM.
       set (MEM0:=MEM.(sim_memory_contents) loc ts).
       rewrite MEMSRC in MEM0. rewrite MEMTGT in MEM0. inv MEM0; ss. guardH PROM0.
       destruct (classic (self loc from_src)) as [SELF|NSELF].
-      { left. exploit sim_memory_from_forget; eauto. ss. auto. }
+      { left. exploit sim_memory_from_forget; eauto. ss. right. auto. }
 
       hexploit (@Memory.remove_exists prom_src); eauto.
       intros [prom_src' REMOVEPROM].
@@ -1241,7 +1268,7 @@ Section SIM.
       intros [mem_src' REMOVEMEM].
       assert (REMOVE: Memory.promise prom_src mem_src loc from_src ts Message.reserve prom_src' mem_src' Memory.op_kind_cancel).
       { econs; eauto. }
-      destruct (classic (exists from_src', (extra_others \3/ extra_self) loc from_src' from_tgt))
+      destruct (classic (exists from_src', (extra_others \\3// extra_self) loc from_src' from_tgt))
         as [[from_src' EXTRA]|].
       { guardH EXTRA.
         hexploit (@Memory.add_exists mem_src' loc from_src' ts Message.reserve).
@@ -1361,7 +1388,7 @@ Section SIM.
         loc from to msg_tgt prom_tgt' mem_tgt' kind_tgt
         (LOC: L loc)
         (STEPTGT: Memory.promise prom_tgt mem_tgt loc from to msg_tgt prom_tgt' mem_tgt' kind_tgt)
-        (MEM: sim_memory (others \2/ self) (extra_others \3/ extra_self) mem_src mem_tgt)
+        (MEM: sim_memory (others \\2// self) (extra_others \\3// extra_self) mem_src mem_tgt)
         (MEMSRC: Memory.closed mem_src)
         (MEMTGT: Memory.closed mem_tgt)
         (MLESRC: Memory.le prom_src mem_src)
@@ -1377,7 +1404,7 @@ Section SIM.
     :
       exists prom_src' mem_src' self' extra_self',
         (<<STEPSRC: reserve_future_memory prom_src mem_src prom_src' mem_src'>>) /\
-        (<<MEM: sim_memory (others \2/ self') (extra_others \3/ extra_self') mem_src' mem_tgt'>>) /\
+        (<<MEM: sim_memory (others \\2// self') (extra_others \\3// extra_self') mem_src' mem_tgt'>>) /\
         (<<PROMISE: sim_promise self' extra_self' prom_src' prom_tgt'>>)
   .
   Proof.
@@ -1475,7 +1502,7 @@ Section SIM.
           erewrite (@Memory.add_o mem_src1); eauto.
           erewrite (@Memory.remove_o mem_src0); eauto. des_ifs.
           { ss. des; subst. exfalso. eapply Time.lt_strorder; eauto. }
-          { ss. des; clarify. econs 3; auto. }
+          { ss. des; clarify. econs 3; auto. right. auto. }
           { ss. des; clarify. inv PROM; ss.
             { inv MEM1. econs 2; eauto.
               { refl. }
@@ -1491,7 +1518,7 @@ Section SIM.
         }
         { i. dup EXTRA.
           apply (MEM.(sim_memory_wf)) in EXTRA0. des_ifs.
-          destruct a. ss. subst. splits; try apply EXTRA0; auto. }
+          destruct a. ss. subst. splits; try apply EXTRA0; auto. right. auto. }
       }
       { econs.
         { i. erewrite (@Memory.split_o prom_tgt'); eauto.
@@ -1552,7 +1579,7 @@ Section SIM.
       exists prom_src, mem_src, self, extra_self. splits; auto.
       { econs.
         { i. erewrite (@Memory.lower_o mem_tgt'); eauto. des_ifs.
-          { ss. des; subst. rewrite GETMEMSRC. econs; eauto. }
+          { ss. des; subst. rewrite GETMEMSRC. econs; eauto. right. auto. }
           { eapply MEM.(sim_memory_contents). }
         }
         { apply MEM.(sim_memory_wf). }
@@ -1586,7 +1613,7 @@ Section SIM.
 
       destruct (classic (self loc from_src)) as [SELF|NSELF].
       { exploit sim_memory_from_forget; eauto.
-        { ss. auto. } i. subst.
+        { ss. right. auto. } i. subst.
         assert (TS: Time.lt from to).
         { apply memory_get_ts_strong in GETPROMSRC. des; auto.
           subst. clarify. }
@@ -1604,7 +1631,17 @@ Section SIM.
           }
         } des.
         hexploit (@Memory.add_exists mem_src0 loc from ts' Message.reserve); eauto.
-        { admit. }
+        { ii. erewrite Memory.remove_o in GET2; eauto. des_ifs. guardH o.
+          hexploit Memory.get_disjoint.
+          { eapply GET2. }
+          { eapply GETMEMSRC. }
+          i. des.
+          { subst. destruct o; ss. }
+          { eapply H.
+            { eapply RHS. }
+            { inv LHS. econs; ss. etrans; eauto. left. auto. }
+          }
+        }
         { econs. }
         intros [mem_src1 ADDMEM].
         hexploit (@Memory.add_exists_le prom_src0 mem_src0 loc from ts' Message.reserve); eauto.
@@ -1613,10 +1650,8 @@ Section SIM.
         assert (PROMISE1: Memory.promise prom_src0 mem_src0 loc from ts' Message.reserve prom_src1 mem_src1 Memory.op_kind_add).
         { econs; eauto. i. clarify. }
 
-        hexploit sim_memory_src_none.
-        { eauto. }
-        { instantiate (1:=ts'). instantiate (1:=loc).
-          destruct (Memory.get loc ts' mem_src) eqn:GET; auto. destruct p.
+        assert (GETMEMNONE: Memory.get loc ts' mem_src = None).
+        { destruct (Memory.get loc ts' mem_src) eqn:GET; auto. destruct p.
           hexploit memory_get_disjoint_strong.
           { eapply GET. }
           { eapply GETMEMSRC. } i. des; subst.
@@ -1624,7 +1659,16 @@ Section SIM.
           { timetac. }
           { exfalso. eapply Time.lt_strorder.
             transitivity ts'; eauto. }
-        } i. des.
+        }
+        assert (GETPROMNONE: Memory.get loc ts' prom_src = None).
+        { destruct (Memory.get loc ts' prom_src) eqn:EQ; auto.
+          destruct p. apply MLESRC in EQ. clarify. }
+        hexploit sim_memory_src_none.
+        { eauto. }
+        { eapply GETMEMNONE. } i. des.
+        hexploit sim_promise_src_none.
+        { eauto. }
+        { eapply GETPROMNONE. } i. des.
 
         exists prom_src1, mem_src1, self,
         (fun l t => if (loc_ts_eq_dec (l, t) (loc, ts'))
@@ -1635,13 +1679,147 @@ Section SIM.
             erewrite (@Memory.add_o mem_src1); eauto.
             erewrite (@Memory.remove_o mem_src0); eauto. des_ifs.
             { ss. des; clarify. }
-            { ss. des; clarify. rewrite GETTGT. econs 4; eauto. }
+            { ss. des; clarify. rewrite GETTGT. econs 4; eauto. right. auto. }
             { ss. des; clarify. eauto. }
             { eapply MEM.(sim_memory_contents). }
           }
-          { i. set (WF:=MEM.(sim_memory_wf) loc0 from0 ts). des_ifs.
+          { i. des_ifs.
+            { ss. des; clarify. destruct EXTRA as [EXTRA|EQ].
+              { hexploit (MEM.(sim_memory_wf) loc from0 ts'); eauto.
+                { left. auto. }
+                i. des. splits; auto. i. des_ifs; eauto.
+                ss. des; clarify. destruct EXTRA0.
+                { exfalso. eapply NEXTRA1. left. eauto. }
+                { subst. exfalso. eapply NEXTRA1. left. eauto. }
+              }
+              { subst. splits; auto.
+                { right. auto. }
+                { i. des_ifs. ss. des; clarify.
+                  destruct EXTRA as [EXTRA|EQ]; auto.
+                  exfalso. eapply NEXTRA1. left. eauto. }
+              }
+            }
+            { hexploit (MEM.(sim_memory_wf) loc0 from0 ts); eauto. }
+          }
+        }
+        { econs.
+          { i. erewrite (@Memory.remove_o prom_tgt'); eauto.
+            erewrite (@Memory.add_o prom_src1); eauto.
+            erewrite (@Memory.remove_o prom_src0); eauto. des_ifs.
+            { ss. des; clarify. }
+            { ss. des; clarify. rewrite GETTGT0. econs 5; eauto. }
+            { ss. des; clarify. eauto. }
+            { eapply PROMISE.(sim_promise_contents). }
+          }
+          { i. des_ifs.
+            { ss. des; clarify. }
+            { eapply PROMISE.(sim_promise_wf); eauto. }
+          }
+          { i. hexploit (PROMISE.(sim_promise_extra) loc0 ts); eauto. i. des.
+            destruct (loc_ts_eq_dec (loc0, ts) (loc, from)).
+            { ss. des. clarify. exists ts'. splits; auto.
+              eapply Memory.add_get0; eauto. }
+            { exists to0. splits; auto.
+              erewrite Memory.add_o; eauto. erewrite Memory.remove_o; eauto.
+              des_ifs.
+              { ss. des; clarify. }
+              { ss. des; clarify. }
+            }
+          }
+        }
+      }
+      { exists prom_src0, mem_src0, self, extra_self. splits; eauto.
+        { econs.
+          { i. erewrite (@Memory.remove_o mem_tgt'); eauto.
+            erewrite (@Memory.remove_o mem_src0); eauto. des_ifs.
+            { ss. des; subst. eauto. }
+            { eapply MEM.(sim_memory_contents). }
+          }
+          { apply MEM.(sim_memory_wf). }
+        }
+        { econs.
+          { i. erewrite (@Memory.remove_o prom_tgt'); eauto.
+            erewrite (@Memory.remove_o prom_src0); eauto. des_ifs.
+            { ss. des; subst. eauto. }
+            { eapply PROMISE.(sim_promise_contents). }
+          }
+          { apply PROMISE.(sim_promise_wf). }
+          { i. dup SELF. apply PROMISE.(sim_promise_extra) in SELF. des.
+            destruct (loc_ts_eq_dec (loc0, to0) (loc, to)).
+            { ss. des; clarify. }
+            { exists to0. splits; auto. erewrite Memory.remove_o; eauto. des_ifs.
+              ss. des; clarify. }
+          }
+        }
+      }
+
+
+
+
+              des; clarify.
+
+            d
+
+          { i. des_ifs.
+            { ss. des; clarify. destruct EXTRA as [EXTRA|EQ].
+              { hexploit (MEM.(sim_memory_wf) loc from0 ts'); eauto.
+                { left. auto. }
+                i. des. splits; auto. i. des_ifs; eauto.
+                ss. des; clarify. destruct EXTRA0.
+                { exfalso. eapply NEXTRA1. left. eauto. }
+                { subst. exfalso. eapply NEXTRA1. left. eauto. }
+              }
+              { subst. splits; auto.
+                { right. auto. }
+                { i. des_ifs. ss. des; clarify.
+                  destruct EXTRA as [EXTRA|EQ]; auto.
+                  exfalso. eapply NEXTRA1. left. eauto. }
+              }
+            }
+            { hexploit (MEM.(sim_memory_wf) loc0 from0 ts); eauto. }
+          }
+        }
+
+              { left. auto. }
+
+
+                {
+
+                    des; ss. ss. des; ss.
+
+                    exfalso. eapply NEXTRA1. eapply eauto.
+
+                    admit. }
+                }
+              }
+            }
+            {
+
+
+
+                  { subst. eapply UNIQUE.
+
+                    eapply NEXTRA1 in H.
+
+
+                  { ss. des; clarify. destruct EXTRA0.
+                  { eapply UNIQUE. left. eauto. }
+                  { subst.
+
+                  eapply UNIQUE.
+
+                  eapply UNIQUE. left. eauto.
+
+                  ss.
+
+              { destruc
+
+
+            set (WF:=MEM.(sim_memory_wf) loc0 from0 ts). des_ifs.
             { destruct a. ss. clarify. des.
-              { hexploit WF; eauto.  i.
+              { hexploit WF; eauto.
+                { right.  eauto. left. eauto. right. auto.
+                i.
                 destruct H as [FORGET EXTRA0]. guardH FORGET. des.
                 splits; auto. i. des_ifs.
                 { admit.
@@ -2406,7 +2584,7 @@ Section SIM.
   Lemma sim_promise_fulfill others self extra_others extra_self
         prom_src prom_tgt mem_src mem_tgt prom_tgt'
         loc from_tgt to val released from_src
-        (MEM: sim_memory (others \2/ self) (extra_others \3/ extra_self) mem_src mem_tgt)
+        (MEM: sim_memory (others \\2// self) (extra_others \\3// extra_self) mem_src mem_tgt)
         (MLETGT: Memory.le prom_tgt mem_tgt)
         (MLESRC: Memory.le prom_src mem_src)
         (FIN: Memory.finite prom_src)
@@ -2426,9 +2604,9 @@ Section SIM.
     :
       exists prom_src' mem_src',
         (<<FUTURE: reserve_future_memory prom_src mem_src prom_src' mem_src'>>) /\
-        (<<MEM: sim_memory (others \2/ self) (extra_others \3/ extra_self) mem_src' mem_tgt>>) /\
+        (<<MEM: sim_memory (others \\2// self) (extra_others \\3// extra_self) mem_src' mem_tgt>>) /\
         (<<PROM: sim_promise_strong
-                   self extra_self (extra_others \3/ extra_self)
+                   self extra_self (extra_others \\3// extra_self)
                    prom_src' prom_tgt>>).
   Proof.
 
@@ -2438,7 +2616,7 @@ Section SIM.
         lc_tgt' sc' mem_tgt' loc from to val ord releasedm released kind
         (NLOC: ~ L loc)
         (STEPTGT: Local.write_step lc_tgt sc mem_tgt loc from to val releasedm released ord lc_tgt' sc' mem_tgt' kind)
-        (MEM: sim_memory (others \2/ self) (extra_others \3/ extra_self) mem_src mem_tgt)
+        (MEM: sim_memory (others \\2// self) (extra_others \\3// extra_self) mem_src mem_tgt)
         (MEMSRC: Memory.closed mem_src)
         (MEMTGT: Memory.closed mem_tgt)
         (SIM: sim_local self extra_self lc_src lc_tgt)
@@ -2454,7 +2632,7 @@ Section SIM.
     :
       exists lc_src' mem_src',
         (<<STEPSRC: Local.write_step lc_src sc mem_src loc from to val releasedm released ord lc_src' sc' mem_src' kind>>) /\
-        (<<MEM: sim_memory (others \2/ self) (extra_others \3/ extra_self) mem_src' mem_tgt'>>) /\
+        (<<MEM: sim_memory (others \\2// self) (extra_others \\3// extra_self) mem_src' mem_tgt'>>) /\
         (<<SIM: sim_local self extra_self lc_src' lc_tgt'>>)
   .
   Proof.
@@ -2463,7 +2641,7 @@ Section SIM.
 
   Lemma sim_promise_fulfill others self extra_others extra_self
         prom_src prom_tgt mem_src mem_tgt
-        (MEM: sim_memory (others \2/ self) (extra_others \3/ extra_self) mem_src mem_tgt)
+        (MEM: sim_memory (others \\2// self) (extra_others \\3// extra_self) mem_src mem_tgt)
         (MLETGT: Memory.le prom_tgt mem_tgt)
         (MLESRC: Memory.le prom_src mem_src)
         (FIN: Memory.finite prom_src)
@@ -2474,9 +2652,9 @@ Section SIM.
     :
       exists prom_src' mem_src',
         (<<FUTURE: reserve_future_memory prom_src mem_src prom_src' mem_src'>>) /\
-        (<<MEM: sim_memory (others \2/ self) (extra_others \3/ extra_self) mem_src' mem_tgt>>) /\
+        (<<MEM: sim_memory (others \\2// self) (extra_others \\3// extra_self) mem_src' mem_tgt>>) /\
         (<<PROM: sim_promise_strong
-                   self extra_self (extra_others \3/ extra_self)
+                   self extra_self (extra_others \\3// extra_self)
                    prom_src' prom_tgt>>).
   Proof.
 
@@ -2823,7 +3001,7 @@ Section SIM.
   Qed.
 
   Lemma sim_promise_weak_stengthen others self prom_src prom_tgt mem_src mem_tgt
-        (MEM: sim_memory (others \2/ self) mem_src mem_tgt)
+        (MEM: sim_memory (others \\2// self) mem_src mem_tgt)
         (MLETGT: Memory.le prom_tgt mem_tgt)
         (MLESRC: Memory.le prom_src mem_src)
         (FIN: Memory.finite prom_src)
@@ -2835,11 +3013,11 @@ Section SIM.
     :
       exists prom_src' mem_src',
         (<<FUTURE: reserve_future_memory prom_src mem_src prom_src' mem_src'>>) /\
-        (<<MEM: sim_memory (others \2/ self) mem_src' mem_tgt>>) /\
+        (<<MEM: sim_memory (others \\2// self) mem_src' mem_tgt>>) /\
         (<<ATTACHEDLE: not_attached_le others mem_src mem_src'>>) /\
         (<<PROMATTACH: promises_not_attached self (promised prom_src') mem_src'>>) /\
         (<<PROM: sim_promise_strong
-                   self (concrete_promised mem_src' \2/ self)
+                   self (concrete_promised mem_src' \\2// self)
                    (* (fun loc' ts' => concrete_promise *)
                    (*    concrete_promised prom_src' loc' ts' /\ *)
                    (*    ~ others loc' ts' *)
@@ -2870,7 +3048,7 @@ Section SIM.
     assert (exists from_tgt msg, <<GETTGT: Memory.get loc ts prom_tgt = Some (from_tgt, msg)>>).
     { inv WEAK; eauto. } des. rewrite GETTGT in *.
 
-    destruct (classic ((concrete_promised mem_src \2/ self) loc from_tgt)) as [OTHER|NOTHER]; cycle 1.
+    destruct (classic ((concrete_promised mem_src \\2// self) loc from_tgt)) as [OTHER|NOTHER]; cycle 1.
     { exploit IHl; eauto. ii.
       specialize (SIM loc0 ts0). ss. des; auto; clarify.
       left. rewrite GETTGT. rewrite GETSRC. inv WEAK.
@@ -3267,7 +3445,7 @@ Section SIM.
         loc from to msg_tgt prom_tgt' mem_tgt' kind_tgt
         (LOC: L loc)
         (STEPTGT: Memory.promise prom_tgt mem_tgt loc from to msg_tgt prom_tgt' mem_tgt' kind_tgt)
-        (MEM: sim_memory (others \2/ self) mem_src mem_tgt)
+        (MEM: sim_memory (others \\2// self) mem_src mem_tgt)
         (MEMSRC: Memory.closed mem_src)
         (MEMTGT: Memory.closed mem_tgt)
         (WFSRC: Memory.le prom_src mem_src)
@@ -3278,7 +3456,7 @@ Section SIM.
     :
       exists prom_src' mem_src' self',
         (<<STEPSRC: reserve_future_memory prom_src mem_src prom_src' mem_src'>>) /\
-        (<<MEM: sim_memory (others \2/ self') mem_src' mem_tgt'>>) /\
+        (<<MEM: sim_memory (others \\2// self') mem_src' mem_tgt'>>) /\
         (<<ATTACHEDLE: not_attached_le others mem_src mem_src'>>) /\
         (<<PROMISE: sim_promise self' prom_src' prom_tgt'>>) /\
         (<<PROMATTACH: promises_not_attached self' (promised prom_src') mem_src'>>)
@@ -3552,7 +3730,7 @@ Section SIM.
   Lemma sim_write_forget others self mem_src mem_tgt prom_src prom_tgt
         loc from from' to val released prom_tgt'
         (STEPTGT: Memory.remove prom_tgt loc from to (Message.concrete val released) prom_tgt')
-        (MEM: sim_memory (others \2/ self) mem_src mem_tgt)
+        (MEM: sim_memory (others \\2// self) mem_src mem_tgt)
         (SELF: self loc to)
         (MEMSRC: Memory.closed mem_src)
         (MEMTGT: Memory.closed mem_tgt)
@@ -3577,7 +3755,7 @@ Section SIM.
         (<<STEPSRC: Memory.write prom0 mem0 loc from' to val released prom1 mem1 Memory.op_kind_add>>) /\
         (<<FUTURE23: reserve_future_memory prom1 mem1 prom_src' mem_src'>>) /\
 
-        (<<MEM: sim_memory (others \2/ self') mem_src' mem_tgt>>) /\
+        (<<MEM: sim_memory (others \\2// self') mem_src' mem_tgt>>) /\
         (<<ATTACHEDLE: not_attached_le others mem_src mem_src'>>) /\
         (<<PROMISE: sim_promise self' prom_src' prom_tgt'>>) /\
         (<<PROMATTACH: promises_not_attached self' (promised prom_src') mem_src'>>)
@@ -3728,7 +3906,7 @@ Section SIM.
         lc_tgt' sc' mem_tgt' loc from to val ord releasedm released kind_tgt from'
         (LOC: L loc)
         (STEPTGT: Local.write_step lc_tgt sc mem_tgt loc from to val releasedm released ord lc_tgt' sc' mem_tgt' kind_tgt)
-        (MEM: sim_memory (others \2/ self) mem_src mem_tgt)
+        (MEM: sim_memory (others \\2// self) mem_src mem_tgt)
         (SCSRC: Memory.closed_timemap sc mem_src)
         (SCTGT: Memory.closed_timemap sc mem_tgt)
         (MEMSRC: Memory.closed mem_src)
@@ -3754,7 +3932,7 @@ Section SIM.
         (<<FUTURE01: reserve_future_memory prom_src mem_src prom0 mem0>>) /\
         (<<STEPSRC: Local.write_step (Local.mk vw_src prom0) sc mem0 loc from' to val releasedm released ord (Local.mk vw_src' prom1) sc' mem1 kind_src>>) /\
         (<<FUTURE12: reserve_future_memory prom1 mem1 prom_src' mem_src'>>) /\
-        (<<MEM: sim_memory (others \2/ self') mem_src' mem_tgt'>>) /\
+        (<<MEM: sim_memory (others \\2// self') mem_src' mem_tgt'>>) /\
         (<<ATTACHEDLE: not_attached_le others mem_src mem_src'>>) /\
         (<<PROMATTACH: promises_not_attached self' (promised prom_src') mem_src'>>) /\
         (<<SIM: sim_local self' (Local.mk vw_src' prom_src') lc_tgt'>>)
@@ -3853,8 +4031,8 @@ Section SIM.
   Lemma sim_thread_step' others self lang st lc_src lc_tgt sc mem_src mem_tgt pf e_tgt
         st' lc_tgt' sc' mem_tgt' views views'
         (STEPTGT: @JThread.step lang pf e_tgt (Thread.mk _ st lc_tgt sc mem_tgt) (Thread.mk _ st' lc_tgt' sc' mem_tgt') views views')
-        (NOREAD: no_read_msgs (others \2/ self) e_tgt)
-        (MEM: sim_memory (others \2/ self) mem_src mem_tgt)
+        (NOREAD: no_read_msgs (others \\2// self) e_tgt)
+        (MEM: sim_memory (others \\2// self) mem_src mem_tgt)
         (SCSRC: Memory.closed_timemap sc mem_src)
         (SCTGT: Memory.closed_timemap sc mem_tgt)
         (MEMSRC: Memory.closed mem_src)
@@ -3869,7 +4047,7 @@ Section SIM.
     :
       exists tr self' lc_src' mem_src',
         (<<STEPSRC: Trace.steps tr (Thread.mk _ st lc_src sc mem_src) (Thread.mk _ st' lc_src' sc' mem_src')>>) /\
-        (<<MEM: sim_memory (others \2/ self') mem_src' mem_tgt'>>) /\
+        (<<MEM: sim_memory (others \\2// self') mem_src' mem_tgt'>>) /\
         (<<ATTACHEDLE: not_attached_le others mem_src mem_src'>>) /\
         (<<PROMATTACH: promises_not_attached self' (promised lc_src'.(Local.promises)) mem_src'>>) /\
         (<<SIM: sim_local self' lc_src' lc_tgt'>>)
@@ -4036,8 +4214,8 @@ Section SIM.
   Lemma sim_thread_step others self lang st lc_src lc_tgt sc mem_src mem_tgt pf e_tgt
         st' lc_tgt' sc' mem_tgt' views views'
         (STEPTGT: @JThread.step lang pf e_tgt (Thread.mk _ st lc_tgt sc mem_tgt) (Thread.mk _ st' lc_tgt' sc' mem_tgt') views views')
-        (NOREAD: no_read_msgs (others \2/ self) e_tgt)
-        (MEM: sim_memory (others \2/ self) mem_src mem_tgt)
+        (NOREAD: no_read_msgs (others \\2// self) e_tgt)
+        (MEM: sim_memory (others \\2// self) mem_src mem_tgt)
         (SCSRC: Memory.closed_timemap sc mem_src)
         (SCTGT: Memory.closed_timemap sc mem_tgt)
         (MEMSRC: Memory.closed mem_src)
@@ -4052,7 +4230,7 @@ Section SIM.
     :
       exists tr self' lc_src' mem_src',
         (<<STEPSRC: Trace.steps tr (Thread.mk _ st lc_src sc mem_src) (Thread.mk _ st' lc_src' sc' mem_src')>>) /\
-        (<<MEM: sim_memory (others \2/ self') mem_src' mem_tgt'>>) /\
+        (<<MEM: sim_memory (others \\2// self') mem_src' mem_tgt'>>) /\
         (<<ATTACHEDLE: not_attached_le others mem_src mem_src'>>) /\
         (<<PROMATTACH: promises_not_attached self' (promised lc_src'.(Local.promises)) mem_src'>>) /\
         (<<SIM: sim_local self' lc_src' lc_tgt'>>) /\
