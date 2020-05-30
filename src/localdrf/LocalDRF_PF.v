@@ -123,7 +123,7 @@ Section SIM.
       sim_memory_content F extra loc ts (Some (from_src, Message.reserve)) (Some (from_tgt, Message.concrete val released))
   | sim_memory_content_extra
       from
-      (PROM: ~ F)
+      (NPROM: ~ F)
       (EXTRA: extra from)
       (NLOC: L loc)
     :
@@ -1410,7 +1410,302 @@ Section SIM.
   Proof.
     inv STEPTGT.
 
-    - admit.
+    - exploit add_succeed_wf; try apply MEM0. i. des.
+      assert (exists from_src,
+                 (<<FROM: Time.le from from_src>>) /\
+                 (<<TO: Time.lt from_src to>>) /\
+                 (<<LB: lb_time (times loc) from from_src>>) /\
+                 (<<EMPTY: forall to2 from2 msg2
+                                  (GET: Memory.get loc to2 mem_src = Some (from2, msg2)),
+                     Interval.disjoint (from_src, to) (from2, to2)>>)).
+      { destruct (classic (exists from_src,
+                              (extra_others \\3// extra_self) loc from_src from)).
+        { des. hexploit (MEM.(sim_memory_wf) loc from from_src); eauto. i. des.
+          exists from_src. splits; eauto.
+          { left. eauto. }
+          { eapply Memory.add_get0 in MEM0. des.
+            eapply MEMWF in GET0. des.
+            eapply LB in TO. auto. }
+          i. hexploit sim_memory_get_larger; eauto. i. des.
+          { ii. eapply DISJOINT; eauto.
+            { instantiate (1:=x). inv LHS. econs; ss.
+              transitivity from_src; eauto. }
+            { inv RHS. econs; ss. eapply TimeFacts.le_lt_lt; eauto. }
+          }
+          { hexploit (MEM.(sim_memory_wf) loc from2 to2); eauto. i. des.
+            ii. inv LHS. inv RHS. ss.
+            set (MEM1:=MEM.(sim_memory_contents) loc from_src).
+            inv MEM1; try by (exfalso; eapply NEXTRA; eauto); ss.
+            set (MEM2:=MEM.(sim_memory_contents) loc to2).
+            inv MEM2; try by (exfalso; eapply NEXTRA; eauto); ss.
+            symmetry in H1. symmetry in H3. hexploit memory_get_disjoint_strong.
+            { eapply H3. }
+            { eapply H1. }
+            i. des; clarify.
+            { timetac. }
+            { eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+              { eapply TS3. } etrans.
+              { left. eapply FROM. }
+              { eauto. }
+            }
+            { set (MEM3:=MEM.(sim_memory_contents) loc from2). inv MEM3; ss.
+              symmetry in H6. eapply DISJOINT.
+              { eapply H6. }
+              { instantiate (1:=from2). econs; ss.
+                { eapply TimeFacts.lt_le_lt; eauto. }
+                { transitivity x; auto. left. auto. }
+              }
+              { econs; ss.
+                { apply memory_get_ts_strong in H6. des; auto.
+                  subst. inv MEMSRC. rewrite INHABITED in H5. clarify. }
+                { refl. }
+              }
+            }
+          }
+        }
+        { exists from. splits; auto.
+          { refl. }
+          { apply eq_lb_time. }
+          { i. hexploit sim_memory_get_larger; eauto. i. des.
+            { ii. eapply DISJOINT; eauto.
+              inv RHS. econs; ss. eapply TimeFacts.le_lt_lt; eauto. }
+            { hexploit (MEM.(sim_memory_wf) loc from2 to2); eauto. i. des.
+              ii. inv LHS. inv RHS. ss.
+              set (MEM1:=MEM.(sim_memory_contents) loc from2).
+              inv MEM1; try by (exfalso; eapply NPROM; eauto); ss.
+              symmetry in H2. hexploit memory_get_disjoint_strong.
+              { eapply Memory.add_get0. eapply MEM0. }
+              { eapply Memory.add_get1; eauto. }
+              i. des; subst.
+              { eapply Memory.add_get0 in MEM0. des. clarify. }
+              { eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+                { eapply TS2. } etrans.
+                { left. eapply FROM0. }
+                { eauto. }
+              }
+              { destruct TS1; cycle 1.
+                { inv H0. eapply H. eauto. }
+                { exploit LB.
+                  { instantiate (1:=from).
+                    eapply Memory.add_get0 in MEM0. des.
+                    eapply MEMWF in GET1. des. auto. }
+                  { auto. }
+                  { i. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+                    { eapply FROM. } etrans.
+                    { eapply TO0. }
+                    { left. auto. }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      des. hexploit (@Memory.add_exists mem_src loc from_src to Message.reserve); eauto.
+      { econs. }
+      intros [mem_src0 ADDMEM0].
+      hexploit (@Memory.add_exists_le prom_src mem_src loc from_src to Message.reserve); eauto.
+      intros [prom_src0 ADDPROM0].
+      assert (PROMISE0: Memory.promise prom_src mem_src loc from_src to Message.reserve prom_src0 mem_src0 Memory.op_kind_add).
+      { econs; eauto. i. clarify. }
+
+      assert (GETMEMNONE: Memory.get loc to mem_src = None).
+      { eapply Memory.add_get0; eauto. }
+      assert (GETPROMNONE: Memory.get loc to prom_src = None).
+      { destruct (Memory.get loc to prom_src) eqn:EQ; auto.
+        destruct p. apply MLESRC in EQ. clarify. }
+      hexploit sim_memory_src_none.
+      { eauto. }
+      { eapply GETMEMNONE. } i. des.
+      hexploit sim_promise_src_none.
+      { eauto. }
+      { eapply GETPROMNONE. } i. des.
+
+      destruct msg_tgt as [val released|].
+      { hexploit (@lb_time_exists (times loc) to). i. des.
+        hexploit (@Memory.add_exists mem_src0 loc to ts' Message.reserve); eauto.
+        { i. erewrite Memory.add_o in GET2; eauto. des_ifs.
+          { ss. des; subst. ii. inv LHS. inv RHS. ss. timetac. }
+          des; ss. hexploit sim_memory_get_larger; eauto. i. des.
+          { ii. inv LHS. inv RHS. ss.
+            dup GETTGT1. eapply Memory.add_get1 in GETTGT1; eauto.
+            hexploit memory_get_disjoint_strong.
+            { eapply GETTGT1. }
+            { eapply Memory.add_get0; eauto. }
+            i. des; clarify.
+            { eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+              { eapply TS3. } etrans.
+              { left. eapply FROM0. }
+              { eauto. }
+            }
+            { destruct TS2.
+              { exploit LB0.
+                { instantiate (1:=from_tgt).
+                  eapply MEMWF in GETTGT1. des. auto. }
+                { auto. }
+                { i. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+                  { eapply x0. } etrans.
+                  { eapply TS1. } etrans.
+                  { left. eapply FROM1. }
+                  { eauto. }
+                }
+              }
+              { inv H. eapply ATTACH; eauto. }
+            }
+          }
+          { hexploit (MEM.(sim_memory_wf) loc from2 to2); eauto. i. des.
+            set (MEM1:=MEM.(sim_memory_contents) loc from2).
+            inv MEM1; try by (exfalso; eapply NPROM; eauto); ss.
+            symmetry in H. hexploit memory_get_disjoint_strong.
+            { eapply Memory.add_get1 in H; [|eauto]. eapply H. }
+            { eapply Memory.add_get0; eauto. }
+            i. des; clarify.
+            { ii. inv LHS. inv RHS. ss. exploit LB2.
+              { instantiate (1:=to).
+                apply Memory.add_get0 in MEM0. des.
+                apply MEMWF in GET0. des. auto. }
+              { eapply TimeFacts.le_lt_lt.
+                { eapply FROM0. } eapply TimeFacts.le_lt_lt.
+                { eapply memory_get_ts_le. eauto. }
+                { eauto. }
+              }
+              { i. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+                { eapply FROM0. } eapply TimeFacts.le_lt_lt.
+                { eapply memory_get_ts_le. eauto. }
+                { eauto. }
+              }
+
+              from_tgt from_src0 to
+
+                  eapply FROM0. } eapp
+eapp
+
+                from_tgt from_sr0 from2 to
+
+
+              exploit
+
+              admit. }
+            {
+
+              timetac.
+
+
+              eapply H. }
+            { eapply
+
+
+          }
+
+                  ts' from_tgt from2 x ts'
+
+                  left.
+                  l
+                    to, from2 from_tgt x ts'
+
+                        to from_tgt from2 ts'
+
+              to2 to x to2
+
+
+              [|eauto].
+            simpl in *.
+            ss.
+
+            cycle 1; eauto.
+
+
+            admit.
+            eauto.
+            eapply MEMWF in GETTGT1.
+
+
+
+
+          admit. }
+        { econs. }
+        intros [mem_src1 ADDMEM1].
+        hexploit (@Memory.add_exists_le prom_src0 mem_src0 loc to ts' Message.reserve); eauto.
+        { eapply promise_memory_le; cycle 1; eauto. }
+        intros [prom_src1 ADDPROM1].
+        assert (PROMISE1: Memory.promise prom_src0 mem_src0 loc to ts' Message.reserve prom_src1 mem_src1 Memory.op_kind_add).
+        { econs; eauto. i. clarify. }
+
+        assert (GETMEMNONE0: Memory.get loc ts' mem_src = None).
+        { destruct (Memory.get loc ts' mem_src) eqn:EQ; auto.
+          destruct p. eapply Memory.add_get1 in EQ; eauto.
+          eapply Memory.add_get0 in ADDMEM1. des. clarify. }
+        assert (GETPROMNONE0: Memory.get loc ts' prom_src = None).
+        { destruct (Memory.get loc ts' prom_src) eqn:EQ; auto.
+          destruct p. eapply MLESRC in EQ. clarify. }
+        hexploit sim_memory_src_none.
+        { eauto. }
+        { eapply GETMEMNONE0. } i. des.
+        hexploit sim_promise_src_none.
+        { eauto. }
+        { eapply GETPROMNONE0. } i. des.
+
+        exists prom_src1, mem_src1,
+        (fun loc' ts' => if loc_ts_eq_dec (loc', ts') (loc, to)
+                         then True else self loc' ts'),
+        (fun l t => if (loc_ts_eq_dec (l, t) (loc, ts'))
+                    then (eq to)
+                    else extra_self l t). splits; eauto.
+        { econs.
+          { i. erewrite (@Memory.add_o mem_src1); eauto.
+            erewrite (@Memory.add_o mem_src0); eauto.
+            erewrite (@Memory.add_o mem_tgt'); eauto. des_ifs.
+            { ss. des; clarify. timetac. }
+            { ss. des; clarify. econs 3; eauto. right. auto. }
+            { ss. des; clarify. erewrite GETTGT1.
+              econs 4; eauto. right. auto. }
+            { eapply MEM.(sim_memory_contents). }
+          }
+          { i. des_ifs; eauto.
+            { ss. des; clarify. splits; auto.
+              { right. auto. }
+              { i. destruct EXTRA0; auto.
+                exfalso. eapply NEXTRA1. left. eauto. }
+            }
+            { apply MEM.(sim_memory_wf) in EXTRA. ss. des; clarify. }
+            { ss. des; clarify. destruct EXTRA as [EXTRA|EQ]; subst; ss.
+              hexploit (MEM.(sim_memory_wf) loc from0 ts').
+              { left. auto. }
+              i. des. splits; auto.
+              i. destruct EXTRA0 as [EXTRA0|EQ].
+              { exfalso. eapply NEXTRA1. left. eauto. }
+              { subst. exfalso. eapply NEXTRA1. left. eauto. }
+            }
+            { eapply MEM.(sim_memory_wf). auto. }
+          }
+        }
+        { econs.
+          { i. erewrite (@Memory.add_o prom_src1); eauto.
+            erewrite (@Memory.add_o prom_src0); eauto.
+            erewrite (@Memory.add_o prom_tgt'); eauto. des_ifs.
+            { ss. des; clarify. timetac. }
+            { ss. des; clarify. econs 4; eauto. }
+            { ss. des; clarify. erewrite GETTGT2. econs 5; eauto. }
+            { eapply PROMISE.(sim_promise_contents). }
+          }
+          { i. des_ifs.
+            { ss. des; clarify. }
+            { ss. des; clarify.
+              hexploit (PROMISE.(sim_promise_wf) loc to ts); auto.
+              i. des. splits; auto. }
+            { ss. des; clarify. }
+            { eapply PROMISE.(sim_promise_wf); auto. }
+          }
+          { i. des_ifs.
+            { ss. des; clarify. exists ts'. splits; auto.
+              eapply Memory.add_get0; eauto. }
+            { guardH o. eapply PROMISE.(sim_promise_extra) in SELF. des.
+              exists to0. splits; eauto.
+              eapply Memory.add_get1; eauto. eapply Memory.add_get1; eauto. }
+          }
+        }
+      }
 
     - des. subst.
       exploit split_succeed_wf; try apply PROMISES. i. des.
