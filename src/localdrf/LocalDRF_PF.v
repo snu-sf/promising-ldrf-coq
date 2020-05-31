@@ -186,6 +186,22 @@ Inductive reserving_tevent: forall (e: ThreadEvent.t), Prop :=
 .
 Hint Constructors reserving_tevent.
 
+Lemma reserving_tevent_silent e
+      (RESERVING: reserving_tevent e)
+  :
+    ThreadEvent.get_machine_event e = MachineEvent.silent.
+Proof.
+  inv RESERVING; ss.
+Qed.
+
+Lemma reserving_tevent_valid L e
+      (RESERVING: reserving_tevent e)
+  :
+    valid_event L e.
+Proof.
+  ii. subst. inv RESERVING; eauto.
+Qed.
+
 Definition reserving_trace (lang: language) (tr: Trace.t lang): Prop :=
   List.Forall (fun the => reserving_tevent (snd the)) tr.
 
@@ -311,6 +327,109 @@ Section SIM.
 
   Variable L: Loc.t -> bool.
   Variable times: Loc.t -> list Time.t.
+
+
+  (* sim trace *)
+
+  Definition sim_event (e_src e_tgt: ThreadEvent.t): Prop :=
+    match e_tgt with
+    | ThreadEvent.write loc from to val released ord =>
+      exists from', (<<EVENT: e_src = ThreadEvent.write loc from' to val released ord>>)
+    | _ => e_src = e_tgt
+    end.
+
+  Inductive sim_silent_trace lang: Trace.t lang -> option ThreadEvent.t -> Prop :=
+  | sim_silent_trace_nil
+    :
+      sim_silent_trace [] None
+  | sim_silent_trace_cons
+      th_src e_src e_tgt tl_src
+      (SILENT: ThreadEvent.get_machine_event e_src = MachineEvent.silent)
+      (VALID: valid_event L e_src)
+      (TL: sim_silent_trace tl_src None)
+      (EVENT: sim_event e_src e_tgt)
+    :
+      sim_silent_trace ((th_src, e_src)::tl_src) (Some e_tgt)
+  | sim_silent_trace_forget
+      e tl_src
+      (VALID: ~ valid_event L e)
+      (TL: sim_silent_trace tl_src None)
+    :
+      sim_silent_trace tl_src (Some e)
+  | sim_silent_trace_reserve
+      th_src e tl_src e_tgt
+      (SILENT: ThreadEvent.get_machine_event e = MachineEvent.silent)
+      (VALID: valid_event L e)
+      (TL: sim_silent_trace tl_src e_tgt)
+    :
+      sim_silent_trace ((th_src, e)::tl_src) e_tgt
+  .
+  Hint Constructors sim_silent_trace.
+
+  Lemma sim_silent_sim_event_exists lang (tr_src: Trace.t lang) e_tgt
+        (TRACE: sim_silent_trace tr_src (Some e_tgt))
+        (VALID: valid_event L e_tgt)
+    :
+      exists th e_src,
+        (<<IN: List.In (th, e_src) tr_src>>) /\
+        (<<EVENT: sim_event e_src e_tgt>>)
+  .
+  Proof.
+    remember (Some e_tgt). revert e_tgt Heqo VALID.
+    ginduction TRACE; i; clarify.
+    { esplits; eauto. econs; eauto. }
+    { hexploit IHTRACE; eauto. i. des.
+      esplits; eauto. right. eauto. }
+  Qed.
+
+  Lemma non_silent_valid e
+        (EVENT: ThreadEvent.get_machine_event e <> MachineEvent.silent)
+    :
+      valid_event L e.
+  Proof.
+    ii. subst. ss.
+  Qed.
+
+  Lemma sim_silent_trace_valid lang (tr_src: Trace.t lang) (e_tgt: option ThreadEvent.t)
+        (TRACE: sim_silent_trace tr_src e_tgt)
+    :
+      List.Forall (compose (valid_event L) snd) tr_src.
+  Proof.
+    ginduction TRACE; eauto.
+  Qed.
+
+  Lemma sim_silent_trace_silent lang (tr_src: Trace.t lang) (e_tgt: option ThreadEvent.t)
+        (TRACE: sim_silent_trace tr_src e_tgt)
+    :
+      List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr_src.
+  Proof.
+    ginduction TRACE; eauto.
+  Qed.
+
+  Lemma reserving_l_sim_silent_trace lang (tr_src tr_reserve: Trace.t lang) (e_tgt: option ThreadEvent.t)
+        (TRACE: sim_silent_trace tr_src e_tgt)
+        (RESERVING: reserving_trace tr_reserve)
+    :
+      sim_silent_trace (tr_reserve ++ tr_src) e_tgt.
+  Proof.
+    ginduction RESERVING; eauto. i. ss.
+    destruct x. econs 4; eauto.
+    { eapply reserving_tevent_silent; eauto. }
+    { eapply reserving_tevent_valid; eauto. }
+  Qed.
+
+  Lemma reserving_r_sim_silent_trace lang (tr_src tr_reserve: Trace.t lang) (e_tgt: option ThreadEvent.t)
+        (TRACE: sim_silent_trace tr_src e_tgt)
+        (RESERVING: reserving_trace tr_reserve)
+    :
+      sim_silent_trace (tr_src ++ tr_reserve) e_tgt.
+  Proof.
+    ginduction TRACE; ss; i; eauto.
+    ginduction RESERVING; eauto.
+    i. destruct x. econs 4; eauto.
+    { eapply reserving_tevent_silent; eauto. }
+    { eapply reserving_tevent_valid; eauto. }
+  Qed.
 
 
   (* sim memory *)
@@ -2830,32 +2949,78 @@ Section SIM.
     { econs; eauto. }
   Qed.
 
-  Lemma sim_thread_step' others self lang st lc_src lc_tgt sc mem_src mem_tgt pf e_tgt
+
+  Lemma sim_thread_step' others self extra_others extra_self
+        lang st lc_src lc_tgt sc mem_src mem_tgt pf e_tgt
         st' lc_tgt' sc' mem_tgt' views views'
         (STEPTGT: @JThread.step lang pf e_tgt (Thread.mk _ st lc_tgt sc mem_tgt) (Thread.mk _ st' lc_tgt' sc' mem_tgt') views views')
-        (NOREAD: no_read_msgs (others \\2// self) e_tgt)
-        (MEM: sim_memory (others \\2// self) mem_src mem_tgt)
+        (NOREAD: no_read_msgs others e_tgt)
+        (MEM: sim_memory (others \\2// self) (extra_others \\3// extra_self) mem_src mem_tgt)
         (SCSRC: Memory.closed_timemap sc mem_src)
         (SCTGT: Memory.closed_timemap sc mem_tgt)
         (MEMSRC: Memory.closed mem_src)
         (MEMTGT: Memory.closed mem_tgt)
         (LOCALSRC: Local.wf lc_src mem_src)
         (LOCALTGT: Local.wf lc_tgt mem_tgt)
-        (SIM: sim_local self lc_src lc_tgt)
-        (PROMATTACH: promises_not_attached self (promised lc_src.(Local.promises)) mem_src)
+        (SIM: sim_local self extra_self lc_src lc_tgt)
+
+        (MEMWF: memory_times_wf times mem_tgt')
+        (CONSISTENT: Local.promise_consistent lc_tgt)
         (EXCLUSIVE: forall loc' ts' (OTHER: others loc' ts'),
             exists from msg, <<UNCH: unchangable mem_src lc_src.(Local.promises) loc' ts' from msg>>)
         (JOINED: forall loc ts (NLOC: ~ L loc), List.Forall (fun vw => Memory.closed_view vw mem_src) (views loc ts))
+
+        (EVENT: ThreadEvent.get_machine_event e_tgt = MachineEvent.silent)
     :
-      exists tr self' lc_src' mem_src',
+      exists tr self' extra_self' lc_src' mem_src',
         (<<STEPSRC: Trace.steps tr (Thread.mk _ st lc_src sc mem_src) (Thread.mk _ st' lc_src' sc' mem_src')>>) /\
-        (<<MEM: sim_memory (others \\2// self') mem_src' mem_tgt'>>) /\
-        (<<ATTACHEDLE: not_attached_le others mem_src mem_src'>>) /\
-        (<<PROMATTACH: promises_not_attached self' (promised lc_src'.(Local.promises)) mem_src'>>) /\
-        (<<SIM: sim_local self' lc_src' lc_tgt'>>)
+        (<<MEM: sim_memory (others \\2// self') (extra_others \\3// extra_self') mem_src' mem_tgt'>>) /\
+        (<<SIM: sim_local self' extra_self' lc_src' lc_tgt'>>) /\
+        (<<TRACE: sim_silent_trace tr (Some e_tgt)>>)
   .
   Proof.
-    inv STEPTGT. inv STEP.
+    inv STEPTGT. inv STEP; ss.
+    - dup STEP0. inv STEP0. destruct (classic (L loc)).
+      + hexploit sim_promise_step_forget; eauto. i. des.
+        destruct lc_src. ss. exploit reserve_future_memory_steps; eauto. i. des.
+        eexists _, self', extra_self', (Local.mk _ _), mem_src'. splits; eauto.
+        * econs 3; ss.
+          { ii. exploit H0; eauto. eapply H0; eauto.
+
+          eauto.
+
+
+        admit.
+      + hexploit sim_promise_step_normal; eauto.
+        { admit. }
+        i. des.
+        eexists [(_, ThreadEvent.promise loc from to msg kind)], self, extra_self, lc_src', mem_src'.
+        splits; ss.
+        * econs 2; [|econs 1|ss]. econs 1. econs; eauto.
+        * econs 2; ss. ii. clarify.
+    -
+
+
+          unfold valid_event. ss. econs.
+
+
+          ss.
+        * ss.
+
+
+
+        inv LOCAL. inv SIM. inv LOCALSRC. inv LOCALTGT.
+        exploit sim_promise_step_forget; eauto.
+        { i. exploit EXCLUSIVE; eauto. i. des. inv UNCH. inv SELF. clarify. }
+        i. des.
+        exploit reserve_future_memory_steps; eauto. i. des.
+        eexists _, self', (Local.mk _ _), mem_src'. splits; eauto.
+      + inv LOCAL. inv SIM. inv LOCALSRC. inv LOCALTGT.
+        exploit sim_promise_step_normal; try apply MEM; eauto.
+        { destruct msg; econs. hexploit PROMISE; eauto.
+          i. inv H0; econs.
+
+
 
     - inv STEP0. destruct (classic (L loc)).
       + inv LOCAL. inv SIM. inv LOCALSRC. inv LOCALTGT.
