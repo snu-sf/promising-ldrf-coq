@@ -3240,3 +3240,5 @@ Section SIM.
           eapply List.Forall_forall in IN; eauto. ss.
         + inv CLOSED2. eapply Memory.singleton_ur_closed_view; eauto. }
   Qed.
+
+End SIM.
