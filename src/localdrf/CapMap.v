@@ -664,6 +664,7 @@ Section MIDDLE.
     :
       sim_memory_content_strong F extra extra_all loc ts (Some (from, Message.reserve)) None
   .
+  Hint Constructors sim_memory_content_strong.
   Hint Constructors sim_memory_content.
 
   Lemma sim_memory_content_strong_sim_memory_content
@@ -1004,5 +1005,186 @@ Section MIDDLE.
     }
     { eapply MEM.(sim_memory_strong_wf); eauto. }
   Qed.
+
+  Definition sim_cell_list
+             loc
+             (F: Loc.t -> Time.t -> Prop)
+             (extra: Loc.t -> Time.t -> Time.t -> Prop)
+             (cell_src cell_tgt: Cell.t)
+             (l: list Time.t)
+    :=
+      forall ts,
+        (<<CONTENT: sim_memory_content_strong
+                      (F loc ts) (extra loc ts) (extra loc)
+                      loc ts (Cell.get ts cell_src) (Cell.get ts cell_tgt)>>) \/
+        ((<<CONTENT: sim_memory_content
+                       L times
+                       (F loc ts) (extra loc ts)
+                       loc ts (Cell.get ts cell_src) (Cell.get ts cell_tgt)>>) /\
+         (<<LIN: List.In ts l>>)).
+
+  Lemma sim_cell_list_exists loc F extra cell_src cell_tgt
+        (CELL: forall ts,
+            sim_memory_content L times (F loc ts) (extra loc ts)
+                               loc ts (Cell.get ts cell_src) (Cell.get ts cell_tgt))
+    :
+      exists l,
+        (<<CELL: sim_cell_list loc F extra cell_src cell_tgt l>>).
+  Proof.
+    hexploit (Cell.finite cell_src). i. des. exists dom. ii.
+    destruct (Cell.get ts cell_src) as [[from_src msg_src]|] eqn:GETSRC.
+    { right. rewrite <- GETSRC. splits; eauto. }
+    { specialize (CELL ts). rewrite GETSRC in *. inv CELL; eauto. }
+  Qed.
+
+  Lemma sim_cell_strong_exists loc F extra cell_src cell_tgt
+        (CELL: forall ts,
+            sim_memory_content L times (F loc ts) (extra loc ts)
+                               loc ts (Cell.get ts cell_src) (Cell.get ts cell_tgt))
+        (WF: forall loc from ts (EXTRA: extra loc ts from),
+            (<<FORGET: F loc from>>) /\
+            (<<LB: lb_time (times loc) from ts>>) /\
+            (<<TS: Time.lt from ts>>) /\
+            (<<UNIQUE: forall from' (EXTRA: extra loc ts from'),
+                from' = from>>))
+    :
+      exists cell_src',
+        (<<CELL: forall ts,
+            sim_memory_content_strong
+              (F loc ts) (extra loc ts) (extra loc)
+              loc ts (Cell.get ts cell_src') (Cell.get ts cell_tgt)>>).
+  Proof.
+    destruct (classic (L loc)) as [LOC|NLOC]; cycle 1.
+    { exists cell_src. ii. specialize (CELL ts). inv CELL; ss; eauto.
+      hexploit NLOC0; eauto. }
+
+    hexploit sim_cell_list_exists; eauto. clear CELL. i. des. ginduction l.
+    { i. exists cell_src. ii. specialize (CELL ts). des; ss. }
+    i. assert (exists cell_src', sim_cell_list loc F extra cell_src' cell_tgt l).
+    { set (CELL a). des.
+      { exists cell_src. ii. destruct (Time.eq_dec a ts).
+        { subst. left. auto. }
+        { specialize (CELL ts). des; auto. ss. des; auto; ss. }
+      } clear LIN.
+
+
+      inv CONTENT.
+      { exists cell_src. ii. destruct (Time.eq_dec a ts).
+        { subst. rewrite <- H. rewrite <- H0. left. eauto. }
+        { specialize (CELL ts). des; auto. ss. des; auto; ss. }
+      }
+
+      { symmetry in H. symmetry in H0.
+        hexploit (@Cell.remove_exists cell_src from_src a msg); auto.
+        intros [cell_src0 REMOVE].
+        destruct (classic (exists from_src', extra loc from_src' from_tgt))
+          as [[from_src' EXTRA]|].
+        { hexploit WF; eauto. i. des.
+
+          hexploit
+
+
+          hexploit (@Cell.add_exists cell_src0 from_src' a msg); auto.
+          { i. erewrite Cell.remove_o in GET2; eauto. des_ifs.
+
+
+
+            hexploit (Interval.disjoint
+
+            Cell.get_disjoint
+
+
+            ii. inv LHS. inv RHS. ss.
+
+
+            admit. }
+
+          {
+
+
+            admit. }
+          { eapply Cell.get_opt_wf in H0. auto. }
+          intros [cell_src1 ADD]. exists cell_src1. ii.
+          erewrite (@Cell.add_o cell_src1); eauto.
+          erewrite (@Cell.remove_o cell_src0); eauto. des_ifs.
+          { left. rewrite H. econs 2; eauto; ss. left. auto. }
+          { specialize (CELL ts). des; auto. ss. des; clarify. right. splits; auto. }
+        }
+
+
+
+
+        admit. }
+      { admit. }
+      { exists cell_src. ii. destruct (Time.eq_dec a ts).
+        { subst. rewrite <- H. rewrite <- H0. left. eauto. }
+        { specialize (CELL ts). des; auto. ss. des; auto; ss. }
+      }
+    }
+    des. eauto.
+  Admitted.
+
+
+    exploit IHl; eauto.
+
+
+    hexploit
+    {
+
+
+    { eapply CONTENT.
+
+
+      des; eauto.
+
+
+
+  :
+
+
+
+           sim_memory_content L times (F loc ts) (extra loc ts)
+                               loc ts (Cell.get ts cell_src) (Cell.get ts cell_tgt))
+    :
+      exists l,
+        (<<CELL: sim_cell_list_contents loc F extra cell_src cell_tgt l>>).
+  Proof.
+    hexploit (Cell.finite cell_src). i. des. exists dom. ii.
+    destruct (Cell.get ts cell_src) as [[from_src msg_src]|] eqn:GETSRC.
+    { right. rewrite <- GETSRC. splits; eauto. }
+    { specialize (CELL loc ts). rewrite GETSRC in *. inv CELL; auto.
+      left. econs; eauto. }
+  Qed.
+
+
+  Lemma sim_memory_strong_exists F extra mem_src mem_tgt
+        (MEM: sim_memory L times F extra mem_src mem_tgt)
+    :
+      exists mem_src',
+        (<<MEM: sim_memory_strong F extra mem_src' mem_tgt>>).
+  Proof.
+
+
+
+  Record sim_memory_strong
+         (F: Loc.t -> Time.t -> Prop)
+         (extra: Loc.t -> Time.t -> Time.t -> Prop)
+         (mem_src mem_tgt: Memory.t): Prop :=
+    {
+      sim_memory_strong_contents:
+        forall loc ts,
+          sim_memory_content_strong (F loc ts) (extra loc ts) (extra loc)
+                                    loc ts (Memory.get loc ts mem_src) (Memory.get loc ts mem_tgt);
+      sim_memory_strong_wf:
+        forall loc from ts (EXTRA: extra loc ts from),
+          (<<FORGET: F loc from>>) /\
+          (<<LB: lb_time (times loc) from ts>>) /\
+          (<<TS: Time.lt from ts>>) /\
+          (<<UNIQUE: forall from' (EXTRA: extra loc ts from'),
+              from' = from>>);
+    }.
+
+
+
 
 End MIDDLE.
