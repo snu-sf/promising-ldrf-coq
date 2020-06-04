@@ -1119,30 +1119,26 @@ Section MIDDLE.
         }
       }
 
-      inv CONTENT.
-      { exists cell_src. ii. splits.
-        { apply CELL. }
-        { destruct (Time.eq_dec a ts).
-          { subst. rewrite <- H. rewrite <- H0. left. eauto. }
-          { specialize (CELL ts). des; auto. ss. des; auto; ss. }
-        }
-      }
-
-      { symmetry in H. symmetry in H0.
-        hexploit (@Cell.remove_exists cell_src from_src a msg); auto.
+      assert (MSG: forall from_src from_tgt msg_src msg_tgt
+                          (FROM: Time.le from_tgt from_src)
+                          (CELLSRC: Cell.get a cell_src = Some (from_src, msg_src))
+                          (CELLTGT: Cell.get a cell_tgt = Some (from_tgt, msg_tgt)),
+                 exists cell_src' : Cell.t, sim_cell_list loc F extra cell_src' cell_tgt l
+             ).
+      { i. hexploit (@Cell.remove_exists cell_src from_src a msg_src); auto.
         intros [cell_src0 REMOVE].
         destruct (classic (exists from_src', extra loc from_src' from_tgt))
           as [[from_src' EXTRA]|].
         { hexploit WF; eauto. i. des.
           set (MEM0:=proj1 (CELL from_src')).
-          inv MEM0; try by (exfalso; eapply NEXTRA0; eauto).
+          inv MEM0; try by (exfalso; eapply NEXTRA; eauto).
           eapply UNIQUE in EXTRA0. subst.
-          hexploit (@Cell.add_exists cell_src0 from_src' a msg); auto.
+          hexploit (@Cell.add_exists cell_src0 from_src' a msg_src); auto.
           { i. erewrite Cell.remove_o in GET2; eauto. des_ifs.
             set (MEM0:=proj1 (CELL to2)). rewrite GET2 in MEM0. inv MEM0.
             { hexploit Cell.get_disjoint.
-              { eapply H. }
-              { symmetry. eapply H6. }
+              { eapply CELLTGT. }
+              { symmetry. eapply H4. }
               i. des; subst; ss.
               eapply Interval.le_disjoint.
               { symmetry. symmetry in H1.
@@ -1151,8 +1147,8 @@ Section MIDDLE.
               { econs; ss; [|refl]. left. auto. }
             }
             { hexploit Cell.get_disjoint.
-              { eapply H. }
-              { symmetry. eapply H6. }
+              { eapply CELLTGT. }
+              { symmetry. eapply H4. }
               i. des; subst; ss.
               eapply Interval.le_disjoint.
               { symmetry. symmetry in H1.
@@ -1163,14 +1159,15 @@ Section MIDDLE.
             hexploit WF; try apply EXTRA0. i. des.
             set (MEM0:=proj1 (CELL from2)). inv MEM0; ss.
             hexploit Cell.get_disjoint.
-            { eapply H. }
-            { symmetry. eapply H5. }
+            { eapply CELLTGT. }
+            { symmetry. eapply H3. }
             i. des; subst; ss.
+            { eapply Interval.disjoint_imm. }
             ii. inv LHS. inv RHS. ss.
             destruct (Time.le_lt_dec to2 from_src); cycle 1.
             { exploit Cell.get_disjoint.
               { eapply GET2. }
-              { eapply H0. }
+              { eapply CELLSRC. }
               i. des; subst; ss. eapply x1.
               { instantiate (1:=Time.meet to2 a). econs; ss.
                 { unfold Time.meet. des_ifs.
@@ -1180,7 +1177,7 @@ Section MIDDLE.
               }
               { econs; ss.
                 { unfold Time.meet. des_ifs.
-                  apply Cell.get_ts in H0. des; auto.
+                  apply Cell.get_ts in CELLSRC. des; auto.
                   subst. timetac.
                 }
                 { eapply Time.meet_r. }
@@ -1189,7 +1186,7 @@ Section MIDDLE.
             destruct (Time.le_lt_dec from_src' from2); cycle 1.
             { exploit Cell.get_disjoint.
               { eapply GET2. }
-              { symmetry. eapply H2. }
+              { symmetry. eapply H0. }
               i. des; subst; ss.
               { timetac. }
               eapply x1.
@@ -1211,8 +1208,8 @@ Section MIDDLE.
               { eapply TimeFacts.lt_le_lt with (b:=from_src'); auto. }
               { transitivity x; auto. left. auto. }
             }
-            { econs; ss; [|refl]. symmetry in H4.
-              apply Cell.get_ts in H4. des.
+            { econs; ss; [|refl]. symmetry in H2.
+              apply Cell.get_ts in H2. des.
               { subst. assert (from_src' = Time.bot).
                 { apply TimeFacts.antisym; auto. apply Time.bot_spec. }
                 subst. timetac.
@@ -1222,62 +1219,67 @@ Section MIDDLE.
           }
           { destruct (Time.le_lt_dec a from_src'); auto. exfalso.
             hexploit Cell.get_disjoint.
-            { symmetry. eapply H2. }
-            { eapply H0. }
+            { symmetry. eapply H0. }
+            { eapply CELLSRC. }
             i. des; subst.
-            { rewrite H in *. clarify. }
+            { rewrite CELLTGT in *. clarify. }
             { eapply H1.
               { instantiate (1:=a). econs; ss.
-                eapply Cell.get_ts in H. des; auto. subst. timetac. }
+                eapply Cell.get_ts in CELLTGT. des; auto. subst. timetac. }
               { econs; ss; [|refl].
-                eapply Cell.get_ts in H0. des; auto. subst. timetac. }
+                eapply Cell.get_ts in CELLSRC. des; auto. subst. timetac. }
             }
           }
-          { eapply Cell.get_opt_wf in H0. auto. }
+          { eapply Cell.get_opt_wf in CELLSRC. auto. }
           intros [cell_src1 ADD]. exists cell_src1. ii.
           erewrite (@Cell.add_o cell_src1); eauto.
           erewrite (@Cell.remove_o cell_src0); eauto. des_ifs.
-          { rewrite H. splits.
+          { cut (sim_memory_content_strong (F loc a) (extra loc a) (extra loc) loc a
+                                           (Some (from_src', msg_src)) (Cell.get a cell_tgt)).
+            { i. splits; auto.
+              eapply sim_memory_content_strong_sim_memory_content; eauto. }
+            rewrite CELLTGT in *. rewrite CELLSRC in *. inv CONTENT.
             { econs 2; eauto; ss. left. auto. }
-            { left. econs 2; eauto; ss. left. auto. }
+            { econs 3; eauto. left. auto. }
           }
           { specialize (CELL ts). des; auto. ss. des; clarify. splits; auto. }
         }
 
-        { hexploit (@Cell.add_exists cell_src0 from_tgt a msg); auto.
+        { hexploit (@Cell.add_exists cell_src0 from_tgt a msg_src); auto.
           { i. erewrite Cell.remove_o in GET2; eauto. des_ifs.
             set (MEM0:=proj1 (CELL to2)). rewrite GET2 in MEM0. inv MEM0.
             { hexploit Cell.get_disjoint.
-              { eapply H. }
-              { symmetry. eapply H5. }
+              { eapply CELLTGT. }
+              { symmetry. eapply H3. }
               i. des; subst; ss.
               eapply Interval.le_disjoint.
-              { symmetry. symmetry in H2.
-                eapply Interval.le_disjoint; try apply H2; eauto.
+              { symmetry. symmetry in H0.
+                eapply Interval.le_disjoint; try apply H0; eauto.
                 econs; ss. refl. }
               { econs; ss; [|refl]. refl. }
             }
             { hexploit Cell.get_disjoint.
-              { eapply H. }
-              { symmetry. eapply H5. }
+              { eapply CELLTGT. }
+              { symmetry. eapply H3. }
               i. des; subst; ss.
               eapply Interval.le_disjoint.
-              { symmetry. symmetry in H2.
-                eapply Interval.le_disjoint; try apply H2; eauto.
+              { symmetry. symmetry in H0.
+                eapply Interval.le_disjoint; try apply H0; eauto.
                 econs; ss. refl. }
               { econs; ss; [|refl]. refl. }
             }
             hexploit WF; try apply EXTRA. i. des.
             set (MEM0:=proj1 (CELL from2)). inv MEM0; ss.
             hexploit Cell.get_disjoint.
-            { eapply H. }
-            { symmetry. eapply H4. }
+            { eapply CELLTGT. }
+            { symmetry. eapply H2. }
             i. des; subst; ss.
+            { eapply Interval.disjoint_imm. }
             ii. inv LHS. inv RHS. ss.
             destruct (Time.le_lt_dec to2 from_src); cycle 1.
             { exploit Cell.get_disjoint.
               { eapply GET2. }
-              { eapply H0. }
+              { eapply CELLSRC. }
               i. des; subst; ss. eapply x1.
               { instantiate (1:=Time.meet to2 a). econs; ss.
                 { unfold Time.meet. des_ifs.
@@ -1287,48 +1289,60 @@ Section MIDDLE.
               }
               { econs; ss.
                 { unfold Time.meet. des_ifs.
-                  apply Cell.get_ts in H0. des; auto.
+                  apply Cell.get_ts in CELLSRC. des; auto.
                   subst. timetac.
                 }
                 { eapply Time.meet_r. }
               }
             }
             destruct (Time.le_lt_dec from_tgt from2); cycle 1.
-            { hexploit (LB0 from_tgt); auto.
-              { apply MEMWF in H. des. auto. }
+            { hexploit (LB from_tgt); auto.
+              { apply MEMWF in CELLTGT. des. auto. }
               i. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
-              { eapply H6. } etrans.
+              { eapply H4. } etrans.
               { left. eapply FROM1. }
               eauto.
             }
             destruct l2; cycle 1.
-            { inv H6. eapply H1; eauto. }
-            eapply H2.
+            { inv H4. eapply H; eauto. }
+            eapply H0.
             { instantiate (1:=from2). econs; ss. transitivity x; auto. left. auto. }
-            { econs; ss; [|refl]. symmetry in H4.
-              apply Cell.get_ts in H4. des; auto. subst.
+            { econs; ss; [|refl]. symmetry in H2.
+              apply Cell.get_ts in H2. des; auto. subst.
               eapply TimeFacts.le_lt_lt with (b:=from_tgt); auto. eapply Time.bot_spec.
             }
           }
-          { apply Cell.get_ts in H. des; auto. subst. auto. }
-          { eapply Cell.get_opt_wf in H0. auto. }
+          { apply Cell.get_ts in CELLTGT. des; auto. subst. auto. }
+          { eapply Cell.get_opt_wf in CELLSRC. auto. }
           intros [cell_src1 ADD]. exists cell_src1. ii.
           erewrite (@Cell.add_o cell_src1); eauto.
           erewrite (@Cell.remove_o cell_src0); eauto. des_ifs.
-          { rewrite H. splits.
+
+          { cut (sim_memory_content_strong (F loc a) (extra loc a) (extra loc) loc a
+                                           (Some (from_tgt, msg_src)) (Cell.get a cell_tgt)).
+            { i. splits; auto.
+              eapply sim_memory_content_strong_sim_memory_content; eauto. }
+            rewrite CELLTGT in *. rewrite CELLSRC in *. inv CONTENT.
             { econs 2; eauto; ss.
               { refl. }
               { i. apply eq_lb_time. }
             }
-            { left. econs 2; eauto; ss.
+            { econs 3; eauto; ss.
               { refl. }
-              { i. apply eq_lb_time. }
             }
           }
           { specialize (CELL ts). des; auto. ss. des; clarify. splits; auto. }
         }
       }
-      { admit. }
+
+      inv CONTENT; eauto.
+      { exists cell_src. ii. splits.
+        { apply CELL. }
+        { destruct (Time.eq_dec a ts).
+          { subst. rewrite <- H. rewrite <- H0. left. eauto. }
+          { specialize (CELL ts). des; auto. ss. des; auto; ss. }
+        }
+      }
       { exists cell_src. ii. splits.
         { apply CELL. }
         { destruct (Time.eq_dec a ts).
@@ -1338,35 +1352,68 @@ Section MIDDLE.
       }
     }
     des. eauto.
-  Admitted.
-
+  Qed.
 
   Lemma sim_memory_strong_exists F extra mem_src mem_tgt
         (MEM: sim_memory L times F extra mem_src mem_tgt)
+        (MEMWF: memory_times_wf times mem_tgt)
     :
       exists mem_src',
         (<<MEM: sim_memory_strong F extra mem_src' mem_tgt>>).
   Proof.
+    hexploit (@choice
+                Loc.t
+                Cell.t
+                (fun loc cell =>
+                   forall ts,
+                     sim_memory_content_strong
+                       (F loc ts) (extra loc ts) (extra loc)
+                       loc ts (Cell.get ts cell) (Memory.get loc ts mem_tgt))).
+    { unfold Memory.get. i. eapply sim_cell_strong_exists.
+      { i. eapply MEM. }
+      { i. eapply MEMWF; eauto. }
+      { i. eapply MEM; eauto. }
+    }
+    intros [mem_src' SPEC]. exists mem_src'. econs; eauto.
+    eapply MEM.
+  Qed.
 
+  Lemma sim_promise_memory_strong others self extra_others extra_self
+        mem_src mem_tgt prom_src prom_tgt mem_src'
+        (MEM: sim_memory L times (others \\2// self) (extra_others \\3// extra_self) mem_src mem_tgt)
+        (PROM: sim_promise_strong L times self extra_self (extra_others \\3// extra_self) prom_src prom_tgt)
+        (MLE: Memory.le prom_src mem_src)
+        (MEMSTRONG: sim_memory_strong (others \\2// self) (extra_others \\3// extra_self) mem_src' mem_tgt)
+    :
+      Memory.le prom_src mem_src'.
+  Proof.
+    ii. exploit MLE; eauto. intros GETSRC.
+    set (MEM0:=MEM.(sim_memory_contents) loc to).
+    set (MEM1:=MEMSTRONG.(sim_memory_strong_contents) loc to).
+    set (PROM0:=PROM.(sim_promise_strong_contents) loc to).
+    rewrite LHS in PROM0.
 
-
-  Record sim_memory_strong
-         (F: Loc.t -> Time.t -> Prop)
-         (extra: Loc.t -> Time.t -> Time.t -> Prop)
-         (mem_src mem_tgt: Memory.t): Prop :=
-    {
-      sim_memory_strong_contents:
-        forall loc ts,
-          sim_memory_content_strong (F loc ts) (extra loc ts) (extra loc)
-                                    loc ts (Memory.get loc ts mem_src) (Memory.get loc ts mem_tgt);
-      sim_memory_strong_wf:
-        forall loc from ts (EXTRA: extra loc ts from),
-          (<<FORGET: F loc from>>) /\
-          (<<LB: lb_time (times loc) from ts>>) /\
-          (<<TS: Time.lt from ts>>) /\
-          (<<UNIQUE: forall from' (EXTRA: extra loc ts from'),
-              from' = from>>);
-    }.
+    inv MEM0.
+    - rewrite GETSRC in *. clarify.
+    - inv MEM1.
+      + rewrite <- H in *. clarify.
+      + admit.
+      + exfalso. eapply NPROM; eauto.
+      + exfalso. eapply NEXTRA; eauto.
+    - inv MEM1.
+      + exfalso. eapply NPROM; eauto.
+      + exfalso. eapply NPROM; eauto.
+      + rewrite GETSRC in *. clarify. f_equal. f_equal.
+        admit.
+      + exfalso. eapply NPROM; eauto.
+    - inv MEM1.
+      + exfalso. eapply NEXTRA; eauto.
+      + exfalso. eapply NEXTRA; eauto.
+      + exfalso. eapply NEXTRA; eauto.
+      + rewrite GETSRC in *. clarify.
+        eapply MEM.(sim_memory_wf) in EXTRA. des.
+        eapply UNIQUE in EXTRA0. subst. auto.
+  Qed.
 
 
 

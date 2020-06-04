@@ -973,7 +973,7 @@ Section SIM.
         splits; auto. ii. rewrite H1 in *. rewrite H2 in *. auto.
   Qed.
 
-  Lemma sim_promise_weak_stengthen others self extra_others extra_self
+  Lemma sim_promise_weak_strengthen others self extra_others extra_self
         prom_src prom_tgt mem_src mem_tgt
         (MEM: sim_memory (others \\2// self) (extra_others \\3// extra_self) mem_src mem_tgt)
         (MLETGT: Memory.le prom_tgt mem_tgt)
