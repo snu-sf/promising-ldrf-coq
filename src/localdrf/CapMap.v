@@ -380,7 +380,7 @@ Section CAPFLEX.
         econs. ss.
   Qed.
 
-  Lemma cap_exists
+  Lemma cap_flex_exists
         mem1 newmax
         (CLOSED1: Memory.closed mem1)
         (NEWMAX: forall loc, Time.lt (Memory.max_ts loc mem1) (newmax loc))
@@ -468,6 +468,14 @@ Section CAPFLEX.
     }
   Qed.
 
+  Lemma cap_cap_flex mem1 mem2
+        (CAP: Memory.cap mem1 mem2)
+    :
+      cap_flex mem1 mem2 (fun loc => Time.incr (Memory.max_ts loc mem1)).
+  Proof.
+    inv CAP. econs; eauto.
+  Qed.
+
 End CAPFLEX.
 
 
@@ -476,18 +484,45 @@ Section MIDDLE.
   Variable L: Loc.t -> bool.
   Variable times: Loc.t -> list Time.t.
 
-  Lemma sim_memory_max_ts F extra (mem_src mem_tgt: Memory.t)
+
+  Lemma sim_memory_max_ts_extra F extra mem_src mem_tgt
         (MEM: sim_memory L times F extra mem_src mem_tgt)
+        (MEMSRC: Memory.closed mem_src)
         (MEMTGT: Memory.closed mem_tgt)
+        loc
     :
-      forall loc, Time.le (Memory.max_ts loc mem_tgt) (Memory.max_ts loc mem_src).
+      Memory.max_ts loc mem_src = Memory.max_ts loc mem_tgt \/
+      extra loc (Memory.max_ts loc mem_src) (Memory.max_ts loc mem_tgt).
   Proof.
+    hexploit (@Memory.max_ts_spec loc).
+    { inv MEMTGT. eapply INHABITED. } i. des.
+    destruct (Memory.get loc (Memory.max_ts loc mem_tgt) mem_src) as [[from_src msg_src]|] eqn:GETSRC; cycle 1.
+    { exfalso. eapply sim_memory_src_none in GETSRC; eauto. des; clarify. }
+
     i. hexploit (@Memory.max_ts_spec loc).
     { inv MEMTGT. eapply INHABITED. } i. des.
-    destruct (Memory.get loc (Memory.max_ts loc mem_tgt) mem_src) eqn:GETSRC.
-    { destruct p. eapply Memory.max_ts_spec in GETSRC. des.
-      eapply Memory.max_ts_spec in GET0. des. auto. }
-    { exfalso. eapply sim_memory_src_none in GETSRC; eauto. des; clarify. }
+    destruct (Memory.get loc (Memory.max_ts loc mem_tgt) mem_src) eqn:GETSRC0.
+    { destruct p. dup GETSRC0. dup GET. eapply Memory.max_ts_spec in GETSRC0. des.
+      eapply Memory.max_ts_spec in GET0. des.
+      dup GET1. eapply sim_memory_get_larger in GET2; eauto. des.
+      { clarify. left. apply TimeFacts.antisym.
+        { apply Memory.max_ts_spec in GETTGT. des. auto. }
+        { apply Memory.max_ts_spec in GETSRC1. des. auto. }
+      }
+      { right.
+  Admitted.
+
+  Lemma sim_memory_max_ts_le F extra mem_src mem_tgt
+        (MEM: sim_memory L times F extra mem_src mem_tgt)
+        (MEMSRC: Memory.closed mem_src)
+        (MEMTGT: Memory.closed mem_tgt)
+        loc
+    :
+      Time.le (Memory.max_ts loc mem_tgt) (Memory.max_ts loc mem_src).
+  Proof.
+    hexploit sim_memory_max_ts_extra; eauto. i. des.
+    { rewrite H. refl. }
+    { eapply MEM.(sim_memory_wf) in H. des. left. auto. }
   Qed.
 
 
@@ -607,7 +642,8 @@ Section MIDDLE.
         (<<GETSRC: Memory.get loc to_src mem_src = Some (from_src, msg_src)>>) /\
         (<<TS: Time.lt to_src ts>>) /\
         (<<EMPTY: forall t (TS0: Time.lt to_src t) (TS1: Time.le t ts),
-            Memory.get loc t mem_src = None>>)
+            Memory.get loc t mem_src = None>>) /\
+        (<<EXTRA: __guard__(to_tgt = to_src \/ extra loc to_src to_tgt)>>)
   .
   Proof.
     destruct (classic (exists to_src, <<EXTRA: extra loc to_src to_tgt>>)) as [EXTRA|NEXTRA].
@@ -619,13 +655,13 @@ Section MIDDLE.
 
       exploit (MEM.(sim_memory_wf) loc to_tgt to_src); auto. i. des.
       eapply UNIQUE in EXTRA. subst.
+      esplits; eauto; cycle 1.
+      { right. auto. } i.
 
-      esplits; eauto. i.
-
-      destruct (Memory.get loc ts mem_src) as [[from_src0 msg_src0]|] eqn:GETSRC0; auto.
+      destruct (Memory.get loc t mem_src) as [[from_src0 msg_src0]|] eqn:GETSRC0; auto.
       eapply sim_memory_get_larger in GETSRC0; eauto. des.
-      { erewrite EMPTY in GETTGT0; clarify. refl. }
-      { exploit (MEM.(sim_memory_wf) loc from_src0 ts); auto. i. des.
+      { erewrite EMPTY in GETTGT0; clarify. etrans; eauto. }
+      { exploit (MEM.(sim_memory_wf) loc from_src0 t); auto. i. des.
         set (MEM0:=MEM.(sim_memory_contents) loc from_src0). inv MEM0; ss.
         hexploit memory_get_disjoint_strong.
         { symmetry. eapply H3. }
@@ -636,7 +672,7 @@ Section MIDDLE.
           { eapply EXTRA. }
           i. subst. timetac.
         }
-        { set (MEM0:=MEM.(sim_memory_contents) loc ts).
+        { set (MEM0:=MEM.(sim_memory_contents) loc t).
           inv MEM0; try by (exfalso; eapply NEXTRA0; eauto).
           eapply UNIQUE0 in EXTRA1. subst.
           hexploit Memory.get_disjoint.
@@ -647,29 +683,29 @@ Section MIDDLE.
           { exfalso. eapply H1.
             { instantiate (1:=to_src). econs; ss.
               { transitivity to_tgt; auto. }
-              { transitivity t; auto. left. auto. }
+              { left. auto. }
             }
             { econs; ss. refl. }
           }
         }
         { set (MEM0:=MEM.(sim_memory_contents) loc from_src0). inv MEM0; ss.
-          erewrite EMPTY in H3; clarify. left. auto. }
+          erewrite EMPTY in H3; clarify. transitivity t; auto. left. auto. }
       }
     }
-    }
     { destruct (Memory.get loc to_tgt mem_src) as [[from_src msg_src]|] eqn:GETSRC.
-      { esplits; eauto. i.
-        destruct (Memory.get loc ts mem_src) as [[from_src0 msg_src0]|] eqn:GETSRC0; auto.
+      { esplits; eauto; cycle 1.
+        { left. auto. } i.
+        destruct (Memory.get loc t mem_src) as [[from_src0 msg_src0]|] eqn:GETSRC0; auto.
         eapply sim_memory_get_larger in GETSRC0; eauto. des.
-        { erewrite EMPTY in GETTGT0; clarify. refl. }
-        { exploit (MEM.(sim_memory_wf) loc from_src0 ts); auto. i. des.
+        { erewrite EMPTY in GETTGT0; clarify. }
+        { exploit (MEM.(sim_memory_wf) loc from_src0 t); auto. i. des.
           set (MEM0:=MEM.(sim_memory_contents) loc from_src0). inv MEM0; ss.
           hexploit memory_get_disjoint_strong.
           { symmetry. eapply H. }
           { eapply GETTGT. }
           i. des; subst.
           { exfalso. eapply NEXTRA. eauto. }
-          { set (MEM0:=MEM.(sim_memory_contents) loc ts).
+          { set (MEM0:=MEM.(sim_memory_contents) loc t).
             inv MEM0; try by (exfalso; eapply NEXTRA1; eauto).
             eapply UNIQUE in EXTRA0. subst.
             hexploit Memory.get_disjoint.
@@ -678,8 +714,7 @@ Section MIDDLE.
             i. des; subst.
             { clarify. exfalso. timetac. }
             { exfalso. eapply H1.
-              { instantiate (1:=to_tgt). econs; ss.
-                etrans; eauto. left. auto. }
+              { instantiate (1:=to_tgt). econs; ss. left. auto. }
               { econs; ss; [|refl].
                 apply memory_get_ts_strong in GETSRC. des; auto.
                 subst. exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
@@ -689,7 +724,7 @@ Section MIDDLE.
             }
           }
           { set (MEM0:=MEM.(sim_memory_contents) loc from_src0). inv MEM0; ss.
-            erewrite EMPTY in H3; clarify. left. auto. }
+            erewrite EMPTY in H3; clarify. transitivity t; auto. left. auto. }
         }
       }
       { eapply sim_memory_src_none in GETSRC; eauto. des. clarify. }
@@ -706,7 +741,11 @@ Section MIDDLE.
     :
       exists from1_src to1_src to2_src,
         (<<ADJ: Memory.adjacent loc from1_src to1_src from2 to2_src mem_src>>) /\
-        (<<TS: Time.lt to1_src from2>>).
+        (<<TS: Time.lt to1_src from2>>) /\
+        (<<FROM: Time.le to1_tgt to1_src>>) /\
+        (<<LB: forall (LOC: L loc), lb_time (times loc) to1_tgt to1_src>>) /\
+        (<<EXTRA: __guard__(to1_tgt = to1_src \/ extra loc to1_src to1_tgt)>>) /\
+        (<<NLOC: ~ L loc -> to1_src = to1_tgt>>).
   Proof.
     inv ADJ. hexploit sim_memory_strong_left_end; eauto. i. des.
     hexploit sim_memory_right_end.
@@ -715,95 +754,58 @@ Section MIDDLE.
     { eapply TS. }
     { apply MEMWF in GET2. des. auto. }
     { eauto. }
-    i. des. exists from_src, to_src0, to_src. splits; auto.
-    econs; eauto.
-    { admit. }
-    { i. eapply EMPTY0.
-
-           EMPTY0.
-
-    {
-
-    esplits.
-    { econs; eauto.
-
-
-
-    destruct (classic (exists to1_src, <<EXTRA: extra loc to1_src to1_tgt>>)).
-    { des. set (MEM0:=MEM.(sim_memory_strong_contents) loc to1_src).
-      inv MEM0; try by (exfalso; eapply NEXTRA; eauto).
-      assert (TS1: Time.lt to1_src from2).
-      { eapply MEM.(sim_memory_strong_wf) in EXTRA0. des.
-        eapply UNIQUE in EXTRA. subst. eapply LB.
-        { eapply MEMWF in GET2. des. auto. }
-        { admit. }
-      }
-      exists from, to1_src, to_src. splits; auto. econs; eauto.
-      { eapply TimeFacts.lt_le_lt.
-        { eapply TS1. }
-        { eapply memory_get_ts_le; eauto. }
-      }
-      admit.
+    i. des. exists from_src, to_src0, to_src.
+    destruct EXTRA.
+    { subst. splits; ss.
+      { econs; eauto. eapply TimeFacts.lt_le_lt; eauto. eapply memory_get_ts_le; eauto. }
+      { refl. }
+      { i. eapply eq_lb_time. }
+      { left. auto. }
     }
-
-
-    {
-
+    { dup H. apply MEM.(sim_memory_strong_wf) in H. des. splits; ss.
+      { econs; eauto. eapply TimeFacts.lt_le_lt; eauto. eapply memory_get_ts_le; eauto. }
+      { left. auto. }
+      { right. auto. }
+      { i. set (MEM0:=MEM.(sim_memory_strong_contents) loc to_src0).
+        inv MEM0; ss; try by (exfalso; eapply NEXTRA; eauto). }
     }
-
-
-          to1_src to2_tgt
-
-                  from from2
-
-          from
-
-
-            inv MEM0
-
-
-
-        to_src msg_src,
-        (<<GETSRC: Memory.get loc to_src mem_src = Some (from, msg_src)>>).
-  Proof.
-    set (MEM0:=MEM.(sim_memory_strong_contents) loc to_tgt).
-    rewrite GETTGT in *. inv MEM0.
-    { des; clarify; eauto.
-      set (MEM0:=MEM.(sim_memory_strong_contents) loc from_src).
-      inv MEM0; try by (exfalso; eapply NEXTRA0; eauto).
-      eapply MEM.(sim_memory_strong_wf) in EXTRA. des.
-      apply UNIQUE in EXTRA0. subst. eauto. }
-    { des; clarify; eauto.
-      set (MEM0:=MEM.(sim_memory_strong_contents) loc from_src).
-      inv MEM0; try by (exfalso; eapply NEXTRA0; eauto).
-      eapply MEM.(sim_memory_strong_wf) in EXTRA. des.
-      apply UNIQUE in EXTRA0. subst. eauto. }
   Qed.
 
-
-
-
-    {
-
-
-      eauto.
-
-
-      set (<
-
-
-      - subst. eauto.
-
-    destruct
-
-
-
-        (MEMSRC: Memory.closed mem_src)
-        (MEMTGT: Memory.closed mem_tgt)
-        (MEMWF: memory_times_wf times mem_tgt)
-        (CAPSRC: Memory.cap mem_src cap_src)
-        (CAPTGT: cap_flex mem_tgt cap_tgt (Memory.max_timemap cap_src))
+  Lemma cap_left_end mem1 mem2 tm loc ts1 ts2 msg1
+        (MEM: Memory.closed mem1)
+        (CAP: cap mem1 mem2)
+        (GET: Memory.get loc ts2 mem1 = Some (ts1, msg1))
     :
+      exists ts0 msg0,
+        (<<GET: Memory.get loc ts1 mem2 = Some (ts0, msg0)>>).
+  Proof.
+    destruct (Memory.get loc ts1 mem1) as [[ts0 msg0]|] eqn:GETORG.
+    { eapply Memory.cap_le in GETORG; eauto. refl. }
+    { hexploit (@cell_elements_greatest
+                  (mem1 loc)
+                  (fun ts => Time.lt ts ts1)). i. des; cycle 1.
+      { inv MEM. specialize (INHABITED loc).
+        hexploit EMPTY; eauto. intros TS.
+        destruct (Time.le_lt_dec ts1 Time.bot); ss. destruct l.
+        { exfalso. eapply Time.lt_strorder.
+          eapply TimeFacts.lt_le_lt; eauto. eapply Time.bot_spec. }
+        { inv H. clarify. }
+      }
+      inv CAP. hexploit MIDDLE.
+      { econs.
+        { eapply GET0. }
+        { eapply GET. }
+        { eapply TimeFacts.lt_le_lt; eauto. eapply memory_get_ts_le; eauto. }
+        { i. destruct TS2.
+          { destruct (Memory.get loc ts mem1) eqn:GETTS; auto. destruct p.
+            eapply GREATEST in GETTS; eauto. timetac. }
+          { inv H. eauto. }
+        }
+      }
+      { auto. }
+      eauto.
+    }
+  Qed.
 
   Lemma sim_memory_strong_cap F extra mem_src mem_tgt cap_src cap_tgt
         (MEM: sim_memory_strong F extra mem_src mem_tgt)
@@ -818,7 +820,8 @@ Section MIDDLE.
     assert (NEXMAX: forall loc, Time.lt (Memory.max_ts loc mem_tgt) (Memory.max_timemap cap_src loc)).
     { i. unfold Memory.max_timemap. erewrite (@Memory.cap_max_ts mem_src cap_src); eauto.
       eapply TimeFacts.le_lt_lt.
-      { eapply sim_memory_max_ts; eauto. eapply sim_memory_strong_sim_memory; eauto. }
+      { eapply sim_memory_max_ts_le; try apply MEMSRC; eauto.
+        eapply sim_memory_strong_sim_memory; eauto. }
       { eapply Time.incr_spec. }
     }
     dup CAPTGT. inv CAPTGT0. dup CAPSRC. inv CAPSRC0. econs.
@@ -826,26 +829,20 @@ Section MIDDLE.
       inv MEM0; symmetry in H; symmetry in H0; rename H into GETMEMTGT; rename H0 into GETMEMSRC.
       { destruct (Memory.get loc ts cap_tgt) as [[from_tgt msg_tgt]|] eqn:GETTGT; eauto.
         { eapply cap_flex_inv in GETTGT; try apply CAPTGT; eauto. des; clarify.
-          { inv GETTGT0.
-            destruct (classic (exists from1_src, <<EXTRA: extra loc from1_src from1>>)).
-            { des.
-              assert (ADJ: Memory.adjacent loc from1_src from_tgt ts to2 mem_tgt
-
-              erewrite MIDDLE0.
-              { instantiate
-
-
-
-
-            admit. }
+          { hexploit sim_memory_strong_adjancent; eauto. i. des.
+            erewrite MIDDLE0; eauto. }
           { revert NEXTRA NPROM. unfold Memory.max_timemap.
             erewrite Memory.cap_max_ts; try apply CAPSRC; eauto.
             erewrite BACK0. i. econs 2; auto.
-            { eapply sim_memory_max_ts; eauto. eapply sim_memory_strong_sim_memory; eauto. }
-            { i.
-
-
-              admit. }
+            { eapply sim_memory_max_ts_le; eauto. eapply sim_memory_strong_sim_memory; eauto. }
+            { i. hexploit sim_memory_max_ts_extra.
+              { eapply sim_memory_strong_sim_memory; eauto. }
+              { eauto. }
+              { eauto. }
+              i. des.
+              { rewrite H. apply eq_lb_time. }
+              { apply MEM.(sim_memory_strong_wf) in H. des. auto. }
+            }
             { i. hexploit (@Memory.max_ts_spec loc).
               { inv MEMSRC. eapply INHABITED. } i. des.
               i. hexploit (@Memory.max_ts_spec loc).
@@ -860,25 +857,21 @@ Section MIDDLE.
             }
           }
         }
-        { destruct (Memory.cap_
+        { destruct (Memory.get loc ts cap_src) as [[from_src msg_src]|] eqn:GETSRC; eauto.
+          eapply Memory.cap_inv in GETSRC; try apply CAPSRC; eauto. des; clarify.
+          { inv GETSRC0. eapply
 
-        {
+            eapply cap_left_end in GET2; eauto. des.
 
+            cap_left_end
 
-            erewrite Memory.max_ts
-
-            erewrite BACK0.
-
-            unfold erewrite BACK.
-
-
-        destruct (Memory.get loc ts cap_src) as [[from_src msg_src]|] eqn:GETSRC; eauto;
-          destruct (Memory.get loc ts cap_tgt) as [[from_tgt msg_tgt]|] eqn:GETTGT; eauto.
-        {
+            Memory.adjacent
 
 
-
-        admit. }
+            admit. }
+          { erewrite <- (@Memory.cap_max_ts mem_src cap_src) in GETTGT; eauto.
+            unfold Memory.max_timemap in BACK. erewrite BACK in *. clarify. }
+      }
       { eapply Memory.cap_le in GETMEMSRC; [|try apply CAPSRC|refl].
         eapply SOUND in GETMEMTGT.
         rewrite GETMEMSRC. rewrite GETMEMTGT. eauto. }
