@@ -1070,6 +1070,52 @@ Section MIDDLE.
         }
       } clear LIN.
 
+      destruct (Time.le_lt_dec a Time.bot).
+      { assert (a = Time.bot).
+        { apply TimeFacts.antisym; auto. apply Time.bot_spec. } subst.
+        exists cell_src. ii. splits.
+        { apply CELL. }
+        { destruct (Time.eq_dec Time.bot ts).
+          { subst. left. inv CONTENT; eauto.
+            { econs; eauto. left.
+              symmetry in H. symmetry in H0. eapply TimeFacts.antisym.
+              { eapply Cell.get_ts in H. des; subst.
+                { eapply Time.bot_spec. }
+                { exfalso. eapply Time.lt_strorder.
+                  eapply (@TimeFacts.lt_le_lt from_tgt Time.bot); eauto.
+                  eapply Time.bot_spec.
+                }
+              }
+              { eapply Cell.get_ts in H0. des; subst.
+                { eapply Time.bot_spec. }
+                { exfalso. eapply Time.lt_strorder.
+                  eapply (@TimeFacts.lt_le_lt from_src Time.bot); eauto.
+                  eapply Time.bot_spec.
+                }
+              }
+            }
+            { econs; eauto. left.
+              symmetry in H. symmetry in H0. eapply TimeFacts.antisym.
+              { eapply Cell.get_ts in H. des; subst.
+                { eapply Time.bot_spec. }
+                { exfalso. eapply Time.lt_strorder.
+                  eapply (@TimeFacts.lt_le_lt from_tgt Time.bot); eauto.
+                  eapply Time.bot_spec.
+                }
+              }
+              { eapply Cell.get_ts in H0. des; subst.
+                { eapply Time.bot_spec. }
+                { exfalso. eapply Time.lt_strorder.
+                  eapply (@TimeFacts.lt_le_lt from_src Time.bot); eauto.
+                  eapply Time.bot_spec.
+                }
+              }
+            }
+          }
+          { specialize (CELL ts). des; auto. ss. des; auto; ss. }
+        }
+      }
+
       inv CONTENT.
       { exists cell_src. ii. splits.
         { apply CELL. }
@@ -1090,6 +1136,33 @@ Section MIDDLE.
           eapply UNIQUE in EXTRA0. subst.
           hexploit (@Cell.add_exists cell_src0 from_src' a msg); auto.
           { i. erewrite Cell.remove_o in GET2; eauto. des_ifs.
+            set (MEM0:=proj1 (CELL to2)). rewrite GET2 in MEM0. inv MEM0.
+            { hexploit Cell.get_disjoint.
+              { eapply H. }
+              { symmetry. eapply H6. }
+              i. des; subst; ss.
+              eapply Interval.le_disjoint.
+              { symmetry. symmetry in H1.
+                eapply Interval.le_disjoint; try apply H1; eauto.
+                econs; ss. refl. }
+              { econs; ss; [|refl]. left. auto. }
+            }
+            { hexploit Cell.get_disjoint.
+              { eapply H. }
+              { symmetry. eapply H6. }
+              i. des; subst; ss.
+              eapply Interval.le_disjoint.
+              { symmetry. symmetry in H1.
+                eapply Interval.le_disjoint; try apply H1; eauto.
+                econs; ss. refl. }
+              { econs; ss; [|refl]. left. auto. }
+            }
+            hexploit WF; try apply EXTRA0. i. des.
+            set (MEM0:=proj1 (CELL from2)). inv MEM0; ss.
+            hexploit Cell.get_disjoint.
+            { eapply H. }
+            { symmetry. eapply H5. }
+            i. des; subst; ss.
             ii. inv LHS. inv RHS. ss.
             destruct (Time.le_lt_dec to2 from_src); cycle 1.
             { exploit Cell.get_disjoint.
@@ -1099,13 +1172,13 @@ Section MIDDLE.
               { instantiate (1:=Time.meet to2 a). econs; ss.
                 { unfold Time.meet. des_ifs.
                   { eapply TimeFacts.lt_le_lt with (b:=x); auto. }
-                  { eapply TimeFacts.lt_le_lt with (b:=x); auto. }
                 }
                 { eapply Time.meet_l. }
               }
               { econs; ss.
                 { unfold Time.meet. des_ifs.
-                  admit.
+                  apply Cell.get_ts in H0. des; auto.
+                  subst. timetac.
                 }
                 { eapply Time.meet_r. }
               }
@@ -1118,22 +1191,45 @@ Section MIDDLE.
               { timetac. }
               eapply x1.
               { instantiate (1:=Time.meet to2 from_src'). econs; ss.
-                { unfold Time.meet. des_ifs.
-                  eapply TimeFacts.lt_le_lt with (b:=x); auto. }
+                { unfold Time.meet. des_ifs. }
                 { eapply Time.meet_l. }
               }
               { econs; ss.
                 { unfold Time.meet. des_ifs. eapply TimeFacts.lt_le_lt.
                   { eapply TS. } etrans.
-                  { left. eapply FROM0. }
+                  { left. eapply FROM1. }
                   eauto.
                 }
                 { eapply Time.meet_r. }
               }
             }
-            admit.
+            eapply H1.
+            { instantiate (1:=from2). econs; ss.
+              { eapply TimeFacts.lt_le_lt with (b:=from_src'); auto. }
+              { transitivity x; auto. left. auto. }
+            }
+            { econs; ss; [|refl]. symmetry in H4.
+              apply Cell.get_ts in H4. des.
+              { subst. assert (from_src' = Time.bot).
+                { apply TimeFacts.antisym; auto. apply Time.bot_spec. }
+                subst. timetac.
+              }
+              { eapply TimeFacts.le_lt_lt with (b:=from_src0); auto. }
+            }
           }
-          { admit. }
+          { destruct (Time.le_lt_dec a from_src'); auto. exfalso.
+            hexploit Cell.get_disjoint.
+            { symmetry. eapply H2. }
+            { eapply H0. }
+            i. des; subst.
+            { rewrite H in *. clarify. }
+            { eapply H1.
+              { instantiate (1:=a). econs; ss.
+                eapply Cell.get_ts in H. des; auto. subst. timetac. }
+              { econs; ss; [|refl].
+                eapply Cell.get_ts in H0. des; auto. subst. timetac. }
+            }
+          }
           { eapply Cell.get_opt_wf in H0. auto. }
           intros [cell_src1 ADD]. exists cell_src1. ii.
           erewrite (@Cell.add_o cell_src1); eauto.
@@ -1144,6 +1240,8 @@ Section MIDDLE.
           }
           { specialize (CELL ts). des; auto. ss. des; clarify. splits; auto. }
         }
+        {
+
         { admit. }
       }
       { admit. }
