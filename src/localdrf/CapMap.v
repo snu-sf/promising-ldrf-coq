@@ -1041,6 +1041,9 @@ Section MIDDLE.
         (CELL: forall ts,
             sim_memory_content L times (F loc ts) (extra loc ts)
                                loc ts (Cell.get ts cell_src) (Cell.get ts cell_tgt))
+        (MEMWF: forall to from msg
+                       (GET: Cell.get to cell_tgt = Some (from, msg)),
+            (<<FROM: List.In from (times loc)>>) /\ (<<TO: List.In to (times loc)>>))
         (WF: forall loc from ts (EXTRA: extra loc ts from),
             (<<FORGET: F loc from>>) /\
             (<<LB: lb_time (times loc) from ts>>) /\
@@ -1240,55 +1243,37 @@ Section MIDDLE.
           }
           { specialize (CELL ts). des; auto. ss. des; clarify. splits; auto. }
         }
-        {
 
-        { admit. }
-      }
-      { admit. }
-      { exists cell_src. ii. splits.
-        { apply CELL. }
-        { destruct (Time.eq_dec a ts).
-          { subst. rewrite <- H. rewrite <- H0. left. eauto. }
-          { specialize (CELL ts). des; auto. ss. des; auto; ss. }
-        }
-      }
-    }
-    des. eauto.
-  Admitted.
-
-          {
-
-
-          {
-            { admit. }
-            { exists cell_src. ii. splits.
-              { apply CELL. }
-              { destruct (Time.eq_dec a ts).
-                { subst. rewrite <- H. rewrite <- H0. left. eauto. }
-                { specialize (CELL ts). des; auto. ss. des; auto; ss. }
-              }
-            }
-          }
-          des. eauto.
-  Admitted.
-
-        }
-
-
-
-      { symmetry in H. symmetry in H0.
-        hexploit (@Cell.remove_exists cell_src from_src a msg); auto.
-        intros [cell_src0 REMOVE].
-        destruct (classic (exists from_src', extra loc from_src' from_tgt))
-          as [[from_src' EXTRA]|].
-        { hexploit WF; eauto. i. des.
-          set (MEM0:=proj1 (CELL from_src')).
-          inv MEM0; try by (exfalso; eapply NEXTRA0; eauto).
-          eapply UNIQUE in EXTRA0. subst.
-          hexploit (@Cell.add_exists cell_src0 from_src' a msg); auto.
+        { hexploit (@Cell.add_exists cell_src0 from_tgt a msg); auto.
           { i. erewrite Cell.remove_o in GET2; eauto. des_ifs.
+            set (MEM0:=proj1 (CELL to2)). rewrite GET2 in MEM0. inv MEM0.
+            { hexploit Cell.get_disjoint.
+              { eapply H. }
+              { symmetry. eapply H5. }
+              i. des; subst; ss.
+              eapply Interval.le_disjoint.
+              { symmetry. symmetry in H2.
+                eapply Interval.le_disjoint; try apply H2; eauto.
+                econs; ss. refl. }
+              { econs; ss; [|refl]. refl. }
+            }
+            { hexploit Cell.get_disjoint.
+              { eapply H. }
+              { symmetry. eapply H5. }
+              i. des; subst; ss.
+              eapply Interval.le_disjoint.
+              { symmetry. symmetry in H2.
+                eapply Interval.le_disjoint; try apply H2; eauto.
+                econs; ss. refl. }
+              { econs; ss; [|refl]. refl. }
+            }
+            hexploit WF; try apply EXTRA. i. des.
+            set (MEM0:=proj1 (CELL from2)). inv MEM0; ss.
+            hexploit Cell.get_disjoint.
+            { eapply H. }
+            { symmetry. eapply H4. }
+            i. des; subst; ss.
             ii. inv LHS. inv RHS. ss.
-
             destruct (Time.le_lt_dec to2 from_src); cycle 1.
             { exploit Cell.get_disjoint.
               { eapply GET2. }
@@ -1297,132 +1282,51 @@ Section MIDDLE.
               { instantiate (1:=Time.meet to2 a). econs; ss.
                 { unfold Time.meet. des_ifs.
                   { eapply TimeFacts.lt_le_lt with (b:=x); auto. }
-                  { eapply TimeFacts.lt_le_lt with (b:=x); auto. }
                 }
                 { eapply Time.meet_l. }
               }
               { econs; ss.
                 { unfold Time.meet. des_ifs.
-                  admit.
+                  apply Cell.get_ts in H0. des; auto.
+                  subst. timetac.
                 }
                 { eapply Time.meet_r. }
               }
             }
-
-            destruct (Time.le_lt_dec from_src' from2); cycle 1.
-            { exploit Cell.get_disjoint.
-              { eapply GET2. }
-              { symmetry. eapply H2. }
-              i. des; subst; ss.
-              { timetac. }
-              eapply x1.
-              { instantiate (1:=Time.meet to2 from_src'). econs; ss.
-                { unfold Time.meet. des_ifs.
-                  eapply TimeFacts.lt_le_lt with (b:=x); auto. }
-                { eapply Time.meet_l. }
-              }
-              { econs; ss.
-                { unfold Time.meet. des_ifs. eapply TimeFacts.lt_le_lt.
-                  { eapply TS. } etrans.
-                  { left. eapply FROM0. }
-                  eauto.
-                }
-                { eapply Time.meet_r. }
-              }
+            destruct (Time.le_lt_dec from_tgt from2); cycle 1.
+            { hexploit (LB0 from_tgt); auto.
+              { apply MEMWF in H. des. auto. }
+              i. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+              { eapply H6. } etrans.
+              { left. eapply FROM1. }
+              eauto.
             }
-
-
-
-
-
-
-                { eapply TimeFacts.lt_le_lt with (b:=x); auto. }
-                }
-                { eapply Time.meet_l. }
-              }
-              { econs; ss.
-                { unfold Time.meet. des_ifs.
-                  admit.
-                }
-                { eapply Time.meet_r. }
-              }
+            destruct l2; cycle 1.
+            { inv H6. eapply H1; eauto. }
+            eapply H2.
+            { instantiate (1:=from2). econs; ss. transitivity x; auto. left. auto. }
+            { econs; ss; [|refl]. symmetry in H4.
+              apply Cell.get_ts in H4. des; auto. subst.
+              eapply TimeFacts.le_lt_lt with (b:=from_tgt); auto. eapply Time.bot_spec.
             }
-
-            {
-
-
-                  { admit. }
-                  {
-
-                  eapply TimeFacts.lt_le_lt with (b:=x); auto. }
-                  { eapply TimeFacts.lt_le_lt with (b:=x); auto. }
-                }
-
-                    d
-
-
-                                   Time.meet
-
-                instantiate (1:=to2). econs; ss; [|refl].
-                admit.
-              }
-              { econs; ss.
-
-                eapply TimeFacts.lt_le_lt; eauto. }
-              { econs; ss; [|refl].
-                admit.
-              }
-            }
-
-
-            destruct (Time.le_lt_dec a to2).
-            { exploit Cell.get_disjoint.
-              { eapply GET2. }
-              { eapply H0. }
-              i. des; subst; ss. eapply x1.
-              { instantiate (1:=a). econs; ss. eapply TimeFacts.lt_le_lt; eauto. }
-              { econs; ss; [|refl].
-                admit.
-              }
-            }
-
-
-
-
-
-
-              {
-
-              destruct l0.
-              {
-
-
-                admit. }
-              { inv H1. ss. }
-            }
-
-
-
-
-
-
-
-
-            admit. }
-
-          {
-            admit. }
+          }
+          { apply Cell.get_ts in H. des; auto. subst. auto. }
           { eapply Cell.get_opt_wf in H0. auto. }
           intros [cell_src1 ADD]. exists cell_src1. ii.
           erewrite (@Cell.add_o cell_src1); eauto.
           erewrite (@Cell.remove_o cell_src0); eauto. des_ifs.
           { rewrite H. splits.
-            { econs 2; eauto; ss. left. auto. }
-            { left. econs 2; eauto; ss. left. auto. }
+            { econs 2; eauto; ss.
+              { refl. }
+              { i. apply eq_lb_time. }
+            }
+            { left. econs 2; eauto; ss.
+              { refl. }
+              { i. apply eq_lb_time. }
+            }
           }
           { specialize (CELL ts). des; auto. ss. des; clarify. splits; auto. }
         }
-        { admit. }
       }
       { admit. }
       { exists cell_src. ii. splits.
@@ -1435,38 +1339,6 @@ Section MIDDLE.
     }
     des. eauto.
   Admitted.
-
-
-    exploit IHl; eauto.
-
-
-    hexploit
-    {
-
-
-    { eapply CONTENT.
-
-
-      des; eauto.
-
-
-
-  :
-
-
-
-           sim_memory_content L times (F loc ts) (extra loc ts)
-                               loc ts (Cell.get ts cell_src) (Cell.get ts cell_tgt))
-    :
-      exists l,
-        (<<CELL: sim_cell_list_contents loc F extra cell_src cell_tgt l>>).
-  Proof.
-    hexploit (Cell.finite cell_src). i. des. exists dom. ii.
-    destruct (Cell.get ts cell_src) as [[from_src msg_src]|] eqn:GETSRC.
-    { right. rewrite <- GETSRC. splits; eauto. }
-    { specialize (CELL loc ts). rewrite GETSRC in *. inv CELL; auto.
-      left. econs; eauto. }
-  Qed.
 
 
   Lemma sim_memory_strong_exists F extra mem_src mem_tgt
