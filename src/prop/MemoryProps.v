@@ -2540,3 +2540,106 @@ Proof.
     - etrans; eauto. erewrite <- Memory.cap_max_ts; eauto.
   }
 Qed.
+
+Section CONCRETELE.
+
+  Definition concrete_promised_le (mem0 mem1: Memory.t): Prop :=
+    concrete_promised mem0 <2= concrete_promised mem1.
+
+  Definition concrete_messages_le (mem0 mem1: Memory.t): Prop :=
+    forall loc to from0 val released
+           (GET0: Memory.get loc to mem0 = Some (from0, Message.concrete val released)),
+    exists from1,
+      (<<GET1: Memory.get loc to mem1 = Some (from1, Message.concrete val released)>>).
+
+  Global Program Instance concrete_promised_le_PreOrder: PreOrder concrete_promised_le.
+  Next Obligation.
+    ii. auto.
+  Qed.
+  Next Obligation.
+    ii. auto.
+  Qed.
+
+  Global Program Instance concrete_messages_le_PreOrder: PreOrder concrete_messages_le.
+  Next Obligation.
+    ii. eauto.
+  Qed.
+  Next Obligation.
+    ii. exploit H; eauto. i. des. eauto.
+  Qed.
+
+  Lemma concrete_messages_le_concrete_promised_le
+    :
+      concrete_messages_le <2= concrete_promised_le.
+  Proof.
+    ii. inv PR0. eapply PR in GET. des. econs; eauto.
+  Qed.
+
+  Lemma concrete_promised_le_closed_timemap
+        mem0 mem1 tm
+        (CONCRETELE: concrete_promised_le mem0 mem1)
+        (CLOSED: Memory.closed_timemap tm mem0)
+    :
+      Memory.closed_timemap tm mem1.
+  Proof.
+    ii. specialize (CLOSED loc). des.
+    exploit CONCRETELE.
+    { econs; eauto. }
+    i. inv x. eauto.
+  Qed.
+
+  Lemma concrete_promised_le_closed_view
+        mem0 mem1 vw
+        (CONCRETELE: concrete_promised_le mem0 mem1)
+        (CLOSED: Memory.closed_view vw mem0)
+    :
+      Memory.closed_view vw mem1.
+  Proof.
+    inv CLOSED. econs.
+    { eapply concrete_promised_le_closed_timemap; try apply PLN; eauto. }
+    { eapply concrete_promised_le_closed_timemap; try apply RLX; eauto. }
+  Qed.
+
+  Lemma concrete_promised_le_closed_opt_view
+        mem0 mem1 vw
+        (CONCRETELE: concrete_promised_le mem0 mem1)
+        (CLOSED: Memory.closed_opt_view vw mem0)
+    :
+      Memory.closed_opt_view vw mem1.
+  Proof.
+    inv CLOSED; econs.
+    eapply concrete_promised_le_closed_view; eauto.
+  Qed.
+
+  Lemma concrete_promised_le_closed_message
+        mem0 mem1 msg
+        (CONCRETELE: concrete_promised_le mem0 mem1)
+        (CLOSED: Memory.closed_message msg mem0)
+    :
+      Memory.closed_message msg mem1.
+  Proof.
+    inv CLOSED; econs.
+    eapply concrete_promised_le_closed_opt_view; eauto.
+  Qed.
+
+  Lemma concrete_promised_le_closed_tview
+        mem0 mem1 tvw
+        (CONCRETELE: concrete_promised_le mem0 mem1)
+        (CLOSED: TView.closed tvw mem0)
+    :
+      TView.closed tvw mem1.
+  Proof.
+    inv CLOSED. econs.
+    { i. eapply concrete_promised_le_closed_view; try apply REL; eauto. }
+    { eapply concrete_promised_le_closed_view; try apply CUR; eauto. }
+    { eapply concrete_promised_le_closed_view; try apply ACQ; eauto. }
+  Qed.
+
+  Lemma memory_le_concrete_messages_le
+    :
+      Memory.le <2= concrete_messages_le.
+  Proof.
+    ii. eapply PR in GET0. eauto.
+  Qed.
+
+End CONCRETELE.
