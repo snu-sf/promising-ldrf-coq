@@ -566,6 +566,203 @@ Section CAPFLEX.
     }
   Qed.
 
+  Record cap_flex_map (max tm0 tm1: TimeMap.t)
+         (times: Loc.t -> list Time.t)
+         (f: Loc.t -> Time.t -> Time.t -> Prop): Prop :=
+    {
+      cap_flex_map_map_lt:
+        mapping_map_lt f;
+      cap_flex_map_map_bot:
+        mapping_map_bot f;
+      cap_flex_map_ident:
+        forall loc ts (TS: Time.le ts (max loc)),
+          f loc ts ts;
+      cap_flex_map_max:
+        forall loc,
+        exists fts,
+          (<<MAP: f loc (tm0 loc) fts>>) /\
+          (<<TS: Time.le (tm1 loc) fts>>);
+      cap_flex_map_complete:
+        forall loc ts (IN: List.In ts (times loc)),
+          mappable_time f loc ts;
+    }.
+
+  Lemma cap_flex_map_exists max tm0 tm1 times
+        (TM0: forall loc, Time.lt (max loc) (tm0 loc))
+        (TM1: forall loc, Time.lt (max loc) (tm1 loc))
+    :
+      exists f,
+        (<<MAP: cap_flex_map max tm0 tm1 times f>>).
+  Proof.
+    hexploit (@choice
+                Loc.t (Time.t -> Time.t -> Prop)
+                (fun loc f =>
+                   (<<MAPLT: mapping_map_lt_loc f>>) /\
+                   (<<IDENT: forall ts (TS: Time.le ts (max loc)),
+                       f ts ts>>) /\
+                   (<<MAX: exists fts,
+                       (<<MAP: f (tm0 loc) fts>>) /\
+                       (<<TS: Time.le (tm1 loc) fts>>)>>)/\
+                   (<<COMPLETE: forall ts (IN: List.In ts (times loc)),
+                       exists fts, (<<MAP: f ts fts>>)>>))).
+    { intros loc.
+      hexploit (@shift_map_exists
+                  (max loc) (tm1 loc) (Time.incr (tm1 loc))
+                  ((tm0 loc)::times loc)); ss.
+      { left. auto. }
+      { apply Time.incr_spec. }
+      intros [f SPEC]. exists f. des. splits; auto.
+      { hexploit (COMPLETE (tm0 loc)); eauto. i. des. esplits; eauto.
+        eapply BOUND in MAPPED; eauto. left. des. auto. }
+      { i. hexploit (COMPLETE ts); eauto. }
+    }
+    intros [f SPEC]. exists f. econs.
+    { eapply mapping_map_lt_locwise.
+      i. specialize (SPEC loc). des. auto. }
+    { ii. specialize (SPEC loc). des.
+      eapply IDENT. eapply Time.bot_spec. }
+    { i. specialize (SPEC loc). des. auto. }
+    { i. specialize (SPEC loc). des. eauto. }
+    { i. specialize (SPEC loc). des.
+      exploit COMPLETE; eauto. }
+  Qed.
+
+  Definition concrete_promised_le (mem0 mem1: Memory.t): Prop :=
+    concrete_promised mem0 <2= concrete_promised mem1.
+
+  Definition concrete_messages_le (mem0 mem1: Memory.t): Prop :=
+    forall loc to from0 val released
+           (GET0: Memory.get loc to mem0 = Some (from0, Message.concrete val released)),
+    exists from1,
+      (<<GET1: Memory.get loc to mem1 = Some (from1, Message.concrete val released)>>).
+
+  Global Program Instance concrete_promised_le_PreOrder: PreOrder concrete_promised_le.
+  Next Obligation.
+    ii. auto.
+  Qed.
+  Next Obligation.
+    ii. auto.
+  Qed.
+
+  Global Program Instance concrete_messages_le_PreOrder: PreOrder concrete_messages_le.
+  Next Obligation.
+    ii. eauto.
+  Qed.
+  Next Obligation.
+    ii. exploit H; eauto. i. des. eauto.
+  Qed.
+
+  Lemma concrete_messages_le_concrete_promised_le
+    :
+      concrete_messages_le <2= concrete_promised_le.
+  Proof.
+    ii. inv PR0. eapply PR in GET. des. econs; eauto.
+  Qed.
+
+  Lemma concrete_promised_le_closed_timemap
+        mem0 mem1 tm
+        (CONCRETELE: concrete_promised_le mem0 mem1)
+        (CLOSED: Memory.closed_timemap tm mem0)
+    :
+      Memory.closed_timemap tm mem1.
+  Proof.
+    ii. specialize (CLOSED loc). des.
+    exploit CONCRETELE.
+    { econs; eauto. }
+    i. inv x. eauto.
+  Qed.
+
+  Lemma concrete_promised_le_closed_view
+        mem0 mem1 vw
+        (CONCRETELE: concrete_promised_le mem0 mem1)
+        (CLOSED: Memory.closed_view vw mem0)
+    :
+      Memory.closed_view vw mem1.
+  Proof.
+    inv CLOSED. econs.
+    { eapply concrete_promised_le_closed_timemap; try apply PLN; eauto. }
+    { eapply concrete_promised_le_closed_timemap; try apply RLX; eauto. }
+  Qed.
+
+  Lemma concrete_promised_le_closed_opt_view
+        mem0 mem1 vw
+        (CONCRETELE: concrete_promised_le mem0 mem1)
+        (CLOSED: Memory.closed_opt_view vw mem0)
+    :
+      Memory.closed_opt_view vw mem1.
+  Proof.
+    inv CLOSED; econs.
+    eapply concrete_promised_le_closed_view; eauto.
+  Qed.
+
+  Lemma concrete_promised_le_closed_message
+        mem0 mem1 msg
+        (CONCRETELE: concrete_promised_le mem0 mem1)
+        (CLOSED: Memory.closed_message msg mem0)
+    :
+      Memory.closed_message msg mem1.
+  Proof.
+    inv CLOSED; econs.
+    eapply concrete_promised_le_closed_opt_view; eauto.
+  Qed.
+
+  Lemma concrete_promised_le_closed_tview
+        mem0 mem1 tvw
+        (CONCRETELE: concrete_promised_le mem0 mem1)
+        (CLOSED: TView.closed tvw mem0)
+    :
+      TView.closed tvw mem1.
+  Proof.
+    inv CLOSED. econs.
+    { i. eapply concrete_promised_le_closed_view; try apply REL; eauto. }
+    { eapply concrete_promised_le_closed_view; try apply CUR; eauto. }
+    { eapply concrete_promised_le_closed_view; try apply ACQ; eauto. }
+  Qed.
+
+  Lemma memory_le_concrete_messages_le
+    :
+      Memory.le <2= concrete_messages_le.
+  Proof.
+    ii. eapply PR in GET0. eauto.
+  Qed.
+
+  Lemma concrete_messages_le_cap_flex_map
+        mem0 mem1 tm0 tm1 cap0 cap1 times f
+        (CONCRETE: concrete_messages_le mem0 mem1)
+        (TM0: forall loc, Time.lt (Memory.max_ts loc mem0) (tm0 loc))
+        (TM1: forall loc, Time.lt (Memory.max_ts loc mem1) (tm1 loc))
+        (CAP0: cap_flex mem0 cap0 tm0)
+        (CAP1: cap_flex mem1 cap1 tm1)
+        (MEM0: Memory.closed mem0)
+        (MEM1: Memory.closed mem1)
+        (MAP: cap_flex_map (Memory.max_timemap mem0) tm0 tm1 times f)
+    :
+      memory_map f cap0 cap1.
+  Proof.
+    assert (IDENT: map_ident_in_memory f mem0).
+    { ii. eapply cap_flex_map_ident; eauto. }
+    econs.
+    { i. eapply (@cap_flex_inv mem0 cap0 tm0) in GET; eauto. des; eauto.
+      destruct msg as [val released|]; auto. right.
+      exploit CONCRETE; eauto. i. des. esplits.
+      { eapply cap_flex_map_ident; eauto.
+        eapply Memory.max_ts_spec in GET. des. auto. }
+      { eapply map_ident_in_memory_closed_message; eauto.
+        eapply MEM0 in GET. des; auto. }
+      { refl. }
+      { inv CAP1. eapply SOUND in GET1. eauto. }
+    }
+    { i. hexploit (MAP.(cap_flex_map_max) loc). i. des.
+      left. exists (tm0 loc), Time.bot, fts, Time.bot. splits; auto.
+      { eapply Time.bot_spec. }
+      { hexploit (@cap_flex_max_ts mem1 cap1 tm1); eauto.
+        i. eapply Memory.max_ts_spec in GET. des.
+        erewrite H in MAX. etrans; eauto. }
+      { eapply MAP.(cap_flex_map_map_bot). }
+      { i. eapply cap_flex_covered; eauto. }
+    }
+  Qed.
+
 End CAPFLEX.
 
 
@@ -1379,7 +1576,7 @@ Section MIDDLE.
   Qed.
 
 
-  Lemma sim_promise_memory_strong others self extra_others extra_self
+  Lemma sim_promise_memory_strong_le others self extra_others extra_self
         mem_src mem_tgt prom_src prom_tgt mem_src'
         (MEM: sim_memory L times (others \\2// self) (extra_others \\3// extra_self) mem_src mem_tgt)
         (PROM: sim_promise_strong L times self extra_self (extra_others \\3// extra_self) prom_src prom_tgt)
@@ -1455,6 +1652,135 @@ Section MIDDLE.
       exploit (MEM.(sim_memory_wf) loc from to).
       { right. auto. } i. des.
       eapply UNIQUE in EXTRA0. eapply UNIQUE in EXTRA1. subst. auto.
+    }
+  Qed.
+
+
+  Lemma sim_memory_same_concrete_messages_le
+        F extra mem_src mem_tgt mem_src'
+        (MEM0: sim_memory L times F extra mem_src mem_tgt)
+        (MEM1: sim_memory L times F extra mem_src' mem_tgt)
+    :
+      concrete_messages_le mem_src mem_src'.
+  Proof.
+    ii.
+    set (CNT0:=MEM0.(sim_memory_contents) loc to).
+    set (CNT1:=MEM1.(sim_memory_contents) loc to).
+    rewrite GET0 in CNT0. inv CNT0.
+    rewrite <- H in *. inv CNT1; clarify. eauto.
+  Qed.
+
+  Lemma sim_memory_concrete_messages_le
+        F extra mem_src mem_tgt
+        (MEM: sim_memory L times F extra mem_src mem_tgt)
+    :
+      concrete_messages_le mem_src mem_tgt.
+  Proof.
+    ii. set (CNT:=MEM.(sim_memory_contents) loc to).
+    rewrite GET0 in *. inv CNT. eauto.
+  Qed.
+
+  Lemma sim_memory_strong_sim_local others self extra_others extra_self
+        mem_src mem_tgt lc_src lc_tgt mem_src'
+        (MEM: sim_memory L times (others \\2// self) (extra_others \\3// extra_self) mem_src mem_tgt)
+        (LOCAL: sim_local L times self extra_self lc_src lc_tgt)
+        (LOCALSRC: Local.wf lc_src mem_src)
+        (LOCALTGT: Local.wf lc_tgt mem_tgt)
+        (PROM: sim_promise_strong L times self extra_self (extra_others \\3// extra_self)
+                                  lc_src.(Local.promises) lc_tgt.(Local.promises))
+        (MEMSTRONG: sim_memory_strong (others \\2// self) (extra_others \\3// extra_self) mem_src' mem_tgt)
+    :
+      Local.wf (Local.mk lc_src.(Local.tview) lc_src.(Local.promises)) mem_src'.
+  Proof.
+    econs; ss.
+    { eapply LOCALSRC. }
+    { eapply concrete_promised_le_closed_tview.
+      { eapply concrete_messages_le_concrete_promised_le.
+        eapply sim_memory_same_concrete_messages_le.
+        { eapply MEM. }
+        { eapply sim_memory_strong_sim_memory; eauto. }
+      }
+      { eapply LOCALSRC. }
+    }
+    { eapply sim_promise_memory_strong_le; eauto.
+      { eapply LOCALSRC. }
+      { eapply LOCALTGT. }
+    }
+    { eapply LOCALSRC. }
+    { eapply LOCALSRC. }
+  Qed.
+
+  Lemma sim_memory_same_closed
+        F extra mem_src mem_tgt mem_src'
+        (MEM0: sim_memory L times F extra mem_src mem_tgt)
+        (MEM1: sim_memory L times F extra mem_src' mem_tgt)
+        (CLOSED: Memory.closed mem_src)
+    :
+      Memory.closed mem_src'.
+  Proof.
+    econs.
+    { i. destruct msg as [val released|].
+      { exploit sim_memory_same_concrete_messages_le.
+        { eapply MEM1. }
+        { eapply MEM0. }
+        { eauto. }
+        i. des. eapply CLOSED in GET1.
+        des. esplits; eauto.
+        eapply concrete_promised_le_closed_message; eauto.
+        eapply concrete_messages_le_concrete_promised_le.
+        eapply sim_memory_same_concrete_messages_le.
+        { eapply MEM0. }
+        { eapply MEM1. }
+      }
+      { esplits; eauto. econs. }
+    }
+    { ii. exploit sim_memory_same_concrete_messages_le.
+      { eapply MEM0. }
+      { eapply MEM1. }
+      { eapply CLOSED. }
+      i. des. replace from1 with Time.bot in GET1; eauto.
+      apply TimeFacts.antisym.
+      { eapply Time.bot_spec. }
+      { eapply memory_get_ts_le; eauto. }
+    }
+  Qed.
+
+
+
+
+
+  Lemma sim_memory_same_
+        F extra mem_src mem_tgt mem_src'
+        (MEM0: sim_memory L times F extra mem_src mem_tgt)
+        (MEM1: sim_memory L times F extra mem_src' mem_tgt)
+        (CLOSED: Memory.closed mem_src)
+    :
+      Memory.closed mem_src'.
+  Proof.
+    econs.
+    { i. destruct msg as [val released|].
+      { exploit sim_memory_same_concrete_messages_le.
+        { eapply MEM1. }
+        { eapply MEM0. }
+        { eauto. }
+        i. des. eapply CLOSED in GET1.
+        des. esplits; eauto.
+        eapply concrete_promised_le_closed_message; eauto.
+        eapply concrete_messages_le_concrete_promised_le.
+        eapply sim_memory_same_concrete_messages_le.
+        { eapply MEM0. }
+        { eapply MEM1. }
+      }
+      { esplits; eauto. econs. }
+    }
+    { ii. exploit sim_memory_same_concrete_messages_le.
+      { eapply MEM0. }
+      { eapply MEM1. }
+      { eapply CLOSED. }
+      i. des. replace from1 with Time.bot in GET1; eauto.
+      apply TimeFacts.antisym.
+      { eapply Time.bot_spec. }
+      { eapply memory_get_ts_le; eauto. }
     }
   Qed.
 
