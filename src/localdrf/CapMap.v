@@ -274,21 +274,21 @@ End CONCRETEIDENT.
 
 Section CAPFLEX.
 
-  Inductive cap_flex (mem1 mem2: Memory.t) (tm: TimeMap.t): Prop :=
-  | cap_flex_intro
-      (SOUND: Memory.le mem1 mem2)
-      (MIDDLE: forall loc from1 to1 from2 to2
-                      (ADJ: Memory.adjacent loc from1 to1 from2 to2 mem1)
-                      (TO: Time.lt to1 from2),
-          Memory.get loc from2 mem2 = Some (to1, Message.reserve))
-      (BACK: forall loc, Memory.get loc (tm loc) mem2 =
-                         Some (Memory.max_ts loc mem1, Message.reserve))
-      (COMPLETE: forall loc from to msg
-                        (GET1: Memory.get loc to mem1 = None)
-                        (GET2: Memory.get loc to mem2 = Some (from, msg)),
-          (exists f m, Memory.get loc from mem1 = Some (f, m)))
+  Record cap_flex (mem1 mem2: Memory.t) (tm: TimeMap.t): Prop :=
+    {
+      cap_flex_le: Memory.le mem1 mem2;
+      cap_flex_middle: forall loc from1 to1 from2 to2
+                              (ADJ: Memory.adjacent loc from1 to1 from2 to2 mem1)
+                              (TO: Time.lt to1 from2),
+          Memory.get loc from2 mem2 = Some (to1, Message.reserve);
+      cap_flex_back: forall loc, Memory.get loc (tm loc) mem2 =
+                                 Some (Memory.max_ts loc mem1, Message.reserve);
+      cap_flex_complete: forall loc from to msg
+                               (GET1: Memory.get loc to mem1 = None)
+                               (GET2: Memory.get loc to mem2 = Some (from, msg)),
+          (exists f m, Memory.get loc from mem1 = Some (f, m));
+    }
   .
-  Hint Constructors cap_flex.
 
   Lemma cap_flex_inv
         mem1 mem2 tm
@@ -311,14 +311,15 @@ Section CAPFLEX.
   Proof.
     inv CAP. move GET at bottom.
     destruct (Memory.get loc to mem1) as [[]|] eqn:GET1.
-    { exploit SOUND; eauto. i.
+    { exploit cap_flex_le0; eauto. i.
       rewrite GET in x. inv x. auto. }
-    right. exploit COMPLETE; eauto. i. des.
+    right. exploit cap_flex_complete0; eauto. i. des.
     exploit Memory.max_ts_spec; eauto. i. des. inv MAX.
     - left.
       exploit Memory.adjacent_exists; try eapply H; eauto. i. des.
       assert (LT: Time.lt from from2).
-      { clear MIDDLE BACK COMPLETE GET0 H.
+      { clear cap_flex_middle0 cap_flex_back0 cap_flex_complete0 GET0 H.
+        (* clear MIDDLE BACK COMPLETE GET0 H. *)
         inv x1. rewrite GET0 in x. inv x.
         exploit Memory.get_ts; try exact GET2. i. des.
         { subst. inv TS. }
@@ -333,7 +334,7 @@ Section CAPFLEX.
           + refl.
           + econs. auto.
         - exfalso. inv H.
-          exploit SOUND; try exact GET2. i.
+          exploit cap_flex_le0; try exact GET2. i.
           exploit Memory.get_ts; try exact GET. i. des.
           { subst. rewrite GET1 in GET0. inv GET0. }
           exploit Memory.get_disjoint; [exact GET|exact x|..]. i. des.
@@ -344,14 +345,14 @@ Section CAPFLEX.
             * econs. auto.
             * refl.
       }
-      exploit MIDDLE; try eapply x1; eauto. i.
+      exploit cap_flex_middle0; try eapply x1; eauto. i.
       destruct (Time.eq_dec to from2).
       + subst. rewrite GET in x0. inv x0. esplits; eauto.
       + exfalso. inv x1.
         exploit Memory.get_ts; try exact GET. i. des.
         { subst. rewrite GET1 in x. inv x. }
         exploit Memory.get_ts; try exact x0. i. des.
-        { subst. exploit SOUND; try exact GET3. i.
+        { subst. exploit cap_flex_le0; try exact GET3. i.
           exploit Memory.get_disjoint; [exact GET|exact x1|..]. i. des.
           { subst. rewrite GET1 in GET3. inv GET3. }
           destruct (Time.le_lt_dec to to2).
@@ -368,9 +369,9 @@ Section CAPFLEX.
           { refl. }
     - right. inv H. do 2 (split; auto).
       rewrite GET0 in x. inv x.
-      specialize (BACK loc).
+      specialize (cap_flex_back0 loc).
       exploit Memory.get_ts; try exact GET. i. des; try congr.
-      exploit Memory.get_disjoint; [exact GET|exact BACK|..]. i. des.
+      exploit Memory.get_disjoint; [exact GET|exact cap_flex_back0|..]. i. des.
       { subst. esplits; eauto. }
       exfalso.
       destruct (Time.le_lt_dec to (tm loc)).
@@ -484,7 +485,7 @@ Section CAPFLEX.
       forall loc,
         Memory.max_ts loc mem2 = tm loc.
   Proof.
-    i. dup CAP. inv CAP0. specialize (BACK loc).
+    i. set (BACK:=CAP.(cap_flex_back) loc).
     exploit Memory.max_ts_spec; try exact BACK. i. des.
     apply TimeFacts.antisym; ss.
     destruct (Time.le_lt_dec (Memory.max_ts loc mem2) (tm loc)); ss.
@@ -513,7 +514,7 @@ Section CAPFLEX.
   Proof.
     split; i.
     {
-      inv H. inv CAP. set (@cell_elements_least
+      inv H. set (@cell_elements_least
                              (mem0 loc)
                              (fun to' => Time.le to to')). des; cycle 1.
       { destruct (Time.le_lt_dec to (Memory.max_ts loc mem0)).
@@ -521,7 +522,7 @@ Section CAPFLEX.
           + eapply CLOSED.
           + i. des. exploit EMPTY; eauto.
         - econs.
-          + eapply BACK.
+          + eapply cap_flex_back; eauto.
           + econs; eauto. }
       set (@cell_elements_greatest
              (mem0 loc)
@@ -531,7 +532,7 @@ Section CAPFLEX.
         - eauto.
         - ss. }
       destruct (Time.le_lt_dec to from).
-      - exploit MIDDLE.
+      - exploit CAP.(cap_flex_middle).
         + econs.
           * eapply GET0.
           * eapply GET.
@@ -555,7 +556,7 @@ Section CAPFLEX.
         + eapply TimeFacts.lt_le_lt; eauto.
         + i. econs; eauto. econs; eauto.
       - econs.
-        + eapply SOUND. eapply GET.
+        + eapply CAP.(cap_flex_le). eapply GET.
         + econs; eauto.
     }
     {
@@ -750,7 +751,7 @@ Section CAPFLEX.
       { eapply map_ident_in_memory_closed_message; eauto.
         eapply MEM0 in GET. des; auto. }
       { refl. }
-      { inv CAP1. eapply SOUND in GET1. eauto. }
+      { eapply CAP1.(cap_flex_le) in GET1. eauto. }
     }
     { i. hexploit (MAP.(cap_flex_map_max) loc). i. des.
       left. exists (tm0 loc), Time.bot, fts, Time.bot. splits; auto.
@@ -760,6 +761,28 @@ Section CAPFLEX.
         erewrite H in MAX. etrans; eauto. }
       { eapply MAP.(cap_flex_map_map_bot). }
       { i. eapply cap_flex_covered; eauto. }
+    }
+  Qed.
+
+  Lemma cap_flex_closed mem cap tm
+        (CAP: cap_flex mem cap tm)
+        (TM: forall loc, Time.lt (Memory.max_ts loc mem) (tm loc))
+        (CLOSED: Memory.closed mem)
+    :
+      Memory.closed cap.
+  Proof.
+    dup CLOSED. inv CLOSED. econs.
+    { i. eapply cap_flex_inv in MSG; eauto. des; subst.
+      { exploit CLOSED1; eauto. i. des. splits; auto.
+        eapply concrete_promised_le_closed_message; eauto.
+        eapply concrete_messages_le_concrete_promised_le; eauto.
+        eapply memory_le_concrete_messages_le; eauto.
+        eapply cap_flex_le; eauto. }
+      { esplits; eauto. econs. }
+      { esplits; eauto. econs. }
+    }
+    { ii. specialize (INHABITED loc).
+      eapply cap_flex_le in INHABITED; eauto.
     }
   Qed.
 
@@ -1100,7 +1123,7 @@ Section MIDDLE.
         (<<GET: Memory.get loc ts1 mem2 = Some (ts0, msg0)>>).
   Proof.
     destruct (Memory.get loc ts1 mem1) as [[ts0 msg0]|] eqn:GETORG.
-    { inv CAP. eapply SOUND in GETORG; eauto. }
+    { eapply cap_flex_le in GETORG; eauto. }
     { hexploit (@cell_elements_greatest
                   (mem1 loc)
                   (fun ts => Time.lt ts ts1)). i. des; cycle 1.
@@ -1111,7 +1134,7 @@ Section MIDDLE.
           eapply TimeFacts.lt_le_lt; eauto. eapply Time.bot_spec. }
         { inv H. clarify. }
       }
-      inv CAP. hexploit MIDDLE.
+      hexploit CAP.(cap_flex_middle).
       { econs.
         { eapply GET0. }
         { eapply GET. }
@@ -1143,14 +1166,14 @@ Section MIDDLE.
       eapply sim_memory_max_ts_le; try apply MEMSRC; eauto.
       eapply sim_memory_strong_sim_memory; eauto. }
 
-    dup CAPTGT. inv CAPTGT0. dup CAPSRC. inv CAPSRC0. econs.
+    econs.
     { i. set (MEM0:=MEM.(sim_memory_strong_contents) loc ts).
       inv MEM0; symmetry in H; symmetry in H0; rename H into GETMEMTGT; rename H0 into GETMEMSRC.
       { destruct (Memory.get loc ts cap_tgt) as [[from_tgt msg_tgt]|] eqn:GETTGT; eauto.
         { eapply cap_flex_inv in GETTGT; try apply CAPTGT; eauto. des; clarify.
           { hexploit sim_memory_strong_adjancent; eauto. i. des.
-            erewrite MIDDLE0; eauto. }
-          { erewrite BACK0. i. econs 2; auto.
+            erewrite CAPSRC.(cap_flex_middle); eauto. }
+          { erewrite CAPSRC.(cap_flex_back). i. econs 2; auto.
             { eapply sim_memory_max_ts_le; eauto. eapply sim_memory_strong_sim_memory; eauto. }
             { i. hexploit sim_memory_max_ts_extra.
               { eapply sim_memory_strong_sim_memory; eauto. }
@@ -1177,14 +1200,14 @@ Section MIDDLE.
           eapply cap_flex_inv in GETSRC; try apply CAPSRC; eauto. des; clarify.
           { inv GETSRC0. exploit sim_memory_strong_left_end_inv; eauto. i. des.
             eapply cap_left_end in GETTGT0; eauto. des. clarify. }
-          { erewrite BACK in GETTGT. clarify. }
+          { erewrite CAPTGT.(cap_flex_back) in GETTGT. clarify. }
         }
       }
-      { eapply SOUND0 in GETMEMSRC. eapply SOUND in GETMEMTGT.
+      { eapply CAPSRC.(cap_flex_le) in GETMEMSRC. eapply CAPTGT.(cap_flex_le) in GETMEMTGT.
         rewrite GETMEMSRC. rewrite GETMEMTGT. eauto. }
-      { eapply SOUND0 in GETMEMSRC. eapply SOUND in GETMEMTGT.
+      { eapply CAPSRC.(cap_flex_le) in GETMEMSRC. eapply CAPTGT.(cap_flex_le) in GETMEMTGT.
         rewrite GETMEMSRC. rewrite GETMEMTGT. eauto. }
-      { dup GETMEMSRC. eapply SOUND0 in GETMEMSRC. rewrite GETMEMSRC.
+      { dup GETMEMSRC. eapply CAPSRC.(cap_flex_le) in GETMEMSRC. rewrite GETMEMSRC.
         destruct (Memory.get loc ts cap_tgt) as [[from_tgt msg_tgt]|] eqn:GETTGT; eauto.
         eapply cap_flex_inv in GETTGT; eauto. des; clarify.
         { inv GETTGT0. eapply MEM.(sim_memory_strong_wf) in EXTRA. des.
@@ -1655,7 +1678,6 @@ Section MIDDLE.
     }
   Qed.
 
-
   Lemma sim_memory_same_concrete_messages_le
         F extra mem_src mem_tgt mem_src'
         (MEM0: sim_memory L times F extra mem_src mem_tgt)
@@ -1744,45 +1766,5 @@ Section MIDDLE.
       { eapply memory_get_ts_le; eauto. }
     }
   Qed.
-
-
-
-
-
-  Lemma sim_memory_same_
-        F extra mem_src mem_tgt mem_src'
-        (MEM0: sim_memory L times F extra mem_src mem_tgt)
-        (MEM1: sim_memory L times F extra mem_src' mem_tgt)
-        (CLOSED: Memory.closed mem_src)
-    :
-      Memory.closed mem_src'.
-  Proof.
-    econs.
-    { i. destruct msg as [val released|].
-      { exploit sim_memory_same_concrete_messages_le.
-        { eapply MEM1. }
-        { eapply MEM0. }
-        { eauto. }
-        i. des. eapply CLOSED in GET1.
-        des. esplits; eauto.
-        eapply concrete_promised_le_closed_message; eauto.
-        eapply concrete_messages_le_concrete_promised_le.
-        eapply sim_memory_same_concrete_messages_le.
-        { eapply MEM0. }
-        { eapply MEM1. }
-      }
-      { esplits; eauto. econs. }
-    }
-    { ii. exploit sim_memory_same_concrete_messages_le.
-      { eapply MEM0. }
-      { eapply MEM1. }
-      { eapply CLOSED. }
-      i. des. replace from1 with Time.bot in GET1; eauto.
-      apply TimeFacts.antisym.
-      { eapply Time.bot_spec. }
-      { eapply memory_get_ts_le; eauto. }
-    }
-  Qed.
-
 
 End MIDDLE.
