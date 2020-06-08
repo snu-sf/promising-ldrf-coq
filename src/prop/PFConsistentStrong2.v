@@ -31,6 +31,7 @@ Require Import MemoryProps.
 Require Import Mapping.
 Require Import CapFlex.
 Require Import GoodFuture.
+Require Import Cover.
 
 Set Implicit Arguments.
 
@@ -49,8 +50,8 @@ Proof.
 Qed.
 
 Lemma write_not_in_traced lang (th0 th1: Thread.t lang) tr
-      (MLE: Memory.le th0.(Thread.local).(Local.promises) th0.(Thread.memory))
       (STEPS: traced_step tr th0 th1)
+      (MLE: Memory.le th0.(Thread.local).(Local.promises) th0.(Thread.memory))
   :
     List.Forall (fun em => (write_not_in (unwritable th0.(Thread.memory) th0.(Thread.local).(Local.promises))) (fst em)) tr.
 Proof.
@@ -92,6 +93,17 @@ Proof.
   inv HD. eapply no_sc_same_sc_step; eauto.
 Qed.
 
+Lemma ident_map_write_not_in MSGS te fte
+      (MAP: tevent_map ident_map fte te)
+      (NOTIN: write_not_in MSGS te)
+  :
+    write_not_in MSGS fte.
+Proof.
+  inv MAP; auto.
+  { inv FROM. inv TO. inv KIND; ss. }
+  { inv FROM. inv TO. ss. }
+  { inv FROM. inv TO. ss. }
+Qed.
 
 Inductive promise_writing_event
           (loc: Loc.t) (from to: Time.t) (val: Const.t) (released: option View.t)
@@ -276,6 +288,7 @@ Proof.
   }
 Qed.
 
+
 Definition pf_consistent_strong_aux lang (e0:Thread.t lang): Prop :=
   forall mem1
          (CAP: Memory.cap e0.(Thread.memory) mem1),
@@ -327,7 +340,7 @@ Definition pf_consistent_flex lang (e0:Thread.t lang): Prop :=
          (CAP: cap_flex e0.(Thread.memory) mem1 tm),
   exists ftr e1 f,
     (<<STEPS: traced_step ftr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot mem1) e1>>) /\
-    (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free /1\ no_sc) (fst em)>> /\ <<TAU: ThreadEvent.get_machine_event (fst em) = MachineEvent.silent>>) ftr >>) /\
+    (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free /1\ no_sc /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (tm loc)>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))) (fst em)>> /\ <<TAU: ThreadEvent.get_machine_event (fst em) = MachineEvent.silent>>) ftr >>) /\
     (<<MAP: cap_flex_map
               (Memory.max_timemap e0.(Thread.memory))
               (fun loc => Time.incr (Memory.max_ts loc e0.(Thread.memory)))
@@ -400,13 +413,32 @@ Proof.
   }
   { eapply mapping_map_lt_collapsable_unwritable. eapply MAP. }
   { eapply timemap_bot_map. eapply MAP. }
-  { refl. }
-  i. des. exists ftr, (Thread.mk _ state flc1 fsc1 fmem1), f. splits; auto.
+  { refl. } i. des.
+  exploit write_not_in_traced; eauto.
+  { ss. transitivity (th.(Thread.memory)).
+    { eapply WF. }
+    { eapply CAP0. }
+  } intros NOTIN. ss.
+  exists ftr, (Thread.mk _ state flc1 fsc1 fmem1), f. splits; auto.
   { eapply List.Forall_forall. i.
+    cut ((promise_free /1\ no_sc) (fst x) /\ ThreadEvent.get_machine_event (fst x) = MachineEvent.silent).
+    { i. des. splits; auto. eapply List.Forall_forall in H; eauto. ss.
+      eapply write_not_in_mon_bot; eauto. intros loc ts. intros. des.
+      assert (ITV: Interval.mem (Time.bot, tm loc) ts).
+      { econs; ss. }
+      erewrite cap_flex_covered in ITV; eauto.
+      inv ITV. econs; eauto. econs; eauto.
+      destruct (Memory.get loc to (Local.promises (Thread.local th)))
+        as [[from' msg']|] eqn:GETPROM; eauto.
+      exfalso. dup GETPROM.
+      eapply WF in GETPROM. eapply CAP0 in GETPROM. clarify.
+      eapply SAT0. econs; eauto.
+    }
     eapply list_Forall2_in in H; eauto. des.
     eapply List.Forall_forall in IN; eauto. ss. des.
     destruct x, a. ss. inv EVENT; ss. inv KIND; ss.
-    splits; auto. inv MSG0; ss. inv MSG; ss. inv MAP1; ss. }
+    splits; auto. inv MSG0; ss. inv MSG; ss. inv MAP1; ss.
+  }
   { ss. unguard. des; eauto.
     { left. esplits; eauto. eapply failure_step_map; eauto.
       { eapply mapping_map_lt_map_le. eapply MAP. }
@@ -436,7 +468,7 @@ Definition pf_consistent_flex_aux lang (e0:Thread.t lang): Prop :=
          (TM1: TimeMap.le (Memory.max_timemap mem1) tm),
   exists ftr e1 f,
     (<<STEPS: traced_step ftr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot mem1) e1>>) /\
-    (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free /1\ no_sc) (fst em)>> /\ <<TAU: ThreadEvent.get_machine_event (fst em) = MachineEvent.silent>>) ftr >>) /\
+    (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free /1\ no_sc /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (tm loc)>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))) (fst em)>> /\ <<TAU: ThreadEvent.get_machine_event (fst em) = MachineEvent.silent>>) ftr >>) /\
     (<<MAP: cap_flex_map
               (Memory.max_timemap e0.(Thread.memory))
               (fun loc => Time.incr (Memory.max_ts loc e0.(Thread.memory)))
@@ -486,11 +518,16 @@ Proof.
   i. des. exists ftr0, (Thread.mk _ state flc1 fsc1 fmem1), f.
   splits; auto.
   { eapply List.Forall_forall. i.
+    cut ((promise_free /1\ no_sc) (fst x) /\ ThreadEvent.get_machine_event (fst x) = MachineEvent.silent).
+    { i. des. splits; auto.
+      eapply list_Forall2_in in H; eauto. des.
+      eapply List.Forall_forall in IN; eauto. ss. des.
+      eapply ident_map_write_not_in; eauto. }
     eapply list_Forall2_in in H; eauto. des.
     eapply List.Forall_forall in IN; eauto. ss. des.
     destruct x, a. ss. inv EVENT; ss. inv KIND; ss.
     splits; auto. inv MSG0; ss. inv MSG; ss. inv MAP1; ss. }
-  { eapply list_Forall2_compose; eauto.
+    { eapply list_Forall2_compose; eauto.
     i. ss. des. eapply ident_map_compose_tevent; eauto. }
   { ss. unguard. des; eauto.
     { left. esplits; eauto. eapply failure_step_map; eauto.
@@ -551,8 +588,44 @@ Proof.
   eapply no_sc_any_sc_traced in STEPS; ss; cycle 1.
   { i. eapply List.Forall_forall in IN; eauto. ss. des; auto. } des.
   esplits; eauto.
-  { ss. eapply pred_steps_traced_step2 in STEPS0; cycle 1.
-    { instantiate (1:=(promise_free /1\ no_sc)). eapply EVENTS. }
+  { eapply List.Forall_impl; [|apply EVENTS]. i. ss. des; auto. }
+  { exploit write_not_in_good_future_traced.
+    {
+
+    eapply write_not_in_good_future_traced in STEPS0; eauto; ss.
+    { admit. }
+    {
+
+    eapply pred_steps_traced_step2 with (P:=write_not_in /1\ no_sc) in STEPS0.
+    { ea
+
+
+    ss. exploit steps_write_not_in_good_future.
+    { eauto. }
+    { eapply pred_steps_traced_step2.
+      { eapply TRACE.
+
+
+           eapply good
+
+    ss. eapply pred_steps_traced_step2 with (P:=promise_free /1\ no_sc) in STEPS0.
+    { eauto.
+
+
+    steps_write_not_in_good_future
+
+
+  }
+
+
+  { ss. eapply pred_steps_traced_step2 with (P:=promise_free /1\ no_sc) in STEPS0.
+    { eauto.
+
+      admit. }
+    { eapply List.Forall_impl; [|apply EVENTS]. i. ss. des; auto. }
+  }
+
+      eapply EVENTS. }
     eapply steps_write_not_in in STEPS0. ss.
 
 

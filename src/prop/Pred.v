@@ -160,6 +160,25 @@ Section Pred.
     - ii. eapply NOTIN; eauto.
   Qed.
 
+  Lemma write_not_in_mon_bot (L0 L1: Loc.t -> Time.t -> Prop)
+        e
+        (NOTIN: write_not_in L1 e)
+        (LE: forall loc ts (SAT: L0 loc ts) (NBOT: Time.lt Time.bot ts), L1 loc ts)
+    :
+      write_not_in L0 e.
+  Proof.
+    i. unfold write_not_in in *. des_ifs.
+    - ii. eapply NOTIN; eauto.
+      eapply LE in H; eauto. inv IN.
+      eapply TimeFacts.le_lt_lt; eauto. eapply Time.bot_spec.
+    - ii. eapply NOTIN; eauto.
+      eapply LE in H; eauto. inv IN.
+      eapply TimeFacts.le_lt_lt; eauto. eapply Time.bot_spec.
+    - ii. eapply NOTIN; eauto.
+      eapply LE in H; eauto. inv IN.
+      eapply TimeFacts.le_lt_lt; eauto. eapply Time.bot_spec.
+  Qed.
+
   Lemma no_read_msgs_mon L0 L1
         e
         (NOTIN: no_read_msgs L1 e)
@@ -533,5 +552,25 @@ Section PredStep.
     :
       opt_pred_step P e t0 t1.
   Hint Constructors opt_pred_step.
+
+  Lemma traced_step_future lang
+        (e1 e2: Thread.t lang) tr
+        (STEP: traced_step tr e1 e2)
+        (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+        (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+        (CLOSED1: Memory.closed e1.(Thread.memory)):
+    (<<WF2: Local.wf e2.(Thread.local) e2.(Thread.memory)>>) /\
+    (<<SC2: Memory.closed_timemap e2.(Thread.sc) e2.(Thread.memory)>>) /\
+    (<<CLOSED2: Memory.closed e2.(Thread.memory)>>) /\
+    (<<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>>) /\
+    (<<SC_FUTURE: TimeMap.le e1.(Thread.sc) e2.(Thread.sc)>>) /\
+    (<<MEM_FUTURE: Memory.future e1.(Thread.memory) e2.(Thread.memory)>>).
+  Proof.
+    revert WF1. induction STEP.
+    - i. splits; ss; refl.
+    - i. subst. inv HD. exploit Thread.step_future; eauto. i. des.
+      exploit IHSTEP; eauto. i. des.
+      splits; ss; etrans; eauto.
+  Qed.
 
 End PredStep.
