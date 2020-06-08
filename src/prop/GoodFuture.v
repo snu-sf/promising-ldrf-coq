@@ -29,7 +29,6 @@ Require Import PFConsistent.
 Require Import ReorderCancel.
 Require Import MemoryProps.
 Require Import Mapping.
-Require Import CapFlex.
 
 Set Implicit Arguments.
 

@@ -447,6 +447,18 @@ End CELL.
 
 Section MEMORYLEMMAS.
 
+  Lemma interval_le_disjoint from0 from1 to0 to1
+        (TS: Time.le to0 from1)
+  :
+    Interval.disjoint (from0, to0) (from1, to1).
+  Proof.
+    ii. inv LHS. inv RHS. ss.
+    eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+    { eapply FROM0. } etrans.
+    { eapply TO. }
+    { eauto. }
+  Qed.
+
   Lemma disjoint_equivalent from0 to0 from1 to1
   :
     (<<INTERSECT: ~ Interval.disjoint (from0, to0) (from1, to1)>>) <->
@@ -644,6 +656,22 @@ Section MEMORYLEMMAS.
     eapply Memory.get_ts in GET. des; clarify.
     - refl.
     - left. auto.
+  Qed.
+
+  Lemma memory_get_disjoint_strong mem loc from0 to0 from1 to1 msg0 msg1
+        (GET0: Memory.get loc to0 mem = Some (from0, msg0))
+        (GET1: Memory.get loc to1 mem = Some (from1, msg1))
+    :
+      (to0 = to1 /\ from0 = from1 /\ msg0 = msg1) \/
+      (<<TS: Time.le to0 from1>> /\ <<TS: Time.lt to0 to1>>) \/
+      (<<TS: Time.le to1 from0>> /\ <<TS: Time.lt to1 to0>>).
+  Proof.
+    destruct (Time.le_lt_dec to0 to1).
+    { destruct l.
+      { dup H. eapply memory_get_from_mon in H; eauto. }
+      { inv H. clarify. auto. }
+    }
+    { dup l. eapply memory_get_from_mon in l; eauto. }
   Qed.
 
   Lemma max_concrete_timemap_get mem tm loc to from val released

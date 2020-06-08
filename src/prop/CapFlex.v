@@ -480,4 +480,19 @@ Section CAPFLEX.
     }
   Qed.
 
+  Lemma cap_flex_wf
+        lc mem1 mem2 tm
+        (CAP: cap_flex mem1 mem2 tm)
+        (WF: Local.wf lc mem1):
+    Local.wf lc mem2.
+  Proof.
+    eapply memory_concrete_le_local_wf.
+    { eapply memory_concrete_le_le. eapply CAP. }
+    { etrans.
+      { eapply WF. }
+      { eapply CAP. }
+    }
+    { eauto. }
+  Qed.
+
 End CAPFLEX.

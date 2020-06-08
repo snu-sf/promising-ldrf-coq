@@ -21,14 +21,14 @@ Require Import TView.
 Require Import Local.
 Require Import Thread.
 Require Import Pred.
-Require Import Mapping.
 
 Require Import MemoryMerge.
 Require Import PromiseConsistent.
 Require Import PFConsistent.
+Require Import PFConsistentStrong.
 Require Import ReorderCancel.
 Require Import MemoryProps.
-Require Import PFConsistentStrong.
+Require Import Mapping.
 Require Import CapFlex.
 Require Import GoodFuture.
 
@@ -268,113 +268,41 @@ Proof.
   { admit. }
   {
 
-    ss.
-
-  eapp P
-
-    eapply List.Forall_impl; eauto.
-
-    i. ss. des; auto.
 
 
+Definition flex_consistent lang (e0:Thread.t lang): Prop :=
+  forall mem1 sc1 tm
+         (CAP: cap_flex e0.(Thread.memory) mem1 tm)
+         (TM: forall loc, Time.lt (Memory.max_ts loc e0.(Thread.memory)) (tm loc)),
+  exists e1,
+    (<<STEPS0: rtc (tau (@pred_step is_cancel lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc1 mem1) e1>>) /\
+    (<<NORESERVE: no_reserves e1.(Thread.local).(Local.promises)>>) /\
+    (<<SC0: e1.(Thread.sc) = sc1>>) /\
+    exists e2,
+      (<<STEPS1: rtc (tau (@pred_step ((promise_free /1\ (fun e => ~ is_cancel e)) /1\ no_sc) lang)) e1 e2>>) /\
+      (<<SC1: e2.(Thread.sc) = sc1>>) /\
+      (__guard__((exists st',
+                     (<<LOCAL: Local.failure_step e2.(Thread.local)>>) /\
+                     (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e2) st'>>)) \/
+                 (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>))).
 
-  .
-  {
+write_not_in
 
-
-
-
-
-  exists tr
-
-  {
-
-  i. des.
-  eapply pred_step_rtc_mon with (Q:=(promise_free /1\ no_sc)) in STEPS0; cycle 1.
-  { i. destruct x1; ss. destruct kind; ss. }
-  eapply pred_step_rtc_mon with (Q:=(promise_free /1\ no_sc)) in STEPS1; cycle 1.
-  { i. des; auto. }
-  hexploit (proj1 (@pred_steps_traced_step (promise_free /1\ no_sc) _ (Thread.mk _ th.(Thread.state) th.(Thread.local) sc1 mem1) e2)).
-  { etrans; eauto. } i. des.
-  exists tr. esplits; eauto.
-Qed.
-
-
-Definition pf_consistent_aux lang (e0:Thread.t lang): Prop :=
-  forall mem1 sc1
-         (CAP: Memory.cap e0.(Thread.memory) mem1),
-  exists tr e1,
-    (<<STEPS: traced_step tr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc1 mem1) e1>>) /\
-    (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free /1\ no_sc) (fst em)>> /\ <<TAU: ThreadEvent.get_machine_event (fst em) = MachineEvent.silent>>) tr >>) /\
-    (__guard__((exists st',
-                   (<<LOCAL: Local.failure_step e1.(Thread.local)>>) /\
-                   (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
-               (<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>))).
-
-Lemma pf_consistent_strong_pf_consistent_aux lang (th: Thread.t lang)
-      (WF: Local.wf th.(Thread.local) th.(Thread.memory))
-      (MEM: Memory.closed th.(Thread.memory))
-      (CONSISTENT: pf_consistent_strong th)
-  :
-    pf_consistent_aux th.
-Proof.
-  ii. exploit CONSISTENT; eauto. i. des.
-  eapply pred_step_rtc_mon with (Q:=(promise_free /1\ no_sc)) in STEPS0; cycle 1.
-  { i. destruct x1; ss. destruct kind; ss. }
-  eapply pred_step_rtc_mon with (Q:=(promise_free /1\ no_sc)) in STEPS1; cycle 1.
-  { i. des; auto. }
-  hexploit (proj1 (@pred_steps_traced_step (promise_free /1\ no_sc) _ (Thread.mk _ th.(Thread.state) th.(Thread.local) sc1 mem1) e2)).
-  { etrans; eauto. } i. des.
-  exists tr. esplits; eauto.
-Qed.
-
-Definition pf_consistent_cap_flex lang (e0:Thread.t lang): Prop :=
-  forall mem1 sc1
-         (CAP: Memory.cap e0.(Thread.memory) mem1),
-  exists tr e1,
-    (<<STEPS: traced_step tr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc1 mem1) e1>>) /\
-    (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free /1\ no_sc) (fst em)>> /\ <<TAU: ThreadEvent.get_machine_event (fst em) = MachineEvent.silent>>) tr >>) /\
-    (__guard__((exists st',
-                   (<<LOCAL: Local.failure_step e1.(Thread.local)>>) /\
-                   (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
-               (<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>))).
-
-
-traced_step
-
-    destruct x1; ss. destruct kind; ss. }
-
-
-    unfold is
-
-  pred_step
-  rtc
-
-
-Lemma pf_consistent_strong_pf_consistent_aux
-  :
-
-
-Lemma pred_steps_traced_step P lang
-      th0 th1
-  :
-    rtc (tau (@pred_step P lang)) th0 th1 <->
-    exists tr,
-      (<<STEPS: traced_step tr th0 th1>>) /\
-      (<<EVENTS: List.Forall (fun em => <<SAT: P (fst em)>> /\ <<TAU: ThreadEvent.get_machine_event (fst em) = MachineEvent.silent>>) tr >>)
-.
-
-Definition pf_consistent_strong2 lang (e0:Thread.t lang): Prop :=
-  forall mem1 sc1
+Definition super_consistent lang (e0:Thread.t lang): Prop :=
+  forall mem1 sc1 mem_future
          (CAP: Memory.cap e0.(Thread.memory) mem1),
   exists e1,
-    (<<STEPS: rtc (tau (@pred_step (promise_free /1\ no_sc) lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc1 mem1) e1>>) /\
-    (__guard__((exists st',
-                   (<<LOCAL: Local.failure_step e1.(Thread.local)>>) /\
-                   (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
-               (<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>))).
+    (<<STEPS0: rtc (tau (@pred_step is_cancel lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc1 mem1) e1>>) /\
+    (<<NORESERVE: no_reserves e1.(Thread.local).(Local.promises)>>) /\
+    exists e2,
+      (<<STEPS1: rtc (tau (@pred_step ((promise_free /1\ (fun e => ~ is_cancel e)) /1\ no_sc) lang)) e1 e2>>) /\
+      (__guard__((exists st',
+                     (<<LOCAL: Local.failure_step e2.(Thread.local)>>) /\
+                     (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e2) st'>>)) \/
+                 (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>))).
 
-Definition pf_consistent_strong2 lang (e0:Thread.t lang): Prop :=
+
+Definition super_consistent lang (e0:Thread.t lang): Prop :=
   forall mem1 sc1
          (CAP: Memory.cap e0.(Thread.memory) mem1),
   exists e1,

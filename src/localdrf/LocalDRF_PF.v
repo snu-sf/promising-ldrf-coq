@@ -33,18 +33,6 @@ Set Implicit Arguments.
 
 
 
-Lemma interval_le_disjoint from0 from1 to0 to1
-      (TS: Time.le to0 from1)
-  :
-    Interval.disjoint (from0, to0) (from1, to1).
-Proof.
-  ii. inv LHS. inv RHS. ss.
-  eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
-  { eapply FROM0. } etrans.
-  { eapply TO. }
-  { eauto. }
-Qed.
-
 Notation "p \\2// q" :=
   (fun x0 x1 => __guard__(p x0 x1 \/ q x0 x1))
     (at level 50, no associativity).
