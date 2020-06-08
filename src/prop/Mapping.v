@@ -2064,6 +2064,30 @@ Section MAPPED.
     - eapply write_fence_fc_mon_same_ord; eauto.
   Qed.
 
+  Lemma promise_consistent_mon vw0 vw1 prom0 prom1
+        (CONSISTENT: Local.promise_consistent (Local.mk vw1 prom1))
+        (VIEW: TView.le vw0 vw1)
+        (MLE: Memory.le prom0 prom1)
+    :
+      Local.promise_consistent (Local.mk vw0 prom0).
+  Proof.
+    ii. eapply MLE in PROMISE. eapply CONSISTENT in PROMISE.
+    eapply TimeFacts.le_lt_lt; eauto. inv VIEW. inv CUR. ss.
+  Qed.
+
+  Lemma failure_step_map lc0 flc0
+        (LOCAL: local_map lc0 flc0)
+        (FAILURE: Local.failure_step lc0)
+    :
+      Local.failure_step flc0.
+  Proof.
+    inv LOCAL. inv FAILURE. econs.
+    destruct lc0, flc0; ss.
+    eapply promise_consistent_mon.
+    { eapply promise_consistent_map; eauto. }
+    { eauto. }
+    { refl. }
+  Qed.
 
   Definition mappable_time loc to :=
     exists fto, (<<MAPPED: f loc to fto>>).
@@ -2182,17 +2206,6 @@ Section MAPPED.
     - inv MSG. econs.
       eapply closed_opt_view_map; eauto.
     - inv MSG. econs.
-  Qed.
-
-  Lemma promise_consistent_mon vw0 vw1 prom0 prom1
-        (CONSISTENT: Local.promise_consistent (Local.mk vw1 prom1))
-        (VIEW: TView.le vw0 vw1)
-        (MLE: Memory.le prom0 prom1)
-    :
-      Local.promise_consistent (Local.mk vw0 prom0).
-  Proof.
-    ii. eapply MLE in PROMISE. eapply CONSISTENT in PROMISE.
-    eapply TimeFacts.le_lt_lt; eauto. inv VIEW. inv CUR. ss.
   Qed.
 
   Definition mappable_evt (e: ThreadEvent.t) : Prop :=
@@ -2339,11 +2352,7 @@ Section MAPPED.
       + inv LOCAL1. esplits; eauto.
         * econs; eauto.
         * econs; eauto. econs 2; eauto. econs; eauto.
-          econs; eauto. econs; eauto. inv LOCAL.
-          eapply promise_consistent_mon.
-          { eapply promise_consistent_map; eauto. }
-          { ss. }
-          { refl. }
+          econs; eauto. eapply failure_step_map; eauto.
   Qed.
 
   Lemma tevent_map_same_machine_event e fe
@@ -2537,6 +2546,20 @@ Section MAPLT.
     erewrite (MAPLT loc to' to) in TLE; eauto. eapply Time.lt_strorder; eauto.
   Qed.
 
+  Lemma mapping_map_lt_inj f
+        (MAPLT: mapping_map_lt f)
+        loc to0 to1 fto
+        (MAP0: f loc to0 fto)
+        (MAP1: f loc to1 fto)
+    :
+      to0 = to1.
+  Proof.
+    destruct (Time.le_lt_dec to0 to1).
+    { destruct l; auto.
+      erewrite (MAPLT _ _ _ _ _ MAP0 MAP1) in H; eauto. timetac. }
+    { erewrite (MAPLT _ _ _ _ _ MAP1 MAP0) in l; eauto. timetac. }
+  Qed.
+
   Lemma mapping_map_lt_collapsable_unwritable f prom mem
         (MAPLT: mapping_map_lt f)
     :
@@ -2639,6 +2662,92 @@ Section IDENTMAP.
     - refl.
     - econs; i; eapply ident_map_view.
     - eapply ident_map_promises.
+  Qed.
+
+  Lemma ident_map_timemap_eq tm0 tm1
+        (MAP: timemap_map ident_map tm0 tm1)
+    :
+      tm0 = tm1.
+  Proof.
+    extensionality loc. apply MAP.
+  Qed.
+
+  Lemma ident_map_view_eq vw0 vw1
+        (MAP: view_map ident_map vw0 vw1)
+    :
+      vw0 = vw1.
+  Proof.
+    destruct vw0, vw1. f_equal.
+    { eapply ident_map_timemap_eq. eapply MAP. }
+    { eapply ident_map_timemap_eq. eapply MAP. }
+  Qed.
+
+  Lemma ident_map_opt_view_eq vw0 vw1
+        (MAP: opt_view_map ident_map vw0 vw1)
+    :
+      vw0 = vw1.
+  Proof.
+    inv MAP; eauto. f_equal.
+    eapply ident_map_view_eq; eauto.
+  Qed.
+
+  Lemma ident_map_message_eq msg0 msg1
+        (MAP: msg_map ident_map msg0 msg1)
+    :
+      msg0 = msg1.
+  Proof.
+    inv MAP; eauto. f_equal.
+    eapply ident_map_opt_view_eq; eauto.
+  Qed.
+
+  Lemma ident_map_kind_eq loc kind0 kind1
+        (MAP: memory_op_kind_map ident_map loc kind0 kind1)
+    :
+      kind0 = kind1.
+  Proof.
+    inv MAP; eauto.
+    { f_equal; eauto. eapply ident_map_message_eq; eauto. }
+    { f_equal; eauto. eapply ident_map_message_eq; eauto. }
+  Qed.
+
+  Lemma ident_map_compose_tevent f te0 te1 te2
+        (MAP0: tevent_map f te1 te0)
+        (MAP1: tevent_map ident_map te2 te1)
+    :
+      tevent_map f te2 te0.
+  Proof.
+    inv MAP0; inv MAP1; econs.
+    { inv FROM0. auto. }
+    { inv TO0. auto. }
+    { eapply ident_map_message_eq in MSG0. subst. auto. }
+    { eapply ident_map_kind_eq in KIND0. subst. auto. }
+    { inv TO0. eauto. }
+    { eauto. }
+    { eapply ident_map_opt_view_eq in RELEASED0. subst. etrans; eauto. }
+    { inv FROM0. eauto. }
+    { inv TO0. eauto. }
+    { eauto. }
+    { eapply ident_map_opt_view_eq in RELEASED0. subst. etrans; eauto. }
+    { inv FROM0. eauto. }
+    { inv TO0. eauto. }
+    { eauto. }
+    { eauto. }
+    { eapply ident_map_opt_view_eq in RELEASEDR0. subst. etrans; eauto. }
+    { eapply ident_map_opt_view_eq in RELEASEDW0. subst. etrans; eauto. }
+  Qed.
+
+  Lemma ident_map_mappable_time loc ts
+    :
+      mappable_time ident_map loc ts.
+  Proof.
+    exists ts. ss.
+  Qed.
+
+  Lemma ident_map_mappable_evt te
+    :
+      mappable_evt ident_map te.
+  Proof.
+    destruct te; ss; split; apply ident_map_mappable_time.
   Qed.
 
 End IDENTMAP.
@@ -2769,6 +2878,71 @@ Section MAPIDENT.
     - refl.
     - eapply map_ident_in_memory_closed_tview; eauto.
     - eapply map_ident_in_memory_promises; eauto.
+  Qed.
+
+  Lemma map_ident_in_memory_timemap_ident
+        f mem
+        (MAP: map_ident_in_memory f mem)
+        (MAPLT: mapping_map_lt f)
+        tm ftm
+        (TM: timemap_map f tm ftm)
+        (CLOSED: Memory.closed_timemap ftm mem)
+    :
+      ftm = tm.
+  Proof.
+    extensionality loc. specialize (TM loc).
+    specialize (CLOSED loc). des.
+    eapply mapping_map_lt_inj; eauto.
+    eapply MAP. eapply Memory.max_ts_spec in CLOSED. des. auto.
+  Qed.
+
+  Lemma map_ident_in_memory_view_ident
+        f mem
+        (MAP: map_ident_in_memory f mem)
+        (MAPLT: mapping_map_lt f)
+        vw fvw
+        (VIEW: view_map f vw fvw)
+        (CLOSED: Memory.closed_view fvw mem)
+    :
+      fvw = vw.
+  Proof.
+    destruct vw, fvw. f_equal.
+    { eapply map_ident_in_memory_timemap_ident; eauto.
+      { eapply VIEW. }
+      { eapply CLOSED. }
+    }
+    { eapply map_ident_in_memory_timemap_ident; eauto.
+      { eapply VIEW. }
+      { eapply CLOSED. }
+    }
+  Qed.
+
+  Lemma map_ident_in_memory_opt_view_ident
+        f mem
+        (MAP: map_ident_in_memory f mem)
+        (MAPLT: mapping_map_lt f)
+        vw fvw
+        (VIEW: opt_view_map f vw fvw)
+        (CLOSED: Memory.closed_opt_view fvw mem)
+    :
+      fvw = vw.
+  Proof.
+    inv VIEW; ss. f_equal. inv CLOSED.
+    eapply map_ident_in_memory_view_ident; eauto.
+  Qed.
+
+  Lemma map_ident_in_memory_message_ident
+        f mem
+        (MAP: map_ident_in_memory f mem)
+        (MAPLT: mapping_map_lt f)
+        msg fmsg
+        (MSG: msg_map f msg fmsg)
+        (CLOSED: Memory.closed_message fmsg mem)
+    :
+      fmsg = msg.
+  Proof.
+    inv MSG; ss. f_equal. inv CLOSED.
+    eapply map_ident_in_memory_opt_view_ident; eauto.
   Qed.
 
 End MAPIDENT.
@@ -3288,6 +3462,10 @@ Section CONCRETEIDENT.
     eapply map_ident_concrete_closed_opt_view; eauto.
   Qed.
 
+End CONCRETEIDENT.
+
+Section COMPOSE.
+
   Inductive compose_map (f0 f1: Loc.t -> Time.t -> Time.t -> Prop)
     : Loc.t -> Time.t -> Time.t -> Prop :=
   | compose_map_intro
@@ -3391,6 +3569,18 @@ Section CONCRETEIDENT.
     eapply compose_map_opt_view; eauto.
   Qed.
 
+  Lemma compose_map_op_kind f0 f1 loc kind0 kind1 kind2
+        (MAP0: memory_op_kind_map f0 loc kind0 kind1)
+        (MAP1: memory_op_kind_map f1 loc kind1 kind2)
+    :
+      memory_op_kind_map (compose_map f0 f1) loc kind0 kind2.
+  Proof.
+    inv MAP0; inv MAP1; econs.
+    { eapply compose_map_msg; eauto. }
+    { econs; eauto. }
+    { eapply compose_map_msg; eauto. }
+  Qed.
+
   Lemma compose_map_mappable f0 f1 mem0 mem1
         (MAP: memory_map f0 mem0 mem1)
         (MAPPABLE: mappable_memory f1 mem1)
@@ -3449,4 +3639,4 @@ Section CONCRETEIDENT.
       exploit ONLY; eauto. i. des. esplits; eauto.
   Qed.
 
-End CONCRETEIDENT.
+End COMPOSE.

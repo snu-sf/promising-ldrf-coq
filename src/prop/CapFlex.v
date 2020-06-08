@@ -495,4 +495,27 @@ Section CAPFLEX.
     { eauto. }
   Qed.
 
+  Lemma cap_flex_future_memory_map
+        mem0 mem1 tm cap
+        (TM0: forall loc, Time.lt (Memory.max_ts loc mem0) (tm loc))
+        (TM1: TimeMap.le (Memory.max_timemap mem1) tm)
+        (CAP: cap_flex mem0 cap tm)
+        (MEM0: Memory.closed mem0)
+        (FUTURE: Memory.future_weak mem0 mem1)
+    :
+      memory_map ident_map cap mem1.
+  Proof.
+    econs.
+    { i. destruct msg as [val released|]; auto. right.
+      eapply cap_flex_inv in GET; eauto. des; clarify.
+      eapply Memory.future_weak_get1 in GET; eauto. des.
+      esplits; eauto; ss. eapply ident_map_message. }
+    { i. left. exists (tm loc), Time.bot, (tm loc), Time.bot.
+      splits; ss; auto.
+      { eapply Time.bot_spec. }
+      { eapply Memory.max_ts_spec in GET. des. etrans; eauto. }
+      { i. eapply cap_flex_covered; eauto. }
+    }
+  Qed.
+
 End CAPFLEX.

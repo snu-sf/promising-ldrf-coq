@@ -94,6 +94,19 @@ Section GENERAL.
     - eapply IHFORALL in IN; eauto. des. esplits; eauto.
   Qed.
 
+  Lemma list_Forall2_in2 A B P (l0: list A) (l1: list B)
+        (FORALL: List.Forall2 P l0 l1)
+        a
+        (IN: List.In a l0)
+    :
+      exists b,
+        (<<IN: List.In b l1>>) /\ (<<SAT: P a b>>).
+  Proof.
+    ginduction FORALL; eauto; i; ss. des; clarify.
+    - esplits; eauto.
+    - eapply IHFORALL in IN; eauto. des. esplits; eauto.
+  Qed.
+
   Lemma list_Forall_sum A (P Q R: A -> Prop) (l: list A)
         (FORALL0: List.Forall P l)
         (FORALL1: List.Forall Q l)
