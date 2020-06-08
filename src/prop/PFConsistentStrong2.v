@@ -48,6 +48,50 @@ Proof.
   { inv FORALL0. inv FORALL1. econs; eauto. }
 Qed.
 
+Lemma write_not_in_traced lang (th0 th1: Thread.t lang) tr
+      (MLE: Memory.le th0.(Thread.local).(Local.promises) th0.(Thread.memory))
+      (STEPS: traced_step tr th0 th1)
+  :
+    List.Forall (fun em => (write_not_in (unwritable th0.(Thread.memory) th0.(Thread.local).(Local.promises))) (fst em)) tr.
+Proof.
+  ginduction STEPS.
+  - econs.
+  - subst. inv HD. econs.
+    + ss. eapply step_write_not_in in STEP; eauto.
+    + exploit IHSTEPS.
+      * eapply step_promises_le in MLE; eauto. econs; eauto.
+      * i. eapply List.Forall_impl; eauto. i. ss.
+        eapply write_not_in_mon; eauto.
+        i. eapply unwritable_increase; eauto.
+Qed.
+
+Lemma no_sc_same_sc_step lang (th0 th1: Thread.t lang) pf e
+      (STEP: Thread.step pf e th0 th1)
+      (NOSC: no_sc e)
+  :
+    th1.(Thread.sc) = th0.(Thread.sc).
+Proof.
+  inv STEP.
+  { inv STEP0. eauto. }
+  { inv STEP0. inv LOCAL; ss.
+    { inv LOCAL0; ss. }
+    { inv LOCAL2; ss. }
+    { inv LOCAL0; ss.
+      unfold TView.write_fence_sc. des_ifs. }
+  }
+Qed.
+
+Lemma no_sc_same_sc_traced lang (th0 th1: Thread.t lang) tr
+      (STEPS: traced_step tr th0 th1)
+      (NOSC: List.Forall (fun em => (no_sc) (fst em)) tr)
+  :
+    th1.(Thread.sc) = th0.(Thread.sc).
+Proof.
+  ginduction STEPS; auto.
+  i. inv NOSC. erewrite IHSTEPS; eauto. ss.
+  inv HD. eapply no_sc_same_sc_step; eauto.
+Qed.
+
 
 Inductive promise_writing_event
           (loc: Loc.t) (from to: Time.t) (val: Const.t) (released: option View.t)
@@ -509,7 +553,7 @@ Proof.
   esplits; eauto.
   { ss. eapply pred_steps_traced_step2 in STEPS0; cycle 1.
     { instantiate (1:=(promise_free /1\ no_sc)). eapply EVENTS. }
-    eapply steps_write_not_in in STEPS0.
+    eapply steps_write_not_in in STEPS0. ss.
 
 
 
