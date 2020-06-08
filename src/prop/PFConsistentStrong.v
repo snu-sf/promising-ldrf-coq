@@ -21,17 +21,264 @@ Require Import TView.
 Require Import Local.
 Require Import Thread.
 Require Import Pred.
+Require Import Mapping.
 
 Require Import MemoryMerge.
 Require Import PromiseConsistent.
 Require Import PFConsistent.
 Require Import ReorderCancel.
 Require Import MemoryProps.
+Require Import PFConsistentStrong.
 
 Set Implicit Arguments.
 
+Inductive promise_writing_event
+          (loc: Loc.t) (from to: Time.t) (val: Const.t) (released: option View.t)
+  : forall (e: ThreadEvent.t), Prop :=
+| writing_event_write
+    from' released' ord
+    (FROM: Time.le from from')
+    (RELEASED: View.opt_le released' released)
+    (ORD: Ordering.le ord Ordering.relaxed)
+  :
+    promise_writing_event
+      loc from to val released
+      (ThreadEvent.write loc from' to val released' ord)
+| writing_event_update
+    from' released' ord valr releasedr ordr
+    (FROM: Time.le from from')
+    (RELEASED: View.opt_le released' released)
+    (ORD: Ordering.le ord Ordering.relaxed)
+  :
+    promise_writing_event
+      loc from to val released
+      (ThreadEvent.update loc from' to valr val releasedr released' ordr ord)
+.
+Hint Constructors promise_writing_event.
 
-Definition pf_consistent_strong lang (e0:Thread.t lang): Prop :=
+Lemma promise_writing_event_mon loc from to val released from' released' e
+      (FROM: Time.le from from')
+      (RELEASED: View.opt_le released' released)
+      (WRITING: promise_writing_event loc from' to val released' e)
+  :
+    promise_writing_event loc from to val released e.
+Proof.
+  inv WRITING; econs; try by (etrans; eauto).
+Qed.
+
+Lemma promise_promise_decrease prom0 mem0 prom1 mem1
+      l f t m k
+      (PROMISE: Memory.promise prom0 mem0 l f t m prom1 mem1 k)
+      loc from to val released
+      (GET: Memory.get loc to prom0 = Some (from, Message.concrete val released))
+  :
+    exists from' released',
+      (<<FROM: Time.le from from'>>) /\
+      (<<RELEASED: View.opt_le released' released>>) /\
+      (<<GET: Memory.get loc to prom1 = Some (from', Message.concrete val released')>>).
+Proof.
+  inv PROMISE.
+  { eapply Memory.add_get1 in GET; eauto.
+    exists from, released. splits; auto; try by refl. }
+  { eapply Memory.split_get1 in GET; eauto. des.
+    exists f', released. splits; auto; try by refl. }
+  { eapply Memory.lower_get1 in GET; eauto. des. inv MSG_LE.
+    exists from, released1. splits; auto; try by refl. }
+  { dup GET. eapply Memory.remove_get1 in GET; eauto. des.
+    { subst. eapply Memory.remove_get0 in PROMISES. des. clarify. }
+    { exists from, released. splits; auto; try by refl. }
+  }
+Qed.
+
+Lemma step_promise_decrease_promise_writing_event lang (th0 th1: Thread.t lang) pf e
+      (STEP: Thread.step pf e th0 th1)
+      loc from to val released
+      (GET: Memory.get loc to th0.(Thread.local).(Local.promises) = Some (from, Message.concrete val released))
+  :
+    (exists from' released',
+        (<<FROM: Time.le from from'>>) /\
+        (<<RELEASED: View.opt_le released' released>>) /\
+        (<<GET: Memory.get loc to th1.(Thread.local).(Local.promises) = Some (from', Message.concrete val released')>>)) \/
+    (promise_writing_event loc from to val released e).
+Proof.
+  inv STEP.
+  { left. inv STEP0; ss. inv LOCAL.
+    eapply promise_promise_decrease in GET; eauto. }
+  { inv STEP0; ss.
+    inv LOCAL; try by (inv LOCAL0; left; exists from, released; splits; auto; refl).
+    { left; exists from, released; splits; auto; refl. }
+    { inv LOCAL0. ss. inv WRITE.
+      eapply promise_promise_decrease in PROMISE; eauto. des.
+      dup GET0. eapply Memory.remove_get1 in GET0; eauto. des.
+      { subst. eapply Memory.remove_get0 in REMOVE. des. clarify.
+        right. econs; eauto. apply NNPP. ii.
+        exploit RELEASE.
+        { destruct ord; ss. }
+        { eapply GET. }
+        { ss. i. subst. inv RELEASED.
+          unfold TView.write_released in *. des_ifs. destruct ord; ss. }
+      }
+      { left. esplits; eauto. }
+    }
+    { inv LOCAL1. inv LOCAL2. ss. inv WRITE.
+      eapply promise_promise_decrease in PROMISE; eauto. des.
+      dup GET1. eapply Memory.remove_get1 in GET1; eauto. des.
+      { subst. eapply Memory.remove_get0 in REMOVE. des. clarify.
+        right. econs; eauto. apply NNPP. ii.
+        exploit RELEASE.
+        { destruct ordw; ss. }
+        { eapply GET. }
+        { ss. i. subst. inv RELEASED.
+          unfold TView.write_released in *. des_ifs; destruct ordw; ss. }
+      }
+      { left. esplits; eauto. }
+    }
+  }
+Qed.
+
+Lemma steps_promise_decrease_promise_writing_event lang (th0 th1: Thread.t lang) tr
+      (STEPS: traced_step tr th0 th1)
+      loc from to val released
+      (GET: Memory.get loc to th0.(Thread.local).(Local.promises) = Some (from, Message.concrete val released))
+  :
+    (exists from' released',
+        (<<FROM: Time.le from from'>>) /\
+        (<<RELEASED: View.opt_le released' released>>) /\
+        (<<GET: Memory.get loc to th1.(Thread.local).(Local.promises) = Some (from', Message.concrete val released')>>)) \/
+    (exists e m,
+        (<<WRITING: promise_writing_event loc from to val released e>>) /\
+        (<<IN: List.In (e, m) tr>>)
+    ).
+Proof.
+  ginduction STEPS.
+  { i. left. exists from, released. splits; auto; try refl. }
+  { subst. i. inv HD.
+    exploit step_promise_decrease_promise_writing_event; eauto. i. des.
+    { exploit IHSTEPS; eauto. i. des.
+      { left. exists from'0, released'0. splits; auto.
+        { etrans; eauto. }
+        { etrans; eauto. }
+      }
+      { right. ss. esplits; eauto.
+        eapply promise_writing_event_mon; eauto. }
+    }
+    { right. ss. esplits; eauto. }
+  }
+Qed.
+
+Definition pf_consistent_aux lang (e0:Thread.t lang): Prop :=
+  forall mem1 sc1
+         (CAP: Memory.cap e0.(Thread.memory) mem1),
+  exists tr e1,
+    (<<STEPS: traced_step tr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc1 mem1) e1>>) /\
+    (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free /1\ no_sc) (fst em)>> /\ <<TAU: ThreadEvent.get_machine_event (fst em) = MachineEvent.silent>>) tr >>) /\
+    (__guard__((exists st',
+                   (<<LOCAL: Local.failure_step e1.(Thread.local)>>) /\
+                   (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
+               ((<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>) /\
+                (<<WRITES: forall loc from to val released
+                                  (GET: Memory.get loc to e0.(Thread.local).(Local.promises) = Some (from, Message.concrete val released)),
+                    exists e m,
+                      (<<WRITING: promise_writing_event loc from to val released e>>) /\
+                      (<<IN: List.In (e, m) tr>>)>>)))).
+
+Lemma pf_consistent_strong_pf_consistent_aux lang (th: Thread.t lang)
+      (WF: Local.wf th.(Thread.local) th.(Thread.memory))
+      (MEM: Memory.closed th.(Thread.memory))
+      (CONSISTENT: pf_consistent_strong th)
+  :
+    pf_consistent_aux th.
+Proof.
+  ii. exploit CONSISTENT; eauto. i. des.
+  eapply pred_step_rtc_mon with (Q:=(promise_free /1\ no_sc)) in STEPS0; cycle 1.
+  { i. destruct x1; ss. destruct kind; ss. }
+  eapply pred_step_rtc_mon with (Q:=(promise_free /1\ no_sc)) in STEPS1; cycle 1.
+  { i. des; auto. }
+  hexploit (proj1 (@pred_steps_traced_step (promise_free /1\ no_sc) _ (Thread.mk _ th.(Thread.state) th.(Thread.local) sc1 mem1) e2)).
+  { etrans; eauto. } i. des.
+  exists tr. esplits; eauto. unguard. des; eauto. right. splits; auto.
+  i. exploit steps_promise_decrease_promise_writing_event.
+  { eapply STEPS. }
+  { ss. eapply GET. }
+  i. des; eauto. erewrite PROMISES in *.
+  erewrite Memory.bot_get in *. clarify.
+Qed.
+
+Definition pf_consistent_aux lang (e0:Thread.t lang): Prop :=
+  forall mem1 sc1
+         (CAP: Memory.cap e0.(Thread.memory) mem1),
+  exists tr e1,
+    (<<STEPS: traced_step tr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc1 mem1) e1>>) /\
+    (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free /1\ no_sc) (fst em)>> /\ <<TAU: ThreadEvent.get_machine_event (fst em) = MachineEvent.silent>>) tr >>) /\
+    (__guard__((exists st',
+                   (<<LOCAL: Local.failure_step e1.(Thread.local)>>) /\
+                   (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
+               (<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>))).
+
+Lemma pf_consistent_strong_pf_consistent_aux lang (th: Thread.t lang)
+      (WF: Local.wf th.(Thread.local) th.(Thread.memory))
+      (MEM: Memory.closed th.(Thread.memory))
+      (CONSISTENT: pf_consistent_strong th)
+  :
+    pf_consistent_aux th.
+Proof.
+  ii. exploit CONSISTENT; eauto. i. des.
+  eapply pred_step_rtc_mon with (Q:=(promise_free /1\ no_sc)) in STEPS0; cycle 1.
+  { i. destruct x1; ss. destruct kind; ss. }
+  eapply pred_step_rtc_mon with (Q:=(promise_free /1\ no_sc)) in STEPS1; cycle 1.
+  { i. des; auto. }
+  hexploit (proj1 (@pred_steps_traced_step (promise_free /1\ no_sc) _ (Thread.mk _ th.(Thread.state) th.(Thread.local) sc1 mem1) e2)).
+  { etrans; eauto. } i. des.
+  exists tr. esplits; eauto.
+Qed.
+
+Definition pf_consistent_cap_flex lang (e0:Thread.t lang): Prop :=
+  forall mem1 sc1
+         (CAP: Memory.cap e0.(Thread.memory) mem1),
+  exists tr e1,
+    (<<STEPS: traced_step tr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc1 mem1) e1>>) /\
+    (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free /1\ no_sc) (fst em)>> /\ <<TAU: ThreadEvent.get_machine_event (fst em) = MachineEvent.silent>>) tr >>) /\
+    (__guard__((exists st',
+                   (<<LOCAL: Local.failure_step e1.(Thread.local)>>) /\
+                   (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
+               (<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>))).
+
+
+traced_step
+
+    destruct x1; ss. destruct kind; ss. }
+
+
+    unfold is
+
+  pred_step
+  rtc
+
+
+Lemma pf_consistent_strong_pf_consistent_aux
+  :
+
+
+Lemma pred_steps_traced_step P lang
+      th0 th1
+  :
+    rtc (tau (@pred_step P lang)) th0 th1 <->
+    exists tr,
+      (<<STEPS: traced_step tr th0 th1>>) /\
+      (<<EVENTS: List.Forall (fun em => <<SAT: P (fst em)>> /\ <<TAU: ThreadEvent.get_machine_event (fst em) = MachineEvent.silent>>) tr >>)
+.
+
+Definition pf_consistent_strong2 lang (e0:Thread.t lang): Prop :=
+  forall mem1 sc1
+         (CAP: Memory.cap e0.(Thread.memory) mem1),
+  exists e1,
+    (<<STEPS: rtc (tau (@pred_step (promise_free /1\ no_sc) lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc1 mem1) e1>>) /\
+    (__guard__((exists st',
+                   (<<LOCAL: Local.failure_step e1.(Thread.local)>>) /\
+                   (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
+               (<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>))).
+
+Definition pf_consistent_strong2 lang (e0:Thread.t lang): Prop :=
   forall mem1 sc1
          (CAP: Memory.cap e0.(Thread.memory) mem1),
   exists e1,
