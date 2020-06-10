@@ -2750,6 +2750,18 @@ Section IDENTMAP.
     destruct te; ss; split; apply ident_map_mappable_time.
   Qed.
 
+  Lemma ident_map_write_not_in MSGS te fte
+        (MAP: tevent_map ident_map fte te)
+        (NOTIN: write_not_in MSGS te)
+    :
+      write_not_in MSGS fte.
+  Proof.
+    inv MAP; auto.
+    { inv FROM. inv TO. inv KIND; ss. }
+    { inv FROM. inv TO. ss. }
+    { inv FROM. inv TO. ss. }
+  Qed.
+
 End IDENTMAP.
 
 
@@ -2943,6 +2955,49 @@ Section MAPIDENT.
   Proof.
     inv MSG; ss. f_equal. inv CLOSED.
     eapply map_ident_in_memory_opt_view_ident; eauto.
+  Qed.
+
+  Lemma promise_writing_event_map loc to mem from val released f e fe
+        (CLOSED: Memory.closed mem)
+        (GET: Memory.get loc to mem = Some (from, Message.concrete val released))
+        (MAPLT: mapping_map_lt f)
+        (IDENT: map_ident_in_memory f mem)
+        (WRITING: promise_writing_event loc from to val released e)
+        (EVENT: tevent_map f fe e)
+    :
+      promise_writing_event loc from to val released fe.
+  Proof.
+    inv WRITING; inv EVENT.
+    { assert (to = fto).
+      { eapply mapping_map_lt_map_eq; eauto. eapply IDENT.
+        eapply Memory.max_ts_spec in GET. des. auto. }
+      assert (from' = ffrom).
+      { eapply mapping_map_lt_map_eq; eauto. eapply IDENT.
+        transitivity to; eauto. eapply Memory.max_ts_spec in GET. des. auto. }
+      subst. econs; eauto.
+      exploit opt_view_le_map.
+      { eapply mapping_map_lt_map_le; eauto. }
+      { eapply RELEASED0. }
+      { eapply CLOSED in GET. des. inv MSG_CLOSED.
+        eapply map_ident_in_memory_closed_opt_view; eauto. }
+      { eauto. }
+      i. transitivity freleased'; auto.
+    }
+    { assert (to = fto).
+      { eapply mapping_map_lt_map_eq; eauto. eapply IDENT.
+        eapply Memory.max_ts_spec in GET. des. auto. }
+      assert (from' = ffrom).
+      { eapply mapping_map_lt_map_eq; eauto. eapply IDENT.
+        transitivity to; eauto. eapply Memory.max_ts_spec in GET. des. auto. }
+      subst. econs; eauto.
+      exploit opt_view_le_map.
+      { eapply mapping_map_lt_map_le; eauto. }
+      { eapply RELEASEDW. }
+      { eapply CLOSED in GET. des. inv MSG_CLOSED.
+        eapply map_ident_in_memory_closed_opt_view; eauto. }
+      { eauto. }
+      i. transitivity freleasedw'; auto.
+    }
   Qed.
 
 End MAPIDENT.

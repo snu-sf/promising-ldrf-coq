@@ -23,10 +23,6 @@ Require Import Thread.
 Require Import Cover.
 Require Import Pred.
 
-Require Import MemoryMerge.
-Require Import PromiseConsistent.
-Require Import PFConsistent.
-Require Import ReorderCancel.
 Require Import MemoryProps.
 Require Import Mapping.
 
@@ -34,10 +30,8 @@ Set Implicit Arguments.
 
 Section GOODFUTURE.
 
-  Record good_future (mem0 mem1: Memory.t) (tm: TimeMap.t): Prop :=
+  Record good_future (tm: TimeMap.t) (mem0 mem1: Memory.t): Prop :=
     {
-      good_future_tm_wf:
-        forall loc, Time.lt (Memory.max_ts loc mem0) (tm loc);
       good_future_future: Memory.future_weak mem0 mem1;
       good_future_cover:
         forall loc ts (COVERED: covered loc ts mem1),
@@ -45,35 +39,30 @@ Section GOODFUTURE.
           (<<TS: Time.lt (tm loc) ts>>);
     }.
 
-  Lemma good_future_refl
-        mem tm
-        (TM: forall loc, Time.lt (Memory.max_ts loc mem) (tm loc))
-    :
-      good_future mem mem tm.
-  Proof.
-    econs; ss.
-    { refl. }
-    { i. left. auto. }
-  Qed.
-
-  Lemma good_future_trans
-        mem0 mem1 mem2 tm0 tm1
-        (FUTURE01: good_future mem0 mem1 tm0)
-        (FUTURE12: good_future mem1 mem2 tm1)
+  Lemma good_future_mon tm0 tm1
         (TM: TimeMap.le tm0 tm1)
     :
-      good_future mem0 mem2 tm0.
+      good_future tm1 <2= good_future tm0.
   Proof.
-    econs; ss.
-    { eapply FUTURE01.(good_future_tm_wf); eauto. }
+    ii. econs.
+    { eapply PR. }
+    { i. eapply PR in COVERED. des; auto.
+      right. eapply TimeFacts.le_lt_lt; eauto.
+    }
+  Qed.
+
+  Global Program Instance good_future_PreOrder tm: PreOrder (good_future tm).
+  Next Obligation.
+    ii. econs; eauto. refl.
+  Qed.
+  Next Obligation.
+    ii. econs.
     { etrans.
-      { eapply FUTURE01.(good_future_future); eauto. }
-      { eapply FUTURE12.(good_future_future); eauto. }
+      { eapply H. }
+      { eapply H0. }
     }
-    { i. exploit FUTURE12.(good_future_cover); eauto. i. des.
-      { eapply FUTURE01.(good_future_cover); eauto. }
-      { right. eapply TimeFacts.le_lt_lt; eauto. }
-    }
+    { i. eapply H0 in COVERED. des; auto.
+      eapply H in COVERED0. auto. }
   Qed.
 
   Record good_future_map (max tm: TimeMap.t)
@@ -140,8 +129,9 @@ Section GOODFUTURE.
   Qed.
 
   Lemma good_future_memory_map mem0 mem1 tm times f
-        (FUTURE: good_future mem0 mem1 tm)
+        (FUTURE: good_future tm mem0 mem1)
         (MEM: Memory.closed mem0)
+        (TM: forall loc, Time.lt (Memory.max_ts loc mem0) (tm loc))
         (MAP: good_future_map (Memory.max_timemap mem0) tm times f)
     :
       memory_map f mem0 mem1.
@@ -176,7 +166,7 @@ Section GOODFUTURE.
           { eapply TS. } etrans.
           { eapply TO. } etrans.
           { eapply l. }
-          { left. eapply FUTURE.(good_future_tm_wf). }
+          { left. auto. }
         }
       }
       { right. destruct (Time.le_lt_dec (tm loc) ffrom).
@@ -197,7 +187,6 @@ Section GOODFUTURE.
               { eapply TO. } eapply TimeFacts.le_lt_lt.
               { eapply MAX. }
               unfold Time.meet. des_ifs.
-              eapply FUTURE.(good_future_tm_wf).
             }
             { eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
               { eapply TS. }
@@ -275,7 +264,7 @@ Section GOODFUTURE.
                                       (<<TS: Time.le ts (tm loc)>>) /\
                                       (<<PROM: ~ covered loc ts th0.(Thread.memory)>>)))
     :
-      good_future th0.(Thread.memory) th1.(Thread.memory) tm.
+      good_future tm th0.(Thread.memory) th1.(Thread.memory).
   Proof.
     econs; auto.
     { eapply Memory.future_future_weak.
@@ -316,7 +305,7 @@ Section GOODFUTURE.
                                       (<<TS: Time.le ts (tm loc)>>) /\
                                       (<<PROM: ~ covered loc ts th0.(Thread.memory)>>)))
     :
-      good_future th0.(Thread.memory) th1.(Thread.memory) tm.
+      good_future tm th0.(Thread.memory) th1.(Thread.memory).
   Proof.
     econs; auto.
     { eapply Memory.future_future_weak.
@@ -340,7 +329,7 @@ Section GOODFUTURE.
                                                (<<TS: Time.le ts (tm loc)>>) /\
                                                (<<PROM: ~ covered loc ts th0.(Thread.memory)>>)) (fst em)) tr)
     :
-      good_future th0.(Thread.memory) th1.(Thread.memory) tm.
+      good_future tm th0.(Thread.memory) th1.(Thread.memory).
   Proof.
     econs; auto.
     { eapply Memory.future_future_weak.
