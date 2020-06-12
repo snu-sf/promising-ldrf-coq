@@ -198,62 +198,6 @@ Section GOODFUTURE.
     }
   Qed.
 
-  Lemma promise_write_not_in_covered prom0 prom1 mem0 mem1 MSGS
-        loc from to msg kind
-        (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
-        (NOTIN: kind = Memory.op_kind_add ->
-                forall ts (ITV: Interval.mem (from, to) ts), ~ MSGS loc ts)
-        l t
-        (COVERED: covered l t mem1)
-    :
-      covered l t mem0 \/ ~ MSGS l t.
-  Proof.
-    inv PROMISE.
-    { erewrite add_covered in COVERED; eauto. des; auto.
-      subst. right. eapply NOTIN; eauto. }
-    { erewrite split_covered in COVERED; eauto. }
-    { erewrite lower_covered in COVERED; eauto. }
-    { erewrite remove_covered in COVERED; eauto. des; auto. }
-  Qed.
-
-  Lemma step_write_not_in_covered MSGS lang (th0 th1: Thread.t lang) pf e
-        (STEP: Thread.step pf e th0 th1)
-        (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
-        (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
-        (CLOSED: Memory.closed (Thread.memory th0))
-        (NOTIN: write_not_in MSGS e)
-        loc ts
-        (COVERED: covered loc ts th1.(Thread.memory))
-    :
-      covered loc ts th0.(Thread.memory) \/ ~ MSGS loc ts.
-  Proof.
-    inv STEP.
-    { inv STEP0; ss. inv LOCAL0. eapply promise_write_not_in_covered; eauto.
-      i. subst. ss. auto. }
-    { inv STEP0; ss. inv LOCAL0; auto.
-      - inv LOCAL1. inv WRITE. ss. eapply promise_write_not_in_covered; eauto.
-      - inv LOCAL2. inv WRITE. ss. eapply promise_write_not_in_covered; eauto.
-    }
-  Qed.
-
-  Lemma steps_write_not_in_covered P MSGS lang (th0 th1: Thread.t lang)
-        (STEPS: rtc (tau (@pred_step P lang)) th0 th1)
-        (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
-        (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
-        (CLOSED: Memory.closed (Thread.memory th0))
-        (NOTIN: P <1= write_not_in MSGS)
-        loc ts
-        (COVERED: covered loc ts th1.(Thread.memory))
-    :
-      covered loc ts th0.(Thread.memory) \/ ~ MSGS loc ts.
-  Proof.
-    ginduction STEPS; auto. i.
-    inv H. dup TSTEP. inv TSTEP. inv STEP.
-    exploit Thread.step_future; eauto. i. des.
-    exploit IHSTEPS; eauto. i. des; auto.
-    exploit step_write_not_in_covered; eauto.
-  Qed.
-
   Lemma step_write_not_in_good_future P lang (th0 th1: Thread.t lang) tm e
         (TM: forall loc, Time.lt (Memory.max_ts loc th0.(Thread.memory)) (tm loc))
         (STEPS: pred_step P e th0 th1)
@@ -276,23 +220,6 @@ Section GOODFUTURE.
       { right. destruct (Time.le_lt_dec ts (tm loc)); ss. }
       { left. apply NNPP; eauto. }
     }
-  Qed.
-
-  Lemma write_not_in_covered_traced MSGS lang (th0 th1: Thread.t lang) tr
-        (STEPS: traced_step tr th0 th1)
-        (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
-        (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
-        (CLOSED: Memory.closed (Thread.memory th0))
-        (NOTIN: List.Forall (fun em => write_not_in MSGS (fst em)) tr)
-        loc ts
-        (COVERED: covered loc ts th1.(Thread.memory))
-    :
-      covered loc ts th0.(Thread.memory) \/ ~ MSGS loc ts.
-  Proof.
-    ginduction STEPS; auto. i. subst.
-    inv HD. inv NOTIN. exploit Thread.step_future; eauto. i. des.
-    exploit IHSTEPS; eauto. i. des; auto.
-    exploit step_write_not_in_covered; eauto.
   Qed.
 
   Lemma steps_write_not_in_good_future P lang (th0 th1: Thread.t lang) tm

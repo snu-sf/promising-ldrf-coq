@@ -1697,6 +1697,79 @@ Section UNCHANGABLES.
         i. eapply unreadable_increase; eauto.
   Qed.
 
+  Lemma promise_write_not_in_covered prom0 prom1 mem0 mem1 MSGS
+        loc from to msg kind
+        (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
+        (NOTIN: kind = Memory.op_kind_add ->
+                forall ts (ITV: Interval.mem (from, to) ts), ~ MSGS loc ts)
+        l t
+        (COVERED: covered l t mem1)
+    :
+      covered l t mem0 \/ ~ MSGS l t.
+  Proof.
+    inv PROMISE.
+    { erewrite add_covered in COVERED; eauto. des; auto.
+      subst. right. eapply NOTIN; eauto. }
+    { erewrite split_covered in COVERED; eauto. }
+    { erewrite lower_covered in COVERED; eauto. }
+    { erewrite remove_covered in COVERED; eauto. des; auto. }
+  Qed.
+
+  Lemma step_write_not_in_covered MSGS lang (th0 th1: Thread.t lang) pf e
+        (STEP: Thread.step pf e th0 th1)
+        (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
+        (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
+        (CLOSED: Memory.closed (Thread.memory th0))
+        (NOTIN: write_not_in MSGS e)
+        loc ts
+        (COVERED: covered loc ts th1.(Thread.memory))
+    :
+      covered loc ts th0.(Thread.memory) \/ ~ MSGS loc ts.
+  Proof.
+    inv STEP.
+    { inv STEP0; ss. inv LOCAL0. eapply promise_write_not_in_covered; eauto.
+      i. subst. ss. auto. }
+    { inv STEP0; ss. inv LOCAL0; auto.
+      - inv LOCAL1. inv WRITE. ss. eapply promise_write_not_in_covered; eauto.
+      - inv LOCAL2. inv WRITE. ss. eapply promise_write_not_in_covered; eauto.
+    }
+  Qed.
+
+  Lemma steps_write_not_in_covered P MSGS lang (th0 th1: Thread.t lang)
+        (STEPS: rtc (tau (@pred_step P lang)) th0 th1)
+        (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
+        (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
+        (CLOSED: Memory.closed (Thread.memory th0))
+        (NOTIN: P <1= write_not_in MSGS)
+        loc ts
+        (COVERED: covered loc ts th1.(Thread.memory))
+    :
+      covered loc ts th0.(Thread.memory) \/ ~ MSGS loc ts.
+  Proof.
+    ginduction STEPS; auto. i.
+    inv H. dup TSTEP. inv TSTEP. inv STEP.
+    exploit Thread.step_future; eauto. i. des.
+    exploit IHSTEPS; eauto. i. des; auto.
+    exploit step_write_not_in_covered; eauto.
+  Qed.
+
+  Lemma write_not_in_covered_traced MSGS lang (th0 th1: Thread.t lang) tr
+        (STEPS: traced_step tr th0 th1)
+        (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
+        (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
+        (CLOSED: Memory.closed (Thread.memory th0))
+        (NOTIN: List.Forall (fun em => write_not_in MSGS (fst em)) tr)
+        loc ts
+        (COVERED: covered loc ts th1.(Thread.memory))
+    :
+      covered loc ts th0.(Thread.memory) \/ ~ MSGS loc ts.
+  Proof.
+    ginduction STEPS; auto. i. subst.
+    inv HD. inv NOTIN. exploit Thread.step_future; eauto. i. des.
+    exploit IHSTEPS; eauto. i. des; auto.
+    exploit step_write_not_in_covered; eauto.
+  Qed.
+
 End UNCHANGABLES.
 
 
@@ -3039,3 +3112,696 @@ Section WFTIME.
   Qed.
 
 End WFTIME.
+
+Section PROMISED.
+
+  Lemma promised_add mem1 loc from to msg mem2
+        (ADD: Memory.add mem1 loc from to msg mem2)
+  :
+    promised mem2 =
+    fun loc' =>
+      if (Loc.eq_dec loc' loc)
+      then fun ts' => if (Time.eq_dec ts' to) then True else promised mem1 loc' ts'
+      else promised mem1 loc'.
+  Proof.
+    extensionality loc'. extensionality ts'.
+    apply Coq.Logic.PropExtensionality.propositional_extensionality.
+    split; i.
+    - inv H. destruct msg0. erewrite Memory.add_o in GET; eauto.
+      des_ifs.
+      + ss. des; clarify.
+      + econs; eauto.
+      + ss. des; clarify.
+      + econs; eauto.
+    - des_ifs.
+      + ss. des; clarify. econs. eapply Memory.add_get0; eauto.
+      + inv H. destruct msg0.
+        eapply Memory.add_get1 in GET; eauto. econs; eauto.
+      + inv H. destruct msg0.
+        eapply Memory.add_get1 in GET; eauto. econs; eauto.
+  Qed.
+
+  Lemma concrete_promised_add mem1 loc from to msg mem2
+        (ADD: Memory.add mem1 loc from to msg mem2)
+    :
+      concrete_promised mem2 =
+      fun loc' =>
+        if (Loc.eq_dec loc' loc)
+        then fun ts' => if (Time.eq_dec ts' to) then (msg <> Message.reserve) else concrete_promised mem1 loc' ts'
+        else concrete_promised mem1 loc'.
+  Proof.
+    extensionality loc'. extensionality ts'.
+    apply Coq.Logic.PropExtensionality.propositional_extensionality.
+    split; i.
+    - inv H. erewrite Memory.add_o in GET; eauto.
+      des_ifs.
+      + ss. des; clarify.
+      + ss. des; clarify.
+      + econs; eauto.
+      + ss. des; clarify.
+      + econs; eauto.
+    - des_ifs.
+      + destruct msg; ss. econs. eapply Memory.add_get0; eauto.
+      + inv H.
+        eapply Memory.add_get1 in GET; eauto. econs; eauto.
+      + inv H.
+        eapply Memory.add_get1 in GET; eauto. econs; eauto.
+  Qed.
+
+  Lemma promised_lower mem1 loc from to msg1 msg2 mem2
+        (LOWER: Memory.lower mem1 loc from to msg1 msg2 mem2)
+    :
+      promised mem2 = promised mem1.
+  Proof.
+    extensionality loc'. extensionality ts'.
+    apply Coq.Logic.PropExtensionality.propositional_extensionality.
+    split; i.
+    - inv H. destruct msg. erewrite Memory.lower_o in GET; eauto. des_ifs.
+      + ss. des; clarify. econs. eapply (Memory.lower_get0 LOWER); eauto.
+      + econs; eauto.
+    - inv H. destruct msg. eapply Memory.lower_get1 in GET; eauto.
+      des. econs; eauto.
+  Qed.
+
+  Lemma concrete_promised_lower mem1 loc from to msg1 msg2 mem2
+        (LOWER: Memory.lower mem1 loc from to msg1 msg2 mem2)
+        (MSG: msg1 <> Message.reserve)
+    :
+      concrete_promised mem2 = concrete_promised mem1.
+  Proof.
+    extensionality loc'. extensionality ts'.
+    apply Coq.Logic.PropExtensionality.propositional_extensionality.
+    split; i.
+    - inv H. erewrite Memory.lower_o in GET; eauto. des_ifs.
+      + ss. des; clarify.
+        exploit lower_succeed_wf; eauto. i. des. inv MSG_LE; clarify.
+        econs; eauto.
+      + econs; eauto.
+    - inv H. eapply Memory.lower_get1 in GET; eauto.
+      des. inv MSG_LE. econs; eauto.
+  Qed.
+
+  Lemma promised_split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2
+        (SPLIT: Memory.split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2)
+    :
+      promised mem2 =
+      fun loc' =>
+        if (Loc.eq_dec loc' loc)
+        then fun ts' => if (Time.eq_dec ts' ts2) then True else promised mem1 loc' ts'
+        else promised mem1 loc'.
+  Proof.
+    extensionality loc'. extensionality ts'.
+    apply Coq.Logic.PropExtensionality.propositional_extensionality.
+    split; i.
+    - inv H. destruct msg. erewrite Memory.split_o in GET; eauto.
+      des_ifs; try by (des; ss; clarify).
+      + ss. des; clarify. econs. eapply (Memory.split_get0 SPLIT); eauto.
+      + econs; eauto.
+      + econs; eauto.
+    - des_ifs.
+      + ss. des; clarify. econs. eapply (Memory.split_get0 SPLIT); eauto.
+      + inv H. destruct msg. eapply Memory.split_get1 in GET; eauto.
+        des. econs; eauto.
+      + inv H. destruct msg. eapply Memory.split_get1 in GET; eauto.
+        des. econs; eauto.
+  Qed.
+
+  Lemma concrete_promised_split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2
+        (SPLIT: Memory.split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2)
+    :
+      concrete_promised mem2 =
+      fun loc' =>
+        if (Loc.eq_dec loc' loc)
+        then fun ts' => if (Time.eq_dec ts' ts2) then (msg2 <> Message.reserve) else concrete_promised mem1 loc' ts'
+        else concrete_promised mem1 loc'.
+  Proof.
+    extensionality loc'. extensionality ts'.
+    apply Coq.Logic.PropExtensionality.propositional_extensionality.
+    split; i.
+    - inv H. erewrite Memory.split_o in GET; eauto.
+      des_ifs; try by (des; ss; clarify).
+      + ss. des; clarify. econs. eapply (Memory.split_get0 SPLIT); eauto.
+      + econs; eauto.
+      + econs; eauto.
+    - des_ifs.
+      + destruct msg2; ss. econs. eapply (Memory.split_get0 SPLIT); eauto.
+      + inv H. eapply Memory.split_get1 in GET; eauto.
+        des. econs; eauto.
+      + inv H. eapply Memory.split_get1 in GET; eauto.
+        des. econs; eauto.
+  Qed.
+
+  Lemma promised_remove mem1 loc from to msg mem2
+        (REMOVE: Memory.remove mem1 loc from to msg mem2)
+    :
+      promised mem2 =
+      fun loc' =>
+        if (Loc.eq_dec loc' loc)
+        then fun ts' => if (Time.eq_dec ts' to) then False else promised mem1 loc' ts'
+        else promised mem1 loc'.
+  Proof.
+    extensionality loc'. extensionality ts'.
+    apply Coq.Logic.PropExtensionality.propositional_extensionality.
+    split; i.
+    - inv H. destruct msg0. erewrite Memory.remove_o in GET; eauto.
+      des_ifs; try by (des; ss; clarify).
+      + econs; eauto.
+      + econs; eauto.
+    - des_ifs.
+      + inv H. destruct msg0. eapply Memory.remove_get1 in GET; eauto.
+        des; clarify. econs; eauto.
+      + inv H. destruct msg0. eapply Memory.remove_get1 in GET; eauto.
+        des; clarify. econs; eauto.
+  Qed.
+
+  Lemma concrete_promised_remove mem1 loc from to mem2
+        (REMOVE: Memory.remove mem1 loc from to Message.reserve mem2)
+    :
+      concrete_promised mem2 = concrete_promised mem1.
+  Proof.
+    extensionality loc'. extensionality ts'.
+    apply Coq.Logic.PropExtensionality.propositional_extensionality.
+    split; i.
+    - inv H. erewrite Memory.remove_o in GET; eauto.
+      des_ifs; try by (des; ss; clarify). econs; eauto.
+    - inv H. dup GET. eapply Memory.remove_get1 in GET; eauto. des.
+      + clarify. eapply Memory.remove_get0 in REMOVE. des. clarify.
+      + econs; eauto.
+  Qed.
+
+End PROMISED.
+
+Section RESERVEFUTURE.
+
+  Inductive reserve_future_memory:
+    forall (prom0 mem0 prom1 mem1: Memory.t), Prop :=
+  | reserve_future_memory_base
+      prom0 mem0
+    :
+      reserve_future_memory
+        prom0 mem0 prom0 mem0
+  | reserve_future_memory_step
+      prom0 mem0 prom1 mem1 prom2 mem2
+      loc from to kind
+      (HD: Memory.promise prom0 mem0 loc from to Message.reserve prom1 mem1 kind)
+      (TL: reserve_future_memory prom1 mem1 prom2 mem2)
+    :
+      reserve_future_memory
+        prom0 mem0 prom2 mem2
+  .
+  Hint Constructors reserve_future_memory.
+
+  Lemma reserve_future_future prom0 mem0 prom1 mem1
+        (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
+    :
+      Memory.future mem0 mem1.
+  Proof.
+    ginduction FUTURE; auto. i. transitivity mem1; auto.
+    inv HD; clarify.
+    - econs; [|refl]. econs; eauto.
+    - econs; [|refl]. econs; eauto.
+    - econs; [|refl]. econs; eauto.
+    - econs; [|refl]. econs; eauto.
+  Qed.
+
+  Lemma reserve_future_concrete_promised prom0 mem0 prom1 mem1
+        (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
+    :
+      concrete_promised mem1 <2= concrete_promised mem0.
+  Proof.
+    ginduction FUTURE; auto. i. apply IHFUTURE in PR; auto.
+    inv HD; des; clarify.
+    - inv PR. erewrite Memory.add_o in GET; eauto.
+      des_ifs. econs; eauto.
+    - apply lower_succeed_wf in MEM. des. inv MSG_LE.
+    - inv PR. erewrite Memory.remove_o in GET; eauto.
+      des_ifs. econs; eauto.
+  Qed.
+
+  Lemma reserve_future_memory_trans prom0 mem0 prom1 mem1 prom2 mem2
+        (FUTURE01: reserve_future_memory prom0 mem0 prom1 mem1)
+        (FUTURE12: reserve_future_memory prom1 mem1 prom2 mem2)
+    :
+      reserve_future_memory prom0 mem0 prom2 mem2.
+  Proof.
+    ginduction FUTURE01; i; eauto.
+  Qed.
+
+  Lemma reserve_future_memory_le prom0 mem0 prom1 mem1
+        (MLE: Memory.le prom0 mem0)
+        (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
+    :
+      Memory.le prom1 mem1.
+  Proof.
+    ginduction FUTURE; eauto. i.
+    eapply IHFUTURE. eapply promise_memory_le; eauto.
+  Qed.
+
+  Lemma reserve_future_memory_bot_none prom0 mem0 prom1 mem1
+        (BOTNONE: Memory.bot_none prom0)
+        (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
+    :
+      Memory.bot_none prom1.
+  Proof.
+    ginduction FUTURE; eauto. i.
+    eapply IHFUTURE. inv HD.
+    - eapply Memory.add_bot_none; eauto.
+    - eapply Memory.split_bot_none; eauto.
+    - eapply Memory.lower_bot_none; eauto.
+    - eapply Memory.cancel_bot_none; eauto.
+  Qed.
+
+  Lemma reserve_future_memory_finite prom0 mem0 prom1 mem1
+        (FIN: Memory.finite prom0)
+        (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
+    :
+      Memory.finite prom1.
+  Proof.
+    ginduction FUTURE; eauto. i.
+    eapply IHFUTURE. inv HD.
+    - eapply Memory.add_finite; eauto.
+    - eapply Memory.split_finite; eauto.
+    - eapply Memory.lower_finite; eauto.
+    - eapply Memory.remove_finite; eauto.
+  Qed.
+
+  Lemma reserve_future_concrete_same prom0 mem0 prom1 mem1 loc from to val released
+        (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
+        (GET: Memory.get loc to mem0 = Some (from, Message.concrete val released))
+    :
+      Memory.get loc to mem1 = Some (from, Message.concrete val released).
+  Proof.
+    ginduction FUTURE; auto. i. apply IHFUTURE.
+    inv HD; des; clarify.
+    - erewrite Memory.add_o; eauto.
+      des_ifs. ss. des; clarify.
+      eapply Memory.add_get0 in MEM. des. clarify.
+    - apply lower_succeed_wf in MEM. des. inv MSG_LE.
+    - erewrite Memory.remove_o; eauto.
+      des_ifs. ss. des; clarify.
+      eapply Memory.remove_get0 in MEM. des. clarify.
+  Qed.
+
+  Lemma reserve_future_concrete_same_promise prom0 mem0 prom1 mem1 loc from to val released
+        (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
+        (GET: Memory.get loc to prom0 = Some (from, Message.concrete val released))
+    :
+      Memory.get loc to prom1 = Some (from, Message.concrete val released).
+  Proof.
+    ginduction FUTURE; auto. i. apply IHFUTURE.
+    inv HD; des; clarify.
+    - erewrite Memory.add_o; eauto.
+      des_ifs. ss. des; clarify.
+      eapply Memory.add_get0 in PROMISES. des. clarify.
+    - apply lower_succeed_wf in PROMISES. des. inv MSG_LE.
+    - erewrite Memory.remove_o; eauto.
+      des_ifs. ss. des; clarify.
+      eapply Memory.remove_get0 in PROMISES. des. clarify.
+  Qed.
+
+  Lemma reserve_future_memory_unch
+        prom0 mem0 prom1 mem1
+        (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
+        loc to from msg
+        (GETMEM: Memory.get loc to mem0 = Some (from, msg))
+        (GETPROM: Memory.get loc to prom0 = None)
+    :
+      (<<GETMEM: Memory.get loc to mem1 = Some (from, msg)>>) /\
+      (<<GETPROM: Memory.get loc to prom1 = None>>).
+  Proof.
+    ginduction FUTURE; eauto. i. inv HD; clarify.
+    { eapply IHFUTURE; eauto.
+      - erewrite Memory.add_o; eauto. des_ifs.
+        ss. des; clarify.
+        eapply Memory.add_get0 in MEM. des. clarify.
+      - erewrite Memory.add_o; eauto. des_ifs.
+        ss. des; clarify.
+        eapply Memory.add_get0 in MEM. des. clarify. }
+    { apply split_succeed_wf in PROMISES. des. clarify. }
+    { apply lower_succeed_wf in PROMISES. des. clarify. inv MSG_LE. }
+    { eapply IHFUTURE; eauto.
+      - erewrite Memory.remove_o; eauto. des_ifs.
+        ss. des; clarify.
+        eapply Memory.remove_get0 in PROMISES. des. clarify.
+      - erewrite Memory.remove_o; eauto. des_ifs. }
+  Qed.
+
+  Lemma reserve_future_memory_unchangable
+        prom0 mem0 prom1 mem1 loc to from msg
+        (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
+        (UNCH: unchangable mem0 prom0 loc to from msg)
+    :
+      unchangable mem1 prom1 loc to from msg.
+  Proof.
+    ginduction FUTURE; eauto. i. exploit IHFUTURE; eauto.
+    eapply unchangable_promise; eauto.
+  Qed.
+
+  Lemma reserve_future_memory_future
+        vw sc prom0 mem0 prom1 mem1
+        (LOCAL: Local.wf (Local.mk vw prom0) mem0)
+        (SC: Memory.closed_timemap sc mem0)
+        (MEM: Memory.closed mem0)
+        (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
+    :
+      (<<LOCAL: Local.wf (Local.mk vw prom1) mem1>>) /\
+      (<<SC: Memory.closed_timemap sc mem1>>) /\
+      (<<MEM: Memory.closed mem1>>).
+  Proof.
+    ginduction FUTURE; eauto. i.
+    exploit Local.promise_step_future.
+    { econs.
+      - instantiate (9:=Local.mk vw prom0). eauto.
+      - eauto.
+      - eauto. }
+    all: eauto. i. des. ss. eapply IHFUTURE; eauto.
+  Qed.
+
+  Lemma reserve_future_concrete_same_promise2 prom0 mem0 prom1 mem1 loc from to val released
+        (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
+        (GET: Memory.get loc to prom1 = Some (from, Message.concrete val released))
+    :
+      Memory.get loc to prom0 = Some (from, Message.concrete val released).
+  Proof.
+    ginduction FUTURE; auto. i. apply IHFUTURE in GET; auto.
+    inv HD; des; clarify.
+    - erewrite Memory.add_o in GET; eauto. des_ifs.
+    - erewrite Memory.lower_o in GET; eauto. des_ifs.
+    - erewrite Memory.remove_o in GET; eauto. des_ifs.
+  Qed.
+
+  Lemma reserve_future_read_commute
+        vw0 prom0 mem0 loc to val released ord vw1 prom' prom1 mem1
+        (READ: Local.read_step (Local.mk vw0 prom0) mem0 loc to val released ord (Local.mk vw1 prom'))
+        (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
+    :
+      Local.read_step (Local.mk vw0 prom1) mem1 loc to val released ord (Local.mk vw1 prom1).
+  Proof.
+    inv READ. clarify. econs; eauto.
+    eapply reserve_future_concrete_same; eauto.
+  Qed.
+
+End RESERVEFUTURE.
+
+
+Section SEMICLOSED.
+
+  Definition semi_closed_timemap
+             (tm: TimeMap.t)
+             (mem: Memory.t)
+             (loc: Loc.t)
+             (ts: Time.t): Prop :=
+    forall l,
+      (exists from val released,
+          (<<GET: Memory.get l (tm l) mem = Some (from, Message.concrete val released)>>)) \/
+      (<<EQ: l = loc /\ tm l = ts>>)
+  .
+
+  Lemma closed_timemap_semi_closed tm mem loc ts
+        (CLOSED: Memory.closed_timemap tm mem)
+    :
+      semi_closed_timemap tm mem loc ts.
+  Proof.
+    ii. left. eauto.
+  Qed.
+
+  Lemma semi_closed_timemap_join tm0 tm1 mem loc ts
+        (CLOSED0: semi_closed_timemap tm0 mem loc ts)
+        (CLOSED1: semi_closed_timemap tm1 mem loc ts)
+    :
+      semi_closed_timemap (TimeMap.join tm0 tm1) mem loc ts.
+  Proof.
+    ii. specialize (CLOSED0 l). specialize (CLOSED1 l).
+    unfold TimeMap.join, Time.join. des; des_ifs; eauto.
+  Qed.
+
+  Lemma semi_closed_timemap_singleton mem loc ts
+        (INHABITED: Memory.inhabited mem)
+    :
+      semi_closed_timemap (TimeMap.singleton loc ts) mem loc ts.
+  Proof.
+    ii. unfold TimeMap.singleton.
+    destruct (Loc.eq_dec loc l).
+    - subst. right. split; auto. setoid_rewrite LocFun.add_spec_eq. auto.
+    - left. esplits. setoid_rewrite LocFun.add_spec_neq; eauto.
+  Qed.
+
+  Lemma semi_closed_timemap_add tm mem0 loc from ts val released mem1
+        (CLOSED: semi_closed_timemap tm mem0 loc ts)
+        (ADD: Memory.add mem0 loc from ts (Message.concrete val released) mem1)
+    :
+      Memory.closed_timemap tm mem1.
+  Proof.
+    ii. specialize (CLOSED loc0). des.
+    - esplits. eapply Memory.add_get1 in GET; eauto.
+    - subst. eapply Memory.add_get0 in ADD. des. eauto.
+  Qed.
+
+  Lemma semi_closed_timemap_split tm mem0 loc ts1 ts2 ts3 msg val released mem1
+        (CLOSED: semi_closed_timemap tm mem0 loc ts2)
+        (SPLIT: Memory.split mem0 loc ts1 ts2 ts3 (Message.concrete val released) msg mem1)
+    :
+      Memory.closed_timemap tm mem1.
+  Proof.
+    ii. specialize (CLOSED loc0). des.
+    - eapply Memory.split_get1 in GET; eauto. des. eauto.
+    - subst. eapply Memory.split_get0 in SPLIT. des. eauto.
+  Qed.
+
+  Lemma semi_closed_timemap_lower tm mem0 loc from to msg val released mem1
+        (CLOSED: semi_closed_timemap tm mem0 loc to)
+        (LOWER: Memory.lower mem0 loc from to msg (Message.concrete val released) mem1)
+    :
+      Memory.closed_timemap tm mem1.
+  Proof.
+    ii. specialize (CLOSED loc0). des.
+    - eapply Memory.lower_get1 in GET; eauto. des. inv MSG_LE. eauto.
+    - subst. eapply Memory.lower_get0 in LOWER. des. eauto.
+  Qed.
+
+  Lemma semi_closed_timemap_future tm mem0 loc ts mem1
+        (CLOSED: semi_closed_timemap tm mem0 loc ts)
+        (FUTURE: Memory.future_weak mem0 mem1)
+    :
+      semi_closed_timemap tm mem1 loc ts.
+  Proof.
+    ii. specialize (CLOSED l). des.
+    - eapply Memory.future_weak_get1 in GET; eauto. des.
+      inv MSG_LE. eauto.
+    - subst. eauto.
+  Qed.
+
+  Inductive semi_closed_view (view:View.t) (mem:Memory.t) (loc: Loc.t) (ts: Time.t): Prop :=
+  | semi_closed_view_intro
+      (PLN: semi_closed_timemap view.(View.pln) mem loc ts)
+      (RLX: semi_closed_timemap view.(View.rlx) mem loc ts)
+  .
+  Hint Constructors semi_closed_view.
+
+  Lemma closed_view_semi_closed vw mem loc ts
+        (CLOSED: Memory.closed_view vw mem)
+    :
+      semi_closed_view vw mem loc ts.
+  Proof.
+    inv CLOSED. econs.
+    - eapply closed_timemap_semi_closed; eauto.
+    - eapply closed_timemap_semi_closed; eauto.
+  Qed.
+
+  Lemma semi_closed_view_join vw0 vw1 mem loc ts
+        (CLOSED0: semi_closed_view vw0 mem loc ts)
+        (CLOSED1: semi_closed_view vw1 mem loc ts)
+    :
+      semi_closed_view (View.join vw0 vw1) mem loc ts.
+  Proof.
+    inv CLOSED0. inv CLOSED1. econs.
+    - eapply semi_closed_timemap_join; eauto.
+    - eapply semi_closed_timemap_join; eauto.
+  Qed.
+
+  Lemma semi_closed_view_singleton mem loc ts
+        (INHABITED: Memory.inhabited mem)
+    :
+      semi_closed_view (View.singleton_ur loc ts) mem loc ts.
+  Proof.
+    econs; ss.
+    - eapply semi_closed_timemap_singleton; eauto.
+    - eapply semi_closed_timemap_singleton; eauto.
+  Qed.
+
+  Lemma semi_closed_view_add vw mem0 loc from ts val released mem1
+        (CLOSED: semi_closed_view vw mem0 loc ts)
+        (ADD: Memory.add mem0 loc from ts (Message.concrete val released) mem1)
+    :
+      Memory.closed_view vw mem1.
+  Proof.
+    inv CLOSED. econs.
+    - eapply semi_closed_timemap_add; eauto.
+    - eapply semi_closed_timemap_add; eauto.
+  Qed.
+
+  Lemma semi_closed_view_split vw mem0 loc ts1 ts2 ts3 msg val released mem1
+        (CLOSED: semi_closed_view vw mem0 loc ts2)
+        (SPLIT: Memory.split mem0 loc ts1 ts2 ts3 (Message.concrete val released) msg mem1)
+    :
+      Memory.closed_view vw mem1.
+  Proof.
+    inv CLOSED. econs.
+    - eapply semi_closed_timemap_split; eauto.
+    - eapply semi_closed_timemap_split; eauto.
+  Qed.
+
+  Lemma semi_closed_view_lower vw mem0 loc from to msg val released mem1
+        (CLOSED: semi_closed_view vw mem0 loc to)
+        (LOWER: Memory.lower mem0 loc from to msg (Message.concrete val released) mem1)
+    :
+      Memory.closed_view vw mem1.
+  Proof.
+    inv CLOSED. econs.
+    - eapply semi_closed_timemap_lower; eauto.
+    - eapply semi_closed_timemap_lower; eauto.
+  Qed.
+
+  Lemma semi_closed_view_future vw mem0 loc ts mem1
+        (CLOSED: semi_closed_view vw mem0 loc ts)
+        (FUTURE: Memory.future_weak mem0 mem1)
+    :
+      semi_closed_view vw mem1 loc ts.
+  Proof.
+    inv CLOSED. econs.
+    - eapply semi_closed_timemap_future; eauto.
+    - eapply semi_closed_timemap_future; eauto.
+  Qed.
+
+  Inductive semi_closed_opt_view: forall (view:option View.t) (mem:Memory.t)
+                                         (loc: Loc.t) (ts: Time.t), Prop :=
+  | semi_closed_opt_view_some
+      view mem loc ts
+      (CLOSED: semi_closed_view view mem loc ts):
+      semi_closed_opt_view (Some view) mem loc ts
+  | semi_closed_opt_view_none
+      mem loc ts:
+      semi_closed_opt_view None mem loc ts
+  .
+  Hint Constructors semi_closed_opt_view.
+
+  Lemma closed_opt_view_semi_closed vw mem loc ts
+        (CLOSED: Memory.closed_opt_view vw mem)
+    :
+      semi_closed_opt_view vw mem loc ts.
+  Proof.
+    inv CLOSED; econs.
+    eapply closed_view_semi_closed; eauto.
+  Qed.
+
+  Lemma unwrap_closed_opt_view
+        view mem loc ts
+        (CLOSED: semi_closed_opt_view view mem loc ts)
+        (INHABITED: Memory.inhabited mem):
+    semi_closed_view view.(View.unwrap) mem loc ts.
+  Proof.
+    inv CLOSED; ss.
+    eapply closed_view_semi_closed. apply Memory.closed_view_bot. ss.
+  Qed.
+
+  Lemma semi_closed_opt_view_add vw mem0 loc from ts val released mem1
+        (CLOSED: semi_closed_opt_view vw mem0 loc ts)
+        (ADD: Memory.add mem0 loc from ts (Message.concrete val released) mem1)
+    :
+      Memory.closed_opt_view vw mem1.
+  Proof.
+    inv CLOSED; econs.
+    eapply semi_closed_view_add; eauto.
+  Qed.
+
+  Lemma semi_closed_opt_view_split vw mem0 loc ts1 ts2 ts3 msg val released mem1
+        (CLOSED: semi_closed_opt_view vw mem0 loc ts2)
+        (SPLIT: Memory.split mem0 loc ts1 ts2 ts3 (Message.concrete val released) msg mem1)
+    :
+      Memory.closed_opt_view vw mem1.
+  Proof.
+    inv CLOSED; econs.
+    eapply semi_closed_view_split; eauto.
+  Qed.
+
+  Lemma semi_closed_opt_view_lower vw mem0 loc from to msg val released mem1
+        (CLOSED: semi_closed_opt_view vw mem0 loc to)
+        (LOWER: Memory.lower mem0 loc from to msg (Message.concrete val released) mem1)
+    :
+      Memory.closed_opt_view vw mem1.
+  Proof.
+    inv CLOSED; econs.
+    eapply semi_closed_view_lower; eauto.
+  Qed.
+
+  Lemma semi_closed_opt_view_future vw mem0 loc ts mem1
+        (CLOSED: semi_closed_opt_view vw mem0 loc ts)
+        (FUTURE: Memory.future_weak mem0 mem1)
+    :
+      semi_closed_opt_view vw mem1 loc ts.
+  Proof.
+    inv CLOSED; econs.
+    eapply semi_closed_view_future; eauto.
+  Qed.
+
+  Inductive semi_closed_message: forall (msg:Message.t) (mem:Memory.t)
+                                        (loc: Loc.t) (ts: Time.t), Prop :=
+  | semi_closed_message_concrete
+      val released mem loc ts
+      (CLOSED: semi_closed_opt_view released mem loc ts):
+      semi_closed_message (Message.concrete val released) mem loc ts
+  | semi_closed_message_reserve
+      mem loc ts:
+      semi_closed_message Message.reserve mem loc ts
+  .
+  Hint Constructors semi_closed_message.
+
+  Lemma closed_message_semi_closed msg mem loc ts
+        (CLOSED: Memory.closed_message msg mem)
+    :
+      semi_closed_message msg mem loc ts.
+  Proof.
+    inv CLOSED; econs. eapply closed_opt_view_semi_closed; eauto.
+  Qed.
+
+  Lemma semi_closed_message_add vw mem0 loc from ts val released mem1
+        (CLOSED: semi_closed_message vw mem0 loc ts)
+        (ADD: Memory.add mem0 loc from ts (Message.concrete val released) mem1)
+    :
+      Memory.closed_message vw mem1.
+  Proof.
+    inv CLOSED; econs.
+    eapply semi_closed_opt_view_add; eauto.
+  Qed.
+
+  Lemma semi_closed_message_split vw mem0 loc ts1 ts2 ts3 msg val released mem1
+        (CLOSED: semi_closed_message vw mem0 loc ts2)
+        (SPLIT: Memory.split mem0 loc ts1 ts2 ts3 (Message.concrete val released) msg mem1)
+    :
+      Memory.closed_message vw mem1.
+  Proof.
+    inv CLOSED; econs.
+    eapply semi_closed_opt_view_split; eauto.
+  Qed.
+
+  Lemma semi_closed_message_lower vw mem0 loc from to msg val released mem1
+        (CLOSED: semi_closed_message vw mem0 loc to)
+        (LOWER: Memory.lower mem0 loc from to msg (Message.concrete val released) mem1)
+    :
+      Memory.closed_message vw mem1.
+  Proof.
+    inv CLOSED; econs.
+    eapply semi_closed_opt_view_lower; eauto.
+  Qed.
+
+  Lemma semi_closed_message_future vw mem0 loc ts mem1
+        (CLOSED: semi_closed_message vw mem0 loc ts)
+        (FUTURE: Memory.future_weak mem0 mem1)
+    :
+      semi_closed_message vw mem1 loc ts.
+  Proof.
+    inv CLOSED; econs.
+    eapply semi_closed_opt_view_future; eauto.
+  Qed.
+
+End SEMICLOSED.

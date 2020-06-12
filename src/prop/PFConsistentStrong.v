@@ -29,6 +29,11 @@ Require Import ReorderCancel.
 Require Import MemoryProps.
 Require Import OrderedTimes.
 
+Require Import Mapping.
+Require Import CapFlex.
+Require Import GoodFuture.
+Require Import Cover.
+
 Set Implicit Arguments.
 
 
@@ -213,11 +218,6 @@ Proof.
     * unguard. ss. eauto.
 Qed.
 
-
-Require Import Mapping.
-Require Import CapFlex.
-Require Import GoodFuture.
-Require Import Cover.
 
 Definition pf_consistent_strong_aux lang (e0:Thread.t lang): Prop :=
   forall mem1

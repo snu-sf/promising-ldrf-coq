@@ -27,6 +27,7 @@ Require Import Trace.
 Require Import MemoryProps.
 Require Import Mapping.
 Require Import CapFlex.
+Require Import OrderedTimes.
 
 Require Import LocalDRFDef.
 Require Import LocalDRF_PF.
@@ -38,7 +39,8 @@ Set Implicit Arguments.
 Section MIDDLE.
 
   Variable L: Loc.t -> bool.
-  Variable times: Loc.t -> list Time.t.
+  Variable times: Loc.t -> Time.t -> Prop.
+  Hypothesis WO: forall loc, well_ordered (times loc).
 
   Lemma sim_memory_max_ts_le F extra mem_src mem_tgt
         (MEM: sim_memory L times F extra mem_src mem_tgt)
@@ -223,7 +225,7 @@ Section MIDDLE.
         loc from_tgt to_tgt msg_tgt ts
         (GETTGT: Memory.get loc to_tgt mem_tgt = Some (from_tgt, msg_tgt))
         (TS: Time.lt to_tgt ts)
-        (TIMES: List.In ts (times loc))
+        (TIMES: times loc ts)
         (EMPTY: forall t (TS0: Time.lt to_tgt t) (TS1: Time.le t ts),
             Memory.get loc t mem_tgt = None)
     :
@@ -473,7 +475,7 @@ Section MIDDLE.
                                loc ts (Cell.get ts cell_src) (Cell.get ts cell_tgt))
         (MEMWF: forall to from msg
                        (GET: Cell.get to cell_tgt = Some (from, msg)),
-            (<<FROM: List.In from (times loc)>>) /\ (<<TO: List.In to (times loc)>>))
+            (<<FROM: times loc from>>) /\ (<<TO: times loc to>>))
         (WF: forall loc from ts (EXTRA: extra loc ts from),
             (<<FORGET: F loc from>>) /\
             (<<LB: lb_time (times loc) from ts>>) /\

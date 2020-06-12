@@ -26,6 +26,7 @@ Require Import Trace.
 Require Import JoinedView.
 
 Require Import MemoryProps.
+Require Import OrderedTimes.
 
 Require Import LocalDRFDef.
 
@@ -41,59 +42,6 @@ Notation "p \\3// q" :=
   (fun x0 x1 x2 => __guard__(p x0 x1 x2 \/ q x0 x1 x2))
     (at level 50, no associativity).
 
-Definition lb_time (l: list Time.t) (ts ts': Time.t) :=
-  forall t (IN: List.In t l) (LT: Time.lt ts t),
-    Time.lt ts' t.
-
-Lemma eq_lb_time l ts
-  :
-    lb_time l ts ts.
-Proof.
-  ii. auto.
-Qed.
-
-Lemma lb_time_exists l ts
-  :
-    exists ts', <<TS: Time.lt ts ts'>> /\ <<LB: lb_time l ts ts'>>.
-Proof.
-  induction l.
-  { exists (Time.incr ts). econs; ss.
-    eapply Time.incr_spec. }
-  { des. destruct (Time.le_lt_dec a ts').
-    { destruct (Time.le_lt_dec a ts).
-      { exists ts'. split; ss. ii. ss. des.
-        { subst. exfalso. eapply Time.lt_strorder.
-          eapply (@TimeFacts.le_lt_lt t ts); eauto. }
-        { eauto. }
-      }
-      { exists (Time.middle ts a). split; ss.
-        { eapply Time.middle_spec; eauto. }
-        { ii. ss. des.
-          { subst. eapply Time.middle_spec; eauto. }
-          { exploit LB; eauto. i.
-            transitivity ts'; eauto.
-            eapply TimeFacts.lt_le_lt; eauto.
-            eapply Time.middle_spec; eauto. }
-        }
-      }
-    }
-    { exists ts'. split; ss. ii. ss. des.
-      { subst. auto. }
-      { eapply LB; eauto. }
-    }
-  }
-Qed.
-
-Lemma lb_time_lower l ts ts'0 ts'1
-      (LB: lb_time l ts ts'0)
-      (TS: Time.le ts'1 ts'0)
-  :
-    lb_time l ts ts'1.
-Proof.
-  ii. exploit LB; eauto.
-  i. eapply TimeFacts.le_lt_lt; eauto.
-Qed.
-
 
 Inductive all_promises (proms: Ident.t -> Loc.t -> Time.t -> Prop): Loc.t -> Time.t -> Prop :=
 | all_promises_intro
@@ -103,33 +51,6 @@ Inductive all_promises (proms: Ident.t -> Loc.t -> Time.t -> Prop): Loc.t -> Tim
     all_promises proms loc ts
 .
 Hint Constructors all_promises.
-
-Lemma reserve_future_memory_unch
-      prom0 mem0 prom1 mem1
-      (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
-      loc to from msg
-      (GETMEM: Memory.get loc to mem0 = Some (from, msg))
-      (GETPROM: Memory.get loc to prom0 = None)
-  :
-    (<<GETMEM: Memory.get loc to mem1 = Some (from, msg)>>) /\
-    (<<GETPROM: Memory.get loc to prom1 = None>>).
-Proof.
-  ginduction FUTURE; eauto. i. inv HD; clarify.
-  { eapply IHFUTURE; eauto.
-    - erewrite Memory.add_o; eauto. des_ifs.
-      ss. des; clarify.
-      eapply Memory.add_get0 in MEM. des. clarify.
-    - erewrite Memory.add_o; eauto. des_ifs.
-      ss. des; clarify.
-      eapply Memory.add_get0 in MEM. des. clarify. }
-  { apply split_succeed_wf in PROMISES. des. clarify. }
-  { apply lower_succeed_wf in PROMISES. des. clarify. inv MSG_LE. }
-  { eapply IHFUTURE; eauto.
-    - erewrite Memory.remove_o; eauto. des_ifs.
-      ss. des; clarify.
-      eapply Memory.remove_get0 in PROMISES. des. clarify.
-    - erewrite Memory.remove_o; eauto. des_ifs. }
-Qed.
 
 
 Inductive reserving_tevent: forall (e: ThreadEvent.t), Prop :=
@@ -179,60 +100,6 @@ Proof.
   }
 Qed.
 
-Lemma reserve_future_memory_unchangable
-      prom0 mem0 prom1 mem1 loc to from msg
-      (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
-      (UNCH: unchangable mem0 prom0 loc to from msg)
-  :
-    unchangable mem1 prom1 loc to from msg.
-Proof.
-  ginduction FUTURE; eauto. i. exploit IHFUTURE; eauto.
-  eapply unchangable_promise; eauto.
-Qed.
-
-Lemma reserve_future_memory_future
-      vw sc prom0 mem0 prom1 mem1
-      (LOCAL: Local.wf (Local.mk vw prom0) mem0)
-      (SC: Memory.closed_timemap sc mem0)
-      (MEM: Memory.closed mem0)
-      (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
-  :
-    (<<LOCAL: Local.wf (Local.mk vw prom1) mem1>>) /\
-    (<<SC: Memory.closed_timemap sc mem1>>) /\
-    (<<MEM: Memory.closed mem1>>).
-Proof.
-  ginduction FUTURE; eauto. i.
-  exploit Local.promise_step_future.
-  { econs.
-    - instantiate (9:=Local.mk vw prom0). eauto.
-    - eauto.
-    - eauto. }
-  all: eauto. i. des. ss. eapply IHFUTURE; eauto.
-Qed.
-
-Lemma reserve_future_concrete_same_promise2 prom0 mem0 prom1 mem1 loc from to val released
-      (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
-      (GET: Memory.get loc to prom1 = Some (from, Message.concrete val released))
-  :
-    Memory.get loc to prom0 = Some (from, Message.concrete val released).
-Proof.
-  ginduction FUTURE; auto. i. apply IHFUTURE in GET; auto.
-  inv HD; des; clarify.
-  - erewrite Memory.add_o in GET; eauto. des_ifs.
-  - erewrite Memory.lower_o in GET; eauto. des_ifs.
-  - erewrite Memory.remove_o in GET; eauto. des_ifs.
-Qed.
-
-Lemma reserve_future_read_commute
-      vw0 prom0 mem0 loc to val released ord vw1 prom' prom1 mem1
-      (READ: Local.read_step (Local.mk vw0 prom0) mem0 loc to val released ord (Local.mk vw1 prom'))
-      (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
-  :
-    Local.read_step (Local.mk vw0 prom1) mem1 loc to val released ord (Local.mk vw1 prom1).
-Proof.
-  inv READ. clarify. econs; eauto.
-  eapply reserve_future_concrete_same; eauto.
-Qed.
 
 Lemma joined_view_semi_closed
       views view mem loc ts
@@ -248,31 +115,6 @@ Proof.
     eapply List.Forall_forall in VIEW; [|eauto]. ss.
 Qed.
 
-Lemma traces_steps_future
-      lang tr e1 e2
-      (STEPS: @Trace.steps lang tr e1 e2)
-      (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
-      (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-      (CLOSED1: Memory.closed e1.(Thread.memory)):
-  (<<WF2: Local.wf e2.(Thread.local) e2.(Thread.memory)>>) /\
-  (<<SC2: Memory.closed_timemap e2.(Thread.sc) e2.(Thread.memory)>>) /\
-  (<<CLOSED2: Memory.closed e2.(Thread.memory)>>) /\
-  (<<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>>) /\
-  (<<SC_FUTURE: TimeMap.le e1.(Thread.sc) e2.(Thread.sc)>>) /\
-  (<<MEM_FUTURE: Memory.future e1.(Thread.memory) e2.(Thread.memory)>>)
-.
-Proof.
-  ginduction STEPS.
-  - i. splits; auto.
-    + refl.
-    + refl.
-  - i. exploit Thread.step_future; eauto. i. des.
-    exploit IHSTEPS; eauto. i. des. splits; auto.
-    + etrans; eauto.
-    + etrans; eauto.
-    + etrans; eauto.
-Qed.
-
 
 
 
@@ -280,8 +122,8 @@ Qed.
 Section SIM.
 
   Variable L: Loc.t -> bool.
-  Variable times: Loc.t -> list Time.t.
-
+  Variable times: Loc.t -> Time.t -> Prop.
+  Hypothesis WO: forall loc, well_ordered (times loc).
 
   (* sim trace *)
 
@@ -947,7 +789,9 @@ Section SIM.
     exploit sim_promise_weak_list_exists; eauto. i. des.
     clear PROM. ginduction l.
     { i. exists prom_src, mem_src. splits; auto.
-      eapply sim_promise_list_nil; eauto. }
+      { econs; eauto. }
+      { eapply sim_promise_list_nil; eauto. }
+    }
     i. destruct a as [loc ts].
 
     cut (sim_promise_content_strong (self loc ts) (extra_self loc ts)
@@ -965,6 +809,7 @@ Section SIM.
                 | [H:?A \/ ?B |- _ ] => cut B
                 end.
       { clear H. i. des. exploit IHl.
+        { eauto. }
         { eapply MEM0. }
         { eauto. }
         { eapply reserve_future_memory_le; eauto. }
@@ -975,6 +820,7 @@ Section SIM.
         i. des. exists prom_src'0, mem_src'0. splits; eauto.
         eapply reserve_future_memory_trans; eauto. }
       { des; eauto. exists prom_src, mem_src. splits; auto.
+        { econs; eauto. }
         econs; [|apply SIM|apply SIM]. ii.
         set (PROM:=SIM.(sim_promise_list_contents) loc0 ts0).
         ss. des; clarify; auto. }
@@ -1036,6 +882,7 @@ Section SIM.
         assert (ADD: Memory.promise prom_src' mem_src' loc from_src' ts Message.reserve prom_src'' mem_src'' Memory.op_kind_add).
         { econs; eauto. i. clarify. }
         right. exists prom_src'', mem_src''. splits; eauto.
+        { econs; eauto. econs; eauto. econs; eauto. }
         { econs; [|apply MEM]. i.
           erewrite (@Memory.add_o mem_src''); eauto.
           erewrite (@Memory.remove_o mem_src'); eauto. des_ifs.
@@ -1085,6 +932,7 @@ Section SIM.
         assert (ADD: Memory.promise prom_src' mem_src' loc from_tgt ts Message.reserve prom_src'' mem_src'' Memory.op_kind_add).
         { econs; eauto. i. clarify. }
         right. exists prom_src'', mem_src''. splits; eauto.
+        { econs; eauto. econs; eauto. econs; eauto. }
         { econs; [|apply MEM]. i.
           erewrite (@Memory.add_o mem_src''); eauto.
           erewrite (@Memory.remove_o mem_src'); eauto. des_ifs.
@@ -1162,6 +1010,7 @@ Section SIM.
         assert (ADD: Memory.promise prom_src' mem_src' loc from_src' ts Message.reserve prom_src'' mem_src'' Memory.op_kind_add).
         { econs; eauto. i. clarify. }
         right. exists prom_src'', mem_src''. splits; eauto.
+        { econs; eauto. econs; eauto. econs; eauto. }
         { econs; [|apply MEM]. i.
           erewrite (@Memory.add_o mem_src''); eauto.
           erewrite (@Memory.remove_o mem_src'); eauto. des_ifs.
@@ -1211,6 +1060,7 @@ Section SIM.
         assert (ADD: Memory.promise prom_src' mem_src' loc from_tgt ts Message.reserve prom_src'' mem_src'' Memory.op_kind_add).
         { econs; eauto. i. clarify. }
         right. exists prom_src'', mem_src''. splits; eauto.
+        { econs; eauto. econs; eauto. econs; eauto. }
         { econs; [|apply MEM]. i.
           erewrite (@Memory.add_o mem_src''); eauto.
           erewrite (@Memory.remove_o mem_src'); eauto. des_ifs.
@@ -1770,7 +1620,7 @@ Section SIM.
       { eapply GETPROMNONE. } i. des.
 
       destruct msg_tgt as [val released|].
-      { hexploit (@lb_time_exists (times loc) to). i. des.
+      { hexploit (@lb_time_exists (times loc) (@WO loc) to). i. des.
         hexploit (@Memory.add_exists mem_src0 loc to ts' Message.reserve); eauto.
         { i. erewrite Memory.add_o in GET2; eauto. des_ifs.
           { ss. des; subst. ii. inv LHS. inv RHS. ss. timetac. }
@@ -1853,6 +1703,7 @@ Section SIM.
         (fun l t => if (loc_ts_eq_dec (l, t) (loc, ts'))
                     then (eq to)
                     else extra_self l t). splits; eauto.
+        { econs; eauto. econs; eauto. econs; eauto. }
         { econs.
           { i. erewrite (@Memory.add_o mem_src1); eauto.
             erewrite (@Memory.add_o mem_src0); eauto.
@@ -1909,6 +1760,7 @@ Section SIM.
       }
 
       exists prom_src0, mem_src0, self, extra_self. splits; eauto.
+      { econs; eauto. econs; eauto. }
       { econs.
         { i. erewrite (@Memory.add_o mem_src0); eauto.
           erewrite (@Memory.add_o mem_tgt'); eauto. des_ifs.
@@ -2011,7 +1863,7 @@ Section SIM.
       exists prom_src2, mem_src2,
       (fun loc' ts' => if loc_ts_eq_dec (loc', ts') (loc, to)
                        then True else self loc' ts'), extra_self. splits; auto.
-      { eauto. }
+      { econs; eauto. econs; eauto. econs; eauto. econs; eauto. }
       { econs.
         { i. erewrite (@Memory.split_o mem_tgt'); eauto.
           erewrite (@Memory.add_o mem_src2); eauto.
@@ -2093,6 +1945,7 @@ Section SIM.
       rewrite GETMEMSRC in MEM1. rewrite GETMEMTGT in MEM1. inv MEM1. clear PROM.
 
       exists prom_src, mem_src, self, extra_self. splits; auto.
+      { econs. }
       { econs.
         { i. erewrite (@Memory.lower_o mem_tgt'); eauto. des_ifs.
           { ss. des; subst. rewrite GETMEMSRC. econs; eauto. right. auto. }
@@ -2136,7 +1989,7 @@ Section SIM.
         assert (exists ts', (<<LB: lb_time (times loc) from ts'>>) /\
                             (<<TS0: Time.lt from ts'>>) /\
                             (<<TS1: Time.lt ts' to>>)).
-        { hexploit (lb_time_exists (times loc) from). i. des.
+        { hexploit (@lb_time_exists (times loc) (@WO loc) from). i. des.
           destruct (Time.le_lt_dec ts' (Time.middle from to)).
           { exists ts'. splits; auto.
             eapply TimeFacts.le_lt_lt; eauto. eapply Time.middle_spec; eauto. }
@@ -2190,6 +2043,7 @@ Section SIM.
         (fun l t => if (loc_ts_eq_dec (l, t) (loc, ts'))
                     then (eq from)
                     else extra_self l t). splits; eauto.
+        { econs; eauto. econs; eauto. econs; eauto. }
         { econs.
           { i. erewrite (@Memory.remove_o mem_tgt'); eauto.
             erewrite (@Memory.add_o mem_src1); eauto.
@@ -2245,6 +2099,7 @@ Section SIM.
         }
       }
       { exists prom_src0, mem_src0, self, extra_self. splits; eauto.
+        { econs; eauto. econs; eauto. }
         { econs.
           { i. erewrite (@Memory.remove_o mem_tgt'); eauto.
             erewrite (@Memory.remove_o mem_src0); eauto. des_ifs.
@@ -2432,6 +2287,8 @@ Section SIM.
       (fun loc' ts' => if loc_ts_eq_dec (loc', ts') (loc, to0)
                        then (fun _ => False) else extra_self loc' ts').
       splits; eauto.
+      { econs; eauto. econs; eauto. econs; eauto. }
+      { econs. }
       { econs.
         { i. erewrite (@Memory.add_o mem_src1); eauto.
           erewrite (@Memory.remove_o mem_src0); eauto.
@@ -2538,6 +2395,8 @@ Section SIM.
       (fun loc' ts' => if loc_ts_eq_dec (loc', ts') (loc, to)
                        then False else self loc' ts'), extra_self.
       splits; eauto.
+      { econs; eauto. econs; eauto. econs; eauto. }
+      { econs; eauto. econs; eauto. }
       { econs.
         { i. erewrite (@Memory.add_o mem_src2); eauto.
           erewrite (@Memory.add_o mem_src1); eauto.
@@ -3082,7 +2941,7 @@ Section SIM.
   .
   Proof.
     hexploit sim_thread_step_silent'; eauto. i. des. esplits; eauto.
-    exploit traces_steps_future; eauto. i. des. ss.
+    exploit Trace.steps_future; eauto. i. des. ss.
     inv STEPTGT. ss.
     i. destruct (classic (views' loc ts = views loc ts)).
     { rewrite H.

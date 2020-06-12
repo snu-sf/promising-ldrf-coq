@@ -44,6 +44,31 @@ Module Trace.
   .
   Hint Constructors steps.
 
+  Lemma steps_future
+        lang tr e1 e2
+        (STEPS: @steps lang tr e1 e2)
+        (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+        (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+        (CLOSED1: Memory.closed e1.(Thread.memory)):
+    (<<WF2: Local.wf e2.(Thread.local) e2.(Thread.memory)>>) /\
+    (<<SC2: Memory.closed_timemap e2.(Thread.sc) e2.(Thread.memory)>>) /\
+    (<<CLOSED2: Memory.closed e2.(Thread.memory)>>) /\
+    (<<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>>) /\
+    (<<SC_FUTURE: TimeMap.le e1.(Thread.sc) e2.(Thread.sc)>>) /\
+    (<<MEM_FUTURE: Memory.future e1.(Thread.memory) e2.(Thread.memory)>>)
+  .
+  Proof.
+    ginduction STEPS.
+    - i. splits; auto.
+      + refl.
+      + refl.
+    - i. exploit Thread.step_future; eauto. i. des.
+      exploit IHSTEPS; eauto. i. des. splits; auto.
+      + etrans; eauto.
+      + etrans; eauto.
+      + etrans; eauto.
+  Qed.
+
   Lemma silent_steps_tau_steps lang tr (th0 th1: Thread.t lang)
         (STEPS: steps tr th0 th1)
         (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr)
