@@ -324,6 +324,29 @@ Section CAPFLEX.
     }
   Qed.
 
+  Record cap_flex_map_loc (max tm0 tm1: Time.t)
+         (times: list Time.t)
+         (f: Time.t -> Time.t -> Prop): Prop :=
+    {
+      cap_flex_map_loc_map_lt:
+        mapping_map_lt_loc f;
+      cap_flex_map_loc_map_bot:
+        f Time.bot Time.bot;
+      cap_flex_map_loc_ident:
+        forall ts (TS: Time.le ts max),
+          f ts ts;
+      cap_flex_map_loc_max:
+        exists fts,
+          (<<MAP: f tm0 fts>>) /\
+          (<<TS: Time.le tm1 fts>>);
+      cap_flex_map_loc_bound:
+        forall ts fts (TS: Time.lt max ts) (MAP: f ts fts),
+          Time.le tm1 fts;
+      cap_flex_map_loc_complete:
+        forall ts (IN: List.In ts times),
+        exists fts, <<MAP: f ts fts>>;
+    }.
+
   Record cap_flex_map (max tm0 tm1: TimeMap.t)
          (times: Loc.t -> list Time.t)
          (f: Loc.t -> Time.t -> Time.t -> Prop): Prop :=
@@ -340,10 +363,50 @@ Section CAPFLEX.
         exists fts,
           (<<MAP: f loc (tm0 loc) fts>>) /\
           (<<TS: Time.le (tm1 loc) fts>>);
+      cap_flex_map_bound:
+        forall loc ts fts (TS: Time.lt (max loc) ts) (MAP: f loc ts fts),
+          Time.le (tm1 loc) fts;
       cap_flex_map_complete:
         forall loc ts (IN: List.In ts (times loc)),
           mappable_time f loc ts;
     }.
+
+  Lemma cap_flex_map_locwise (max tm0 tm1: TimeMap.t)
+        (times: Loc.t -> list Time.t)
+        (f: Loc.t -> Time.t -> Time.t -> Prop)
+        (LOCWISE: forall loc, cap_flex_map_loc (max loc) (tm0 loc) (tm1 loc) (times loc) (f loc))
+    :
+      cap_flex_map max tm0 tm1 times f.
+  Proof.
+    econs.
+    { eapply mapping_map_lt_locwise.
+      eapply LOCWISE. }
+    { ii. eapply LOCWISE. }
+    { ii. eapply LOCWISE. auto. }
+    { ii. eapply LOCWISE. }
+    { ii. eapply LOCWISE; eauto. }
+    { ii. eapply LOCWISE. auto. }
+  Qed.
+
+  Lemma cap_flex_map_loc_exists max tm0 tm1 times
+        (TM0: Time.lt max tm0)
+        (TM1: Time.lt max tm1)
+    :
+      exists f,
+        (<<MAP: cap_flex_map_loc max tm0 tm1 times f>>).
+  Proof.
+    hexploit (@shift_map_exists
+                max tm1 (Time.incr tm1)
+                (tm0::times)); ss.
+    { left. auto. }
+    { apply Time.incr_spec. }
+    intros [f SPEC]. exists f. des. splits; auto.
+    econs; eauto.
+    { eapply SAME. eapply Time.bot_spec. }
+    { exploit (COMPLETE tm0); auto. i. des. esplits; eauto.
+      eapply BOUND in MAPPED; eauto. left. des. auto. }
+    { i. exploit BOUND; eauto. i. des. left. auto. }
+  Qed.
 
   Lemma cap_flex_map_exists max tm0 tm1 times
         (TM0: forall loc, Time.lt (max loc) (tm0 loc))
@@ -352,37 +415,12 @@ Section CAPFLEX.
       exists f,
         (<<MAP: cap_flex_map max tm0 tm1 times f>>).
   Proof.
-    hexploit (@choice
-                Loc.t (Time.t -> Time.t -> Prop)
-                (fun loc f =>
-                   (<<MAPLT: mapping_map_lt_loc f>>) /\
-                   (<<IDENT: forall ts (TS: Time.le ts (max loc)),
-                       f ts ts>>) /\
-                   (<<MAX: exists fts,
-                       (<<MAP: f (tm0 loc) fts>>) /\
-                       (<<TS: Time.le (tm1 loc) fts>>)>>)/\
-                   (<<COMPLETE: forall ts (IN: List.In ts (times loc)),
-                       exists fts, (<<MAP: f ts fts>>)>>))).
-    { intros loc.
-      hexploit (@shift_map_exists
-                  (max loc) (tm1 loc) (Time.incr (tm1 loc))
-                  ((tm0 loc)::times loc)); ss.
-      { left. auto. }
-      { apply Time.incr_spec. }
-      intros [f SPEC]. exists f. des. splits; auto.
-      { hexploit (COMPLETE (tm0 loc)); eauto. i. des. esplits; eauto.
-        eapply BOUND in MAPPED; eauto. left. des. auto. }
-      { i. hexploit (COMPLETE ts); eauto. }
-    }
-    intros [f SPEC]. exists f. econs.
-    { eapply mapping_map_lt_locwise.
-      i. specialize (SPEC loc). des. auto. }
-    { ii. specialize (SPEC loc). des.
-      eapply IDENT. eapply Time.bot_spec. }
-    { i. specialize (SPEC loc). des. auto. }
-    { i. specialize (SPEC loc). des. eauto. }
-    { i. specialize (SPEC loc). des.
-      exploit COMPLETE; eauto. }
+    hexploit (@choice Loc.t (Time.t -> Time.t -> Prop)
+                      (fun loc f =>
+                         cap_flex_map_loc (max loc) (tm0 loc) (tm1 loc) (times loc) f)).
+    { i. eapply cap_flex_map_loc_exists; eauto. }
+    intros [f SPEC]. exists f.
+    eapply cap_flex_map_locwise; eauto.
   Qed.
 
   Lemma concrete_messages_le_cap_flex_memory_map
