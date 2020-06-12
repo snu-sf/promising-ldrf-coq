@@ -219,6 +219,110 @@ Require Import CapFlex.
 Require Import GoodFuture.
 Require Import Cover.
 
+Lemma no_read_msgs_sum L0 L1 L2
+      e
+      (NOTIN0: no_read_msgs L0 e)
+      (NOTIN1: no_read_msgs L1 e)
+      (LE: L2 <2= (L0 \2/ L1))
+  :
+    no_read_msgs L2 e.
+Proof.
+  unfold no_read_msgs in *. des_ifs.
+  - ii. eapply LE in H. des; auto.
+  - ii. eapply LE in H. des; auto.
+Qed.
+
+Lemma ident_map_no_read_msgs MSGS te fte
+      (MAP: tevent_map ident_map fte te)
+      (NOREAD: no_read_msgs MSGS te)
+  :
+    no_read_msgs MSGS fte.
+Proof.
+  inv MAP; auto.
+  { inv TO. ss. }
+  { inv FROM. ss. }
+Qed.
+
+Inductive unreadable (mem prom: Memory.t) (l: Loc.t) (t: Time.t): Prop :=
+| unreadable_intro
+    (UNWRITABLE: unwritable mem prom l t)
+    (NOTCONCRETE: forall
+        from val released
+        (GET: Memory.get l t mem = Some (from, Message.concrete val released)), False)
+.
+
+Lemma unreadable_increase pf e lang (th0 th1: Thread.t lang)
+      (STEP: Thread.step pf e th0 th1)
+  :
+    unreadable th0.(Thread.memory) th0.(Thread.local).(Local.promises) <2=
+    unreadable th1.(Thread.memory) th1.(Thread.local).(Local.promises).
+Proof.
+  ii. inv PR. inv UNWRITABLE.
+  dup UNCH. eapply unchangable_increase in UNCH; eauto. split.
+  { econs; eauto. }
+  { ii. inv UNCH. exploit Memory.get_disjoint.
+    { eapply GET. }
+    { eapply GET0. }
+    i. des.
+    { subst. eapply NOTCONCRETE; eauto.
+      inv UNCH0. eauto. }
+    { eapply x2; eauto. econs; ss; [|refl].
+      eapply memory_get_ts_strong in GET. des; auto.
+      subst. inv ITV. ss. inv FROM. }
+  }
+Qed.
+
+Lemma rtc_unreadable_increase lang (th0 th1: Thread.t lang)
+      (STEP: rtc (Thread.tau_step (lang:=lang)) th0 th1)
+  :
+    unreadable th0.(Thread.memory) th0.(Thread.local).(Local.promises) <2=
+    unreadable th1.(Thread.memory) th1.(Thread.local).(Local.promises).
+Proof.
+  induction STEP; eauto.
+  i. inv H. inv TSTEP. eapply IHSTEP. eapply unreadable_increase; eauto.
+Qed.
+
+Lemma step_no_read_unreadable lang (th_tgt th_tgt': Thread.t lang) e_tgt pf
+      (STEP: Thread.step pf e_tgt th_tgt th_tgt')
+  :
+    no_read_msgs (unreadable th_tgt.(Thread.memory) th_tgt.(Thread.local).(Local.promises))
+                 e_tgt.
+Proof.
+  inv STEP.
+  - inv STEP0; ss.
+  - inv STEP0; ss. inv LOCAL; ss.
+    + ii. inv H. inv LOCAL0. eapply NOTCONCRETE; eauto.
+    + ii. inv H. inv LOCAL1. eapply NOTCONCRETE; eauto.
+Qed.
+
+Lemma steps_no_read_unreadable P lang (th_tgt th_tgt': Thread.t lang)
+      (STEP: rtc (tau (@pred_step P lang)) th_tgt th_tgt')
+  :
+    rtc (tau (@pred_step (P /1\ no_read_msgs (unreadable th_tgt.(Thread.memory) th_tgt.(Thread.local).(Local.promises))) lang)) th_tgt th_tgt'.
+Proof.
+  ginduction STEP.
+  - i. refl.
+  - i. inv H. inv TSTEP. econs 2.
+    + econs; eauto. econs; eauto.
+      split; auto. inv STEP0. eapply step_no_read_unreadable; eauto.
+    + inv STEP0. eapply pred_step_rtc_mon; eauto.
+      i. ss. des. split; auto. eapply no_read_msgs_mon; eauto.
+      i. eapply unreadable_increase; eauto.
+Qed.
+
+Lemma no_read_unreadable_traced lang (th0 th1: Thread.t lang) tr
+      (STEPS: traced_step tr th0 th1)
+  :
+    List.Forall (fun em => (no_read_msgs (unreadable th0.(Thread.memory) th0.(Thread.local).(Local.promises))) (fst em)) tr.
+Proof.
+  ginduction STEPS.
+  - econs.
+  - subst. inv HD. econs.
+    + ss. eapply step_no_read_unreadable in STEP; eauto.
+    + eapply List.Forall_impl; eauto. i. ss.
+      eapply no_read_msgs_mon; eauto.
+      i. eapply unreadable_increase; eauto.
+Qed.
 
 Definition pf_consistent_strong_aux lang (e0:Thread.t lang): Prop :=
   forall mem1
@@ -263,8 +367,6 @@ Proof.
   i. des; eauto. erewrite PROMISES in *.
   erewrite Memory.bot_get in *. clarify.
 Qed.
-
-
 
 Definition certification_times (times : Loc.t -> list Time.t)
            (f: Loc.t -> nat -> (Time.t -> Time.t -> Prop))
