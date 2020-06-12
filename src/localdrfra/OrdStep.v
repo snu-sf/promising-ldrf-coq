@@ -20,6 +20,7 @@ Require Import Memory.
 Require Import TView.
 Require Import Local.
 Require Import Thread.
+Require Import Configuration.
 
 Set Implicit Arguments.
 
@@ -223,6 +224,42 @@ Module OrdThread.
     .
     Hint Constructors step.
 
+    Inductive step_allpf (e: ThreadEvent.t) (e1 e2: Thread.t lang): Prop :=
+    | step_nopf_intro
+        pf
+        (STEP: step pf e e1 e2)
+    .
+    Hint Constructors step_allpf.
+
+    Lemma allpf pf: step pf <3= step_allpf.
+    Proof.
+      i. econs. eauto.
+    Qed.
+
+    Definition pf_tau_step := tau (step true).
+    Hint Unfold pf_tau_step.
+
+    Definition tau_step := tau step_allpf.
+    Hint Unfold tau_step.
+
+    Definition all_step := union step_allpf.
+    Hint Unfold all_step.
+
+    Definition steps_failure (e1: Thread.t lang): Prop :=
+      exists e2 e3,
+        <<STEPS: rtc tau_step e1 e2>> /\
+        <<FAILURE: step true ThreadEvent.failure e2 e3>>.
+    Hint Unfold steps_failure.
+
+    Definition consistent (e: Thread.t lang): Prop :=
+      forall mem1 sc1
+        (CAP: Memory.cap e.(Thread.memory) mem1)
+        (SC_MAX: Memory.max_concrete_timemap mem1 sc1),
+        <<FAILURE: steps_failure (Thread.mk lang e.(Thread.state) e.(Thread.local) sc1 mem1)>> \/
+        exists e2,
+          <<STEPS: rtc tau_step (Thread.mk lang e.(Thread.state) e.(Thread.local) sc1 mem1) e2>> /\
+          <<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>.
+
 
     Lemma program_step_future
           e e1 e2
@@ -259,3 +296,28 @@ Module OrdThread.
     Qed.
   End OrdThread.
 End OrdThread.
+
+
+Module OrdConfiguration.
+  Section OrdConfiguration.
+    Variable L: Loc.t -> bool.
+    Variable ordc: Ordering.t.
+
+    Inductive step: forall (e: MachineEvent.t) (tid: Ident.t) (c1 c2: Configuration.t), Prop :=
+    | step_failure
+        pf tid c1 lang st1 lc1 e2 st3 lc3 sc3 memory3
+        (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
+        (STEPS: rtc (@Thread.tau_step _) (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
+        (STEP: OrdThread.step L ordc pf ThreadEvent.failure e2 (Thread.mk _ st3 lc3 sc3 memory3)):
+        step MachineEvent.failure tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
+    | step_normal
+        pf e tid c1 lang st1 lc1 e2 st3 lc3 sc3 memory3
+        (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
+        (STEPS: rtc (@Thread.tau_step _) (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
+        (STEP: OrdThread.step L ordc pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
+        (EVENT: e <> ThreadEvent.failure)
+        (CONSISTENT: OrdThread.consistent L ordc (Thread.mk lang st3 lc3 sc3 memory3)):
+        step (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
+    .
+  End OrdConfiguration.
+End OrdConfiguration.

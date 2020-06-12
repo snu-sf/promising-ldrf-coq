@@ -22,17 +22,12 @@ Require Import Local.
 Require Import Thread.
 
 Require Import MemoryMerge.
-Require Import Trace.
 
 Require Import OrdStep.
+Require Import RARace.
 Require Import Stable.
 
 Set Implicit Arguments.
-
-
-Module ReleaseWrites.
-  Definition t: Type := list (Loc.t * Time.t).
-End ReleaseWrites.
 
 
 Module RASimThread.
@@ -82,15 +77,6 @@ Module RASimThread.
         (CUR: tview_src.(TView.cur) = tview_tgt.(TView.cur))
         (ACQ: tview_src.(TView.acq) = tview_tgt.(TView.acq))
     .
-
-    Definition rel_write (e: ThreadEvent.t): option (Loc.t * Time.t) :=
-      match e with
-      | ThreadEvent.write loc from to val released ord =>
-        if Ordering.le Ordering.acqrel ord then Some (loc, to) else None
-      | ThreadEvent.update loc tsr to valr valw releasedr releasedw ordr ordw =>
-        if Ordering.le Ordering.acqrel ordw then Some (loc, to) else None
-      | _ => None
-      end.
 
     Inductive sim_local (rels: ReleaseWrites.t) (lc_src lc_tgt: Local.t): Prop :=
     | sim_local_intro
@@ -355,15 +341,6 @@ Module RASimThread.
     Qed.
 
 
-    (* race condition *)
-
-    Definition ra_race (rels: ReleaseWrites.t) (tview: TView.t) (loc: Loc.t) (to: Time.t) (ordr: Ordering.t): Prop :=
-      <<LOC: L loc>> /\
-      <<HIGHER: Time.lt (tview.(TView.cur).(View.rlx) loc) to>> /\
-      (<<ORDW: ~ List.In (loc, to) rels>> \/
-       <<ORDR: Ordering.le ordr Ordering.strong_relaxed>>).
-
-
     (* step *)
 
     Lemma promise
@@ -550,7 +527,7 @@ Module RASimThread.
             <<RELEASED: released_src = released_tgt \/
                         (View.opt_le released_src (Some lc2_src.(Local.tview).(TView.cur)) /\
                          View.opt_le released_tgt (Some lc2_tgt.(Local.tview).(TView.cur)))>> \/
-            <<RACE: ra_race rels lc1_src.(Local.tview) loc to ord>>).
+            <<RACE: RARace.ra_race L rels lc1_src.(Local.tview) loc to ord>>).
     Proof.
       inv LC1. inv TVIEW. inv MEM1. inv STEP_TGT.
       exploit COMPLETE; eauto. i. des. inv MSG. clear RELEASED.
@@ -581,11 +558,11 @@ Module RASimThread.
       }
       destruct (classic (List.In (loc, to) rels)); cycle 1.
       { (* non release write *)
-        right. unfold ra_race. auto.
+        right. unfold RARace.ra_race. auto.
       }
       destruct (Ordering.le ord Ordering.strong_relaxed) eqn:ORDR.
       { (* non acquire read *)
-        right. unfold ra_race. auto.
+        right. unfold RARace.ra_race. auto.
       }
 
       (* RA synchronized *)
@@ -1103,7 +1080,7 @@ Module RASimThread.
                 <<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>>) \/
             <<RACE: exists loc to val released ord,
               ThreadEvent.is_reading e_src = Some (loc, to, val, released, ord) /\
-              ra_race rels e1_src.(Thread.local).(Local.tview) loc to ord>>).
+              RARace.ra_race L rels e1_src.(Thread.local).(Local.tview) loc to ord>>).
     Proof.
       destruct e1_src as [st1_src lc1_src sc1_src mem1_src].
       destruct e1_tgt as [st1_tgt lc1_tgt sc1_tgt mem1_tgt].
