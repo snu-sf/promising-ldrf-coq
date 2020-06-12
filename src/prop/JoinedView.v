@@ -719,6 +719,98 @@ End JConfiguration.
 
 Module JSim.
 
+  Inductive sim_op_kind: forall (kind_src kind_tgt: Memory.op_kind), Prop :=
+  | sim_op_kind_add
+    :
+      sim_op_kind Memory.op_kind_add Memory.op_kind_add
+  | sim_op_kind_split
+      ts msg_src msg_tgt
+      (MSG: sim_message msg_src msg_tgt)
+    :
+      sim_op_kind (Memory.op_kind_split ts msg_src) (Memory.op_kind_split ts msg_tgt)
+  | sim_op_kind_lower
+      msg_src msg_tgt
+      (MSG: sim_message msg_src msg_tgt)
+    :
+      sim_op_kind (Memory.op_kind_lower msg_src) (Memory.op_kind_lower msg_tgt)
+  | sim_op_kind_cancel
+    :
+      sim_op_kind Memory.op_kind_cancel Memory.op_kind_cancel
+  .
+  Hint Constructors sim_op_kind.
+
+  Inductive sim_event: forall (e_src e_tgt: ThreadEvent.t), Prop :=
+  | sim_event_promise
+      loc from to msg_src msg_tgt kind_src kind_tgt
+      (MSG: sim_message msg_src msg_tgt)
+      (KIND: sim_op_kind kind_src kind_tgt)
+    :
+      sim_event
+        (ThreadEvent.promise loc from to msg_src kind_src)
+        (ThreadEvent.promise loc from to msg_tgt kind_tgt)
+  | sim_event_silent
+    :
+      sim_event
+        ThreadEvent.silent
+        ThreadEvent.silent
+  | sim_event_read
+      loc ts val released_src released_tgt ord
+      (RELEASED: View.opt_le released_src released_tgt)
+    :
+      sim_event
+        (ThreadEvent.read loc ts val released_src ord)
+        (ThreadEvent.read loc ts val released_tgt ord)
+  | sim_event_write
+      loc from to val released_src released_tgt ord
+      (RELEASED: View.opt_le released_src released_tgt)
+    :
+      sim_event
+        (ThreadEvent.write loc from to val released_src ord)
+        (ThreadEvent.write loc from to val released_tgt ord)
+  | sim_event_update
+      loc tsr tsw valr valw releasedr_src releasedr_tgt releasedw_src releasedw_tgt ordr ordw
+      (RELEASEDR: View.opt_le releasedr_src releasedr_tgt)
+      (RELEASEDW: View.opt_le releasedw_src releasedw_tgt)
+    :
+      sim_event
+        (ThreadEvent.update loc tsr tsw valr valw releasedr_src releasedw_src ordr ordw)
+        (ThreadEvent.update loc tsr tsw valr valw releasedr_tgt releasedw_tgt ordr ordw)
+  | sim_event_fence
+      ordr ordw
+    :
+      sim_event
+        (ThreadEvent.fence ordr ordw)
+        (ThreadEvent.fence ordr ordw)
+  | sim_event_syscall
+      e
+    :
+      sim_event
+        (ThreadEvent.syscall e)
+        (ThreadEvent.syscall e)
+  | sim_event_failure
+    :
+      sim_event
+        ThreadEvent.failure
+        ThreadEvent.failure
+  .
+  Hint Constructors sim_event.
+
+  Lemma sim_event_program_event e_src e_tgt
+        (EVENT: sim_event e_src e_tgt)
+    :
+      ThreadEvent.get_program_event e_src = ThreadEvent.get_program_event e_tgt.
+  Proof.
+    inv EVENT; ss.
+  Qed.
+
+  Lemma sim_event_machine_event e_src e_tgt
+        (EVENT: sim_event e_src e_tgt)
+    :
+      ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt.
+  Proof.
+    inv EVENT; ss.
+  Qed.
+
   Inductive joined_promise_content
             (views: list View.t)
             (loc: Loc.t) (ts: Time.t)
@@ -999,7 +1091,9 @@ Module JSim.
             exists from val released,
               (<<GET: Memory.get loc ts mem2_src = Some (from, Message.concrete val released)>>) /\
               (<<VIEW: views2 loc ts = (View.join (lc2_src.(Local.tview).(TView.rel) loc) (View.singleton_ur loc ts))
-                                         ::(all_join_views (View.singleton_ur loc ts) (views1 loc from))>>)>>)
+                                         ::(all_join_views (View.singleton_ur loc ts) (views1 loc from))>>)>>) /\
+        (<<MSG: sim_message msg_src msg_tgt>>) /\
+        (<<KIND: sim_op_kind kind_src kind_tgt>>)
   .
   Proof.
     inv STEP_TGT. inv PROMISE.
@@ -1116,6 +1210,8 @@ Module JSim.
           - unfold views. esplits; eauto.
             eapply Memory.add_get0; eauto.
         }
+        { econs; eauto. eapply max_le_joined_opt_view_le; eauto. }
+        { eauto. }
       }
 
       (* add reserve *)
@@ -1152,6 +1248,8 @@ Module JSim.
         { ss. ii. erewrite (@Memory.add_o prom2_src) in *; eauto. des_ifs; eauto. }
         { i. clarify. }
         { i. clarify. }
+        { eauto. }
+        { eauto. }
       }
     }
 
@@ -1283,6 +1381,8 @@ Module JSim.
         - unfold views. esplits; eauto.
           eapply Memory.split_get0 in MEM_SRC. des. eauto.
       }
+      { econs; eauto. eapply max_le_joined_opt_view_le; eauto. }
+      { eauto. }
     }
 
     (* lower *)
@@ -1338,6 +1438,8 @@ Module JSim.
         ss. des; clarify. inv RELEASEDLE. eapply REL1; eauto. }
       { i. clarify. eapply max_le_joined_opt_view_joined; eauto. }
       { i. clarify. }
+      { econs; eauto. eapply max_le_joined_opt_view_le; eauto. }
+      { econs; eauto. econs; eauto. eapply max_le_joined_opt_view_le; eauto. }
     }
 
     { hexploit Memory.remove_get0; try apply PROMISES; eauto. i. des.
@@ -1372,6 +1474,8 @@ Module JSim.
       { ss. ii. erewrite (@Memory.remove_o prom2_src) in *; eauto. des_ifs; eauto. }
       { i. clarify. }
       { i. clarify. }
+      { eauto. }
+      { eauto. }
     }
   Qed.
 
@@ -1421,8 +1525,8 @@ Module JSim.
             exists from val released,
               (<<GET: Memory.get loc ts mem2_src = Some (from, Message.concrete val released)>>) /\
               (<<VIEW: views2 loc ts = (View.join (lc2_src.(Local.tview).(TView.rel) loc) (View.singleton_ur loc ts))
-                                         ::(all_join_views (View.singleton_ur loc ts) (views1 loc from))>>)>>)
-
+                                         ::(all_join_views (View.singleton_ur loc ts) (views1 loc from))>>)>>) /\
+        (<<RELEASED: View.opt_le released_src released_tgt>>)
   .
   Proof.
     inv WF1_SRC.
@@ -1639,6 +1743,7 @@ Module JSim.
             setoid_rewrite LocFun.add_spec_eq. condtac.
             { eapply View.join_r. }
             { eapply View.join_r. }
+      - inv SIMMSG. eauto.
     }
 
     {
@@ -1814,6 +1919,7 @@ Module JSim.
             setoid_rewrite LocFun.add_spec_eq. condtac.
             { eapply View.join_r. }
             { eapply View.join_r. }
+      - inv SIMMSG. eauto.
     }
 
     {
@@ -1910,6 +2016,7 @@ Module JSim.
         unguard. des; subst; ss.
         exfalso. eapply Time.lt_strorder. etrans; eauto.
       - i. ss.
+      - inv SIMMSG. eauto.
     }
     { ss. }
   Qed.
@@ -1934,8 +2041,7 @@ Module JSim.
       exists e_src pf_src th1_src views1,
         (<<STEP: JThread.step pf_src e_src th0_src th1_src views0 views1>>) /\
         (<<SIM: sim_thread views1 th1_src th1_tgt>>) /\
-        (<<EVENT: ThreadEvent.get_program_event e_src =
-                  ThreadEvent.get_program_event e_tgt>>)
+        (<<EVENT: sim_event e_src e_tgt>>)
   .
   Proof.
     dup SIM. inv SIM.
@@ -1955,7 +2061,7 @@ Module JSim.
         * eauto.
         * ss.
       + ss.
-      + ss.
+      + eauto.
     - inv STEP0. inv LOCAL0.
       + esplits.
         * econs.
@@ -1979,7 +2085,7 @@ Module JSim.
           { ss. }
           { ss. }
         * ss.
-        * ss.
+        * eauto.
 
       + hexploit sim_local_write; eauto.
         { econs. }
@@ -1993,7 +2099,7 @@ Module JSim.
           { ss. }
           { ss. }
         * ss.
-        * ss.
+        * eauto.
 
       + hexploit sim_local_read; eauto.
         { refl. } i. des.
@@ -2010,7 +2116,7 @@ Module JSim.
           { ss. }
           { ss. }
         * ss.
-        * ss.
+        * eauto.
 
       + hexploit sim_local_fence; eauto.
         { refl. }
@@ -2085,7 +2191,8 @@ Module JSim.
       exploit sim_thread_step; eauto. i. des.
       hexploit JThread.step_future; eauto. i. des.
       exploit IHSTEPS; eauto. i. des. esplits.
-      + econs 2; eauto. destruct e, e_src; ss.
+      + econs 2; eauto. rewrite <- EVENT.
+        eapply sim_event_machine_event; eauto.
       + eauto.
   Qed.
 
@@ -2250,13 +2357,12 @@ Module JSim.
       hexploit JThread.step_future; eauto. ss. i. des.
 
       esplits.
-      + replace MachineEvent.failure with (ThreadEvent.get_machine_event e_src).
-        econs.
+      + ss. eapply sim_event_machine_event in EVENT. ss.
+        erewrite <- EVENT. econs.
         * eauto.
         * eapply STEPS0.
         * eauto.
         * i. destruct e_src; ss.
-        * destruct e_src; ss.
       + econs; eauto. i. ss.
         erewrite IdentMap.gsspec. erewrite IdentMap.gsspec. des_ifs.
         specialize (THS0 tid0). unfold option_rel in *. des_ifs.
@@ -2289,7 +2395,8 @@ Module JSim.
       hexploit JThread.step_future; eauto. ss. i. des.
 
       esplits.
-      + erewrite <- ThreadEvent.eq_program_event_eq_machine_event; eauto. econs.
+      + ss. eapply sim_event_machine_event in EVENT0. ss.
+        erewrite <- EVENT0. econs.
         * eauto.
         * eapply STEPS0.
         * eauto.
