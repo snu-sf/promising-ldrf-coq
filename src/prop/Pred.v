@@ -191,6 +191,19 @@ Section Pred.
     - ii. eapply NOTIN; eauto.
   Qed.
 
+  Lemma no_read_msgs_sum L0 L1 L2
+        e
+        (NOTIN0: no_read_msgs L0 e)
+        (NOTIN1: no_read_msgs L1 e)
+        (LE: L2 <2= (L0 \2/ L1))
+    :
+      no_read_msgs L2 e.
+  Proof.
+    unfold no_read_msgs in *. des_ifs.
+    - ii. eapply LE in H. des; auto.
+    - ii. eapply LE in H. des; auto.
+  Qed.
+
   Lemma no_update_on_mon L0 L1
         e
         (NOTIN: no_update_on L1 e)

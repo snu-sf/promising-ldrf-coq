@@ -2762,6 +2762,17 @@ Section IDENTMAP.
     { inv FROM. inv TO. ss. }
   Qed.
 
+  Lemma ident_map_no_read_msgs MSGS te fte
+        (MAP: tevent_map ident_map fte te)
+        (NOREAD: no_read_msgs MSGS te)
+    :
+      no_read_msgs MSGS fte.
+  Proof.
+    inv MAP; auto.
+    { inv TO. ss. }
+    { inv FROM. ss. }
+  Qed.
+
 End IDENTMAP.
 
 
