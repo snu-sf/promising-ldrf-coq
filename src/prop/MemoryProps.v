@@ -2968,3 +2968,74 @@ Section PROMISEWRITING.
   Qed.
 
 End PROMISEWRITING.
+
+Section WFTIME.
+
+  Definition memory_times_wf (times: Loc.t -> Time.t -> Prop) (mem: Memory.t): Prop :=
+    forall loc to from msg
+           (GET: Memory.get loc to mem = Some (from, msg)),
+      (<<FROM: times loc from>>) /\ (<<TO: times loc to>>).
+
+  Lemma promise_memory_times_wf (times: Loc.t -> Time.t -> Prop)
+        prom0 mem0 loc from to msg prom1 mem1 kind
+        (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
+        (FROM: times loc from)
+        (TO: times loc to)
+        (WF: memory_times_wf times mem0)
+    :
+      memory_times_wf times mem1.
+  Proof.
+    inv PROMISE.
+    { ii. erewrite Memory.add_o in GET; eauto. des_ifs; eauto.
+      ss. des; clarify. }
+    { ii. erewrite Memory.split_o in GET; eauto. des_ifs; eauto.
+      { ss. des; clarify. }
+      { ss. des; clarify. eapply Memory.split_get0 in MEM.
+        des. eapply WF in GET0. des. auto. }
+    }
+    { ii. erewrite Memory.lower_o in GET; eauto. des_ifs; eauto.
+      ss. des; clarify. }
+    { ii. erewrite Memory.remove_o in GET; eauto. des_ifs; eauto. }
+  Qed.
+
+  Lemma step_memory_times_wf times lang (th0 th1: Thread.t lang) e pf
+        (STEP: Thread.step pf e th0 th1)
+        (EVENT: wf_time_evt times e)
+        (WF: memory_times_wf times th0.(Thread.memory))
+    :
+      memory_times_wf times th1.(Thread.memory).
+  Proof.
+    inv STEP.
+    { inv STEP0. ss. inv LOCAL. des. eapply promise_memory_times_wf; eauto. }
+    { inv STEP0. ss. inv LOCAL; ss.
+      { inv LOCAL0. inv WRITE. des. eapply promise_memory_times_wf; eauto. }
+      { inv LOCAL2. inv WRITE. des. eapply promise_memory_times_wf; eauto. }
+    }
+  Qed.
+
+  Lemma steps_memory_times_wf times P lang (th0 th1: Thread.t lang)
+        (STEPS: rtc (tau (@pred_step P lang)) th0 th1)
+        (TIME: P <1= wf_time_evt times)
+        (WF: memory_times_wf times th0.(Thread.memory))
+    :
+      memory_times_wf times th1.(Thread.memory).
+  Proof.
+    ginduction STEPS; auto. i.
+    eapply IHSTEPS; eauto.
+    inv H. inv TSTEP. inv STEP. eapply step_memory_times_wf; eauto.
+  Qed.
+
+  Lemma memory_times_wf_traced times lang (th0 th1: Thread.t lang) tr
+        (STEPS: traced_step tr th0 th1)
+        (WF: memory_times_wf times th0.(Thread.memory))
+        (EVENTS: forall e (IN: List.In e tr), wf_time_evt times (fst e))
+    :
+      memory_times_wf times th1.(Thread.memory).
+  Proof.
+    ginduction STEPS; auto. i. eapply IHSTEPS; eauto.
+    { inv HD. eapply step_memory_times_wf; eauto.
+      exploit (EVENTS (hde, th0.(Thread.memory))); ss. auto. }
+    { i. exploit (EVENTS e); ss. auto. }
+  Qed.
+
+End WFTIME.

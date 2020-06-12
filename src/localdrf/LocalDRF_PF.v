@@ -95,24 +95,6 @@ Proof.
 Qed.
 
 
-Definition memory_times_wf (times: Loc.t -> list Time.t) (mem: Memory.t): Prop :=
-  forall loc to from msg
-         (GET: Memory.get loc to mem = Some (from, msg)),
-    (<<FROM: List.In from (times loc)>>) /\ (<<TO: List.In to (times loc)>>).
-
-Definition memory_times_wf_strong (times: Loc.t -> list Time.t) (mem: Memory.t): Prop :=
-  forall loc to from msg
-         (GET: Memory.get loc to mem = Some (from, msg)),
-    (<<FROM: List.In from (times loc)>>) /\ (<<TO: List.In to (times loc)>>) /\
-    (<<CAP: List.In (Time.incr to) (times loc)>>).
-
-Lemma memory_times_wf_strong_wf
-  :
-    memory_times_wf_strong <2= memory_times_wf.
-Proof.
-  ii. eapply PR in GET. des. auto.
-Qed.
-
 Inductive all_promises (proms: Ident.t -> Loc.t -> Time.t -> Prop): Loc.t -> Time.t -> Prop :=
 | all_promises_intro
     tid loc ts
@@ -147,22 +129,6 @@ Proof.
       ss. des; clarify.
       eapply Memory.remove_get0 in PROMISES. des. clarify.
     - erewrite Memory.remove_o; eauto. des_ifs. }
-Qed.
-
-Lemma memory_get_disjoint_strong mem loc from0 to0 from1 to1 msg0 msg1
-      (GET0: Memory.get loc to0 mem = Some (from0, msg0))
-      (GET1: Memory.get loc to1 mem = Some (from1, msg1))
-  :
-    (to0 = to1 /\ from0 = from1 /\ msg0 = msg1) \/
-    (<<TS: Time.le to0 from1>> /\ <<TS: Time.lt to0 to1>>) \/
-    (<<TS: Time.le to1 from0>> /\ <<TS: Time.lt to1 to0>>).
-Proof.
-  destruct (Time.le_lt_dec to0 to1).
-  { destruct l.
-    { dup H. eapply memory_get_from_mon in H; eauto. }
-    { inv H. clarify. auto. }
-  }
-  { dup l. eapply memory_get_from_mon in l; eauto. }
 Qed.
 
 
