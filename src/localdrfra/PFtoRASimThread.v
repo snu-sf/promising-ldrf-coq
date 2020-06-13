@@ -30,8 +30,8 @@ Require Import Stable.
 Set Implicit Arguments.
 
 
-Module RASimThread.
-  Section RASimThread.
+Module PFtoRASimThread.
+  Section PFtoRASimThread.
     Variable lang: language.
     Variable L: Loc.t -> bool.
 
@@ -125,6 +125,15 @@ Module RASimThread.
               <<GET_TGT: Memory.get loc to mem_tgt = Some (from, msg)>>)
     .
 
+    Inductive sim_statelocal (rels: ReleaseWrites.t):
+      forall (sl_src sl_tgt: {lang : language & Language.state lang} * Local.t), Prop :=
+    | sim_statelocal_intro
+        lang st lc_src lc_tgt
+        (LOCAL: sim_local rels lc_src lc_tgt):
+        sim_statelocal rels (existT _ lang st, lc_src) (existT _ lang st, lc_tgt)
+    .
+    Hint Constructors sim_statelocal.
+
     Inductive sim_thread (rels: ReleaseWrites.t) (e_src e_tgt: Thread.t lang): Prop :=
     | sim_thread_intro
         (STATE: e_src.(Thread.state) = e_tgt.(Thread.state))
@@ -132,6 +141,8 @@ Module RASimThread.
         (SC: e_src.(Thread.sc) = e_tgt.(Thread.sc))
         (MEMORY: sim_memory rels e_src.(Thread.memory) e_tgt.(Thread.memory))
     .
+    Hint Constructors sim_thread.
+
 
     Lemma sim_tview_write_released
           tview_src tview_tgt
@@ -146,6 +157,16 @@ Module RASimThread.
       unfold LocFun.add. condtac; ss. condtac; ss.
       - rewrite CUR. ss.
       - rewrite REL; ss.
+    Qed.
+
+    Lemma sim_local_promise_consistent
+          rels lc_src lc_tgt
+          (SIM: sim_local rels lc_src lc_tgt)
+          (CONS: Local.promise_consistent lc_tgt):
+      Local.promise_consistent lc_src.
+    Proof.
+      inv SIM. inv TVIEW. ii.
+      rewrite PROMISES, CUR in *. eauto.
     Qed.
 
     Lemma sim_memory_closed_timemap
@@ -1070,14 +1091,8 @@ Module RASimThread.
       exists e_src e2_src,
         <<STEP_SRC: OrdThread.step L Ordering.acqrel pf e_src e1_src e2_src>> /\
         __guard__ (
-            (exists rels',
-                <<REL: rels' = match ThreadEvent.is_writing e_src with
-                               | Some (loc, from, to, val, released, ord)  =>
-                                 if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels
-                               | _ => rels
-                               end>> /\
-                <<SIM2: sim_thread rels' e2_src e2_tgt>> /\
-                <<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>>) \/
+            <<SIM2: sim_thread (ReleaseWrites.append e_tgt rels) e2_src e2_tgt>> /\
+            <<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>> \/
             <<RACE: exists loc to val released ord,
               ThreadEvent.is_reading e_src = Some (loc, to, val, released, ord) /\
               RARace.ra_race L rels e1_src.(Thread.local).(Local.tview) loc to ord>>).
@@ -1311,5 +1326,5 @@ Module RASimThread.
         + econs 2. econs; [|econs 7]; eauto.
         + left. esplits; ss.
     Qed.
-  End RASimThread.
-End RASimThread.
+  End PFtoRASimThread.
+End PFtoRASimThread.

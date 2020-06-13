@@ -307,17 +307,21 @@ Module OrdConfiguration.
     | step_failure
         pf tid c1 lang st1 lc1 e2 st3 lc3 sc3 memory3
         (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
-        (STEPS: rtc (@Thread.tau_step _) (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
+        (STEPS: rtc (@OrdThread.tau_step _ L ordc)
+                    (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
         (STEP: OrdThread.step L ordc pf ThreadEvent.failure e2 (Thread.mk _ st3 lc3 sc3 memory3)):
-        step MachineEvent.failure tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
+        step MachineEvent.failure tid
+             c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
     | step_normal
         pf e tid c1 lang st1 lc1 e2 st3 lc3 sc3 memory3
         (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
-        (STEPS: rtc (@Thread.tau_step _) (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
+        (STEPS: rtc (@OrdThread.tau_step _ L ordc)
+                    (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
         (STEP: OrdThread.step L ordc pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
         (EVENT: e <> ThreadEvent.failure)
         (CONSISTENT: OrdThread.consistent L ordc (Thread.mk lang st3 lc3 sc3 memory3)):
-        step (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
+        step (ThreadEvent.get_machine_event e) tid
+             c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
     .
   End OrdConfiguration.
 End OrdConfiguration.

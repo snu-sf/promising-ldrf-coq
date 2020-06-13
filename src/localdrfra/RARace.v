@@ -28,25 +28,17 @@ Require Import OrdStep.
 Module ReleaseWrites.
   Definition t: Type := list (Loc.t * Time.t).
 
-  Definition rel_write (e: ThreadEvent.t): option (Loc.t * Time.t) :=
-    match e with
-    | ThreadEvent.write loc from to val released ord =>
-      if Ordering.le Ordering.acqrel ord then Some (loc, to) else None
-    | ThreadEvent.update loc tsr to valr valw releasedr releasedw ordr ordw =>
-      if Ordering.le Ordering.acqrel ordw then Some (loc, to) else None
-    | _ => None
-    end.
-
-  Definition append (rels: t) (e: ThreadEvent.t): t :=
-    match rel_write e with
-    | Some r => r :: rels
+  Definition append (e: ThreadEvent.t) (rels: t): t :=
+    match ThreadEvent.is_writing e with
+    | Some (loc, from, to, val, released, ord) =>
+      if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels
     | None => rels
     end.
 End ReleaseWrites.
 
 
-Module RARace.
-  Section RARace.
+Module RATrace.
+  Section RATrace.
     Variable L: Loc.t -> bool.
 
     Inductive thread_steps lang: forall (rels: ReleaseWrites.t) (e1 e2: Thread.t lang), Prop :=
@@ -58,7 +50,7 @@ Module RARace.
         (STEPS: @thread_steps lang rels e1 e2)
         (STEP: @OrdThread.step lang L Ordering.acqrel pf e e2 e3)
         (SILENT: ThreadEvent.get_machine_event e = MachineEvent.silent):
-        thread_steps lang (ReleaseWrites.append rels e) e1 e3
+        thread_steps lang (ReleaseWrites.append e rels) e1 e3
     .
 
     Inductive configuration_step: forall (e: MachineEvent.t) (tid: Ident.t) (rels: ReleaseWrites.t) (c1 c2: Configuration.t), Prop :=
@@ -69,7 +61,7 @@ Module RARace.
         (STEPS: thread_steps lang rels (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
         (STEP: OrdThread.step L Ordering.acqrel pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
         (CONSISTENT: OrdThread.consistent L Ordering.acqrel (Thread.mk _ st3 lc3 sc3 memory3)):
-        configuration_step (ThreadEvent.get_machine_event e) tid (ReleaseWrites.append rels e)
+        configuration_step (ThreadEvent.get_machine_event e) tid (ReleaseWrites.append e rels)
                            c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
     .
 
@@ -84,8 +76,34 @@ Module RARace.
         configuration_steps (rels' ++ rels) c1 c3
     .
 
+    Lemma thread_steps_rtc_tau_step
+          lang rels e1 e2
+          (STEPS: thread_steps lang rels e1 e2):
+      rtc (@OrdThread.tau_step lang L Ordering.acqrel) e1 e2.
+    Proof.
+      induction STEPS; eauto.
+      exploit rtc_n1; try exact IHSTEPS; eauto.
+      econs; eauto. econs. eauto.
+    Qed.
 
-    (* race condition *)
+    Lemma configuration_step_ord_step
+          e tid rels c1 c2
+          (STEP: configuration_step e tid rels c1 c2):
+      OrdConfiguration.step L Ordering.acqrel e tid c1 c2.
+    Proof.
+      inv STEP. exploit thread_steps_rtc_tau_step; eauto. i.
+      destruct (ThreadEvent.get_machine_event e0) eqn:EVENT.
+      - rewrite <- EVENT. econs 2; eauto. destruct e0; ss.
+      - rewrite <- EVENT. econs 2; eauto. destruct e0; ss.
+      - destruct e0; ss. econs 1; eauto.
+    Qed.
+  End RATrace.
+End RATrace.
+
+
+Module RARace.
+  Section RARace.
+    Variable L: Loc.t -> bool.
 
     Definition ra_race (rels: ReleaseWrites.t) (tview: TView.t) (loc: Loc.t) (to: Time.t) (ordr: Ordering.t): Prop :=
       <<LOC: L loc>> /\
@@ -97,10 +115,11 @@ Module RARace.
       forall rels c
         tid lang st1 lc1
         pf loc to val released ord e2 e3
-        (CSTEPS: configuration_steps rels (Configuration.init s) c)
+        (CSTEPS: RATrace.configuration_steps L rels (Configuration.init s) c)
         (TID: IdentMap.find tid c.(Configuration.threads) = Some (existT _ lang st1, lc1))
         (STEPS: rtc (@OrdThread.tau_step lang L Ordering.acqrel)
                     (Thread.mk _ st1 lc1 c.(Configuration.sc) c.(Configuration.memory)) e2)
+        (CONS: Local.promise_consistent e2.(Thread.local))
         (STEP: OrdThread.step L Ordering.acqrel pf (ThreadEvent.read loc to val released ord) e2 e3)
         (RACE: ra_race rels e2.(Thread.local).(Local.tview) loc to ord),
         False.
