@@ -34,6 +34,12 @@ Module ReleaseWrites.
       if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels
     | None => rels
     end.
+
+  Definition wf (rels: t) (lc: Local.t) (mem: Memory.t): Prop :=
+    forall loc to (IN: List.In (loc, to) rels),
+      Memory.get loc to lc.(Local.promises) = None /\
+      exists from val released,
+        Memory.get loc to mem = Some (from, Message.concrete val released).
 End ReleaseWrites.
 
 

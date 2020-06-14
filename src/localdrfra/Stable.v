@@ -21,6 +21,8 @@ Require Import TView.
 Require Import Local.
 Require Import Thread.
 
+Require Import RARace.
+
 Set Implicit Arguments.
 
 
@@ -117,13 +119,14 @@ Module Stable.
 
     Inductive stable_tview (mem: Memory.t) (tview: TView.t): Prop :=
     | stable_tview_intro
-        (REL: forall loc, stable_view mem (tview.(TView.rel) loc))
+        (REL: forall loc (LOC: ~ L loc), stable_view mem (tview.(TView.rel) loc))
         (CUR: stable_view mem tview.(TView.cur))
         (ACQ: stable_view mem tview.(TView.acq))
     .
 
-    Definition stable_memory (mem: Memory.t): Prop :=
+    Definition stable_memory (rels: ReleaseWrites.t) (mem: Memory.t): Prop :=
       forall loc from to val released
+        (LOC: ~ L loc \/ List.In (loc, to) rels)
         (GET: Memory.get loc to mem = Some (from, Message.concrete val (Some released))),
         stable_view mem released.
 
@@ -279,24 +282,34 @@ Module Stable.
         destruct released; eauto. apply View.bot_spec.
     Qed.
 
+    Lemma stable_memory_tail
+          loc to rels mem
+          (STABLE: stable_memory ((loc, to) :: rels) mem):
+      stable_memory rels mem.
+    Proof.
+      ii. des.
+      - eapply STABLE; eauto.
+      - eapply STABLE; eauto. right. s. right. ss.
+    Qed.
+
 
     (* step *)
 
     Lemma promise
-          tview1 promises1 mem1 loc from to msg promises2 mem2 kind
+          rels tview1 promises1 mem1 loc from to msg promises2 mem2 kind
           (TVIEW1: TView.closed tview1 mem1)
           (MEM1: Memory.closed mem1)
           (NORMAL_TVIEW1: normal_tview tview1)
           (NORMAL_MEM1: normal_memory mem1)
           (STABLE_TVIEW1: stable_tview mem1 tview1)
-          (STABLE_MEM1: stable_memory mem1)
+          (STABLE_MEM1: stable_memory rels mem1)
           (MSG: forall val released
                   (MSG: msg = Message.concrete val (Some released)),
               normal_view released /\ stable_view mem2 released)
           (PROMISE: Memory.promise promises1 mem1 loc from to msg promises2 mem2 kind):
       <<NORMAL_MEM2: normal_memory mem2>> /\
       <<STABLE_TVIEW2: stable_tview mem2 tview1>> /\
-      <<STABLE_MEM2: stable_memory mem2>>.
+      <<STABLE_MEM2: stable_memory rels mem2>>.
     Proof.
       inv PROMISE; ss.
       { (* add *)
@@ -325,9 +338,9 @@ Module Stable.
             specialize (RLX loc). des. congr.
         - ii. revert GET.
           erewrite Memory.add_o; eauto. condtac; ss; i.
-          + des. subst. inv GET.
+          + guardH LOC. des. subst. inv GET.
             exploit MSG; eauto. i. des. eauto.
-          + guardH o. inv MEM1. exploit CLOSED; eauto. i. des.
+          + guardH LOC. guardH o. inv MEM1. exploit CLOSED; eauto. i. des.
             inv MSG_CLOSED. inv CLOSED0. inv CLOSED1.
             specialize (RLX loc1). des.
             exploit Memory.add_get1; try exact RLX; eauto. i.
@@ -372,9 +385,9 @@ Module Stable.
               exploit Memory.split_get0; try exact MEM. i. des. eauto.
         - ii. revert GET.
           erewrite Memory.split_o; eauto. repeat condtac; ss; i.
-          + des. subst. inv GET.
+          + guardH LOC. des. subst. inv GET.
             exploit MSG; eauto. i. des. eauto.
-          + guardH o. des. subst. inv GET.
+          + guardH LOC. guardH o. des. subst. inv GET.
             exploit Memory.split_get0; try exact MEM. i. des.
             inv MEM1. exploit CLOSED; try exact GET1. i. des.
             inv MSG_CLOSED. inv CLOSED0. inv CLOSED1.
@@ -382,7 +395,7 @@ Module Stable.
             exploit Memory.split_get1; try exact RLX; eauto. i. des.
             rewrite GET4 in *. inv GET0.
             eapply STABLE_MEM1; eauto.
-          + guardH o. guardH o0.
+          + guardH LOC. guardH o. guardH o0.
             inv MEM1. exploit CLOSED; eauto. i. des.
             inv MSG_CLOSED. inv CLOSED0. inv CLOSED1.
             specialize (RLX loc1). des.
@@ -415,9 +428,9 @@ Module Stable.
             inv MSG_LE. inv RELEASED. etrans; eauto.
         - ii. revert GET.
           erewrite Memory.lower_o; eauto. condtac; ss; i.
-          + des. subst. inv GET.
+          + guardH LOC. des. subst. inv GET.
             exploit MSG; eauto. i. des. eauto.
-          + guardH o. inv MEM1. exploit CLOSED; eauto. i. des.
+          + guardH LOC. guardH o. inv MEM1. exploit CLOSED; eauto. i. des.
             inv MSG_CLOSED. inv CLOSED0. inv CLOSED1.
             specialize (RLX loc1). des.
             exploit Memory.lower_get1; try exact RLX; eauto. i. des.
@@ -438,7 +451,7 @@ Module Stable.
           + erewrite Memory.remove_o; eauto. condtac; ss; i; eauto.
         - ii. revert GET.
           erewrite Memory.remove_o; eauto. condtac; ss; i.
-          guardH o. inv MEM1. exploit CLOSED; eauto. i. des.
+          guardH LOC. guardH o. inv MEM1. exploit CLOSED; eauto. i. des.
           inv MSG_CLOSED. inv CLOSED0. inv CLOSED1.
           specialize (RLX loc1). des.
           exploit Memory.remove_get1; try exact RLX; eauto. i. des.
@@ -449,13 +462,14 @@ Module Stable.
     Qed.
 
     Lemma promise_step
-          lc1 mem1 loc from to msg lc2 mem2 kind
+          rels lc1 mem1 loc from to msg lc2 mem2 kind
           (WF1: Local.wf lc1 mem1)
           (MEM1: Memory.closed mem1)
           (NORMAL_TVIEW1: normal_tview lc1.(Local.tview))
           (NORMAL_MEM1: normal_memory mem1)
           (STABLE_TVIEW1: stable_tview mem1 lc1.(Local.tview))
-          (STABLE_MEM1: stable_memory mem1)
+          (STABLE_MEM1: stable_memory rels mem1)
+          (RELS_WF1: ReleaseWrites.wf rels lc1 mem1)
           (MSG: forall val released
                   (MSG: msg = Message.concrete val (Some released)),
               normal_view released /\ stable_view mem2 released)
@@ -463,27 +477,116 @@ Module Stable.
       <<NORMAL_TVIEW2: normal_tview lc2.(Local.tview)>> /\
       <<NORMAL_MEM2: normal_memory mem2>> /\
       <<STABLE_TVIEW2: stable_tview mem2 lc2.(Local.tview)>> /\
-      <<STABLE_MEM2: stable_memory mem2>>.
+      <<STABLE_MEM2: stable_memory rels mem2>> /\
+      <<RELS_WF2: ReleaseWrites.wf rels lc2 mem2>>.
     Proof.
-      inv STEP. exploit promise; eauto. apply WF1.
+      inv STEP. exploit promise; try apply WF1; eauto. i. des.
+      splits; auto. ii. ss.
+      exploit RELS_WF1; eauto. i. des. split.
+      - inv PROMISE.
+        + erewrite Memory.add_o; eauto. condtac; ss.
+          des. subst. exploit Memory.add_get0; try exact MEM. i. des. congr.
+        + erewrite Memory.split_o; eauto. repeat condtac; ss.
+          * des. subst. exploit Memory.split_get0; try exact MEM. i. des. congr.
+          * guardH o. des. subst.
+            exploit Memory.split_get0; try exact PROMISES. i. des. congr.
+        + erewrite Memory.lower_o; eauto. condtac; ss.
+          des. subst. exploit Memory.lower_get0; try exact PROMISES. i. des. congr.
+        + erewrite Memory.remove_o; eauto. condtac; ss.
+      - destruct (Memory.op_kind_is_cancel kind) eqn:KIND.
+        + destruct kind; ss. inv PROMISE.
+          erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+          des. subst. exploit Memory.remove_get0; try exact MEM. i. des. congr.
+        + exploit Memory.promise_get1; eauto. i. des. inv MSG_LE. eauto.
     Qed.
 
-    Lemma read_step_loc
-          lc1 mem1 loc to val released ord lc2
+    Lemma read_step_loc_cur
+          rels lc1 mem1 loc to val released ord lc2
           (WF1: Local.wf lc1 mem1)
           (MEM1: Memory.closed mem1)
           (NORMAL_TVIEW1: normal_tview lc1.(Local.tview))
           (NORMAL_MEM1: normal_memory mem1)
           (STABLE_TVIEW1: stable_tview mem1 lc1.(Local.tview))
-          (STABLE_MEM1: stable_memory mem1)
+          (STABLE_MEM1: stable_memory rels mem1)
           (LOC: L loc)
+          (TO: to = lc1.(Local.tview).(TView.cur).(View.rlx) loc)
+          (STEP: Local.read_step lc1 mem1 loc to val released ord lc2):
+      <<LC2: lc2 = lc1>>.
+    Proof.
+      unnw. inv STEP. destruct lc1. f_equal; ss.
+      unfold TView.read_tview. condtac; ss; [|condtac; [|destruct ord]; ss].
+      - condtac; [|destruct ord]; ss.
+        destruct tview; ss. f_equal; ss.
+        + repeat rewrite View.le_join_l; ss.
+          * eapply View.singleton_ur_spec; try apply WF1.
+            inv NORMAL_TVIEW1. rewrite CUR; ss. refl.
+          * destruct released; try apply View.bot_spec. ss.
+            inv STABLE_TVIEW1. eauto.
+          * eapply View.singleton_ur_spec; try apply WF1.
+            inv NORMAL_TVIEW1. rewrite CUR; ss. refl.
+        + repeat rewrite View.le_join_l; ss.
+          * inv WF1. ss. inv TVIEW_WF. ss. etrans; eauto.
+            eapply View.singleton_ur_spec; ss.
+            inv NORMAL_TVIEW1. rewrite CUR0; ss. refl.
+          * inv WF1. ss. inv TVIEW_WF. ss. etrans; eauto.
+            destruct released; try apply View.bot_spec. ss.
+            inv STABLE_TVIEW1. eauto.
+          * inv WF1. ss. inv TVIEW_WF. ss. etrans; eauto.
+            eapply View.singleton_ur_spec; ss.
+            inv NORMAL_TVIEW1. rewrite CUR0; ss. refl.
+      - destruct tview; ss. f_equal; ss.
+        + repeat rewrite View.le_join_l; ss.
+          * eapply View.singleton_ur_spec; try apply WF1.
+            inv NORMAL_TVIEW1. rewrite CUR; ss. refl.
+          * destruct released; try apply View.bot_spec.
+          * eapply View.singleton_ur_spec; try apply WF1.
+            inv NORMAL_TVIEW1. rewrite CUR; ss. refl.
+        + repeat rewrite View.le_join_l; ss.
+          * inv WF1. ss. inv TVIEW_WF. ss. etrans; eauto.
+            eapply View.singleton_ur_spec; ss.
+            inv NORMAL_TVIEW1. rewrite CUR0; ss. refl.
+          * inv WF1. ss. inv TVIEW_WF. ss. etrans; eauto.
+            destruct released; try apply View.bot_spec. ss.
+            inv STABLE_TVIEW1. eauto.
+          * inv WF1. ss. inv TVIEW_WF. ss. etrans; eauto.
+            eapply View.singleton_ur_spec; ss.
+            inv NORMAL_TVIEW1. rewrite CUR0; ss. refl.
+      - destruct tview; ss. f_equal; ss.
+        + repeat rewrite View.le_join_l; ss.
+          * eapply View.singleton_rw_spec; try apply WF1.
+            inv NORMAL_TVIEW1. rewrite CUR; ss. refl.
+          * destruct released; try apply View.bot_spec.
+          * eapply View.singleton_rw_spec; try apply WF1.
+            inv NORMAL_TVIEW1. rewrite CUR; ss. refl.
+        + repeat rewrite View.le_join_l; ss.
+          * inv WF1. ss. inv TVIEW_WF. ss. etrans; eauto.
+            eapply View.singleton_rw_spec; ss.
+            inv NORMAL_TVIEW1. rewrite CUR0; ss. refl.
+          * inv WF1. ss. inv TVIEW_WF. ss. etrans; eauto.
+            destruct released; try apply View.bot_spec.
+          * inv WF1. ss. inv TVIEW_WF. ss. etrans; eauto.
+            eapply View.singleton_rw_spec; ss.
+            inv NORMAL_TVIEW1. rewrite CUR0; ss. refl.
+    Qed.
+
+    Lemma read_step_loc_ra
+          rels lc1 mem1 loc to val released ord lc2
+          (WF1: Local.wf lc1 mem1)
+          (MEM1: Memory.closed mem1)
+          (NORMAL_TVIEW1: normal_tview lc1.(Local.tview))
+          (NORMAL_MEM1: normal_memory mem1)
+          (STABLE_TVIEW1: stable_tview mem1 lc1.(Local.tview))
+          (STABLE_MEM1: stable_memory rels mem1)
+          (RELS_WF1: ReleaseWrites.wf rels lc1 mem1)
+          (LOC: L loc)
+          (REL: List.In (loc, to) rels)
           (ORD: Ordering.le Ordering.acqrel ord)
           (STEP: Local.read_step lc1 mem1 loc to val released ord lc2):
       <<NORMAL_TVIEW2: normal_tview lc2.(Local.tview)>> /\
       <<STABLE_TVIEW2: stable_tview mem1 lc2.(Local.tview)>> /\
-      <<LC2: to = lc1.(Local.tview).(TView.cur).(View.rlx) loc -> lc1 = lc2>>.
+      <<RELS_WF2: ReleaseWrites.wf rels lc2 mem1>>.
     Proof.
-      inv STEP. ss. splits.
+      inv STEP. ss. splits; ss.
       - inv NORMAL_TVIEW1. econs; ss.
         + repeat eapply join_normal_view; ss.
           { destruct ord; ss. }
@@ -559,42 +662,24 @@ Module Stable.
               etrans; eauto.
               etrans; [|apply View.join_r].
               refl. }
-      - i. subst. destruct lc1. f_equal; ss.
-        unfold TView.read_tview. condtac; ss. condtac; [|destruct ord]; ss.
-        destruct tview; ss. f_equal; ss.
-        + repeat rewrite View.le_join_l; ss.
-          * eapply View.singleton_ur_spec; try apply WF1.
-            inv NORMAL_TVIEW1. rewrite CUR; ss. refl.
-          * destruct released; try apply View.bot_spec. ss.
-            inv STABLE_TVIEW1. eauto.
-          * eapply View.singleton_ur_spec; try apply WF1.
-            inv NORMAL_TVIEW1. rewrite CUR; ss. refl.
-        + repeat rewrite View.le_join_l; ss.
-          * inv WF1. ss. inv TVIEW_WF. ss. etrans; eauto.
-            eapply View.singleton_ur_spec; ss.
-            inv NORMAL_TVIEW1. rewrite CUR0; ss. refl.
-          * inv WF1. ss. inv TVIEW_WF. ss. etrans; eauto.
-            destruct released; try apply View.bot_spec. ss.
-            inv STABLE_TVIEW1. eauto.
-          * inv WF1. ss. inv TVIEW_WF. ss. etrans; eauto.
-            eapply View.singleton_ur_spec; ss.
-            inv NORMAL_TVIEW1. rewrite CUR0; ss. refl.
     Qed.
 
     Lemma read_step_other
-          lc1 mem1 loc to val released ord lc2
+          rels lc1 mem1 loc to val released ord lc2
           (WF1: Local.wf lc1 mem1)
           (MEM1: Memory.closed mem1)
           (NORMAL_TVIEW1: normal_tview lc1.(Local.tview))
           (NORMAL_MEM1: normal_memory mem1)
           (STABLE_TVIEW1: stable_tview mem1 lc1.(Local.tview))
-          (STABLE_MEM1: stable_memory mem1)
+          (STABLE_MEM1: stable_memory rels mem1)
+          (RELS_WF1: ReleaseWrites.wf rels lc1 mem1)
           (LOC: ~ L loc)
           (STEP: Local.read_step lc1 mem1 loc to val released ord lc2):
       <<NORMAL_TVIEW2: normal_tview lc2.(Local.tview)>> /\
-      <<STABLE_TVIEW2: stable_tview mem1 lc2.(Local.tview)>>.
+      <<STABLE_TVIEW2: stable_tview mem1 lc2.(Local.tview)>> /\
+      <<RELS_WF2: ReleaseWrites.wf rels lc2 mem1>>.
     Proof.
-      inv STEP. ss. splits.
+      inv STEP. ss. splits; ss.
       - inv NORMAL_TVIEW1. econs; ss.
         + repeat apply join_normal_view; ss.
           * apply singleton_ur_if_normal_view. ss.
@@ -619,26 +704,27 @@ Module Stable.
             { apply bot_stable_view; ss. }
     Qed.
 
-    Lemma write_step_loc
-          lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
+    Lemma write_step_loc_cur
+          rels lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
           (WF1: Local.wf lc1 mem1)
           (SC1: Memory.closed_timemap sc1 mem1)
           (MEM1: Memory.closed mem1)
+          (RELS_WF1: ReleaseWrites.wf rels lc1 mem1)
           (NORMAL_TVIEW1: normal_tview lc1.(Local.tview))
           (NORMAL_MEM1: normal_memory mem1)
           (STABLE_TVIEW1: stable_tview mem1 lc1.(Local.tview))
-          (STABLE_MEM1: stable_memory mem1)
+          (STABLE_MEM1: stable_memory rels mem1)
           (WF_RELEASEDM: View.opt_wf releasedm)
           (CLOSED_RELEASEDM: Memory.closed_opt_view releasedm mem1)
           (NORMAL_RELEASEDM: normal_view releasedm.(View.unwrap))
           (STABLE_RELEASEDM: stable_view mem1 releasedm.(View.unwrap))
           (RELEASEDM: View.le releasedm.(View.unwrap) lc1.(Local.tview).(TView.cur))
-          (ORD: Ordering.le Ordering.acqrel ord)
           (STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind):
       <<NORMAL_TVIEW2: normal_tview lc2.(Local.tview)>> /\
       <<NORMAL_MEM2: normal_memory mem2>> /\
       <<STABLE_TVIEW2: stable_tview mem2 lc2.(Local.tview)>> /\
-      <<STABLE_MEM2: stable_memory mem2>>.
+      <<STABLE_MEM2: stable_memory (if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels) mem2>> /\
+      <<RELS_WF2: ReleaseWrites.wf (if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels) lc2 mem2>>.
     Proof.
       exploit Local.write_step_future; eauto. i. des.
       inv STEP. inv WRITE. ss.
@@ -650,40 +736,76 @@ Module Stable.
       assert (STABLE_TVIEW2: stable_tview mem2 (TView.write_tview (Local.tview lc1) sc1 loc to ord)).
       { inv STABLE_TVIEW1. econs; ss; i.
         - condtac; ss.
-          unfold LocFun.add, LocFun.find.
-          condtac; ss; subst; ii; ss.
-          + revert GET.
-            unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
-            condtac; ss; i.
-            * subst. rewrite time_le_join_r in GET; cycle 1.
-              { inv WRITABLE. econs. ss. }
-              exploit Memory.promise_get0; try exact PROMISE.
+          { unfold LocFun.add, LocFun.find.
+            condtac; ss; subst; ii; ss.
+            + revert GET.
+              unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
+              condtac; ss; i.
+              * subst. rewrite time_le_join_r in GET; cycle 1.
+                { inv WRITABLE. econs. ss. }
+                exploit Memory.promise_get0; try exact PROMISE.
+                { inv PROMISE; ss. }
+                i. des.
+                rewrite GET in *. inv GET_MEM.
+                revert H2. unfold TView.write_released. condtac; ss.
+              * rewrite time_le_join_l in GET; try by apply Time.bot_spec.
+                etrans; [|eapply View.join_l].
+                revert GET. inv PROMISE.
+                { erewrite Memory.add_o; eauto. condtac; ss; i; eauto.
+                  des. subst. inv GET. ss. }
+                { erewrite Memory.split_o; eauto. repeat condtac; ss; i; eauto.
+                  - des. subst. inv GET. ss.
+                  - guardH o. des. subst. inv GET. ss. }
+                { erewrite Memory.lower_o; eauto. condtac; ss; i; eauto.
+                  des. subst. inv GET. ss. }
+                { exploit Memory.remove_get0; try exact PROMISES. i. des.
+                  exploit Memory.remove_get0; try exact REMOVE. i. des.
+                  congr. }
+            + inv WF1. inv TVIEW_WF. inv TVIEW_CLOSED.
+              destruct (REL1 loc0). specialize (RLX loc1). des.
+              exploit Memory.promise_get1; try exact RLX; eauto.
               { inv PROMISE; ss. }
               i. des.
-              rewrite GET in *. inv GET_MEM.
-              revert H2. unfold TView.write_released. condtac; ss.
-              unfold LocFun.add. repeat condtac; ss. i. inv H2.
-              repeat eapply View.join_spec; eauto using View.join_l, View.join_r.
-            * rewrite time_le_join_l in GET; try by apply Time.bot_spec.
-              etrans; [|eapply View.join_l].
-              revert GET. inv PROMISE.
-              { erewrite Memory.add_o; eauto. condtac; ss; i; eauto.
-                des. subst. inv GET. ss. }
-              { erewrite Memory.split_o; eauto. repeat condtac; ss; i; eauto.
-                - des. subst. inv GET. ss.
-                - guardH o. des. subst. inv GET. ss. }
-              { erewrite Memory.lower_o; eauto. condtac; ss; i; eauto.
-                des. subst. inv GET. ss. }
-              { exploit Memory.remove_get0; try exact PROMISES. i. des.
-                exploit Memory.remove_get0; try exact REMOVE. i. des.
-                congr. }
-          + inv WF1. inv TVIEW_WF. inv TVIEW_CLOSED.
-            destruct (REL1 loc0). specialize (RLX loc1). des.
-            exploit Memory.promise_get1; try exact RLX; eauto.
-            { inv PROMISE; ss. }
-            i. des.
-            rewrite GET0 in *. inv GET. inv MSG_LE. inv RELEASED.
-            etrans; eauto. eapply REL; eauto.
+              rewrite GET0 in *. inv GET. inv MSG_LE. inv RELEASED.
+              etrans; eauto. eapply REL; eauto.
+          }
+          { unfold LocFun.add, LocFun.find.
+            condtac; ss; subst; ii; ss.
+            + revert GET.
+              unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
+              condtac; ss; i.
+              * subst. rewrite time_le_join_r in GET; cycle 1.
+                { inv WRITABLE. econs. inv WF1. inv TVIEW_WF.
+                  eapply TimeFacts.le_lt_lt; eauto. apply REL_CUR. }
+                exploit Memory.promise_get0; try exact PROMISE.
+                { inv PROMISE; ss. }
+                i. des.
+                rewrite GET in *. inv GET_MEM.
+                revert H2. unfold TView.write_released. condtac; ss.
+              * rewrite time_le_join_l in GET; try by apply Time.bot_spec.
+                etrans; [|eapply View.join_l].
+                revert GET. inv PROMISE.
+                { erewrite Memory.add_o; eauto. condtac; ss; i; eauto.
+                  - des. subst. inv GET. ss.
+                  - eapply REL; eauto. }
+                { erewrite Memory.split_o; eauto. repeat condtac; ss; i; eauto.
+                  - des. subst. inv GET. ss.
+                  - guardH o. des. subst. inv GET. ss.
+                  - eapply REL; eauto. }
+                { erewrite Memory.lower_o; eauto. condtac; ss; i; eauto.
+                  - des. subst. inv GET. ss.
+                  - eapply REL; eauto. }
+                { exploit Memory.remove_get0; try exact PROMISES. i. des.
+                  exploit Memory.remove_get0; try exact REMOVE. i. des.
+                  congr. }
+            + inv WF1. inv TVIEW_WF. inv TVIEW_CLOSED.
+              destruct (REL1 loc0). specialize (RLX loc1). des.
+              exploit Memory.promise_get1; try exact RLX; eauto.
+              { inv PROMISE; ss. }
+              i. des.
+              rewrite GET0 in *. inv GET. inv MSG_LE. inv RELEASED.
+              etrans; eauto. eapply REL; eauto.
+          }
         - ii. revert GET. ss.
           unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
           condtac; ss; subst; i.
@@ -694,8 +816,12 @@ Module Stable.
             i. des.
             rewrite GET in *. inv GET_MEM.
             revert H2. unfold TView.write_released. condtac; ss.
-            unfold LocFun.add. repeat condtac; ss. i. inv H2.
-            repeat eapply View.join_spec; eauto using View.join_l, View.join_r.
+            unfold LocFun.add. repeat condtac; ss.
+            * i. inv H2.
+              repeat eapply View.join_spec; eauto using View.join_l, View.join_r.
+            * i. inv H2.
+              repeat eapply View.join_spec; eauto using View.join_l, View.join_r.
+              etrans; try eapply WF1. apply View.join_l.
           + rewrite time_le_join_l in GET; try by apply Time.bot_spec.
             etrans; [|apply View.join_l].
             revert GET. inv PROMISE.
@@ -729,11 +855,17 @@ Module Stable.
               i. des.
               rewrite GET in *. inv GET_MEM.
               revert H2. unfold TView.write_released. condtac; ss.
-              unfold LocFun.add. repeat condtac; ss. i. inv H2.
-              repeat eapply View.join_spec; try apply View.join_r.
-              { etrans; eauto.
-                etrans; try eapply WF1. apply View.join_l. }
-              { etrans; try eapply WF1. apply View.join_l. }
+              unfold LocFun.add. repeat condtac; ss.
+              { i. inv H2.
+                repeat eapply View.join_spec; try apply View.join_r.
+                - etrans; eauto.
+                  etrans; try eapply WF1. apply View.join_l.
+                - etrans; try eapply WF1. apply View.join_l. }
+              { i. inv H2.
+                repeat eapply View.join_spec; try apply View.join_r.
+                - etrans; eauto.
+                  etrans; try eapply WF1. apply View.join_l.
+                - etrans; try eapply WF1. etrans; try eapply WF1. apply View.join_l. }
           + rewrite time_le_join_l in GET; try by apply Time.bot_spec.
             etrans; [|apply View.join_l].
             revert GET. inv PROMISE.
@@ -749,51 +881,197 @@ Module Stable.
               congr. }
       }
 
-      exploit promise; try exact PROMISE; try apply WF1; eauto.
+      assert (NORMAL_RELEASED: forall released,
+                 TView.write_released (Local.tview lc1) sc1 loc to releasedm ord = Some released ->
+                 normal_view released).
       { unfold TView.write_released. repeat (condtac; ss).
         unfold LocFun.add. condtac; ss.
-        i. inv MSG. split.
-        - repeat apply join_normal_view; ss. apply NORMAL_TVIEW1.
-        - ii. revert GET.
+        - i. inv H. repeat apply join_normal_view; ss. apply NORMAL_TVIEW1.
+        - i. inv H. unfold LocFun.add. condtac; ss.
+          repeat apply join_normal_view; ss. apply NORMAL_TVIEW1. }
+
+      condtac; ss.
+      { assert (STABLE_RELEASED: forall released,
+                   TView.write_released (Local.tview lc1) sc1 loc to releasedm ord = Some released ->
+                   stable_view mem2 released).
+        { unfold TView.write_released. repeat (condtac; ss).
+          unfold LocFun.add. condtac; ss.
+          i. inv H.
+          ii. revert GET.
           destruct (Loc.eq_dec loc loc0); subst.
-          + ss. unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
+          - ss. unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
             condtac; ss.
             rewrite (@time_le_join_r _ to); cycle 1.
             { inv WRITABLE. econs. ss. }
             rewrite time_le_join_r; cycle 1.
-            { etrans; try eapply RELEASEDM.
-              inv WRITABLE. econs. ss. }
+            { etrans; try eapply RELEASEDM. inv WRITABLE. econs. ss. }
             exploit Memory.promise_get0; try exact PROMISE.
             { inv PROMISE; ss. }
             i. des. rewrite GET in *. inv GET_MEM.
             revert H2. unfold TView.write_released.
             repeat (condtac; ss). i. inv H2.
             unfold LocFun.add. condtac; ss. refl.
-          + ss. unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
+          - ss. unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
             condtac; ss; try congr.
             rewrite (@time_le_join_l _ Time.bot); try by apply Time.bot_spec. i.
             rewrite <- View.join_assoc.
             etrans; [|apply View.join_l].
             eapply future_stable_view; try eapply GET; try eapply join_stable_view; eauto.
-            * eapply Memory.join_closed_view; ss.
-              { inv CLOSED_RELEASEDM; ss.
-                apply Memory.closed_view_bot. apply MEM1. }
-              { apply WF1. }
-            * apply STABLE_TVIEW1.
+            + eapply Memory.join_closed_view; ss.
+              * inv CLOSED_RELEASEDM; ss.
+                apply Memory.closed_view_bot. apply MEM1.
+              * apply WF1.
+            + apply STABLE_TVIEW1.
+        }
+        exploit promise; try exact PROMISE; try apply WF1; eauto.
+        { i. inv MSG. auto. }
+        i. des. splits; auto.
+        ii. ss. des.
+        - eapply STABLE_MEM2; eauto.
+        - inv LOC. exploit Memory.promise_get0; try exact PROMISE; try by (inv PROMISE; ss). i. des.
+          rewrite GET in *. inv GET_MEM.
+          eapply STABLE_RELEASED; eauto.
+        - eapply STABLE_MEM2; eauto.
+        - ii. ss. des.
+          + inv IN. exploit Memory.promise_get2; eauto; try by (inv PROMISE; ss). i. des.
+            exploit Memory.remove_get0; eauto. i. des. eauto.
+          + exploit RELS_WF1; eauto. i. des.
+            exploit Memory.promise_get1; try exact x0; eauto; try by (inv PROMISE; ss). i. des.
+            inv MSG_LE. esplits; eauto.
+            erewrite Memory.remove_o; eauto. condtac; ss.
+            guardH o. inv PROMISE; ss.
+            * erewrite Memory.add_o; eauto. condtac; ss.
+            * erewrite Memory.split_o; eauto. repeat condtac; ss.
+              guardH o0. des. subst.
+              exploit Memory.split_get0; try exact PROMISES. i. des. congr.
+            * erewrite Memory.lower_o; eauto. condtac; ss.
       }
 
-      i. des. splits; auto.
+      splits; auto.
+      - ii. 
+        revert GET. inv PROMISE; ss.
+        + erewrite Memory.add_o; eauto. condtac; ss.
+          * i. des. subst. inv GET.
+            eapply NORMAL_RELEASED; eauto.
+          * i. eapply NORMAL_MEM1; eauto.
+        + erewrite Memory.split_o; eauto. repeat condtac; ss.
+          * i. des. subst. inv GET.
+            eapply NORMAL_RELEASED; eauto.
+          * guardH o. des. subst. i. inv GET.
+            exploit Memory.split_get0; try exact MEM. i. des.
+            eapply NORMAL_MEM1; eauto.
+          * i. eapply NORMAL_MEM1; eauto.
+        + erewrite Memory.lower_o; eauto. condtac; ss.
+          * i. des. subst. inv GET.
+            eapply NORMAL_RELEASED; eauto.
+          * i. eapply NORMAL_MEM1; eauto.
+      - assert (STABLE_RELEASED: forall released (LOC: ~ L loc),
+                   TView.write_released (Local.tview lc1) sc1 loc to releasedm ord = Some released ->
+                   stable_view mem2 released).
+        { unfold TView.write_released. repeat (condtac; ss).
+          unfold LocFun.add. condtac; ss.
+          i. inv H.
+          ii. revert GET.
+          destruct (Loc.eq_dec loc loc0); subst; ss.
+          unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
+          condtac; ss; try congr.
+          rewrite (@time_le_join_l _ Time.bot); try by apply Time.bot_spec. i.
+          rewrite <- View.join_assoc.
+          etrans; [|apply View.join_l].
+          eapply future_stable_view; try eapply GET; try eapply join_stable_view; eauto.
+          + eapply Memory.join_closed_view; ss.
+            * inv CLOSED_RELEASEDM; ss.
+              apply Memory.closed_view_bot. apply MEM1.
+            * apply WF1.
+          + apply STABLE_TVIEW1. ss.
+        }
+        ii. guardH LOC. revert GET. inv PROMISE; ss.
+        + erewrite Memory.add_o; eauto. condtac; ss.
+          * i. des. subst. inv GET. unguard. des.
+            { eapply STABLE_RELEASED; eauto. }
+            { exploit RELS_WF1; eauto. i. des.
+              exploit Memory.add_get0; try exact MEM. i. des. congr. }
+          * guardH o. i. inv MEM1. exploit CLOSED; eauto. i. des.
+            inv MSG_CLOSED. inv CLOSED0. inv CLOSED1.
+            specialize (RLX loc1). des.
+            exploit Memory.add_get1; try exact RLX; eauto. i.
+            rewrite x0 in *. inv GET0. eapply STABLE_MEM1; eauto.
+        + erewrite Memory.split_o; eauto. repeat condtac; ss.
+          * i. des. subst. inv GET. unguard. des.
+            { eapply STABLE_RELEASED; eauto. }
+            { exploit RELS_WF1; eauto. i. des.
+              exploit Memory.split_get0; try exact MEM. i. des. congr. }
+          * guardH o. i. des. subst. inv GET. unguardH LOC. des.
+            { exploit Memory.split_get0; try exact MEM. i. des.
+              inv MEM1. exploit CLOSED; try exact GET1. i. des.
+              inv MSG_CLOSED. inv CLOSED0. inv CLOSED1.
+              specialize (RLX loc1). des.
+              exploit Memory.split_get1; try exact RLX; eauto. i. des.
+              rewrite GET4 in *. inv GET0.
+              eapply STABLE_MEM1; eauto. }
+            { exploit RELS_WF1; eauto. i. des.
+              exploit Memory.split_get0; try exact PROMISES. i. des. congr. }
+          * guardH o. guardH o0. i.
+            inv MEM1. exploit CLOSED; eauto. i. des.
+            inv MSG_CLOSED. inv CLOSED0. inv CLOSED1.
+            specialize (RLX loc1). des.
+            exploit Memory.split_get1; try exact RLX; eauto. i. des.
+            rewrite GET2 in *. inv GET0. eapply STABLE_MEM1; eauto.
+        + erewrite Memory.lower_o; eauto. condtac; ss.
+          * i. des. subst. inv GET. unguard. des.
+            { eapply STABLE_RELEASED; eauto. }
+            { exploit RELS_WF1; eauto. i. des.
+              exploit Memory.lower_get0; try exact PROMISES. i. des. congr. }
+          * guardH o. i. inv MEM1. exploit CLOSED; eauto. i. des.
+            inv MSG_CLOSED. inv CLOSED0. inv CLOSED1.
+            specialize (RLX loc1). des.
+            exploit Memory.lower_get1; try exact RLX; eauto. i. des. inv MSG_LE.
+            rewrite GET2 in *. inv GET0. inv RELEASED.
+            etrans; eauto. eapply STABLE_MEM1; eauto.
+      - ii. ss. exploit RELS_WF1; eauto. i. des.
+        exploit Memory.promise_get1; try exact x0; eauto; try by (inv PROMISE; ss). i. des.
+        inv MSG_LE. esplits; eauto.
+        erewrite Memory.remove_o; eauto. condtac; ss. guardH o.
+        inv PROMISE; ss.
+        + erewrite Memory.add_o; eauto. condtac; ss.
+        + erewrite Memory.split_o; eauto. repeat condtac; ss.
+          guardH o0. des. subst.
+          exploit Memory.split_get0; try exact PROMISES. i. des. congr.
+        + erewrite Memory.lower_o; eauto. condtac; ss.
     Qed.
 
-    Lemma write_step_other
-          lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
+    Lemma write_step_loc_None
+          rels lc1 sc1 mem1 loc from to val released ord lc2 sc2 mem2 kind
           (WF1: Local.wf lc1 mem1)
           (SC1: Memory.closed_timemap sc1 mem1)
           (MEM1: Memory.closed mem1)
           (NORMAL_TVIEW1: normal_tview lc1.(Local.tview))
           (NORMAL_MEM1: normal_memory mem1)
           (STABLE_TVIEW1: stable_tview mem1 lc1.(Local.tview))
-          (STABLE_MEM1: stable_memory mem1)
+          (STABLE_MEM1: stable_memory rels mem1)
+          (RELS_WF1: ReleaseWrites.wf rels lc1 mem1)
+          (STEP: Local.write_step lc1 sc1 mem1 loc from to val None released ord lc2 sc2 mem2 kind):
+      <<NORMAL_TVIEW2: normal_tview lc2.(Local.tview)>> /\
+      <<NORMAL_MEM2: normal_memory mem2>> /\
+      <<STABLE_TVIEW2: stable_tview mem2 lc2.(Local.tview)>> /\
+      <<STABLE_MEM2: stable_memory (if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels) mem2>> /\
+      <<RELS_WF2: ReleaseWrites.wf (if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels) lc2 mem2>>.
+    Proof.
+      eapply write_step_loc_cur; eauto; ss.
+      - apply bot_stable_view. apply MEM1.
+      - apply View.bot_spec.
+    Qed.
+
+    Lemma write_step_other
+          rels lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
+          (WF1: Local.wf lc1 mem1)
+          (SC1: Memory.closed_timemap sc1 mem1)
+          (MEM1: Memory.closed mem1)
+          (NORMAL_TVIEW1: normal_tview lc1.(Local.tview))
+          (NORMAL_MEM1: normal_memory mem1)
+          (STABLE_TVIEW1: stable_tview mem1 lc1.(Local.tview))
+          (STABLE_MEM1: stable_memory rels mem1)
+          (RELS_WF1: ReleaseWrites.wf rels lc1 mem1)
           (LOC: ~ L loc)
           (WF_RELEASEDM: View.opt_wf releasedm)
           (CLOSED_RELEASEDM: Memory.closed_opt_view releasedm mem1)
@@ -804,7 +1082,8 @@ Module Stable.
       <<NORMAL_TVIEW2: normal_tview lc2.(Local.tview)>> /\
       <<NORMAL_MEM2: normal_memory mem2>> /\
       <<STABLE_TVIEW2: stable_tview mem2 lc2.(Local.tview)>> /\
-      <<STABLE_MEM2: stable_memory mem2>>.
+      <<STABLE_MEM2: stable_memory rels mem2>> /\
+      <<RELS_WF2: ReleaseWrites.wf rels lc2 mem2>>.
     Proof.
       exploit Local.write_step_future; eauto. i. des.
       inv STEP. inv WRITE. ss.
@@ -941,48 +1220,39 @@ Module Stable.
               { inv CLOSED_RELEASEDM; ss.
                 apply Memory.closed_view_bot. apply MEM1. }
               { apply WF1. }
-            * apply STABLE_TVIEW1.
+            * apply STABLE_TVIEW1. ss.
       }
 
       i. des. splits; auto.
-    Qed.
-
-    Lemma write_step_loc_None
-          lc1 sc1 mem1 loc from to val released ord lc2 sc2 mem2 kind
-          (WF1: Local.wf lc1 mem1)
-          (SC1: Memory.closed_timemap sc1 mem1)
-          (MEM1: Memory.closed mem1)
-          (NORMAL_TVIEW1: normal_tview lc1.(Local.tview))
-          (NORMAL_MEM1: normal_memory mem1)
-          (STABLE_TVIEW1: stable_tview mem1 lc1.(Local.tview))
-          (STABLE_MEM1: stable_memory mem1)
-          (ORD: Ordering.le Ordering.acqrel ord)
-          (STEP: Local.write_step lc1 sc1 mem1 loc from to val None released ord lc2 sc2 mem2 kind):
-      <<NORMAL_TVIEW2: normal_tview lc2.(Local.tview)>> /\
-      <<NORMAL_MEM2: normal_memory mem2>> /\
-      <<STABLE_TVIEW2: stable_tview mem2 lc2.(Local.tview)>> /\
-      <<STABLE_MEM2: stable_memory mem2>>.
-    Proof.
-      eapply write_step_loc; eauto; ss.
-      - apply bot_stable_view. apply MEM1.
-      - apply View.bot_spec.
+      ii. exploit RELS_WF1; eauto. i. des.
+      exploit Memory.promise_get1; try exact x0; eauto; try by (inv PROMISE; ss). i. des. inv MSG_LE.
+      esplits; eauto. s.
+      erewrite Memory.remove_o; eauto. condtac; ss. guardH o.
+      inv PROMISE; ss.
+      - erewrite Memory.add_o; eauto. condtac; ss.
+      - erewrite Memory.split_o; eauto. repeat condtac; ss.
+        guardH o0. des. subst.
+        exploit Memory.split_get0; try exact PROMISES. i. des. congr.
+      - erewrite Memory.lower_o; eauto. condtac; ss.
     Qed.
 
     Lemma write_step_other_None
-          lc1 sc1 mem1 loc from to val released ord lc2 sc2 mem2 kind
+          rels lc1 sc1 mem1 loc from to val released ord lc2 sc2 mem2 kind
           (WF1: Local.wf lc1 mem1)
           (SC1: Memory.closed_timemap sc1 mem1)
           (MEM1: Memory.closed mem1)
           (NORMAL_TVIEW1: normal_tview lc1.(Local.tview))
           (NORMAL_MEM1: normal_memory mem1)
           (STABLE_TVIEW1: stable_tview mem1 lc1.(Local.tview))
-          (STABLE_MEM1: stable_memory mem1)
+          (STABLE_MEM1: stable_memory rels mem1)
+          (RELS_WF1: ReleaseWrites.wf rels lc1 mem1)
           (LOC: ~ L loc)
           (STEP: Local.write_step lc1 sc1 mem1 loc from to val None released ord lc2 sc2 mem2 kind):
       <<NORMAL_TVIEW2: normal_tview lc2.(Local.tview)>> /\
       <<NORMAL_MEM2: normal_memory mem2>> /\
       <<STABLE_TVIEW2: stable_tview mem2 lc2.(Local.tview)>> /\
-      <<STABLE_MEM2: stable_memory mem2>>.
+      <<STABLE_MEM2: stable_memory rels mem2>> /\
+      <<RELS_WF2: ReleaseWrites.wf rels lc2 mem2>>.
     Proof.
       eapply write_step_other; eauto; ss.
       - apply bot_stable_view. apply MEM1.
@@ -990,7 +1260,7 @@ Module Stable.
     Qed.
 
     Lemma fence_step
-          lc1 sc1 mem1 ordr ordw lc2 sc2
+          rels lc1 sc1 mem1 ordr ordw lc2 sc2
           (WF1: Local.wf lc1 mem1)
           (SC1: Memory.closed_timemap sc1 mem1)
           (MEM1: Memory.closed mem1)
@@ -998,19 +1268,21 @@ Module Stable.
           (NORMAL_MEM1: normal_memory mem1)
           (STABLE_TVIEW1: stable_tview mem1 lc1.(Local.tview))
           (STABLE_SC1: stable_timemap mem1 sc1)
-          (STABLE_MEM1: stable_memory mem1)
+          (STABLE_MEM1: stable_memory rels mem1)
+          (RELS_WF1: ReleaseWrites.wf rels lc1 mem1)
           (STEP: Local.fence_step lc1 sc1 ordr ordw lc2 sc2):
       <<NORMAL_TVIEW2: normal_tview lc2.(Local.tview)>> /\
       <<STABLE_TVIEW2: stable_tview mem1 lc2.(Local.tview)>> /\
-      <<STABLE_SC2: stable_timemap mem1 sc2>>.
+      <<STABLE_SC2: stable_timemap mem1 sc2>> /\
+      <<RELS_WF2: ReleaseWrites.wf rels lc2 mem1>>.
     Proof.
-      inv STEP. ss. splits.
+      inv STEP. ss. splits; ss.
       - inv NORMAL_TVIEW1.
         econs; ss; i; repeat (condtac; ss).
         + apply join_normal_view; ss.
         + apply join_normal_view; ss.
       - inv STABLE_TVIEW1.
-        econs; ss; i; repeat (condtac; ss).
+        econs; ss; i; repeat (condtac; ss); eauto.
         + unfold TView.write_fence_sc. repeat (condtac; ss).
           * hexploit join_stable_view; [apply STABLE_SC1| apply ACQ|]. i.
             unfold View.join in H. ss. ii.

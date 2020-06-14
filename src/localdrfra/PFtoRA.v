@@ -36,6 +36,7 @@ Module PFtoRA.
     Variable lang: language.
     Variable L: Loc.t -> bool.
 
+
     Definition sim_statelocal (views: Loc.t -> Time.t -> list View.t) (rels: ReleaseWrites.t)
                (sl_pf sl_j sl_ra: {lang: language & Language.state lang} * Local.t): Prop :=
       JSim.sim_statelocal views sl_j sl_pf /\
