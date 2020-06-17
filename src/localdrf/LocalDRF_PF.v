@@ -43,16 +43,6 @@ Notation "p \\3// q" :=
     (at level 50, no associativity).
 
 
-Inductive all_promises (proms: Ident.t -> Loc.t -> Time.t -> Prop): Loc.t -> Time.t -> Prop :=
-| all_promises_intro
-    tid loc ts
-    (PROMS: proms tid loc ts)
-  :
-    all_promises proms loc ts
-.
-Hint Constructors all_promises.
-
-
 Inductive reserving_tevent: forall (e: ThreadEvent.t), Prop :=
 | reserving_tevent_reserve
     loc from to kind
