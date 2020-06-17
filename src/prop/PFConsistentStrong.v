@@ -745,3 +745,37 @@ Proof.
   eapply pf_consistent_flex_pf_consistent_flex_aux in CONSISTENT0; eauto.
   eapply pf_consistent_flex_aux_pf_consistent_super_strong in CONSISTENT0; eauto.
 Qed.
+
+Lemma pf_consistent_super_strong_consistent lang (th: Thread.t lang)
+      (LOCAL: Local.wf th.(Thread.local) th.(Thread.memory))
+      (MEM: Memory.closed th.(Thread.memory))
+      tr times certimes
+      (CONSISTENT: pf_consistent_super_strong th tr times certimes)
+  :
+    Thread.consistent th.
+Proof.
+  ii. exploit (CONSISTENT mem1 sc1 sc1).
+  { eapply Memory.cap_future_weak; eauto. }
+  { eapply Memory.cap_closed; eauto. }
+  { eapply Local.cap_wf; eauto. }
+  i. des.
+  eapply pred_steps_traced_step2 in STEPS; cycle 1.
+  { instantiate (1:=fun _ => True). eapply List.Forall_impl; eauto.
+    i. ss. des. splits; auto. }
+  eapply thread_steps_pred_steps in STEPS.
+  unguard. des.
+  { destruct e1. ss. left. econs. esplits; eauto. }
+  { right. esplits; eauto. }
+Qed.
+
+Definition pf_consistent_super_strong_mon lang e0 tr times certimes0 certimes1
+           (CONSISTENT: @pf_consistent_super_strong
+                          lang e0 tr times certimes0)
+           (LE: certimes0 <2= certimes1)
+  :
+    pf_consistent_super_strong e0 tr times certimes1.
+Proof.
+  ii. exploit CONSISTENT; eauto. i. des. esplits; eauto.
+  eapply List.Forall_impl; eauto. i. ss. des. splits; auto.
+  eapply wf_time_evt_mon; eauto.
+Qed.
