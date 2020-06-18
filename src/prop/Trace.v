@@ -18,6 +18,7 @@ Require Import TView.
 Require Import Local.
 Require Import Thread.
 Require Import Configuration.
+Require Import PromiseConsistent.
 Require Import Progress.
 Require Import Behavior.
 
@@ -248,6 +249,20 @@ Module Trace.
   Proof.
     eapply configuration_step_step in STEP.
     eapply Configuration.step_future; eauto.
+  Qed.
+
+  Lemma steps_promise_consistent
+        lang (th1 th2: Thread.t lang) tr
+        (STEPS: steps tr th1 th2)
+        (CONS: Local.promise_consistent th2.(Thread.local))
+        (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
+        (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory))
+        (MEM1: Memory.closed th1.(Thread.memory)):
+    Local.promise_consistent th1.(Thread.local).
+  Proof.
+    ginduction STEPS; auto. i. subst.
+    exploit Thread.step_future; eauto. i. des.
+    eapply step_promise_consistent; eauto.
   Qed.
 
 End Trace.

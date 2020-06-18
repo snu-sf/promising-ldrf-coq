@@ -1434,6 +1434,16 @@ Section UNCHANGABLES.
     inv H. inv TSTEP. inv STEP. eapply unchangable_increase; eauto.
   Qed.
 
+  Lemma unchangable_trace_steps_increase lang (th0 th1: Thread.t lang) tr
+        (STEPS: Trace.steps tr th0 th1)
+    :
+      unchangable th0.(Thread.memory) th0.(Thread.local).(Local.promises) <4=
+      unchangable th1.(Thread.memory) th1.(Thread.local).(Local.promises).
+  Proof.
+    ginduction STEPS; ss. i.
+    eapply IHSTEPS. eapply unchangable_increase; eauto.
+  Qed.
+
   Lemma other_promise_unchangable c tid1 tid2 st1 st2 lc1 lc2
         (CWF: Configuration.wf c)
         (TID1: IdentMap.find tid1 c.(Configuration.threads) = Some (st1, lc1))
@@ -1576,6 +1586,16 @@ Section UNCHANGABLES.
     i. inv H. inv TSTEP. eapply IHSTEP. eapply unwritable_increase; eauto.
   Qed.
 
+  Lemma unwritable_traces_steps_increase lang (th0 th1: Thread.t lang) tr
+        (STEPS: Trace.steps tr th0 th1)
+    :
+      unwritable th0.(Thread.memory) th0.(Thread.local).(Local.promises) <2=
+      unwritable th1.(Thread.memory) th1.(Thread.local).(Local.promises).
+  Proof.
+    ginduction STEPS; ss. i.
+    eapply IHSTEPS. eapply unwritable_increase; eauto.
+  Qed.
+
   Lemma steps_write_not_in P lang (th_tgt th_tgt': Thread.t lang)
         (MLE: Memory.le th_tgt.(Thread.local).(Local.promises) th_tgt.(Thread.memory))
         (STEP: rtc (tau (@pred_step P lang)) th_tgt th_tgt')
@@ -1669,6 +1689,16 @@ Section UNCHANGABLES.
   Proof.
     induction STEP; eauto.
     i. inv H. inv TSTEP. eapply IHSTEP. eapply unreadable_increase; eauto.
+  Qed.
+
+  Lemma unreadable_traces_steps_increase lang (th0 th1: Thread.t lang) tr
+        (STEPS: Trace.steps tr th0 th1)
+    :
+      unreadable th0.(Thread.memory) th0.(Thread.local).(Local.promises) <2=
+      unreadable th1.(Thread.memory) th1.(Thread.local).(Local.promises).
+  Proof.
+    ginduction STEPS; ss. i.
+    eapply IHSTEPS. eapply unreadable_increase; eauto.
   Qed.
 
   Lemma step_no_read_unreadable lang (th_tgt th_tgt': Thread.t lang) e_tgt pf
