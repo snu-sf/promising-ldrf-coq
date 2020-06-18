@@ -114,8 +114,7 @@ Module CompressSteps.
       unfold Thread.steps_failure in *. des.
       eapply pred_steps_thread_steps in STEPS.
       eapply pred_steps_trace_steps in STEPS. des.
-      hexploit trace_times_list_exists.
-      { eapply STEPS0. } i. des.
+      hexploit (trace_times_list_exists tr). i. des.
       hexploit (spatial_memory_map times MEMORY); eauto. i. des.
       destruct e2. hexploit trace_steps_map; try apply STEPS0; try apply MEMORY0; eauto.
       { eapply mapping_map_lt_map_le; eauto. }
@@ -168,8 +167,7 @@ Module CompressSteps.
       unfold Thread.steps_failure in *. des.
       eapply pred_steps_thread_steps in STEPS_TGT.
       eapply pred_steps_trace_steps in STEPS_TGT. des.
-      hexploit trace_times_list_exists.
-      { eapply STEPS. } i. des.
+      hexploit (trace_times_list_exists tr). i. des.
       hexploit (spatial_memory_map times MEMORY); eauto. i. des.
       destruct e2_tgt. hexploit trace_steps_map; try apply STEPS; try apply MEMORY0; eauto.
       { eapply mapping_map_lt_map_le; eauto. }

@@ -416,21 +416,21 @@ Section PredStep.
     exploit event_times_list_exists; eauto.
   Qed.
 
-  Lemma trace_times_list_exists lang (th0 th1: Thread.t lang) tr
-        (STEPS: Trace.steps tr th0 th1)
+  Lemma trace_times_list_exists lang (tr: Trace.t lang)
     :
       exists (times: Loc.t -> list Time.t),
         (<<WFTIME: List.Forall (fun em => wf_time_evt (fun loc to => List.In to (times loc)) (snd em)) tr>>).
   Proof.
-    ginduction STEPS.
-    - exists (fun _ => []). econs.
-    - des. clarify. eapply step_times_list_exists in STEP. des.
-      exists (fun loc => (times0 loc ++ times loc)). econs.
-      + eapply wf_time_evt_mon; eauto.
-        i. ss. eapply List.in_or_app; eauto.
-      + eapply List.Forall_impl; eauto.
-        i. ss. eapply wf_time_evt_mon; eauto.
-        i. ss. eapply List.in_or_app; eauto.
+    induction tr.
+    { exists (fun _ => []). ss. }
+    { des. hexploit (event_times_list_exists (snd a)). i. des.
+      exists (fun loc => times loc ++ times0 loc). econs.
+      { eapply wf_time_evt_mon; eauto. i. ss.
+        eapply List.in_or_app; auto. }
+      { eapply List.Forall_impl; eauto. i. ss.
+        eapply wf_time_evt_mon; eauto. i. ss.
+        eapply List.in_or_app; auto. }
+    }
   Qed.
 
   Inductive opt_pred_step P lang

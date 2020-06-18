@@ -84,8 +84,7 @@ Proof.
   ginduction FUTURE.
   { i. exists []. splits; eauto. econs; eauto. }
   { i. exploit IHFUTURE; eauto. i. des. esplits.
-    { eapply Trace.steps_trans; [|apply STEPS|ss].
-      econs 1. econs; eauto. }
+    { econs; eauto. econs; eauto. econs; eauto. }
     { econs; ss. }
   }
 Qed.
