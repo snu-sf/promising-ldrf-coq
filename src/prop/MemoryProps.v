@@ -27,6 +27,7 @@ Require Import PromiseConsistent.
 Require Import MemoryMerge.
 Require Import Cover.
 Require Import Pred.
+Require Import Trace.
 
 
 Set Implicit Arguments.
@@ -129,6 +130,31 @@ Section GENERAL.
     ginduction la; i.
     { inv FORALL0. inv FORALL1. econs. }
     { inv FORALL0. inv FORALL1. econs; eauto. }
+  Qed.
+
+  Lemma list_Forall2_symm A B
+        (P: A -> B -> Prop) (Q: B -> A -> Prop)
+        (la: list A) (lb: list B)
+        (FORALL: List.Forall2 P la lb)
+        (IMPLY: forall a b (SAT: P a b), Q b a)
+    :
+      List.Forall2 Q lb la.
+  Proof.
+    ginduction la; i.
+    { inv FORALL. econs. }
+    { inv FORALL. econs; eauto. }
+  Qed.
+
+  Lemma list_Forall2_rev A B
+        (P: A -> B -> Prop)
+        (la: list A) (lb: list B)
+        (FORALL: List.Forall2 P la lb)
+    :
+      List.Forall2 (fun b a => P a b) lb la.
+  Proof.
+    ginduction la; i.
+    { inv FORALL. econs. }
+    { inv FORALL. econs; eauto. }
   Qed.
 
 End GENERAL.
@@ -750,14 +776,14 @@ Section MEMORYLEMMAS.
       + inv LOCAL0; ss.
   Qed.
 
-  Lemma traced_step_promises_le lang tr (th0 th1: Thread.t lang)
+  Lemma trace_steps_promises_le lang tr (th0 th1: Thread.t lang)
         (MLE: Memory.le th0.(Thread.local).(Local.promises) th0.(Thread.memory))
-        (STEP: traced_step tr th0 th1)
+        (STEP: Trace.steps tr th0 th1)
   :
     Memory.le th1.(Thread.local).(Local.promises) th1.(Thread.memory).
   Proof.
     ginduction STEP; ss.
-    i. eapply IHSTEP. eapply step_promises_le; eauto.
+    i. eapply IHSTEP. eapply step_promises_le; eauto. econs; eauto.
   Qed.
 
   Lemma steps_promises_le P lang (th0 th1: Thread.t lang)
@@ -769,16 +795,6 @@ Section MEMORYLEMMAS.
     ginduction STEP; ss.
     i. eapply IHSTEP.
     inv H. inv TSTEP. eapply step_promises_le; eauto.
-  Qed.
-
-  Lemma traced_steps_promises_le lang (th0 th1: Thread.t lang) events
-        (MLE: Memory.le th0.(Thread.local).(Local.promises) th0.(Thread.memory))
-        (STEP: traced_step events th0 th1)
-  :
-    Memory.le th1.(Thread.local).(Local.promises) th1.(Thread.memory).
-  Proof.
-    ginduction STEP; ss.
-    i. eapply IHSTEP. eapply step_promises_le; eauto.
   Qed.
 
   Lemma inhabited_future mem1 mem2
@@ -1579,14 +1595,14 @@ Section UNCHANGABLES.
   Qed.
 
   Lemma write_not_in_traced lang (th0 th1: Thread.t lang) tr
-        (STEPS: traced_step tr th0 th1)
+        (STEPS: Trace.steps tr th0 th1)
         (MLE: Memory.le th0.(Thread.local).(Local.promises) th0.(Thread.memory))
     :
-      List.Forall (fun em => (write_not_in (unwritable th0.(Thread.memory) th0.(Thread.local).(Local.promises))) (fst em)) tr.
+      List.Forall (fun em => (write_not_in (unwritable th0.(Thread.memory) th0.(Thread.local).(Local.promises))) (snd em)) tr.
   Proof.
     ginduction STEPS.
     - econs.
-    - subst. inv HD. econs.
+    - i. subst. econs.
       + ss. eapply step_write_not_in in STEP; eauto.
       + exploit IHSTEPS.
         * eapply step_promises_le in MLE; eauto. econs; eauto.
@@ -1684,13 +1700,13 @@ Section UNCHANGABLES.
   Qed.
 
   Lemma no_read_unreadable_traced lang (th0 th1: Thread.t lang) tr
-        (STEPS: traced_step tr th0 th1)
+        (STEPS: Trace.steps tr th0 th1)
     :
-      List.Forall (fun em => (no_read_msgs (unreadable th0.(Thread.memory) th0.(Thread.local).(Local.promises))) (fst em)) tr.
+      List.Forall (fun em => (no_read_msgs (unreadable th0.(Thread.memory) th0.(Thread.local).(Local.promises))) (snd em)) tr.
   Proof.
     ginduction STEPS.
     - econs.
-    - subst. inv HD. econs.
+    - subst. econs.
       + ss. eapply step_no_read_unreadable in STEP; eauto.
       + eapply List.Forall_impl; eauto. i. ss.
         eapply no_read_msgs_mon; eauto.
@@ -1754,18 +1770,18 @@ Section UNCHANGABLES.
   Qed.
 
   Lemma write_not_in_covered_traced MSGS lang (th0 th1: Thread.t lang) tr
-        (STEPS: traced_step tr th0 th1)
+        (STEPS: Trace.steps tr th0 th1)
         (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
         (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
         (CLOSED: Memory.closed (Thread.memory th0))
-        (NOTIN: List.Forall (fun em => write_not_in MSGS (fst em)) tr)
+        (NOTIN: List.Forall (fun em => write_not_in MSGS (snd em)) tr)
         loc ts
         (COVERED: covered loc ts th1.(Thread.memory))
     :
       covered loc ts th0.(Thread.memory) \/ ~ MSGS loc ts.
   Proof.
     ginduction STEPS; auto. i. subst.
-    inv HD. inv NOTIN. exploit Thread.step_future; eauto. i. des.
+    inv NOTIN. exploit Thread.step_future; eauto. i. des.
     exploit IHSTEPS; eauto. i. des; auto.
     exploit step_write_not_in_covered; eauto.
   Qed.
@@ -2409,31 +2425,6 @@ Section CANCEL.
       eapply cancel_promises_decrease; eauto.
   Qed.
 
-  Lemma nacancel_promises_decrease P lang e th0 th1
-        (STEP: (@pred_step P lang) e th0 th1)
-        (PRED: P <1= is_cancel)
-    :
-      Memory.le th1.(Thread.local).(Local.promises) th0.(Thread.local).(Local.promises).
-  Proof.
-    inv STEP. eapply PRED in SAT. unfold is_cancel in SAT. des_ifs.
-    inv STEP0. inv STEP; inv STEP0; ss.
-    - inv LOCAL. inv PROMISE; ss.
-      ii. erewrite Memory.remove_o in LHS; eauto. des_ifs.
-    - inv LOCAL.
-  Qed.
-
-  Lemma nacancels_promises_decrease P lang th0 th1
-        (STEP: rtc (tau (@pred_step P lang)) th0 th1)
-        (PRED: P <1= is_cancel)
-    :
-      Memory.le th1.(Thread.local).(Local.promises) th0.(Thread.local).(Local.promises).
-  Proof.
-    ginduction STEP.
-    - refl.
-    - etrans; eauto. inv H.
-      eapply nacancel_promises_decrease; eauto.
-  Qed.
-
   Lemma cancel_remove_only P lang e th0 th1
         (STEP: (@pred_step P lang) e th0 th1)
         (PRED: P <1= is_cancel)
@@ -2485,64 +2476,59 @@ End CANCEL.
 Section NOSC.
 
   Lemma no_sc_any_sc
-        P lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc_src sc'
-        mem mem' e
-        (STEP: (@pred_step P lang) e th_tgt th_tgt')
-        (NOSC: P <1= no_sc)
+        lang th_src th_tgt th_tgt' st st' v v' prom prom' sc sc_src sc'
+        mem mem' pf e
+        (STEP: Thread.step pf e th_tgt th_tgt')
+        (NOSC: no_sc e)
         (TH_SRC: th_src = Thread.mk lang st (Local.mk v prom) sc_src mem)
         (TH_TGT0: th_tgt = Thread.mk lang st (Local.mk v prom) sc mem)
         (TH_TGT1: th_tgt' = Thread.mk lang st' (Local.mk v' prom') sc' mem')
   :
     exists sc_src',
-      (<<STEP: (@pred_step P lang)
-                 e th_src
-                 (Thread.mk lang st' (Local.mk v' prom') sc_src' mem')>>).
+      (<<STEP: Thread.step pf e th_src
+                           (Thread.mk lang st' (Local.mk v' prom') sc_src' mem')>>).
   Proof.
-    clarify. inv STEP. dup SAT. eapply NOSC in SAT.
-    inv STEP0. des. inv STEP.
+    clarify. inv STEP.
     - inv STEP0. inv LOCAL. ss. clarify.
-      esplits. econs; eauto. econs; eauto. econs 1; eauto. econs; eauto.
+      esplits. econs; eauto. econs; eauto.
     - inv STEP0. inv LOCAL; ss.
-      + esplits. econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
-      + esplits. econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+      + esplits. econs 2; eauto. econs; eauto.
+      + esplits. econs 2; eauto. econs; eauto.
       + inv LOCAL0. ss. clarify. exists sc_src.
-        econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
-        econs; eauto. econs; eauto. ss.
+        econs 2; eauto. econs; eauto. econs; eauto. econs; eauto. ss.
         inv WRITABLE. econs; eauto.
       + inv LOCAL1. ss. inv LOCAL2. ss. clarify. exists sc_src.
-        econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
-        econs; eauto. econs; eauto. ss.
+        econs 2; eauto. econs; eauto. econs; eauto. econs; eauto. ss.
         inv WRITABLE. econs; eauto.
       + inv LOCAL0. ss. clarify.
-        esplits. econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
-        econs; eauto. econs; eauto. ss. f_equal.
+        esplits. econs 2; eauto. econs; eauto. econs; eauto. econs; eauto. ss. f_equal.
         unfold TView.write_fence_tview. ss. des_ifs.
-      + esplits. econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
+      + esplits. econs 2; eauto. econs; eauto.
   Qed.
 
   Lemma no_sc_any_sc_traced
         lang th_src th_tgt th_tgt' st st' lc lc' sc sc_src sc'
-        mem mem' events
-        (STEPS: traced_step events th_tgt th_tgt')
+        mem mem' tr
+        (STEPS: Trace.steps tr th_tgt th_tgt')
         (TH_SRC: th_src = Thread.mk lang st lc sc_src mem)
         (TH_TGT0: th_tgt = Thread.mk lang st lc sc mem)
         (TH_TGT1: th_tgt' = Thread.mk lang st' lc' sc' mem')
-        (EVENTS: forall e (IN: List.In e events), <<SAT: no_sc (fst e)>>)
+        (EVENTS: List.Forall (fun em => no_sc (snd em)) tr)
     :
-      exists sc_src',
-        (<<STEPS: traced_step events
-                              th_src
-                              (Thread.mk lang st' lc' sc_src' mem')>>).
+      exists sc_src' tr_src,
+        (<<STEPS: Trace.steps
+                    tr_src th_src
+                    (Thread.mk lang st' lc' sc_src' mem')>>) /\
+        (<<EVENTS: List.Forall2 (fun em_src em_tgt => snd em_src = snd em_tgt) tr_src tr>>)
+  .
   Proof.
     ginduction STEPS.
-    - i. clarify. esplits; eauto. econs.
-    - i. clarify. destruct th1. destruct local, lc, lc'. ss.
-      exploit no_sc_any_sc; ss.
-      { econs; eauto. instantiate (1:=no_sc).
-        exploit EVENTS; eauto. }
-      { ss. }
-      i. des. inv STEP.
-      exploit IHSTEPS; eauto. i. des. eexists. econs; eauto.
+    - i. clarify. esplits; eauto.
+    - i. clarify. destruct th1. destruct local, lc, lc'. inv EVENTS. ss.
+      exploit no_sc_any_sc; try eapply STEP; ss. i. des.
+      exploit IHSTEPS; ss. i. des.
+      instantiate (1:=sc_src') in STEPS0.
+      instantiate (1:=sc_src) in STEP0. esplits; eauto.
   Qed.
 
   Lemma no_sc_any_sc_rtc
@@ -2562,9 +2548,10 @@ Section NOSC.
     ginduction STEP.
     - i. clarify. esplits; eauto.
     - i. clarify. destruct y. destruct local, lc, lc'. ss.
-      inv H. exploit no_sc_any_sc; eauto. i. des.
+      inv H. inv TSTEP. inv STEP0. exploit no_sc_any_sc; eauto. i. des.
       exploit IHSTEP; eauto. i. des.
       exists sc_src'0. esplits. econs; eauto.
+      econs; eauto. econs; eauto. econs; eauto.
   Qed.
 
   Lemma no_sc_same_sc_step lang (th0 th1: Thread.t lang) pf e
@@ -2584,14 +2571,14 @@ Section NOSC.
   Qed.
 
   Lemma no_sc_same_sc_traced lang (th0 th1: Thread.t lang) tr
-        (STEPS: traced_step tr th0 th1)
-        (NOSC: List.Forall (fun em => (no_sc) (fst em)) tr)
+        (STEPS: Trace.steps tr th0 th1)
+        (NOSC: List.Forall (fun em => (no_sc) (snd em)) tr)
     :
       th1.(Thread.sc) = th0.(Thread.sc).
   Proof.
     ginduction STEPS; auto.
-    i. inv NOSC. erewrite IHSTEPS; eauto. ss.
-    inv HD. eapply no_sc_same_sc_step; eauto.
+    i. inv NOSC; ss. clarify. erewrite IHSTEPS; eauto. ss.
+    eapply no_sc_same_sc_step; eauto.
   Qed.
 
 End NOSC.
@@ -3011,7 +2998,7 @@ Section PROMISEWRITING.
   Qed.
 
   Lemma steps_promise_decrease_promise_writing_event lang (th0 th1: Thread.t lang) tr
-        (STEPS: traced_step tr th0 th1)
+        (STEPS: Trace.steps tr th0 th1)
         loc from to val released
         (GET: Memory.get loc to th0.(Thread.local).(Local.promises) = Some (from, Message.concrete val released))
     :
@@ -3019,15 +3006,14 @@ Section PROMISEWRITING.
           (<<FROM: Time.le from from'>>) /\
           (<<RELEASED: View.opt_le released' released>>) /\
           (<<GET: Memory.get loc to th1.(Thread.local).(Local.promises) = Some (from', Message.concrete val released')>>)) \/
-      (exists e m,
+      (exists th e,
           (<<WRITING: promise_writing_event loc from to val released e>>) /\
-          (<<IN: List.In (e, m) tr>>)
+          (<<IN: List.In (th, e) tr>>)
       ).
   Proof.
     ginduction STEPS.
     { i. left. exists from, released. splits; auto; try refl. }
-    { subst. i. inv HD.
-      exploit step_promise_decrease_promise_writing_event; eauto. i. des.
+    { subst. i. exploit step_promise_decrease_promise_writing_event; eauto. i. des.
       { exploit IHSTEPS; eauto. i. des.
         { left. exists from'0, released'0. splits; auto.
           { etrans; eauto. }
@@ -3099,16 +3085,14 @@ Section WFTIME.
   Qed.
 
   Lemma memory_times_wf_traced times lang (th0 th1: Thread.t lang) tr
-        (STEPS: traced_step tr th0 th1)
+        (STEPS: Trace.steps tr th0 th1)
         (WF: memory_times_wf times th0.(Thread.memory))
-        (EVENTS: forall e (IN: List.In e tr), wf_time_evt times (fst e))
+        (EVENTS: List.Forall (fun em => wf_time_evt times (snd em)) tr)
     :
       memory_times_wf times th1.(Thread.memory).
   Proof.
-    ginduction STEPS; auto. i. eapply IHSTEPS; eauto.
-    { inv HD. eapply step_memory_times_wf; eauto.
-      exploit (EVENTS (hde, th0.(Thread.memory))); ss. auto. }
-    { i. exploit (EVENTS e); ss. auto. }
+    ginduction STEPS; auto. subst. i. inv EVENTS. eapply IHSTEPS; eauto.
+    eapply step_memory_times_wf; eauto.
   Qed.
 
 End WFTIME.

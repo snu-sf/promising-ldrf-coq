@@ -26,6 +26,7 @@ Require Import Program.
 Require Import Cell.
 Require Import Time.
 Require Import Pred.
+Require Import Trace.
 Require Import MemoryProps.
 
 Set Implicit Arguments.
@@ -2222,14 +2223,14 @@ Section MAPPED.
     | _ => True
     end.
 
-  Lemma wf_time_mapped_mappable (tr: list (ThreadEvent.t * Memory.t)) times
-        (WFTIME: List.Forall (fun em => wf_time_evt (fun loc to => List.In to (times loc)) (fst em)) tr)
-        (COMPLETE: forall loc to (IN: List.In to (times loc)),
+  Lemma wf_time_mapped_mappable lang (tr: Trace.t lang) times
+        (WFTIME: List.Forall (fun em => wf_time_evt times (snd em)) tr)
+        (COMPLETE: forall loc to (IN: times loc to),
             exists fto, (<<MAPPED: f loc to fto>>))
     :
-      List.Forall (fun em => mappable_evt (fst em)) tr.
+      List.Forall (fun em => mappable_evt (snd em)) tr.
   Proof.
-    eapply List.Forall_impl; eauto. i. ss. destruct a. destruct t; ss.
+    eapply List.Forall_impl; eauto. i. ss. destruct a. destruct t0; ss.
     - des. split.
       + apply COMPLETE in FROM. des. esplit. eauto.
       + apply COMPLETE in TO. des. esplit. eauto.
@@ -2410,11 +2411,11 @@ Section MAPPED.
       + erewrite tevent_map_same_machine_event; eauto.
   Qed.
 
-  Lemma traced_steps_map
+  Lemma trace_steps_map
         lang (th0 th1 fth0: Thread.t lang) st0 st1 lc0 lc1 flc0
         sc0 sc1 fsc0 fsc0' mem0 mem1 fmem0 tr
-        (PRED: List.Forall (fun em => mappable_evt (fst em)) tr)
-        (STEPS: traced_step tr th0 th1)
+        (PRED: List.Forall (fun em => mappable_evt (snd em)) tr)
+        (STEPS: Trace.steps tr th0 th1)
         (TH_TGT0: th0 = Thread.mk lang st0 lc0 sc0 mem0)
         (TH_TGT1: th1 = Thread.mk lang st1 lc1 sc1 mem1)
         (TH_SRC: fth0 = Thread.mk lang st0 flc0 fsc0 fmem0)
@@ -2431,19 +2432,19 @@ Section MAPPED.
         (SCLE: TimeMap.le fsc0 fsc0')
     :
       exists ftr flc1 fmem1 fsc1 fsc1',
-        (<<STEPS: traced_step ftr fth0 (Thread.mk lang st1 flc1 fsc1 fmem1)>>) /\
+        (<<STEPS: Trace.steps ftr fth0 (Thread.mk lang st1 flc1 fsc1 fmem1)>>) /\
         (<<SC: timemap_map sc1 fsc1'>>) /\
         (<<SCLE: TimeMap.le fsc1 fsc1'>>) /\
         (<<MEM: memory_map mem1 fmem1>>) /\
         (<<LOCAL: local_map lc1 flc1>>) /\
-        (<<TRACE: List.Forall2 (fun em fem => <<EVENT: tevent_map (fst fem) (fst em)>> /\ <<MEM: memory_map (snd em) (snd fem)>>) tr ftr>>)
+        (<<TRACE: List.Forall2 (fun em fem => <<EVENT: tevent_map (snd fem) (snd em)>>) tr ftr>>)
   .
   Proof.
     ginduction STEPS; i; ss; clarify.
-    - esplits; eauto. econs.
+    - esplits; eauto.
     - ss. destruct th1. inv PRED. exploit step_map; ss.
       { instantiate (1:=mappable_evt). ss. }
-      { econs; eauto. }
+      { econs; eauto. econs; eauto. }
       { eauto. }
       { eapply LCWF1. }
       { eauto. }
@@ -2451,15 +2452,11 @@ Section MAPPED.
       { eauto. }
       { eauto. }
       i. des.
-      dup HD. inv HD.
-      exploit Thread.step_future; try apply STEP0; ss. i. des.
-      dup STEP. inv STEP1.
-      exploit Thread.step_future; try apply STEP2; ss. i. des.
+      exploit Thread.step_future; try apply STEP; ss. i. des.
+      inv STEP0. exploit Thread.step_future; try apply STEP1; ss. i. des.
       exploit IHSTEPS; try apply STEPS; eauto.
-      { eapply collapsable_unwritable_step in STEP0; eauto. }
+      { eapply collapsable_unwritable_step in STEP; eauto. }
       i. des. esplits; eauto.
-      + econs; eauto.
-      + econs; eauto.
   Qed.
 
 End MAPPED.

@@ -19,6 +19,7 @@ Require Import Local.
 Require Import Thread.
 Require Import Mapping.
 Require Import Pred.
+Require Import Trace.
 Require Import MemoryProps.
 
 Set Implicit Arguments.
@@ -112,11 +113,11 @@ Module CompressSteps.
       inv THREAD1. destruct e1_src, e1_tgt. ss. clarify.
       unfold Thread.steps_failure in *. des.
       eapply pred_steps_thread_steps in STEPS.
-      eapply pred_steps_traced_step in STEPS. des.
-      hexploit traced_times_list_exists.
+      eapply pred_steps_trace_steps in STEPS. des.
+      hexploit trace_times_list_exists.
       { eapply STEPS0. } i. des.
       hexploit (spatial_memory_map times MEMORY); eauto. i. des.
-      destruct e2. hexploit traced_steps_map; try apply STEPS0; try apply MEMORY0; eauto.
+      destruct e2. hexploit trace_steps_map; try apply STEPS0; try apply MEMORY0; eauto.
       { eapply mapping_map_lt_map_le; eauto. }
       { eapply map_ident_in_memory_bot; eauto. }
       { eapply mapping_map_lt_map_eq; eauto. }
@@ -128,12 +129,12 @@ Module CompressSteps.
       i. des. inv FAILURE; inv STEP. inv LOCAL0. inv LOCAL1.
       esplits.
       - eapply thread_steps_pred_steps.
-        eapply pred_steps_traced_step2.
+        eapply pred_steps_trace_steps2.
         + eapply STEPS.
         + instantiate (1:=fun _ => True). eapply List.Forall_forall. ii.
           eapply list_Forall2_in in H; eauto. des.
           eapply List.Forall_forall in EVENTS; try apply IN. destruct a, x.
-          ss. des. split; auto. inv EVENT; ss.
+          ss. des. split; auto. inv SAT; ss.
       - econs 2. econs; eauto. econs. econs.
         destruct lc2, flc1. inv LOCAL. ss.
         eapply promise_consistent_mon.
@@ -166,11 +167,11 @@ Module CompressSteps.
       inv THREAD1. destruct e1_src, e1_tgt. ss. clarify.
       unfold Thread.steps_failure in *. des.
       eapply pred_steps_thread_steps in STEPS_TGT.
-      eapply pred_steps_traced_step in STEPS_TGT. des.
-      hexploit traced_times_list_exists.
+      eapply pred_steps_trace_steps in STEPS_TGT. des.
+      hexploit trace_times_list_exists.
       { eapply STEPS. } i. des.
       hexploit (spatial_memory_map times MEMORY); eauto. i. des.
-      destruct e2_tgt. hexploit traced_steps_map; try apply STEPS; try apply MEMORY0; eauto.
+      destruct e2_tgt. hexploit trace_steps_map; try apply STEPS; try apply MEMORY0; eauto.
       { eapply mapping_map_lt_map_le; eauto. }
       { eapply map_ident_in_memory_bot; eauto. }
       { eapply mapping_map_lt_map_eq; eauto. }
@@ -181,12 +182,12 @@ Module CompressSteps.
       { refl. }
       i. des. esplits.
       - eapply thread_steps_pred_steps.
-        eapply pred_steps_traced_step2.
+        eapply pred_steps_trace_steps2.
         + eapply STEPS0.
         + instantiate (1:=fun _ => True). eapply List.Forall_forall. ii.
           eapply list_Forall2_in in H; eauto. des.
           eapply List.Forall_forall in EVENTS; try apply IN. destruct a, x.
-          ss. des. split; auto. inv EVENT; ss.
+          ss. des. split; auto. inv SAT; ss.
       - ss. inv LOCAL. rewrite PROMISES_TGT in *.
         eapply bot_promises_map; eauto.
     Qed.

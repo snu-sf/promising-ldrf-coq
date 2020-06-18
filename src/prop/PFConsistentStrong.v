@@ -21,6 +21,7 @@ Require Import TView.
 Require Import Local.
 Require Import Thread.
 Require Import Pred.
+Require Import Trace.
 
 Require Import MemoryMerge.
 Require Import PromiseConsistent.
@@ -113,7 +114,7 @@ Proof.
         * left. inv FAILURE; inv STEP. inv LOCAL. inv LOCAL0.
           exists (Thread.mk _ st2 (Local.mk tview proms1) sc2 mem0).
           ss. econs 2. econs; eauto. econs; eauto. econs; eauto.
-          eapply nacancels_promises_decrease in STEPS0; auto. ss.
+          eapply cancels_promises_decrease in STEPS0; auto. ss.
           ii. eapply CONSISTENT0; eauto.
     - unguard. esplits; eauto. rewrite PROMISES. ii.
       rewrite Memory.bot_get in GET. clarify. }
@@ -223,17 +224,17 @@ Definition pf_consistent_strong_aux lang (e0:Thread.t lang): Prop :=
   forall mem1
          (CAP: Memory.cap e0.(Thread.memory) mem1),
   exists tr e1 times,
-    (<<STEPS: traced_step tr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot mem1) e1>>) /\
-    (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free /1\ no_sc /1\ (wf_time_evt (fun loc to => List.In to (times loc)))) (fst em)>> /\ <<TAU: ThreadEvent.get_machine_event (fst em) = MachineEvent.silent>>) tr >>) /\
+    (<<STEPS: Trace.steps tr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot mem1) e1>>) /\
+    (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free /1\ no_sc /1\ (wf_time_evt (fun loc to => List.In to (times loc)))) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) tr >>) /\
     (__guard__((exists st',
                    (<<LOCAL: Local.failure_step e1.(Thread.local)>>) /\
                    (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
                ((<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>) /\
                 (<<WRITES: forall loc from to val released
                                   (GET: Memory.get loc to e0.(Thread.local).(Local.promises) = Some (from, Message.concrete val released)),
-                    exists e m,
+                    exists th e,
                       (<<WRITING: promise_writing_event loc from to val released e>>) /\
-                      (<<IN: List.In (e, m) tr>>)>>)))).
+                      (<<IN: List.In (th, e) tr>>)>>)))).
 
 Lemma pf_consistent_strong_pf_consistent_strong_aux lang (th: Thread.t lang)
       (WF: Local.wf th.(Thread.local) th.(Thread.memory))
@@ -247,9 +248,9 @@ Proof.
   { i. destruct x1; ss. destruct kind; ss. }
   eapply pred_step_rtc_mon with (Q:=(promise_free /1\ no_sc)) in STEPS1; cycle 1.
   { i. des; auto. }
-  hexploit (proj1 (@pred_steps_traced_step (promise_free /1\ no_sc) _ (Thread.mk _ th.(Thread.state) th.(Thread.local) TimeMap.bot mem1) e2)).
+  hexploit (proj1 (@pred_steps_trace_steps (promise_free /1\ no_sc) _ (Thread.mk _ th.(Thread.state) th.(Thread.local) TimeMap.bot mem1) e2)).
   { etrans; eauto. } i. des.
-  exploit traced_times_list_exists; eauto. i. des.
+  exploit trace_times_list_exists; eauto. i. des.
   eexists tr, e2, times. esplits; eauto.
   { eapply list_Forall_sum.
     { eapply EVENTS. }
@@ -346,7 +347,7 @@ Proof.
 Qed.
 
 Definition pf_consistent_flex lang (e0:Thread.t lang)
-           (tr : list (ThreadEvent.t * Memory.t)) (times : Loc.t -> list Time.t)
+           (tr : Trace.t lang) (times : Loc.t -> list Time.t)
            (f: Loc.t -> nat -> (Time.t -> Time.t -> Prop))
   : Prop :=
   (<<MAP: forall loc n
@@ -359,22 +360,22 @@ Definition pf_consistent_flex lang (e0:Thread.t lang)
                         (TM: forall loc, Time.lt (Memory.max_ts loc e0.(Thread.memory)) (incr_time_seq (tm loc)))
                         (CAP: cap_flex e0.(Thread.memory) mem1 (fun loc => incr_time_seq (tm loc))),
       exists ftr e1,
-        (<<STEPS: traced_step ftr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot mem1) e1>>) /\
+        (<<STEPS: Trace.steps ftr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot mem1) e1>>) /\
         (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free
                                                     /1\ no_sc
                                                     /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (incr_time_seq (tm loc))>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))
                                                     /1\ wf_time_evt (fun loc => certification_times times f (Memory.max_timemap e0.(Thread.memory)) loc)
-                                                    /1\ no_read_msgs (fun loc ts => ~ (covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts \/ Time.lt (incr_time_seq (tm loc)) ts))) (fst em)>> /\ <<TAU: ThreadEvent.get_machine_event (fst em) = MachineEvent.silent>>) ftr >>) /\
-        (<<TRACE: List.Forall2 (fun em fem => <<EVENT: tevent_map (fun loc => f loc (tm loc)) (fst fem) (fst em)>> /\ <<MEM: memory_map (fun loc => f loc (tm loc)) (snd em) (snd fem)>>) tr ftr>>) /\
+                                                    /1\ no_read_msgs (fun loc ts => ~ (covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts \/ Time.lt (incr_time_seq (tm loc)) ts))) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) ftr >>) /\
+        (<<TRACE: List.Forall2 (fun em fem => tevent_map (fun loc => f loc (tm loc)) (snd fem) (snd em)) tr ftr>>) /\
         (__guard__((exists st',
                        (<<LOCAL: Local.failure_step e1.(Thread.local)>>) /\
                        (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
                    ((<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>) /\
                     (<<WRITES: forall loc from to val released
                                       (GET: Memory.get loc to e0.(Thread.local).(Local.promises) = Some (from, Message.concrete val released)),
-                        exists e m,
+                        exists th e,
                           (<<WRITING: promise_writing_event loc from to val released e>>) /\
-                          (<<IN: List.In (e, m) ftr>>)>>))))>>).
+                          (<<IN: List.In (th, e) ftr>>)>>))))>>).
 
 Lemma pf_consistent_strong_aux_pf_consistent_flex lang (th: Thread.t lang)
       (WF: Local.wf th.(Thread.local) th.(Thread.memory))
@@ -414,7 +415,7 @@ Proof.
   { eapply cap_flex_map_locwise. i.
     eapply (SPEC (loc, tm loc)). eauto. }
   destruct e1. ss.
-  hexploit traced_steps_map.
+  hexploit trace_steps_map.
   { eapply mapping_map_lt_map_le. eapply MAP. }
   { eapply MAP. }
   { eapply mapping_map_lt_map_eq. eapply MAP. }
@@ -463,7 +464,7 @@ Proof.
   exploit no_read_unreadable_traced; eauto. intros NOREAD. ss.
   exists ftr, (Thread.mk _ state flc1 fsc1 fmem1). splits; auto.
   { eapply List.Forall_forall. i.
-    cut ((promise_free /1\ no_sc) (fst x) /\ ThreadEvent.get_machine_event (fst x) = MachineEvent.silent).
+    cut ((promise_free /1\ no_sc) (snd x) /\ ThreadEvent.get_machine_event (snd x) = MachineEvent.silent).
     { i. des. splits; auto.
       { eapply List.Forall_forall in NOTIN; eauto. ss.
         eapply write_not_in_mon_bot; eauto. intros loc ts. intros. des.
@@ -478,7 +479,7 @@ Proof.
         eapply SAT0. econs; eauto. }
       { eapply list_Forall2_in in H; eauto. des.
         eapply List.Forall_forall in IN; eauto. ss. des.
-        eapply wf_time_evt_map in SAT0; eauto. eapply wf_time_evt_mon; try apply SAT0.
+        eapply wf_time_evt_map in SAT1; eauto. eapply wf_time_evt_mon; try apply SAT1.
         i. ss. des. destruct (Time.le_lt_dec ts (Memory.max_timemap (Thread.memory th) x0)).
         { left. assert (ts = x2).
           { eapply mapping_map_lt_map_eq.
@@ -511,7 +512,7 @@ Proof.
     }
     eapply list_Forall2_in in H; eauto. des.
     eapply List.Forall_forall in IN; eauto. ss. des.
-    destruct x, a. ss. inv EVENT; ss. inv KIND; ss.
+    destruct x, a. ss. inv SAT; ss. inv KIND; ss.
     splits; auto. inv MSG0; ss. inv MSG; ss. inv MAP1; ss.
   }
   { ss. unguard. des; eauto.
@@ -523,7 +524,7 @@ Proof.
       { inv LOCAL. erewrite PROMISES in *. eapply bot_promises_map; eauto. }
       { i. exploit WRITES; eauto. i. des.
         eapply list_Forall2_in2 in IN; eauto. des.
-        destruct b. ss. eexists t, _. splits; eauto.
+        destruct b. ss. eexists t, _. splits; try apply IN0.
         eapply promise_writing_event_map; eauto.
         { inv WF. eapply PROMISES0 in GET. eauto. }
         { eapply MAP. }
@@ -534,7 +535,7 @@ Proof.
 Qed.
 
 Definition pf_consistent_flex_aux lang (e0:Thread.t lang)
-           (tr : list (ThreadEvent.t * Memory.t)) (times : Loc.t -> list Time.t)
+           (tr : Trace.t lang) (times : Loc.t -> list Time.t)
            (f: Loc.t -> nat -> (Time.t -> Time.t -> Prop))
   : Prop :=
   (<<MAP: forall loc n
@@ -551,22 +552,22 @@ Definition pf_consistent_flex_aux lang (e0:Thread.t lang)
                         (TM0: forall loc, Time.lt (Memory.max_ts loc e0.(Thread.memory)) (incr_time_seq (tm loc)))
                         (TM1: forall loc, Time.lt (Memory.max_ts loc mem1) (incr_time_seq (tm loc))),
       exists ftr e1,
-        (<<STEPS: traced_step ftr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot mem1) e1>>) /\
+        (<<STEPS: Trace.steps ftr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot mem1) e1>>) /\
         (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free
                                                     /1\ no_sc
                                                     /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (incr_time_seq (tm loc))>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))
                                                     /1\ no_read_msgs (fun loc ts => ~ (covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts \/ Time.lt (incr_time_seq (tm loc)) ts))
-                                                    /1\ wf_time_evt (fun loc => certification_times times f (Memory.max_timemap e0.(Thread.memory)) loc)) (fst em)>> /\ <<TAU: ThreadEvent.get_machine_event (fst em) = MachineEvent.silent>>) ftr >>) /\
-        (<<TRACE: List.Forall2 (fun em fem => tevent_map (fun loc => f loc (tm loc)) (fst fem) (fst em)) tr ftr>>) /\
+                                                    /1\ wf_time_evt (fun loc => certification_times times f (Memory.max_timemap e0.(Thread.memory)) loc)) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) ftr >>) /\
+        (<<TRACE: List.Forall2 (fun em fem => tevent_map (fun loc => f loc (tm loc)) (snd fem) (snd em)) tr ftr>>) /\
         (__guard__((exists st',
                        (<<LOCAL: Local.failure_step e1.(Thread.local)>>) /\
                        (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
                    ((<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>) /\
                     (<<WRITES: forall loc from to val released
                                       (GET: Memory.get loc to e0.(Thread.local).(Local.promises) = Some (from, Message.concrete val released)),
-                        exists e m,
+                        exists th e,
                           (<<WRITING: promise_writing_event loc from to val released e>>) /\
-                          (<<IN: List.In (e, m) ftr>>)>>))))>>).
+                          (<<IN: List.In (th, e) ftr>>)>>))))>>).
 
 Lemma pf_consistent_flex_pf_consistent_flex_aux lang (th: Thread.t lang) tr times f
       (WF: Local.wf th.(Thread.local) th.(Thread.memory))
@@ -578,7 +579,7 @@ Proof.
   unfold pf_consistent_flex in *. des. econs; eauto.
   ii. exploit (@cap_flex_exists th.(Thread.memory) (fun loc => incr_time_seq (tm loc))); eauto. i. des.
   exploit CONSISTENT0; eauto. i. des. destruct e1. ss.
-  hexploit traced_steps_map.
+  hexploit trace_steps_map.
   { eapply ident_map_le; eauto. }
   { eapply ident_map_bot; eauto. }
   { eapply ident_map_eq; eauto. }
@@ -603,19 +604,19 @@ Proof.
   i. des. exists ftr0, (Thread.mk _ state flc1 fsc1 fmem1).
   splits; auto.
   { eapply List.Forall_forall. i.
-    cut ((promise_free /1\ no_sc) (fst x) /\ ThreadEvent.get_machine_event (fst x) = MachineEvent.silent).
+    cut ((promise_free /1\ no_sc) (snd x) /\ ThreadEvent.get_machine_event (snd x) = MachineEvent.silent).
     { i. des. eapply list_Forall2_in in H; eauto. des.
       eapply List.Forall_forall in IN; eauto. ss. des.
       splits; auto.
       { eapply ident_map_write_not_in; eauto. }
       { eapply ident_map_no_read_msgs; eauto. }
-      { eapply wf_time_evt_map in SAT1; eauto.
-        eapply wf_time_evt_mon; try apply SAT1. ss.
+      { eapply wf_time_evt_map in SAT2; eauto.
+        eapply wf_time_evt_mon; try apply SAT2. ss.
         i. des. inv MAP0. eauto. }
     }
     eapply list_Forall2_in in H; eauto. des.
     eapply List.Forall_forall in IN; eauto. ss. des.
-    destruct x, a. ss. inv EVENT; ss. inv KIND; ss.
+    destruct x, a. ss. inv SAT; ss. inv KIND; ss.
     splits; auto. inv MSG0; ss. inv MSG; ss. inv MAP1; ss. }
     { eapply list_Forall2_compose; eauto.
     i. ss. des. eapply ident_map_compose_tevent; eauto. }
@@ -628,7 +629,7 @@ Proof.
       { inv LOCAL0. erewrite PROMISES in *. eapply bot_promises_map; eauto. }
       { i. exploit WRITES; eauto. i. des.
         eapply list_Forall2_in2 in IN; eauto. des.
-        destruct b. ss. eexists t, _. splits; eauto.
+        destruct b. ss. eexists t, _. splits; try apply IN0.
         eapply promise_writing_event_map; eauto.
         { inv LOCAL. eapply PROMISES0 in GET. eauto. }
         { eapply ident_map_lt. }
@@ -639,7 +640,7 @@ Proof.
 Qed.
 
 Definition pf_consistent_super_strong lang (e0:Thread.t lang)
-           (tr : list (ThreadEvent.t * Memory.t))
+           (tr : Trace.t lang)
            (times: Loc.t -> list Time.t)
            (certimes: Loc.t -> (Time.t -> Prop))
   : Prop :=
@@ -649,16 +650,16 @@ Definition pf_consistent_super_strong lang (e0:Thread.t lang)
          (LOCAL: Local.wf e0.(Thread.local) mem1),
   exists ftm ftr e1 f,
     (<<TM: TimeMap.le tm ftm>>) /\
-    (<<STEPS: traced_step ftr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc mem1) e1>>) /\
+    (<<STEPS: Trace.steps ftr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc mem1) e1>>) /\
     (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free
                                                 /1\ no_sc
                                                 /1\ wf_time_evt certimes
-                                                /1\ no_read_msgs (fun loc ts => ~ (covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts \/ Time.lt (ftm loc) ts))) (fst em)>> /\ <<TAU: ThreadEvent.get_machine_event (fst em) = MachineEvent.silent>>) ftr >>) /\
+                                                /1\ no_read_msgs (fun loc ts => ~ (covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts \/ Time.lt (ftm loc) ts))) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) ftr >>) /\
     (<<MAP: cap_flex_map
               (Memory.max_timemap e0.(Thread.memory))
               (fun loc => Time.incr (Memory.max_ts loc e0.(Thread.memory)))
               ftm times f>>) /\
-    (<<TRACE: List.Forall2 (fun em fem => tevent_map f (fst fem) (fst em)) tr ftr>>) /\
+    (<<TRACE: List.Forall2 (fun em fem => tevent_map f (snd fem) (snd em)) tr ftr>>) /\
     (<<GOOD: good_future ftm mem1 e1.(Thread.memory)>>) /\
     (<<SC: e1.(Thread.sc) = sc>>) /\
     (__guard__((exists st',
@@ -667,9 +668,9 @@ Definition pf_consistent_super_strong lang (e0:Thread.t lang)
                ((<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>) /\
                 (<<WRITES: forall loc from to val released
                                   (GET: Memory.get loc to e0.(Thread.local).(Local.promises) = Some (from, Message.concrete val released)),
-                    exists e m,
+                    exists th e,
                       (<<WRITING: promise_writing_event loc from to val released e>>) /\
-                      (<<IN: List.In (e, m) ftr>>)>>)))).
+                      (<<IN: List.In (th, e) ftr>>)>>)))).
 
 Lemma pf_consistent_flex_aux_pf_consistent_super_strong lang (th: Thread.t lang) tr times f
       (WF: Local.wf th.(Thread.local) th.(Thread.memory))
@@ -719,14 +720,24 @@ Proof.
     i. ss. des. split; auto. ii. eapply PROM.
     inv H. econs; eauto. eapply LOCAL in GET; eauto. } intros GOOD.
   eapply no_sc_any_sc_traced in STEPS; ss; cycle 1.
-  { i. eapply List.Forall_forall in IN; eauto. ss. des; auto. } des.
-  eexists (fun loc => incr_time_seq (ftm loc)), ftr, _, (fun loc => f loc (ftm loc)).
+  { eapply List.Forall_impl; eauto. i. ss. des. auto. } i. des.
+  eexists (fun loc => incr_time_seq (ftm loc)), tr_src, _, (fun loc => f loc (ftm loc)).
   esplits; eauto.
   { ii. eapply TM. }
-  { eapply List.Forall_impl; [|apply EVENTS]. i. ss. des; auto. }
+  { eapply List.Forall_forall. i.
+    eapply list_Forall2_in2 in H; eauto. des. rewrite SAT.
+    eapply List.Forall_forall in EVENTS; eauto. ss. des. splits; auto. }
   { eapply cap_flex_map_locwise. i. eapply MAP. eapply TM. }
+  { eapply list_Forall2_rev in EVENTS0.
+    eapply list_Forall2_compose; eauto. i. ss. rewrite SAT1. auto. }
   { eapply no_sc_same_sc_traced in STEPS0; eauto.
-    eapply List.Forall_impl; eauto. i. ss. des; auto. }
+    eapply List.Forall_forall. i.
+    eapply list_Forall2_in2 in H; eauto. des. rewrite SAT.
+    eapply List.Forall_forall in EVENTS; eauto. ss. des. splits; auto. }
+  { ss. unguard. des; eauto. right. splits; auto. i.
+    eapply WRITES in GET. des.
+    eapply list_Forall2_in in EVENTS0; eauto. des. destruct a. ss. subst.
+    esplits; eauto. }
 Qed.
 
 Lemma consistent_pf_consistent_super_strong lang (th: Thread.t lang)
@@ -759,7 +770,7 @@ Proof.
   { eapply Memory.cap_closed; eauto. }
   { eapply Local.cap_wf; eauto. }
   i. des.
-  eapply pred_steps_traced_step2 in STEPS; cycle 1.
+  eapply pred_steps_trace_steps2 in STEPS; cycle 1.
   { instantiate (1:=fun _ => True). eapply List.Forall_impl; eauto.
     i. ss. des. splits; auto. }
   eapply thread_steps_pred_steps in STEPS.

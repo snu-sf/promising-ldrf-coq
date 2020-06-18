@@ -22,6 +22,7 @@ Require Import Local.
 Require Import Thread.
 Require Import Cover.
 Require Import Pred.
+Require Import Trace.
 
 Require Import MemoryProps.
 Require Import Mapping.
@@ -247,20 +248,20 @@ Section GOODFUTURE.
 
   Lemma write_not_in_good_future_traced lang (th0 th1: Thread.t lang) tr tm
         (TM: forall loc, Time.lt (Memory.max_ts loc th0.(Thread.memory)) (tm loc))
-        (STEPS: traced_step tr th0 th1)
+        (STEPS: Trace.steps tr th0 th1)
         (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
         (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
         (CLOSED: Memory.closed (Thread.memory th0))
         (NOTIN: List.Forall (fun em =>
                                write_not_in (fun loc ts =>
                                                (<<TS: Time.le ts (tm loc)>>) /\
-                                               (<<PROM: ~ covered loc ts th0.(Thread.memory)>>)) (fst em)) tr)
+                                               (<<PROM: ~ covered loc ts th0.(Thread.memory)>>)) (snd em)) tr)
     :
       good_future tm th0.(Thread.memory) th1.(Thread.memory).
   Proof.
     econs; auto.
     { eapply Memory.future_future_weak.
-      eapply traced_step_future; eauto. }
+      eapply Trace.steps_future; eauto. }
     { i. eapply write_not_in_covered_traced in COVERED; eauto. des; auto.
       apply not_and_or in COVERED. des.
       { right. destruct (Time.le_lt_dec ts (tm loc)); ss. }

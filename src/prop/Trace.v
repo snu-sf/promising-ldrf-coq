@@ -34,7 +34,7 @@ Module Trace.
       th0
     :
       steps [] th0 th0
-  | steps_trans
+  | steps_step
       tr tr' th0 th1 th2 pf e
       (STEP: Thread.step pf e th0 th1)
       (STEPS: steps tr th1 th2)
@@ -43,6 +43,104 @@ Module Trace.
       steps tr' th0 th2
   .
   Hint Constructors steps.
+
+  Inductive steps_n1 lang: t lang -> (Thread.t lang) -> (Thread.t lang) -> Prop :=
+  | steps_n1_refl
+      th0
+    :
+      steps_n1 [] th0 th0
+  | steps_n1_step
+      th0 th1 th2 hds pf tle
+      (HD: steps_n1 hds th0 th1)
+      (TL: Thread.step pf tle th1 th2)
+    :
+      steps_n1 (hds++[(th1, tle)]) th0 th2
+  .
+  Hint Constructors steps_n1.
+
+  Lemma steps_n1_one lang (th0 th1: Thread.t lang) e pf
+        (STEP: Thread.step pf e th0 th1)
+    :
+      steps_n1 [(th0, e)] th0 th1.
+  Proof.
+    erewrite <- List.app_nil_l at 1. econs; eauto.
+  Qed.
+
+  Lemma steps_n1_trans lang (th0 th1 th2: Thread.t lang) tr0 tr1
+        (STEPS0: steps_n1 tr0 th0 th1)
+        (STEPS1: steps_n1 tr1 th1 th2)
+    :
+      steps_n1 (tr0 ++ tr1) th0 th2.
+  Proof.
+    ginduction STEPS1; i; ss.
+    - erewrite List.app_nil_r. auto.
+    - rewrite List.app_assoc. econs; eauto.
+  Qed.
+
+  Lemma steps_one lang (th0 th1: Thread.t lang) e pf
+        (STEP: Thread.step pf e th0 th1)
+    :
+      steps [(th0, e)] th0 th1.
+  Proof.
+    econs 2; eauto.
+  Qed.
+
+  Lemma steps_trans lang (th0 th1 th2: Thread.t lang) tr0 tr1
+        (STEPS0: steps tr0 th0 th1)
+        (STEPS1: steps tr1 th1 th2)
+    :
+      steps (tr0 ++ tr1) th0 th2.
+  Proof.
+    ginduction STEPS0; i; ss. subst. econs; eauto.
+  Qed.
+
+  Lemma steps_equivalent lang (th0 th1: Thread.t lang) tr
+    :
+        steps tr th0 th1 <-> steps_n1 tr th0 th1.
+  Proof.
+    split; intros STEP.
+    - ginduction STEP.
+      + econs.
+      + exploit steps_n1_trans.
+        * eapply steps_n1_one; eauto.
+        * eauto.
+        * ss. clarify.
+    - ginduction STEP.
+      + econs.
+      + eapply steps_trans; eauto.
+  Qed.
+
+  Lemma steps_separate lang (th0 th2: Thread.t lang) tr0 tr1
+        (STEPS: steps (tr0++tr1) th0 th2)
+    :
+      exists th1,
+        (<<STEPS0: steps tr0 th0 th1>>) /\
+        (<<STEPS1: steps tr1 th1 th2>>).
+  Proof.
+    ginduction tr0; i; ss.
+    - exists th0. splits; ss.
+    - inv STEPS. inv TR. eapply IHtr0 in STEPS0. des.
+      exists th1. splits; ss.
+      econs; eauto.
+  Qed.
+
+  Lemma steps_in lang P (th0 th1: Thread.t lang) tr e th
+        (STEPS: steps tr th0 th1)
+        (IN: List.In (th, e) tr)
+        (PRED: List.Forall P tr)
+    :
+      exists th' th'' pf tr0 tr1,
+        (<<STEPS0: steps tr0 th0 th'>>) /\
+        (<<STEP: Thread.step pf e th' th''>>) /\
+        (<<STEPS1: steps tr1 th'' th1>>) /\
+        (<<TRACES: tr = tr0 ++ [(th, e)] ++ tr1>>) /\
+        (<<SAT: P (th, e)>>).
+  Proof.
+    ginduction STEPS; i; ss. inv PRED; ss. des; clarify.
+    - exists th, th1. esplits; eauto.
+    - exploit IHSTEPS; eauto. i. des. subst.
+      exists th', th''. esplits; eauto.
+  Qed.
 
   Lemma steps_future
         lang tr e1 e2
