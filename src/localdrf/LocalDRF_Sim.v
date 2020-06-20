@@ -83,7 +83,18 @@ Section SIM.
     { des. inv H. erewrite GET in *. inv CNT; ss. econs; eauto. }
   Qed.
 
-  Definition pi_consistent (mem_src: Memory.t) lang (e0:Thread.t lang)
+  Lemma memory_future_concrete_promised mem0 mem1
+        (FUTURE: Memory.future_weak mem0 mem1)
+    :
+      concrete_promised mem0 <2= concrete_promised mem1.
+  Proof.
+    ii. inv PR. eapply FUTURE in GET. des.
+    { econs; eauto. }
+    { econs; eauto. }
+  Qed.
+
+  Definition pi_consistent (self: Loc.t -> Time.t -> Prop) (mem_src: Memory.t)
+             lang (e0:Thread.t lang)
     : Prop :=
     forall mem1 tm sc
            (FUTURE: Memory.future_weak e0.(Thread.memory) mem1)
@@ -97,20 +108,22 @@ Section SIM.
                                                   /1\ wf_time_evt times) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) ftr >>) /\
       (<<GOOD: good_future tm mem1 e1.(Thread.memory)>>) /\
       (<<SC: e1.(Thread.sc) = sc>>) /\
-      (<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>) /\
-      (<<WRITES: forall loc from to val released
-                        (GET: Memory.get loc to e0.(Thread.local).(Local.promises) = Some (from, Message.concrete val released)),
-          exists th e,
-            (<<WRITING: promise_writing_event loc from to val released e>>) /\
-            (<<IN: List.In (th, e) ftr>>)>>).
+      (__guard__((exists st',
+                     (<<LOCAL: Local.failure_step e1.(Thread.local)>>) /\
+                     (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
+                 ((<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>) /\
+                  (<<WRITES: forall loc ts (PROM: self loc ts),
+                      exists th e,
+                        (<<RACY: racy_write loc ts th e>>) /\
+                        (<<IN: List.In (th, e) ftr>>)>>)))).
 
-  Lemma pi_consistent_mon mem_src0 mem_src1 lang
+  Lemma pi_consistent_mon self mem_src0 mem_src1 lang
         st lc sc0 mem0 sc1 mem1
-        (CONSISTENT: pi_consistent mem_src0 (Thread.mk lang st lc sc0 mem0))
-        (FUTURE: Memory.future_weak mem0 mem1)
-        (CONCRETE: concrete_promised mem_src0 <2= concrete_promised mem_src1)
+        (CONSISTENT: pi_consistent self mem_src0 (Thread.mk lang st lc sc0 mem0))
+        (FUTURETGT: Memory.future_weak mem0 mem1)
+        (FUTURESRC: Memory.future_weak mem_src0 mem_src1)
     :
-      pi_consistent mem_src1 (Thread.mk lang st lc sc1 mem1).
+      pi_consistent self mem_src1 (Thread.mk lang st lc sc1 mem1).
   Proof.
     ii. ss. exploit CONSISTENT.
     { transitivity mem1; eauto. }
@@ -119,6 +132,7 @@ Section SIM.
     i. des. ss. esplits; eauto.
     eapply List.Forall_impl; eauto. i. ss. des. splits; auto.
     eapply no_read_msgs_mon; eauto. ii. des; eauto.
+    eapply memory_future_concrete_promised in H; eauto.
   Qed.
 
   Inductive sim_configuration
@@ -151,8 +165,8 @@ Section SIM.
       (MEMJOIN: SimMemory.sim_memory mem_mid mem_tgt)
       (MEMWF: memory_times_wf times mem_mid)
       (CONSISTENT: forall tid lang st lc
-                          (GET: IdentMap.find tid ths_src = Some (existT _ lang st, lc)),
-          pi_consistent mem_src (Thread.mk lang st lc sc_tgt mem_tgt))
+                          (GET: IdentMap.find tid ths_tgt = Some (existT _ lang st, lc)),
+          pi_consistent (prom tid) mem_src (Thread.mk lang st lc sc_tgt mem_tgt))
     :
       sim_configuration
         views prom extra
@@ -210,13 +224,12 @@ Section SIM.
         views0 prom_self0 prom_others extra_self0 extra_others
         lang th_src0 th_mid0 th_tgt0 th_tgt1 pf_tgt e_tgt
         (STEPTGT: Thread.step pf_tgt e_tgt th_tgt0 th_tgt1)
-        (WFTIME: wf_time_evt times e_tgt)
-        (NOREAD: no_read_msgs prom_others e_tgt)
-        (EVENT: ThreadEvent.get_machine_event e_tgt = MachineEvent.silent)
-
         (THREAD: @sim_thread
                    views0 prom_self0 prom_others extra_self0 extra_others
                    lang th_src0 th_mid0 th_tgt0)
+        (WFTIME: wf_time_evt times e_tgt)
+        (NOREAD: no_read_msgs prom_others e_tgt)
+        (EVENT: ThreadEvent.get_machine_event e_tgt = MachineEvent.silent)
 
         (SCSRC: Memory.closed_timemap th_src0.(Thread.sc) th_src0.(Thread.memory))
         (SCMID: Memory.closed_timemap th_mid0.(Thread.sc) th_mid0.(Thread.memory))
@@ -270,13 +283,12 @@ Section SIM.
         views0 prom_self0 prom_others extra_self0 extra_others
         lang th_src0 th_mid0 th_tgt0 th_tgt1 pf_tgt e_tgt
         (STEPTGT: Thread.step pf_tgt e_tgt th_tgt0 th_tgt1)
-        (WFTIME: wf_time_evt times e_tgt)
-        (NOREAD: no_read_msgs prom_others e_tgt)
-        (EVENT: ThreadEvent.get_machine_event e_tgt <> MachineEvent.silent)
-
         (THREAD: @sim_thread
                    views0 prom_self0 prom_others extra_self0 extra_others
                    lang th_src0 th_mid0 th_tgt0)
+        (WFTIME: wf_time_evt times e_tgt)
+        (NOREAD: no_read_msgs prom_others e_tgt)
+        (EVENT: ThreadEvent.get_machine_event e_tgt <> MachineEvent.silent)
 
         (SCSRC: Memory.closed_timemap th_src0.(Thread.sc) th_src0.(Thread.memory))
         (SCMID: Memory.closed_timemap th_mid0.(Thread.sc) th_mid0.(Thread.memory))
@@ -368,12 +380,11 @@ Section SIM.
         views0 prom_self0 prom_others extra_self0 extra_others
         lang th_src0 th_mid0 th_tgt0 th_tgt1 tr_tgt
         (STEPTGT: Trace.steps tr_tgt th_tgt0 th_tgt1)
-
-        (EVENTS: List.Forall (fun the => <<SAT: (wf_time_evt times /1\ no_read_msgs prom_others) (snd the)>> /\ <<TAU: ThreadEvent.get_machine_event (snd the) = MachineEvent.silent>>) tr_tgt)
-
         (THREAD: @sim_thread
                    views0 prom_self0 prom_others extra_self0 extra_others
                    lang th_src0 th_mid0 th_tgt0)
+
+        (EVENTS: List.Forall (fun the => <<SAT: (wf_time_evt times /1\ no_read_msgs prom_others) (snd the)>> /\ <<TAU: ThreadEvent.get_machine_event (snd the) = MachineEvent.silent>>) tr_tgt)
 
         (SCSRC: Memory.closed_timemap th_src0.(Thread.sc) th_src0.(Thread.memory))
         (SCMID: Memory.closed_timemap th_mid0.(Thread.sc) th_mid0.(Thread.memory))
@@ -580,6 +591,240 @@ Section SIM.
     }
   Qed.
 
+  Lemma option_rel_mon A B (R0 R1: A -> B-> Prop)
+        (LE: R0 <2= R1)
+    :
+      option_rel R0 <2= option_rel R1.
+  Proof. i. unfold option_rel in *. des_ifs. auto. Qed.
+
+  Lemma sim_memory_concrete_promised mem_src mem_tgt
+        (MEM: SimMemory.sim_memory mem_src mem_tgt)
+    :
+      concrete_promised mem_tgt <2= concrete_promised mem_src.
+  Proof.
+    ii. inv PR. eapply MEM in GET.  des. inv MSG. econs; eauto.
+  Qed.
+
+  Lemma promise_writing_event_racy
+        lang loc from ts val released e (th: Thread.t lang)
+        (WRITING : promise_writing_event loc from ts val released e)
+    :
+      racy_write loc ts th e.
+  Proof.
+    inv WRITING; econs; eauto.
+  Qed.
+
+  Lemma sim_memory_forget_concrete_promised F extra mem_src mem_tgt
+        (MEM: sim_memory L times F extra mem_src mem_tgt)
+    :
+      F <2= concrete_promised mem_tgt.
+  Proof.
+    ii. set (CNT:=MEM.(sim_memory_contents) x0 x1). inv CNT; ss.
+    econs; eauto.
+  Qed.
+
+  Lemma sim_thread_sim_configuration views0 prom extra (c_src c_mid c_tgt: Configuration.t)
+        tid lang (st: Language.state lang)
+        lc_src lc_mid lc_tgt mem_src mem_mid mem_tgt sc_src sc_mid sc_tgt
+        (CONFIG: sim_configuration views0 prom extra c_src c_mid c_tgt)
+        views1 prom_self extra_self tr_cert ths_src ths_mid ths_tgt
+        (VIEWSLE: views_le views0 views1)
+        (JOINED: forall loc ts (NLOC: ~ L loc), List.Forall (fun vw => Memory.closed_view vw mem_src) (views1 loc ts))
+        (MEMWF: memory_times_wf times mem_mid)
+        (FUTURESRC: Memory.future_weak c_src.(Configuration.memory) mem_src)
+        (FUTUREMID: Memory.future_weak c_mid.(Configuration.memory) mem_mid)
+        (FUTURETGT: Memory.future_weak c_tgt.(Configuration.memory) mem_tgt)
+        (CONFIGTGT: Configuration.wf (Configuration.mk ths_tgt sc_tgt mem_tgt))
+        (CONFIGMID: Configuration.wf (Configuration.mk ths_mid sc_mid mem_mid))
+        (CONFIGSRC: Configuration.wf (Configuration.mk ths_src sc_src mem_src))
+        (CONSISTENT: pf_consistent_super_strong
+                       (Thread.mk _ st lc_tgt sc_tgt mem_tgt)
+                       tr_cert
+                       times)
+        (NOREAD: List.Forall
+                   (fun the => no_read_msgs
+                                 (all_promises (fun tid' => tid <> tid') prom)
+                                 (snd the)) tr_cert)
+        (THREAD:
+           sim_thread
+             views1
+             prom_self
+             (all_promises (fun tid' => tid <> tid') prom)
+             extra_self
+             (all_extra (fun tid' => tid <> tid') extra)
+             (Thread.mk _ st lc_src sc_src mem_src)
+             (Thread.mk _ st lc_mid sc_mid mem_mid)
+             (Thread.mk _ st lc_tgt sc_tgt mem_tgt))
+        (THSSRC:
+           forall tid',
+             IdentMap.find tid' ths_src =
+             if (Ident.eq_dec tid' tid)
+             then Some (existT _ lang st, lc_src)
+             else IdentMap.find tid' c_src.(Configuration.threads))
+        (THSMID:
+           forall tid',
+             IdentMap.find tid' ths_mid =
+             if (Ident.eq_dec tid' tid)
+             then Some (existT _ lang st, lc_mid)
+             else IdentMap.find tid' c_mid.(Configuration.threads))
+        (THSTGT:
+           forall tid',
+             IdentMap.find tid' ths_tgt =
+             if (Ident.eq_dec tid' tid)
+             then Some (existT _ lang st, lc_tgt)
+             else IdentMap.find tid' c_tgt.(Configuration.threads))
+    :
+      sim_configuration
+        views1
+        (fun tid' => if (Ident.eq_dec tid' tid) then prom_self else (prom tid'))
+        (fun tid' => if (Ident.eq_dec tid' tid) then extra_self else (extra tid'))
+        (Configuration.mk ths_src sc_src mem_src)
+        (Configuration.mk ths_mid sc_mid mem_mid)
+        (Configuration.mk ths_tgt sc_tgt mem_tgt)
+  .
+  Proof.
+    dep_inv THREAD. dep_inv CONFIG. econs; auto.
+    { i. erewrite THSSRC. erewrite THSMID. des_ifs. }
+    { i. erewrite THSMID. erewrite THSTGT. des_ifs.
+      eapply option_rel_mon; try apply THSJOIN.
+      i. eapply JSim.sim_statelocal_le; eauto. }
+    { ii. erewrite THSSRC in NONE. des_ifs. eauto. }
+    { replace (all_promises
+                 (fun _ => True)
+                 (fun tid' => if LocSet.Facts.eq_dec tid' tid then prom_self else prom tid'))
+        with
+          (all_promises (fun tid' => tid <> tid') prom \\2// prom_self); cycle 1.
+      { extensionality loc. extensionality ts.
+        apply Coq.Logic.PropExtensionality.propositional_extensionality. split; i.
+        { destruct H.
+          { inv H. eapply all_promises_intro with (tid:=tid0); ss. des_ifs. }
+          { eapply all_promises_intro with (tid:=tid); ss. des_ifs. }
+        }
+        { inv H. unguard. des_ifs; auto. econs; eauto. }
+      }
+      replace (all_extra
+                 (fun _ => True)
+                 (fun tid' => if LocSet.Facts.eq_dec tid' tid then extra_self else extra tid'))
+        with
+          (all_extra (fun tid' => tid <> tid') extra \\3// extra_self); cycle 1.
+      { extensionality loc. extensionality ts. extensionality from.
+        apply Coq.Logic.PropExtensionality.propositional_extensionality. split; i.
+        { destruct H.
+          { inv H. eapply all_extra_intro with (tid:=tid0); ss. des_ifs. }
+          { eapply all_extra_intro with (tid:=tid); ss. des_ifs. }
+        }
+        { inv H. unguard. des_ifs; auto. econs; eauto. }
+      }
+      auto.
+    }
+    { i. erewrite THSTGT in GET. des_ifs.
+      { dep_clarify. ii. ss.
+        exploit CONSISTENT; eauto. i. ss. des. esplits; eauto.
+        { eapply list_Forall_sum.
+          { eapply EVENTS. }
+          { instantiate (1:= fun the => no_read_msgs (all_promises (fun tid'=> tid <> tid') prom) (snd the)).
+            eapply List.Forall_forall. i.
+            eapply list_Forall2_in in H; eauto. des.
+            eapply List.Forall_forall in IN; eauto. ss.
+            destruct x, a. ss. inv SAT; ss.
+            { ii. replace fto with to in *; auto.
+              eapply mapping_map_lt_inj; eauto. eapply MAPIDENT.
+              inv H. exploit sim_memory_forget_concrete_promised.
+              { eapply MEMPF0. }
+              { econs; eauto. }
+              intros GET. eapply memory_future_concrete_promised in GET; eauto. inv GET.
+              erewrite <- SimMemory.sim_memory_max_ts; eauto.
+              { eapply Memory.max_ts_spec in GET0. des. auto. }
+              { eapply CONFIGMID. }
+              { eapply CONFIGTGT. }
+            }
+            { ii. replace ffrom with from in *; auto.
+              eapply mapping_map_lt_inj; eauto. eapply MAPIDENT.
+              inv H. exploit sim_memory_forget_concrete_promised.
+              { eapply MEMPF0. }
+              { econs; eauto. }
+              intros GET. eapply memory_future_concrete_promised in GET; eauto. inv GET.
+              erewrite <- SimMemory.sim_memory_max_ts; eauto.
+              eapply Memory.max_ts_spec in GET0.
+              { des. auto. }
+              { eapply CONFIGMID. }
+              { eapply CONFIGTGT. }
+            }
+          }
+          { ii. ss. des. splits; auto. eapply no_read_msgs_sum.
+            { eapply SAT2. }
+            { eapply SAT1. }
+            i. ss. apply not_or_and in PR. des. apply not_or_and in PR0. des.
+            erewrite sim_memory_concrte_promised in PR0; [|eauto].
+            apply not_and_or in PR0. des.
+            { left. ii. des; ss. eapply PR0.
+              eapply sim_memory_concrete_promised; eauto. }
+            { right. apply NNPP in PR0. destruct PR0; auto. exfalso. eapply PR.
+              inv LOCALPF. inv LOCALJOIN.
+              specialize (PROMISES x0 x2). set (CNT:=PROMS.(sim_promise_contents) x0 x2).
+              inv CNT; ss. rewrite <- H3 in *. inv PROMISES.
+              econs; eauto. econs; ss; [|refl].
+              symmetry in H3. apply memory_get_ts_strong in H3. des; auto.
+              subst. inv CONFIGTGT. ss. inv WF.
+              specialize (THREADS tid). erewrite THSTGT in THREADS. des_ifs.
+              specialize (THREADS _ _ _ eq_refl). inv THREADS. ss.
+              erewrite BOT0 in H8. clarify. }
+          }
+        }
+        { unguard. des; eauto. right. splits; auto. i.
+          inv LOCALPF. inv LOCALJOIN.
+          specialize (PROMISES0 loc ts). set (CNT:=PROMS.(sim_promise_contents) loc ts).
+          inv CNT; ss. rewrite <-H in *. inv PROMISES0.
+          exploit WRITES; eauto. i. des. esplits; eauto.
+          eapply promise_writing_event_racy; eauto. }
+      }
+      { eapply pi_consistent_mon; eauto. }
+    }
+  Qed.
+
+  Lemma sim_thread_consistent
+        views prom_self prom_others extra_self extra_others
+        lang th_src th_mid th_tgt tr
+        (CONSISTENTTGT: pf_consistent_super_strong th_tgt tr times)
+        (THREAD: @sim_thread
+                   views prom_self prom_others extra_self extra_others
+                   lang th_src th_mid th_tgt)
+        (SCSRC: Memory.closed_timemap th_src.(Thread.sc) th_src.(Thread.memory))
+        (SCMID: Memory.closed_timemap th_mid.(Thread.sc) th_mid.(Thread.memory))
+        (SCTGT: Memory.closed_timemap th_tgt.(Thread.sc) th_tgt.(Thread.memory))
+        (MEMSRC: Memory.closed th_src.(Thread.memory))
+        (MEMMID: Memory.closed th_mid.(Thread.memory))
+        (MEMTGT: Memory.closed th_tgt.(Thread.memory))
+        (LOCALSRC: Local.wf th_src.(Thread.local) th_src.(Thread.memory))
+        (LOCALMID: Local.wf th_mid.(Thread.local) th_mid.(Thread.memory))
+        (LOCALTGT: Local.wf th_tgt.(Thread.local) th_tgt.(Thread.memory))
+        (MEMWF: memory_times_wf times th_mid.(Thread.memory))
+        (EXCLUSIVE: forall loc ts (OTHER: prom_others loc ts),
+            exists from msg, <<UNCH: unchangable th_src.(Thread.memory) th_src.(Thread.local).(Local.promises) loc ts from msg>>)
+        (EXCLUSIVEEXTRA: forall loc ts from (OTHER: extra_others loc ts from),
+            (<<UNCH: unchangable th_src.(Thread.memory) th_src.(Thread.local).(Local.promises) loc ts from Message.reserve>>))
+        (JOINED: forall loc ts (NLOC: ~ L loc), List.Forall (fun vw => Memory.closed_view vw th_src.(Thread.memory)) (views loc ts))
+
+        (REL: joined_released
+                views th_mid.(Thread.local).(Local.promises) th_mid.(Thread.local).(Local.tview).(TView.rel))
+        (JOINEDMEM: joined_memory views th_mid.(Thread.memory))
+        (VIEWS: wf_views views)
+    :
+      (<<CONSISTENTMID: JThread.consistent th_mid views>>) /\
+      (<<CONSISTENTSRC: Thread.consistent th_src>>).
+  Proof.
+    exploit (CONSISTENTTGT th_tgt.(Thread.memory) TimeMap.bot th_tgt.(Thread.sc)); eauto.
+    { refl. }
+    i. des. destruct th_tgt. ss. hexploit sim_thread_steps_silent; eauto.
+    { admit. }
+    { unguard. des.
+      { inv LOCAL. ss. }
+      { ii. rewrite PROMISES in *. rewrite Memory.bot_get in *. ss. }
+    }
+    i. des. split.
+    { unfold JThread.consistent. esplits; eauto.
+  Admitted.
+
   Lemma step_sim_configuration views0 prom0 extra0
         c_src0 c_mid0 c_tgt0 c_tgt1 e tid lang tr_tgt tr_cert
         (STEPTGT: @times_configuration_step times lang tr_tgt tr_cert e tid c_tgt0 c_tgt1)
@@ -593,7 +838,7 @@ Section SIM.
         (WF_TGT: Configuration.wf c_tgt0)
     :
       exists tr_src c_src1 c_mid1 views1 prom1 extra1,
-        (<<STEPSRC: @Trace.configuration_step lang tr_src e tid c_src0 c_src1>>) /\
+        (<<STEPSRC: @Trace.configuration_opt_step lang tr_src e tid c_src0 c_src1>>) /\
         (<<STEPMID: JConfiguration.step e tid c_mid0 c_mid1 views0 views1>>) /\
         (<<SIM: sim_configuration views1 prom1 extra1 c_src1 c_mid1 c_tgt1>>) /\
         (<<TRACE: sim_traces L tr_src tr_tgt>>)
@@ -636,7 +881,23 @@ Section SIM.
     { eapply WF0; eauto. }
     { eapply WF1; eauto. }
     i. des.
-    { admit. }
+    exploit JThread.tau_steps_future; eauto; ss.
+    { eapply WF0; eauto. }
+    { eapply WF0. }
+    { eapply WF0. }
+    i. des.
+    exploit Trace.steps_future; eauto; ss.
+    { eapply WF; eauto. }
+    i. des.
+    destruct (classic (ThreadEvent.get_machine_event e0 = MachineEvent.silent)) as [EQ|NEQ].
+    { exploit sim_thread_step_silent; eauto.
+      { inv FORALL4. auto. }
+      { inv FORALL3. auto. }
+      { i. eapply EXCLUSIVE in OTHER. des. esplits.
+        eapply unchangable_trace_steps_increase; eauto. }
+      { i. eapply EXCLUSIVEEXTRA in OTHER. des. esplits.
+        eapply unchangable_trace_steps_increase; eauto. }
+      i. des.
   Admitted.
 
 End SIM.

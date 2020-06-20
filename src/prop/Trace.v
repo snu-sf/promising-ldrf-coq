@@ -200,7 +200,7 @@ Module Trace.
   Qed.
 
   Inductive configuration_step: forall lang (tr: t lang) (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
-  | step_intro
+  | configuration_step_intro
       lang tr e tr' pf tid c1 st1 lc1 e2 st3 lc3 sc3 memory3
       (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
       (STEPS: steps tr' (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
@@ -211,6 +211,18 @@ Module Trace.
           Thread.consistent (Thread.mk _ st3 lc3 sc3 memory3))
     :
       configuration_step tr (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
+  .
+
+  Inductive configuration_opt_step: forall lang (tr: t lang) (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
+  | configuration_opt_step_some
+      lang tr e tid c1 c2
+      (STEP: @configuration_step lang tr e tid c1 c2)
+    :
+      configuration_opt_step tr e tid c1 c2
+  | configuration_opt_step_none
+      lang tid c1
+    :
+      @configuration_opt_step lang [] MachineEvent.silent tid c1 c1
   .
 
   Lemma configuration_step_step lang tr e tid c1 c2
@@ -249,6 +261,20 @@ Module Trace.
   Proof.
     eapply configuration_step_step in STEP.
     eapply Configuration.step_future; eauto.
+  Qed.
+
+  Lemma configuration_opt_step_future
+        lang (tr: t lang) e tid c1 c2
+        (STEP: configuration_opt_step tr e tid c1 c2)
+        (WF1: Configuration.wf c1):
+    (<<WF2: Configuration.wf c2>>) /\
+    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
+    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
+  Proof.
+    inv STEP.
+    { apply inj_pair2 in H1. subst.
+      eapply configuration_step_future; eauto. }
+    { apply inj_pair2 in H1. subst. splits; auto. refl. }
   Qed.
 
   Lemma steps_promise_consistent
