@@ -1886,6 +1886,36 @@ Section PROMISED.
         eapply concrete_promised_increase_promise; eauto.
   Qed.
 
+  Lemma rtc_concrete_promised_increase lang (th0 th1: Thread.t lang)
+        (STEP: rtc (@Thread.tau_step lang) th0 th1)
+    :
+      concrete_promised th0.(Thread.memory) <2= concrete_promised th1.(Thread.memory).
+  Proof.
+    ginduction STEP; auto. i. eapply IHSTEP.
+    inv H. inv TSTEP. eapply concrete_promised_increase; eauto.
+  Qed.
+
+  Lemma trace_steps_concrete_promised_increase lang (th0 th1: Thread.t lang) tr
+        (STEP: Trace.steps tr th0 th1)
+    :
+      concrete_promised th0.(Thread.memory) <2= concrete_promised th1.(Thread.memory).
+  Proof.
+    ginduction STEP; auto. i. subst. eapply IHSTEP.
+    eapply concrete_promised_increase; eauto.
+  Qed.
+
+  Lemma configuration_step_concrete_promised_increase c0 c1 e tid
+        (STEP: Configuration.step e tid c0 c1)
+    :
+      concrete_promised c0.(Configuration.memory) <2= concrete_promised c1.(Configuration.memory).
+  Proof.
+    inv STEP; ss.
+    { i. eapply rtc_concrete_promised_increase in STEPS; eauto.
+      eapply concrete_promised_increase in STEP0; eauto. }
+    { i. eapply rtc_concrete_promised_increase in STEPS; eauto.
+      eapply concrete_promised_increase in STEP0; eauto. }
+  Qed.
+
 End PROMISED.
 
 

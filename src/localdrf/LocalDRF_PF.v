@@ -227,6 +227,47 @@ Section SIM.
     { eapply reserving_tevent_valid; eauto. }
   Qed.
 
+  Inductive sim_silent_traces lang: Trace.t lang -> Trace.t lang -> Prop :=
+  | sim_silent_traces_nil
+    :
+      sim_silent_traces [] []
+  | sim_silent_traces_some
+      hd_src th_tgt e_tgt tl_src tl_tgt
+      (TL: sim_silent_traces tl_src tl_tgt)
+      (HD: sim_silent_trace hd_src (Some e_tgt))
+    :
+      sim_silent_traces (hd_src ++ tl_src) ((th_tgt, e_tgt)::tl_tgt)
+  | sim_silent_traces_none
+      hd_src tl_src tl_tgt
+      (TL: sim_silent_traces tl_src tl_tgt)
+      (HD: sim_silent_trace hd_src None)
+    :
+      sim_silent_traces (hd_src ++ tl_src) tl_tgt
+  .
+  Hint Constructors sim_silent_traces.
+
+  Lemma sim_silent_traces_sim_event_exists lang (tr_src tr_tgt: Trace.t lang) th_tgt e_tgt
+        (TRACE: sim_silent_traces tr_src tr_tgt)
+        (IN: List.In (th_tgt, e_tgt) tr_tgt)
+        (VALID: valid_event L e_tgt)
+        (RACY: racy_event e_tgt)
+    :
+      exists th e_src,
+        (<<IN: List.In (th, e_src) tr_src>>) /\
+        (<<EVENT: sim_event e_src e_tgt>>)
+  .
+  Proof.
+    ginduction TRACE; i; ss.
+    { des; clarify.
+      { eapply sim_silent_sim_event_exists in HD; eauto. des. esplits; eauto.
+        eapply List.in_or_app; eauto. }
+      { exploit IHTRACE; eauto. i. des. esplits; eauto.
+        eapply List.in_or_app; eauto. }
+    }
+    { exploit IHTRACE; eauto. i. des. esplits; eauto.
+      eapply List.in_or_app; eauto. }
+  Qed.
+
 
   (* sim memory *)
 
