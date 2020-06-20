@@ -250,7 +250,7 @@ Section SIM.
                      th_src1 th_mid1 th_tgt1>>) /\
         (<<EVENTJOIN: JSim.sim_event e_mid e_tgt>>) /\
         (<<JOINED: forall loc ts (NLOC: ~ L loc), List.Forall (fun vw => Memory.closed_view vw th_src1.(Thread.memory)) (views1 loc ts)>>) /\
-        (<<TRACE: sim_silent_trace L tr (Some e_mid)>>) /\
+        (<<TRACE: sim_trace L tr (Some e_mid)>>) /\
         (<<MEMWF: memory_times_wf times th_mid1.(Thread.memory)>>)
   .
   Proof.
@@ -326,6 +326,41 @@ Section SIM.
     { inv STEP. ss. hexploit step_memory_times_wf; eauto. }
   Qed.
 
+  Global Program Instance sim_event_Equivalence: Equivalence sim_event.
+  Next Obligation.
+  Proof. ii. destruct x; econs. Qed.
+  Next Obligation.
+  Proof. ii. inv H; econs. Qed.
+  Next Obligation.
+  Proof. ii. inv H; inv H0; econs. Qed.
+
+  Lemma jsim_event_sim_event
+    :
+      JSim.sim_event <2= sim_event.
+  Proof. ii. inv PR; econs. Qed.
+
+  Lemma sim_event_racy_event e_src e_tgt
+        (RACY: racy_event e_tgt)
+        (EVENT: sim_event e_src e_tgt)
+    :
+      racy_event e_src.
+  Proof.
+    inv EVENT; ss.
+  Qed.
+
+  Lemma sim_trace_sim_event_sim_trace lang (tr_src: Trace.t lang) e_mid e_tgt
+        (TRACE: sim_trace L tr_src (Some e_mid))
+        (EVENT: sim_event e_mid e_tgt)
+    :
+      sim_trace L tr_src (Some e_tgt).
+  Proof.
+    remember (Some e_mid) as e. ginduction TRACE; i; clarify.
+    { econs 2; eauto. etrans; eauto. }
+    { econs 3; eauto. ii. eapply NONRACY. eapply sim_event_racy_event; eauto. }
+    { econs 4; eauto. }
+  Qed.
+
+
   Lemma sim_thread_steps_silent
         views0 prom_self0 prom_others extra_self0 extra_others
         lang th_src0 th_mid0 th_tgt0 th_tgt1 tr_tgt
@@ -368,12 +403,12 @@ Section SIM.
                      views1 prom_self1 prom_others extra_self1 extra_others
                      th_src1 th_mid1 th_tgt1>>) /\
         (<<JOINED: forall loc ts (NLOC: ~ L loc), List.Forall (fun vw => Memory.closed_view vw th_src1.(Thread.memory)) (views1 loc ts)>>) /\
-        (<<TRACE: True>>) /\
+        (<<TRACE: sim_traces L tr_src tr_tgt>>) /\
         (<<MEMWF: memory_times_wf times th_mid1.(Thread.memory)>>)
   .
   Proof.
     ginduction STEPTGT.
-    { i. esplits; eauto. } i. subst. inv EVENTS. ss. des.
+    { i. esplits; eauto. econs. } i. subst. inv EVENTS. ss. des.
     hexploit Thread.step_future; try apply STEP; eauto. i. des.
     exploit sim_thread_step_silent; eauto.
     { eapply Trace.steps_promise_consistent; eauto. } i. des.
@@ -387,6 +422,8 @@ Section SIM.
     i. des. esplits; try apply THREAD1; eauto.
     { econs; eauto. inv EVENTJOIN; ss. }
     { eapply Trace.steps_trans; eauto. }
+    { econs 2; eauto. eapply sim_trace_sim_event_sim_trace; eauto.
+      eapply jsim_event_sim_event; eauto. }
   Qed.
 
   Lemma sim_configuration_sim_thread views prom extra (c_src c_mid c_tgt: Configuration.t)
@@ -539,22 +576,22 @@ Section SIM.
   Qed.
 
   Lemma step_sim_configuration views0 prom0 extra0
-        c_src0 c_mid0 c_tgt0 c_tgt1 e tid lang tr_src tr_cert
-        (STEPTGT: @times_configuration_step times lang tr_src tr_cert e tid c_tgt0 c_tgt1)
+        c_src0 c_mid0 c_tgt0 c_tgt1 e tid lang tr_tgt tr_cert
+        (STEPTGT: @times_configuration_step times lang tr_tgt tr_cert e tid c_tgt0 c_tgt1)
         (NOREAD: List.Forall
                    (fun the => no_read_msgs
                                  (all_promises (fun tid' => tid <> tid') prom0)
-                                 (snd the)) (tr_src++tr_cert))
+                                 (snd the)) (tr_tgt++tr_cert))
         (SIM: sim_configuration views0 prom0 extra0 c_src0 c_mid0 c_tgt0)
         (WF_SRC: Configuration.wf c_src0)
         (WF_MID: JConfiguration.wf views0 c_mid0)
         (WF_TGT: Configuration.wf c_tgt0)
     :
-      exists lang tr_tgt c_src1 c_mid1 views1 prom1 extra1,
-        (<<STEPSRC: @Trace.configuration_step lang tr_tgt e tid c_src0 c_src1>>) /\
+      exists tr_src c_src1 c_mid1 views1 prom1 extra1,
+        (<<STEPSRC: @Trace.configuration_step lang tr_src e tid c_src0 c_src1>>) /\
         (<<STEPMID: JConfiguration.step e tid c_mid0 c_mid1 views0 views1>>) /\
         (<<SIM: sim_configuration views1 prom1 extra1 c_src1 c_mid1 c_tgt1>>) /\
-        (<<TRACE: True>>)
+        (<<TRACE: sim_traces L tr_src tr_tgt>>)
   .
   Proof.
     dep_inv STEPTGT.

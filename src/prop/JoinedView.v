@@ -739,6 +739,10 @@ Module JSim.
   .
   Hint Constructors sim_op_kind.
 
+  Global Program Instance sim_op_kind_PreOrder: PreOrder sim_op_kind.
+  Next Obligation. ii. destruct x; econs; eauto; refl. Qed.
+  Next Obligation. ii. inv H; inv H0; econs; eauto; etrans; eauto. Qed.
+
   Inductive sim_event: forall (e_src e_tgt: ThreadEvent.t), Prop :=
   | sim_event_promise
       loc from to msg_src msg_tgt kind_src kind_tgt
@@ -794,6 +798,10 @@ Module JSim.
         ThreadEvent.failure
   .
   Hint Constructors sim_event.
+
+  Global Program Instance sim_event_PreOrder: PreOrder sim_event.
+  Next Obligation. ii. destruct x; econs; eauto; refl. Qed.
+  Next Obligation. ii. inv H; inv H0; econs; eauto; etrans; eauto. Qed.
 
   Lemma sim_event_program_event e_src e_tgt
         (EVENT: sim_event e_src e_tgt)
@@ -2099,7 +2107,7 @@ Module JSim.
           { ss. }
           { ss. }
         * ss.
-        * eauto.
+        * econs; eauto; refl.
 
       + hexploit sim_local_read; eauto.
         { refl. } i. des.

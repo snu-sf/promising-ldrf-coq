@@ -124,45 +124,93 @@ Section SIM.
     | _ => False
     end.
 
-  Definition sim_event (e_src e_tgt: ThreadEvent.t): Prop :=
-    match e_tgt with
-    | ThreadEvent.write loc from to val released ord =>
-      exists from', (<<EVENT: e_src = ThreadEvent.write loc from' to val released ord>>)
-    | ThreadEvent.read _ _ _ _ _ => e_src = e_tgt
-    | ThreadEvent.update _ _ _ _ _ _ _ _ _ => e_src = e_tgt
-    | _ => True
-    end.
-
-  Inductive sim_silent_trace lang: Trace.t lang -> option ThreadEvent.t -> Prop :=
-  | sim_silent_trace_nil
+  Inductive sim_event: forall (e_src e_tgt: ThreadEvent.t), Prop :=
+  | sim_event_promise
+      loc from_src from_tgt to msg_src msg_tgt kind_src kind_tgt
     :
-      sim_silent_trace [] None
-  | sim_silent_trace_cons
+      sim_event
+        (ThreadEvent.promise loc from_src to msg_src kind_src)
+        (ThreadEvent.promise loc from_tgt to msg_tgt kind_tgt)
+  | sim_event_silent
+    :
+      sim_event
+        ThreadEvent.silent
+        ThreadEvent.silent
+  | sim_event_read
+      loc ts val released_src released_tgt ord
+    :
+      sim_event
+        (ThreadEvent.read loc ts val released_src ord)
+        (ThreadEvent.read loc ts val released_tgt ord)
+  | sim_event_write
+      loc from_src from_tgt to val released_src released_tgt ord
+    :
+      sim_event
+        (ThreadEvent.write loc from_src to val released_src ord)
+        (ThreadEvent.write loc from_tgt to val released_tgt ord)
+  | sim_event_update
+      loc tsr tsw valr valw releasedr_src releasedr_tgt releasedw_src releasedw_tgt ordr ordw
+    :
+      sim_event
+        (ThreadEvent.update loc tsr tsw valr valw releasedr_src releasedw_src ordr ordw)
+        (ThreadEvent.update loc tsr tsw valr valw releasedr_tgt releasedw_tgt ordr ordw)
+  | sim_event_fence
+      ordr ordw
+    :
+      sim_event
+        (ThreadEvent.fence ordr ordw)
+        (ThreadEvent.fence ordr ordw)
+  | sim_event_syscall
+      e
+    :
+      sim_event
+        (ThreadEvent.syscall e)
+        (ThreadEvent.syscall e)
+  | sim_event_failure
+    :
+      sim_event
+        ThreadEvent.failure
+        ThreadEvent.failure
+  .
+  Hint Constructors sim_event.
+
+  Lemma sim_event_machine_event e_src e_tgt
+        (EVENT: sim_event e_src e_tgt)
+    :
+      ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt.
+  Proof.
+    inv EVENT; ss.
+  Qed.
+
+  Inductive sim_trace lang: Trace.t lang -> option ThreadEvent.t -> Prop :=
+  | sim_trace_nil
+    :
+      sim_trace [] None
+  | sim_trace_cons
       th_src e_src e_tgt tl_src
-      (SILENT: ThreadEvent.get_machine_event e_src = MachineEvent.silent)
       (VALID: valid_event L e_src)
-      (TL: sim_silent_trace tl_src None)
+      (TL: sim_trace tl_src None)
       (EVENT: sim_event e_src e_tgt)
     :
-      sim_silent_trace ((th_src, e_src)::tl_src) (Some e_tgt)
-  | sim_silent_trace_forget
+      sim_trace ((th_src, e_src)::tl_src) (Some e_tgt)
+  | sim_trace_forget
       e tl_src
       (NONRACY: ~ racy_event e)
-      (TL: sim_silent_trace tl_src None)
+      (TL: sim_trace tl_src None)
     :
-      sim_silent_trace tl_src (Some e)
-  | sim_silent_trace_reserve
+      sim_trace tl_src (Some e)
+  | sim_trace_reserve
       th_src e tl_src e_tgt
       (SILENT: ThreadEvent.get_machine_event e = MachineEvent.silent)
       (VALID: valid_event L e)
-      (TL: sim_silent_trace tl_src e_tgt)
+      (TL: sim_trace tl_src e_tgt)
     :
-      sim_silent_trace ((th_src, e)::tl_src) e_tgt
+      sim_trace ((th_src, e)::tl_src) e_tgt
   .
-  Hint Constructors sim_silent_trace.
+  Hint Constructors sim_trace.
 
   Lemma sim_silent_sim_event_exists lang (tr_src: Trace.t lang) e_tgt
-        (TRACE: sim_silent_trace tr_src (Some e_tgt))
+        (TRACE: sim_trace tr_src (Some e_tgt))
         (VALID: valid_event L e_tgt)
         (RACY: racy_event e_tgt)
     :
@@ -178,6 +226,20 @@ Section SIM.
       esplits; eauto. right. eauto. }
   Qed.
 
+  Lemma sim_trace_silent lang (tr_src: Trace.t lang) (e_tgt: option ThreadEvent.t)
+        (SILENT: forall e (EQ: e_tgt = Some e), ThreadEvent.get_machine_event e = MachineEvent.silent)
+        (TRACE: sim_trace tr_src e_tgt)
+    :
+      List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr_src.
+  Proof.
+    ginduction TRACE; eauto.
+    { i. econs; eauto.
+      { ss. erewrite sim_event_machine_event; eauto. }
+      { eapply IHTRACE; eauto. i. ss. }
+    }
+    { i. eapply IHTRACE; eauto. i. ss. }
+  Qed.
+
   Lemma non_silent_valid e
         (EVENT: ThreadEvent.get_machine_event e <> MachineEvent.silent)
     :
@@ -186,27 +248,19 @@ Section SIM.
     ii. subst. ss.
   Qed.
 
-  Lemma sim_silent_trace_valid lang (tr_src: Trace.t lang) (e_tgt: option ThreadEvent.t)
-        (TRACE: sim_silent_trace tr_src e_tgt)
+  Lemma sim_trace_valid lang (tr_src: Trace.t lang) (e_tgt: option ThreadEvent.t)
+        (TRACE: sim_trace tr_src e_tgt)
     :
       List.Forall (compose (valid_event L) snd) tr_src.
   Proof.
     ginduction TRACE; eauto.
   Qed.
 
-  Lemma sim_silent_trace_silent lang (tr_src: Trace.t lang) (e_tgt: option ThreadEvent.t)
-        (TRACE: sim_silent_trace tr_src e_tgt)
-    :
-      List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr_src.
-  Proof.
-    ginduction TRACE; eauto.
-  Qed.
-
-  Lemma reserving_l_sim_silent_trace lang (tr_src tr_reserve: Trace.t lang) (e_tgt: option ThreadEvent.t)
-        (TRACE: sim_silent_trace tr_src e_tgt)
+  Lemma reserving_l_sim_trace lang (tr_src tr_reserve: Trace.t lang) (e_tgt: option ThreadEvent.t)
+        (TRACE: sim_trace tr_src e_tgt)
         (RESERVING: reserving_trace tr_reserve)
     :
-      sim_silent_trace (tr_reserve ++ tr_src) e_tgt.
+      sim_trace (tr_reserve ++ tr_src) e_tgt.
   Proof.
     ginduction RESERVING; eauto. i. ss.
     destruct x. econs 4; eauto.
@@ -214,11 +268,11 @@ Section SIM.
     { eapply reserving_tevent_valid; eauto. }
   Qed.
 
-  Lemma reserving_r_sim_silent_trace lang (tr_src tr_reserve: Trace.t lang) (e_tgt: option ThreadEvent.t)
-        (TRACE: sim_silent_trace tr_src e_tgt)
+  Lemma reserving_r_sim_trace lang (tr_src tr_reserve: Trace.t lang) (e_tgt: option ThreadEvent.t)
+        (TRACE: sim_trace tr_src e_tgt)
         (RESERVING: reserving_trace tr_reserve)
     :
-      sim_silent_trace (tr_src ++ tr_reserve) e_tgt.
+      sim_trace (tr_src ++ tr_reserve) e_tgt.
   Proof.
     ginduction TRACE; ss; i; eauto.
     ginduction RESERVING; eauto.
@@ -227,27 +281,27 @@ Section SIM.
     { eapply reserving_tevent_valid; eauto. }
   Qed.
 
-  Inductive sim_silent_traces lang: Trace.t lang -> Trace.t lang -> Prop :=
-  | sim_silent_traces_nil
+  Inductive sim_traces lang: Trace.t lang -> Trace.t lang -> Prop :=
+  | sim_traces_nil
     :
-      sim_silent_traces [] []
-  | sim_silent_traces_some
+      sim_traces [] []
+  | sim_traces_some
       hd_src th_tgt e_tgt tl_src tl_tgt
-      (TL: sim_silent_traces tl_src tl_tgt)
-      (HD: sim_silent_trace hd_src (Some e_tgt))
+      (TL: sim_traces tl_src tl_tgt)
+      (HD: sim_trace hd_src (Some e_tgt))
     :
-      sim_silent_traces (hd_src ++ tl_src) ((th_tgt, e_tgt)::tl_tgt)
-  | sim_silent_traces_none
+      sim_traces (hd_src ++ tl_src) ((th_tgt, e_tgt)::tl_tgt)
+  | sim_traces_none
       hd_src tl_src tl_tgt
-      (TL: sim_silent_traces tl_src tl_tgt)
-      (HD: sim_silent_trace hd_src None)
+      (TL: sim_traces tl_src tl_tgt)
+      (HD: sim_trace hd_src None)
     :
-      sim_silent_traces (hd_src ++ tl_src) tl_tgt
+      sim_traces (hd_src ++ tl_src) tl_tgt
   .
-  Hint Constructors sim_silent_traces.
+  Hint Constructors sim_traces.
 
-  Lemma sim_silent_traces_sim_event_exists lang (tr_src tr_tgt: Trace.t lang) th_tgt e_tgt
-        (TRACE: sim_silent_traces tr_src tr_tgt)
+  Lemma sim_traces_sim_event_exists lang (tr_src tr_tgt: Trace.t lang) th_tgt e_tgt
+        (TRACE: sim_traces tr_src tr_tgt)
         (IN: List.In (th_tgt, e_tgt) tr_tgt)
         (VALID: valid_event L e_tgt)
         (RACY: racy_event e_tgt)
@@ -266,6 +320,19 @@ Section SIM.
     }
     { exploit IHTRACE; eauto. i. des. esplits; eauto.
       eapply List.in_or_app; eauto. }
+  Qed.
+
+  Lemma sim_traces_silent lang (tr_src tr_tgt: Trace.t lang)
+        (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr_tgt)
+        (TRACE: sim_traces tr_src tr_tgt)
+    :
+      List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr_src.
+  Proof.
+    ginduction TRACE; eauto.
+    { i. inv SILENT. eapply Forall_app; eauto.
+      eapply sim_trace_silent; eauto. i. ss. clarify. }
+    { i. eapply Forall_app; eauto.
+      eapply sim_trace_silent; eauto. i. ss. }
   Qed.
 
 
@@ -2191,6 +2258,7 @@ Section SIM.
       exists prom_src0 mem_src0 mem_src1 prom_src2 mem_src2 self' extra_self',
         (<<FUTURE0: reserve_future_memory prom_src mem_src prom_src0 mem_src0>>) /\
         (<<WRITE: Memory.write prom_src0 mem_src0 loc from_src' to val released prom_src0 mem_src1 Memory.op_kind_add>>) /\
+        (<<FROM: Time.le from_tgt from_src'>>) /\
         (<<FUTURE1: reserve_future_memory prom_src0 mem_src1 prom_src2 mem_src2>>) /\
         (<<MEM: sim_memory (others \\2// self') (extra_others \\3// extra_self') mem_src2 mem_tgt>>) /\
         (<<PROMISE: sim_promise
@@ -2511,6 +2579,7 @@ Section SIM.
       exists from_src prom_src0 mem_src0 mem_src1 prom_src2 mem_src2 self' extra_self',
         (<<FUTURE0: reserve_future_memory prom_src mem_src prom_src0 mem_src0>>) /\
         (<<WRITE: Memory.write prom_src0 mem_src0 loc from_src to val released prom_src0 mem_src1 Memory.op_kind_add>>) /\
+        (<<FROM: Time.le from_tgt from_src>>) /\
         (<<FUTURE1: reserve_future_memory prom_src0 mem_src1 prom_src2 mem_src2>>) /\
         (<<MEM: sim_memory (others \\2// self') (extra_others \\3// extra_self') mem_src2 mem_tgt>>) /\
         (<<PROMISE: sim_promise
@@ -2563,6 +2632,7 @@ Section SIM.
       exists prom_src0 mem_src0 mem_src1 prom_src2 mem_src2 self' extra_self',
         (<<FUTURE0: reserve_future_memory prom_src mem_src prom_src0 mem_src0>>) /\
         (<<WRITE: Memory.write prom_src0 mem_src0 loc from_tgt to val released prom_src0 mem_src1 Memory.op_kind_add>>) /\
+        (<<FROM: Time.le from_tgt from_tgt>>) /\
         (<<FUTURE1: reserve_future_memory prom_src0 mem_src1 prom_src2 mem_src2>>) /\
         (<<MEM: sim_memory (others \\2// self') (extra_others \\3// extra_self') mem_src2 mem_tgt>>) /\
         (<<PROMISE: sim_promise
@@ -2696,6 +2766,7 @@ Section SIM.
       exists self' extra_self' from' lc_src' prom_src0 mem_src0 mem_src1 prom_src' mem_src',
         (<<FUTURE0: reserve_future_memory lc_src.(Local.promises) mem_src prom_src0 mem_src0>>) /\
         (<<WRITE: Local.write_step (Local.mk lc_src.(Local.tview) prom_src0) sc mem_src0 loc from' to val None released ord lc_src' sc' mem_src1 Memory.op_kind_add>>) /\
+        (<<FROM: Time.le from from'>>) /\
         (<<FUTURE1: reserve_future_memory lc_src'.(Local.promises) mem_src1 prom_src' mem_src'>>) /\
 
         (<<MEM: sim_memory (others \\2// self') (extra_others \\3// extra_self') mem_src' mem_tgt'>>) /\
@@ -2832,7 +2903,7 @@ Section SIM.
         (<<STEPSRC: Trace.steps tr (Thread.mk _ st lc_src sc mem_src) (Thread.mk _ st' lc_src' sc' mem_src')>>) /\
         (<<MEM: sim_memory (others \\2// self') (extra_others \\3// extra_self') mem_src' mem_tgt'>>) /\
         (<<SIM: sim_local self' extra_self' lc_src' lc_tgt'>>) /\
-        (<<TRACE: sim_silent_trace tr (Some e_tgt)>>)
+        (<<TRACE: sim_trace tr (Some e_tgt)>>)
   .
   Proof.
     inv STEPTGT. inv STEP; ss.
@@ -2841,7 +2912,7 @@ Section SIM.
         destruct lc_src. ss. exploit reserve_future_memory_steps; eauto. i. des.
         eexists _, self', extra_self', (Local.mk _ _), mem_src'. splits; eauto.
         * econs 3; ss.
-          eapply reserving_r_sim_silent_trace with (tr_src:=[]) in RESERVING; eauto.
+          eapply reserving_r_sim_trace with (tr_src:=[]) in RESERVING; eauto.
       + hexploit sim_promise_step_normal; eauto.
         { destruct msg; econs. hexploit PROMISE; eauto.
           i. inv H0; econs.
@@ -2892,15 +2963,15 @@ Section SIM.
               - ss. eauto. }
             eauto.
           }
-          { eapply reserving_l_sim_silent_trace; eauto.
-            eapply reserving_r_sim_silent_trace; eauto.
+          { eapply reserving_l_sim_trace; eauto.
+            eapply reserving_r_sim_trace; eauto.
             econs 2; ss; eauto. }
         * hexploit sim_write_step_normal; eauto. i. des.
           eexists [(_, ThreadEvent.write loc from to val _ ord)],
           self, extra_self, lc_src', mem_src'.
           splits; ss.
           { econs 2; [|econs 1|ss]. econs 2. econs; eauto. }
-          { econs 2; ss. eauto. }
+          { econs 2; ss. }
       + exploit sim_read_step; eauto.
         { eapply PromiseConsistent.write_step_promise_consistent; eauto. } i. des.
         exploit Local.read_step_future; try apply LOCAL1; eauto. i. des.
@@ -2921,8 +2992,8 @@ Section SIM.
               - ss. eauto. }
             eauto.
           }
-          { eapply reserving_l_sim_silent_trace; eauto.
-            eapply reserving_r_sim_silent_trace; eauto.
+          { eapply reserving_l_sim_trace; eauto.
+            eapply reserving_r_sim_trace; eauto.
             econs 2; ss; eauto. }
         * hexploit sim_write_step_normal; eauto. i. des.
           eexists [(_, ThreadEvent.update loc tsr tsw valr valw releasedr releasedw ordr ordw)],
@@ -2966,7 +3037,7 @@ Section SIM.
         (<<STEPSRC: Trace.steps tr (Thread.mk _ st lc_src sc mem_src) (Thread.mk _ st' lc_src' sc' mem_src')>>) /\
         (<<MEM: sim_memory (others \\2// self') (extra_others \\3// extra_self') mem_src' mem_tgt'>>) /\
         (<<SIM: sim_local self' extra_self' lc_src' lc_tgt'>>) /\
-        (<<TRACE: sim_silent_trace tr (Some e_tgt)>>) /\
+        (<<TRACE: sim_trace tr (Some e_tgt)>>) /\
         (<<JOINED: forall loc ts (NLOC: ~ L loc), List.Forall (fun vw => Memory.closed_view vw mem_src') (views' loc ts)>>)
   .
   Proof.
