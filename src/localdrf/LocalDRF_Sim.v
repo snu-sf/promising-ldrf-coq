@@ -250,7 +250,7 @@ Section SIM.
                      th_src1 th_mid1 th_tgt1>>) /\
         (<<EVENTJOIN: JSim.sim_event e_mid e_tgt>>) /\
         (<<JOINED: forall loc ts (NLOC: ~ L loc), List.Forall (fun vw => Memory.closed_view vw th_src1.(Thread.memory)) (views1 loc ts)>>) /\
-        (<<TRACE: sim_trace L tr (Some e_mid)>>) /\
+        (<<TRACE: sim_trace L tr (Some (th_mid0, e_mid))>>) /\
         (<<MEMWF: memory_times_wf times th_mid1.(Thread.memory)>>)
   .
   Proof.
@@ -348,18 +348,21 @@ Section SIM.
     inv EVENT; ss.
   Qed.
 
-  Lemma sim_trace_sim_event_sim_trace lang (tr_src: Trace.t lang) e_mid e_tgt
-        (TRACE: sim_trace L tr_src (Some e_mid))
+  Lemma sim_trace_sim_event_sim_trace lang (tr_src: Trace.t lang) th_mid th_tgt e_mid e_tgt
+        (TRACE: sim_trace L tr_src (Some (th_mid, e_mid)))
+        (THREAD: TView.le th_mid.(Thread.local).(Local.tview) th_tgt.(Thread.local).(Local.tview))
         (EVENT: sim_event e_mid e_tgt)
     :
-      sim_trace L tr_src (Some e_tgt).
+      sim_trace L tr_src (Some (th_tgt, e_tgt)).
   Proof.
-    remember (Some e_mid) as e. ginduction TRACE; i; clarify.
-    { econs 2; eauto. etrans; eauto. }
+    remember (Some (th_mid, e_mid)) as e. ginduction TRACE; i; clarify.
+    { econs 2; eauto.
+      { etrans; eauto. }
+      { etrans; eauto. }
+    }
     { econs 3; eauto. ii. eapply NONRACY. eapply sim_event_racy_event; eauto. }
     { econs 4; eauto. }
   Qed.
-
 
   Lemma sim_thread_steps_silent
         views0 prom_self0 prom_others extra_self0 extra_others
@@ -423,7 +426,9 @@ Section SIM.
     { econs; eauto. inv EVENTJOIN; ss. }
     { eapply Trace.steps_trans; eauto. }
     { econs 2; eauto. eapply sim_trace_sim_event_sim_trace; eauto.
-      eapply jsim_event_sim_event; eauto. }
+      { dep_inv THREAD. inv LOCALJOIN. ss. }
+      { eapply jsim_event_sim_event; eauto. }
+    }
   Qed.
 
   Lemma sim_configuration_sim_thread views prom extra (c_src c_mid c_tgt: Configuration.t)

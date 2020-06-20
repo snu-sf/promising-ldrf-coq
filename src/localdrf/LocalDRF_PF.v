@@ -182,23 +182,24 @@ Section SIM.
     inv EVENT; ss.
   Qed.
 
-  Inductive sim_trace lang: Trace.t lang -> option ThreadEvent.t -> Prop :=
+  Inductive sim_trace lang: Trace.t lang -> option (Thread.t lang * ThreadEvent.t) -> Prop :=
   | sim_trace_nil
     :
       sim_trace [] None
   | sim_trace_cons
-      th_src e_src e_tgt tl_src
+      th_src th_tgt e_src e_tgt tl_src
       (VALID: valid_event L e_src)
       (TL: sim_trace tl_src None)
       (EVENT: sim_event e_src e_tgt)
+      (VW: TView.le th_src.(Thread.local).(Local.tview) th_tgt.(Thread.local).(Local.tview))
     :
-      sim_trace ((th_src, e_src)::tl_src) (Some e_tgt)
+      sim_trace ((th_src, e_src)::tl_src) (Some (th_tgt, e_tgt))
   | sim_trace_forget
-      e tl_src
+      th_tgt e tl_src
       (NONRACY: ~ racy_event e)
       (TL: sim_trace tl_src None)
     :
-      sim_trace tl_src (Some e)
+      sim_trace tl_src (Some (th_tgt, e))
   | sim_trace_reserve
       th_src e tl_src e_tgt
       (SILENT: ThreadEvent.get_machine_event e = MachineEvent.silent)
@@ -209,8 +210,8 @@ Section SIM.
   .
   Hint Constructors sim_trace.
 
-  Lemma sim_silent_sim_event_exists lang (tr_src: Trace.t lang) e_tgt
-        (TRACE: sim_trace tr_src (Some e_tgt))
+  Lemma sim_silent_sim_event_exists lang (tr_src: Trace.t lang) th_tgt e_tgt
+        (TRACE: sim_trace tr_src (Some (th_tgt, e_tgt)))
         (VALID: valid_event L e_tgt)
         (RACY: racy_event e_tgt)
     :
@@ -219,16 +220,16 @@ Section SIM.
         (<<EVENT: sim_event e_src e_tgt>>)
   .
   Proof.
-    remember (Some e_tgt). revert e_tgt Heqo VALID RACY.
+    remember (Some (th_tgt, e_tgt)). revert e_tgt Heqo VALID RACY.
     ginduction TRACE; i; clarify.
     { esplits; eauto. econs; eauto. }
     { hexploit IHTRACE; eauto. i. des.
       esplits; eauto. right. eauto. }
   Qed.
 
-  Lemma sim_trace_silent lang (tr_src: Trace.t lang) (e_tgt: option ThreadEvent.t)
-        (SILENT: forall e (EQ: e_tgt = Some e), ThreadEvent.get_machine_event e = MachineEvent.silent)
-        (TRACE: sim_trace tr_src e_tgt)
+  Lemma sim_trace_silent lang (tr_src: Trace.t lang) (e: option (Thread.t lang * ThreadEvent.t))
+        (SILENT: forall th_tgt e_tgt (EQ: e = Some (th_tgt, e_tgt)), ThreadEvent.get_machine_event e_tgt = MachineEvent.silent)
+        (TRACE: sim_trace tr_src e)
     :
       List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr_src.
   Proof.
@@ -248,19 +249,19 @@ Section SIM.
     ii. subst. ss.
   Qed.
 
-  Lemma sim_trace_valid lang (tr_src: Trace.t lang) (e_tgt: option ThreadEvent.t)
-        (TRACE: sim_trace tr_src e_tgt)
+  Lemma sim_trace_valid lang (tr_src: Trace.t lang) (e: option (Thread.t lang * ThreadEvent.t))
+        (TRACE: sim_trace tr_src e)
     :
       List.Forall (compose (valid_event L) snd) tr_src.
   Proof.
     ginduction TRACE; eauto.
   Qed.
 
-  Lemma reserving_l_sim_trace lang (tr_src tr_reserve: Trace.t lang) (e_tgt: option ThreadEvent.t)
-        (TRACE: sim_trace tr_src e_tgt)
+  Lemma reserving_l_sim_trace lang (tr_src tr_reserve: Trace.t lang) (e: option (Thread.t lang * ThreadEvent.t))
+        (TRACE: sim_trace tr_src e)
         (RESERVING: reserving_trace tr_reserve)
     :
-      sim_trace (tr_reserve ++ tr_src) e_tgt.
+      sim_trace (tr_reserve ++ tr_src) e.
   Proof.
     ginduction RESERVING; eauto. i. ss.
     destruct x. econs 4; eauto.
@@ -268,11 +269,11 @@ Section SIM.
     { eapply reserving_tevent_valid; eauto. }
   Qed.
 
-  Lemma reserving_r_sim_trace lang (tr_src tr_reserve: Trace.t lang) (e_tgt: option ThreadEvent.t)
-        (TRACE: sim_trace tr_src e_tgt)
+  Lemma reserving_r_sim_trace lang (tr_src tr_reserve: Trace.t lang) (e: option (Thread.t lang * ThreadEvent.t))
+        (TRACE: sim_trace tr_src e)
         (RESERVING: reserving_trace tr_reserve)
     :
-      sim_trace (tr_src ++ tr_reserve) e_tgt.
+      sim_trace (tr_src ++ tr_reserve) e.
   Proof.
     ginduction TRACE; ss; i; eauto.
     ginduction RESERVING; eauto.
@@ -288,7 +289,7 @@ Section SIM.
   | sim_traces_some
       hd_src th_tgt e_tgt tl_src tl_tgt
       (TL: sim_traces tl_src tl_tgt)
-      (HD: sim_trace hd_src (Some e_tgt))
+      (HD: sim_trace hd_src (Some (th_tgt, e_tgt)))
     :
       sim_traces (hd_src ++ tl_src) ((th_tgt, e_tgt)::tl_tgt)
   | sim_traces_none
@@ -1203,6 +1204,14 @@ Section SIM.
   .
   Hint Constructors sim_local.
 
+  Lemma sim_local_tview_le self extra lc_src lc_tgt
+        (LOCAL: sim_local self extra lc_src lc_tgt)
+    :
+      TView.le lc_src.(Local.tview) lc_tgt.(Local.tview).
+  Proof.
+    inv LOCAL. ss. refl.
+  Qed.
+
   Inductive sim_statelocal
             (self: Loc.t -> Time.t -> Prop)
             (extra: Loc.t -> Time.t -> Time.t -> Prop)
@@ -1214,7 +1223,6 @@ Section SIM.
     :
       sim_statelocal self extra (st, lc_src) (st, lc_tgt)
   .
-
 
 
   Lemma sim_read_step self others extra_self extra_others lc_src lc_tgt mem_src mem_tgt loc to val released ord
@@ -2903,7 +2911,7 @@ Section SIM.
         (<<STEPSRC: Trace.steps tr (Thread.mk _ st lc_src sc mem_src) (Thread.mk _ st' lc_src' sc' mem_src')>>) /\
         (<<MEM: sim_memory (others \\2// self') (extra_others \\3// extra_self') mem_src' mem_tgt'>>) /\
         (<<SIM: sim_local self' extra_self' lc_src' lc_tgt'>>) /\
-        (<<TRACE: sim_trace tr (Some e_tgt)>>)
+        (<<TRACE: sim_trace tr (Some (Thread.mk _ st lc_tgt sc mem_tgt, e_tgt))>>)
   .
   Proof.
     inv STEPTGT. inv STEP; ss.
@@ -2939,16 +2947,18 @@ Section SIM.
         self, extra_self, lc_src', mem_src'.
         splits; ss.
         * econs 2; [|econs 1|ss]. econs 1. econs; eauto.
-        * econs 2; ss. ii. clarify.
+        * econs 2; ss.
+          { ii. clarify. }
+          { eapply sim_local_tview_le; eauto. }
     - inv STEP0. inv LOCAL.
       + eexists [(_, ThreadEvent.silent)], self, extra_self, lc_src, mem_src. splits; ss.
         * econs 2; [|econs 1|ss]. econs 2. econs; eauto.
-        * econs 2; ss.
+        * econs 2; ss. eapply sim_local_tview_le; eauto.
       + exploit sim_read_step; eauto. i. des.
         eexists [(_, ThreadEvent.read loc ts val released ord)],
         self, extra_self, lc_src', mem_src. splits; ss.
         * econs 2; [|econs 1|ss]. econs 2. econs; eauto.
-        * econs 2; ss.
+        * econs 2; ss. eapply sim_local_tview_le; eauto.
       + destruct (classic (L loc)).
         * exploit sim_write_step_forget; eauto. i. des.
           destruct lc_src, lc_src'. ss.
@@ -2965,13 +2975,14 @@ Section SIM.
           }
           { eapply reserving_l_sim_trace; eauto.
             eapply reserving_r_sim_trace; eauto.
-            econs 2; ss; eauto. }
+            econs 2; ss; eauto.
+            eapply sim_local_tview_le in SIM; eauto. }
         * hexploit sim_write_step_normal; eauto. i. des.
           eexists [(_, ThreadEvent.write loc from to val _ ord)],
           self, extra_self, lc_src', mem_src'.
           splits; ss.
           { econs 2; [|econs 1|ss]. econs 2. econs; eauto. }
-          { econs 2; ss. }
+          { econs 2; ss. eapply sim_local_tview_le; eauto. }
       + exploit sim_read_step; eauto.
         { eapply PromiseConsistent.write_step_promise_consistent; eauto. } i. des.
         exploit Local.read_step_future; try apply LOCAL1; eauto. i. des.
@@ -2994,17 +3005,17 @@ Section SIM.
           }
           { eapply reserving_l_sim_trace; eauto.
             eapply reserving_r_sim_trace; eauto.
-            econs 2; ss; eauto. }
+            econs 2; ss; eauto. eapply sim_local_tview_le in SIM; eauto. }
         * hexploit sim_write_step_normal; eauto. i. des.
           eexists [(_, ThreadEvent.update loc tsr tsw valr valw releasedr releasedw ordr ordw)],
           self, extra_self, lc_src', mem_src'. splits; ss.
           { econs 2; [|econs 1|ss]. econs 2. econs; eauto. }
-          { econs 2; ss. }
+          { econs 2; ss. eapply sim_local_tview_le; eauto. }
       + exploit sim_fence_step; eauto. i. des.
         eexists [(_, ThreadEvent.fence ordr ordw)],
         self, extra_self, lc_src', mem_src. splits; ss.
         * econs 2; [|econs 1|ss]. econs 2. econs; eauto.
-        * econs 2; ss.
+        * econs 2; ss. eapply sim_local_tview_le in SIM; eauto.
       + ss.
       + ss.
   Qed.
@@ -3037,7 +3048,7 @@ Section SIM.
         (<<STEPSRC: Trace.steps tr (Thread.mk _ st lc_src sc mem_src) (Thread.mk _ st' lc_src' sc' mem_src')>>) /\
         (<<MEM: sim_memory (others \\2// self') (extra_others \\3// extra_self') mem_src' mem_tgt'>>) /\
         (<<SIM: sim_local self' extra_self' lc_src' lc_tgt'>>) /\
-        (<<TRACE: sim_trace tr (Some e_tgt)>>) /\
+        (<<TRACE: sim_trace tr (Some (Thread.mk _ st lc_tgt sc mem_tgt, e_tgt))>>) /\
         (<<JOINED: forall loc ts (NLOC: ~ L loc), List.Forall (fun vw => Memory.closed_view vw mem_src') (views' loc ts)>>)
   .
   Proof.
