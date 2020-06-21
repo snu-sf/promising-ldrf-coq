@@ -684,6 +684,99 @@ Section SIM.
     econs; eauto.
   Qed.
 
+  Lemma pf_consistent_pi_consistent prom extra
+        tid lang (st_src st_mid st_tgt: Language.state lang)
+        lc_src lc_mid lc_tgt mem_src mem_mid mem_tgt sc_src sc_mid sc_tgt
+        views1 prom_self extra_self tr_cert ths_tgt
+        (CONFIGTGT: Configuration.wf (Configuration.mk ths_tgt sc_tgt mem_tgt))
+        (CONSISTENT: pf_consistent_super_strong
+                       (Thread.mk _ st_tgt lc_tgt sc_tgt mem_tgt)
+                       tr_cert
+                       times)
+        (NOREAD: List.Forall
+                   (fun the => no_read_msgs
+                                 (all_promises (fun tid' => tid <> tid') prom)
+                                 (snd the)) tr_cert)
+        (THREAD:
+           sim_thread
+             views1
+             prom_self
+             (all_promises (fun tid' => tid <> tid') prom)
+             extra_self
+             (all_extra (fun tid' => tid <> tid') extra)
+             (Thread.mk _ st_src lc_src sc_src mem_src)
+             (Thread.mk _ st_mid lc_mid sc_mid mem_mid)
+             (Thread.mk _ st_tgt lc_tgt sc_tgt mem_tgt))
+        (THSTGT: IdentMap.find tid ths_tgt = Some (existT _ lang st_tgt, lc_tgt))
+    :
+      pi_consistent
+        prom_self mem_src
+        (Thread.mk lang st_tgt lc_tgt sc_tgt mem_tgt).
+  Proof.
+    dep_inv THREAD.
+    ii. exploit CONSISTENT; eauto. i. ss. des. esplits; eauto.
+    { eapply list_Forall_sum.
+      { eapply EVENTS. }
+      { instantiate (1:= fun the => no_read_msgs (all_promises (fun tid'=> tid <> tid') prom) (snd the)).
+        eapply List.Forall_forall. i.
+        eapply list_Forall2_in in H; eauto. des.
+        eapply List.Forall_forall in IN; eauto. ss.
+        destruct x, a. ss. inv SAT; ss.
+        { ii. replace fto with to in *; auto.
+          eapply mapping_map_lt_inj; eauto. eapply MAPIDENT.
+          inv H. exploit sim_memory_forget_concrete_promised.
+          { eapply MEMPF. }
+          { econs; eauto. }
+          intros GET. inv GET. dup GET0.
+          apply memory_get_ts_strong in GET1. des.
+          { subst. apply Time.bot_spec. }
+          inv MEMJOIN. hexploit (proj1 (COVER loc fto)).
+          { econs; eauto. econs; ss. refl. }
+          i. inv H. inv ITV. ss.
+          eapply Memory.max_ts_spec in GET. des. etrans; eauto.
+        }
+        { ii. replace ffrom with from in *; auto.
+          eapply mapping_map_lt_inj; eauto. eapply MAPIDENT.
+          inv H. exploit sim_memory_forget_concrete_promised.
+          { eapply MEMPF. }
+          { econs; eauto. }
+          intros GET. inv GET. dup GET0.
+          apply memory_get_ts_strong in GET1. des.
+          { subst. apply Time.bot_spec. }
+          inv MEMJOIN. hexploit (proj1 (COVER loc ffrom)).
+          { econs; eauto. econs; ss. refl. }
+          i. inv H. inv ITV. ss.
+          eapply Memory.max_ts_spec in GET. des. etrans; eauto.
+        }
+      }
+      { ii. ss. des. splits; auto. eapply no_read_msgs_sum.
+        { eapply SAT2. }
+        { eapply SAT1. }
+        i. ss. apply not_or_and in PR. des. apply not_or_and in PR0. des.
+        erewrite sim_memory_concrte_promised in PR0; [|eauto].
+        apply not_and_or in PR0. des.
+        { left. ii. des; ss. eapply PR0.
+          eapply sim_memory_concrete_promised; eauto. }
+        { right. apply NNPP in PR0. destruct PR0; auto. exfalso. eapply PR.
+          inv LOCALPF. inv LOCALJOIN.
+          specialize (PROMISES x0 x2). set (CNT:=PROMS.(sim_promise_contents) x0 x2).
+          inv CNT; ss. rewrite <- H2 in *. inv PROMISES.
+          econs; eauto. econs; ss; [|refl].
+          symmetry in H2. apply memory_get_ts_strong in H2. des; auto.
+          subst. inv CONFIGTGT. ss. inv WF.
+          specialize (THREADS tid). erewrite THSTGT in THREADS.
+          specialize (THREADS _ _ _ eq_refl). inv THREADS. ss.
+          erewrite BOT in *. clarify. }
+      }
+    }
+    { unguard. des; eauto. right. splits; auto. i.
+      inv LOCALPF. inv LOCALJOIN.
+      specialize (PROMISES0 loc ts). set (CNT:=PROMS.(sim_promise_contents) loc ts).
+      inv CNT; ss. rewrite <-H in *. inv PROMISES0.
+      exploit WRITES; eauto. i. des. esplits; eauto.
+      eapply promise_writing_event_racy; eauto. }
+  Qed.
+
   Lemma sim_thread_sim_configuration views0 prom extra (c_src c_mid c_tgt: Configuration.t)
         tid lang (st_src st_mid st_tgt: Language.state lang)
         lc_src lc_mid lc_tgt mem_src mem_mid mem_tgt sc_src sc_mid sc_tgt
@@ -693,11 +786,8 @@ Section SIM.
         (JOINED: forall loc ts (NLOC: ~ L loc), List.Forall (fun vw => Memory.closed_view vw mem_src) (views1 loc ts))
         (MEMWF: memory_times_wf times mem_mid)
         (FUTURESRC: Memory.future_weak c_src.(Configuration.memory) mem_src)
-        (FUTUREMID: Memory.future_weak c_mid.(Configuration.memory) mem_mid)
         (FUTURETGT: Memory.future_weak c_tgt.(Configuration.memory) mem_tgt)
         (CONFIGTGT: Configuration.wf (Configuration.mk ths_tgt sc_tgt mem_tgt))
-        (CONFIGMID: Configuration.wf (Configuration.mk ths_mid sc_mid mem_mid))
-        (CONFIGSRC: Configuration.wf (Configuration.mk ths_src sc_src mem_src))
         (CONSISTENT: pf_consistent_super_strong
                        (Thread.mk _ st_tgt lc_tgt sc_tgt mem_tgt)
                        tr_cert
@@ -779,66 +869,8 @@ Section SIM.
       auto.
     }
     { i. erewrite THSTGT in GET. des_ifs.
-      { dep_clarify. ii. ss.
-        exploit CONSISTENT; eauto. i. ss. des. esplits; eauto.
-        { eapply list_Forall_sum.
-          { eapply EVENTS. }
-          { instantiate (1:= fun the => no_read_msgs (all_promises (fun tid'=> tid <> tid') prom) (snd the)).
-            eapply List.Forall_forall. i.
-            eapply list_Forall2_in in H; eauto. des.
-            eapply List.Forall_forall in IN; eauto. ss.
-            destruct x, a. ss. inv SAT; ss.
-            { ii. replace fto with to in *; auto.
-              eapply mapping_map_lt_inj; eauto. eapply MAPIDENT.
-              inv H. exploit sim_memory_forget_concrete_promised.
-              { eapply MEMPF0. }
-              { econs; eauto. }
-              intros GET. eapply memory_future_concrete_promised in GET; eauto. inv GET.
-              erewrite <- SimMemory.sim_memory_max_ts; eauto.
-              { eapply Memory.max_ts_spec in GET0. des. auto. }
-              { eapply CONFIGMID. }
-              { eapply CONFIGTGT. }
-            }
-            { ii. replace ffrom with from in *; auto.
-              eapply mapping_map_lt_inj; eauto. eapply MAPIDENT.
-              inv H. exploit sim_memory_forget_concrete_promised.
-              { eapply MEMPF0. }
-              { econs; eauto. }
-              intros GET. eapply memory_future_concrete_promised in GET; eauto. inv GET.
-              erewrite <- SimMemory.sim_memory_max_ts; eauto.
-              eapply Memory.max_ts_spec in GET0.
-              { des. auto. }
-              { eapply CONFIGMID. }
-              { eapply CONFIGTGT. }
-            }
-          }
-          { ii. ss. des. splits; auto. eapply no_read_msgs_sum.
-            { eapply SAT2. }
-            { eapply SAT1. }
-            i. ss. apply not_or_and in PR. des. apply not_or_and in PR0. des.
-            erewrite sim_memory_concrte_promised in PR0; [|eauto].
-            apply not_and_or in PR0. des.
-            { left. ii. des; ss. eapply PR0.
-              eapply sim_memory_concrete_promised; eauto. }
-            { right. apply NNPP in PR0. destruct PR0; auto. exfalso. eapply PR.
-              inv LOCALPF. inv LOCALJOIN.
-              specialize (PROMISES x0 x2). set (CNT:=PROMS.(sim_promise_contents) x0 x2).
-              inv CNT; ss. rewrite <- H2 in *. inv PROMISES.
-              econs; eauto. econs; ss; [|refl].
-              symmetry in H2. apply memory_get_ts_strong in H2. des; auto.
-              subst. inv CONFIGTGT. ss. inv WF.
-              specialize (THREADS tid). erewrite THSTGT in THREADS. des_ifs.
-              specialize (THREADS _ _ _ eq_refl). inv THREADS. ss.
-              erewrite BOT0 in *. clarify. }
-          }
-        }
-        { unguard. des; eauto. right. splits; auto. i.
-          inv LOCALPF. inv LOCALJOIN.
-          specialize (PROMISES0 loc ts). set (CNT:=PROMS.(sim_promise_contents) loc ts).
-          inv CNT; ss. rewrite <-H in *. inv PROMISES0.
-          exploit WRITES; eauto. i. des. esplits; eauto.
-          eapply promise_writing_event_racy; eauto. }
-      }
+      { dep_clarify. eapply pf_consistent_pi_consistent; eauto.
+        erewrite THSTGT. des_ifs. }
       { eapply pi_consistent_mon; eauto. }
     }
   Qed.
@@ -1013,8 +1045,6 @@ Section SIM.
             { etrans; eauto. }
             { refl. }
             { ss. eapply Memory.future_future_weak. etrans; eauto. }
-            { ss. eapply Memory.future_future_weak. etrans; eauto. }
-            { eapply JConfiguration.step_future; eauto. }
             { eapply CONSISTENT. ii. subst. ss. }
             { dup THREAD0. eapply sim_thread_strong_sim_thread. eauto. }
             { i. des_ifs. }
@@ -1068,8 +1098,6 @@ Section SIM.
             { etrans; eauto. }
             { ss. eapply Memory.future_future_weak. auto. }
             { ss. eapply Memory.future_future_weak. etrans; eauto. }
-            { ss. eapply Memory.future_future_weak. etrans; eauto. }
-            { eapply JConfiguration.step_future; eauto. }
             { eapply CONSISTENT. ii. subst. ss. }
             { dup THREAD0. eapply sim_thread_strong_sim_thread. eauto. }
             { i. erewrite IdentMap.gsspec. des_ifs; eauto. }
@@ -1144,8 +1172,6 @@ Section SIM.
             { etrans; eauto. }
             { ss. eapply Memory.future_future_weak. auto. }
             { ss. eapply Memory.future_future_weak. etrans; eauto. }
-            { ss. eapply Memory.future_future_weak. etrans; eauto. }
-            { eapply JConfiguration.step_future; eauto. }
             { dup THREAD0. eapply sim_thread_strong_sim_thread. eauto. }
             { i. erewrite IdentMap.gsspec. des_ifs; eauto. }
             { i. erewrite IdentMap.gsspec. des_ifs; eauto. }
