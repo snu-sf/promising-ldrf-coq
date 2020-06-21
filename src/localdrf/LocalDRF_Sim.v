@@ -83,6 +83,45 @@ Inductive all_extra
 .
 Hint Constructors all_extra.
 
+Global Program Instance sim_event_Equivalence: Equivalence sim_event.
+Next Obligation.
+Proof. ii. destruct x; econs. Qed.
+Next Obligation.
+Proof. ii. inv H; econs. Qed.
+Next Obligation.
+Proof. ii. inv H; inv H0; econs. Qed.
+
+Lemma jsim_event_sim_event
+  :
+    JSim.sim_event <2= sim_event.
+Proof. ii. inv PR; econs. Qed.
+
+Lemma sim_event_racy_event e_src e_tgt
+      (RACY: racy_event e_tgt)
+      (EVENT: sim_event e_src e_tgt)
+  :
+    racy_event e_src.
+Proof.
+  inv EVENT; ss.
+Qed.
+
+Lemma sim_trace_sim_event_sim_trace L lang (tr_src: Trace.t lang) th_mid th_tgt e_mid e_tgt
+      (TRACE: sim_trace L tr_src (Some (th_mid, e_mid)))
+      (THREAD: TView.le th_mid.(Thread.local).(Local.tview) th_tgt.(Thread.local).(Local.tview))
+      (EVENT: sim_event e_mid e_tgt)
+  :
+    sim_trace L tr_src (Some (th_tgt, e_tgt)).
+Proof.
+  remember (Some (th_mid, e_mid)) as e. ginduction TRACE; i; clarify.
+  { econs 2; eauto.
+    { etrans; eauto. }
+    { etrans; eauto. }
+  }
+  { econs 3; eauto. ii. eapply NONRACY. eapply sim_event_racy_event; eauto. }
+  { econs 4; eauto. }
+Qed.
+
+
 Section SIM.
 
   Variable L: Loc.t -> bool.
@@ -302,7 +341,7 @@ Section SIM.
                      th_src1 th_mid1 th_tgt1>>) /\
         (<<EVENTJOIN: JSim.sim_event e_mid e_tgt>>) /\
         (<<JOINED: forall loc ts (NLOC: ~ L loc), List.Forall (fun vw => Memory.closed_view vw th_src1.(Thread.memory)) (views1 loc ts)>>) /\
-        (<<TRACE: sim_trace L tr (Some (th_mid0, e_mid))>>) /\
+        (<<TRACE: sim_trace L tr (Some (th_tgt0, e_tgt))>>) /\
         (<<MEMWF: memory_times_wf times th_mid1.(Thread.memory)>>)
   .
   Proof.
@@ -315,6 +354,10 @@ Section SIM.
     { dep_inv SIM. eapply JSim.sim_local_promise_consistent; eauto. }
     { inv EVENT0; ss. }
     i. des. dep_inv SIM. esplits; eauto.
+    { eapply sim_trace_sim_event_sim_trace; eauto.
+      { dep_inv JTHREAD. inv LOCAL0. ss. }
+      { eapply jsim_event_sim_event; eauto. }
+    }
     { inv STEP. ss. hexploit step_memory_times_wf; eauto. inv EVENT0; ss. }
   Qed.
 
@@ -377,44 +420,6 @@ Section SIM.
     { inv EVENT0; ss. } subst.
     i. des. dep_inv SIM. esplits; eauto.
     { inv STEP. ss. hexploit step_memory_times_wf; eauto. }
-  Qed.
-
-  Global Program Instance sim_event_Equivalence: Equivalence sim_event.
-  Next Obligation.
-  Proof. ii. destruct x; econs. Qed.
-  Next Obligation.
-  Proof. ii. inv H; econs. Qed.
-  Next Obligation.
-  Proof. ii. inv H; inv H0; econs. Qed.
-
-  Lemma jsim_event_sim_event
-    :
-      JSim.sim_event <2= sim_event.
-  Proof. ii. inv PR; econs. Qed.
-
-  Lemma sim_event_racy_event e_src e_tgt
-        (RACY: racy_event e_tgt)
-        (EVENT: sim_event e_src e_tgt)
-    :
-      racy_event e_src.
-  Proof.
-    inv EVENT; ss.
-  Qed.
-
-  Lemma sim_trace_sim_event_sim_trace lang (tr_src: Trace.t lang) th_mid th_tgt e_mid e_tgt
-        (TRACE: sim_trace L tr_src (Some (th_mid, e_mid)))
-        (THREAD: TView.le th_mid.(Thread.local).(Local.tview) th_tgt.(Thread.local).(Local.tview))
-        (EVENT: sim_event e_mid e_tgt)
-    :
-      sim_trace L tr_src (Some (th_tgt, e_tgt)).
-  Proof.
-    remember (Some (th_mid, e_mid)) as e. ginduction TRACE; i; clarify.
-    { econs 2; eauto.
-      { etrans; eauto. }
-      { etrans; eauto. }
-    }
-    { econs 3; eauto. ii. eapply NONRACY. eapply sim_event_racy_event; eauto. }
-    { econs 4; eauto. }
   Qed.
 
   Lemma sim_thread_steps_silent
@@ -495,10 +500,7 @@ Section SIM.
     i. des. esplits; try apply THREAD1; eauto.
     { econs; eauto. inv EVENTJOIN; ss. }
     { eapply Trace.steps_trans; eauto. }
-    { econs 2; eauto. eapply sim_trace_sim_event_sim_trace; eauto.
-      { dep_inv THREAD. inv LOCALJOIN. ss. }
-      { eapply jsim_event_sim_event; eauto. }
-    }
+    { econs 2; eauto. }
   Qed.
 
   Lemma sim_configuration_sim_thread views prom extra (c_src c_mid c_tgt: Configuration.t)
@@ -683,7 +685,7 @@ Section SIM.
   Qed.
 
   Lemma sim_thread_sim_configuration views0 prom extra (c_src c_mid c_tgt: Configuration.t)
-        tid lang (st: Language.state lang)
+        tid lang (st_src st_mid st_tgt: Language.state lang)
         lc_src lc_mid lc_tgt mem_src mem_mid mem_tgt sc_src sc_mid sc_tgt
         (CONFIG: sim_configuration views0 prom extra c_src c_mid c_tgt)
         views1 prom_self extra_self tr_cert ths_src ths_mid ths_tgt
@@ -697,7 +699,7 @@ Section SIM.
         (CONFIGMID: Configuration.wf (Configuration.mk ths_mid sc_mid mem_mid))
         (CONFIGSRC: Configuration.wf (Configuration.mk ths_src sc_src mem_src))
         (CONSISTENT: pf_consistent_super_strong
-                       (Thread.mk _ st lc_tgt sc_tgt mem_tgt)
+                       (Thread.mk _ st_tgt lc_tgt sc_tgt mem_tgt)
                        tr_cert
                        times)
         (NOREAD: List.Forall
@@ -711,26 +713,26 @@ Section SIM.
              (all_promises (fun tid' => tid <> tid') prom)
              extra_self
              (all_extra (fun tid' => tid <> tid') extra)
-             (Thread.mk _ st lc_src sc_src mem_src)
-             (Thread.mk _ st lc_mid sc_mid mem_mid)
-             (Thread.mk _ st lc_tgt sc_tgt mem_tgt))
+             (Thread.mk _ st_src lc_src sc_src mem_src)
+             (Thread.mk _ st_mid lc_mid sc_mid mem_mid)
+             (Thread.mk _ st_tgt lc_tgt sc_tgt mem_tgt))
         (THSSRC:
            forall tid',
              IdentMap.find tid' ths_src =
              if (Ident.eq_dec tid' tid)
-             then Some (existT _ lang st, lc_src)
+             then Some (existT _ lang st_src, lc_src)
              else IdentMap.find tid' c_src.(Configuration.threads))
         (THSMID:
            forall tid',
              IdentMap.find tid' ths_mid =
              if (Ident.eq_dec tid' tid)
-             then Some (existT _ lang st, lc_mid)
+             then Some (existT _ lang st_mid, lc_mid)
              else IdentMap.find tid' c_mid.(Configuration.threads))
         (THSTGT:
            forall tid',
              IdentMap.find tid' ths_tgt =
              if (Ident.eq_dec tid' tid)
-             then Some (existT _ lang st, lc_tgt)
+             then Some (existT _ lang st_tgt, lc_tgt)
              else IdentMap.find tid' c_tgt.(Configuration.threads))
     :
       sim_configuration
@@ -821,13 +823,13 @@ Section SIM.
             { right. apply NNPP in PR0. destruct PR0; auto. exfalso. eapply PR.
               inv LOCALPF. inv LOCALJOIN.
               specialize (PROMISES x0 x2). set (CNT:=PROMS.(sim_promise_contents) x0 x2).
-              inv CNT; ss. rewrite <- H3 in *. inv PROMISES.
+              inv CNT; ss. rewrite <- H2 in *. inv PROMISES.
               econs; eauto. econs; ss; [|refl].
-              symmetry in H3. apply memory_get_ts_strong in H3. des; auto.
+              symmetry in H2. apply memory_get_ts_strong in H2. des; auto.
               subst. inv CONFIGTGT. ss. inv WF.
               specialize (THREADS tid). erewrite THSTGT in THREADS. des_ifs.
               specialize (THREADS _ _ _ eq_refl). inv THREADS. ss.
-              erewrite BOT0 in H8. clarify. }
+              erewrite BOT0 in *. clarify. }
           }
         }
         { unguard. des; eauto. right. splits; auto. i.
@@ -869,8 +871,7 @@ Section SIM.
         (JOINEDMEM: joined_memory views th_mid.(Thread.memory))
         (VIEWS: wf_views views)
     :
-      (<<CONSISTENTMID: JThread.consistent th_mid views>>) /\
-      (<<CONSISTENTSRC: Thread.consistent th_src>>).
+      Thread.consistent th_src.
   Proof.
     exploit (CONSISTENTTGT th_tgt.(Thread.memory) TimeMap.bot th_tgt.(Thread.sc)); eauto.
     { refl. }
@@ -884,6 +885,18 @@ Section SIM.
     (* i. des. split. *)
     (* { unfold JThread.consistent. esplits; eauto. *)
   Admitted.
+
+  Lemma sim_traces_trans lang (tr_src0 tr_src1 tr_tgt0 tr_tgt1: Trace.t lang)
+        (TRACE0: sim_traces L tr_src0 tr_tgt0)
+        (TRACE1: sim_traces L tr_src1 tr_tgt1)
+    :
+      sim_traces L (tr_src0 ++ tr_src1) (tr_tgt0 ++ tr_tgt1).
+  Proof.
+    ginduction TRACE0; i.
+    { ss. }
+    { erewrite <- List.app_assoc. erewrite <- List.app_comm_cons. econs 2; eauto. }
+    { erewrite <- List.app_assoc. econs 3; eauto. }
+  Qed.
 
   Lemma step_sim_configuration views0 prom0 extra0
         c_src0 c_mid0 c_tgt0 c_tgt1 e tid lang tr_tgt tr_cert
@@ -900,19 +913,21 @@ Section SIM.
       exists tr_src c_src1 c_mid1 views1 prom1 extra1,
         (<<STEPSRC: @Trace.configuration_opt_step lang tr_src e tid c_src0 c_src1>>) /\
         (<<STEPMID: JConfiguration.step e tid c_mid0 c_mid1 views0 views1>>) /\
-        (<<SIM: sim_configuration views1 prom1 extra1 c_src1 c_mid1 c_tgt1>>) /\
-        (<<TRACE: sim_traces L tr_src tr_tgt>>) /\
-        (<<PROM: forall tid' (NEQ: tid <> tid'), prom1 tid' = prom0 tid'>>) /\
-        (<<EXTRA: forall tid' (NEQ: tid <> tid'), extra1 tid' = extra0 tid'>>)
-  .
+        (e = MachineEvent.failure \/
+         (<<SIM: sim_configuration views1 prom1 extra1 c_src1 c_mid1 c_tgt1>>) /\
+         (<<TRACE: sim_traces L tr_src tr_tgt>>) /\
+         (<<PROM: forall tid' (NEQ: tid <> tid'), prom1 tid' = prom0 tid'>>) /\
+         (<<EXTRA: forall tid' (NEQ: tid <> tid'), extra1 tid' = extra0 tid'>>))
+         .
   Proof.
+    hexploit times_configuration_step_future; eauto. i. des.
     dep_inv STEPTGT.
     exploit sim_configuration_sim_thread; eauto. i. des.
     generalize (sim_configuration_forget_exclusive SIM WF_SRC TIDSRC).
     intros EXCLUSIVE.
     generalize (sim_configuration_extra_exclusive SIM WF_SRC TIDSRC).
     intros EXCLUSIVEEXTRA.
-    inv WF_SRC. inv WF_MID. inv WF_TGT. inv SIM.
+    dup WF_MID. dup WF_SRC. inv WF_SRC. inv WF_MID. inv WF_TGT. inv SIM.
     eapply Forall_app_inv in NOREAD. des.
     eapply Forall_app_inv in FORALL1. des.
     eapply Forall_app_inv in TIMES. des.
@@ -952,15 +967,195 @@ Section SIM.
     { eapply WF; eauto. }
     i. des.
     destruct (classic (ThreadEvent.get_machine_event e0 = MachineEvent.silent)) as [EQ|NEQ].
-    { exploit sim_thread_step_silent; eauto.
+    { eapply sim_thread_strong_sim_thread in THREAD.
+      exploit sim_thread_step_silent; eauto.
       { inv FORALL4. auto. }
       { inv FORALL3. auto. }
       { i. eapply EXCLUSIVE in OTHER. des. esplits.
         eapply unchangable_trace_steps_increase; eauto. }
       { i. eapply EXCLUSIVEEXTRA in OTHER. des. esplits.
         eapply unchangable_trace_steps_increase; eauto. }
-      i. des.
-  Admitted.
+      i. des. exists (tr_src ++ tr).
+      hexploit JThread.step_future; eauto. i. des.
+      hexploit Trace.steps_future; eauto. i. des.
+      assert (SIMTRACE: sim_traces L (tr_src++tr) (tr' ++ [(e2, e0)])).
+      { eapply sim_traces_trans; eauto. replace tr with (tr++[]).
+        { econs; eauto. econs. }
+        { apply List.app_nil_r. }
+      }
+      assert (JSTEP: JConfiguration.step
+                       (ThreadEvent.get_machine_event e0) tid
+                       (Configuration.mk ths_mid sc_src mem_mid)
+                       (Configuration.mk
+                          (IdentMap.add
+                             tid
+                             (existT _ _ th_mid0.(Thread.state), th_mid0.(Thread.local)) ths_mid)
+                          th_mid0.(Thread.sc) th_mid0.(Thread.memory)) views0 views2).
+      { erewrite <- JSim.sim_event_machine_event; eauto. econs; eauto.
+        { destruct th_mid0. eauto. }
+        { i. dep_inv THREAD0. eapply JSim.sim_thread_consistent; eauto; ss.
+          eapply pf_consistent_super_strong_consistent; eauto.
+          eapply CONSISTENT. ii. subst. ss. }
+      }
+
+      hexploit (list_match_rev (tr_src++tr)). i. des.
+      { assert (tr_src = [] /\ tr = []).
+        { split.
+          { destruct tr_src; auto. ss. }
+          { destruct tr; auto. destruct tr_src; ss. }
+        } des. subst. inv STEPSRC; ss. inv STEPSRC0; ss.
+        destruct th_mid0. esplits.
+        { rewrite EQ. econs 2; eauto. }
+        { eauto. }
+        { right. splits.
+          { eapply sim_thread_sim_configuration; eauto.
+            { etrans; eauto. }
+            { refl. }
+            { ss. eapply Memory.future_future_weak. etrans; eauto. }
+            { ss. eapply Memory.future_future_weak. etrans; eauto. }
+            { eapply JConfiguration.step_future; eauto. }
+            { eapply CONSISTENT. ii. subst. ss. }
+            { dup THREAD0. eapply sim_thread_strong_sim_thread. eauto. }
+            { i. des_ifs. }
+            { i. erewrite IdentMap.gsspec. des_ifs; eauto. }
+            { i. erewrite IdentMap.gsspec. des_ifs; eauto. }
+          }
+          { auto. }
+          { i. ss. des_ifs. }
+          { i. ss. des_ifs. }
+        }
+      }
+      { hexploit Trace.steps_trans.
+        { eapply STEPSRC. }
+        { eapply STEPSRC0. } intros ALLSTEPS. rewrite H in ALLSTEPS. dup ALLSTEPS.
+        eapply Trace.steps_separate in ALLSTEPS. des. inv STEPS1; clarify.
+        inv STEPS2; ss. destruct th_src0, th_mid0. ss.
+        assert (ALLSILENT: List.Forall
+                             (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent)
+                             (tl_rev ++ [(th1, e)])).
+        { rewrite <- H. eapply Forall_app.
+          { eapply sim_traces_silent; eauto. }
+          { eapply sim_trace_silent; eauto. i. clarify. }
+        }
+        eapply Forall_app_inv in ALLSILENT. des. inv FORALL6; ss.
+        assert (VSTEP: Trace.configuration_step
+                         (tr_src ++ tr)
+                         (ThreadEvent.get_machine_event e0) tid
+                         (Configuration.mk ths_src sc_src mem_src)
+                         (Configuration.mk
+                            (IdentMap.add
+                               tid
+                               (existT _ _ state, local) ths_src)
+                            sc memory)).
+        { rewrite EQ.
+          replace MachineEvent.silent with (ThreadEvent.get_machine_event e); auto.
+          econs; try apply STEP0; eauto.
+          { i. eapply sim_thread_consistent; eauto.
+            { eapply CONSISTENT. ii. subst. clarify. }
+            { i. ss. eapply EXCLUSIVE in OTHER. des.
+              eapply unchangable_trace_steps_increase in ALLSTEPS0; eauto. }
+            { i. ss. eapply EXCLUSIVEEXTRA in OTHER. des.
+              eapply unchangable_trace_steps_increase in ALLSTEPS0; eauto. }
+          }
+        }
+        exploit Trace.configuration_step_future; try apply VSTEP; eauto. i. des. ss.
+        esplits.
+        { econs 1. eauto. }
+        { eauto. }
+        { right. splits.
+          { eapply sim_thread_sim_configuration; eauto.
+            { etrans; eauto. }
+            { ss. eapply Memory.future_future_weak. auto. }
+            { ss. eapply Memory.future_future_weak. etrans; eauto. }
+            { ss. eapply Memory.future_future_weak. etrans; eauto. }
+            { eapply JConfiguration.step_future; eauto. }
+            { eapply CONSISTENT. ii. subst. ss. }
+            { dup THREAD0. eapply sim_thread_strong_sim_thread. eauto. }
+            { i. erewrite IdentMap.gsspec. des_ifs; eauto. }
+            { i. erewrite IdentMap.gsspec. des_ifs; eauto. }
+            { i. erewrite IdentMap.gsspec. des_ifs; eauto. }
+          }
+          { auto. }
+          { i. ss. des_ifs. }
+          { i. ss. des_ifs. }
+        }
+      }
+    }
+    { exploit sim_thread_step_event; eauto.
+      { inv FORALL4. auto. }
+      { inv FORALL3. auto. }
+      { i. eapply EXCLUSIVE in OTHER. des. esplits.
+        eapply unchangable_trace_steps_increase; eauto. }
+      { i. eapply EXCLUSIVEEXTRA in OTHER. des. esplits.
+        eapply unchangable_trace_steps_increase; eauto. }
+      i. des. hexploit JThread.step_future; eauto. i. des.
+      hexploit Thread.step_future; eauto. i. des.
+      assert (JSTEP: JConfiguration.step
+                       (ThreadEvent.get_machine_event e0) tid
+                       (Configuration.mk ths_mid sc_src mem_mid)
+                       (Configuration.mk
+                          (IdentMap.add
+                             tid
+                             (existT _ _ th_mid0.(Thread.state), th_mid0.(Thread.local)) ths_mid)
+                          th_mid0.(Thread.sc) th_mid0.(Thread.memory)) views0 views2).
+      { econs; eauto.
+        { destruct th_mid0. eauto. }
+        { i. dep_inv THREAD0. eapply JSim.sim_thread_consistent; eauto; ss.
+          eapply pf_consistent_super_strong_consistent; eauto. }
+      }
+      { assert (VSTEP: Trace.configuration_step
+                         (tr_src ++ [(th_src1, e0)])
+                         (ThreadEvent.get_machine_event e0) tid
+                         (Configuration.mk ths_src sc_src mem_src)
+                         (Configuration.mk
+                            (IdentMap.add
+                               tid
+                               (existT _ _ th_src0.(Thread.state), th_src0.(Thread.local)) ths_src)
+                            th_src0.(Thread.sc) th_src0.(Thread.memory))).
+        { econs; eauto.
+          { eapply sim_traces_silent; eauto. }
+          { destruct th_src0. eauto. }
+          { i. destruct th_src0. ss. eapply sim_thread_consistent; eauto.
+            { i. ss. eapply EXCLUSIVE in OTHER. des.
+              eapply unchangable_trace_steps_increase in STEPSRC; eauto.
+              eapply unchangable_increase in STEPSRC0; eauto. }
+            { i. ss. eapply EXCLUSIVEEXTRA in OTHER. des.
+              eapply unchangable_trace_steps_increase in STEPSRC; eauto.
+              eapply unchangable_increase in STEPSRC0; eauto. }
+          }
+        }
+        exploit Trace.configuration_step_future; try apply VSTEP; eauto. i. des. ss.
+        destruct th_src0, th_mid0. ss. esplits.
+        { econs 1. eauto. }
+        { eauto. }
+        { destruct (classic (e0 = ThreadEvent.failure)); subst; auto. right. splits.
+          { eapply sim_thread_sim_configuration; eauto.
+            { etrans; eauto. }
+            { ss. eapply Memory.future_future_weak. auto. }
+            { ss. eapply Memory.future_future_weak. etrans; eauto. }
+            { ss. eapply Memory.future_future_weak. etrans; eauto. }
+            { eapply JConfiguration.step_future; eauto. }
+            { dup THREAD0. eapply sim_thread_strong_sim_thread. eauto. }
+            { i. erewrite IdentMap.gsspec. des_ifs; eauto. }
+            { i. erewrite IdentMap.gsspec. des_ifs; eauto. }
+            { i. erewrite IdentMap.gsspec. des_ifs; eauto. }
+          }
+          { eapply sim_traces_trans; eauto.
+            replace [(th_src1, e0)] with ([(th_src1, e0)]++[]); auto. econs 2; auto.
+            { econs. }
+            { econs 2.
+              { eapply non_silent_valid; eauto. }
+              { econs. }
+              { refl. }
+              { dep_inv THREAD. inv LOCALJOIN. inv LOCALPF. eauto. }
+            }
+          }
+          { i. ss. des_ifs. }
+          { i. ss. des_ifs. }
+        }
+      }
+    }
+  Qed.
 
   Lemma sim_configuration_forget_src_not_concrete c_src c_mid c_tgt prom extra views
         (SIM: sim_configuration views prom extra c_src c_mid c_tgt)

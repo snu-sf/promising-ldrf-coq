@@ -586,6 +586,7 @@ Module JThread.
       (<<VIEWS: wf_views views1>>) /\
       (<<TVIEW_FUTURE: TView.le th0.(Thread.local).(Local.tview) th1.(Thread.local).(Local.tview)>>) /\
       (<<SC_FUTURE: TimeMap.le th0.(Thread.sc) th1.(Thread.sc)>>) /\
+      (<<MEM_FUTURE: Memory.future th0.(Thread.memory) th1.(Thread.memory)>>) /\
       (<<VIEWS_FUTURE: views_le views0 views1>>)
   .
   Proof.
@@ -610,6 +611,7 @@ Module JThread.
       (<<VIEWS: wf_views views1>>) /\
       (<<TVIEW_FUTURE: TView.le th0.(Thread.local).(Local.tview) th1.(Thread.local).(Local.tview)>>) /\
       (<<SC_FUTURE: TimeMap.le th0.(Thread.sc) th1.(Thread.sc)>>) /\
+      (<<MEM_FUTURE: Memory.future th0.(Thread.memory) th1.(Thread.memory)>>) /\
       (<<VIEWS_FUTURE: views_le views0 views1>>)
   .
   Proof.
