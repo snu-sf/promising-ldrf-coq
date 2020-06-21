@@ -51,8 +51,7 @@ Module PFtoRA.
         (JOINED_VIEWS: wf_views views)
 
         (SIM_RA: PFtoRASimThread.sim_thread L rels e_ra e_j)
-        (STABLE_J: PFtoRASimThread.stable_thread L e_j)
-        (STABLE_RA: PFtoRASimThread.stable_thread L e_ra)
+        (STABLE_RA: PFtoRASimThread.stable_thread L rels e_ra)
         (* TODO: stable views *)
 
         (WF_PF: Local.wf e_pf.(Thread.local) e_pf.(Thread.memory))
