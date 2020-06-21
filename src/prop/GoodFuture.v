@@ -269,4 +269,72 @@ Section GOODFUTURE.
     }
   Qed.
 
+  Lemma max_good_future_map (mem mem_good: Memory.t) (tm: TimeMap.t)
+        (FUTURE: good_future tm mem mem_good)
+        (CLOSED: Memory.closed mem)
+        (TM: forall loc, Time.lt (Memory.max_ts loc mem) (tm loc))
+    :
+      memory_map
+        (fun loc ts fts => ts = fts /\ Time.lt ts (tm loc))
+        mem
+        mem_good.
+  Proof.
+    assert (IDENT: map_ident_in_memory (fun loc ts fts => ts = fts /\ Time.lt ts (tm loc)) mem).
+    { ii. split; auto. eapply TimeFacts.le_lt_lt; eauto. }
+    econs.
+    { i. destruct msg as [val released|]; auto.
+      exploit Memory.max_ts_spec; try apply GET. i. des. dup GET.
+      eapply FUTURE.(good_future_future) in GET.
+      destruct GET as [from' [released' [GET [FROM RELEASED]]]]. guardH RELEASED.
+      right. esplits.
+      { ss. }
+      { eapply TimeFacts.le_lt_lt; eauto. }
+      { eapply map_ident_in_memory_closed_message; eauto.
+        eapply CLOSED; eauto. }
+      { econs 1. instantiate (1:=released'). unguard. des; auto. subst. refl. }
+      { eauto. }
+    }
+    { i. destruct (Time.le_lt_dec (tm loc) ffrom).
+      { right. ii. des. subst. eapply TimeFacts.lt_le_lt; eauto.  }
+      { assert (TS: Time.lt fto (tm loc)).
+        { destruct (Time.le_lt_dec (tm loc) fto); auto. exfalso.
+          exploit FUTURE.(good_future_cover).
+          { instantiate (1:=Time.middle (Time.join (Memory.max_ts loc mem) ffrom) (tm loc)).
+            instantiate (1:=loc).
+            econs; eauto. econs; ss.
+            { eapply TimeFacts.le_lt_lt.
+              { eapply Time.join_r. }
+              { eapply Time.middle_spec. unfold Time.join. des_ifs. }
+            }
+            { transitivity (tm loc); auto. left. eapply Time.middle_spec.
+              unfold Time.join. des_ifs. }
+          }
+          { i. des.
+            { inv COVERED. inv ITV. ss.
+              eapply Memory.max_ts_spec in GET0. des.
+              exfalso. eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt.
+              { eapply TO. } eapply TimeFacts.le_lt_lt.
+              { eapply MAX. } eapply TimeFacts.le_lt_lt.
+              { eapply Time.join_l. }
+              { eapply Time.middle_spec. unfold Time.join. des_ifs. }
+            }
+            { exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+              { eapply TS. } left.
+              { eapply Time.middle_spec. unfold Time.join. des_ifs. }
+            }
+          }
+        }
+        left. exists fto, ffrom, fto, ffrom. splits; auto; try refl.
+        i. exploit FUTURE.(good_future_cover).
+        { econs; eauto. }
+        i. des; auto. inv ITV. ss.
+        exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+        { eapply TS. } etrans.
+        { left. eapply TS0. }
+        auto.
+      }
+    }
+  Qed.
+
+
 End GOODFUTURE.
