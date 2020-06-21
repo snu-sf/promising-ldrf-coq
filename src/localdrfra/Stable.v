@@ -704,7 +704,7 @@ Module Stable.
             { apply bot_stable_view; ss. }
     Qed.
 
-    Lemma write_step_loc_cur
+    Lemma write_step_loc
           rels lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
           (WF1: Local.wf lc1 mem1)
           (SC1: Memory.closed_timemap sc1 mem1)
@@ -717,8 +717,8 @@ Module Stable.
           (WF_RELEASEDM: View.opt_wf releasedm)
           (CLOSED_RELEASEDM: Memory.closed_opt_view releasedm mem1)
           (NORMAL_RELEASEDM: normal_view releasedm.(View.unwrap))
-          (STABLE_RELEASEDM: stable_view mem1 releasedm.(View.unwrap))
           (RELEASEDM: View.le releasedm.(View.unwrap) lc1.(Local.tview).(TView.cur))
+          (LOC: L loc)
           (STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind):
       <<NORMAL_TVIEW2: normal_tview lc2.(Local.tview)>> /\
       <<NORMAL_MEM2: normal_memory mem2>> /\
@@ -738,73 +738,23 @@ Module Stable.
         - condtac; ss.
           { unfold LocFun.add, LocFun.find.
             condtac; ss; subst; ii; ss.
-            + revert GET.
-              unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
-              condtac; ss; i.
-              * subst. rewrite time_le_join_r in GET; cycle 1.
-                { inv WRITABLE. econs. ss. }
-                exploit Memory.promise_get0; try exact PROMISE.
-                { inv PROMISE; ss. }
-                i. des.
-                rewrite GET in *. inv GET_MEM.
-                revert H2. unfold TView.write_released. condtac; ss.
-              * rewrite time_le_join_l in GET; try by apply Time.bot_spec.
-                etrans; [|eapply View.join_l].
-                revert GET. inv PROMISE.
-                { erewrite Memory.add_o; eauto. condtac; ss; i; eauto.
-                  des. subst. inv GET. ss. }
-                { erewrite Memory.split_o; eauto. repeat condtac; ss; i; eauto.
-                  - des. subst. inv GET. ss.
-                  - guardH o. des. subst. inv GET. ss. }
-                { erewrite Memory.lower_o; eauto. condtac; ss; i; eauto.
-                  des. subst. inv GET. ss. }
-                { exploit Memory.remove_get0; try exact PROMISES. i. des.
-                  exploit Memory.remove_get0; try exact REMOVE. i. des.
-                  congr. }
-            + inv WF1. inv TVIEW_WF. inv TVIEW_CLOSED.
-              destruct (REL1 loc0). specialize (RLX loc1). des.
-              exploit Memory.promise_get1; try exact RLX; eauto.
-              { inv PROMISE; ss. }
-              i. des.
-              rewrite GET0 in *. inv GET. inv MSG_LE. inv RELEASED.
-              etrans; eauto. eapply REL; eauto.
+            inv WF1. inv TVIEW_WF. inv TVIEW_CLOSED.
+            destruct (REL1 loc0). specialize (RLX loc1). des.
+            exploit Memory.promise_get1; try exact RLX; eauto.
+            { inv PROMISE; ss. }
+            i. des.
+            rewrite GET0 in *. inv GET. inv MSG_LE. inv RELEASED.
+            etrans; eauto. eapply REL; eauto.
           }
           { unfold LocFun.add, LocFun.find.
             condtac; ss; subst; ii; ss.
-            + revert GET.
-              unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
-              condtac; ss; i.
-              * subst. rewrite time_le_join_r in GET; cycle 1.
-                { inv WRITABLE. econs. inv WF1. inv TVIEW_WF.
-                  eapply TimeFacts.le_lt_lt; eauto. apply REL_CUR. }
-                exploit Memory.promise_get0; try exact PROMISE.
-                { inv PROMISE; ss. }
-                i. des.
-                rewrite GET in *. inv GET_MEM.
-                revert H2. unfold TView.write_released. condtac; ss.
-              * rewrite time_le_join_l in GET; try by apply Time.bot_spec.
-                etrans; [|eapply View.join_l].
-                revert GET. inv PROMISE.
-                { erewrite Memory.add_o; eauto. condtac; ss; i; eauto.
-                  - des. subst. inv GET. ss.
-                  - eapply REL; eauto. }
-                { erewrite Memory.split_o; eauto. repeat condtac; ss; i; eauto.
-                  - des. subst. inv GET. ss.
-                  - guardH o. des. subst. inv GET. ss.
-                  - eapply REL; eauto. }
-                { erewrite Memory.lower_o; eauto. condtac; ss; i; eauto.
-                  - des. subst. inv GET. ss.
-                  - eapply REL; eauto. }
-                { exploit Memory.remove_get0; try exact PROMISES. i. des.
-                  exploit Memory.remove_get0; try exact REMOVE. i. des.
-                  congr. }
-            + inv WF1. inv TVIEW_WF. inv TVIEW_CLOSED.
-              destruct (REL1 loc0). specialize (RLX loc1). des.
-              exploit Memory.promise_get1; try exact RLX; eauto.
-              { inv PROMISE; ss. }
-              i. des.
-              rewrite GET0 in *. inv GET. inv MSG_LE. inv RELEASED.
-              etrans; eauto. eapply REL; eauto.
+            inv WF1. inv TVIEW_WF. inv TVIEW_CLOSED.
+            destruct (REL1 loc0). specialize (RLX loc1). des.
+            exploit Memory.promise_get1; try exact RLX; eauto.
+            { inv PROMISE; ss. }
+            i. des.
+            rewrite GET0 in *. inv GET. inv MSG_LE. inv RELEASED.
+            etrans; eauto. eapply REL; eauto.
           }
         - ii. revert GET. ss.
           unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
@@ -891,47 +841,47 @@ Module Stable.
           repeat apply join_normal_view; ss. apply NORMAL_TVIEW1. }
 
       condtac; ss.
-      { assert (STABLE_RELEASED: forall released,
-                   TView.write_released (Local.tview lc1) sc1 loc to releasedm ord = Some released ->
-                   stable_view mem2 released).
-        { unfold TView.write_released. repeat (condtac; ss).
+      { assert (RELEASED: TView.write_released lc1.(Local.tview) sc1 loc to releasedm ord =
+                          Some (View.join (View.singleton_ur loc to) lc1.(Local.tview).(TView.cur))).
+        { unfold TView.write_released. repeat (condtac; ss); cycle 1.
+          { destruct ord; ss. }
+          f_equal.
           unfold LocFun.add. condtac; ss.
-          i. inv H.
-          ii. revert GET.
-          destruct (Loc.eq_dec loc loc0); subst.
-          - ss. unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
-            condtac; ss.
-            rewrite (@time_le_join_r _ to); cycle 1.
-            { inv WRITABLE. econs. ss. }
-            rewrite time_le_join_r; cycle 1.
-            { etrans; try eapply RELEASEDM. inv WRITABLE. econs. ss. }
-            exploit Memory.promise_get0; try exact PROMISE.
-            { inv PROMISE; ss. }
-            i. des. rewrite GET in *. inv GET_MEM.
-            revert H2. unfold TView.write_released.
-            repeat (condtac; ss). i. inv H2.
-            unfold LocFun.add. condtac; ss. refl.
-          - ss. unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
-            condtac; ss; try congr.
-            rewrite (@time_le_join_l _ Time.bot); try by apply Time.bot_spec. i.
-            rewrite <- View.join_assoc.
-            etrans; [|apply View.join_l].
-            eapply future_stable_view; try eapply GET; try eapply join_stable_view; eauto.
-            + eapply Memory.join_closed_view; ss.
-              * inv CLOSED_RELEASEDM; ss.
-                apply Memory.closed_view_bot. apply MEM1.
-              * apply WF1.
-            + apply STABLE_TVIEW1.
+          rewrite (View.join_comm (View.singleton_ur loc to)).
+          apply View.antisym; cycle 1.
+          { etrans; [|eapply View.join_r]. refl. }
+          apply View.join_spec; try refl.
+          etrans; [|eapply View.join_l]. ss.
+        }
+        assert (STABLE_RELEASED:
+                  stable_view mem2 (View.join (View.singleton_ur loc to) lc1.(Local.tview).(TView.cur))).
+        { rewrite RELEASED in *. ii. revert GET. ss.
+          unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find. condtac; ss.
+          - subst. replace (Time.join to (View.rlx (TView.cur (Local.tview lc1)) loc)) with to; cycle 1.
+            { rewrite time_le_join_l; ss.
+              inv WRITABLE. econs. ss. }
+            exploit Memory.promise_get0; try exact PROMISE; try by (inv PROMISE; ss). i. des.
+            rewrite GET_MEM in *. inv GET. refl.
+          - rewrite time_le_join_r; try by apply Time.bot_spec. i.
+            inv WF1. inv TVIEW_CLOSED. inv CUR. specialize (RLX loc0). des.
+            exploit Memory.promise_get1; try exact RLX; eauto; try by (inv PROMISE; ss). i. des.
+            rewrite GET0 in *. inv GET. inv MSG_LE. inv RELEASED0.
+            etrans; eauto. etrans; [|apply View.join_r].
+            eapply STABLE_TVIEW1; eauto.
         }
         exploit promise; try exact PROMISE; try apply WF1; eauto.
-        { i. inv MSG. auto. }
+        { i. inv MSG. rewrite RELEASED in *. inv H1. split; ss.
+          apply join_normal_view.
+          eauto using singleton_ur_normal_view.
+          apply NORMAL_TVIEW1. }
         i. des. splits; auto.
-        ii. ss. des.
-        - eapply STABLE_MEM2; eauto.
-        - inv LOC. exploit Memory.promise_get0; try exact PROMISE; try by (inv PROMISE; ss). i. des.
-          rewrite GET in *. inv GET_MEM.
-          eapply STABLE_RELEASED; eauto.
-        - eapply STABLE_MEM2; eauto.
+        - ii. ss. des.
+          + eapply STABLE_MEM2; eauto.
+          + inv LOC0. exploit Memory.promise_get0; try exact PROMISE; try by (inv PROMISE; ss). i. des.
+            rewrite GET in *. inv GET_MEM.
+            rewrite RELEASED in *. inv H2.
+            eapply STABLE_RELEASED; eauto.
+          + eapply STABLE_MEM2; eauto.
         - ii. ss. des.
           + inv IN. exploit Memory.promise_get2; eauto; try by (inv PROMISE; ss). i. des.
             exploit Memory.remove_get0; eauto. i. des. eauto.
@@ -948,8 +898,7 @@ Module Stable.
       }
 
       splits; auto.
-      - ii. 
-        revert GET. inv PROMISE; ss.
+      - ii. revert GET. inv PROMISE; ss.
         + erewrite Memory.add_o; eauto. condtac; ss.
           * i. des. subst. inv GET.
             eapply NORMAL_RELEASED; eauto.
@@ -965,52 +914,28 @@ Module Stable.
           * i. des. subst. inv GET.
             eapply NORMAL_RELEASED; eauto.
           * i. eapply NORMAL_MEM1; eauto.
-      - assert (STABLE_RELEASED: forall released (LOC: ~ L loc),
-                   TView.write_released (Local.tview lc1) sc1 loc to releasedm ord = Some released ->
-                   stable_view mem2 released).
-        { unfold TView.write_released. repeat (condtac; ss).
-          unfold LocFun.add. condtac; ss.
-          i. inv H.
-          ii. revert GET.
-          destruct (Loc.eq_dec loc loc0); subst; ss.
-          unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
-          condtac; ss; try congr.
-          rewrite (@time_le_join_l _ Time.bot); try by apply Time.bot_spec. i.
-          rewrite <- View.join_assoc.
-          etrans; [|apply View.join_l].
-          eapply future_stable_view; try eapply GET; try eapply join_stable_view; eauto.
-          + eapply Memory.join_closed_view; ss.
-            * inv CLOSED_RELEASEDM; ss.
-              apply Memory.closed_view_bot. apply MEM1.
-            * apply WF1.
-          + apply STABLE_TVIEW1. ss.
-        }
-        ii. guardH LOC. revert GET. inv PROMISE; ss.
+      - ii. guardH LOC0. revert GET. inv PROMISE; ss.
         + erewrite Memory.add_o; eauto. condtac; ss.
-          * i. des. subst. inv GET. unguard. des.
-            { eapply STABLE_RELEASED; eauto. }
-            { exploit RELS_WF1; eauto. i. des.
-              exploit Memory.add_get0; try exact MEM. i. des. congr. }
+          * i. des. subst. inv GET. unguard. des; ss. subst.
+            exploit RELS_WF1; eauto. i. des.
+            exploit Memory.add_get0; try exact MEM. i. des. congr.
           * guardH o. i. inv MEM1. exploit CLOSED; eauto. i. des.
             inv MSG_CLOSED. inv CLOSED0. inv CLOSED1.
             specialize (RLX loc1). des.
             exploit Memory.add_get1; try exact RLX; eauto. i.
             rewrite x0 in *. inv GET0. eapply STABLE_MEM1; eauto.
         + erewrite Memory.split_o; eauto. repeat condtac; ss.
-          * i. des. subst. inv GET. unguard. des.
-            { eapply STABLE_RELEASED; eauto. }
-            { exploit RELS_WF1; eauto. i. des.
-              exploit Memory.split_get0; try exact MEM. i. des. congr. }
-          * guardH o. i. des. subst. inv GET. unguardH LOC. des.
-            { exploit Memory.split_get0; try exact MEM. i. des.
-              inv MEM1. exploit CLOSED; try exact GET1. i. des.
-              inv MSG_CLOSED. inv CLOSED0. inv CLOSED1.
-              specialize (RLX loc1). des.
-              exploit Memory.split_get1; try exact RLX; eauto. i. des.
-              rewrite GET4 in *. inv GET0.
-              eapply STABLE_MEM1; eauto. }
-            { exploit RELS_WF1; eauto. i. des.
-              exploit Memory.split_get0; try exact PROMISES. i. des. congr. }
+          * i. des. subst. inv GET. unguard. des; ss.
+            exploit RELS_WF1; eauto. i. des.
+            exploit Memory.split_get0; try exact MEM. i. des. congr.
+          * guardH o. i. des. subst. inv GET.
+            exploit Memory.split_get0; try exact MEM. i. des.
+            inv MEM1. exploit CLOSED; try exact GET1. i. des.
+            inv MSG_CLOSED. inv CLOSED0. inv CLOSED1.
+            specialize (RLX loc1). des.
+            exploit Memory.split_get1; try exact RLX; eauto. i. des.
+            rewrite GET4 in *. inv GET0.
+            eapply STABLE_MEM1; eauto.
           * guardH o. guardH o0. i.
             inv MEM1. exploit CLOSED; eauto. i. des.
             inv MSG_CLOSED. inv CLOSED0. inv CLOSED1.
@@ -1018,10 +943,9 @@ Module Stable.
             exploit Memory.split_get1; try exact RLX; eauto. i. des.
             rewrite GET2 in *. inv GET0. eapply STABLE_MEM1; eauto.
         + erewrite Memory.lower_o; eauto. condtac; ss.
-          * i. des. subst. inv GET. unguard. des.
-            { eapply STABLE_RELEASED; eauto. }
-            { exploit RELS_WF1; eauto. i. des.
-              exploit Memory.lower_get0; try exact PROMISES. i. des. congr. }
+          * i. des. subst. inv GET. unguard. des; ss.
+            exploit RELS_WF1; eauto. i. des.
+            exploit Memory.lower_get0; try exact PROMISES. i. des. congr.
           * guardH o. i. inv MEM1. exploit CLOSED; eauto. i. des.
             inv MSG_CLOSED. inv CLOSED0. inv CLOSED1.
             specialize (RLX loc1). des.
@@ -1050,6 +974,7 @@ Module Stable.
           (STABLE_TVIEW1: stable_tview mem1 lc1.(Local.tview))
           (STABLE_MEM1: stable_memory rels mem1)
           (RELS_WF1: ReleaseWrites.wf rels lc1 mem1)
+          (LOC: L loc)
           (STEP: Local.write_step lc1 sc1 mem1 loc from to val None released ord lc2 sc2 mem2 kind):
       <<NORMAL_TVIEW2: normal_tview lc2.(Local.tview)>> /\
       <<NORMAL_MEM2: normal_memory mem2>> /\
@@ -1057,8 +982,7 @@ Module Stable.
       <<STABLE_MEM2: stable_memory (if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels) mem2>> /\
       <<RELS_WF2: ReleaseWrites.wf (if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels) lc2 mem2>>.
     Proof.
-      eapply write_step_loc_cur; eauto; ss.
-      - apply bot_stable_view. apply MEM1.
+      eapply write_step_loc; eauto; ss.
       - apply View.bot_spec.
     Qed.
 
