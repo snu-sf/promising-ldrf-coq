@@ -3020,6 +3020,28 @@ Section SIM.
       + ss.
   Qed.
 
+  Inductive sim_local_strong
+            (self: Loc.t -> Time.t -> Prop)
+            (extra extra_all: Loc.t -> Time.t -> Time.t -> Prop)
+    :
+      forall (lc_src lc_tgt: Local.t), Prop :=
+  | sim_local_strong_intro
+      tvw prom_src prom_tgt
+      (PROMS: sim_promise_strong self extra extra_all prom_src prom_tgt)
+    :
+      sim_local_strong self extra extra_all (Local.mk tvw prom_src) (Local.mk tvw prom_tgt)
+  .
+  Hint Constructors sim_local_strong.
+
+  Lemma sim_local_strong_sim_local
+        self extra extra_all lc_src lc_tgt
+        (SIM: sim_local_strong self extra extra_all lc_src lc_tgt)
+    :
+      sim_local self extra lc_src lc_tgt.
+  Proof.
+    inv SIM. econs; eauto. eapply sim_promise_strong_sim_promise; eauto.
+  Qed.
+
   Lemma sim_thread_step_silent others self extra_others extra_self
         lang st lc_src lc_tgt sc mem_src mem_tgt pf e_tgt
         st' lc_tgt' sc' mem_tgt' views views'
@@ -3047,32 +3069,50 @@ Section SIM.
       exists tr self' extra_self' lc_src' mem_src',
         (<<STEPSRC: Trace.steps tr (Thread.mk _ st lc_src sc mem_src) (Thread.mk _ st' lc_src' sc' mem_src')>>) /\
         (<<MEM: sim_memory (others \\2// self') (extra_others \\3// extra_self') mem_src' mem_tgt'>>) /\
-        (<<SIM: sim_local self' extra_self' lc_src' lc_tgt'>>) /\
+        (<<SIM: sim_local_strong self' extra_self' (extra_others \\3// extra_self') lc_src' lc_tgt'>>) /\
         (<<TRACE: sim_trace tr (Some (Thread.mk _ st lc_tgt sc mem_tgt, e_tgt))>>) /\
         (<<JOINED: forall loc ts (NLOC: ~ L loc), List.Forall (fun vw => Memory.closed_view vw mem_src') (views' loc ts)>>)
   .
   Proof.
-    hexploit sim_thread_step_silent'; eauto. i. des. esplits; eauto.
+    hexploit sim_thread_step_silent'; eauto. i. des.
+    exploit Thread.step_future.
+    { inv STEPTGT. eauto. } all: ss. i. des.
     exploit Trace.steps_future; eauto. i. des. ss.
-    inv STEPTGT. ss.
-    i. destruct (classic (views' loc ts = views loc ts)).
-    { rewrite H.
-      eapply List.Forall_impl; eauto.
-      i. ss. eapply Memory.future_closed_view; eauto. }
-    { hexploit VIEWSLE; eauto. i. des.
-      set (MEM1:=MEM0.(sim_memory_contents) loc ts). rewrite GET in MEM1. inv MEM1; ss.
-      rewrite VIEW. econs.
-      - eapply Memory.join_closed_view.
-        + inv WF2. inv SIM0. ss. eapply TVIEW_CLOSED.
-        + inv CLOSED2. eapply Memory.singleton_ur_closed_view; eauto.
-      - apply List.Forall_forall.
-        i. eapply all_join_views_in_iff in H0. des. subst.
-        eapply Memory.join_closed_view.
-        + eapply Memory.future_closed_view; eauto.
-          eapply List.Forall_forall in IN; eauto. ss.
-        + inv CLOSED2. eapply Memory.singleton_ur_closed_view; eauto. }
+    exploit sim_promise_weak_strengthen; eauto.
+    { eapply WF2. }
+    { eapply WF0. }
+    { eapply WF0. }
+    { eapply WF0. }
+    { inv SIM0. ss. }
+    i. des. destruct lc_src'. ss.
+    exploit reserve_future_memory_steps; eauto. i. des.
+    exists (tr++tr0). esplits; eauto.
+    { eapply Trace.steps_trans; eauto. }
+    { inv SIM0. econs; eauto. }
+    { eapply reserving_r_sim_trace; eauto. }
+    assert (JOINED0: forall loc ts (NLOC: ~ L loc), List.Forall (fun vw => Memory.closed_view vw mem_src') (views' loc ts)).
+    { inv STEPTGT. ss.
+      i. destruct (classic (views' loc ts = views loc ts)).
+      { rewrite H.
+        eapply List.Forall_impl; eauto.
+        i. ss. eapply Memory.future_closed_view; eauto. }
+      { hexploit VIEWSLE; eauto. i. des.
+        set (MEM2:=MEM0.(sim_memory_contents) loc ts). rewrite GET in MEM2. inv MEM2; ss.
+        rewrite VIEW. econs.
+        - eapply Memory.join_closed_view.
+          + inv WF0. inv SIM0. ss. eapply TVIEW_CLOSED.
+          + inv CLOSED0. eapply Memory.singleton_ur_closed_view; eauto.
+        - apply List.Forall_forall.
+          i. eapply all_join_views_in_iff in H0. des. subst.
+          eapply Memory.join_closed_view.
+          + eapply Memory.future_closed_view; eauto.
+            eapply List.Forall_forall in IN; eauto. ss.
+          + inv CLOSED0. eapply Memory.singleton_ur_closed_view; eauto. }
+    }
+    { i. eapply JOINED0 in NLOC. eapply List.Forall_impl; eauto.
+      i. ss. eapply Memory.future_closed_view in H; eauto.
+      eapply reserve_future_future; eauto. }
   Qed.
-
 
   Lemma sim_thread_step_event' others self extra_others extra_self
         lang st lc_src lc_tgt sc mem_src mem_tgt pf e_tgt
@@ -3113,7 +3153,6 @@ Section SIM.
         * econs 2; eauto. econs; eauto.
   Qed.
 
-
   Lemma sim_thread_step_event others self extra_others extra_self
         lang st lc_src lc_tgt sc mem_src mem_tgt pf e_tgt
         st' lc_tgt' sc' mem_tgt' views views'
@@ -3146,6 +3185,118 @@ Section SIM.
   .
   Proof.
     hexploit sim_thread_step_event'; eauto. i. des. esplits; eauto.
+    hexploit Thread.step_future; eauto. i. des. ss.
+    inv STEPTGT. ss.
+    i. destruct (classic (views' loc ts = views loc ts)).
+    { rewrite H.
+      eapply List.Forall_impl; eauto.
+      i. ss. }
+    { hexploit VIEWSLE; eauto. i. des.
+      set (MEM1:=MEM0.(sim_memory_contents) loc ts). rewrite GET in MEM1. inv MEM1; ss.
+      rewrite VIEW. econs.
+      - eapply Memory.join_closed_view.
+        + inv WF2. inv SIM0. ss. eapply TVIEW_CLOSED.
+        + inv CLOSED2. eapply Memory.singleton_ur_closed_view; eauto.
+      - apply List.Forall_forall.
+        i. eapply all_join_views_in_iff in H0. des. subst.
+        eapply Memory.join_closed_view.
+        + eapply Memory.future_closed_view; eauto.
+          eapply List.Forall_forall in IN; eauto. ss.
+        + inv CLOSED2. eapply Memory.singleton_ur_closed_view; eauto. }
+  Qed.
+
+  Lemma sim_fence_step_strong self extra extra_all lc_src lc_tgt sc ordr ordw
+        sc' lc_tgt'
+        (STEPTGT: Local.fence_step lc_tgt sc ordr ordw lc_tgt' sc')
+        (LOCAL: sim_local_strong self extra extra_all lc_src lc_tgt)
+    :
+      exists lc_src',
+        (<<STEPSRC: Local.fence_step lc_src sc ordr ordw lc_src' sc'>>) /\
+        (<<SIM: sim_local_strong self extra extra_all lc_src' lc_tgt'>>)
+  .
+  Proof.
+    inv LOCAL. inv STEPTGT. esplits.
+    - econs; ss; eauto. ii.
+      set (PROM:= PROMS.(sim_promise_strong_contents) loc t).
+      rewrite GET in *. inv PROM; ss.
+      exploit RELEASE; eauto.
+    - econs; ss; eauto.
+  Qed.
+
+  Lemma sim_thread_step_event_strong' others self extra_others extra_self
+        lang st lc_src lc_tgt sc mem_src mem_tgt pf e_tgt
+        st' lc_tgt' sc' mem_tgt' views views'
+        (STEPTGT: @JThread.step lang pf e_tgt (Thread.mk _ st lc_tgt sc mem_tgt) (Thread.mk _ st' lc_tgt' sc' mem_tgt') views views')
+        (NOREAD: no_read_msgs others e_tgt)
+        (MEM: sim_memory (others \\2// self) (extra_others \\3// extra_self) mem_src mem_tgt)
+        (SCSRC: Memory.closed_timemap sc mem_src)
+        (SCTGT: Memory.closed_timemap sc mem_tgt)
+        (MEMSRC: Memory.closed mem_src)
+        (MEMTGT: Memory.closed mem_tgt)
+        (LOCALSRC: Local.wf lc_src mem_src)
+        (LOCALTGT: Local.wf lc_tgt mem_tgt)
+        (SIM: sim_local_strong self extra_self (extra_others \\3// extra_self) lc_src lc_tgt)
+
+        (MEMWF: memory_times_wf times mem_tgt')
+        (CONSISTENT: Local.promise_consistent lc_tgt')
+        (EXCLUSIVE: forall loc' ts' (OTHER: others loc' ts'),
+            exists from msg, <<UNCH: unchangable mem_src lc_src.(Local.promises) loc' ts' from msg>>)
+        (EXCLUSIVEEXTRA: forall loc' ts' from' (OTHER: extra_others loc' ts' from'),
+            (<<UNCH: unchangable mem_src lc_src.(Local.promises) loc' ts' from' Message.reserve>>))
+        (JOINED: forall loc ts (NLOC: ~ L loc), List.Forall (fun vw => Memory.closed_view vw mem_src) (views loc ts))
+
+        (EVENT: ThreadEvent.get_machine_event e_tgt <> MachineEvent.silent)
+    :
+      exists lc_src',
+        (<<STEPSRC: Thread.step pf e_tgt (Thread.mk _ st lc_src sc mem_src) (Thread.mk _ st' lc_src' sc' mem_src)>>) /\
+        (<<MEM: sim_memory (others \\2// self) (extra_others \\3// extra_self) mem_src mem_tgt'>>) /\
+        (<<SIM: sim_local_strong self extra_self (extra_others \\3// extra_self) lc_src' lc_tgt'>>)
+  .
+  Proof.
+    inv STEPTGT. inv STEP.
+    - inv STEP0; ss.
+    - inv STEP0; ss. inv LOCAL; ss.
+      + exploit sim_fence_step_strong; eauto. i. des. esplits; eauto.
+        * econs 2; eauto. econs; eauto.
+      + exploit sim_failure_step; eauto.
+        { eapply sim_local_strong_sim_local; eauto. }
+        i. des. esplits; eauto.
+        * econs 2; eauto. econs; eauto.
+  Qed.
+
+  Lemma sim_thread_step_event_strong others self extra_others extra_self
+        lang st lc_src lc_tgt sc mem_src mem_tgt pf e_tgt
+        st' lc_tgt' sc' mem_tgt' views views'
+        (STEPTGT: @JThread.step lang pf e_tgt (Thread.mk _ st lc_tgt sc mem_tgt) (Thread.mk _ st' lc_tgt' sc' mem_tgt') views views')
+        (NOREAD: no_read_msgs others e_tgt)
+        (MEM: sim_memory (others \\2// self) (extra_others \\3// extra_self) mem_src mem_tgt)
+        (SCSRC: Memory.closed_timemap sc mem_src)
+        (SCTGT: Memory.closed_timemap sc mem_tgt)
+        (MEMSRC: Memory.closed mem_src)
+        (MEMTGT: Memory.closed mem_tgt)
+        (LOCALSRC: Local.wf lc_src mem_src)
+        (LOCALTGT: Local.wf lc_tgt mem_tgt)
+        (SIM: sim_local_strong self extra_self (extra_others \\3// extra_self) lc_src lc_tgt)
+
+        (MEMWF: memory_times_wf times mem_tgt')
+        (CONSISTENT: Local.promise_consistent lc_tgt')
+        (EXCLUSIVE: forall loc' ts' (OTHER: others loc' ts'),
+            exists from msg, <<UNCH: unchangable mem_src lc_src.(Local.promises) loc' ts' from msg>>)
+        (EXCLUSIVEEXTRA: forall loc' ts' from' (OTHER: extra_others loc' ts' from'),
+            (<<UNCH: unchangable mem_src lc_src.(Local.promises) loc' ts' from' Message.reserve>>))
+        (JOINED: forall loc ts (NLOC: ~ L loc), List.Forall (fun vw => Memory.closed_view vw mem_src) (views loc ts))
+
+        (EVENT: ThreadEvent.get_machine_event e_tgt <> MachineEvent.silent)
+    :
+      exists lc_src',
+        (<<STEPSRC: Thread.step pf e_tgt (Thread.mk _ st lc_src sc mem_src) (Thread.mk _ st' lc_src' sc' mem_src)>>) /\
+        (<<MEM: sim_memory (others \\2// self) (extra_others \\3// extra_self) mem_src mem_tgt'>>) /\
+        (<<SIM: sim_local_strong self extra_self (extra_others \\3// extra_self) lc_src' lc_tgt'>>) /\
+        (<<JOINED: forall loc ts (NLOC: ~ L loc), List.Forall (fun vw => Memory.closed_view vw mem_src) (views' loc ts)>>)
+  .
+  Proof.
+    hexploit sim_thread_step_event_strong'; eauto.
+    i. des. esplits; eauto.
     hexploit Thread.step_future; eauto. i. des. ss.
     inv STEPTGT. ss.
     i. destruct (classic (views' loc ts = views loc ts)).

@@ -48,6 +48,16 @@ Proof.
   { right. esplits. erewrite List.app_comm_cons. eauto. }
 Qed.
 
+Ltac dep_clarify :=
+  (repeat
+     match goal with
+     | H:existT ?P ?p ?x = existT ?P ?p ?y |- _ =>
+       eapply inj_pair2 in H; subst
+     end); ss; clarify.
+
+Ltac dep_inv H :=
+  inv H; dep_clarify.
+
 Inductive all_promises
           (tids: Ident.t -> Prop)
           (proms: Ident.t -> Loc.t -> Time.t -> Prop): Loc.t -> Time.t -> Prop :=
@@ -207,15 +217,35 @@ Section SIM.
   .
   Hint Constructors sim_thread.
 
-  Ltac dep_clarify :=
-    (repeat
-       match goal with
-       | H:existT ?P ?p ?x = existT ?P ?p ?y |- _ =>
-         eapply inj_pair2 in H; subst
-       end); ss; clarify.
+  Inductive sim_thread_strong
+            (views: Loc.t -> Time.t -> list View.t)
+            (prom_self prom_others: Loc.t -> Time.t -> Prop)
+            (extra_self extra_others: Loc.t -> Time.t -> Time.t -> Prop):
+    forall lang (th_src th_mid th_tgt: Thread.t lang), Prop :=
+  | sim_thread_strong_intro
+      lang st lc_src lc_mid lc_tgt
+      mem_src mem_mid mem_tgt sc_src sc_tgt
+      (LOCALPF: sim_local_strong L times prom_self extra_self (extra_others \\3// extra_self) lc_src lc_mid)
+      (LOCALJOIN: JSim.sim_local views lc_mid lc_tgt)
+      (MEMPF: sim_memory L times (prom_others \\2// prom_self) (extra_others \\3// extra_self) mem_src mem_mid)
+      (MEMJOIN: SimMemory.sim_memory mem_mid mem_tgt)
+      (SC: TimeMap.le sc_src sc_tgt)
+    :
+      sim_thread_strong
+        views prom_self prom_others extra_self extra_others
+        (Thread.mk lang st lc_src sc_src mem_src)
+        (Thread.mk lang st lc_mid sc_src mem_mid)
+        (Thread.mk lang st lc_tgt sc_tgt mem_tgt)
+  .
+  Hint Constructors sim_thread_strong.
 
-  Ltac dep_inv H :=
-    inv H; dep_clarify.
+  Lemma sim_thread_strong_sim_thread
+    :
+      sim_thread_strong <9= sim_thread.
+  Proof.
+    ii. dep_inv PR. econs; eauto.
+    eapply sim_local_strong_sim_local; eauto.
+  Qed.
 
   Lemma sim_thread_jsim_thread
         views prom_self prom_others extra_self extra_others
@@ -267,7 +297,7 @@ Section SIM.
       exists th_mid1 th_src1 views1 prom_self1 extra_self1 pf_mid e_mid tr,
         (<<STEPMID: JThread.step pf_mid e_mid th_mid0 th_mid1 views0 views1>>) /\
         (<<STEPSRC: Trace.steps tr th_src0 th_src1>>) /\
-        (<<THREAD: sim_thread
+        (<<THREAD: sim_thread_strong
                      views1 prom_self1 prom_others extra_self1 extra_others
                      th_src1 th_mid1 th_tgt1>>) /\
         (<<EVENTJOIN: JSim.sim_event e_mid e_tgt>>) /\
@@ -292,7 +322,7 @@ Section SIM.
         views0 prom_self0 prom_others extra_self0 extra_others
         lang th_src0 th_mid0 th_tgt0 th_tgt1 pf_tgt e_tgt
         (STEPTGT: Thread.step pf_tgt e_tgt th_tgt0 th_tgt1)
-        (THREAD: @sim_thread
+        (THREAD: @sim_thread_strong
                    views0 prom_self0 prom_others extra_self0 extra_others
                    lang th_src0 th_mid0 th_tgt0)
         (WFTIME: wf_time_evt times e_tgt)
@@ -326,17 +356,19 @@ Section SIM.
       exists th_mid1 th_src1 views1 prom_self1 extra_self1 pf_mid pf_src,
         (<<STEPMID: JThread.step pf_mid e_tgt th_mid0 th_mid1 views0 views1>>) /\
         (<<STEPSRC: Thread.step pf_src e_tgt th_src0 th_src1>>) /\
-        (<<THREAD: sim_thread
+        (<<THREAD: sim_thread_strong
                      views1 prom_self1 prom_others extra_self1 extra_others
                      th_src1 th_mid1 th_tgt1>>) /\
         (<<JOINED: forall loc ts (NLOC: ~ L loc), List.Forall (fun vw => Memory.closed_view vw th_src1.(Thread.memory)) (views1 loc ts)>>) /\
         (<<MEMWF: memory_times_wf times th_mid1.(Thread.memory)>>)
   .
   Proof.
-    hexploit sim_thread_jsim_thread; eauto. intros JTHREAD.
+    hexploit sim_thread_jsim_thread; eauto.
+    { eapply sim_thread_strong_sim_thread; eauto. }
+    intros JTHREAD.
     exploit JSim.sim_thread_step; eauto. i. des.
     dep_inv THREAD. destruct th1_src. ss.
-    hexploit sim_thread_step_event; try apply STEP; eauto.
+    hexploit sim_thread_step_event_strong; try apply STEP; eauto.
     { inv EVENT0; ss. }
     { inv STEP. ss. hexploit step_memory_times_wf; eauto. inv EVENT0; ss. }
     { dep_inv SIM. eapply JSim.sim_local_promise_consistent; eauto. }
@@ -422,7 +454,7 @@ Section SIM.
       exists th_mid1 th_src1 views1 prom_self1 extra_self1 tr_src,
         (<<STEPMID: JThread.rtc_tau th_mid0 th_mid1 views0 views1>>) /\
         (<<STEPSRC: Trace.steps tr_src th_src0 th_src1>>) /\
-        (<<THREAD: sim_thread
+        (<<THREAD: sim_thread_strong
                      views1 prom_self1 prom_others extra_self1 extra_others
                      th_src1 th_mid1 th_tgt1>>) /\
         (<<JOINED: forall loc ts (NLOC: ~ L loc), List.Forall (fun vw => Memory.closed_view vw th_src1.(Thread.memory)) (views1 loc ts)>>) /\
@@ -431,13 +463,31 @@ Section SIM.
   .
   Proof.
     ginduction STEPTGT.
-    { i. esplits; eauto. econs. } i. subst. inv EVENTS. ss. des.
+    { i. dep_inv THREAD. inv LOCALPF. exploit sim_promise_weak_strengthen; eauto.
+      { eapply LOCALMID. }
+      { eapply LOCALSRC. }
+      { eapply LOCALSRC. }
+      { eapply LOCALSRC. }
+      i. des. exploit reserve_future_memory_steps; eauto. i. des. ss. esplits; eauto.
+      { econs; eauto. econs; eauto. }
+      { i. ss. eapply JOINED in NLOC. eapply List.Forall_impl; eauto.
+        ii. ss. eapply Memory.future_closed_view in H; eauto.
+        eapply reserve_future_future; eauto. }
+      { replace tr with (tr ++ []); auto.
+        { econs 3.
+          { econs. }
+          { eapply reserving_r_sim_trace with (tr_src:=[]); eauto. econs. }
+        }
+        { eapply List.app_nil_r. }
+      }
+    }
+    i. subst. inv EVENTS. ss. des.
     hexploit Thread.step_future; try apply STEP; eauto. i. des.
     exploit sim_thread_step_silent; eauto.
     { eapply Trace.steps_promise_consistent; eauto. } i. des.
     hexploit JThread.step_future; try apply STEPMID; eauto. i. des.
     hexploit Trace.steps_future; try apply STEPSRC; eauto. i. des.
-    exploit IHSTEPTGT; eauto.
+    eapply sim_thread_strong_sim_thread in THREAD0. exploit IHSTEPTGT; eauto.
     { i. eapply EXCLUSIVE in OTHER. des.
       eapply unchangable_trace_steps_increase in UNCH; eauto. }
     { i. eapply EXCLUSIVEEXTRA in OTHER. des.
@@ -795,7 +845,7 @@ Section SIM.
         views prom_self prom_others extra_self extra_others
         lang th_src th_mid th_tgt tr
         (CONSISTENTTGT: pf_consistent_super_strong th_tgt tr times)
-        (THREAD: @sim_thread
+        (THREAD: @sim_thread_strong
                    views prom_self prom_others extra_self extra_others
                    lang th_src th_mid th_tgt)
         (SCSRC: Memory.closed_timemap th_src.(Thread.sc) th_src.(Thread.memory))
@@ -824,14 +874,15 @@ Section SIM.
   Proof.
     exploit (CONSISTENTTGT th_tgt.(Thread.memory) TimeMap.bot th_tgt.(Thread.sc)); eauto.
     { refl. }
-    i. des. destruct th_tgt. ss. hexploit sim_thread_steps_silent; eauto.
-    { admit. }
-    { unguard. des.
-      { inv LOCAL. ss. }
-      { ii. rewrite PROMISES in *. rewrite Memory.bot_get in *. ss. }
-    }
-    i. des. split.
-    { unfold JThread.consistent. esplits; eauto.
+    i. des.
+    (* destruct th_tgt. ss. hexploit sim_thread_steps_silent; eauto. *)
+    (* { admit. } *)
+    (* { unguard. des. *)
+    (*   { inv LOCAL. ss. } *)
+    (*   { ii. rewrite PROMISES in *. rewrite Memory.bot_get in *. ss. } *)
+    (* } *)
+    (* i. des. split. *)
+    (* { unfold JThread.consistent. esplits; eauto. *)
   Admitted.
 
   Lemma step_sim_configuration views0 prom0 extra0
