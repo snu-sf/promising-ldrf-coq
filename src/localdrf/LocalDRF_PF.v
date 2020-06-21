@@ -59,10 +59,10 @@ Proof.
   inv RESERVING; ss.
 Qed.
 
-Lemma reserving_tevent_valid L e
+Lemma reserving_tevent_pf L e
       (RESERVING: reserving_tevent e)
   :
-    valid_event L e.
+    pf_event L e.
 Proof.
   ii. subst. inv RESERVING; eauto.
 Qed.
@@ -188,7 +188,7 @@ Section SIM.
       sim_trace [] None
   | sim_trace_cons
       th_src th_tgt e_src e_tgt tl_src
-      (VALID: valid_event L e_src)
+      (PF: pf_event L e_src)
       (TL: sim_trace tl_src None)
       (EVENT: sim_event e_src e_tgt)
       (VW: TView.le th_src.(Thread.local).(Local.tview) th_tgt.(Thread.local).(Local.tview))
@@ -203,7 +203,7 @@ Section SIM.
   | sim_trace_reserve
       th_src e tl_src e_tgt
       (SILENT: ThreadEvent.get_machine_event e = MachineEvent.silent)
-      (VALID: valid_event L e)
+      (PF: pf_event L e)
       (TL: sim_trace tl_src e_tgt)
     :
       sim_trace ((th_src, e)::tl_src) e_tgt
@@ -212,7 +212,7 @@ Section SIM.
 
   Lemma sim_silent_sim_event_exists lang (tr_src: Trace.t lang) th_tgt e_tgt
         (TRACE: sim_trace tr_src (Some (th_tgt, e_tgt)))
-        (VALID: valid_event L e_tgt)
+        (PF: pf_event L e_tgt)
         (RACY: racy_event e_tgt)
     :
       exists th e_src,
@@ -220,7 +220,7 @@ Section SIM.
         (<<EVENT: sim_event e_src e_tgt>>)
   .
   Proof.
-    remember (Some (th_tgt, e_tgt)). revert e_tgt Heqo VALID RACY.
+    remember (Some (th_tgt, e_tgt)). revert e_tgt Heqo PF RACY.
     ginduction TRACE; i; clarify.
     { esplits; eauto. econs; eauto. }
     { hexploit IHTRACE; eauto. i. des.
@@ -241,18 +241,18 @@ Section SIM.
     { i. eapply IHTRACE; eauto. i. ss. }
   Qed.
 
-  Lemma non_silent_valid e
+  Lemma non_silent_pf e
         (EVENT: ThreadEvent.get_machine_event e <> MachineEvent.silent)
     :
-      valid_event L e.
+      pf_event L e.
   Proof.
     ii. subst. ss.
   Qed.
 
-  Lemma sim_trace_valid lang (tr_src: Trace.t lang) (e: option (Thread.t lang * ThreadEvent.t))
+  Lemma sim_trace_pf lang (tr_src: Trace.t lang) (e: option (Thread.t lang * ThreadEvent.t))
         (TRACE: sim_trace tr_src e)
     :
-      List.Forall (compose (valid_event L) snd) tr_src.
+      List.Forall (compose (pf_event L) snd) tr_src.
   Proof.
     ginduction TRACE; eauto.
   Qed.
@@ -266,7 +266,7 @@ Section SIM.
     ginduction RESERVING; eauto. i. ss.
     destruct x. econs 4; eauto.
     { eapply reserving_tevent_silent; eauto. }
-    { eapply reserving_tevent_valid; eauto. }
+    { eapply reserving_tevent_pf; eauto. }
   Qed.
 
   Lemma reserving_r_sim_trace lang (tr_src tr_reserve: Trace.t lang) (e: option (Thread.t lang * ThreadEvent.t))
@@ -279,7 +279,7 @@ Section SIM.
     ginduction RESERVING; eauto.
     i. destruct x. econs 4; eauto.
     { eapply reserving_tevent_silent; eauto. }
-    { eapply reserving_tevent_valid; eauto. }
+    { eapply reserving_tevent_pf; eauto. }
   Qed.
 
   Inductive sim_traces lang: Trace.t lang -> Trace.t lang -> Prop :=
@@ -304,7 +304,7 @@ Section SIM.
   Lemma sim_traces_sim_event_exists lang (tr_src tr_tgt: Trace.t lang) th_tgt e_tgt
         (TRACE: sim_traces tr_src tr_tgt)
         (IN: List.In (th_tgt, e_tgt) tr_tgt)
-        (VALID: valid_event L e_tgt)
+        (PF: pf_event L e_tgt)
         (RACY: racy_event e_tgt)
     :
       exists th e_src,
