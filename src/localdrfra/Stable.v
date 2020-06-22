@@ -1001,7 +1001,6 @@ Module Stable.
           (CLOSED_RELEASEDM: Memory.closed_opt_view releasedm mem1)
           (NORMAL_RELEASEDM: normal_view releasedm.(View.unwrap))
           (STABLE_RELEASEDM: stable_view mem1 releasedm.(View.unwrap))
-          (RELEASEDM: View.le releasedm.(View.unwrap) lc1.(Local.tview).(TView.cur))
           (STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind):
       <<NORMAL_TVIEW2: normal_tview lc2.(Local.tview)>> /\
       <<NORMAL_MEM2: normal_memory mem2>> /\
@@ -1179,20 +1178,15 @@ Module Stable.
       <<RELS_WF2: ReleaseWrites.wf rels lc2 mem2>>.
     Proof.
       eapply write_step_other; eauto; ss.
-      - apply bot_stable_view. apply MEM1.
-      - apply View.bot_spec.
+      apply bot_stable_view. apply MEM1.
     Qed.
 
     Lemma fence_step
           rels lc1 sc1 mem1 ordr ordw lc2 sc2
           (WF1: Local.wf lc1 mem1)
-          (SC1: Memory.closed_timemap sc1 mem1)
-          (MEM1: Memory.closed mem1)
           (NORMAL_TVIEW1: normal_tview lc1.(Local.tview))
-          (NORMAL_MEM1: normal_memory mem1)
           (STABLE_TVIEW1: stable_tview mem1 lc1.(Local.tview))
           (STABLE_SC1: stable_timemap mem1 sc1)
-          (STABLE_MEM1: stable_memory rels mem1)
           (RELS_WF1: ReleaseWrites.wf rels lc1 mem1)
           (STEP: Local.fence_step lc1 sc1 ordr ordw lc2 sc2):
       <<NORMAL_TVIEW2: normal_tview lc2.(Local.tview)>> /\

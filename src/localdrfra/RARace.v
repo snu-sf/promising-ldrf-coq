@@ -26,20 +26,26 @@ Require Import OrdStep.
 
 
 Module ReleaseWrites.
-  Definition t: Type := list (Loc.t * Time.t).
+  Section ReleaseWrites.
+    Variable L: Loc.t -> bool.
 
-  Definition append (e: ThreadEvent.t) (rels: t): t :=
-    match ThreadEvent.is_writing e with
-    | Some (loc, from, to, val, released, ord) =>
-      if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels
-    | None => rels
-    end.
+    Definition t: Type := list (Loc.t * Time.t).
 
-  Definition wf (rels: t) (lc: Local.t) (mem: Memory.t): Prop :=
-    forall loc to (IN: List.In (loc, to) rels),
-      Memory.get loc to lc.(Local.promises) = None /\
-      exists from val released,
-        Memory.get loc to mem = Some (from, Message.concrete val released).
+    Definition append (e: ThreadEvent.t) (rels: t): t :=
+      match ThreadEvent.is_writing e with
+      | Some (loc, from, to, val, released, ord) =>
+        if L loc
+        then if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels
+        else rels
+      | None => rels
+      end.
+
+    Definition wf (rels: t) (lc: Local.t) (mem: Memory.t): Prop :=
+      forall loc to (IN: List.In (loc, to) rels),
+        Memory.get loc to lc.(Local.promises) = None /\
+        exists from val released,
+          Memory.get loc to mem = Some (from, Message.concrete val released).
+  End ReleaseWrites.
 End ReleaseWrites.
 
 
@@ -56,7 +62,7 @@ Module RATrace.
         (STEPS: @thread_steps lang rels e1 e2)
         (STEP: @OrdThread.step lang L Ordering.acqrel pf e e2 e3)
         (SILENT: ThreadEvent.get_machine_event e = MachineEvent.silent):
-        thread_steps lang (ReleaseWrites.append e rels) e1 e3
+        thread_steps lang (ReleaseWrites.append L e rels) e1 e3
     .
 
     Inductive configuration_step: forall (e: MachineEvent.t) (tid: Ident.t) (rels: ReleaseWrites.t) (c1 c2: Configuration.t), Prop :=
@@ -67,7 +73,7 @@ Module RATrace.
         (STEPS: thread_steps lang rels (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
         (STEP: OrdThread.step L Ordering.acqrel pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
         (CONSISTENT: OrdThread.consistent L Ordering.acqrel (Thread.mk _ st3 lc3 sc3 memory3)):
-        configuration_step (ThreadEvent.get_machine_event e) tid (ReleaseWrites.append e rels)
+        configuration_step (ThreadEvent.get_machine_event e) tid (ReleaseWrites.append L e rels)
                            c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
     .
 
