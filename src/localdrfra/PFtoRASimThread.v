@@ -1554,6 +1554,7 @@ Module PFtoRASimThread.
     | sim_event_failure:
         sim_event ThreadEvent.failure ThreadEvent.failure
     .
+    Hint Constructors sim_event.
 
     Lemma thread_step
           rels e1_src e1_tgt
@@ -1576,7 +1577,7 @@ Module PFtoRASimThread.
         (<<STEP_SRC: OrdThread.step L Ordering.acqrel pf e_src e1_src e2_src>>) /\
         __guard__ (
             (<<SIM2: sim_thread (ReleaseWrites.append L e_src rels) e2_src e2_tgt>>) /\
-            (<<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>>) /\
+            (<<EVENT: sim_event e_src e_tgt>>) /\
             (<<STABLE2_SRC: stable_thread (ReleaseWrites.append L e_src rels) e2_src>>) /\
             (<<NORMAL2_SRC: normal_thread e2_src>>) /\
             (<<NORMAL2_TGT: normal_thread e2_tgt>>)
