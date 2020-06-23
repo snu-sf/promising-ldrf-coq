@@ -38,9 +38,157 @@ Module PFtoRA.
     Variable L: Loc.t -> bool.
 
 
+    Definition closed_views (views: Loc.t -> Time.t -> list View.t) (mem: Memory.t): Prop :=
+      forall loc ts view (LOC: ~ L loc) (IN: List.In view (views loc ts)),
+        Memory.closed_view view mem.
+
+    Definition normal_views (views: Loc.t -> Time.t -> list View.t): Prop :=
+      forall loc ts view (LOC: ~ L loc) (IN: List.In view (views loc ts)),
+        Stable.normal_view L view.
+
     Definition stable_views (mem: Memory.t) (views: Loc.t -> Time.t -> list View.t): Prop :=
-      forall loc to view (IN: List.In view (views loc to)),
+      forall loc ts view (LOC: ~ L loc) (IN: List.In view (views loc ts)),
         Stable.stable_view L mem view.
+
+    Lemma joined_opt_view_normal_view
+          views loc ts released
+          (NORMAL: normal_views views)
+          (LOC: ~ L loc)
+          (JOINED: joined_opt_view (views loc ts) (Some released)):
+      Stable.normal_view L released.
+    Proof.
+      specialize (NORMAL loc ts).
+      inv JOINED. induction JOINED0; ss.
+      apply Stable.join_normal_view; eauto.
+    Qed.
+
+    Lemma joined_opt_view_stable_view
+          mem views loc ts released
+          (MEM: Memory.closed mem)
+          (STABLE: stable_views mem views)
+          (LOC: ~ L loc)
+          (JOINED: joined_opt_view (views loc ts) (Some released)):
+      Stable.stable_view L mem released.
+    Proof.
+      specialize (STABLE loc ts).
+      inv JOINED. induction JOINED0.
+      { ii. inv MEM. rewrite INHABITED in *. inv GET. }
+      apply Stable.join_stable_view; eauto.
+    Qed.
+
+    Lemma future_closed_views
+          views mem1 mem2
+          (CLOSED1: closed_views views mem1)
+          (FUTURE: Memory.future mem1 mem2):
+      closed_views views mem2.
+    Proof.
+      ii. eapply Memory.future_closed_view; eauto.
+    Qed.
+
+    Lemma future_stable_views
+          views mem1 mem2
+          (STABLE1: stable_views mem1 views)
+          (CLOSED1: closed_views views mem1)
+          (FUTURE: Memory.future mem1 mem2):
+      stable_views mem2 views.
+    Proof.
+      ii. exploit CLOSED1; eauto. i.
+      inv x. specialize (RLX loc0). des.
+      exploit Memory.future_get1; try exact RLX; eauto. i. des.
+      rewrite GET0 in *. inv GET. inv MSG_LE. inv RELEASED.
+      etrans; eauto. eapply STABLE1; eauto.
+    Qed.
+
+    Lemma step_closed_views
+          views1 views2 rel mem
+          (MEM: Memory.closed mem)
+          (CLOSED1: closed_views views1 mem)
+          (CLOSED_REL: forall loc, Memory.closed_view (rel loc) mem)
+          (VIEW: forall loc ts (LOC: ~ L loc) (NEQ: views2 loc ts <> views1 loc ts),
+              exists from val released,
+                Memory.get loc ts mem = Some (from, Message.concrete val released) /\
+                views2 loc ts = (View.join (rel loc) (View.singleton_ur loc ts))
+                                  :: (all_join_views (View.singleton_ur loc ts) (views1 loc from))):
+      closed_views views2 mem.
+    Proof.
+      ii. destruct (classic (views2 loc ts = views1 loc ts)).
+      { rewrite H in *. eauto. }
+      hexploit VIEW; eauto. i. des.
+      rewrite H1 in *. ss. des.
+      { subst. apply Memory.join_closed_view; eauto.
+        econs; ss.
+        - ii. unfold TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
+          condtac; ss; subst; eauto. esplits. eapply MEM.
+        - ii. unfold TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
+          condtac; ss; subst; eauto. esplits. eapply MEM.
+      }
+      specialize (CLOSED1 loc from).
+      remember (views1 loc from) as views.
+      clear rel Heqviews CLOSED_REL VIEW H H1.
+      induction views; ss. des; eauto.
+      subst. apply Memory.join_closed_view; eauto.
+      econs; ss.
+      - ii. unfold TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
+        condtac; ss; subst; eauto. esplits. eapply MEM.
+      - ii. unfold TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
+        condtac; ss; subst; eauto. esplits. eapply MEM.
+    Qed.
+
+    Lemma step_normal_views
+          views1 views2 rel
+          (NORMAL1: normal_views views1)
+          (NORMAL_REL: forall loc (LOC: ~ L loc), Stable.normal_view L (rel loc))
+          (VIEW: forall loc ts (LOC: ~ L loc) (NEQ: views2 loc ts <> views1 loc ts),
+              exists from, views2 loc ts = (View.join (rel loc) (View.singleton_ur loc ts))
+                                        :: (all_join_views (View.singleton_ur loc ts) (views1 loc from))):
+      normal_views views2.
+    Proof.
+      ii. destruct (classic (views2 loc ts = views1 loc ts)).
+      { rewrite H in *. eapply NORMAL1; eauto. }
+      hexploit VIEW; eauto. i. des.
+      rewrite H0 in *. ss. des.
+      { subst. eapply Stable.join_normal_view; eauto.
+        apply Stable.singleton_ur_normal_view. }
+      specialize (NORMAL1 loc from).
+      remember (views1 loc from) as views.
+      clear rel Heqviews NORMAL_REL VIEW H H0.
+      induction views; ss. des; eauto.
+      subst. eapply Stable.join_normal_view; eauto.
+      apply Stable.singleton_ur_normal_view.
+    Qed.
+
+    Lemma step_stable_views
+          views1 views2 rel mem
+          (STABLE1: stable_views mem views1)
+          (STABLE_REL: forall loc (LOC: ~ L loc), Stable.stable_view L mem (rel loc))
+          (VIEW: forall loc ts (LOC: ~ L loc) (NEQ: views2 loc ts <> views1 loc ts),
+              exists from, views2 loc ts = (View.join (rel loc) (View.singleton_ur loc ts))
+                                        :: (all_join_views (View.singleton_ur loc ts) (views1 loc from))):
+      stable_views mem views2.
+    Proof.
+      ii. destruct (classic (views2 loc ts = views1 loc ts)).
+      { rewrite H in *. eapply STABLE1; eauto. }
+      hexploit VIEW; eauto. i. des.
+      rewrite H0 in *. ss. des.
+      { subst. etrans; [|eapply View.join_l].
+        revert GET. unfold View.join, View.singleton_ur. ss.
+        unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
+        condtac; ss; try congr.
+        rewrite time_le_join_l; try apply Time.bot_spec. i.
+        eapply STABLE_REL; eauto.
+      }
+      specialize (STABLE1 loc from0).
+      remember (views1 loc from0) as views.
+      clear rel from0 Heqviews STABLE_REL VIEW H H0.
+      induction views; ss. des; eauto.
+      subst. etrans; [|eapply View.join_l].
+      revert GET. unfold View.join, View.singleton_ur. ss.
+      unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
+      condtac; ss; try congr.
+      rewrite time_le_join_l; try apply Time.bot_spec. i.
+      eapply STABLE1; eauto.
+    Qed.
+
 
     Definition sim_statelocal (views: Loc.t -> Time.t -> list View.t) (rels: ReleaseWrites.t)
                (sl_pf sl_j sl_ra: {lang: language & Language.state lang} * Local.t): Prop :=
@@ -59,6 +207,8 @@ Module PFtoRA.
         (NORMAL_J: PFtoRASimThread.normal_thread L e_j)
         (NORMAL_RA: PFtoRASimThread.normal_thread L e_ra)
         (STABLE_RA: PFtoRASimThread.stable_thread L rels e_ra)
+        (CLOSED_VIEWS: closed_views views e_ra.(Thread.memory))
+        (NORMAL_VIEWS: normal_views views)
         (STABLE_VIEWS: stable_views e_ra.(Thread.memory) views)
 
         (WF_PF: Local.wf e_pf.(Thread.local) e_pf.(Thread.memory))
@@ -111,7 +261,29 @@ Module PFtoRA.
           exploit Thread.step_future; try eapply STEP0; try apply SIM1. i. des.
           exploit OrdThread.step_future; try exact STEP_SRC; try apply SIM1. i. des.
           econs; eauto.
-          admit.
+          + hexploit future_closed_views; try eapply SIM1; eauto. i.
+            eapply step_closed_views; try eapply SIM1; eauto.
+            * inv WF1. inv TVIEW_CLOSED. apply REL.
+            * i. exploit VIEWSLE; eauto. i. des.
+              inv SIM2. inv MEMORY0.
+              exploit COMPLETE; try exact GET. i. des. inv MSG.
+              inv LOCAL. inv TVIEW. specialize (REL loc). des_ifs.
+              rewrite REL. esplits; eauto.
+          + eapply step_normal_views; try eapply SIM1; eauto.
+            * inv NORMAL2_SRC. inv NORMAL_TVIEW. i. eapply (REL loc).
+            * i. exploit VIEWSLE; eauto. i. des.
+              inv SIM2. inv MEMORY0.
+              exploit COMPLETE; try exact GET. i. des. inv MSG.
+              inv LOCAL. inv TVIEW. specialize (REL loc). des_ifs.
+              rewrite REL. esplits; eauto.
+          + hexploit future_stable_views; try eapply SIM1; eauto. i.
+            eapply step_stable_views; try eapply SIM1; eauto.
+            * inv STABLE2_SRC. inv STABLE_TVIEW. i. eapply (REL loc); eauto.
+            * i. exploit VIEWSLE; eauto. i. des.
+              inv SIM2. inv MEMORY0.
+              exploit COMPLETE; try exact GET. i. des. inv MSG.
+              inv LOCAL. inv TVIEW. specialize (REL loc). des_ifs.
+              rewrite REL. esplits; eauto.
         - esplits; eauto. right. esplits; eauto.
           hexploit step_promise_consistent; try exact STEP_PF; try apply SIM1; eauto. i.
           inv SIM1. inv SIM_JOINED. inv SIM_RA.
@@ -122,8 +294,82 @@ Module PFtoRA.
       }
 
       (* promise on ~ L *)
-      admit.
-    Admitted.
+      des. subst. dup STEP. inv STEP0.
+      inv STEP1; [|inv STEP0; inv LOCAL]. inv STEP0. ss.
+      hexploit PFtoRASimThread.promise_step; try exact LOCAL; try eapply SIM1; eauto; try congr. s. i. des.
+      destruct e1_ra. esplits; eauto.
+      { econs. econs; eauto. }
+      left.
+      assert (MSG: forall (val: Const.t) (released: View.t) (MSG: msg = Message.concrete val (Some released)),
+                 Stable.normal_view L released /\ Stable.stable_view L mem2_src released).
+      { i. subst. split.
+        - hexploit (@step_normal_views views1 views0); try eapply SIM1; eauto.
+          { inv SIM1. ss. inv NORMAL_RA. inv NORMAL_TVIEW. i. eapply (REL loc0). }
+          { s. i. exploit VIEWSLE; eauto. i. des.
+            inv MEM2.
+            exploit COMPLETE; try exact GET. i. des. inv MSG.
+            inv LC2. inv TVIEW. specialize (REL loc0). des_ifs.
+            inv STEP_SRC. ss. rewrite REL. esplits; eauto. }
+          i. exploit PROMISE0; eauto. i. des.
+          eapply joined_opt_view_normal_view; eauto.
+        - exploit Local.promise_step_future; try exact STEP_SRC; try apply SIM1. s. i. des.
+          hexploit future_closed_views; try eapply SIM1; try exact FUTURE. i.
+          hexploit future_stable_views; try eapply SIM1; try exact FUTURE. i.
+          hexploit (@step_stable_views views1 views0); try exact H1; eauto.
+          { inv SIM1. ss. inv STABLE_RA. ss. inv STABLE_TVIEW.
+            i. hexploit (REL loc0); ss. i.
+            hexploit Stable.future_stable_view; try exact H2; try exact FUTURE; try apply WF_RA. i.
+            eapply H3. }
+          { i. exploit VIEWSLE; eauto. i. des.
+            inv MEM2.
+            exploit COMPLETE; try exact GET. i. des. inv MSG.
+            inv LC2. inv TVIEW. specialize (REL loc0). des_ifs.
+            inv STEP_SRC. ss. rewrite REL. esplits; eauto. }
+          i. exploit PROMISE0; eauto. i. des.
+          eapply joined_opt_view_stable_view; eauto.
+      }
+      hexploit PFtoRASimThread.sim_memory_stable_tview; try eapply SIM1. s. i.
+      hexploit PFtoRASimThread.sim_memory_stable_memory; try eapply SIM1. s. i.
+      exploit PFtoRASimThread.sim_release_writes_wf; try eapply SIM1. s. i. des.
+      hexploit Stable.promise_step; try exact LOCAL; try eapply SIM1; eauto.
+      { i. subst. exploit MSG; eauto. i. des. split; ss.
+        eapply PFtoRASimThread.sim_memory_stable_view; eauto. }
+      i. des.
+      hexploit Stable.promise_step; try exact STEP_SRC; try eapply SIM1; eauto. i. des.
+      split; try by econs.
+      exploit Thread.step_future; try exact STEP_PF; try eapply SIM1. i. des.
+      exploit Local.promise_step_future; try exact LOCAL; try eapply SIM1. s. i. des.
+      exploit Local.promise_step_future; try exact STEP_SRC; try eapply SIM1. s. i. des.
+      econs; ss; eauto.
+      - inv SIM1. inv SIM_RA. econs; ss; eauto.
+      - unfold ReleaseWrites.append. ss. econs; ss; eauto.
+        inv SIM1. ss.
+        eapply Stable.future_stable_view; try exact FUTURE0; try eapply SIM; ss.
+        apply STABLE_RA.
+      - hexploit future_closed_views; try eapply SIM1; eauto. i.
+        eapply step_closed_views; try eapply SIM1; eauto.
+        + inv WF1. inv TVIEW_CLOSED. apply REL.
+        + i. exploit VIEWSLE; eauto. i. des.
+          inv MEM2.
+          exploit COMPLETE; try exact GET. i. des. inv MSG0.
+          inv LC2. inv TVIEW. specialize (REL loc0). des_ifs.
+          rewrite REL. esplits; eauto.
+      - eapply step_normal_views; try eapply SIM1; eauto.
+        + inv NORMAL_TVIEW0. i. eapply (REL loc0).
+        + i. exploit VIEWSLE; eauto. i. des.
+          inv MEM2.
+          exploit COMPLETE; try exact GET. i. des. inv MSG0.
+          inv LC2. inv TVIEW. specialize (REL loc0). des_ifs.
+          rewrite REL. esplits; eauto.
+      - hexploit future_stable_views; try eapply SIM1; eauto. i.
+        eapply step_stable_views; try eapply SIM1; eauto.
+        + inv STABLE_TVIEW0. i. eapply (REL loc0); eauto.
+        + i. exploit VIEWSLE; eauto. i. des.
+          inv MEM2.
+          exploit COMPLETE; try exact GET. i. des. inv MSG0.
+          inv LC2. inv TVIEW. specialize (REL loc0). des_ifs.
+          rewrite REL. esplits; eauto.
+    Qed.
   End PFtoRAThread.
 
   Section PFtoRA.
