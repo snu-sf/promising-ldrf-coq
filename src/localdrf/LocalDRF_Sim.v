@@ -947,8 +947,8 @@ Section SIM.
     erewrite Memory.bot_get in CNT. inv CNT; ss.
   Qed.
 
-  Lemma sim_memory_same_max_ts_le
-        F extra mem_src mem_tgt mem_src'
+  Lemma sim_memory_same_max_ts_le mem_src mem_src'
+        F extra mem_tgt
         (CLOSED: Memory.closed mem_src)
         (MEM0: sim_memory L times F extra mem_src mem_tgt)
         (MEM1: sim_memory L times F extra mem_src' mem_tgt)
@@ -974,8 +974,8 @@ Section SIM.
     }
   Qed.
 
-  Lemma sim_memory_same_max_ts_eq
-        F extra mem_src mem_tgt mem_src'
+  Lemma sim_memory_same_max_ts_eq mem_src mem_src'
+        F extra mem_tgt
         (CLOSED0: Memory.closed mem_src)
         (CLOSED1: Memory.closed mem_src')
         (MEM0: sim_memory L times F extra mem_src mem_tgt)
@@ -1079,6 +1079,44 @@ Section SIM.
     }
   Qed.
 
+  Lemma joined_memory_cap_flex views mem cap tm
+        (JOINED: joined_memory views mem)
+        (TM: forall loc, Time.lt (Memory.max_ts loc mem) (tm loc))
+        (CAP: cap_flex mem cap tm)
+        (CLOSED: Memory.closed mem)
+    :
+      joined_memory views cap.
+  Proof.
+    inv JOINED. econs.
+    - i. eapply cap_flex_inv in GET; eauto. des; eauto; clarify.
+    - i. exploit ONLY; eauto. i. des.
+      eapply CAP in GET; eauto.
+    - i. eapply List.Forall_impl; try apply CLOSED0; eauto.
+      i. ss. eapply Memory.future_weak_closed_view; eauto.
+      eapply cap_flex_future_weak; eauto.
+  Qed.
+
+  Lemma cap_flex_concrete_messages_le mem cap tm
+        (CAP: cap_flex mem cap tm)
+        (CLOSED: Memory.closed mem)
+        (TM: forall loc, Time.lt (Memory.max_ts loc mem) (tm loc))
+    :
+      concrete_messages_le cap mem.
+  Proof.
+    ii. eapply cap_flex_inv in GET0; eauto. des; clarify. eauto.
+  Qed.
+
+  Lemma concrete_promised_le_local_wf
+        mem0 mem1 lc
+        (LOCAL: Local.wf lc mem0)
+        (CONCRETELE: concrete_promised_le mem0 mem1)
+        (MLE: Memory.le lc.(Local.promises) mem1)
+    :
+      Local.wf lc mem1.
+  Proof.
+    inv LOCAL. econs; eauto.
+    eapply concrete_promised_le_closed_tview; eauto.
+  Qed.
 
   Lemma sim_thread_consistent
         views prom_self prom_others extra_self extra_others
@@ -1153,7 +1191,29 @@ Section SIM.
     intros [max MAX].
 
     ii. ss.
-    exploit (CONSISTENTTGT cap_tgt (Memory.max_timemap mem_src) sc1); simpl.
+    assert (SCSRC0: Memory.closed_timemap sc1 mem_src).
+    { eapply concrete_promised_le_closed_timemap.
+      { eapply concrete_messages_le_concrete_promised_le.
+        eapply cap_flex_concrete_messages_le.
+        { eapply cap_cap_flex; eauto. }
+        { eauto. }
+        { i. ss. eapply Time.incr_spec. }
+      }
+      eapply Memory.max_concrete_timemap_closed; eauto.
+    }
+    assert (SCSRC1: Memory.closed_timemap sc1 mem_src').
+    { eapply concrete_promised_le_closed_timemap; eauto.
+      eapply concrete_messages_le_concrete_promised_le.
+      eapply sim_memory_same_concrete_messages_le; eauto.
+      eapply sim_memory_strong_sim_memory; eauto. }
+    assert (SCMID0: Memory.closed_timemap sc1 mem_mid).
+    { eapply concrete_promised_le_closed_timemap; try apply SCSRC0; eauto.
+      eapply concrete_messages_le_concrete_promised_le.
+      eapply sim_memory_concrete_messages_le; eauto. }
+    exploit (@Memory.max_concrete_timemap_exists mem_tgt).
+    { eapply MEMTGT. } intros [sctgt MAXTGT]. des.
+
+    exploit (CONSISTENTTGT cap_tgt (Memory.max_timemap mem_src) sctgt); simpl.
     { ss. eapply cap_flex_future_weak; eauto. }
     { eapply cap_flex_closed; eauto. }
     { eapply cap_flex_wf; eauto. }
@@ -1166,7 +1226,16 @@ Section SIM.
       { eauto. }
       { eapply sim_memory_strong_cap; eauto. }
       { eapply (@cap_flex_sim_memory mem_mid mem_tgt); eauto. }
-      { refl. }
+      { instantiate (1:=sc1).
+        eapply Memory.max_concrete_timemap_spec.
+        { instantiate (1:=mem_mid).
+          exploit (@Memory.max_concrete_timemap_exists mem_mid); eauto.
+          { eapply MEMMID. } i. des.
+          exploit (@SimMemory.sim_memory_max_concrete_timemap mem_mid mem_tgt); eauto.
+          i. subst. auto.
+        }
+        auto.
+      }
     }
     { eapply List.Forall_forall. i.
       cut (no_read_msgs prom_others (snd x)).
@@ -1193,13 +1262,21 @@ Section SIM.
         { eapply Memory.max_ts_spec in GET. des. exfalso. timetac. }
       }
     }
-    { ss. admit. }
-    { ss. admit. }
-    { ss. admit. }
+    { ss. eapply Memory.future_weak_closed_timemap.
+      { eapply cap_flex_future_weak; eauto. } eauto. }
+    { ss. eapply Memory.future_weak_closed_timemap.
+      { eapply cap_flex_future_weak; eauto. } eauto. }
+    { ss. eapply Memory.future_weak_closed_timemap.
+      { eapply cap_flex_future_weak; eauto. }
+      eapply Memory.max_concrete_timemap_closed; eauto. }
     { ss. eapply cap_flex_closed; eauto. }
     { ss. eapply cap_flex_closed; eauto. }
     { ss. eapply cap_flex_closed; eauto. }
-    { ss. admit. }
+    { ss. eapply cap_flex_wf; eauto.
+      eapply sim_memory_strong_sim_local; eauto.
+      { eapply sim_local_strong_sim_local; eauto. }
+      { inv LOCALPF. ss. }
+    }
     { ss. eapply cap_flex_wf; eauto. }
     { ss. eapply cap_flex_wf; eauto. }
     { ss. eapply cap_flex_memory_times_wf; eauto. }
@@ -1207,18 +1284,26 @@ Section SIM.
       { des. inv LOCAL. auto. }
       { des. ii. erewrite PROMISES in *. erewrite Memory.bot_get in *. ss. }
     }
-    { ss. ii. exploit EXCLUSIVE; eauto. i. des. inv UNCH. esplits.
-      econs; eauto.
-      admit.
-    }
-    { ss. ii. exploit EXCLUSIVEEXTRA; eauto. i. des. inv x. econs; eauto.
-      admit.
-    }
-    { ss. i. eapply JOINED in NLOC. eapply List.Forall_impl; eauto.
-      i. ss. admit.
-    }
+    { ss. ii. exploit EXCLUSIVE; eauto. i. des. inv UNCH.
+      set (CNT:=MEM.(sim_memory_strong_contents) loc ts).
+      inv CNT; ss; try by (exfalso; eapply NPROM0; left; auto).
+      symmetry in H0. eapply CAPSRCSTRONG in H0. esplits. econs; eauto. }
+    { ss. ii. exploit EXCLUSIVEEXTRA; eauto. i. des. inv x.
+      set (CNT:=MEM.(sim_memory_strong_contents) loc ts).
+      exploit (MEM.(sim_memory_strong_wf) loc from ts).
+      { left. auto. } i. des.
+      inv CNT; ss; try by (exfalso; eapply NEXTRA; left; eauto).
+      eapply UNIQUE in EXTRA. subst.
+      symmetry in H0. eapply CAPSRCSTRONG in H0. esplits. econs; eauto. }
+    { ss. i. eapply JOINED in NLOC. eapply List.Forall_impl; eauto. i. ss.
+      eapply Memory.future_weak_closed_view.
+      { eapply cap_flex_future_weak; eauto. }
+      eapply concrete_promised_le_closed_view; eauto.
+      eapply concrete_messages_le_concrete_promised_le.
+      eapply sim_memory_same_concrete_messages_le; eauto.
+      eapply sim_memory_strong_sim_memory; eauto. }
     { ss. }
-    { ss. admit. }
+    { ss. eapply joined_memory_cap_flex; eauto. }
     { ss. }
 
     i. des. hexploit (trace_times_list_exists tr_src). i. des.
@@ -1228,7 +1313,10 @@ Section SIM.
                 tm
                 (fun loc : Loc.t => Time.incr (Memory.max_ts loc mem_src))
                 times0); auto.
-    { i. admit. } i. des.
+    { i. erewrite (@sim_memory_same_max_ts_eq mem_src mem_src'); eauto.
+      { apply Time.incr_spec. }
+      { eapply sim_memory_strong_sim_memory; eauto. }
+    } i. des.
 
     hexploit concrete_messages_le_cap_flex_memory_map; try apply MAP.
     { eapply sim_memory_same_concrete_messages_le.
@@ -1252,22 +1340,33 @@ Section SIM.
     { ss. }
     { ss. }
     { ss. }
-    { admit. }
+    { eapply cap_flex_wf; eauto.
+      eapply sim_memory_strong_sim_local; eauto.
+      { eapply sim_local_strong_sim_local; eauto. }
+      { inv LOCALPF. ss. }
+    }
     { eapply Local.cap_wf; eauto. }
     { eapply Memory.cap_closed; eauto. }
     { eapply cap_flex_closed; eauto. }
     { eapply Memory.max_concrete_timemap_closed; eauto. }
-    { admit. }
+    { eapply Memory.future_weak_closed_timemap.
+      { eapply cap_flex_future_weak; eauto. }
+      { eauto. }
+    }
     { eapply map_ident_in_memory_local; eauto.
-      { ii. eapply MAP; auto. admit. }
+      { ii. eapply MAP; auto.
+        erewrite (@sim_memory_same_max_ts_eq mem_src mem_src') in TS; eauto.
+        eapply sim_memory_strong_sim_memory; eauto. }
       { eapply MAP. }
     }
     { eapply mapping_map_lt_collapsable_unwritable. eapply MAP. }
     { eapply map_ident_in_memory_closed_timemap.
-      { ii. eapply MAP; auto. admit. }
-      { admit. }
+      { ii. eapply MAP; auto.
+        erewrite (@sim_memory_same_max_ts_eq mem_src mem_src') in TS; eauto.
+        eapply sim_memory_strong_sim_memory; eauto. }
+      { eauto. }
     }
-    { admit. }
+    { refl. }
 
     i. des.
     eapply Trace.silent_steps_tau_steps in STEPS0; cycle 1.
@@ -1295,7 +1394,7 @@ Section SIM.
       eapply JSim.sim_local_memory_bot in LOCALJOIN0; auto.
       inv LOCALPF0. ss.
       eapply sim_promise_bot; eauto. eapply sim_promise_strong_sim_promise; eauto. }
-  Admitted.
+  Qed.
 
   Lemma sim_traces_trans lang (tr_src0 tr_src1 tr_tgt0 tr_tgt1: Trace.t lang)
         (TRACE0: sim_traces L tr_src0 tr_tgt0)

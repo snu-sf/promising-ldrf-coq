@@ -924,7 +924,7 @@ Section MIDDLE.
                                   lc_src.(Local.promises) lc_tgt.(Local.promises))
         (MEMSTRONG: sim_memory_strong (others \\2// self) (extra_others \\3// extra_self) mem_src' mem_tgt)
     :
-      Local.wf (Local.mk lc_src.(Local.tview) lc_src.(Local.promises)) mem_src'.
+      Local.wf lc_src mem_src'.
   Proof.
     econs; ss.
     { eapply LOCALSRC. }
