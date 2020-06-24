@@ -86,6 +86,34 @@ Proof.
   eapply Trace.configuration_step_future; eauto.
 Qed.
 
+Inductive times_configuration_opt_step (times: Loc.t -> Time.t -> Prop)
+  : forall lang (tr tr_cert: Trace.t lang)
+           (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
+| times_configuration_opt_step_some
+    lang tr tr_cert e tid c1 c2
+    (STEP: @times_configuration_step times lang tr tr_cert e tid c1 c2)
+  :
+    times_configuration_opt_step times tr tr_cert e tid c1 c2
+| times_configuration_opt_step_none
+    lang tid c
+  :
+    @times_configuration_opt_step times lang [] [] MachineEvent.silent tid c c
+.
+
+Lemma times_configuration_opt_step_future
+      times lang tr tr_cert e tid c1 c2
+      (STEP: @times_configuration_opt_step times lang tr tr_cert e tid c1 c2)
+      (WF1: Configuration.wf c1):
+  (<<WF2: Configuration.wf c2>>) /\
+  (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
+  (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
+Proof.
+  inv STEP.
+  { apply inj_pair2 in H1. apply inj_pair2 in H2. subst.
+    eapply times_configuration_step_future; eauto. }
+  { apply inj_pair2 in H1. apply inj_pair2 in H2. subst. splits; auto. refl. }
+Qed.
+
 Lemma times_configuration_step_mon times0 times1
       (LE: times0 <2= times1)
   :
@@ -142,12 +170,15 @@ Lemma times_configuration_step_same_behaviors c beh
   :
     exists times,
       (<<BEH: behaviors (times_configuration_step_all times) c beh>>) /\
-      (<<WO: forall loc, well_ordered (times loc)>>).
+      (<<WO: forall loc, well_ordered (times loc)>>) /\
+      (<<INCR: forall nat loc, times loc (incr_time_seq nat)>>)
+.
 Proof.
   ginduction BEH.
-  { i. exists bot2. splits.
+  { i. exists (fun loc => incr_times). splits.
     { econs 1; eauto. }
-    { i. eapply empty_well_ordered. }
+    { i. eapply incr_times_well_ordered. }
+    { i. eexists. eauto. }
   }
   { i. exploit IHBEH.
     { eapply Configuration.step_future; eauto. } i. des.
@@ -159,9 +190,15 @@ Proof.
         eapply times_configuration_step_all_mon; auto. }
     }
     { i. eapply join_well_ordered; eauto. }
+    { auto. }
   }
   { i. exploit times_configuration_step_exists; eauto. i. des.
-    exists times. splits; eauto. econs 3; eauto. econs; eauto. }
+    exists (times \2/ fun loc => incr_times). splits; eauto.
+    { econs 3; eauto. econs; eauto.
+      eapply times_configuration_step_mon; eauto. }
+    { i. eapply join_well_ordered; eauto. eapply incr_times_well_ordered. }
+    { i. right. eexists. eauto. }
+  }
   { i. exploit IHBEH.
     { eapply Configuration.step_future; eauto. } i. des.
     exploit times_configuration_step_exists; eauto. i. des.
@@ -172,33 +209,6 @@ Proof.
         eapply times_configuration_step_all_mon; auto. }
     }
     { i. eapply join_well_ordered; eauto. }
+    { auto. }
   }
-Qed.
-
-Inductive times_configuration_opt_step (times: Loc.t -> Time.t -> Prop)
-  : forall lang (tr tr_cert: Trace.t lang)
-           (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
-| times_configuration_opt_step_some
-    lang tr tr_cert e tid c1 c2
-    (STEP: @times_configuration_step times lang tr tr_cert e tid c1 c2)
-  :
-    times_configuration_opt_step times tr tr_cert e tid c1 c2
-| times_configuration_opt_step_none
-    lang tid c
-  :
-    @times_configuration_opt_step times lang [] [] MachineEvent.silent tid c c
-.
-
-Lemma times_configuration_opt_step_future
-      times lang tr tr_cert e tid c1 c2
-      (STEP: @times_configuration_opt_step times lang tr tr_cert e tid c1 c2)
-      (WF1: Configuration.wf c1):
-  (<<WF2: Configuration.wf c2>>) /\
-  (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-  (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
-Proof.
-  inv STEP.
-  { apply inj_pair2 in H1. apply inj_pair2 in H2. subst.
-    eapply times_configuration_step_future; eauto. }
-  { apply inj_pair2 in H1. apply inj_pair2 in H2. subst. splits; auto. refl. }
 Qed.

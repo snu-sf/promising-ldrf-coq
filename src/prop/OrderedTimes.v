@@ -271,3 +271,20 @@ Proof.
     }
   }
 Qed.
+
+Definition incr_times (ts: Time.t):=
+  exists n, incr_time_seq n = ts.
+
+Lemma incr_times_well_ordered
+  :
+    well_ordered incr_times.
+Proof.
+  hexploit (increasing_join_well_ordered
+              incr_time_seq
+              (fun n => eq (incr_time_seq n))).
+  { eapply incr_time_seq_lt. }
+  { eapply incr_time_seq_diverge. }
+  { i. subst. refl. }
+  { i. apply singleton_well_ordered. }
+  i. eapply sub_well_ordered; eauto.
+Qed.
