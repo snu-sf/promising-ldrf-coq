@@ -42,6 +42,91 @@ Require Import Pred.
 
 Set Implicit Arguments.
 
+Section INCR.
+
+  Variable f0 f1: Loc.t -> Time.t -> Time.t -> Prop.
+  Hypothesis INCR: f0 <3= f1.
+  Hypothesis MAPLT: mapping_map_lt f1.
+
+  Lemma mappalbe_time_incr loc to
+        (TIME: mappable_time f0 loc to)
+    :
+      mappable_time f1 loc to.
+  Proof.
+    unfold mappable_time in *. des. eapply INCR in MAPPED. eauto.
+  Qed.
+
+  Lemma timamap_map_incr tm ftm
+        (MAP: timemap_map f0 tm ftm)
+    :
+      timemap_map f1 tm ftm.
+  Proof.
+    ii. eauto.
+  Qed.
+
+  Lemma view_map_incr vw fvw
+        (MAP: view_map f0 vw fvw)
+    :
+      view_map f1 vw fvw.
+  Proof.
+    inv MAP. econs.
+    { eapply timamap_map_incr; eauto. }
+    { eapply timamap_map_incr; eauto. }
+  Qed.
+
+  Lemma opt_view_map_incr vw fvw
+        (MAP: opt_view_map f0 vw fvw)
+    :
+      opt_view_map f1 vw fvw.
+  Proof.
+    inv MAP; econs.
+    eapply view_map_incr; eauto.
+  Qed.
+
+  Lemma tview_map_incr vw fvw
+        (MAP: tview_map f0 vw fvw)
+    :
+      tview_map f1 vw fvw.
+  Proof.
+    inv MAP; econs.
+    { i. eapply view_map_incr; eauto. }
+    { eapply view_map_incr; eauto. }
+    { eapply view_map_incr; eauto. }
+  Qed.
+
+  Lemma message_map_incr msg fmsg
+        (MAP: msg_map f0 msg fmsg)
+    :
+      msg_map f1 msg fmsg.
+  Proof.
+    inv MAP; econs. eapply opt_view_map_incr; eauto.
+  Qed.
+
+  Lemma promises_map_incr prom fprom
+        (MAP: promises_map f0 prom fprom)
+    :
+      promises_map f1 prom fprom.
+  Proof.
+    inv MAP. econs.
+    { i. exploit MAPPED; eauto. i. des. esplits; eauto.
+      { eapply mapping_map_lt_non_collapsable; eauto. }
+      { eapply message_map_incr; eauto. }
+    }
+    { i. exploit ONLY; eauto. i. des. esplits; eauto. }
+  Qed.
+
+  Lemma local_map_incr lc flc
+        (MAP: local_map f0 lc flc)
+    :
+      local_map f1 lc flc.
+  Proof.
+    inv MAP. econs; eauto.
+    { eapply tview_map_incr; eauto. }
+    { eapply promises_map_incr; eauto. }
+  Qed.
+
+End INCR.
+
 Lemma list_match_rev A (l: list A)
   :
     l = [] \/ exists tl_rev hd_rev, l = tl_rev++[hd_rev].
@@ -2074,6 +2159,144 @@ Section SIM.
         eapply sim_configuration_forget_promise_exist in PROM; eauto. des.
         eapply IdentMap.elements_correct in TID0.
         eapply List.in_map with (f:=fst) in TID0. auto. }
+    }
+  Qed.
+
+  Lemma good_future_future_future mem0 mem_good0 mem_good1
+        (f0: Loc.t -> Time.t -> Time.t -> Prop)
+        (IDENT: forall loc to fto (MAP: f0 loc to fto), to = fto)
+        (MAPBOT: mapping_map_bot f0)
+        (GOOD: memory_map f0 mem0 mem_good0)
+        (FUTURE: Memory.future_weak mem_good0 mem_good1)
+        (CLOSED: Memory.closed mem0)
+    :
+      exists tm mem1,
+        (<<TM0: forall loc, Time.lt (Memory.max_ts loc mem_good1) (tm loc)>>) /\
+        (<<TM1: forall loc, Time.lt (Memory.max_ts loc mem0) (tm loc)>>) /\
+        (<<CAP: cap_flex mem0 mem1 tm>>) /\
+        (<<MAP: memory_map ident_map mem1 mem_good1>>).
+  Proof.
+    set (tm := fun loc =>
+                 Time.incr (Time.join (Memory.max_ts loc mem_good1) (Memory.max_ts loc mem0))).
+    assert (TM0: forall loc, Time.lt (Memory.max_ts loc mem_good1) (tm loc)).
+    { i. eapply TimeFacts.le_lt_lt.
+      { eapply Time.join_l. }
+      { eapply Time.incr_spec. }
+    }
+    assert (TM1: forall loc, Time.lt (Memory.max_ts loc mem0) (tm loc)).
+    { i. eapply TimeFacts.le_lt_lt.
+      { eapply Time.join_r. }
+      { eapply Time.incr_spec. }
+    }
+    exploit (@cap_flex_exists mem0 tm); eauto. intros [mem1 CAP].
+    exists tm, mem1. splits; auto. econs.
+    { i. eapply cap_flex_inv in GET; eauto. des; auto.
+      apply GOOD in GET. des; auto. destruct fmsg as [val freleased|]; cycle 1.
+      { inv MSGLE. inv MSG. auto. }
+      eapply Memory.future_weak_get1 in GET; eauto. des.
+      dup MSG. dup MSGLE. dup MSG_LE.
+      inv MSG; inv MSGLE; inv MSG_LE; auto.
+      right. esplits; cycle 3.
+      { eauto. }
+      { eapply IDENT; eauto. }
+      { eapply message_map_incr; eauto. }
+      { econs; eauto. }
+    }
+    { i. left. exists (tm loc), Time.bot, (tm loc), Time.bot. splits; ss.
+      { eapply Time.bot_spec. }
+      { eapply Memory.max_ts_spec in GET. des. left.
+        eapply TimeFacts.le_lt_lt; eauto. }
+      { i. erewrite cap_flex_covered in ITV; eauto. }
+    }
+  Qed.
+
+  Definition pf_consistent_semi_strong lang (e0:Thread.t lang)
+             (tr : Trace.t lang)
+             (times: Loc.t -> (Time.t -> Prop))
+    : Prop :=
+    forall mem1 sc
+           (FUTURE: Memory.future_weak e0.(Thread.memory) mem1)
+           (CLOSED: Memory.closed mem1)
+           (LOCAL: Local.wf e0.(Thread.local) mem1),
+    exists ftr e1,
+      (<<STEPS: Trace.steps ftr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc mem1) e1>>) /\
+      (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free
+                                                  /1\ no_sc
+                                                  /1\ wf_time_evt times) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) ftr >>) /\
+      (__guard__((exists st',
+                     (<<LOCAL: Local.failure_step e1.(Thread.local)>>) /\
+                     (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
+                 (<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>))).
+
+  Lemma good_future_consistent lang st lc_src lc_tgt sc_src sc_tgt mem_src mem_tgt tr
+        (f: Loc.t -> Time.t -> Time.t -> Prop)
+        (CONSISTENT: pf_consistent_super_strong
+                       (Thread.mk lang st lc_tgt sc_tgt mem_tgt)
+                       tr times)
+        (IDENT: forall loc to fto (MAP: f loc to fto), to = fto)
+        (MAPBOT: mapping_map_bot f)
+        (LOCALSRC: Local.wf lc_src mem_src)
+        (LOCALTGT: Local.wf lc_tgt mem_tgt)
+        (MEMSRC: Memory.closed mem_src)
+        (MEMTGT: Memory.closed mem_tgt)
+        (LOCAL: local_map f lc_tgt lc_src)
+        (MEM: memory_map f mem_tgt mem_src)
+    :
+      pf_consistent_semi_strong (Thread.mk lang st lc_src sc_src mem_src) tr times.
+  Proof.
+    ii. ss.
+    exploit good_future_future_future; eauto. i. des.
+    exploit (CONSISTENT mem0 tm TimeMap.bot); eauto.
+    { ss. eapply cap_flex_future_weak; eauto. }
+    { eapply cap_flex_closed; eauto. }
+    { ss. eapply cap_flex_wf; eauto. }
+    i. des. destruct e1. ss.
+    hexploit trace_steps_map.
+    { eapply ident_map_le; eauto. }
+    { eapply ident_map_bot; eauto. }
+    { eapply ident_map_eq; eauto. }
+    { eapply List.Forall_forall. i. eapply ident_map_mappable_evt. }
+    { eauto. }
+    { ss. }
+    { ss. }
+    { ss. }
+    { eapply cap_flex_wf; eauto. }
+    { eapply LOCAL0. }
+    { eauto. }
+    { eapply cap_flex_closed; eauto. }
+    { eapply Memory.closed_timemap_bot. eapply CLOSED. }
+    { eapply Memory.closed_timemap_bot.
+      eapply cap_flex_closed in CAP; eauto. eapply CAP. }
+    { eapply local_map_incr; eauto. eapply ident_map_lt; eauto. }
+    { eauto. }
+    { eapply mapping_map_lt_collapsable_unwritable; eauto. eapply ident_map_lt. }
+    { eapply ident_map_timemap. }
+    { refl. }
+    i. des.
+    exploit no_sc_any_sc_traced; try apply STEPS0; eauto.
+    { eapply List.Forall_forall. i.
+      eapply list_Forall2_in in H; eauto. des. destruct a, x. ss.
+      eapply List.Forall_forall in IN; eauto. ss. des. inv SAT; ss. }
+    i. des. exists tr_src. esplits; eauto; ss.
+    { eapply List.Forall_forall. i.
+      eapply list_Forall2_in2 in H; eauto. des. clear EVENTS0.
+      eapply list_Forall2_in in IN; eauto. des.
+      eapply List.Forall_forall in IN0; eauto. ss. des.
+      destruct a, b, x. ss. subst. inv SAT0; splits; ss.
+      { inv KIND; ss. inv MSG0; ss. inv MSG; ss. inv MAP1; ss. }
+      { inv FROM. inv TO. des. splits; auto. }
+      { inv FROM. inv TO. des. splits; auto. }
+      { inv FROM. inv TO. auto. }
+    }
+    { unguard. des.
+      { left. esplits; eauto. eapply failure_step_map; eauto.
+        { eapply ident_map_le. }
+        { eapply ident_map_eq. }
+      }
+      { inv LOCAL1. right. esplits; eauto.
+        { erewrite PROMISES in *.
+          eapply bot_promises_map in PROMISES0; eauto. }
+      }
     }
   Qed.
 
