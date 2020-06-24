@@ -825,21 +825,21 @@ Section SIM.
         tid lang (st_src st_mid st_tgt: Language.state lang)
         lc_src lc_mid lc_tgt mem_src mem_mid mem_tgt sc_src sc_mid sc_tgt
         (CONFIG: sim_configuration tids views0 prom extra c_src c_mid c_tgt)
-        views1 prom_self extra_self ths_src ths_mid ths_tgt
+        views1 prom_self extra_self tr_cert ths_src ths_mid ths_tgt
         (VIEWSLE: views_le views0 views1)
         (JOINED: forall loc ts (NLOC: ~ L loc), List.Forall (fun vw => Memory.closed_view vw mem_src) (views1 loc ts))
         (MEMWF: memory_times_wf times mem_mid)
         (FUTURESRC: Memory.future_weak c_src.(Configuration.memory) mem_src)
         (FUTURETGT: Memory.future_weak c_tgt.(Configuration.memory) mem_tgt)
         (CONFIGTGT: Configuration.wf (Configuration.mk ths_tgt sc_tgt mem_tgt))
-        (* (CONSISTENT: pf_consistent_super_strong *)
-        (*                (Thread.mk _ st_tgt lc_tgt sc_tgt mem_tgt) *)
-        (*                tr_cert *)
-        (*                times) *)
-        (* (NOREAD: List.Forall *)
-        (*            (fun the => no_read_msgs *)
-        (*                          (all_promises (fun tid' => tid <> tid') prom) *)
-        (*                          (snd the)) tr_cert) *)
+        (CONSISTENT: pf_consistent_super_strong
+                       (Thread.mk _ st_tgt lc_tgt sc_tgt mem_tgt)
+                       tr_cert
+                       times)
+        (NOREAD: List.Forall
+                   (fun the => no_read_msgs
+                                 (all_promises (fun tid' => tid <> tid') prom)
+                                 (snd the)) tr_cert)
         (THREAD:
            sim_thread
              views1
@@ -870,7 +870,7 @@ Section SIM.
              else IdentMap.find tid' c_tgt.(Configuration.threads))
     :
       sim_configuration
-        (fun tid' => tids tid' /\ tid' <> tid)
+        tids
         views1
         (fun tid' => if (Ident.eq_dec tid' tid) then prom_self else (prom tid'))
         (fun tid' => if (Ident.eq_dec tid' tid) then extra_self else (extra tid'))
@@ -914,8 +914,9 @@ Section SIM.
       auto.
     }
     { i. erewrite THSTGT in GET. des_ifs.
-      { dep_clarify. des. ss. }
-      { des. eapply pi_consistent_mon; eauto. }
+      { dep_clarify. eapply pf_consistent_pi_consistent; eauto.
+        erewrite THSTGT. des_ifs. }
+      { eapply pi_consistent_mon; eauto. }
     }
   Qed.
 
