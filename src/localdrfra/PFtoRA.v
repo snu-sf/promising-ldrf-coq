@@ -20,10 +20,13 @@ Require Import Memory.
 Require Import TView.
 Require Import Local.
 Require Import Thread.
+Require Import Configuration.
 
 Require Import PromiseConsistent.
+Require Import Trace.
 Require Import JoinedView.
 
+Require Import LocalDRF_PF.
 Require Import OrdStep.
 Require Import RARace.
 Require Import Stable.
@@ -189,11 +192,6 @@ Module PFtoRA.
       eapply STABLE1; eauto.
     Qed.
 
-
-    Definition sim_statelocal (views: Loc.t -> Time.t -> list View.t) (rels: ReleaseWrites.t)
-               (sl_pf sl_j sl_ra: {lang: language & Language.state lang} * Local.t): Prop :=
-      JSim.sim_statelocal views sl_j sl_pf /\
-      PFtoRASimThread.sim_statelocal L rels sl_ra sl_j.
 
     Inductive sim_thread (views: Loc.t -> Time.t -> list View.t) (rels: ReleaseWrites.t)
               (e_pf e_j e_ra: Thread.t lang): Prop :=
@@ -370,9 +368,103 @@ Module PFtoRA.
           inv LC2. inv TVIEW. specialize (REL loc0). des_ifs.
           rewrite REL. esplits; eauto.
     Qed.
+
+    (* Lemma thread_steps *)
+    (*       views1 rels1 e1_pf e1_j e1_ra *)
+    (*       tr e_pf e2_pf *)
+    (*       (SIM1: sim_thread views1 rels1 e1_pf e1_j e1_ra) *)
+    (*       (STEPS: Trace.steps tr e1_pf e2_pf) *)
+    (*       (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr) *)
+    (*       (VALID: List.Forall (compose (valid_event L) snd) tr) *)
+    (*       (CONS: Local.promise_consistent e2_pf.(Thread.local)): *)
+    (*   exists views2 e_j pf_j e2_j e_ra e2_ra, *)
+    (*     (<<STEP_J: JThread.step pf_j e_j e1_j e2_j views1 views2>>) /\ *)
+    (*     (<<EVENT_J: JSim.sim_event e_j e_pf>>) /\ *)
+    (*     (<<STEP_RA: OrdThread.step L Ordering.acqrel pf_j e_ra e1_ra e2_ra>>) /\ *)
+    (*     __guard__ ( *)
+    (*       (<<SIM2: sim_thread views2 (ReleaseWrites.append L e_ra rels1) e2_pf e2_j e2_ra>>) /\ *)
+    (*       (<<EVENT: PFtoRASimThread.sim_event e_ra e_j>>) \/ *)
+    (*       (<<CONS: Local.promise_consistent e1_ra.(Thread.local)>>) /\ *)
+    (*       (<<RACE: exists loc to val released ord, *)
+    (*           ThreadEvent.is_reading e_ra = Some (loc, to, val, released, ord) /\ *)
+    (*           RARace.ra_race L rels1 e1_ra.(Thread.local).(Local.tview) loc to ord>>)). *)
   End PFtoRAThread.
+
 
   Section PFtoRA.
     Variable L: Loc.t -> bool.
+
+    Definition option_rel3 {A B C} (P: A -> B -> C -> Prop)
+               (a: option A) (b: option B) (c: option C): Prop :=
+      match a, b, c with
+      | Some x, Some y, Some z => P x y z
+      | None, None, None => True
+      | _, _, _ => False
+      end.
+
+    Inductive sim_thread_sl (views: Loc.t -> Time.t -> list View.t) (rels: ReleaseWrites.t)
+              (sc_pf sc_j sc_ra: TimeMap.t) (mem_pf mem_j mem_ra: Memory.t):
+      forall (sl_pf sl_j sl_ra: {lang: language & Language.state lang} * Local.t), Prop :=
+    | sim_thread_sl_intro
+        lang st_pf lc_pf st_j lc_j st_ra lc_ra
+        (SIM: sim_thread L views rels
+                         (Thread.mk lang st_pf lc_pf sc_pf mem_pf)
+                         (Thread.mk lang st_j lc_j sc_j mem_j)
+                         (Thread.mk lang st_ra lc_ra sc_ra mem_ra)):
+        sim_thread_sl views rels sc_pf sc_j sc_ra mem_pf mem_j mem_ra
+                      (existT _ lang st_pf, lc_pf) (existT _ lang st_j, lc_j) (existT _ lang st_ra, lc_ra)
+    .
+
+    (* Lemma future_sim_thread_sl *)
+    (*       lang st_pf st_j st_ra lc_pf lc_j lc_ra *)
+    (*       views1 rels1 sc1_pf sc1_j sc1_ra mem1_pf mem1_j mem1_ra *)
+    (*       views2 rels2 sc2_pf sc2_j sc2_ra mem2_pf mem2_j mem2_ra *)
+    (*       (SIM1: sim_thread_sl views1 rels1 sc1_pf sc1_j sc1_ra mem1_pf mem1_j mem1_ra *)
+    (*                            (existT _ lang st_pf, lc_pf) (existT _ lang st_j, lc_j) (existT _ lang st_ra, lc_ra)) *)
+    (*       (SC_PF_FUTURE: TimeMap.le sc1_pf sc2_pf) *)
+    (*       (SC_J_FUTURE: TimeMap.le sc1_j sc2_j) *)
+    (*       (SC_RA_FUTURE: TimeMap.le sc1_ra sc2_ra) *)
+    (*       (MEM_PF_FUTURE: Memory.future mem1_pf mem2_pf) *)
+    (*       (MEM_J_FUTURE: Memory.future mem1_j mem2_j) *)
+    (*       (MEM_RA_FUTURE: Memory.future mem1_ra mem2_ra) *)
+    (*       (WF2_PF: Local.wf lc_pf mem2_pf) *)
+    (*       (WF2_J: Local.wf lc_j mem2_j) *)
+    (*       (WF2_RA: Local.wf lc_ra mem2_ra) *)
+    (*       (SC2_PF: Memory.closed_timemap sc2_pf mem2_pf) *)
+    (*       (SC2_J: Memory.closed_timemap sc2_j mem2_j) *)
+    (*       (SC2_RA: Memory.closed_timemap sc2_ra mem2_ra) *)
+    (*       (MEM2_PF: Memory.closed mem2_pf) *)
+    (*       (MEM2_J: Memory.closed mem2_j) *)
+    (*       (MEM2_RA: Memory.closed mem2_ra) *)
+    (*       (SC2_PF_STABLE: Stable.stable_timemap L mem2_pf sc2_pf) *)
+    (*       (SC2_PF_STABLE: Stable.stable_timemap L mem2_pf sc2_pf) *)
+    (*       (SC2_PF_STABLE: Stable.stable_timemap L mem2_pf sc2_pf) *)
+
+    Inductive sim_conf (rels: ReleaseWrites.t): forall (c_pf c_ra: Configuration.t), Prop :=
+    | sim_conf_intro
+        views
+        ths_pf sc_pf mem_pf
+        ths_j sc_j mem_j
+        ths_ra sc_ra mem_ra
+        (THS: forall tid,
+            option_rel3
+              (sim_thread_sl views rels sc_pf sc_j sc_ra mem_pf mem_j mem_ra)
+              (IdentMap.find tid ths_pf)
+              (IdentMap.find tid ths_j)
+              (IdentMap.find tid ths_ra)):
+        sim_conf rels
+                 (Configuration.mk ths_pf sc_pf mem_pf)
+                 (Configuration.mk ths_ra sc_ra mem_ra)
+    .
+
+    (* Lemma sim_conf_steps *)
+    (*       views1 rels2 c1_pf c1_j c1_ra *)
+    (*       c2_pf trs *)
+    (*       (SIM: sim_conf views rels c1_pf c1_j c1_ra) *)
+    (*       (WF1_PF: Configuration.wf c1_pf) *)
+    (*       (WF1_J: Configuration.wf c1_j) *)
+    (*       (WF1_RA: Configuration.wf c1_ra) *)
+    (*       (STEPS_PF: LOCALDRF.configuration_steps_trace c1_pf c2_pf): *)
+    (*   exists  *)
   End PFtoRA.
 End PFtoRA.
