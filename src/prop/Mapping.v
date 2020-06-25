@@ -2364,6 +2364,20 @@ Section MAPPED.
     inv TEVENT; ss; eauto.
   Qed.
 
+  Inductive thread_map lang: Thread.t lang -> Thread.t lang -> Prop :=
+  | thread_map_intro
+      st lc flc mem fmem sc fsc fsc'
+      (LOCAL: local_map lc flc)
+      (MEM: memory_map mem fmem)
+      (UNWRITABLE: collapsable_unwritable lc.(Local.promises) mem)
+      (SC: timemap_map sc fsc')
+      (SCLE: TimeMap.le fsc fsc')
+    :
+      thread_map
+        (Thread.mk _ st lc sc mem)
+        (Thread.mk _ st flc fsc fmem)
+  .
+
   Lemma steps_map
         P0 P1 lang th0 th1 fth0 st0 st1 lc0 lc1 flc0
         sc0 sc1 fsc0 fsc0' mem0 mem1 fmem0
@@ -2437,7 +2451,7 @@ Section MAPPED.
         (<<SCLE: TimeMap.le fsc1 fsc1'>>) /\
         (<<MEM: memory_map mem1 fmem1>>) /\
         (<<LOCAL: local_map lc1 flc1>>) /\
-        (<<TRACE: List.Forall2 (fun em fem => <<EVENT: tevent_map (snd fem) (snd em)>>) tr ftr>>)
+        (<<TRACE: List.Forall2 (fun the fthe => <<EVENT: tevent_map (snd fthe) (snd the)>> /\ <<THREAD: thread_map (fst the) (fst fthe)>>) tr ftr>>)
   .
   Proof.
     ginduction STEPS; i; ss; clarify.
@@ -2456,7 +2470,8 @@ Section MAPPED.
       inv STEP0. exploit Thread.step_future; try apply STEP1; ss. i. des.
       exploit IHSTEPS; try apply STEPS; eauto.
       { eapply collapsable_unwritable_step in STEP; eauto. }
-      i. des. esplits; eauto.
+      i. des. esplits; eauto. econs; eauto. ss. splits; auto.
+      econs; eauto.
   Qed.
 
 End MAPPED.
@@ -3703,3 +3718,88 @@ Section COMPOSE.
   Qed.
 
 End COMPOSE.
+
+Section INCR.
+
+  Variable f0 f1: Loc.t -> Time.t -> Time.t -> Prop.
+  Hypothesis INCR: f0 <3= f1.
+  Hypothesis MAPLT: mapping_map_lt f1.
+
+  Lemma mappalbe_time_incr loc to
+        (TIME: mappable_time f0 loc to)
+    :
+      mappable_time f1 loc to.
+  Proof.
+    unfold mappable_time in *. des. eapply INCR in MAPPED. eauto.
+  Qed.
+
+  Lemma timamap_map_incr tm ftm
+        (MAP: timemap_map f0 tm ftm)
+    :
+      timemap_map f1 tm ftm.
+  Proof.
+    ii. eauto.
+  Qed.
+
+  Lemma view_map_incr vw fvw
+        (MAP: view_map f0 vw fvw)
+    :
+      view_map f1 vw fvw.
+  Proof.
+    inv MAP. econs.
+    { eapply timamap_map_incr; eauto. }
+    { eapply timamap_map_incr; eauto. }
+  Qed.
+
+  Lemma opt_view_map_incr vw fvw
+        (MAP: opt_view_map f0 vw fvw)
+    :
+      opt_view_map f1 vw fvw.
+  Proof.
+    inv MAP; econs.
+    eapply view_map_incr; eauto.
+  Qed.
+
+  Lemma tview_map_incr vw fvw
+        (MAP: tview_map f0 vw fvw)
+    :
+      tview_map f1 vw fvw.
+  Proof.
+    inv MAP; econs.
+    { i. eapply view_map_incr; eauto. }
+    { eapply view_map_incr; eauto. }
+    { eapply view_map_incr; eauto. }
+  Qed.
+
+  Lemma message_map_incr msg fmsg
+        (MAP: msg_map f0 msg fmsg)
+    :
+      msg_map f1 msg fmsg.
+  Proof.
+    inv MAP; econs. eapply opt_view_map_incr; eauto.
+  Qed.
+
+  Lemma promises_map_incr prom fprom
+        (MAP: promises_map f0 prom fprom)
+    :
+      promises_map f1 prom fprom.
+  Proof.
+    inv MAP. econs.
+    { i. exploit MAPPED; eauto. i. des. esplits; eauto.
+      { eapply mapping_map_lt_non_collapsable; eauto. }
+      { eapply message_map_incr; eauto. }
+    }
+    { i. exploit ONLY; eauto. i. des. esplits; eauto. }
+  Qed.
+
+  Lemma local_map_incr lc flc
+        (MAP: local_map f0 lc flc)
+    :
+      local_map f1 lc flc.
+  Proof.
+    inv MAP. econs; eauto.
+    { eapply tview_map_incr; eauto. }
+    { eapply promises_map_incr; eauto. }
+  Qed.
+
+End INCR.

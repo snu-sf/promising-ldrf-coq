@@ -479,7 +479,7 @@ Proof.
         eapply SAT0. econs; eauto. }
       { eapply list_Forall2_in in H; eauto. des.
         eapply List.Forall_forall in IN; eauto. ss. des.
-        eapply wf_time_evt_map in SAT1; eauto. eapply wf_time_evt_mon; try apply SAT1.
+        eapply wf_time_evt_map in EVENT; eauto. eapply wf_time_evt_mon; try apply EVENT.
         i. ss. des. destruct (Time.le_lt_dec ts (Memory.max_timemap (Thread.memory th) x0)).
         { left. assert (ts = x2).
           { eapply mapping_map_lt_map_eq.
@@ -512,9 +512,10 @@ Proof.
     }
     eapply list_Forall2_in in H; eauto. des.
     eapply List.Forall_forall in IN; eauto. ss. des.
-    destruct x, a. ss. inv SAT; ss. inv KIND; ss.
+    destruct x, a. ss. inv EVENT; ss. inv KIND; ss.
     splits; auto. inv MSG0; ss. inv MSG; ss. inv MAP1; ss.
   }
+  { eapply list_Forall2_impl; eauto. i. ss. des. auto. }
   { ss. unguard. des; eauto.
     { left. esplits; eauto. eapply failure_step_map; eauto.
       { eapply mapping_map_lt_map_le. eapply MAP. }
@@ -610,13 +611,13 @@ Proof.
       splits; auto.
       { eapply ident_map_write_not_in; eauto. }
       { eapply ident_map_no_read_msgs; eauto. }
-      { eapply wf_time_evt_map in SAT2; eauto.
-        eapply wf_time_evt_mon; try apply SAT2. ss.
+      { eapply wf_time_evt_map in SAT1; eauto.
+        eapply wf_time_evt_mon; try apply SAT1. ss.
         i. des. inv MAP0. eauto. }
     }
     eapply list_Forall2_in in H; eauto. des.
     eapply List.Forall_forall in IN; eauto. ss. des.
-    destruct x, a. ss. inv SAT; ss. inv KIND; ss.
+    destruct x, a. ss. inv EVENT; ss. inv KIND; ss.
     splits; auto. inv MSG0; ss. inv MSG; ss. inv MAP1; ss. }
     { eapply list_Forall2_compose; eauto.
     i. ss. des. eapply ident_map_compose_tevent; eauto. }

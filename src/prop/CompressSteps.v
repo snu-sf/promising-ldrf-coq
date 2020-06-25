@@ -133,7 +133,8 @@ Module CompressSteps.
         + instantiate (1:=fun _ => True). eapply List.Forall_forall. ii.
           eapply list_Forall2_in in H; eauto. des.
           eapply List.Forall_forall in EVENTS; try apply IN. destruct a, x.
-          ss. des. split; auto. inv SAT; ss.
+          ss. des. split; auto. rewrite <- TAU.
+          eapply tevent_map_same_machine_event; eauto.
       - econs 2. econs; eauto. econs. econs.
         destruct lc2, flc1. inv LOCAL. ss.
         eapply promise_consistent_mon.
@@ -185,7 +186,7 @@ Module CompressSteps.
         + instantiate (1:=fun _ => True). eapply List.Forall_forall. ii.
           eapply list_Forall2_in in H; eauto. des.
           eapply List.Forall_forall in EVENTS; try apply IN. destruct a, x.
-          ss. des. split; auto. inv SAT; ss.
+          ss. des. split; auto. inv EVENT; ss.
       - ss. inv LOCAL. rewrite PROMISES_TGT in *.
         eapply bot_promises_map; eauto.
     Qed.

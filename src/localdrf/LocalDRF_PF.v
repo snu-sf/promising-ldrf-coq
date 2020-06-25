@@ -174,6 +174,14 @@ Section SIM.
   .
   Hint Constructors sim_event.
 
+  Global Program Instance sim_event_Equivalence: Equivalence sim_event.
+  Next Obligation.
+  Proof. ii. destruct x; econs. Qed.
+  Next Obligation.
+  Proof. ii. inv H; econs. Qed.
+  Next Obligation.
+  Proof. ii. inv H; inv H0; econs. Qed.
+
   Lemma sim_event_machine_event e_src e_tgt
         (EVENT: sim_event e_src e_tgt)
     :
@@ -209,6 +217,31 @@ Section SIM.
       sim_trace ((th_src, e)::tl_src) e_tgt
   .
   Hint Constructors sim_trace.
+
+  Lemma sim_event_racy_event e_src e_tgt
+        (RACY: racy_event e_tgt)
+        (EVENT: sim_event e_src e_tgt)
+    :
+      racy_event e_src.
+  Proof.
+    inv EVENT; ss.
+  Qed.
+
+  Lemma sim_trace_sim_event_sim_trace lang (tr_src: Trace.t lang) th_mid th_tgt e_mid e_tgt
+        (TRACE: sim_trace tr_src (Some (th_mid, e_mid)))
+        (THREAD: TView.le th_mid.(Thread.local).(Local.tview) th_tgt.(Thread.local).(Local.tview))
+        (EVENT: sim_event e_mid e_tgt)
+    :
+      sim_trace tr_src (Some (th_tgt, e_tgt)).
+  Proof.
+    remember (Some (th_mid, e_mid)) as e. ginduction TRACE; i; clarify.
+    { econs 2; eauto.
+      { etrans; eauto. }
+      { etrans; eauto. }
+    }
+    { econs 3; eauto. ii. eapply NONRACY. eapply sim_event_racy_event; eauto. }
+    { econs 4; eauto. }
+  Qed.
 
   Lemma sim_silent_sim_event_exists lang (tr_src: Trace.t lang) th_tgt e_tgt
         (TRACE: sim_trace tr_src (Some (th_tgt, e_tgt)))
@@ -334,6 +367,34 @@ Section SIM.
       eapply sim_trace_silent; eauto. i. ss. clarify. }
     { i. eapply Forall_app; eauto.
       eapply sim_trace_silent; eauto. i. ss. }
+  Qed.
+
+  Lemma sim_traces_trans lang (tr_src0 tr_src1 tr_tgt0 tr_tgt1: Trace.t lang)
+        (TRACE0: sim_traces tr_src0 tr_tgt0)
+        (TRACE1: sim_traces tr_src1 tr_tgt1)
+    :
+      sim_traces (tr_src0 ++ tr_src1) (tr_tgt0 ++ tr_tgt1).
+  Proof.
+    ginduction TRACE0; i.
+    { ss. }
+    { erewrite <- List.app_assoc. erewrite <- List.app_comm_cons. econs 2; eauto. }
+    { erewrite <- List.app_assoc. econs 3; eauto. }
+  Qed.
+
+  Lemma sim_traces_pf lang (tr_src tr_tgt: Trace.t lang)
+        (TRACE: sim_traces tr_src tr_tgt)
+    :
+      List.Forall (compose (pf_event L) snd) tr_src.
+  Proof.
+    induction TRACE; eauto.
+    { i. eapply Forall_app.
+      { eapply sim_trace_pf; eauto. }
+      { eapply IHTRACE; eauto. }
+    }
+    { i. eapply Forall_app.
+      { eapply sim_trace_pf; eauto. }
+      { eapply IHTRACE; eauto. }
+    }
   Qed.
 
 

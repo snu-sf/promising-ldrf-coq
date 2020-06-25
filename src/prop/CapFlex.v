@@ -556,4 +556,27 @@ Section CAPFLEX.
     }
   Qed.
 
+  Lemma cap_flex_future_weak
+        mem1 mem2 tm
+        (CAP: cap_flex mem1 mem2 tm)
+        (TM: forall loc, Time.lt (Memory.max_ts loc mem1) (tm loc))
+        (CLOSED: Memory.closed mem1):
+    Memory.future_weak mem1 mem2.
+  Proof.
+    econs; ii.
+    { eapply CAP in GET. esplits; eauto. refl. }
+    { eapply cap_flex_inv in GET2; eauto. des; clarify. }
+    { eapply cap_flex_inv in GET2; eauto. des; clarify. }
+  Qed.
+
+  Lemma cap_flex_concrete_messages_le mem cap tm
+        (CAP: cap_flex mem cap tm)
+        (CLOSED: Memory.closed mem)
+        (TM: forall loc, Time.lt (Memory.max_ts loc mem) (tm loc))
+    :
+      concrete_messages_le cap mem.
+  Proof.
+    ii. eapply cap_flex_inv in GET0; eauto. des; clarify. eauto.
+  Qed.
+
 End CAPFLEX.

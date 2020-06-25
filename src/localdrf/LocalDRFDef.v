@@ -53,23 +53,23 @@ Section LOCALDRF.
       configuration_steps_trace c0 c0 []
   | configuration_steps_trace_cons
       c0 c1 c2 trs lang tr e tid
-      (STEPS: configuration_steps_trace c0 c1 trs)
-      (STEP: @Trace.configuration_step lang tr e tid c1 c2)
+      (STEPS: configuration_steps_trace c1 c2 trs)
+      (STEP: @Trace.configuration_step lang tr e tid c0 c1)
       (PF: List.Forall (compose pf_event snd) tr)
     :
-      configuration_steps_trace c0 c2 (trs ++ [(tid, existT _ _ tr)])
+      configuration_steps_trace c0 c2 ((tid, existT _ _ tr) :: trs)
   .
 
-  Lemma configuration_steps_trace_1n c0 c1 c2 lang tr trs e tid
-        (STEPS: configuration_steps_trace c1 c2 trs)
-        (STEP: @Trace.configuration_step lang tr e tid c0 c1)
+  Lemma configuration_steps_trace_n1 c0 c1 c2 lang tr trs e tid
+        (STEPS: configuration_steps_trace c0 c1 trs)
+        (STEP: @Trace.configuration_step lang tr e tid c1 c2)
         (PF: List.Forall (compose pf_event snd) tr)
     :
-      configuration_steps_trace c0 c2 ((tid, existT _ _ tr)::trs).
+      configuration_steps_trace c0 c2 (trs ++ [(tid, existT _ _ tr)]).
   Proof.
     ginduction STEPS.
     { i. eapply configuration_steps_trace_cons with (trs:=[]); eauto. econs. }
-    { i. exploit IHSTEPS; eauto. i. erewrite List.app_comm_cons. econs; eauto. }
+    { i. exploit IHSTEPS; eauto. i. erewrite <- List.app_comm_cons. econs; eauto. }
   Qed.
 
   Lemma configuration_steps_trace_trans c0 c1 c2 trs0 trs1
@@ -78,9 +78,43 @@ Section LOCALDRF.
     :
       configuration_steps_trace c0 c2 (trs0 ++ trs1).
   Proof.
-    ginduction STEPS1.
-    { i. erewrite List.app_nil_r. eauto. }
-    { i. exploit IHSTEPS1; eauto. i. erewrite List.app_assoc. econs; eauto. }
+    ginduction STEPS0.
+    { i. erewrite List.app_nil_l. eauto. }
+    { i. exploit IHSTEPS0; eauto. i. econs; eauto. }
+  Qed.
+
+  Inductive silent_configuration_steps_trace:
+    forall (c0 c1: Configuration.t) (tr: list (Ident.t * sigT Trace.t)), Prop :=
+  | silent_configuration_steps_trace_nil
+      c0
+    :
+      silent_configuration_steps_trace c0 c0 []
+  | silent_configuration_steps_trace_cons
+      c0 c1 c2 trs lang tr tid
+      (STEPS: silent_configuration_steps_trace c1 c2 trs)
+      (STEP: @Trace.configuration_step lang tr MachineEvent.silent tid c0 c1)
+      (PF: List.Forall (compose pf_event snd) tr)
+    :
+      silent_configuration_steps_trace c0 c2 ((tid, existT _ _ tr) :: trs)
+  .
+
+  Lemma silent_configuration_steps_trace_configuration_steps_trace
+    :
+      silent_configuration_steps_trace <3= configuration_steps_trace.
+  Proof.
+    intros. induction PR.
+    { econs. }
+    { econs; eauto. }
+  Qed.
+
+  Lemma silent_configuration_steps_trace_behaviors c0 c1 tr
+        (STEP: silent_configuration_steps_trace c0 c1 tr)
+    :
+      behaviors pf_step c1 <1= behaviors pf_step c0.
+  Proof.
+    ginduction STEP; auto.
+    i. eapply IHSTEP in PR. econs 4; eauto.
+    econs. esplits; eauto.
   Qed.
 
   Inductive racy_read (loc: Loc.t) (ts: Time.t):
@@ -142,9 +176,9 @@ Section LOCALDRF.
       racefree c1.
   Proof.
     ii. eapply RACEFREE.
-    { eapply configuration_steps_trace_1n; eauto. }
-    { ss. right.  eapply TRACE0. }
-    { ss. right.  eapply TRACE1. }
+    { econs 2; eauto. }
+    { ss. right. eapply TRACE0. }
+    { ss. right. eapply TRACE1. }
     { eauto. }
     { eauto. }
     { eauto. }

@@ -35,6 +35,12 @@ Set Implicit Arguments.
 
 Section GENERAL.
 
+  Lemma option_rel_mon A B (R0 R1: A -> B-> Prop)
+        (LE: R0 <2= R1)
+    :
+      option_rel R0 <2= option_rel R1.
+  Proof. i. unfold option_rel in *. des_ifs. auto. Qed.
+
   Lemma list_filter_exists A (P: A -> Prop) (l: list A)
     :
       exists l',
@@ -155,6 +161,26 @@ Section GENERAL.
     ginduction la; i.
     { inv FORALL. econs. }
     { inv FORALL. econs; eauto. }
+  Qed.
+
+  Lemma list_Forall2_impl A B (P Q: A -> B -> Prop) (la: list A) (lb: list B)
+        (FORALL: List.Forall2 P la lb)
+        (IMPL: forall a b (SAT: P a b), Q a b)
+    :
+      List.Forall2 Q la lb.
+  Proof.
+    revert lb FORALL. induction la.
+    { i. inv FORALL. econs. }
+    { i. inv FORALL. econs; eauto. }
+  Qed.
+
+  Lemma list_match_rev A (l: list A)
+    :
+      l = [] \/ exists tl_rev hd_rev, l = tl_rev++[hd_rev].
+  Proof.
+    induction l; auto. des; subst.
+    { right. exists []. ss. eauto. }
+    { right. esplits. erewrite List.app_comm_cons. eauto. }
   Qed.
 
 End GENERAL.
@@ -1916,6 +1942,16 @@ Section PROMISED.
       eapply concrete_promised_increase in STEP0; eauto. }
   Qed.
 
+  Lemma memory_future_concrete_promised mem0 mem1
+        (FUTURE: Memory.future_weak mem0 mem1)
+    :
+      concrete_promised mem0 <2= concrete_promised mem1.
+  Proof.
+    ii. inv PR. eapply FUTURE in GET. des.
+    { econs; eauto. }
+    { econs; eauto. }
+  Qed.
+
 End PROMISED.
 
 
@@ -2940,6 +2976,18 @@ Section CONCRETELE.
       Memory.le <2= concrete_messages_le.
   Proof.
     ii. eapply PR in GET0. eauto.
+  Qed.
+
+  Lemma concrete_promised_le_local_wf
+        mem0 mem1 lc
+        (LOCAL: Local.wf lc mem0)
+        (CONCRETELE: concrete_promised_le mem0 mem1)
+        (MLE: Memory.le lc.(Local.promises) mem1)
+    :
+      Local.wf lc mem1.
+  Proof.
+    inv LOCAL. econs; eauto.
+    eapply concrete_promised_le_closed_tview; eauto.
   Qed.
 
 End CONCRETELE.

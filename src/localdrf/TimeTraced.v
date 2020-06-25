@@ -171,14 +171,19 @@ Lemma times_configuration_step_same_behaviors c beh
     exists times,
       (<<BEH: behaviors (times_configuration_step_all times) c beh>>) /\
       (<<WO: forall loc, well_ordered (times loc)>>) /\
-      (<<INCR: forall nat loc, times loc (incr_time_seq nat)>>)
+      (<<INCR: forall nat loc, times loc (incr_time_seq nat)>>) /\
+      (<<BOT: forall loc, times loc Time.bot>>)
 .
 Proof.
   ginduction BEH.
-  { i. exists (fun loc => incr_times). splits.
+  { i. exists (fun loc => incr_times \1/ eq Time.bot). splits.
     { econs 1; eauto. }
-    { i. eapply incr_times_well_ordered. }
-    { i. eexists. eauto. }
+    { i. eapply join_well_ordered; eauto.
+      { eapply incr_times_well_ordered. }
+      { eapply singleton_well_ordered. }
+    }
+    { i. left. eexists. eauto. }
+    { auto. }
   }
   { i. exploit IHBEH.
     { eapply Configuration.step_future; eauto. } i. des.
@@ -191,13 +196,17 @@ Proof.
     }
     { i. eapply join_well_ordered; eauto. }
     { auto. }
+    { auto. }
   }
   { i. exploit times_configuration_step_exists; eauto. i. des.
-    exists (times \2/ fun loc => incr_times). splits; eauto.
+    exists (times \2/ (fun loc => incr_times) \2/ (fun _ => eq Time.bot)). splits; eauto.
     { econs 3; eauto. econs; eauto.
       eapply times_configuration_step_mon; eauto. }
-    { i. eapply join_well_ordered; eauto. eapply incr_times_well_ordered. }
-    { i. right. eexists. eauto. }
+    { i. eapply join_well_ordered; eauto.
+      { eapply join_well_ordered; eauto. eapply incr_times_well_ordered. }
+      { eapply singleton_well_ordered. }
+    }
+    { i. left. right. eexists. eauto. }
   }
   { i. exploit IHBEH.
     { eapply Configuration.step_future; eauto. } i. des.
@@ -209,6 +218,7 @@ Proof.
         eapply times_configuration_step_all_mon; auto. }
     }
     { i. eapply join_well_ordered; eauto. }
+    { auto. }
     { auto. }
   }
 Qed.
