@@ -177,14 +177,15 @@ Module RARace.
     Definition racefree (s: Threads.syntax): Prop :=
       forall rels1 c
         tid lang st1 lc1
-        rels2 pf loc to val released ord e2 e3
+        rels2 pf e loc to val released ord e2 e3
         (CSTEPS: RATrace.configuration_steps L rels1 (Configuration.init s) c)
         (TID: IdentMap.find tid c.(Configuration.threads) = Some (existT _ lang st1, lc1))
         (STEPS: RATrace.thread_steps L lang rels2
                                      (Thread.mk _ st1 lc1 c.(Configuration.sc) c.(Configuration.memory))
                                      e2)
         (CONS: Local.promise_consistent e2.(Thread.local))
-        (STEP: OrdThread.step L Ordering.acqrel pf (ThreadEvent.read loc to val released ord) e2 e3)
+        (STEP: OrdThread.step L Ordering.acqrel pf e e2 e3)
+        (READ: ThreadEvent.is_reading e = Some (loc, to, val, released, ord))
         (RACE: ra_race (rels2 ++ rels1) e2.(Thread.local).(Local.tview) loc to ord),
         False.
   End RARace.
