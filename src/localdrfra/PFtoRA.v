@@ -236,7 +236,7 @@ Module PFtoRA.
         (<<STEP_RA: OrdThread.step L Ordering.acqrel pf_j e_ra e1_ra e2_ra>>) /\
         __guard__
           ((<<SIM2: sim_thread views2 (ReleaseWrites.append L e_ra rels1) e2_pf e2_j e2_ra>>) /\
-           (<<EVENT: PFtoRASimThread.sim_event e_ra e_j>>) \/
+           (<<EVENT_RA: PFtoRASimThread.sim_event e_ra e_j>>) \/
            (<<CONS: Local.promise_consistent e1_ra.(Thread.local)>>) /\
            (<<RACE: exists loc to val released ord,
                ThreadEvent.is_reading e_ra = Some (loc, to, val, released, ord) /\
@@ -370,36 +370,70 @@ Module PFtoRA.
     Qed.
 
     Definition consistent_rel (tr: Trace.t lang) (rel: ReleaseWrites.t): Prop :=
-      forall th e loc to val released ord
+      forall th e loc from to val released ord
         (IN: List.In (th, e) tr)
-        (EVENT: ThreadEvent.is_reading e = Some (loc, to, val, released, ord))
+        (EVENT: ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord))
         (ORD: Ordering.le ord Ordering.strong_relaxed),
         ~ List.In (loc, to) rel.
 
-    (* Lemma thread_steps *)
-    (*       views1 rels1 e1_pf e1_j e1_ra *)
-    (*       tr e2_pf *)
-    (*       (SIM1: sim_thread views1 rels1 e1_pf e1_j e1_ra) *)
-    (*       (STEPS: Trace.steps tr e1_pf e2_pf) *)
-    (*       (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr) *)
-    (*       (VALID: List.Forall (compose (valid_event L) snd) tr) *)
-    (*       (CONS: Local.promise_consistent e2_pf.(Thread.local)): *)
-    (*   (exists views2 rels2 e2_j e2_ra, *)
-    (*       (<<STEPS_RA: RAThread.tau_steps L lang rels2 e1_ra e2_ra>>) /\ *)
-    (*       (<<RELS: consistent_rel tr rels2>>) /\ *)
-    (*       (<<SIM2: sim_thread views2 (rels2 ++ rels1) e2_pf e2_j e2_ra>>)) \/ *)
-    (*   (exists rels2 pf e_ra e2_ra e3_ra, *)
-    (*       (<<STEPS_RA: RAThread.tau_steps L lang rels2 e1_ra e2_ra>>) /\ *)
-    (*       (<<CONS: Local.promise_consistent e1_ra.(Thread.local)>>) /\ *)
-    (*       (<<STEP_RA: OrdThread.step L Ordering.acqrel pf e_ra e2_ra e3_ra>>) /\ *)
-    (*       (<<RACE: exists loc to val released ord, *)
-    (*           ThreadEvent.is_reading e_ra = Some (loc, to, val, released, ord) /\ *)
-    (*           RAThread.ra_race L (rels2 ++ rels1) e1_ra.(Thread.local).(Local.tview) loc to ord>>)). *)
-    (* Proof. *)
-    (*   revert views1 rels1 e1_j e1_ra SIM1 SILENT VALID CONS. *)
-    (*   induction STEPS; i; ss. *)
-    (*   { left. esplits; [econs 1|..]; ss; eauto. } *)
-    (* Admitted. *)
+    Lemma thread_steps
+          views1 rels1 e1_pf e1_j e1_ra
+          tr e2_pf
+          (SIM1: sim_thread views1 rels1 e1_pf e1_j e1_ra)
+          (STEPS: Trace.steps tr e1_pf e2_pf)
+          (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr)
+          (VALID: List.Forall (compose (valid_event L) snd) tr)
+          (CONS: Local.promise_consistent e2_pf.(Thread.local)):
+      (exists views2 rels2 e2_j e2_ra,
+          (<<STEPS_RA: RAThread.tau_steps lang L rels1 (rels2 ++ rels1) e1_ra e2_ra>>) /\
+          (<<RELS: consistent_rel tr rels2>>) /\
+          (<<SIM2: sim_thread views2 (rels2 ++ rels1) e2_pf e2_j e2_ra>>)) \/
+      (exists rels2 rels3 e2_ra e3_ra,
+          (<<STEPS_RA: RAThread.tau_steps lang L rels1 (rels2 ++ rels1) e1_ra e2_ra>>) /\
+          (<<RACE: RAThread.step lang L (rels2 ++ rels1) rels3 ThreadEvent.failure e2_ra e3_ra>>)).
+    Proof.
+      revert views1 rels1 e1_j e1_ra SIM1 SILENT VALID CONS.
+      induction STEPS; i; ss.
+      { left. eexists _. exists []. s.
+        esplits; [econs 1|..]; ss; eauto. }
+      subst. exploit thread_step; try exact SIM1; eauto.
+      { exploit Thread.step_future; try exact STEP; try apply SIM1. i. des.
+        eapply rtc_tau_step_promise_consistent; try eapply Trace.silent_steps_tau_steps; eauto.
+        inv SILENT. ss. }
+      { i. inv VALID. exploit H1; ss; eauto. }
+      i. unguard. des.
+      - exploit IHSTEPS; eauto.
+        { inv SILENT. ss. }
+        { inv VALID. ss. }
+        i. des.
+        + left.
+          replace (rels2 ++ ReleaseWrites.append L e_ra rels1) with
+              ((rels2 ++ ReleaseWrites.append L e_ra []) ++ rels1) in *; cycle 1.
+          { rewrite <- List.app_assoc. unfold ReleaseWrites.append. des_ifs. }
+          esplits.
+          * econs 2; [econs 1; eauto|..]; eauto.
+            inv SILENT. ss. inv EVENT_J; inv EVENT_RA; ss.
+          * ii. apply List.in_app_or in H. des; inv IN.
+            { admit. }
+            { eapply RELS; eauto. }
+            { inv H0. unfold ReleaseWrites.append in H.
+              destruct e0; inv EVENT_J; inv EVENT_RA; ss.
+              - inv EVENT. revert H. repeat (condtac; ss).
+                i. des; ss. destruct ord; ss.
+              - inv EVENT. revert H. repeat (condtac; ss).
+                i. des; ss. destruct ord; ss. }
+            { admit. }
+          * eauto.
+        + right.
+          replace (rels2 ++ ReleaseWrites.append L e_ra rels1) with
+              ((rels2 ++ ReleaseWrites.append L e_ra []) ++ rels1) in *; cycle 1.
+          { rewrite <- List.app_assoc. unfold ReleaseWrites.append. des_ifs. }
+          esplits.
+          * econs 2; [econs 1; eauto|..]; eauto.
+            inv SILENT. ss. inv EVENT_J; inv EVENT_RA; ss.
+          * eauto.
+      - right. exists []. ss. esplits; [econs 1|]. econs 2; eauto.
+    Admitted.
   End PFtoRAThread.
 
 
