@@ -697,7 +697,7 @@ Module PFtoRASimThread.
             (<<NORMAL_TVIEW1_TGT: Stable.normal_tview L lc2_tgt.(Local.tview)>>) /\
             (<<STABLE_TVIEW1_SRC: Stable.stable_tview L mem1_src lc2_src.(Local.tview)>>)
             \/
-            (<<RACE: RARace.ra_race L rels lc1_src.(Local.tview) loc to ord>>)).
+            (<<RACE: RAThread.ra_race L rels lc1_src.(Local.tview) loc to ord>>)).
     Proof.
       exploit sim_memory_stable_tview; eauto; try apply LC1. intro STABLE_TVIEW1_TGT.
       hexploit sim_memory_stable_memory; eauto. intro STABLE_MEM1_TGT.
@@ -740,11 +740,11 @@ Module PFtoRASimThread.
       }
       destruct (classic (List.In (loc, to) rels)); cycle 1.
       { (* non release write *)
-        right. unfold RARace.ra_race. auto.
+        right. unfold RAThread.ra_race. auto.
       }
       destruct (Ordering.le ord Ordering.strong_relaxed) eqn:ORDR.
       { (* non acquire read *)
-        right. unfold RARace.ra_race. auto.
+        right. unfold RAThread.ra_race. auto.
       }
 
       (* RA synchronized *)
@@ -1584,7 +1584,7 @@ Module PFtoRASimThread.
             \/
             (<<RACE: exists loc to val released ord,
                 ThreadEvent.is_reading e_src = Some (loc, to, val, released, ord) /\
-                RARace.ra_race L rels e1_src.(Thread.local).(Local.tview) loc to ord>>)).
+                RAThread.ra_race L rels e1_src.(Thread.local).(Local.tview) loc to ord>>)).
     Proof.
       destruct e1_src as [st1_src lc1_src sc1_src mem1_src].
       destruct e1_tgt as [st1_tgt lc1_tgt sc1_tgt mem1_tgt].

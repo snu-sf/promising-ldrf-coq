@@ -240,7 +240,7 @@ Module PFtoRA.
            (<<CONS: Local.promise_consistent e1_ra.(Thread.local)>>) /\
            (<<RACE: exists loc to val released ord,
                ThreadEvent.is_reading e_ra = Some (loc, to, val, released, ord) /\
-               RARace.ra_race L rels1 e1_ra.(Thread.local).(Local.tview) loc to ord>>)).
+               RAThread.ra_race L rels1 e1_ra.(Thread.local).(Local.tview) loc to ord>>)).
     Proof.
       hexploit JSim.sim_thread_step; try exact STEP; try eapply SIM1; eauto. i. des.
       destruct (classic (exists loc from to msg kind,
@@ -376,30 +376,30 @@ Module PFtoRA.
         (ORD: Ordering.le ord Ordering.strong_relaxed),
         ~ List.In (loc, to) rel.
 
-    Lemma thread_steps
-          views1 rels1 e1_pf e1_j e1_ra
-          tr e2_pf
-          (SIM1: sim_thread views1 rels1 e1_pf e1_j e1_ra)
-          (STEPS: Trace.steps tr e1_pf e2_pf)
-          (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr)
-          (VALID: List.Forall (compose (valid_event L) snd) tr)
-          (CONS: Local.promise_consistent e2_pf.(Thread.local)):
-      (exists views2 rels2 e2_j e2_ra,
-          (<<STEPS_RA: RATrace.thread_tau_steps L lang rels2 e1_ra e2_ra>>) /\
-          (<<RELS: consistent_rel tr rels2>>) /\
-          (<<SIM2: sim_thread views2 (rels2 ++ rels1) e2_pf e2_j e2_ra>>)) \/
-      (exists rels2 pf e_ra e2_ra e3_ra,
-          (<<STEPS_RA: RATrace.thread_tau_steps L lang rels2 e1_ra e2_ra>>) /\
-          (<<CONS: Local.promise_consistent e1_ra.(Thread.local)>>) /\
-          (<<STEP_RA: OrdThread.step L Ordering.acqrel pf e_ra e2_ra e3_ra>>) /\
-          (<<RACE: exists loc to val released ord,
-              ThreadEvent.is_reading e_ra = Some (loc, to, val, released, ord) /\
-              RARace.ra_race L (rels2 ++ rels1) e1_ra.(Thread.local).(Local.tview) loc to ord>>)).
-    Proof.
-      revert views1 rels1 e1_j e1_ra SIM1 SILENT VALID CONS.
-      induction STEPS; i; ss.
-      { left. esplits; [econs 1|..]; ss; eauto. }
-    Admitted.
+    (* Lemma thread_steps *)
+    (*       views1 rels1 e1_pf e1_j e1_ra *)
+    (*       tr e2_pf *)
+    (*       (SIM1: sim_thread views1 rels1 e1_pf e1_j e1_ra) *)
+    (*       (STEPS: Trace.steps tr e1_pf e2_pf) *)
+    (*       (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr) *)
+    (*       (VALID: List.Forall (compose (valid_event L) snd) tr) *)
+    (*       (CONS: Local.promise_consistent e2_pf.(Thread.local)): *)
+    (*   (exists views2 rels2 e2_j e2_ra, *)
+    (*       (<<STEPS_RA: RAThread.tau_steps L lang rels2 e1_ra e2_ra>>) /\ *)
+    (*       (<<RELS: consistent_rel tr rels2>>) /\ *)
+    (*       (<<SIM2: sim_thread views2 (rels2 ++ rels1) e2_pf e2_j e2_ra>>)) \/ *)
+    (*   (exists rels2 pf e_ra e2_ra e3_ra, *)
+    (*       (<<STEPS_RA: RAThread.tau_steps L lang rels2 e1_ra e2_ra>>) /\ *)
+    (*       (<<CONS: Local.promise_consistent e1_ra.(Thread.local)>>) /\ *)
+    (*       (<<STEP_RA: OrdThread.step L Ordering.acqrel pf e_ra e2_ra e3_ra>>) /\ *)
+    (*       (<<RACE: exists loc to val released ord, *)
+    (*           ThreadEvent.is_reading e_ra = Some (loc, to, val, released, ord) /\ *)
+    (*           RAThread.ra_race L (rels2 ++ rels1) e1_ra.(Thread.local).(Local.tview) loc to ord>>)). *)
+    (* Proof. *)
+    (*   revert views1 rels1 e1_j e1_ra SIM1 SILENT VALID CONS. *)
+    (*   induction STEPS; i; ss. *)
+    (*   { left. esplits; [econs 1|..]; ss; eauto. } *)
+    (* Admitted. *)
   End PFtoRAThread.
 
 

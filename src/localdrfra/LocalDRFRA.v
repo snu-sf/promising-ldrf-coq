@@ -38,7 +38,7 @@ Set Implicit Arguments.
 
 Theorem local_drf_ra
         L s
-        (RACEFREE: RARace.racefree L s):
+        (RACEFREE: RARace.racefree_syn L s):
   behaviors Configuration.step (Configuration.init s) <1=
   behaviors (@OrdConfiguration.step L Ordering.acqrel) (Configuration.init s).
 Proof.

@@ -193,19 +193,6 @@ Module RAConfiguration.
         steps rels1 rels3 c1 c3
     .
     Hint Constructors steps.
-
-    (* Lemma step_ord_step *)
-    (*       e tid rels1 rels2 c1 c2 *)
-    (*       (STEP: step e tid rels1 rels2 c1 c2): *)
-    (*   OrdConfiguration.step L Ordering.acqrel e tid c1 c2. *)
-    (* Proof. *)
-    (*   inv STEP. exploit RAThread.tau_steps_rtc_tau_step; eauto. i. *)
-    (*   econs; eauto. *)
-    (*   destruct (ThreadEvent.get_machine_event e0) eqn:EVENT. *)
-    (*   - rewrite <- EVENT. econs 2; eauto. destruct e0; ss. *)
-    (*   - rewrite <- EVENT. econs 2; eauto. destruct e0; ss. *)
-    (*   - destruct e0; ss. econs 1; eauto. *)
-    (* Qed. *)
   End RAConfiguration.
 End RAConfiguration.
 
@@ -214,19 +201,13 @@ Module RARace.
   Section RARace.
     Variable L: Loc.t -> bool.
 
-    (* Definition racefree (s: Threads.syntax): Prop := *)
-    (*   forall rels1 c *)
-    (*     tid lang st1 lc1 *)
-    (*     rels2 pf e loc to val released ord e2 e3 *)
-    (*     (CSTEPS: RATrace.configuration_steps L rels1 (Configuration.init s) c) *)
-    (*     (TID: IdentMap.find tid c.(Configuration.threads) = Some (existT _ lang st1, lc1)) *)
-    (*     (STEPS: RATrace.thread_steps L lang rels2 *)
-    (*                                  (Thread.mk _ st1 lc1 c.(Configuration.sc) c.(Configuration.memory)) *)
-    (*                                  e2) *)
-    (*     (CONS: Local.promise_consistent e2.(Thread.local)) *)
-    (*     (STEP: OrdThread.step L Ordering.acqrel pf e e2 e3) *)
-    (*     (READ: ThreadEvent.is_reading e = Some (loc, to, val, released, ord)) *)
-    (*     (RACE: ra_race (rels2 ++ rels1) e2.(Thread.local).(Local.tview) loc to ord), *)
-    (*     False. *)
+    Definition racefree (rels: ReleaseWrites.t) (c: Configuration.t): Prop :=
+      forall e tid rels2 rels3 c2 c3
+        (STEPS: RAConfiguration.steps L rels rels2 c c2)
+        (STEP: RAConfiguration.step L e tid rels2 rels3 c2 c3),
+        False.
+
+    Definition racefree_syn (syn: Threads.syntax): Prop :=
+      racefree [] (Configuration.init syn).
   End RARace.
 End RARace.
