@@ -267,71 +267,95 @@ Qed.
 Definition certification_times (times : Loc.t -> list Time.t)
            (f: Loc.t -> nat -> (Time.t -> Time.t -> Prop))
            (max: TimeMap.t)
+           (maxmap: TimeMap.t)
            (loc: Loc.t) (fts: Time.t): Prop :=
   ((<<IN: List.In fts (times loc)>>) /\ (<<TS: Time.le fts (max loc)>>)) \/
   (exists ts n,
       (<<IN: List.In ts (times loc)>>) /\ (<<TS: Time.lt (max loc) ts>>)
-      /\ (<<MAX: Time.lt (max loc) (incr_time_seq n)>>)
+      /\ (<<MAX: Time.lt (maxmap loc) (incr_time_seq n)>>)
       /\ (<<MAP: f loc n ts fts>>)).
 
-Lemma certification_times_well_ordered times f max
+Lemma mapped_well_ordered f (times ftimes: Time.t -> Prop)
+      (MAPLT: mapping_map_lt_loc f)
+      (WO: well_ordered times)
+      (FTIMES: forall fts (IN: ftimes fts),
+          exists ts,
+            (<<MAP: f ts fts>>) /\
+            (<<TIMES: times ts>>))
+  :
+    well_ordered ftimes.
+Proof.
+  ii.
+  dup INHABITED. eapply SUB in INHABITED. dup INHABITED. eapply FTIMES in INHABITED. des.
+  exploit (WO (fun ts => exists fts, (<<MAP: f ts fts>>) /\ (<<TIMES: sub fts>>))).
+  { i. des. eapply SUB in TIMES0. eapply FTIMES in TIMES0. des.
+    destruct (Time.le_lt_dec x0 ts0).
+    { destruct l.
+      { exploit MAPLT.
+        { eapply MAP0. }
+        { eapply MAP1. } i. des.
+        exfalso. eapply Time.lt_strorder. eapply x1; eauto.
+      }
+      { inv H. auto. }
+    }
+    { exploit MAPLT.
+      { eapply MAP1. }
+      { eapply MAP0. } i. des.
+      exfalso. eapply Time.lt_strorder. eapply x1; eauto.
+    }
+  }
+  { eauto. }
+  { i. des. exists fts. splits; auto. i.
+    dup IN. eapply SUB in IN. dup IN. eapply FTIMES in IN. des.
+    exploit LEAST; eauto. i.
+    eapply mapping_map_lt_loc_map_le in x0; eauto.
+  }
+Qed.
+
+
+Lemma certification_times_well_ordered times f max maxmap tm
       (MAP: forall loc n
-                   (TS: Time.lt (max loc) (incr_time_seq n)),
+                   (TS: Time.lt (maxmap loc) (incr_time_seq n)),
           cap_flex_map_loc
             (max loc)
-            (Time.incr (max loc))
+            (tm loc)
             (incr_time_seq n) (times loc) (f loc n))
+      (TM: forall loc, Time.lt (maxmap loc) (tm loc))
+      (MAXMAP: TimeMap.le max maxmap)
   :
-    forall loc, well_ordered (certification_times times f max loc).
+    forall loc, well_ordered (certification_times times f max maxmap loc).
 Proof.
   i. hexploit (@increasing_join_well_ordered
                  incr_time_seq
                  (fun n fts =>
                     (exists ts,
-                        (<<IN: List.In ts (times loc)>>) /\ (<<TS: Time.lt (max loc) ts>>)
-                        /\ (<<MAX: Time.lt (max loc) (incr_time_seq n)>>)
+                        (<<IN: List.In ts (times loc)>>)
+                        /\ (<<TS: Time.lt (max loc) ts>>)
+                        /\ (<<MAX: Time.lt (maxmap loc) (incr_time_seq n)>>)
                         /\ (<<MAP: f loc n ts fts>>)))).
   { i. eapply incr_time_seq_lt; eauto. }
   { eapply incr_time_seq_diverge. }
   { i. des. exploit MAP; eauto. intros FLEXMAP.
     eapply (FLEXMAP.(cap_flex_map_loc_bound)); try apply MAP0. auto. }
-  { i. assert (INJ: forall (TS: Time.lt (max loc) (incr_time_seq n))
-                           ts fts0 fts1
-                           (MAP0: f loc n ts fts0)
-                           (MAP1: f loc n ts fts1),
-                  fts0 = fts1).
-    { i. specialize (MAP _ _ TS). eapply mapping_map_lt_loc_map_eq; eauto. eapply MAP. }
-    remember (times loc). clear MAP times Heql. induction l.
-    { eapply sub_well_ordered with (times0 := bot1).
-      { eapply empty_well_ordered. }
-      { i. des. ss. }
+  { i. destruct (classic (Time.lt (maxmap loc) (incr_time_seq n))).
+    { specialize (MAP _ _ H). eapply mapped_well_ordered.
+      { eapply MAP. }
+      { eapply (finite_well_ordered (times loc)). }
+      i. des. esplits; eauto.
     }
-    { destruct (classic (exists fts,
-                            (<<TS: Time.lt (max loc) a>>)
-                            /\ (<<MAX: Time.lt (max loc) (incr_time_seq n)>>)
-                            /\ (<<MAP: f loc n a fts>>))).
-      { des. eapply sub_well_ordered.
-        { eapply join_well_ordered.
-          { eapply IHl. }
-          { eapply (singleton_well_ordered fts). }
-        }
-        i. des. ss. des.
-        { subst. right. eapply INJ; eauto. }
-        { left. eauto. }
-      }
-      { eapply sub_well_ordered.
-        { eapply IHl. }
-        i. des. ss. des; eauto. subst.
-        exfalso. eapply H. esplits; eauto. }
+    { eapply sub_well_ordered.
+      { eapply empty_well_ordered. }
+      i. des; ss.
     }
   }
-  intros WO. eapply sub_well_ordered.
+
+  intros WO.
+  eapply sub_well_ordered.
   { eapply join_well_ordered.
     { eapply WO. }
     { eapply (finite_well_ordered (times loc)). }
   }
-  { i. unfold certification_times in *. des; eauto. left.
-    esplits; eauto. }
+  { i. unfold certification_times in *. des; eauto. left. esplits; eauto. }
 Qed.
 
 Lemma wf_time_evt_map times f te fte
@@ -346,36 +370,213 @@ Proof.
   { des. splits; eauto. }
 Qed.
 
+Inductive concrete_promise_max_ts mem prom loc ts: Prop :=
+| concrete_or_promise_max_ts_intro
+    (EXISTS:
+       (<<CONCRETE: exists from val released,
+           (<<GET: Memory.get loc ts mem = Some (from, Message.concrete val released)>>)>>) \/
+       (<<PROMISE: exists from msg, (<<GET: Memory.get loc ts prom = Some (from, msg)>>)>>))
+    (CONCRETE: forall to from val released
+                      (GET: Memory.get loc to mem = Some (from, Message.concrete val released)),
+        Time.le to ts)
+    (PROMISE: forall to from msg
+                     (GET: Memory.get loc to prom = Some (from, msg)),
+        Time.le to ts)
+.
+
+Lemma concrete_promise_max_ts_inj mem prom loc ts0 ts1
+      (MAX0: concrete_promise_max_ts mem prom loc ts0)
+      (MAX1: concrete_promise_max_ts mem prom loc ts1)
+  :
+    ts0 = ts1.
+Proof.
+  eapply TimeFacts.antisym.
+  { inv MAX0. des.
+    { eapply MAX1 in GET. auto. }
+    { eapply MAX1 in GET. auto. }
+  }
+  { inv MAX1. des.
+    { eapply MAX0 in GET. auto. }
+    { eapply MAX0 in GET. auto. }
+  }
+Qed.
+
+Lemma concrete_promise_max_ts_exists mem prom loc
+      (INHABITED: Memory.inhabited mem)
+  :
+    exists ts, (<<MAX: concrete_promise_max_ts mem prom loc ts>>).
+Proof.
+  exploit Memory.max_concrete_ts_exists; eauto. intros [max MAX].
+  exploit Memory.max_concrete_ts_spec.
+  { eapply MAX. }
+  { eapply INHABITED. } i. des.
+  destruct (classic (exists to from msg, (<<INHABITED: Memory.get loc to prom = Some (from, msg)>>))).
+  { des. eapply Cell.max_ts_spec in INHABITED0. des.
+    exists (Time.join max (Cell.max_ts (prom loc))). econs.
+    { unfold Time.join. des_ifs; eauto. left. eauto. }
+    { i. etrans; [|eapply Time.join_l].
+      eapply Memory.max_concrete_ts_spec in GET1; eauto. des. auto. }
+    { i. etrans; [|eapply Time.join_r].
+      eapply Cell.max_ts_spec in GET1; eauto. des. auto. }
+  }
+  { exists max. econs.
+    { left. eauto. }
+    { i. eapply Memory.max_concrete_ts_spec in GET0; eauto. des. auto. }
+    { i. exfalso. eauto. }
+  }
+Qed.
+
+Lemma concrete_promise_max_ts_max_ts mem prom loc ts
+      (MAX: concrete_promise_max_ts mem prom loc ts)
+      (MLE: Memory.le prom mem)
+  :
+    Time.le ts (Memory.max_ts loc mem).
+Proof.
+  inv MAX. des.
+  { eapply Memory.max_ts_spec; eauto. }
+  { eapply Memory.max_ts_spec; eauto. }
+Qed.
+
+Lemma concrete_promise_max_ts_max_concrete_ts mem prom loc ts max
+      (MAX: concrete_promise_max_ts mem prom loc ts)
+      (CONCRETE: Memory.max_concrete_ts mem loc max)
+  :
+    Time.le max ts.
+Proof.
+  inv CONCRETE. des. eapply MAX in GET; eauto.
+Qed.
+
+Definition concrete_promise_max_timemap mem prom tm: Prop :=
+  forall loc, concrete_promise_max_ts mem prom loc (tm loc).
+
+Lemma concrete_promise_max_timemap_inj mem prom tm0 tm1
+      (MAX0: concrete_promise_max_timemap mem prom tm0)
+      (MAX1: concrete_promise_max_timemap mem prom tm1)
+  :
+    tm0 = tm1.
+Proof.
+  extensionality loc.
+  eapply concrete_promise_max_ts_inj; eauto.
+Qed.
+
+Lemma concrete_promise_max_timemap_exists mem prom
+      (INHABITED: Memory.inhabited mem)
+  :
+    exists tm, (<<MAX: concrete_promise_max_timemap mem prom tm>>).
+Proof.
+  eapply choice. i. eapply concrete_promise_max_ts_exists; eauto.
+Qed.
+
+Lemma map_ident_concrete_promises mem prom tm (f: Loc.t -> Time.t -> Time.t -> Prop)
+      (MAX: concrete_promise_max_timemap mem prom tm)
+      (IDENT: forall loc ts (TS: Time.le ts (tm loc)), f loc ts ts)
+      (MAPLT: mapping_map_lt f)
+      (CLOSED: Memory.closed mem)
+      (MLE: Memory.le prom mem)
+  :
+    promises_map f prom prom.
+Proof.
+  assert (CONCRETE: map_ident_concrete f mem).
+  { ii. inv CONCRETE. eapply MAX in GET. auto. }
+  econs.
+  { i. exists to, from, msg. splits; auto.
+    { eapply mapping_map_lt_non_collapsable; eauto. }
+    { eapply IDENT. eapply MAX in GET; eauto. }
+    { eapply map_ident_concrete_closed_message; eauto.
+      eapply MLE in GET. eapply CLOSED; eauto. }
+  }
+  { i. exists fto, ffrom, fmsg. splits; auto.
+    { eapply IDENT. eapply MAX in GET; eauto. }
+    { eapply IDENT. transitivity fto.
+      { eapply memory_get_ts_le; eauto. }
+      { eapply MAX in GET; eauto. }
+    }
+  }
+Qed.
+
+
 Definition pf_consistent_flex lang (e0:Thread.t lang)
            (tr : Trace.t lang) (times : Loc.t -> list Time.t)
            (f: Loc.t -> nat -> (Time.t -> Time.t -> Prop))
   : Prop :=
-  (<<MAP: forall loc n
-                 (TS: Time.lt (Memory.max_ts loc e0.(Thread.memory)) (incr_time_seq n)),
-      cap_flex_map_loc
-        (Memory.max_ts loc e0.(Thread.memory))
-        (Time.incr (Memory.max_ts loc e0.(Thread.memory)))
-        (incr_time_seq n) (times loc) (f loc n)>>) /\
-  (<<CONSISTENT: forall mem1 (tm: Loc.t -> nat)
-                        (TM: forall loc, Time.lt (Memory.max_ts loc e0.(Thread.memory)) (incr_time_seq (tm loc)))
-                        (CAP: cap_flex e0.(Thread.memory) mem1 (fun loc => incr_time_seq (tm loc))),
-      exists ftr e1,
-        (<<STEPS: Trace.steps ftr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot mem1) e1>>) /\
-        (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free
-                                                    /1\ no_sc
-                                                    /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (incr_time_seq (tm loc))>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))
-                                                    /1\ wf_time_evt (fun loc => certification_times times f (Memory.max_timemap e0.(Thread.memory)) loc)
-                                                    /1\ no_read_msgs (fun loc ts => ~ (covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts \/ Time.lt (incr_time_seq (tm loc)) ts))) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) ftr >>) /\
-        (<<TRACE: List.Forall2 (fun em fem => tevent_map (fun loc => f loc (tm loc)) (snd fem) (snd em)) tr ftr>>) /\
-        (__guard__((exists st',
-                       (<<LOCAL: Local.failure_step e1.(Thread.local)>>) /\
-                       (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
-                   ((<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>) /\
-                    (<<WRITES: forall loc from to val released
-                                      (GET: Memory.get loc to e0.(Thread.local).(Local.promises) = Some (from, Message.concrete val released)),
-                        exists th e,
-                          (<<WRITING: promise_writing_event loc from to val released e>>) /\
-                          (<<IN: List.In (th, e) ftr>>)>>))))>>).
+  forall max
+         (MAX: concrete_promise_max_timemap
+                 (e0.(Thread.memory))
+                 (e0.(Thread.local).(Local.promises))
+                 max),
+    (<<MAP: forall loc n
+                   (TS: Time.lt (Memory.max_ts loc e0.(Thread.memory)) (incr_time_seq n)),
+        cap_flex_map_loc
+          (max loc)
+          (Time.incr (Memory.max_ts loc e0.(Thread.memory)))
+          (incr_time_seq n) (times loc) (f loc n)>>) /\
+    (<<CONSISTENT: forall mem1 (tm: Loc.t -> nat)
+                          (TM: forall loc, Time.lt (Memory.max_ts loc e0.(Thread.memory)) (incr_time_seq (tm loc)))
+                          (CAP: cap_flex e0.(Thread.memory) mem1 (fun loc => incr_time_seq (tm loc))),
+        exists ftr e1,
+          (<<STEPS: Trace.steps ftr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot mem1) e1>>) /\
+          (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free
+                                                      /1\ no_sc
+                                                      /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (incr_time_seq (tm loc))>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))
+                                                      /1\ wf_time_evt (fun loc => certification_times times f max (Memory.max_timemap e0.(Thread.memory)) loc)
+                                                      /1\ no_read_msgs (fun loc ts => ~ (covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts \/ Time.lt (incr_time_seq (tm loc)) ts))) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) ftr >>) /\
+          (<<TRACE: List.Forall2 (fun em fem => tevent_map (fun loc => f loc (tm loc)) (snd fem) (snd em)) tr ftr>>) /\
+          (__guard__((exists st',
+                         (<<LOCAL: Local.failure_step e1.(Thread.local)>>) /\
+                         (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
+                     ((<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>) /\
+                      (<<WRITES: forall loc from to val released
+                                        (GET: Memory.get loc to e0.(Thread.local).(Local.promises) = Some (from, Message.concrete val released)),
+                          exists th e,
+                            (<<WRITING: promise_writing_event loc from to val released e>>) /\
+                            (<<IN: List.In (th, e) ftr>>)>>))))>>).
+
+(* TODO: move it *)
+Lemma promise_writing_event_map loc to mem from val released f e fe
+      (CLOSED: Memory.closed mem)
+      (GET: Memory.get loc to mem = Some (from, Message.concrete val released))
+      (MAPLT: mapping_map_lt f)
+      (IDENT: forall loc' to' from' val' released' ts
+                     (GET: Memory.get loc' to' mem = Some (from', Message.concrete val' released'))
+                     (TS: Time.le ts to')
+        ,
+          f loc' ts ts)
+      (WRITING: promise_writing_event loc from to val released e)
+      (EVENT: tevent_map f fe e)
+  :
+    promise_writing_event loc from to val released fe.
+Proof.
+  assert (CONCRETE: map_ident_concrete f mem).
+  { ii. inv CONCRETE. eapply IDENT; eauto. refl. }
+  inv WRITING; inv EVENT.
+  { assert (to = fto).
+    { eapply mapping_map_lt_map_eq; eauto. eapply IDENT; eauto. refl. } subst.
+    assert (from' = ffrom).
+    { eapply mapping_map_lt_map_eq; eauto. } subst.
+    econs; eauto.
+    exploit opt_view_le_map.
+    { eapply mapping_map_lt_map_le; eauto. }
+    { eapply RELEASED0. }
+    { eapply CLOSED in GET. des. inv MSG_CLOSED.
+      eapply map_ident_concrete_closed_opt_view; eauto. }
+    { eauto. }
+    i. transitivity freleased'; auto.
+  }
+  { assert (to = fto).
+    { eapply mapping_map_lt_map_eq; eauto. eapply IDENT; eauto. refl. } subst.
+    assert (from' = ffrom).
+    { eapply mapping_map_lt_map_eq; eauto. } subst.
+    econs; eauto.
+    exploit opt_view_le_map.
+    { eapply mapping_map_lt_map_le; eauto. }
+    { eapply RELEASEDW. }
+    { eapply CLOSED in GET. des. inv MSG_CLOSED.
+      eapply map_ident_concrete_closed_opt_view; eauto. }
+    { eauto. }
+    i. transitivity freleasedw'; auto.
+  }
+Qed.
+
 
 Lemma pf_consistent_strong_aux_pf_consistent_flex lang (th: Thread.t lang)
       (WF: Local.wf th.(Thread.local) th.(Thread.memory))
@@ -386,6 +587,10 @@ Lemma pf_consistent_strong_aux_pf_consistent_flex lang (th: Thread.t lang)
 Proof.
   exploit Memory.cap_exists; eauto. i. des.
   exploit CONSISTENT; eauto. i. des. exists tr, times.
+  hexploit (@concrete_promise_max_timemap_exists
+              (th.(Thread.memory))
+              (th.(Thread.local).(Local.promises))).
+  { eapply MEM. } intros [max MAX]. des.
   hexploit (@choice
               (Loc.t * nat)
               (Time.t -> Time.t -> Prop)
@@ -394,26 +599,40 @@ Proof.
                  forall
                    (TS: Time.lt (Memory.max_ts loc th.(Thread.memory)) (incr_time_seq n)),
                    cap_flex_map_loc
-                     (Memory.max_ts loc th.(Thread.memory))
+                     (max loc)
                      (Time.incr (Memory.max_ts loc th.(Thread.memory)))
                      (incr_time_seq n) (times loc) f)).
   { intros [loc n].
     destruct (classic (Time.lt (Memory.max_ts loc th.(Thread.memory)) (incr_time_seq n))).
-    { des. hexploit cap_flex_map_loc_exists.
-      { eapply Time.incr_spec. }
-      { eapply H. }
+    { des. hexploit (@cap_flex_map_loc_exists
+                       (max loc)
+                       (Time.incr (Memory.max_ts loc (Thread.memory th)))
+                       (incr_time_seq n)).
+      { eapply TimeFacts.le_lt_lt.
+        { eapply concrete_promise_max_ts_max_ts; eauto. eapply WF. }
+        { eapply Time.incr_spec. }
+      }
+      { eapply TimeFacts.le_lt_lt.
+        { eapply concrete_promise_max_ts_max_ts; eauto. eapply WF. }
+        { auto. }
+      }
       i. des. eauto. }
     { exists bot2. i. exfalso. eapply H. auto. }
   }
-  intros [f SPEC]. des. exists (fun loc ts => f (loc, ts)). econs.
+  intros [f SPEC]. des. exists (fun loc ts => f (loc, ts)). ii.
+  assert (max0 = max).
+  { eapply concrete_promise_max_timemap_inj; eauto. } subst. econs.
   { ii. specialize (SPEC (loc, n)). ss. eauto. }
   ii. assert (MAP: cap_flex_map
-                     (Memory.max_timemap (Thread.memory th))
+                     max
                      (fun loc => Time.incr (Memory.max_ts loc (Thread.memory th)))
                      (fun loc => incr_time_seq (tm loc))
                      times (fun loc => f (loc, tm loc))).
   { eapply cap_flex_map_locwise. i.
     eapply (SPEC (loc, tm loc)). eauto. }
+
+  assert (IDENT: map_ident_concrete (fun loc => f (loc, tm loc)) th.(Thread.memory)).
+  { ii. inv CONCRETE. eapply MAX in GET. eapply MAP; eauto. }
   destruct e1. ss.
   hexploit trace_steps_map.
   { eapply mapping_map_lt_map_le. eapply MAP. }
@@ -436,14 +655,21 @@ Proof.
     eapply cap_flex_closed in CAP0; auto. eapply CAP0. }
   { eapply Memory.closed_timemap_bot.
     eapply Memory.cap_closed in CAP; auto. eapply CAP. }
-  { eapply map_ident_in_memory_local.
-    { ii. eapply MAP. eapply TS. }
-    { eapply MAP. }
-    { eauto. }
-    { eauto. }
-  }
-  { eapply concrete_messages_le_cap_flex_memory_map.
+  { econs.
     { refl. }
+    { eapply map_ident_concrete_closed_tview; eauto. eapply WF. }
+    { eapply map_ident_concrete_promises; eauto.
+      { i. eapply MAP; eauto. }
+      { eapply MAP. }
+      { eapply WF. }
+    }
+  }
+  { exploit (@Memory.max_concrete_timemap_exists th.(Thread.memory)).
+    { eapply MEM. } i. des.
+    eapply concrete_messages_le_cap_flex_memory_map.
+    { refl. }
+    { eauto. }
+    { ii. eapply concrete_promise_max_ts_max_concrete_ts; eauto. }
     { instantiate (1:=(fun loc => Time.incr (Memory.max_ts loc th.(Thread.memory)))).
       i. eapply Time.incr_spec. }
     { eapply TM. }
@@ -480,14 +706,15 @@ Proof.
       { eapply list_Forall2_in in H; eauto. des.
         eapply List.Forall_forall in IN; eauto. ss. des.
         eapply wf_time_evt_map in EVENT; eauto. eapply wf_time_evt_mon; try apply EVENT.
-        i. ss. des. destruct (Time.le_lt_dec ts (Memory.max_timemap (Thread.memory th) x0)).
+        i. ss. des. destruct (Time.le_lt_dec ts (max x0)).
         { left. assert (ts = x2).
           { eapply mapping_map_lt_map_eq.
             { eapply MAP. }
             { ss. eapply MAP. eauto. }
             { eauto. }
           }
-          subst. eauto. }
+          subst. splits; auto.
+        }
         { right. esplits; eauto. }
       }
       { eapply List.Forall_forall in NOREAD; eauto.
@@ -529,7 +756,7 @@ Proof.
         eapply promise_writing_event_map; eauto.
         { inv WF. eapply PROMISES0 in GET. eauto. }
         { eapply MAP. }
-        { ii. eapply MAP. auto. }
+        { ii. ss. eapply MAP. eapply MAX in GET0. etrans; eauto. }
       }
     }
   }
@@ -539,36 +766,41 @@ Definition pf_consistent_flex_aux lang (e0:Thread.t lang)
            (tr : Trace.t lang) (times : Loc.t -> list Time.t)
            (f: Loc.t -> nat -> (Time.t -> Time.t -> Prop))
   : Prop :=
-  (<<MAP: forall loc n
-                 (TS: Time.lt (Memory.max_ts loc e0.(Thread.memory)) (incr_time_seq n)),
-      cap_flex_map_loc
-        (Memory.max_ts loc e0.(Thread.memory))
-        (Time.incr (Memory.max_ts loc e0.(Thread.memory)))
-        (incr_time_seq n) (times loc) (f loc n)>>) /\
-  (<<CONSISTENT: forall mem1
-                        (tm: Loc.t -> nat)
-                        (FUTURE: Memory.future_weak e0.(Thread.memory) mem1)
-                        (CLOSED: Memory.closed mem1)
-                        (LOCAL: Local.wf e0.(Thread.local) mem1)
-                        (TM0: forall loc, Time.lt (Memory.max_ts loc e0.(Thread.memory)) (incr_time_seq (tm loc)))
-                        (TM1: forall loc, Time.lt (Memory.max_ts loc mem1) (incr_time_seq (tm loc))),
-      exists ftr e1,
-        (<<STEPS: Trace.steps ftr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot mem1) e1>>) /\
-        (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free
-                                                    /1\ no_sc
-                                                    /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (incr_time_seq (tm loc))>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))
-                                                    /1\ no_read_msgs (fun loc ts => ~ (covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts \/ Time.lt (incr_time_seq (tm loc)) ts))
-                                                    /1\ wf_time_evt (fun loc => certification_times times f (Memory.max_timemap e0.(Thread.memory)) loc)) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) ftr >>) /\
-        (<<TRACE: List.Forall2 (fun em fem => tevent_map (fun loc => f loc (tm loc)) (snd fem) (snd em)) tr ftr>>) /\
-        (__guard__((exists st',
-                       (<<LOCAL: Local.failure_step e1.(Thread.local)>>) /\
-                       (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
-                   ((<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>) /\
-                    (<<WRITES: forall loc from to val released
-                                      (GET: Memory.get loc to e0.(Thread.local).(Local.promises) = Some (from, Message.concrete val released)),
-                        exists th e,
-                          (<<WRITING: promise_writing_event loc from to val released e>>) /\
-                          (<<IN: List.In (th, e) ftr>>)>>))))>>).
+  forall max
+         (MAX: concrete_promise_max_timemap
+                 (e0.(Thread.memory))
+                 (e0.(Thread.local).(Local.promises))
+                 max),
+    (<<MAP: forall loc n
+                   (TS: Time.lt (Memory.max_ts loc e0.(Thread.memory)) (incr_time_seq n)),
+        cap_flex_map_loc
+          (max loc)
+          (Time.incr (Memory.max_ts loc e0.(Thread.memory)))
+          (incr_time_seq n) (times loc) (f loc n)>>) /\
+    (<<CONSISTENT: forall mem1
+                          (tm: Loc.t -> nat)
+                          (FUTURE: Memory.future_weak e0.(Thread.memory) mem1)
+                          (CLOSED: Memory.closed mem1)
+                          (LOCAL: Local.wf e0.(Thread.local) mem1)
+                          (TM0: forall loc, Time.lt (Memory.max_ts loc e0.(Thread.memory)) (incr_time_seq (tm loc)))
+                          (TM1: forall loc, Time.lt (Memory.max_ts loc mem1) (incr_time_seq (tm loc))),
+        exists ftr e1,
+          (<<STEPS: Trace.steps ftr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot mem1) e1>>) /\
+          (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free
+                                                      /1\ no_sc
+                                                      /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (incr_time_seq (tm loc))>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))
+                                                      /1\ no_read_msgs (fun loc ts => ~ (covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts \/ Time.lt (incr_time_seq (tm loc)) ts))
+                                                      /1\ wf_time_evt (fun loc => certification_times times f max (Memory.max_timemap e0.(Thread.memory)) loc)) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) ftr >>) /\
+          (<<TRACE: List.Forall2 (fun em fem => tevent_map (fun loc => f loc (tm loc)) (snd fem) (snd em)) tr ftr>>) /\
+          (__guard__((exists st',
+                         (<<LOCAL: Local.failure_step e1.(Thread.local)>>) /\
+                         (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
+                     ((<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>) /\
+                      (<<WRITES: forall loc from to val released
+                                        (GET: Memory.get loc to e0.(Thread.local).(Local.promises) = Some (from, Message.concrete val released)),
+                          exists th e,
+                            (<<WRITING: promise_writing_event loc from to val released e>>) /\
+                            (<<IN: List.In (th, e) ftr>>)>>))))>>).
 
 Lemma pf_consistent_flex_pf_consistent_flex_aux lang (th: Thread.t lang) tr times f
       (WF: Local.wf th.(Thread.local) th.(Thread.memory))
@@ -577,7 +809,7 @@ Lemma pf_consistent_flex_pf_consistent_flex_aux lang (th: Thread.t lang) tr time
   :
     pf_consistent_flex_aux th tr times f.
 Proof.
-  unfold pf_consistent_flex in *. des. econs; eauto.
+  ii. specialize (CONSISTENT _ MAX). des. econs; eauto.
   ii. exploit (@cap_flex_exists th.(Thread.memory) (fun loc => incr_time_seq (tm loc))); eauto. i. des.
   exploit CONSISTENT0; eauto. i. des. destruct e1. ss.
   hexploit trace_steps_map.
@@ -644,19 +876,27 @@ Definition pf_consistent_super_strong lang (e0:Thread.t lang)
            (tr : Trace.t lang)
            (times: Loc.t -> (Time.t -> Prop))
   : Prop :=
-  forall mem1 tm sc
+  forall mem1 tm sc max
          (FUTURE: Memory.future_weak e0.(Thread.memory) mem1)
          (CLOSED: Memory.closed mem1)
-         (LOCAL: Local.wf e0.(Thread.local) mem1),
+         (LOCAL: Local.wf e0.(Thread.local) mem1)
+         (MAX: concrete_promise_max_timemap
+                 (e0.(Thread.memory))
+                 (e0.(Thread.local).(Local.promises))
+                 max),
   exists ftr e1 f,
     (<<STEPS: Trace.steps ftr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc mem1) e1>>) /\
     (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free
                                                 /1\ no_sc
                                                 /1\ no_read_msgs (fun loc ts => ~ (covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts \/ Time.lt (tm loc) ts))
+                                                /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (tm loc)>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))
                                                 /1\ wf_time_evt times) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) ftr >>) /\
     (<<MAPLT: mapping_map_lt f>>) /\
-    (<<MAPIDENT: map_ident_in_memory f e0.(Thread.memory)>>) /\
-    (<<BOUND: forall loc ts fts (TS: Time.lt (Memory.max_ts loc e0.(Thread.memory)) ts) (MAP: f loc ts fts),
+    (<<MAPIDENT: forall loc ts fts
+                     (TS: Time.le fts (max loc))
+                     (MAP: f loc ts fts),
+        ts = fts>>) /\
+    (<<BOUND: forall loc ts fts (TS: Time.lt (max loc) fts) (MAP: f loc ts fts),
         Time.le (tm loc) fts>>) /\
     (<<TRACE: List.Forall2 (fun em fem => tevent_map f (snd fem) (snd em)) tr ftr>>) /\
     (<<GOOD: good_future tm mem1 e1.(Thread.memory)>>) /\
@@ -680,14 +920,23 @@ Lemma pf_consistent_flex_aux_pf_consistent_super_strong lang (th: Thread.t lang)
       (<<WO: forall loc, well_ordered (certimes loc)>>) /\
       (<<CONSISTENT: pf_consistent_super_strong th tr certimes>>).
 Proof.
-  unfold pf_consistent_flex_aux in *. des.
-  exists (certification_times times f (Memory.max_timemap th.(Thread.memory))). splits.
-  { eapply certification_times_well_ordered. eauto. }
-  ii. assert (TM: exists (ftm: Loc.t -> nat),
-                 forall loc,
-                   (<<TM0: Time.lt (Memory.max_ts loc th.(Thread.memory)) (incr_time_seq (ftm loc))>>) /\
-                   (<<TM1: Time.lt (Memory.max_ts loc mem1) (incr_time_seq (ftm loc))>>) /\
-                   (<<TM2: Time.le (tm loc) (incr_time_seq (ftm loc))>>)).
+  hexploit (@concrete_promise_max_timemap_exists
+              (th.(Thread.memory))
+              (th.(Thread.local).(Local.promises))).
+  { eapply MEM. } intros [max MAX]. specialize (CONSISTENT _ MAX). des.
+  exists (certification_times times f max (Memory.max_timemap th.(Thread.memory))). splits.
+  { eapply certification_times_well_ordered; eauto.
+    { i. eapply MAP. auto. }
+    { i. ss. eapply Time.incr_spec. }
+    { ii. eapply concrete_promise_max_ts_max_ts; eauto. eapply WF. }
+  }
+  ii. assert (max0 = max).
+  { eapply concrete_promise_max_timemap_inj; eauto. } subst.
+  assert (TM: exists (ftm: Loc.t -> nat),
+             forall loc,
+               (<<TM0: Time.lt (Memory.max_ts loc th.(Thread.memory)) (incr_time_seq (ftm loc))>>) /\
+               (<<TM1: Time.lt (Memory.max_ts loc mem1) (incr_time_seq (ftm loc))>>) /\
+               (<<TM2: Time.le (tm loc) (incr_time_seq (ftm loc))>>)).
   { eapply (choice
               (fun loc n =>
                  (<<TM0: Time.lt (Memory.max_ts loc th.(Thread.memory)) (incr_time_seq n)>>) /\
@@ -721,7 +970,7 @@ Proof.
   eapply no_sc_any_sc_traced in STEPS; ss; cycle 1.
   { eapply List.Forall_impl; eauto. i. ss. des. auto. } i. des.
   assert (CAP: cap_flex_map
-                 (Memory.max_timemap (Thread.memory th))
+                 max
                  (fun loc : Loc.t => Time.incr (Memory.max_ts loc (Thread.memory th))) (fun loc => incr_time_seq (ftm loc)) times (fun loc => f loc (ftm loc))).
   { eapply cap_flex_map_locwise. i. eapply MAP. eapply TM. }
   eexists tr_src, _, (fun loc => f loc (ftm loc)).
@@ -729,13 +978,33 @@ Proof.
   { eapply List.Forall_forall. i.
     eapply list_Forall2_in2 in H; eauto. des. rewrite SAT.
     eapply List.Forall_forall in EVENTS; eauto. ss. des. splits; auto.
-    eapply no_read_msgs_mon; eauto. i. ss. ii. eapply PR. des; auto.
-    right. right. eapply TimeFacts.le_lt_lt; eauto. eapply TM. }
+    { eapply no_read_msgs_mon; eauto. i. ss. ii. eapply PR. des; auto.
+      right. right. eapply TimeFacts.le_lt_lt; eauto. eapply TM. }
+    { eapply write_not_in_mon; eauto. i. ss. des. split; auto.
+      red. etrans; eauto. eapply TM. }
+  }
   { eapply CAP. }
-  { ii. eapply CAP. auto. }
-  { i. transitivity (incr_time_seq (ftm loc)).
-    { apply TM. }
-    { eapply CAP; eauto. }
+  { i. destruct (Time.le_lt_dec ts (max loc)).
+    { eapply CAP in l. eapply mapping_map_lt_map_eq.
+      { eapply CAP. }
+      { ss. eauto. }
+      { ss. }
+    }
+    { eapply CAP.(cap_flex_map_bound) in l; eauto.
+      exfalso. eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt.
+      { eapply l. } eapply TimeFacts.le_lt_lt.
+      { eapply TS. } eapply TimeFacts.le_lt_lt.
+      { eapply concrete_promise_max_ts_max_ts; eauto. eapply WF. }
+      { eapply TM. }
+    }
+  }
+  { i. destruct (Time.le_lt_dec ts (max loc)).
+    { dup l. eapply CAP in l. exploit mapping_map_lt_map_eq.
+      { eapply CAP. }
+      { eapply MAP0. }
+      { eapply l. }
+      i. subst. timetac. }
+    { eapply CAP.(cap_flex_map_bound) in l; eauto. etrans; eauto. eapply TM. }
   }
   { eapply list_Forall2_rev in EVENTS0.
     eapply list_Forall2_compose; eauto. i. ss. rewrite SAT1. auto. }
@@ -775,10 +1044,15 @@ Lemma pf_consistent_super_strong_consistent lang (th: Thread.t lang)
   :
     Thread.consistent th.
 Proof.
+  hexploit (@concrete_promise_max_timemap_exists
+              (th.(Thread.memory))
+              (th.(Thread.local).(Local.promises))).
+  { eapply MEM. } intros [max MAX]. des.
   ii. exploit (CONSISTENT mem1 sc1 sc1).
   { eapply Memory.cap_future_weak; eauto. }
   { eapply Memory.cap_closed; eauto. }
   { eapply Local.cap_wf; eauto. }
+  { eauto. }
   i. des.
   eapply pred_steps_trace_steps2 in STEPS; cycle 1.
   { instantiate (1:=fun _ => True). eapply List.Forall_impl; eauto.
@@ -799,4 +1073,326 @@ Proof.
   ii. exploit CONSISTENT; eauto. i. des. esplits; eauto.
   eapply List.Forall_impl; eauto. i. ss. des. splits; auto.
   eapply wf_time_evt_mon; eauto.
+Qed.
+
+
+Lemma good_future_future_future mem0 mem_good0 mem_good1 tm
+      (f0: Loc.t -> Time.t -> Time.t -> Prop)
+      (IDENT: forall loc to fto (MAP: f0 loc to fto), to = fto)
+      (MAPBOT: mapping_map_bot f0)
+      (GOOD: memory_map f0 mem0 mem_good0)
+      (FUTURE: Memory.future_weak mem_good0 mem_good1)
+      (CLOSED: Memory.closed mem0)
+      (TM0: forall loc, Time.lt (Memory.max_ts loc mem_good1) (tm loc))
+      (TM1: forall loc, Time.lt (Memory.max_ts loc mem0) (tm loc))
+  :
+    exists mem1,
+      (<<CAP: cap_flex mem0 mem1 tm>>) /\
+      (<<MAP: memory_map ident_map mem1 mem_good1>>).
+Proof.
+  exploit (@cap_flex_exists mem0 tm); eauto. intros [mem1 CAP].
+  exists mem1. splits; auto. econs.
+  { i. eapply cap_flex_inv in GET; eauto. des; auto.
+    apply GOOD in GET. des; auto. destruct fmsg as [val freleased|]; cycle 1.
+    { inv MSGLE. inv MSG. auto. }
+    eapply Memory.future_weak_get1 in GET; eauto. des.
+    dup MSG. dup MSGLE. dup MSG_LE.
+    inv MSG; inv MSGLE; inv MSG_LE; auto.
+    right. esplits; cycle 3.
+    { eauto. }
+    { eapply IDENT; eauto. }
+    { eapply message_map_incr; eauto. }
+    { econs; eauto. }
+  }
+  { i. left. exists (tm loc), Time.bot, (tm loc), Time.bot. splits; ss.
+    { eapply Time.bot_spec. }
+    { eapply Memory.max_ts_spec in GET. des. left.
+      eapply TimeFacts.le_lt_lt; eauto. }
+    { i. erewrite cap_flex_covered in ITV; eauto. }
+  }
+Qed.
+
+Lemma promises_ident_map_covered f prom_src prom_tgt
+      (PROMISES: promises_map f prom_src prom_tgt)
+      (IDENT: forall loc to fto (MAP: f loc to fto), to = fto)
+      loc ts
+  :
+    covered loc ts prom_src <-> covered loc ts prom_tgt.
+Proof.
+  split; i.
+  { inv H. dup GET. eapply PROMISES in GET; eauto. des.
+    dup GET. eapply PROMISES in GET. des. clarify.
+    eapply IDENT in FROM. eapply IDENT in TO0. subst. eapply IDENT in TO. subst.
+    clarify. econs; eauto. }
+  { inv H. eapply PROMISES in GET. des. eapply IDENT in TO. eapply IDENT in FROM. subst.
+    econs; eauto. }
+Qed.
+
+Lemma memory_ident_map_concrete f mem fmem
+      (MEM: memory_map f mem fmem)
+      (IDENT: forall loc to fto (MAP: f loc to fto), to = fto)
+      loc ts
+      (CONCRETE: concrete_promised mem loc ts)
+  :
+    concrete_promised fmem loc ts.
+Proof.
+  inv CONCRETE. eapply MEM in GET. des; ss.
+  eapply IDENT in TO. subst. inv MSG. inv MSGLE. econs; eauto.
+Qed.
+
+Lemma timemap_ident_map f tm ftm
+      (MAP: timemap_map f tm ftm)
+      (IDENT: forall loc to fto (MAP: f loc to fto), to = fto)
+  :
+    tm = ftm.
+Proof.
+  extensionality loc. specialize (MAP loc). eapply IDENT in MAP. auto.
+Qed.
+
+Lemma view_ident_map f vw fvw
+      (MAP: view_map f vw fvw)
+      (IDENT: forall loc to fto (MAP: f loc to fto), to = fto)
+  :
+    vw = fvw.
+Proof.
+  destruct vw, fvw. inv MAP. f_equal.
+  { eapply timemap_ident_map; eauto. }
+  { eapply timemap_ident_map; eauto. }
+Qed.
+
+Lemma opt_view_ident_map f vw fvw
+      (MAP: opt_view_map f vw fvw)
+      (IDENT: forall loc to fto (MAP: f loc to fto), to = fto)
+  :
+    vw = fvw.
+Proof.
+  inv MAP; auto. f_equal. eapply view_ident_map; eauto.
+Qed.
+
+Lemma memory_ident_map_concrete_max f mem fmem
+      (MEM: memory_map f mem fmem)
+      (IDENT: forall loc to fto (MAP: f loc to fto), to = fto)
+      loc max fmax
+      (CLOSED: Memory.closed mem)
+      (MAX: Memory.max_concrete_ts mem loc max)
+      (FMAX: Memory.max_concrete_ts fmem loc fmax)
+  :
+    Time.le max fmax.
+Proof.
+  eapply Memory.max_concrete_ts_spec in MAX; eauto.
+  { des. eapply MEM in GET. des; ss. inv MSG. inv MSGLE.
+    eapply Memory.max_concrete_ts_spec in GET; eauto. des.
+    eapply IDENT in TO. subst. auto. }
+  { eapply CLOSED. }
+Qed.
+
+Lemma memory_ident_map_concrete_promise_max_timemap
+      f mem_src mem_tgt prom_src prom_tgt tm_src tm_tgt
+      (MAXSRC: concrete_promise_max_timemap mem_src prom_src tm_src)
+      (MAXTGT: concrete_promise_max_timemap mem_tgt prom_tgt tm_tgt)
+      (LOCAL: promises_map f prom_tgt prom_src)
+      (MEM: memory_map f mem_tgt mem_src)
+      (IDENT: forall loc to fto (MAP: f loc to fto), to = fto)
+  :
+    TimeMap.le tm_tgt tm_src.
+Proof.
+  ii. specialize (MAXTGT loc). inv MAXTGT. des.
+  { eapply MEM in GET. des; ss.
+    eapply IDENT in TO. subst. inv MSG. inv MSGLE.
+    eapply MAXSRC in GET. auto. }
+  { eapply LOCAL in GET. des; ss.
+    eapply IDENT in TO. subst.
+    eapply MAXSRC in GET. auto. }
+Qed.
+
+Lemma good_future_consistent times lang st lc_src lc_tgt sc_src sc_tgt mem_src mem_tgt tr
+      (f: Loc.t -> Time.t -> Time.t -> Prop)
+      (CONSISTENT: pf_consistent_super_strong
+                     (Thread.mk lang st lc_tgt sc_tgt mem_tgt)
+                     tr times)
+      (IDENT: forall loc to fto (MAP: f loc to fto), to = fto)
+      (MAPBOT: mapping_map_bot f)
+      (LOCALSRC: Local.wf lc_src mem_src)
+      (LOCALTGT: Local.wf lc_tgt mem_tgt)
+      (MEMSRC: Memory.closed mem_src)
+      (MEMTGT: Memory.closed mem_tgt)
+      (LOCAL: local_map f lc_tgt lc_src)
+      (MEM: memory_map f mem_tgt mem_src)
+  :
+    pf_consistent_super_strong (Thread.mk lang st lc_src sc_src mem_src) tr times.
+Proof.
+  ii. ss.
+  set (tm0 := TimeMap.join tm
+                           (fun loc => Time.incr
+                                         (Time.join
+                                            (max loc)
+                                            (Time.join
+                                               (Memory.max_ts loc mem1)
+                                               (Memory.max_ts loc mem_tgt))))).
+  assert (TM0: forall loc, Time.lt (Memory.max_ts loc mem1) (tm0 loc)).
+  { i. unfold tm0. eapply TimeFacts.le_lt_lt.
+    { eapply Time.join_l. } eapply TimeFacts.le_lt_lt.
+    { eapply Time.join_r. } eapply TimeFacts.lt_le_lt.
+    { eapply Time.incr_spec. }
+    { eapply Time.join_r. }
+  }
+  assert (TM1: forall loc, Time.lt (Memory.max_ts loc mem_tgt) (tm0 loc)).
+  { i. unfold tm0. eapply TimeFacts.le_lt_lt.
+    { eapply Time.join_r. } eapply TimeFacts.le_lt_lt.
+    { eapply Time.join_r. } eapply TimeFacts.lt_le_lt.
+    { eapply Time.incr_spec. }
+    { eapply Time.join_r. }
+  }
+  assert (TM2: TimeMap.le tm tm0).
+  { eapply TimeMap.join_l. }
+  assert (TM3: forall loc, Time.lt (max loc) (tm0 loc)).
+  { i. unfold tm0. eapply TimeFacts.le_lt_lt.
+    { eapply Time.join_l. } eapply TimeFacts.lt_le_lt.
+    { eapply Time.incr_spec. }
+    { eapply Time.join_r. }
+  }
+  exploit good_future_future_future; eauto. i. des.
+  exploit (@concrete_promise_max_timemap_exists mem_tgt lc_tgt.(Local.promises)).
+  { eapply MEMTGT. } intros [max_tgt MAXTGT].
+  assert (MAXMAP: TimeMap.le max_tgt max).
+  { eapply memory_ident_map_concrete_promise_max_timemap; eauto.
+    eapply LOCAL. }
+
+  exploit (CONSISTENT mem0 tm0 TimeMap.bot); eauto.
+  { ss. eapply cap_flex_future_weak; eauto. }
+  { eapply cap_flex_closed; eauto. }
+  { ss. eapply cap_flex_wf; eauto. }
+  ss. i. des. destruct e1. ss.
+  hexploit trace_steps_map.
+  { eapply ident_map_le; eauto. }
+  { eapply ident_map_bot; eauto. }
+  { eapply ident_map_eq; eauto. }
+  { eapply List.Forall_forall. i. eapply ident_map_mappable_evt. }
+  { eauto. }
+  { ss. }
+  { ss. }
+  { ss. }
+  { eapply cap_flex_wf; eauto. }
+  { eapply LOCAL0. }
+  { eauto. }
+  { eapply cap_flex_closed; eauto. }
+  { eapply Memory.closed_timemap_bot. eapply CLOSED. }
+  { eapply Memory.closed_timemap_bot.
+    eapply cap_flex_closed in CAP; eauto. eapply CAP. }
+  { eapply local_map_incr; eauto. eapply ident_map_lt; eauto. }
+  { eauto. }
+  { eapply mapping_map_lt_collapsable_unwritable; eauto. eapply ident_map_lt. }
+  { eapply ident_map_timemap. }
+  { refl. }
+  i. des.
+  exploit no_sc_any_sc_traced; try apply STEPS0; eauto.
+  { eapply List.Forall_forall. i.
+    eapply list_Forall2_in in H; eauto. des. destruct a, x. ss.
+    eapply List.Forall_forall in IN; eauto. ss. des. inv EVENT; ss. }
+  i. des. exists tr_src.
+  assert (NOTIN: List.Forall
+                   (fun em =>
+                      ((((promise_free (snd em) /\ no_sc (snd em)) /\
+                         no_read_msgs
+                           (fun loc ts =>
+                              ~
+                                (covered loc ts (Local.promises lc_src) \/
+                                 concrete_promised mem_src loc ts \/ Time.lt (tm loc) ts))
+                           (snd em)) /\
+                        write_not_in
+                          (fun loc ts =>
+                             Time.le ts (tm0 loc) /\ ~ covered loc ts (Local.promises lc_src))
+                          (snd em)) /\ wf_time_evt times (snd em)) /\
+                      ThreadEvent.get_machine_event (snd em) = MachineEvent.silent) tr_src).
+  { eapply List.Forall_forall. i.
+    eapply list_Forall2_in2 in H; eauto. des. clear EVENTS0.
+    eapply list_Forall2_in in IN; eauto. des.
+    eapply List.Forall_forall in IN0; eauto. ss. des.
+    destruct a, b, x. ss. subst. inv EVENT; splits; ss.
+    { inv KIND; ss. inv MSG0; ss. inv MSG; ss. inv MAP1; ss. }
+    { inv KIND; ss. inv FROM. inv TO. ii. eapply SAT2; eauto. des. split; auto.
+      inv LOCAL. erewrite <- promises_ident_map_covered in H0; eauto. }
+    { inv FROM. inv TO. des. splits; auto. }
+    { inv TO. apply NNPP in SAT3. ii. apply H. des; auto.
+      { inv LOCAL. erewrite promises_ident_map_covered in SAT3; eauto. }
+      { eapply memory_ident_map_concrete in SAT3; eauto. }
+      { right. right. eapply TimeFacts.le_lt_lt; eauto. }
+    }
+    { inv FROM. inv TO. ii. eapply SAT2; eauto. des. split; auto.
+      inv LOCAL. erewrite <- promises_ident_map_covered in H0; eauto. }
+    { inv FROM. inv TO. des. splits; auto. }
+    { inv TO. inv FROM. apply NNPP in SAT3. ii. apply H. des; auto.
+      { inv LOCAL. erewrite promises_ident_map_covered in SAT3; eauto. }
+      { eapply memory_ident_map_concrete in SAT3; eauto. }
+      { right. right. eapply TimeFacts.le_lt_lt; eauto. }
+    }
+    { inv FROM. inv TO. ii. eapply SAT2; eauto. des. split; auto.
+      inv LOCAL. erewrite <- promises_ident_map_covered in H0; eauto. }
+    { inv FROM. inv TO. auto. }
+  }
+  esplits; eauto; ss.
+  { eapply List.Forall_impl; eauto. i. ss. des. splits; auto.
+    eapply write_not_in_mon; eauto. i. ss. des. split; auto. etrans; eauto. }
+  { i. destruct (Time.le_lt_dec fts (max_tgt loc)); eauto.
+    dup l. exploit BOUND; eauto.
+    i. exfalso. eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt.
+    { eapply x. } eapply TimeFacts.le_lt_lt.
+    { eapply TS. } eauto.
+  }
+  { i. exploit BOUND.
+    { eapply TimeFacts.le_lt_lt.
+      { eapply MAXMAP. }
+      { eapply TS. }
+    }
+    { eauto. }
+    { i. etrans; eauto. }
+  }
+  { eapply list_Forall2_rev in EVENTS0.
+    eapply list_Forall2_compose.
+    { eapply TRACE. }
+    { eapply list_Forall2_compose.
+      { eauto. }
+      { eauto. }
+      i. simpl in *. des. rewrite <- SAT1 in *.
+      instantiate (1:=fun em fem : Thread.t lang * ThreadEvent.t => tevent_map ident_map (snd fem) (snd em)).
+      auto. }
+    { i. ss. eapply ident_map_compose_tevent; eauto. }
+  }
+  { eapply write_not_in_good_future_traced in STEPS0; ss.
+    { eapply good_future_mon; eauto. }
+    { eapply Memory.closed_timemap_bot; eauto. apply CLOSED. }
+    { eapply List.Forall_forall. i.
+      eapply list_Forall2_in in H; eauto. des. rewrite <- SAT.
+      eapply List.Forall_forall in NOTIN; eauto. ss. des.
+      eapply write_not_in_mon; eauto. i. ss. des. split; auto.
+      ii. eapply PROM. eapply memory_le_covered; eauto. eapply LOCAL0. }
+  }
+  { eapply no_sc_same_sc_traced in STEPS1; eauto.
+    eapply List.Forall_impl; eauto. i. ss. des. auto. }
+  { unguard. des.
+    { left. esplits; eauto. eapply failure_step_map; eauto.
+      { eapply ident_map_le. }
+      { eapply ident_map_eq. }
+    }
+    { inv LOCAL1. right. esplits; eauto.
+      { erewrite PROMISES in *.
+        eapply bot_promises_map in PROMISES0; eauto. }
+      { i. dup GET. eapply LOCAL in GET. des. dup GET.
+        eapply LOCAL in GET; eauto. des.
+        eapply IDENT in TO. eapply IDENT in TO0. eapply IDENT in FROM. subst. clarify.
+        inv MSG. exploit WRITES; eauto. i. des.
+        eapply list_Forall2_in2 in IN; eauto. des.
+        eapply list_Forall2_in in IN0; eauto. des.
+        destruct a, b. ss. subst. esplits; eauto.
+        dup GET0. eapply LOCAL0 in GET0.
+        eapply promise_writing_event_map; try apply GET0; try apply EVENT; eauto.
+        { eapply ident_map_lt. }
+        { ii. refl. }
+        { eapply promise_writing_event_mon in WRITING; eauto.
+          { refl. }
+          { eapply opt_view_ident_map in MAP0; auto. subst. refl. }
+        }
+      }
+    }
+  }
 Qed.

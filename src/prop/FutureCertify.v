@@ -125,6 +125,8 @@ Module FutureCertify.
       future_certify e.
     Proof.
       eapply consistent_pf_consistent_super_strong in CONSISTENT; eauto. des.
+      exploit (@concrete_promise_max_timemap_exists e.(Thread.memory) e.(Thread.local).(Local.promises)).
+      { eapply MEMORY. } i. des.
       ii. exploit (CONSISTENT0 mem1 TimeMap.bot sc1); eauto. i. des.
       eapply Trace.silent_steps_tau_steps in STEPS; cycle 1.
       { eapply List.Forall_impl; eauto. i. ss. des. auto. }
