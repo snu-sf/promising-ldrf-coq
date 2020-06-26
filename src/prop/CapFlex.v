@@ -424,15 +424,16 @@ Section CAPFLEX.
   Qed.
 
   Lemma concrete_messages_le_cap_flex_memory_map
-        mem0 mem1 tm0 tm1 cap0 cap1 times f
+        mem0 mem1 max tm0 tm1 cap0 cap1 times f
         (CONCRETE: concrete_messages_le mem0 mem1)
         (TM0: forall loc, Time.lt (Memory.max_ts loc mem0) (tm0 loc))
         (TM1: forall loc, Time.lt (Memory.max_ts loc mem1) (tm1 loc))
+        (TM2: TimeMap.le (Memory.max_timemap mem0) max)
         (CAP0: cap_flex mem0 cap0 tm0)
         (CAP1: cap_flex mem1 cap1 tm1)
         (MEM0: Memory.closed mem0)
         (MEM1: Memory.closed mem1)
-        (MAP: cap_flex_map (Memory.max_timemap mem0) tm0 tm1 times f)
+        (MAP: cap_flex_map max tm0 tm1 times f)
     :
       memory_map f cap0 cap1.
   Proof.
@@ -443,7 +444,7 @@ Section CAPFLEX.
       destruct msg as [val released|]; auto. right.
       exploit CONCRETE; eauto. i. des. esplits.
       { eapply cap_flex_map_ident; eauto.
-        eapply Memory.max_ts_spec in GET. des. auto. }
+        eapply Memory.max_ts_spec in GET. des. etrans; eauto. }
       { eapply map_ident_in_memory_closed_message; eauto.
         eapply MEM0 in GET. des; auto. }
       { refl. }

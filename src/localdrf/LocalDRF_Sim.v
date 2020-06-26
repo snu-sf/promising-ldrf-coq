@@ -100,7 +100,18 @@ Definition pf_consistent_super_strong2 lang (e0:Thread.t lang)
                                                 /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (tm loc)>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))
                                                 /1\ wf_time_evt times) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) ftr >>) /\
     (<<MAPLT: mapping_map_lt f>>) /\
-    (<<MAPIDENT: map_ident_in_memory f mem1>>) /\
+    (<<MAPIDENT: forall loc ts fts
+                     (TS: Time.le fts (Memory.max_ts loc e0.(Thread.memory)))
+                     (MAP: f loc ts fts),
+        ts = fts>>) /\
+
+    (<<BOUND: forall loc ts fts (TS: Time.lt (Memory.max_ts loc e0.(Thread.memory)) ts) (MAP: f loc ts fts),
+        Time.le (tm loc) fts>>) /\
+
+    (* (<<MAPIDENT: forall loc ts max *)
+    (*                     (MAX: Memory.max_concrete_ts e0.(Thread.memory) loc max) *)
+    (*                     (TS: Time.le ts max), *)
+    (*     f loc ts ts>>) /\ *)
     (<<TRACE: List.Forall2 (fun em fem => tevent_map f (snd fem) (snd em)) tr ftr>>) /\
     (<<GOOD: good_future tm mem1 e1.(Thread.memory)>>) /\
     (<<SC: e1.(Thread.sc) = sc>>) /\
@@ -770,27 +781,23 @@ Section SIM.
         eapply List.Forall_forall in IN; eauto. ss.
         destruct x, a. ss. inv SAT; ss.
         { ii. replace fto with to in *; auto.
-          eapply mapping_map_lt_inj; eauto. eapply MAPIDENT.
+          eapply MAPIDENT; eauto.
           inv H. exploit sim_memory_forget_concrete_promised.
           { eapply MEMPF. }
           { econs; eauto. }
           intros GET. eapply sim_memory_concrete_promised_later in GET; eauto.
-          { des. etrans; eauto.
-            eapply memory_future_concrete_promised in PROMISED; eauto.
-            inv PROMISED. eapply Memory.max_ts_spec in GET. des. auto.
-          }
+          { des. etrans; eauto. inv PROMISED.
+            eapply Memory.max_ts_spec in GET; eauto. des. auto. }
           { eapply CONFIGTGT. }
         }
         { ii. replace ffrom with from in *; auto.
-          eapply mapping_map_lt_inj; eauto. eapply MAPIDENT.
+          eapply MAPIDENT; eauto.
           inv H. exploit sim_memory_forget_concrete_promised.
           { eapply MEMPF. }
           { econs; eauto. }
           intros GET. eapply sim_memory_concrete_promised_later in GET; eauto.
-          { des. etrans; eauto.
-            eapply memory_future_concrete_promised in PROMISED; eauto.
-            inv PROMISED. eapply Memory.max_ts_spec in GET. des. auto.
-          }
+          { des. etrans; eauto. inv PROMISED.
+            eapply Memory.max_ts_spec in GET; eauto. des. auto. }
           { eapply CONFIGTGT. }
         }
       }
@@ -804,7 +811,7 @@ Section SIM.
           eapply sim_memory_concrete_promised; eauto. }
         { right. apply NNPP in PR0. destruct PR0; auto. exfalso. eapply PR.
           inv LOCALPF. inv LOCALJOIN.
-          specialize (PROMISES x1 x2). set (CNT:=PROMS.(sim_promise_contents) x1 x2).
+          specialize (PROMISES x0 x2). set (CNT:=PROMS.(sim_promise_contents) x0 x2).
           inv CNT; ss. rewrite <- H2 in *. inv PROMISES.
           econs; eauto. econs; ss; [|refl].
           symmetry in H2. apply memory_get_ts_strong in H2. des; auto.
@@ -1210,29 +1217,65 @@ Section SIM.
       destruct x. dup H. eapply list_Forall2_in in H; eauto. des. destruct a. ss.
       eapply List.Forall_forall in IN0; eauto. ss.
       eapply List.Forall_forall in H0; eauto. ss. des. inv SAT; auto; s.
-      { intros PROM. replace fto with to in PROM; ss.
-        eapply mapping_map_lt_inj; eauto.
-        eapply MAPIDENT. eapply EXCLUSIVE in PROM. des. inv UNCH.
-        apply NNPP in SAT3. des.
-        { inv SAT3. eapply LOCALTGT in GET0. inv ITV; ss.
-          eapply Memory.max_ts_spec in GET0. des. etrans; eauto. etrans; eauto.
-          erewrite (@cap_flex_max_ts mem_tgt cap_tgt); eauto. left. auto. }
-        { inv SAT3. eapply Memory.max_ts_spec in GET0. des. etrans; eauto.
-          erewrite (@cap_flex_max_ts mem_tgt cap_tgt); eauto. left. auto. }
-        { eapply Memory.max_ts_spec in GET. des. exfalso. timetac. }
+      { intros PROM. replace fto with to in PROM; ss. eapply MAPIDENT; eauto.
+        exploit sim_memory_forget_concrete_promised.
+        { eapply MEMPF. }
+        { left. eauto. }
+        i. eapply sim_memory_concrete_promised_later in x1; eauto. des.
+        inv PROMISED. etrans; eauto. eapply Memory.max_ts_spec in GET. des. auto.
       }
-      { intros PROM. replace ffrom with from in PROM; ss.
-        eapply mapping_map_lt_inj; eauto.
-        eapply MAPIDENT. eapply EXCLUSIVE in PROM. des. inv UNCH.
-        apply NNPP in SAT3. des.
-        { inv SAT3. eapply LOCALTGT in GET0. inv ITV; ss.
-          eapply Memory.max_ts_spec in GET0. des. etrans; eauto. etrans; eauto.
-          erewrite (@cap_flex_max_ts mem_tgt cap_tgt); eauto. left. auto. }
-        { inv SAT3. eapply Memory.max_ts_spec in GET0. des. etrans; eauto.
-          erewrite (@cap_flex_max_ts mem_tgt cap_tgt); eauto. left. auto. }
-        { eapply Memory.max_ts_spec in GET. des. exfalso. timetac. }
+
+          in MEMPF.
+
+            PROM; eauto.
+
+        specialize (MEMPF
+
+
+        admit.
       }
+        eapply MAPIDENT; eauto. eapply EXCLUSIVE in PROM. des. inv UNCH.
+        inv H. exploit sim_memory_forget_concrete_promised.
+        { eapply MEMPF. }
+        { econs; eauto. }
+        intros GET. eapply sim_memory_concrete_promised_later in GET; eauto.
+        { des. etrans; eauto. inv PROMISED.
+          eapply Memory.max_ts_spec in GET; eauto. des. auto. }
+        { eapply CONFIGTGT. }
+      }
+
+        admit. }
+      admit.
     }
+      (* eapply mapping_map_lt_inj; eauto. *)
+(* eapply EXCLUSIVE in PROM. des. inv UNCH. *)
+(*         apply NNPP in SAT3. des. *)
+(*         { inv SAT3. eapply LOCALTGT in GET0. inv ITV; ss. } *)
+(*         { inv SAT3. eapply Memory.max_ts_spec in GET0. des. etrans; eauto. *)
+(*           erewrite (@cap_flex_max_ts mem_tgt cap_tgt); eauto. left. auto. } *)
+(*         { eapply Memory.max_ts_spec in GET. des. exfalso. timetac. } *)
+(*       } *)
+
+      (*   eapply MAPIDENT. eapply EXCLUSIVE in PROM. des. inv UNCH. *)
+      (*   apply NNPP in SAT3. des. *)
+      (*   { inv SAT3. eapply LOCALTGT in GET0. inv ITV; ss. } *)
+      (*   { inv SAT3. eapply Memory.max_ts_spec in GET0. des. etrans; eauto. *)
+      (*     erewrite (@cap_flex_max_ts mem_tgt cap_tgt); eauto. left. auto. } *)
+      (*   { eapply Memory.max_ts_spec in GET. des. exfalso. timetac. } *)
+      (* } *)
+
+    (* { intros PROM. replace ffrom with from in PROM; ss. *)
+    (*     eapply mapping_map_lt_inj; eauto. *)
+    (*     eapply MAPIDENT. eapply EXCLUSIVE in PROM. des. inv UNCH. *)
+    (*     apply NNPP in SAT3. des. *)
+    (*     { inv SAT3. eapply LOCALTGT in GET0. inv ITV; ss. *)
+    (*       eapply Memory.max_ts_spec in GET0. des. etrans; eauto. etrans; eauto. *)
+    (*       erewrite (@cap_flex_max_ts mem_tgt cap_tgt); eauto. left. auto. } *)
+    (*     { inv SAT3. eapply Memory.max_ts_spec in GET0. des. etrans; eauto. *)
+    (*       erewrite (@cap_flex_max_ts mem_tgt cap_tgt); eauto. left. auto. } *)
+    (*     { eapply Memory.max_ts_spec in GET. des. exfalso. timetac. } *)
+    (*   } *)
+    (* } *)
     { ss. eapply Memory.future_weak_closed_timemap.
       { eapply cap_flex_future_weak; eauto. } eauto. }
     { ss. eapply Memory.future_weak_closed_timemap.
@@ -1365,7 +1408,8 @@ Section SIM.
       eapply JSim.sim_local_memory_bot in LOCALJOIN0; auto.
       inv LOCALPF0. ss.
       eapply sim_promise_bot; eauto. eapply sim_promise_strong_sim_promise; eauto. }
-  Qed.
+  Admitted.
+  (* Qed. *)
 
   Lemma step_sim_configuration tids views0 prom0 extra0
         c_src0 c_mid0 c_tgt0 c_tgt1 e tid lang tr_tgt tr_cert
@@ -2147,6 +2191,23 @@ Section SIM.
     inv MAP; auto. f_equal. eapply view_ident_map; eauto.
   Qed.
 
+  Lemma memory_ident_map_concrete_max f mem fmem
+        (MEM: memory_map f mem fmem)
+        (IDENT: forall loc to fto (MAP: f loc to fto), to = fto)
+        loc max fmax
+        (CLOSED: Memory.closed mem)
+        (MAX: Memory.max_concrete_ts mem loc max)
+        (FMAX: Memory.max_concrete_ts fmem loc fmax)
+    :
+      Time.le max fmax.
+  Proof.
+    eapply Memory.max_concrete_ts_spec in MAX; eauto.
+    { des. eapply MEM in GET. des; ss. inv MSG. inv MSGLE.
+      eapply Memory.max_concrete_ts_spec in GET; eauto. des.
+      eapply IDENT in TO. subst. auto. }
+    { eapply CLOSED. }
+  Qed.
+
   Lemma good_future_consistent lang st lc_src lc_tgt sc_src sc_tgt mem_src mem_tgt tr
         (f: Loc.t -> Time.t -> Time.t -> Prop)
         (CONSISTENT: pf_consistent_super_strong2
@@ -2258,7 +2319,15 @@ Section SIM.
     esplits; eauto; ss.
     { eapply List.Forall_impl; eauto. i. ss. des. splits; auto.
       eapply write_not_in_mon; eauto. i. ss. des. split; auto. etrans; eauto. }
-    { ii. eapply MAPIDENT. erewrite (@cap_flex_max_ts mem_tgt mem0); eauto.
+    { ii. exploit Memory.max_concrete_ts_exists.
+      { eapply MEMTGT. } i. des.
+      eapply MAPIDENT; eauto. etrans; eauto.
+      eapply memory_ident_map_concrete_max in MEM; eauto.
+      rename f into aaaaaaaaaa.
+
+
+
+      erewrite (@cap_flex_max_ts mem_tgt mem0); eauto.
       etrans; eauto. left. auto. }
     { eapply list_Forall2_rev in EVENTS0.
       eapply list_Forall2_compose.
