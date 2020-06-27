@@ -51,6 +51,18 @@ Module ReleaseWrites.
     Proof.
       unfold append. des_ifs.
     Qed.
+
+    Lemma in_append_or
+          loc to e rels
+          (IN: List.In (loc, to) (append e rels)):
+      (exists from val released ord,
+          ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord) /\
+          L loc /\ Ordering.le Ordering.acqrel ord) \/
+      List.In (loc, to) rels.
+    Proof.
+      revert IN. unfold append. des_ifs; eauto. i.
+      inv IN; eauto. inv H. left. esplits; eauto.
+    Qed.
   End ReleaseWrites.
 End ReleaseWrites.
 

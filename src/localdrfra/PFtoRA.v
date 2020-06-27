@@ -37,7 +37,7 @@ Set Implicit Arguments.
 
 
 Module TraceWF.
-  Definition trace_wf (tr: Trace.t) (promises: Memory.t) (mem: Memory.t): Prop :=
+  Definition wf (tr: Trace.t) (promises: Memory.t) (mem: Memory.t): Prop :=
     forall th e loc from to val released ord
       (IN: List.In (th, e) tr)
       (EVENT: ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord)),
@@ -64,7 +64,7 @@ Module TraceWF.
   Lemma steps_wf
         lang tr e1 e2
         (STEPS: @Trace.steps lang tr e1 e2):
-    trace_wf tr e2.(Thread.local).(Local.promises) e2.(Thread.memory).
+    wf tr e2.(Thread.local).(Local.promises) e2.(Thread.memory).
   Proof.
     induction STEPS; ss. subst.
     ii. inv IN; eauto. inv H.
@@ -73,9 +73,9 @@ Module TraceWF.
 
   Lemma steps_wf_other
         lang tr e1 e2 tr'
-        (TRACE1: trace_wf tr' e1.(Thread.local).(Local.promises) e1.(Thread.memory))
+        (TRACE1: wf tr' e1.(Thread.local).(Local.promises) e1.(Thread.memory))
         (STEPS: @Trace.steps lang tr e1 e2):
-    trace_wf tr' e2.(Thread.local).(Local.promises) e2.(Thread.memory).
+    wf tr' e2.(Thread.local).(Local.promises) e2.(Thread.memory).
   Proof.
     revert tr' TRACE1. induction STEPS; i; ss.
     subst. apply IHSTEPS.
@@ -90,7 +90,7 @@ Module TraceWF.
         (CLOSED1: Memory.closed e1.(Thread.memory))
         (DISJOINT: Local.disjoint e1.(Thread.local) lc)
         (WF: Local.wf lc e1.(Thread.memory)):
-    trace_wf tr lc.(Local.promises) e2.(Thread.memory).
+    wf tr lc.(Local.promises) e2.(Thread.memory).
   Proof.
     induction STEPS; i; ss. subst. ii. inv IN.
     - inv H. exploit step_unchangable; eauto. i.
@@ -123,14 +123,33 @@ Module TraceWF.
 
   Lemma steps_disjoint_other
         lang tr e1 e2 tr' lc
-        (TRACE1: trace_wf tr' e1.(Thread.local).(Local.promises) e1.(Thread.memory))
-        (TRACE2: trace_wf tr' lc.(Local.promises) e1.(Thread.memory))
+        (TRACE1: wf tr' e1.(Thread.local).(Local.promises) e1.(Thread.memory))
+        (TRACE2: wf tr' lc.(Local.promises) e1.(Thread.memory))
         (STEPS: @Trace.steps lang tr e1 e2):
-    trace_wf tr' lc.(Local.promises) e2.(Thread.memory).
+    wf tr' lc.(Local.promises) e2.(Thread.memory).
   Proof.
     hexploit steps_wf_other; eauto. ii.
     exploit H; eauto. i. inv x.
     exploit TRACE2; eauto. i. inv x. econs; ss.
+  Qed.
+
+  Lemma wf_app
+        tr1 tr2 promises mem
+        (TRACE1: wf tr1 promises mem)
+        (TRACE2: wf tr2 promises mem):
+    wf (tr1 ++ tr2) promises mem.
+  Proof.
+    ii. apply List.in_app_or in IN. des; eauto.
+  Qed.
+
+  Lemma app_wf
+        tr1 tr2 promises mem
+        (TRACE: wf (tr1 ++ tr2) promises mem):
+    wf tr1 promises mem /\ wf tr2 promises mem.
+  Proof.
+    split; ii.
+    - eapply TRACE; eauto. apply List.in_or_app. left. eauto.
+    - eapply TRACE; eauto. apply List.in_or_app. right. eauto.
   Qed.
 End TraceWF.
 
@@ -319,7 +338,7 @@ Module PFtoRA.
         (MEM_RA: Memory.closed e_ra.(Thread.memory))
     .
 
-    Lemma thread_step
+    Lemma thread_step_aux
           views1 rels1 e1_pf e1_j e1_ra
           pf e_pf e2_pf
           (SIM1: sim_thread views1 rels1 e1_pf e1_j e1_ra)
@@ -468,71 +487,121 @@ Module PFtoRA.
           rewrite REL. esplits; eauto.
     Qed.
 
-    Definition consistent_rel (tr: Trace.t lang) (rel: ReleaseWrites.t): Prop :=
+    Definition sim_trace (tr: Trace.t) (rels: ReleaseWrites.t): Prop :=
       forall th e loc from to val released ord
         (IN: List.In (th, e) tr)
         (EVENT: ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord))
         (ORD: Ordering.le ord Ordering.strong_relaxed),
-        ~ List.In (loc, to) rel.
+        ~ List.In (loc, to) rels.
+
+    Lemma thread_step
+          tr1 views1 rels1 e1_pf e1_j e1_ra
+          pf e_pf e2_pf
+          (SIM1: sim_thread views1 rels1 e1_pf e1_j e1_ra)
+          (SIM_TR1: sim_trace tr1 rels1)
+          (TRACE1_WF: TraceWF.wf tr1 e1_pf.(Thread.local).(Local.promises) e1_pf.(Thread.memory))
+          (RELS1_WF: ReleaseWrites.wf rels1 e1_ra.(Thread.local).(Local.promises) e1_ra.(Thread.memory))
+          (STEP: Thread.step pf e_pf e1_pf e2_pf)
+          (PF: pf_event L e_pf)
+          (CONS: Local.promise_consistent e2_pf.(Thread.local)):
+      (exists views2 rels2 e_j e2_j e_ra e2_ra,
+          (<<STEP_RA: RAThread.step lang L rels1 rels2 e_ra e1_ra e2_ra>>) /\
+          (<<EVENT_J: JSim.sim_event e_j e_pf>>) /\
+          (<<EVENT_RA: PFtoRASimThread.sim_event e_ra e_j>>) /\
+          (<<SIM2: sim_thread views2 rels2 e2_pf e2_j e2_ra>>) /\
+          (<<SIM_TR2: sim_trace (tr1 ++ [(e1_pf.(Thread.local), e_pf)]) rels2>>) /\
+          (<<TRACE2_WF: TraceWF.wf (tr1 ++ [(e1_pf.(Thread.local), e_pf)])
+                                   e2_pf.(Thread.local).(Local.promises) e2_pf.(Thread.memory)>>) /\
+          (<<RELS2_WF: ReleaseWrites.wf rels2 e2_ra.(Thread.local).(Local.promises) e2_ra.(Thread.memory)>>)) \/
+      (exists rels2 e2_ra,
+          (<<RACE: RAThread.step lang L rels1 rels2 ThreadEvent.failure e1_ra e2_ra>>)).
+    Proof.
+      exploit thread_step_aux; eauto. i. unguard. des.
+      - left. esplits; eauto.
+        + econs 1. eauto.
+        + ii. apply List.in_app_or in IN.
+          apply ReleaseWrites.in_append_or in H. des.
+          * exploit TRACE1_WF; eauto. i. inv x.
+            inv EVENT_J; inv EVENT_RA; ss.
+            { inv H. inv STEP; inv STEP0. inv LOCAL. inv LOCAL0. inv WRITE. ss.
+              inv PROMISE; ss.
+              - exploit Memory.add_get0; try exact MEM. i. des. congr.
+              - exploit Memory.split_get0; try exact MEM. i. des. congr.
+              - exploit Memory.lower_get0; try exact PROMISES. i. des. congr. }
+            { inv H. inv STEP; inv STEP0. inv LOCAL. inv LOCAL1. inv LOCAL2. inv WRITE. ss.
+              inv PROMISE; ss.
+              - exploit Memory.add_get0; try exact MEM. i. des. congr.
+              - exploit Memory.split_get0; try exact MEM. i. des. congr.
+              - exploit Memory.lower_get0; try exact PROMISES. i. des. congr. }
+          * inv IN; ss. inv H2. inv EVENT_J; inv EVENT_RA; ss.
+            { inv H. inv EVENT. destruct ord; ss. }
+            { inv H. inv EVENT. destruct ord; ss. }
+          * eapply SIM_TR1; eauto.
+          * inv IN; ss. inv H0. exploit RELS1_WF; eauto. i. des.
+            inv EVENT_J; inv EVENT_RA; ss.
+            { inv EVENT.
+              inv STEP_RA; inv STEP0. inv LOCAL. inv LOCAL0. inv STEP0. inv WRITE. ss.
+              inv PROMISE; ss.
+              - exploit Memory.add_get0; try exact MEM. i. des. congr.
+              - exploit Memory.split_get0; try exact MEM. i. des. congr.
+              - exploit Memory.lower_get0; try exact PROMISES. i. des. congr. }
+            { inv EVENT.
+              inv STEP_RA; inv STEP0. inv LOCAL. inv LOCAL1. inv STEP0. inv LOCAL2. inv STEP0. inv WRITE. ss.
+              inv PROMISE; ss.
+              - exploit Memory.add_get0; try exact MEM. i. des. congr.
+              - exploit Memory.split_get0; try exact MEM. i. des. congr.
+              - exploit Memory.lower_get0; try exact PROMISES. i. des. congr. }
+        + apply TraceWF.wf_app.
+          * eapply TraceWF.steps_wf_other; eauto.
+          * eapply TraceWF.steps_wf; eauto.
+        + eapply RAThread.step_wf; eauto. econs 1; eauto.
+      - right. esplits. econs 2; eauto.
+    Qed.
 
     Lemma thread_steps
-          views1 rels1 e1_pf e1_j e1_ra
+          tr1 views1 rels1 e1_pf e1_j e1_ra
           tr e2_pf
           (SIM1: sim_thread views1 rels1 e1_pf e1_j e1_ra)
+          (SIM_TR1: sim_trace tr1 rels1)
+          (TRACE1_WF: TraceWF.wf tr1 e1_pf.(Thread.local).(Local.promises) e1_pf.(Thread.memory))
+          (RELS1_WF: ReleaseWrites.wf rels1 e1_ra.(Thread.local).(Local.promises) e1_ra.(Thread.memory))
           (STEPS: Trace.steps tr e1_pf e2_pf)
           (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr)
           (PF: List.Forall (compose (pf_event L) snd) tr)
           (CONS: Local.promise_consistent e2_pf.(Thread.local)):
       (exists views2 rels2 e2_j e2_ra,
-          (<<STEPS_RA: RAThread.tau_steps lang L rels1 (rels2 ++ rels1) e1_ra e2_ra>>) /\
-          (<<RELS: consistent_rel tr rels2>>) /\
-          (<<SIM2: sim_thread views2 (rels2 ++ rels1) e2_pf e2_j e2_ra>>)) \/
+          (<<STEPS_RA: RAThread.tau_steps lang L rels1 rels2 e1_ra e2_ra>>) /\
+          (<<SIM2: sim_thread views2 rels2 e2_pf e2_j e2_ra>>) /\
+          (<<SIM_TR2: sim_trace (tr1 ++ tr) rels2>>) /\
+          (<<TRACE2_WF: TraceWF.wf (tr1 ++ tr) e2_pf.(Thread.local).(Local.promises) e2_pf.(Thread.memory)>>) /\
+          (<<RELS2_WF: ReleaseWrites.wf rels2 e2_ra.(Thread.local).(Local.promises) e2_ra.(Thread.memory)>>)) \/
       (exists rels2 rels3 e2_ra e3_ra,
-          (<<STEPS_RA: RAThread.tau_steps lang L rels1 (rels2 ++ rels1) e1_ra e2_ra>>) /\
-          (<<RACE: RAThread.step lang L (rels2 ++ rels1) rels3 ThreadEvent.failure e2_ra e3_ra>>)).
+          (<<STEPS_RA: RAThread.tau_steps lang L rels1 rels2 e1_ra e2_ra>>) /\
+          (<<RACE: RAThread.step lang L rels2 rels3 ThreadEvent.failure e2_ra e3_ra>>)).
     Proof.
-      revert views1 rels1 e1_j e1_ra SIM1 SILENT PF CONS.
+      revert tr1 views1 rels1 e1_j e1_ra SIM1 SIM_TR1 TRACE1_WF RELS1_WF SILENT PF CONS.
       induction STEPS; i; ss.
-      { left. eexists _. exists []. s.
+      { left. eexists _. exists rels1.
+        rewrite List.app_nil_r.
         esplits; [econs 1|..]; ss; eauto. }
       subst. exploit thread_step; try exact SIM1; eauto.
+      { ii. inv PF. exploit H1; ss; eauto. }
       { exploit Thread.step_future; try exact STEP; try apply SIM1. i. des.
         eapply rtc_tau_step_promise_consistent; try eapply Trace.silent_steps_tau_steps; eauto.
         inv SILENT. ss. }
-      { i. inv PF. exploit H1; ss; eauto. }
       i. unguard. des.
       - exploit IHSTEPS; eauto.
         { inv SILENT. ss. }
         { inv PF. ss. }
-        i. des.
-        + left.
-          replace (rels2 ++ ReleaseWrites.append L e_ra rels1) with
-              ((rels2 ++ ReleaseWrites.append L e_ra []) ++ rels1) in *; cycle 1.
-          { rewrite <- List.app_assoc. unfold ReleaseWrites.append. des_ifs. }
-          esplits.
-          * econs 2; [econs 1; eauto|..]; eauto.
-            inv SILENT. ss. inv EVENT_J; inv EVENT_RA; ss.
-          * ii. apply List.in_app_or in H. des; inv IN.
-            { admit. }
-            { eapply RELS; eauto. }
-            { inv H0. unfold ReleaseWrites.append in H.
-              destruct e0; inv EVENT_J; inv EVENT_RA; ss.
-              - inv EVENT. revert H. repeat (condtac; ss).
-                i. des; ss. destruct ord; ss.
-              - inv EVENT. revert H. repeat (condtac; ss).
-                i. des; ss. destruct ord; ss. }
-            { admit. }
-          * eauto.
-        + right.
-          replace (rels2 ++ ReleaseWrites.append L e_ra rels1) with
-              ((rels2 ++ ReleaseWrites.append L e_ra []) ++ rels1) in *; cycle 1.
-          { rewrite <- List.app_assoc. unfold ReleaseWrites.append. des_ifs. }
-          esplits.
-          * econs 2; [econs 1; eauto|..]; eauto.
-            inv SILENT. ss. inv EVENT_J; inv EVENT_RA; ss.
-          * eauto.
-      - right. exists []. ss. esplits; [econs 1|]. econs 2; eauto.
-    Admitted.
+        i. rewrite <- List.app_assoc in x. des.
+        + left. esplits; eauto.
+          econs 2; [eauto|..]; eauto.
+          inv SILENT. ss. inv EVENT_J; inv EVENT_RA; ss.
+        + right. esplits; eauto.
+          econs 2; [eauto|..]; eauto.
+          inv SILENT. ss. inv EVENT_J; inv EVENT_RA; ss.
+      - right. esplits; eauto. econs 1.
+    Qed.
   End PFtoRAThread.
 
 
