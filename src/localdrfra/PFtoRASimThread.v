@@ -485,8 +485,8 @@ Module PFtoRASimThread.
           rels lc_src lc_tgt mem_src mem_tgt
           (LC: sim_local rels lc_src lc_tgt)
           (MEM: sim_memory rels mem_src mem_tgt):
-      <<RELS_WF_SRC: ReleaseWrites.wf rels lc_src mem_src>> /\
-      <<RELS_WF_TGT: ReleaseWrites.wf rels lc_tgt mem_tgt>>.
+      <<RELS_WF_SRC: ReleaseWrites.wf rels lc_src.(Local.promises) mem_src>> /\
+      <<RELS_WF_TGT: ReleaseWrites.wf rels lc_tgt.(Local.promises) mem_tgt>>.
     Proof.
       inv LC. inv MEM. split; ii.
       - exploit REL_WRITES; eauto. i. des. esplits; eauto.

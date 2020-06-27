@@ -42,10 +42,10 @@ Theorem local_drf_ra
   behaviors Configuration.step (Configuration.init s) <1=
   behaviors (@OrdConfiguration.step L Ordering.acqrel) (Configuration.init s).
 Proof.
-  ii. exploit (@local_DRF_PF L); eauto.
-  { ii.
-    admit.
-  }
+  (* ii. exploit (@local_DRF_PF L); eauto. *)
+  (* { ii. *)
+  (*   admit. *)
+  (* } *)
 
   (* ii. clear PR. *)
   (* remember (Configuration.init s) as c_tgt in x1. *)

@@ -294,6 +294,22 @@ Module OrdThread.
       - eapply Thread.promise_step_future; eauto.
       - eapply program_step_future; eauto.
     Qed.
+
+    Lemma step_disjoint
+          pf e e1 e2 lc
+          (STEP: step pf e e1 e2)
+          (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+          (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+          (CLOSED1: Memory.closed e1.(Thread.memory))
+          (DISJOINT1: Local.disjoint e1.(Thread.local) lc)
+          (WF: Local.wf lc e1.(Thread.memory)):
+      <<DISJOINT2: Local.disjoint e2.(Thread.local) lc>> /\
+      <<WF: Local.wf lc e2.(Thread.memory)>>.
+    Proof.
+      inv STEP.
+      - eapply Thread.promise_step_disjoint; eauto.
+      - inv STEP0. eapply OrdLocal.program_step_disjoint; eauto.
+    Qed.
   End OrdThread.
 End OrdThread.
 

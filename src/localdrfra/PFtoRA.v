@@ -24,9 +24,10 @@ Require Import Configuration.
 
 Require Import PromiseConsistent.
 Require Import Trace.
+Require Import MemoryProps.
 Require Import JoinedView.
 
-Require Import LocalDRF_PF.
+Require Import LocalDRFDef.
 Require Import OrdStep.
 Require Import RARace.
 Require Import Stable.
@@ -35,11 +36,109 @@ Require Import PFtoRASimThread.
 Set Implicit Arguments.
 
 
+Module TraceWF.
+  Definition trace_wf (tr: Trace.t) (promises: Memory.t) (mem: Memory.t): Prop :=
+    forall th e loc from to val released ord
+      (IN: List.In (th, e) tr)
+      (EVENT: ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord)),
+      unchangable mem promises loc to from (Message.concrete val released).
+
+  Lemma step_unchangable
+        lang pf e e1 e2
+        loc from to val released ord
+        (STEP: @Thread.step lang pf e e1 e2)
+        (EVENT: ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord)):
+    unchangable e2.(Thread.memory) e2.(Thread.local).(Local.promises) loc to from (Message.concrete val released).
+  Proof.
+    destruct e; ss.
+    - inv EVENT. inv STEP; inv STEP0. inv LOCAL. inv LOCAL0. inv WRITE. ss.
+      exploit Memory.remove_get0; eauto. i. des.
+      exploit Memory.promise_get0; eauto; try by (inv PROMISE; ss). i. des.
+      econs; eauto.
+    - inv EVENT. inv STEP; inv STEP0. inv LOCAL. inv LOCAL1. inv LOCAL2. inv WRITE. ss.
+      exploit Memory.remove_get0; eauto. i. des.
+      exploit Memory.promise_get0; eauto; try by (inv PROMISE; ss). i. des.
+      econs; eauto.
+  Qed.
+
+  Lemma steps_wf
+        lang tr e1 e2
+        (STEPS: @Trace.steps lang tr e1 e2):
+    trace_wf tr e2.(Thread.local).(Local.promises) e2.(Thread.memory).
+  Proof.
+    induction STEPS; ss. subst.
+    ii. inv IN; eauto. inv H.
+    eapply unchangable_trace_steps_increase; eauto using step_unchangable.
+  Qed.
+
+  Lemma steps_wf_other
+        lang tr e1 e2 tr'
+        (TRACE1: trace_wf tr' e1.(Thread.local).(Local.promises) e1.(Thread.memory))
+        (STEPS: @Trace.steps lang tr e1 e2):
+    trace_wf tr' e2.(Thread.local).(Local.promises) e2.(Thread.memory).
+  Proof.
+    revert tr' TRACE1. induction STEPS; i; ss.
+    subst. apply IHSTEPS.
+    ii. eapply unchangable_increase; eauto.
+  Qed.
+
+  Lemma steps_disjoint
+        lang tr e1 e2 lc
+        (STEPS: @Trace.steps lang tr e1 e2)
+        (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+        (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+        (CLOSED1: Memory.closed e1.(Thread.memory))
+        (DISJOINT: Local.disjoint e1.(Thread.local) lc)
+        (WF: Local.wf lc e1.(Thread.memory)):
+    trace_wf tr lc.(Local.promises) e2.(Thread.memory).
+  Proof.
+    induction STEPS; i; ss. subst. ii. inv IN.
+    - inv H. exploit step_unchangable; eauto. i.
+      exploit unchangable_trace_steps_increase; eauto. i. inv x1.
+      econs; eauto.
+      clear IHSTEPS STEPS.
+      destruct (Memory.get loc to lc.(Local.promises)) as [[]|] eqn:GETP; ss.
+      exfalso. inv WF. exploit PROMISES; eauto. i.
+      destruct e0; ss; inv EVENT.
+      + inv STEP; inv STEP0. inv LOCAL. inv LOCAL0. inv WRITE. inv PROMISE; ss.
+        * exploit Memory.add_get0; try exact MEM. i. des. congr.
+        * exploit Memory.split_get0; try exact MEM. i. des. congr.
+        * exploit Memory.lower_get0; try exact PROMISES0. i. des.
+          inv DISJOINT. inv DISJOINT0. exploit DISJOINT; eauto. i. des.
+          exploit Memory.get_ts; try exact GET0. i. des; try congr.
+          exploit Memory.get_ts; try exact GETP. i. des; try congr.
+          apply (x1 to); econs; try refl; ss.
+      + inv STEP; inv STEP0. inv LOCAL. inv LOCAL1. inv LOCAL2. inv WRITE. inv PROMISE; ss.
+        * exploit Memory.add_get0; try exact MEM. i. des. congr.
+        * exploit Memory.split_get0; try exact MEM. i. des. congr.
+        * exploit Memory.lower_get0; try exact PROMISES0. i. des.
+          inv DISJOINT. inv DISJOINT0. exploit DISJOINT; eauto. i. des.
+          exploit Memory.get_ts; try exact GET1. i. des; try congr.
+          exploit Memory.get_ts; try exact GETP. i. des; try congr.
+          apply (x1 to); econs; try refl; ss.
+    - exploit Thread.step_future; eauto. i. des.
+      exploit Thread.step_disjoint; eauto. i. des.
+      eapply IHSTEPS; eauto.
+  Qed.
+
+  Lemma steps_disjoint_other
+        lang tr e1 e2 tr' lc
+        (TRACE1: trace_wf tr' e1.(Thread.local).(Local.promises) e1.(Thread.memory))
+        (TRACE2: trace_wf tr' lc.(Local.promises) e1.(Thread.memory))
+        (STEPS: @Trace.steps lang tr e1 e2):
+    trace_wf tr' lc.(Local.promises) e2.(Thread.memory).
+  Proof.
+    hexploit steps_wf_other; eauto. ii.
+    exploit H; eauto. i. inv x.
+    exploit TRACE2; eauto. i. inv x. econs; ss.
+  Qed.
+End TraceWF.
+
+
 Module PFtoRA.
   Section PFtoRAThread.
     Variable lang: language.
     Variable L: Loc.t -> bool.
-
 
     Definition closed_views (views: Loc.t -> Time.t -> list View.t) (mem: Memory.t): Prop :=
       forall loc ts view (LOC: ~ L loc) (IN: List.In view (views loc ts)),
@@ -382,7 +481,7 @@ Module PFtoRA.
           (SIM1: sim_thread views1 rels1 e1_pf e1_j e1_ra)
           (STEPS: Trace.steps tr e1_pf e2_pf)
           (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr)
-          (VALID: List.Forall (compose (valid_event L) snd) tr)
+          (PF: List.Forall (compose (pf_event L) snd) tr)
           (CONS: Local.promise_consistent e2_pf.(Thread.local)):
       (exists views2 rels2 e2_j e2_ra,
           (<<STEPS_RA: RAThread.tau_steps lang L rels1 (rels2 ++ rels1) e1_ra e2_ra>>) /\
@@ -392,7 +491,7 @@ Module PFtoRA.
           (<<STEPS_RA: RAThread.tau_steps lang L rels1 (rels2 ++ rels1) e1_ra e2_ra>>) /\
           (<<RACE: RAThread.step lang L (rels2 ++ rels1) rels3 ThreadEvent.failure e2_ra e3_ra>>)).
     Proof.
-      revert views1 rels1 e1_j e1_ra SIM1 SILENT VALID CONS.
+      revert views1 rels1 e1_j e1_ra SIM1 SILENT PF CONS.
       induction STEPS; i; ss.
       { left. eexists _. exists []. s.
         esplits; [econs 1|..]; ss; eauto. }
@@ -400,11 +499,11 @@ Module PFtoRA.
       { exploit Thread.step_future; try exact STEP; try apply SIM1. i. des.
         eapply rtc_tau_step_promise_consistent; try eapply Trace.silent_steps_tau_steps; eauto.
         inv SILENT. ss. }
-      { i. inv VALID. exploit H1; ss; eauto. }
+      { i. inv PF. exploit H1; ss; eauto. }
       i. unguard. des.
       - exploit IHSTEPS; eauto.
         { inv SILENT. ss. }
-        { inv VALID. ss. }
+        { inv PF. ss. }
         i. des.
         + left.
           replace (rels2 ++ ReleaseWrites.append L e_ra rels1) with
