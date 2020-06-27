@@ -1996,6 +1996,31 @@ Section SIM.
     }
   Qed.
 
+  Lemma tview_ident_map f vw fvw
+        (MAP: tview_map f vw fvw)
+        (IDENT: forall loc to fto (MAP: f loc to fto), to = fto)
+    :
+      vw = fvw.
+  Proof.
+    destruct vw, fvw. inv MAP. ss. f_equal.
+    { extensionality loc. eapply view_ident_map; eauto. }
+    { eapply view_ident_map; eauto. }
+    { eapply view_ident_map; eauto. }
+  Qed.
+
+  Lemma tevent_ident_map f e fe
+        (MAP: tevent_map f fe e)
+        (IDENT: forall loc to fto (MAP: f loc to fto), to = fto)
+    :
+      sim_event e fe.
+  Proof.
+    inv MAP; try econs; eauto.
+    { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. }
+    { eapply IDENT in TO. subst. econs; eauto. }
+    { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. }
+    { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. }
+  Qed.
+
   Lemma good_future_configuration_step c0 c1 c0' e tid lang (tr0 tr_cert0: Trace.t lang) tm
         (STEP: times_configuration_step times tr0 tr_cert0 e tid c0 c0')
         (WF0: Configuration.wf c0)
@@ -2012,7 +2037,7 @@ Section SIM.
         (<<TRACE: List.Forall2
                     (fun the0 the1 =>
                        (<<EVT: sim_event (snd the0) (snd the1)>>) /\
-                       (<<TVIEW: TView.le (fst the0).(Thread.local).(Local.tview) (fst the1).(Thread.local).(Local.tview)>>)) tr0 tr1>>).
+                       (<<TVIEW: TView.le (fst the1).(Thread.local).(Local.tview) (fst the0).(Thread.local).(Local.tview)>>)) tr0 tr1>>).
   Proof.
     dep_inv STEP.
     hexploit max_good_future_map; eauto.
@@ -2104,10 +2129,18 @@ Section SIM.
       }
     }
     { eapply list_Forall2_app.
-      { eapply list_Forall2_impl; eauto. i. ss. admit. }
-      { econs; ss; eauto. admit. }
+      { eapply list_Forall2_impl; eauto. i. destruct a, b. ss. des. split; auto.
+        { eapply tevent_ident_map; eauto. i. ss. des; auto. }
+        { inv THREAD. ss. inv LOCAL1. eapply tview_ident_map in TVIEW; subst; eauto.
+          ii. ss. des. auto. }
+      }
+      { econs; ss; eauto. split; auto.
+        { eapply tevent_ident_map; eauto. i. ss. des; auto. }
+        { inv LOCAL. eapply tview_ident_map in TVIEW; subst; eauto.
+          ii. ss. des. auto. }
+      }
     }
-  Admitted.
+  Qed.
 
   Lemma configuration_step_certify lang c0 c1 e tid (tr tr_cert: Trace.t lang)
         (WF: Configuration.wf c0)
@@ -2131,11 +2164,14 @@ Section SIM.
     hexploit times_configuration_step_future; eauto. i. des.
     dup STEP. dep_inv STEP.
     destruct (ThreadEvent.get_machine_event e0) eqn:EVENT.
-    { exploit CONSISTENT.
+    { exploit (@concrete_promise_max_timemap_exists memory3 (Local.promises lc3)).
+      { eapply WF2. } i. des.
+      exploit CONSISTENT.
       { ii. subst. ss. }
       { refl. }
       { eapply WF2. }
       { eapply WF2; eauto. ss. erewrite IdentMap.gss; eauto. }
+      { eauto. }
       i. des. ss. destruct e1. ss. unguard. des.
       { esplits.
         { econs.
@@ -2197,9 +2233,9 @@ Section SIM.
               { econs 1. }
               { econs. }
               { instantiate (1:=fun loc ts fts => ts = fts /\
-                                                  Time.le ts (Memory.max_ts loc memory)).
+                                                  Time.le ts (max loc)).
                 ii. des. subst. auto. }
-              { ii. des; auto. }
+              { ii. ss. des; auto. }
               { i. ss. des. subst. timetac. }
               { econs. }
               { refl. }
@@ -2218,14 +2254,15 @@ Section SIM.
             { ii. erewrite H in *. ss. }
             { i. ss. erewrite IdentMap.gss in TID0. dep_clarify. }
             { eauto. }
-            { eauto. }
-            { i. eapply BOUND in TS.
-              instantiate (2:=fun loc => Time.incr (Memory.max_ts loc memory3)) in TS.
-              ss. eapply TimeFacts.lt_le_lt.
-              { eapply Time.incr_spec. }
-              { eapply TS. }
-              { auto. }
-            }
+            { admit. }
+            { admit. }
+            (* { i. eapply BOUND in TS. *)
+            (*   instantiate (2:=fun loc => Time.incr (Memory.max_ts loc memory3)) in TS. *)
+            (*   ss. eapply TimeFacts.lt_le_lt. *)
+            (*   { eapply Time.incr_spec. } *)
+            (*   { eapply TS. } *)
+            (*   { auto. } *)
+            (* } *)
             { eauto. }
           }
         }
