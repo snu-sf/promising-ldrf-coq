@@ -250,7 +250,8 @@ Section SIM.
     :
       exists lc e_src,
         (<<IN: List.In (lc, e_src) tr_src>>) /\
-        (<<EVENT: sim_event e_src e_tgt>>)
+        (<<EVENT: sim_event e_src e_tgt>>) /\
+        (<<LOCAL: TView.le lc.(Local.tview) lc_tgt.(Local.tview)>>)
   .
   Proof.
     remember (Some (lc_tgt, e_tgt)). revert e_tgt Heqo PF RACY.
@@ -342,7 +343,8 @@ Section SIM.
     :
       exists th e_src,
         (<<IN: List.In (th, e_src) tr_src>>) /\
-        (<<EVENT: sim_event e_src e_tgt>>)
+        (<<EVENT: sim_event e_src e_tgt>>) /\
+        (<<LOCAL: TView.le th.(Local.tview) th_tgt.(Local.tview)>>)
   .
   Proof.
     ginduction TRACE; i; ss.

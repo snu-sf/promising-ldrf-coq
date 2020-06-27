@@ -2128,24 +2128,68 @@ Section SIM.
     }
   Qed.
 
+  Lemma racy_read_mon loc ts lc0 lc1 e0 e1
+        (RACY: racy_read loc ts lc1 e1)
+        (LOCAL: TView.le lc0.(Local.tview) lc1.(Local.tview))
+        (EVENT: sim_event e0 e1)
+    :
+        racy_read loc ts lc0 e0.
+  Proof.
+    inv RACY; inv EVENT; econs; eauto.
+    { des_ifs.
+      { eapply TimeFacts.le_lt_lt; eauto. eapply LOCAL. }
+      { eapply TimeFacts.le_lt_lt; eauto. eapply LOCAL. }
+    }
+    { des_ifs.
+      { eapply TimeFacts.le_lt_lt; eauto. eapply LOCAL. }
+      { eapply TimeFacts.le_lt_lt; eauto. eapply LOCAL. }
+    }
+  Qed.
+
+  Lemma list_first_occurence A (P: A -> Prop) (l: list A)
+    :
+      (<<ALL: List.Forall P l>>) \/
+      (exists l0 a l1,
+          (<<EQ: l = l0 ++ a :: l1>>) /\
+          (<<ALL: List.Forall P l0>>) /\
+          (<<FAIL: ~ P a>>)).
+  Proof.
+    induction l.
+    { left. ss. }
+    { destruct (classic (P a)).
+      { des; eauto. subst.
+        right. exists (a::l0), a0, l1. esplits; eauto. }
+      { right. exists [], a, l. splits; auto. }
+    }
+  Qed.
 
   Lemma configuration_step_certify c0 c1 e tid (tr tr_cert: Trace.t)
         (WF: Configuration.wf c0)
         (STEP: times_configuration_step times tr tr_cert e tid c0 c1)
+        (max: TimeMap.t)
+
+        (MAX: Memory.max_concrete_timemap c1.(Configuration.memory) max)
     :
       exists c2 tr_cert' f e',
         (<<STEP: times_configuration_step times (tr ++ tr_cert') [] e' tid c0 c2>>) /\
+        (<<MAPLT: mapping_map_lt f>>) /\
+        (<<MAPIDENT:
+           forall loc ts fts
+                  (TS: Time.le fts (max loc))
+                  (MAP: f loc ts fts),
+             ts = fts>>) /\
+        (<<BOUND:
+           forall loc ts fts
+                  (TS: Time.lt (max loc) fts)
+                  (MAP: f loc ts fts),
+             Time.lt (max loc) fts>>) /\
+        __guard__((<<TRACE: List.Forall2 (fun em fem => tevent_map f (snd fem) (snd em)) tr_cert tr_cert'>>) \/
+                  (<<TRACE: exists lc, List.Forall2 (fun em fem => tevent_map f (snd fem) (snd em)) (tr_cert++[(lc, ThreadEvent.failure)]) tr_cert'>>)) /\
         __guard__(e' = MachineEvent.failure \/
                   ((<<NEQ: e' <> MachineEvent.failure>>) /\
                    (<<BOT: forall lang st lc
                                   (TID: IdentMap.find tid c2.(Configuration.threads) = Some (existT _ lang st, lc)),
-                       lc.(Local.promises) = Memory.bot>>)) /\
-                  (<<MAPLT: mapping_map_lt f>>) /\
-                  (<<MAPIDENT: map_ident_in_memory f c1.(Configuration.memory)>>) /\
-                  (<<BOUND: forall loc ts fts (TS: Time.lt (Memory.max_ts loc c1.(Configuration.memory)) ts) (MAP: f loc ts fts),
-                      Time.lt (Memory.max_ts loc c1.(Configuration.memory)) fts>>)
-                  /\
-                  (<<TRACE: List.Forall2 (fun em fem => tevent_map f (snd fem) (snd em)) tr_cert tr_cert'>>))
+                       lc.(Local.promises) = Memory.bot>>)))
   .
   Proof.
     hexploit times_configuration_step_future; eauto. i. des.
@@ -2159,7 +2203,8 @@ Section SIM.
       { eapply WF2. }
       { eapply WF2; eauto. ss. erewrite IdentMap.gss; eauto. }
       { eauto. }
-      i. des. ss. destruct e1. ss. unguard. des.
+      i. des. ss. instantiate (1:=fun loc => Time.incr (max loc)) in GOOD.
+      destruct e1. ss. unguard. des.
       { esplits.
         { econs.
           { eauto. }
@@ -2186,16 +2231,32 @@ Section SIM.
             { econs; ss; eauto. }
           }
         }
+        { eauto. }
+        { ii. eapply MAPIDENT; eauto. etrans; eauto.
+          eapply concrete_promise_max_ts_max_concrete_ts; eauto. }
+        { ii.
+          exploit BOUND; eauto.
+
+          admit.
+        }
+          (* exploit BOUND; cycle 1. *)
+          (* { eauto. } *)
+          (* { admit. } *)
+          (* i. admit. *)
+
+          (* eapply TimeFacts.le_lt_lt; eauto. *)
+          (* eapply memory_ident_map_concrete_promise_max_timemap; eauto. *)
+        { right. exists local. esplits. eapply List.Forall2_app; eauto.
+          econs; eauto. ss. econs. }
         { left. auto. }
       }
       { hexploit (list_match_rev ftr). i. des; subst.
         { inv TRACE. inv STEPS0; ss.
           eexists _, [], ident_map, MachineEvent.silent.
           erewrite List.app_nil_r. splits; eauto.
-          right. splits; ss.
-          { i. erewrite IdentMap.gss in TID0. dep_clarify. }
           { eapply ident_map_lt. }
-          { ii. inv MAP. auto. }
+          right. splits; ss.
+          i. erewrite IdentMap.gss in TID0. dep_clarify.
         }
         { eapply Trace.steps_separate in STEPS0. des.
           inv STEPS2; ss. inv TR. inv STEPS0; ss.
@@ -2223,7 +2284,7 @@ Section SIM.
                                                   Time.le ts (max loc)).
                 ii. des. subst. auto. }
               { ii. ss. des; auto. }
-              { i. ss. des. subst. timetac. }
+              { ii. ss. des; auto. subst. admit. }
               { econs. }
               { refl. }
               { refl. }
@@ -2237,20 +2298,14 @@ Section SIM.
                 eapply List.Forall_impl; eauto. i. ss. des; auto. }
             }
           }
+          { eauto. }
+          { ii. eapply MAPIDENT; eauto. etrans; eauto.
+            eapply concrete_promise_max_ts_max_concrete_ts; eauto. }
+          { ii. auto. }
+          { left. eauto. }
           { right. splits; auto.
             { ii. erewrite H in *. ss. }
             { i. ss. erewrite IdentMap.gss in TID0. dep_clarify. }
-            { eauto. }
-            { admit. }
-            { admit. }
-            (* { i. eapply BOUND in TS. *)
-            (*   instantiate (2:=fun loc => Time.incr (Memory.max_ts loc memory3)) in TS. *)
-            (*   ss. eapply TimeFacts.lt_le_lt. *)
-            (*   { eapply Time.incr_spec. } *)
-            (*   { eapply TS. } *)
-            (*   { auto. } *)
-            (* } *)
-            { eauto. }
           }
         }
       }
@@ -2259,7 +2314,9 @@ Section SIM.
     { hexploit CERTNIL.
       { destruct e0; ss. } i. subst.
       eexists _, [], ident_map. erewrite List.app_nil_r. esplits; eauto.
-      left. auto.
+      { eapply ident_map_lt. }
+      { left. auto. }
+      { left. auto. }
     }
   Admitted.
 
@@ -2281,22 +2338,118 @@ Section SIM.
                  (<<BEH: forall beh,
                      behaviors (pf_step L) c_src0 (s :: beh)>>)).
   Proof.
-    eapply configuration_step_certify in STEPTGT; auto. des.
+    exploit times_configuration_step_future; eauto. i. des.
+    exploit (@Memory.max_concrete_timemap_exists (Configuration.memory c_tgt1)); eauto.
+    { eapply WF2. } intros [max MAX].
+    eapply configuration_step_certify in STEPTGT; eauto. des.
     assert (exists loc ts th e,
                (<<PROM: all_promises (fun tid' => tid <> tid') prom0 loc ts>>) /\
-               (<<RACY: racy_write loc ts th e>>) /\
+               (<<RACY: racy_read loc ts th e>>) /\
                (<<IN: List.In (th, e) (tr_tgt ++ tr_cert')>>)).
-    { admit. } des.
+    { destruct (list_first_occurence
+                  (fun the => no_read_msgs
+                                (all_promises (fun tid' => tid <> tid') prom0)
+                                (snd the))
+                  (tr_tgt++tr_cert')); ss.
+      { exfalso. eapply NOREAD.
+        eapply Forall_app_inv in H. des. eapply Forall_app; auto.
+        destruct STEPTGT1.
+        { des. eapply List.Forall_forall. i.
+          eapply list_Forall2_in2 in H0; eauto. des.
+          eapply List.Forall_forall in IN; eauto. ss. destruct b, x. ss.
+
+          inv SIM. ss.
+
+          inv SAT; eauto.
+          { ii. eapply IN.
+
+            replace fto with to in *; auto. inv H0.
+            exploit sim_memory_forget_concrete_promised.
+            { eauto. }
+            { econs; eauto. }
+            i. exploit sim_memory_concrete_promised_later.
+            { eauto. }
+            { eapply WF_TGT. }
+            { eauto. }
+            i. des.
+            eapply memory_future_concrete_promised in PROMISED; cycle 1.
+            { eapply Memory.future_future_weak; eauto. }
+            inv PROMISED.
+            exploit MAPIDENT; cycle 1. eauto.
+            i. ss.
+            ss.
+
+
+              in GET; eauto.
+
+            eapply MAPIDENT; eauto.
+
+            { admit. }
+            {
+
+              in TO.
+            { subst. econs; eauto.
+            inv SIM.
+            eapply sim_memory_forget_concrete_promised
+
+
+
+            { subst. eauto.
+
+          eapply List.Forall2
+
+
+        admit. }
+      des. inv STEP. erewrite EQ in *.
+      admit.
+    } des.
     assert (DEC: forall (tid'': Ident.t), { (fun tid' => tid <> tid') tid'' } + { ~ (fun tid' => tid <> tid') tid''}).
     { i. destruct (Ident.eq_dec tid tid''); auto. }
+
+    hexploit (@trace_times_list_exists (tr_tgt ++ tr_cert')). i. des.
+    assert (exists (maxmap: TimeMap.t),
+               (<<TIMES: forall loc' ts (IN: List.In ts (times0 loc')), Time.lt ts (maxmap loc')>>) /\
+               (<<MAX: forall loc', Time.lt (Memory.max_ts loc' c_tgt0.(Configuration.memory)) (maxmap loc')>>)).
+    { hexploit (@choice
+                  Loc.t
+                  Time.t
+                  (fun loc' max =>
+                     (<<TIMES: forall ts (IN: List.In ts (times0 loc')), Time.lt ts (max)>>) /\
+                     (<<MAX: Time.lt (Memory.max_ts loc' c_tgt0.(Configuration.memory)) (max)>>))).
+      { i. hexploit (finite_greatest (fun _ => True) (times0 x)). i. des.
+        { exists (Time.incr (Time.join
+                               (Memory.max_ts x (Configuration.memory c_tgt0))
+                               to)).
+          splits.
+          { i. eapply GREATEST in IN1; auto. eapply TimeFacts.le_lt_lt; eauto.
+            eapply TimeFacts.le_lt_lt.
+            { eapply Time.join_r. }
+            { eapply  Time.incr_spec. }
+          }
+          { eapply TimeFacts.le_lt_lt.
+            { eapply Time.join_l. }
+            { eapply  Time.incr_spec. }
+          }
+        }
+        { exists (Time.incr (Memory.max_ts x (Configuration.memory c_tgt0))). splits.
+          { i. eapply EMPTY in IN0. ss. }
+          { eapply Time.incr_spec. }
+        }
+      }
+      i. des. exists f0. split.
+      { ii. specialize (H loc'). des. auto. }
+      { ii. specialize (H loc'). des. auto. }
+    } i. des.
+
     exploit (@sim_configuration_certify_all _ DEC); eauto; ss.
     i. des. destruct x1; des.
     { left. ii. eapply silent_configuration_steps_trace_behaviors; eauto.
       econs 3; eauto. }
+
     exploit good_future_configuration_step; eauto.
     { symmetry. eapply THS. ss. }
-    { i. eapply Time.incr_spec. }
-    { admit. }
+    { erewrite List.app_nil_r. eapply List.Forall_impl; eauto.
+      i. ss. eapply wf_time_evt_mon; eauto. i. ss. eapply TIMES in PR. auto. }
     i. des.
     inv PROM. exploit WRITES; eauto. i. des.
     exploit step_sim_configuration.
@@ -2311,12 +2464,20 @@ Section SIM.
     { auto. }
     i. des. destruct x1; des.
     { subst. dep_inv STEPSRC0.
-      admit. }
-    dep_inv STEPSRC0; cycle 1.
-    { exfalso.
-      (* eapply sim_traces_sim_event_exists in TRACE1; eauto. *)
-      admit.
-    }
+      left. ii. eapply silent_configuration_steps_trace_behaviors; eauto.
+      econs 3. unfold pf_step. esplits; eauto.
+      eapply sim_traces_pf; eauto. }
+
+    exploit list_Forall2_in2.
+    { eapply TRACE. }
+    { eapply IN. }
+    i. des. destruct b. ss.
+    dup TRACE0. eapply sim_traces_sim_event_exists in TRACE0; eauto; cycle 1.
+    { dup RACY. inv RACY1; inv EVT; ss. }
+    { dup RACY. inv RACY1; inv EVT; ss. }
+    i. des.
+
+    dep_inv STEPSRC0.
     exfalso. eapply racefree_write_read.
     { eauto. }
     { eapply silent_configuration_steps_trace_configuration_steps_trace; eauto. }
@@ -2326,9 +2487,13 @@ Section SIM.
       { eapply sim_traces_pf; eauto. }
     }
     { eauto. }
-    { admit. }
+    { erewrite List.app_nil_r. eauto. }
     { eauto. }
-    { admit. }
+    { eapply racy_read_mon.
+      { eauto. }
+      { etrans; eauto.  }
+      { etrans; eauto. symmetry. auto. }
+    }
   Admitted.
 
 End SIM.
