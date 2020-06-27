@@ -490,7 +490,7 @@ Definition pf_consistent_flex lang (e0:Thread.t lang)
                                                       /1\ no_sc
                                                       /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (incr_time_seq (tm loc))>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))
                                                       /1\ wf_time_evt (fun loc => certification_times times f max (Memory.max_timemap e0.(Thread.memory)) loc)
-                                                      /1\ no_read_msgs (fun loc ts => ~ (covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts \/ Time.lt (incr_time_seq (tm loc)) ts))) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) ftr >>) /\
+                                                      /1\ no_read_msgs (fun loc ts => ~ ((covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts) /\ f loc (tm loc) ts ts \/ Time.lt (incr_time_seq (tm loc)) ts))) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) ftr >>) /\
           (<<TRACE: List.Forall2 (fun em fem => tevent_map (fun loc => f loc (tm loc)) (snd fem) (snd em)) tr ftr>>) /\
           (__guard__((exists st',
                          (<<LOCAL: Local.failure_step e1.(Thread.local)>>) /\
@@ -643,23 +643,61 @@ Proof.
         { right. esplits; eauto. }
       }
       { eapply List.Forall_forall in NOREAD; eauto.
-        eapply no_read_msgs_mon; eauto. i.
-        apply not_or_and in PR. des. apply not_or_and in PR0. des.
-        exploit cap_flex_covered; eauto. intros COV. hexploit (proj1 COV).
-        { instantiate (1:=x2). instantiate (1:=x0). econs; ss.
-          { destruct (Time.bot_spec x2); auto. inv H3. exfalso. eapply PR0.
-            econs. eapply MEM. }
-          { destruct (Time.le_lt_dec x2 (incr_time_seq (tm x0))); ss. }
+        eapply no_read_msgs_sum.
+        { instantiate (1:=(fun loc ts =>
+                             ~ (f (loc, tm loc) ts ts \/
+                                Time.le (incr_time_seq (tm loc)) ts))).
+          exploit list_Forall2_in.
+          { eapply TRACE. }
+          { eauto. }
+          i. des. inv EVENT; ss.
+          { ii. apply not_or_and in H3. des.
+            destruct (Time.le_lt_dec to (max loc)).
+            { eapply MAP in l. eapply H3. replace fto with to; auto.
+              eapply mapping_map_lt_map_eq.
+              { eapply MAP. }
+              { ss. eauto. }
+              { ss. }
+            }
+            eapply MAP.(cap_flex_map_bound) in l; eauto.
+          }
+          { ii. apply not_or_and in H3. des.
+            destruct (Time.le_lt_dec from (max loc)).
+            { eapply MAP in l. eapply H3. replace ffrom with from; auto.
+              eapply mapping_map_lt_map_eq.
+              { eapply MAP. }
+              { ss. eauto. }
+              { ss. }
+            }
+            eapply MAP.(cap_flex_map_bound) in l; eauto.
+          }
         }
-        intros COVERED. inv COVERED. econs; eauto.
-        { econs; eauto. econs; eauto.
-          destruct (Memory.get x0 to (Local.promises (Thread.local th)))
-            as [[from0 msgs]|] eqn: GETPROM; auto.
-          dup GETPROM. eapply WF in GETPROM.
-          eapply CAP0 in GETPROM. clarify.
-          exfalso. eapply PR. econs; eauto. }
-        { i. eapply cap_flex_inv in GET0; eauto. des; clarify.
-          eapply PR0. econs; eauto. }
+        { instantiate (1:=(fun loc ts =>
+                             ~ ((covered loc ts (Local.promises (Thread.local th)) \/
+                                 concrete_promised (Thread.memory th) loc ts) \/
+                                Time.lt (incr_time_seq (tm loc)) ts))).
+          eapply no_read_msgs_mon; eauto. i.
+          apply not_or_and in PR. des.
+          apply not_or_and in PR. des.
+          exploit cap_flex_covered; eauto. intros COV. hexploit (proj1 COV).
+          { instantiate (1:=x2). instantiate (1:=x0). econs; ss.
+            { destruct (Time.bot_spec x2); auto. inv H3. exfalso. eapply PR1.
+              econs. eapply MEM. }
+            { destruct (Time.le_lt_dec x2 (incr_time_seq (tm x0))); ss. }
+          }
+          intros COVERED. inv COVERED. econs; eauto.
+          { econs; eauto. econs; eauto.
+            destruct (Memory.get x0 to (Local.promises (Thread.local th)))
+              as [[from0 msgs]|] eqn: GETPROM; auto.
+            dup GETPROM. eapply WF in GETPROM.
+            eapply CAP0 in GETPROM. clarify.
+            exfalso. eapply PR. econs; eauto. }
+          { i. eapply cap_flex_inv in GET0; eauto. des; clarify.
+            eapply PR1. econs; eauto. }
+        }
+        { i. apply not_and_or. ii. apply not_or_and in PR.
+          des; try by (ss; eapply PR; eauto). eapply PR. splits; auto.
+          eapply MAP. inv H4. eapply MAX in GET. inv ITV. ss. eauto. }
       }
     }
     eapply list_Forall2_in in H; eauto. des.
@@ -714,7 +752,7 @@ Definition pf_consistent_flex_aux lang (e0:Thread.t lang)
           (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free
                                                       /1\ no_sc
                                                       /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (incr_time_seq (tm loc))>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))
-                                                      /1\ no_read_msgs (fun loc ts => ~ (covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts \/ Time.lt (incr_time_seq (tm loc)) ts))
+                                                      /1\ no_read_msgs (fun loc ts => ~ ((covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts) /\ f loc (tm loc) ts ts \/ Time.lt (incr_time_seq (tm loc)) ts))
                                                       /1\ wf_time_evt (fun loc => certification_times times f max (Memory.max_timemap e0.(Thread.memory)) loc)) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) ftr >>) /\
           (<<TRACE: List.Forall2 (fun em fem => tevent_map (fun loc => f loc (tm loc)) (snd fem) (snd em)) tr ftr>>) /\
           (__guard__((exists st',
@@ -813,7 +851,7 @@ Definition pf_consistent_super_strong lang (e0:Thread.t lang)
     (<<STEPS: Trace.steps ftr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc mem1) e1>>) /\
     (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free
                                                 /1\ no_sc
-                                                /1\ no_read_msgs (fun loc ts => ~ (covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts \/ Time.lt (tm loc) ts))
+                                                /1\ no_read_msgs (fun loc ts => ~ ((covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts) /\ f loc ts ts \/ Time.lt (tm loc) ts))
                                                 /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (tm loc)>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))
                                                 /1\ wf_time_evt times) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) ftr >>) /\
     (<<MAPLT: mapping_map_lt f>>) /\
@@ -904,7 +942,7 @@ Proof.
     eapply list_Forall2_in2 in H; eauto. des. rewrite SAT.
     eapply List.Forall_forall in EVENTS; eauto. ss. des. splits; auto.
     { eapply no_read_msgs_mon; eauto. i. ss. ii. eapply PR. des; auto.
-      right. right. eapply TimeFacts.le_lt_lt; eauto. eapply TM. }
+      right. eapply TimeFacts.le_lt_lt; eauto. eapply TM. }
     { eapply write_not_in_mon; eauto. i. ss. des. split; auto.
       red. etrans; eauto. eapply TM. }
   }
@@ -1127,8 +1165,8 @@ Proof.
                          no_read_msgs
                            (fun loc ts =>
                               ~
-                                (covered loc ts (Local.promises lc_src) \/
-                                 concrete_promised mem_src loc ts \/ Time.lt (tm loc) ts))
+                                ((covered loc ts (Local.promises lc_src) \/
+                                  concrete_promised mem_src loc ts) /\ f0 loc ts ts \/ Time.lt (tm loc) ts))
                            (snd em)) /\
                         write_not_in
                           (fun loc ts =>
@@ -1147,7 +1185,7 @@ Proof.
     { inv TO. apply NNPP in SAT3. ii. apply H. des; auto.
       { inv LOCAL. erewrite promises_ident_map_covered in SAT3; eauto. }
       { eapply memory_ident_map_concrete in SAT3; eauto. }
-      { right. right. eapply TimeFacts.le_lt_lt; eauto. }
+      { right. eapply TimeFacts.le_lt_lt; eauto. }
     }
     { inv FROM. inv TO. ii. eapply SAT2; eauto. des. split; auto.
       inv LOCAL. erewrite <- promises_ident_map_covered in H0; eauto. }
@@ -1155,7 +1193,7 @@ Proof.
     { inv TO. inv FROM. apply NNPP in SAT3. ii. apply H. des; auto.
       { inv LOCAL. erewrite promises_ident_map_covered in SAT3; eauto. }
       { eapply memory_ident_map_concrete in SAT3; eauto. }
-      { right. right. eapply TimeFacts.le_lt_lt; eauto. }
+      { right. eapply TimeFacts.le_lt_lt; eauto. }
     }
     { inv FROM. inv TO. ii. eapply SAT2; eauto. des. split; auto.
       inv LOCAL. erewrite <- promises_ident_map_covered in H0; eauto. }
@@ -1163,7 +1201,8 @@ Proof.
   }
   esplits; eauto; ss.
   { eapply List.Forall_impl; eauto. i. ss. des. splits; auto.
-    eapply write_not_in_mon; eauto. i. ss. des. split; auto. etrans; eauto. }
+    eapply write_not_in_mon; eauto. i. ss. des. split; auto. etrans; eauto.
+  }
   { i. destruct (Time.le_lt_dec fts (max_tgt loc)); eauto.
     dup l. exploit BOUND; eauto.
     i. exfalso. eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt.

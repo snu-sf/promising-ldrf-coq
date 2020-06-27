@@ -2166,23 +2166,15 @@ Section SIM.
   Lemma configuration_step_certify c0 c1 e tid (tr tr_cert: Trace.t)
         (WF: Configuration.wf c0)
         (STEP: times_configuration_step times tr tr_cert e tid c0 c1)
-        (max: TimeMap.t)
-
-        (MAX: Memory.max_concrete_timemap c1.(Configuration.memory) max)
     :
       exists c2 tr_cert' f e',
         (<<STEP: times_configuration_step times (tr ++ tr_cert') [] e' tid c0 c2>>) /\
         (<<MAPLT: mapping_map_lt f>>) /\
         (<<MAPIDENT:
            forall loc ts fts
-                  (TS: Time.le fts (max loc))
+                  (CONCRETE: concrete_promised c1.(Configuration.memory) loc ts)
                   (MAP: f loc ts fts),
              ts = fts>>) /\
-        (<<BOUND:
-           forall loc ts fts
-                  (TS: Time.lt (max loc) fts)
-                  (MAP: f loc ts fts),
-             Time.lt (max loc) fts>>) /\
         __guard__((<<TRACE: List.Forall2 (fun em fem => tevent_map f (snd fem) (snd em)) tr_cert tr_cert'>>) \/
                   (<<TRACE: exists lc, List.Forall2 (fun em fem => tevent_map f (snd fem) (snd em)) (tr_cert++[(lc, ThreadEvent.failure)]) tr_cert'>>)) /\
         __guard__(e' = MachineEvent.failure \/
@@ -2203,7 +2195,7 @@ Section SIM.
       { eapply WF2. }
       { eapply WF2; eauto. ss. erewrite IdentMap.gss; eauto. }
       { eauto. }
-      i. des. ss. instantiate (1:=fun loc => Time.incr (max loc)) in GOOD.
+      i. des. ss. instantiate (1:=fun loc => Time.incr (Memory.max_ts loc memory3)) in GOOD.
       destruct e1. ss. unguard. des.
       { esplits.
         { econs.
@@ -2232,20 +2224,12 @@ Section SIM.
           }
         }
         { eauto. }
-        { ii. eapply MAPIDENT; eauto. etrans; eauto.
-          eapply concrete_promise_max_ts_max_concrete_ts; eauto. }
-        { ii.
-          exploit BOUND; eauto.
-
-          admit.
+        { ii. destruct (Time.le_lt_dec fts (tm loc)).
+          { eapply MAPIDENT; eauto. }
+          { eapply BOUND in l; eauto.
+            admit.
+          }
         }
-          (* exploit BOUND; cycle 1. *)
-          (* { eauto. } *)
-          (* { admit. } *)
-          (* i. admit. *)
-
-          (* eapply TimeFacts.le_lt_lt; eauto. *)
-          (* eapply memory_ident_map_concrete_promise_max_timemap; eauto. *)
         { right. exists local. esplits. eapply List.Forall2_app; eauto.
           econs; eauto. ss. econs. }
         { left. auto. }
@@ -2299,10 +2283,8 @@ Section SIM.
             }
           }
           { eauto. }
-          { ii. eapply MAPIDENT; eauto. etrans; eauto.
-            eapply concrete_promise_max_ts_max_concrete_ts; eauto. }
+          { ii. admit. }
           { ii. auto. }
-          { left. eauto. }
           { right. splits; auto.
             { ii. erewrite H in *. ss. }
             { i. ss. erewrite IdentMap.gss in TID0. dep_clarify. }
@@ -2351,57 +2333,8 @@ Section SIM.
                                 (all_promises (fun tid' => tid <> tid') prom0)
                                 (snd the))
                   (tr_tgt++tr_cert')); ss.
-      { exfalso. eapply NOREAD.
-        eapply Forall_app_inv in H. des. eapply Forall_app; auto.
-        destruct STEPTGT1.
-        { des. eapply List.Forall_forall. i.
-          eapply list_Forall2_in2 in H0; eauto. des.
-          eapply List.Forall_forall in IN; eauto. ss. destruct b, x. ss.
-
-          inv SIM. ss.
-
-          inv SAT; eauto.
-          { ii. eapply IN.
-
-            replace fto with to in *; auto. inv H0.
-            exploit sim_memory_forget_concrete_promised.
-            { eauto. }
-            { econs; eauto. }
-            i. exploit sim_memory_concrete_promised_later.
-            { eauto. }
-            { eapply WF_TGT. }
-            { eauto. }
-            i. des.
-            eapply memory_future_concrete_promised in PROMISED; cycle 1.
-            { eapply Memory.future_future_weak; eauto. }
-            inv PROMISED.
-            exploit MAPIDENT; cycle 1. eauto.
-            i. ss.
-            ss.
-
-
-              in GET; eauto.
-
-            eapply MAPIDENT; eauto.
-
-            { admit. }
-            {
-
-              in TO.
-            { subst. econs; eauto.
-            inv SIM.
-            eapply sim_memory_forget_concrete_promised
-
-
-
-            { subst. eauto.
-
-          eapply List.Forall2
-
-
-        admit. }
-      des. inv STEP. erewrite EQ in *.
-      admit.
+      { admit. }
+      { admit. }
     } des.
     assert (DEC: forall (tid'': Ident.t), { (fun tid' => tid <> tid') tid'' } + { ~ (fun tid' => tid <> tid') tid''}).
     { i. destruct (Ident.eq_dec tid tid''); auto. }
