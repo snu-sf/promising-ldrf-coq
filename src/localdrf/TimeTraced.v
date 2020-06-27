@@ -30,7 +30,7 @@ Set Implicit Arguments.
 
 
 Inductive times_configuration_step (times: Loc.t -> Time.t -> Prop)
-  : forall lang (tr tr_cert: Trace.t lang)
+  : forall (tr tr_cert: Trace.t)
            (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
 | times_configuration_step_intro
     lang tr e tr' pf tid c1 st1 lc1 e2 st3 lc3 sc3 memory3 tr_cert
@@ -38,7 +38,7 @@ Inductive times_configuration_step (times: Loc.t -> Time.t -> Prop)
     (STEPS: Trace.steps tr' (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
     (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr')
     (STEP: Thread.step pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
-    (TR: tr = tr'++[(e2, e)])
+    (TR: tr = tr'++[(e2.(Thread.local), e)])
     (CONSISTENT: forall (EVENT: e <> ThreadEvent.failure),
         pf_consistent_super_strong (Thread.mk _ st3 lc3 sc3 memory3) tr_cert times)
     (CERTNIL: e = ThreadEvent.failure -> tr_cert = [])
@@ -52,19 +52,18 @@ Inductive times_configuration_step (times: Loc.t -> Time.t -> Prop)
 Inductive times_configuration_step_all (times: Loc.t -> Time.t -> Prop)
           (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t): Prop :=
 | times_configuration_step_all_intro
-    lang tr tr_cert
-    (STEP: @times_configuration_step times lang tr tr_cert e tid c1 c2)
+    tr tr_cert
+    (STEP: @times_configuration_step times tr tr_cert e tid c1 c2)
 .
 
-Lemma times_configuration_step_traced_step times lang tr tr_cert e tid c1 c2
-      (STEP: @times_configuration_step times lang tr tr_cert e tid c1 c2)
+Lemma times_configuration_step_traced_step times tr tr_cert e tid c1 c2
+      (STEP: @times_configuration_step times tr tr_cert e tid c1 c2)
       (WF: Configuration.wf c1)
   :
-    exists lang (tr: Trace.t lang),
+    exists (tr: Trace.t),
       (<<STEP: Trace.configuration_step tr e tid c1 c2>>).
 Proof.
-  inv STEP. apply inj_pair2 in H1. apply inj_pair2 in H2. subst.
-  esplits. econs; eauto.
+  inv STEP. esplits. econs; eauto.
   i. hexploit CONSISTENT; eauto. i. des.
   dup WF. inv WF. exploit Trace.steps_future; eauto.
   { ss. eapply WF1; eauto. } i. des. ss.
@@ -75,8 +74,8 @@ Proof.
 Qed.
 
 Lemma times_configuration_step_future
-      times lang tr tr_cert e tid c1 c2
-      (STEP: @times_configuration_step times lang tr tr_cert e tid c1 c2)
+      times tr tr_cert e tid c1 c2
+      (STEP: @times_configuration_step times tr tr_cert e tid c1 c2)
       (WF1: Configuration.wf c1):
   (<<WF2: Configuration.wf c2>>) /\
   (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
@@ -87,39 +86,38 @@ Proof.
 Qed.
 
 Inductive times_configuration_opt_step (times: Loc.t -> Time.t -> Prop)
-  : forall lang (tr tr_cert: Trace.t lang)
+  : forall (tr tr_cert: Trace.t)
            (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
 | times_configuration_opt_step_some
-    lang tr tr_cert e tid c1 c2
-    (STEP: @times_configuration_step times lang tr tr_cert e tid c1 c2)
+    tr tr_cert e tid c1 c2
+    (STEP: @times_configuration_step times tr tr_cert e tid c1 c2)
   :
     times_configuration_opt_step times tr tr_cert e tid c1 c2
 | times_configuration_opt_step_none
-    lang tid c
+    tid c
   :
-    @times_configuration_opt_step times lang [] [] MachineEvent.silent tid c c
+    @times_configuration_opt_step times [] [] MachineEvent.silent tid c c
 .
 
 Lemma times_configuration_opt_step_future
-      times lang tr tr_cert e tid c1 c2
-      (STEP: @times_configuration_opt_step times lang tr tr_cert e tid c1 c2)
+      times tr tr_cert e tid c1 c2
+      (STEP: @times_configuration_opt_step times tr tr_cert e tid c1 c2)
       (WF1: Configuration.wf c1):
   (<<WF2: Configuration.wf c2>>) /\
   (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
   (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
 Proof.
   inv STEP.
-  { apply inj_pair2 in H1. apply inj_pair2 in H2. subst.
-    eapply times_configuration_step_future; eauto. }
-  { apply inj_pair2 in H1. apply inj_pair2 in H2. subst. splits; auto. refl. }
+  { eapply times_configuration_step_future; eauto. }
+  { splits; auto. refl. }
 Qed.
 
 Lemma times_configuration_step_mon times0 times1
       (LE: times0 <2= times1)
   :
-    times_configuration_step times0 <7= times_configuration_step times1.
+    times_configuration_step times0 <6= times_configuration_step times1.
 Proof.
-  i. inv PR. eapply inj_pair2 in H1. eapply inj_pair2 in H2. subst. econs; eauto.
+  i. inv PR. econs; eauto.
   { i. hexploit CONSISTENT; eauto. i. des. esplits; eauto.
     eapply pf_consistent_super_strong_mon; eauto. }
   { eapply List.Forall_impl; eauto. i. eapply wf_time_evt_mon; eauto. }
@@ -137,14 +135,14 @@ Lemma times_configuration_step_exists c0 c1 tid e
       (STEP: Configuration.step e tid c0 c1)
       (WF: Configuration.wf c0)
   :
-    exists lang times tr tr_cert,
-      (<<STEP: @times_configuration_step times lang tr tr_cert e tid c0 c1>>) /\
+    exists times tr tr_cert,
+      (<<STEP: @times_configuration_step times tr tr_cert e tid c0 c1>>) /\
       (<<WO: forall loc, well_ordered (times loc)>>).
 Proof.
   eapply Trace.step_configuration_step in STEP. des.
   hexploit (trace_times_list_exists tr). i. des. inv STEP0.
-  eapply inj_pair2 in H1. subst. destruct (classic (e0 = ThreadEvent.failure)).
-  { subst. eexists lang, (fun loc ts => List.In ts (times loc)), (tr'++_), []. splits.
+  destruct (classic (e0 = ThreadEvent.failure)).
+  { subst. eexists (fun loc ts => List.In ts (times loc)), (tr'++_), []. splits.
     { econs; eauto. ss. }
     { i. eapply finite_well_ordered. }
   }
@@ -153,7 +151,7 @@ Proof.
     { ss. eapply WF1; eauto. } i. des. ss.
     hexploit Thread.step_future; eauto. i. des. ss.
     eapply consistent_pf_consistent_super_strong in H0; eauto.
-    des. eexists lang, (certimes \2/ (fun loc ts => List.In ts (times loc))), (tr'++_), tr. splits.
+    des. eexists (certimes \2/ (fun loc ts => List.In ts (times loc))), (tr'++_), tr. splits.
     { econs; eauto.
       { i. esplits. eapply pf_consistent_super_strong_mon; eauto. }
       { i. ss. }

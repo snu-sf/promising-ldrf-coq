@@ -41,35 +41,40 @@ Section LOCALDRF.
 
   Definition pf_step (e: MachineEvent.t) (tid: Ident.t)
              (c0 c1: Configuration.t): Prop :=
-    exists lang tr,
-      (<<STEP: @Trace.configuration_step lang tr e tid c0 c1>>) /\
+    exists tr,
+      (<<STEP: @Trace.configuration_step tr e tid c0 c1>>) /\
       (<<PF: List.Forall (compose pf_event snd) tr>>).
 
   Inductive configuration_steps_trace:
-    forall (c0 c1: Configuration.t) (tr: list (Ident.t * sigT Trace.t)), Prop :=
+    forall (c0 c1: Configuration.t) (tr: Trace.t), Prop :=
   | configuration_steps_trace_nil
       c0
     :
       configuration_steps_trace c0 c0 []
   | configuration_steps_trace_cons
-      c0 c1 c2 trs lang tr e tid
+      c0 c1 c2 trs tr e tid
       (STEPS: configuration_steps_trace c1 c2 trs)
-      (STEP: @Trace.configuration_step lang tr e tid c0 c1)
+      (STEP: @Trace.configuration_step tr e tid c0 c1)
       (PF: List.Forall (compose pf_event snd) tr)
     :
-      configuration_steps_trace c0 c2 ((tid, existT _ _ tr) :: trs)
+      configuration_steps_trace c0 c2 (tr ++ trs)
   .
 
-  Lemma configuration_steps_trace_n1 c0 c1 c2 lang tr trs e tid
+  Lemma configuration_steps_trace_n1 c0 c1 c2 tr trs e tid
         (STEPS: configuration_steps_trace c0 c1 trs)
-        (STEP: @Trace.configuration_step lang tr e tid c1 c2)
+        (STEP: @Trace.configuration_step tr e tid c1 c2)
         (PF: List.Forall (compose pf_event snd) tr)
     :
-      configuration_steps_trace c0 c2 (trs ++ [(tid, existT _ _ tr)]).
+      configuration_steps_trace c0 c2 (trs ++ tr).
   Proof.
     ginduction STEPS.
-    { i. eapply configuration_steps_trace_cons with (trs:=[]); eauto. econs. }
-    { i. exploit IHSTEPS; eauto. i. erewrite <- List.app_comm_cons. econs; eauto. }
+    { i. exploit configuration_steps_trace_cons.
+      { econs 1. }
+      { eapply STEP. }
+      { auto. }
+      { i. ss. erewrite List.app_nil_r in *. auto. }
+    }
+    { i. exploit IHSTEPS; eauto. i. erewrite <- List.app_assoc. econs; eauto. }
   Qed.
 
   Lemma configuration_steps_trace_trans c0 c1 c2 trs0 trs1
@@ -80,22 +85,22 @@ Section LOCALDRF.
   Proof.
     ginduction STEPS0.
     { i. erewrite List.app_nil_l. eauto. }
-    { i. exploit IHSTEPS0; eauto. i. econs; eauto. }
+    { i. exploit IHSTEPS0; eauto. i. erewrite <- List.app_assoc. econs; eauto. }
   Qed.
 
   Inductive silent_configuration_steps_trace:
-    forall (c0 c1: Configuration.t) (tr: list (Ident.t * sigT Trace.t)), Prop :=
+    forall (c0 c1: Configuration.t) (tr: Trace.t), Prop :=
   | silent_configuration_steps_trace_nil
       c0
     :
       silent_configuration_steps_trace c0 c0 []
   | silent_configuration_steps_trace_cons
-      c0 c1 c2 trs lang tr tid
+      c0 c1 c2 trs tr tid
       (STEPS: silent_configuration_steps_trace c1 c2 trs)
-      (STEP: @Trace.configuration_step lang tr MachineEvent.silent tid c0 c1)
+      (STEP: @Trace.configuration_step tr MachineEvent.silent tid c0 c1)
       (PF: List.Forall (compose pf_event snd) tr)
     :
-      silent_configuration_steps_trace c0 c2 ((tid, existT _ _ tr) :: trs)
+      silent_configuration_steps_trace c0 c2 (tr ++ trs)
   .
 
   Lemma silent_configuration_steps_trace_configuration_steps_trace
@@ -118,69 +123,64 @@ Section LOCALDRF.
   Qed.
 
   Inductive racy_read (loc: Loc.t) (ts: Time.t):
-    forall lang (th: Thread.t lang) (e: ThreadEvent.t), Prop :=
+    forall (lc: Local.t) (e: ThreadEvent.t), Prop :=
   | racy_read_read
-      lang (th: Thread.t lang)
+      lc
       valr releasedr ordr
       (VIEW:
          if Ordering.le Ordering.relaxed ordr
-         then Time.lt (th.(Thread.local).(Local.tview).(TView.cur).(View.rlx) loc) ts
-         else Time.lt (th.(Thread.local).(Local.tview).(TView.cur).(View.pln) loc) ts)
+         then Time.lt (lc.(Local.tview).(TView.cur).(View.rlx) loc) ts
+         else Time.lt (lc.(Local.tview).(TView.cur).(View.pln) loc) ts)
     :
-      racy_read loc ts th (ThreadEvent.read loc ts valr releasedr ordr)
+      racy_read loc ts lc (ThreadEvent.read loc ts valr releasedr ordr)
   | racy_read_update
-      lang (th: Thread.t lang)
+      lc
       to valr valw releasedr releasedw ordr ordw
       (VIEW:
          if Ordering.le Ordering.relaxed ordr
-         then Time.lt (th.(Thread.local).(Local.tview).(TView.cur).(View.rlx) loc) ts
-         else Time.lt (th.(Thread.local).(Local.tview).(TView.cur).(View.pln) loc) ts)
+         then Time.lt (lc.(Local.tview).(TView.cur).(View.rlx) loc) ts
+         else Time.lt (lc.(Local.tview).(TView.cur).(View.pln) loc) ts)
     :
-      racy_read loc ts th (ThreadEvent.update loc ts to valr valw releasedr releasedw ordr ordw)
+      racy_read loc ts lc (ThreadEvent.update loc ts to valr valw releasedr releasedw ordr ordw)
   .
 
   Inductive racy_write (loc: Loc.t) (ts: Time.t):
-    forall lang (th: Thread.t lang) (e: ThreadEvent.t), Prop :=
+    forall (lc: Local.t) (e: ThreadEvent.t), Prop :=
   | racy_write_write
-      lang (th: Thread.t lang)
+      lc
       from valw releasedw ordw
       (ORD: Ordering.le ordw Ordering.relaxed)
     :
-      racy_write loc ts th (ThreadEvent.write loc from ts valw releasedw ordw)
+      racy_write loc ts lc (ThreadEvent.write loc from ts valw releasedw ordw)
   | racy_write_update
-      lang (th: Thread.t lang)
+      lc
       from valr valw releasedr releasedw ordr ordw
       (ORD: Ordering.le ordw Ordering.relaxed)
     :
-      racy_write loc ts th (ThreadEvent.update loc from ts valr valw releasedr releasedw ordr ordw)
+      racy_write loc ts lc (ThreadEvent.update loc from ts valr valw releasedr releasedw ordr ordw)
   .
 
   Definition racefree (c0: Configuration.t): Prop :=
     forall c1 trs
-           loc ts
-           tid0 tid1 lang0 lang1 tr0 tr1 th0 th1 e0 e1
+           loc ts lc0 lc1 e0 e1
            (CSTEPS: configuration_steps_trace c0 c1 trs)
-           (TRACE0: List.In (tid0, existT _ lang0 tr0) trs)
-           (TRACE1: List.In (tid1, existT _ lang1 tr1) trs)
-           (EVENT0: List.In (th0, e0) tr0)
-           (EVENT1: List.In (th1, e1) tr1)
-           (WRITE: racy_write loc ts th0 e0)
-           (READ: racy_read loc ts th1 e1),
+           (TRACE0: List.In (lc0, e0) trs)
+           (TRACE1: List.In (lc1, e1) trs)
+           (WRITE: racy_write loc ts lc0 e0)
+           (READ: racy_read loc ts lc1 e1),
       False.
 
-  Lemma step_racefree c0 c1 lang tr e tid
+  Lemma step_racefree c0 c1 tr e tid
         (RACEFREE: racefree c0)
-        (STEP: @Trace.configuration_step lang tr e tid c0 c1)
+        (STEP: @Trace.configuration_step tr e tid c0 c1)
         (PF: List.Forall (compose pf_event snd) tr)
     :
       racefree c1.
   Proof.
     ii. eapply RACEFREE.
     { econs 2; eauto. }
-    { ss. right. eapply TRACE0. }
-    { ss. right. eapply TRACE1. }
-    { eauto. }
-    { eauto. }
+    { eapply List.in_or_app. right. eapply TRACE0. }
+    { eapply List.in_or_app. right. eapply TRACE1. }
     { eauto. }
     { eauto. }
   Qed.
@@ -197,21 +197,17 @@ Section LOCALDRF.
     { eapply List.in_or_app. right. eapply TRACE1. }
     { eauto. }
     { eauto. }
-    { eauto. }
-    { eauto. }
   Qed.
 
   Lemma racefree_write_read c0 c1 c2 trs0 trs1
-        loc ts tid0 tid1 lang0 lang1 tr0 tr1 th0 th1 e0 e1
+        loc ts lc0 lc1 e0 e1
         (RACEFREE: racefree c0)
         (STEPS0: configuration_steps_trace c0 c1 trs0)
         (STEPS1: configuration_steps_trace c1 c2 trs1)
-        (TRACE0: List.In (tid0, existT _ lang0 tr0) trs0)
-        (TRACE1: List.In (tid1, existT _ lang1 tr1) trs1)
-        (EVENT0: List.In (th0, e0) tr0)
-        (EVENT1: List.In (th1, e1) tr1)
-        (WRITE: racy_write loc ts th0 e0)
-        (READ: racy_read loc ts th1 e1)
+        (TRACE0: List.In (lc0, e0) trs0)
+        (TRACE1: List.In (lc1, e1) trs1)
+        (WRITE: racy_write loc ts lc0 e0)
+        (READ: racy_read loc ts lc1 e1)
     :
       False.
   Proof.
@@ -219,8 +215,6 @@ Section LOCALDRF.
     { eapply configuration_steps_trace_trans; eauto. }
     { eapply List.in_or_app. left. eapply TRACE0. }
     { eapply List.in_or_app. right. eapply TRACE1. }
-    { eauto. }
-    { eauto. }
     { eauto. }
     { eauto. }
   Qed.

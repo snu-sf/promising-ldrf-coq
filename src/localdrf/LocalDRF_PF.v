@@ -67,7 +67,7 @@ Proof.
   ii. subst. inv RESERVING; eauto.
 Qed.
 
-Definition reserving_trace (lang: language) (tr: Trace.t lang): Prop :=
+Definition reserving_trace (tr: Trace.t): Prop :=
   List.Forall (fun the => reserving_tevent (snd the)) tr.
 
 Lemma reserve_future_memory_steps
@@ -190,18 +190,18 @@ Section SIM.
     inv EVENT; ss.
   Qed.
 
-  Inductive sim_trace lang: Trace.t lang -> option (Thread.t lang * ThreadEvent.t) -> Prop :=
+  Inductive sim_trace: Trace.t -> option (Local.t * ThreadEvent.t) -> Prop :=
   | sim_trace_nil
     :
       sim_trace [] None
   | sim_trace_cons
-      th_src th_tgt e_src e_tgt tl_src
+      lc_src lc_tgt e_src e_tgt tl_src
       (PF: pf_event L e_src)
       (TL: sim_trace tl_src None)
       (EVENT: sim_event e_src e_tgt)
-      (VW: TView.le th_src.(Thread.local).(Local.tview) th_tgt.(Thread.local).(Local.tview))
+      (VW: TView.le lc_src.(Local.tview) lc_tgt.(Local.tview))
     :
-      sim_trace ((th_src, e_src)::tl_src) (Some (th_tgt, e_tgt))
+      sim_trace ((lc_src, e_src)::tl_src) (Some (lc_tgt, e_tgt))
   | sim_trace_forget
       th_tgt e tl_src
       (NONRACY: ~ racy_event e)
@@ -227,14 +227,14 @@ Section SIM.
     inv EVENT; ss.
   Qed.
 
-  Lemma sim_trace_sim_event_sim_trace lang (tr_src: Trace.t lang) th_mid th_tgt e_mid e_tgt
-        (TRACE: sim_trace tr_src (Some (th_mid, e_mid)))
-        (THREAD: TView.le th_mid.(Thread.local).(Local.tview) th_tgt.(Thread.local).(Local.tview))
+  Lemma sim_trace_sim_event_sim_trace (tr_src: Trace.t) lc_mid lc_tgt e_mid e_tgt
+        (TRACE: sim_trace tr_src (Some (lc_mid, e_mid)))
+        (THREAD: TView.le lc_mid.(Local.tview) lc_tgt.(Local.tview))
         (EVENT: sim_event e_mid e_tgt)
     :
-      sim_trace tr_src (Some (th_tgt, e_tgt)).
+      sim_trace tr_src (Some (lc_tgt, e_tgt)).
   Proof.
-    remember (Some (th_mid, e_mid)) as e. ginduction TRACE; i; clarify.
+    remember (Some (lc_mid, e_mid)) as e. ginduction TRACE; i; clarify.
     { econs 2; eauto.
       { etrans; eauto. }
       { etrans; eauto. }
@@ -243,25 +243,25 @@ Section SIM.
     { econs 4; eauto. }
   Qed.
 
-  Lemma sim_silent_sim_event_exists lang (tr_src: Trace.t lang) th_tgt e_tgt
-        (TRACE: sim_trace tr_src (Some (th_tgt, e_tgt)))
+  Lemma sim_silent_sim_event_exists (tr_src: Trace.t) lc_tgt e_tgt
+        (TRACE: sim_trace tr_src (Some (lc_tgt, e_tgt)))
         (PF: pf_event L e_tgt)
         (RACY: racy_event e_tgt)
     :
-      exists th e_src,
-        (<<IN: List.In (th, e_src) tr_src>>) /\
+      exists lc e_src,
+        (<<IN: List.In (lc, e_src) tr_src>>) /\
         (<<EVENT: sim_event e_src e_tgt>>)
   .
   Proof.
-    remember (Some (th_tgt, e_tgt)). revert e_tgt Heqo PF RACY.
+    remember (Some (lc_tgt, e_tgt)). revert e_tgt Heqo PF RACY.
     ginduction TRACE; i; clarify.
     { esplits; eauto. econs; eauto. }
     { hexploit IHTRACE; eauto. i. des.
       esplits; eauto. right. eauto. }
   Qed.
 
-  Lemma sim_trace_silent lang (tr_src: Trace.t lang) (e: option (Thread.t lang * ThreadEvent.t))
-        (SILENT: forall th_tgt e_tgt (EQ: e = Some (th_tgt, e_tgt)), ThreadEvent.get_machine_event e_tgt = MachineEvent.silent)
+  Lemma sim_trace_silent (tr_src: Trace.t) (e: option (Local.t * ThreadEvent.t))
+        (SILENT: forall lc_tgt e_tgt (EQ: e = Some (lc_tgt, e_tgt)), ThreadEvent.get_machine_event e_tgt = MachineEvent.silent)
         (TRACE: sim_trace tr_src e)
     :
       List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr_src.
@@ -282,7 +282,7 @@ Section SIM.
     ii. subst. ss.
   Qed.
 
-  Lemma sim_trace_pf lang (tr_src: Trace.t lang) (e: option (Thread.t lang * ThreadEvent.t))
+  Lemma sim_trace_pf (tr_src: Trace.t) (e: option (Local.t * ThreadEvent.t))
         (TRACE: sim_trace tr_src e)
     :
       List.Forall (compose (pf_event L) snd) tr_src.
@@ -290,7 +290,7 @@ Section SIM.
     ginduction TRACE; eauto.
   Qed.
 
-  Lemma reserving_l_sim_trace lang (tr_src tr_reserve: Trace.t lang) (e: option (Thread.t lang * ThreadEvent.t))
+  Lemma reserving_l_sim_trace (tr_src tr_reserve: Trace.t) (e: option (Local.t * ThreadEvent.t))
         (TRACE: sim_trace tr_src e)
         (RESERVING: reserving_trace tr_reserve)
     :
@@ -302,7 +302,7 @@ Section SIM.
     { eapply reserving_tevent_pf; eauto. }
   Qed.
 
-  Lemma reserving_r_sim_trace lang (tr_src tr_reserve: Trace.t lang) (e: option (Thread.t lang * ThreadEvent.t))
+  Lemma reserving_r_sim_trace (tr_src tr_reserve: Trace.t) (e: option (Local.t * ThreadEvent.t))
         (TRACE: sim_trace tr_src e)
         (RESERVING: reserving_trace tr_reserve)
     :
@@ -315,7 +315,7 @@ Section SIM.
     { eapply reserving_tevent_pf; eauto. }
   Qed.
 
-  Inductive sim_traces lang: Trace.t lang -> Trace.t lang -> Prop :=
+  Inductive sim_traces: Trace.t -> Trace.t -> Prop :=
   | sim_traces_nil
     :
       sim_traces [] []
@@ -334,7 +334,7 @@ Section SIM.
   .
   Hint Constructors sim_traces.
 
-  Lemma sim_traces_sim_event_exists lang (tr_src tr_tgt: Trace.t lang) th_tgt e_tgt
+  Lemma sim_traces_sim_event_exists (tr_src tr_tgt: Trace.t) th_tgt e_tgt
         (TRACE: sim_traces tr_src tr_tgt)
         (IN: List.In (th_tgt, e_tgt) tr_tgt)
         (PF: pf_event L e_tgt)
@@ -356,7 +356,7 @@ Section SIM.
       eapply List.in_or_app; eauto. }
   Qed.
 
-  Lemma sim_traces_silent lang (tr_src tr_tgt: Trace.t lang)
+  Lemma sim_traces_silent (tr_src tr_tgt: Trace.t)
         (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr_tgt)
         (TRACE: sim_traces tr_src tr_tgt)
     :
@@ -369,7 +369,7 @@ Section SIM.
       eapply sim_trace_silent; eauto. i. ss. }
   Qed.
 
-  Lemma sim_traces_trans lang (tr_src0 tr_src1 tr_tgt0 tr_tgt1: Trace.t lang)
+  Lemma sim_traces_trans (tr_src0 tr_src1 tr_tgt0 tr_tgt1: Trace.t)
         (TRACE0: sim_traces tr_src0 tr_tgt0)
         (TRACE1: sim_traces tr_src1 tr_tgt1)
     :
@@ -381,7 +381,7 @@ Section SIM.
     { erewrite <- List.app_assoc. econs 3; eauto. }
   Qed.
 
-  Lemma sim_traces_pf lang (tr_src tr_tgt: Trace.t lang)
+  Lemma sim_traces_pf (tr_src tr_tgt: Trace.t)
         (TRACE: sim_traces tr_src tr_tgt)
     :
       List.Forall (compose (pf_event L) snd) tr_src.
@@ -2972,7 +2972,7 @@ Section SIM.
         (<<STEPSRC: Trace.steps tr (Thread.mk _ st lc_src sc mem_src) (Thread.mk _ st' lc_src' sc' mem_src')>>) /\
         (<<MEM: sim_memory (others \\2// self') (extra_others \\3// extra_self') mem_src' mem_tgt'>>) /\
         (<<SIM: sim_local self' extra_self' lc_src' lc_tgt'>>) /\
-        (<<TRACE: sim_trace tr (Some (Thread.mk _ st lc_tgt sc mem_tgt, e_tgt))>>)
+        (<<TRACE: sim_trace tr (Some (lc_tgt, e_tgt))>>)
   .
   Proof.
     inv STEPTGT. inv STEP; ss.
@@ -3131,7 +3131,7 @@ Section SIM.
         (<<STEPSRC: Trace.steps tr (Thread.mk _ st lc_src sc mem_src) (Thread.mk _ st' lc_src' sc' mem_src')>>) /\
         (<<MEM: sim_memory (others \\2// self') (extra_others \\3// extra_self') mem_src' mem_tgt'>>) /\
         (<<SIM: sim_local_strong self' extra_self' (extra_others \\3// extra_self') lc_src' lc_tgt'>>) /\
-        (<<TRACE: sim_trace tr (Some (Thread.mk _ st lc_tgt sc mem_tgt, e_tgt))>>) /\
+        (<<TRACE: sim_trace tr (Some (lc_tgt, e_tgt))>>) /\
         (<<JOINED: forall loc ts (NLOC: ~ L loc), List.Forall (fun vw => Memory.closed_view vw mem_src') (views' loc ts)>>)
   .
   Proof.

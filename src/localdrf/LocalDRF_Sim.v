@@ -331,7 +331,7 @@ Section SIM.
                      th_src1 th_mid1 th_tgt1>>) /\
         (<<EVENTJOIN: JSim.sim_event e_mid e_tgt>>) /\
         (<<JOINED: forall loc ts (NLOC: ~ L loc), List.Forall (fun vw => Memory.closed_view vw th_src1.(Thread.memory)) (views1 loc ts)>>) /\
-        (<<TRACE: sim_trace L tr (Some (th_tgt0, e_tgt))>>) /\
+        (<<TRACE: sim_trace L tr (Some (th_tgt0.(Thread.local), e_tgt))>>) /\
         (<<MEMWF: memory_times_wf times th_mid1.(Thread.memory)>>)
   .
   Proof.
@@ -652,10 +652,10 @@ Section SIM.
   Qed.
 
   Lemma promise_writing_event_racy
-        lang loc from ts val released e (th: Thread.t lang)
+        loc from ts val released e (lc: Local.t)
         (WRITING : promise_writing_event loc from ts val released e)
     :
-      racy_write loc ts th e.
+      racy_write loc ts lc e.
   Proof.
     inv WRITING; econs; eauto.
   Qed.
@@ -1329,8 +1329,8 @@ Section SIM.
   Qed.
 
   Lemma step_sim_configuration tids views0 prom0 extra0
-        c_src0 c_mid0 c_tgt0 c_tgt1 e tid lang tr_tgt tr_cert
-        (STEPTGT: @times_configuration_step times lang tr_tgt tr_cert e tid c_tgt0 c_tgt1)
+        c_src0 c_mid0 c_tgt0 c_tgt1 e tid tr_tgt tr_cert
+        (STEPTGT: @times_configuration_step times tr_tgt tr_cert e tid c_tgt0 c_tgt1)
         (SIM: sim_configuration tids views0 prom0 extra0 c_src0 c_mid0 c_tgt0)
         (NOREAD: List.Forall
                    (fun the => no_read_msgs
@@ -1341,7 +1341,7 @@ Section SIM.
         (WF_TGT: Configuration.wf c_tgt0)
     :
       exists tr_src c_src1 c_mid1 views1 prom1 extra1,
-        (<<STEPSRC: @Trace.configuration_opt_step lang tr_src e tid c_src0 c_src1>>) /\
+        (<<STEPSRC: @Trace.configuration_opt_step tr_src e tid c_src0 c_src1>>) /\
         (<<STEPMID: JConfiguration.step e tid c_mid0 c_mid1 views0 views1>>) /\
         (<<TRACE: sim_traces L tr_src tr_tgt>>) /\
         __guard__(e = MachineEvent.failure \/
@@ -1408,7 +1408,7 @@ Section SIM.
       i. des. exists (tr_src ++ tr).
       hexploit JThread.step_future; eauto. i. des.
       hexploit Trace.steps_future; eauto. i. des.
-      assert (SIMTRACE: sim_traces L (tr_src++tr) (tr' ++ [(e2, e0)])).
+      assert (SIMTRACE: sim_traces L (tr_src++tr) (tr' ++ [(e2.(Thread.local), e0)])).
       { eapply sim_traces_trans; eauto. replace tr with (tr++[]).
         { econs; eauto. econs. }
         { apply List.app_nil_r. }
@@ -1460,7 +1460,7 @@ Section SIM.
         inv STEPS2; ss. destruct th_src0, th_mid0. ss.
         assert (ALLSILENT: List.Forall
                              (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent)
-                             (tl_rev ++ [(th1, e)])).
+                             (tl_rev ++ [(th1.(Thread.local), e)])).
         { rewrite <- H. eapply Forall_app.
           { eapply sim_traces_silent; eauto. }
           { eapply sim_trace_silent; eauto. i. clarify. }
@@ -1530,7 +1530,7 @@ Section SIM.
           eapply pf_consistent_super_strong_consistent; eauto. }
       }
       { assert (VSTEP: Trace.configuration_step
-                         (tr_src ++ [(th_src1, e0)])
+                         (tr_src ++ [(th_src1.(Thread.local), e0)])
                          (ThreadEvent.get_machine_event e0) tid
                          (Configuration.mk ths_src sc_src mem_src)
                          (Configuration.mk
@@ -1555,7 +1555,7 @@ Section SIM.
         { econs 1. eauto. }
         { eauto. }
         { eapply sim_traces_trans; eauto.
-          replace [(th_src1, e0)] with ([(th_src1, e0)]++[]); auto. econs 2; auto.
+          replace [(th_src1.(Thread.local), e0)] with ([(th_src1.(Thread.local), e0)]++[]); auto. econs 2; auto.
           { econs. }
           { econs 2.
             { eapply non_silent_pf; eauto. }
@@ -1616,10 +1616,10 @@ Section SIM.
         (WF_TGT: Configuration.wf c_tgt0)
         (TIDS: tids tid)
     :
-      exists lang tr_src tr_tgt c_src1 c_mid1 c_tgt1 views1 e,
-        (<<STEPSRC: @Trace.configuration_opt_step lang tr_src e tid c_src0 c_src1>>) /\
+      exists tr_src tr_tgt c_src1 c_mid1 c_tgt1 views1 e,
+        (<<STEPSRC: @Trace.configuration_opt_step tr_src e tid c_src0 c_src1>>) /\
         (<<STEPMID: JConfiguration.opt_step e tid c_mid0 c_mid1 views0 views1>>) /\
-        (<<STEPTGT: @times_configuration_opt_step times lang tr_tgt [] e tid c_tgt0 c_tgt1>>) /\
+        (<<STEPTGT: @times_configuration_opt_step times tr_tgt [] e tid c_tgt0 c_tgt1>>) /\
         (<<TRACE: sim_traces L tr_src tr_tgt>>) /\
         (<<FUTURE: good_future tm c_tgt0.(Configuration.memory) c_tgt1.(Configuration.memory)>>) /\
         (<<SC: c_tgt1.(Configuration.sc) = c_tgt0.(Configuration.sc)>>) /\
@@ -1637,7 +1637,7 @@ Section SIM.
   Proof.
     destruct (IdentMap.find tid c_tgt0.(Configuration.threads)) as [[[lang_tgt st_tgt] lc_tgt]|] eqn:TIDTGT.
     { destruct (classic (exists loc ts, (prom tid loc ts))) as [EXIST|NONE]; cycle 1.
-      { eexists (@Language.mk _ False False id bot1 bot3), [], [], c_src0, c_mid0, c_tgt0, views0, MachineEvent.silent.
+      { eexists [], [], c_src0, c_mid0, c_tgt0, views0, MachineEvent.silent.
         splits; auto.
         { econs 2; eauto. }
         { econs 2; eauto. }
@@ -1680,8 +1680,7 @@ Section SIM.
       { destruct e1. ss.
         assert (STEPTGT: @times_configuration_step
                            times
-                           lang_tgt
-                           (ftr++[(Thread.mk _ state local sc memory, ThreadEvent.failure)])
+                           (ftr++[(local, ThreadEvent.failure)])
                            []
                            MachineEvent.failure
                            tid
@@ -1713,7 +1712,6 @@ Section SIM.
       { destruct e1; ss.
         assert (STEPTGT: @times_configuration_step
                            times
-                           lang_tgt
                            ftr
                            []
                            MachineEvent.silent
@@ -1747,7 +1745,7 @@ Section SIM.
         }
         exploit step_sim_configuration; eauto.
         { erewrite List.app_nil_r. eapply List.Forall_impl in NOREAD; eauto. }
-        i. des. eexists _, _, _, _, _, _, views1, _. esplits; eauto.
+        i. des. eexists _, _, _, _, _, views1, _. esplits; eauto.
         { econs 1. eauto. }
         { ss. eapply good_future_mon; eauto. eapply TimeMap.join_l. }
         { ss. }
@@ -1771,13 +1769,13 @@ Section SIM.
             { inv RACY; ss. }
             i. des. exists th0, e_src. splits; auto.
             clear - RACY EVENT. inv RACY.
-            { apply inj_pair2 in H1. subst. inv EVENT. econs. auto. }
-            { apply inj_pair2 in H1. subst. inv EVENT. econs. auto. }
+            { inv EVENT. econs. auto. }
+            { inv EVENT. econs. auto. }
           }
         }
       }
     }
-    { eexists (@Language.mk _ False False id bot1 bot3), [], [], c_src0, c_mid0, c_tgt0,views0, MachineEvent.silent.
+    { eexists [], [], c_src0, c_mid0, c_tgt0,views0, MachineEvent.silent.
       dup SIM. inv SIM. ss. specialize (THSPF tid). specialize (THSJOIN tid).
       rewrite TIDTGT in *. unfold option_rel in *. des_ifs.
       specialize (BOT _ Heq0). des. splits; auto.
@@ -1830,10 +1828,9 @@ Section SIM.
                              (fun tid' => if (List.in_dec Ident.eq_dec tid' tidl) then bot3 else (extra tid'))
                              c_src1 c_mid1 c_tgt1>>) /\
                    (<<WRITES: forall tid loc ts (TID: List.In tid tidl) (PROM: prom tid loc ts),
-                       exists lang tr th e_write,
-                         (<<RACY: racy_write loc ts th e_write>>) /\
-                         (<<TRACE: List.In (tid, existT _ lang tr) trs>>) /\
-                         (<<EVENT: List.In (th, e_write) tr>>)>>))).
+                       exists lc e_write,
+                         (<<RACY: racy_write loc ts lc e_write>>) /\
+                         (<<EVENT: List.In (lc, e_write) trs>>)>>))).
   Proof.
     Local Opaque List.in_dec.
     ginduction tidl.
@@ -1881,9 +1878,11 @@ Section SIM.
               { extensionality tid. des_ifs; ss; des; exfalso; eauto. }
             }
             { i. destruct (Ident.eq_dec a tid).
-              { clear TID. subst. exploit WRITES; eauto. i. des. esplits; eauto. ss. auto. }
+              { clear TID. subst. exploit WRITES; eauto. i. des. esplits; eauto.
+                eapply List.in_or_app; eauto. }
               { des; ss. exploit WRITES0; eauto. des_ifs; eauto.
-                i. des. esplits; eauto. }
+                i. des. esplits; eauto.
+                eapply List.in_or_app; eauto. }
             }
           }
         }
@@ -1945,10 +1944,9 @@ Section SIM.
                              (fun tid' => if (ctids_dec tid') then bot3 else (extra tid'))
                              c_src1 c_mid1 c_tgt1>>) /\
                    (<<WRITES: forall tid loc ts (TID: ctids tid) (PROM: prom tid loc ts),
-                       exists lang tr th e_write,
-                         (<<RACY: racy_write loc ts th e_write>>) /\
-                         (<<TRACE: List.In (tid, existT _ lang tr) trs>>) /\
-                         (<<EVENT: List.In (th, e_write) tr>>)>>))).
+                       exists lc e_write,
+                         (<<RACY: racy_write loc ts lc e_write>>) /\
+                         (<<EVENT: List.In (lc, e_write) trs>>)>>))).
   Proof.
     hexploit (@sim_configuration_certify_list
                 (List.filter
@@ -1996,18 +1994,6 @@ Section SIM.
     }
   Qed.
 
-  Lemma tview_ident_map f vw fvw
-        (MAP: tview_map f vw fvw)
-        (IDENT: forall loc to fto (MAP: f loc to fto), to = fto)
-    :
-      vw = fvw.
-  Proof.
-    destruct vw, fvw. inv MAP. ss. f_equal.
-    { extensionality loc. eapply view_ident_map; eauto. }
-    { eapply view_ident_map; eauto. }
-    { eapply view_ident_map; eauto. }
-  Qed.
-
   Lemma tevent_ident_map f e fe
         (MAP: tevent_map f fe e)
         (IDENT: forall loc to fto (MAP: f loc to fto), to = fto)
@@ -2021,7 +2007,7 @@ Section SIM.
     { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. }
   Qed.
 
-  Lemma good_future_configuration_step c0 c1 c0' e tid lang (tr0 tr_cert0: Trace.t lang) tm
+  Lemma good_future_configuration_step c0 c1 c0' e tid (tr0 tr_cert0: Trace.t) tm
         (STEP: times_configuration_step times tr0 tr_cert0 e tid c0 c0')
         (WF0: Configuration.wf c0)
         (WF1: Configuration.wf c1)
@@ -2032,12 +2018,12 @@ Section SIM.
         (SC: c1.(Configuration.sc) = c0.(Configuration.sc))
         (TIME: List.Forall (fun the => wf_time_evt (fun loc ts => Time.lt ts (tm loc)) (snd the)) (tr0 ++ tr_cert0))
     :
-      exists (tr1: Trace.t lang) tr_cert1 c1',
+      exists (tr1: Trace.t) tr_cert1 c1',
         (<<STEP: times_configuration_step times tr1 tr_cert1 e tid c1 c1'>>) /\
         (<<TRACE: List.Forall2
                     (fun the0 the1 =>
                        (<<EVT: sim_event (snd the0) (snd the1)>>) /\
-                       (<<TVIEW: TView.le (fst the1).(Thread.local).(Local.tview) (fst the0).(Thread.local).(Local.tview)>>)) tr0 tr1>>).
+                       (<<TVIEW: TView.le (fst the1).(Local.tview) (fst the0).(Local.tview)>>)) tr0 tr1>>).
   Proof.
     dep_inv STEP.
     hexploit max_good_future_map; eauto.
@@ -2131,7 +2117,7 @@ Section SIM.
     { eapply list_Forall2_app.
       { eapply list_Forall2_impl; eauto. i. destruct a, b. ss. des. split; auto.
         { eapply tevent_ident_map; eauto. i. ss. des; auto. }
-        { inv THREAD. ss. inv LOCAL1. eapply tview_ident_map in TVIEW; subst; eauto.
+        { inv LOCAL1. eapply tview_ident_map in TVIEW; subst; eauto.
           ii. ss. des. auto. }
       }
       { econs; ss; eauto. split; auto.
@@ -2142,7 +2128,8 @@ Section SIM.
     }
   Qed.
 
-  Lemma configuration_step_certify lang c0 c1 e tid (tr tr_cert: Trace.t lang)
+
+  Lemma configuration_step_certify c0 c1 e tid (tr tr_cert: Trace.t)
         (WF: Configuration.wf c0)
         (STEP: times_configuration_step times tr tr_cert e tid c0 c1)
     :
@@ -2277,8 +2264,8 @@ Section SIM.
   Admitted.
 
   Lemma promise_read_race views0 prom0 extra0
-        c_src0 c_mid0 c_tgt0 c_tgt1 e tid lang tr_tgt tr_cert
-        (STEPTGT: @times_configuration_step times lang tr_tgt tr_cert e tid c_tgt0 c_tgt1)
+        c_src0 c_mid0 c_tgt0 c_tgt1 e tid tr_tgt tr_cert
+        (STEPTGT: @times_configuration_step times tr_tgt tr_cert e tid c_tgt0 c_tgt1)
         (SIM: sim_configuration (fun _ => True) views0 prom0 extra0 c_src0 c_mid0 c_tgt0)
         (NOREAD: ~ List.Forall
                    (fun the => no_read_msgs
@@ -2338,8 +2325,6 @@ Section SIM.
       { eauto. }
       { eapply sim_traces_pf; eauto. }
     }
-    { eauto. }
-    { ss. eauto. }
     { eauto. }
     { admit. }
     { eauto. }

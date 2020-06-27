@@ -28,9 +28,9 @@ Set Implicit Arguments.
 
 Module Trace.
 
-  Definition t lang := list (Thread.t lang * ThreadEvent.t).
+  Definition t := list (Local.t * ThreadEvent.t).
 
-  Inductive steps lang: forall (tr: t lang) (th0 th1: Thread.t lang), Prop :=
+  Inductive steps lang: forall (tr: t) (th0 th1: Thread.t lang), Prop :=
   | steps_refl
       th0
     :
@@ -39,13 +39,13 @@ Module Trace.
       tr tr' th0 th1 th2 pf e
       (STEP: Thread.step pf e th0 th1)
       (STEPS: steps tr th1 th2)
-      (TR: tr' = (th0, e) :: tr)
+      (TR: tr' = (th0.(Thread.local), e) :: tr)
     :
       steps tr' th0 th2
   .
   Hint Constructors steps.
 
-  Inductive steps_n1 lang: t lang -> (Thread.t lang) -> (Thread.t lang) -> Prop :=
+  Inductive steps_n1 lang: t -> (Thread.t lang) -> (Thread.t lang) -> Prop :=
   | steps_n1_refl
       th0
     :
@@ -55,14 +55,14 @@ Module Trace.
       (HD: steps_n1 hds th0 th1)
       (TL: Thread.step pf tle th1 th2)
     :
-      steps_n1 (hds++[(th1, tle)]) th0 th2
+      steps_n1 (hds++[(th1.(Thread.local), tle)]) th0 th2
   .
   Hint Constructors steps_n1.
 
   Lemma steps_n1_one lang (th0 th1: Thread.t lang) e pf
         (STEP: Thread.step pf e th0 th1)
     :
-      steps_n1 [(th0, e)] th0 th1.
+      steps_n1 [(th0.(Thread.local), e)] th0 th1.
   Proof.
     erewrite <- List.app_nil_l at 1. econs; eauto.
   Qed.
@@ -81,7 +81,7 @@ Module Trace.
   Lemma steps_one lang (th0 th1: Thread.t lang) e pf
         (STEP: Thread.step pf e th0 th1)
     :
-      steps [(th0, e)] th0 th1.
+      steps [(th0.(Thread.local), e)] th0 th1.
   Proof.
     econs 2; eauto.
   Qed.
@@ -138,7 +138,7 @@ Module Trace.
         (<<SAT: P (th, e)>>).
   Proof.
     ginduction STEPS; i; ss. inv PRED; ss. des; clarify.
-    - exists th, th1. esplits; eauto.
+    - exists th0, th1. esplits; eauto.
     - exploit IHSTEPS; eauto. i. des. subst.
       exists th', th''. esplits; eauto.
   Qed.
@@ -187,7 +187,7 @@ Module Trace.
         (<<SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr>>).
   Proof.
     ginduction STEPS; eauto. inv H. inv TSTEP. des.
-    exists ((x, e)::tr). splits; eauto.
+    exists ((x.(Thread.local), e)::tr). splits; eauto.
   Qed.
 
   Lemma steps_app lang tr0 tr1 (th0 th1 th2: Thread.t lang)
@@ -199,34 +199,34 @@ Module Trace.
     ginduction STEPS0; eauto. i. subst. econs; eauto.
   Qed.
 
-  Inductive configuration_step: forall lang (tr: t lang) (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
+  Inductive configuration_step: forall (tr: t) (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
   | configuration_step_intro
       lang tr e tr' pf tid c1 st1 lc1 e2 st3 lc3 sc3 memory3
       (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
       (STEPS: steps tr' (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
       (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr')
       (STEP: Thread.step pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
-      (TR: tr = tr'++[(e2, e)])
+      (TR: tr = tr'++[(e2.(Thread.local), e)])
       (CONSISTENT: forall (EVENT: e <> ThreadEvent.failure),
           Thread.consistent (Thread.mk _ st3 lc3 sc3 memory3))
     :
       configuration_step tr (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
   .
 
-  Inductive configuration_opt_step: forall lang (tr: t lang) (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
+  Inductive configuration_opt_step: forall (tr: t) (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
   | configuration_opt_step_some
-      lang tr e tid c1 c2
-      (STEP: @configuration_step lang tr e tid c1 c2)
+      tr e tid c1 c2
+      (STEP: @configuration_step tr e tid c1 c2)
     :
       configuration_opt_step tr e tid c1 c2
   | configuration_opt_step_none
-      lang tid c1
+      tid c1
     :
-      @configuration_opt_step lang [] MachineEvent.silent tid c1 c1
+      @configuration_opt_step [] MachineEvent.silent tid c1 c1
   .
 
-  Lemma configuration_step_step lang tr e tid c1 c2
-        (STEP: @configuration_step lang tr e tid c1 c2)
+  Lemma configuration_step_step tr e tid c1 c2
+        (STEP: @configuration_step tr e tid c1 c2)
     :
       Configuration.step e tid c1 c2.
   Proof.
@@ -240,8 +240,8 @@ Module Trace.
   Lemma step_configuration_step e tid c1 c2
         (STEP: Configuration.step e tid c1 c2)
     :
-      exists lang tr,
-        (<<STEP: @configuration_step lang tr e tid c1 c2>>).
+      exists tr,
+        (<<STEP: @configuration_step tr e tid c1 c2>>).
   Proof.
     inv STEP.
     { eapply tau_steps_silent_steps in STEPS. des.
@@ -252,7 +252,7 @@ Module Trace.
   Qed.
 
   Lemma configuration_step_future
-        lang (tr: t lang) e tid c1 c2
+        (tr: t) e tid c1 c2
         (STEP: configuration_step tr e tid c1 c2)
         (WF1: Configuration.wf c1):
     (<<WF2: Configuration.wf c2>>) /\
@@ -264,7 +264,7 @@ Module Trace.
   Qed.
 
   Lemma configuration_opt_step_future
-        lang (tr: t lang) e tid c1 c2
+        (tr: t) e tid c1 c2
         (STEP: configuration_opt_step tr e tid c1 c2)
         (WF1: Configuration.wf c1):
     (<<WF2: Configuration.wf c2>>) /\
@@ -272,9 +272,8 @@ Module Trace.
     (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
   Proof.
     inv STEP.
-    { apply inj_pair2 in H1. subst.
-      eapply configuration_step_future; eauto. }
-    { apply inj_pair2 in H1. subst. splits; auto. refl. }
+    { eapply configuration_step_future; eauto. }
+    { splits; auto. refl. }
   Qed.
 
   Lemma steps_promise_consistent

@@ -2223,7 +2223,7 @@ Section MAPPED.
     | _ => True
     end.
 
-  Lemma wf_time_mapped_mappable lang (tr: Trace.t lang) times
+  Lemma wf_time_mapped_mappable (tr: Trace.t) times
         (WFTIME: List.Forall (fun em => wf_time_evt times (snd em)) tr)
         (COMPLETE: forall loc to (IN: times loc to),
             exists fto, (<<MAPPED: f loc to fto>>))
@@ -2240,6 +2240,18 @@ Section MAPPED.
     - des. split.
       + apply COMPLETE in FROM. des. esplit. eauto.
       + apply COMPLETE in TO. des. esplit. eauto.
+  Qed.
+
+  Lemma wf_time_evt_map times te fte
+        (WF: wf_time_evt times te)
+        (MAP: tevent_map fte te)
+    :
+      wf_time_evt (fun loc fts => exists ts, (<<IN: times loc ts>>) /\ (<<MAP: f loc ts fts>>)) fte.
+  Proof.
+    inv MAP; ss.
+    { des. splits; eauto. }
+    { des. splits; eauto. }
+    { des. splits; eauto. }
   Qed.
 
   Lemma step_map
@@ -2451,7 +2463,7 @@ Section MAPPED.
         (<<SCLE: TimeMap.le fsc1 fsc1'>>) /\
         (<<MEM: memory_map mem1 fmem1>>) /\
         (<<LOCAL: local_map lc1 flc1>>) /\
-        (<<TRACE: List.Forall2 (fun the fthe => <<EVENT: tevent_map (snd fthe) (snd the)>> /\ <<THREAD: thread_map (fst the) (fst fthe)>>) tr ftr>>)
+        (<<TRACE: List.Forall2 (fun the fthe => <<EVENT: tevent_map (snd fthe) (snd the)>> /\ <<LOCAL: local_map (fst the) (fst fthe)>>) tr ftr>>)
   .
   Proof.
     ginduction STEPS; i; ss; clarify.
@@ -2470,8 +2482,7 @@ Section MAPPED.
       inv STEP0. exploit Thread.step_future; try apply STEP1; ss. i. des.
       exploit IHSTEPS; try apply STEPS; eauto.
       { eapply collapsable_unwritable_step in STEP; eauto. }
-      i. des. esplits; eauto. econs; eauto. ss. splits; auto.
-      econs; eauto.
+      i. des. esplits; eauto.
   Qed.
 
 End MAPPED.
@@ -2785,6 +2796,75 @@ Section IDENTMAP.
     { inv FROM. ss. }
   Qed.
 
+  Lemma promises_ident_map_covered f prom_src prom_tgt
+        (PROMISES: promises_map f prom_src prom_tgt)
+        (IDENT: forall loc to fto (MAP: f loc to fto), to = fto)
+        loc ts
+    :
+      covered loc ts prom_src <-> covered loc ts prom_tgt.
+  Proof.
+    split; i.
+    { inv H. dup GET. eapply PROMISES in GET; eauto. des.
+      dup GET. eapply PROMISES in GET. des. clarify.
+      eapply IDENT in FROM. eapply IDENT in TO0. subst. eapply IDENT in TO. subst.
+      clarify. econs; eauto. }
+    { inv H. eapply PROMISES in GET. des. eapply IDENT in TO. eapply IDENT in FROM. subst.
+      econs; eauto. }
+  Qed.
+
+  Lemma memory_ident_map_concrete f mem fmem
+        (MEM: memory_map f mem fmem)
+        (IDENT: forall loc to fto (MAP: f loc to fto), to = fto)
+        loc ts
+        (CONCRETE: concrete_promised mem loc ts)
+    :
+      concrete_promised fmem loc ts.
+  Proof.
+    inv CONCRETE. eapply MEM in GET. des; ss.
+    eapply IDENT in TO. subst. inv MSG. inv MSGLE. econs; eauto.
+  Qed.
+
+  Lemma timemap_ident_map f tm ftm
+        (MAP: timemap_map f tm ftm)
+        (IDENT: forall loc to fto (MAP: f loc to fto), to = fto)
+    :
+      tm = ftm.
+  Proof.
+    extensionality loc. specialize (MAP loc). eapply IDENT in MAP. auto.
+  Qed.
+
+  Lemma view_ident_map f vw fvw
+        (MAP: view_map f vw fvw)
+        (IDENT: forall loc to fto (MAP: f loc to fto), to = fto)
+    :
+      vw = fvw.
+  Proof.
+    destruct vw, fvw. inv MAP. f_equal.
+    { eapply timemap_ident_map; eauto. }
+    { eapply timemap_ident_map; eauto. }
+  Qed.
+
+  Lemma opt_view_ident_map f vw fvw
+        (MAP: opt_view_map f vw fvw)
+        (IDENT: forall loc to fto (MAP: f loc to fto), to = fto)
+    :
+      vw = fvw.
+  Proof.
+    inv MAP; auto. f_equal. eapply view_ident_map; eauto.
+  Qed.
+
+  Lemma tview_ident_map f vw fvw
+        (MAP: tview_map f vw fvw)
+        (IDENT: forall loc to fto (MAP: f loc to fto), to = fto)
+    :
+      vw = fvw.
+  Proof.
+    destruct vw, fvw. inv MAP. ss. f_equal.
+    { extensionality loc. eapply view_ident_map; eauto. }
+    { eapply view_ident_map; eauto. }
+    { eapply view_ident_map; eauto. }
+  Qed.
+
 End IDENTMAP.
 
 
@@ -2978,49 +3058,6 @@ Section MAPIDENT.
   Proof.
     inv MSG; ss. f_equal. inv CLOSED.
     eapply map_ident_in_memory_opt_view_ident; eauto.
-  Qed.
-
-  Lemma promise_writing_event_map loc to mem from val released f e fe
-        (CLOSED: Memory.closed mem)
-        (GET: Memory.get loc to mem = Some (from, Message.concrete val released))
-        (MAPLT: mapping_map_lt f)
-        (IDENT: map_ident_in_memory f mem)
-        (WRITING: promise_writing_event loc from to val released e)
-        (EVENT: tevent_map f fe e)
-    :
-      promise_writing_event loc from to val released fe.
-  Proof.
-    inv WRITING; inv EVENT.
-    { assert (to = fto).
-      { eapply mapping_map_lt_map_eq; eauto. eapply IDENT.
-        eapply Memory.max_ts_spec in GET. des. auto. }
-      assert (from' = ffrom).
-      { eapply mapping_map_lt_map_eq; eauto. eapply IDENT.
-        transitivity to; eauto. eapply Memory.max_ts_spec in GET. des. auto. }
-      subst. econs; eauto.
-      exploit opt_view_le_map.
-      { eapply mapping_map_lt_map_le; eauto. }
-      { eapply RELEASED0. }
-      { eapply CLOSED in GET. des. inv MSG_CLOSED.
-        eapply map_ident_in_memory_closed_opt_view; eauto. }
-      { eauto. }
-      i. transitivity freleased'; auto.
-    }
-    { assert (to = fto).
-      { eapply mapping_map_lt_map_eq; eauto. eapply IDENT.
-        eapply Memory.max_ts_spec in GET. des. auto. }
-      assert (from' = ffrom).
-      { eapply mapping_map_lt_map_eq; eauto. eapply IDENT.
-        transitivity to; eauto. eapply Memory.max_ts_spec in GET. des. auto. }
-      subst. econs; eauto.
-      exploit opt_view_le_map.
-      { eapply mapping_map_lt_map_le; eauto. }
-      { eapply RELEASEDW. }
-      { eapply CLOSED in GET. des. inv MSG_CLOSED.
-        eapply map_ident_in_memory_closed_opt_view; eauto. }
-      { eauto. }
-      i. transitivity freleasedw'; auto.
-    }
   Qed.
 
 End MAPIDENT.
@@ -3538,6 +3575,51 @@ Section CONCRETEIDENT.
   Proof.
     inv CLOSED; econs.
     eapply map_ident_concrete_closed_opt_view; eauto.
+  Qed.
+
+  Lemma promise_writing_event_map loc to mem from val released f e fe
+        (CLOSED: Memory.closed mem)
+        (GET: Memory.get loc to mem = Some (from, Message.concrete val released))
+        (MAPLT: mapping_map_lt f)
+        (IDENT: forall loc' to' from' val' released' ts
+                       (GET: Memory.get loc' to' mem = Some (from', Message.concrete val' released'))
+                       (TS: Time.le ts to')
+          ,
+            f loc' ts ts)
+        (WRITING: promise_writing_event loc from to val released e)
+        (EVENT: tevent_map f fe e)
+    :
+      promise_writing_event loc from to val released fe.
+  Proof.
+    assert (CONCRETE: map_ident_concrete f mem).
+    { ii. inv CONCRETE. eapply IDENT; eauto. refl. }
+    inv WRITING; inv EVENT.
+    { assert (to = fto).
+      { eapply mapping_map_lt_map_eq; eauto. eapply IDENT; eauto. refl. } subst.
+      assert (from' = ffrom).
+      { eapply mapping_map_lt_map_eq; eauto. } subst.
+      econs; eauto.
+      exploit opt_view_le_map.
+      { eapply mapping_map_lt_map_le; eauto. }
+      { eapply RELEASED0. }
+      { eapply CLOSED in GET. des. inv MSG_CLOSED.
+        eapply map_ident_concrete_closed_opt_view; eauto. }
+      { eauto. }
+      i. transitivity freleased'; auto.
+    }
+    { assert (to = fto).
+      { eapply mapping_map_lt_map_eq; eauto. eapply IDENT; eauto. refl. } subst.
+      assert (from' = ffrom).
+      { eapply mapping_map_lt_map_eq; eauto. } subst.
+      econs; eauto.
+      exploit opt_view_le_map.
+      { eapply mapping_map_lt_map_le; eauto. }
+      { eapply RELEASEDW. }
+      { eapply CLOSED in GET. des. inv MSG_CLOSED.
+        eapply map_ident_concrete_closed_opt_view; eauto. }
+      { eauto. }
+      i. transitivity freleasedw'; auto.
+    }
   Qed.
 
 End CONCRETEIDENT.

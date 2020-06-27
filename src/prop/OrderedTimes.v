@@ -288,3 +288,46 @@ Proof.
   { i. apply singleton_well_ordered. }
   i. eapply sub_well_ordered; eauto.
 Qed.
+
+Lemma mapped_well_ordered
+      (f: Time.t -> Time.t -> Prop)
+      (times ftimes: Time.t -> Prop)
+      (MAPLT: forall t0 t1 ft0 ft1
+                     (MAP0: f t0 ft0)
+                     (MAP1: f t1 ft1),
+          Time.lt t0 t1 <-> Time.lt ft0 ft1)
+      (WO: well_ordered times)
+      (FTIMES: forall fts (IN: ftimes fts),
+          exists ts,
+            (<<MAP: f ts fts>>) /\
+            (<<TIMES: times ts>>))
+  :
+    well_ordered ftimes.
+Proof.
+  ii.
+  dup INHABITED. eapply SUB in INHABITED. dup INHABITED. eapply FTIMES in INHABITED. des.
+  exploit (WO (fun ts => exists fts, (<<MAP: f ts fts>>) /\ (<<TIMES: sub fts>>))).
+  { i. des. eapply SUB in TIMES0. eapply FTIMES in TIMES0. des.
+    destruct (Time.le_lt_dec x0 ts0).
+    { destruct l.
+      { exploit MAPLT.
+        { eapply MAP0. }
+        { eapply MAP1. } i. des.
+        exfalso. eapply Time.lt_strorder. eapply x1; eauto.
+      }
+      { inv H. auto. }
+    }
+    { exploit MAPLT.
+      { eapply MAP1. }
+      { eapply MAP0. } i. des.
+      exfalso. eapply Time.lt_strorder. eapply x1; eauto.
+    }
+  }
+  { eauto. }
+  { i. des. exists fts. splits; auto. i.
+    dup IN. eapply SUB in IN. dup IN. eapply FTIMES in IN. des.
+    exploit LEAST; eauto. i.
+    destruct (Time.le_lt_dec fts ts'); auto.
+    erewrite <- MAPLT in l; eauto. timetac.
+  }
+Qed.

@@ -331,7 +331,7 @@ Section PredStep.
     split; i.
     - ginduction H; i.
       + exists []. splits; eauto.
-      + des. inv H. inv TSTEP. exists ((x, e)::tr). splits.
+      + des. inv H. inv TSTEP. exists ((x.(Thread.local), e)::tr). splits.
         * inv STEP. econs; eauto.
         * i. ss. des; clarify. eauto.
     - des. ginduction STEPS; i.
@@ -416,7 +416,7 @@ Section PredStep.
     exploit event_times_list_exists; eauto.
   Qed.
 
-  Lemma trace_times_list_exists lang (tr: Trace.t lang)
+  Lemma trace_times_list_exists (tr: Trace.t)
     :
       exists (times: Loc.t -> list Time.t),
         (<<WFTIME: List.Forall (fun em => wf_time_evt (fun loc to => List.In to (times loc)) (snd em)) tr>>).
