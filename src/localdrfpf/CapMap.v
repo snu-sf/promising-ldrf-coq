@@ -29,8 +29,8 @@ Require Import Mapping.
 Require Import CapFlex.
 Require Import OrderedTimes.
 
-Require Import LocalDRFDef.
-Require Import LocalDRF_PF.
+Require Import LocalPF.
+Require Import LocalPFThread.
 
 Set Implicit Arguments.
 

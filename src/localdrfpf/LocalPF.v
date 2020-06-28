@@ -240,7 +240,7 @@ Section LOCALDRF.
       racy_write loc ts lc (ThreadEvent.update loc from ts valr valw releasedr releasedw ordr ordw)
   .
 
-  Definition racefree (c0: Configuration.t): Prop :=
+  Definition pf_racefree (c0: Configuration.t): Prop :=
     forall c1 trs
            loc ts lc0 lc1 e0 e1
            (CSTEPS: pf_steps_trace c0 c1 trs)
@@ -250,11 +250,11 @@ Section LOCALDRF.
            (READ: racy_read loc ts lc1 e1),
       False.
 
-  Lemma step_racefree c0 c1 tr e tid
-        (RACEFREE: racefree c0)
+  Lemma step_pf_racefree c0 c1 tr e tid
+        (RACEFREE: pf_racefree c0)
         (STEP: pf_step_trace tr e tid c0 c1)
     :
-      racefree c1.
+      pf_racefree c1.
   Proof.
     ii. eapply RACEFREE.
     { econs 2; eauto. }
@@ -264,11 +264,11 @@ Section LOCALDRF.
     { eauto. }
   Qed.
 
-  Lemma steps_racefree c0 c1 trs
-        (RACEFREE: racefree c0)
+  Lemma steps_pf_racefree c0 c1 trs
+        (RACEFREE: pf_racefree c0)
         (STEP: pf_steps_trace c0 c1 trs)
     :
-      racefree c1.
+      pf_racefree c1.
   Proof.
     ii. eapply RACEFREE.
     { eapply pf_steps_trace_trans; eauto. }
@@ -278,9 +278,9 @@ Section LOCALDRF.
     { eauto. }
   Qed.
 
-  Lemma racefree_write_read c0 c1 c2 trs0 trs1
+  Lemma pf_racefree_write_read c0 c1 c2 trs0 trs1
         loc ts lc0 lc1 e0 e1
-        (RACEFREE: racefree c0)
+        (RACEFREE: pf_racefree c0)
         (STEPS0: pf_steps_trace c0 c1 trs0)
         (STEPS1: pf_steps_trace c1 c2 trs1)
         (TRACE0: List.In (lc0, e0) trs0)
@@ -297,12 +297,5 @@ Section LOCALDRF.
     { eauto. }
     { eauto. }
   Qed.
-
-  Theorem local_DRF_PF s
-          (RACEFRFEE: racefree (Configuration.init s))
-    :
-      behaviors Configuration.step (Configuration.init s) <1=
-      behaviors pf_step (Configuration.init s).
-  Admitted.
 
 End LOCALDRF.

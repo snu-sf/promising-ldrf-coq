@@ -28,7 +28,7 @@ Require Import JoinedView.
 Require Import MemoryProps.
 Require Import OrderedTimes.
 
-Require Import LocalDRFDef.
+Require Import LocalPF.
 
 Set Implicit Arguments.
 
