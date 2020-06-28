@@ -207,8 +207,8 @@ Module PFtoRA.
           (<<STEP_RA: RAConfiguration.step L MachineEvent.failure tid rels1 rels2 c1_ra c2_ra>>)).
     Proof.
       dup SIM1. inv SIM0. inv STEP. ss.
-      specialize (THS tid). unfold option_rel3 in THS. des_ifs.
-      inv THS. apply inj_pair2 in H1. subst.
+      dup THS. specialize (THS0 tid). unfold option_rel3 in THS0. des_ifs.
+      inv THS0. apply inj_pair2 in H1. subst.
       exploit wf_pf_thread; eauto. s. i.
       exploit wf_j_thread; eauto. s. i.
       exploit wf_ra_thread; eauto. s. i.
@@ -240,12 +240,45 @@ Module PFtoRA.
         + replace (ThreadEvent.get_machine_event e0) with (ThreadEvent.get_machine_event e_ra); cycle 1.
           { inv EVENT_J; inv EVENT_RA; ss. }
           econs; eauto. i. eapply CONS. inv EVENT_J; inv EVENT_RA; ss.
-        + ss. admit.
+        + econs; ss. i.
+          repeat rewrite IdentMap.gsspec. condtac; ss.
+          specialize (THS tid0). unfold option_rel3 in THS. des_ifs. inv THS. ss.
+          inv SIM0. ss. econs. econs; s; eauto; try apply SIM2.
+          * inv SIM_JOINED.
+            apply inj_pair2 in H2. apply inj_pair2 in H6. subst.
+            econs; s; eauto; try by (inv SIM2; inv SIM_JOINED; ss).
+            exploit JThread.tau_steps_future; eauto; try apply x1. s. i. des.
+            exploit JThread.step_future; eauto. s. i. des.
+            eapply JSim.sim_local_le; try exact LOCAL.
+            etrans; eauto.
+          * inv SIM_RA. ss. subst.
+            econs; s; eauto; try by (inv SIM2; inv SIM_RA; ss).
+            inv LOCAL. econs; ss. i.
+            assert (STEPS': RAThread.steps lang L rels1 rels3
+                                           (Thread.mk _ st_ra lc_ra sc_j mem_ra)
+                                           (Thread.mk _ st3_ra lc3_ra sc3_ra mem3_ra)).
+            { exploit RAThread.tau_steps_steps; eauto. i.
+              inv STEP_RA; eapply RAThread.plus_step_steps; eauto. }
+            exploit wf_ra_thread; try exact WF1_RA; try eapply Heq4. s. i.
+            eapply RAThread.steps_rels_disjoint; try exact STEPS'; ss; try apply x2; try apply x9.
+            inv WF1_RA. inv WF. inv WF0. ss.
+            eapply DISJOINT; [|eapply Heq1|eapply Heq4]. congr.
+          * econs; try apply SIM2; try apply NORMAL_J.
+          * econs; try apply SIM2; try apply NORMAL_RA.
+          * econs; s; try apply SIM2; try apply STABLE_RA.
+            assert (STEPS': RAThread.steps lang L rels1 rels3
+                                           (Thread.mk _ st_ra lc_ra sc_ra mem_ra)
+                                           (Thread.mk _ st3_ra lc3_ra sc3_ra mem3_ra)).
+            { exploit RAThread.tau_steps_steps; eauto. i.
+              inv STEP_RA; eapply RAThread.plus_step_steps; eauto. }
+            exploit RAThread.steps_future; try exact STEPS'; try apply x2. s. i. des.
+            exploit wf_ra_thread; try exact WF1_RA; try eapply Heq4. s. i.
+            exploit Stable.future_stable_tview; try eapply STABLE_RA; try apply x9; eauto.
       - right.
         destruct e3_ra as [st3_ra lc3_ra sc3_ra mem3_ra].
         esplits.
         replace MachineEvent.failure with (ThreadEvent.get_machine_event ThreadEvent.failure) by ss.
         econs; eauto. ss.
-    Admitted.
+    Qed.
   End PFtoRA.
 End PFtoRA.

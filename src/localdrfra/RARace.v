@@ -208,6 +208,26 @@ Module RAThread.
       inv STEP; eauto using OrdThread.step_future.
     Qed.
 
+    Lemma steps_future
+          rels1 rels2 e1 e2
+          (STEPS: steps rels1 rels2 e1 e2)
+          (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+          (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+          (CLOSED1: Memory.closed e1.(Thread.memory)):
+      <<WF2: Local.wf e2.(Thread.local) e2.(Thread.memory)>> /\
+      <<SC2: Memory.closed_timemap e2.(Thread.sc) e2.(Thread.memory)>> /\
+      <<CLOSED2: Memory.closed e2.(Thread.memory)>> /\
+      <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
+      <<SC_FUTURE: TimeMap.le e1.(Thread.sc) e2.(Thread.sc)>> /\
+      <<MEM_FUTURE: Memory.future e1.(Thread.memory) e2.(Thread.memory)>>.
+    Proof.
+      revert WF1 SC1 CLOSED1. induction STEPS; i.
+      - splits; ss; refl.
+      - exploit step_future; eauto. i. des.
+        exploit IHSTEPS; eauto. i. des.
+        splits; ss; etrans; eauto.
+    Qed.
+
     Lemma step_disjoint
           rels1 rels2 e e1 e2 lc
           (STEP: step rels1 rels2 e e1 e2)
