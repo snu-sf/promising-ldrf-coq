@@ -703,6 +703,49 @@ Module PFtoRAThread.
       - right. esplits; eauto. econs 1.
     Qed.
 
+    Lemma sim_thread_plus_step
+          tr1 views1 rels1 e1_pf e1_j e1_ra
+          tr e2_pf pf e_pf e3_pf
+          (SIM1: sim_thread views1 rels1 e1_pf e1_j e1_ra)
+          (SIM_TR1: sim_trace tr1 rels1)
+          (WF1_PF: wf_pf tr1 e1_pf)
+          (WF1_J: wf_j views1 e1_j)
+          (WF1_RA: wf_ra rels1 e1_ra)
+          (STEPS: Trace.steps tr e1_pf e2_pf)
+          (STEP: Thread.step pf e_pf e2_pf e3_pf)
+          (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr)
+          (PF: List.Forall (compose (pf_event L) snd) (tr ++ [(e2_pf.(Thread.local), e_pf)]))
+          (CONS: Local.promise_consistent e3_pf.(Thread.local)):
+      (exists views2 views3 rels2 rels3 pf_j e_j e2_j e3_j e_ra e2_ra e3_ra,
+          (<<STEPS_J: JThread.rtc_tau e1_j e2_j views1 views2>>) /\
+          (<<STEP_J: JThread.step pf_j e_j e2_j e3_j views2 views3>>) /\
+          (<<STEPS_RA: RAThread.tau_steps lang L rels1 rels2 e1_ra e2_ra>>) /\
+          (<<STEP_RA: RAThread.step lang L rels2 rels3 e_ra e2_ra e3_ra>>) /\
+          (<<EVENT_J: JSim.sim_event e_j e_pf>>) /\
+          (<<EVENT_RA: PFtoRASimThread.sim_event e_ra e_j>>) /\
+          (<<SIM2: sim_thread views3 rels3 e3_pf e3_j e3_ra>>) /\
+          (<<SIM_TR2: sim_trace (tr1 ++ tr ++ [(e2_pf.(Thread.local), e_pf)]) rels3>>)) \/
+      (exists rels2 rels3 e2_ra e3_ra,
+          (<<STEPS_RA: RAThread.tau_steps lang L rels1 rels2 e1_ra e2_ra>>) /\
+          (<<RACE: RAThread.step lang L rels2 rels3 ThreadEvent.failure e2_ra e3_ra>>)).
+    Proof.
+      apply Forall_app_inv in PF. des.
+      exploit steps_pf_future; eauto. i. des.
+      hexploit step_promise_consistent; try exact STEP; try apply x0; eauto. i.
+      hexploit sim_thread_steps; eauto. i. des.
+      - hexploit steps_j_future; eauto. i. des.
+        hexploit steps_ra_future; try eapply RAThread.tau_steps_steps; eauto. i. des.
+        exploit sim_thread_step; try exact SIM2; eauto.
+        { inv FORALL2. ss. }
+        i. des.
+        + left. esplits; eauto. rewrite List.app_assoc. ss.
+        + right. esplits; eauto.
+      - right. esplits; eauto.
+    Qed.
+
+
+    (* consistency *)
+
     Lemma cap_wf_pf
           tr e sc mem
           (WF: wf_pf tr e)
@@ -807,8 +850,14 @@ Module PFtoRAThread.
           (WF1_J: wf_j views1 e1_j)
           (WF1_RA: wf_ra rels1 e1_ra)
           (CONSISTENT: pf_consistent L e1_pf):
-      RAThread.consistent lang L rels1 e1_ra.
+      (<<CONSISTENT_J: JThread.consistent e1_j views1>>) /\
+      (<<CONSISTENT_RA: RAThread.consistent lang L rels1 e1_ra>>).
     Proof.
+      split.
+      { eapply JSim.sim_thread_consistent;
+          try eapply SIM1; try eapply WF1_PF; try eapply WF1_J.
+        inv CONSISTENT. des.
+        eapply Trace.consistent_thread_consistent; eauto. }
       exploit Memory.cap_exists; try apply WF1_PF. i. des.
       exploit Memory.cap_exists; try apply WF1_J. i. des.
       exploit Memory.cap_exists; try apply WF1_RA. i. des.

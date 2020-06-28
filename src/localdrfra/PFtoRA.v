@@ -172,9 +172,9 @@ Module PFtoRA.
                       (existT _ lang st_pf, lc_pf) (existT _ lang st_j, lc_j) (existT _ lang st_ra, lc_ra)
     .
 
-    Inductive sim_conf (tr: Trace.t) (rels: ReleaseWrites.t): forall (c_pf c_ra: Configuration.t), Prop :=
+    Inductive sim_conf (tr: Trace.t) (views: Loc.t -> Time.t -> list View.t) (rels: ReleaseWrites.t):
+      forall (c_pf c_j c_ra: Configuration.t), Prop :=
     | sim_conf_intro
-        views
         ths_pf sc_pf mem_pf
         ths_j sc_j mem_j
         ths_ra sc_ra mem_ra
@@ -185,9 +185,67 @@ Module PFtoRA.
               (IdentMap.find tid ths_pf)
               (IdentMap.find tid ths_j)
               (IdentMap.find tid ths_ra)):
-        sim_conf tr rels
+        sim_conf tr views rels
                  (Configuration.mk ths_pf sc_pf mem_pf)
+                 (Configuration.mk ths_j sc_j mem_j)
                  (Configuration.mk ths_ra sc_ra mem_ra)
     .
+
+    Lemma sim_conf_step
+          tr1 views1 rels1 c1_pf c1_j c1_ra
+          tr tid e c2_pf
+          (SIM1: sim_conf tr1 views1 rels1 c1_pf c1_j c1_ra)
+          (WF1_PF: wf_pf tr1 c1_pf)
+          (WF1_J: wf_j views1 c1_j)
+          (WF1_RA: wf_ra rels1 c1_ra)
+          (STEP: pf_step_trace L tr e tid c1_pf c2_pf):
+      (exists c2_j views2 rels2 c2_ra,
+          (<<STEP_J: JConfiguration.step e tid c1_j c2_j views1 views2>>) /\
+          (<<STEP_RA: RAConfiguration.step L e tid rels1 rels2 c1_ra c2_ra>>) /\
+          (<<SIM2: sim_conf (tr1 ++ tr) views2 rels2 c2_pf c2_j c2_ra>>)) \/
+      (exists rels2 c2_ra,
+          (<<STEP_RA: RAConfiguration.step L MachineEvent.failure tid rels1 rels2 c1_ra c2_ra>>)).
+    Proof.
+      dup SIM1. inv SIM0. inv STEP. ss.
+      specialize (THS tid). unfold option_rel3 in THS. des_ifs.
+      inv THS. apply inj_pair2 in H1. subst.
+      exploit wf_pf_thread; eauto. s. i.
+      exploit wf_j_thread; eauto. s. i.
+      exploit wf_ra_thread; eauto. s. i.
+      exploit PFtoRAThread.sim_thread_plus_step; eauto.
+      { exploit PFtoRAThread.steps_pf_future; eauto. i. des.
+        exploit PFtoRAThread.step_pf_future; eauto. i. des.
+        destruct (classic(e0 = ThreadEvent.failure)).
+        - subst. inv STEP0; inv STEP. inv LOCAL. inv LOCAL0. ss.
+        - hexploit CONSISTENT; eauto. i. inv H0. des.
+          hexploit consistent_promise_consistent;
+            try eapply Trace.consistent_thread_consistent; eauto; try eapply x4. }
+      i. des.
+      - left.
+        exploit PFtoRAThread.steps_pf_future; eauto. i. des.
+        exploit PFtoRAThread.step_pf_future; eauto. i. des.
+        exploit PFtoRAThread.steps_j_future; eauto. i. des.
+        exploit PFtoRAThread.step_j_future; eauto. i. des.
+        exploit PFtoRAThread.steps_ra_future; try eapply RAThread.tau_steps_steps; eauto. i. des.
+        exploit PFtoRAThread.step_ra_future; eauto. i. des.
+        rewrite <- List.app_assoc in x4.
+        assert (CONS: e0 <> ThreadEvent.failure ->
+                      JThread.consistent e3_j views3 /\ RAThread.consistent lang L rels3 e3_ra).
+        { i. exploit PFtoRAThread.sim_thread_consistent; try exact SIM_TR2; eauto. }
+        destruct e3_j as [st3_j lc3_j sc3_j mem3_j], e3_ra as [st3_ra lc3_ra sc3_ra mem3_ra].
+        esplits.
+        + replace (ThreadEvent.get_machine_event e0) with (ThreadEvent.get_machine_event e_j); cycle 1.
+          { inv EVENT_J; ss. }
+          econs; eauto. i. eapply CONS. inv EVENT_J; ss.
+        + replace (ThreadEvent.get_machine_event e0) with (ThreadEvent.get_machine_event e_ra); cycle 1.
+          { inv EVENT_J; inv EVENT_RA; ss. }
+          econs; eauto. i. eapply CONS. inv EVENT_J; inv EVENT_RA; ss.
+        + ss. admit.
+      - right.
+        destruct e3_ra as [st3_ra lc3_ra sc3_ra mem3_ra].
+        esplits.
+        replace MachineEvent.failure with (ThreadEvent.get_machine_event ThreadEvent.failure) by ss.
+        econs; eauto. ss.
+    Admitted.
   End PFtoRA.
 End PFtoRA.
