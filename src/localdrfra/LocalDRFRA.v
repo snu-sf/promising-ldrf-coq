@@ -25,8 +25,7 @@ Require Import Behavior.
 
 Require Import JoinedView.
 
-(* TODO: rename *)
-Require Import LocalDRF_PF.
+Require Import LocalDRFPF.
 
 Require Import OrdStep.
 Require Import Stable.
