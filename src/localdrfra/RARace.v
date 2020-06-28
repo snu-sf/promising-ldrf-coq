@@ -134,6 +134,16 @@ Module RAThread.
           <<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>.
 
 
+    Lemma tau_steps_ord_tau_steps
+          rels1 rels2 e1 e2
+          (STEPS: tau_steps rels1 rels2 e1 e2):
+      rtc (@OrdThread.tau_step lang L Ordering.acqrel) e1 e2.
+    Proof.
+      induction STEPS; eauto.
+      inv STEP; ss.
+      econs 2; eauto. econs; eauto. econs. eauto.
+    Qed.
+
     Lemma tau_steps_steps
           rels1 rels2 e1 e2
           (STEPS: tau_steps rels1 rels2 e1 e2):
@@ -182,7 +192,39 @@ Module RAThread.
       econs; eauto. econs; eauto.
     Qed.
 
-    Lemma promise_wf
+    Lemma step_future
+          rels1 rels2 e e1 e2
+          (STEP: step rels1 rels2 e e1 e2)
+          (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+          (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+          (CLOSED1: Memory.closed e1.(Thread.memory)):
+      <<WF2: Local.wf e2.(Thread.local) e2.(Thread.memory)>> /\
+      <<SC2: Memory.closed_timemap e2.(Thread.sc) e2.(Thread.memory)>> /\
+      <<CLOSED2: Memory.closed e2.(Thread.memory)>> /\
+      <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
+      <<SC_FUTURE: TimeMap.le e1.(Thread.sc) e2.(Thread.sc)>> /\
+      <<MEM_FUTURE: Memory.future e1.(Thread.memory) e2.(Thread.memory)>>.
+    Proof.
+      inv STEP; eauto using OrdThread.step_future.
+    Qed.
+
+    Lemma step_disjoint
+          rels1 rels2 e e1 e2 lc
+          (STEP: step rels1 rels2 e e1 e2)
+          (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+          (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+          (CLOSED1: Memory.closed e1.(Thread.memory))
+          (DISJOINT1: Local.disjoint e1.(Thread.local) lc)
+          (WF: Local.wf lc e1.(Thread.memory)):
+      <<DISJOINT2: Local.disjoint e2.(Thread.local) lc>> /\
+      <<WF: Local.wf lc e2.(Thread.memory)>>.
+    Proof.
+      inv STEP; eauto using OrdThread.step_disjoint.
+    Qed.
+
+    (* ReleaseWrites.wf *)
+
+    Lemma promise_rels_wf
           rels promises1 mem1 loc from to msg promises2 mem2 kind
           (RELS1: ReleaseWrites.wf rels promises1 mem1)
           (PROMISE: Memory.promise promises1 mem1 loc from to msg promises2 mem2 kind):
@@ -206,7 +248,7 @@ Module RAThread.
         des. subst. exploit Memory.remove_get0; try exact PROMISES. i. des. congr.
     Qed.
 
-    Lemma step_wf
+    Lemma step_rels_wf
           rels1 rels2 e e1 e2
           (RELS1: ReleaseWrites.wf rels1 e1.(Thread.local).(Local.promises) e1.(Thread.memory))
           (STEP: step rels1 rels2 e e1 e2):
@@ -217,7 +259,7 @@ Module RAThread.
         inv STEP0; inv STEP; inv LOCAL; ss.
         - inv LOCAL0. inv STEP. ss.
         - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP. inv WRITE. ss.
-          hexploit promise_wf; eauto. i.
+          hexploit promise_rels_wf; eauto. i.
           cut (ReleaseWrites.wf rels1 promises2 mem2).
           { i. repeat condtac; ss. ii. inv IN; eauto. inv H1.
             exploit Memory.promise_get0; eauto; try by (inv PROMISE; ss). i. des.
@@ -228,10 +270,10 @@ Module RAThread.
       }
       unfold ReleaseWrites.append.
       inv STEP0; inv STEP; inv LOCAL; ss.
-      - eauto using promise_wf.
+      - eauto using promise_rels_wf.
       - inv LOCAL0. inv STEP. ss.
       - inv LOCAL0. inv STEP. inv WRITE. ss.
-        hexploit promise_wf; eauto. i.
+        hexploit promise_rels_wf; eauto. i.
         cut (ReleaseWrites.wf rels1 promises2 mem2).
         { i. repeat condtac; ss. ii. inv IN; eauto. inv H1.
           exploit Memory.promise_get0; eauto; try by (inv PROMISE; ss). i. des.
@@ -240,7 +282,7 @@ Module RAThread.
         ii. exploit H; eauto. i. des. esplits; eauto.
         erewrite Memory.remove_o; eauto. condtac; ss.
       - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP. inv WRITE. ss.
-        hexploit promise_wf; eauto. i.
+        hexploit promise_rels_wf; eauto. i.
         cut (ReleaseWrites.wf rels1 promises2 mem2).
         { i. repeat condtac; ss. ii. inv IN; eauto. inv H1.
           exploit Memory.promise_get0; eauto; try by (inv PROMISE; ss). i. des.
@@ -252,17 +294,17 @@ Module RAThread.
       - inv LOCAL0. ss.
     Qed.
 
-    Lemma steps_wf
+    Lemma steps_rels_wf
           rels1 rels2 e1 e2
           (RELS1: ReleaseWrites.wf rels1 e1.(Thread.local).(Local.promises) e1.(Thread.memory))
           (STEPS: steps rels1 rels2 e1 e2):
       ReleaseWrites.wf rels2 e2.(Thread.local).(Local.promises) e2.(Thread.memory).
     Proof.
       induction STEPS; eauto.
-      apply IHSTEPS. eapply step_wf; eauto.
+      apply IHSTEPS. eapply step_rels_wf; eauto.
     Qed.
 
-    Lemma promise_disjoint
+    Lemma promise_rels_disjoint
           promises1 mem1 loc from to msg promises2 mem2 kind
           promises
           (PROMISE: Memory.promise promises1 mem1 loc from to msg promises2 mem2 kind)
@@ -287,7 +329,7 @@ Module RAThread.
         apply (x0 to); econs; try refl; ss.
     Qed.
 
-    Lemma step_disjoint
+    Lemma step_rels_disjoint
           rels1 rels2 e e1 e2 promises
           (RELS1: ReleaseWrites.wf rels1 e1.(Thread.local).(Local.promises) e1.(Thread.memory))
           (STEP: step rels1 rels2 e e1 e2)
@@ -296,7 +338,7 @@ Module RAThread.
           (RELS: ReleaseWrites.wf rels1 promises e1.(Thread.memory)):
       ReleaseWrites.wf rels2 promises e2.(Thread.memory).
     Proof.
-      hexploit step_wf; eauto. ii.
+      hexploit step_rels_wf; eauto. ii.
       exploit H; eauto. i. des. esplits; eauto.
       inv STEP; cycle 1.
       { unfold ReleaseWrites.append in *.
@@ -304,7 +346,7 @@ Module RAThread.
         - inv LOCAL0. exploit RELS; eauto. i. des. ss.
         - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP. inv WRITE. ss.
           revert IN. repeat condtac; ss; i; des; try by (exploit RELS; eauto; i; des; ss).
-          inv IN. eapply promise_disjoint; eauto.
+          inv IN. eapply promise_rels_disjoint; eauto.
       }
       unfold ReleaseWrites.append in *.
       inv STEP0; inv STEP; inv LOCAL; ss.
@@ -313,16 +355,16 @@ Module RAThread.
       - exploit RELS; eauto. i. des. ss.
       - inv LOCAL0. inv STEP. inv WRITE. ss. revert IN.
         repeat condtac; ss; i; des; try by (exploit RELS; eauto; i; des; ss).
-        inv IN. eapply promise_disjoint; eauto.
+        inv IN. eapply promise_rels_disjoint; eauto.
       - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP. inv WRITE. ss. revert IN.
         repeat condtac; ss; i; des; try by (exploit RELS; eauto; i; des; ss).
-        inv IN. eapply promise_disjoint; eauto.
+        inv IN. eapply promise_rels_disjoint; eauto.
       - exploit RELS; eauto. i. des. ss.
       - exploit RELS; eauto. i. des. ss.
       - exploit RELS; eauto. i. des. ss.
     Qed.
 
-    Lemma steps_disjoint
+    Lemma steps_rels_disjoint
           rels1 rels2 e1 e2 lc
           (RELS1: ReleaseWrites.wf rels1 e1.(Thread.local).(Local.promises) e1.(Thread.memory))
           (STEPS: steps rels1 rels2 e1 e2)
@@ -335,8 +377,8 @@ Module RAThread.
       ReleaseWrites.wf rels2 lc.(Local.promises) e2.(Thread.memory).
     Proof.
       induction STEPS; ss.
-      hexploit step_disjoint; eauto; try apply DISJOINT; try apply WF. i.
-      hexploit step_wf; eauto. i.
+      hexploit step_rels_disjoint; eauto; try apply DISJOINT; try apply WF. i.
+      hexploit step_rels_wf; eauto. i.
       inv STEP.
       - exploit OrdThread.step_future; eauto. i. des.
         exploit OrdThread.step_disjoint; eauto. i. des.
@@ -379,6 +421,36 @@ Module RAConfiguration.
         steps rels1 rels3 c1 c3
     .
     Hint Constructors steps.
+
+    Lemma step_future
+          e tid rels1 rels2 c1 c2
+          (WF1: Configuration.wf c1)
+          (STEP: step e tid rels1 rels2 c1 c2):
+      <<WF2: Configuration.wf c2>>.
+    Proof.
+      inv WF1. inv WF. inv STEP; s.
+      exploit THREADS; eauto. i.
+      exploit OrdThread.rtc_tau_step_future;
+        try eapply RAThread.tau_steps_ord_tau_steps; try exact STEPS; eauto.
+      s. i. des.
+      exploit RAThread.step_future; try exact STEP0; eauto. s. i. des.
+      econs; ss. econs.
+      - i. Configuration.simplify.
+        + exploit THREADS; try apply TH1; eauto. i.
+          exploit OrdThread.rtc_tau_step_disjoint;
+            try eapply RAThread.tau_steps_ord_tau_steps; try exact STEPS; eauto. i. des.
+          exploit RAThread.step_disjoint; try exact STEP0; eauto. s. i. des. symmetry. ss.
+        + exploit THREADS; try apply TH2; eauto. i.
+          exploit OrdThread.rtc_tau_step_disjoint;
+            try eapply RAThread.tau_steps_ord_tau_steps; try exact STEPS; eauto. i. des.
+          exploit RAThread.step_disjoint; try exact STEP0; eauto. s. i. des. ss.
+        + eapply DISJOINT; cycle 1; eauto.
+      - i. Configuration.simplify.
+        exploit THREADS; try apply TH; eauto. i.
+        exploit OrdThread.rtc_tau_step_disjoint;
+          try eapply RAThread.tau_steps_ord_tau_steps; try exact STEPS; eauto. i. des.
+        exploit RAThread.step_disjoint; try exact STEP0; eauto. s. i. des. ss.
+    Qed.
   End RAConfiguration.
 End RAConfiguration.
 

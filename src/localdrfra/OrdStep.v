@@ -295,6 +295,44 @@ Module OrdThread.
       - eapply program_step_future; eauto.
     Qed.
 
+    Lemma rtc_all_step_future
+          e1 e2
+          (STEPS: rtc all_step e1 e2)
+          (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+          (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+          (CLOSED1: Memory.closed e1.(Thread.memory)):
+      <<WF2: Local.wf e2.(Thread.local) e2.(Thread.memory)>> /\
+      <<SC2: Memory.closed_timemap e2.(Thread.sc) e2.(Thread.memory)>> /\
+      <<CLOSED2: Memory.closed e2.(Thread.memory)>> /\
+      <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
+      <<SC_FUTURE: TimeMap.le e1.(Thread.sc) e2.(Thread.sc)>> /\
+      <<MEM_FUTURE: Memory.future e1.(Thread.memory) e2.(Thread.memory)>>.
+    Proof.
+      revert WF1 SC1 CLOSED1. induction STEPS; i.
+      - esplits; eauto; refl.
+      - inv H. inv USTEP. exploit step_future; eauto. i. des.
+        exploit IHSTEPS; eauto. i. des.
+        esplits; eauto; etrans; eauto.
+    Qed.
+
+    Lemma rtc_tau_step_future
+          e1 e2
+          (STEPS: rtc tau_step e1 e2)
+          (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+          (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+          (CLOSED1: Memory.closed e1.(Thread.memory)):
+      <<WF2: Local.wf e2.(Thread.local) e2.(Thread.memory)>> /\
+      <<SC2: Memory.closed_timemap e2.(Thread.sc) e2.(Thread.memory)>> /\
+      <<CLOSED2: Memory.closed e2.(Thread.memory)>> /\
+      <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
+      <<SC_FUTURE: TimeMap.le e1.(Thread.sc) e2.(Thread.sc)>> /\
+      <<MEM_FUTURE: Memory.future e1.(Thread.memory) e2.(Thread.memory)>>.
+    Proof.
+      eapply rtc_all_step_future; eauto.
+      eapply rtc_implies; try exact STEPS.
+      apply tau_union.
+    Qed.
+
     Lemma step_disjoint
           pf e e1 e2 lc
           (STEP: step pf e e1 e2)
@@ -309,6 +347,41 @@ Module OrdThread.
       inv STEP.
       - eapply Thread.promise_step_disjoint; eauto.
       - inv STEP0. eapply OrdLocal.program_step_disjoint; eauto.
+    Qed.
+
+    Lemma rtc_all_step_disjoint
+          e1 e2 lc
+          (STEPS: rtc all_step e1 e2)
+          (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+          (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+          (CLOSED1: Memory.closed e1.(Thread.memory))
+          (DISJOINT1: Local.disjoint e1.(Thread.local) lc)
+          (WF: Local.wf lc e1.(Thread.memory)):
+      <<DISJOINT2: Local.disjoint e2.(Thread.local) lc>> /\
+      <<WF: Local.wf lc e2.(Thread.memory)>>.
+    Proof.
+      revert WF1 SC1 CLOSED1 DISJOINT1 WF.
+      induction STEPS; i; eauto.
+      inv H. inv USTEP.
+      exploit step_future; eauto. i. des.
+      exploit step_disjoint; eauto. i. des.
+      eauto.
+    Qed.
+
+    Lemma rtc_tau_step_disjoint
+          e1 e2 lc
+          (STEPS: rtc tau_step e1 e2)
+          (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+          (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+          (CLOSED1: Memory.closed e1.(Thread.memory))
+          (DISJOINT1: Local.disjoint e1.(Thread.local) lc)
+          (WF: Local.wf lc e1.(Thread.memory)):
+      <<DISJOINT2: Local.disjoint e2.(Thread.local) lc>> /\
+      <<WF: Local.wf lc e2.(Thread.memory)>>.
+    Proof.
+      eapply rtc_all_step_disjoint; try exact DISJOINT1; eauto.
+      eapply rtc_implies; try exact STEPS.
+      apply tau_union.
     Qed.
   End OrdThread.
 End OrdThread.

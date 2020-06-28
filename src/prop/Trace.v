@@ -265,4 +265,12 @@ Module Trace.
     }
   Qed.
 
+  Lemma steps_step_steps
+        lang tr e1 e2 e3 pf e
+        (STEPS: @steps lang tr e1 e2)
+        (STEP: Thread.step pf e e2 e3):
+    steps (tr ++ [(e2.(Thread.local), e)]) e1 e3.
+  Proof.
+    rewrite steps_equivalent in *. eauto.
+  Qed.
 End Trace.

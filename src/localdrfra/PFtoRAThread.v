@@ -370,7 +370,7 @@ Module PFtoRAThread.
           (STEP: RAThread.step lang L rels1 rels2 e e1 e2):
       <<WF2_RA: wf_ra rels2 e2>>.
     Proof.
-      inv WF1. hexploit RAThread.step_wf; eauto. i. inv STEP.
+      inv WF1. hexploit RAThread.step_rels_wf; eauto. i. inv STEP.
       - exploit OrdThread.step_future; eauto. i. des. eauto.
       - exploit OrdThread.step_future; eauto. i. des. eauto.
     Qed.
