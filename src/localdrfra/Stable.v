@@ -1261,5 +1261,76 @@ Module Stable.
           * apply WF1.
           * apply STABLE_TVIEW1.
     Qed.
+
+
+    (* cap *)
+
+    Lemma max_concrete_timemap_stable
+          mem tm
+          (CLOSED: Memory.closed mem)
+          (MAX: Memory.max_concrete_timemap mem tm):
+      stable_timemap mem tm.
+    Proof.
+      ii. dup CLOSED. inv CLOSED.
+      exploit CLOSED1; eauto. i. des. inv MSG_CLOSED. inv CLOSED. inv CLOSED2.
+      hexploit Memory.max_concrete_timemap_spec; try exact PLN; eauto. i.
+      hexploit Memory.max_concrete_timemap_spec; try exact RLX; eauto. i.
+      econs; ss.
+    Qed.
+
+    Lemma cap_normal_memory
+          mem1 mem2
+          (CLOSED: Memory.closed mem1)
+          (CAP: Memory.cap mem1 mem2)
+          (NORMAL: normal_memory mem1):
+      normal_memory mem2.
+    Proof.
+      ii. exploit Memory.cap_inv; eauto. i. des; ss.
+      eapply NORMAL; eauto.
+    Qed.
+
+    Lemma cap_stable_view
+          mem1 mem2 view
+          (CLOSED: Memory.closed mem1)
+          (CAP: Memory.cap mem1 mem2)
+          (STABLE: stable_view mem1 view):
+      stable_view mem2 view.
+    Proof.
+      ii. exploit Memory.cap_inv; eauto. i. des; ss.
+      eapply STABLE; eauto.
+    Qed.
+
+    Lemma cap_stable_timemap
+          mem1 mem2 tm
+          (CLOSED: Memory.closed mem1)
+          (CAP: Memory.cap mem1 mem2)
+          (STABLE: stable_timemap mem1 tm):
+      stable_timemap mem2 tm.
+    Proof.
+      eapply cap_stable_view; eauto.
+    Qed.
+
+    Lemma cap_stable_tview
+          mem1 mem2 tview
+          (CLOSED: Memory.closed mem1)
+          (CAP: Memory.cap mem1 mem2)
+          (STABLE: stable_tview mem1 tview):
+      stable_tview mem2 tview.
+    Proof.
+      inv STABLE. econs; eauto using cap_stable_view.
+    Qed.
+
+    Lemma cap_stable_memory
+          rels mem1 mem2
+          (CLOSED: Memory.closed mem1)
+          (CAP: Memory.cap mem1 mem2)
+          (STABLE: stable_memory rels mem1):
+      stable_memory rels mem2.
+    Proof.
+      ii. guardH LOC.
+      exploit Memory.cap_inv; try exact GET; eauto. i. des; ss.
+      exploit Memory.cap_inv; try exact GET0; eauto. i. des; ss.
+      eapply STABLE; eauto.
+    Qed.
   End Stable.
 End Stable.

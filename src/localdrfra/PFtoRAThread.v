@@ -311,26 +311,7 @@ Module PFtoRAThread.
     Qed.
 
 
-    Inductive sim_thread (views: Loc.t -> Time.t -> list View.t) (rels: ReleaseWrites.t)
-              (e_pf e_j e_ra: Thread.t lang): Prop :=
-    | sim_thread_intro
-        (SIM_JOINED: JSim.sim_thread views e_j e_pf)
-        (SIM_RA: PFtoRASimThread.sim_thread L rels e_ra e_j)
-
-        (NORMAL_J: PFtoRASimThread.normal_thread L e_j)
-        (NORMAL_RA: PFtoRASimThread.normal_thread L e_ra)
-        (STABLE_RA: PFtoRASimThread.stable_thread L rels e_ra)
-        (CLOSED_VIEWS: closed_views views e_ra.(Thread.memory))
-        (NORMAL_VIEWS: normal_views views)
-        (STABLE_VIEWS: stable_views e_ra.(Thread.memory) views)
-    .
-
-    Definition sim_trace (tr: Trace.t) (rels: ReleaseWrites.t): Prop :=
-      forall th e loc from to val released ord
-        (IN: List.In (th, e) tr)
-        (EVENT: ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord))
-        (ORD: Ordering.le ord Ordering.strong_relaxed),
-        ~ List.In (loc, to) rels.
+    (* well-formedness *)
 
     Inductive wf_pf (tr: Trace.t) (e: Thread.t lang): Prop :=
     | wf_pf_intro
@@ -393,6 +374,62 @@ Module PFtoRAThread.
       - exploit OrdThread.step_future; eauto. i. des. eauto.
       - exploit OrdThread.step_future; eauto. i. des. eauto.
     Qed.
+
+    Lemma steps_pf_future
+          tr1 tr e1 e2
+          (WF1: wf_pf tr1 e1)
+          (STEPS: Trace.steps tr e1 e2):
+      <<WF2_PF: wf_pf (tr1 ++ tr) e2>>.
+    Proof.
+      inv WF1. exploit Trace.steps_future; eauto. i. des.
+      econs; eauto.
+      apply TraceWF.wf_app.
+      - eapply TraceWF.steps_wf_other; eauto.
+      - eapply TraceWF.steps_wf; eauto.
+    Qed.
+
+    Lemma steps_j_future
+          e1 e2 views1 views2
+          (WF1: wf_j views1 e1)
+          (STEPS: JThread.rtc_tau e1 e2 views1 views2):
+      <<WF2_J: wf_j views2 e2>>.
+    Proof.
+      inv WF1. exploit JThread.tau_steps_future; eauto. i. des. eauto.
+    Qed.
+
+    Lemma steps_ra_future
+          rels1 rels2 e1 e2
+          (WF1: wf_ra rels1 e1)
+          (STEPS: RAThread.steps lang L rels1 rels2 e1 e2):
+      <<WF2_RA: wf_ra rels2 e2>>.
+    Proof.
+      induction STEPS; eauto.
+      exploit step_ra_future; eauto.
+    Qed.
+
+
+    (* sim_thread *)
+
+    Inductive sim_thread (views: Loc.t -> Time.t -> list View.t) (rels: ReleaseWrites.t)
+              (e_pf e_j e_ra: Thread.t lang): Prop :=
+    | sim_thread_intro
+        (SIM_JOINED: JSim.sim_thread views e_j e_pf)
+        (SIM_RA: PFtoRASimThread.sim_thread L rels e_ra e_j)
+
+        (NORMAL_J: PFtoRASimThread.normal_thread L e_j)
+        (NORMAL_RA: PFtoRASimThread.normal_thread L e_ra)
+        (STABLE_RA: PFtoRASimThread.stable_thread L rels e_ra)
+        (CLOSED_VIEWS: closed_views views e_ra.(Thread.memory))
+        (NORMAL_VIEWS: normal_views views)
+        (STABLE_VIEWS: stable_views e_ra.(Thread.memory) views)
+    .
+
+    Definition sim_trace (tr: Trace.t) (rels: ReleaseWrites.t): Prop :=
+      forall th e loc from to val released ord
+        (IN: List.In (th, e) tr)
+        (EVENT: ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord))
+        (ORD: Ordering.le ord Ordering.strong_relaxed),
+        ~ List.In (loc, to) rels.
 
     Lemma sim_thread_step_aux
           views1 rels1 e1_pf e1_j e1_ra
@@ -664,6 +701,150 @@ Module PFtoRAThread.
           econs 2; [eauto|..]; eauto.
           inv SILENT. ss. inv EVENT_J; inv EVENT_RA; ss.
       - right. esplits; eauto. econs 1.
+    Qed.
+
+    Lemma cap_wf_pf
+          tr e sc mem
+          (WF: wf_pf tr e)
+          (CAP: Memory.cap e.(Thread.memory) mem)
+          (SC: Memory.max_concrete_timemap mem sc):
+      wf_pf tr (Thread.mk lang e.(Thread.state) e.(Thread.local) sc mem).
+    Proof.
+      inv WF.
+      exploit Local.cap_wf; eauto. i.
+      exploit Memory.cap_closed; eauto. i.
+      hexploit Memory.max_concrete_timemap_closed; eauto. i.
+      econs; ss.
+      ii. exploit TRACE; eauto. i. inv x. econs; ss.
+      inv CAP. eauto.
+    Qed.
+
+    Lemma cap_wf_j
+          views e sc mem
+          (WF: wf_j views e)
+          (CAP: Memory.cap e.(Thread.memory) mem)
+          (SC: Memory.max_concrete_timemap mem sc):
+      wf_j views (Thread.mk lang e.(Thread.state) e.(Thread.local) sc mem).
+    Proof.
+      inv WF.
+      exploit Local.cap_wf; eauto. i.
+      exploit Memory.cap_closed; eauto. i.
+      hexploit Memory.max_concrete_timemap_closed; eauto. i.
+      exploit JSim.joined_memory_cap; eauto.
+    Qed.
+
+    Lemma cap_wf_ra
+          rels e sc mem
+          (WF: wf_ra rels e)
+          (CAP: Memory.cap e.(Thread.memory) mem)
+          (SC: Memory.max_concrete_timemap mem sc):
+      wf_ra rels (Thread.mk lang e.(Thread.state) e.(Thread.local) sc mem).
+    Proof.
+      inv WF.
+      exploit Local.cap_wf; eauto. i.
+      exploit Memory.cap_closed; eauto. i.
+      hexploit Memory.max_concrete_timemap_closed; eauto. i.
+      econs; ss.
+      ii. exploit RELS; eauto. i. des.
+      inv CAP. exploit SOUND; eauto.
+    Qed.
+
+    Lemma sim_thread_cap
+          tr views rels e_pf e_j e_ra
+          sc_pf mem_pf sc_j mem_j sc_ra mem_ra
+          (SIM: sim_thread views rels e_pf e_j e_ra)
+          (WF_PF: wf_pf tr e_pf)
+          (WF_J: wf_j views e_j)
+          (WF_RA: wf_ra rels e_ra)
+          (CAP_PF: Memory.cap e_pf.(Thread.memory) mem_pf)
+          (SC_PF: Memory.max_concrete_timemap mem_pf sc_pf)
+          (CAP_J: Memory.cap e_j.(Thread.memory) mem_j)
+          (SC_J: Memory.max_concrete_timemap mem_j sc_j)
+          (CAP_RA: Memory.cap e_ra.(Thread.memory) mem_ra)
+          (SC_RA: Memory.max_concrete_timemap mem_ra sc_ra):
+      (<<SIM_CAP: sim_thread views rels
+                             (Thread.mk lang e_pf.(Thread.state) e_pf.(Thread.local) sc_pf mem_pf)
+                             (Thread.mk lang e_j.(Thread.state) e_j.(Thread.local) sc_j mem_j)
+                             (Thread.mk lang e_ra.(Thread.state) e_ra.(Thread.local) sc_ra mem_ra)>>) /\
+      (<<WF_PF_CAP: wf_pf tr (Thread.mk lang e_pf.(Thread.state) e_pf.(Thread.local) sc_pf mem_pf)>>) /\
+      (<<WF_J_CAP: wf_j views (Thread.mk lang e_j.(Thread.state) e_j.(Thread.local) sc_j mem_j)>>) /\
+      (<<WF_RA_CAP: wf_ra rels (Thread.mk lang e_ra.(Thread.state) e_ra.(Thread.local) sc_ra mem_ra)>>).
+    Proof.
+      exploit cap_wf_pf; eauto. i.
+      exploit cap_wf_j; eauto. i.
+      exploit cap_wf_ra; eauto. i.
+      splits; ss.
+      inv SIM. econs; ss.
+      - inv WF_PF. inv WF_J. inv x0. inv x1. inv SIM_JOINED.
+        apply inj_pair2 in H2. apply inj_pair2 in H3. subst. ss.
+        econs; eauto.
+        + eapply SimMemory.sim_memory_cap; eauto.
+        + eapply SimMemory.sim_memory_cap in MEM; eauto.
+          eapply SimMemory.sim_memory_max_concrete_timemap in MEM; eauto.
+          subst. refl.
+      - inv SIM_RA. econs; ss.
+        + exploit PFtoRASimThread.sim_memory_cap; eauto; try apply WF_J; try apply WF_RA. i.
+          eapply PFtoRASimThread.sim_memory_max_concrete_timemap; eauto.
+        + eapply PFtoRASimThread.sim_memory_cap; eauto; try apply WF_J; try apply WF_RA.
+      - inv NORMAL_J. econs; ss.
+        eapply Stable.cap_normal_memory; eauto. apply WF_J.
+      - inv NORMAL_RA. econs; ss.
+        eapply Stable.cap_normal_memory; eauto. apply WF_RA.
+      - inv WF_RA. inv STABLE_RA. econs; ss.
+        + eapply Stable.cap_stable_tview; eauto.
+        + eapply Stable.max_concrete_timemap_stable; eauto; try apply x2.
+        + eapply Stable.cap_stable_memory; eauto.
+      - ii. eapply Memory.cap_closed_view; eauto.
+      - ii. exploit Memory.cap_inv; try exact CAP_RA; eauto; try apply WF_RA. i. des; ss.
+        exploit STABLE_VIEWS; eauto.
+    Qed.
+
+    Lemma sim_thread_consistent
+          tr1 views1 rels1 e1_pf e1_j e1_ra
+          (SIM1: sim_thread views1 rels1 e1_pf e1_j e1_ra)
+          (SIM_TR1: sim_trace tr1 rels1)
+          (WF1_PF: wf_pf tr1 e1_pf)
+          (WF1_J: wf_j views1 e1_j)
+          (WF1_RA: wf_ra rels1 e1_ra)
+          (CONSISTENT: pf_consistent L e1_pf):
+      RAThread.consistent lang L rels1 e1_ra.
+    Proof.
+      exploit Memory.cap_exists; try apply WF1_PF. i. des.
+      exploit Memory.cap_exists; try apply WF1_J. i. des.
+      exploit Memory.cap_exists; try apply WF1_RA. i. des.
+      exploit Memory.cap_closed; try eapply WF1_PF; eauto. i.
+      exploit Memory.cap_closed; try eapply WF1_J; eauto. i.
+      exploit Memory.cap_closed; try eapply WF1_RA; eauto. i.
+      exploit Memory.max_concrete_timemap_exists; try eapply x0. i. des.
+      exploit Memory.max_concrete_timemap_exists; try eapply x1. i. des.
+      exploit Memory.max_concrete_timemap_exists; try eapply x2. i. des.
+      exploit sim_thread_cap; eauto. i. des. ii.
+      exploit Memory.cap_inj; [exact CAP2|exact CAP1|..]; try apply WF1_RA. i. subst.
+      exploit Memory.max_concrete_timemap_inj; [exact SC_MAX|exact x5|]. i. subst.
+      inv CONSISTENT. des. exploit CONSISTENT; eauto. i. des.
+      - exploit sim_thread_steps; try exact STEPS; eauto.
+        { inv FAILURE; inv STEP. inv LOCAL. inv LOCAL0. ss. }
+        i. des.
+        + exploit steps_pf_future; try exact STEPS; eauto. i. des.
+          exploit steps_j_future; try exact STEPS_J; eauto. i. des.
+          exploit steps_ra_future; try eapply RAThread.tau_steps_steps;
+            try exact STEPS_RA; eauto. i. des.
+          exploit sim_thread_step; try exact FAILURE; eauto; ss.
+          { inv FAILURE; inv STEP. inv LOCAL. inv LOCAL0. ss. }
+          i. des.
+          * left. inv EVENT_J; inv EVENT_RA.
+            unfold RAThread.steps_failure. esplits; eauto.
+          * left. unfold RAThread.steps_failure. esplits; eauto.
+        + left. unfold RAThread.steps_failure. esplits; eauto.
+      - exploit sim_thread_steps; try exact STEPS; eauto.
+        { ii. rewrite PROMISES in *. rewrite Memory.bot_get in *. ss. }
+        i. des.
+        + right. esplits; eauto.
+          inv SIM2. inv SIM_JOINED.
+          apply inj_pair2 in H2. apply inj_pair2 in H3. subst. ss.
+          exploit JSim.sim_local_memory_bot; eauto. i.
+          inv SIM_RA. ss. subst. inv LOCAL0. congr.
+        + left. unfold RAThread.steps_failure. esplits; eauto.
     Qed.
   End PFtoRAThread.
 End PFtoRAThread.

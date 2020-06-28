@@ -1840,5 +1840,105 @@ Module PFtoRASimThread.
         + econs 2. econs; [|econs 7]; eauto.
         + left. esplits; ss.
     Qed.
+
+
+    (* cap *)
+
+    Lemma sim_memory_max_concrete_timemap
+          rels mem_src mem_tgt tm_src tm_tgt
+          (SIM: sim_memory rels mem_src mem_tgt)
+          (MAX_SRC: Memory.max_concrete_timemap mem_src tm_src)
+          (MAX_TGT: Memory.max_concrete_timemap mem_tgt tm_tgt):
+      tm_src = tm_tgt.
+    Proof.
+      extensionality loc.
+      destruct (MAX_SRC loc). des.
+      destruct (MAX_TGT loc). des.
+      inv SIM.
+      exploit SOUND; eauto. i. des. inv MSG.
+      exploit COMPLETE; try exact GET0. i. des. inv MSG.
+      apply TimeFacts.antisym; eauto.
+    Qed.
+
+    Lemma sim_memory_adjacent_src
+          rels mem_src mem_tgt
+          loc from1 to1 from2 to2
+          (SIM: sim_memory rels mem_src mem_tgt)
+          (ADJ: Memory.adjacent loc from1 to1 from2 to2 mem_src):
+      Memory.adjacent loc from1 to1 from2 to2 mem_tgt.
+    Proof.
+      inv SIM. inv ADJ.
+      exploit SOUND; try exact GET1. i. des.
+      exploit SOUND; try exact GET2. i. des.
+      econs; eauto. i.
+      exploit EMPTY; eauto. i.
+      destruct (Memory.get loc ts mem_tgt) as [[]|] eqn:GETT; ss.
+      exploit COMPLETE; eauto. i. des. congr.
+    Qed.
+
+    Lemma sim_memory_adjacent_tgt
+          rels mem_src mem_tgt
+          loc from1 to1 from2 to2
+          (SIM: sim_memory rels mem_src mem_tgt)
+          (ADJ: Memory.adjacent loc from1 to1 from2 to2 mem_tgt):
+      Memory.adjacent loc from1 to1 from2 to2 mem_src.
+    Proof.
+      inv SIM. inv ADJ.
+      exploit COMPLETE; try exact GET1. i. des.
+      exploit COMPLETE; try exact GET2. i. des.
+      econs; eauto. i.
+      exploit EMPTY; eauto. i.
+      destruct (Memory.get loc ts mem_src) as [[]|] eqn:GETT; ss.
+      exploit SOUND; eauto. i. des. congr.
+    Qed.
+
+    Lemma sim_memory_max_ts
+          rels mem_src mem_tgt
+          (SIM: sim_memory rels mem_src mem_tgt)
+          (CLOSED_SRC: Memory.closed mem_src)
+          (CLOSED_TGT: Memory.closed mem_tgt):
+      forall loc, Memory.max_ts loc mem_src = Memory.max_ts loc mem_tgt.
+    Proof.
+      inv SIM. i.
+      exploit Memory.max_ts_spec; try eapply CLOSED_SRC. i. des.
+      exploit Memory.max_ts_spec; try eapply CLOSED_TGT. i. des.
+      exploit SOUND; eauto. i. des.
+      exploit COMPLETE; try exact GET0. i. des.
+      exploit Memory.max_ts_spec; try exact GET_TGT. i. des.
+      exploit Memory.max_ts_spec; try exact GET_SRC. i. des.
+      apply TimeFacts.antisym; eauto.
+    Qed.
+
+    Lemma sim_memory_cap
+          rels mem_src mem_tgt cap_src cap_tgt
+          (SIM: sim_memory rels mem_src mem_tgt)
+          (CLOSED_SRC: Memory.closed mem_src)
+          (CLOSED_TGT: Memory.closed mem_tgt)
+          (CAP_SRC: Memory.cap mem_src cap_src)
+          (CAP_TGT: Memory.cap mem_tgt cap_tgt):
+      sim_memory rels cap_src cap_tgt.
+    Proof.
+      dup SIM. inv SIM0. econs; i.
+      - exploit Memory.cap_inv; try exact CAP_SRC; eauto. i. des; subst.
+        + exploit SOUND; eauto. i. des.
+          inv CAP_TGT. exploit SOUND0; eauto.
+        + exploit sim_memory_adjacent_src; eauto. i.
+          inv CAP_TGT. exploit MIDDLE; eauto. i.
+          esplits; eauto. refl.
+        + erewrite sim_memory_max_ts; eauto.
+          inv CAP_TGT. esplits; eauto. refl.
+      - exploit Memory.cap_inv; try exact CAP_TGT; eauto. i. des; subst.
+        + exploit COMPLETE; eauto. i. des.
+          inv CAP_SRC. exploit SOUND0; eauto.
+        + exploit sim_memory_adjacent_tgt; eauto. i.
+          inv CAP_SRC. exploit MIDDLE; eauto. i.
+          esplits; eauto. refl.
+        + erewrite <- sim_memory_max_ts; eauto.
+          inv CAP_SRC. esplits; eauto. refl.
+      - exploit REL_WRITES; eauto. i. des.
+        inv CAP_SRC. inv CAP_TGT.
+        exploit SOUND0; eauto. i.
+        exploit SOUND1; eauto.
+    Qed.
   End PFtoRASimThread.
 End PFtoRASimThread.
