@@ -315,33 +315,101 @@ Module PFtoRA.
               (e_pf e_j e_ra: Thread.t lang): Prop :=
     | sim_thread_intro
         (SIM_JOINED: JSim.sim_thread views e_j e_pf)
-        (JOINED_REL: joined_released views e_j.(Thread.local).(Local.promises) e_j.(Thread.local).(Local.tview).(TView.rel))
-        (JOINED_MEM: joined_memory views e_j.(Thread.memory))
-        (JOINED_VIEWS: wf_views views)
-
         (SIM_RA: PFtoRASimThread.sim_thread L rels e_ra e_j)
+
         (NORMAL_J: PFtoRASimThread.normal_thread L e_j)
         (NORMAL_RA: PFtoRASimThread.normal_thread L e_ra)
         (STABLE_RA: PFtoRASimThread.stable_thread L rels e_ra)
         (CLOSED_VIEWS: closed_views views e_ra.(Thread.memory))
         (NORMAL_VIEWS: normal_views views)
         (STABLE_VIEWS: stable_views e_ra.(Thread.memory) views)
-
-        (WF_PF: Local.wf e_pf.(Thread.local) e_pf.(Thread.memory))
-        (SC_PF: Memory.closed_timemap e_pf.(Thread.sc) e_pf.(Thread.memory))
-        (MEM_PF: Memory.closed e_pf.(Thread.memory))
-        (WF_J: Local.wf e_j.(Thread.local) e_j.(Thread.memory))
-        (SC_J: Memory.closed_timemap e_j.(Thread.sc) e_j.(Thread.memory))
-        (MEM_J: Memory.closed e_j.(Thread.memory))
-        (WF_RA: Local.wf e_ra.(Thread.local) e_ra.(Thread.memory))
-        (SC_RA: Memory.closed_timemap e_ra.(Thread.sc) e_ra.(Thread.memory))
-        (MEM_RA: Memory.closed e_ra.(Thread.memory))
     .
 
-    Lemma thread_step_aux
+    Definition sim_trace (tr: Trace.t) (rels: ReleaseWrites.t): Prop :=
+      forall th e loc from to val released ord
+        (IN: List.In (th, e) tr)
+        (EVENT: ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord))
+        (ORD: Ordering.le ord Ordering.strong_relaxed),
+        ~ List.In (loc, to) rels.
+
+    Inductive wf_pf (tr: Trace.t) (e: Thread.t lang): Prop :=
+    | wf_pf_intro
+        (WF: Local.wf e.(Thread.local) e.(Thread.memory))
+        (SC: Memory.closed_timemap e.(Thread.sc) e.(Thread.memory))
+        (MEM: Memory.closed e.(Thread.memory))
+        (TRACE: TraceWF.wf tr e.(Thread.local).(Local.promises) e.(Thread.memory))
+    .
+    Hint Constructors wf_pf.
+
+    Inductive wf_j (views: Loc.t -> Time.t -> list View.t) (e: Thread.t lang): Prop :=
+    | wf_j_intro
+        (WF: Local.wf e.(Thread.local) e.(Thread.memory))
+        (SC: Memory.closed_timemap e.(Thread.sc) e.(Thread.memory))
+        (MEM: Memory.closed e.(Thread.memory))
+        (JOINED_REL: joined_released views e.(Thread.local).(Local.promises) e.(Thread.local).(Local.tview).(TView.rel))
+        (JOINED_MEM: joined_memory views e.(Thread.memory))
+        (JOINED_VIEWS: wf_views views)
+    .
+    Hint Constructors wf_j.
+
+    Inductive wf_ra (rels: ReleaseWrites.t) (e: Thread.t lang): Prop :=
+    | wf_ra_intro
+        (WF: Local.wf e.(Thread.local) e.(Thread.memory))
+        (SC: Memory.closed_timemap e.(Thread.sc) e.(Thread.memory))
+        (MEM: Memory.closed e.(Thread.memory))
+        (RELS: ReleaseWrites.wf rels e.(Thread.local).(Local.promises) e.(Thread.memory))
+    .
+    Hint Constructors wf_ra.
+
+    Lemma step_pf_future
+          tr1 pf e e1 e2
+          (WF1: wf_pf tr1 e1)
+          (STEP: Thread.step pf e e1 e2):
+      <<WF2_PF: wf_pf (tr1 ++ [(e1.(Thread.local), e)]) e2>>.
+    Proof.
+      inv WF1. exploit Thread.step_future; eauto. i. des.
+      econs; eauto.
+      apply TraceWF.wf_app.
+      - eapply TraceWF.steps_wf_other; eauto.
+      - eapply TraceWF.steps_wf; eauto.
+    Qed.
+
+    Lemma step_j_future
+          pf e e1 e2 views1 views2
+          (WF1: wf_j views1 e1)
+          (STEP: JThread.step pf e e1 e2 views1 views2):
+      <<WF2_J: wf_j views2 e2>>.
+    Proof.
+      inv WF1. exploit JThread.step_future; eauto. i. des. eauto.
+    Qed.
+
+    Lemma step_ra_future
+          rels1 rels2 e e1 e2
+          (WF1: wf_ra rels1 e1)
+          (STEP: RAThread.step lang L rels1 rels2 e e1 e2):
+      <<WF2_RA: wf_ra rels2 e2>>.
+    Proof.
+      inv WF1. hexploit RAThread.step_wf; eauto. i. inv STEP.
+      - exploit OrdThread.step_future; eauto. i. des. eauto.
+      - exploit OrdThread.step_future; eauto. i. des. eauto.
+    Qed.
+
+    Lemma sim_thread_step_aux
           views1 rels1 e1_pf e1_j e1_ra
           pf e_pf e2_pf
           (SIM1: sim_thread views1 rels1 e1_pf e1_j e1_ra)
+          (JOINED_REL: joined_released views1 e1_j.(Thread.local).(Local.promises) e1_j.(Thread.local).(Local.tview).(TView.rel))
+          (JOINED_MEM: joined_memory views1 e1_j.(Thread.memory))
+          (JOINED_VIEWS: wf_views views1)
+          (WF1_PF: Local.wf e1_pf.(Thread.local) e1_pf.(Thread.memory))
+          (SC1_PF: Memory.closed_timemap e1_pf.(Thread.sc) e1_pf.(Thread.memory))
+          (MEM1_PF: Memory.closed e1_pf.(Thread.memory))
+          (WF1_J: Local.wf e1_j.(Thread.local) e1_j.(Thread.memory))
+          (SC1_J: Memory.closed_timemap e1_j.(Thread.sc) e1_j.(Thread.memory))
+          (MEM1_J: Memory.closed e1_j.(Thread.memory))
+          (WF1_RA: Local.wf e1_ra.(Thread.local) e1_ra.(Thread.memory))
+          (SC1_RA: Memory.closed_timemap e1_ra.(Thread.sc) e1_ra.(Thread.memory))
+          (MEM1_RA: Memory.closed e1_ra.(Thread.memory))
           (STEP_PF: Thread.step pf e_pf e1_pf e2_pf)
           (CONS: Local.promise_consistent e2_pf.(Thread.local))
           (PROMISE: forall loc from to msg kind
@@ -373,9 +441,9 @@ Module PFtoRA.
         }
         i. unguard. des.
         - esplits; eauto. left. split; ss.
-          exploit Thread.step_future; try exact STEP_PF; try apply SIM1. i. des.
-          exploit Thread.step_future; try eapply STEP0; try apply SIM1. i. des.
-          exploit OrdThread.step_future; try exact STEP_SRC; try apply SIM1. i. des.
+          exploit Thread.step_future; try exact STEP_PF; eauto. i. des.
+          exploit Thread.step_future; try eapply STEP0; eauto. i. des.
+          exploit OrdThread.step_future; try exact STEP_SRC; eauto. i. des.
           econs; eauto.
           + hexploit future_closed_views; try eapply SIM1; eauto. i.
             eapply step_closed_views; try eapply SIM1; eauto.
@@ -428,13 +496,13 @@ Module PFtoRA.
             inv STEP_SRC. ss. rewrite REL. esplits; eauto. }
           i. exploit PROMISE0; eauto. i. des.
           eapply joined_opt_view_normal_view; eauto.
-        - exploit Local.promise_step_future; try exact STEP_SRC; try apply SIM1. s. i. des.
+        - exploit Local.promise_step_future; try exact STEP_SRC; eauto. s. i. des.
           hexploit future_closed_views; try eapply SIM1; try exact FUTURE. i.
           hexploit future_stable_views; try eapply SIM1; try exact FUTURE. i.
           hexploit (@step_stable_views views1 views0); try exact H1; eauto.
           { inv SIM1. ss. inv STABLE_RA. ss. inv STABLE_TVIEW.
             i. hexploit (REL loc0); ss. i.
-            hexploit Stable.future_stable_view; try exact H2; try exact FUTURE; try apply WF_RA. i.
+            hexploit Stable.future_stable_view; try exact H2; try exact FUTURE; try eapply WF1_RA. i.
             eapply H3. }
           { i. exploit VIEWSLE; eauto. i. des.
             inv MEM2.
@@ -453,9 +521,9 @@ Module PFtoRA.
       i. des.
       hexploit Stable.promise_step; try exact STEP_SRC; try eapply SIM1; eauto. i. des.
       split; try by econs.
-      exploit Thread.step_future; try exact STEP_PF; try eapply SIM1. i. des.
-      exploit Local.promise_step_future; try exact LOCAL; try eapply SIM1. s. i. des.
-      exploit Local.promise_step_future; try exact STEP_SRC; try eapply SIM1. s. i. des.
+      exploit Thread.step_future; try exact STEP_PF; eauto. i. des.
+      exploit Local.promise_step_future; try exact LOCAL; eauto. s. i. des.
+      exploit Local.promise_step_future; try exact STEP_SRC; eauto. s. i. des.
       econs; ss; eauto.
       - inv SIM1. inv SIM_RA. econs; ss; eauto.
       - unfold ReleaseWrites.append. ss. econs; ss; eauto.
@@ -487,116 +555,111 @@ Module PFtoRA.
           rewrite REL. esplits; eauto.
     Qed.
 
-    Definition sim_trace (tr: Trace.t) (rels: ReleaseWrites.t): Prop :=
-      forall th e loc from to val released ord
-        (IN: List.In (th, e) tr)
-        (EVENT: ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord))
-        (ORD: Ordering.le ord Ordering.strong_relaxed),
-        ~ List.In (loc, to) rels.
-
-    Lemma thread_step
+    Lemma sim_thread_step
           tr1 views1 rels1 e1_pf e1_j e1_ra
           pf e_pf e2_pf
           (SIM1: sim_thread views1 rels1 e1_pf e1_j e1_ra)
           (SIM_TR1: sim_trace tr1 rels1)
-          (TRACE1_WF: TraceWF.wf tr1 e1_pf.(Thread.local).(Local.promises) e1_pf.(Thread.memory))
-          (RELS1_WF: ReleaseWrites.wf rels1 e1_ra.(Thread.local).(Local.promises) e1_ra.(Thread.memory))
+          (WF1_PF: wf_pf tr1 e1_pf)
+          (WF1_J: wf_j views1 e1_j)
+          (WF1_RA: wf_ra rels1 e1_ra)
           (STEP: Thread.step pf e_pf e1_pf e2_pf)
           (PF: pf_event L e_pf)
           (CONS: Local.promise_consistent e2_pf.(Thread.local)):
-      (exists views2 rels2 e_j e2_j e_ra e2_ra,
+      (exists views2 rels2 pf_j e_j e2_j e_ra e2_ra,
+          (<<STEP_J: JThread.step pf_j e_j e1_j e2_j views1 views2>>) /\
           (<<STEP_RA: RAThread.step lang L rels1 rels2 e_ra e1_ra e2_ra>>) /\
           (<<EVENT_J: JSim.sim_event e_j e_pf>>) /\
           (<<EVENT_RA: PFtoRASimThread.sim_event e_ra e_j>>) /\
           (<<SIM2: sim_thread views2 rels2 e2_pf e2_j e2_ra>>) /\
-          (<<SIM_TR2: sim_trace (tr1 ++ [(e1_pf.(Thread.local), e_pf)]) rels2>>) /\
-          (<<TRACE2_WF: TraceWF.wf (tr1 ++ [(e1_pf.(Thread.local), e_pf)])
-                                   e2_pf.(Thread.local).(Local.promises) e2_pf.(Thread.memory)>>) /\
-          (<<RELS2_WF: ReleaseWrites.wf rels2 e2_ra.(Thread.local).(Local.promises) e2_ra.(Thread.memory)>>)) \/
+          (<<SIM_TR2: sim_trace (tr1 ++ [(e1_pf.(Thread.local), e_pf)]) rels2>>)) \/
       (exists rels2 e2_ra,
           (<<RACE: RAThread.step lang L rels1 rels2 ThreadEvent.failure e1_ra e2_ra>>)).
     Proof.
-      exploit thread_step_aux; eauto. i. unguard. des.
+      exploit sim_thread_step_aux; eauto; try apply WF1_PF; try apply WF1_J; try apply WF1_RA.
+      i. unguard. des.
       - left. esplits; eauto.
         + econs 1. eauto.
         + ii. apply List.in_app_or in IN.
           apply ReleaseWrites.in_append_or in H. des.
-          * exploit TRACE1_WF; eauto. i. inv x.
+          * inv WF1_PF. exploit TRACE; eauto. i. inv x.
             inv EVENT_J; inv EVENT_RA; ss.
             { inv H. inv STEP; inv STEP0. inv LOCAL. inv LOCAL0. inv WRITE. ss.
               inv PROMISE; ss.
-              - exploit Memory.add_get0; try exact MEM. i. des. congr.
-              - exploit Memory.split_get0; try exact MEM. i. des. congr.
+              - exploit Memory.add_get0; try exact MEM0. i. des. congr.
+              - exploit Memory.split_get0; try exact MEM0. i. des. congr.
               - exploit Memory.lower_get0; try exact PROMISES. i. des. congr. }
             { inv H. inv STEP; inv STEP0. inv LOCAL. inv LOCAL1. inv LOCAL2. inv WRITE. ss.
               inv PROMISE; ss.
-              - exploit Memory.add_get0; try exact MEM. i. des. congr.
-              - exploit Memory.split_get0; try exact MEM. i. des. congr.
+              - exploit Memory.add_get0; try exact MEM0. i. des. congr.
+              - exploit Memory.split_get0; try exact MEM0. i. des. congr.
               - exploit Memory.lower_get0; try exact PROMISES. i. des. congr. }
           * inv IN; ss. inv H2. inv EVENT_J; inv EVENT_RA; ss.
             { inv H. inv EVENT. destruct ord; ss. }
             { inv H. inv EVENT. destruct ord; ss. }
           * eapply SIM_TR1; eauto.
-          * inv IN; ss. inv H0. exploit RELS1_WF; eauto. i. des.
+          * inv IN; ss. inv H0.
+            inv WF1_RA. exploit RELS; eauto. i. des.
             inv EVENT_J; inv EVENT_RA; ss.
             { inv EVENT.
               inv STEP_RA; inv STEP0. inv LOCAL. inv LOCAL0. inv STEP0. inv WRITE. ss.
               inv PROMISE; ss.
-              - exploit Memory.add_get0; try exact MEM. i. des. congr.
-              - exploit Memory.split_get0; try exact MEM. i. des. congr.
+              - exploit Memory.add_get0; try exact MEM0. i. des. congr.
+              - exploit Memory.split_get0; try exact MEM0. i. des. congr.
               - exploit Memory.lower_get0; try exact PROMISES. i. des. congr. }
             { inv EVENT.
               inv STEP_RA; inv STEP0. inv LOCAL. inv LOCAL1. inv STEP0. inv LOCAL2. inv STEP0. inv WRITE. ss.
               inv PROMISE; ss.
-              - exploit Memory.add_get0; try exact MEM. i. des. congr.
-              - exploit Memory.split_get0; try exact MEM. i. des. congr.
+              - exploit Memory.add_get0; try exact MEM0. i. des. congr.
+              - exploit Memory.split_get0; try exact MEM0. i. des. congr.
               - exploit Memory.lower_get0; try exact PROMISES. i. des. congr. }
-        + apply TraceWF.wf_app.
-          * eapply TraceWF.steps_wf_other; eauto.
-          * eapply TraceWF.steps_wf; eauto.
-        + eapply RAThread.step_wf; eauto. econs 1; eauto.
       - right. esplits. econs 2; eauto.
     Qed.
 
-    Lemma thread_steps
+    Lemma sim_thread_steps
           tr1 views1 rels1 e1_pf e1_j e1_ra
           tr e2_pf
           (SIM1: sim_thread views1 rels1 e1_pf e1_j e1_ra)
           (SIM_TR1: sim_trace tr1 rels1)
-          (TRACE1_WF: TraceWF.wf tr1 e1_pf.(Thread.local).(Local.promises) e1_pf.(Thread.memory))
-          (RELS1_WF: ReleaseWrites.wf rels1 e1_ra.(Thread.local).(Local.promises) e1_ra.(Thread.memory))
+          (WF1_PF: wf_pf tr1 e1_pf)
+          (WF1_J: wf_j views1 e1_j)
+          (WF1_RA: wf_ra rels1 e1_ra)
           (STEPS: Trace.steps tr e1_pf e2_pf)
           (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr)
           (PF: List.Forall (compose (pf_event L) snd) tr)
           (CONS: Local.promise_consistent e2_pf.(Thread.local)):
       (exists views2 rels2 e2_j e2_ra,
+          (<<STEPS_J: JThread.rtc_tau e1_j e2_j views1 views2>>) /\
           (<<STEPS_RA: RAThread.tau_steps lang L rels1 rels2 e1_ra e2_ra>>) /\
           (<<SIM2: sim_thread views2 rels2 e2_pf e2_j e2_ra>>) /\
-          (<<SIM_TR2: sim_trace (tr1 ++ tr) rels2>>) /\
-          (<<TRACE2_WF: TraceWF.wf (tr1 ++ tr) e2_pf.(Thread.local).(Local.promises) e2_pf.(Thread.memory)>>) /\
-          (<<RELS2_WF: ReleaseWrites.wf rels2 e2_ra.(Thread.local).(Local.promises) e2_ra.(Thread.memory)>>)) \/
+          (<<SIM_TR2: sim_trace (tr1 ++ tr) rels2>>)) \/
       (exists rels2 rels3 e2_ra e3_ra,
           (<<STEPS_RA: RAThread.tau_steps lang L rels1 rels2 e1_ra e2_ra>>) /\
           (<<RACE: RAThread.step lang L rels2 rels3 ThreadEvent.failure e2_ra e3_ra>>)).
     Proof.
-      revert tr1 views1 rels1 e1_j e1_ra SIM1 SIM_TR1 TRACE1_WF RELS1_WF SILENT PF CONS.
+      revert tr1 views1 rels1 e1_j e1_ra SIM1 SIM_TR1 WF1_PF WF1_J WF1_RA SILENT PF CONS.
       induction STEPS; i; ss.
-      { left. eexists _. exists rels1.
-        rewrite List.app_nil_r.
-        esplits; [econs 1|..]; ss; eauto. }
-      subst. exploit thread_step; try exact SIM1; eauto.
+      { left. esplits; eauto.
+        - econs 1; eauto.
+        - rewrite List.app_nil_r. ss. }
+      subst. exploit sim_thread_step; try exact SIM1; eauto.
       { ii. inv PF. exploit H1; ss; eauto. }
-      { exploit Thread.step_future; try exact STEP; try apply SIM1. i. des.
+      { exploit Thread.step_future; try exact STEP; try apply WF1_PF. i. des.
         eapply rtc_tau_step_promise_consistent; try eapply Trace.silent_steps_tau_steps; eauto.
         inv SILENT. ss. }
       i. unguard. des.
-      - exploit IHSTEPS; eauto.
+      - exploit step_pf_future; eauto. i. des.
+        exploit step_j_future; eauto. i. des.
+        exploit step_ra_future; eauto. i. des.
+        exploit IHSTEPS; eauto.
         { inv SILENT. ss. }
         { inv PF. ss. }
         i. rewrite <- List.app_assoc in x. des.
-        + left. esplits; eauto.
-          econs 2; [eauto|..]; eauto.
-          inv SILENT. ss. inv EVENT_J; inv EVENT_RA; ss.
+        + left. esplits; try exact SIM0; eauto.
+          * econs 2; [eauto|..]; eauto.
+            inv SILENT. ss. inv EVENT_J; ss.
+          * econs 2; [eauto|..]; eauto.
+            inv SILENT. ss. inv EVENT_J; inv EVENT_RA; ss.
         + right. esplits; eauto.
           econs 2; [eauto|..]; eauto.
           inv SILENT. ss. inv EVENT_J; inv EVENT_RA; ss.
@@ -616,7 +679,7 @@ Module PFtoRA.
       | _, _, _ => False
       end.
 
-    Inductive sim_thread_sl (views: Loc.t -> Time.t -> list View.t) (rels: ReleaseWrites.t)
+    Inductive sim_thread_sl (tr: Trace.t) (views: Loc.t -> Time.t -> list View.t) (rels: ReleaseWrites.t)
               (sc_pf sc_j sc_ra: TimeMap.t) (mem_pf mem_j mem_ra: Memory.t):
       forall (sl_pf sl_j sl_ra: {lang: language & Language.state lang} * Local.t), Prop :=
     | sim_thread_sl_intro
@@ -624,8 +687,11 @@ Module PFtoRA.
         (SIM: sim_thread L views rels
                          (Thread.mk lang st_pf lc_pf sc_pf mem_pf)
                          (Thread.mk lang st_j lc_j sc_j mem_j)
-                         (Thread.mk lang st_ra lc_ra sc_ra mem_ra)):
-        sim_thread_sl views rels sc_pf sc_j sc_ra mem_pf mem_j mem_ra
+                         (Thread.mk lang st_ra lc_ra sc_ra mem_ra))
+        (SIM_TR: sim_trace tr rels)
+        (TRACE_WF: TraceWF.wf tr lc_pf.(Local.promises) mem_pf)
+        (RELS_WF: ReleaseWrites.wf rels lc_ra.(Local.promises) mem_ra):
+        sim_thread_sl tr views rels sc_pf sc_j sc_ra mem_pf mem_j mem_ra
                       (existT _ lang st_pf, lc_pf) (existT _ lang st_j, lc_j) (existT _ lang st_ra, lc_ra)
     .
 
