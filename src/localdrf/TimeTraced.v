@@ -56,21 +56,20 @@ Inductive times_configuration_step_all (times: Loc.t -> Time.t -> Prop)
     (STEP: @times_configuration_step times tr tr_cert e tid c1 c2)
 .
 
-Lemma times_configuration_step_traced_step times tr tr_cert e tid c1 c2
+Lemma times_configuration_step_configuration_step times tr tr_cert e tid c1 c2
       (STEP: @times_configuration_step times tr tr_cert e tid c1 c2)
       (WF: Configuration.wf c1)
   :
-    exists (tr: Trace.t),
-      (<<STEP: Trace.configuration_step tr e tid c1 c2>>).
+    Configuration.step e tid c1 c2.
 Proof.
-  inv STEP. esplits. econs; eauto.
-  i. hexploit CONSISTENT; eauto. i. des.
-  dup WF. inv WF. exploit Trace.steps_future; eauto.
-  { ss. eapply WF1; eauto. } i. des. ss.
-  hexploit Trace.steps_future; eauto.
-  { eapply WF0; eauto. } i. des. ss.
-  hexploit Thread.step_future; eauto. i. des. ss.
-  eapply pf_consistent_super_strong_consistent; eauto.
+  inv STEP. eapply Trace.silent_steps_tau_steps in STEPS; eauto.
+  destruct (classic (e0 = ThreadEvent.failure)).
+  { subst. econs; eauto. }
+  { inv WF. exploit Thread.rtc_tau_step_future; ss; eauto.
+    { eapply WF0; eauto. } i. des.
+    exploit Thread.step_future; ss; eauto. ss. i. des.
+    econs 2; eauto. eapply pf_consistent_super_strong_consistent; eauto.
+  }
 Qed.
 
 Lemma times_configuration_step_future
@@ -81,8 +80,8 @@ Lemma times_configuration_step_future
   (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
   (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
 Proof.
-  eapply times_configuration_step_traced_step in STEP; eauto. des.
-  eapply Trace.configuration_step_future; eauto.
+  eapply times_configuration_step_configuration_step in STEP; eauto.
+  eapply Configuration.step_future; eauto.
 Qed.
 
 Inductive times_configuration_opt_step (times: Loc.t -> Time.t -> Prop)
@@ -139,24 +138,37 @@ Lemma times_configuration_step_exists c0 c1 tid e
       (<<STEP: @times_configuration_step times tr tr_cert e tid c0 c1>>) /\
       (<<WO: forall loc, well_ordered (times loc)>>).
 Proof.
-  eapply Trace.step_configuration_step in STEP. des.
-  hexploit (trace_times_list_exists tr). i. des. inv STEP0.
-  destruct (classic (e0 = ThreadEvent.failure)).
-  { subst. eexists (fun loc ts => List.In ts (times loc)), (tr'++_), []. splits.
-    { econs; eauto. ss. }
+  inv STEP.
+  { eapply Trace.tau_steps_silent_steps in STEPS. des.
+    hexploit (trace_times_list_exists tr). i. des.
+    hexploit step_times_list_exists; eauto. i. des.
+    replace MachineEvent.failure with (ThreadEvent.get_machine_event ThreadEvent.failure); auto.
+    eexists (fun loc ts => List.In ts (times loc ++ times0 loc)), (tr++_), []. splits.
+    { econs; eauto; ss. eapply Forall_app.
+      { eapply List.Forall_impl; eauto. i. ss. eapply wf_time_evt_mon; eauto.
+        i. ss. eapply List.in_or_app; eauto. }
+      { econs; ss. }
+    }
     { i. eapply finite_well_ordered. }
   }
-  { hexploit CONSISTENT; ss.
+  { eapply Trace.tau_steps_silent_steps in STEPS. des.
+    hexploit (trace_times_list_exists tr). i. des.
+    hexploit step_times_list_exists; eauto. i. des.
+    hexploit CONSISTENT; ss.
     dup WF. inv WF. exploit Trace.steps_future; eauto.
     { ss. eapply WF1; eauto. } i. des. ss.
     hexploit Thread.step_future; eauto. i. des. ss.
-    eapply consistent_pf_consistent_super_strong in H0; eauto.
-    des. eexists (certimes \2/ (fun loc ts => List.In ts (times loc))), (tr'++_), tr. splits.
+    eapply consistent_pf_consistent_super_strong in H; eauto.
+    des. eexists (certimes \2/ (fun loc ts => List.In ts (times loc ++ times0 loc))), (tr++_), tr0. splits.
     { econs; eauto.
       { i. esplits. eapply pf_consistent_super_strong_mon; eauto. }
       { i. ss. }
-      { eapply List.Forall_impl; try apply WFTIME.
-        i. ss. eapply wf_time_evt_mon; try apply H0. i. ss. auto. }
+      { eapply Forall_app.
+        { eapply List.Forall_impl; eauto. i. eapply wf_time_evt_mon; try apply H.
+          i. ss. right. eapply List.in_or_app; eauto. }
+        { econs; ss. eapply wf_time_evt_mon; try apply WFTIME0.
+          i. ss. right. eapply List.in_or_app; eauto. }
+      }
     }
     { i. eapply join_well_ordered; eauto. eapply finite_well_ordered. }
   }

@@ -39,81 +39,161 @@ Section LOCALDRF.
     forall loc from to msg kind (PROMISE: e = ThreadEvent.promise loc from to msg kind) (LOC: L loc),
       msg = Message.reserve.
 
-  Definition pf_step (e: MachineEvent.t) (tid: Ident.t)
-             (c0 c1: Configuration.t): Prop :=
-    exists tr,
-      (<<STEP: @Trace.configuration_step tr e tid c0 c1>>) /\
-      (<<PF: List.Forall (compose pf_event snd) tr>>).
+  Definition pf_consistent lang (th: Thread.t lang): Prop :=
+    exists tr_cert,
+      (<<CONSISTENT: Trace.consistent th tr_cert>>) /\
+      (<<PFCERT: List.Forall (compose pf_event snd) tr_cert>>).
 
-  Inductive configuration_steps_trace:
-    forall (c0 c1: Configuration.t) (tr: Trace.t), Prop :=
-  | configuration_steps_trace_nil
-      c0
-    :
-      configuration_steps_trace c0 c0 []
-  | configuration_steps_trace_cons
-      c0 c1 c2 trs tr e tid
-      (STEPS: configuration_steps_trace c1 c2 trs)
-      (STEP: @Trace.configuration_step tr e tid c0 c1)
+  Inductive pf_step_trace: forall (tr: Trace.t) (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
+  | pf_step_trace_intro
+      lang tr e tr' pf tid c1 st1 lc1 e2 st3 lc3 sc3 memory3
+      (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
+      (STEPS: Trace.steps tr' (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
+      (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr')
+      (STEP: Thread.step pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
+      (TR: tr = tr'++[(e2.(Thread.local), e)])
+      (CONSISTENT: forall (EVENT: e <> ThreadEvent.failure),
+          pf_consistent (Thread.mk _ st3 lc3 sc3 memory3))
       (PF: List.Forall (compose pf_event snd) tr)
     :
-      configuration_steps_trace c0 c2 (tr ++ trs)
+      pf_step_trace tr (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
   .
 
-  Lemma configuration_steps_trace_n1 c0 c1 c2 tr trs e tid
-        (STEPS: configuration_steps_trace c0 c1 trs)
-        (STEP: @Trace.configuration_step tr e tid c1 c2)
-        (PF: List.Forall (compose pf_event snd) tr)
+  Inductive pf_opt_step_trace: forall (tr: Trace.t) (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
+  | pf_opt_step_trace_some
+      tr e tid c1 c2
+      (STEP: pf_step_trace tr e tid c1 c2)
     :
-      configuration_steps_trace c0 c2 (trs ++ tr).
+      pf_opt_step_trace tr e tid c1 c2
+  | pf_opt_step_trace_none
+      tid c1
+    :
+      pf_opt_step_trace [] MachineEvent.silent tid c1 c1
+  .
+
+  Lemma pf_step_trace_step tr e tid c1 c2
+        (STEP: pf_step_trace tr e tid c1 c2)
+    :
+      Configuration.step e tid c1 c2.
+  Proof.
+    inv STEP. destruct (classic (e0 = ThreadEvent.failure)).
+    { subst. econs 1; try apply STEP0; eauto.
+      eapply Trace.silent_steps_tau_steps; eauto. }
+    { econs 2; try apply STEP0; eauto.
+      { eapply Trace.silent_steps_tau_steps; eauto. }
+      { exploit CONSISTENT; eauto. i. unfold pf_consistent in *. des.
+        eapply Trace.consistent_thread_consistent; eauto. }
+    }
+  Qed.
+
+  Lemma pf_step_trace_future
+        (tr: Trace.t) e tid c1 c2
+        (STEP: pf_step_trace tr e tid c1 c2)
+        (WF1: Configuration.wf c1):
+    (<<WF2: Configuration.wf c2>>) /\
+    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
+    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
+  Proof.
+    eapply pf_step_trace_step in STEP.
+    eapply Configuration.step_future; eauto.
+  Qed.
+
+  Lemma pf_opt_step_trace_future
+        (tr: Trace.t) e tid c1 c2
+        (STEP: pf_opt_step_trace tr e tid c1 c2)
+        (WF1: Configuration.wf c1):
+    (<<WF2: Configuration.wf c2>>) /\
+    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
+    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
+  Proof.
+    inv STEP.
+    { eapply pf_step_trace_future; eauto. }
+    { splits; auto. refl. }
+  Qed.
+
+  Inductive pf_steps_trace:
+    forall (c0 c1: Configuration.t) (tr: Trace.t), Prop :=
+  | pf_steps_trace_nil
+      c0
+    :
+      pf_steps_trace c0 c0 []
+  | pf_steps_trace_cons
+      c0 c1 c2 trs tr e tid
+      (STEPS: pf_steps_trace c1 c2 trs)
+      (STEP: pf_step_trace tr e tid c0 c1)
+    :
+      pf_steps_trace c0 c2 (tr ++ trs)
+  .
+
+  Lemma pf_steps_trace_n1 c0 c1 c2 tr trs e tid
+        (STEPS: pf_steps_trace c0 c1 trs)
+        (STEP: pf_step_trace tr e tid c1 c2)
+    :
+      pf_steps_trace c0 c2 (trs ++ tr).
   Proof.
     ginduction STEPS.
-    { i. exploit configuration_steps_trace_cons.
+    { i. exploit pf_steps_trace_cons.
       { econs 1. }
       { eapply STEP. }
-      { auto. }
       { i. ss. erewrite List.app_nil_r in *. auto. }
     }
     { i. exploit IHSTEPS; eauto. i. erewrite <- List.app_assoc. econs; eauto. }
   Qed.
 
-  Lemma configuration_steps_trace_trans c0 c1 c2 trs0 trs1
-        (STEPS0: configuration_steps_trace c0 c1 trs0)
-        (STEPS1: configuration_steps_trace c1 c2 trs1)
+  Lemma pf_steps_trace_trans c0 c1 c2 trs0 trs1
+        (STEPS0: pf_steps_trace c0 c1 trs0)
+        (STEPS1: pf_steps_trace c1 c2 trs1)
     :
-      configuration_steps_trace c0 c2 (trs0 ++ trs1).
+      pf_steps_trace c0 c2 (trs0 ++ trs1).
   Proof.
     ginduction STEPS0.
     { i. erewrite List.app_nil_l. eauto. }
     { i. exploit IHSTEPS0; eauto. i. erewrite <- List.app_assoc. econs; eauto. }
   Qed.
 
-  Inductive silent_configuration_steps_trace:
+  Inductive silent_pf_steps_trace:
     forall (c0 c1: Configuration.t) (tr: Trace.t), Prop :=
-  | silent_configuration_steps_trace_nil
+  | silent_pf_steps_trace_nil
       c0
     :
-      silent_configuration_steps_trace c0 c0 []
-  | silent_configuration_steps_trace_cons
+      silent_pf_steps_trace c0 c0 []
+  | silent_pf_steps_trace_cons
       c0 c1 c2 trs tr tid
-      (STEPS: silent_configuration_steps_trace c1 c2 trs)
-      (STEP: @Trace.configuration_step tr MachineEvent.silent tid c0 c1)
-      (PF: List.Forall (compose pf_event snd) tr)
+      (STEPS: silent_pf_steps_trace c1 c2 trs)
+      (STEP: pf_step_trace tr MachineEvent.silent tid c0 c1)
     :
-      silent_configuration_steps_trace c0 c2 (tr ++ trs)
+      silent_pf_steps_trace c0 c2 (tr ++ trs)
   .
 
-  Lemma silent_configuration_steps_trace_configuration_steps_trace
+  Lemma silent_pf_steps_trace_pf_steps_trace
     :
-      silent_configuration_steps_trace <3= configuration_steps_trace.
+      silent_pf_steps_trace <3= pf_steps_trace.
   Proof.
     intros. induction PR.
     { econs. }
     { econs; eauto. }
   Qed.
 
-  Lemma silent_configuration_steps_trace_behaviors c0 c1 tr
-        (STEP: silent_configuration_steps_trace c0 c1 tr)
+
+  Inductive pf_step (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t): Prop :=
+  | pf_step_intro
+      tr
+      (STEP: pf_step_trace tr e tid c1 c2)
+  .
+
+  Lemma pf_step_future
+        e tid c1 c2
+        (STEP: pf_step e tid c1 c2)
+        (WF1: Configuration.wf c1):
+    (<<WF2: Configuration.wf c2>>) /\
+    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
+    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
+  Proof.
+    inv STEP. eapply pf_step_trace_future; eauto.
+  Qed.
+
+  Lemma silent_pf_steps_trace_behaviors c0 c1 tr
+        (STEP: silent_pf_steps_trace c0 c1 tr)
     :
       behaviors pf_step c1 <1= behaviors pf_step c0.
   Proof.
@@ -128,18 +208,18 @@ Section LOCALDRF.
       lc
       valr releasedr ordr
       (VIEW:
-         if Ordering.le Ordering.relaxed ordr
-         then Time.lt (lc.(Local.tview).(TView.cur).(View.rlx) loc) ts
-         else Time.lt (lc.(Local.tview).(TView.cur).(View.pln) loc) ts)
+         Time.lt (if Ordering.le Ordering.relaxed ordr
+                  then (lc.(Local.tview).(TView.cur).(View.rlx) loc)
+                  else (lc.(Local.tview).(TView.cur).(View.pln) loc)) ts)
     :
       racy_read loc ts lc (ThreadEvent.read loc ts valr releasedr ordr)
   | racy_read_update
       lc
       to valr valw releasedr releasedw ordr ordw
       (VIEW:
-         if Ordering.le Ordering.relaxed ordr
-         then Time.lt (lc.(Local.tview).(TView.cur).(View.rlx) loc) ts
-         else Time.lt (lc.(Local.tview).(TView.cur).(View.pln) loc) ts)
+         Time.lt (if Ordering.le Ordering.relaxed ordr
+                  then (lc.(Local.tview).(TView.cur).(View.rlx) loc)
+                  else (lc.(Local.tview).(TView.cur).(View.pln) loc)) ts)
     :
       racy_read loc ts lc (ThreadEvent.update loc ts to valr valw releasedr releasedw ordr ordw)
   .
@@ -163,7 +243,7 @@ Section LOCALDRF.
   Definition racefree (c0: Configuration.t): Prop :=
     forall c1 trs
            loc ts lc0 lc1 e0 e1
-           (CSTEPS: configuration_steps_trace c0 c1 trs)
+           (CSTEPS: pf_steps_trace c0 c1 trs)
            (TRACE0: List.In (lc0, e0) trs)
            (TRACE1: List.In (lc1, e1) trs)
            (WRITE: racy_write loc ts lc0 e0)
@@ -172,8 +252,7 @@ Section LOCALDRF.
 
   Lemma step_racefree c0 c1 tr e tid
         (RACEFREE: racefree c0)
-        (STEP: @Trace.configuration_step tr e tid c0 c1)
-        (PF: List.Forall (compose pf_event snd) tr)
+        (STEP: pf_step_trace tr e tid c0 c1)
     :
       racefree c1.
   Proof.
@@ -187,12 +266,12 @@ Section LOCALDRF.
 
   Lemma steps_racefree c0 c1 trs
         (RACEFREE: racefree c0)
-        (STEP: configuration_steps_trace c0 c1 trs)
+        (STEP: pf_steps_trace c0 c1 trs)
     :
       racefree c1.
   Proof.
     ii. eapply RACEFREE.
-    { eapply configuration_steps_trace_trans; eauto. }
+    { eapply pf_steps_trace_trans; eauto. }
     { eapply List.in_or_app. right. eapply TRACE0. }
     { eapply List.in_or_app. right. eapply TRACE1. }
     { eauto. }
@@ -202,8 +281,8 @@ Section LOCALDRF.
   Lemma racefree_write_read c0 c1 c2 trs0 trs1
         loc ts lc0 lc1 e0 e1
         (RACEFREE: racefree c0)
-        (STEPS0: configuration_steps_trace c0 c1 trs0)
-        (STEPS1: configuration_steps_trace c1 c2 trs1)
+        (STEPS0: pf_steps_trace c0 c1 trs0)
+        (STEPS1: pf_steps_trace c1 c2 trs1)
         (TRACE0: List.In (lc0, e0) trs0)
         (TRACE1: List.In (lc1, e1) trs1)
         (WRITE: racy_write loc ts lc0 e0)
@@ -212,7 +291,7 @@ Section LOCALDRF.
       False.
   Proof.
     eapply RACEFREE.
-    { eapply configuration_steps_trace_trans; eauto. }
+    { eapply pf_steps_trace_trans; eauto. }
     { eapply List.in_or_app. left. eapply TRACE0. }
     { eapply List.in_or_app. right. eapply TRACE1. }
     { eauto. }

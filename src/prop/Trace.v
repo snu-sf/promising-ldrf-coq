@@ -168,6 +168,20 @@ Module Trace.
       + etrans; eauto.
   Qed.
 
+  Lemma steps_promise_consistent
+        lang (th1 th2: Thread.t lang) tr
+        (STEPS: steps tr th1 th2)
+        (CONS: Local.promise_consistent th2.(Thread.local))
+        (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
+        (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory))
+        (MEM1: Memory.closed th1.(Thread.memory)):
+    Local.promise_consistent th1.(Thread.local).
+  Proof.
+    ginduction STEPS; auto. i. subst.
+    exploit Thread.step_future; eauto. i. des.
+    eapply step_promise_consistent; eauto.
+  Qed.
+
   Lemma silent_steps_tau_steps lang tr (th0 th1: Thread.t lang)
         (STEPS: steps tr th0 th1)
         (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr)
@@ -199,95 +213,56 @@ Module Trace.
     ginduction STEPS0; eauto. i. subst. econs; eauto.
   Qed.
 
-  Inductive configuration_step: forall (tr: t) (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
-  | configuration_step_intro
-      lang tr e tr' pf tid c1 st1 lc1 e2 st3 lc3 sc3 memory3
-      (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
-      (STEPS: steps tr' (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
-      (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr')
-      (STEP: Thread.step pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
-      (TR: tr = tr'++[(e2.(Thread.local), e)])
-      (CONSISTENT: forall (EVENT: e <> ThreadEvent.failure),
-          Thread.consistent (Thread.mk _ st3 lc3 sc3 memory3))
-    :
-      configuration_step tr (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
-  .
+  Definition consistent lang (e:Thread.t lang) (tr: t): Prop :=
+    forall mem1 sc1
+           (CAP: Memory.cap e.(Thread.memory) mem1)
+           (SC_MAX: Memory.max_concrete_timemap mem1 sc1),
+    exists e2,
+      (<<STEPS: steps tr (Thread.mk _ e.(Thread.state) e.(Thread.local) sc1 mem1) e2>>) /\
+      (<<SILENT: List.Forall (fun lce => ThreadEvent.get_machine_event (snd lce) = MachineEvent.silent) tr>>) /\
+      ((<<FAILURE: exists e3, Thread.step true ThreadEvent.failure e2 e3 >>) \/
+       (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>)).
 
-  Inductive configuration_opt_step: forall (tr: t) (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
-  | configuration_opt_step_some
-      tr e tid c1 c2
-      (STEP: @configuration_step tr e tid c1 c2)
+  Lemma consistent_thread_consistent lang (e: Thread.t lang) tr
+        (CONSISTENT: consistent e tr)
     :
-      configuration_opt_step tr e tid c1 c2
-  | configuration_opt_step_none
-      tid c1
-    :
-      @configuration_opt_step [] MachineEvent.silent tid c1 c1
-  .
-
-  Lemma configuration_step_step tr e tid c1 c2
-        (STEP: @configuration_step tr e tid c1 c2)
-    :
-      Configuration.step e tid c1 c2.
+      Thread.consistent e.
   Proof.
-    inv STEP. destruct (classic (e0 = ThreadEvent.failure)).
-    { subst. econs 1; try apply STEP0; eauto.
-      eapply silent_steps_tau_steps; eauto. }
-    { econs 2; try apply STEP0; eauto.
-      eapply silent_steps_tau_steps; eauto. }
+    ii. exploit CONSISTENT; eauto. i. des.
+    { left. unfold Thread.steps_failure. esplits.
+      { eapply silent_steps_tau_steps in STEPS; eauto. }
+      { eauto. }
+    }
+    { right. esplits.
+      { eapply silent_steps_tau_steps in STEPS; eauto. }
+      { eauto. }
+    }
   Qed.
 
-  Lemma step_configuration_step e tid c1 c2
-        (STEP: Configuration.step e tid c1 c2)
+  Lemma thread_consistent_consistent lang (e: Thread.t lang)
+        (CONSISTENT: Thread.consistent e)
+        (CLOSED: Memory.closed e.(Thread.memory))
     :
       exists tr,
-        (<<STEP: @configuration_step tr e tid c1 c2>>).
+        (<<CONSISTENT: consistent e tr>>).
   Proof.
-    inv STEP.
+    exploit Memory.cap_exists; eauto. i. des.
+    exploit Memory.max_concrete_timemap_exists; eauto.
+    { eapply Memory.cap_closed; eauto. } i. des.
+    exploit CONSISTENT; eauto. i. des.
+    { unfold Thread.steps_failure in *. des.
+      eapply tau_steps_silent_steps in STEPS. des.
+      exists tr. ii.
+      exploit (@Memory.cap_inj e.(Thread.memory) mem2 mem1); eauto. i. subst.
+      exploit (@Memory.max_concrete_timemap_inj mem1 tm sc1); eauto. i. subst.
+      esplits; eauto.
+    }
     { eapply tau_steps_silent_steps in STEPS. des.
-      replace MachineEvent.failure with (ThreadEvent.get_machine_event ThreadEvent.failure); auto.
-      esplits. econs; eauto. i. ss. }
-    { eapply tau_steps_silent_steps in STEPS. des.
-      esplits. econs; eauto. }
-  Qed.
-
-  Lemma configuration_step_future
-        (tr: t) e tid c1 c2
-        (STEP: configuration_step tr e tid c1 c2)
-        (WF1: Configuration.wf c1):
-    (<<WF2: Configuration.wf c2>>) /\
-    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
-  Proof.
-    eapply configuration_step_step in STEP.
-    eapply Configuration.step_future; eauto.
-  Qed.
-
-  Lemma configuration_opt_step_future
-        (tr: t) e tid c1 c2
-        (STEP: configuration_opt_step tr e tid c1 c2)
-        (WF1: Configuration.wf c1):
-    (<<WF2: Configuration.wf c2>>) /\
-    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
-  Proof.
-    inv STEP.
-    { eapply configuration_step_future; eauto. }
-    { splits; auto. refl. }
-  Qed.
-
-  Lemma steps_promise_consistent
-        lang (th1 th2: Thread.t lang) tr
-        (STEPS: steps tr th1 th2)
-        (CONS: Local.promise_consistent th2.(Thread.local))
-        (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
-        (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory))
-        (MEM1: Memory.closed th1.(Thread.memory)):
-    Local.promise_consistent th1.(Thread.local).
-  Proof.
-    ginduction STEPS; auto. i. subst.
-    exploit Thread.step_future; eauto. i. des.
-    eapply step_promise_consistent; eauto.
+      exists tr. ii.
+      exploit (@Memory.cap_inj e.(Thread.memory) mem2 mem1); eauto. i. subst.
+      exploit (@Memory.max_concrete_timemap_inj mem1 tm sc1); eauto. i. subst.
+      esplits; eauto.
+    }
   Qed.
 
 End Trace.
