@@ -23,6 +23,7 @@ Require Import Thread.
 Require Import Configuration.
 
 Require Import PromiseConsistent.
+Require Import Mapping.
 
 Set Implicit Arguments.
 
@@ -445,6 +446,151 @@ Module OrdThread.
       apply tau_union.
     Qed.
 
+    Lemma cap_step_current_step
+          pf e e0 e1 fe0
+          (THREAD: thread_map ident_map e0 fe0)
+          (STEP: step pf e e0 e1)
+          (LOCAL: Local.wf e0.(Thread.local) e0.(Thread.memory))
+          (FLOCAL: Local.wf fe0.(Thread.local) fe0.(Thread.memory))
+          (MEMORY: Memory.closed e0.(Thread.memory))
+          (FMEMORY: Memory.closed fe0.(Thread.memory))
+          (SC: Memory.closed_timemap e0.(Thread.sc) e0.(Thread.memory))
+          (FSC: Memory.closed_timemap fe0.(Thread.sc) fe0.(Thread.memory))
+      :
+        exists fe fe1,
+          (<<THREAD: thread_map ident_map e1 fe1>>) /\
+          (<<STEP: step pf fe fe0 fe1>>) /\
+          (<<EVENT: tevent_map ident_map fe e>>).
+    Proof.
+      assert (MAPLT: mapping_map_lt ident_map).
+      { eapply ident_map_lt. }
+      assert (MAPLE: mapping_map_le ident_map).
+      { eapply ident_map_le. }
+      assert (MAPEQ: mapping_map_eq ident_map).
+      { eapply ident_map_eq. }
+
+      inv THREAD. ss. inv STEP.
+      { inv STEP0. inv LOCAL1.
+        exploit promise_map; try apply PROMISE; eauto; ss.
+        { eapply FLOCAL. }
+        { eapply LOCAL0. }
+        { eapply mapping_map_lt_non_collapsable; eauto. }
+        { eapply ident_map_message. }
+        i. des. inv LOCAL0.
+        eexists _, (Thread.mk _ st (Local.mk (Local.tview flc) fprom1) fsc fmem1).
+        esplits; eauto.
+        { econs; eauto.
+          { econs; eauto. }
+          { eapply mapping_map_lt_collapsable_unwritable; eauto. }
+        }
+        { econs 1. econs.
+          { econs; eauto. eapply closed_message_map; eauto.
+            eapply ident_map_message. }
+          { inv KIND; ss. inv MSG; ss. }
+        }
+        { econs; eauto; ss. eapply ident_map_message. }
+      }
+      { inv STEP0. inv LOCAL1.
+        { esplits; eauto.
+          { econs; eauto. }
+          { econs 2; eauto. econs; eauto. econs 1; eauto. }
+          { econs; eauto. }
+        }
+        { inv LOCAL2. exploit read_step_map; eauto.
+          { eapply ident_map_bot. }
+          { eapply FLOCAL. } i. des.
+          exists (ThreadEvent.read loc fto val freleased ord). esplits.
+          { econs; eauto. eapply mapping_map_lt_collapsable_unwritable; eauto. }
+          { econs 2; eauto. econs; eauto. econs 2; eauto. econs; eauto. }
+          { econs; eauto. }
+        }
+        { inv LOCAL2. hexploit write_step_map; try eassumption; eauto.
+          { eapply ident_map_bot. }
+          { eapply FLOCAL. }
+          { eapply FLOCAL. }
+          { econs 2. }
+          { refl. }
+          { refl. }
+          { eapply mapping_map_lt_non_collapsable; eauto. }
+          i. des.
+          exists (ThreadEvent.write loc from to val freleasedw ord). esplits.
+          { econs; eauto. eapply mapping_map_lt_collapsable_unwritable; eauto. }
+          { econs 2; eauto. econs; eauto. econs 3; eauto. econs; eauto. }
+          { econs; eauto; ss. }
+        }
+        { inv LOCAL2. inv LOCAL3. exploit read_step_map; eauto.
+          { eapply ident_map_bot. }
+          { eapply FLOCAL. } i. des.
+          hexploit Local.read_step_future; try apply STEP; eauto. i. des.
+          hexploit Local.read_step_future; try apply READ; eauto. i. des.
+          hexploit write_step_map; try eapply STEP0; try eassumption; eauto.
+          { eapply ident_map_bot. }
+          { eapply WF0. }
+          { eapply WF0. }
+          { eapply mapping_map_lt_collapsable_unwritable; eauto. }
+          { refl. }
+          { eapply mapping_map_lt_non_collapsable; eauto. }
+          i. des.
+          exists (ThreadEvent.update loc fto tsw valr valw freleased freleasedw ordr ordw). esplits.
+          { econs; eauto. eapply mapping_map_lt_collapsable_unwritable; eauto. }
+          { econs 2; eauto. econs; eauto. econs 4; eauto.
+            { econs; eauto. }
+            { econs; eauto. }
+          }
+          { econs; eauto; ss. }
+        }
+        { inv LOCAL2. exploit fence_step_map; try apply FENCE; eauto.
+          { eapply ident_map_bot. }
+          { eapply FLOCAL. } i. des.
+          exists (ThreadEvent.fence ordr ordw). esplits.
+          { econs; eauto. }
+          { econs 2; eauto. econs; eauto. econs 5; eauto. }
+          { econs; eauto; ss. }
+        }
+        { inv LOCAL2. exploit fence_step_map; eauto.
+          { eapply ident_map_bot. }
+          { eapply FLOCAL. } i. des.
+          exists (ThreadEvent.syscall e0). esplits.
+          { econs; eauto. }
+          { econs 2; eauto. econs; eauto. econs 6; eauto. }
+          { econs; eauto; ss. }
+        }
+        { inv LOCAL2. exploit failure_step_map; eauto. i.
+          exists (ThreadEvent.failure). esplits.
+          { econs; eauto. }
+          { econs 2; eauto. econs; eauto. econs 7; eauto. }
+          { econs; eauto; ss. }
+        }
+      }
+    Qed.
+
+    Lemma cap_tau_steps_current_tau_steps
+          e0 e1 fe0
+          (THREAD: thread_map ident_map e0 fe0)
+          (STEPS: rtc tau_step e0 e1)
+          (LOCAL: Local.wf e0.(Thread.local) e0.(Thread.memory))
+          (FLOCAL: Local.wf fe0.(Thread.local) fe0.(Thread.memory))
+          (MEMORY: Memory.closed e0.(Thread.memory))
+          (FMEMORY: Memory.closed fe0.(Thread.memory))
+          (SC: Memory.closed_timemap e0.(Thread.sc) e0.(Thread.memory))
+          (FSC: Memory.closed_timemap fe0.(Thread.sc) fe0.(Thread.memory))
+      :
+        exists fe1,
+          (<<THREAD: thread_map ident_map e1 fe1>>) /\
+          (<<STEPS: rtc tau_step fe0 fe1>>)
+    .
+    Proof.
+      ginduction STEPS; eauto. i.
+      inv H. inv TSTEP.
+      exploit cap_step_current_step; eauto. i. des.
+      exploit step_future; try apply STEP; eauto. i. des.
+      exploit step_future; try apply STEP0; eauto. i. des.
+      exploit IHSTEPS; eauto. i. des. exists fe2. splits; eauto.
+      econs; eauto. econs.
+      { econs; eauto. }
+      { inv EVENT0; ss. }
+    Qed.
+
     Lemma cap_plus_step_current_plus_step
           pf e e1 e2 e3 sc1 mem1
           (LOCAL: Local.wf e1.(Thread.local) e1.(Thread.memory))
@@ -457,10 +603,43 @@ Module OrdThread.
         exists pf' e' e2' e3',
           (<<STEPS: rtc tau_step e1 e2'>>) /\
           (<<STEP: step pf' e' e2' e3'>>) /\
-          (<<LOCAL: True (* concrete promises in e2 and e2' has identical loc, to & e2'.tview <= e2.tview *)>>) /\
-          (<<EVENT: True (* e and e' has same kind accessing same loc, to *)>>).
+          (<<LOCAL: promises_map ident_map e3.(Thread.local).(Local.promises) e3'.(Thread.local).(Local.promises)>>) /\
+          (<<EVENT: tevent_map ident_map e' e>>).
     Proof.
-    Admitted.
+      exploit cap_tau_steps_current_tau_steps; try apply STEPS; eauto; ss.
+      { destruct e1. ss. econs; eauto.
+        { eapply ident_map_local. }
+        { econs.
+          { i. eapply Memory.cap_inv in GET; eauto. des; auto.
+            right. exists to, from, msg, msg; splits; ss.
+            { eapply ident_map_message. }
+            { refl. }
+          }
+          { i. eapply CAP in GET. left. esplits; ss.
+            { refl. }
+            { refl. }
+            { i. econs; eauto. }
+          }
+        }
+        { eapply mapping_map_lt_collapsable_unwritable. eapply ident_map_lt. }
+        { eapply ident_map_timemap. }
+        { eapply Memory.max_concrete_timemap_spec; eauto.
+          eapply Memory.cap_closed_timemap; eauto. }
+      }
+      { eapply Local.cap_wf; eauto. }
+      { eapply Memory.cap_closed; eauto. }
+      { eapply Memory.max_concrete_timemap_closed; eauto. }
+      i. des.
+      exploit rtc_tau_step_future; try apply STEPS; ss.
+      { eapply Local.cap_wf; eauto. }
+      { eapply Memory.max_concrete_timemap_closed; eauto. }
+      { eapply Memory.cap_closed; eauto. }
+      i. des.
+      exploit rtc_tau_step_future; try apply STEPS0; ss. i. des.
+      exploit cap_step_current_step; eauto. i. des.
+      esplits; eauto. inv THREAD0. ss. eapply LOCAL0.
+    Qed.
+
   End OrdThread.
 End OrdThread.
 
