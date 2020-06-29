@@ -143,7 +143,7 @@ Module PFtoRA.
     Proof.
       exploit RAConfiguration.step_future; try eapply WF1; eauto. i. des.
       inv STEP. ss.
-      assert (STEPS': RAThread.steps lang L rels1 rels2
+      assert (STEPS': RAThread.steps L rels1 rels2
                                      (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory))
                                      (Thread.mk _ st3 lc3 sc3 memory3)).
       { exploit RAThread.tau_steps_steps; eauto. i.
@@ -350,7 +350,7 @@ Module PFtoRA.
         exploit PFtoRAThread.step_ra_future; eauto. i. des.
         rewrite <- List.app_assoc in x4.
         assert (CONS: e0 <> ThreadEvent.failure ->
-                      JThread.consistent e3_j views3 /\ RAThread.consistent lang L rels3 e3_ra).
+                      JThread.consistent e3_j views3 /\ RAThread.consistent L rels3 e3_ra).
         { i. exploit PFtoRAThread.sim_thread_consistent; try exact SIM_TR2; eauto. }
         destruct e3_j as [st3_j lc3_j sc3_j mem3_j], e3_ra as [st3_ra lc3_ra sc3_ra mem3_ra].
         esplits.
@@ -374,7 +374,7 @@ Module PFtoRA.
           * inv SIM_RA. ss. subst.
             econs; s; eauto; try by (inv SIM2; inv SIM_RA; ss).
             inv LOCAL. econs; ss. i.
-            assert (STEPS': RAThread.steps lang L rels1 rels3
+            assert (STEPS': RAThread.steps L rels1 rels3
                                            (Thread.mk _ st_ra lc_ra sc_j mem_ra)
                                            (Thread.mk _ st3_ra lc3_ra sc3_ra mem3_ra)).
             { exploit RAThread.tau_steps_steps; eauto. i.
@@ -386,7 +386,7 @@ Module PFtoRA.
           * econs; try apply SIM2; try apply NORMAL_J.
           * econs; try apply SIM2; try apply NORMAL_RA.
           * econs; s; try apply SIM2; try apply STABLE_RA.
-            assert (STEPS': RAThread.steps lang L rels1 rels3
+            assert (STEPS': RAThread.steps L rels1 rels3
                                            (Thread.mk _ st_ra lc_ra sc_ra mem_ra)
                                            (Thread.mk _ st3_ra lc3_ra sc3_ra mem3_ra)).
             { exploit RAThread.tau_steps_steps; eauto. i.

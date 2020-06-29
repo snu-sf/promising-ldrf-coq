@@ -22,7 +22,11 @@ Require Import Local.
 Require Import Thread.
 Require Import Configuration.
 
+Require Import Mapping.
+
 Require Import OrdStep.
+
+Set Implicit Arguments.
 
 
 Module ReleaseWrites.
@@ -418,6 +422,86 @@ Module RAThread.
         exploit OrdThread.step_disjoint; eauto. i. des.
         eapply IHSTEPS; eauto.
     Qed.
+
+
+    Lemma cap_tau_steps_current_tau_steps
+          rels0 rels1 e0 e1 fe0
+          (THREAD: thread_map ident_map e0 fe0)
+          (STEPS: tau_steps rels0 rels1 e0 e1)
+          (LOCAL: Local.wf e0.(Thread.local) e0.(Thread.memory))
+          (FLOCAL: Local.wf fe0.(Thread.local) fe0.(Thread.memory))
+          (MEMORY: Memory.closed e0.(Thread.memory))
+          (FMEMORY: Memory.closed fe0.(Thread.memory))
+          (SC: Memory.closed_timemap e0.(Thread.sc) e0.(Thread.memory))
+          (FSC: Memory.closed_timemap fe0.(Thread.sc) fe0.(Thread.memory))
+      :
+        exists fe1,
+          (<<THREAD: thread_map ident_map e1 fe1>>) /\
+          (<<STEPS: tau_steps rels0 rels1 fe0 fe1>>)
+    .
+    Proof.
+      ginduction STEPS; eauto. i.
+      inv STEP; ss.
+      exploit OrdThread.cap_step_current_step; eauto. i. des.
+      exploit OrdThread.step_future; try apply STEP; eauto. i. des.
+      exploit OrdThread.step_future; try apply STEP0; eauto. i. des.
+      exploit IHSTEPS; eauto. i. des. exists fe2. splits; eauto.
+      replace (ReleaseWrites.append L e rels1) with (ReleaseWrites.append L fe rels1) in STEPS0; cycle 1.
+      { unfold ReleaseWrites.append. destruct e; inv EVENT; ss.
+        - inv FROM. inv TO. refl.
+        - inv FROM. inv TO. refl. }
+      econs; [econs 1; eauto|..]; eauto.
+      destruct e; inv EVENT; ss.
+    Qed.
+
+    Lemma cap_plus_step_current_plus_step
+          rels1 rels2 pf e e1 e2 e3 sc1 mem1
+          (LOCAL: Local.wf e1.(Thread.local) e1.(Thread.memory))
+          (MEMORY: Memory.closed e1.(Thread.memory))
+          (SC: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+          (CAP: Memory.cap e1.(Thread.memory) mem1)
+          (SC_MAX: Memory.max_concrete_timemap mem1 sc1)
+          (STEPS: tau_steps rels1 rels2 (Thread.mk lang e1.(Thread.state) e1.(Thread.local) sc1 mem1) e2)
+          (STEP: OrdThread.step L Ordering.acqrel pf e e2 e3):
+        exists pf' e' e2' e3',
+          (<<STEPS: tau_steps rels1 rels2 e1 e2'>>) /\
+          (<<STEP: OrdThread.step L Ordering.acqrel pf' e' e2' e3'>>) /\
+          (<<LOCAL: local_map ident_map e2.(Thread.local) e2'.(Thread.local)>>) /\
+          (<<EVENT: tevent_map ident_map e' e>>).
+    Proof.
+      exploit cap_tau_steps_current_tau_steps; try apply STEPS; eauto; ss.
+      { destruct e1. ss. econs; eauto.
+        { eapply ident_map_local. }
+        { econs.
+          { i. eapply Memory.cap_inv in GET; eauto. des; auto.
+            right. exists to, from, msg, msg; splits; ss.
+            { eapply ident_map_message. }
+            { refl. }
+          }
+          { i. eapply CAP in GET. left. esplits; ss.
+            { refl. }
+            { refl. }
+            { i. econs; eauto. }
+          }
+        }
+        { eapply mapping_map_lt_collapsable_unwritable. eapply ident_map_lt. }
+        { eapply ident_map_timemap. }
+        { eapply Memory.max_concrete_timemap_spec; eauto.
+          eapply Memory.cap_closed_timemap; eauto. }
+      }
+      { eapply Local.cap_wf; eauto. }
+      { eapply Memory.cap_closed; eauto. }
+      { eapply Memory.max_concrete_timemap_closed; eauto. }
+      i. des.
+      exploit steps_future; try eapply tau_steps_steps; try apply STEPS; ss.
+      { eapply Local.cap_wf; eauto. }
+      { eapply Memory.max_concrete_timemap_closed; eauto. }
+      { eapply Memory.cap_closed; eauto. }
+      i. des.
+      exploit steps_future; try eapply tau_steps_steps; try apply STEPS0; ss. i. des.
+      exploit OrdThread.cap_step_current_step; eauto. i. des.
+      esplits; eauto. inv THREAD. ss.
+    Qed.
   End RAThread.
 End RAThread.
 
@@ -432,11 +516,11 @@ Module RAConfiguration.
         rels1 rels2 rels3
         e tid c1 lang st1 lc1 e2 st3 lc3 sc3 memory3
         (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
-        (STEPS: RAThread.tau_steps lang L rels1 rels2
+        (STEPS: RAThread.tau_steps L rels1 rels2
                                    (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
-        (STEP: RAThread.step lang L rels2 rels3 e e2 (Thread.mk _ st3 lc3 sc3 memory3))
+        (STEP: RAThread.step L rels2 rels3 e e2 (Thread.mk _ st3 lc3 sc3 memory3))
         (CONSISTENT: e <> ThreadEvent.failure ->
-                     RAThread.consistent lang L rels3 (Thread.mk _ st3 lc3 sc3 memory3)):
+                     RAThread.consistent L rels3 (Thread.mk _ st3 lc3 sc3 memory3)):
         step (ThreadEvent.get_machine_event e) tid rels1 rels3
              c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
     .
@@ -540,13 +624,15 @@ Module RARace.
       exploit RAThread.steps_future; try eapply RAThread.tau_steps_steps;
         try eapply STEPS; eauto. s. i. des.
       exploit OrdThread.step_future; try exact STEP; eauto. s. i. des.
-      exploit RAThread.tau_steps_ord_tau_steps; try exact STEPS0. i.
-      exploit OrdThread.cap_plus_step_current_plus_step; try exact x2; try exact STEP0.
+      exploit RAThread.cap_plus_step_current_plus_step; try exact STEPS0; try exact STEP0.
       instantiate (1 := Thread.mk _ st3 lc3 sc3 memory3).
       all: eauto.
       i. des. destruct e3'.
-      exploit RAThread.ord_tau_steps_tau_steps; try exact STEPS1.
-      instantiate (1 := (ReleaseWrites.append L e0 rels3)). i. des.
+      assert (EVENT': exists released', ThreadEvent.is_reading e' = Some (loc, to, val, released', ord)).
+      { destruct e; inv EVENT; inv EVENT0; ss.
+        - inv TO. eauto.
+        - inv FROM. eauto. }
+      des.
       eapply RACEFREE.
       - econs 2; [|econs 1]. econs; eauto. econs 1; eauto.
       - instantiate (3 := tid).
@@ -555,6 +641,23 @@ Module RARace.
         + rewrite IdentMap.gss. eauto.
         + eauto.
         + econs 2; try eapply STEP1.
-    Admitted.
+          * inv LOCAL. exploit tview_ident_map; eauto. i. subst.
+            inv PROMISES. ii.
+            exploit ONLY; eauto. i. des.
+            exploit MAPPED; eauto. i. des.
+            inv TO. inv FROM. inv TO0. rewrite GET0 in *. inv PROMISE. inv MSG.
+            eapply TimeFacts.le_lt_lt; try eapply TVIEWLE.
+            eapply CONS; eauto.
+          * eauto.
+          * move RACE at bottom. unfold RAThread.ra_race in *.
+            des; splits; eauto.
+            { eapply TimeFacts.le_lt_lt; eauto.
+              inv LOCAL. exploit tview_ident_map; eauto. i. subst.
+              apply TVIEWLE. }
+            { eapply TimeFacts.le_lt_lt; eauto.
+              inv LOCAL. exploit tview_ident_map; eauto. i. subst.
+              apply TVIEWLE. }
+        + ss.
+    Qed.
   End RARace.
 End RARace.

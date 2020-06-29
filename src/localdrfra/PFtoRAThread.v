@@ -367,7 +367,7 @@ Module PFtoRAThread.
     Lemma step_ra_future
           rels1 rels2 e e1 e2
           (WF1: wf_ra rels1 e1)
-          (STEP: RAThread.step lang L rels1 rels2 e e1 e2):
+          (STEP: RAThread.step L rels1 rels2 e e1 e2):
       <<WF2_RA: wf_ra rels2 e2>>.
     Proof.
       inv WF1. hexploit RAThread.step_rels_wf; eauto. i. inv STEP.
@@ -400,7 +400,7 @@ Module PFtoRAThread.
     Lemma steps_ra_future
           rels1 rels2 e1 e2
           (WF1: wf_ra rels1 e1)
-          (STEPS: RAThread.steps lang L rels1 rels2 e1 e2):
+          (STEPS: RAThread.steps L rels1 rels2 e1 e2):
       <<WF2_RA: wf_ra rels2 e2>>.
     Proof.
       induction STEPS; eauto.
@@ -605,13 +605,13 @@ Module PFtoRAThread.
           (CONS: Local.promise_consistent e2_pf.(Thread.local)):
       (exists views2 rels2 pf_j e_j e2_j e_ra e2_ra,
           (<<STEP_J: JThread.step pf_j e_j e1_j e2_j views1 views2>>) /\
-          (<<STEP_RA: RAThread.step lang L rels1 rels2 e_ra e1_ra e2_ra>>) /\
+          (<<STEP_RA: RAThread.step L rels1 rels2 e_ra e1_ra e2_ra>>) /\
           (<<EVENT_J: JSim.sim_event e_j e_pf>>) /\
           (<<EVENT_RA: PFtoRASimThread.sim_event e_ra e_j>>) /\
           (<<SIM2: sim_thread views2 rels2 e2_pf e2_j e2_ra>>) /\
           (<<SIM_TR2: sim_trace (tr1 ++ [(e1_pf.(Thread.local), e_pf)]) rels2>>)) \/
       (exists rels2 e2_ra,
-          (<<RACE: RAThread.step lang L rels1 rels2 ThreadEvent.failure e1_ra e2_ra>>)).
+          (<<RACE: RAThread.step L rels1 rels2 ThreadEvent.failure e1_ra e2_ra>>)).
     Proof.
       exploit sim_thread_step_aux; eauto; try apply WF1_PF; try apply WF1_J; try apply WF1_RA.
       i. unguard. des.
@@ -667,12 +667,12 @@ Module PFtoRAThread.
           (CONS: Local.promise_consistent e2_pf.(Thread.local)):
       (exists views2 rels2 e2_j e2_ra,
           (<<STEPS_J: JThread.rtc_tau e1_j e2_j views1 views2>>) /\
-          (<<STEPS_RA: RAThread.tau_steps lang L rels1 rels2 e1_ra e2_ra>>) /\
+          (<<STEPS_RA: RAThread.tau_steps L rels1 rels2 e1_ra e2_ra>>) /\
           (<<SIM2: sim_thread views2 rels2 e2_pf e2_j e2_ra>>) /\
           (<<SIM_TR2: sim_trace (tr1 ++ tr) rels2>>)) \/
       (exists rels2 rels3 e2_ra e3_ra,
-          (<<STEPS_RA: RAThread.tau_steps lang L rels1 rels2 e1_ra e2_ra>>) /\
-          (<<RACE: RAThread.step lang L rels2 rels3 ThreadEvent.failure e2_ra e3_ra>>)).
+          (<<STEPS_RA: RAThread.tau_steps L rels1 rels2 e1_ra e2_ra>>) /\
+          (<<RACE: RAThread.step L rels2 rels3 ThreadEvent.failure e2_ra e3_ra>>)).
     Proof.
       revert tr1 views1 rels1 e1_j e1_ra SIM1 SIM_TR1 WF1_PF WF1_J WF1_RA SILENT PF CONS.
       induction STEPS; i; ss.
@@ -719,15 +719,15 @@ Module PFtoRAThread.
       (exists views2 views3 rels2 rels3 pf_j e_j e2_j e3_j e_ra e2_ra e3_ra,
           (<<STEPS_J: JThread.rtc_tau e1_j e2_j views1 views2>>) /\
           (<<STEP_J: JThread.step pf_j e_j e2_j e3_j views2 views3>>) /\
-          (<<STEPS_RA: RAThread.tau_steps lang L rels1 rels2 e1_ra e2_ra>>) /\
-          (<<STEP_RA: RAThread.step lang L rels2 rels3 e_ra e2_ra e3_ra>>) /\
+          (<<STEPS_RA: RAThread.tau_steps L rels1 rels2 e1_ra e2_ra>>) /\
+          (<<STEP_RA: RAThread.step L rels2 rels3 e_ra e2_ra e3_ra>>) /\
           (<<EVENT_J: JSim.sim_event e_j e_pf>>) /\
           (<<EVENT_RA: PFtoRASimThread.sim_event e_ra e_j>>) /\
           (<<SIM2: sim_thread views3 rels3 e3_pf e3_j e3_ra>>) /\
           (<<SIM_TR2: sim_trace (tr1 ++ tr ++ [(e2_pf.(Thread.local), e_pf)]) rels3>>)) \/
       (exists rels2 rels3 e2_ra e3_ra,
-          (<<STEPS_RA: RAThread.tau_steps lang L rels1 rels2 e1_ra e2_ra>>) /\
-          (<<RACE: RAThread.step lang L rels2 rels3 ThreadEvent.failure e2_ra e3_ra>>)).
+          (<<STEPS_RA: RAThread.tau_steps L rels1 rels2 e1_ra e2_ra>>) /\
+          (<<RACE: RAThread.step L rels2 rels3 ThreadEvent.failure e2_ra e3_ra>>)).
     Proof.
       apply Forall_app_inv in PF. des.
       exploit steps_pf_future; eauto. i. des.
@@ -851,7 +851,7 @@ Module PFtoRAThread.
           (WF1_RA: wf_ra rels1 e1_ra)
           (CONSISTENT: pf_consistent L e1_pf):
       (<<CONSISTENT_J: JThread.consistent e1_j views1>>) /\
-      (<<CONSISTENT_RA: RAThread.consistent lang L rels1 e1_ra>>).
+      (<<CONSISTENT_RA: RAThread.consistent L rels1 e1_ra>>).
     Proof.
       split.
       { eapply JSim.sim_thread_consistent;
