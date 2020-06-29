@@ -24,6 +24,7 @@ Require Import Cover.
 Require Import Pred.
 Require Import Trace.
 
+Require Import PromiseConsistent.
 Require Import MemoryProps.
 
 Set Implicit Arguments.
@@ -125,6 +126,21 @@ Section LOCALDRF.
       pf_steps_trace c0 c2 (tr ++ trs)
   .
 
+  Lemma pf_steps_trace_future
+        c1 c2 tr
+        (STEPS: pf_steps_trace c1 c2 tr)
+        (WF1: Configuration.wf c1):
+    (<<WF2: Configuration.wf c2>>) /\
+    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
+    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
+  Proof.
+    revert WF1. induction STEPS; i.
+    - splits; ss; refl.
+    - exploit pf_step_trace_future; eauto. i. des.
+      exploit IHSTEPS; eauto. i. des.
+      splits; ss; etrans; eauto.
+  Qed.
+
   Lemma pf_steps_trace_n1 c0 c1 c2 tr trs e tid
         (STEPS: pf_steps_trace c0 c1 trs)
         (STEP: pf_step_trace tr e tid c1 c2)
@@ -172,6 +188,96 @@ Section LOCALDRF.
     intros. induction PR.
     { econs. }
     { econs; eauto. }
+  Qed.
+
+  Inductive pf_steps_trace_rev: forall (c1 c2: Configuration.t) (tr: Trace.t), Prop :=
+  | pf_steps_trace_rev_nil
+      c:
+      pf_steps_trace_rev c c []
+  | pf_steps_trace_rev_cons
+      c1 c2 c3 tr1 tr2 e tid
+      (STEPS: pf_steps_trace_rev c1 c2 tr1)
+      (STEP: pf_step_trace tr2 e tid c2 c3):
+      pf_steps_trace_rev c1 c3 (tr1 ++ tr2)
+  .
+  Hint Constructors pf_steps_trace_rev.
+
+  Lemma pf_steps_trace_rev_1n
+        c1 c2 c3 tr1 tr2 e tid
+        (STEP: pf_step_trace tr1 e tid c1 c2)
+        (STEPS: pf_steps_trace_rev c2 c3 tr2):
+    pf_steps_trace_rev c1 c3 (tr1 ++ tr2).
+  Proof.
+    revert tr1 e tid c1 STEP. induction STEPS; i.
+    - replace (tr1 ++ []) with ([] ++ tr1) by (rewrite List.app_nil_r; ss).
+      econs 2; [econs 1|]. eauto.
+    - exploit IHSTEPS; eauto. i.
+      rewrite List.app_assoc.
+      econs 2; eauto.
+  Qed.
+
+  Lemma pf_steps_trace_equiv c1 c2 tr:
+    pf_steps_trace c1 c2 tr <-> pf_steps_trace_rev c1 c2 tr.
+  Proof.
+    split; i.
+    - induction H; eauto.
+      eapply pf_steps_trace_rev_1n; eauto.
+    - induction H; [econs 1|].
+      eapply pf_steps_trace_n1; eauto.
+  Qed.
+
+  Lemma pf_steps_trace_inv
+        c1 c2 tr lc e
+        (STEPS: pf_steps_trace c1 c2 tr)
+        (WF: Configuration.wf c1)
+        (TRACE: List.In (lc, e) tr):
+    exists c tr1 tid lang st1 lc1,
+      (<<STEPS: pf_steps_trace c1 c tr1>>) /\
+      (<<FIND: IdentMap.find tid c.(Configuration.threads) = Some (existT _ lang st1, lc1)>>) /\
+      exists tr2 pf e2 e3,
+        (<<THREAD_STEPS: Trace.steps tr2 (Thread.mk _ st1 lc1 c.(Configuration.sc) c.(Configuration.memory)) e2>>) /\
+        (<<SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr2>>) /\
+        (<<PF: List.Forall (compose pf_event snd) tr2>>) /\
+        (<<LC: e2.(Thread.local) = lc>>) /\
+        (<<THREAD_STEP: Thread.step pf e e2 e3>>) /\
+        (<<CONS: Local.promise_consistent e3.(Thread.local)>>).
+  Proof.
+    rewrite pf_steps_trace_equiv in STEPS.
+    induction STEPS; ss.
+    apply List.in_app_or in TRACE. des; eauto.
+    clear IHSTEPS. inv STEP.
+    exists c2, tr1, tid, lang, st1, lc1.
+    rewrite <- pf_steps_trace_equiv in STEPS.
+    splits; ss.
+    apply List.in_app_or in TRACE. des; cycle 1.
+    { inv TRACE; ss. inv H. esplits; eauto.
+      - apply Forall_app_inv in PF. des. ss.
+      - destruct (classic (e = ThreadEvent.failure)).
+        + subst. inv STEP0; inv STEP. inv LOCAL. inv LOCAL0. ss.
+        + exploit CONSISTENT; eauto. i. inv x. des.
+          exploit pf_steps_trace_future; eauto. i. des.
+          inv WF2. inv WF0. exploit THREADS; eauto. i.
+          exploit Trace.steps_future; try exact STEPS0; eauto. s. i. des.
+          exploit Thread.step_future; try exact STEP0; eauto. s. i. des.
+          hexploit consistent_promise_consistent;
+            try eapply Trace.consistent_thread_consistent; try exact CONSISTENT0; eauto.
+    }
+    exploit pf_steps_trace_future; eauto. i. des.
+    inv WF2. inv WF0. exploit THREADS; eauto. i. clear DISJOINT THREADS.
+    exploit Trace.steps_inv; try exact STEPS0; eauto.
+    { destruct (classic (e1 = ThreadEvent.failure)).
+      - subst. inv STEP0; inv STEP. inv LOCAL. inv LOCAL0. ss.
+      - exploit CONSISTENT; ss. i. inv x0. des.
+        exploit Trace.steps_future; eauto. s. i. des.
+        exploit Thread.step_future; eauto. s. i. des.
+        eapply step_promise_consistent; eauto.
+        eapply consistent_promise_consistent; eauto.
+        eapply Trace.consistent_thread_consistent; eauto.
+    }
+    i. des. esplits; eauto; subst.
+    - apply Forall_app_inv in SILENT. des. ss.
+    - apply Forall_app_inv in PF. des.
+      apply Forall_app_inv in FORALL1. des. ss.
   Qed.
 
 
@@ -242,13 +348,14 @@ Section LOCALDRF.
 
   Definition pf_racefree (c0: Configuration.t): Prop :=
     forall c1 trs1 c2 trs2
-           loc ts lc0 lc1 e0 e1
-           (CSTEPS1: pf_steps_trace c0 c1 trs1)
-           (TRACE1: List.In (lc0, e0) trs1)
-           (WRITE: racy_write loc ts lc0 e0)
-           (CSTEPS2: pf_steps_trace c1 c2 trs2)
-           (TRACE2: List.In (lc1, e1) trs2)
-           (READ: racy_read loc ts lc1 e1),
+      loc ts lc0 lc1 e0 e1
+      (CSTEPS1: pf_steps_trace c0 c1 trs1)
+      (LOC: L loc)
+      (TRACE1: List.In (lc0, e0) trs1)
+      (WRITE: racy_write loc ts lc0 e0)
+      (CSTEPS2: pf_steps_trace c1 c2 trs2)
+      (TRACE2: List.In (lc1, e1) trs2)
+      (READ: racy_read loc ts lc1 e1),
       False.
 
   Lemma step_pf_racefree c0 c1 tr e tid
@@ -262,6 +369,7 @@ Section LOCALDRF.
       { eapply CSTEPS1. }
       { eauto. }
     }
+    { eauto. }
     { eapply List.in_or_app. right. eapply TRACE1. }
     { eauto. }
     { eauto. }

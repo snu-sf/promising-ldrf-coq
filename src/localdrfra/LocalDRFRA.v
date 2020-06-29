@@ -31,6 +31,7 @@ Require Import OrdStep.
 Require Import Stable.
 Require Import RARace.
 Require Import PFtoRASimThread.
+Require Import PFtoRA.
 
 Set Implicit Arguments.
 
@@ -41,21 +42,12 @@ Theorem local_drf_ra
   behaviors Configuration.step (Configuration.init s) <1=
   behaviors (@OrdConfiguration.step L Ordering.acqrel) (Configuration.init s).
 Proof.
-  (* ii. exploit (@local_DRF_PF L); eauto. *)
-  (* { ii. *)
-  (*   admit. *)
-  (* } *)
-
-  (* ii. clear PR. *)
-  (* remember (Configuration.init s) as c_tgt in x1. *)
-  (* remember (Configuration.init s) as c_src. *)
-  (* assert (exists rels, RATrace.configuration_steps L rels (Configuration.init s) c_src) by admit. des. *)
-  (* clear Heqc_src Heqc_tgt. *)
-  (* revert c_src rels H. induction x1. *)
-  (* - admit. *)
-  (* - i. *)
-  (* Require Import Program. *)
-  (* dependent induction x1. *)
-  (* - admit. *)
-  (* -  *)
-Admitted.
+  i.
+  specialize (PFtoRA.init_sim_conf L s). intro SIM.
+  specialize (PFtoRA.init_wf_pf s). intro WF_PF.
+  specialize (PFtoRA.init_wf_j s). intro WF_J.
+  specialize (PFtoRA.init_wf_ra s). intro WF_RA.
+  ii. exploit (@local_DRFPF L); eauto.
+  { eapply PFtoRA.sim_conf_racefree; eauto. }
+  eapply PFtoRA.sim_conf_behavior; eauto.
+Qed.

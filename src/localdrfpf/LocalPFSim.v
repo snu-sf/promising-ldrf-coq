@@ -2621,6 +2621,7 @@ Section SIM.
     dep_inv STEPSRC0.
     exfalso. eapply RACEFREE.
     { eapply silent_pf_steps_trace_pf_steps_trace; eauto. }
+    { admit. }
     { eauto. }
     { eauto. }
     { econs 2.

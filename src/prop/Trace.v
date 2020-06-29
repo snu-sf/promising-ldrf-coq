@@ -265,12 +265,41 @@ Module Trace.
     }
   Qed.
 
-  Lemma steps_step_steps
+  Lemma plus_step_steps
         lang tr e1 e2 e3 pf e
         (STEPS: @steps lang tr e1 e2)
         (STEP: Thread.step pf e e2 e3):
     steps (tr ++ [(e2.(Thread.local), e)]) e1 e3.
   Proof.
     rewrite steps_equivalent in *. eauto.
+  Qed.
+
+  Lemma steps_inv
+        lang tr e1 e2 lc e
+        (STEPS: @steps lang tr e1 e2)
+        (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+        (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+        (MEM1: Memory.closed e1.(Thread.memory))
+        (EVENT: List.In (lc, e) tr)
+        (CONS: Local.promise_consistent e2.(Thread.local)):
+    exists tr' tr'' e2' pf e3,
+      (<<STEPS: steps tr' e1 e2'>>) /\
+      (<<TRACE: tr = tr' ++ tr''>>) /\
+      (<<LC: e2'.(Thread.local) = lc>>) /\
+      (<<STEP: Thread.step pf e e2' e3>>) /\
+      (<<CONS: Local.promise_consistent e3.(Thread.local)>>).
+  Proof.
+    rewrite steps_equivalent in STEPS.
+    induction STEPS; ss.
+    apply List.in_app_or in EVENT. des.
+    - exploit IHSTEPS; eauto.
+      { rewrite <- steps_equivalent in STEPS.
+        exploit steps_future; eauto. i. des.
+        eapply step_promise_consistent; eauto. }
+      i. des. subst. esplits; eauto.
+      rewrite <- List.app_assoc. refl.
+    - inv EVENT; ss. inv H.
+      rewrite <- steps_equivalent in STEPS.
+      esplits; eauto.
   Qed.
 End Trace.

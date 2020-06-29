@@ -653,6 +653,19 @@ Module JConfiguration.
   .
   Hint Constructors opt_step.
 
+  Inductive steps: forall (c1 c2: Configuration.t) (views1 views2: Loc.t -> Time.t -> list View.t), Prop :=
+  | steps_refl
+      c views:
+      steps c c views views
+  | steps_step
+      e tid c1 c2 c3 views1 views2 views3
+      (STEP: step e tid c1 c2 views1 views2)
+      (STEPS: steps c2 c3 views2 views3):
+      steps c1 c3 views1 views3
+  .
+  Hint Constructors steps.
+
+
   Lemma step_configuration_step e tid c1 c2 views1 views2
         (STEP: step e tid c1 c2 views1 views2)
     :
@@ -744,6 +757,21 @@ Module JConfiguration.
     { esplits; eauto; try refl. }
   Qed.
 
+  Lemma steps_future
+        c1 c2 views1 views2
+        (STEPS: steps c1 c2 views1 views2)
+        (WF1: wf views1 c1):
+      (<<WF2: wf views2 c2>>) /\
+      (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
+      (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
+      (<<VIEWS_FUTURE: views_le views1 views2>>).
+  Proof.
+    revert WF1. induction STEPS; i.
+    - splits; ss; refl.
+    - exploit step_future; eauto. i. des.
+      exploit IHSTEPS; eauto. i. des.
+      splits; ss; etrans; eauto.
+  Qed.
 End JConfiguration.
 
 

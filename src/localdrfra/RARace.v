@@ -152,7 +152,7 @@ Module RAThread.
       induction STEPS; eauto.
     Qed.
 
-    Lemma steps_app
+    Lemma steps_trans
           rels1 rels2 rels3 e1 e2 e3
           (STEPS1: steps rels1 rels2 e1 e2)
           (STEPS2: steps rels2 rels3 e2 e3):
@@ -162,7 +162,7 @@ Module RAThread.
       induction STEPS1; i; eauto.
     Qed.
 
-    Lemma tau_steps_app
+    Lemma tau_steps_trans
           rels1 rels2 rels3 e1 e2 e3
           (STEPS1: tau_steps rels1 rels2 e1 e2)
           (STEPS2: tau_steps rels2 rels3 e2 e3):
@@ -442,6 +442,15 @@ Module RAConfiguration.
     .
     Hint Constructors steps.
 
+    Lemma steps_trans
+          rels1 rels2 rels3 c1 c2 c3
+          (STEPS1: steps rels1 rels2 c1 c2)
+          (STEPS2: steps rels2 rels3 c2 c3):
+      steps rels1 rels3 c1 c3.
+    Proof.
+      revert c3 STEPS2. induction STEPS1; i; eauto.
+    Qed.
+
     Lemma step_future
           e tid rels1 rels2 c1 c2
           (WF1: Configuration.wf c1)
@@ -480,12 +489,38 @@ Module RARace.
     Variable L: Loc.t -> bool.
 
     Definition racefree (rels: ReleaseWrites.t) (c: Configuration.t): Prop :=
-      forall e tid rels2 rels3 c2 c3
+      forall tid rels2 rels3 c2 c3
         (STEPS: RAConfiguration.steps L rels rels2 c c2)
-        (STEP: RAConfiguration.step L e tid rels2 rels3 c2 c3),
+        (STEP: RAConfiguration.step L MachineEvent.failure tid rels2 rels3 c2 c3),
         False.
 
     Definition racefree_syn (syn: Threads.syntax): Prop :=
       racefree [] (Configuration.init syn).
+
+    Lemma step_racefree
+          e tid rels1 rels2 c1 c2
+          (RACEFREE: racefree rels1 c1)
+          (STEP: RAConfiguration.step L e tid rels1 rels2 c1 c2):
+      racefree rels2 c2.
+    Proof.
+      ii. eapply RACEFREE; eauto. econs 2; eauto.
+    Qed.
+
+    Lemma racefree_step_ord_step
+          e tid rels1 rels2 c1 c2
+          (WF1: Configuration.wf c1)
+          (RACEFREE: racefree rels1 c1)
+          (STEP: RAConfiguration.step L e tid rels1 rels2 c1 c2):
+      OrdConfiguration.step L Ordering.acqrel e tid c1 c2.
+    Proof.
+      destruct (classic (e = MachineEvent.failure)).
+      { subst. exfalso. eapply RACEFREE; eauto. econs. }
+      inv STEP.
+      exploit RAThread.tau_steps_ord_tau_steps; eauto. i.
+      inv STEP0; ss. econs; eauto. ii.
+      exploit CONSISTENT; eauto. i. des; cycle 1.
+      { exploit RAThread.tau_steps_ord_tau_steps; eauto. }
+      exfalso.
+    Admitted.
   End RARace.
 End RARace.
