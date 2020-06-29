@@ -144,6 +144,17 @@ Module RAThread.
       econs 2; eauto. econs; eauto. econs. eauto.
     Qed.
 
+    Lemma ord_tau_steps_tau_steps
+          e1 e2
+          (STEPS: rtc (@OrdThread.tau_step lang L Ordering.acqrel) e1 e2):
+      forall rels1, exists rels2,
+          tau_steps rels1 rels2 e1 e2.
+    Proof.
+      induction STEPS; eauto. inv H. inv TSTEP. i.
+      specialize (IHSTEPS (ReleaseWrites.append L e rels1)). des.
+      esplits. econs 2; eauto. econs; eauto.
+    Qed.
+
     Lemma tau_steps_steps
           rels1 rels2 e1 e2
           (STEPS: tau_steps rels1 rels2 e1 e2):
@@ -520,7 +531,30 @@ Module RARace.
       inv STEP0; ss. econs; eauto. ii.
       exploit CONSISTENT; eauto. i. des; cycle 1.
       { exploit RAThread.tau_steps_ord_tau_steps; eauto. }
-      exfalso.
+      unfold RAThread.steps_failure in *. des. inv FAILURE0.
+      { left. exploit RAThread.tau_steps_ord_tau_steps; eauto. i.
+        unfold OrdThread.steps_failure. esplits; eauto.
+        destruct pf0; eauto. inv STEP0; inv STEP1. }
+      exfalso. ss.
+      inv WF1. inv WF. exploit THREADS; eauto. i. clear DISJOINT THREADS.
+      exploit RAThread.steps_future; try eapply RAThread.tau_steps_steps;
+        try eapply STEPS; eauto. s. i. des.
+      exploit OrdThread.step_future; try exact STEP; eauto. s. i. des.
+      exploit RAThread.tau_steps_ord_tau_steps; try exact STEPS0. i.
+      exploit OrdThread.cap_plus_step_current_plus_step; try exact x2; try exact STEP0.
+      instantiate (1 := Thread.mk _ st3 lc3 sc3 memory3).
+      all: eauto.
+      i. des. destruct e3'.
+      exploit RAThread.ord_tau_steps_tau_steps; try exact STEPS1.
+      instantiate (1 := (ReleaseWrites.append L e0 rels3)). i. des.
+      eapply RACEFREE.
+      - econs 2; [|econs 1]. econs; eauto. econs 1; eauto.
+      - instantiate (3 := tid).
+        replace MachineEvent.failure with (ThreadEvent.get_machine_event ThreadEvent.failure) by ss.
+        econs; s.
+        + rewrite IdentMap.gss. eauto.
+        + eauto.
+        + econs 2; try eapply STEP1.
     Admitted.
   End RARace.
 End RARace.

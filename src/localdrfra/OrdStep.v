@@ -22,6 +22,8 @@ Require Import Local.
 Require Import Thread.
 Require Import Configuration.
 
+Require Import PromiseConsistent.
+
 Set Implicit Arguments.
 
 
@@ -261,6 +263,8 @@ Module OrdThread.
           <<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>.
 
 
+    (* future *)
+
     Lemma program_step_future
           e e1 e2
           (STEP: program_step e e1 e2)
@@ -333,6 +337,9 @@ Module OrdThread.
       apply tau_union.
     Qed.
 
+
+    (* disjoint *)
+
     Lemma step_disjoint
           pf e e1 e2 lc
           (STEP: step pf e e1 e2)
@@ -383,6 +390,77 @@ Module OrdThread.
       eapply rtc_implies; try exact STEPS.
       apply tau_union.
     Qed.
+
+
+    (* promise_consistent *)
+
+    Lemma step_promise_consistent
+          pf e e1 e2
+          (STEP: step pf e e1 e2)
+          (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+          (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+          (CLOSED1: Memory.closed e1.(Thread.memory))
+          (CONS: Local.promise_consistent e2.(Thread.local)):
+      Local.promise_consistent e1.(Thread.local).
+    Proof.
+      inv STEP; ss.
+      - inv STEP0. s.
+        eapply promise_step_promise_consistent; eauto.
+      - inv STEP0. inv LOCAL; ss.
+        + inv LOCAL0. eapply read_step_promise_consistent; eauto.
+        + inv LOCAL0. eapply write_step_promise_consistent; eauto.
+        + inv LOCAL1. inv LOCAL2.
+          exploit Local.read_step_future; eauto. i. des.
+          eapply read_step_promise_consistent; eauto.
+          eapply write_step_promise_consistent; eauto.
+        + eapply fence_step_promise_consistent; eauto.
+        + eapply fence_step_promise_consistent; eauto.
+    Qed.
+
+    Lemma rtc_all_step_promise_consistent
+          e1 e2
+          (STEPS: rtc all_step e1 e2)
+          (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+          (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+          (CLOSED1: Memory.closed e1.(Thread.memory))
+          (CONS: Local.promise_consistent e2.(Thread.local)):
+      Local.promise_consistent e1.(Thread.local).
+    Proof.
+      revert WF1 SC1 CLOSED1 CONS. induction STEPS; ss. i.
+      inv H. inv USTEP. exploit step_future; eauto. i. des.
+      eapply step_promise_consistent; eauto.
+    Qed.
+
+    Lemma rtc_tau_step_promise_consistent
+          e1 e2
+          (STEPS: rtc tau_step e1 e2)
+          (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+          (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+          (CLOSED1: Memory.closed e1.(Thread.memory))
+          (CONS: Local.promise_consistent e2.(Thread.local)):
+      Local.promise_consistent e1.(Thread.local).
+    Proof.
+      eapply rtc_all_step_promise_consistent; try exact CONS; eauto.
+      eapply rtc_implies; try exact STEPS.
+      apply tau_union.
+    Qed.
+
+    Lemma cap_plus_step_current_plus_step
+          pf e e1 e2 e3 sc1 mem1
+          (LOCAL: Local.wf e1.(Thread.local) e1.(Thread.memory))
+          (MEMORY: Memory.closed e1.(Thread.memory))
+          (SC: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+          (CAP: Memory.cap e1.(Thread.memory) mem1)
+          (SC_MAX: Memory.max_concrete_timemap mem1 sc1)
+          (STEPS: rtc tau_step (Thread.mk lang e1.(Thread.state) e1.(Thread.local) sc1 mem1) e2)
+          (STEP: step pf e e2 e3):
+        exists pf' e' e2' e3',
+          (<<STEPS: rtc tau_step e1 e2'>>) /\
+          (<<STEP: step pf' e' e2' e3'>>) /\
+          (<<LOCAL: True (* concrete promises in e2 and e2' has identical loc, to & e2'.tview <= e2.tview *)>>) /\
+          (<<EVENT: True (* e and e' has same kind accessing same loc, to *)>>).
+    Proof.
+    Admitted.
   End OrdThread.
 End OrdThread.
 
