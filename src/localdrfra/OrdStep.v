@@ -383,6 +383,21 @@ Module OrdThread.
       eapply rtc_implies; try exact STEPS.
       apply tau_union.
     Qed.
+
+    Lemma cap_tau_steps_current
+          e1 e2 mem1 sc1
+          (LOCAL: Local.wf e1.(Thread.local) e1.(Thread.memory))
+          (MEMORY: Memory.closed e1.(Thread.memory))
+          (SC: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+          (CAP: Memory.cap e1.(Thread.memory) mem1)
+          (SC_MAX: Memory.max_concrete_timemap mem1 sc1)
+          (STEPS: rtc tau_step (Thread.mk lang e1.(Thread.state) e1.(Thread.local) sc1 mem1) e2)
+          (CONSISTENT: Local.promise_consistent e1.(Thread.local)):
+        exists lc' sc' mem',
+          (<<STEPS: rtc tau_step e1 (Thread.mk lang e2.(Thread.state) lc' sc' mem')>>) /\
+          (<<CONSISTENT: Local.promise_consistent lc'>>).
+    Admitted.
+    Proof.
   End OrdThread.
 End OrdThread.
 
