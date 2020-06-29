@@ -241,12 +241,13 @@ Section LOCALDRF.
   .
 
   Definition pf_racefree (c0: Configuration.t): Prop :=
-    forall c1 trs
+    forall c1 trs1 c2 trs2
            loc ts lc0 lc1 e0 e1
-           (CSTEPS: pf_steps_trace c0 c1 trs)
-           (TRACE0: List.In (lc0, e0) trs)
-           (TRACE1: List.In (lc1, e1) trs)
+           (CSTEPS1: pf_steps_trace c0 c1 trs1)
+           (TRACE1: List.In (lc0, e0) trs1)
            (WRITE: racy_write loc ts lc0 e0)
+           (CSTEPS2: pf_steps_trace c1 c2 trs2)
+           (TRACE2: List.In (lc1, e1) trs2)
            (READ: racy_read loc ts lc1 e1),
       False.
 
@@ -257,45 +258,25 @@ Section LOCALDRF.
       pf_racefree c1.
   Proof.
     ii. eapply RACEFREE.
-    { econs 2; eauto. }
-    { eapply List.in_or_app. right. eapply TRACE0. }
+    { econs 2.
+      { eapply CSTEPS1. }
+      { eauto. }
+    }
     { eapply List.in_or_app. right. eapply TRACE1. }
+    { eauto. }
+    { eauto. }
     { eauto. }
     { eauto. }
   Qed.
 
   Lemma steps_pf_racefree c0 c1 trs
         (RACEFREE: pf_racefree c0)
-        (STEP: pf_steps_trace c0 c1 trs)
+        (STEPS: pf_steps_trace c0 c1 trs)
     :
       pf_racefree c1.
   Proof.
-    ii. eapply RACEFREE.
-    { eapply pf_steps_trace_trans; eauto. }
-    { eapply List.in_or_app. right. eapply TRACE0. }
-    { eapply List.in_or_app. right. eapply TRACE1. }
-    { eauto. }
-    { eauto. }
-  Qed.
-
-  Lemma pf_racefree_write_read c0 c1 c2 trs0 trs1
-        loc ts lc0 lc1 e0 e1
-        (RACEFREE: pf_racefree c0)
-        (STEPS0: pf_steps_trace c0 c1 trs0)
-        (STEPS1: pf_steps_trace c1 c2 trs1)
-        (TRACE0: List.In (lc0, e0) trs0)
-        (TRACE1: List.In (lc1, e1) trs1)
-        (WRITE: racy_write loc ts lc0 e0)
-        (READ: racy_read loc ts lc1 e1)
-    :
-      False.
-  Proof.
-    eapply RACEFREE.
-    { eapply pf_steps_trace_trans; eauto. }
-    { eapply List.in_or_app. left. eapply TRACE0. }
-    { eapply List.in_or_app. right. eapply TRACE1. }
-    { eauto. }
-    { eauto. }
+    induction STEPS; auto. eapply IHSTEPS.
+    eapply step_pf_racefree; eauto.
   Qed.
 
 End LOCALDRF.
