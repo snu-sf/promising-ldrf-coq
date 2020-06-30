@@ -2611,11 +2611,10 @@ Section NOSC.
         (TH_TGT1: th_tgt' = Thread.mk lang st' lc' sc' mem')
         (EVENTS: List.Forall (fun em => no_sc (snd em)) tr)
     :
-      exists sc_src' tr_src,
+      exists sc_src',
         (<<STEPS: Trace.steps
-                    tr_src th_src
-                    (Thread.mk lang st' lc' sc_src' mem')>>) /\
-        (<<EVENTS: List.Forall2 (fun em_src em_tgt => snd em_src = snd em_tgt) tr_src tr>>)
+                    tr th_src
+                    (Thread.mk lang st' lc' sc_src' mem')>>)
   .
   Proof.
     ginduction STEPS.

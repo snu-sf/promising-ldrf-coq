@@ -997,10 +997,9 @@ Proof.
                  max
                  (fun loc : Loc.t => Time.incr (Memory.max_ts loc (Thread.memory th))) (fun loc => incr_time_seq (ftm loc)) times (fun loc => f loc (ftm loc))).
   { eapply cap_flex_map_locwise. i. eapply MAP. eapply TM. }
-  eexists tr_src, _, (fun loc => f loc (ftm loc)).
+  eexists ftr, _, (fun loc => f loc (ftm loc)).
   esplits; eauto.
   { eapply List.Forall_forall. i.
-    eapply list_Forall2_in2 in H; eauto. des. rewrite SAT.
     eapply List.Forall_forall in EVENTS; eauto. ss. des. splits; auto.
     { eapply no_read_msgs_mon; eauto. i. ss. ii. eapply PR. des; auto.
       right. right. eapply TimeFacts.le_lt_lt; eauto. eapply TM. }
@@ -1040,18 +1039,12 @@ Proof.
       { etrans; eauto. eapply TM. }
     }
   }
-  { eapply list_Forall2_rev in EVENTS0.
-    eapply list_Forall2_compose; eauto. i. ss. rewrite SAT1.
-    eapply tevent_map_tevent_map_weak; auto. }
+  { eapply list_Forall2_impl; eauto.
+    i. eapply tevent_map_tevent_map_weak; auto. }
   { eapply good_future_mon; eauto. ii. apply TM. }
   { eapply no_sc_same_sc_traced in STEPS0; eauto.
     eapply List.Forall_forall. i.
-    eapply list_Forall2_in2 in H; eauto. des. rewrite SAT.
     eapply List.Forall_forall in EVENTS; eauto. ss. des. splits; auto. }
-  { ss. unguard. des; eauto. right. splits; auto. i.
-    eapply WRITES in GET. des.
-    eapply list_Forall2_in in EVENTS0; eauto. des. destruct a. ss. subst.
-    esplits; eauto. }
 Qed.
 
 Lemma consistent_pf_consistent_super_strong lang (th: Thread.t lang)
@@ -1252,7 +1245,7 @@ Proof.
   { eapply List.Forall_forall. i.
     eapply list_Forall2_in in H; eauto. des. destruct a, x. ss.
     eapply List.Forall_forall in IN; eauto. ss. des. inv EVENT; ss. }
-  i. des. exists tr_src.
+  i. des. exists ftr0.
   assert (NOTIN: List.Forall
                    (fun em =>
                       ((((promise_free (snd em) /\ no_sc (snd em)) /\
@@ -1266,30 +1259,29 @@ Proof.
                           (fun loc ts =>
                              Time.le ts (tm0 loc) /\ ~ covered loc ts (Local.promises lc_src))
                           (snd em)) /\ wf_time_evt times (snd em)) /\
-                      ThreadEvent.get_machine_event (snd em) = MachineEvent.silent) tr_src).
+                      ThreadEvent.get_machine_event (snd em) = MachineEvent.silent) ftr0).
   { eapply List.Forall_forall. i.
-    eapply list_Forall2_in2 in H; eauto. des. clear EVENTS0.
-    eapply list_Forall2_in in IN; eauto. des.
-    eapply List.Forall_forall in IN0; eauto. ss. des.
-    destruct a, b, x. ss. subst. inv EVENT; splits; ss.
+    eapply list_Forall2_in in H; eauto. des.
+    eapply List.Forall_forall in IN; eauto. ss. des.
+    destruct a, x. ss. subst. inv EVENT; splits; ss.
     { inv KIND; ss. inv MSG0; ss. inv MSG; ss. inv MAP1; ss. }
-    { inv KIND; ss. inv FROM. inv TO. ii. eapply SAT2; eauto. des. split; auto.
+    { inv KIND; ss. inv FROM. inv TO. ii. eapply SAT1; eauto. des. split; auto.
       inv LOCAL. erewrite <- promises_ident_map_covered in H0; eauto. }
     { inv FROM. inv TO. des. splits; auto. }
-    { inv TO. apply NNPP in SAT3. ii. apply H. des; auto.
-      { inv LOCAL. erewrite promises_ident_map_covered in SAT3; eauto. }
-      { eapply memory_ident_map_concrete in SAT3; eauto. }
+    { inv TO. apply NNPP in SAT2. ii. apply H. des; auto.
+      { inv LOCAL. erewrite promises_ident_map_covered in SAT2; eauto. }
+      { eapply memory_ident_map_concrete in SAT2; eauto. }
       { right. right. eapply TimeFacts.le_lt_lt; eauto. }
     }
-    { inv FROM. inv TO. ii. eapply SAT2; eauto. des. split; auto.
+    { inv FROM. inv TO. ii. eapply SAT1; eauto. des. split; auto.
       inv LOCAL. erewrite <- promises_ident_map_covered in H0; eauto. }
     { inv FROM. inv TO. des. splits; auto. }
-    { inv TO. inv FROM. apply NNPP in SAT3. ii. apply H. des; auto.
-      { inv LOCAL. erewrite promises_ident_map_covered in SAT3; eauto. }
-      { eapply memory_ident_map_concrete in SAT3; eauto. }
+    { inv TO. inv FROM. apply NNPP in SAT2. ii. apply H. des; auto.
+      { inv LOCAL. erewrite promises_ident_map_covered in SAT2; eauto. }
+      { eapply memory_ident_map_concrete in SAT2; eauto. }
       { right. right. eapply TimeFacts.le_lt_lt; eauto. }
     }
-    { inv FROM. inv TO. ii. eapply SAT2; eauto. des. split; auto.
+    { inv FROM. inv TO. ii. eapply SAT1; eauto. des. split; auto.
       inv LOCAL. erewrite <- promises_ident_map_covered in H0; eauto. }
     { inv FROM. inv TO. auto. }
   }
@@ -1333,19 +1325,14 @@ Proof.
       }
     }
   }
-  { dup TRACEGOOD. dup TRACE. dup TRACE0. dup EVENTS0.
+  { dup TRACEGOOD. dup TRACE. dup TRACE0.
     eapply list_Forall2_compose.
     { eapply list_Forall2_rev. eapply TRACEGOOD. }
     { eapply list_Forall2_compose.
       { eapply TRACE. }
-      { eapply list_Forall2_compose.
-        { eapply TRACE0. }
-        { eapply list_Forall2_rev. eapply EVENTS1. }
-        instantiate (1:=fun the fthe => tevent_map ident_map (snd fthe) (snd the)).
-        ss. i. des. rewrite SAT1. auto.
-      }
+      { eapply TRACE0. }
       simpl. instantiate (1:=fun the fthe => tevent_map_weak f0 (snd fthe) (snd the)).
-      i. ss. eapply tevent_map_tevent_map_weak in SAT1.
+      i. ss. des. eapply tevent_map_tevent_map_weak in EVENT.
       eapply tevent_map_weak_compose; eauto.
       i. inv MAP1. auto.
     }
@@ -1358,9 +1345,7 @@ Proof.
   { eapply write_not_in_good_future_traced in STEPS0; ss.
     { eapply good_future_mon; eauto. }
     { eapply Memory.closed_timemap_bot; eauto. apply CLOSED. }
-    { eapply List.Forall_forall. i.
-      eapply list_Forall2_in in H; eauto. des. rewrite <- SAT.
-      eapply List.Forall_forall in NOTIN; eauto. ss. des.
+    { eapply List.Forall_impl; eauto. i. ss. des.
       eapply write_not_in_mon; eauto. i. ss. des. split; auto.
       ii. eapply PROM. eapply memory_le_covered; eauto. eapply LOCAL0. }
   }
@@ -1378,9 +1363,8 @@ Proof.
         eapply LOCAL in GET; eauto. des.
         eapply IDENT in TO. eapply IDENT in TO0. eapply IDENT in FROM. subst. clarify.
         inv MSG. exploit WRITES; eauto. i. des.
-        eapply list_Forall2_in2 in IN; eauto. des.
-        eapply list_Forall2_in in IN0; eauto. des.
-        destruct a, b. ss. subst. esplits; eauto.
+        eapply list_Forall2_in2 in IN; eauto. des. ss.
+        destruct b. ss. esplits; eauto.
         dup GET0. eapply LOCAL0 in GET0.
         eapply promise_writing_event_map; try apply GET0; try apply EVENT; eauto.
         { eapply ident_map_lt. }
