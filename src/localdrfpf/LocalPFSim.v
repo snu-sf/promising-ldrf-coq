@@ -2107,6 +2107,7 @@ Section SIM.
                              c_src1 c_mid1 c_tgt1>>) /\
                    (<<WRITES: forall loc ts (PROM: prom tid loc ts),
                        exists th e_write,
+                         (<<INLOCS: L loc>>) /\
                          (<<RACY: racy_write loc ts th e_write>>) /\
                          (<<IN: List.In (th, e_write) tr_src>>)>>)))
   .
@@ -2258,7 +2259,12 @@ Section SIM.
             exploit sim_traces_sim_event_exists; eauto.
             { inv RACY; ss. }
             { inv RACY; ss. }
-            i. des. exists th0, e_src. splits; auto.
+            i. des. exists th0, e_src. split.
+            { set (CNT := MEMPF.(sim_memory_contents) loc0 ts0). inv CNT; ss.
+              { exfalso. eapply NPROM. econs; eauto. }
+              { exfalso. eapply NPROM. econs; eauto. }
+            }
+            splits; auto.
             clear - RACY EVENT. inv RACY.
             { inv EVENT. econs. auto. }
             { inv EVENT. econs. auto. }
@@ -2318,6 +2324,7 @@ Section SIM.
                              c_src1 c_mid1 c_tgt1>>) /\
                    (<<WRITES: forall tid loc ts (TID: List.In tid tidl) (PROM: prom tid loc ts),
                        exists lc e_write,
+                         (<<INLOCS: L loc>>) /\
                          (<<RACY: racy_write loc ts lc e_write>>) /\
                          (<<EVENT: List.In (lc, e_write) trs>>)>>))).
   Proof.
@@ -2434,6 +2441,7 @@ Section SIM.
                              c_src1 c_mid1 c_tgt1>>) /\
                    (<<WRITES: forall tid loc ts (TID: ctids tid) (PROM: prom tid loc ts),
                        exists lc e_write,
+                         (<<INLOCS: L loc>>) /\
                          (<<RACY: racy_write loc ts lc e_write>>) /\
                          (<<EVENT: List.In (lc, e_write) trs>>)>>))).
   Proof.
@@ -2645,41 +2653,6 @@ Section SIM.
     }
   Qed.
 
-
-  (* Lemma good_future_configuration_step c0 c1 c0' e tid (tr0 tr_cert0: Trace.t) tm *)
-  (*       (STEP: times_configuration_step times tr0 tr_cert0 e tid c0 c0') *)
-  (*       (WF0: Configuration.wf c0) *)
-  (*       (WF1: Configuration.wf c1) *)
-  (*       (TID: IdentMap.find tid c0.(Configuration.threads) = *)
-  (*             IdentMap.find tid c1.(Configuration.threads)) *)
-  (*       (MEM: good_future tm c0.(Configuration.memory) c1.(Configuration.memory)) *)
-  (*       (TM: forall loc, Time.lt (Memory.max_ts loc c0.(Configuration.memory)) (tm loc)) *)
-  (*       (SC: c1.(Configuration.sc) = c0.(Configuration.sc)) *)
-  (*       (TIME: List.Forall (fun the => wf_time_evt (fun loc ts => Time.lt ts (tm loc)) (snd the)) (tr0 ++ tr_cert0)) *)
-  (*   : *)
-  (*     exists (tr1: Trace.t) tr_cert1 c1', *)
-  (*       (<<STEP: times_configuration_step times tr1 tr_cert1 e tid c1 c1'>>) /\ *)
-  (*       (<<TRACE: List.Forall2 *)
-  (*                   (fun the0 the1 => *)
-  (*                      (<<EVT: sim_event (snd the0) (snd the1)>>) /\ *)
-  (*                      (<<TVIEW: TView.le (fst the1).(Local.tview) (fst the0).(Local.tview)>>)) tr0 tr1>>) *)
-  (* . *)
-  (* Proof. *)
-  (*   assert (IDENT: map_ident_in_memory (fun loc ts fts => ts = fts /\ Time.lt ts (tm loc)) *)
-  (*                                      (Configuration.memory c0)). *)
-  (*   { ii. splits; auto. eapply TimeFacts.le_lt_lt; eauto. } *)
-  (*   assert (MAPLT: mapping_map_lt (fun loc ts fts => ts = fts /\ Time.lt ts (tm loc))). *)
-  (*   { ii. des. subst. auto. } *)
-  (*   dup STEP. dep_inv STEP. eapply good_future_configuration_step_aux; eauto. *)
-  (*   { erewrite <- TID; eauto. } *)
-  (*   { eapply map_ident_in_memory_local; eauto. *)
-  (*     { eapply WF0; eauto. } *)
-  (*     { eapply WF0; eauto. } *)
-  (*   } *)
-  (*   { eapply max_good_future_map; eauto. eapply WF0. } *)
-  (*   { eapply map_ident_in_memory_closed_timemap; eauto. eapply WF0. } *)
-  (*   { erewrite SC. refl. } *)
-  (* Qed. *)
 
   Lemma readable_not_exist_racy lc mem loc ts released ord
         (READABLE: TView.readable (TView.cur (Local.tview lc)) loc ts released ord)
@@ -3234,7 +3207,7 @@ Section SIM.
     dep_inv STEPSRC0.
     exfalso. eapply RACEFREE.
     { eapply silent_pf_steps_trace_pf_steps_trace; eauto. }
-    { admit. }
+    { eauto. }
     { eauto. }
     { eauto. }
     { econs 2.
@@ -3506,6 +3479,7 @@ Section SIM.
 
     eapply RACEFREE.
     { eapply silent_pf_steps_trace_pf_steps_trace; eauto. }
+    { eauto. }
     { eauto. }
     { eauto. }
     { eapply pf_steps_trace_trans.
