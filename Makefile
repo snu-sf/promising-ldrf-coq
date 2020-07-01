@@ -7,8 +7,8 @@ COQTHEORIES  := \
 	src/invariant/*.v \
 	src/gopt/*.v \
 	src/promotion/*.v \
-	src/localdrfpf/*.v \
-	src/localdrfra/*.v \
+	src/ldrfpf/*.v \
+	src/ldrfra/*.v \
 
 .PHONY: all theories clean
 
@@ -28,8 +28,8 @@ Makefile.coq: Makefile $(COQTHEORIES)
    echo "-R src/invariant $(COQMODULE)"; \
    echo "-R src/gopt $(COQMODULE)"; \
    echo "-R src/promotion $(COQMODULE)"; \
-   echo "-R src/localdrfpf $(COQMODULE)"; \
-   echo "-R src/localdrfra $(COQMODULE)"; \
+   echo "-R src/ldrfpf $(COQMODULE)"; \
+   echo "-R src/ldrfra $(COQMODULE)"; \
    \
    echo $(COQTHEORIES)) > _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq
