@@ -9,8 +9,6 @@ COQTHEORIES  := \
 	src/promotion/*.v \
 	src/localdrfpf/*.v \
 	src/localdrfra/*.v \
-#	src/pf/*.v \
-#	src/drf/*.v
 
 .PHONY: all theories clean
 
@@ -32,8 +30,6 @@ Makefile.coq: Makefile $(COQTHEORIES)
    echo "-R src/promotion $(COQMODULE)"; \
    echo "-R src/localdrfpf $(COQMODULE)"; \
    echo "-R src/localdrfra $(COQMODULE)"; \
-#   echo "-R src/pf $(COQMODULE)"; \
-#   echo "-R src/drf $(COQMODULE)"; \
    \
    echo $(COQTHEORIES)) > _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq
