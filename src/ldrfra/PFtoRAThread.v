@@ -295,7 +295,7 @@ Module PFtoRAThread.
         revert GET. unfold View.join, View.singleton_ur. ss.
         unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
         condtac; ss; try congr.
-        rewrite time_le_join_l; try apply Time.bot_spec. i.
+        rewrite TimeFacts.le_join_l; try apply Time.bot_spec. i.
         eapply STABLE_REL; eauto.
       }
       specialize (STABLE1 loc from0).
@@ -306,7 +306,7 @@ Module PFtoRAThread.
       revert GET. unfold View.join, View.singleton_ur. ss.
       unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
       condtac; ss; try congr.
-      rewrite time_le_join_l; try apply Time.bot_spec. i.
+      rewrite TimeFacts.le_join_l; try apply Time.bot_spec. i.
       eapply STABLE1; eauto.
     Qed.
 

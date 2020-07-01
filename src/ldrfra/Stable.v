@@ -26,27 +26,6 @@ Require Import RARace.
 Set Implicit Arguments.
 
 
-(* TODO: move *)
-
-Lemma time_le_join_l
-      l r
-      (LE: Time.le r l):
-  Time.join l r = l.
-Proof.
-  unfold Time.join. condtac; auto.
-  apply TimeFacts.antisym; auto.
-Qed.
-
-Lemma time_le_join_r
-      l r
-      (LE: Time.le l r):
-  Time.join l r = r.
-Proof.
-  rewrite Time.join_comm.
-  apply time_le_join_l; auto.
-Qed.
-
-
 Module Stable.
   Section Stable.
     Variable L: Loc.t -> bool.
@@ -601,18 +580,18 @@ Module Stable.
           * unfold TimeMap.join, View.singleton_ur_if,
             TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find in GET0.
             revert GET0. condtac; ss. i.
-            rewrite time_le_join_l in GET0; cycle 1.
+            rewrite TimeFacts.le_join_l in GET0; cycle 1.
             { etrans; [|eapply Time.join_r].
               inv MEM1. exploit CLOSED; try exact GET. i. des.
               inv MSG_TS. ss. }
-            rewrite time_le_join_r in GET0; cycle 1.
+            rewrite TimeFacts.le_join_r in GET0; cycle 1.
             { inv READABLE. auto. }
             rewrite GET0 in *. inv GET. ss.
             etrans; [|apply View.join_r]. refl.
           * unfold TimeMap.join, View.singleton_ur_if,
             TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find in GET0.
             revert GET0. condtac; try congr; ss. i.
-            rewrite (@time_le_join_l _ Time.bot) in GET0; try apply Time.bot_spec.
+            rewrite (@TimeFacts.le_join_l _ Time.bot) in GET0; try apply Time.bot_spec.
             exploit Time.join_cases. i. des.
             { rewrite x0 in GET0.
               exploit CUR; eauto. i. etrans; eauto.
@@ -633,7 +612,7 @@ Module Stable.
             TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find in GET0.
             revert GET0. condtac; ss. i.
             rewrite Time.join_assoc in GET0.
-            rewrite (@time_le_join_l to) in GET0; cycle 1.
+            rewrite (@TimeFacts.le_join_l to) in GET0; cycle 1.
             { inv MEM1. exploit CLOSED; try exact GET. i. des.
               inv MSG_TS. ss. }
             exploit Time.join_cases. i. des.
@@ -648,7 +627,7 @@ Module Stable.
           * unfold TimeMap.join, View.singleton_ur_if,
             TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find in GET0.
             revert GET0. condtac; try congr; ss. i.
-            rewrite (@time_le_join_l _ Time.bot) in GET0; try apply Time.bot_spec.
+            rewrite (@TimeFacts.le_join_l _ Time.bot) in GET0; try apply Time.bot_spec.
             exploit Time.join_cases. i. des.
             { rewrite x0 in GET0.
               exploit ACQ; eauto. i. etrans; eauto.
@@ -760,7 +739,7 @@ Module Stable.
         - ii. revert GET. ss.
           unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
           condtac; ss; subst; i.
-          + rewrite time_le_join_r in GET; cycle 1.
+          + rewrite TimeFacts.le_join_r in GET; cycle 1.
             { inv WRITABLE. econs. ss. }
             exploit Memory.promise_get0; try exact PROMISE.
             { inv PROMISE; ss. }
@@ -773,7 +752,7 @@ Module Stable.
             * i. inv H2.
               repeat eapply View.join_spec; eauto using View.join_l, View.join_r.
               etrans; try eapply WF1. apply View.join_l.
-          + rewrite time_le_join_l in GET; try by apply Time.bot_spec.
+          + rewrite TimeFacts.le_join_l in GET; try by apply Time.bot_spec.
             etrans; [|apply View.join_l].
             revert GET. inv PROMISE.
             { erewrite Memory.add_o; eauto. condtac; ss; i; eauto.
@@ -817,7 +796,7 @@ Module Stable.
                 - etrans; eauto.
                   etrans; try eapply WF1. apply View.join_l.
                 - etrans; try eapply WF1. etrans; try eapply WF1. apply View.join_l. }
-          + rewrite time_le_join_l in GET; try by apply Time.bot_spec.
+          + rewrite TimeFacts.le_join_l in GET; try by apply Time.bot_spec.
             etrans; [|apply View.join_l].
             revert GET. inv PROMISE.
             { erewrite Memory.add_o; eauto. condtac; ss; i; eauto.
@@ -859,11 +838,11 @@ Module Stable.
         { rewrite RELEASED in *. ii. revert GET. ss.
           unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find. condtac; ss.
           - subst. replace (Time.join to (View.rlx (TView.cur (Local.tview lc1)) loc)) with to; cycle 1.
-            { rewrite time_le_join_l; ss.
+            { rewrite TimeFacts.le_join_l; ss.
               inv WRITABLE. econs. ss. }
             exploit Memory.promise_get0; try exact PROMISE; try by (inv PROMISE; ss). i. des.
             rewrite GET_MEM in *. inv GET. refl.
-          - rewrite time_le_join_r; try by apply Time.bot_spec. i.
+          - rewrite TimeFacts.le_join_r; try by apply Time.bot_spec. i.
             inv WF1. inv TVIEW_CLOSED. inv CUR. specialize (RLX loc0). des.
             exploit Memory.promise_get1; try exact RLX; eauto; try by (inv PROMISE; ss). i. des.
             rewrite GET0 in *. inv GET. inv MSG_LE. inv RELEASED0.
@@ -1026,7 +1005,7 @@ Module Stable.
               unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
               condtac; ss; i.
               * subst. congr.
-              * rewrite time_le_join_l in GET; try by apply Time.bot_spec.
+              * rewrite TimeFacts.le_join_l in GET; try by apply Time.bot_spec.
                 etrans; [|eapply View.join_l].
                 revert GET. inv PROMISE.
                 { erewrite Memory.add_o; eauto. condtac; ss; i; eauto.
@@ -1052,7 +1031,7 @@ Module Stable.
               unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
               condtac; ss; i.
               * subst. congr.
-              * rewrite time_le_join_l in GET; try by apply Time.bot_spec.
+              * rewrite TimeFacts.le_join_l in GET; try by apply Time.bot_spec.
                 etrans; [|eapply View.join_l].
                 revert GET. inv PROMISE.
                 { erewrite Memory.add_o; eauto. condtac; ss; i.
@@ -1079,7 +1058,7 @@ Module Stable.
         { ii. revert GET. ss.
           unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
           condtac; ss; subst; i; try congr.
-          rewrite time_le_join_l in GET; try by apply Time.bot_spec.
+          rewrite TimeFacts.le_join_l in GET; try by apply Time.bot_spec.
           etrans; [|apply View.join_l].
           revert GET. inv PROMISE.
           { erewrite Memory.add_o; eauto. condtac; ss; i; eauto.
@@ -1096,7 +1075,7 @@ Module Stable.
         { ii.  revert GET. ss.
           unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
           condtac; ss; subst; i; try congr.
-          rewrite time_le_join_l in GET; try by apply Time.bot_spec.
+          rewrite TimeFacts.le_join_l in GET; try by apply Time.bot_spec.
           etrans; [|apply View.join_l].
           revert GET. inv PROMISE.
           { erewrite Memory.add_o; eauto. condtac; ss; i; eauto.
@@ -1121,7 +1100,7 @@ Module Stable.
             destruct (Loc.eq_dec loc loc0); subst; try congr.
             ss. unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
             condtac; ss; try congr.
-            rewrite (@time_le_join_l _ Time.bot); try by apply Time.bot_spec. i.
+            rewrite (@TimeFacts.le_join_l _ Time.bot); try by apply Time.bot_spec. i.
             rewrite <- View.join_assoc.
             etrans; [|apply View.join_l].
             eapply future_stable_view; try eapply GET; try eapply join_stable_view; eauto.
@@ -1137,7 +1116,7 @@ Module Stable.
             destruct (Loc.eq_dec loc loc0); subst; try congr.
             ss. unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
             condtac; ss; try congr.
-            rewrite (@time_le_join_l _ Time.bot); try by apply Time.bot_spec. i.
+            rewrite (@TimeFacts.le_join_l _ Time.bot); try by apply Time.bot_spec. i.
             rewrite <- View.join_assoc.
             etrans; [|apply View.join_l].
             eapply future_stable_view; try eapply GET; try eapply join_stable_view; eauto.

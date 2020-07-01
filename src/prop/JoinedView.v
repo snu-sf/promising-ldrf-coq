@@ -27,39 +27,12 @@ Require Import MemoryProps.
 
 Set Implicit Arguments.
 
-(* TODO: move *)
-
-Lemma time_join_idempotent
-      ts
-  :
-    Time.join ts ts = ts.
-Proof.
-  unfold Time.join. condtac; auto.
-Qed.
-
-Lemma timemap_join_idempotent
-      tm
-  :
-    TimeMap.join tm tm = tm.
-Proof.
-  extensionality ts. apply time_join_idempotent; auto.
-Qed.
-
-Lemma view_join_idempotent
-      vw
-  :
-    View.join vw vw = vw.
-Proof.
-  destruct vw. unfold View.join. ss. f_equal.
-  - apply timemap_join_idempotent.
-  - apply timemap_join_idempotent.
-Qed.
 
 Lemma view_join_dist vw0 vw1 vw2
   :
     View.join vw0 (View.join vw1 vw2) = View.join (View.join vw0 vw1) (View.join vw0 vw2).
 Proof.
-  erewrite <- (@view_join_idempotent vw0) at 1.
+  rewrite <- (@View.le_join_l vw0 vw0) at 1; try refl.
   erewrite View.join_assoc. erewrite View.join_assoc. f_equal.
   erewrite <- View.join_assoc. erewrite <- View.join_assoc. f_equal.
   eapply View.join_comm.
@@ -79,6 +52,7 @@ Proof.
     + eapply View.singleton_ur_wf.
     + ss. unfold TimeMap.singleton. setoid_rewrite LocFun.add_spec_eq. left. auto.
 Qed.
+
 
 Section JOINED.
 
@@ -141,8 +115,8 @@ Section JOINED.
     ginduction JOINED; eauto. ss. des; subst.
     - right. esplits; eauto.
     - left. econs; eauto.
-    - erewrite <- View.join_assoc. erewrite view_join_idempotent.
-      right. eauto.
+    - erewrite <- View.join_assoc.
+      erewrite (@View.le_join_l vw0 vw0); try refl. eauto.
     - right. erewrite View.join_comm. erewrite View.join_assoc. esplits; eauto.
       erewrite View.join_comm. econs; eauto.
   Qed.
