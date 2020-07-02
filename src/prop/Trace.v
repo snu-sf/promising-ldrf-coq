@@ -143,6 +143,24 @@ Module Trace.
       exists th', th''. esplits; eauto.
   Qed.
 
+  Lemma steps_disjoint
+        lang tr (e1 e2: Thread.t lang) lc
+        (STEPS: steps tr e1 e2)
+        (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+        (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+        (CLOSED1: Memory.closed e1.(Thread.memory))
+        (DISJOINT1: Local.disjoint e1.(Thread.local) lc)
+        (WF: Local.wf lc e1.(Thread.memory)):
+    (<<DISJOINT2: Local.disjoint e2.(Thread.local) lc>>) /\
+    (<<WF: Local.wf lc e2.(Thread.memory)>>).
+  Proof.
+    induction STEPS; eauto. subst.
+    exploit Thread.step_disjoint; eauto. i. des.
+    exploit Thread.step_future; eauto. i. des.
+    eapply IHSTEPS; eauto.
+  Qed.
+
+
   Lemma steps_future
         lang tr e1 e2
         (STEPS: @steps lang tr e1 e2)

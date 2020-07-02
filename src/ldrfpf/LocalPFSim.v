@@ -42,15 +42,6 @@ Require Import Pred.
 
 Set Implicit Arguments.
 
-Ltac dep_clarify :=
-  (repeat
-     match goal with
-     | H:existT ?P ?p ?x = existT ?P ?p ?y |- _ =>
-       eapply inj_pair2 in H; subst
-     end); ss; clarify.
-
-Ltac dep_inv H :=
-  inv H; dep_clarify.
 
 Inductive all_promises
           (tids: Ident.t -> Prop)
@@ -81,6 +72,218 @@ Lemma jsim_event_sim_event
   :
     JSim.sim_event <2= sim_event.
 Proof. ii. inv PR; econs. Qed.
+
+Lemma promise_writing_event_racy
+      loc from ts val released e (lc: Local.t)
+      (WRITING : promise_writing_event loc from ts val released e)
+  :
+    racy_write loc ts lc e.
+Proof.
+  inv WRITING; econs; eauto.
+Qed.
+
+Lemma jsim_memory_concrete_promised mem_src mem_tgt
+      (MEM: SimMemory.sim_memory mem_src mem_tgt)
+  :
+    concrete_promised mem_tgt <2= concrete_promised mem_src.
+Proof.
+  ii. inv PR. eapply MEM in GET.  des. inv MSG. econs; eauto.
+Qed.
+
+Lemma sim_memory_concrete_promised_later mem_src mem_tgt loc ts
+      (MEM: SimMemory.sim_memory mem_src mem_tgt)
+      (CLOSED: Memory.closed mem_tgt)
+      (PROMISED: concrete_promised mem_src loc ts)
+  :
+    exists ts_tgt,
+      (<<PROMISED: concrete_promised mem_tgt loc ts_tgt>>) /\
+      (<<TS: Time.le ts ts_tgt>>).
+Proof.
+  inv PROMISED. dup GET. apply memory_get_ts_strong in GET. des; subst.
+  { exists Time.bot. splits.
+    { econs. eapply CLOSED. }
+    { refl. }
+  }
+  inv MEM. exploit (proj1 (COVER loc ts)).
+  { econs; eauto. econs; ss. refl. }
+  i. inv x0. destruct msg.
+  { inv ITV. ss. exists to. splits; auto. econs; eauto. }
+  { eapply RESERVE in GET. exploit Memory.get_disjoint.
+    { eapply GET. }
+    { eapply GET0. }
+    i. des; clarify. exfalso. eapply x0; eauto. econs; ss. refl.
+  }
+Qed.
+
+Lemma jsim_joined_promises_covered prom_src prom_tgt view
+      (SIM: JSim.sim_joined_promises view prom_src prom_tgt)
+  :
+    forall loc ts, covered loc ts prom_src <-> covered loc ts prom_tgt.
+Proof.
+  split; i.
+  { inv H. specialize (SIM loc to). rewrite GET in *. inv SIM; ss.
+    { econs; eauto. }
+    { econs; eauto. }
+  }
+  { inv H. specialize (SIM loc to). rewrite GET in *. inv SIM; ss.
+    { econs; eauto. }
+    { econs; eauto. }
+  }
+Qed.
+
+Lemma cap_flex_sim_memory mem_src mem_tgt cap_src cap_tgt tm
+      (TMSRC: forall loc : Loc.t, Time.lt (Memory.max_ts loc mem_src) (tm loc))
+      (MEM: SimMemory.sim_memory mem_src mem_tgt)
+      (CAPSRC: cap_flex mem_src cap_src tm)
+      (CAPTGT: cap_flex mem_tgt cap_tgt tm)
+      (MEMSRC: Memory.closed mem_src)
+      (MEMTGT: Memory.closed mem_tgt)
+  :
+    SimMemory.sim_memory cap_src cap_tgt.
+Proof.
+  assert (TMTGT: forall loc : Loc.t, Time.lt (Memory.max_ts loc mem_tgt) (tm loc)).
+  { i. erewrite <- SimMemory.sim_memory_max_ts; eauto. }
+  dup MEM. inv MEM.
+  econs.
+  { i. erewrite <- (@cap_flex_covered mem_src cap_src); eauto.
+    erewrite <- (@cap_flex_covered mem_tgt cap_tgt); eauto. }
+  { i. eapply cap_flex_inv in GET; eauto. des; subst.
+    { exploit MSG; eauto. i. des.
+      eapply CAPSRC in GET0. esplits; eauto. }
+    { exploit SimMemory.sim_memory_adjacent_tgt; eauto. i. des.
+      eapply CAPSRC in x0; eauto. }
+    { esplits; eauto.
+      erewrite CAPSRC.(cap_flex_back); eauto. }
+  }
+  { i. split; intros GET.
+    { eapply (@cap_flex_inv mem_src cap_src) in GET; eauto. des; subst.
+      { erewrite RESERVE in GET; eauto.
+        eapply CAPTGT.(cap_flex_le); eauto. }
+      { exploit SimMemory.sim_memory_adjacent_src; eauto. i. des.
+        eapply CAPTGT in x0; eauto. }
+      { erewrite SimMemory.sim_memory_max_ts; eauto.
+        eapply CAPTGT.(cap_flex_back). }
+    }
+    { eapply (@cap_flex_inv mem_tgt cap_tgt) in GET; eauto. des; subst.
+      { erewrite <- RESERVE in GET; eauto.
+        eapply CAPSRC.(cap_flex_le); eauto. }
+      { exploit SimMemory.sim_memory_adjacent_tgt; eauto. i. des.
+        eapply CAPSRC in x0; eauto. }
+      { erewrite <- SimMemory.sim_memory_max_ts; eauto.
+        eapply CAPSRC.(cap_flex_back). }
+    }
+  }
+Qed.
+
+Lemma joined_memory_cap_flex views mem cap tm
+      (JOINED: joined_memory views mem)
+      (TM: forall loc, Time.lt (Memory.max_ts loc mem) (tm loc))
+      (CAP: cap_flex mem cap tm)
+      (CLOSED: Memory.closed mem)
+  :
+    joined_memory views cap.
+Proof.
+  inv JOINED. econs.
+  - i. eapply cap_flex_inv in GET; eauto. des; eauto; clarify.
+  - i. exploit ONLY; eauto. i. des.
+    eapply CAP in GET; eauto.
+  - i. eapply List.Forall_impl; try apply CLOSED0; eauto.
+    i. ss. eapply Memory.future_weak_closed_view; eauto.
+    eapply cap_flex_future_weak; eauto.
+Qed.
+
+Lemma sim_memory_concrete_promise_max_timemap mem_src mem_tgt
+      views prom_src prom_tgt max
+      (MAX: concrete_promise_max_timemap mem_src prom_src max)
+      (MEM: SimMemory.sim_memory mem_src mem_tgt)
+      (PROM: JSim.sim_joined_promises views prom_src prom_tgt)
+      (PROMSRC: Memory.le prom_src mem_src)
+      (PROMTGT: Memory.le prom_tgt mem_tgt)
+      (MEMSRC: Memory.closed mem_src)
+      (MEMTGT: Memory.closed mem_tgt)
+  :
+    concrete_promise_max_timemap mem_tgt prom_tgt max.
+Proof.
+  ii. specialize (MAX loc). inv MAX. guardH EXISTS. econs.
+  { unguard. des.
+    { left. exploit sim_memory_concrete_promised_later; eauto.
+      { econs; eauto. }
+      i. des. inv PROMISED. inv TS.
+      { exfalso. eapply MEM in GET0. des. inv MSG.
+        eapply CONCRETE in GET1. timetac. }
+      { inv H. esplits; eauto.  }
+    }
+    { specialize (PROM loc (max loc)). rewrite GET in *. inv PROM; eauto. }
+  }
+  { i. eapply MEM in GET. des; eauto. inv MSG. eauto. }
+  { i. specialize (PROM loc to). rewrite GET in *. inv PROM; eauto. }
+Qed.
+
+Lemma jsim_event_write_not_in e_src e_tgt (P_src P_tgt: Loc.t -> Time.t -> Prop)
+      (WRITE: write_not_in P_tgt e_tgt)
+      (EVENT: JSim.sim_event e_src e_tgt)
+      (IMPL: forall loc ts (SAT: P_src loc ts), P_tgt loc ts)
+  :
+    write_not_in P_src e_src.
+Proof.
+  inv EVENT; ss.
+  { des_ifs.
+    { inv KIND; ss. }
+    ii. eapply WRITE; eauto.
+  }
+  { ii. eapply WRITE; eauto. }
+  { ii. eapply WRITE; eauto. }
+Qed.
+
+Lemma tevent_ident_map f e fe
+      (MAP: tevent_map f fe e)
+      (IDENT: forall loc to fto (MAP: f loc to fto), to = fto)
+  :
+    sim_event e fe.
+Proof.
+  inv MAP; try econs; eauto.
+  { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. }
+  { eapply IDENT in TO. subst. econs; eauto. }
+  { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. }
+  { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. }
+Qed.
+
+Lemma readable_not_exist_racy lc mem loc ts released ord
+      (READABLE: TView.readable (TView.cur (Local.tview lc)) loc ts released ord)
+      (CLOSED: TView.closed lc.(Local.tview) mem)
+      (NOTEXIST: ~ concrete_promised mem loc ts)
+  :
+    Time.lt
+      (if Ordering.le Ordering.relaxed ord
+       then View.rlx (TView.cur (Local.tview lc)) loc
+       else View.pln (TView.cur (Local.tview lc)) loc) ts.
+Proof.
+  inv READABLE. des_ifs.
+  { specialize (RLX eq_refl). destruct RLX; auto. inv H.
+    inv CLOSED. inv CUR. specialize (RLX loc).
+    des. exfalso. eapply NOTEXIST. econs; eauto. }
+  { destruct PLN; auto. inv H.
+    inv CLOSED. inv CUR. specialize (PLN loc).
+    des. exfalso. eapply NOTEXIST. econs; eauto. }
+Qed.
+
+Lemma racy_read_mon loc ts lc0 lc1 e0 e1
+      (RACY: racy_read loc ts lc1 e1)
+      (LOCAL: TView.le lc0.(Local.tview) lc1.(Local.tview))
+      (EVENT: sim_event e0 e1)
+  :
+    racy_read loc ts lc0 e0.
+Proof.
+  inv RACY; inv EVENT; econs; eauto.
+  { des_ifs.
+    { eapply TimeFacts.le_lt_lt; eauto. eapply LOCAL. }
+    { eapply TimeFacts.le_lt_lt; eauto. eapply LOCAL. }
+  }
+  { des_ifs.
+    { eapply TimeFacts.le_lt_lt; eauto. eapply LOCAL. }
+    { eapply TimeFacts.le_lt_lt; eauto. eapply LOCAL. }
+  }
+Qed.
 
 
 Section SIM.
@@ -123,19 +326,6 @@ Section SIM.
       { eapply CLOSED. }
       i. des. eapply MEMWF in GET0. des. eauto.
     }
-  Qed.
-
-  Lemma sim_memory_concrete_promised F extra mem_src mem_tgt
-        (MEM: sim_memory L times F extra mem_src mem_tgt)
-        loc ts
-    :
-      concrete_promised mem_src loc ts
-      <->
-      concrete_promised mem_tgt loc ts /\ ~ F loc ts.
-  Proof.
-    set (CNT:= MEM.(sim_memory_contents) loc ts). split; i.
-    { inv H. erewrite GET in *. inv CNT. split; auto. econs; eauto. }
-    { des. inv H. erewrite GET in *. inv CNT; ss. econs; eauto. }
   Qed.
 
   Definition pi_consistent (self: Loc.t -> Time.t -> Prop) (mem_src: Memory.t)
@@ -656,57 +846,6 @@ Section SIM.
     }
   Qed.
 
-  Lemma jsim_memory_concrete_promised mem_src mem_tgt
-        (MEM: SimMemory.sim_memory mem_src mem_tgt)
-    :
-      concrete_promised mem_tgt <2= concrete_promised mem_src.
-  Proof.
-    ii. inv PR. eapply MEM in GET.  des. inv MSG. econs; eauto.
-  Qed.
-
-  Lemma promise_writing_event_racy
-        loc from ts val released e (lc: Local.t)
-        (WRITING : promise_writing_event loc from ts val released e)
-    :
-      racy_write loc ts lc e.
-  Proof.
-    inv WRITING; econs; eauto.
-  Qed.
-
-  Lemma sim_memory_forget_concrete_promised F extra mem_src mem_tgt
-        (MEM: sim_memory L times F extra mem_src mem_tgt)
-    :
-      F <2= concrete_promised mem_tgt.
-  Proof.
-    ii. set (CNT:=MEM.(sim_memory_contents) x0 x1). inv CNT; ss.
-    econs; eauto.
-  Qed.
-
-  Lemma sim_memory_concrete_promised_later mem_src mem_tgt loc ts
-        (MEM: SimMemory.sim_memory mem_src mem_tgt)
-        (CLOSED: Memory.closed mem_tgt)
-        (PROMISED: concrete_promised mem_src loc ts)
-    :
-      exists ts_tgt,
-        (<<PROMISED: concrete_promised mem_tgt loc ts_tgt>>) /\
-        (<<TS: Time.le ts ts_tgt>>).
-  Proof.
-    inv PROMISED. dup GET. apply memory_get_ts_strong in GET. des; subst.
-    { exists Time.bot. splits.
-      { econs. eapply CLOSED. }
-      { refl. }
-    }
-    inv MEM. exploit (proj1 (COVER loc ts)).
-    { econs; eauto. econs; ss. refl. }
-    i. inv x0. destruct msg.
-    { inv ITV. ss. exists to. splits; auto. econs; eauto. }
-    { eapply RESERVE in GET. exploit Memory.get_disjoint.
-      { eapply GET. }
-      { eapply GET0. }
-      i. des; clarify. exfalso. eapply x0; eauto. econs; ss. refl.
-    }
-  Qed.
-
   Lemma pf_consistent_pi_consistent
         (prom_others prom_self: Time.t -> Time.t -> Prop)
         lang (st_src st_mid st_tgt: Language.state lang)
@@ -781,49 +920,6 @@ Section SIM.
     }
   Qed.
 
-  Lemma jsim_joined_promises_covered prom_src prom_tgt view
-        (SIM: JSim.sim_joined_promises view prom_src prom_tgt)
-    :
-      forall loc ts, covered loc ts prom_src <-> covered loc ts prom_tgt.
-  Proof.
-    split; i.
-    { inv H. specialize (SIM loc to). rewrite GET in *. inv SIM; ss.
-      { econs; eauto. }
-      { econs; eauto. }
-    }
-    { inv H. specialize (SIM loc to). rewrite GET in *. inv SIM; ss.
-      { econs; eauto. }
-      { econs; eauto. }
-    }
-  Qed.
-
-  Lemma sim_memory_concrete_promise_max_timemap mem_src mem_tgt
-        views prom_src prom_tgt max
-        (MAX: concrete_promise_max_timemap mem_src prom_src max)
-        (MEM: SimMemory.sim_memory mem_src mem_tgt)
-        (PROM: JSim.sim_joined_promises views prom_src prom_tgt)
-        (PROMSRC: Memory.le prom_src mem_src)
-        (PROMTGT: Memory.le prom_tgt mem_tgt)
-        (MEMSRC: Memory.closed mem_src)
-        (MEMTGT: Memory.closed mem_tgt)
-    :
-      concrete_promise_max_timemap mem_tgt prom_tgt max.
-  Proof.
-    ii. specialize (MAX loc). inv MAX. guardH EXISTS. econs.
-    { unguard. des.
-      { left. exploit sim_memory_concrete_promised_later; eauto.
-        { econs; eauto. }
-        i. des. inv PROMISED. inv TS.
-        { exfalso. eapply MEM in GET0. des. inv MSG.
-          eapply CONCRETE in GET1. timetac. }
-        { inv H. esplits; eauto.  }
-      }
-      { specialize (PROM loc (max loc)). rewrite GET in *. inv PROM; eauto. }
-    }
-    { i. eapply MEM in GET. des; eauto. inv MSG. eauto. }
-    { i. specialize (PROM loc to). rewrite GET in *. inv PROM; eauto. }
-  Qed.
-
   Lemma sim_thread_steps_mid
         views0
         lang (th_mid0 th_tgt0 th_tgt1: Thread.t lang) tr_tgt
@@ -867,123 +963,6 @@ Section SIM.
       { econs; eauto. splits; auto. ss.
         dep_inv THREAD. inv LOCAL. ss. }
     }
-  Qed.
-
-  Lemma sim_promise_bot self extra prom_src prom_tgt
-        (SIM: sim_promise L times self extra prom_src prom_tgt)
-        (BOT: prom_tgt = Memory.bot)
-    :
-      prom_src = Memory.bot.
-  Proof.
-    eapply Memory.ext. i. erewrite Memory.bot_get.
-    set (CNT:=SIM.(sim_promise_contents) loc ts). subst.
-    erewrite Memory.bot_get in CNT. inv CNT; ss.
-    eapply sim_promise_wf in EXTRA; eauto. des.
-    set (CNT:=SIM.(sim_promise_contents) loc from).
-    erewrite Memory.bot_get in CNT. inv CNT; ss.
-  Qed.
-
-  Lemma sim_memory_same_max_ts_le mem_src mem_src'
-        F extra mem_tgt
-        (CLOSED: Memory.closed mem_src)
-        (MEM0: sim_memory L times F extra mem_src mem_tgt)
-        (MEM1: sim_memory L times F extra mem_src' mem_tgt)
-        loc
-    :
-      Time.le (Memory.max_ts loc mem_src) (Memory.max_ts loc mem_src').
-  Proof.
-    inv CLOSED. specialize (INHABITED loc).
-    eapply Memory.max_ts_spec in INHABITED. des.
-    set (CNT0:=MEM0.(sim_memory_contents) loc (Memory.max_ts loc mem_src)).
-    set (CNT1:=MEM1.(sim_memory_contents) loc (Memory.max_ts loc mem_src)).
-    rewrite GET in CNT0. inv CNT0.
-    { rewrite <- H in *. inv CNT1; ss.
-      symmetry in H1. eapply Memory.max_ts_spec in H1. des. auto. }
-    { rewrite <- H in *. inv CNT1; ss.
-      symmetry in H1. eapply Memory.max_ts_spec in H1. des. auto. }
-    { inv CNT1; ss.
-      { exfalso. eapply NEXTRA; eauto. }
-      { exfalso. eapply NEXTRA; eauto. }
-      { eapply MEM0.(sim_memory_wf) in EXTRA0. des.
-        eapply UNIQUE in EXTRA. subst.
-        symmetry in H1. eapply Memory.max_ts_spec in H1. des. auto. }
-    }
-  Qed.
-
-  Lemma sim_memory_same_max_ts_eq mem_src mem_src'
-        F extra mem_tgt
-        (CLOSED0: Memory.closed mem_src)
-        (CLOSED1: Memory.closed mem_src')
-        (MEM0: sim_memory L times F extra mem_src mem_tgt)
-        (MEM1: sim_memory L times F extra mem_src' mem_tgt)
-        loc
-    :
-      Memory.max_ts loc mem_src = Memory.max_ts loc mem_src'.
-  Proof.
-    apply TimeFacts.antisym.
-    { eapply sim_memory_same_max_ts_le; eauto. }
-    { eapply sim_memory_same_max_ts_le; eauto. }
-  Qed.
-
-  Lemma cap_flex_sim_memory mem_src mem_tgt cap_src cap_tgt tm
-        (TMSRC: forall loc : Loc.t, Time.lt (Memory.max_ts loc mem_src) (tm loc))
-        (MEM: SimMemory.sim_memory mem_src mem_tgt)
-        (CAPSRC: cap_flex mem_src cap_src tm)
-        (CAPTGT: cap_flex mem_tgt cap_tgt tm)
-        (MEMSRC: Memory.closed mem_src)
-        (MEMTGT: Memory.closed mem_tgt)
-    :
-      SimMemory.sim_memory cap_src cap_tgt.
-  Proof.
-    assert (TMTGT: forall loc : Loc.t, Time.lt (Memory.max_ts loc mem_tgt) (tm loc)).
-    { i. erewrite <- SimMemory.sim_memory_max_ts; eauto. }
-    dup MEM. inv MEM.
-    econs.
-    { i. erewrite <- (@cap_flex_covered mem_src cap_src); eauto.
-      erewrite <- (@cap_flex_covered mem_tgt cap_tgt); eauto. }
-    { i. eapply cap_flex_inv in GET; eauto. des; subst.
-      { exploit MSG; eauto. i. des.
-        eapply CAPSRC in GET0. esplits; eauto. }
-      { exploit SimMemory.sim_memory_adjacent_tgt; eauto. i. des.
-        eapply CAPSRC in x0; eauto. }
-      { esplits; eauto.
-        erewrite CAPSRC.(cap_flex_back); eauto. }
-    }
-    { i. split; intros GET.
-      { eapply (@cap_flex_inv mem_src cap_src) in GET; eauto. des; subst.
-        { erewrite RESERVE in GET; eauto.
-          eapply CAPTGT.(cap_flex_le); eauto. }
-        { exploit SimMemory.sim_memory_adjacent_src; eauto. i. des.
-          eapply CAPTGT in x0; eauto. }
-        { erewrite SimMemory.sim_memory_max_ts; eauto.
-          eapply CAPTGT.(cap_flex_back). }
-      }
-      { eapply (@cap_flex_inv mem_tgt cap_tgt) in GET; eauto. des; subst.
-        { erewrite <- RESERVE in GET; eauto.
-          eapply CAPSRC.(cap_flex_le); eauto. }
-        { exploit SimMemory.sim_memory_adjacent_tgt; eauto. i. des.
-          eapply CAPSRC in x0; eauto. }
-        { erewrite <- SimMemory.sim_memory_max_ts; eauto.
-          eapply CAPSRC.(cap_flex_back). }
-      }
-    }
-  Qed.
-
-  Lemma joined_memory_cap_flex views mem cap tm
-        (JOINED: joined_memory views mem)
-        (TM: forall loc, Time.lt (Memory.max_ts loc mem) (tm loc))
-        (CAP: cap_flex mem cap tm)
-        (CLOSED: Memory.closed mem)
-    :
-      joined_memory views cap.
-  Proof.
-    inv JOINED. econs.
-    - i. eapply cap_flex_inv in GET; eauto. des; eauto; clarify.
-    - i. exploit ONLY; eauto. i. des.
-      eapply CAP in GET; eauto.
-    - i. eapply List.Forall_impl; try apply CLOSED0; eauto.
-      i. ss. eapply Memory.future_weak_closed_view; eauto.
-      eapply cap_flex_future_weak; eauto.
   Qed.
 
   Lemma sim_thread_pf_consistent_super_strong
@@ -1052,9 +1031,6 @@ Section SIM.
       { right. eapply JSim.sim_local_memory_bot; eauto. }
     }
   Qed.
-
-  Definition ternary A (b: bool) (a_true a_false: A) :=
-    if b then a_true else a_false.
 
   Lemma sim_thread_sim_configuration
         (consistent: bool)
@@ -1451,7 +1427,7 @@ Section SIM.
                 tm
                 (fun loc : Loc.t => Time.incr (Memory.max_ts loc mem_src))
                 times0); auto.
-    { i. erewrite (@sim_memory_same_max_ts_eq mem_src mem_src'); eauto.
+    { i. erewrite (@sim_memory_same_max_ts_eq L times mem_src mem_src'); eauto.
       { apply Time.incr_spec. }
       { eapply sim_memory_strong_sim_memory; eauto. }
     } i. des.
@@ -1497,14 +1473,14 @@ Section SIM.
     }
     { eapply map_ident_in_memory_local; eauto.
       { ii. eapply MAP; auto.
-        erewrite (@sim_memory_same_max_ts_eq mem_src mem_src') in TS; eauto.
+        erewrite (@sim_memory_same_max_ts_eq L times mem_src mem_src') in TS; eauto.
         eapply sim_memory_strong_sim_memory; eauto. }
       { eapply MAP. }
     }
     { eapply mapping_map_lt_collapsable_unwritable. eapply MAP. }
     { eapply map_ident_in_memory_closed_timemap.
       { ii. eapply MAP; auto.
-        erewrite (@sim_memory_same_max_ts_eq mem_src mem_src') in TS; eauto.
+        erewrite (@sim_memory_same_max_ts_eq L times mem_src mem_src') in TS; eauto.
         eapply sim_memory_strong_sim_memory; eauto. }
       { eauto. }
     }
@@ -1551,23 +1527,6 @@ Section SIM.
   Qed.
 
 
-  Lemma traced_steps_disjoint
-        lang tr (e1 e2: Thread.t lang) lc
-        (STEPS: Trace.steps tr e1 e2)
-        (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
-        (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-        (CLOSED1: Memory.closed e1.(Thread.memory))
-        (DISJOINT1: Local.disjoint e1.(Thread.local) lc)
-        (WF: Local.wf lc e1.(Thread.memory)):
-    (<<DISJOINT2: Local.disjoint e2.(Thread.local) lc>>) /\
-    (<<WF: Local.wf lc e2.(Thread.memory)>>).
-  Proof.
-    induction STEPS; eauto. subst.
-    exploit Thread.step_disjoint; eauto. i. des.
-    exploit Thread.step_future; eauto. i. des.
-    eapply IHSTEPS; eauto.
-  Qed.
-
   Lemma configuration_step_not_consistent_future
         c1 tid tr lang st1 lc1 th2
         (TID: IdentMap.find tid (Configuration.threads c1) =
@@ -1593,12 +1552,12 @@ Section SIM.
     econs; ss. econs; i.
     { erewrite IdentMap.gsspec in TH1.
       erewrite IdentMap.gsspec in TH2. des_ifs; dep_clarify.
-      { symmetry. eapply traced_steps_disjoint; eauto. }
-      { eapply traced_steps_disjoint; eauto. }
+      { symmetry. eapply Trace.steps_disjoint; eauto. }
+      { eapply Trace.steps_disjoint; eauto. }
       { eapply DISJOINT; [|eauto|eauto]. auto. }
     }
     { erewrite IdentMap.gsspec in TH. des_ifs; dep_clarify.
-      eapply traced_steps_disjoint; eauto.
+      eapply Trace.steps_disjoint; eauto.
     }
   Qed.
 
@@ -2005,83 +1964,6 @@ Section SIM.
       specialize (PROMISES loc from). rewrite <- H in *. inv PROMISES; ss.
       erewrite Memory.bot_get in *. clarify. }
   Qed.
-
-  Lemma jsim_event_write_not_in e_src e_tgt (P_src P_tgt: Loc.t -> Time.t -> Prop)
-        (WRITE: write_not_in P_tgt e_tgt)
-        (EVENT: JSim.sim_event e_src e_tgt)
-        (IMPL: forall loc ts (SAT: P_src loc ts), P_tgt loc ts)
-    :
-      write_not_in P_src e_src.
-  Proof.
-    inv EVENT; ss.
-    { des_ifs.
-      { inv KIND; ss. }
-      ii. eapply WRITE; eauto.
-    }
-    { ii. eapply WRITE; eauto. }
-    { ii. eapply WRITE; eauto. }
-  Qed.
-
-  Lemma tevent_ident_map f e fe
-        (MAP: tevent_map f fe e)
-        (IDENT: forall loc to fto (MAP: f loc to fto), to = fto)
-    :
-      sim_event e fe.
-  Proof.
-    inv MAP; try econs; eauto.
-    { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. }
-    { eapply IDENT in TO. subst. econs; eauto. }
-    { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. }
-    { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. }
-  Qed.
-
-  Lemma promises_bot_certify_nil lang (th: Thread.t lang)
-        (PROMISES: th.(Thread.local).(Local.promises) = Memory.bot)
-    :
-      pf_consistent_super_strong th [] times.
-  Proof.
-    ii. eexists [], _, bot3. esplits; eauto.
-    { ii. ss. }
-    { ii. ss. }
-    { ii. ss. }
-    { refl. }
-    { eapply Local.bot_promise_consistent; eauto. }
-    { right. ss. splits; auto. i.
-      rewrite PROMISES in *. erewrite Memory.bot_get in *. ss. }
-  Qed.
-
-  Lemma failure_certify_nil lang (th: Thread.t lang) st'
-        (FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang th) st')
-        (LOCAL: Local.failure_step th.(Thread.local))
-    :
-      pf_consistent_super_strong th [] times.
-  Proof.
-    ii. eexists [], _, bot3. esplits; eauto.
-    { ii. ss. }
-    { ii. ss. }
-    { ii. ss. }
-    { refl. }
-    { inv LOCAL. ss. }
-    { left. ss. esplits; eauto. }
-  Qed.
-
-  Lemma certify_nil_promises_bot_or_failure lang (th: Thread.t lang)
-        (CONSISTENT: pf_consistent_super_strong th [] times)
-        (CLOSED: Memory.closed th.(Thread.memory))
-        (LOCAL: Local.wf (Thread.local th) (Thread.memory th))
-    :
-      (<<PROMISES: th.(Thread.local).(Local.promises) = Memory.bot>>) \/
-      exists st',
-        (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang th) st'>>) /\
-        (<<LOCAL: Local.failure_step th.(Thread.local)>>).
-  Proof.
-    exploit concrete_promise_max_timemap_exists.
-    { eapply CLOSED. } i. des.
-    exploit (CONSISTENT (Thread.memory th) TimeMap.bot (Thread.sc th) tm); eauto.
-    { refl. } i. des. inv TRACE. inv STEPS; ss.
-    unguard. des; eauto.
-  Qed.
-
 
   Lemma sim_configuration_certify tids views0 prom extra
         c_src0 c_mid0 c_tgt0 tid tm
@@ -2653,26 +2535,6 @@ Section SIM.
     }
   Qed.
 
-
-  Lemma readable_not_exist_racy lc mem loc ts released ord
-        (READABLE: TView.readable (TView.cur (Local.tview lc)) loc ts released ord)
-        (CLOSED: TView.closed lc.(Local.tview) mem)
-        (NOTEXIST: ~ concrete_promised mem loc ts)
-    :
-      Time.lt
-        (if Ordering.le Ordering.relaxed ord
-         then View.rlx (TView.cur (Local.tview lc)) loc
-         else View.pln (TView.cur (Local.tview lc)) loc) ts.
-  Proof.
-    inv READABLE. des_ifs.
-    { specialize (RLX eq_refl). destruct RLX; auto. inv H.
-      inv CLOSED. inv CUR. specialize (RLX loc).
-      des. exfalso. eapply NOTEXIST. econs; eauto. }
-    { destruct PLN; auto. inv H.
-      inv CLOSED. inv CUR. specialize (PLN loc).
-      des. exfalso. eapply NOTEXIST. econs; eauto. }
-  Qed.
-
   Lemma sim_thread_read_racy (others self: Loc.t -> Time.t -> Prop)
         (extra_others extra_self: Loc.t -> Time.t -> Time.t -> Prop)
         lang st lc_src lc_tgt sc mem_src mem_tgt pf e_tgt
@@ -2725,23 +2587,6 @@ Section SIM.
     }
     { refl. }
     { refl. }
-  Qed.
-
-  Lemma list_first_occurence A (P: A -> Prop) (l: list A)
-    :
-      (<<ALL: List.Forall P l>>) \/
-      (exists l0 a l1,
-          (<<EQ: l = l0 ++ a :: l1>>) /\
-          (<<ALL: List.Forall P l0>>) /\
-          (<<FAIL: ~ P a>>)).
-  Proof.
-    induction l.
-    { left. ss. }
-    { destruct (classic (P a)).
-      { des; eauto. subst.
-        right. exists (a::l0), a0, l1. esplits; eauto. }
-      { right. exists [], a, l. splits; auto. }
-    }
   Qed.
 
   Lemma first_read_racy tids views0 prom0 extra0
@@ -3055,34 +2900,6 @@ Section SIM.
     }
   Qed.
 
-  Lemma racy_read_mon loc ts lc0 lc1 e0 e1
-        (RACY: racy_read loc ts lc1 e1)
-        (LOCAL: TView.le lc0.(Local.tview) lc1.(Local.tview))
-        (EVENT: sim_event e0 e1)
-    :
-        racy_read loc ts lc0 e0.
-  Proof.
-    inv RACY; inv EVENT; econs; eauto.
-    { des_ifs.
-      { eapply TimeFacts.le_lt_lt; eauto. eapply LOCAL. }
-      { eapply TimeFacts.le_lt_lt; eauto. eapply LOCAL. }
-    }
-    { des_ifs.
-      { eapply TimeFacts.le_lt_lt; eauto. eapply LOCAL. }
-      { eapply TimeFacts.le_lt_lt; eauto. eapply LOCAL. }
-    }
-  Qed.
-
-  Lemma bot_no_read (msgs: Loc.t -> Time.t -> Prop) e
-        (MSGS: forall loc ts (MSGS: msgs loc ts), False)
-    :
-      no_read_msgs msgs e.
-  Proof.
-    unfold no_read_msgs. des_ifs.
-    { ii. eapply MSGS; eauto. }
-    { ii. eapply MSGS; eauto. }
-  Qed.
-
   Lemma promise_read_race views0 prom0 extra0
         c_src0 c_mid0 c_tgt0 c_tgt1 e tid tr_tgt tr_cert
         (STEPTGT: @times_configuration_step times tr_tgt tr_cert e tid c_tgt0 c_tgt1)
@@ -3220,20 +3037,6 @@ Section SIM.
       { etrans; eauto.  }
       { etrans; eauto. symmetry. auto. }
     }
-  Qed.
-
-  Lemma pf_opt_step_trace_pf_steps_trace tr e tid c1 c2
-        (STEP: pf_opt_step_trace L tr e tid c1 c2)
-    :
-      pf_steps_trace L c1 c2 tr.
-  Proof.
-    inv STEP.
-    { exploit pf_steps_trace_cons.
-      { econs 1. }
-      { eauto. }
-      i. rewrite List.app_nil_r in x0. auto.
-    }
-    { econs 1. }
   Qed.
 
   Lemma promise_read_race_certfication views0 prom0 extra0

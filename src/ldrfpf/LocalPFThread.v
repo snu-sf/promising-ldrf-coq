@@ -34,41 +34,6 @@ Set Implicit Arguments.
 
 
 
-Notation "p \\2// q" :=
-  (fun x0 x1 => __guard__(p x0 x1 \/ q x0 x1))
-    (at level 50, no associativity).
-
-Notation "p \\3// q" :=
-  (fun x0 x1 x2 => __guard__(p x0 x1 x2 \/ q x0 x1 x2))
-    (at level 50, no associativity).
-
-
-Inductive reserving_tevent: forall (e: ThreadEvent.t), Prop :=
-| reserving_tevent_reserve
-    loc from to kind
-  :
-    reserving_tevent (ThreadEvent.promise loc from to Message.reserve kind)
-.
-Hint Constructors reserving_tevent.
-
-Lemma reserving_tevent_silent e
-      (RESERVING: reserving_tevent e)
-  :
-    ThreadEvent.get_machine_event e = MachineEvent.silent.
-Proof.
-  inv RESERVING; ss.
-Qed.
-
-Lemma reserving_tevent_pf L e
-      (RESERVING: reserving_tevent e)
-  :
-    pf_event L e.
-Proof.
-  ii. subst. inv RESERVING; eauto.
-Qed.
-
-Definition reserving_trace (tr: Trace.t): Prop :=
-  List.Forall (fun the => reserving_tevent (snd the)) tr.
 
 Lemma reserve_future_memory_steps
       lang st vw sc prom0 mem0 prom1 mem1
@@ -299,8 +264,8 @@ Section SIM.
   Proof.
     ginduction RESERVING; eauto. i. ss.
     destruct x. econs 4; eauto.
-    { eapply reserving_tevent_silent; eauto. }
-    { eapply reserving_tevent_pf; eauto. }
+    { eapply reserving_event_silent; eauto. }
+    { eapply reserving_event_pf; eauto. }
   Qed.
 
   Lemma reserving_r_sim_trace (tr_src tr_reserve: Trace.t) (e: option (Local.t * ThreadEvent.t))
@@ -312,8 +277,8 @@ Section SIM.
     ginduction TRACE; ss; i; eauto.
     ginduction RESERVING; eauto.
     i. destruct x. econs 4; eauto.
-    { eapply reserving_tevent_silent; eauto. }
-    { eapply reserving_tevent_pf; eauto. }
+    { eapply reserving_event_silent; eauto. }
+    { eapply reserving_event_pf; eauto. }
   Qed.
 
   Inductive sim_traces: Trace.t -> Trace.t -> Prop :=
@@ -477,6 +442,28 @@ Section SIM.
     inv MEMORY0; clarify; (exfalso; eapply NEXTRA; eauto).
   Qed.
 
+  Lemma sim_memory_concrete_promised F extra mem_src mem_tgt
+        (MEM: sim_memory F extra mem_src mem_tgt)
+        loc ts
+    :
+      concrete_promised mem_src loc ts
+      <->
+      concrete_promised mem_tgt loc ts /\ ~ F loc ts.
+  Proof.
+    set (CNT:= MEM.(sim_memory_contents) loc ts). split; i.
+    { inv H. erewrite GET in *. inv CNT. split; auto. econs; eauto. }
+    { des. inv H. erewrite GET in *. inv CNT; ss. econs; eauto. }
+  Qed.
+
+  Lemma sim_memory_forget_concrete_promised F extra mem_src mem_tgt
+        (MEM: sim_memory F extra mem_src mem_tgt)
+    :
+      F <2= concrete_promised mem_tgt.
+  Proof.
+    ii. set (CNT:=MEM.(sim_memory_contents) x0 x1). inv CNT; ss.
+    econs; eauto.
+  Qed.
+
   Lemma sim_memory_get_larger F extra mem_src mem_tgt loc from_src ts msg_src
         (MEM: sim_memory F extra mem_src mem_tgt)
         (GETSRC: Memory.get loc ts mem_src = Some (from_src, msg_src))
@@ -493,6 +480,48 @@ Section SIM.
     { left. esplits; eauto. }
     { right. esplits; eauto.
       apply MEM.(sim_memory_wf) in EXTRA. des; auto. }
+  Qed.
+
+  Lemma sim_memory_same_max_ts_le mem_src mem_src'
+        F extra mem_tgt
+        (CLOSED: Memory.closed mem_src)
+        (MEM0: sim_memory F extra mem_src mem_tgt)
+        (MEM1: sim_memory F extra mem_src' mem_tgt)
+        loc
+    :
+      Time.le (Memory.max_ts loc mem_src) (Memory.max_ts loc mem_src').
+  Proof.
+    inv CLOSED. specialize (INHABITED loc).
+    eapply Memory.max_ts_spec in INHABITED. des.
+    set (CNT0:=MEM0.(sim_memory_contents) loc (Memory.max_ts loc mem_src)).
+    set (CNT1:=MEM1.(sim_memory_contents) loc (Memory.max_ts loc mem_src)).
+    rewrite GET in CNT0. inv CNT0.
+    { rewrite <- H in *. inv CNT1; ss.
+      symmetry in H1. eapply Memory.max_ts_spec in H1. des. auto. }
+    { rewrite <- H in *. inv CNT1; ss.
+      symmetry in H1. eapply Memory.max_ts_spec in H1. des. auto. }
+    { inv CNT1; ss.
+      { exfalso. eapply NEXTRA; eauto. }
+      { exfalso. eapply NEXTRA; eauto. }
+      { eapply MEM0.(sim_memory_wf) in EXTRA0. des.
+        eapply UNIQUE in EXTRA. subst.
+        symmetry in H1. eapply Memory.max_ts_spec in H1. des. auto. }
+    }
+  Qed.
+
+  Lemma sim_memory_same_max_ts_eq mem_src mem_src'
+        F extra mem_tgt
+        (CLOSED0: Memory.closed mem_src)
+        (CLOSED1: Memory.closed mem_src')
+        (MEM0: sim_memory F extra mem_src mem_tgt)
+        (MEM1: sim_memory F extra mem_src' mem_tgt)
+        loc
+    :
+      Memory.max_ts loc mem_src = Memory.max_ts loc mem_src'.
+  Proof.
+    apply TimeFacts.antisym.
+    { eapply sim_memory_same_max_ts_le; eauto. }
+    { eapply sim_memory_same_max_ts_le; eauto. }
   Qed.
 
   Lemma memory_forget_extra_exclusive F extra mem_src mem_tgt loc from to ts
@@ -662,7 +691,6 @@ Section SIM.
   Qed.
 
 
-
   (* sim promises *)
 
   Inductive sim_promise_content
@@ -760,6 +788,20 @@ Section SIM.
     rewrite GETSRC in PROM. inv PROM.
     - splits; auto.
     - splits; auto.
+  Qed.
+
+  Lemma sim_promise_bot self extra prom_src prom_tgt
+        (SIM: sim_promise self extra prom_src prom_tgt)
+        (BOT: prom_tgt = Memory.bot)
+    :
+      prom_src = Memory.bot.
+  Proof.
+    eapply Memory.ext. i. erewrite Memory.bot_get.
+    set (CNT:=SIM.(sim_promise_contents) loc ts). subst.
+    erewrite Memory.bot_get in CNT. inv CNT; ss.
+    eapply sim_promise_wf in EXTRA; eauto. des.
+    set (CNT:=SIM.(sim_promise_contents) loc from).
+    erewrite Memory.bot_get in CNT. inv CNT; ss.
   Qed.
 
 

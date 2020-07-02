@@ -109,6 +109,16 @@ Section Pred.
     | _ => True
     end.
 
+  Lemma bot_no_read (msgs: Loc.t -> Time.t -> Prop) e
+        (MSGS: forall loc ts (MSGS: msgs loc ts), False)
+    :
+      no_read_msgs msgs e.
+  Proof.
+    unfold no_read_msgs. des_ifs.
+    { ii. eapply MSGS; eauto. }
+    { ii. eapply MSGS; eauto. }
+  Qed.
+
   Definition write_not_in (MSGS : Loc.t -> Time.t -> Prop)
              (e : ThreadEvent.t) : Prop :=
     match e with

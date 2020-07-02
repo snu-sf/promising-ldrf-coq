@@ -33,7 +33,29 @@ Require Import Trace.
 Set Implicit Arguments.
 
 
+
+Ltac dep_clarify :=
+  (repeat
+     match goal with
+     | H:existT ?P ?p ?x = existT ?P ?p ?y |- _ =>
+       eapply inj_pair2 in H; subst
+     end); ss; clarify.
+
+Ltac dep_inv H :=
+  inv H; dep_clarify.
+
+Notation "p \\2// q" :=
+  (fun x0 x1 => __guard__(p x0 x1 \/ q x0 x1))
+    (at level 50, no associativity).
+
+Notation "p \\3// q" :=
+  (fun x0 x1 x2 => __guard__(p x0 x1 x2 \/ q x0 x1 x2))
+    (at level 50, no associativity).
+
 Section GENERAL.
+
+  Definition ternary A (b: bool) (a_true a_false: A) :=
+    if b then a_true else a_false.
 
   Lemma option_rel_mon A B (R0 R1: A -> B-> Prop)
         (LE: R0 <2= R1)
@@ -181,6 +203,23 @@ Section GENERAL.
     induction l; auto. des; subst.
     { right. exists []. ss. eauto. }
     { right. esplits. erewrite List.app_comm_cons. eauto. }
+  Qed.
+
+  Lemma list_first_occurence A (P: A -> Prop) (l: list A)
+    :
+      (<<ALL: List.Forall P l>>) \/
+      (exists l0 a l1,
+          (<<EQ: l = l0 ++ a :: l1>>) /\
+          (<<ALL: List.Forall P l0>>) /\
+          (<<FAIL: ~ P a>>)).
+  Proof.
+    induction l.
+    { left. ss. }
+    { destruct (classic (P a)).
+      { des; eauto. subst.
+        right. exists (a::l0), a0, l1. esplits; eauto. }
+      { right. exists [], a, l. splits; auto. }
+    }
   Qed.
 
 End GENERAL.

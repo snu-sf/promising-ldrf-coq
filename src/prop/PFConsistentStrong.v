@@ -1214,6 +1214,54 @@ Proof.
   eapply wf_time_evt_mon; eauto.
 Qed.
 
+Lemma promises_bot_certify_nil times lang (th: Thread.t lang)
+      (PROMISES: th.(Thread.local).(Local.promises) = Memory.bot)
+  :
+    pf_consistent_super_strong th [] times.
+Proof.
+  ii. eexists [], _, bot3. esplits; eauto.
+  { ii. ss. }
+  { ii. ss. }
+  { ii. ss. }
+  { refl. }
+  { eapply Local.bot_promise_consistent; eauto. }
+  { right. ss. splits; auto. i.
+    rewrite PROMISES in *. erewrite Memory.bot_get in *. ss. }
+Qed.
+
+Lemma failure_certify_nil times lang (th: Thread.t lang) st'
+      (FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang th) st')
+      (LOCAL: Local.failure_step th.(Thread.local))
+  :
+    pf_consistent_super_strong th [] times.
+Proof.
+  ii. eexists [], _, bot3. esplits; eauto.
+  { ii. ss. }
+  { ii. ss. }
+  { ii. ss. }
+  { refl. }
+  { inv LOCAL. ss. }
+  { left. ss. esplits; eauto. }
+Qed.
+
+Lemma certify_nil_promises_bot_or_failure times lang (th: Thread.t lang)
+      (CONSISTENT: pf_consistent_super_strong th [] times)
+      (CLOSED: Memory.closed th.(Thread.memory))
+      (LOCAL: Local.wf (Thread.local th) (Thread.memory th))
+  :
+    (<<PROMISES: th.(Thread.local).(Local.promises) = Memory.bot>>) \/
+    exists st',
+      (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang th) st'>>) /\
+      (<<LOCAL: Local.failure_step th.(Thread.local)>>).
+Proof.
+  exploit concrete_promise_max_timemap_exists.
+  { eapply CLOSED. } i. des.
+  exploit (CONSISTENT (Thread.memory th) TimeMap.bot (Thread.sc th) tm); eauto.
+  { refl. } i. des. inv TRACE. inv STEPS; ss.
+  unguard. des; eauto.
+Qed.
+
+
 Lemma good_future_future_future mem0 mem_good0 mem_good1 tm
       (f0: Loc.t -> Time.t -> Time.t -> Prop)
       (IDENT: forall loc to fto (MAP: f0 loc to fto), to = fto)
