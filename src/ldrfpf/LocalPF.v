@@ -32,13 +32,40 @@ Set Implicit Arguments.
 
 
 
-Section LOCALDRF.
+Inductive reserving_event: forall (e: ThreadEvent.t), Prop :=
+| reserving_event_reserve
+    loc from to kind
+  :
+    reserving_event (ThreadEvent.promise loc from to Message.reserve kind)
+.
+Hint Constructors reserving_event.
+
+Lemma reserving_event_silent e
+      (RESERVING: reserving_event e)
+  :
+    ThreadEvent.get_machine_event e = MachineEvent.silent.
+Proof.
+  inv RESERVING; ss.
+Qed.
+
+Definition reserving_trace (tr: Trace.t): Prop :=
+  List.Forall (fun the => reserving_event (snd the)) tr.
+
+Section LOCALPF.
 
   Variable L: Loc.t -> bool.
 
   Definition pf_event (e: ThreadEvent.t): Prop :=
     forall loc from to msg kind (PROMISE: e = ThreadEvent.promise loc from to msg kind) (LOC: L loc),
       msg = Message.reserve.
+
+  Lemma reserving_event_pf e
+        (RESERVING: reserving_event e)
+    :
+      pf_event e.
+  Proof.
+    ii. subst. inv RESERVING; eauto.
+  Qed.
 
   Definition pf_consistent lang (th: Thread.t lang): Prop :=
     exists tr_cert,
@@ -165,6 +192,27 @@ Section LOCALDRF.
     ginduction STEPS0.
     { i. erewrite List.app_nil_l. eauto. }
     { i. exploit IHSTEPS0; eauto. i. erewrite <- List.app_assoc. econs; eauto. }
+  Qed.
+
+  Lemma pf_step_trace_pf_steps_trace tr e tid c1 c2
+        (STEP: pf_step_trace tr e tid c1 c2)
+    :
+      pf_steps_trace c1 c2 tr.
+  Proof.
+    exploit pf_steps_trace_cons.
+    { econs 1. }
+    { eauto. }
+    i. rewrite List.app_nil_r in x0. auto.
+  Qed.
+
+  Lemma pf_opt_step_trace_pf_steps_trace tr e tid c1 c2
+        (STEP: pf_opt_step_trace tr e tid c1 c2)
+    :
+      pf_steps_trace c1 c2 tr.
+  Proof.
+    inv STEP.
+    { eapply pf_step_trace_pf_steps_trace; eauto. }
+    { econs 1. }
   Qed.
 
   Inductive silent_pf_steps_trace:
@@ -308,6 +356,87 @@ Section LOCALDRF.
     econs. esplits; eauto.
   Qed.
 
+  Inductive reading_event (loc: Loc.t) (ts: Time.t):
+    forall (e: ThreadEvent.t), Prop :=
+  | reading_event_read
+      valr releasedr ordr
+    :
+      reading_event loc ts (ThreadEvent.read loc ts valr releasedr ordr)
+  | reading_event_update
+      to valr valw releasedr releasedw ordr ordw
+    :
+      reading_event loc ts (ThreadEvent.update loc ts to valr valw releasedr releasedw ordr ordw)
+  .
+
+  Inductive writing_event (loc: Loc.t) (ts: Time.t):
+    forall (e: ThreadEvent.t), Prop :=
+  | writing_event_write
+      from valw releasedw ordw
+      (ORD: Ordering.le ordw Ordering.relaxed)
+    :
+      writing_event loc ts (ThreadEvent.write loc from ts valw releasedw ordw)
+  | writing_event_update
+      from valr valw releasedr releasedw ordr ordw
+      (ORD: Ordering.le ordw Ordering.relaxed)
+    :
+      writing_event loc ts (ThreadEvent.update loc from ts valr valw releasedr releasedw ordr ordw)
+  .
+
+  Inductive final_event_trace (e: ThreadEvent.t)
+    :
+      forall (tr: Trace.t), Prop :=
+  | final_event_trace_base
+      lc str
+      (RESERVING: reserving_trace str)
+    :
+      final_event_trace e ((lc, e) :: str)
+  | final_event_trace_cons
+      hd tl
+      (FINAL: final_event_trace e tl)
+    :
+      final_event_trace e (hd :: tl)
+  .
+
+  Definition pf_racefree_imm (c0: Configuration.t): Prop :=
+    forall tid0 c1 trs0 tid1 c2 trs1
+           loc ts lc1 te0 te1 e0 e1
+           (LOC: L loc)
+           (TID: tid0 <> tid1)
+           (CSTEP0: pf_step_trace trs0 e0 tid0 c0 c1)
+           (WRITE: writing_event loc ts te0)
+           (TRACE0: final_event_trace te0 trs0)
+           (CSTEP1: pf_step_trace trs1 e1 tid1 c1 c2)
+           (READ: reading_event loc ts te1)
+           (TRACE1: List.In (lc1, te1) trs1),
+      False.
+
+  Definition pf_racefree (c0: Configuration.t): Prop :=
+    forall c1 trs
+           (CSTEPS: pf_steps_trace c0 c1 trs),
+      pf_racefree_imm c1.
+
+  Lemma step_pf_racefree c0 c1 tr e tid
+        (RACEFREE: pf_racefree c0)
+        (STEP: pf_step_trace tr e tid c0 c1)
+    :
+      pf_racefree c1.
+  Proof.
+    unfold pf_racefree in *. i.
+    eapply RACEFREE. econs 2; eauto.
+  Qed.
+
+  Lemma steps_pf_racefree c0 c1 trs
+        (RACEFREE: pf_racefree c0)
+        (STEPS: pf_steps_trace c0 c1 trs)
+    :
+      pf_racefree c1.
+  Proof.
+    induction STEPS; auto. eapply IHSTEPS.
+    eapply step_pf_racefree; eauto.
+  Qed.
+
+
+
   Inductive racy_read (loc: Loc.t) (ts: Time.t):
     forall (lc: Local.t) (e: ThreadEvent.t), Prop :=
   | racy_read_read
@@ -346,7 +475,7 @@ Section LOCALDRF.
       racy_write loc ts lc (ThreadEvent.update loc from ts valr valw releasedr releasedw ordr ordw)
   .
 
-  Definition pf_racefree (c0: Configuration.t): Prop :=
+  Definition pf_racefree_view (c0: Configuration.t): Prop :=
     forall c1 trs1 c2 trs2
       loc ts lc0 lc1 e0 e1
       (CSTEPS1: pf_steps_trace c0 c1 trs1)
@@ -358,11 +487,11 @@ Section LOCALDRF.
       (READ: racy_read loc ts lc1 e1),
       False.
 
-  Lemma step_pf_racefree c0 c1 tr e tid
-        (RACEFREE: pf_racefree c0)
+  Lemma step_pf_racefree_view c0 c1 tr e tid
+        (RACEFREE: pf_racefree_view c0)
         (STEP: pf_step_trace tr e tid c0 c1)
     :
-      pf_racefree c1.
+      pf_racefree_view c1.
   Proof.
     ii. eapply RACEFREE.
     { econs 2.
@@ -377,14 +506,22 @@ Section LOCALDRF.
     { eauto. }
   Qed.
 
-  Lemma steps_pf_racefree c0 c1 trs
-        (RACEFREE: pf_racefree c0)
+  Lemma steps_pf_racefree_view c0 c1 trs
+        (RACEFREE: pf_racefree_view c0)
         (STEPS: pf_steps_trace c0 c1 trs)
     :
-      pf_racefree c1.
+      pf_racefree_view c1.
   Proof.
     induction STEPS; auto. eapply IHSTEPS.
-    eapply step_pf_racefree; eauto.
+    eapply step_pf_racefree_view; eauto.
   Qed.
 
-End LOCALDRF.
+  Lemma pf_racefree_pf_racefree_tview c
+        (WF: Configuration.wf c)
+        (RACEFREE: pf_racefree_view c)
+    :
+      pf_racefree c.
+  Proof.
+  Admitted.
+
+End LOCALPF.
