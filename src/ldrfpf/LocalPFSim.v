@@ -1,4 +1,5 @@
 Require Import RelationClasses.
+Require Import List.
 
 From Paco Require Import paco.
 From sflib Require Import sflib.
@@ -328,42 +329,58 @@ Section SIM.
     }
   Qed.
 
-  Definition pi_consistent (self: Loc.t -> Time.t -> Prop) (mem_src: Memory.t)
-             lang (e0:Thread.t lang)
+  Record pi_consistent
+         (self: Loc.t -> Time.t -> Prop)
+         (pl: list (Loc.t * Time.t))
+         (mem_src: Memory.t)
+         lang (e0:Thread.t lang)
     : Prop :=
-    forall mem1 tm sc
-           (FUTURE: Memory.future_weak e0.(Thread.memory) mem1)
-           (CLOSED: Memory.closed mem1)
-           (LOCAL: Local.wf e0.(Thread.local) mem1),
-    exists ftr e1,
-      (<<STEPS: Trace.steps ftr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc mem1) e1>>) /\
-      (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free
-                                                  /1\ no_sc
-                                                  /1\ no_read_msgs (fun loc ts => ~ (covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised mem_src loc ts \/ Time.lt (tm loc) ts))
-                                                  /1\ wf_time_evt times
-                                                  /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (tm loc)>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))
-                                               ) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) ftr >>) /\
-      (<<GOOD: good_future tm mem1 e1.(Thread.memory)>>) /\
-      (<<SC: e1.(Thread.sc) = sc>>) /\
-      (__guard__((exists st',
-                     (<<LOCAL: Local.failure_step e1.(Thread.local)>>) /\
-                     (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
-                 ((<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>) /\
-                  (<<WRITES: forall loc ts (PROM: self loc ts),
-                      exists th e,
-                        (<<RACY: racy_write loc ts th e>>) /\
-                        (<<IN: List.In (th, e) ftr>>)>>)))).
+    {
+      pi_consistent_promises:
+        forall loc ts, self loc ts <-> List.In (loc, ts) pl;
+      pi_consistent_no_dup:
+        NoDup pl;
+      pi_consistent_certify:
+        forall mem1 tm sc
+               (pl0 pl1: list (Loc.t * Time.t))
+               (ploc: Loc.t) (pts: Time.t)
+               (FUTURE: Memory.future_weak e0.(Thread.memory) mem1)
+               (CLOSED: Memory.closed mem1)
+               (LOCAL: Local.wf e0.(Thread.local) mem1)
+               (PLIST: pl = pl0 ++ (ploc, pts) :: pl1)
+        ,
+        exists ftr e1,
+          (<<STEPS: Trace.steps ftr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc mem1) e1>>) /\
+          (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free
+                                                      /1\ no_sc
+                                                      /1\ no_read_msgs (fun loc ts => ~ (covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised mem_src loc ts \/ Time.lt (tm loc) ts))
+                                                      /1\ wf_time_evt times
+                                                      /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (tm loc)>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))
+                                                   ) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) ftr >>) /\
+          (<<GOOD: good_future tm mem1 e1.(Thread.memory)>>) /\
+          (<<SC: e1.(Thread.sc) = sc>>) /\
+          (__guard__((exists st',
+                         (<<LOCAL: Local.failure_step e1.(Thread.local)>>) /\
+                         (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
+                     ((<<PROMISES: forall loc ts (PROM: List.In (loc, ts) (pl0 ++ [(ploc, pts)])),
+                          Memory.get loc ts e1.(Thread.local).(Local.promises) = None>>) /\
+                      (exists e_write,
+                          (<<FINAL: final_event_trace e_write ftr>>) /\
+                          (<<WRITING: writing_event ploc pts e_write>>)))));
+    }.
 
-  Lemma pi_consistent_mon self mem_src0 mem_src1 lang
+  Lemma pi_consistent_mon self pl mem_src0 mem_src1 lang
         st lc sc0 mem0 sc1 mem1
-        (CONSISTENT: pi_consistent self mem_src0 (Thread.mk lang st lc sc0 mem0))
+        (CONSISTENT: pi_consistent pl self mem_src0 (Thread.mk lang st lc sc0 mem0))
         (FUTURETGT: Memory.future_weak mem0 mem1)
         (FUTURESRC: Memory.future_weak mem_src0 mem_src1)
     :
-      pi_consistent self mem_src1 (Thread.mk lang st lc sc1 mem1).
+      pi_consistent pl self mem_src1 (Thread.mk lang st lc sc1 mem1).
   Proof.
-    ii. ss. exploit CONSISTENT.
+    inv CONSISTENT. ss. econs; eauto.
+    ii. ss. exploit pi_consistent_certify0.
     { transitivity mem1; eauto. }
+    { eauto. }
     { eauto. }
     { eauto. }
     i. des. ss. esplits; eauto.
@@ -377,6 +394,7 @@ Section SIM.
             (views: Loc.t -> Time.t -> list View.t)
             (prom: Ident.t -> Loc.t -> Time.t -> Prop)
             (extra: Ident.t -> Loc.t -> Time.t -> Time.t -> Prop)
+            (proml: Ident.t -> list (Loc.t * Time.t))
     :
       forall (c_src c_mid c_tgt: Configuration.t), Prop :=
   | sim_configuration_intro
@@ -395,7 +413,8 @@ Section SIM.
             (IdentMap.find tid ths_tgt))
       (BOT: forall tid (NONE: IdentMap.find tid ths_src = None),
           (<<PROM: forall loc ts, ~ prom tid loc ts>>) /\
-          (<<EXTRA: forall loc ts from, ~ extra tid loc ts from>>))
+          (<<EXTRA: forall loc ts from, ~ extra tid loc ts from>>) /\
+          (<<PLS: proml tid = []>>))
       (MEMPF: sim_memory L times (all_promises (fun _ => True) prom) (all_extra (fun _ => True) extra) mem_src mem_mid)
       (SCPF: TimeMap.le sc_src sc_tgt)
 
@@ -405,14 +424,10 @@ Section SIM.
       (CONSISTENT: forall tid lang st lc
                           (IN: tids tid)
                           (GET: IdentMap.find tid ths_tgt = Some (existT _ lang st, lc)),
-          pi_consistent (prom tid) mem_src (Thread.mk lang st lc sc_tgt mem_tgt))
-      (CONSISTENTMID: forall tid lang st lc
-                          (IN: tids tid)
-                          (GET: IdentMap.find tid ths_mid = Some (existT _ lang st, lc)),
-          pi_consistent (prom tid) mem_src (Thread.mk lang st lc sc_src mem_mid))
+          pi_consistent (prom tid) (proml tid) mem_src (Thread.mk lang st lc sc_tgt mem_tgt))
     :
       sim_configuration
-        tids views prom extra
+        tids views prom extra proml
         (Configuration.mk ths_src sc_src mem_src)
         (Configuration.mk ths_mid sc_src mem_mid)
         (Configuration.mk ths_tgt sc_tgt mem_tgt)
