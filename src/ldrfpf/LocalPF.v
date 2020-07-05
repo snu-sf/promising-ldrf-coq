@@ -31,26 +31,6 @@ Set Implicit Arguments.
 
 
 
-
-Inductive reserving_event: forall (e: ThreadEvent.t), Prop :=
-| reserving_event_reserve
-    loc from to kind
-  :
-    reserving_event (ThreadEvent.promise loc from to Message.reserve kind)
-.
-Hint Constructors reserving_event.
-
-Lemma reserving_event_silent e
-      (RESERVING: reserving_event e)
-  :
-    ThreadEvent.get_machine_event e = MachineEvent.silent.
-Proof.
-  inv RESERVING; ss.
-Qed.
-
-Definition reserving_trace (tr: Trace.t): Prop :=
-  List.Forall (fun the => reserving_event (snd the)) tr.
-
 Section LOCALPF.
 
   Variable L: Loc.t -> bool.
@@ -58,14 +38,6 @@ Section LOCALPF.
   Definition pf_event (e: ThreadEvent.t): Prop :=
     forall loc from to msg kind (PROMISE: e = ThreadEvent.promise loc from to msg kind) (LOC: L loc),
       msg = Message.reserve.
-
-  Lemma reserving_event_pf e
-        (RESERVING: reserving_event e)
-    :
-      pf_event e.
-  Proof.
-    ii. subst. inv RESERVING; eauto.
-  Qed.
 
   Definition pf_consistent lang (th: Thread.t lang): Prop :=
     exists tr_cert,
@@ -380,21 +352,6 @@ Section LOCALPF.
       (ORD: Ordering.le ordw Ordering.relaxed)
     :
       writing_event loc ts (ThreadEvent.update loc from ts valr valw releasedr releasedw ordr ordw)
-  .
-
-  Inductive final_event_trace (e: ThreadEvent.t)
-    :
-      forall (tr: Trace.t), Prop :=
-  | final_event_trace_base
-      lc str
-      (RESERVING: reserving_trace str)
-    :
-      final_event_trace e ((lc, e) :: str)
-  | final_event_trace_cons
-      hd tl
-      (FINAL: final_event_trace e tl)
-    :
-      final_event_trace e (hd :: tl)
   .
 
   Definition pf_racefree_imm (c0: Configuration.t): Prop :=

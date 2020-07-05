@@ -3935,3 +3935,120 @@ Section SEMICLOSED.
   Qed.
 
 End SEMICLOSED.
+
+
+Section CONCRETEMAX.
+
+  Inductive concrete_promise_max_ts mem prom loc ts: Prop :=
+  | concrete_or_promise_max_ts_intro
+      (EXISTS:
+         (<<CONCRETE: exists from val released,
+             (<<GET: Memory.get loc ts mem = Some (from, Message.concrete val released)>>)>>) \/
+         (<<PROMISE: exists from msg, (<<GET: Memory.get loc ts prom = Some (from, msg)>>)>>))
+      (CONCRETE: forall to from val released
+                        (GET: Memory.get loc to mem = Some (from, Message.concrete val released)),
+          Time.le to ts)
+      (PROMISE: forall to from msg
+                       (GET: Memory.get loc to prom = Some (from, msg)),
+          Time.le to ts)
+  .
+
+  Lemma concrete_promise_max_ts_inj mem prom loc ts0 ts1
+        (MAX0: concrete_promise_max_ts mem prom loc ts0)
+        (MAX1: concrete_promise_max_ts mem prom loc ts1)
+    :
+      ts0 = ts1.
+  Proof.
+    eapply TimeFacts.antisym.
+    { inv MAX0. des.
+      { eapply MAX1 in GET. auto. }
+      { eapply MAX1 in GET. auto. }
+    }
+    { inv MAX1. des.
+      { eapply MAX0 in GET. auto. }
+      { eapply MAX0 in GET. auto. }
+    }
+  Qed.
+
+  Lemma concrete_promise_max_ts_exists mem prom loc
+        (INHABITED: Memory.inhabited mem)
+    :
+      exists ts, (<<MAX: concrete_promise_max_ts mem prom loc ts>>).
+  Proof.
+    exploit Memory.max_concrete_ts_exists; eauto. intros [max MAX].
+    exploit Memory.max_concrete_ts_spec.
+    { eapply MAX. }
+    { eapply INHABITED. } i. des.
+    destruct (classic (exists to from msg, (<<INHABITED: Memory.get loc to prom = Some (from, msg)>>))).
+    { des. eapply Cell.max_ts_spec in INHABITED0. des.
+      exists (Time.join max (Cell.max_ts (prom loc))). econs.
+      { unfold Time.join. des_ifs; eauto. left. eauto. }
+      { i. etrans; [|eapply Time.join_l].
+        eapply Memory.max_concrete_ts_spec in GET1; eauto. des. auto. }
+      { i. etrans; [|eapply Time.join_r].
+        eapply Cell.max_ts_spec in GET1; eauto. des. auto. }
+    }
+    { exists max. econs.
+      { left. eauto. }
+      { i. eapply Memory.max_concrete_ts_spec in GET0; eauto. des. auto. }
+      { i. exfalso. eauto. }
+    }
+  Qed.
+
+  Lemma concrete_promise_max_ts_max_ts mem prom loc ts
+        (MAX: concrete_promise_max_ts mem prom loc ts)
+        (MLE: Memory.le prom mem)
+    :
+      Time.le ts (Memory.max_ts loc mem).
+  Proof.
+    inv MAX. des.
+    { eapply Memory.max_ts_spec; eauto. }
+    { eapply Memory.max_ts_spec; eauto. }
+  Qed.
+
+  Lemma concrete_promise_max_ts_max_concrete_ts mem prom loc ts max
+        (MAX: concrete_promise_max_ts mem prom loc ts)
+        (CONCRETE: Memory.max_concrete_ts mem loc max)
+    :
+      Time.le max ts.
+  Proof.
+    inv CONCRETE. des. eapply MAX in GET; eauto.
+  Qed.
+
+  Definition concrete_promise_max_timemap mem prom tm: Prop :=
+    forall loc, concrete_promise_max_ts mem prom loc (tm loc).
+
+  Lemma concrete_promise_max_timemap_inj mem prom tm0 tm1
+        (MAX0: concrete_promise_max_timemap mem prom tm0)
+        (MAX1: concrete_promise_max_timemap mem prom tm1)
+    :
+      tm0 = tm1.
+  Proof.
+    extensionality loc.
+    eapply concrete_promise_max_ts_inj; eauto.
+  Qed.
+
+  Lemma concrete_promise_max_timemap_exists mem prom
+        (INHABITED: Memory.inhabited mem)
+    :
+      exists tm, (<<MAX: concrete_promise_max_timemap mem prom tm>>).
+  Proof.
+    eapply choice. i. eapply concrete_promise_max_ts_exists; eauto.
+  Qed.
+
+  Lemma concrete_promise_max_timemap_future mem0 mem1 prom tm0 tm1
+        (MAX0: concrete_promise_max_timemap mem0 prom tm0)
+        (MAX1: concrete_promise_max_timemap mem1 prom tm1)
+        (FUTURE: Memory.future_weak mem0 mem1)
+    :
+      TimeMap.le tm0 tm1.
+  Proof.
+    ii. specialize (MAX0 loc). specialize (MAX1 loc). inv MAX0. des.
+    { eapply FUTURE in GET. des.
+      { eapply MAX1 in GET. eauto. }
+      { eapply MAX1 in GET. eauto. }
+    }
+    { eapply MAX1 in GET. auto. }
+  Qed.
+
+End CONCRETEMAX.

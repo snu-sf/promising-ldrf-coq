@@ -452,12 +452,6 @@ Proof.
 Qed.
 
 
-Definition is_reserving (te: ThreadEvent.t): Prop :=
-  match te with
-  | ThreadEvent.promise _ _ _ Message.reserve Memory.op_kind_add => True
-  | _ => False
-  end.
-
 Lemma promise_needed_spaces prom0 prom1 mem0 mem1
       loc from to msg kind
       (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
@@ -1025,6 +1019,185 @@ Proof.
     erewrite add_unattachable in TL; eauto. des; auto. }
 Qed.
 
+Definition eventable (mem prom: Memory.t) (spaces: Loc.t -> Time.t -> Prop)
+           (loc: Loc.t) (ts: Time.t): Prop :=
+  concrete_promised mem loc ts \/
+  covered loc ts prom \/
+  spaces loc ts.
+
+Definition eventable_below (mem prom: Memory.t) (spaces: Loc.t -> Time.t -> Prop)
+           (loc: Loc.t) (ts: Time.t): Prop :=
+  exists to, <<TIME: eventable mem prom spaces loc to>> /\ <<TS: Time.le ts to>>.
+
+Lemma eventable_le_below mem0 prom0 mem1 prom1 spaces
+      (INCR: eventable mem1 prom1 spaces <2= eventable mem0 prom0 spaces)
+  :
+    eventable_below mem1 prom1 spaces <2= eventable_below mem0 prom0 spaces.
+Proof.
+  ii. unfold eventable_below in *. des. esplits; eauto.
+Qed.
+
+Lemma event_in_concrete_or_writes_promise (spaces: Loc.t -> Time.t -> Prop)
+      prom0 mem0 loc from to msg prom1 mem1 kind
+      (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
+      (NOTIN: if Memory.op_kind_is_cancel kind
+              then True
+              else (forall ts (ITV: Interval.mem (from, to) ts), spaces loc ts))
+      (CLOSED: Memory.closed mem0)
+  :
+    (<<INCR: eventable mem1 prom1 spaces <2= eventable mem0 prom0 spaces>>) /\
+    (<<FROM: eventable_below mem0 prom0 spaces loc from>>) /\
+    (<<TO: eventable_below mem0 prom0 spaces loc to>>).
+Proof.
+  unfold eventable. inv PROMISE.
+  { exploit add_succeed_wf; try apply MEM; eauto. i. des.
+    splits.
+    { ii. des; auto.
+      { inv PR. erewrite Memory.add_o in GET; eauto. des_ifs.
+        { ss. des; clarify. right. right. eapply NOTIN. econs; ss. refl. }
+        { left. econs; eauto. }
+      }
+      { erewrite add_covered in PR; eauto. des; auto. subst.
+        right. right. eapply NOTIN; eauto. }
+    }
+    { exists to. esplits; eauto.
+      { right. right. eapply NOTIN; eauto. econs; ss. refl. }
+      { left. auto. }
+    }
+    { exists to. esplits; eauto.
+      { right. right. eapply NOTIN; eauto. econs; ss. refl. }
+      { refl. }
+    }
+  }
+  { exploit split_succeed_wf; try apply PROMISES; eauto. i. des.
+    splits.
+    { ii. des; auto.
+      { inv PR. erewrite Memory.split_o in GET; eauto. des_ifs.
+        { ss. des; clarify. right. left. econs; eauto.
+          econs; eauto. ss. left. auto. }
+        { ss. des; clarify. right. left. econs; eauto.
+          econs; eauto. ss. refl. }
+        { left. econs; eauto. }
+      }
+      { erewrite split_covered in PR; eauto. }
+    }
+    { exists ts3. esplits; eauto.
+      { right. left. econs; eauto. econs; eauto. refl. }
+      { left. etrans; eauto. }
+    }
+    { exists ts3. esplits; eauto.
+      { right. left. econs; eauto. econs; eauto. refl. }
+      { left. auto. }
+    }
+  }
+  { exploit lower_succeed_wf; try apply PROMISES; eauto. i. des.
+    splits.
+    { ii. des; auto.
+      { inv PR. erewrite Memory.lower_o in GET0; eauto. des_ifs.
+        { ss. des; clarify. right. left. econs; eauto.
+          econs; eauto. ss. refl. }
+        { left. econs; eauto. }
+      }
+      { erewrite lower_covered in PR; eauto. }
+    }
+    { exists to. esplits; eauto.
+      { right. left. econs; eauto. econs; eauto. refl. }
+      { left. eauto. }
+    }
+    { exists to. esplits; eauto.
+      { right. left. econs; eauto. econs; eauto. refl. }
+      { refl. }
+    }
+  }
+  { exploit Memory.remove_get0; try apply PROMISES; eauto. i. des.
+    assert (TS: Time.lt from to).
+    { exploit Memory.remove_get0; try apply MEM; eauto. i. des.
+      inv CLOSED. apply memory_get_ts_strong in GET. des; auto.
+      subst. erewrite INHABITED in GET1. ss. }
+    splits.
+    { ii. des; auto.
+      { inv PR. erewrite Memory.remove_o in GET1; eauto. des_ifs.
+        left. econs; eauto. }
+      { erewrite remove_covered in PR; eauto. des; auto. }
+    }
+    { exists to. esplits; eauto.
+      { right. left. econs; eauto. econs; eauto. refl. }
+      { left. eauto. }
+    }
+    { exists to. esplits; eauto.
+      { right. left. econs; eauto. econs; eauto. refl. }
+      { refl. }
+    }
+  }
+Qed.
+
+Lemma event_in_concrete_or_writes_write (spaces: Loc.t -> Time.t -> Prop)
+      prom0 mem0 loc from to prom1 mem1 val released kind
+      (PROMISE: Memory.write prom0 mem0 loc from to val released prom1 mem1 kind)
+      (NOTIN: if Memory.op_kind_is_cancel kind
+              then True
+              else (forall ts (ITV: Interval.mem (from, to) ts), spaces loc ts))
+      (CLOSED: Memory.closed mem0)
+  :
+    (<<INCR: eventable mem1 prom1 spaces <2= eventable mem0 prom0 spaces>>) /\
+    (<<FROM: eventable_below mem0 prom0 spaces loc from>>) /\
+    (<<TO: eventable_below mem0 prom0 spaces loc to>>).
+Proof.
+  inv PROMISE.
+  exploit event_in_concrete_or_writes_promise; eauto. i. des. esplits; eauto.
+  i. eapply INCR. unfold eventable in *. des; auto.
+  erewrite remove_covered in PR; eauto. des; auto.
+Qed.
+
+Lemma step_eventable_time lang (th0 th1: Thread.t lang) pf e
+      (spaces: Loc.t -> Time.t -> Prop)
+      (STEP: Thread.step pf e th0 th1)
+      (WRITENOTIN: write_not_in (fun loc ts => ~ spaces loc ts) e)
+      (CLOSED: Memory.closed th0.(Thread.memory))
+  :
+    (<<INCR: eventable th1.(Thread.memory) th1.(Thread.local).(Local.promises) spaces <2= eventable th0.(Thread.memory) th0.(Thread.local).(Local.promises) spaces>>) /\
+    (<<TIMES: wf_time_evt (eventable_below th0.(Thread.memory) th0.(Thread.local).(Local.promises) spaces) e>>).
+Proof.
+  inv STEP.
+  { inv STEP0; ss. inv LOCAL.
+    eapply event_in_concrete_or_writes_promise in PROMISE; ss.
+    { des. splits; eauto. }
+    { des_ifs. ii. apply NNPP. eapply WRITENOTIN; eauto. }
+  }
+  { inv STEP0; ss. inv LOCAL; ss; eauto.
+    { inv LOCAL0. ss. splits; auto. }
+    { inv LOCAL0. eapply event_in_concrete_or_writes_write in WRITE; eauto.
+      des_ifs. ii. eapply NNPP. eauto. }
+    { inv LOCAL1. inv LOCAL2. eapply event_in_concrete_or_writes_write in WRITE; eauto.
+      des_ifs. ii. eapply NNPP. eauto. }
+    { inv LOCAL0. ss. splits; auto. }
+    { inv LOCAL0. ss. splits; auto. }
+  }
+Qed.
+
+Lemma traced_steps_eventable_time lang (th0 th1: Thread.t lang) tr
+      (spaces: Loc.t -> Time.t -> Prop)
+      (STEPS: Trace.steps tr th0 th1)
+      (WRITENOTIN: List.Forall (fun em => write_not_in (fun loc ts => ~ spaces loc ts) (snd em)) tr)
+      (MEM: Memory.closed th0.(Thread.memory))
+      (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
+      (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
+  :
+    (<<INCR: eventable th1.(Thread.memory) th1.(Thread.local).(Local.promises) spaces <2= eventable th0.(Thread.memory) th0.(Thread.local).(Local.promises) spaces>>) /\
+    (<<TIMES: List.Forall (fun em => wf_time_evt (eventable_below th0.(Thread.memory) th0.(Thread.local).(Local.promises) spaces) (snd em)) tr>>).
+Proof.
+  ginduction STEPS.
+  { i. splits; ss. }
+  { i. subst. inv WRITENOTIN.
+    exploit Thread.step_future; eauto. i. des.
+    exploit IHSTEPS; eauto. i. des.
+    exploit step_eventable_time; eauto. i. des. esplits; eauto.
+    econs; eauto. eapply List.Forall_impl; eauto.
+    i. ss. eapply wf_time_evt_mon; cycle 1; eauto.
+    eapply eventable_le_below; eauto.
+  }
+Qed.
+
 Lemma can_reserve_all_needed times
       (DIVERGE: forall loc ts,
           exists ts',
@@ -1052,7 +1225,10 @@ Lemma can_reserve_all_needed times
            (<<CANCELSTEPS:
               Trace.steps tr_cancel (Thread.mk lang st0 lc0' sc0 cap0') (Thread.mk lang st0 lc0 sc0 cap0)>>) /\
            (<<STEPS:
-              Trace.steps tr (Thread.mk lang st0 lc0 sc0 cap0) (Thread.mk lang st1 lc1 sc1 cap1)>>)>>).
+              Trace.steps tr (Thread.mk lang st0 lc0 sc0 cap0) (Thread.mk lang st1 lc1 sc1 cap1)>>)>>) /\
+      (<<TIMES: forall max
+                       (MAX: concrete_promise_max_timemap mem0' lc0'.(Local.promises) max),
+          List.Forall (fun em => <<SAT: wf_time_evt (fun loc ts => Time.le ts (max loc)) (snd em)>>) (tr_cancel ++ tr)>>).
 Proof.
   exploit (@traced_steps_finte_write_to tr); eauto.
   { eapply List.Forall_impl; eauto. i. ss. des. eauto. }
@@ -1080,13 +1256,17 @@ Proof.
   { instantiate (1:=Local.mk lc0.(Local.tview) prom'0). eapply ADDEDPROMALL. }
   { eapply Forall_app; eauto. }
   i. des.
-  esplits.
-  { eapply Trace.steps_trans.
-    { eapply STEPS0. }
-    { eapply STEPS1. }
-  }
-  { eapply Forall_app; eauto. }
-  { eapply CANCELTRACE. }
+  assert (CAP: forall cap0'
+                      (MLE: Memory.le mem'0 cap0'),
+             exists cap0 cap1,
+               Trace.steps
+                 tr2
+                 (Thread.mk _ st0 {| Local.tview := Local.tview lc0; Local.promises := prom'0 |} sc0 cap0')
+                 (Thread.mk _ st0 lc0 sc0 cap0) /\
+               Trace.steps
+                 tr
+                 (Thread.mk _ st0 lc0 sc0 cap0)
+                 (Thread.mk _ st1 lc1 sc1 cap1)).
   { i. ss. exploit (H0 st0 sc0 cap0').
     { etrans; eauto. eapply trace_steps_promises_le in STEPS1; eauto. }
     i. des.
@@ -1125,4 +1305,14 @@ Proof.
     i. des. exists mem'1, cap1.
     splits; eauto. destruct lc0. ss.
   }
-Qed.
+  esplits.
+  { eapply Trace.steps_trans.
+    { eapply STEPS0. }
+    { eapply STEPS1. }
+  }
+  { eapply Forall_app; eauto. }
+  { eapply CANCELTRACE. }
+  { auto. }
+  { i. exploit (CAP mem'0).
+    { refl. } i. des. ss.
+Admitted.

@@ -321,3 +321,24 @@ Module Trace.
       esplits; eauto.
   Qed.
 End Trace.
+
+Definition is_reserving (te: ThreadEvent.t): Prop :=
+  match te with
+  | ThreadEvent.promise _ _ _ Message.reserve Memory.op_kind_add => True
+  | _ => False
+  end.
+
+Inductive final_event_trace (e: ThreadEvent.t)
+  :
+    forall (tr: Trace.t), Prop :=
+| final_event_trace_base
+    lc str
+    (RESERVING: List.Forall (fun lce => is_reserving (snd lce)) str)
+  :
+    final_event_trace e ((lc, e) :: str)
+| final_event_trace_cons
+    hd tl
+    (FINAL: final_event_trace e tl)
+  :
+    final_event_trace e (hd :: tl)
+.

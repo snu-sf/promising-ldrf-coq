@@ -34,6 +34,32 @@ Set Implicit Arguments.
 
 
 
+Inductive reserving_event: forall (e: ThreadEvent.t), Prop :=
+| reserving_event_reserve
+    loc from to kind
+  :
+    reserving_event (ThreadEvent.promise loc from to Message.reserve kind)
+.
+Hint Constructors reserving_event.
+
+Definition reserving_trace (tr: Trace.t): Prop :=
+  List.Forall (fun lce => reserving_event (snd lce)) tr.
+
+Lemma reserving_event_silent e
+      (RESERVING: reserving_event e)
+  :
+    ThreadEvent.get_machine_event e = MachineEvent.silent.
+Proof.
+  inv RESERVING; ss.
+Qed.
+
+Lemma reserving_event_pf L e
+      (RESERVING: reserving_event e)
+  :
+    pf_event L e.
+Proof.
+  ii. subst. inv RESERVING; eauto.
+Qed.
 
 Lemma reserve_future_memory_steps
       lang st vw sc prom0 mem0 prom1 mem1
@@ -53,7 +79,6 @@ Proof.
     { econs; ss. }
   }
 Qed.
-
 
 Lemma joined_view_semi_closed
       views view mem loc ts

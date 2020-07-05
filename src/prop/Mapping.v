@@ -313,6 +313,73 @@ Section MAPPED.
         (ThreadEvent.failure)
   .
 
+  Inductive tevent_map_weak
+  : ThreadEvent.t -> ThreadEvent.t -> Prop :=
+  | tevent_map_weak_promise
+      loc from ffrom to fto msg fmsg kind fkind
+      (FROM: f loc from ffrom)
+      (TO: f loc to fto)
+    :
+      tevent_map_weak
+        (ThreadEvent.promise loc ffrom fto fmsg fkind)
+        (ThreadEvent.promise loc from to msg kind)
+  | tevent_map_weak_read
+      loc to fto val released freleased ordr
+      (TO: f loc to fto)
+    :
+      tevent_map_weak
+        (ThreadEvent.read loc fto val freleased ordr)
+        (ThreadEvent.read loc to val released ordr)
+  | tevent_map_weak_write
+      loc from ffrom to fto val released freleased ordw
+      (FROM: f loc from ffrom)
+      (TO: f loc to fto)
+    :
+      tevent_map_weak
+        (ThreadEvent.write loc ffrom fto val freleased ordw)
+        (ThreadEvent.write loc from to val released ordw)
+  | tevent_map_weak_update
+      loc from ffrom to fto valr valw releasedr freleasedr
+      releasedw freleasedw ordr ordw
+      (FROM: f loc from ffrom)
+      (TO: f loc to fto)
+    :
+      tevent_map_weak
+        (ThreadEvent.update loc ffrom fto valr valw freleasedr freleasedw ordr ordw)
+        (ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw)
+  | tevent_map_weak_fence
+      or ow
+    :
+      tevent_map_weak
+        (ThreadEvent.fence or ow)
+        (ThreadEvent.fence or ow)
+  | tevent_map_weak_syscall
+      e
+    :
+      tevent_map_weak
+        (ThreadEvent.syscall e)
+        (ThreadEvent.syscall e)
+  | tevent_map_weak_silent
+    :
+      tevent_map_weak
+        (ThreadEvent.silent)
+        (ThreadEvent.silent)
+  | tevent_map_weak_failure
+    :
+      tevent_map_weak
+        (ThreadEvent.failure)
+        (ThreadEvent.failure)
+  .
+  Hint Constructors tevent_map_weak.
+
+  Lemma tevent_map_tevent_map_weak e fe
+        (EVENT: tevent_map e fe)
+    :
+      tevent_map_weak e fe.
+  Proof.
+    inv EVENT; eauto.
+  Qed.
+
   Definition non_collapsable (loc: Loc.t) (to: Time.t): Prop :=
     forall to' (TLE: Time.lt to' to),
       ~ collapsed loc to' to.
@@ -3798,6 +3865,27 @@ Section COMPOSE.
     - ii. exploit ONLY0; eauto. i. des.
       exploit ONLY; eauto. i. des. esplits; eauto.
   Qed.
+
+  Lemma tevent_map_weak_compose (f0 f1 f2: Loc.t -> Time.t -> Time.t -> Prop) e0 e1 e2
+        (EVENT0: tevent_map_weak f0 e1 e0)
+        (EVENT1: tevent_map_weak f1 e2 e1)
+        (COMPOSE: forall loc ts0 ts1 ts2 (MAP0: f0 loc ts0 ts1) (MAP1: f1 loc ts1 ts2),
+            f2 loc ts0 ts2)
+    :
+      tevent_map_weak f2 e2 e0.
+  Proof.
+    inv EVENT0; inv EVENT1; econs; eauto.
+  Qed.
+
+  Lemma tevent_map_weak_rev (f0 f1: Loc.t -> Time.t -> Time.t -> Prop) e0 e1
+        (EVENT: tevent_map_weak f0 e1 e0)
+        (REV: forall loc ts0 ts1 (MAP: f0 loc ts0 ts1), f1 loc ts1 ts0)
+    :
+      tevent_map_weak f1 e0 e1.
+  Proof.
+    inv EVENT; econs; eauto.
+  Qed.
+
 
 End COMPOSE.
 

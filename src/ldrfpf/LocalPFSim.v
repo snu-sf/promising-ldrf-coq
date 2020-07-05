@@ -311,24 +311,6 @@ Section SIM.
     { eapply SPEC; eauto. }
   Qed.
 
-  Lemma cap_flex_memory_times_wf mem cap tm
-        (MEMWF: memory_times_wf times mem)
-        (CAP: cap_flex mem cap tm)
-        (TM: forall loc, Time.lt (Memory.max_ts loc mem) (tm loc))
-        (IN: forall loc, times loc (tm loc))
-        (CLOSED: Memory.closed mem)
-    :
-      memory_times_wf times cap.
-  Proof.
-    ii. eapply cap_flex_inv in GET; eauto. des.
-    { eapply MEMWF; eauto. }
-    { inv GET0. eapply MEMWF in GET3. eapply MEMWF in GET4. des. auto. }
-    { subst. split; auto. exploit Memory.max_ts_spec.
-      { eapply CLOSED. }
-      i. des. eapply MEMWF in GET0. des. eauto.
-    }
-  Qed.
-
   Record pi_consistent
          (self: Loc.t -> Time.t -> Prop)
          (pl: list (Loc.t * Time.t))
