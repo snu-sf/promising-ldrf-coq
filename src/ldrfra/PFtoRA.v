@@ -448,6 +448,7 @@ Module PFtoRA.
       pf_racefree L c_pf.
     Proof.
       eapply pf_racefree_pf_racefree_tview.
+      { eapply WF_PF. }
       ii. exploit sim_conf_steps; eauto. i. des; eauto.
       exploit steps_pf_future; eauto. i. des.
       exploit steps_j_future; eauto. i. des.

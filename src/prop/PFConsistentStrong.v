@@ -1732,58 +1732,6 @@ Qed.
 
 
 
-Definition pf_consistent_super_strong_failure lang (e0:Thread.t lang)
-           (tr : Trace.t)
-           (times: Loc.t -> (Time.t -> Prop))
-  : Prop :=
-  forall mem1 tm sc max
-         (FUTURE: Memory.future_weak e0.(Thread.memory) mem1)
-         (CLOSED: Memory.closed mem1)
-         (LOCAL: Local.wf e0.(Thread.local) mem1)
-         (MAX: concrete_promise_max_timemap
-                 (e0.(Thread.memory))
-                 (e0.(Thread.local).(Local.promises))
-                 max),
-  exists ftr e1 f,
-    (<<STEPS: Trace.steps ftr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc mem1) e1>>) /\
-    (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free
-                                                /1\ no_sc
-                                                /1\ no_read_msgs (fun loc ts => ~ (covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts \/ Time.lt (tm loc) ts))
-                                                /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (tm loc)>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))
-                                                /1\ wf_time_evt times) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) ftr >>) /\
-
-    (<<CANCELNORMAL: cancel_normal_trace ftr>>) /\
-    (<<SPLIT:
-       forall ftr0 ftr1
-              (FTRACE: ftr = ftr0 ++ ftr1)
-              (NORMAL: List.Forall (fun em => ~ is_cancel (snd em)) ftr1),
-       exists ftr_reserve ftr_cancel e2,
-         (<<STEPS: Trace.steps (ftr0 ++ ftr_reserve) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc mem1) e2>>) /\
-         (<<RESERVE: List.Forall (fun em => <<SAT: (is_reserving
-                                                      /1\ wf_time_evt times
-                                                      /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (tm loc)>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))) (snd em)>>) ftr_reserve>>) /\
-         (<<CANCEL: List.Forall (fun em => <<SAT: (is_cancel /1\ wf_time_evt times) (snd em)>>) ftr_cancel>>) /\
-         (<<CONSISTENT: pf_consistent_super_strong_easy e2 (ftr_cancel ++ ftr1) times>>) /\
-         (<<PROMCONSISTENT: Local.promise_consistent e2.(Thread.local)>>) /\
-         (<<CANCELNORMAL: cancel_normal_trace (ftr_cancel ++ ftr1)>>) /\
-         (<<GOOD: good_future tm mem1 e2.(Thread.memory)>>) /\
-         (<<SC: e2.(Thread.sc) = sc>>)>>) /\
-
-    (<<MAPLT: mapping_map_lt f>>) /\
-    (<<MAPIDENT: forall loc ts fts
-                        (TS: Time.le fts (max loc))
-                        (MAP: f loc ts fts),
-        ts = fts>>) /\
-    (<<BOUND: forall loc ts fts (TS: Time.lt (max loc) fts) (MAP: f loc ts fts),
-        Time.lt (max loc) ts /\ Time.le (tm loc) fts>>) /\
-    (<<TRACE: List.Forall2 (fun em fem => tevent_map_weak f (snd fem) (snd em)) tr ftr>>) /\
-    (<<GOOD: good_future tm mem1 e1.(Thread.memory)>>) /\
-    (<<SC: e1.(Thread.sc) = sc>>) /\
-    (<<PROMCONSISTENT: Local.promise_consistent e1.(Thread.local)>>) /\
-    (__guard__((exists st',
-                   (<<LOCAL: Local.failure_step e1.(Thread.local)>>) /\
-                   (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)))).
-
 
 Inductive relaxed_writing_event
           (loc: Loc.t) (to: Time.t) (val: Const.t)
@@ -1813,71 +1761,6 @@ Proof.
   ii. exploit CONSISTENT; eauto.
 Qed.
 
-Definition pf_consistent_super_strong_promises_list lang (e0:Thread.t lang)
-           (tr : Trace.t)
-           (times: Loc.t -> (Time.t -> Prop))
-           (pl: list (Loc.t * Time.t))
-  : Prop :=
-  (<<COMPLETE: forall loc from to val released
-                      (GET: Memory.get loc to e0.(Thread.local).(Local.promises) = Some (from, Message.concrete val released)),
-      List.In (loc, to) pl>>) /\
-  (<<CONSISTENT: forall
-      pl0 loc to pl1
-      (PROMISES: pl = pl0 ++ (loc, to) :: pl1)
-      mem1 tm sc max
-      (FUTURE: Memory.future_weak e0.(Thread.memory) mem1)
-      (CLOSED: Memory.closed mem1)
-      (LOCAL: Local.wf e0.(Thread.local) mem1)
-      (MWF: memory_times_wf times mem1)
-      (MAX: concrete_promise_max_timemap
-              (e0.(Thread.memory))
-              (e0.(Thread.local).(Local.promises))
-              max),
-      exists ftr0 ftr1 ftr_reserve ftr_cancel e1 f we val,
-        (<<STEPS: Trace.steps (ftr0 ++ ftr_reserve) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc mem1) e1>>) /\
-        (<<EVENTS: List.Forall (fun em => <<SAT: ((promise_free \1/ is_reserving)
-                                                    /1\ no_sc
-                                                    /1\ no_read_msgs (fun loc ts => ~ (covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts \/ Time.lt (tm loc) ts))
-                                                    /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (tm loc)>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))
-                                                    /1\ wf_time_evt times) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) (ftr0 ++ ftr_reserve) >>) /\
-
-        (<<RESERVE: List.Forall (fun em => <<SAT: (is_reserving
-                                                     /1\ wf_time_evt times
-                                                     /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (tm loc)>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))) (snd em)>>) ftr_reserve>>) /\
-        (<<CANCEL: List.Forall (fun em => <<SAT: (is_cancel /1\ wf_time_evt times) (snd em)>>) ftr_cancel>>) /\
-
-        (<<EVENTSCERT: List.Forall (fun em => <<SAT: ((promise_free \1/ is_reserving)
-                                                    /1\ no_sc
-                                                    /1\ no_read_msgs (fun loc ts => ~ (covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts \/ Time.lt (tm loc) ts))
-                                                    /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (tm loc)>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))
-                                                    /1\ wf_time_evt times) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) (ftr_cancel ++ ftr1) >>) /\
-
-        (<<CONSISTENT: pf_consistent_super_strong e1 (ftr_cancel ++ ftr1) times>>) /\
-
-        (<<PROMCONSISTENT: Local.promise_consistent e1.(Thread.local)>>) /\
-
-        (<<MAPLT: mapping_map_lt f>>) /\
-        (<<MAPIDENT: forall loc ts fts
-                            (TS: Time.le fts (max loc))
-                            (MAP: f loc ts fts),
-            ts = fts>>) /\
-        (<<BOUND: forall loc ts fts (TS: Time.lt (max loc) fts) (MAP: f loc ts fts),
-            Time.lt (max loc) ts /\ Time.le (tm loc) fts>>) /\
-        (<<TRACE: List.Forall2 (fun em fem => tevent_map_weak f (snd fem) (snd em)) tr (ftr0 ++ ftr1)>>) /\
-        (<<GOOD: good_future tm mem1 e1.(Thread.memory)>>) /\
-        (<<SC: e1.(Thread.sc) = sc>>) /\
-
-        (<<FINAL: final_event_trace we (ftr0 ++ ftr_reserve)>>) /\
-        (<<WRITING: relaxed_writing_event loc to val we>>) /\
-        (<<SOUND: forall loc0 from0 to0 val0 released0
-                         (GET: Memory.get loc0 to0 e1.(Thread.local).(Local.promises) = Some (from0, Message.concrete val0 released0)),
-            exists from0' released0',
-              (<<GET: Memory.get loc0 to0 e0.(Thread.local).(Local.promises) = Some (from0', Message.concrete val0 released0')>>)>>) /\
-        (<<WRITTEN: forall loc0 to0
-                           (IN: List.In (loc0, to0) (pl0 ++ [(loc, to)])),
-            Memory.get loc0 to0 e1.(Thread.local).(Local.promises) = None>>)
-          >>)
-.
 
 Fixpoint map_somes A B (f: A -> option B) (l: list A): list B :=
   match l with
@@ -2133,7 +2016,100 @@ Proof.
   { exploit IHSTEPS; eauto. }
 Qed.
 
-Lemma pf_consistent_super_strong_failure_or_promises_list lang (e0: Thread.t lang)
+
+
+Definition pf_consistent_super_strong_promises_list lang (e0:Thread.t lang)
+           (tr : Trace.t)
+           (times: Loc.t -> (Time.t -> Prop))
+           (pl: list (Loc.t * Time.t))
+  : Prop :=
+  (<<COMPLETE: forall loc from to val released
+                      (GET: Memory.get loc to e0.(Thread.local).(Local.promises) = Some (from, Message.concrete val released)),
+      List.In (loc, to) pl>>) /\
+  (<<CONSISTENT: forall
+      pl0 loc to pl1
+      (PROMISES: pl = pl0 ++ (loc, to) :: pl1)
+      mem1 tm sc max
+      (FUTURE: Memory.future_weak e0.(Thread.memory) mem1)
+      (CLOSED: Memory.closed mem1)
+      (LOCAL: Local.wf e0.(Thread.local) mem1)
+      (MWF: memory_times_wf times mem1)
+      (MAX: concrete_promise_max_timemap
+              (e0.(Thread.memory))
+              (e0.(Thread.local).(Local.promises))
+              max),
+      (exists ftr0 ftr1 ftr_reserve ftr_cancel e1 f we val,
+          (<<STEPS: Trace.steps (ftr0 ++ ftr_reserve) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc mem1) e1>>) /\
+          (<<EVENTS: List.Forall (fun em => <<SAT: ((promise_free \1/ is_reserving)
+                                                      /1\ no_sc
+                                                      /1\ no_read_msgs (fun loc ts => ~ (covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts \/ Time.lt (tm loc) ts))
+                                                      /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (tm loc)>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))
+                                                      /1\ wf_time_evt times) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) (ftr0 ++ ftr_reserve) >>) /\
+
+          (<<RESERVE: List.Forall (fun em => <<SAT: (is_reserving
+                                                       /1\ wf_time_evt times
+                                                       /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (tm loc)>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))) (snd em)>>) ftr_reserve>>) /\
+          (<<CANCEL: List.Forall (fun em => <<SAT: (is_cancel /1\ wf_time_evt times) (snd em)>>) ftr_cancel>>) /\
+
+          (<<EVENTSCERT: List.Forall (fun em => <<SAT: ((promise_free \1/ is_reserving)
+                                                          /1\ no_sc
+                                                          /1\ no_read_msgs (fun loc ts => ~ (covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts \/ Time.lt (tm loc) ts))
+                                                          /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (tm loc)>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))
+                                                          /1\ wf_time_evt times) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) (ftr_cancel ++ ftr1) >>) /\
+
+          (<<CONSISTENT: pf_consistent_super_strong e1 (ftr_cancel ++ ftr1) times>>) /\
+
+          (<<PROMCONSISTENT: Local.promise_consistent e1.(Thread.local)>>) /\
+
+          (<<MAPLT: mapping_map_lt f>>) /\
+          (<<MAPIDENT: forall loc ts fts
+                              (TS: Time.le fts (max loc))
+                              (MAP: f loc ts fts),
+              ts = fts>>) /\
+          (<<BOUND: forall loc ts fts (TS: Time.lt (max loc) fts) (MAP: f loc ts fts),
+              Time.lt (max loc) ts /\ Time.le (tm loc) fts>>) /\
+          (<<TRACE: List.Forall2 (fun em fem => tevent_map_weak f (snd fem) (snd em)) tr (ftr0 ++ ftr1)>>) /\
+          (<<GOOD: good_future tm mem1 e1.(Thread.memory)>>) /\
+          (<<SC: e1.(Thread.sc) = sc>>) /\
+
+          (<<FINAL: final_event_trace we (ftr0 ++ ftr_reserve)>>) /\
+          (<<WRITING: relaxed_writing_event loc to val we>>) /\
+          (<<SOUND: forall loc0 from0 to0 val0 released0
+                           (GET: Memory.get loc0 to0 e1.(Thread.local).(Local.promises) = Some (from0, Message.concrete val0 released0)),
+              exists from0' released0',
+                (<<GET: Memory.get loc0 to0 e0.(Thread.local).(Local.promises) = Some (from0', Message.concrete val0 released0')>>)>>) /\
+          (<<WRITTEN: forall loc0 to0
+                             (IN: List.In (loc0, to0) (pl0 ++ [(loc, to)])),
+              Memory.get loc0 to0 e1.(Thread.local).(Local.promises) = None>>)) \/
+      (exists ftr e1 f,
+          (<<STEPS: Trace.steps ftr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc mem1) e1>>) /\
+          (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free
+                                                      /1\ no_sc
+                                                      /1\ no_read_msgs (fun loc ts => ~ (covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts \/ Time.lt (tm loc) ts))
+                                                      /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (tm loc)>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))
+                                                      /1\ wf_time_evt times) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) ftr >>) /\
+
+          (<<CANCELNORMAL: cancel_normal_trace ftr>>) /\
+
+          (<<MAPLT: mapping_map_lt f>>) /\
+          (<<MAPIDENT: forall loc ts fts
+                              (TS: Time.le fts (max loc))
+                              (MAP: f loc ts fts),
+              ts = fts>>) /\
+          (<<BOUND: forall loc ts fts (TS: Time.lt (max loc) fts) (MAP: f loc ts fts),
+              Time.lt (max loc) ts /\ Time.le (tm loc) fts>>) /\
+          (<<TRACE: List.Forall2 (fun em fem => tevent_map_weak f (snd fem) (snd em)) tr ftr>>) /\
+          (<<GOOD: good_future tm mem1 e1.(Thread.memory)>>) /\
+          (<<SC: e1.(Thread.sc) = sc>>) /\
+          (<<PROMCONSISTENT: Local.promise_consistent e1.(Thread.local)>>) /\
+          (__guard__((exists st',
+                         (<<LOCAL: Local.failure_step e1.(Thread.local)>>) /\
+                         (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)))))
+        >>)
+.
+
+
+Lemma pf_consistent_super_strong_promises_list_exists lang (e0: Thread.t lang)
       (tr : Trace.t)
       (times: Loc.t -> (Time.t -> Prop))
       (CONSISTENT: pf_consistent_super_strong e0 tr times)
@@ -2141,7 +2117,6 @@ Lemma pf_consistent_super_strong_failure_or_promises_list lang (e0: Thread.t lan
       (LOCAL: Local.wf (Thread.local e0) (Thread.memory e0))
       (DIVERGE: forall loc n, times loc (incr_time_seq n))
   :
-    (<<FAILURE: pf_consistent_super_strong_failure e0 tr times>>) \/
     exists pl,
       (<<PROMISES: pf_consistent_super_strong_promises_list e0 tr times pl>>)
 .
@@ -2170,29 +2145,30 @@ Proof.
   destruct (classic (exists loc ts,
                         (<<IN: List.In (loc, ts) dom>>) /\
                         (<<NIN: ~ List.In (loc, ts) pl>>))) as [EXIST|ALL].
-  { des. left. ii.
-    exploit CONSISTENT; eauto. i. des. esplits; eauto.
+  { exists dom. split.
+    { ii. eapply COMPLETE in GET. auto. }
+    ii. exploit CONSISTENT; eauto. i. des. right. esplits; eauto.
     unguard. des; eauto. exfalso.
     eapply SOUND in IN. des.
     exploit WRITES; eauto. i. des.
     eapply list_Forall2_in in IN; eauto. des. destruct a. ss.
-    assert (WRITE: writing_loc_prom e0.(Thread.local).(Local.promises) t0 = Some (loc, ts)).
+    assert (WRITE: writing_loc_prom e0.(Thread.local).(Local.promises) t0 = Some (loc0, ts)).
     { inv WRITING; inv SAT; ss.
-      { rewrite ORD. replace ts with to in *.
+      { rewrite ORD. replace ts with to0 in *.
         { erewrite GET. auto. }
         eapply MAPIDENT; eauto.
         eapply MAX in GET. auto. }
-      { rewrite ORD. replace ts with to in *.
+      { rewrite ORD. replace ts with to0 in *.
         { erewrite GET. auto. }
         eapply MAPIDENT; eauto.
         eapply MAX in GET. auto. }
     }
     eapply NIN. eapply map_somes_in; eauto.
   }
-  { right. exists pl. split.
+  { exists pl. split.
     { ii. eapply COMPLETE in GET. eapply NNPP. ii.
       eapply ALL. esplits; eauto. }
-    ii. exploit (@CONSISTENT mem1 tm sc max); eauto.
+    ii. left. exploit (@CONSISTENT mem1 tm sc max); eauto.
     hexploit map_somes_split_inv_one; try apply PROMISES. i. des. subst.
     dup TRACE.
     eapply List.Forall2_app_inv_l in TRACE. des. subst.
@@ -2300,5 +2276,5 @@ Proof.
       { eauto. }
       { des. inv UNCH. auto. }
     }
-  }  
+  }
 Qed.

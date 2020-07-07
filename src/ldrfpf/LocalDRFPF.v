@@ -39,14 +39,14 @@ Set Implicit Arguments.
 
 
 
-Lemma PF_sim_configuration_beh L times c_src c_mid c_tgt views prom extra
+Lemma PF_sim_configuration_beh L times c_src c_mid c_tgt views prom extra proml
       (WO: forall loc, well_ordered (times loc))
       (INCR: forall nat loc, times loc (incr_time_seq nat))
       (RACEFRFEE: pf_racefree L c_src)
       (WF_SRC: Configuration.wf c_src)
       (WF_MID: JConfiguration.wf views c_mid)
       (WF_TGT: Configuration.wf c_tgt)
-      (SIM: sim_configuration L times (fun _ => True) views prom extra c_src c_mid c_tgt)
+      (SIM: sim_configuration L times (fun _ => True) views prom extra proml c_src c_mid c_tgt)
   :
     behaviors (times_configuration_step_all times) c_tgt <1=
     behaviors (pf_step L) c_src.
@@ -65,75 +65,60 @@ Proof.
     destruct (classic (List.Forall
                          (fun the => no_read_msgs
                                        (all_promises (fun tid' => tid <> tid') prom)
-                                       (snd the)) (tr))).
-    { destruct (classic (List.Forall
-                           (fun the => no_read_msgs
-                                         (all_promises (fun tid' => tid <> tid') prom)
-                                         (snd the)) (tr_cert))).
-      { exploit (step_sim_configuration); eauto.
-        { instantiate (1:=true). ss. }
-        i. des. unguard. des; ss. dep_inv STEPSRC.
-        econs 2; eauto.
+                                       (snd the)) (tr ++ tr_cert))).
+    { eapply Forall_app_inv in H. des.
+      exploit (step_sim_configuration); eauto.
+      { instantiate (1:=true). ss. }
+      i. des. unguard. des; ss. dep_inv STEPSRC.
+      econs 2; eauto.
+      { econs; eauto. }
+      { eapply IHPR; try apply SIM0; eauto.
+        { eapply steps_pf_racefree; eauto. econs; eauto. econs. }
+        { eapply pf_step_trace_future; eauto. }
+        { eapply JConfiguration.step_future; eauto. }
+        { eapply times_configuration_step_future; eauto. }
+      }
+    }
+    { exploit promise_read_race; eauto. i. des; clarify. }
+  }
+  { inv STEP.
+    destruct (classic (List.Forall
+                         (fun the => no_read_msgs
+                                       (all_promises (fun tid' => tid <> tid') prom)
+                                       (snd the)) (tr ++ tr_cert))).
+    { eapply Forall_app_inv in H. des.
+       exploit step_sim_configuration; eauto.
+      { instantiate (1:=true). ss. }
+      i. des. unguard. des; ss.
+      { dep_inv STEPSRC. econs 3; eauto. econs; eauto. }
+      { dep_inv STEPSRC. econs 3; eauto. econs; eauto. }
+    }
+    { exploit promise_read_race; eauto. i. des; clarify. }
+  }
+  { inv STEP.
+    destruct (classic (List.Forall
+                         (fun the => no_read_msgs
+                                       (all_promises (fun tid' => tid <> tid') prom)
+                                       (snd the)) (tr ++ tr_cert))).
+    { eapply Forall_app_inv in H. des.
+      exploit step_sim_configuration; eauto.
+      { instantiate (1:=true). ss. }
+      i. des. ss. dep_inv STEPSRC.
+      { econs 4; eauto.
         { econs; eauto. }
-        { eapply IHPR; try apply SIM0; eauto.
+        { destruct x1; ss. des.
+          eapply IHPR; try apply SIM0; eauto.
           { eapply steps_pf_racefree; eauto. econs; eauto. econs. }
           { eapply pf_step_trace_future; eauto. }
           { eapply JConfiguration.step_future; eauto. }
           { eapply times_configuration_step_future; eauto. }
         }
       }
-      { exploit promise_read_race_certfication; eauto. i. des; clarify. }
-    }
-    { exploit promise_read_race; eauto. i. des; clarify. }
-  }
-  { inv STEP.
-    destruct (classic (List.Forall
-                         (fun the => no_read_msgs
-                                       (all_promises (fun tid' => tid <> tid') prom)
-                                       (snd the)) (tr))).
-    { destruct (classic (List.Forall
-                           (fun the => no_read_msgs
-                                         (all_promises (fun tid' => tid <> tid') prom)
-                                         (snd the)) (tr_cert))).
-      { exploit step_sim_configuration; eauto.
-        { instantiate (1:=true). ss. }
-        i. des. unguard. des; ss.
-        { dep_inv STEPSRC. econs 3; eauto. econs; eauto. }
-        { dep_inv STEPSRC. econs 3; eauto. econs; eauto. }
+      { destruct x1; ss. des.
+        eapply IHPR; try apply SIM0; eauto.
+        { eapply JConfiguration.step_future; eauto. }
+        { eapply times_configuration_step_future; eauto. }
       }
-      { exploit promise_read_race_certfication; eauto. i. des; clarify. }
-    }
-    { exploit promise_read_race; eauto. i. des; clarify. }
-  }
-  { inv STEP.
-    destruct (classic (List.Forall
-                         (fun the => no_read_msgs
-                                       (all_promises (fun tid' => tid <> tid') prom)
-                                       (snd the)) (tr))).
-    { destruct (classic (List.Forall
-                           (fun the => no_read_msgs
-                                         (all_promises (fun tid' => tid <> tid') prom)
-                                         (snd the)) (tr_cert))).
-      { exploit step_sim_configuration; eauto.
-        { instantiate (1:=true). ss. }
-        i. des. ss. dep_inv STEPSRC.
-        { econs 4; eauto.
-          { econs; eauto. }
-          { destruct x0; ss. des.
-            eapply IHPR; try apply SIM0; eauto.
-            { eapply steps_pf_racefree; eauto. econs; eauto. econs. }
-            { eapply pf_step_trace_future; eauto. }
-            { eapply JConfiguration.step_future; eauto. }
-            { eapply times_configuration_step_future; eauto. }
-          }
-        }
-        { destruct x0; ss. des.
-          eapply IHPR; try apply SIM0; eauto.
-          { eapply JConfiguration.step_future; eauto. }
-          { eapply times_configuration_step_future; eauto. }
-        }
-      }
-      { exploit promise_read_race_certfication; eauto. i. des; clarify. }
     }
     { exploit promise_read_race; eauto. i. des; clarify. }
   }
@@ -152,7 +137,8 @@ Proof.
   { eapply Configuration.init_wf. }
   { eapply JConfiguration.init_wf. }
   { eapply Configuration.init_wf. }
-  instantiate (1:=s). instantiate (1:=bot4). instantiate (1:=bot3). econs; eauto.
+  instantiate (1:=s). instantiate (1:=fun _ => []).
+  instantiate (1:=bot4). instantiate (1:=bot3). econs; eauto.
   { i. unfold Threads.init. repeat erewrite IdentMap.Facts.map_o.
     unfold option_map. des_ifs. ss. econs. econs.
     econs; ss. i. erewrite Memory.bot_get. destruct (classic (L loc)).
@@ -186,14 +172,10 @@ Proof.
   { refl. }
   { ii. unfold Memory.init, Memory.get in GET. erewrite Cell.init_get in GET.
     des_ifs. auto. }
+  { ii. unfold Memory.init, Memory.get in GET. erewrite Cell.init_get in GET.
+    des_ifs. auto. }
   { i. unfold Threads.init in GET. erewrite IdentMap.Facts.map_o in GET.
-    unfold option_map in GET. des_ifs. dep_clarify. ii. ss. eexists [], _. splits; auto.
-    { refl. }
-    { right. ss. }
-  }
-  { i. unfold Threads.init in GET. erewrite IdentMap.Facts.map_o in GET.
-    unfold option_map in GET. des_ifs. dep_clarify. ii. ss. eexists [], _. splits; auto.
-    { refl. }
-    { right. ss. }
+    unfold option_map in GET. des_ifs. dep_clarify. econs; ss.
+    ii. destruct pl0; ss.
   }
 Qed.
