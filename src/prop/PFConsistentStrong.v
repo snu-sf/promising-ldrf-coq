@@ -1805,6 +1805,14 @@ Inductive relaxed_writing_event
 .
 Hint Constructors relaxed_writing_event.
 
+Lemma pf_consistent_super_strong_same_sc lang (e0: Thread.t lang) tr times sc
+      (CONSISTENT: pf_consistent_super_strong e0 tr times)
+  :
+    pf_consistent_super_strong (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc e0.(Thread.memory)) tr times.
+Proof.
+  ii. exploit CONSISTENT; eauto.
+Qed.
+
 Definition pf_consistent_super_strong_promises_list lang (e0:Thread.t lang)
            (tr : Trace.t)
            (times: Loc.t -> (Time.t -> Prop))
@@ -1820,6 +1828,7 @@ Definition pf_consistent_super_strong_promises_list lang (e0:Thread.t lang)
       (FUTURE: Memory.future_weak e0.(Thread.memory) mem1)
       (CLOSED: Memory.closed mem1)
       (LOCAL: Local.wf e0.(Thread.local) mem1)
+      (MWF: memory_times_wf times mem1)
       (MAX: concrete_promise_max_timemap
               (e0.(Thread.memory))
               (e0.(Thread.local).(Local.promises))
@@ -1836,7 +1845,15 @@ Definition pf_consistent_super_strong_promises_list lang (e0:Thread.t lang)
                                                      /1\ wf_time_evt times
                                                      /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (tm loc)>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))) (snd em)>>) ftr_reserve>>) /\
         (<<CANCEL: List.Forall (fun em => <<SAT: (is_cancel /1\ wf_time_evt times) (snd em)>>) ftr_cancel>>) /\
-        (<<CONSISTENT: pf_consistent_super_strong_easy e1 (ftr_cancel ++ ftr1) times>>) /\
+
+        (<<EVENTSCERT: List.Forall (fun em => <<SAT: ((promise_free \1/ is_reserving)
+                                                    /1\ no_sc
+                                                    /1\ no_read_msgs (fun loc ts => ~ (covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts \/ Time.lt (tm loc) ts))
+                                                    /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (tm loc)>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))
+                                                    /1\ wf_time_evt times) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) (ftr_cancel ++ ftr1) >>) /\
+
+        (<<CONSISTENT: pf_consistent_super_strong e1 (ftr_cancel ++ ftr1) times>>) /\
+
         (<<PROMCONSISTENT: Local.promise_consistent e1.(Thread.local)>>) /\
 
         (<<MAPLT: mapping_map_lt f>>) /\
@@ -2122,6 +2139,7 @@ Lemma pf_consistent_super_strong_failure_or_promises_list lang (e0: Thread.t lan
       (CONSISTENT: pf_consistent_super_strong e0 tr times)
       (CLOSED: Memory.closed e0.(Thread.memory))
       (LOCAL: Local.wf (Thread.local e0) (Thread.memory e0))
+      (DIVERGE: forall loc n, times loc (incr_time_seq n))
   :
     (<<FAILURE: pf_consistent_super_strong_failure e0 tr times>>) \/
     exists pl,
@@ -2209,6 +2227,37 @@ Proof.
         { destruct t4; ss. }
       }
     }
+    { eapply Forall_app.
+      { eapply List.Forall_impl; eauto. i. ss. des. destruct a. ss. splits; auto.
+        { destruct t4; ss. destruct kind; ss. auto. }
+        { destruct t4; ss. }
+        { destruct t4; ss. }
+        { destruct t4; ss. destruct kind; ss. }
+        { destruct t4; ss. }
+      }
+      { eapply Forall_app_inv in EVENTS. des.
+        eapply List.Forall_impl; eauto. i. ss. des. splits; auto. }
+    }
+    { destruct e2. eapply no_sc_any_sc_traced in STEPS0; ss.
+      { des. exploit Trace.steps_future; try apply STEPS1; eauto; ss.
+        { instantiate (1:=TimeMap.bot). ss.
+          eapply Memory.closed_timemap_bot; eauto. eapply CLOSED0. }
+        i. des. hexploit pf_consistent_super_strong_same_sc.
+        { eapply pf_consistent_super_strong_not_easy; try apply CONSISTENT0; eauto.
+          { ss. eapply memory_times_wf_traced in STEPS1; eauto. eapply Forall_app.
+            { eapply Forall_app_inv in EVENTS. des. eapply List.Forall_impl; eauto.
+              i. ss. des; auto. }
+            { eapply List.Forall_impl; eauto. i. ss. des; auto. }
+          }
+        }
+        i. eauto. }
+      { eapply Forall_app.
+        { eapply Forall_app_inv in EVENTS. des. eapply List.Forall_impl; eauto.
+          i. ss. des; auto. }
+        { eapply List.Forall_impl; eauto. i. ss. des; auto.
+          destruct a. ss. destruct t4; ss. }
+      }
+    }
     { erewrite <- List.app_assoc. eapply final_event_trace_post.
       econs. eapply List.Forall_impl; eauto. i. ss. des; auto. }
     { i. eapply no_concrete_promise_concrete_decrease_steps in STEPS0; eauto.
@@ -2218,8 +2267,8 @@ Proof.
       { eapply List.Forall_impl; eauto. i. ss. des. destruct a. ss. splits; auto. }
     }
     { i. assert (WRITED: exists flc fwe,
-                 (<<IN: List.In (flc, fwe) (l0 ++ [(t1, t2)])>>) /\
-                 (<<WRITING: writing_loc_prom (Local.promises (Thread.local e0)) fwe = Some (loc0, to0)>>)).
+                    (<<IN: List.In (flc, fwe) (l0 ++ [(t1, t2)])>>) /\
+                    (<<WRITING: writing_loc_prom (Local.promises (Thread.local e0)) fwe = Some (loc0, to0)>>)).
       { apply List.in_app_or in IN. des.
         { eapply map_somes_in_rev in IN. des. destruct a. ss. esplits; eauto.
           eapply List.in_or_app; eauto. }
@@ -2251,5 +2300,5 @@ Proof.
       { eauto. }
       { des. inv UNCH. auto. }
     }
-  }
+  }  
 Qed.
