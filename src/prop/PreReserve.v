@@ -651,6 +651,12 @@ Proof.
   }
 Qed.
 
+Definition is_reserving (te: ThreadEvent.t): Prop :=
+  match te with
+  | ThreadEvent.promise _ _ _ Message.reserve Memory.op_kind_add => True
+  | _ => False
+  end.
+
 Lemma reserve_empty_intervals times lang (th: Thread.t lang) l
       (DISJOINT: disjoint_intervals l)
       (NITV: forall loc ts (ITV: intervals_sum l loc ts),

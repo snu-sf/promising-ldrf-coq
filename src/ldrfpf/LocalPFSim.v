@@ -44,6 +44,109 @@ Require Import Pred.
 Set Implicit Arguments.
 
 
+
+Lemma reserving_trace_sim_trace_none L tr
+      (TRACE: sim_trace L tr None)
+  :
+    reserving_trace tr.
+Proof.
+  ginduction tr.
+  { i. ss. }
+  { i. inv TRACE. econs; eauto. eapply IHtr; eauto. }
+Qed.
+
+Lemma reserving_trace_sim_trace_reserving L tr lc e
+      (TRACE: sim_trace L tr (Some (lc, e)))
+      (RESERVING: reserving_event e)
+  :
+    reserving_trace tr.
+Proof.
+  remember (Some (lc, e)). ginduction TRACE; eauto; i; clarify.
+  { econs; eauto.
+    { ss. inv RESERVING; inv EVENT.
+      exploit (proj2 RESERVE); auto. i. subst. econs; eauto. }
+    { eapply reserving_trace_sim_trace_none; eauto. }
+  }
+  { eapply reserving_trace_sim_trace_none; eauto. }
+  { econs; eauto. eapply IHTRACE; eauto. }
+Qed.
+
+Lemma reserving_trace_sim_traces_reserving L tr_src tr_tgt
+      (TRACE: sim_traces L tr_src tr_tgt)
+      (RESERVING: reserving_trace tr_tgt)
+  :
+    reserving_trace tr_src.
+Proof.
+  ginduction TRACE; eauto.
+  { i. inv RESERVING. eapply Forall_app.
+    { eapply reserving_trace_sim_trace_reserving; eauto. }
+    { eapply IHTRACE; eauto. }
+  }
+  { i. eapply Forall_app.
+    { eapply reserving_trace_sim_trace_none; eauto. }
+    { eapply IHTRACE; eauto. }
+  }
+Qed.
+
+Lemma sim_trace_relaxed_writing_event L tr lc ploc pts val we_tgt
+      (WRITING : relaxed_writing_event ploc pts val we_tgt)
+      (TRACE : sim_trace L tr (Some (lc, we_tgt)))
+  :
+    exists we_src : ThreadEvent.t,
+      (<<FINAL: final_event_trace we_src tr>>) /\
+      (<<WRITING: writing_event ploc pts we_src>>).
+Proof.
+  remember (Some (lc, we_tgt)). ginduction TRACE; eauto; i; clarify.
+  { inv WRITING; inv EVENT.
+    { esplits; eauto.
+      { econs; eauto. eapply reserving_trace_sim_trace_none; eauto. }
+      { econs; eauto. }
+    }
+    { esplits; eauto.
+      { econs; eauto. eapply reserving_trace_sim_trace_none; eauto. }
+      { econs; eauto. }
+    }
+  }
+  { inv WRITING; ss. }
+  { exploit IHTRACE; eauto. i. des. esplits; eauto. econs; eauto. }
+Qed.
+
+Lemma final_event_trace_post_reserve e tr0 tr1
+      (FINAL: final_event_trace e tr0)
+      (RESERVING: reserving_trace tr1)
+  :
+    final_event_trace e (tr0 ++ tr1).
+Proof.
+  ginduction FINAL; eauto.
+  { i. ss. erewrite List.app_comm_cons. ss. econs; eauto.
+    eapply Forall_app; eauto.
+  }
+  { i. eapply IHFINAL in RESERVING. ss. econs; eauto. }
+Qed.
+
+Lemma sim_traces_relaxed_writing_event L tr_src tr_tgt ploc pts val we_tgt
+      (WRITING : relaxed_writing_event ploc pts val we_tgt)
+      (TRACE : sim_traces L tr_src tr_tgt)
+      (FINAL: final_event_trace we_tgt tr_tgt)
+  :
+    exists we_src : ThreadEvent.t,
+      (<<FINAL: final_event_trace we_src tr_src>>) /\
+      (<<WRITING: writing_event ploc pts we_src>>).
+Proof.
+  ginduction TRACE; eauto.
+  { i. inv FINAL. }
+  { i. inv FINAL.
+    { exploit sim_trace_relaxed_writing_event; eauto. i. des. esplits; eauto.
+      eapply final_event_trace_post_reserve; eauto.
+      eapply reserving_trace_sim_traces_reserving; eauto. }
+    { exploit IHTRACE; eauto. i. des. esplits; eauto.
+      eapply final_event_trace_post; eauto. }
+  }
+  { i. exploit IHTRACE; eauto. i. des. esplits; eauto.
+    eapply final_event_trace_post; eauto.
+  }
+Qed.
+
 Inductive all_promises
           (tids: Ident.t -> Prop)
           (proms: Ident.t -> Loc.t -> Time.t -> Prop): Loc.t -> Time.t -> Prop :=
@@ -72,7 +175,7 @@ Hint Constructors all_extra.
 Lemma jsim_event_sim_event
   :
     JSim.sim_event <2= sim_event.
-Proof. ii. inv PR; econs. Qed.
+Proof. ii. inv PR; econs. inv MSG; ss. Qed.
 
 Lemma promise_writing_event_racy
       loc from ts val released e (lc: Local.t)
@@ -243,7 +346,7 @@ Lemma tevent_ident_map f e fe
     sim_event e fe.
 Proof.
   inv MAP; try econs; eauto.
-  { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. }
+  { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. inv MSG; ss. }
   { eapply IDENT in TO. subst. econs; eauto. }
   { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. }
   { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. }
@@ -1846,19 +1949,6 @@ Section SIM.
       specialize (PROMISES loc from). rewrite <- H in *. inv PROMISES; ss.
       erewrite Memory.bot_get in *. clarify. }
   Qed.
-
-  Lemma sim_traces_relaxed_writing_event tr_src tr_tgt ploc pts val we_tgt
-        (WRITING : relaxed_writing_event ploc pts val we_tgt)
-        (TRACE : sim_traces L tr_src tr_tgt)
-        (FINAL: final_event_trace we_tgt tr_tgt)
-    :
-      exists we_src : ThreadEvent.t,
-        (<<FINAL: final_event_trace we_src tr_src>>) /\
-        (<<WRITING: writing_event ploc pts we_src>>).
-  Proof.
-    revert tr_src WRITING TRACE FINAL. induction tr_tgt.
-    { i. inv FINAL. }
-  Admitted.
 
   Lemma sim_thread_forget
         views prom_self prom_others extra_self extra_others

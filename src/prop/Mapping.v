@@ -319,6 +319,7 @@ Section MAPPED.
       loc from ffrom to fto msg fmsg kind fkind
       (FROM: f loc from ffrom)
       (TO: f loc to fto)
+      (MSG: msg = Message.reserve <-> fmsg = Message.reserve)
     :
       tevent_map_weak
         (ThreadEvent.promise loc ffrom fto fmsg fkind)
@@ -377,7 +378,7 @@ Section MAPPED.
     :
       tevent_map_weak e fe.
   Proof.
-    inv EVENT; eauto.
+    inv EVENT; eauto. econs; eauto. inv MSG; ss.
   Qed.
 
   Definition non_collapsable (loc: Loc.t) (to: Time.t): Prop :=
@@ -3918,7 +3919,7 @@ Section COMPOSE.
     :
       tevent_map_weak f2 e2 e0.
   Proof.
-    inv EVENT0; inv EVENT1; econs; eauto.
+    inv EVENT0; inv EVENT1; econs; eauto. etrans; eauto.
   Qed.
 
   Lemma tevent_map_weak_rev (f0 f1: Loc.t -> Time.t -> Time.t -> Prop) e0 e1
@@ -3927,7 +3928,7 @@ Section COMPOSE.
     :
       tevent_map_weak f1 e0 e1.
   Proof.
-    inv EVENT; econs; eauto.
+    inv EVENT; econs; eauto. symmetry. auto.
   Qed.
 
 

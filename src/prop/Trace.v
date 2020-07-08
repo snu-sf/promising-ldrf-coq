@@ -422,23 +422,40 @@ Module ThreadTrace.
 End ThreadTrace.
 
 
-Definition is_reserving (te: ThreadEvent.t): Prop :=
-  match te with
-  | ThreadEvent.promise _ _ _ Message.reserve Memory.op_kind_add => True
-  | _ => False
-  end.
+Section RESERVING.
 
-Inductive final_event_trace (e: ThreadEvent.t)
-  :
-    forall (tr: Trace.t), Prop :=
-| final_event_trace_base
-    lc str
-    (RESERVING: List.Forall (fun lce => is_reserving (snd lce)) str)
-  :
-    final_event_trace e ((lc, e) :: str)
-| final_event_trace_cons
-    hd tl
-    (FINAL: final_event_trace e tl)
-  :
-    final_event_trace e (hd :: tl)
-.
+  Inductive reserving_event: forall (e: ThreadEvent.t), Prop :=
+  | reserving_event_reserve
+      loc from to kind
+    :
+      reserving_event (ThreadEvent.promise loc from to Message.reserve kind)
+  .
+  Hint Constructors reserving_event.
+
+  Definition reserving_trace (tr: Trace.t): Prop :=
+    List.Forall (fun lce => reserving_event (snd lce)) tr.
+
+  Lemma reserving_event_silent e
+        (RESERVING: reserving_event e)
+    :
+      ThreadEvent.get_machine_event e = MachineEvent.silent.
+  Proof.
+    inv RESERVING; ss.
+  Qed.
+
+  Inductive final_event_trace (e: ThreadEvent.t)
+    :
+      forall (tr: Trace.t), Prop :=
+  | final_event_trace_base
+      lc str
+      (RESERVING: reserving_trace str)
+    :
+      final_event_trace e ((lc, e) :: str)
+  | final_event_trace_cons
+      hd tl
+      (FINAL: final_event_trace e tl)
+    :
+      final_event_trace e (hd :: tl)
+  .
+
+End RESERVING.

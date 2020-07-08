@@ -825,6 +825,7 @@ Proof.
   inv MAP0; inv MAP1; econs.
   { inv FROM0. auto. }
   { inv TO0. auto. }
+  { inv TO0. etrans; eauto. }
   { inv TO0. eauto. }
   { inv FROM0. eauto. }
   { inv TO0. eauto. }
@@ -841,6 +842,7 @@ Proof.
   inv MAP0; inv MAP1; econs.
   { inv FROM. auto. }
   { inv TO. auto. }
+  { inv TO. eauto. etrans; eauto. }
   { inv TO. eauto. }
   { inv FROM. eauto. }
   { inv TO. eauto. }
@@ -2532,7 +2534,9 @@ Proof.
       }
     }
     { erewrite <- List.app_assoc. eapply final_event_trace_post.
-      econs. eapply List.Forall_impl; eauto. i. ss. des; auto. }
+      econs. eapply List.Forall_impl; eauto. i. ss. des; auto.
+      clear - H. destruct a. ss. unfold is_reserving in *. des_ifs.
+    }
     { i. eapply no_concrete_promise_concrete_decrease_steps in STEPS0; eauto.
       eapply Forall_app.
       { eapply Forall_app_inv in EVENTS. des.

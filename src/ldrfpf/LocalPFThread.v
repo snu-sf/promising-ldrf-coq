@@ -34,25 +34,6 @@ Set Implicit Arguments.
 
 
 
-Inductive reserving_event: forall (e: ThreadEvent.t), Prop :=
-| reserving_event_reserve
-    loc from to kind
-  :
-    reserving_event (ThreadEvent.promise loc from to Message.reserve kind)
-.
-Hint Constructors reserving_event.
-
-Definition reserving_trace (tr: Trace.t): Prop :=
-  List.Forall (fun lce => reserving_event (snd lce)) tr.
-
-Lemma reserving_event_silent e
-      (RESERVING: reserving_event e)
-  :
-    ThreadEvent.get_machine_event e = MachineEvent.silent.
-Proof.
-  inv RESERVING; ss.
-Qed.
-
 Lemma reserving_event_pf L e
       (RESERVING: reserving_event e)
   :
@@ -117,6 +98,7 @@ Section SIM.
   Inductive sim_event: forall (e_src e_tgt: ThreadEvent.t), Prop :=
   | sim_event_promise
       loc from_src from_tgt to msg_src msg_tgt kind_src kind_tgt
+      (RESERVE: msg_src = Message.reserve <-> msg_tgt = Message.reserve)
     :
       sim_event
         (ThreadEvent.promise loc from_src to msg_src kind_src)
@@ -166,11 +148,11 @@ Section SIM.
 
   Global Program Instance sim_event_Equivalence: Equivalence sim_event.
   Next Obligation.
-  Proof. ii. destruct x; econs. Qed.
+  Proof. ii. destruct x; econs. auto. Qed.
   Next Obligation.
-  Proof. ii. inv H; econs. Qed.
+  Proof. ii. inv H; econs. symmetry. auto. Qed.
   Next Obligation.
-  Proof. ii. inv H; inv H0; econs. Qed.
+  Proof. ii. inv H; inv H0; econs. etrans; eauto. Qed.
 
   Lemma sim_event_machine_event e_src e_tgt
         (EVENT: sim_event e_src e_tgt)
@@ -200,7 +182,7 @@ Section SIM.
       sim_trace tl_src (Some (th_tgt, e))
   | sim_trace_reserve
       th_src e tl_src e_tgt
-      (SILENT: ThreadEvent.get_machine_event e = MachineEvent.silent)
+      (SILENT: reserving_event e)
       (PF: pf_event L e)
       (TL: sim_trace tl_src e_tgt)
     :
@@ -263,6 +245,7 @@ Section SIM.
       { eapply IHTRACE; eauto. i. ss. }
     }
     { i. eapply IHTRACE; eauto. i. ss. }
+    { i. econs; eauto. ss. inv SILENT; ss. }
   Qed.
 
   Lemma non_silent_pf e
@@ -289,8 +272,7 @@ Section SIM.
   Proof.
     ginduction RESERVING; eauto. i. ss.
     destruct x. econs 4; eauto.
-    { eapply reserving_event_silent; eauto. }
-    { eapply reserving_event_pf; eauto. }
+    eapply reserving_event_pf; eauto.
   Qed.
 
   Lemma reserving_r_sim_trace (tr_src tr_reserve: Trace.t) (e: option (Local.t * ThreadEvent.t))
@@ -302,7 +284,6 @@ Section SIM.
     ginduction TRACE; ss; i; eauto.
     ginduction RESERVING; eauto.
     i. destruct x. econs 4; eauto.
-    { eapply reserving_event_silent; eauto. }
     { eapply reserving_event_pf; eauto. }
   Qed.
 
@@ -3079,6 +3060,7 @@ Section SIM.
         * econs 2; [|econs 1|ss]. econs 1. econs; eauto.
         * econs 2; ss.
           { ii. clarify. }
+          { econs; eauto. }
           { eapply sim_local_tview_le; eauto. }
     - inv STEP0. inv LOCAL.
       + eexists [(_, ThreadEvent.silent)], self, extra_self, lc_src, mem_src. splits; ss.
