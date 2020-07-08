@@ -1012,12 +1012,12 @@ Proof.
     { unfold cancel_normal_trace. esplits; eauto.
       eapply List.Forall_impl; eauto. i. ss. des; auto.
     }
-    { admit. }
+    { eauto. }
     { ss. }
   }
   { unfold cancel_normal_trace. esplits; eauto.
     eapply List.Forall_impl; eauto. i. ss. des; auto. }
-Admitted.
+Qed.
 
 
 Definition pf_consistent_super_strong_aux lang (e0:Thread.t lang)
