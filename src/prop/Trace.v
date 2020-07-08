@@ -322,6 +322,106 @@ Module Trace.
   Qed.
 End Trace.
 
+Module ThreadTrace.
+
+  Definition t (lang: language) := list (Thread.t lang * ThreadEvent.t).
+
+  Inductive steps lang: forall (tr: t lang) (th0 th1: Thread.t lang), Prop :=
+  | steps_refl
+      th0
+    :
+      steps [] th0 th0
+  | steps_step
+      tr tr' th0 th1 th2 pf e
+      (STEP: Thread.step pf e th0 th1)
+      (STEPS: steps tr th1 th2)
+      (TR: tr' = (th0, e) :: tr)
+    :
+      steps tr' th0 th2
+  .
+  Hint Constructors steps.
+
+  Lemma steps_trans lang (th0 th1 th2: Thread.t lang) tr0 tr1
+        (STEPS0: steps tr0 th0 th1)
+        (STEPS1: steps tr1 th1 th2)
+    :
+      steps (tr0 ++ tr1) th0 th2.
+  Proof.
+    ginduction STEPS0; i; ss. subst. econs; eauto.
+  Qed.
+
+  Lemma steps_separate lang (th0 th2: Thread.t lang) tr0 tr1
+        (STEPS: steps (tr0++tr1) th0 th2)
+    :
+      exists th1,
+        (<<STEPS0: steps tr0 th0 th1>>) /\
+        (<<STEPS1: steps tr1 th1 th2>>).
+  Proof.
+    ginduction tr0; i; ss.
+    - exists th0. splits; ss.
+    - inv STEPS. inv TR. eapply IHtr0 in STEPS0. des.
+      exists th1. splits; ss.
+      econs; eauto.
+  Qed.
+
+  Lemma steps_future
+        lang tr e1 e2
+        (STEPS: @steps lang tr e1 e2)
+        (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+        (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+        (CLOSED1: Memory.closed e1.(Thread.memory)):
+    (<<WF2: Local.wf e2.(Thread.local) e2.(Thread.memory)>>) /\
+    (<<SC2: Memory.closed_timemap e2.(Thread.sc) e2.(Thread.memory)>>) /\
+    (<<CLOSED2: Memory.closed e2.(Thread.memory)>>) /\
+    (<<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>>) /\
+    (<<SC_FUTURE: TimeMap.le e1.(Thread.sc) e2.(Thread.sc)>>) /\
+    (<<MEM_FUTURE: Memory.future e1.(Thread.memory) e2.(Thread.memory)>>)
+  .
+  Proof.
+    ginduction STEPS.
+    - i. splits; auto.
+      + refl.
+      + refl.
+    - i. exploit Thread.step_future; eauto. i. des.
+      exploit IHSTEPS; eauto. i. des. splits; auto.
+      + etrans; eauto.
+      + etrans; eauto.
+      + etrans; eauto.
+  Qed.
+
+  Lemma trace_steps_thread_trace_steps lang (th0 th1: Thread.t lang) tr
+        (STEPS: Trace.steps tr th0 th1)
+    :
+      exists ttr,
+        (<<STEPS: steps ttr th0 th1>>) /\
+        (<<MATCH: List.Forall2
+                    (fun the lce =>
+                       (fst the).(Thread.local) = (fst lce) /\
+                       (snd the) = (snd lce)) ttr tr>>).
+  Proof.
+    ginduction STEPS; eauto. i. subst. des. esplits.
+    { econs; eauto. }
+    { econs; eauto. }
+  Qed.
+
+  Lemma thread_trace_steps_trace_steps lang (th0 th1: Thread.t lang) ttr
+        (STEPS: steps ttr th0 th1)
+    :
+      exists tr,
+        (<<STEPS: Trace.steps tr th0 th1>>) /\
+        (<<MATCH: List.Forall2
+                    (fun the lce =>
+                       (fst the).(Thread.local) = (fst lce) /\
+                       (snd the) = (snd lce)) ttr tr>>).
+  Proof.
+    ginduction STEPS; eauto. i. subst. des. esplits.
+    { econs; eauto. }
+    { econs; eauto. }
+  Qed.
+
+End ThreadTrace.
+
+
 Definition is_reserving (te: ThreadEvent.t): Prop :=
   match te with
   | ThreadEvent.promise _ _ _ Message.reserve Memory.op_kind_add => True

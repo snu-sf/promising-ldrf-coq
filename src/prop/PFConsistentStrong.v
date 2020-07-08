@@ -693,6 +693,57 @@ Qed.
 Require Import PreReserve.
 
 
+Definition pf_consistent_special lang (e0:Thread.t lang)
+           (tr : Trace.t)
+           (times: Loc.t -> (Time.t -> Prop))
+  : Prop :=
+  forall cap (tm: Loc.t -> nat) max
+         (CAPTM: forall loc, Time.lt (Memory.max_ts loc e0.(Thread.memory)) (incr_time_seq (tm loc)))
+         (CAP: cap_flex e0.(Thread.memory) cap (fun loc => incr_time_seq (tm loc)))
+         (MAX: concrete_promise_max_timemap
+                 (e0.(Thread.memory))
+                 (e0.(Thread.local).(Local.promises))
+                 max),
+  exists ftr e1,
+    (<<STEPS: Trace.steps ftr (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot cap) e1>>) /\
+    (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free
+                                                /1\ no_sc
+                                                /1\ wf_time_evt times) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) ftr >>) /\
+    (<<CANCELNORMAL: cancel_normal_trace ftr>>) /\
+    (<<TRACE: List.Forall2 (fun em fem => tevent_map_weak (fun loc ts fts => ts = fts /\ Time.le ts (max loc)) (snd fem) (snd em)) tr ftr>>) /\
+    (__guard__((exists st',
+                   (<<LOCAL: Local.failure_step e1.(Thread.local)>>) /\
+                   (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
+               (<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>))).
+
+Lemma pf_consistent_speciali_strong_easy
+      lang (th: Thread.t lang) tr times
+      (CONSISTENT: pf_consistent_special th tr times)
+  :
+    pf_consistent_super_strong_easy th tr times.
+Proof.
+  ii. exploit CONSISTENT; eauto. i. des. esplits; eauto.
+  { ii. des. subst. auto. }
+  { ii. ss. des. auto. }
+  { ii. ss. des. subst. exfalso. timetac. }
+Qed.
+
+Lemma pf_consistent_speciali_events_map
+      lang (th: Thread.t lang) tr0 tr1 times
+      (CONSISTENT: pf_consistent_special th tr0 times)
+      (EVENTS: List.Forall2 (fun em fem => tevent_map_weak ident_map (snd fem) (snd em)) tr0 tr1)
+  :
+    pf_consistent_special th tr1 times.
+Proof.
+  ii. exploit CONSISTENT; eauto. i. des. esplits; eauto.
+  eapply list_Forall2_compose.
+  { eapply list_Forall2_rev; eauto. }
+  { eauto. }
+  { i. ss. eapply tevent_map_weak_rev with (f1:=ident_map) in SAT0; ss.
+    eapply tevent_map_weak_compose; eauto. i. ss. inv MAP0. des; auto. }
+Qed.
+
+
 Definition pf_consistent_super_strong_split lang (e0:Thread.t lang)
            (tr : Trace.t)
            (times: Loc.t -> (Time.t -> Prop))
@@ -712,14 +763,17 @@ Definition pf_consistent_super_strong_split lang (e0:Thread.t lang)
     (<<CANCELNORMAL: cancel_normal_trace ftr>>) /\
 
     (<<SPLIT:
-       forall ftr0 ftr1
+       forall ftr0 ftr1 e_mid
               (FTRACE: ftr = ftr0 ++ ftr1)
-              (NORMAL: List.Forall (fun em => ~ is_cancel (snd em)) ftr1),
+              (NORMAL: List.Forall (fun em => ~ is_cancel (snd em)) ftr1)
+              (STEPS0: Trace.steps ftr0 (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot cap) e_mid)
+              (STEPS1: Trace.steps ftr1 e_mid e1)
+       ,
        exists ftr_reserve ftr_cancel e2,
-         (<<STEPS: Trace.steps (ftr0 ++ ftr_reserve) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot cap) e2>>) /\
+         (<<STEPS: Trace.steps ftr_reserve e_mid e2>>) /\
          (<<RESERVE: List.Forall (fun em => <<SAT: (is_reserving /1\ wf_time_evt times) (snd em)>>) ftr_reserve>>) /\
          (<<CANCEL: List.Forall (fun em => <<SAT: (is_cancel /1\ wf_time_evt times) (snd em)>>) ftr_cancel>>) /\
-         (<<CONSISTENT: pf_consistent_super_strong_easy e2 (ftr_cancel ++ ftr1) times>>) /\
+         (<<CONSISTENT: pf_consistent_special e2 (ftr_cancel ++ ftr1) times>>) /\
          (<<CANCELNORMAL: cancel_normal_trace (ftr_cancel ++ ftr1)>>)>>) /\
 
     (<<MAPLT: mapping_map_lt f>>) /\
@@ -761,6 +815,149 @@ Proof.
   ginduction l; eauto. i. inv FORALL. econs; eauto.
 Qed.
 
+
+Lemma ident_map_compose_tevent_weak f te0 te1 te2
+      (MAP0: tevent_map_weak f te1 te0)
+      (MAP1: tevent_map_weak ident_map te2 te1)
+  :
+    tevent_map_weak f te2 te0.
+Proof.
+  inv MAP0; inv MAP1; econs.
+  { inv FROM0. auto. }
+  { inv TO0. auto. }
+  { inv TO0. eauto. }
+  { inv FROM0. eauto. }
+  { inv TO0. eauto. }
+  { inv FROM0. eauto. }
+  { inv TO0. eauto. }
+Qed.
+
+Lemma ident_map_compose_tevent_weak2 f te0 te1 te2
+      (MAP0: tevent_map_weak ident_map te1 te0)
+      (MAP1: tevent_map_weak f te2 te1)
+  :
+    tevent_map_weak f te2 te0.
+Proof.
+  inv MAP0; inv MAP1; econs.
+  { inv FROM. auto. }
+  { inv TO. auto. }
+  { inv TO. eauto. }
+  { inv FROM. eauto. }
+  { inv TO. eauto. }
+  { inv FROM. eauto. }
+  { inv TO. eauto. }
+Qed.
+
+Lemma ident_map_pf_consistent_super_strong_easy
+      lang (th0 th1: Thread.t lang) tr times
+      (CONSISTENT: pf_consistent_special th0 tr times)
+      (WF0: Local.wf th0.(Thread.local) th0.(Thread.memory))
+      (MEM0: Memory.closed th0.(Thread.memory))
+      (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
+      (MEM1: Memory.closed th1.(Thread.memory))
+      (MAP: thread_map ident_map th0 th1)
+  :
+    pf_consistent_special th1 tr times.
+Proof.
+  ii.
+  assert (exists (tm_src: Loc.t -> nat),
+             (<<CAPTMSRC: forall loc,
+                 Time.lt (Memory.max_ts loc (Thread.memory th0)) (incr_time_seq (tm_src loc))>>)  /\
+             (<<TMLE: forall loc, Time.le (incr_time_seq (tm loc)) (incr_time_seq (tm_src loc))>>)).
+  { exploit (choice (fun loc n =>
+                       (<<CAPTMSRC:
+                          Time.lt (Memory.max_ts loc (Thread.memory th0)) (incr_time_seq n)>>)  /\
+                       (<<TMLE: Time.le (incr_time_seq (tm loc)) (incr_time_seq n)>>))).
+    { i. hexploit (@incr_time_seq_diverge
+                     (Time.join
+                        (Memory.max_ts x (Thread.memory th0))
+                        (incr_time_seq (tm x)))). i. des.
+      exists n. splits; auto.
+      { eapply TimeFacts.le_lt_lt; eauto. eapply Time.join_l. }
+      { left. eapply TimeFacts.le_lt_lt; eauto. eapply Time.join_r. }
+    }
+    i. des. exists f. splits.
+    { i. specialize (x0 loc). des; auto. }
+    { i. specialize (x0 loc). des; auto. }
+  }
+  des.
+  exploit (@concrete_promise_max_timemap_exists (Thread.memory th0) (Local.promises th0.(Thread.local))).
+  { eapply MEM0. }
+  i. des.
+  assert (MAXLE: TimeMap.le tm0 max).
+  { inv MAP. ss. inv LOCAL. eapply memory_ident_map_concrete_promise_max_timemap; eauto. }
+  exploit (@cap_flex_exists (Thread.memory th0) (fun loc => incr_time_seq (tm_src loc))); eauto.
+  i. des.
+  exploit CONSISTENT; eauto. i. des. inv MAP. ss.
+  destruct e1. ss. hexploit trace_steps_map.
+  { eapply ident_map_le; eauto. }
+  { eapply ident_map_bot; eauto. }
+  { eapply ident_map_eq; eauto. }
+  { eapply List.Forall_forall. i. eapply ident_map_mappable_evt. }
+  { eapply STEPS. }
+  { ss. }
+  { ss. }
+  { ss. }
+  { eapply cap_flex_wf; eauto. }
+  { eapply cap_flex_wf; try apply CAP; eauto. }
+  { eapply cap_flex_closed; eauto. }
+  { eapply cap_flex_closed; eauto. }
+  { eapply Memory.closed_timemap_bot; eauto.
+    eapply cap_flex_closed; eauto. }
+  { eapply Memory.closed_timemap_bot; eauto.
+    eapply cap_flex_closed; eauto. }
+  all: eauto.
+  { econs.
+    { i. eapply cap_flex_inv in GET; try apply CAP0; eauto. des; auto.
+      eapply MEM in GET. des; auto. right. esplits; eauto.
+      eapply CAP in GET; eauto. }
+    { i. left.
+      exists (incr_time_seq (tm_src loc)), Time.bot, (incr_time_seq (tm_src loc)), Time.bot.
+      splits; auto; ss.
+      { eapply Time.bot_spec. }
+      { eapply Memory.max_ts_spec in GET. des.
+        erewrite (@cap_flex_max_ts fmem cap) in MAX1; eauto. ss.
+        etrans; eauto. }
+      i. eapply cap_flex_covered; eauto.
+    }
+  }
+  { eapply mapping_map_lt_collapsable_unwritable. eapply ident_map_lt. }
+  { eapply ident_map_timemap. }
+  { refl. }
+  i. des. esplits.
+  { eauto. }
+  { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
+    eapply List.Forall_forall in IN; eauto. ss. des.
+    destruct a, x. ss. unfold ident_map in *.
+    inv EVENT; ss; des; subst; auto. splits; auto.
+    inv KIND; ss. inv MSG0; auto. inv MSG; auto. inv MAP0; ss. }
+  { clear - CANCELNORMAL TRACE0. unfold cancel_normal_trace in *. des.
+    subst. eapply List.Forall2_app_inv_l in TRACE0. des. subst. esplits; eauto.
+    { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
+      eapply List.Forall_forall in IN; eauto. ss.
+      destruct a, x. ss. inv EVENT; ss. inv KIND; ss. }
+    { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
+      eapply List.Forall_forall in IN; eauto. ss.
+      destruct a, x. ss. inv EVENT; ss. inv KIND; ss. }
+  }
+  { eapply list_Forall2_compose.
+    { eapply TRACE. }
+    { eapply TRACE0. }
+    i. ss. des. eapply tevent_map_tevent_map_weak in EVENT.
+    eapply tevent_map_weak_compose; eauto.
+    i. ss. des; subst. inv MAP1. split; auto. etrans; eauto.
+  }
+  { i. unguard. des.
+    { left. ss. esplits; eauto. eapply failure_step_map; eauto.
+      { eapply ident_map_le. }
+      { eapply ident_map_eq. }
+    }
+    { right. ss. inv LOCAL0.
+      rewrite PROMISES in *. eapply bot_promises_map in PROMISES0; auto. }
+  }
+Qed.
+
+
 Lemma pf_consistent_flex_super_strong_easy_split
       lang (th: Thread.t lang) tr times
       (WF: Local.wf th.(Thread.local) th.(Thread.memory))
@@ -773,14 +970,13 @@ Lemma pf_consistent_flex_super_strong_easy_split
     pf_consistent_super_strong_split th tr times.
 Proof.
   ii. exploit CONSISTENT; eauto. i. des. esplits; eauto.
-  i. subst. eapply Trace.steps_separate in STEPS. des.
-  exploit Trace.steps_future; try apply STEPS0; eauto; ss.
+  i. subst. exploit Trace.steps_future; try apply STEPS0; eauto; ss.
   { eapply cap_flex_wf; eauto. }
   { eapply Memory.closed_timemap_bot; eauto.
     eapply cap_flex_closed; eauto. }
   { eapply cap_flex_closed; eauto. } i. des.
   eapply Forall_app_inv in EVENTS. des.
-  destruct th1, e1. ss.
+  destruct e_mid, e1. ss.
   assert (sc = TimeMap.bot).
   { eapply no_sc_same_sc_traced in STEPS0; eauto.
     eapply List.Forall_impl; eauto. i. ss. des; auto. } subst.
@@ -801,14 +997,13 @@ Proof.
   { eauto. }
   { eauto. }
   { eauto. }
-  i. des. esplits; eauto.
-  { eapply Trace.steps_trans; eauto. }
+  i. des. exists tr_reserve, tr_cancel. esplits; eauto.
   { ii. exploit (CAP0 cap0).
     { eapply CAP1. } i. des.
-    eexists (tr_cancel ++ ftr1), _, _. esplits.
+    eexists (tr_cancel ++ ftr1), _. esplits.
     { eapply Trace.steps_trans.
       { eapply CANCELSTEPS. }
-      { eapply STEPS. }
+      { eapply STEPS2. }
     }
     { eapply Forall_app; eauto.
       eapply List.Forall_impl; eauto. i. ss. des.
@@ -817,18 +1012,7 @@ Proof.
     { unfold cancel_normal_trace. esplits; eauto.
       eapply List.Forall_impl; eauto. i. ss. des; auto.
     }
-    { instantiate (1:=fun loc ts fts => ts = fts /\ Time.le ts (max0 loc)).
-      ii. des; clarify.
-    }
-    { ii. ss. des; clarify. }
-    { ii. ss. des; clarify. clear - TS MAP0. exfalso. timetac. }
-    { hexploit TIMES; eauto. i.
-      eapply list_Forall_refl_Forall2; eauto.
-      eapply List.Forall_impl; eauto. i. ss. clear - H0.
-      destruct a. ss. des.
-      destruct t0; ss; des; subst; econs; ss.
-      admit.
-    }
+    { admit. }
     { ss. }
   }
   { unfold cancel_normal_trace. esplits; eauto.
@@ -857,16 +1041,18 @@ Definition pf_consistent_super_strong_aux lang (e0:Thread.t lang)
 
     (<<CANCELNORMAL: cancel_normal_trace ftr>>) /\
     (<<SPLIT:
-       forall ftr0 ftr1
+       forall ftr0 ftr1 e_mid
               (FTRACE: ftr = ftr0 ++ ftr1)
+              (STEPS0: Trace.steps ftr0 (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot cap) e_mid)
+              (STEPS1: Trace.steps ftr1 e_mid e1)
               (NORMAL: List.Forall (fun em => ~ is_cancel (snd em)) ftr1),
        exists ftr_reserve ftr_cancel e2,
-         (<<STEPS: Trace.steps (ftr0 ++ ftr_reserve) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot cap) e2>>) /\
+         (<<STEPS: Trace.steps ftr_reserve e_mid e2>>) /\
          (<<RESERVE: List.Forall (fun em => <<SAT: (is_reserving
                                                      /1\ wf_time_evt times
                                                      /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (incr_time_seq (tm loc))>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))) (snd em)>>) ftr_reserve>>) /\
          (<<CANCEL: List.Forall (fun em => <<SAT: (is_cancel /1\ wf_time_evt times) (snd em)>>) ftr_cancel>>) /\
-         (<<CONSISTENT: pf_consistent_super_strong_easy e2 (ftr_cancel ++ ftr1) times>>) /\
+         (<<CONSISTENT: pf_consistent_special e2 (ftr_cancel ++ ftr1) times>>) /\
          (<<CANCELNORMAL: cancel_normal_trace (ftr_cancel ++ ftr1)>>)>>) /\
 
     (<<MAPLT: mapping_map_lt f>>) /\
@@ -929,7 +1115,13 @@ Proof.
     { i. ss. des. splits; auto. }
   }
   { i. exploit SPLIT; eauto. i. des. esplits; eauto.
-    exploit write_not_in_traced; try eapply STEPS0; eauto. i. ss.
+    exploit write_not_in_traced.
+    { eapply Trace.steps_trans.
+      { eapply STEPS0. }
+      { eapply STEPS2. }
+    }
+    { eauto. }
+    i. ss.
     eapply list_Forall_sum.
     { eapply RESERVE. }
     { eapply Forall_app_inv in x0. des. eapply FORALL2. }
@@ -972,7 +1164,7 @@ Definition pf_consistent_super_strong_aux2 lang (e0:Thread.t lang)
                                                       /1\ wf_time_evt times
                                                       /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (tm loc)>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))) (snd em)>>) ftr_reserve>>) /\
          (<<CANCEL: List.Forall (fun em => <<SAT: (is_cancel /1\ wf_time_evt times) (snd em)>>) ftr_cancel>>) /\
-         (<<CONSISTENT: pf_consistent_super_strong_easy e2 (ftr_cancel ++ ftr1) times>>) /\
+         (<<CONSISTENT: pf_consistent_special e2 (ftr_cancel ++ ftr1) times>>) /\
          (<<CANCELNORMAL: cancel_normal_trace (ftr_cancel ++ ftr1)>>)>>) /\
 
     (<<MAPLT: mapping_map_lt f>>) /\
@@ -988,38 +1180,18 @@ Definition pf_consistent_super_strong_aux2 lang (e0:Thread.t lang)
                    (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
                ((<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>)))).
 
-Lemma ident_map_compose_tevent_weak f te0 te1 te2
-      (MAP0: tevent_map_weak f te1 te0)
-      (MAP1: tevent_map_weak ident_map te2 te1)
+Lemma thread_trace_trace_match_map lang (ttr: ThreadTrace.t lang) (tr: Trace.t)
+      (MATCH: List.Forall2
+                (fun the lce =>
+                   (fst the).(Thread.local) = (fst lce) /\
+                   (snd the) = (snd lce)) ttr tr)
   :
-    tevent_map_weak f te2 te0.
+    tr = List.map (fun the => ((fst the).(Thread.local), snd the)) ttr.
 Proof.
-  inv MAP0; inv MAP1; econs.
-  { inv FROM0. auto. }
-  { inv TO0. auto. }
-  { inv TO0. eauto. }
-  { inv FROM0. eauto. }
-  { inv TO0. eauto. }
-  { inv FROM0. eauto. }
-  { inv TO0. eauto. }
+  ginduction ttr; eauto; i; ss.
+  { inv MATCH. ss. }
+  { inv MATCH. f_equal; eauto. destruct a, y. ss. des. clarify. }
 Qed.
-
-Lemma ident_map_compose_tevent_weak2 f te0 te1 te2
-      (MAP0: tevent_map_weak ident_map te1 te0)
-      (MAP1: tevent_map_weak f te2 te1)
-  :
-    tevent_map_weak f te2 te0.
-Proof.
-  inv MAP0; inv MAP1; econs.
-  { inv FROM. auto. }
-  { inv TO. auto. }
-  { inv TO. eauto. }
-  { inv FROM. eauto. }
-  { inv TO. eauto. }
-  { inv FROM. eauto. }
-  { inv TO. eauto. }
-Qed.
-
 
 Lemma pf_consistent_super_strong_aux_aux2
       lang (th: Thread.t lang) tr times
@@ -1062,16 +1234,17 @@ Proof.
   exploit CONSISTENT; eauto.
   { i. eapply TM. }
   i. des.
+  exploit ThreadTrace.trace_steps_thread_trace_steps; eauto. i. des.
   hexploit (@cap_flex_future_memory_map th.(Thread.memory)); eauto.
   { i. eapply TM. }
   { i. left. eapply TM. }
   intros MEMORY. destruct e1. ss.
-  hexploit trace_steps_map.
+  hexploit thread_trace_steps_map.
   { eapply ident_map_le; eauto. }
   { eapply ident_map_bot; eauto. }
   { eapply ident_map_eq; eauto. }
   { eapply List.Forall_forall. i. eapply ident_map_mappable_evt. }
-  { eapply STEPS. }
+  { eapply STEPS0. }
   { ss. }
   { ss. }
   { ss. }
@@ -1082,75 +1255,197 @@ Proof.
   { eapply Memory.closed_timemap_bot; eauto. eapply CLOSED. }
   { eapply Memory.closed_timemap_bot; eauto.
     eapply cap_flex_closed; eauto. i. eapply TM. }
-  { eapply ident_map_local. }
-  { eauto. }
-  { eapply mapping_map_lt_collapsable_unwritable. eapply ident_map_lt. }
-  { eapply ident_map_timemap. }
-  { refl. }
-  i. des. esplits; eauto.
-  eapply List.Forall_forall. i.
-  eapply list_Forall2_in in H; eauto. des.
-  eapply List.Forall_forall in IN; eauto. ss. des.
-  destruct a, x. ss. splits; auto.
-  { inv EVENT; ss. inv FROM. inv TO. inv KIND; ss.
-    inv MSG0; ss. inv MSG; ss. inv MAP0; ss. }
-  { inv EVENT; ss. }
-  { inv EVENT; ss.
-    { inv TO. ii. eapply SAT2. ii. eapply H. des; auto.
-      right. right. eapply TimeFacts.le_lt_lt; eauto. apply TM. }
-    { inv FROM. ii. eapply SAT2. ii. eapply H. des; auto.
-      right. right. eapply TimeFacts.le_lt_lt; eauto. apply TM. }
+  { econs; eauto.
+    { eapply ident_map_local. }
+    { eapply mapping_map_lt_collapsable_unwritable. eapply ident_map_lt. }
+    { eapply ident_map_timemap. }
+    { refl. }
   }
-  { inv EVENT; ss.
-    { inv TO. inv FROM. inv KIND; ss. ii. eapply SAT1; eauto.
-      des. split; auto. red. etrans; eauto. eapply TM. }
-    { inv TO. inv FROM. ii. eapply SAT1; eauto.
-      des. split; auto. red. etrans; eauto. eapply TM. }
-    { inv TO. inv FROM. ii. eapply SAT1; eauto.
-      des. split; auto. red. etrans; eauto. eapply TM. }
+  i. des.
+  exploit ThreadTrace.thread_trace_steps_trace_steps; eauto. i. des.
+  assert (LCTRACE: List.Forall2
+                     (fun em fem : Local.t * ThreadEvent.t => tevent_map ident_map (snd fem) (snd em)) ftr tr0).
+  { eapply list_Forall2_compose.
+    { eapply list_Forall2_rev. eauto. }
+    { eapply list_Forall2_compose.
+      { eauto. }
+      { eauto. }
+      simpl. i.
+      instantiate (1:=fun em fem => tevent_map ident_map (snd fem) (snd em)).
+      ss. des. rewrite SAT2 in *. auto.
+    }
+    i. ss. des. rewrite SAT2 in *. auto.
   }
-  { inv EVENT; ss.
-    { inv FROM. inv TO. auto. }
-    { inv FROM. inv TO. auto. }
-    { inv FROM. inv TO. auto. }
+  assert (FEVENTS: List.Forall
+                     (fun em : Local.t * ThreadEvent.t =>
+                        ((((promise_free (snd em) /\ no_sc (snd em)) /\
+                           no_read_msgs
+                             (fun (loc : Loc.t) (ts : Time.t) =>
+                                ~
+                                  (covered loc ts (Local.promises (Thread.local th)) \/
+                                   concrete_promised (Thread.memory th) loc ts \/ Time.lt (tm loc) ts))
+                             (snd em)) /\
+                          write_not_in
+                            (fun (loc : Loc.t) (ts : Time.t) =>
+                               Time.le ts (tm loc) /\ ~ covered loc ts (Local.promises (Thread.local th)))
+                            (snd em)) /\ wf_time_evt times (snd em)) /\
+                        ThreadEvent.get_machine_event (snd em) = MachineEvent.silent) tr0).
+  { esplits; eauto.
+    eapply List.Forall_forall. i.
+    eapply list_Forall2_in in H; eauto. des.
+    eapply List.Forall_forall in IN; eauto. ss. des.
+    destruct a, x. ss. splits; auto.
+    { inv SAT; ss. inv FROM. inv TO. inv KIND; ss.
+      inv MSG0; ss. inv MSG; ss. inv MAP1; ss. }
+    { inv SAT; ss. }
+    { inv SAT; ss.
+      { inv TO. ii. eapply SAT3. ii. eapply H. des; auto.
+        right. right. eapply TimeFacts.le_lt_lt; eauto. apply TM. }
+      { inv FROM. ii. eapply SAT3. ii. eapply H. des; auto.
+        right. right. eapply TimeFacts.le_lt_lt; eauto. apply TM. }
+    }
+    { inv SAT; ss.
+      { inv TO. inv FROM. inv KIND; ss. ii. eapply SAT2; eauto.
+        des. split; auto. red. etrans; eauto. eapply TM. }
+      { inv TO. inv FROM. ii. eapply SAT2; eauto.
+        des. split; auto. red. etrans; eauto. eapply TM. }
+      { inv TO. inv FROM. ii. eapply SAT2; eauto.
+        des. split; auto. red. etrans; eauto. eapply TM. }
+    }
+    { inv SAT; ss.
+      { inv FROM. inv TO. auto. }
+      { inv FROM. inv TO. auto. }
+      { inv FROM. inv TO. auto. }
+    }
+    { inv SAT; ss. }
   }
-  { inv EVENT; ss. }
+  esplits; eauto.
   { unfold cancel_normal_trace in *. des. subst.
-    eapply List.Forall2_app_inv_l in TRACE0. des. subst. esplits; eauto.
+    eapply List.Forall2_app_inv_l in LCTRACE. des. subst. esplits; eauto.
     { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
-      destruct a, x. ss. eapply List.Forall_forall in IN; eauto. ss. inv EVENT; ss. inv KIND; ss. }
+      destruct a, x. ss. eapply List.Forall_forall in IN; eauto. ss. inv SAT; ss. inv KIND; ss. }
     { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
-      destruct a, x. ss. eapply List.Forall_forall in IN; eauto. ss. inv EVENT; ss. inv KIND; ss. }
+      destruct a, x. ss. eapply List.Forall_forall in IN; eauto. ss. inv SAT; ss. inv KIND; ss. }
   }
-  { i. subst. eapply List.Forall2_app_inv_r in TRACE0. des. subst.
-    exploit SPLIT; eauto.
-    { eapply List.Forall_forall. i. eapply list_Forall2_in2 in H; eauto. des.
-      destruct b, x. ss. eapply List.Forall_forall in IN; eauto. ss. inv EVENT; ss. inv KIND; ss. }
-    i. des. destruct e2. ss.
+  { i. subst.
+    assert (exists l1 l2 e_mid fe_mid,
+               (<<EQ: ftr = l1 ++ l2>>) /\
+               (<<STEPSCAP1: Trace.steps
+                               l1
+                               (Thread.mk _ th.(Thread.state) th.(Thread.local) TimeMap.bot cap) e_mid>>) /\
+               (<<STEPSCAP2: Trace.steps
+                               l2
+                               e_mid
+                               (Thread.mk _ state local sc memory)>>) /\
+               (<<STEPSMEM: Trace.steps
+                              ftr1
+                              (Thread.mk _ th.(Thread.state) th.(Thread.local) TimeMap.bot mem1) fe_mid>>) /\
+               (<<MAP: thread_map ident_map e_mid fe_mid>>) /\
+               (<<LCTRACE0: List.Forall2
+                             (fun em fem => tevent_map ident_map (snd fem) (snd em))
+                             l1 ftr1>>) /\
+               (<<LCTRACE1: List.Forall2
+                              (fun em fem => tevent_map ident_map (snd fem) (snd em))
+                              l2 ftr2>>)).
+    { clear SPLIT CANCELNORMAL EVENTS x1 CAP MAPLT MAPIDENT BOUND FEVENTS.
+      eapply List.Forall2_app_inv_r in MATCH0. des. subst.
+      eapply List.Forall2_app_inv_r in TRACE0. des. subst.
+      eapply ThreadTrace.steps_separate in STEPS0. des.
+      eapply ThreadTrace.steps_separate in STEPS1. des.
+      eapply ThreadTrace.thread_trace_steps_trace_steps in STEPS3.
+      dup STEPS4. eapply ThreadTrace.thread_trace_steps_trace_steps in STEPS4.
+      eapply ThreadTrace.thread_trace_steps_trace_steps in STEPS0. des.
+      assert (ftr1 = tr0).
+      { eapply thread_trace_trace_match_map in MATCH2.
+        eapply thread_trace_trace_match_map in MATCH0. subst. auto. }
+      subst.
+      assert (ftr = tr2 ++ tr1).
+      { eapply thread_trace_trace_match_map in MATCH.
+        eapply thread_trace_trace_match_map in MATCH4.
+        eapply thread_trace_trace_match_map in MATCH3. subst.
+        eapply List.map_app. }
+      subst. esplits; eauto.
+      { destruct l3.
+        { inv TRACE1. inv MATCH1. inv NORMAL. inv MATCH3.
+          inv STEPS5; ss. inv STEPS0; ss. }
+        { inv TRACE1. inv MATCH1. inv MATCH3.
+          inv STEPS5; ss. inv STEPS1; ss. clarify. ss. des. auto. }
+      }
+      { eapply list_Forall2_compose.
+        { eapply list_Forall2_rev. eapply MATCH4. }
+        { eapply list_Forall2_compose.
+          { eapply TRACE0. }
+          { eauto. }
+          { simpl. i. instantiate (1:=fun em fem =>tevent_map ident_map (snd fem) (snd em)).
+            ss. des. rewrite SAT2 in *. auto. }
+        }
+        { i. ss. des. rewrite SAT2 in *. auto. }
+      }
+      { eapply list_Forall2_compose.
+        { eapply list_Forall2_rev. eapply MATCH3. }
+        { eapply list_Forall2_compose.
+          { eapply TRACE1. }
+          { eauto. }
+          { simpl. i. instantiate (1:=fun em fem =>tevent_map ident_map (snd fem) (snd em)).
+            ss. des. rewrite SAT2 in *. auto. }
+        }
+        { i. ss. des. rewrite SAT2 in *. auto. }
+      }
+    }
+    clear LCTRACE. des. exploit SPLIT; eauto.
+    { clear - LCTRACE1 NORMAL.
+      eapply List.Forall_forall. i. eapply list_Forall2_in2 in H; eauto.
+      des. eapply List.Forall_forall in IN; eauto. ss.
+      destruct b, x. ss. inv SAT; ss. inv KIND; ss. }
+    i. des.
+    inv MAP0. destruct e2. ss.
 
-    hexploit trace_steps_map.
+    exploit Trace.steps_future; try apply STEPSCAP1; eauto.
+    { eapply cap_flex_wf; eauto. }
+    { eapply Memory.closed_timemap_bot; eauto.
+      eapply cap_flex_closed; eauto. i. eapply TM. }
+    { eapply cap_flex_closed; eauto. i. eapply TM. } i. des. ss.
+    exploit Trace.steps_future; try apply STEPSMEM; eauto.
+    { eapply Memory.closed_timemap_bot; eauto. eapply CLOSED. } i. des. ss.
+
+    hexploit trace_steps_map; try apply STEPS3.
     { eapply ident_map_le; eauto. }
     { eapply ident_map_bot; eauto. }
     { eapply ident_map_eq; eauto. }
     { eapply List.Forall_forall. i. eapply ident_map_mappable_evt. }
-    { eapply STEPS1. }
     { ss. }
     { ss. }
     { ss. }
-    { eapply cap_flex_wf; eauto. }
-    { eapply LOCAL. }
     { eauto. }
-    { eapply cap_flex_closed; eauto. i. eapply TM. }
-    { eapply Memory.closed_timemap_bot; eauto. eapply CLOSED. }
-    { eapply Memory.closed_timemap_bot; eauto.
-      eapply cap_flex_closed; eauto. i. eapply TM. }
-    { eapply ident_map_local. }
+    { eapply WF0. }
+    all: eauto. i. des.
+    eexists ftr, ftr_cancel, _. splits.
+    { eapply Trace.steps_trans.
+      { eapply STEPSMEM. }
+      { eapply STEPS4. }
+    }
+    { clear - TM RESERVE TRACE1. eapply List.Forall_forall. i.
+      eapply list_Forall2_in in H; eauto. des.
+      eapply List.Forall_forall in IN; eauto. ss. des.
+      destruct a, x. ss. unfold ident_map in *.
+      inv EVENT; ss; des; subst; eauto. inv MSG; inv KIND; ss. splits; auto.
+      ii. eapply IN0; eauto. des. splits; auto. etrans; eauto. eapply TM. }
     { eauto. }
-    { eapply mapping_map_lt_collapsable_unwritable. eapply ident_map_lt. }
-    { eapply ident_map_timemap. }
-    { refl. }
-    i. des. eapply List.Forall2_app_inv_l in TRACE2. des.
-    admit.
+    { eapply pf_consistent_speciali_events_map with (tr1 := ftr_cancel ++ ftr2) in CONSISTENT0; cycle 1.
+      { eapply list_Forall2_app.
+        { eapply list_Forall_refl_Forall2; eauto. eapply List.Forall_forall.
+          ii. destruct x. ss. destruct t0; econs; ss. }
+        { eapply list_Forall2_impl; eauto. i. eapply tevent_map_tevent_map_weak; eauto. }
+      }
+      { eapply Trace.steps_future in STEPS3; eauto. des.
+        eapply Trace.steps_future in STEPS4; eauto. des.
+        eapply ident_map_pf_consistent_super_strong_easy; eauto.
+        econs; eauto.
+        eapply mapping_map_lt_collapsable_unwritable; eauto. eapply ident_map_lt; eauto.
+      }
+    }
+    { exists ftr_cancel, ftr2. splits; auto.
+      eapply List.Forall_impl; eauto. i. ss. des. auto. }
   }
   { ii. exploit BOUND; eauto. i. des. split; auto.
     etrans; eauto. eapply TM. }
@@ -1162,11 +1457,12 @@ Proof.
     { left. esplits; eauto. eapply failure_step_map; eauto.
       { eapply ident_map_le. }
       { eapply ident_map_eq. }
+      { inv MAP. auto. }
     }
-    { right. inv LOCAL0. rewrite PROMISES in *.
+    { right. inv MAP. inv LOCAL0. rewrite PROMISES in *.
       eapply bot_promises_map; eauto. }
   }
-Admitted.
+Qed.
 
 Lemma pf_consistent_super_strong_easy_promise_consistent lang (e0: Thread.t lang) tr times
       (CONSISTENT: pf_consistent_super_strong_easy e0 tr times)
@@ -1300,8 +1596,9 @@ Proof.
     esplits; eauto.
     { eapply List.Forall_impl; eauto. i. ss. des. splits; auto.
       eapply write_not_in_mon; eauto. i. ss. des. splits; auto. etrans; eauto. }
+    { eapply pf_consistent_speciali_strong_easy in CONSISTENT0; eauto. }
     { eapply Trace.steps_future in STEPS2; eauto.
-      { ss. des.
+      { ss. des. eapply pf_consistent_speciali_strong_easy in CONSISTENT0; eauto.
         eapply pf_consistent_super_strong_easy_promise_consistent in CONSISTENT0; eauto. }
       { ss. eapply Memory.closed_timemap_bot. eapply CLOSED. }
     }

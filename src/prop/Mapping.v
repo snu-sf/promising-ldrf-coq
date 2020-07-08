@@ -2552,6 +2552,50 @@ Section MAPPED.
       i. des. esplits; eauto.
   Qed.
 
+  Lemma thread_trace_steps_map
+        lang (th0 th1 fth0: Thread.t lang) st0 st1 lc0 lc1 flc0
+        sc0 sc1 fsc0 mem0 mem1 fmem0 tr
+        (PRED: List.Forall (fun em => mappable_evt (snd em)) tr)
+        (STEPS: ThreadTrace.steps tr th0 th1)
+        (TH_TGT0: th0 = Thread.mk lang st0 lc0 sc0 mem0)
+        (TH_TGT1: th1 = Thread.mk lang st1 lc1 sc1 mem1)
+        (TH_SRC: fth0 = Thread.mk lang st0 flc0 fsc0 fmem0)
+        (LCWF0: Local.wf lc0 mem0)
+        (LCWF1: Local.wf flc0 fmem0)
+        (CLOSED0: Memory.closed fmem0)
+        (CLOSED1: Memory.closed mem0)
+        (CLOSEDSC0: Memory.closed_timemap fsc0 fmem0)
+        (CLOSEDSC1: Memory.closed_timemap sc0 mem0)
+        (MAP: thread_map th0 fth0)
+    :
+      exists ftr flc1 fmem1 fsc1,
+        (<<STEPS: ThreadTrace.steps ftr fth0 (Thread.mk lang st1 flc1 fsc1 fmem1)>>) /\
+        (<<MAP: thread_map th1 (Thread.mk lang st1 flc1 fsc1 fmem1)>>) /\
+        (<<TRACE: List.Forall2 (fun the fthe => <<EVENT: tevent_map (snd fthe) (snd the)>> /\ <<THREAD: thread_map (fst the) (fst fthe)>>) tr ftr>>)
+  .
+  Proof.
+    ginduction STEPS; i; ss; clarify.
+    - esplits; eauto.
+    - ss. destruct th1. inv PRED. inv MAP. ss. exploit step_map; ss.
+      { instantiate (1:=mappable_evt). ss. }
+      { econs; eauto. econs; eauto. }
+      { eauto. }
+      { eapply LCWF1. }
+      { eauto. }
+      { eauto. }
+      { eauto. }
+      { eauto. }
+      i. des.
+      exploit Thread.step_future; try apply STEP; ss. i. des.
+      inv STEP0. exploit Thread.step_future; try apply STEP1; ss. i. des.
+      exploit IHSTEPS; try apply STEPS; eauto.
+      { econs; eauto.
+        eapply collapsable_unwritable_step in STEP; eauto. }
+      i. des. esplits; eauto. econs; eauto.
+      splits; auto. econs; eauto.
+  Qed.
+
+
 End MAPPED.
 
 
