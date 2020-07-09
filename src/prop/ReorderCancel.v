@@ -395,7 +395,10 @@ Proof.
         { econs. econs 1. econs; eauto. }
         { ss. }
       * econs.
-        { econs. econs 2. econs; eauto; ss. eauto. }
+        { econs. econs 2. instantiate (1:=ThreadEvent.syscall e).
+          econs; eauto; ss. econs; eauto. inv STEP1. rewrite PROMISES in *.
+          inv PROMISE. ss. eapply Memory.remove_get0 in PROMISES0.
+          des. erewrite Memory.bot_get in GET. ss. }
         { ss. }
       * ss.
     + esplits.

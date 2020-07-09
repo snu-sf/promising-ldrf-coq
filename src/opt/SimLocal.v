@@ -84,7 +84,7 @@ Proof.
   exploit COMPLETE; eauto.
   - apply Memory.bot_get.
   - rewrite SimPromises.bot_spec. ss.
-Qed.  
+Qed.
 
 Lemma sim_local_promise
       pview
@@ -554,6 +554,7 @@ Proof.
   - exploit sim_local_fence; eauto; try refl. i. des.
     esplits; (try by econs; [|econs 5]; eauto); ss.
   - exploit sim_local_fence; eauto; try refl. i. des.
+    eapply sim_local_memory_bot in PROMISES; eauto.
     esplits; (try by econs; [|econs 6]; eauto); ss.
   - exploit sim_local_failure; eauto. i. des.
     esplits; (try by econs; [|econs 7]; eauto); ss.

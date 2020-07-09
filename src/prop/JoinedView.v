@@ -1095,6 +1095,17 @@ Module JSim.
     eapply View.unwrap_opt_le in RELEASED. inv RELEASED. auto.
   Qed.
 
+  Lemma sim_local_memory_bot views lc_src lc_tgt
+        (SIM: sim_local views lc_src lc_tgt)
+        (BOT: Local.promises lc_tgt = Memory.bot)
+    :
+      Local.promises lc_src = Memory.bot.
+  Proof.
+    inv SIM. ss. eapply Memory.ext. i.
+    specialize (PROMISES loc ts). inv PROMISES; eauto.
+    erewrite Memory.bot_get in H. clarify.
+  Qed.
+
   Lemma sim_local_promise
         views1
         lc1_src mem1_src
@@ -2178,7 +2189,8 @@ Module JSim.
         { refl. } i. des.
         exists (ThreadEvent.syscall e). esplits.
         * econs.
-          { econs 2; eauto. econs; eauto. }
+          { econs 2; eauto. econs; eauto. econs; eauto.
+            eapply sim_local_memory_bot; eauto. }
           { ss. }
           { ss. }
           { ss. }
@@ -2271,17 +2283,6 @@ Module JSim.
       eapply Memory.cap_le in GET; eauto. refl.
     - i. eapply List.Forall_impl; try apply CLOSED0; eauto.
       i. ss. eapply Memory.cap_closed_view; eauto.
-  Qed.
-
-  Lemma sim_local_memory_bot views lc_src lc_tgt
-        (SIM: sim_local views lc_src lc_tgt)
-        (BOT: Local.promises lc_tgt = Memory.bot)
-    :
-      Local.promises lc_src = Memory.bot.
-  Proof.
-    inv SIM. ss. eapply Memory.ext. i.
-    specialize (PROMISES loc ts). inv PROMISES; eauto.
-    erewrite Memory.bot_get in H. clarify.
   Qed.
 
   Lemma sim_thread_consistent lang views (th_src th_tgt: Thread.t lang)

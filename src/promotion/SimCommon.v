@@ -508,7 +508,7 @@ Module SimCommon.
     <<PREV: prev_released_le_loc l loc from mem_src (get_released_src strong l loc released_tgt tview_src released_prev)>>.
   Proof.
     unfold prev_released_le_loc. rewrite GET.
-    unfold get_released_src, LocFun.add. 
+    unfold get_released_src, LocFun.add.
     econs; repeat (condtac; ss); eauto using Time.join_r.
   Qed.
 
@@ -2108,6 +2108,13 @@ Module SimCommon.
     - exploit fence_step; eauto. i. des.
       esplits; [econs 5|..]; eauto.
     - exploit fence_step; eauto. i. des.
+      assert (BOT: lc1_src.(Local.promises) = Memory.bot).
+      { inv LC1. inv PROMISES0. eapply Memory.ext. i. rewrite Memory.bot_get.
+        destruct (Memory.get loc ts (Local.promises lc1_src)) as [[from msg]|] eqn:GET; ss.
+        eapply SOUND in GET.
+        { des. erewrite PROMISES in *. erewrite Memory.bot_get in *. ss. }
+        { ii. subst. erewrite PROMISES1 in *. ss. }
+      }
       esplits; [econs 6|..]; eauto; refl.
     - exploit failure_step; eauto. i. des.
       esplits; [econs 7|..]; eauto.

@@ -2430,6 +2430,8 @@ Section MAPPED.
         esplits; eauto.
         * econs; eauto.
         * econs; eauto. econs 2; eauto. econs; eauto.
+          inv LOCAL. rewrite PROMISES0 in *.
+          eapply bot_promises_map in PROMISES1; eauto.
       + inv LOCAL1. esplits; eauto.
         * econs; eauto.
         * econs; eauto. econs 2; eauto. econs; eauto.

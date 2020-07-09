@@ -247,7 +247,9 @@ Proof.
         (try by apply rtc_lang_tau_step_rtc_thread_tau_step; eauto);
         (try exact SC).
       * ss.
-      * econs 2. econs 2. econs; [|econs 6]; eauto.
+      * econs 2. econs 2.
+        eapply sim_local_memory_bot in PROMISES; eauto.
+        econs; [|econs 6]; eauto.
       * ss.
       * ss.
       * ss.

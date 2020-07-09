@@ -289,7 +289,8 @@ Module Local.
   | step_syscall
       lc1 sc1 mem1
       e lc2 sc2
-      (LOCAL: Local.fence_step lc1 sc1 Ordering.seqcst Ordering.seqcst lc2 sc2):
+      (LOCAL: Local.fence_step lc1 sc1 Ordering.seqcst Ordering.seqcst lc2 sc2)
+      (PROMISES: lc1.(Local.promises) = Memory.bot):
       program_step (ThreadEvent.syscall e) lc1 sc1 mem1 lc2 sc2 mem1
   | step_failure
       lc1 sc1 mem1
