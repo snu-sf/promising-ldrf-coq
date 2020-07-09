@@ -29,6 +29,28 @@ Require Import PFConsistentStrong.
 Set Implicit Arguments.
 
 
+
+Inductive times_configuration_step_strong (times: Loc.t -> Time.t -> Prop)
+  : forall (tr tr_cert: Trace.t)
+           (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
+| times_configuration_step_strong_intro
+    lang tr e tr' pf tid c1 st1 lc1 e2 st3 lc3 sc3 memory3 tr_cert
+    (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
+    (STEPS: Trace.steps tr' (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
+    (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr')
+    (STEP: Thread.step pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
+    (TR: tr = tr'++[(e2.(Thread.local), e)])
+    (CONSISTENT: forall (EVENT: e <> ThreadEvent.failure),
+        pf_consistent_super_strong (Thread.mk _ st3 lc3 sc3 memory3) tr_cert times)
+    (CERTBOT: e = ThreadEvent.failure -> tr_cert = [])
+    (CERTBOTNIL: lc3.(Local.promises) = Memory.bot -> tr_cert = [])
+    (TIMES: List.Forall (fun thte => wf_time_evt times (snd thte)) tr)
+  :
+    times_configuration_step_strong
+      times tr tr_cert
+      (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
+.
+
 Inductive times_configuration_step (times: Loc.t -> Time.t -> Prop)
   : forall (tr tr_cert: Trace.t)
            (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
@@ -41,7 +63,7 @@ Inductive times_configuration_step (times: Loc.t -> Time.t -> Prop)
     (TR: tr = tr'++[(e2.(Thread.local), e)])
     (CONSISTENT: forall (EVENT: e <> ThreadEvent.failure),
         pf_consistent_super_strong (Thread.mk _ st3 lc3 sc3 memory3) tr_cert times)
-    (CERTNIL: e = ThreadEvent.failure -> tr_cert = [])
+    (CERTBOT: e = ThreadEvent.failure -> tr_cert = [])
     (TIMES: List.Forall (fun thte => wf_time_evt times (snd thte)) tr)
   :
     times_configuration_step
@@ -49,11 +71,18 @@ Inductive times_configuration_step (times: Loc.t -> Time.t -> Prop)
       (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
 .
 
-Inductive times_configuration_step_all (times: Loc.t -> Time.t -> Prop)
+Lemma times_configuration_step_strong_step
+  :
+    times_configuration_step_strong <7= times_configuration_step.
+Proof.
+  i. inv PR. econs; eauto.
+Qed.
+
+Inductive times_configuration_step_strong_all (times: Loc.t -> Time.t -> Prop)
           (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t): Prop :=
-| times_configuration_step_all_intro
+| times_configuration_step_strong_all_intro
     tr tr_cert
-    (STEP: @times_configuration_step times tr tr_cert e tid c1 c2)
+    (STEP: @times_configuration_step_strong times tr tr_cert e tid c1 c2)
 .
 
 Lemma times_configuration_step_configuration_step times tr tr_cert e tid c1 c2
@@ -111,6 +140,17 @@ Proof.
   { splits; auto. refl. }
 Qed.
 
+Lemma times_configuration_step_strong_mon times0 times1
+      (LE: times0 <2= times1)
+  :
+    times_configuration_step_strong times0 <6= times_configuration_step_strong times1.
+Proof.
+  i. inv PR. econs; eauto.
+  { i. hexploit CONSISTENT; eauto. i. des. esplits; eauto.
+    eapply pf_consistent_super_strong_mon; eauto. }
+  { eapply List.Forall_impl; eauto. i. eapply wf_time_evt_mon; eauto. }
+Qed.
+
 Lemma times_configuration_step_mon times0 times1
       (LE: times0 <2= times1)
   :
@@ -122,12 +162,12 @@ Proof.
   { eapply List.Forall_impl; eauto. i. eapply wf_time_evt_mon; eauto. }
 Qed.
 
-Lemma times_configuration_step_all_mon times0 times1
+Lemma times_configuration_step_strong_all_mon times0 times1
       (LE: times0 <2= times1)
   :
-    times_configuration_step_all times0 <4= times_configuration_step_all times1.
+    times_configuration_step_strong_all times0 <4= times_configuration_step_strong_all times1.
 Proof.
-  i. inv PR. econs. eapply times_configuration_step_mon; eauto.
+  i. inv PR. econs. eapply times_configuration_step_strong_mon; eauto.
 Qed.
 
 Lemma times_configuration_step_exists c0 c1 tid e
@@ -135,7 +175,7 @@ Lemma times_configuration_step_exists c0 c1 tid e
       (WF: Configuration.wf c0)
   :
     exists times tr tr_cert,
-      (<<STEP: @times_configuration_step times tr tr_cert e tid c0 c1>>) /\
+      (<<STEP: @times_configuration_step_strong times tr tr_cert e tid c0 c1>>) /\
       (<<WO: forall loc, well_ordered (times loc)>>).
 Proof.
   inv STEP.
@@ -158,19 +198,34 @@ Proof.
     dup WF. inv WF. exploit Trace.steps_future; eauto.
     { ss. eapply WF1; eauto. } i. des. ss.
     hexploit Thread.step_future; eauto. i. des. ss.
-    eapply consistent_pf_consistent_super_strong in H; eauto.
-    des. eexists (certimes \2/ (fun loc ts => List.In ts (times loc ++ times0 loc))), (tr++_), tr0. splits.
-    { econs; eauto.
-      { i. esplits. eapply pf_consistent_super_strong_mon; eauto. }
-      { i. ss. }
-      { eapply Forall_app.
-        { eapply List.Forall_impl; eauto. i. eapply wf_time_evt_mon; try apply H.
-          i. ss. right. eapply List.in_or_app; eauto. }
-        { econs; ss. eapply wf_time_evt_mon; try apply WFTIME0.
-          i. ss. right. eapply List.in_or_app; eauto. }
+    eapply consistent_pf_consistent_super_strong in H; eauto. des.
+    destruct (classic (lc3.(Local.promises) = Memory.bot)) as [EQBOT|NEQBOT].
+    { des. eexists (certimes \2/ (fun loc ts => List.In ts (times loc ++ times0 loc))), (tr++_), []. splits.
+      { econs; eauto.
+        { i. esplits. eapply promises_bot_certify_nil; eauto. }
+        { eapply Forall_app.
+          { eapply List.Forall_impl; eauto. i. eapply wf_time_evt_mon; try apply H.
+            i. ss. right. eapply List.in_or_app; eauto. }
+          { econs; ss. eapply wf_time_evt_mon; try apply WFTIME0.
+            i. ss. right. eapply List.in_or_app; eauto. }
+        }
       }
+      { i. eapply join_well_ordered; eauto. eapply finite_well_ordered. }
     }
-    { i. eapply join_well_ordered; eauto. eapply finite_well_ordered. }
+    { des. eexists (certimes \2/ (fun loc ts => List.In ts (times loc ++ times0 loc))), (tr++_), tr0. splits.
+      { econs; eauto.
+        { i. esplits. eapply pf_consistent_super_strong_mon; eauto. }
+        { i. ss. }
+        { ii. ss. }
+        { eapply Forall_app.
+          { eapply List.Forall_impl; eauto. i. eapply wf_time_evt_mon; try apply H.
+            i. ss. right. eapply List.in_or_app; eauto. }
+          { econs; ss. eapply wf_time_evt_mon; try apply WFTIME0.
+            i. ss. right. eapply List.in_or_app; eauto. }
+        }
+      }
+      { i. eapply join_well_ordered; eauto. eapply finite_well_ordered. }
+    }
   }
 Qed.
 
@@ -179,7 +234,7 @@ Lemma times_configuration_step_same_behaviors c beh
       (BEH: behaviors Configuration.step c beh)
   :
     exists times,
-      (<<BEH: behaviors (times_configuration_step_all times) c beh>>) /\
+      (<<BEH: behaviors (times_configuration_step_strong_all times) c beh>>) /\
       (<<WO: forall loc, well_ordered (times loc)>>) /\
       (<<INCR: forall nat loc, times loc (incr_time_seq nat)>>) /\
       (<<BOT: forall loc, times loc Time.bot>>)
@@ -200,9 +255,9 @@ Proof.
     exploit times_configuration_step_exists; eauto. i. des.
     exists (times \2/ times0). splits.
     { econs 2; eauto.
-      { econs. eapply times_configuration_step_mon; eauto. }
+      { econs. eapply times_configuration_step_strong_mon; eauto. }
       { eapply le_step_behavior_improve; try apply BEH0.
-        eapply times_configuration_step_all_mon; auto. }
+        eapply times_configuration_step_strong_all_mon; auto. }
     }
     { i. eapply join_well_ordered; eauto. }
     { auto. }
@@ -211,7 +266,7 @@ Proof.
   { i. exploit times_configuration_step_exists; eauto. i. des.
     exists (times \2/ (fun loc => incr_times) \2/ (fun _ => eq Time.bot)). splits; eauto.
     { econs 3; eauto. econs; eauto.
-      eapply times_configuration_step_mon; eauto. }
+      eapply times_configuration_step_strong_mon; eauto. }
     { i. eapply join_well_ordered; eauto.
       { eapply join_well_ordered; eauto. eapply incr_times_well_ordered. }
       { eapply singleton_well_ordered. }
@@ -223,9 +278,9 @@ Proof.
     exploit times_configuration_step_exists; eauto. i. des.
     exists (times \2/ times0). splits.
     { econs 4; eauto.
-      { econs. eapply times_configuration_step_mon; eauto. }
+      { econs. eapply times_configuration_step_strong_mon; eauto. }
       { eapply le_step_behavior_improve; try apply BEH0.
-        eapply times_configuration_step_all_mon; auto. }
+        eapply times_configuration_step_strong_all_mon; auto. }
     }
     { i. eapply join_well_ordered; eauto. }
     { auto. }

@@ -48,7 +48,7 @@ Lemma PF_sim_configuration_beh L times c_src c_mid c_tgt views prom extra proml
       (WF_TGT: Configuration.wf c_tgt)
       (SIM: sim_configuration L times (fun _ => True) views prom extra proml c_src c_mid c_tgt)
   :
-    behaviors (times_configuration_step_all times) c_tgt <1=
+    behaviors (times_configuration_step_strong_all times) c_tgt <1=
     behaviors (pf_step L) c_src.
 Proof.
   i. ginduction PR; i.
@@ -67,6 +67,7 @@ Proof.
                                        (all_promises (fun tid' => tid <> tid') prom)
                                        (snd the)) (tr ++ tr_cert))).
     { eapply Forall_app_inv in H. des.
+      eapply times_configuration_step_strong_step in STEP0.
       exploit (step_sim_configuration); eauto.
       { instantiate (1:=true). ss. }
       i. des. unguard. des; ss. dep_inv STEPSRC.
@@ -87,7 +88,8 @@ Proof.
                                        (all_promises (fun tid' => tid <> tid') prom)
                                        (snd the)) (tr ++ tr_cert))).
     { eapply Forall_app_inv in H. des.
-       exploit step_sim_configuration; eauto.
+      eapply times_configuration_step_strong_step in STEP0.
+      exploit step_sim_configuration; eauto.
       { instantiate (1:=true). ss. }
       i. des. unguard. des; ss.
       { dep_inv STEPSRC. econs 3; eauto. econs; eauto. }
@@ -101,6 +103,7 @@ Proof.
                                        (all_promises (fun tid' => tid <> tid') prom)
                                        (snd the)) (tr ++ tr_cert))).
     { eapply Forall_app_inv in H. des.
+      eapply times_configuration_step_strong_step in STEP0.
       exploit step_sim_configuration; eauto.
       { instantiate (1:=true). ss. }
       i. des. ss. dep_inv STEPSRC.

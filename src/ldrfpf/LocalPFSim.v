@@ -2579,7 +2579,7 @@ Section SIM.
       destruct (classic (e0 = ThreadEvent.failure)).
       { exists [], ident_map. splits; ss.
         { ii. subst. ss. }
-        { exploit CERTNIL; eauto. i. subst. econs. }
+        { exploit CERTBOT; eauto. i. subst. econs. }
       }
       { specialize (CONSISTENT H).
         hexploit good_future_consistent; eauto.
@@ -2651,7 +2651,7 @@ Section SIM.
 
   Lemma configuration_step_certify c0 c1 e tid (tr tr_cert: Trace.t)
         (WF: Configuration.wf c0)
-        (STEP: times_configuration_step times tr tr_cert e tid c0 c1)
+        (STEP: times_configuration_step_strong times tr tr_cert e tid c0 c1)
     :
       exists c2 tr_cert' f e',
         (<<STEP: times_configuration_step times (tr ++ tr_cert') [] e' tid c0 c2>>) /\
@@ -2671,7 +2671,9 @@ Section SIM.
                        lc.(Local.promises) = Memory.bot>>)))
   .
   Proof.
-    hexploit times_configuration_step_future; eauto. i. des.
+    dup STEP. rename STEP0 into STEPWEAK.
+    eapply times_configuration_step_strong_step in STEPWEAK.
+    exploit times_configuration_step_future; eauto. i. des.
     dup STEP. dep_inv STEP.
     destruct (ThreadEvent.get_machine_event e0) eqn:EVENT.
     { exploit (@concrete_promise_max_timemap_exists memory3 (Local.promises lc3)).
@@ -2779,8 +2781,16 @@ Section SIM.
         }
       }
     }
-    { (* strengthen SC fence *) admit. }
-    { hexploit CERTNIL.
+    { assert (BOT: Local.promises lc3 = Memory.bot).
+      { admit. }
+      hexploit CERTBOTNIL; auto. i. subst.
+      eexists _, [], ident_map. erewrite List.app_nil_r. esplits; eauto.
+      { eapply ident_map_lt. }
+      { left. auto. }
+      { right. splits; ss.
+        i. ss. erewrite IdentMap.gss in TID0. dep_clarify. }
+    }
+    { hexploit CERTBOT.
       { destruct e0; ss. } i. subst.
       eexists _, [], ident_map. erewrite List.app_nil_r. esplits; eauto.
       { eapply ident_map_lt. }
@@ -2816,7 +2826,7 @@ Section SIM.
     { subst. exists c1, [], ident_map, MachineEvent.silent. splits; auto.
       { econs 2. }
       { eapply ident_map_lt. }
-      { dep_inv STEP. exploit CERTNIL; eauto.
+      { dep_inv STEP. exploit CERTBOT; eauto.
         { destruct e; ss. }
         { i. subst. left. econs. }
       }
@@ -2945,7 +2955,7 @@ Section SIM.
 
   Lemma promise_read_race views0 prom0 extra0 proml0
         c_src0 c_mid0 c_tgt0 c_tgt1 e tid tr_tgt tr_cert
-        (STEPTGT: @times_configuration_step times tr_tgt tr_cert e tid c_tgt0 c_tgt1)
+        (STEPTGT: @times_configuration_step_strong times tr_tgt tr_cert e tid c_tgt0 c_tgt1)
         (SIM: sim_configuration (fun _ => True) views0 prom0 extra0 proml0 c_src0 c_mid0 c_tgt0)
         (READ: ~ List.Forall
                  (fun the => no_read_msgs
@@ -2961,7 +2971,8 @@ Section SIM.
                  (<<BEH: forall beh,
                      behaviors (pf_step L) c_src0 (s :: beh)>>)).
   Proof.
-    exploit times_configuration_step_future; eauto. i. des.
+    exploit times_configuration_step_future; eauto.
+    { eapply times_configuration_step_strong_step; eauto. } i. des.
     exploit (@Memory.max_concrete_timemap_exists (Configuration.memory c_tgt1)); eauto.
     { eapply WF2. } intros [max MAX].
     eapply configuration_step_certify in STEPTGT; eauto. des.
