@@ -473,12 +473,4 @@ Section LOCALPF.
     eapply step_pf_racefree_view; eauto.
   Qed.
 
-  Lemma pf_racefree_pf_racefree_tview c
-        (WF: Configuration.wf c)
-        (RACEFREE: pf_racefree_view c)
-    :
-      pf_racefree c.
-  Proof.
-  Admitted.
-
 End LOCALPF.
