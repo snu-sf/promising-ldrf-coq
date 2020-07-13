@@ -158,6 +158,10 @@ Module SimThreadPromotion.
   .
   Hint Constructors sim_thread_reserve.
 
+  Definition sim_thread_all (l: Loc.t) (r: Reg.t): forall (e_src e_tgt: Thread.t lang), Prop :=
+    (sim_thread l r) \2/ (sim_thread_reserve l r).
+  Hint Unfold sim_thread_all.
+
 
   Lemma step_sim_thread_reserve
         l r e1_src e_tgt
@@ -915,64 +919,29 @@ Module SimThreadPromotion.
     esplits; eauto.
   Qed.
 
-  Lemma reorder_cancel
-        lang e e1 e2 e3
+  Lemma reorder_failure_cancel
+        lang e1 e2 e3
         l from to
-        (STEP1: @Thread.step lang true e e1 e2)
-        (STEP2: Thread.step false (ThreadEvent.promise l from to Message.reserve Memory.op_kind_add) e2 e3)
-        (EVENT: ThreadEvent.get_machine_event e <> MachineEvent.silent):
+        (STEP1: @Thread.step lang true ThreadEvent.failure e1 e2)
+        (STEP2: Thread.step false (ThreadEvent.promise l from to Message.reserve Memory.op_kind_add) e2 e3):
     exists e2',
       <<STEP1: Thread.step false (ThreadEvent.promise l from to Message.reserve Memory.op_kind_add) e1 e2'>> /\
-      <<STEP2: Thread.step true e e2' e3>>.
+      <<STEP2: Thread.step true ThreadEvent.failure e2' e3>>.
   Proof.
-    destruct e; ss.
-    - inv STEP1; inv STEP. inv LOCAL. inv LOCAL0. ss.
-      inv STEP2. inv STEP. inv LOCAL. ss.
-      esplits.
-      + econs. econs; ss. econs; eauto.
-      + econs 2. econs; ss. econs. econs; eauto.
-        ii. inv PROMISE. ss. revert GET.
-        erewrite Memory.add_o; eauto. condtac; ss; i.
-        * inv GET. ss.
-        * eapply RELEASE; eauto.
-        * admit.
-    - inv STEP1; inv STEP. inv LOCAL. inv LOCAL0. ss.
-      inv STEP2. inv STEP. inv LOCAL. ss.
-      esplits.
-      + econs. econs; ss. econs; eauto.
-      + econs 2. econs; ss. econs. econs; eauto.
-        ii. inv PROMISE. ss. revert PROMISE0.
-        erewrite Memory.add_o; eauto. condtac; ss; i.
-        eapply CONSISTENT; eauto.
-  Admitted.
-
-  Lemma sim_thread_reserve_rtc_tau_step
-        l r e1_src
-        e1_tgt e2_tgt
-        (SIM1: sim_thread_reserve l r e1_src e1_tgt)
-        (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
-        (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
-        (SC1_SRC: Memory.closed_timemap e1_src.(Thread.sc) e1_src.(Thread.memory))
-        (SC1_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
-        (CLOSED1_SRC: Memory.closed e1_src.(Thread.memory))
-        (CLOSED1_TGT: Memory.closed e1_tgt.(Thread.memory))
-        (STEPS_TGT: rtc (@Thread.tau_step lang) e1_tgt e2_tgt):
-    exists e2_src,
-      <<STEPS_SRC: rtc (@Thread.tau_step lang) e1_src e2_src>> /\
-      <<SIM2: sim_thread l r e2_src e2_tgt>>.
-  Proof.
-    exploit step_reserve_sim_thread; try exact SIM1; eauto. i. des.
-    exploit Thread.step_future; eauto. i. des.
-    exploit sim_thread_rtc_tau_step; try exact SIM2; eauto. i. des.
+    inv STEP1; inv STEP. inv LOCAL. inv LOCAL0. ss.
+    inv STEP2. inv STEP. inv LOCAL. ss.
     esplits.
-    - econs 2; eauto. econs; [econs; eauto|]. ss.
-    - ss.
+    - econs. econs; ss. econs; eauto.
+    - econs 2. econs; ss. econs. econs; eauto.
+      ii. inv PROMISE. ss. revert PROMISE0.
+      erewrite Memory.add_o; eauto. condtac; ss; i.
+      eapply CONSISTENT; eauto.
   Qed.
 
-  Lemma sim_thread_reserve_plus_step
+  Lemma sim_thread_all_plus_step
         l r e1_src
         pf e_tgt e1_tgt e2_tgt e3_tgt
-        (SIM1: sim_thread_reserve l r e1_src e1_tgt)
+        (SIM1: sim_thread_all l r e1_src e1_tgt)
         (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
         (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
         (SC1_SRC: Memory.closed_timemap e1_src.(Thread.sc) e1_src.(Thread.memory))
@@ -980,44 +949,150 @@ Module SimThreadPromotion.
         (CLOSED1_SRC: Memory.closed e1_src.(Thread.memory))
         (CLOSED1_TGT: Memory.closed e1_tgt.(Thread.memory))
         (STEPS_TGT: rtc (@Thread.tau_step lang) e1_tgt e2_tgt)
-        (STEP_TGT: Thread.step pf e_tgt e2_tgt e3_tgt):
+        (STEP_TGT: Thread.step pf e_tgt e2_tgt e3_tgt)
+        (EVENT: forall evt, e_tgt <> ThreadEvent.syscall evt):
     exists e_src e2_src e3_src,
       <<STEPS_SRC: rtc (@Thread.tau_step lang) e1_src e2_src>> /\
       <<STEP_SRC: Thread.opt_step e_src e2_src e3_src>> /\
       <<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>> /\
       <<SIM3: sim_thread_reserve l r e3_src e3_tgt>>.
   Proof.
-    exploit step_reserve_sim_thread; try exact SIM1; eauto. i. des.
-    exploit Thread.step_future; eauto. i. des.
-    exploit sim_thread_plus_step; try exact SIM2; eauto. i. des.
-    exploit Thread.rtc_tau_step_future; try exact STEPS_SRC; eauto. i. des.
-    exploit Thread.opt_step_future; try exact STEP_SRC; eauto. i. des.
-    exploit step_sim_thread_reserve; try exact SIM3; eauto. i. des.
-    destruct (classic (ThreadEvent.get_machine_event e_tgt = MachineEvent.silent)).
-    - exploit Thread.tau_opt_tau; try exact STEPS_SRC; eauto; i.
-      { rewrite EVENT. ss. }
-      esplits.
-      + econs 2; try exact x0. econs; [econs; eauto|]. ss.
-      + econs 2; eauto.
-      + ss.
-      + ss.
-    - inv STEP_SRC; try by (ss; congr).
-      rewrite <- EVENT in H.
-      destruct pf0; cycle 1.
-      { inv STEP1. inv STEP2. ss. }
-      exploit reorder_cancel; try exact STEP1; eauto. i. des.
-      esplits.
-      + econs 2.
-        * econs; [econs; eauto|]. ss.
-        * eapply rtc_n1; try exact STEPS_SRC.
+    inv SIM1.
+    { exploit sim_thread_plus_step; try exact SIM2; eauto. i. des.
+      exploit Thread.rtc_tau_step_future; try exact STEPS_SRC; eauto. i. des.
+      exploit Thread.opt_step_future; try exact STEP_SRC; eauto. i. des.
+      exploit step_sim_thread_reserve; try exact SIM3; eauto. i. des.
+      destruct (classic (ThreadEvent.get_machine_event e_tgt = MachineEvent.silent)).
+      - exploit Thread.tau_opt_tau; try exact STEPS_SRC; eauto; i.
+        { rewrite EVENT0. ss. }
+        esplits.
+        + apply x0.
+        + econs 2; eauto.
+        + ss.
+        + ss.
+      - inv STEP_SRC; try by (ss; congr).
+        destruct e_tgt; ss; try congr.
+        rewrite <- EVENT0 in H0.
+        destruct pf0; [|inv STEP0; inv STEP1; ss].
+        destruct e_src; ss.
+        exploit reorder_failure_cancel; try exact STEP0; eauto. i. des.
+        esplits.
+        + eapply rtc_n1; try exact STEPS_SRC.
           econs; [econs; eauto|]. ss.
-      + econs 2. apply STEP3.
-      + ss.
-      + ss.
+        + econs 2. apply STEP2.
+        + ss.
+        + ss.
+    }
+    { exploit step_reserve_sim_thread; try exact H; eauto. i. des.
+      exploit Thread.step_future; eauto. i. des.
+      exploit sim_thread_plus_step; try exact SIM2; eauto. i. des.
+      exploit Thread.rtc_tau_step_future; try exact STEPS_SRC; eauto. i. des.
+      exploit Thread.opt_step_future; try exact STEP_SRC; eauto. i. des.
+      exploit step_sim_thread_reserve; try exact SIM3; eauto. i. des.
+      destruct (classic (ThreadEvent.get_machine_event e_tgt = MachineEvent.silent)).
+      - exploit Thread.tau_opt_tau; try exact STEPS_SRC; eauto; i.
+        { rewrite EVENT0. ss. }
+        esplits.
+        + econs 2; try exact x0. econs; [econs; eauto|]. ss.
+        + econs 2; eauto.
+        + ss.
+        + ss.
+      - inv STEP_SRC; try by (ss; congr).
+        destruct e_tgt; ss; try congr.
+        rewrite <- EVENT0 in H0.
+        destruct pf0; [|inv STEP1; inv STEP2; ss].
+        destruct e_src; ss.
+        exploit reorder_failure_cancel; try exact STEP1; eauto. i. des.
+        esplits.
+        + econs 2.
+          * econs; [econs; eauto|]. ss.
+          * eapply rtc_n1; try exact STEPS_SRC.
+            econs; [econs; eauto|]. ss.
+        + econs 2. apply STEP3.
+        + ss.
+        + ss.
+    }
+  Qed.
+
+  Lemma sim_thread_all_plus_step_syscall
+        l r e1_src
+        pf e_tgt e1_tgt e2_tgt e3_tgt evt
+        (SIM1: sim_thread_all l r e1_src e1_tgt)
+        (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
+        (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
+        (SC1_SRC: Memory.closed_timemap e1_src.(Thread.sc) e1_src.(Thread.memory))
+        (SC1_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
+        (CLOSED1_SRC: Memory.closed e1_src.(Thread.memory))
+        (CLOSED1_TGT: Memory.closed e1_tgt.(Thread.memory))
+        (STEPS_TGT: rtc (@Thread.tau_step lang) e1_tgt e2_tgt)
+        (STEP_TGT: Thread.step pf e_tgt e2_tgt e3_tgt)
+        (EVENT: e_tgt = ThreadEvent.syscall evt):
+    exists e_src e2_src e3_src,
+      <<STEPS_SRC: rtc (@Thread.tau_step lang) e1_src e2_src>> /\
+      <<STEP_SRC: Thread.step true e_src e2_src e3_src>> /\
+      <<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>> /\
+      <<SIM3: sim_thread l r e3_src e3_tgt>>.
+  Proof.
+    inv SIM1.
+    { exploit sim_thread_plus_step; eauto. i. des.
+      esplits; eauto.
+      destruct e_src; ss. inv STEP_SRC; ss.
+      destruct pf0; [|inv STEP; inv STEP0; ss]. ss.
+    }
+    { subst. ss.
+      exploit step_reserve_sim_thread; try exact H; eauto. i. des.
+      exploit Thread.step_future; eauto. i. des.
+      exploit sim_thread_plus_step; try exact SIM2; eauto. i. des.
+      exploit Thread.rtc_tau_step_future; try exact STEPS_SRC; eauto. i. des.
+      exploit Thread.opt_step_future; try exact STEP_SRC; eauto. i. des.
+      destruct e_src; ss. inv STEP_SRC.
+      destruct pf0; [|inv STEP0; inv STEP1].
+      esplits.
+      - econs 2; try exact STEPS_SRC. econs; [econs; eauto|]. ss.
+      - eauto.
+      - ss.
+      - ss.
+    }
   Qed.
 
 
   (* future *)
+
+  Lemma sim_thread_future
+        l r
+        st_src lc_src sc1_src mem1_src sc2_src mem2_src
+        st_tgt lc_tgt sc1_tgt mem1_tgt sc2_tgt mem2_tgt
+        (SIM1: sim_thread l r
+                          (Thread.mk lang st_src lc_src sc1_src mem1_src)
+                          (Thread.mk lang st_tgt lc_tgt sc1_tgt mem1_tgt))
+        (WF1_SRC: Local.wf lc_src mem1_src)
+        (MEM_SRC: Memory.future mem1_src mem2_src)
+        (SC: sim_timemap l sc2_src sc2_tgt)
+        (MEM: sim_memory l mem2_src mem2_tgt)
+        (PREV: Memory.prev_None mem1_src mem2_src)
+        (MEMLOC: forall to, Memory.get l to mem1_src = Memory.get l to mem2_src):
+    sim_thread l r
+               (Thread.mk lang st_src lc_src sc2_src mem2_src)
+               (Thread.mk lang st_tgt lc_tgt sc2_tgt mem2_tgt).
+  Proof.
+    inv SIM1. des. ss. econs; s; eauto.
+    - ii. exploit FULFILLABLE; eauto. i. des. split; ss.
+      unfold prev_released_le_loc in *. des_ifs; ss.
+      + exploit Memory.future_get1; try exact Heq0; eauto. i. des.
+        inv MSG_LE. inv RELEASED; try congr.
+        rewrite Heq in *. inv GET.
+        unnw. etrans; eauto. split; apply LE.
+      + exploit Memory.future_get1; try exact Heq0; eauto. i. des.
+        inv MSG_LE. inv RELEASED; try congr.
+      + inv WF1_SRC. exploit PROMISES0; eauto. i.
+        exploit PREV; eauto; ss. ii. congr.
+      + inv WF1_SRC. exploit PROMISES0; eauto. i.
+        exploit PREV; eauto; ss. ii. congr.
+    - erewrite <- eq_loc_max_ts; eauto.
+      rewrite MEMLOC in *.
+      esplits; eauto.
+    - ii. rewrite <- MEMLOC in *. eauto.
+  Qed.
 
   Lemma sim_thread_reserve_future
         l r
@@ -1054,6 +1129,28 @@ Module SimThreadPromotion.
       esplits; eauto.
     - erewrite <- eq_loc_max_ts; eauto.
     - ii. rewrite <- MEMLOC in *. eauto.
+  Qed.
+
+  Lemma sim_thread_all_future
+        l r
+        st_src lc_src sc1_src mem1_src sc2_src mem2_src
+        st_tgt lc_tgt sc1_tgt mem1_tgt sc2_tgt mem2_tgt
+        (SIM1: sim_thread_all l r
+                          (Thread.mk lang st_src lc_src sc1_src mem1_src)
+                          (Thread.mk lang st_tgt lc_tgt sc1_tgt mem1_tgt))
+        (WF1_SRC: Local.wf lc_src mem1_src)
+        (MEM_SRC: Memory.future mem1_src mem2_src)
+        (SC: sim_timemap l sc2_src sc2_tgt)
+        (MEM: sim_memory l mem2_src mem2_tgt)
+        (PREV: Memory.prev_None mem1_src mem2_src)
+        (MEMLOC: forall to, Memory.get l to mem1_src = Memory.get l to mem2_src):
+    sim_thread_all l r
+               (Thread.mk lang st_src lc_src sc2_src mem2_src)
+               (Thread.mk lang st_tgt lc_tgt sc2_tgt mem2_tgt).
+  Proof.
+    inv SIM1.
+    - left. eapply sim_thread_future; eauto.
+    - right. eapply sim_thread_reserve_future; eauto.
   Qed.
 
 
