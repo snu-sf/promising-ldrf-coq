@@ -317,7 +317,10 @@ Proof.
   inv STEP1. inv STEP2. ss. esplits.
   - econs; eauto.
   - econs; eauto.
-    inv PROMISE. i. eapply remove_non_synch; eauto.
+    + inv PROMISE. i. eapply remove_non_synch; eauto.
+    + i. ss. subst. erewrite PROMISES in *; auto.
+      inv PROMISE. eapply Memory.remove_get0 in PROMISES0. des.
+      erewrite Memory.bot_get in *. ss.
 Qed.
 
 Lemma reorder_pf_step_cancel
@@ -395,10 +398,7 @@ Proof.
         { econs. econs 1. econs; eauto. }
         { ss. }
       * econs.
-        { econs. econs 2. instantiate (1:=ThreadEvent.syscall e).
-          econs; eauto; ss. econs; eauto. inv STEP1. rewrite PROMISES in *.
-          inv PROMISE. ss. eapply Memory.remove_get0 in PROMISES0.
-          des. erewrite Memory.bot_get in GET. ss. }
+        { econs. econs 2. econs; eauto; ss. eauto. }
         { ss. }
       * ss.
     + esplits.

@@ -185,7 +185,7 @@ Proof.
   - right. inv TERMINAL_TGT. inv PR; ss.
   - right. esplits; eauto.
     inv PR. inversion FENCE. subst lc2_src. inversion LOCAL. ss.
-    apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
+    apply SimPromises.sem_bot_inv in PROMISES0; auto. rewrite PROMISES0. auto.
   - exploit sim_fence_step; try apply PR; try apply SC; eauto. i. des; eauto.
     + right. esplits; eauto.
       left. eapply paco9_mon; eauto. ss.

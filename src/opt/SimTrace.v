@@ -248,7 +248,6 @@ Proof.
         (try exact SC).
       * ss.
       * econs 2. econs 2.
-        eapply sim_local_memory_bot in PROMISES; eauto.
         econs; [|econs 6]; eauto.
       * ss.
       * ss.

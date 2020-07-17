@@ -248,7 +248,8 @@ Qed.
 Lemma progress_fence_step
       lc1 sc1
       ordr ordw
-      (PROMISES1: Ordering.le Ordering.strong_relaxed ordw -> Memory.nonsynch lc1.(Local.promises)):
+      (PROMISES1: Ordering.le Ordering.strong_relaxed ordw -> Memory.nonsynch lc1.(Local.promises))
+      (PROMISES2: ordw = Ordering.seqcst -> lc1.(Local.promises) = Memory.bot):
   exists lc2 sc2,
     Local.fence_step lc1 sc1 ordr ordw lc2 sc2.
 Proof.

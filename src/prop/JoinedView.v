@@ -1020,6 +1020,17 @@ Module JSim.
     ii. eapply sim_local_nonsynch_loc; eauto.
   Qed.
 
+  Lemma sim_local_memory_bot views lc_src lc_tgt
+        (SIM: sim_local views lc_src lc_tgt)
+        (BOT: Local.promises lc_tgt = Memory.bot)
+    :
+      Local.promises lc_src = Memory.bot.
+  Proof.
+    inv SIM. ss. eapply Memory.ext. i.
+    specialize (PROMISES loc ts). inv PROMISES; eauto.
+    erewrite Memory.bot_get in H. clarify.
+  Qed.
+
   Lemma sim_local_fence
         views
         lc1_src sc1_src mem1_src
@@ -1043,7 +1054,11 @@ Module JSim.
       (<<REL: joined_released views lc2_src.(Local.promises) lc2_src.(Local.tview).(TView.rel)>>).
   Proof.
     inv STEP_TGT. esplits.
-    - econs; eauto. i. eapply sim_local_nonsynch; eauto.
+    - econs; eauto.
+      + i. eapply sim_local_nonsynch; eauto.
+      + i. subst. destruct ordw_tgt; ss.
+        specialize (PROMISES eq_refl).
+        eapply sim_local_memory_bot; eauto.
     - inv LOCAL1. inv WF1_SRC. inv WF1_TGT. econs.
       + eapply TViewFacts.write_fence_tview_mon; eauto.
         * eapply TViewFacts.read_fence_tview_mon; eauto.
@@ -1053,8 +1068,8 @@ Module JSim.
       apply TViewFacts.write_fence_sc_mon; auto; try refl.
       apply TViewFacts.read_fence_tview_mon; auto; try refl.
     - ss. ii. exploit REL; eauto. i.
-      inv LOCAL1. specialize (PROMISES loc ts). ss.
-      rewrite GET in *. inv PROMISES. inv RELEASED.
+      inv LOCAL1. specialize (PROMISES0 loc ts). ss.
+      rewrite GET in *. inv PROMISES0. inv RELEASED.
       condtac; auto. condtac; auto.
       * exploit RELEASE; eauto; ss. destruct ordw_src, ordw_tgt; ss.
       * exploit RELEASE; eauto; ss. destruct ordw_src, ordw_tgt; ss.
@@ -1093,17 +1108,6 @@ Module JSim.
   Proof.
     inv MSGTO; inv MSG; econs. etrans; eauto.
     eapply View.unwrap_opt_le in RELEASED. inv RELEASED. auto.
-  Qed.
-
-  Lemma sim_local_memory_bot views lc_src lc_tgt
-        (SIM: sim_local views lc_src lc_tgt)
-        (BOT: Local.promises lc_tgt = Memory.bot)
-    :
-      Local.promises lc_src = Memory.bot.
-  Proof.
-    inv SIM. ss. eapply Memory.ext. i.
-    specialize (PROMISES loc ts). inv PROMISES; eauto.
-    erewrite Memory.bot_get in H. clarify.
   Qed.
 
   Lemma sim_local_promise
@@ -2189,8 +2193,7 @@ Module JSim.
         { refl. } i. des.
         exists (ThreadEvent.syscall e). esplits.
         * econs.
-          { econs 2; eauto. econs; eauto. econs; eauto.
-            eapply sim_local_memory_bot; eauto. }
+          { econs 2; eauto. econs; eauto. }
           { ss. }
           { ss. }
           { ss. }

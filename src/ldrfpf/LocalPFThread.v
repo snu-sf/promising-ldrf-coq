@@ -1386,10 +1386,12 @@ Section SIM.
   .
   Proof.
     inv LOCAL. inv STEPTGT. esplits.
-    - econs; ss; eauto. ii.
-      set (PROM:= PROMS.(sim_promise_contents) loc t).
-      rewrite GET in *. inv PROM; ss.
-      exploit RELEASE; eauto.
+    - econs; ss; eauto.
+      + ii.
+        set (PROM:= PROMS.(sim_promise_contents) loc t).
+        rewrite GET in *. inv PROM; ss.
+        exploit RELEASE; eauto.
+      + i. eapply sim_promise_bot; eauto.
     - econs; ss; eauto.
   Qed.
 
@@ -3261,7 +3263,6 @@ Section SIM.
     - inv STEP0; ss. inv LOCAL; ss.
       + exploit sim_fence_step; eauto. i. des. esplits; eauto.
         * econs 2; eauto. econs; eauto.
-          inv SIM. eapply sim_promise_bot in PROMS; eauto.
       + exploit sim_failure_step; eauto. i. des. esplits; eauto.
         * econs 2; eauto. econs; eauto.
   Qed.
@@ -3329,10 +3330,12 @@ Section SIM.
   .
   Proof.
     inv LOCAL. inv STEPTGT. esplits.
-    - econs; ss; eauto. ii.
-      set (PROM:= PROMS.(sim_promise_strong_contents) loc t).
-      rewrite GET in *. inv PROM; ss.
-      exploit RELEASE; eauto.
+    - econs; ss; eauto.
+      + ii. set (PROM:= PROMS.(sim_promise_strong_contents) loc t).
+        rewrite GET in *. inv PROM; ss.
+        exploit RELEASE; eauto.
+      + i. eapply sim_promise_strong_sim_promise in PROMS.
+        eapply sim_promise_bot in PROMS; eauto.
     - econs; ss; eauto.
   Qed.
 
@@ -3370,9 +3373,7 @@ Section SIM.
     - inv STEP0; ss.
     - inv STEP0; ss. inv LOCAL; ss.
       + exploit sim_fence_step_strong; eauto. i. des. esplits; eauto.
-        * econs 2; eauto. econs; eauto. econs; eauto.
-          inv SIM. eapply sim_promise_bot in PROMISES; eauto.
-          eapply sim_promise_strong_sim_promise; eauto.
+        * econs 2; eauto. econs; eauto.
       + exploit sim_failure_step; eauto.
         { eapply sim_local_strong_sim_local; eauto. }
         i. des. esplits; eauto.

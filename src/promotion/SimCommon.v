@@ -2006,13 +2006,14 @@ Module SimCommon.
         (STEP_TGT: Local.fence_step lc1_tgt sc1_tgt ordr ordw lc2_tgt sc2_tgt):
     exists lc2_src sc2_src,
       <<STEP_SRC: Local.fence_step lc1_src sc1_src ordr ordw lc2_src sc2_src>> /\
-      <<LC2: sim_local l lc2_src lc2_tgt>> /\
-      <<SC2: sim_timemap l sc2_src sc2_tgt>> /\
-      <<FULFILLABLE2: fulfillable l lc2_src.(Local.tview) mem1_src lc2_src.(Local.promises)>>.
+                  <<LC2: sim_local l lc2_src lc2_tgt>> /\
+                         <<SC2: sim_timemap l sc2_src sc2_tgt>> /\
+                                <<FULFILLABLE2: fulfillable l lc2_src.(Local.tview) mem1_src lc2_src.(Local.promises)>>.
   Proof.
     inv STEP_TGT. esplits.
-    - econs; eauto. ii.
-      hexploit RELEASE; eauto.
+    - econs; eauto; cycle 1.
+      { admit. }
+      ii. hexploit RELEASE; eauto.
       inv LC1. inv PROMISES0. exploit SOUND; eauto.
       { ii. subst. congr. }
       i. des. inv MSG; ss.
@@ -2032,7 +2033,7 @@ Module SimCommon.
         { ii. subst. congr. }
         i. des. inv MSG. inv RELEASED.
         exploit RELEASE; eauto. ss.
-  Qed.
+  Admitted.
 
   Lemma failure_step
         l
@@ -2108,13 +2109,6 @@ Module SimCommon.
     - exploit fence_step; eauto. i. des.
       esplits; [econs 5|..]; eauto.
     - exploit fence_step; eauto. i. des.
-      assert (BOT: lc1_src.(Local.promises) = Memory.bot).
-      { inv LC1. inv PROMISES0. eapply Memory.ext. i. rewrite Memory.bot_get.
-        destruct (Memory.get loc ts (Local.promises lc1_src)) as [[from msg]|] eqn:GET; ss.
-        eapply SOUND in GET.
-        { des. erewrite PROMISES in *. erewrite Memory.bot_get in *. ss. }
-        { ii. subst. erewrite PROMISES1 in *. ss. }
-      }
       esplits; [econs 6|..]; eauto; refl.
     - exploit failure_step; eauto. i. des.
       esplits; [econs 7|..]; eauto.

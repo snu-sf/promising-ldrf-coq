@@ -2127,7 +2127,10 @@ Section MAPPED.
     exploit write_fence_tview_map; eauto. intros WRITEVIEW.
     exploit write_fence_tview_mon_same_ord; eauto. intros WRITEVIEWLE.
     esplits.
-    - econs; ss. i. eapply nonsynch_map; eauto.
+    - econs; ss.
+      + i. eapply nonsynch_map; eauto.
+      + i. subst. erewrite PROMISES0 in PROMISES; eauto.
+        eapply bot_promises_map; eauto.
     - econs; eauto.
     - eapply write_fence_sc_map; eauto.
     - eapply write_fence_fc_mon_same_ord; eauto.
@@ -2430,8 +2433,6 @@ Section MAPPED.
         esplits; eauto.
         * econs; eauto.
         * econs; eauto. econs 2; eauto. econs; eauto.
-          inv LOCAL. rewrite PROMISES0 in *.
-          eapply bot_promises_map in PROMISES1; eauto.
       + inv LOCAL1. esplits; eauto.
         * econs; eauto.
         * econs; eauto. econs 2; eauto. econs; eauto.

@@ -766,21 +766,28 @@ Proof.
       * right. esplits. econs; eauto.
   - inv LOCAL0. inv LOCAL2.
     esplits; eauto.
-    + econs; eauto. econs 5; eauto. econs; eauto. ss.
-      intros ORDW l. eapply promise_step_nonsynch_loc_inv; eauto.
+    + econs; eauto. econs 5; eauto. econs; eauto; cycle 1.
+      { i. subst. ss. erewrite PROMISES in *; eauto.
+        eapply Memory.ext. i. erewrite Memory.bot_get.
+        destruct (Memory.get loc0 ts (Local.promises lc1)) as [[from0 msg0]|] eqn:GET; auto.
+        eapply Memory.promise_get1_promise in GET; try apply PROMISE.
+        { des. erewrite Memory.bot_get in *. ss. }
+        { destruct kind; ss. }
+      }
+      ss. intros ORDW l. eapply promise_step_nonsynch_loc_inv; eauto.
       * destruct msg, kind; ss; eauto. repeat condtac; ss; eauto.
       * apply RELEASE. ss.
     + right. esplits. econs; eauto.
   - inv LOCAL0. inv LOCAL2.
     esplits; eauto.
-    + econs; eauto. econs 6; eauto; cycle 1.
-      { ss. subst. eapply Memory.ext. i. rewrite Memory.bot_get.
-        destruct (Memory.get loc0 ts lc1.(Local.promises)) as [[from0 msg0]|] eqn:GET; auto.
-        eapply Memory.promise_get1_promise in GET; eauto.
-        { des. erewrite Memory.bot_get in GET0. ss. }
+    + econs; eauto. econs 6; eauto. econs; eauto; cycle 1.
+      { i. subst. ss. erewrite PROMISES in *; eauto.
+        eapply Memory.ext. i. erewrite Memory.bot_get.
+        destruct (Memory.get loc0 ts (Local.promises lc1)) as [[from0 msg0]|] eqn:GET; auto.
+        eapply Memory.promise_get1_promise in GET; try apply PROMISE.
+        { des. erewrite Memory.bot_get in *. ss. }
         { destruct kind; ss. }
       }
-      econs; eauto.
       intros ORDW l. eapply promise_step_nonsynch_loc_inv; eauto.
       * destruct msg, kind; ss; eauto. repeat condtac; ss; eauto.
       * apply RELEASE. ss.
