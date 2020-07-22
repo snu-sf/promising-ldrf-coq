@@ -1320,12 +1320,13 @@ Lemma can_reserve_all_needed times
       (LOCAL: Local.wf lc0 mem0)
       (SC: Memory.closed_timemap sc0 mem0)
   :
-    exists lc0' mem0' tr_reserve tr_cancel,
+    exists lc0' mem0' tr_reserve tr_cancel reserves,
       (<<RESERVESTEPS:
          Trace.steps tr_reserve (Thread.mk lang st0 lc0 sc0 mem0) (Thread.mk lang st0 lc0' sc0 mem0')>>) /\
       (<<RESERVETRACE:
          List.Forall (fun em => <<SAT: (is_reserving /1\ wf_time_evt times) (snd em)>>) tr_reserve>>) /\
       (<<CANCELTRACE: List.Forall (fun em => <<SAT: (is_cancel /1\ wf_time_evt times) (snd em)>>) tr_cancel>>) /\
+      (<<RESERVEMEM: reservations_added reserves mem0 mem0'>>) /\
       (<<CAP:
          forall cap0'
                 (MLE: Memory.le mem0' cap0'),
@@ -1333,7 +1334,8 @@ Lemma can_reserve_all_needed times
            (<<CANCELSTEPS:
               Trace.steps tr_cancel (Thread.mk lang st0 lc0' sc0 cap0') (Thread.mk lang st0 lc0 sc0 cap0)>>) /\
            (<<STEPS:
-              Trace.steps tr (Thread.mk lang st0 lc0 sc0 cap0) (Thread.mk lang st1 lc1 sc1 cap1)>>)>>) /\
+              Trace.steps tr (Thread.mk lang st0 lc0 sc0 cap0) (Thread.mk lang st1 lc1 sc1 cap1)>>) /\
+           (<<RESERVEMEM: reservations_added reserves cap0 cap0'>>)>>) /\
       (<<TIMES: forall max
                        (MAX: concrete_promise_max_timemap mem0' lc0'.(Local.promises) max),
           List.Forall2
@@ -1426,7 +1428,8 @@ Proof.
   }
   { eapply Forall_app; eauto. }
   { eapply CANCELTRACE. }
-  { i. exploit CAP; eauto. i. des. eauto. }
+  { eauto. }
+  { i. exploit CAP; eauto. }
   { i. exploit (CAP mem'0).
     { refl. }
     i. des. ss.
