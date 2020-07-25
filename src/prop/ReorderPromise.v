@@ -666,13 +666,15 @@ Lemma reorder_nonpf_program
       (MEMORY: Memory.closed th0.(Thread.memory)):
   exists th1',
      <<STEP1: Thread.program_step e2 th0 th1'>> /\
-     <<STEP2: __guard__ (th2 = th1' \/ exists pf2' e2', Thread.promise_step pf2' e2' th1' th2)>>.
+     <<STEP2: __guard__ (th2 = th1' \/ exists pf2' e2' loc to, (Thread.promise_step pf2' e2' th1' th2 /\ ThreadEvent.is_promising e1 = Some (loc, to) /\ ThreadEvent.is_promising e2' = Some (loc, to)))>>.
 Proof.
   exploit Thread.step_future; eauto. i. des.
   inv STEP1. inv STEP. ss. inv STEP2. inv LOCAL1; ss.
   - (* silent *)
     esplits; eauto.
-    right. esplits. econs; eauto.
+    right. esplits; ss.
+    + econs; eauto.
+    + ss.
   - (* read *)
     exploit reorder_promise_read; try exact LOCAL0; eauto; try by viewtac.
     { ii. inv H.
@@ -685,7 +687,9 @@ Proof.
     }
     i. des. esplits.
     + econs; eauto.
-    + right. esplits. econs; eauto.
+    + right. esplits; ss.
+      * econs; eauto.
+      * ss.
   - (* write *)
     exploit reorder_promise_write; try exact LOCAL0; eauto; try by viewtac.
     { destruct kind, msg; ss; eauto. repeat condtac; ss; eauto. }
@@ -717,7 +721,9 @@ Proof.
     + econs; eauto.
     + unguardH STEP2. des.
       * inv STEP2. left. auto.
-      * right. esplits. econs; eauto.
+      * right. esplits; ss.
+        { econs; eauto. }
+        { ss. }
   - (* update *)
     exploit reorder_promise_read; try exact LOCAL1; eauto; try by viewtac.
     { ii. inv H.
@@ -763,7 +769,9 @@ Proof.
     + econs; eauto.
     + unguardH STEP3. des.
       * inv STEP3. left. auto.
-      * right. esplits. econs; eauto.
+      * right. esplits; ss.
+        { econs; eauto. }
+        { ss. }
   - inv LOCAL0. inv LOCAL2.
     esplits; eauto.
     + econs; eauto. econs 5; eauto. econs; eauto; cycle 1.
@@ -777,7 +785,9 @@ Proof.
       ss. intros ORDW l. eapply promise_step_nonsynch_loc_inv; eauto.
       * destruct msg, kind; ss; eauto. repeat condtac; ss; eauto.
       * apply RELEASE. ss.
-    + right. esplits. econs; eauto.
+    + right. esplits; ss.
+      * econs; eauto.
+      * ss.
   - inv LOCAL0. inv LOCAL2.
     esplits; eauto.
     + econs; eauto. econs 6; eauto. econs; eauto; cycle 1.
@@ -791,11 +801,15 @@ Proof.
       intros ORDW l. eapply promise_step_nonsynch_loc_inv; eauto.
       * destruct msg, kind; ss; eauto. repeat condtac; ss; eauto.
       * apply RELEASE. ss.
-    + right. esplits. econs; eauto.
+    + right. esplits; ss.
+      * econs; eauto.
+      * ss.
   - inv LOCAL2.
     hexploit promise_step_promise_consistent; eauto. i.
     esplits; eauto.
-    right. esplits. econs; eauto.
+    right. esplits; ss.
+    + econs; eauto.
+    + ss.
 Qed.
 
 Lemma reorder_nonpf_pf
@@ -810,11 +824,11 @@ Lemma reorder_nonpf_pf
   (th0 = th2) \/
   (exists pf2' e2',
       <<STEP: Thread.step pf2' e2' th0 th2>> /\
-      <<EVENT: __guard__ (e2' = e2 \/ (ThreadEvent.is_promising e2' /\ ThreadEvent.is_promising e2))>>) \/
+      <<EVENT: __guard__ (e2' = e2 \/ (exists loc to, ThreadEvent.is_promising e2' = Some (loc, to) /\ ThreadEvent.is_promising e2 = Some (loc, to)))>>) \/
   (exists e2' pf1' e1' th1',
       <<STEP1: Thread.step true e2' th0 th1'>> /\
       <<STEP2: Thread.promise_step pf1' e1' th1' th2>> /\
-      <<EVENT: __guard__ (e2' = e2 \/ (ThreadEvent.is_promising e2' /\ ThreadEvent.is_promising e2))>>).
+      <<EVENT: __guard__ (e2' = e2 \/ (exists loc to, ThreadEvent.is_promising e2' = Some (loc, to) /\ ThreadEvent.is_promising e2 = Some (loc, to)))>>).
 Proof.
   inv STEP2; ss.
   - inv STEP. ss.
@@ -826,23 +840,25 @@ Proof.
       i. des; subst.
       * right. left. esplits.
         { econs 1. econs; eauto. }
-        { right. ss. }
+        { right. esplits; ss. }
       * right. right. esplits.
         { econs 1. econs; eauto. }
         { econs; eauto. }
-        { right. ss. }
+        { right. esplits; ss. }
     + exploit reorder_promise_promise_cancel; eauto.
       { destruct kind0; ss. }
       i. des; subst; eauto.
       * right. left. esplits.
         { econs 1. econs; eauto. }
-        { right. ss. }
+        { right. esplits; ss. }
       * right. right. esplits.
         { econs 1. econs; eauto. }
         { econs; eauto. }
-        { right. ss. }
+        { right. esplits; ss. }
   - exploit reorder_nonpf_program; eauto. i. des.
     unguardH STEP2. des.
     + subst. right. left. esplits; eauto. left. ss.
     + right. right. esplits; eauto. left. ss.
 Qed.
+
+Set Printing All.
