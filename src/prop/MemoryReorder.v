@@ -875,7 +875,7 @@ Module MemoryReorder.
   Proof.
     inv PROMISE1.
     exploit split_remove; try exact PROMISES; eauto. i. des.
-    esplits; eauto.
+    esplits; eauto. econs; eauto.
   Qed.
 
   Lemma promise_lower_remove
@@ -916,7 +916,7 @@ Module MemoryReorder.
       revert GET0. erewrite Memory.remove_o; eauto. condtac; ss. i. guardH o.
       exploit Memory.split_exists; try exact GET0; try by inv PROMISES; inv SPLIT; eauto. i. des.
       exploit remove_split; eauto. i.
-      esplits; eauto.
+      esplits; eauto. econs; eauto.
     - exploit Memory.lower_get0; try eexact PROMISES; eauto. i. des.
       revert GET. erewrite Memory.remove_o; eauto. condtac; ss. i. guardH o.
       exploit Memory.lower_exists; try exact GET; try by inv PROMISES; inv LOWER; eauto. i. des.

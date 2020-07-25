@@ -799,8 +799,9 @@ Module SimCommon.
         + eapply get_message_src_message_to; eauto.
         + unguard. des. subst.
           unfold get_message_src.
-          destruct released'; eauto.
+          destruct released'0; eauto.
           destruct (Memory.get loc from mem1_src) as [[? [? []|]]|]; eauto.
+        + subst. inv MSG. eauto.
       - econs; i.
         + revert GET_SRC0. erewrite Memory.split_o; eauto. repeat condtac; ss; i.
           * des. subst. inv GET_SRC0.
@@ -1165,8 +1166,9 @@ Module SimCommon.
         + eapply get_message_src_message_to; eauto.
         + unguard. des. subst.
           unfold get_message_src.
-          destruct released'; eauto.
+          destruct released'0; eauto.
           destruct (Memory.get loc from mem1_src) as [[? [? []|]]|]; eauto.
+        + subst. inv MSG. eauto.
       - econs; i.
         + revert GET_SRC0. erewrite Memory.split_o; eauto. repeat condtac; ss; i.
           * des. subst. inv GET_SRC0.
@@ -1231,7 +1233,7 @@ Module SimCommon.
           exploit SOUND0; eauto. i. des. inv MSG0. inv RELEASED.
           exploit SPLIT_TGT; eauto. i. des.
           * inv x2. exploit LE1_TGT; eauto. i. congr.
-          * inv x2. exploit LE1_TGT; eauto. i. congr.
+          * inv x2.
         + guardH o. guardH o0.
           exploit FULFILL1; eauto. i. des. split; auto.
           unfold prev_released_le_loc.

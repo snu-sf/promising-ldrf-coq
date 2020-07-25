@@ -177,7 +177,7 @@ Module SimPromises.
         unfold none_if_released. condtac; ss.
         * inv INV1. exploit PVIEW; eauto. i. des.
           hexploit Memory.split_get0; try exact PROMISES; eauto. congr.
-        * econs 2; eauto; congr.
+        * subst. econs 2; eauto. ss. eauto.
       + econs.
         * ii. revert LHS.
           erewrite Memory.split_o; eauto. erewrite (@Memory.split_o mem2); try exact x0.
@@ -189,7 +189,6 @@ Module SimPromises.
           { apply INV1. }
         * i. inv INV1. exploit PVIEW; eauto. i. des.
           erewrite Memory.split_o; eauto. repeat condtac; eauto.
-          des; ss. subst. rewrite GET0 in x. inv x. eauto.
         * i. inv INV1. exploit SOUND; eauto. i.
           erewrite Memory.split_o; eauto. erewrite (@Memory.split_o mem2); eauto.
           exploit Memory.split_get0; try exact x0; eauto. i. des.

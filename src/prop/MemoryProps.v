@@ -2414,7 +2414,6 @@ Section CANCEL.
       eapply split_succeed_wf in PROMISES. des. des_ifs.
       + ss. des. clarify.
       + ss. guardH o. des. clarify.
-        esplits; eauto.
       + esplits; eauto.
     - des. clarify. erewrite Memory.lower_o; eauto. des_ifs.
       + ss. des. clarify.

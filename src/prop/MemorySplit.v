@@ -104,7 +104,8 @@ Module MemorySplit.
         (MSG_WF2: Message.wf (Message.concrete val2 released2))
         (MSG_TS2: Memory.message_to (Message.concrete val2 released2) loc ts2)
         (LE: Memory.le promises0 mem0)
-        (REMOVE: Memory.remove promises0 loc ts1 ts3 msg3 promises3):
+        (REMOVE: Memory.remove promises0 loc ts1 ts3 msg3 promises3)
+        (RESERVE: exists val' released', msg3 = Message.concrete val' released'):
     exists promises1 promises2 mem1,
       <<STEP1: Memory.promise promises0 mem0 loc ts1 ts2 (Message.concrete val2 released2) promises1 mem1 (Memory.op_kind_split ts3 msg3)>> /\
       <<STEP2: Memory.remove promises1 loc ts1 ts2 (Message.concrete val2 released2) promises2>> /\
@@ -115,6 +116,6 @@ Module MemorySplit.
     exploit LE; eauto. i.
     exploit Memory.split_exists; eauto. i. des.
     exploit commute_remove_split_remove_remove; try exact REMOVE; eauto. i. des.
-    esplits; eauto.
+    esplits; eauto. econs; eauto.
   Qed.
 End MemorySplit.
