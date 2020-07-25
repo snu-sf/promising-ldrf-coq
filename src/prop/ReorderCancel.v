@@ -69,17 +69,9 @@ Lemma reorder_promise_promise_cancel2
       (KIND2: Memory.op_kind_is_cancel kind2 = true):
   (loc1 = loc2 /\ from1 = from2 /\ to1 = to2 /\ msg1 = Message.reserve /\ kind1 = Memory.op_kind_add /\
    lc0 = lc2 /\ mem0 = mem2) \/
-  (loc1 = loc2 /\ from1 = from2 /\ to1 = to2 /\ msg1 = Message.reserve /\ kind1 = Memory.op_kind_lower Message.reserve /\
-   <<STEP: Local.promise_step lc0 mem0 loc1 from1 to1 Message.reserve lc2 mem2 kind2>>) \/
-  (exists lc1' mem1' from2' kind1',
-      (<<STEP1: Local.promise_step lc0 mem0 loc2 from2' to2 msg2 lc1' mem1' kind2>>) /\
-      (<<STEP2: Local.promise_step lc1' mem1' loc1 from1 to1 msg1 lc2 mem2 kind1'>>) /\
-      (<<KIND1': Memory.op_kind_is_cancel kind1 = false>>) /\
-      (<<KINDEQ: (Memory.op_kind_is_lower_concrete kind1' && Message.is_released_none msg1
-                  || Memory.op_kind_is_cancel kind1')%bool =
-                 (Memory.op_kind_is_lower_concrete kind1 && Message.is_released_none msg1
-                  || Memory.op_kind_is_cancel kind1)%bool>>) /\
-      (<<CANCEL: Memory.op_kind_is_cancel kind1' = false>>))
+  (exists lc1' mem1',
+      (<<STEP1: Local.promise_step lc0 mem0 loc2 from2 to2 msg2 lc1' mem1' kind2>>) /\
+      (<<STEP2: Local.promise_step lc1' mem1' loc1 from1 to1 msg1 lc2 mem2 kind1>>))
 .
 Proof.
   inv STEP1. inv STEP2. ss. inv PROMISE0; inv KIND2. inv PROMISE; ss.
@@ -90,17 +82,18 @@ Proof.
       left. splits; auto. destruct lc0; ss.
     + exploit MemoryReorder.add_remove; try exact PROMISES0; eauto. i. des.
       exploit MemoryReorder.add_remove; try exact MEM1; eauto. i. des.
-      right. right. esplits; ss; [eauto|econs; eauto|..].
+      right. esplits; ss; [eauto|econs; eauto|..].
       * econs; eauto. i. revert GET.
         erewrite Memory.remove_o; eauto. condtac; ss. eauto.
       * eapply Memory.cancel_closed_message; eauto.
-      * ss.
-      * ss.
   - destruct (classic ((loc1, ts3) = (loc2, to2))).
     + des. subst. inv H.
       exploit MemoryReorder.split_remove_same; try exact PROMISES0; eauto. i. des. subst.
       exploit MemoryReorder.split_remove_same; try exact MEM1; eauto. i. des. subst.
-      right. right. esplits; ss; [eauto|econs; eauto|..].
+      right. esplits; ss; [eauto|econs; eauto|..].
+      * econs; ss.
+        econs; eauto.
+
       * econs 1; eauto; ss.
         i. revert GET.
         erewrite Memory.remove_o; eauto. condtac; ss. i. des; ss.
@@ -127,7 +120,7 @@ Proof.
         exploit Memory.remove_get0; try exact MEM. i. des. congr. }
       exploit MemoryReorder.split_remove; try exact PROMISES0; eauto. i. des.
       exploit MemoryReorder.split_remove; try exact MEM1; eauto. i. des.
-      right. right. esplits; ss; [eauto|econs; eauto|..].
+      right. esplits; ss; [eauto|econs; eauto|..].
       * eapply Memory.cancel_closed_message; eauto.
       * ss.
       * ss.
@@ -139,7 +132,95 @@ Proof.
       exploit Memory.lower_get0; try exact MEM1. i. des. inv MSG_LE.
     + exploit MemoryReorder.lower_remove; try exact PROMISES0; eauto. i. des.
       exploit MemoryReorder.lower_remove; try exact MEM1; eauto. i. des.
-      right. right. esplits; ss; [eauto|econs; eauto|..].
+      right. esplits; ss; [eauto|econs; eauto|..].
+      * eapply Memory.cancel_closed_message; eauto.
+      * ss.
+      * ss.
+Qed.
+
+Lemma reorder_promise_promise_cancel2
+      lc0 mem0
+      lc1 mem1
+      lc2 mem2
+      loc1 from1 to1 msg1 kind1
+      loc2 from2 to2 msg2 kind2
+      (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 msg1 lc1 mem1 kind1)
+      (STEP2: Local.promise_step lc1 mem1 loc2 from2 to2 msg2 lc2 mem2 kind2)
+      (LOCAL0: Local.wf lc0 mem0)
+      (MEM0: Memory.closed mem0)
+      (KIND1: Memory.op_kind_is_cancel kind1 = false)
+      (KIND2: Memory.op_kind_is_cancel kind2 = true):
+  (loc1 = loc2 /\ from1 = from2 /\ to1 = to2 /\ msg1 = Message.reserve /\ kind1 = Memory.op_kind_add /\
+   lc0 = lc2 /\ mem0 = mem2) \/
+  (exists lc1' mem1' from2' kind1',
+      (<<STEP1: Local.promise_step lc0 mem0 loc2 from2' to2 msg2 lc1' mem1' kind2>>) /\
+      (<<STEP2: Local.promise_step lc1' mem1' loc1 from1 to1 msg1 lc2 mem2 kind1'>>) /\
+      (<<KIND1': Memory.op_kind_is_cancel kind1 = false>>) /\
+      (<<KINDEQ: (Memory.op_kind_is_lower_concrete kind1' && Message.is_released_none msg1
+                  || Memory.op_kind_is_cancel kind1')%bool =
+                 (Memory.op_kind_is_lower_concrete kind1 && Message.is_released_none msg1
+                  || Memory.op_kind_is_cancel kind1)%bool>>) /\
+      (<<CANCEL: Memory.op_kind_is_cancel kind1' = false>>))
+.
+Proof.
+  inv STEP1. inv STEP2. ss. inv PROMISE0; inv KIND2. inv PROMISE; ss.
+  - destruct (classic ((loc1, to1) = (loc2, to2))).
+    + inv H.
+      exploit MemoryReorder.add_remove_same; try exact PROMISES0; eauto. i. des. subst.
+      exploit MemoryReorder.add_remove_same; try exact MEM1; eauto. i. des. subst.
+      left. splits; auto. destruct lc0; ss.
+    + exploit MemoryReorder.add_remove; try exact PROMISES0; eauto. i. des.
+      exploit MemoryReorder.add_remove; try exact MEM1; eauto. i. des.
+      right. esplits; ss; [eauto|econs; eauto|..].
+      * econs; eauto. i. revert GET.
+        erewrite Memory.remove_o; eauto. condtac; ss. eauto.
+      * eapply Memory.cancel_closed_message; eauto.
+      * ss.
+      * ss.
+  - destruct (classic ((loc1, ts3) = (loc2, to2))).
+    + des. subst. inv H.
+      exploit MemoryReorder.split_remove_same; try exact PROMISES0; eauto. i. des. subst.
+      exploit MemoryReorder.split_remove_same; try exact MEM1; eauto. i. des. subst.
+      right. esplits; ss; [eauto|econs; eauto|..].
+      * econs 1; eauto; ss.
+        i. revert GET.
+        erewrite Memory.remove_o; eauto. condtac; ss. i. des; ss.
+        exploit Memory.split_get0; try exact MEM1. i. des.
+        clear GET0 GET2 GET3.
+        exploit Memory.get_ts; try exact GET. i. des.
+        { subst. inv ADD2. inv ADD. inv TO. }
+        exploit Memory.get_ts; try exact GET1. i. des.
+        { subst. inv MEM1. inv SPLIT. inv TS23. }
+        exploit Memory.get_disjoint; [exact GET|exact GET1|..]. i. des.
+        { subst. inv MEM1. inv SPLIT. timetac. }
+        destruct (TimeFacts.le_lt_dec to' to2).
+        { apply (x4 to'); econs; ss; try refl.
+          inv MEM1. inv SPLIT. etrans; eauto. }
+        { apply (x4 to2); econs; ss; try refl.
+          - inv MEM1. inv SPLIT. ss.
+          - econs. ss. }
+      * eapply Memory.cancel_closed_message; eauto.
+      * ss.
+      * ss.
+    + destruct (classic ((loc1, to1) = (loc2, to2))).
+      { des. inv H0.
+        exploit Memory.split_get0; try exact MEM1. i. des.
+        exploit Memory.remove_get0; try exact MEM. i. des. congr. }
+      exploit MemoryReorder.split_remove; try exact PROMISES0; eauto. i. des.
+      exploit MemoryReorder.split_remove; try exact MEM1; eauto. i. des.
+      right. esplits; ss; [eauto|econs; eauto|..].
+      * eapply Memory.cancel_closed_message; eauto.
+      * ss.
+      * ss.
+  - des. subst.
+    destruct (classic ((loc1, to1) = (loc2, to2))).
+    + inv H.
+      exploit MemoryReorder.lower_remove_same; try exact PROMISES0; eauto. i. des. subst.
+      exploit MemoryReorder.lower_remove_same; try exact MEM1; eauto. i. des. subst.
+      exploit Memory.lower_get0; try exact MEM1. i. des. inv MSG_LE.
+    + exploit MemoryReorder.lower_remove; try exact PROMISES0; eauto. i. des.
+      exploit MemoryReorder.lower_remove; try exact MEM1; eauto. i. des.
+      right. esplits; ss; [eauto|econs; eauto|..].
       * eapply Memory.cancel_closed_message; eauto.
       * ss.
       * ss.
