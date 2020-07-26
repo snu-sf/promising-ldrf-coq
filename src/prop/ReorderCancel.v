@@ -258,6 +258,29 @@ Proof.
     { subst. right. esplits; eauto. }
 Qed.
 
+Lemma reorder_opt_step_cancels
+      lang
+      e1 th0 th1 th2
+      (STEP1: Thread.opt_step e1 th0 th1)
+      (STEPS2: rtc (@Thread.cancel_step lang) th1 th2)
+  :
+    exists th1' e1',
+      (<<STEPS1: rtc (@Thread.cancel_step lang) th0 th1'>>) /\
+      (<<STEP2: Thread.opt_step e1' th1' th2>>) /\
+      __guard__(e1' = e1 \/ e1' = ThreadEvent.silent /\ <<RESERVE: is_reserve e1>>).
+Proof.
+  unguard. inv STEP1.
+  { esplits.
+    { eauto. }
+    { econs 1. }
+    { auto. }
+  }
+  { exploit reorder_step_cancels; eauto. i. des.
+    { esplits; eauto. econs 2; eauto. }
+    { esplits; eauto. econs 1; eauto. }
+  }
+Qed.
+
 Lemma steps_cancels_not_cancels
       P lang th0 th2
       (STEPS: rtc (tau (@pred_step P lang)) th0 th2)

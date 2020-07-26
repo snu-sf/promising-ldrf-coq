@@ -32,6 +32,41 @@ Set Implicit Arguments.
 
 
 
+Lemma reorder_abort_reserve
+      lang
+      pf th0 th1 th2
+      (STEP0: @Thread.step lang pf ThreadEvent.failure th0 th1)
+      (STEP1: Thread.reserve_step th1 th2)
+  :
+    exists th1',
+      (<<STEP0: Thread.reserve_step th0 th1'>>) /\
+      (<<STEP1: Thread.step pf ThreadEvent.failure th1' th2>>).
+Proof.
+  inv STEP1. inv STEP; inv STEP1; inv LOCAL.
+  inv STEP0; inv STEP. inv LOCAL. inv LOCAL0. esplits.
+  { econs; eauto. econs; eauto. econs; eauto. }
+  { econs 2; eauto. econs; eauto. econs; eauto. econs.
+    ii. inv PROMISE. erewrite Memory.add_o in PROMISE0; eauto. des_ifs.
+    eapply CONSISTENT; eauto. }
+Qed.
+
+Lemma reorder_abort_reserves
+      lang
+      pf th0 th1 th2
+      (STEP: Thread.step pf ThreadEvent.failure th0 th1)
+      (STEPS: rtc (@Thread.reserve_step lang) th1 th2)
+  :
+    exists th1',
+      (<<STEPS: rtc (@Thread.reserve_step lang) th0 th1'>>) /\
+      (<<STEP: Thread.step pf ThreadEvent.failure th1' th2>>).
+Proof.
+  ginduction STEPS; eauto. i.
+  exploit reorder_abort_reserve; eauto. i. des.
+  exploit IHSTEPS; eauto. i. des. esplits.
+  { econs 2; eauto. }
+  { eauto. }
+Qed.
+
 Lemma reorder_reserve_promise
       prom0 mem0
       prom1 mem1
@@ -281,6 +316,29 @@ Proof.
     { subst. right.
       eapply Operators_Properties.clos_rt_rtn1_iff in STEPS1.
       eapply Operators_Properties.clos_rt_rt1n_iff in STEPS1. auto. }
+Qed.
+
+Lemma reorder_reserves_opt_step
+      lang
+      e2 th0 th1 th2
+      (STEPS1: rtc (@Thread.reserve_step lang) th0 th1)
+      (STEP2: Thread.opt_step e2 th1 th2)
+  :
+    exists th1' e2',
+      (<<STEP1: Thread.opt_step e2' th0 th1'>>) /\
+      (<<STEPS2: rtc (@Thread.reserve_step lang) th1' th2>>) /\
+      __guard__(e2' = e2 \/ e2' = ThreadEvent.silent /\ <<CANCEL: is_cancel e2>>).
+Proof.
+  unguard. inv STEP2.
+  { esplits.
+    { econs 1. }
+    { eauto. }
+    { auto. }
+  }
+  { exploit reorder_reserves_step; eauto. i. des.
+    { esplits; eauto. econs 2; eauto. }
+    { esplits; eauto. econs 1; eauto. }
+  }
 Qed.
 
 Lemma steps_not_reserves_reserves
