@@ -61,6 +61,7 @@ Proof.
   inv STEP.
   { inv STEP0. inv LOCAL. ss.
     eapply promise_not_cancel_covered_increase; eauto. destruct kind; ss.
+    des_ifs. inv PROMISE; ss.
   }
   { inv STEP0. inv LOCAL; auto.
     { inv LOCAL0. inv WRITE. eapply promise_not_cancel_covered_increase; eauto.
@@ -326,7 +327,7 @@ Section LIFT.
     inv STEP.
     { inv STEP0. inv LOCAL. ss.
       destruct (Memory.op_kind_is_cancel kind) eqn:KIND; ss.
-      { destruct kind; ss. }
+      { destruct kind; ss. des_ifs. inv PROMISE; ss. }
       exploit step_lifting_promise; eauto.
       { eapply LOCAL0. }
       { transitivity mem0; eauto. eapply LOCAL0. }
@@ -506,7 +507,7 @@ Proof.
   inv STEP.
   { inv STEP0. inv LOCAL. ss.
     destruct (Memory.op_kind_is_cancel kind) eqn:KIND.
-    { destruct kind; ss. }
+    { destruct kind; ss. des_ifs. inv PROMISE; ss. }
     exploit promise_needed_spaces; eauto.
     { destruct kind; ss. }
     i. des.
@@ -1270,7 +1271,7 @@ Proof.
   { i. subst. inv WRITENOTIN.
     exploit Thread.step_future; eauto. i. des.
     hexploit step_eventable_time; eauto.
-    { instantiate (1:=spaces). destruct e; ss. destruct kind; ss. }
+    { instantiate (1:=spaces). destruct e; ss. des_ifs. }
     exploit IHSTEPS; eauto. i. des.
     splits; eauto. econs; eauto.
     eapply list_Forall2_impl; eauto.

@@ -385,7 +385,7 @@ Lemma pf_consistent_strong_pf_consistent_strong_aux lang (th: Thread.t lang)
 Proof.
   ii. exploit CONSISTENT; eauto. i. des.
   eapply pred_step_rtc_mon with (Q:=(promise_free /1\ no_sc)) in STEPS0; cycle 1.
-  { i. destruct x1; ss. destruct kind; ss. }
+  { i. destruct x1; ss. des_ifs. }
   eapply pred_step_rtc_mon with (Q:=(promise_free /1\ no_sc)) in STEPS1; cycle 1.
   { i. des; auto. }
   hexploit (proj1 (@pred_steps_trace_steps (promise_free /1\ no_sc) _ (Thread.mk _ th.(Thread.state) th.(Thread.local) TimeMap.bot mem1) e2)).

@@ -239,7 +239,7 @@ Section Pred.
 
   Definition is_cancel (e: ThreadEvent.t) : Prop :=
     match e with
-    | ThreadEvent.promise _ _ _ _ Memory.op_kind_cancel => True
+    | ThreadEvent.promise _ _ _ Message.reserve Memory.op_kind_cancel => True
     | _ => False
     end.
 

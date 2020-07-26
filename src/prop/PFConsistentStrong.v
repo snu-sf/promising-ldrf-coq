@@ -305,7 +305,7 @@ Proof.
     { instantiate (1:=(fun em => <<SAT: (promise_free /1\ no_sc) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>)).
       eapply Forall_app.
       { eapply List.Forall_impl; eauto. i. ss. destruct a. ss. des.
-        destruct t0; ss. destruct kind; ss. }
+        destruct t0; ss. des_ifs. }
       { eapply List.Forall_impl; eauto. i. ss. des. splits; auto. }
     }
     { i. ss. des. splits; auto. }
@@ -666,9 +666,11 @@ Proof.
   { unfold cancel_normal_trace in *. des. subst.
     eapply List.Forall2_app_inv_l in TRACE. des. esplits; eauto.
     { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
-      destruct a, x. ss. eapply List.Forall_forall in IN; eauto. ss. inv SAT; ss. inv KIND; ss. }
+      destruct a, x. ss. eapply List.Forall_forall in IN; eauto. ss. inv SAT; ss.
+      inv KIND; ss; des_ifs. inv MSG. }
     { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
-      destruct a, x. ss. eapply List.Forall_forall in IN; eauto. ss. inv SAT; ss. inv KIND; ss. }
+      destruct a, x. ss. eapply List.Forall_forall in IN; eauto. ss. inv SAT; ss.
+      inv KIND; ss; des_ifs. inv MSG. }
   }
   { eapply MAPALL. }
   { i. eapply MAPALL in TS; eauto.
@@ -937,10 +939,10 @@ Proof.
     subst. eapply List.Forall2_app_inv_l in TRACE0. des. subst. esplits; eauto.
     { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
       eapply List.Forall_forall in IN; eauto. ss.
-      destruct a, x. ss. inv EVENT; ss. inv KIND; ss. }
+      destruct a, x. ss. inv EVENT; ss. inv KIND; ss; des_ifs. inv MSG. }
     { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
       eapply List.Forall_forall in IN; eauto. ss.
-      destruct a, x. ss. inv EVENT; ss. inv KIND; ss. }
+      destruct a, x. ss. inv EVENT; ss. inv KIND; ss; des_ifs. inv MSG. }
   }
   { eapply list_Forall2_compose.
     { eapply TRACE. }
@@ -1009,7 +1011,7 @@ Proof.
     }
     { eapply Forall_app; eauto.
       eapply List.Forall_impl; eauto. i. ss. des.
-      destruct a. ss. destruct t0; ss. destruct kind; ss.
+      destruct a. ss. destruct t0; ss. des_ifs.
     }
     { unfold cancel_normal_trace. esplits; eauto.
       eapply List.Forall_impl; eauto. i. ss. des; auto.
@@ -1325,9 +1327,11 @@ Proof.
   { unfold cancel_normal_trace in *. des. subst.
     eapply List.Forall2_app_inv_l in LCTRACE. des. subst. esplits; eauto.
     { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
-      destruct a, x. ss. eapply List.Forall_forall in IN; eauto. ss. inv SAT; ss. inv KIND; ss. }
+      destruct a, x. ss. eapply List.Forall_forall in IN; eauto. ss. inv SAT; ss.
+      inv KIND; ss; des_ifs. inv MSG. }
     { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
-      destruct a, x. ss. eapply List.Forall_forall in IN; eauto. ss. inv SAT; ss. inv KIND; ss. }
+      destruct a, x. ss. eapply List.Forall_forall in IN; eauto. ss. inv SAT; ss.
+      inv KIND; ss; des_ifs. inv MSG. }
   }
   { i. subst.
     assert (exists l1 l2 e_mid fe_mid,
@@ -1398,7 +1402,8 @@ Proof.
     { clear - LCTRACE1 NORMAL.
       eapply List.Forall_forall. i. eapply list_Forall2_in2 in H; eauto.
       des. eapply List.Forall_forall in IN; eauto. ss.
-      destruct b, x. ss. inv SAT; ss. inv KIND; ss. }
+      destruct b, x. ss. inv SAT; ss.
+      inv KIND; ss; des_ifs. inv MSG. }
     i. des.
     inv MAP0. destruct e2. ss.
 
@@ -1962,9 +1967,11 @@ Proof.
   { clear - CANCELNORMAL TRACE0. unfold cancel_normal_trace in *. des. subst.
     eapply List.Forall2_app_inv_l in TRACE0. des. subst. esplits; eauto.
     { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
-      eapply List.Forall_forall in IN; eauto. destruct a, x. ss. inv EVENT; ss. inv KIND; ss. }
+      eapply List.Forall_forall in IN; eauto. destruct a, x. ss. inv EVENT; ss.
+      inv KIND; ss; des_ifs. inv MSG. }
     { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
-      eapply List.Forall_forall in IN; eauto. destruct a, x. ss. inv EVENT; ss. inv KIND; ss. }
+      eapply List.Forall_forall in IN; eauto. destruct a, x. ss. inv EVENT; ss.
+      inv KIND; ss; des_ifs. inv MSG. }
   }
   { ii. des. erewrite <- (MAPLTGOOD loc ts0 ts1 t0 t1); eauto. }
   { ii. des.
@@ -2504,10 +2511,10 @@ Proof.
     }
     { eapply Forall_app.
       { eapply List.Forall_impl; eauto. i. ss. des. destruct a. ss. splits; auto.
-        { destruct t4; ss. destruct kind; ss. auto. }
+        { destruct t4; ss. destruct kind; ss; des_ifs. auto. }
         { destruct t4; ss. }
         { destruct t4; ss. }
-        { destruct t4; ss. destruct kind; ss. }
+        { destruct t4; ss. des_ifs. }
         { destruct t4; ss. }
       }
       { eapply Forall_app_inv in EVENTS. des.

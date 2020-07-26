@@ -36,9 +36,9 @@ Lemma split_reserve_write prom0 mem0 loc from to val released prom1 mem1 ts3 pro
       (MLE: Memory.le prom0 mem0)
   :
     exists prom_mid0 mem_mid0 mem_mid1,
-      (<< REMOVE: Memory.promise prom0 mem0 loc from ts3 Message.reserve prom_mid0 mem_mid0 Memory.op_kind_cancel>>) /\
-      (<< ADDMESSAGE: Memory.write prom_mid0 mem_mid0 loc from to val released prom_mid0 mem_mid1 Memory.op_kind_add >>) /\
-      (<< ADDRESERVE: Memory.promise prom_mid0 mem_mid1 loc to ts3 Message.reserve prom2 mem1 Memory.op_kind_add >>).
+      (<<REMOVE: Memory.promise prom0 mem0 loc from ts3 Message.reserve prom_mid0 mem_mid0 Memory.op_kind_cancel>>) /\
+      (<<ADDMESSAGE: Memory.write prom_mid0 mem_mid0 loc from to val released prom_mid0 mem_mid1 Memory.op_kind_add>>) /\
+      (<<ADDRESERVE: Memory.promise prom_mid0 mem_mid1 loc to ts3 Message.reserve prom2 mem1 Memory.op_kind_add>>).
 Proof.
   inv SEMI. des. clarify.
   hexploit split_succeed_wf; try apply PROMISES. i. des.
@@ -134,9 +134,10 @@ Lemma split_reserve_promise prom0 mem0 loc from to msg prom1 mem1 ts3
       (MLE: Memory.le prom0 mem0)
   :
     exists prom_mid0 mem_mid0 prom_mid1 mem_mid1,
-      (<< REMOVE: Memory.promise prom0 mem0 loc from ts3 Message.reserve prom_mid0 mem_mid0 Memory.op_kind_cancel>>) /\
-      (<< ADDMESSAGE: Memory.promise prom_mid0 mem_mid0 loc from to msg prom_mid1 mem_mid1 Memory.op_kind_add >>) /\
-      (<< ADDRESERVE: Memory.promise prom_mid1 mem_mid1 loc to ts3 Message.reserve prom1 mem1 Memory.op_kind_add >>).
+      (<<REMOVE: Memory.promise prom0 mem0 loc from ts3 Message.reserve prom_mid0 mem_mid0 Memory.op_kind_cancel>>) /\
+      (<<ADDMESSAGE: Memory.promise prom_mid0 mem_mid0 loc from to msg prom_mid1 mem_mid1 Memory.op_kind_add>>) /\
+      (<<ADDRESERVE: Memory.promise prom_mid1 mem_mid1 loc to ts3 Message.reserve prom1 mem1 Memory.op_kind_add>>) /\
+      (<<CLOSEDMSG: Memory.closed_message msg mem1 -> Memory.closed_message msg mem_mid1>>).
 Proof.
   inv SEMI. des. clarify.
   hexploit split_succeed_wf; try apply PROMISES. i. des.
@@ -218,5 +219,11 @@ Proof.
     erewrite (@Memory.split_o mem1 mem0); eauto. des_ifs.
     ss. des; clarify.
   }
-  subst. esplits; eauto. econs; eauto. ss.
+  subst. esplits; eauto.
+  { econs; eauto. ss. }
+  { i. eapply memory_concrete_le_closed_msg; try apply H. ii.
+    erewrite (@Memory.split_o mem1 mem0) in GET4; eauto.
+    erewrite (@Memory.add_o mem_mid1 mem_mid0); eauto.
+    erewrite (@Memory.remove_o mem_mid0 mem0); eauto. des_ifs.
+  }
 Qed.

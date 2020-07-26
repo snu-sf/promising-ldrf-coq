@@ -220,7 +220,7 @@ Proof.
   inv STEP0. inv STEP1; inv STEP0; [|inv LOCAL0]. ss.
   inv STEP. inv STEP0; ss.
   - inv STEP. ss. exploit reorder_promise_promise_cancel; eauto.
-    { des_ifs. }
+    { des_ifs. inv LOCAL1. inv PROMISE; ss. }
     i. des; clarify. esplits.
     + econs.
       * econs. econs 1. econs; eauto.
@@ -393,7 +393,7 @@ Proof.
   inv STEP0. inv STEP1; inv STEP0; [|inv LOCAL0]. ss.
   inv STEP. inv STEP0; ss.
   - inv STEP. ss. exploit reorder_promise_promise_cancel; eauto.
-    { des_ifs. }
+    { des_ifs. inv LOCAL1. inv PROMISE; ss. }
     i. des; clarify.
     { esplits.
       + econs 1.
