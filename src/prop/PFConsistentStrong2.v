@@ -266,10 +266,7 @@ Proof.
 
   clear x. des.
   eapply pf_step_promise_free_step_rtc in STEPS.
-  eapply steps_cancels_not_cancels in STEPS; cycle 1.
-  { ss. eapply Local.cap_wf; eauto. }
-  { ss. eapply Memory.cap_closed; eauto. }
-  { ss. eapply Memory.max_concrete_timemap_closed; eauto. } des.
+  eapply steps_cancels_not_cancels in STEPS; cycle 1. des.
 
   exploit Thread.rtc_cancel_step_future.
   { eapply STEPS1. }

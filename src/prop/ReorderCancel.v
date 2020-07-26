@@ -52,26 +52,6 @@ Proof.
   i. des. esplits; eauto.
 Qed.
 
-Lemma reorder_promise_read
-      lc0 mem0
-      lc1 mem1
-      lc2
-      loc1 from1 to1 msg1
-      loc2 to2 val2 released2 ord2
-      (STEP1: Local.read_step lc0 mem0 loc2 to2 val2 released2 ord2 lc1)
-      (STEP2: Local.promise_step lc1 mem0 loc1 from1 to1 msg1 lc2 mem1 Memory.op_kind_cancel)
-  :
-    exists lc1',
-      (<<STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 msg1 lc1' mem1 Memory.op_kind_cancel>>) /\
-      (<<STEP2: Local.read_step lc1' mem1 loc2 to2 val2 released2 ord2 lc2>>).
-Proof.
-  inv STEP1. inv STEP2.
-  hexploit MemoryFacts.promise_get1_diff; eauto.
-  { ii. clarify. ss. inv PROMISE.
-    eapply Memory.remove_get0 in MEM. des. clarify. }
-  i. des. esplits; eauto.
-Qed.
-
 Lemma remove_non_synch_loc loc0 prom0 loc1 from to msg prom1
       (NONSYNCH: Memory.nonsynch_loc loc0 prom0)
       (REMOVE: Memory.remove prom0 loc1 from to msg prom1)
@@ -204,9 +184,7 @@ Lemma reorder_step_cancel
       pf1 pf2 e1 e2 th0 th1 th2
       (STEP1: @Thread.step lang pf1 e1 th0 th1)
       (STEP2: Thread.step pf2 e2 th1 th2)
-      (CANCEL: is_cancel e2)
-      (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
-      (MEMORY: Memory.closed th0.(Thread.memory)):
+      (CANCEL: is_cancel e2):
   (exists th1',
     (<<STEP1: Thread.step pf2 e2 th0 th1'>>) /\
     (<<STEP2: Thread.step pf1 e1 th1' th2>>)) \/
@@ -214,14 +192,14 @@ Lemma reorder_step_cancel
 .
 Proof.
   unfold is_cancel in *. des_ifs.
-  inv STEP2; inv STEP; [|inv LOCAL0]. ss.
+  inv STEP2; inv STEP; [|inv LOCAL]. ss.
   inv STEP1; ss.
   - inv STEP. ss. exploit reorder_promise_promise_cancel; eauto.
     i. des; clarify; eauto.
     left. esplits.
     + econs 1. econs; eauto.
     + econs 1. econs; eauto.
-  - left. inv STEP. ss. inv LOCAL1; ss.
+  - left. inv STEP. ss. inv LOCAL0; ss.
     + esplits.
       * econs 1. econs; eauto.
       * econs 2. econs; eauto; ss.
@@ -245,7 +223,7 @@ Proof.
     + esplits.
       * econs 1. econs; eauto.
       * econs 2. econs; eauto.
-        econs. econs. inv LOCAL2. inv LOCAL0. inv PROMISE.
+        econs. econs. inv LOCAL1. inv LOCAL. inv PROMISE.
         ii. ss. erewrite Memory.remove_o in PROMISE; eauto. des_ifs.
         eapply CONSISTENT; eauto.
 Qed.
@@ -255,9 +233,6 @@ Lemma reorder_step_cancels
       pf e1 th0 th1 th2
       (STEP1: Thread.step pf e1 th0 th1)
       (STEPS2: rtc (@Thread.cancel_step lang) th1 th2)
-      (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
-      (MEMORY: Memory.closed th0.(Thread.memory))
-      (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
   :
     (exists th1',
         (<<STEPS1: rtc (@Thread.cancel_step lang) th0 th1'>>) /\
@@ -271,11 +246,8 @@ Proof.
     { eapply STEP1. }
     { eapply STEP. }
     { ss. }
-    { eauto. }
-    { eauto. }
     i. des.
-    { exploit Thread.step_future; try apply STEP0; eauto. i. des.
-      exploit IHSTEPS2; eauto. i. des.
+    { exploit IHSTEPS2; eauto. i. des.
       - left. esplits.
         + econs 2.
           * splits; auto. econs; eauto.
@@ -289,9 +261,6 @@ Qed.
 Lemma steps_cancels_not_cancels
       P lang th0 th2
       (STEPS: rtc (tau (@pred_step P lang)) th0 th2)
-      (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
-      (MEMORY: Memory.closed th0.(Thread.memory))
-      (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
   :
     exists th1,
       (<<STEPS1: rtc (@Thread.cancel_step _) th0 th1>>) /\
@@ -301,8 +270,7 @@ Proof.
   ginduction STEPS; i.
   - esplits; eauto.
   - inv H. inv TSTEP. inv STEP.
-    exploit Thread.step_future; eauto. i. des.
-    exploit IHSTEPS; eauto. i. des.
+    hexploit IHSTEPS; eauto. i. des.
     destruct (classic (is_cancel e)).
     + unfold is_cancel in H. des_ifs. esplits.
       * econs 2.
@@ -312,9 +280,6 @@ Proof.
     + exploit reorder_step_cancels.
       { eapply STEP0. }
       { eapply STEPS1. }
-      { eauto. }
-      { eauto. }
-      { eauto. }
       i. des; eauto. esplits.
       * eauto.
       * econs 2.
