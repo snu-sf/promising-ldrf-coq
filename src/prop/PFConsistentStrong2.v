@@ -266,18 +266,26 @@ Proof.
 
   clear x. des.
   eapply pf_step_promise_free_step_rtc in STEPS.
-  eapply pf_steps_cancels_not_cancels in STEPS; cycle 1.
+  eapply steps_cancels_not_cancels in STEPS; cycle 1.
   { ss. eapply Local.cap_wf; eauto. }
   { ss. eapply Memory.cap_closed; eauto. }
   { ss. eapply Memory.max_concrete_timemap_closed; eauto. } des.
 
-  exploit Thread.rtc_tau_step_future.
-  { eapply thread_steps_pred_steps. eapply STEPS1. }
+  exploit Thread.rtc_cancel_step_future.
+  { eapply STEPS1. }
   { ss. eapply Local.cap_wf; eauto. }
   { ss. eapply Memory.max_concrete_timemap_closed; eauto. }
   { ss. eapply Memory.cap_closed; eauto. }
   i. des. ss.
 
+  eapply rtc_implies with (R2 := tau (@pred_step is_cancel lang)) in STEPS1; cycle 1.
+  { clear. i. inv H. econs.
+    { econs; eauto.
+      { econs; eauto. }
+      { ss. }
+    }
+    { ss. }
+  }
   destruct th1. exploit no_sc_any_sc_rtc; try apply STEPS1; ss.
   { i. unfold is_cancel in PR. des_ifs. }
   i. des. instantiate (1:=sc1) in STEP. clear STEPS1.

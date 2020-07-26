@@ -122,7 +122,6 @@ Lemma reorder_promise_promise_cancel
       (STEP2: Local.promise_step lc1 mem1 loc2 from2 to2 msg2 lc2 mem2 kind2)
       (LOCAL0: Local.wf lc0 mem0)
       (MEM0: Memory.closed mem0)
-      (KIND1: Memory.op_kind_is_cancel kind1 = false)
       (KIND2: Memory.op_kind_is_cancel kind2 = true):
   (loc1 = loc2 /\ from1 = from2 /\ to1 = to2 /\ msg1 = Message.reserve /\ kind1 = Memory.op_kind_add /\
    lc0 = lc2 /\ mem0 = mem2) \/
@@ -166,6 +165,9 @@ Proof.
       exploit MemoryReorder.lower_remove; try exact MEM1; eauto. i. des.
       right. esplits; eauto. econs; eauto.
       eapply Memory.cancel_closed_message; eauto.
+  - exploit MemoryReorder.remove_remove; try apply PROMISES0; eauto. i. des.
+    exploit MemoryReorder.remove_remove; try apply MEM1; eauto. i. des.
+    right. esplits; eauto.
 Qed.
 
 Lemma reorder_promise_promise
@@ -820,7 +822,6 @@ Proof.
         { econs; eauto. }
         { right. ss. }
     + exploit reorder_promise_promise_cancel; eauto.
-      { destruct kind0; ss. }
       i. des; subst; eauto.
       right. right. esplits.
       { econs 1. econs; eauto. }

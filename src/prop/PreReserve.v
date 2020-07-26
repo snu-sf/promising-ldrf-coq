@@ -652,12 +652,6 @@ Proof.
   }
 Qed.
 
-Definition is_reserving (te: ThreadEvent.t): Prop :=
-  match te with
-  | ThreadEvent.promise _ _ _ Message.reserve Memory.op_kind_add => True
-  | _ => False
-  end.
-
 Lemma reserve_empty_intervals times lang (th: Thread.t lang) l
       (DISJOINT: disjoint_intervals l)
       (NITV: forall loc ts (ITV: intervals_sum l loc ts),
@@ -669,7 +663,7 @@ Lemma reserve_empty_intervals times lang (th: Thread.t lang) l
   :
     exists tr prom' mem',
       (<<STEPS: Trace.steps tr th (Thread.mk _ th.(Thread.state) (Local.mk th.(Thread.local).(Local.tview) prom') th.(Thread.sc) mem')>>) /\
-      (<<RESERVETRACE: List.Forall (fun em => <<SAT: (is_reserving /1\ wf_time_evt times) (snd em)>>) tr>>) /\
+      (<<RESERVETRACE: List.Forall (fun em => <<SAT: (is_reserve /1\ wf_time_evt times) (snd em)>>) tr>>) /\
       (<<ADDEDPROM: reservations_added l th.(Thread.local).(Local.promises) prom'>>) /\
       (<<ADDEDMEM: reservations_added l th.(Thread.memory) mem'>>)
 .
@@ -912,7 +906,7 @@ Lemma reserve_write_tos times lang (th: Thread.t lang) tos
   :
     exists l tr prom' mem',
       (<<STEPS: Trace.steps tr th (Thread.mk _ th.(Thread.state) (Local.mk th.(Thread.local).(Local.tview) prom') th.(Thread.sc) mem')>>) /\
-      (<<RESERVETRACE: List.Forall (fun em => <<SAT: (is_reserving /1\ wf_time_evt times) (snd em)>>) tr>>) /\
+      (<<RESERVETRACE: List.Forall (fun em => <<SAT: (is_reserve /1\ wf_time_evt times) (snd em)>>) tr>>) /\
       (<<ADDEDPROM: reservations_added l th.(Thread.local).(Local.promises) prom'>>) /\
       (<<ADDEDMEM: reservations_added l th.(Thread.memory) mem'>>) /\
       (<<WRITETO: forall loc ts (IN: List.In (loc, ts) tos),
@@ -1325,7 +1319,7 @@ Lemma can_reserve_all_needed times
       (<<RESERVESTEPS:
          Trace.steps tr_reserve (Thread.mk lang st0 lc0 sc0 mem0) (Thread.mk lang st0 lc0' sc0 mem0')>>) /\
       (<<RESERVETRACE:
-         List.Forall (fun em => <<SAT: (is_reserving /1\ wf_time_evt times) (snd em)>>) tr_reserve>>) /\
+         List.Forall (fun em => <<SAT: (is_reserve /1\ wf_time_evt times) (snd em)>>) tr_reserve>>) /\
       (<<CANCELTRACE: List.Forall (fun em => <<SAT: (is_cancel /1\ wf_time_evt times) (snd em)>>) tr_cancel>>) /\
       (<<RESERVEMEM: reservations_added reserves mem0 mem0'>>) /\
       (<<CAP:
