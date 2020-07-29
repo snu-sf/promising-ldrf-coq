@@ -2008,13 +2008,19 @@ Module SimCommon.
         (STEP_TGT: Local.fence_step lc1_tgt sc1_tgt ordr ordw lc2_tgt sc2_tgt):
     exists lc2_src sc2_src,
       <<STEP_SRC: Local.fence_step lc1_src sc1_src ordr ordw lc2_src sc2_src>> /\
-                  <<LC2: sim_local l lc2_src lc2_tgt>> /\
-                         <<SC2: sim_timemap l sc2_src sc2_tgt>> /\
-                                <<FULFILLABLE2: fulfillable l lc2_src.(Local.tview) mem1_src lc2_src.(Local.promises)>>.
+      <<LC2: sim_local l lc2_src lc2_tgt>> /\
+      <<SC2: sim_timemap l sc2_src sc2_tgt>> /\
+      <<FULFILLABLE2: fulfillable l lc2_src.(Local.tview) mem1_src lc2_src.(Local.promises)>>.
   Proof.
     inv STEP_TGT. esplits.
     - econs; eauto; cycle 1.
-      { admit. }
+      { i. subst. exploit PROMISES; eauto. i.
+        apply Memory.ext. i. rewrite Memory.bot_get.
+        destruct (Loc.eq_dec loc l); subst; eauto.
+        inv LC1. inv PROMISES0.
+        destruct (Memory.get loc ts lc1_src.(Local.promises)) as [[]|] eqn:GETP; ss.
+        exploit SOUND; eauto. i. des.
+        rewrite x in *. rewrite Memory.bot_get in *. ss. }
       ii. hexploit RELEASE; eauto.
       inv LC1. inv PROMISES0. exploit SOUND; eauto.
       { ii. subst. congr. }
@@ -2035,7 +2041,7 @@ Module SimCommon.
         { ii. subst. congr. }
         i. des. inv MSG. inv RELEASED.
         exploit RELEASE; eauto. ss.
-  Admitted.
+  Qed.
 
   Lemma failure_step
         l
