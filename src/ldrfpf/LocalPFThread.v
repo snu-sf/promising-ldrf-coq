@@ -1386,10 +1386,12 @@ Section SIM.
   .
   Proof.
     inv LOCAL. inv STEPTGT. esplits.
-    - econs; ss; eauto. ii.
-      set (PROM:= PROMS.(sim_promise_contents) loc t).
-      rewrite GET in *. inv PROM; ss.
-      exploit RELEASE; eauto.
+    - econs; ss; eauto.
+      + ii.
+        set (PROM:= PROMS.(sim_promise_contents) loc t).
+        rewrite GET in *. inv PROM; ss.
+        exploit RELEASE; eauto.
+      + i. eapply sim_promise_bot; eauto.
     - econs; ss; eauto.
   Qed.
 
@@ -1491,16 +1493,16 @@ Section SIM.
     - exploit split_succeed_wf; try apply PROMISES. i. des. clarify.
       set (PROMISE0:= PROMISE.(sim_promise_contents) loc ts3). rewrite GET2 in *.
       inv PROMISE0; ss.
-      hexploit (@Memory.split_exists prom_src loc from to ts3 (Message.concrete val' released')); ss.
+      hexploit (@Memory.split_exists prom_src loc from to ts3 (Message.concrete val'0 released'0)); ss.
       { eauto. }
       intros [prom_src' SPLITPROMSRC].
       exploit Memory.split_exists_le; try apply SPLITPROMSRC; eauto.
       intros [mem_src' SPLITMEMSRC].
 
-      assert (PROMISESRC: Memory.promise prom_src mem_src loc from to (Message.concrete val' released') prom_src' mem_src' (Memory.op_kind_split ts3 msg3)).
+      assert (PROMISESRC: Memory.promise prom_src mem_src loc from to (Message.concrete val'0 released'0) prom_src' mem_src' (Memory.op_kind_split ts3 (Message.concrete val' released'))).
       { econs; eauto. }
 
-      assert (CLOSEDMSG: Memory.closed_message (Message.concrete val' released') mem_src').
+      assert (CLOSEDMSG: Memory.closed_message (Message.concrete val'0 released'0) mem_src').
       { eapply semi_closed_message_split; eauto. }
 
       exists prom_src', mem_src'. splits; auto.
@@ -1529,7 +1531,7 @@ Section SIM.
         { i. hexploit PROMISE.(sim_promise_extra); eauto. i. des.
           esplits; eauto. erewrite (@Memory.split_o prom_src'); eauto. des_ifs.
           - ss. des; clarify. exfalso. eapply NLOC. eapply PROMSWF; eauto. right. eauto.
-          - ss. des; clarify. exfalso. eapply NLOC. eapply PROMSWF; eauto. right. eauto. }
+          - ss. des; clarify. }
 
     (* lower case *)
     - exploit lower_succeed_wf; try apply PROMISES. i. des. clarify.
@@ -2011,8 +2013,6 @@ Section SIM.
       { inv PROM; ss.
         { symmetry in H0. apply MLESRC in H0.
           rewrite H0 in *. inv MEM1. esplits; eauto. }
-        { symmetry in H0. apply MLESRC in H0.
-          rewrite H0 in *. inv MEM1. esplits; eauto. }
       } des.
       assert (TS0: Time.lt from_src to).
       { eapply LB; auto.
@@ -2088,9 +2088,6 @@ Section SIM.
           { ss. des; subst. exfalso. eapply Time.lt_strorder; eauto. }
           { ss. des; clarify. econs 3; auto. right. auto. }
           { ss. des; clarify. inv PROM; ss.
-            { inv MEM1. econs 2; eauto.
-              { refl. }
-              { i. apply eq_lb_time. } }
             { dup H0. symmetry in H0. apply MLESRC in H0.
               rewrite H0 in *. inv MEM1.
               econs 3; eauto.
@@ -2113,7 +2110,6 @@ Section SIM.
           { ss. des; clarify. econs 4; auto.
             ii. eapply NEXTRATO. eauto. }
           { ss. des; clarify. inv PROM; ss.
-            { inv MEM1. econs 3; eauto. }
             { econs 4; eauto. }
           }
           { eapply (PROMISE.(sim_promise_contents)). }
@@ -3261,7 +3257,6 @@ Section SIM.
     - inv STEP0; ss. inv LOCAL; ss.
       + exploit sim_fence_step; eauto. i. des. esplits; eauto.
         * econs 2; eauto. econs; eauto.
-          inv SIM. eapply sim_promise_bot in PROMS; eauto.
       + exploit sim_failure_step; eauto. i. des. esplits; eauto.
         * econs 2; eauto. econs; eauto.
   Qed.
@@ -3329,10 +3324,12 @@ Section SIM.
   .
   Proof.
     inv LOCAL. inv STEPTGT. esplits.
-    - econs; ss; eauto. ii.
-      set (PROM:= PROMS.(sim_promise_strong_contents) loc t).
-      rewrite GET in *. inv PROM; ss.
-      exploit RELEASE; eauto.
+    - econs; ss; eauto.
+      + ii. set (PROM:= PROMS.(sim_promise_strong_contents) loc t).
+        rewrite GET in *. inv PROM; ss.
+        exploit RELEASE; eauto.
+      + i. eapply sim_promise_strong_sim_promise in PROMS.
+        eapply sim_promise_bot in PROMS; eauto.
     - econs; ss; eauto.
   Qed.
 
@@ -3370,9 +3367,7 @@ Section SIM.
     - inv STEP0; ss.
     - inv STEP0; ss. inv LOCAL; ss.
       + exploit sim_fence_step_strong; eauto. i. des. esplits; eauto.
-        * econs 2; eauto. econs; eauto. econs; eauto.
-          inv SIM. eapply sim_promise_bot in PROMISES; eauto.
-          eapply sim_promise_strong_sim_promise; eauto.
+        * econs 2; eauto. econs; eauto.
       + exploit sim_failure_step; eauto.
         { eapply sim_local_strong_sim_local; eauto. }
         i. des. esplits; eauto.

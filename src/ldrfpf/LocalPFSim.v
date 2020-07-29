@@ -2783,7 +2783,7 @@ Section SIM.
     }
     { assert (BOT: Local.promises lc3 = Memory.bot).
       { destruct e0; ss. inv STEP1; inv STEP; ss. inv LOCAL.
-        inv LOCAL0; ss. }
+        inv LOCAL0; ss. eauto. }
       hexploit CERTBOTNIL; auto. i. subst.
       eexists _, [], ident_map. erewrite List.app_nil_r. esplits; eauto.
       { eapply ident_map_lt. }

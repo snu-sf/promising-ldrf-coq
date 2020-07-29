@@ -1785,12 +1785,14 @@ Section MAPPED.
       + eauto.
       + eapply Memory.split_get0 in PROMISES. des. eauto.
       + eapply Memory.split_get0 in SPLIT0. des. eauto.
-    - econs; eauto. econs; eauto. econs.
-      inv TS. eapply View.unwrap_opt_le in VIEWLE.
-      eapply unwrap_map in VIEW.
-      eapply map_rlx in VIEW. specialize (VIEW loc).
-      eapply map_le in TS0; cycle 1; eauto.
-      etrans; eauto. inv VIEWLE. eauto.
+    - econs; eauto. econs; eauto.
+      + econs.
+        inv TS. eapply View.unwrap_opt_le in VIEWLE.
+        eapply unwrap_map in VIEW.
+        eapply map_rlx in VIEW. specialize (VIEW loc).
+        eapply map_le in TS0; cycle 1; eauto.
+        etrans; eauto. inv VIEWLE. eauto.
+      + inv MSG. eauto.
   Qed.
 
   Lemma promise_add_map mem0 fmem0 prom0 fprom0 loc from ffrom to fto msg fmsg mem1 prom1
@@ -1893,8 +1895,9 @@ Section MAPPED.
     { eapply Memory.split_get0 in PROMISES. des.
       inv PROM. eapply MAPPED in GET0. des. auto. }
     i. des. esplits; eauto. inv MSG. econs; eauto.
-    econs. inv TS. eapply map_le; eauto.
-    eapply map_rlx. eapply unwrap_map; eauto.
+    - econs. inv TS. eapply map_le; eauto.
+      eapply map_rlx. eapply unwrap_map; eauto.
+    - inv MSG0. eauto.
   Qed.
 
   Lemma promise_cancel_map mem0 fmem0 prom0 fprom0 loc from ffrom to fto msg fmsg mem1 prom1
@@ -2127,7 +2130,10 @@ Section MAPPED.
     exploit write_fence_tview_map; eauto. intros WRITEVIEW.
     exploit write_fence_tview_mon_same_ord; eauto. intros WRITEVIEWLE.
     esplits.
-    - econs; ss. i. eapply nonsynch_map; eauto.
+    - econs; ss.
+      + i. eapply nonsynch_map; eauto.
+      + i. subst. erewrite PROMISES0 in PROMISES; eauto.
+        eapply bot_promises_map; eauto.
     - econs; eauto.
     - eapply write_fence_sc_map; eauto.
     - eapply write_fence_fc_mon_same_ord; eauto.
@@ -2430,8 +2436,6 @@ Section MAPPED.
         esplits; eauto.
         * econs; eauto.
         * econs; eauto. econs 2; eauto. econs; eauto.
-          inv LOCAL. rewrite PROMISES0 in *.
-          eapply bot_promises_map in PROMISES1; eauto.
       + inv LOCAL1. esplits; eauto.
         * econs; eauto.
         * econs; eauto. econs 2; eauto. econs; eauto.

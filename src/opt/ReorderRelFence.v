@@ -336,7 +336,10 @@ Lemma sim_local_fence_relfenced
     <<SC2: TimeMap.le sc2_src sc2_tgt>>.
 Proof.
   inv STEP_TGT. esplits; eauto.
-  - econs; eauto. i. eapply sim_local_nonsynch; eauto.
+  - econs; eauto.
+    + i. eapply sim_local_nonsynch; eauto.
+    + i. subst. eapply sim_local_memory_bot; eauto.
+      eapply PROMISES; eauto. destruct ordw_tgt; ss.
   - inv LOCAL1. inv TVIEW. econs; ss.
     econs; s; unfold LocFun.find; repeat condtac; aggrtac.
     + etrans; eauto. apply WF1_TGT.
@@ -378,8 +381,10 @@ Lemma sim_local_fence_src_relfenced
     <<SC2: TimeMap.le sc2_src sc1_tgt>>.
 Proof.
   inv LOCAL1. inv TVIEW. ss.
-  esplits; eauto. econs; eauto. econs; ss; eauto.
-  repeat (condtac; aggrtac).
+  esplits; eauto.
+  - econs; eauto. i. ss.
+  - econs; eauto. econs; ss; eauto.
+    repeat (condtac; aggrtac).
 Qed.
 
 Lemma sim_local_fence_tgt_relfenced

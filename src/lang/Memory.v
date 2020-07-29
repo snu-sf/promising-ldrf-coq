@@ -377,7 +377,8 @@ Module Memory.
       (PROMISES: split promises1 loc from to ts3 msg msg3 promises2)
       (MEM: split mem1 loc from to ts3 msg msg3 mem2)
       (TS: message_to msg loc to)
-      (RESERVE: exists val' released', msg = Message.concrete val' released'):
+      (RESERVE: exists val' released', msg = Message.concrete val' released')
+      (RESERVEORIGINAL: exists val' released', msg3 = Message.concrete val' released'):
       promise promises1 mem1 loc from to msg promises2 mem2 (op_kind_split ts3 msg3)
   | promise_lower
       msg0

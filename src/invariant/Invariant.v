@@ -203,9 +203,9 @@ Section Invariant.
     - erewrite Memory.split_o; eauto. condtac; ss.
       { i. des. inv SEM. congr. }
       condtac; ss.
-      { guardH o. i. des. inv SEM.
+      { guardH o. i. des. inv SEM. ss.
         exploit Memory.split_get0; try exact MEM; eauto. i. des.
-        esplits; eauto.
+        clarify. esplits; eauto.
       }
       i. esplits; eauto.
     - erewrite Memory.lower_o; eauto. condtac; ss.

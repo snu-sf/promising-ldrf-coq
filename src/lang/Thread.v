@@ -561,5 +561,55 @@ Module Thread.
           hexploit Memory.promise_prev_None; eauto. i.
           eapply IHSTEPS; eauto.
     Qed.
+
+    Inductive reserve_step (e1 e2:t): Prop :=
+    | reserve_step_intro
+        pf loc from to
+        (STEP: step pf (ThreadEvent.promise loc from to Message.reserve Memory.op_kind_add) e1 e2)
+    .
+    Hint Constructors reserve_step.
+    
+    Inductive cancel_step (e1 e2:t): Prop :=
+    | cancel_step_intro
+        pf loc from to
+        (STEP: Thread.step pf (ThreadEvent.promise loc from to Message.reserve Memory.op_kind_cancel) e1 e2)
+    .
+    Hint Constructors cancel_step.
+
+    Lemma rtc_reserve_step_future
+          e1 e2
+          (STEP: rtc reserve_step e1 e2)
+          (WF1: Local.wf e1.(local) e1.(memory))
+          (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
+          (CLOSED1: Memory.closed e1.(memory)):
+      <<WF2: Local.wf e2.(local) e2.(memory)>> /\
+      <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
+      <<CLOSED2: Memory.closed e2.(memory)>> /\
+      <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
+      <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
+      <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>>.
+    Proof.
+      apply rtc_all_step_future; auto.
+      eapply rtc_implies; [|eauto].
+      i. inv H. eauto.
+    Qed.
+
+    Lemma rtc_cancel_step_future
+          e1 e2
+          (STEP: rtc cancel_step e1 e2)
+          (WF1: Local.wf e1.(local) e1.(memory))
+          (SC1: Memory.closed_timemap e1.(sc) e1.(memory))
+          (CLOSED1: Memory.closed e1.(memory)):
+      <<WF2: Local.wf e2.(local) e2.(memory)>> /\
+      <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
+      <<CLOSED2: Memory.closed e2.(memory)>> /\
+      <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
+      <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
+      <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>>.
+    Proof.
+      apply rtc_all_step_future; auto.
+      eapply rtc_implies; [|eauto].
+      i. inv H. eauto.
+    Qed.
   End Thread.
 End Thread.

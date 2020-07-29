@@ -190,7 +190,8 @@ Lemma progress_write_step_split
       (WF_REL: View.opt_wf releasedm)
       (TS_REL: Time.le (releasedm.(View.unwrap).(View.rlx) loc) from)
       (CLOSED_REL: Memory.closed_opt_view releasedm mem1)
-      (PROMISES1: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc lc1.(Local.promises)):
+      (PROMISES1: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc lc1.(Local.promises))
+      (RESERVE: exists val' released', msg = Message.concrete val' released'):
   exists released lc2 sc2 mem2,
     Local.write_step lc1 sc1 mem1 loc from (Time.middle from to) val releasedm
                      released ord lc2 sc2 mem2 (Memory.op_kind_split to msg).
@@ -248,7 +249,8 @@ Qed.
 Lemma progress_fence_step
       lc1 sc1
       ordr ordw
-      (PROMISES1: Ordering.le Ordering.strong_relaxed ordw -> Memory.nonsynch lc1.(Local.promises)):
+      (PROMISES1: Ordering.le Ordering.strong_relaxed ordw -> Memory.nonsynch lc1.(Local.promises))
+      (PROMISES2: ordw = Ordering.seqcst -> lc1.(Local.promises) = Memory.bot):
   exists lc2 sc2,
     Local.fence_step lc1 sc1 ordr ordw lc2 sc2.
 Proof.

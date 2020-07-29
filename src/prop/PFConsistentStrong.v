@@ -171,18 +171,23 @@ Proof.
 
   clear x. des.
   eapply pf_step_promise_free_step_rtc in STEPS.
-  eapply pf_steps_cancels_not_cancels in STEPS; cycle 1.
-  { ss. eapply Local.cap_wf; eauto. }
-  { ss. eapply Memory.cap_closed; eauto. }
-  { ss. eapply Memory.max_concrete_timemap_closed; eauto. } des.
+  eapply steps_cancels_not_cancels in STEPS; cycle 1. des.
 
-  exploit Thread.rtc_tau_step_future.
-  { eapply thread_steps_pred_steps. eapply STEPS1. }
+  exploit Thread.rtc_cancel_step_future.
+  { eapply STEPS1. }
   { ss. eapply Local.cap_wf; eauto. }
   { ss. eapply Memory.max_concrete_timemap_closed; eauto. }
   { ss. eapply Memory.cap_closed; eauto. }
   i. des. ss.
 
+  eapply rtc_implies with (R2 := tau (@pred_step is_cancel lang)) in STEPS1; cycle 1.
+  { clear. i. inv H. econs.
+    { econs; eauto.
+      { econs; eauto. }
+      { ss. }
+    }
+    { ss. }
+  }
   destruct th1. exploit no_sc_any_sc_rtc; try apply STEPS1; ss.
   { i. unfold is_cancel in PR. des_ifs. }
   i. des. instantiate (1:=sc1) in STEP. clear STEPS1.
@@ -305,7 +310,7 @@ Proof.
     { instantiate (1:=(fun em => <<SAT: (promise_free /1\ no_sc) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>)).
       eapply Forall_app.
       { eapply List.Forall_impl; eauto. i. ss. destruct a. ss. des.
-        destruct t0; ss. destruct kind; ss. }
+        destruct t0; ss. des_ifs. }
       { eapply List.Forall_impl; eauto. i. ss. des. splits; auto. }
     }
     { i. ss. des. splits; auto. }
@@ -666,9 +671,11 @@ Proof.
   { unfold cancel_normal_trace in *. des. subst.
     eapply List.Forall2_app_inv_l in TRACE. des. esplits; eauto.
     { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
-      destruct a, x. ss. eapply List.Forall_forall in IN; eauto. ss. inv SAT; ss. inv KIND; ss. }
+      destruct a, x. ss. eapply List.Forall_forall in IN; eauto. ss. inv SAT; ss.
+      inv KIND; ss; des_ifs. inv MSG. }
     { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
-      destruct a, x. ss. eapply List.Forall_forall in IN; eauto. ss. inv SAT; ss. inv KIND; ss. }
+      destruct a, x. ss. eapply List.Forall_forall in IN; eauto. ss. inv SAT; ss.
+      inv KIND; ss; des_ifs. inv MSG. }
   }
   { eapply MAPALL. }
   { i. eapply MAPALL in TS; eauto.
@@ -771,7 +778,7 @@ Definition pf_consistent_super_strong_split lang (e0:Thread.t lang)
        ,
        exists ftr_reserve ftr_cancel e2,
          (<<STEPS: Trace.steps ftr_reserve e_mid e2>>) /\
-         (<<RESERVE: List.Forall (fun em => <<SAT: (is_reserving /1\ wf_time_evt times) (snd em)>>) ftr_reserve>>) /\
+         (<<RESERVE: List.Forall (fun em => <<SAT: (is_reserve /1\ wf_time_evt times) (snd em)>>) ftr_reserve>>) /\
          (<<CANCEL: List.Forall (fun em => <<SAT: (is_cancel /1\ wf_time_evt times) (snd em)>>) ftr_cancel>>) /\
          (<<CONSISTENT: pf_consistent_special e2 (ftr_cancel ++ ftr1) times>>) /\
          (<<CANCELNORMAL: cancel_normal_trace (ftr_cancel ++ ftr1)>>)>>) /\
@@ -937,10 +944,10 @@ Proof.
     subst. eapply List.Forall2_app_inv_l in TRACE0. des. subst. esplits; eauto.
     { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
       eapply List.Forall_forall in IN; eauto. ss.
-      destruct a, x. ss. inv EVENT; ss. inv KIND; ss. }
+      destruct a, x. ss. inv EVENT; ss. inv KIND; ss; des_ifs. inv MSG. }
     { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
       eapply List.Forall_forall in IN; eauto. ss.
-      destruct a, x. ss. inv EVENT; ss. inv KIND; ss. }
+      destruct a, x. ss. inv EVENT; ss. inv KIND; ss; des_ifs. inv MSG. }
   }
   { eapply list_Forall2_compose.
     { eapply TRACE. }
@@ -1009,7 +1016,7 @@ Proof.
     }
     { eapply Forall_app; eauto.
       eapply List.Forall_impl; eauto. i. ss. des.
-      destruct a. ss. destruct t0; ss. destruct kind; ss.
+      destruct a. ss. destruct t0; ss. des_ifs.
     }
     { unfold cancel_normal_trace. esplits; eauto.
       eapply List.Forall_impl; eauto. i. ss. des; auto.
@@ -1050,7 +1057,7 @@ Definition pf_consistent_super_strong_aux lang (e0:Thread.t lang)
               (NORMAL: List.Forall (fun em => ~ is_cancel (snd em)) ftr1),
        exists ftr_reserve ftr_cancel e2,
          (<<STEPS: Trace.steps ftr_reserve e_mid e2>>) /\
-         (<<RESERVE: List.Forall (fun em => <<SAT: (is_reserving
+         (<<RESERVE: List.Forall (fun em => <<SAT: (is_reserve
                                                      /1\ wf_time_evt times
                                                      /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (incr_time_seq (tm loc))>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))) (snd em)>>) ftr_reserve>>) /\
          (<<CANCEL: List.Forall (fun em => <<SAT: (is_cancel /1\ wf_time_evt times) (snd em)>>) ftr_cancel>>) /\
@@ -1162,7 +1169,7 @@ Definition pf_consistent_super_strong_aux2 lang (e0:Thread.t lang)
               (NORMAL: List.Forall (fun em => ~ is_cancel (snd em)) ftr1),
        exists ftr_reserve ftr_cancel e2,
          (<<STEPS: Trace.steps (ftr0 ++ ftr_reserve) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) TimeMap.bot mem1) e2>>) /\
-         (<<RESERVE: List.Forall (fun em => <<SAT: (is_reserving
+         (<<RESERVE: List.Forall (fun em => <<SAT: (is_reserve
                                                       /1\ wf_time_evt times
                                                       /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (tm loc)>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))) (snd em)>>) ftr_reserve>>) /\
          (<<CANCEL: List.Forall (fun em => <<SAT: (is_cancel /1\ wf_time_evt times) (snd em)>>) ftr_cancel>>) /\
@@ -1325,9 +1332,11 @@ Proof.
   { unfold cancel_normal_trace in *. des. subst.
     eapply List.Forall2_app_inv_l in LCTRACE. des. subst. esplits; eauto.
     { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
-      destruct a, x. ss. eapply List.Forall_forall in IN; eauto. ss. inv SAT; ss. inv KIND; ss. }
+      destruct a, x. ss. eapply List.Forall_forall in IN; eauto. ss. inv SAT; ss.
+      inv KIND; ss; des_ifs. inv MSG. }
     { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
-      destruct a, x. ss. eapply List.Forall_forall in IN; eauto. ss. inv SAT; ss. inv KIND; ss. }
+      destruct a, x. ss. eapply List.Forall_forall in IN; eauto. ss. inv SAT; ss.
+      inv KIND; ss; des_ifs. inv MSG. }
   }
   { i. subst.
     assert (exists l1 l2 e_mid fe_mid,
@@ -1398,7 +1407,8 @@ Proof.
     { clear - LCTRACE1 NORMAL.
       eapply List.Forall_forall. i. eapply list_Forall2_in2 in H; eauto.
       des. eapply List.Forall_forall in IN; eauto. ss.
-      destruct b, x. ss. inv SAT; ss. inv KIND; ss. }
+      destruct b, x. ss. inv SAT; ss.
+      inv KIND; ss; des_ifs. inv MSG. }
     i. des.
     inv MAP0. destruct e2. ss.
 
@@ -1527,7 +1537,7 @@ Definition pf_consistent_super_strong lang (e0:Thread.t lang)
               (NORMAL: List.Forall (fun em => ~ is_cancel (snd em)) ftr1),
        exists ftr_reserve ftr_cancel e2,
          (<<STEPS: Trace.steps (ftr0 ++ ftr_reserve) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc mem1) e2>>) /\
-         (<<RESERVE: List.Forall (fun em => <<SAT: (is_reserving
+         (<<RESERVE: List.Forall (fun em => <<SAT: (is_reserve
                                                       /1\ wf_time_evt times
                                                       /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (tm loc)>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))) (snd em)>>) ftr_reserve>>) /\
          (<<CANCEL: List.Forall (fun em => <<SAT: (is_cancel /1\ wf_time_evt times) (snd em)>>) ftr_cancel>>) /\
@@ -1962,9 +1972,11 @@ Proof.
   { clear - CANCELNORMAL TRACE0. unfold cancel_normal_trace in *. des. subst.
     eapply List.Forall2_app_inv_l in TRACE0. des. subst. esplits; eauto.
     { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
-      eapply List.Forall_forall in IN; eauto. destruct a, x. ss. inv EVENT; ss. inv KIND; ss. }
+      eapply List.Forall_forall in IN; eauto. destruct a, x. ss. inv EVENT; ss.
+      inv KIND; ss; des_ifs. inv MSG. }
     { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
-      eapply List.Forall_forall in IN; eauto. destruct a, x. ss. inv EVENT; ss. inv KIND; ss. }
+      eapply List.Forall_forall in IN; eauto. destruct a, x. ss. inv EVENT; ss.
+      inv KIND; ss; des_ifs. inv MSG. }
   }
   { ii. des. erewrite <- (MAPLTGOOD loc ts0 ts1 t0 t1); eauto. }
   { ii. des.
@@ -2248,7 +2260,7 @@ Qed.
 
 Lemma no_concrete_promise_concrete_decrease_steps lang (th0 th1: Thread.t lang) tr
       (STEPS: Trace.steps tr th0 th1)
-      (NOPROMISE: List.Forall (fun em => <<SAT: (promise_free \1/ is_reserving) (snd em)>>) tr)
+      (NOPROMISE: List.Forall (fun em => <<SAT: (promise_free \1/ is_reserve) (snd em)>>) tr)
       loc ts from val released
       (GET: Memory.get loc ts th1.(Thread.local).(Local.promises) =
             Some (from, Message.concrete val released))
@@ -2339,18 +2351,18 @@ Definition pf_consistent_super_strong_promises_list lang (e0:Thread.t lang)
               max),
       (exists ftr0 ftr1 ftr_reserve ftr_cancel e1 f we val,
           (<<STEPS: Trace.steps (ftr0 ++ ftr_reserve) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc mem1) e1>>) /\
-          (<<EVENTS: List.Forall (fun em => <<SAT: ((promise_free \1/ is_reserving)
+          (<<EVENTS: List.Forall (fun em => <<SAT: ((promise_free \1/ is_reserve)
                                                       /1\ no_sc
                                                       /1\ no_read_msgs (fun loc ts => ~ (covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts \/ Time.lt (tm loc) ts))
                                                       /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (tm loc)>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))
                                                       /1\ wf_time_evt times) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) (ftr0 ++ ftr_reserve) >>) /\
 
-          (<<RESERVE: List.Forall (fun em => <<SAT: (is_reserving
+          (<<RESERVE: List.Forall (fun em => <<SAT: (is_reserve
                                                        /1\ wf_time_evt times
                                                        /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (tm loc)>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))) (snd em)>>) ftr_reserve>>) /\
           (<<CANCEL: List.Forall (fun em => <<SAT: (is_cancel /1\ wf_time_evt times) (snd em)>>) ftr_cancel>>) /\
 
-          (<<EVENTSCERT: List.Forall (fun em => <<SAT: ((promise_free \1/ is_reserving)
+          (<<EVENTSCERT: List.Forall (fun em => <<SAT: ((promise_free \1/ is_reserve)
                                                           /1\ no_sc
                                                           /1\ no_read_msgs (fun loc ts => ~ (covered loc ts e0.(Thread.local).(Local.promises) \/ concrete_promised e0.(Thread.memory) loc ts \/ Time.lt (tm loc) ts))
                                                           /1\ write_not_in (fun loc ts => (<<TS: Time.le ts (tm loc)>>) /\ (<<PROM: ~ covered loc ts e0.(Thread.local).(Local.promises)>>))
@@ -2504,10 +2516,10 @@ Proof.
     }
     { eapply Forall_app.
       { eapply List.Forall_impl; eauto. i. ss. des. destruct a. ss. splits; auto.
-        { destruct t4; ss. destruct kind; ss. auto. }
+        { destruct t4; ss. destruct kind; ss; des_ifs. auto. }
         { destruct t4; ss. }
         { destruct t4; ss. }
-        { destruct t4; ss. destruct kind; ss. }
+        { destruct t4; ss. des_ifs. }
         { destruct t4; ss. }
       }
       { eapply Forall_app_inv in EVENTS. des.
@@ -2535,7 +2547,7 @@ Proof.
     }
     { erewrite <- List.app_assoc. eapply final_event_trace_post.
       econs. eapply List.Forall_impl; eauto. i. ss. des; auto.
-      clear - H. destruct a. ss. unfold is_reserving in *. des_ifs.
+      clear - H. destruct a. ss. unfold is_reserve in *. des_ifs.
     }
     { i. eapply no_concrete_promise_concrete_decrease_steps in STEPS0; eauto.
       eapply Forall_app.

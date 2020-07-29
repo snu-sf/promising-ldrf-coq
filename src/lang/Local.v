@@ -247,7 +247,8 @@ Module Local.
       (READ: TView.read_fence_tview lc1.(tview) ordr = tview2)
       (RELEASE: Ordering.le Ordering.strong_relaxed ordw -> Memory.nonsynch lc1.(promises))
       (LC2: lc2 = mk (TView.write_fence_tview tview2 sc1 ordw) lc1.(promises))
-      (SC2: sc2 = TView.write_fence_sc tview2 sc1 ordw):
+      (SC2: sc2 = TView.write_fence_sc tview2 sc1 ordw)
+      (PROMISES: ordw = Ordering.seqcst -> lc1.(Local.promises) = Memory.bot):
       fence_step lc1 sc1 ordr ordw lc2 sc2
   .
   Hint Constructors fence_step.
@@ -289,8 +290,7 @@ Module Local.
   | step_syscall
       lc1 sc1 mem1
       e lc2 sc2
-      (LOCAL: Local.fence_step lc1 sc1 Ordering.seqcst Ordering.seqcst lc2 sc2)
-      (PROMISES: lc1.(Local.promises) = Memory.bot):
+      (LOCAL: Local.fence_step lc1 sc1 Ordering.seqcst Ordering.seqcst lc2 sc2):
       program_step (ThreadEvent.syscall e) lc1 sc1 mem1 lc2 sc2 mem1
   | step_failure
       lc1 sc1 mem1

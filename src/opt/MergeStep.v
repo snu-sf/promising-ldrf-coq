@@ -175,6 +175,7 @@ Proof.
     - etrans; [apply WF0|]. etrans; eauto. left. auto.
   }
   { apply WF0. }
+  { eauto. }
   i. des.
   assert (REL1'_CLOSED: Memory.closed_opt_view released1' mem1).
   { unfold released1'. eapply TViewFacts.op_closed_released; eauto; try apply WF0.
@@ -419,7 +420,7 @@ Proof.
   - erewrite Memory.split_o; eauto. repeat condtac; ss.
     + guardH o. guardH o0. des. subst.
       exploit Memory.split_get0; try exact PROMISES0; eauto. i. des. inv GET.
-      eapply PROMISES. eauto.
+      exploit PROMISES; eauto.
     + apply PROMISES.
   - erewrite Memory.lower_o; eauto. condtac; ss. apply PROMISES.
 Qed.

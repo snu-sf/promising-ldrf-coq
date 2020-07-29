@@ -243,7 +243,9 @@ Proof.
     exploit LowerPromises.rtc_opt_promise_step_future; eauto. s. i. des. inv STATE.
     hexploit LowerPromises.promises_rel_promise_consistent; eauto. i.
     hexploit LowerPromises.promises_rel_nonsynch; eauto. i.
-    exploit progress_fence_step; eauto. i. des.
+    exploit progress_fence_step; eauto.
+    { instantiate (1:=ow2). i. subst. ss. }
+    i. des.
     esplits.
     + eapply rtc_n1; eauto. econs.
       * econs. econs 2. econs; [|econs 5; eauto]. econs. econs.

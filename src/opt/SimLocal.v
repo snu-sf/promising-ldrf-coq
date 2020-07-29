@@ -475,6 +475,8 @@ Lemma sim_local_fence
 Proof.
   inv STEP_TGT. esplits; eauto.
   - econs; eauto. i. eapply sim_local_nonsynch; eauto.
+    i. eapply sim_local_memory_bot; eauto. eapply PROMISES.
+    subst. destruct ordw_tgt; ss.
   - econs; try apply LOCAL1. s.
     apply TViewFacts.write_fence_tview_mon; auto; try refl.
     apply TViewFacts.read_fence_tview_mon; auto; try refl.
@@ -554,7 +556,6 @@ Proof.
   - exploit sim_local_fence; eauto; try refl. i. des.
     esplits; (try by econs; [|econs 5]; eauto); ss.
   - exploit sim_local_fence; eauto; try refl. i. des.
-    eapply sim_local_memory_bot in PROMISES; eauto.
     esplits; (try by econs; [|econs 6]; eauto); ss.
   - exploit sim_local_failure; eauto. i. des.
     esplits; (try by econs; [|econs 7]; eauto); ss.

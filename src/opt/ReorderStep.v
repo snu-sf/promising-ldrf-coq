@@ -114,7 +114,7 @@ Proof.
     + inv MEM0. exploit CLOSED; try exact GET. i. des.
       exploit CLOSED; try exact GET0. i. des. f_equal.
       inv MSG_WF. inv MSG_WF0.
-      apply TView.antisym; apply ReorderTView.read_read_tview; 
+      apply TView.antisym; apply ReorderTView.read_read_tview;
         (try by apply WF0); eauto.
 Qed.
 
@@ -825,7 +825,9 @@ Proof.
   inv STEP1. inv STEP2. ss.
   esplits.
   - econs; eauto.
-  - econs; eauto. s. i. destruct ordw1; inv ORDW1; inv H.
+  - econs; eauto.
+    + s. i. destruct ordw1; inv ORDW1; inv H.
+    + s. i. destruct ordw1; inv ORDW1; inv H.
 Qed.
 
 Lemma reorder_fence_fulfill
@@ -871,14 +873,18 @@ Proof.
           eapply TViewFacts.read_fence_future; apply WF0.
         }
       * apply TViewFacts.write_fence_sc_incr.
-  - econs; eauto. ss. ii. revert GET.
-    erewrite Memory.remove_o; eauto. condtac; ss. i. eapply RELEASE; eauto.
+  - econs; eauto.
+    + ss. ii. revert GET.
+      erewrite Memory.remove_o; eauto. condtac; ss. i. eapply RELEASE; eauto.
+    + ss. ii. subst. erewrite PROMISES in REMOVE; eauto.
+      eapply Memory.remove_get0 in REMOVE. des.
+      erewrite Memory.bot_get in *. ss.
   - s. econs; s.
     + etrans; [|etrans].
       * apply TViewFacts.write_fence_tview_mon; [|refl|refl|].
         { apply ReorderTView.read_fence_write_tview; auto. apply WF0. }
         { exploit Memory.remove_get0; eauto. s. i. des.
-          inv WF0. exploit PROMISES; eauto. i.
+          inv WF0. exploit PROMISES0; eauto. i.
           exploit TViewFacts.write_future_fulfill; try exact SC0; eauto.
           { inv MEM0. exploit CLOSED; eauto. i. des. inv MSG_CLOSED. ss.  }
           i. des.

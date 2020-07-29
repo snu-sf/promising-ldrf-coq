@@ -266,18 +266,23 @@ Proof.
 
   clear x. des.
   eapply pf_step_promise_free_step_rtc in STEPS.
-  eapply pf_steps_cancels_not_cancels in STEPS; cycle 1.
-  { ss. eapply Local.cap_wf; eauto. }
-  { ss. eapply Memory.cap_closed; eauto. }
-  { ss. eapply Memory.max_concrete_timemap_closed; eauto. } des.
+  eapply steps_cancels_not_cancels in STEPS; cycle 1. des.
 
-  exploit Thread.rtc_tau_step_future.
-  { eapply thread_steps_pred_steps. eapply STEPS1. }
+  exploit Thread.rtc_cancel_step_future.
+  { eapply STEPS1. }
   { ss. eapply Local.cap_wf; eauto. }
   { ss. eapply Memory.max_concrete_timemap_closed; eauto. }
   { ss. eapply Memory.cap_closed; eauto. }
   i. des. ss.
 
+  eapply rtc_implies with (R2 := tau (@pred_step is_cancel lang)) in STEPS1; cycle 1.
+  { clear. i. inv H. econs.
+    { econs; eauto.
+      { econs; eauto. }
+      { ss. }
+    }
+    { ss. }
+  }
   destruct th1. exploit no_sc_any_sc_rtc; try apply STEPS1; ss.
   { i. unfold is_cancel in PR. des_ifs. }
   i. des. instantiate (1:=sc1) in STEP. clear STEPS1.
@@ -385,7 +390,7 @@ Lemma pf_consistent_strong_pf_consistent_strong_aux lang (th: Thread.t lang)
 Proof.
   ii. exploit CONSISTENT; eauto. i. des.
   eapply pred_step_rtc_mon with (Q:=(promise_free /1\ no_sc)) in STEPS0; cycle 1.
-  { i. destruct x1; ss. destruct kind; ss. }
+  { i. destruct x1; ss. des_ifs. }
   eapply pred_step_rtc_mon with (Q:=(promise_free /1\ no_sc)) in STEPS1; cycle 1.
   { i. des; auto. }
   hexploit (proj1 (@pred_steps_trace_steps (promise_free /1\ no_sc) _ (Thread.mk _ th.(Thread.state) th.(Thread.local) TimeMap.bot mem1) e2)).

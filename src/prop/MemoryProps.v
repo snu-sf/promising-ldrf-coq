@@ -2414,7 +2414,6 @@ Section CANCEL.
       eapply split_succeed_wf in PROMISES. des. des_ifs.
       + ss. des. clarify.
       + ss. guardH o. des. clarify.
-        esplits; eauto.
       + esplits; eauto.
     - des. clarify. erewrite Memory.lower_o; eauto. des_ifs.
       + ss. des. clarify.
@@ -2451,7 +2450,7 @@ Section CANCEL.
     inv STEPS. eapply PRED in SAT. inv STEP. inv STEP0.
     - inv STEP. des. ss. inv LOCAL.
       eapply promise_not_cacncel_reserves_same; eauto.
-      ii. clarify.
+      ii. clarify. des_ifs. inv PROMISE; ss.
     - inv STEP. inv LOCAL; ss.
       + esplits; eauto.
       + inv LOCAL0. esplits; eauto.

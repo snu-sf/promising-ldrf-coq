@@ -1020,6 +1020,17 @@ Module JSim.
     ii. eapply sim_local_nonsynch_loc; eauto.
   Qed.
 
+  Lemma sim_local_memory_bot views lc_src lc_tgt
+        (SIM: sim_local views lc_src lc_tgt)
+        (BOT: Local.promises lc_tgt = Memory.bot)
+    :
+      Local.promises lc_src = Memory.bot.
+  Proof.
+    inv SIM. ss. eapply Memory.ext. i.
+    specialize (PROMISES loc ts). inv PROMISES; eauto.
+    erewrite Memory.bot_get in H. clarify.
+  Qed.
+
   Lemma sim_local_fence
         views
         lc1_src sc1_src mem1_src
@@ -1043,7 +1054,11 @@ Module JSim.
       (<<REL: joined_released views lc2_src.(Local.promises) lc2_src.(Local.tview).(TView.rel)>>).
   Proof.
     inv STEP_TGT. esplits.
-    - econs; eauto. i. eapply sim_local_nonsynch; eauto.
+    - econs; eauto.
+      + i. eapply sim_local_nonsynch; eauto.
+      + i. subst. destruct ordw_tgt; ss.
+        specialize (PROMISES eq_refl).
+        eapply sim_local_memory_bot; eauto.
     - inv LOCAL1. inv WF1_SRC. inv WF1_TGT. econs.
       + eapply TViewFacts.write_fence_tview_mon; eauto.
         * eapply TViewFacts.read_fence_tview_mon; eauto.
@@ -1053,8 +1068,8 @@ Module JSim.
       apply TViewFacts.write_fence_sc_mon; auto; try refl.
       apply TViewFacts.read_fence_tview_mon; auto; try refl.
     - ss. ii. exploit REL; eauto. i.
-      inv LOCAL1. specialize (PROMISES loc ts). ss.
-      rewrite GET in *. inv PROMISES. inv RELEASED.
+      inv LOCAL1. specialize (PROMISES0 loc ts). ss.
+      rewrite GET in *. inv PROMISES0. inv RELEASED.
       condtac; auto. condtac; auto.
       * exploit RELEASE; eauto; ss. destruct ordw_src, ordw_tgt; ss.
       * exploit RELEASE; eauto; ss. destruct ordw_src, ordw_tgt; ss.
@@ -1093,17 +1108,6 @@ Module JSim.
   Proof.
     inv MSGTO; inv MSG; econs. etrans; eauto.
     eapply View.unwrap_opt_le in RELEASED. inv RELEASED. auto.
-  Qed.
-
-  Lemma sim_local_memory_bot views lc_src lc_tgt
-        (SIM: sim_local views lc_src lc_tgt)
-        (BOT: Local.promises lc_tgt = Memory.bot)
-    :
-      Local.promises lc_src = Memory.bot.
-  Proof.
-    inv SIM. ss. eapply Memory.ext. i.
-    specialize (PROMISES loc ts). inv PROMISES; eauto.
-    erewrite Memory.bot_get in H. clarify.
   Qed.
 
   Lemma sim_local_promise
@@ -1321,22 +1325,22 @@ Module JSim.
       set (views2 := fun l t => if (loc_ts_eq_dec (l, t) (loc, to))
                                 then views
                                 else views1 l t).
-      hexploit (@max_le_joined_opt_view_exists views released'); auto. i. des.
+      hexploit (@max_le_joined_opt_view_exists views released'0); auto. i. des.
 
-      assert (exists msg3_src,
-                 (<<GETSRC: Memory.get loc ts3 lc1_src.(Local.promises) = Some (from, msg3_src)>>) /\
-                 (<<GETMEMSRC: Memory.get loc ts3 mem1_src = Some (from, msg3_src)>>) /\
-                 (<<SIMMSG: sim_message msg3_src msg3>>)).
+      assert (exists val'_src released'_src,
+                 (<<GETSRC: Memory.get loc ts3 lc1_src.(Local.promises) = Some (from, Message.concrete val'_src released'_src)>>) /\
+                 (<<GETMEMSRC: Memory.get loc ts3 mem1_src = Some (from, Message.concrete val'_src released'_src)>>) /\
+                 (<<SIMMSG: sim_message (Message.concrete val'_src released'_src) (Message.concrete val' released')>>)).
       { inv LOCAL1. inv WF1_SRC. dup PROMISES0. ss.
         specialize (PROMISES2 loc ts3). erewrite GET2 in *. inv PROMISES2.
         - esplits; eauto. inv WF1_TGT. exploit sim_memory_get; eauto.
           { i. des. symmetry in H0. apply PROMISES1 in H0. clarify. }
-        - esplits; eauto. } des.
+      } des.
 
-      hexploit (@Memory.split_exists lc1_src.(Local.promises) loc from to ts3 (Message.concrete val' max) msg3_src); auto.
+      hexploit (@Memory.split_exists lc1_src.(Local.promises) loc from to ts3 (Message.concrete val'0 max) (Message.concrete val'_src released'_src)); auto.
       { econs. auto. }
       intros [prom2_src PROMISES_SRC].
-      hexploit (@Memory.split_exists_le lc1_src.(Local.promises) mem1_src loc from to ts3 (Message.concrete val' max) msg3_src); eauto.
+      hexploit (@Memory.split_exists_le lc1_src.(Local.promises) mem1_src loc from to ts3 (Message.concrete val'0 max) (Message.concrete val'_src released'_src)); eauto.
       { inv WF1_SRC. auto. }
       intros [mem2_src MEM_SRC].
 
@@ -1386,8 +1390,7 @@ Module JSim.
           + ss. des; clarify.
           + ss. eauto.
         - unfold views2. i. erewrite (@Memory.split_o mem2_src); eauto.
-          des_ifs; eauto. ss. des; clarify.
-          hexploit (ONLY loc ts3); eauto. i. des. clarify. eauto.
+          des_ifs; eauto.
         - unfold views2. i. des_ifs.
           + ss. des; clarify. unfold views. econs; auto.
             eapply all_join_views_closed; eauto.
@@ -1397,7 +1400,7 @@ Module JSim.
             i. eapply Memory.split_closed_view; eauto.
       }
 
-      exists (Message.concrete val' max), views2. esplits.
+      exists (Message.concrete val'0 max), views2. esplits.
       { econs.
         - econs 2; eauto.
           eapply sim_message_to; eauto.
@@ -1815,7 +1818,7 @@ Module JSim.
         - esplits; eauto. inv WF1_TGT. exploit sim_memory_get; eauto.
           { i. des. symmetry in H0. apply PROMISES in H0. erewrite H0 in *.
             inv GET. auto. }
-        - esplits; eauto. } des.
+      } des.
 
       hexploit (@Memory.split_exists lc1_src.(Local.promises) loc from to ts3 (Message.concrete val released_src) msg3_src); auto.
       { econs. auto. }
@@ -1914,7 +1917,8 @@ Module JSim.
       - econs; eauto.
         + inv LOCAL1. inv TVIEW. eapply TViewFacts.writable_mon; eauto.
         + econs; eauto. econs 2; eauto.
-          eapply sim_message_to; eauto.
+          { eapply sim_message_to; eauto. }
+          { subst. inv SIMMSG0. eauto. }
         + i. eapply sim_local_nonsynch_loc; eauto.
       - inv LOCAL1. econs.
         + inv WF1_TGT. eapply TViewFacts.write_tview_mon; eauto.
@@ -2189,8 +2193,7 @@ Module JSim.
         { refl. } i. des.
         exists (ThreadEvent.syscall e). esplits.
         * econs.
-          { econs 2; eauto. econs; eauto. econs; eauto.
-            eapply sim_local_memory_bot; eauto. }
+          { econs 2; eauto. econs; eauto. }
           { ss. }
           { ss. }
           { ss. }
