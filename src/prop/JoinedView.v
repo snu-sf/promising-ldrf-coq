@@ -21,6 +21,7 @@ Require Import TView.
 Require Import Local.
 Require Import Thread.
 Require Import Configuration.
+Require Import Single.
 
 Require Import SimMemory.
 Require Import MemoryProps.
@@ -484,12 +485,35 @@ Module JThread.
   .
   Hint Constructors step.
 
+  Inductive opt_step lang: forall (e:ThreadEvent.t)
+                                  (e1 e2:Thread.t lang)
+                                  (views1 views2: Loc.t -> Time.t -> list View.t), Prop :=
+  | opt_step_none
+      e views:
+      opt_step ThreadEvent.silent e e views views
+  | opt_step_some
+      pf e e1 e2 views1 views2
+      (STEP: step pf e e1 e2 views1 views2):
+      opt_step e e1 e2 views1 views2
+  .
+  Hint Constructors opt_step.
+
   Lemma step_thread_step lang pf e (e1 e2: Thread.t lang) views1 views2
         (STEP: step pf e e1 e2 views1 views2)
     :
       Thread.step pf e e1 e2.
   Proof.
     inv STEP. auto.
+  Qed.
+
+  Lemma opt_step_thread_opt_step lang e (e1 e2: Thread.t lang) views1 views2
+        (STEP: opt_step e e1 e2 views1 views2)
+    :
+      Thread.opt_step e e1 e2.
+  Proof.
+    inv STEP.
+    - econs.
+    - econs 2. eapply step_thread_step; eauto.
   Qed.
 
   Inductive rtc_tau lang: forall (e1 e2: Thread.t lang)
@@ -544,7 +568,7 @@ Module JThread.
   Qed.
 
   Lemma step_future lang pf e th0 th1 views0 views1
-        (STEP: @JThread.step lang pf e th0 th1 views0 views1)
+        (STEP: @step lang pf e th0 th1 views0 views1)
         (WF: Local.wf th0.(Thread.local) th0.(Thread.memory))
         (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
         (MEM: Memory.closed th0.(Thread.memory))
@@ -568,8 +592,34 @@ Module JThread.
     ii. apply NNPP. ii. exploit VIEWSLE; eauto. i. des. ss.
   Qed.
 
+  Lemma opt_step_future lang e th0 th1 views0 views1
+        (STEP: @opt_step lang e th0 th1 views0 views1)
+        (WF: Local.wf th0.(Thread.local) th0.(Thread.memory))
+        (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
+        (MEM: Memory.closed th0.(Thread.memory))
+        (REL: joined_released views0 th0.(Thread.local).(Local.promises) th0.(Thread.local).(Local.tview).(TView.rel))
+        (JOINED: joined_memory views0 th0.(Thread.memory))
+        (VIEWS: wf_views views0)
+    :
+      (<<WF: Local.wf th1.(Thread.local) th1.(Thread.memory)>>) /\
+      (<<SC: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory)>>) /\
+      (<<MEM: Memory.closed th1.(Thread.memory)>>)/\
+      (<<REL: joined_released views1 th1.(Thread.local).(Local.promises) th1.(Thread.local).(Local.tview).(TView.rel)>>)/\
+      (<<JOINED: joined_memory views1 th1.(Thread.memory)>>) /\
+      (<<VIEWS: wf_views views1>>) /\
+      (<<TVIEW_FUTURE: TView.le th0.(Thread.local).(Local.tview) th1.(Thread.local).(Local.tview)>>) /\
+      (<<SC_FUTURE: TimeMap.le th0.(Thread.sc) th1.(Thread.sc)>>) /\
+      (<<MEM_FUTURE: Memory.future th0.(Thread.memory) th1.(Thread.memory)>>) /\
+      (<<VIEWS_FUTURE: views_le views0 views1>>)
+  .
+  Proof.
+    inv STEP.
+    - esplits; eauto; try by refl.
+    - eapply step_future; eauto.
+  Qed.
+
   Lemma tau_steps_future lang th0 th1 views0 views1
-        (STEPS: @JThread.rtc_tau lang th0 th1 views0 views1)
+        (STEPS: @rtc_tau lang th0 th1 views0 views1)
         (WF: Local.wf th0.(Thread.local) th0.(Thread.memory))
         (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
         (MEM: Memory.closed th0.(Thread.memory))
@@ -595,6 +645,92 @@ Module JThread.
       exploit IHSTEPS; eauto. i. des. splits; auto; try by (etrans; eauto).
   Qed.
 
+  Inductive reserve_step (views: Loc.t -> Time.t -> list View.t)
+            lang (e1 e2:Thread.t lang): Prop :=
+  | reserve_step_intro
+      pf loc from to
+      (STEP: step pf (ThreadEvent.promise loc from to Message.reserve Memory.op_kind_add) e1 e2 views views)
+    :
+      reserve_step views e1 e2
+  .
+  Hint Constructors reserve_step.
+
+  Inductive cancel_step (views: Loc.t -> Time.t -> list View.t)
+            lang (e1 e2:Thread.t lang): Prop :=
+  | cancel_step_intro
+      pf loc from to
+      (STEP: step pf (ThreadEvent.promise loc from to Message.reserve Memory.op_kind_cancel) e1 e2 views views)
+    :
+      cancel_step views e1 e2
+  .
+  Hint Constructors cancel_step.
+
+  Lemma rtc_reserve_step_rtc_tau lang th0 th1 views
+        (STEPS: rtc (@reserve_step views lang) th0 th1)
+    :
+      rtc_tau th0 th1 views views.
+  Proof.
+    ginduction STEPS; eauto. inv H. econs 2; eauto.
+  Qed.
+
+  Lemma rtc_cancel_step_rtc_tau lang th0 th1 views
+        (STEPS: rtc (@cancel_step views lang) th0 th1)
+    :
+      rtc_tau th0 th1 views views.
+  Proof.
+    ginduction STEPS; eauto. inv H. econs 2; eauto.
+  Qed.
+
+  Lemma rtc_reserve_step_future lang th0 th1 views
+        (STEPS: rtc (@reserve_step views lang) th0 th1)
+        (WF: Local.wf th0.(Thread.local) th0.(Thread.memory))
+        (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
+        (MEM: Memory.closed th0.(Thread.memory))
+        (REL: joined_released views th0.(Thread.local).(Local.promises) th0.(Thread.local).(Local.tview).(TView.rel))
+        (JOINED: joined_memory views th0.(Thread.memory))
+        (VIEWS: wf_views views)
+    :
+      (<<WF: Local.wf th1.(Thread.local) th1.(Thread.memory)>>) /\
+      (<<SC: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory)>>) /\
+      (<<MEM: Memory.closed th1.(Thread.memory)>>)/\
+      (<<REL: joined_released views th1.(Thread.local).(Local.promises) th1.(Thread.local).(Local.tview).(TView.rel)>>)/\
+      (<<JOINED: joined_memory views th1.(Thread.memory)>>) /\
+      (<<TVIEW_FUTURE: TView.le th0.(Thread.local).(Local.tview) th1.(Thread.local).(Local.tview)>>) /\
+      (<<SC_FUTURE: TimeMap.le th0.(Thread.sc) th1.(Thread.sc)>>) /\
+      (<<MEM_FUTURE: Memory.future th0.(Thread.memory) th1.(Thread.memory)>>)
+  .
+  Proof.
+    ginduction STEPS; i.
+    - splits; eauto; try by refl.
+    - inv H. exploit step_future; eauto. i. des.
+      exploit IHSTEPS; eauto. i. des. splits; auto; try by (etrans; eauto).
+  Qed.
+
+  Lemma rtc_cancel_step_future lang th0 th1 views
+        (STEPS: rtc (@cancel_step views lang) th0 th1)
+        (WF: Local.wf th0.(Thread.local) th0.(Thread.memory))
+        (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
+        (MEM: Memory.closed th0.(Thread.memory))
+        (REL: joined_released views th0.(Thread.local).(Local.promises) th0.(Thread.local).(Local.tview).(TView.rel))
+        (JOINED: joined_memory views th0.(Thread.memory))
+        (VIEWS: wf_views views)
+    :
+      (<<WF: Local.wf th1.(Thread.local) th1.(Thread.memory)>>) /\
+      (<<SC: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory)>>) /\
+      (<<MEM: Memory.closed th1.(Thread.memory)>>)/\
+      (<<REL: joined_released views th1.(Thread.local).(Local.promises) th1.(Thread.local).(Local.tview).(TView.rel)>>)/\
+      (<<JOINED: joined_memory views th1.(Thread.memory)>>) /\
+      (<<TVIEW_FUTURE: TView.le th0.(Thread.local).(Local.tview) th1.(Thread.local).(Local.tview)>>) /\
+      (<<SC_FUTURE: TimeMap.le th0.(Thread.sc) th1.(Thread.sc)>>) /\
+      (<<MEM_FUTURE: Memory.future th0.(Thread.memory) th1.(Thread.memory)>>)
+  .
+  Proof.
+    ginduction STEPS; i.
+    - splits; eauto; try by refl.
+    - inv H. exploit step_future; eauto. i. des.
+      exploit IHSTEPS; eauto. i. des. splits; auto; try by (etrans; eauto).
+  Qed.
+
 End JThread.
 
 Module JConfiguration.
@@ -616,12 +752,12 @@ Module JConfiguration.
 
   Inductive opt_step: forall (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t)
                              (views1 views2: Loc.t -> Time.t -> list View.t), Prop :=
-  | step_some
+  | opt_step_some
       e tid c1 c2 views1 views2
       (STEP: step e tid c1 c2 views1 views2)
     :
       opt_step e tid c1 c2 views1 views2
-  | step_none
+  | opt_step_none
       tid c views:
       opt_step MachineEvent.silent tid c c views views
   .
@@ -638,7 +774,6 @@ Module JConfiguration.
       steps c1 c3 views1 views3
   .
   Hint Constructors steps.
-
 
   Lemma step_configuration_step e tid c1 c2 views1 views2
         (STEP: step e tid c1 c2 views1 views2)
@@ -746,6 +881,87 @@ Module JConfiguration.
       exploit IHSTEPS; eauto. i. des.
       splits; ss; etrans; eauto.
   Qed.
+
+  Inductive single_step:
+    forall (e:ThreadEvent.t) (tid:Ident.t) (c1 c2:Configuration.t)
+           (views1 views2: Loc.t -> Time.t -> list View.t), Prop :=
+  | single_step_intro
+      e tid c1 lang st1 lc1 e2 e3 st4 lc4 sc4 memory4 views1 views2
+      (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
+      (CANCELS: rtc (@JThread.cancel_step views1 lang) (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
+      (STEP: JThread.opt_step e e2 e3 views1 views2)
+      (RESERVES: rtc (@JThread.reserve_step views2 _) e3 (Thread.mk _ st4 lc4 sc4 memory4))
+      (CONSISTENT: e <> ThreadEvent.failure -> JThread.consistent (Thread.mk _ st4 lc4 sc4 memory4) views2):
+      single_step e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) c1.(Configuration.threads)) sc4 memory4) views1 views2
+  .
+  Hint Constructors single_step.
+
+  Inductive machine_single_step: forall (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t)
+                                 (views1 views2: Loc.t -> Time.t -> list View.t), Prop :=
+  | machine_single_step_intro
+      e tid c1 c2 views1 views2
+      (STEP: single_step e tid c1 c2 views1 views2)
+    :
+      machine_single_step (ThreadEvent.get_machine_event e) tid c1 c2 views1 views2
+  .
+  Hint Constructors machine_single_step.
+
+  Lemma single_step_configuration_step e tid c1 c2 views1 views2
+        (STEP: single_step e tid c1 c2 views1 views2)
+    :
+      SConfiguration.step e tid c1 c2.
+  Proof.
+    inv STEP. econs.
+    - eauto.
+    - eapply rtc_implies; try apply CANCELS.
+      clear. i. inv H. econs. eapply JThread.step_thread_step; eauto.
+    - eapply JThread.opt_step_thread_opt_step; eauto.
+    - eapply rtc_implies; try apply RESERVES.
+      clear. i. inv H. econs. eapply JThread.step_thread_step; eauto.
+    - i. eapply JThread.consistent_thread_consistent; eauto.
+  Qed.
+
+  Lemma single_step_future
+        e tid c1 c2 views1 views2
+        (STEP: single_step e tid c1 c2 views1 views2)
+        (WF1: wf views1 c1)
+    :
+      (<<WF2: wf views2 c2>>) /\
+      (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
+      (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
+      (<<VIEWS_FUTURE: views_le views1 views2>>)
+  .
+  Proof.
+    inv WF1.
+    dup STEP. exploit SConfiguration.step_future; eauto.
+    { eapply single_step_configuration_step; eauto. }
+    i. des.
+    inv STEP0. inv WF. ss.
+    hexploit JThread.rtc_cancel_step_future; try apply CANCELS; ss; eauto.
+    { inv WF0. eapply THREADS in TID. ss. }
+    i. des.
+    hexploit JThread.opt_step_future; eauto. i. des.
+    hexploit JThread.rtc_reserve_step_future; try apply RESERVES; ss; eauto. i. des.
+    splits; auto.
+    econs; eauto. i. ss. erewrite IdentMap.gsspec in TH. des_ifs.
+    hexploit REL; eauto. i.
+    eapply joined_released_le; eauto.
+  Qed.
+
+  Lemma machine_single_step_future
+        e tid c1 c2 views1 views2
+        (STEP: machine_single_step e tid c1 c2 views1 views2)
+        (WF1: wf views1 c1)
+    :
+      (<<WF2: wf views2 c2>>) /\
+      (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
+      (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
+      (<<VIEWS_FUTURE: views_le views1 views2>>)
+  .
+  Proof.
+    inv STEP. eapply single_step_future; eauto.
+  Qed.
+
 End JConfiguration.
 
 
@@ -1149,7 +1365,8 @@ Module JSim.
               (<<VIEW: views2 loc ts = (View.join (lc2_src.(Local.tview).(TView.rel) loc) (View.singleton_ur loc ts))
                                          ::(all_join_views (View.singleton_ur loc ts) (views1 loc from))>>)>>) /\
         (<<MSG: sim_message msg_src msg_tgt>>) /\
-        (<<KIND: sim_op_kind kind_src kind_tgt>>)
+        (<<KIND: sim_op_kind kind_src kind_tgt>>) /\
+        (<<RESERVE: msg_tgt = Message.reserve -> msg_src = Message.reserve /\ views1 = views2>>)
   .
   Proof.
     inv STEP_TGT. inv PROMISE.
@@ -1268,6 +1485,7 @@ Module JSim.
         }
         { econs; eauto. eapply max_le_joined_opt_view_le; eauto. }
         { eauto. }
+        { ss. }
       }
 
       (* add reserve *)
@@ -1306,6 +1524,7 @@ Module JSim.
         { i. clarify. }
         { eauto. }
         { eauto. }
+        { i. splits; auto. }
       }
     }
 
@@ -1438,6 +1657,7 @@ Module JSim.
       }
       { econs; eauto. eapply max_le_joined_opt_view_le; eauto. }
       { eauto. }
+      { ss. }
     }
 
     (* lower *)
@@ -1495,6 +1715,7 @@ Module JSim.
       { i. clarify. }
       { econs; eauto. eapply max_le_joined_opt_view_le; eauto. }
       { econs; eauto. econs; eauto. eapply max_le_joined_opt_view_le; eauto. }
+      { ss. }
     }
 
     { hexploit Memory.remove_get0; try apply PROMISES; eauto. i. des.
@@ -1531,6 +1752,7 @@ Module JSim.
       { i. clarify. }
       { eauto. }
       { eauto. }
+      { i. splits; auto. }
     }
   Qed.
 
@@ -2121,7 +2343,7 @@ Module JSim.
     - inv STEP0. inv LOCAL0.
       + esplits.
         * econs.
-          { econs 2; eauto. econs; eauto. }
+          { econs 2; eauto. }
           { ss. }
           { ss. }
           { ss. }
@@ -2134,7 +2356,7 @@ Module JSim.
         { refl. } i. des.
         exists (ThreadEvent.read loc ts val released_src ord). esplits.
         * econs.
-          { econs 2; eauto. econs; eauto. }
+          { econs 2; eauto. }
           { ss. }
           { ss. }
           { ss. }
@@ -2148,7 +2370,7 @@ Module JSim.
         { refl. } i. des.
         exists (ThreadEvent.write loc from to val released_src ord). esplits.
         * econs.
-          { econs 2; eauto. econs; eauto. }
+          { econs 2; eauto. }
           { ss. }
           { eapply VIEWSLE. }
           { ss. }
@@ -2165,7 +2387,7 @@ Module JSim.
         { refl. } i. des.
         exists (ThreadEvent.update loc tsr tsw valr valw released_src released_src0 ordr ordw). esplits.
         * econs.
-          { econs 2; eauto. econs; eauto. }
+          { econs 2; eauto. }
           { ss. }
           { eapply VIEWSLE. }
           { ss. }
@@ -2179,7 +2401,7 @@ Module JSim.
         { refl. } i. des.
         exists (ThreadEvent.fence ordr ordw). esplits.
         * econs.
-          { econs 2; eauto. econs; eauto. }
+          { econs 2; eauto. }
           { ss. }
           { ss. }
           { ss. }
@@ -2193,7 +2415,7 @@ Module JSim.
         { refl. } i. des.
         exists (ThreadEvent.syscall e). esplits.
         * econs.
-          { econs 2; eauto. econs; eauto. }
+          { econs 2; eauto. }
           { ss. }
           { ss. }
           { ss. }
@@ -2205,7 +2427,7 @@ Module JSim.
       + hexploit sim_local_failure; eauto.  i. des.
         exists (ThreadEvent.failure). esplits.
         * econs.
-          { econs 2; eauto. econs; eauto. }
+          { econs 2; eauto. }
           { ss. }
           { ss. }
           { ss. }
@@ -2213,6 +2435,37 @@ Module JSim.
           { ss. }
         * ss.
         * ss.
+  Qed.
+
+  Lemma sim_thread_opt_step views0 lang_src lang_tgt
+        th0_src th0_tgt th1_tgt e_tgt
+        (STEP: Thread.opt_step e_tgt th0_tgt th1_tgt)
+        (SIM: @sim_thread views0 lang_src lang_tgt th0_src th0_tgt)
+
+        (WF_SRC: Local.wf th0_src.(Thread.local) th0_src.(Thread.memory))
+        (WF_TGT: Local.wf th0_tgt.(Thread.local) th0_tgt.(Thread.memory))
+        (SC_SRC: Memory.closed_timemap th0_src.(Thread.sc) th0_src.(Thread.memory))
+        (SC_TGT: Memory.closed_timemap th0_tgt.(Thread.sc) th0_tgt.(Thread.memory))
+        (MEM_SRC: Memory.closed th0_src.(Thread.memory))
+        (MEM_TGT: Memory.closed th0_tgt.(Thread.memory))
+        (CONS_TGT: Local.promise_consistent th1_tgt.(Thread.local))
+
+        (REL: joined_released views0 th0_src.(Thread.local).(Local.promises) th0_src.(Thread.local).(Local.tview).(TView.rel))
+        (JOINED: joined_memory views0 th0_src.(Thread.memory))
+        (VIEWS: wf_views views0)
+    :
+      exists e_src th1_src views1,
+        (<<STEP: JThread.opt_step e_src th0_src th1_src views0 views1>>) /\
+        (<<SIM: sim_thread views1 th1_src th1_tgt>>) /\
+        (<<EVENT: sim_event e_src e_tgt>>)
+  .
+  Proof.
+    inv STEP.
+    - esplits; eauto.
+    - exploit sim_thread_step; eauto. i. des. esplits.
+      + econs 2; eauto.
+      + eauto.
+      + eauto.
   Qed.
 
   Lemma sim_thread_tau_steps views0 lang_src lang_tgt
@@ -2250,6 +2503,154 @@ Module JSim.
       + econs 2; eauto. rewrite <- EVENT.
         eapply sim_event_machine_event; eauto.
       + eauto.
+  Qed.
+
+  Lemma sim_thread_reserve_step views0 lang_src lang_tgt
+        th0_src th0_tgt th1_tgt
+        (STEP: Thread.reserve_step th0_tgt th1_tgt)
+        (SIM: @sim_thread views0 lang_src lang_tgt th0_src th0_tgt)
+
+        (WF_SRC: Local.wf th0_src.(Thread.local) th0_src.(Thread.memory))
+        (WF_TGT: Local.wf th0_tgt.(Thread.local) th0_tgt.(Thread.memory))
+        (SC_SRC: Memory.closed_timemap th0_src.(Thread.sc) th0_src.(Thread.memory))
+        (SC_TGT: Memory.closed_timemap th0_tgt.(Thread.sc) th0_tgt.(Thread.memory))
+        (MEM_SRC: Memory.closed th0_src.(Thread.memory))
+        (MEM_TGT: Memory.closed th0_tgt.(Thread.memory))
+        (CONS_TGT: Local.promise_consistent th1_tgt.(Thread.local))
+
+        (REL: joined_released views0 th0_src.(Thread.local).(Local.promises) th0_src.(Thread.local).(Local.tview).(TView.rel))
+        (JOINED: joined_memory views0 th0_src.(Thread.memory))
+        (VIEWS: wf_views views0)
+    :
+      exists th1_src,
+        (<<STEP: JThread.reserve_step views0 th0_src th1_src>>) /\
+        (<<SIM: sim_thread views0 th1_src th1_tgt>>)
+  .
+  Proof.
+    dup SIM. inv SIM.
+    apply inj_pair2 in H2. apply inj_pair2 in H4. subst. ss.
+    assert (st0 = st).
+    { inv SIM0.
+      apply inj_pair2 in H2. apply inj_pair2 in H7. subst. auto. }
+    subst. clear SIM0.
+    inv STEP. inv STEP0; inv STEP; [|inv LOCAL0].
+    hexploit sim_local_promise; eauto. i. des.
+    specialize (RESERVE eq_refl). des; clarify. inv KIND.
+    esplits; eauto. econs. econs; eauto; ss.
+    econs 1; eauto. econs; eauto.
+  Qed.
+
+  Lemma sim_thread_cancel_step views0 lang_src lang_tgt
+        th0_src th0_tgt th1_tgt
+        (STEP: Thread.cancel_step th0_tgt th1_tgt)
+        (SIM: @sim_thread views0 lang_src lang_tgt th0_src th0_tgt)
+
+        (WF_SRC: Local.wf th0_src.(Thread.local) th0_src.(Thread.memory))
+        (WF_TGT: Local.wf th0_tgt.(Thread.local) th0_tgt.(Thread.memory))
+        (SC_SRC: Memory.closed_timemap th0_src.(Thread.sc) th0_src.(Thread.memory))
+        (SC_TGT: Memory.closed_timemap th0_tgt.(Thread.sc) th0_tgt.(Thread.memory))
+        (MEM_SRC: Memory.closed th0_src.(Thread.memory))
+        (MEM_TGT: Memory.closed th0_tgt.(Thread.memory))
+        (CONS_TGT: Local.promise_consistent th1_tgt.(Thread.local))
+
+        (REL: joined_released views0 th0_src.(Thread.local).(Local.promises) th0_src.(Thread.local).(Local.tview).(TView.rel))
+        (JOINED: joined_memory views0 th0_src.(Thread.memory))
+        (VIEWS: wf_views views0)
+    :
+      exists th1_src,
+        (<<STEP: JThread.cancel_step views0 th0_src th1_src>>) /\
+        (<<SIM: sim_thread views0 th1_src th1_tgt>>)
+  .
+  Proof.
+    dup SIM. inv SIM.
+    apply inj_pair2 in H2. apply inj_pair2 in H4. subst. ss.
+    assert (st0 = st).
+    { inv SIM0.
+      apply inj_pair2 in H2. apply inj_pair2 in H7. subst. auto. }
+    subst. clear SIM0.
+    inv STEP. inv STEP0; inv STEP; [|inv LOCAL0].
+    hexploit sim_local_promise; eauto. i. des.
+    specialize (RESERVE eq_refl). des; clarify. inv KIND.
+    esplits; eauto. econs. econs; eauto; ss.
+    econs 1; eauto. econs; eauto.
+  Qed.
+
+  Lemma sim_thread_rtc_reserve_step views0 lang_src lang_tgt
+        th0_src th0_tgt th1_tgt
+        (STEPS: rtc (@Thread.reserve_step _) th0_tgt th1_tgt)
+        (SIM: @sim_thread views0 lang_src lang_tgt th0_src th0_tgt)
+
+        (WF_SRC: Local.wf th0_src.(Thread.local) th0_src.(Thread.memory))
+        (WF_TGT: Local.wf th0_tgt.(Thread.local) th0_tgt.(Thread.memory))
+        (SC_SRC: Memory.closed_timemap th0_src.(Thread.sc) th0_src.(Thread.memory))
+        (SC_TGT: Memory.closed_timemap th0_tgt.(Thread.sc) th0_tgt.(Thread.memory))
+        (MEM_SRC: Memory.closed th0_src.(Thread.memory))
+        (MEM_TGT: Memory.closed th0_tgt.(Thread.memory))
+        (CONS_TGT: Local.promise_consistent th1_tgt.(Thread.local))
+
+        (REL: joined_released views0 th0_src.(Thread.local).(Local.promises) th0_src.(Thread.local).(Local.tview).(TView.rel))
+        (JOINED: joined_memory views0 th0_src.(Thread.memory))
+        (VIEWS: wf_views views0)
+    :
+      exists th1_src,
+        (<<STEP: rtc (@JThread.reserve_step views0 _) th0_src th1_src>>) /\
+        (<<SIM: sim_thread views0 th1_src th1_tgt>>)
+  .
+  Proof.
+    ginduction STEPS; eauto. i.
+    dup H. inv H0.
+    exploit Thread.step_future; eauto. clear STEP. i. des.
+    exploit sim_thread_reserve_step; eauto.
+    { hexploit PromiseConsistent.rtc_tau_step_promise_consistent; cycle 1; eauto.
+      eapply rtc_implies; try apply STEPS. clear.
+      i. inv H. econs.
+      { econs; eauto. }
+      { ss. }
+    }
+    i. des. dup STEP. inv STEP0.
+    exploit JThread.step_future; eauto. i. des. clear STEP1.
+    exploit IHSTEPS; eauto. i. des. esplits.
+    { econs 2; eauto. }
+    { eauto. }
+  Qed.
+
+  Lemma sim_thread_rtc_cancel_step views0 lang_src lang_tgt
+        th0_src th0_tgt th1_tgt
+        (STEPS: rtc (@Thread.cancel_step _) th0_tgt th1_tgt)
+        (SIM: @sim_thread views0 lang_src lang_tgt th0_src th0_tgt)
+
+        (WF_SRC: Local.wf th0_src.(Thread.local) th0_src.(Thread.memory))
+        (WF_TGT: Local.wf th0_tgt.(Thread.local) th0_tgt.(Thread.memory))
+        (SC_SRC: Memory.closed_timemap th0_src.(Thread.sc) th0_src.(Thread.memory))
+        (SC_TGT: Memory.closed_timemap th0_tgt.(Thread.sc) th0_tgt.(Thread.memory))
+        (MEM_SRC: Memory.closed th0_src.(Thread.memory))
+        (MEM_TGT: Memory.closed th0_tgt.(Thread.memory))
+        (CONS_TGT: Local.promise_consistent th1_tgt.(Thread.local))
+
+        (REL: joined_released views0 th0_src.(Thread.local).(Local.promises) th0_src.(Thread.local).(Local.tview).(TView.rel))
+        (JOINED: joined_memory views0 th0_src.(Thread.memory))
+        (VIEWS: wf_views views0)
+    :
+      exists th1_src,
+        (<<STEP: rtc (@JThread.cancel_step views0 _) th0_src th1_src>>) /\
+        (<<SIM: sim_thread views0 th1_src th1_tgt>>)
+  .
+  Proof.
+    ginduction STEPS; eauto. i.
+    dup H. inv H0.
+    exploit Thread.step_future; eauto. clear STEP. i. des.
+    exploit sim_thread_cancel_step; eauto.
+    { hexploit PromiseConsistent.rtc_tau_step_promise_consistent; cycle 1; eauto.
+      eapply rtc_implies; try apply STEPS. clear.
+      i. inv H. econs.
+      { econs; eauto. }
+      { ss. }
+    }
+    i. des. dup STEP. inv STEP0.
+    exploit JThread.step_future; eauto. i. des. clear STEP1.
+    exploit IHSTEPS; eauto. i. des. esplits.
+    { econs 2; eauto. }
+    { eauto. }
   Qed.
 
   Inductive sim_configuration
@@ -2450,6 +2851,79 @@ Module JSim.
         erewrite IdentMap.gsspec. erewrite IdentMap.gsspec. des_ifs.
         specialize (THS0 tid0). unfold option_rel in *. des_ifs.
         eapply sim_statelocal_le; eauto. etrans; eauto.
+  Qed.
+
+  Lemma single_step_sim_configuration views0 c_src0 c_tgt0 c_tgt1 e_tgt tid
+        (STEP: SConfiguration.step e_tgt tid c_tgt0 c_tgt1)
+        (SIM: sim_configuration views0 c_src0 c_tgt0)
+        (WF_SRC: JConfiguration.wf views0 c_src0)
+        (WF_TGT: Configuration.wf c_tgt0)
+    :
+      exists c_src1 views1 e_src,
+        (<<STEP: JConfiguration.single_step e_src tid c_src0 c_src1 views0 views1>>) /\
+        (<<SIM: sim_configuration views1 c_src1 c_tgt1>>) /\
+        (<<EVENT: sim_event e_src e_tgt>>).
+  Proof.
+    inv SIM. inv STEP. ss.
+    dup THS. specialize (THS tid). rewrite TID in THS. ss.
+    unfold option_rel in THS. des_ifs. dep_clarify.
+    dup THS. dep_inv THS1. dep_inv THS.
+    inv WF_SRC. inv WF_TGT. ss. inv WF. inv WF0. inv WF1.
+    hexploit THREADS; eauto. hexploit THREADS0; eauto. i. ss.
+
+    hexploit Thread.rtc_cancel_step_future; eauto. i. des. ss.
+    hexploit Thread.opt_step_future; eauto. i. des. ss.
+    hexploit Thread.rtc_reserve_step_future; eauto. i. des. ss.
+
+    assert (CONSISTENT3: Local.promise_consistent lc4).
+    { destruct (classic (e_tgt = ThreadEvent.failure)).
+      { subst. eapply PromiseConsistent.rtc_reserve_step_promise_consistent2 in RESERVES; eauto.
+        inv STEP0. inv STEP; inv STEP0. inv LOCAL1. inv LOCAL2. ss. }
+      { hexploit PromiseConsistent.consistent_promise_consistent; eauto. }
+    }
+    assert (CONSISTENT2: Local.promise_consistent e3.(Thread.local)).
+    { eapply PromiseConsistent.rtc_reserve_step_promise_consistent in RESERVES; eauto. }
+    assert (CONSISTENT1: Local.promise_consistent e2.(Thread.local)).
+    { inv STEP0; eauto.
+      eapply PromiseConsistent.step_promise_consistent in STEP; eauto. }
+    assert (CONSISTENT0: Local.promise_consistent lc1).
+    { eapply PromiseConsistent.rtc_cancel_step_promise_consistent in CANCELS; eauto. }
+
+    hexploit sim_thread_rtc_cancel_step; eauto. i. des.
+    hexploit JThread.rtc_cancel_step_future; eauto. i. des. ss.
+    hexploit sim_thread_opt_step; eauto. i. des.
+    hexploit JThread.opt_step_future; eauto. i. des. ss.
+    hexploit sim_thread_rtc_reserve_step; eauto. i. des.
+    hexploit JThread.rtc_reserve_step_future; eauto. i. des. ss.
+
+    destruct th1_src1. ss. esplits.
+    + econs.
+      * eauto.
+      * eapply STEP.
+      * eapply STEP1.
+      * eapply STEP2.
+      * i. eapply sim_thread_consistent; eauto.
+        eapply CONSISTENT. ii. subst. inv EVENT; ss.
+    + dep_inv SIM1. econs; eauto. i. ss.
+      erewrite IdentMap.gsspec. erewrite IdentMap.gsspec. des_ifs.
+      specialize (THS0 tid0). unfold option_rel in *. des_ifs.
+      eapply sim_statelocal_le; eauto.
+    + auto.
+  Qed.
+
+  Lemma single_machine_step_sim_configuration views0 c_src0 c_tgt0 c_tgt1 e tid
+        (STEP: SConfiguration.machine_step e tid c_tgt0 c_tgt1)
+        (SIM: sim_configuration views0 c_src0 c_tgt0)
+        (WF_SRC: JConfiguration.wf views0 c_src0)
+        (WF_TGT: Configuration.wf c_tgt0)
+    :
+      exists c_src1 views1,
+        (<<STEP: JConfiguration.machine_single_step e tid c_src0 c_src1 views0 views1>>) /\
+        (<<SIM: sim_configuration views1 c_src1 c_tgt1>>).
+  Proof.
+    inv STEP. exploit single_step_sim_configuration; eauto. i. des.
+    esplits; eauto.
+    erewrite <- sim_event_machine_event; eauto.
   Qed.
 
 End JSim.

@@ -3256,9 +3256,7 @@ Section SIM.
     - inv STEP0; ss.
     - inv STEP0; ss. inv LOCAL; ss.
       + exploit sim_fence_step; eauto. i. des. esplits; eauto.
-        * econs 2; eauto. econs; eauto.
       + exploit sim_failure_step; eauto. i. des. esplits; eauto.
-        * econs 2; eauto. econs; eauto.
   Qed.
 
   Lemma sim_thread_step_event others self extra_others extra_self
@@ -3367,11 +3365,9 @@ Section SIM.
     - inv STEP0; ss.
     - inv STEP0; ss. inv LOCAL; ss.
       + exploit sim_fence_step_strong; eauto. i. des. esplits; eauto.
-        * econs 2; eauto. econs; eauto.
       + exploit sim_failure_step; eauto.
         { eapply sim_local_strong_sim_local; eauto. }
         i. des. esplits; eauto.
-        * econs 2; eauto. econs; eauto.
   Qed.
 
   Lemma sim_thread_step_event_strong others self extra_others extra_self

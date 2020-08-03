@@ -206,10 +206,10 @@ Definition pf_consistent_strong lang (e0:Thread.t lang): Prop :=
   forall mem1 sc1
          (CAP: Memory.cap e0.(Thread.memory) mem1),
   exists e1,
-    (<<STEPS0: rtc (tau (@pred_step is_cancel lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc1 mem1) e1>>) /\
+    (<<STEPS0: rtc (tau (@pred_step ThreadEvent.is_cancel lang)) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) sc1 mem1) e1>>) /\
     (<<NORESERVE: no_reserves e1.(Thread.local).(Local.promises)>>) /\
     exists e2,
-      (<<STEPS1: rtc (tau (@pred_step ((promise_free /1\ (fun e => ~ is_cancel e)) /1\ no_sc) lang)) e1 e2>>) /\
+      (<<STEPS1: rtc (tau (@pred_step ((promise_free /1\ (fun e => ~ ThreadEvent.is_cancel e)) /1\ no_sc) lang)) e1 e2>>) /\
       (__guard__((exists st',
                      (<<LOCAL: Local.failure_step e2.(Thread.local)>>) /\
                      (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e2) st'>>)) \/
@@ -251,7 +251,7 @@ Proof.
           { eapply STEPS. }
           { eapply rtc_implies; [|apply STEPS0].
             i. inv H. inv TSTEP. inv STEP.
-            unfold is_cancel in SAT. des_ifs.
+            unfold ThreadEvent.is_cancel in SAT. des_ifs.
             inv STEP0; inv STEP.
             - econs; eauto. econs; eauto. econs; eauto.
             - inv LOCAL. }
@@ -275,7 +275,7 @@ Proof.
   { ss. eapply Memory.cap_closed; eauto. }
   i. des. ss.
 
-  eapply rtc_implies with (R2 := tau (@pred_step is_cancel lang)) in STEPS1; cycle 1.
+  eapply rtc_implies with (R2 := tau (@pred_step ThreadEvent.is_cancel lang)) in STEPS1; cycle 1.
   { clear. i. inv H. econs.
     { econs; eauto.
       { econs; eauto. }
@@ -284,7 +284,7 @@ Proof.
     { ss. }
   }
   destruct th1. exploit no_sc_any_sc_rtc; try apply STEPS1; ss.
-  { i. unfold is_cancel in PR. des_ifs. }
+  { i. unfold ThreadEvent.is_cancel in PR. des_ifs. }
   i. des. instantiate (1:=sc1) in STEP. clear STEPS1.
 
   eexists. splits.
@@ -333,7 +333,7 @@ Proof.
         eapply step_not_cancel_reserves_same in GET; cycle 1.
         + econs.
           * econs; eauto.
-          * instantiate (1:=promise_free /1\ (fun e => ~ is_cancel e)). ss.
+          * instantiate (1:=promise_free /1\ (fun e => ~ ThreadEvent.is_cancel e)). ss.
         + ss.
         + des. eapply steps_not_cancel_reserves_same in GET; eauto.
           des. eapply NORESERVES; eauto.
@@ -344,7 +344,7 @@ Proof.
         { econs; eauto. } ss. i.
         exploit pf_step_rtc_promises_decrease.
         { eapply STEP. }
-        { i. unfold is_cancel in *. des_ifs. }
+        { i. unfold ThreadEvent.is_cancel in *. des_ifs. }
         { ss. eauto. }
         ss. i. inv x2.
         ss. unfold no_sc in BREAKQ. des_ifs; try by (exfalso; eauto).

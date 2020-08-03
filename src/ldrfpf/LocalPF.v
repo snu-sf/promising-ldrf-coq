@@ -44,6 +44,7 @@ Section LOCALPF.
       (<<CONSISTENT: Trace.consistent th tr_cert>>) /\
       (<<PFCERT: List.Forall (compose pf_event snd) tr_cert>>).
 
+  (* multiple thread steps per one configuration step *)
   Inductive pf_step_trace: forall (tr: Trace.t) (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
   | pf_step_trace_intro
       lang tr e tr' pf tid c1 st1 lc1 e2 st3 lc3 sc3 memory3

@@ -568,13 +568,29 @@ Module Thread.
         (STEP: step pf (ThreadEvent.promise loc from to Message.reserve Memory.op_kind_add) e1 e2)
     .
     Hint Constructors reserve_step.
-    
+
     Inductive cancel_step (e1 e2:t): Prop :=
     | cancel_step_intro
         pf loc from to
         (STEP: Thread.step pf (ThreadEvent.promise loc from to Message.reserve Memory.op_kind_cancel) e1 e2)
     .
     Hint Constructors cancel_step.
+
+    Lemma reserve_step_tau_step e1 e2
+          (RESERVE: reserve_step e1 e2)
+      :
+        tau_step e1 e2.
+    Proof.
+      inv RESERVE. econs; eauto.
+    Qed.
+
+    Lemma cancel_step_tau_step e1 e2
+          (CANCEL: cancel_step e1 e2)
+      :
+        tau_step e1 e2.
+    Proof.
+      inv CANCEL. econs; eauto.
+    Qed.
 
     Lemma rtc_reserve_step_future
           e1 e2

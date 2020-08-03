@@ -52,7 +52,7 @@ Qed.
 
 Lemma step_not_cancel_covered_increase lang (th0 th1: Thread.t lang) pf e
       (STEP: Thread.step pf e th0 th1)
-      (NOTCANCEL: ~ is_cancel e)
+      (NOTCANCEL: ~ ThreadEvent.is_cancel e)
       loc0 ts0
       (COVERED: covered loc0 ts0 th0.(Thread.memory))
   :
@@ -73,7 +73,7 @@ Qed.
 
 Lemma traced_steps_not_cancel_covered_increase lang (th0 th1: Thread.t lang) tr
       (STEPS: Trace.steps tr th0 th1)
-      (EVENTS: List.Forall (fun em => <<SAT: (fun e => ~ is_cancel e) (snd em)>>) tr)
+      (EVENTS: List.Forall (fun em => <<SAT: (fun e => ~ ThreadEvent.is_cancel e) (snd em)>>) tr)
       loc0 ts0
       (COVERED: covered loc0 ts0 th0.(Thread.memory))
   :
@@ -301,7 +301,7 @@ Section LIFT.
         (STEP: Thread.step pf e (Thread.mk lang st0 lc0 sc0 mem0) (Thread.mk _ st1 lc1 sc1 mem1))
         (WRITENOTIN: write_not_in spaces e)
         (WRITENOTTO: write_not_to lefts e)
-        (NOTCANCEL: ~ is_cancel e)
+        (NOTCANCEL: ~ ThreadEvent.is_cancel e)
         (SOUND: Memory.le mem0 cap0)
         (SPACES:
            forall loc ts (COV: covered loc ts cap0),
@@ -360,7 +360,7 @@ Section LIFT.
   Lemma traced_step_lifting lang st0 st1 lc0 lc1 sc0 sc1 mem0 mem1 cap0 tr
         (spaces lefts: Loc.t -> Time.t -> Prop)
         (STEPS: Trace.steps tr (Thread.mk lang st0 lc0 sc0 mem0) (Thread.mk _ st1 lc1 sc1 mem1))
-        (EVENTS: List.Forall (fun em => <<SAT: (write_not_in spaces /1\ write_not_to lefts /1\ (fun e => ~ is_cancel e)) (snd em)>>) tr)
+        (EVENTS: List.Forall (fun em => <<SAT: (write_not_in spaces /1\ write_not_to lefts /1\ (fun e => ~ ThreadEvent.is_cancel e)) (snd em)>>) tr)
         (SOUND: Memory.le mem0 cap0)
         (SPACES:
            forall loc ts (COV: covered loc ts cap0),
@@ -490,7 +490,7 @@ Qed.
 Lemma step_needed_spaces lang (th0 th1: Thread.t lang) pf e
       (times: Loc.t -> Time.t -> Prop)
       (STEP: Thread.step pf e th0 th1)
-      (NOTCANCEL: ~ is_cancel e)
+      (NOTCANCEL: ~ ThreadEvent.is_cancel e)
       (WFTIME: wf_time_evt times e)
   :
     ((<<ALREADY: write_not_in (fun loc0 ts0 => ~ covered loc0 ts0 th0.(Thread.memory)) e>>) /\
@@ -606,7 +606,7 @@ Hint Constructors disjoint_intervals.
 Lemma traced_steps_needed_spaces lang (th0 th1: Thread.t lang) tr
       (times: Loc.t -> Time.t -> Prop)
       (STEP: Trace.steps tr th0 th1)
-      (EVENTS: List.Forall (fun em => <<SAT: ((fun e => ~ is_cancel e) /1\ wf_time_evt times) (snd em)>>) tr)
+      (EVENTS: List.Forall (fun em => <<SAT: ((fun e => ~ ThreadEvent.is_cancel e) /1\ wf_time_evt times) (snd em)>>) tr)
   :
     exists l,
       (<<WRITENOTIN:
@@ -663,7 +663,7 @@ Lemma reserve_empty_intervals times lang (th: Thread.t lang) l
   :
     exists tr prom' mem',
       (<<STEPS: Trace.steps tr th (Thread.mk _ th.(Thread.state) (Local.mk th.(Thread.local).(Local.tview) prom') th.(Thread.sc) mem')>>) /\
-      (<<RESERVETRACE: List.Forall (fun em => <<SAT: (is_reserve /1\ wf_time_evt times) (snd em)>>) tr>>) /\
+      (<<RESERVETRACE: List.Forall (fun em => <<SAT: (ThreadEvent.is_reserve /1\ wf_time_evt times) (snd em)>>) tr>>) /\
       (<<ADDEDPROM: reservations_added l th.(Thread.local).(Local.promises) prom'>>) /\
       (<<ADDEDMEM: reservations_added l th.(Thread.memory) mem'>>)
 .
@@ -749,7 +749,7 @@ Lemma cancel_reservations_added times l prom lang lc
                              times (fst locitv) (snd (snd locitv))) l)
   :
     exists tr,
-      (<<CANCELTRACE: List.Forall (fun em => <<SAT: (is_cancel /1\ wf_time_evt times) (snd em)>>) tr>>) /\
+      (<<CANCELTRACE: List.Forall (fun em => <<SAT: (ThreadEvent.is_cancel /1\ wf_time_evt times) (snd em)>>) tr>>) /\
     forall
       (st: Language.state lang) sc mem
       (MLE: Memory.le lc.(Local.promises) mem),
@@ -906,7 +906,7 @@ Lemma reserve_write_tos times lang (th: Thread.t lang) tos
   :
     exists l tr prom' mem',
       (<<STEPS: Trace.steps tr th (Thread.mk _ th.(Thread.state) (Local.mk th.(Thread.local).(Local.tview) prom') th.(Thread.sc) mem')>>) /\
-      (<<RESERVETRACE: List.Forall (fun em => <<SAT: (is_reserve /1\ wf_time_evt times) (snd em)>>) tr>>) /\
+      (<<RESERVETRACE: List.Forall (fun em => <<SAT: (ThreadEvent.is_reserve /1\ wf_time_evt times) (snd em)>>) tr>>) /\
       (<<ADDEDPROM: reservations_added l th.(Thread.local).(Local.promises) prom'>>) /\
       (<<ADDEDMEM: reservations_added l th.(Thread.memory) mem'>>) /\
       (<<WRITETO: forall loc ts (IN: List.In (loc, ts) tos),
@@ -1216,7 +1216,7 @@ Qed.
 Lemma traced_steps_eventable_time_normal lang (th0 th1: Thread.t lang) tr
       (spaces: Loc.t -> Time.t -> Prop)
       (STEPS: Trace.steps tr th0 th1)
-      (WRITENOTIN: List.Forall (fun em => (write_not_in (fun loc ts => ~ (spaces loc ts \/ covered loc ts th0.(Thread.memory))) /1\ (fun e => ~ is_cancel e)) (snd em)) tr)
+      (WRITENOTIN: List.Forall (fun em => (write_not_in (fun loc ts => ~ (spaces loc ts \/ covered loc ts th0.(Thread.memory))) /1\ (fun e => ~ ThreadEvent.is_cancel e)) (snd em)) tr)
       (MEM: Memory.closed th0.(Thread.memory))
       (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
       (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
@@ -1249,7 +1249,7 @@ Qed.
 Lemma traced_steps_eventable_time_cancel lang (th0 th1: Thread.t lang) tr
       (spaces: Loc.t -> Time.t -> Prop)
       (STEPS: Trace.steps tr th0 th1)
-      (WRITENOTIN: List.Forall (fun em => is_cancel (snd em)) tr)
+      (WRITENOTIN: List.Forall (fun em => ThreadEvent.is_cancel (snd em)) tr)
       (MEM: Memory.closed th0.(Thread.memory))
       (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
       (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
@@ -1310,7 +1310,7 @@ Lemma can_reserve_all_needed times
       st0 st1 lc0 lc1 sc0 sc1 mem0 mem1 tr
       (MWF: memory_times_wf times mem0)
       (STEPS: Trace.steps tr (Thread.mk lang st0 lc0 sc0 mem0) (Thread.mk lang st1 lc1 sc1 mem1))
-      (EVENTS: List.Forall (fun em => <<SAT: ((fun e => ~ is_cancel e) /1\ wf_time_evt times) (snd em)>>) tr)
+      (EVENTS: List.Forall (fun em => <<SAT: ((fun e => ~ ThreadEvent.is_cancel e) /1\ wf_time_evt times) (snd em)>>) tr)
       (MEM: Memory.closed mem0)
       (LOCAL: Local.wf lc0 mem0)
       (SC: Memory.closed_timemap sc0 mem0)
@@ -1319,8 +1319,8 @@ Lemma can_reserve_all_needed times
       (<<RESERVESTEPS:
          Trace.steps tr_reserve (Thread.mk lang st0 lc0 sc0 mem0) (Thread.mk lang st0 lc0' sc0 mem0')>>) /\
       (<<RESERVETRACE:
-         List.Forall (fun em => <<SAT: (is_reserve /1\ wf_time_evt times) (snd em)>>) tr_reserve>>) /\
-      (<<CANCELTRACE: List.Forall (fun em => <<SAT: (is_cancel /1\ wf_time_evt times) (snd em)>>) tr_cancel>>) /\
+         List.Forall (fun em => <<SAT: (ThreadEvent.is_reserve /1\ wf_time_evt times) (snd em)>>) tr_reserve>>) /\
+      (<<CANCELTRACE: List.Forall (fun em => <<SAT: (ThreadEvent.is_cancel /1\ wf_time_evt times) (snd em)>>) tr_cancel>>) /\
       (<<RESERVEMEM: reservations_added reserves mem0 mem0'>>) /\
       (<<CAP:
          forall cap0'
@@ -1393,7 +1393,7 @@ Proof.
       { eapply list_Forall_sum.
         { eapply EVENTS. }
         { eapply EVENTS0. }
-        { instantiate (1:=fun em => <<SAT: ((fun e => ~ is_cancel e) /1\ write_not_to (fun loc ts => ~ List.In (loc, ts) tos)) (snd em)>>).
+        { instantiate (1:=fun em => <<SAT: ((fun e => ~ ThreadEvent.is_cancel e) /1\ write_not_to (fun loc ts => ~ List.In (loc, ts) tos)) (snd em)>>).
           i. ss. des. splits; auto. }
       }
       { eapply WRITENOTIN. }

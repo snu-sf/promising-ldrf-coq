@@ -2343,7 +2343,7 @@ Section CANCEL.
         (MLE: Memory.le proms0 mem0)
     :
       exists proms1 mem1,
-        (<<STEPS: rtc (tau (@pred_step is_cancel lang))
+        (<<STEPS: rtc (tau (@pred_step ThreadEvent.is_cancel lang))
                       (Thread.mk lang st (Local.mk vw proms0) sc mem0)
                       (Thread.mk lang st (Local.mk vw proms1) sc mem1)>>) /\
         (<<NORESERVES: no_reserves proms1>>).
@@ -2440,7 +2440,7 @@ Section CANCEL.
 
   Lemma step_not_cancel_reserves_same P lang e th0 th1
         (STEPS: (@pred_step P lang) e th0 th1)
-        (PRED: P <1= (promise_free /1\ (fun e => ~ is_cancel e)))
+        (PRED: P <1= (promise_free /1\ (fun e => ~ ThreadEvent.is_cancel e)))
         loc to from
         (GET: Memory.get loc to th0.(Thread.local).(Local.promises) = Some (from, Message.reserve))
     :
@@ -2469,7 +2469,7 @@ Section CANCEL.
 
   Lemma steps_not_cancel_reserves_same P lang th0 th1
         (STEPS: rtc (tau (@pred_step P lang)) th0 th1)
-        (PRED: P <1= (promise_free /1\ (fun e => ~ is_cancel e)))
+        (PRED: P <1= (promise_free /1\ (fun e => ~ ThreadEvent.is_cancel e)))
         loc to from
         (GET: Memory.get loc to th0.(Thread.local).(Local.promises) = Some (from, Message.reserve))
     :
@@ -2484,11 +2484,11 @@ Section CANCEL.
 
   Lemma cancel_memory_decrease P lang e th0 th1
         (STEP: (@pred_step P lang) e th0 th1)
-        (PRED: P <1= is_cancel)
+        (PRED: P <1= ThreadEvent.is_cancel)
     :
       Memory.le th1.(Thread.memory) th0.(Thread.memory).
   Proof.
-    inv STEP. eapply PRED in SAT. unfold is_cancel in SAT. des_ifs.
+    inv STEP. eapply PRED in SAT. unfold ThreadEvent.is_cancel in SAT. des_ifs.
     inv STEP0. inv STEP; inv STEP0; ss.
     - inv LOCAL. inv PROMISE; ss.
       ii. erewrite Memory.remove_o in LHS; eauto. des_ifs.
@@ -2497,7 +2497,7 @@ Section CANCEL.
 
   Lemma cancels_memory_decrease P lang th0 th1
         (STEP: rtc (tau (@pred_step P lang)) th0 th1)
-        (PRED: P <1= is_cancel)
+        (PRED: P <1= ThreadEvent.is_cancel)
     :
       Memory.le th1.(Thread.memory) th0.(Thread.memory).
   Proof.
@@ -2509,11 +2509,11 @@ Section CANCEL.
 
   Lemma cancel_concrete_same P lang e th0 th1
         (STEP: (@pred_step P lang) e th0 th1)
-        (PRED: P <1= is_cancel)
+        (PRED: P <1= ThreadEvent.is_cancel)
     :
       memory_concrete_le th0.(Thread.memory) th1.(Thread.memory).
   Proof.
-    inv STEP. eapply PRED in SAT. unfold is_cancel in SAT. des_ifs.
+    inv STEP. eapply PRED in SAT. unfold ThreadEvent.is_cancel in SAT. des_ifs.
     inv STEP0. inv STEP; inv STEP0; ss.
     - inv LOCAL. inv PROMISE; ss.
       ii. erewrite Memory.remove_o; eauto. des_ifs.
@@ -2524,7 +2524,7 @@ Section CANCEL.
 
   Lemma cancels_concrete_same P lang th0 th1
         (STEP: rtc (tau (@pred_step P lang)) th0 th1)
-        (PRED: P <1= is_cancel)
+        (PRED: P <1= ThreadEvent.is_cancel)
     :
       memory_concrete_le th0.(Thread.memory) th1.(Thread.memory).
   Proof.
@@ -2536,11 +2536,11 @@ Section CANCEL.
 
   Lemma cancel_promises_decrease P lang e th0 th1
         (STEP: (@pred_step P lang) e th0 th1)
-        (PRED: P <1= is_cancel)
+        (PRED: P <1= ThreadEvent.is_cancel)
     :
       Memory.le th1.(Thread.local).(Local.promises) th0.(Thread.local).(Local.promises).
   Proof.
-    inv STEP. eapply PRED in SAT. unfold is_cancel in SAT. des_ifs.
+    inv STEP. eapply PRED in SAT. unfold ThreadEvent.is_cancel in SAT. des_ifs.
     inv STEP0. inv STEP; inv STEP0; ss.
     - inv LOCAL. inv PROMISE; ss.
       ii. erewrite Memory.remove_o in LHS; eauto. des_ifs.
@@ -2549,7 +2549,7 @@ Section CANCEL.
 
   Lemma cancels_promises_decrease P lang th0 th1
         (STEP: rtc (tau (@pred_step P lang)) th0 th1)
-        (PRED: P <1= is_cancel)
+        (PRED: P <1= ThreadEvent.is_cancel)
     :
       Memory.le th1.(Thread.local).(Local.promises) th0.(Thread.local).(Local.promises).
   Proof.
@@ -2561,7 +2561,7 @@ Section CANCEL.
 
   Lemma cancel_remove_only P lang e th0 th1
         (STEP: (@pred_step P lang) e th0 th1)
-        (PRED: P <1= is_cancel)
+        (PRED: P <1= ThreadEvent.is_cancel)
         loc from to msg
         (GET: Memory.get loc to th0.(Thread.local).(Local.promises) = Some (from, msg))
         (NONE: Memory.get loc to th1.(Thread.local).(Local.promises) = None)
@@ -2570,7 +2570,7 @@ Section CANCEL.
       (<<NONE: Memory.get loc to th1.(Thread.memory) = None>>) /\
       (<<RESERVE: msg = Message.reserve>>).
   Proof.
-    inv STEP. eapply PRED in SAT. unfold is_cancel in SAT. des_ifs.
+    inv STEP. eapply PRED in SAT. unfold ThreadEvent.is_cancel in SAT. des_ifs.
     inv STEP0. inv STEP; inv STEP0; ss.
     - inv LOCAL. inv PROMISE; ss.
       dup NONE. erewrite Memory.remove_o in NONE; eauto. des_ifs. ss. clarify.
@@ -2581,7 +2581,7 @@ Section CANCEL.
 
   Lemma cancels_remove_only P lang th0 th1
         (STEP: rtc (tau (@pred_step P lang)) th0 th1)
-        (PRED: P <1= is_cancel)
+        (PRED: P <1= ThreadEvent.is_cancel)
         loc from to msg
         (GET: Memory.get loc to th0.(Thread.local).(Local.promises) = Some (from, msg))
         (NONE: Memory.get loc to th1.(Thread.local).(Local.promises) = None)

@@ -47,14 +47,58 @@ Lemma reorder_reserves_opt_step_cancels
       (STEP2: Thread.opt_step e th1 th2)
       (STEPS3: rtc (@Thread.reserve_step lang \2/ @Thread.cancel_step _) th2 th3)
   :
-    exists th1' th2' e',
+    (exists th1' th2',
       (<<STEPS1: rtc (@Thread.cancel_step lang) th0 th1'>>) /\
-      (<<STEP2: Thread.opt_step e' th1' th2'>>) /\
-      (<<STEPS3: rtc (@Thread.reserve_step lang) th2' th3>>) /\
-      __guard__(e' = e \/ e' = ThreadEvent.silent /\ (<<RESERVE: is_reserve e>> \/ <<CANCEL: is_cancel e>>)).
+      (<<STEP2: Thread.opt_step e th1' th2'>>) /\
+      (<<STEPS3: rtc (@Thread.reserve_step lang) th2' th3>>)) \/
+    (exists th1',
+      (<<STEPS1: rtc (@Thread.cancel_step lang) th0 th1'>>) /\
+      (<<STEPS3: rtc (@Thread.reserve_step lang) th1' th3>>) /\
+      (<<RESERVATION: ~ ThreadEvent.is_normal e>>)).
 Proof.
-  eapply rtc_implies with (R2:=tau (@pred_step (is_reserve \1/ is_cancel) _)) in STEPS1; cycle 1.
-  { i. des.
+  destruct (classic (ThreadEvent.is_normal e)) as [NRESERVATION|RESERVATION]; cycle 1.
+  { right.
+    assert (STEPS: rtc (@Thread.reserve_step lang \2/ @Thread.cancel_step _) th0 th3).
+    { etrans.
+      { eapply STEPS1. }
+      econs 2.
+      { unfold ThreadEvent.is_normal in *. apply not_and_or in RESERVATION.
+        instantiate (1:=th2). des.
+        { apply NNPP in RESERVATION.
+          unfold ThreadEvent.is_reserve in RESERVATION. des_ifs. inv STEP2.
+          left. econs; eauto. }
+        { unfold ThreadEvent.is_cancel in RESERVATION. des_ifs. inv STEP2.
+          right. econs; eauto. }
+      }
+      { eapply STEPS3. }
+    }
+    eapply rtc_implies with (R2:=tau (@pred_step (ThreadEvent.is_reserve \1/ ThreadEvent.is_cancel) _)) in STEPS; cycle 1.
+    { clear. i. des.
+      { inv H. econs; eauto.
+        { econs; eauto.
+          { econs; eauto. }
+          { ss; auto. }
+        }
+        { ss. }
+      }
+      { inv H. econs; eauto.
+        { econs; eauto.
+          { econs; eauto. }
+          { ss; auto. }
+        }
+        { ss. }
+      }
+    }
+    hexploit steps_not_reserves_reserves; try apply STEPS. i. des.
+    esplits.
+    { eapply rtc_implies; try apply STEPS0.
+      clear. i. inv H. inv TSTEP. des; ss. inv STEP.
+      unfold ThreadEvent.is_cancel in *. des_ifs. econs; eauto. }
+    { eapply STEPS2. }
+    { auto. }
+  }
+  eapply rtc_implies with (R2:=tau (@pred_step (ThreadEvent.is_reserve \1/ ThreadEvent.is_cancel) _)) in STEPS1; cycle 1.
+  { clear. i. des.
     { inv H. econs; eauto.
       { econs; eauto.
         { econs; eauto. }
@@ -71,8 +115,9 @@ Proof.
     }
   }
   hexploit steps_not_reserves_reserves; try apply STEPS1. i. des.
-  hexploit reorder_reserves_opt_step; eauto. i. des.
-  hexploit (@steps_cancels_not_cancels (is_reserve \1/ is_cancel)).
+  hexploit reorder_reserves_opt_step; eauto. i. des; cycle 1.
+  { exfalso. eapply NRESERVATION. auto. }
+  hexploit (@steps_cancels_not_cancels (ThreadEvent.is_reserve \1/ ThreadEvent.is_cancel)).
   { etrans.
     { eapply rtc_implies; try apply STEPS4. i. inv H. econs; eauto.
       { econs.
@@ -103,19 +148,47 @@ Proof.
   hexploit reorder_opt_step_cancels.
   { eapply STEP1. }
   { eapply STEPS5. }
-  i. des. esplits.
+  i. des; cycle 1.
+  { exfalso. unfold ThreadEvent.is_normal in *. des. ss. }
+  left. esplits.
   { etrans.
     { eapply rtc_implies; try apply STEPS0.
       clear. i. inv H. inv TSTEP. des; ss.
-      unfold is_cancel in *. des_ifs. inv STEP. econs; eauto. }
+      unfold ThreadEvent.is_cancel in *. des_ifs. inv STEP. econs; eauto. }
     { eapply STEPS7. }
   }
   { eapply STEP0. }
   { eapply rtc_implies; try apply STEPS6.
     clear. i. inv H. inv TSTEP. des; ss.
-    unfold is_cancel in *. des_ifs. inv STEP. econs; eauto.
+    unfold ThreadEvent.is_cancel in *. des_ifs. inv STEP. econs; eauto.
   }
-  { unguard. des; subst; auto. }
+Qed.
+
+Lemma reorder_reserves_opt_step_cancels2
+      lang
+      e th0 th1 th2 th3
+      (STEPS1: rtc (@Thread.reserve_step lang \2/ @Thread.cancel_step _) th0 th1)
+      (STEP2: Thread.opt_step e th1 th2)
+      (STEPS3: rtc (@Thread.reserve_step lang \2/ @Thread.cancel_step _) th2 th3)
+  :
+    exists th1' th2' e',
+      (<<STEPS1: rtc (@Thread.cancel_step lang) th0 th1'>>) /\
+      (<<STEP2: Thread.opt_step e' th1' th2'>>) /\
+      (<<STEPS3: rtc (@Thread.reserve_step lang) th2' th3>>) /\
+      __guard__(e' = e \/ e' = ThreadEvent.silent /\ (<<RESERVATION: ~ ThreadEvent.is_normal e>>)).
+Proof.
+  hexploit reorder_reserves_opt_step_cancels.
+  { eapply STEPS1. }
+  { eapply STEP2. }
+  { eapply STEPS3. }
+  i. des.
+  { esplits; eauto. left. auto. }
+  { esplits.
+    { eapply STEPS0. }
+    { econs 1. }
+    { eapply STEPS2. }
+    right. splits; auto.
+  }
 Qed.
 
 Lemma reserve_step_cancel_step_eq lang (th0 th1: Thread.t lang)
@@ -239,24 +312,24 @@ Qed.
 
 Lemma reserve_trace_reserve_steps lang (th0 th1: Thread.t lang) tr
       (STEPS: Trace.steps tr th0 th1)
-      (RESERVE: List.Forall (fun lce => is_reserve (snd lce)) tr)
+      (RESERVE: List.Forall (fun lce => ThreadEvent.is_reserve (snd lce)) tr)
   :
     rtc (@Thread.reserve_step _) th0 th1.
 Proof.
   ginduction STEPS; eauto. subst. i. inv RESERVE.
   exploit IHSTEPS; eauto. i. econs; eauto. ss.
-  unfold is_reserve in *. des_ifs. econs; eauto.
+  unfold ThreadEvent.is_reserve in *. des_ifs. econs; eauto.
 Qed.
 
 Lemma cancel_trace_cancel_steps lang (th0 th1: Thread.t lang) tr
       (STEPS: Trace.steps tr th0 th1)
-      (RESERVE: List.Forall (fun lce => is_cancel (snd lce)) tr)
+      (RESERVE: List.Forall (fun lce => ThreadEvent.is_cancel (snd lce)) tr)
   :
     rtc (@Thread.cancel_step _) th0 th1.
 Proof.
   ginduction STEPS; eauto. subst. i. inv RESERVE.
   exploit IHSTEPS; eauto. i. econs; eauto. ss.
-  unfold is_cancel in *. des_ifs.
+  unfold ThreadEvent.is_cancel in *. des_ifs.
   dup STEP. inv STEP0; inv STEP1; inv LOCAL. inv PROMISE.
   econs; eauto.
 Qed.
@@ -338,13 +411,13 @@ Proof.
       i. ss. des.
       eapply no_sc_any_sc_traced in CANCELSTEPS; eauto; cycle 1.
       { eapply List.Forall_impl; eauto. clear.
-        i. ss. des. unfold is_cancel in *. des_ifs. }
+        i. ss. des. unfold ThreadEvent.is_cancel in *. des_ifs. }
       des. eapply Trace.silent_steps_tau_steps in STEPS4; cycle 1.
       { eapply List.Forall_impl; eauto. clear.
-        i. ss. des; auto. unfold is_cancel in *. des_ifs. }
+        i. ss. des; auto. unfold ThreadEvent.is_cancel in *. des_ifs. }
       eapply no_sc_any_sc_traced in STEPS2; eauto; cycle 1.
       { eapply List.Forall_impl; eauto. clear.
-        i. ss. des. unfold is_cancel in *. des_ifs. }
+        i. ss. des. unfold ThreadEvent.is_cancel in *. des_ifs. }
       des. eapply Trace.silent_steps_tau_steps in STEPS5; cycle 1.
       { eapply List.Forall_impl; eauto. i. ss. des. auto. }
       unfold Thread.steps_failure. esplits.
@@ -359,13 +432,13 @@ Proof.
       i. ss. des.
       eapply no_sc_any_sc_traced in CANCELSTEPS; eauto; cycle 1.
       { eapply List.Forall_impl; eauto. clear.
-        i. ss. des. unfold is_cancel in *. des_ifs. }
+        i. ss. des. unfold ThreadEvent.is_cancel in *. des_ifs. }
       des. eapply Trace.silent_steps_tau_steps in STEPS4; cycle 1.
       { eapply List.Forall_impl; eauto. clear.
-        i. ss. des; auto. unfold is_cancel in *. des_ifs. }
+        i. ss. des; auto. unfold ThreadEvent.is_cancel in *. des_ifs. }
       eapply no_sc_any_sc_traced in STEPS2; eauto; cycle 1.
       { eapply List.Forall_impl; eauto. clear.
-        i. ss. des. unfold is_cancel in *. des_ifs. }
+        i. ss. des. unfold ThreadEvent.is_cancel in *. des_ifs. }
       des. eapply Trace.silent_steps_tau_steps in STEPS5; cycle 1.
       { eapply List.Forall_impl; eauto. i. ss. des. auto. }
       unfold Thread.steps_failure. esplits.

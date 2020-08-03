@@ -133,6 +133,29 @@ Module ThreadEvent.
   Proof.
     destruct e1, e2; ss. inv EVENT. ss.
   Qed.
+
+  Definition is_cancel (e: t) : Prop :=
+    match e with
+    | promise _ _ _ Message.reserve Memory.op_kind_cancel => True
+    | _ => False
+    end.
+
+  Definition is_reserve (te: t): Prop :=
+    match te with
+    | promise _ _ _ Message.reserve Memory.op_kind_add => True
+    | _ => False
+    end.
+
+  Definition is_normal (e: ThreadEvent.t) :=
+    ~ is_reserve e /\ ~ is_cancel e.
+
+  Lemma is_normal_dec (e: ThreadEvent.t):
+    { is_normal e } + { ~ is_normal e }.
+  Proof.
+    unfold is_normal.
+    destruct e; ss; try by (left; ii; des; ss).
+    destruct msg, kind0; auto; try by (right; ii; des; ss).
+  Qed.
 End ThreadEvent.
 
 Module Local.

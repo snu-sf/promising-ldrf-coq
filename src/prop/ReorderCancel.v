@@ -184,14 +184,14 @@ Lemma reorder_step_cancel
       pf1 pf2 e1 e2 th0 th1 th2
       (STEP1: @Thread.step lang pf1 e1 th0 th1)
       (STEP2: Thread.step pf2 e2 th1 th2)
-      (CANCEL: is_cancel e2):
+      (CANCEL: ThreadEvent.is_cancel e2):
   (exists th1',
     (<<STEP1: Thread.step pf2 e2 th0 th1'>>) /\
     (<<STEP2: Thread.step pf1 e1 th1' th2>>)) \/
-  (th2 = th0 /\ <<RESERVE: is_reserve e1>>)
+  (th2 = th0 /\ <<RESERVE: ThreadEvent.is_reserve e1>>)
 .
 Proof.
-  unfold is_cancel in *. des_ifs.
+  unfold ThreadEvent.is_cancel in *. des_ifs.
   inv STEP2; inv STEP; [|inv LOCAL]. ss.
   inv STEP1; ss.
   - inv STEP. ss. exploit reorder_promise_promise_cancel; eauto.
@@ -237,7 +237,7 @@ Lemma reorder_step_cancels
     (exists th1',
         (<<STEPS1: rtc (@Thread.cancel_step lang) th0 th1'>>) /\
         (<<STEP2: Thread.step pf e1 th1' th2>>)) \/
-    ((<<STEPS1: rtc (@Thread.cancel_step lang) th0 th2>>) /\ (<<RESERVE: is_reserve e1>>))
+    ((<<STEPS1: rtc (@Thread.cancel_step lang) th0 th2>>) /\ (<<RESERVE: ThreadEvent.is_reserve e1>>))
 .
 Proof.
   ginduction STEPS2; i.
@@ -264,10 +264,29 @@ Lemma reorder_opt_step_cancels
       (STEP1: Thread.opt_step e1 th0 th1)
       (STEPS2: rtc (@Thread.cancel_step lang) th1 th2)
   :
+    (exists th1',
+        (<<STEPS1: rtc (@Thread.cancel_step lang) th0 th1'>>) /\
+        (<<STEP2: Thread.opt_step e1 th1' th2>>)) \/
+    ((<<STEPS1: rtc (@Thread.cancel_step lang) th0 th2>>) /\ (<<RESERVE: ThreadEvent.is_reserve e1>>)).
+Proof.
+  inv STEP1.
+  { left. esplits; eauto. econs 1. }
+  { exploit reorder_step_cancels; eauto. i. des.
+    { left. esplits; eauto. econs 2; eauto. }
+    { right. esplits; eauto. }
+  }
+Qed.
+
+Lemma reorder_opt_step_cancels2
+      lang
+      e1 th0 th1 th2
+      (STEP1: Thread.opt_step e1 th0 th1)
+      (STEPS2: rtc (@Thread.cancel_step lang) th1 th2)
+  :
     exists th1' e1',
       (<<STEPS1: rtc (@Thread.cancel_step lang) th0 th1'>>) /\
       (<<STEP2: Thread.opt_step e1' th1' th2>>) /\
-      __guard__(e1' = e1 \/ e1' = ThreadEvent.silent /\ <<RESERVE: is_reserve e1>>).
+      __guard__(e1' = e1 \/ e1' = ThreadEvent.silent /\ <<RESERVE: ThreadEvent.is_reserve e1>>).
 Proof.
   unguard. inv STEP1.
   { esplits.
@@ -287,15 +306,15 @@ Lemma steps_cancels_not_cancels
   :
     exists th1,
       (<<STEPS1: rtc (@Thread.cancel_step _) th0 th1>>) /\
-      (<<STEPS2: rtc (tau (@pred_step (P /1\ fun e => ~ is_cancel e) _)) th1 th2>>)
+      (<<STEPS2: rtc (tau (@pred_step (P /1\ fun e => ~ ThreadEvent.is_cancel e) _)) th1 th2>>)
 .
 Proof.
   ginduction STEPS; i.
   - esplits; eauto.
   - inv H. inv TSTEP. inv STEP.
     hexploit IHSTEPS; eauto. i. des.
-    destruct (classic (is_cancel e)).
-    + unfold is_cancel in H. des_ifs. esplits.
+    destruct (classic (ThreadEvent.is_cancel e)).
+    + unfold ThreadEvent.is_cancel in H. des_ifs. esplits.
       * econs 2.
         { econs; eauto. }
         { eapply STEPS1. }
