@@ -464,24 +464,8 @@ End ThreadTrace.
 
 Section RESERVING.
 
-  Inductive reserving_event: forall (e: ThreadEvent.t), Prop :=
-  | reserving_event_reserve
-      loc from to kind
-    :
-      reserving_event (ThreadEvent.promise loc from to Message.reserve kind)
-  .
-  Hint Constructors reserving_event.
-
   Definition reserving_trace (tr: Trace.t): Prop :=
-    List.Forall (fun lce => reserving_event (snd lce)) tr.
-
-  Lemma reserving_event_silent e
-        (RESERVING: reserving_event e)
-    :
-      ThreadEvent.get_machine_event e = MachineEvent.silent.
-  Proof.
-    inv RESERVING; ss.
-  Qed.
+    List.Forall (fun lce => ThreadEvent.is_reservation_event (snd lce)) tr.
 
   Inductive final_event_trace (e: ThreadEvent.t)
     :

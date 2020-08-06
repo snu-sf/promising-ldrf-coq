@@ -44,12 +44,13 @@ Lemma PF_sim_configuration_beh L times c_src c_mid c_tgt views prom extra
       (INCR: forall nat loc, times loc (incr_time_seq nat))
       (RACEFRFEE: pf_racefree_view L c_src)
       (WF_SRC: Configuration.wf c_src)
+      (PFSRC: pf_configuration L c_src)
       (WF_MID: JConfiguration.wf views c_mid)
       (WF_TGT: Configuration.wf c_tgt)
       (SIM: sim_configuration L times (fun _ => True) views prom extra c_src c_mid c_tgt)
   :
     behaviors (times_configuration_step_all times) c_tgt <1=
-    behaviors (pf_step L) c_src.
+    behaviors (pf_multi_step L) c_src.
 Proof.
   i. ginduction PR; i.
   { dep_inv SIM. econs 1. ii. ss.
@@ -77,6 +78,7 @@ Proof.
         { econs; eauto. }
         { eapply IHPR; try apply SIM0; eauto.
           { eapply steps_pf_racefree_view; eauto. econs; eauto. econs. }
+          { eapply pf_step_trace_future; eauto. }
           { eapply pf_step_trace_future; eauto. }
           { eapply JConfiguration.step_future; eauto. }
           { eapply times_configuration_step_future; eauto. }
@@ -123,6 +125,7 @@ Proof.
             eapply IHPR; try apply SIM0; eauto.
             { eapply steps_pf_racefree_view; eauto. econs; eauto. econs. }
             { eapply pf_step_trace_future; eauto. }
+            { eapply pf_step_trace_future; eauto. }
             { eapply JConfiguration.step_future; eauto. }
             { eapply times_configuration_step_future; eauto. }
           }
@@ -144,12 +147,13 @@ Theorem local_DRFPF L s
         (RACEFRFEE: pf_racefree_view L (Configuration.init s))
   :
     behaviors Configuration.step (Configuration.init s) <1=
-    behaviors (pf_step L) (Configuration.init s).
+    behaviors (pf_multi_step L) (Configuration.init s).
 Proof.
   i. eapply times_configuration_step_same_behaviors in PR; cycle 1.
   { eapply Configuration.init_wf. }
   des. eapply PF_sim_configuration_beh; eauto.
   { eapply Configuration.init_wf. }
+  { eapply configuration_init_pf. }
   { eapply JConfiguration.init_wf. }
   { eapply Configuration.init_wf. }
   instantiate (1:=s). instantiate (1:=bot4). instantiate (1:=bot3). econs; eauto.
@@ -197,10 +201,3 @@ Proof.
     { right. ss. }
   }
 Qed.
-
-
-(* Lemma pf_racefree_pf_racefree_tview L c *)
-(*       (WF: Configuration.wf c) *)
-(*       (RACEFREE: pf_racefree_view L c) *)
-(*   : *)
-(*     pf_racefree L c. *)

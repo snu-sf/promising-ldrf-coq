@@ -42,16 +42,6 @@ Require Import Pred.
 
 Set Implicit Arguments.
 
-Ltac dep_clarify :=
-  (repeat
-     match goal with
-     | H:existT ?P ?p ?x = existT ?P ?p ?y |- _ =>
-       eapply inj_pair2 in H; subst
-     end); ss; clarify.
-
-Ltac dep_inv H :=
-  inv H; dep_clarify.
-
 Inductive all_promises
           (tids: Ident.t -> Prop)
           (proms: Ident.t -> Loc.t -> Time.t -> Prop): Loc.t -> Time.t -> Prop :=
@@ -2300,12 +2290,14 @@ Section SIM.
         c_src0 c_mid0 c_tgt0 tm
         (SIM: sim_configuration tids views0 prom extra c_src0 c_mid0 c_tgt0)
         (WF_SRC: Configuration.wf c_src0)
+        (PFSRC: pf_configuration L c_src0)
         (WF_MID: JConfiguration.wf views0 c_mid0)
         (WF_TGT: Configuration.wf c_tgt0)
         (ALL: List.Forall tids tidl)
     :
       exists trs c_src1 c_mid1 c_tgt1 views1,
         (<<WF_SRC: Configuration.wf c_src1>>) /\
+        (<<PFSRC: pf_configuration L c_src1>>) /\
         (<<WF_MID: JConfiguration.wf views1 c_mid1>>) /\
         (<<WF_TGT: Configuration.wf c_tgt1>>) /\
         (<<STEPSRC: silent_pf_steps_trace L c_src0 c_src1 trs>>) /\
@@ -2314,7 +2306,7 @@ Section SIM.
             IdentMap.find tid c_tgt1.(Configuration.threads)>>) /\
         __guard__((<<FAIL: exists tid c_src2,
                       (<<TID: List.In tid tidl>>) /\
-                      (<<STEP: pf_step L MachineEvent.failure tid c_src1 c_src2>>)>>) \/
+                      (<<STEP: pf_multi_step L MachineEvent.failure tid c_src1 c_src2>>)>>) \/
                   ((<<FUTURE: good_future tm c_tgt0.(Configuration.memory) c_tgt1.(Configuration.memory)>>) /\
                    (<<SC: c_tgt1.(Configuration.sc) = c_tgt0.(Configuration.sc)>>) /\
                    (<<SIM: sim_configuration
@@ -2351,6 +2343,7 @@ Section SIM.
         { econs. esplits; eauto. }
       }
       exploit IHtidl; eauto.
+      { eapply pf_opt_step_trace_future; eauto. }
       { eapply pf_opt_step_trace_future; eauto. }
       { eapply JConfiguration.opt_step_future; eauto. }
       { eapply times_configuration_opt_step_future; eauto. }
@@ -2417,11 +2410,13 @@ Section SIM.
         c_src0 c_mid0 c_tgt0 tm
         (SIM: sim_configuration tids views0 prom extra c_src0 c_mid0 c_tgt0)
         (WF_SRC: Configuration.wf c_src0)
+        (PFSRC: pf_configuration L c_src0)
         (WF_MID: JConfiguration.wf views0 c_mid0)
         (WF_TGT: Configuration.wf c_tgt0)
     :
       exists trs c_src1 c_mid1 c_tgt1 views1,
         (<<WF_SRC: Configuration.wf c_src1>>) /\
+        (<<PFSRC: pf_configuration L c_src1>>) /\
         (<<WF_MID: JConfiguration.wf views1 c_mid1>>) /\
         (<<WF_TGT: Configuration.wf c_tgt1>>) /\
         (<<STEPSRC: silent_pf_steps_trace L c_src0 c_src1 trs>>) /\
@@ -2430,7 +2425,7 @@ Section SIM.
             IdentMap.find tid c_tgt1.(Configuration.threads)>>) /\
         __guard__((<<FAIL: exists tid c_src2,
                       (<<TID: ctids tid>>) /\
-                      (<<STEP: pf_step L MachineEvent.failure tid c_src1 c_src2>>)>>) \/
+                      (<<STEP: pf_multi_step L MachineEvent.failure tid c_src1 c_src2>>)>>) \/
                   ((<<FUTURE: good_future tm c_tgt0.(Configuration.memory) c_tgt1.(Configuration.memory)>>) /\
                    (<<SC: c_tgt1.(Configuration.sc) = c_tgt0.(Configuration.sc)>>) /\
                    (<<SIM: sim_configuration
@@ -3092,14 +3087,15 @@ Section SIM.
                                (all_promises (fun tid' => tid <> tid') prom0)
                                (snd the)) tr_tgt)
         (WF_SRC: Configuration.wf c_src0)
+        (PFSRC: pf_configuration L c_src0)
         (WF_MID: JConfiguration.wf views0 c_mid0)
         (WF_TGT: Configuration.wf c_tgt0)
         (RACEFREE: pf_racefree_view L c_src0)
     :
-      (<<BEH: forall beh, behaviors (pf_step L) c_src0 beh>>) \/
+      (<<BEH: forall beh, behaviors (pf_multi_step L) c_src0 beh>>) \/
       (exists s, (<<EVENT: e = MachineEvent.syscall s>>) /\
                  (<<BEH: forall beh,
-                     behaviors (pf_step L) c_src0 (s :: beh)>>)).
+                     behaviors (pf_multi_step L) c_src0 (s :: beh)>>)).
   Proof.
     exploit times_configuration_step_future; eauto. i. des.
     hexploit sim_configuration_mid_mid; eauto. intros SIMMID.
@@ -3152,8 +3148,8 @@ Section SIM.
 
     exploit (@sim_configuration_certify_all _ DEC); eauto; ss.
     { eapply WF_MID. }
-    i. des. destruct x1; des.
-    { left. ii. eapply silent_pf_steps_trace_behaviors; eauto.
+    i. des. destruct x0; des.
+    { left. ii. eapply silent_pf_multi_steps_trace_behaviors; eauto.
       econs 3; eauto. }
 
     assert (IDENT: map_ident_in_memory (fun loc ts fts => ts = fts /\ Time.lt ts (maxmap loc))
@@ -3192,7 +3188,7 @@ Section SIM.
     { auto. }
     i. des. destruct x0; des.
     { ss. rewrite H in *. dep_inv STEPSRC0; clarify.
-      left. ii. eapply silent_pf_steps_trace_behaviors; eauto.
+      left. ii. eapply silent_pf_multi_steps_trace_behaviors; eauto.
       econs 3. econs; eauto. }
 
     exploit list_Forall2_in2.
@@ -3249,14 +3245,15 @@ Section SIM.
                                (all_promises (fun tid' => tid <> tid') prom0)
                                (snd the)) tr_cert)
         (WF_SRC: Configuration.wf c_src0)
+        (PFSRC: pf_configuration L c_src0)
         (WF_MID: JConfiguration.wf views0 c_mid0)
         (WF_TGT: Configuration.wf c_tgt0)
         (RACEFREE: pf_racefree_view L c_src0)
     :
-      (<<BEH: forall beh, behaviors (pf_step L) c_src0 beh>>) \/
+      (<<BEH: forall beh, behaviors (pf_multi_step L) c_src0 beh>>) \/
       (exists s, (<<EVENT: e = MachineEvent.syscall s>>) /\
                  (<<BEH: forall beh,
-                     behaviors (pf_step L) c_src0 (s :: beh)>>)).
+                     behaviors (pf_multi_step L) c_src0 (s :: beh)>>)).
   Proof.
     exploit times_configuration_step_future; eauto. i. des.
     hexploit sim_configuration_mid_mid; eauto. intros SIMMID.
@@ -3377,8 +3374,8 @@ Section SIM.
 
     exploit (@sim_configuration_certify_all _ DEC); try apply SIMMID; eauto; ss.
     { eapply WF_MID. }
-    i. des. destruct x3; des.
-    { left. ii. eapply silent_pf_steps_trace_behaviors; eauto.
+    i. des. destruct x2; des.
+    { left. ii. eapply silent_pf_multi_steps_trace_behaviors; eauto.
       econs 3; eauto. }
 
     assert (IDENT: map_ident_in_memory (fun loc ts fts => ts = fts /\ Time.lt ts (maxmap loc))
@@ -3414,7 +3411,7 @@ Section SIM.
     { auto. }
     i. des. ss. destruct x2; des.
     { ss. rewrite H in *. dep_inv STEPSRC1; clarify.
-      left. ii. eapply silent_pf_steps_trace_behaviors; eauto.
+      left. ii. eapply silent_pf_multi_steps_trace_behaviors; eauto.
       econs 3. econs; eauto. }
     hexploit times_configuration_step_future; try apply STEP1; eauto. i. des.
     hexploit JConfiguration.step_future; try apply STEPMID1; eauto. i. des.
@@ -3444,11 +3441,11 @@ Section SIM.
     i. des. ss.
 
     destruct (classic (e0 = ThreadEvent.failure)).
-    { subst. left. ii. eapply silent_pf_steps_trace_behaviors; eauto.
+    { subst. left. ii. eapply silent_pf_multi_steps_trace_behaviors; eauto.
       ss. inv STEPSRC1. econs 3; eauto. econs; eauto. }
     destruct (classic (e' = MachineEvent.failure)).
     { subst. destruct (ThreadEvent.get_machine_event e0) eqn:EVENT.
-      { subst. left. ii. eapply silent_pf_steps_trace_behaviors; eauto.
+      { subst. left. ii. eapply silent_pf_multi_steps_trace_behaviors; eauto.
         inv STEPSRC1.
         { econs 4; eauto.
           { econs; eauto. }
@@ -3457,7 +3454,7 @@ Section SIM.
         { inv STEPSRC2. econs 3; eauto. econs; eauto. }
       }
       { right. rewrite H0 in *. esplits; eauto. i.
-        eapply silent_pf_steps_trace_behaviors; eauto.
+        eapply silent_pf_multi_steps_trace_behaviors; eauto.
         inv STEPSRC1. econs 2; eauto.
         { econs; eauto. }
         { inv STEPSRC2. econs 3; eauto. econs; eauto. }

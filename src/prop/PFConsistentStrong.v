@@ -2546,9 +2546,8 @@ Proof.
       }
     }
     { erewrite <- List.app_assoc. eapply final_event_trace_post.
-      econs. eapply List.Forall_impl; eauto. i. ss. des; auto.
-      clear - H. destruct a. ss. unfold ThreadEvent.is_reserve in *. des_ifs.
-    }
+      econs. eapply List.Forall_impl; eauto. i. ss.
+      des. destruct a. unfold ThreadEvent.is_reserve in *. des_ifs. }
     { i. eapply no_concrete_promise_concrete_decrease_steps in STEPS0; eauto.
       eapply Forall_app.
       { eapply Forall_app_inv in EVENTS. des.

@@ -146,15 +146,29 @@ Module ThreadEvent.
     | _ => False
     end.
 
-  Definition is_normal (e: ThreadEvent.t) :=
-    ~ is_reserve e /\ ~ is_cancel e.
+  Definition is_reservation_event (te: t): Prop :=
+    match te with
+    | promise _ _ _ Message.reserve _ => True
+    | _ => False
+    end.
+
+  Definition is_normal (te: t) :=
+    ~ is_reservation_event te.
 
   Lemma is_normal_dec (e: ThreadEvent.t):
     { is_normal e } + { ~ is_normal e }.
   Proof.
-    unfold is_normal.
-    destruct e; ss; try by (left; ii; des; ss).
-    destruct msg, kind0; auto; try by (right; ii; des; ss).
+    unfold is_normal, is_reservation_event, is_cancel, is_reserve.
+    des_ifs; ss; (try by (left; ii; des; ss)); try by (right; ii; eauto).
+  Defined.
+
+  Lemma reservation_event_silent te
+        (RESERVING: is_reservation_event te)
+    :
+      get_machine_event te = MachineEvent.silent.
+  Proof.
+    unfold is_reservation_event, is_cancel, is_reserve in *.
+    des; des_ifs.
   Qed.
 End ThreadEvent.
 

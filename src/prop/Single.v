@@ -63,22 +63,6 @@ Module SConfiguration.
   .
   Hint Constructors steps.
 
-  (* Inductive steps: *)
-  (*   forall (es: list ThreadEvent.t) (tid: Ident.t) (c1 c2:Configuration.t), Prop := *)
-  (* | steps_base *)
-  (*     tid e c1 c2 *)
-  (*     (STEP: step e tid c1 c2) *)
-  (*   : *)
-  (*     steps [e] tid c1 c2 *)
-  (* | steps_cons *)
-  (*     ehd etl tid c1 c2 c3 *)
-  (*     (STEP: step ehd tid c1 c2) *)
-  (*     (STEPS: steps etl tid c2 c3) *)
-  (*   : *)
-  (*     steps (ehd :: etl) tid c1 c3 *)
-  (* . *)
-  (* Hint Constructors steps. *)
-
   Lemma steps_trans es0 es1 tid c0 c1 c2
         (STEPS0: steps es0 tid c0 c1)
         (STEPS1: steps es1 tid c1 c2)
@@ -168,49 +152,26 @@ Module SConfiguration.
     { auto. }
   Qed.
 
-  Lemma reserve_reservation_only_step e tid c1 c2
-        (STEP: step e tid c1 c2)
-        (RESERVE: ThreadEvent.is_reserve e)
-    :
-      reservation_only_step tid c1 c2.
-  Proof.
-    inv STEP. inv STEP0; ss. econs.
-    { eauto. }
-    { eauto. }
-    { unfold ThreadEvent.is_reserve in *. des_ifs. econs 2.
-      { econs; eauto. }
-      { eapply RESERVES. }
-    }
-    { eapply CONSISTENT. ii. clarify. }
-  Qed.
-
-  Lemma cancel_reservation_only_step e tid c1 c2
-        (STEP: step e tid c1 c2)
-        (CANCEL: ThreadEvent.is_cancel e)
-    :
-      reservation_only_step tid c1 c2.
-  Proof.
-    inv STEP. inv STEP0; ss. econs.
-    { eauto. }
-    { unfold ThreadEvent.is_cancel in *. des_ifs. etrans.
-      { eauto. }
-      { econs 2; [|refl]. econs; eauto. }
-    }
-    { eauto. }
-    { eapply CONSISTENT. ii. clarify. }
-  Qed.
-
   Lemma reservation_event_reservation_only_step e tid c1 c2
         (STEP: step e tid c1 c2)
         (RESERVATION: ~ ThreadEvent.is_normal e)
     :
       reservation_only_step tid c1 c2.
   Proof.
-    unfold ThreadEvent.is_normal in *. apply not_and_or in RESERVATION. des.
-    { apply NNPP in RESERVATION.
-      eapply reserve_reservation_only_step; eauto. }
-    { apply NNPP in RESERVATION.
-      eapply cancel_reservation_only_step; eauto. }
+    apply NNPP in RESERVATION. inv STEP. inv STEP0; ss.
+    eapply Thread.reservation_event_reserve_or_cancel_step in STEP; auto. des.
+    { econs.
+      { eauto. }
+      { eauto. }
+      { econs 2; eauto. }
+      { eapply CONSISTENT. ii. clarify. }
+    }
+    { econs.
+      { eauto. }
+      { etrans; [eauto|]. econs 2; [|refl]. eauto. }
+      { eauto. }
+      { eapply CONSISTENT. ii. clarify. }
+    }
   Qed.
 
   Inductive machine_step: forall (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
@@ -381,7 +342,7 @@ Module SConfiguration.
       { eapply STEPS1. }
       { eapply STEPS3. }
       { eapply CONSISTENT; eauto. ii. clarify.
-        unfold ThreadEvent.is_normal in *. eauto. }
+        eapply RESERVATION. ii. destruct H; ss. }
     }
   Qed.
 
@@ -437,20 +398,6 @@ Module SConfiguration.
       { eauto. }
     }
     i. des; eauto.
-  Qed.
-
-  Lemma list_filter_idempotent A P (l: list A)
-    :
-      List.filter P (List.filter P l) = List.filter P l.
-  Proof.
-    induction l; eauto. ss. des_ifs. ss. des_ifs. f_equal; auto.
-  Qed.
-
-  Lemma list_filter_app A P (l0 l1: list A)
-    :
-      List.filter P (l0 ++ l1) = (List.filter P l0) ++ (List.filter P l1) .
-  Proof.
-    induction l0; eauto. ss. des_ifs. ss. f_equal; auto.
   Qed.
 
   Lemma steps_filtering es tid c1 c2
@@ -644,24 +591,6 @@ Module SConfiguration.
     }
   Qed.
 
-  Lemma list_filter_forall A P (Q R: A -> Prop) (l: list A)
-        (FORALL: List.Forall Q l)
-        (REL: forall a (SAT0: P a = true) (SAT1: Q a), R a)
-    :
-      List.Forall R (List.filter P l).
-  Proof.
-    induction l; ss. inv FORALL. des_ifs; eauto.
-  Qed.
-
-  Lemma list_map_forall A B (P: A -> Prop) (Q: B -> Prop) f (l: list A)
-        (FORALL: List.Forall P l)
-        (REL: forall a (SAT: P a), Q (f a))
-    :
-      List.Forall Q (List.map f l).
-  Proof.
-    induction l; ss. inv FORALL. eauto.
-  Qed.
-
   Lemma multi_step_machine_step e tid c1 c3
         (STEP: Configuration.step e tid c1 c3)
         (WF: Configuration.wf c1)
@@ -685,9 +614,9 @@ Module SConfiguration.
         econs 2. econs; eauto. }
       { inv STEPS2.
         replace (ThreadEvent.get_machine_event e0) with MachineEvent.silent; eauto.
-        unfold ThreadEvent.is_normal in *. apply not_and_or in n. des.
-        { apply NNPP in n. unfold ThreadEvent.is_reserve in *. des_ifs. }
-        { apply NNPP in n. unfold ThreadEvent.is_cancel in *. des_ifs. }
+        apply NNPP in n.
+        unfold ThreadEvent.is_reservation_event, ThreadEvent.is_reserve, ThreadEvent.is_cancel in n.
+        des; des_ifs.
       }
     }
     { eapply reservation_only_step_step in STEP.
@@ -698,9 +627,9 @@ Module SConfiguration.
       rewrite list_filter_app in NIL.
       eapply List.app_eq_nil in NIL.
       ss. unfold proj_sumbool in NIL. des. des_ifs.
-      unfold ThreadEvent.is_normal in *. apply not_and_or in n. des.
-      { apply NNPP in n. unfold ThreadEvent.is_reserve in *. des_ifs. }
-      { apply NNPP in n. unfold ThreadEvent.is_cancel in *. des_ifs. }
+      apply NNPP in n.
+      unfold ThreadEvent.is_reservation_event, ThreadEvent.is_reserve, ThreadEvent.is_cancel in n.
+      des; des_ifs.
     }
   Qed.
 

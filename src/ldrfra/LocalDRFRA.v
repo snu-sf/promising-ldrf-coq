@@ -44,7 +44,7 @@ Theorem local_drf_ra
 Proof.
   i.
   specialize (PFtoRA.init_sim_conf L s). intro SIM.
-  specialize (PFtoRA.init_wf_pf s). intro WF_PF.
+  specialize (PFtoRA.init_wf_pf L s). intro WF_PF.
   specialize (PFtoRA.init_wf_j s). intro WF_J.
   specialize (PFtoRA.init_wf_ra s). intro WF_RA.
   ii. exploit (@local_DRFPF L); eauto.

@@ -62,14 +62,8 @@ Proof.
     { etrans.
       { eapply STEPS1. }
       econs 2.
-      { unfold ThreadEvent.is_normal in *. apply not_and_or in RESERVATION.
-        instantiate (1:=th2). des.
-        { apply NNPP in RESERVATION.
-          unfold ThreadEvent.is_reserve in RESERVATION. des_ifs. inv STEP2.
-          left. econs; eauto. }
-        { unfold ThreadEvent.is_cancel in RESERVATION. des_ifs. inv STEP2.
-          right. econs; eauto. }
-      }
+      { instantiate (1:=th2). apply NNPP in RESERVATION. inv STEP2; ss.
+        eapply Thread.reservation_event_reserve_or_cancel_step; eauto. }
       { eapply STEPS3. }
     }
     eapply rtc_implies with (R2:=tau (@pred_step (ThreadEvent.is_reserve \1/ ThreadEvent.is_cancel) _)) in STEPS; cycle 1.
@@ -116,7 +110,7 @@ Proof.
   }
   hexploit steps_not_reserves_reserves; try apply STEPS1. i. des.
   hexploit reorder_reserves_opt_step; eauto. i. des; cycle 1.
-  { exfalso. eapply NRESERVATION. auto. }
+  { exfalso. eapply NRESERVATION. unfold ThreadEvent.is_cancel in *. des_ifs. }
   hexploit (@steps_cancels_not_cancels (ThreadEvent.is_reserve \1/ ThreadEvent.is_cancel)).
   { etrans.
     { eapply rtc_implies; try apply STEPS4. i. inv H. econs; eauto.
@@ -149,7 +143,7 @@ Proof.
   { eapply STEP1. }
   { eapply STEPS5. }
   i. des; cycle 1.
-  { exfalso. unfold ThreadEvent.is_normal in *. des. ss. }
+  { exfalso. eapply NRESERVATION. unfold ThreadEvent.is_reserve in *. des_ifs. }
   left. esplits.
   { etrans.
     { eapply rtc_implies; try apply STEPS0.

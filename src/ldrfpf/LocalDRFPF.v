@@ -28,6 +28,7 @@ Require Import JoinedView.
 
 Require Import MemoryProps.
 Require Import OrderedTimes.
+Require Import Single.
 Require SimMemory.
 
 Require Import TimeTraced.
@@ -42,14 +43,15 @@ Set Implicit Arguments.
 Lemma PF_sim_configuration_beh L times c_src c_mid c_tgt views prom extra proml
       (WO: forall loc, well_ordered (times loc))
       (INCR: forall nat loc, times loc (incr_time_seq nat))
-      (RACEFRFEE: pf_racefree L c_src)
+      (RACEFRFEE: pf_multi_racefree L c_src)
       (WF_SRC: Configuration.wf c_src)
+      (PFSRC: pf_configuration L c_src)
       (WF_MID: JConfiguration.wf views c_mid)
       (WF_TGT: Configuration.wf c_tgt)
       (SIM: sim_configuration L times (fun _ => True) views prom extra proml c_src c_mid c_tgt)
   :
     behaviors (times_configuration_step_strong_all times) c_tgt <1=
-    behaviors (pf_step L) c_src.
+    behaviors (pf_multi_step L) c_src.
 Proof.
   i. ginduction PR; i.
   { dep_inv SIM. econs 1. ii. ss.
@@ -74,7 +76,8 @@ Proof.
       econs 2; eauto.
       { econs; eauto. }
       { eapply IHPR; try apply SIM0; eauto.
-        { eapply steps_pf_racefree; eauto. econs; eauto. econs. }
+        { eapply multi_steps_pf_multi_racefree; eauto. econs; eauto. econs. }
+        { eapply pf_step_trace_future; eauto. }
         { eapply pf_step_trace_future; eauto. }
         { eapply JConfiguration.step_future; eauto. }
         { eapply times_configuration_step_future; eauto. }
@@ -111,7 +114,8 @@ Proof.
         { econs; eauto. }
         { destruct x1; ss. des.
           eapply IHPR; try apply SIM0; eauto.
-          { eapply steps_pf_racefree; eauto. econs; eauto. econs. }
+          { eapply multi_steps_pf_multi_racefree; eauto. econs; eauto. econs. }
+          { eapply pf_step_trace_future; eauto. }
           { eapply pf_step_trace_future; eauto. }
           { eapply JConfiguration.step_future; eauto. }
           { eapply times_configuration_step_future; eauto. }
@@ -128,16 +132,17 @@ Proof.
 Qed.
 
 
-Theorem local_DRFPF L s
-        (RACEFRFEE: pf_racefree L (Configuration.init s))
+Lemma local_DRFPF_multi L s
+        (RACEFRFEE: pf_multi_racefree L (Configuration.init s))
   :
     behaviors Configuration.step (Configuration.init s) <1=
-    behaviors (pf_step L) (Configuration.init s).
+    behaviors (pf_multi_step L) (Configuration.init s).
 Proof.
   i. eapply times_configuration_step_same_behaviors in PR; cycle 1.
   { eapply Configuration.init_wf. }
   des. eapply PF_sim_configuration_beh; eauto.
   { eapply Configuration.init_wf. }
+  { eapply configuration_init_pf. }
   { eapply JConfiguration.init_wf. }
   { eapply Configuration.init_wf. }
   instantiate (1:=s). instantiate (1:=fun _ => []).
@@ -181,4 +186,18 @@ Proof.
     unfold option_map in GET. des_ifs. dep_clarify. econs; ss.
     ii. destruct pl0; ss.
   }
+Qed.
+
+Theorem local_DRFPF L s
+        (RACEFREE: pf_racefree L (Configuration.init s))
+  :
+    behaviors SConfiguration.machine_step (Configuration.init s) <1=
+    behaviors (pf_machine_step L) (Configuration.init s).
+Proof.
+  hexploit (Configuration.init_wf s). intros WF.
+  hexploit (configuration_init_pf L s). intros PF.
+  i. eapply SConfiguration.multi_step_equiv in PR; eauto.
+  eapply pf_racefree_multi_racefree in RACEFREE; eauto.
+  eapply pf_multi_step_behavior; eauto.
+  eapply local_DRFPF_multi; eauto.
 Qed.

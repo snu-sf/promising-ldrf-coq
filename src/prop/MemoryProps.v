@@ -222,6 +222,38 @@ Section GENERAL.
     }
   Qed.
 
+  Lemma list_filter_idempotent A P (l: list A)
+    :
+      List.filter P (List.filter P l) = List.filter P l.
+  Proof.
+    induction l; eauto. ss. des_ifs. ss. des_ifs. f_equal; auto.
+  Qed.
+
+  Lemma list_filter_app A P (l0 l1: list A)
+    :
+      List.filter P (l0 ++ l1) = (List.filter P l0) ++ (List.filter P l1) .
+  Proof.
+    induction l0; eauto. ss. des_ifs. ss. f_equal; auto.
+  Qed.
+
+  Lemma list_filter_forall A P (Q R: A -> Prop) (l: list A)
+        (FORALL: List.Forall Q l)
+        (REL: forall a (SAT0: P a = true) (SAT1: Q a), R a)
+    :
+      List.Forall R (List.filter P l).
+  Proof.
+    induction l; ss. inv FORALL. des_ifs; eauto.
+  Qed.
+
+  Lemma list_map_forall A B (P: A -> Prop) (Q: B -> Prop) f (l: list A)
+        (FORALL: List.Forall P l)
+        (REL: forall a (SAT: P a), Q (f a))
+    :
+      List.Forall Q (List.map f l).
+  Proof.
+    induction l; ss. inv FORALL. eauto.
+  Qed.
+
 End GENERAL.
 
 

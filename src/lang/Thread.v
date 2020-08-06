@@ -592,6 +592,21 @@ Module Thread.
       inv CANCEL. econs; eauto.
     Qed.
 
+    Lemma reservation_event_reserve_or_cancel_step (e1 e2: t) pf e
+          (RESERVATION: ThreadEvent.is_reservation_event e)
+          (STEP: step pf e e1 e2)
+      :
+        reserve_step e1 e2 \/ cancel_step e1 e2.
+    Proof.
+      dup STEP. inv STEP.
+      - inv STEP1. inv LOCAL. ss. des_ifs. inv PROMISE; ss.
+        + eauto.
+        + des; clarify.
+        + des; clarify. eapply Memory.lower_get0 in MEM. des. inv MSG_LE.
+        + eauto.
+      - inv STEP1. inv LOCAL; ss.
+    Qed.
+
     Lemma rtc_reserve_step_future
           e1 e2
           (STEP: rtc reserve_step e1 e2)

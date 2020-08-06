@@ -59,6 +59,7 @@ Module PFtoRA.
         (TRACE: forall tid lang st lc
                   (TH: IdentMap.find tid c.(Configuration.threads) = Some (existT _ lang st, lc)),
             TraceWF.wf tr lc.(Local.promises) c.(Configuration.memory))
+        (PF: pf_configuration L c)
     .
 
     Definition wf_j := JConfiguration.wf.
@@ -227,7 +228,9 @@ Module PFtoRA.
     Lemma init_wf_pf syn:
       wf_pf [] (Configuration.init syn).
     Proof.
-      econs; eauto using Configuration.init_wf. i. ss.
+      econs; eauto using Configuration.init_wf.
+      - i. ss.
+      - eapply configuration_init_pf.
     Qed.
 
     Lemma init_wf_j syn:
@@ -552,7 +555,7 @@ Module PFtoRA.
           (WF_J: wf_j views c_j)
           (WF_RA: wf_ra rels c_ra)
           (RACEFREE: RARace.racefree L rels c_ra):
-      behaviors (pf_step L) c_pf <1=
+      behaviors (pf_multi_step L) c_pf <1=
       behaviors (@OrdConfiguration.step L Ordering.acqrel) c_ra.
     Proof.
       i. revert tr views rels c_j c_ra SIM WF_PF WF_J WF_RA RACEFREE.
