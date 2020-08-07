@@ -151,7 +151,7 @@ Section SIM.
                  ((<<PROMISES: e1.(Thread.local).(Local.promises) = Memory.bot>>) /\
                   (<<WRITES: forall loc ts (PROM: self loc ts),
                       exists th e,
-                        (<<RACY: racy_write loc ts th e>>) /\
+                        (<<RACY: writing_event loc ts e>>) /\
                         (<<IN: List.In (th, e) ftr>>)>>)))).
 
   Lemma pi_consistent_mon self mem_src0 mem_src1 lang
@@ -655,10 +655,10 @@ Section SIM.
   Qed.
 
   Lemma promise_writing_event_racy
-        loc from ts val released e (lc: Local.t)
+        loc from ts val released e
         (WRITING : promise_writing_event loc from ts val released e)
     :
-      racy_write loc ts lc e.
+      writing_event loc ts e.
   Proof.
     inv WRITING; econs; eauto.
   Qed.
@@ -2098,7 +2098,7 @@ Section SIM.
                    (<<WRITES: forall loc ts (PROM: prom tid loc ts),
                        exists th e_write,
                          (<<INLOCS: L loc>>) /\
-                         (<<RACY: racy_write loc ts th e_write>>) /\
+                         (<<RACY: writing_event loc ts e_write>>) /\
                          (<<IN: List.In (th, e_write) tr_src>>)>>)))
   .
   Proof.
@@ -2317,7 +2317,7 @@ Section SIM.
                    (<<WRITES: forall tid loc ts (TID: List.In tid tidl) (PROM: prom tid loc ts),
                        exists lc e_write,
                          (<<INLOCS: L loc>>) /\
-                         (<<RACY: racy_write loc ts lc e_write>>) /\
+                         (<<RACY: writing_event loc ts e_write>>) /\
                          (<<EVENT: List.In (lc, e_write) trs>>)>>))).
   Proof.
     Local Opaque List.in_dec.
@@ -2437,7 +2437,7 @@ Section SIM.
                    (<<WRITES: forall tid loc ts (TID: ctids tid) (PROM: prom tid loc ts),
                        exists lc e_write,
                          (<<INLOCS: L loc>>) /\
-                         (<<RACY: racy_write loc ts lc e_write>>) /\
+                         (<<RACY: writing_event loc ts e_write>>) /\
                          (<<EVENT: List.In (lc, e_write) trs>>)>>))).
   Proof.
     hexploit (@sim_configuration_certify_list
@@ -3090,7 +3090,7 @@ Section SIM.
         (PFSRC: pf_configuration L c_src0)
         (WF_MID: JConfiguration.wf views0 c_mid0)
         (WF_TGT: Configuration.wf c_tgt0)
-        (RACEFREE: pf_racefree_view L c_src0)
+        (RACEFREE: pf_multi_racefree_view L c_src0)
     :
       (<<BEH: forall beh, behaviors (pf_multi_step L) c_src0 beh>>) \/
       (exists s, (<<EVENT: e = MachineEvent.syscall s>>) /\
@@ -3248,7 +3248,7 @@ Section SIM.
         (PFSRC: pf_configuration L c_src0)
         (WF_MID: JConfiguration.wf views0 c_mid0)
         (WF_TGT: Configuration.wf c_tgt0)
-        (RACEFREE: pf_racefree_view L c_src0)
+        (RACEFREE: pf_multi_racefree_view L c_src0)
     :
       (<<BEH: forall beh, behaviors (pf_multi_step L) c_src0 beh>>) \/
       (exists s, (<<EVENT: e = MachineEvent.syscall s>>) /\

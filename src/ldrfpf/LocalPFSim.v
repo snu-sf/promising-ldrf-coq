@@ -178,10 +178,10 @@ Lemma jsim_event_sim_event
 Proof. ii. inv PR; econs. inv MSG; ss. Qed.
 
 Lemma promise_writing_event_racy
-      loc from ts val released e (lc: Local.t)
+      loc from ts val released e
       (WRITING : promise_writing_event loc from ts val released e)
   :
-    racy_write loc ts lc e.
+    writing_event loc ts e.
 Proof.
   inv WRITING; econs; eauto.
 Qed.

@@ -163,27 +163,24 @@ Qed.
 Lemma rtc_reserve_step_promise_consistent
       lang th1 th2
       (STEPS: rtc (@Thread.reserve_step lang) th1 th2)
-      (CONS: Local.promise_consistent th2.(Thread.local))
-      (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
-      (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory))
-      (MEM1: Memory.closed th1.(Thread.memory)):
+      (CONS: Local.promise_consistent th2.(Thread.local)):
   Local.promise_consistent th1.(Thread.local).
 Proof.
-  eapply rtc_tau_step_promise_consistent; cycle 1; eauto.
-  eapply rtc_implies; [|eauto]. eapply Thread.reserve_step_tau_step.
+  ginduction STEPS; eauto. i. eapply IHSTEPS in CONS.
+  inv H. inv STEP; inv STEP0; inv LOCAL. inv PROMISE. ss.
+  ii. eapply Memory.add_get1 in PROMISE; eauto.
 Qed.
 
 Lemma rtc_cancel_step_promise_consistent
       lang th1 th2
       (STEPS: rtc (@Thread.cancel_step lang) th1 th2)
-      (CONS: Local.promise_consistent th2.(Thread.local))
-      (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
-      (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory))
-      (MEM1: Memory.closed th1.(Thread.memory)):
+      (CONS: Local.promise_consistent th2.(Thread.local)):
   Local.promise_consistent th1.(Thread.local).
 Proof.
-  eapply rtc_tau_step_promise_consistent; cycle 1; eauto.
-  eapply rtc_implies; [|eauto]. eapply Thread.cancel_step_tau_step.
+  ginduction STEPS; eauto. i. eapply IHSTEPS in CONS.
+  inv H. inv STEP; inv STEP0; inv LOCAL. inv PROMISE. ss.
+  ii. dup PROMISE. eapply Memory.remove_get1 in PROMISE; eauto. des; eauto.
+  clarify. eapply Memory.remove_get0 in PROMISES. des. clarify.
 Qed.
 
 Lemma rtc_reserve_step_promise_consistent2

@@ -180,14 +180,14 @@ Section LOCALPF.
 
   Definition pf_racefree_imm (c0: Configuration.t): Prop :=
     forall tid0 c1 tid1 c2 c3
-           loc ts te0 te1 e0 e1
+           loc ts e0 e1
            (LOC: L loc)
            (TID: tid0 <> tid1)
            (CSTEP0: pf_step e0 tid0 c0 c1)
-           (WRITE: writing_event loc ts te0)
+           (WRITE: writing_event loc ts e0)
            (STEPS: rtc (pf_machine_step MachineEvent.silent tid1) c1 c2)
            (CSTEP1: pf_step e1 tid1 c2 c3)
-           (READ: reading_event loc ts te1),
+           (READ: reading_event loc ts e1),
       False.
 
   Definition pf_racefree (c0: Configuration.t): Prop :=
@@ -544,8 +544,9 @@ Section LOCALPF.
         (PF: pf_configuration c1):
     (<<WF2: Configuration.wf c2>>) /\
     (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
-  Proof.
+    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
+    (<<PF: pf_configuration c2>>).
+Proof.
     ginduction STEPS; eauto.
     - i. splits; eauto. refl.
     - i. exploit pf_all_step_future; eauto. i. des.
@@ -1146,39 +1147,23 @@ Section LOCALPF.
       racy_read loc ts lc (ThreadEvent.update loc ts to valr valw releasedr releasedw ordr ordw)
   .
 
-  Inductive racy_write (loc: Loc.t) (ts: Time.t):
-    forall (lc: Local.t) (e: ThreadEvent.t), Prop :=
-  | racy_write_write
-      lc
-      from valw releasedw ordw
-      (ORD: Ordering.le ordw Ordering.relaxed)
-    :
-      racy_write loc ts lc (ThreadEvent.write loc from ts valw releasedw ordw)
-  | racy_write_update
-      lc
-      from valr valw releasedr releasedw ordr ordw
-      (ORD: Ordering.le ordw Ordering.relaxed)
-    :
-      racy_write loc ts lc (ThreadEvent.update loc from ts valr valw releasedr releasedw ordr ordw)
-  .
-
-  Definition pf_racefree_view (c0: Configuration.t): Prop :=
+  Definition pf_multi_racefree_view (c0: Configuration.t): Prop :=
     forall c1 trs1 c2 trs2
       loc ts lc0 lc1 e0 e1
       (CSTEPS1: pf_steps_trace c0 c1 trs1)
       (LOC: L loc)
       (TRACE1: List.In (lc0, e0) trs1)
-      (WRITE: racy_write loc ts lc0 e0)
+      (WRITE: writing_event loc ts e0)
       (CSTEPS2: pf_steps_trace c1 c2 trs2)
       (TRACE2: List.In (lc1, e1) trs2)
       (READ: racy_read loc ts lc1 e1),
       False.
 
-  Lemma step_pf_racefree_view c0 c1 tr e tid
-        (RACEFREE: pf_racefree_view c0)
+  Lemma multi_step_pf_multi_racefree_view c0 c1 tr e tid
+        (RACEFREE: pf_multi_racefree_view c0)
         (STEP: pf_step_trace tr e tid c0 c1)
     :
-      pf_racefree_view c1.
+      pf_multi_racefree_view c1.
   Proof.
     ii. eapply RACEFREE.
     { econs 2.
@@ -1193,14 +1178,68 @@ Section LOCALPF.
     { eauto. }
   Qed.
 
-  Lemma steps_pf_racefree_view c0 c1 trs
-        (RACEFREE: pf_racefree_view c0)
+  Lemma multi_steps_pf_multi_racefree_view c0 c1 trs
+        (RACEFREE: pf_multi_racefree_view c0)
         (STEPS: pf_steps_trace c0 c1 trs)
+    :
+      pf_multi_racefree_view c1.
+  Proof.
+    induction STEPS; auto. eapply IHSTEPS.
+    eapply multi_step_pf_multi_racefree_view; eauto.
+  Qed.
+
+  Inductive pf_racy_read_step:
+    forall (loc: Loc.t) (ts: Time.t)
+           (e:ThreadEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
+  | pf_racy_read_step_intro
+      loc ts e tid c1 lang st1 lc1 e2 e3 st4 lc4 sc4 memory4
+      (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
+      (CANCELS: rtc (@Thread.cancel_step _) (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
+      (STEP: Thread.opt_step e e2 e3)
+      (RESERVES: rtc (@Thread.reserve_step _) e3 (Thread.mk _ st4 lc4 sc4 memory4))
+      (CONSISTENT: e <> ThreadEvent.failure -> pf_consistent (Thread.mk _ st4 lc4 sc4 memory4))
+      (PF: pf_event e)
+      (READ: racy_read loc ts e2.(Thread.local) e)
+    :
+      pf_racy_read_step loc ts e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) c1.(Configuration.threads)) sc4 memory4)
+  .
+  Hint Constructors pf_racy_read_step.
+
+  Inductive pf_racy_write_step:
+    forall (loc: Loc.t) (ts: Time.t)
+           (e:ThreadEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
+  | pf_racy_write_step_intro
+      loc ts e tid c1 c2
+      (STEP: pf_step e tid c1 c2)
+      (WRITE: writing_event loc ts e)
+    :
+      pf_racy_write_step loc ts e tid c1 c2
+  .
+
+  Definition pf_racefree_view (c0: Configuration.t): Prop :=
+    forall c1 c2 c3 c4 loc ts e0 e1 tid0 tid1
+           (CSTEPS1: rtc pf_all_step c0 c1)
+           (WRITE: pf_racy_write_step loc ts e0 tid0 c1 c2)
+           (CSTEPS2: rtc pf_all_step c2 c3)
+           (READ: pf_racy_read_step loc ts e1 tid1 c3 c4),
+      False.
+
+  Lemma step_pf_racefree_view c0 c1 e tid
+        (RACEFREE: pf_racefree_view c0)
+        (STEP: pf_step e tid c0 c1)
     :
       pf_racefree_view c1.
   Proof.
-    induction STEPS; auto. eapply IHSTEPS.
-    eapply step_pf_racefree_view; eauto.
+    ii. eapply RACEFREE; cycle 1; eauto.
+  Qed.
+
+  Lemma steps_pf_racefree_view c0 c1
+        (RACEFREE: pf_racefree_view c0)
+        (STEPS: rtc pf_all_step c0 c1)
+    :
+      pf_racefree_view c1.
+  Proof.
+    ii. eapply RACEFREE; cycle 1; eauto. etrans; eauto.
   Qed.
 
 End LOCALPF.

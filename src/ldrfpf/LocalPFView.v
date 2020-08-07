@@ -27,177 +27,771 @@ Require Import Trace.
 Require Import JoinedView.
 
 Require Import MemoryProps.
-Require Import OrderedTimes.
-Require SimMemory.
 
-Require Import TimeTraced2.
+Require Import Single.
 Require Import LocalPF.
-Require Import LocalPFThread.
-Require Import LocalPFSimView.
+Require Import LocalDRFPF.
 
 Set Implicit Arguments.
 
+Section NOTRELEASED.
 
+  Variable loc: Loc.t.
+  Variable ts: Time.t.
+  Hypothesis NONBOT: ts <> Time.bot.
 
-Lemma PF_sim_configuration_beh L times c_src c_mid c_tgt views prom extra
-      (WO: forall loc, well_ordered (times loc))
-      (INCR: forall nat loc, times loc (incr_time_seq nat))
-      (RACEFRFEE: pf_racefree_view L c_src)
-      (WF_SRC: Configuration.wf c_src)
-      (PFSRC: pf_configuration L c_src)
-      (WF_MID: JConfiguration.wf views c_mid)
-      (WF_TGT: Configuration.wf c_tgt)
-      (SIM: sim_configuration L times (fun _ => True) views prom extra c_src c_mid c_tgt)
-  :
-    behaviors (times_configuration_step_all times) c_tgt <1=
-    behaviors (pf_multi_step L) c_src.
-Proof.
-  i. ginduction PR; i.
-  { dep_inv SIM. econs 1. ii. ss.
-    specialize (THSPF tid). specialize (THSJOIN tid).
-    setoid_rewrite FIND in THSPF. unfold option_rel in *. des_ifs.
-    dep_inv THSPF. dep_inv THSJOIN.
-    eapply TERMINAL in Heq0. des. splits; auto.
-    inv THREAD. inv LOCAL. inv LOCAL0. ss. subst.
-    econs. exploit sim_promise_bot; eauto. eapply Memory.ext.
-    i. specialize (PROMISES0 loc ts). erewrite Memory.bot_get in *.
-    inv PROMISES0; ss. }
-  { inv STEP.
-    destruct (classic (List.Forall
-                         (fun the => no_read_msgs
-                                       (all_promises (fun tid' => tid <> tid') prom)
-                                       (snd the)) (tr))).
-    { destruct (classic (List.Forall
-                           (fun the => no_read_msgs
-                                         (all_promises (fun tid' => tid <> tid') prom)
-                                         (snd the)) (tr_cert))).
-      { exploit (step_sim_configuration); eauto.
-        { instantiate (1:=true). ss. }
-        i. des. unguard. des; ss. dep_inv STEPSRC.
-        econs 2; eauto.
-        { econs; eauto. }
-        { eapply IHPR; try apply SIM0; eauto.
-          { eapply steps_pf_racefree_view; eauto. econs; eauto. econs. }
-          { eapply pf_step_trace_future; eauto. }
-          { eapply pf_step_trace_future; eauto. }
-          { eapply JConfiguration.step_future; eauto. }
-          { eapply times_configuration_step_future; eauto. }
-        }
-      }
-      { exploit promise_read_race_certfication; eauto. i. des; clarify. }
-    }
-    { exploit promise_read_race; eauto. i. des; clarify. }
-  }
-  { inv STEP.
-    destruct (classic (List.Forall
-                         (fun the => no_read_msgs
-                                       (all_promises (fun tid' => tid <> tid') prom)
-                                       (snd the)) (tr))).
-    { destruct (classic (List.Forall
-                           (fun the => no_read_msgs
-                                         (all_promises (fun tid' => tid <> tid') prom)
-                                         (snd the)) (tr_cert))).
-      { exploit step_sim_configuration; eauto.
-        { instantiate (1:=true). ss. }
-        i. des. unguard. des; ss.
-        { dep_inv STEPSRC. econs 3; eauto. econs; eauto. }
-        { dep_inv STEPSRC. econs 3; eauto. econs; eauto. }
-      }
-      { exploit promise_read_race_certfication; eauto. i. des; clarify. }
-    }
-    { exploit promise_read_race; eauto. i. des; clarify. }
-  }
-  { inv STEP.
-    destruct (classic (List.Forall
-                         (fun the => no_read_msgs
-                                       (all_promises (fun tid' => tid <> tid') prom)
-                                       (snd the)) (tr))).
-    { destruct (classic (List.Forall
-                           (fun the => no_read_msgs
-                                         (all_promises (fun tid' => tid <> tid') prom)
-                                         (snd the)) (tr_cert))).
-      { exploit step_sim_configuration; eauto.
-        { instantiate (1:=true). ss. }
-        i. des. ss. dep_inv STEPSRC.
-        { econs 4; eauto.
-          { econs; eauto. }
-          { destruct x0; ss. des.
-            eapply IHPR; try apply SIM0; eauto.
-            { eapply steps_pf_racefree_view; eauto. econs; eauto. econs. }
-            { eapply pf_step_trace_future; eauto. }
-            { eapply pf_step_trace_future; eauto. }
-            { eapply JConfiguration.step_future; eauto. }
-            { eapply times_configuration_step_future; eauto. }
+  Definition not_released_timemap (tm: TimeMap.t) := tm loc <> ts.
+
+  Record not_released_view (vw: View.t): Prop :=
+    {
+      not_released_pln: not_released_timemap vw.(View.pln);
+      not_released_rlx: not_released_timemap vw.(View.rlx);
+    }.
+  Hint Constructors not_released_view.
+
+  Inductive not_released_opt_view: option View.t -> Prop :=
+  | not_released_opt_view_some
+      vw
+      (RELEASED: not_released_view vw)
+    :
+      not_released_opt_view (Some vw)
+  | not_released_opt_view_none
+    :
+      not_released_opt_view None
+  .
+  Hint Constructors not_released_opt_view.
+
+  Inductive not_released_message: Message.t -> Prop :=
+  | not_released_message_concrete
+      val released
+      (RELEASED: not_released_opt_view released)
+    :
+      not_released_message (Message.concrete val released)
+  | not_released_message_reserve
+    :
+      not_released_message Message.reserve
+  .
+  Hint Constructors not_released_message.
+
+  Record not_released_tview (vw: TView.t): Prop :=
+    {
+      not_released_rel: forall loc0, not_released_view (vw.(TView.rel) loc0);
+      not_released_cur: not_released_view vw.(TView.cur);
+      not_released_acq: not_released_view vw.(TView.acq);
+    }.
+  Hint Constructors not_released_tview.
+
+  Lemma not_released_timemap_bot
+    :
+      not_released_timemap TimeMap.bot.
+  Proof.
+    ii. eapply NONBOT. eauto.
+  Qed.
+
+  Lemma not_released_timemap_join tm0 tm1
+      (TM0: not_released_timemap tm0)
+      (TM1: not_released_timemap tm1)
+    :
+      not_released_timemap (TimeMap.join tm0 tm1).
+  Proof.
+    ii. unfold TimeMap.join, Time.join in *. des_ifs.
+  Qed.
+
+  Lemma not_released_timemap_singleton_join loc0 ts0
+        (NEQ: (loc0, ts0) <> (loc, ts))
+    :
+      not_released_timemap (TimeMap.singleton loc0 ts0).
+  Proof.
+    ii. unfold TimeMap.singleton in *.
+    setoid_rewrite LocFun.add_spec in H. des_ifs.
+  Qed.
+
+  Lemma not_released_view_bot
+    :
+      not_released_view View.bot.
+  Proof.
+    econs; eapply not_released_timemap_bot.
+  Qed.
+
+  Lemma not_released_unwrap vw
+        (RELEASED: not_released_opt_view vw)
+    :
+      not_released_view (View.unwrap vw).
+  Proof.
+    inv RELEASED; ss. eapply not_released_view_bot.
+  Qed.
+
+  Lemma not_released_view_join vw0 vw1
+        (VW0: not_released_view vw0)
+        (VW1: not_released_view vw1)
+    :
+      not_released_view (View.join vw0 vw1).
+  Proof.
+    inv VW0. inv VW1.
+    econs; eapply not_released_timemap_join; eauto.
+  Qed.
+
+  Lemma not_released_view_singleton_ur loc0 ts0
+        (NEQ: (loc0, ts0) <> (loc, ts))
+    :
+      not_released_view (View.singleton_ur loc0 ts0).
+  Proof.
+    econs; ss; eapply not_released_timemap_singleton_join; eauto.
+  Qed.
+
+  Lemma not_released_view_singleton_rw loc0 ts0
+        (NEQ: (loc0, ts0) <> (loc, ts))
+    :
+      not_released_view (View.singleton_rw loc0 ts0).
+  Proof.
+    econs; ss.
+    - eapply not_released_timemap_bot; eauto.
+    - eapply not_released_timemap_singleton_join; eauto.
+  Qed.
+
+  Lemma not_released_view_singleton_ur_if cond loc0 ts0
+        (NEQ: (loc0, ts0) <> (loc, ts))
+    :
+      not_released_view (View.singleton_ur_if cond loc0 ts0).
+  Proof.
+    unfold View.singleton_ur_if. des_ifs.
+    - eapply not_released_view_singleton_ur; eauto.
+    - eapply not_released_view_singleton_rw; eauto.
+  Qed.
+
+  Inductive not_released_memory (prom mem: Memory.t): Prop :=
+  | not_released_memory_intro
+      (MESSAGES: forall loc0 ts0 from msg
+                        (GET: Memory.get loc0 ts0 mem = Some (from, msg))
+                        (LOCTS: (loc0, ts0) <> (loc, ts)),
+          (<<RELEASED: not_released_message msg>>) \/ (<<GET: Memory.get loc0 ts0 prom = Some (from, msg)>>))
+      (EXIST: exists from val released, Memory.get loc ts mem = Some (from, Message.concrete val released))
+      (NONE: Memory.get loc ts prom = None)
+  .
+
+  Inductive not_released_thread lang (th: Thread.t lang): Prop :=
+  | not_released_thread_intro
+      (TVIEW: not_released_tview th.(Thread.local).(Local.tview))
+      (MEM: not_released_memory th.(Thread.local).(Local.promises) th.(Thread.memory))
+      (SC: not_released_timemap th.(Thread.sc))
+  .
+
+  Lemma not_released_promise_neq prom0 mem0 loc0 from to msg prom1 mem1 kind
+        (PROMISE: Memory.promise prom0 mem0 loc0 from to msg prom1 mem1 kind)
+        (RELEASED: not_released_memory prom0 mem0)
+    :
+      (loc0, to) <> (loc, ts).
+  Proof.
+    ii. clarify. inv RELEASED. des. inv PROMISE.
+    - eapply Memory.add_get0 in MEM. eapply Memory.add_get0 in PROMISES.
+      des. clarify.
+    - eapply Memory.split_get0 in MEM. eapply Memory.split_get0 in PROMISES.
+      des. clarify.
+    - eapply Memory.lower_get0 in MEM. eapply Memory.lower_get0 in PROMISES.
+      des. clarify.
+    - eapply Memory.remove_get0 in MEM. eapply Memory.remove_get0 in PROMISES.
+      des. clarify.
+  Qed.
+
+  Lemma not_released_promise prom0 mem0 loc0 from to msg prom1 mem1 kind
+        (PROMISE: Memory.promise prom0 mem0 loc0 from to msg prom1 mem1 kind)
+        (RELEASED: not_released_memory prom0 mem0)
+    :
+      not_released_memory prom1 mem1.
+  Proof.
+    hexploit not_released_promise_neq; eauto. intros NEQ.
+    inv RELEASED. inv PROMISE.
+    - econs.
+      + ii. erewrite Memory.add_o in GET; eauto.
+        erewrite (@Memory.add_o prom1 prom0); eauto. des_ifs; auto.
+      + des. eapply Memory.add_get1 in EXIST; eauto.
+      + erewrite Memory.add_o; eauto. des_ifs. ss. des; clarify.
+    - econs.
+      + ii. erewrite Memory.split_o in GET; eauto.
+        erewrite (@Memory.split_o prom1 prom0); eauto. des_ifs; auto.
+      + des. eapply Memory.split_get1 in EXIST; eauto. des. eauto.
+      + erewrite Memory.split_o; eauto. des_ifs.
+        * ss. des; clarify.
+        * ss. des; clarify. symmetry in a. symmetry in a0. inv a.
+          eapply Memory.split_get0 in PROMISES. des. clarify.
+    - econs.
+      + ii. erewrite Memory.lower_o in GET; eauto.
+        erewrite (@Memory.lower_o prom1 prom0); eauto. des_ifs; auto.
+      + des. eapply Memory.lower_get1 in EXIST; eauto. des.
+        clarify. inv MSG_LE. eauto.
+      + erewrite Memory.lower_o; eauto. des_ifs. ss. des; clarify.
+    - econs.
+      + ii. erewrite Memory.remove_o in GET; eauto.
+        erewrite (@Memory.remove_o prom1 prom0); eauto. des_ifs; auto.
+      + des. eapply Memory.remove_get1 in EXIST; eauto. des; eauto. clarify.
+      + erewrite Memory.remove_o; eauto. des_ifs.
+  Qed.
+
+  Lemma not_released_fulfill prom0 loc0 from to msg prom1 mem
+        (FULFILL: Memory.remove prom0 loc0 from to msg prom1)
+        (RELEASED: not_released_memory prom0 mem)
+        (RELEASEDM: not_released_message msg)
+        (GET: Memory.get loc0 to mem = Some (from, msg))
+    :
+      not_released_memory prom1 mem.
+  Proof.
+    econs.
+    - ii. dup GET0. eapply RELEASED in GET0.
+      { erewrite Memory.remove_o; eauto.
+        des; auto. des_ifs; auto. ss. des; clarify. left. auto. }
+      { ii. clarify. }
+    - eapply RELEASED.
+    - inv RELEASED. erewrite Memory.remove_o; eauto. des_ifs.
+  Qed.
+
+  Lemma not_released_read lc0 mem0 loc0 ts0 val released ord lc1
+        (READ: Local.read_step lc0 mem0 loc0 ts0 val released ord lc1)
+        (TVIEW: not_released_tview lc0.(Local.tview))
+        (MEM: not_released_memory lc0.(Local.promises) mem0)
+        (CONSISTENT: Local.promise_consistent lc1)
+        (NOTREAD: (loc0, ts0) <> (loc, ts))
+    :
+      (<<TVIEW: not_released_tview lc1.(Local.tview)>>) /\
+      (<<MEM: not_released_memory lc1.(Local.promises) mem0>>) /\
+      (<<RELEASEDM: not_released_opt_view released>>).
+  Proof.
+    inv READ. inv MEM. exploit MESSAGES; eauto. i. des.
+    { inv RELEASED. splits; ss.
+      { econs; ss.
+        { eapply TVIEW; eauto. }
+        { eapply not_released_view_join.
+          { eapply not_released_view_join.
+            { eapply TVIEW; eauto. }
+            { eapply not_released_view_singleton_ur_if; eauto. }
+          }
+          { des_ifs.
+            { eapply not_released_unwrap; eauto. }
+            { eapply not_released_view_bot; eauto. }
           }
         }
-        { destruct x0; ss. des.
-          eapply IHPR; try apply SIM0; eauto.
-          { eapply JConfiguration.step_future; eauto. }
-          { eapply times_configuration_step_future; eauto. }
+        { eapply not_released_view_join.
+          { eapply not_released_view_join.
+            { eapply TVIEW; eauto. }
+            { eapply not_released_view_singleton_ur_if; eauto. }
+          }
+          { des_ifs.
+            { eapply not_released_unwrap; eauto. }
+            { eapply not_released_view_bot; eauto. }
+          }
         }
       }
-      { exploit promise_read_race_certfication; eauto. i. des; clarify. }
+      { econs; eauto. }
     }
-    { exploit promise_read_race; eauto. i. des; clarify. }
+    { exfalso. eapply CONSISTENT in GET0. ss.
+      eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto.
+      etrans; [|try apply TimeMap.join_l].
+      etrans; [|try apply TimeMap.join_r]. clear GET0.
+      unfold View.singleton_ur_if. des_ifs; ss.
+      { unfold TimeMap.singleton. setoid_rewrite LocFun.add_spec_eq. refl. }
+      { unfold TimeMap.singleton. setoid_rewrite LocFun.add_spec_eq. refl. }
+    }
+  Qed.
+
+  Lemma not_released_read_racy lc0 mem0 val released ord lc1
+        (READ: Local.read_step lc0 mem0 loc ts val released ord lc1)
+        (TVIEW: not_released_tview lc0.(Local.tview))
+        (MEM: not_released_memory lc0.(Local.promises) mem0)
+        (CONSISTENT: Local.promise_consistent lc1)
+    :
+      Time.lt (if Ordering.le Ordering.relaxed ord
+               then (lc0.(Local.tview).(TView.cur).(View.rlx) loc)
+               else (lc0.(Local.tview).(TView.cur).(View.pln) loc)) ts.
+  Proof.
+    inv READ. inv READABLE. des_ifs.
+    { exploit RLX; eauto. intros H. inv H; eauto. inv H0. exfalso.
+      eapply TVIEW.(not_released_cur).(not_released_rlx); auto. }
+    { inv PLN; eauto. inv H. exfalso.
+      eapply TVIEW.(not_released_cur).(not_released_pln); auto. }
+  Qed.
+
+  Lemma not_released_write lc0 sc0 mem0 loc0 from to val releasedr releasedm ord lc1 sc1 mem1 kind
+        (WRITE: Local.write_step lc0 sc0 mem0 loc0 from to val releasedr releasedm ord lc1 sc1 mem1 kind)
+        (TVIEW: not_released_tview lc0.(Local.tview))
+        (MEM: not_released_memory lc0.(Local.promises) mem0)
+        (SC: not_released_timemap sc0)
+        (RELEASEDR: not_released_opt_view releasedr)
+    :
+      (<<TVIEW: not_released_tview lc1.(Local.tview)>>) /\
+      (<<MEM: not_released_memory lc1.(Local.promises) mem1>>) /\
+      (<<SC: not_released_timemap sc1>>).
+  Proof.
+    inv WRITE. inv WRITE0.
+    hexploit not_released_promise_neq; eauto. intros NEQ.
+    hexploit not_released_promise; eauto. intros MEM0.
+    assert (WRITETIVEW: not_released_tview (TView.write_tview (Local.tview lc0) sc0 loc0 to ord)).
+    { econs; ss.
+      { i. setoid_rewrite LocFun.add_spec. des_ifs.
+        { eapply not_released_view_join; eauto.
+          { eapply TVIEW. }
+          { eapply not_released_view_singleton_ur; eauto. }
+        }
+        { eapply not_released_view_join; eauto.
+          { eapply TVIEW. }
+          { eapply not_released_view_singleton_ur; eauto. }
+        }
+        { eapply TVIEW. }
+      }
+      { eapply not_released_view_join; eauto.
+        { eapply TVIEW. }
+        { eapply not_released_view_singleton_ur; eauto. }
+      }
+      { eapply not_released_view_join; eauto.
+        { eapply TVIEW. }
+        { eapply not_released_view_singleton_ur; eauto. }
+      }
+    }
+    splits; ss. eapply not_released_fulfill; eauto.
+    { econs. unfold TView.write_released. des_ifs. econs.
+      eapply not_released_view_join; eauto.
+      { eapply not_released_unwrap; eauto. }
+      { eapply WRITETIVEW. }
+    }
+    { eapply Memory.promise_get2 in PROMISE.
+      { des; eauto. }
+      { destruct kind; ss. inv PROMISE. ss. }
+    }
+  Qed.
+
+  Lemma not_released_read_fence_tview tvw ord
+        (TVIEW: not_released_tview tvw)
+    :
+      not_released_tview (TView.read_fence_tview tvw ord).
+  Proof.
+    econs; ss.
+    { eapply TVIEW. }
+    { des_ifs; eapply TVIEW. }
+    { eapply TVIEW. }
+  Qed.
+
+  Lemma not_released_write_fence_sc tvw sc ord
+        (TVIEW: not_released_tview tvw)
+        (SC: not_released_timemap sc)
+    :
+      not_released_timemap (TView.write_fence_sc tvw sc ord).
+  Proof.
+    unfold TView.write_fence_sc. des_ifs.
+    eapply not_released_timemap_join; eauto. eapply TVIEW.
+  Qed.
+
+  Lemma not_released_write_fence_tview tvw sc ord
+        (TVIEW: not_released_tview tvw)
+        (SC: not_released_timemap sc)
+    :
+      not_released_tview (TView.write_fence_tview tvw sc ord).
+  Proof.
+    econs; ss.
+    { i. des_ifs.
+      { econs; eapply not_released_write_fence_sc; eauto. }
+      { eapply TVIEW. }
+      { eapply TVIEW. }
+    }
+    { des_ifs.
+      { econs; eapply not_released_write_fence_sc; eauto. }
+      { eapply TVIEW. }
+    }
+    { eapply not_released_view_join.
+      { eapply TVIEW. }
+      des_ifs.
+      { econs; eapply not_released_write_fence_sc; eauto. }
+      { eapply not_released_view_bot. }
+    }
+  Qed.
+
+  Lemma not_released_fence lc0 sc0 ordr ordw lc1 sc1 mem
+        (FENCE: Local.fence_step lc0 sc0 ordr ordw lc1 sc1)
+        (TVIEW: not_released_tview lc0.(Local.tview))
+        (MEM: not_released_memory lc0.(Local.promises) mem)
+        (SC: not_released_timemap sc0)
+    :
+      (<<TVIEW: not_released_tview lc1.(Local.tview)>>) /\
+      (<<MEM: not_released_memory lc1.(Local.promises) mem>>) /\
+      (<<SC: not_released_timemap sc1>>).
+  Proof.
+    inv FENCE. splits; ss.
+    { eapply not_released_write_fence_tview; eauto.
+      eapply not_released_read_fence_tview; eauto.
+    }
+    { eapply not_released_write_fence_sc; eauto.
+      eapply not_released_read_fence_tview; eauto.
+    }
+  Qed.
+
+  Lemma not_released_thread_step lang (th0 th1: Thread.t lang) pf e
+        (STEP: Thread.step pf e th0 th1)
+        (CONSISTENT: Local.promise_consistent th1.(Thread.local))
+        (THREAD: not_released_thread th0)
+    :
+      (<<THREAD: not_released_thread th1>> /\ <<RACY: ~ reading_event loc ts e>>) \/
+      (<<RACY: racy_read loc ts th0.(Thread.local) e>>).
+  Proof.
+    inv THREAD. inv STEP.
+    { inv STEP0. inv LOCAL. ss. exploit not_released_promise; eauto.
+      i. left. splits; ss; eauto. ii. inv H. }
+    { inv STEP0. inv LOCAL; ss.
+      { left. splits; [|intros H; inv H]. econs; eauto. }
+      { destruct (loc_ts_eq_dec (loc0, ts0) (loc, ts)).
+        { ss. des; clarify. right.
+          exploit not_released_read_racy; eauto. i. econs; eauto.
+        }
+        { exploit not_released_read; eauto.
+          { ii. ss. des; clarify. }
+          guardH o. i. des. left. splits.
+          { econs; eauto. }
+          { ii. inv H. ss. unguard. des; clarify. }
+        }
+      }
+      { exploit not_released_write; eauto. i. des.
+        left. splits; [|intros H; inv H]. econs; eauto. }
+      { eapply write_step_promise_consistent in CONSISTENT; eauto.
+        destruct (loc_ts_eq_dec (loc0, tsr) (loc, ts)).
+        { ss. des; clarify. right.
+          exploit not_released_read_racy; eauto. i. econs; eauto.
+        }
+        { exploit not_released_read; eauto.
+          { ii. ss. des; clarify. }
+          guardH o. i. des. left.
+          exploit not_released_write; eauto. i. des. splits.
+          { econs; eauto. }
+          { ii. inv H. ss. unguard. des; clarify. }
+        }
+      }
+      { exploit not_released_fence; eauto.
+        i. des. left. splits; [|intros H; inv H]. econs; eauto. }
+      { exploit not_released_fence; eauto.
+        i. des. left. splits; [|intros H; inv H]. econs; eauto. }
+      { inv LOCAL0. left. splits; [|intros H; inv H]. econs; eauto. }
+    }
+  Qed.
+
+  Lemma not_released_thread_opt_step lang (th0 th1: Thread.t lang) e
+        (STEP: Thread.opt_step e th0 th1)
+        (CONSISTENT: Local.promise_consistent th1.(Thread.local))
+        (THREAD: not_released_thread th0)
+    :
+      (<<THREAD: not_released_thread th1>> /\ <<RACY: ~ reading_event loc ts e>>) \/
+      (<<RACY: racy_read loc ts th0.(Thread.local) e>>).
+  Proof.
+    inv STEP; eauto.
+    { left. splits; auto. ii. inv H. }
+    { eapply not_released_thread_step; eauto. }
+  Qed.
+
+  Lemma not_released_rtc_reserve_step lang (th0 th1: Thread.t lang)
+        (STEPS: rtc (@Thread.reserve_step _) th0 th1)
+        (CONSISTENT: Local.promise_consistent th1.(Thread.local))
+        (THREAD: not_released_thread th0)
+    :
+      not_released_thread th1.
+  Proof.
+    ginduction STEPS; eauto. i. eapply IHSTEPS; eauto.
+    inv H. eapply not_released_thread_step in STEP; eauto.
+    { des; auto. inv RACY. }
+    { eapply rtc_reserve_step_promise_consistent; eauto. }
+  Qed.
+
+  Lemma not_released_rtc_cancel_step lang (th0 th1: Thread.t lang)
+        (STEPS: rtc (@Thread.cancel_step _) th0 th1)
+        (CONSISTENT: Local.promise_consistent th1.(Thread.local))
+        (THREAD: not_released_thread th0)
+    :
+      not_released_thread th1.
+  Proof.
+    ginduction STEPS; eauto. i. eapply IHSTEPS; eauto.
+    inv H. eapply not_released_thread_step in STEP; eauto.
+    { des; auto. inv RACY. }
+    { eapply rtc_cancel_step_promise_consistent; eauto. }
+  Qed.
+
+  Definition not_released_configuration tid (c: Configuration.t): Prop :=
+    forall lang st lc
+           (TID: IdentMap.find tid c.(Configuration.threads) = Some (existT _ lang st, lc)),
+      not_released_thread (Thread.mk _ st lc c.(Configuration.sc) c.(Configuration.memory)).
+
+  Lemma not_released_configuration_step L tid e c0 c1
+        (STEP: pf_step L e tid c0 c1)
+        (CONFIGURATION: not_released_configuration tid c0)
+        (WF: Configuration.wf c0)
+    :
+      (<<RELEASED: not_released_configuration tid c1>> /\ <<RACY: ~ reading_event loc ts e>>) \/
+      (<<RACY: pf_racy_read_step L loc ts e tid c0 c1>>).
+  Proof.
+    inv STEP.
+    exploit Thread.rtc_cancel_step_future; eauto; try eapply WF; eauto. i. des. ss.
+    exploit Thread.opt_step_future; eauto. i. des. ss.
+    exploit Thread.rtc_reserve_step_future; eauto. i. des. ss.
+    assert (CONSISTENT4: Local.promise_consistent lc4).
+    { destruct (classic (e = ThreadEvent.failure)).
+      { subst. eapply rtc_reserve_step_promise_consistent2 in RESERVES; eauto.
+        inv STEP0. inv STEP; inv STEP0; inv LOCAL. inv LOCAL0. ss. }
+      { specialize (CONSISTENT H).
+        eapply pf_consistent_consistent in CONSISTENT.
+        eapply consistent_promise_consistent in CONSISTENT; eauto. }
+    }
+    assert (CONSISTENT3: Local.promise_consistent e3.(Thread.local)).
+    { eapply rtc_reserve_step_promise_consistent; eauto. }
+    assert (CONSISTENT2: Local.promise_consistent e2.(Thread.local)).
+    { inv STEP0; eauto. eapply step_promise_consistent; eauto. }
+    assert (CONSISTENT1: Local.promise_consistent lc1).
+    { eapply rtc_cancel_step_promise_consistent in CANCELS; eauto. }
+    exploit not_released_rtc_cancel_step; eauto. intros RELEASED2.
+    exploit not_released_thread_opt_step; eauto. i. des.
+    { exploit not_released_rtc_reserve_step; eauto. intros RELEASED4.
+      inv RELEASED4. ss. left. splits; auto. ii. ss.
+      erewrite IdentMap.gss in TID0. dep_clarify. }
+    { right. econs; eauto. }
+  Qed.
+
+  Lemma not_released_configuration_steps L tid c0 c1
+        (STEPS: rtc (pf_machine_step L MachineEvent.silent tid) c0 c1)
+        (CONFIGURATION: not_released_configuration tid c0)
+        (WF: Configuration.wf c0)
+    :
+      (<<RELEASED: not_released_configuration tid c1>>) \/
+      (exists c1' c2' e,
+          (<<STEPS: rtc (pf_machine_step L MachineEvent.silent tid) c0 c1'>>) /\
+          (<<RACY: pf_racy_read_step L loc ts e tid c1' c2'>>)).
+  Proof.
+    ginduction STEPS; eauto. i. inv H.
+    exploit not_released_configuration_step; eauto. i. des.
+    { erewrite H1. exploit IHSTEPS; eauto.
+      { eapply pf_step_pf_event_configuration_step in STEP; eauto.
+        des. eapply SConfiguration.step_future; eauto. }
+      i. des; auto. right. exists c1', c2'. esplits; eauto.
+      econs 2; eauto. erewrite <- H1. econs; eauto.
+    }
+    { right. esplits; eauto. }
+  Qed.
+
+  Lemma promise_not_released_timemap prom0 mem0 from msg prom1 mem1
+        (PROMISE: Memory.promise prom0 mem0 loc from ts msg prom1 mem1 Memory.op_kind_add)
+        tm
+        (TM: Memory.closed_timemap tm mem0)
+    :
+      not_released_timemap tm.
+  Proof.
+    inv PROMISE. ii.
+    specialize (TM loc). des. eapply Memory.add_get0 in MEM.
+    des. rewrite H in *. clarify.
+  Qed.
+
+  Lemma promise_not_released_view prom0 mem0 from msg prom1 mem1
+        (PROMISE: Memory.promise prom0 mem0 loc from ts msg prom1 mem1 Memory.op_kind_add)
+        vw
+        (VW: Memory.closed_view vw mem0)
+    :
+      not_released_view vw.
+  Proof.
+    inv VW. econs; eapply promise_not_released_timemap; eauto.
+  Qed.
+
+  Lemma promise_not_released_tview prom0 mem0 from msg prom1 mem1
+        (PROMISE: Memory.promise prom0 mem0 loc from ts msg prom1 mem1 Memory.op_kind_add)
+        vw
+        (VW: TView.closed vw mem0)
+    :
+      not_released_tview vw.
+  Proof.
+    inv VW. econs; i; eapply promise_not_released_view; eauto.
+  Qed.
+
+  Lemma promise_not_released_opt_view prom0 mem0 from msg prom1 mem1
+        (PROMISE: Memory.promise prom0 mem0 loc from ts msg prom1 mem1 Memory.op_kind_add)
+        vw
+        (VW: Memory.closed_opt_view vw mem0)
+    :
+      not_released_opt_view vw.
+  Proof.
+    inv VW; econs. eapply promise_not_released_view; eauto.
+  Qed.
+
+  Lemma promise_not_released_message prom0 mem0 from msg prom1 mem1
+        (PROMISE: Memory.promise prom0 mem0 loc from ts msg prom1 mem1 Memory.op_kind_add)
+        msg0
+        (MSG: Memory.closed_message msg0 mem0)
+    :
+      not_released_message msg0.
+  Proof.
+    inv MSG; econs. eapply promise_not_released_opt_view; eauto.
+  Qed.
+
+  Lemma promise_not_released_memory prom0 mem0 from val released prom1 mem1
+        (PROMISE: Memory.promise prom0 mem0 loc from ts (Message.concrete val released) prom1 mem1 Memory.op_kind_add)
+        (MEM: Memory.closed mem0)
+        prom
+        (MLE: Memory.le prom mem0)
+    :
+      not_released_memory prom mem1.
+  Proof.
+    inversion PROMISE. econs.
+    { i. erewrite Memory.add_o in GET; eauto. des_ifs.
+      { ss. des; clarify. }
+      { left. eapply promise_not_released_message; eauto. eapply MEM; eauto. }
+    }
+    { eapply Memory.add_get0 in MEM0. des. eauto. }
+    { destruct (Memory.get loc ts prom) as [[from0 msg]|] eqn:GET; auto.
+      eapply MLE in GET. eapply Memory.add_get0 in MEM0. des. clarify. }
+  Qed.
+
+End NOTRELEASED.
+
+
+Lemma promise_not_released_add L loc ts prom0 mem0 from val released prom1 mem1 kind
+      (PROMISE: Memory.promise prom0 mem0 loc from ts (Message.concrete val released) prom1 mem1 kind)
+      (PF: pf_promises L prom0)
+      (LOC: L loc)
+  :
+    (<<KIND: kind = Memory.op_kind_add>>) /\ (<<NONBOT: ts <> Time.bot>>).
+Proof.
+  inv PROMISE.
+  { splits; auto.
+    ii. subst. eapply add_succeed_wf in MEM. des.
+    eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt; eauto. eapply Time.bot_spec.
+  }
+  { eapply Memory.split_get0 in PROMISES. des. subst.
+    eapply PF in GET0; eauto. ss. }
+  { eapply Memory.lower_get0 in PROMISES. des. subst.
+    eapply PF in GET; eauto. ss. }
+  { ss. }
+Qed.
+
+Lemma thread_step_write_not_released L loc ts lang (th0 th1: Thread.t lang) pf e
+      lc_other
+      (STEP: Thread.step pf e th0 th1)
+      (WRITE: writing_event loc ts e)
+      (PF: pf_promises L th0.(Thread.local).(Local.promises))
+      (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
+      (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
+      (MEM: Memory.closed th0.(Thread.memory))
+      (LOC: L loc)
+      (LOCALOTHER: Local.wf lc_other th0.(Thread.memory))
+  :
+    (<<NONBOT: ts <> Time.bot>>) /\
+    (<<TVIEW: not_released_tview loc ts lc_other.(Local.tview)>>) /\
+    (<<MEM: not_released_memory loc ts lc_other.(Local.promises) th1.(Thread.memory)>>) /\
+    (<<SC: not_released_timemap loc ts th1.(Thread.sc)>>).
+Proof.
+  inv STEP; inv STEP0; ss.
+  { inv WRITE. }
+  inv WRITE; inv LOCAL0.
+  { inv LOCAL1. inv WRITE.
+    exploit promise_not_released_add; eauto. i. des; subst. splits; auto.
+    { eapply promise_not_released_tview; eauto. eapply LOCALOTHER. }
+    { eapply promise_not_released_memory; eauto. eapply LOCALOTHER. }
+    { eapply promise_not_released_timemap; eauto. }
+  }
+  { inv LOCAL1. inv LOCAL2. inv WRITE. ss.
+    exploit promise_not_released_add; eauto. i. des; subst. splits; auto.
+    { eapply promise_not_released_tview; eauto. eapply LOCALOTHER. }
+    { eapply promise_not_released_memory; eauto. eapply LOCALOTHER. }
+    { eapply promise_not_released_timemap; eauto. }
   }
 Qed.
 
+Lemma rtc_reserve_step_write_not_released loc ts lang (th0 th1: Thread.t lang)
+      lc_other
+      (STEPS: rtc (@Thread.reserve_step _) th0 th1)
+      (TVIEW: not_released_tview loc ts lc_other.(Local.tview))
+      (MEM: not_released_memory loc ts lc_other.(Local.promises) th0.(Thread.memory))
+      (SC: not_released_timemap loc ts th0.(Thread.sc))
+  :
+    (<<TVIEW: not_released_tview loc ts lc_other.(Local.tview)>>) /\
+    (<<MEM: not_released_memory loc ts lc_other.(Local.promises) th1.(Thread.memory)>>) /\
+    (<<SC: not_released_timemap loc ts th1.(Thread.sc)>>).
+Proof.
+  ginduction STEPS; eauto.
+  i. inv H. inv STEP; inv STEP0; inv LOCAL. ss. inv PROMISE.
+  eapply IHSTEPS; eauto. inv MEM. des. econs; eauto.
+  { i. erewrite Memory.add_o in GET; eauto. des_ifs.
+    { ss. des; clarify. left. econs. }
+    { eapply MESSAGES; eauto. }
+  }
+  { eapply Memory.add_get1 in EXIST; eauto. }
+Qed.
 
-Theorem local_DRFPF L s
+Lemma configuration_write_not_released L c0 c1 e loc ts tid0 tid1
+      (WRITE: writing_event loc ts e)
+      (STEP: pf_step L e tid0 c0 c1)
+      (WF: Configuration.wf c0)
+      (PF: pf_configuration L c0)
+      (TID: tid0 <> tid1)
+      (LOC: L loc)
+  :
+    (<<NONBOT: ts <> Time.bot>>) /\ (<<RELEASED: not_released_configuration loc ts tid1 c1>>).
+Proof.
+  inv STEP. hexploit (PF tid0); eauto. intros PROMISES.
+  exploit Thread.rtc_cancel_step_future; eauto; try eapply WF; eauto.
+  i. des. ss.
+  inv STEP0.
+  { inv WRITE. }
+  hexploit pf_promises_cancel_steps; eauto. intros PROMISES2. splits.
+  { inv WRITE.
+    { inv STEP; inv STEP0; inv LOCAL. ss.
+      inv LOCAL0. inv WRITE.
+      eapply promise_not_released_add in PROMISE; eauto. des; auto. }
+    { inv STEP; inv STEP0; inv LOCAL. ss.
+      inv LOCAL1. inv LOCAL2. inv WRITE.
+      eapply promise_not_released_add in PROMISE; eauto. des; auto. }
+  }
+  { ii. ss. erewrite IdentMap.gso in TID1; eauto.
+    hexploit Thread.rtc_all_step_disjoint.
+    { eapply rtc_implies; try apply CANCELS.
+      clear. i. inv H. econs. econs; eauto. }
+    { eapply WF; eauto. }
+    { eapply WF; eauto. }
+    { eapply WF; eauto. }
+    { eapply WF; eauto. }
+    { eapply WF; eauto. }
+    i. des.
+    hexploit thread_step_write_not_released; eauto. i. des.
+    hexploit rtc_reserve_step_write_not_released; eauto. i. des. ss.
+  }
+Qed.
+
+Lemma pf_racefree_view_pf_race_free_imm L c
+      (WF: Configuration.wf c)
+      (PF: pf_configuration L c)
+      (RACEFREE: pf_racefree_view L c)
+  :
+    pf_racefree L c.
+Proof.
+  ii. exploit rtc_pf_all_step_future; eauto. i. des.
+  exploit configuration_write_not_released; eauto. i. des.
+  exploit pf_step_future; try apply CSTEP0; eauto. i. des.
+  exploit not_released_configuration_steps; eauto. i. des.
+  { exploit not_released_configuration_step; try apply CSTEP1; eauto.
+    { eapply rtc_pf_all_step_future; try apply WF0; eauto.
+      eapply rtc_implies; try apply STEPS.
+      i. inv H. econs; eauto. }
+    i. des; ss.
+    eapply RACEFREE.
+    { eapply CSTEPS. }
+    { econs; eauto. }
+    { eapply rtc_implies; try apply STEPS.
+      i. inv H. econs; eauto. }
+    { eauto. }
+  }
+  { eapply RACEFREE.
+    { eapply CSTEPS. }
+    { econs; eauto. }
+    { eapply rtc_implies; try apply STEPS0.
+      i. inv H. econs; eauto. }
+    { eauto. }
+  }
+Qed.
+
+Theorem local_DRFPF_view L s
         (RACEFRFEE: pf_racefree_view L (Configuration.init s))
   :
-    behaviors Configuration.step (Configuration.init s) <1=
-    behaviors (pf_multi_step L) (Configuration.init s).
+    behaviors SConfiguration.machine_step (Configuration.init s) <1=
+    behaviors (pf_machine_step L) (Configuration.init s).
 Proof.
-  i. eapply times_configuration_step_same_behaviors in PR; cycle 1.
-  { eapply Configuration.init_wf. }
-  des. eapply PF_sim_configuration_beh; eauto.
+  ii. eapply local_DRFPF; eauto.
+  eapply pf_racefree_view_pf_race_free_imm; eauto.
   { eapply Configuration.init_wf. }
   { eapply configuration_init_pf. }
-  { eapply JConfiguration.init_wf. }
-  { eapply Configuration.init_wf. }
-  instantiate (1:=s). instantiate (1:=bot4). instantiate (1:=bot3). econs; eauto.
-  { i. unfold Threads.init. repeat erewrite IdentMap.Facts.map_o.
-    unfold option_map. des_ifs. ss. econs. econs.
-    econs; ss. i. erewrite Memory.bot_get. destruct (classic (L loc)).
-    { econs 1; eauto. }
-    { econs 2; eauto.  }
-  }
-  { i. unfold Threads.init. repeat erewrite IdentMap.Facts.map_o.
-    unfold option_map. des_ifs. ss. econs. econs.
-    { refl. }
-    { ii. erewrite Memory.bot_get. econs. }
-  }
-  { i. splits; ss. }
-  { econs.
-    { i. unfold Memory.init, Memory.get. erewrite Cell.init_get. des_ifs.
-      { econs 2; eauto.
-        { ii. inv H. ss. }
-        { ii. inv H. ss. }
-        { refl. }
-        { i. apply eq_lb_time. }
-      }
-      { econs.
-        { ii. inv H. ss. }
-        { ii. inv H. ss. }
-      }
-    }
-    { i. inv EXTRA. ss. }
-  }
-  { refl. }
-  { i. unfold JConfiguration.init_views. des_ifs. econs; eauto.
-    eapply Memory.closed_view_bot. eapply Memory.init_closed. }
-  { refl. }
-  { ii. unfold Memory.init, Memory.get in GET. erewrite Cell.init_get in GET.
-    des_ifs. auto. }
-  { i. unfold Threads.init in GET. erewrite IdentMap.Facts.map_o in GET.
-    unfold option_map in GET. des_ifs. dep_clarify. ii. ss. eexists [], _. splits; auto.
-    { refl. }
-    { right. ss. }
-  }
-  { i. unfold Threads.init in GET. erewrite IdentMap.Facts.map_o in GET.
-    unfold option_map in GET. des_ifs. dep_clarify. ii. ss. eexists [], _. splits; auto.
-    { refl. }
-    { right. ss. }
-  }
 Qed.

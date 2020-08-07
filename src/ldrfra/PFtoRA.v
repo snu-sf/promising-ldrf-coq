@@ -448,7 +448,7 @@ Module PFtoRA.
           (WF_J: wf_j views c_j)
           (WF_RA: wf_ra rels c_ra)
           (RA_RACEFREE: RARace.racefree L rels c_ra):
-      pf_racefree_view L c_pf.
+      pf_multi_racefree_view L c_pf.
     Proof.
       ii. exploit sim_conf_steps; eauto. i. des; eauto.
       exploit steps_pf_future; eauto. i. des.
