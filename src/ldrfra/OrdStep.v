@@ -248,6 +248,17 @@ Module OrdThread.
     Definition all_step := union step_allpf.
     Hint Unfold all_step.
 
+    Inductive opt_step: forall (e: ThreadEvent.t) (e1 e2: Thread.t lang), Prop :=
+    | step_none
+        e:
+        opt_step ThreadEvent.silent e e
+    | step_some
+        pf e e1 e2
+        (STEP: step pf e e1 e2):
+        opt_step e e1 e2
+    .
+    Hint Constructors opt_step.
+
     Definition steps_failure (e1: Thread.t lang): Prop :=
       exists e2 e3,
         <<STEPS: rtc tau_step e1 e2>> /\
@@ -572,17 +583,17 @@ Module OrdConfiguration.
     Variable L: Loc.t -> bool.
     Variable ordc: Ordering.t.
 
-    Inductive step: forall (e: MachineEvent.t) (tid: Ident.t) (c1 c2: Configuration.t), Prop :=
+    Inductive step: forall (e:ThreadEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
     | step_intro
-        pf e tid c1 lang st1 lc1 e2 st3 lc3 sc3 memory3
+        e tid c1 lang st1 lc1 e2 e3 st4 lc4 sc4 memory4
         (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
-        (STEPS: rtc (@OrdThread.tau_step _ L ordc)
-                    (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
-        (STEP: OrdThread.step L ordc pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
+        (CANCELS: rtc (@Thread.cancel_step _) (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
+        (STEP: OrdThread.opt_step L ordc e e2 e3)
+        (RESERVES: rtc (@Thread.reserve_step _) e3 (Thread.mk _ st4 lc4 sc4 memory4))
         (CONSISTENT: e <> ThreadEvent.failure ->
-                     OrdThread.consistent L ordc (Thread.mk lang st3 lc3 sc3 memory3)):
-        step (ThreadEvent.get_machine_event e) tid
-             c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
+                     OrdThread.consistent L ordc (Thread.mk _ st4 lc4 sc4 memory4)):
+        step e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) c1.(Configuration.threads)) sc4 memory4)
     .
+    Hint Constructors step.
   End OrdConfiguration.
 End OrdConfiguration.
