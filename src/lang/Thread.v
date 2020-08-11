@@ -140,7 +140,7 @@ Module Thread.
         opt_promise_step ThreadEvent.silent e1 e1
     | opt_promise_step_some
         pf e e1 e2
-        (STEP: Thread.promise_step pf e e1 e2):
+        (STEP: promise_step pf e e1 e2):
         opt_promise_step e e1 e2
     .
 
@@ -150,16 +150,16 @@ Module Thread.
         opt_program_step ThreadEvent.silent e1 e1
     | opt_program_step_some
         e e1 e2
-        (STEP: Thread.program_step e e1 e2):
+        (STEP: program_step e e1 e2):
         opt_program_step e e1 e2
     .
 
     Lemma tau_opt_tau
           e1 e2 e3 e
-          (STEPS: rtc Thread.tau_step e1 e2)
-          (STEP: Thread.opt_step e e2 e3)
+          (STEPS: rtc tau_step e1 e2)
+          (STEP: opt_step e e2 e3)
           (EVENT: ThreadEvent.get_machine_event e = MachineEvent.silent):
-      rtc Thread.tau_step e1 e3.
+      rtc tau_step e1 e3.
     Proof.
       induction STEPS.
       - inv STEP; eauto.
@@ -168,9 +168,9 @@ Module Thread.
 
     Lemma tau_opt_all
           e1 e2 e3 e
-          (STEPS: rtc Thread.tau_step e1 e2)
-          (STEP: Thread.opt_step e e2 e3):
-      rtc Thread.all_step e1 e3.
+          (STEPS: rtc tau_step e1 e2)
+          (STEP: opt_step e e2 e3):
+      rtc all_step e1 e3.
     Proof.
       induction STEPS.
       - inv STEP; eauto.
@@ -210,7 +210,7 @@ Module Thread.
       <<WF2: Local.wf e2.(local) e2.(memory)>> /\
       <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
       <<CLOSED2: Memory.closed e2.(memory)>> /\
-      <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
+      <<TVIEW_FUTURE: TView.le e1.(local).(Local.tview) e2.(local).(Local.tview)>> /\
       <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
       <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>>.
     Proof.
@@ -228,7 +228,7 @@ Module Thread.
       <<WF2: Local.wf e2.(local) e2.(memory)>> /\
       <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
       <<CLOSED2: Memory.closed e2.(memory)>> /\
-      <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
+      <<TVIEW_FUTURE: TView.le e1.(local).(Local.tview) e2.(local).(Local.tview)>> /\
       <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
       <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>>.
     Proof.
@@ -244,7 +244,7 @@ Module Thread.
       <<WF2: Local.wf e2.(local) e2.(memory)>> /\
       <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
       <<CLOSED2: Memory.closed e2.(memory)>> /\
-      <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
+      <<TVIEW_FUTURE: TView.le e1.(local).(Local.tview) e2.(local).(Local.tview)>> /\
       <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
       <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>>.
     Proof.
@@ -262,7 +262,7 @@ Module Thread.
       <<WF2: Local.wf e2.(local) e2.(memory)>> /\
       <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
       <<CLOSED2: Memory.closed e2.(memory)>> /\
-      <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
+      <<TVIEW_FUTURE: TView.le e1.(local).(Local.tview) e2.(local).(Local.tview)>> /\
       <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
       <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>>.
     Proof.
@@ -280,7 +280,7 @@ Module Thread.
       <<WF2: Local.wf e2.(local) e2.(memory)>> /\
       <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
       <<CLOSED2: Memory.closed e2.(memory)>> /\
-      <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
+      <<TVIEW_FUTURE: TView.le e1.(local).(Local.tview) e2.(local).(Local.tview)>> /\
       <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
       <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>>.
     Proof.
@@ -301,7 +301,7 @@ Module Thread.
       <<WF2: Local.wf e2.(local) e2.(memory)>> /\
       <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
       <<CLOSED2: Memory.closed e2.(memory)>> /\
-      <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
+      <<TVIEW_FUTURE: TView.le e1.(local).(Local.tview) e2.(local).(Local.tview)>> /\
       <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
       <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>>.
     Proof.
@@ -572,7 +572,7 @@ Module Thread.
     Inductive cancel_step (e1 e2:t): Prop :=
     | cancel_step_intro
         pf loc from to
-        (STEP: Thread.step pf (ThreadEvent.promise loc from to Message.reserve Memory.op_kind_cancel) e1 e2)
+        (STEP: step pf (ThreadEvent.promise loc from to Message.reserve Memory.op_kind_cancel) e1 e2)
     .
     Hint Constructors cancel_step.
 
@@ -616,7 +616,7 @@ Module Thread.
       <<WF2: Local.wf e2.(local) e2.(memory)>> /\
       <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
       <<CLOSED2: Memory.closed e2.(memory)>> /\
-      <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
+      <<TVIEW_FUTURE: TView.le e1.(local).(Local.tview) e2.(local).(Local.tview)>> /\
       <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
       <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>>.
     Proof.
@@ -634,7 +634,7 @@ Module Thread.
       <<WF2: Local.wf e2.(local) e2.(memory)>> /\
       <<SC2: Memory.closed_timemap e2.(sc) e2.(memory)>> /\
       <<CLOSED2: Memory.closed e2.(memory)>> /\
-      <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
+      <<TVIEW_FUTURE: TView.le e1.(local).(Local.tview) e2.(local).(Local.tview)>> /\
       <<SC_FUTURE: TimeMap.le e1.(sc) e2.(sc)>> /\
       <<MEM_FUTURE: Memory.future e1.(memory) e2.(memory)>>.
     Proof.
