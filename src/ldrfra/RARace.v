@@ -439,12 +439,10 @@ Module RAThread.
           (MEMORY: Memory.closed e0.(Thread.memory))
           (FMEMORY: Memory.closed fe0.(Thread.memory))
           (SC: Memory.closed_timemap e0.(Thread.sc) e0.(Thread.memory))
-          (FSC: Memory.closed_timemap fe0.(Thread.sc) fe0.(Thread.memory))
-      :
+          (FSC: Memory.closed_timemap fe0.(Thread.sc) fe0.(Thread.memory)):
         exists fe1,
           (<<THREAD: thread_map ident_map e1 fe1>>) /\
-          (<<STEPS: tau_steps rels0 rels1 fe0 fe1>>)
-    .
+          (<<STEPS: tau_steps rels0 rels1 fe0 fe1>>).
     Proof.
       ginduction STEPS; eauto. i.
       inv STEP; ss.
@@ -461,17 +459,17 @@ Module RAThread.
     Qed.
 
     Lemma cap_plus_step_current_plus_step
-          rels1 rels2 pf e e1 e2 e3 sc1 mem1
+          rels1 rels2 rels3 e e1 e2 e3 sc1 mem1
           (LOCAL: Local.wf e1.(Thread.local) e1.(Thread.memory))
           (MEMORY: Memory.closed e1.(Thread.memory))
           (SC: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
           (CAP: Memory.cap e1.(Thread.memory) mem1)
           (SC_MAX: Memory.max_concrete_timemap mem1 sc1)
           (STEPS: tau_steps rels1 rels2 (Thread.mk lang e1.(Thread.state) e1.(Thread.local) sc1 mem1) e2)
-          (STEP: OrdThread.step L Ordering.acqrel pf e e2 e3):
-        exists pf' e' e2' e3',
+          (STEP: RAThread.step rels2 rels3 e e2 e3):
+        exists rels3' e' e2' e3',
           (<<STEPS: tau_steps rels1 rels2 e1 e2'>>) /\
-          (<<STEP: OrdThread.step L Ordering.acqrel pf' e' e2' e3'>>) /\
+          (<<STEP: RAThread.step rels2 rels3' e' e2' e3'>>) /\
           (<<LOCAL: local_map ident_map e2.(Thread.local) e2'.(Thread.local)>>) /\
           (<<EVENT: tevent_map ident_map e' e>>).
     Proof.
@@ -505,8 +503,11 @@ Module RAThread.
       { eapply Memory.cap_closed; eauto. }
       i. des.
       exploit steps_future; try eapply tau_steps_steps; try apply STEPS0; ss. i. des.
+      inv STEP.
       exploit OrdThread.cap_step_current_step; eauto. i. des.
-      esplits; eauto. inv THREAD. ss.
+      esplits; eauto.
+      - econs; eauto.
+      - inv THREAD. ss.
     Qed.
   End RAThread.
 End RAThread.
@@ -605,14 +606,15 @@ Module RARace.
 
     Definition racefree (rels: ReleaseWrites.t) (c: Configuration.t): Prop :=
       forall tid rels2 rels3 rels4
-        c2 lang st2 lc2 loc to val released ord e3 e4
+        c2 lang st2 lc2 e loc to val released ord e3 e4
         (STEPS: RAConfiguration.steps L rels rels2 c c2)
         (TID: IdentMap.find tid c2.(Configuration.threads) = Some (existT _ lang st2, lc2))
         (THREAD_STEPS: RAThread.tau_steps L rels2 rels3
                                           (Thread.mk _ st2 lc2 c2.(Configuration.sc) c2.(Configuration.memory)) e3)
         (CONS: Local.promise_consistent e3.(Thread.local))
-        (THREAD_STEP: RAThread.step L rels3 rels4 (ThreadEvent.read loc to val released ord) e3 e4)
-        (RARACE: ra_race L rels3 e3.(Thread.local).(Local.tview) loc to ord),
+        (THREAD_STEP: RAThread.step L rels3 rels4 e e3 e4)
+        (READ: ThreadEvent.is_reading e = Some (loc, to, val, released, ord))
+        (RARACE: ra_race rels3 e3.(Thread.local).(Local.tview) loc to ord),
         False.
 
     Definition racefree_syn (syn: Threads.syntax): Prop :=
