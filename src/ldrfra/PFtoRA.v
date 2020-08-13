@@ -501,7 +501,7 @@ Module PFtoRA.
             apply inj_pair2 in H3. apply inj_pair2 in H4. subst. ss.
             eapply PFtoRASimThread.sim_local_promise_consistent; eauto.
             eapply JSim.sim_local_promise_consistent; eauto.
-          * unfold RAThread.ra_race. splits; ss.
+          * unfold RARace.ra_race. splits; ss.
             { inv SIM1. inv SIM_JOINED. inv SIM_RA.
               apply inj_pair2 in H3. apply inj_pair2 in H4. subst. ss.
               inv LOCAL0. inv TVIEW. rewrite CUR.
@@ -526,7 +526,7 @@ Module PFtoRA.
             apply inj_pair2 in H3. apply inj_pair2 in H4. subst. ss.
             eapply PFtoRASimThread.sim_local_promise_consistent; eauto.
             eapply JSim.sim_local_promise_consistent; eauto.
-          * unfold RAThread.ra_race. splits; ss.
+          * unfold RARace.ra_race. splits; ss.
             { inv SIM1. inv SIM_JOINED. inv SIM_RA.
               apply inj_pair2 in H3. apply inj_pair2 in H4. subst. ss.
               inv LOCAL0. inv TVIEW. rewrite CUR.

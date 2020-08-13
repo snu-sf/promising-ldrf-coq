@@ -1841,6 +1841,86 @@ Module PFtoRASimThread.
         + left. esplits; ss.
     Qed.
 
+    Lemma reserve_step
+          rels e1_src e1_tgt e2_tgt
+          (SIM1: sim_thread rels e1_src e1_tgt)
+          (STABLE1_SRC: stable_thread rels e1_src)
+          (NORMAL1_SRC: normal_thread e1_src)
+          (NORMAL1_TGT: normal_thread e1_tgt)
+          (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
+          (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
+          (SC1_SRC: Memory.closed_timemap e1_src.(Thread.sc) e1_src.(Thread.memory))
+          (SC1_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
+          (MEM1_SRC: Memory.closed e1_src.(Thread.memory))
+          (MEM1_TGT: Memory.closed e1_tgt.(Thread.memory))
+          (STEP_TGT: Thread.reserve_step e1_tgt e2_tgt):
+      exists e2_src,
+        (<<STEP_SRC: Thread.reserve_step e1_src e2_src>>) /\
+        (<<SIM2: sim_thread rels e2_src e2_tgt>>) /\
+        (<<STABLE2_SRC: stable_thread rels e2_src>>) /\
+        (<<NORMAL2_SRC: normal_thread e2_src>>) /\
+        (<<NORMAL2_TGT: normal_thread e2_tgt>>).
+    Proof.
+      destruct e1_src as [st1_src lc1_src sc1_src mem1_src].
+      destruct e1_tgt as [st1_tgt lc1_tgt sc1_tgt mem1_tgt].
+      inv SIM1. inv STABLE1_SRC. inv NORMAL1_SRC. inv NORMAL1_TGT. ss.
+      exploit sim_release_writes_wf; eauto. i. des.
+      hexploit sim_memory_stable_tview; eauto; try apply LOCAL. intro STABLE_TVIEW1_TGT.
+      hexploit sim_memory_stable_memory; eauto. intro STABLE_MEM1_TGT.
+      inv STEP_TGT. inv STEP; inv STEP0; [|inv LOCAL0].
+      exploit promise_step; try exact LOCAL0; eauto. i. des.
+      exploit Stable.promise_step; try exact STEP_SRC; eauto; ss. i. des.
+      exploit Stable.promise_step; try exact LOCAL0; eauto; ss. i. des.
+      esplits.
+      + econs 1. econs 1. econs; eauto.
+      + eauto.
+      + econs; ss; eauto.
+        eapply Stable.future_stable_view; try apply STABLE_SC; eauto.
+        exploit Local.promise_step_future; try exact STEP_SRC; eauto. i. des. ss.
+      + eauto.
+      + eauto.
+    Qed.
+
+    Lemma cancel_step
+          rels e1_src e1_tgt e2_tgt
+          (SIM1: sim_thread rels e1_src e1_tgt)
+          (STABLE1_SRC: stable_thread rels e1_src)
+          (NORMAL1_SRC: normal_thread e1_src)
+          (NORMAL1_TGT: normal_thread e1_tgt)
+          (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
+          (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
+          (SC1_SRC: Memory.closed_timemap e1_src.(Thread.sc) e1_src.(Thread.memory))
+          (SC1_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
+          (MEM1_SRC: Memory.closed e1_src.(Thread.memory))
+          (MEM1_TGT: Memory.closed e1_tgt.(Thread.memory))
+          (STEP_TGT: Thread.cancel_step e1_tgt e2_tgt):
+      exists e2_src,
+        (<<STEP_SRC: Thread.cancel_step e1_src e2_src>>) /\
+        (<<SIM2: sim_thread rels e2_src e2_tgt>>) /\
+        (<<STABLE2_SRC: stable_thread rels e2_src>>) /\
+        (<<NORMAL2_SRC: normal_thread e2_src>>) /\
+        (<<NORMAL2_TGT: normal_thread e2_tgt>>).
+    Proof.
+      destruct e1_src as [st1_src lc1_src sc1_src mem1_src].
+      destruct e1_tgt as [st1_tgt lc1_tgt sc1_tgt mem1_tgt].
+      inv SIM1. inv STABLE1_SRC. inv NORMAL1_SRC. inv NORMAL1_TGT. ss.
+      exploit sim_release_writes_wf; eauto. i. des.
+      hexploit sim_memory_stable_tview; eauto; try apply LOCAL. intro STABLE_TVIEW1_TGT.
+      hexploit sim_memory_stable_memory; eauto. intro STABLE_MEM1_TGT.
+      inv STEP_TGT. inv STEP; inv STEP0; [|inv LOCAL0].
+      exploit promise_step; try exact LOCAL0; eauto. i. des.
+      exploit Stable.promise_step; try exact STEP_SRC; eauto; ss. i. des.
+      exploit Stable.promise_step; try exact LOCAL0; eauto; ss. i. des.
+      esplits.
+      + econs 1. econs 1. econs; eauto.
+      + eauto.
+      + econs; ss; eauto.
+        eapply Stable.future_stable_view; try apply STABLE_SC; eauto.
+        exploit Local.promise_step_future; try exact STEP_SRC; eauto. i. des. ss.
+      + eauto.
+      + eauto.
+    Qed.
+
 
     (* cap *)
 
