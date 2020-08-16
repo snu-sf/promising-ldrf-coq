@@ -646,7 +646,7 @@ Module RARace.
         (<<STEPS: RAConfiguration.steps L rels rels2 c c2>>) /\
         (<<TID: IdentMap.find tid c2.(Configuration.threads) = Some (existT _ lang st2, lc2)>>) /\
         (<<THREAD_STEPS: RAThread.steps L rels2 rels3
-                                            (Thread.mk _ st2 lc2 c2.(Configuration.sc) c2.(Configuration.memory)) e3>>) /\
+                                        (Thread.mk _ st2 lc2 c2.(Configuration.sc) c2.(Configuration.memory)) e3>>) /\
         (<<CONS: Local.promise_consistent e3.(Thread.local)>>) /\
         (<<THREAD_STEP: RAThread.step L rels3 rels4 e e3 e4>>) /\
         (<<READ: ThreadEvent.is_reading e = Some (loc, to, val, released, ord)>>) /\

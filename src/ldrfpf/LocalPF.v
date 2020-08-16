@@ -1242,12 +1242,4 @@ Proof.
   Proof.
     ii. eapply RACEFREE; cycle 2; eauto. etrans; eauto.
   Qed.
-
-  Lemma pf_racy_read_step_step
-        loc to e tid c1 c2
-        (STEP: pf_racy_read_step loc to e tid c1 c2):
-    pf_step e tid c1 c2.
-  Proof.
-    inv STEP. econs; eauto.
-  Qed.
 End LOCALPF.
