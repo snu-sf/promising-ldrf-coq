@@ -132,6 +132,18 @@ Proof.
   - eapply fence_step_promise_consistent; eauto.
 Qed.
 
+Lemma opt_step_promise_consistent
+      lang e th1 th2
+      (STEP: @Thread.opt_step lang e th1 th2)
+      (CONS: Local.promise_consistent th2.(Thread.local))
+      (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
+      (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory))
+      (MEM1: Memory.closed th1.(Thread.memory)):
+  Local.promise_consistent th1.(Thread.local).
+Proof.
+  inv STEP; eauto using step_promise_consistent.
+Qed.
+
 Lemma rtc_all_step_promise_consistent
       lang th1 th2
       (STEP: rtc (@Thread.all_step lang) th1 th2)

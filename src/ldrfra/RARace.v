@@ -164,6 +164,62 @@ Module RAThread.
       induction STEPS; eauto.
     Qed.
 
+    Lemma reserve_steps_tau_steps
+          rels e1 e2
+          (STEPS: rtc (@Thread.reserve_step _) e1 e2):
+      tau_steps rels rels e1 e2.
+    Proof.
+      induction STEPS; eauto.
+      inv H. inv STEP; [|inv STEP0; inv LOCAL].
+      econs 2; eauto.
+      - replace rels with (ReleaseWrites.append
+                             L (ThreadEvent.promise loc from to Message.reserve Memory.op_kind_add) rels) at 2 by ss.
+        econs. econs 1. eauto.
+      - ss.
+    Qed.
+
+    Lemma cancel_steps_tau_steps
+          rels e1 e2
+          (STEPS: rtc (@Thread.cancel_step _) e1 e2):
+      tau_steps rels rels e1 e2.
+    Proof.
+      induction STEPS; eauto.
+      inv H. inv STEP; [|inv STEP0; inv LOCAL].
+      econs 2; eauto.
+      - replace rels with (ReleaseWrites.append
+                             L (ThreadEvent.promise loc from to Message.reserve Memory.op_kind_cancel) rels) at 2 by ss.
+        econs. econs 1. eauto.
+      - ss.
+    Qed.
+
+    Lemma tau_steps_rtc_tau_step
+          rels1 rels2 e1 e2
+          (STEPS: tau_steps rels1 rels2 e1 e2):
+      rtc (@OrdThread.tau_step lang L Ordering.acqrel) e1 e2.
+    Proof.
+      induction STEPS; eauto.
+      econs 2; eauto. inv STEP; ss.
+      econs; eauto. econs. eauto.
+    Qed.
+
+    Lemma opt_step_steps
+          rels1 rels2 e e1 e2
+          (STEP: opt_step rels1 rels2 e e1 e2):
+      steps rels1 rels2 e1 e2.
+    Proof.
+      inv STEP; eauto.
+    Qed.
+
+    Lemma plus_step_steps
+          rels1 rels2 e1 pf e e2 e3
+          (STEPS: steps rels1 rels2 e1 e2)
+          (STEP: OrdThread.step L Ordering.acqrel pf e e2 e3):
+      steps rels1 (ReleaseWrites.append L e rels2) e1 e3.
+    Proof.
+      induction STEPS; eauto.
+      econs; eauto. econs; eauto.
+    Qed.
+
     Lemma steps_trans
           rels1 rels2 rels3 e1 e2 e3
           (STEPS1: steps rels1 rels2 e1 e2)
@@ -182,26 +238,6 @@ Module RAThread.
     Proof.
       revert rels3 e3 STEPS2.
       induction STEPS1; i; eauto.
-    Qed.
-
-    Lemma tau_steps_rtc_tau_step
-          rels1 rels2 e1 e2
-          (STEPS: tau_steps rels1 rels2 e1 e2):
-      rtc (@OrdThread.tau_step lang L Ordering.acqrel) e1 e2.
-    Proof.
-      induction STEPS; eauto.
-      econs 2; eauto. inv STEP; ss.
-      econs; eauto. econs. eauto.
-    Qed.
-
-    Lemma plus_step_steps
-          rels1 rels2 e1 pf e e2 e3
-          (STEPS: steps rels1 rels2 e1 e2)
-          (STEP: OrdThread.step L Ordering.acqrel pf e e2 e3):
-      steps rels1 (ReleaseWrites.append L e rels2) e1 e3.
-    Proof.
-      induction STEPS; eauto.
-      econs; eauto. econs; eauto.
     Qed.
 
     Lemma step_future
@@ -603,6 +639,18 @@ Module RARace.
       (<<HIGHER: Time.lt (tview.(TView.cur).(View.rlx) loc) to>>) /\
       ((<<ORDW: ~ List.In (loc, to) rels>>) \/
        (<<ORDR: Ordering.le ordr Ordering.strong_relaxed>>)).
+
+    Definition ra_race_steps (rels: ReleaseWrites.t) (c: Configuration.t): Prop :=
+      exists tid rels2 rels3 rels4
+        c2 lang st2 lc2 e loc to val released ord e3 e4,
+        (<<STEPS: RAConfiguration.steps L rels rels2 c c2>>) /\
+        (<<TID: IdentMap.find tid c2.(Configuration.threads) = Some (existT _ lang st2, lc2)>>) /\
+        (<<THREAD_STEPS: RAThread.steps L rels2 rels3
+                                            (Thread.mk _ st2 lc2 c2.(Configuration.sc) c2.(Configuration.memory)) e3>>) /\
+        (<<CONS: Local.promise_consistent e3.(Thread.local)>>) /\
+        (<<THREAD_STEP: RAThread.step L rels3 rels4 e e3 e4>>) /\
+        (<<READ: ThreadEvent.is_reading e = Some (loc, to, val, released, ord)>>) /\
+        (<<RARACE: ra_race rels3 e3.(Thread.local).(Local.tview) loc to ord>>).
 
     Definition racefree (rels: ReleaseWrites.t) (c: Configuration.t): Prop :=
       forall tid rels2 rels3 rels4

@@ -53,12 +53,9 @@ Module PFtoRA.
 
     (* well-formedness *)
 
-    Inductive wf_pf (tr: Trace.t) (c: Configuration.t): Prop :=
+    Inductive wf_pf (c: Configuration.t): Prop :=
     | wf_pf_intro
         (WF: Configuration.wf c)
-        (TRACE: forall tid lang st lc
-                  (TH: IdentMap.find tid c.(Configuration.threads) = Some (existT _ lang st, lc)),
-            TraceWF.wf tr lc.(Local.promises) c.(Configuration.memory))
         (PF: pf_configuration L c)
     .
 
@@ -73,14 +70,13 @@ Module PFtoRA.
     .
 
     Lemma wf_pf_thread
-          tr c tid lang st lc
-          (WF: wf_pf tr c)
+          c tid lang st lc
+          (WF: wf_pf c)
           (FIND: IdentMap.find tid c.(Configuration.threads) = Some (existT _ lang st, lc)):
-      PFtoRAThread.wf_pf tr (Thread.mk _ st lc c.(Configuration.sc) c.(Configuration.memory)).
+      PFtoRAThread.wf_pf (Thread.mk _ st lc c.(Configuration.sc) c.(Configuration.memory)).
     Proof.
       inv WF. inv WF0. inv WF.
       hexploit THREADS; eauto. i.
-      hexploit TRACE; eauto. i.
       econs; eauto.
     Qed.
 
@@ -109,31 +105,21 @@ Module PFtoRA.
     Qed.
 
     Lemma step_pf_future
-          tr1 tr e tid c1 c2
-          (WF1: wf_pf tr1 c1)
-          (STEP: pf_step_trace L tr e tid c1 c2):
-      <<WF2: wf_pf (tr1 ++ tr) c2>>.
+          e tid c1 c2
+          (WF1: wf_pf c1)
+          (STEP: pf_step L e tid c1 c2):
+      <<WF2: wf_pf c2>>.
     Proof.
-      exploit pf_step_trace_future; eauto; try apply WF1. i. des.
-      inv STEP. ss.
-      exploit wf_pf_thread; eauto. i.
-      exploit Trace.plus_step_steps; eauto. i.
-      exploit PFtoRAThread.steps_pf_future; try exact x1; eauto. i. des.
-      econs; ss. i. Configuration.simplify; try apply x2.
-      exploit wf_pf_thread; try eapply TH; eauto. i. inv x3. ss.
-      apply TraceWF.wf_app.
-      - hexploit TraceWF.steps_disjoint_other; [eapply x0|eapply TRACE|..]; eauto.
-      - hexploit TraceWF.steps_disjoint; try eapply x1; eauto; try apply x0; s.
-        inv WF1. inv WF0. inv WF1. eauto.
+      exploit pf_step_future; eauto; try apply WF1. i. des. ss.
     Qed.
 
     Lemma step_j_future
           e tid c1 c2 views1 views2
           (WF1: wf_j views1 c1)
-          (STEP: JConfiguration.step e tid c1 c2 views1 views2):
+          (STEP: JConfiguration.single_step e tid c1 c2 views1 views2):
       <<WF2: wf_j views2 c2>>.
     Proof.
-      eapply JConfiguration.step_future; eauto.
+      eapply JConfiguration.single_step_future; eauto.
     Qed.
 
     Lemma step_ra_future
@@ -146,9 +132,14 @@ Module PFtoRA.
       inv STEP. ss.
       assert (STEPS': RAThread.steps L rels1 rels2
                                      (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory))
-                                     (Thread.mk _ st3 lc3 sc3 memory3)).
-      { exploit RAThread.tau_steps_steps; eauto. i.
-        inv STEP0; eapply RAThread.plus_step_steps; eauto. }
+                                     (Thread.mk _ st4 lc4 sc4 memory4)).
+      { exploit RAThread.tau_steps_steps;
+          try eapply RAThread.cancel_steps_tau_steps; try exact CANCELS. i.
+        exploit RAThread.opt_step_steps; try exact STEP0. i.
+        exploit RAThread.tau_steps_steps;
+          try eapply RAThread.reserve_steps_tau_steps; try exact RESERVES. i.
+        eapply RAThread.steps_trans; [eauto|].
+        eapply RAThread.steps_trans; eauto. }
       exploit wf_ra_thread; eauto. i.
       hexploit RAThread.steps_rels_wf; try exact STEPS'; try apply x1. s. i.
       econs; ss. i. Configuration.simplify; ss.
@@ -159,25 +150,22 @@ Module PFtoRA.
     Qed.
 
     Lemma steps_pf_future
-          tr1 tr c1 c2
-          (WF1: wf_pf tr1 c1)
-          (STEPS: pf_steps_trace L c1 c2 tr):
-      <<WF2: wf_pf (tr1 ++ tr) c2>>.
+          c1 c2
+          (WF1: wf_pf c1)
+          (STEPS: rtc (pf_all_step L) c1 c2):
+      <<WF2: wf_pf c2>>.
     Proof.
-      revert tr1 WF1. induction STEPS; i.
-      - rewrite List.app_nil_r. ss.
-      - exploit step_pf_future; eauto. i.
-        exploit IHSTEPS; eauto. i.
-        rewrite List.app_assoc. ss.
+      exploit rtc_pf_all_step_future; try apply WF1; eauto. i. des.
+      econs; ss.
     Qed.
 
     Lemma steps_j_future
           c1 c2 views1 views2
           (WF1: wf_j views1 c1)
-          (STEPS: JConfiguration.steps c1 c2 views1 views2):
+          (STEPS: JConfiguration.single_steps c1 c2 views1 views2):
       <<WF2: wf_j views2 c2>>.
     Proof.
-      eapply JConfiguration.steps_future; eauto.
+      eapply JConfiguration.single_steps_future; eauto.
     Qed.
 
     Lemma steps_ra_future
@@ -206,31 +194,28 @@ Module PFtoRA.
                       (existT _ lang st_pf, lc_pf) (existT _ lang st_j, lc_j) (existT _ lang st_ra, lc_ra)
     .
 
-    Inductive sim_conf (tr: Trace.t) (views: Loc.t -> Time.t -> list View.t) (rels: ReleaseWrites.t):
+    Inductive sim_conf (views: Loc.t -> Time.t -> list View.t) (rels: ReleaseWrites.t):
       forall (c_pf c_j c_ra: Configuration.t), Prop :=
     | sim_conf_intro
         ths_pf sc_pf mem_pf
         ths_j sc_j mem_j
         ths_ra sc_ra mem_ra
-        (SIM_TR: PFtoRAThread.sim_trace tr rels)
         (THS: forall tid,
             option_rel3
               (sim_thread_sl views rels sc_pf sc_j sc_ra mem_pf mem_j mem_ra)
               (IdentMap.find tid ths_pf)
               (IdentMap.find tid ths_j)
               (IdentMap.find tid ths_ra)):
-        sim_conf tr views rels
+        sim_conf views rels
                  (Configuration.mk ths_pf sc_pf mem_pf)
                  (Configuration.mk ths_j sc_j mem_j)
                  (Configuration.mk ths_ra sc_ra mem_ra)
     .
 
     Lemma init_wf_pf syn:
-      wf_pf [] (Configuration.init syn).
+      wf_pf (Configuration.init syn).
     Proof.
-      econs; eauto using Configuration.init_wf.
-      - i. ss.
-      - eapply configuration_init_pf.
+      econs; eauto using Configuration.init_wf, configuration_init_pf.
     Qed.
 
     Lemma init_wf_j syn:
@@ -257,7 +242,7 @@ Module PFtoRA.
     Qed.
 
     Lemma init_sim_conf syn:
-      sim_conf [] (fun _ => fun _ => []) []
+      sim_conf (fun _ => fun _ => []) []
                (Configuration.init syn) (Configuration.init syn) (Configuration.init syn).
     Proof.
       econs; ss. i. unfold option_rel3.
@@ -293,8 +278,8 @@ Module PFtoRA.
     Qed.
 
     Lemma sim_conf_terminal
-          tr views rrels c_pf c_j c_ra
-          (SIM: sim_conf tr views rrels c_pf c_j c_ra)
+          views rrels c_pf c_j c_ra
+          (SIM: sim_conf views rrels c_pf c_j c_ra)
           (TERMINAL: Configuration.is_terminal c_pf):
       Configuration.is_terminal c_ra.
     Proof.
@@ -315,19 +300,20 @@ Module PFtoRA.
     (* step *)
 
     Lemma sim_conf_step
-          tr1 views1 rels1 c1_pf c1_j c1_ra
-          tr tid e c2_pf
-          (SIM1: sim_conf tr1 views1 rels1 c1_pf c1_j c1_ra)
-          (WF1_PF: wf_pf tr1 c1_pf)
+          views1 rels1 c1_pf c1_j c1_ra
+          tid e_pf c2_pf
+          (SIM1: sim_conf views1 rels1 c1_pf c1_j c1_ra)
+          (WF1_PF: wf_pf c1_pf)
           (WF1_J: wf_j views1 c1_j)
           (WF1_RA: wf_ra rels1 c1_ra)
-          (STEP: pf_step_trace L tr e tid c1_pf c2_pf):
-      (exists c2_j views2 rels2 c2_ra,
-          (<<STEP_J: JConfiguration.step e tid c1_j c2_j views1 views2>>) /\
-          (<<STEP_RA: RAConfiguration.step L e tid rels1 rels2 c1_ra c2_ra>>) /\
-          (<<SIM2: sim_conf (tr1 ++ tr) views2 rels2 c2_pf c2_j c2_ra>>)) \/
-      (exists rels2 c2_ra,
-          (<<STEP_RA: RAConfiguration.step L MachineEvent.failure tid rels1 rels2 c1_ra c2_ra>>)).
+          (STEP: pf_step L e_pf tid c1_pf c2_pf):
+      (exists e_j c2_j views2 e_ra rels2 c2_ra,
+          (<<STEP_J: JConfiguration.single_step e_j tid c1_j c2_j views1 views2>>) /\
+          (<<STEP_RA: RAConfiguration.step L e_ra tid rels1 rels2 c1_ra c2_ra>>) /\
+          (<<EVENT_J: JSim.sim_event e_j e_pf>>) /\
+          (<<EVENT_RA: PFtoRASimThread.sim_event e_ra e_j>>) /\
+          (<<SIM2: sim_conf views2 rels2 c2_pf c2_j c2_ra>>)) \/
+      (<<RACE: RARace.ra_race_steps L rels1 c1_ra>>).
     Proof.
       dup SIM1. inv SIM0. inv STEP. ss.
       dup THS. specialize (THS0 tid). unfold option_rel3 in THS0. des_ifs.
@@ -335,251 +321,360 @@ Module PFtoRA.
       exploit wf_pf_thread; eauto. s. i.
       exploit wf_j_thread; eauto. s. i.
       exploit wf_ra_thread; eauto. s. i.
-      exploit PFtoRAThread.sim_thread_plus_step; eauto.
-      { exploit PFtoRAThread.steps_pf_future; eauto. i. des.
-        exploit PFtoRAThread.step_pf_future; eauto. i. des.
-        destruct (classic(e0 = ThreadEvent.failure)).
-        - subst. inv STEP0; inv STEP. inv LOCAL. inv LOCAL0. ss.
-        - hexploit CONSISTENT; eauto. i. inv H0. des.
-          hexploit consistent_promise_consistent;
-            try eapply Trace.consistent_thread_consistent; eauto; try eapply x4. }
+      exploit PFtoRAThread.sim_thread_cancel_steps; eauto.
+      { exploit PFtoRAThread.cancel_steps_pf_future; eauto. i.
+        exploit PFtoRAThread.opt_step_pf_future; eauto. i.
+        exploit PFtoRAThread.reserve_steps_pf_future; eauto. i.
+        destruct (classic (e_pf = ThreadEvent.failure)).
+        - subst. inv STEP0. inv STEP; inv STEP0. inv LOCAL. inv LOCAL0. ss.
+        - eapply opt_step_promise_consistent; eauto; try apply x3.
+          eapply rtc_reserve_step_promise_consistent; eauto.
+          eapply consistent_promise_consistent;
+            try eapply pf_consistent_consistent; eauto; try apply x5.
+      }
       i. des.
-      - left.
-        exploit PFtoRAThread.steps_pf_future; eauto. i. des.
-        exploit PFtoRAThread.step_pf_future; eauto. i. des.
-        exploit PFtoRAThread.steps_j_future; eauto. i. des.
-        exploit PFtoRAThread.step_j_future; eauto. i. des.
-        exploit PFtoRAThread.steps_ra_future; try eapply RAThread.tau_steps_steps; eauto. i. des.
-        exploit PFtoRAThread.step_ra_future; eauto. i. des.
-        rewrite <- List.app_assoc in x4.
-        assert (CONS: e0 <> ThreadEvent.failure ->
-                      JThread.consistent e3_j views3 /\ RAThread.consistent L rels3 e3_ra).
-        { i. exploit PFtoRAThread.sim_thread_consistent; try exact SIM_TR2; eauto. }
-        destruct e3_j as [st3_j lc3_j sc3_j mem3_j], e3_ra as [st3_ra lc3_ra sc3_ra mem3_ra].
-        esplits.
-        + replace (ThreadEvent.get_machine_event e0) with (ThreadEvent.get_machine_event e_j); cycle 1.
-          { inv EVENT_J; ss. }
-          econs; eauto. i. eapply CONS. inv EVENT_J; ss.
-        + replace (ThreadEvent.get_machine_event e0) with (ThreadEvent.get_machine_event e_ra); cycle 1.
-          { inv EVENT_J; inv EVENT_RA; ss. }
-          econs; eauto. i. eapply CONS. inv EVENT_J; inv EVENT_RA; ss.
-        + econs; ss. i.
+      exploit PFtoRAThread.cancel_steps_pf_future; eauto. i.
+      exploit PFtoRAThread.cancel_steps_j_future; eauto. i.
+      exploit PFtoRAThread.cancel_steps_ra_future; eauto. i.
+      exploit PFtoRAThread.sim_thread_opt_step; eauto.
+      { exploit PFtoRAThread.opt_step_pf_future; eauto. i.
+        exploit PFtoRAThread.reserve_steps_pf_future; eauto. i.
+        destruct (classic (e_pf = ThreadEvent.failure)).
+        - subst. inv STEP0. inv STEP; inv STEP0. inv LOCAL. inv LOCAL0. ss.
+        - eapply rtc_reserve_step_promise_consistent; eauto.
+          eapply consistent_promise_consistent;
+            try eapply pf_consistent_consistent; eauto; try apply x7.
+      }
+      i. des; cycle 1.
+      { right. unfold RARace.ra_race_steps.
+        esplits; [econs 1|..]; eauto. s.
+        eapply RAThread.tau_steps_steps.
+        eapply RAThread.cancel_steps_tau_steps; eauto. }
+      exploit PFtoRAThread.opt_step_pf_future; eauto. i.
+      exploit PFtoRAThread.opt_step_j_future; eauto. i.
+      exploit PFtoRAThread.opt_step_ra_future; eauto. i.
+      exploit PFtoRAThread.sim_thread_reserve_steps; eauto.
+      { exploit PFtoRAThread.reserve_steps_pf_future; eauto. i.
+        destruct (classic (e_pf = ThreadEvent.failure)).
+        - subst. inv STEP0. inv STEP; inv STEP0. inv LOCAL. inv LOCAL0.
+          eapply rtc_reserve_step_promise_consistent2; eauto. ss.
+        - eapply consistent_promise_consistent;
+            try eapply pf_consistent_consistent; eauto; try apply x9.
+      }
+      i. des.
+      exploit PFtoRAThread.reserve_steps_pf_future; eauto. i.
+      exploit PFtoRAThread.reserve_steps_j_future; eauto. i.
+      exploit PFtoRAThread.reserve_steps_ra_future; eauto. i.
+      assert (STEPS': RAThread.steps L rels1 rels2 (Thread.mk _ st_ra lc_ra sc_ra mem_ra) e2_ra1).
+      { exploit RAThread.tau_steps_steps;
+          try eapply RAThread.cancel_steps_tau_steps; try exact STEP_RA. i.
+        exploit RAThread.opt_step_steps; eauto. i.
+        exploit RAThread.tau_steps_steps;
+          try eapply RAThread.reserve_steps_tau_steps; try exact STEP_RA1. i.
+        eapply RAThread.steps_trans; eauto.
+        eapply RAThread.steps_trans; eauto. }
+
+      destruct (classic (e_pf = ThreadEvent.failure)).
+      { subst. inv EVENT_J. inv EVENT_RA.
+        destruct e2_j1 as [st4_j lc4_j sc4_j mem4_j], e2_ra1 as [st4_ra lc4_ra sc4_ra mem4_ra].
+        left. esplits.
+        - econs; eauto. ss.
+        - econs; eauto. ss.
+        - ss.
+        - econs.
+        - econs; ss. i.
           repeat rewrite IdentMap.gsspec. condtac; ss.
           specialize (THS tid0). unfold option_rel3 in THS. des_ifs. inv THS. ss.
-          inv SIM0. ss. econs. econs; s; eauto; try apply SIM2.
+          inv SIM4. ss. econs. econs; s; eauto; try apply SIM3.
           * inv SIM_JOINED.
             apply inj_pair2 in H2. apply inj_pair2 in H6. subst.
-            econs; s; eauto; try by (inv SIM2; inv SIM_JOINED; ss).
-            exploit JThread.tau_steps_future; eauto; try apply x1. s. i. des.
-            exploit JThread.step_future; eauto. s. i. des.
+            econs; s; eauto; try by (inv SIM3; inv SIM_JOINED; ss).
+            exploit JThread.rtc_cancel_step_future; eauto; try apply x1. s. i. des.
+            exploit JThread.opt_step_future; eauto; try apply x1. s. i. des.
+            exploit JThread.rtc_reserve_step_future; eauto. s. i. des.
             eapply JSim.sim_local_le; try exact LOCAL.
-            etrans; eauto.
+            etrans; eauto. refl.
           * inv SIM_RA. ss. subst.
-            econs; s; eauto; try by (inv SIM2; inv SIM_RA; ss).
+            econs; s; eauto; try by (inv SIM3; inv SIM_RA; ss).
             inv LOCAL. econs; ss. i.
-            assert (STEPS': RAThread.steps L rels1 rels3
-                                           (Thread.mk _ st_ra lc_ra sc_j mem_ra)
-                                           (Thread.mk _ st3_ra lc3_ra sc3_ra mem3_ra)).
-            { exploit RAThread.tau_steps_steps; eauto. i.
-              inv STEP_RA; eapply RAThread.plus_step_steps; eauto. }
             exploit wf_ra_thread; try exact WF1_RA; try eapply Heq4. s. i.
-            eapply RAThread.steps_rels_disjoint; try exact STEPS'; ss; try apply x2; try apply x9.
+            eapply RAThread.steps_rels_disjoint; try exact STEPS'; ss; try apply x2; try apply x12.
             inv WF1_RA. inv WF. inv WF0. ss.
             eapply DISJOINT; [|eapply Heq1|eapply Heq4]. congr.
-          * econs; try apply SIM2; try apply NORMAL_J.
-          * econs; try apply SIM2; try apply NORMAL_RA.
-          * econs; s; try apply SIM2; try apply STABLE_RA.
-            assert (STEPS': RAThread.steps L rels1 rels3
-                                           (Thread.mk _ st_ra lc_ra sc_ra mem_ra)
-                                           (Thread.mk _ st3_ra lc3_ra sc3_ra mem3_ra)).
-            { exploit RAThread.tau_steps_steps; eauto. i.
-              inv STEP_RA; eapply RAThread.plus_step_steps; eauto. }
+          * econs; try apply SIM3; try apply NORMAL_J.
+          * econs; try apply SIM3; try apply NORMAL_RA.
+          * econs; s; try apply SIM3; try apply STABLE_RA.
             exploit RAThread.steps_future; try exact STEPS'; try apply x2. s. i. des.
             exploit wf_ra_thread; try exact WF1_RA; try eapply Heq4. s. i.
-            exploit Stable.future_stable_tview; try eapply STABLE_RA; try apply x9; eauto.
-      - right.
-        destruct e3_ra as [st3_ra lc3_ra sc3_ra mem3_ra].
-        esplits.
-        replace MachineEvent.failure with (ThreadEvent.get_machine_event ThreadEvent.failure) by ss.
-        econs; eauto. ss.
+            exploit Stable.future_stable_tview; try eapply STABLE_RA; try apply x12; eauto.
+      }
+
+      exploit PFtoRAThread.sim_thread_consistent; try eapply CONSISTENT; eauto. i. des; cycle 1.
+      { right. unfold RARace.ra_race_steps.
+        esplits; [econs 1|..]; try eapply RACE; eauto. s.
+        eapply RAThread.steps_trans; eauto.
+        eapply RAThread.tau_steps_steps; eauto. }
+      destruct e2_j1 as [st4_j lc4_j sc4_j mem4_j], e2_ra1 as [st4_ra lc4_ra sc4_ra mem4_ra].
+      left. esplits.
+      - econs; eauto.
+      - econs; eauto.
+      - ss.
+      - ss.
+      - econs; ss. i.
+        repeat rewrite IdentMap.gsspec. condtac; ss.
+        specialize (THS tid0). unfold option_rel3 in THS. des_ifs. inv THS. ss.
+        inv SIM4. ss. econs. econs; s; eauto; try apply SIM3.
+        * inv SIM_JOINED.
+          apply inj_pair2 in H3. apply inj_pair2 in H7. subst.
+          econs; s; eauto; try by (inv SIM3; inv SIM_JOINED; ss).
+          exploit JThread.rtc_cancel_step_future; eauto; try apply x1. s. i. des.
+          exploit JThread.opt_step_future; eauto; try apply x1. s. i. des.
+          exploit JThread.rtc_reserve_step_future; eauto. s. i. des.
+          eapply JSim.sim_local_le; try exact LOCAL.
+          etrans; eauto. refl.
+        * inv SIM_RA. ss. subst.
+          econs; s; eauto; try by (inv SIM3; inv SIM_RA; ss).
+          inv LOCAL. econs; ss. i.
+          exploit wf_ra_thread; try exact WF1_RA; try eapply Heq4. s. i.
+          eapply RAThread.steps_rels_disjoint; try exact STEPS'; ss; try apply x2; try apply x12.
+          inv WF1_RA. inv WF. inv WF0. ss.
+          eapply DISJOINT; [|eapply Heq1|eapply Heq4]. congr.
+        * econs; try apply SIM3; try apply NORMAL_J.
+        * econs; try apply SIM3; try apply NORMAL_RA.
+        * econs; s; try apply SIM3; try apply STABLE_RA.
+          exploit RAThread.steps_future; try exact STEPS'; try apply x2. s. i. des.
+          exploit wf_ra_thread; try exact WF1_RA; try eapply Heq4. s. i.
+          exploit Stable.future_stable_tview; try eapply STABLE_RA; try apply x12; eauto.
     Qed.
 
     Lemma sim_conf_steps
-          tr1 views1 rels1 c1_pf c1_j c1_ra
-          tr c2_pf
-          (SIM1: sim_conf tr1 views1 rels1 c1_pf c1_j c1_ra)
-          (WF1_PF: wf_pf tr1 c1_pf)
+          views1 rels1 c1_pf c1_j c1_ra
+          c2_pf
+          (SIM1: sim_conf views1 rels1 c1_pf c1_j c1_ra)
+          (WF1_PF: wf_pf c1_pf)
           (WF1_J: wf_j views1 c1_j)
           (WF1_RA: wf_ra rels1 c1_ra)
-          (STEPS: pf_steps_trace L c1_pf c2_pf tr):
+          (STEPS: rtc (pf_all_step L) c1_pf c2_pf):
       (exists c2_j views2 rels2 c2_ra,
           (<<STEPS_RA: RAConfiguration.steps L rels1 rels2 c1_ra c2_ra>>) /\
-          (<<STEPS_J: JConfiguration.steps c1_j c2_j views1 views2>>) /\
-          (<<SIM2: sim_conf (tr1 ++ tr) views2 rels2 c2_pf c2_j c2_ra>>)) \/
-      (exists rels2 rels3 tid c2_ra c3_ra,
-          (<<STEP_RA: RAConfiguration.steps L rels1 rels2 c1_ra c2_ra>>) /\
-          (<<STEP_RA: RAConfiguration.step L MachineEvent.failure tid rels2 rels3 c2_ra c3_ra>>)).
+          (<<STEPS_J: JConfiguration.single_steps c1_j c2_j views1 views2>>) /\
+          (<<SIM2: sim_conf views2 rels2 c2_pf c2_j c2_ra>>)) \/
+      (<<RACE: RARace.ra_race_steps L rels1 c1_ra>>).
     Proof.
-      revert tr1 views1 rels1 c1_j c1_ra SIM1 WF1_PF WF1_J WF1_RA.
+      revert views1 rels1 c1_j c1_ra SIM1 WF1_PF WF1_J WF1_RA.
       induction STEPS; i.
-      { left. esplits; [econs 1|econs 1|]. rewrite List.app_nil_r. eauto. }
-      exploit sim_conf_step; eauto. i. des.
-      - exploit step_pf_future; eauto. i. des.
-        exploit step_j_future; eauto. i. des.
-        exploit step_ra_future; eauto. i. des.
-        exploit IHSTEPS; eauto. i. des.
-        + left. esplits.
-          * econs 2; eauto.
-          * econs 2; eauto.
-          * rewrite List.app_assoc. eauto.
-        + right. esplits.
-          * econs 2; eauto.
-          * eauto.
-      - right. esplits; eauto. econs 1.
+      { left. esplits; try by econs 1. ss. }
+      inv H. exploit sim_conf_step; eauto. i. des; eauto.
+      exploit step_pf_future; eauto. i. des.
+      exploit step_j_future; eauto. i. des.
+      exploit step_ra_future; eauto. i. des.
+      exploit IHSTEPS; eauto. i. des.
+      - left. esplits.
+        + econs 2; eauto.
+        + econs 2; eauto.
+        + ss.
+      - right. unfold RARace.ra_race_steps in *. des.
+        esplits; [econs 2; eauto|..]; eauto.
     Qed.
 
 
     (* racefree *)
 
-    Lemma sim_conf_racefree
-          tr views rels c_pf c_j c_ra
-          (SIM: sim_conf tr views rels c_pf c_j c_ra)
-          (WF_PF: wf_pf tr c_pf)
-          (WF_J: wf_j views c_j)
-          (WF_RA: wf_ra rels c_ra)
-          (RA_RACEFREE: RARace.racefree L rels c_ra):
-      pf_multi_racefree_view L c_pf.
+    Lemma sim_conf_racy_read
+          views1 rels1 c1_pf c1_j c1_ra
+          loc ts e_pf tid c2_pf
+          (SIM1: sim_conf views1 rels1 c1_pf c1_j c1_ra)
+          (WF1_PF: wf_pf c1_pf)
+          (WF1_J: wf_j views1 c1_j)
+          (WF1_RA: wf_ra rels1 c1_ra)
+          (STEP: pf_racy_read_step L loc ts e_pf tid c1_pf c2_pf)
+          (RELS: ~ List.In (loc, ts) rels1):
+      (<<RACE: RARace.ra_race_steps L rels1 c1_ra>>).
     Proof.
-      ii. exploit sim_conf_steps; eauto. i. des; eauto.
-      exploit steps_pf_future; eauto. i. des.
-      exploit steps_j_future; eauto. i. des.
-      exploit steps_ra_future; eauto. i. des.
-      exploit pf_steps_trace_inv; try exact CSTEPS2; eauto; try apply x0. i. des.
-      exploit sim_conf_steps; try exact STEPS; eauto. i. des; cycle 1.
-      { eapply RA_RACEFREE; try eapply STEP_RA0.
-        eapply RAConfiguration.steps_trans; eauto. }
-      exploit steps_pf_future; try exact STEPS; eauto. i. des.
-      exploit steps_j_future; try exact STEPS_J0; eauto. i. des.
-      exploit steps_ra_future; try exact STEPS_RA0; eauto. i. des.
-      subst. inv SIM0. specialize (THS tid). ss.
-      unfold option_rel3 in THS. des_ifs. inv THS.
-      apply inj_pair2 in H1. subst.
-      exploit wf_pf_thread; try exact x3; eauto. s. i.
-      exploit wf_j_thread; try exact x4; eauto. s. i.
-      exploit wf_ra_thread; try exact x5; eauto. s. i.
-      exploit PFtoRAThread.steps_pf_future; try exact THREAD_STEPS; eauto. i. des.
-      hexploit step_promise_consistent; try exact THREAD_STEP; try apply x9; eauto. i.
-      exploit PFtoRAThread.sim_thread_steps; try eapply SIM0; eauto. i. des; cycle 1.
-      { destruct e3_ra. eapply RA_RACEFREE.
-        - eapply RAConfiguration.steps_trans; eauto.
-        - replace MachineEvent.failure with (ThreadEvent.get_machine_event ThreadEvent.failure) by ss.
-          econs; eauto; ss.
-      }
-      exploit PFtoRAThread.steps_j_future; try exact STEPS_J1; eauto. i. des.
-      exploit PFtoRAThread.steps_ra_future;
-        try eapply RAThread.tau_steps_steps; try exact STEPS_RA1; eauto. i. des.
-      exploit PFtoRAThread.sim_thread_step; try exact THREAD_STEP; eauto.
-      { inv READ; ss. }
-      i. des; cycle 1.
-      { destruct e2_ra0. eapply RA_RACEFREE.
-        - eapply RAConfiguration.steps_trans; eauto.
-        - replace MachineEvent.failure with (ThreadEvent.get_machine_event ThreadEvent.failure) by ss.
-          econs; eauto; ss.
-      }
-      inv STEP_RA; cycle 1.
-      { destruct e2_ra0. eapply RA_RACEFREE.
-        - eapply RAConfiguration.steps_trans; eauto.
-        - replace MachineEvent.failure with (ThreadEvent.get_machine_event ThreadEvent.failure) by ss.
-          econs; eauto; ss. econs 2; eauto.
-      }
-      inv READ; inv EVENT_J; inv EVENT_RA; ss.
-      - destruct e2_ra0. eapply RA_RACEFREE.
-        + eapply RAConfiguration.steps_trans; eauto.
-        + replace MachineEvent.failure with (ThreadEvent.get_machine_event ThreadEvent.failure) by ss.
-          econs; eauto; ss. econs 2; eauto; ss.
-          * inv SIM1. inv SIM_JOINED. inv SIM_RA.
-            apply inj_pair2 in H3. apply inj_pair2 in H4. subst. ss.
-            eapply PFtoRASimThread.sim_local_promise_consistent; eauto.
-            eapply JSim.sim_local_promise_consistent; eauto.
-          * unfold RARace.ra_race. splits; ss.
-            { inv SIM1. inv SIM_JOINED. inv SIM_RA.
-              apply inj_pair2 in H3. apply inj_pair2 in H4. subst. ss.
-              inv LOCAL0. inv TVIEW. rewrite CUR.
-              eapply TimeFacts.le_lt_lt; eauto. condtac.
-              - inv LOCAL. inv TVIEW. inv CUR0. apply RLX.
-              - inv LOCAL. inv TVIEW. inv CUR0.
-                inv NORMAL_J. inv NORMAL_TVIEW. ss. rewrite CUR0; ss. }
-            { left. ii. inv WRITE.
-              - eapply SIM_TR2; eauto.
-                + do 2 (apply List.in_or_app; left).
-                  apply List.in_or_app. right. eauto.
-                + ss.
-              - eapply SIM_TR2; eauto.
-                + do 2 (apply List.in_or_app; left).
-                  apply List.in_or_app. right. eauto.
-                + ss. }
-      - destruct e2_ra0. eapply RA_RACEFREE.
-        + eapply RAConfiguration.steps_trans; eauto.
-        + replace MachineEvent.failure with (ThreadEvent.get_machine_event ThreadEvent.failure) by ss.
-          econs; eauto; ss. econs 2; eauto; ss.
-          * inv SIM1. inv SIM_JOINED. inv SIM_RA.
-            apply inj_pair2 in H3. apply inj_pair2 in H4. subst. ss.
-            eapply PFtoRASimThread.sim_local_promise_consistent; eauto.
-            eapply JSim.sim_local_promise_consistent; eauto.
-          * unfold RARace.ra_race. splits; ss.
-            { inv SIM1. inv SIM_JOINED. inv SIM_RA.
-              apply inj_pair2 in H3. apply inj_pair2 in H4. subst. ss.
-              inv LOCAL0. inv TVIEW. rewrite CUR.
-              eapply TimeFacts.le_lt_lt; eauto. condtac.
-              - inv LOCAL. inv TVIEW. inv CUR0. apply RLX.
-              - inv LOCAL. inv TVIEW. inv CUR0.
-                inv NORMAL_J. inv NORMAL_TVIEW. ss. rewrite CUR0; ss. }
-            { left. ii. inv WRITE.
-              - eapply SIM_TR2; eauto.
-                + do 2 (apply List.in_or_app; left).
-                  apply List.in_or_app. right. eauto.
-                + ss.
-              - eapply SIM_TR2; eauto.
-                + do 2 (apply List.in_or_app; left).
-                  apply List.in_or_app. right. eauto.
-                + ss. }
-    Qed.
+      inv STEP. inv SIM1. ss.
+      specialize (THS tid). unfold option_rel3 in THS. des_ifs.
+      inv THS. apply inj_pair2 in H1. subst.
+      exploit wf_pf_thread; eauto. s. i.
+      exploit wf_j_thread; eauto. s. i.
+      exploit wf_ra_thread; eauto. s. i.
+    Admitted.
+
+    (* Lemma sim_conf_racefree *)
+    (*       views rels c_pf c_j c_ra *)
+    (*       (SIM: sim_conf views rels c_pf c_j c_ra) *)
+    (*       (WF_PF: wf_pf c_pf) *)
+    (*       (WF_J: wf_j views c_j) *)
+    (*       (WF_RA: wf_ra rels c_ra) *)
+    (*       (RA_RACEFREE: RARace.racefree L rels c_ra): *)
+    (*   pf_racefree_view L c_pf. *)
+    (* Proof. *)
+    (*   ii. exploit sim_conf_steps; eauto. i. des; cycle 1. *)
+    (*   { unfold RARace.ra_race_steps in *. des. eauto. } *)
+    (*   exploit steps_pf_future; eauto. i. des. *)
+    (*   exploit steps_j_future; eauto. i. des. *)
+    (*   exploit steps_ra_future; eauto. i. des. *)
+    (*   inv WRITE. *)
+    (*   exploit sim_conf_step; try exact STEP; eauto. i. des; cycle 1. *)
+    (*   { unfold RARace.ra_race_steps in *. des. *)
+    (*     eapply RA_RACEFREE; cycle 1; eauto. *)
+    (*     eapply RAConfiguration.steps_trans; eauto. } *)
+    (*   assert (WRITE_RA: ~ List.In (loc, ts) rels0). *)
+    (*   { admit. } *)
+    (*   exploit step_pf_future; try exact STEP; eauto. i. des. *)
+    (*   exploit step_j_future; try exact STEP_J; eauto. i. des. *)
+    (*   exploit step_ra_future; try exact STEP_RA; eauto. i. des. *)
+    (*   exploit sim_conf_steps; try exact CSTEPS2; eauto. i. des; cycle 1. *)
+    (*   { unfold RARace.ra_race_steps in *. des. *)
+    (*     eapply RA_RACEFREE; cycle 1; eauto. *)
+    (*     eapply RAConfiguration.steps_trans; [eauto|]. *)
+    (*     econs 2; eauto. } *)
+    (*   exploit steps_pf_future; try exact CSTEPS2; eauto. i. des. *)
+    (*   exploit steps_j_future; try exact STEPS_J0; eauto. i. des. *)
+    (*   exploit steps_ra_future; try exact STEPS_RA0; eauto. i. des. *)
+    (*   assert (READ_RA: ~ List.In (loc, ts) rels1). *)
+    (*   { admit. } *)
+
+    (*   inv  *)
+
+    (*   exploit sim_conf_step; try exact x9; eauto. i. des; cycle 1. *)
+    (*   { unfold RARace.ra_race_steps in *. des. *)
+    (*     eapply RA_RACEFREE; cycle 1; eauto. *)
+    (*     eapply RAConfiguration.steps_trans; [eauto|]. *)
+    (*     eapply RAConfiguration.steps_trans; [|eauto]. *)
+    (*     econs; eauto. } *)
+    (*   inv STEP_RA0. eapply RA_RACEFREE. *)
+    (*   - eapply RAConfiguration.steps_trans; [eauto|]. *)
+    (*     econs 2; eauto. *)
+    (*   - eauto. *)
+    (*   -  *)
+
+    (*   exploit pf_steps_trace_inv; try exact CSTEPS2; eauto; try apply x0. i. des. *)
+    (*   exploit sim_conf_steps; try exact STEPS; eauto. i. des; cycle 1. *)
+    (*   { eapply RA_RACEFREE; try eapply STEP_RA0. *)
+    (*     eapply RAConfiguration.steps_trans; eauto. } *)
+    (*   exploit steps_pf_future; try exact STEPS; eauto. i. des. *)
+    (*   exploit steps_j_future; try exact STEPS_J0; eauto. i. des. *)
+    (*   exploit steps_ra_future; try exact STEPS_RA0; eauto. i. des. *)
+    (*   subst. inv SIM0. specialize (THS tid). ss. *)
+    (*   unfold option_rel3 in THS. des_ifs. inv THS. *)
+    (*   apply inj_pair2 in H1. subst. *)
+    (*   exploit wf_pf_thread; try exact x3; eauto. s. i. *)
+    (*   exploit wf_j_thread; try exact x4; eauto. s. i. *)
+    (*   exploit wf_ra_thread; try exact x5; eauto. s. i. *)
+    (*   exploit PFtoRAThread.steps_pf_future; try exact THREAD_STEPS; eauto. i. des. *)
+    (*   hexploit step_promise_consistent; try exact THREAD_STEP; try apply x9; eauto. i. *)
+    (*   exploit PFtoRAThread.sim_thread_steps; try eapply SIM0; eauto. i. des; cycle 1. *)
+    (*   { destruct e3_ra. eapply RA_RACEFREE. *)
+    (*     - eapply RAConfiguration.steps_trans; eauto. *)
+    (*     - replace MachineEvent.failure with (ThreadEvent.get_machine_event ThreadEvent.failure) by ss. *)
+    (*       econs; eauto; ss. *)
+    (*   } *)
+    (*   exploit PFtoRAThread.steps_j_future; try exact STEPS_J1; eauto. i. des. *)
+    (*   exploit PFtoRAThread.steps_ra_future; *)
+    (*     try eapply RAThread.tau_steps_steps; try exact STEPS_RA1; eauto. i. des. *)
+    (*   exploit PFtoRAThread.sim_thread_step; try exact THREAD_STEP; eauto. *)
+    (*   { inv READ; ss. } *)
+    (*   i. des; cycle 1. *)
+    (*   { destruct e2_ra0. eapply RA_RACEFREE. *)
+    (*     - eapply RAConfiguration.steps_trans; eauto. *)
+    (*     - replace MachineEvent.failure with (ThreadEvent.get_machine_event ThreadEvent.failure) by ss. *)
+    (*       econs; eauto; ss. *)
+    (*   } *)
+    (*   inv STEP_RA; cycle 1. *)
+    (*   { destruct e2_ra0. eapply RA_RACEFREE. *)
+    (*     - eapply RAConfiguration.steps_trans; eauto. *)
+    (*     - replace MachineEvent.failure with (ThreadEvent.get_machine_event ThreadEvent.failure) by ss. *)
+    (*       econs; eauto; ss. econs 2; eauto. *)
+    (*   } *)
+    (*   inv READ; inv EVENT_J; inv EVENT_RA; ss. *)
+    (*   - destruct e2_ra0. eapply RA_RACEFREE. *)
+    (*     + eapply RAConfiguration.steps_trans; eauto. *)
+    (*     + replace MachineEvent.failure with (ThreadEvent.get_machine_event ThreadEvent.failure) by ss. *)
+    (*       econs; eauto; ss. econs 2; eauto; ss. *)
+    (*       * inv SIM1. inv SIM_JOINED. inv SIM_RA. *)
+    (*         apply inj_pair2 in H3. apply inj_pair2 in H4. subst. ss. *)
+    (*         eapply PFtoRASimThread.sim_local_promise_consistent; eauto. *)
+    (*         eapply JSim.sim_local_promise_consistent; eauto. *)
+    (*       * unfold RARace.ra_race. splits; ss. *)
+    (*         { inv SIM1. inv SIM_JOINED. inv SIM_RA. *)
+    (*           apply inj_pair2 in H3. apply inj_pair2 in H4. subst. ss. *)
+    (*           inv LOCAL0. inv TVIEW. rewrite CUR. *)
+    (*           eapply TimeFacts.le_lt_lt; eauto. condtac. *)
+    (*           - inv LOCAL. inv TVIEW. inv CUR0. apply RLX. *)
+    (*           - inv LOCAL. inv TVIEW. inv CUR0. *)
+    (*             inv NORMAL_J. inv NORMAL_TVIEW. ss. rewrite CUR0; ss. } *)
+    (*         { left. ii. inv WRITE. *)
+    (*           - eapply SIM_TR2; eauto. *)
+    (*             + do 2 (apply List.in_or_app; left). *)
+    (*               apply List.in_or_app. right. eauto. *)
+    (*             + ss. *)
+    (*           - eapply SIM_TR2; eauto. *)
+    (*             + do 2 (apply List.in_or_app; left). *)
+    (*               apply List.in_or_app. right. eauto. *)
+    (*             + ss. } *)
+    (*   - destruct e2_ra0. eapply RA_RACEFREE. *)
+    (*     + eapply RAConfiguration.steps_trans; eauto. *)
+    (*     + replace MachineEvent.failure with (ThreadEvent.get_machine_event ThreadEvent.failure) by ss. *)
+    (*       econs; eauto; ss. econs 2; eauto; ss. *)
+    (*       * inv SIM1. inv SIM_JOINED. inv SIM_RA. *)
+    (*         apply inj_pair2 in H3. apply inj_pair2 in H4. subst. ss. *)
+    (*         eapply PFtoRASimThread.sim_local_promise_consistent; eauto. *)
+    (*         eapply JSim.sim_local_promise_consistent; eauto. *)
+    (*       * unfold RARace.ra_race. splits; ss. *)
+    (*         { inv SIM1. inv SIM_JOINED. inv SIM_RA. *)
+    (*           apply inj_pair2 in H3. apply inj_pair2 in H4. subst. ss. *)
+    (*           inv LOCAL0. inv TVIEW. rewrite CUR. *)
+    (*           eapply TimeFacts.le_lt_lt; eauto. condtac. *)
+    (*           - inv LOCAL. inv TVIEW. inv CUR0. apply RLX. *)
+    (*           - inv LOCAL. inv TVIEW. inv CUR0. *)
+    (*             inv NORMAL_J. inv NORMAL_TVIEW. ss. rewrite CUR0; ss. } *)
+    (*         { left. ii. inv WRITE. *)
+    (*           - eapply SIM_TR2; eauto. *)
+    (*             + do 2 (apply List.in_or_app; left). *)
+    (*               apply List.in_or_app. right. eauto. *)
+    (*             + ss. *)
+    (*           - eapply SIM_TR2; eauto. *)
+    (*             + do 2 (apply List.in_or_app; left). *)
+    (*               apply List.in_or_app. right. eauto. *)
+    (*             + ss. } *)
+    (* Qed. *)
 
 
     (* behaviors *)
 
-    Lemma sim_conf_behavior
-          tr views rels c_pf c_j c_ra
-          (SIM: sim_conf tr views rels c_pf c_j c_ra)
-          (WF_PF: wf_pf tr c_pf)
-          (WF_J: wf_j views c_j)
-          (WF_RA: wf_ra rels c_ra)
-          (RACEFREE: RARace.racefree L rels c_ra):
-      behaviors (pf_multi_step L) c_pf <1=
-      behaviors (@OrdConfiguration.step L Ordering.acqrel) c_ra.
-    Proof.
-      i. revert tr views rels c_j c_ra SIM WF_PF WF_J WF_RA RACEFREE.
-      induction PR; i.
-      - econs 1. eapply sim_conf_terminal; eauto.
-      - inv STEP. exploit sim_conf_step; eauto. i. des.
-        + exploit RARace.racefree_step_ord_step; eauto; try apply WF_RA. i.
-          econs 2; eauto.
-          hexploit RARace.step_racefree; eauto. i.
-          exploit step_pf_future; eauto. i. des.
-          exploit step_j_future; eauto. i. des.
-          exploit step_ra_future; eauto.
-        + exfalso. eapply RACEFREE; eauto. econs 1.
-      - inv STEP. exploit sim_conf_step; eauto. i. des.
-        + exfalso. eapply RACEFREE; eauto. econs 1.
-        + exfalso. eapply RACEFREE; eauto. econs 1.
-      - inv STEP. exploit sim_conf_step; eauto. i. des.
-        + exploit RARace.racefree_step_ord_step; eauto; try apply WF_RA. i.
-          econs 4; eauto.
-          hexploit RARace.step_racefree; eauto. i.
-          exploit step_pf_future; eauto. i. des.
-          exploit step_j_future; eauto. i. des.
-          exploit step_ra_future; eauto.
-        + exfalso. eapply RACEFREE; eauto. econs 1.
-    Qed.
+    (* Lemma sim_conf_behavior *)
+    (*       tr views rels c_pf c_j c_ra *)
+    (*       (SIM: sim_conf tr views rels c_pf c_j c_ra) *)
+    (*       (WF_PF: wf_pf tr c_pf) *)
+    (*       (WF_J: wf_j views c_j) *)
+    (*       (WF_RA: wf_ra rels c_ra) *)
+    (*       (RACEFREE: RARace.racefree L rels c_ra): *)
+    (*   behaviors (pf_multi_step L) c_pf <1= *)
+    (*   behaviors (@OrdConfiguration.step L Ordering.acqrel) c_ra. *)
+    (* Proof. *)
+    (*   i. revert tr views rels c_j c_ra SIM WF_PF WF_J WF_RA RACEFREE. *)
+    (*   induction PR; i. *)
+    (*   - econs 1. eapply sim_conf_terminal; eauto. *)
+    (*   - inv STEP. exploit sim_conf_step; eauto. i. des. *)
+    (*     + exploit RARace.racefree_step_ord_step; eauto; try apply WF_RA. i. *)
+    (*       econs 2; eauto. *)
+    (*       hexploit RARace.step_racefree; eauto. i. *)
+    (*       exploit step_pf_future; eauto. i. des. *)
+    (*       exploit step_j_future; eauto. i. des. *)
+    (*       exploit step_ra_future; eauto. *)
+    (*     + exfalso. eapply RACEFREE; eauto. econs 1. *)
+    (*   - inv STEP. exploit sim_conf_step; eauto. i. des. *)
+    (*     + exfalso. eapply RACEFREE; eauto. econs 1. *)
+    (*     + exfalso. eapply RACEFREE; eauto. econs 1. *)
+    (*   - inv STEP. exploit sim_conf_step; eauto. i. des. *)
+    (*     + exploit RARace.racefree_step_ord_step; eauto; try apply WF_RA. i. *)
+    (*       econs 4; eauto. *)
+    (*       hexploit RARace.step_racefree; eauto. i. *)
+    (*       exploit step_pf_future; eauto. i. des. *)
+    (*       exploit step_j_future; eauto. i. des. *)
+    (*       exploit step_ra_future; eauto. *)
+    (*     + exfalso. eapply RACEFREE; eauto. econs 1. *)
+    (* Qed. *)
+
   End PFtoRA.
 End PFtoRA.

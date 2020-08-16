@@ -372,6 +372,33 @@ Module PFtoRAThread.
       exploit RAThread.step_future; eauto. i. des. eauto.
     Qed.
 
+    Lemma opt_step_pf_future
+          e e1 e2
+          (WF1: wf_pf e1)
+          (STEP: Thread.opt_step e e1 e2):
+      <<WF2_PF: wf_pf e2>>.
+    Proof.
+      inv STEP; eauto using step_pf_future.
+    Qed.
+
+    Lemma opt_step_j_future
+          e e1 e2 views1 views2
+          (WF1: wf_j views1 e1)
+          (STEP: JThread.opt_step e e1 e2 views1 views2):
+      <<WF2_J: wf_j views2 e2>>.
+    Proof.
+      inv STEP; eauto using step_j_future.
+    Qed.
+
+    Lemma opt_step_ra_future
+          rels1 rels2 e e1 e2
+          (WF1: wf_ra rels1 e1)
+          (STEP: RAThread.opt_step L rels1 rels2 e e1 e2):
+      <<WF2_RA: wf_ra rels2 e2>>.
+    Proof.
+      inv STEP; eauto using step_ra_future.
+    Qed.
+
     Lemma reserve_step_pf_future
           e1 e2
           (WF1: wf_pf e1)
@@ -832,6 +859,122 @@ Module PFtoRAThread.
       - right. esplits; eauto. econs 1.
     Qed.
 
+    Lemma sim_thread_reserve_step
+          views1 rels1 e1_pf e1_j e1_ra
+          e2_pf
+          (SIM1: sim_thread views1 rels1 e1_pf e1_j e1_ra)
+          (WF1_PF: wf_pf e1_pf)
+          (WF1_J: wf_j views1 e1_j)
+          (WF1_RA: wf_ra rels1 e1_ra)
+          (STEP: Thread.reserve_step e1_pf e2_pf)
+          (CONS: Local.promise_consistent e2_pf.(Thread.local)):
+      exists e2_j e2_ra,
+        (<<STEP_J: JThread.reserve_step views1 e1_j e2_j>>) /\
+        (<<STEP_RA: Thread.reserve_step e1_ra e2_ra>>) /\
+        (<<SIM2: sim_thread views1 rels1 e2_pf e2_j e2_ra>>).
+    Proof.
+      exploit JSim.sim_thread_reserve_step;
+        try eapply SIM1; try eapply WF1_PF; try eapply WF1_J; eauto.
+      i. des. inv STEP0. inv STEP1.
+      exploit PFtoRASimThread.reserve_step;
+        try eapply SIM1; try eapply WF1_J; try eapply WF1_RA.
+      { econs; eauto. }
+      i. des.
+      esplits; eauto.
+      exploit Thread.rtc_reserve_step_future; [econs 2|..];
+        try eapply STEP_SRC; try eapply WF1_RA; eauto. i. des.
+      hexploit future_closed_views; try eapply SIM1; eauto. i.
+      hexploit future_stable_views; try eapply SIM1; eauto. i.
+      econs; eauto. apply SIM1.
+    Qed.
+
+    Lemma sim_thread_reserve_steps
+          views1 rels1 e1_pf e1_j e1_ra
+          e2_pf
+          (SIM1: sim_thread views1 rels1 e1_pf e1_j e1_ra)
+          (WF1_PF: wf_pf e1_pf)
+          (WF1_J: wf_j views1 e1_j)
+          (WF1_RA: wf_ra rels1 e1_ra)
+          (STEP: rtc (@Thread.reserve_step _) e1_pf e2_pf)
+          (CONS: Local.promise_consistent e2_pf.(Thread.local)):
+      exists e2_j e2_ra,
+        (<<STEP_J: rtc (@JThread.reserve_step views1 _) e1_j e2_j>>) /\
+        (<<STEP_RA: rtc (@Thread.reserve_step _) e1_ra e2_ra>>) /\
+        (<<SIM2: sim_thread views1 rels1 e2_pf e2_j e2_ra>>).
+    Proof.
+      revert e1_j e1_ra SIM1 WF1_PF WF1_J WF1_RA.
+      induction STEP; i; [esplits; eauto|].
+      exploit sim_thread_reserve_step; eauto.
+      { eapply rtc_reserve_step_promise_consistent; eauto. }
+      i. des.
+      exploit reserve_step_pf_future; eauto. i.
+      exploit reserve_step_j_future; eauto. i.
+      exploit reserve_step_ra_future; eauto. i.
+      exploit IHSTEP; eauto. i. des.
+      esplits.
+      - econs 2; eauto.
+      - econs 2; eauto.
+      - ss.
+    Qed.
+
+    Lemma sim_thread_cancel_step
+          views1 rels1 e1_pf e1_j e1_ra
+          e2_pf
+          (SIM1: sim_thread views1 rels1 e1_pf e1_j e1_ra)
+          (WF1_PF: wf_pf e1_pf)
+          (WF1_J: wf_j views1 e1_j)
+          (WF1_RA: wf_ra rels1 e1_ra)
+          (STEP: Thread.cancel_step e1_pf e2_pf)
+          (CONS: Local.promise_consistent e2_pf.(Thread.local)):
+      exists e2_j e2_ra,
+        (<<STEP_J: JThread.cancel_step views1 e1_j e2_j>>) /\
+        (<<STEP_RA: Thread.cancel_step e1_ra e2_ra>>) /\
+        (<<SIM2: sim_thread views1 rels1 e2_pf e2_j e2_ra>>).
+    Proof.
+      exploit JSim.sim_thread_cancel_step;
+        try eapply SIM1; try eapply WF1_PF; try eapply WF1_J; eauto.
+      i. des. inv STEP0. inv STEP1.
+      exploit PFtoRASimThread.cancel_step;
+        try eapply SIM1; try eapply WF1_J; try eapply WF1_RA.
+      { econs; eauto. }
+      i. des.
+      esplits; eauto.
+      exploit Thread.rtc_cancel_step_future; [econs 2|..];
+        try eapply STEP_SRC; try eapply WF1_RA; eauto. i. des.
+      hexploit future_closed_views; try eapply SIM1; eauto. i.
+      hexploit future_stable_views; try eapply SIM1; eauto. i.
+      econs; eauto. apply SIM1.
+    Qed.
+
+    Lemma sim_thread_cancel_steps
+          views1 rels1 e1_pf e1_j e1_ra
+          e2_pf
+          (SIM1: sim_thread views1 rels1 e1_pf e1_j e1_ra)
+          (WF1_PF: wf_pf e1_pf)
+          (WF1_J: wf_j views1 e1_j)
+          (WF1_RA: wf_ra rels1 e1_ra)
+          (STEP: rtc (@Thread.cancel_step _) e1_pf e2_pf)
+          (CONS: Local.promise_consistent e2_pf.(Thread.local)):
+      exists e2_j e2_ra,
+        (<<STEP_J: rtc (@JThread.cancel_step views1 _) e1_j e2_j>>) /\
+        (<<STEP_RA: rtc (@Thread.cancel_step _) e1_ra e2_ra>>) /\
+        (<<SIM2: sim_thread views1 rels1 e2_pf e2_j e2_ra>>).
+    Proof.
+      revert e1_j e1_ra SIM1 WF1_PF WF1_J WF1_RA.
+      induction STEP; i; [esplits; eauto|].
+      exploit sim_thread_cancel_step; eauto.
+      { eapply rtc_cancel_step_promise_consistent; eauto. }
+      i. des.
+      exploit cancel_step_pf_future; eauto. i.
+      exploit cancel_step_j_future; eauto. i.
+      exploit cancel_step_ra_future; eauto. i.
+      exploit IHSTEP; eauto. i. des.
+      esplits.
+      - econs 2; eauto.
+      - econs 2; eauto.
+      - ss.
+    Qed.
+
     (* Lemma sim_thread_plus_step *)
     (*       tr1 views1 rels1 e1_pf e1_j e1_ra *)
     (*       tr e2_pf pf e_pf e3_pf *)
@@ -1005,7 +1148,7 @@ Module PFtoRAThread.
           (WF1_RA: wf_ra rels1 e1_ra)
           (CONSISTENT: pf_consistent L e1_pf):
       (<<CONSISTENT_J: JThread.consistent e1_j views1>>) /\
-      ((<<CONSISTENT_RA: RAThread.consistent L rels1 e1_ra>>) \/
+      ((<<CONSISTENT_RA: OrdThread.consistent L Ordering.acqrel e1_ra>>) \/
        exists rels2 rels3 e_ra e2_ra e3_ra loc to val released ord,
          (<<STEPS_RA: RAThread.tau_steps L rels1 rels2 e1_ra e2_ra>>) /\
          (<<CONS: Local.promise_consistent e2_ra.(Thread.local)>>) /\
@@ -1043,7 +1186,9 @@ Module PFtoRAThread.
             exploit Memory.cap_inj; [exact CAP2|exact CAP1|..]; try apply WF1_RA. i. subst.
             exploit Memory.max_concrete_timemap_inj; [exact SC_MAX|exact x5|]. i. subst.
             inv EVENT_J; inv EVENT_RA.
-            unfold RAThread.steps_failure. esplits; eauto.
+            exploit RAThread.tau_steps_ord_tau_steps; try exact STEPS_RA. i.
+            inv STEP_RA. dup STEP. inv STEP0; [inv STEP1|].
+            unfold OrdThread.steps_failure. esplits; eauto.
           * right.
             exploit RAThread.cap_plus_step_current_plus_step;
               try exact STEPS_RA; eauto; try apply WF1_RA. i. des.
@@ -1070,6 +1215,7 @@ Module PFtoRAThread.
         + left. ii. right.
           exploit Memory.cap_inj; [exact CAP2|exact CAP1|..]; try apply WF1_RA. i. subst.
           exploit Memory.max_concrete_timemap_inj; [exact SC_MAX|exact x5|]. i. subst.
+          exploit RAThread.tau_steps_ord_tau_steps; try exact STEPS_RA. i.
           esplits; eauto.
           inv SIM2. inv SIM_JOINED.
           apply inj_pair2 in H2. apply inj_pair2 in H3. subst. ss.
