@@ -769,6 +769,7 @@ Proof.
       i. inv H. econs; eauto. }
     i. des; ss.
     eapply RACEFREE.
+    { eauto. }
     { eapply CSTEPS. }
     { econs; eauto. }
     { eapply rtc_implies; try apply STEPS.
@@ -776,6 +777,7 @@ Proof.
     { eauto. }
   }
   { eapply RACEFREE.
+    { eauto. }
     { eapply CSTEPS. }
     { econs; eauto. }
     { eapply rtc_implies; try apply STEPS0.

@@ -1218,10 +1218,11 @@ Proof.
 
   Definition pf_racefree_view (c0: Configuration.t): Prop :=
     forall c1 c2 c3 c4 loc ts e0 e1 tid0 tid1
-           (CSTEPS1: rtc pf_all_step c0 c1)
-           (WRITE: pf_racy_write_step loc ts e0 tid0 c1 c2)
-           (CSTEPS2: rtc pf_all_step c2 c3)
-           (READ: pf_racy_read_step loc ts e1 tid1 c3 c4),
+      (LOC: L loc)
+      (CSTEPS1: rtc pf_all_step c0 c1)
+      (WRITE: pf_racy_write_step loc ts e0 tid0 c1 c2)
+      (CSTEPS2: rtc pf_all_step c2 c3)
+      (READ: pf_racy_read_step loc ts e1 tid1 c3 c4),
       False.
 
   Lemma step_pf_racefree_view c0 c1 e tid
@@ -1230,7 +1231,7 @@ Proof.
     :
       pf_racefree_view c1.
   Proof.
-    ii. eapply RACEFREE; cycle 1; eauto.
+    ii. eapply RACEFREE; cycle 2; eauto.
   Qed.
 
   Lemma steps_pf_racefree_view c0 c1
@@ -1239,7 +1240,7 @@ Proof.
     :
       pf_racefree_view c1.
   Proof.
-    ii. eapply RACEFREE; cycle 1; eauto. etrans; eauto.
+    ii. eapply RACEFREE; cycle 2; eauto. etrans; eauto.
   Qed.
 
 End LOCALPF.
