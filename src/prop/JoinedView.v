@@ -962,6 +962,33 @@ Module JConfiguration.
     inv STEP. eapply single_step_future; eauto.
   Qed.
 
+  Inductive single_steps: forall (c1 c2: Configuration.t) (views1 views2: Loc.t -> Time.t -> list View.t), Prop :=
+  | single_steps_refl
+      c views:
+      single_steps c c views views
+  | single_steps_step
+      e tid c1 c2 c3 views1 views2 views3
+      (STEP: single_step e tid c1 c2 views1 views2)
+      (STEPS: single_steps c2 c3 views2 views3):
+      single_steps c1 c3 views1 views3
+  .
+  Hint Constructors single_steps.
+
+  Lemma single_steps_future
+        c1 c2 views1 views2
+        (STEPS: single_steps c1 c2 views1 views2)
+        (WF1: wf views1 c1):
+      (<<WF2: wf views2 c2>>) /\
+      (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
+      (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
+      (<<VIEWS_FUTURE: views_le views1 views2>>).
+  Proof.
+    revert WF1. induction STEPS; i.
+    - splits; ss; refl.
+    - exploit single_step_future; eauto. i. des.
+      exploit IHSTEPS; eauto. i. des.
+      splits; ss; etrans; eauto.
+  Qed.
 End JConfiguration.
 
 
