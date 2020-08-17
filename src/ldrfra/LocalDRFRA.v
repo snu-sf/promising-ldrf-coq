@@ -23,9 +23,10 @@ Require Import Thread.
 Require Import Configuration.
 Require Import Behavior.
 
+Require Import Single.
 Require Import JoinedView.
 
-Require Import LocalPFViewMulti.
+Require Import LocalPFView.
 
 Require Import OrdStep.
 Require Import Stable.
@@ -36,18 +37,18 @@ Require Import PFtoRA.
 Set Implicit Arguments.
 
 
-(* Theorem local_drf_ra *)
-(*         L s *)
-(*         (RACEFREE: RARace.racefree_syn L s): *)
-(*   behaviors Configuration.step (Configuration.init s) <1= *)
-(*   behaviors (@OrdConfiguration.step L Ordering.acqrel) (Configuration.init s). *)
-(* Proof. *)
-(*   i. *)
-(*   specialize (PFtoRA.init_sim_conf L s). intro SIM. *)
-(*   specialize (PFtoRA.init_wf_pf L s). intro WF_PF. *)
-(*   specialize (PFtoRA.init_wf_j s). intro WF_J. *)
-(*   specialize (PFtoRA.init_wf_ra s). intro WF_RA. *)
-(*   ii. exploit (@local_DRFPF L); eauto. *)
-(*   { eapply PFtoRA.sim_conf_racefree; eauto. } *)
-(*   eapply PFtoRA.sim_conf_behavior; eauto. *)
-(* Qed. *)
+Theorem local_drf_ra
+        L s
+        (RACEFREE: RARace.racefree_syn L s):
+  behaviors SConfiguration.machine_step (Configuration.init s) <1=
+  behaviors (@OrdConfiguration.step L Ordering.acqrel) (Configuration.init s).
+Proof.
+  i.
+  specialize (PFtoRA.init_sim_conf L s). intro SIM.
+  specialize (PFtoRA.init_wf_pf L s). intro WF_PF.
+  specialize (PFtoRA.init_wf_j s). intro WF_J.
+  specialize (PFtoRA.init_wf_ra s). intro WF_RA.
+  ii. exploit (@local_DRFPF_view L); eauto.
+  { eapply PFtoRA.sim_conf_racefree; eauto. }
+  eapply PFtoRA.sim_conf_behavior; eauto.
+Qed.

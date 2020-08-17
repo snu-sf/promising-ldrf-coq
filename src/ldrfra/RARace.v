@@ -657,7 +657,7 @@ Module RARace.
         c2 lang st2 lc2 e loc to val released ord e3 e4
         (STEPS: RAConfiguration.steps L rels rels2 c c2)
         (TID: IdentMap.find tid c2.(Configuration.threads) = Some (existT _ lang st2, lc2))
-        (THREAD_STEPS: RAThread.tau_steps L rels2 rels3
+        (THREAD_STEPS: RAThread.steps L rels2 rels3
                                           (Thread.mk _ st2 lc2 c2.(Configuration.sc) c2.(Configuration.memory)) e3)
         (CONS: Local.promise_consistent e3.(Thread.local))
         (THREAD_STEP: RAThread.step L rels3 rels4 e e3 e4)
@@ -679,9 +679,8 @@ Module RARace.
 
     Lemma step_ord_step
           e tid rels1 rels2 c1 c2
-          (WF1: Configuration.wf c1)
           (STEP: RAConfiguration.step L e tid rels1 rels2 c1 c2):
-      OrdConfiguration.step L Ordering.acqrel e tid c1 c2.
+      OrdConfiguration.step L Ordering.acqrel (ThreadEvent.get_machine_event e) tid c1 c2.
     Proof.
       inv STEP. econs; eauto. inv STEP0.
       - econs 1.

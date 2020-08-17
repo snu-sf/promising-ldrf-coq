@@ -583,7 +583,7 @@ Module OrdConfiguration.
     Variable L: Loc.t -> bool.
     Variable ordc: Ordering.t.
 
-    Inductive step: forall (e:ThreadEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
+    Inductive step: forall (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
     | step_intro
         e tid c1 lang st1 lc1 e2 e3 st4 lc4 sc4 memory4
         (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
@@ -592,7 +592,8 @@ Module OrdConfiguration.
         (RESERVES: rtc (@Thread.reserve_step _) e3 (Thread.mk _ st4 lc4 sc4 memory4))
         (CONSISTENT: e <> ThreadEvent.failure ->
                      OrdThread.consistent L ordc (Thread.mk _ st4 lc4 sc4 memory4)):
-        step e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) c1.(Configuration.threads)) sc4 memory4)
+        step (ThreadEvent.get_machine_event e) tid
+             c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) c1.(Configuration.threads)) sc4 memory4)
     .
     Hint Constructors step.
   End OrdConfiguration.
