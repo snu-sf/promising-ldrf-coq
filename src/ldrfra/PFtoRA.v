@@ -582,7 +582,16 @@ Module PFtoRA.
         eapply RA_RACEFREE; cycle 1; eauto.
         eapply RAConfiguration.steps_trans; eauto. }
       assert (WRITE_RA: ~ List.In (loc, ts) rels0).
-      { admit. }
+      { inv WRITE0; inv EVENT_J; inv EVENT_RA; ss.
+        - hexploit RAConfiguration.write_rels; try exact STEP_RA; try eapply x2; ss. i.
+          inv STEP_RA. inv STEP0; ss. inv STEP1.
+          unfold ReleaseWrites.append. ss. condtac; ss. condtac; ss.
+          destruct ordw; ss.
+        - hexploit RAConfiguration.write_rels; try exact STEP_RA; try eapply x2; ss. i.
+          inv STEP_RA. inv STEP0; ss. inv STEP1.
+          unfold ReleaseWrites.append. ss. condtac; ss. condtac; ss.
+          destruct ordw; ss.
+      }
       exploit step_pf_future; try exact STEP; eauto. i. des.
       exploit step_j_future; try exact STEP_J; eauto. i. des.
       exploit step_ra_future; try exact STEP_RA; eauto. i. des.
@@ -595,13 +604,18 @@ Module PFtoRA.
       exploit steps_j_future; try exact STEPS_J0; eauto. i. des.
       exploit steps_ra_future; try exact STEPS_RA0; eauto. i. des.
       assert (READ_RA: ~ List.In (loc, ts) rels1).
-      { admit. }
+      { inv WRITE0; inv EVENT_J; inv EVENT_RA; ss.
+        - exploit RAConfiguration.write_get_None; try exact STEP_RA; ss; try apply x2. i. des.
+          eapply RAConfiguration.steps_rels; eauto.
+        - exploit RAConfiguration.write_get_None; try exact STEP_RA; ss; try apply x2. i. des.
+          eapply RAConfiguration.steps_rels; eauto.
+      }
       exploit sim_conf_racy_read; eauto. unfold RARace.ra_race_steps. i. des.
       eapply RA_RACEFREE; cycle 1; eauto.
       eapply RAConfiguration.steps_trans; eauto.
       eapply RAConfiguration.steps_trans; eauto.
       econs 2; eauto.
-    Admitted.
+    Qed.
 
 
     (* behaviors *)
