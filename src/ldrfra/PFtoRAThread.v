@@ -37,124 +37,6 @@ Require Import PFtoRASimThread.
 Set Implicit Arguments.
 
 
-Module TraceWF.
-  Definition wf (tr: Trace.t) (promises: Memory.t) (mem: Memory.t): Prop :=
-    forall th e loc from to val released ord
-      (IN: List.In (th, e) tr)
-      (EVENT: ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord)),
-      unchangable mem promises loc to from (Message.concrete val released).
-
-  Lemma step_unchangable
-        lang pf e e1 e2
-        loc from to val released ord
-        (STEP: @Thread.step lang pf e e1 e2)
-        (EVENT: ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord)):
-    unchangable e2.(Thread.memory) e2.(Thread.local).(Local.promises) loc to from (Message.concrete val released).
-  Proof.
-    destruct e; ss.
-    - inv EVENT. inv STEP; inv STEP0. inv LOCAL. inv LOCAL0. inv WRITE. ss.
-      exploit Memory.remove_get0; eauto. i. des.
-      exploit Memory.promise_get0; eauto; try by (inv PROMISE; ss). i. des.
-      econs; eauto.
-    - inv EVENT. inv STEP; inv STEP0. inv LOCAL. inv LOCAL1. inv LOCAL2. inv WRITE. ss.
-      exploit Memory.remove_get0; eauto. i. des.
-      exploit Memory.promise_get0; eauto; try by (inv PROMISE; ss). i. des.
-      econs; eauto.
-  Qed.
-
-  Lemma steps_wf
-        lang tr e1 e2
-        (STEPS: @Trace.steps lang tr e1 e2):
-    wf tr e2.(Thread.local).(Local.promises) e2.(Thread.memory).
-  Proof.
-    induction STEPS; ss. subst.
-    ii. inv IN; eauto. inv H.
-    eapply unchangable_trace_steps_increase; eauto using step_unchangable.
-  Qed.
-
-  Lemma steps_wf_other
-        lang tr e1 e2 tr'
-        (TRACE1: wf tr' e1.(Thread.local).(Local.promises) e1.(Thread.memory))
-        (STEPS: @Trace.steps lang tr e1 e2):
-    wf tr' e2.(Thread.local).(Local.promises) e2.(Thread.memory).
-  Proof.
-    revert tr' TRACE1. induction STEPS; i; ss.
-    subst. apply IHSTEPS.
-    ii. eapply unchangable_increase; eauto.
-  Qed.
-
-  Lemma steps_disjoint
-        lang tr e1 e2 lc
-        (STEPS: @Trace.steps lang tr e1 e2)
-        (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
-        (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-        (CLOSED1: Memory.closed e1.(Thread.memory))
-        (DISJOINT: Local.disjoint e1.(Thread.local) lc)
-        (WF: Local.wf lc e1.(Thread.memory)):
-    wf tr lc.(Local.promises) e2.(Thread.memory).
-  Proof.
-    induction STEPS; i; ss. subst. ii. inv IN.
-    - inv H. exploit step_unchangable; eauto. i.
-      exploit unchangable_trace_steps_increase; eauto. i. inv x1.
-      econs; eauto.
-      clear IHSTEPS STEPS.
-      destruct (Memory.get loc to lc.(Local.promises)) as [[]|] eqn:GETP; ss.
-      exfalso. inv WF. exploit PROMISES; eauto. i.
-      destruct e0; ss; inv EVENT.
-      + inv STEP; inv STEP0. inv LOCAL. inv LOCAL0. inv WRITE. inv PROMISE; ss.
-        * exploit Memory.add_get0; try exact MEM. i. des. congr.
-        * exploit Memory.split_get0; try exact MEM. i. des. congr.
-        * exploit Memory.lower_get0; try exact PROMISES0. i. des.
-          inv DISJOINT. inv DISJOINT0. exploit DISJOINT; eauto. i. des.
-          exploit Memory.get_ts; try exact GET0. i. des; try congr.
-          exploit Memory.get_ts; try exact GETP. i. des; try congr.
-          apply (x1 to); econs; try refl; ss.
-      + inv STEP; inv STEP0. inv LOCAL. inv LOCAL1. inv LOCAL2. inv WRITE. inv PROMISE; ss.
-        * exploit Memory.add_get0; try exact MEM. i. des. congr.
-        * exploit Memory.split_get0; try exact MEM. i. des. congr.
-        * exploit Memory.lower_get0; try exact PROMISES0. i. des.
-          inv DISJOINT. inv DISJOINT0. exploit DISJOINT; eauto. i. des.
-          exploit Memory.get_ts; try exact GET1. i. des; try congr.
-          exploit Memory.get_ts; try exact GETP. i. des; try congr.
-          apply (x1 to); econs; try refl; ss.
-    - exploit Thread.step_future; eauto. i. des.
-      exploit Thread.step_disjoint; eauto. i. des.
-      eapply IHSTEPS; eauto.
-  Qed.
-
-  Lemma steps_disjoint_other
-        lang tr e1 e2 tr' lc
-        (TRACE1: wf tr' e1.(Thread.local).(Local.promises) e1.(Thread.memory))
-        (TRACE2: wf tr' lc.(Local.promises) e1.(Thread.memory))
-        (STEPS: @Trace.steps lang tr e1 e2):
-    wf tr' lc.(Local.promises) e2.(Thread.memory).
-  Proof.
-    hexploit steps_wf_other; eauto. ii.
-    exploit H; eauto. i. inv x.
-    exploit TRACE2; eauto. i. inv x. econs; ss.
-  Qed.
-
-  Lemma wf_app
-        tr1 tr2 promises mem
-        (TRACE1: wf tr1 promises mem)
-        (TRACE2: wf tr2 promises mem):
-    wf (tr1 ++ tr2) promises mem.
-  Proof.
-    ii. apply List.in_app_or in IN. des; eauto.
-  Qed.
-
-  Lemma app_wf
-        tr1 tr2 promises mem
-        (TRACE: wf (tr1 ++ tr2) promises mem):
-    wf tr1 promises mem /\ wf tr2 promises mem.
-  Proof.
-    split; ii.
-    - eapply TRACE; eauto. apply List.in_or_app. left. eauto.
-    - eapply TRACE; eauto. apply List.in_or_app. right. eauto.
-  Qed.
-End TraceWF.
-
-
 Module PFtoRAThread.
   Section PFtoRAThread.
     Variable lang: language.
@@ -582,13 +464,6 @@ Module PFtoRAThread.
         (STABLE_VIEWS: stable_views e_ra.(Thread.memory) views)
     .
 
-    (* Definition sim_trace (tr: Trace.t) (rels: ReleaseWrites.t): Prop := *)
-    (*   forall th e loc from to val released ord *)
-    (*     (IN: List.In (th, e) tr) *)
-    (*     (EVENT: ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord)) *)
-    (*     (ORD: Ordering.le ord Ordering.strong_relaxed), *)
-    (*     ~ List.In (loc, to) rels. *)
-
     Lemma sim_thread_step_aux
           views1 rels1 e1_pf e1_j e1_ra
           pf e_pf e2_pf
@@ -974,46 +849,6 @@ Module PFtoRAThread.
       - econs 2; eauto.
       - ss.
     Qed.
-
-    (* Lemma sim_thread_plus_step *)
-    (*       tr1 views1 rels1 e1_pf e1_j e1_ra *)
-    (*       tr e2_pf pf e_pf e3_pf *)
-    (*       (SIM1: sim_thread views1 rels1 e1_pf e1_j e1_ra) *)
-    (*       (SIM_TR1: sim_trace tr1 rels1) *)
-    (*       (WF1_PF: wf_pf tr1 e1_pf) *)
-    (*       (WF1_J: wf_j views1 e1_j) *)
-    (*       (WF1_RA: wf_ra rels1 e1_ra) *)
-    (*       (STEPS: Trace.steps tr e1_pf e2_pf) *)
-    (*       (STEP: Thread.step pf e_pf e2_pf e3_pf) *)
-    (*       (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr) *)
-    (*       (PF: List.Forall (compose (pf_event L) snd) (tr ++ [(e2_pf.(Thread.local), e_pf)])) *)
-    (*       (CONS: Local.promise_consistent e3_pf.(Thread.local)): *)
-    (*   (exists views2 views3 rels2 rels3 pf_j e_j e2_j e3_j e_ra e2_ra e3_ra, *)
-    (*       (<<STEPS_J: JThread.rtc_tau e1_j e2_j views1 views2>>) /\ *)
-    (*       (<<STEP_J: JThread.step pf_j e_j e2_j e3_j views2 views3>>) /\ *)
-    (*       (<<STEPS_RA: RAThread.tau_steps L rels1 rels2 e1_ra e2_ra>>) /\ *)
-    (*       (<<STEP_RA: RAThread.step L rels2 rels3 e_ra e2_ra e3_ra>>) /\ *)
-    (*       (<<EVENT_J: JSim.sim_event e_j e_pf>>) /\ *)
-    (*       (<<EVENT_RA: PFtoRASimThread.sim_event e_ra e_j>>) /\ *)
-    (*       (<<SIM2: sim_thread views3 rels3 e3_pf e3_j e3_ra>>) /\ *)
-    (*       (<<SIM_TR2: sim_trace (tr1 ++ tr ++ [(e2_pf.(Thread.local), e_pf)]) rels3>>)) \/ *)
-    (*   (exists rels2 rels3 e2_ra e3_ra, *)
-    (*       (<<STEPS_RA: RAThread.tau_steps L rels1 rels2 e1_ra e2_ra>>) /\ *)
-    (*       (<<RACE: RAThread.step L rels2 rels3 ThreadEvent.failure e2_ra e3_ra>>)). *)
-    (* Proof. *)
-    (*   apply Forall_app_inv in PF. des. *)
-    (*   exploit steps_pf_future; eauto. i. des. *)
-    (*   hexploit step_promise_consistent; try exact STEP; try apply x0; eauto. i. *)
-    (*   hexploit sim_thread_steps; eauto. i. des. *)
-    (*   - hexploit steps_j_future; eauto. i. des. *)
-    (*     hexploit steps_ra_future; try eapply RAThread.tau_steps_steps; eauto. i. des. *)
-    (*     exploit sim_thread_step; try exact SIM2; eauto. *)
-    (*     { inv FORALL2. ss. } *)
-    (*     i. des. *)
-    (*     + left. esplits; eauto. rewrite List.app_assoc. ss. *)
-    (*     + right. esplits; eauto. *)
-    (*   - right. esplits; eauto. *)
-    (* Qed. *)
 
 
     (* consistency *)

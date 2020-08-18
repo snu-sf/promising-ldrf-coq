@@ -56,18 +56,6 @@ Module ReleaseWrites.
     Proof.
       unfold append. des_ifs.
     Qed.
-
-    Lemma in_append_or
-          loc to e rels
-          (IN: List.In (loc, to) (append e rels)):
-      (exists from val released ord,
-          ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord) /\
-          L loc /\ Ordering.le Ordering.acqrel ord) \/
-      List.In (loc, to) rels.
-    Proof.
-      revert IN. unfold append. des_ifs; eauto. i.
-      inv IN; eauto. inv H. left. esplits; eauto.
-    Qed.
   End ReleaseWrites.
 End ReleaseWrites.
 
@@ -119,21 +107,6 @@ Module RAThread.
         opt_step rels1 rels2 e e1 e2
     .
     Hint Constructors opt_step.
-
-    Definition steps_failure (rels1: ReleaseWrites.t) (e1: Thread.t lang): Prop :=
-      exists rels2 rels3 e2 e3,
-        (<<STEPS: tau_steps rels1 rels2 e1 e2>>) /\
-        (<<FAILURE: step rels2 rels3 ThreadEvent.failure e2 e3>>).
-    Hint Unfold steps_failure.
-
-    Definition consistent (rels: ReleaseWrites.t) (e: Thread.t lang): Prop :=
-      forall mem1 sc1
-        (CAP: Memory.cap e.(Thread.memory) mem1)
-        (SC_MAX: Memory.max_concrete_timemap mem1 sc1),
-        (<<FAILURE: steps_failure rels (Thread.mk lang e.(Thread.state) e.(Thread.local) sc1 mem1)>>) \/
-        exists rels2 e2,
-          (<<STEPS: tau_steps rels rels2 (Thread.mk lang e.(Thread.state) e.(Thread.local) sc1 mem1) e2>>) /\
-          (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>).
 
 
     Lemma tau_steps_ord_tau_steps
@@ -209,16 +182,6 @@ Module RAThread.
       steps rels1 rels2 e1 e2.
     Proof.
       inv STEP; eauto.
-    Qed.
-
-    Lemma plus_step_steps
-          rels1 rels2 e1 pf e e2 e3
-          (STEPS: steps rels1 rels2 e1 e2)
-          (STEP: OrdThread.step L Ordering.acqrel pf e e2 e3):
-      steps rels1 (ReleaseWrites.append L e rels2) e1 e3.
-    Proof.
-      induction STEPS; eauto.
-      econs; eauto. econs; eauto.
     Qed.
 
     Lemma steps_trans
