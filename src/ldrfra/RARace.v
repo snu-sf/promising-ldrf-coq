@@ -923,7 +923,7 @@ Module RARace.
     Lemma step_ord_step
           e tid rels1 rels2 c1 c2
           (STEP: RAConfiguration.step L e tid rels1 rels2 c1 c2):
-      OrdConfiguration.step L Ordering.acqrel (ThreadEvent.get_machine_event e) tid c1 c2.
+      OrdConfiguration.step L Ordering.acqrel e tid c1 c2.
     Proof.
       inv STEP. econs; eauto. inv STEP0.
       - econs 1.

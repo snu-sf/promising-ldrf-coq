@@ -38,15 +38,6 @@ Require Import PFtoRAThread.
 Set Implicit Arguments.
 
 
-Definition option_rel3 {A B C} (P: A -> B -> C -> Prop)
-           (a: option A) (b: option B) (c: option C): Prop :=
-  match a, b, c with
-  | Some x, Some y, Some z => P x y z
-  | None, None, None => True
-  | _, _, _ => False
-  end.
-
-
 Module PFtoRA.
   Section PFtoRA.
     Variable L: Loc.t -> bool.
@@ -628,7 +619,7 @@ Module PFtoRA.
           (WF_RA: wf_ra rels c_ra)
           (RACEFREE: RARace.racefree L rels c_ra):
       behaviors (pf_machine_step L) c_pf <1=
-      behaviors (@OrdConfiguration.step L Ordering.acqrel) c_ra.
+      behaviors (@OrdConfiguration.machine_step L Ordering.acqrel) c_ra.
     Proof.
       i. revert views rels c_j c_ra SIM WF_PF WF_J WF_RA RACEFREE.
       induction PR; i.
@@ -636,7 +627,10 @@ Module PFtoRA.
       - inv STEP. exploit sim_conf_step; eauto. i. des.
         + exploit RARace.step_ord_step; eauto. i.
           inv EVENT_J; inv EVENT_RA; ss. inv H0.
-          econs 2; eauto.
+          econs 2.
+          { replace (MachineEvent.syscall e) with
+                (ThreadEvent.get_machine_event (ThreadEvent.syscall e)) by ss.
+            econs; eauto. }
           hexploit RARace.step_racefree; eauto. i.
           exploit step_pf_future; eauto. i. des.
           exploit step_j_future; eauto. i. des.
@@ -645,13 +639,17 @@ Module PFtoRA.
       - inv STEP. exploit sim_conf_step; eauto. i. des.
         + exploit RARace.step_ord_step; eauto. i.
           inv EVENT_J; inv EVENT_RA; ss. inv H0.
-          econs 3; eauto.
+          econs 3.
+          replace MachineEvent.failure with (ThreadEvent.get_machine_event ThreadEvent.failure) by ss.
+          econs; eauto.
         + exfalso. unfold RARace.ra_race_steps in *. des. eauto.
       - inv STEP. exploit sim_conf_step; eauto. i. des.
         + exploit RARace.step_ord_step; eauto. i.
-          replace (ThreadEvent.get_machine_event e_ra) with MachineEvent.silent in *; cycle 1.
-          { inv EVENT_J; inv EVENT_RA; ss. }
-          econs 4; eauto.
+          econs 4.
+          { replace MachineEvent.silent with (ThreadEvent.get_machine_event e_ra); cycle 1.
+            { inv EVENT_J; inv EVENT_RA; ss. }
+            econs; eauto.
+          }
           hexploit RARace.step_racefree; eauto. i.
           exploit step_pf_future; eauto. i. des.
           exploit step_j_future; eauto. i. des.
