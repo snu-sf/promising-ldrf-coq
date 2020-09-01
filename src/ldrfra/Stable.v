@@ -21,7 +21,7 @@ Require Import TView.
 Require Import Local.
 Require Import Thread.
 
-Require Import RARace.
+Require Import RAStep.
 
 Set Implicit Arguments.
 

@@ -23,8 +23,9 @@ Require Import Thread.
 
 Require Import MemoryMerge.
 
+Require Import LocalPF.
 Require Import OrdStep.
-Require Import RARace.
+Require Import RAStep.
 Require Import Stable.
 
 Set Implicit Arguments.
@@ -78,12 +79,6 @@ Module PFtoRASimThread.
 
     (* sim *)
 
-    Definition reserve_only (promises: Memory.t): Prop :=
-      forall loc from to val released
-        (LOC: L loc)
-        (PROMISE: Memory.get loc to promises = Some (from, Message.concrete val released)),
-        False.
-
     Inductive sim_tview (tview_src tview_tgt: TView.t): Prop :=
     | sim_tview_intro
         (REL: forall loc, if L loc
@@ -97,7 +92,7 @@ Module PFtoRASimThread.
     | sim_local_intro
         (TVIEW: sim_tview lc_src.(Local.tview) lc_tgt.(Local.tview))
         (PROMISES: lc_src.(Local.promises) = lc_tgt.(Local.promises))
-        (RESERVE: reserve_only lc_src.(Local.promises))
+        (RESERVE: RAThread.reserve_only L lc_src.(Local.promises))
         (REL_WRITES_NONE: forall loc to (IN: List.In (loc, to) rels),
             Memory.get loc to lc_src.(Local.promises) = None)
     .
@@ -500,7 +495,7 @@ Module PFtoRASimThread.
     Lemma promise
           rels mem1_src
           promises1 mem1_tgt loc from to msg promises2 mem2_tgt kind
-          (PROMISES1: reserve_only promises1)
+          (PROMISES1: RAThread.reserve_only L promises1)
           (REL1: forall loc to (IN: List.In (loc, to) rels),
               Memory.get loc to promises1 = None)
           (MEM1: sim_memory rels mem1_src mem1_tgt)
@@ -510,7 +505,7 @@ Module PFtoRASimThread.
           (MSG: L loc -> msg = Message.reserve):
       exists mem2_src,
         <<STEP_SRC: Memory.promise promises1 mem1_src loc from to msg promises2 mem2_src kind>> /\
-        <<PROMISES2: reserve_only promises2>> /\
+        <<PROMISES2: RAThread.reserve_only L promises2>> /\
         <<REL2: forall loc to (IN: List.In (loc, to) rels),
             Memory.get loc to promises2 = None>> /\
         <<MEM2: sim_memory rels mem2_src mem2_tgt>>.
@@ -538,8 +533,9 @@ Module PFtoRASimThread.
           exploit Memory.add_exists_le; try apply LE1_SRC; eauto. i. des.
           esplits.
           + econs; eauto. ss.
-          + ii. revert PROMISE.
-            erewrite Memory.add_o; eauto. condtac; ss. eauto.
+          + ii. revert GET.
+            erewrite Memory.add_o; eauto. condtac; ss; eauto.
+            i. des. inv GET. ss.
           + i. erewrite Memory.add_o; eauto. condtac; ss; eauto. des. subst.
             exploit REL_WRITES; eauto. i. des.
             exploit Memory.add_get0; try exact MEM. i. des. congr.
@@ -568,7 +564,7 @@ Module PFtoRASimThread.
           exploit Memory.remove_exists_le; try apply LE1_SRC; eauto. i. des.
           esplits.
           + econs; eauto.
-          + ii. revert PROMISE.
+          + ii. revert GET1.
             erewrite Memory.remove_o; eauto. condtac; ss; eauto.
           + i. erewrite Memory.remove_o; eauto. condtac; ss; eauto.
           + econs; i.
@@ -594,7 +590,7 @@ Module PFtoRASimThread.
         inv MEM1. esplits.
         + econs; eauto.
           i. subst. exploit SOUND; eauto. i. des. eauto.
-        + ii. revert PROMISE.
+        + ii. revert GET.
           erewrite Memory.add_o; eauto. condtac; ss; eauto.
           i. des. subst. congr.
         + i. erewrite Memory.add_o; eauto. condtac; ss; eauto.
@@ -608,7 +604,7 @@ Module PFtoRASimThread.
         i. des.
         inv MEM1. esplits.
         + econs; eauto.
-        + ii. revert PROMISE.
+        + ii. revert GET.
           erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
           * i. des. subst. congr.
           * guardH o. i. des. subst. congr.
@@ -626,7 +622,7 @@ Module PFtoRASimThread.
         i. des.
         inv MEM1. esplits.
         + econs; eauto.
-        + ii. revert PROMISE.
+        + ii. revert GET.
           erewrite Memory.lower_o; eauto. condtac; ss; eauto.
           i. des. subst. congr.
         + i. erewrite Memory.lower_o; eauto. condtac; ss; eauto.
@@ -640,7 +636,7 @@ Module PFtoRASimThread.
         i. des.
         inv MEM1. esplits.
         + econs; eauto.
-        + ii. revert PROMISE.
+        + ii. revert GET.
           erewrite Memory.remove_o; eauto. condtac; ss; eauto.
         + i. erewrite Memory.remove_o; eauto. condtac; ss; eauto.
         + ss.
@@ -902,7 +898,7 @@ Module PFtoRASimThread.
               { specialize (REL loc0). des_ifs. }
             * exploit MemoryMerge.add_remove; try exact PROMISES; eauto. i. subst.
               exploit MemoryMerge.add_remove; try exact x1; eauto.
-            * ii. revert PROMISE.
+            * ii. revert GET1.
               erewrite Memory.remove_o; eauto. condtac; ss.
               erewrite Memory.add_o; eauto. condtac; ss. eauto.
             * exploit MemoryMerge.add_remove; try exact x1; eauto. i. subst.
@@ -1002,10 +998,10 @@ Module PFtoRASimThread.
               erewrite Memory.split_o; eauto.
               erewrite (@Memory.split_o promises1); try exact PROMISES.
               repeat condtac; ss.
-            * ii. revert PROMISE.
+            * ii. revert GET3.
               erewrite Memory.remove_o; eauto. condtac; ss.
               erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
-              guardH o. guardH o0. i. des. inv PROMISE.
+              guardH o. guardH o0. i. des. inv GET3.
               exploit Memory.split_get0; try exact PROMISES. i. des. eauto.
             * i. des.
               { inv IN. exploit Memory.remove_get0; try exact x2. i. des. ss. }
@@ -1138,7 +1134,7 @@ Module PFtoRASimThread.
               - unfold LocFun.find. specialize (REL loc0). des_ifs. }
           * exploit MemoryMerge.add_remove; try exact PROMISES; eauto. i. subst.
             exploit MemoryMerge.add_remove; try exact x1; eauto.
-          * ii. revert PROMISE.
+          * ii. revert GET1.
             erewrite Memory.remove_o; eauto. condtac; ss.
             erewrite Memory.add_o; eauto. condtac; ss. eauto.
           * exploit MemoryMerge.add_remove; try exact x1; eauto.
@@ -1227,10 +1223,10 @@ Module PFtoRASimThread.
             erewrite Memory.split_o; eauto.
             erewrite (@Memory.split_o promises1); try exact PROMISES.
             repeat condtac; ss.
-          * ii. revert PROMISE.
+          * ii. revert GET3.
             erewrite Memory.remove_o; eauto. condtac; ss.
             erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
-            guardH o. guardH o0. i. des. inv PROMISE.
+            guardH o. guardH o0. i. des. inv GET3.
             exploit Memory.split_get0; try exact PROMISES. i. des. eauto.
           * i. erewrite Memory.remove_o; eauto. condtac; ss. guardH o.
             erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
@@ -1387,7 +1383,7 @@ Module PFtoRASimThread.
           * specialize (REL loc0). des_ifs.
           * specialize (REL loc). des_ifs. rewrite REL. refl.
           * specialize (REL loc0). des_ifs.
-        + ii. revert PROMISE0.
+        + ii. revert GET.
           erewrite Memory.remove_o; eauto. condtac; ss. guardH o.
           inv PROMISE; ss.
           * erewrite Memory.add_o; eauto. condtac; ss; eauto.
@@ -1599,7 +1595,9 @@ Module PFtoRASimThread.
         exploit Stable.promise_step; try exact STEP_SRC; eauto; ss. i. des.
         exploit Stable.promise_step; try exact LOCAL0; eauto; ss. i. des.
         esplits.
-        + econs 1. econs; eauto.
+        + econs 1.
+          * econs; eauto.
+          * ii. inv PROMISE0. ss.
         + left. esplits; eauto.
           econs; ss; eauto.
           eapply Stable.future_stable_view; try apply STABLE_SC; eauto.

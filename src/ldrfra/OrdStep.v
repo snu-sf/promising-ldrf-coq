@@ -25,6 +25,8 @@ Require Import Configuration.
 Require Import PromiseConsistent.
 Require Import Mapping.
 
+Require Import LocalPF.
+
 Set Implicit Arguments.
 
 
@@ -218,7 +220,8 @@ Module OrdThread.
     Inductive step: forall (pf:bool) (e:ThreadEvent.t) (e1 e2:Thread.t lang), Prop :=
     | step_promise
         pf e e1 e2
-        (STEP: Thread.promise_step pf e e1 e2):
+        (STEP: Thread.promise_step pf e e1 e2)
+        (PF: pf_event L e):
         step pf e e1 e2
     | step_program
         e e1 e2
@@ -498,6 +501,7 @@ Module OrdThread.
           { econs; eauto. eapply closed_message_map; eauto.
             eapply ident_map_message. }
           { inv KIND; ss. inv MSG; ss. }
+          { unfold pf_event in *. i. inv PROMISE1. eauto. }
         }
         { econs; eauto; ss. eapply ident_map_message. }
       }

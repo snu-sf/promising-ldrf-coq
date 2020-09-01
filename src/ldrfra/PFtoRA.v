@@ -30,7 +30,7 @@ Require Import JoinedView.
 
 Require Import LocalPF.
 Require Import OrdStep.
-Require Import RARace.
+Require Import RAStep.
 Require Import Stable.
 Require Import PFtoRASimThread.
 Require Import PFtoRAThread.

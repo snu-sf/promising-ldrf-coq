@@ -25,6 +25,7 @@ Require Import Configuration.
 
 Require Import Mapping.
 
+Require Import LocalPF.
 Require Import OrdStep.
 
 Set Implicit Arguments.
@@ -146,9 +147,12 @@ Module RAThread.
       induction STEPS; eauto.
       inv H. inv STEP; [|inv STEP0; inv LOCAL].
       econs 2; eauto.
-      - replace rels with (ReleaseWrites.append
-                             L (ThreadEvent.promise loc from to Message.reserve Memory.op_kind_add) rels) at 2 by ss.
-        econs. econs 1. eauto.
+      - replace rels with
+            (ReleaseWrites.append
+               L (ThreadEvent.promise loc from to Message.reserve Memory.op_kind_add) rels)
+            at 2 by ss.
+        econs. econs 1; eauto.
+        ii. inv PROMISE. ss.
       - ss.
     Qed.
 
@@ -160,9 +164,12 @@ Module RAThread.
       induction STEPS; eauto.
       inv H. inv STEP; [|inv STEP0; inv LOCAL].
       econs 2; eauto.
-      - replace rels with (ReleaseWrites.append
-                             L (ThreadEvent.promise loc from to Message.reserve Memory.op_kind_cancel) rels) at 2 by ss.
-        econs. econs 1. eauto.
+      - replace rels with
+            (ReleaseWrites.append
+               L (ThreadEvent.promise loc from to Message.reserve Memory.op_kind_cancel) rels)
+            at 2 by ss.
+        econs. econs 1; eauto.
+        ii. inv PROMISE; ss.
       - ss.
     Qed.
 
@@ -658,6 +665,63 @@ Module RAThread.
     Proof.
       induction STEP; ss.
       exploit cancel_step_get_None; eauto. i. des. eauto.
+    Qed.
+
+
+    (* reserve_only *)
+
+    Definition reserve_only (promises: Memory.t): Prop :=
+      forall loc from to msg
+        (LOC: L loc)
+        (GET: Memory.get loc to promises = Some (from, msg)),
+        msg = Message.reserve.
+
+    Lemma step_reserve_only
+          rels1 rels2 e e1 e2
+          (PROMISES1: reserve_only e1.(Thread.local).(Local.promises))
+          (STEP: step rels1 rels2 e e1 e2):
+      <<PROMISES2: reserve_only e2.(Thread.local).(Local.promises)>>.
+    Proof.
+      inv STEP. inv STEP0; inv STEP; inv LOCAL; ss; try by (inv LOCAL0; ss).
+      - destruct (L loc) eqn:LOC.
+        + ii. exploit PF; eauto. i. subst.
+          revert GET. inv PROMISE; ss.
+          * erewrite Memory.add_o; eauto. condtac; ss; eauto.
+            i. des. subst. inv GET. ss.
+          * erewrite Memory.split_o; eauto. repeat (condtac; ss; eauto).
+            { i. des. subst. inv GET. ss. }
+            { guardH o. i. des. subst. inv GET. ss. }
+          * erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+            i. des. subst. inv GET. ss.
+          * erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+        + ii. revert GET. inv PROMISE; ss.
+          * erewrite Memory.add_o; eauto. condtac; ss; eauto.
+            i. des. subst. congr.
+          * erewrite Memory.split_o; eauto. repeat (condtac; ss; eauto).
+            { i. des. subst. congr. }
+            { guardH o. i. des. subst. congr. }
+          * erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+            i. des. subst. congr.
+          * erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+      - inv LOCAL0. inv STEP. ss.
+      - inv LOCAL0. inv STEP. inv WRITE. ss.
+        ii. revert GET. erewrite Memory.remove_o; eauto. condtac; ss.
+        guardH o. inv PROMISE; ss.
+        + erewrite Memory.add_o; eauto. condtac; ss; eauto.
+        + erewrite Memory.split_o; eauto. condtac; ss. condtac; ss; eauto.
+          guardH o0. i. des. inv GET.
+          exploit Memory.split_get0; try exact PROMISES. i. des.
+          exploit PROMISES1; try exact GET0; eauto.
+        + erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+      - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP. inv WRITE. ss.
+        ii. revert GET0. erewrite Memory.remove_o; eauto. condtac; ss.
+        guardH o. inv PROMISE; ss.
+        + erewrite Memory.add_o; eauto. condtac; ss; eauto.
+        + erewrite Memory.split_o; eauto. condtac; ss. condtac; ss; eauto.
+          guardH o0. i. des. inv GET0.
+          exploit Memory.split_get0; try exact PROMISES. i. des.
+          exploit PROMISES1; try exact GET0; eauto.
+        + erewrite Memory.lower_o; eauto. condtac; ss; eauto.
     Qed.
   End RAThread.
 End RAThread.

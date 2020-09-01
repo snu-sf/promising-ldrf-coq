@@ -30,7 +30,7 @@ Require Import JoinedView.
 
 Require Import LocalPF.
 Require Import OrdStep.
-Require Import RARace.
+Require Import RAStep.
 Require Import Stable.
 Require Import PFtoRASimThread.
 
@@ -549,7 +549,10 @@ Module PFtoRAThread.
       inv STEP1; [|inv STEP0; inv LOCAL]. inv STEP0. ss.
       hexploit PFtoRASimThread.promise_step; try exact LOCAL; try eapply SIM1; eauto; try congr. s. i. des.
       destruct e1_ra. esplits; eauto.
-      { econs. econs; eauto. }
+      { econs.
+        - econs; eauto.
+        - ii. inv PROMISE1. ss.
+      }
       left.
       assert (MSG: forall (val: Const.t) (released: View.t) (MSG: msg = Message.concrete val (Some released)),
                  Stable.normal_view L released /\ Stable.stable_view L mem2_src released).

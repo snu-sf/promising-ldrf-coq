@@ -1,6 +1,7 @@
 Require Import Omega.
 Require Import Bool.
 Require Import RelationClasses.
+Require Import Program.
 
 From sflib Require Import sflib.
 From Paco Require Import paco.
@@ -30,7 +31,7 @@ Require Import LocalPFView.
 
 Require Import OrdStep.
 Require Import Stable.
-Require Import RARace.
+Require Import RAStep.
 Require Import PFtoRASimThread.
 Require Import PFtoRA.
 
@@ -44,7 +45,7 @@ Section LocalDRFRA.
     forall c1 c2 c3
       tid_w e_w loc from to val released ordw
       tid_r lang st3 lc3 e4 e5
-      pf e_r releasedr ordr
+      pf e_r released' ordr
       (STEPS1: rtc (@OrdConfiguration.all_step L Ordering.acqrel) c c1)
       (WRITE_STEP: OrdConfiguration.step L Ordering.acqrel e_w tid_w c1 c2)
       (WRITE_EVENT: ThreadEvent.is_writing e_w = Some (loc, from, to, val, released, ordw))
@@ -55,7 +56,7 @@ Section LocalDRFRA.
                          e4)
       (CONS: Local.promise_consistent e4.(Thread.local))
       (READ_STEP: OrdThread.step L Ordering.acqrel pf e_r e4 e5)
-      (READ_EVENT: ThreadEvent.is_reading e_r = Some (loc, to, val, releasedr, ordr))
+      (READ_EVENT: ThreadEvent.is_reading e_r = Some (loc, to, val, released', ordr))
       (LOC: L loc)
       (HIGHER: Time.lt (e4.(Thread.local).(Local.tview).(TView.cur).(View.rlx) loc) to)
       (ORDERING: Ordering.le ordw Ordering.strong_relaxed \/
@@ -65,11 +66,107 @@ Section LocalDRFRA.
   Definition ra_racefree_syn (s: Threads.syntax): Prop :=
     ra_racefree (Configuration.init s).
 
+  Lemma read_message_exists
+        lang
+        rels1 rels2 rels3 e1 e2 e3
+        e loc to val released ord
+        (PROMISES: RAThread.reserve_only L e1.(Thread.local).(Local.promises))
+        (STEPS: @RAThread.steps lang L rels1 rels2 e1 e2)
+        (STEP: RAThread.step L rels2 rels3 e e2 e3)
+        (EVENT: ThreadEvent.is_reading e = Some (loc, to, val, released, ord))
+        (LOC: L loc)
+        (HIGHER: Time.lt (e2.(Thread.local).(Local.tview).(TView.cur).(View.rlx) loc) to):
+    exists from,
+      (<<GET: Memory.get loc to e1.(Thread.memory) = Some (from, Message.concrete val released)>>) /\
+      (<<RELS: List.In (loc, to) rels1 <-> List.In (loc, to) rels2>>).
+  Proof.
+    assert (GET: exists from,
+               Memory.get loc to e2.(Thread.memory) = Some (from, Message.concrete val released)).
+    { destruct e; inv EVENT; inv STEP; inv STEP0; inv STEP; inv LOCAL.
+      - inv LOCAL0. inv STEP. eauto.
+      - inv LOCAL1. inv STEP. eauto. }
+    des. clear rels3 e3 e STEP EVENT. exists from.
+    dependent induction STEPS; try by (esplits; eauto).
+    hexploit RAThread.step_reserve_only; try exact STEP; eauto. i. des.
+    exploit IHSTEPS; eauto. i. des.
+    clear IHSTEPS.
+    inv STEP. inv STEP0; inv STEP; [|inv LOCAL]; ss; try by (esplits; eauto).
+    - splits; ss.
+      revert GET0. inv LOCAL. inv PROMISE.
+      + erewrite Memory.add_o; eauto. condtac; ss.
+        i. des. inv GET0. exploit PF; eauto. ss.
+      + erewrite Memory.split_o; eauto. repeat condtac; ss.
+        * i. des. inv GET0. inv H2. exploit PF; eauto. ss.
+        * guardH o. i. des. inv GET0. inv H2.
+          exploit Memory.split_get0; try exact PROMISES0. i. des.
+          exploit H; try exact GET3; eauto. ss.
+      + erewrite Memory.lower_o; eauto. condtac; ss.
+        i. des. inv GET0. exploit PF; eauto. ss.
+      + erewrite Memory.remove_o; eauto. condtac; ss.
+    - destruct (classic ((loc, to) = (loc0, to0))).
+      { admit. }
+      revert GET0. inv LOCAL0. inv STEP. inv WRITE. inv PROMISE; ss.
+      + erewrite Memory.add_o; eauto. condtac; ss.
+        { des. subst. ss. }
+        guardH o. i. split; ss.
+        unfold ReleaseWrites.append in *. ss. split; i.
+        * apply RELS. repeat condtac; ss. right. ss.
+        * exploit RELS0; eauto. repeat condtac; ss. i. des; ss.
+          inv x. ss.
+      + erewrite Memory.split_o; eauto. condtac; ss.
+        { des. subst. ss. }
+        guardH o. condtac; ss.
+        { i. des. inv GET0. inv H3.
+          exploit Memory.split_get0; try exact PROMISES0. i. des.
+          exploit PROMISES; try exact GET1; ss. }
+        guardH o0. i. split; ss.
+        unfold ReleaseWrites.append in *. ss. split; i.
+        * apply RELS. repeat condtac; ss. right. ss.
+        * exploit RELS0; eauto. repeat condtac; ss. i. des; ss.
+          inv x. ss.
+      + erewrite Memory.lower_o; eauto. condtac; ss.
+        { des. subst. ss. }
+        guardH o. i. split; ss.
+        unfold ReleaseWrites.append in *. ss. split; i.
+        * apply RELS. repeat condtac; ss. right. ss.
+        * exploit RELS0; eauto. repeat condtac; ss. i. des; ss.
+          inv x. ss.
+    - destruct (classic ((loc, to) = (loc0, tsw))).
+      { admit. }
+      revert GET0. inv LOCAL1. inv STEP. inv LOCAL2. inv STEP. inv WRITE. inv PROMISE; ss.
+      + erewrite Memory.add_o; eauto. condtac; ss.
+        { des. subst. ss. }
+        guardH o. i. split; ss.
+        unfold ReleaseWrites.append in *. ss. split; i.
+        * apply RELS. repeat condtac; ss. right. ss.
+        * exploit RELS0; eauto. repeat condtac; ss. i. des; ss.
+          inv x. ss.
+      + erewrite Memory.split_o; eauto. condtac; ss.
+        { des. subst. ss. }
+        guardH o. condtac; ss.
+        { i. des. inv GET1. inv H3.
+          exploit Memory.split_get0; try exact PROMISES0. i. des.
+          exploit PROMISES; try exact GET2; ss. }
+        guardH o0. i. split; ss.
+        unfold ReleaseWrites.append in *. ss. split; i.
+        * apply RELS. repeat condtac; ss. right. ss.
+        * exploit RELS0; eauto. repeat condtac; ss. i. des; ss.
+          inv x. ss.
+      + erewrite Memory.lower_o; eauto. condtac; ss.
+        { des. subst. ss. }
+        guardH o. i. split; ss.
+        unfold ReleaseWrites.append in *. ss. split; i.
+        * apply RELS. repeat condtac; ss. right. ss.
+        * exploit RELS0; eauto. repeat condtac; ss. i. des; ss.
+          inv x. ss.
+  Admitted.
+
   Lemma racefree_implies
         s
         (RACEFREE: ra_racefree_syn s):
     RARace.racefree_syn L s.
   Proof.
+    ii. unfold RARace.ra_race in *. des.
   Admitted.
 
   Theorem local_drf_ra
