@@ -66,11 +66,15 @@ Section LocalDRFRA.
   Definition ra_racefree_syn (s: Threads.syntax): Prop :=
     ra_racefree (Configuration.init s).
 
+
   Lemma read_message_exists
         lang
         rels1 rels2 rels3 e1 e2 e3
         e loc to val released ord
         (PROMISES: RAThread.reserve_only L e1.(Thread.local).(Local.promises))
+        (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
+        (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
+        (MEM1: Memory.closed e1.(Thread.memory))
         (STEPS: @RAThread.steps lang L rels1 rels2 e1 e2)
         (STEP: RAThread.step L rels2 rels3 e e2 e3)
         (EVENT: ThreadEvent.is_reading e = Some (loc, to, val, released, ord))
@@ -88,6 +92,7 @@ Section LocalDRFRA.
     des. clear rels3 e3 e STEP EVENT. exists from.
     dependent induction STEPS; try by (esplits; eauto).
     hexploit RAThread.step_reserve_only; try exact STEP; eauto. i. des.
+    exploit RAThread.step_future; eauto. i. des.
     exploit IHSTEPS; eauto. i. des.
     clear IHSTEPS.
     inv STEP. inv STEP0; inv STEP; [|inv LOCAL]; ss; try by (esplits; eauto).
@@ -104,7 +109,16 @@ Section LocalDRFRA.
         i. des. inv GET0. exploit PF; eauto. ss.
       + erewrite Memory.remove_o; eauto. condtac; ss.
     - destruct (classic ((loc, to) = (loc0, to0))).
-      { admit. }
+      { exfalso. symmetry in H0. inv H0.
+        assert (Time.le to (lc2.(Local.tview).(TView.cur).(View.rlx) loc)).
+        { inv LOCAL0. inv STEP. ss.
+          unfold TimeMap.join, TimeMap.singleton.
+          unfold LocFun.add, LocFun.init, LocFun.find. condtac; ss.
+          apply Time.join_r. }
+        exploit RAThread.steps_future; try exact STEPS; eauto. s. i. des.
+        inv TVIEW_FUTURE0. inv CUR. rewrite (RLX loc) in H0.
+        timetac.
+      }
       revert GET0. inv LOCAL0. inv STEP. inv WRITE. inv PROMISE; ss.
       + erewrite Memory.add_o; eauto. condtac; ss.
         { des. subst. ss. }
@@ -132,7 +146,16 @@ Section LocalDRFRA.
         * exploit RELS0; eauto. repeat condtac; ss. i. des; ss.
           inv x. ss.
     - destruct (classic ((loc, to) = (loc0, tsw))).
-      { admit. }
+      { exfalso. symmetry in H0. inv H0.
+        assert (Time.le to (lc2.(Local.tview).(TView.cur).(View.rlx) loc)).
+        { inv LOCAL2. inv STEP. ss.
+          unfold TimeMap.join, TimeMap.singleton.
+          unfold LocFun.add, LocFun.init, LocFun.find. condtac; ss.
+          apply Time.join_r. }
+        exploit RAThread.steps_future; try exact STEPS; eauto. s. i. des.
+        inv TVIEW_FUTURE0. inv CUR. rewrite (RLX loc) in H0.
+        timetac.
+      }
       revert GET0. inv LOCAL1. inv STEP. inv LOCAL2. inv STEP. inv WRITE. inv PROMISE; ss.
       + erewrite Memory.add_o; eauto. condtac; ss.
         { des. subst. ss. }
@@ -159,7 +182,18 @@ Section LocalDRFRA.
         * apply RELS. repeat condtac; ss. right. ss.
         * exploit RELS0; eauto. repeat condtac; ss. i. des; ss.
           inv x. ss.
-  Admitted.
+  Qed.
+
+  (* Lemma write_exists *)
+  (*       rels1 rels2 e1 e2 *)
+  (*       loc from to val released *)
+  (*       (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory)) *)
+  (*       (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory)) *)
+  (*       (MEM1: Memory.closed e1.(Thread.memory)) *)
+  (*       (STEPS: RAThread.steps rels1 rels2 e1 e2) *)
+  (*       (LOC: L loc) *)
+  (*       (GET1: Memory.get loc to e2.(Thread.memory) = Some (from,  *)
+  (*       (GET2: Memory.get loc to e2.(Thread.memory) = Some (from, Message.concrete val released)): *)
 
   Lemma racefree_implies
         s
