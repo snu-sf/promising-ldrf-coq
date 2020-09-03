@@ -110,6 +110,24 @@ Module RAThread.
     Hint Constructors opt_step.
 
 
+    Lemma step_ord_step
+          rels1 rels2 e e1 e2
+          (STEP: step rels1 rels2 e e1 e2):
+      exists pf, OrdThread.step L Ordering.acqrel pf e e1 e2.
+    Proof.
+      inv STEP. eauto.
+    Qed.
+
+    Lemma steps_ord_steps
+          rels1 rels2 e1 e2
+          (STEPS: steps rels1 rels2 e1 e2):
+      rtc (OrdThread.all_step L Ordering.acqrel) e1 e2.
+    Proof.
+      induction STEPS; eauto.
+      exploit step_ord_step; eauto. i. des.
+      econs 2; eauto. econs. econs. eauto.
+    Qed.
+
     Lemma tau_steps_ord_tau_steps
           rels1 rels2 e1 e2
           (STEPS: tau_steps rels1 rels2 e1 e2):
@@ -723,6 +741,57 @@ Module RAThread.
           exploit PROMISES1; try exact GET0; eauto.
         + erewrite Memory.lower_o; eauto. condtac; ss; eauto.
     Qed.
+
+    Lemma opt_step_reserve_only
+          rels1 rels2 e e1 e2
+          (PROMISES1: reserve_only e1.(Thread.local).(Local.promises))
+          (STEP: opt_step rels1 rels2 e e1 e2):
+      <<PROMISES2: reserve_only e2.(Thread.local).(Local.promises)>>.
+    Proof.
+      inv STEP; ss.
+      eapply step_reserve_only; eauto.
+    Qed.
+
+    Lemma reserve_step_reserve_only
+          e1 e2
+          (PROMISES1: reserve_only e1.(Thread.local).(Local.promises))
+          (STEP: @Thread.reserve_step lang e1 e2):
+      <<PROMISES2: reserve_only e2.(Thread.local).(Local.promises)>>.
+    Proof.
+      inv STEP. inv STEP0; inv STEP; inv LOCAL. inv PROMISE. ss. ii.
+      revert GET. erewrite Memory.add_o; eauto. condtac; ss; eauto.
+      i. des. inv GET. ss.
+    Qed.
+
+    Lemma cancel_step_reserve_only
+          e1 e2
+          (PROMISES1: reserve_only e1.(Thread.local).(Local.promises))
+          (STEP: @Thread.cancel_step lang e1 e2):
+      <<PROMISES2: reserve_only e2.(Thread.local).(Local.promises)>>.
+    Proof.
+      inv STEP. inv STEP0; inv STEP; inv LOCAL. inv PROMISE. ss. ii.
+      revert GET. erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+    Qed.
+
+    Lemma reserve_steps_reserve_only
+          e1 e2
+          (PROMISES1: reserve_only e1.(Thread.local).(Local.promises))
+          (STEPS: rtc (@Thread.reserve_step lang) e1 e2):
+      <<PROMISES2: reserve_only e2.(Thread.local).(Local.promises)>>.
+    Proof.
+      induction STEPS; ss.
+      hexploit reserve_step_reserve_only; eauto.
+    Qed.
+
+    Lemma cancel_steps_reserve_only
+          e1 e2
+          (PROMISES1: reserve_only e1.(Thread.local).(Local.promises))
+          (STEPS: rtc (@Thread.cancel_step lang) e1 e2):
+      <<PROMISES2: reserve_only e2.(Thread.local).(Local.promises)>>.
+    Proof.
+      induction STEPS; ss.
+      hexploit cancel_step_reserve_only; eauto.
+    Qed.
   End RAThread.
 End RAThread.
 
@@ -767,6 +836,25 @@ Module RAConfiguration.
       revert c3 STEPS2. induction STEPS1; i; eauto.
     Qed.
 
+    Lemma step_ord_step
+          e tid rels1 rels2 c1 c2
+          (STEP: step e tid rels1 rels2 c1 c2):
+      OrdConfiguration.step L Ordering.acqrel e tid c1 c2.
+    Proof.
+      inv STEP. econs; eauto. inv STEP0; [econs 1|].
+      inv STEP. econs 2. eauto.
+    Qed.
+
+    Lemma steps_ord_steps
+          rels1 rels2 c1 c2
+          (STEPS: steps rels1 rels2 c1 c2):
+      rtc (@OrdConfiguration.all_step L Ordering.acqrel) c1 c2.
+    Proof.
+      induction STEPS; eauto.
+      exploit step_ord_step; eauto. i. econs 2; eauto.
+      econs. eauto.
+    Qed.
+
     Lemma step_future
           e tid rels1 rels2 c1 c2
           (WF1: Configuration.wf c1)
@@ -803,6 +891,16 @@ Module RAConfiguration.
         exploit Thread.rtc_tau_step_disjoint; try eapply rtc_implies;
           try eapply Thread.reserve_step_tau_step; try exact RESERVES; eauto. s. i. des.
         ss.
+    Qed.
+
+    Lemma steps_future
+          rels1 rels2 c1 c2
+          (WF1: Configuration.wf c1)
+          (STEP: steps rels1 rels2 c1 c2):
+      <<WF2: Configuration.wf c2>>.
+    Proof.
+      induction STEP; ss.
+      exploit step_future; eauto.
     Qed.
 
     Lemma write_get_None
@@ -932,6 +1030,51 @@ Module RAConfiguration.
         exploit RAThread.promise_rels_wf; eauto. i. des.
         exploit Memory.promise_get0; eauto; try by (inv PROMISE; ss). i. des.
         congr.
+    Qed.
+
+    
+    (* reserve_only *)
+
+    Definition reserve_only (c: Configuration.t): Prop :=
+      forall tid lang st lc
+        (FIND: IdentMap.find tid c.(Configuration.threads) = Some (existT _ lang st, lc)),
+        RAThread.reserve_only L lc.(Local.promises).
+
+    Lemma init_reserve_only s:
+      reserve_only (Configuration.init s).
+    Proof.
+      ii. unfold Configuration.init, Threads.init in *. ss.
+      rewrite IdentMap.Facts.map_o in *.
+      destruct (@UsualFMapPositive.UsualPositiveMap'.find
+                  (@sigT _ (@Language.syntax ProgramEvent.t)) tid s); inv FIND.
+      ss. rewrite Memory.bot_get in *. ss.
+    Qed.
+
+    Lemma step_reserve_only
+          tid e rels1 rels2 c1 c2
+          (RESERVE: reserve_only c1)
+          (STEP: step tid e rels1 rels2 c1 c2):
+      reserve_only c2.
+    Proof.
+      inv STEP. ii. ss.
+      revert FIND. rewrite IdentMap.gsspec. condtac; ss; i; cycle 1.
+      { eapply RESERVE; eauto. }
+      inv FIND. apply inj_pair2 in H1. subst.
+      unfold reserve_only in RESERVE.
+      hexploit RESERVE; eauto. i.
+      hexploit RAThread.cancel_steps_reserve_only; try exact CANCELS; eauto. i. des.
+      hexploit RAThread.opt_step_reserve_only; try exact STEP0; eauto. i.
+      hexploit RAThread.reserve_steps_reserve_only; try exact RESERVES; eauto.
+    Qed.
+
+    Lemma steps_reserve_only
+          rels1 rels2 c1 c2
+          (RESERVE: reserve_only c1)
+          (STEPS: steps rels1 rels2 c1 c2):
+      reserve_only c2.
+    Proof.
+      induction STEPS; ss.
+      hexploit step_reserve_only; eauto.
     Qed.
   End RAConfiguration.
 End RAConfiguration.

@@ -184,23 +184,51 @@ Section LocalDRFRA.
           inv x. ss.
   Qed.
 
-  (* Lemma write_exists *)
-  (*       rels1 rels2 e1 e2 *)
-  (*       loc from to val released *)
-  (*       (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory)) *)
-  (*       (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory)) *)
-  (*       (MEM1: Memory.closed e1.(Thread.memory)) *)
-  (*       (STEPS: RAThread.steps rels1 rels2 e1 e2) *)
-  (*       (LOC: L loc) *)
-  (*       (GET1: Memory.get loc to e2.(Thread.memory) = Some (from,  *)
-  (*       (GET2: Memory.get loc to e2.(Thread.memory) = Some (from, Message.concrete val released)): *)
+  Lemma write_exists
+        rels1 rels2 c1 c2
+        loc from to val released
+        (WF1: Configuration.wf c1)
+        (STEPS: RAConfiguration.steps L rels1 rels2 c1 c2)
+        (LOC: L loc)
+        (GET1: Memory.get loc to c1.(Configuration.memory) = None)
+        (GET2: Memory.get loc to c2.(Configuration.memory) = Some (from, Message.concrete val released)):
+    exists rels11 rels12 c11 c12 tid e ord,
+      (<<STEPS1: RAConfiguration.steps L rels1 rels11 c1 c11>>) /\
+      (<<WRITE_STEP: RAConfiguration.step L e tid rels11 rels12 c11 c12>>) /\
+      (<<WRITE_EVENT: ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord)>>) /\
+      (<<ORD: ~ List.In (loc, to) rels2 -> Ordering.le ord Ordering.strong_relaxed>>) /\
+      (<<STEPS2: RAConfiguration.steps L rels12 rels2 c12 c2>>).
+  Proof.
+  Admitted.
 
   Lemma racefree_implies
         s
         (RACEFREE: ra_racefree_syn s):
     RARace.racefree_syn L s.
   Proof.
-    ii. unfold RARace.ra_race in *. des.
+    specialize (@Configuration.init_wf s). intro WF.
+    specialize (@RAConfiguration.init_reserve_only L s). intro RESERVE.
+    ii. unfold RARace.ra_race in *. inv RARACE. inv H0. guardH H2.
+    destruct (Memory.get loc to (Configuration.init s).(Configuration.memory)) eqn:GET.
+    { unfold Memory.get, Memory.init, Cell.get, Cell.init in GET. ss.
+      apply DOMap.singleton_find_inv in GET. des. subst. inv H1. }
+    unfold ra_racefree_syn in *.
+    remember (Configuration.init s) as c1. clear Heqc1.
+    exploit RAConfiguration.steps_future; eauto. i. des.
+    hexploit RAConfiguration.steps_reserve_only; eauto. i.
+    dup x0. inv x1. inv WF0. exploit THREADS; eauto. i.
+    clear DISJOINT. clear THREADS.
+    unfold RAConfiguration.reserve_only in H0.
+    hexploit H0; eauto. i.
+    exploit read_message_exists; try exact THREAD_STEPS; eauto. s. i. des.
+    exploit write_exists; try exact GET; try exact GET0; eauto. i. des.
+    exploit RAConfiguration.steps_ord_steps; try exact STEPS1. i.
+    exploit RAConfiguration.step_ord_step; try exact WRITE_STEP. i.
+    exploit RAConfiguration.steps_ord_steps; try exact STEPS2. i.
+    exploit RAThread.steps_ord_steps; eauto. i.
+    exploit RAThread.step_ord_step; eauto. i. des.
+    eapply RACEFREE; eauto.
+    unguard. des; eauto.
   Admitted.
 
   Theorem local_drf_ra
