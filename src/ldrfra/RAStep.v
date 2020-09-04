@@ -792,6 +792,105 @@ Module RAThread.
       induction STEPS; ss.
       hexploit cancel_step_reserve_only; eauto.
     Qed.
+
+    Lemma step_rels_incl
+          rels1 rels2 e e1 e2
+          (STEP: step rels1 rels2 e e1 e2):
+      rels2 = rels1 \/ exists a, rels2 = a :: rels1.
+    Proof.
+      inv STEP. unfold ReleaseWrites.append. des_ifs; eauto.
+    Qed.
+
+    Lemma step_non_concrete
+          rels1 rels2 e e1 e2 loc to
+          (STEP: step rels1 rels2 e e1 e2)
+          (LOC: L loc)
+          (EVENT: forall from val released ord,
+              ThreadEvent.is_writing e <> Some (loc, from, to, val, released, ord))
+          (GET1: forall from val released,
+              Memory.get loc to e1.(Thread.memory) <> Some (from, Message.concrete val released)):
+      <<GET2: forall from val released,
+        Memory.get loc to e2.(Thread.memory) <> Some (from, Message.concrete val released)>>.
+    Proof.
+      i. inv STEP. inv STEP0; inv STEP; inv LOCAL; ss; eauto.
+      - inv PROMISE.
+        + erewrite Memory.add_o; eauto. condtac; ss; eauto.
+          des. subst. exploit PF; eauto. i. subst. ss.
+        + erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
+          * des. subst. exploit PF; eauto. i. subst. ss.
+          * guardH o. des. subst. exploit PF; eauto. i. ss.
+        + erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+          des. subst. exploit PF; eauto. i. subst. ss.
+        + erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+      - inv LOCAL0. inv STEP. inv WRITE. inv PROMISE; ss.
+        + erewrite Memory.add_o; eauto. condtac; ss; eauto.
+          des. subst. exploit EVENT; eauto.
+        + erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
+          * des. subst. exploit EVENT; eauto.
+          * des. subst. exploit EVENT; eauto.
+          * guardH o. des. subst.
+            exploit Memory.split_get0; try exact MEM. i. des.
+            exploit GET1; eauto.
+        + erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+          des. subst. exploit EVENT; eauto.
+      - inv LOCAL1. inv STEP.
+        inv LOCAL2. inv STEP. inv WRITE. inv PROMISE; ss.
+        + erewrite Memory.add_o; eauto. condtac; ss; eauto.
+          des. subst. exploit EVENT; eauto.
+        + erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
+          * des. subst. exploit EVENT; eauto.
+          * des. subst. exploit EVENT; eauto.
+          * guardH o. des. subst.
+            exploit Memory.split_get0; try exact MEM. i. des.
+            exploit GET1; eauto.
+        + erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+          des. subst. exploit EVENT; eauto.
+    Qed.
+
+    Lemma opt_step_non_concrete
+          rels1 rels2 e e1 e2 loc to
+          (STEP: opt_step rels1 rels2 e e1 e2)
+          (LOC: L loc)
+          (EVENT: forall from val released ord,
+              ThreadEvent.is_writing e <> Some (loc, from, to, val, released, ord))
+          (GET1: forall from val released,
+              Memory.get loc to e1.(Thread.memory) <> Some (from, Message.concrete val released)):
+      <<GET2: forall from val released,
+        Memory.get loc to e2.(Thread.memory) <> Some (from, Message.concrete val released)>>.
+    Proof.
+      inv STEP; eauto.
+      eapply step_non_concrete; eauto.
+    Qed.
+
+    Lemma reserve_steps_non_concrete
+          e1 e2 loc to
+          (STEPS: rtc (@Thread.reserve_step lang) e1 e2)
+          (LOC: L loc)
+          (GET1: forall from val released,
+              Memory.get loc to e1.(Thread.memory) <> Some (from, Message.concrete val released)):
+      <<GET2: forall from val released,
+        Memory.get loc to e2.(Thread.memory) <> Some (from, Message.concrete val released)>>.
+    Proof.
+      induction STEPS; eauto. i.
+      eapply IHSTEPS; eauto. i.
+      inv H. inv STEP; inv STEP0; inv LOCAL. inv PROMISE; ss.
+      erewrite Memory.add_o; eauto. condtac; ss; eauto.
+    Qed.
+
+    Lemma cancel_steps_non_concrete
+          e1 e2 loc to
+          (STEPS: rtc (@Thread.cancel_step lang) e1 e2)
+          (LOC: L loc)
+          (GET1: forall from val released,
+              Memory.get loc to e1.(Thread.memory) <> Some (from, Message.concrete val released)):
+      <<GET2: forall from val released,
+        Memory.get loc to e2.(Thread.memory) <> Some (from, Message.concrete val released)>>.
+    Proof.
+      induction STEPS; eauto. i.
+      eapply IHSTEPS; eauto. i.
+      inv H. inv STEP; inv STEP0; inv LOCAL. inv PROMISE; ss.
+      erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+    Qed.
   End RAThread.
 End RAThread.
 
@@ -893,14 +992,46 @@ Module RAConfiguration.
         ss.
     Qed.
 
+    Lemma step_future2
+          e tid rels1 rels2 c1 c2
+          (WF1: Configuration.wf c1)
+          (STEP: step e tid rels1 rels2 c1 c2):
+      (<<WF2: Configuration.wf c2>>) /\
+      (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
+      (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
+    Proof.
+      exploit step_future; eauto. i. des. split; ss.
+      inv STEP. s.
+      inv WF1. inv WF. exploit THREADS; eauto. i. clear DISJOINT THREADS.
+      exploit Thread.rtc_cancel_step_future; eauto. s. i. des.
+      exploit RAThread.opt_step_future; eauto. i. des.
+      exploit Thread.rtc_reserve_step_future; eauto. s. i. des.
+      splits; (etrans; [etrans|]; eauto).
+    Qed.
+
     Lemma steps_future
           rels1 rels2 c1 c2
           (WF1: Configuration.wf c1)
-          (STEP: steps rels1 rels2 c1 c2):
+          (STEPS: steps rels1 rels2 c1 c2):
       <<WF2: Configuration.wf c2>>.
     Proof.
-      induction STEP; ss.
+      induction STEPS; ss.
       exploit step_future; eauto.
+    Qed.
+
+    Lemma steps_future2
+          rels1 rels2 c1 c2
+          (WF1: Configuration.wf c1)
+          (STEPS: steps rels1 rels2 c1 c2):
+      (<<WF2: Configuration.wf c2>>) /\
+      (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
+      (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
+    Proof.
+      induction STEPS.
+      - splits; ss; try refl.
+      - exploit step_future2; eauto. i. des.
+        exploit IHSTEPS; eauto. i. des.
+        splits; ss; etrans; eauto.
     Qed.
 
     Lemma write_get_None
@@ -1075,6 +1206,44 @@ Module RAConfiguration.
     Proof.
       induction STEPS; ss.
       hexploit step_reserve_only; eauto.
+    Qed.
+
+    Lemma step_rels_incl
+          e tid rels1 rels2 c1 c2
+          (STEP: step e tid rels1 rels2 c1 c2):
+      rels2 = rels1 \/ exists a, rels2 = a :: rels1.
+    Proof.
+      inv STEP. inv STEP0; eauto. inv STEP.
+      unfold ReleaseWrites.append. des_ifs; eauto.
+    Qed.
+
+    Lemma steps_rels_incl
+          rels1 rels2 c1 c2
+          (STEPS: steps rels1 rels2 c1 c2):
+      exists rels, rels2 = rels ++ rels1.
+    Proof.
+      induction STEPS.
+      - exists []. ss.
+      - des. exploit step_rels_incl; eauto. i. des; subst.
+        + exists rels. ss.
+        + exists (rels ++ [a]). rewrite <- List.app_assoc. ss.
+    Qed.
+
+    Lemma step_non_concrete
+          e tid rels1 rels2 c1 c2 loc to
+          (STEP: step e tid rels1 rels2 c1 c2)
+          (LOC: L loc)
+          (EVENT: forall from val released ord,
+              ThreadEvent.is_writing e <> Some (loc, from, to, val, released, ord))
+          (GET1: forall from val released,
+              Memory.get loc to c1.(Configuration.memory) <> Some (from, Message.concrete val released)):
+      <<GET2: forall from val released,
+        Memory.get loc to c2.(Configuration.memory) <> Some (from, Message.concrete val released)>>.
+    Proof.
+      inv STEP. ss.
+      hexploit RAThread.cancel_steps_non_concrete; eauto. i. des.
+      hexploit RAThread.opt_step_non_concrete; eauto. i. des.
+      hexploit RAThread.reserve_steps_non_concrete; eauto.
     Qed.
   End RAConfiguration.
 End RAConfiguration.

@@ -41,6 +41,8 @@ Set Implicit Arguments.
 Section LocalDRFRA.
   Variable L: Loc.t -> bool.
 
+  (* RA race condition *)
+
   Definition ra_racefree (c: Configuration.t): Prop :=
     forall c1 c2 c3
       tid_w e_w loc from to val released ordw
@@ -190,16 +192,61 @@ Section LocalDRFRA.
         (WF1: Configuration.wf c1)
         (STEPS: RAConfiguration.steps L rels1 rels2 c1 c2)
         (LOC: L loc)
-        (GET1: Memory.get loc to c1.(Configuration.memory) = None)
+        (GET1: forall from' val' released',
+            Memory.get loc to c1.(Configuration.memory) <> Some (from', Message.concrete val' released'))
         (GET2: Memory.get loc to c2.(Configuration.memory) = Some (from, Message.concrete val released)):
-    exists rels11 rels12 c11 c12 tid e ord,
+    exists rels11 rels12 c11 c12 tid e from' released' ord,
       (<<STEPS1: RAConfiguration.steps L rels1 rels11 c1 c11>>) /\
       (<<WRITE_STEP: RAConfiguration.step L e tid rels11 rels12 c11 c12>>) /\
-      (<<WRITE_EVENT: ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord)>>) /\
+      (<<WRITE_EVENT: ThreadEvent.is_writing e = Some (loc, from', to, val, released', ord)>>) /\
       (<<ORD: ~ List.In (loc, to) rels2 -> Ordering.le ord Ordering.strong_relaxed>>) /\
       (<<STEPS2: RAConfiguration.steps L rels12 rels2 c12 c2>>).
   Proof.
-  Admitted.
+    revert WF1. induction STEPS; i; try congr.
+    exploit RAConfiguration.step_future; eauto. i. des.
+    destruct (ThreadEvent.is_writing e) eqn:EVENT; cycle 1.
+    { exploit IHSTEPS; eauto.
+      { hexploit RAConfiguration.step_non_concrete; eauto.
+        rewrite EVENT; ss. }
+      i. des.
+      esplits; [econs 2; eauto|..]; eauto.
+    }
+    destruct p as [[[[[loc' from'] to'] val'] released'] ord].
+    destruct (classic ((loc', to') = (loc, to))); cycle 1.
+    { exploit IHSTEPS; eauto.
+      { hexploit RAConfiguration.step_non_concrete; eauto.
+        rewrite EVENT. ii. inv H0. ss. }
+      i. des.
+      esplits; [econs 2; eauto|..]; eauto.
+    }
+    inv H. assert (val' = val).
+    { inv STEP. inv STEP0; ss.
+      inv WF1. inv WF. exploit THREADS; eauto. i. clear DISJOINT THREADS.
+      exploit Thread.rtc_cancel_step_future; eauto. s. i. des.
+      exploit RAThread.step_future; try exact STEP; eauto. i. des.
+      exploit Thread.rtc_reserve_step_future; eauto. s. i. des.
+      exploit RAConfiguration.steps_future2; try exact STEPS; eauto. s. i. des.
+      inv STEP. inv STEP0; inv STEP; ss. inv LOCAL; ss; inv EVENT.
+      - inv LOCAL0. inv STEP.
+        exploit Memory.write_get2; eauto. s. i. des.
+        exploit Memory.future_get1; try exact GET_MEM.
+        { etrans; eauto. }
+        i. des. inv MSG_LE. rewrite GET in *. inv GET2. ss.
+      - inv LOCAL2. inv STEP.
+        exploit Memory.write_get2; eauto. s. i. des.
+        exploit Memory.future_get1; try exact GET_MEM.
+        { etrans; eauto. }
+        i. des. inv MSG_LE. rewrite GET in *. inv GET2. ss.
+    }
+    subst. esplits; eauto; try eapply RAConfiguration.steps_refl. i.
+    destruct (Ordering.le ord Ordering.strong_relaxed) eqn: ORD; ss.
+    exfalso. apply H.
+    exploit RAConfiguration.steps_rels_incl; eauto. i. des.
+    rewrite x1. apply List.in_or_app. right.
+    inv STEP. inv STEP0; ss. inv STEP.
+    unfold ReleaseWrites.append. rewrite EVENT.
+    condtac; ss. condtac; [|destruct ord; ss]. left. ss.
+  Qed.
 
   Lemma racefree_implies
         s
@@ -221,15 +268,21 @@ Section LocalDRFRA.
     unfold RAConfiguration.reserve_only in H0.
     hexploit H0; eauto. i.
     exploit read_message_exists; try exact THREAD_STEPS; eauto. s. i. des.
-    exploit write_exists; try exact GET; try exact GET0; eauto. i. des.
+    exploit write_exists; try exact STEPS; eauto.
+    { ii. congr. }
+    i. des.
     exploit RAConfiguration.steps_ord_steps; try exact STEPS1. i.
     exploit RAConfiguration.step_ord_step; try exact WRITE_STEP. i.
     exploit RAConfiguration.steps_ord_steps; try exact STEPS2. i.
     exploit RAThread.steps_ord_steps; eauto. i.
     exploit RAThread.step_ord_step; eauto. i. des.
     eapply RACEFREE; eauto.
-    unguard. des; eauto.
-  Admitted.
+    unguard. des; eauto. left.
+    apply ORD. auto.
+  Qed.
+
+
+  (* Local DRF-RA theorem *)
 
   Theorem local_drf_ra
           s
