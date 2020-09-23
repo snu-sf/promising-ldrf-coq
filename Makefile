@@ -9,6 +9,7 @@ COQTHEORIES  := \
 	src/promotion/*.v \
 	src/ldrfpf/*.v \
 	src/ldrfra/*.v \
+	src/ldrfsc/*.v \
 
 .PHONY: all theories clean
 
@@ -30,6 +31,7 @@ Makefile.coq: Makefile $(COQTHEORIES)
    echo "-R src/promotion $(COQMODULE)"; \
    echo "-R src/ldrfpf $(COQMODULE)"; \
    echo "-R src/ldrfra $(COQMODULE)"; \
+   echo "-R src/ldrfsc $(COQMODULE)"; \
    \
    echo $(COQTHEORIES)) > _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq
