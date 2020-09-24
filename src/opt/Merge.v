@@ -104,6 +104,51 @@ Proof.
       * i. inv PR.
 Qed.
 
+Lemma merge_load_store_sim_stmts
+      l or ow r1:
+  sim_stmts eq
+            [Stmt.instr (Instr.load r1 l or); Stmt.instr (Instr.store l (Value.reg r1) ow)]
+            [Stmt.instr (Instr.update r1 l (Instr.fetch_add (Value.const 0)) or ow)]
+            eq.
+Proof.
+  pcofix CIH. ii. subst. pfold. ii. splits; ii.
+  { right. inv TERMINAL_TGT. }
+  { right. esplits; eauto.
+    eapply sim_local_memory_bot; eauto.
+  }
+  right.
+  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
+    try (inv STATE; inv INSTR); ss.
+  - (* promise *)
+    exploit sim_local_promise; eauto. i. des.
+    esplits; try apply SC; eauto; ss.
+    + econs 2. econs 1. econs; eauto.
+    + auto.
+  - (* load *)
+    clarify. rewrite Const.add_0_r in *.
+    exploit sim_local_read; try exact LOCAL; eauto; try refl. i. des.
+    assert (VIEWLE: View.opt_le None releasedr) by eauto.
+    exploit Local.read_step_future; try apply LOCAL1; eauto. i. des.
+    exploit Local.read_step_future; try apply STEP_SRC; eauto. i. des.
+    hexploit sim_local_write; try apply VIEWLE; try exact SC; try exact LOCAL0; eauto; try refl. i. des.
+    rewrite SimPromises.unset_bot in *.
+    esplits.
+    + ss.
+    + econs 2; [|econs 1].
+      econs.
+      * econs. econs 2. econs; [|econs 2]; eauto. econs. econs.
+      * eauto.
+    + econs 2. econs 2. econs; [|econs 3].
+      * econs. ss. econs.
+      * ss. rewrite RegFun.add_spec_eq. eauto.
+    + ss.
+    + ss.
+    + ss.
+    + left. eapply paco9_mon.
+      * apply sim_stmts_nil; eauto.
+      * ii. inv PR.
+Qed.
+
 
 (* merge store; instr *)
 
