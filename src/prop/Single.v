@@ -210,6 +210,15 @@ Module SConfiguration.
 
   Definition tau_machine_step := union (machine_step MachineEvent.silent).
 
+  Inductive all_machine_step: forall (c1 c2:Configuration.t), Prop :=
+  | all_machine_step_intro
+      e tid c1 c2
+      (STEP: machine_step e tid c1 c2)
+    :
+      all_machine_step c1 c2
+  .
+  Hint Constructors all_machine_step.
+
   Lemma step_future
         e tid c1 c2
         (STEP: step e tid c1 c2)
@@ -289,6 +298,31 @@ Module SConfiguration.
       exploit step_future; eauto. i. des.
       exploit IHSTEPS; eauto. i. des.
       splits; eauto; etrans; eauto.
+  Qed.
+
+  Lemma all_machine_step_future
+        c1 c2
+        (STEP: all_machine_step c1 c2)
+        (WF1: Configuration.wf c1):
+    (<<WF2: Configuration.wf c2>>) /\
+    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
+    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
+  Proof.
+    inv STEP. eapply machine_step_future; eauto.
+  Qed.
+
+  Lemma all_machine_steps_future
+        c1 c2
+        (STEP: rtc all_machine_step c1 c2)
+        (WF1: Configuration.wf c1):
+    (<<WF2: Configuration.wf c2>>) /\
+    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
+    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
+  Proof.
+    ginduction STEP; i.
+    - splits; auto. refl.
+    -  exploit all_machine_step_future; eauto. i. des.
+       exploit IHSTEP; eauto. i. des. esplits; eauto. etrans; eauto.
   Qed.
 
   Lemma silent_steps_tau_machine_steps es tid c1 c2
