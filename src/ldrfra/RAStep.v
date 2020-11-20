@@ -170,7 +170,7 @@ Module RAThread.
                L (ThreadEvent.promise loc from to Message.reserve Memory.op_kind_add) rels)
             at 2 by ss.
         econs. econs 1; eauto.
-        ii. inv PROMISE. ss.
+        ii. inv PROMISE.
       - ss.
     Qed.
 
@@ -702,7 +702,8 @@ Module RAThread.
     Proof.
       inv STEP. inv STEP0; inv STEP; inv LOCAL; ss; try by (inv LOCAL0; ss).
       - destruct (L loc) eqn:LOC.
-        + ii. exploit PF; eauto. i. subst.
+        + ii. destruct msg.
+          { exploit PF; ss. }
           revert GET. inv PROMISE; ss.
           * erewrite Memory.add_o; eauto. condtac; ss; eauto.
             i. des. subst. inv GET. ss.
@@ -815,12 +816,12 @@ Module RAThread.
       i. inv STEP. inv STEP0; inv STEP; inv LOCAL; ss; eauto.
       - inv PROMISE.
         + erewrite Memory.add_o; eauto. condtac; ss; eauto.
-          des. subst. exploit PF; eauto. i. subst. ss.
+          des. subst. ii. clarify. exploit PF; ss.
         + erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
-          * des. subst. exploit PF; eauto. i. subst. ss.
-          * guardH o. des. subst. exploit PF; eauto. i. ss.
+          * des. subst. exploit PF; eauto.
+          * guardH o. des. subst. exploit PF; eauto.
         + erewrite Memory.lower_o; eauto. condtac; ss; eauto.
-          des. subst. exploit PF; eauto. i. subst. ss.
+          des. subst. ii. clarify. exploit PF; ss.
         + erewrite Memory.remove_o; eauto. condtac; ss; eauto.
       - inv LOCAL0. inv STEP. inv WRITE. inv PROMISE; ss.
         + erewrite Memory.add_o; eauto. condtac; ss; eauto.

@@ -39,8 +39,7 @@ Lemma reservation_event_pf L e
   :
     pf_event L e.
 Proof.
-  ii. subst. unfold ThreadEvent.is_reservation_event in *.
-  ss. des; des_ifs.
+  ii. subst. unfold ThreadEvent.is_reservation_event in *. ss.
 Qed.
 
 Lemma reserve_future_memory_steps

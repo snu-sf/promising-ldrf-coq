@@ -34,32 +34,20 @@ Set Implicit Arguments.
 
 
 Section LOCALPF.
-
+  (** The Definition of the L-PF machine **)
   Variable L: Loc.t -> bool.
 
   Definition pf_event (e: ThreadEvent.t): Prop :=
-    forall loc from to msg kind (PROMISE: e = ThreadEvent.promise loc from to msg kind) (LOC: L loc),
-      msg = Message.reserve.
+    forall loc from to val released kind
+           (PROMISE: e = ThreadEvent.promise loc from to (Message.concrete val released) kind)
+           (LOC: L loc),
+      False.
 
   Definition pf_consistent lang (th: Thread.t lang): Prop :=
     exists tr_cert,
       (<<CONSISTENT: Trace.consistent th tr_cert>>) /\
       (<<PFCERT: List.Forall (compose pf_event snd) tr_cert>>).
 
-  Lemma pf_consistent_consistent lang (th: Thread.t lang)
-        (CONSISTENT: pf_consistent th)
-    :
-      Thread.consistent th.
-  Proof.
-    ii. unfold pf_consistent in *. des.
-    exploit CONSISTENT0; eauto. i. des.
-    { eapply Trace.silent_steps_tau_steps in STEPS; eauto.
-      left. unfold Thread.steps_failure. esplits; eauto. }
-    { eapply Trace.silent_steps_tau_steps in STEPS; eauto. }
-  Qed.
-
-
-  (* a single thread steps per one configuration step *)
   Inductive pf_step:
     forall (e:ThreadEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
   | pf_step_intro
@@ -84,6 +72,101 @@ Section LOCALPF.
   .
   Hint Constructors pf_machine_step.
 
+  Inductive pf_all_step (c1 c2: Configuration.t): Prop :=
+  | pf_all_step_intro
+      e tid
+      (STEP: pf_step e tid c1 c2)
+  .
+  Hint Constructors pf_all_step.
+
+
+  (** The Definition of an L-PF race **)
+  Inductive reading_event (loc: Loc.t) (ts: Time.t):
+    forall (e: ThreadEvent.t), Prop :=
+  | reading_event_read
+      valr releasedr ordr
+    :
+      reading_event loc ts (ThreadEvent.read loc ts valr releasedr ordr)
+  | reading_event_update
+      to valr valw releasedr releasedw ordr ordw
+    :
+      reading_event loc ts (ThreadEvent.update loc ts to valr valw releasedr releasedw ordr ordw)
+  .
+
+  Inductive writing_event (loc: Loc.t) (ts: Time.t):
+    forall (e: ThreadEvent.t), Prop :=
+  | writing_event_write
+      from valw releasedw ordw
+      (ORD: Ordering.le ordw Ordering.relaxed)
+    :
+      writing_event loc ts (ThreadEvent.write loc from ts valw releasedw ordw)
+  | writing_event_update
+      from valr valw releasedr releasedw ordr ordw
+      (ORD: Ordering.le ordw Ordering.relaxed)
+    :
+      writing_event loc ts (ThreadEvent.update loc from ts valr valw releasedr releasedw ordr ordw)
+  .
+
+  Definition pf_racy_execution (c0: Configuration.t): Prop :=
+    forall tid0 c1 tid1 c2 c3
+           loc ts e0 e1
+           (LOC: L loc)
+           (TID: tid0 <> tid1)
+           (CSTEP0: pf_step e0 tid0 c0 c1)
+           (WRITE: writing_event loc ts e0)
+           (STEPS: rtc (pf_machine_step MachineEvent.silent tid1) c1 c2)
+           (CSTEP1: pf_step e1 tid1 c2 c3)
+           (READ: reading_event loc ts e1),
+      False.
+
+  Definition pf_racefree (c0: Configuration.t): Prop :=
+    forall c1
+           (CSTEPS: rtc pf_all_step c0 c1),
+      pf_racy_execution c1.
+
+  Definition pf_promises (prom: Memory.t): Prop :=
+    forall loc to from msg
+           (LOC: L loc)
+           (GET: Memory.get loc to prom = Some (from, msg)),
+      msg = Message.reserve.
+
+  Definition pf_configuration (c: Configuration.t) :=
+    forall tid lang st lc
+           (TID: IdentMap.find tid c.(Configuration.threads) = Some (existT _ lang st, lc)),
+      pf_promises lc.(Local.promises).
+
+  Inductive pf_racy_state (c0: Configuration.t): Prop :=
+  | pf_race_intro
+      c1 c2
+      tid0 tid1 e0 e1
+      lang st0 lc0 th1 th2
+      tr pf loc ts
+      (STEPS: rtc (pf_machine_step MachineEvent.silent tid0) c0 c1)
+      (WRITE_STEP: pf_step e0 tid0 c1 c2)
+      (WRITE: writing_event loc ts e0)
+      (FIND: IdentMap.find tid1 c2.(Configuration.threads) = Some (existT _ lang st0, lc0))
+      (THREAD_STEPS: Trace.steps tr (Thread.mk _ st0 lc0 c2.(Configuration.sc) c2.(Configuration.memory)) th1)
+      (PF: List.Forall (compose pf_event snd) tr)
+      (CONS: Local.promise_consistent th1.(Thread.local))
+      (READ_STEP: Thread.step pf e1 th1 th2)
+      (READ: reading_event loc ts e1)
+      (LOC: L loc)
+  .
+
+
+  (** Properties of the L-PF machine **)
+  Lemma pf_consistent_consistent lang (th: Thread.t lang)
+        (CONSISTENT: pf_consistent th)
+    :
+      Thread.consistent th.
+  Proof.
+    ii. unfold pf_consistent in *. des.
+    exploit CONSISTENT0; eauto. i. des.
+    { eapply Trace.silent_steps_tau_steps in STEPS; eauto.
+      left. unfold Thread.steps_failure. esplits; eauto. }
+    { eapply Trace.silent_steps_tau_steps in STEPS; eauto. }
+  Qed.
+
   Inductive opt_pf_machine_step:
     forall (e: MachineEvent.t) (tid: Ident.t) (c1 c2: Configuration.t), Prop :=
   | opt_pf_machine_step_none
@@ -97,13 +180,6 @@ Section LOCALPF.
   Hint Constructors opt_pf_machine_step.
 
   Definition tau_pf_machine_step := union (pf_machine_step MachineEvent.silent).
-
-  Inductive pf_all_step (c1 c2: Configuration.t): Prop :=
-  | pf_all_step_intro
-      e tid
-      (STEP: pf_step e tid c1 c2)
-  .
-  Hint Constructors pf_all_step.
 
   Inductive pf_steps:
     forall (es: list ThreadEvent.t) (tid: Ident.t) (c1 c2:Configuration.t), Prop :=
@@ -152,67 +228,6 @@ Section LOCALPF.
       i. econs 2; eauto. rewrite <- H1. econs; eauto. }
   Qed.
 
-  Inductive reading_event (loc: Loc.t) (ts: Time.t):
-    forall (e: ThreadEvent.t), Prop :=
-  | reading_event_read
-      valr releasedr ordr
-    :
-      reading_event loc ts (ThreadEvent.read loc ts valr releasedr ordr)
-  | reading_event_update
-      to valr valw releasedr releasedw ordr ordw
-    :
-      reading_event loc ts (ThreadEvent.update loc ts to valr valw releasedr releasedw ordr ordw)
-  .
-
-  Inductive writing_event (loc: Loc.t) (ts: Time.t):
-    forall (e: ThreadEvent.t), Prop :=
-  | writing_event_write
-      from valw releasedw ordw
-      (ORD: Ordering.le ordw Ordering.relaxed)
-    :
-      writing_event loc ts (ThreadEvent.write loc from ts valw releasedw ordw)
-  | writing_event_update
-      from valr valw releasedr releasedw ordr ordw
-      (ORD: Ordering.le ordw Ordering.relaxed)
-    :
-      writing_event loc ts (ThreadEvent.update loc from ts valr valw releasedr releasedw ordr ordw)
-  .
-
-  Inductive pf_race (c0: Configuration.t): Prop :=
-  | pf_race_intro
-      c1 c2
-      tid0 tid1 e0 e1
-      lang st0 lc0 th1 th2
-      tr pf loc ts
-      (STEPS: rtc (pf_machine_step MachineEvent.silent tid0) c0 c1)
-      (WRITE_STEP: pf_step e0 tid0 c1 c2)
-      (WRITE: writing_event loc ts e0)
-      (FIND: IdentMap.find tid1 c2.(Configuration.threads) = Some (existT _ lang st0, lc0))
-      (THREAD_STEPS: Trace.steps tr (Thread.mk _ st0 lc0 c2.(Configuration.sc) c2.(Configuration.memory)) th1)
-      (PF: List.Forall (compose pf_event snd) tr)
-      (CONS: Local.promise_consistent th1.(Thread.local))
-      (READ_STEP: Thread.step pf e1 th1 th2)
-      (READ: reading_event loc ts e1)
-      (LOC: L loc)
-  .
-
-  Definition pf_racefree_imm (c0: Configuration.t): Prop :=
-    forall tid0 c1 tid1 c2 c3
-           loc ts e0 e1
-           (LOC: L loc)
-           (TID: tid0 <> tid1)
-           (CSTEP0: pf_step e0 tid0 c0 c1)
-           (WRITE: writing_event loc ts e0)
-           (STEPS: rtc (pf_machine_step MachineEvent.silent tid1) c1 c2)
-           (CSTEP1: pf_step e1 tid1 c2 c3)
-           (READ: reading_event loc ts e1),
-      False.
-
-  Definition pf_racefree (c0: Configuration.t): Prop :=
-    forall c1
-           (CSTEPS: rtc pf_all_step c0 c1),
-      pf_racefree_imm c1.
-
   Lemma step_pf_racefree c0 c1 e tid
         (RACEFREE: pf_racefree c0)
         (STEP: pf_step e tid c0 c1)
@@ -244,12 +259,6 @@ Section LOCALPF.
     i. eapply IHSTEPS.
     eapply step_pf_racefree; eauto.
   Qed.
-
-  Definition pf_promises (prom: Memory.t): Prop :=
-    forall loc to from msg
-           (LOC: L loc)
-           (GET: Memory.get loc to prom = Some (from, msg)),
-      msg = Message.reserve.
 
   Lemma pf_promises_promise prom0 mem0 loc from to msg prom1 mem1 kind
         (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
@@ -305,7 +314,8 @@ Section LOCALPF.
   Proof.
     inv STEP.
     - inv STEP0; ss. inv LOCAL.
-      eapply pf_promises_promise; eauto.
+      eapply pf_promises_promise; eauto. i.
+      destruct msg; ss. exfalso. eapply PF; eauto.
     - inv STEP0. inv LOCAL; ss.
       + inv LOCAL0; ss.
       + inv LOCAL0; ss.
@@ -346,11 +356,6 @@ Section LOCALPF.
     ginduction STEPS; eauto. i. eapply IHSTEPS.
     inv H. eapply pf_promises_step; eauto. ii. clarify.
   Qed.
-
-  Definition pf_configuration (c: Configuration.t) :=
-    forall tid lang st lc
-           (TID: IdentMap.find tid c.(Configuration.threads) = Some (existT _ lang st, lc)),
-      pf_promises lc.(Local.promises).
 
   Lemma configuration_init_pf syn: pf_configuration (Configuration.init syn).
   Proof.
@@ -587,10 +592,6 @@ Proof.
       exploit IHSTEPS; eauto. i. des. esplits; eauto. etrans; eauto.
   Qed.
 
-
-
-
-  (* multiple thread steps per one configuration step *)
   Inductive pf_step_trace: forall (tr: Trace.t) (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
   | pf_step_trace_intro
       lang tr e tr' pf tid c1 st1 lc1 e2 st3 lc3 sc3 memory3
@@ -1144,7 +1145,7 @@ Proof.
         (WF: Configuration.wf c)
         (PF: pf_configuration c)
     :
-      pf_race c.
+      pf_racy_state c.
   Proof.
     inv RACE.
     exploit pf_step_trace_future; try apply STEPS; eauto. i. des.

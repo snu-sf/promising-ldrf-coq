@@ -129,7 +129,7 @@ Proof.
   }
 Qed.
 
-Lemma local_DRFPF_multi L c
+Lemma local_drf_pf_multi L c
       (PF: pf_configuration L c)
       (WF: Configuration.wf c)
       (RACEFRFEE: pf_multi_racefree L c)
@@ -196,7 +196,7 @@ Proof.
     eapply times_configuration_step_strong_all_mon; eauto. }
 Qed.
 
-Theorem local_DRFPF L c
+Theorem local_drf_pf L c
         (PF: pf_configuration L c)
         (WF: Configuration.wf c)
         (RACEFREE: pf_racefree L c)
@@ -207,5 +207,5 @@ Proof.
   i. eapply SConfiguration.multi_step_equiv in PR; eauto.
   eapply pf_racefree_multi_racefree in RACEFREE; eauto.
   eapply pf_multi_step_behavior; eauto.
-  eapply local_DRFPF_multi; eauto.
+  eapply local_drf_pf_multi; eauto.
 Qed.

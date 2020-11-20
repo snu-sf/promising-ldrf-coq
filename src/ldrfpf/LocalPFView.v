@@ -786,7 +786,7 @@ Proof.
   }
 Qed.
 
-Theorem local_DRFPF_view_time L c
+Theorem local_drf_pf_view_time L c
         (WF: Configuration.wf c)
         (PF: pf_configuration L c)
         (RACEFRFEE: pf_racefree_view L c)
@@ -794,17 +794,17 @@ Theorem local_DRFPF_view_time L c
     behaviors SConfiguration.machine_step c <1=
     behaviors (pf_machine_step L) c.
 Proof.
-  ii. eapply local_DRFPF; eauto.
+  ii. eapply local_drf_pf; eauto.
   eapply pf_racefree_view_pf_race_free_imm; eauto.
 Qed.
 
-Theorem local_DRFPF_view L s
+Theorem local_drf_pf_view L s
         (RACEFRFEE: pf_racefree_view L (Configuration.init s))
   :
     behaviors SConfiguration.machine_step (Configuration.init s) <1=
     behaviors (pf_machine_step L) (Configuration.init s).
 Proof.
-  eapply local_DRFPF_view_time; eauto.
+  eapply local_drf_pf_view_time; eauto.
   { eapply Configuration.init_wf. }
   { eapply configuration_init_pf. }
 Qed.

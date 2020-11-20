@@ -1597,7 +1597,7 @@ Module PFtoRASimThread.
         esplits.
         + econs 1.
           * econs; eauto.
-          * ii. inv PROMISE0. ss.
+          * ii. inv PROMISE0.
         + left. esplits; eauto.
           econs; ss; eauto.
           eapply Stable.future_stable_view; try apply STABLE_SC; eauto.

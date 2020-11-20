@@ -1708,8 +1708,9 @@ Section SIM.
       eapply List.Forall_forall. i.
       eapply list_Forall2_in in H; eauto. des. destruct a, x; ss.
       eapply List.Forall_forall in IN0; try apply TRACE0; eauto.
-      inv EVENT; ss. ii. ss. clarify.
-      exploit IN0; ss; eauto. i. inv MSG; ss. }
+      inv EVENT; ss. ii. ss. clarify. destruct msg; ss.
+      - exploit IN0; ss.
+      - inv MSG; ss. }
   Qed.
 
 

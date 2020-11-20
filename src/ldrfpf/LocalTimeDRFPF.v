@@ -56,7 +56,7 @@ Lemma PF_sim_configuration_step
       (SIM: sim_configuration L times (fun _ => True) views0 prom0 extra0 proml0 c_src0 c_mid0 c_tgt0)
       (STEP: times_configuration_step_strong_all times e tid c_tgt0 c_tgt1)
   :
-    (<<RACE: pf_race L c_src0>>) \/
+    (<<RACE: pf_racy_state L c_src0>>) \/
     (<<UB: forall beh, behaviors (pf_machine_step L) c_src0 beh>>) \/
     (<<PROGRESS:
        exists c_src1 c_mid1 views1 prom1 extra1 proml1,
@@ -66,7 +66,7 @@ Lemma PF_sim_configuration_step
          (<<STEPMID: JConfiguration.step e tid c_mid0 c_mid1 views0 views1>>) /\
          (<<SIM: sim_configuration L times (fun _ => True) views1 prom1 extra1 proml1 c_src1 c_mid1 c_tgt1>>)>>).
 Proof.
-  destruct (classic (pf_race L c_src0)) as [RACE|NRACE]; auto.
+  destruct (classic (pf_racy_state L c_src0)) as [RACE|NRACE]; auto.
   right. inv STEP.
   destruct (classic (List.Forall
                        (fun the => no_read_msgs
@@ -110,7 +110,7 @@ Lemma PF_sim_configuration_behavior
     (exists bhd btl c_src1,
         (<<EQ: beh = bhd ++ btl>>) /\
         (<<BHD: behaviors_partial (pf_machine_step L) c_src0 c_src1 bhd>>) /\
-        (<<RACE: pf_race L c_src1>>) /\
+        (<<RACE: pf_racy_state L c_src1>>) /\
         (<<BTL: behaviors SConfiguration.machine_step c_src1 btl>>)).
 Proof.
   ginduction BEH; i.
@@ -257,10 +257,9 @@ Proof.
   { i. right. splits; ss. }
 Qed.
 
-Theorem local_DRFPF L c0
+Theorem local_drf_pf L c0
         (PF: pf_configuration L c0)
         (WF: Configuration.wf c0)
-        (RACEFREE: pf_racefree L c0)
         beh
         (BEH: behaviors SConfiguration.machine_step c0 beh)
   :
@@ -268,7 +267,7 @@ Theorem local_DRFPF L c0
     (exists bhd btl c1,
         (<<EQ: beh = bhd ++ btl>>) /\
         (<<BHD: behaviors_partial (pf_machine_step L) c0 c1 bhd>>) /\
-        (<<RACE: pf_race L c1>>) /\
+        (<<RACE: pf_racy_state L c1>>) /\
         (<<BTL: behaviors SConfiguration.machine_step c1 btl>>)).
 Proof.
   eapply SConfiguration.multi_step_equiv in BEH; eauto.
