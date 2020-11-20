@@ -295,7 +295,7 @@ Section LocalDRFRA.
     specialize (PFtoRA.init_wf_pf L s). intro WF_PF.
     specialize (PFtoRA.init_wf_j s). intro WF_J.
     specialize (PFtoRA.init_wf_ra s). intro WF_RA.
-    ii. exploit (@local_DRFPF_view L); eauto.
+    ii. exploit (@local_drf_pf_view L); eauto.
     { eapply PFtoRA.sim_conf_racefree; eauto. }
     eapply PFtoRA.sim_conf_behavior; eauto.
   Qed.

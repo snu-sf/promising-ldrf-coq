@@ -502,8 +502,8 @@ Module PFtoRAThread.
         inv STEP.
         hexploit PFtoRASimThread.thread_step; try exact STEP1; try eapply SIM1; eauto.
         { i. subst. destruct (L loc) eqn:LOC.
-          - split; ss. inv EVENT.
-            exploit PROMISE; eauto. i. subst. inv MSG. ss.
+          - split; ss. inv EVENT. destruct msg; ss. inv MSG.
+            exploit PROMISE; eauto; ss.
           - exfalso. apply H. esplits; eauto. congr.
         }
         i. unguard. des.
