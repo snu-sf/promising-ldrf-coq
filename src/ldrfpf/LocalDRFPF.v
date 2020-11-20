@@ -35,6 +35,7 @@ Require Import TimeTraced.
 Require Import LocalPF.
 Require Import LocalPFThread.
 Require Import LocalPFSim.
+Require Import JoinedViewExist.
 
 Set Implicit Arguments.
 
@@ -71,7 +72,6 @@ Proof.
     { eapply Forall_app_inv in H. des.
       eapply times_configuration_step_strong_step in STEP0.
       exploit (step_sim_configuration); eauto.
-      { instantiate (1:=true). ss. }
       i. des. unguard. des; ss. dep_inv STEPSRC.
       econs 2; eauto.
       { econs; eauto. }
@@ -93,7 +93,6 @@ Proof.
     { eapply Forall_app_inv in H. des.
       eapply times_configuration_step_strong_step in STEP0.
       exploit step_sim_configuration; eauto.
-      { instantiate (1:=true). ss. }
       i. des. unguard. des; ss.
       { dep_inv STEPSRC. econs 3; eauto. econs; eauto. }
       { dep_inv STEPSRC. econs 3; eauto. econs; eauto. }
@@ -108,7 +107,6 @@ Proof.
     { eapply Forall_app_inv in H. des.
       eapply times_configuration_step_strong_step in STEP0.
       exploit step_sim_configuration; eauto.
-      { instantiate (1:=true). ss. }
       i. des. ss. dep_inv STEPSRC.
       { econs 4; eauto.
         { econs; eauto. }
@@ -131,71 +129,81 @@ Proof.
   }
 Qed.
 
-
-Lemma local_DRFPF_multi L s
-        (RACEFRFEE: pf_multi_racefree L (Configuration.init s))
+Lemma local_DRFPF_multi L c
+      (PF: pf_configuration L c)
+      (WF: Configuration.wf c)
+      (RACEFRFEE: pf_multi_racefree L c)
   :
-    behaviors Configuration.step (Configuration.init s) <1=
-    behaviors (pf_multi_step L) (Configuration.init s).
+    behaviors Configuration.step c <1=
+    behaviors (pf_multi_step L) c.
 Proof.
-  i. eapply times_configuration_step_same_behaviors in PR; cycle 1.
-  { eapply Configuration.init_wf. }
-  des. eapply PF_sim_configuration_beh; eauto.
-  { eapply Configuration.init_wf. }
-  { eapply configuration_init_pf. }
-  { eapply JConfiguration.init_wf. }
-  { eapply Configuration.init_wf. }
-  instantiate (1:=s). instantiate (1:=fun _ => []).
-  instantiate (1:=bot4). instantiate (1:=bot3). econs; eauto.
-  { i. unfold Threads.init. repeat erewrite IdentMap.Facts.map_o.
-    unfold option_map. des_ifs. ss. econs. econs.
-    econs; ss. i. erewrite Memory.bot_get. destruct (classic (L loc)).
-    { econs 1; eauto. }
-    { econs 2; eauto.  }
+  hexploit joined_view_exist; eauto. intros [views JWF].
+  i. eapply times_configuration_step_same_behaviors in PR; eauto.
+  des. hexploit (PFConsistentStrong.memory_times_wf_exists c.(Configuration.memory)).
+  i. des.
+  eapply (@PF_sim_configuration_beh L (times \2/ times_mem)); eauto.
+  { i. eapply join_well_ordered; eauto. }
+  instantiate (1:=fun _ => []).
+  instantiate (1:=bot4). instantiate (1:=bot3). destruct c. econs; eauto.
+  { i. unfold option_rel. des_ifs. destruct p as [[lang st] [tview prom]].
+    econs; eauto. econs; eauto. econs; i; ss.
+    destruct (Memory.get loc ts prom) as [[from [val released|]]|] eqn:EQ; ss.
+    - econs; eauto. ii. exploit PF; eauto. ss.
+    - destruct (L loc) eqn:LOC; eauto.
+      + econs 3; eauto.
+      + econs 2; eauto. clarify.
+    - destruct (L loc) eqn:LOC; eauto.
+      + econs 1; eauto.
+      + econs 2; eauto. clarify.
   }
-  { i. unfold Threads.init. repeat erewrite IdentMap.Facts.map_o.
-    unfold option_map. des_ifs. ss. econs. econs.
+  { i. unfold option_rel, language. des_ifs.
+    destruct p as [[lang st] [tview prom]]. econs; eauto. econs; eauto.
     { refl. }
-    { ii. erewrite Memory.bot_get. econs. }
+    { ii. destruct (Memory.get loc ts prom) as [[from [val [released|]|]]|] eqn:EQ; ss.
+      - econs.
+         + econs. econs; eauto.
+           * eapply WF in Heq. eapply Heq in EQ. ss.
+             eapply JWF in EQ. des. auto.
+           * refl.
+         + inv JWF. ss. eapply REL in Heq. ss.
+           eapply Heq in EQ. right. ii. rewrite H in *. clarify.
+      - econs; eauto. econs.
+    }
   }
   { i. splits; ss. }
-  { econs.
-    { i. unfold Memory.init, Memory.get. erewrite Cell.init_get. des_ifs.
-      { econs 2; eauto.
-        { ii. inv H. ss. }
-        { ii. inv H. ss. }
-        { refl. }
-        { i. apply eq_lb_time. }
-      }
-      { econs.
-        { ii. inv H. ss. }
-        { ii. inv H. ss. }
-      }
+  { econs; ii.
+    { destruct (Memory.get loc ts memory) as [[from msg]|] eqn:EQ; ss.
+      - econs 2; eauto.
+        + ii. inv H. ss.
+        + ii. inv H. ss.
+        + refl.
+        + i. eapply eq_lb_time.
+      - econs 1; eauto.
+        + ii. inv H. ss.
+        + ii. inv H. ss.
     }
-    { i. inv EXTRA. ss. }
+    { inv EXTRA. ss. }
   }
   { refl. }
-  { i. unfold JConfiguration.init_views. des_ifs. econs; eauto.
-    eapply Memory.closed_view_bot. eapply Memory.init_closed. }
+  { i. inv JWF. inv JOINMEM. eapply List.Forall_impl; [|apply CLOSED].
+    ss. i. eapply closed_view_semi_closed; auto. }
   { refl. }
-  { ii. unfold Memory.init, Memory.get in GET. erewrite Cell.init_get in GET.
-    des_ifs. auto. }
-  { ii. unfold Memory.init, Memory.get in GET. erewrite Cell.init_get in GET.
-    des_ifs. auto. }
-  { i. unfold Threads.init in GET. erewrite IdentMap.Facts.map_o in GET.
-    unfold option_map in GET. des_ifs. dep_clarify. econs; ss.
-    ii. destruct pl0; ss.
-  }
+  { ii. eapply MWF in GET. des; auto. }
+  { ii. eapply MWF in GET. des; auto. }
+  { ii. econs; ss. i. destruct pl0; ss. }
+  { i. right. splits; ss. }
+  { eapply le_step_behavior_improve; [|apply BEH].
+    eapply times_configuration_step_strong_all_mon; eauto. }
 Qed.
 
-Theorem local_DRFPF L s
-        (RACEFREE: pf_racefree L (Configuration.init s))
+Theorem local_DRFPF L c
+        (PF: pf_configuration L c)
+        (WF: Configuration.wf c)
+        (RACEFREE: pf_racefree L c)
   :
-    behaviors SConfiguration.machine_step (Configuration.init s) <1=
-    behaviors (pf_machine_step L) (Configuration.init s).
+    behaviors SConfiguration.machine_step c <1=
+    behaviors (pf_machine_step L) c.
 Proof.
-  hexploit (Configuration.init_wf s). intros WF.
-  hexploit (configuration_init_pf L s). intros PF.
   i. eapply SConfiguration.multi_step_equiv in PR; eauto.
   eapply pf_racefree_multi_racefree in RACEFREE; eauto.
   eapply pf_multi_step_behavior; eauto.

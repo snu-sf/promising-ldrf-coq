@@ -178,6 +178,24 @@ Section LOCALPF.
       writing_event loc ts (ThreadEvent.update loc from ts valr valw releasedr releasedw ordr ordw)
   .
 
+  Inductive pf_race (c0: Configuration.t): Prop :=
+  | pf_race_intro
+      c1 c2
+      tid0 tid1 e0 e1
+      lang st0 lc0 th1 th2
+      tr pf loc ts
+      (STEPS: rtc (pf_machine_step MachineEvent.silent tid0) c0 c1)
+      (WRITE_STEP: pf_step e0 tid0 c1 c2)
+      (WRITE: writing_event loc ts e0)
+      (FIND: IdentMap.find tid1 c2.(Configuration.threads) = Some (existT _ lang st0, lc0))
+      (THREAD_STEPS: Trace.steps tr (Thread.mk _ st0 lc0 c2.(Configuration.sc) c2.(Configuration.memory)) th1)
+      (PF: List.Forall (compose pf_event snd) tr)
+      (CONS: Local.promise_consistent th1.(Thread.local))
+      (READ_STEP: Thread.step pf e1 th1 th2)
+      (READ: reading_event loc ts e1)
+      (LOC: L loc)
+  .
+
   Definition pf_racefree_imm (c0: Configuration.t): Prop :=
     forall tid0 c1 tid1 c2 c3
            loc ts e0 e1
@@ -975,6 +993,24 @@ Proof.
     econs. esplits; eauto.
   Qed.
 
+  Inductive pf_multi_race (c0: Configuration.t): Prop :=
+  | pf_multi_race_intro
+      c1
+      tid0 tid1 e0 e1
+      lang st0 lc0 th1 th2
+      e trs tr pf loc ts
+      (STEPS: pf_step_trace trs e tid0 c0 c1)
+      (TRACE: final_event_trace e0 trs)
+      (WRITE: writing_event loc ts e0)
+      (FIND: IdentMap.find tid1 c1.(Configuration.threads) = Some (existT _ lang st0, lc0))
+      (THREAD_STEPS: Trace.steps tr (Thread.mk _ st0 lc0 c1.(Configuration.sc) c1.(Configuration.memory)) th1)
+      (PF: List.Forall (compose pf_event snd) tr)
+      (CONS: Local.promise_consistent th1.(Thread.local))
+      (READ_STEP: Thread.step pf e1 th1 th2)
+      (READ: reading_event loc ts e1)
+      (LOC: L loc)
+  .
+
   Definition pf_multi_racefree_imm (c0: Configuration.t): Prop :=
     forall tid0 c1 trs0 tid1 c2 trs1
            loc ts lc1 te0 te1 e0 e1
@@ -1100,6 +1136,44 @@ Proof.
       { eapply steps_pf_racefree; eauto. }
       { eapply reservation_only_step_pf_step in STEP0; eauto.
         eapply step_pf_racefree; eauto. }
+    }
+  Qed.
+
+  Lemma pf_multi_race_pf_race c
+        (RACE: pf_multi_race c)
+        (WF: Configuration.wf c)
+        (PF: pf_configuration c)
+    :
+      pf_race c.
+  Proof.
+    inv RACE.
+    exploit pf_step_trace_future; try apply STEPS; eauto. i. des.
+    exploit final_event_trace_filter; eauto.
+    { ii. inv WRITE; eauto. } i. des.
+    dup STEPS. eapply pf_step_trace_pf_steps in STEPS; eauto.
+    rewrite FILTER in *. des; cycle 1.
+    { eapply List.app_eq_nil in NIL. des; ss. }
+    eapply pf_steps_split in STEPS1. des. inv STEPS3. inv STEPS.
+    econs; cycle 1; eauto.
+    eapply silent_pf_steps_tau_pf_machine_steps; eauto.
+    assert (exists trs_hd trs_tl,
+               (<<TRS: trs = trs_hd ++ [trs_tl]>>) /\
+               (<<SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) trs_hd>>)).
+    { inv STEPS0. eauto. } clear STEPS0. des. subst.
+    erewrite List.map_app in FILTER. erewrite list_filter_app in FILTER.
+    assert (exists tl,
+               tr_hd ++ tl = List.filter (fun e => ThreadEvent.is_normal_dec e) (List.map snd trs_hd)).
+    { ss. des_ifs.
+      - exists []. rewrite List.app_nil_r.
+        eapply List.app_inj_tail in FILTER. des. auto.
+      - exists [e0]. rewrite <- FILTER. rewrite List.app_nil_r. auto.
+    }
+    des. exploit Forall_app_inv; cycle 1.
+    { i. des. eapply FORALL1. }
+    { rewrite H. eapply List.Forall_forall. i.
+      eapply List.filter_In in H0. des.
+      eapply List.in_map_iff in H0. des. subst.
+      eapply List.Forall_forall in SILENT; eauto.
     }
   Qed.
 

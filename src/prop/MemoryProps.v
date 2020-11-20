@@ -3965,6 +3965,59 @@ Section SEMICLOSED.
     eapply semi_closed_opt_view_future; eauto.
   Qed.
 
+  Lemma join_singleton_semi_closed_timemap tm mem loc from to
+        (CLOSED: semi_closed_timemap tm mem loc from)
+        (TS: Time.le from to)
+    :
+      semi_closed_timemap (TimeMap.join (TimeMap.singleton loc to) tm) mem loc to.
+  Proof.
+    ii. specialize (CLOSED l).
+    remember (TimeMap.join (TimeMap.singleton loc to) tm l).
+    unfold TimeMap.join, TimeMap.singleton in Heqt.
+    setoid_rewrite LocFun.add_spec in Heqt.
+    unfold Time.join in Heqt. des_ifs; des; clarify; eauto.
+    - right. splits; auto. eapply TimeFacts.antisym; eauto.
+    - erewrite LocFun.init_spec in l0.
+      exfalso. eapply Time.lt_strorder.
+      eapply TimeFacts.lt_le_lt; eauto. eapply Time.bot_spec.
+  Qed.
+
+  Lemma join_singleton_semi_closed_view vw mem loc from to
+        (CLOSED: semi_closed_view vw mem loc from)
+        (TS: Time.le from to)
+    :
+      semi_closed_view (View.join (View.singleton_ur loc to) vw) mem loc to.
+  Proof.
+    inv CLOSED. econs; ss.
+    - eapply join_singleton_semi_closed_timemap; eauto.
+    - eapply join_singleton_semi_closed_timemap; eauto.
+  Qed.
+
+  Lemma concrete_promised_le_semi_closed_timemap tm mem0 mem1 loc to
+        (CLOSED: semi_closed_timemap tm mem0 loc to)
+        (CONCRETE: concrete_promised_le mem0 mem1)
+    :
+      semi_closed_timemap tm mem1 loc to.
+  Proof.
+    ii. specialize (CLOSED l). des.
+    { exploit CONCRETE.
+      { econs; eauto. }
+      i. inv x. eauto.
+    }
+    { clarify. auto. }
+  Qed.
+
+  Lemma concrete_promised_le_semi_closed_view vw mem0 mem1 loc to
+        (CLOSED: semi_closed_view vw mem0 loc to)
+        (CONCRETE: concrete_promised_le mem0 mem1)
+    :
+      semi_closed_view vw mem1 loc to.
+  Proof.
+    inv CLOSED. econs.
+    - eapply concrete_promised_le_semi_closed_timemap; eauto.
+    - eapply concrete_promised_le_semi_closed_timemap; eauto.
+  Qed.
+
 End SEMICLOSED.
 
 

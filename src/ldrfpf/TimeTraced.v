@@ -42,7 +42,7 @@ Inductive times_configuration_step_strong (times: Loc.t -> Time.t -> Prop)
     (TR: tr = tr'++[(e2.(Thread.local), e)])
     (CONSISTENT: forall (EVENT: e <> ThreadEvent.failure),
         pf_consistent_super_strong (Thread.mk _ st3 lc3 sc3 memory3) tr_cert times)
-    (CERTBOT: e = ThreadEvent.failure -> tr_cert = [])
+    (CERTBOT: e = ThreadEvent.failure \/ (exists se, e = ThreadEvent.syscall se) -> tr_cert = [])
     (CERTBOTNIL: lc3.(Local.promises) = Memory.bot -> tr_cert = [])
     (TIMES: List.Forall (fun thte => wf_time_evt times (snd thte)) tr)
   :
@@ -63,7 +63,7 @@ Inductive times_configuration_step (times: Loc.t -> Time.t -> Prop)
     (TR: tr = tr'++[(e2.(Thread.local), e)])
     (CONSISTENT: forall (EVENT: e <> ThreadEvent.failure),
         pf_consistent_super_strong (Thread.mk _ st3 lc3 sc3 memory3) tr_cert times)
-    (CERTBOT: e = ThreadEvent.failure -> tr_cert = [])
+    (CERTBOT: e = ThreadEvent.failure \/ (exists se, e = ThreadEvent.syscall se) -> tr_cert = [])
     (TIMES: List.Forall (fun thte => wf_time_evt times (snd thte)) tr)
   :
     times_configuration_step
@@ -215,7 +215,8 @@ Proof.
     { des. eexists (certimes \2/ (fun loc ts => List.In ts (times loc ++ times0 loc))), (tr++_), tr0. splits.
       { econs; eauto.
         { i. esplits. eapply pf_consistent_super_strong_mon; eauto. }
-        { i. ss. }
+        { i. des; ss. clarify.
+          inv STEP0; inv STEP. inv LOCAL. inv LOCAL0. ss. exfalso. eauto. }
         { ii. ss. }
         { eapply Forall_app.
           { eapply List.Forall_impl; eauto. i. eapply wf_time_evt_mon; try apply H.
@@ -226,6 +227,30 @@ Proof.
       }
       { i. eapply join_well_ordered; eauto. eapply finite_well_ordered. }
     }
+  }
+Qed.
+
+Lemma times_configuration_behavior_configuration_behavior times c
+      (WF: Configuration.wf c)
+  :
+    behaviors (times_configuration_step_strong_all times) c <1=
+    behaviors (Configuration.step) c.
+Proof.
+  i. ginduction PR; eauto.
+  { i. econs 1. eauto. }
+  { i. inv STEP. eapply times_configuration_step_strong_step in STEP0.
+    eapply times_configuration_step_configuration_step in STEP0; eauto.
+    econs 2; eauto. eapply IHPR; eauto.
+    eapply Configuration.step_future; eauto.
+  }
+  { i. inv STEP. eapply times_configuration_step_strong_step in STEP0.
+    eapply times_configuration_step_configuration_step in STEP0; eauto.
+    econs 3; eauto.
+  }
+  { i. inv STEP. eapply times_configuration_step_strong_step in STEP0.
+    eapply times_configuration_step_configuration_step in STEP0; eauto.
+    econs 4; eauto. eapply IHPR; eauto.
+    eapply Configuration.step_future; eauto.
   }
 Qed.
 

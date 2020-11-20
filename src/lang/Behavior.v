@@ -77,3 +77,57 @@ Proof.
   - econs 3; eauto.
   - econs 4; eauto.
 Qed.
+
+Inductive behaviors_partial
+          (step: forall (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop):
+  forall (conf1 conf2:Configuration.t) (b:list Event.t), Prop :=
+| behaviors_partial_nil
+    c:
+    behaviors_partial step c c nil
+| behaviors_partial_syscall
+    e tid c1 c2 c3 beh
+    (STEP: step (MachineEvent.syscall e) tid c1 c2)
+    (NEXT: behaviors_partial step c2 c3 beh):
+    behaviors_partial step c1 c3 (e::beh)
+| behaviors_partial_tau
+    tid c1 c2 c3 beh
+    (STEP: step MachineEvent.silent tid c1 c2)
+    (NEXT: behaviors_partial step c2 c3 beh):
+    behaviors_partial step c1 c3 beh
+.
+
+Lemma rtc_tau_step_behavior_partial
+      step c1 c2 c3 b
+      (STEPS: rtc (union (step MachineEvent.silent)) c1 c2)
+      (BEH: behaviors_partial step c2 c3 b):
+  behaviors_partial step c1 c3 b.
+Proof.
+  revert BEH. induction STEPS; auto. inv H.
+  i. specialize (IHSTEPS BEH). econs 3; eauto.
+Qed.
+
+Lemma behaviors_partial_app_partial
+      step c1 c2 c3 b1 b2
+      (BEH1: behaviors_partial step c1 c2 b1)
+      (BEH2: behaviors_partial step c2 c3 b2)
+  :
+    behaviors_partial step c1 c3 (b1 ++ b2).
+Proof.
+  induction BEH1.
+  - eauto.
+  - econs 2; eauto.
+  - econs 3; eauto.
+Qed.
+
+Lemma behaviors_partial_app
+      step c1 c2 b1 b2
+      (BEH1: behaviors_partial step c1 c2 b1)
+      (BEH2: behaviors step c2 b2)
+  :
+    behaviors step c1 (b1 ++ b2).
+Proof.
+  induction BEH1.
+  - eauto.
+  - econs 2; eauto.
+  - econs 4; eauto.
+Qed.

@@ -1102,7 +1102,7 @@ Module JSim.
   | joined_promise_content_concrete
       from val released_src released_tgt
       (RELEASED: max_le_joined_opt_view views released_tgt released_src)
-      (NIL: views <> [])
+      (NIL: (released_src = None /\ released_tgt = None) \/ views <> [])
     :
       joined_promise_content
         views loc ts
@@ -1136,8 +1136,9 @@ Module JSim.
     :
       sim_joined_promises views1 prom_src prom_tgt.
   Proof.
-    ii. specialize (PROM loc ts). inv PROM; eauto.
-    exploit VIEWSLE; eauto. i. rewrite x. auto.
+    ii. specialize (PROM loc ts). inv PROM; eauto. des.
+    { clarify. econs; eauto. econs. }
+    { exploit VIEWSLE; eauto. i. rewrite x. auto. }
   Qed.
 
   Inductive sim_local (views: Loc.t -> Time.t -> list View.t):
@@ -1493,7 +1494,8 @@ Module JSim.
           - ii. unfold views2.
             erewrite (@Memory.add_o prom2_src); eauto.
             erewrite (@Memory.add_o promises2); eauto. des_ifs.
-            ss. des; clarify. econs; eauto. ss.
+            ss. des; clarify. econs; eauto.
+            inv MAX; eauto. right. ii. clarify.
         }
         { eapply sim_memory_add; cycle 1; eauto. econs.
           eapply max_le_joined_opt_view_le; eauto. }
@@ -1580,7 +1582,8 @@ Module JSim.
       { inv LOCAL1. inv WF1_SRC. dup PROMISES0. ss.
         specialize (PROMISES2 loc ts3). erewrite GET2 in *. inv PROMISES2.
         - esplits; eauto. inv WF1_TGT. exploit sim_memory_get; eauto.
-          { i. des. symmetry in H0. apply PROMISES1 in H0. clarify. }
+          { i. clear NIL. des.
+            symmetry in H0. apply PROMISES1 in H0. clarify. }
       } des.
 
       hexploit (@Memory.split_exists lc1_src.(Local.promises) loc from to ts3 (Message.concrete val'0 max) (Message.concrete val'_src released'_src)); auto.
@@ -1659,7 +1662,8 @@ Module JSim.
       { inv LOCAL1. econs; eauto.
         - ii. erewrite (@Memory.split_o prom2_src); eauto.
           erewrite (@Memory.split_o promises2); eauto. unfold views2. des_ifs.
-          + ss. des; clarify. econs; eauto. ss.
+          + ss. des; clarify. econs; eauto.
+            inv MAX; eauto. right. ii. clarify.
           + ss. des; clarify.
             specialize (PROMISES0 loc ts3).
             rewrite GETSRC in *. erewrite GET2 in *.
@@ -1693,7 +1697,8 @@ Module JSim.
       inv LOCAL1. dup PROMISES0. ss.
       specialize (PROMISES1 loc to). erewrite GET in *. inv PROMISES1.
 
-      hexploit (@max_le_joined_opt_view_exists ((views1 loc to)) released0); auto. i. des.
+      hexploit (@max_le_joined_opt_view_exists ((views1 loc to)) released0); auto. i.
+      guardH NIL. des.
 
       assert (RELEASEDLE: View.opt_le max released_src).
       { eapply max_le_joined_opt_view_le_le; eauto. }
@@ -1731,6 +1736,7 @@ Module JSim.
         - ii. erewrite (@Memory.lower_o prom2_src); eauto.
           erewrite (@Memory.lower_o promises2); eauto. des_ifs.
           ss. des; clarify. econs; eauto.
+          unguard. des; auto. clarify. inv RELEASEDLE. inv MAX. auto.
       }
       { eapply sim_memory_lower; cycle 1; eauto. econs.
         eapply max_le_joined_opt_view_le; eauto. }
@@ -1846,7 +1852,7 @@ Module JSim.
                ((<<TS: Time.lt (View.rlx (TView.cur write_tview) loc0) ts0>>) /\
                 (<<NEQ: __guard__(loc0 <> loc \/ loc0 = loc /\ Time.lt to ts0)>>))).
     { i. inv LOCAL1. ss. specialize (PROMISES0 loc0 ts0).
-      erewrite GET in *. inv PROMISES0. symmetry in H.
+      erewrite GET in *. inv PROMISES0. symmetry in H. clear NIL.
       assert (((<<NEQ: __guard__(loc0 <> loc \/ ts0 <> to)>>) /\
                exists from0' val0' released_tgt0',
                  (<<GET_TGT: Memory.get loc0 ts0 lc2_tgt.(Local.promises) =
@@ -1887,7 +1893,7 @@ Module JSim.
       intros NONSYNCH. eapply sim_local_nonsynch_loc in NONSYNCH; eauto.
       inv LOCAL1. ss. specialize (PROMISES0 loc ts).
       erewrite GET in *. inv PROMISES0. symmetry in H. inv RELEASED.
-      inv PROMISE; ss.
+      clear NIL. inv PROMISE; ss.
       - eapply Memory.add_get1 in H; cycle 1; eauto.
         eapply Memory.remove_get1 in H; eauto. des; subst.
         + exploit NONSYNCH; eauto. ss.
@@ -2065,7 +2071,7 @@ Module JSim.
       { inv LOCAL1. dup PROMISES0. ss.
         specialize (PROMISES1 loc ts3). erewrite GET2 in *. inv PROMISES1.
         - esplits; eauto. inv WF1_TGT. exploit sim_memory_get; eauto.
-          { i. des. symmetry in H0. apply PROMISES in H0. erewrite H0 in *.
+          { i. clear NIL. des. symmetry in H0. apply PROMISES in H0. erewrite H0 in *.
             inv GET. auto. }
       } des.
 
@@ -2241,7 +2247,7 @@ Module JSim.
         setoid_rewrite LocFun.add_spec_eq. condtac.
         - exfalso. inv RELEASED. eapply RELEASE_SRC; eauto.
         - inv RELM_JOINED; ss.
-          + eapply all_join_views_joined in JOINED. des.
+          + eapply all_join_views_joined in JOINED. clear NIL. des.
             { subst. erewrite View.join_bot_l.
               eapply joined_view_exact; eauto. }
             erewrite <- View.le_join_r with (l:=View.singleton_ur loc to); cycle 1.
@@ -2269,18 +2275,18 @@ Module JSim.
       intros [mem2_src MEM_SRC].
 
       hexploit (@Memory.remove_exists prom2_src' loc from to (Message.concrete val released_src)); auto.
-      { eapply Memory.lower_get0 in PROMISES_SRC'. des. eauto. }
+      { eapply Memory.lower_get0 in PROMISES_SRC'. clear NIL. des. eauto. }
       intros [prom2_src PROMISES_SRC].
 
       assert (JOINMEM2: joined_memory views1 mem2_src).
       { inv JOINMEM1. econs.
         - i. erewrite Memory.lower_o in GET0; eauto.
           destruct (loc_ts_eq_dec (loc0, ts) (loc, to)); eauto.
-          ss. des; subst. inv GET0. rewrite H2 in *.
+          ss. clear NIL. des; subst. inv GET0. rewrite H2 in *.
           inv RELEASED_JOINED. splits; auto.
           inv MSG_LE_SRC. inv RELEASED0. hexploit COMPLETE; eauto.
           i. des. auto.
-        - i. exploit ONLY; eauto. i. des.
+        - i. exploit ONLY; eauto. i. clear NIL. des.
           eapply Memory.lower_get1 in GET0; eauto.
           des. inv MSG_LE0. eauto.
         - i. eapply List.Forall_impl; try apply CLOSED. ss.
@@ -2308,7 +2314,7 @@ Module JSim.
         erewrite (@Memory.remove_o prom2_src) in GET0; eauto.
         erewrite (@Memory.lower_o prom2_src') in GET0; eauto.
         destruct (loc_ts_eq_dec (loc0, ts) (loc, to)); ss.
-        apply or_strengthen in o. des.
+        apply or_strengthen in o. clear NIL. des.
         { setoid_rewrite LocFun.add_spec_neq; auto.
           exploit REL1; eauto. }
         apply NNPP in NOT. subst. setoid_rewrite LocFun.add_spec_eq.
@@ -2953,4 +2959,51 @@ Module JSim.
     erewrite <- sim_event_machine_event; eauto.
   Qed.
 
+  Require Import Behavior.
+
+  Lemma multi_step_machine_behavior views0 c_src0 c_tgt0
+        (SIM: sim_configuration views0 c_src0 c_tgt0)
+        (WF_SRC: JConfiguration.wf views0 c_src0)
+        (WF_TGT: Configuration.wf c_tgt0)
+    :
+      behaviors Configuration.step c_tgt0 <1=
+      behaviors Configuration.step c_src0.
+  Proof.
+    ii. revert views0 c_src0 SIM WF_SRC. induction PR.
+    - i. econs 1. ii. inv SIM. ss.
+      specialize (THS tid). rewrite FIND in THS.
+      unfold option_rel in THS. des_ifs. dep_inv THS.
+      exploit (TERMINAL tid); eauto. i. des. splits; auto.
+      inv THREAD. econs. eapply sim_local_memory_bot; eauto.
+    - i. exploit step_sim_configuration; eauto. i. des.
+      econs 2.
+      { eapply JConfiguration.step_configuration_step; eauto. }
+      { eapply IHPR; eauto.
+        { eapply Configuration.step_future in STEP; eauto. des. auto. }
+        { eapply JConfiguration.step_future in STEP0; eauto. des. auto. }
+      }
+    - i. exploit step_sim_configuration; eauto. i. des.
+      econs 3.
+      { eapply JConfiguration.step_configuration_step; eauto. }
+    - i. exploit step_sim_configuration; eauto. i. des.
+      econs 4.
+      { eapply JConfiguration.step_configuration_step; eauto. }
+      { eapply IHPR; eauto.
+        { eapply Configuration.step_future in STEP; eauto. des. auto. }
+        { eapply JConfiguration.step_future in STEP0; eauto. des. auto. }
+      }
+  Qed.
+
+  Lemma machine_behavior views0 c_src0 c_tgt0
+        (SIM: sim_configuration views0 c_src0 c_tgt0)
+        (WF_SRC: JConfiguration.wf views0 c_src0)
+        (WF_TGT: Configuration.wf c_tgt0)
+    :
+      behaviors SConfiguration.machine_step c_tgt0 <1=
+      behaviors SConfiguration.machine_step c_src0.
+  Proof.
+    ii. eapply SConfiguration.multi_step_equiv in PR; auto.
+    eapply multi_step_machine_behavior in PR; eauto.
+    eapply SConfiguration.multi_step_equiv; eauto. eapply WF_SRC.
+  Qed.
 End JSim.
