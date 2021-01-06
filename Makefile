@@ -10,9 +10,9 @@ COQTHEORIES  := \
 	src/invariant/*.v \
 	src/gopt/*.v \
 	src/promotion/*.v \
-	src/ldrfpf/*.v \
-	src/ldrfra/*.v \
-	src/ldrfsc/*.v \
+#	src/ldrfpf/*.v \
+#	src/ldrfra/*.v \
+#	src/ldrfsc/*.v \
 
 .PHONY: all theories clean
 
