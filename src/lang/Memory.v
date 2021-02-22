@@ -167,6 +167,9 @@ Module Memory.
       val released loc to
       (TS: Time.le ((View.rlx (View.unwrap released)) loc) to):
       message_to (Message.concrete val released) loc to
+  | message_to_undef
+      loc to:
+      message_to Message.undef loc to
   | message_to_reserve
       loc to:
       message_to Message.reserve loc to
@@ -199,6 +202,9 @@ Module Memory.
       val released mem
       (CLOSED: closed_opt_view released mem):
       closed_message (Message.concrete val released) mem
+  | closed_message_undef
+      mem:
+      closed_message Message.undef mem
   | closed_message_reserve
       mem:
       closed_message Message.reserve mem
@@ -363,6 +369,7 @@ Module Memory.
       (MEM: add mem1 loc from to msg mem2)
       (TS: message_to msg loc to)
       (ATTACH: forall val released to' msg'
+                 (* TODO: non-reserve? any msg? *)
                  (MSG: msg = Message.concrete val released)
                  (GET: get loc to' mem1 = Some (to, msg')), False):
       promise promises1 mem1 loc from to msg promises2 mem2 op_kind_add
@@ -371,32 +378,32 @@ Module Memory.
       (PROMISES: split promises1 loc from to ts3 msg msg3 promises2)
       (MEM: split mem1 loc from to ts3 msg msg3 mem2)
       (TS: message_to msg loc to)
-      (RESERVE: exists val' released', msg = Message.concrete val' released')
-      (RESERVE3: exists val' released', msg3 = Message.concrete val' released'):
+      (MSG: msg <> Message.reserve)
+      (MSG3: msg3 <> Message.reserve):
       promise promises1 mem1 loc from to msg promises2 mem2 (op_kind_split ts3 msg3)
   | promise_lower
       msg0
       (PROMISES: lower promises1 loc from to msg0 msg promises2)
       (MEM: lower mem1 loc from to msg0 msg mem2)
       (TS: message_to msg loc to)
-      (RESERVE: exists val released, msg0 = Message.concrete val released):
+      (MSG: exists val released, msg0 = Message.concrete val released):
       promise promises1 mem1 loc from to msg promises2 mem2 (op_kind_lower msg0)
   | promise_cancel
       (PROMISES: remove promises1 loc from to msg promises2)
       (MEM: remove mem1 loc from to msg mem2)
-      (RESERVE: msg = Message.reserve):
+      (MSG: msg = Message.reserve):
       promise promises1 mem1 loc from to msg promises2 mem2 op_kind_cancel
   .
   Hint Constructors promise.
 
   Inductive write
             (promises1 mem1:t)
-            (loc:Loc.t) (from1 to1:Time.t) (val:Const.t) (released: option View.t)
+            (loc:Loc.t) (from1 to1:Time.t) (msg:Message.t)
             (promises3 mem2:t) (kind:op_kind): Prop :=
   | write_intro
       promises2
-      (PROMISE: promise promises1 mem1 loc from1 to1 (Message.concrete val released) promises2 mem2 kind)
-      (REMOVE: remove promises2 loc from1 to1 (Message.concrete val released) promises3)
+      (PROMISE: promise promises1 mem1 loc from1 to1 msg promises2 mem2 kind)
+      (REMOVE: remove promises2 loc from1 to1 msg promises3)
   .
   Hint Constructors write.
 
@@ -783,10 +790,7 @@ Module Memory.
     ii. erewrite add_o; eauto. condtac; ss.
     des. subst. exfalso.
     specialize (CLOSED loc). des.
-    inv ADD. inv ADD0. eapply DISJOINT; eauto.
-    all: econs; eauto; ss; try refl.
-    exploit get_ts; eauto. i. des; ss.
-    rewrite x1 in TO. inv TO.
+    exploit add_get0; eauto. i. des. congr.
   Qed.
 
   Lemma add_closed_view
@@ -849,26 +853,11 @@ Module Memory.
     ii. erewrite split_o; eauto. repeat condtac; ss.
     - des. subst. exfalso.
       specialize (CLOSED loc). des.
-      inv SPLIT. inv SPLIT0. unfold get in CLOSED.
-      destruct (mem1 loc). generalize WF. intro X. inv X. ss.
-      eapply DISJOINT; [exact CLOSED|exact GET2|..].
-      + ii. subst. timetac.
-      + econs; ss; try refl.
-        exploit Cell.get_ts; try eapply CLOSED. i. des; ss.
-        rewrite x1 in *. inv TS12.
-      + econs; ss; try refl.
-        exploit (Cell.get_ts ts3 (Cell.mk WF)).
-        { unfold Cell.get. ss. eauto. }
-        i. des; subst.
-        * inv TS23.
-        * specialize (Time.le_lteq (times loc) ts3). i. des.
-          apply H0. auto.
-    - guardH o. des. subst. destruct msg3.
-      { esplits; ss. }
+      exploit split_get0; eauto. i. des. congr.
+    - guardH o. des. subst.
       specialize (CLOSED loc). des.
-      inv SPLIT. inv SPLIT0.
-      unfold get in CLOSED. unfold Cell.get in CLOSED.
-      rewrite CLOSED in GET2. inv GET2.
+      exploit split_get0; eauto. i. des.
+      rewrite CLOSED in *. inv GET0. eauto.
   Qed.
 
   Lemma split_closed_view
@@ -932,12 +921,10 @@ Module Memory.
         (CLOSED: closed_timemap times mem1):
     closed_timemap times mem2.
   Proof.
-    ii. erewrite lower_o; eauto. condtac; ss.
-    des. subst. destruct msg2; eauto.
-    inv LOWER. inv LOWER0. inv MSG_LE.
+    ii. erewrite lower_o; eauto. condtac; ss. des. subst.
     specialize (CLOSED loc). des.
-    unfold get in CLOSED. unfold Cell.get in CLOSED.
-    rewrite CLOSED in GET2. inv GET2.
+    exploit lower_get0; eauto. i. des.
+    rewrite CLOSED in *. inv GET. inv MSG_LE. eauto.
   Qed.
 
   Lemma lower_closed_view
@@ -1358,15 +1345,16 @@ Module Memory.
 
   Inductive future_weak (mem1 mem2: t): Prop :=
   | future_weak_intro
-      (SOUND: forall loc from to val released
-                 (GET: get loc to mem1 = Some (from, Message.concrete val released)),
-          exists f r,
-            get loc to mem2 = Some (f, Message.concrete val r) /\
+      (SOUND: forall loc from to msg
+                (GET: get loc to mem1 = Some (from, msg))
+                (MSG: msg <> Message.reserve),
+          exists f m,
+            get loc to mem2 = Some (f, m) /\
             Time.le from f /\
-            (r = released \/
-             View.opt_wf r /\
-             closed_opt_view r mem2 /\
-             View.opt_le r released))
+            (m = msg \/
+             Message.wf m /\
+             closed_message m mem2 /\
+             Message.le m msg))
       (COMPLETE1: forall loc from to val released
                      (GET1: get loc to mem1 = None)
                      (GET2: get loc to mem2 = Some (from, Message.concrete val released)),
@@ -1389,7 +1377,8 @@ Module Memory.
     closed_timemap times mem2.
   Proof.
     ii. specialize (CLOSED loc). des.
-    inv FUTURE. exploit SOUND; eauto. i. des; eauto.
+    inv FUTURE. exploit SOUND; eauto; ss. i. des; subst; eauto.
+    inv x3. eauto.
   Qed.
 
   Lemma future_weak_closed_view
@@ -1429,25 +1418,24 @@ Module Memory.
     - destruct msg; try by (splits; econs).
       destruct (get loc to mem1) as [[f []]|] eqn:GET1.
       + exploit CLOSED0; eauto. i. des.
-        exploit SOUND; eauto. i. des.
-        * rewrite MSG in *. inv x.
+        exploit SOUND; eauto; ss. i. des.
+        * rewrite MSG in *. inv x. inv H1.
           splits; auto. eapply future_weak_closed_message; eauto.
         * rewrite MSG in *. inv x. splits; eauto.
-          { econs. ss. }
-          { econs. inv MSG_TS. etrans; eauto.
-            inv x3; ss; try apply LE.
-            unfold TimeMap.bot. apply Time.bot_spec. }
+          econs. inv MSG_TS. etrans; eauto.
+          inv x3. inv RELEASED; ss; try apply LE.
+          unfold TimeMap.bot. apply Time.bot_spec.
+      + exploit SOUND; eauto; ss. i. des; subst; try congr.
+        inv x3. congr.
       + exploit COMPLETE2; eauto. i. des.
         splits; econs; eauto.
       + exploit COMPLETE1; eauto. i. des.
         splits; econs; eauto.
     - ii. specialize (INHABITED loc).
-      exploit SOUND; eauto. i. des.
-      + subst. exploit get_ts; try exact x. i. des.
-        * subst. eauto.
-        * inv x2.
+      exploit SOUND; eauto; ss. i. des.
+      + subst. exploit get_ts; try exact x. i. des; subst; eauto. inv x2.
       + exploit get_ts; try exact x. i. des.
-        * subst. inv x3. eauto.
+        * subst. inv x3. inv RELEASED. eauto.
         * inv x5.
   Qed.
 
@@ -1462,28 +1450,30 @@ Module Memory.
       + exploit SOUND0; eauto. i. des; subst.
         * esplits; eauto.
         * esplits; eauto.
-      + exploit SOUND0; eauto. i. des; subst.
-        * esplits; eauto. right. splits; eauto.
-          eapply future_weak_closed_opt_view; eauto.
-        * esplits; eauto.
-    - destruct (get loc to y) as [[f []]|] eqn:GET; eauto.
+      + exploit SOUND0; eauto.
+        { inv x4; ss. }
+        i. des; subst.
+        * esplits; eauto. right. splits; auto.
+          eapply future_weak_closed_message; eauto.
+        * esplits; eauto. right. splits; auto. etrans; eauto.
+    - destruct (get loc to y) as [[f []]|] eqn:GET; eauto; cycle 1.
+      { exploit SOUND0; eauto; ss. i. des; subst; try congr. inv x4. congr. }
       exploit COMPLETE1; eauto. i. des.
-      exploit SOUND0; eauto. i. des; subst.
+      exploit SOUND0; eauto; ss. i. des; subst.
       + rewrite GET2 in *. inv x3. splits; eauto.
         eapply future_weak_closed_opt_view; eauto.
-      + rewrite GET2 in *. inv x3. splits; eauto.
-        etrans; eauto.
-        inv x7; ss; try apply LE.
-        unfold TimeMap.bot. apply Time.bot_spec.
-    - destruct (get loc to y) as [[f' []]|] eqn:GET; eauto.
+      + rewrite GET2 in *. inv x3. inv x5. inv x6. inv x7.
+        splits; auto. etrans; eauto.
+        inv RELEASED; try apply LE. apply Time.bot_spec.
+    - destruct (get loc to y) as [[f' []]|] eqn:GET; eauto; cycle 1.
+      { exploit SOUND0; eauto; ss. i. des; subst; try congr. inv x4. congr. }
       exploit COMPLETE2; eauto. i. des.
-      exploit SOUND0; eauto. i. des; subst.
+      exploit SOUND0; eauto; ss. i. des; subst.
       + rewrite GET2 in *. inv x3. splits; eauto.
         eapply future_weak_closed_opt_view; eauto.
-      + rewrite GET2 in *. inv x3. splits; eauto.
-        etrans; eauto.
-        inv x7; ss; try apply LE.
-        unfold TimeMap.bot. apply Time.bot_spec.
+      + rewrite GET2 in *. inv x3. inv x5. inv x6. inv x7.
+        splits; eauto. etrans; eauto.
+        inv RELEASED; try apply LE. apply Time.bot_spec.
   Qed.
 
   Lemma future_future_weak
@@ -1530,10 +1520,11 @@ Module Memory.
       econs; i.
       + erewrite lower_o; eauto. condtac; ss.
         * des. subst.
-          rewrite GET in *. inv GET1. inv MSG_LE.
-          esplits; eauto; try refl.
-          right. inv CLOSED. splits; auto.
-          inv LOWER. inv LOWER0. inv MSG_WF. ss.
+          rewrite GET in *. inv GET1. inv MSG_LE; ss.
+          { esplits; eauto; try refl.
+            right. inv CLOSED. splits; auto.
+            inv LOWER. inv LOWER0. inv MSG_WF. econs. ss. }
+          { esplits; eauto. refl. }
         * esplits; eauto. refl.
       + revert GET2. erewrite lower_o; eauto. condtac; ss; i.
         * des. subst. congr.
@@ -1564,7 +1555,7 @@ Module Memory.
       <<FROM: Time.le from from'>> /\
       <<MSG_LE: Message.le msg' (Message.concrete val released)>>.
   Proof.
-    inv FUTURE. exploit SOUND; eauto. i. des.
+    inv FUTURE. exploit SOUND; eauto; ss. i. des.
     - subst. esplits; eauto. refl.
     - esplits; eauto.
   Qed.
@@ -2062,21 +2053,32 @@ Module Memory.
     i. eapply DISJOINT; eauto.
   Qed.
 
-  Lemma write_get2
-        promises1 mem1 loc from to val released promises2 mem2 kind
-        (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind):
-    <<GET_PROMISE: get loc to promises2 = None>> /\
-    <<GET_MEM: get loc to mem2 = Some (from, Message.concrete val released)>>.
+  Lemma write_not_cancel
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind):
+    op_kind_is_cancel kind = false.
   Proof.
+    inv WRITE. inv PROMISE; ss.
+    exploit remove_get0; try exact PROMISES. i. des.
+    exploit remove_get0; try exact REMOVE. i. des. congr.
+  Qed.
+
+  Lemma write_get2
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind):
+    <<GET_PROMISE: get loc to promises2 = None>> /\
+    <<GET_MEM: get loc to mem2 = Some (from, msg)>>.
+  Proof.
+    exploit write_not_cancel; eauto. i.
     inv WRITE. splits.
     - erewrite remove_o; eauto. condtac; ss. des; ss.
-    - eapply promise_get2; eauto. inv PROMISE; ss.
+    - eapply promise_get2; eauto.
   Qed.
 
   Lemma write_get_diff
-        promises1 mem1 loc from to val released promises2 mem2 kind
+        promises1 mem1 loc from to msg promises2 mem2 kind
         loc'
-        (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind)
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
         (LOC: loc' <> loc):
     forall to', get loc' to' mem2 = get loc' to' mem1.
   Proof.
@@ -2085,9 +2087,9 @@ Module Memory.
   Qed.
 
   Lemma write_get_diff_promise
-        promises1 mem1 loc from to val released promises2 mem2 kind
+        promises1 mem1 loc from to msg promises2 mem2 kind
         loc'
-        (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind)
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
         (LOC: loc' <> loc):
     forall to', get loc' to' promises2 = get loc' to' promises1.
   Proof.
@@ -2097,10 +2099,10 @@ Module Memory.
   Qed.
 
   Lemma write_future
-        promises1 mem1 loc from to val released promises2 mem2 kind
-        (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind)
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
         (CLOSED: closed mem1)
-        (MSG_CLOSED: closed_message (Message.concrete val released) mem2)
+        (MSG_CLOSED: closed_message msg mem2)
         (LE: le promises1 mem1)
         (FINITE: finite promises1)
         (BOT: bot_none promises1):
@@ -2118,8 +2120,8 @@ Module Memory.
   Qed.
 
   Lemma write_disjoint
-        promises1 mem1 loc from to val released promises2 mem2 ctx kind
-        (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind)
+        promises1 mem1 loc from to msg promises2 mem2 ctx kind
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
         (DISJOINT: disjoint promises1 ctx)
         (LE_CTX: le ctx mem1):
     <<DISJOINT: disjoint promises2 ctx>> /\
@@ -2131,8 +2133,8 @@ Module Memory.
   Qed.
 
   Lemma write_promises_bot
-        promises1 mem1 loc from to val released promises2 mem2 kind
-        (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind)
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
         (PROMISES: promises1 = Memory.bot):
     promises2 = Memory.bot.
   Proof.
@@ -2339,7 +2341,7 @@ Module Memory.
     forall f t msg (GET: get loc t mem = Some (f, msg)),
       match msg with
       | Message.concrete _ rel => rel = None
-      | Message.reserve => True
+      | _ => True
       end.
 
   Definition nonsynch (mem:t): Prop :=
@@ -2745,26 +2747,26 @@ Module Memory.
       i. eapply GET_PREV; eauto.
   Qed.
 
-  Lemma promise_get_from
-        promises1 mem1 loc from to msg promises2 mem2 kind
-        l t f v r
-        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
-        (GET: get l t mem1 = Some (f, Message.concrete v r)):
-    exists t' v' r',
-      get l t' mem2 = Some (f, Message.concrete v' r').
-  Proof.
-    inv PROMISE.
-    - exploit add_get1; eauto.
-    - exploit split_get1; eauto. i. des.
-      exploit split_get0; eauto. i. des.
-      dup GET2. revert GET2.
-      erewrite split_o; eauto. repeat condtac; ss; i.
-      + des. subst. inv GET2. congr.
-      + guardH o. des. subst. inv GET2.
-        rewrite GET in *. inv GET1. eauto.
-      + rewrite GET in *. inv GET2. eauto.
-    - exploit lower_get1; eauto. i. des. inv MSG_LE. eauto.
-    - exploit remove_get1; try exact GET; eauto. i. des; eauto.
-      subst. exploit remove_get0; try exact MEM. i. des. congr.
-  Qed.
+  (* Lemma promise_get_from *)
+  (*       promises1 mem1 loc from to msg promises2 mem2 kind *)
+  (*       l t f v r *)
+  (*       (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind) *)
+  (*       (GET: get l t mem1 = Some (f, Message.concrete v r)): *)
+  (*   exists t' v' r', *)
+  (*     get l t' mem2 = Some (f, Message.concrete v' r'). *)
+  (* Proof. *)
+  (*   inv PROMISE. *)
+  (*   - exploit add_get1; eauto. *)
+  (*   - exploit split_get1; eauto. i. des. *)
+  (*     exploit split_get0; eauto. i. des. *)
+  (*     dup GET2. revert GET2. *)
+  (*     erewrite split_o; eauto. repeat condtac; ss; i. *)
+  (*     + des. subst. inv GET2. congr. *)
+  (*     + guardH o. des. subst. inv GET2.  *)
+  (*       rewrite GET in *. inv GET1. eauto. *)
+  (*     + rewrite GET in *. inv GET2. eauto. *)
+  (*   - exploit lower_get1; eauto. i. des. inv MSG_LE. eauto. *)
+  (*   - exploit remove_get1; try exact GET; eauto. i. des; eauto. *)
+  (*     subst. exploit remove_get0; try exact MEM. i. des. congr. *)
+  (* Qed. *)
 End Memory.

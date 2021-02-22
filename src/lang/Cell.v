@@ -21,6 +21,7 @@ Set Implicit Arguments.
 Module Message.
   Inductive t :=
   | concrete (val: Const.t) (released: option View.t)
+  | undef
   | reserve
   .
   Hint Constructors t.
@@ -28,10 +29,12 @@ Module Message.
   Definition elt: t := concrete 0 None.
 
   Inductive le : t -> t -> Prop :=
-  | le_view
+  | le_concrete
       val released released'
       (RELEASED: View.opt_le released released'):
       le (concrete val released) (concrete val released')
+  | le_undef:
+      le undef undef
   | le_reserve:
       le reserve reserve
   .
@@ -59,17 +62,20 @@ Module Message.
       val released
       (WF: View.opt_wf released):
       wf (concrete val released)
+  | wf_undef:
+      wf undef
   | wf_reserve:
       wf reserve
   .
+  Hint Constructors wf.
 
   Definition elt_wf: wf elt.
   Proof. econs; ss. Qed.
 
   Definition is_reserve (msg: t): bool :=
     match msg with
-    | concrete _ _ => false
     | reserve => true
+    | _ => false
     end.
 
   Definition is_released_none (msg: t): bool :=
