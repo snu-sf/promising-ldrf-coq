@@ -33,7 +33,7 @@ Section Pred.
   Definition promise_free (e: ThreadEvent.t): Prop :=
     match e with
     | ThreadEvent.promise loc from to msg kind =>
-      (Memory.op_kind_is_lower_concrete kind && Message.is_released_none msg
+      (Memory.op_kind_is_lower kind && Message.is_released_none msg
        || Memory.op_kind_is_cancel kind)%bool
     | _ => True
     end.

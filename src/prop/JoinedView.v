@@ -368,7 +368,7 @@ Section JOINED.
         views msg max
         (MAX: max_le_joined_message views msg max)
     :
-      sim_message max msg.
+      Message.le max msg.
   Proof.
     inv MAX; eauto. inv MAXLE; eauto. inv MAXLE0; eauto.
   Qed.
@@ -1001,12 +1001,12 @@ Module JSim.
       sim_op_kind Memory.op_kind_add Memory.op_kind_add
   | sim_op_kind_split
       ts msg_src msg_tgt
-      (MSG: sim_message msg_src msg_tgt)
+      (MSG: Message.le msg_src msg_tgt)
     :
       sim_op_kind (Memory.op_kind_split ts msg_src) (Memory.op_kind_split ts msg_tgt)
   | sim_op_kind_lower
       msg_src msg_tgt
-      (MSG: sim_message msg_src msg_tgt)
+      (MSG: Message.le msg_src msg_tgt)
     :
       sim_op_kind (Memory.op_kind_lower msg_src) (Memory.op_kind_lower msg_tgt)
   | sim_op_kind_cancel
@@ -1022,7 +1022,7 @@ Module JSim.
   Inductive sim_event: forall (e_src e_tgt: ThreadEvent.t), Prop :=
   | sim_event_promise
       loc from to msg_src msg_tgt kind_src kind_tgt
-      (MSG: sim_message msg_src msg_tgt)
+      (MSG: Message.le msg_src msg_tgt)
       (KIND: sim_op_kind kind_src kind_tgt)
     :
       sim_event
@@ -1240,7 +1240,7 @@ Module JSim.
       + apply WF1_TGT.
       + inv MEM1_TGT. exploit CLOSED; eauto. i. des. inv MSG_WF. auto.
     - eauto.
-    - destruct released_src; econs. inv JOINMEM.
+    - destruct released; econs. inv JOINMEM.
       exploit COMPLETE; eauto. i. des. auto.
   Qed.
 
@@ -1344,9 +1344,9 @@ Module JSim.
     hexploit sim_local_promise_consistent; eauto.
   Qed.
 
-  Lemma sim_message_to msg_src msg_tgt loc to
+  Lemma message_le_to msg_src msg_tgt loc to
         (MSGTO: Memory.message_to msg_tgt loc to)
-        (MSG: sim_message msg_src msg_tgt)
+        (MSG: Message.le msg_src msg_tgt)
     :
       Memory.message_to msg_src loc to.
   Proof.
@@ -1392,7 +1392,7 @@ Module JSim.
               (<<GET: Memory.get loc ts mem2_src = Some (from, Message.concrete val released)>>) /\
               (<<VIEW: views2 loc ts = (View.join ((TView.rel (Local.tview lc2_src)) loc) (View.singleton_ur loc ts))
                                          ::(all_join_views (View.singleton_ur loc ts) (views1 loc from))>>)>>) /\
-        (<<MSG: sim_message msg_src msg_tgt>>) /\
+        (<<MSG: Message.le msg_src msg_tgt>>) /\
         (<<KIND: sim_op_kind kind_src kind_tgt>>) /\
         (<<RESERVE: msg_tgt = Message.reserve -> msg_src = Message.reserve /\ views1 = views2>>)
   .
@@ -1483,7 +1483,7 @@ Module JSim.
         esplits.
         { econs.
           - econs; eauto.
-            eapply sim_message_to; eauto.
+            eapply message_le_to; eauto.
             eapply max_le_joined_message_le. econs; eauto.
           - eapply joined_memory_get_closed; eauto.
             + eapply Memory.add_get0; eauto.
@@ -1578,7 +1578,7 @@ Module JSim.
       assert (exists val'_src released'_src,
                  (<<GETSRC: Memory.get loc ts3 (Local.promises lc1_src) = Some (from, Message.concrete val'_src released'_src)>>) /\
                  (<<GETMEMSRC: Memory.get loc ts3 mem1_src = Some (from, Message.concrete val'_src released'_src)>>) /\
-                 (<<SIMMSG: sim_message (Message.concrete val'_src released'_src) (Message.concrete val' released')>>)).
+                 (<<SIMMSG: Message.le (Message.concrete val'_src released'_src) (Message.concrete val' released')>>)).
       { inv LOCAL1. inv WF1_SRC. dup PROMISES0. ss.
         specialize (PROMISES2 loc ts3). erewrite GET2 in *. inv PROMISES2.
         - esplits; eauto. inv WF1_TGT. exploit sim_memory_get; eauto.
@@ -1652,7 +1652,7 @@ Module JSim.
       exists (Message.concrete val'0 max), views2. esplits.
       { econs.
         - econs 2; eauto.
-          eapply sim_message_to; eauto.
+          eapply message_le_to; eauto.
           eapply max_le_joined_message_le. econs; eauto.
         - eapply joined_memory_get_closed; eauto.
           + eapply Memory.split_get0 in MEM_SRC. des. eauto.
@@ -1725,7 +1725,7 @@ Module JSim.
       exists (Message.concrete val max), views1. esplits.
       { econs.
         - econs 3; eauto.
-          eapply sim_message_to; eauto.
+          eapply message_le_to; eauto.
           eapply max_le_joined_message_le. econs; eauto.
         - eapply joined_memory_get_closed; eauto.
           + eapply Memory.lower_get0; eauto.
@@ -1908,7 +1908,7 @@ Module JSim.
         + exploit NONSYNCH; eauto. ss.
     }
 
-    assert (SIMMSG: sim_message (Message.concrete val released_src) (Message.concrete val released_tgt)).
+    assert (SIMMSG: Message.le (Message.concrete val released_src) (Message.concrete val released_tgt)).
     { econs; eauto. inv STEP_TGT. inv LOCAL1. inv WF1_TGT.
       eapply TViewFacts.write_released_mon; eauto. }
 
@@ -2010,7 +2010,7 @@ Module JSim.
       - econs; eauto.
         + inv LOCAL1. inv TVIEW. eapply TViewFacts.writable_mon; eauto.
         + econs; eauto. econs; eauto.
-          eapply sim_message_to; eauto.
+          eapply message_le_to; eauto.
         + i. eapply sim_local_nonsynch_loc; eauto.
       - inv LOCAL1. econs.
         + inv WF1_TGT. eapply TViewFacts.write_tview_mon; eauto.
@@ -2066,7 +2066,7 @@ Module JSim.
       assert (exists msg3_src,
                  (<<GETSRC: Memory.get loc ts3 (Local.promises lc1_src) = Some (from, msg3_src)>>) /\
                  (<<GETMEMSRC: Memory.get loc ts3 mem1_src = Some (from, msg3_src)>>) /\
-                 (<<SIMMSG: sim_message msg3_src msg3>>)).
+                 (<<SIMMSG: Message.le msg3_src msg3>>)).
       { inv LOCAL1. dup PROMISES0. ss.
         specialize (PROMISES1 loc ts3). erewrite GET2 in *. inv PROMISES1.
         - esplits; eauto. inv WF1_TGT. exploit sim_memory_get; eauto.
@@ -2171,7 +2171,7 @@ Module JSim.
       - econs; eauto.
         + inv LOCAL1. inv TVIEW. eapply TViewFacts.writable_mon; eauto.
         + econs; eauto. econs 2; eauto.
-          { eapply sim_message_to; eauto. }
+          { eapply message_le_to; eauto. }
           { subst. inv SIMMSG0. eauto. }
         + i. eapply sim_local_nonsynch_loc; eauto.
       - inv LOCAL1. econs.
@@ -2296,7 +2296,7 @@ Module JSim.
       - econs; eauto.
         + inv TVIEW. eapply TViewFacts.writable_mon; eauto.
         + econs; eauto. econs 3; eauto.
-          eapply sim_message_to; eauto.
+          eapply message_le_to; eauto.
         + i. eapply sim_local_nonsynch_loc; eauto.
       - econs.
         + inv WF1_TGT. eapply TViewFacts.write_tview_mon; eauto.

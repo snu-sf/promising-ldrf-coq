@@ -28,24 +28,6 @@ Require Import FulfillStep.
 Set Implicit Arguments.
 
 
-Inductive sim_message: forall (msg_src msg_tgt: Message.t), Prop :=
-| sim_message_concrete
-    val released_src released_tgt
-    (RELEASED: View.opt_le released_src released_tgt):
-    sim_message (Message.concrete val released_src) (Message.concrete val released_tgt)
-| sim_message_reserve:
-    sim_message Message.reserve Message.reserve
-.
-Hint Constructors sim_message.
-
-Program Instance sim_message_PreOrder: PreOrder sim_message.
-Next Obligation.
-  ii. destruct x; econs; refl.
-Qed.
-Next Obligation.
-  ii. inv H; inv H0; econs. etrans; eauto.
-Qed.
-
 Inductive message_same_kind: forall (msg_src msg_tgt: Message.t), Prop :=
 | message_same_kind_concrete
     val_src val_tgt released_src released_tgt:
@@ -53,7 +35,7 @@ Inductive message_same_kind: forall (msg_src msg_tgt: Message.t), Prop :=
 | same_message_kine_reserve:
     message_same_kind Message.reserve Message.reserve
 .
-Hint Constructors sim_message.
+Hint Constructors message_same_kind.
 
 Program Instance message_same_kind_Equivalence: Equivalence message_same_kind.
 Next Obligation.
@@ -66,12 +48,12 @@ Next Obligation.
   ii. inv H; inv H0; econs.
 Qed.
 
-Lemma sim_message_message_same_kind
+Lemma le_message_same_kind
       msg_src msg_tgt
-      (SIM: sim_message msg_src msg_tgt):
+      (LE: Message.le msg_src msg_tgt):
   message_same_kind msg_src msg_tgt.
 Proof.
-  inv SIM; econs.
+  inv LE; econs.
 Qed.
 
 Inductive sim_memory (mem_src mem_tgt:Memory.t): Prop :=
@@ -81,7 +63,7 @@ Inductive sim_memory (mem_src mem_tgt:Memory.t): Prop :=
             (GET: Memory.get loc to mem_tgt = Some (from_tgt, msg_tgt)),
         exists from_src msg_src,
           <<GET: Memory.get loc to mem_src = Some (from_src, msg_src)>> /\
-          <<MSG: sim_message msg_src msg_tgt>>)
+          <<MSG: Message.le msg_src msg_tgt>>)
     (RESERVE: forall loc from to,
         Memory.get loc to mem_src = Some (from, Message.reserve) <->
         Memory.get loc to mem_tgt = Some (from, Message.reserve))
@@ -105,7 +87,7 @@ Lemma sim_memory_get
       (GET: Memory.get loc to mem_tgt = Some (from_tgt, msg_tgt)):
   exists from_src msg_src,
     <<GET: Memory.get loc to mem_src = Some (from_src, msg_src)>> /\
-    <<MSG: sim_message msg_src msg_tgt>>.
+    <<MSG: Message.le msg_src msg_tgt>>.
 Proof.
   eapply SIM. eauto.
 Qed.
@@ -293,8 +275,7 @@ Qed.
 
 Lemma lower_sim_memory
       mem1 loc from to msg1 msg2 mem2
-      (LOWER: Memory.lower mem1 loc from to msg1 msg2 mem2)
-      (MSG: message_same_kind msg1 msg2):
+      (LOWER: Memory.lower mem1 loc from to msg1 msg2 mem2):
   sim_memory mem2 mem1.
 Proof.
   econs; i.
@@ -303,22 +284,21 @@ Proof.
     + des. subst.
       exploit Memory.lower_get0; eauto. i. des.
       rewrite GET0 in GET. inv GET.
-      inv MSG_LE; inv MSG; esplits; eauto.
+      inv MSG_LE; esplits; eauto.
     + esplits; eauto. refl.
   - split; i.
     + revert H. erewrite Memory.lower_o; eauto. condtac; ss.
-      i. des. subst. inv H. inv LOWER. inv LOWER0. inv MSG.
+      i. des. subst. inv H. inv LOWER. inv LOWER0. inv MSG_LE.
       unfold Memory.get, Cell.get. rewrite GET2. ss.
     + erewrite Memory.lower_o; eauto. condtac; ss.
       des. subst. inv LOWER. inv LOWER0.
       unfold Memory.get, Cell.get in H. rewrite H in GET2. inv GET2.
-      inv MSG. ss.
+      inv MSG_LE. ss.
 Qed.
 
 Lemma promise_lower_sim_memory
       promises1 mem1 loc from to msg1 msg2 promises2 mem2
-      (PROMISE: Memory.promise promises1 mem1 loc from to msg2 promises2 mem2 (Memory.op_kind_lower msg1))
-      (MSG: message_same_kind msg1 msg2):
+      (PROMISE: Memory.promise promises1 mem1 loc from to msg2 promises2 mem2 (Memory.op_kind_lower msg1)):
   sim_memory mem2 mem1.
 Proof.
   inv PROMISE. eapply lower_sim_memory; eauto.
@@ -328,7 +308,7 @@ Lemma sim_memory_add
       mem1_src mem1_tgt msg_src
       mem2_src mem2_tgt msg_tgt
       loc from to
-      (SIM_MSG: sim_message msg_src msg_tgt)
+      (MSG: Message.le msg_src msg_tgt)
       (SRC: Memory.add mem1_src loc from to msg_src mem2_src)
       (TGT: Memory.add mem1_tgt loc from to msg_tgt mem2_tgt)
       (SIM: sim_memory mem1_src mem1_tgt):
@@ -346,11 +326,11 @@ Proof.
   - split; i.
     + erewrite Memory.add_o in H; try exact SRC.
       erewrite Memory.add_o; try exact TGT. condtac; ss.
-      * des. subst. inv H. inv SIM_MSG. ss.
+      * des. subst. inv H. inv MSG. ss.
       * rewrite <- RESERVE. ss.
     + erewrite Memory.add_o in H; try exact TGT.
       erewrite Memory.add_o; try exact SRC. condtac; ss.
-      * des. subst. inv H. inv SIM_MSG. ss.
+      * des. subst. inv H. inv MSG. ss.
       * rewrite RESERVE. ss.
 Qed.
 
@@ -358,7 +338,7 @@ Lemma sim_memory_split
       mem1_src mem1_tgt
       mem2_src mem2_tgt
       loc ts1 ts2 ts3 msg2_src msg3_src msg2_tgt msg3_tgt
-      (SIM_MSG: sim_message msg2_src msg2_tgt)
+      (MSG: Message.le msg2_src msg2_tgt)
       (SRC: Memory.split mem1_src loc ts1 ts2 ts3 msg2_src msg3_src mem2_src)
       (TGT: Memory.split mem1_tgt loc ts1 ts2 ts3 msg2_tgt msg3_tgt mem2_tgt)
       (SIM: sim_memory mem1_src mem1_tgt):
@@ -374,13 +354,13 @@ Proof.
       i. inv GET. guardH o. guardH o0. des. subst.
       exploit Memory.split_get0; try exact SRC; eauto. i. des.
       exploit Memory.split_get0; try exact TGT; eauto. i. des.
-      exploit MSG; eauto. i. des. rewrite GET0 in GET7. inv GET7.
+      exploit MSG0; eauto. i. des. rewrite GET0 in GET7. inv GET7.
       esplits; eauto.
     + erewrite (@Memory.split_o mem2_src); eauto. repeat condtac; ss. eauto.
   - split; i.
     + erewrite Memory.split_o in H; try exact SRC.
       erewrite Memory.split_o; try exact TGT. repeat condtac; ss.
-      * des. subst. inv H. inv SIM_MSG. ss.
+      * des. subst. inv H. inv MSG. ss.
       * guardH o. des. subst. inv H.
         exploit Memory.split_get0; try exact SRC. i. des.
         exploit Memory.split_get0; try exact TGT. i. des.
@@ -388,7 +368,7 @@ Proof.
       * rewrite <- RESERVE. ss.
     + erewrite Memory.split_o in H; try exact TGT.
       erewrite Memory.split_o; try exact SRC. repeat condtac; ss.
-      * des. subst. inv H. inv SIM_MSG. ss.
+      * des. subst. inv H. inv MSG. ss.
       * guardH o. des. subst. inv H.
         exploit Memory.split_get0; try exact SRC. i. des.
         exploit Memory.split_get0; try exact TGT. i. des.
@@ -400,7 +380,7 @@ Lemma sim_memory_lower
       mem1_src mem1_tgt
       mem2_src mem2_tgt
       loc from to msg1_src msg2_src msg1_tgt msg2_tgt
-      (SIM_MSG: sim_message msg2_src msg2_tgt)
+      (MSG: Message.le msg2_src msg2_tgt)
       (SRC: Memory.lower mem1_src loc from to msg1_src msg2_src mem2_src)
       (TGT: Memory.lower mem1_tgt loc from to msg1_tgt msg2_tgt mem2_tgt)
       (SIM: sim_memory mem1_src mem1_tgt):
@@ -416,11 +396,11 @@ Proof.
   - split; i.
     + erewrite Memory.lower_o in H; try exact SRC.
       erewrite Memory.lower_o; try exact TGT. condtac; ss.
-      * des. subst. inv H. inv SIM_MSG. ss.
+      * des. subst. inv H. inv MSG. ss.
       * rewrite <- RESERVE. ss.
     + erewrite Memory.lower_o in H; try exact TGT.
       erewrite Memory.lower_o; try exact SRC. condtac; ss.
-      * des. subst. inv H. inv SIM_MSG. ss.
+      * des. subst. inv H. inv MSG. ss.
       * rewrite RESERVE. ss.
 Qed.
 
@@ -854,7 +834,7 @@ Proof.
   esplits; eauto.
   - econs; eauto.
     i. destruct ord; inv ORD; inv H.
-  - eapply promise_lower_sim_memory; eauto. econs.
+  - eapply promise_lower_sim_memory; eauto.
 Qed.
 
 Lemma promise_fulfill_write_sim_memory
@@ -893,5 +873,5 @@ Proof.
   esplits; eauto.
   - econs; eauto. econs; eauto.
     eapply MemoryMerge.promise_promise_promise; eauto.
-  - eapply promise_lower_sim_memory; eauto. econs.
+  - eapply promise_lower_sim_memory; eauto.
 Qed.

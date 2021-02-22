@@ -1072,7 +1072,7 @@ Section MAPPED.
     inv MSGLE.
     - inv MSG0. inv MSG1. econs; eauto.
       eapply opt_view_le_map; eauto.
-    - inv MSG0. econs; eauto.
+    - inv MSG0. inv MSG1. econs; eauto.
   Qed.
 
   Lemma msg_get_promises_map m fm loc to from msg

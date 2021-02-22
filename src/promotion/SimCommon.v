@@ -1001,14 +1001,9 @@ Module SimCommon.
           des. subst.
           exploit Memory.lower_get0; try exact x1. i. des.
           unfold prev_released_le_loc in PREV. rewrite GET in *.
-          inv x1. inv MSG_LE0; ss.
-          * inv RELEASED; ss.
-            unnw. etrans; try exact PREV.
-            inv LE. econs; eauto.
-          * exploit SOUND0; try exact GET; eauto. i. des. inv MSG0.
-            exploit Memory.lower_get0; try exact MEM. i. des.
-            rewrite GET1 in *. inv GET_TGT.
-            unguardH RESERVE. des. ss.
+          inv x1. inv MSG_LE0; ss. inv RELEASED; ss.
+          unnw. etrans; try exact PREV.
+          inv LE. econs; eauto.
     }
 
     { (* cancel *)
@@ -1319,38 +1314,6 @@ Module SimCommon.
         + revert GET_TGT. erewrite Memory.remove_o; eauto.
           condtac; [des|]; ss; i; eauto.
     }
-  Qed.
-
-  Lemma promise_eq_promises
-        l
-        promises1 mem1 loc from to msg promises2 mem2 kind
-        (PROMISE: Memory.promise promises1 mem1 loc from to msg promises2 mem2 kind)
-        (LOC: loc <> l):
-    forall to, Memory.get l to promises1 = Memory.get l to promises2.
-  Proof.
-    i. inv PROMISE.
-    - erewrite (@Memory.add_o promises2); eauto. condtac; ss. des. subst. ss.
-    - erewrite (@Memory.split_o promises2); eauto. repeat condtac; ss.
-      { des. subst. ss. }
-      { des; subst; ss. }
-    - erewrite (@Memory.lower_o promises2); eauto. condtac; ss. des. subst. ss.
-    - erewrite (@Memory.remove_o promises2); eauto. condtac; ss. des. subst. ss.
-  Qed.
-
-  Lemma promise_eq_mem
-        l
-        promises1 mem1 loc from to msg promises2 mem2 kind
-        (PROMISE: Memory.promise promises1 mem1 loc from to msg promises2 mem2 kind)
-        (LOC: loc <> l):
-    forall to, Memory.get l to mem1 = Memory.get l to mem2.
-  Proof.
-    i. inv PROMISE.
-    - erewrite (@Memory.add_o mem2); eauto. condtac; ss. des. subst. ss.
-    - erewrite (@Memory.split_o mem2); eauto. repeat condtac; ss.
-      { des. subst. ss. }
-      { des; subst; ss. }
-    - erewrite (@Memory.lower_o mem2); eauto. condtac; ss. des. subst. ss.
-    - erewrite (@Memory.remove_o mem2); eauto. condtac; ss. des. subst. ss.
   Qed.
 
 
@@ -2117,66 +2080,6 @@ Module SimCommon.
       esplits; [econs 6|..]; eauto; refl.
     - exploit failure_step; eauto. i. des.
       esplits; [econs 7|..]; eauto.
-  Qed.
-
-  Lemma program_step_eq_promises
-        l
-        e lc1 sc1 mem1 lc2 sc2 mem2
-        (STEP: Local.program_step e lc1 sc1 mem1 lc2 sc2 mem2)
-        (LOC: ~ ThreadEvent.is_accessing_loc l e):
-    forall to, Memory.get l to (Local.promises lc1) = Memory.get l to (Local.promises lc2).
-  Proof.
-    unfold ThreadEvent.is_accessing_loc in *.
-    inv STEP; ss; try by inv LOCAL.
-    - i. inv LOCAL. inv WRITE. ss.
-      erewrite (@Memory.remove_o promises2); eauto. condtac; ss.
-      + des. subst. ss.
-      + guardH o. inv PROMISE.
-        * erewrite (@Memory.add_o promises0); eauto. condtac; ss.
-        * erewrite (@Memory.split_o promises0); eauto. repeat condtac; ss.
-          guardH o0. des. subst. ss.
-        * erewrite (@Memory.lower_o promises0); eauto. condtac; ss.
-        * erewrite (@Memory.remove_o promises0); eauto. condtac; ss.
-    - i. inv LOCAL1. inv LOCAL2. inv WRITE. ss.
-      erewrite (@Memory.remove_o promises2); eauto. condtac; ss.
-      + des. subst. ss.
-      + guardH o. inv PROMISE.
-        * erewrite (@Memory.add_o promises0); eauto. condtac; ss.
-        * erewrite (@Memory.split_o promises0); eauto. repeat condtac; ss.
-          guardH o0. des. subst. ss.
-        * erewrite (@Memory.lower_o promises0); eauto. condtac; ss.
-        * erewrite (@Memory.remove_o promises0); eauto. condtac; ss.
-  Qed.
-
-  Lemma program_step_eq_mem
-        l
-        e lc1 sc1 mem1 lc2 sc2 mem2
-        (STEP: Local.program_step e lc1 sc1 mem1 lc2 sc2 mem2)
-        (LOC: ~ ThreadEvent.is_accessing_loc l e):
-    forall to, Memory.get l to mem1 = Memory.get l to mem2.
-  Proof.
-    unfold ThreadEvent.is_accessing_loc in *.
-    inv STEP; ss; try by inv LOCAL.
-    - i. inv LOCAL. inv WRITE. ss.
-      inv PROMISE.
-      + erewrite (@Memory.add_o mem2); eauto. condtac; ss.
-        des. subst. ss.
-      + erewrite (@Memory.split_o mem2); eauto. repeat condtac; ss.
-        * des. subst. ss.
-        * guardH o. des. subst. ss.
-      + erewrite (@Memory.lower_o mem2); eauto. condtac; ss.
-        des. subst. ss.
-      + erewrite (@Memory.remove_o mem2); eauto. condtac; ss.
-    - i. inv LOCAL1. inv LOCAL2. inv WRITE. ss.
-      inv PROMISE.
-      + erewrite (@Memory.add_o mem2); eauto. condtac; ss.
-        des. subst. ss.
-      + erewrite (@Memory.split_o mem2); eauto. repeat condtac; ss.
-        * des. subst. ss.
-        * guardH o. des. subst. ss.
-      + erewrite (@Memory.lower_o mem2); eauto. condtac; ss.
-        des. subst. ss.
-      + erewrite (@Memory.remove_o mem2); eauto. condtac; ss.
   Qed.
 
 

@@ -618,4 +618,32 @@ Module Local.
     - inv LOCAL1. inv LOCAL2.
       eapply Memory.write_promises_bot; eauto.
   Qed.
+
+  Lemma program_step_get_diff_promises
+        l
+        e lc1 sc1 mem1 lc2 sc2 mem2
+        (STEP: program_step e lc1 sc1 mem1 lc2 sc2 mem2)
+        (LOC: ~ ThreadEvent.is_accessing_loc l e):
+    forall to, Memory.get l to lc1.(Local.promises) = Memory.get l to lc2.(Local.promises).
+  Proof.
+    inv STEP; ss; try by inv LOCAL.
+    - i. inv LOCAL. s.
+      erewrite <- Memory.write_get_diff_promise; eauto.
+    - i. inv LOCAL1. inv LOCAL2. s.
+      erewrite <- Memory.write_get_diff_promise; eauto.
+  Qed.
+
+  Lemma program_step_get_diff
+        l
+        e lc1 sc1 mem1 lc2 sc2 mem2
+        (STEP: program_step e lc1 sc1 mem1 lc2 sc2 mem2)
+        (LOC: ~ ThreadEvent.is_accessing_loc l e):
+    forall to, Memory.get l to mem1 = Memory.get l to mem2.
+  Proof.
+    inv STEP; ss; try by inv LOCAL.
+    - i. inv LOCAL. s.
+      erewrite <- Memory.write_get_diff; eauto.
+    - i. inv LOCAL1. inv LOCAL2. s.
+      erewrite <- Memory.write_get_diff; eauto.
+  Qed.
 End Local.

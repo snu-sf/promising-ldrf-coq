@@ -227,7 +227,9 @@ Section Invariant.
     inv STEP.
     { inv STEP0. symmetry in PF.
       destruct kind; ss.
-      - destruct msg1; ss. destruct msg; ss. destruct released0; ss.
+      - destruct msg1; cycle 1.
+        { inv LOCAL. inv PROMISE. des. subst. ss. }
+        destruct msg; ss. destruct released0; ss.
         splits; ss. inv LOCAL. inv PROMISE. des. inv RESERVE.
         ii. apply MEM1. ii. specialize (PR loc0). des.
         revert PR. erewrite Memory.lower_o; eauto. condtac; eauto.

@@ -317,14 +317,8 @@ Module Memory.
   Definition op_kind_is_split kind :=
     match kind with op_kind_split _ _ => true | _ => false end.
 
-  Definition op_kind_is_lower (kind:op_kind): bool :=
+  Definition op_kind_is_lower kind: bool :=
     match kind with op_kind_lower _ => true | _ => false end.
-
-  Definition op_kind_is_lower_reserve (kind:op_kind): bool :=
-    match kind with op_kind_lower Message.reserve => true | _ => false end.
-
-  Definition op_kind_is_lower_concrete (kind:op_kind): bool :=
-    match kind with op_kind_lower (Message.concrete _ _) => true | _ => false end.
 
   Definition op_kind_is_cancel kind :=
     match kind with op_kind_cancel => true | _ => false end.
@@ -378,7 +372,7 @@ Module Memory.
       (MEM: split mem1 loc from to ts3 msg msg3 mem2)
       (TS: message_to msg loc to)
       (RESERVE: exists val' released', msg = Message.concrete val' released')
-      (RESERVEORIGINAL: exists val' released', msg3 = Message.concrete val' released'):
+      (RESERVE3: exists val' released', msg3 = Message.concrete val' released'):
       promise promises1 mem1 loc from to msg promises2 mem2 (op_kind_split ts3 msg3)
   | promise_lower
       msg0
@@ -1239,6 +1233,59 @@ Module Memory.
   Qed.
 
 
+  (* get from different loc *)
+
+  Lemma add_get_diff
+        mem1 loc from to msg mem2
+        loc'
+        (ADD: add mem1 loc from to msg mem2)
+        (LOC: loc' <> loc):
+    forall to', get loc' to' mem2 = get loc' to' mem1.
+  Proof.
+    i. erewrite add_o; eauto. condtac; ss. des. ss.
+  Qed.
+
+  Lemma split_get_diff
+        mem1 loc ts1 ts2 ts3 msg2 msg3 mem2
+        loc'
+        (SPLIT: split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2)
+        (LOC: loc' <> loc):
+    forall to', get loc' to' mem2 = get loc' to' mem1.
+  Proof.
+    i. erewrite split_o; eauto. repeat (condtac; ss); des; ss.
+  Qed.
+
+  Lemma lower_get_diff
+        mem1 loc from to msg1 msg2 mem2
+        loc'
+        (LOWER: lower mem1 loc from to msg1 msg2 mem2)
+        (LOC: loc' <> loc):
+    forall to', get loc' to' mem2 = get loc' to' mem1.
+  Proof.
+    i. erewrite lower_o; eauto. condtac; ss. des. ss.
+  Qed.
+
+  Lemma remove_get_diff
+        mem1 loc from to msg mem2
+        loc'
+        (REMOVE: remove mem1 loc from to msg mem2)
+        (LOC: loc' <> loc):
+    forall to', get loc' to' mem2 = get loc' to' mem1.
+  Proof.
+    i. erewrite remove_o; eauto. condtac; ss. des. ss.
+  Qed.
+
+  Lemma op_get_diff
+        mem1 loc from to msg mem2 kind
+        loc'
+        (OP: op mem1 loc from to msg mem2 kind)
+        (LOC: loc' <> loc):
+    forall to', get loc' to' mem2 = get loc' to' mem1.
+  Proof.
+    inv OP; eauto using add_get_diff, split_get_diff, lower_get_diff, remove_get_diff.
+  Qed.
+
+
   (* finite *)
 
   Definition finite (mem:t): Prop :=
@@ -1826,6 +1873,26 @@ Module Memory.
     inv PROMISE; splits; eauto using op_get2.
   Qed.
 
+  Lemma promise_get_diff
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        loc'
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (LOC: loc' <> loc):
+    forall to', get loc' to' mem2 = get loc' to' mem1.
+  Proof.
+    inv PROMISE; eauto using add_get_diff, split_get_diff, lower_get_diff, remove_get_diff.
+  Qed.
+
+  Lemma promise_get_diff_promise
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        loc'
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (LOC: loc' <> loc):
+    forall to', get loc' to' promises2 = get loc' to' promises1.
+  Proof.
+    inv PROMISE; eauto using add_get_diff, split_get_diff, lower_get_diff, remove_get_diff.
+  Qed.
+
   Lemma op_future
         mem1 loc from to msg mem2 kind
         (OP: op mem1 loc from to msg mem2 kind)
@@ -2004,6 +2071,29 @@ Module Memory.
     inv WRITE. splits.
     - erewrite remove_o; eauto. condtac; ss. des; ss.
     - eapply promise_get2; eauto. inv PROMISE; ss.
+  Qed.
+
+  Lemma write_get_diff
+        promises1 mem1 loc from to val released promises2 mem2 kind
+        loc'
+        (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind)
+        (LOC: loc' <> loc):
+    forall to', get loc' to' mem2 = get loc' to' mem1.
+  Proof.
+    i. inv WRITE.
+    eauto using promise_get_diff.
+  Qed.
+
+  Lemma write_get_diff_promise
+        promises1 mem1 loc from to val released promises2 mem2 kind
+        loc'
+        (WRITE: write promises1 mem1 loc from to val released promises2 mem2 kind)
+        (LOC: loc' <> loc):
+    forall to', get loc' to' promises2 = get loc' to' promises1.
+  Proof.
+    i. inv WRITE.
+    erewrite remove_get_diff; try exact REMOVE; ss.
+    eauto using promise_get_diff_promise.
   Qed.
 
   Lemma write_future

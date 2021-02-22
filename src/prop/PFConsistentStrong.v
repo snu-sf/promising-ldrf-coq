@@ -37,6 +37,7 @@ Require Import Cover.
 
 Set Implicit Arguments.
 
+
 Section CONCRETEMAX.
 
   Lemma map_ident_concrete_promises mem prom tm (f: Loc.t -> Time.t -> Time.t -> Prop)
@@ -533,7 +534,7 @@ Proof.
     eapply list_Forall2_in in H; eauto. des.
     eapply List.Forall_forall in IN; eauto. ss. des.
     destruct x, a. ss. inv EVENT; ss. inv KIND; ss.
-    splits; auto. inv MSG0; ss. inv MSG; ss. inv MAP1; ss.
+    splits; auto. inv MSG; ss. inv MAP0; ss.
   }
   { eapply list_Forall2_impl; eauto. i. ss. des. auto. }
   { ss. unguard. des; eauto.
@@ -939,7 +940,7 @@ Proof.
     eapply List.Forall_forall in IN; eauto. ss. des.
     destruct a, x. ss. unfold ident_map in *.
     inv EVENT; ss; des; subst; auto. splits; auto.
-    inv KIND; ss. inv MSG0; auto. inv MSG; auto. inv MAP0; ss. }
+    inv KIND; ss. inv MSG; ss. inv MAP; ss. }
   { clear - CANCELNORMAL TRACE0. unfold cancel_normal_trace in *. des.
     subst. eapply List.Forall2_app_inv_l in TRACE0. des. subst. esplits; eauto.
     { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
@@ -1305,7 +1306,7 @@ Proof.
     eapply List.Forall_forall in IN; eauto. ss. des.
     destruct a, x. ss. splits; auto.
     { inv SAT; ss. inv FROM. inv TO. inv KIND; ss.
-      inv MSG0; ss. inv MSG; ss. inv MAP1; ss. }
+      inv MSG; ss. inv MAP0; ss. }
     { inv SAT; ss. }
     { inv SAT; ss.
       { inv TO. ii. eapply SAT3. ii. eapply H. des; auto.
@@ -1964,7 +1965,7 @@ Proof.
   { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
     eapply List.Forall_forall in IN; eauto. ss. des. destruct a, x. ss.
     inv EVENT; splits; ss.
-    { inv KIND; ss. inv MSG0; ss. inv MSG; ss. inv MAP1; ss. }
+    { inv KIND; ss. inv MSG; ss. inv MAP0; ss. }
     { inv FROM. inv TO. auto. }
     { inv FROM. inv TO. auto. }
     { inv FROM. inv TO. auto. }
@@ -2039,9 +2040,6 @@ Proof.
       eapply bot_promises_map in PROMISES0; eauto. }
   }
 Qed.
-
-
-
 
 
 Inductive relaxed_writing_event
@@ -2335,7 +2333,8 @@ Definition pf_consistent_super_strong_promises_list lang (e0:Thread.t lang)
            (pl: list (Loc.t * Time.t))
   : Prop :=
   (<<COMPLETE: forall loc from to val released
-                      (GET: Memory.get loc to (Local.promises (Thread.local e0)) = Some (from, Message.concrete val released)),
+                 (GET: Memory.get loc to e0.(Thread.local).(Local.promises) =
+                       Some (from, Message.concrete val released)),
       List.In (loc, to) pl>>) /\
   (<<CONSISTENT: forall
       pl0 loc to pl1

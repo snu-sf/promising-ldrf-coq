@@ -333,11 +333,11 @@ Module SimThreadPromotion.
     - econs 2. econs; eauto.
     - inv SIM1. inv STEP_SRC. ss.
       econs; eauto; ss; ii.
-      + erewrite <- promise_eq_mem; eauto.
-        erewrite <- eq_loc_max_ts; eauto.
-        eapply promise_eq_mem; eauto.
-      + erewrite <- promise_eq_promises; eauto.
-      + erewrite <- promise_eq_mem in GET; eauto.
+      + erewrite Memory.promise_get_diff; eauto.
+        erewrite eq_loc_max_ts; eauto.
+        eapply Memory.promise_get_diff; eauto.
+      + erewrite Memory.promise_get_diff_promise; eauto.
+      + erewrite Memory.promise_get_diff in GET; eauto.
   Qed.
 
   Lemma promote_stmts_step
@@ -786,17 +786,17 @@ Module SimThreadPromotion.
             inv SIM1. eauto. }
           rewrite <- ThreadEvent.eq_program_event_eq_loc in *; eauto.
           unfold ThreadEvent.is_accessing_loc in *. inv STEP_SRC; ss.
-          * inv LOCAL1. inv WRITE. eapply promise_eq_mem; eauto.
-          * inv LOCAL2. inv WRITE. eapply promise_eq_mem; eauto.
+          * inv LOCAL1. inv WRITE. symmetry. eapply Memory.promise_get_diff; eauto.
+          * inv LOCAL2. inv WRITE. symmetry. eapply Memory.promise_get_diff; eauto.
         + i. rewrite <- ThreadEvent.eq_program_event_eq_loc in *; eauto.
           unfold ThreadEvent.is_accessing_loc in *.
           inv STEP_SRC; ss; try by inv LOCAL1; ss.
           * inv LOCAL1. inv WRITE. ss.
             erewrite Memory.remove_o; eauto. condtac; ss.
-            erewrite <- promise_eq_promises; eauto.
+            erewrite Memory.promise_get_diff_promise; eauto.
           * inv LOCAL1. inv LOCAL2. inv WRITE. ss.
             erewrite Memory.remove_o; eauto. condtac; ss.
-            erewrite <- promise_eq_promises; eauto.
+            erewrite Memory.promise_get_diff_promise; eauto.
         + ii. exploit Local.program_step_future; try exact STEP_SRC; eauto. i. des.
           etrans; try eapply TVIEW_FUTURE.
           inv SIM1. ss. revert GET.
@@ -804,9 +804,9 @@ Module SimThreadPromotion.
           unfold ThreadEvent.is_accessing_loc in *.
           inv STEP_SRC; ss; eauto; try by inv LOCAL1; ss; eauto.
           * inv LOCAL2. inv WRITE. ss.
-            erewrite <- promise_eq_mem; eauto.
+            erewrite Memory.promise_get_diff; eauto.
           * inv LOCAL2. inv LOCAL3. inv WRITE. ss.
-            erewrite <- promise_eq_mem; eauto.
+            erewrite Memory.promise_get_diff; eauto.
     }
   Qed.
 

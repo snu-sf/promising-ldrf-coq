@@ -32,9 +32,8 @@ Module Message.
       val released released'
       (RELEASED: View.opt_le released released'):
       le (concrete val released) (concrete val released')
-  | le_reserve
-      msg:
-      le msg reserve
+  | le_reserve:
+      le reserve reserve
   .
   Hint Constructors le.
 

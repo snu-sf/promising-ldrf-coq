@@ -506,9 +506,9 @@ Lemma promise_step_nonsynch_loc_inv
       lc1 mem1 loc from to msg lc2 mem2 kind l
       (WF1: Local.wf lc1 mem1)
       (STEP: Local.promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
-      (NONPF: Memory.op_kind_is_lower_concrete kind = false \/ ~ Message.is_released_none msg)
-      (NONSYNCH: Memory.nonsynch_loc l (Local.promises lc2)):
-  Memory.nonsynch_loc l (Local.promises lc1).
+      (NONPF: Memory.op_kind_is_lower kind = false \/ ~ Message.is_released_none msg)
+      (NONSYNCH: Memory.nonsynch_loc l lc2.(Local.promises)):
+  Memory.nonsynch_loc l lc1.(Local.promises).
 Proof.
   guardH NONPF.
   ii.
@@ -540,7 +540,7 @@ Lemma reorder_promise_write
       loc2 from2 to2 val2 releasedm2 released2 ord2 kind2
       (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 msg1 lc1 mem1 kind1)
       (STEP2: Local.write_step lc1 sc0 mem1 loc2 from2 to2 val2 releasedm2 released2 ord2 lc2 sc2 mem2 kind2)
-      (NONPF: Memory.op_kind_is_lower_concrete kind1 = false \/ ~ Message.is_released_none msg1)
+      (NONPF: Memory.op_kind_is_lower kind1 = false \/ ~ Message.is_released_none msg1)
       (REL_WF: View.opt_wf releasedm2)
       (REL_CLOSED: Memory.closed_opt_view releasedm2 mem0)
       (LOCAL0: Local.wf lc0 mem0)
@@ -605,7 +605,7 @@ Lemma reorder_promise_write'
       loc2 from2 to2 val2 releasedm2 released2 ord2 kind2
       (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 msg1 lc1 mem1 kind1)
       (STEP2: Local.write_step lc1 sc0 mem1 loc2 from2 to2 val2 releasedm2 released2 ord2 lc2 sc2 mem2 kind2)
-      (NONPF: Memory.op_kind_is_lower_concrete kind1 = false \/ ~ Message.is_released_none msg1)
+      (NONPF: Memory.op_kind_is_lower kind1 = false \/ ~ Message.is_released_none msg1)
       (REL_WF: View.opt_wf releasedm2)
       (REL_CLOSED: Memory.closed_opt_view releasedm2 mem0)
       (LOCAL0: Local.wf lc0 mem0)
@@ -808,7 +808,9 @@ Proof.
   - inv STEP. ss.
     inv STEP1. inv STEP. ss.
     destruct kind; ss.
-    + destruct msg1, msg; ss. destruct released0; ss.
+    + destruct msg1, msg; ss; cycle 1.
+      { inv LOCAL0. inv PROMISE. des. ss. }
+      destruct released0; ss.
       exploit reorder_promise_promise_lower_None; eauto.
       { destruct kind0; ss. }
       i. des; subst.

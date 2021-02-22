@@ -77,9 +77,9 @@ Module SimThreadOther.
     - econs 2. econs; eauto.
     - inv SIM1. ss. econs; eauto; ss.
       i. inv STEP_SRC.
-      erewrite <- promise_eq_promises; try exact PROMISE; eauto.
+      erewrite Memory.promise_get_diff_promise; try exact PROMISE; eauto.
     - i. s. inv STEP_SRC.
-      erewrite promise_eq_mem; try exact PROMISE; eauto.
+      erewrite <- Memory.promise_get_diff; try exact PROMISE; eauto.
   Qed.
 
   Lemma sim_thread_program_step
@@ -113,10 +113,10 @@ Module SimThreadOther.
       + s. eapply step_loc_free; eauto.
         inv SIM1. ss. subst. ss.
       + s. i. inv SIM1.
-        erewrite <- program_step_eq_promises; eauto.
+        erewrite <- Local.program_step_get_diff_promises; eauto.
         erewrite ThreadEvent.eq_program_event_eq_loc; eauto.
     - s. i.
-      eapply program_step_eq_mem; eauto.
+      eapply Local.program_step_get_diff; eauto.
       erewrite ThreadEvent.eq_program_event_eq_loc; eauto.
   Qed.
 
