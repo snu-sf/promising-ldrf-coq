@@ -32,6 +32,7 @@ Module Ordering.
      - Normal accesses to numbers are compiled to nonatomic accesses.
    *)
   Inductive t :=
+  | na
   | plain
   | relaxed
   | strong_relaxed
@@ -41,6 +42,9 @@ Module Ordering.
 
   Definition le (lhs rhs:t): bool :=
     match lhs, rhs with
+    | na, _ => true
+    | _, na => false
+
     | plain, _ => true
     | _, plain => false
 
@@ -68,6 +72,9 @@ Module Ordering.
 
   Definition join (lhs rhs:t): t :=
     match lhs, rhs with
+    | na, _ => rhs
+    | _, na => lhs
+
     | plain, _ => rhs
     | _, plain => lhs
 

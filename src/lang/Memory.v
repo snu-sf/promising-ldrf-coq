@@ -1884,6 +1884,16 @@ Module Memory.
     inv PROMISE; eauto using add_get_diff, split_get_diff, lower_get_diff, remove_get_diff.
   Qed.
 
+  Lemma promise_inhabited
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (INHABITED: inhabited mem1):
+    inhabited mem2.
+  Proof.
+    exploit promise_op; eauto. i.
+    eapply op_inhabited; eauto.
+  Qed.
+
   Lemma op_future
         mem1 loc from to msg mem2 kind
         (OP: op mem1 loc from to msg mem2 kind)
@@ -2096,6 +2106,15 @@ Module Memory.
     i. inv WRITE.
     erewrite remove_get_diff; try exact REMOVE; ss.
     eauto using promise_get_diff_promise.
+  Qed.
+
+  Lemma write_inhabited
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
+        (INHABITED: inhabited mem1):
+    inhabited mem2.
+  Proof.
+    inv WRITE. eauto using promise_inhabited.
   Qed.
 
   Lemma write_future

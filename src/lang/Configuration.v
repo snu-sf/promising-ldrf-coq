@@ -205,20 +205,16 @@ Module Configuration.
 
 
   Inductive step: forall (e:MachineEvent.t) (tid:Ident.t) (c1 c2:t), Prop :=
-  | step_failure
-      pf tid c1 lang st1 lc1 e2 st3 lc3 sc3 memory3
-      (TID: IdentMap.find tid (threads c1) = Some (existT _ lang st1, lc1))
-      (STEPS: rtc (@Thread.tau_step _) (Thread.mk _ st1 lc1 (sc c1) (memory c1)) e2)
-      (STEP: Thread.step pf ThreadEvent.failure e2 (Thread.mk _ st3 lc3 sc3 memory3)):
-      step MachineEvent.failure tid c1 (mk (IdentMap.add tid (existT _ _ st3, lc3) (threads c1)) sc3 memory3)
-  | step_normal
+  | step_intro
       pf e tid c1 lang st1 lc1 e2 st3 lc3 sc3 memory3
       (TID: IdentMap.find tid (threads c1) = Some (existT _ lang st1, lc1))
       (STEPS: rtc (@Thread.tau_step _) (Thread.mk _ st1 lc1 (sc c1) (memory c1)) e2)
       (STEP: Thread.step pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
-      (EVENT: e <> ThreadEvent.failure)
-      (CONSISTENT: Thread.consistent (Thread.mk _ st3 lc3 sc3 memory3)):
-      step (ThreadEvent.get_machine_event e) tid c1 (mk (IdentMap.add tid (existT _ _ st3, lc3) (threads c1)) sc3 memory3)
+      (EVENT: ThreadEvent.get_machine_event e <> MachineEvent.failure
+                   -> Thread.consistent (Thread.mk _ st3 lc3 sc3 memory3)):
+      step (ThreadEvent.get_machine_event e) tid
+           c1
+           (mk (IdentMap.add tid (existT _ _ st3, lc3) (threads c1)) sc3 memory3)
   .
 
   Inductive normal_step (c1 c2: t): Prop :=
@@ -315,46 +311,26 @@ Module Configuration.
     <<MEM_FUTURE: Memory.future (memory c1) (memory c2)>>.
   Proof.
     inv WF1. inv WF. inv STEP; s.
-    - exploit THREADS; ss; eauto. i.
-      exploit Thread.rtc_tau_step_future; eauto. s. i. des.
-      exploit Thread.step_future; eauto. s. i. des.
-      splits; [|by etrans; eauto|by etrans; eauto].
-      econs; ss. econs.
-      + i. simplify.
-        * exploit THREADS; try apply TH1; eauto. i. des.
-          exploit Thread.rtc_tau_step_disjoint; eauto. i. des.
-          exploit Thread.step_disjoint; eauto. s. i. des.
-          symmetry. auto.
-        * exploit THREADS; try apply TH2; eauto. i. des.
-          exploit Thread.rtc_tau_step_disjoint; eauto. i. des.
-          exploit Thread.step_disjoint; eauto. i. des.
-          auto.
-        * eapply DISJOINT; [|eauto|eauto]. auto.
-      + i. simplify.
-        exploit THREADS; try apply TH; eauto. i.
+    exploit THREADS; ss; eauto. i.
+    exploit Thread.rtc_tau_step_future; eauto. s. i. des.
+    exploit Thread.step_future; eauto. s. i. des.
+    splits; [|by etrans; eauto|by etrans; eauto].
+    econs; ss. econs.
+    - i. simplify.
+      + exploit THREADS; try apply TH1; eauto. i. des.
         exploit Thread.rtc_tau_step_disjoint; eauto. i. des.
         exploit Thread.step_disjoint; eauto. s. i. des.
-        auto.
-    - exploit THREADS; ss; eauto. i.
-      exploit Thread.rtc_tau_step_future; eauto. s. i. des.
-      exploit Thread.step_future; eauto. s. i. des.
-      splits; [|by etrans; eauto|by etrans; eauto].
-      econs; ss. econs.
-      + i. simplify.
-        * exploit THREADS; try apply TH1; eauto. i. des.
-          exploit Thread.rtc_tau_step_disjoint; eauto. i. des.
-          exploit Thread.step_disjoint; eauto. s. i. des.
-          symmetry. auto.
-        * exploit THREADS; try apply TH2; eauto. i. des.
-          exploit Thread.rtc_tau_step_disjoint; eauto. i. des.
-          exploit Thread.step_disjoint; eauto. i. des.
-          auto.
-        * eapply DISJOINT; [|eauto|eauto]. auto.
-      + i. simplify.
-        exploit THREADS; try apply TH; eauto. i.
+        symmetry. auto.
+      + exploit THREADS; try apply TH2; eauto. i. des.
         exploit Thread.rtc_tau_step_disjoint; eauto. i. des.
-        exploit Thread.step_disjoint; eauto. s. i. des.
+        exploit Thread.step_disjoint; eauto. i. des.
         auto.
+      + eapply DISJOINT; [|eauto|eauto]. auto.
+    - i. simplify.
+      exploit THREADS; try apply TH; eauto. i.
+      exploit Thread.rtc_tau_step_disjoint; eauto. i. des.
+      exploit Thread.step_disjoint; eauto. s. i. des.
+      auto.
   Qed.
 
   Lemma opt_step_future

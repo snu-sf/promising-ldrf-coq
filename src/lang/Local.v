@@ -32,31 +32,11 @@ Module ThreadEvent.
   | fence (ordr ordw:Ordering.t)
   | syscall (e:Event.t)
   | failure
+  | racy_read (loc:Loc.t) (val:Const.t) (ord:Ordering.t)
+  | racy_write (loc:Loc.t) (val:Const.t) (ord:Ordering.t)
+  | racy_update (loc:Loc.t) (valr valw:Const.t) (ordr ordw:Ordering.t)
   .
   Hint Constructors t.
-
-  Inductive kind :=
-  | kind_promise
-  | kind_syscall
-  | kind_others
-  .
-  Hint Constructors kind.
-
-  Definition kinds_all := fun k: kind => True.
-  Hint Unfold kinds_all.
-  Definition kinds_promise := fun k: kind => k = kind_promise.
-  Hint Unfold kinds_promise.
-  Definition kinds_program := fun k: kind => k <> kind_promise.
-  Hint Unfold kinds_program.
-  Definition kinds_tau := fun k: kind => k <> kind_syscall.
-  Hint Unfold kinds_tau.
-
-  Definition get_kind (e:t): kind :=
-    match e with
-    | promise _ _ _ _ _ => kind_promise
-    | syscall _ => kind_syscall
-    | _ => kind_others
-    end.
 
   Definition get_event (e:t): option Event.t :=
     match e with
@@ -74,12 +54,17 @@ Module ThreadEvent.
     | fence ordr ordw => ProgramEvent.fence ordr ordw
     | syscall ev => ProgramEvent.syscall ev
     | failure => ProgramEvent.failure
+    | racy_read loc val ord => ProgramEvent.read loc val ord
+    | racy_write loc val ord => ProgramEvent.write loc val ord
+    | racy_update loc valr valw ordr ordw => ProgramEvent.update loc valr valw ordr ordw
     end.
 
   Definition get_machine_event (e: t): MachineEvent.t :=
     match e with
     | syscall e => MachineEvent.syscall e
-    | failure => MachineEvent.failure
+    | failure
+    | racy_write _ _ _
+    | racy_update _ _ _ _ _ => MachineEvent.failure
     | _ => MachineEvent.silent
     end.
 
@@ -112,9 +97,14 @@ Module ThreadEvent.
     end.
 
   Definition is_accessing_loc (l: Loc.t) (e: t): Prop :=
-    match is_accessing e with
-    | Some (loc, _) => loc = l
-    | None => False
+    match e with
+    | read loc _ _ _ _
+    | write loc _ _ _ _ _
+    | update loc _ _ _ _ _ _ _ _
+    | racy_read loc _ _
+    | racy_write loc _ _
+    | racy_update loc _ _ _ _ => loc = l
+    | _ => False
     end.
 
   Lemma eq_program_event_eq_loc
@@ -124,14 +114,6 @@ Module ThreadEvent.
   Proof.
     unfold is_accessing_loc.
     destruct e1, e2; ss; inv EVENT; ss.
-  Qed.
-
-  Lemma eq_program_event_eq_machine_event
-        e1 e2
-        (EVENT: get_program_event e1 = get_program_event e2):
-    get_machine_event e1 = get_machine_event e2.
-  Proof.
-    destruct e1, e2; ss. inv EVENT. ss.
   Qed.
 
   Definition is_cancel (e: t) : Prop :=
@@ -270,13 +252,27 @@ Module Local.
       promises2
       (RELEASED: released = TView.write_released (tview lc1) sc1 loc to releasedm ord)
       (WRITABLE: TView.writable (TView.cur (tview lc1)) sc1 loc to ord)
-      (WRITE: Memory.write (promises lc1) mem1 loc from to val released promises2 mem2 kind)
+      (WRITE: Memory.write (promises lc1) mem1 loc from to (Message.concrete val released) promises2 mem2 kind)
       (RELEASE: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc (promises lc1))
       (LC2: lc2 = mk (TView.write_tview (tview lc1) sc1 loc to ord) promises2)
       (SC2: sc2 = sc1):
       write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
   .
   Hint Constructors write_step.
+
+  Inductive write_undef_step (lc1:t) (sc1:TimeMap.t) (mem1:Memory.t)
+                             (loc:Loc.t) (from to:Time.t) (ord:Ordering.t)
+                             (lc2:t) (sc2:TimeMap.t) (mem2:Memory.t) (kind:Memory.op_kind): Prop :=
+  | write_undef_step_intro
+      promises2
+      (NA: Ordering.le ord Ordering.na)
+      (WRITABLE: TView.writable lc1.(tview).(TView.cur) sc1 loc to ord)
+      (WRITE: Memory.write lc1.(promises) mem1 loc from to Message.undef promises2 mem2 kind)
+      (LC2: lc2 = mk lc1.(tview) promises2)
+      (SC2: sc2 = sc1):
+      write_undef_step lc1 sc1 mem1 loc from to ord lc2 sc2 mem2 kind
+  .
+  Hint Constructors write_undef_step.
 
   Inductive fence_step (lc1:t) (sc1:TimeMap.t) (ordr ordw:Ordering.t) (lc2:t) (sc2:TimeMap.t): Prop :=
   | fence_step_intro
@@ -296,6 +292,47 @@ Module Local.
   .
   Hint Constructors failure_step.
 
+  Inductive racy_read_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (val:Const.t) (ord:Ordering.t): Prop :=
+  | racy_read_step_intro
+      from to msg
+      (GET: Memory.get loc to mem1 = Some (from, msg))
+      (GETP: Memory.get loc to lc1.(promises) = None)
+      (RACE: TView.racy_readable lc1.(tview).(TView.cur) loc to ord)
+      (MSG1: Message.is_reserve msg = false)
+      (MSG2: Ordering.le Ordering.plain ord -> msg = Message.undef)
+  .
+  Hint Constructors racy_read_step.
+
+  Inductive racy_write_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (ord:Ordering.t): Prop :=
+  | racy_write_step_intro
+      from to msg
+      (GET: Memory.get loc to mem1 = Some (from, msg))
+      (GETP: Memory.get loc to lc1.(promises) = None)
+      (RACE: TView.racy_writable lc1.(tview).(TView.cur) loc to)
+      (MSG1: Message.is_reserve msg = false)
+      (MSG2: Ordering.le Ordering.plain ord -> msg = Message.undef)
+      (CONSISTENT: promise_consistent lc1)
+  .
+  Hint Constructors racy_write_step.
+
+  Inductive racy_update_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (ordr ordw:Ordering.t): Prop :=
+  | racy_update_step_ordr
+      (ORDR: Ordering.le ordr Ordering.na)
+      (CONSISTENT: promise_consistent lc1)
+  | racy_update_step_ordw
+      (ORDW: Ordering.le ordw Ordering.na)
+      (CONSISTENT: promise_consistent lc1)
+  | racy_update_step_intro
+      from to msg
+      (GET: Memory.get loc to mem1 = Some (from, msg))
+      (GETP: Memory.get loc to lc1.(promises) = None)
+      (RACE: TView.racy_writable lc1.(tview).(TView.cur) loc to)
+      (MSG: msg = Message.undef)
+      (CONSISTENT: promise_consistent lc1)
+  .
+  Hint Constructors racy_update_step.
+
+
   Inductive program_step:
     forall (e:ThreadEvent.t) (lc1:t) (sc1:TimeMap.t) (mem1:Memory.t) (lc2:t) (sc2:TimeMap.t) (mem2:Memory.t), Prop :=
   | step_silent
@@ -304,36 +341,61 @@ Module Local.
   | step_read
       lc1 sc1 mem1
       loc ts val released ord lc2
-      (LOCAL: Local.read_step lc1 mem1 loc ts val released ord lc2):
+      (LOCAL: read_step lc1 mem1 loc ts val released ord lc2):
       program_step (ThreadEvent.read loc ts val released ord) lc1 sc1 mem1 lc2 sc1 mem1
   | step_write
       lc1 sc1 mem1
       loc from to val released ord lc2 sc2 mem2 kind
-      (LOCAL: Local.write_step lc1 sc1 mem1 loc from to val None released ord lc2 sc2 mem2 kind):
+      (LOCAL: write_step lc1 sc1 mem1 loc from to val None released ord lc2 sc2 mem2 kind):
       program_step (ThreadEvent.write loc from to val released ord) lc1 sc1 mem1 lc2 sc2 mem2
+  | step_na_write
+      loc ord val released
+      lc1 sc1 mem1
+      from1 to1 kind1
+      lc2 sc2 mem2
+      from2 to2 kind2
+      lc3 sc3 mem3
+      (LOCAL1: write_undef_step lc1 sc1 mem1 loc from1 to1 ord lc2 sc2 mem2 kind1)
+      (LOCAL2: write_step lc2 sc2 mem2 loc from2 to2 val None released ord lc3 sc3 mem3 kind2):
+      program_step (ThreadEvent.write loc from2 to2 val released ord) lc1 sc1 mem1 lc3 sc3 mem3
   | step_update
       lc1 sc1 mem1
       loc ordr ordw
       tsr valr releasedr releasedw lc2
       tsw valw lc3 sc3 mem3 kind
-      (LOCAL1: Local.read_step lc1 mem1 loc tsr valr releasedr ordr lc2)
-      (LOCAL2: Local.write_step lc2 sc1 mem1 loc tsr tsw valw releasedr releasedw ordw lc3 sc3 mem3 kind):
+      (LOCAL1: read_step lc1 mem1 loc tsr valr releasedr ordr lc2)
+      (LOCAL2: write_step lc2 sc1 mem1 loc tsr tsw valw releasedr releasedw ordw lc3 sc3 mem3 kind):
       program_step (ThreadEvent.update loc tsr tsw valr valw releasedr releasedw ordr ordw)
                    lc1 sc1 mem1 lc3 sc3 mem3
   | step_fence
       lc1 sc1 mem1
       ordr ordw lc2 sc2
-      (LOCAL: Local.fence_step lc1 sc1 ordr ordw lc2 sc2):
+      (LOCAL: fence_step lc1 sc1 ordr ordw lc2 sc2):
       program_step (ThreadEvent.fence ordr ordw) lc1 sc1 mem1 lc2 sc2 mem1
   | step_syscall
       lc1 sc1 mem1
       e lc2 sc2
-      (LOCAL: Local.fence_step lc1 sc1 Ordering.seqcst Ordering.seqcst lc2 sc2):
+      (LOCAL: fence_step lc1 sc1 Ordering.seqcst Ordering.seqcst lc2 sc2):
       program_step (ThreadEvent.syscall e) lc1 sc1 mem1 lc2 sc2 mem1
   | step_failure
       lc1 sc1 mem1
-      (LOCAL: Local.failure_step lc1):
+      (LOCAL: failure_step lc1):
       program_step ThreadEvent.failure lc1 sc1 mem1 lc1 sc1 mem1
+  | step_racy_read
+      lc1 sc1 mem1
+      loc val ord
+      (LOCAL: racy_read_step lc1 mem1 loc val ord):
+      program_step (ThreadEvent.racy_read loc val ord) lc1 sc1 mem1 lc1 sc1 mem1
+  | step_racy_write
+      lc1 sc1 mem1
+      loc val ord
+      (LOCAL: racy_write_step lc1 mem1 loc ord):
+      program_step (ThreadEvent.racy_write loc val ord) lc1 sc1 mem1 lc1 sc1 mem1
+  | step_racy_update
+      lc1 sc1 mem1
+      loc valr valw ordr ordw
+      (LOCAL: racy_update_step lc1 mem1 loc ordr ordw):
+      program_step (ThreadEvent.racy_update loc valr valw ordr ordw) lc1 sc1 mem1 lc1 sc1 mem1
   .
   Hint Constructors program_step.
 
@@ -418,6 +480,27 @@ Module Local.
     - inv WRITE. inv PROMISE; try inv TS; ss.
   Qed.
 
+  Lemma write_undef_step_future
+        lc1 sc1 mem1 loc from to ord lc2 sc2 mem2 kind
+        (STEP: write_undef_step lc1 sc1 mem1 loc from to ord lc2 sc2 mem2 kind)
+        (WF1: wf lc1 mem1)
+        (SC1: Memory.closed_timemap sc1 mem1)
+        (CLOSED1: Memory.closed mem1):
+    <<WF2: wf lc2 mem2>> /\
+    <<SC2: Memory.closed_timemap sc2 mem2>> /\
+    <<CLOSED2: Memory.closed mem2>> /\
+    <<TVIEW_FUTURE: TView.le lc1.(tview) lc2.(tview)>> /\
+    <<SC_FUTURE: TimeMap.le sc1 sc2>> /\
+    <<MEM_FUTURE: Memory.future mem1 mem2>>.
+  Proof.
+    inv WF1. inv STEP.
+    exploit Memory.write_future; try apply WRITE; eauto. i. des.
+    splits; eauto; try refl.
+    - econs; ss. inv TVIEW_CLOSED.
+      econs; eauto using Memory.future_closed_view.
+    - eauto using Memory.future_closed_timemap.
+  Qed.
+
   Lemma write_step_non_cancel
         lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
         (STEP: write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind):
@@ -477,18 +560,19 @@ Module Local.
     <<SC_FUTURE: TimeMap.le sc1 sc2>> /\
     <<MEM_FUTURE: Memory.future mem1 mem2>>.
   Proof.
-    inv STEP.
-    - esplits; eauto; try refl.
+    inv STEP; try by (esplits; eauto; try refl).
     - exploit read_step_future; eauto. i. des.
       esplits; eauto; try refl.
     - exploit write_step_future; eauto; try by econs. i. des.
       esplits; eauto; try refl.
+    - exploit write_undef_step_future; eauto. i. des.
+      exploit write_step_future; eauto. i. des.
+      esplits; eauto; try refl; etrans; eauto.
     - exploit read_step_future; eauto. i. des.
       exploit write_step_future; eauto; try by econs. i. des.
       esplits; eauto. etrans; eauto.
     - exploit fence_step_future; eauto. i. des. esplits; eauto; try refl.
     - exploit fence_step_future; eauto. i. des. esplits; eauto; try refl.
-    - esplits; eauto; try refl.
   Qed.
 
   Lemma promise_step_inhabited
@@ -497,8 +581,7 @@ Module Local.
         (INHABITED1: Memory.inhabited mem1):
     <<INHABITED2: Memory.inhabited mem2>>.
   Proof.
-    inv STEP.
-    inv PROMISE; eauto using Memory.add_inhabited, Memory.split_inhabited, Memory.lower_inhabited, Memory.cancel_inhabited.
+    inv STEP. eauto using Memory.promise_inhabited.
   Qed.
 
   Lemma program_step_inhabited
@@ -508,10 +591,9 @@ Module Local.
     <<INHABITED2: Memory.inhabited mem2>>.
   Proof.
     inv STEP; eauto.
-    - inv LOCAL. inv WRITE.
-      inv PROMISE; eauto using Memory.add_inhabited, Memory.split_inhabited, Memory.lower_inhabited, Memory.cancel_inhabited.
-    - inv LOCAL2. inv WRITE.
-      inv PROMISE; eauto using Memory.add_inhabited, Memory.split_inhabited, Memory.lower_inhabited, Memory.cancel_inhabited.
+    - inv LOCAL. eauto using Memory.write_inhabited.
+    - inv LOCAL1. inv LOCAL2. eauto using Memory.write_inhabited.
+    - inv LOCAL2. eauto using Memory.write_inhabited.
   Qed.
 
 
@@ -563,6 +645,23 @@ Module Local.
     inv WRITE. eapply TView.promise_closed; eauto.
   Qed.
 
+  Lemma write_undef_step_disjoint
+        lc1 sc1 mem1 lc2 sc2 loc from to ord mem2 kind lc
+        (STEP: write_undef_step lc1 sc1 mem1 loc from to ord lc2 sc2 mem2 kind)
+        (WF1: wf lc1 mem1)
+        (SC1: Memory.closed_timemap sc1 mem1)
+        (CLOSED1: Memory.closed mem1)
+        (DISJOINT1: disjoint lc1 lc)
+        (WF: wf lc mem1):
+    <<DISJOINT2: disjoint lc2 lc>> /\
+    <<WF: wf lc mem2>>.
+  Proof.
+    inv WF1. inv DISJOINT1. inversion WF. inv STEP.
+    exploit Memory.write_disjoint; try apply WRITE; eauto. i. des.
+    splits; ss. econs; eauto.
+    inv WRITE. eapply TView.promise_closed; eauto.
+  Qed.
+
   Lemma fence_step_disjoint
         lc1 sc1 mem1 lc2 sc2 ordr ordw lc
         (STEP: fence_step lc1 sc1 ordr ordw lc2 sc2)
@@ -595,16 +694,17 @@ Module Local.
     <<DISJOINT2: disjoint lc2 lc>> /\
     <<WF: wf lc mem2>>.
   Proof.
-    inv STEP.
-    - esplits; eauto.
+    inv STEP; try by (esplits; eauto).
     - exploit read_step_disjoint; eauto.
     - exploit write_step_disjoint; eauto.
+    - exploit write_undef_step_future; eauto. i. des.
+      exploit write_undef_step_disjoint; eauto. i. des.
+      exploit write_step_disjoint; eauto.
     - exploit read_step_future; eauto. i. des.
       exploit read_step_disjoint; eauto. i. des.
       exploit write_step_disjoint; eauto.
     - exploit fence_step_disjoint; eauto.
     - exploit fence_step_disjoint; eauto.
-    - esplits; eauto.
   Qed.
 
   Lemma program_step_promises_bot
@@ -616,6 +716,8 @@ Module Local.
     inv STEP; try inv LOCAL; ss.
     - eapply Memory.write_promises_bot; eauto.
     - inv LOCAL1. inv LOCAL2.
+      do 2 (eapply Memory.write_promises_bot; eauto).
+    - inv LOCAL1. inv LOCAL2.
       eapply Memory.write_promises_bot; eauto.
   Qed.
 
@@ -624,10 +726,13 @@ Module Local.
         e lc1 sc1 mem1 lc2 sc2 mem2
         (STEP: program_step e lc1 sc1 mem1 lc2 sc2 mem2)
         (LOC: ~ ThreadEvent.is_accessing_loc l e):
-    forall to, Memory.get l to lc1.(Local.promises) = Memory.get l to lc2.(Local.promises).
+    forall to, Memory.get l to lc1.(promises) = Memory.get l to lc2.(promises).
   Proof.
     inv STEP; ss; try by inv LOCAL.
     - i. inv LOCAL. s.
+      erewrite <- Memory.write_get_diff_promise; eauto.
+    - i. inv LOCAL1. inv LOCAL2. ss.
+      erewrite <- Memory.write_get_diff_promise; try exact WRITE; eauto.
       erewrite <- Memory.write_get_diff_promise; eauto.
     - i. inv LOCAL1. inv LOCAL2. s.
       erewrite <- Memory.write_get_diff_promise; eauto.
@@ -642,6 +747,9 @@ Module Local.
   Proof.
     inv STEP; ss; try by inv LOCAL.
     - i. inv LOCAL. s.
+      erewrite <- Memory.write_get_diff; eauto.
+    - i. inv LOCAL1. inv LOCAL2. ss.
+      erewrite <- Memory.write_get_diff; try exact WRITE; eauto.
       erewrite <- Memory.write_get_diff; eauto.
     - i. inv LOCAL1. inv LOCAL2. s.
       erewrite <- Memory.write_get_diff; eauto.
