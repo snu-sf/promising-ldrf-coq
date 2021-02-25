@@ -919,8 +919,7 @@ Module MemoryReorder.
     - exploit Memory.lower_get0; try eexact PROMISES; eauto. i. des.
       revert GET. erewrite Memory.remove_o; eauto. condtac; ss. i. guardH o.
       exploit Memory.lower_exists; try exact GET; try by inv PROMISES; inv LOWER; eauto. i. des.
-      exploit remove_lower; eauto. i.
-      esplits; eauto.
+      exploit remove_lower; eauto.
     - exploit remove_remove; try exact REMOVE; eauto. i. des. eauto.
   Qed.
 
@@ -995,7 +994,7 @@ Module MemoryReorder.
     exploit lower_split; try exact MEM; eauto. i. des.
     unguard. des; [|congr]. inv FROM1.
     esplits.
-    - econs; eauto; congr.
+    - econs; eauto. inv MEM. inv LOWER. inv MSG_LE; ss.
     - econs; eauto.
   Qed.
 End MemoryReorder.

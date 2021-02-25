@@ -61,7 +61,7 @@ Module MemorySplit.
   Proof.
     exploit remove_lower_remove; eauto. i. des.
     exploit Memory.lower_exists_le; eauto. i. des.
-    esplits; eauto.
+    esplits; eauto. econs; eauto. inv MSG_LE. ss.
   Qed.
 
   Lemma commute_remove_split_remove_remove

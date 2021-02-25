@@ -214,7 +214,7 @@ Module MemoryFacts.
                                   (Message.concrete val released) (Message.concrete val None)); eauto.
     i. des.
     exploit Memory.lower_exists_le; eauto. i. des.
-    esplits. econs; eauto. econs. apply Time.bot_spec.
+    esplits. econs; eauto; ss. econs. apply Time.bot_spec.
   Qed.
 
   Lemma released_time_lt

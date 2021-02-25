@@ -204,8 +204,7 @@ Module LowerPromises.
     destruct e1. ss.
     esplits.
     - econs; eauto. econs.
-      + econs 3; eauto. econs. ss.
-        unfold TimeMap.bot. apply Time.bot_spec.
+      + econs 3; eauto; ss. econs. apply Time.bot_spec.
       + econs. ss.
       + eauto.
     - ss.
@@ -236,7 +235,7 @@ Module LowerPromises.
     Local.promise_consistent lc2.
   Proof.
     inv REL. ii. rewrite <- TVIEW.
-    exploit COMPLETE; eauto. i. des. inv MSG.
-    eapply CONS; eauto.
+    exploit COMPLETE; eauto. i. des.
+    eapply CONS; eauto. inv MSG0; ss.
   Qed.
 End LowerPromises.

@@ -36,11 +36,12 @@ Proof.
     + dup GET2. revert GET0.
       erewrite Memory.remove_o; eauto. condtac; ss. i.
       rewrite PROMISE0 in *. inv GET0. eauto.
-    + revert GET2. erewrite Memory.remove_o; eauto. condtac; ss; i.
-      * des. subst. exploit Memory.remove_get0; eauto. i. des. congr.
-      * congr.
+    + revert GET2. erewrite Memory.remove_o; eauto.
+      condtac; ss; i; try congr.
+      des. subst. exploit Memory.remove_get0; eauto. i. des.
+      rewrite GET in *. inv PROMISE0. ss.
   - exploit Memory.promise_get1_promise; eauto. i. des.
-    inv MSG_LE. exploit CONS; eauto.
+    inv MSG_LE; ss; eauto. eapply CONS; eauto. ss.
 Qed.
 
 Lemma read_step_promise_consistent
@@ -78,13 +79,14 @@ Proof.
   inv STEP. inv WRITE. ii.
   exploit Memory.promise_get1_promise; eauto.
   { inv PROMISE; ss. }
-  i. des. inv MSG_LE.
+  i. des.
   destruct (Memory.get loc0 ts promises2) as [[]|] eqn:X.
   - dup X. revert X0.
     erewrite Memory.remove_o; eauto. condtac; ss; i.
     rewrite GET in *. inv X0.
-    apply CONS in X. eapply TimeFacts.le_lt_lt; eauto.
-    s. etrans; [|apply Time.join_l]. refl.
+    apply CONS in X. ss. exploit X; try by (inv MSG_LE; ss). i.
+    eapply TimeFacts.le_lt_lt; eauto.
+    etrans; [|apply Time.join_l]. refl.
   - exploit fulfill_unset_promises; eauto. i. des. subst.
     apply WRITABLE.
 Qed.
@@ -98,12 +100,12 @@ Proof.
   inv STEP. inv WRITE. ii.
   exploit Memory.promise_get1_promise; eauto.
   { inv PROMISE; ss. }
-  i. des. inv MSG_LE.
+  i. des.
   destruct (Memory.get loc0 ts promises2) as [[]|] eqn:X.
   - dup X. revert X0.
     erewrite Memory.remove_o; eauto. condtac; ss; i.
     rewrite GET in *. inv X0.
-    apply CONS in X. eapply TimeFacts.le_lt_lt; eauto. refl.
+    apply CONS in X. ss. exploit X; try by (inv MSG_LE; ss).
   - exploit fulfill_unset_promises; eauto. i. des. subst.
     apply WRITABLE.
 Qed.
@@ -145,12 +147,12 @@ Proof.
   - eapply promise_step_promise_consistent; eauto.
   - eapply read_step_promise_consistent; eauto.
   - eapply write_step_promise_consistent; eauto.
-  - eapply write_undef_step_promise_consistent; eauto.
-    eapply write_step_promise_consistent; eauto.
   - eapply read_step_promise_consistent; eauto.
     eapply write_step_promise_consistent; eauto.
   - eapply fence_step_promise_consistent; eauto.
   - eapply fence_step_promise_consistent; eauto.
+  - eapply write_undef_step_promise_consistent; eauto.
+    eapply write_step_promise_consistent; eauto.
 Qed.
 
 Lemma opt_step_promise_consistent
@@ -272,7 +274,7 @@ Lemma promise_consistent_promise_read
       (CONS: Local.promise_consistent lc2):
   Time.lt to t.
 Proof.
-  inv STEP. exploit CONS; eauto. s. i.
+  inv STEP. exploit CONS; eauto; ss. i.
   apply TimeFacts.join_lt_des in x. des.
   apply TimeFacts.join_lt_des in AC. des.
   revert BC0. unfold View.singleton_ur_if. condtac; ss.
@@ -282,9 +284,10 @@ Qed.
 
 Lemma promise_consistent_promise_write
       lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
-      f t v r
+      f t m
       (STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
-      (PROMISE: Memory.get loc t (Local.promises lc1) = Some (f, Message.concrete v r))
+      (PROMISE: Memory.get loc t (Local.promises lc1) = Some (f, m))
+      (MSG: m <> Message.reserve)
       (CONS: Local.promise_consistent lc2):
   Time.le to t.
 Proof.
@@ -294,14 +297,15 @@ Proof.
     erewrite Memory.remove_o; eauto. condtac; ss. i. guardH o.
     exploit Memory.promise_get1_promise; try exact PROMISE; eauto.
     { inv PROMISE0; ss. }
-    i. des. inv MSG_LE.
+    i. des.
     rewrite X0 in *. inv GET.
-    exploit CONS; eauto. i. ss.
+    exploit CONS; eauto; try by (inv MSG_LE; ss). s. i.
     apply TimeFacts.join_lt_des in x. des.
-    left. revert BC. unfold TimeMap.singleton, LocFun.add. condtac; ss.
+    revert BC. unfold TimeMap.singleton, LocFun.add. condtac; ss. i.
+    econs. ss.
   - inv STEP. inv WRITE.
     exploit Memory.promise_get1_promise; eauto.
     { inv PROMISE0; ss. }
-    i. des. inv MSG_LE.
+    i. des.
     exploit fulfill_unset_promises; eauto. i. des. subst. refl.
 Qed.

@@ -386,7 +386,7 @@ Module Memory.
       (PROMISES: lower promises1 loc from to msg0 msg promises2)
       (MEM: lower mem1 loc from to msg0 msg mem2)
       (TS: message_to msg loc to)
-      (MSG: exists val released, msg0 = Message.concrete val released):
+      (MSG: msg <> Message.reserve):
       promise promises1 mem1 loc from to msg promises2 mem2 (op_kind_lower msg0)
   | promise_cancel
       (PROMISES: remove promises1 loc from to msg promises2)
@@ -604,9 +604,9 @@ Module Memory.
     des. subst. inv LOWER. inv LOWER0. inv TS.
   Qed.
 
-  Lemma cancel_bot_none
-        mem1 mem2 loc from to
-        (CANCEL: remove mem1 loc from to Message.reserve mem2)
+  Lemma remove_bot_none
+        mem1 mem2 loc from to msg
+        (CANCEL: remove mem1 loc from to msg mem2)
         (BOT: bot_none mem1):
     <<BOT: bot_none mem2>>.
   Proof.
@@ -1963,7 +1963,7 @@ Module Memory.
     - eapply add_bot_none; eauto.
     - eapply split_bot_none; eauto.
     - eapply lower_bot_none; eauto.
-    - eapply cancel_bot_none; eauto.
+    - eapply remove_bot_none; eauto.
   Qed.
 
   Lemma promise_disjoint
@@ -2757,10 +2757,9 @@ Module Memory.
       + guardH o. i. des. subst. inv H.
         exploit split_get0; try exact MEM. i. des. congr.
       + i. eapply GET_PREV; eauto.
-    - des. subst.
-      erewrite lower_o; eauto. condtac; ss.
+    - erewrite lower_o; eauto. condtac; ss.
       + i. des. subst. inv H.
-        exploit lower_get0; try exact MEM. i. des. congr.
+        exploit lower_get0; try exact MEM. i. des. inv MSG_LE. congr.
       + i. eapply GET_PREV; eauto.
     - erewrite remove_o; eauto. condtac; ss.
       i. eapply GET_PREV; eauto.

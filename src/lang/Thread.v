@@ -600,10 +600,7 @@ Module Thread.
         reserve_step e1 e2 \/ cancel_step e1 e2.
     Proof.
       dup STEP. inv STEP.
-      - inv STEP1. inv LOCAL. ss. des_ifs. inv PROMISE; ss.
-        + eauto.
-        + des; clarify. inv MEM. inv LOWER. inv MSG_LE.
-        + eauto.
+      - inv STEP1. inv LOCAL. ss. des_ifs. inv PROMISE; ss; eauto.
       - inv STEP1. inv LOCAL; ss.
     Qed.
 

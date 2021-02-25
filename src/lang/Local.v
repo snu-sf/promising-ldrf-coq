@@ -201,9 +201,10 @@ Module Local.
   Qed.
 
   Definition promise_consistent (lc:t): Prop :=
-    forall loc ts from val released
-       (PROMISE: Memory.get loc ts (promises lc) = Some (from, Message.concrete val released)),
-      Time.lt ((TView.cur (tview lc)).(View.rlx) loc) ts.
+    forall loc ts from msg
+      (PROMISE: Memory.get loc ts (promises lc1) = Some (from, msg))
+      (MSG: msg <> Message.reserve),
+      Time.lt (lc.(tview).(TView.cur).(View.rlx) loc) ts.
 
   Lemma bot_promise_consistent
         lc
@@ -298,7 +299,7 @@ Module Local.
       (GET: Memory.get loc to mem1 = Some (from, msg))
       (GETP: Memory.get loc to lc1.(promises) = None)
       (RACE: TView.racy_readable lc1.(tview).(TView.cur) loc to ord)
-      (MSG1: Message.is_reserve msg = false)
+      (MSG1: msg <> Message.reserve)
       (MSG2: Ordering.le Ordering.plain ord -> msg = Message.undef)
   .
   Hint Constructors racy_read_step.
@@ -309,7 +310,7 @@ Module Local.
       (GET: Memory.get loc to mem1 = Some (from, msg))
       (GETP: Memory.get loc to lc1.(promises) = None)
       (RACE: TView.racy_writable lc1.(tview).(TView.cur) loc to)
-      (MSG1: Message.is_reserve msg = false)
+      (MSG1: msg <> Message.reserve)
       (MSG2: Ordering.le Ordering.plain ord -> msg = Message.undef)
       (CONSISTENT: promise_consistent lc1)
   .
@@ -348,16 +349,6 @@ Module Local.
       loc from to val released ord lc2 sc2 mem2 kind
       (LOCAL: write_step lc1 sc1 mem1 loc from to val None released ord lc2 sc2 mem2 kind):
       program_step (ThreadEvent.write loc from to val released ord) lc1 sc1 mem1 lc2 sc2 mem2
-  | step_na_write
-      loc ord val released
-      lc1 sc1 mem1
-      from1 to1 kind1
-      lc2 sc2 mem2
-      from2 to2 kind2
-      lc3 sc3 mem3
-      (LOCAL1: write_undef_step lc1 sc1 mem1 loc from1 to1 ord lc2 sc2 mem2 kind1)
-      (LOCAL2: write_step lc2 sc2 mem2 loc from2 to2 val None released ord lc3 sc3 mem3 kind2):
-      program_step (ThreadEvent.write loc from2 to2 val released ord) lc1 sc1 mem1 lc3 sc3 mem3
   | step_update
       lc1 sc1 mem1
       loc ordr ordw
@@ -381,6 +372,17 @@ Module Local.
       lc1 sc1 mem1
       (LOCAL: failure_step lc1):
       program_step ThreadEvent.failure lc1 sc1 mem1 lc1 sc1 mem1
+  | step_na_write
+      loc ord val released
+      lc1 sc1 mem1
+      from1 to1 kind1
+      lc2 sc2 mem2
+      from2 to2 kind2
+      lc3 sc3 mem3
+      (LT: Time.lt to1 to2)
+      (LOCAL1: write_undef_step lc1 sc1 mem1 loc from1 to1 ord lc2 sc2 mem2 kind1)
+      (LOCAL2: write_step lc2 sc2 mem2 loc from2 to2 val None released ord lc3 sc3 mem3 kind2):
+      program_step (ThreadEvent.write loc from2 to2 val released ord) lc1 sc1 mem1 lc3 sc3 mem3
   | step_racy_read
       lc1 sc1 mem1
       loc val ord
@@ -565,14 +567,14 @@ Module Local.
       esplits; eauto; try refl.
     - exploit write_step_future; eauto; try by econs. i. des.
       esplits; eauto; try refl.
-    - exploit write_undef_step_future; eauto. i. des.
-      exploit write_step_future; eauto. i. des.
-      esplits; eauto; try refl; etrans; eauto.
     - exploit read_step_future; eauto. i. des.
       exploit write_step_future; eauto; try by econs. i. des.
       esplits; eauto. etrans; eauto.
     - exploit fence_step_future; eauto. i. des. esplits; eauto; try refl.
     - exploit fence_step_future; eauto. i. des. esplits; eauto; try refl.
+    - exploit write_undef_step_future; eauto. i. des.
+      exploit write_step_future; eauto. i. des.
+      esplits; eauto; try refl; etrans; eauto.
   Qed.
 
   Lemma promise_step_inhabited
@@ -592,8 +594,8 @@ Module Local.
   Proof.
     inv STEP; eauto.
     - inv LOCAL. eauto using Memory.write_inhabited.
-    - inv LOCAL1. inv LOCAL2. eauto using Memory.write_inhabited.
     - inv LOCAL2. eauto using Memory.write_inhabited.
+    - inv LOCAL1. inv LOCAL2. eauto using Memory.write_inhabited.
   Qed.
 
 
@@ -697,14 +699,14 @@ Module Local.
     inv STEP; try by (esplits; eauto).
     - exploit read_step_disjoint; eauto.
     - exploit write_step_disjoint; eauto.
-    - exploit write_undef_step_future; eauto. i. des.
-      exploit write_undef_step_disjoint; eauto. i. des.
-      exploit write_step_disjoint; eauto.
     - exploit read_step_future; eauto. i. des.
       exploit read_step_disjoint; eauto. i. des.
       exploit write_step_disjoint; eauto.
     - exploit fence_step_disjoint; eauto.
     - exploit fence_step_disjoint; eauto.
+    - exploit write_undef_step_future; eauto. i. des.
+      exploit write_undef_step_disjoint; eauto. i. des.
+      exploit write_step_disjoint; eauto.
   Qed.
 
   Lemma program_step_promises_bot
@@ -716,9 +718,9 @@ Module Local.
     inv STEP; try inv LOCAL; ss.
     - eapply Memory.write_promises_bot; eauto.
     - inv LOCAL1. inv LOCAL2.
-      do 2 (eapply Memory.write_promises_bot; eauto).
-    - inv LOCAL1. inv LOCAL2.
       eapply Memory.write_promises_bot; eauto.
+    - inv LOCAL1. inv LOCAL2.
+      do 2 (eapply Memory.write_promises_bot; eauto).
   Qed.
 
   Lemma program_step_get_diff_promises
@@ -731,10 +733,10 @@ Module Local.
     inv STEP; ss; try by inv LOCAL.
     - i. inv LOCAL. s.
       erewrite <- Memory.write_get_diff_promise; eauto.
+    - i. inv LOCAL1. inv LOCAL2. s.
+      erewrite <- Memory.write_get_diff_promise; eauto.
     - i. inv LOCAL1. inv LOCAL2. ss.
       erewrite <- Memory.write_get_diff_promise; try exact WRITE; eauto.
-      erewrite <- Memory.write_get_diff_promise; eauto.
-    - i. inv LOCAL1. inv LOCAL2. s.
       erewrite <- Memory.write_get_diff_promise; eauto.
   Qed.
 
@@ -748,10 +750,10 @@ Module Local.
     inv STEP; ss; try by inv LOCAL.
     - i. inv LOCAL. s.
       erewrite <- Memory.write_get_diff; eauto.
+    - i. inv LOCAL1. inv LOCAL2. s.
+      erewrite <- Memory.write_get_diff; eauto.
     - i. inv LOCAL1. inv LOCAL2. ss.
       erewrite <- Memory.write_get_diff; try exact WRITE; eauto.
-      erewrite <- Memory.write_get_diff; eauto.
-    - i. inv LOCAL1. inv LOCAL2. s.
       erewrite <- Memory.write_get_diff; eauto.
   Qed.
 End Local.

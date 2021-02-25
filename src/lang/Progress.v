@@ -73,9 +73,9 @@ Proof.
   inv STEP. inv LOCAL; ss; try by inv LOCAL0.
   - eapply write_step_promise; eauto.
   - eapply write_step_promise; eauto.
-    eapply write_undef_step_promise; eauto.
-  - eapply write_step_promise; eauto.
     inv LOCAL1. auto.
+  - eapply write_step_promise; eauto.
+    eapply write_undef_step_promise; eauto.
 Qed.
 
 Lemma closed_timemap_max_ts
