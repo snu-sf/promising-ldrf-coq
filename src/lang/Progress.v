@@ -21,26 +21,45 @@ Require Import Thread.
 Set Implicit Arguments.
 
 
-Lemma write_step_promise
-      lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
-      (STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
-      (PROMISES: (Local.promises lc1) = Memory.bot):
-  (Local.promises lc2) = Memory.bot.
+Lemma write_promise
+      promises1 mem1 loc from to msg promises2 mem2 kind
+      (WRITE: Memory.write promises1 mem1 loc from to msg promises2 mem2 kind)
+      (PROMISES: promises1 = Memory.bot):
+  promises2 = Memory.bot.
 Proof.
-  inv STEP. rewrite PROMISES in *. s.
-  apply Memory.ext. i. rewrite Memory.bot_get.
-  inv WRITE.
+  subst. apply Memory.ext. i. rewrite Memory.bot_get.
+  exploit Memory.write_not_cancel; eauto. i. inv WRITE.
   erewrite Memory.remove_o; eauto. condtac; ss. guardH o.
   inv PROMISE; ss.
   - erewrite Memory.add_o; eauto. condtac; ss.
     apply Memory.bot_get.
   - erewrite Memory.split_o; eauto. repeat condtac; ss.
     + guardH o0. des. subst.
-      exploit Memory.split_get0; try exact PROMISES0; eauto. i. des.
+      exploit Memory.split_get0; try exact PROMISES; eauto. i. des.
       rewrite Memory.bot_get in *. congr.
     + apply Memory.bot_get.
   - erewrite Memory.lower_o; eauto. condtac; ss.
     apply Memory.bot_get.
+Qed.
+
+Lemma write_step_promise
+      lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
+      (STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
+      (PROMISES: lc1.(Local.promises) = Memory.bot):
+  lc2.(Local.promises) = Memory.bot.
+Proof.
+  inv STEP.
+  eapply write_promise; eauto.
+Qed.
+
+Lemma write_undef_step_promise
+      lc1 sc1 mem1 loc from to ord lc2 sc2 mem2 kind
+      (STEP: Local.write_undef_step lc1 sc1 mem1 loc from to ord lc2 sc2 mem2 kind)
+      (PROMISES: lc1.(Local.promises) = Memory.bot):
+  lc2.(Local.promises) = Memory.bot.
+Proof.
+  inv STEP.
+  eapply write_promise; eauto.
 Qed.
 
 Lemma program_step_promise
@@ -53,6 +72,8 @@ Lemma program_step_promise
 Proof.
   inv STEP. inv LOCAL; ss; try by inv LOCAL0.
   - eapply write_step_promise; eauto.
+  - eapply write_step_promise; eauto.
+    eapply write_undef_step_promise; eauto.
   - eapply write_step_promise; eauto.
     inv LOCAL1. auto.
 Qed.
@@ -190,8 +211,8 @@ Lemma progress_write_step_split
       (WF_REL: View.opt_wf releasedm)
       (TS_REL: Time.le ((View.rlx (View.unwrap releasedm)) loc) from)
       (CLOSED_REL: Memory.closed_opt_view releasedm mem1)
-      (PROMISES1: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc (Local.promises lc1))
-      (RESERVE: exists val' released', msg = Message.concrete val' released'):
+      (PROMISES1: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc lc1.(Local.promises))
+      (RESERVE: msg <> Message.reserve):
   exists released lc2 sc2 mem2,
     Local.write_step lc1 sc1 mem1 loc from (Time.middle from to) val releasedm
                      released ord lc2 sc2 mem2 (Memory.op_kind_split to msg).
@@ -226,7 +247,7 @@ Proof.
   - econs; ss.
     eapply TimeFacts.le_lt_lt; eauto.
     apply Time.middle_spec. ss.
-  - econs; eauto. econs; eauto.
+  - econs; eauto. econs; eauto; ss.
     econs. unfold TView.write_released. ss.
     condtac; ss; try by unfold TimeMap.bot; apply Time.bot_spec.
     unfold LocFun.add. condtac; ss.

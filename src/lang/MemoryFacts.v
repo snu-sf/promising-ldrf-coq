@@ -30,12 +30,12 @@ Module MemoryFacts.
   Qed.
 
   Lemma write_time_lt
-        promises1 mem1 loc from to val released promises2 mem2 kind
-        (WRITE: Memory.write promises1 mem1 loc from to val released promises2 mem2 kind):
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (WRITE: Memory.write promises1 mem1 loc from to msg promises2 mem2 kind):
     Time.lt from to.
   Proof.
+    exploit Memory.write_not_cancel; eauto. i.
     inv WRITE. eapply promise_time_lt; eauto.
-    inv PROMISE; ss.
   Qed.
 
   Lemma promise_get1_diff
@@ -169,11 +169,13 @@ Module MemoryFacts.
   Qed.
 
   Lemma write_not_bot
-        pm1 mem1 loc from to val released pm2 mem2 kind
-        (WRITE: Memory.write pm1 mem1 loc from to val released pm2 mem2 kind):
+        pm1 mem1 loc from to msg pm2 mem2 kind
+        (WRITE: Memory.write pm1 mem1 loc from to msg pm2 mem2 kind):
     to <> Time.bot.
   Proof.
-    ii. subst. inv WRITE. inv PROMISE; ss.
+    ii. subst.
+    exploit Memory.write_not_cancel; eauto. i.
+    inv WRITE. inv PROMISE; ss.
     - inv MEM. inv ADD. inv TO.
     - inv MEM. inv SPLIT. inv TS12.
     - inv MEM. inv LOWER. inv TS0.
@@ -193,8 +195,8 @@ Module MemoryFacts.
   Qed.
 
   Lemma write_add_promises
-        promises1 mem1 loc from to val released promises2 mem2
-        (WRITE: Memory.write promises1 mem1 loc from to val released promises2 mem2 Memory.op_kind_add):
+        promises1 mem1 loc from to msg promises2 mem2
+        (WRITE: Memory.write promises1 mem1 loc from to msg promises2 mem2 Memory.op_kind_add):
     promises2 = promises1.
   Proof.
     inv WRITE. inv PROMISE. eapply add_remove_eq; eauto.
@@ -208,9 +210,10 @@ Module MemoryFacts.
     exists promises2 mem2,
       Memory.promise promises1 mem1 loc from to (Message.concrete val None) promises2 mem2 (Memory.op_kind_lower (Message.concrete val released)).
   Proof.
-    exploit Memory.lower_exists; eauto; try by econs. i. des.
-    exploit LE; eauto. i.
-    exploit Memory.lower_exists; eauto; try by econs. i. des.
+    exploit (@Memory.lower_exists promises1 loc from to
+                                  (Message.concrete val released) (Message.concrete val None)); eauto.
+    i. des.
+    exploit Memory.lower_exists_le; eauto. i. des.
     esplits. econs; eauto. econs. apply Time.bot_spec.
   Qed.
 

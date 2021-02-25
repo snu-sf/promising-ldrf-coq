@@ -28,6 +28,8 @@ Module LowerPromises.
   | message_rel_concrete
       val released:
       message_rel (Message.concrete val released) (Message.concrete val None)
+  | message_rel_undef:
+      message_rel Message.undef Message.undef
   | message_rel_reserve:
       message_rel Message.reserve Message.reserve
   .
@@ -125,7 +127,15 @@ Module LowerPromises.
       exploit COMPLETE2; eauto. ii. inv H0; ss.
       inv H1. ss.
     }
-    destruct msg1 as [val released|]; cycle 1.
+    destruct msg1 as [val released| |]; cycle 1.
+    { left. econs; i; eauto.
+      destruct (loc_ts_eq_dec (loc, to) (loc0, to0)).
+      - ss. des. subst.
+        rewrite GET1 in *. inv GET2.
+        esplits; eauto.
+      - ss. exploit COMPLETE2; eauto. ii. inv H0; ss.
+        inv H1. des; ss.
+    }
     { left. econs; i; eauto.
       destruct (loc_ts_eq_dec (loc, to) (loc0, to0)).
       - ss. des. subst.
@@ -139,7 +149,6 @@ Module LowerPromises.
                                   (Message.concrete val None)); eauto.
     { exploit Memory.get_ts; eauto. i. des; ss.
       subst. rewrite BOT in GET1. ss. }
-    { econs. ss. }
     i. des.
     esplits; eauto.
     - econs; i.

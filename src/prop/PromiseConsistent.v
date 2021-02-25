@@ -9,10 +9,10 @@ From PromisingLib Require Import Basic.
 From PromisingLib Require Import DataStructure.
 From PromisingLib Require Import DenseOrder.
 From PromisingLib Require Import Loc.
+From PromisingLib Require Import Language.
 
 Require Import Event.
 Require Import Time.
-From PromisingLib Require Import Language.
 Require Import View.
 Require Import Cell.
 Require Import Memory.
@@ -89,6 +89,25 @@ Proof.
     apply WRITABLE.
 Qed.
 
+Lemma write_undef_step_promise_consistent
+      lc1 sc1 mem1 loc from to ord lc2 sc2 mem2 kind
+      (STEP: Local.write_undef_step lc1 sc1 mem1 loc from to ord lc2 sc2 mem2 kind)
+      (CONS: Local.promise_consistent lc2):
+  Local.promise_consistent lc1.
+Proof.
+  inv STEP. inv WRITE. ii.
+  exploit Memory.promise_get1_promise; eauto.
+  { inv PROMISE; ss. }
+  i. des. inv MSG_LE.
+  destruct (Memory.get loc0 ts promises2) as [[]|] eqn:X.
+  - dup X. revert X0.
+    erewrite Memory.remove_o; eauto. condtac; ss; i.
+    rewrite GET in *. inv X0.
+    apply CONS in X. eapply TimeFacts.le_lt_lt; eauto. refl.
+  - exploit fulfill_unset_promises; eauto. i. des. subst.
+    apply WRITABLE.
+Qed.
+
 Lemma fence_step_promise_consistent
       lc1 sc1 mem1 ordr ordw lc2 sc2
       (STEP: Local.fence_step lc1 sc1 ordr ordw lc2 sc2)
@@ -126,6 +145,8 @@ Proof.
   - eapply promise_step_promise_consistent; eauto.
   - eapply read_step_promise_consistent; eauto.
   - eapply write_step_promise_consistent; eauto.
+  - eapply write_undef_step_promise_consistent; eauto.
+    eapply write_step_promise_consistent; eauto.
   - eapply read_step_promise_consistent; eauto.
     eapply write_step_promise_consistent; eauto.
   - eapply fence_step_promise_consistent; eauto.
@@ -236,8 +257,9 @@ Proof.
   exploit Memory.max_concrete_timemap_exists; try apply x0. i. des.
   hexploit Memory.max_concrete_timemap_closed; eauto. i.
   exploit CONS; eauto. s. i. des.
-  - inv FAILURE. des. inv FAILURE; inv STEP. inv LOCAL. inv LOCAL0.
-    hexploit rtc_tau_step_promise_consistent; try exact STEPS; eauto.
+  - inv FAILURE. des. inv STEP_FAILURE; inv STEP; ss.
+    inv LOCAL; ss; inv LOCAL0;
+      hexploit rtc_tau_step_promise_consistent; try exact STEPS; eauto.
   - hexploit rtc_tau_step_promise_consistent; try exact STEPS; eauto.
     ii. rewrite PROMISES, Memory.bot_get in *. congr.
 Qed.
