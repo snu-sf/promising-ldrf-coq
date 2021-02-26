@@ -71,7 +71,8 @@ Proof.
       left. esplits; ss.
       * inv MEM. inv LOWER. ss.
       * econs; eauto. econs; eauto.
-        i. inv MSG0. inv MEM. inv LOWER. inv MSG_LE. eauto.
+        i. inv MEM. inv LOWER. inv MSG_LE; ss; eauto.
+        eapply ATTACH; eauto. ss.
     + exploit MemoryReorder.add_lower; try exact MEM1; try exact MEM; eauto. i. des; [congr|].
       right. esplits; eauto; econs; eauto.
       * econs; eauto.
@@ -184,11 +185,10 @@ Lemma reorder_promise_promise
                 (KIND: kind1 = Memory.op_kind_split to1' msg1'),
           to1' <> to2 /\
           (forall msg2', kind2 <> Memory.op_kind_split to1' msg2'))
-      (LOCTS2: forall val released
-                 (LOC: loc1 = loc2)
+      (LOCTS2: forall (LOC: loc1 = loc2)
                  (KIND1: kind1 = Memory.op_kind_add)
                  (KIND2: kind2 = Memory.op_kind_add)
-                 (MSG1: msg1 = Message.concrete val released),
+                 (MSG1: msg1 <> Message.reserve),
                Time.lt to2 to1):
   exists lc1' mem1' kind2',
     <<STEP1: Local.promise_step lc0 mem0 loc2 from2 to2 msg2 lc1' mem1' kind2'>> /\
@@ -303,7 +303,8 @@ Proof.
         exploit MemoryReorder.add_lower; try exact MEM; try exact MEM0; eauto. i. des; [|congr].
         esplits.
         * econs; eauto. econs; eauto.
-          i. inv MSG0. inv MEM0. inv LOWER. inv MSG_LE. eauto.
+          i. inv MEM0. inv LOWER. inv MSG_LE; ss; eauto.
+          eapply ATTACH; eauto. ss.
         * left. auto.
         * auto.
       + exploit MemoryReorder.add_lower; try exact MEM; try exact MEM0; eauto. i. des; [congr|].
@@ -590,11 +591,10 @@ Lemma reorder_promise_write_aux
                 (KIND: kind1 = Memory.op_kind_split to1' msg1'),
           to1' <> to2 /\
           (forall msg2', kind2 <> Memory.op_kind_split to1' msg2'))
-      (LOCTS2: forall val released
-                 (LOC: loc1 = loc2)
+      (LOCTS2: forall (LOC: loc1 = loc2)
                  (KIND1: kind1 = Memory.op_kind_add)
                  (KIND2: kind2 = Memory.op_kind_add)
-                 (MSG1: msg1 = Message.concrete val released),
+                 (MSG1: msg1 <> Message.reserve),
                Time.lt to2 to1):
   exists kind2' lc1' mem1',
     <<STEP1: Local.write_step lc0 sc0 mem0 loc2 from2 to2 val2 releasedm2 released2 ord2 lc1' sc2 mem1' kind2'>> /\
@@ -701,11 +701,10 @@ Lemma reorder_promise_write_undef_aux
                 (KIND: kind1 = Memory.op_kind_split to1' msg1'),
           to1' <> to2 /\
           (forall msg2', kind2 <> Memory.op_kind_split to1' msg2'))
-      (LOCTS2: forall val released
-                 (LOC: loc1 = loc2)
+      (LOCTS2: forall (LOC: loc1 = loc2)
                  (KIND1: kind1 = Memory.op_kind_add)
                  (KIND2: kind2 = Memory.op_kind_add)
-                 (MSG1: msg1 = Message.concrete val released),
+                 (MSG1: msg1 <> Message.reserve),
                Time.lt to2 to1):
   exists kind2' lc1' mem1',
     <<STEP1: Local.write_undef_step lc0 sc0 mem0 loc2 from2 to2 ord2 lc1' sc2 mem1' kind2'>> /\
@@ -790,7 +789,7 @@ Proof.
       }
       i. inv MEM1. inv SPLIT. rewrite x0 in TS12. timetac.
   - i. subst. inv STEP1. inv PROMISE. inv STEP2. inv WRITE. inv PROMISE. ss.
-    exploit (LOCTS from1 (Message.concrete val released)); eauto; ss.
+    exploit (LOCTS from1 msg1); eauto; ss.
     erewrite Memory.remove_o; eauto. condtac; ss.
     { des. subst.
       exploit Memory.add_get0; try exact MEM. i. des.

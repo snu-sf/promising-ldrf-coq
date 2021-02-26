@@ -368,9 +368,8 @@ Module Memory.
       (PROMISES: add promises1 loc from to msg promises2)
       (MEM: add mem1 loc from to msg mem2)
       (TS: message_to msg loc to)
-      (ATTACH: forall val released to' msg'
-                 (* TODO: non-reserve? any msg? *)
-                 (MSG: msg = Message.concrete val released)
+      (ATTACH: forall to' msg'
+                 (MSG: msg <> Message.reserve)
                  (GET: get loc to' mem1 = Some (to, msg')), False):
       promise promises1 mem1 loc from to msg promises2 mem2 op_kind_add
   | promise_split
@@ -2737,7 +2736,7 @@ Module Memory.
   Proof.
     ii. revert H. inv PROMISE.
     - erewrite add_o; eauto. condtac; ss.
-      + i. des. subst. inv H. eauto.
+      + i. des. subst. inv H. eapply ATTACH; eauto. ss.
       + i. eapply GET_PREV; eauto.
     - des. subst.
       erewrite split_o; eauto. repeat condtac; ss.
