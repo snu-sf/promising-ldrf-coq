@@ -192,8 +192,7 @@ Module Thread.
 
     Definition consistent (e:t): Prop :=
       forall mem1 sc1
-        (CAP: Memory.cap (memory e) mem1)
-        (SC_MAX: Memory.max_concrete_timemap mem1 sc1),
+        (CAP: Memory.cap (memory e) mem1),
         <<FAILURE: steps_failure (mk (state e) (local e) sc1 mem1)>> \/
         exists e2,
           <<STEPS: rtc tau_step (mk (state e) (local e) sc1 mem1) e2>> /\

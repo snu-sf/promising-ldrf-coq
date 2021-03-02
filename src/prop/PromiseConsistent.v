@@ -256,8 +256,7 @@ Proof.
   exploit Memory.cap_exists; eauto. i. des.
   exploit Memory.cap_closed; eauto. i.
   exploit Local.cap_wf; eauto. i.
-  exploit Memory.max_concrete_timemap_exists; try apply x0. i. des.
-  hexploit Memory.max_concrete_timemap_closed; eauto. i.
+  hexploit Memory.cap_closed_timemap; eauto. i. des.
   exploit CONS; eauto. s. i. des.
   - inv FAILURE. des. inv STEP_FAILURE; inv STEP; ss.
     inv LOCAL; ss; inv LOCAL0;
