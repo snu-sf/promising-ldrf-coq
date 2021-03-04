@@ -803,7 +803,7 @@ Qed.
 (* Happens-before based LDRF-PF theorem *)
 Theorem local_drf_pf_view L
         s
-        (RACEFRFEE: PFRace.racefree_view L (Configuration.init s)):
+        (RACEFRFEE: PFRace.racefree_view_syn L s):
   behaviors SConfiguration.machine_step (Configuration.init s) <1=
   behaviors (PFConfiguration.machine_step L) (Configuration.init s).
 Proof.

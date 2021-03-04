@@ -216,9 +216,9 @@ Qed.
 (* LDRF-PF theorem *)
 Theorem local_drf_pf L
         s
-        (RACEFREE: PF.racefree_syn L s):
-  behaviors SConfiguration.machine_step c <1=
-  behaviors (PFConfiguration.machine_step L) c.
+        (RACEFREE: PFRace.racefree_syn L s):
+  behaviors SConfiguration.machine_step (Configuration.init s) <1=
+  behaviors (PFConfiguration.machine_step L) (Configuration.init s).
 Proof.
   i. eapply SConfiguration.multi_step_equiv in PR; eauto.
   eapply PFRace.racefree_multi_racefree in RACEFREE; eauto.
