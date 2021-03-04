@@ -304,7 +304,7 @@ Module PFtoRA.
           (<<EVENT_J: JSim.sim_event e_j e_pf>>) /\
           (<<EVENT_RA: PFtoRASimThread.sim_event e_ra e_j>>) /\
           (<<SIM2: sim_conf views2 rels2 c2_pf c2_j c2_ra>>)) \/
-      (<<RACE: RARace.ra_race_steps L rels1 c1_ra>>).
+      (<<RACE: RARaceW.ra_race_steps L rels1 c1_ra>>).
     Proof.
       dup SIM1. inv SIM0. inv STEP. ss.
       dup THS. specialize (THS0 tid). unfold option_rel3 in THS0. des_ifs.
@@ -337,7 +337,7 @@ Module PFtoRA.
             try eapply PF.pf_consistent_consistent; eauto; try apply x7.
       }
       i. des; cycle 1.
-      { right. unfold RARace.ra_race_steps.
+      { right. unfold RARaceW.ra_race_steps.
         esplits; [econs 1|..]; eauto. s.
         eapply RAThread.tau_steps_steps.
         eapply RAThread.cancel_steps_tau_steps; eauto. }
@@ -401,7 +401,7 @@ Module PFtoRA.
       }
 
       exploit PFtoRAThread.sim_thread_consistent; try eapply CONSISTENT; eauto. i. des; cycle 1.
-      { right. unfold RARace.ra_race_steps.
+      { right. unfold RARaceW.ra_race_steps.
         esplits; [econs 1|..]; try eapply RACE; eauto. s.
         eapply RAThread.steps_trans; eauto.
         eapply RAThread.tau_steps_steps; eauto. }
@@ -450,7 +450,7 @@ Module PFtoRA.
           (<<STEPS_RA: RAConfiguration.steps L rels1 rels2 c1_ra c2_ra>>) /\
           (<<STEPS_J: JConfiguration.single_steps c1_j c2_j views1 views2>>) /\
           (<<SIM2: sim_conf views2 rels2 c2_pf c2_j c2_ra>>)) \/
-      (<<RACE: RARace.ra_race_steps L rels1 c1_ra>>).
+      (<<RACE: RARaceW.ra_race_steps L rels1 c1_ra>>).
     Proof.
       revert views1 rels1 c1_j c1_ra SIM1 WF1_PF WF1_J WF1_RA.
       induction STEPS; i.
@@ -464,7 +464,7 @@ Module PFtoRA.
         + econs 2; eauto.
         + econs 2; eauto.
         + ss.
-      - right. unfold RARace.ra_race_steps in *. des.
+      - right. unfold RARaceW.ra_race_steps in *. des.
         esplits; [econs 2; eauto|..]; eauto.
     Qed.
 
@@ -481,7 +481,7 @@ Module PFtoRA.
           (STEP: PFRace.racy_read_step L loc ts e_pf tid c1_pf c2_pf)
           (LOC: L loc)
           (RELS: ~ List.In (loc, ts) rels1):
-      (<<RACE: RARace.ra_race_steps L rels1 c1_ra>>).
+      (<<RACE: RARaceW.ra_race_steps L rels1 c1_ra>>).
     Proof.
       inv STEP. inv SIM1. ss.
       specialize (THS tid). unfold option_rel3 in THS. des_ifs.
@@ -513,7 +513,7 @@ Module PFtoRA.
           eapply consistent_promise_consistent; try eapply PF.pf_consistent_consistent;
             try eapply CONSISTENT; try eapply x7; eauto.
       }
-      i. unfold RARace.ra_race_steps. des; cycle 1.
+      i. unfold RARaceW.ra_race_steps. des; cycle 1.
       { esplits; [econs 1|..]; eauto. s.
         eapply RAThread.tau_steps_steps; eapply RAThread.cancel_steps_tau_steps; eauto. }
       hexploit PFtoRASimThread.sim_local_promise_consistent; try eapply SIM2.
@@ -533,7 +533,7 @@ Module PFtoRA.
       i. inv READ; inv EVENT_J; inv EVENT_RA; ss.
       - inv STEP_RA0. esplits; [econs 1|..]; eauto; ss.
         + eapply RAThread.tau_steps_steps; eapply RAThread.cancel_steps_tau_steps; eauto.
-        + unfold RARace.ra_race. splits; eauto.
+        + unfold RARaceW.ra_race. splits; eauto.
           inv SIM2. inv SIM_JOINED. inv SIM_RA.
           apply inj_pair2 in H3. apply inj_pair2 in H4. subst. ss.
           inv LOCAL0. inv TVIEW. rewrite CUR.
@@ -543,7 +543,7 @@ Module PFtoRA.
             inv NORMAL_J. inv NORMAL_TVIEW. ss. rewrite CUR0; ss.
       - inv STEP_RA0. esplits; [econs 1|..]; eauto; ss.
         + eapply RAThread.tau_steps_steps; eapply RAThread.cancel_steps_tau_steps; eauto.
-        + unfold RARace.ra_race. splits; eauto.
+        + unfold RARaceW.ra_race. splits; eauto.
           inv SIM2. inv SIM_JOINED. inv SIM_RA.
           apply inj_pair2 in H3. apply inj_pair2 in H4. subst. ss.
           inv LOCAL0. inv TVIEW. rewrite CUR.
@@ -559,17 +559,17 @@ Module PFtoRA.
           (WF_PF: wf_pf c_pf)
           (WF_J: wf_j views c_j)
           (WF_RA: wf_ra rels c_ra)
-          (RA_RACEFREE: RARace.racefree L rels c_ra):
+          (RA_RACEFREE: RARaceW.racefree L rels c_ra):
       PFRace.racefree_view L c_pf.
     Proof.
       ii. exploit sim_conf_steps; eauto. i. des; cycle 1.
-      { unfold RARace.ra_race_steps in *. des. eauto. }
+      { unfold RARaceW.ra_race_steps in *. des. eauto. }
       exploit steps_pf_future; eauto. i. des.
       exploit steps_j_future; eauto. i. des.
       exploit steps_ra_future; eauto. i. des.
       inv WRITE.
       exploit sim_conf_step; try exact STEP; eauto. i. des; cycle 1.
-      { unfold RARace.ra_race_steps in *. des.
+      { unfold RARaceW.ra_race_steps in *. des.
         eapply RA_RACEFREE; cycle 1; eauto.
         eapply RAConfiguration.steps_trans; eauto. }
       assert (WRITE_RA: ~ List.In (loc, ts) rels0).
@@ -587,7 +587,7 @@ Module PFtoRA.
       exploit step_j_future; try exact STEP_J; eauto. i. des.
       exploit step_ra_future; try exact STEP_RA; eauto. i. des.
       exploit sim_conf_steps; try exact CSTEPS2; eauto. i. des; cycle 1.
-      { unfold RARace.ra_race_steps in *. des.
+      { unfold RARaceW.ra_race_steps in *. des.
         eapply RA_RACEFREE; cycle 1; eauto.
         eapply RAConfiguration.steps_trans; [eauto|].
         econs 2; eauto. }
@@ -601,7 +601,7 @@ Module PFtoRA.
         - exploit RAConfiguration.write_get_None; try exact STEP_RA; ss; try apply x2. i. des.
           eapply RAConfiguration.steps_rels; eauto.
       }
-      exploit sim_conf_racy_read; eauto. unfold RARace.ra_race_steps. i. des.
+      exploit sim_conf_racy_read; eauto. unfold RARaceW.ra_race_steps. i. des.
       eapply RA_RACEFREE; cycle 1; eauto.
       eapply RAConfiguration.steps_trans; eauto.
       eapply RAConfiguration.steps_trans; eauto.
@@ -617,7 +617,7 @@ Module PFtoRA.
           (WF_PF: wf_pf c_pf)
           (WF_J: wf_j views c_j)
           (WF_RA: wf_ra rels c_ra)
-          (RACEFREE: RARace.racefree L rels c_ra):
+          (RACEFREE: RARaceW.racefree L rels c_ra):
       behaviors (PFConfiguration.machine_step L) c_pf <1=
       behaviors (@OrdConfiguration.machine_step L Ordering.acqrel) c_ra.
     Proof.
@@ -625,36 +625,36 @@ Module PFtoRA.
       induction PR; i.
       - econs 1. eapply sim_conf_terminal; eauto.
       - inv STEP. exploit sim_conf_step; eauto. i. des.
-        + exploit RARace.step_ord_step; eauto. i.
+        + exploit RARaceW.step_ord_step; eauto. i.
           inv EVENT_J; inv EVENT_RA; ss. inv H0.
           econs 2.
           { replace (MachineEvent.syscall e) with
                 (ThreadEvent.get_machine_event (ThreadEvent.syscall e)) by ss.
             econs; eauto. }
-          hexploit RARace.step_racefree; eauto. i.
+          hexploit RARaceW.step_racefree; eauto. i.
           exploit step_pf_future; eauto. i. des.
           exploit step_j_future; eauto. i. des.
           exploit step_ra_future; eauto.
-        + exfalso. unfold RARace.ra_race_steps in *. des. eauto.
+        + exfalso. unfold RARaceW.ra_race_steps in *. des. eauto.
       - inv STEP. exploit sim_conf_step; eauto. i. des.
-        + exploit RARace.step_ord_step; eauto. i.
+        + exploit RARaceW.step_ord_step; eauto. i.
           inv EVENT_J; inv EVENT_RA; ss. inv H0.
           econs 3.
           replace MachineEvent.failure with (ThreadEvent.get_machine_event ThreadEvent.failure) by ss.
           econs; eauto.
-        + exfalso. unfold RARace.ra_race_steps in *. des. eauto.
+        + exfalso. unfold RARaceW.ra_race_steps in *. des. eauto.
       - inv STEP. exploit sim_conf_step; eauto. i. des.
-        + exploit RARace.step_ord_step; eauto. i.
+        + exploit RARaceW.step_ord_step; eauto. i.
           econs 4.
           { replace MachineEvent.silent with (ThreadEvent.get_machine_event e_ra); cycle 1.
             { inv EVENT_J; inv EVENT_RA; ss. }
             econs; eauto.
           }
-          hexploit RARace.step_racefree; eauto. i.
+          hexploit RARaceW.step_racefree; eauto. i.
           exploit step_pf_future; eauto. i. des.
           exploit step_j_future; eauto. i. des.
           exploit step_ra_future; eauto.
-        + exfalso. unfold RARace.ra_race_steps in *. des. eauto.
+        + exfalso. unfold RARaceW.ra_race_steps in *. des. eauto.
     Qed.
   End PFtoRA.
 End PFtoRA.

@@ -26,6 +26,7 @@ Require Import Behavior.
 Require Import Single.
 
 Require Import OrdStep.
+Require Import RARace.
 Require Import SCStep.
 Require Import Stable.
 
@@ -609,9 +610,9 @@ Section SIM.
         (RACEFREE: SCRace.racefree L c)
         (WF: Configuration.wf c)
     :
-      ra_racefree L c.
+      RARace.racefree L c.
   Proof.
-    ii. guardH ORDERING.
+    ii. unfold RARace.race in *. des. guardH ORDERING.
     exploit ra_configuration_steps_sc_configuration_steps_or_race.
     { etrans.
       { eapply STEPS1. } econs 2.

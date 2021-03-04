@@ -429,9 +429,9 @@ Section Invariant.
       apply DOMap.singleton_find_inv in PR. des. inv PR0. auto.
   Qed.
 
-  Lemma sound
-        c
-        (STEPS: rtc Configuration.all_step (Configuration.init program) c):
+  Theorem sound
+          c
+          (STEPS: rtc Configuration.all_step (Configuration.init program) c):
     sem c.
   Proof.
     cut (forall c1 c2

@@ -32,6 +32,7 @@ Require Import LocalDRFPFView.
 Require Import OrdStep.
 Require Import Stable.
 Require Import RAStep.
+Require Import RARace.
 Require Import PFtoRASimThread.
 Require Import PFtoRA.
 
@@ -42,32 +43,6 @@ Section LocalDRFRA.
   Variable L: Loc.t -> bool.
 
   (* RA race condition *)
-
-  Definition ra_racefree (c: Configuration.t): Prop :=
-    forall c1 c2 c3
-      tid_w e_w loc from to val released ordw
-      tid_r lang st3 lc3 e4 e5
-      pf e_r released' ordr
-      (STEPS1: rtc (@OrdConfiguration.all_step L Ordering.acqrel) c c1)
-      (WRITE_STEP: OrdConfiguration.step L Ordering.acqrel e_w tid_w c1 c2)
-      (WRITE_EVENT: ThreadEvent.is_writing e_w = Some (loc, from, to, val, released, ordw))
-      (STEPS2: rtc (@OrdConfiguration.all_step L Ordering.acqrel) c2 c3)
-      (FIND: IdentMap.find tid_r c3.(Configuration.threads) = Some (existT _ lang st3, lc3))
-      (THREAD_STEPS: rtc (@OrdThread.all_step _ L Ordering.acqrel)
-                         (Thread.mk _ st3 lc3 c3.(Configuration.sc) c3.(Configuration.memory))
-                         e4)
-      (CONS: Local.promise_consistent e4.(Thread.local))
-      (READ_STEP: OrdThread.step L Ordering.acqrel pf e_r e4 e5)
-      (READ_EVENT: ThreadEvent.is_reading e_r = Some (loc, to, val, released', ordr))
-      (LOC: L loc)
-      (HIGHER: Time.lt (e4.(Thread.local).(Local.tview).(TView.cur).(View.rlx) loc) to)
-      (ORDERING: Ordering.le ordw Ordering.strong_relaxed \/
-                 Ordering.le ordr Ordering.strong_relaxed),
-      False.
-
-  Definition ra_racefree_syn (s: Threads.syntax): Prop :=
-    ra_racefree (Configuration.init s).
-
 
   Lemma read_message_exists
         lang
@@ -250,16 +225,16 @@ Section LocalDRFRA.
 
   Lemma racefree_implies
         s
-        (RACEFREE: ra_racefree_syn s):
-    RARace.racefree_syn L s.
+        (RACEFREE: RARace.racefree_syn L s):
+    RARaceW.racefree_syn L s.
   Proof.
     specialize (@Configuration.init_wf s). intro WF.
     specialize (@RAConfiguration.init_reserve_only L s). intro RESERVE.
-    ii. unfold RARace.ra_race in *. inv RARACE. inv H0. guardH H2.
+    ii. unfold RARace.race in *. inv RARACE. inv H0. guardH H2.
     destruct (Memory.get loc to (Configuration.init s).(Configuration.memory)) eqn:GET.
     { unfold Memory.get, Memory.init, Cell.get, Cell.init in GET. ss.
       apply DOMap.singleton_find_inv in GET. des. subst. inv H1. }
-    unfold ra_racefree_syn in *.
+    unfold RARace.racefree_syn in *.
     remember (Configuration.init s) as c1. clear Heqc1.
     exploit RAConfiguration.steps_future; eauto. i. des.
     hexploit RAConfiguration.steps_reserve_only; eauto. i.
@@ -276,7 +251,7 @@ Section LocalDRFRA.
     exploit RAConfiguration.steps_ord_steps; try exact STEPS2. i.
     exploit RAThread.steps_ord_steps; eauto. i.
     exploit RAThread.step_ord_step; eauto. i. des.
-    eapply RACEFREE; eauto.
+    eapply RACEFREE; eauto. unfold RARace.race. esplits; eauto.
     unguard. des; eauto. left.
     apply ORD. auto.
   Qed.
@@ -287,7 +262,7 @@ End LocalDRFRA.
 (* LDRF-RA theorem *)
 Theorem local_drf_ra L
         s
-        (RACEFREE: ra_racefree_syn L s):
+        (RACEFREE: RARace.racefree_syn L s):
   behaviors SConfiguration.machine_step (Configuration.init s) <1=
   behaviors (@OrdConfiguration.machine_step L Ordering.acqrel) (Configuration.init s).
 Proof.

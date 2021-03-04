@@ -493,7 +493,7 @@ Module PFtoRAThread.
            (<<CONS: Local.promise_consistent e1_ra.(Thread.local)>>) /\
            (<<RACE: exists loc to val released ord,
                ThreadEvent.is_reading e_ra = Some (loc, to, val, released, ord) /\
-               RARace.ra_race L rels1 e1_ra.(Thread.local).(Local.tview) loc to ord>>)).
+               RARaceW.ra_race L rels1 e1_ra.(Thread.local).(Local.tview) loc to ord>>)).
     Proof.
       hexploit JSim.sim_thread_step; try exact STEP; try eapply SIM1; eauto. i. des.
       destruct (classic (exists loc from to msg kind,
@@ -645,7 +645,7 @@ Module PFtoRAThread.
           (<<CONS_RA: Local.promise_consistent e1_ra.(Thread.local)>>) /\
           (<<STEP_RA: RAThread.step L rels1 rels2 e_ra e1_ra e2_ra>>) /\
           (<<READ: ThreadEvent.is_reading e_ra = Some (loc, to, val, released, ord)>>) /\
-          (<<RACE: RARace.ra_race L rels1 e1_ra.(Thread.local).(Local.tview) loc to ord>>)).
+          (<<RACE: RARaceW.ra_race L rels1 e1_ra.(Thread.local).(Local.tview) loc to ord>>)).
     Proof.
       exploit sim_thread_step_aux; eauto; try apply WF1_PF; try apply WF1_J; try apply WF1_RA.
       i. unguard. des.
@@ -674,7 +674,7 @@ Module PFtoRAThread.
           (<<CONS_RA: Local.promise_consistent e1_ra.(Thread.local)>>) /\
           (<<STEP_RA: RAThread.step L rels1 rels2 e_ra e1_ra e2_ra>>) /\
           (<<READ: ThreadEvent.is_reading e_ra = Some (loc, to, val, released, ord)>>) /\
-          (<<RACE: RARace.ra_race L rels1 e1_ra.(Thread.local).(Local.tview) loc to ord>>)).
+          (<<RACE: RARaceW.ra_race L rels1 e1_ra.(Thread.local).(Local.tview) loc to ord>>)).
     Proof.
       inv STEP.
       - left. esplits; eauto; try econs 1. econs.
@@ -708,7 +708,7 @@ Module PFtoRAThread.
           (<<CONS_RA: Local.promise_consistent e2_ra.(Thread.local)>>) /\
           (<<STEP_RA: RAThread.step L rels2 rels3 e_ra e2_ra e3_ra>>) /\
           (<<READ: ThreadEvent.is_reading e_ra = Some (loc, to, val, released, ord)>>) /\
-          (<<RACE: RARace.ra_race L rels2 e2_ra.(Thread.local).(Local.tview) loc to ord>>)).
+          (<<RACE: RARaceW.ra_race L rels2 e2_ra.(Thread.local).(Local.tview) loc to ord>>)).
     Proof.
       revert views1 rels1 e1_j e1_ra SIM1 WF1_PF WF1_J WF1_RA SILENT PF CONS.
       induction STEPS; i; ss.
@@ -967,11 +967,11 @@ Module PFtoRAThread.
     Lemma local_map_ra_race
           lc1 lc2 rels loc to ordr
           (LOCAL: local_map ident_map lc1 lc2)
-          (RARACE: RARace.ra_race L rels lc1.(Local.tview) loc to ordr):
-      RARace.ra_race L rels lc2.(Local.tview) loc to ordr.
+          (RARACE: RARaceW.ra_race L rels lc1.(Local.tview) loc to ordr):
+      RARaceW.ra_race L rels lc2.(Local.tview) loc to ordr.
     Proof.
       destruct lc1, lc2. ss. inv LOCAL. ss.
-      unfold RARace.ra_race in *. des; splits; eauto.
+      unfold RARaceW.ra_race in *. des; splits; eauto.
       - eapply TimeFacts.le_lt_lt; eauto.
         inv TVIEW. inv map_cur. rewrite map_rlx. apply TVIEWLE.
       - eapply TimeFacts.le_lt_lt; eauto.
@@ -992,7 +992,7 @@ Module PFtoRAThread.
          (<<CONS: Local.promise_consistent e2_ra.(Thread.local)>>) /\
          (<<STEP_RA: RAThread.step L rels2 rels3 e_ra e2_ra e3_ra>>) /\
          (<<READ: ThreadEvent.is_reading e_ra = Some (loc, to, val, released, ord)>>) /\
-         (<<RACE: RARace.ra_race L rels2 e2_ra.(Thread.local).(Local.tview) loc to ord>>)).
+         (<<RACE: RARaceW.ra_race L rels2 e2_ra.(Thread.local).(Local.tview) loc to ord>>)).
     Proof.
       split.
       { eapply JSim.sim_thread_consistent;

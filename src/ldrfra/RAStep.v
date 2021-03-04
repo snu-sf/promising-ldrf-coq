@@ -1250,7 +1250,7 @@ Module RAConfiguration.
 End RAConfiguration.
 
 
-Module RARace.
+Module RARaceW.
   Section RARace.
     Variable L: Loc.t -> bool.
 
@@ -1307,4 +1307,4 @@ Module RARace.
       - inv STEP. econs 2. eauto.
     Qed.
   End RARace.
-End RARace.
+End RARaceW.
