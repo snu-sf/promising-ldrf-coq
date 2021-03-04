@@ -94,7 +94,7 @@ Lemma sim_trace_relaxed_writing_event L tr lc ploc pts val we_tgt
   :
     exists we_src : ThreadEvent.t,
       (<<FINAL: final_event_trace we_src tr>>) /\
-      (<<WRITING: writing_event ploc pts we_src>>).
+      (<<WRITING: PFRace.writing_event ploc pts we_src>>).
 Proof.
   remember (Some (lc, we_tgt)). ginduction TRACE; eauto; i; clarify.
   { inv WRITING; inv EVENT.
@@ -131,7 +131,7 @@ Lemma sim_traces_relaxed_writing_event L tr_src tr_tgt ploc pts val we_tgt
   :
     exists we_src : ThreadEvent.t,
       (<<FINAL: final_event_trace we_src tr_src>>) /\
-      (<<WRITING: writing_event ploc pts we_src>>).
+      (<<WRITING: PFRace.writing_event ploc pts we_src>>).
 Proof.
   ginduction TRACE; eauto.
   { i. inv FINAL. }
@@ -181,7 +181,7 @@ Lemma promise_writing_event_racy
       loc from ts val released e
       (WRITING : promise_writing_event loc from ts val released e)
   :
-    writing_event loc ts e.
+    PFRace.writing_event loc ts e.
 Proof.
   inv WRITING; econs; eauto.
 Qed.
@@ -372,11 +372,11 @@ Proof.
 Qed.
 
 Lemma racy_read_mon loc ts lc0 lc1 e0 e1
-      (RACY: racy_read loc ts lc1 e1)
+      (RACY: PFRace.racy_read loc ts lc1 e1)
       (LOCAL: TView.le lc0.(Local.tview) lc1.(Local.tview))
       (EVENT: sim_event e0 e1)
   :
-    racy_read loc ts lc0 e0.
+    PFRace.racy_read loc ts lc0 e0.
 Proof.
   inv RACY; inv EVENT; econs; eauto.
   { des_ifs.
@@ -1442,7 +1442,7 @@ Section SIM.
         (JOINEDMEM: joined_memory views th_mid.(Thread.memory))
         (VIEWS: wf_views views)
     :
-      pf_consistent L th_src.
+      PF.pf_consistent L th_src.
   Proof.
     dup THREAD. dep_inv THREAD.
     hexploit sim_memory_strong_exists; eauto. i. des.
@@ -1766,7 +1766,7 @@ Section SIM.
     :
       exists tr_src c_src1 c_mid1 views1 prom1 extra1 proml1,
         (<<STEPMID: JConfiguration.step e tid c_mid0 c_mid1 views0 views1>>) /\
-        (<<STEPSRC: pf_opt_step_trace L tr_src e tid c_src0 c_src1>>) /\
+        (<<STEPSRC: PFConfiguration.opt_step_trace L tr_src e tid c_src0 c_src1>>) /\
         (<<TRACE: sim_traces L tr_src tr_tgt>>) /\
         __guard__(e = MachineEvent.failure \/
                   (<<SIM: sim_configuration tids views1 prom1 extra1 proml1 c_src1 c_mid1 c_tgt1>>) /\
@@ -1906,7 +1906,7 @@ Section SIM.
           { eapply sim_trace_silent; eauto. i. clarify. }
         }
         eapply Forall_app_inv in ALLSILENT. des. inv FORALL5; ss.
-        assert (VSTEP: pf_step_trace
+        assert (VSTEP: PFConfiguration.step_trace
                          L
                          (tr_src ++ tr)
                          (ThreadEvent.get_machine_event e0) tid
@@ -1975,7 +1975,7 @@ Section SIM.
         { i. dep_inv THREAD0. eapply JSim.sim_thread_consistent; eauto; ss.
           eapply pf_consistent_super_strong_consistent; eauto. }
       }
-      assert (VSTEP: pf_step_trace
+      assert (VSTEP: PFConfiguration.step_trace
                        L
                        (tr_src ++ [(th_src1.(Thread.local), e0)])
                        (ThreadEvent.get_machine_event e0) tid
@@ -2101,7 +2101,7 @@ Section SIM.
         c_src0 c_mid0 c_tgt0 tm
         (SIM: sim_configuration tids views0 prom extra proml c_src0 c_mid0 c_tgt0)
         (WF_SRC: Configuration.wf c_src0)
-        (PFSRC: pf_configuration L c_src0)
+        (PFSRC: PF.pf_configuration L c_src0)
         (WF_MID: JConfiguration.wf views0 c_mid0)
         (WF_TGT: Configuration.wf c_tgt0)
         (TIDS: tids tid)
@@ -2109,7 +2109,7 @@ Section SIM.
     :
       exists tr_src tr_tgt tr_cert c_src1 c_mid1 c_tgt1
              views1 e prom_self extra1 proml1 we,
-        (<<STEPSRC: pf_opt_step_trace L tr_src e tid c_src0 c_src1>>) /\
+        (<<STEPSRC: PFConfiguration.opt_step_trace L tr_src e tid c_src0 c_src1>>) /\
         (<<STEPMID: JConfiguration.opt_step e tid c_mid0 c_mid1 views0 views1>>) /\
         (<<STEPTGT: @times_configuration_opt_step times tr_tgt tr_cert e tid c_tgt0 c_tgt1>>) /\
         (<<TRACE: sim_traces L tr_src tr_tgt>>) /\
@@ -2123,7 +2123,7 @@ Section SIM.
                              extra1
                              proml1
                              c_src1 c_mid1 c_tgt1>>) /\
-                   (<<WRITE: writing_event ploc pts we>>) /\
+                   (<<WRITE: PFRace.writing_event ploc pts we>>) /\
                    (<<FINAL: final_event_trace we tr_src>>) /\
                    (<<DECR: prom_self <2= prom tid>>) /\
                    (<<WRITTEN: forall loc ts (IN: List.In (loc, ts) (pl0 ++ [(ploc, pts)])),
@@ -2237,7 +2237,7 @@ Section SIM.
           }
           { eauto. }
           { eauto. }
-          { exploit pf_opt_step_trace_future; try apply STEPSRC; eauto. i. des.
+          { exploit PFConfiguration.opt_step_trace_future; try apply STEPSRC; eauto. i. des.
             exploit sim_configuration_sim_thread; try apply SIM0; eauto.
             ss. i. des.
             exploit sim_configuration_sim_thread; try apply SIM; eauto.
@@ -2251,7 +2251,7 @@ Section SIM.
               eapply Memory.future_future_weak; eauto. }
             { inv PROMTGT. eapply SOUND in GET. des. econs; eauto. }
           }
-          { exploit pf_opt_step_trace_future; try apply STEPSRC; eauto. i. des.
+          { exploit PFConfiguration.opt_step_trace_future; try apply STEPSRC; eauto. i. des.
             exploit sim_configuration_sim_thread; try apply SIM; eauto.
             { ss. erewrite IdentMap.gss. ss. }
             ss. i. des. ii. eapply sim_thread_forget in H; try apply SIM1; cycle 1.
@@ -2328,13 +2328,13 @@ Section SIM.
         c_src0 c_mid0 c_tgt0 tid tm
         (SIM: sim_configuration tids views0 prom extra proml c_src0 c_mid0 c_tgt0)
         (WF_SRC: Configuration.wf c_src0)
-        (PFSRC: pf_configuration L c_src0)
+        (PFSRC: PF.pf_configuration L c_src0)
         (WF_MID: JConfiguration.wf views0 c_mid0)
         (WF_TGT: Configuration.wf c_tgt0)
         (TIDS: tids tid)
     :
       exists tr_src tr_tgt tr_cert c_src1 c_mid1 c_tgt1 views1 e extra1 proml1,
-        (<<STEPSRC: pf_opt_step_trace L tr_src e tid c_src0 c_src1>>) /\
+        (<<STEPSRC: PFConfiguration.opt_step_trace L tr_src e tid c_src0 c_src1>>) /\
         (<<STEPMID: JConfiguration.opt_step e tid c_mid0 c_mid1 views0 views1>>) /\
         (<<STEPTGT: @times_configuration_opt_step times tr_tgt tr_cert e tid c_tgt0 c_tgt1>>) /\
         (<<TRACE: sim_traces L tr_src tr_tgt>>) /\
@@ -2405,23 +2405,23 @@ Section SIM.
         c_src0 c_mid0 c_tgt0 tm
         (SIM: sim_configuration tids views0 prom extra proml c_src0 c_mid0 c_tgt0)
         (WF_SRC: Configuration.wf c_src0)
-        (PFSRC: pf_configuration L c_src0)
+        (PFSRC: PF.pf_configuration L c_src0)
         (WF_MID: JConfiguration.wf views0 c_mid0)
         (WF_TGT: Configuration.wf c_tgt0)
         (ALL: List.Forall tids tidl)
     :
       exists trs c_src1 c_mid1 c_tgt1 views1 extra1 proml1,
         (<<WF_SRC: Configuration.wf c_src1>>) /\
-        (<<PFSRC: pf_configuration L c_src1>>) /\
+        (<<PFSRC: PF.pf_configuration L c_src1>>) /\
         (<<WF_MID: JConfiguration.wf views1 c_mid1>>) /\
         (<<WF_TGT: Configuration.wf c_tgt1>>) /\
-        (<<STEPSRC: silent_pf_steps_trace L c_src0 c_src1 trs>>) /\
+        (<<STEPSRC: PFConfiguration.silent_steps_trace L c_src0 c_src1 trs>>) /\
         (<<THS: forall tid (TID: ~ List.In tid tidl),
             IdentMap.find tid c_tgt0.(Configuration.threads) =
             IdentMap.find tid c_tgt1.(Configuration.threads)>>) /\
         __guard__((<<FAIL: exists tid c_src2,
                       (<<TID: List.In tid tidl>>) /\
-                      (<<STEP: pf_multi_step L MachineEvent.failure tid c_src1 c_src2>>)>>) \/
+                      (<<STEP: PFConfiguration.multi_step L MachineEvent.failure tid c_src1 c_src2>>)>>) \/
                   ((<<FUTURE: good_future tm c_tgt0.(Configuration.memory) c_tgt1.(Configuration.memory)>>) /\
                    (<<SC: c_tgt1.(Configuration.sc) = c_tgt0.(Configuration.sc)>>) /\
                    (<<SIM: sim_configuration
@@ -2454,8 +2454,8 @@ Section SIM.
         { econs. esplits; eauto. }
       }
       exploit IHtidl; eauto.
-      { eapply pf_opt_step_trace_future; eauto. }
-      { eapply pf_opt_step_trace_future; eauto. }
+      { eapply PFConfiguration.opt_step_trace_future; eauto. }
+      { eapply PFConfiguration.opt_step_trace_future; eauto. }
       { eapply JConfiguration.opt_step_future; eauto. }
       { eapply times_configuration_opt_step_future; eauto. }
       { i. des. dep_inv STEPSRC.
@@ -2513,22 +2513,22 @@ Section SIM.
         c_src0 c_mid0 c_tgt0 tm
         (SIM: sim_configuration tids views0 prom extra proml c_src0 c_mid0 c_tgt0)
         (WF_SRC: Configuration.wf c_src0)
-        (PFSRC: pf_configuration L c_src0)
+        (PFSRC: PF.pf_configuration L c_src0)
         (WF_MID: JConfiguration.wf views0 c_mid0)
         (WF_TGT: Configuration.wf c_tgt0)
     :
       exists trs c_src1 c_mid1 c_tgt1 views1 extra1 proml1,
         (<<WF_SRC: Configuration.wf c_src1>>) /\
-        (<<PFSRC: pf_configuration L c_src1>>) /\
+        (<<PFSRC: PF.pf_configuration L c_src1>>) /\
         (<<WF_MID: JConfiguration.wf views1 c_mid1>>) /\
         (<<WF_TGT: Configuration.wf c_tgt1>>) /\
-        (<<STEPSRC: silent_pf_steps_trace L c_src0 c_src1 trs>>) /\
+        (<<STEPSRC: PFConfiguration.silent_steps_trace L c_src0 c_src1 trs>>) /\
         (<<THS: forall tid (TID: ~ ctids tid),
             IdentMap.find tid c_tgt0.(Configuration.threads) =
             IdentMap.find tid c_tgt1.(Configuration.threads)>>) /\
         __guard__((<<FAIL: exists tid c_src2,
                       (<<TID: ctids tid>>) /\
-                      (<<STEP: pf_multi_step L MachineEvent.failure tid c_src1 c_src2>>)>>) \/
+                      (<<STEP: PFConfiguration.multi_step L MachineEvent.failure tid c_src1 c_src2>>)>>) \/
                   ((<<FUTURE: good_future tm c_tgt0.(Configuration.memory) c_tgt1.(Configuration.memory)>>) /\
                    (<<SC: c_tgt1.(Configuration.sc) = c_tgt0.(Configuration.sc)>>) /\
                    (<<SIM: sim_configuration
@@ -2975,15 +2975,15 @@ Section SIM.
                                (all_promises (fun tid' => tid <> tid') prom0)
                                (snd the)) (tr_tgt ++ tr_cert))
         (WF_SRC: Configuration.wf c_src0)
-        (PFSRC: pf_configuration L c_src0)
+        (PFSRC: PF.pf_configuration L c_src0)
         (WF_MID: JConfiguration.wf views0 c_mid0)
         (WF_TGT: Configuration.wf c_tgt0)
-        (RACEFREE: pf_multi_racefree L c_src0)
+        (RACEFREE: PFRace.multi_racefree L c_src0)
     :
-      (<<BEH: forall beh, behaviors (pf_multi_step L) c_src0 beh>>) \/
+      (<<BEH: forall beh, behaviors (PFConfiguration.multi_step L) c_src0 beh>>) \/
       (exists s, (<<EVENT: e = MachineEvent.syscall s>>) /\
                  (<<BEH: forall beh,
-                     behaviors (pf_multi_step L) c_src0 (s :: beh)>>)).
+                     behaviors (PFConfiguration.multi_step L) c_src0 (s :: beh)>>)).
   Proof.
     exploit times_configuration_step_future; eauto.
     { eapply times_configuration_step_strong_step; eauto. } i. des.
@@ -3025,7 +3025,7 @@ Section SIM.
       { ii. specialize (H loc'). des. auto. }
     } i. des.
     assert (exists tid0 ploc pts rlc re pl0 pl1,
-               (<<READING: reading_event ploc pts re>>) /\
+               (<<READING: PFRace.reading_event ploc pts re>>) /\
                (<<IN: List.In (rlc, re) (tr_tgt ++ tr_cert')>>) /\
                (<<PROMISED: prom0 tid0 ploc pts>>) /\
                (<<NEQ: tid0 <> tid>>) /\
@@ -3035,7 +3035,7 @@ Section SIM.
                     (fun the =>
                        no_read_msgs (fun loc ts => List.In (loc, ts) pl1 /\ prom0 tid0 loc ts) (snd the)) (tr_tgt ++ tr_cert')>>)).
     { assert (exists tid0 loc ts rlc0 re0,
-                 (<<READING0: reading_event loc ts re0>>) /\
+                 (<<READING0: PFRace.reading_event loc ts re0>>) /\
                  (<<IN0: List.In (rlc0, re0) (tr_tgt ++ tr_cert)>>) /\
                  (<<PROMISED: prom0 tid0 loc ts>>) /\
                  (<<NEQ: tid0 <> tid>>)).
@@ -3052,7 +3052,7 @@ Section SIM.
         eapply sim_configuration_forget_tgt_concrete; eauto; ss.
       }
       assert (exists rlc re,
-                 (<<READING0: reading_event loc ts re>>) /\
+                 (<<READING0: PFRace.reading_event loc ts re>>) /\
                  (<<IN0: List.In (rlc, re) (tr_tgt ++ tr_cert')>>)).
       { eapply List.in_app_or in IN0. des.
         { esplits; eauto. eapply List.in_or_app. eauto. }
@@ -3115,7 +3115,7 @@ Section SIM.
       }
       { apply not_or_and in SAT. des. apply NNPP in SAT. destruct a. ss.
         assert (exists rlc' re',
-                   (<<READING: reading_event t t0 re'>>) /\
+                   (<<READING: PFRace.reading_event t t0 re'>>) /\
                    (<<IN: List.In (rlc', re') (tr_tgt ++ tr_cert')>>)).
         { apply NNPP. ii. eapply SAT0. eapply List.Forall_forall.
           i. destruct x. ss. unfold no_read_msgs. des_ifs.
@@ -3148,19 +3148,19 @@ Section SIM.
 
     exploit (@sim_configuration_certify_all _ DEC); eauto; ss.
     i. des. destruct x0; des.
-    { left. ii. eapply silent_pf_multi_steps_trace_behaviors; eauto.
+    { left. ii. eapply PFConfiguration.silent_multi_steps_trace_behaviors; eauto.
       econs 3; eauto. }
 
     exploit (@sim_configuration_certify_partial
                (fun _ => True) tid0 ploc pts pl0 pl1); eauto.
     { erewrite <- PROML0; eauto. ii. des; ss. }
     i. des. destruct x0; des.
-    { left. ii. eapply silent_pf_multi_steps_trace_behaviors; eauto.
+    { left. ii. eapply PFConfiguration.silent_multi_steps_trace_behaviors; eauto.
       inv STEPSRC0; ss. econs 3; eauto. econs; eauto. }
 
     hexploit times_configuration_opt_step_future; try apply STEPTGT; eauto. i. des.
     hexploit JConfiguration.opt_step_future; try apply STEPMID; eauto. i. des.
-    hexploit pf_opt_step_trace_future; try apply STEPSRC0; eauto. i. des.
+    hexploit PFConfiguration.opt_step_trace_future; try apply STEPSRC0; eauto. i. des.
 
     assert (IDENT: map_ident_in_memory (fun loc ts fts => ts = fts /\ Time.lt ts (maxmap loc))
                                        (Configuration.memory c_tgt0)).
@@ -3227,7 +3227,7 @@ Section SIM.
 
     assert (exists rlc' re',
                (<<IN: In (rlc', re') (tr_src0)>>) /\
-               (<<READING: reading_event ploc pts re'>>)).
+               (<<READING: PFRace.reading_event ploc pts re'>>)).
     { eapply list_Forall2_in2 in IN; eauto. des. ss.
       destruct b. ss. exploit sim_traces_sim_event_exists; eauto.
       { inv READING; inv EVT; ss. }
@@ -3238,7 +3238,7 @@ Section SIM.
     des.
 
     exfalso. eapply RACEFREE.
-    { eapply silent_pf_steps_trace_pf_steps_trace; eauto. }
+    { eapply PFConfiguration.silent_steps_trace_steps_trace; eauto. }
     { eauto. }
     { eapply NEQ. }
     { inv STEPSRC0; eauto. inv FINAL. }

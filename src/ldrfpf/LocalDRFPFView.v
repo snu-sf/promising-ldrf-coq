@@ -426,8 +426,8 @@ Section NOTRELEASED.
         (CONSISTENT: Local.promise_consistent th1.(Thread.local))
         (THREAD: not_released_thread th0)
     :
-      (<<THREAD: not_released_thread th1>> /\ <<RACY: ~ reading_event loc ts e>>) \/
-      (<<RACY: racy_read loc ts th0.(Thread.local) e>>).
+      (<<THREAD: not_released_thread th1>> /\ <<RACY: ~ PFRace.reading_event loc ts e>>) \/
+      (<<RACY: PFRace.racy_read loc ts th0.(Thread.local) e>>).
   Proof.
     inv THREAD. inv STEP.
     { inv STEP0. inv LOCAL. ss. exploit not_released_promise; eauto.
@@ -473,8 +473,8 @@ Section NOTRELEASED.
         (CONSISTENT: Local.promise_consistent th1.(Thread.local))
         (THREAD: not_released_thread th0)
     :
-      (<<THREAD: not_released_thread th1>> /\ <<RACY: ~ reading_event loc ts e>>) \/
-      (<<RACY: racy_read loc ts th0.(Thread.local) e>>).
+      (<<THREAD: not_released_thread th1>> /\ <<RACY: ~ PFRace.reading_event loc ts e>>) \/
+      (<<RACY: PFRace.racy_read loc ts th0.(Thread.local) e>>).
   Proof.
     inv STEP; eauto.
     { left. splits; auto. ii. inv H. }
@@ -513,12 +513,12 @@ Section NOTRELEASED.
       not_released_thread (Thread.mk _ st lc c.(Configuration.sc) c.(Configuration.memory)).
 
   Lemma not_released_configuration_step L tid e c0 c1
-        (STEP: pf_step L e tid c0 c1)
+        (STEP: PFConfiguration.step L e tid c0 c1)
         (CONFIGURATION: not_released_configuration tid c0)
         (WF: Configuration.wf c0)
     :
-      (<<RELEASED: not_released_configuration tid c1>> /\ <<RACY: ~ reading_event loc ts e>>) \/
-      (<<RACY: pf_racy_read_step L loc ts e tid c0 c1>>).
+      (<<RELEASED: not_released_configuration tid c1>> /\ <<RACY: ~ PFRace.reading_event loc ts e>>) \/
+      (<<RACY: PFRace.racy_read_step L loc ts e tid c0 c1>>).
   Proof.
     inv STEP.
     exploit Thread.rtc_cancel_step_future; eauto; try eapply WF; eauto. i. des. ss.
@@ -529,7 +529,7 @@ Section NOTRELEASED.
       { subst. eapply rtc_reserve_step_promise_consistent2 in RESERVES; eauto.
         inv STEP0. inv STEP; inv STEP0; inv LOCAL. inv LOCAL0. ss. }
       { specialize (CONSISTENT H).
-        eapply pf_consistent_consistent in CONSISTENT.
+        eapply PF.pf_consistent_consistent in CONSISTENT.
         eapply consistent_promise_consistent in CONSISTENT; eauto. }
     }
     assert (CONSISTENT3: Local.promise_consistent e3.(Thread.local)).
@@ -547,19 +547,19 @@ Section NOTRELEASED.
   Qed.
 
   Lemma not_released_configuration_steps L tid c0 c1
-        (STEPS: rtc (pf_machine_step L MachineEvent.silent tid) c0 c1)
+        (STEPS: rtc (PFConfiguration.machine_step L MachineEvent.silent tid) c0 c1)
         (CONFIGURATION: not_released_configuration tid c0)
         (WF: Configuration.wf c0)
     :
       (<<RELEASED: not_released_configuration tid c1>>) \/
       (exists c1' c2' e,
-          (<<STEPS: rtc (pf_machine_step L MachineEvent.silent tid) c0 c1'>>) /\
-          (<<RACY: pf_racy_read_step L loc ts e tid c1' c2'>>)).
+          (<<STEPS: rtc (PFConfiguration.machine_step L MachineEvent.silent tid) c0 c1'>>) /\
+          (<<RACY: PFRace.racy_read_step L loc ts e tid c1' c2'>>)).
   Proof.
     ginduction STEPS; eauto. i. inv H.
     exploit not_released_configuration_step; eauto. i. des.
     { erewrite H1. exploit IHSTEPS; eauto.
-      { eapply pf_step_pf_event_configuration_step in STEP; eauto.
+      { eapply PFConfiguration.step_event_configuration_step in STEP; eauto.
         des. eapply SConfiguration.step_future; eauto. }
       i. des; auto. right. exists c1', c2'. esplits; eauto.
       econs 2; eauto. erewrite <- H1. econs; eauto.
@@ -642,7 +642,7 @@ End NOTRELEASED.
 
 Lemma promise_not_released_add L loc ts prom0 mem0 from val released prom1 mem1 kind
       (PROMISE: Memory.promise prom0 mem0 loc from ts (Message.concrete val released) prom1 mem1 kind)
-      (PF: pf_promises L prom0)
+      (PF: PF.pf_promises L prom0)
       (LOC: L loc)
   :
     (<<KIND: kind = Memory.op_kind_add>>) /\ (<<NONBOT: ts <> Time.bot>>).
@@ -662,8 +662,8 @@ Qed.
 Lemma thread_step_write_not_released L loc ts lang (th0 th1: Thread.t lang) pf e
       lc_other
       (STEP: Thread.step pf e th0 th1)
-      (WRITE: writing_event loc ts e)
-      (PF: pf_promises L th0.(Thread.local).(Local.promises))
+      (WRITE: PFRace.writing_event loc ts e)
+      (PF: PF.pf_promises L th0.(Thread.local).(Local.promises))
       (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
       (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
       (MEM: Memory.closed th0.(Thread.memory))
@@ -714,10 +714,10 @@ Proof.
 Qed.
 
 Lemma configuration_write_not_released L c0 c1 e loc ts tid0 tid1
-      (WRITE: writing_event loc ts e)
-      (STEP: pf_step L e tid0 c0 c1)
+      (WRITE: PFRace.writing_event loc ts e)
+      (STEP: PFConfiguration.step L e tid0 c0 c1)
       (WF: Configuration.wf c0)
-      (PF: pf_configuration L c0)
+      (PF: PF.pf_configuration L c0)
       (TID: tid0 <> tid1)
       (LOC: L loc)
   :
@@ -728,7 +728,7 @@ Proof.
   i. des. ss.
   inv STEP0.
   { inv WRITE. }
-  hexploit pf_promises_cancel_steps; eauto. intros PROMISES2. splits.
+  hexploit PF.pf_promises_cancel_steps; eauto. intros PROMISES2. splits.
   { inv WRITE.
     { inv STEP; inv STEP0; inv LOCAL. ss.
       inv LOCAL0. inv WRITE.
@@ -754,17 +754,17 @@ Qed.
 
 Lemma pf_racefree_view_pf_race_free_imm L c
       (WF: Configuration.wf c)
-      (PF: pf_configuration L c)
-      (RACEFREE: pf_racefree_view L c)
+      (PF: PF.pf_configuration L c)
+      (RACEFREE: PFRace.racefree_view L c)
   :
-    pf_racefree L c.
+    PFRace.racefree L c.
 Proof.
-  ii. exploit rtc_pf_all_step_future; eauto. i. des.
+  ii. exploit PFConfiguration.rtc_all_step_future; eauto. i. des.
   exploit configuration_write_not_released; eauto. i. des.
-  exploit pf_step_future; try apply CSTEP0; eauto. i. des.
+  exploit PFConfiguration.step_future; try apply CSTEP0; eauto. i. des.
   exploit not_released_configuration_steps; eauto. i. des.
   { exploit not_released_configuration_step; try apply CSTEP1; eauto.
-    { eapply rtc_pf_all_step_future; try apply WF0; eauto.
+    { eapply PFConfiguration.rtc_all_step_future; try apply WF0; eauto.
       eapply rtc_implies; try apply STEPS.
       i. inv H. econs; eauto. }
     i. des; ss.
@@ -788,23 +788,23 @@ Qed.
 
 Theorem local_drf_pf_view_time L c
         (WF: Configuration.wf c)
-        (PF: pf_configuration L c)
-        (RACEFRFEE: pf_racefree_view L c)
+        (PF: PF.pf_configuration L c)
+        (RACEFRFEE: PFRace.racefree_view L c)
   :
     behaviors SConfiguration.machine_step c <1=
-    behaviors (pf_machine_step L) c.
+    behaviors (PFConfiguration.machine_step L) c.
 Proof.
   ii. eapply local_drf_pf; eauto.
   eapply pf_racefree_view_pf_race_free_imm; eauto.
 Qed.
 
 Theorem local_drf_pf_view L s
-        (RACEFRFEE: pf_racefree_view L (Configuration.init s))
+        (RACEFRFEE: PFRace.racefree_view L (Configuration.init s))
   :
     behaviors SConfiguration.machine_step (Configuration.init s) <1=
-    behaviors (pf_machine_step L) (Configuration.init s).
+    behaviors (PFConfiguration.machine_step L) (Configuration.init s).
 Proof.
   eapply local_drf_pf_view_time; eauto.
   { eapply Configuration.init_wf. }
-  { eapply configuration_init_pf. }
+  { eapply PF.configuration_init_pf. }
 Qed.

@@ -482,4 +482,28 @@ Section RESERVING.
       final_event_trace e (hd :: tl)
   .
 
+  Lemma reserving_trace_filter tr
+        (TRACE: reserving_trace tr)
+    :
+      List.filter ThreadEvent.is_normal_dec (List.map snd tr) = [].
+  Proof.
+    induction TRACE; eauto. ss. rewrite IHTRACE; eauto.
+    unfold ThreadEvent.is_normal, proj_sumbool in *. des_ifs.
+  Qed.
+
+  Lemma final_event_trace_filter tr e
+        (FINAL: final_event_trace e tr)
+        (NORMAL: ThreadEvent.is_normal e)
+    :
+      exists tr_hd,
+        (<<FILTER: List.filter ThreadEvent.is_normal_dec (List.map snd tr) = tr_hd ++ [e]>>).
+  Proof.
+    induction FINAL; eauto; i.
+    { exists []. ss. rewrite reserving_trace_filter; eauto.
+      unfold proj_sumbool. des_ifs. }
+    { des. ss. rewrite FILTER. des_ifs; eauto.
+      eexists. erewrite List.app_comm_cons. eauto.
+    }
+  Qed.
+
 End RESERVING.

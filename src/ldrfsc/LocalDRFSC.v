@@ -27,7 +27,6 @@ Require Import Single.
 
 Require Import OrdStep.
 Require Import SCStep.
-Require Import SCRace.
 Require Import Stable.
 
 Require Import MemoryProps.

@@ -50,23 +50,23 @@ Lemma PF_sim_configuration_step
       (WO: forall loc, well_ordered (times loc))
       (INCR: forall nat loc, times loc (incr_time_seq nat))
       (WFSRC: Configuration.wf c_src0)
-      (PFSRC: pf_configuration L c_src0)
+      (PFSRC: PF.pf_configuration L c_src0)
       (WFMID: JConfiguration.wf views0 c_mid0)
       (WFTGT: Configuration.wf c_tgt0)
       (SIM: sim_configuration L times (fun _ => True) views0 prom0 extra0 proml0 c_src0 c_mid0 c_tgt0)
       (STEP: times_configuration_step_strong_all times e tid c_tgt0 c_tgt1)
   :
-    (<<RACE: pf_racy_state L c_src0>>) \/
-    (<<UB: forall beh, behaviors (pf_machine_step L) c_src0 beh>>) \/
+    (<<RACE: PFRace.racy_state L c_src0>>) \/
+    (<<UB: forall beh, behaviors (PFConfiguration.machine_step L) c_src0 beh>>) \/
     (<<PROGRESS:
        exists c_src1 c_mid1 views1 prom1 extra1 proml1,
          (<<STEPSRC: exists c_src0',
-             (<<STEPS: rtc (tau_pf_machine_step L) c_src0 c_src0'>>) /\
-             (<<STEP: opt_pf_machine_step L e tid c_src0' c_src1>>)>>) /\
+             (<<STEPS: rtc (PFConfiguration.tau_machine_step L) c_src0 c_src0'>>) /\
+             (<<STEP: PFConfiguration.opt_machine_step L e tid c_src0' c_src1>>)>>) /\
          (<<STEPMID: JConfiguration.step e tid c_mid0 c_mid1 views0 views1>>) /\
          (<<SIM: sim_configuration L times (fun _ => True) views1 prom1 extra1 proml1 c_src1 c_mid1 c_tgt1>>)>>).
 Proof.
-  destruct (classic (pf_racy_state L c_src0)) as [RACE|NRACE]; auto.
+  destruct (classic (PFRace.racy_state L c_src0)) as [RACE|NRACE]; auto.
   right. inv STEP.
   destruct (classic (List.Forall
                        (fun the => no_read_msgs
@@ -76,10 +76,10 @@ Proof.
     eapply times_configuration_step_strong_step in STEP0.
     exploit (step_sim_configuration); eauto.
     i. des. unguard. des; clarify.
-    { inv STEPSRC. left. ii. eapply pf_multi_step_behavior; eauto.
+    { inv STEPSRC. left. ii. eapply PFConfiguration.multi_step_behavior; eauto.
       econs 3. econs; eauto. }
     { right. inv STEPSRC; eauto.
-      { exploit pf_multi_step_machine_step.
+      { exploit PFConfiguration.multi_step_machine_step.
         { econs; eauto. }
         { eauto. }
         { eauto. } i. des.
@@ -88,9 +88,9 @@ Proof.
       { esplits; eauto. econs. }
     }
   }
-  { left. ii. eapply pf_multi_step_behavior; eauto.
+  { left. ii. eapply PFConfiguration.multi_step_behavior; eauto.
     eapply promise_read_race; eauto. ii. eapply NRACE.
-    eapply pf_multi_race_pf_race; eauto.
+    eapply PFRace.multi_race_race; eauto.
   }
 Qed.
 
@@ -99,18 +99,18 @@ Lemma PF_sim_configuration_behavior
       (WO: forall loc, well_ordered (times loc))
       (INCR: forall nat loc, times loc (incr_time_seq nat))
       (WF_SRC: Configuration.wf c_src0)
-      (PFSRC: pf_configuration L c_src0)
+      (PFSRC: PF.pf_configuration L c_src0)
       (WF_MID: JConfiguration.wf views0 c_mid0)
       (WF_TGT: Configuration.wf c_tgt0)
       (SIM: sim_configuration L times (fun _ => True) views0 prom0 extra0 proml0 c_src0 c_mid0 c_tgt0)
       beh
       (BEH: behaviors (times_configuration_step_strong_all times) c_tgt0 beh)
   :
-    (<<BEH: behaviors (pf_machine_step L) c_src0 beh>>) \/
+    (<<BEH: behaviors (PFConfiguration.machine_step L) c_src0 beh>>) \/
     (exists bhd btl c_src1,
         (<<EQ: beh = bhd ++ btl>>) /\
-        (<<BHD: behaviors_partial (pf_machine_step L) c_src0 c_src1 bhd>>) /\
-        (<<RACE: pf_racy_state L c_src1>>) /\
+        (<<BHD: behaviors_partial (PFConfiguration.machine_step L) c_src0 c_src1 bhd>>) /\
+        (<<RACE: PFRace.racy_state L c_src1>>) /\
         (<<BTL: behaviors SConfiguration.machine_step c_src1 btl>>)).
 Proof.
   ginduction BEH; i.
@@ -134,8 +134,8 @@ Proof.
       }
     }
     { left. eauto. }
-    { exploit rtc_tau_pf_machine_step_future; eauto. i. des.
-      exploit opt_pf_machine_step_future; eauto. i. des.
+    { exploit PFConfiguration.rtc_tau_machine_step_future; eauto. i. des.
+      exploit PFConfiguration.opt_machine_step_future; eauto. i. des.
       exploit JConfiguration.step_future; eauto. i. des.
       exploit IHBEH; try apply SIM0; eauto.
       { inv STEP. eapply times_configuration_step_strong_step in STEP1.
@@ -175,8 +175,8 @@ Proof.
       }
     }
     { left. eauto. }
-    { exploit rtc_tau_pf_machine_step_future; eauto. i. des.
-      exploit opt_pf_machine_step_future; eauto. i. des.
+    { exploit PFConfiguration.rtc_tau_machine_step_future; eauto. i. des.
+      exploit PFConfiguration.opt_machine_step_future; eauto. i. des.
       exploit JConfiguration.step_future; eauto. i. des.
       exploit IHBEH; try apply SIM0; eauto.
       { inv STEP. eapply times_configuration_step_strong_step in STEP1.
@@ -196,7 +196,7 @@ Proof.
 Qed.
 
 Lemma pf_configuration_sim_configuration L times c
-      (PF: pf_configuration L c)
+      (PF: PF.pf_configuration L c)
       (WF: Configuration.wf c)
       (TIMES: memory_times_wf times c.(Configuration.memory))
   :
@@ -257,17 +257,17 @@ Proof.
   { i. right. splits; ss. }
 Qed.
 
-Theorem local_drf_pf L c0
-        (PF: pf_configuration L c0)
+Theorem local_drf_pf_time L c0
+        (PF: PF.pf_configuration L c0)
         (WF: Configuration.wf c0)
         beh
         (BEH: behaviors SConfiguration.machine_step c0 beh)
   :
-    (<<BEH: behaviors (pf_machine_step L) c0 beh>>) \/
+    (<<BEH: behaviors (PFConfiguration.machine_step L) c0 beh>>) \/
     (exists bhd btl c1,
         (<<EQ: beh = bhd ++ btl>>) /\
-        (<<BHD: behaviors_partial (pf_machine_step L) c0 c1 bhd>>) /\
-        (<<RACE: pf_racy_state L c1>>) /\
+        (<<BHD: behaviors_partial (PFConfiguration.machine_step L) c0 c1 bhd>>) /\
+        (<<RACE: PFRace.racy_state L c1>>) /\
         (<<BTL: behaviors SConfiguration.machine_step c1 btl>>)).
 Proof.
   eapply SConfiguration.multi_step_equiv in BEH; eauto.

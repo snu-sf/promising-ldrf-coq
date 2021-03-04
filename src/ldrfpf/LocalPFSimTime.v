@@ -71,12 +71,12 @@ Section SIMTIME.
                                (all_promises (fun tid' => tid <> tid') prom0)
                                (snd the)) (tr_tgt ++ tr_cert))
         (WF_SRC: Configuration.wf c_src0)
-        (PFSRC: pf_configuration L c_src0)
+        (PFSRC: PF.pf_configuration L c_src0)
         (WF_MID: JConfiguration.wf views0 c_mid0)
         (WF_TGT: Configuration.wf c_tgt0)
-        (RACEFREE: ~ pf_multi_race L c_src0)
+        (RACEFREE: ~ PFRace.multi_race L c_src0)
     :
-      (<<UB: forall beh, behaviors (pf_multi_step L) c_src0 beh>>).
+      (<<UB: forall beh, behaviors (PFConfiguration.multi_step L) c_src0 beh>>).
   Proof.
     exploit times_configuration_step_future; eauto.
     { eapply times_configuration_step_strong_step; eauto. } i. des.
@@ -119,7 +119,7 @@ Section SIMTIME.
     } i. des.
 
     assert (exists tid0 ploc pts rlc re pl0 pl1 tr0 tr1,
-               (<<READING: reading_event ploc pts re>>) /\
+               (<<READING: PFRace.reading_event ploc pts re>>) /\
                (<<PROMISED: prom0 tid0 ploc pts>>) /\
                (<<NEQ: tid0 <> tid>>) /\
                (<<PROML: proml0 tid0 = pl0 ++ (ploc, pts) :: pl1>>) /\
@@ -168,7 +168,7 @@ Section SIMTIME.
       exploit list_first_occurence. i. des.
       { exfalso. eapply FORALL; eauto. }
       destruct a as (rlc, re). ss.
-      assert (exists ploc pts tid0, (<<PROMISED: prom0 tid0 ploc pts>>) /\ (<<READING: reading_event ploc pts re>>) /\ (<<NEQ: tid <> tid0>>)).
+      assert (exists ploc pts tid0, (<<PROMISED: prom0 tid0 ploc pts>>) /\ (<<READING: PFRace.reading_event ploc pts re>>) /\ (<<NEQ: tid <> tid0>>)).
       { eapply NNPP. ii. eapply FAIL. unfold no_read_msgs. ss. des_ifs.
         - ii. inv H0. eapply H; eauto. esplits; eauto. econs.
         - ii. inv H0. eapply H; eauto. esplits; eauto. econs. } des.
@@ -195,7 +195,7 @@ Section SIMTIME.
 
     hexploit times_configuration_opt_step_future; try apply STEPTGT; eauto. i. des.
     hexploit JConfiguration.opt_step_future; try apply STEPMID; eauto. i. des.
-    hexploit pf_step_trace_future; try apply STEPSRC; eauto. i. des.
+    hexploit PFConfiguration.step_trace_future; try apply STEPSRC; eauto. i. des.
 
     assert (IDENT: map_ident_in_memory (fun loc ts fts => ts = fts /\ Time.lt ts (maxmap loc))
                                        (Configuration.memory c_tgt0)).
@@ -247,7 +247,7 @@ Section SIMTIME.
                (<<STEPS: Trace.steps (tr_read ++ [(rlc', re')]) (Thread.mk _ st0 lc0 c_tgt2.(Configuration.sc) c_tgt2.(Configuration.memory)) th>>) /\
                (<<REST: exists tr_rest,
                    Trace.steps tr_rest th (Thread.mk _ st2 lc2 sc0 memory0)>>) /\
-               (<<READING: reading_event ploc pts re'>>) /\
+               (<<READING: PFRace.reading_event ploc pts re'>>) /\
                (<<SILENT: Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) (tr_read ++ [(rlc', re')])>>) /\
                (<<WFTIME: Forall (fun the => wf_time_evt times (snd the)) (tr_read ++ [(rlc', re')])>>) /\
                (<<NOREAD: Forall (fun the => no_read_msgs (all_promises (fun tid' => tid <> tid') (fun tid' => if Ident.eq_dec tid' tid0 then prom_self else prom0 tid')) (snd the)) (tr_read ++ [(rlc', re')])>>)).

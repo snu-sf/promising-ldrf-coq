@@ -27,7 +27,7 @@ Require Import Behavior.
 Require Import Single.
 Require Import JoinedView.
 
-Require Import LocalPFView.
+Require Import LocalDRFPFView.
 
 Require Import OrdStep.
 Require Import Stable.

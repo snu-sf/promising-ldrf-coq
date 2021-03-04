@@ -44,15 +44,15 @@ Set Implicit Arguments.
 Lemma PF_sim_configuration_beh L times c_src c_mid c_tgt views prom extra proml
       (WO: forall loc, well_ordered (times loc))
       (INCR: forall nat loc, times loc (incr_time_seq nat))
-      (RACEFRFEE: pf_multi_racefree L c_src)
+      (RACEFRFEE: PFRace.multi_racefree L c_src)
       (WF_SRC: Configuration.wf c_src)
-      (PFSRC: pf_configuration L c_src)
+      (PFSRC: PF.pf_configuration L c_src)
       (WF_MID: JConfiguration.wf views c_mid)
       (WF_TGT: Configuration.wf c_tgt)
       (SIM: sim_configuration L times (fun _ => True) views prom extra proml c_src c_mid c_tgt)
   :
     behaviors (times_configuration_step_strong_all times) c_tgt <1=
-    behaviors (pf_multi_step L) c_src.
+    behaviors (PFConfiguration.multi_step L) c_src.
 Proof.
   i. ginduction PR; i.
   { dep_inv SIM. econs 1. ii. ss.
@@ -76,9 +76,9 @@ Proof.
       econs 2; eauto.
       { econs; eauto. }
       { eapply IHPR; try apply SIM0; eauto.
-        { eapply multi_steps_pf_multi_racefree; eauto. econs; eauto. econs. }
-        { eapply pf_step_trace_future; eauto. }
-        { eapply pf_step_trace_future; eauto. }
+        { eapply PFRace.multi_steps_multi_racefree; eauto. econs; eauto. econs. }
+        { eapply PFConfiguration.step_trace_future; eauto. }
+        { eapply PFConfiguration.step_trace_future; eauto. }
         { eapply JConfiguration.step_future; eauto. }
         { eapply times_configuration_step_future; eauto. }
       }
@@ -112,9 +112,9 @@ Proof.
         { econs; eauto. }
         { destruct x1; ss. des.
           eapply IHPR; try apply SIM0; eauto.
-          { eapply multi_steps_pf_multi_racefree; eauto. econs; eauto. econs. }
-          { eapply pf_step_trace_future; eauto. }
-          { eapply pf_step_trace_future; eauto. }
+          { eapply PFRace.multi_steps_multi_racefree; eauto. econs; eauto. econs. }
+          { eapply PFConfiguration.step_trace_future; eauto. }
+          { eapply PFConfiguration.step_trace_future; eauto. }
           { eapply JConfiguration.step_future; eauto. }
           { eapply times_configuration_step_future; eauto. }
         }
@@ -130,12 +130,12 @@ Proof.
 Qed.
 
 Lemma local_drf_pf_multi L c
-      (PF: pf_configuration L c)
+      (PF: PF.pf_configuration L c)
       (WF: Configuration.wf c)
-      (RACEFRFEE: pf_multi_racefree L c)
+      (RACEFRFEE: PFRace.multi_racefree L c)
   :
     behaviors Configuration.step c <1=
-    behaviors (pf_multi_step L) c.
+    behaviors (PFConfiguration.multi_step L) c.
 Proof.
   hexploit joined_view_exist; eauto. intros [views JWF].
   i. eapply times_configuration_step_same_behaviors in PR; eauto.
@@ -197,15 +197,15 @@ Proof.
 Qed.
 
 Theorem local_drf_pf L c
-        (PF: pf_configuration L c)
+        (PF: PF.pf_configuration L c)
         (WF: Configuration.wf c)
-        (RACEFREE: pf_racefree L c)
+        (RACEFREE: PFRace.racefree L c)
   :
     behaviors SConfiguration.machine_step c <1=
-    behaviors (pf_machine_step L) c.
+    behaviors (PFConfiguration.machine_step L) c.
 Proof.
   i. eapply SConfiguration.multi_step_equiv in PR; eauto.
-  eapply pf_racefree_multi_racefree in RACEFREE; eauto.
-  eapply pf_multi_step_behavior; eauto.
+  eapply PFRace.racefree_multi_racefree in RACEFREE; eauto.
+  eapply PFConfiguration.multi_step_behavior; eauto.
   eapply local_drf_pf_multi; eauto.
 Qed.

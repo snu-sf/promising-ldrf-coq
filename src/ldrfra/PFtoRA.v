@@ -47,7 +47,7 @@ Module PFtoRA.
     Inductive wf_pf (c: Configuration.t): Prop :=
     | wf_pf_intro
         (WF: Configuration.wf c)
-        (PF: pf_configuration L c)
+        (PF: PF.pf_configuration L c)
     .
 
     Definition wf_j := JConfiguration.wf.
@@ -98,10 +98,10 @@ Module PFtoRA.
     Lemma step_pf_future
           e tid c1 c2
           (WF1: wf_pf c1)
-          (STEP: pf_step L e tid c1 c2):
+          (STEP: PFConfiguration.step L e tid c1 c2):
       <<WF2: wf_pf c2>>.
     Proof.
-      exploit pf_step_future; eauto; try apply WF1. i. des. ss.
+      exploit PFConfiguration.step_future; eauto; try apply WF1. i. des. ss.
     Qed.
 
     Lemma step_j_future
@@ -143,10 +143,10 @@ Module PFtoRA.
     Lemma steps_pf_future
           c1 c2
           (WF1: wf_pf c1)
-          (STEPS: rtc (pf_all_step L) c1 c2):
+          (STEPS: rtc (PFConfiguration.all_step L) c1 c2):
       <<WF2: wf_pf c2>>.
     Proof.
-      exploit rtc_pf_all_step_future; try apply WF1; eauto. i. des.
+      exploit PFConfiguration.rtc_all_step_future; try apply WF1; eauto. i. des.
       econs; ss.
     Qed.
 
@@ -206,7 +206,7 @@ Module PFtoRA.
     Lemma init_wf_pf syn:
       wf_pf (Configuration.init syn).
     Proof.
-      econs; eauto using Configuration.init_wf, configuration_init_pf.
+      econs; eauto using Configuration.init_wf, PF.configuration_init_pf.
     Qed.
 
     Lemma init_wf_j syn:
@@ -297,7 +297,7 @@ Module PFtoRA.
           (WF1_PF: wf_pf c1_pf)
           (WF1_J: wf_j views1 c1_j)
           (WF1_RA: wf_ra rels1 c1_ra)
-          (STEP: pf_step L e_pf tid c1_pf c2_pf):
+          (STEP: PFConfiguration.step L e_pf tid c1_pf c2_pf):
       (exists e_j c2_j views2 e_ra rels2 c2_ra,
           (<<STEP_J: JConfiguration.single_step e_j tid c1_j c2_j views1 views2>>) /\
           (<<STEP_RA: RAConfiguration.step L e_ra tid rels1 rels2 c1_ra c2_ra>>) /\
@@ -321,7 +321,7 @@ Module PFtoRA.
         - eapply opt_step_promise_consistent; eauto; try apply x3.
           eapply rtc_reserve_step_promise_consistent; eauto.
           eapply consistent_promise_consistent;
-            try eapply pf_consistent_consistent; eauto; try apply x5.
+            try eapply PF.pf_consistent_consistent; eauto; try apply x5.
       }
       i. des.
       exploit PFtoRAThread.cancel_steps_pf_future; eauto. i.
@@ -334,7 +334,7 @@ Module PFtoRA.
         - subst. inv STEP0. inv STEP; inv STEP0. inv LOCAL. inv LOCAL0. ss.
         - eapply rtc_reserve_step_promise_consistent; eauto.
           eapply consistent_promise_consistent;
-            try eapply pf_consistent_consistent; eauto; try apply x7.
+            try eapply PF.pf_consistent_consistent; eauto; try apply x7.
       }
       i. des; cycle 1.
       { right. unfold RARace.ra_race_steps.
@@ -350,7 +350,7 @@ Module PFtoRA.
         - subst. inv STEP0. inv STEP; inv STEP0. inv LOCAL. inv LOCAL0.
           eapply rtc_reserve_step_promise_consistent2; eauto. ss.
         - eapply consistent_promise_consistent;
-            try eapply pf_consistent_consistent; eauto; try apply x9.
+            try eapply PF.pf_consistent_consistent; eauto; try apply x9.
       }
       i. des.
       exploit PFtoRAThread.reserve_steps_pf_future; eauto. i.
@@ -445,7 +445,7 @@ Module PFtoRA.
           (WF1_PF: wf_pf c1_pf)
           (WF1_J: wf_j views1 c1_j)
           (WF1_RA: wf_ra rels1 c1_ra)
-          (STEPS: rtc (pf_all_step L) c1_pf c2_pf):
+          (STEPS: rtc (PFConfiguration.all_step L) c1_pf c2_pf):
       (exists c2_j views2 rels2 c2_ra,
           (<<STEPS_RA: RAConfiguration.steps L rels1 rels2 c1_ra c2_ra>>) /\
           (<<STEPS_J: JConfiguration.single_steps c1_j c2_j views1 views2>>) /\
@@ -478,7 +478,7 @@ Module PFtoRA.
           (WF1_PF: wf_pf c1_pf)
           (WF1_J: wf_j views1 c1_j)
           (WF1_RA: wf_ra rels1 c1_ra)
-          (STEP: pf_racy_read_step L loc ts e_pf tid c1_pf c2_pf)
+          (STEP: PFRace.racy_read_step L loc ts e_pf tid c1_pf c2_pf)
           (LOC: L loc)
           (RELS: ~ List.In (loc, ts) rels1):
       (<<RACE: RARace.ra_race_steps L rels1 c1_ra>>).
@@ -497,7 +497,7 @@ Module PFtoRA.
           exploit PFtoRAThread.reserve_steps_pf_future; eauto. i.
           eapply opt_step_promise_consistent; eauto; try eapply x3.
           eapply rtc_reserve_step_promise_consistent; eauto.
-          eapply consistent_promise_consistent; try eapply pf_consistent_consistent;
+          eapply consistent_promise_consistent; try eapply PF.pf_consistent_consistent;
             try eapply CONSISTENT; try eapply x5; eauto.
       }
       i. des.
@@ -510,7 +510,7 @@ Module PFtoRA.
         - exploit PFtoRAThread.opt_step_pf_future; eauto. i.
           exploit PFtoRAThread.reserve_steps_pf_future; eauto. i.
           eapply rtc_reserve_step_promise_consistent; eauto.
-          eapply consistent_promise_consistent; try eapply pf_consistent_consistent;
+          eapply consistent_promise_consistent; try eapply PF.pf_consistent_consistent;
             try eapply CONSISTENT; try eapply x7; eauto.
       }
       i. unfold RARace.ra_race_steps. des; cycle 1.
@@ -525,7 +525,7 @@ Module PFtoRA.
         - subst. inv STEP0; inv STEP; inv STEP0. inv LOCAL0. inv LOCAL1. ss.
         - exploit PFtoRAThread.opt_step_pf_future; eauto. i. des.
           exploit PFtoRAThread.reserve_steps_pf_future; eauto. i.
-          hexploit consistent_promise_consistent; try eapply pf_consistent_consistent;
+          hexploit consistent_promise_consistent; try eapply PF.pf_consistent_consistent;
             try eapply CONSISTENT; try eapply x8; eauto. s. i.
           hexploit rtc_reserve_step_promise_consistent; try exact H1; eauto. i.
           hexploit opt_step_promise_consistent; try eapply x6; eauto.
@@ -560,7 +560,7 @@ Module PFtoRA.
           (WF_J: wf_j views c_j)
           (WF_RA: wf_ra rels c_ra)
           (RA_RACEFREE: RARace.racefree L rels c_ra):
-      pf_racefree_view L c_pf.
+      PFRace.racefree_view L c_pf.
     Proof.
       ii. exploit sim_conf_steps; eauto. i. des; cycle 1.
       { unfold RARace.ra_race_steps in *. des. eauto. }
@@ -618,7 +618,7 @@ Module PFtoRA.
           (WF_J: wf_j views c_j)
           (WF_RA: wf_ra rels c_ra)
           (RACEFREE: RARace.racefree L rels c_ra):
-      behaviors (pf_machine_step L) c_pf <1=
+      behaviors (PFConfiguration.machine_step L) c_pf <1=
       behaviors (@OrdConfiguration.machine_step L Ordering.acqrel) c_ra.
     Proof.
       i. revert views rels c_j c_ra SIM WF_PF WF_J WF_RA RACEFREE.

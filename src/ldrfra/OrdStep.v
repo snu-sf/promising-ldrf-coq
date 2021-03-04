@@ -221,7 +221,7 @@ Module OrdThread.
     | step_promise
         pf e e1 e2
         (STEP: Thread.promise_step pf e e1 e2)
-        (PF: pf_event L e):
+        (PF: PF.pf_event L e):
         step pf e e1 e2
     | step_program
         e e1 e2
@@ -501,7 +501,7 @@ Module OrdThread.
           { econs; eauto. eapply closed_message_map; eauto.
             eapply ident_map_message. }
           { inv KIND; ss. inv MSG; ss. }
-          { unfold pf_event in *. i. inv PROMISE1. eauto. }
+          { unfold PF.pf_event in *. i. inv PROMISE1. eauto. }
         }
         { econs; eauto; ss. eapply ident_map_message. }
       }

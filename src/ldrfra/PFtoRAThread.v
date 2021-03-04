@@ -482,7 +482,7 @@ Module PFtoRAThread.
           (MEM1_RA: Memory.closed e1_ra.(Thread.memory))
           (STEP_PF: Thread.step pf e_pf e1_pf e2_pf)
           (CONS: Local.promise_consistent e2_pf.(Thread.local))
-          (PROMISE: pf_event L e_pf):
+          (PROMISE: PF.pf_event L e_pf):
       exists views2 e_j pf_j e2_j e_ra e2_ra,
         (<<STEP_J: JThread.step pf_j e_j e1_j e2_j views1 views2>>) /\
         (<<EVENT_J: JSim.sim_event e_j e_pf>>) /\
@@ -633,7 +633,7 @@ Module PFtoRAThread.
           (WF1_J: wf_j views1 e1_j)
           (WF1_RA: wf_ra rels1 e1_ra)
           (STEP: Thread.step pf e_pf e1_pf e2_pf)
-          (PF: pf_event L e_pf)
+          (PF: PF.pf_event L e_pf)
           (CONS: Local.promise_consistent e2_pf.(Thread.local)):
       (exists views2 rels2 pf_j e_j e2_j e_ra e2_ra,
           (<<STEP_J: JThread.step pf_j e_j e1_j e2_j views1 views2>>) /\
@@ -662,7 +662,7 @@ Module PFtoRAThread.
           (WF1_J: wf_j views1 e1_j)
           (WF1_RA: wf_ra rels1 e1_ra)
           (STEP: Thread.opt_step e_pf e1_pf e2_pf)
-          (PF: pf_event L e_pf)
+          (PF: PF.pf_event L e_pf)
           (CONS: Local.promise_consistent e2_pf.(Thread.local)):
       (exists views2 rels2 e_j e2_j e_ra e2_ra,
           (<<STEP_J: JThread.opt_step e_j e1_j e2_j views1 views2>>) /\
@@ -697,7 +697,7 @@ Module PFtoRAThread.
           (WF1_RA: wf_ra rels1 e1_ra)
           (STEPS: Trace.steps tr e1_pf e2_pf)
           (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr)
-          (PF: List.Forall (compose (pf_event L) snd) tr)
+          (PF: List.Forall (compose (PF.pf_event L) snd) tr)
           (CONS: Local.promise_consistent e2_pf.(Thread.local)):
       (exists views2 rels2 e2_j e2_ra,
           (<<STEPS_J: JThread.rtc_tau e1_j e2_j views1 views2>>) /\
@@ -984,7 +984,7 @@ Module PFtoRAThread.
           (WF1_PF: wf_pf e1_pf)
           (WF1_J: wf_j views1 e1_j)
           (WF1_RA: wf_ra rels1 e1_ra)
-          (CONSISTENT: pf_consistent L e1_pf):
+          (CONSISTENT: PF.pf_consistent L e1_pf):
       (<<CONSISTENT_J: JThread.consistent e1_j views1>>) /\
       ((<<CONSISTENT_RA: OrdThread.consistent L Ordering.acqrel e1_ra>>) \/
        exists rels2 rels3 e_ra e2_ra e3_ra loc to val released ord,

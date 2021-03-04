@@ -37,7 +37,7 @@ Set Implicit Arguments.
 Lemma reservation_event_pf L e
       (RESERVATION: ThreadEvent.is_reservation_event e)
   :
-    pf_event L e.
+    PF.pf_event L e.
 Proof.
   ii. subst. unfold ThreadEvent.is_reservation_event in *. ss.
 Qed.
@@ -168,7 +168,7 @@ Section SIM.
       sim_trace [] None
   | sim_trace_cons
       lc_src lc_tgt e_src e_tgt tl_src
-      (PF: pf_event L e_src)
+      (PF: PF.pf_event L e_src)
       (TL: sim_trace tl_src None)
       (EVENT: sim_event e_src e_tgt)
       (VW: TView.le lc_src.(Local.tview) lc_tgt.(Local.tview))
@@ -183,7 +183,7 @@ Section SIM.
   | sim_trace_reserve
       th_src e tl_src e_tgt
       (SILENT: ThreadEvent.is_reservation_event e)
-      (PF: pf_event L e)
+      (PF: PF.pf_event L e)
       (TL: sim_trace tl_src e_tgt)
     :
       sim_trace ((th_src, e)::tl_src) e_tgt
@@ -217,7 +217,7 @@ Section SIM.
 
   Lemma sim_silent_sim_event_exists (tr_src: Trace.t) lc_tgt e_tgt
         (TRACE: sim_trace tr_src (Some (lc_tgt, e_tgt)))
-        (PF: pf_event L e_tgt)
+        (PF: PF.pf_event L e_tgt)
         (RACY: racy_event e_tgt)
     :
       exists lc e_src,
@@ -251,7 +251,7 @@ Section SIM.
   Lemma non_silent_pf e
         (EVENT: ThreadEvent.get_machine_event e <> MachineEvent.silent)
     :
-      pf_event L e.
+      PF.pf_event L e.
   Proof.
     ii. subst. ss.
   Qed.
@@ -259,7 +259,7 @@ Section SIM.
   Lemma sim_trace_pf (tr_src: Trace.t) (e: option (Local.t * ThreadEvent.t))
         (TRACE: sim_trace tr_src e)
     :
-      List.Forall (compose (pf_event L) snd) tr_src.
+      List.Forall (compose (PF.pf_event L) snd) tr_src.
   Proof.
     ginduction TRACE; eauto.
   Qed.
@@ -309,7 +309,7 @@ Section SIM.
   Lemma sim_traces_sim_event_exists (tr_src tr_tgt: Trace.t) th_tgt e_tgt
         (TRACE: sim_traces tr_src tr_tgt)
         (IN: List.In (th_tgt, e_tgt) tr_tgt)
-        (PF: pf_event L e_tgt)
+        (PF: PF.pf_event L e_tgt)
         (RACY: racy_event e_tgt)
     :
       exists th e_src,
@@ -357,7 +357,7 @@ Section SIM.
   Lemma sim_traces_pf (tr_src tr_tgt: Trace.t)
         (TRACE: sim_traces tr_src tr_tgt)
     :
-      List.Forall (compose (pf_event L) snd) tr_src.
+      List.Forall (compose (PF.pf_event L) snd) tr_src.
   Proof.
     induction TRACE; eauto.
     { i. eapply Forall_app.
