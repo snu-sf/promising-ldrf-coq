@@ -281,7 +281,6 @@ Section LOCALPF.
   .
   Hint Constructors all_step.
 
-  (** Properties of the L-PF machine **)
   Inductive opt_machine_step:
     forall (e: MachineEvent.t) (tid: Ident.t) (c1 c2: Configuration.t), Prop :=
   | opt_machine_step_none
@@ -931,11 +930,11 @@ End LOCALPF.
 End PFConfiguration.
 
 
+(** L-PF race **)
 Module PFRace.
 Section LOCALPFRACE.
   Variable L: Loc.t -> bool.
 
-  (** The Definition of an L-PF race **)
   Inductive reading_event (loc: Loc.t) (ts: Time.t):
     forall (e: ThreadEvent.t), Prop :=
   | reading_event_read
@@ -978,6 +977,9 @@ Section LOCALPFRACE.
     forall c1
            (CSTEPS: rtc (PFConfiguration.all_step L) c0 c1),
       racy_execution c1.
+
+  Definition racefree_syn (syn: Threads.syntax): Prop :=
+    racefree (Configuration.init syn).
 
   Inductive racy_state (c0: Configuration.t): Prop :=
   | race_intro
@@ -1289,6 +1291,9 @@ Section LOCALPFRACE.
       (READ: racy_read_step loc ts e1 tid1 c3 c4),
       False.
 
+  Definition racefree_view_syn (syn: Threads.syntax): Prop :=
+    racefree_view (Configuration.init syn).
+
   Lemma step_racefree_view c0 c1 e tid
         (RACEFREE: racefree_view c0)
         (STEP: PFConfiguration.step L e tid c0 c1)
@@ -1307,5 +1312,6 @@ Section LOCALPFRACE.
   Proof.
     ii. eapply RACEFREE; cycle 2; eauto. etrans; eauto.
   Qed.
+
 End LOCALPFRACE.
 End PFRace.

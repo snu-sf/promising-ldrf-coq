@@ -32,7 +32,7 @@ Require Import Single.
 Require SimMemory.
 
 Require Import TimeTraced.
-Require Import LocalPF.
+Require Import PFStep.
 Require Import LocalPFThread.
 Require Import LocalPFSim.
 Require Import JoinedViewExist.
@@ -196,13 +196,29 @@ Proof.
     eapply times_configuration_step_strong_all_mon; eauto. }
 Qed.
 
-Theorem local_drf_pf L c
+
+Lemma local_drf_pf_after L
+        c
         (PF: PF.pf_configuration L c)
         (WF: Configuration.wf c)
         (RACEFREE: PFRace.racefree L c)
   :
     behaviors SConfiguration.machine_step c <1=
     behaviors (PFConfiguration.machine_step L) c.
+Proof.
+  i. eapply SConfiguration.multi_step_equiv in PR; eauto.
+  eapply PFRace.racefree_multi_racefree in RACEFREE; eauto.
+  eapply PFConfiguration.multi_step_behavior; eauto.
+  eapply local_drf_pf_multi; eauto.
+Qed.
+
+
+(* LDRF-PF theorem *)
+Theorem local_drf_pf L
+        s
+        (RACEFREE: PF.racefree_syn L s):
+  behaviors SConfiguration.machine_step c <1=
+  behaviors (PFConfiguration.machine_step L) c.
 Proof.
   i. eapply SConfiguration.multi_step_equiv in PR; eauto.
   eapply PFRace.racefree_multi_racefree in RACEFREE; eauto.

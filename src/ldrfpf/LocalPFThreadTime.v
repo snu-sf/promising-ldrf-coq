@@ -28,7 +28,7 @@ Require Import JoinedView.
 Require Import MemoryProps.
 Require Import OrderedTimes.
 
-Require Import LocalPF.
+Require Import PFStep.
 Require Import LocalPFThread.
 
 Set Implicit Arguments.

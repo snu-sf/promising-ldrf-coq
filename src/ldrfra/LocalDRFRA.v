@@ -281,22 +281,22 @@ Section LocalDRFRA.
     apply ORD. auto.
   Qed.
 
-
-  (* Local DRF-RA theorem *)
-
-  Theorem local_drf_ra
-          s
-          (RACEFREE: ra_racefree_syn s):
-    behaviors SConfiguration.machine_step (Configuration.init s) <1=
-    behaviors (@OrdConfiguration.machine_step L Ordering.acqrel) (Configuration.init s).
-  Proof.
-    hexploit racefree_implies; eauto. i.
-    specialize (PFtoRA.init_sim_conf L s). intro SIM.
-    specialize (PFtoRA.init_wf_pf L s). intro WF_PF.
-    specialize (PFtoRA.init_wf_j s). intro WF_J.
-    specialize (PFtoRA.init_wf_ra s). intro WF_RA.
-    ii. exploit (@local_drf_pf_view L); eauto.
-    { eapply PFtoRA.sim_conf_racefree; eauto. }
-    eapply PFtoRA.sim_conf_behavior; eauto.
-  Qed.
 End LocalDRFRA.
+
+
+(* LDRF-RA theorem *)
+Theorem local_drf_ra L
+        s
+        (RACEFREE: ra_racefree_syn L s):
+  behaviors SConfiguration.machine_step (Configuration.init s) <1=
+  behaviors (@OrdConfiguration.machine_step L Ordering.acqrel) (Configuration.init s).
+Proof.
+  hexploit racefree_implies; eauto. i.
+  specialize (PFtoRA.init_sim_conf L s). intro SIM.
+  specialize (PFtoRA.init_wf_pf L s). intro WF_PF.
+  specialize (PFtoRA.init_wf_j s). intro WF_J.
+  specialize (PFtoRA.init_wf_ra s). intro WF_RA.
+  ii. exploit (@local_drf_pf_view L); eauto.
+  { eapply PFtoRA.sim_conf_racefree; eauto. }
+  eapply PFtoRA.sim_conf_behavior; eauto.
+Qed.

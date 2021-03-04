@@ -33,7 +33,7 @@ Require SimMemory.
 
 Require Import TimeTraced.
 Require Import RecoverForget.
-Require Import LocalPF.
+Require Import PFStep.
 Require Import LocalPFThread.
 Require Import LocalPFSim.
 Require Import JoinedViewExist.
@@ -257,12 +257,14 @@ Proof.
   { i. right. splits; ss. }
 Qed.
 
-Theorem local_drf_pf_time L c0
+
+(* Time-wise LDRF-PF theorem *)
+Theorem local_drf_pf_time L
+        c0
         (PF: PF.pf_configuration L c0)
-        (WF: Configuration.wf c0)
-        beh
-        (BEH: behaviors SConfiguration.machine_step c0 beh)
-  :
+        (WF: Configuration.wf c0):
+  forall beh
+         (BEH: behaviors SConfiguration.machine_step c0 beh),
     (<<BEH: behaviors (PFConfiguration.machine_step L) c0 beh>>) \/
     (exists bhd btl c1,
         (<<EQ: beh = bhd ++ btl>>) /\
@@ -270,7 +272,7 @@ Theorem local_drf_pf_time L c0
         (<<RACE: PFRace.racy_state L c1>>) /\
         (<<BTL: behaviors SConfiguration.machine_step c1 btl>>)).
 Proof.
-  eapply SConfiguration.multi_step_equiv in BEH; eauto.
+  i. eapply SConfiguration.multi_step_equiv in BEH; eauto.
   eapply times_configuration_step_same_behaviors in BEH; eauto. des.
   hexploit (PFConsistentStrong.memory_times_wf_exists c0.(Configuration.memory)).
   i. des.

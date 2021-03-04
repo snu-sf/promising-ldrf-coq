@@ -25,7 +25,7 @@ Require Import Configuration.
 
 Require Import Mapping.
 
-Require Import LocalPF.
+Require Import PFStep.
 Require Import OrdStep.
 
 Set Implicit Arguments.

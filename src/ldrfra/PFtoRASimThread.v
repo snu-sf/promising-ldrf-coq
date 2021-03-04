@@ -23,7 +23,7 @@ Require Import Thread.
 
 Require Import MemoryMerge.
 
-Require Import LocalPF.
+Require Import PFStep.
 Require Import OrdStep.
 Require Import RAStep.
 Require Import Stable.

@@ -28,7 +28,7 @@ Require Import Trace.
 Require Import MemoryProps.
 Require Import JoinedView.
 
-Require Import LocalPF.
+Require Import PFStep.
 Require Import OrdStep.
 Require Import RAStep.
 Require Import Stable.

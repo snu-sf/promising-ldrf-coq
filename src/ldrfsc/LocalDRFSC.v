@@ -643,6 +643,7 @@ Section SIM.
 End SIM.
 
 
+(* LDRF-SC theorem *)
 Theorem local_drf_sc L
         s
         (RACEFREE: SCRace.racefree_syn L s):

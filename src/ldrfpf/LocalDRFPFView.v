@@ -29,7 +29,7 @@ Require Import JoinedView.
 Require Import MemoryProps.
 
 Require Import Single.
-Require Import LocalPF.
+Require Import PFStep.
 Require Import LocalDRFPF.
 
 Set Implicit Arguments.
@@ -786,7 +786,8 @@ Proof.
   }
 Qed.
 
-Theorem local_drf_pf_view_time L c
+
+Lemma local_drf_pf_view_after L c
         (WF: Configuration.wf c)
         (PF: PF.pf_configuration L c)
         (RACEFRFEE: PFRace.racefree_view L c)
@@ -798,13 +799,15 @@ Proof.
   eapply pf_racefree_view_pf_race_free_imm; eauto.
 Qed.
 
-Theorem local_drf_pf_view L s
-        (RACEFRFEE: PFRace.racefree_view L (Configuration.init s))
-  :
-    behaviors SConfiguration.machine_step (Configuration.init s) <1=
-    behaviors (PFConfiguration.machine_step L) (Configuration.init s).
+
+(* Happens-before based LDRF-PF theorem *)
+Theorem local_drf_pf_view L
+        s
+        (RACEFRFEE: PFRace.racefree_view L (Configuration.init s)):
+  behaviors SConfiguration.machine_step (Configuration.init s) <1=
+  behaviors (PFConfiguration.machine_step L) (Configuration.init s).
 Proof.
-  eapply local_drf_pf_view_time; eauto.
+  eapply local_drf_pf_view_after; eauto.
   { eapply Configuration.init_wf. }
   { eapply PF.configuration_init_pf. }
 Qed.

@@ -31,7 +31,7 @@ Require Import MemoryProps.
 Require Import OrderedTimes.
 Require SimMemory.
 
-Require Import LocalPF.
+Require Import PFStep.
 Require Import LocalPFThread.
 Require Import TimeTraced.
 Require Import PFConsistentStrong.

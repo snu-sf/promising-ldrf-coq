@@ -29,7 +29,6 @@ Require Import Mapping.
 Require Import CapFlex.
 Require Import OrderedTimes.
 
-Require Import LocalPF.
 Require Import LocalPFThread.
 
 Set Implicit Arguments.
