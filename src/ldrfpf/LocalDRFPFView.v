@@ -795,7 +795,7 @@ Lemma local_drf_pf_view_after L c
     behaviors SConfiguration.machine_step c <1=
     behaviors (PFConfiguration.machine_step L) c.
 Proof.
-  ii. eapply local_drf_pf; eauto.
+  ii. eapply local_drf_pf_after; eauto.
   eapply pf_racefree_view_pf_race_free_imm; eauto.
 Qed.
 
@@ -808,6 +808,6 @@ Theorem local_drf_pf_view L
   behaviors (PFConfiguration.machine_step L) (Configuration.init s).
 Proof.
   eapply local_drf_pf_view_after; eauto.
-  { eapply Configuration.init_wf. }
-  { eapply PF.configuration_init_pf. }
+  - eapply Configuration.init_wf.
+  - eapply PF.configuration_init_pf.
 Qed.
