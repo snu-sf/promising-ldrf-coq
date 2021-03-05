@@ -16,10 +16,11 @@ make build -j
 ```
 
 ## The Model & Results Updated from PS 2.0
-- `promising2.1/src/lang`: The Promising Semantics 2.1 model (*Figure 5*)
+- `src/lang`: The Promising Semantics 2.1 model (*Figure 5*)
 
-Our Coq development is based on the previous Coq formalization of PS 2.0. See https://github.com/snu-sf/promising2-coq for the detailed explanation of the model.\
-The only difference is the definition of capped memory (*Definition 3.1*): `cap` in `Module Mem` (`promising2.1/src/lang/Memory.v`)
+Our Coq development is based on the previous Coq formalization of PS 2.0.
+See https://github.com/snu-sf/promising2-coq for a more detailed explanation about the model.  
+The only change from PS 2.0 is the definition of capped memory (*Definition 3.1*): `cap` in `Module Mem` (`promising2.1/src/lang/Memory.v`)
 
 - `src/opt` - Compiler transformations (updated from PS 2.0)
 - `src/invariant` - An invariant-based program logic (updated from PS 2.0)
@@ -51,7 +52,7 @@ The only difference is the definition of capped memory (*Definition 3.1*): `cap`
 - `src/ldrfsc/LocalDRFSC.v`:
   + LDRF-SC theorem (*Theorem 4.12*): `Theorem local_drf_sc`
 
->Note that the race conditions of LDRF-RA and LDRF-SC seem slightly different from the race conditions in the paper:
+> Note that the race conditions of LDRF-RA and LDRF-SC in Coq are slightly different from the race conditions in the paper:
 Instead of defining race-detecting-machines,
-we define a racy machine state as a state including a thread able to take thread steps ending with a racy step.
+we define a racy machine state to be a state where a thread can take multiple steps ending with a racy step.
 However, these conditions are provably equivalent to those in the paper.
