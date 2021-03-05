@@ -1,0 +1,4 @@
+#!/bin/bash
+opam repo add coq-released https://coq.inria.fr/opam/released
+opam remote add coq-promising -k git https://github.com/snu-sf/promising-opam-coq-archive
+opam install coq-paco.2.0.3 coq-sflib coq-promising-lib
