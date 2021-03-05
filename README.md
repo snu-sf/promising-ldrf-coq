@@ -1,6 +1,8 @@
 # Modular Data-Race-Freedom Guarantees in the Promising Semantics
 
-Minki Cho, Sung-Hwan Lee, Chung-Kil Hur, Ori Lahav.
+Minki Cho, Sung-Hwan Lee, Chung-Kil Hur, Ori Lahav
+
+Proceedings of the 42nd ACM SIGPLAN Conference on Programming Language Design and Implementation, conditionally accepted ([PLDI 2021](https://conf.researchr.org/home/pldi-2021))
 
 ## Build
 - Requirement: Coq 8.9.1, opam (>=2.0.0)
