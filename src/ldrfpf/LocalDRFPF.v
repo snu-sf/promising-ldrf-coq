@@ -220,8 +220,7 @@ Theorem local_drf_pf L
   behaviors SConfiguration.machine_step (Configuration.init s) <1=
   behaviors (PFConfiguration.machine_step L) (Configuration.init s).
 Proof.
-  i. eapply SConfiguration.multi_step_equiv in PR; eauto.
-  eapply PFRace.racefree_multi_racefree in RACEFREE; eauto.
-  eapply PFConfiguration.multi_step_behavior; eauto.
-  eapply local_drf_pf_multi; eauto.
+  i. eapply local_drf_pf_after; eauto.
+  - eapply PF.configuration_init_pf.
+  - eapply Configuration.init_wf.
 Qed.
