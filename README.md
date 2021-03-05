@@ -5,7 +5,7 @@ Minki Cho, Sung-Hwan Lee, Chung-Kil Hur, Ori Lahav
 Proceedings of the 42nd ACM SIGPLAN Conference on Programming Language Design and Implementation ([PLDI 2021](https://conf.researchr.org/home/pldi-2021))
 
 ## Build
-- Requirement: Coq 8.9.1, opam (>=2.0.0)
+- Requirement: opam (>=2.0.0), Coq 8.9.1 
 - Install dependencies with opam
 ```
 ./configure
@@ -20,7 +20,7 @@ make build -j
 
 Our Coq development is based on the previous Coq formalization of PS 2.0.
 See https://github.com/snu-sf/promising2-coq for a more detailed explanation about the model.  
-The only change from PS 2.0 is the definition of capped memory (*Definition 3.1*): `cap` in `Module Mem` (`promising2.1/src/lang/Memory.v`)
+The only change from PS 2.0 is the definition of capped memory (*Definition 3.1*): `cap` in `Module Mem` (`src/lang/Memory.v`)
 
 - `src/opt` - Compiler transformations (updated from PS 2.0)
 - `src/invariant` - An invariant-based program logic (updated from PS 2.0)
@@ -53,6 +53,6 @@ The only change from PS 2.0 is the definition of capped memory (*Definition 3.1*
   + LDRF-SC theorem (*Theorem 4.12*): `Theorem local_drf_sc`
 
 > Note that the race conditions of LDRF-RA and LDRF-SC in Coq are slightly different from the race conditions in the paper:
-Instead of defining race-detecting-machines,
+Instead of defining race-detecting-machines,~
 we define a racy machine state to be a state where a thread can take multiple steps ending with a racy step.
 However, these conditions are provably equivalent to those in the paper.
