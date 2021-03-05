@@ -18,7 +18,7 @@ make build -j
 ## The Model & Results Updated from PS 2.0
 - `promising2.1/src/lang`: The Promising Semantics 2.1 model (*Figure 5*)
 
-Our Coq developments are based on the previous Coq formalization of PS 2.0. See https://github.com/snu-sf/promising2-coq for the detailed explanation of the model.\
+Our Coq development is based on the previous Coq formalization of PS 2.0. See https://github.com/snu-sf/promising2-coq for the detailed explanation of the model.\
 The only difference is the definition of capped memory (*Definition 3.1*): `cap` in `Module Mem` (`promising2.1/src/lang/Memory.v`)
 
 - `src/opt` - Compiler transformations (updated from PS 2.0)
