@@ -45,14 +45,14 @@ Proof.
     esplits; try apply SC; eauto; ss.
     econs 2. econs 1; eauto. econs; eauto. eauto.
   - (* load *)
-    destruct e_tgt; ss. esplits; eauto; ss.
-    + econs 1.
-    + ss.
+    esplits; [|refl|econs 1|..]; eauto.
+    + destruct e_tgt; ss.
+    + destruct e_tgt; ss.
     + by inv LOCAL0.
     + by inv LOCAL0.
     + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
       * etrans; [eauto|].
         symmetry. apply RegFile.eq_except_singleton.
-      * inv LOCAL. inv LOCAL0. inv LOCAL. econs; ss.
+      * inv LOCAL. inv LOCAL0; ss. inv LOCAL. econs; ss.
         etrans; eauto. apply TViewFacts.read_tview_incr.
 Qed.
