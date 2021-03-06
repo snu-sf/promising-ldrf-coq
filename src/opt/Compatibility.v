@@ -120,6 +120,10 @@ Proof.
   - econs; [|econs 5]; s; eauto. apply lang_step_seq. auto.
   - econs; [|econs 6]; s; eauto. apply lang_step_seq. auto.
   - econs; [|econs 7]; s; eauto. apply lang_step_seq. auto.
+  - econs; [|econs 8]; s; eauto. apply lang_step_seq. auto.
+  - econs; [|econs 9]; s; eauto. apply lang_step_seq. auto.
+  - econs; [|econs 10]; s; eauto. apply lang_step_seq. auto.
+  - econs; [|econs 11]; s; eauto. apply lang_step_seq. auto.
 Qed.
 
 Lemma step_seq
@@ -333,7 +337,7 @@ Proof.
         unfold Thread.steps_failure in *. des.
         destruct e2, e3, state, state0.
         eapply rtc_internal_step_seq in STEPS.
-        eapply step_seq in FAILURE0.
+        eapply step_seq in STEP_FAILURE.
         esplits; eauto.
       - inversion LOCAL. exploit SimPromises.sem_bot_inv; eauto. i.
         destruct lc2_src. ss. subst.
@@ -345,7 +349,7 @@ Proof.
         + left.
           unfold Thread.steps_failure in *. des.
           destruct e2, state.
-          esplits; [|eauto].
+          esplits; [|eauto|eauto].
           etrans; try exact STEPS0.
           eapply rtc_internal_step_seq in STEPS. ss. eauto.
         + right.
@@ -360,7 +364,7 @@ Proof.
         unfold Thread.steps_failure in *. des.
         destruct e2, e3, state, state0.
         eapply rtc_internal_step_seq in STEPS.
-        eapply step_seq in FAILURE0.
+        eapply step_seq in STEP_FAILURE.
         esplits; eauto.
       - right.
         destruct lc_tgt, st2_src, lc2_src. ss. subst.
@@ -374,7 +378,7 @@ Proof.
         unfold Thread.steps_failure in *. des.
         destruct e2, e3, state, state0. ss.
         eapply rtc_internal_step_seq in STEPS.
-        eapply step_seq in FAILURE0.
+        eapply step_seq in STEP_FAILURE.
         esplits; eauto.
       * inversion LOCAL. exploit SimPromises.sem_bot_inv; eauto. i. subst.
         destruct st2_src, lc2_src. inv TERMINAL_SRC. ss. subst.
@@ -386,7 +390,7 @@ Proof.
           unfold Thread.steps_failure in *. des.
           destruct e2, e3, state, state0.
           eapply rtc_internal_step_seq in STEPS.
-          esplits; try exact FAILURE0.
+          esplits; try exact STEP_FAILURE; ss.
           etrans; eauto. }
         { right.
           esplits; cycle 2; eauto.
@@ -400,7 +404,7 @@ Proof.
         unfold Thread.steps_failure in *. des.
         destruct e2, e3, state, state0.
         eapply rtc_internal_step_seq in STEPS.
-        eapply step_seq in FAILURE0.
+        eapply step_seq in STEP_FAILURE.
         esplits; eauto.
       * right.
         destruct st2_src, lc2_src. destruct st3_src, lc3_src.

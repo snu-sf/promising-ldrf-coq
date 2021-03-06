@@ -59,6 +59,7 @@ Proof.
     exploit LE; eauto. intro X. rewrite GET in X. inv X.
     unfold SimPromises.none_if, SimPromises.none_if_released. condtac; ss.
   - exploit LE; eauto. s. i. congr.
+  - exploit LE; eauto. s. i. congr.
   - exploit COMPLETE; eauto. rewrite SimPromises.bot_spec. ss.
 Qed.
 
@@ -213,7 +214,6 @@ Proof.
   }
   exploit SimPromises.remove; try exact REMOVE;
     try exact MEM1; try apply LOCAL1; eauto.
-  { econs. ss. }
   { apply WF1_SRC. }
   { apply WF1_TGT. }
   { apply WF1_TGT. }
@@ -260,6 +260,41 @@ Proof.
   { rewrite SimPromises.bot_spec. intuition. }
   i. des. esplits; eauto.
   rewrite SimPromises.unset_bot in *; ss.
+Qed.
+
+Lemma sim_local_fulfill_undef
+      pview
+      lc1_src sc1_src mem1_src
+      lc1_tgt sc1_tgt mem1_tgt
+      lc2_tgt sc2_tgt
+      loc from to ord_src ord_tgt
+      (ORD: Ordering.le ord_src ord_tgt)
+      (STEP_TGT: fulfill_undef_step lc1_tgt sc1_tgt loc from to ord_tgt lc2_tgt sc2_tgt)
+      (LOCAL1: sim_local pview lc1_src lc1_tgt)
+      (SC1: TimeMap.le sc1_src sc1_tgt)
+      (MEM1: sim_memory mem1_src mem1_tgt)
+      (WF1_SRC: Local.wf lc1_src mem1_src)
+      (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
+      (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
+      (SC1_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
+      (MEM1_SRC: Memory.closed mem1_src)
+      (MEM1_TGT: Memory.closed mem1_tgt):
+  exists lc2_src sc2_src,
+    <<STEP_SRC: fulfill_undef_step lc1_src sc1_src loc from to ord_src lc2_src sc2_src>> /\
+    <<LOCAL2: sim_local (SimPromises.unset loc to pview) lc2_src lc2_tgt>> /\
+    <<SC2: TimeMap.le sc2_src sc2_tgt>>.
+Proof.
+  inv STEP_TGT.
+  exploit SimPromises.remove; try exact REMOVE;
+    try exact MEM1; try apply LOCAL1; eauto.
+  { apply WF1_SRC. }
+  { apply WF1_TGT. }
+  { apply WF1_TGT. }
+  i. des. esplits.
+  - econs; eauto.
+    eapply TViewFacts.writable_mon; try exact WRITABLE; eauto. apply LOCAL1.
+  - econs; eauto. apply LOCAL1.
+  - ss.
 Qed.
 
 Lemma sim_local_promise_not_lower
@@ -373,6 +408,42 @@ Proof.
   i. des. esplits; eauto.
   - rewrite SimPromises.kind_transf_bot in *. eauto.
   - rewrite SimPromises.unset_bot in *; ss.
+Qed.
+
+Lemma sim_local_write_undef
+      pview
+      lc1_src sc1_src mem1_src
+      lc1_tgt sc1_tgt mem1_tgt
+      lc2_tgt sc2_tgt mem2_tgt
+      loc from to ord_src ord_tgt kind
+      (ORD: Ordering.le ord_src ord_tgt)
+      (STEP_TGT: Local.write_undef_step lc1_tgt sc1_tgt mem1_tgt loc from to ord_tgt lc2_tgt sc2_tgt mem2_tgt kind)
+      (LOCAL1: sim_local pview lc1_src lc1_tgt)
+      (SC1: TimeMap.le sc1_src sc1_tgt)
+      (MEM1: sim_memory mem1_src mem1_tgt)
+      (WF1_SRC: Local.wf lc1_src mem1_src)
+      (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
+      (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
+      (SC1_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
+      (MEM1_SRC: Memory.closed mem1_src)
+      (MEM1_TGT: Memory.closed mem1_tgt):
+  exists lc2_src sc2_src mem2_src,
+    <<STEP_SRC: Local.write_undef_step lc1_src sc1_src mem1_src loc from to
+                                       ord_src lc2_src sc2_src mem2_src
+                                       (SimPromises.kind_transf loc to pview kind)>> /\
+    <<LOCAL2: sim_local (SimPromises.unset loc to pview) lc2_src lc2_tgt>> /\
+    <<SC2: TimeMap.le sc2_src sc2_tgt>> /\
+    <<MEM2: sim_memory mem2_src mem2_tgt>>.
+Proof.
+  exploit write_undef_promise_fulfill_undef; eauto. i. des.
+  exploit Local.promise_step_future; eauto. i. des.
+  exploit sim_local_promise; eauto. i. des.
+  exploit Local.promise_step_future; eauto. i. des.
+  exploit sim_local_fulfill_undef; try apply STEP2;
+    try apply LOCAL2; try apply MEM2; eauto.
+  i. des.
+  exploit promise_fulfill_undef_write_undef; try exact STEP_SRC; eauto. i.
+  esplits; eauto.
 Qed.
 
 Lemma sim_local_update
@@ -499,8 +570,8 @@ Proof.
   inv LOCAL. inv PROMISES. ii.
   destruct (Memory.get loc ts (Local.promises lc_tgt)) as [[]|] eqn:GETP.
   - exploit LE; eauto. i. rewrite PROMISE in x. inv x.
-    destruct t0; ss.
-    exploit CONS_TGT; eauto. i.
+    destruct (classic (t0 = Message.reserve)); subst; ss.
+    exploit CONS_TGT; eauto; ss. i.
     eapply TimeFacts.le_lt_lt; eauto.
     inv TVIEW. inv CUR. eauto.
   - exploit COMPLETE; eauto. i.
@@ -516,6 +587,75 @@ Lemma sim_local_failure
 Proof.
   inv STEP_TGT.
   hexploit sim_local_promise_consistent; eauto.
+Qed.
+
+Lemma sim_local_racy_read
+      pview
+      lc1_src mem1_src
+      lc1_tgt mem1_tgt
+      loc val ord_src ord_tgt
+      (STEP_TGT: Local.racy_read_step lc1_tgt mem1_tgt loc val ord_tgt)
+      (LOCAL1: sim_local pview lc1_src lc1_tgt)
+      (MEM1: sim_memory mem1_src mem1_tgt)
+      (WF1_SRC: Local.wf lc1_src mem1_src)
+      (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
+      (ORD: Ordering.le ord_src ord_tgt):
+  <<STEP_SRC: Local.racy_read_step lc1_src mem1_src loc val ord_src>>.
+Proof.
+  inv STEP_TGT.
+  exploit sim_memory_get; eauto. i. des.
+  exploit SimPromises.get_None; [apply LOCAL1|..]; eauto. i. des.
+  econs; eauto.
+  - eapply TViewFacts.racy_readable_mon; eauto. apply LOCAL1.
+  - inv MSG; ss.
+  - i. exploit MSG2; try by destruct ord_src, ord_tgt; inv ORD.
+    i. subst. inv MSG. ss.
+Qed.
+
+Lemma sim_local_racy_write
+      pview
+      lc1_src mem1_src
+      lc1_tgt mem1_tgt
+      loc ord_src ord_tgt
+      (STEP_TGT: Local.racy_write_step lc1_tgt mem1_tgt loc ord_tgt)
+      (LOCAL1: sim_local pview lc1_src lc1_tgt)
+      (MEM1: sim_memory mem1_src mem1_tgt)
+      (WF1_SRC: Local.wf lc1_src mem1_src)
+      (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
+      (ORD: Ordering.le ord_src ord_tgt):
+  <<STEP_SRC: Local.racy_write_step lc1_src mem1_src loc ord_src>>.
+Proof.
+  inv STEP_TGT.
+  exploit sim_memory_get; eauto. i. des.
+  exploit SimPromises.get_None; [apply LOCAL1|..]; eauto. i. des.
+  econs; eauto.
+  - eapply TViewFacts.racy_writable_mon; eauto. apply LOCAL1.
+  - inv MSG; ss.
+  - i. exploit MSG2; try by destruct ord_src, ord_tgt; inv ORD.
+    i. subst. inv MSG. ss.
+  - eapply sim_local_promise_consistent; eauto.
+Qed.
+
+Lemma sim_local_racy_update
+      pview
+      lc1_src mem1_src
+      lc1_tgt mem1_tgt
+      loc ordr_src ordw_src ordr_tgt ordw_tgt
+      (STEP_TGT: Local.racy_update_step lc1_tgt mem1_tgt loc ordr_tgt ordw_tgt)
+      (LOCAL1: sim_local pview lc1_src lc1_tgt)
+      (MEM1: sim_memory mem1_src mem1_tgt)
+      (WF1_SRC: Local.wf lc1_src mem1_src)
+      (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
+      (ORDR: Ordering.le ordr_src ordr_tgt)
+      (ORDW: Ordering.le ordw_src ordw_tgt):
+  <<STEP_SRC: Local.racy_update_step lc1_src mem1_src loc ordr_src ordw_src>>.
+Proof.
+  inv STEP_TGT; try by hexploit sim_local_promise_consistent; eauto.
+  exploit sim_memory_get; eauto. i. des. inv MSG.
+  exploit SimPromises.get_None; [apply LOCAL1|..]; eauto. i. des.
+  econs 3; eauto.
+  - eapply TViewFacts.racy_writable_mon; eauto. apply LOCAL1.
+  - eapply sim_local_promise_consistent; eauto.
 Qed.
 
 Lemma sim_local_program_step
@@ -559,6 +699,18 @@ Proof.
     esplits; (try by econs; [|econs 6]; eauto); ss.
   - exploit sim_local_failure; eauto. i. des.
     esplits; (try by econs; [|econs 7]; eauto); ss.
+  - exploit Local.write_undef_step_future; eauto. i. des.
+    exploit sim_local_write_undef; eauto; try refl. i. des.
+    exploit Local.write_undef_step_future; eauto. i. des.
+    rewrite SimPromises.unset_bot in *.
+    hexploit sim_local_write_bot; try exact LOCAL2; eauto; try refl. i. des.
+    esplits; (try by econs; [|econs 8]; eauto); ss.
+  - exploit sim_local_racy_read; eauto; try refl. i. des.
+    esplits; (try by econs; [|econs 9]; eauto); ss.
+  - exploit sim_local_racy_write; eauto; try refl. i. des.
+    esplits; (try by econs; [|econs 10]; eauto); ss.
+  - exploit sim_local_racy_update; eauto; try refl. i. des.
+    esplits; (try by econs; [|econs 11]; eauto); ss.
 Qed.
 
 Lemma sim_local_lower_src
@@ -610,9 +762,10 @@ Proof.
       { eapply PVIEW. }
       rewrite SimPromises.set_o. condtac; ss; cycle 1.
       { eapply PVIEW. }
-      i. des. subst. destruct p. destruct t0; eauto.
+      i. des. subst. destruct p.
       exploit LE; eauto. ss. i.
-      exploit Memory.lower_get0; try exact PROMISES; eauto. i. des. congr.
+      exploit Memory.lower_get0; try exact PROMISES; eauto. i. des.
+      destruct t0; ss; try congr; eauto.
     + i. revert SRC. erewrite Memory.lower_o; eauto. condtac; ss.
       * i. des. inv SRC. eapply COMPLETE; eauto.
         hexploit Memory.lower_get0; try exact PROMISES; eauto. i. des. eauto.
@@ -662,12 +815,12 @@ Proof.
   { eapply IHdom; eauto. i. exploit FINITE'; eauto. i. inv x; ss.
     inv H1. rewrite X in H. inv H. inv H0. }
   { eapply IHdom; eauto. i. exploit FINITE'; eauto. i. inv x; ss.
-    inv H1. congr.
-  }
+    inv H1. rewrite X in H. inv H. inv H0. }
+  { eapply IHdom; eauto. i. exploit FINITE'; eauto. i. inv x; ss.
+    inv H1. congr. }
   destruct released; cycle 1.
   { eapply IHdom; eauto. i. exploit FINITE'; eauto. i. inv x; ss.
-    inv H1. rewrite H in X. inv X. ss.
-  }
+    inv H1. rewrite H in X. inv X. ss. }
   exploit MemoryFacts.promise_exists_None; eauto.
   { eapply MemoryFacts.released_time_lt; [by apply MEM1_SRC|]. apply LOCAL1_SRC. eauto. }
   i. des.

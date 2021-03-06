@@ -87,8 +87,7 @@ Proof.
   generalize (rtc_tail STEPS). i. des.
   - inv H0. inv TSTEP. econs; eauto.
     econs. rewrite <- EVENT. econs; ss; eauto.
-    + destruct e; ss.
-    + ii. ss. esplits; eauto.
+    ii. ss. esplits; eauto.
   - inv H.
     replace (IdentMap.add tid (existT _ lang_src st2_src, lc2_src) ths1_src) with ths1_src; auto.
     apply IdentMap.eq_leibniz. ii.
@@ -165,16 +164,14 @@ Proof.
     + (* failure *)
       left. unfold Thread.steps_failure in FAILURE. des.
       exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
-      exploit Thread.step_future; try exact FAILURE; eauto. s. i. des.
+      exploit Thread.step_future; try exact STEP_FAILURE; eauto. s. i. des.
       unfold Configuration.steps_failure.
       destruct e3. ss.
-      esplits; [refl|]. econs; eauto.
+      esplits; [refl|]. rewrite <- EVENT_FAILURE. econs; eauto. destruct e; ss.
     + (* non-failure *)
       exploit thread_rtc_step_rtc_step; try exact STEPS; eauto; i.
-      { guardH TID. exploit IN; try eapply TID; eauto. i. des.
-        esplits.
-        eapply sim_thread_future; try exact x1;
-          eauto using Memory.future_future_weak. }
+      { guardH TID. exploit IN; try eapply TID; eauto. i. des. esplits.
+        eapply sim_thread_future; try exact x1; eauto using Memory.future_future_weak. }
       { inv THREAD. eapply sim_local_memory_bot; eauto. }
       exploit Configuration.rtc_step_future; try eapply x3; eauto. s. i. des.
       exploit IHl; [| |exact SC2|exact MEMORY|..]; try exact WF2; try exact WF_TGT;
@@ -196,103 +193,89 @@ Proof.
         rewrite STEPS0 in x3. esplits; try exact x3; eauto.
       * right.
         rewrite x1 in x3. esplits; try exact x3; eauto.
+
   - (* STEP CASE *)
-    i. inv STEP_TGT.
-    + destruct e2. ss.
-      destruct (IdentMap.find tid_tgt ths_src) as [[[lang_src st_src] lc_src]|] eqn:FIND_SRC; cycle 1.
-      { remember (Threads.tids ths_src) as tids eqn:TIDS_SRC.
-        exploit tids_find; [exact TIDS_SRC|exact TIDS_TGT|..]. i. des.
-        exploit x1; eauto. i. des. rewrite FIND_SRC in x. inv x. }
-      inv WF_SRC. inv WF_TGT. inv WF. inv WF0. ss.
-      exploit SIM; eauto. i. des.
-      exploit sim_thread_future; eauto using Memory.future_future_weak. i.
-      exploit sim_thread_plus_step; try exact STEPS; try exact x1;
-        eauto using Memory.future_future_weak.
-      { inv STEP; inv STEP0. inv LOCAL. inv LOCAL0. ss. }
-      s. i. des; ss.
-      left.
+    i. inv STEP_TGT. destruct e2. ss.
+    destruct (IdentMap.find tid_tgt ths_src) as [[[lang_src st_src] lc_src]|] eqn:FIND_SRC; cycle 1.
+    { remember (Threads.tids ths_src) as tids eqn:TIDS_SRC.
+      exploit tids_find; [exact TIDS_SRC|exact TIDS_TGT|..]. i. des.
+      exploit x1; eauto. i. des. rewrite FIND_SRC in x. inv x. }
+    inv WF_SRC. inv WF_TGT. inv WF. inv WF0. ss.
+    exploit SIM; eauto. i. des.
+    exploit sim_thread_future; eauto using Memory.future_future_weak. i.
+    exploit sim_thread_plus_step; try exact STEPS; try exact x1;
+      eauto using Memory.future_future_weak.
+    { s. destruct (classic (ThreadEvent.get_machine_event e0 = MachineEvent.failure)).
+      - inv STEP; inv STEP0; ss. inv LOCAL; ss; inv LOCAL0; ss.
+      - exploit Thread.rtc_tau_step_future; eauto. s. i. des.
+        exploit Thread.step_future; eauto. s. i. des.
+        hexploit consistent_promise_consistent; eauto.
+    }
+    s. i. des.
+    + left.
       unfold Thread.steps_failure in FAILURE. des.
       unfold Configuration.steps_failure.
       destruct e3. ss.
-      esplits; eauto. econs; eauto.
-    + destruct e2. ss.
-      destruct (IdentMap.find tid_tgt ths_src) as [[[lang_src st_src] lc_src]|] eqn:FIND_SRC; cycle 1.
-      { remember (Threads.tids ths_src) as tids eqn:TIDS_SRC.
-        exploit tids_find; [exact TIDS_SRC|exact TIDS_TGT|..]. i. des.
-        exploit x1; eauto. i. des. rewrite FIND_SRC in x. inv x. }
-      inv WF_SRC. inv WF_TGT. inv WF. inv WF0. ss.
-      assert (CONS: Local.promise_consistent lc3).
-      { exploit Thread.rtc_tau_step_future; eauto. s. i. des.
-        exploit Thread.step_future; eauto. s. i. des.
-        hexploit consistent_promise_consistent; eauto. }
-      exploit SIM; eauto. i. des.
-      exploit sim_thread_future; eauto using Memory.future_future_weak. i.
-      exploit sim_thread_plus_step; try exact STEPS; try exact x1;
-        eauto using Memory.future_future_weak.
-      s. i. des.
-      * left.
-        unfold Thread.steps_failure in FAILURE. des.
-        unfold Configuration.steps_failure.
-        destruct e3. ss.
-        esplits; eauto. econs; eauto.
-      * right. inv STEP0.
-        { generalize (rtc_tail STEPS0). intro X. des.
-          - inv X0. inv TSTEP. ss.
-            rewrite <- EVENT0. rewrite <- EVENT1. esplits; eauto.
-            + econs 2. econs; eauto.
-              * destruct e; ss.
-              * eapply sim_thread_consistent; eauto.
-            + ss. right. eapply CIH.
-              * rewrite Threads.tids_add. rewrite IdentSet.add_mem; ss.
-                rewrite Threads.tids_o. rewrite FIND_SRC. ss.
-              * rewrite TIDS_TGT.
-                rewrite Threads.tids_add. rewrite IdentSet.add_mem; ss.
-                rewrite Threads.tids_o. rewrite TID. ss.
-              * i. Configuration.simplify; [eexists; eauto|].
-                exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
-                exploit Thread.step_future; try exact STEP; eauto. s. i. des.
-                exploit Thread.rtc_tau_step_future; try exact X; eauto. s. i. des.
-                exploit Thread.step_future; try exact STEP0; eauto. s. i. des.
-                exploit SIM; try eapply H; eauto. i. des.
-                eexists.
-                eapply sim_thread_future; try exact x0;
-                  try by (etrans; [eauto using Memory.future_future_weak|etrans; eauto using Memory.future_future_weak]).
-          - ss. inv X. esplits; eauto.
-            + destruct e0; ss.
-            + right. eapply CIH; ss.
-              * rewrite TIDS_TGT.
-                rewrite Threads.tids_add. rewrite IdentSet.add_mem; ss.
-                rewrite Threads.tids_o. rewrite TID. ss.
-              * i. Configuration.simplify.
-                { rewrite FIND_SRC in H. inv H. Configuration.simplify.
-                  eexists; eauto. }
-                { exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
-                  exploit Thread.step_future; try exact STEP; eauto. s. i. des.
-                  exploit SIM; try eapply H; eauto. i. des.
-                  eexists.
-                  eapply sim_thread_future; try exact x0; eauto;
-                    try by (etrans; [eauto using Memory.future_future_weak|etrans; eauto using Memory.future_future_weak]). }
-        }
-        { esplits; eauto.
-          - rewrite <- EVENT0.
-            econs 2. econs; eauto.
-            + destruct e0, e_src; ss.
-            + eapply sim_thread_consistent; eauto.
-          - ss. right. eapply CIH.
-            + rewrite Threads.tids_add. rewrite IdentSet.add_mem; ss.
+      esplits; eauto. rewrite <- EVENT_FAILURE. econs; eauto. destruct e; ss.
+    + right. inv STEP0.
+      { generalize (rtc_tail STEPS0). intro X. des.
+        - inv X0. inv TSTEP. ss.
+          rewrite <- EVENT0. rewrite <- EVENT1. esplits; eauto.
+          + econs 2. econs; eauto. i.
+            eapply sim_thread_consistent; eauto.
+          + ss. right. eapply CIH.
+            * rewrite Threads.tids_add. rewrite IdentSet.add_mem; ss.
               rewrite Threads.tids_o. rewrite FIND_SRC. ss.
-            + rewrite TIDS_TGT.
+            * rewrite TIDS_TGT.
               rewrite Threads.tids_add. rewrite IdentSet.add_mem; ss.
               rewrite Threads.tids_o. rewrite TID. ss.
-            + i. Configuration.simplify; [eexists; eauto|].
+            * i. Configuration.simplify; [eexists; eauto|].
               exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
               exploit Thread.step_future; try exact STEP; eauto. s. i. des.
-              exploit Thread.rtc_tau_step_future; try exact STEPS0; eauto. s. i. des.
-              exploit Thread.step_future; try exact STEP1; eauto. s. i. des.
+              exploit Thread.rtc_tau_step_future; try exact X; eauto. s. i. des.
+              exploit Thread.step_future; try exact STEP0; eauto. s. i. des.
               exploit SIM; try eapply H; eauto. i. des.
               eexists.
               eapply sim_thread_future; try exact x0;
-                try by (etrans; [eauto using Memory.future_future_weak|etrans; eauto using Memory.future_future_weak]). }
+                try by (etrans; [eauto using Memory.future_future_weak|
+                                 etrans; eauto using Memory.future_future_weak]).
+        - ss. inv X. esplits; eauto.
+          + destruct e0; ss.
+          + right. eapply CIH; ss.
+            * rewrite TIDS_TGT.
+              rewrite Threads.tids_add. rewrite IdentSet.add_mem; ss.
+              rewrite Threads.tids_o. rewrite TID. ss.
+            * i. Configuration.simplify.
+              { rewrite FIND_SRC in H. inv H. Configuration.simplify.
+                eexists; eauto. }
+              { exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
+                exploit Thread.step_future; try exact STEP; eauto. s. i. des.
+                exploit SIM; try eapply H; eauto. i. des.
+                eexists.
+                eapply sim_thread_future; try exact x0; eauto;
+                  try by (etrans; [eauto using Memory.future_future_weak|
+                                   etrans; eauto using Memory.future_future_weak]). }
+      }
+      { esplits; eauto.
+        - rewrite <- EVENT0. econs 2. econs; eauto. i.
+          eapply sim_thread_consistent; eauto.
+        - ss. right. eapply CIH.
+          + rewrite Threads.tids_add. rewrite IdentSet.add_mem; ss.
+            rewrite Threads.tids_o. rewrite FIND_SRC. ss.
+          + rewrite TIDS_TGT.
+            rewrite Threads.tids_add. rewrite IdentSet.add_mem; ss.
+            rewrite Threads.tids_o. rewrite TID. ss.
+          + i. Configuration.simplify; [eexists; eauto|].
+            exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
+            exploit Thread.step_future; try exact STEP; eauto. s. i. des.
+            exploit Thread.rtc_tau_step_future; try exact STEPS0; eauto. s. i. des.
+            exploit Thread.step_future; try exact STEP1; eauto. s. i. des.
+            exploit SIM; try eapply H; eauto. i. des.
+            eexists.
+            eapply sim_thread_future; try exact x0;
+              try by (etrans; [eauto using Memory.future_future_weak|
+                               etrans; eauto using Memory.future_future_weak]).
+      }
 Grab Existential Variables.
-  { auto. }
+{ auto. }
 Qed.
