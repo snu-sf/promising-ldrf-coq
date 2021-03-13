@@ -147,7 +147,7 @@ Lemma promise_monotonicity lang0 lang1 st0 st1 st2 lc0 lc1 lc2 sc0 sc2 mem0 mem2
       (DISJOINT: Local.disjoint lc0 lc1)
       (SC: Memory.closed_timemap sc0 mem0)
       (MEM: Memory.closed mem0)
-      (PROMISE: concrete_promised lc0.(Local.promises) loc to)
+      (PROMISE: concrete_promised (Local.promises lc0) loc to)
       (STEPS0: Trace.steps tr0 (@Thread.mk lang1 st1 lc1 sc0 mem0) (@Thread.mk _ st2 lc2 sc2 mem2))
   :
     (exists tr1 st0' lc0' sc0' mem0' we tr0' val lc2' sc2' mem2',

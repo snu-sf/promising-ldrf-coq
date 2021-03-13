@@ -28,8 +28,8 @@ Set Implicit Arguments.
 Lemma semi_failure_machine_failure (c0: Configuration.t)
       tid lang st0 lc0 st1 lc1 st2 lc2 sc1 mem1 sc2 mem2 pf
       (WF: Configuration.wf c0)
-      (TID: IdentMap.find tid c0.(Configuration.threads) = Some (existT _ lang st0, lc0))
-      (STEPS: rtc (@Thread.tau_step lang) (Thread.mk _ st0 lc0 c0.(Configuration.sc) c0.(Configuration.memory)) (Thread.mk _ st1 lc1 sc1 mem1))
+      (TID: IdentMap.find tid (Configuration.threads c0) = Some (existT _ lang st0, lc0))
+      (STEPS: rtc (@Thread.tau_step lang) (Thread.mk _ st0 lc0 (Configuration.sc c0) (Configuration.memory c0)) (Thread.mk _ st1 lc1 sc1 mem1))
       (STEP: Thread.step pf ThreadEvent.failure (Thread.mk _ st1 lc1 sc1 mem1) (Thread.mk _ st2 lc2 sc2 mem2))
   :
     exists c1 c2,

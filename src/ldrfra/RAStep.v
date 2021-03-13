@@ -232,15 +232,15 @@ Module RAThread.
     Lemma step_future
           rels1 rels2 e e1 e2
           (STEP: step rels1 rels2 e e1 e2)
-          (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
-          (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-          (CLOSED1: Memory.closed e1.(Thread.memory)):
-      <<WF2: Local.wf e2.(Thread.local) e2.(Thread.memory)>> /\
-      <<SC2: Memory.closed_timemap e2.(Thread.sc) e2.(Thread.memory)>> /\
-      <<CLOSED2: Memory.closed e2.(Thread.memory)>> /\
-      <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
-      <<SC_FUTURE: TimeMap.le e1.(Thread.sc) e2.(Thread.sc)>> /\
-      <<MEM_FUTURE: Memory.future e1.(Thread.memory) e2.(Thread.memory)>>.
+          (WF1: Local.wf (Thread.local e1) (Thread.memory e1))
+          (SC1: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
+          (CLOSED1: Memory.closed (Thread.memory e1)):
+      <<WF2: Local.wf (Thread.local e2) (Thread.memory e2)>> /\
+      <<SC2: Memory.closed_timemap (Thread.sc e2) (Thread.memory e2)>> /\
+      <<CLOSED2: Memory.closed (Thread.memory e2)>> /\
+      <<TVIEW_FUTURE: TView.le (Local.tview (Thread.local e1)) (Local.tview (Thread.local e2))>> /\
+      <<SC_FUTURE: TimeMap.le (Thread.sc e1) (Thread.sc e2)>> /\
+      <<MEM_FUTURE: Memory.future (Thread.memory e1) (Thread.memory e2)>>.
     Proof.
       inv STEP; eauto using OrdThread.step_future.
     Qed.
@@ -248,15 +248,15 @@ Module RAThread.
     Lemma opt_step_future
           rels1 rels2 e e1 e2
           (STEP: opt_step rels1 rels2 e e1 e2)
-          (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
-          (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-          (CLOSED1: Memory.closed e1.(Thread.memory)):
-      <<WF2: Local.wf e2.(Thread.local) e2.(Thread.memory)>> /\
-      <<SC2: Memory.closed_timemap e2.(Thread.sc) e2.(Thread.memory)>> /\
-      <<CLOSED2: Memory.closed e2.(Thread.memory)>> /\
-      <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
-      <<SC_FUTURE: TimeMap.le e1.(Thread.sc) e2.(Thread.sc)>> /\
-      <<MEM_FUTURE: Memory.future e1.(Thread.memory) e2.(Thread.memory)>>.
+          (WF1: Local.wf (Thread.local e1) (Thread.memory e1))
+          (SC1: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
+          (CLOSED1: Memory.closed (Thread.memory e1)):
+      <<WF2: Local.wf (Thread.local e2) (Thread.memory e2)>> /\
+      <<SC2: Memory.closed_timemap (Thread.sc e2) (Thread.memory e2)>> /\
+      <<CLOSED2: Memory.closed (Thread.memory e2)>> /\
+      <<TVIEW_FUTURE: TView.le (Local.tview (Thread.local e1)) (Local.tview (Thread.local e2))>> /\
+      <<SC_FUTURE: TimeMap.le (Thread.sc e1) (Thread.sc e2)>> /\
+      <<MEM_FUTURE: Memory.future (Thread.memory e1) (Thread.memory e2)>>.
     Proof.
       inv STEP.
       - esplits; eauto; refl.
@@ -266,15 +266,15 @@ Module RAThread.
     Lemma steps_future
           rels1 rels2 e1 e2
           (STEPS: steps rels1 rels2 e1 e2)
-          (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
-          (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-          (CLOSED1: Memory.closed e1.(Thread.memory)):
-      <<WF2: Local.wf e2.(Thread.local) e2.(Thread.memory)>> /\
-      <<SC2: Memory.closed_timemap e2.(Thread.sc) e2.(Thread.memory)>> /\
-      <<CLOSED2: Memory.closed e2.(Thread.memory)>> /\
-      <<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>> /\
-      <<SC_FUTURE: TimeMap.le e1.(Thread.sc) e2.(Thread.sc)>> /\
-      <<MEM_FUTURE: Memory.future e1.(Thread.memory) e2.(Thread.memory)>>.
+          (WF1: Local.wf (Thread.local e1) (Thread.memory e1))
+          (SC1: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
+          (CLOSED1: Memory.closed (Thread.memory e1)):
+      <<WF2: Local.wf (Thread.local e2) (Thread.memory e2)>> /\
+      <<SC2: Memory.closed_timemap (Thread.sc e2) (Thread.memory e2)>> /\
+      <<CLOSED2: Memory.closed (Thread.memory e2)>> /\
+      <<TVIEW_FUTURE: TView.le (Local.tview (Thread.local e1)) (Local.tview (Thread.local e2))>> /\
+      <<SC_FUTURE: TimeMap.le (Thread.sc e1) (Thread.sc e2)>> /\
+      <<MEM_FUTURE: Memory.future (Thread.memory e1) (Thread.memory e2)>>.
     Proof.
       revert WF1 SC1 CLOSED1. induction STEPS; i.
       - splits; ss; refl.
@@ -286,13 +286,13 @@ Module RAThread.
     Lemma step_disjoint
           rels1 rels2 e e1 e2 lc
           (STEP: step rels1 rels2 e e1 e2)
-          (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
-          (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-          (CLOSED1: Memory.closed e1.(Thread.memory))
-          (DISJOINT1: Local.disjoint e1.(Thread.local) lc)
-          (WF: Local.wf lc e1.(Thread.memory)):
-      <<DISJOINT2: Local.disjoint e2.(Thread.local) lc>> /\
-      <<WF: Local.wf lc e2.(Thread.memory)>>.
+          (WF1: Local.wf (Thread.local e1) (Thread.memory e1))
+          (SC1: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
+          (CLOSED1: Memory.closed (Thread.memory e1))
+          (DISJOINT1: Local.disjoint (Thread.local e1) lc)
+          (WF: Local.wf lc (Thread.memory e1)):
+      <<DISJOINT2: Local.disjoint (Thread.local e2) lc>> /\
+      <<WF: Local.wf lc (Thread.memory e2)>>.
     Proof.
       inv STEP; eauto using OrdThread.step_disjoint.
     Qed.
@@ -300,13 +300,13 @@ Module RAThread.
     Lemma opt_step_disjoint
           rels1 rels2 e e1 e2 lc
           (STEP: opt_step rels1 rels2 e e1 e2)
-          (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
-          (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-          (CLOSED1: Memory.closed e1.(Thread.memory))
-          (DISJOINT1: Local.disjoint e1.(Thread.local) lc)
-          (WF: Local.wf lc e1.(Thread.memory)):
-      <<DISJOINT2: Local.disjoint e2.(Thread.local) lc>> /\
-      <<WF: Local.wf lc e2.(Thread.memory)>>.
+          (WF1: Local.wf (Thread.local e1) (Thread.memory e1))
+          (SC1: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
+          (CLOSED1: Memory.closed (Thread.memory e1))
+          (DISJOINT1: Local.disjoint (Thread.local e1) lc)
+          (WF: Local.wf lc (Thread.memory e1)):
+      <<DISJOINT2: Local.disjoint (Thread.local e2) lc>> /\
+      <<WF: Local.wf lc (Thread.memory e2)>>.
     Proof.
       inv STEP; eauto.
       inv STEP0; eauto using OrdThread.step_disjoint.
@@ -341,9 +341,9 @@ Module RAThread.
 
     Lemma step_rels_wf
           rels1 rels2 e e1 e2
-          (RELS1: ReleaseWrites.wf rels1 e1.(Thread.local).(Local.promises) e1.(Thread.memory))
+          (RELS1: ReleaseWrites.wf rels1 (Local.promises (Thread.local e1)) (Thread.memory e1))
           (STEP: step rels1 rels2 e e1 e2):
-      ReleaseWrites.wf rels2 e2.(Thread.local).(Local.promises) e2.(Thread.memory).
+      ReleaseWrites.wf rels2 (Local.promises (Thread.local e2)) (Thread.memory e2).
     Proof.
       inv STEP. unfold ReleaseWrites.append.
       inv STEP0; inv STEP; inv LOCAL; ss.
@@ -373,9 +373,9 @@ Module RAThread.
 
     Lemma steps_rels_wf
           rels1 rels2 e1 e2
-          (RELS1: ReleaseWrites.wf rels1 e1.(Thread.local).(Local.promises) e1.(Thread.memory))
+          (RELS1: ReleaseWrites.wf rels1 (Local.promises (Thread.local e1)) (Thread.memory e1))
           (STEPS: steps rels1 rels2 e1 e2):
-      ReleaseWrites.wf rels2 e2.(Thread.local).(Local.promises) e2.(Thread.memory).
+      ReleaseWrites.wf rels2 (Local.promises (Thread.local e2)) (Thread.memory e2).
     Proof.
       induction STEPS; eauto.
       apply IHSTEPS. eapply step_rels_wf; eauto.
@@ -408,12 +408,12 @@ Module RAThread.
 
     Lemma step_rels_disjoint
           rels1 rels2 e e1 e2 promises
-          (RELS1: ReleaseWrites.wf rels1 e1.(Thread.local).(Local.promises) e1.(Thread.memory))
+          (RELS1: ReleaseWrites.wf rels1 (Local.promises (Thread.local e1)) (Thread.memory e1))
           (STEP: step rels1 rels2 e e1 e2)
-          (DISJOINT: Memory.disjoint e1.(Thread.local).(Local.promises) promises)
-          (LE: Memory.le promises e1.(Thread.memory))
-          (RELS: ReleaseWrites.wf rels1 promises e1.(Thread.memory)):
-      ReleaseWrites.wf rels2 promises e2.(Thread.memory).
+          (DISJOINT: Memory.disjoint (Local.promises (Thread.local e1)) promises)
+          (LE: Memory.le promises (Thread.memory e1))
+          (RELS: ReleaseWrites.wf rels1 promises (Thread.memory e1)):
+      ReleaseWrites.wf rels2 promises (Thread.memory e2).
     Proof.
       hexploit step_rels_wf; eauto. ii.
       exploit H; eauto. i. des. esplits; eauto.
@@ -435,15 +435,15 @@ Module RAThread.
 
     Lemma steps_rels_disjoint
           rels1 rels2 e1 e2 lc
-          (RELS1: ReleaseWrites.wf rels1 e1.(Thread.local).(Local.promises) e1.(Thread.memory))
+          (RELS1: ReleaseWrites.wf rels1 (Local.promises (Thread.local e1)) (Thread.memory e1))
           (STEPS: steps rels1 rels2 e1 e2)
-          (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
-          (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-          (CLOSED1: Memory.closed e1.(Thread.memory))
-          (DISJOINT: Local.disjoint e1.(Thread.local) lc)
-          (WF: Local.wf lc e1.(Thread.memory))
-          (RELS: ReleaseWrites.wf rels1 lc.(Local.promises) e1.(Thread.memory)):
-      ReleaseWrites.wf rels2 lc.(Local.promises) e2.(Thread.memory).
+          (WF1: Local.wf (Thread.local e1) (Thread.memory e1))
+          (SC1: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
+          (CLOSED1: Memory.closed (Thread.memory e1))
+          (DISJOINT: Local.disjoint (Thread.local e1) lc)
+          (WF: Local.wf lc (Thread.memory e1))
+          (RELS: ReleaseWrites.wf rels1 (Local.promises lc) (Thread.memory e1)):
+      ReleaseWrites.wf rels2 (Local.promises lc) (Thread.memory e2).
     Proof.
       induction STEPS; ss.
       hexploit step_rels_disjoint; eauto; try apply DISJOINT; try apply WF. i.
@@ -459,12 +459,12 @@ Module RAThread.
           rels0 rels1 e0 e1 fe0
           (THREAD: thread_map ident_map e0 fe0)
           (STEPS: tau_steps rels0 rels1 e0 e1)
-          (LOCAL: Local.wf e0.(Thread.local) e0.(Thread.memory))
-          (FLOCAL: Local.wf fe0.(Thread.local) fe0.(Thread.memory))
-          (MEMORY: Memory.closed e0.(Thread.memory))
-          (FMEMORY: Memory.closed fe0.(Thread.memory))
-          (SC: Memory.closed_timemap e0.(Thread.sc) e0.(Thread.memory))
-          (FSC: Memory.closed_timemap fe0.(Thread.sc) fe0.(Thread.memory)):
+          (LOCAL: Local.wf (Thread.local e0) (Thread.memory e0))
+          (FLOCAL: Local.wf (Thread.local fe0) (Thread.memory fe0))
+          (MEMORY: Memory.closed (Thread.memory e0))
+          (FMEMORY: Memory.closed (Thread.memory fe0))
+          (SC: Memory.closed_timemap (Thread.sc e0) (Thread.memory e0))
+          (FSC: Memory.closed_timemap (Thread.sc fe0) (Thread.memory fe0)):
         exists fe1,
           (<<THREAD: thread_map ident_map e1 fe1>>) /\
           (<<STEPS: tau_steps rels0 rels1 fe0 fe1>>).
@@ -485,17 +485,17 @@ Module RAThread.
 
     Lemma cap_plus_step_current_plus_step
           rels1 rels2 rels3 e e1 e2 e3 sc1 mem1
-          (LOCAL: Local.wf e1.(Thread.local) e1.(Thread.memory))
-          (MEMORY: Memory.closed e1.(Thread.memory))
-          (SC: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-          (CAP: Memory.cap e1.(Thread.memory) mem1)
+          (LOCAL: Local.wf (Thread.local e1) (Thread.memory e1))
+          (MEMORY: Memory.closed (Thread.memory e1))
+          (SC: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
+          (CAP: Memory.cap (Thread.memory e1) mem1)
           (SC_MAX: Memory.max_concrete_timemap mem1 sc1)
-          (STEPS: tau_steps rels1 rels2 (Thread.mk lang e1.(Thread.state) e1.(Thread.local) sc1 mem1) e2)
+          (STEPS: tau_steps rels1 rels2 (Thread.mk lang (Thread.state e1) (Thread.local e1) sc1 mem1) e2)
           (STEP: RAThread.step rels2 rels3 e e2 e3):
         exists rels3' e' e2' e3',
           (<<STEPS: tau_steps rels1 rels2 e1 e2'>>) /\
           (<<STEP: RAThread.step rels2 rels3' e' e2' e3'>>) /\
-          (<<LOCAL: local_map ident_map e2.(Thread.local) e2'.(Thread.local)>>) /\
+          (<<LOCAL: local_map ident_map (Thread.local e2) (Thread.local e2')>>) /\
           (<<EVENT: tevent_map ident_map e' e>>).
     Proof.
       exploit cap_tau_steps_current_tau_steps; try apply STEPS; eauto; ss.
@@ -599,10 +599,10 @@ Module RAThread.
           e rels1 rels2 e1 e2
           loc from to msg
           (STEP: step rels1 rels2 e e1 e2)
-          (PROMISES1: Memory.get loc to e1.(Thread.local).(Local.promises) = None)
-          (MEM1: Memory.get loc to e1.(Thread.memory) = Some (from, msg)):
-      (<<PROMISES2: Memory.get loc to e2.(Thread.local).(Local.promises) = None>>) /\
-      (<<MEM2: Memory.get loc to e2.(Thread.memory) = Some (from, msg)>>) /\
+          (PROMISES1: Memory.get loc to (Local.promises (Thread.local e1)) = None)
+          (MEM1: Memory.get loc to (Thread.memory e1) = Some (from, msg)):
+      (<<PROMISES2: Memory.get loc to (Local.promises (Thread.local e2)) = None>>) /\
+      (<<MEM2: Memory.get loc to (Thread.memory e2) = Some (from, msg)>>) /\
       (<<EVENT: forall from' val released ord, ThreadEvent.is_writing e <> Some (loc, from', to, val, released, ord)>>).
     Proof.
       inv STEP. inv STEP0; inv STEP; inv LOCAL; ss.
@@ -622,10 +622,10 @@ Module RAThread.
           e rels1 rels2 e1 e2
           loc from to msg
           (STEP: opt_step rels1 rels2 e e1 e2)
-          (PROMISES1: Memory.get loc to e1.(Thread.local).(Local.promises) = None)
-          (MEM1: Memory.get loc to e1.(Thread.memory) = Some (from, msg)):
-      (<<PROMISES2: Memory.get loc to e2.(Thread.local).(Local.promises) = None>>) /\
-      (<<MEM2: Memory.get loc to e2.(Thread.memory) = Some (from, msg)>>) /\
+          (PROMISES1: Memory.get loc to (Local.promises (Thread.local e1)) = None)
+          (MEM1: Memory.get loc to (Thread.memory e1) = Some (from, msg)):
+      (<<PROMISES2: Memory.get loc to (Local.promises (Thread.local e2)) = None>>) /\
+      (<<MEM2: Memory.get loc to (Thread.memory e2) = Some (from, msg)>>) /\
       (<<EVENT: forall from' val released ord, ThreadEvent.is_writing e <> Some (loc, from', to, val, released, ord)>>).
     Proof.
       inv STEP.
@@ -637,10 +637,10 @@ Module RAThread.
           e1 e2
           loc from to msg
           (STEP: @Thread.reserve_step lang e1 e2)
-          (PROMISES1: Memory.get loc to e1.(Thread.local).(Local.promises) = None)
-          (MEM1: Memory.get loc to e1.(Thread.memory) = Some (from, msg)):
-      (<<PROMISES2: Memory.get loc to e2.(Thread.local).(Local.promises) = None>>) /\
-      (<<MEM2: Memory.get loc to e2.(Thread.memory) = Some (from, msg)>>).
+          (PROMISES1: Memory.get loc to (Local.promises (Thread.local e1)) = None)
+          (MEM1: Memory.get loc to (Thread.memory e1) = Some (from, msg)):
+      (<<PROMISES2: Memory.get loc to (Local.promises (Thread.local e2)) = None>>) /\
+      (<<MEM2: Memory.get loc to (Thread.memory e2) = Some (from, msg)>>).
     Proof.
       inv STEP. inv STEP0; inv STEP; inv LOCAL; ss.
       exploit promise_get_None; eauto. i. des. ss.
@@ -650,10 +650,10 @@ Module RAThread.
           e1 e2
           loc from to msg
           (STEP: @Thread.cancel_step lang e1 e2)
-          (PROMISES1: Memory.get loc to e1.(Thread.local).(Local.promises) = None)
-          (MEM1: Memory.get loc to e1.(Thread.memory) = Some (from, msg)):
-      (<<PROMISES2: Memory.get loc to e2.(Thread.local).(Local.promises) = None>>) /\
-      (<<MEM2: Memory.get loc to e2.(Thread.memory) = Some (from, msg)>>).
+          (PROMISES1: Memory.get loc to (Local.promises (Thread.local e1)) = None)
+          (MEM1: Memory.get loc to (Thread.memory e1) = Some (from, msg)):
+      (<<PROMISES2: Memory.get loc to (Local.promises (Thread.local e2)) = None>>) /\
+      (<<MEM2: Memory.get loc to (Thread.memory e2) = Some (from, msg)>>).
     Proof.
       inv STEP. inv STEP0; inv STEP; inv LOCAL; ss.
       exploit promise_get_None; eauto. i. des. ss.
@@ -663,10 +663,10 @@ Module RAThread.
           e1 e2
           loc from to msg
           (STEP: rtc (@Thread.reserve_step lang) e1 e2)
-          (PROMISES1: Memory.get loc to e1.(Thread.local).(Local.promises) = None)
-          (MEM1: Memory.get loc to e1.(Thread.memory) = Some (from, msg)):
-      (<<PROMISES2: Memory.get loc to e2.(Thread.local).(Local.promises) = None>>) /\
-      (<<MEM2: Memory.get loc to e2.(Thread.memory) = Some (from, msg)>>).
+          (PROMISES1: Memory.get loc to (Local.promises (Thread.local e1)) = None)
+          (MEM1: Memory.get loc to (Thread.memory e1) = Some (from, msg)):
+      (<<PROMISES2: Memory.get loc to (Local.promises (Thread.local e2)) = None>>) /\
+      (<<MEM2: Memory.get loc to (Thread.memory e2) = Some (from, msg)>>).
     Proof.
       induction STEP; ss.
       exploit reserve_step_get_None; eauto. i. des. eauto.
@@ -676,10 +676,10 @@ Module RAThread.
           e1 e2
           loc from to msg
           (STEP: rtc (@Thread.cancel_step lang) e1 e2)
-          (PROMISES1: Memory.get loc to e1.(Thread.local).(Local.promises) = None)
-          (MEM1: Memory.get loc to e1.(Thread.memory) = Some (from, msg)):
-      (<<PROMISES2: Memory.get loc to e2.(Thread.local).(Local.promises) = None>>) /\
-      (<<MEM2: Memory.get loc to e2.(Thread.memory) = Some (from, msg)>>).
+          (PROMISES1: Memory.get loc to (Local.promises (Thread.local e1)) = None)
+          (MEM1: Memory.get loc to (Thread.memory e1) = Some (from, msg)):
+      (<<PROMISES2: Memory.get loc to (Local.promises (Thread.local e2)) = None>>) /\
+      (<<MEM2: Memory.get loc to (Thread.memory e2) = Some (from, msg)>>).
     Proof.
       induction STEP; ss.
       exploit cancel_step_get_None; eauto. i. des. eauto.
@@ -696,9 +696,9 @@ Module RAThread.
 
     Lemma step_reserve_only
           rels1 rels2 e e1 e2
-          (PROMISES1: reserve_only e1.(Thread.local).(Local.promises))
+          (PROMISES1: reserve_only (Local.promises (Thread.local e1)))
           (STEP: step rels1 rels2 e e1 e2):
-      <<PROMISES2: reserve_only e2.(Thread.local).(Local.promises)>>.
+      <<PROMISES2: reserve_only (Local.promises (Thread.local e2))>>.
     Proof.
       inv STEP. inv STEP0; inv STEP; inv LOCAL; ss; try by (inv LOCAL0; ss).
       - destruct (L loc) eqn:LOC.
@@ -745,9 +745,9 @@ Module RAThread.
 
     Lemma opt_step_reserve_only
           rels1 rels2 e e1 e2
-          (PROMISES1: reserve_only e1.(Thread.local).(Local.promises))
+          (PROMISES1: reserve_only (Local.promises (Thread.local e1)))
           (STEP: opt_step rels1 rels2 e e1 e2):
-      <<PROMISES2: reserve_only e2.(Thread.local).(Local.promises)>>.
+      <<PROMISES2: reserve_only (Local.promises (Thread.local e2))>>.
     Proof.
       inv STEP; ss.
       eapply step_reserve_only; eauto.
@@ -755,9 +755,9 @@ Module RAThread.
 
     Lemma reserve_step_reserve_only
           e1 e2
-          (PROMISES1: reserve_only e1.(Thread.local).(Local.promises))
+          (PROMISES1: reserve_only (Local.promises (Thread.local e1)))
           (STEP: @Thread.reserve_step lang e1 e2):
-      <<PROMISES2: reserve_only e2.(Thread.local).(Local.promises)>>.
+      <<PROMISES2: reserve_only (Local.promises (Thread.local e2))>>.
     Proof.
       inv STEP. inv STEP0; inv STEP; inv LOCAL. inv PROMISE. ss. ii.
       revert GET. erewrite Memory.add_o; eauto. condtac; ss; eauto.
@@ -766,9 +766,9 @@ Module RAThread.
 
     Lemma cancel_step_reserve_only
           e1 e2
-          (PROMISES1: reserve_only e1.(Thread.local).(Local.promises))
+          (PROMISES1: reserve_only (Local.promises (Thread.local e1)))
           (STEP: @Thread.cancel_step lang e1 e2):
-      <<PROMISES2: reserve_only e2.(Thread.local).(Local.promises)>>.
+      <<PROMISES2: reserve_only (Local.promises (Thread.local e2))>>.
     Proof.
       inv STEP. inv STEP0; inv STEP; inv LOCAL. inv PROMISE. ss. ii.
       revert GET. erewrite Memory.remove_o; eauto. condtac; ss; eauto.
@@ -776,9 +776,9 @@ Module RAThread.
 
     Lemma reserve_steps_reserve_only
           e1 e2
-          (PROMISES1: reserve_only e1.(Thread.local).(Local.promises))
+          (PROMISES1: reserve_only (Local.promises (Thread.local e1)))
           (STEPS: rtc (@Thread.reserve_step lang) e1 e2):
-      <<PROMISES2: reserve_only e2.(Thread.local).(Local.promises)>>.
+      <<PROMISES2: reserve_only (Local.promises (Thread.local e2))>>.
     Proof.
       induction STEPS; ss.
       hexploit reserve_step_reserve_only; eauto.
@@ -786,9 +786,9 @@ Module RAThread.
 
     Lemma cancel_steps_reserve_only
           e1 e2
-          (PROMISES1: reserve_only e1.(Thread.local).(Local.promises))
+          (PROMISES1: reserve_only (Local.promises (Thread.local e1)))
           (STEPS: rtc (@Thread.cancel_step lang) e1 e2):
-      <<PROMISES2: reserve_only e2.(Thread.local).(Local.promises)>>.
+      <<PROMISES2: reserve_only (Local.promises (Thread.local e2))>>.
     Proof.
       induction STEPS; ss.
       hexploit cancel_step_reserve_only; eauto.
@@ -809,9 +809,9 @@ Module RAThread.
           (EVENT: forall from val released ord,
               ThreadEvent.is_writing e <> Some (loc, from, to, val, released, ord))
           (GET1: forall from val released,
-              Memory.get loc to e1.(Thread.memory) <> Some (from, Message.concrete val released)):
+              Memory.get loc to (Thread.memory e1) <> Some (from, Message.concrete val released)):
       <<GET2: forall from val released,
-        Memory.get loc to e2.(Thread.memory) <> Some (from, Message.concrete val released)>>.
+        Memory.get loc to (Thread.memory e2) <> Some (from, Message.concrete val released)>>.
     Proof.
       i. inv STEP. inv STEP0; inv STEP; inv LOCAL; ss; eauto.
       - inv PROMISE.
@@ -855,9 +855,9 @@ Module RAThread.
           (EVENT: forall from val released ord,
               ThreadEvent.is_writing e <> Some (loc, from, to, val, released, ord))
           (GET1: forall from val released,
-              Memory.get loc to e1.(Thread.memory) <> Some (from, Message.concrete val released)):
+              Memory.get loc to (Thread.memory e1) <> Some (from, Message.concrete val released)):
       <<GET2: forall from val released,
-        Memory.get loc to e2.(Thread.memory) <> Some (from, Message.concrete val released)>>.
+        Memory.get loc to (Thread.memory e2) <> Some (from, Message.concrete val released)>>.
     Proof.
       inv STEP; eauto.
       eapply step_non_concrete; eauto.
@@ -868,9 +868,9 @@ Module RAThread.
           (STEPS: rtc (@Thread.reserve_step lang) e1 e2)
           (LOC: L loc)
           (GET1: forall from val released,
-              Memory.get loc to e1.(Thread.memory) <> Some (from, Message.concrete val released)):
+              Memory.get loc to (Thread.memory e1) <> Some (from, Message.concrete val released)):
       <<GET2: forall from val released,
-        Memory.get loc to e2.(Thread.memory) <> Some (from, Message.concrete val released)>>.
+        Memory.get loc to (Thread.memory e2) <> Some (from, Message.concrete val released)>>.
     Proof.
       induction STEPS; eauto. i.
       eapply IHSTEPS; eauto. i.
@@ -883,9 +883,9 @@ Module RAThread.
           (STEPS: rtc (@Thread.cancel_step lang) e1 e2)
           (LOC: L loc)
           (GET1: forall from val released,
-              Memory.get loc to e1.(Thread.memory) <> Some (from, Message.concrete val released)):
+              Memory.get loc to (Thread.memory e1) <> Some (from, Message.concrete val released)):
       <<GET2: forall from val released,
-        Memory.get loc to e2.(Thread.memory) <> Some (from, Message.concrete val released)>>.
+        Memory.get loc to (Thread.memory e2) <> Some (from, Message.concrete val released)>>.
     Proof.
       induction STEPS; eauto. i.
       eapply IHSTEPS; eauto. i.
@@ -905,14 +905,14 @@ Module RAConfiguration.
     | step_intro
         rels1 rels2
         e tid c1 lang st1 lc1 e2 e3 st4 lc4 sc4 memory4
-        (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
-        (CANCELS: rtc (@Thread.cancel_step _) (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
+        (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
+        (CANCELS: rtc (@Thread.cancel_step _) (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) e2)
         (STEP: RAThread.opt_step L rels1 rels2 e e2 e3)
         (RESERVES: rtc (@Thread.reserve_step _) e3 (Thread.mk _ st4 lc4 sc4 memory4))
         (CONSISTENT: e <> ThreadEvent.failure ->
                      OrdThread.consistent L Ordering.acqrel (Thread.mk _ st4 lc4 sc4 memory4)):
         step e tid rels1 rels2
-             c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) c1.(Configuration.threads)) sc4 memory4)
+             c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) (Configuration.threads c1)) sc4 memory4)
     .
 
     Inductive steps rels1: forall (rels2: ReleaseWrites.t) (c1 c2: Configuration.t), Prop :=
@@ -998,8 +998,8 @@ Module RAConfiguration.
           (WF1: Configuration.wf c1)
           (STEP: step e tid rels1 rels2 c1 c2):
       (<<WF2: Configuration.wf c2>>) /\
-      (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-      (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
+      (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+      (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>).
     Proof.
       exploit step_future; eauto. i. des. split; ss.
       inv STEP. s.
@@ -1025,8 +1025,8 @@ Module RAConfiguration.
           (WF1: Configuration.wf c1)
           (STEPS: steps rels1 rels2 c1 c2):
       (<<WF2: Configuration.wf c2>>) /\
-      (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-      (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
+      (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+      (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>).
     Proof.
       induction STEPS.
       - splits; ss; try refl.
@@ -1042,9 +1042,9 @@ Module RAConfiguration.
           (STEP: step e tid rels1 rels2 c1 c2)
           (WRITE: ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord)):
       (<<PROMISES: forall tid lang st lc
-                     (FIND: IdentMap.find tid c2.(Configuration.threads) = Some (existT _ lang st, lc)),
-          Memory.get loc to lc.(Local.promises) = None>>) /\
-      (<<MEM: Memory.get loc to c2.(Configuration.memory) = Some (from, Message.concrete val released)>>).
+                     (FIND: IdentMap.find tid (Configuration.threads c2) = Some (existT _ lang st, lc)),
+          Memory.get loc to (Local.promises lc) = None>>) /\
+      (<<MEM: Memory.get loc to (Configuration.memory c2) = Some (from, Message.concrete val released)>>).
     Proof.
       inv STEP. inv STEP0; ss.
       split; cycle 1.
@@ -1077,7 +1077,7 @@ Module RAConfiguration.
       - inv LOCAL0. inv STEP. inv WRITE.
         exploit Memory.promise_disjoint; try eapply WF; try eapply DISJOINT2; eauto. i. des.
         exploit Memory.promise_get0; eauto; try by (inv PROMISE; ss). i. des.
-        destruct (Memory.get loc to lc.(Local.promises)) as [[]|] eqn:GETP; ss.
+        destruct (Memory.get loc to (Local.promises lc)) as [[]|] eqn:GETP; ss.
         exfalso.
         exploit MemoryFacts.promise_time_lt; eauto; try by (inv PROMISE; ss). i.
         inv DISJOINT0. hexploit DISJOINT1; eauto. i. des.
@@ -1087,7 +1087,7 @@ Module RAConfiguration.
       - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP. inv WRITE.
         exploit Memory.promise_disjoint; try eapply WF; try eapply DISJOINT2; eauto. i. des.
         exploit Memory.promise_get0; eauto; try by (inv PROMISE; ss). i. des.
-        destruct (Memory.get loc to lc.(Local.promises)) as [[]|] eqn:GETP; ss.
+        destruct (Memory.get loc to (Local.promises lc)) as [[]|] eqn:GETP; ss.
         exfalso.
         exploit MemoryFacts.promise_time_lt; eauto; try by (inv PROMISE; ss). i.
         inv DISJOINT0. hexploit DISJOINT1; eauto. i. des.
@@ -1101,13 +1101,13 @@ Module RAConfiguration.
           loc from to msg
           (STEP: step e tid rels1 rels2 c1 c2)
           (PROMISES1: forall tid lang st lc
-                       (FIND: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st, lc)),
-              Memory.get loc to lc.(Local.promises) = None)
-          (MEM1: Memory.get loc to c1.(Configuration.memory) = Some (from, msg)):
+                       (FIND: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st, lc)),
+              Memory.get loc to (Local.promises lc) = None)
+          (MEM1: Memory.get loc to (Configuration.memory c1) = Some (from, msg)):
       (<<PROMISES2: forall tid lang st lc
-                     (FIND: IdentMap.find tid c2.(Configuration.threads) = Some (existT _ lang st, lc)),
-          Memory.get loc to lc.(Local.promises) = None>>) /\
-      (<<MEM2: Memory.get loc to c2.(Configuration.memory) = Some (from, msg)>>) /\
+                     (FIND: IdentMap.find tid (Configuration.threads c2) = Some (existT _ lang st, lc)),
+          Memory.get loc to (Local.promises lc) = None>>) /\
+      (<<MEM2: Memory.get loc to (Configuration.memory c2) = Some (from, msg)>>) /\
       (<<EVENT: forall from' val released ord, ThreadEvent.is_writing e <> Some (loc, from', to, val, released, ord)>>).
     Proof.
       inv STEP. ss.
@@ -1124,9 +1124,9 @@ Module RAConfiguration.
           loc from to msg
           (STEPS: steps rels1 rels2 c1 c2)
           (PROMISES1: forall tid lang st lc
-                       (FIND: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st, lc)),
-              Memory.get loc to lc.(Local.promises) = None)
-          (MEM1: Memory.get loc to c1.(Configuration.memory) = Some (from, msg))
+                       (FIND: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st, lc)),
+              Memory.get loc to (Local.promises lc) = None)
+          (MEM1: Memory.get loc to (Configuration.memory c1) = Some (from, msg))
           (RELS1: ~ List.In (loc, to) rels1):
       ~ List.In (loc, to) rels2.
     Proof.
@@ -1143,8 +1143,8 @@ Module RAConfiguration.
           loc from to val released ord
           (WF1: Configuration.wf c1)
           (RELS1: forall tid lang st lc
-                    (TH: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st, lc)),
-              ReleaseWrites.wf rels1 lc.(Local.promises) c1.(Configuration.memory))
+                    (TH: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st, lc)),
+              ReleaseWrites.wf rels1 (Local.promises lc) (Configuration.memory c1))
           (STEP: step e tid rels1 rels2 c1 c2)
           (WRITE: ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord)):
       ~ List.In (loc, to) rels1.
@@ -1169,8 +1169,8 @@ Module RAConfiguration.
 
     Definition reserve_only (c: Configuration.t): Prop :=
       forall tid lang st lc
-        (FIND: IdentMap.find tid c.(Configuration.threads) = Some (existT _ lang st, lc)),
-        RAThread.reserve_only L lc.(Local.promises).
+        (FIND: IdentMap.find tid (Configuration.threads c) = Some (existT _ lang st, lc)),
+        RAThread.reserve_only L (Local.promises lc).
 
     Lemma init_reserve_only s:
       reserve_only (Configuration.init s).
@@ -1237,9 +1237,9 @@ Module RAConfiguration.
           (EVENT: forall from val released ord,
               ThreadEvent.is_writing e <> Some (loc, from, to, val, released, ord))
           (GET1: forall from val released,
-              Memory.get loc to c1.(Configuration.memory) <> Some (from, Message.concrete val released)):
+              Memory.get loc to (Configuration.memory c1) <> Some (from, Message.concrete val released)):
       <<GET2: forall from val released,
-        Memory.get loc to c2.(Configuration.memory) <> Some (from, Message.concrete val released)>>.
+        Memory.get loc to (Configuration.memory c2) <> Some (from, Message.concrete val released)>>.
     Proof.
       inv STEP. ss.
       hexploit RAThread.cancel_steps_non_concrete; eauto. i. des.
@@ -1256,7 +1256,7 @@ Module RARaceW.
 
     Definition ra_race (rels: ReleaseWrites.t) (tview: TView.t) (loc: Loc.t) (to: Time.t) (ordr: Ordering.t): Prop :=
       (<<LOC: L loc>>) /\
-      (<<HIGHER: Time.lt (tview.(TView.cur).(View.rlx) loc) to>>) /\
+      (<<HIGHER: Time.lt ((View.rlx (TView.cur tview)) loc) to>>) /\
       ((<<ORDW: ~ List.In (loc, to) rels>>) \/
        (<<ORDR: Ordering.le ordr Ordering.strong_relaxed>>)).
 
@@ -1264,25 +1264,25 @@ Module RARaceW.
       exists tid rels2 rels3 rels4
         c2 lang st2 lc2 e loc to val released ord e3 e4,
         (<<STEPS: RAConfiguration.steps L rels rels2 c c2>>) /\
-        (<<TID: IdentMap.find tid c2.(Configuration.threads) = Some (existT _ lang st2, lc2)>>) /\
+        (<<TID: IdentMap.find tid (Configuration.threads c2) = Some (existT _ lang st2, lc2)>>) /\
         (<<THREAD_STEPS: RAThread.steps L rels2 rels3
-                                        (Thread.mk _ st2 lc2 c2.(Configuration.sc) c2.(Configuration.memory)) e3>>) /\
-        (<<CONS: Local.promise_consistent e3.(Thread.local)>>) /\
+                                        (Thread.mk _ st2 lc2 (Configuration.sc c2) (Configuration.memory c2)) e3>>) /\
+        (<<CONS: Local.promise_consistent (Thread.local e3)>>) /\
         (<<THREAD_STEP: RAThread.step L rels3 rels4 e e3 e4>>) /\
         (<<READ: ThreadEvent.is_reading e = Some (loc, to, val, released, ord)>>) /\
-        (<<RARACE: ra_race rels3 e3.(Thread.local).(Local.tview) loc to ord>>).
+        (<<RARACE: ra_race rels3 (Local.tview (Thread.local e3)) loc to ord>>).
 
     Definition racefree (rels: ReleaseWrites.t) (c: Configuration.t): Prop :=
       forall tid rels2 rels3 rels4
         c2 lang st2 lc2 e loc to val released ord e3 e4
         (STEPS: RAConfiguration.steps L rels rels2 c c2)
-        (TID: IdentMap.find tid c2.(Configuration.threads) = Some (existT _ lang st2, lc2))
+        (TID: IdentMap.find tid (Configuration.threads c2) = Some (existT _ lang st2, lc2))
         (THREAD_STEPS: RAThread.steps L rels2 rels3
-                                      (Thread.mk _ st2 lc2 c2.(Configuration.sc) c2.(Configuration.memory)) e3)
-        (CONS: Local.promise_consistent e3.(Thread.local))
+                                      (Thread.mk _ st2 lc2 (Configuration.sc c2) (Configuration.memory c2)) e3)
+        (CONS: Local.promise_consistent (Thread.local e3))
         (THREAD_STEP: RAThread.step L rels3 rels4 e e3 e4)
         (READ: ThreadEvent.is_reading e = Some (loc, to, val, released, ord))
-        (RARACE: ra_race rels3 e3.(Thread.local).(Local.tview) loc to ord),
+        (RARACE: ra_race rels3 (Local.tview (Thread.local e3)) loc to ord),
         False.
 
     Definition racefree_syn (syn: Threads.syntax): Prop :=

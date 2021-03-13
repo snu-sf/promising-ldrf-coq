@@ -28,7 +28,7 @@ Lemma progress_program_step_non_update
       (WF1: Local.wf lc1 mem1)
       (MEM1: Memory.closed mem1)
       (SC1: Memory.closed_timemap sc1 mem1)
-      (PROMISES1: lc1.(Local.promises) = Memory.bot)
+      (PROMISES1: (Local.promises lc1) = Memory.bot)
       (UPDATE: match i1 with Stmt.instr (Instr.update _ _ _ _ _) => False | _ => True end):
   exists e th2, <<STEP: Thread.program_step e (Thread.mk lang (State.mk rs1 (i1::s1)) lc1 sc1 mem1) th2>>.
 Proof.

@@ -429,7 +429,7 @@ Module Shorter2.
   Lemma shorter_memory_local_write_step lc0 sc0 mem_tgt0 loc from to val releasedr releasedw ord lc1 sc1 mem_tgt1 kind mem_src0
         (WRITE: Local.write_step lc0 sc0 mem_tgt0 loc from to val releasedr releasedw ord lc1 sc1 mem_tgt1 kind)
         (SHORTER: shorter_memory mem_src0 mem_tgt0)
-        (MLE: Memory.le lc0.(Local.promises) mem_src0)
+        (MLE: Memory.le (Local.promises lc0) mem_src0)
     :
       exists mem_src1,
         (<<WRITE: Local.write_step lc0 sc0 mem_src0 loc from to val releasedr releasedw ord lc1 sc1 mem_src1 kind>>) /\
@@ -441,7 +441,7 @@ Module Shorter2.
   Lemma shorter_memory_thread_step lang st0 st1 lc0 lc1 sc0 sc1 mem_tgt0 mem_tgt1 mem_src0 pf e
         (STEP: Thread.step pf e (Thread.mk lang st0 lc0 sc0 mem_tgt0) (Thread.mk _ st1 lc1 sc1 mem_tgt1))
         (SHORTER: shorter_memory mem_src0 mem_tgt0)
-        (MLE: Memory.le lc0.(Local.promises) mem_src0)
+        (MLE: Memory.le (Local.promises lc0) mem_src0)
     :
       exists mem_src1,
         (<<STEP: Thread.step pf e (Thread.mk _ st0 lc0 sc0 mem_src0) (Thread.mk _ st1 lc1 sc1 mem_src1)>>) /\
@@ -469,7 +469,7 @@ Module Shorter2.
   Lemma shorter_memory_thread_steps lang st0 st1 lc0 lc1 sc0 sc1 mem_tgt0 mem_tgt1 mem_src0
         (STEPS: rtc (@Thread.tau_step _) (Thread.mk lang st0 lc0 sc0 mem_tgt0) (Thread.mk _ st1 lc1 sc1 mem_tgt1))
         (SHORTER: shorter_memory mem_src0 mem_tgt0)
-        (MLE: Memory.le lc0.(Local.promises) mem_src0)
+        (MLE: Memory.le (Local.promises lc0) mem_src0)
     :
       exists mem_src1,
         (<<STEPS: rtc (@Thread.tau_step _) (Thread.mk _ st0 lc0 sc0 mem_src0) (Thread.mk _ st1 lc1 sc1 mem_src1)>>) /\
@@ -811,7 +811,7 @@ Module Shorter.
   Lemma shorter_memory_local_write_step lc0 sc0 mem_tgt0 loc from to val releasedr releasedw ord lc1 sc1 mem_tgt1 kind mem_src0
         (WRITE: Local.write_step lc0 sc0 mem_tgt0 loc from to val releasedr releasedw ord lc1 sc1 mem_tgt1 kind)
         (SHORTER: shorter_memory mem_src0 mem_tgt0)
-        (MLE: Memory.le lc0.(Local.promises) mem_src0)
+        (MLE: Memory.le (Local.promises lc0) mem_src0)
     :
       exists mem_src1,
         (<<WRITE: Local.write_step lc0 sc0 mem_src0 loc from to val releasedr releasedw ord lc1 sc1 mem_src1 kind>>) /\
@@ -823,7 +823,7 @@ Module Shorter.
   Lemma shorter_memory_thread_step lang st0 st1 lc0 lc1 sc0 sc1 mem_tgt0 mem_tgt1 mem_src0 pf e
         (STEP: Thread.step pf e (Thread.mk lang st0 lc0 sc0 mem_tgt0) (Thread.mk _ st1 lc1 sc1 mem_tgt1))
         (SHORTER: shorter_memory mem_src0 mem_tgt0)
-        (MLE: Memory.le lc0.(Local.promises) mem_src0)
+        (MLE: Memory.le (Local.promises lc0) mem_src0)
     :
       exists mem_src1,
         (<<STEP: Thread.step pf e (Thread.mk _ st0 lc0 sc0 mem_src0) (Thread.mk _ st1 lc1 sc1 mem_src1)>>) /\
@@ -851,7 +851,7 @@ Module Shorter.
   Lemma shorter_memory_thread_steps lang st0 st1 lc0 lc1 sc0 sc1 mem_tgt0 mem_tgt1 mem_src0
         (STEPS: rtc (@Thread.tau_step _) (Thread.mk lang st0 lc0 sc0 mem_tgt0) (Thread.mk _ st1 lc1 sc1 mem_tgt1))
         (SHORTER: shorter_memory mem_src0 mem_tgt0)
-        (MLE: Memory.le lc0.(Local.promises) mem_src0)
+        (MLE: Memory.le (Local.promises lc0) mem_src0)
     :
       exists mem_src1,
         (<<STEPS: rtc (@Thread.tau_step _) (Thread.mk _ st0 lc0 sc0 mem_src0) (Thread.mk _ st1 lc1 sc1 mem_src1)>>) /\
@@ -902,7 +902,7 @@ Module Shorter.
   Lemma shorter_memory_consistent lang st lc sc mem_tgt mem_src
         (CONSISTENT: Thread.consistent (Thread.mk lang st lc sc mem_tgt))
         (SHORTER: shorter_memory mem_src mem_tgt)
-        (MLE: Memory.le lc.(Local.promises) mem_src)
+        (MLE: Memory.le (Local.promises lc) mem_src)
         (CLOSED: Memory.closed mem_tgt)
     :
       Thread.consistent (Thread.mk lang st lc sc mem_src).

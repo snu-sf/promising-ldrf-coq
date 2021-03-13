@@ -54,9 +54,9 @@ Section MIDDLE.
       Memory.le prom_src mem_src'.
   Proof.
     ii. exploit MLESRC; eauto. intros GETSRC.
-    set (MEM0:=MEM.(sim_memory_contents) loc to).
-    set (MEM1:=MEMSTRONG.(sim_memory_strong_contents) loc to).
-    set (PROM0:=PROM.(sim_promise_strong_contents) loc to).
+    set (MEM0:=(sim_memory_contents MEM) loc to).
+    set (MEM1:=(sim_memory_strong_contents MEMSTRONG) loc to).
+    set (PROM0:=(sim_promise_strong_contents PROM) loc to).
     rewrite LHS in PROM0. rewrite GETSRC in *.
 
     inv PROM0.
@@ -64,11 +64,11 @@ Section MIDDLE.
       - rewrite <- H in *. inv MEM1; ss. f_equal. f_equal.
         dup H1. symmetry in H1. eapply MLETGT in H1. rewrite H1 in *. clarify.
         destruct EXTRA; auto.
-        set (MEM1:=MEM.(sim_memory_contents) loc from_src). inv MEM1; clarify.
+        set (MEM1:=(sim_memory_contents MEM) loc from_src). inv MEM1; clarify.
         { exfalso. eapply NEXTRA2; eauto. }
         { exfalso. eapply NEXTRA2; eauto. }
         { exfalso. eapply NEXTRA2; eauto. }
-        eapply MEM.(sim_memory_wf) in H. des.
+        eapply (sim_memory_wf MEM) in H. des.
         dup EXTRA. eapply UNIQUE in EXTRA. clarify.
         exploit memory_get_from_inj.
         { eapply GETSRC. }
@@ -83,8 +83,8 @@ Section MIDDLE.
     { symmetry in H. rename H into RHS.
       exploit MLETGT; eauto. intros GETTGT. rewrite GETTGT in *.
       inv MEM1. f_equal. f_equal. des; subst; auto.
-      { exploit MEM.(sim_memory_wf); eauto. i. des.
-        exfalso. set (MEM2:=MEMSTRONG.(sim_memory_strong_contents) loc from).
+      { exploit (sim_memory_wf MEM); eauto. i. des.
+        exfalso. set (MEM2:=(sim_memory_strong_contents MEMSTRONG) loc from).
         inv MEM2; try by (eapply NEXTRA1; eauto).
         eapply UNIQUE in EXTRA0. subst.
         hexploit memory_get_from_inj.
@@ -93,8 +93,8 @@ Section MIDDLE.
         i. des; clarify.
         inv MEM0; ss. eapply NEXTRA1; eauto.
       }
-      { exploit MEM.(sim_memory_wf); eauto. i. des.
-        exfalso. set (MEM2:=MEM.(sim_memory_contents) loc from_src).
+      { exploit (sim_memory_wf MEM); eauto. i. des.
+        exfalso. set (MEM2:=(sim_memory_contents MEM) loc from_src).
         inv MEM2; try by (eapply NEXTRA1; eauto).
         eapply UNIQUE in EXTRA. subst.
         hexploit memory_get_from_inj.
@@ -108,8 +108,8 @@ Section MIDDLE.
     { symmetry in H. rename H into RHS.
       exploit MLETGT; eauto. intros GETTGT. rewrite GETTGT in *.
       inv MEM0; ss. inv MEM1; ss. f_equal. f_equal. des; subst; auto.
-      { exploit MEM.(sim_memory_wf); eauto. i. des.
-        exfalso. set (MEM2:=MEMSTRONG.(sim_memory_strong_contents) loc from).
+      { exploit (sim_memory_wf MEM); eauto. i. des.
+        exfalso. set (MEM2:=(sim_memory_strong_contents MEMSTRONG) loc from).
         inv MEM2; try by (eapply NEXTRA2; eauto).
         eapply UNIQUE in EXTRA0. subst.
         hexploit memory_get_from_inj.
@@ -119,8 +119,8 @@ Section MIDDLE.
         { eapply memory_get_ts_le; eauto. }
         { apply Time.bot_spec. }
       }
-      { exploit MEM.(sim_memory_wf); eauto. i. des.
-        exfalso. set (MEM2:=MEM.(sim_memory_contents) loc from_src).
+      { exploit (sim_memory_wf MEM); eauto. i. des.
+        exfalso. set (MEM2:=(sim_memory_contents MEM) loc from_src).
         inv MEM2; try by (eapply NEXTRA2; eauto).
         eapply UNIQUE in EXTRA. subst.
         hexploit memory_get_from_inj.
@@ -134,7 +134,7 @@ Section MIDDLE.
     }
     { inv MEM0; ss; try by (exfalso; eapply NEXTRA; right; eauto).
       inv MEM1; ss; try by (exfalso; eapply NEXTRA; right; eauto).
-      exploit (MEM.(sim_memory_wf) loc from to).
+      exploit ((sim_memory_wf MEM) loc from to).
       { right. auto. } i. des.
       eapply UNIQUE in EXTRA0. eapply UNIQUE in EXTRA1. subst. auto.
     }
@@ -147,7 +147,7 @@ Section MIDDLE.
         (LOCALSRC: Local.wf lc_src mem_src)
         (LOCALTGT: Local.wf lc_tgt mem_tgt)
         (PROM: sim_promise_strong L times self extra_self (extra_others \\3// extra_self)
-                                  lc_src.(Local.promises) lc_tgt.(Local.promises))
+                                  (Local.promises lc_src) (Local.promises lc_tgt))
         (MEMSTRONG: sim_memory_strong L times (others \\2// self) (extra_others \\3// extra_self) mem_src' mem_tgt)
     :
       Local.wf lc_src mem_src'.

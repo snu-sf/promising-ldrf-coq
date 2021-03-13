@@ -39,7 +39,7 @@ Module Trace.
       tr tr' th0 th1 th2 pf e
       (STEP: Thread.step pf e th0 th1)
       (STEPS: steps tr th1 th2)
-      (TR: tr' = (th0.(Thread.local), e) :: tr)
+      (TR: tr' = ((Thread.local th0), e) :: tr)
     :
       steps tr' th0 th2
   .
@@ -55,14 +55,14 @@ Module Trace.
       (HD: steps_n1 hds th0 th1)
       (TL: Thread.step pf tle th1 th2)
     :
-      steps_n1 (hds++[(th1.(Thread.local), tle)]) th0 th2
+      steps_n1 (hds++[((Thread.local th1), tle)]) th0 th2
   .
   Hint Constructors steps_n1.
 
   Lemma steps_n1_one lang (th0 th1: Thread.t lang) e pf
         (STEP: Thread.step pf e th0 th1)
     :
-      steps_n1 [(th0.(Thread.local), e)] th0 th1.
+      steps_n1 [((Thread.local th0), e)] th0 th1.
   Proof.
     erewrite <- List.app_nil_l at 1. econs; eauto.
   Qed.
@@ -81,7 +81,7 @@ Module Trace.
   Lemma steps_one lang (th0 th1: Thread.t lang) e pf
         (STEP: Thread.step pf e th0 th1)
     :
-      steps [(th0.(Thread.local), e)] th0 th1.
+      steps [((Thread.local th0), e)] th0 th1.
   Proof.
     econs 2; eauto.
   Qed.
@@ -146,13 +146,13 @@ Module Trace.
   Lemma steps_disjoint
         lang tr (e1 e2: Thread.t lang) lc
         (STEPS: steps tr e1 e2)
-        (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
-        (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-        (CLOSED1: Memory.closed e1.(Thread.memory))
-        (DISJOINT1: Local.disjoint e1.(Thread.local) lc)
-        (WF: Local.wf lc e1.(Thread.memory)):
-    (<<DISJOINT2: Local.disjoint e2.(Thread.local) lc>>) /\
-    (<<WF: Local.wf lc e2.(Thread.memory)>>).
+        (WF1: Local.wf (Thread.local e1) (Thread.memory e1))
+        (SC1: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
+        (CLOSED1: Memory.closed (Thread.memory e1))
+        (DISJOINT1: Local.disjoint (Thread.local e1) lc)
+        (WF: Local.wf lc (Thread.memory e1)):
+    (<<DISJOINT2: Local.disjoint (Thread.local e2) lc>>) /\
+    (<<WF: Local.wf lc (Thread.memory e2)>>).
   Proof.
     induction STEPS; eauto. subst.
     exploit Thread.step_disjoint; eauto. i. des.
@@ -164,15 +164,15 @@ Module Trace.
   Lemma steps_future
         lang tr e1 e2
         (STEPS: @steps lang tr e1 e2)
-        (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
-        (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-        (CLOSED1: Memory.closed e1.(Thread.memory)):
-    (<<WF2: Local.wf e2.(Thread.local) e2.(Thread.memory)>>) /\
-    (<<SC2: Memory.closed_timemap e2.(Thread.sc) e2.(Thread.memory)>>) /\
-    (<<CLOSED2: Memory.closed e2.(Thread.memory)>>) /\
-    (<<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>>) /\
-    (<<SC_FUTURE: TimeMap.le e1.(Thread.sc) e2.(Thread.sc)>>) /\
-    (<<MEM_FUTURE: Memory.future e1.(Thread.memory) e2.(Thread.memory)>>)
+        (WF1: Local.wf (Thread.local e1) (Thread.memory e1))
+        (SC1: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
+        (CLOSED1: Memory.closed (Thread.memory e1)):
+    (<<WF2: Local.wf (Thread.local e2) (Thread.memory e2)>>) /\
+    (<<SC2: Memory.closed_timemap (Thread.sc e2) (Thread.memory e2)>>) /\
+    (<<CLOSED2: Memory.closed (Thread.memory e2)>>) /\
+    (<<TVIEW_FUTURE: TView.le (Local.tview (Thread.local e1)) (Local.tview (Thread.local e2))>>) /\
+    (<<SC_FUTURE: TimeMap.le (Thread.sc e1) (Thread.sc e2)>>) /\
+    (<<MEM_FUTURE: Memory.future (Thread.memory e1) (Thread.memory e2)>>)
   .
   Proof.
     ginduction STEPS.
@@ -189,11 +189,11 @@ Module Trace.
   Lemma steps_promise_consistent
         lang (th1 th2: Thread.t lang) tr
         (STEPS: steps tr th1 th2)
-        (CONS: Local.promise_consistent th2.(Thread.local))
-        (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
-        (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory))
-        (MEM1: Memory.closed th1.(Thread.memory)):
-    Local.promise_consistent th1.(Thread.local).
+        (CONS: Local.promise_consistent (Thread.local th2))
+        (WF1: Local.wf (Thread.local th1) (Thread.memory th1))
+        (SC1: Memory.closed_timemap (Thread.sc th1) (Thread.memory th1))
+        (MEM1: Memory.closed (Thread.memory th1)):
+    Local.promise_consistent (Thread.local th1).
   Proof.
     ginduction STEPS; auto. i. subst.
     exploit Thread.step_future; eauto. i. des.
@@ -219,7 +219,7 @@ Module Trace.
         (<<SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr>>).
   Proof.
     ginduction STEPS; eauto. inv H. inv TSTEP. des.
-    exists ((x.(Thread.local), e)::tr). splits; eauto.
+    exists (((Thread.local x), e)::tr). splits; eauto.
   Qed.
 
   Lemma steps_app lang tr0 tr1 (th0 th1 th2: Thread.t lang)
@@ -233,13 +233,13 @@ Module Trace.
 
   Definition consistent lang (e:Thread.t lang) (tr: t): Prop :=
     forall mem1 sc1
-           (CAP: Memory.cap e.(Thread.memory) mem1)
+           (CAP: Memory.cap (Thread.memory e) mem1)
            (SC_MAX: Memory.max_concrete_timemap mem1 sc1),
     exists e2,
-      (<<STEPS: steps tr (Thread.mk _ e.(Thread.state) e.(Thread.local) sc1 mem1) e2>>) /\
+      (<<STEPS: steps tr (Thread.mk _ (Thread.state e) (Thread.local e) sc1 mem1) e2>>) /\
       (<<SILENT: List.Forall (fun lce => ThreadEvent.get_machine_event (snd lce) = MachineEvent.silent) tr>>) /\
       ((<<FAILURE: exists e3, Thread.step true ThreadEvent.failure e2 e3 >>) \/
-       (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>)).
+       (<<PROMISES: (Local.promises (Thread.local e2)) = Memory.bot>>)).
 
   Lemma consistent_thread_consistent lang (e: Thread.t lang) tr
         (CONSISTENT: consistent e tr)
@@ -259,7 +259,7 @@ Module Trace.
 
   Lemma thread_consistent_consistent lang (e: Thread.t lang)
         (CONSISTENT: Thread.consistent e)
-        (CLOSED: Memory.closed e.(Thread.memory))
+        (CLOSED: Memory.closed (Thread.memory e))
     :
       exists tr,
         (<<CONSISTENT: consistent e tr>>).
@@ -271,13 +271,13 @@ Module Trace.
     { unfold Thread.steps_failure in *. des.
       eapply tau_steps_silent_steps in STEPS. des.
       exists tr. ii.
-      exploit (@Memory.cap_inj e.(Thread.memory) mem2 mem1); eauto. i. subst.
+      exploit (@Memory.cap_inj (Thread.memory e) mem2 mem1); eauto. i. subst.
       exploit (@Memory.max_concrete_timemap_inj mem1 tm sc1); eauto. i. subst.
       esplits; eauto.
     }
     { eapply tau_steps_silent_steps in STEPS. des.
       exists tr. ii.
-      exploit (@Memory.cap_inj e.(Thread.memory) mem2 mem1); eauto. i. subst.
+      exploit (@Memory.cap_inj (Thread.memory e) mem2 mem1); eauto. i. subst.
       exploit (@Memory.max_concrete_timemap_inj mem1 tm sc1); eauto. i. subst.
       esplits; eauto.
     }
@@ -287,7 +287,7 @@ Module Trace.
         lang tr e1 e2 e3 pf e
         (STEPS: @steps lang tr e1 e2)
         (STEP: Thread.step pf e e2 e3):
-    steps (tr ++ [(e2.(Thread.local), e)]) e1 e3.
+    steps (tr ++ [((Thread.local e2), e)]) e1 e3.
   Proof.
     rewrite steps_equivalent in *. eauto.
   Qed.
@@ -295,17 +295,17 @@ Module Trace.
   Lemma steps_inv
         lang tr e1 e2 lc e
         (STEPS: @steps lang tr e1 e2)
-        (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
-        (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-        (MEM1: Memory.closed e1.(Thread.memory))
+        (WF1: Local.wf (Thread.local e1) (Thread.memory e1))
+        (SC1: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
+        (MEM1: Memory.closed (Thread.memory e1))
         (EVENT: List.In (lc, e) tr)
-        (CONS: Local.promise_consistent e2.(Thread.local)):
+        (CONS: Local.promise_consistent (Thread.local e2)):
     exists tr' tr'' e2' pf e3,
       (<<STEPS: steps tr' e1 e2'>>) /\
       (<<TRACE: tr = tr' ++ tr''>>) /\
-      (<<LC: e2'.(Thread.local) = lc>>) /\
+      (<<LC: (Thread.local e2') = lc>>) /\
       (<<STEP: Thread.step pf e e2' e3>>) /\
-      (<<CONS: Local.promise_consistent e3.(Thread.local)>>).
+      (<<CONS: Local.promise_consistent (Thread.local e3)>>).
   Proof.
     rewrite steps_equivalent in STEPS.
     induction STEPS; ss.
@@ -324,15 +324,15 @@ Module Trace.
   Inductive configuration_step: forall (tr: Trace.t) (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
   | configuration_step_intro
       lang tr e tr' pf tid c1 st1 lc1 e2 st3 lc3 sc3 memory3
-      (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
-      (STEPS: Trace.steps tr' (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
+      (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
+      (STEPS: Trace.steps tr' (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) e2)
       (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr')
       (STEP: Thread.step pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
-      (TR: tr = tr'++[(e2.(Thread.local), e)])
+      (TR: tr = tr'++[((Thread.local e2), e)])
       (CONSISTENT: forall (EVENT: e <> ThreadEvent.failure),
           Thread.consistent (Thread.mk _ st3 lc3 sc3 memory3))
     :
-      configuration_step tr (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
+      configuration_step tr (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) (Configuration.threads c1)) sc3 memory3)
   .
 
   Lemma step_configuration_step tr e tid c1 c2
@@ -407,15 +407,15 @@ Module ThreadTrace.
   Lemma steps_future
         lang tr e1 e2
         (STEPS: @steps lang tr e1 e2)
-        (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
-        (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-        (CLOSED1: Memory.closed e1.(Thread.memory)):
-    (<<WF2: Local.wf e2.(Thread.local) e2.(Thread.memory)>>) /\
-    (<<SC2: Memory.closed_timemap e2.(Thread.sc) e2.(Thread.memory)>>) /\
-    (<<CLOSED2: Memory.closed e2.(Thread.memory)>>) /\
-    (<<TVIEW_FUTURE: TView.le e1.(Thread.local).(Local.tview) e2.(Thread.local).(Local.tview)>>) /\
-    (<<SC_FUTURE: TimeMap.le e1.(Thread.sc) e2.(Thread.sc)>>) /\
-    (<<MEM_FUTURE: Memory.future e1.(Thread.memory) e2.(Thread.memory)>>)
+        (WF1: Local.wf (Thread.local e1) (Thread.memory e1))
+        (SC1: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
+        (CLOSED1: Memory.closed (Thread.memory e1)):
+    (<<WF2: Local.wf (Thread.local e2) (Thread.memory e2)>>) /\
+    (<<SC2: Memory.closed_timemap (Thread.sc e2) (Thread.memory e2)>>) /\
+    (<<CLOSED2: Memory.closed (Thread.memory e2)>>) /\
+    (<<TVIEW_FUTURE: TView.le (Local.tview (Thread.local e1)) (Local.tview (Thread.local e2))>>) /\
+    (<<SC_FUTURE: TimeMap.le (Thread.sc e1) (Thread.sc e2)>>) /\
+    (<<MEM_FUTURE: Memory.future (Thread.memory e1) (Thread.memory e2)>>)
   .
   Proof.
     ginduction STEPS.
@@ -436,7 +436,7 @@ Module ThreadTrace.
         (<<STEPS: steps ttr th0 th1>>) /\
         (<<MATCH: List.Forall2
                     (fun the lce =>
-                       (fst the).(Thread.local) = (fst lce) /\
+                       (Thread.local (fst the)) = (fst lce) /\
                        (snd the) = (snd lce)) ttr tr>>).
   Proof.
     ginduction STEPS; eauto. i. subst. des. esplits.
@@ -451,7 +451,7 @@ Module ThreadTrace.
         (<<STEPS: Trace.steps tr th0 th1>>) /\
         (<<MATCH: List.Forall2
                     (fun the lce =>
-                       (fst the).(Thread.local) = (fst lce) /\
+                       (Thread.local (fst the)) = (fst lce) /\
                        (snd the) = (snd lce)) ttr tr>>).
   Proof.
     ginduction STEPS; eauto. i. subst. des. esplits.

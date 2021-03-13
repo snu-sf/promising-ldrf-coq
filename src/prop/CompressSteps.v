@@ -38,10 +38,10 @@ Module CompressSteps.
 
     Inductive spatial_thread (e_src e_tgt: Thread.t lang): Prop :=
     | spatial_thread_intro
-        (STATE: e_src.(Thread.state) = e_tgt.(Thread.state))
-        (LOCAL: e_src.(Thread.local) = e_tgt.(Thread.local))
-        (SC: e_src.(Thread.sc) = e_tgt.(Thread.sc))
-        (MEMORY: spatial_mem e_src.(Thread.memory) e_tgt.(Thread.memory))
+        (STATE: (Thread.state e_src) = (Thread.state e_tgt))
+        (LOCAL: (Thread.local e_src) = (Thread.local e_tgt))
+        (SC: (Thread.sc e_src) = (Thread.sc e_tgt))
+        (MEMORY: spatial_mem (Thread.memory e_src) (Thread.memory e_tgt))
     .
 
     Lemma spatial_memory_map mem_src mem_tgt times
@@ -101,12 +101,12 @@ Module CompressSteps.
     Lemma compress_steps_failure
           e1_src e1_tgt
           (THREAD1: spatial_thread e1_src e1_tgt)
-          (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
-          (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
-          (SC1_SRC: Memory.closed_timemap e1_src.(Thread.sc) e1_src.(Thread.memory))
-          (SC1_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
-          (MEM1_SRC: Memory.closed e1_src.(Thread.memory))
-          (MEM1_TGT: Memory.closed e1_tgt.(Thread.memory))
+          (WF1_SRC: Local.wf (Thread.local e1_src) (Thread.memory e1_src))
+          (WF1_TGT: Local.wf (Thread.local e1_tgt) (Thread.memory e1_tgt))
+          (SC1_SRC: Memory.closed_timemap (Thread.sc e1_src) (Thread.memory e1_src))
+          (SC1_TGT: Memory.closed_timemap (Thread.sc e1_tgt) (Thread.memory e1_tgt))
+          (MEM1_SRC: Memory.closed (Thread.memory e1_src))
+          (MEM1_TGT: Memory.closed (Thread.memory e1_tgt))
           (STEPS_TGT: @Thread.steps_failure lang e1_tgt):
       Thread.steps_failure e1_src.
     Proof.
@@ -152,17 +152,17 @@ Module CompressSteps.
           e1_src e1_tgt
           e2_tgt
           (THREAD1: spatial_thread e1_src e1_tgt)
-          (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
-          (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
-          (SC1_SRC: Memory.closed_timemap e1_src.(Thread.sc) e1_src.(Thread.memory))
-          (SC1_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
-          (MEM1_SRC: Memory.closed e1_src.(Thread.memory))
-          (MEM1_TGT: Memory.closed e1_tgt.(Thread.memory))
+          (WF1_SRC: Local.wf (Thread.local e1_src) (Thread.memory e1_src))
+          (WF1_TGT: Local.wf (Thread.local e1_tgt) (Thread.memory e1_tgt))
+          (SC1_SRC: Memory.closed_timemap (Thread.sc e1_src) (Thread.memory e1_src))
+          (SC1_TGT: Memory.closed_timemap (Thread.sc e1_tgt) (Thread.memory e1_tgt))
+          (MEM1_SRC: Memory.closed (Thread.memory e1_src))
+          (MEM1_TGT: Memory.closed (Thread.memory e1_tgt))
           (STEPS_TGT: rtc (@Thread.tau_step lang) e1_tgt e2_tgt)
-          (PROMISES_TGT: e2_tgt.(Thread.local).(Local.promises) = Memory.bot):
+          (PROMISES_TGT: (Local.promises (Thread.local e2_tgt)) = Memory.bot):
       exists e2_src,
         <<STEPS_SRC: rtc (@Thread.tau_step lang) e1_src e2_src>> /\
-                     <<PROMISES_SRC: e2_src.(Thread.local).(Local.promises) = Memory.bot>>.
+                     <<PROMISES_SRC: (Local.promises (Thread.local e2_src)) = Memory.bot>>.
     Proof.
       inv THREAD1. destruct e1_src, e1_tgt. ss. clarify.
       unfold Thread.steps_failure in *. des.

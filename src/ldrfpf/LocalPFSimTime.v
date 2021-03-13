@@ -86,13 +86,13 @@ Section SIMTIME.
     hexploit (@trace_times_list_exists (tr_tgt ++ tr_cert')). i. des.
     assert (exists (maxmap: TimeMap.t),
                (<<TIMES: forall loc' ts (IN: List.In ts (times0 loc')), Time.lt ts (maxmap loc')>>) /\
-               (<<MAX: forall loc', Time.lt (Memory.max_ts loc' c_tgt0.(Configuration.memory)) (maxmap loc')>>)).
+               (<<MAX: forall loc', Time.lt (Memory.max_ts loc' (Configuration.memory c_tgt0)) (maxmap loc')>>)).
     { hexploit (@choice
                   Loc.t
                   Time.t
                   (fun loc' max =>
                      (<<TIMES: forall ts (IN: List.In ts (times0 loc')), Time.lt ts (max)>>) /\
-                     (<<MAX: Time.lt (Memory.max_ts loc' c_tgt0.(Configuration.memory)) (max)>>))).
+                     (<<MAX: Time.lt (Memory.max_ts loc' (Configuration.memory c_tgt0)) (max)>>))).
       { i. hexploit (finite_greatest (fun _ => True) (times0 x)). i. des.
         { exists (Time.incr (Time.join
                                (Memory.max_ts x (Configuration.memory c_tgt0))
@@ -173,9 +173,9 @@ Section SIMTIME.
         - ii. inv H0. eapply H; eauto. esplits; eauto. econs.
         - ii. inv H0. eapply H; eauto. esplits; eauto. econs. } des.
       assert (LIN: List.In (ploc, pts) (proml0 tid0)).
-      { destruct (IdentMap.find tid0 c_tgt0.(Configuration.threads)) as [[[lang_tgt st_tgt] lc_tgt]|] eqn:TIDTGT.
+      { destruct (IdentMap.find tid0 (Configuration.threads c_tgt0)) as [[[lang_tgt st_tgt] lc_tgt]|] eqn:TIDTGT.
         { inv SIM. eapply CONSISTENT in TIDTGT; eauto.
-          eapply TIDTGT.(pi_consistent_promises) in PROMISED. auto. }
+          eapply (pi_consistent_promises TIDTGT) in PROMISED. auto. }
         { inv SIM. ss. specialize (THSJOIN tid0). specialize (THSPF tid0).
           unfold option_rel in THSJOIN.
           unfold option_rel in THSPF. des_ifs.
@@ -244,7 +244,7 @@ Section SIMTIME.
     exploit Thread.step_future; eauto. i. des. ss. ss.
 
     assert (exists tr_read rlc' re' th,
-               (<<STEPS: Trace.steps (tr_read ++ [(rlc', re')]) (Thread.mk _ st0 lc0 c_tgt2.(Configuration.sc) c_tgt2.(Configuration.memory)) th>>) /\
+               (<<STEPS: Trace.steps (tr_read ++ [(rlc', re')]) (Thread.mk _ st0 lc0 (Configuration.sc c_tgt2) (Configuration.memory c_tgt2)) th>>) /\
                (<<REST: exists tr_rest,
                    Trace.steps tr_rest th (Thread.mk _ st2 lc2 sc0 memory0)>>) /\
                (<<READING: PFRace.reading_event ploc pts re'>>) /\
@@ -267,7 +267,7 @@ Section SIMTIME.
               exploit sim_configuration_forget_exclusive; try eassumption.
               { econs; eauto. }
               i. des. ss. inv UNCH.
-              set (PROM := PROMS0.(sim_promise_contents) ploc pts).
+              set (PROM := (sim_promise_contents PROMS0) ploc pts).
               rewrite NPROM in *. inv PROM; try by (eapply NPROM0; eauto).
             }
             { eapply BOT in Heq. des. eapply PROM; eauto. }
@@ -279,7 +279,7 @@ Section SIMTIME.
       erewrite <- TRACE in *.
       hexploit (list_match_rev tr1). i. des; clarify.
       { eapply Forall2_tail in TRACE1. des. ss.
-        exists tr'0, e3.(Thread.local), e1, (Thread.mk _ st2 lc2 sc0 memory0). splits.
+        exists tr'0, (Thread.local e3), e1, (Thread.mk _ st2 lc2 sc0 memory0). splits.
         { eapply Trace.steps_trans; eauto. }
         { eauto. }
         { inv READING; inv EVT; econs; eauto. }
@@ -323,7 +323,7 @@ Section SIMTIME.
     { eapply WF0; eauto. }
     { eapply WF0; eauto. } i. des.
 
-    assert (CONSISTENT1: Local.promise_consistent th.(Thread.local)).
+    assert (CONSISTENT1: Local.promise_consistent (Thread.local th)).
     { exploit Trace.steps_future; try apply REST; eauto. i. des. ss.
       eapply Trace.steps_promise_consistent; eauto. ss.
       destruct (classic (e1 = ThreadEvent.failure)) as [EQ0|NEQ0].

@@ -34,7 +34,7 @@ Module SemiReachable.
     Variable (c0: Configuration.t).
 
     Hypothesis CONFIG_CONSISTENT: forall tid lang st lc
-                                         (TID: IdentMap.find tid c0.(Configuration.threads) = Some (existT _ lang st, lc)),
+                                         (TID: IdentMap.find tid (Configuration.threads c0) = Some (existT _ lang st, lc)),
         Local.promise_consistent lc.
     Hypothesis CONFIG_WF: Configuration.wf c0.
 
@@ -46,9 +46,9 @@ Module SemiReachable.
       | semi_reachable_intro
           c1 st1 lc1
           (STEPS: rtc SConfiguration.all_machine_step c0 c1)
-          (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
-          (TSTEPS: rtc (@Thread.all_step _) (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) th)
-          (CONSISTENT: Local.promise_consistent th.(Thread.local))
+          (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
+          (TSTEPS: rtc (@Thread.all_step _) (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) th)
+          (CONSISTENT: Local.promise_consistent (Thread.local th))
       .
       Hint Constructors semi_reachable.
 
@@ -66,7 +66,7 @@ Module SemiReachable.
       | step_intro
           pf e th0 th1
           (STEP: Thread.step pf e th0 th1)
-          (REACHABLE: semi_reachable_state lang th1.(Thread.state))
+          (REACHABLE: semi_reachable_state lang (Thread.state th1))
         :
           step pf e th0 th1
       .
@@ -108,7 +108,7 @@ Module SemiReachable.
 
       Lemma step_reachable lang pf e (th0 th1: Thread.t lang)
             (STEP: Thread.step pf e th0 th1)
-            (CONSISTENT: Local.promise_consistent th1.(Thread.local))
+            (CONSISTENT: Local.promise_consistent (Thread.local th1))
             (REACHABLE: semi_reachable th0)
         :
           (<<STEP: step pf e th0 th1>>) /\
@@ -122,7 +122,7 @@ Module SemiReachable.
 
       Lemma opt_step_reachable lang e (th0 th1: Thread.t lang)
             (STEP: Thread.opt_step e th0 th1)
-            (CONSISTENT: Local.promise_consistent th1.(Thread.local))
+            (CONSISTENT: Local.promise_consistent (Thread.local th1))
             (REACHABLE: semi_reachable th0)
         :
           (<<STEP: opt_step e th0 th1>>) /\
@@ -135,10 +135,10 @@ Module SemiReachable.
 
       Lemma tau_steps_reachable lang (th0 th1: Thread.t lang)
             (STEPS: rtc (@Thread.tau_step _) th0 th1)
-            (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
-            (MEMORY: Memory.closed th0.(Thread.memory))
-            (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
-            (CONSISTENT: Local.promise_consistent th1.(Thread.local))
+            (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
+            (MEMORY: Memory.closed (Thread.memory th0))
+            (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
+            (CONSISTENT: Local.promise_consistent (Thread.local th1))
             (REACHABLE: semi_reachable th0)
         :
           (<<STEP: rtc (@tau_step _) th0 th1>>) /\
@@ -154,10 +154,10 @@ Module SemiReachable.
 
       Lemma reserve_steps_reachable lang (th0 th1: Thread.t lang)
             (STEPS: rtc (@Thread.reserve_step _) th0 th1)
-            (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
-            (MEMORY: Memory.closed th0.(Thread.memory))
-            (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
-            (CONSISTENT: Local.promise_consistent th1.(Thread.local))
+            (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
+            (MEMORY: Memory.closed (Thread.memory th0))
+            (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
+            (CONSISTENT: Local.promise_consistent (Thread.local th1))
             (REACHABLE: semi_reachable th0)
         :
           (<<STEP: rtc (@reserve_step _) th0 th1>>) /\
@@ -172,10 +172,10 @@ Module SemiReachable.
 
       Lemma cancel_steps_reachable lang (th0 th1: Thread.t lang)
             (STEPS: rtc (@Thread.cancel_step _) th0 th1)
-            (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
-            (MEMORY: Memory.closed th0.(Thread.memory))
-            (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
-            (CONSISTENT: Local.promise_consistent th1.(Thread.local))
+            (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
+            (MEMORY: Memory.closed (Thread.memory th0))
+            (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
+            (CONSISTENT: Local.promise_consistent (Thread.local th1))
             (REACHABLE: semi_reachable th0)
         :
           (<<STEP: rtc (@cancel_step _) th0 th1>>) /\
@@ -190,40 +190,40 @@ Module SemiReachable.
 
       Definition consistent lang (e1:Thread.t lang): Prop :=
         forall mem1 sc1
-               (CAP: Memory.cap e1.(Thread.memory) mem1)
+               (CAP: Memory.cap (Thread.memory e1) mem1)
                (SC_MAX: Memory.max_concrete_timemap mem1 sc1),
           (exists e2 e3,
-              (<<STEPS: rtc (@tau_step lang) (Thread.mk _ e1.(Thread.state) e1.(Thread.local) sc1 mem1) e2>>) /\
+              (<<STEPS: rtc (@tau_step lang) (Thread.mk _ (Thread.state e1) (Thread.local e1) sc1 mem1) e2>>) /\
               (<<FAILURE: step true ThreadEvent.failure e2 e3 >>)) \/
           (exists e2,
-              (<<STEPS: rtc (@tau_step lang) (Thread.mk _ e1.(Thread.state) e1.(Thread.local) sc1 mem1) e2>>) /\
-              (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>))
+              (<<STEPS: rtc (@tau_step lang) (Thread.mk _ (Thread.state e1) (Thread.local e1) sc1 mem1) e2>>) /\
+              (<<PROMISES: (Local.promises (Thread.local e2)) = Memory.bot>>))
       .
 
       Inductive configuration_step:
         forall (e:ThreadEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
       | configuration_step_intro
           e tid c1 lang st1 lc1 e2 e3 st4 lc4 sc4 memory4
-          (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
-          (CANCELS: rtc (@cancel_step _) (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
+          (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
+          (CANCELS: rtc (@cancel_step _) (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) e2)
           (STEP: opt_step e e2 e3)
           (RESERVES: rtc (@reserve_step _) e3 (Thread.mk _ st4 lc4 sc4 memory4))
           (CONSISTENT: e <> ThreadEvent.failure -> consistent (Thread.mk _ st4 lc4 sc4 memory4)):
-          configuration_step e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) c1.(Configuration.threads)) sc4 memory4)
+          configuration_step e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) (Configuration.threads c1)) sc4 memory4)
       .
       Hint Constructors configuration_step.
 
       Lemma step_map_reachable lang pf e (th0 th1 fth0: Thread.t lang)
             (STEP: Thread.step pf e th0 th1)
             (THREAD: thread_map ident_map th0 fth0)
-            (CONSISTENT: Local.promise_consistent th1.(Thread.local))
+            (CONSISTENT: Local.promise_consistent (Thread.local th1))
             (REACHABLE: semi_reachable fth0)
-            (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
-            (MEMORY: Memory.closed th0.(Thread.memory))
-            (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
-            (FLOCAL: Local.wf fth0.(Thread.local) fth0.(Thread.memory))
-            (FMEMORY: Memory.closed fth0.(Thread.memory))
-            (FSC: Memory.closed_timemap fth0.(Thread.sc) fth0.(Thread.memory))
+            (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
+            (MEMORY: Memory.closed (Thread.memory th0))
+            (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
+            (FLOCAL: Local.wf (Thread.local fth0) (Thread.memory fth0))
+            (FMEMORY: Memory.closed (Thread.memory fth0))
+            (FSC: Memory.closed_timemap (Thread.sc fth0) (Thread.memory fth0))
         :
           exists fpf fe fth1,
             (<<STEP: Thread.step fpf fe fth0 fth1>>) /\
@@ -266,14 +266,14 @@ Module SemiReachable.
       Lemma tau_steps_map_reachable lang (th0 th1 fth0: Thread.t lang)
             (STEPS: rtc (@Thread.tau_step _) th0 th1)
             (THREAD: thread_map ident_map th0 fth0)
-            (CONSISTENT: Local.promise_consistent th1.(Thread.local))
+            (CONSISTENT: Local.promise_consistent (Thread.local th1))
             (REACHABLE: semi_reachable fth0)
-            (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
-            (MEMORY: Memory.closed th0.(Thread.memory))
-            (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
-            (FLOCAL: Local.wf fth0.(Thread.local) fth0.(Thread.memory))
-            (FMEMORY: Memory.closed fth0.(Thread.memory))
-            (FSC: Memory.closed_timemap fth0.(Thread.sc) fth0.(Thread.memory))
+            (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
+            (MEMORY: Memory.closed (Thread.memory th0))
+            (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
+            (FLOCAL: Local.wf (Thread.local fth0) (Thread.memory fth0))
+            (FMEMORY: Memory.closed (Thread.memory fth0))
+            (FSC: Memory.closed_timemap (Thread.sc fth0) (Thread.memory fth0))
         :
           exists fth1,
             (<<STEPS: rtc (@Thread.tau_step _) fth0 fth1>>) /\
@@ -299,14 +299,14 @@ Module SemiReachable.
       Lemma consistent_reachable lang (th0: Thread.t lang)
             (CONSISTENT: Thread.consistent th0)
             (REACHABLE: semi_reachable th0)
-            (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
-            (MEMORY: Memory.closed th0.(Thread.memory))
-            (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
+            (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
+            (MEMORY: Memory.closed (Thread.memory th0))
+            (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
         :
           consistent th0.
       Proof.
         ii.
-        assert (THREAD: thread_map ident_map (Thread.mk _ th0.(Thread.state) th0.(Thread.local) sc1 mem1) th0).
+        assert (THREAD: thread_map ident_map (Thread.mk _ (Thread.state th0) (Thread.local th0) sc1 mem1) th0).
         { destruct th0. ss. econs; eauto.
           - eapply ident_map_local.
           - econs.
@@ -321,7 +321,7 @@ Module SemiReachable.
           - eapply Memory.max_concrete_timemap_spec; eauto.
             eapply Memory.cap_closed_timemap; eauto.
         }
-        assert (FLOCAL: Local.wf th0.(Thread.local) mem1).
+        assert (FLOCAL: Local.wf (Thread.local th0) mem1).
         { eapply Local.cap_wf; eauto. }
         assert (FMEMORY: Memory.closed mem1).
         { eapply Memory.cap_closed; eauto. }
@@ -356,7 +356,7 @@ Module SemiReachable.
         exploit Thread.opt_step_future; eauto. i. des.
         exploit Thread.rtc_reserve_step_future; eauto. i. des. ss.
         assert ((<<CONSISTENT4: Local.promise_consistent lc4>>) /\
-                (<<CONSISTENT3: Local.promise_consistent e3.(Thread.local)>>)).
+                (<<CONSISTENT3: Local.promise_consistent (Thread.local e3)>>)).
         { destruct (classic (e = ThreadEvent.failure)).
           - subst. inv STEP0. inv STEP; inv STEP0. inv LOCAL. inv LOCAL0. ss.
             splits; eauto.
@@ -367,7 +367,7 @@ Module SemiReachable.
             eapply PromiseConsistent.rtc_reserve_step_promise_consistent; eauto.
         }
         des.
-        assert (CONSISTENT2: Local.promise_consistent e2.(Thread.local)).
+        assert (CONSISTENT2: Local.promise_consistent (Thread.local e2)).
         { inv STEP0; eauto.
           eapply PromiseConsistent.step_promise_consistent; eauto. }
         assert (CONSISTENT1: Local.promise_consistent lc1).
@@ -575,7 +575,7 @@ Module SemiReachable.
       Lemma steps_configuration_local_consistent c1
             (REACHABLE: rtc SConfiguration.all_machine_step c0 c1)
             tid lang st lc
-            (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st, lc))
+            (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st, lc))
         :
           Local.promise_consistent lc.
       Proof.

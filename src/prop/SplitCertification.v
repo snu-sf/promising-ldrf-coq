@@ -191,7 +191,7 @@ Lemma reserve_step_cancel_step_eq lang (th0 th1: Thread.t lang)
     Thread.cancel_step th1 th0.
 Proof.
   inv STEP. inv STEP0; inv STEP; inv LOCAL.
-  assert (REMOVE: Memory.promise promises2 mem2 loc from to Message.reserve lc1.(Local.promises) mem1 Memory.op_kind_cancel).
+  assert (REMOVE: Memory.promise promises2 mem2 loc from to Message.reserve (Local.promises lc1) mem1 Memory.op_kind_cancel).
   { inv PROMISE. econs; eauto.
     { exploit Memory.remove_exists.
       { eapply Memory.add_get0. eapply PROMISES. }
@@ -211,12 +211,12 @@ Qed.
 Lemma reserve_steps_le_cancel_steps lang (th0 th1: Thread.t lang)
       (STEPS: rtc (@Thread.reserve_step _) th0 th1)
       cap sc
-      (CAP: Memory.le th1.(Thread.memory) cap)
+      (CAP: Memory.le (Thread.memory th1) cap)
   :
     exists th0',
-      (<<STEPS: rtc (@Thread.cancel_step _) (Thread.mk _ th1.(Thread.state) th1.(Thread.local) sc cap) th0'>>) /\
-      (<<LOCAL: th0'.(Thread.local) = th0.(Thread.local)>>) /\
-      (<<MLE: Memory.le th0.(Thread.memory) th0'.(Thread.memory)>>).
+      (<<STEPS: rtc (@Thread.cancel_step _) (Thread.mk _ (Thread.state th1) (Thread.local th1) sc cap) th0'>>) /\
+      (<<LOCAL: (Thread.local th0') = (Thread.local th0)>>) /\
+      (<<MLE: Memory.le (Thread.memory th0) (Thread.memory th0')>>).
 Proof.
   ginduction STEPS.
   { i. esplits; eauto. }
@@ -224,7 +224,7 @@ Proof.
   inv H. inv STEP; inv STEP0; inv LOCAL0. inv PROMISE. ss.
   exploit (@Memory.remove_exists promises2 loc from to Message.reserve).
   { eapply Memory.add_get0; eauto. } i. des.
-  exploit (@Memory.remove_exists th0'.(Thread.memory) loc from to Message.reserve).
+  exploit (@Memory.remove_exists (Thread.memory th0') loc from to Message.reserve).
   { eapply MLE. eapply Memory.add_get0; eauto. } i. des.
   destruct th0'. ss. esplits.
   { etrans; [eapply STEPS0|]. econs; [|refl]. econs.
@@ -246,7 +246,7 @@ Qed.
 
 Lemma cancel_step_reserve_step_eq lang (th0 th1: Thread.t lang)
       (STEP: Thread.cancel_step th0 th1)
-      (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
+      (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
   :
     Thread.reserve_step th1 th0.
 Proof.
@@ -255,7 +255,7 @@ Proof.
   { eapply LOCAL. }
   { econs; eauto. }
   intros MLE. inv STEP0; inv STEP; inv LOCAL0. ss.
-  assert (REMOVE: Memory.promise promises2 mem2 loc from to Message.reserve lc1.(Local.promises) mem1 Memory.op_kind_add).
+  assert (REMOVE: Memory.promise promises2 mem2 loc from to Message.reserve (Local.promises lc1) mem1 Memory.op_kind_add).
   { inv PROMISE. dup MEM. eapply Memory.remove_get0 in MEM. des.
     exploit (@Memory.add_exists mem2 loc from to Message.reserve).
     { ii. erewrite Memory.remove_o in GET2; eauto. des_ifs.
@@ -279,7 +279,7 @@ Proof.
     replace promises0 with (Local.promises lc1) in *; cycle 1.
     { eapply Memory.ext. i.
       erewrite (@Memory.add_o promises0 promises2); eauto.
-      erewrite (@Memory.remove_o promises2 lc1.(Local.promises)); eauto. des_ifs.
+      erewrite (@Memory.remove_o promises2 (Local.promises lc1)); eauto. des_ifs.
       ss. des; subst. eapply Memory.remove_get0; eauto. }
     econs; eauto. ss.
   }
@@ -289,9 +289,9 @@ Qed.
 
 Lemma reserve_or_cancel_cancellable lang (th0 th1: Thread.t lang)
       (STEPS: rtc (@Thread.reserve_step _ \2/ @Thread.cancel_step _) th0 th1)
-      (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
-      (CLOSED: Memory.closed th0.(Thread.memory))
-      (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
+      (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
+      (CLOSED: Memory.closed (Thread.memory th0))
+      (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
   :
     rtc (@Thread.reserve_step _ \2/ @Thread.cancel_step _) th1 th0.
 Proof.
@@ -331,9 +331,9 @@ Qed.
 Lemma tau_steps_consistent_split lang (th0 th1: Thread.t lang)
       (STEPS: rtc (tau (@pred_step no_sc _)) th0 th1)
       (CONSISTENT: Thread.consistent th1)
-      (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
-      (MEM: Memory.closed th0.(Thread.memory))
-      (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
+      (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
+      (MEM: Memory.closed (Thread.memory th0))
+      (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
   :
     exists th0',
       (<<RESERVESTEPS: rtc (@Thread.reserve_step _ \2/ @Thread.cancel_step _) th0 th0'>>) /\
@@ -347,7 +347,7 @@ Proof.
   { eauto. }
   i. des.
   exploit consistent_pf_consistent_super_strong; eauto. i. des.
-  exploit (@concrete_promise_max_timemap_exists th1.(Thread.memory) th1.(Thread.local).(Local.promises)).
+  exploit (@concrete_promise_max_timemap_exists (Thread.memory th1) (Local.promises (Thread.local th1))).
   { eapply CLOSED2. } i. des. destruct th1; ss.
   exploit (CONSISTENT0 memory TimeMap.bot); eauto.
   { refl. }
@@ -450,9 +450,9 @@ Lemma consistent_split lang (th0 th1' th1: Thread.t lang) pf e
       (STEP: Thread.step pf e th0 th1')
       (STEPS: rtc (@Thread.reserve_step _ \2/ @Thread.cancel_step _) th1' th1)
       (CONSISTENT: Thread.consistent th1 \/ e = ThreadEvent.failure)
-      (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
-      (MEM: Memory.closed th0.(Thread.memory))
-      (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
+      (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
+      (MEM: Memory.closed (Thread.memory th0))
+      (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
   :
     exists th0',
       (<<RESERVESTEPS: rtc (@Thread.reserve_step _ \2/ @Thread.cancel_step _) th0 th0'>>) /\

@@ -242,7 +242,7 @@ Section CAPFLEX.
       forall loc,
         Memory.max_ts loc mem2 = tm loc.
   Proof.
-    i. set (BACK:=CAP.(cap_flex_back) loc).
+    i. set (BACK:=(cap_flex_back CAP) loc).
     exploit Memory.max_ts_spec; try exact BACK. i. des.
     apply TimeFacts.antisym; ss.
     destruct (Time.le_lt_dec (Memory.max_ts loc mem2) (tm loc)); ss.
@@ -289,7 +289,7 @@ Section CAPFLEX.
         - eauto.
         - ss. }
       destruct (Time.le_lt_dec to from).
-      - exploit CAP.(cap_flex_middle).
+      - exploit (cap_flex_middle CAP).
         + econs.
           * eapply GET0.
           * eapply GET.
@@ -313,7 +313,7 @@ Section CAPFLEX.
         + eapply TimeFacts.lt_le_lt; eauto.
         + i. econs; eauto. econs; eauto.
       - econs.
-        + eapply CAP.(cap_flex_le). eapply GET.
+        + eapply (cap_flex_le CAP). eapply GET.
         + econs; eauto.
     }
     {
@@ -461,15 +461,15 @@ Section CAPFLEX.
       { eapply map_ident_concrete_closed_message; eauto.
         eapply MEM0 in GET. des; auto. }
       { refl. }
-      { eapply CAP1.(cap_flex_le) in GET1. eauto. }
+      { eapply (cap_flex_le CAP1) in GET1. eauto. }
     }
-    { i. hexploit (MAP.(cap_flex_map_max) loc). i. des.
+    { i. hexploit ((cap_flex_map_max MAP) loc). i. des.
       left. exists (tm0 loc), Time.bot, fts, Time.bot. splits; auto.
       { eapply Time.bot_spec. }
       { hexploit (@cap_flex_max_ts mem1 cap1 tm1); eauto.
         i. eapply Memory.max_ts_spec in GET. des.
         erewrite H in MAX0. etrans; eauto. }
-      { eapply MAP.(cap_flex_map_map_bot). }
+      { eapply (cap_flex_map_map_bot MAP). }
       { i. eapply cap_flex_covered; eauto. }
     }
   Qed.
@@ -516,7 +516,7 @@ Section CAPFLEX.
           eapply TimeFacts.lt_le_lt; eauto. eapply Time.bot_spec. }
         { inv H. clarify. }
       }
-      hexploit CAP.(cap_flex_middle).
+      hexploit (cap_flex_middle CAP).
       { econs.
         { eapply GET0. }
         { eapply GET. }

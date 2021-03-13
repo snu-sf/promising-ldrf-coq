@@ -72,7 +72,7 @@ Module Deadlock.
     assert (NOTIN: forall tid lang st lc
                      (FIND: IdentMap.find tid ths = Some (existT _ lang st, lc))
                      (TID: ~ List.In tid (IdentSet.elements tids)),
-               lc.(Local.promises) = Memory.bot).
+               (Local.promises lc) = Memory.bot).
     { i. destruct (IdentSet.mem tid tids) eqn:MEM.
       - exfalso. apply TID. rewrite IdentSet.mem_spec in MEM.
         rewrite <- IdentSet.elements_spec1 in MEM.

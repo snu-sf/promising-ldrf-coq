@@ -198,29 +198,29 @@ Module PFtoRAThread.
 
     Inductive wf_pf (e: Thread.t lang): Prop :=
     | wf_pf_intro
-        (WF: Local.wf e.(Thread.local) e.(Thread.memory))
-        (SC: Memory.closed_timemap e.(Thread.sc) e.(Thread.memory))
-        (MEM: Memory.closed e.(Thread.memory))
+        (WF: Local.wf (Thread.local e) (Thread.memory e))
+        (SC: Memory.closed_timemap (Thread.sc e) (Thread.memory e))
+        (MEM: Memory.closed (Thread.memory e))
     .
     Hint Constructors wf_pf.
 
     Inductive wf_j (views: Loc.t -> Time.t -> list View.t) (e: Thread.t lang): Prop :=
     | wf_j_intro
-        (WF: Local.wf e.(Thread.local) e.(Thread.memory))
-        (SC: Memory.closed_timemap e.(Thread.sc) e.(Thread.memory))
-        (MEM: Memory.closed e.(Thread.memory))
-        (JOINED_REL: joined_released views e.(Thread.local).(Local.promises) e.(Thread.local).(Local.tview).(TView.rel))
-        (JOINED_MEM: joined_memory views e.(Thread.memory))
+        (WF: Local.wf (Thread.local e) (Thread.memory e))
+        (SC: Memory.closed_timemap (Thread.sc e) (Thread.memory e))
+        (MEM: Memory.closed (Thread.memory e))
+        (JOINED_REL: joined_released views (Local.promises (Thread.local e)) (Local.tview (Thread.local e)).(TView.rel))
+        (JOINED_MEM: joined_memory views (Thread.memory e))
         (JOINED_VIEWS: wf_views views)
     .
     Hint Constructors wf_j.
 
     Inductive wf_ra (rels: ReleaseWrites.t) (e: Thread.t lang): Prop :=
     | wf_ra_intro
-        (WF: Local.wf e.(Thread.local) e.(Thread.memory))
-        (SC: Memory.closed_timemap e.(Thread.sc) e.(Thread.memory))
-        (MEM: Memory.closed e.(Thread.memory))
-        (RELS: ReleaseWrites.wf rels e.(Thread.local).(Local.promises) e.(Thread.memory))
+        (WF: Local.wf (Thread.local e) (Thread.memory e))
+        (SC: Memory.closed_timemap (Thread.sc e) (Thread.memory e))
+        (MEM: Memory.closed (Thread.memory e))
+        (RELS: ReleaseWrites.wf rels (Local.promises (Thread.local e)) (Thread.memory e))
     .
     Hint Constructors wf_ra.
 
@@ -459,29 +459,29 @@ Module PFtoRAThread.
         (NORMAL_J: PFtoRASimThread.normal_thread L e_j)
         (NORMAL_RA: PFtoRASimThread.normal_thread L e_ra)
         (STABLE_RA: PFtoRASimThread.stable_thread L rels e_ra)
-        (CLOSED_VIEWS: closed_views views e_ra.(Thread.memory))
+        (CLOSED_VIEWS: closed_views views (Thread.memory e_ra))
         (NORMAL_VIEWS: normal_views views)
-        (STABLE_VIEWS: stable_views e_ra.(Thread.memory) views)
+        (STABLE_VIEWS: stable_views (Thread.memory e_ra) views)
     .
 
     Lemma sim_thread_step_aux
           views1 rels1 e1_pf e1_j e1_ra
           pf e_pf e2_pf
           (SIM1: sim_thread views1 rels1 e1_pf e1_j e1_ra)
-          (JOINED_REL: joined_released views1 e1_j.(Thread.local).(Local.promises) e1_j.(Thread.local).(Local.tview).(TView.rel))
-          (JOINED_MEM: joined_memory views1 e1_j.(Thread.memory))
+          (JOINED_REL: joined_released views1 (Local.promises (Thread.local e1_j)) (Local.tview (Thread.local e1_j)).(TView.rel))
+          (JOINED_MEM: joined_memory views1 (Thread.memory e1_j))
           (JOINED_VIEWS: wf_views views1)
-          (WF1_PF: Local.wf e1_pf.(Thread.local) e1_pf.(Thread.memory))
-          (SC1_PF: Memory.closed_timemap e1_pf.(Thread.sc) e1_pf.(Thread.memory))
-          (MEM1_PF: Memory.closed e1_pf.(Thread.memory))
-          (WF1_J: Local.wf e1_j.(Thread.local) e1_j.(Thread.memory))
-          (SC1_J: Memory.closed_timemap e1_j.(Thread.sc) e1_j.(Thread.memory))
-          (MEM1_J: Memory.closed e1_j.(Thread.memory))
-          (WF1_RA: Local.wf e1_ra.(Thread.local) e1_ra.(Thread.memory))
-          (SC1_RA: Memory.closed_timemap e1_ra.(Thread.sc) e1_ra.(Thread.memory))
-          (MEM1_RA: Memory.closed e1_ra.(Thread.memory))
+          (WF1_PF: Local.wf (Thread.local e1_pf) (Thread.memory e1_pf))
+          (SC1_PF: Memory.closed_timemap (Thread.sc e1_pf) (Thread.memory e1_pf))
+          (MEM1_PF: Memory.closed (Thread.memory e1_pf))
+          (WF1_J: Local.wf (Thread.local e1_j) (Thread.memory e1_j))
+          (SC1_J: Memory.closed_timemap (Thread.sc e1_j) (Thread.memory e1_j))
+          (MEM1_J: Memory.closed (Thread.memory e1_j))
+          (WF1_RA: Local.wf (Thread.local e1_ra) (Thread.memory e1_ra))
+          (SC1_RA: Memory.closed_timemap (Thread.sc e1_ra) (Thread.memory e1_ra))
+          (MEM1_RA: Memory.closed (Thread.memory e1_ra))
           (STEP_PF: Thread.step pf e_pf e1_pf e2_pf)
-          (CONS: Local.promise_consistent e2_pf.(Thread.local))
+          (CONS: Local.promise_consistent (Thread.local e2_pf))
           (PROMISE: PF.pf_event L e_pf):
       exists views2 e_j pf_j e2_j e_ra e2_ra,
         (<<STEP_J: JThread.step pf_j e_j e1_j e2_j views1 views2>>) /\
@@ -490,10 +490,10 @@ Module PFtoRAThread.
         __guard__
           ((<<SIM2: sim_thread views2 (ReleaseWrites.append L e_ra rels1) e2_pf e2_j e2_ra>>) /\
            (<<EVENT_RA: PFtoRASimThread.sim_event e_ra e_j>>) \/
-           (<<CONS: Local.promise_consistent e1_ra.(Thread.local)>>) /\
+           (<<CONS: Local.promise_consistent (Thread.local e1_ra)>>) /\
            (<<RACE: exists loc to val released ord,
                ThreadEvent.is_reading e_ra = Some (loc, to, val, released, ord) /\
-               RARaceW.ra_race L rels1 e1_ra.(Thread.local).(Local.tview) loc to ord>>)).
+               RARaceW.ra_race L rels1 (Local.tview (Thread.local e1_ra)) loc to ord>>)).
     Proof.
       hexploit JSim.sim_thread_step; try exact STEP; try eapply SIM1; eauto. i. des.
       destruct (classic (exists loc from to msg kind,
@@ -634,7 +634,7 @@ Module PFtoRAThread.
           (WF1_RA: wf_ra rels1 e1_ra)
           (STEP: Thread.step pf e_pf e1_pf e2_pf)
           (PF: PF.pf_event L e_pf)
-          (CONS: Local.promise_consistent e2_pf.(Thread.local)):
+          (CONS: Local.promise_consistent (Thread.local e2_pf)):
       (exists views2 rels2 pf_j e_j e2_j e_ra e2_ra,
           (<<STEP_J: JThread.step pf_j e_j e1_j e2_j views1 views2>>) /\
           (<<STEP_RA: RAThread.step L rels1 rels2 e_ra e1_ra e2_ra>>) /\
@@ -642,10 +642,10 @@ Module PFtoRAThread.
           (<<EVENT_RA: PFtoRASimThread.sim_event e_ra e_j>>) /\
           (<<SIM2: sim_thread views2 rels2 e2_pf e2_j e2_ra>>)) \/
       (exists rels2 e_ra e2_ra loc to val released ord,
-          (<<CONS_RA: Local.promise_consistent e1_ra.(Thread.local)>>) /\
+          (<<CONS_RA: Local.promise_consistent (Thread.local e1_ra)>>) /\
           (<<STEP_RA: RAThread.step L rels1 rels2 e_ra e1_ra e2_ra>>) /\
           (<<READ: ThreadEvent.is_reading e_ra = Some (loc, to, val, released, ord)>>) /\
-          (<<RACE: RARaceW.ra_race L rels1 e1_ra.(Thread.local).(Local.tview) loc to ord>>)).
+          (<<RACE: RARaceW.ra_race L rels1 (Local.tview (Thread.local e1_ra)) loc to ord>>)).
     Proof.
       exploit sim_thread_step_aux; eauto; try apply WF1_PF; try apply WF1_J; try apply WF1_RA.
       i. unguard. des.
@@ -663,7 +663,7 @@ Module PFtoRAThread.
           (WF1_RA: wf_ra rels1 e1_ra)
           (STEP: Thread.opt_step e_pf e1_pf e2_pf)
           (PF: PF.pf_event L e_pf)
-          (CONS: Local.promise_consistent e2_pf.(Thread.local)):
+          (CONS: Local.promise_consistent (Thread.local e2_pf)):
       (exists views2 rels2 e_j e2_j e_ra e2_ra,
           (<<STEP_J: JThread.opt_step e_j e1_j e2_j views1 views2>>) /\
           (<<STEP_RA: RAThread.opt_step L rels1 rels2 e_ra e1_ra e2_ra>>) /\
@@ -671,10 +671,10 @@ Module PFtoRAThread.
           (<<EVENT_RA: PFtoRASimThread.sim_event e_ra e_j>>) /\
           (<<SIM2: sim_thread views2 rels2 e2_pf e2_j e2_ra>>)) \/
       (exists rels2 e_ra e2_ra loc to val released ord,
-          (<<CONS_RA: Local.promise_consistent e1_ra.(Thread.local)>>) /\
+          (<<CONS_RA: Local.promise_consistent (Thread.local e1_ra)>>) /\
           (<<STEP_RA: RAThread.step L rels1 rels2 e_ra e1_ra e2_ra>>) /\
           (<<READ: ThreadEvent.is_reading e_ra = Some (loc, to, val, released, ord)>>) /\
-          (<<RACE: RARaceW.ra_race L rels1 e1_ra.(Thread.local).(Local.tview) loc to ord>>)).
+          (<<RACE: RARaceW.ra_race L rels1 (Local.tview (Thread.local e1_ra)) loc to ord>>)).
     Proof.
       inv STEP.
       - left. esplits; eauto; try econs 1. econs.
@@ -698,17 +698,17 @@ Module PFtoRAThread.
           (STEPS: Trace.steps tr e1_pf e2_pf)
           (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr)
           (PF: List.Forall (compose (PF.pf_event L) snd) tr)
-          (CONS: Local.promise_consistent e2_pf.(Thread.local)):
+          (CONS: Local.promise_consistent (Thread.local e2_pf)):
       (exists views2 rels2 e2_j e2_ra,
           (<<STEPS_J: JThread.rtc_tau e1_j e2_j views1 views2>>) /\
           (<<STEPS_RA: RAThread.tau_steps L rels1 rels2 e1_ra e2_ra>>) /\
           (<<SIM2: sim_thread views2 rels2 e2_pf e2_j e2_ra>>)) \/
       (exists rels2 rels3 e_ra e2_ra e3_ra loc to val released ord,
           (<<STEPS_RA: RAThread.tau_steps L rels1 rels2 e1_ra e2_ra>>) /\
-          (<<CONS_RA: Local.promise_consistent e2_ra.(Thread.local)>>) /\
+          (<<CONS_RA: Local.promise_consistent (Thread.local e2_ra)>>) /\
           (<<STEP_RA: RAThread.step L rels2 rels3 e_ra e2_ra e3_ra>>) /\
           (<<READ: ThreadEvent.is_reading e_ra = Some (loc, to, val, released, ord)>>) /\
-          (<<RACE: RARaceW.ra_race L rels2 e2_ra.(Thread.local).(Local.tview) loc to ord>>)).
+          (<<RACE: RARaceW.ra_race L rels2 (Local.tview (Thread.local e2_ra)) loc to ord>>)).
     Proof.
       revert views1 rels1 e1_j e1_ra SIM1 WF1_PF WF1_J WF1_RA SILENT PF CONS.
       induction STEPS; i; ss.
@@ -745,7 +745,7 @@ Module PFtoRAThread.
           (WF1_J: wf_j views1 e1_j)
           (WF1_RA: wf_ra rels1 e1_ra)
           (STEP: Thread.reserve_step e1_pf e2_pf)
-          (CONS: Local.promise_consistent e2_pf.(Thread.local)):
+          (CONS: Local.promise_consistent (Thread.local e2_pf)):
       exists e2_j e2_ra,
         (<<STEP_J: JThread.reserve_step views1 e1_j e2_j>>) /\
         (<<STEP_RA: Thread.reserve_step e1_ra e2_ra>>) /\
@@ -774,7 +774,7 @@ Module PFtoRAThread.
           (WF1_J: wf_j views1 e1_j)
           (WF1_RA: wf_ra rels1 e1_ra)
           (STEP: rtc (@Thread.reserve_step _) e1_pf e2_pf)
-          (CONS: Local.promise_consistent e2_pf.(Thread.local)):
+          (CONS: Local.promise_consistent (Thread.local e2_pf)):
       exists e2_j e2_ra,
         (<<STEP_J: rtc (@JThread.reserve_step views1 _) e1_j e2_j>>) /\
         (<<STEP_RA: rtc (@Thread.reserve_step _) e1_ra e2_ra>>) /\
@@ -803,7 +803,7 @@ Module PFtoRAThread.
           (WF1_J: wf_j views1 e1_j)
           (WF1_RA: wf_ra rels1 e1_ra)
           (STEP: Thread.cancel_step e1_pf e2_pf)
-          (CONS: Local.promise_consistent e2_pf.(Thread.local)):
+          (CONS: Local.promise_consistent (Thread.local e2_pf)):
       exists e2_j e2_ra,
         (<<STEP_J: JThread.cancel_step views1 e1_j e2_j>>) /\
         (<<STEP_RA: Thread.cancel_step e1_ra e2_ra>>) /\
@@ -832,7 +832,7 @@ Module PFtoRAThread.
           (WF1_J: wf_j views1 e1_j)
           (WF1_RA: wf_ra rels1 e1_ra)
           (STEP: rtc (@Thread.cancel_step _) e1_pf e2_pf)
-          (CONS: Local.promise_consistent e2_pf.(Thread.local)):
+          (CONS: Local.promise_consistent (Thread.local e2_pf)):
       exists e2_j e2_ra,
         (<<STEP_J: rtc (@JThread.cancel_step views1 _) e1_j e2_j>>) /\
         (<<STEP_RA: rtc (@Thread.cancel_step _) e1_ra e2_ra>>) /\
@@ -859,9 +859,9 @@ Module PFtoRAThread.
     Lemma cap_wf_pf
           e sc mem
           (WF: wf_pf e)
-          (CAP: Memory.cap e.(Thread.memory) mem)
+          (CAP: Memory.cap (Thread.memory e) mem)
           (SC: Memory.max_concrete_timemap mem sc):
-      wf_pf (Thread.mk lang e.(Thread.state) e.(Thread.local) sc mem).
+      wf_pf (Thread.mk lang (Thread.state e) (Thread.local e) sc mem).
     Proof.
       inv WF.
       exploit Local.cap_wf; eauto. i.
@@ -872,9 +872,9 @@ Module PFtoRAThread.
     Lemma cap_wf_j
           views e sc mem
           (WF: wf_j views e)
-          (CAP: Memory.cap e.(Thread.memory) mem)
+          (CAP: Memory.cap (Thread.memory e) mem)
           (SC: Memory.max_concrete_timemap mem sc):
-      wf_j views (Thread.mk lang e.(Thread.state) e.(Thread.local) sc mem).
+      wf_j views (Thread.mk lang (Thread.state e) (Thread.local e) sc mem).
     Proof.
       inv WF.
       exploit Local.cap_wf; eauto. i.
@@ -886,9 +886,9 @@ Module PFtoRAThread.
     Lemma cap_wf_ra
           rels e sc mem
           (WF: wf_ra rels e)
-          (CAP: Memory.cap e.(Thread.memory) mem)
+          (CAP: Memory.cap (Thread.memory e) mem)
           (SC: Memory.max_concrete_timemap mem sc):
-      wf_ra rels (Thread.mk lang e.(Thread.state) e.(Thread.local) sc mem).
+      wf_ra rels (Thread.mk lang (Thread.state e) (Thread.local e) sc mem).
     Proof.
       inv WF.
       exploit Local.cap_wf; eauto. i.
@@ -906,19 +906,19 @@ Module PFtoRAThread.
           (WF_PF: wf_pf e_pf)
           (WF_J: wf_j views e_j)
           (WF_RA: wf_ra rels e_ra)
-          (CAP_PF: Memory.cap e_pf.(Thread.memory) mem_pf)
+          (CAP_PF: Memory.cap (Thread.memory e_pf) mem_pf)
           (SC_PF: Memory.max_concrete_timemap mem_pf sc_pf)
-          (CAP_J: Memory.cap e_j.(Thread.memory) mem_j)
+          (CAP_J: Memory.cap (Thread.memory e_j) mem_j)
           (SC_J: Memory.max_concrete_timemap mem_j sc_j)
-          (CAP_RA: Memory.cap e_ra.(Thread.memory) mem_ra)
+          (CAP_RA: Memory.cap (Thread.memory e_ra) mem_ra)
           (SC_RA: Memory.max_concrete_timemap mem_ra sc_ra):
       (<<SIM_CAP: sim_thread views rels
-                             (Thread.mk lang e_pf.(Thread.state) e_pf.(Thread.local) sc_pf mem_pf)
-                             (Thread.mk lang e_j.(Thread.state) e_j.(Thread.local) sc_j mem_j)
-                             (Thread.mk lang e_ra.(Thread.state) e_ra.(Thread.local) sc_ra mem_ra)>>) /\
-      (<<WF_PF_CAP: wf_pf (Thread.mk lang e_pf.(Thread.state) e_pf.(Thread.local) sc_pf mem_pf)>>) /\
-      (<<WF_J_CAP: wf_j views (Thread.mk lang e_j.(Thread.state) e_j.(Thread.local) sc_j mem_j)>>) /\
-      (<<WF_RA_CAP: wf_ra rels (Thread.mk lang e_ra.(Thread.state) e_ra.(Thread.local) sc_ra mem_ra)>>).
+                             (Thread.mk lang (Thread.state e_pf) (Thread.local e_pf) sc_pf mem_pf)
+                             (Thread.mk lang (Thread.state e_j) (Thread.local e_j) sc_j mem_j)
+                             (Thread.mk lang (Thread.state e_ra) (Thread.local e_ra) sc_ra mem_ra)>>) /\
+      (<<WF_PF_CAP: wf_pf (Thread.mk lang (Thread.state e_pf) (Thread.local e_pf) sc_pf mem_pf)>>) /\
+      (<<WF_J_CAP: wf_j views (Thread.mk lang (Thread.state e_j) (Thread.local e_j) sc_j mem_j)>>) /\
+      (<<WF_RA_CAP: wf_ra rels (Thread.mk lang (Thread.state e_ra) (Thread.local e_ra) sc_ra mem_ra)>>).
     Proof.
       exploit cap_wf_pf; eauto. i.
       exploit cap_wf_j; eauto. i.
@@ -967,8 +967,8 @@ Module PFtoRAThread.
     Lemma local_map_ra_race
           lc1 lc2 rels loc to ordr
           (LOCAL: local_map ident_map lc1 lc2)
-          (RARACE: RARaceW.ra_race L rels lc1.(Local.tview) loc to ordr):
-      RARaceW.ra_race L rels lc2.(Local.tview) loc to ordr.
+          (RARACE: RARaceW.ra_race L rels (Local.tview lc1) loc to ordr):
+      RARaceW.ra_race L rels (Local.tview lc2) loc to ordr.
     Proof.
       destruct lc1, lc2. ss. inv LOCAL. ss.
       unfold RARaceW.ra_race in *. des; splits; eauto.
@@ -989,10 +989,10 @@ Module PFtoRAThread.
       ((<<CONSISTENT_RA: OrdThread.consistent L Ordering.acqrel e1_ra>>) \/
        exists rels2 rels3 e_ra e2_ra e3_ra loc to val released ord,
          (<<STEPS_RA: RAThread.tau_steps L rels1 rels2 e1_ra e2_ra>>) /\
-         (<<CONS: Local.promise_consistent e2_ra.(Thread.local)>>) /\
+         (<<CONS: Local.promise_consistent (Thread.local e2_ra)>>) /\
          (<<STEP_RA: RAThread.step L rels2 rels3 e_ra e2_ra e3_ra>>) /\
          (<<READ: ThreadEvent.is_reading e_ra = Some (loc, to, val, released, ord)>>) /\
-         (<<RACE: RARaceW.ra_race L rels2 e2_ra.(Thread.local).(Local.tview) loc to ord>>)).
+         (<<RACE: RARaceW.ra_race L rels2 (Local.tview (Thread.local e2_ra)) loc to ord>>)).
     Proof.
       split.
       { eapply JSim.sim_thread_consistent;

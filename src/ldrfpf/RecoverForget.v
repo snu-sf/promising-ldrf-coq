@@ -130,29 +130,29 @@ Section RECOVER.
         (NOREAD: no_read_msgs prom_others e_tgt)
         (EVENT: ThreadEvent.get_machine_event e_tgt = MachineEvent.silent)
 
-        (SCSRC: Memory.closed_timemap th_src0.(Thread.sc) th_src0.(Thread.memory))
-        (SCMID: Memory.closed_timemap th_mid0.(Thread.sc) th_mid0.(Thread.memory))
-        (SCTGT: Memory.closed_timemap th_tgt0.(Thread.sc) th_tgt0.(Thread.memory))
-        (MEMSRC: Memory.closed th_src0.(Thread.memory))
-        (MEMMID: Memory.closed th_mid0.(Thread.memory))
-        (MEMTGT: Memory.closed th_tgt0.(Thread.memory))
-        (LOCALSRC: Local.wf th_src0.(Thread.local) th_src0.(Thread.memory))
-        (LOCALMID: Local.wf th_mid0.(Thread.local) th_mid0.(Thread.memory))
-        (LOCALTGT: Local.wf th_tgt0.(Thread.local) th_tgt0.(Thread.memory))
+        (SCSRC: Memory.closed_timemap (Thread.sc th_src0) (Thread.memory th_src0))
+        (SCMID: Memory.closed_timemap (Thread.sc th_mid0) (Thread.memory th_mid0))
+        (SCTGT: Memory.closed_timemap (Thread.sc th_tgt0) (Thread.memory th_tgt0))
+        (MEMSRC: Memory.closed (Thread.memory th_src0))
+        (MEMMID: Memory.closed (Thread.memory th_mid0))
+        (MEMTGT: Memory.closed (Thread.memory th_tgt0))
+        (LOCALSRC: Local.wf (Thread.local th_src0) (Thread.memory th_src0))
+        (LOCALMID: Local.wf (Thread.local th_mid0) (Thread.memory th_mid0))
+        (LOCALTGT: Local.wf (Thread.local th_tgt0) (Thread.memory th_tgt0))
 
-        (MEMWF: memory_times_wf times th_mid0.(Thread.memory))
-        (MEMWFTGT: memory_times_wf times th_tgt0.(Thread.memory))
-        (CONSISTENT: Local.promise_consistent th_tgt1.(Thread.local))
+        (MEMWF: memory_times_wf times (Thread.memory th_mid0))
+        (MEMWFTGT: memory_times_wf times (Thread.memory th_tgt0))
+        (CONSISTENT: Local.promise_consistent (Thread.local th_tgt1))
 
         (EXCLUSIVE: forall loc ts (OTHER: prom_others loc ts),
-            exists from msg, <<UNCH: unchangable th_src0.(Thread.memory) th_src0.(Thread.local).(Local.promises) loc ts from msg>>)
+            exists from msg, <<UNCH: unchangable (Thread.memory th_src0) (Local.promises (Thread.local th_src0)) loc ts from msg>>)
         (EXCLUSIVEEXTRA: forall loc ts from (OTHER: extra_others loc ts from),
-            (<<UNCH: unchangable th_src0.(Thread.memory) th_src0.(Thread.local).(Local.promises) loc ts from Message.reserve>>))
-        (JOINED: forall loc ts, List.Forall (fun vw => semi_closed_view vw th_src0.(Thread.memory) loc ts) (views0 loc ts))
+            (<<UNCH: unchangable (Thread.memory th_src0) (Local.promises (Thread.local th_src0)) loc ts from Message.reserve>>))
+        (JOINED: forall loc ts, List.Forall (fun vw => semi_closed_view vw (Thread.memory th_src0) loc ts) (views0 loc ts))
 
         (REL: joined_released
-                views0 th_mid0.(Thread.local).(Local.promises) th_mid0.(Thread.local).(Local.tview).(TView.rel))
-        (JOINEDMEM: joined_memory views0 th_mid0.(Thread.memory))
+                views0 (Local.promises (Thread.local th_mid0)) (Local.tview (Thread.local th_mid0)).(TView.rel))
+        (JOINEDMEM: joined_memory views0 (Thread.memory th_mid0))
         (VIEWS: wf_views views0)
     :
       exists th_mid1 th_src1 views1 prom_self1 extra_self1 pf_mid e_mid tr,
@@ -162,9 +162,9 @@ Section RECOVER.
                      views1 prom_self1 prom_others extra_self1 extra_others
                      th_src1 th_mid1 th_tgt1>>) /\
         (<<EVENTJOIN: JSim.sim_event e_mid e_tgt>>) /\
-        (<<JOINED: forall loc ts, List.Forall (fun vw => semi_closed_view vw th_src1.(Thread.memory) loc ts) (views1 loc ts)>>) /\
-        (<<MEMWF: memory_times_wf times th_mid1.(Thread.memory)>>) /\
-        (<<MEMWFTGT: memory_times_wf times th_tgt1.(Thread.memory)>>) /\
+        (<<JOINED: forall loc ts, List.Forall (fun vw => semi_closed_view vw (Thread.memory th_src1) loc ts) (views1 loc ts)>>) /\
+        (<<MEMWF: memory_times_wf times (Thread.memory th_mid1)>>) /\
+        (<<MEMWFTGT: memory_times_wf times (Thread.memory th_tgt1)>>) /\
         (<<SILENT: List.Forall (fun lce => ThreadEvent.get_machine_event (snd lce) = MachineEvent.silent) tr>>)
   .
   Proof.
@@ -191,29 +191,29 @@ Section RECOVER.
 
         (EVENTS: List.Forall (fun the => <<SAT: (wf_time_evt times /1\ no_read_msgs prom_others) (snd the)>> /\ <<TAU: ThreadEvent.get_machine_event (snd the) = MachineEvent.silent>>) tr_tgt)
 
-        (SCSRC: Memory.closed_timemap th_src0.(Thread.sc) th_src0.(Thread.memory))
-        (SCMID: Memory.closed_timemap th_mid0.(Thread.sc) th_mid0.(Thread.memory))
-        (SCTGT: Memory.closed_timemap th_tgt0.(Thread.sc) th_tgt0.(Thread.memory))
-        (MEMSRC: Memory.closed th_src0.(Thread.memory))
-        (MEMMID: Memory.closed th_mid0.(Thread.memory))
-        (MEMTGT: Memory.closed th_tgt0.(Thread.memory))
-        (LOCALSRC: Local.wf th_src0.(Thread.local) th_src0.(Thread.memory))
-        (LOCALMID: Local.wf th_mid0.(Thread.local) th_mid0.(Thread.memory))
-        (LOCALTGT: Local.wf th_tgt0.(Thread.local) th_tgt0.(Thread.memory))
+        (SCSRC: Memory.closed_timemap (Thread.sc th_src0) (Thread.memory th_src0))
+        (SCMID: Memory.closed_timemap (Thread.sc th_mid0) (Thread.memory th_mid0))
+        (SCTGT: Memory.closed_timemap (Thread.sc th_tgt0) (Thread.memory th_tgt0))
+        (MEMSRC: Memory.closed (Thread.memory th_src0))
+        (MEMMID: Memory.closed (Thread.memory th_mid0))
+        (MEMTGT: Memory.closed (Thread.memory th_tgt0))
+        (LOCALSRC: Local.wf (Thread.local th_src0) (Thread.memory th_src0))
+        (LOCALMID: Local.wf (Thread.local th_mid0) (Thread.memory th_mid0))
+        (LOCALTGT: Local.wf (Thread.local th_tgt0) (Thread.memory th_tgt0))
 
-        (MEMWF: memory_times_wf times th_mid0.(Thread.memory))
-        (MEMWFTGT: memory_times_wf times th_tgt0.(Thread.memory))
-        (CONSISTENT: Local.promise_consistent th_tgt1.(Thread.local))
+        (MEMWF: memory_times_wf times (Thread.memory th_mid0))
+        (MEMWFTGT: memory_times_wf times (Thread.memory th_tgt0))
+        (CONSISTENT: Local.promise_consistent (Thread.local th_tgt1))
 
         (EXCLUSIVE: forall loc ts (OTHER: prom_others loc ts),
-            exists from msg, <<UNCH: unchangable th_src0.(Thread.memory) th_src0.(Thread.local).(Local.promises) loc ts from msg>>)
+            exists from msg, <<UNCH: unchangable (Thread.memory th_src0) (Local.promises (Thread.local th_src0)) loc ts from msg>>)
         (EXCLUSIVEEXTRA: forall loc ts from (OTHER: extra_others loc ts from),
-            (<<UNCH: unchangable th_src0.(Thread.memory) th_src0.(Thread.local).(Local.promises) loc ts from Message.reserve>>))
-        (JOINED: forall loc ts, List.Forall (fun vw => semi_closed_view vw th_src0.(Thread.memory) loc ts) (views0 loc ts))
+            (<<UNCH: unchangable (Thread.memory th_src0) (Local.promises (Thread.local th_src0)) loc ts from Message.reserve>>))
+        (JOINED: forall loc ts, List.Forall (fun vw => semi_closed_view vw (Thread.memory th_src0) loc ts) (views0 loc ts))
 
         (REL: joined_released
-                views0 th_mid0.(Thread.local).(Local.promises) th_mid0.(Thread.local).(Local.tview).(TView.rel))
-        (JOINEDMEM: joined_memory views0 th_mid0.(Thread.memory))
+                views0 (Local.promises (Thread.local th_mid0)) (Local.tview (Thread.local th_mid0)).(TView.rel))
+        (JOINEDMEM: joined_memory views0 (Thread.memory th_mid0))
         (VIEWS: wf_views views0)
     :
       exists th_mid1 th_src1 views1 prom_self1 extra_self1 tr_src,
@@ -222,9 +222,9 @@ Section RECOVER.
         (<<THREAD: sim_thread_strong
                      views1 prom_self1 prom_others extra_self1 extra_others
                      th_src1 th_mid1 th_tgt1>>) /\
-        (<<JOINED: forall loc ts, List.Forall (fun vw => semi_closed_view vw th_src1.(Thread.memory) loc ts) (views1 loc ts)>>) /\
-        (<<MEMWF: memory_times_wf times th_mid1.(Thread.memory)>>) /\
-        (<<MEMWFTGT: memory_times_wf times th_tgt1.(Thread.memory)>>) /\
+        (<<JOINED: forall loc ts, List.Forall (fun vw => semi_closed_view vw (Thread.memory th_src1) loc ts) (views1 loc ts)>>) /\
+        (<<MEMWF: memory_times_wf times (Thread.memory th_mid1)>>) /\
+        (<<MEMWFTGT: memory_times_wf times (Thread.memory th_tgt1)>>) /\
         (<<SILENT: List.Forall (fun lce => ThreadEvent.get_machine_event (snd lce) = MachineEvent.silent) tr_src>>)
   .
   Proof.
@@ -261,31 +261,31 @@ Section RECOVER.
   Lemma sim_thread_consistent
         views prom_self prom_others extra_self extra_others
         lang th_src th_mid th_tgt
-        (CONSISTENTTGT: past_consistent times th_src.(Thread.memory) th_tgt)
+        (CONSISTENTTGT: past_consistent times (Thread.memory th_src) th_tgt)
         (THREAD: @sim_thread_strong
                    views prom_self prom_others extra_self extra_others
                    lang th_src th_mid th_tgt)
-        (SCSRC: Memory.closed_timemap th_src.(Thread.sc) th_src.(Thread.memory))
-        (SCMID: Memory.closed_timemap th_mid.(Thread.sc) th_mid.(Thread.memory))
-        (SCTGT: Memory.closed_timemap th_tgt.(Thread.sc) th_tgt.(Thread.memory))
-        (MEMSRC: Memory.closed th_src.(Thread.memory))
-        (MEMMID: Memory.closed th_mid.(Thread.memory))
-        (MEMTGT: Memory.closed th_tgt.(Thread.memory))
-        (LOCALSRC: Local.wf th_src.(Thread.local) th_src.(Thread.memory))
-        (LOCALMID: Local.wf th_mid.(Thread.local) th_mid.(Thread.memory))
-        (LOCALTGT: Local.wf th_tgt.(Thread.local) th_tgt.(Thread.memory))
-        (MEMWF: memory_times_wf times th_mid.(Thread.memory))
-        (MEMWFTGT: memory_times_wf times th_tgt.(Thread.memory))
+        (SCSRC: Memory.closed_timemap (Thread.sc th_src) (Thread.memory th_src))
+        (SCMID: Memory.closed_timemap (Thread.sc th_mid) (Thread.memory th_mid))
+        (SCTGT: Memory.closed_timemap (Thread.sc th_tgt) (Thread.memory th_tgt))
+        (MEMSRC: Memory.closed (Thread.memory th_src))
+        (MEMMID: Memory.closed (Thread.memory th_mid))
+        (MEMTGT: Memory.closed (Thread.memory th_tgt))
+        (LOCALSRC: Local.wf (Thread.local th_src) (Thread.memory th_src))
+        (LOCALMID: Local.wf (Thread.local th_mid) (Thread.memory th_mid))
+        (LOCALTGT: Local.wf (Thread.local th_tgt) (Thread.memory th_tgt))
+        (MEMWF: memory_times_wf times (Thread.memory th_mid))
+        (MEMWFTGT: memory_times_wf times (Thread.memory th_tgt))
         (EXCLUSIVE: forall loc ts (OTHER: prom_others loc ts),
-            exists from msg, <<UNCH: unchangable th_src.(Thread.memory) th_src.(Thread.local).(Local.promises) loc ts from msg>>)
+            exists from msg, <<UNCH: unchangable (Thread.memory th_src) (Local.promises (Thread.local th_src)) loc ts from msg>>)
         (EXCLUSIVEEXTRA: forall loc ts from (OTHER: extra_others loc ts from),
-            (<<UNCH: unchangable th_src.(Thread.memory) th_src.(Thread.local).(Local.promises) loc ts from Message.reserve>>))
-        (EXCLUSIVE2: forall loc to (OTHER: prom_others loc to), ~ covered loc to th_mid.(Thread.local).(Local.promises))
-        (JOINED: forall loc ts, List.Forall (fun vw => semi_closed_view vw th_src.(Thread.memory) loc ts) (views loc ts))
+            (<<UNCH: unchangable (Thread.memory th_src) (Local.promises (Thread.local th_src)) loc ts from Message.reserve>>))
+        (EXCLUSIVE2: forall loc to (OTHER: prom_others loc to), ~ covered loc to (Local.promises (Thread.local th_mid)))
+        (JOINED: forall loc ts, List.Forall (fun vw => semi_closed_view vw (Thread.memory th_src) loc ts) (views loc ts))
 
         (REL: joined_released
-                views th_mid.(Thread.local).(Local.promises) th_mid.(Thread.local).(Local.tview).(TView.rel))
-        (JOINEDMEM: joined_memory views th_mid.(Thread.memory))
+                views (Local.promises (Thread.local th_mid)) (Local.tview (Thread.local th_mid)).(TView.rel))
+        (JOINEDMEM: joined_memory views (Thread.memory th_mid))
         (VIEWS: wf_views views)
     :
       Thread.consistent th_src.
@@ -393,7 +393,7 @@ Section RECOVER.
       { inv LOCALJOIN. erewrite <- jsim_joined_promises_covered in H; eauto.
         eapply EXCLUSIVE2; eauto.
       }
-      { inv H.  set (MEM0:=MEMPF.(sim_memory_contents) x0 x1).
+      { inv H.  set (MEM0:=(sim_memory_contents MEMPF) x0 x1).
         rewrite GET in *. inv MEM0; ss. eapply NPROM. left. auto.
       }
       { eapply EXCLUSIVE in PR. des. inv UNCH.
@@ -424,12 +424,12 @@ Section RECOVER.
       { des. ii. erewrite H in *. erewrite Memory.bot_get in *. ss. }
     }
     { ss. ii. exploit EXCLUSIVE; eauto. i. des. inv UNCH.
-      set (CNT:=MEM.(sim_memory_strong_contents) loc ts).
+      set (CNT:=(sim_memory_strong_contents MEM) loc ts).
       inv CNT; ss; try by (exfalso; eapply NPROM0; left; auto).
       symmetry in H0. eapply CAPSRCSTRONG in H0. esplits. econs; eauto. }
     { ss. ii. exploit EXCLUSIVEEXTRA; eauto. i. des. inv x.
-      set (CNT:=MEM.(sim_memory_strong_contents) loc ts).
-      exploit (MEM.(sim_memory_strong_wf) loc from ts).
+      set (CNT:=(sim_memory_strong_contents MEM) loc ts).
+      exploit ((sim_memory_strong_wf MEM) loc from ts).
       { left. auto. } i. des.
       inv CNT; ss; try by (exfalso; eapply NEXTRA; left; eauto).
       eapply UNIQUE in EXTRA. subst.
@@ -537,7 +537,7 @@ Section RECOVER.
         eapply JSim.sim_local_failure; eauto.
       }
       { right. esplits; eauto. ss. inv LOCAL.
-        cut (local.(Local.promises) = Memory.bot).
+        cut ((Local.promises local) = Memory.bot).
         { i. eapply bot_promises_map; eauto. erewrite <- H. eauto. }
         eapply JSim.sim_local_memory_bot in LOCALJOIN0; auto.
         inv LOCALPF0. ss.
@@ -635,9 +635,9 @@ Section RECOVER.
              (JOINED: forall loc ts, List.Forall (fun vw => semi_closed_view vw mem_src loc ts) (views loc ts))
 
              (EXCLUSIVE: forall loc' ts' (OTHER: prom_others loc' ts'),
-                 exists from msg, <<UNCH: unchangable mem_src lc_src.(Local.promises) loc' ts' from msg>>)
+                 exists from msg, <<UNCH: unchangable mem_src (Local.promises lc_src) loc' ts' from msg>>)
              (EXCLUSIVEEXTRA: forall loc' ts' from' (OTHER: extra_others loc' ts' from'),
-                 (<<UNCH: unchangable mem_src lc_src.(Local.promises) loc' ts' from' Message.reserve>>))
+                 (<<UNCH: unchangable mem_src (Local.promises lc_src) loc' ts' from' Message.reserve>>))
 
              (MWFSRC: Memory.closed mem_src)
              (MWFTGT: Memory.closed mem_mid)
@@ -653,8 +653,8 @@ Section RECOVER.
   .
   Proof.
     inv LOCAL.
-    set (MEM := MEMORY.(sim_memory_contents) loc to).
-    set (PROM := PROMS.(sim_promise_contents) loc to).
+    set (MEM := (sim_memory_contents MEMORY) loc to).
+    set (PROM := (sim_promise_contents PROMS) loc to).
     inv PROM; clarify; try by (exfalso; eapply NPROM; right; eauto).
     symmetry in H0. symmetry in H.
     dup H. eapply WFTGT in H1.
@@ -670,7 +670,7 @@ Section RECOVER.
       i. eapply memory_get_ts_strong in H0. des; clarify. timetac.
     }
 
-    exploit PROMS.(sim_promise_extra); eauto. i. des.
+    exploit (sim_promise_extra PROMS); eauto. i. des.
     exploit Memory.remove_exists; try apply GET. intros [prom_src1 REMOVEPROM1].
     exploit Memory.remove_exists_le; try apply REMOVEPROM1; eauto. intros [mem_src1 REMOVEMEM1].
     hexploit PreReserve.memory_remove_le_preserve; try apply MLE0; eauto. intros MLE1.
@@ -696,7 +696,7 @@ Section RECOVER.
         { eapply WF. eapply H0. }
         i. des.
         { subst. ss. destruct o; ss. }
-        { ss. set (MEM0:=MEMORY.(sim_memory_contents) loc to2).
+        { ss. set (MEM0:=(sim_memory_contents MEMORY) loc to2).
           rewrite GET2 in MEM0. inv MEM0.
           - exploit Memory.get_disjoint.
             { symmetry. eapply H5. }
@@ -785,12 +785,12 @@ Section RECOVER.
           erewrite (@Memory.remove_o prom_src1); eauto. des_ifs.
           + ss. des; clarify. exfalso. eapply NEXTRA; eauto.
           + ss. des; clarify.
-            set (PROM:=PROMS.(sim_promise_contents) loc to0).
+            set (PROM:=(sim_promise_contents PROMS) loc to0).
             inv PROM; clarify; try by (exfalso; eapply NEXTRA0; eauto).
             econs; eauto. ii. des; ss.
           + ss. des; clarify. erewrite H. econs 2; eauto. ii. des; clarify.
           + ss. guardH o. guardH o0.
-            set (PROM:=PROMS.(sim_promise_contents) loc0 ts). inv PROM; clarify.
+            set (PROM:=(sim_promise_contents PROMS) loc0 ts). inv PROM; clarify.
             * econs 1; eauto. ii. des; auto.
             * econs 2; eauto. ii. des; auto.
             * econs 3; eauto. ii. des; auto.
@@ -816,7 +816,7 @@ Section RECOVER.
           erewrite (@Memory.remove_o mem_src1); eauto. des_ifs.
           + ss. des; clarify. exfalso. eapply NSELF; eauto. right. auto.
           + ss. des; clarify.
-            set (MEM0:=MEMORY.(sim_memory_contents) loc to0). inv MEM0; ss.
+            set (MEM0:=(sim_memory_contents MEMORY) loc to0). inv MEM0; ss.
             * econs 1; eauto.
               { ii. eapply NPROM. unguard. destruct H2; des; auto. }
               { ii. destruct H2; ss. eapply NEXTRA0. left. eauto. }
@@ -835,7 +835,7 @@ Section RECOVER.
             * refl.
             * i. eapply eq_lb_time.
           + guardH o. guardH o0.
-            set (MEM0:=MEMORY.(sim_memory_contents) loc0 ts). inv MEM0; ss.
+            set (MEM0:=(sim_memory_contents MEMORY) loc0 ts). inv MEM0; ss.
             * econs 1; eauto. ii. eapply NPROM. unguard. destruct H2; des; auto.
             * econs 2; eauto. ii. eapply NPROM. unguard. destruct H2; des; auto.
             * econs 3; eauto. destruct PROM.
@@ -845,7 +845,7 @@ Section RECOVER.
         - i. des_ifs.
           + ss. des; clarify. destruct EXTRA0; ss.
             eapply EXCLUSIVEEXTRA in H2. inv H2. clarify.
-          + guardH o. dup EXTRA0. eapply MEMORY.(sim_memory_wf) in EXTRA0.
+          + guardH o. dup EXTRA0. eapply (sim_memory_wf MEMORY) in EXTRA0.
             des. splits; auto. destruct FORGET0.
             * left. auto.
             * right. splits; auto. ii. clarify. ss.
@@ -867,9 +867,9 @@ Section RECOVER.
           { eapply GET0. }
           i. des; clarify.
         }
-        set (PROM := PROMS.(sim_promise_contents) loc t).
+        set (PROM := (sim_promise_contents PROMS) loc t).
         inv PROM; try by (eapply NEXTRA1; eauto).
-        exploit MEMORY.(sim_memory_wf).
+        exploit (sim_memory_wf MEMORY).
         { right. eapply EXTRA. }
         i. des. exploit UNIQUE.
         { right. eapply H2. } i. clarify.
@@ -914,7 +914,7 @@ Section RECOVER.
           erewrite (@Memory.remove_o prom_src2); eauto.
           erewrite (@Memory.remove_o prom_src1); eauto. des_ifs.
           + ss. des; clarify.
-            set (PROM:=PROMS.(sim_promise_contents) loc to0).
+            set (PROM:=(sim_promise_contents PROMS) loc to0).
             rewrite GET in *. inv PROM; clarify.
             * econs 2; eauto. ii. des; clarify.
             * econs 3; eauto. ii. des; clarify.
@@ -922,7 +922,7 @@ Section RECOVER.
               eapply memory_get_ts_strong in H0. des; clarify. timetac.
           + ss. des; clarify. rewrite H. econs 2; eauto. ii. des; clarify.
           + ss. guardH o. guardH o0.
-            set (PROM:=PROMS.(sim_promise_contents) loc0 ts). inv PROM; clarify.
+            set (PROM:=(sim_promise_contents PROMS) loc0 ts). inv PROM; clarify.
             * econs 1; eauto. ii. des; auto.
             * econs 2; eauto. ii. des; auto.
             * econs 3; eauto. ii. des; auto.
@@ -942,7 +942,7 @@ Section RECOVER.
           erewrite (@Memory.remove_o mem_src2); eauto.
           erewrite (@Memory.remove_o mem_src1); eauto. des_ifs.
           + ss. des; clarify.
-            set (MEM0:=MEMORY.(sim_memory_contents) loc to0). inv MEM0; ss.
+            set (MEM0:=(sim_memory_contents MEMORY) loc to0). inv MEM0; ss.
             * eapply WF in GET. rewrite GET in *. clarify.
             * eapply WF in GET. rewrite GET in *. clarify.
               econs 2; eauto. ii. eapply NPROM. unguard. des; auto.
@@ -960,14 +960,14 @@ Section RECOVER.
             * refl.
             * i. eapply eq_lb_time.
           + guardH o. guardH o0.
-            set (MEM0:=MEMORY.(sim_memory_contents) loc0 ts). inv MEM0; ss.
+            set (MEM0:=(sim_memory_contents MEMORY) loc0 ts). inv MEM0; ss.
             * econs 1; eauto. ii. eapply NPROM. unguard. destruct H2; des; auto.
             * econs 2; eauto. ii. eapply NPROM. unguard. destruct H2; des; auto.
             * econs 3; eauto. destruct PROM.
               { left. auto. }
               { right. splits; auto. ii. destruct o0; des; clarify. }
             * econs 4; eauto. ii. eapply NPROM. unguard. destruct H2; des; auto.
-        - i. dup EXTRA. eapply MEMORY.(sim_memory_wf) in EXTRA.
+        - i. dup EXTRA. eapply (sim_memory_wf MEMORY) in EXTRA.
           des. splits; auto. destruct FORGET0.
           + left. auto.
           + right. splits; auto. ii. clarify.
@@ -986,14 +986,14 @@ Section RECOVER.
         (PROM: prom tid loc ts)
     :
       exists lang st lc_src from msg,
-        (<<TID: IdentMap.find tid c_src.(Configuration.threads) = Some (existT _ lang st, lc_src)>>) /\
-        (<<PROMISE: Memory.get loc ts lc_src.(Local.promises) = Some (from, msg)>>)
+        (<<TID: IdentMap.find tid (Configuration.threads c_src) = Some (existT _ lang st, lc_src)>>) /\
+        (<<PROMISE: Memory.get loc ts (Local.promises lc_src) = Some (from, msg)>>)
   .
   Proof.
-    destruct (IdentMap.find tid c_src.(Configuration.threads)) as
+    destruct (IdentMap.find tid (Configuration.threads c_src)) as
         [[[lang st] lc_src]|] eqn:TID.
     { inv SIM. specialize (THSPF tid). setoid_rewrite TID in THSPF. ss. des_ifs.
-      inv THSPF. inv LOCAL. set (CNT:=PROMS.(sim_promise_contents) loc ts).
+      inv THSPF. inv LOCAL. set (CNT:=(sim_promise_contents PROMS) loc ts).
       inv CNT; ss. esplits; eauto. }
     { exfalso. inv SIM. eapply BOT in TID. des. eapply PROM0; eauto. }
   Qed.
@@ -1006,16 +1006,16 @@ Section RECOVER.
         (PROM: extra tid loc ts from)
     :
       exists lang st lc_src,
-        (<<TID: IdentMap.find tid c_src.(Configuration.threads) = Some (existT _ lang st, lc_src)>>) /\
-        (<<PROMISE: Memory.get loc ts lc_src.(Local.promises) = Some (from, Message.reserve)>>)
+        (<<TID: IdentMap.find tid (Configuration.threads c_src) = Some (existT _ lang st, lc_src)>>) /\
+        (<<PROMISE: Memory.get loc ts (Local.promises lc_src) = Some (from, Message.reserve)>>)
   .
   Proof.
-    destruct (IdentMap.find tid c_src.(Configuration.threads)) as
+    destruct (IdentMap.find tid (Configuration.threads c_src)) as
         [[[lang st] lc_src]|] eqn:TID.
     { inv SIM. specialize (THSPF tid). setoid_rewrite TID in THSPF. ss. des_ifs.
-      inv THSPF. inv LOCAL. set (CNT:=PROMS.(sim_promise_contents) loc ts).
+      inv THSPF. inv LOCAL. set (CNT:=(sim_promise_contents PROMS) loc ts).
       inv CNT; try by (exfalso; eapply NEXTRA; eauto).
-      exploit (MEMPF.(sim_memory_wf) loc from ts); eauto. i. des.
+      exploit ((sim_memory_wf MEMPF) loc from ts); eauto. i. des.
       exploit (UNIQUE from0); eauto. i. subst. esplits; eauto. }
     { exfalso. inv SIM. eapply BOT in TID. des. eapply EXTRA; eauto. }
   Qed.
@@ -1025,12 +1025,12 @@ Section RECOVER.
         tid lang st lc_src
         (SIM: sim_configuration views prom extra proml c_src c_mid c_tgt)
         (WF_SRC: Configuration.wf c_src)
-        (TID: IdentMap.find tid c_src.(Configuration.threads) = Some (existT _ lang st, lc_src))
+        (TID: IdentMap.find tid (Configuration.threads c_src) = Some (existT _ lang st, lc_src))
     :
       forall loc ts
              (PROM: all_promises (fun tid' => tid <> tid') prom loc ts),
       exists (from : Time.t) (msg : Message.t),
-        (<<UNCH: unchangable c_src.(Configuration.memory) lc_src.(Local.promises) loc ts from msg>>).
+        (<<UNCH: unchangable (Configuration.memory c_src) (Local.promises lc_src) loc ts from msg>>).
   Proof.
     ii. dup WF_SRC. inv WF_SRC.
     inv PROM. exploit sim_configuration_forget_promise_exist; eauto. i. des.
@@ -1052,11 +1052,11 @@ Section RECOVER.
         tid lang st lc_src
         (SIM: sim_configuration views prom extra proml c_src c_mid c_tgt)
         (WF_SRC: Configuration.wf c_src)
-        (TID: IdentMap.find tid c_src.(Configuration.threads) = Some (existT _ lang st, lc_src))
+        (TID: IdentMap.find tid (Configuration.threads c_src) = Some (existT _ lang st, lc_src))
     :
       forall loc ts from
              (EXTRA: all_extra (fun tid' => tid <> tid') extra loc ts from),
-        (<<UNCH: unchangable c_src.(Configuration.memory) lc_src.(Local.promises) loc ts from Message.reserve>>).
+        (<<UNCH: unchangable (Configuration.memory c_src) (Local.promises lc_src) loc ts from Message.reserve>>).
   Proof.
     ii. dup WF_SRC. inv WF_SRC.
     inv EXTRA. exploit sim_configuration_extra_promise_exist; eauto. i. des.
@@ -1077,20 +1077,20 @@ Section RECOVER.
         (c_src c_mid c_tgt: Configuration.t)
         tid lang st lc_tgt
         (SIM: sim_configuration views prom extra proml c_src c_mid c_tgt)
-        (TIDTGT: IdentMap.find tid c_tgt.(Configuration.threads) = Some (existT _ lang st, lc_tgt))
+        (TIDTGT: IdentMap.find tid (Configuration.threads c_tgt) = Some (existT _ lang st, lc_tgt))
     :
       exists lc_src lc_mid,
-        (<<TIDSRC: IdentMap.find tid c_src.(Configuration.threads) = Some (existT _ lang st, lc_src)>>) /\
-        (<<TIDMID: IdentMap.find tid c_mid.(Configuration.threads) = Some (existT _ lang st, lc_mid)>>) /\
+        (<<TIDSRC: IdentMap.find tid (Configuration.threads c_src) = Some (existT _ lang st, lc_src)>>) /\
+        (<<TIDMID: IdentMap.find tid (Configuration.threads c_mid) = Some (existT _ lang st, lc_mid)>>) /\
         (<<SIM: sim_thread
                   views
                   (prom tid)
                   (all_promises (fun tid' => tid <> tid') prom)
                   (extra tid)
                   (all_extra (fun tid' => tid <> tid') extra)
-                  (Thread.mk _ st lc_src c_src.(Configuration.sc) c_src.(Configuration.memory))
-                  (Thread.mk _ st lc_mid c_mid.(Configuration.sc) c_mid.(Configuration.memory))
-                  (Thread.mk _ st lc_tgt c_tgt.(Configuration.sc) c_tgt.(Configuration.memory))>>).
+                  (Thread.mk _ st lc_src (Configuration.sc c_src) (Configuration.memory c_src))
+                  (Thread.mk _ st lc_mid (Configuration.sc c_mid) (Configuration.memory c_mid))
+                  (Thread.mk _ st lc_tgt (Configuration.sc c_tgt) (Configuration.memory c_tgt))>>).
   Proof.
     inv SIM. ss.
     specialize (THSJOIN tid). specialize (THSPF tid).
@@ -1232,7 +1232,7 @@ Section RECOVER.
       specialize (THSPF tid0). unfold option_rel in THSPF. des_ifs.
       2: { exfalso. eapply BOT in Heq. des. eapply PROM; eauto. }
       inv THSPF. inv LOCAL0.
-      set (PROM:=PROMS0.(sim_promise_contents) loc0 to). inv PROM; clarify.
+      set (PROM:=(sim_promise_contents PROMS0) loc0 to). inv PROM; clarify.
       destruct st0 as [lang0 st0].
       inv WFMID. inv WF. ss. inv WF1. exploit DISJOINT; eauto. i.
       inv H0. inv x. inv DISJOINT0. hexploit DISJOINT1; eauto. i. des.
@@ -1416,7 +1416,7 @@ Section RECOVER.
   Proof.
     assert (exists (pl: list (Ident.t * Loc.t * Time.t)),
                forall tid loc to (PROM: prom tid loc to), List.In (tid, loc, to) pl).
-    { set (tids := List.map fst (IdentMap.elements c_tgt.(Configuration.threads))).
+    { set (tids := List.map fst (IdentMap.elements (Configuration.threads c_tgt))).
       set (promls := List.map (fun tid => List.map (fun locts => (tid, fst locts, snd locts)) (proml tid)) tids).
       exists (concat promls). i.
       inv SIM. destruct (IdentMap.find tid ths_tgt) as [[[lang st] lc]|] eqn:TID.
@@ -1451,7 +1451,7 @@ Section RECOVER.
           extensionality tid. extensionality loc. extensionality from. extensionality ts.
           apply Coq.Logic.PropExtensionality.propositional_extensionality.
           split; i; ss.
-          inv SIM. exploit (MEMPF.(sim_memory_wf)).
+          inv SIM. exploit ((sim_memory_wf MEMPF)).
           { econs; eauto. }
           i. des. inv FORGET. ss.
         }
@@ -1473,7 +1473,7 @@ Section RECOVER.
       prom_src = prom_tgt.
   Proof.
     eapply Memory.ext. i.
-    set (PROM:=SIM.(sim_promise_strong_contents) loc ts). inv PROM; auto.
+    set (PROM:=(sim_promise_strong_contents SIM) loc ts). inv PROM; auto.
     { des; clarify. }
     { des; clarify. }
     { des; clarify. }
@@ -1681,8 +1681,8 @@ Section RECOVER.
         (<<STEPS: rtc Configuration.tau_step c_src c_src'>>) /\
         (<<SIM: sim_configuration_strong (fun _ => false) views c_src' c_mid c_tgt>>).
   Proof.
-    set (tidl := List.map fst (IdentMap.elements c_src.(Configuration.threads))).
-    set (tids := fun tid => match IdentMap.find tid c_src.(Configuration.threads) with
+    set (tidl := List.map fst (IdentMap.elements (Configuration.threads c_src))).
+    set (tids := fun tid => match IdentMap.find tid (Configuration.threads c_src) with
                             | Some _ => true
                             | None => false
                             end).
@@ -1692,7 +1692,7 @@ Section RECOVER.
         unfold tids in Heq. ss. unfold option_rel. des_ifs.
         clear - Heq0 Heq2. setoid_rewrite Heq0 in Heq2. clarify. }
       { clear - MEMPF. econs.
-        - i. set (MEM:=MEMPF.(sim_memory_contents) loc ts). inv MEM.
+        - i. set (MEM:=(sim_memory_contents MEMPF) loc ts). inv MEM.
           + econs 1; ss.
           + econs 2; ss.
           + inv PROM. ss.
@@ -1723,7 +1723,7 @@ Section RECOVER.
       { eauto. }
       { inv SIM. replace ths_mid with ths_src in *.
         { econs; eauto. ii.
-          set (MEM:=MEMPF.(sim_memory_contents) loc to). inv MEM; ss.
+          set (MEM:=(sim_memory_contents MEMPF) loc to). inv MEM; ss.
         }
         { eapply IdentMap.eq_leibniz. ii.
           specialize (THSPF y). unfold option_rel in THSPF. des_ifs.

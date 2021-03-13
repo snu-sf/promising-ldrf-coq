@@ -54,9 +54,9 @@ Lemma step_not_cancel_covered_increase lang (th0 th1: Thread.t lang) pf e
       (STEP: Thread.step pf e th0 th1)
       (NOTCANCEL: ~ ThreadEvent.is_cancel e)
       loc0 ts0
-      (COVERED: covered loc0 ts0 th0.(Thread.memory))
+      (COVERED: covered loc0 ts0 (Thread.memory th0))
   :
-    covered loc0 ts0 th1.(Thread.memory).
+    covered loc0 ts0 (Thread.memory th1).
 Proof.
   inv STEP.
   { inv STEP0. inv LOCAL. ss.
@@ -75,9 +75,9 @@ Lemma traced_steps_not_cancel_covered_increase lang (th0 th1: Thread.t lang) tr
       (STEPS: Trace.steps tr th0 th1)
       (EVENTS: List.Forall (fun em => <<SAT: (fun e => ~ ThreadEvent.is_cancel e) (snd em)>>) tr)
       loc0 ts0
-      (COVERED: covered loc0 ts0 th0.(Thread.memory))
+      (COVERED: covered loc0 ts0 (Thread.memory th0))
   :
-    covered loc0 ts0 th1.(Thread.memory).
+    covered loc0 ts0 (Thread.memory th1).
 Proof.
   ginduction STEPS; auto. i. clarify. inv EVENTS.
   eapply step_not_cancel_covered_increase in STEP; eauto.
@@ -493,13 +493,13 @@ Lemma step_needed_spaces lang (th0 th1: Thread.t lang) pf e
       (NOTCANCEL: ~ ThreadEvent.is_cancel e)
       (WFTIME: wf_time_evt times e)
   :
-    ((<<ALREADY: write_not_in (fun loc0 ts0 => ~ covered loc0 ts0 th0.(Thread.memory)) e>>) /\
-     (<<COVERED: forall loc ts, covered loc ts th1.(Thread.memory) <-> covered loc ts th0.(Thread.memory)>>))
+    ((<<ALREADY: write_not_in (fun loc0 ts0 => ~ covered loc0 ts0 (Thread.memory th0)) e>>) /\
+     (<<COVERED: forall loc ts, covered loc ts (Thread.memory th1) <-> covered loc ts (Thread.memory th0)>>))
     \/
     exists loc from to,
-      (<<NEW: forall ts (ITV: Interval.mem (from, to) ts), ~ covered loc ts th0.(Thread.memory)>>) /\
+      (<<NEW: forall ts (ITV: Interval.mem (from, to) ts), ~ covered loc ts (Thread.memory th0)>>) /\
       (<<COVERED: forall loc0 ts0,
-          covered loc0 ts0 th1.(Thread.memory) <-> covered loc0 ts0 th0.(Thread.memory) \/ (loc0 = loc /\ Interval.mem (from, to) ts0)>>) /\
+          covered loc0 ts0 (Thread.memory th1) <-> covered loc0 ts0 (Thread.memory th0) \/ (loc0 = loc /\ Interval.mem (from, to) ts0)>>) /\
       (<<WF: Time.lt from to>>) /\
       (<<TIMES: times loc from /\ times loc to>>) /\
       (<<EVENT: write_not_in (fun loc0 ts0 => ~ (loc0 = loc /\ Interval.mem (from, to) ts0)) e>>).
@@ -610,11 +610,11 @@ Lemma traced_steps_needed_spaces lang (th0 th1: Thread.t lang) tr
   :
     exists l,
       (<<WRITENOTIN:
-         List.Forall (fun em => <<SAT: write_not_in (fun loc ts => ~ (covered loc ts th0.(Thread.memory) \/ intervals_sum l loc ts)) (snd em)>>) tr>>) /\
+         List.Forall (fun em => <<SAT: write_not_in (fun loc ts => ~ (covered loc ts (Thread.memory th0) \/ intervals_sum l loc ts)) (snd em)>>) tr>>) /\
       (<<DISJOINT: disjoint_intervals l>>) /\
-      (<<NITV: forall loc ts (ITV: intervals_sum l loc ts), ~ covered loc ts th0.(Thread.memory)>>) /\
+      (<<NITV: forall loc ts (ITV: intervals_sum l loc ts), ~ covered loc ts (Thread.memory th0)>>) /\
       (<<COVERED: forall loc ts,
-          covered loc ts th1.(Thread.memory) <-> covered loc ts th0.(Thread.memory) \/ intervals_sum l loc ts>>) /\
+          covered loc ts (Thread.memory th1) <-> covered loc ts (Thread.memory th0) \/ intervals_sum l loc ts>>) /\
       (<<TIMES: List.Forall (fun locitv =>
                                times (fst locitv) (fst (snd locitv)) /\
                                times (fst locitv) (snd (snd locitv))) l>>)
@@ -655,17 +655,17 @@ Qed.
 Lemma reserve_empty_intervals times lang (th: Thread.t lang) l
       (DISJOINT: disjoint_intervals l)
       (NITV: forall loc ts (ITV: intervals_sum l loc ts),
-          ~ covered loc ts th.(Thread.memory))
-      (MLE: Memory.le th.(Thread.local).(Local.promises) th.(Thread.memory))
+          ~ covered loc ts (Thread.memory th))
+      (MLE: Memory.le (Local.promises (Thread.local th)) (Thread.memory th))
       (TIMES: List.Forall (fun locitv =>
                              times (fst locitv) (fst (snd locitv)) /\
                              times (fst locitv) (snd (snd locitv))) l)
   :
     exists tr prom' mem',
-      (<<STEPS: Trace.steps tr th (Thread.mk _ th.(Thread.state) (Local.mk th.(Thread.local).(Local.tview) prom') th.(Thread.sc) mem')>>) /\
+      (<<STEPS: Trace.steps tr th (Thread.mk _ (Thread.state th) (Local.mk (Local.tview (Thread.local th)) prom') (Thread.sc th) mem')>>) /\
       (<<RESERVETRACE: List.Forall (fun em => <<SAT: (ThreadEvent.is_reserve /1\ wf_time_evt times) (snd em)>>) tr>>) /\
-      (<<ADDEDPROM: reservations_added l th.(Thread.local).(Local.promises) prom'>>) /\
-      (<<ADDEDMEM: reservations_added l th.(Thread.memory) mem'>>)
+      (<<ADDEDPROM: reservations_added l (Local.promises (Thread.local th)) prom'>>) /\
+      (<<ADDEDMEM: reservations_added l (Thread.memory th) mem'>>)
 .
 Proof.
   ginduction l; i.
@@ -674,18 +674,18 @@ Proof.
     { econs. }
   }
   { inv DISJOINT. inv TIMES. ss.
-    exploit (@Memory.add_exists th.(Thread.memory) loc from to Message.reserve); eauto.
+    exploit (@Memory.add_exists (Thread.memory th) loc from to Message.reserve); eauto.
     { ii. eapply NITV.
       { left. eauto. }
       { econs; eauto. }
     }
     { econs. }
     intros [mem MEM].
-    exploit (@Memory.add_exists_le th.(Thread.local).(Local.promises) th.(Thread.memory)); eauto.
+    exploit (@Memory.add_exists_le (Local.promises (Thread.local th)) (Thread.memory th)); eauto.
     intros [prom PROM].
-    assert (STEP: Thread.step false (ThreadEvent.promise loc from to Message.reserve Memory.op_kind_add) th (Thread.mk _ th.(Thread.state) (Local.mk th.(Thread.local).(Local.tview) prom) th.(Thread.sc) mem)).
+    assert (STEP: Thread.step false (ThreadEvent.promise loc from to Message.reserve Memory.op_kind_add) th (Thread.mk _ (Thread.state th) (Local.mk (Local.tview (Thread.local th)) prom) (Thread.sc th) mem)).
     { destruct th. ss. econs. econs; ss. econs; ss. econs; ss. }
-    exploit (@IHl times lang (Thread.mk _ th.(Thread.state) (Local.mk th.(Thread.local).(Local.tview) prom) th.(Thread.sc) mem)); eauto; ss.
+    exploit (@IHl times lang (Thread.mk _ (Thread.state th) (Local.mk (Local.tview (Thread.local th)) prom) (Thread.sc th) mem)); eauto; ss.
     { i. erewrite add_covered; eauto. ii. des; subst.
       { eapply NITV; eauto. }
       { eapply NITV0; eauto. }
@@ -743,7 +743,7 @@ Proof.
 Qed.
 
 Lemma cancel_reservations_added times l prom lang lc
-      (ADDEDPROM: reservations_added l prom lc.(Local.promises))
+      (ADDEDPROM: reservations_added l prom (Local.promises lc))
       (TIMES: List.Forall (fun locitv =>
                              times (fst locitv) (fst (snd locitv)) /\
                              times (fst locitv) (snd (snd locitv))) l)
@@ -752,9 +752,9 @@ Lemma cancel_reservations_added times l prom lang lc
       (<<CANCELTRACE: List.Forall (fun em => <<SAT: (ThreadEvent.is_cancel /1\ wf_time_evt times) (snd em)>>) tr>>) /\
     forall
       (st: Language.state lang) sc mem
-      (MLE: Memory.le lc.(Local.promises) mem),
+      (MLE: Memory.le (Local.promises lc) mem),
     exists mem',
-      (<<STEPS: Trace.steps tr (Thread.mk _ st lc sc mem) (Thread.mk _ st (Local.mk lc.(Local.tview) prom) sc mem')>>) /\
+      (<<STEPS: Trace.steps tr (Thread.mk _ st lc sc mem) (Thread.mk _ st (Local.mk (Local.tview lc) prom) sc mem')>>) /\
       (<<ADDEDMEM: reservations_added l mem' mem>>)
 .
 Proof.
@@ -762,7 +762,7 @@ Proof.
   { exists []. splits; ss. i. destruct lc. ss. inv ADDEDPROM. esplits; eauto. econs. }
   { inv TIMES. inv ADDEDPROM.
     exploit IHl; eauto. i. des.
-    eexists (tr++[(Local.mk lc.(Local.tview) mem1, ThreadEvent.promise loc from to Message.reserve Memory.op_kind_cancel)]).
+    eexists (tr++[(Local.mk (Local.tview lc) mem1, ThreadEvent.promise loc from to Message.reserve Memory.op_kind_cancel)]).
     splits.
     { eapply Forall_app; eauto. econs; ss. }
     i. exploit (x0 st sc mem); eauto. i. des.
@@ -900,15 +900,15 @@ Lemma reserve_write_tos times lang (th: Thread.t lang) tos
           exists ts',
             (<<TIMES: times loc ts'>>) /\
             (<<TS: Time.lt ts ts'>>))
-      (MWF: memory_times_wf times th.(Thread.memory))
-      (MLE: Memory.le th.(Thread.local).(Local.promises) th.(Thread.memory))
+      (MWF: memory_times_wf times (Thread.memory th))
+      (MLE: Memory.le (Local.promises (Thread.local th)) (Thread.memory th))
       (TIMES: List.Forall (fun locts => times (fst locts) (snd locts)) tos)
   :
     exists l tr prom' mem',
-      (<<STEPS: Trace.steps tr th (Thread.mk _ th.(Thread.state) (Local.mk th.(Thread.local).(Local.tview) prom') th.(Thread.sc) mem')>>) /\
+      (<<STEPS: Trace.steps tr th (Thread.mk _ (Thread.state th) (Local.mk (Local.tview (Thread.local th)) prom') (Thread.sc th) mem')>>) /\
       (<<RESERVETRACE: List.Forall (fun em => <<SAT: (ThreadEvent.is_reserve /1\ wf_time_evt times) (snd em)>>) tr>>) /\
-      (<<ADDEDPROM: reservations_added l th.(Thread.local).(Local.promises) prom'>>) /\
-      (<<ADDEDMEM: reservations_added l th.(Thread.memory) mem'>>) /\
+      (<<ADDEDPROM: reservations_added l (Local.promises (Thread.local th)) prom'>>) /\
+      (<<ADDEDMEM: reservations_added l (Thread.memory th) mem'>>) /\
       (<<WRITETO: forall loc ts (IN: List.In (loc, ts) tos),
           unattachable mem' loc ts>>) /\
       (<<TIMES: List.Forall (fun locitv =>
@@ -1170,13 +1170,13 @@ Qed.
 Lemma step_eventable_time lang (th0 th1: Thread.t lang) pf e
       (spaces: Loc.t -> Time.t -> Prop)
       (STEP: Thread.step pf e th0 th1)
-      (WRITENOTIN: write_not_in (fun loc ts => ~ (spaces loc ts \/ covered loc ts th0.(Thread.memory))) e)
-      (CLOSED: Memory.closed th0.(Thread.memory))
+      (WRITENOTIN: write_not_in (fun loc ts => ~ (spaces loc ts \/ covered loc ts (Thread.memory th0))) e)
+      (CLOSED: Memory.closed (Thread.memory th0))
   :
-    (<<INCR: eventable th1.(Thread.memory) th1.(Thread.local).(Local.promises) spaces <2= eventable th0.(Thread.memory) th0.(Thread.local).(Local.promises) spaces>>) /\
+    (<<INCR: eventable (Thread.memory th1) (Local.promises (Thread.local th1)) spaces <2= eventable (Thread.memory th0) (Local.promises (Thread.local th0)) spaces>>) /\
     (<<TIMES: tevent_map_weak
                 (fun loc ts fts => ts = fts /\
-                                   eventable_below th0.(Thread.memory) th0.(Thread.local).(Local.promises) spaces loc ts) e e>>).
+                                   eventable_below (Thread.memory th0) (Local.promises (Thread.local th0)) spaces loc ts) e e>>).
 Proof.
   inv STEP.
   { inv STEP0; ss. inv LOCAL.
@@ -1216,15 +1216,15 @@ Qed.
 Lemma traced_steps_eventable_time_normal lang (th0 th1: Thread.t lang) tr
       (spaces: Loc.t -> Time.t -> Prop)
       (STEPS: Trace.steps tr th0 th1)
-      (WRITENOTIN: List.Forall (fun em => (write_not_in (fun loc ts => ~ (spaces loc ts \/ covered loc ts th0.(Thread.memory))) /1\ (fun e => ~ ThreadEvent.is_cancel e)) (snd em)) tr)
-      (MEM: Memory.closed th0.(Thread.memory))
-      (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
-      (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
+      (WRITENOTIN: List.Forall (fun em => (write_not_in (fun loc ts => ~ (spaces loc ts \/ covered loc ts (Thread.memory th0))) /1\ (fun e => ~ ThreadEvent.is_cancel e)) (snd em)) tr)
+      (MEM: Memory.closed (Thread.memory th0))
+      (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
+      (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
   :
-    (<<INCR: eventable th1.(Thread.memory) th1.(Thread.local).(Local.promises) spaces <2= eventable th0.(Thread.memory) th0.(Thread.local).(Local.promises) spaces>>) /\
+    (<<INCR: eventable (Thread.memory th1) (Local.promises (Thread.local th1)) spaces <2= eventable (Thread.memory th0) (Local.promises (Thread.local th0)) spaces>>) /\
     (<<TIMES: List.Forall2
                 (fun em fem =>
-                   tevent_map_weak (fun loc ts fts => ts = fts /\ eventable_below th0.(Thread.memory) th0.(Thread.local).(Local.promises) spaces loc ts)
+                   tevent_map_weak (fun loc ts fts => ts = fts /\ eventable_below (Thread.memory th0) (Local.promises (Thread.local th0)) spaces loc ts)
                                    (snd fem) (snd em)) tr tr>>).
 Proof.
   ginduction STEPS.
@@ -1250,14 +1250,14 @@ Lemma traced_steps_eventable_time_cancel lang (th0 th1: Thread.t lang) tr
       (spaces: Loc.t -> Time.t -> Prop)
       (STEPS: Trace.steps tr th0 th1)
       (WRITENOTIN: List.Forall (fun em => ThreadEvent.is_cancel (snd em)) tr)
-      (MEM: Memory.closed th0.(Thread.memory))
-      (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
-      (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
+      (MEM: Memory.closed (Thread.memory th0))
+      (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
+      (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
   :
-    (<<INCR: eventable th1.(Thread.memory) th1.(Thread.local).(Local.promises) spaces <2= eventable th0.(Thread.memory) th0.(Thread.local).(Local.promises) spaces>>) /\
+    (<<INCR: eventable (Thread.memory th1) (Local.promises (Thread.local th1)) spaces <2= eventable (Thread.memory th0) (Local.promises (Thread.local th0)) spaces>>) /\
     (<<TIMES: List.Forall2
                 (fun em fem =>
-                   tevent_map_weak (fun loc ts fts => ts = fts /\ eventable_below th0.(Thread.memory) th0.(Thread.local).(Local.promises) spaces loc ts)
+                   tevent_map_weak (fun loc ts fts => ts = fts /\ eventable_below (Thread.memory th0) (Local.promises (Thread.local th0)) spaces loc ts)
                                    (snd fem) (snd em)) tr tr>>).
 Proof.
   ginduction STEPS.
@@ -1332,7 +1332,7 @@ Lemma can_reserve_all_needed times
               Trace.steps tr (Thread.mk lang st0 lc0 sc0 cap0) (Thread.mk lang st1 lc1 sc1 cap1)>>) /\
            (<<RESERVEMEM: reservations_added reserves cap0 cap0'>>)>>) /\
       (<<TIMES: forall max
-                       (MAX: concrete_promise_max_timemap mem0' lc0'.(Local.promises) max),
+                       (MAX: concrete_promise_max_timemap mem0' (Local.promises lc0') max),
           List.Forall2
             (fun em fem =>
                tevent_map_weak (fun loc ts fts => ts = fts /\ Time.le ts (max loc))
@@ -1362,7 +1362,7 @@ Proof.
   assert (ADDEDMEMALL: reservations_added (l ++ l0) mem0 mem'0).
   { eapply reservations_added_trans; eauto. }
   hexploit cancel_reservations_added.
-  { instantiate (1:=Local.mk lc0.(Local.tview) prom'0). eapply ADDEDPROMALL. }
+  { instantiate (1:=Local.mk (Local.tview lc0) prom'0). eapply ADDEDPROMALL. }
   { eapply Forall_app; eauto. }
   i. des.
   assert (CAP: forall cap0'

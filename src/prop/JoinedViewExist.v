@@ -126,15 +126,15 @@ Definition get_released_view_fun (c: Configuration.t) (f: Loc.t -> Time.t -> opt
     match (f loc to) with
     | None =>
       forall tid st lc from val released
-             (THREAD: IdentMap.find tid c.(Configuration.threads) = Some (st, lc))
-             (GET: Memory.get loc to lc.(Local.promises) = Some (from, Message.concrete val (Some released))),
+             (THREAD: IdentMap.find tid (Configuration.threads c) = Some (st, lc))
+             (GET: Memory.get loc to (Local.promises lc) = Some (from, Message.concrete val (Some released))),
         False
     | Some releasedvw =>
       exists tid st lc from val released,
-      (<<THREAD: IdentMap.find tid c.(Configuration.threads) = Some (st, lc)>>) /\
-      (<<GET: Memory.get loc to lc.(Local.promises) = Some (from, Message.concrete val (Some released))>>) /\
-      (<<RELEASED: releasedvw = View.join (lc.(Local.tview).(TView.rel) loc) (View.singleton_ur loc to)>>) /\
-      (<<CLOSED: Memory.closed_view releasedvw c.(Configuration.memory)>>) /\
+      (<<THREAD: IdentMap.find tid (Configuration.threads c) = Some (st, lc)>>) /\
+      (<<GET: Memory.get loc to (Local.promises lc) = Some (from, Message.concrete val (Some released))>>) /\
+      (<<RELEASED: releasedvw = View.join ((TView.rel (Local.tview lc)) loc) (View.singleton_ur loc to)>>) /\
+      (<<CLOSED: Memory.closed_view releasedvw (Configuration.memory c)>>) /\
       (<<WF: View.wf releasedvw>>)
     end.
 
@@ -227,15 +227,15 @@ Proof.
                       forall to, match (floc to) with
                                  | None =>
                                    forall tid st lc from val released
-                                          (THREAD: IdentMap.find tid c.(Configuration.threads) = Some (st, lc))
-                                          (GET: Memory.get loc to lc.(Local.promises) = Some (from, Message.concrete val (Some released))),
+                                          (THREAD: IdentMap.find tid (Configuration.threads c) = Some (st, lc))
+                                          (GET: Memory.get loc to (Local.promises lc) = Some (from, Message.concrete val (Some released))),
                                      False
                                  | Some releasedvw =>
                                    exists tid st lc from val released,
-                                   (<<THREAD: IdentMap.find tid c.(Configuration.threads) = Some (st, lc)>>) /\
-                                   (<<GET: Memory.get loc to lc.(Local.promises) = Some (from, Message.concrete val (Some released))>>) /\
-                                   (<<RELEASED: releasedvw = View.join (lc.(Local.tview).(TView.rel) loc) (View.singleton_ur loc to)>>) /\
-                                   (<<CLOSED: Memory.closed_view releasedvw c.(Configuration.memory)>>) /\
+                                   (<<THREAD: IdentMap.find tid (Configuration.threads c) = Some (st, lc)>>) /\
+                                   (<<GET: Memory.get loc to (Local.promises lc) = Some (from, Message.concrete val (Some released))>>) /\
+                                   (<<RELEASED: releasedvw = View.join ((TView.rel (Local.tview lc)) loc) (View.singleton_ur loc to)>>) /\
+                                   (<<CLOSED: Memory.closed_view releasedvw (Configuration.memory c)>>) /\
                                    (<<WF: View.wf releasedvw>>)
                                  end)).
     intros loc.
@@ -243,22 +243,22 @@ Proof.
                       match releasedvw with
                       | None =>
                         forall tid st lc from val released
-                               (THREAD: IdentMap.find tid c.(Configuration.threads) = Some (st, lc))
-                               (GET: Memory.get loc to lc.(Local.promises) = Some (from, Message.concrete val (Some released))),
+                               (THREAD: IdentMap.find tid (Configuration.threads c) = Some (st, lc))
+                               (GET: Memory.get loc to (Local.promises lc) = Some (from, Message.concrete val (Some released))),
                           False
                       | Some releasedvw =>
                         exists tid st lc from val released,
-                        (<<THREAD: IdentMap.find tid c.(Configuration.threads) = Some (st, lc)>>) /\
-                        (<<GET: Memory.get loc to lc.(Local.promises) = Some (from, Message.concrete val (Some released))>>) /\
-                        (<<RELEASED: releasedvw = View.join (lc.(Local.tview).(TView.rel) loc) (View.singleton_ur loc to)>>) /\
-                        (<<CLOSED: Memory.closed_view releasedvw c.(Configuration.memory)>>) /\
+                        (<<THREAD: IdentMap.find tid (Configuration.threads c) = Some (st, lc)>>) /\
+                        (<<GET: Memory.get loc to (Local.promises lc) = Some (from, Message.concrete val (Some released))>>) /\
+                        (<<RELEASED: releasedvw = View.join ((TView.rel (Local.tview lc)) loc) (View.singleton_ur loc to)>>) /\
+                        (<<CLOSED: Memory.closed_view releasedvw (Configuration.memory c)>>) /\
                         (<<WF: View.wf releasedvw>>)
                       end)).
     intros to.
     destruct (classic (exists tid st lc from val released,
-                          (<<THRAED: IdentMap.find tid c.(Configuration.threads) = Some (st, lc)>>) /\
-                          (<<GET: Memory.get loc to lc.(Local.promises) = Some (from, Message.concrete val (Some released))>>))).
-    { des. exists (Some (View.join (lc.(Local.tview).(TView.rel) loc) (View.singleton_ur loc to))). esplits; eauto.
+                          (<<THRAED: IdentMap.find tid (Configuration.threads c) = Some (st, lc)>>) /\
+                          (<<GET: Memory.get loc to (Local.promises lc) = Some (from, Message.concrete val (Some released))>>))).
+    { des. exists (Some (View.join ((TView.rel (Local.tview lc)) loc) (View.singleton_ur loc to))). esplits; eauto.
       - destruct st. eapply Memory.join_closed_view.
         + eapply WF; eauto.
         + eapply WF in GET; eauto. eapply Memory.singleton_ur_closed_view; eauto.

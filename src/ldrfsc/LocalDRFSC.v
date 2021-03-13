@@ -142,12 +142,12 @@ Section SIM.
         pf e lang (e0 e1: Thread.t lang) fe0
         (THREAD: thread_map ident_map e0 fe0)
         (STEP: SCThread.step L pf e e0 e1)
-        (LOCAL: Local.wf e0.(Thread.local) e0.(Thread.memory))
-        (FLOCAL: Local.wf fe0.(Thread.local) fe0.(Thread.memory))
-        (MEMORY: Memory.closed e0.(Thread.memory))
-        (FMEMORY: Memory.closed fe0.(Thread.memory))
-        (SC: Memory.closed_timemap e0.(Thread.sc) e0.(Thread.memory))
-        (FSC: Memory.closed_timemap fe0.(Thread.sc) fe0.(Thread.memory))
+        (LOCAL: Local.wf (Thread.local e0) (Thread.memory e0))
+        (FLOCAL: Local.wf (Thread.local fe0) (Thread.memory fe0))
+        (MEMORY: Memory.closed (Thread.memory e0))
+        (FMEMORY: Memory.closed (Thread.memory fe0))
+        (SC: Memory.closed_timemap (Thread.sc e0) (Thread.memory e0))
+        (FSC: Memory.closed_timemap (Thread.sc fe0) (Thread.memory fe0))
     :
       (exists fe fe1,
           (<<THREAD: thread_map ident_map e1 fe1>>) /\
@@ -298,12 +298,12 @@ Section SIM.
         lang (e0 e1: Thread.t lang) fe0
         (THREAD: thread_map ident_map e0 fe0)
         (STEPS: rtc (SCThread.tau_step L) e0 e1)
-        (LOCAL: Local.wf e0.(Thread.local) e0.(Thread.memory))
-        (FLOCAL: Local.wf fe0.(Thread.local) fe0.(Thread.memory))
-        (MEMORY: Memory.closed e0.(Thread.memory))
-        (FMEMORY: Memory.closed fe0.(Thread.memory))
-        (SC: Memory.closed_timemap e0.(Thread.sc) e0.(Thread.memory))
-        (FSC: Memory.closed_timemap fe0.(Thread.sc) fe0.(Thread.memory))
+        (LOCAL: Local.wf (Thread.local e0) (Thread.memory e0))
+        (FLOCAL: Local.wf (Thread.local fe0) (Thread.memory fe0))
+        (MEMORY: Memory.closed (Thread.memory e0))
+        (FMEMORY: Memory.closed (Thread.memory fe0))
+        (SC: Memory.closed_timemap (Thread.sc e0) (Thread.memory e0))
+        (FSC: Memory.closed_timemap (Thread.sc fe0) (Thread.memory fe0))
     :
       (exists fe1,
           (<<THREAD: thread_map ident_map e1 fe1>>) /\
@@ -333,24 +333,24 @@ Section SIM.
 
   Lemma cap_race_current_race
         lang (e0 e1: Thread.t lang) cap max
-        (CAP: Memory.cap e0.(Thread.memory) cap)
+        (CAP: Memory.cap (Thread.memory e0) cap)
         (MAX: Memory.max_concrete_timemap cap max)
-        (STEPS: rtc (SCThread.tau_step L) (Thread.mk _ e0.(Thread.state) e0.(Thread.local) max cap) e1)
-        (LOCAL: Local.wf e0.(Thread.local) e0.(Thread.memory))
-        (MEMORY: Memory.closed e0.(Thread.memory))
-        (SC: Memory.closed_timemap e0.(Thread.sc) e0.(Thread.memory))
-        (CONSISTENT: Local.promise_consistent e1.(Thread.local))
+        (STEPS: rtc (SCThread.tau_step L) (Thread.mk _ (Thread.state e0) (Thread.local e0) max cap) e1)
+        (LOCAL: Local.wf (Thread.local e0) (Thread.memory e0))
+        (MEMORY: Memory.closed (Thread.memory e0))
+        (SC: Memory.closed_timemap (Thread.sc e0) (Thread.memory e0))
+        (CONSISTENT: Local.promise_consistent (Thread.local e1))
         (RACE: SCRace.race L e1)
     :
       exists e2,
         (<<STEPS: rtc (SCThread.tau_step L) e0 e2>>) /\
-        (<<CONSISTENT: Local.promise_consistent e2.(Thread.local)>>) /\
+        (<<CONSISTENT: Local.promise_consistent (Thread.local e2)>>) /\
         (<<RACE: SCRace.race L e2>>).
   Proof.
     exploit cap_tau_steps_current_tau_steps.
     { econs.
       { eapply ident_map_local. }
-      { instantiate (1:=e0.(Thread.memory)). instantiate (1:=cap). econs.
+      { instantiate (1:=(Thread.memory e0)). instantiate (1:=cap). econs.
         - i. eapply Memory.cap_inv in GET; eauto. des; clarify; auto.
           right. exists to, from, msg, msg.
           esplits; eauto; try refl. eapply ident_map_message.
@@ -360,7 +360,7 @@ Section SIM.
       }
       { eapply mapping_map_lt_collapsable_unwritable. eapply ident_map_lt. }
       { eapply ident_map_timemap. }
-      { instantiate (1:=max). instantiate (1:=e0.(Thread.sc)).
+      { instantiate (1:=max). instantiate (1:=(Thread.sc e0)).
         eapply Memory.max_concrete_timemap_spec; eauto.
         eapply Memory.cap_closed_timemap; eauto. }
     }
@@ -384,7 +384,7 @@ Section SIM.
         { eauto. }
         { refl. }
       + eapply sc_race_map; eauto. eapply ident_map_lt.
-    - assert (CONSISTENT0: Local.promise_consistent e'.(Thread.local)).
+    - assert (CONSISTENT0: Local.promise_consistent (Thread.local e')).
       { exploit SCThread.rtc_tau_step_future; try apply STEPS0; eauto.
         { eapply Local.cap_wf; eauto. }
         { eapply Memory.max_concrete_timemap_closed; eauto. }
@@ -408,13 +408,13 @@ Section SIM.
   Lemma ord_thread_consistent_promise_consistent lang
         (th0: Thread.t lang)
         (CONSISTENT: OrdThread.consistent L Ordering.acqrel th0)
-        (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
-        (MEMORY: Memory.closed th0.(Thread.memory))
-        (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
+        (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
+        (MEMORY: Memory.closed (Thread.memory th0))
+        (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
     :
-      Local.promise_consistent th0.(Thread.local).
+      Local.promise_consistent (Thread.local th0).
   Proof.
-    hexploit (@Memory.cap_exists th0.(Thread.memory)); eauto. intros [cap CAP].
+    hexploit (@Memory.cap_exists (Thread.memory th0)); eauto. intros [cap CAP].
     hexploit (@Memory.max_concrete_timemap_exists cap); eauto.
     { eapply Memory.cap_closed; eauto. } intros [max MAX].
     exploit CONSISTENT; eauto. i. des.
@@ -436,19 +436,19 @@ Section SIM.
   Lemma ra_thread_consistent_sc_thread_consistent_or_race lang
         (th0: Thread.t lang)
         (CONSISTENT: OrdThread.consistent L Ordering.acqrel th0)
-        (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
-        (MEMORY: Memory.closed th0.(Thread.memory))
-        (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
+        (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
+        (MEMORY: Memory.closed (Thread.memory th0))
+        (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
     :
       (<<CONSISTENT: SCThread.consistent L th0>>) \/
       (exists th1,
           (<<STEPS: rtc (SCThread.tau_step L) th0 th1>>) /\
-          (<<CONSISTENT: Local.promise_consistent th1.(Thread.local)>>) /\
+          (<<CONSISTENT: Local.promise_consistent (Thread.local th1)>>) /\
           (<<RACE: SCRace.race L th1>>)).
   Proof.
     destruct (classic (exists th1,
                           (<<STEPS: rtc (SCThread.tau_step L) th0 th1>>) /\
-                          (<<CONSISTENT: Local.promise_consistent th1.(Thread.local)>>) /\
+                          (<<CONSISTENT: Local.promise_consistent (Thread.local th1)>>) /\
                           (<<RACE: SCRace.race L th1>>))) as [RACE|RACE]; auto.
     left. ii. exploit CONSISTENT; eauto. i. des.
     - unfold OrdThread.steps_failure in *. des.
@@ -495,7 +495,7 @@ Section SIM.
         exploit Thread.rtc_reserve_step_future; eauto. i. des. ss.
     } des.
 
-    assert ((<<CONSISTENT: Local.promise_consistent e2.(Thread.local)>>) /\
+    assert ((<<CONSISTENT: Local.promise_consistent (Thread.local e2)>>) /\
             (<<CONSISTENT: Local.promise_consistent lc4>>)).
     { destruct (classic (e = ThreadEvent.failure)).
       - clarify. inv STEP0. inv STEP; inv STEP0. inv LOCAL0. inv LOCAL1. splits; auto.

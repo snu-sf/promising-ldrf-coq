@@ -5,7 +5,7 @@ Minki Cho, Sung-Hwan Lee, Chung-Kil Hur, Ori Lahav
 Proceedings of the 42nd ACM SIGPLAN Conference on Programming Language Design and Implementation ([PLDI 2021](https://conf.researchr.org/home/pldi-2021))
 
 ## Build
-- Requirement: opam (>=2.0.0), Coq 8.9.1 
+- Requirement: opam (>=2.0.0), Coq 8.13.1 
 - Install dependencies with opam
 ```
 ./configure
