@@ -202,7 +202,7 @@ Module Local.
 
   Definition promise_consistent (lc:t): Prop :=
     forall loc ts from msg
-      (PROMISE: Memory.get loc ts (promises lc1) = Some (from, msg))
+      (PROMISE: Memory.get loc ts (promises lc) = Some (from, msg))
       (MSG: msg <> Message.reserve),
       Time.lt (lc.(tview).(TView.cur).(View.rlx) loc) ts.
 

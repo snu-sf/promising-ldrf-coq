@@ -191,11 +191,11 @@ Module Thread.
     (* consistency *)
 
     Definition consistent (e:t): Prop :=
-      forall mem1 sc1
+      forall mem1
         (CAP: Memory.cap (memory e) mem1),
-        <<FAILURE: steps_failure (mk (state e) (local e) sc1 mem1)>> \/
+        <<FAILURE: steps_failure (mk (state e) (local e) (sc e) mem1)>> \/
         exists e2,
-          <<STEPS: rtc tau_step (mk (state e) (local e) sc1 mem1) e2>> /\
+          <<STEPS: rtc tau_step (mk (state e) (local e) (sc e) mem1) e2>> /\
           <<PROMISES: (Local.promises (local e2)) = Memory.bot>>.
 
 
