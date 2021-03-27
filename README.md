@@ -30,8 +30,8 @@ The only change from PS 2.0 is the definition of capped memory (*Definition 3.1*
 
 ### Local DRF-PF
 - `src/ldrfpf/PFStep.v`
-  + `L`-PF-machine (*Definition 4.1*): `machine_step` in `Module SCConfiguration`
-  + `L`-PF race (*Definition 4.2*): `racy_state` in `Module PFrace`
+  + `L`-PF-machine (*Definition 4.1*): `machine_step` in `Module PFConfiguration`
+  + `L`-PF race (*Definition 4.2*): `racy_execution` in `Module PFrace`
 - `src/ldrfpf/LocalDRFPF.v`:
   + LDRF-PF theorem (*Theorem 4.3*): `Theorem local_drf_pf`
 - `src/prop/Monotonicity.v`:
