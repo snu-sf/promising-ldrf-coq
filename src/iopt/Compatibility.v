@@ -25,156 +25,169 @@ Require Import SimPromises.
 Require Import SimLocal.
 Require Import SimThread.
 
-Require Import Syntax.
-Require Import Semantics.
+Require Import Program.
+
+Require Import ITreeLang.
+Require Import ITreeLib.
 
 Set Implicit Arguments.
 
 
-Definition SIM_REGS := forall (rs_src rs_tgt:RegFile.t), Prop.
+Definition SIM_RET R := forall (r_src r_tgt:R), Prop.
 
-Inductive sim_terminal
-          (sim_regs:SIM_REGS)
-          (st_src:(Language.state lang)) (st_tgt:(Language.state lang)): Prop :=
+
+Variant sim_terminal R
+           (sim_ret:SIM_RET R)
+           (st_src: itree MemE.t R) (st_tgt: itree MemE.t R): Prop :=
 | sim_terminal_intro
-    (REGS: sim_regs (State.regs st_src) (State.regs st_tgt))
+    r0 r1
+    (SIMRET: sim_ret r0 r1)
+    (SRC: st_src = Ret r0)
+    (TGT: st_tgt = Ret r1)
 .
 
-Definition sim_expr
-           (sim_regs:SIM_REGS)
-           e_src e_tgt :=
-  forall rs_src rs_tgt (RS: sim_regs rs_src rs_tgt),
-    RegFile.eval_expr rs_src e_src = RegFile.eval_expr rs_tgt e_tgt.
-
-Definition _sim_stmts
-           (sim_thread:SIM_THREAD lang lang)
-           (sim_regs0:SIM_REGS)
-           (stmts_src stmts_tgt:list Stmt.t)
-           (sim_regs1:SIM_REGS): Prop :=
-  forall rs_src rs_tgt lc_src lc_tgt sc0_src sc0_tgt mem0_src mem0_tgt
-    (RS: sim_regs0 rs_src rs_tgt)
-    (LOCAL: sim_local SimPromises.bot lc_src lc_tgt),
+Definition _sim_itree R
+           (sim_thread:SIM_THREAD (lang R) (lang R))
+           (sim_ret:SIM_RET R)
+           (itr_src itr_tgt: itree MemE.t R): Prop :=
+  forall lc_src lc_tgt sc0_src sc0_tgt mem0_src mem0_tgt
+         (LOCAL: sim_local SimPromises.bot lc_src lc_tgt),
     sim_thread
-      (sim_terminal sim_regs1)
-      (State.mk rs_src stmts_src) lc_src sc0_src mem0_src
-      (State.mk rs_tgt stmts_tgt) lc_tgt sc0_tgt mem0_tgt.
+      (sim_terminal sim_ret)
+      itr_src lc_src sc0_src mem0_src
+      itr_tgt lc_tgt sc0_tgt mem0_tgt.
 
-Lemma _sim_stmts_mon
+Definition _sim_ktree R0 R1
+           (sim_thread:SIM_THREAD (lang R1) (lang R1))
+           (sim_ret0:SIM_RET R0)
+           (ktr_src ktr_tgt: R0 -> itree MemE.t R1)
+           (sim_ret1:SIM_RET R1): Prop :=
+  forall r_src r_tgt lc_src lc_tgt sc0_src sc0_tgt mem0_src mem0_tgt
+         (RET: sim_ret0 r_src r_tgt)
+         (LOCAL: sim_local SimPromises.bot lc_src lc_tgt),
+    sim_thread
+      (sim_terminal sim_ret1)
+      (ktr_src r_src) lc_src sc0_src mem0_src
+      (ktr_tgt r_tgt) lc_tgt sc0_tgt mem0_tgt.
+
+Lemma _sim_itree_mon R
       s1 s2 (S: s1 <9= s2):
-  _sim_stmts s1 <4= _sim_stmts s2.
+  @_sim_itree R s1 <3= @_sim_itree R s2.
 Proof.
   ii. apply S. apply PR; auto.
 Qed.
 
-Lemma lang_step_seq
-      stmts rs1 stmts1 rs2 stmts2 e
-      (STEP: State.step e
-                        (State.mk rs1 stmts1)
-                        (State.mk rs2 stmts2)):
-  State.step e
-             (State.mk rs1 (stmts1 ++ stmts))
-             (State.mk rs2 (stmts2 ++ stmts)).
+Lemma _sim_ktree_mon R0 R1
+      s1 s2 (S: s1 <9= s2):
+  @_sim_ktree R0 R1 s1 <4= @_sim_ktree R0 R1 s2.
 Proof.
-  inv STEP.
-  - econs 1. auto.
-  - s. rewrite <- app_assoc. econs 2.
-  - s. rewrite <- app_assoc. econs 3.
+  ii. apply S. apply PR; auto.
 Qed.
 
-Lemma lang_step_deseq
-      stmts rs1 stmt1 stmts1 rs2 stmts2 e
-      (STEP: State.step e
-                        (State.mk rs1 (stmt1 :: stmts1 ++ stmts))
-                        (State.mk rs2 stmts2)):
-  exists stmts2',
-    stmts2 = stmts2' ++ stmts /\
-    State.step e
-               (State.mk rs1 (stmt1 :: stmts1))
-               (State.mk rs2 stmts2').
+Lemma lang_step_bind R0 R1
+      (itr0 itr1: itree MemE.t R0) (k: R0 -> itree MemE.t R1) e
+      (STEP: ILang.step e itr0 itr1):
+  ILang.step e
+             (itr0 >>= k)
+             (itr1 >>= k).
 Proof.
-  inv STEP.
-  - esplits; eauto. econs; eauto.
-  - eexists. rewrite app_assoc. splits; eauto. econs.
-  - eexists. rewrite app_comm_cons, app_assoc. splits; eauto. econs.
+  dependent destruction STEP; subst; ired; econs; eauto.
 Qed.
 
-Lemma program_step_seq
-      stmts e
-      rs1 stmts1 lc1 sc1 mem1
-      rs2 stmts2 lc2 sc2 mem2
+Lemma program_step_bind R0 R1
+      (itr0 itr1: itree MemE.t R0) (k: R0 -> itree MemE.t R1) e
+      lc1 sc1 mem1
+      lc2 sc2 mem2
       (STEP: Thread.program_step
                e
-               (Thread.mk lang (State.mk rs1 stmts1) lc1 sc1 mem1)
-               (Thread.mk lang (State.mk rs2 stmts2) lc2 sc2 mem2)):
+               (Thread.mk (lang R0) itr0 lc1 sc1 mem1)
+               (Thread.mk (lang R0) itr1 lc2 sc2 mem2)):
   Thread.program_step
     e
-    (Thread.mk lang (State.mk rs1 (stmts1 ++ stmts)) lc1 sc1 mem1)
-    (Thread.mk lang (State.mk rs2 (stmts2 ++ stmts)) lc2 sc2 mem2).
+    (Thread.mk (lang R1) (itr0 >>= k) lc1 sc1 mem1)
+    (Thread.mk (lang R1) (itr1 >>= k) lc2 sc2 mem2).
 Proof.
   inv STEP; inv LOCAL; ss.
-  - econs; [|econs 1]; s; eauto. apply lang_step_seq. auto.
-  - econs; [|econs 2]; s; eauto. apply lang_step_seq. auto.
-  - econs; [|econs 3]; s; eauto. apply lang_step_seq. auto.
-  - econs; [|econs 4]; s; eauto. apply lang_step_seq. auto.
-  - econs; [|econs 5]; s; eauto. apply lang_step_seq. auto.
-  - econs; [|econs 6]; s; eauto. apply lang_step_seq. auto.
-  - econs; [|econs 7]; s; eauto. apply lang_step_seq. auto.
+  - econs; [|econs 1]; s; eauto. apply lang_step_bind. auto.
+  - econs; [|econs 2]; s; eauto. apply lang_step_bind. auto.
+  - econs; [|econs 3]; s; eauto. apply lang_step_bind. auto.
+  - econs; [|econs 4]; s; eauto. apply lang_step_bind. auto.
+  - econs; [|econs 5]; s; eauto. apply lang_step_bind. auto.
+  - econs; [|econs 6]; s; eauto. apply lang_step_bind. auto.
+  - econs; [|econs 7]; s; eauto. apply lang_step_bind. auto.
 Qed.
 
-Lemma step_seq
-      stmts pf e
-      rs1 stmts1 lc1 sc1 mem1
-      rs2 stmts2 lc2 sc2 mem2
+Lemma step_bind R0 R1
+      (itr0 itr1: itree MemE.t R0) (k: R0 -> itree MemE.t R1) pf e
+      lc1 sc1 mem1
+      lc2 sc2 mem2
       (STEP: Thread.step pf e
-                         (Thread.mk lang (State.mk rs1 stmts1) lc1 sc1 mem1)
-                         (Thread.mk lang (State.mk rs2 stmts2) lc2 sc2 mem2)):
+                         (Thread.mk (lang R0) itr0 lc1 sc1 mem1)
+                         (Thread.mk (lang R0) itr1 lc2 sc2 mem2)):
   Thread.step pf e
-              (Thread.mk lang (State.mk rs1 (stmts1 ++ stmts)) lc1 sc1 mem1)
-              (Thread.mk lang (State.mk rs2 (stmts2 ++ stmts)) lc2 sc2 mem2).
+              (Thread.mk (lang R1) (itr0 >>= k) lc1 sc1 mem1)
+              (Thread.mk (lang R1) (itr1 >>= k) lc2 sc2 mem2).
 Proof.
   inv STEP.
   - econs 1. inv STEP0. econs; eauto.
-  - econs 2. apply program_step_seq. eauto.
+  - econs 2. apply program_step_bind. eauto.
 Qed.
 
-Lemma opt_step_seq
-      stmts e
-      rs1 stmts1 lc1 sc1 mem1
-      rs2 stmts2 lc2 sc2 mem2
+Lemma opt_step_bind R0 R1
+      (itr0 itr1: itree MemE.t R0) (k: R0 -> itree MemE.t R1) e
+      lc1 sc1 mem1
+      lc2 sc2 mem2
       (STEP: Thread.opt_step e
-                             (Thread.mk lang (State.mk rs1 stmts1) lc1 sc1 mem1)
-                             (Thread.mk lang (State.mk rs2 stmts2) lc2 sc2 mem2)):
+                             (Thread.mk (lang R0) itr0 lc1 sc1 mem1)
+                             (Thread.mk (lang R0) itr1 lc2 sc2 mem2)):
   Thread.opt_step e
-                  (Thread.mk lang (State.mk rs1 (stmts1 ++ stmts)) lc1 sc1 mem1)
-                  (Thread.mk lang (State.mk rs2 (stmts2 ++ stmts)) lc2 sc2 mem2).
+                  (Thread.mk (lang R1) (itr0 >>= k) lc1 sc1 mem1)
+                  (Thread.mk (lang R1) (itr1 >>= k) lc2 sc2 mem2).
 Proof.
   inv STEP.
   - econs 1.
-  - econs 2. apply step_seq. eauto.
+  - econs 2. apply step_bind. eauto.
 Qed.
 
-Lemma thread_step_deseq
-      stmts pf e
-      rs1 stmt1 stmts1 lc1 sc1 mem1
-      rs2 stmts2 lc2 sc2 mem2
-      (STEP: Thread.step pf e
-                         (Thread.mk lang (State.mk rs1 (stmt1 :: stmts1 ++ stmts)) lc1 sc1 mem1)
-                         (Thread.mk lang (State.mk rs2 stmts2) lc2 sc2 mem2)):
-  exists stmts2',
-    stmts2 = stmts2' ++ stmts /\
-  Thread.step pf e
-              (Thread.mk lang (State.mk rs1 (stmt1 :: stmts1)) lc1 sc1 mem1)
-              (Thread.mk lang (State.mk rs2 stmts2') lc2 sc2 mem2).
-Proof.
-  inv STEP.
-  - inv STEP0.
-    rewrite app_comm_cons.
-    esplits; eauto.
-    econs 1. econs; eauto.
-  - inv STEP0; ss.
-    apply lang_step_deseq in STATE. des. subst.
-    esplits; eauto. econs 2. econs; eauto.
-Qed.
+(* Lemma lang_step_deseq *)
+(*       stmts rs1 stmt1 stmts1 rs2 stmts2 e *)
+(*       (STEP: State.step e *)
+(*                         (State.mk rs1 (stmt1 :: stmts1 ++ stmts)) *)
+(*                         (State.mk rs2 stmts2)): *)
+(*   exists stmts2', *)
+(*     stmts2 = stmts2' ++ stmts /\ *)
+(*     State.step e *)
+(*                (State.mk rs1 (stmt1 :: stmts1)) *)
+(*                (State.mk rs2 stmts2'). *)
+(* Proof. *)
+(*   inv STEP. *)
+(*   - esplits; eauto. econs; eauto. *)
+(*   - eexists. rewrite app_assoc. splits; eauto. econs. *)
+(*   - eexists. rewrite app_comm_cons, app_assoc. splits; eauto. econs. *)
+(* Qed. *)
+
+(* Lemma thread_step_deseq *)
+(*       stmts pf e *)
+(*       rs1 stmt1 stmts1 lc1 sc1 mem1 *)
+(*       rs2 stmts2 lc2 sc2 mem2 *)
+(*       (STEP: Thread.step pf e *)
+(*                          (Thread.mk lang (State.mk rs1 (stmt1 :: stmts1 ++ stmts)) lc1 sc1 mem1) *)
+(*                          (Thread.mk lang (State.mk rs2 stmts2) lc2 sc2 mem2)): *)
+(*   exists stmts2', *)
+(*     stmts2 = stmts2' ++ stmts /\ *)
+(*   Thread.step pf e *)
+(*               (Thread.mk lang (State.mk rs1 (stmt1 :: stmts1)) lc1 sc1 mem1) *)
+(*               (Thread.mk lang (State.mk rs2 stmts2') lc2 sc2 mem2). *)
+(* Proof. *)
+(*   inv STEP. *)
+(*   - inv STEP0. *)
+(*     rewrite app_comm_cons. *)
+(*     esplits; eauto. *)
+(*     econs 1. econs; eauto. *)
+(*   - inv STEP0; ss. *)
+(*     apply lang_step_deseq in STATE. des. subst. *)
+(*     esplits; eauto. econs 2. econs; eauto. *)
+(* Qed. *)
 
 Lemma sim_rtc
       A B
@@ -196,35 +209,168 @@ Proof.
     econs; eauto.
 Qed.
 
-Inductive sim_seq (s:list Stmt.t): forall (lhs rhs:Thread.t lang), Prop :=
-| sim_seq_intro
-    rs stmts lc sc mem:
-    sim_seq s
-            (Thread.mk lang (State.mk rs stmts) lc sc mem)
-            (Thread.mk lang (State.mk rs (stmts ++ s)) lc sc mem)
+Inductive sim_bind R0 R1 (k: R0 -> itree MemE.t R1):
+  forall (lhs: Thread.t (lang R0)) (rhs:Thread.t (lang R1)), Prop :=
+| sim_bind_intro
+    itr lc sc mem:
+    sim_bind k
+             (Thread.mk (lang R0) itr lc sc mem)
+             (Thread.mk (lang R1) (itr >>= k) lc sc mem)
 .
 
-Lemma rtc_internal_step_seq
-      stmts
-      rs1 stmts1 lc1 sc1 mem1
-      rs2 stmts2 lc2 sc2 mem2
-      (STEP: rtc (@Thread.tau_step lang)
-                 (Thread.mk lang (State.mk rs1 stmts1) lc1 sc1 mem1)
-                 (Thread.mk lang (State.mk rs2 stmts2) lc2 sc2 mem2)):
-  rtc (@Thread.tau_step lang)
-      (Thread.mk lang (State.mk rs1 (stmts1 ++ stmts)) lc1 sc1 mem1)
-      (Thread.mk lang (State.mk rs2 (stmts2 ++ stmts)) lc2 sc2 mem2).
+Lemma rtc_internal_step_bind R0 R1
+      (itr0 itr1: itree MemE.t R0) (k: R0 -> itree MemE.t R1)
+      lc1 sc1 mem1
+      lc2 sc2 mem2
+      (STEP: rtc (@Thread.tau_step (lang R0))
+                 (Thread.mk (lang R0) itr0 lc1 sc1 mem1)
+                 (Thread.mk (lang R0) itr1 lc2 sc2 mem2)):
+  rtc (@Thread.tau_step (lang R1))
+      (Thread.mk (lang R1) (itr0 >>= k) lc1 sc1 mem1)
+      (Thread.mk (lang R1) (itr1 >>= k) lc2 sc2 mem2).
 Proof.
-  exploit (sim_rtc (sim_seq stmts)); eauto.
-  - i. inv SIM1. destruct a2. destruct state. destruct local. inv RA. inv TSTEP.
-    generalize (step_seq stmts STEP0). i.
+  exploit (sim_rtc (sim_bind k)); eauto.
+  - i. inv SIM1. destruct a2. destruct local. inv RA. inv TSTEP.
+    generalize (step_bind k STEP0). i.
     esplits; [|econs; eauto].
     eapply tau_intro; eauto. eapply Thread.step_nopf_intro. eauto.
   - econs; ss.
   - i. des. inv x1. auto.
 Qed.
 
-Inductive ctx (sim_thread:SIM_THREAD lang lang): SIM_THREAD lang lang :=
+Inductive ctx (sim_thread:forall R, SIM_THREAD (lang R) (lang R)) R:
+  SIM_THREAD (lang R) (lang R) :=
+| ctx_ret
+    (sim_ret:SIM_RET R)
+    sc0_src mem0_src
+    sc0_tgt mem0_tgt
+    lc_src lc_tgt (r_src r_tgt: R)
+    (RET: sim_ret r_src r_tgt)
+    (LOCAL: sim_local SimPromises.bot lc_src lc_tgt):
+    ctx sim_thread
+        (sim_terminal sim_ret)
+        (Ret r_src) lc_src sc0_src mem0_src
+        (Ret r_tgt) lc_tgt sc0_tgt mem0_tgt
+.
+
+
+| ctx_seq
+    R1 (sim_ret1:SIM_RET R1) (sim_ret2:SIM_RET R)
+    itr0 k0 lc_src sc0_src mem0_src
+    itr1 k1 lc_tgt sc0_tgt mem0_tgt
+    (SIM1: sim_thread (sim_terminal sim_ret1)
+                      itr0 lc_src sc0_src mem0_src
+                      itr1 lc_tgt sc0_tgt mem0_tgt)
+    (SIM2: forall r_src r_tgt (RET: sim_ret1 r_src r_tgt),
+        _sim_stmts sim_thread sim_regs1 stmts2_src stmts2_tgt sim_regs2):
+    ctx sim_thread
+        (sim_terminal sim_regs2)
+        (itr0 >>= k0) lc_src sc0_src mem0_src
+        (itr1 >>= k1) lc_tgt sc0_tgt mem0_tgt
+.
+
+| ctx_bind
+
+.
+
+| ctx_seq
+    sim_regs1 sim_regs2
+    stmts1_src stmts2_src rs_src lc_src sc0_src mem0_src
+    stmts1_tgt stmts2_tgt rs_tgt lc_tgt sc0_tgt mem0_tgt
+    (SIM1: sim_thread (sim_terminal sim_regs1)
+                      (State.mk rs_src stmts1_src) lc_src sc0_src mem0_src
+                      (State.mk rs_tgt stmts1_tgt) lc_tgt sc0_tgt mem0_tgt)
+    (SIM2: _sim_stmts sim_thread sim_regs1 stmts2_src stmts2_tgt sim_regs2):
+    ctx sim_thread
+        (sim_terminal sim_regs2)
+        (State.mk rs_src (stmts1_src ++ stmts2_src)) lc_src sc0_src mem0_src
+        (State.mk rs_tgt (stmts1_tgt ++ stmts2_tgt)) lc_tgt sc0_tgt mem0_tgt
+| ctx_ite
+    sim_regs0 sim_regs1
+    cond_src stmts1_src stmts2_src rs_src sc0_src mem0_src
+    cond_tgt stmts1_tgt stmts2_tgt rs_tgt sc0_tgt mem0_tgt
+    lc_src lc_tgt
+    (COND: sim_expr sim_regs0 cond_src cond_tgt)
+    (RS: sim_regs0 rs_src rs_tgt)
+    (LOCAL: sim_local SimPromises.bot lc_src lc_tgt)
+    (SIM1: _sim_stmts sim_thread sim_regs0 stmts1_src stmts1_tgt sim_regs1)
+    (SIM2: _sim_stmts sim_thread sim_regs0 stmts2_src stmts2_tgt sim_regs1):
+    ctx sim_thread
+        (sim_terminal sim_regs1)
+        (State.mk rs_src [Stmt.ite cond_src stmts1_src stmts2_src]) lc_src sc0_src mem0_src
+        (State.mk rs_tgt [Stmt.ite cond_tgt stmts1_tgt stmts2_tgt]) lc_tgt sc0_tgt mem0_tgt
+| ctx_dowhile
+    sim_regs
+    cond_src stmts_src rs_src sc0_src mem0_src
+    cond_tgt stmts_tgt rs_tgt sc0_tgt mem0_tgt
+    lc_src lc_tgt
+    (COND: sim_expr sim_regs cond_src cond_tgt)
+    (RS: sim_regs rs_src rs_tgt)
+    (LOCAL: sim_local SimPromises.bot lc_src lc_tgt)
+    (SIM: _sim_stmts sim_thread sim_regs stmts_src stmts_tgt sim_regs):
+    ctx sim_thread
+        (sim_terminal sim_regs)
+        (State.mk rs_src [Stmt.dowhile stmts_src cond_src]) lc_src sc0_src mem0_src
+        (State.mk rs_tgt [Stmt.dowhile stmts_tgt cond_tgt]) lc_tgt sc0_tgt mem0_tgt
+.
+Hint Constructors ctx.
+
+Inductive ctx (sim_thread:forall R, SIM_THREAD (lang R) (lang R)) R:
+  SIM_THREAD (lang R) (lang R) :=
+| ctx_nil
+    rs_src sc0_src mem0_src
+    rs_tgt sc0_tgt mem0_tgt
+    lc_src lc_tgt
+    (RS: sim_regs rs_src rs_tgt)
+    (LOCAL: sim_local SimPromises.bot lc_src lc_tgt):
+    ctx sim_thread
+        (sim_terminal sim_regs)
+        (State.mk rs_src []) lc_src sc0_src mem0_src
+        (State.mk rs_tgt []) lc_tgt sc0_tgt mem0_tgt
+| ctx_seq
+    sim_regs1 sim_regs2
+    stmts1_src stmts2_src rs_src lc_src sc0_src mem0_src
+    stmts1_tgt stmts2_tgt rs_tgt lc_tgt sc0_tgt mem0_tgt
+    (SIM1: sim_thread (sim_terminal sim_regs1)
+                      (State.mk rs_src stmts1_src) lc_src sc0_src mem0_src
+                      (State.mk rs_tgt stmts1_tgt) lc_tgt sc0_tgt mem0_tgt)
+    (SIM2: _sim_stmts sim_thread sim_regs1 stmts2_src stmts2_tgt sim_regs2):
+    ctx sim_thread
+        (sim_terminal sim_regs2)
+        (State.mk rs_src (stmts1_src ++ stmts2_src)) lc_src sc0_src mem0_src
+        (State.mk rs_tgt (stmts1_tgt ++ stmts2_tgt)) lc_tgt sc0_tgt mem0_tgt
+| ctx_ite
+    sim_regs0 sim_regs1
+    cond_src stmts1_src stmts2_src rs_src sc0_src mem0_src
+    cond_tgt stmts1_tgt stmts2_tgt rs_tgt sc0_tgt mem0_tgt
+    lc_src lc_tgt
+    (COND: sim_expr sim_regs0 cond_src cond_tgt)
+    (RS: sim_regs0 rs_src rs_tgt)
+    (LOCAL: sim_local SimPromises.bot lc_src lc_tgt)
+    (SIM1: _sim_stmts sim_thread sim_regs0 stmts1_src stmts1_tgt sim_regs1)
+    (SIM2: _sim_stmts sim_thread sim_regs0 stmts2_src stmts2_tgt sim_regs1):
+    ctx sim_thread
+        (sim_terminal sim_regs1)
+        (State.mk rs_src [Stmt.ite cond_src stmts1_src stmts2_src]) lc_src sc0_src mem0_src
+        (State.mk rs_tgt [Stmt.ite cond_tgt stmts1_tgt stmts2_tgt]) lc_tgt sc0_tgt mem0_tgt
+| ctx_dowhile
+    sim_regs
+    cond_src stmts_src rs_src sc0_src mem0_src
+    cond_tgt stmts_tgt rs_tgt sc0_tgt mem0_tgt
+    lc_src lc_tgt
+    (COND: sim_expr sim_regs cond_src cond_tgt)
+    (RS: sim_regs rs_src rs_tgt)
+    (LOCAL: sim_local SimPromises.bot lc_src lc_tgt)
+    (SIM: _sim_stmts sim_thread sim_regs stmts_src stmts_tgt sim_regs):
+    ctx sim_thread
+        (sim_terminal sim_regs)
+        (State.mk rs_src [Stmt.dowhile stmts_src cond_src]) lc_src sc0_src mem0_src
+        (State.mk rs_tgt [Stmt.dowhile stmts_tgt cond_tgt]) lc_tgt sc0_tgt mem0_tgt
+.
+Hint Constructors ctx.
+
+Inductive ctx (sim_thread:forall R, SIM_THREAD (lang R) (lang R)) R:
+  SIM_THREAD (lang R) (lang R) :=
 | ctx_incl
     sim_terminal
     st1 lc1 sc0_src mem0_src st2 lc2 sc0_tgt mem0_tgt
@@ -498,6 +644,7 @@ Proof.
   ii. ginit; [apply ctx_wcompat|]. gclo. eauto.
 Qed.
 
+(* TODO: bind *)
 Lemma sim_stmts_seq
       sim_regs0 sim_regs1 sim_regs2
       stmts1_src stmts2_src
@@ -512,6 +659,7 @@ Proof.
   - ii. gfinal. right. apply SIM2; auto.
 Qed.
 
+(* TODO: I don't need it *)
 Lemma sim_stmts_ite
       sim_regs0 sim_regs1
       cond_src stmts1_src stmts2_src
@@ -527,6 +675,7 @@ Proof.
   - ii. gfinal. right. apply SIM2; auto.
 Qed.
 
+(* TODO: iter *)
 Lemma sim_stmts_dowhile
       sim_regs
       cond_src stmts_src

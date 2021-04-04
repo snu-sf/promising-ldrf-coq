@@ -16,10 +16,26 @@ Require Import Local.
 Require Import Thread.
 
 Set Implicit Arguments.
+Set Printing Universes.
+Set Printing All.
+
+Definition T0 := Type@{Language.t.u0}.
+Definition T1 := Type@{language.u0}.
+Check T0: T1.
+
+(* From ITree Require Export ITree ITreeFacts. *)
+(* From PromisingLib Require Import Basic Language. *)
+(* Definition t: T0 := itree id unit. *)
+(* Definition aa:= (IdentMap.t (@sigT (itree id unit) (fun _ => False))). *)
+
+(* Check Type@{language.u0}: Type@{IdentMap.t.u0}. *)
+
+Definition aa: Type@{IdentMap.t.u0} := Type@{language.u0}.
 
 
 Module Threads.
   Definition syntax := IdentMap.t {lang:language & (Language.syntax lang)}.
+
   Definition t := IdentMap.t ({lang:language & (Language.state lang)} * Local.t).
 
   Definition init (s:syntax): t :=
