@@ -4,6 +4,8 @@ Minki Cho, Sung-Hwan Lee, Chung-Kil Hur, Ori Lahav
 
 Proceedings of the 42nd ACM SIGPLAN Conference on Programming Language Design and Implementation ([PLDI 2021](https://conf.researchr.org/home/pldi-2021))
 
+Please visit the [project website](https://sf.snu.ac.kr/promising-ldrf/) for more information.
+
 ## Build
 - Requirement: opam (>=2.0.0), Coq 8.9.1 
 - Install dependencies with opam
@@ -53,6 +55,6 @@ The only change from PS 2.0 is the definition of capped memory (*Definition 3.1*
   + LDRF-SC theorem (*Theorem 4.12*): `Theorem local_drf_sc`
 
 > Note that the race conditions of LDRF-RA and LDRF-SC in Coq are slightly different from the race conditions in the paper:
-Instead of defining race-detecting-machines,~
+Instead of defining race-detecting-machines,
 we define a racy machine state to be a state where a thread can take multiple steps ending with a racy step.
 However, these conditions are provably equivalent to those in the paper.
