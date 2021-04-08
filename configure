@@ -2,4 +2,4 @@
 opam repo add coq-released https://coq.inria.fr/opam/released
 opam repo add coq-sflib -k git https://github.com/snu-sf/sf-opam-coq-archive.git
 opam repo add coq-promising -k git https://github.com/snu-sf/promising-opam-coq-archive.git#8.13
-opam install coq-paco.4.0.4 coq-sflib coq-promising-lib
+opam install -y coq-paco.4.0.4 coq-sflib coq-promising-lib
