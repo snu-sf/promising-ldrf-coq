@@ -182,17 +182,17 @@ Module Local.
 
   Inductive is_terminal (lc:t): Prop :=
   | is_terminal_intro
-      (PROMISES: lc.(promises) = Memory.bot)
+      (PROMISES: (promises lc) = Memory.bot)
   .
   Hint Constructors is_terminal.
 
   Inductive wf (lc:t) (mem:Memory.t): Prop :=
   | wf_intro
-      (TVIEW_WF: TView.wf lc.(tview))
-      (TVIEW_CLOSED: TView.closed lc.(tview) mem)
-      (PROMISES: Memory.le lc.(promises) mem)
-      (FINITE: Memory.finite lc.(promises))
-      (BOT: Memory.bot_none lc.(promises))
+      (TVIEW_WF: TView.wf (tview lc))
+      (TVIEW_CLOSED: TView.closed (tview lc) mem)
+      (PROMISES: Memory.le (promises lc) mem)
+      (FINITE: Memory.finite (promises lc))
+      (BOT: Memory.bot_none (promises lc))
   .
   Hint Constructors wf.
 
@@ -209,7 +209,7 @@ Module Local.
 
   Inductive disjoint (lc1 lc2:t): Prop :=
   | disjoint_intro
-      (DISJOINT: Memory.disjoint lc1.(promises) lc2.(promises))
+      (DISJOINT: Memory.disjoint (promises lc1) (promises lc2))
   .
   Hint Constructors disjoint.
 
@@ -220,12 +220,12 @@ Module Local.
 
   Definition promise_consistent (lc:t): Prop :=
     forall loc ts from val released
-       (PROMISE: Memory.get loc ts lc.(promises) = Some (from, Message.concrete val released)),
-      Time.lt (lc.(tview).(TView.cur).(View.rlx) loc) ts.
+       (PROMISE: Memory.get loc ts (promises lc) = Some (from, Message.concrete val released)),
+      Time.lt ((TView.cur (tview lc)).(View.rlx) loc) ts.
 
   Lemma bot_promise_consistent
         lc
-        (PROMISES: lc.(promises) = Memory.bot):
+        (PROMISES: (promises lc) = Memory.bot):
     promise_consistent lc.
   Proof.
     ii. rewrite PROMISES, Memory.bot_get in *. ss.
@@ -243,9 +243,9 @@ Module Local.
   Inductive promise_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (from to:Time.t) (msg:Message.t) (lc2:t) (mem2:Memory.t) (kind:Memory.op_kind): Prop :=
   | promise_step_intro
       promises2
-      (PROMISE: Memory.promise lc1.(promises) mem1 loc from to msg promises2 mem2 kind)
+      (PROMISE: Memory.promise (promises lc1) mem1 loc from to msg promises2 mem2 kind)
       (CLOSED: Memory.closed_message msg mem2)
-      (LC2: lc2 = mk lc1.(tview) promises2):
+      (LC2: lc2 = mk (tview lc1) promises2):
       promise_step lc1 mem1 loc from to msg lc2 mem2 kind
   .
   Hint Constructors promise_step.
@@ -255,9 +255,9 @@ Module Local.
       from
       tview2
       (GET: Memory.get loc to mem1 = Some (from, Message.concrete val released))
-      (READABLE: TView.readable lc1.(tview).(TView.cur) loc to released ord)
-      (TVIEW: TView.read_tview lc1.(tview) loc to released ord = tview2)
-      (LC2: lc2 = mk tview2 lc1.(promises)):
+      (READABLE: TView.readable (TView.cur (tview lc1)) loc to released ord)
+      (TVIEW: TView.read_tview (tview lc1) loc to released ord = tview2)
+      (LC2: lc2 = mk tview2 (promises lc1)):
       read_step lc1 mem1 loc to val released ord lc2
   .
   Hint Constructors read_step.
@@ -268,11 +268,11 @@ Module Local.
                        (lc2:t) (sc2:TimeMap.t) (mem2:Memory.t) (kind:Memory.op_kind): Prop :=
   | write_step_intro
       promises2
-      (RELEASED: released = TView.write_released lc1.(tview) sc1 loc to releasedm ord)
-      (WRITABLE: TView.writable lc1.(tview).(TView.cur) sc1 loc to ord)
-      (WRITE: Memory.write lc1.(promises) mem1 loc from to val released promises2 mem2 kind)
-      (RELEASE: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc lc1.(promises))
-      (LC2: lc2 = mk (TView.write_tview lc1.(tview) sc1 loc to ord) promises2)
+      (RELEASED: released = TView.write_released (tview lc1) sc1 loc to releasedm ord)
+      (WRITABLE: TView.writable (TView.cur (tview lc1)) sc1 loc to ord)
+      (WRITE: Memory.write (promises lc1) mem1 loc from to val released promises2 mem2 kind)
+      (RELEASE: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc (promises lc1))
+      (LC2: lc2 = mk (TView.write_tview (tview lc1) sc1 loc to ord) promises2)
       (SC2: sc2 = sc1):
       write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
   .
@@ -281,11 +281,11 @@ Module Local.
   Inductive fence_step (lc1:t) (sc1:TimeMap.t) (ordr ordw:Ordering.t) (lc2:t) (sc2:TimeMap.t): Prop :=
   | fence_step_intro
       tview2
-      (READ: TView.read_fence_tview lc1.(tview) ordr = tview2)
-      (RELEASE: Ordering.le Ordering.strong_relaxed ordw -> Memory.nonsynch lc1.(promises))
-      (LC2: lc2 = mk (TView.write_fence_tview tview2 sc1 ordw) lc1.(promises))
+      (READ: TView.read_fence_tview (tview lc1) ordr = tview2)
+      (RELEASE: Ordering.le Ordering.strong_relaxed ordw -> Memory.nonsynch (promises lc1))
+      (LC2: lc2 = mk (TView.write_fence_tview tview2 sc1 ordw) (promises lc1))
       (SC2: sc2 = TView.write_fence_sc tview2 sc1 ordw)
-      (PROMISES: ordw = Ordering.seqcst -> lc1.(Local.promises) = Memory.bot):
+      (PROMISES: ordw = Ordering.seqcst -> (Local.promises lc1) = Memory.bot):
       fence_step lc1 sc1 ordr ordw lc2 sc2
   .
   Hint Constructors fence_step.
@@ -296,7 +296,8 @@ Module Local.
   .
   Hint Constructors failure_step.
 
-  Inductive program_step: forall (e:ThreadEvent.t) lc1 sc1 mem1 lc2 sc2 mem2, Prop :=
+  Inductive program_step:
+    forall (e:ThreadEvent.t) (lc1:t) (sc1:TimeMap.t) (mem1:Memory.t) (lc2:t) (sc2:TimeMap.t) (mem2:Memory.t), Prop :=
   | step_silent
       lc1 sc1 mem1:
       program_step ThreadEvent.silent lc1 sc1 mem1 lc1 sc1 mem1
@@ -349,7 +350,7 @@ Module Local.
     <<SC2: Memory.closed_timemap sc1 mem2>> /\
     <<CLOSED2: Memory.closed mem2>> /\
     <<FUTURE: Memory.future mem1 mem2>> /\
-    <<TVIEW_FUTURE: TView.le lc1.(tview) lc2.(tview)>> /\
+    <<TVIEW_FUTURE: TView.le (tview lc1) (tview lc2)>> /\
     <<MSG_WF: Message.wf msg>> /\
     <<MSG_TS: Memory.message_to msg loc to>> /\
     <<MSG_CLOSED: Memory.closed_message msg mem2>>.
@@ -374,7 +375,7 @@ Module Local.
         (WF1: wf lc1 mem1)
         (CLOSED1: Memory.closed mem1):
     <<WF2: wf lc2 mem1>> /\
-    <<TVIEW_FUTURE: TView.le lc1.(tview) lc2.(tview)>> /\
+    <<TVIEW_FUTURE: TView.le (tview lc1) (tview lc2)>> /\
     <<REL_WF: View.opt_wf released>> /\
     <<REL_CLOSED: Memory.closed_opt_view released mem1>>.
   Proof.
@@ -398,11 +399,11 @@ Module Local.
     <<WF2: wf lc2 mem2>> /\
     <<SC2: Memory.closed_timemap sc2 mem2>> /\
     <<CLOSED2: Memory.closed mem2>> /\
-    <<TVIEW_FUTURE: TView.le lc1.(tview) lc2.(tview)>> /\
+    <<TVIEW_FUTURE: TView.le (tview lc1) (tview lc2)>> /\
     <<SC_FUTURE: TimeMap.le sc1 sc2>> /\
     <<MEM_FUTURE: Memory.future mem1 mem2>> /\
     <<REL_WF: View.opt_wf released>> /\
-    <<REL_TS: Time.le (released.(View.unwrap).(View.rlx) loc) to>> /\
+    <<REL_TS: Time.le ((View.rlx (View.unwrap released)) loc) to>> /\
     <<REL_CLOSED: Memory.closed_opt_view released mem2>>.
   Proof.
     inv WF1. inv STEP.
@@ -449,7 +450,7 @@ Module Local.
         (CLOSED1: Memory.closed mem1):
     <<WF2: wf lc2 mem1>> /\
     <<SC2: Memory.closed_timemap sc2 mem1>> /\
-    <<TVIEW_FUTURE: TView.le lc1.(tview) lc2.(tview)>> /\
+    <<TVIEW_FUTURE: TView.le (tview lc1) (tview lc2)>> /\
     <<SC_FUTURE: TimeMap.le sc1 sc2>>.
   Proof.
     inv WF1. inv STEP.
@@ -472,7 +473,7 @@ Module Local.
     <<WF2: wf lc2 mem2>> /\
     <<SC2: Memory.closed_timemap sc2 mem2>> /\
     <<CLOSED2: Memory.closed mem2>> /\
-    <<TVIEW_FUTURE: TView.le lc1.(tview) lc2.(tview)>> /\
+    <<TVIEW_FUTURE: TView.le (tview lc1) (tview lc2)>> /\
     <<SC_FUTURE: TimeMap.le sc1 sc2>> /\
     <<MEM_FUTURE: Memory.future mem1 mem2>>.
   Proof.
@@ -578,7 +579,7 @@ Module Local.
   Lemma read_step_promises
         lc1 mem loc to val released ord lc2
         (READ: read_step lc1 mem loc to val released ord lc2):
-    lc1.(promises) = lc2.(promises).
+    (promises lc1) = (promises lc2).
   Proof.
     inv READ. auto.
   Qed.
@@ -609,8 +610,8 @@ Module Local.
   Lemma program_step_promises_bot
         e lc1 sc1 mem1 lc2 sc2 mem2
         (STEP: program_step e lc1 sc1 mem1 lc2 sc2 mem2)
-        (PROMISES: lc1.(promises) = Memory.bot):
-    lc2.(promises) = Memory.bot.
+        (PROMISES: (promises lc1) = Memory.bot):
+    (promises lc2) = Memory.bot.
   Proof.
     inv STEP; try inv LOCAL; ss.
     - eapply Memory.write_promises_bot; eauto.

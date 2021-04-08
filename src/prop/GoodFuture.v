@@ -147,19 +147,19 @@ Section GOODFUTURE.
       { eapply good_future_map_ident; eauto.
         eapply Memory.max_ts_spec in GET. des. eauto. }
       { eapply map_ident_in_memory_closed_message.
-        { ii. eapply MAP.(good_future_map_ident). eapply TS. }
+        { ii. eapply (good_future_map_ident MAP). eapply TS. }
         { eapply MEM in GET. des. auto. }
       }
     }
     { i. destruct (Time.le_lt_dec fto (Memory.max_ts loc mem0)).
       { left. exists fto, ffrom, fto, ffrom. splits; auto.
-        { eapply MAP.(good_future_map_ident); eauto. }
+        { eapply (good_future_map_ident MAP); eauto. }
         { refl. }
         { refl. }
-        { eapply MAP.(good_future_map_ident); eauto.
+        { eapply (good_future_map_ident MAP); eauto.
           eapply memory_get_ts_le in GET. etrans; eauto.
         }
-        { i. exploit FUTURE.(good_future_cover).
+        { i. exploit (good_future_cover FUTURE).
           { econs; eauto. }
           i. des; auto.
           exfalso. inv ITV. ss.
@@ -171,9 +171,9 @@ Section GOODFUTURE.
         }
       }
       { right. destruct (Time.le_lt_dec (tm loc) ffrom).
-        { ii. eapply MAP.(good_future_map_bound) in MAP0.
+        { ii. eapply (good_future_map_bound MAP) in MAP0.
           eapply TimeFacts.lt_le_lt; eauto. }
-        { exfalso. exploit FUTURE.(good_future_cover).
+        { exfalso. exploit (good_future_cover FUTURE).
           { econs; try apply GET.
             instantiate (1:=Time.meet (tm loc) fto). econs; ss.
             { unfold Time.meet. des_ifs.
@@ -200,16 +200,16 @@ Section GOODFUTURE.
   Qed.
 
   Lemma step_write_not_in_good_future P lang (th0 th1: Thread.t lang) tm e
-        (TM: forall loc, Time.lt (Memory.max_ts loc th0.(Thread.memory)) (tm loc))
+        (TM: forall loc, Time.lt (Memory.max_ts loc (Thread.memory th0)) (tm loc))
         (STEPS: pred_step P e th0 th1)
         (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
         (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
         (CLOSED: Memory.closed (Thread.memory th0))
         (NOTIN: P <1= write_not_in (fun loc ts =>
                                       (<<TS: Time.le ts (tm loc)>>) /\
-                                      (<<PROM: ~ covered loc ts th0.(Thread.memory)>>)))
+                                      (<<PROM: ~ covered loc ts (Thread.memory th0)>>)))
     :
-      good_future tm th0.(Thread.memory) th1.(Thread.memory).
+      good_future tm (Thread.memory th0) (Thread.memory th1).
   Proof.
     econs; auto.
     { eapply Memory.future_future_weak.
@@ -224,16 +224,16 @@ Section GOODFUTURE.
   Qed.
 
   Lemma steps_write_not_in_good_future P lang (th0 th1: Thread.t lang) tm
-        (TM: forall loc, Time.lt (Memory.max_ts loc th0.(Thread.memory)) (tm loc))
+        (TM: forall loc, Time.lt (Memory.max_ts loc (Thread.memory th0)) (tm loc))
         (STEPS: rtc (tau (@pred_step P lang)) th0 th1)
         (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
         (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
         (CLOSED: Memory.closed (Thread.memory th0))
         (NOTIN: P <1= write_not_in (fun loc ts =>
                                       (<<TS: Time.le ts (tm loc)>>) /\
-                                      (<<PROM: ~ covered loc ts th0.(Thread.memory)>>)))
+                                      (<<PROM: ~ covered loc ts (Thread.memory th0)>>)))
     :
-      good_future tm th0.(Thread.memory) th1.(Thread.memory).
+      good_future tm (Thread.memory th0) (Thread.memory th1).
   Proof.
     econs; auto.
     { eapply Memory.future_future_weak.
@@ -247,7 +247,7 @@ Section GOODFUTURE.
   Qed.
 
   Lemma write_not_in_good_future_traced lang (th0 th1: Thread.t lang) tr tm
-        (TM: forall loc, Time.lt (Memory.max_ts loc th0.(Thread.memory)) (tm loc))
+        (TM: forall loc, Time.lt (Memory.max_ts loc (Thread.memory th0)) (tm loc))
         (STEPS: Trace.steps tr th0 th1)
         (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
         (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
@@ -255,9 +255,9 @@ Section GOODFUTURE.
         (NOTIN: List.Forall (fun em =>
                                write_not_in (fun loc ts =>
                                                (<<TS: Time.le ts (tm loc)>>) /\
-                                               (<<PROM: ~ covered loc ts th0.(Thread.memory)>>)) (snd em)) tr)
+                                               (<<PROM: ~ covered loc ts (Thread.memory th0)>>)) (snd em)) tr)
     :
-      good_future tm th0.(Thread.memory) th1.(Thread.memory).
+      good_future tm (Thread.memory th0) (Thread.memory th1).
   Proof.
     econs; auto.
     { eapply Memory.future_future_weak.
@@ -284,7 +284,7 @@ Section GOODFUTURE.
     econs.
     { i. destruct msg as [val released|]; auto.
       exploit Memory.max_ts_spec; try apply GET. i. des. dup GET.
-      eapply FUTURE.(good_future_future) in GET.
+      eapply (good_future_future FUTURE) in GET.
       destruct GET as [from' [released' [GET [FROM RELEASED]]]]. guardH RELEASED.
       right. esplits.
       { ss. }
@@ -298,7 +298,7 @@ Section GOODFUTURE.
       { right. ii. des. subst. eapply TimeFacts.lt_le_lt; eauto.  }
       { assert (TS: Time.lt fto (tm loc)).
         { destruct (Time.le_lt_dec (tm loc) fto); auto. exfalso.
-          exploit FUTURE.(good_future_cover).
+          exploit (good_future_cover FUTURE).
           { instantiate (1:=Time.middle (Time.join (Memory.max_ts loc mem) ffrom) (tm loc)).
             instantiate (1:=loc).
             econs; eauto. econs; ss.
@@ -325,7 +325,7 @@ Section GOODFUTURE.
           }
         }
         left. exists fto, ffrom, fto, ffrom. splits; auto; try refl.
-        i. exploit FUTURE.(good_future_cover).
+        i. exploit (good_future_cover FUTURE).
         { econs; eauto. }
         i. des; auto. inv ITV. ss.
         exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.

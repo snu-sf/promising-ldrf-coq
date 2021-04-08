@@ -89,9 +89,9 @@ Module Memory.
     destruct (Time.eq_dec to Time.bot).
     - subst. congr.
     - eapply x.
-      + apply Interval.mem_ub. destruct (lhs loc).(Cell.WF).
+      + apply Interval.mem_ub. destruct (Cell.WF (lhs loc)).
         exploit VOLUME; eauto. i. des; auto. inv x1. congr.
-      + apply Interval.mem_ub. destruct (rhs loc).(Cell.WF).
+      + apply Interval.mem_ub. destruct (Cell.WF (rhs loc)).
         exploit VOLUME; eauto. i. des; auto. inv x1. congr.
   Qed.
 
@@ -107,7 +107,7 @@ Module Memory.
   Proof.
     inv DISJOINT. exploit DISJOINT0; eauto. i. des.
     destruct (Time.le_lt_dec ts2 ts0).
-    - destruct (lhs loc).(Cell.WF). exploit VOLUME; eauto. i. des.
+    - destruct (Cell.WF (lhs loc)). exploit VOLUME; eauto. i. des.
       + inv x1. inv TS12.
       + eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt; eauto.
     - eapply x.
@@ -165,7 +165,7 @@ Module Memory.
   Inductive message_to: forall (msg:Message.t) (loc:Loc.t) (to:Time.t), Prop :=
   | message_to_concrete
       val released loc to
-      (TS: Time.le (released.(View.unwrap).(View.rlx) loc) to):
+      (TS: Time.le ((View.rlx (View.unwrap released)) loc) to):
       message_to (Message.concrete val released) loc to
   | message_to_reserve
       loc to:
@@ -178,8 +178,8 @@ Module Memory.
 
   Inductive closed_view (view:View.t) (mem:t): Prop :=
   | closed_view_intro
-      (PLN: closed_timemap view.(View.pln) mem)
-      (RLX: closed_timemap view.(View.rlx) mem)
+      (PLN: closed_timemap (View.pln view) mem)
+      (RLX: closed_timemap (View.rlx view) mem)
   .
   Hint Constructors closed_view.
 
@@ -237,7 +237,7 @@ Module Memory.
         view mem
         (CLOSED: closed_opt_view view mem)
         (INHABITED: inhabited mem):
-    closed_view view.(View.unwrap) mem.
+    closed_view (View.unwrap view) mem.
   Proof.
     inv CLOSED; ss. apply closed_view_bot. ss.
   Qed.
@@ -1325,13 +1325,13 @@ Module Memory.
                      (GET2: get loc to mem2 = Some (from, Message.concrete val released)),
           View.opt_wf released /\
           closed_opt_view released mem2 /\
-          Time.le (released.(View.unwrap).(View.rlx) loc) to)
+          Time.le ((View.rlx (View.unwrap released)) loc) to)
       (COMPLETE2: forall loc from to val released f
                      (GET1: get loc to mem1 = Some (f, Message.reserve))
                      (GET2: get loc to mem2 = Some (from, Message.concrete val released)),
           View.opt_wf released /\
           closed_opt_view released mem2 /\
-          Time.le (released.(View.unwrap).(View.rlx) loc) to)
+          Time.le ((View.rlx (View.unwrap released)) loc) to)
   .
   Hint Constructors future_weak.
 
@@ -1917,7 +1917,7 @@ Module Memory.
         des. subst. exfalso. inv MEM. inv ADD. eapply DISJOINT0; eauto.
         * apply Interval.mem_ub. auto.
         * apply Interval.mem_ub.
-          destruct (mem1 loc).(Cell.WF). exploit VOLUME; eauto. i. des; auto.
+          destruct (Cell.WF (mem1 loc)). exploit VOLUME; eauto. i. des; auto.
           inv x. inv TO.
     - splits.
       + inv DISJOINT. econs. i. revert GET1. erewrite split_o; eauto. repeat condtac; ss.
@@ -1944,7 +1944,7 @@ Module Memory.
           i. des. eapply x.
           { inv MEM. inv SPLIT. econs. eauto. left. auto. }
           { apply Interval.mem_ub.
-            destruct (mem1 loc).(Cell.WF). exploit VOLUME; eauto. i. des; auto.
+            destruct (Cell.WF (mem1 loc)). exploit VOLUME; eauto. i. des; auto.
             inv x1. inv MEM. inv SPLIT. inv TS12.
           }
         * guardH o. des. subst. exfalso. inv DISJOINT. exploit DISJOINT0; eauto.
@@ -1952,7 +1952,7 @@ Module Memory.
           i. des. eapply x.
           { apply Interval.mem_ub. inv MEM. inv SPLIT. etrans; eauto. }
           { apply Interval.mem_ub.
-            destruct (ctx loc).(Cell.WF). exploit VOLUME; eauto. i. des; auto.
+            destruct (Cell.WF (ctx loc)). exploit VOLUME; eauto. i. des; auto.
             inv x1. inv MEM. inv SPLIT. inv TS23.
           }
     - splits.

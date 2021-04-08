@@ -139,7 +139,7 @@ Lemma local_drf_pf_multi L c
 Proof.
   hexploit joined_view_exist; eauto. intros [views JWF].
   i. eapply times_configuration_step_same_behaviors in PR; eauto.
-  des. hexploit (PFConsistentStrong.memory_times_wf_exists c.(Configuration.memory)).
+  des. hexploit (PFConsistentStrong.memory_times_wf_exists (Configuration.memory c)).
   i. des.
   eapply (@PF_sim_configuration_beh L (times \2/ times_mem)); eauto.
   { i. eapply join_well_ordered; eauto. }

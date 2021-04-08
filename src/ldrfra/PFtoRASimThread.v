@@ -40,16 +40,16 @@ Module PFtoRASimThread.
 
     Inductive normal_thread (e: Thread.t lang): Prop :=
     | normal_thread_intro
-        (NORMAL_TVIEW: Stable.normal_tview L e.(Thread.local).(Local.tview))
-        (NORMAL_MEMORY: Stable.normal_memory L e.(Thread.memory))
+        (NORMAL_TVIEW: Stable.normal_tview L (Local.tview (Thread.local e)))
+        (NORMAL_MEMORY: Stable.normal_memory L (Thread.memory e))
     .
     Hint Constructors normal_thread.
 
     Inductive stable_thread (rels: ReleaseWrites.t) (e: Thread.t lang): Prop :=
     | stable_thread_intro
-        (STABLE_TVIEW: Stable.stable_tview L e.(Thread.memory) e.(Thread.local).(Local.tview))
-        (STABLE_SC: Stable.stable_timemap L e.(Thread.memory) e.(Thread.sc))
-        (STABLE_MEMORY: Stable.stable_memory L rels e.(Thread.memory))
+        (STABLE_TVIEW: Stable.stable_tview L (Thread.memory e) (Local.tview (Thread.local e)))
+        (STABLE_SC: Stable.stable_timemap L (Thread.memory e) (Thread.sc e))
+        (STABLE_MEMORY: Stable.stable_memory L rels (Thread.memory e))
     .
     Hint Constructors stable_thread.
 
@@ -57,20 +57,20 @@ Module PFtoRASimThread.
           e sc' mem'
           (NORMAL: normal_thread e)
           (NORMAL_MEM: Stable.normal_memory L mem'):
-      normal_thread (Thread.mk lang e.(Thread.state) e.(Thread.local) sc' mem').
+      normal_thread (Thread.mk lang (Thread.state e) (Thread.local e) sc' mem').
     Proof.
       inv NORMAL. econs; ss.
     Qed.
 
     Lemma future_stable_thread
           rels e sc' mem'
-          (WF: Local.wf e.(Thread.local) e.(Thread.memory))
+          (WF: Local.wf (Thread.local e) (Thread.memory e))
           (STABLE: stable_thread rels e)
-          (SC: TimeMap.le e.(Thread.sc) sc')
-          (MEM: Memory.future e.(Thread.memory) mem')
+          (SC: TimeMap.le (Thread.sc e) sc')
+          (MEM: Memory.future (Thread.memory e) mem')
           (STABLE_SC: Stable.stable_timemap L mem' sc')
           (STABLE_MEM: Stable.stable_memory L rels mem'):
-      stable_thread rels (Thread.mk lang e.(Thread.state) e.(Thread.local) sc' mem').
+      stable_thread rels (Thread.mk lang (Thread.state e) (Thread.local e) sc' mem').
     Proof.
       destruct e, local. inv STABLE. inv WF. ss.
       econs; i; ss; eauto using Stable.future_stable_tview.
@@ -82,19 +82,19 @@ Module PFtoRASimThread.
     Inductive sim_tview (tview_src tview_tgt: TView.t): Prop :=
     | sim_tview_intro
         (REL: forall loc, if L loc
-                     then View.le (tview_tgt.(TView.rel) loc) (tview_src.(TView.rel) loc)
-                     else tview_src.(TView.rel) loc = tview_tgt.(TView.rel) loc)
-        (CUR: tview_src.(TView.cur) = tview_tgt.(TView.cur))
-        (ACQ: tview_src.(TView.acq) = tview_tgt.(TView.acq))
+                     then View.le ((TView.rel tview_tgt) loc) ((TView.rel tview_src) loc)
+                     else (TView.rel tview_src) loc = (TView.rel tview_tgt) loc)
+        (CUR: (TView.cur tview_src) = (TView.cur tview_tgt))
+        (ACQ: (TView.acq tview_src) = (TView.acq tview_tgt))
     .
 
     Inductive sim_local (rels: ReleaseWrites.t) (lc_src lc_tgt: Local.t): Prop :=
     | sim_local_intro
-        (TVIEW: sim_tview lc_src.(Local.tview) lc_tgt.(Local.tview))
-        (PROMISES: lc_src.(Local.promises) = lc_tgt.(Local.promises))
-        (RESERVE: RAThread.reserve_only L lc_src.(Local.promises))
+        (TVIEW: sim_tview (Local.tview lc_src) (Local.tview lc_tgt))
+        (PROMISES: (Local.promises lc_src) = (Local.promises lc_tgt))
+        (RESERVE: RAThread.reserve_only L (Local.promises lc_src))
         (REL_WRITES_NONE: forall loc to (IN: List.In (loc, to) rels),
-            Memory.get loc to lc_src.(Local.promises) = None)
+            Memory.get loc to (Local.promises lc_src) = None)
     .
 
     Inductive sim_message (loc: Loc.t): forall (msg_src msg_tgt: Message.t), Prop :=
@@ -143,10 +143,10 @@ Module PFtoRASimThread.
 
     Inductive sim_thread (rels: ReleaseWrites.t) (e_src e_tgt: Thread.t lang): Prop :=
     | sim_thread_intro
-        (STATE: e_src.(Thread.state) = e_tgt.(Thread.state))
-        (LOCAL: sim_local rels e_src.(Thread.local) e_tgt.(Thread.local))
-        (SC: e_src.(Thread.sc) = e_tgt.(Thread.sc))
-        (MEMORY: sim_memory rels e_src.(Thread.memory) e_tgt.(Thread.memory))
+        (STATE: (Thread.state e_src) = (Thread.state e_tgt))
+        (LOCAL: sim_local rels (Thread.local e_src) (Thread.local e_tgt))
+        (SC: (Thread.sc e_src) = (Thread.sc e_tgt))
+        (MEMORY: sim_memory rels (Thread.memory e_src) (Thread.memory e_tgt))
     .
     Hint Constructors sim_thread.
 
@@ -480,8 +480,8 @@ Module PFtoRASimThread.
           rels lc_src lc_tgt mem_src mem_tgt
           (LC: sim_local rels lc_src lc_tgt)
           (MEM: sim_memory rels mem_src mem_tgt):
-      <<RELS_WF_SRC: ReleaseWrites.wf rels lc_src.(Local.promises) mem_src>> /\
-      <<RELS_WF_TGT: ReleaseWrites.wf rels lc_tgt.(Local.promises) mem_tgt>>.
+      <<RELS_WF_SRC: ReleaseWrites.wf rels (Local.promises lc_src) mem_src>> /\
+      <<RELS_WF_TGT: ReleaseWrites.wf rels (Local.promises lc_tgt) mem_tgt>>.
     Proof.
       inv LC. inv MEM. split; ii.
       - exploit REL_WRITES; eauto. i. des. esplits; eauto.
@@ -671,9 +671,9 @@ Module PFtoRASimThread.
           lc1_tgt mem1_tgt loc to val released_tgt ord lc2_tgt
           (LC1: sim_local rels lc1_src lc1_tgt)
           (MEM1: sim_memory rels mem1_src mem1_tgt)
-          (NORMAL_TVIEW1_SRC: Stable.normal_tview L lc1_src.(Local.tview))
-          (NORMAL_TVIEW1_TGT: Stable.normal_tview L lc1_tgt.(Local.tview))
-          (STABLE_TVIEW1_SRC: Stable.stable_tview L mem1_src lc1_src.(Local.tview))
+          (NORMAL_TVIEW1_SRC: Stable.normal_tview L (Local.tview lc1_src))
+          (NORMAL_TVIEW1_TGT: Stable.normal_tview L (Local.tview lc1_tgt))
+          (STABLE_TVIEW1_SRC: Stable.stable_tview L mem1_src (Local.tview lc1_src))
           (NORMAL_MEM1_SRC: Stable.normal_memory L mem1_src)
           (NORMAL_MEM1_TGT: Stable.normal_memory L mem1_tgt)
           (STABLE_MEM1_SRC: Stable.stable_memory L rels mem1_src)
@@ -687,13 +687,13 @@ Module PFtoRASimThread.
         <<STEP_SRC: OrdLocal.read_step L Ordering.acqrel lc1_src mem1_src loc to val released_src ord lc2_src>> /\
         __guard__ (
             (<<LC2: sim_local rels lc2_src lc2_tgt>>) /\
-            (<<RELEASED_SRC: View.opt_le released_src (Some lc2_src.(Local.tview).(TView.cur))>>) /\
-            (<<RELEASED_TGT: View.opt_le released_tgt (Some lc2_tgt.(Local.tview).(TView.cur))>>) /\
-            (<<NORMAL_TVIEW1_SRC: Stable.normal_tview L lc2_src.(Local.tview)>>) /\
-            (<<NORMAL_TVIEW1_TGT: Stable.normal_tview L lc2_tgt.(Local.tview)>>) /\
-            (<<STABLE_TVIEW1_SRC: Stable.stable_tview L mem1_src lc2_src.(Local.tview)>>)
+            (<<RELEASED_SRC: View.opt_le released_src (Some (TView.cur (Local.tview lc2_src)))>>) /\
+            (<<RELEASED_TGT: View.opt_le released_tgt (Some (TView.cur (Local.tview lc2_tgt)))>>) /\
+            (<<NORMAL_TVIEW1_SRC: Stable.normal_tview L (Local.tview lc2_src)>>) /\
+            (<<NORMAL_TVIEW1_TGT: Stable.normal_tview L (Local.tview lc2_tgt)>>) /\
+            (<<STABLE_TVIEW1_SRC: Stable.stable_tview L mem1_src (Local.tview lc2_src)>>)
             \/
-            (<<RACE: RARaceW.ra_race L rels lc1_src.(Local.tview) loc to ord>>)).
+            (<<RACE: RARaceW.ra_race L rels (Local.tview lc1_src) loc to ord>>)).
     Proof.
       exploit sim_memory_stable_tview; eauto; try apply LC1. intro STABLE_TVIEW1_TGT.
       hexploit sim_memory_stable_memory; eauto. intro STABLE_MEM1_TGT.
@@ -797,9 +797,9 @@ Module PFtoRASimThread.
           lc1_tgt mem1_tgt loc to val released ord lc2_tgt
           (LC1: sim_local rels lc1_src lc1_tgt)
           (MEM1: sim_memory rels mem1_src mem1_tgt)
-          (NORMAL_TVIEW1_SRC: Stable.normal_tview L lc1_src.(Local.tview))
-          (NORMAL_TVIEW1_TGT: Stable.normal_tview L lc1_tgt.(Local.tview))
-          (STABLE_TVIEW1_SRC: Stable.stable_tview L mem1_src lc1_src.(Local.tview))
+          (NORMAL_TVIEW1_SRC: Stable.normal_tview L (Local.tview lc1_src))
+          (NORMAL_TVIEW1_TGT: Stable.normal_tview L (Local.tview lc1_tgt))
+          (STABLE_TVIEW1_SRC: Stable.stable_tview L mem1_src (Local.tview lc1_src))
           (NORMAL_MEM1_SRC: Stable.normal_memory L mem1_src)
           (NORMAL_MEM1_TGT: Stable.normal_memory L mem1_tgt)
           (STABLE_MEM1_SRC: Stable.stable_memory L rels mem1_src)
@@ -812,9 +812,9 @@ Module PFtoRASimThread.
       exists lc2_src,
         (<<STEP_SRC: OrdLocal.read_step L Ordering.acqrel lc1_src mem1_src loc to val released ord lc2_src>>) /\
         (<<LC2: sim_local rels lc2_src lc2_tgt>>) /\
-        (<<NORMAL_TVIEW1_SRC: Stable.normal_tview L lc2_src.(Local.tview)>>) /\
-        (<<NORMAL_TVIEW1_TGT: Stable.normal_tview L lc2_tgt.(Local.tview)>>) /\
-        (<<STABLE_TVIEW1_SRC: Stable.stable_tview L mem1_src lc2_src.(Local.tview)>>).
+        (<<NORMAL_TVIEW1_SRC: Stable.normal_tview L (Local.tview lc2_src)>>) /\
+        (<<NORMAL_TVIEW1_TGT: Stable.normal_tview L (Local.tview lc2_tgt)>>) /\
+        (<<STABLE_TVIEW1_SRC: Stable.stable_tview L mem1_src (Local.tview lc2_src)>>).
     Proof.
       exploit sim_release_writes_wf; eauto. i. des.
       exploit sim_memory_stable_tview; try eapply LC1; eauto. intro STABLE_TVIEW1_TGT.
@@ -834,8 +834,8 @@ Module PFtoRASimThread.
           (WF1_SRC: Local.wf lc1_src mem1_src)
           (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
           (RELEASEDM: View.opt_le releasedm_tgt releasedm_src)
-          (RELEASEDM_SRC: View.opt_le releasedm_src (Some lc1_src.(Local.tview).(TView.cur)))
-          (RELEASEDM_TGT: View.opt_le releasedm_tgt (Some lc1_tgt.(Local.tview).(TView.cur)))
+          (RELEASEDM_SRC: View.opt_le releasedm_src (Some (TView.cur (Local.tview lc1_src))))
+          (RELEASEDM_TGT: View.opt_le releasedm_tgt (Some (TView.cur (Local.tview lc1_tgt))))
           (RELEASEDM_WF_SRC: View.opt_wf releasedm_src)
           (RELEASEDM_WF_TGT: View.opt_wf releasedm_tgt)
           (LOC: L loc)
@@ -941,11 +941,11 @@ Module PFtoRASimThread.
                 unfold TView.write_released. repeat (condtac; ss). f_equal.
                 unfold LocFun.add. condtac; ss.
                 inv TVIEW. rewrite CUR.
-                rewrite (@View.le_join_r releasedm_src.(View.unwrap)); cycle 1.
+                rewrite (@View.le_join_r (View.unwrap releasedm_src)); cycle 1.
                 { etrans; [|apply View.join_l].
                   destruct releasedm_src; try apply View.bot_spec. ss.
                   rewrite <- CUR. inv RELEASEDM_SRC. ss. }
-                rewrite (@View.le_join_r releasedm_tgt.(View.unwrap)); ss.
+                rewrite (@View.le_join_r (View.unwrap releasedm_tgt)); ss.
                 etrans; [|apply View.join_l].
                 destruct releasedm_tgt; try apply View.bot_spec. ss.
                 inv RELEASEDM_TGT. ss.
@@ -1053,11 +1053,11 @@ Module PFtoRASimThread.
                 unfold TView.write_released. condtac; ss. condtac; ss.
                 unfold LocFun.add. condtac; ss.
                 inv TVIEW. rewrite CUR.
-                rewrite (@View.le_join_r releasedm_src.(View.unwrap)); cycle 1.
+                rewrite (@View.le_join_r (View.unwrap releasedm_src)); cycle 1.
                 { etrans; [|apply View.join_l].
                   destruct releasedm_src; try apply View.bot_spec. ss.
                   rewrite <- CUR. inv RELEASEDM_SRC. ss. }
-                rewrite (@View.le_join_r releasedm_tgt.(View.unwrap)); ss.
+                rewrite (@View.le_join_r (View.unwrap releasedm_tgt)); ss.
                 etrans; [|apply View.join_l].
                 destruct releasedm_tgt; try apply View.bot_spec. ss.
                 inv RELEASEDM_TGT. ss.
@@ -1291,9 +1291,9 @@ Module PFtoRASimThread.
           lc1_tgt sc1 mem1_tgt loc from to val releasedm_tgt released_tgt ord lc2_tgt sc2 mem2_tgt kind
           (LC1: sim_local rels lc1_src lc1_tgt)
           (MEM1: sim_memory rels mem1_src mem1_tgt)
-          (NORMAL_TVIEW1_SRC: Stable.normal_tview L lc1_src.(Local.tview))
-          (NORMAL_TVIEW1_TGT: Stable.normal_tview L lc1_tgt.(Local.tview))
-          (STABLE_TVIEW1_SRC: Stable.stable_tview L mem1_src lc1_src.(Local.tview))
+          (NORMAL_TVIEW1_SRC: Stable.normal_tview L (Local.tview lc1_src))
+          (NORMAL_TVIEW1_TGT: Stable.normal_tview L (Local.tview lc1_tgt))
+          (STABLE_TVIEW1_SRC: Stable.stable_tview L mem1_src (Local.tview lc1_src))
           (NORMAL_MEM1_SRC: Stable.normal_memory L mem1_src)
           (NORMAL_MEM1_TGT: Stable.normal_memory L mem1_tgt)
           (STABLE_MEM1_SRC: Stable.stable_memory L rels mem1_src)
@@ -1304,10 +1304,10 @@ Module PFtoRASimThread.
           (MEM1_SRC: Memory.closed mem1_src)
           (MEM1_TGT: Memory.closed mem1_tgt)
           (RELEASEDM: View.opt_le releasedm_tgt releasedm_src)
-          (RELEASEDM_SRC: View.opt_le releasedm_src (Some lc1_src.(Local.tview).(TView.cur)))
-          (RELEASEDM_TGT: View.opt_le releasedm_tgt (Some lc1_tgt.(Local.tview).(TView.cur)))
-          (RELEASEDM_NORMAL_SRC: Stable.normal_view L releasedm_src.(View.unwrap))
-          (RELEASEDM_NORMAL_TGT: Stable.normal_view L releasedm_tgt.(View.unwrap))
+          (RELEASEDM_SRC: View.opt_le releasedm_src (Some (TView.cur (Local.tview lc1_src))))
+          (RELEASEDM_TGT: View.opt_le releasedm_tgt (Some (TView.cur (Local.tview lc1_tgt))))
+          (RELEASEDM_NORMAL_SRC: Stable.normal_view L (View.unwrap releasedm_src))
+          (RELEASEDM_NORMAL_TGT: Stable.normal_view L (View.unwrap releasedm_tgt))
           (RELEASEDM_WF_SRC: View.opt_wf releasedm_src)
           (RELEASEDM_WF_TGT: View.opt_wf releasedm_tgt)
           (RELEASEDM_CLOSED_SRC: Memory.closed_opt_view releasedm_src mem1_src)
@@ -1322,9 +1322,9 @@ Module PFtoRASimThread.
         (<<REL: rels' = if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels>>) /\
         (<<LC2: sim_local rels' lc2_src lc2_tgt>>) /\
         (<<MEM2: sim_memory rels' mem2_src mem2_tgt>>) /\
-        (<<NORMAL_TVIEW2_SRC: Stable.normal_tview L lc2_src.(Local.tview)>>) /\
-        (<<NORMAL_TVIEW2_TGT: Stable.normal_tview L lc2_tgt.(Local.tview)>>) /\
-        (<<STABLE_TVIEW2_SRC: Stable.stable_tview L mem2_src lc2_src.(Local.tview)>>) /\
+        (<<NORMAL_TVIEW2_SRC: Stable.normal_tview L (Local.tview lc2_src)>>) /\
+        (<<NORMAL_TVIEW2_TGT: Stable.normal_tview L (Local.tview lc2_tgt)>>) /\
+        (<<STABLE_TVIEW2_SRC: Stable.stable_tview L mem2_src (Local.tview lc2_src)>>) /\
         (<<NORMAL_MEM2_SRC: Stable.normal_memory L mem2_src>>) /\
         (<<NORMAL_MEM2_TGT: Stable.normal_memory L mem2_tgt>>) /\
         (<<STABLE_MEM2_SRC: Stable.stable_memory L rels' mem2_src>>).
@@ -1402,9 +1402,9 @@ Module PFtoRASimThread.
           lc1_tgt sc1 mem1_tgt loc from to val releasedm released_tgt ord lc2_tgt sc2 mem2_tgt kind
           (LC1: sim_local rels lc1_src lc1_tgt)
           (MEM1: sim_memory rels mem1_src mem1_tgt)
-          (NORMAL_TVIEW1_SRC: Stable.normal_tview L lc1_src.(Local.tview))
-          (NORMAL_TVIEW1_TGT: Stable.normal_tview L lc1_tgt.(Local.tview))
-          (STABLE_TVIEW1_SRC: Stable.stable_tview L mem1_src lc1_src.(Local.tview))
+          (NORMAL_TVIEW1_SRC: Stable.normal_tview L (Local.tview lc1_src))
+          (NORMAL_TVIEW1_TGT: Stable.normal_tview L (Local.tview lc1_tgt))
+          (STABLE_TVIEW1_SRC: Stable.stable_tview L mem1_src (Local.tview lc1_src))
           (NORMAL_MEM1_SRC: Stable.normal_memory L mem1_src)
           (NORMAL_MEM1_TGT: Stable.normal_memory L mem1_tgt)
           (STABLE_MEM1_SRC: Stable.stable_memory L rels mem1_src)
@@ -1416,8 +1416,8 @@ Module PFtoRASimThread.
           (MEM1_TGT: Memory.closed mem1_tgt)
           (RELEASEDM_WF: View.opt_wf releasedm)
           (RELEASEDM_CLOSED: Memory.closed_opt_view releasedm mem1_src)
-          (RELEASEDM_NORMAL: Stable.normal_view L releasedm.(View.unwrap))
-          (RELEASEDM_STABLE: Stable.stable_view L mem1_src releasedm.(View.unwrap))
+          (RELEASEDM_NORMAL: Stable.normal_view L (View.unwrap releasedm))
+          (RELEASEDM_STABLE: Stable.stable_view L mem1_src (View.unwrap releasedm))
           (LOC: ~ L loc)
           (STEP_TGT: Local.write_step lc1_tgt sc1 mem1_tgt loc from to val releasedm released_tgt ord
                                       lc2_tgt sc2 mem2_tgt kind):
@@ -1427,9 +1427,9 @@ Module PFtoRASimThread.
                                          lc2_src sc2 mem2_src kind>>) /\
         (<<LC2: sim_local rels lc2_src lc2_tgt>>) /\
         (<<MEM2: sim_memory rels mem2_src mem2_tgt>>) /\
-        (<<NORMAL_TVIEW2_SRC: Stable.normal_tview L lc2_src.(Local.tview)>>) /\
-        (<<NORMAL_TVIEW2_TGT: Stable.normal_tview L lc2_tgt.(Local.tview)>>) /\
-        (<<STABLE_TVIEW2_SRC: Stable.stable_tview L mem2_src lc2_src.(Local.tview)>>) /\
+        (<<NORMAL_TVIEW2_SRC: Stable.normal_tview L (Local.tview lc2_src)>>) /\
+        (<<NORMAL_TVIEW2_TGT: Stable.normal_tview L (Local.tview lc2_tgt)>>) /\
+        (<<STABLE_TVIEW2_SRC: Stable.stable_tview L mem2_src (Local.tview lc2_src)>>) /\
         (<<NORMAL_MEM2_SRC: Stable.normal_memory L mem2_src>>) /\
         (<<NORMAL_MEM2_TGT: Stable.normal_memory L mem2_tgt>>) /\
         (<<STABLE_MEM2_SRC: Stable.stable_memory L rels mem2_src>>).
@@ -1483,9 +1483,9 @@ Module PFtoRASimThread.
           lc1_tgt sc1 mem1_tgt ordr ordw lc2_tgt sc2
           (LC1: sim_local rels lc1_src lc1_tgt)
           (MEM1: sim_memory rels mem1_src mem1_tgt)
-          (NORMAL_TVIEW1_SRC: Stable.normal_tview L lc1_src.(Local.tview))
-          (NORMAL_TVIEW1_TGT: Stable.normal_tview L lc1_tgt.(Local.tview))
-          (STABLE_TVIEW1_SRC: Stable.stable_tview L mem1_src lc1_src.(Local.tview))
+          (NORMAL_TVIEW1_SRC: Stable.normal_tview L (Local.tview lc1_src))
+          (NORMAL_TVIEW1_TGT: Stable.normal_tview L (Local.tview lc1_tgt))
+          (STABLE_TVIEW1_SRC: Stable.stable_tview L mem1_src (Local.tview lc1_src))
           (STABLE_SC1_SRC: Stable.stable_timemap L mem1_src sc1)
           (WF1_SRC: Local.wf lc1_src mem1_src)
           (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
@@ -1493,9 +1493,9 @@ Module PFtoRASimThread.
       exists lc2_src,
         (<<STEP_SRC: Local.fence_step lc1_src sc1 ordr ordw lc2_src sc2>>) /\
         (<<LC2: sim_local rels lc2_src lc2_tgt>>) /\
-        (<<NORMAL_TVIEW2_SRC: Stable.normal_tview L lc2_src.(Local.tview)>>) /\
-        (<<NORMAL_TVIEW2_TGT: Stable.normal_tview L lc2_tgt.(Local.tview)>>) /\
-        (<<STABLE_TVIEW2_SRC: Stable.stable_tview L mem1_src lc2_src.(Local.tview)>>) /\
+        (<<NORMAL_TVIEW2_SRC: Stable.normal_tview L (Local.tview lc2_src)>>) /\
+        (<<NORMAL_TVIEW2_TGT: Stable.normal_tview L (Local.tview lc2_tgt)>>) /\
+        (<<STABLE_TVIEW2_SRC: Stable.stable_tview L mem1_src (Local.tview lc2_src)>>) /\
         (<<STABLE_SC2_SRC: Stable.stable_timemap L mem1_src sc2>>).
     Proof.
       exploit sim_release_writes_wf; eauto. i. des.
@@ -1559,12 +1559,12 @@ Module PFtoRASimThread.
           (STABLE1_SRC: stable_thread rels e1_src)
           (NORMAL1_SRC: normal_thread e1_src)
           (NORMAL1_TGT: normal_thread e1_tgt)
-          (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
-          (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
-          (SC1_SRC: Memory.closed_timemap e1_src.(Thread.sc) e1_src.(Thread.memory))
-          (SC1_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
-          (MEM1_SRC: Memory.closed e1_src.(Thread.memory))
-          (MEM1_TGT: Memory.closed e1_tgt.(Thread.memory))
+          (WF1_SRC: Local.wf (Thread.local e1_src) (Thread.memory e1_src))
+          (WF1_TGT: Local.wf (Thread.local e1_tgt) (Thread.memory e1_tgt))
+          (SC1_SRC: Memory.closed_timemap (Thread.sc e1_src) (Thread.memory e1_src))
+          (SC1_TGT: Memory.closed_timemap (Thread.sc e1_tgt) (Thread.memory e1_tgt))
+          (MEM1_SRC: Memory.closed (Thread.memory e1_src))
+          (MEM1_TGT: Memory.closed (Thread.memory e1_tgt))
           (PROMISE: forall loc from to msg kind
                       (EVENT: e_tgt = ThreadEvent.promise loc from to msg kind),
               L loc /\ msg = Message.reserve)
@@ -1580,7 +1580,7 @@ Module PFtoRASimThread.
             \/
             (<<RACE: exists loc to val released ord,
                 ThreadEvent.is_reading e_src = Some (loc, to, val, released, ord) /\
-                RARaceW.ra_race L rels e1_src.(Thread.local).(Local.tview) loc to ord>>)).
+                RARaceW.ra_race L rels (Local.tview (Thread.local e1_src)) loc to ord>>)).
     Proof.
       destruct e1_src as [st1_src lc1_src sc1_src mem1_src].
       destruct e1_tgt as [st1_tgt lc1_tgt sc1_tgt mem1_tgt].
@@ -1845,12 +1845,12 @@ Module PFtoRASimThread.
           (STABLE1_SRC: stable_thread rels e1_src)
           (NORMAL1_SRC: normal_thread e1_src)
           (NORMAL1_TGT: normal_thread e1_tgt)
-          (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
-          (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
-          (SC1_SRC: Memory.closed_timemap e1_src.(Thread.sc) e1_src.(Thread.memory))
-          (SC1_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
-          (MEM1_SRC: Memory.closed e1_src.(Thread.memory))
-          (MEM1_TGT: Memory.closed e1_tgt.(Thread.memory))
+          (WF1_SRC: Local.wf (Thread.local e1_src) (Thread.memory e1_src))
+          (WF1_TGT: Local.wf (Thread.local e1_tgt) (Thread.memory e1_tgt))
+          (SC1_SRC: Memory.closed_timemap (Thread.sc e1_src) (Thread.memory e1_src))
+          (SC1_TGT: Memory.closed_timemap (Thread.sc e1_tgt) (Thread.memory e1_tgt))
+          (MEM1_SRC: Memory.closed (Thread.memory e1_src))
+          (MEM1_TGT: Memory.closed (Thread.memory e1_tgt))
           (STEP_TGT: Thread.reserve_step e1_tgt e2_tgt):
       exists e2_src,
         (<<STEP_SRC: Thread.reserve_step e1_src e2_src>>) /\
@@ -1885,12 +1885,12 @@ Module PFtoRASimThread.
           (STABLE1_SRC: stable_thread rels e1_src)
           (NORMAL1_SRC: normal_thread e1_src)
           (NORMAL1_TGT: normal_thread e1_tgt)
-          (WF1_SRC: Local.wf e1_src.(Thread.local) e1_src.(Thread.memory))
-          (WF1_TGT: Local.wf e1_tgt.(Thread.local) e1_tgt.(Thread.memory))
-          (SC1_SRC: Memory.closed_timemap e1_src.(Thread.sc) e1_src.(Thread.memory))
-          (SC1_TGT: Memory.closed_timemap e1_tgt.(Thread.sc) e1_tgt.(Thread.memory))
-          (MEM1_SRC: Memory.closed e1_src.(Thread.memory))
-          (MEM1_TGT: Memory.closed e1_tgt.(Thread.memory))
+          (WF1_SRC: Local.wf (Thread.local e1_src) (Thread.memory e1_src))
+          (WF1_TGT: Local.wf (Thread.local e1_tgt) (Thread.memory e1_tgt))
+          (SC1_SRC: Memory.closed_timemap (Thread.sc e1_src) (Thread.memory e1_src))
+          (SC1_TGT: Memory.closed_timemap (Thread.sc e1_tgt) (Thread.memory e1_tgt))
+          (MEM1_SRC: Memory.closed (Thread.memory e1_src))
+          (MEM1_TGT: Memory.closed (Thread.memory e1_tgt))
           (STEP_TGT: Thread.cancel_step e1_tgt e2_tgt):
       exists e2_src,
         (<<STEP_SRC: Thread.cancel_step e1_src e2_src>>) /\

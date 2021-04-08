@@ -56,15 +56,15 @@ Module PFtoRA.
     | wf_ra_intro
         (WF: Configuration.wf c)
         (RELS: forall tid lang st lc
-                 (TH: IdentMap.find tid c.(Configuration.threads) = Some (existT _ lang st, lc)),
-            ReleaseWrites.wf rels lc.(Local.promises) c.(Configuration.memory))
+                 (TH: IdentMap.find tid (Configuration.threads c) = Some (existT _ lang st, lc)),
+            ReleaseWrites.wf rels (Local.promises lc) (Configuration.memory c))
     .
 
     Lemma wf_pf_thread
           c tid lang st lc
           (WF: wf_pf c)
-          (FIND: IdentMap.find tid c.(Configuration.threads) = Some (existT _ lang st, lc)):
-      PFtoRAThread.wf_pf (Thread.mk _ st lc c.(Configuration.sc) c.(Configuration.memory)).
+          (FIND: IdentMap.find tid (Configuration.threads c) = Some (existT _ lang st, lc)):
+      PFtoRAThread.wf_pf (Thread.mk _ st lc (Configuration.sc c) (Configuration.memory c)).
     Proof.
       inv WF. inv WF0. inv WF.
       hexploit THREADS; eauto. i.
@@ -74,8 +74,8 @@ Module PFtoRA.
     Lemma wf_j_thread
           views c tid lang st lc
           (WF: wf_j views c)
-          (FIND: IdentMap.find tid c.(Configuration.threads) = Some (existT _ lang st, lc)):
-      PFtoRAThread.wf_j views (Thread.mk _ st lc c.(Configuration.sc) c.(Configuration.memory)).
+          (FIND: IdentMap.find tid (Configuration.threads c) = Some (existT _ lang st, lc)):
+      PFtoRAThread.wf_j views (Thread.mk _ st lc (Configuration.sc c) (Configuration.memory c)).
     Proof.
       inv WF. inv WF0. inv WF.
       hexploit THREADS; eauto. i.
@@ -86,8 +86,8 @@ Module PFtoRA.
     Lemma wf_ra_thread
           rels c tid lang st lc
           (WF: wf_ra rels c)
-          (FIND: IdentMap.find tid c.(Configuration.threads) = Some (existT _ lang st, lc)):
-      PFtoRAThread.wf_ra rels (Thread.mk _ st lc c.(Configuration.sc) c.(Configuration.memory)).
+          (FIND: IdentMap.find tid (Configuration.threads c) = Some (existT _ lang st, lc)):
+      PFtoRAThread.wf_ra rels (Thread.mk _ st lc (Configuration.sc c) (Configuration.memory c)).
     Proof.
       inv WF. inv WF0. inv WF.
       hexploit THREADS; eauto. i.
@@ -122,7 +122,7 @@ Module PFtoRA.
       exploit RAConfiguration.step_future; try eapply WF1; eauto. i. des.
       inv STEP. ss.
       assert (STEPS': RAThread.steps L rels1 rels2
-                                     (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory))
+                                     (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1))
                                      (Thread.mk _ st4 lc4 sc4 memory4)).
       { exploit RAThread.tau_steps_steps;
           try eapply RAThread.cancel_steps_tau_steps; try exact CANCELS. i.

@@ -192,8 +192,8 @@ Section MAPPED.
 
   Record view_map (vw fvw: View.t): Prop :=
     view_map_intro
-      { map_pln: timemap_map vw.(View.pln) fvw.(View.pln);
-        map_rlx: timemap_map vw.(View.rlx) fvw.(View.rlx);
+      { map_pln: timemap_map (View.pln vw) (View.pln fvw);
+        map_rlx: timemap_map (View.rlx vw) (View.rlx fvw);
       }.
 
   Inductive opt_view_map: option View.t -> option View.t -> Prop :=
@@ -209,9 +209,9 @@ Section MAPPED.
 
   Record tview_map (vw fvw: TView.t): Prop :=
     tview_map_intro
-      { map_rel: forall loc, view_map (vw.(TView.rel) loc) (fvw.(TView.rel) loc);
-        map_cur: view_map vw.(TView.cur) fvw.(TView.cur);
-        map_acq: view_map vw.(TView.acq) fvw.(TView.acq);
+      { map_rel: forall loc, view_map ((TView.rel vw) loc) ((TView.rel fvw) loc);
+        map_cur: view_map (TView.cur vw) (TView.cur fvw);
+        map_acq: view_map (TView.acq vw) (TView.acq fvw);
       }.
 
   Inductive msg_map: Message.t -> Message.t -> Prop :=
@@ -563,18 +563,18 @@ Section MAPPED.
 
   Lemma collapsable_unwritable_step pf e lang (th0 th1: Thread.t lang)
         (STEP: Thread.step pf e th0 th1)
-        (WFMEM: collapsable_unwritable th0.(Thread.local).(Local.promises) th0.(Thread.memory))
+        (WFMEM: collapsable_unwritable (Local.promises (Thread.local th0)) (Thread.memory th0))
     :
-      collapsable_unwritable th1.(Thread.local).(Local.promises) th1.(Thread.memory) .
+      collapsable_unwritable (Local.promises (Thread.local th1)) (Thread.memory th1) .
   Proof.
     ii. eapply unwritable_increase; eauto.
   Qed.
 
   Lemma collapsable_unwritable_steps P lang (th0 th1: Thread.t lang)
         (STEP: rtc (tau (@pred_step P lang)) th0 th1)
-        (WFMEM: collapsable_unwritable th0.(Thread.local).(Local.promises) th0.(Thread.memory))
+        (WFMEM: collapsable_unwritable (Local.promises (Thread.local th0)) (Thread.memory th0))
     :
-      collapsable_unwritable th1.(Thread.local).(Local.promises) th1.(Thread.memory) .
+      collapsable_unwritable (Local.promises (Thread.local th1)) (Thread.memory th1) .
   Proof.
     revert WFMEM. induction STEP; auto.
     i. eapply IHSTEP. inv H. inv TSTEP. inv STEP0.
@@ -1987,15 +1987,15 @@ Section MAPPED.
   Inductive local_map (lc flc: Local.t): Prop :=
   | local_map_intro
       ftv'
-      (TVIEWLE: TView.le flc.(Local.tview) ftv')
-      (TVIEW: tview_map lc.(Local.tview) ftv')
+      (TVIEWLE: TView.le (Local.tview flc) ftv')
+      (TVIEW: tview_map (Local.tview lc) ftv')
       (* (TVWF: TView.wf ftv') *)
-      (PROMISES: promises_map lc.(Local.promises) flc.(Local.promises))
+      (PROMISES: promises_map (Local.promises lc) (Local.promises flc))
   .
 
   Lemma read_step_map lc0 flc0 mem0 fmem0 loc to val released ord lc1
         (LOCAL: local_map lc0 flc0)
-        (TVWF: TView.wf flc0.(Local.tview))
+        (TVWF: TView.wf (Local.tview flc0))
         (MEM: memory_map mem0 fmem0)
         (READ: Local.read_step lc0 mem0 loc to val released ord lc1)
     :
@@ -2046,10 +2046,10 @@ Section MAPPED.
   Lemma write_step_map lc0 flc0 mem0 mem1 fmem0 loc from to val releasedr releasedw ord lc1
         kind ffrom fto freleasedr freleasedr' sc0 sc1 fsc0 fsc0'
         (LOCAL: local_map lc0 flc0)
-        (MLE: Memory.le flc0.(Local.promises) fmem0)
-        (TVWF: TView.wf flc0.(Local.tview))
+        (MLE: Memory.le (Local.promises flc0) fmem0)
+        (TVWF: TView.wf (Local.tview flc0))
         (MEM: memory_map mem0 fmem0)
-        (UNWRITABLE: collapsable_unwritable lc0.(Local.promises) mem0)
+        (UNWRITABLE: collapsable_unwritable (Local.promises lc0) mem0)
         (RELEASEDR: opt_view_map releasedr freleasedr')
         (RELEASEDRLE: View.opt_le freleasedr freleasedr')
         (RELEASEDRWF: View.opt_wf freleasedr)
@@ -2114,7 +2114,7 @@ Section MAPPED.
         (LOCAL: local_map lc0 flc0)
         (SC: timemap_map sc0 fsc0')
         (SCLE: TimeMap.le fsc0 fsc0')
-        (TVWF: TView.wf flc0.(Local.tview))
+        (TVWF: TView.wf (Local.tview flc0))
         (FENCE: Local.fence_step lc0 sc0 ordr ordw lc1 sc1)
     :
       exists flc1 fsc1 fsc1',
@@ -2341,7 +2341,7 @@ Section MAPPED.
         (CLOSED: Memory.closed fmem0)
         (LOCAL: local_map lc0 flc0)
         (MEM: memory_map mem0 fmem0)
-        (UNWRITABLE: collapsable_unwritable lc0.(Local.promises) mem0)
+        (UNWRITABLE: collapsable_unwritable (Local.promises lc0) mem0)
         (SC: timemap_map sc0 fsc0')
         (SCLE: TimeMap.le fsc0 fsc0')
     :
@@ -2455,7 +2455,7 @@ Section MAPPED.
       st lc flc mem fmem sc fsc fsc'
       (LOCAL: local_map lc flc)
       (MEM: memory_map mem fmem)
-      (UNWRITABLE: collapsable_unwritable lc.(Local.promises) mem)
+      (UNWRITABLE: collapsable_unwritable (Local.promises lc) mem)
       (SC: timemap_map sc fsc')
       (SCLE: TimeMap.le fsc fsc')
     :
@@ -2480,7 +2480,7 @@ Section MAPPED.
         (CLOSEDSC1: Memory.closed_timemap sc0 mem0)
         (LOCAL: local_map lc0 flc0)
         (MEM: memory_map mem0 fmem0)
-        (UNWRITABLE: collapsable_unwritable lc0.(Local.promises) mem0)
+        (UNWRITABLE: collapsable_unwritable (Local.promises lc0) mem0)
         (SC: timemap_map sc0 fsc0')
         (SCLE: TimeMap.le fsc0 fsc0')
         (SHIFT: te_pred_shift P1 P0 tevent_map)
@@ -2527,7 +2527,7 @@ Section MAPPED.
         (CLOSEDSC1: Memory.closed_timemap sc0 mem0)
         (LOCAL: local_map lc0 flc0)
         (MEM: memory_map mem0 fmem0)
-        (UNWRITABLE: collapsable_unwritable lc0.(Local.promises) mem0)
+        (UNWRITABLE: collapsable_unwritable (Local.promises lc0) mem0)
         (SC: timemap_map sc0 fsc0')
         (SCLE: TimeMap.le fsc0 fsc0')
     :
@@ -3298,14 +3298,14 @@ Section SHIFTMAP.
         { eapply H. }
         eapply TimeFacts.le_lt_lt.
         { eauto. } eapply TimeFacts.lt_le_lt.
-        { eapply PAIR.(mapping_map_lt_pair_loc_lt); try apply l; eauto. }
+        { eapply (mapping_map_lt_pair_loc_lt PAIR); try apply l; eauto. }
         { eauto. }
       }
     }
     destruct l.
     { split; i; auto. eapply TimeFacts.le_lt_lt.
       { eauto. } eapply TimeFacts.lt_le_lt.
-      { eapply PAIR.(mapping_map_lt_pair_loc_lt); eauto. }
+      { eapply (mapping_map_lt_pair_loc_lt PAIR); eauto. }
       { eauto. }
     }
     { inv H. split; i.
@@ -3346,7 +3346,7 @@ Section SHIFTMAP.
       destruct (classic (exists ftspair, <<MAPPAIR: fpair ts ftspair>>)).
       { des. esplits. right. left. esplits; eauto.
         - refl.
-        - eapply PAIR.(mapping_map_lt_pair_loc_wf); eauto. }
+        - eapply (mapping_map_lt_pair_loc_wf PAIR); eauto. }
       { esplits. right. right. esplits; eauto. ss. }
     }
     intros [f' FSPEC]. exists f'. splits.
@@ -3392,25 +3392,25 @@ Section SHIFTMAP.
     { i. destruct (Time.eq_dec t ts); eauto. }
     econs.
     - ii. des; subst.
-      + eapply MAPLT.(mapping_map_lt_pair_loc_lt); eauto.
+      + eapply (mapping_map_lt_pair_loc_lt MAPLT); eauto.
       + eapply RIGHT; eauto.
       + eapply LEFT; eauto.
       + exfalso. eapply Time.lt_strorder; eauto.
     - i. des; subst.
-      + eapply MAPLT.(mapping_map_lt_pair_loc_wf); eauto.
+      + eapply (mapping_map_lt_pair_loc_wf MAPLT); eauto.
       + auto.
     - i. des; subst.
-      + eapply MAPLT.(mapping_map_lt_pair_loc_inj); eauto.
+      + eapply (mapping_map_lt_pair_loc_inj MAPLT); eauto.
       + exfalso. eauto.
       + exfalso. eauto.
       + auto.
-    (* - left. eapply MAPLT.(mapping_map_lt_pair_loc_bot); eauto. *)
+    (* - left. eapply (mapping_map_lt_pair_loc_bot MAPLT); eauto. *)
     - ii. des; subst.
-      + eapply MAPLT.(mapping_map_lt_pair_loc_max); eauto.
+      + eapply (mapping_map_lt_pair_loc_max MAPLT); eauto.
       + eapply MAX; eauto.
     - i. assert (NEQ: ts <> ts0).
       { ii. subst. eapply NMAP. eauto. }
-      hexploit (MAPLT.(mapping_map_lt_pair_loc_closed) ts0).
+      hexploit ((mapping_map_lt_pair_loc_closed MAPLT) ts0).
       { i. eapply NMAP. eauto. } i.
 
       destruct H. guardH H0. des. split.
@@ -3472,25 +3472,25 @@ Section SHIFTMAP.
           eapply (@TimeFacts.le_lt_lt _ (snd fts_left)).
           { destruct x.
             - transitivity (fst fts_left).
-              + left. eapply MAPLT.(mapping_map_lt_pair_loc_lt); eauto.
-              + eapply MAPLT.(mapping_map_lt_pair_loc_wf); eauto.
-            - inv H. hexploit (MAPLT.(mapping_map_lt_pair_loc_inj) _ _ _ MAP MAP0); eauto.
+              + left. eapply (mapping_map_lt_pair_loc_lt MAPLT); eauto.
+              + eapply (mapping_map_lt_pair_loc_wf MAPLT); eauto.
+            - inv H. hexploit ((mapping_map_lt_pair_loc_inj MAPLT) _ _ _ MAP MAP0); eauto.
               i. subst. refl. }
           { unfold fts. des_ifs.
-            - eapply Time.middle_spec. eapply MAPLT.(mapping_map_lt_pair_loc_max); eauto.
+            - eapply Time.middle_spec. eapply (mapping_map_lt_pair_loc_max MAPLT); eauto.
             - eapply Time.incr_spec. }
         + i. exploit MAX; eauto. i.
           exfalso. eapply Time.lt_strorder. etrans; eauto.
         + refl.
         + i. subst. unfold fts. eapply Time.middle_spec.
-          eapply MAPLT.(mapping_map_lt_pair_loc_max); eauto.
+          eapply (mapping_map_lt_pair_loc_max MAPLT); eauto.
       - i. ss. destruct (Time.eq_dec x0 ts).
         { subst. exfalso. eauto. }
         { eauto. }
       - ss. eauto.
     }
     { assert (LEFTRIGHT: Time.lt (snd fts_left) (fst fts_right)).
-      { eapply MAPLT.(mapping_map_lt_pair_loc_lt); eauto. }
+      { eapply (mapping_map_lt_pair_loc_lt MAPLT); eauto. }
       esplits.
       - eapply mapping_map_lt_pair_loc_update_one.
         + eauto.
@@ -3499,9 +3499,9 @@ Section SHIFTMAP.
           eapply (@TimeFacts.le_lt_lt _ (snd fts_left)).
           { destruct x.
             - transitivity (fst fts_left).
-              + left. eapply MAPLT.(mapping_map_lt_pair_loc_lt); eauto.
-              + eapply MAPLT.(mapping_map_lt_pair_loc_wf); eauto.
-            - inv H. hexploit (MAPLT.(mapping_map_lt_pair_loc_inj) _ _ _ MAP MAP1); eauto.
+              + left. eapply (mapping_map_lt_pair_loc_lt MAPLT); eauto.
+              + eapply (mapping_map_lt_pair_loc_wf MAPLT); eauto.
+            - inv H. hexploit ((mapping_map_lt_pair_loc_inj MAPLT) _ _ _ MAP MAP1); eauto.
               i. subst. refl. }
           { eapply Time.middle_spec. auto. }
         + i. exploit SUP; eauto. i. ss.
@@ -3509,17 +3509,17 @@ Section SHIFTMAP.
           { eapply Time.middle_spec. auto. }
           { destruct x.
             - transitivity (snd fts_right).
-              + eapply MAPLT.(mapping_map_lt_pair_loc_wf); eauto.
-              + left. eapply MAPLT.(mapping_map_lt_pair_loc_lt); eauto.
-            - inv H. hexploit (MAPLT.(mapping_map_lt_pair_loc_inj) _ _ _ MAP0 MAP1); eauto.
+              + eapply (mapping_map_lt_pair_loc_wf MAPLT); eauto.
+              + left. eapply (mapping_map_lt_pair_loc_lt MAPLT); eauto.
+            - inv H. hexploit ((mapping_map_lt_pair_loc_inj MAPLT) _ _ _ MAP0 MAP1); eauto.
               i. subst. refl. }
         + refl.
         + i. ss. etrans.
           { eapply TimeFacts.lt_le_lt.
             - eapply Time.middle_spec. auto.
-            - eapply MAPLT.(mapping_map_lt_pair_loc_wf); eauto.
+            - eapply (mapping_map_lt_pair_loc_wf MAPLT); eauto.
           }
-          { eapply MAPLT.(mapping_map_lt_pair_loc_max); eauto.
+          { eapply (mapping_map_lt_pair_loc_max MAPLT); eauto.
           }
       - i. ss. destruct (Time.eq_dec x0 ts).
         { subst. exfalso. eauto. }
@@ -3581,7 +3581,7 @@ Section SHIFTMAP.
       { split; ss. left. auto. }
     - eapply INCR. eauto.
     - i. eapply MAPLT in TS0; cycle 1; eauto. ss. split; auto.
-      eapply MAPLT.(mapping_map_lt_pair_loc_max); eauto.
+      eapply (mapping_map_lt_pair_loc_max MAPLT); eauto.
     - auto.
   Qed.
 

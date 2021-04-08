@@ -35,20 +35,20 @@ Inductive times_configuration_step_strong (times: Loc.t -> Time.t -> Prop)
            (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
 | times_configuration_step_strong_intro
     lang tr e tr' pf tid c1 st1 lc1 e2 st3 lc3 sc3 memory3 tr_cert
-    (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
-    (STEPS: Trace.steps tr' (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
+    (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
+    (STEPS: Trace.steps tr' (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) e2)
     (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr')
     (STEP: Thread.step pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
-    (TR: tr = tr'++[(e2.(Thread.local), e)])
+    (TR: tr = tr'++[((Thread.local e2), e)])
     (CONSISTENT: forall (EVENT: e <> ThreadEvent.failure),
         pf_consistent_super_strong (Thread.mk _ st3 lc3 sc3 memory3) tr_cert times)
     (CERTBOT: e = ThreadEvent.failure \/ (exists se, e = ThreadEvent.syscall se) -> tr_cert = [])
-    (CERTBOTNIL: lc3.(Local.promises) = Memory.bot -> tr_cert = [])
+    (CERTBOTNIL: (Local.promises lc3) = Memory.bot -> tr_cert = [])
     (TIMES: List.Forall (fun thte => wf_time_evt times (snd thte)) tr)
   :
     times_configuration_step_strong
       times tr tr_cert
-      (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
+      (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) (Configuration.threads c1)) sc3 memory3)
 .
 
 Inductive times_configuration_step (times: Loc.t -> Time.t -> Prop)
@@ -56,11 +56,11 @@ Inductive times_configuration_step (times: Loc.t -> Time.t -> Prop)
            (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
 | times_configuration_step_intro
     lang tr e tr' pf tid c1 st1 lc1 e2 st3 lc3 sc3 memory3 tr_cert
-    (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
-    (STEPS: Trace.steps tr' (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
+    (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
+    (STEPS: Trace.steps tr' (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) e2)
     (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr')
     (STEP: Thread.step pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
-    (TR: tr = tr'++[(e2.(Thread.local), e)])
+    (TR: tr = tr'++[((Thread.local e2), e)])
     (CONSISTENT: forall (EVENT: e <> ThreadEvent.failure),
         pf_consistent_super_strong (Thread.mk _ st3 lc3 sc3 memory3) tr_cert times)
     (CERTBOT: e = ThreadEvent.failure \/ (exists se, e = ThreadEvent.syscall se) -> tr_cert = [])
@@ -68,7 +68,7 @@ Inductive times_configuration_step (times: Loc.t -> Time.t -> Prop)
   :
     times_configuration_step
       times tr tr_cert
-      (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
+      (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) (Configuration.threads c1)) sc3 memory3)
 .
 
 Lemma times_configuration_step_strong_step
@@ -106,8 +106,8 @@ Lemma times_configuration_step_future
       (STEP: @times_configuration_step times tr tr_cert e tid c1 c2)
       (WF1: Configuration.wf c1):
   (<<WF2: Configuration.wf c2>>) /\
-  (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-  (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
+  (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+  (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>).
 Proof.
   eapply times_configuration_step_configuration_step in STEP; eauto.
   eapply Configuration.step_future; eauto.
@@ -132,8 +132,8 @@ Lemma times_configuration_opt_step_future
       (STEP: @times_configuration_opt_step times tr tr_cert e tid c1 c2)
       (WF1: Configuration.wf c1):
   (<<WF2: Configuration.wf c2>>) /\
-  (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-  (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
+  (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+  (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>).
 Proof.
   inv STEP.
   { eapply times_configuration_step_future; eauto. }
@@ -199,7 +199,7 @@ Proof.
     { ss. eapply WF1; eauto. } i. des. ss.
     hexploit Thread.step_future; eauto. i. des. ss.
     eapply consistent_pf_consistent_super_strong in H; eauto. des.
-    destruct (classic (lc3.(Local.promises) = Memory.bot)) as [EQBOT|NEQBOT].
+    destruct (classic ((Local.promises lc3) = Memory.bot)) as [EQBOT|NEQBOT].
     { des. eexists (certimes \2/ (fun loc ts => List.In ts (times loc ++ times0 loc))), (tr++_), []. splits.
       { econs; eauto.
         { i. esplits. eapply promises_bot_certify_nil; eauto. }

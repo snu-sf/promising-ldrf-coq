@@ -48,21 +48,21 @@ Section LocalDRFRA.
         lang
         rels1 rels2 rels3 e1 e2 e3
         e loc to val released ord
-        (PROMISES: RAThread.reserve_only L e1.(Thread.local).(Local.promises))
-        (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
-        (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-        (MEM1: Memory.closed e1.(Thread.memory))
+        (PROMISES: RAThread.reserve_only L (Local.promises (Thread.local e1)))
+        (WF1: Local.wf (Thread.local e1) (Thread.memory e1))
+        (SC1: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
+        (MEM1: Memory.closed (Thread.memory e1))
         (STEPS: @RAThread.steps lang L rels1 rels2 e1 e2)
         (STEP: RAThread.step L rels2 rels3 e e2 e3)
         (EVENT: ThreadEvent.is_reading e = Some (loc, to, val, released, ord))
         (LOC: L loc)
-        (HIGHER: Time.lt (e2.(Thread.local).(Local.tview).(TView.cur).(View.rlx) loc) to):
+        (HIGHER: Time.lt ((Local.tview (Thread.local e2)).(TView.cur).(View.rlx) loc) to):
     exists from,
-      (<<GET: Memory.get loc to e1.(Thread.memory) = Some (from, Message.concrete val released)>>) /\
+      (<<GET: Memory.get loc to (Thread.memory e1) = Some (from, Message.concrete val released)>>) /\
       (<<RELS: List.In (loc, to) rels1 <-> List.In (loc, to) rels2>>).
   Proof.
     assert (GET: exists from,
-               Memory.get loc to e2.(Thread.memory) = Some (from, Message.concrete val released)).
+               Memory.get loc to (Thread.memory e2) = Some (from, Message.concrete val released)).
     { destruct e; inv EVENT; inv STEP; inv STEP0; inv STEP; inv LOCAL.
       - inv LOCAL0. inv STEP. eauto.
       - inv LOCAL1. inv STEP. eauto. }
@@ -87,7 +87,7 @@ Section LocalDRFRA.
       + erewrite Memory.remove_o; eauto. condtac; ss.
     - destruct (classic ((loc, to) = (loc0, to0))).
       { exfalso. symmetry in H0. inv H0.
-        assert (Time.le to (lc2.(Local.tview).(TView.cur).(View.rlx) loc)).
+        assert (Time.le to ((TView.cur (Local.tview lc2)).(View.rlx) loc)).
         { inv LOCAL0. inv STEP. ss.
           unfold TimeMap.join, TimeMap.singleton.
           unfold LocFun.add, LocFun.init, LocFun.find. condtac; ss.
@@ -124,7 +124,7 @@ Section LocalDRFRA.
           inv x. ss.
     - destruct (classic ((loc, to) = (loc0, tsw))).
       { exfalso. symmetry in H0. inv H0.
-        assert (Time.le to (lc2.(Local.tview).(TView.cur).(View.rlx) loc)).
+        assert (Time.le to ((TView.cur (Local.tview lc2)).(View.rlx) loc)).
         { inv LOCAL2. inv STEP. ss.
           unfold TimeMap.join, TimeMap.singleton.
           unfold LocFun.add, LocFun.init, LocFun.find. condtac; ss.
@@ -168,8 +168,8 @@ Section LocalDRFRA.
         (STEPS: RAConfiguration.steps L rels1 rels2 c1 c2)
         (LOC: L loc)
         (GET1: forall from' val' released',
-            Memory.get loc to c1.(Configuration.memory) <> Some (from', Message.concrete val' released'))
-        (GET2: Memory.get loc to c2.(Configuration.memory) = Some (from, Message.concrete val released)):
+            Memory.get loc to (Configuration.memory c1) <> Some (from', Message.concrete val' released'))
+        (GET2: Memory.get loc to (Configuration.memory c2) = Some (from, Message.concrete val released)):
     exists rels11 rels12 c11 c12 tid e from' released' ord,
       (<<STEPS1: RAConfiguration.steps L rels1 rels11 c1 c11>>) /\
       (<<WRITE_STEP: RAConfiguration.step L e tid rels11 rels12 c11 c12>>) /\
@@ -231,7 +231,7 @@ Section LocalDRFRA.
     specialize (@Configuration.init_wf s). intro WF.
     specialize (@RAConfiguration.init_reserve_only L s). intro RESERVE.
     ii. unfold RARace.race in *. inv RARACE. inv H0. guardH H2.
-    destruct (Memory.get loc to (Configuration.init s).(Configuration.memory)) eqn:GET.
+    destruct (Memory.get loc to (Configuration.memory (Configuration.init s))) eqn:GET.
     { unfold Memory.get, Memory.init, Cell.get, Cell.init in GET. ss.
       apply DOMap.singleton_find_inv in GET. des. subst. inv H1. }
     unfold RARace.racefree_syn in *.

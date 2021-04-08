@@ -851,10 +851,10 @@ Section MEMORYLEMMAS.
   Qed.
 
   Lemma step_promises_le lang (th0 th1: Thread.t lang) e
-        (MLE: Memory.le th0.(Thread.local).(Local.promises) th0.(Thread.memory))
+        (MLE: Memory.le (Local.promises (Thread.local th0)) (Thread.memory th0))
         (STEP: Thread.step_allpf e th0 th1)
   :
-    Memory.le th1.(Thread.local).(Local.promises) th1.(Thread.memory).
+    Memory.le (Local.promises (Thread.local th1)) (Thread.memory th1).
   Proof.
     inv STEP. inv STEP0.
     - inv STEP. inv LOCAL. ss.
@@ -874,20 +874,20 @@ Section MEMORYLEMMAS.
   Qed.
 
   Lemma trace_steps_promises_le lang tr (th0 th1: Thread.t lang)
-        (MLE: Memory.le th0.(Thread.local).(Local.promises) th0.(Thread.memory))
+        (MLE: Memory.le (Local.promises (Thread.local th0)) (Thread.memory th0))
         (STEP: Trace.steps tr th0 th1)
   :
-    Memory.le th1.(Thread.local).(Local.promises) th1.(Thread.memory).
+    Memory.le (Local.promises (Thread.local th1)) (Thread.memory th1).
   Proof.
     ginduction STEP; ss.
     i. eapply IHSTEP. eapply step_promises_le; eauto. econs; eauto.
   Qed.
 
   Lemma steps_promises_le P lang (th0 th1: Thread.t lang)
-        (MLE: Memory.le th0.(Thread.local).(Local.promises) th0.(Thread.memory))
+        (MLE: Memory.le (Local.promises (Thread.local th0)) (Thread.memory th0))
         (STEP: rtc (tau (@pred_step P lang)) th0 th1)
   :
-    Memory.le th1.(Thread.local).(Local.promises) th1.(Thread.memory).
+    Memory.le (Local.promises (Thread.local th1)) (Thread.memory th1).
   Proof.
     ginduction STEP; ss.
     i. eapply IHSTEP.
@@ -1028,9 +1028,9 @@ Section MEMORYLEMMAS.
   Lemma promise_bot_no_promise P lang (th0 th1: Thread.t lang) e
         (STEP: (@pred_step P lang) e th0 th1)
         (NOPROMISE: P <1= no_promise)
-        (BOT: th0.(Thread.local).(Local.promises) = Memory.bot)
+        (BOT: (Local.promises (Thread.local th0)) = Memory.bot)
     :
-      th1.(Thread.local).(Local.promises) = Memory.bot.
+      (Local.promises (Thread.local th1)) = Memory.bot.
   Proof.
     inv STEP. eapply NOPROMISE in SAT. inv STEP0. inv STEP.
     - inv STEP0; des; clarify.
@@ -1045,9 +1045,9 @@ Section MEMORYLEMMAS.
   Lemma promise_bot_no_promise_rtc P lang (th0 th1: Thread.t lang)
         (STEP: rtc (tau (@pred_step P lang)) th0 th1)
         (NOPROMISE: P <1= no_promise)
-        (BOT: th0.(Thread.local).(Local.promises) = Memory.bot)
+        (BOT: (Local.promises (Thread.local th0)) = Memory.bot)
     :
-      th1.(Thread.local).(Local.promises) = Memory.bot.
+      (Local.promises (Thread.local th1)) = Memory.bot.
   Proof.
     induction STEP; auto. erewrite IHSTEP; auto.
     inv H. eapply promise_bot_no_promise; eauto.
@@ -1108,7 +1108,7 @@ Section MEMORYLEMMAS.
         MSGS lang (th0 th1: Thread.t lang) pf e
         (STEP: Thread.step pf e th0 th1)
         (WRITENOTIN: write_not_in MSGS e)
-        (LCWF0: Local.wf th0.(Thread.local) th0.(Thread.memory))
+        (LCWF0: Local.wf (Thread.local th0) (Thread.memory th0))
     :
       write_not_to MSGS e.
   Proof.
@@ -1147,7 +1147,7 @@ Section MEMORYLEMMAS.
   Qed.
 
   Lemma step_wf_event lang P (th0 th1: Thread.t lang) e
-        (INHABITED: Memory.inhabited th0.(Thread.memory))
+        (INHABITED: Memory.inhabited (Thread.memory th0))
         (STEP: pred_step P e th0 th1)
     :
       wf_event e.
@@ -1161,7 +1161,7 @@ Section MEMORYLEMMAS.
   Qed.
 
   Lemma steps_wf_event lang P (th0 th1: Thread.t lang)
-        (INHABITED: Memory.inhabited th0.(Thread.memory))
+        (INHABITED: Memory.inhabited (Thread.memory th0))
         (STEP: rtc (tau (@pred_step P lang)) th0 th1)
     :
       rtc (tau (@pred_step (P /1\ wf_event) lang)) th0 th1.
@@ -1506,8 +1506,8 @@ Section UNCHANGABLES.
   Lemma unchangable_increase pf e lang (th0 th1: Thread.t lang)
         (STEP: Thread.step pf e th0 th1)
     :
-      unchangable th0.(Thread.memory) th0.(Thread.local).(Local.promises) <4=
-      unchangable th1.(Thread.memory) th1.(Thread.local).(Local.promises).
+      unchangable (Thread.memory th0) (Local.promises (Thread.local th0)) <4=
+      unchangable (Thread.memory th1) (Local.promises (Thread.local th1)).
   Proof.
     inv STEP.
     - inv STEP0; ss. inv LOCAL. i.
@@ -1523,8 +1523,8 @@ Section UNCHANGABLES.
   Lemma unchangable_rtc_increase P lang (th0 th1: Thread.t lang)
         (STEPS: rtc (tau (@pred_step P lang))th0 th1)
     :
-      unchangable th0.(Thread.memory) th0.(Thread.local).(Local.promises) <4=
-      unchangable th1.(Thread.memory) th1.(Thread.local).(Local.promises).
+      unchangable (Thread.memory th0) (Local.promises (Thread.local th0)) <4=
+      unchangable (Thread.memory th1) (Local.promises (Thread.local th1)).
   Proof.
     ginduction STEPS; ss. i.
     eapply IHSTEPS.
@@ -1534,8 +1534,8 @@ Section UNCHANGABLES.
   Lemma unchangable_trace_steps_increase lang (th0 th1: Thread.t lang) tr
         (STEPS: Trace.steps tr th0 th1)
     :
-      unchangable th0.(Thread.memory) th0.(Thread.local).(Local.promises) <4=
-      unchangable th1.(Thread.memory) th1.(Thread.local).(Local.promises).
+      unchangable (Thread.memory th0) (Local.promises (Thread.local th0)) <4=
+      unchangable (Thread.memory th1) (Local.promises (Thread.local th1)).
   Proof.
     ginduction STEPS; ss. i.
     eapply IHSTEPS. eapply unchangable_increase; eauto.
@@ -1543,13 +1543,13 @@ Section UNCHANGABLES.
 
   Lemma other_promise_unchangable c tid1 tid2 st1 st2 lc1 lc2
         (CWF: Configuration.wf c)
-        (TID1: IdentMap.find tid1 c.(Configuration.threads) = Some (st1, lc1))
-        (TID2: IdentMap.find tid2 c.(Configuration.threads) = Some (st2, lc2))
+        (TID1: IdentMap.find tid1 (Configuration.threads c) = Some (st1, lc1))
+        (TID2: IdentMap.find tid2 (Configuration.threads c) = Some (st2, lc2))
         (DIFF: tid1 <> tid2)
         l t from msg
-        (GET: Memory.get l t lc2.(Local.promises) = Some (from, msg))
+        (GET: Memory.get l t (Local.promises lc2) = Some (from, msg))
     :
-      unchangable c.(Configuration.memory) lc1.(Local.promises) l t from msg.
+      unchangable (Configuration.memory c) (Local.promises lc1) l t from msg.
   Proof.
     inv CWF. inv WF. destruct st1, st2. econs; eauto.
     - exploit THREADS; try apply TID2; eauto. intros LCWF. inv LCWF. eauto.
@@ -1648,10 +1648,10 @@ Section UNCHANGABLES.
   Qed.
 
   Lemma step_write_not_in lang (th_tgt th_tgt': Thread.t lang) e_tgt pf
-        (MLE: Memory.le th_tgt.(Thread.local).(Local.promises) th_tgt.(Thread.memory))
+        (MLE: Memory.le (Local.promises (Thread.local th_tgt)) (Thread.memory th_tgt))
         (STEP: Thread.step pf e_tgt th_tgt th_tgt')
     :
-      write_not_in (unwritable th_tgt.(Thread.memory) th_tgt.(Thread.local).(Local.promises))
+      write_not_in (unwritable (Thread.memory th_tgt) (Local.promises (Thread.local th_tgt)))
                    e_tgt.
   Proof.
     inv STEP.
@@ -1665,8 +1665,8 @@ Section UNCHANGABLES.
   Lemma unwritable_increase pf e lang (th0 th1: Thread.t lang)
         (STEP: Thread.step pf e th0 th1)
     :
-      unwritable th0.(Thread.memory) th0.(Thread.local).(Local.promises) <2=
-      unwritable th1.(Thread.memory) th1.(Thread.local).(Local.promises).
+      unwritable (Thread.memory th0) (Local.promises (Thread.local th0)) <2=
+      unwritable (Thread.memory th1) (Local.promises (Thread.local th1)).
   Proof.
     ii. inv PR.
     eapply unchangable_increase in UNCH; eauto.
@@ -1676,8 +1676,8 @@ Section UNCHANGABLES.
   Lemma rtc_unwritable_increase lang (th0 th1: Thread.t lang)
         (STEP: rtc (Thread.tau_step (lang:=lang)) th0 th1)
     :
-      unwritable th0.(Thread.memory) th0.(Thread.local).(Local.promises) <2=
-      unwritable th1.(Thread.memory) th1.(Thread.local).(Local.promises).
+      unwritable (Thread.memory th0) (Local.promises (Thread.local th0)) <2=
+      unwritable (Thread.memory th1) (Local.promises (Thread.local th1)).
   Proof.
     induction STEP; eauto.
     i. inv H. inv TSTEP. eapply IHSTEP. eapply unwritable_increase; eauto.
@@ -1686,18 +1686,18 @@ Section UNCHANGABLES.
   Lemma unwritable_traces_steps_increase lang (th0 th1: Thread.t lang) tr
         (STEPS: Trace.steps tr th0 th1)
     :
-      unwritable th0.(Thread.memory) th0.(Thread.local).(Local.promises) <2=
-      unwritable th1.(Thread.memory) th1.(Thread.local).(Local.promises).
+      unwritable (Thread.memory th0) (Local.promises (Thread.local th0)) <2=
+      unwritable (Thread.memory th1) (Local.promises (Thread.local th1)).
   Proof.
     ginduction STEPS; ss. i.
     eapply IHSTEPS. eapply unwritable_increase; eauto.
   Qed.
 
   Lemma steps_write_not_in P lang (th_tgt th_tgt': Thread.t lang)
-        (MLE: Memory.le th_tgt.(Thread.local).(Local.promises) th_tgt.(Thread.memory))
+        (MLE: Memory.le (Local.promises (Thread.local th_tgt)) (Thread.memory th_tgt))
         (STEP: rtc (tau (@pred_step P lang)) th_tgt th_tgt')
     :
-      rtc (tau (@pred_step (P /1\ write_not_in (unwritable th_tgt.(Thread.memory) th_tgt.(Thread.local).(Local.promises))) lang)) th_tgt th_tgt'.
+      rtc (tau (@pred_step (P /1\ write_not_in (unwritable (Thread.memory th_tgt) (Local.promises (Thread.local th_tgt)))) lang)) th_tgt th_tgt'.
   Proof.
     ginduction STEP.
     - i. refl.
@@ -1713,9 +1713,9 @@ Section UNCHANGABLES.
 
   Lemma write_not_in_traced lang (th0 th1: Thread.t lang) tr
         (STEPS: Trace.steps tr th0 th1)
-        (MLE: Memory.le th0.(Thread.local).(Local.promises) th0.(Thread.memory))
+        (MLE: Memory.le (Local.promises (Thread.local th0)) (Thread.memory th0))
     :
-      List.Forall (fun em => (write_not_in (unwritable th0.(Thread.memory) th0.(Thread.local).(Local.promises))) (snd em)) tr.
+      List.Forall (fun em => (write_not_in (unwritable (Thread.memory th0) (Local.promises (Thread.local th0)))) (snd em)) tr.
   Proof.
     ginduction STEPS.
     - econs.
@@ -1730,13 +1730,13 @@ Section UNCHANGABLES.
 
   Lemma other_promise_unwritable c tid1 tid2 st1 st2 lc1 lc2
         (CWF: Configuration.wf c)
-        (TID1: IdentMap.find tid1 c.(Configuration.threads) = Some (st1, lc1))
-        (TID2: IdentMap.find tid2 c.(Configuration.threads) = Some (st2, lc2))
+        (TID1: IdentMap.find tid1 (Configuration.threads c) = Some (st1, lc1))
+        (TID2: IdentMap.find tid2 (Configuration.threads c) = Some (st2, lc2))
         (DIFF: tid1 <> tid2)
         l t
-        (COV: covered l t lc2.(Local.promises))
+        (COV: covered l t (Local.promises lc2))
     :
-      unwritable c.(Configuration.memory) lc1.(Local.promises) l t.
+      unwritable (Configuration.memory c) (Local.promises lc1) l t.
   Proof.
     inv CWF. inv WF. inv COV. destruct st1, st2.
     rewrite unwritable_eq; cycle 1.
@@ -1760,8 +1760,8 @@ Section UNCHANGABLES.
   Lemma unreadable_increase pf e lang (th0 th1: Thread.t lang)
         (STEP: Thread.step pf e th0 th1)
     :
-      unreadable th0.(Thread.memory) th0.(Thread.local).(Local.promises) <2=
-      unreadable th1.(Thread.memory) th1.(Thread.local).(Local.promises).
+      unreadable (Thread.memory th0) (Local.promises (Thread.local th0)) <2=
+      unreadable (Thread.memory th1) (Local.promises (Thread.local th1)).
   Proof.
     ii. inv PR. inv UNWRITABLE.
     dup UNCH. eapply unchangable_increase in UNCH; eauto. split.
@@ -1781,8 +1781,8 @@ Section UNCHANGABLES.
   Lemma rtc_unreadable_increase lang (th0 th1: Thread.t lang)
         (STEP: rtc (Thread.tau_step (lang:=lang)) th0 th1)
     :
-      unreadable th0.(Thread.memory) th0.(Thread.local).(Local.promises) <2=
-      unreadable th1.(Thread.memory) th1.(Thread.local).(Local.promises).
+      unreadable (Thread.memory th0) (Local.promises (Thread.local th0)) <2=
+      unreadable (Thread.memory th1) (Local.promises (Thread.local th1)).
   Proof.
     induction STEP; eauto.
     i. inv H. inv TSTEP. eapply IHSTEP. eapply unreadable_increase; eauto.
@@ -1791,8 +1791,8 @@ Section UNCHANGABLES.
   Lemma unreadable_traces_steps_increase lang (th0 th1: Thread.t lang) tr
         (STEPS: Trace.steps tr th0 th1)
     :
-      unreadable th0.(Thread.memory) th0.(Thread.local).(Local.promises) <2=
-      unreadable th1.(Thread.memory) th1.(Thread.local).(Local.promises).
+      unreadable (Thread.memory th0) (Local.promises (Thread.local th0)) <2=
+      unreadable (Thread.memory th1) (Local.promises (Thread.local th1)).
   Proof.
     ginduction STEPS; ss. i.
     eapply IHSTEPS. eapply unreadable_increase; eauto.
@@ -1801,7 +1801,7 @@ Section UNCHANGABLES.
   Lemma step_no_read_unreadable lang (th_tgt th_tgt': Thread.t lang) e_tgt pf
         (STEP: Thread.step pf e_tgt th_tgt th_tgt')
     :
-      no_read_msgs (unreadable th_tgt.(Thread.memory) th_tgt.(Thread.local).(Local.promises))
+      no_read_msgs (unreadable (Thread.memory th_tgt) (Local.promises (Thread.local th_tgt)))
                    e_tgt.
   Proof.
     inv STEP.
@@ -1814,7 +1814,7 @@ Section UNCHANGABLES.
   Lemma steps_no_read_unreadable P lang (th_tgt th_tgt': Thread.t lang)
         (STEP: rtc (tau (@pred_step P lang)) th_tgt th_tgt')
     :
-      rtc (tau (@pred_step (P /1\ no_read_msgs (unreadable th_tgt.(Thread.memory) th_tgt.(Thread.local).(Local.promises))) lang)) th_tgt th_tgt'.
+      rtc (tau (@pred_step (P /1\ no_read_msgs (unreadable (Thread.memory th_tgt) (Local.promises (Thread.local th_tgt)))) lang)) th_tgt th_tgt'.
   Proof.
     ginduction STEP.
     - i. refl.
@@ -1829,7 +1829,7 @@ Section UNCHANGABLES.
   Lemma no_read_unreadable_traced lang (th0 th1: Thread.t lang) tr
         (STEPS: Trace.steps tr th0 th1)
     :
-      List.Forall (fun em => (no_read_msgs (unreadable th0.(Thread.memory) th0.(Thread.local).(Local.promises))) (snd em)) tr.
+      List.Forall (fun em => (no_read_msgs (unreadable (Thread.memory th0) (Local.promises (Thread.local th0)))) (snd em)) tr.
   Proof.
     ginduction STEPS.
     - econs.
@@ -1865,9 +1865,9 @@ Section UNCHANGABLES.
         (CLOSED: Memory.closed (Thread.memory th0))
         (NOTIN: write_not_in MSGS e)
         loc ts
-        (COVERED: covered loc ts th1.(Thread.memory))
+        (COVERED: covered loc ts (Thread.memory th1))
     :
-      covered loc ts th0.(Thread.memory) \/ ~ MSGS loc ts.
+      covered loc ts (Thread.memory th0) \/ ~ MSGS loc ts.
   Proof.
     inv STEP.
     { inv STEP0; ss. inv LOCAL0. eapply promise_write_not_in_covered; eauto.
@@ -1885,9 +1885,9 @@ Section UNCHANGABLES.
         (CLOSED: Memory.closed (Thread.memory th0))
         (NOTIN: P <1= write_not_in MSGS)
         loc ts
-        (COVERED: covered loc ts th1.(Thread.memory))
+        (COVERED: covered loc ts (Thread.memory th1))
     :
-      covered loc ts th0.(Thread.memory) \/ ~ MSGS loc ts.
+      covered loc ts (Thread.memory th0) \/ ~ MSGS loc ts.
   Proof.
     ginduction STEPS; auto. i.
     inv H. dup TSTEP. inv TSTEP. inv STEP.
@@ -1903,9 +1903,9 @@ Section UNCHANGABLES.
         (CLOSED: Memory.closed (Thread.memory th0))
         (NOTIN: List.Forall (fun em => write_not_in MSGS (snd em)) tr)
         loc ts
-        (COVERED: covered loc ts th1.(Thread.memory))
+        (COVERED: covered loc ts (Thread.memory th1))
     :
-      covered loc ts th0.(Thread.memory) \/ ~ MSGS loc ts.
+      covered loc ts (Thread.memory th0) \/ ~ MSGS loc ts.
   Proof.
     ginduction STEPS; auto. i. subst.
     inv NOTIN. exploit Thread.step_future; eauto. i. des.
@@ -1971,7 +1971,7 @@ Section PROMISED.
   Lemma concrete_promised_increase lang (th0 th1: Thread.t lang) pf e
         (STEP: Thread.step pf e th0 th1)
     :
-      concrete_promised th0.(Thread.memory) <2= concrete_promised th1.(Thread.memory).
+      concrete_promised (Thread.memory th0) <2= concrete_promised (Thread.memory th1).
   Proof.
     i. inv STEP.
     - inv STEP0. ss. inv LOCAL.
@@ -1986,7 +1986,7 @@ Section PROMISED.
   Lemma rtc_concrete_promised_increase lang (th0 th1: Thread.t lang)
         (STEP: rtc (@Thread.tau_step lang) th0 th1)
     :
-      concrete_promised th0.(Thread.memory) <2= concrete_promised th1.(Thread.memory).
+      concrete_promised (Thread.memory th0) <2= concrete_promised (Thread.memory th1).
   Proof.
     ginduction STEP; auto. i. eapply IHSTEP.
     inv H. inv TSTEP. eapply concrete_promised_increase; eauto.
@@ -1995,7 +1995,7 @@ Section PROMISED.
   Lemma trace_steps_concrete_promised_increase lang (th0 th1: Thread.t lang) tr
         (STEP: Trace.steps tr th0 th1)
     :
-      concrete_promised th0.(Thread.memory) <2= concrete_promised th1.(Thread.memory).
+      concrete_promised (Thread.memory th0) <2= concrete_promised (Thread.memory th1).
   Proof.
     ginduction STEP; auto. i. subst. eapply IHSTEP.
     eapply concrete_promised_increase; eauto.
@@ -2004,7 +2004,7 @@ Section PROMISED.
   Lemma configuration_step_concrete_promised_increase c0 c1 e tid
         (STEP: Configuration.step e tid c0 c1)
     :
-      concrete_promised c0.(Configuration.memory) <2= concrete_promised c1.(Configuration.memory).
+      concrete_promised (Configuration.memory c0) <2= concrete_promised (Configuration.memory c1).
   Proof.
     inv STEP; ss.
     { i. eapply rtc_concrete_promised_increase in STEPS; eauto.
@@ -2070,9 +2070,9 @@ Section UNCHANGEDON.
   Lemma write_not_in_unchanged_on P L e lang (th0 th1: Thread.t lang)
         (STEP: pred_step P e th0 th1)
         (PRED: P <1= (write_not_in L /1\ no_promise))
-        (BOT: th0.(Thread.local).(Local.promises) = Memory.bot)
+        (BOT: (Local.promises (Thread.local th0)) = Memory.bot)
     :
-      unchanged_on L th0.(Thread.memory) th1.(Thread.memory).
+      unchanged_on L (Thread.memory th0) (Thread.memory th1).
   Proof.
     inv STEP. eapply PRED in SAT. des. inv STEP0. inv STEP.
     - inv STEP0; ss; des; clarify.
@@ -2088,12 +2088,12 @@ End UNCHANGEDON.
 Section PROMISEFREE.
 
   Lemma promise_free_no_promise P lang (th0 th1: Thread.t lang) e
-        (NOPROMISE: th0.(Thread.local).(Local.promises) = Memory.bot)
+        (NOPROMISE: (Local.promises (Thread.local th0)) = Memory.bot)
         (STEP: pred_step P e th0 th1)
         (PRED: P <1= promise_free)
   :
     (<<STEP: pred_step P e th0 th1>>) /\
-    (<<NOPROMISE: th1.(Thread.local).(Local.promises) = Memory.bot>>).
+    (<<NOPROMISE: (Local.promises (Thread.local th1)) = Memory.bot>>).
   Proof.
     inv STEP. dup SAT. eapply PRED in SAT. inv STEP0. inv STEP.
     - inv STEP0. inv LOCAL. inv PROMISE; ss; des; clarify.
@@ -2161,8 +2161,8 @@ Section PROMISEFREE.
         (STEP: (@pred_step P lang) e th0 th1)
         (PRED: P <1= promise_free)
     :
-      concrete_promised (th1.(Thread.local).(Local.promises)) <2=
-      concrete_promised (th0.(Thread.local).(Local.promises)).
+      concrete_promised ((Local.promises (Thread.local th1))) <2=
+      concrete_promised ((Local.promises (Thread.local th0))).
   Proof.
     i. inv STEP. eapply PRED in SAT. inv STEP0. des. inv STEP.
     - inv STEP0. ss. inv LOCAL. ss. inv PROMISE; clarify.
@@ -2184,8 +2184,8 @@ Section PROMISEFREE.
         (STEP: rtc (tau (@pred_step P lang)) th0 th1)
         (PRED: P <1= promise_free)
     :
-      concrete_promised (th1.(Thread.local).(Local.promises)) <2=
-      concrete_promised (th0.(Thread.local).(Local.promises)).
+      concrete_promised ((Local.promises (Thread.local th1))) <2=
+      concrete_promised ((Local.promises (Thread.local th0))).
   Proof.
     ginduction STEP; ss.
     i. eapply IHSTEP in PR; eauto. inv H.
@@ -2225,9 +2225,9 @@ Qed.
 
 Lemma step_memory_le lang (th0 th1: Thread.t lang) pf e
       (STEP: Thread.step pf e th0 th1)
-      (MLE: Memory.le th0.(Thread.local).(Local.promises) th0.(Thread.memory))
+      (MLE: Memory.le (Local.promises (Thread.local th0)) (Thread.memory th0))
   :
-    Memory.le th1.(Thread.local).(Local.promises) th1.(Thread.memory).
+    Memory.le (Local.promises (Thread.local th1)) (Thread.memory th1).
 Proof.
   inv STEP.
   - inv STEP0. ss. inv LOCAL.
@@ -2240,9 +2240,9 @@ Qed.
 
 Lemma pf_step_memory_le lang (th0 th1: Thread.t lang) e
       (STEP: pred_step no_promise e th0 th1)
-      (BOT: th0.(Thread.local).(Local.promises) = Memory.bot)
+      (BOT: (Local.promises (Thread.local th0)) = Memory.bot)
   :
-    Memory.le th0.(Thread.memory) th1.(Thread.memory).
+    Memory.le (Thread.memory th0) (Thread.memory th1).
 Proof.
   exploit write_not_in_unchanged_on; eauto.
   - i. instantiate (1:=fun _ _ => False).
@@ -2253,13 +2253,13 @@ Qed.
 Inductive configuration_step: forall (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
 | configuration_step_intro
     pf e tid c1 lang st1 lc1 e2 st3 lc3 sc3 memory3
-    (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
-    (STEPS: rtc (@Thread.tau_step _) (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
+    (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
+    (STEPS: rtc (@Thread.tau_step _) (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) e2)
     (STEP: Thread.step pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
     (CONSISTENT: forall (EVENT: e <> ThreadEvent.failure),
         Thread.consistent (Thread.mk _ st3 lc3 sc3 memory3))
   :
-    configuration_step (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
+    configuration_step (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) (Configuration.threads c1)) sc3 memory3)
 .
 
 Lemma configuration_step_equivalent e tid c1 c2
@@ -2474,10 +2474,10 @@ Section CANCEL.
         (STEPS: (@pred_step P lang) e th0 th1)
         (PRED: P <1= (promise_free /1\ (fun e => ~ ThreadEvent.is_cancel e)))
         loc to from
-        (GET: Memory.get loc to th0.(Thread.local).(Local.promises) = Some (from, Message.reserve))
+        (GET: Memory.get loc to (Local.promises (Thread.local th0)) = Some (from, Message.reserve))
     :
       exists from',
-        Memory.get loc to th1.(Thread.local).(Local.promises) = Some (from', Message.reserve).
+        Memory.get loc to (Local.promises (Thread.local th1)) = Some (from', Message.reserve).
   Proof.
     inv STEPS. eapply PRED in SAT. inv STEP. inv STEP0.
     - inv STEP. des. ss. inv LOCAL.
@@ -2503,10 +2503,10 @@ Section CANCEL.
         (STEPS: rtc (tau (@pred_step P lang)) th0 th1)
         (PRED: P <1= (promise_free /1\ (fun e => ~ ThreadEvent.is_cancel e)))
         loc to from
-        (GET: Memory.get loc to th0.(Thread.local).(Local.promises) = Some (from, Message.reserve))
+        (GET: Memory.get loc to (Local.promises (Thread.local th0)) = Some (from, Message.reserve))
     :
       exists from',
-        Memory.get loc to th1.(Thread.local).(Local.promises) = Some (from', Message.reserve).
+        Memory.get loc to (Local.promises (Thread.local th1)) = Some (from', Message.reserve).
   Proof.
     ginduction STEPS; i.
     - esplits; eauto.
@@ -2518,7 +2518,7 @@ Section CANCEL.
         (STEP: (@pred_step P lang) e th0 th1)
         (PRED: P <1= ThreadEvent.is_cancel)
     :
-      Memory.le th1.(Thread.memory) th0.(Thread.memory).
+      Memory.le (Thread.memory th1) (Thread.memory th0).
   Proof.
     inv STEP. eapply PRED in SAT. unfold ThreadEvent.is_cancel in SAT. des_ifs.
     inv STEP0. inv STEP; inv STEP0; ss.
@@ -2531,7 +2531,7 @@ Section CANCEL.
         (STEP: rtc (tau (@pred_step P lang)) th0 th1)
         (PRED: P <1= ThreadEvent.is_cancel)
     :
-      Memory.le th1.(Thread.memory) th0.(Thread.memory).
+      Memory.le (Thread.memory th1) (Thread.memory th0).
   Proof.
     ginduction STEP.
     - refl.
@@ -2543,7 +2543,7 @@ Section CANCEL.
         (STEP: (@pred_step P lang) e th0 th1)
         (PRED: P <1= ThreadEvent.is_cancel)
     :
-      memory_concrete_le th0.(Thread.memory) th1.(Thread.memory).
+      memory_concrete_le (Thread.memory th0) (Thread.memory th1).
   Proof.
     inv STEP. eapply PRED in SAT. unfold ThreadEvent.is_cancel in SAT. des_ifs.
     inv STEP0. inv STEP; inv STEP0; ss.
@@ -2558,7 +2558,7 @@ Section CANCEL.
         (STEP: rtc (tau (@pred_step P lang)) th0 th1)
         (PRED: P <1= ThreadEvent.is_cancel)
     :
-      memory_concrete_le th0.(Thread.memory) th1.(Thread.memory).
+      memory_concrete_le (Thread.memory th0) (Thread.memory th1).
   Proof.
     ginduction STEP.
     - refl.
@@ -2570,7 +2570,7 @@ Section CANCEL.
         (STEP: (@pred_step P lang) e th0 th1)
         (PRED: P <1= ThreadEvent.is_cancel)
     :
-      Memory.le th1.(Thread.local).(Local.promises) th0.(Thread.local).(Local.promises).
+      Memory.le (Local.promises (Thread.local th1)) (Local.promises (Thread.local th0)).
   Proof.
     inv STEP. eapply PRED in SAT. unfold ThreadEvent.is_cancel in SAT. des_ifs.
     inv STEP0. inv STEP; inv STEP0; ss.
@@ -2583,7 +2583,7 @@ Section CANCEL.
         (STEP: rtc (tau (@pred_step P lang)) th0 th1)
         (PRED: P <1= ThreadEvent.is_cancel)
     :
-      Memory.le th1.(Thread.local).(Local.promises) th0.(Thread.local).(Local.promises).
+      Memory.le (Local.promises (Thread.local th1)) (Local.promises (Thread.local th0)).
   Proof.
     ginduction STEP.
     - refl.
@@ -2595,11 +2595,11 @@ Section CANCEL.
         (STEP: (@pred_step P lang) e th0 th1)
         (PRED: P <1= ThreadEvent.is_cancel)
         loc from to msg
-        (GET: Memory.get loc to th0.(Thread.local).(Local.promises) = Some (from, msg))
-        (NONE: Memory.get loc to th1.(Thread.local).(Local.promises) = None)
+        (GET: Memory.get loc to (Local.promises (Thread.local th0)) = Some (from, msg))
+        (NONE: Memory.get loc to (Local.promises (Thread.local th1)) = None)
     :
-      (<<GET: Memory.get loc to th0.(Thread.memory) = Some (from, msg)>>) /\
-      (<<NONE: Memory.get loc to th1.(Thread.memory) = None>>) /\
+      (<<GET: Memory.get loc to (Thread.memory th0) = Some (from, msg)>>) /\
+      (<<NONE: Memory.get loc to (Thread.memory th1) = None>>) /\
       (<<RESERVE: msg = Message.reserve>>).
   Proof.
     inv STEP. eapply PRED in SAT. unfold ThreadEvent.is_cancel in SAT. des_ifs.
@@ -2615,11 +2615,11 @@ Section CANCEL.
         (STEP: rtc (tau (@pred_step P lang)) th0 th1)
         (PRED: P <1= ThreadEvent.is_cancel)
         loc from to msg
-        (GET: Memory.get loc to th0.(Thread.local).(Local.promises) = Some (from, msg))
-        (NONE: Memory.get loc to th1.(Thread.local).(Local.promises) = None)
+        (GET: Memory.get loc to (Local.promises (Thread.local th0)) = Some (from, msg))
+        (NONE: Memory.get loc to (Local.promises (Thread.local th1)) = None)
     :
-      (<<GET: Memory.get loc to th0.(Thread.memory) = Some (from, msg)>>) /\
-      (<<NONE: Memory.get loc to th1.(Thread.memory) = None>>) /\
+      (<<GET: Memory.get loc to (Thread.memory th0) = Some (from, msg)>>) /\
+      (<<NONE: Memory.get loc to (Thread.memory th1) = None>>) /\
       (<<RESERVE: msg = Message.reserve>>).
   Proof.
     ginduction STEP.
@@ -2723,7 +2723,7 @@ Section NOSC.
         (STEP: Thread.step pf e th0 th1)
         (NOSC: no_sc e)
     :
-      th1.(Thread.sc) = th0.(Thread.sc).
+      (Thread.sc th1) = (Thread.sc th0).
   Proof.
     inv STEP.
     { inv STEP0. eauto. }
@@ -2739,7 +2739,7 @@ Section NOSC.
         (STEPS: Trace.steps tr th0 th1)
         (NOSC: List.Forall (fun em => (no_sc) (snd em)) tr)
     :
-      th1.(Thread.sc) = th0.(Thread.sc).
+      (Thread.sc th1) = (Thread.sc th0).
   Proof.
     ginduction STEPS; auto.
     i. inv NOSC; ss. clarify. erewrite IHSTEPS; eauto. ss.
@@ -3051,7 +3051,7 @@ Section CONCRETELE.
         mem0 mem1 lc
         (LOCAL: Local.wf lc mem0)
         (CONCRETELE: concrete_promised_le mem0 mem1)
-        (MLE: Memory.le lc.(Local.promises) mem1)
+        (MLE: Memory.le (Local.promises lc) mem1)
     :
       Local.wf lc mem1.
   Proof.
@@ -3127,12 +3127,12 @@ Section PROMISEWRITING.
   Lemma step_promise_decrease_promise_writing_event lang (th0 th1: Thread.t lang) pf e
         (STEP: Thread.step pf e th0 th1)
         loc from to val released
-        (GET: Memory.get loc to th0.(Thread.local).(Local.promises) = Some (from, Message.concrete val released))
+        (GET: Memory.get loc to (Local.promises (Thread.local th0)) = Some (from, Message.concrete val released))
     :
       (exists from' released',
           (<<FROM: Time.le from from'>>) /\
           (<<RELEASED: View.opt_le released' released>>) /\
-          (<<GET: Memory.get loc to th1.(Thread.local).(Local.promises) = Some (from', Message.concrete val released')>>)) \/
+          (<<GET: Memory.get loc to (Local.promises (Thread.local th1)) = Some (from', Message.concrete val released')>>)) \/
       (promise_writing_event loc from to val released e).
   Proof.
     inv STEP.
@@ -3177,12 +3177,12 @@ Section PROMISEWRITING.
   Lemma steps_promise_decrease_promise_writing_event lang (th0 th1: Thread.t lang) tr
         (STEPS: Trace.steps tr th0 th1)
         loc from to val released
-        (GET: Memory.get loc to th0.(Thread.local).(Local.promises) = Some (from, Message.concrete val released))
+        (GET: Memory.get loc to (Local.promises (Thread.local th0)) = Some (from, Message.concrete val released))
     :
       (exists from' released',
           (<<FROM: Time.le from from'>>) /\
           (<<RELEASED: View.opt_le released' released>>) /\
-          (<<GET: Memory.get loc to th1.(Thread.local).(Local.promises) = Some (from', Message.concrete val released')>>)) \/
+          (<<GET: Memory.get loc to (Local.promises (Thread.local th1)) = Some (from', Message.concrete val released')>>)) \/
       (exists th e,
           (<<WRITING: promise_writing_event loc from to val released e>>) /\
           (<<IN: List.In (th, e) tr>>)
@@ -3237,9 +3237,9 @@ Section WFTIME.
   Lemma step_memory_times_wf times lang (th0 th1: Thread.t lang) e pf
         (STEP: Thread.step pf e th0 th1)
         (EVENT: wf_time_evt times e)
-        (WF: memory_times_wf times th0.(Thread.memory))
+        (WF: memory_times_wf times (Thread.memory th0))
     :
-      memory_times_wf times th1.(Thread.memory).
+      memory_times_wf times (Thread.memory th1).
   Proof.
     inv STEP.
     { inv STEP0. ss. inv LOCAL. des. eapply promise_memory_times_wf; eauto. }
@@ -3252,9 +3252,9 @@ Section WFTIME.
   Lemma steps_memory_times_wf times P lang (th0 th1: Thread.t lang)
         (STEPS: rtc (tau (@pred_step P lang)) th0 th1)
         (TIME: P <1= wf_time_evt times)
-        (WF: memory_times_wf times th0.(Thread.memory))
+        (WF: memory_times_wf times (Thread.memory th0))
     :
-      memory_times_wf times th1.(Thread.memory).
+      memory_times_wf times (Thread.memory th1).
   Proof.
     ginduction STEPS; auto. i.
     eapply IHSTEPS; eauto.
@@ -3263,10 +3263,10 @@ Section WFTIME.
 
   Lemma memory_times_wf_traced times lang (th0 th1: Thread.t lang) tr
         (STEPS: Trace.steps tr th0 th1)
-        (WF: memory_times_wf times th0.(Thread.memory))
+        (WF: memory_times_wf times (Thread.memory th0))
         (EVENTS: List.Forall (fun em => wf_time_evt times (snd em)) tr)
     :
-      memory_times_wf times th1.(Thread.memory).
+      memory_times_wf times (Thread.memory th1).
   Proof.
     ginduction STEPS; auto. subst. i. inv EVENTS. eapply IHSTEPS; eauto.
     eapply step_memory_times_wf; eauto.
@@ -3754,8 +3754,8 @@ Section SEMICLOSED.
 
   Inductive semi_closed_view (view:View.t) (mem:Memory.t) (loc: Loc.t) (ts: Time.t): Prop :=
   | semi_closed_view_intro
-      (PLN: semi_closed_timemap view.(View.pln) mem loc ts)
-      (RLX: semi_closed_timemap view.(View.rlx) mem loc ts)
+      (PLN: semi_closed_timemap (View.pln view) mem loc ts)
+      (RLX: semi_closed_timemap (View.rlx view) mem loc ts)
   .
   Hint Constructors semi_closed_view.
 
@@ -3859,7 +3859,7 @@ Section SEMICLOSED.
         view mem loc ts
         (CLOSED: semi_closed_opt_view view mem loc ts)
         (INHABITED: Memory.inhabited mem):
-    semi_closed_view view.(View.unwrap) mem loc ts.
+    semi_closed_view (View.unwrap view) mem loc ts.
   Proof.
     inv CLOSED; ss.
     eapply closed_view_semi_closed. apply Memory.closed_view_bot. ss.

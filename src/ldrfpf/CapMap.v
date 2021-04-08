@@ -65,7 +65,7 @@ Section MIDDLE.
   Proof.
     hexploit sim_memory_max_ts_le; eauto. intros [TS|[]]; auto.
     assert (exists from_bot msg_bot, <<GETBOTSRC: Memory.get loc Time.bot mem_src = Some (from_bot, msg_bot)>>).
-    { set (MEM0:=MEM.(sim_memory_contents) loc Time.bot).
+    { set (MEM0:=(sim_memory_contents MEM) loc Time.bot).
       inv MEMTGT. erewrite INHABITED in MEM0. inv MEM0; eauto. }
     des. eapply Memory.max_ts_spec in GETBOTSRC. des.
     dup GET. eapply sim_memory_get_larger in GET; eauto. des.
@@ -76,8 +76,8 @@ Section MIDDLE.
       { exfalso. eapply sim_memory_src_none in GETSRC; eauto. des; clarify. }
       eapply Memory.max_ts_spec in GETSRC; eauto. des. auto.
     }
-    { hexploit (MEM.(sim_memory_wf) loc from (Memory.max_ts loc mem_src)); eauto. i. des.
-      set (MEM0 := MEM.(sim_memory_contents) loc from). inv MEM0; ss. symmetry in H.
+    { hexploit ((sim_memory_wf MEM) loc from (Memory.max_ts loc mem_src)); eauto. i. des.
+      set (MEM0 := (sim_memory_contents MEM) loc from). inv MEM0; ss. symmetry in H.
       right. replace (Memory.max_ts loc mem_tgt) with from; auto.
       apply Memory.max_ts_spec in H; eauto. des. apply TimeFacts.antisym; auto.
       destruct (Memory.get loc (Memory.max_ts loc mem_tgt) mem_src) as [[ts msg_src]|] eqn:GETSRC; cycle 1.
@@ -181,17 +181,17 @@ Section MIDDLE.
       exists to_src msg_src,
         (<<GETSRC: Memory.get loc to_src mem_src = Some (from, msg_src)>>).
   Proof.
-    set (MEM0:=MEM.(sim_memory_strong_contents) loc to_tgt).
+    set (MEM0:=(sim_memory_strong_contents MEM) loc to_tgt).
     rewrite GETTGT in *. inv MEM0.
     { des; clarify; eauto.
-      set (MEM0:=MEM.(sim_memory_strong_contents) loc from_src).
+      set (MEM0:=(sim_memory_strong_contents MEM) loc from_src).
       inv MEM0; try by (exfalso; eapply NEXTRA0; eauto).
-      eapply MEM.(sim_memory_strong_wf) in EXTRA. des.
+      eapply (sim_memory_strong_wf MEM) in EXTRA. des.
       apply UNIQUE in EXTRA0. subst. eauto. }
     { des; clarify; eauto.
-      set (MEM0:=MEM.(sim_memory_strong_contents) loc from_src).
+      set (MEM0:=(sim_memory_strong_contents MEM) loc from_src).
       inv MEM0; try by (exfalso; eapply NEXTRA0; eauto).
-      eapply MEM.(sim_memory_strong_wf) in EXTRA. des.
+      eapply (sim_memory_strong_wf MEM) in EXTRA. des.
       apply UNIQUE in EXTRA0. subst. eauto. }
   Qed.
 
@@ -204,18 +204,18 @@ Section MIDDLE.
       exists to_tgt msg_tgt,
         (<<GETTGT: Memory.get loc to_tgt mem_tgt = Some (from, msg_tgt)>>).
   Proof.
-    set (MEM0:=MEM.(sim_memory_strong_contents) loc to_src).
+    set (MEM0:=(sim_memory_strong_contents MEM) loc to_src).
     rewrite GETSRC in *. inv MEM0.
     { des; clarify; eauto.
-      set (MEM0:=MEM.(sim_memory_strong_contents) loc from).
+      set (MEM0:=(sim_memory_strong_contents MEM) loc from).
       inv MEM0; try by (exfalso; eapply NEXTRA0; eauto).
       rewrite NONE in *. clarify. }
     { des; clarify; eauto.
-      set (MEM0:=MEM.(sim_memory_strong_contents) loc from).
+      set (MEM0:=(sim_memory_strong_contents MEM) loc from).
       inv MEM0; try by (exfalso; eapply NEXTRA0; eauto).
       rewrite NONE in *. clarify. }
-    { exploit (MEM.(sim_memory_strong_wf) loc from to_src); eauto. i. des.
-      set (MEM0:=MEM.(sim_memory_strong_contents) loc from). inv MEM0; ss.
+    { exploit ((sim_memory_strong_wf MEM) loc from to_src); eauto. i. des.
+      set (MEM0:=(sim_memory_strong_contents MEM) loc from). inv MEM0; ss.
       rewrite NONE in *. clarify. }
   Qed.
 
@@ -237,13 +237,13 @@ Section MIDDLE.
   .
   Proof.
     destruct (classic (exists to_src, <<EXTRA: extra loc to_src to_tgt>>)) as [EXTRA|NEXTRA].
-    { des. set (MEM0:=MEM.(sim_memory_contents) loc to_src).
+    { des. set (MEM0:=(sim_memory_contents MEM) loc to_src).
       inv MEM0; try by (exfalso; eapply NEXTRA; eauto).
       assert (TS1: Time.lt to_src ts).
-      { eapply MEM.(sim_memory_wf) in EXTRA0. des.
+      { eapply (sim_memory_wf MEM) in EXTRA0. des.
         eapply UNIQUE in EXTRA. subst. eapply LB; auto. }
 
-      exploit (MEM.(sim_memory_wf) loc to_tgt to_src); auto. i. des.
+      exploit ((sim_memory_wf MEM) loc to_tgt to_src); auto. i. des.
       eapply UNIQUE in EXTRA. subst.
       esplits; eauto; cycle 1.
       { right. auto. } i.
@@ -251,8 +251,8 @@ Section MIDDLE.
       destruct (Memory.get loc t mem_src) as [[from_src0 msg_src0]|] eqn:GETSRC0; auto.
       eapply sim_memory_get_larger in GETSRC0; eauto. des.
       { erewrite EMPTY in GETTGT0; clarify. etrans; eauto. }
-      { exploit (MEM.(sim_memory_wf) loc from_src0 t); auto. i. des.
-        set (MEM0:=MEM.(sim_memory_contents) loc from_src0). inv MEM0; ss.
+      { exploit ((sim_memory_wf MEM) loc from_src0 t); auto. i. des.
+        set (MEM0:=(sim_memory_contents MEM) loc from_src0). inv MEM0; ss.
         hexploit memory_get_disjoint_strong.
         { symmetry. eapply H3. }
         { eapply GETTGT. }
@@ -262,7 +262,7 @@ Section MIDDLE.
           { eapply EXTRA. }
           i. subst. timetac.
         }
-        { set (MEM0:=MEM.(sim_memory_contents) loc t).
+        { set (MEM0:=(sim_memory_contents MEM) loc t).
           inv MEM0; try by (exfalso; eapply NEXTRA0; eauto).
           eapply UNIQUE0 in EXTRA1. subst.
           hexploit Memory.get_disjoint.
@@ -278,7 +278,7 @@ Section MIDDLE.
             { econs; ss. refl. }
           }
         }
-        { set (MEM0:=MEM.(sim_memory_contents) loc from_src0). inv MEM0; ss.
+        { set (MEM0:=(sim_memory_contents MEM) loc from_src0). inv MEM0; ss.
           erewrite EMPTY in H3; clarify. transitivity t; auto. left. auto. }
       }
     }
@@ -288,14 +288,14 @@ Section MIDDLE.
         destruct (Memory.get loc t mem_src) as [[from_src0 msg_src0]|] eqn:GETSRC0; auto.
         eapply sim_memory_get_larger in GETSRC0; eauto. des.
         { erewrite EMPTY in GETTGT0; clarify. }
-        { exploit (MEM.(sim_memory_wf) loc from_src0 t); auto. i. des.
-          set (MEM0:=MEM.(sim_memory_contents) loc from_src0). inv MEM0; ss.
+        { exploit ((sim_memory_wf MEM) loc from_src0 t); auto. i. des.
+          set (MEM0:=(sim_memory_contents MEM) loc from_src0). inv MEM0; ss.
           hexploit memory_get_disjoint_strong.
           { symmetry. eapply H. }
           { eapply GETTGT. }
           i. des; subst.
           { exfalso. eapply NEXTRA. eauto. }
-          { set (MEM0:=MEM.(sim_memory_contents) loc t).
+          { set (MEM0:=(sim_memory_contents MEM) loc t).
             inv MEM0; try by (exfalso; eapply NEXTRA1; eauto).
             eapply UNIQUE in EXTRA0. subst.
             hexploit Memory.get_disjoint.
@@ -313,7 +313,7 @@ Section MIDDLE.
               }
             }
           }
-          { set (MEM0:=MEM.(sim_memory_contents) loc from_src0). inv MEM0; ss.
+          { set (MEM0:=(sim_memory_contents MEM) loc from_src0). inv MEM0; ss.
             erewrite EMPTY in H3; clarify. transitivity t; auto. left. auto. }
         }
       }
@@ -352,11 +352,11 @@ Section MIDDLE.
       { i. eapply eq_lb_time. }
       { left. auto. }
     }
-    { dup H. apply MEM.(sim_memory_strong_wf) in H. des. splits; ss.
+    { dup H. apply (sim_memory_strong_wf MEM) in H. des. splits; ss.
       { econs; eauto. eapply TimeFacts.lt_le_lt; eauto. eapply memory_get_ts_le; eauto. }
       { left. auto. }
       { right. auto. }
-      { i. set (MEM0:=MEM.(sim_memory_strong_contents) loc to_src0).
+      { i. set (MEM0:=(sim_memory_strong_contents MEM) loc to_src0).
         inv MEM0; ss; try by (exfalso; eapply NEXTRA; eauto). }
     }
   Qed.
@@ -378,30 +378,30 @@ Section MIDDLE.
       eapply sim_memory_strong_sim_memory; eauto. }
 
     econs.
-    { i. set (MEM0:=MEM.(sim_memory_strong_contents) loc ts).
+    { i. set (MEM0:=(sim_memory_strong_contents MEM) loc ts).
       inv MEM0; symmetry in H; symmetry in H0; rename H into GETMEMTGT; rename H0 into GETMEMSRC.
       { destruct (Memory.get loc ts cap_tgt) as [[from_tgt msg_tgt]|] eqn:GETTGT; eauto.
         { eapply cap_flex_inv in GETTGT; try apply CAPTGT; eauto. des; clarify.
           { hexploit sim_memory_strong_adjancent; eauto. i. des.
-            erewrite CAPSRC.(cap_flex_middle); eauto. }
-          { erewrite CAPSRC.(cap_flex_back). i. econs 2; auto.
+            erewrite (cap_flex_middle CAPSRC); eauto. }
+          { erewrite (cap_flex_back CAPSRC). i. econs 2; auto.
             { eapply sim_memory_max_ts_le; eauto. eapply sim_memory_strong_sim_memory; eauto. }
             { i. hexploit sim_memory_max_ts_extra.
               { eapply sim_memory_strong_sim_memory; eauto. }
               { eauto. }
               i. des.
               { rewrite H. apply eq_lb_time. }
-              { apply MEM.(sim_memory_strong_wf) in H. des. auto. }
+              { apply (sim_memory_strong_wf MEM) in H. des. auto. }
             }
             { i. hexploit (@Memory.max_ts_spec loc).
               { inv MEMSRC. eapply INHABITED. } i. des.
               i. hexploit (@Memory.max_ts_spec loc).
               { inv MEMTGT. eapply INHABITED. } i. des.
               apply TimeFacts.antisym.
-              { set (MEM0:=MEM.(sim_memory_strong_contents) loc (Memory.max_ts loc mem_src)).
+              { set (MEM0:=(sim_memory_strong_contents MEM) loc (Memory.max_ts loc mem_src)).
                 erewrite GET in MEM0. inv MEM0; ss.
                 symmetry in H3. eapply Memory.max_ts_spec in H3. des; auto. }
-              { set (MEM0:=MEM.(sim_memory_strong_contents) loc (Memory.max_ts loc mem_tgt)).
+              { set (MEM0:=(sim_memory_strong_contents MEM) loc (Memory.max_ts loc mem_tgt)).
                 erewrite GET0 in MEM0. inv MEM0; ss.
                 symmetry in H1. eapply Memory.max_ts_spec in H1. des; auto. }
             }
@@ -411,17 +411,17 @@ Section MIDDLE.
           eapply cap_flex_inv in GETSRC; try apply CAPSRC; eauto. des; clarify.
           { inv GETSRC0. exploit sim_memory_strong_left_end_inv; eauto. i. des.
             eapply cap_left_end in GETTGT0; eauto. des. clarify. }
-          { erewrite CAPTGT.(cap_flex_back) in GETTGT. clarify. }
+          { erewrite (cap_flex_back CAPTGT) in GETTGT. clarify. }
         }
       }
-      { eapply CAPSRC.(cap_flex_le) in GETMEMSRC. eapply CAPTGT.(cap_flex_le) in GETMEMTGT.
+      { eapply (cap_flex_le CAPSRC) in GETMEMSRC. eapply (cap_flex_le CAPTGT) in GETMEMTGT.
         rewrite GETMEMSRC. rewrite GETMEMTGT. eauto. }
-      { eapply CAPSRC.(cap_flex_le) in GETMEMSRC. eapply CAPTGT.(cap_flex_le) in GETMEMTGT.
+      { eapply (cap_flex_le CAPSRC) in GETMEMSRC. eapply (cap_flex_le CAPTGT) in GETMEMTGT.
         rewrite GETMEMSRC. rewrite GETMEMTGT. eauto. }
-      { dup GETMEMSRC. eapply CAPSRC.(cap_flex_le) in GETMEMSRC. rewrite GETMEMSRC.
+      { dup GETMEMSRC. eapply (cap_flex_le CAPSRC) in GETMEMSRC. rewrite GETMEMSRC.
         destruct (Memory.get loc ts cap_tgt) as [[from_tgt msg_tgt]|] eqn:GETTGT; eauto.
         eapply cap_flex_inv in GETTGT; eauto. des; clarify.
-        { inv GETTGT0. eapply MEM.(sim_memory_strong_wf) in EXTRA. des.
+        { inv GETTGT0. eapply (sim_memory_strong_wf MEM) in EXTRA. des.
           exploit LB.
           { eapply MEMWF in GET2. des. eapply FROM. }
           { auto. }
@@ -434,7 +434,7 @@ Section MIDDLE.
         }
       }
     }
-    { eapply MEM.(sim_memory_strong_wf); eauto. }
+    { eapply (sim_memory_strong_wf MEM); eauto. }
   Qed.
 
   Definition sim_cell_list
@@ -821,9 +821,9 @@ Section MIDDLE.
       Memory.le prom_src mem_src'.
   Proof.
     ii. exploit MLESRC; eauto. intros GETSRC.
-    set (MEM0:=MEM.(sim_memory_contents) loc to).
-    set (MEM1:=MEMSTRONG.(sim_memory_strong_contents) loc to).
-    set (PROM0:=PROM.(sim_promise_strong_contents) loc to).
+    set (MEM0:=(sim_memory_contents MEM) loc to).
+    set (MEM1:=(sim_memory_strong_contents MEMSTRONG) loc to).
+    set (PROM0:=(sim_promise_strong_contents PROM) loc to).
     rewrite LHS in PROM0. rewrite GETSRC in *.
 
     inv PROM0.
@@ -832,8 +832,8 @@ Section MIDDLE.
     { symmetry in H. rename H into RHS.
       exploit MLETGT; eauto. intros GETTGT. rewrite GETTGT in *.
       inv MEM1. f_equal. f_equal. des; subst; auto.
-      { exploit MEM.(sim_memory_wf); eauto. i. des.
-        exfalso. set (MEM2:=MEMSTRONG.(sim_memory_strong_contents) loc from).
+      { exploit (sim_memory_wf MEM); eauto. i. des.
+        exfalso. set (MEM2:=(sim_memory_strong_contents MEMSTRONG) loc from).
         inv MEM2; try by (eapply NEXTRA1; eauto).
         eapply UNIQUE in EXTRA0. subst.
         hexploit memory_get_from_inj.
@@ -842,8 +842,8 @@ Section MIDDLE.
         i. des; clarify.
         inv MEM0; ss. eapply NEXTRA1; eauto.
       }
-      { exploit MEM.(sim_memory_wf); eauto. i. des.
-        exfalso. set (MEM2:=MEM.(sim_memory_contents) loc from_src).
+      { exploit (sim_memory_wf MEM); eauto. i. des.
+        exfalso. set (MEM2:=(sim_memory_contents MEM) loc from_src).
         inv MEM2; try by (eapply NEXTRA1; eauto).
         eapply UNIQUE in EXTRA. subst.
         hexploit memory_get_from_inj.
@@ -857,8 +857,8 @@ Section MIDDLE.
     { symmetry in H. rename H into RHS.
       exploit MLETGT; eauto. intros GETTGT. rewrite GETTGT in *.
       inv MEM0; ss. inv MEM1; ss. f_equal. f_equal. des; subst; auto.
-      { exploit MEM.(sim_memory_wf); eauto. i. des.
-        exfalso. set (MEM2:=MEMSTRONG.(sim_memory_strong_contents) loc from).
+      { exploit (sim_memory_wf MEM); eauto. i. des.
+        exfalso. set (MEM2:=(sim_memory_strong_contents MEMSTRONG) loc from).
         inv MEM2; try by (eapply NEXTRA2; eauto).
         eapply UNIQUE in EXTRA0. subst.
         hexploit memory_get_from_inj.
@@ -868,8 +868,8 @@ Section MIDDLE.
         { eapply memory_get_ts_le; eauto. }
         { apply Time.bot_spec. }
       }
-      { exploit MEM.(sim_memory_wf); eauto. i. des.
-        exfalso. set (MEM2:=MEM.(sim_memory_contents) loc from_src).
+      { exploit (sim_memory_wf MEM); eauto. i. des.
+        exfalso. set (MEM2:=(sim_memory_contents MEM) loc from_src).
         inv MEM2; try by (eapply NEXTRA2; eauto).
         eapply UNIQUE in EXTRA. subst.
         hexploit memory_get_from_inj.
@@ -883,7 +883,7 @@ Section MIDDLE.
     }
     { inv MEM0; ss; try by (exfalso; eapply NEXTRA; right; eauto).
       inv MEM1; ss; try by (exfalso; eapply NEXTRA; right; eauto).
-      exploit (MEM.(sim_memory_wf) loc from to).
+      exploit ((sim_memory_wf MEM) loc from to).
       { right. auto. } i. des.
       eapply UNIQUE in EXTRA0. eapply UNIQUE in EXTRA1. subst. auto.
     }
@@ -897,8 +897,8 @@ Section MIDDLE.
       concrete_messages_le mem_src mem_src'.
   Proof.
     ii.
-    set (CNT0:=MEM0.(sim_memory_contents) loc to).
-    set (CNT1:=MEM1.(sim_memory_contents) loc to).
+    set (CNT0:=(sim_memory_contents MEM0) loc to).
+    set (CNT1:=(sim_memory_contents MEM1) loc to).
     rewrite GET0 in CNT0. inv CNT0.
     rewrite <- H in *. inv CNT1; clarify. eauto.
   Qed.
@@ -909,7 +909,7 @@ Section MIDDLE.
     :
       concrete_messages_le mem_src mem_tgt.
   Proof.
-    ii. set (CNT:=MEM.(sim_memory_contents) loc to).
+    ii. set (CNT:=(sim_memory_contents MEM) loc to).
     rewrite GET0 in *. inv CNT. eauto.
   Qed.
 
@@ -920,7 +920,7 @@ Section MIDDLE.
         (LOCALSRC: Local.wf lc_src mem_src)
         (LOCALTGT: Local.wf lc_tgt mem_tgt)
         (PROM: sim_promise_strong L times self extra_self (extra_others \\3// extra_self)
-                                  lc_src.(Local.promises) lc_tgt.(Local.promises))
+                                  (Local.promises lc_src) (Local.promises lc_tgt))
         (MEMSTRONG: sim_memory_strong (others \\2// self) (extra_others \\3// extra_self) mem_src' mem_tgt)
     :
       Local.wf lc_src mem_src'.

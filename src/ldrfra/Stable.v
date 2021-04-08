@@ -33,13 +33,13 @@ Module Stable.
     (* normal *)
 
     Definition normal_view (view: View.t): Prop :=
-      forall loc (LOC: L loc), view.(View.rlx) loc = view.(View.pln) loc.
+      forall loc (LOC: L loc), (View.rlx view) loc = (View.pln view) loc.
 
     Inductive normal_tview (tview:TView.t): Prop :=
     | normal_tview_intro
-        (REL: forall loc, normal_view (tview.(TView.rel) loc))
-        (CUR: normal_view tview.(TView.cur))
-        (ACQ: normal_view tview.(TView.acq))
+        (REL: forall loc, normal_view ((TView.rel tview) loc))
+        (CUR: normal_view (TView.cur tview))
+        (ACQ: normal_view (TView.acq tview))
     .
 
     Definition normal_memory (mem: Memory.t): Prop :=
@@ -89,7 +89,7 @@ Module Stable.
     Definition stable_view (mem: Memory.t) (view: View.t): Prop :=
       forall loc from val released
         (LOC: L loc)
-        (GET: Memory.get loc (view.(View.rlx) loc) mem =
+        (GET: Memory.get loc ((View.rlx view) loc) mem =
               Some (from, Message.concrete val (Some released))),
         View.le released view.
 
@@ -98,9 +98,9 @@ Module Stable.
 
     Inductive stable_tview (mem: Memory.t) (tview: TView.t): Prop :=
     | stable_tview_intro
-        (REL: forall loc (LOC: ~ L loc), stable_view mem (tview.(TView.rel) loc))
-        (CUR: stable_view mem tview.(TView.cur))
-        (ACQ: stable_view mem tview.(TView.acq))
+        (REL: forall loc (LOC: ~ L loc), stable_view mem ((TView.rel tview) loc))
+        (CUR: stable_view mem (TView.cur tview))
+        (ACQ: stable_view mem (TView.acq tview))
     .
 
     Definition stable_memory (rels: ReleaseWrites.t) (mem: Memory.t): Prop :=
@@ -198,7 +198,7 @@ Module Stable.
           mem view
           (VIEW: View.wf view)
           (STABLE: stable_view mem view):
-      stable_timemap mem view.(View.rlx).
+      stable_timemap mem (View.rlx view).
     Proof.
       ii. etrans; [eapply STABLE|]; eauto.
       econs; ss; try refl. apply VIEW.
@@ -221,9 +221,9 @@ Module Stable.
           (NORMAL: normal_tview tview)
           (STABLE: stable_tview mem tview)
           (LOC: L loc)
-          (GET: Memory.get loc (tview.(TView.cur).(View.rlx) loc) mem =
+          (GET: Memory.get loc ((View.rlx (TView.cur tview)) loc) mem =
                 Some (from, Message.concrete val released)):
-      TView.read_tview tview loc (tview.(TView.cur).(View.rlx) loc) released ord = tview.
+      TView.read_tview tview loc ((View.rlx (TView.cur tview)) loc) released ord = tview.
     Proof.
       inv STABLE. inv NORMAL.
       destruct tview. unfold TView.read_tview. ss. f_equal.
@@ -444,20 +444,20 @@ Module Stable.
           rels lc1 mem1 loc from to msg lc2 mem2 kind
           (WF1: Local.wf lc1 mem1)
           (MEM1: Memory.closed mem1)
-          (NORMAL_TVIEW1: normal_tview lc1.(Local.tview))
+          (NORMAL_TVIEW1: normal_tview (Local.tview lc1))
           (NORMAL_MEM1: normal_memory mem1)
-          (STABLE_TVIEW1: stable_tview mem1 lc1.(Local.tview))
+          (STABLE_TVIEW1: stable_tview mem1 (Local.tview lc1))
           (STABLE_MEM1: stable_memory rels mem1)
-          (RELS_WF1: ReleaseWrites.wf rels lc1.(Local.promises) mem1)
+          (RELS_WF1: ReleaseWrites.wf rels (Local.promises lc1) mem1)
           (MSG: forall val released
                   (MSG: msg = Message.concrete val (Some released)),
               normal_view released /\ stable_view mem2 released)
           (STEP: Local.promise_step lc1 mem1 loc from to msg lc2 mem2 kind):
-      <<NORMAL_TVIEW2: normal_tview lc2.(Local.tview)>> /\
+      <<NORMAL_TVIEW2: normal_tview (Local.tview lc2)>> /\
       <<NORMAL_MEM2: normal_memory mem2>> /\
-      <<STABLE_TVIEW2: stable_tview mem2 lc2.(Local.tview)>> /\
+      <<STABLE_TVIEW2: stable_tview mem2 (Local.tview lc2)>> /\
       <<STABLE_MEM2: stable_memory rels mem2>> /\
-      <<RELS_WF2: ReleaseWrites.wf rels lc2.(Local.promises) mem2>>.
+      <<RELS_WF2: ReleaseWrites.wf rels (Local.promises lc2) mem2>>.
     Proof.
       inv STEP. exploit promise; try apply WF1; eauto. i. des.
       splits; auto. ii. ss.
@@ -483,12 +483,12 @@ Module Stable.
           rels lc1 mem1 loc to val released ord lc2
           (WF1: Local.wf lc1 mem1)
           (MEM1: Memory.closed mem1)
-          (NORMAL_TVIEW1: normal_tview lc1.(Local.tview))
+          (NORMAL_TVIEW1: normal_tview (Local.tview lc1))
           (NORMAL_MEM1: normal_memory mem1)
-          (STABLE_TVIEW1: stable_tview mem1 lc1.(Local.tview))
+          (STABLE_TVIEW1: stable_tview mem1 (Local.tview lc1))
           (STABLE_MEM1: stable_memory rels mem1)
           (LOC: L loc)
-          (TO: to = lc1.(Local.tview).(TView.cur).(View.rlx) loc)
+          (TO: to = (TView.cur (Local.tview lc1)).(View.rlx) loc)
           (STEP: Local.read_step lc1 mem1 loc to val released ord lc2):
       <<LC2: lc2 = lc1>>.
     Proof.
@@ -552,18 +552,18 @@ Module Stable.
           rels lc1 mem1 loc to val released ord lc2
           (WF1: Local.wf lc1 mem1)
           (MEM1: Memory.closed mem1)
-          (NORMAL_TVIEW1: normal_tview lc1.(Local.tview))
+          (NORMAL_TVIEW1: normal_tview (Local.tview lc1))
           (NORMAL_MEM1: normal_memory mem1)
-          (STABLE_TVIEW1: stable_tview mem1 lc1.(Local.tview))
+          (STABLE_TVIEW1: stable_tview mem1 (Local.tview lc1))
           (STABLE_MEM1: stable_memory rels mem1)
-          (RELS_WF1: ReleaseWrites.wf rels lc1.(Local.promises) mem1)
+          (RELS_WF1: ReleaseWrites.wf rels (Local.promises lc1) mem1)
           (LOC: L loc)
           (REL: List.In (loc, to) rels)
           (ORD: Ordering.le Ordering.acqrel ord)
           (STEP: Local.read_step lc1 mem1 loc to val released ord lc2):
-      <<NORMAL_TVIEW2: normal_tview lc2.(Local.tview)>> /\
-      <<STABLE_TVIEW2: stable_tview mem1 lc2.(Local.tview)>> /\
-      <<RELS_WF2: ReleaseWrites.wf rels lc2.(Local.promises) mem1>>.
+      <<NORMAL_TVIEW2: normal_tview (Local.tview lc2)>> /\
+      <<STABLE_TVIEW2: stable_tview mem1 (Local.tview lc2)>> /\
+      <<RELS_WF2: ReleaseWrites.wf rels (Local.promises lc2) mem1>>.
     Proof.
       inv STEP. ss. splits; ss.
       - inv NORMAL_TVIEW1. econs; ss.
@@ -647,16 +647,16 @@ Module Stable.
           rels lc1 mem1 loc to val released ord lc2
           (WF1: Local.wf lc1 mem1)
           (MEM1: Memory.closed mem1)
-          (NORMAL_TVIEW1: normal_tview lc1.(Local.tview))
+          (NORMAL_TVIEW1: normal_tview (Local.tview lc1))
           (NORMAL_MEM1: normal_memory mem1)
-          (STABLE_TVIEW1: stable_tview mem1 lc1.(Local.tview))
+          (STABLE_TVIEW1: stable_tview mem1 (Local.tview lc1))
           (STABLE_MEM1: stable_memory rels mem1)
-          (RELS_WF1: ReleaseWrites.wf rels lc1.(Local.promises) mem1)
+          (RELS_WF1: ReleaseWrites.wf rels (Local.promises lc1) mem1)
           (LOC: ~ L loc)
           (STEP: Local.read_step lc1 mem1 loc to val released ord lc2):
-      <<NORMAL_TVIEW2: normal_tview lc2.(Local.tview)>> /\
-      <<STABLE_TVIEW2: stable_tview mem1 lc2.(Local.tview)>> /\
-      <<RELS_WF2: ReleaseWrites.wf rels lc2.(Local.promises) mem1>>.
+      <<NORMAL_TVIEW2: normal_tview (Local.tview lc2)>> /\
+      <<STABLE_TVIEW2: stable_tview mem1 (Local.tview lc2)>> /\
+      <<RELS_WF2: ReleaseWrites.wf rels (Local.promises lc2) mem1>>.
     Proof.
       inv STEP. ss. splits; ss.
       - inv NORMAL_TVIEW1. econs; ss.
@@ -688,23 +688,23 @@ Module Stable.
           (WF1: Local.wf lc1 mem1)
           (SC1: Memory.closed_timemap sc1 mem1)
           (MEM1: Memory.closed mem1)
-          (RELS_WF1: ReleaseWrites.wf rels lc1.(Local.promises) mem1)
-          (NORMAL_TVIEW1: normal_tview lc1.(Local.tview))
+          (RELS_WF1: ReleaseWrites.wf rels (Local.promises lc1) mem1)
+          (NORMAL_TVIEW1: normal_tview (Local.tview lc1))
           (NORMAL_MEM1: normal_memory mem1)
-          (STABLE_TVIEW1: stable_tview mem1 lc1.(Local.tview))
+          (STABLE_TVIEW1: stable_tview mem1 (Local.tview lc1))
           (STABLE_MEM1: stable_memory rels mem1)
           (WF_RELEASEDM: View.opt_wf releasedm)
           (CLOSED_RELEASEDM: Memory.closed_opt_view releasedm mem1)
-          (NORMAL_RELEASEDM: normal_view releasedm.(View.unwrap))
-          (RELEASEDM: View.le releasedm.(View.unwrap) lc1.(Local.tview).(TView.cur))
+          (NORMAL_RELEASEDM: normal_view (View.unwrap releasedm))
+          (RELEASEDM: View.le (View.unwrap releasedm) (TView.cur (Local.tview lc1)))
           (LOC: L loc)
           (STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind):
-      <<NORMAL_TVIEW2: normal_tview lc2.(Local.tview)>> /\
+      <<NORMAL_TVIEW2: normal_tview (Local.tview lc2)>> /\
       <<NORMAL_MEM2: normal_memory mem2>> /\
-      <<STABLE_TVIEW2: stable_tview mem2 lc2.(Local.tview)>> /\
+      <<STABLE_TVIEW2: stable_tview mem2 (Local.tview lc2)>> /\
       <<STABLE_MEM2: stable_memory (if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels) mem2>> /\
       <<RELS_WF2: ReleaseWrites.wf (if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels) 
-                                   lc2.(Local.promises) mem2>>.
+                                   (Local.promises lc2) mem2>>.
     Proof.
       exploit Local.write_step_future; eauto. i. des.
       inv STEP. inv WRITE. ss.
@@ -821,8 +821,8 @@ Module Stable.
           repeat apply join_normal_view; ss. apply NORMAL_TVIEW1. }
 
       condtac; ss.
-      { assert (RELEASED: TView.write_released lc1.(Local.tview) sc1 loc to releasedm ord =
-                          Some (View.join (View.singleton_ur loc to) lc1.(Local.tview).(TView.cur))).
+      { assert (RELEASED: TView.write_released (Local.tview lc1) sc1 loc to releasedm ord =
+                          Some (View.join (View.singleton_ur loc to) (TView.cur (Local.tview lc1)))).
         { unfold TView.write_released. repeat (condtac; ss); cycle 1.
           { destruct ord; ss. }
           f_equal.
@@ -834,7 +834,7 @@ Module Stable.
           etrans; [|eapply View.join_l]. ss.
         }
         assert (STABLE_RELEASED:
-                  stable_view mem2 (View.join (View.singleton_ur loc to) lc1.(Local.tview).(TView.cur))).
+                  stable_view mem2 (View.join (View.singleton_ur loc to) (TView.cur (Local.tview lc1)))).
         { rewrite RELEASED in *. ii. revert GET. ss.
           unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find. condtac; ss.
           - subst. replace (Time.join to (View.rlx (TView.cur (Local.tview lc1)) loc)) with to; cycle 1.
@@ -949,19 +949,19 @@ Module Stable.
           (WF1: Local.wf lc1 mem1)
           (SC1: Memory.closed_timemap sc1 mem1)
           (MEM1: Memory.closed mem1)
-          (NORMAL_TVIEW1: normal_tview lc1.(Local.tview))
+          (NORMAL_TVIEW1: normal_tview (Local.tview lc1))
           (NORMAL_MEM1: normal_memory mem1)
-          (STABLE_TVIEW1: stable_tview mem1 lc1.(Local.tview))
+          (STABLE_TVIEW1: stable_tview mem1 (Local.tview lc1))
           (STABLE_MEM1: stable_memory rels mem1)
-          (RELS_WF1: ReleaseWrites.wf rels lc1.(Local.promises) mem1)
+          (RELS_WF1: ReleaseWrites.wf rels (Local.promises lc1) mem1)
           (LOC: L loc)
           (STEP: Local.write_step lc1 sc1 mem1 loc from to val None released ord lc2 sc2 mem2 kind):
-      <<NORMAL_TVIEW2: normal_tview lc2.(Local.tview)>> /\
+      <<NORMAL_TVIEW2: normal_tview (Local.tview lc2)>> /\
       <<NORMAL_MEM2: normal_memory mem2>> /\
-      <<STABLE_TVIEW2: stable_tview mem2 lc2.(Local.tview)>> /\
+      <<STABLE_TVIEW2: stable_tview mem2 (Local.tview lc2)>> /\
       <<STABLE_MEM2: stable_memory (if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels) mem2>> /\
       <<RELS_WF2: ReleaseWrites.wf (if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels) 
-                                   lc2.(Local.promises) mem2>>.
+                                   (Local.promises lc2) mem2>>.
     Proof.
       eapply write_step_loc; eauto; ss.
       - apply View.bot_spec.
@@ -972,22 +972,22 @@ Module Stable.
           (WF1: Local.wf lc1 mem1)
           (SC1: Memory.closed_timemap sc1 mem1)
           (MEM1: Memory.closed mem1)
-          (NORMAL_TVIEW1: normal_tview lc1.(Local.tview))
+          (NORMAL_TVIEW1: normal_tview (Local.tview lc1))
           (NORMAL_MEM1: normal_memory mem1)
-          (STABLE_TVIEW1: stable_tview mem1 lc1.(Local.tview))
+          (STABLE_TVIEW1: stable_tview mem1 (Local.tview lc1))
           (STABLE_MEM1: stable_memory rels mem1)
-          (RELS_WF1: ReleaseWrites.wf rels lc1.(Local.promises) mem1)
+          (RELS_WF1: ReleaseWrites.wf rels (Local.promises lc1) mem1)
           (LOC: ~ L loc)
           (WF_RELEASEDM: View.opt_wf releasedm)
           (CLOSED_RELEASEDM: Memory.closed_opt_view releasedm mem1)
-          (NORMAL_RELEASEDM: normal_view releasedm.(View.unwrap))
-          (STABLE_RELEASEDM: stable_view mem1 releasedm.(View.unwrap))
+          (NORMAL_RELEASEDM: normal_view (View.unwrap releasedm))
+          (STABLE_RELEASEDM: stable_view mem1 (View.unwrap releasedm))
           (STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind):
-      <<NORMAL_TVIEW2: normal_tview lc2.(Local.tview)>> /\
+      <<NORMAL_TVIEW2: normal_tview (Local.tview lc2)>> /\
       <<NORMAL_MEM2: normal_memory mem2>> /\
-      <<STABLE_TVIEW2: stable_tview mem2 lc2.(Local.tview)>> /\
+      <<STABLE_TVIEW2: stable_tview mem2 (Local.tview lc2)>> /\
       <<STABLE_MEM2: stable_memory rels mem2>> /\
-      <<RELS_WF2: ReleaseWrites.wf rels lc2.(Local.promises) mem2>>.
+      <<RELS_WF2: ReleaseWrites.wf rels (Local.promises lc2) mem2>>.
     Proof.
       exploit Local.write_step_future; eauto. i. des.
       inv STEP. inv WRITE. ss.
@@ -1145,18 +1145,18 @@ Module Stable.
           (WF1: Local.wf lc1 mem1)
           (SC1: Memory.closed_timemap sc1 mem1)
           (MEM1: Memory.closed mem1)
-          (NORMAL_TVIEW1: normal_tview lc1.(Local.tview))
+          (NORMAL_TVIEW1: normal_tview (Local.tview lc1))
           (NORMAL_MEM1: normal_memory mem1)
-          (STABLE_TVIEW1: stable_tview mem1 lc1.(Local.tview))
+          (STABLE_TVIEW1: stable_tview mem1 (Local.tview lc1))
           (STABLE_MEM1: stable_memory rels mem1)
-          (RELS_WF1: ReleaseWrites.wf rels lc1.(Local.promises) mem1)
+          (RELS_WF1: ReleaseWrites.wf rels (Local.promises lc1) mem1)
           (LOC: ~ L loc)
           (STEP: Local.write_step lc1 sc1 mem1 loc from to val None released ord lc2 sc2 mem2 kind):
-      <<NORMAL_TVIEW2: normal_tview lc2.(Local.tview)>> /\
+      <<NORMAL_TVIEW2: normal_tview (Local.tview lc2)>> /\
       <<NORMAL_MEM2: normal_memory mem2>> /\
-      <<STABLE_TVIEW2: stable_tview mem2 lc2.(Local.tview)>> /\
+      <<STABLE_TVIEW2: stable_tview mem2 (Local.tview lc2)>> /\
       <<STABLE_MEM2: stable_memory rels mem2>> /\
-      <<RELS_WF2: ReleaseWrites.wf rels lc2.(Local.promises) mem2>>.
+      <<RELS_WF2: ReleaseWrites.wf rels (Local.promises lc2) mem2>>.
     Proof.
       eapply write_step_other; eauto; ss.
       apply bot_stable_view. apply MEM1.
@@ -1165,15 +1165,15 @@ Module Stable.
     Lemma fence_step
           rels lc1 sc1 mem1 ordr ordw lc2 sc2
           (WF1: Local.wf lc1 mem1)
-          (NORMAL_TVIEW1: normal_tview lc1.(Local.tview))
-          (STABLE_TVIEW1: stable_tview mem1 lc1.(Local.tview))
+          (NORMAL_TVIEW1: normal_tview (Local.tview lc1))
+          (STABLE_TVIEW1: stable_tview mem1 (Local.tview lc1))
           (STABLE_SC1: stable_timemap mem1 sc1)
-          (RELS_WF1: ReleaseWrites.wf rels lc1.(Local.promises) mem1)
+          (RELS_WF1: ReleaseWrites.wf rels (Local.promises lc1) mem1)
           (STEP: Local.fence_step lc1 sc1 ordr ordw lc2 sc2):
-      <<NORMAL_TVIEW2: normal_tview lc2.(Local.tview)>> /\
-      <<STABLE_TVIEW2: stable_tview mem1 lc2.(Local.tview)>> /\
+      <<NORMAL_TVIEW2: normal_tview (Local.tview lc2)>> /\
+      <<STABLE_TVIEW2: stable_tview mem1 (Local.tview lc2)>> /\
       <<STABLE_SC2: stable_timemap mem1 sc2>> /\
-      <<RELS_WF2: ReleaseWrites.wf rels lc2.(Local.promises) mem1>>.
+      <<RELS_WF2: ReleaseWrites.wf rels (Local.promises lc2) mem1>>.
     Proof.
       inv STEP. ss. splits; ss.
       - inv NORMAL_TVIEW1.

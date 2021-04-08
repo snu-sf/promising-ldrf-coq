@@ -335,7 +335,7 @@ Section PredStep.
     split; i.
     - ginduction H; i.
       + exists []. splits; eauto.
-      + des. inv H. inv TSTEP. exists ((x.(Thread.local), e)::tr). splits.
+      + des. inv H. inv TSTEP. exists (((Thread.local x), e)::tr). splits.
         * inv STEP. econs; eauto.
         * i. ss. des; clarify. eauto.
     - des. ginduction STEPS; i.

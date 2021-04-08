@@ -39,12 +39,12 @@ Module SConfiguration.
     forall (e:ThreadEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
   | step_intro
       e tid c1 lang st1 lc1 e2 e3 st4 lc4 sc4 memory4
-      (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
-      (CANCELS: rtc (@Thread.cancel_step _) (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
+      (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
+      (CANCELS: rtc (@Thread.cancel_step _) (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) e2)
       (STEP: Thread.opt_step e e2 e3)
       (RESERVES: rtc (@Thread.reserve_step _) e3 (Thread.mk _ st4 lc4 sc4 memory4))
       (CONSISTENT: e <> ThreadEvent.failure -> Thread.consistent (Thread.mk _ st4 lc4 sc4 memory4)):
-      step e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) c1.(Configuration.threads)) sc4 memory4)
+      step e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) (Configuration.threads c1)) sc4 memory4)
   .
   Hint Constructors step.
 
@@ -89,11 +89,11 @@ Module SConfiguration.
     forall (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
   | reservation_only_step_intro
       tid c1 lang st1 lc1 e2 st4 lc4 sc4 memory4
-      (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
-      (CANCELS: rtc (@Thread.cancel_step _) (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
+      (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
+      (CANCELS: rtc (@Thread.cancel_step _) (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) e2)
       (RESERVES: rtc (@Thread.reserve_step _) e2 (Thread.mk _ st4 lc4 sc4 memory4))
       (CONSISTENT: Thread.consistent (Thread.mk _ st4 lc4 sc4 memory4)):
-      reservation_only_step tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) c1.(Configuration.threads)) sc4 memory4)
+      reservation_only_step tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) (Configuration.threads c1)) sc4 memory4)
   .
   Hint Constructors reservation_only_step.
 
@@ -115,7 +115,7 @@ Module SConfiguration.
     erewrite IdentMap.gss in TID0. dep_clarify. dep_clarify.
     assert (STEPS: rtc
                      (@Thread.reserve_step _ \2/ @Thread.cancel_step _)
-                     (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory))
+                     (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1))
                      (Thread.mk _ st2 lc2 sc0 memory0)).
     { etrans.
       { eapply rtc_implies; try apply CANCELS; eauto. }
@@ -187,12 +187,12 @@ Module SConfiguration.
     forall (e:ThreadEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
   | mixed_step_intro
       e tid c1 lang st1 lc1 e2 e3 st4 lc4 sc4 memory4
-      (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
-      (CANCELS: rtc (@Thread.reserve_step _ \2/ @Thread.cancel_step _) (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
+      (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
+      (CANCELS: rtc (@Thread.reserve_step _ \2/ @Thread.cancel_step _) (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) e2)
       (STEP: Thread.opt_step e e2 e3)
       (RESERVES: rtc (@Thread.reserve_step _ \2/ @Thread.cancel_step _) e3 (Thread.mk _ st4 lc4 sc4 memory4))
       (CONSISTENT: e <> ThreadEvent.failure -> Thread.consistent (Thread.mk _ st4 lc4 sc4 memory4)):
-      mixed_step e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) c1.(Configuration.threads)) sc4 memory4)
+      mixed_step e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) (Configuration.threads c1)) sc4 memory4)
   .
   Hint Constructors mixed_step.
 
@@ -224,8 +224,8 @@ Module SConfiguration.
         (STEP: step e tid c1 c2)
         (WF1: Configuration.wf c1):
     (<<WF2: Configuration.wf c2>>) /\
-    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
+    (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+    (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>).
   Proof.
     inv WF1. inv WF. inv STEP; s. exploit THREADS; ss; eauto. i.
     assert (STEPS: rtc
@@ -265,8 +265,8 @@ Module SConfiguration.
         (STEP: machine_step e tid c1 c2)
         (WF1: Configuration.wf c1):
     (<<WF2: Configuration.wf c2>>) /\
-    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
+    (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+    (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>).
   Proof.
     inv STEP. eapply step_future; eauto.
   Qed.
@@ -276,8 +276,8 @@ Module SConfiguration.
         (STEP: opt_machine_step e tid c1 c2)
         (WF1: Configuration.wf c1):
     (<<WF2: Configuration.wf c2>>) /\
-    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
+    (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+    (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>).
   Proof.
     inv STEP.
     - splits; auto; refl.
@@ -289,8 +289,8 @@ Module SConfiguration.
         (STEPS: rtc tau_machine_step c1 c2)
         (WF1: Configuration.wf c1):
     (<<WF2: Configuration.wf c2>>) /\
-    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
+    (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+    (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>).
   Proof.
     induction STEPS; i.
     - splits; auto; refl.
@@ -305,8 +305,8 @@ Module SConfiguration.
         (STEP: all_machine_step c1 c2)
         (WF1: Configuration.wf c1):
     (<<WF2: Configuration.wf c2>>) /\
-    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
+    (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+    (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>).
   Proof.
     inv STEP. eapply machine_step_future; eauto.
   Qed.
@@ -316,8 +316,8 @@ Module SConfiguration.
         (STEP: rtc all_machine_step c1 c2)
         (WF1: Configuration.wf c1):
     (<<WF2: Configuration.wf c2>>) /\
-    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>).
+    (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+    (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>).
   Proof.
     ginduction STEP; i.
     - splits; auto. refl.
@@ -541,7 +541,7 @@ Module SConfiguration.
                (<<STEPS: rtc (@Thread.reserve_step _ \2/ @Thread.cancel_step _) e2' (Thread.mk _ st3 lc3 sc3 memory3)>>)).
     { eauto. }
     clear STEP0. des.
-    remember (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)).
+    remember (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)).
     ginduction STEPS.
     { i. subst. exploit mixed_step_step.
       { econs.
@@ -690,7 +690,7 @@ Module SConfiguration.
     destruct (ThreadEvent.get_machine_event e0) eqn:EVENT.
     { esplits; [|econs 1].
       assert (STEPS: rtc (@Thread.tau_step _)
-                         (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory))
+                         (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1))
                          (Thread.mk _ st4 lc4 sc4 memory4)).
       { etrans.
         { eapply CANCELS. }
@@ -708,7 +708,7 @@ Module SConfiguration.
         rewrite IdentMap.gsident; eauto. }
     }
     { inv STEP; ss.
-      assert (BOT: e3.(Thread.local).(Local.promises) = Memory.bot).
+      assert (BOT: (Local.promises (Thread.local e3)) = Memory.bot).
       { destruct e0; ss. inv STEP0; inv STEP. inv LOCAL. inv LOCAL0; auto. }
       destruct e3. esplits.
       { econs 2. rewrite <- EVENT. econs; eauto.

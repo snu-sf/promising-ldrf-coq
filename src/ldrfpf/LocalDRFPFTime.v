@@ -198,7 +198,7 @@ Qed.
 Lemma pf_configuration_sim_configuration L times c
       (PF: PF.pf_configuration L c)
       (WF: Configuration.wf c)
-      (TIMES: memory_times_wf times c.(Configuration.memory))
+      (TIMES: memory_times_wf times (Configuration.memory c))
   :
     exists views prom extra proml,
       (<<SIM: sim_configuration L times (fun _ => True) views prom extra proml c c c>>) /\
@@ -274,7 +274,7 @@ Theorem local_drf_pf_time L
 Proof.
   i. eapply SConfiguration.multi_step_equiv in BEH; eauto.
   eapply times_configuration_step_same_behaviors in BEH; eauto. des.
-  hexploit (PFConsistentStrong.memory_times_wf_exists c0.(Configuration.memory)).
+  hexploit (PFConsistentStrong.memory_times_wf_exists (Configuration.memory c0)).
   i. des.
   hexploit (@pf_configuration_sim_configuration L (times \2/ times_mem)); eauto.
   { ii. eapply MWF in GET. des. splits; auto. }

@@ -473,13 +473,13 @@ Module JThread.
       (VIEWSLE: forall loc ts (NEQ: views2 loc ts <> views1 loc ts),
           (<<NIL: views1 loc ts = []>>) /\
           exists from val released,
-            (<<GET: Memory.get loc ts e2.(Thread.memory) = Some (from, Message.concrete val released)>>) /\
-            (<<VIEW: views2 loc ts = (View.join (e2.(Thread.local).(Local.tview).(TView.rel) loc) (View.singleton_ur loc ts))
+            (<<GET: Memory.get loc ts (Thread.memory e2) = Some (from, Message.concrete val released)>>) /\
+            (<<VIEW: views2 loc ts = (View.join ((Local.tview (Thread.local e2)).(TView.rel) loc) (View.singleton_ur loc ts))
                                        ::(all_join_views (View.singleton_ur loc ts) (views1 loc from))>>))
 
       (VIEWSWF: wf_views views2)
-      (MEMORY: joined_memory views2 e2.(Thread.memory))
-      (RELEASED: joined_released views2 e2.(Thread.local).(Local.promises) e2.(Thread.local).(Local.tview).(TView.rel))
+      (MEMORY: joined_memory views2 (Thread.memory e2))
+      (RELEASED: joined_released views2 (Local.promises (Thread.local e2)) (Local.tview (Thread.local e2)).(TView.rel))
     :
       step pf e e1 e2 views1 views2
   .
@@ -545,10 +545,10 @@ Module JThread.
   Definition consistent lang (e: Thread.t lang)
              (views1: Loc.t -> Time.t -> list View.t): Prop :=
     forall (mem1 : Memory.t) (sc1 : TimeMap.t)
-           (CAP: Memory.cap e.(Thread.memory) mem1)
+           (CAP: Memory.cap (Thread.memory e) mem1)
            (SC_MAX: Memory.max_concrete_timemap mem1 sc1),
     exists e2 views2,
-      (<<STEPS: rtc_tau (Thread.mk _ e.(Thread.state) e.(Thread.local) sc1 mem1) e2
+      (<<STEPS: rtc_tau (Thread.mk _ (Thread.state e) (Thread.local e) sc1 mem1) e2
                         views1 views2>>) /\
       ((<<FAILURE: exists e3, <<FAILURE: Thread.step true ThreadEvent.failure e2 e3>> >>) \/
        (<<PROMISES: Local.promises (Thread.local e2) = Memory.bot>>)).
@@ -569,22 +569,22 @@ Module JThread.
 
   Lemma step_future lang pf e th0 th1 views0 views1
         (STEP: @step lang pf e th0 th1 views0 views1)
-        (WF: Local.wf th0.(Thread.local) th0.(Thread.memory))
-        (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
-        (MEM: Memory.closed th0.(Thread.memory))
-        (REL: joined_released views0 th0.(Thread.local).(Local.promises) th0.(Thread.local).(Local.tview).(TView.rel))
-        (JOINED: joined_memory views0 th0.(Thread.memory))
+        (WF: Local.wf (Thread.local th0) (Thread.memory th0))
+        (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
+        (MEM: Memory.closed (Thread.memory th0))
+        (REL: joined_released views0 (Local.promises (Thread.local th0)) (Local.tview (Thread.local th0)).(TView.rel))
+        (JOINED: joined_memory views0 (Thread.memory th0))
         (VIEWS: wf_views views0)
     :
-      (<<WF: Local.wf th1.(Thread.local) th1.(Thread.memory)>>) /\
-      (<<SC: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory)>>) /\
-      (<<MEM: Memory.closed th1.(Thread.memory)>>)/\
-      (<<REL: joined_released views1 th1.(Thread.local).(Local.promises) th1.(Thread.local).(Local.tview).(TView.rel)>>)/\
-      (<<JOINED: joined_memory views1 th1.(Thread.memory)>>) /\
+      (<<WF: Local.wf (Thread.local th1) (Thread.memory th1)>>) /\
+      (<<SC: Memory.closed_timemap (Thread.sc th1) (Thread.memory th1)>>) /\
+      (<<MEM: Memory.closed (Thread.memory th1)>>)/\
+      (<<REL: joined_released views1 (Local.promises (Thread.local th1)) (Local.tview (Thread.local th1)).(TView.rel)>>)/\
+      (<<JOINED: joined_memory views1 (Thread.memory th1)>>) /\
       (<<VIEWS: wf_views views1>>) /\
-      (<<TVIEW_FUTURE: TView.le th0.(Thread.local).(Local.tview) th1.(Thread.local).(Local.tview)>>) /\
-      (<<SC_FUTURE: TimeMap.le th0.(Thread.sc) th1.(Thread.sc)>>) /\
-      (<<MEM_FUTURE: Memory.future th0.(Thread.memory) th1.(Thread.memory)>>) /\
+      (<<TVIEW_FUTURE: TView.le (Local.tview (Thread.local th0)) (Local.tview (Thread.local th1))>>) /\
+      (<<SC_FUTURE: TimeMap.le (Thread.sc th0) (Thread.sc th1)>>) /\
+      (<<MEM_FUTURE: Memory.future (Thread.memory th0) (Thread.memory th1)>>) /\
       (<<VIEWS_FUTURE: views_le views0 views1>>)
   .
   Proof.
@@ -594,22 +594,22 @@ Module JThread.
 
   Lemma opt_step_future lang e th0 th1 views0 views1
         (STEP: @opt_step lang e th0 th1 views0 views1)
-        (WF: Local.wf th0.(Thread.local) th0.(Thread.memory))
-        (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
-        (MEM: Memory.closed th0.(Thread.memory))
-        (REL: joined_released views0 th0.(Thread.local).(Local.promises) th0.(Thread.local).(Local.tview).(TView.rel))
-        (JOINED: joined_memory views0 th0.(Thread.memory))
+        (WF: Local.wf (Thread.local th0) (Thread.memory th0))
+        (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
+        (MEM: Memory.closed (Thread.memory th0))
+        (REL: joined_released views0 (Local.promises (Thread.local th0)) (Local.tview (Thread.local th0)).(TView.rel))
+        (JOINED: joined_memory views0 (Thread.memory th0))
         (VIEWS: wf_views views0)
     :
-      (<<WF: Local.wf th1.(Thread.local) th1.(Thread.memory)>>) /\
-      (<<SC: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory)>>) /\
-      (<<MEM: Memory.closed th1.(Thread.memory)>>)/\
-      (<<REL: joined_released views1 th1.(Thread.local).(Local.promises) th1.(Thread.local).(Local.tview).(TView.rel)>>)/\
-      (<<JOINED: joined_memory views1 th1.(Thread.memory)>>) /\
+      (<<WF: Local.wf (Thread.local th1) (Thread.memory th1)>>) /\
+      (<<SC: Memory.closed_timemap (Thread.sc th1) (Thread.memory th1)>>) /\
+      (<<MEM: Memory.closed (Thread.memory th1)>>)/\
+      (<<REL: joined_released views1 (Local.promises (Thread.local th1)) (Local.tview (Thread.local th1)).(TView.rel)>>)/\
+      (<<JOINED: joined_memory views1 (Thread.memory th1)>>) /\
       (<<VIEWS: wf_views views1>>) /\
-      (<<TVIEW_FUTURE: TView.le th0.(Thread.local).(Local.tview) th1.(Thread.local).(Local.tview)>>) /\
-      (<<SC_FUTURE: TimeMap.le th0.(Thread.sc) th1.(Thread.sc)>>) /\
-      (<<MEM_FUTURE: Memory.future th0.(Thread.memory) th1.(Thread.memory)>>) /\
+      (<<TVIEW_FUTURE: TView.le (Local.tview (Thread.local th0)) (Local.tview (Thread.local th1))>>) /\
+      (<<SC_FUTURE: TimeMap.le (Thread.sc th0) (Thread.sc th1)>>) /\
+      (<<MEM_FUTURE: Memory.future (Thread.memory th0) (Thread.memory th1)>>) /\
       (<<VIEWS_FUTURE: views_le views0 views1>>)
   .
   Proof.
@@ -620,22 +620,22 @@ Module JThread.
 
   Lemma tau_steps_future lang th0 th1 views0 views1
         (STEPS: @rtc_tau lang th0 th1 views0 views1)
-        (WF: Local.wf th0.(Thread.local) th0.(Thread.memory))
-        (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
-        (MEM: Memory.closed th0.(Thread.memory))
-        (REL: joined_released views0 th0.(Thread.local).(Local.promises) th0.(Thread.local).(Local.tview).(TView.rel))
-        (JOINED: joined_memory views0 th0.(Thread.memory))
+        (WF: Local.wf (Thread.local th0) (Thread.memory th0))
+        (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
+        (MEM: Memory.closed (Thread.memory th0))
+        (REL: joined_released views0 (Local.promises (Thread.local th0)) (Local.tview (Thread.local th0)).(TView.rel))
+        (JOINED: joined_memory views0 (Thread.memory th0))
         (VIEWS: wf_views views0)
     :
-      (<<WF: Local.wf th1.(Thread.local) th1.(Thread.memory)>>) /\
-      (<<SC: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory)>>) /\
-      (<<MEM: Memory.closed th1.(Thread.memory)>>)/\
-      (<<REL: joined_released views1 th1.(Thread.local).(Local.promises) th1.(Thread.local).(Local.tview).(TView.rel)>>)/\
-      (<<JOINED: joined_memory views1 th1.(Thread.memory)>>) /\
+      (<<WF: Local.wf (Thread.local th1) (Thread.memory th1)>>) /\
+      (<<SC: Memory.closed_timemap (Thread.sc th1) (Thread.memory th1)>>) /\
+      (<<MEM: Memory.closed (Thread.memory th1)>>)/\
+      (<<REL: joined_released views1 (Local.promises (Thread.local th1)) (Local.tview (Thread.local th1)).(TView.rel)>>)/\
+      (<<JOINED: joined_memory views1 (Thread.memory th1)>>) /\
       (<<VIEWS: wf_views views1>>) /\
-      (<<TVIEW_FUTURE: TView.le th0.(Thread.local).(Local.tview) th1.(Thread.local).(Local.tview)>>) /\
-      (<<SC_FUTURE: TimeMap.le th0.(Thread.sc) th1.(Thread.sc)>>) /\
-      (<<MEM_FUTURE: Memory.future th0.(Thread.memory) th1.(Thread.memory)>>) /\
+      (<<TVIEW_FUTURE: TView.le (Local.tview (Thread.local th0)) (Local.tview (Thread.local th1))>>) /\
+      (<<SC_FUTURE: TimeMap.le (Thread.sc th0) (Thread.sc th1)>>) /\
+      (<<MEM_FUTURE: Memory.future (Thread.memory th0) (Thread.memory th1)>>) /\
       (<<VIEWS_FUTURE: views_le views0 views1>>)
   .
   Proof.
@@ -683,21 +683,21 @@ Module JThread.
 
   Lemma rtc_reserve_step_future lang th0 th1 views
         (STEPS: rtc (@reserve_step views lang) th0 th1)
-        (WF: Local.wf th0.(Thread.local) th0.(Thread.memory))
-        (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
-        (MEM: Memory.closed th0.(Thread.memory))
-        (REL: joined_released views th0.(Thread.local).(Local.promises) th0.(Thread.local).(Local.tview).(TView.rel))
-        (JOINED: joined_memory views th0.(Thread.memory))
+        (WF: Local.wf (Thread.local th0) (Thread.memory th0))
+        (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
+        (MEM: Memory.closed (Thread.memory th0))
+        (REL: joined_released views (Local.promises (Thread.local th0)) (Local.tview (Thread.local th0)).(TView.rel))
+        (JOINED: joined_memory views (Thread.memory th0))
         (VIEWS: wf_views views)
     :
-      (<<WF: Local.wf th1.(Thread.local) th1.(Thread.memory)>>) /\
-      (<<SC: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory)>>) /\
-      (<<MEM: Memory.closed th1.(Thread.memory)>>)/\
-      (<<REL: joined_released views th1.(Thread.local).(Local.promises) th1.(Thread.local).(Local.tview).(TView.rel)>>)/\
-      (<<JOINED: joined_memory views th1.(Thread.memory)>>) /\
-      (<<TVIEW_FUTURE: TView.le th0.(Thread.local).(Local.tview) th1.(Thread.local).(Local.tview)>>) /\
-      (<<SC_FUTURE: TimeMap.le th0.(Thread.sc) th1.(Thread.sc)>>) /\
-      (<<MEM_FUTURE: Memory.future th0.(Thread.memory) th1.(Thread.memory)>>)
+      (<<WF: Local.wf (Thread.local th1) (Thread.memory th1)>>) /\
+      (<<SC: Memory.closed_timemap (Thread.sc th1) (Thread.memory th1)>>) /\
+      (<<MEM: Memory.closed (Thread.memory th1)>>)/\
+      (<<REL: joined_released views (Local.promises (Thread.local th1)) (Local.tview (Thread.local th1)).(TView.rel)>>)/\
+      (<<JOINED: joined_memory views (Thread.memory th1)>>) /\
+      (<<TVIEW_FUTURE: TView.le (Local.tview (Thread.local th0)) (Local.tview (Thread.local th1))>>) /\
+      (<<SC_FUTURE: TimeMap.le (Thread.sc th0) (Thread.sc th1)>>) /\
+      (<<MEM_FUTURE: Memory.future (Thread.memory th0) (Thread.memory th1)>>)
   .
   Proof.
     ginduction STEPS; i.
@@ -708,21 +708,21 @@ Module JThread.
 
   Lemma rtc_cancel_step_future lang th0 th1 views
         (STEPS: rtc (@cancel_step views lang) th0 th1)
-        (WF: Local.wf th0.(Thread.local) th0.(Thread.memory))
-        (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
-        (MEM: Memory.closed th0.(Thread.memory))
-        (REL: joined_released views th0.(Thread.local).(Local.promises) th0.(Thread.local).(Local.tview).(TView.rel))
-        (JOINED: joined_memory views th0.(Thread.memory))
+        (WF: Local.wf (Thread.local th0) (Thread.memory th0))
+        (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
+        (MEM: Memory.closed (Thread.memory th0))
+        (REL: joined_released views (Local.promises (Thread.local th0)) (Local.tview (Thread.local th0)).(TView.rel))
+        (JOINED: joined_memory views (Thread.memory th0))
         (VIEWS: wf_views views)
     :
-      (<<WF: Local.wf th1.(Thread.local) th1.(Thread.memory)>>) /\
-      (<<SC: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory)>>) /\
-      (<<MEM: Memory.closed th1.(Thread.memory)>>)/\
-      (<<REL: joined_released views th1.(Thread.local).(Local.promises) th1.(Thread.local).(Local.tview).(TView.rel)>>)/\
-      (<<JOINED: joined_memory views th1.(Thread.memory)>>) /\
-      (<<TVIEW_FUTURE: TView.le th0.(Thread.local).(Local.tview) th1.(Thread.local).(Local.tview)>>) /\
-      (<<SC_FUTURE: TimeMap.le th0.(Thread.sc) th1.(Thread.sc)>>) /\
-      (<<MEM_FUTURE: Memory.future th0.(Thread.memory) th1.(Thread.memory)>>)
+      (<<WF: Local.wf (Thread.local th1) (Thread.memory th1)>>) /\
+      (<<SC: Memory.closed_timemap (Thread.sc th1) (Thread.memory th1)>>) /\
+      (<<MEM: Memory.closed (Thread.memory th1)>>)/\
+      (<<REL: joined_released views (Local.promises (Thread.local th1)) (Local.tview (Thread.local th1)).(TView.rel)>>)/\
+      (<<JOINED: joined_memory views (Thread.memory th1)>>) /\
+      (<<TVIEW_FUTURE: TView.le (Local.tview (Thread.local th0)) (Local.tview (Thread.local th1))>>) /\
+      (<<SC_FUTURE: TimeMap.le (Thread.sc th0) (Thread.sc th1)>>) /\
+      (<<MEM_FUTURE: Memory.future (Thread.memory th0) (Thread.memory th1)>>)
   .
   Proof.
     ginduction STEPS; i.
@@ -740,13 +740,13 @@ Module JConfiguration.
   | step_intro
       pf e tid c1 lang st1 lc1 e2 st3 lc3 sc3 memory3
       views1 views2 views3
-      (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
-      (STEPS: JThread.rtc_tau (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2 views1 views2)
+      (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
+      (STEPS: JThread.rtc_tau (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) e2 views1 views2)
       (STEP: JThread.step pf e e2 (Thread.mk _ st3 lc3 sc3 memory3) views2 views3)
       (CONSISTENT: forall (NORMAL: e <> ThreadEvent.failure),
           JThread.consistent (Thread.mk _ st3 lc3 sc3 memory3) views3)
     :
-      step (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3) views1 views3
+      step (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) (Configuration.threads c1)) sc3 memory3) views1 views3
   .
   Hint Constructors step.
 
@@ -795,9 +795,9 @@ Module JConfiguration.
   | wf_intro
       (WF: Configuration.wf conf)
       (REL: forall tid lang st lc
-                   (TH: IdentMap.find tid conf.(Configuration.threads) = Some (existT _ lang st, lc)),
-          joined_released views lc.(Local.promises) lc.(Local.tview).(TView.rel))
-      (JOINMEM: joined_memory views conf.(Configuration.memory))
+                   (TH: IdentMap.find tid (Configuration.threads conf) = Some (existT _ lang st, lc)),
+          joined_released views (Local.promises lc) (TView.rel (Local.tview lc)))
+      (JOINMEM: joined_memory views (Configuration.memory conf))
       (VIEWS: wf_views views)
   .
 
@@ -830,8 +830,8 @@ Module JConfiguration.
         (WF1: wf views1 c1)
     :
       (<<WF2: wf views2 c2>>) /\
-      (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-      (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
+      (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+      (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\
       (<<VIEWS_FUTURE: views_le views1 views2>>)
   .
   Proof.
@@ -856,8 +856,8 @@ Module JConfiguration.
         (WF1: wf views1 c1)
     :
       (<<WF2: wf views2 c2>>) /\
-      (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-      (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
+      (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+      (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\
       (<<VIEWS_FUTURE: views_le views1 views2>>)
   .
   Proof.
@@ -871,8 +871,8 @@ Module JConfiguration.
         (STEPS: steps c1 c2 views1 views2)
         (WF1: wf views1 c1):
       (<<WF2: wf views2 c2>>) /\
-      (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-      (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
+      (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+      (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\
       (<<VIEWS_FUTURE: views_le views1 views2>>).
   Proof.
     revert WF1. induction STEPS; i.
@@ -887,12 +887,12 @@ Module JConfiguration.
            (views1 views2: Loc.t -> Time.t -> list View.t), Prop :=
   | single_step_intro
       e tid c1 lang st1 lc1 e2 e3 st4 lc4 sc4 memory4 views1 views2
-      (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
-      (CANCELS: rtc (@JThread.cancel_step views1 lang) (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
+      (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
+      (CANCELS: rtc (@JThread.cancel_step views1 lang) (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) e2)
       (STEP: JThread.opt_step e e2 e3 views1 views2)
       (RESERVES: rtc (@JThread.reserve_step views2 _) e3 (Thread.mk _ st4 lc4 sc4 memory4))
       (CONSISTENT: e <> ThreadEvent.failure -> JThread.consistent (Thread.mk _ st4 lc4 sc4 memory4) views2):
-      single_step e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) c1.(Configuration.threads)) sc4 memory4) views1 views2
+      single_step e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) (Configuration.threads c1)) sc4 memory4) views1 views2
   .
   Hint Constructors single_step.
 
@@ -927,8 +927,8 @@ Module JConfiguration.
         (WF1: wf views1 c1)
     :
       (<<WF2: wf views2 c2>>) /\
-      (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-      (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
+      (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+      (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\
       (<<VIEWS_FUTURE: views_le views1 views2>>)
   .
   Proof.
@@ -954,8 +954,8 @@ Module JConfiguration.
         (WF1: wf views1 c1)
     :
       (<<WF2: wf views2 c2>>) /\
-      (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-      (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
+      (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+      (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\
       (<<VIEWS_FUTURE: views_le views1 views2>>)
   .
   Proof.
@@ -979,8 +979,8 @@ Module JConfiguration.
         (STEPS: single_steps c1 c2 views1 views2)
         (WF1: wf views1 c1):
       (<<WF2: wf views2 c2>>) /\
-      (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-      (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
+      (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+      (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\
       (<<VIEWS_FUTURE: views_le views1 views2>>).
   Proof.
     revert WF1. induction STEPS; i.
@@ -1220,14 +1220,14 @@ Module JSim.
         (MEM1_SRC: Memory.closed mem1_src)
         (MEM1_TGT: Memory.closed mem1_tgt)
         (JOINMEM: joined_memory views mem1_src)
-        (REL: joined_released views lc1_src.(Local.promises) lc1_src.(Local.tview).(TView.rel))
+        (REL: joined_released views (Local.promises lc1_src) (TView.rel (Local.tview lc1_src)))
         (ORD: Ordering.le ord_src ord_tgt)
     :
       exists released_src lc2_src,
         (<<REL: View.opt_le released_src released_tgt>>) /\
         (<<STEP_SRC: Local.read_step lc1_src mem1_src loc ts val released_src ord_src lc2_src>>) /\
         (<<LOCAL2: sim_local views lc2_src lc2_tgt>>) /\
-        (<<REL: joined_released views lc2_src.(Local.promises) lc2_src.(Local.tview).(TView.rel)>>) /\
+        (<<REL: joined_released views (Local.promises lc2_src) (TView.rel (Local.tview lc2_src))>>) /\
         (<<JOINED: joined_opt_view (views loc ts) released_src>>)
   .
   Proof.
@@ -1247,8 +1247,8 @@ Module JSim.
   Lemma sim_local_nonsynch_loc
         views loc lc_src lc_tgt
         (SIM: sim_local views lc_src lc_tgt)
-        (NONSYNCH: Memory.nonsynch_loc loc lc_tgt.(Local.promises)):
-    Memory.nonsynch_loc loc lc_src.(Local.promises).
+        (NONSYNCH: Memory.nonsynch_loc loc (Local.promises lc_tgt)):
+    Memory.nonsynch_loc loc (Local.promises lc_src).
   Proof.
     inv SIM. ii. destruct msg; ss.
     specialize (PROMISES loc t). rewrite GET in *. inv PROMISES.
@@ -1258,8 +1258,8 @@ Module JSim.
   Lemma sim_local_nonsynch
         views lc_src lc_tgt
         (SIM: sim_local views lc_src lc_tgt)
-        (NONSYNCH: Memory.nonsynch lc_tgt.(Local.promises)):
-    Memory.nonsynch lc_src.(Local.promises).
+        (NONSYNCH: Memory.nonsynch (Local.promises lc_tgt)):
+    Memory.nonsynch (Local.promises lc_src).
   Proof.
     ii. eapply sim_local_nonsynch_loc; eauto.
   Qed.
@@ -1284,7 +1284,7 @@ Module JSim.
         ordr_tgt ordw_tgt
         (STEP_TGT: Local.fence_step lc1_tgt sc1_tgt ordr_tgt ordw_tgt lc2_tgt sc2_tgt)
         (LOCAL1: sim_local views lc1_src lc1_tgt)
-        (REL: joined_released views lc1_src.(Local.promises) lc1_src.(Local.tview).(TView.rel))
+        (REL: joined_released views (Local.promises lc1_src) (TView.rel (Local.tview lc1_src)))
         (SC1: TimeMap.le sc1_src sc1_tgt)
         (MEM1: sim_memory mem1_src mem1_tgt)
         (WF1_SRC: Local.wf lc1_src mem1_src)
@@ -1295,7 +1295,7 @@ Module JSim.
       (<<STEP_SRC: Local.fence_step lc1_src sc1_src ordr_src ordw_src lc2_src sc2_src>>) /\
       (<<LOCAL2: sim_local views lc2_src lc2_tgt>>) /\
       (<<SC2: TimeMap.le sc2_src sc2_tgt>>) /\
-      (<<REL: joined_released views lc2_src.(Local.promises) lc2_src.(Local.tview).(TView.rel)>>).
+      (<<REL: joined_released views (Local.promises lc2_src) (TView.rel (Local.tview lc2_src))>>).
   Proof.
     inv STEP_TGT. esplits.
     - econs; eauto.
@@ -1371,7 +1371,7 @@ Module JSim.
         (WFVIEWS1: wf_views views1)
         (CONS_TGT: Local.promise_consistent lc2_tgt)
 
-        (REL1: joined_released views1 lc1_src.(Local.promises) lc1_src.(Local.tview).(TView.rel))
+        (REL1: joined_released views1 (Local.promises lc1_src) (TView.rel (Local.tview lc1_src)))
 
     :
       exists msg_src views2 kind_src lc2_src mem2_src,
@@ -1380,7 +1380,7 @@ Module JSim.
         (<<MEM2: sim_memory mem2_src mem2_tgt>>) /\
         (<<JOINMEM2: joined_memory views2 mem2_src>>) /\
         (<<WFVIEWS2: wf_views views2>>) /\
-        (<<REL2: joined_released views2 lc2_src.(Local.promises) lc2_src.(Local.tview).(TView.rel)>>) /\
+        (<<REL2: joined_released views2 (Local.promises lc2_src) (TView.rel (Local.tview lc2_src))>>) /\
 
         (<<PROMISE:
            forall val released
@@ -1390,7 +1390,7 @@ Module JSim.
             (<<NIL: views1 loc ts = []>>) /\
             exists from val released,
               (<<GET: Memory.get loc ts mem2_src = Some (from, Message.concrete val released)>>) /\
-              (<<VIEW: views2 loc ts = (View.join (lc2_src.(Local.tview).(TView.rel) loc) (View.singleton_ur loc ts))
+              (<<VIEW: views2 loc ts = (View.join ((TView.rel (Local.tview lc2_src)) loc) (View.singleton_ur loc ts))
                                          ::(all_join_views (View.singleton_ur loc ts) (views1 loc from))>>)>>) /\
         (<<MSG: sim_message msg_src msg_tgt>>) /\
         (<<KIND: sim_op_kind kind_src kind_tgt>>) /\
@@ -1424,7 +1424,7 @@ Module JSim.
           { etrans; eauto. econs. ss. }
         }
 
-        set (views := (View.join (lc1_src.(Local.tview).(TView.rel) loc) (View.singleton_ur loc to))
+        set (views := (View.join ((TView.rel (Local.tview lc1_src)) loc) (View.singleton_ur loc to))
                         ::(all_join_views (View.singleton_ur loc to) (views1 loc from))).
         assert (VIEWWF: View.wf (View.join (TView.rel (Local.tview lc1_src) loc) (View.singleton_ur loc to))).
         { inv WF1_SRC. inv TVIEW_WF.
@@ -1443,7 +1443,7 @@ Module JSim.
           - i. inv H. eapply DISJOINT; eauto. }
         { econs; eauto. }
         intros [mem2_src MEM_SRC].
-        hexploit (@Memory.add_exists_le lc1_src.(Local.promises) mem1_src loc from to (Message.concrete val max)); eauto.
+        hexploit (@Memory.add_exists_le (Local.promises lc1_src) mem1_src loc from to (Message.concrete val max)); eauto.
         { inv WF1_SRC. auto. }
         intros [prom2_src PROMISES_SRC].
         exists (Message.concrete val max), views2.
@@ -1524,7 +1524,7 @@ Module JSim.
           - econs; eauto.
           - i. inv H. eapply DISJOINT; eauto. }
         intros [mem2_src MEM_SRC].
-        hexploit (@Memory.add_exists_le lc1_src.(Local.promises) mem1_src loc from to Message.reserve); eauto.
+        hexploit (@Memory.add_exists_le (Local.promises lc1_src) mem1_src loc from to Message.reserve); eauto.
         { inv WF1_SRC. auto. }
         intros [prom2_src PROMISES_SRC].
         exists Message.reserve, views1.
@@ -1560,7 +1560,7 @@ Module JSim.
     (* split *)
     { hexploit split_succeed_wf; try apply PROMISES; eauto. i. des. subst.
 
-      set (views :=(View.join (lc1_src.(Local.tview).(TView.rel) loc)
+      set (views :=(View.join ((TView.rel (Local.tview lc1_src)) loc)
                               (View.singleton_ur loc to))
                      ::(all_join_views (View.singleton_ur loc to) (views1 loc from))).
       assert (VIEWWF: View.wf (View.join (TView.rel (Local.tview lc1_src) loc) (View.singleton_ur loc to))).
@@ -1576,7 +1576,7 @@ Module JSim.
       hexploit (@max_le_joined_opt_view_exists views released'0); auto. i. des.
 
       assert (exists val'_src released'_src,
-                 (<<GETSRC: Memory.get loc ts3 lc1_src.(Local.promises) = Some (from, Message.concrete val'_src released'_src)>>) /\
+                 (<<GETSRC: Memory.get loc ts3 (Local.promises lc1_src) = Some (from, Message.concrete val'_src released'_src)>>) /\
                  (<<GETMEMSRC: Memory.get loc ts3 mem1_src = Some (from, Message.concrete val'_src released'_src)>>) /\
                  (<<SIMMSG: sim_message (Message.concrete val'_src released'_src) (Message.concrete val' released')>>)).
       { inv LOCAL1. inv WF1_SRC. dup PROMISES0. ss.
@@ -1586,10 +1586,10 @@ Module JSim.
             symmetry in H0. apply PROMISES1 in H0. clarify. }
       } des.
 
-      hexploit (@Memory.split_exists lc1_src.(Local.promises) loc from to ts3 (Message.concrete val'0 max) (Message.concrete val'_src released'_src)); auto.
+      hexploit (@Memory.split_exists (Local.promises lc1_src) loc from to ts3 (Message.concrete val'0 max) (Message.concrete val'_src released'_src)); auto.
       { econs. auto. }
       intros [prom2_src PROMISES_SRC].
-      hexploit (@Memory.split_exists_le lc1_src.(Local.promises) mem1_src loc from to ts3 (Message.concrete val'0 max) (Message.concrete val'_src released'_src)); eauto.
+      hexploit (@Memory.split_exists_le (Local.promises lc1_src) mem1_src loc from to ts3 (Message.concrete val'0 max) (Message.concrete val'_src released'_src)); eauto.
       { inv WF1_SRC. auto. }
       intros [mem2_src MEM_SRC].
 
@@ -1815,7 +1815,7 @@ Module JSim.
         (MEM1_TGT: Memory.closed mem1_tgt)
         (WFVIEWS1: wf_views views1)
         (JOINMEM1: joined_memory views1 mem1_src)
-        (REL1: joined_released views1 lc1_src.(Local.promises) lc1_src.(Local.tview).(TView.rel))
+        (REL1: joined_released views1 (Local.promises lc1_src) (TView.rel (Local.tview lc1_src)))
         (CONS_TGT: Local.promise_consistent lc2_tgt)
     :
       exists released_src views2 kind_src lc2_src sc2_src mem2_src,
@@ -1828,13 +1828,13 @@ Module JSim.
         (<<JOINMEM2: joined_memory views2 mem2_src>>) /\
         (<<WFVIEWS2: wf_views views2>>) /\
 
-        (<<REL2: joined_released views2 lc2_src.(Local.promises) lc2_src.(Local.tview).(TView.rel)>>) /\
+        (<<REL2: joined_released views2 (Local.promises lc2_src) (TView.rel (Local.tview lc2_src))>>) /\
 
         (<<VIEWSLE: forall loc ts (NEQ: views2 loc ts <> views1 loc ts),
             (<<NIL: views1 loc ts = []>>) /\
             exists from val released,
               (<<GET: Memory.get loc ts mem2_src = Some (from, Message.concrete val released)>>) /\
-              (<<VIEW: views2 loc ts = (View.join (lc2_src.(Local.tview).(TView.rel) loc) (View.singleton_ur loc ts))
+              (<<VIEW: views2 loc ts = (View.join ((TView.rel (Local.tview lc2_src)) loc) (View.singleton_ur loc ts))
                                          ::(all_join_views (View.singleton_ur loc ts) (views1 loc from))>>)>>) /\
         (<<RELEASED: View.opt_le released_src released_tgt>>)
   .
@@ -1855,7 +1855,7 @@ Module JSim.
       erewrite GET in *. inv PROMISES0. symmetry in H. clear NIL.
       assert (((<<NEQ: __guard__(loc0 <> loc \/ ts0 <> to)>>) /\
                exists from0' val0' released_tgt0',
-                 (<<GET_TGT: Memory.get loc0 ts0 lc2_tgt.(Local.promises) =
+                 (<<GET_TGT: Memory.get loc0 ts0 (Local.promises lc2_tgt) =
                              Some (from0', Message.concrete val0' released_tgt0')>>))
               \/
               (loc0 = loc /\ ts0 = to)).
@@ -1914,7 +1914,7 @@ Module JSim.
 
     inv STEP_TGT. inv WRITE. inv PROMISE.
     { hexploit add_succeed_wf; try apply MEM; eauto. i. des.
-      set (views :=((write_tview).(TView.rel) loc)
+      set (views :=((TView.rel (write_tview)) loc)
                      ::(all_join_views (View.singleton_ur loc to) (views1 loc from))).
       set (views2 := fun (l: Loc.t) (t: Time.t) => if (loc_ts_eq_dec (l, t) (loc, to))
                                                    then views
@@ -1948,7 +1948,7 @@ Module JSim.
         - i. inv H. eapply DISJOINT; eauto. }
       { econs; eauto. }
       intros [mem2_src MEM_SRC].
-      hexploit (@Memory.add_exists_le lc1_src.(Local.promises) mem1_src loc from to (Message.concrete val released_src)); eauto.
+      hexploit (@Memory.add_exists_le (Local.promises lc1_src) mem1_src loc from to (Message.concrete val released_src)); eauto.
       intros [prom2_src' PROMISES_SRC'].
       hexploit (@Memory.remove_exists prom2_src' loc from to (Message.concrete val released_src)).
       { eapply Memory.add_get0. eauto. }
@@ -2033,8 +2033,7 @@ Module JSim.
           { exfalso. ss. unguard. des; subst; ss.
             eapply Time.lt_strorder; eauto. }
           ss. unguard. guardH o. des; subst.
-          { setoid_rewrite LocFun.add_spec_neq; eauto.
-            exploit REL1; eauto. }
+          { setoid_rewrite LocFun.add_spec_neq; eauto. }
           { setoid_rewrite LocFun.add_spec_eq. condtac.
             { exfalso. eapply RELEASE_SRC in GET; auto. }
             exploit REL1; eauto. i.
@@ -2058,14 +2057,14 @@ Module JSim.
 
     {
       hexploit split_succeed_wf; try apply PROMISES0; eauto. i. des.
-      set (views :=((write_tview).(TView.rel) loc)
+      set (views :=((TView.rel (write_tview)) loc)
                      ::(all_join_views (View.singleton_ur loc to) (views1 loc from))).
       set (views2 := fun (l: Loc.t) (t: Time.t) => if (loc_ts_eq_dec (l, t) (loc, to))
                                                    then views
                                                    else views1 l t).
 
       assert (exists msg3_src,
-                 (<<GETSRC: Memory.get loc ts3 lc1_src.(Local.promises) = Some (from, msg3_src)>>) /\
+                 (<<GETSRC: Memory.get loc ts3 (Local.promises lc1_src) = Some (from, msg3_src)>>) /\
                  (<<GETMEMSRC: Memory.get loc ts3 mem1_src = Some (from, msg3_src)>>) /\
                  (<<SIMMSG: sim_message msg3_src msg3>>)).
       { inv LOCAL1. dup PROMISES0. ss.
@@ -2075,10 +2074,10 @@ Module JSim.
             inv GET. auto. }
       } des.
 
-      hexploit (@Memory.split_exists lc1_src.(Local.promises) loc from to ts3 (Message.concrete val released_src) msg3_src); auto.
+      hexploit (@Memory.split_exists (Local.promises lc1_src) loc from to ts3 (Message.concrete val released_src) msg3_src); auto.
       { econs. auto. }
       intros [prom2_src' PROMISES_SRC'].
-      hexploit (@Memory.split_exists_le lc1_src.(Local.promises) mem1_src loc from to ts3 (Message.concrete val released_src) msg3_src); eauto.
+      hexploit (@Memory.split_exists_le (Local.promises lc1_src) mem1_src loc from to ts3 (Message.concrete val released_src) msg3_src); eauto.
       intros [mem2_src MEM_SRC].
 
       assert (JOINMEM2: joined_memory views2 mem2_src).
@@ -2337,16 +2336,16 @@ Module JSim.
         (STEP: Thread.step pf_tgt e_tgt th0_tgt th1_tgt)
         (SIM: @sim_thread views0 lang_src lang_tgt th0_src th0_tgt)
 
-        (WF_SRC: Local.wf th0_src.(Thread.local) th0_src.(Thread.memory))
-        (WF_TGT: Local.wf th0_tgt.(Thread.local) th0_tgt.(Thread.memory))
-        (SC_SRC: Memory.closed_timemap th0_src.(Thread.sc) th0_src.(Thread.memory))
-        (SC_TGT: Memory.closed_timemap th0_tgt.(Thread.sc) th0_tgt.(Thread.memory))
-        (MEM_SRC: Memory.closed th0_src.(Thread.memory))
-        (MEM_TGT: Memory.closed th0_tgt.(Thread.memory))
-        (CONS_TGT: Local.promise_consistent th1_tgt.(Thread.local))
+        (WF_SRC: Local.wf (Thread.local th0_src) (Thread.memory th0_src))
+        (WF_TGT: Local.wf (Thread.local th0_tgt) (Thread.memory th0_tgt))
+        (SC_SRC: Memory.closed_timemap (Thread.sc th0_src) (Thread.memory th0_src))
+        (SC_TGT: Memory.closed_timemap (Thread.sc th0_tgt) (Thread.memory th0_tgt))
+        (MEM_SRC: Memory.closed (Thread.memory th0_src))
+        (MEM_TGT: Memory.closed (Thread.memory th0_tgt))
+        (CONS_TGT: Local.promise_consistent (Thread.local th1_tgt))
 
-        (REL: joined_released views0 th0_src.(Thread.local).(Local.promises) th0_src.(Thread.local).(Local.tview).(TView.rel))
-        (JOINED: joined_memory views0 th0_src.(Thread.memory))
+        (REL: joined_released views0 (Local.promises (Thread.local th0_src)) (Local.tview (Thread.local th0_src)).(TView.rel))
+        (JOINED: joined_memory views0 (Thread.memory th0_src))
         (VIEWS: wf_views views0)
     :
       exists e_src pf_src th1_src views1,
@@ -2475,16 +2474,16 @@ Module JSim.
         (STEP: Thread.opt_step e_tgt th0_tgt th1_tgt)
         (SIM: @sim_thread views0 lang_src lang_tgt th0_src th0_tgt)
 
-        (WF_SRC: Local.wf th0_src.(Thread.local) th0_src.(Thread.memory))
-        (WF_TGT: Local.wf th0_tgt.(Thread.local) th0_tgt.(Thread.memory))
-        (SC_SRC: Memory.closed_timemap th0_src.(Thread.sc) th0_src.(Thread.memory))
-        (SC_TGT: Memory.closed_timemap th0_tgt.(Thread.sc) th0_tgt.(Thread.memory))
-        (MEM_SRC: Memory.closed th0_src.(Thread.memory))
-        (MEM_TGT: Memory.closed th0_tgt.(Thread.memory))
-        (CONS_TGT: Local.promise_consistent th1_tgt.(Thread.local))
+        (WF_SRC: Local.wf (Thread.local th0_src) (Thread.memory th0_src))
+        (WF_TGT: Local.wf (Thread.local th0_tgt) (Thread.memory th0_tgt))
+        (SC_SRC: Memory.closed_timemap (Thread.sc th0_src) (Thread.memory th0_src))
+        (SC_TGT: Memory.closed_timemap (Thread.sc th0_tgt) (Thread.memory th0_tgt))
+        (MEM_SRC: Memory.closed (Thread.memory th0_src))
+        (MEM_TGT: Memory.closed (Thread.memory th0_tgt))
+        (CONS_TGT: Local.promise_consistent (Thread.local th1_tgt))
 
-        (REL: joined_released views0 th0_src.(Thread.local).(Local.promises) th0_src.(Thread.local).(Local.tview).(TView.rel))
-        (JOINED: joined_memory views0 th0_src.(Thread.memory))
+        (REL: joined_released views0 (Local.promises (Thread.local th0_src)) (Local.tview (Thread.local th0_src)).(TView.rel))
+        (JOINED: joined_memory views0 (Thread.memory th0_src))
         (VIEWS: wf_views views0)
     :
       exists e_src th1_src views1,
@@ -2506,16 +2505,16 @@ Module JSim.
         (STEPS: rtc (@Thread.tau_step lang_tgt) th0_tgt th1_tgt)
         (SIM: @sim_thread views0 lang_src lang_tgt th0_src th0_tgt)
 
-        (WF_SRC: Local.wf th0_src.(Thread.local) th0_src.(Thread.memory))
-        (WF_TGT: Local.wf th0_tgt.(Thread.local) th0_tgt.(Thread.memory))
-        (SC_SRC: Memory.closed_timemap th0_src.(Thread.sc) th0_src.(Thread.memory))
-        (SC_TGT: Memory.closed_timemap th0_tgt.(Thread.sc) th0_tgt.(Thread.memory))
-        (MEM_SRC: Memory.closed th0_src.(Thread.memory))
-        (MEM_TGT: Memory.closed th0_tgt.(Thread.memory))
-        (CONS_TGT: Local.promise_consistent th1_tgt.(Thread.local))
+        (WF_SRC: Local.wf (Thread.local th0_src) (Thread.memory th0_src))
+        (WF_TGT: Local.wf (Thread.local th0_tgt) (Thread.memory th0_tgt))
+        (SC_SRC: Memory.closed_timemap (Thread.sc th0_src) (Thread.memory th0_src))
+        (SC_TGT: Memory.closed_timemap (Thread.sc th0_tgt) (Thread.memory th0_tgt))
+        (MEM_SRC: Memory.closed (Thread.memory th0_src))
+        (MEM_TGT: Memory.closed (Thread.memory th0_tgt))
+        (CONS_TGT: Local.promise_consistent (Thread.local th1_tgt))
 
-        (REL: joined_released views0 th0_src.(Thread.local).(Local.promises) th0_src.(Thread.local).(Local.tview).(TView.rel))
-        (JOINED: joined_memory views0 th0_src.(Thread.memory))
+        (REL: joined_released views0 (Local.promises (Thread.local th0_src)) (Local.tview (Thread.local th0_src)).(TView.rel))
+        (JOINED: joined_memory views0 (Thread.memory th0_src))
         (VIEWS: wf_views views0)
     :
       exists th1_src views1,
@@ -2543,16 +2542,16 @@ Module JSim.
         (STEP: Thread.reserve_step th0_tgt th1_tgt)
         (SIM: @sim_thread views0 lang_src lang_tgt th0_src th0_tgt)
 
-        (WF_SRC: Local.wf th0_src.(Thread.local) th0_src.(Thread.memory))
-        (WF_TGT: Local.wf th0_tgt.(Thread.local) th0_tgt.(Thread.memory))
-        (SC_SRC: Memory.closed_timemap th0_src.(Thread.sc) th0_src.(Thread.memory))
-        (SC_TGT: Memory.closed_timemap th0_tgt.(Thread.sc) th0_tgt.(Thread.memory))
-        (MEM_SRC: Memory.closed th0_src.(Thread.memory))
-        (MEM_TGT: Memory.closed th0_tgt.(Thread.memory))
-        (CONS_TGT: Local.promise_consistent th1_tgt.(Thread.local))
+        (WF_SRC: Local.wf (Thread.local th0_src) (Thread.memory th0_src))
+        (WF_TGT: Local.wf (Thread.local th0_tgt) (Thread.memory th0_tgt))
+        (SC_SRC: Memory.closed_timemap (Thread.sc th0_src) (Thread.memory th0_src))
+        (SC_TGT: Memory.closed_timemap (Thread.sc th0_tgt) (Thread.memory th0_tgt))
+        (MEM_SRC: Memory.closed (Thread.memory th0_src))
+        (MEM_TGT: Memory.closed (Thread.memory th0_tgt))
+        (CONS_TGT: Local.promise_consistent (Thread.local th1_tgt))
 
-        (REL: joined_released views0 th0_src.(Thread.local).(Local.promises) th0_src.(Thread.local).(Local.tview).(TView.rel))
-        (JOINED: joined_memory views0 th0_src.(Thread.memory))
+        (REL: joined_released views0 (Local.promises (Thread.local th0_src)) (Local.tview (Thread.local th0_src)).(TView.rel))
+        (JOINED: joined_memory views0 (Thread.memory th0_src))
         (VIEWS: wf_views views0)
     :
       exists th1_src,
@@ -2578,16 +2577,16 @@ Module JSim.
         (STEP: Thread.cancel_step th0_tgt th1_tgt)
         (SIM: @sim_thread views0 lang_src lang_tgt th0_src th0_tgt)
 
-        (WF_SRC: Local.wf th0_src.(Thread.local) th0_src.(Thread.memory))
-        (WF_TGT: Local.wf th0_tgt.(Thread.local) th0_tgt.(Thread.memory))
-        (SC_SRC: Memory.closed_timemap th0_src.(Thread.sc) th0_src.(Thread.memory))
-        (SC_TGT: Memory.closed_timemap th0_tgt.(Thread.sc) th0_tgt.(Thread.memory))
-        (MEM_SRC: Memory.closed th0_src.(Thread.memory))
-        (MEM_TGT: Memory.closed th0_tgt.(Thread.memory))
-        (CONS_TGT: Local.promise_consistent th1_tgt.(Thread.local))
+        (WF_SRC: Local.wf (Thread.local th0_src) (Thread.memory th0_src))
+        (WF_TGT: Local.wf (Thread.local th0_tgt) (Thread.memory th0_tgt))
+        (SC_SRC: Memory.closed_timemap (Thread.sc th0_src) (Thread.memory th0_src))
+        (SC_TGT: Memory.closed_timemap (Thread.sc th0_tgt) (Thread.memory th0_tgt))
+        (MEM_SRC: Memory.closed (Thread.memory th0_src))
+        (MEM_TGT: Memory.closed (Thread.memory th0_tgt))
+        (CONS_TGT: Local.promise_consistent (Thread.local th1_tgt))
 
-        (REL: joined_released views0 th0_src.(Thread.local).(Local.promises) th0_src.(Thread.local).(Local.tview).(TView.rel))
-        (JOINED: joined_memory views0 th0_src.(Thread.memory))
+        (REL: joined_released views0 (Local.promises (Thread.local th0_src)) (Local.tview (Thread.local th0_src)).(TView.rel))
+        (JOINED: joined_memory views0 (Thread.memory th0_src))
         (VIEWS: wf_views views0)
     :
       exists th1_src,
@@ -2613,16 +2612,16 @@ Module JSim.
         (STEPS: rtc (@Thread.reserve_step _) th0_tgt th1_tgt)
         (SIM: @sim_thread views0 lang_src lang_tgt th0_src th0_tgt)
 
-        (WF_SRC: Local.wf th0_src.(Thread.local) th0_src.(Thread.memory))
-        (WF_TGT: Local.wf th0_tgt.(Thread.local) th0_tgt.(Thread.memory))
-        (SC_SRC: Memory.closed_timemap th0_src.(Thread.sc) th0_src.(Thread.memory))
-        (SC_TGT: Memory.closed_timemap th0_tgt.(Thread.sc) th0_tgt.(Thread.memory))
-        (MEM_SRC: Memory.closed th0_src.(Thread.memory))
-        (MEM_TGT: Memory.closed th0_tgt.(Thread.memory))
-        (CONS_TGT: Local.promise_consistent th1_tgt.(Thread.local))
+        (WF_SRC: Local.wf (Thread.local th0_src) (Thread.memory th0_src))
+        (WF_TGT: Local.wf (Thread.local th0_tgt) (Thread.memory th0_tgt))
+        (SC_SRC: Memory.closed_timemap (Thread.sc th0_src) (Thread.memory th0_src))
+        (SC_TGT: Memory.closed_timemap (Thread.sc th0_tgt) (Thread.memory th0_tgt))
+        (MEM_SRC: Memory.closed (Thread.memory th0_src))
+        (MEM_TGT: Memory.closed (Thread.memory th0_tgt))
+        (CONS_TGT: Local.promise_consistent (Thread.local th1_tgt))
 
-        (REL: joined_released views0 th0_src.(Thread.local).(Local.promises) th0_src.(Thread.local).(Local.tview).(TView.rel))
-        (JOINED: joined_memory views0 th0_src.(Thread.memory))
+        (REL: joined_released views0 (Local.promises (Thread.local th0_src)) (Local.tview (Thread.local th0_src)).(TView.rel))
+        (JOINED: joined_memory views0 (Thread.memory th0_src))
         (VIEWS: wf_views views0)
     :
       exists th1_src,
@@ -2652,16 +2651,16 @@ Module JSim.
         (STEPS: rtc (@Thread.cancel_step _) th0_tgt th1_tgt)
         (SIM: @sim_thread views0 lang_src lang_tgt th0_src th0_tgt)
 
-        (WF_SRC: Local.wf th0_src.(Thread.local) th0_src.(Thread.memory))
-        (WF_TGT: Local.wf th0_tgt.(Thread.local) th0_tgt.(Thread.memory))
-        (SC_SRC: Memory.closed_timemap th0_src.(Thread.sc) th0_src.(Thread.memory))
-        (SC_TGT: Memory.closed_timemap th0_tgt.(Thread.sc) th0_tgt.(Thread.memory))
-        (MEM_SRC: Memory.closed th0_src.(Thread.memory))
-        (MEM_TGT: Memory.closed th0_tgt.(Thread.memory))
-        (CONS_TGT: Local.promise_consistent th1_tgt.(Thread.local))
+        (WF_SRC: Local.wf (Thread.local th0_src) (Thread.memory th0_src))
+        (WF_TGT: Local.wf (Thread.local th0_tgt) (Thread.memory th0_tgt))
+        (SC_SRC: Memory.closed_timemap (Thread.sc th0_src) (Thread.memory th0_src))
+        (SC_TGT: Memory.closed_timemap (Thread.sc th0_tgt) (Thread.memory th0_tgt))
+        (MEM_SRC: Memory.closed (Thread.memory th0_src))
+        (MEM_TGT: Memory.closed (Thread.memory th0_tgt))
+        (CONS_TGT: Local.promise_consistent (Thread.local th1_tgt))
 
-        (REL: joined_released views0 th0_src.(Thread.local).(Local.promises) th0_src.(Thread.local).(Local.tview).(TView.rel))
-        (JOINED: joined_memory views0 th0_src.(Thread.memory))
+        (REL: joined_released views0 (Local.promises (Thread.local th0_src)) (Local.tview (Thread.local th0_src)).(TView.rel))
+        (JOINED: joined_memory views0 (Thread.memory th0_src))
         (VIEWS: wf_views views0)
     :
       exists th1_src,
@@ -2726,20 +2725,20 @@ Module JSim.
         (SIM: sim_thread views th_src th_tgt)
         (CONSISTENT: Thread.consistent th_tgt)
 
-        (WF_SRC: Local.wf th_src.(Thread.local) th_src.(Thread.memory))
-        (WF_TGT: Local.wf th_tgt.(Thread.local) th_tgt.(Thread.memory))
-        (SC_SRC: Memory.closed_timemap th_src.(Thread.sc) th_src.(Thread.memory))
-        (SC_TGT: Memory.closed_timemap th_tgt.(Thread.sc) th_tgt.(Thread.memory))
-        (MEM_SRC: Memory.closed th_src.(Thread.memory))
-        (MEM_TGT: Memory.closed th_tgt.(Thread.memory))
+        (WF_SRC: Local.wf (Thread.local th_src) (Thread.memory th_src))
+        (WF_TGT: Local.wf (Thread.local th_tgt) (Thread.memory th_tgt))
+        (SC_SRC: Memory.closed_timemap (Thread.sc th_src) (Thread.memory th_src))
+        (SC_TGT: Memory.closed_timemap (Thread.sc th_tgt) (Thread.memory th_tgt))
+        (MEM_SRC: Memory.closed (Thread.memory th_src))
+        (MEM_TGT: Memory.closed (Thread.memory th_tgt))
 
-        (REL: joined_released views th_src.(Thread.local).(Local.promises) th_src.(Thread.local).(Local.tview).(TView.rel))
-        (JOINED: joined_memory views th_src.(Thread.memory))
+        (REL: joined_released views (Local.promises (Thread.local th_src)) (Local.tview (Thread.local th_src)).(TView.rel))
+        (JOINED: joined_memory views (Thread.memory th_src))
         (VIEWS: wf_views views)
     :
       JThread.consistent th_src views.
   Proof.
-    ii. hexploit (@Memory.cap_exists th_tgt.(Thread.memory)); eauto. i. des.
+    ii. hexploit (@Memory.cap_exists (Thread.memory th_tgt)); eauto. i. des.
     hexploit (@Memory.max_concrete_timemap_exists mem2).
     { eapply Memory.cap_closed in MEM_TGT; eauto. inv MEM_TGT. eauto. } i. des.
 
@@ -2914,9 +2913,9 @@ Module JSim.
         inv STEP0. inv STEP; inv STEP0. inv LOCAL1. inv LOCAL2. ss. }
       { hexploit PromiseConsistent.consistent_promise_consistent; eauto. }
     }
-    assert (CONSISTENT2: Local.promise_consistent e3.(Thread.local)).
+    assert (CONSISTENT2: Local.promise_consistent (Thread.local e3)).
     { eapply PromiseConsistent.rtc_reserve_step_promise_consistent in RESERVES; eauto. }
-    assert (CONSISTENT1: Local.promise_consistent e2.(Thread.local)).
+    assert (CONSISTENT1: Local.promise_consistent (Thread.local e2)).
     { inv STEP0; eauto.
       eapply PromiseConsistent.step_promise_consistent in STEP; eauto. }
     assert (CONSISTENT0: Local.promise_consistent lc1).

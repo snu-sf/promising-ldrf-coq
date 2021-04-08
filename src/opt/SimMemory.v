@@ -863,7 +863,7 @@ Lemma promise_fulfill_write_sim_memory
       (FULFILL: fulfill_step lc1 sc0 loc from to val releasedm released ord lc2 sc2)
       (REL_WF: View.opt_wf releasedm)
       (REL_CLOSED: Memory.closed_opt_view releasedm mem0)
-      (ORD: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc lc0.(Local.promises))
+      (ORD: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch_loc loc (Local.promises lc0))
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0):
@@ -871,7 +871,7 @@ Lemma promise_fulfill_write_sim_memory
     <<STEP: Local.write_step lc0 sc0 mem0 loc from to val releasedm released' ord lc2 sc2 mem2' kind>> /\
     <<REL_LE: View.opt_le released' released>> /\
     <<MEM: sim_memory mem2' mem2>> /\
-    <<REL: released' = TView.write_released lc0.(Local.tview) sc0 loc to releasedm ord>>.
+    <<REL: released' = TView.write_released (Local.tview lc0) sc0 loc to releasedm ord>>.
 Proof.
   exploit Local.promise_step_future; eauto. i. des.
   inv PROMISE. inv FULFILL. ss.

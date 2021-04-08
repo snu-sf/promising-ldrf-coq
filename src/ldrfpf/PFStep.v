@@ -56,8 +56,8 @@ Section LOCALPF.
 
   Definition pf_configuration (c: Configuration.t) :=
     forall tid lang st lc
-           (TID: IdentMap.find tid c.(Configuration.threads) = Some (existT _ lang st, lc)),
-      pf_promises lc.(Local.promises).
+           (TID: IdentMap.find tid (Configuration.threads c) = Some (existT _ lang st, lc)),
+      pf_promises (Local.promises lc).
 
   Lemma pf_consistent_consistent lang (th: Thread.t lang)
         (CONSISTENT: pf_consistent th)
@@ -119,9 +119,9 @@ Section LOCALPF.
   Lemma pf_promises_step lang (th0 th1: Thread.t lang) pf e
         (STEP: Thread.step pf e th0 th1)
         (PF: pf_event e)
-        (PROMISES: pf_promises th0.(Thread.local).(Local.promises))
+        (PROMISES: pf_promises (Local.promises (Thread.local th0)))
     :
-      pf_promises th1.(Thread.local).(Local.promises).
+      pf_promises (Local.promises (Thread.local th1)).
   Proof.
     inv STEP.
     - inv STEP0; ss. inv LOCAL.
@@ -140,9 +140,9 @@ Section LOCALPF.
   Lemma pf_promises_opt_step lang (th0 th1: Thread.t lang) e
         (STEP: Thread.opt_step e th0 th1)
         (PF: pf_event e)
-        (PROMISES: pf_promises th0.(Thread.local).(Local.promises))
+        (PROMISES: pf_promises (Local.promises (Thread.local th0)))
     :
-      pf_promises th1.(Thread.local).(Local.promises).
+      pf_promises (Local.promises (Thread.local th1)).
   Proof.
     inv STEP; auto.
     eapply pf_promises_step; eauto.
@@ -150,9 +150,9 @@ Section LOCALPF.
 
   Lemma pf_promises_reserve_steps lang (th0 th1: Thread.t lang)
         (STEPS: rtc (@Thread.reserve_step _) th0 th1)
-        (PROMISES: pf_promises th0.(Thread.local).(Local.promises))
+        (PROMISES: pf_promises (Local.promises (Thread.local th0)))
     :
-      pf_promises th1.(Thread.local).(Local.promises).
+      pf_promises (Local.promises (Thread.local th1)).
   Proof.
     ginduction STEPS; eauto. i. eapply IHSTEPS.
     inv H. eapply pf_promises_step; eauto. ii. clarify.
@@ -160,9 +160,9 @@ Section LOCALPF.
 
   Lemma pf_promises_cancel_steps lang (th0 th1: Thread.t lang)
         (STEPS: rtc (@Thread.cancel_step _) th0 th1)
-        (PROMISES: pf_promises th0.(Thread.local).(Local.promises))
+        (PROMISES: pf_promises (Local.promises (Thread.local th0)))
     :
-      pf_promises th1.(Thread.local).(Local.promises).
+      pf_promises (Local.promises (Thread.local th1)).
   Proof.
     ginduction STEPS; eauto. i. eapply IHSTEPS.
     inv H. eapply pf_promises_step; eauto. ii. clarify.
@@ -178,7 +178,7 @@ Section LOCALPF.
 
   Lemma pf_promises_step_event lang (th0 th1: Thread.t lang) e
         (STEP: Thread.step true e th0 th1)
-        (PROMISES: pf_promises th0.(Thread.local).(Local.promises))
+        (PROMISES: pf_promises (Local.promises (Thread.local th0)))
     :
       pf_event e.
   Proof.
@@ -190,7 +190,7 @@ Section LOCALPF.
 
   Lemma pf_promises_steps_trace lang (th0 th1: Thread.t lang)
         (STEPS: rtc (tau (Thread.step true)) th0 th1)
-        (PROMISES: pf_promises th0.(Thread.local).(Local.promises))
+        (PROMISES: pf_promises (Local.promises (Thread.local th0)))
     :
       exists tr,
         (<<STEPS: Trace.steps tr th0 th1>>) /\
@@ -207,9 +207,9 @@ Section LOCALPF.
   Lemma pf_promises_trace_steps lang (th0 th1: Thread.t lang) tr
         (STEPS: Trace.steps tr th0 th1)
         (PF: List.Forall (compose pf_event snd) tr)
-        (PROMISES: pf_promises th0.(Thread.local).(Local.promises))
+        (PROMISES: pf_promises (Local.promises (Thread.local th0)))
     :
-      pf_promises th1.(Thread.local).(Local.promises).
+      pf_promises (Local.promises (Thread.local th1)).
   Proof.
     ginduction STEPS; eauto. i. subst.
     inv PF. eapply IHSTEPS; eauto.
@@ -218,9 +218,9 @@ Section LOCALPF.
 
   Lemma pf_promises_consistent_consistent lang (th: Thread.t lang)
         (CONSISTENT: Thread.consistent th)
-        (WF: Local.wf th.(Thread.local) th.(Thread.memory))
-        (MEM: Memory.closed th.(Thread.memory))
-        (PROMISES: pf_promises th.(Thread.local).(Local.promises))
+        (WF: Local.wf (Thread.local th) (Thread.memory th))
+        (MEM: Memory.closed (Thread.memory th))
+        (PROMISES: pf_promises (Local.promises (Thread.local th)))
     :
       pf_consistent th.
   Proof.
@@ -231,13 +231,13 @@ Section LOCALPF.
     exploit CONSISTENT; eauto. i. des.
     { eapply pf_promises_steps_trace in STEPS; eauto. des.
       exists tr. splits; auto. ii.
-      exploit (@Memory.cap_inj th.(Thread.memory) mem2 mem1); eauto. i. subst.
+      exploit (@Memory.cap_inj (Thread.memory th) mem2 mem1); eauto. i. subst.
       exploit (@Memory.max_concrete_timemap_inj mem1 tm sc1); eauto. i. subst.
       esplits; eauto.
     }
     { eapply pf_promises_steps_trace in STEPS; eauto. des.
       exists tr. splits; auto. ii.
-      exploit (@Memory.cap_inj th.(Thread.memory) mem2 mem1); eauto. i. subst.
+      exploit (@Memory.cap_inj (Thread.memory th) mem2 mem1); eauto. i. subst.
       exploit (@Memory.max_concrete_timemap_inj mem1 tm sc1); eauto. i. subst.
       esplits; eauto.
     }
@@ -254,14 +254,14 @@ Section LOCALPF.
     forall (e:ThreadEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
   | step_intro
       e tid c1 lang st1 lc1 e2 e3 st4 lc4 sc4 memory4
-      (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
-      (CANCELS: rtc (@Thread.cancel_step _) (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
+      (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
+      (CANCELS: rtc (@Thread.cancel_step _) (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) e2)
       (STEP: Thread.opt_step e e2 e3)
       (RESERVES: rtc (@Thread.reserve_step _) e3 (Thread.mk _ st4 lc4 sc4 memory4))
       (CONSISTENT: e <> ThreadEvent.failure -> PF.pf_consistent L (Thread.mk _ st4 lc4 sc4 memory4))
       (PF: PF.pf_event L e)
     :
-      step e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) c1.(Configuration.threads)) sc4 memory4)
+      step e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) (Configuration.threads c1)) sc4 memory4)
   .
   Hint Constructors step.
 
@@ -403,8 +403,8 @@ Section LOCALPF.
         (WF1: Configuration.wf c1)
         (PF: PF.pf_configuration L c1):
     (<<WF2: Configuration.wf c2>>) /\
-    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
+    (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+    (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\
     (<<PF: PF.pf_configuration L c2>>).
   Proof.
     exploit step_event_configuration_step; eauto. i. des.
@@ -418,8 +418,8 @@ Section LOCALPF.
         (WF1: Configuration.wf c1)
         (PF: PF.pf_configuration L c1):
     (<<WF2: Configuration.wf c2>>) /\
-    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
+    (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+    (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\
     (<<PF: PF.pf_configuration L c2>>).
   Proof.
     inv STEP. eapply step_future; eauto.
@@ -431,8 +431,8 @@ Section LOCALPF.
         (WF1: Configuration.wf c1)
         (PF: PF.pf_configuration L c1):
     (<<WF2: Configuration.wf c2>>) /\
-    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
+    (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+    (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\
     (<<PF: PF.pf_configuration L c2>>).
   Proof.
     inv STEP; eauto.
@@ -446,8 +446,8 @@ Section LOCALPF.
         (WF1: Configuration.wf c1)
         (PF: PF.pf_configuration L c1):
     (<<WF2: Configuration.wf c2>>) /\
-    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
+    (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+    (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\
     (<<PF: PF.pf_configuration L c2>>).
   Proof.
     inv STEP. eapply step_future; eauto.
@@ -459,8 +459,8 @@ Section LOCALPF.
         (WF1: Configuration.wf c1)
         (PF: PF.pf_configuration L c1):
     (<<WF2: Configuration.wf c2>>) /\
-    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
+    (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+    (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\
     (<<PF: PF.pf_configuration L c2>>).
   Proof.
     inv STEP. eapply machine_step_future; eauto.
@@ -472,8 +472,8 @@ Section LOCALPF.
         (WF1: Configuration.wf c1)
         (PF: PF.pf_configuration L c1):
     (<<WF2: Configuration.wf c2>>) /\
-    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
+    (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+    (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\
     (<<PF: PF.pf_configuration L c2>>).
   Proof.
     ginduction STEPS; eauto.
@@ -488,8 +488,8 @@ Section LOCALPF.
         (WF1: Configuration.wf c1)
         (PF: PF.pf_configuration L c1):
     (<<WF2: Configuration.wf c2>>) /\
-    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
+    (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+    (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\
     (<<PF: PF.pf_configuration L c2>>).
 Proof.
     ginduction STEPS; eauto.
@@ -504,8 +504,8 @@ Proof.
         (WF1: Configuration.wf c1)
         (PF: PF.pf_configuration L c1):
     (<<WF2: Configuration.wf c2>>) /\
-    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
+    (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+    (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\
     (<<PF: PF.pf_configuration L c2>>).
   Proof.
     ginduction STEPS; eauto.
@@ -517,16 +517,16 @@ Proof.
   Inductive step_trace: forall (tr: Trace.t) (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
   | step_trace_intro
       lang tr e tr' pf tid c1 st1 lc1 e2 st3 lc3 sc3 memory3
-      (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
-      (STEPS: Trace.steps tr' (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
+      (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
+      (STEPS: Trace.steps tr' (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) e2)
       (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr')
       (STEP: Thread.step pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
-      (TR: tr = tr'++[(e2.(Thread.local), e)])
+      (TR: tr = tr'++[((Thread.local e2), e)])
       (CONSISTENT: forall (EVENT: e <> ThreadEvent.failure),
           PF.pf_consistent L (Thread.mk _ st3 lc3 sc3 memory3))
       (PF: List.Forall (compose (PF.pf_event L) snd) tr)
     :
-      step_trace tr (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) c1.(Configuration.threads)) sc3 memory3)
+      step_trace tr (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) (Configuration.threads c1)) sc3 memory3)
   .
 
   Lemma trace_step_step_trace c1 c2 tr e tid
@@ -627,8 +627,8 @@ Proof.
         (WF1: Configuration.wf c1)
         (PF: PF.pf_configuration L c1):
     (<<WF2: Configuration.wf c2>>) /\
-    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
+    (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+    (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\
     (<<PF: PF.pf_configuration L c2>>).
   Proof.
     eapply step_trace_steps in STEP; eauto. des.
@@ -643,8 +643,8 @@ Proof.
         (WF1: Configuration.wf c1)
         (PF: PF.pf_configuration L c1):
     (<<WF2: Configuration.wf c2>>) /\
-    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
+    (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+    (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\
     (<<PF: PF.pf_configuration L c2>>).
   Proof.
     inv STEP.
@@ -658,8 +658,8 @@ Proof.
         (WF1: Configuration.wf c1)
         (PF: PF.pf_configuration L c1):
     (<<WF2: Configuration.wf c2>>) /\
-    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
+    (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+    (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\
     (<<PF: PF.pf_configuration L c2>>).
   Proof.
     revert WF1. induction STEPS; i.
@@ -783,14 +783,14 @@ Proof.
         (TRACE: List.In (lc, e) tr):
     exists c tr1 tid lang st1 lc1,
       (<<STEPS: steps_trace c1 c tr1>>) /\
-      (<<FIND: IdentMap.find tid c.(Configuration.threads) = Some (existT _ lang st1, lc1)>>) /\
+      (<<FIND: IdentMap.find tid (Configuration.threads c) = Some (existT _ lang st1, lc1)>>) /\
       exists tr2 pf e2 e3,
-        (<<THREAD_STEPS: Trace.steps tr2 (Thread.mk _ st1 lc1 c.(Configuration.sc) c.(Configuration.memory)) e2>>) /\
+        (<<THREAD_STEPS: Trace.steps tr2 (Thread.mk _ st1 lc1 (Configuration.sc c) (Configuration.memory c)) e2>>) /\
         (<<SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr2>>) /\
         (<<PF: List.Forall (compose (PF.pf_event L) snd) tr2>>) /\
-        (<<LC: e2.(Thread.local) = lc>>) /\
+        (<<LC: (Thread.local e2) = lc>>) /\
         (<<THREAD_STEP: Thread.step pf e e2 e3>>) /\
-        (<<CONS: Local.promise_consistent e3.(Thread.local)>>).
+        (<<CONS: Local.promise_consistent (Thread.local e3)>>).
   Proof.
     rewrite steps_trace_equiv in STEPS.
     induction STEPS; ss.
@@ -887,8 +887,8 @@ Proof.
         (WF1: Configuration.wf c1)
         (PF: PF.pf_configuration L c1):
     (<<WF2: Configuration.wf c2>>) /\
-    (<<SC_FUTURE: TimeMap.le c1.(Configuration.sc) c2.(Configuration.sc)>>) /\
-    (<<MEM_FUTURE: Memory.future c1.(Configuration.memory) c2.(Configuration.memory)>>) /\
+    (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+    (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\
     (<<PF: PF.pf_configuration L c2>>).
   Proof.
     inv STEP. eapply step_trace_future; eauto.
@@ -990,10 +990,10 @@ Section LOCALPFRACE.
       (STEPS: rtc (PFConfiguration.machine_step L MachineEvent.silent tid0) c0 c1)
       (WRITE_STEP: PFConfiguration.step L e0 tid0 c1 c2)
       (WRITE: writing_event loc ts e0)
-      (FIND: IdentMap.find tid1 c2.(Configuration.threads) = Some (existT _ lang st0, lc0))
-      (THREAD_STEPS: Trace.steps tr (Thread.mk _ st0 lc0 c2.(Configuration.sc) c2.(Configuration.memory)) th1)
+      (FIND: IdentMap.find tid1 (Configuration.threads c2) = Some (existT _ lang st0, lc0))
+      (THREAD_STEPS: Trace.steps tr (Thread.mk _ st0 lc0 (Configuration.sc c2) (Configuration.memory c2)) th1)
       (PF: List.Forall (compose (PF.pf_event L) snd) tr)
-      (CONS: Local.promise_consistent th1.(Thread.local))
+      (CONS: Local.promise_consistent (Thread.local th1))
       (READ_STEP: Thread.step pf e1 th1 th2)
       (READ: reading_event loc ts e1)
       (LOC: L loc)
@@ -1040,10 +1040,10 @@ Section LOCALPFRACE.
       (STEPS: PFConfiguration.step_trace L trs e tid0 c0 c1)
       (TRACE: final_event_trace e0 trs)
       (WRITE: writing_event loc ts e0)
-      (FIND: IdentMap.find tid1 c1.(Configuration.threads) = Some (existT _ lang st0, lc0))
-      (THREAD_STEPS: Trace.steps tr (Thread.mk _ st0 lc0 c1.(Configuration.sc) c1.(Configuration.memory)) th1)
+      (FIND: IdentMap.find tid1 (Configuration.threads c1) = Some (existT _ lang st0, lc0))
+      (THREAD_STEPS: Trace.steps tr (Thread.mk _ st0 lc0 (Configuration.sc c1) (Configuration.memory c1)) th1)
       (PF: List.Forall (compose (PF.pf_event L) snd) tr)
-      (CONS: Local.promise_consistent th1.(Thread.local))
+      (CONS: Local.promise_consistent (Thread.local th1))
       (READ_STEP: Thread.step pf e1 th1 th2)
       (READ: reading_event loc ts e1)
       (LOC: L loc)
@@ -1198,8 +1198,8 @@ Section LOCALPFRACE.
       valr releasedr ordr
       (VIEW:
          Time.lt (if Ordering.le Ordering.relaxed ordr
-                  then (lc.(Local.tview).(TView.cur).(View.rlx) loc)
-                  else (lc.(Local.tview).(TView.cur).(View.pln) loc)) ts)
+                  then ((TView.cur (Local.tview lc)).(View.rlx) loc)
+                  else ((TView.cur (Local.tview lc)).(View.pln) loc)) ts)
     :
       racy_read loc ts lc (ThreadEvent.read loc ts valr releasedr ordr)
   | racy_read_update
@@ -1207,8 +1207,8 @@ Section LOCALPFRACE.
       to valr valw releasedr releasedw ordr ordw
       (VIEW:
          Time.lt (if Ordering.le Ordering.relaxed ordr
-                  then (lc.(Local.tview).(TView.cur).(View.rlx) loc)
-                  else (lc.(Local.tview).(TView.cur).(View.pln) loc)) ts)
+                  then ((TView.cur (Local.tview lc)).(View.rlx) loc)
+                  else ((TView.cur (Local.tview lc)).(View.pln) loc)) ts)
     :
       racy_read loc ts lc (ThreadEvent.update loc ts to valr valw releasedr releasedw ordr ordw)
   .
@@ -1259,15 +1259,15 @@ Section LOCALPFRACE.
            (e:ThreadEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
   | racy_read_step_intro
       loc ts e tid c1 lang st1 lc1 e2 e3 st4 lc4 sc4 memory4
-      (TID: IdentMap.find tid c1.(Configuration.threads) = Some (existT _ lang st1, lc1))
-      (CANCELS: rtc (@Thread.cancel_step _) (Thread.mk _ st1 lc1 c1.(Configuration.sc) c1.(Configuration.memory)) e2)
+      (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
+      (CANCELS: rtc (@Thread.cancel_step _) (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) e2)
       (STEP: Thread.opt_step e e2 e3)
       (RESERVES: rtc (@Thread.reserve_step _) e3 (Thread.mk _ st4 lc4 sc4 memory4))
       (CONSISTENT: e <> ThreadEvent.failure -> PF.pf_consistent L (Thread.mk _ st4 lc4 sc4 memory4))
       (PF: PF.pf_event L e)
-      (READ: racy_read loc ts e2.(Thread.local) e)
+      (READ: racy_read loc ts (Thread.local e2) e)
     :
-      racy_read_step loc ts e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) c1.(Configuration.threads)) sc4 memory4)
+      racy_read_step loc ts e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) (Configuration.threads c1)) sc4 memory4)
   .
   Hint Constructors racy_read_step.
 

@@ -38,20 +38,20 @@ Module FutureCertify.
 
     Lemma cap_steps_current_steps
           th0 th1 mem1 sc1
-          (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
-          (MEMORY: Memory.closed th0.(Thread.memory))
-          (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
-          (CAP: Memory.cap th0.(Thread.memory) mem1)
+          (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
+          (MEMORY: Memory.closed (Thread.memory th0))
+          (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
+          (CAP: Memory.cap (Thread.memory th0) mem1)
           (SC_MAX: Memory.max_concrete_timemap mem1 sc1)
           (STEPS: rtc (@Thread.tau_step lang)
-                      (Thread.mk lang th0.(Thread.state) th0.(Thread.local) sc1 mem1)
+                      (Thread.mk lang (Thread.state th0) (Thread.local th0) sc1 mem1)
                       th1)
-          (CONSISTENT: Local.promise_consistent th1.(Thread.local))
+          (CONSISTENT: Local.promise_consistent (Thread.local th1))
       :
         exists lc' sc' mem',
           (<<STEPS: rtc (@Thread.tau_step lang)
                         th0
-                        (Thread.mk lang th1.(Thread.state) lc' sc' mem')>>) /\
+                        (Thread.mk lang (Thread.state th1) lc' sc' mem')>>) /\
           (<<CONSISTENT: Local.promise_consistent lc'>>)
     .
     Proof.
@@ -106,26 +106,26 @@ Module FutureCertify.
 
     Definition future_certify lang (e:Thread.t lang): Prop :=
       forall sc1 mem1
-        (FUTURE: Memory.future_weak e.(Thread.memory) mem1)
-        (FUTURE: TimeMap.le e.(Thread.sc) sc1)
-        (WF: Local.wf e.(Thread.local) mem1)
+        (FUTURE: Memory.future_weak (Thread.memory e) mem1)
+        (FUTURE: TimeMap.le (Thread.sc e) sc1)
+        (WF: Local.wf (Thread.local e) mem1)
         (SC: Memory.closed_timemap sc1 mem1)
         (MEM: Memory.closed mem1),
-        (<<FAILURE: Thread.steps_failure (Thread.mk lang e.(Thread.state) e.(Thread.local) sc1 mem1)>>) \/
+        (<<FAILURE: Thread.steps_failure (Thread.mk lang (Thread.state e) (Thread.local e) sc1 mem1)>>) \/
         exists e2,
-          (<<STEPS: rtc (@Thread.tau_step lang) (Thread.mk lang e.(Thread.state) e.(Thread.local) sc1 mem1) e2>>) /\
-          (<<PROMISES: e2.(Thread.local).(Local.promises) = Memory.bot>>).
+          (<<STEPS: rtc (@Thread.tau_step lang) (Thread.mk lang (Thread.state e) (Thread.local e) sc1 mem1) e2>>) /\
+          (<<PROMISES: (Local.promises (Thread.local e2)) = Memory.bot>>).
 
     Lemma future_certify_exists
           e
-          (LOCAL: Local.wf e.(Thread.local) e.(Thread.memory))
-          (MEMORY: Memory.closed e.(Thread.memory))
-          (SC: Memory.closed_timemap e.(Thread.sc) e.(Thread.memory))
+          (LOCAL: Local.wf (Thread.local e) (Thread.memory e))
+          (MEMORY: Memory.closed (Thread.memory e))
+          (SC: Memory.closed_timemap (Thread.sc e) (Thread.memory e))
           (CONSISTENT: @Thread.consistent lang e):
       future_certify e.
     Proof.
       eapply consistent_pf_consistent_super_strong in CONSISTENT; eauto. des.
-      exploit (@concrete_promise_max_timemap_exists e.(Thread.memory) e.(Thread.local).(Local.promises)).
+      exploit (@concrete_promise_max_timemap_exists (Thread.memory e) (Local.promises (Thread.local e))).
       { eapply MEMORY. } i. des.
       ii. exploit (CONSISTENT0 mem1 TimeMap.bot sc1); eauto. i. des.
       eapply Trace.silent_steps_tau_steps in STEPS; cycle 1.
@@ -137,16 +137,16 @@ Module FutureCertify.
 
     Lemma future_consistent
           e sc' mem'
-          (LOCAL: Local.wf e.(Thread.local) e.(Thread.memory))
-          (MEMORY: Memory.closed e.(Thread.memory))
-          (SC: Memory.closed_timemap e.(Thread.sc) e.(Thread.memory))
+          (LOCAL: Local.wf (Thread.local e) (Thread.memory e))
+          (MEMORY: Memory.closed (Thread.memory e))
+          (SC: Memory.closed_timemap (Thread.sc e) (Thread.memory e))
           (CONSISTENT: @Thread.consistent lang e)
-          (SC_FUTURE: TimeMap.le e.(Thread.sc) sc')
-          (MEM_FUTURE: Memory.future_weak e.(Thread.memory) mem')
-          (LOCAL': Local.wf e.(Thread.local) mem')
+          (SC_FUTURE: TimeMap.le (Thread.sc e) sc')
+          (MEM_FUTURE: Memory.future_weak (Thread.memory e) mem')
+          (LOCAL': Local.wf (Thread.local e) mem')
           (MEMORY': Memory.closed mem')
           (SC': Memory.closed_timemap sc' mem'):
-      Thread.consistent (Thread.mk lang e.(Thread.state) e.(Thread.local) sc' mem').
+      Thread.consistent (Thread.mk lang (Thread.state e) (Thread.local e) sc' mem').
     Proof.
       ii. ss.
       eapply future_certify_exists; try exact CONSISTENT; eauto.

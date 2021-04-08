@@ -44,8 +44,8 @@ Section NOTRELEASED.
 
   Record not_released_view (vw: View.t): Prop :=
     {
-      not_released_pln: not_released_timemap vw.(View.pln);
-      not_released_rlx: not_released_timemap vw.(View.rlx);
+      not_released_pln: not_released_timemap (View.pln vw);
+      not_released_rlx: not_released_timemap (View.rlx vw);
     }.
   Hint Constructors not_released_view.
 
@@ -75,9 +75,9 @@ Section NOTRELEASED.
 
   Record not_released_tview (vw: TView.t): Prop :=
     {
-      not_released_rel: forall loc0, not_released_view (vw.(TView.rel) loc0);
-      not_released_cur: not_released_view vw.(TView.cur);
-      not_released_acq: not_released_view vw.(TView.acq);
+      not_released_rel: forall loc0, not_released_view ((TView.rel vw) loc0);
+      not_released_cur: not_released_view (TView.cur vw);
+      not_released_acq: not_released_view (TView.acq vw);
     }.
   Hint Constructors not_released_tview.
 
@@ -171,9 +171,9 @@ Section NOTRELEASED.
 
   Inductive not_released_thread lang (th: Thread.t lang): Prop :=
   | not_released_thread_intro
-      (TVIEW: not_released_tview th.(Thread.local).(Local.tview))
-      (MEM: not_released_memory th.(Thread.local).(Local.promises) th.(Thread.memory))
-      (SC: not_released_timemap th.(Thread.sc))
+      (TVIEW: not_released_tview (Local.tview (Thread.local th)))
+      (MEM: not_released_memory (Local.promises (Thread.local th)) (Thread.memory th))
+      (SC: not_released_timemap (Thread.sc th))
   .
 
   Lemma not_released_promise_neq prom0 mem0 loc0 from to msg prom1 mem1 kind
@@ -212,7 +212,7 @@ Section NOTRELEASED.
       + des. eapply Memory.split_get1 in EXIST; eauto. des. eauto.
       + erewrite Memory.split_o; eauto. des_ifs.
         * ss. des; clarify.
-        * ss. des; clarify. symmetry in a. symmetry in a0. inv a.
+        * ss. des; clarify.
           eapply Memory.split_get0 in PROMISES. des. clarify.
     - econs.
       + ii. erewrite Memory.lower_o in GET; eauto.
@@ -246,13 +246,13 @@ Section NOTRELEASED.
 
   Lemma not_released_read lc0 mem0 loc0 ts0 val released ord lc1
         (READ: Local.read_step lc0 mem0 loc0 ts0 val released ord lc1)
-        (TVIEW: not_released_tview lc0.(Local.tview))
-        (MEM: not_released_memory lc0.(Local.promises) mem0)
+        (TVIEW: not_released_tview (Local.tview lc0))
+        (MEM: not_released_memory (Local.promises lc0) mem0)
         (CONSISTENT: Local.promise_consistent lc1)
         (NOTREAD: (loc0, ts0) <> (loc, ts))
     :
-      (<<TVIEW: not_released_tview lc1.(Local.tview)>>) /\
-      (<<MEM: not_released_memory lc1.(Local.promises) mem0>>) /\
+      (<<TVIEW: not_released_tview (Local.tview lc1)>>) /\
+      (<<MEM: not_released_memory (Local.promises lc1) mem0>>) /\
       (<<RELEASEDM: not_released_opt_view released>>).
   Proof.
     inv READ. inv MEM. exploit MESSAGES; eauto. i. des.
@@ -294,30 +294,30 @@ Section NOTRELEASED.
 
   Lemma not_released_read_racy lc0 mem0 val released ord lc1
         (READ: Local.read_step lc0 mem0 loc ts val released ord lc1)
-        (TVIEW: not_released_tview lc0.(Local.tview))
-        (MEM: not_released_memory lc0.(Local.promises) mem0)
+        (TVIEW: not_released_tview (Local.tview lc0))
+        (MEM: not_released_memory (Local.promises lc0) mem0)
         (CONSISTENT: Local.promise_consistent lc1)
     :
       Time.lt (if Ordering.le Ordering.relaxed ord
-               then (lc0.(Local.tview).(TView.cur).(View.rlx) loc)
-               else (lc0.(Local.tview).(TView.cur).(View.pln) loc)) ts.
+               then ((TView.cur (Local.tview lc0)).(View.rlx) loc)
+               else ((TView.cur (Local.tview lc0)).(View.pln) loc)) ts.
   Proof.
     inv READ. inv READABLE. des_ifs.
     { exploit RLX; eauto. intros H. inv H; eauto. inv H0. exfalso.
-      eapply TVIEW.(not_released_cur).(not_released_rlx); auto. }
+      eapply (not_released_rlx (not_released_cur TVIEW)); auto. }
     { inv PLN; eauto. inv H. exfalso.
-      eapply TVIEW.(not_released_cur).(not_released_pln); auto. }
+      eapply (not_released_pln (not_released_cur TVIEW)); auto. }
   Qed.
 
   Lemma not_released_write lc0 sc0 mem0 loc0 from to val releasedr releasedm ord lc1 sc1 mem1 kind
         (WRITE: Local.write_step lc0 sc0 mem0 loc0 from to val releasedr releasedm ord lc1 sc1 mem1 kind)
-        (TVIEW: not_released_tview lc0.(Local.tview))
-        (MEM: not_released_memory lc0.(Local.promises) mem0)
+        (TVIEW: not_released_tview (Local.tview lc0))
+        (MEM: not_released_memory (Local.promises lc0) mem0)
         (SC: not_released_timemap sc0)
         (RELEASEDR: not_released_opt_view releasedr)
     :
-      (<<TVIEW: not_released_tview lc1.(Local.tview)>>) /\
-      (<<MEM: not_released_memory lc1.(Local.promises) mem1>>) /\
+      (<<TVIEW: not_released_tview (Local.tview lc1)>>) /\
+      (<<MEM: not_released_memory (Local.promises lc1) mem1>>) /\
       (<<SC: not_released_timemap sc1>>).
   Proof.
     inv WRITE. inv WRITE0.
@@ -404,12 +404,12 @@ Section NOTRELEASED.
 
   Lemma not_released_fence lc0 sc0 ordr ordw lc1 sc1 mem
         (FENCE: Local.fence_step lc0 sc0 ordr ordw lc1 sc1)
-        (TVIEW: not_released_tview lc0.(Local.tview))
-        (MEM: not_released_memory lc0.(Local.promises) mem)
+        (TVIEW: not_released_tview (Local.tview lc0))
+        (MEM: not_released_memory (Local.promises lc0) mem)
         (SC: not_released_timemap sc0)
     :
-      (<<TVIEW: not_released_tview lc1.(Local.tview)>>) /\
-      (<<MEM: not_released_memory lc1.(Local.promises) mem>>) /\
+      (<<TVIEW: not_released_tview (Local.tview lc1)>>) /\
+      (<<MEM: not_released_memory (Local.promises lc1) mem>>) /\
       (<<SC: not_released_timemap sc1>>).
   Proof.
     inv FENCE. splits; ss.
@@ -423,11 +423,11 @@ Section NOTRELEASED.
 
   Lemma not_released_thread_step lang (th0 th1: Thread.t lang) pf e
         (STEP: Thread.step pf e th0 th1)
-        (CONSISTENT: Local.promise_consistent th1.(Thread.local))
+        (CONSISTENT: Local.promise_consistent (Thread.local th1))
         (THREAD: not_released_thread th0)
     :
       (<<THREAD: not_released_thread th1>> /\ <<RACY: ~ PFRace.reading_event loc ts e>>) \/
-      (<<RACY: PFRace.racy_read loc ts th0.(Thread.local) e>>).
+      (<<RACY: PFRace.racy_read loc ts (Thread.local th0) e>>).
   Proof.
     inv THREAD. inv STEP.
     { inv STEP0. inv LOCAL. ss. exploit not_released_promise; eauto.
@@ -470,11 +470,11 @@ Section NOTRELEASED.
 
   Lemma not_released_thread_opt_step lang (th0 th1: Thread.t lang) e
         (STEP: Thread.opt_step e th0 th1)
-        (CONSISTENT: Local.promise_consistent th1.(Thread.local))
+        (CONSISTENT: Local.promise_consistent (Thread.local th1))
         (THREAD: not_released_thread th0)
     :
       (<<THREAD: not_released_thread th1>> /\ <<RACY: ~ PFRace.reading_event loc ts e>>) \/
-      (<<RACY: PFRace.racy_read loc ts th0.(Thread.local) e>>).
+      (<<RACY: PFRace.racy_read loc ts (Thread.local th0) e>>).
   Proof.
     inv STEP; eauto.
     { left. splits; auto. ii. inv H. }
@@ -483,7 +483,7 @@ Section NOTRELEASED.
 
   Lemma not_released_rtc_reserve_step lang (th0 th1: Thread.t lang)
         (STEPS: rtc (@Thread.reserve_step _) th0 th1)
-        (CONSISTENT: Local.promise_consistent th1.(Thread.local))
+        (CONSISTENT: Local.promise_consistent (Thread.local th1))
         (THREAD: not_released_thread th0)
     :
       not_released_thread th1.
@@ -496,7 +496,7 @@ Section NOTRELEASED.
 
   Lemma not_released_rtc_cancel_step lang (th0 th1: Thread.t lang)
         (STEPS: rtc (@Thread.cancel_step _) th0 th1)
-        (CONSISTENT: Local.promise_consistent th1.(Thread.local))
+        (CONSISTENT: Local.promise_consistent (Thread.local th1))
         (THREAD: not_released_thread th0)
     :
       not_released_thread th1.
@@ -509,8 +509,8 @@ Section NOTRELEASED.
 
   Definition not_released_configuration tid (c: Configuration.t): Prop :=
     forall lang st lc
-           (TID: IdentMap.find tid c.(Configuration.threads) = Some (existT _ lang st, lc)),
-      not_released_thread (Thread.mk _ st lc c.(Configuration.sc) c.(Configuration.memory)).
+           (TID: IdentMap.find tid (Configuration.threads c) = Some (existT _ lang st, lc)),
+      not_released_thread (Thread.mk _ st lc (Configuration.sc c) (Configuration.memory c)).
 
   Lemma not_released_configuration_step L tid e c0 c1
         (STEP: PFConfiguration.step L e tid c0 c1)
@@ -532,9 +532,9 @@ Section NOTRELEASED.
         eapply PF.pf_consistent_consistent in CONSISTENT.
         eapply consistent_promise_consistent in CONSISTENT; eauto. }
     }
-    assert (CONSISTENT3: Local.promise_consistent e3.(Thread.local)).
+    assert (CONSISTENT3: Local.promise_consistent (Thread.local e3)).
     { eapply rtc_reserve_step_promise_consistent; eauto. }
-    assert (CONSISTENT2: Local.promise_consistent e2.(Thread.local)).
+    assert (CONSISTENT2: Local.promise_consistent (Thread.local e2)).
     { inv STEP0; eauto. eapply step_promise_consistent; eauto. }
     assert (CONSISTENT1: Local.promise_consistent lc1).
     { eapply rtc_cancel_step_promise_consistent in CANCELS; eauto. }
@@ -663,17 +663,17 @@ Lemma thread_step_write_not_released L loc ts lang (th0 th1: Thread.t lang) pf e
       lc_other
       (STEP: Thread.step pf e th0 th1)
       (WRITE: PFRace.writing_event loc ts e)
-      (PF: PF.pf_promises L th0.(Thread.local).(Local.promises))
-      (LOCAL: Local.wf th0.(Thread.local) th0.(Thread.memory))
-      (SC: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
-      (MEM: Memory.closed th0.(Thread.memory))
+      (PF: PF.pf_promises L (Local.promises (Thread.local th0)))
+      (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
+      (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
+      (MEM: Memory.closed (Thread.memory th0))
       (LOC: L loc)
-      (LOCALOTHER: Local.wf lc_other th0.(Thread.memory))
+      (LOCALOTHER: Local.wf lc_other (Thread.memory th0))
   :
     (<<NONBOT: ts <> Time.bot>>) /\
-    (<<TVIEW: not_released_tview loc ts lc_other.(Local.tview)>>) /\
-    (<<MEM: not_released_memory loc ts lc_other.(Local.promises) th1.(Thread.memory)>>) /\
-    (<<SC: not_released_timemap loc ts th1.(Thread.sc)>>).
+    (<<TVIEW: not_released_tview loc ts (Local.tview lc_other)>>) /\
+    (<<MEM: not_released_memory loc ts (Local.promises lc_other) (Thread.memory th1)>>) /\
+    (<<SC: not_released_timemap loc ts (Thread.sc th1)>>).
 Proof.
   inv STEP; inv STEP0; ss.
   { inv WRITE. }
@@ -695,13 +695,13 @@ Qed.
 Lemma rtc_reserve_step_write_not_released loc ts lang (th0 th1: Thread.t lang)
       lc_other
       (STEPS: rtc (@Thread.reserve_step _) th0 th1)
-      (TVIEW: not_released_tview loc ts lc_other.(Local.tview))
-      (MEM: not_released_memory loc ts lc_other.(Local.promises) th0.(Thread.memory))
-      (SC: not_released_timemap loc ts th0.(Thread.sc))
+      (TVIEW: not_released_tview loc ts (Local.tview lc_other))
+      (MEM: not_released_memory loc ts (Local.promises lc_other) (Thread.memory th0))
+      (SC: not_released_timemap loc ts (Thread.sc th0))
   :
-    (<<TVIEW: not_released_tview loc ts lc_other.(Local.tview)>>) /\
-    (<<MEM: not_released_memory loc ts lc_other.(Local.promises) th1.(Thread.memory)>>) /\
-    (<<SC: not_released_timemap loc ts th1.(Thread.sc)>>).
+    (<<TVIEW: not_released_tview loc ts (Local.tview lc_other)>>) /\
+    (<<MEM: not_released_memory loc ts (Local.promises lc_other) (Thread.memory th1)>>) /\
+    (<<SC: not_released_timemap loc ts (Thread.sc th1)>>).
 Proof.
   ginduction STEPS; eauto.
   i. inv H. inv STEP; inv STEP0; inv LOCAL. ss. inv PROMISE.

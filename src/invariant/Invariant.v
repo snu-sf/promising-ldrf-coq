@@ -31,7 +31,7 @@ Set Implicit Arguments.
 Definition ThreadsProp :=
   forall (tid:Ident.t)
     (lang:language)
-    (st:lang.(Language.state)),
+    (st:(Language.state lang)),
     Prop.
 
 Definition MemoryProp :=
@@ -51,12 +51,12 @@ Module Logic.
         <<ST_INIT:
           forall tid lang syn
             (FIND: IdentMap.find tid program = Some (existT _ lang syn)),
-            S tid lang (lang.(Language.init) syn)>> /\
+            S tid lang ((Language.init lang) syn)>> /\
         <<ASSIGN_INIT: J (LocFun.init 0)>>;
       SILENT:
         forall tid lang st1 st2
           (ST1: S tid lang st1)
-          (STEP: lang.(Language.step) ProgramEvent.silent st1 st2),
+          (STEP: (Language.step lang) ProgramEvent.silent st1 st2),
           S tid lang st2;
       READ:
         forall tid lang st1 st2
@@ -64,13 +64,13 @@ Module Logic.
           assign
           (ST1: S tid lang st1)
           (ASSIGN1: J assign /\ LocFun.find loc assign = val)
-          (STEP: lang.(Language.step) (ProgramEvent.read loc val ord) st1 st2),
+          (STEP: (Language.step lang) (ProgramEvent.read loc val ord) st1 st2),
           S tid lang st2;
       WRITE:
         forall tid lang st1 st2
           loc val ord
           (ST1: S tid lang st1)
-          (STEP: lang.(Language.step) (ProgramEvent.write loc val ord) st1 st2),
+          (STEP: (Language.step lang) (ProgramEvent.write loc val ord) st1 st2),
           <<ST2: S tid lang st2>> /\
           <<ASSIGN2: forall assign, J assign -> J (LocFun.add loc val assign)>>;
       UPDATE:
@@ -79,25 +79,25 @@ Module Logic.
           assign
           (ST1: S tid lang st1)
           (ASSIGN1: J assign /\ LocFun.find loc assign = valr)
-          (STEP: lang.(Language.step) (ProgramEvent.update loc valr valw ordr ordw) st1 st2),
+          (STEP: (Language.step lang) (ProgramEvent.update loc valr valw ordr ordw) st1 st2),
           <<ST2: S tid lang st2>> /\
           <<ASSIGN2: forall assign, J assign -> J (LocFun.add loc valw assign)>>;
       FENCE:
         forall tid lang st1 st2
           ordr ordw
           (ST1: S tid lang st1)
-          (STEP: lang.(Language.step) (ProgramEvent.fence ordr ordw) st1 st2),
+          (STEP: (Language.step lang) (ProgramEvent.fence ordr ordw) st1 st2),
           S tid lang st2;
       SYSCALL:
         forall tid lang st1 st2
           e
           (ST1: S tid lang st1)
-          (STEP: lang.(Language.step) (ProgramEvent.syscall e) st1 st2),
+          (STEP: (Language.step lang) (ProgramEvent.syscall e) st1 st2),
           S tid lang st2;
       FAILURE:
         forall tid lang st1 st2
           (ST1: S tid lang st1)
-          (STEP: lang.(Language.step) ProgramEvent.failure st1 st2),
+          (STEP: (Language.step lang) ProgramEvent.failure st1 st2),
           <<ST2: forall tid lang st, S tid lang st>> /\
           <<ASSIGN2: forall assign, J assign>>;
     }.
@@ -109,7 +109,7 @@ Section Invariant.
   Variable
     (S:ThreadsProp)
     (J:MemoryProp)
-    (program: IdentMap.t {lang:language & lang.(Language.syntax)}).
+    (program: IdentMap.t {lang:language & (Language.syntax lang)}).
 
   Context `{LOGIC: Logic.t S J program}.
 
@@ -129,8 +129,8 @@ Section Invariant.
 
   Inductive sem (c:Configuration.t): Prop :=
   | sem_configuration_intro
-      (TH: sem_threads c.(Configuration.threads))
-      (MEM: sem_memory c.(Configuration.memory))
+      (TH: sem_threads (Configuration.threads c))
+      (MEM: sem_memory (Configuration.memory c))
   .
 
 
@@ -264,14 +264,14 @@ Section Invariant.
   Lemma rtc_thread_step_sem
         tid lang
         th1 th2
-        (TH1: S tid lang th1.(Thread.state))
-        (MEM1: sem_memory th1.(Thread.memory))
-        (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
-        (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory))
-        (CLOSED1: Memory.closed th1.(Thread.memory))
+        (TH1: S tid lang (Thread.state th1))
+        (MEM1: sem_memory (Thread.memory th1))
+        (WF1: Local.wf (Thread.local th1) (Thread.memory th1))
+        (SC1: Memory.closed_timemap (Thread.sc th1) (Thread.memory th1))
+        (CLOSED1: Memory.closed (Thread.memory th1))
         (STEPS: rtc (union (Thread.step true)) th1 th2):
-    <<TH2: S tid lang th2.(Thread.state)>> /\
-    <<MEM2: sem_memory th2.(Thread.memory)>>.
+    <<TH2: S tid lang (Thread.state th2)>> /\
+    <<MEM2: sem_memory (Thread.memory th2)>>.
   Proof.
     move STEPS after TH1. revert_until STEPS. induction STEPS; ss.
     i. inv H.
@@ -284,14 +284,14 @@ Section Invariant.
   Lemma rtc_thread_step_sem_thread
         tid lang
         th1 th2
-        (TH1: S tid lang th1.(Thread.state))
-        (MEM1: sem_memory th1.(Thread.memory))
-        (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
-        (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory))
-        (CLOSED1: Memory.closed th1.(Thread.memory))
+        (TH1: S tid lang (Thread.state th1))
+        (MEM1: sem_memory (Thread.memory th1))
+        (WF1: Local.wf (Thread.local th1) (Thread.memory th1))
+        (SC1: Memory.closed_timemap (Thread.sc th1) (Thread.memory th1))
+        (CLOSED1: Memory.closed (Thread.memory th1))
         (STEPS: rtc (@Thread.all_step lang) th1 th2)
-        (CONS: Local.promise_consistent th2.(Thread.local)):
-    <<TH2: S tid lang th2.(Thread.state)>>.
+        (CONS: Local.promise_consistent (Thread.local th2)):
+    <<TH2: S tid lang (Thread.state th2)>>.
   Proof.
     exploit steps_pf_steps; eauto. i. des.
     exploit Thread.rtc_all_step_future; try eapply rtc_implies; try exact STEPS1; eauto.
@@ -333,16 +333,16 @@ Section Invariant.
   Lemma consistent_sem
         tid lang
         pf e th1 th2 th3
-        (TH1: S tid lang th1.(Thread.state))
-        (MEM1: sem_memory th1.(Thread.memory))
-        (WF1: Local.wf th1.(Thread.local) th1.(Thread.memory))
-        (SC1: Memory.closed_timemap th1.(Thread.sc) th1.(Thread.memory))
-        (CLOSED1: Memory.closed th1.(Thread.memory))
+        (TH1: S tid lang (Thread.state th1))
+        (MEM1: sem_memory (Thread.memory th1))
+        (WF1: Local.wf (Thread.local th1) (Thread.memory th1))
+        (SC1: Memory.closed_timemap (Thread.sc th1) (Thread.memory th1))
+        (CLOSED1: Memory.closed (Thread.memory th1))
         (STEPS: rtc (@Thread.tau_step lang) th1 th2)
         (STEP: Thread.step pf e th2 th3)
         (CONSISTENT: Thread.consistent th3):
-    <<TH3: S tid lang th3.(Thread.state)>> /\
-    <<MEM3: sem_memory th3.(Thread.memory)>>.
+    <<TH3: S tid lang (Thread.state th3)>> /\
+    <<MEM3: sem_memory (Thread.memory th3)>>.
   Proof.
     exploit Thread.rtc_tau_step_future; eauto. s. i. des.
     exploit Thread.step_future; eauto. s. i. des.

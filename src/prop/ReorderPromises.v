@@ -29,10 +29,10 @@ Lemma steps_pf_steps_aux
       lang
       n e1 e3
       (STEPS: rtcn (@Thread.all_step lang) n e1 e3)
-      (CONS: Local.promise_consistent e3.(Thread.local))
-      (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
-      (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-      (MEM1: Memory.closed e1.(Thread.memory)):
+      (CONS: Local.promise_consistent (Thread.local e3))
+      (WF1: Local.wf (Thread.local e1) (Thread.memory e1))
+      (SC1: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
+      (MEM1: Memory.closed (Thread.memory e1)):
   exists n' e2,
     <<N: n' <= n>> /\
     <<STEPS1: rtcn (union (Thread.step true)) n' e1 e2>> /\
@@ -104,10 +104,10 @@ Lemma steps_pf_steps
       lang
       e1 e3
       (STEPS: rtc (@Thread.all_step lang) e1 e3)
-      (CONS: Local.promise_consistent e3.(Thread.local))
-      (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
-      (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-      (MEM1: Memory.closed e1.(Thread.memory)):
+      (CONS: Local.promise_consistent (Thread.local e3))
+      (WF1: Local.wf (Thread.local e1) (Thread.memory e1))
+      (SC1: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
+      (MEM1: Memory.closed (Thread.memory e1)):
   exists e2,
     <<STEPS1: rtc (union (Thread.step true)) e1 e2>> /\
     <<STEPS2: rtc (union (Thread.step false)) e2 e3>>.
@@ -121,10 +121,10 @@ Lemma tau_steps_pf_tau_steps_aux
       lang
       n e1 e3
       (STEPS: rtcn (@Thread.tau_step lang) n e1 e3)
-      (CONS: Local.promise_consistent e3.(Thread.local))
-      (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
-      (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-      (MEM1: Memory.closed e1.(Thread.memory)):
+      (CONS: Local.promise_consistent (Thread.local e3))
+      (WF1: Local.wf (Thread.local e1) (Thread.memory e1))
+      (SC1: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
+      (MEM1: Memory.closed (Thread.memory e1)):
   exists n' e2,
     <<N: n' <= n>> /\
     <<STEPS1: rtcn (tau (Thread.step true)) n' e1 e2>> /\
@@ -198,10 +198,10 @@ Lemma tau_steps_pf_tau_steps
       lang
       e1 e3
       (STEPS: rtc (@Thread.tau_step lang) e1 e3)
-      (CONS: Local.promise_consistent e3.(Thread.local))
-      (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
-      (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-      (MEM1: Memory.closed e1.(Thread.memory)):
+      (CONS: Local.promise_consistent (Thread.local e3))
+      (WF1: Local.wf (Thread.local e1) (Thread.memory e1))
+      (SC1: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
+      (MEM1: Memory.closed (Thread.memory e1)):
   exists e2,
     <<STEPS1: rtc (tau (Thread.step true)) e1 e2>> /\
     <<STEPS2: rtc (tau (Thread.step false)) e2 e3>>.
@@ -215,13 +215,13 @@ Lemma steps_pf_steps_state
       lang
       e1 e3
       (STEPS: rtc (@Thread.all_step lang) e1 e3)
-      (CONS: Local.promise_consistent e3.(Thread.local))
-      (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
-      (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-      (MEM1: Memory.closed e1.(Thread.memory)):
+      (CONS: Local.promise_consistent (Thread.local e3))
+      (WF1: Local.wf (Thread.local e1) (Thread.memory e1))
+      (SC1: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
+      (MEM1: Memory.closed (Thread.memory e1)):
   exists e2,
     <<STEPS1: rtc (union (Thread.step true)) e1 e2>> /\
-    <<STATE: e3.(Thread.state) = e2.(Thread.state)>>.
+    <<STATE: (Thread.state e3) = (Thread.state e2)>>.
 Proof.
   exploit steps_pf_steps; eauto. i. des.
   esplits; eauto.
@@ -235,13 +235,13 @@ Lemma tau_steps_pf_tau_steps_state
       lang
       e1 e3
       (STEPS: rtc (@Thread.tau_step lang) e1 e3)
-      (CONS: Local.promise_consistent e3.(Thread.local))
-      (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
-      (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-      (MEM1: Memory.closed e1.(Thread.memory)):
+      (CONS: Local.promise_consistent (Thread.local e3))
+      (WF1: Local.wf (Thread.local e1) (Thread.memory e1))
+      (SC1: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
+      (MEM1: Memory.closed (Thread.memory e1)):
   exists e2,
     <<STEPS1: rtc (tau (Thread.step true)) e1 e2>> /\
-    <<STATE: e3.(Thread.state) = e2.(Thread.state)>>.
+    <<STATE: (Thread.state e3) = (Thread.state e2)>>.
 Proof.
   exploit tau_steps_pf_tau_steps; eauto. i. des.
   esplits; eauto.
@@ -259,9 +259,9 @@ Lemma nonpf_steps_failure
       pf e1 e2 e3
       (STEPS: rtc (union (@Thread.step lang false)) e1 e2)
       (FAILURE: Thread.step pf ThreadEvent.failure e2 e3)
-      (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
-      (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-      (MEM1: Memory.closed e1.(Thread.memory)):
+      (WF1: Local.wf (Thread.local e1) (Thread.memory e1))
+      (SC1: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
+      (MEM1: Memory.closed (Thread.memory e1)):
   exists e2', <<FAILURE: Thread.step true ThreadEvent.failure e1 e2'>>.
 Proof.
   revert_until STEPS. revert e3. induction STEPS; i.
@@ -281,9 +281,9 @@ Lemma nonpf_tau_steps_failure
       pf e1 e2 e3
       (STEPS: rtc (tau (@Thread.step lang false)) e1 e2)
       (FAILURE: Thread.step pf ThreadEvent.failure e2 e3)
-      (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
-      (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-      (MEM1: Memory.closed e1.(Thread.memory)):
+      (WF1: Local.wf (Thread.local e1) (Thread.memory e1))
+      (SC1: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
+      (MEM1: Memory.closed (Thread.memory e1)):
   exists e2', <<FAILURE: Thread.step true ThreadEvent.failure e1 e2'>>.
 Proof.
   exploit rtc_implies; try apply tau_union; eauto. i.
@@ -295,13 +295,13 @@ Lemma steps_failure_pf_steps_failure
       pf e1 e2 e3
       (STEPS: rtc (@Thread.all_step lang) e1 e2)
       (FAILURE: Thread.step pf ThreadEvent.failure e2 e3)
-      (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
-      (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-      (MEM1: Memory.closed e1.(Thread.memory)):
+      (WF1: Local.wf (Thread.local e1) (Thread.memory e1))
+      (SC1: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
+      (MEM1: Memory.closed (Thread.memory e1)):
   exists e2' e3',
     <<STEPS': rtc (union (@Thread.step lang true)) e1 e2'>> /\
     <<FAILURE': Thread.step true ThreadEvent.failure e2' e3'>> /\
-    <<STATE: e2.(Thread.state) = e2'.(Thread.state)>>.
+    <<STATE: (Thread.state e2) = (Thread.state e2')>>.
 Proof.
   exploit steps_pf_steps; try exact STEPS; eauto.
   { inv FAILURE; inv STEP. inv LOCAL. inv LOCAL0. ss. }
@@ -319,13 +319,13 @@ Lemma tau_steps_failure_pf_tau_steps_failure
       pf e1 e2 e3
       (STEPS: rtc (@Thread.tau_step lang) e1 e2)
       (FAILURE: Thread.step pf ThreadEvent.failure e2 e3)
-      (WF1: Local.wf e1.(Thread.local) e1.(Thread.memory))
-      (SC1: Memory.closed_timemap e1.(Thread.sc) e1.(Thread.memory))
-      (MEM1: Memory.closed e1.(Thread.memory)):
+      (WF1: Local.wf (Thread.local e1) (Thread.memory e1))
+      (SC1: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
+      (MEM1: Memory.closed (Thread.memory e1)):
   exists e2' e3',
     <<STEPS': rtc (tau (@Thread.step lang true)) e1 e2'>> /\
     <<FAILURE': Thread.step true ThreadEvent.failure e2' e3'>> /\
-    <<STATE: e2.(Thread.state) = e2'.(Thread.state)>>.
+    <<STATE: (Thread.state e2) = (Thread.state e2')>>.
 Proof.
   exploit tau_steps_pf_tau_steps; try exact STEPS; eauto.
   { inv FAILURE; inv STEP. inv LOCAL. inv LOCAL0. ss. }
@@ -344,17 +344,17 @@ Qed.
 Lemma union_step_nonpf_bot
       lang e1 e2
       (STEP: union (@Thread.step lang false) e1 e2)
-      (PROMISE: e2.(Thread.local).(Local.promises) = Memory.bot):
+      (PROMISE: (Local.promises (Thread.local e2)) = Memory.bot):
   False.
 Proof.
   inv STEP. inv USTEP. inv STEP. inv LOCAL. ss. subst. inv PROMISE0; ss.
-  - exploit (@Memory.add_o Memory.bot lc1.(Local.promises) loc from to msg loc to)
+  - exploit (@Memory.add_o Memory.bot (Local.promises lc1) loc from to msg loc to)
     ; try exact PROMISES; eauto. condtac; ss; [|des; congr].
     rewrite Memory.bot_get. congr.
-  - exploit (@Memory.split_o Memory.bot lc1.(Local.promises) loc from to ts3 msg msg3 loc to)
+  - exploit (@Memory.split_o Memory.bot (Local.promises lc1) loc from to ts3 msg msg3 loc to)
     ; try exact PROMISES; eauto. condtac; ss; [|des; congr].
     rewrite Memory.bot_get. congr.
-  - exploit (@Memory.lower_o Memory.bot lc1.(Local.promises) loc from to msg0 msg loc to)
+  - exploit (@Memory.lower_o Memory.bot (Local.promises lc1) loc from to msg0 msg loc to)
     ; try exact PROMISES; eauto. condtac; ss; [|des; congr].
     rewrite Memory.bot_get. congr.
 Qed.
@@ -362,7 +362,7 @@ Qed.
 Lemma rtc_union_step_nonpf_bot
       lang e1 e2
       (STEP: rtc (union (@Thread.step lang false)) e1 e2)
-      (PROMISE: e2.(Thread.local).(Local.promises) = Memory.bot):
+      (PROMISE: (Local.promises (Thread.local e2)) = Memory.bot):
   e1 = e2.
 Proof.
   exploit rtc_tail; eauto. i. des; ss.
