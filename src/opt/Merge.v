@@ -57,7 +57,7 @@ Proof.
     esplits; try apply SC; eauto; ss.
     + econs 1.
     + auto.
-    + left. eapply paco9_mon.
+    + left. eapply paco11_mon.
       * apply sim_stmts_nil; eauto.
       * ii. inv PR.
 Qed.
@@ -99,7 +99,7 @@ Proof.
     + auto.
     + auto.
     + auto.
-    + left. eapply paco9_mon.
+    + left. eapply paco11_mon.
       * apply assign_sim_thread; eauto. s. rewrite RegFun.add_spec_eq. auto.
       * i. inv PR.
 Qed.
@@ -144,7 +144,7 @@ Proof.
     + ss.
     + ss.
     + ss.
-    + left. eapply paco9_mon.
+    + left. eapply paco11_mon.
       * apply sim_stmts_nil; eauto.
       * ii. inv PR.
 Qed.
@@ -187,7 +187,7 @@ Proof.
     + auto.
     + auto.
     + auto.
-    + left. eapply paco9_mon.
+    + left. eapply paco11_mon.
       * apply assign_sim_thread; auto.
       * i. inv PR.
 Qed.
@@ -234,7 +234,7 @@ Proof.
       * auto.
       * etrans; eauto.
       * etrans; eauto.
-      * left. eapply paco9_mon.
+      * left. eapply paco11_mon.
         { apply sim_stmts_nil; eauto. etrans; eauto. }
         { ii. inv PR. }
     + inv STEP1.
@@ -248,7 +248,7 @@ Proof.
       * auto.
       * etrans; eauto.
       * etrans; eauto.
-      * left. eapply paco9_mon.
+      * left. eapply paco11_mon.
         { apply sim_stmts_nil; eauto. etrans; eauto. }
         { ii. inv PR. }
 Qed.
@@ -300,7 +300,7 @@ Proof.
       * auto.
       * etrans; eauto.
       * etrans; eauto.
-      * left. eapply paco9_mon.
+      * left. eapply paco11_mon.
         { apply assign_sim_thread; eauto. etrans; eauto. }
         { i. inv PR. }
     + inv STEP1.
@@ -315,7 +315,7 @@ Proof.
       * auto.
       * etrans; eauto.
       * etrans; eauto.
-      * left. eapply paco9_mon.
+      * left. eapply paco11_mon.
         { apply assign_sim_thread; eauto. etrans; eauto. }
         { i. inv PR. }
 Qed.
@@ -369,7 +369,7 @@ Proof.
       * auto.
       * etrans; eauto.
       * etrans; eauto.
-      * left. eapply paco9_mon.
+      * left. eapply paco11_mon.
         { apply assign_sim_thread; eauto. etrans; eauto. }
         { i. inv PR. }
     + inv STEP1.
@@ -386,7 +386,7 @@ Proof.
       * auto.
       * etrans; eauto.
       * etrans; eauto.
-      * left. eapply paco9_mon.
+      * left. eapply paco11_mon.
         { apply assign_sim_thread; eauto. etrans; eauto. }
         { i. inv PR. }
 Qed.
@@ -445,7 +445,7 @@ Proof.
     + auto.
     + auto.
     + auto.
-    + left. eapply paco9_mon.
+    + left. eapply paco11_mon.
       * apply assign_sim_thread; auto. s. rewrite RegFun.add_spec_eq. inv RMW. auto.
       * i. inv PR.
 Qed.
@@ -492,7 +492,7 @@ Proof.
     + ss.
     + ss.
     + ss. rewrite RegFun.add_spec_eq. condtac; ss.
-      left. eapply paco9_mon.
+      left. eapply paco11_mon.
       * apply sim_stmts_nil; eauto.
       * i. inv PR.
   - (* update success *)
@@ -543,7 +543,7 @@ Proof.
       * auto.
       * etrans; eauto.
       * etrans; eauto.
-      * left. eapply paco9_mon.
+      * left. eapply paco11_mon.
         { apply sim_stmts_nil; eauto.
           - revert RMW. condtac; ss. i. inv RMW. ss.
           - etrans; eauto. }
@@ -572,7 +572,7 @@ Proof.
       * auto.
       * etrans; eauto.
       * etrans; eauto.
-      * left. eapply paco9_mon.
+      * left. eapply paco11_mon.
         { apply sim_stmts_nil; eauto.
           - revert RMW. condtac; ss. i. inv RMW. ss.
           - etrans; eauto. }
@@ -646,7 +646,7 @@ Proof.
       * auto.
       * etrans; eauto.
       * etrans; eauto.
-      * left. eapply paco9_mon.
+      * left. eapply paco11_mon.
         { apply assign_sim_thread; eauto.
           - s. unfold RegFun.find. unfold RegFun.add at 4. condtac; [|congr]. auto.
           - etrans; eauto.
@@ -671,7 +671,7 @@ Proof.
       * auto.
       * etrans; eauto.
       * etrans; eauto.
-      * left. eapply paco9_mon.
+      * left. eapply paco11_mon.
         { apply assign_sim_thread; eauto.
           - s. unfold RegFun.find. unfold RegFun.add at 4. condtac; [|congr]. auto.
           - etrans; eauto.
@@ -713,7 +713,7 @@ Proof.
     + auto.
     + etrans; eauto.
     + auto.
-    + left. eapply paco9_mon.
+    + left. eapply paco11_mon.
       * apply sim_stmts_nil; eauto. etrans; eauto.
       * ii. inv PR.
 Qed.

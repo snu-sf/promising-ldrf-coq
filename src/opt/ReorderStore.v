@@ -150,7 +150,7 @@ Proof.
     + auto.
     + auto.
     + etrans; eauto.
-    + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
+    + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
   - (* store *)
     hexploit sim_local_write_bot; try exact LOCAL1; eauto; try refl; try by viewtac. i. des.
     hexploit reorder_fulfill_write_sim_memory; try exact FULFILL; try exact STEP_SRC; eauto; try by viewtac. i. des.
@@ -165,7 +165,7 @@ Proof.
     + auto.
     + etrans; eauto.
     + etrans; eauto. etrans; eauto.
-    + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
+    + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
       etrans; eauto.
 Qed.
 
@@ -210,6 +210,6 @@ Proof.
   - exploit sim_store_mon; eauto. i. des.
     exploit sim_store_step; eauto. i. des; eauto.
     + right. esplits; eauto.
-      left. eapply paco9_mon; eauto. ss.
+      left. eapply paco11_mon; eauto. ss.
     + right. esplits; eauto.
 Qed.

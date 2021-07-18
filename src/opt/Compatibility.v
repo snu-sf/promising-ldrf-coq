@@ -47,7 +47,7 @@ Definition sim_expr
     RegFile.eval_expr rs_src e_src = RegFile.eval_expr rs_tgt e_tgt.
 
 Definition _sim_stmts
-           (sim_thread:SIM_THREAD lang lang)
+           (sim_thread:SIM_THREAD)
            (sim_regs0:SIM_REGS)
            (stmts_src stmts_tgt:list Stmt.t)
            (sim_regs1:SIM_REGS): Prop :=
@@ -55,12 +55,13 @@ Definition _sim_stmts
     (RS: sim_regs0 rs_src rs_tgt)
     (LOCAL: sim_local SimPromises.bot lc_src lc_tgt),
     sim_thread
+      _ _
       (sim_terminal sim_regs1)
       (State.mk rs_src stmts_src) lc_src sc0_src mem0_src
       (State.mk rs_tgt stmts_tgt) lc_tgt sc0_tgt mem0_tgt.
 
 Lemma _sim_stmts_mon
-      s1 s2 (S: s1 <9= s2):
+      s1 s2 (S: s1 <11= s2):
   _sim_stmts s1 <4= _sim_stmts s2.
 Proof.
   ii. apply S. apply PR; auto.
@@ -224,11 +225,11 @@ Proof.
   - i. des. inv x1. auto.
 Qed.
 
-Inductive ctx (sim_thread:SIM_THREAD lang lang): SIM_THREAD lang lang :=
+Inductive ctx (sim_thread:SIM_THREAD): SIM_THREAD :=
 | ctx_incl
     sim_terminal
     st1 lc1 sc0_src mem0_src st2 lc2 sc0_tgt mem0_tgt
-    (SIM: sim_thread sim_terminal st1 lc1 sc0_src mem0_src st2 lc2 sc0_tgt mem0_tgt):
+    (SIM: sim_thread lang lang sim_terminal st1 lc1 sc0_src mem0_src st2 lc2 sc0_tgt mem0_tgt):
     ctx sim_thread sim_terminal st1 lc1 sc0_src mem0_src st2 lc2 sc0_tgt mem0_tgt
 | ctx_nil
     (sim_regs:SIM_REGS)
@@ -245,7 +246,7 @@ Inductive ctx (sim_thread:SIM_THREAD lang lang): SIM_THREAD lang lang :=
     sim_regs1 sim_regs2
     stmts1_src stmts2_src rs_src lc_src sc0_src mem0_src
     stmts1_tgt stmts2_tgt rs_tgt lc_tgt sc0_tgt mem0_tgt
-    (SIM1: sim_thread (sim_terminal sim_regs1)
+    (SIM1: sim_thread lang lang (sim_terminal sim_regs1)
                       (State.mk rs_src stmts1_src) lc_src sc0_src mem0_src
                       (State.mk rs_tgt stmts1_tgt) lc_tgt sc0_tgt mem0_tgt)
     (SIM2: _sim_stmts sim_thread sim_regs1 stmts2_src stmts2_tgt sim_regs2):
@@ -283,9 +284,9 @@ Inductive ctx (sim_thread:SIM_THREAD lang lang): SIM_THREAD lang lang :=
 .
 Hint Constructors ctx.
 
-Lemma ctx_mon: monotone9 ctx.
+Lemma ctx_mon: monotone11 ctx.
 Proof.
-  ii. inv IN.
+  ii. destruct IN.
   - econs 1. auto.
   - econs 2; auto.
   - econs 3; eauto; eapply _sim_stmts_mon; eauto.
@@ -295,9 +296,9 @@ Qed.
 Hint Resolve ctx_mon.
 
 
-Lemma ctx_wcompat: wcompatible9 (@_sim_thread lang lang) ctx.
+Lemma ctx_wcompat: wcompatible11 _sim_thread ctx.
 Proof.
-  assert (MON: monotone9 (@_sim_thread lang lang)).
+  assert (MON: monotone11 _sim_thread).
   (* paco tactics do not work well without this *)
   { eapply _sim_thread_mon; eauto. }
   econs; auto. i. destruct PR.
@@ -477,7 +478,7 @@ Proof.
       }
 Qed.
 
-Definition sim_stmts := @_sim_stmts (@sim_thread lang lang).
+Definition sim_stmts := @_sim_stmts sim_thread.
 
 Lemma sim_stmts_frame
       sim_regs0 sim_regs1

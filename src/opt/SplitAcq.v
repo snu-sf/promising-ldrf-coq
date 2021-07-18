@@ -266,7 +266,7 @@ Proof.
     exploit Local.fence_step_future; eauto. i. des.
     inv STATE. inv INSTR. inv LOCAL1. ss.
     esplits; (try by econs 1); eauto; ss.
-    left. eapply paco9_mon; [apply sim_stmts_nil|]; ss. econs; ss.
+    left. eapply paco11_mon; [apply sim_stmts_nil|]; ss. econs; ss.
     + rewrite TViewFacts.write_fence_tview_strong_relaxed; ss. apply LOCAL.
     + apply LOCAL.
 Qed.
@@ -281,7 +281,7 @@ Proof.
   - exploit sim_acquired_mon; eauto. i.
     exploit sim_acquired_step; eauto. i. des; eauto.
     + right. esplits; eauto.
-      left. eapply paco9_mon; eauto. ss.
+      left. eapply paco11_mon; eauto. ss.
     + right. esplits; eauto.
 Qed.
 
@@ -350,7 +350,7 @@ Proof.
       * econs 2. eauto.
       * econs. econs.
     + auto.
-    + left. eapply paco9_mon; [apply sim_acquired_sim_thread|]; ss.
+    + left. eapply paco11_mon; [apply sim_acquired_sim_thread|]; ss.
   - (* update-load *)
     exploit Local.read_step_future; eauto. i. des.
     exploit sim_local_read_acquired; eauto. i. des.
@@ -360,7 +360,7 @@ Proof.
       * econs 2. eauto.
       * econs. econs. eauto.
     + auto.
-    + left. eapply paco9_mon; [apply sim_acquired_sim_thread|]; ss.
+    + left. eapply paco11_mon; [apply sim_acquired_sim_thread|]; ss.
   - (* update *)
     exploit Local.read_step_future; eauto. i. des.
     exploit sim_local_read_acquired; eauto. i. des.
@@ -383,5 +383,5 @@ Proof.
       * econs 4; eauto.
       * econs. econs. eauto.
     + auto.
-    + left. eapply paco9_mon; [apply sim_acquired_sim_thread|]; ss.
+    + left. eapply paco11_mon; [apply sim_acquired_sim_thread|]; ss.
 Qed.

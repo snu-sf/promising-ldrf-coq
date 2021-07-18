@@ -278,7 +278,7 @@ Proof.
     exploit Local.fence_step_future; eauto. i. des.
     inv STATE. inv INSTR. inv LOCAL1. ss.
     esplits; (try by econs 1); eauto; ss.
-    left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
+    left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
 Qed.
 
 Lemma sim_acqrel_sim_thread:
@@ -291,7 +291,7 @@ Proof.
   - exploit sim_acqrel_mon; eauto. i. des.
     exploit sim_acqrel_step; eauto. i. des; eauto.
     + right. esplits; eauto.
-      left. eapply paco9_mon; eauto. ss.
+      left. eapply paco11_mon; eauto. ss.
     + right. esplits; eauto.
 Qed.
 
@@ -324,7 +324,7 @@ Proof.
       * econs 2. eauto.
       * econs. econs.
     + auto.
-    + left. eapply paco9_mon; [apply sim_acqrel_sim_thread|]; ss.
+    + left. eapply paco11_mon; [apply sim_acqrel_sim_thread|]; ss.
       econs; ss. inv LOCAL2. econs; ss.
       etrans; eauto. apply TViewFacts.write_fence_tview_incr.
       eapply TViewFacts.read_fence_future; apply WF2.
@@ -337,7 +337,7 @@ Proof.
       * econs 2. eauto.
       * econs. econs. eauto.
     + auto.
-    + left. eapply paco9_mon; [apply sim_acqrel_sim_thread|]; ss.
+    + left. eapply paco11_mon; [apply sim_acqrel_sim_thread|]; ss.
       econs; ss. inv LOCAL2. econs; ss.
       etrans; eauto. apply TViewFacts.write_fence_tview_incr.
       eapply TViewFacts.read_fence_future; apply WF2.
@@ -363,5 +363,5 @@ Proof.
       * econs 4; eauto.
       * econs. econs. eauto.
     + auto.
-    + left. eapply paco9_mon; [apply sim_acqrel_sim_thread|]; ss.
+    + left. eapply paco11_mon; [apply sim_acqrel_sim_thread|]; ss.
 Qed.

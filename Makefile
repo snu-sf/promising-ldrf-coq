@@ -5,7 +5,7 @@ COQTHEORIES  := \
 	src/itree/*.v \
 	src/prop/*.v \
 	src/opt/*.v \
-	src/iopt/*.v \
+	# src/iopt/*.v \
 	src/invariant/*.v \
 	src/gopt/*.v \
 	src/promotion/*.v \
@@ -29,7 +29,7 @@ Makefile.coq: Makefile $(COQTHEORIES)
    echo "-R src/itree $(COQMODULE)"; \
    echo "-R src/prop $(COQMODULE)"; \
    echo "-R src/opt $(COQMODULE)"; \
-   echo "-R src/iopt $(COQMODULE)"; \
+   # echo "-R src/iopt $(COQMODULE)"; \
    echo "-R src/invariant $(COQMODULE)"; \
    echo "-R src/gopt $(COQMODULE)"; \
    echo "-R src/promotion $(COQMODULE)"; \

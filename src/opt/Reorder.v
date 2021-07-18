@@ -85,7 +85,7 @@ Proof.
     esplits; try apply SC; eauto; ss.
     + econs 1.
     + auto.
-    + left. eapply paco9_mon; [apply sim_load_sim_thread|]; ss.
+    + left. eapply paco11_mon; [apply sim_load_sim_thread|]; ss.
       econs; eauto.
       eapply Local.read_step_future; eauto.
   - (* update-load *)
@@ -94,7 +94,7 @@ Proof.
     esplits; try apply SC; eauto; ss.
     + econs 1.
     + auto.
-    + left. eapply paco9_mon; [apply sim_update_sim_thread|]; ss.
+    + left. eapply paco11_mon; [apply sim_update_sim_thread|]; ss.
       econs; [eauto|..]; s; eauto.
       eapply Local.read_step_future; eauto.
   - (* store *)
@@ -111,7 +111,7 @@ Proof.
     + auto.
     + etrans; eauto.
     + auto.
-    + left. eapply paco9_mon; [apply sim_store_sim_thread|done].
+    + left. eapply paco11_mon; [apply sim_store_sim_thread|done].
       econs; eauto.
   - (* update *)
     right.
@@ -134,7 +134,7 @@ Proof.
     + auto.
     + etrans; eauto.
     + auto.
-    + left. eapply paco9_mon; [apply sim_update_sim_thread|done].
+    + left. eapply paco11_mon; [apply sim_update_sim_thread|done].
       econs; [eauto|..]; s; eauto.
       etrans; eauto.
   - (* fence *)
@@ -147,7 +147,7 @@ Proof.
     + auto.
     + etrans; [|eauto]. inv STEP_SRC. apply TViewFacts.write_fence_sc_incr.
     + auto.
-    + left. eapply paco9_mon; [apply sim_fence_sim_thread|]; ss.
+    + left. eapply paco11_mon; [apply sim_fence_sim_thread|]; ss.
       econs; eauto.
   - (* abort *)
     left.

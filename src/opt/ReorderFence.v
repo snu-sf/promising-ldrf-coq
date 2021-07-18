@@ -117,7 +117,7 @@ Proof.
     + auto.
     + etrans; eauto.
     + auto.
-    + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
+    + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
       etrans; eauto.
   - (* update-load *)
     guardH ORDR2.
@@ -134,7 +134,7 @@ Proof.
     + auto.
     + etrans; eauto.
     + auto.
-    + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
+    + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
       etrans; eauto.
   - (* store *)
     hexploit sim_local_write_bot; try exact LOCAL1; try apply SC; eauto; try refl; viewtac.
@@ -150,7 +150,7 @@ Proof.
     + auto.
     + etrans; eauto.
     + etrans; eauto.
-    + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
+    + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
       etrans; eauto.
   - (* update *)
     guardH ORDR2.
@@ -174,7 +174,7 @@ Proof.
     + auto.
     + etrans; eauto.
     + etrans; eauto.
-    + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
+    + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
       etrans; eauto.
 Qed.
 
@@ -188,6 +188,6 @@ Proof.
     apply SimPromises.sem_bot_inv in PROMISES0; auto. rewrite PROMISES0. auto.
   - exploit sim_fence_step; try apply PR; try apply SC; eauto. i. des; eauto.
     + right. esplits; eauto.
-      left. eapply paco9_mon; eauto. ss.
+      left. eapply paco11_mon; eauto. ss.
     + right. esplits; eauto.
 Qed.

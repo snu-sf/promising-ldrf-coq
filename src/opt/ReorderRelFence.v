@@ -487,7 +487,7 @@ Proof.
     + auto.
     + auto.
     + auto.
-    + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
+    + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
 Qed.
 
 Lemma sim_release_fenceF_sim_thread:
@@ -500,7 +500,7 @@ Proof.
     eapply sim_local_memory_bot; eauto.
   - exploit sim_release_fenceF_step; try apply PR; try apply SC; eauto. i. des; eauto.
     + right. esplits; eauto.
-      left. eapply paco9_mon; eauto. ss.
+      left. eapply paco11_mon; eauto. ss.
     + right. esplits; eauto.
 Qed.
 
@@ -540,7 +540,7 @@ Proof.
     + auto.
     + etrans; eauto.
     + auto.
-    + left. eapply paco9_mon; [apply sim_release_fenceF_sim_thread|]; ss.
+    + left. eapply paco11_mon; [apply sim_release_fenceF_sim_thread|]; ss.
       econs. eauto.
   - (* update-load *)
     guardH ORDW2.
@@ -554,7 +554,7 @@ Proof.
     + auto.
     + etrans; eauto.
     + auto.
-    + left. eapply paco9_mon; [apply sim_release_fenceF_sim_thread|]; ss.
+    + left. eapply paco11_mon; [apply sim_release_fenceF_sim_thread|]; ss.
       econs. eauto.
   - (* write *)
     guardH ORD2.
@@ -570,7 +570,7 @@ Proof.
     + auto.
     + auto.
     + auto.
-    + left. eapply paco9_mon; [apply sim_release_fenceF_sim_thread|]; ss.
+    + left. eapply paco11_mon; [apply sim_release_fenceF_sim_thread|]; ss.
       econs. eauto.
   - (* update *)
     guardH ORDW2.
@@ -590,7 +590,7 @@ Proof.
     + auto.
     + auto.
     + auto.
-    + left. eapply paco9_mon; [apply sim_release_fenceF_sim_thread|]; ss.
+    + left. eapply paco11_mon; [apply sim_release_fenceF_sim_thread|]; ss.
       econs. eauto.
   - (* fence *)
     exploit sim_local_fence_relfenced; try exact SC; eauto; try refl. i. des.
@@ -605,6 +605,6 @@ Proof.
     + auto.
     + auto.
     + auto.
-    + left. eapply paco9_mon; [apply sim_release_fenceF_sim_thread|]; ss.
+    + left. eapply paco11_mon; [apply sim_release_fenceF_sim_thread|]; ss.
       econs. eauto.
 Qed.

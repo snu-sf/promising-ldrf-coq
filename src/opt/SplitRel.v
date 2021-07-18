@@ -220,7 +220,7 @@ Proof.
     esplits; eauto; ss.
     + econs 2. econs 2. econs; [|econs 2]; eauto. econs. econs. eauto.
     + eauto.
-    + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
+    + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
   - (* write *)
     right.
     hexploit sim_local_write_released; (try by etrans; eauto); eauto; try refl; try by econs.
@@ -229,7 +229,7 @@ Proof.
     esplits; eauto; ss.
     + econs 2. econs 2. econs; [|econs 3]; eauto. econs. econs.
     + ss.
-    + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
+    + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
   - (* update *)
     right.
     exploit Local.read_step_future; eauto. i. des.
@@ -245,7 +245,7 @@ Proof.
     esplits; eauto; ss.
     + econs 2. econs 2. econs; [|econs 4]; eauto. econs. econs. eauto.
     + ss.
-    + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
+    + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
 Qed.
 
 Lemma sim_released_sim_thread:
@@ -258,7 +258,7 @@ Proof.
   - exploit sim_released_mon; eauto. i.
     exploit sim_released_step; eauto. i. des; eauto.
     + right. esplits; eauto.
-      left. eapply paco9_mon; eauto. ss.
+      left. eapply paco11_mon; eauto. ss.
     + right. esplits; eauto.
 Qed.
 
@@ -291,7 +291,7 @@ Proof.
     + ss.
     + inv LOCAL1. ss.
     + ss.
-    + left. eapply paco9_mon; [apply sim_released_sim_thread|]; ss.
+    + left. eapply paco11_mon; [apply sim_released_sim_thread|]; ss.
       inv LOCAL1. econs; eauto.
       * inv LOCAL. econs; ss. etrans; eauto.
       * s. i. repeat condtac; ss. refl.

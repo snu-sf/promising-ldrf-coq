@@ -50,7 +50,7 @@ Proof.
     + ss.
     + by inv LOCAL0.
     + by inv LOCAL0.
-    + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
+    + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
       * etrans; [eauto|].
         symmetry. apply RegFile.eq_except_singleton.
       * inv LOCAL. inv LOCAL0. inv LOCAL. econs; ss.

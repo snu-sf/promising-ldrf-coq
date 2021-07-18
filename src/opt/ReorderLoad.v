@@ -141,7 +141,7 @@ Proof.
     + eauto.
     + eauto.
     + eauto.
-    + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
+    + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
       apply RegFun.add_add. ii. subst. eapply REGS.
       * apply RegSet.singleton_spec. eauto.
       * apply RegSet.singleton_spec. eauto.
@@ -162,7 +162,7 @@ Proof.
     + eauto.
     + eauto.
     + eauto.
-    + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
+    + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
       apply RegFun.add_add. ii. subst. eapply REGS.
       * apply RegSet.singleton_spec. eauto.
       * apply RegSet.add_spec. auto.
@@ -183,7 +183,7 @@ Proof.
     + eauto.
     + eauto.
     + etrans; eauto.
-    + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss. etrans; eauto.
+    + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss. etrans; eauto.
   - (* update *)
     guardH ORDW2.
     exploit Local.read_step_future; try exact LOCAL1; eauto. i. des.
@@ -206,7 +206,7 @@ Proof.
     + eauto.
     + eauto.
     + etrans; eauto.
-    + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
+    + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
       * apply RegFun.add_add. ii. subst. eapply REGS.
         { apply RegSet.singleton_spec. eauto. }
         { apply RegSet.add_spec. eauto. }
@@ -223,7 +223,7 @@ Proof.
     + eauto.
     + etrans; eauto.
     + eauto.
-    + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
+    + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
       etrans; eauto.
 Qed.
 
@@ -239,6 +239,6 @@ Proof.
   - exploit sim_load_mon; eauto. i.
     exploit sim_load_step; eauto. i. des; eauto.
     + right. esplits; eauto.
-      left. eapply paco9_mon; eauto. ss.
+      left. eapply paco11_mon; eauto. ss.
     + right. esplits; eauto.
 Qed.

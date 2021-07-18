@@ -176,7 +176,7 @@ Proof.
       + eauto.
       + eauto.
       + eauto.
-      + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
+      + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
         apply RegFun.add_add. ii. subst. eapply REGS; cycle 1.
         * apply RegSet.singleton_spec. eauto.
         * apply RegSet.add_spec. auto.
@@ -197,7 +197,7 @@ Proof.
       + eauto.
       + eauto.
       + etrans; eauto.
-      + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss. etrans; eauto.
+      + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss. etrans; eauto.
   }
 
   exploit fulfill_step_future; eauto. i. des.
@@ -237,7 +237,7 @@ Proof.
     + auto.
     + auto.
     + etrans; eauto.
-    + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
+    + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
       apply RegFun.add_add. ii. subst. eapply REGS.
       apply RegSet.Facts.singleton_iff. auto.
   - (* store *)
@@ -263,7 +263,7 @@ Proof.
     + auto.
     + etrans; eauto.
     + etrans; eauto. etrans; eauto.
-    + left. eapply paco9_mon; [apply sim_stmts_nil|]; ss.
+    + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
       etrans; eauto.
 Grab Existential Variables.
 { econs 2. }
@@ -311,6 +311,6 @@ Proof.
   - exploit sim_update_mon; eauto. i. des.
     exploit sim_update_step; eauto. i. des; eauto.
     + right. esplits; eauto.
-      left. eapply paco9_mon; eauto. ss.
+      left. eapply paco11_mon; eauto. ss.
     + right. esplits; eauto.
 Qed.
