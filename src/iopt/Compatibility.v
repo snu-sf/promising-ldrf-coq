@@ -251,192 +251,25 @@ Inductive ctx (sim_thread:forall R, SIM_THREAD (lang R) (lang R)) R:
         (sim_terminal sim_ret)
         (Ret r_src) lc_src sc0_src mem0_src
         (Ret r_tgt) lc_tgt sc0_tgt mem0_tgt
-.
-
-
 | ctx_seq
     R1 (sim_ret1:SIM_RET R1) (sim_ret2:SIM_RET R)
     itr0 k0 lc_src sc0_src mem0_src
     itr1 k1 lc_tgt sc0_tgt mem0_tgt
-    (SIM1: sim_thread (sim_terminal sim_ret1)
+    (SIM1: sim_thread _ (sim_terminal sim_ret1)
                       itr0 lc_src sc0_src mem0_src
                       itr1 lc_tgt sc0_tgt mem0_tgt)
-    (SIM2: forall r_src r_tgt (RET: sim_ret1 r_src r_tgt),
-        _sim_stmts sim_thread sim_regs1 stmts2_src stmts2_tgt sim_regs2):
+    (SIM2: _sim_ktree (sim_thread _) sim_ret1 k0 k1 sim_ret2):
     ctx sim_thread
-        (sim_terminal sim_regs2)
+        (sim_terminal sim_ret2)
         (itr0 >>= k0) lc_src sc0_src mem0_src
         (itr1 >>= k1) lc_tgt sc0_tgt mem0_tgt
 .
 
-| ctx_bind
-
-.
-
-| ctx_seq
-    sim_regs1 sim_regs2
-    stmts1_src stmts2_src rs_src lc_src sc0_src mem0_src
-    stmts1_tgt stmts2_tgt rs_tgt lc_tgt sc0_tgt mem0_tgt
-    (SIM1: sim_thread (sim_terminal sim_regs1)
-                      (State.mk rs_src stmts1_src) lc_src sc0_src mem0_src
-                      (State.mk rs_tgt stmts1_tgt) lc_tgt sc0_tgt mem0_tgt)
-    (SIM2: _sim_stmts sim_thread sim_regs1 stmts2_src stmts2_tgt sim_regs2):
-    ctx sim_thread
-        (sim_terminal sim_regs2)
-        (State.mk rs_src (stmts1_src ++ stmts2_src)) lc_src sc0_src mem0_src
-        (State.mk rs_tgt (stmts1_tgt ++ stmts2_tgt)) lc_tgt sc0_tgt mem0_tgt
-| ctx_ite
-    sim_regs0 sim_regs1
-    cond_src stmts1_src stmts2_src rs_src sc0_src mem0_src
-    cond_tgt stmts1_tgt stmts2_tgt rs_tgt sc0_tgt mem0_tgt
-    lc_src lc_tgt
-    (COND: sim_expr sim_regs0 cond_src cond_tgt)
-    (RS: sim_regs0 rs_src rs_tgt)
-    (LOCAL: sim_local SimPromises.bot lc_src lc_tgt)
-    (SIM1: _sim_stmts sim_thread sim_regs0 stmts1_src stmts1_tgt sim_regs1)
-    (SIM2: _sim_stmts sim_thread sim_regs0 stmts2_src stmts2_tgt sim_regs1):
-    ctx sim_thread
-        (sim_terminal sim_regs1)
-        (State.mk rs_src [Stmt.ite cond_src stmts1_src stmts2_src]) lc_src sc0_src mem0_src
-        (State.mk rs_tgt [Stmt.ite cond_tgt stmts1_tgt stmts2_tgt]) lc_tgt sc0_tgt mem0_tgt
-| ctx_dowhile
-    sim_regs
-    cond_src stmts_src rs_src sc0_src mem0_src
-    cond_tgt stmts_tgt rs_tgt sc0_tgt mem0_tgt
-    lc_src lc_tgt
-    (COND: sim_expr sim_regs cond_src cond_tgt)
-    (RS: sim_regs rs_src rs_tgt)
-    (LOCAL: sim_local SimPromises.bot lc_src lc_tgt)
-    (SIM: _sim_stmts sim_thread sim_regs stmts_src stmts_tgt sim_regs):
-    ctx sim_thread
-        (sim_terminal sim_regs)
-        (State.mk rs_src [Stmt.dowhile stmts_src cond_src]) lc_src sc0_src mem0_src
-        (State.mk rs_tgt [Stmt.dowhile stmts_tgt cond_tgt]) lc_tgt sc0_tgt mem0_tgt
-.
-Hint Constructors ctx.
-
-Inductive ctx (sim_thread:forall R, SIM_THREAD (lang R) (lang R)) R:
-  SIM_THREAD (lang R) (lang R) :=
-| ctx_nil
-    rs_src sc0_src mem0_src
-    rs_tgt sc0_tgt mem0_tgt
-    lc_src lc_tgt
-    (RS: sim_regs rs_src rs_tgt)
-    (LOCAL: sim_local SimPromises.bot lc_src lc_tgt):
-    ctx sim_thread
-        (sim_terminal sim_regs)
-        (State.mk rs_src []) lc_src sc0_src mem0_src
-        (State.mk rs_tgt []) lc_tgt sc0_tgt mem0_tgt
-| ctx_seq
-    sim_regs1 sim_regs2
-    stmts1_src stmts2_src rs_src lc_src sc0_src mem0_src
-    stmts1_tgt stmts2_tgt rs_tgt lc_tgt sc0_tgt mem0_tgt
-    (SIM1: sim_thread (sim_terminal sim_regs1)
-                      (State.mk rs_src stmts1_src) lc_src sc0_src mem0_src
-                      (State.mk rs_tgt stmts1_tgt) lc_tgt sc0_tgt mem0_tgt)
-    (SIM2: _sim_stmts sim_thread sim_regs1 stmts2_src stmts2_tgt sim_regs2):
-    ctx sim_thread
-        (sim_terminal sim_regs2)
-        (State.mk rs_src (stmts1_src ++ stmts2_src)) lc_src sc0_src mem0_src
-        (State.mk rs_tgt (stmts1_tgt ++ stmts2_tgt)) lc_tgt sc0_tgt mem0_tgt
-| ctx_ite
-    sim_regs0 sim_regs1
-    cond_src stmts1_src stmts2_src rs_src sc0_src mem0_src
-    cond_tgt stmts1_tgt stmts2_tgt rs_tgt sc0_tgt mem0_tgt
-    lc_src lc_tgt
-    (COND: sim_expr sim_regs0 cond_src cond_tgt)
-    (RS: sim_regs0 rs_src rs_tgt)
-    (LOCAL: sim_local SimPromises.bot lc_src lc_tgt)
-    (SIM1: _sim_stmts sim_thread sim_regs0 stmts1_src stmts1_tgt sim_regs1)
-    (SIM2: _sim_stmts sim_thread sim_regs0 stmts2_src stmts2_tgt sim_regs1):
-    ctx sim_thread
-        (sim_terminal sim_regs1)
-        (State.mk rs_src [Stmt.ite cond_src stmts1_src stmts2_src]) lc_src sc0_src mem0_src
-        (State.mk rs_tgt [Stmt.ite cond_tgt stmts1_tgt stmts2_tgt]) lc_tgt sc0_tgt mem0_tgt
-| ctx_dowhile
-    sim_regs
-    cond_src stmts_src rs_src sc0_src mem0_src
-    cond_tgt stmts_tgt rs_tgt sc0_tgt mem0_tgt
-    lc_src lc_tgt
-    (COND: sim_expr sim_regs cond_src cond_tgt)
-    (RS: sim_regs rs_src rs_tgt)
-    (LOCAL: sim_local SimPromises.bot lc_src lc_tgt)
-    (SIM: _sim_stmts sim_thread sim_regs stmts_src stmts_tgt sim_regs):
-    ctx sim_thread
-        (sim_terminal sim_regs)
-        (State.mk rs_src [Stmt.dowhile stmts_src cond_src]) lc_src sc0_src mem0_src
-        (State.mk rs_tgt [Stmt.dowhile stmts_tgt cond_tgt]) lc_tgt sc0_tgt mem0_tgt
-.
-Hint Constructors ctx.
-
-Inductive ctx (sim_thread:forall R, SIM_THREAD (lang R) (lang R)) R:
-  SIM_THREAD (lang R) (lang R) :=
-| ctx_incl
-    sim_terminal
-    st1 lc1 sc0_src mem0_src st2 lc2 sc0_tgt mem0_tgt
-    (SIM: sim_thread sim_terminal st1 lc1 sc0_src mem0_src st2 lc2 sc0_tgt mem0_tgt):
-    ctx sim_thread sim_terminal st1 lc1 sc0_src mem0_src st2 lc2 sc0_tgt mem0_tgt
-| ctx_nil
-    (sim_regs:SIM_REGS)
-    rs_src sc0_src mem0_src
-    rs_tgt sc0_tgt mem0_tgt
-    lc_src lc_tgt
-    (RS: sim_regs rs_src rs_tgt)
-    (LOCAL: sim_local SimPromises.bot lc_src lc_tgt):
-    ctx sim_thread
-        (sim_terminal sim_regs)
-        (State.mk rs_src []) lc_src sc0_src mem0_src
-        (State.mk rs_tgt []) lc_tgt sc0_tgt mem0_tgt
-| ctx_seq
-    sim_regs1 sim_regs2
-    stmts1_src stmts2_src rs_src lc_src sc0_src mem0_src
-    stmts1_tgt stmts2_tgt rs_tgt lc_tgt sc0_tgt mem0_tgt
-    (SIM1: sim_thread (sim_terminal sim_regs1)
-                      (State.mk rs_src stmts1_src) lc_src sc0_src mem0_src
-                      (State.mk rs_tgt stmts1_tgt) lc_tgt sc0_tgt mem0_tgt)
-    (SIM2: _sim_stmts sim_thread sim_regs1 stmts2_src stmts2_tgt sim_regs2):
-    ctx sim_thread
-        (sim_terminal sim_regs2)
-        (State.mk rs_src (stmts1_src ++ stmts2_src)) lc_src sc0_src mem0_src
-        (State.mk rs_tgt (stmts1_tgt ++ stmts2_tgt)) lc_tgt sc0_tgt mem0_tgt
-| ctx_ite
-    sim_regs0 sim_regs1
-    cond_src stmts1_src stmts2_src rs_src sc0_src mem0_src
-    cond_tgt stmts1_tgt stmts2_tgt rs_tgt sc0_tgt mem0_tgt
-    lc_src lc_tgt
-    (COND: sim_expr sim_regs0 cond_src cond_tgt)
-    (RS: sim_regs0 rs_src rs_tgt)
-    (LOCAL: sim_local SimPromises.bot lc_src lc_tgt)
-    (SIM1: _sim_stmts sim_thread sim_regs0 stmts1_src stmts1_tgt sim_regs1)
-    (SIM2: _sim_stmts sim_thread sim_regs0 stmts2_src stmts2_tgt sim_regs1):
-    ctx sim_thread
-        (sim_terminal sim_regs1)
-        (State.mk rs_src [Stmt.ite cond_src stmts1_src stmts2_src]) lc_src sc0_src mem0_src
-        (State.mk rs_tgt [Stmt.ite cond_tgt stmts1_tgt stmts2_tgt]) lc_tgt sc0_tgt mem0_tgt
-| ctx_dowhile
-    sim_regs
-    cond_src stmts_src rs_src sc0_src mem0_src
-    cond_tgt stmts_tgt rs_tgt sc0_tgt mem0_tgt
-    lc_src lc_tgt
-    (COND: sim_expr sim_regs cond_src cond_tgt)
-    (RS: sim_regs rs_src rs_tgt)
-    (LOCAL: sim_local SimPromises.bot lc_src lc_tgt)
-    (SIM: _sim_stmts sim_thread sim_regs stmts_src stmts_tgt sim_regs):
-    ctx sim_thread
-        (sim_terminal sim_regs)
-        (State.mk rs_src [Stmt.dowhile stmts_src cond_src]) lc_src sc0_src mem0_src
-        (State.mk rs_tgt [Stmt.dowhile stmts_tgt cond_tgt]) lc_tgt sc0_tgt mem0_tgt
-.
-Hint Constructors ctx.
-
-Lemma ctx_mon: monotone9 ctx.
+Lemma ctx_mon: monotone10 ctx.
 Proof.
   ii. inv IN.
-  - econs 1. auto.
-  - econs 2; auto.
-  - econs 3; eauto; eapply _sim_stmts_mon; eauto.
-  - econs 4; eauto; eapply _sim_stmts_mon; eauto.
-  - econs 5; eauto; eapply _sim_stmts_mon; eauto.
+  - econs 1; eauto.
+  - econs 2; eauto. ii. eapply LE. eapply SIM2; eauto.
 Qed.
 Hint Resolve ctx_mon.
 

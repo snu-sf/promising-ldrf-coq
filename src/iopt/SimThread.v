@@ -24,19 +24,19 @@ Set Implicit Arguments.
 
 
 Section SimulationThread.
-  Variable (lang_src lang_tgt:language).
-
   Definition SIM_TERMINAL :=
-    forall (st_src:(Language.state lang_src)) (st_tgt:(Language.state lang_tgt)), Prop.
+    forall (lang_src lang_tgt: language) (st_src:(Language.state lang_src)) (st_tgt:(Language.state lang_tgt)), Prop.
 
   Definition SIM_THREAD :=
     forall (sim_terminal: SIM_TERMINAL)
-      (st1_src:(Language.state lang_src)) (lc1_src:Local.t) (sc0_src:TimeMap.t) (mem0_src:Memory.t)
-      (st1_tgt:(Language.state lang_tgt)) (lc1_tgt:Local.t) (sc0_tgt:TimeMap.t) (mem0_tgt:Memory.t), Prop.
+           (lang_src lang_tgt:language)
+           (st1_src:(Language.state lang_src)) (lc1_src:Local.t) (sc0_src:TimeMap.t) (mem0_src:Memory.t)
+           (st1_tgt:(Language.state lang_tgt)) (lc1_tgt:Local.t) (sc0_tgt:TimeMap.t) (mem0_tgt:Memory.t), Prop.
 
   Definition _sim_thread_step
-             (sim_thread: forall (st1_src:(Language.state lang_src)) (lc1_src:Local.t) (sc0_src:TimeMap.t) (mem0_src:Memory.t)
-                            (st1_tgt:(Language.state lang_tgt)) (lc1_tgt:Local.t) (sc0_tgt:TimeMap.t) (mem0_tgt:Memory.t), Prop)
+             (sim_thread: forall (lang_src lang_tgt:language) (st1_src:(Language.state lang_src)) (lc1_src:Local.t) (sc0_src:TimeMap.t) (mem0_src:Memory.t)
+                                 (st1_tgt:(Language.state lang_tgt)) (lc1_tgt:Local.t) (sc0_tgt:TimeMap.t) (mem0_tgt:Memory.t), Prop)
+             lang_src lang_tgt
              st1_src lc1_src sc1_src mem1_src
              st1_tgt lc1_tgt sc1_tgt mem1_tgt
     :=
@@ -56,11 +56,12 @@ Section SimulationThread.
         <<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>> /\
         <<SC3: TimeMap.le sc3_src sc3_tgt>> /\
         <<MEMORY3: sim_memory mem3_src mem3_tgt>> /\
-        <<SIM: sim_thread st3_src lc3_src sc3_src mem3_src st3_tgt lc3_tgt sc3_tgt mem3_tgt>>.
+        <<SIM: sim_thread lang_src lang_tgt st3_src lc3_src sc3_src mem3_src st3_tgt lc3_tgt sc3_tgt mem3_tgt>>.
 
   Definition _sim_thread
              (sim_thread: SIM_THREAD)
              (sim_terminal: SIM_TERMINAL)
+             (lang_src lang_tgt:language)
              (st1_src:(Language.state lang_src)) (lc1_src:Local.t) (sc0_src:TimeMap.t) (mem0_src:Memory.t)
              (st1_tgt:(Language.state lang_tgt)) (lc1_tgt:Local.t) (sc0_tgt:TimeMap.t) (mem0_tgt:Memory.t): Prop :=
     forall sc1_src mem1_src
@@ -89,7 +90,7 @@ Section SimulationThread.
             <<MEMORY: sim_memory mem2_src mem1_tgt>> /\
             <<TERMINAL_SRC: (Language.is_terminal lang_src) st2_src>> /\
             <<LOCAL: sim_local SimPromises.bot lc2_src lc1_tgt>> /\
-            <<TERMINAL: sim_terminal st2_src st1_tgt>>>> /\
+            <<TERMINAL: sim_terminal _ _ st2_src st1_tgt>>>> /\
       <<PROMISES:
         forall (PROMISES_TGT: (Local.promises lc1_tgt) = Memory.bot),
           <<FAILURE: Thread.steps_failure (Thread.mk _ st1_src lc1_src sc1_src mem1_src)>> \/
@@ -98,11 +99,11 @@ Section SimulationThread.
                          (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
                          (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>> /\
             <<PROMISES_SRC: (Local.promises lc2_src) = Memory.bot>>>> /\
-      <<STEP: _sim_thread_step (sim_thread sim_terminal)
+      <<STEP: _sim_thread_step (sim_thread sim_terminal) lang_src lang_tgt
                                st1_src lc1_src sc1_src mem1_src
                                st1_tgt lc1_tgt sc1_tgt mem1_tgt>>.
 
-  Lemma _sim_thread_mon: monotone9 _sim_thread.
+  Lemma _sim_thread_mon: monotone11 _sim_thread.
   Proof.
     ii. exploit IN; try apply SC; eauto. i. des.
     splits; eauto. ii.
@@ -111,12 +112,12 @@ Section SimulationThread.
   Qed.
   Hint Resolve _sim_thread_mon: paco.
 
-  Definition sim_thread: SIM_THREAD := paco9 _sim_thread bot9.
+  Definition sim_thread: SIM_THREAD := paco11 _sim_thread bot11.
 
   Lemma sim_thread_mon
         sim_terminal1 sim_terminal2
-        (SIM: sim_terminal1 <2= sim_terminal2):
-    sim_thread sim_terminal1 <8= sim_thread sim_terminal2.
+        (SIM: sim_terminal1 <4= sim_terminal2):
+    sim_thread sim_terminal1 <10= sim_thread sim_terminal2.
   Proof.
     pcofix CIH. i. punfold PR. pfold. ii.
     exploit PR; try apply SC; eauto. i. des.
@@ -129,6 +130,7 @@ Section SimulationThread.
   Qed.
 End SimulationThread.
 Hint Resolve _sim_thread_mon: paco.
+Arguments sim_thread _ [_] [_] _ _ _ _ _ _ _ _.
 
 
 Lemma sim_thread_step
@@ -336,7 +338,7 @@ Lemma sim_thread_future
       sim_terminal
       st_src lc_src sc1_src sc2_src mem1_src mem2_src
       st_tgt lc_tgt sc1_tgt sc2_tgt mem1_tgt mem2_tgt
-      (SIM: @sim_thread lang_src lang_tgt sim_terminal st_src lc_src sc1_src mem1_src st_tgt lc_tgt sc1_tgt mem1_tgt)
+      (SIM: @sim_thread sim_terminal lang_src lang_tgt st_src lc_src sc1_src mem1_src st_tgt lc_tgt sc1_tgt mem1_tgt)
       (SC_FUTURE_SRC: TimeMap.le sc1_src sc2_src)
       (SC_FUTURE_TGT: TimeMap.le sc1_tgt sc2_tgt)
       (MEM_FUTURE_SRC: Memory.future_weak mem1_src mem2_src)
