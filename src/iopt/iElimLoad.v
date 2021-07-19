@@ -46,7 +46,7 @@ Set Implicit Arguments.
  * `x_rlx` will allow the loop to run forever.
  *)
 
-Lemma elim_load_sim_stmts
+Lemma elim_load_sim_itree
       loc ord
       (ORD: Ordering.le ord Ordering.plain):
   sim_itree (fun _ _ => True)
