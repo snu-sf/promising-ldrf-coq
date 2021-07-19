@@ -347,7 +347,7 @@ Proof.
           destruct e2, state.
           esplits; [|eauto].
           etrans; try exact STEPS0.
-          eapply rtc_internal_step_seq in STEPS. eauto.
+          eapply rtc_internal_step_seq in STEPS. ss. eauto.
         + right.
           destruct st2_src, lc2_src. inv TERMINAL_SRC. ss. subst.
           esplits; cycle 1; eauto.
