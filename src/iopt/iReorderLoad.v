@@ -118,7 +118,6 @@ Lemma sim_load_step
 Proof.
   dependent destruction SIM. ii. right.
   exploit Local.read_step_future; eauto. i. des.
-
   inv STEP_TGT; [inv STEP|dependent destruction STEP; inv LOCAL0; ss; dependent destruction STATE; inv REORDER].
   - (* promise *)
     exploit Local.promise_step_future; eauto. i. des.
