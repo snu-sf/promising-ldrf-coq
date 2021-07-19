@@ -283,10 +283,28 @@ Inductive ctx (sim_thread:SIM_THREAD): SIM_THREAD :=
                       itr1 lc_tgt sc0_tgt mem0_tgt)
     (SIM2: _sim_ktree sim_thread sim_ret1 k0 k1 sim_ret2):
     @ctx sim_thread
-        (lang R_src1) (lang R_tgt1)
-        (sim_terminal sim_ret2)
-        (itr0 >>= k0) lc_src sc0_src mem0_src
-        (itr1 >>= k1) lc_tgt sc0_tgt mem0_tgt
+         (lang R_src1) (lang R_tgt1)
+         (sim_terminal sim_ret2)
+         (itr0 >>= k0) lc_src sc0_src mem0_src
+         (itr1 >>= k1) lc_tgt sc0_tgt mem0_tgt
+| ctx_tau_iter
+    I_src I_tgt R_src R_tgt
+    (sim_ret0: SIM_RET I_src I_tgt) (sim_ret1: SIM_RET R_src R_tgt)
+    sc0_src mem0_src
+    sc0_tgt mem0_tgt
+    lc_src lc_tgt
+    (body_src: I_src -> itree MemE.t (I_src + R_src))
+    (body_tgt: I_tgt -> itree MemE.t (I_tgt + R_tgt))
+    (SIM: _sim_ktree sim_thread sim_ret0 body_src body_tgt (sum_rel sim_ret0 sim_ret1))
+    i_src i_tgt
+    (VAL: sim_ret0 i_src i_tgt)
+    (LOCAL: sim_local SimPromises.bot lc_src lc_tgt)
+  :
+    @ctx sim_thread
+              (lang R_src) (lang R_tgt)
+              (sim_terminal sim_ret1)
+              (ITree.iter body_src i_src) lc_src sc0_src mem0_src
+              (ITree.iter body_tgt i_tgt) lc_tgt sc0_tgt mem0_tgt
 .
 
 Lemma ctx_mon: monotone11 ctx.
@@ -295,9 +313,22 @@ Proof.
   - econs 1; eauto.
   - econs 2; eauto.
   - econs 3; eauto. ii. eapply LE. eapply SIM2; eauto.
+  - econs 4; eauto. ii. eapply LE. eapply SIM; eauto.
 Qed.
 Hint Resolve ctx_mon.
 
+
+Lemma unfold_iter_eq {E} {A B} (f: A -> itree E (A + B)) (a: A)
+  :
+    ITree.iter f a
+    = lr <- f a;;
+      match lr with
+      | inl l => tau;; ITree.iter f l
+      | inr r => Ret r
+      end.
+Proof.
+  eapply bisimulation_is_eq. eapply unfold_iter.
+Qed.
 
 Lemma ctx_compat:
   ctx <12= gupaco11 _sim_thread (cpn11 _sim_thread).
@@ -438,6 +469,125 @@ Proof.
         { eapply rclo11_clo_base. eapply ctx_bind; eauto.
           eapply _sim_ktree_mon; cycle 1; eauto.
         }
+  - (* dowhile *)
+    ii. inversion LOCAL. exploit SimPromises.sem_bot_inv; eauto. i.
+    destruct lc_src, lc_tgt. ss. subst.
+    splits; s; ii.
+    { inv TERMINAL_TGT.
+      rewrite unfold_iter_eq in H. ides (body_tgt i_tgt).
+      { rewrite bind_ret_l in H. destruct r0.
+        { eapply f_equal with (f:=observe) in H. ss. }
+        assert (r0 = x).
+        { eapply f_equal with (f:=observe) in H. ss. clarify. }
+        subst. exploit SIM; eauto. i. eapply GF in x0.
+        exploit x0; try apply SC; eauto using Memory.future_future_weak.
+        i. ss. des. exploit TERMINAL; eauto.
+        { rewrite T. econs; eauto. }
+        i. rewrite ! unfold_iter_eq. des.
+        { left. unfold Thread.steps_failure in *. des.
+          destruct e2, e3. esplits.
+          { eapply rtc_internal_step_bind; eauto. }
+          { eapply step_bind; eauto. }
+        }
+        { right. inv TERMINAL0.
+          assert (r1 = inr x).
+          { rewrite T in TGT. clarify. }
+          subst. inv SIMRET. esplits; try apply SC0; eauto.
+          { eapply rtc_internal_step_bind; eauto. }
+          { inv TERMINAL_SRC. rewrite bind_ret_l. econs; eauto. }
+          { rewrite TGT. rewrite ! bind_ret_l. econs; eauto. }
+        }
+      }
+      { eapply f_equal with (f:=observe) in H. ss. }
+      { eapply f_equal with (f:=observe) in H. ss. }
+    }
+    { right. subst. esplits; eauto. }
+    rewrite unfold_iter_eq in STEP_TGT.
+    eapply thread_step_deseq in STEP_TGT. des; clarify.
+    { destruct r0.
+      {
+
+        admit. }
+      { admit. }
+    }
+    { exploit SIM; eauto. i. eapply GF in x.
+      exploit x; try apply SC; eauto using Memory.future_future_weak.
+      i. ss. des. exploit STEP; eauto.
+      i. des.
+      { left. unfold Thread.steps_failure in *. des.
+        rewrite unfold_iter_eq. destruct e2, e3. esplits.
+        { eapply rtc_internal_step_bind; eauto. }
+        { eapply step_bind; eauto. }
+      }
+      { right. rewrite unfold_iter_eq. esplits.
+        { eauto. }
+        { eapply rtc_internal_step_bind; eauto. }
+        { eapply opt_step_bind; eauto. }
+        { eauto. }
+        { eauto. }
+        { eauto. }
+        eapply rclo11_clo. eapply ctx_bind.
+        { eapply rclo11_base. eauto. }
+        ii. inv RET.
+        { eapply rclo11_base. eapply rclo11_clo. econs 1.
+          replace
+
+          bind_tau
+
+          admit. }
+        { eapply rclo11_clo. eapply ctx_ret; eauto. }
+      }
+
+      }
+
+        esplits; try apply SC0; eauto.
+        { eapply rtc_internal_step_bind; eauto. }
+        { inv TERMINAL_SRC. rewrite bind_ret_l. econs; eauto. }
+        { rewrite TGT. rewrite ! bind_ret_l. econs; eauto. }
+      }
+        destruct e2, e3. esplits.
+        { eapply rtc_internal_step_bind; eauto. }
+        { eapply step_bind; eauto. }
+      }
+      { right. inv TERMINAL0.
+        assert (r1 = inr x).
+        { rewrite T in TGT. clarify. }
+        subst. inv SIMRET. esplits; try apply SC0; eauto.
+        { eapply rtc_internal_step_bind; eauto. }
+        { inv TERMINAL_SRC. rewrite bind_ret_l. econs; eauto. }
+        { rewrite TGT. rewrite ! bind_ret_l. econs; eauto. }
+      }
+
+    { destruct r0.
+      {
+
+
+    right. inv STEP_TGT; ss.
+    + (* promise *)
+      inv STEP; ss.
+      exploit sim_local_promise; eauto. i. des.
+      esplits; try apply SC; eauto; ss.
+      { econs 2. econs 1. econs; eauto. }
+      { eauto. }
+      { eapply rclo11_clo_base. eapply ctx_iter; eauto.
+        eapply _sim_ktree_mon; cycle 1; eauto.
+      }
+    + (* dowhile *)
+      rewrite unfold_iter_eq in STEP.
+
+      inv STEP. inv LOCAL0; inv STATE; ss.
+      inv LOCAL. ss.
+      esplits; try apply SC; eauto; ss.
+      { econs 2. econs 2. econs; [|econs 1]; eauto. econs; eauto. }
+      { eauto. }
+      { gclo. eapply ctx_seq; eauto.
+        { gstep. eapply _sim_thread_mon; try apply SIM; ss. i. gbase. auto. }
+        ii. gclo. eapply ctx_ite; eauto.
+        - ii. gclo. eapply ctx_dowhile; eauto.
+          eapply _sim_stmts_mon; cycle 1; eauto.
+          i. gstep. eapply _sim_thread_mon; eauto. i. gbase. auto.
+        - ii. gclo; auto.
+      }
 Qed.
 
 Definition sim_itree := @_sim_itree sim_thread.
