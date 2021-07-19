@@ -47,18 +47,19 @@ Variant sim_terminal R
 .
 
 Definition _sim_itree R
-           (sim_thread:SIM_THREAD (lang R) (lang R))
+           (sim_thread:SIM_THREAD)
            (sim_ret:SIM_RET R)
            (itr_src itr_tgt: itree MemE.t R): Prop :=
   forall lc_src lc_tgt sc0_src sc0_tgt mem0_src mem0_tgt
          (LOCAL: sim_local SimPromises.bot lc_src lc_tgt),
     sim_thread
+      (lang R) (lang R)
       (sim_terminal sim_ret)
       itr_src lc_src sc0_src mem0_src
       itr_tgt lc_tgt sc0_tgt mem0_tgt.
 
 Definition _sim_ktree R0 R1
-           (sim_thread:SIM_THREAD (lang R1) (lang R1))
+           (sim_thread:SIM_THREAD)
            (sim_ret0:SIM_RET R0)
            (ktr_src ktr_tgt: R0 -> itree MemE.t R1)
            (sim_ret1:SIM_RET R1): Prop :=
@@ -66,19 +67,20 @@ Definition _sim_ktree R0 R1
          (RET: sim_ret0 r_src r_tgt)
          (LOCAL: sim_local SimPromises.bot lc_src lc_tgt),
     sim_thread
+      (lang R1) (lang R1)
       (sim_terminal sim_ret1)
       (ktr_src r_src) lc_src sc0_src mem0_src
       (ktr_tgt r_tgt) lc_tgt sc0_tgt mem0_tgt.
 
 Lemma _sim_itree_mon R
-      s1 s2 (S: s1 <9= s2):
+      s1 s2 (S: s1 <11= s2):
   @_sim_itree R s1 <3= @_sim_itree R s2.
 Proof.
   ii. apply S. apply PR; auto.
 Qed.
 
 Lemma _sim_ktree_mon R0 R1
-      s1 s2 (S: s1 <9= s2):
+      s1 s2 (S: s1 <11= s2):
   @_sim_ktree R0 R1 s1 <4= @_sim_ktree R0 R1 s2.
 Proof.
   ii. apply S. apply PR; auto.
@@ -238,45 +240,47 @@ Proof.
   - i. des. inv x1. auto.
 Qed.
 
-Inductive ctx (sim_thread:forall R, SIM_THREAD (lang R) (lang R)) R:
-  SIM_THREAD (lang R) (lang R) :=
+Inductive ctx (sim_thread:SIM_THREAD): SIM_THREAD :=
 | ctx_ret
+    R
     (sim_ret:SIM_RET R)
     sc0_src mem0_src
     sc0_tgt mem0_tgt
     lc_src lc_tgt (r_src r_tgt: R)
     (RET: sim_ret r_src r_tgt)
     (LOCAL: sim_local SimPromises.bot lc_src lc_tgt):
-    ctx sim_thread
-        (sim_terminal sim_ret)
-        (Ret r_src) lc_src sc0_src mem0_src
-        (Ret r_tgt) lc_tgt sc0_tgt mem0_tgt
+    @ctx sim_thread
+         (lang R) (lang R)
+         (sim_terminal sim_ret)
+         (Ret r_src) lc_src sc0_src mem0_src
+         (Ret r_tgt) lc_tgt sc0_tgt mem0_tgt
 | ctx_seq
-    R1 (sim_ret1:SIM_RET R1) (sim_ret2:SIM_RET R)
+    R R1 (sim_ret1:SIM_RET R1) (sim_ret2:SIM_RET R)
     itr0 k0 lc_src sc0_src mem0_src
     itr1 k1 lc_tgt sc0_tgt mem0_tgt
-    (SIM1: sim_thread _ (sim_terminal sim_ret1)
+    (SIM1: sim_thread (lang R1) (lang R1) (sim_terminal sim_ret1)
                       itr0 lc_src sc0_src mem0_src
                       itr1 lc_tgt sc0_tgt mem0_tgt)
-    (SIM2: _sim_ktree (sim_thread _) sim_ret1 k0 k1 sim_ret2):
-    ctx sim_thread
+    (SIM2: _sim_ktree sim_thread sim_ret1 k0 k1 sim_ret2):
+    @ctx sim_thread
+        (lang R) (lang R)
         (sim_terminal sim_ret2)
         (itr0 >>= k0) lc_src sc0_src mem0_src
         (itr1 >>= k1) lc_tgt sc0_tgt mem0_tgt
 .
 
-Lemma ctx_mon: monotone10 ctx.
+Lemma ctx_mon: monotone11 ctx.
 Proof.
-  ii. inv IN.
+  ii. destruct IN.
   - econs 1; eauto.
   - econs 2; eauto. ii. eapply LE. eapply SIM2; eauto.
 Qed.
 Hint Resolve ctx_mon.
 
 
-Lemma ctx_wcompat: wcompatible9 (@_sim_thread lang lang) ctx.
+Lemma ctx_wcompat: wcompatible11 _sim_thread ctx.
 Proof.
-  assert (MON: monotone9 (@_sim_thread lang lang)).
+  assert (MON: monotone11 _sim_thread).
   (* paco tactics do not work well without this *)
   { eapply _sim_thread_mon; eauto. }
   econs; auto. i. destruct PR.
