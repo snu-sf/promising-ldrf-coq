@@ -33,11 +33,11 @@ Require Import ITreeLib.
 Set Implicit Arguments.
 
 
-Definition SIM_RET R_src R_tgt := forall (r_src:R_src) (r_tgt:R_tgt), Prop.
+Definition SIM_VAL R_src R_tgt := forall (r_src:R_src) (r_tgt:R_tgt), Prop.
 
 
 Variant sim_terminal R_src R_tgt
-           (sim_ret:SIM_RET R_src R_tgt)
+           (sim_ret:SIM_VAL R_src R_tgt)
            (st_src: itree MemE.t R_src) (st_tgt: itree MemE.t R_tgt): Prop :=
 | sim_terminal_intro
     r0 r1
@@ -49,7 +49,7 @@ Variant sim_terminal R_src R_tgt
 Definition _sim_itree
            (sim_thread:SIM_THREAD)
            R_src R_tgt
-           (sim_ret:SIM_RET R_src R_tgt)
+           (sim_ret:SIM_VAL R_src R_tgt)
            (itr_src: itree MemE.t R_src) (itr_tgt: itree MemE.t R_tgt): Prop :=
   forall lc_src lc_tgt sc0_src sc0_tgt mem0_src mem0_tgt
          (LOCAL: sim_local SimPromises.bot lc_src lc_tgt),
@@ -62,18 +62,13 @@ Definition _sim_itree
 Definition _sim_ktree
            (sim_thread:SIM_THREAD)
            R_src0 R_tgt0 R_src1 R_tgt1
-           (sim_ret0:SIM_RET R_src0 R_tgt0)
+           (sim_ret0:SIM_VAL R_src0 R_tgt0)
            (ktr_src: R_src0 -> itree MemE.t R_src1)
            (ktr_tgt: R_tgt0 -> itree MemE.t R_tgt1)
-           (sim_ret1:SIM_RET R_src1 R_tgt1): Prop :=
-  forall r_src r_tgt lc_src lc_tgt sc0_src sc0_tgt mem0_src mem0_tgt
-         (RET: sim_ret0 r_src r_tgt)
-         (LOCAL: sim_local SimPromises.bot lc_src lc_tgt),
-    sim_thread
-      (lang R_src1) (lang R_tgt1)
-      (sim_terminal sim_ret1)
-      (ktr_src r_src) lc_src sc0_src mem0_src
-      (ktr_tgt r_tgt) lc_tgt sc0_tgt mem0_tgt.
+           (sim_ret1:SIM_VAL R_src1 R_tgt1): Prop :=
+  forall r_src r_tgt
+         (RET: sim_ret0 r_src r_tgt),
+    _sim_itree sim_thread sim_ret1 (ktr_src r_src) (ktr_tgt r_tgt).
 
 Lemma _sim_itree_mon
       s1 s2 (S: s1 <11= s2):
@@ -257,7 +252,7 @@ Global Hint Resolve cpn11_wcompat: paco.
 Inductive ctx (sim_thread:SIM_THREAD): SIM_THREAD :=
 | ctx_ret
     R_src R_tgt
-    (sim_ret:SIM_RET R_src R_tgt)
+    (sim_ret:SIM_VAL R_src R_tgt)
     sc0_src mem0_src
     sc0_tgt mem0_tgt
     lc_src lc_tgt (r_src: R_src) (r_tgt: R_tgt)
@@ -270,7 +265,7 @@ Inductive ctx (sim_thread:SIM_THREAD): SIM_THREAD :=
          (Ret r_tgt) lc_tgt sc0_tgt mem0_tgt
 | ctx_bind
     R_src0 R_tgt0 R_src1 R_tgt1
-    (sim_ret1:SIM_RET R_src0 R_tgt0) (sim_ret2:SIM_RET R_src1 R_tgt1)
+    (sim_ret1:SIM_VAL R_src0 R_tgt0) (sim_ret2:SIM_VAL R_src1 R_tgt1)
     itr0 k0 lc_src sc0_src mem0_src
     itr1 k1 lc_tgt sc0_tgt mem0_tgt
     (SIM1: sim_thread (lang R_src0) (lang R_tgt0) (sim_terminal sim_ret1)
@@ -284,7 +279,7 @@ Inductive ctx (sim_thread:SIM_THREAD): SIM_THREAD :=
          (itr1 >>= k1) lc_tgt sc0_tgt mem0_tgt
 | ctx_tau_iter
     I_src I_tgt R_src R_tgt
-    (sim_ret0: SIM_RET I_src I_tgt) (sim_ret1: SIM_RET R_src R_tgt)
+    (sim_ret0: SIM_VAL I_src I_tgt) (sim_ret1: SIM_VAL R_src R_tgt)
     sc0_src mem0_src
     sc0_tgt mem0_tgt
     lc_src lc_tgt
@@ -497,7 +492,7 @@ Qed.
 Inductive iter_ctx (sim_thread:SIM_THREAD): SIM_THREAD :=
 | ctx_iter
     I_src I_tgt R_src R_tgt
-    (sim_ret0: SIM_RET I_src I_tgt) (sim_ret1: SIM_RET R_src R_tgt)
+    (sim_ret0: SIM_VAL I_src I_tgt) (sim_ret1: SIM_VAL R_src R_tgt)
     sc0_src mem0_src
     sc0_tgt mem0_tgt
     lc_src lc_tgt
@@ -561,7 +556,7 @@ Proof.
   i. inv PR. econs; eauto.
 Qed.
 
-Lemma sim_itree_ret R_src R_tgt (sim_ret: SIM_RET R_src R_tgt)
+Lemma sim_itree_ret R_src R_tgt (sim_ret: SIM_VAL R_src R_tgt)
       r_src r_tgt
       (SIM: sim_ret r_src r_tgt):
   @sim_itree R_src R_tgt sim_ret (Ret r_src) (Ret r_tgt).
@@ -571,8 +566,8 @@ Qed.
 
 Lemma sim_itree_bind
       R_src0 R_tgt0 R_src1 R_tgt1
-      (sim_ret0: SIM_RET R_src0 R_tgt0)
-      (sim_ret1: SIM_RET R_src1 R_tgt1)
+      (sim_ret0: SIM_VAL R_src0 R_tgt0)
+      (sim_ret1: SIM_VAL R_src1 R_tgt1)
       itr_src itr_tgt k_src k_tgt
       (SIM1: sim_itree sim_ret0 itr_src itr_tgt)
       (SIM2: sim_ktree sim_ret0 k_src k_tgt sim_ret1):
@@ -585,7 +580,7 @@ Qed.
 
 Lemma sim_itree_iter
       I_src I_tgt R_src R_tgt
-      (sim_ret0: SIM_RET I_src I_tgt) (sim_ret1: SIM_RET R_src R_tgt)
+      (sim_ret0: SIM_VAL I_src I_tgt) (sim_ret1: SIM_VAL R_src R_tgt)
       (body_src: I_src -> itree MemE.t (I_src + R_src))
       (body_tgt: I_tgt -> itree MemE.t (I_tgt + R_tgt))
       (SIM: sim_ktree sim_ret0 body_src body_tgt (sum_rel sim_ret0 sim_ret1))
@@ -607,9 +602,9 @@ Qed.
 
 Lemma sim_ktree_bind
       R_src0 R_tgt0 R_src1 R_tgt1 R_src2 R_tgt2
-      (sim_ret0: SIM_RET R_src0 R_tgt0)
-      (sim_ret1: SIM_RET R_src1 R_tgt1)
-      (sim_ret2: SIM_RET R_src2 R_tgt2)
+      (sim_ret0: SIM_VAL R_src0 R_tgt0)
+      (sim_ret1: SIM_VAL R_src1 R_tgt1)
+      (sim_ret2: SIM_VAL R_src2 R_tgt2)
       k1_src k2_src
       k1_tgt k2_tgt
       (SIM1: sim_ktree sim_ret0 k1_src k1_tgt sim_ret1)
@@ -623,7 +618,7 @@ Qed.
 
 Lemma sim_ktree_iter
       I_src I_tgt R_src R_tgt
-      (sim_ret0: SIM_RET I_src I_tgt) (sim_ret1: SIM_RET R_src R_tgt)
+      (sim_ret0: SIM_VAL I_src I_tgt) (sim_ret1: SIM_VAL R_src R_tgt)
       (body_src: I_src -> itree MemE.t (I_src + R_src))
       (body_tgt: I_tgt -> itree MemE.t (I_tgt + R_tgt))
       (SIM: sim_ktree sim_ret0 body_src body_tgt (sum_rel sim_ret0 sim_ret1)):
