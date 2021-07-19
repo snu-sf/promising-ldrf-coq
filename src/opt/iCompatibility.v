@@ -33,12 +33,12 @@ Require Import ITreeLib.
 Set Implicit Arguments.
 
 
-Definition SIM_RET R0 R1 := forall (r_src:R0) (r_tgt:R1), Prop.
+Definition SIM_RET R_src R_tgt := forall (r_src:R_src) (r_tgt:R_tgt), Prop.
 
 
-Variant sim_terminal R0 R1
-           (sim_ret:SIM_RET R)
-           (st_src: itree MemE.t R) (st_tgt: itree MemE.t R): Prop :=
+Variant sim_terminal R_src R_tgt
+           (sim_ret:SIM_RET R_src R_tgt)
+           (st_src: itree MemE.t R_src) (st_tgt: itree MemE.t R_tgt): Prop :=
 | sim_terminal_intro
     r0 r1
     (SIMRET: sim_ret r0 r1)
@@ -46,43 +46,44 @@ Variant sim_terminal R0 R1
     (TGT: st_tgt = Ret r1)
 .
 
-Definition _sim_itree R0 R1
+Definition _sim_itree R_src R_tgt
            (sim_thread:SIM_THREAD)
-           (sim_ret:SIM_RET R)
-           (itr_src itr_tgt: itree MemE.t R): Prop :=
+           (sim_ret:SIM_RET R_src R_tgt)
+           (itr_src: itree MemE.t R_src) (itr_tgt: itree MemE.t R_tgt): Prop :=
   forall lc_src lc_tgt sc0_src sc0_tgt mem0_src mem0_tgt
          (LOCAL: sim_local SimPromises.bot lc_src lc_tgt),
     sim_thread
-      (lang R) (lang R)
+      (lang R_src) (lang R_tgt)
       (sim_terminal sim_ret)
       itr_src lc_src sc0_src mem0_src
       itr_tgt lc_tgt sc0_tgt mem0_tgt.
 
 Definition _sim_ktree
            (sim_thread:SIM_THREAD)
-           R0 R1
-           (sim_ret0:SIM_RET R0)
-           (ktr_src ktr_tgt: R0 -> itree MemE.t R1)
-           (sim_ret1:SIM_RET R1): Prop :=
+           R_src0 R_tgt0 R_src1 R_tgt1
+           (sim_ret0:SIM_RET R_src0 R_tgt0)
+           (ktr_src: R_src0 -> itree MemE.t R_src1)
+           (ktr_tgt: R_tgt0 -> itree MemE.t R_tgt1)
+           (sim_ret1:SIM_RET R_src1 R_tgt1): Prop :=
   forall r_src r_tgt lc_src lc_tgt sc0_src sc0_tgt mem0_src mem0_tgt
          (RET: sim_ret0 r_src r_tgt)
          (LOCAL: sim_local SimPromises.bot lc_src lc_tgt),
     sim_thread
-      (lang R1) (lang R1)
+      (lang R_src1) (lang R_tgt1)
       (sim_terminal sim_ret1)
       (ktr_src r_src) lc_src sc0_src mem0_src
       (ktr_tgt r_tgt) lc_tgt sc0_tgt mem0_tgt.
 
-Lemma _sim_itree_mon R
+Lemma _sim_itree_mon R_src R_tgt
       s1 s2 (S: s1 <11= s2):
-  @_sim_itree R s1 <3= @_sim_itree R s2.
+  @_sim_itree R_src R_tgt s1 <3= @_sim_itree R_src R_tgt s2.
 Proof.
   ii. apply S. apply PR; auto.
 Qed.
 
 Lemma _sim_ktree_mon
       s1 s2 (S: s1 <11= s2):
-  @_sim_ktree s1 <6= @_sim_ktree s2.
+  @_sim_ktree s1 <8= @_sim_ktree s2.
 Proof.
   ii. apply S. apply PR; auto.
 Qed.
@@ -260,28 +261,29 @@ Inductive ctx (sim_thread:SIM_THREAD): SIM_THREAD :=
     (SIM: sim_thread (lang R) (lang R) sim_terminal st1 lc1 sc0_src mem0_src st2 lc2 sc0_tgt mem0_tgt):
     ctx sim_thread sim_terminal st1 lc1 sc0_src mem0_src st2 lc2 sc0_tgt mem0_tgt
 | ctx_ret
-    R
-    (sim_ret:SIM_RET R)
+    R_src R_tgt
+    (sim_ret:SIM_RET R_src R_tgt)
     sc0_src mem0_src
     sc0_tgt mem0_tgt
-    lc_src lc_tgt (r_src r_tgt: R)
+    lc_src lc_tgt (r_src: R_src) (r_tgt: R_tgt)
     (RET: sim_ret r_src r_tgt)
     (LOCAL: sim_local SimPromises.bot lc_src lc_tgt):
     @ctx sim_thread
-         (lang R) (lang R)
+         (lang R_src) (lang R_tgt)
          (sim_terminal sim_ret)
          (Ret r_src) lc_src sc0_src mem0_src
          (Ret r_tgt) lc_tgt sc0_tgt mem0_tgt
 | ctx_bind
-    R R1 (sim_ret1:SIM_RET R1) (sim_ret2:SIM_RET R)
+    R_src0 R_tgt0 R_src1 R_tgt1
+    (sim_ret1:SIM_RET R_src0 R_tgt0) (sim_ret2:SIM_RET R_src1 R_tgt1)
     itr0 k0 lc_src sc0_src mem0_src
     itr1 k1 lc_tgt sc0_tgt mem0_tgt
-    (SIM1: sim_thread (lang R1) (lang R1) (sim_terminal sim_ret1)
+    (SIM1: sim_thread (lang R_src0) (lang R_tgt0) (sim_terminal sim_ret1)
                       itr0 lc_src sc0_src mem0_src
                       itr1 lc_tgt sc0_tgt mem0_tgt)
     (SIM2: _sim_ktree sim_thread sim_ret1 k0 k1 sim_ret2):
     @ctx sim_thread
-        (lang R) (lang R)
+        (lang R_src1) (lang R_tgt1)
         (sim_terminal sim_ret2)
         (itr0 >>= k0) lc_src sc0_src mem0_src
         (itr1 >>= k1) lc_tgt sc0_tgt mem0_tgt
@@ -437,53 +439,40 @@ Admitted.
 
 Definition sim_ktree := @_sim_ktree sim_thread.
 
-Lemma sim_ktree_mon R0 R1
+Lemma sim_ktree_mon R_src0 R_tgt0 R_src1 R_tgt1
       sim_ret0 sim_ret1
       sim_ret2 sim_ret3
       stmts_src stmts_tgt
       (SIM01: sim_ret0 <2= sim_ret1)
       (SIM23: sim_ret2 <2= sim_ret3)
-      (SIM: @sim_ktree R0 R1 sim_ret1 stmts_src stmts_tgt sim_ret2):
+      (SIM: @sim_ktree R_src0 R_tgt0 R_src1 R_tgt1 sim_ret1 stmts_src stmts_tgt sim_ret2):
   sim_ktree sim_ret0 stmts_src stmts_tgt sim_ret3.
 Proof.
   ii. eapply sim_thread_mon; [|eauto].
   i. inv PR. econs; eauto.
 Qed.
 
-Lemma sim_ktree_ret R0 R1 sim_ret:
-  @sim_ktree R0 R1 sim_ret (fun r => Ret r) (fun r => Ret r) sim_ret.
+Lemma sim_ktree_ret R_src R_tgt sim_ret:
+  @sim_ktree R_src R_tgt R_src R_tgt sim_ret (fun r => Ret r) (fun r => Ret r) sim_ret.
 Proof.
-  ii. ginit; [apply ctx_wcompat|]. gclo. eauto.
+  ii. ginit; [apply ctx_wcompat|]. gclo. econs 2; eauto.
 Qed.
 
 (* TODO: bind *)
-Lemma sim_stmts_seq
-      sim_regs0 sim_regs1 sim_regs2
-      stmts1_src stmts2_src
-      stmts1_tgt stmts2_tgt
-      (SIM1: sim_stmts sim_regs0 stmts1_src stmts1_tgt sim_regs1)
-      (SIM2: sim_stmts sim_regs1 stmts2_src stmts2_tgt sim_regs2):
-  sim_stmts sim_regs0 (stmts1_src ++ stmts2_src) (stmts1_tgt ++ stmts2_tgt) sim_regs2.
+Lemma sim_ktree_bind
+      R_src0 R_tgt0 R_src1 R_tgt1 R_src2 R_tgt2
+      (sim_ret0: SIM_RET R_src0 R_tgt0)
+      (sim_ret1: SIM_RET R_src1 R_tgt1)
+      (sim_ret2: SIM_RET R_src2 R_tgt2)
+      k1_src k2_src
+      k1_tgt k2_tgt
+      (SIM1: sim_ktree sim_ret0 k1_src k1_tgt sim_ret1)
+      (SIM2: sim_ktree sim_ret1 k2_src k2_tgt sim_ret2):
+  sim_ktree sim_ret0 (fun r => k1_src r >>= k2_src) (fun r => k1_tgt r >>= k2_tgt) sim_ret2.
 Proof.
   ii. ginit; [apply ctx_wcompat|].
   gclo. econs 3.
   - gfinal. right. apply SIM1; auto.
-  - ii. gfinal. right. apply SIM2; auto.
-Qed.
-
-(* TODO: I don't need it *)
-Lemma sim_stmts_ite
-      sim_regs0 sim_regs1
-      cond_src stmts1_src stmts2_src
-      cond_tgt stmts1_tgt stmts2_tgt
-      (COND: sim_expr sim_regs0 cond_src cond_tgt)
-      (SIM1: sim_stmts sim_regs0 stmts1_src stmts1_tgt sim_regs1)
-      (SIM2: sim_stmts sim_regs0 stmts2_src stmts2_tgt sim_regs1):
-  sim_stmts sim_regs0 [Stmt.ite cond_src stmts1_src stmts2_src] [Stmt.ite cond_tgt stmts1_tgt stmts2_tgt] sim_regs1.
-Proof.
-  ii. ginit; [apply ctx_wcompat|].
-  gclo. econs 4; eauto.
-  - ii. gfinal. right. apply SIM1; auto.
   - ii. gfinal. right. apply SIM2; auto.
 Qed.
 
