@@ -29,10 +29,9 @@ Set Implicit Arguments.
 
 Lemma intro_load_sim_itree
       loc ord:
-  sim_itree (fun _ _ => True)
+  sim_itree eq
             (Ret tt)
             (Vis (MemE.read loc ord) (fun _ => Ret tt)).
-Proof.
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; i.
   { inv TERMINAL_TGT. eapply f_equal with (f:=observe) in H; ss. }
