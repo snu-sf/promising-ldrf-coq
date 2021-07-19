@@ -19,10 +19,9 @@ Require Import SimMemory.
 Require Import SimPromises.
 Require Import SimLocal.
 Require Import SimThread.
-Require Import Compatibility.
+Require Import iCompatibility.
 
-Require Import Syntax.
-Require Import Semantics.
+Require Import ITreeLang.
 
 Require Import ElimLoadCommon.
 
@@ -48,12 +47,11 @@ Set Implicit Arguments.
  *)
 
 Lemma elim_load_sim_stmts
-      r loc ord
+      loc ord
       (ORD: Ordering.le ord Ordering.plain):
-  sim_stmts (RegFile.eq_except (RegSet.singleton r))
-            [Stmt.instr (Instr.load r loc ord)]
-            []
-            (RegFile.eq_except (RegSet.singleton r)).
+  sim_itree (fun _ _ => True)
+            (Vis (MemE.read loc ord) (fun _ => Ret tt))
+            (Ret tt).
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; i.
   { right.
@@ -67,7 +65,7 @@ Proof.
     - auto.
     - auto.
     - auto.
-    - econs. s. etrans; eauto. apply RegFile.eq_except_singleton.
+    - econs; eauto.
   }
   { i. right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
