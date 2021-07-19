@@ -33,12 +33,12 @@ Require Import ITreeLib.
 Set Implicit Arguments.
 
 
-Definition SIM_RET R := forall (r_src r_tgt:R), Prop.
+Definition SIM_RET R_src R_tgt := forall (r_src:R_src) (r_tgt:R_tgt), Prop.
 
 
-Variant sim_terminal R
-           (sim_ret:SIM_RET R)
-           (st_src: itree MemE.t R) (st_tgt: itree MemE.t R): Prop :=
+Variant sim_terminal R_src R_tgt
+           (sim_ret:SIM_RET R_src R_tgt)
+           (st_src: itree MemE.t R_src) (st_tgt: itree MemE.t R_tgt): Prop :=
 | sim_terminal_intro
     r0 r1
     (SIMRET: sim_ret r0 r1)
@@ -46,42 +46,45 @@ Variant sim_terminal R
     (TGT: st_tgt = Ret r1)
 .
 
-Definition _sim_itree R
+Definition _sim_itree
            (sim_thread:SIM_THREAD)
-           (sim_ret:SIM_RET R)
-           (itr_src itr_tgt: itree MemE.t R): Prop :=
+           R_src R_tgt
+           (sim_ret:SIM_RET R_src R_tgt)
+           (itr_src: itree MemE.t R_src) (itr_tgt: itree MemE.t R_tgt): Prop :=
   forall lc_src lc_tgt sc0_src sc0_tgt mem0_src mem0_tgt
          (LOCAL: sim_local SimPromises.bot lc_src lc_tgt),
     sim_thread
-      (lang R) (lang R)
+      (lang R_src) (lang R_tgt)
       (sim_terminal sim_ret)
       itr_src lc_src sc0_src mem0_src
       itr_tgt lc_tgt sc0_tgt mem0_tgt.
 
-Definition _sim_ktree R0 R1
+Definition _sim_ktree
            (sim_thread:SIM_THREAD)
-           (sim_ret0:SIM_RET R0)
-           (ktr_src ktr_tgt: R0 -> itree MemE.t R1)
-           (sim_ret1:SIM_RET R1): Prop :=
+           R_src0 R_tgt0 R_src1 R_tgt1
+           (sim_ret0:SIM_RET R_src0 R_tgt0)
+           (ktr_src: R_src0 -> itree MemE.t R_src1)
+           (ktr_tgt: R_tgt0 -> itree MemE.t R_tgt1)
+           (sim_ret1:SIM_RET R_src1 R_tgt1): Prop :=
   forall r_src r_tgt lc_src lc_tgt sc0_src sc0_tgt mem0_src mem0_tgt
          (RET: sim_ret0 r_src r_tgt)
          (LOCAL: sim_local SimPromises.bot lc_src lc_tgt),
     sim_thread
-      (lang R1) (lang R1)
+      (lang R_src1) (lang R_tgt1)
       (sim_terminal sim_ret1)
       (ktr_src r_src) lc_src sc0_src mem0_src
       (ktr_tgt r_tgt) lc_tgt sc0_tgt mem0_tgt.
 
-Lemma _sim_itree_mon R
+Lemma _sim_itree_mon
       s1 s2 (S: s1 <11= s2):
-  @_sim_itree R s1 <3= @_sim_itree R s2.
+  @_sim_itree s1 <5= @_sim_itree s2.
 Proof.
   ii. apply S. apply PR; auto.
 Qed.
 
-Lemma _sim_ktree_mon R0 R1
+Lemma _sim_ktree_mon
       s1 s2 (S: s1 <11= s2):
-  @_sim_ktree R0 R1 s1 <4= @_sim_ktree R0 R1 s2.
+  @_sim_ktree s1 <8= @_sim_ktree s2.
 Proof.
   ii. apply S. apply PR; auto.
 Qed.
@@ -151,45 +154,53 @@ Proof.
   - econs 2. apply step_bind. eauto.
 Qed.
 
-(* Lemma lang_step_deseq *)
-(*       stmts rs1 stmt1 stmts1 rs2 stmts2 e *)
-(*       (STEP: State.step e *)
-(*                         (State.mk rs1 (stmt1 :: stmts1 ++ stmts)) *)
-(*                         (State.mk rs2 stmts2)): *)
-(*   exists stmts2', *)
-(*     stmts2 = stmts2' ++ stmts /\ *)
-(*     State.step e *)
-(*                (State.mk rs1 (stmt1 :: stmts1)) *)
-(*                (State.mk rs2 stmts2'). *)
-(* Proof. *)
-(*   inv STEP. *)
-(*   - esplits; eauto. econs; eauto. *)
-(*   - eexists. rewrite app_assoc. splits; eauto. econs. *)
-(*   - eexists. rewrite app_comm_cons, app_assoc. splits; eauto. econs. *)
-(* Qed. *)
+Lemma lang_step_deseq
+      R0 R1 ktr (itr1: itree MemE.t R0) (itr2: itree MemE.t R1) e
+      (STEP: ILang.step e
+                        (itr1 >>= ktr)
+                        itr2):
+  (exists r,
+      itr1 = Ret r /\
+      ILang.step e (ktr r) itr2) \/
+  (exists itr2',
+      itr2 = itr2' >>= ktr /\
+      ILang.step e itr1 itr2').
+Proof.
+  ides itr1.
+  { rewrite bind_ret_l in STEP. left. esplits; eauto. }
+  { rewrite bind_tau in STEP. dependent destruction STEP.
+    right. esplits; eauto. econs. eauto. }
+  { right. rewrite bind_vis in STEP.
+    dependent destruction STEP; try by (esplits; eauto; econs; eauto). }
+Qed.
 
-(* Lemma thread_step_deseq *)
-(*       stmts pf e *)
-(*       rs1 stmt1 stmts1 lc1 sc1 mem1 *)
-(*       rs2 stmts2 lc2 sc2 mem2 *)
-(*       (STEP: Thread.step pf e *)
-(*                          (Thread.mk lang (State.mk rs1 (stmt1 :: stmts1 ++ stmts)) lc1 sc1 mem1) *)
-(*                          (Thread.mk lang (State.mk rs2 stmts2) lc2 sc2 mem2)): *)
-(*   exists stmts2', *)
-(*     stmts2 = stmts2' ++ stmts /\ *)
-(*   Thread.step pf e *)
-(*               (Thread.mk lang (State.mk rs1 (stmt1 :: stmts1)) lc1 sc1 mem1) *)
-(*               (Thread.mk lang (State.mk rs2 stmts2') lc2 sc2 mem2). *)
-(* Proof. *)
-(*   inv STEP. *)
-(*   - inv STEP0. *)
-(*     rewrite app_comm_cons. *)
-(*     esplits; eauto. *)
-(*     econs 1. econs; eauto. *)
-(*   - inv STEP0; ss. *)
-(*     apply lang_step_deseq in STATE. des. subst. *)
-(*     esplits; eauto. econs 2. econs; eauto. *)
-(* Qed. *)
+Lemma thread_step_deseq
+      R0 R1 ktr (itr1: itree MemE.t R0) (itr2: itree MemE.t R1)
+      pf e
+      lc1 sc1 mem1
+      lc2 sc2 mem2
+      (STEP: Thread.step pf e
+                         (Thread.mk (lang _) (itr1 >>= ktr) lc1 sc1 mem1)
+                         (Thread.mk (lang _) itr2 lc2 sc2 mem2)):
+  (exists r,
+      itr1 = Ret r /\
+      Thread.step pf e
+                  (Thread.mk (lang _) (ktr r) lc1 sc1 mem1)
+                  (Thread.mk (lang _) (itr2) lc2 sc2 mem2)) \/
+  (exists itr2',
+      itr2 = itr2' >>= ktr /\
+      Thread.step pf e
+                  (Thread.mk (lang _) itr1 lc1 sc1 mem1)
+                  (Thread.mk (lang _) itr2' lc2 sc2 mem2)).
+Proof.
+  inv STEP.
+  - inv STEP0. right. esplits; eauto.
+    econs 1. econs; eauto.
+  - inv STEP0; ss.
+    apply lang_step_deseq in STATE. des; clarify.
+    { left. esplits; eauto. econs 2. econs; eauto. }
+    { right. esplits; eauto. econs 2. econs; eauto. }
+Qed.
 
 Lemma sim_rtc
       A B
@@ -240,30 +251,39 @@ Proof.
   - i. des. inv x1. auto.
 Qed.
 
+
+Global Hint Resolve cpn11_wcompat: paco.
+
 Inductive ctx (sim_thread:SIM_THREAD): SIM_THREAD :=
+| ctx_incl
+    R_src R_tgt sim_terminal
+    st1 lc1 sc0_src mem0_src st2 lc2 sc0_tgt mem0_tgt
+    (SIM: sim_thread (lang R_src) (lang R_tgt) sim_terminal st1 lc1 sc0_src mem0_src st2 lc2 sc0_tgt mem0_tgt):
+    ctx sim_thread sim_terminal st1 lc1 sc0_src mem0_src st2 lc2 sc0_tgt mem0_tgt
 | ctx_ret
-    R
-    (sim_ret:SIM_RET R)
+    R_src R_tgt
+    (sim_ret:SIM_RET R_src R_tgt)
     sc0_src mem0_src
     sc0_tgt mem0_tgt
-    lc_src lc_tgt (r_src r_tgt: R)
+    lc_src lc_tgt (r_src: R_src) (r_tgt: R_tgt)
     (RET: sim_ret r_src r_tgt)
     (LOCAL: sim_local SimPromises.bot lc_src lc_tgt):
     @ctx sim_thread
-         (lang R) (lang R)
+         (lang R_src) (lang R_tgt)
          (sim_terminal sim_ret)
          (Ret r_src) lc_src sc0_src mem0_src
          (Ret r_tgt) lc_tgt sc0_tgt mem0_tgt
-| ctx_seq
-    R R1 (sim_ret1:SIM_RET R1) (sim_ret2:SIM_RET R)
+| ctx_bind
+    R_src0 R_tgt0 R_src1 R_tgt1
+    (sim_ret1:SIM_RET R_src0 R_tgt0) (sim_ret2:SIM_RET R_src1 R_tgt1)
     itr0 k0 lc_src sc0_src mem0_src
     itr1 k1 lc_tgt sc0_tgt mem0_tgt
-    (SIM1: sim_thread (lang R1) (lang R1) (sim_terminal sim_ret1)
+    (SIM1: sim_thread (lang R_src0) (lang R_tgt0) (sim_terminal sim_ret1)
                       itr0 lc_src sc0_src mem0_src
                       itr1 lc_tgt sc0_tgt mem0_tgt)
     (SIM2: _sim_ktree sim_thread sim_ret1 k0 k1 sim_ret2):
     @ctx sim_thread
-        (lang R) (lang R)
+        (lang R_src1) (lang R_tgt1)
         (sim_terminal sim_ret2)
         (itr0 >>= k0) lc_src sc0_src mem0_src
         (itr1 >>= k1) lc_tgt sc0_tgt mem0_tgt
@@ -273,26 +293,32 @@ Lemma ctx_mon: monotone11 ctx.
 Proof.
   ii. destruct IN.
   - econs 1; eauto.
-  - econs 2; eauto. ii. eapply LE. eapply SIM2; eauto.
+  - econs 2; eauto.
+  - econs 3; eauto. ii. eapply LE. eapply SIM2; eauto.
 Qed.
 Hint Resolve ctx_mon.
 
 
-Lemma ctx_wcompat: wcompatible11 _sim_thread ctx.
+Lemma ctx_compat:
+  ctx <12= gupaco11 _sim_thread (cpn11 _sim_thread).
 Proof.
   assert (MON: monotone11 _sim_thread).
   (* paco tactics do not work well without this *)
   { eapply _sim_thread_mon; eauto. }
+  eapply wrespect11_uclo; auto.
   econs; auto. i. destruct PR.
   - (* incl *)
     eapply _sim_thread_mon; eauto.
-    i. gbase. auto.
-  - (* nil *)
+    i. eapply rclo11_base. auto.
+  - (* ret *)
     ii.
     inversion LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto.
     destruct lc_src, lc_tgt. ss. subst.
     splits; s; ii.
-    { right. inv TERMINAL_TGT. ss. esplits; eauto; ss. }
+    { right. inv TERMINAL_TGT. ss. esplits; eauto; ss.
+      - econs; eauto.
+      - econs; eauto.
+    }
     { right. subst. esplits; eauto. }
     inv STEP_TGT; try by inv STEP; inv STATE.
     inv STEP; ss.
@@ -304,213 +330,472 @@ Proof.
     + eauto.
     + eauto.
     + eauto.
-    + gclo. eapply ctx_nil; auto.
-  - (* seq *)
-    ii. ss.
+    + eapply rclo11_clo_base. eapply ctx_ret; auto.
+  - (* bind *)
+    ii. ss. eapply GF in SIM1.
     exploit SIM1; try apply SC; eauto. i. des.
     splits; s; ii.
-    { inv TERMINAL_TGT. destruct stmts1_tgt, stmts2_tgt; inv H0.
+    { inv TERMINAL_TGT. ides itr1.
+      2: { eapply f_equal with (f:=observe) in H. ss. }
+      2: { eapply f_equal with (f:=observe) in H. ss. }
+      rewrite bind_ret_l in H.
       exploit TERMINAL; try by econs. i. des.
       - left.
         unfold Thread.steps_failure in *. des.
-        destruct e2, e3, state, state0.
-        eapply rtc_internal_step_seq in STEPS.
-        eapply step_seq in FAILURE0.
+        destruct e2, e3.
+        eapply rtc_internal_step_bind in STEPS.
+        eapply step_bind in FAILURE0.
         esplits; eauto.
       - inversion LOCAL. exploit SimPromises.sem_bot_inv; eauto. i.
         destruct lc2_src. ss. subst.
-        destruct st2_src. inv TERMINAL_SRC. ss. subst.
+        inv TERMINAL_SRC.
         exploit Thread.rtc_tau_step_future; eauto. s. i. des.
         inv TERMINAL0. ss.
-        exploit SIM2; try apply SC0; eauto using Memory.future_future_weak. s. i. des.
-        exploit TERMINAL0; try by econs. i. des.
+        assert (x0 = r1).
+        { eapply f_equal with (f:=observe) in SRC. ss. clarify. }
+        assert (r0 = r2).
+        { eapply f_equal with (f:=observe) in TGT. ss. clarify. }
+        subst.
+        exploit SIM2; eauto. i. eapply GF in x0.
+        exploit x0; try apply SC0; eauto using Memory.future_future_weak.
+        i. ss. des. exploit TERMINAL0; try by econs.
+        { econs. eauto. }
+        i. des.
         + left.
           unfold Thread.steps_failure in *. des.
-          destruct e2, state.
+          destruct e2.
           esplits; [|eauto].
           etrans; try exact STEPS0.
-          eapply rtc_internal_step_seq in STEPS. eauto.
+          eapply rtc_internal_step_bind in STEPS.
+          rewrite bind_ret_l in STEPS. eauto.
         + right.
-          destruct st2_src, lc2_src. inv TERMINAL_SRC. ss. subst.
+          destruct lc2_src.
           esplits; cycle 1; eauto.
-          * econs.
+          * rewrite bind_ret_l. eauto.
           * etrans; [|eauto].
-            eapply rtc_internal_step_seq in STEPS. eauto.
+            eapply rtc_internal_step_bind in STEPS.
+            rewrite bind_ret_l in STEPS. eauto.
     }
     { exploit PROMISES; eauto. i. des.
       - left.
         unfold Thread.steps_failure in *. des.
-        destruct e2, e3, state, state0.
-        eapply rtc_internal_step_seq in STEPS.
-        eapply step_seq in FAILURE0.
+        destruct e2, e3.
+        eapply rtc_internal_step_bind in STEPS.
+        eapply step_bind in FAILURE0.
         esplits; eauto.
       - right.
-        destruct lc_tgt, st2_src, lc2_src. ss. subst.
+        destruct lc_tgt, lc2_src. ss. subst.
         esplits; [|eauto].
-        + eapply rtc_internal_step_seq. apply STEPS.
+        + eapply rtc_internal_step_bind. apply STEPS.
         + ss.
     }
-    destruct stmts1_tgt.
+    hexploit thread_step_deseq; eauto. i. des; clarify.
     + exploit TERMINAL; try by econs. i. des.
       * left.
         unfold Thread.steps_failure in *. des.
-        destruct e2, e3, state, state0. ss.
-        eapply rtc_internal_step_seq in STEPS.
-        eapply step_seq in FAILURE0.
+        destruct e2, e3. ss.
+        eapply rtc_internal_step_bind in STEPS.
+        eapply step_bind in FAILURE0.
         esplits; eauto.
       * inversion LOCAL. exploit SimPromises.sem_bot_inv; eauto. i. subst.
-        destruct st2_src, lc2_src. inv TERMINAL_SRC. ss. subst.
+        destruct lc2_src. inv TERMINAL_SRC. ss. subst.
         exploit Thread.rtc_tau_step_future; eauto. s. i. des.
         inv TERMINAL0. ss. subst.
-        exploit SIM2; try apply SC0; eauto using Memory.future_future_weak. s. i. des.
+        assert (x = r1).
+        { eapply f_equal with (f:=observe) in SRC. ss. clarify. }
+        assert (r0 = r2).
+        { eapply f_equal with (f:=observe) in TGT. ss. clarify. }
+        subst.
+        exploit SIM2; eauto. i. eapply GF in x.
+        exploit x; try apply SC0; eauto using Memory.future_future_weak.
+        i. ss. des.
         exploit STEP0; eauto. i. des.
         { left.
           unfold Thread.steps_failure in *. des.
-          destruct e2, e3, state, state0.
-          eapply rtc_internal_step_seq in STEPS.
+          destruct e2, e3.
+          eapply rtc_internal_step_bind in STEPS.
           esplits; try exact FAILURE0.
-          etrans; eauto. }
+          etrans; eauto. rewrite bind_ret_l. eauto. }
         { right.
           esplits; cycle 2; eauto.
-          - gbase. auto.
-          - eapply rtc_internal_step_seq in STEPS.
-            etrans; [apply STEPS|eauto]. }
-    + destruct st3_tgt, lc3_tgt.
-      exploit thread_step_deseq; eauto. i. des. ss. subst.
+          - eapply rclo11_base. auto.
+          - eapply rtc_internal_step_bind in STEPS.
+            etrans; [apply STEPS|eauto].
+            rewrite bind_ret_l. eauto. }
+    + destruct lc3_tgt.
       exploit STEP; eauto. i. des.
       * left.
         unfold Thread.steps_failure in *. des.
-        destruct e2, e3, state, state0.
-        eapply rtc_internal_step_seq in STEPS.
-        eapply step_seq in FAILURE0.
+        destruct e2, e3.
+        eapply rtc_internal_step_bind in STEPS.
+        eapply step_bind in FAILURE0.
         esplits; eauto.
       * right.
-        destruct st2_src, lc2_src. destruct st3_src, lc3_src.
+        destruct lc2_src. destruct lc3_src.
         esplits; [|M|M| | | |]; Mskip eauto.
-        { eapply rtc_internal_step_seq. eauto. }
-        { eapply opt_step_seq. eauto. }
-        { gclo. eapply ctx_seq; eauto.
-          - gbase. eauto.
-          - eapply _sim_stmts_mon; cycle 1; eauto.
-            i. gstep. eapply _sim_thread_mon; eauto. i. gbase. auto.
+        { eapply rtc_internal_step_bind. eauto. }
+        { eapply opt_step_bind. eauto. }
+        { eapply rclo11_clo_base. eapply ctx_bind; eauto.
+          eapply _sim_ktree_mon; cycle 1; eauto.
         }
-  - (* ite *)
-    ii.
-    inversion LOCAL. exploit SimPromises.sem_bot_inv; eauto. i.
-    destruct lc_src, lc_tgt. ss. subst.
-    splits; s; ii.
-    { inv TERMINAL_TGT. }
-    { right. subst. esplits; eauto. }
-    right. inv STEP_TGT; ss.
-    + (* promise *)
-      inv STEP; ss.
-      exploit sim_local_promise; eauto. i. des.
-      esplits; try apply SC; eauto; ss.
-      { econs 2. econs 1. econs; eauto. }
-      { eauto. }
-      { gclo. eapply ctx_ite; eauto.
-        - eapply _sim_stmts_mon; cycle 1; eauto.
-          i. gstep. eapply _sim_thread_mon; eauto. i. gbase. auto.
-        - eapply _sim_stmts_mon; cycle 1; eauto.
-          i. gstep. eapply _sim_thread_mon; eauto. i. gbase. auto.
-      }
-    + (* ite *)
-      inv STEP. inv LOCAL0; inv STATE; ss.
-      inv LOCAL. ss.
-      esplits; try apply MEMORY; try apply SC; eauto; ss.
-      { econs 2. econs 2. econs; [|econs 1]; eauto. econs; eauto. }
-      { eauto. }
-      { s. rewrite ? app_nil_r.
-        exploit COND; eauto. intro C. rewrite C.
-        destruct (RegFile.eval_expr rs_tgt cond_tgt).
-        - gstep. eapply _sim_thread_mon; try apply SIM1; ss. i. gbase. auto.
-        - gstep. eapply _sim_thread_mon; try apply SIM2; ss. i. gbase. auto.
-      }
-  - (* dowhile *)
-    ii.
-    inversion LOCAL. exploit SimPromises.sem_bot_inv; eauto. i.
-    destruct lc_src, lc_tgt. ss. subst.
-    splits; s; ii.
-    { inv TERMINAL_TGT. }
-    { right. subst. esplits; eauto. }
-    right. inv STEP_TGT; ss.
-    + (* promise *)
-      inv STEP; ss.
-      exploit sim_local_promise; eauto. i. des.
-      esplits; try apply SC; eauto; ss.
-      { econs 2. econs 1. econs; eauto. }
-      { eauto. }
-      { gclo. eapply ctx_dowhile; eauto.
-        eapply _sim_stmts_mon; cycle 1; eauto.
-        i. gstep. eapply _sim_thread_mon; eauto. i. gbase. auto.
-      }
-    + (* dowhile *)
-      inv STEP. inv LOCAL0; inv STATE; ss.
-      inv LOCAL. ss.
-      esplits; try apply SC; eauto; ss.
-      { econs 2. econs 2. econs; [|econs 1]; eauto. econs; eauto. }
-      { eauto. }
-      { gclo. eapply ctx_seq; eauto.
-        { gstep. eapply _sim_thread_mon; try apply SIM; ss. i. gbase. auto. }
-        ii. gclo. eapply ctx_ite; eauto.
-        - ii. gclo. eapply ctx_dowhile; eauto.
-          eapply _sim_stmts_mon; cycle 1; eauto.
-          i. gstep. eapply _sim_thread_mon; eauto. i. gbase. auto.
-        - ii. gclo; auto.
-      }
 Qed.
 
-Definition sim_stmts := @_sim_stmts (@sim_thread lang lang).
+Definition sim_itree := @_sim_itree sim_thread.
+Definition sim_ktree := @_sim_ktree sim_thread.
 
-Lemma sim_stmts_frame
-      sim_regs0 sim_regs1
-      sim_regs2 sim_regs3
-      stmts_src stmts_tgt
-      (SIM01: sim_regs0 <2= sim_regs1)
-      (SIM23: sim_regs2 <2= sim_regs3)
-      (SIM: sim_stmts sim_regs1 stmts_src stmts_tgt sim_regs2):
-  sim_stmts sim_regs0 stmts_src stmts_tgt sim_regs3.
+Lemma sim_itree_mon R_src R_tgt
+      sim_ret0 sim_ret1
+      itr_src itr_tgt
+      (SIM01: sim_ret0 <2= sim_ret1)
+      (SIM: @sim_itree R_src R_tgt sim_ret0 itr_src itr_tgt):
+  sim_itree sim_ret1 itr_src itr_tgt.
 Proof.
   ii. eapply sim_thread_mon; [|eauto].
   i. inv PR. econs; eauto.
 Qed.
 
-Lemma sim_stmts_nil sim_regs:
-  sim_stmts sim_regs [] [] sim_regs.
+Lemma sim_itree_ret R_src R_tgt (sim_ret: SIM_RET R_src R_tgt)
+      r_src r_tgt
+      (SIM: sim_ret r_src r_tgt):
+  @sim_itree R_src R_tgt sim_ret (Ret r_src) (Ret r_tgt).
 Proof.
-  ii. ginit; [apply ctx_wcompat|]. gclo. eauto.
+  ii. ginit. guclo ctx_compat. econs 2; eauto.
 Qed.
 
-(* TODO: bind *)
-Lemma sim_stmts_seq
-      sim_regs0 sim_regs1 sim_regs2
-      stmts1_src stmts2_src
-      stmts1_tgt stmts2_tgt
-      (SIM1: sim_stmts sim_regs0 stmts1_src stmts1_tgt sim_regs1)
-      (SIM2: sim_stmts sim_regs1 stmts2_src stmts2_tgt sim_regs2):
-  sim_stmts sim_regs0 (stmts1_src ++ stmts2_src) (stmts1_tgt ++ stmts2_tgt) sim_regs2.
+Lemma sim_itree_bind
+      R_src0 R_tgt0 R_src1 R_tgt1
+      (sim_ret0: SIM_RET R_src0 R_tgt0)
+      (sim_ret1: SIM_RET R_src1 R_tgt1)
+      itr_src itr_tgt k_src k_tgt
+      (SIM1: sim_itree sim_ret0 itr_src itr_tgt)
+      (SIM2: sim_ktree sim_ret0 k_src k_tgt sim_ret1):
+  sim_itree sim_ret1 (itr_src >>= k_src) (itr_tgt >>= k_tgt).
 Proof.
-  ii. ginit; [apply ctx_wcompat|].
-  gclo. econs 3.
+  ii. ginit. guclo ctx_compat. econs 3.
   - gfinal. right. apply SIM1; auto.
   - ii. gfinal. right. apply SIM2; auto.
 Qed.
 
-(* TODO: I don't need it *)
-Lemma sim_stmts_ite
-      sim_regs0 sim_regs1
-      cond_src stmts1_src stmts2_src
-      cond_tgt stmts1_tgt stmts2_tgt
-      (COND: sim_expr sim_regs0 cond_src cond_tgt)
-      (SIM1: sim_stmts sim_regs0 stmts1_src stmts1_tgt sim_regs1)
-      (SIM2: sim_stmts sim_regs0 stmts2_src stmts2_tgt sim_regs1):
-  sim_stmts sim_regs0 [Stmt.ite cond_src stmts1_src stmts2_src] [Stmt.ite cond_tgt stmts1_tgt stmts2_tgt] sim_regs1.
+
+Lemma sim_ktree_ret R_src R_tgt sim_ret:
+  @sim_ktree R_src R_tgt R_src R_tgt sim_ret (fun r => Ret r) (fun r => Ret r) sim_ret.
 Proof.
-  ii. ginit; [apply ctx_wcompat|].
-  gclo. econs 4; eauto.
-  - ii. gfinal. right. apply SIM1; auto.
+  ii. ginit. guclo ctx_compat. econs 2; eauto.
+Qed.
+
+Lemma sim_ktree_bind
+      R_src0 R_tgt0 R_src1 R_tgt1 R_src2 R_tgt2
+      (sim_ret0: SIM_RET R_src0 R_tgt0)
+      (sim_ret1: SIM_RET R_src1 R_tgt1)
+      (sim_ret2: SIM_RET R_src2 R_tgt2)
+      k1_src k2_src
+      k1_tgt k2_tgt
+      (SIM1: sim_ktree sim_ret0 k1_src k1_tgt sim_ret1)
+      (SIM2: sim_ktree sim_ret1 k2_src k2_tgt sim_ret2):
+  sim_ktree sim_ret0 (fun r => k1_src r >>= k2_src) (fun r => k1_tgt r >>= k2_tgt) sim_ret2.
+Proof.
+  ii. ginit. guclo ctx_compat. econs 3.
+  - gfinal. right. apply SIM1; auto.
   - ii. gfinal. right. apply SIM2; auto.
 Qed.
+
+Inductive ctx_iter (sim_thread:SIM_THREAD): SIM_THREAD :=
+| ctx_iter_intro
+    I_src I_tgt R_src R_tgt
+    (sim_ret0: SIM_RET I_src I_tgt) (sim_ret1: SIM_RET R_src R_tgt)
+    sc0_src mem0_src
+    sc0_tgt mem0_tgt
+    lc_src lc_tgt
+    (body_src: I_src -> itree MemE.t (I_src + R_src))
+    (body_tgt: I_tgt -> itree MemE.t (I_tgt + R_tgt))
+    (SIM: forall i_src i_tgt (VAL: sim_ret0 i_src i_tgt),
+        _sim_itree sim_thread
+                   (sum_rel sim_ret0 sim_ret1)
+                   (body_src i_src) (body_tgt i_tgt))
+    i_src i_tgt
+    (VAL: sim_ret0 i_src i_tgt)
+    (LOCAL: sim_local SimPromises.bot lc_src lc_tgt)
+  :
+    @ctx_iter sim_thread
+              (lang R_src) (lang R_tgt)
+              (sim_terminal sim_ret1)
+              (ITree.iter body_src i_src) lc_src sc0_src mem0_src
+              (ITree.iter body_tgt i_tgt) lc_tgt sc0_tgt mem0_tgt
+.
+
+Lemma ctx_iter_mon: monotone11 ctx_iter.
+Proof.
+  ii. destruct IN. econs; eauto.
+  i. eapply _sim_itree_mon; eauto.
+Qed.
+Hint Resolve ctx_iter_mon.
+
+Lemma unfold_iter_eq {E} {A B} (f: A -> itree E (A + B)) (a: A)
+  :
+    ITree.iter f a
+    = lr <- f a;;
+      match lr with
+      | inl l => tau;; ITree.iter f l
+      | inr r => Ret r
+      end.
+Proof.
+  eapply bisimulation_is_eq. eapply unfold_iter.
+Qed.
+
+Lemma ctx_iter_wcompat: grespectful11 _sim_thread ctx_iter.
+Proof.
+  assert (MON: monotone11 _sim_thread).
+  (* paco tactics do not work well without this *)
+  { eapply _sim_thread_mon; eauto. }
+  econs; auto. i. destruct PR.
+  rewrite unfold_iter_eq. rewrite unfold_iter_eq.
+  eapply rclo11_clo_base. eapply cpn11_gupaco; [eauto with paco|].
+  guclo ctx_compat. econs 3.
+  { gstep. ii.
+    hexploit SIM; eauto. i. exploit H; eauto. i. eapply GF in x.
+    exploit x; try apply SC; eauto using Memory.future_future_weak. i. des.
+    splits; eauto.
+ITree.tau tau;; Tau tau    eapply _sim_thread_step.
+
+    ii. exploit STEP; eauto. i. des.
+    { left. eauto. }
+    { right. esplits; eauto. gbase. gstep.
+      rename r into rrrrrr.
+      gfinal.
+      gbase.
+      gfinal. right.
+
+ esplits.
+
+    inv STEP.
+
+
+    split.
+    { ii. hexploit SIM; eauto. i. exploit H; eauto. i.
+      eapply GF in x.
+      exploit x; try apply SC; eauto using Memory.future_future_weak. i. des.
+      exploit PROMISES; eauto.
+    }
+    {
+
+      ii.
+
+      exploit x; eauto.
+
+      specialize (SIM i). exploit SIM; eauto. (SIM i).
+
+
+    admit. }
+  { instantiate (1:=sum_rel eq sim_ret). ii. inv RET.
+    { gstep. econs.
+      { ii. inv TERMINAL_TGT.
+        exfalso. clear - H. admit.
+      }
+      ii. split.
+      {
+
+        right.
+
+      }
+
+    "".
+
+
+
+  econs 2.
+
+
+  ctx sim_thread (sim_terminal sim_ret2)
+                 (` x : _ <- itr0;; k0 x) lc_src sc0_src mem0_src
+                 (` x : _ <- itr1;; k1 x) lc_tgt sc0_tgt mem0_tgt
+
+
+  wcompatible11
+
+  gclo.
+  wcompat11
+
+
+  ; eauto with paco. ss. econs.
+  { eapply compat11_wcompat.
+  gclo.
+
+
+  - (* incl *)
+    eapply _sim_thread_mon; eauto.
+    i. gbase. auto.
+  - (* ret *)
+    ii.
+    inversion LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto.
+    destruct lc_src, lc_tgt. ss. subst.
+    splits; s; ii.
+    { right. inv TERMINAL_TGT. ss. esplits; eauto; ss.
+      - econs; eauto.
+      - econs; eauto.
+    }
+    { right. subst. esplits; eauto. }
+    inv STEP_TGT; try by inv STEP; inv STATE.
+    inv STEP; ss.
+    exploit sim_local_promise; eauto. i. des.
+    right. esplits.
+    + ss.
+    + eauto.
+    + econs 2. econs 1. econs; eauto.
+    + eauto.
+    + eauto.
+    + eauto.
+    + gclo. eapply ctx_ret; auto.
+  - (* bind *)
+    ii. ss.
+    exploit SIM1; try apply SC; eauto. i. des.
+    splits; s; ii.
+    { inv TERMINAL_TGT. ides itr1.
+      2: { exfalso. clear - H. admit. }
+      2: { exfalso. clear - H. admit. }
+      rewrite bind_ret_l in H.
+      exploit TERMINAL; try by econs. i. des.
+      - left.
+        unfold Thread.steps_failure in *. des.
+        destruct e2, e3.
+        eapply rtc_internal_step_bind in STEPS.
+        eapply step_bind in FAILURE0.
+        esplits; eauto.
+      - inversion LOCAL. exploit SimPromises.sem_bot_inv; eauto. i.
+        destruct lc2_src. ss. subst.
+        inv TERMINAL_SRC.
+        exploit Thread.rtc_tau_step_future; eauto. s. i. des.
+        inv TERMINAL0. ss.
+        assert (x0 = r1).
+        { clear - SRC. admit. }
+        assert (r0 = r2).
+        { clear - TGT. admit. }
+        subst.
+        exploit SIM2; try apply SC0; eauto using Memory.future_future_weak. s. i. des.
+        exploit TERMINAL0; try by econs.
+        { econs; eauto. }
+        i. des.
+        + left.
+          unfold Thread.steps_failure in *. des.
+          destruct e2.
+          esplits; [|eauto].
+          etrans; try exact STEPS0.
+          eapply rtc_internal_step_bind in STEPS.
+          rewrite bind_ret_l in STEPS. eauto.
+        + right.
+          destruct lc2_src.
+          esplits; cycle 1; eauto.
+          * rewrite bind_ret_l. eauto.
+          * etrans; [|eauto].
+            eapply rtc_internal_step_bind in STEPS.
+            rewrite bind_ret_l in STEPS. eauto.
+    }
+    { exploit PROMISES; eauto. i. des.
+      - left.
+        unfold Thread.steps_failure in *. des.
+        destruct e2, e3.
+        eapply rtc_internal_step_bind in STEPS.
+        eapply step_bind in FAILURE0.
+        esplits; eauto.
+      - right.
+        destruct lc_tgt, lc2_src. ss. subst.
+        esplits; [|eauto].
+        + eapply rtc_internal_step_bind. apply STEPS.
+        + ss.
+    }
+    hexploit thread_step_deseq; eauto. i. des; clarify.
+    + exploit TERMINAL; try by econs. i. des.
+      * left.
+        unfold Thread.steps_failure in *. des.
+        destruct e2, e3. ss.
+        eapply rtc_internal_step_bind in STEPS.
+        eapply step_bind in FAILURE0.
+        esplits; eauto.
+      * inversion LOCAL. exploit SimPromises.sem_bot_inv; eauto. i. subst.
+        destruct lc2_src. inv TERMINAL_SRC. ss. subst.
+        exploit Thread.rtc_tau_step_future; eauto. s. i. des.
+        inv TERMINAL0. ss. subst.
+        assert (x = r1).
+        { clear - SRC. admit. }
+        assert (r0 = r2).
+        { clear - TGT. admit. }
+        subst.
+        exploit SIM2; try apply SC0; eauto using Memory.future_future_weak. s. i. des.
+        exploit STEP0; eauto. i. des.
+        { left.
+          unfold Thread.steps_failure in *. des.
+          destruct e2, e3.
+          eapply rtc_internal_step_bind in STEPS.
+          esplits; try exact FAILURE0.
+          etrans; eauto. rewrite bind_ret_l. eauto. }
+        { right.
+          esplits; cycle 2; eauto.
+          - gbase. auto.
+          - eapply rtc_internal_step_bind in STEPS.
+            etrans; [apply STEPS|eauto].
+            rewrite bind_ret_l. eauto. }
+    + destruct lc3_tgt.
+      exploit STEP; eauto. i. des.
+      * left.
+        unfold Thread.steps_failure in *. des.
+        destruct e2, e3.
+        eapply rtc_internal_step_bind in STEPS.
+        eapply step_bind in FAILURE0.
+        esplits; eauto.
+      * right.
+        destruct lc2_src. destruct lc3_src.
+        esplits; [|M|M| | | |]; Mskip eauto.
+        { eapply rtc_internal_step_bind. eauto. }
+        { eapply opt_step_bind. eauto. }
+        { gclo. eapply ctx_bind; eauto.
+          - gbase. eauto.
+          - eapply _sim_ktree_mon; cycle 1; eauto.
+            i. gstep. eapply _sim_thread_mon; eauto. i. gbase. auto.
+        }
+Admitted.
+
+
+
+            (lang (I + R_src)) (
+
+    ITree.iter i_src i_tgt
+
+    body_src
+    body_tgt
+
+    ITree.iter
+
+    R sim_terminal
+    st1 lc1 sc0_src mem0_src st2 lc2 sc0_tgt mem0_tgt
+    (SIM: sim_thread (lang R) (lang R) sim_terminal st1 lc1 sc0_src mem0_src st2 lc2 sc0_tgt mem0_tgt):
+    ctx sim_thread sim_terminal st1 lc1 sc0_src mem0_src st2 lc2 sc0_tgt mem0_tgt
+| ctx_ret
+    R_src R_tgt
+    (sim_ret:SIM_RET R_src R_tgt)
+    sc0_src mem0_src
+    sc0_tgt mem0_tgt
+    lc_src lc_tgt (r_src: R_src) (r_tgt: R_tgt)
+    (RET: sim_ret r_src r_tgt)
+    (LOCAL: sim_local SimPromises.bot lc_src lc_tgt):
+    @ctx sim_thread
+         (lang R_src) (lang R_tgt)
+         (sim_terminal sim_ret)
+         (Ret r_src) lc_src sc0_src mem0_src
+         (Ret r_tgt) lc_tgt sc0_tgt mem0_tgt
+| ctx_bind
+    R_src0 R_tgt0 R_src1 R_tgt1
+    (sim_ret1:SIM_RET R_src0 R_tgt0) (sim_ret2:SIM_RET R_src1 R_tgt1)
+    itr0 k0 lc_src sc0_src mem0_src
+    itr1 k1 lc_tgt sc0_tgt mem0_tgt
+    (SIM1: sim_thread (lang R_src0) (lang R_tgt0) (sim_terminal sim_ret1)
+                      itr0 lc_src sc0_src mem0_src
+                      itr1 lc_tgt sc0_tgt mem0_tgt)
+    (SIM2: _sim_ktree sim_thread sim_ret1 k0 k1 sim_ret2):
+    @ctx sim_thread
+        (lang R_src1) (lang R_tgt1)
+        (sim_terminal sim_ret2)
+        (itr0 >>= k0) lc_src sc0_src mem0_src
+        (itr1 >>= k1) lc_tgt sc0_tgt mem0_tgt
+.
 
 (* TODO: iter *)
 Lemma sim_stmts_dowhile
