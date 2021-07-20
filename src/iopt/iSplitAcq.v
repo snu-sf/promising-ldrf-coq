@@ -138,9 +138,15 @@ Lemma split_acquire_sim_itree R
       (i_src i_tgt: MemE.t R)
       (SPLIT: split_acquire i_src i_tgt):
   sim_itree eq
-            (Vis i_src (fun r => Ret r))
-            (Vis i_tgt (fun r => Vis (MemE.fence Ordering.acqrel Ordering.plain) (fun _ => Ret r))).
+            (ITree.trigger i_src)
+            (r <- ITree.trigger i_tgt;; ITree.trigger (MemE.fence Ordering.acqrel Ordering.plain);; Ret r).
 Proof.
+  replace (ITree.trigger i_src) with (Vis i_src (fun r => Ret r)).
+  2: { unfold ITree.trigger. grind. }
+  replace (r <- ITree.trigger i_tgt;; ITree.trigger (MemE.fence Ordering.acqrel Ordering.plain);; Ret r) with
+      (Vis i_tgt (fun r => Vis (MemE.fence Ordering.acqrel Ordering.plain) (fun _ => Ret r))).
+  2: { unfold ITree.trigger. grind. repeat f_equal. extensionality r. grind.
+       repeat f_equal. extensionality u. grind. }
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { inv TERMINAL_TGT. eapply f_equal with (f:=observe) in H; ss. }
   { right. esplits; eauto.
