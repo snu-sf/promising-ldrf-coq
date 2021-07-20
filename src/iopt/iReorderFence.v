@@ -49,8 +49,8 @@ Inductive reorder_fence (or1 ow1:Ordering.t): forall R (i2:MemE.t R), Prop :=
 .
 
 Inductive sim_fence: forall R
-                            (st_src:itree MemE.t R) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t)
-                            (st_tgt:itree MemE.t R) (lc_tgt:Local.t) (sc1_tgt:TimeMap.t) (mem1_tgt:Memory.t), Prop :=
+                            (st_src:itree MemE.t (unit * R)%type) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t)
+                            (st_tgt:itree MemE.t (unit * R)%type) (lc_tgt:Local.t) (sc1_tgt:TimeMap.t) (mem1_tgt:Memory.t), Prop :=
 | sim_fence_intro
     R
     or1 ow1 (i2: MemE.t R)
@@ -61,8 +61,8 @@ Inductive sim_fence: forall R
     (FENCE: Local.fence_step lc1_src sc1_src or1 ow1 lc2_src sc2_src)
     (LOCAL: sim_local SimPromises.bot lc2_src lc1_tgt):
     sim_fence
-      (Vis i2 (fun v2 => Vis (MemE.fence or1 ow1) (fun _ => Ret v2))) lc1_src sc1_src mem1_src
-      (Vis i2 (fun r => Ret r)) lc1_tgt sc1_tgt mem1_tgt
+      (Vis i2 (fun v2 => Vis (MemE.fence or1 ow1) (fun v1 => Ret (v1, v2)))) lc1_src sc1_src mem1_src
+      (Vis i2 (fun r => Ret (tt, r))) lc1_tgt sc1_tgt mem1_tgt
 .
 
 Lemma sim_fence_step
@@ -85,8 +85,8 @@ Lemma sim_fence_step
     (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
     (MEM_SRC: Memory.closed mem1_src)
     (MEM_TGT: Memory.closed mem1_tgt),
-  _sim_thread_step (lang R) (lang R)
-                   ((@sim_thread (lang R) (lang R) (sim_terminal eq)) \8/ @sim_fence R)
+  _sim_thread_step (lang (unit * R)%type) (lang (unit * R)%type)
+                   ((@sim_thread (lang (unit * R)%type) (lang (unit * R)%type) (sim_terminal eq)) \8/ @sim_fence R)
                      st1_src lc1_src sc1_src mem1_src
                      st1_tgt lc1_tgt sc1_tgt mem1_tgt.
 Proof.
@@ -182,7 +182,7 @@ Proof.
 Qed.
 
 Lemma sim_fence_sim_thread R:
-  @sim_fence R <8= @sim_thread (lang R) (lang R) (sim_terminal eq).
+  @sim_fence R <8= @sim_thread (lang (unit * R)%type) (lang (unit * R)%type) (sim_terminal eq).
 Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss; ii.
   - right. inv TERMINAL_TGT. inv PR; ss.

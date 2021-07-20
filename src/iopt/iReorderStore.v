@@ -47,8 +47,8 @@ Inductive reorder_store l1 o1: forall R (i2:MemE.t R), Prop :=
 .
 
 Inductive sim_store: forall R
-                            (st_src:itree MemE.t R) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t)
-                            (st_tgt:itree MemE.t R) (lc_tgt:Local.t) (sc1_tgt:TimeMap.t) (mem1_tgt:Memory.t), Prop :=
+                            (st_src:itree MemE.t (unit * R)%type) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t)
+                            (st_tgt:itree MemE.t (unit * R)%type) (lc_tgt:Local.t) (sc1_tgt:TimeMap.t) (mem1_tgt:Memory.t), Prop :=
 | sim_store_intro
     R
     l1 f1 t1 v1 released1 o1 (i2: MemE.t R)
@@ -67,8 +67,8 @@ Inductive sim_store: forall R
     (MEM_SRC: Memory.closed mem1_src)
     (MEM_TGT: Memory.closed mem1_tgt):
     sim_store
-      (Vis i2 (fun v2 => Vis (MemE.write l1 v1 o1) (fun _ => Ret v2))) lc1_src sc1_src mem1_src
-      (Vis i2 (fun r => Ret r)) lc1_tgt sc1_tgt mem1_tgt
+      (Vis i2 (fun v2 => Vis (MemE.write l1 v1 o1) (fun v1 => Ret (v1, v2)))) lc1_src sc1_src mem1_src
+      (Vis i2 (fun r => Ret (tt, r))) lc1_tgt sc1_tgt mem1_tgt
 .
 
 Lemma sim_store_mon
@@ -105,8 +105,8 @@ Lemma sim_store_step
       st1_tgt lc1_tgt sc1_tgt mem1_tgt
       (SIM: sim_store st1_src lc1_src sc1_src mem1_src
                       st1_tgt lc1_tgt sc1_tgt mem1_tgt):
-  _sim_thread_step (lang R) (lang R)
-                   ((@sim_thread (lang R) (lang R) (sim_terminal eq)) \8/ @sim_store R)
+  _sim_thread_step (lang (unit * R)%type) (lang (unit * R)%type)
+                   ((@sim_thread (lang (unit * R)%type) (lang (unit * R)%type) (sim_terminal eq)) \8/ @sim_store R)
                    st1_src lc1_src sc1_src mem1_src
                    st1_tgt lc1_tgt sc1_tgt mem1_tgt.
 Proof.
@@ -161,13 +161,13 @@ Proof.
 Qed.
 
 Lemma sim_store_sim_thread R:
-  @sim_store R <8= @sim_thread (lang R) (lang R) (sim_terminal eq).
+  @sim_store R <8= @sim_thread (lang (unit * R)%type) (lang (unit * R)%type) (sim_terminal eq).
 Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss; ii.
   - inv TERMINAL_TGT. inv PR; ss.
   - exploit sim_store_mon; eauto. i.
     dup x0. dependent destruction x1. subst.
-    exploit (progress_program_step_non_update i2 (fun r => Ret r)); eauto.
+    exploit (progress_program_step_non_update i2 (fun r => Ret (tt, r))); eauto.
     { dependent destruction PR. inv REORDER0; ss. }
     i. des.
     destruct th2.
@@ -198,7 +198,7 @@ Proof.
         { econs. eauto. }
         { etrans; eauto.
           destruct e; by inv STEP; ss; dependent destruction STATE; inv REORDER. }
-    + inv SIM. inv STEP; ss; dependent destruction STATE.
+    + destruct SIM. dependent destruction STEP; ss; dependent destruction STATE.
   - exploit sim_store_mon; eauto. i. des.
     exploit sim_store_step; eauto. i. des; eauto.
     + right. esplits; eauto.

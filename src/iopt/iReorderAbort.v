@@ -48,8 +48,9 @@ Inductive reorder_abort: forall R (i2:MemE.t R), Prop :=
     reorder_abort (MemE.fence or2 ow2)
 .
 
-Inductive sim_abort: forall (st_src:itree MemE.t void) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t)
-                            (st_tgt:itree MemE.t void) (lc_tgt:Local.t) (sc1_tgt:TimeMap.t) (mem1_tgt:Memory.t), Prop :=
+Inductive sim_abort: forall R
+                            (st_src:itree MemE.t (unit * R)%type) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t)
+                            (st_tgt:itree MemE.t (unit * R)%type) (lc_tgt:Local.t) (sc1_tgt:TimeMap.t) (mem1_tgt:Memory.t), Prop :=
 | sim_abort_intro
     R (i2: MemE.t R)
     lc1_src sc1_src mem1_src
@@ -64,13 +65,17 @@ Inductive sim_abort: forall (st_src:itree MemE.t void) (lc_src:Local.t) (sc1_src
     (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
     (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
     (MEM_SRC: Memory.closed mem1_src)
-    (MEM_TGT: Memory.closed mem1_tgt):
-    sim_abort
-      (Vis i2 (fun v2 => Vis (MemE.abort) (Empty_set_rect _))) lc1_src sc1_src mem1_src
-      (Vis MemE.abort (Empty_set_rect _)) lc1_tgt sc1_tgt mem1_tgt
+    (MEM_TGT: Memory.closed mem1_tgt)
+    k
+  :
+    @sim_abort
+      R
+      (Vis i2 (fun v2 => Vis (MemE.abort) (fun v1 => Ret (v1, v2)))) lc1_src sc1_src mem1_src
+      (Vis MemE.abort k) lc1_tgt sc1_tgt mem1_tgt
 .
 
 Lemma sim_abort_mon
+      R
       st_src lc_src sc1_src mem1_src
       st_tgt lc_tgt sc1_tgt mem1_tgt
       sc2_src mem2_src
@@ -89,18 +94,21 @@ Lemma sim_abort_mon
       (SC_TGT: Memory.closed_timemap sc2_tgt mem2_tgt)
       (MEM_SRC: Memory.closed mem2_src)
       (MEM_TGT: Memory.closed mem2_tgt):
-  sim_abort st_src lc_src sc2_src mem2_src
-            st_tgt lc_tgt sc2_tgt mem2_tgt.
+  @sim_abort R
+             st_src lc_src sc2_src mem2_src
+             st_tgt lc_tgt sc2_tgt mem2_tgt.
 Proof.
-  inv SIM1. econs; eauto.
+  dependent destruction SIM1. econs; eauto.
 Qed.
 
 Lemma sim_abort_steps_failure
+      R
       st1_src lc1_src sc1_src mem1_src
       st1_tgt lc1_tgt sc1_tgt mem1_tgt
-      (SIM: sim_abort st1_src lc1_src sc1_src mem1_src
-                      st1_tgt lc1_tgt sc1_tgt mem1_tgt):
-  Thread.steps_failure (Thread.mk (lang void) st1_src lc1_src sc1_src mem1_src).
+      (SIM: @sim_abort R
+                       st1_src lc1_src sc1_src mem1_src
+                       st1_tgt lc1_tgt sc1_tgt mem1_tgt):
+  Thread.steps_failure (Thread.mk (lang (unit * R)%type) st1_src lc1_src sc1_src mem1_src).
 Proof.
   destruct SIM. inv FAILURE. unfold Thread.steps_failure.
   dependent destruction REORDER.
@@ -112,13 +120,13 @@ Proof.
       * econs. econs 2. econs; [|econs 2]; eauto. econs. econs.
       * ss.
     + econs 2. econs.
-      * econs.
+      * econs; eauto.
       * econs. econs. ii.
         rewrite <- TVIEW. rewrite <- PROMISES in *. eauto.
   - (* store *)
     exploit (@LowerPromises.steps_promises_rel
-               (lang void) (Thread.mk (lang void) (Vis (MemE.write l2 v2 o2) (fun v2 => Vis (MemE.abort) (Empty_set_rect _)))
-                                      lc1_src sc1_src mem1_src)); s; eauto.
+               (lang (unit * unit)%type) (Thread.mk (lang (unit * unit)%type) (Vis (MemE.write l2 v2 o2) (fun v2 => Vis (MemE.abort) (fun v1 => Ret (v1, v2))))
+                                                    lc1_src sc1_src mem1_src)); s; eauto.
     i. des. destruct e2. ss.
     exploit LowerPromises.rtc_opt_promise_step_future; eauto. s. i. des. subst.
     hexploit LowerPromises.promises_rel_promise_consistent; eauto. i.
@@ -132,7 +140,7 @@ Proof.
     + econs 2. econs; [econs; econs|]. econs. econs. ss.
   - (* fence *)
     exploit (@LowerPromises.steps_promises_rel
-               (lang void) (Thread.mk (lang void) (Vis (MemE.fence or2 ow2) (fun v2 => Vis (MemE.abort) (Empty_set_rect _)))
+               (lang (unit * unit)%type) (Thread.mk (lang (unit * unit)%type) (Vis (MemE.fence or2 ow2) (fun v2 => Vis (MemE.abort) (fun v1 => Ret (v1, v2))))
                                       lc1_src sc1_src mem1_src)); s; eauto.
     i. des. destruct e2. ss.
     exploit LowerPromises.rtc_opt_promise_step_future; eauto. s. i. des. inv STATE.

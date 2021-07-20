@@ -18,7 +18,6 @@ Require Import Configuration.
 Require Import Progress.
 
 Require Import ITreeLang.
-Require Import Program.
 
 Set Implicit Arguments.
 

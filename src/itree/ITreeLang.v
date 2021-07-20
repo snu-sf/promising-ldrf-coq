@@ -57,7 +57,7 @@ Module MemE.
   | update (loc: Loc.t) (rmw:rmw) (ordr ordw: Ordering.t): t Const.t
   | fence (ordr ordw: Ordering.t): t unit
   | syscall (args: list Const.t): t Const.t
-  | abort: t void
+  | abort: t unit
   | choose: t Const.t
   .
 End MemE.
@@ -139,8 +139,8 @@ Module ILang.
             (Vis (MemE.syscall args) k)
             itr1
   | step_abort
-      R (k: void -> itree MemE.t R)
-      itr1
+      R (k: unit -> itree MemE.t R)
+      itr1 (EQ: itr1 = k tt)
     :
       @step R (ProgramEvent.failure)
             (Vis (MemE.abort) k)

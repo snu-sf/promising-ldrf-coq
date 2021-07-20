@@ -50,16 +50,16 @@ Inductive reorder_release_fenceF: forall R (i2:MemE.t R), Prop :=
 .
 
 Inductive sim_release_fenceF: forall R
-                                     (st_src:itree MemE.t R) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t)
-                                     (st_tgt:itree MemE.t R) (lc_tgt:Local.t) (sc1_tgt:TimeMap.t) (mem1_tgt:Memory.t), Prop :=
+                                     (st_src:itree MemE.t (unit * R)%type) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t)
+                                     (st_tgt:itree MemE.t (unit * R)%type) (lc_tgt:Local.t) (sc1_tgt:TimeMap.t) (mem1_tgt:Memory.t), Prop :=
 | sim_relese_fenceF_intro
     R (v: R) pview
     lc1_src sc1_src mem1_src
     lc1_tgt sc1_tgt mem1_tgt
     (LOCALF: sim_local pview lc1_src (local_relfenced lc1_tgt)):
     sim_release_fenceF
-      (Ret v) lc1_src sc1_src mem1_src
-      (Vis (MemE.fence Ordering.plain Ordering.acqrel) (fun _ => Ret v)) lc1_tgt sc1_tgt mem1_tgt
+      (Ret (tt, v)) lc1_src sc1_src mem1_src
+      (Vis (MemE.fence Ordering.plain Ordering.acqrel) (fun r => Ret (r, v))) lc1_tgt sc1_tgt mem1_tgt
 .
 
 Lemma sim_release_fenceF_step
@@ -82,8 +82,8 @@ Lemma sim_release_fenceF_step
     (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
     (MEM_SRC: Memory.closed mem1_src)
     (MEM_TGT: Memory.closed mem1_tgt),
-    _sim_thread_step (lang R) (lang R)
-                     ((@sim_thread (lang R) (lang R) (sim_terminal eq)) \8/ @sim_release_fenceF R)
+    _sim_thread_step (lang (unit * R)%type) (lang (unit * R)%type)
+                     ((@sim_thread (lang (unit * R)%type) (lang (unit * R)%type) (sim_terminal eq)) \8/ @sim_release_fenceF R)
                      st1_src lc1_src sc1_src mem1_src
                      st1_tgt lc1_tgt sc1_tgt mem1_tgt.
 Proof.
@@ -112,7 +112,7 @@ Proof.
 Qed.
 
 Lemma sim_release_fenceF_sim_thread R:
-  @sim_release_fenceF R <8= (@sim_thread (lang R) (lang R) (sim_terminal eq)).
+  @sim_release_fenceF R <8= (@sim_thread (lang (unit * R)%type) (lang (unit * R)%type) (sim_terminal eq)).
 Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss; ii.
   - right. inv TERMINAL_TGT. inv PR; ss.
@@ -128,8 +128,8 @@ Qed.
 Lemma reorder_release_fenceF_sim_itree R
       (i1: MemE.t R) (REORDER: reorder_release_fenceF i1):
   sim_itree eq
-            (Vis (MemE.fence Ordering.plain Ordering.acqrel) (fun _ => Vis i1 (fun r => Ret r)))
-            (Vis i1 (fun r => Vis (MemE.fence Ordering.plain Ordering.acqrel) (fun _ => Ret r))).
+            (Vis (MemE.fence Ordering.plain Ordering.acqrel) (fun r0 => Vis i1 (fun r => Ret (r0, r))))
+            (Vis i1 (fun r => Vis (MemE.fence Ordering.plain Ordering.acqrel) (fun r0 => Ret (r0, r)))).
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
   { inv TERMINAL_TGT. eapply f_equal with (f:=observe) in H; ss. }
@@ -145,9 +145,9 @@ Proof.
   }
   exploit sim_local_intro_relfenced; eauto. i. des.
   exploit sim_local_nonsynch_src; try exact SC_SRC; eauto using local_relfenced_wf. i. des.
-  instantiate (3:=lang R) in STEP_SRC.
+  instantiate (3:=lang (unit * R)) in STEP_SRC.
   instantiate (2:=Vis (MemE.fence Ordering.plain Ordering.acqrel)
-                      (fun _ => Vis i1 (fun r => Ret r))) in STEP_SRC.
+                      (fun r0 => Vis i1 (fun r => Ret (r0, r)))) in STEP_SRC.
   exploit Thread.rtc_tau_step_future; eauto. s. i. des.
   exploit sim_local_fence_src_relfenced; eauto. i. des.
   exploit Local.fence_step_future; eauto. i. des.

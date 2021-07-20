@@ -63,16 +63,24 @@ Inductive reorder: forall R0 R1 (i1: MemE.t R0) (i2: MemE.t R1), Prop :=
 Lemma reorder_sim_stmts R0 R1
       (i1: MemE.t R0) (i2: MemE.t R1) (REORDER: reorder i1 i2):
   sim_itree eq
-            (r1 <- trigger i1;; r2 <- trigger i2;; Ret (r1, r2))
-            (r2 <- trigger i2;; r1 <- trigger i1;; Ret (r1, r2)).
+            (r2 <- ITree.trigger i2;; r1 <- ITree.trigger i1;; Ret (r1, r2))
+            (r1 <- ITree.trigger i1;; r2 <- ITree.trigger i2;; Ret (r1, r2)).
 Proof.
+  replace (r2 <- ITree.trigger i2;; r1 <- ITree.trigger i1;; Ret (r1, r2)) with
+      (Vis i2 (fun r2 => Vis i1 (fun r1 => Ret (r1, r2)))).
+  2:{ unfold ITree.trigger. grind. repeat f_equal. extensionality r2. grind.
+      repeat f_equal. extensionality r1. grind. }
+  replace (r1 <- ITree.trigger i1;; r2 <- ITree.trigger i2;; Ret (r1, r2)) with
+      (Vis i1 (fun r1 => Vis i2 (fun r2 => Ret (r1, r2)))).
+  2:{ unfold ITree.trigger. grind. repeat f_equal. extensionality r2. grind.
+      repeat f_equal. extensionality r1. grind. }
+  (* unfold trigger. rewrite ! bind_vis. *)
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
-  { inv TERMINAL_TGT. }
+  { inv TERMINAL_TGT. eapply f_equal with (f:=observe) in H; ss. }
   { right. esplits; eauto.
     inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   }
-  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
-    try (inv STATE; inv INSTR; inv REORDER); ss.
+  inv STEP_TGT; [inv STEP|destruct REORDER; inv STEP; ss; dependent destruction STATE; inv LOCAL0]; ss; clarify.
   - (* promise *)
     right.
     exploit sim_local_promise; eauto. i. des.
@@ -86,15 +94,6 @@ Proof.
     + auto.
     + left. eapply paco11_mon; [apply sim_load_sim_thread|]; ss.
       econs; eauto.
-      eapply Local.read_step_future; eauto.
-  - (* update-load *)
-    right.
-    exploit sim_local_read; eauto; try refl. i. des.
-    esplits; try apply SC; eauto; ss.
-    + econs 1.
-    + auto.
-    + left. eapply paco11_mon; [apply sim_update_sim_thread|]; ss.
-      econs; [eauto|..]; s; eauto.
       eapply Local.read_step_future; eauto.
   - (* store *)
     right.
@@ -136,6 +135,15 @@ Proof.
     + left. eapply paco11_mon; [apply sim_update_sim_thread|done].
       econs; [eauto|..]; s; eauto.
       etrans; eauto.
+  - (* update-load *)
+    right.
+    exploit sim_local_read; eauto; try refl. i. des.
+    esplits; try apply SC; eauto; ss.
+    + econs 1.
+    + auto.
+    + left. eapply paco11_mon; [apply sim_update_sim_thread|]; ss.
+      econs; [eauto|..]; s; eauto.
+      eapply Local.read_step_future; eauto.
   - (* fence *)
     right.
     exploit sim_local_fence; try apply SC; eauto; try refl. i. des.
@@ -153,6 +161,7 @@ Proof.
     eapply sim_abort_steps_failure. econs; eauto.
     eapply sim_local_failure; eauto.
 Grab Existential Variables.
+  { i. exact ITree.spin. }
   { econs 2. }
   { econs. econs 3. }
 Qed.
