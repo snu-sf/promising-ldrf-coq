@@ -21,48 +21,49 @@ Require Import SimMemory.
 Require Import SimPromises.
 Require Import SimLocal.
 Require Import SimThread.
-Require Import Compatibility.
+Require Import iCompatibility.
 
 Require Import FulfillStep.
 Require Import ReorderStep.
 Require Import ReorderRelFenceCommon.
 
-Require Import Syntax.
-Require Import Semantics.
+Require Import ITreeLang.
+Require Import Program.
 
 Set Implicit Arguments.
 
 
-Inductive reorder_release_fenceF: forall (i2:Instr.t), Prop :=
+Inductive reorder_release_fenceF: forall R (i2:MemE.t R), Prop :=
 | reorder_release_fenceF_load
-    r2 l2 o2:
-    reorder_release_fenceF (Instr.load r2 l2 o2)
+    l2 o2:
+    reorder_release_fenceF (MemE.read l2 o2)
 | reorder_release_fenceF_store
     l2 v2 o2
     (ORD2: Ordering.le o2 Ordering.plain \/ Ordering.le Ordering.acqrel o2):
-    reorder_release_fenceF (Instr.store l2 v2 o2)
+    reorder_release_fenceF (MemE.write l2 v2 o2)
 | reorder_release_fenceF_update
-    r2 l2 rmw2 or2 ow2
+    l2 rmw2 or2 ow2
     (ORDW2: Ordering.le ow2 Ordering.plain \/ Ordering.le Ordering.acqrel ow2):
-    reorder_release_fenceF (Instr.update r2 l2 rmw2 or2 ow2)
+    reorder_release_fenceF (MemE.update l2 rmw2 or2 ow2)
 | reorder_release_fenceF_fence:
-    reorder_release_fenceF (Instr.fence Ordering.acqrel Ordering.plain)
+    reorder_release_fenceF (MemE.fence Ordering.acqrel Ordering.plain)
 .
 
-Inductive sim_release_fenceF: forall (st_src:(Language.state lang)) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t)
-                        (st_tgt:(Language.state lang)) (lc_tgt:Local.t) (sc1_tgt:TimeMap.t) (mem1_tgt:Memory.t), Prop :=
+Inductive sim_release_fenceF: forall R
+                                     (st_src:itree MemE.t R) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t)
+                                     (st_tgt:itree MemE.t R) (lc_tgt:Local.t) (sc1_tgt:TimeMap.t) (mem1_tgt:Memory.t), Prop :=
 | sim_relese_fenceF_intro
-    rs
-    pview
+    R (v: R) pview
     lc1_src sc1_src mem1_src
     lc1_tgt sc1_tgt mem1_tgt
     (LOCALF: sim_local pview lc1_src (local_relfenced lc1_tgt)):
     sim_release_fenceF
-      (State.mk rs []) lc1_src sc1_src mem1_src
-      (State.mk rs [Stmt.instr (Instr.fence Ordering.plain Ordering.acqrel)]) lc1_tgt sc1_tgt mem1_tgt
+      (Ret v) lc1_src sc1_src mem1_src
+      (Vis (MemE.fence Ordering.plain Ordering.acqrel) (fun _ => Ret v)) lc1_tgt sc1_tgt mem1_tgt
 .
 
 Lemma sim_release_fenceF_step
+      R
       st1_src lc1_src sc0_src mem0_src
       st1_tgt lc1_tgt sc0_tgt mem0_tgt
       (SIM: sim_release_fenceF st1_src lc1_src sc0_src mem0_src
@@ -81,13 +82,13 @@ Lemma sim_release_fenceF_step
     (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
     (MEM_SRC: Memory.closed mem1_src)
     (MEM_TGT: Memory.closed mem1_tgt),
-    _sim_thread_step lang lang ((sim_thread (sim_terminal eq)) \8/ sim_release_fenceF)
+    _sim_thread_step (lang R) (lang R)
+                     ((@sim_thread (lang R) (lang R) (sim_terminal eq)) \8/ @sim_release_fenceF R)
                      st1_src lc1_src sc1_src mem1_src
                      st1_tgt lc1_tgt sc1_tgt mem1_tgt.
 Proof.
-  inv SIM; ii. right.
-  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL];
-    try (inv STATE; inv INSTR); ss.
+  destruct SIM; ii. right.
+  inv STEP_TGT; [inv STEP|dependent destruction STEP; inv LOCAL; ss; dependent destruction STATE]; ss.
   - (* promise *)
     exploit sim_local_promise_relfenced; eauto. i. des.
     esplits.
@@ -107,11 +108,11 @@ Proof.
     + auto.
     + auto.
     + auto.
-    + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
+    + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
 Qed.
 
-Lemma sim_release_fenceF_sim_thread:
-  sim_release_fenceF <8= (sim_thread (sim_terminal eq)).
+Lemma sim_release_fenceF_sim_thread R:
+  @sim_release_fenceF R <8= (@sim_thread (lang R) (lang R) (sim_terminal eq)).
 Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss; ii.
   - right. inv TERMINAL_TGT. inv PR; ss.
@@ -124,15 +125,14 @@ Proof.
     + right. esplits; eauto.
 Qed.
 
-Lemma reorder_release_fenceF_sim_stmts
-      i1 (REORDER: reorder_release_fenceF i1):
-  sim_stmts eq
-            [Stmt.instr (Instr.fence Ordering.plain Ordering.acqrel); Stmt.instr i1]
-            [Stmt.instr i1; Stmt.instr (Instr.fence Ordering.plain Ordering.acqrel)]
-            eq.
+Lemma reorder_release_fenceF_sim_itree R
+      (i1: MemE.t R) (REORDER: reorder_release_fenceF i1):
+  sim_itree eq
+            (Vis (MemE.fence Ordering.plain Ordering.acqrel) (fun _ => Vis i1 (fun r => Ret r)))
+            (Vis i1 (fun r => Vis (MemE.fence Ordering.plain Ordering.acqrel) (fun _ => Ret r))).
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
-  { inv TERMINAL_TGT. }
+  { inv TERMINAL_TGT. eapply f_equal with (f:=observe) in H; ss. }
   { right. esplits; eauto.
     inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   }
@@ -145,10 +145,13 @@ Proof.
   }
   exploit sim_local_intro_relfenced; eauto. i. des.
   exploit sim_local_nonsynch_src; try exact SC_SRC; eauto using local_relfenced_wf. i. des.
+  instantiate (3:=lang R) in STEP_SRC.
+  instantiate (2:=Vis (MemE.fence Ordering.plain Ordering.acqrel)
+                      (fun _ => Vis i1 (fun r => Ret r))) in STEP_SRC.
   exploit Thread.rtc_tau_step_future; eauto. s. i. des.
   exploit sim_local_fence_src_relfenced; eauto. i. des.
   exploit Local.fence_step_future; eauto. i. des.
-  inv STEP. inv LOCAL1; inv STATE; inv INSTR; inv REORDER.
+  inv STEP. inv LOCAL1; ss; dependent destruction STATE; inv REORDER.
   - (* load *)
     exploit sim_local_read_relfenced; eauto; try refl. i. des.
     esplits.
@@ -170,7 +173,7 @@ Proof.
     + etrans; [eauto|]. econs 2; [|refl]. econs.
       * econs. econs 2. econs; [|econs 5]; eauto. econs. econs.
       * ss.
-    + econs 2. econs 2. econs; [|econs 2]; eauto. econs. econs. eauto.
+    + econs 2. econs 2. econs; [|econs 2]; eauto. econs; eauto.
     + auto.
     + etrans; eauto.
     + auto.
@@ -205,7 +208,7 @@ Proof.
       * econs. econs 2. econs; [|econs 5]; eauto. econs. econs.
       * ss.
     + econs 2. econs 2. econs; [|econs 4]; eauto.
-      * econs. econs. eauto.
+      * econs; eauto.
       * replace sc2_src with sc1_src; eauto. apply TimeMap.antisym; ss.
     + auto.
     + auto.
