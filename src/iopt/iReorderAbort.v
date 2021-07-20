@@ -23,35 +23,35 @@ Require Import SimMemory.
 Require Import SimPromises.
 Require Import SimLocal.
 Require Import SimThread.
-Require Import Compatibility.
+Require Import iCompatibility.
 Require Import ReorderAbortCommon.
 
-Require Import Syntax.
-Require Import Semantics.
+Require Import ITreeLang.
+Require Import Program.
 
 Set Implicit Arguments.
 
 
-Inductive reorder_abort: forall (i2:Instr.t), Prop :=
+Inductive reorder_abort: forall R (i2:MemE.t R), Prop :=
 | reorder_abort_load
-    r2 l2 o2
+    l2 o2
     (ORD2: Ordering.le o2 Ordering.relaxed):
-    reorder_abort (Instr.load r2 l2 o2)
+    reorder_abort (MemE.read l2 o2)
 | reorder_abort_store
     l2 v2 o2
     (ORD: Ordering.le o2 Ordering.acqrel):
-    reorder_abort (Instr.store l2 v2 o2)
+    reorder_abort (MemE.write l2 v2 o2)
 | reorder_abort_fence
     or2 ow2
     (ORDR2: Ordering.le or2 Ordering.relaxed)
     (ORDW2: Ordering.le ow2 Ordering.acqrel):
-    reorder_abort (Instr.fence or2 ow2)
+    reorder_abort (MemE.fence or2 ow2)
 .
 
-Inductive sim_abort: forall (st_src:(Language.state lang)) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t)
-                       (st_tgt:(Language.state lang)) (lc_tgt:Local.t) (sc1_tgt:TimeMap.t) (mem1_tgt:Memory.t), Prop :=
+Inductive sim_abort: forall (st_src:itree MemE.t void) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t)
+                            (st_tgt:itree MemE.t void) (lc_tgt:Local.t) (sc1_tgt:TimeMap.t) (mem1_tgt:Memory.t), Prop :=
 | sim_abort_intro
-    rs i2
+    R (i2: MemE.t R)
     lc1_src sc1_src mem1_src
     lc1_tgt sc1_tgt mem1_tgt
     (REORDER: reorder_abort i2)
@@ -66,8 +66,8 @@ Inductive sim_abort: forall (st_src:(Language.state lang)) (lc_src:Local.t) (sc1
     (MEM_SRC: Memory.closed mem1_src)
     (MEM_TGT: Memory.closed mem1_tgt):
     sim_abort
-      (State.mk rs [Stmt.instr i2; Stmt.instr Instr.abort]) lc1_src sc1_src mem1_src
-      (State.mk rs [Stmt.instr i2]) lc1_tgt sc1_tgt mem1_tgt
+      (Vis i2 (fun v2 => Vis (MemE.abort) (Empty_set_rect _))) lc1_src sc1_src mem1_src
+      (Vis MemE.abort (Empty_set_rect _)) lc1_tgt sc1_tgt mem1_tgt
 .
 
 Lemma sim_abort_mon
@@ -100,10 +100,10 @@ Lemma sim_abort_steps_failure
       st1_tgt lc1_tgt sc1_tgt mem1_tgt
       (SIM: sim_abort st1_src lc1_src sc1_src mem1_src
                       st1_tgt lc1_tgt sc1_tgt mem1_tgt):
-  Thread.steps_failure (Thread.mk lang st1_src lc1_src sc1_src mem1_src).
+  Thread.steps_failure (Thread.mk (lang void) st1_src lc1_src sc1_src mem1_src).
 Proof.
-  inv SIM. inv FAILURE. unfold Thread.steps_failure.
-  inv REORDER.
+  destruct SIM. inv FAILURE. unfold Thread.steps_failure.
+  dependent destruction REORDER.
   - (* load *)
     exploit progress_read_step_cur; try exact WF_SRC; eauto. i. des.
     exploit read_step_cur_future; try exact READ; eauto. i. des.
@@ -112,15 +112,15 @@ Proof.
       * econs. econs 2. econs; [|econs 2]; eauto. econs. econs.
       * ss.
     + econs 2. econs.
-      * econs. econs.
+      * econs.
       * econs. econs. ii.
         rewrite <- TVIEW. rewrite <- PROMISES in *. eauto.
   - (* store *)
     exploit (@LowerPromises.steps_promises_rel
-               lang (Thread.mk lang (State.mk rs [Stmt.instr (Instr.store l2 v2 o2); Stmt.instr Instr.abort])
-                               lc1_src sc1_src mem1_src)); s; eauto.
-    i. des. destruct e2, state. ss.
-    exploit LowerPromises.rtc_opt_promise_step_future; eauto. s. i. des. inv STATE.
+               (lang void) (Thread.mk (lang void) (Vis (MemE.write l2 v2 o2) (fun v2 => Vis (MemE.abort) (Empty_set_rect _)))
+                                      lc1_src sc1_src mem1_src)); s; eauto.
+    i. des. destruct e2. ss.
+    exploit LowerPromises.rtc_opt_promise_step_future; eauto. s. i. des. subst.
     hexploit LowerPromises.promises_rel_promise_consistent; eauto. i.
     hexploit LowerPromises.promises_rel_nonsynch; eauto. i.
     exploit Thread.rtc_tau_step_future; try exact STEPS0; eauto. s. i. des.
@@ -132,9 +132,9 @@ Proof.
     + econs 2. econs; [econs; econs|]. econs. econs. ss.
   - (* fence *)
     exploit (@LowerPromises.steps_promises_rel
-               lang (Thread.mk lang (State.mk rs [Stmt.instr (Instr.fence or2 ow2); Stmt.instr Instr.abort])
-                               lc1_src sc1_src mem1_src)); s; eauto.
-    i. des. destruct e2, state. ss.
+               (lang void) (Thread.mk (lang void) (Vis (MemE.fence or2 ow2) (fun v2 => Vis (MemE.abort) (Empty_set_rect _)))
+                                      lc1_src sc1_src mem1_src)); s; eauto.
+    i. des. destruct e2. ss.
     exploit LowerPromises.rtc_opt_promise_step_future; eauto. s. i. des. inv STATE.
     hexploit LowerPromises.promises_rel_promise_consistent; eauto. i.
     hexploit LowerPromises.promises_rel_nonsynch; eauto. i.
@@ -148,4 +148,5 @@ Proof.
     + econs 2. econs; [econs; econs|]. econs. econs.
       exploit fence_step_future; eauto. i. des.
       ii. rewrite <- PROMISES in *. rewrite <- TVIEW0. eauto.
+  Unshelve. all: try exact ITree.spin.
 Qed.
