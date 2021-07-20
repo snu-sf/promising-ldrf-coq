@@ -21,31 +21,31 @@ Require Import SimMemory.
 Require Import SimPromises.
 Require Import SimLocal.
 Require Import SimThread.
-Require Import Compatibility.
+Require Import iCompatibility.
 
 Require Import SplitAcqCommon.
 Require Import SplitAcqRelCommon.
 
-Require Import Syntax.
-Require Import Semantics.
+Require Import ITreeLang.
 
 Set Implicit Arguments.
 
 
-Inductive split_acqrel: forall (i1 i2:Instr.t), Prop :=
+Inductive split_acqrel: forall R (i1: MemE.t R) (i2: MemE.t R), Prop :=
 | split_acqrel_load
-    r l:
-    split_acqrel (Instr.load r l Ordering.acqrel) (Instr.load r l Ordering.relaxed)
+    l:
+    split_acqrel (MemE.read l Ordering.acqrel) (MemE.read l Ordering.relaxed)
 | split_acqrel_update
-    r l rmw ow
+    l rmw ow
     (OW: Ordering.le ow Ordering.acqrel):
-    split_acqrel (Instr.update r l rmw Ordering.acqrel ow) (Instr.update r l rmw Ordering.relaxed ow)
+    split_acqrel (MemE.update l rmw Ordering.acqrel ow) (MemE.update l rmw Ordering.relaxed ow)
 .
 
-Inductive sim_acqrel: forall (st_src:(Language.state lang)) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t)
-                        (st_tgt:(Language.state lang)) (lc_tgt:Local.t) (sc1_tgt:TimeMap.t) (mem1_tgt:Memory.t), Prop :=
+Inductive sim_acqrel: forall R
+                             (st_src:(Language.state (lang R))) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t)
+                             (st_tgt:(Language.state (lang R))) (lc_tgt:Local.t) (sc1_tgt:TimeMap.t) (mem1_tgt:Memory.t), Prop :=
 | sim_acqrel_intro
-    rs
+    R
     lc1_src sc1_src mem1_src
     lc1_tgt sc1_tgt mem1_tgt
     (LOCAL: sim_local SimPromises.bot lc1_src (local_acqrel lc1_tgt))
@@ -56,13 +56,15 @@ Inductive sim_acqrel: forall (st_src:(Language.state lang)) (lc_src:Local.t) (sc
     (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
     (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
     (MEM_SRC: Memory.closed mem1_src)
-    (MEM_TGT: Memory.closed mem1_tgt):
+    (MEM_TGT: Memory.closed mem1_tgt)
+    (r: R):
     sim_acqrel
-      (State.mk rs []) lc1_src sc1_src mem1_src
-      (State.mk rs [Stmt.instr (Instr.fence Ordering.acqrel Ordering.acqrel)]) lc1_tgt sc1_tgt mem1_tgt
+      (Ret r) lc1_src sc1_src mem1_src
+      (Vis (MemE.fence Ordering.acqrel Ordering.acqrel) (fun _ => Ret r)) lc1_tgt sc1_tgt mem1_tgt
 .
 
 Lemma sim_acqrel_mon
+      R
       st_src lc_src sc1_src mem1_src
       st_tgt lc_tgt sc1_tgt mem1_tgt
       sc2_src mem2_src
@@ -81,22 +83,24 @@ Lemma sim_acqrel_mon
       (SC_TGT: Memory.closed_timemap sc2_tgt mem2_tgt)
       (MEM_SRC: Memory.closed mem2_src)
       (MEM_TGT: Memory.closed mem2_tgt):
-  sim_acqrel st_src lc_src sc2_src mem2_src
-               st_tgt lc_tgt sc2_tgt mem2_tgt.
+  @sim_acqrel R
+              st_src lc_src sc2_src mem2_src
+              st_tgt lc_tgt sc2_tgt mem2_tgt.
 Proof.
-  inv SIM1. econs; eauto.
+  destruct SIM1. econs; eauto.
 Qed.
 
-Lemma sim_acqrel_step
+Lemma sim_acqrel_step R
       st1_src lc1_src sc1_src mem1_src
       st1_tgt lc1_tgt sc1_tgt mem1_tgt
       (SIM: sim_acqrel st1_src lc1_src sc1_src mem1_src
-                         st1_tgt lc1_tgt sc1_tgt mem1_tgt):
-  _sim_thread_step lang lang ((sim_thread (sim_terminal eq)) \8/ sim_acqrel)
+                       st1_tgt lc1_tgt sc1_tgt mem1_tgt):
+  _sim_thread_step (lang R) (lang R)
+                   ((@sim_thread (lang R) (lang R) (sim_terminal eq)) \8/ @sim_acqrel R)
                    st1_src lc1_src sc1_src mem1_src
                    st1_tgt lc1_tgt sc1_tgt mem1_tgt.
 Proof.
-  inv SIM. ii.
+  destruct SIM. ii.
   inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
     try (inv STATE; inv INSTR; inv SPLIT); ss.
   - (* promise *)
@@ -111,13 +115,13 @@ Proof.
   - (* fence *)
     right.
     exploit Local.fence_step_future; eauto. i. des.
-    inv STATE. inv INSTR. inv LOCAL1. ss.
+    dependent destruction STATE. inv LOCAL1. ss.
     esplits; (try by econs 1); eauto; ss.
-    left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
+    left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
 Qed.
 
-Lemma sim_acqrel_sim_thread:
-  sim_acqrel <8= (sim_thread (sim_terminal eq)).
+Lemma sim_acqrel_sim_thread R:
+  @sim_acqrel R <8= @sim_thread (lang R) (lang R) (sim_terminal eq).
 Proof.
   pcofix CIH. i. pfold. ii. ss. splits; ss; ii.
   - inv TERMINAL_TGT. inv PR; ss.
@@ -130,27 +134,27 @@ Proof.
     + right. esplits; eauto.
 Qed.
 
-Lemma split_acqrel_sim_stmts
-      i_src i_tgt
+Lemma split_acqrel_sim_itree R
+      (i_src i_tgt: MemE.t R)
       (SPLIT: split_acqrel i_src i_tgt):
-  sim_stmts eq
-            [Stmt.instr i_src]
-            [Stmt.instr i_tgt; Stmt.instr (Instr.fence Ordering.acqrel Ordering.acqrel)]
-            eq.
+  sim_itree eq
+            (Vis i_src (fun r => Ret r))
+            (Vis i_tgt (fun r => Vis (MemE.fence Ordering.acqrel Ordering.acqrel) (fun _ => Ret r))).
 Proof.
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
-  { inv TERMINAL_TGT. }
+  { inv TERMINAL_TGT. apply f_equal with (f:=observe) in H; ss. }
   { right. esplits; eauto.
     inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   }
   right.
-  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
-    try (inv STATE; inv INSTR; inv SPLIT); ss.
+  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0]; ss;
+    try (dependent destruction STATE; inv SPLIT); ss.
   - (* promise *)
     exploit sim_local_promise; eauto. i. des.
     esplits; try apply SC; eauto; ss.
     econs 2. econs 1; eauto. econs; eauto. eauto.
-  - (* load *)
+  - dependent destruction H.
+    (* load *)
     exploit Local.read_step_future; eauto. i. des.
     exploit sim_local_read_acquired; eauto. i. des.
     exploit Local.read_step_future; eauto. i. des.
@@ -163,20 +167,22 @@ Proof.
       econs; ss. inv LOCAL2. econs; ss.
       etrans; eauto. apply TViewFacts.write_fence_tview_incr.
       eapply TViewFacts.read_fence_future; apply WF2.
-  - (* update-load *)
+  - dependent destruction H.
+    (* update-load *)
     exploit Local.read_step_future; eauto. i. des.
     exploit sim_local_read_acquired; eauto. i. des.
     exploit Local.read_step_future; eauto. i. des.
     esplits; try apply SC; eauto; ss.
     + econs 2. econs 2. econs; cycle 1.
       * econs 2. eauto.
-      * econs. econs. eauto.
+      * econs; eauto.
     + auto.
     + left. eapply paco11_mon; [apply sim_acqrel_sim_thread|]; ss.
       econs; ss. inv LOCAL2. econs; ss.
       etrans; eauto. apply TViewFacts.write_fence_tview_incr.
       eapply TViewFacts.read_fence_future; apply WF2.
-  - (* update *)
+  - dependent destruction H.
+    (* update *)
     exploit Local.read_step_future; eauto. i. des.
     exploit sim_local_read_acquired; eauto. i. des.
     exploit Local.read_step_future; eauto. i. des.
@@ -196,7 +202,7 @@ Proof.
     esplits; try apply SC; eauto; ss.
     + econs 2. econs 2. econs; cycle 1.
       * econs 4; eauto.
-      * econs. econs. eauto.
+      * econs; eauto.
     + auto.
     + left. eapply paco11_mon; [apply sim_acqrel_sim_thread|]; ss.
 Qed.

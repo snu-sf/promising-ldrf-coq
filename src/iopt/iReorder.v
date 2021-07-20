@@ -60,7 +60,7 @@ Inductive reorder: forall R0 R1 (i1: MemE.t R0) (i2: MemE.t R1), Prop :=
     reorder MemE.abort i2
 .
 
-Lemma reorder_sim_stmts R0 R1
+Lemma reorder_sim_itree R0 R1
       (i1: MemE.t R0) (i2: MemE.t R1) (REORDER: reorder i1 i2):
   sim_itree eq
             (r2 <- ITree.trigger i2;; r1 <- ITree.trigger i1;; Ret (r1, r2))
