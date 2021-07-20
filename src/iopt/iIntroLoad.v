@@ -22,7 +22,6 @@ Require Import SimThread.
 Require Import iCompatibility.
 
 Require Import ITreeLang.
-Require Import Program.
 
 Set Implicit Arguments.
 
@@ -31,8 +30,9 @@ Lemma intro_load_sim_itree
       loc ord:
   sim_itree eq
             (Ret tt)
-            (Vis (MemE.read loc ord) (fun _ => Ret tt)).
+            (ITree.trigger (MemE.read loc ord);; Ret tt).
 Proof.
+  unfold trigger. rewrite bind_vis.
   pcofix CIH. ii. subst. pfold. ii. splits; i.
   { inv TERMINAL_TGT. eapply f_equal with (f:=observe) in H; ss. }
   { right. esplits; eauto.
@@ -50,7 +50,8 @@ Proof.
     + ss.
     + by inv LOCAL0.
     + by inv LOCAL0.
-    + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
+    + rewrite bind_ret_l.
+      left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
       * inv LOCAL. inv LOCAL0. inv LOCAL. econs; ss.
         etrans; eauto. apply TViewFacts.read_tview_incr.
 Qed.

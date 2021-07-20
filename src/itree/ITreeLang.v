@@ -42,7 +42,8 @@ From PromisingLib Require Import Loc.
 From PromisingLib Require Import Language.
 
 Require Import Event.
-
+Require Export ITreeLib.
+Require Export Program.
 
 Module MemE.
   Variant rmw :=

@@ -50,9 +50,10 @@ Lemma elim_load_sim_itree
       loc ord
       (ORD: Ordering.le ord Ordering.plain):
   sim_itree (fun _ _ => True)
-            (Vis (MemE.read loc ord) (fun _ => Ret tt))
+            (ITree.trigger (MemE.read loc ord);; Ret tt)
             (Ret tt).
 Proof.
+  unfold trigger. rewrite bind_vis.
   pcofix CIH. ii. subst. pfold. ii. splits; i.
   { right.
     exploit elim_read; eauto. i. des.
@@ -63,9 +64,9 @@ Proof.
       + eauto.
     - auto.
     - auto.
+    - rewrite bind_ret_l. auto.
     - auto.
-    - auto.
-    - econs; eauto.
+    - rewrite bind_ret_l. econs; eauto.
   }
   { i. right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
