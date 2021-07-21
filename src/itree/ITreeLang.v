@@ -60,6 +60,32 @@ Module MemE.
   | abort: t unit
   | choose: t Const.t
   .
+
+  Variant ord: forall R (i_src i_tgt:t R), Prop :=
+  | ord_read
+      l o1 o2 (O: Ordering.le o1 o2):
+      ord (read l o1) (read l o2)
+  | ord_write
+      l v o1 o2 (O: Ordering.le o1 o2):
+      ord (write l v o1) (write l v o2)
+  | ord_update
+      l rmw or1 or2 ow1 ow2
+      (OR: Ordering.le or1 or2)
+      (OW: Ordering.le ow1 ow2):
+      ord (update l rmw or1 ow1) (update l rmw or2 ow2)
+  | ord_fence
+      or1 or2 ow1 ow2
+      (OR: Ordering.le or1 or2)
+      (OW: Ordering.le ow1 ow2):
+      ord (fence or1 ow1) (fence or2 ow2)
+  | ord_syscall
+      args:
+      ord (syscall args) (syscall args)
+  | ord_abort:
+      ord abort abort
+  | ord_choose:
+      ord choose choose
+  .
 End MemE.
 
 
@@ -147,6 +173,17 @@ Module ILang.
             itr1
   .
   #[export] Hint Constructors step: core.
+
+  Inductive opt_step:
+    forall R (e:ProgramEvent.t) (s1: itree MemE.t R) (s2: itree MemE.t R), Prop :=
+  | opt_step_none
+      R (st: itree MemE.t R):
+      opt_step ProgramEvent.silent st st
+  | opt_step_some
+      R e (st1 st2: itree MemE.t R)
+      (STEP: step e st1 st2):
+      opt_step e st1 st2
+  .
 End ILang.
 
 Definition lang (R: Type): Language.t ProgramEvent.t :=
