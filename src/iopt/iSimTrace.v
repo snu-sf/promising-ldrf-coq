@@ -83,23 +83,43 @@ Qed.
 Hint Resolve _sim_trace_mon: paco.
 
 Definition sim_trace: SIM_TRACE := paco5 _sim_trace bot5.
-(* Definition sim_trace: SIM_TRACE := paco5 _sim_trace sim_itree. *)
 
-Lemma sim_trace_sim_thread R_src R_tgt
-      sim_val
+Variant sim_traceF (r: SIM_THREAD): SIM_THREAD :=
+| sim_traceF_intro
+    R_src R_tgt
+    (sim_val: SIM_VAL R_src R_tgt)
+    st1_src lc1_src sc1_src mem1_src
+    st1_tgt lc1_tgt sc1_tgt mem1_tgt
+    (SIM: paco5 _sim_trace (@_sim_itree r) _ _ sim_val st1_src st1_tgt)
+    (LOCAL: sim_local SimPromises.bot lc1_src lc1_tgt):
+    @sim_traceF
+      r
+      (lang R_src) (lang R_tgt)
+      (sim_terminal sim_val)
       st1_src lc1_src sc1_src mem1_src
       st1_tgt lc1_tgt sc1_tgt mem1_tgt
-      (SIM: sim_trace sim_val st1_src st1_tgt)
-      (LOCAL: sim_local SimPromises.bot lc1_src lc1_tgt):
-  @sim_thread
-    (lang R_src) (lang R_tgt)
-    (sim_terminal sim_val)
-    st1_src lc1_src sc1_src mem1_src
-    st1_tgt lc1_tgt sc1_tgt mem1_tgt.
+.
+
+Lemma sim_trace_F_mon: monotone11 sim_traceF.
 Proof.
-  revert_until sim_val. pcofix CIH. i.
+  ii. destruct IN. econs; eauto.
+  eapply paco5_mon; eauto. eapply _sim_itree_mon; eauto.
+Qed.
+
+Lemma sim_traceF_uclo:
+  sim_traceF <12= gupaco11 _sim_thread (cpn11 _sim_thread).
+Proof.
+  eapply grespect11_uclo.
+  { eauto with paco. }
+  econs.
+  { eapply sim_trace_F_mon. }
+  ii. destruct PR.
+  eapply rclo11_clo_base. econs.
+  { eapply cpn11_compat. eauto with paco. }
+  eapply cpn11_gupaco; eauto with paco.
+  revert_until sim_val. gcofix CIH. i.
   generalize SIM. i. punfold SIM0. unfold _sim_trace in SIM0. des.
-  pfold. ii. splits.
+  gstep. ii. splits.
   - i. exploit TERMINAL; eauto. i. des.
     + left.
       unfold lang_steps_failure, Thread.steps_failure in *. des.
@@ -117,7 +137,7 @@ Proof.
     + right.
       exploit sim_local_promise_bot; eauto. i. des.
       esplits; (try exact SC); eauto; ss.
-      econs 2. econs 1. econs; eauto.
+      econs 2. econs 1. econs; eauto. gbase. eauto.
     + exploit STEP; eauto. i. des.
       * left.
         unfold lang_steps_failure, Thread.steps_failure in *. des.
@@ -126,19 +146,30 @@ Proof.
         hexploit sim_local_promise_consistent; eauto. i. des.
         econs 2. econs; eauto.
       * right.
-        inv SIM0; [|done].
         inv EVT. dependent destruction STEP_SRC.
         { esplits;
             (try by apply rtc_lang_tau_step_rtc_thread_tau_step; eauto);
             (try exact SC);
             eauto; ss.
-          econs 1.
+          { econs 1. }
+          { gbase. inv SIM0; eauto.
+            { exploit H; eauto. i. eapply GF in x.
+              eapply CIH0. eapply _sim_thread_mon; eauto.
+              i. eapply rclo11_clo_base. right. gbase. auto.
+            }
+          }
         }
         { esplits;
             (try by apply rtc_lang_tau_step_rtc_thread_tau_step; eauto);
             (try exact SC);
             eauto; ss.
-          econs 2. econs 2. econs; [|econs 1]; eauto.
+          { econs 2. econs 2. econs; [|econs 1]; eauto. }
+          { gbase. inv SIM0; eauto.
+            { exploit H; eauto. i. eapply GF in x.
+              eapply CIH0. eapply _sim_thread_mon; eauto.
+              i. eapply rclo11_clo_base. right. gbase. auto.
+            }
+          }
         }
     + exploit STEP; eauto. i. des.
       { left.
@@ -148,7 +179,6 @@ Proof.
         hexploit sim_local_promise_consistent; eauto. i. des.
         econs 2. econs; eauto. }
       right.
-      inv SIM0; ss.
       inv EVT. dependent destruction STEP_SRC.
       exploit sim_local_read; eauto. i. des.
       esplits;
@@ -158,7 +188,11 @@ Proof.
       * econs 2. econs 2. econs; [|econs 2]; eauto.
       * ss.
       * ss.
-      * right. apply CIH; auto.
+      * gbase. inv SIM0; eauto.
+        { exploit H; eauto. i. eapply GF in x.
+          eapply CIH0. eapply _sim_thread_mon; eauto.
+          i. eapply rclo11_clo_base. right. gbase. auto.
+        }
     + exploit STEP; eauto. i. des.
       { left.
         unfold lang_steps_failure, Thread.steps_failure in *. des.
@@ -167,7 +201,6 @@ Proof.
         hexploit sim_local_promise_consistent; eauto. i. des.
         econs 2. econs; eauto. }
       right.
-      inv SIM0; [|done].
       inv EVT. dependent destruction STEP_SRC.
       hexploit sim_local_write_bot;
         (try exact LOCAL);
@@ -181,7 +214,11 @@ Proof.
       * ss.
       * ss.
       * ss.
-      * right. apply CIH; auto.
+      * gbase. inv SIM0; eauto.
+        { exploit H; eauto. i. eapply GF in x.
+          eapply CIH0. eapply _sim_thread_mon; eauto.
+          i. eapply rclo11_clo_base. right. gbase. auto.
+        }
     + exploit STEP; eauto. i. des.
       { left.
         unfold lang_steps_failure, Thread.steps_failure in *. des.
@@ -190,7 +227,6 @@ Proof.
         hexploit sim_local_promise_consistent; eauto. i. des.
         econs 2. econs; eauto. }
       right.
-      inv SIM0; [|done].
       inv EVT. dependent destruction STEP_SRC.
       exploit Local.read_step_future; eauto. i. des.
       exploit sim_local_read; eauto; try refl. i. des.
@@ -207,7 +243,11 @@ Proof.
       * ss.
       * ss.
       * ss.
-      * right. apply CIH; auto.
+      * gbase. inv SIM0; eauto.
+        { exploit H; eauto. i. eapply GF in x.
+          eapply CIH0. eapply _sim_thread_mon; eauto.
+          i. eapply rclo11_clo_base. right. gbase. auto.
+        }
     + exploit STEP; eauto. i. des.
       { left.
         unfold lang_steps_failure, Thread.steps_failure in *. des.
@@ -216,7 +256,6 @@ Proof.
         hexploit sim_local_promise_consistent; eauto. i. des.
         econs 2. econs; eauto. }
       right.
-      inv SIM0; [|done].
       inv EVT. dependent destruction STEP_SRC.
       exploit sim_local_fence;
         (try exact LOCAL);
@@ -230,7 +269,11 @@ Proof.
       * ss.
       * ss.
       * ss.
-      * right. apply CIH; auto.
+      * gbase. inv SIM0; eauto.
+        { exploit H; eauto. i. eapply GF in x.
+          eapply CIH0. eapply _sim_thread_mon; eauto.
+          i. eapply rclo11_clo_base. right. gbase. auto.
+        }
     + exploit STEP; eauto. i. des.
       { left.
         unfold lang_steps_failure, Thread.steps_failure in *. des.
@@ -239,7 +282,6 @@ Proof.
         hexploit sim_local_promise_consistent; eauto. i. des.
         econs 2. econs; eauto. }
       right.
-      inv SIM0; [|done].
       inv EVT. dependent destruction STEP_SRC.
       exploit sim_local_fence;
         (try exact LOCAL);
@@ -254,7 +296,11 @@ Proof.
       * ss.
       * ss.
       * ss.
-      * right. apply CIH; auto.
+      * gbase. inv SIM0; eauto.
+        { exploit H; eauto. i. eapply GF in x.
+          eapply CIH0. eapply _sim_thread_mon; eauto.
+          i. eapply rclo11_clo_base. right. gbase. auto.
+        }
     + exploit STEP; eauto. i. des.
       { left.
         unfold lang_steps_failure, Thread.steps_failure in *. des.
@@ -263,7 +309,6 @@ Proof.
         hexploit sim_local_promise_consistent; eauto. i. des.
         econs 2. econs; eauto. }
       left.
-      inv SIM0; [|done].
       inv EVT. dependent destruction STEP_SRC.
       exploit sim_local_failure;
         (try exact LOCAL);
@@ -272,6 +317,22 @@ Proof.
       esplits;
         (try by apply rtc_lang_tau_step_rtc_thread_tau_step; eauto).
       econs 2. econs; [|econs 7]; eauto.
+Qed.
+
+Lemma sim_trace_sim_thread R_src R_tgt
+      sim_val
+      st1_src lc1_src sc1_src mem1_src
+      st1_tgt lc1_tgt sc1_tgt mem1_tgt
+      (SIM: sim_trace sim_val st1_src st1_tgt)
+      (LOCAL: sim_local SimPromises.bot lc1_src lc1_tgt):
+  @sim_thread
+    (lang R_src) (lang R_tgt)
+    (sim_terminal sim_val)
+    st1_src lc1_src sc1_src mem1_src
+    st1_tgt lc1_tgt sc1_tgt mem1_tgt.
+Proof.
+  ginit. guclo sim_traceF_uclo. econs; eauto.
+  eapply paco5_mon; [eapply SIM|]. ss.
 Qed.
 
 Lemma sim_trace_sim_itree R_src R_tgt
@@ -379,6 +440,87 @@ Proof.
   i. ss. inv STEP_TGT.
 Qed.
 
+Variant tauF_l (r: SIM_TRACE): SIM_TRACE :=
+| tauF_l_intro
+    R_src R_tgt
+    (sim_val: SIM_VAL R_src R_tgt)
+    st_src0 st_src1 st_tgt
+    (STEP: ILang.step ProgramEvent.silent st_src0 st_src1)
+    (SIM: r R_src R_tgt sim_val st_src1 st_tgt)
+  :
+    tauF_l r sim_val st_src0 st_tgt
+.
+
+Lemma tauF_l_mon: monotone5 tauF_l.
+Proof.
+  ii. destruct IN. econs; eauto.
+Qed.
+
+Lemma tauF_l_uclo:
+  tauF_l <6= gupaco5 _sim_trace (cpn5 _sim_trace).
+Proof.
+  eapply cpn5_uclo; eauto with paco.
+  { eapply tauF_l_mon. }
+  i. destruct PR. inv SIM. econs.
+  { ii. exploit H; eauto. i. des.
+    { left. unfold lang_steps_failure in *. des. esplits.
+      { econs 2; eauto. }
+      { eauto. }
+    }
+    { right. esplits.
+      { econs 2; eauto. }
+      { eauto. }
+      { eauto. }
+    }
+  }
+  { ii. exploit H0; eauto. i. des.
+    { left. unfold lang_steps_failure in *. des. esplits.
+      { econs 2; eauto. }
+      { eauto. }
+    }
+    { right. esplits.
+      { eauto. }
+      { econs 2; eauto. }
+      { eauto. }
+      { gbase. eauto. }
+    }
+  }
+Qed.
+
+Variant tauF_r (r: SIM_TRACE): SIM_TRACE :=
+| tauF_r_intro
+    R_src R_tgt
+    (sim_val: SIM_VAL R_src R_tgt)
+    st_src st_tgt0
+    (SIM: forall st_tgt1 e
+                 (STEP: ILang.step e st_tgt0 st_tgt1),
+        e = ProgramEvent.silent /\ r R_src R_tgt sim_val st_src st_tgt1)
+    (NRET: ~ ILang.is_terminal st_tgt0)
+  :
+    tauF_r r sim_val st_src st_tgt0
+.
+
+Lemma tauF_r_mon: monotone5 tauF_r.
+Proof.
+  ii. destruct IN. econs; eauto.
+  ii. exploit SIM; eauto. i. des; eauto.
+Qed.
+
+Lemma tauF_r_uclo:
+  tauF_r <6= gupaco5 _sim_trace (cpn5 _sim_trace).
+Proof.
+  eapply wrespect5_uclo; eauto with paco. econs.
+  { eapply tauF_r_mon. }
+  i. destruct PR. econs.
+  { ii. ss. }
+  ii. exploit SIM; eauto. i. des; clarify. right.
+  esplits.
+  { econs. }
+  { eauto. }
+  { econs 1. }
+  eapply rclo5_base. eauto.
+Qed.
+
 Lemma eutt_sim_trace R_src R_tgt
       (sim_val: SIM_VAL R_src R_tgt)
       (itr_src: itree MemE.t R_src) (itr_tgt: itree MemE.t R_tgt)
@@ -386,7 +528,9 @@ Lemma eutt_sim_trace R_src R_tgt
   :
     sim_trace sim_val itr_src itr_tgt.
 Proof.
-  revert R_src R_tgt sim_val itr_src itr_tgt EUTT. pcofix CIH.
+  ginit.
+  { eapply cpn5_wcompat. eauto with paco. }
+  revert R_src R_tgt sim_val itr_src itr_tgt EUTT. gcofix CIH.
   i. punfold EUTT. unfold eqit_ in EUTT.
   replace itr_src with (go (observe itr_src)).
   2:{ apply bisim_is_eq. symmetry. apply itree_eta. }
@@ -396,36 +540,37 @@ Proof.
   generalize (observe itr_src) as itr_src'.
   generalize (observe itr_tgt) as itr_tgt'. clear itr_src itr_tgt. i.
   induction EUTT.
-  - pfold. econs.
+  - gstep. econs.
     2:{ ii. inv STEP_TGT. }
     ii. right. esplits; eauto.
     { econs; eauto. }
     { econs; eauto. }
-  - pclearbot. pfold. econs.
+  - pclearbot. gstep. econs.
     { ii. inv TERMINAL_TGT. apply f_equal with (f:=observe) in H; ss. }
     ii. ss. dependent destruction STEP_TGT. right.
     esplits; eauto.
     { econs. }
-    econs 2. econs; eauto.
-  - pclearbot. pfold. econs.
+    { econs 2. econs; eauto. }
+    gbase. eauto.
+  - pclearbot. gstep. econs.
     { ii. inv TERMINAL_TGT. apply f_equal with (f:=observe) in H; ss. }
     ii. ss. right.
     dependent destruction STEP_TGT.
-    + esplits; [econs; refl|eauto|econs 2|right; apply CIH; eauto]; econs; eauto.
-    + esplits; [econs; refl|eauto|econs 2|right; apply CIH; eauto]; econs; eauto.
-    + esplits; [econs; refl|eauto|econs 2|right; apply CIH; eauto]; econs; eauto.
-    + esplits; [econs; refl|eauto|econs 2|right; apply CIH; eauto]; econs; eauto.
-    + esplits; [econs; refl|eauto|econs 2|right; apply CIH; eauto]; econs; eauto.
-    + esplits; [econs; refl|eauto|econs 2|right; apply CIH; eauto]; econs; eauto.
-    + esplits; [econs; refl|eauto|econs 2|right; apply CIH; eauto]; econs; eauto.
-    + esplits; [econs; refl|eauto|econs 2|right; apply CIH; eauto]; econs; eauto.
-  - admit.
-  - pfold. econs.
+    + esplits; [econs; refl|eauto|econs 2|gbase; apply CIH; eauto]; econs; eauto.
+    + esplits; [econs; refl|eauto|econs 2|gbase; apply CIH; eauto]; econs; eauto.
+    + esplits; [econs; refl|eauto|econs 2|gbase; apply CIH; eauto]; econs; eauto.
+    + esplits; [econs; refl|eauto|econs 2|gbase; apply CIH; eauto]; econs; eauto.
+    + esplits; [econs; refl|eauto|econs 2|gbase; apply CIH; eauto]; econs; eauto.
+    + esplits; [econs; refl|eauto|econs 2|gbase; apply CIH; eauto]; econs; eauto.
+    + esplits; [econs; refl|eauto|econs 2|gbase; apply CIH; eauto]; econs; eauto.
+    + esplits; [econs; refl|eauto|econs 2|gbase; apply CIH; eauto]; econs; eauto.
+  - guclo tauF_l_uclo. econs; eauto. econs. eapply bisim_is_eq. symmetry. eapply itree_eta.
+  - gstep. econs.
     { ii. inv TERMINAL_TGT. apply f_equal with (f:=observe) in H; ss. }
     ii. ss. right.
     dependent destruction STEP_TGT.
-    esplits; [econs; refl|eauto|econs 1|]. right. eauto.
-Admitted.
+    esplits; [econs; refl|eauto|econs 1|]. gbase. eauto.
+Qed.
 
 Lemma sim_trace_refl R (itr: itree MemE.t R):
   sim_trace eq itr itr.
