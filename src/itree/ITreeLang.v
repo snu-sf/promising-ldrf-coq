@@ -166,11 +166,10 @@ Module ILang.
             itr1
   | step_abort
       R (k: void -> itree MemE.t R)
-      itr1
     :
       @step R (ProgramEvent.failure)
             (Vis (MemE.abort) k)
-            itr1
+            ITree.spin
   .
   #[export] Hint Constructors step: core.
 
@@ -195,3 +194,24 @@ Definition lang (R: Type): Language.t ProgramEvent.t :=
     (@ILang.is_terminal _)
     (@ILang.step _)
 .
+
+From Paco Require Import paco.
+
+Lemma bind_spin E A B (k: ktree E A B):
+  ITree.spin >>= k = ITree.spin.
+Proof.
+  apply bisim_is_eq. revert k. pcofix CIH.
+  i. pfold. red.
+  change (observe (ITree.spin: itree E B)) with (@TauF E B _ (ITree.spin: itree E B)).
+  change (observe (ITree.spin >>= k)) with (@TauF E B _ (ITree.spin >>= k)).
+  econs. right. auto.
+Qed.
+
+Lemma spin_unfold E R
+  :
+    (ITree.spin: itree E R) = tau;;ITree.spin.
+Proof.
+  apply bisim_is_eq. ginit. gstep. red. ss.
+  change (observe ITree.spin) with (@TauF E R _ (ITree.spin: itree E R)).
+  refl.
+Qed.

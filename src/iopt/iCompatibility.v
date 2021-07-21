@@ -91,7 +91,8 @@ Lemma lang_step_bind R0 R1
              (itr0 >>= k)
              (itr1 >>= k).
 Proof.
-  dependent destruction STEP; subst; ired; econs; eauto.
+  dependent destruction STEP; subst; ired; try econs; eauto.
+  rewrite bind_spin. econs; eauto.
 Qed.
 
 Lemma program_step_bind R0 R1
