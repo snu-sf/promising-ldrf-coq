@@ -80,14 +80,21 @@ Lemma merge_load_store_sim_itree
             (r1 <- ITree.trigger (MemE.read l or);; ITree.trigger (MemE.write l r1 ow);; Ret r1)
             (ITree.trigger (MemE.update l (MemE.fetch_add 0) or ow)).
 Proof.
+  replace (r1 <- ITree.trigger (MemE.read l or);; ITree.trigger (MemE.write l r1 ow);; Ret r1) with
+      (Vis (MemE.read l or) (fun r1 => Vis (MemE.write l r1 ow) (fun _ => Ret r1))).
+  2:{ unfold ITree.trigger. grind. repeat f_equal. extensionality r1.
+      grind. repeat f_equal. extensionality r2. grind. }
+  replace (ITree.trigger (MemE.update l (MemE.fetch_add 0) or ow)) with
+      (Vis (MemE.update l (MemE.fetch_add 0) or ow) (fun r => Ret r)).
+  2:{ unfold ITree.trigger. grind. }
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
-  { right. inv TERMINAL_TGT. }
+  { right. inv TERMINAL_TGT. eapply f_equal with (f:=observe) in H; ss. }
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
   right.
-  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
-    try (inv STATE; inv INSTR); ss.
+  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0]; ss;
+    try (dependent destruction STATE); ss; clarify.
   - (* promise *)
     exploit sim_local_promise; eauto. i. des.
     esplits; try apply SC; eauto; ss.
@@ -108,13 +115,13 @@ Proof.
       * econs. econs 2. econs; [|econs 2]; eauto. econs. econs.
       * eauto.
     + econs 2. econs 2. econs; [|econs 3].
-      * econs. ss. econs.
-      * ss. rewrite RegFun.add_spec_eq. eauto.
+      * econs. ss.
+      * eauto.
     + ss.
     + ss.
     + ss.
     + left. eapply paco11_mon.
-      * apply sim_itree_nil; eauto.
+      * apply sim_itree_ret; eauto.
       * ii. inv PR.
 Qed.
 
@@ -124,21 +131,26 @@ Qed.
 Lemma merge_store_load_sim_itree
       l
       v1 o1
-      r2 o2
+      o2
       (O: Ordering.le Ordering.seqcst o2 -> Ordering.le Ordering.seqcst o1):
   sim_itree eq
-            [Stmt.instr (Instr.store l v1 o1); Stmt.instr (Instr.load r2 l o2)]
-            [Stmt.instr (Instr.store l v1 o1); Stmt.instr (Instr.assign r2 v1)]
-            eq.
+            (ITree.trigger (MemE.write l v1 o1);; ITree.trigger (MemE.read l o2))
+            (ITree.trigger (MemE.write l v1 o1);; Ret v1).
 Proof.
+  replace (ITree.trigger (MemE.write l v1 o1);; ITree.trigger (MemE.read l o2)) with
+      (Vis (MemE.write l v1 o1) (fun _ => Vis (MemE.read l o2) (fun r => Ret r))).
+  2:{ unfold ITree.trigger. grind. repeat f_equal. extensionality r1. grind. }
+  replace (ITree.trigger (MemE.write l v1 o1);; Ret v1) with
+      (Vis (MemE.write l v1 o1) (fun _ => Ret v1)).
+  2:{ unfold ITree.trigger. grind. repeat f_equal. extensionality r1. grind. }
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
-  { right. inv TERMINAL_TGT. }
+  { right. inv TERMINAL_TGT. eapply f_equal with (f:=observe) in H; ss. }
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
   right.
-  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
-    try (inv STATE; inv INSTR); ss.
+  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0]; ss;
+    try (dependent destruction STATE); ss; clarify.
   - (* promise *)
     exploit sim_local_promise; eauto. i. des.
     esplits; try apply SC; eauto; ss.
@@ -157,7 +169,7 @@ Proof.
     + auto.
     + auto.
     + left. eapply paco11_mon.
-      * apply assign_sim_thread; auto.
+      * eapply sim_itree_ret; eauto.
       * i. inv PR.
 Qed.
 
@@ -166,18 +178,23 @@ Lemma merge_store_store_sim_itree
       v1
       v2:
   sim_itree eq
-            [Stmt.instr (Instr.store l v1 o); Stmt.instr (Instr.store l v2 o)]
-            [Stmt.instr (Instr.store l v2 o)]
-            eq.
+            (ITree.trigger (MemE.write l v1 o);; ITree.trigger (MemE.write l v2 o))
+            (ITree.trigger (MemE.write l v2 o)).
 Proof.
+  replace (ITree.trigger (MemE.write l v1 o);; ITree.trigger (MemE.write l v2 o)) with
+      (Vis (MemE.write l v1 o) (fun _ => Vis (MemE.write l v2 o) (fun r => Ret r))).
+  2:{ unfold ITree.trigger. grind. repeat f_equal. extensionality r1. grind. }
+  replace (ITree.trigger (MemE.write l v2 o)) with
+      (Vis (MemE.write l v2 o) (fun r => Ret r)).
+  2:{ unfold ITree.trigger. grind. }
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
-  { right. inv TERMINAL_TGT. }
+  { right. inv TERMINAL_TGT. apply f_equal with (f:=observe) in H; ss. }
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
   right.
-  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
-    try (inv STATE; inv INSTR); ss.
+  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0]; ss;
+    try (dependent destruction STATE); ss; clarify.
   - (* promise *)
     exploit sim_local_promise; eauto. i. des.
     esplits; try apply SC; eauto; ss.
@@ -204,7 +221,7 @@ Proof.
       * etrans; eauto.
       * etrans; eauto.
       * left. eapply paco11_mon.
-        { apply sim_itree_nil; eauto. etrans; eauto. }
+        { apply sim_itree_ret; eauto. etrans; eauto. }
         { ii. inv PR. }
     + inv STEP1.
       esplits.
@@ -218,28 +235,33 @@ Proof.
       * etrans; eauto.
       * etrans; eauto.
       * left. eapply paco11_mon.
-        { apply sim_itree_nil; eauto. etrans; eauto. }
+        { apply sim_itree_ret; eauto. etrans; eauto. }
         { ii. inv PR. }
 Qed.
 
 Lemma merge_store_update_fetch_add_sim_itree
       l o
       v1
-      r2 or2
+      or2
       (ORD: Ordering.le Ordering.seqcst or2 -> Ordering.le Ordering.seqcst o):
-   sim_itree eq
-            [Stmt.instr (Instr.store l v1 o); Stmt.instr (Instr.update r2 l (Instr.fetch_add (Value.const 0)) or2 o)]
-            [Stmt.instr (Instr.store l v1 o); Stmt.instr (Instr.assign r2 v1)]
-            eq.
+  sim_itree eq
+            (ITree.trigger (MemE.write l v1 o);; ITree.trigger (MemE.update l (MemE.fetch_add 0) or2 o))
+            (ITree.trigger (MemE.write l v1 o);; Ret v1).
 Proof.
+  replace (ITree.trigger (MemE.write l v1 o);; ITree.trigger (MemE.update l (MemE.fetch_add 0) or2 o)) with
+      (Vis (MemE.write l v1 o) (fun _ => Vis (MemE.update l (MemE.fetch_add 0) or2 o) (fun r => Ret r))).
+  2:{ unfold ITree.trigger. grind. repeat f_equal. extensionality r1. grind. }
+  replace (ITree.trigger (MemE.write l v1 o);; Ret v1) with
+      (Vis (MemE.write l v1 o) (fun r => Ret v1)).
+  2:{ unfold ITree.trigger. grind. repeat f_equal. extensionality r1. grind. }
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
-  { right. inv TERMINAL_TGT. }
+  { right. inv TERMINAL_TGT. apply f_equal with (f:=observe) in H; ss. }
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
   right.
-  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
-    try (inv STATE; inv INSTR); ss.
+  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0]; ss;
+    try (dependent destruction STATE); ss; clarify.
   - (* promise *)
     exploit sim_local_promise; eauto. i. des.
     esplits; try apply SC; eauto; ss.
@@ -264,13 +286,13 @@ Proof.
           - auto.
         }
       * econs 2. econs 2. econs; [|econs 4]; eauto.
-        { econs. econs. s. rewrite ? Const.add_0_r. eauto. }
+        { econs; eauto. ss. rewrite ? Const.add_0_r. eauto. }
         { eapply merge_write_read; try exact STEP2; eauto using View.bot_spec. }
       * auto.
       * etrans; eauto.
       * etrans; eauto.
       * left. eapply paco11_mon.
-        { apply assign_sim_thread; eauto. etrans; eauto. }
+        { apply sim_itree_ret; eauto. etrans; eauto. }
         { i. inv PR. }
     + inv STEP1.
       esplits.
@@ -279,34 +301,39 @@ Proof.
         { econs. econs. }
         { auto. }
       * econs 2. econs 2. econs; [|econs 4]; eauto.
-        { econs. econs. s. rewrite ? Const.add_0_r. eauto. }
+        { econs; eauto. s. rewrite ? Const.add_0_r. eauto. }
         { eapply merge_write_read; try apply STEP2; eauto using View.bot_spec. }
       * auto.
       * etrans; eauto.
       * etrans; eauto.
       * left. eapply paco11_mon.
-        { apply assign_sim_thread; eauto. etrans; eauto. }
+        { apply sim_itree_ret; eauto. etrans; eauto. }
         { i. inv PR. }
 Qed.
 
 Lemma merge_store_update_cas_sim_itree
       l o
       v1 v2
-      r2 or2
+      or2
       (ORD: Ordering.le Ordering.seqcst or2 -> Ordering.le Ordering.seqcst o):
-   sim_itree eq
-            [Stmt.instr (Instr.store l v1 o); Stmt.instr (Instr.update r2 l (Instr.cas v1 v2) or2 o)]
-            [Stmt.instr (Instr.store l v2 o); Stmt.instr (Instr.assign r2 (Value.const 1))]
-            eq.
+  sim_itree eq
+            (ITree.trigger (MemE.write l v1 o);; ITree.trigger (MemE.update l (MemE.cas v1 v2) or2 o))
+            (ITree.trigger  (MemE.write l v2 o);; Ret 1).
 Proof.
+  replace (ITree.trigger (MemE.write l v1 o);; ITree.trigger (MemE.update l (MemE.cas v1 v2) or2 o)) with
+      (Vis (MemE.write l v1 o) (fun _ => Vis (MemE.update l (MemE.cas v1 v2) or2 o) (fun r => Ret r))).
+  2:{ unfold ITree.trigger. grind. repeat f_equal. extensionality r1. grind. }
+  replace (ITree.trigger  (MemE.write l v2 o);; Ret 1) with
+      (Vis (MemE.write l v2 o) (fun _ => Ret 1)).
+  2:{ unfold ITree.trigger. grind. repeat f_equal. extensionality r1. grind. }
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
-  { right. inv TERMINAL_TGT. }
+  { right. inv TERMINAL_TGT. apply f_equal with (f:=observe) in H; ss. }
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
   right.
-  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
-    try (inv STATE; inv INSTR); ss.
+  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0]; ss;
+    try (dependent destruction STATE); ss; clarify.
   - (* promise *)
     exploit sim_local_promise; eauto. i. des.
     esplits; try apply SC; eauto; ss.
@@ -331,15 +358,13 @@ Proof.
           - auto.
         }
       * econs 2. econs 2. econs; [|econs 4]; eauto.
-        { econs. econs. s.
-          instantiate (2 := RegFile.eval_value rf2 v1).
-          condtac; [refl|congr]. }
+        { econs; eauto. ss. des_ifs. }
         { eapply merge_write_read; try exact STEP2; eauto using View.bot_spec. }
       * auto.
       * etrans; eauto.
       * etrans; eauto.
       * left. eapply paco11_mon.
-        { apply assign_sim_thread; eauto. etrans; eauto. }
+        { apply sim_itree_ret; eauto. etrans; eauto. }
         { i. inv PR. }
     + inv STEP1.
       esplits.
@@ -348,15 +373,13 @@ Proof.
         { econs. econs. }
         { auto. }
       * econs 2. econs 2. econs; [|econs 4]; eauto.
-        { econs. econs. s.
-          instantiate (2 := RegFile.eval_value rf2 v1).
-          condtac; [refl|congr]. }
+        { econs; eauto. ss. des_ifs. }
         { eapply merge_write_read; try apply STEP2; eauto using View.bot_spec. }
       * auto.
       * etrans; eauto.
       * etrans; eauto.
       * left. eapply paco11_mon.
-        { apply assign_sim_thread; eauto. etrans; eauto. }
+        { apply sim_itree_ret; eauto. etrans; eauto. }
         { i. inv PR. }
 Qed.
 
@@ -365,23 +388,28 @@ Qed.
 
 Lemma merge_update_load_sim_itree
       l
-      r1 v1 or ow
-      r2 or2
+      v1 or ow
+      or2
       (O: Ordering.le Ordering.seqcst or2 -> Ordering.le Ordering.seqcst ow)
       (OR2: Ordering.le or2 or):
   sim_itree eq
-            [Stmt.instr (Instr.update r1 l (Instr.fetch_add v1) or ow); Stmt.instr (Instr.load r2 l or2)]
-            [Stmt.instr (Instr.update r1 l (Instr.fetch_add v1) or ow); Stmt.instr (Instr.assign r2 r1)]
-            eq.
+            (ITree.trigger (MemE.update l (MemE.fetch_add v1) or ow);; ITree.trigger (MemE.read l or2))
+            (ITree.trigger (MemE.update l (MemE.fetch_add v1) or ow)).
 Proof.
+  replace (ITree.trigger (MemE.update l (MemE.fetch_add v1) or ow);; ITree.trigger (MemE.read l or2)) with
+      (Vis (MemE.update l (MemE.fetch_add v1) or ow) (fun _ => Vis (MemE.read l or2) (fun r => Ret r))).
+  2:{ unfold ITree.trigger. grind. repeat f_equal. extensionality r1. grind. }
+  replace (ITree.trigger (MemE.update l (MemE.fetch_add v1) or ow)) with
+      (Vis (MemE.update l (MemE.fetch_add v1) or ow) (fun r => Ret r)).
+  2:{ unfold ITree.trigger. grind. }
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
-  { right. inv TERMINAL_TGT. }
+  { right. inv TERMINAL_TGT. apply f_equal with (f:=observe) in H; ss. }
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
   right.
-  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
-    try (inv STATE; inv INSTR); ss.
+  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0]; ss;
+    try (dependent destruction STATE); ss; clarify.
   - (* promise *)
     exploit sim_local_promise; eauto. i. des.
     esplits; try apply SC; eauto; ss.
@@ -391,9 +419,11 @@ Proof.
     exploit Local.write_step_future; eauto. i. des.
     exploit merge_write_read; try apply LOCAL2; eauto.
     { inv LOCAL1. s. i. repeat (try condtac; aggrtac).
+      rename or into ordr.
       destruct ordr, or2; inv H; inv COND; inv OR2.
     }
     { inv LOCAL1. s. i. repeat (try condtac; aggrtac).
+      rename or into ordr.
       destruct ordr, or2; inv H; inv COND; inv OR2.
     }
     i. des.
@@ -415,30 +445,36 @@ Proof.
     + auto.
     + auto.
     + left. eapply paco11_mon.
-      * apply assign_sim_thread; auto. s. rewrite RegFun.add_spec_eq. inv RMW. auto.
+      * apply sim_itree_ret; auto.
       * i. inv PR.
 Qed.
 
 Lemma merge_update_store_sim_itree
       l or ow
-      r1 v1 v2 v3
-      (VAL: v3 <> Value.reg r1):
+      v1 v2 v3:
   sim_itree eq
-            [Stmt.instr (Instr.update r1 l (Instr.cas v1 v2) or ow);
-               Stmt.ite (Instr.expr_op2 Op2.eq (Value.reg r1) (Value.const 1))
-                        [Stmt.instr (Instr.store l v3 ow)]
-                        nil]
-            [Stmt.instr (Instr.update r1 l (Instr.cas v1 v3) or ow)]
-            eq.
+            (r <- ITree.trigger (MemE.update l (MemE.cas v1 v2) or ow);;
+             (if (r: Const.t) then Ret tt else ITree.trigger (MemE.write l v3 ow));; Ret r)
+            (ITree.trigger (MemE.update l (MemE.cas v1 v3) or ow)).
 Proof.
+  replace (r <- ITree.trigger (MemE.update l (MemE.cas v1 v2) or ow);;
+           (if (r: Const.t) then Ret tt else ITree.trigger (MemE.write l v3 ow));; Ret r) with
+      (Vis (MemE.update l (MemE.cas v1 v2) or ow)
+           (fun r => if (r: Const.t) then Ret r
+                     else Vis (MemE.write l v3 ow) (fun _ => Ret r))).
+  2:{ unfold ITree.trigger. grind. repeat f_equal. extensionality r. grind.
+      repeat f_equal. extensionality u. grind. }
+  replace (ITree.trigger (MemE.update l (MemE.cas v1 v3) or ow)) with
+      (Vis (MemE.update l (MemE.cas v1 v3) or ow) (fun r => Ret r)).
+  2:{ unfold ITree.trigger. grind. }
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
-  { right. inv TERMINAL_TGT. }
+  { right. inv TERMINAL_TGT. apply f_equal with (f:=observe) in H; ss. }
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
   right.
-  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
-    try (inv STATE; inv INSTR); ss.
+  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0]; ss;
+    try (dependent destruction STATE); ss; clarify.
   - (* promise *)
     exploit sim_local_promise; eauto. i. des.
     esplits; try apply SC; eauto ; ss.
@@ -454,15 +490,14 @@ Proof.
     + ss.
     + econs 2; [|eauto]. econs.
       * econs. econs 2. econs; [|econs 2]; try exact STEP_SRC. s.
-        econs. econs. s. condtac; ss.
+        econs; eauto. ss. condtac; ss.
       * ss.
-    + econs 2. econs 2. econs; [|econs 1]. s. econs.
+    + econs 1.
     + ss.
     + ss.
     + ss.
-    + ss. rewrite RegFun.add_spec_eq. condtac; ss.
-      left. eapply paco11_mon.
-      * apply sim_itree_nil; eauto.
+    + ss. left. eapply paco11_mon.
+      * apply sim_itree_ret; eauto.
       * i. inv PR.
   - (* update success *)
     exploit Time.middle_spec; eauto.
@@ -488,85 +523,72 @@ Proof.
       i. des.
       esplits.
       * ss.
-      * econs 2; [|econs 2; [|econs 2;eauto]].
+      * econs 2; [|econs 2; eauto].
         { econs.
           - econs. econs 1. econs; eauto.
           - auto.
         }
         { econs.
           - econs. econs 2. econs; [|econs 4]; try exact STEP4; try exact STEP_SRC0; eauto.
-            econs. econs. s. condtac; ss.
+            econs; eauto. ss. condtac; ss.
           - auto.
         }
-        { econs.
-          - econs. econs 2. econs; [|econs 1]. s. econs.
-          - ss.
-        }
-      * ss. rewrite RegFun.add_spec_eq. condtac; ss.
-        econs 2. econs 2. econs; [|econs 3]; eauto. econs. s.
-        instantiate (1 := RegFun.add r1 1 rs_tgt).
-        revert RMW. condtac; ss. i. inv RMW.
-        replace (RegFile.eval_value rs_tgt v3) with (RegFile.eval_value (RegFun.add r1 1 rs_tgt) v3); try econs.
-        destruct v3; ss.
-        rewrite RegFun.add_spec_neq; ss. congr.
+      * ss. econs 2. econs 2. econs; [|econs 3]; eauto. ss.
+        des_ifs; clarify. econs; eauto.
       * auto.
       * etrans; eauto.
       * etrans; eauto.
       * left. eapply paco11_mon.
-        { apply sim_itree_nil; eauto.
-          - revert RMW. condtac; ss. i. inv RMW. ss.
+        { apply sim_itree_ret; eauto.
           - etrans; eauto. }
         { i. inv PR. }
     + inv STEP1.
       exploit Local.write_step_future; try apply STEP2; eauto; try by viewtac. i. des.
       esplits.
       * ss.
-      * econs 2; [|econs 2; eauto].
+      * econs 2; eauto.
         { econs.
           - econs. econs 2. econs; [|econs 4]; try exact STEP_SRC; try exact STEP2; eauto.
-            econs. econs. s. condtac; ss.
+            econs; eauto. ss. condtac; ss.
           - auto.
         }
-        { econs.
-          - econs. econs 2. econs; [|econs 1]. s. econs.
-          - ss.
-        }
-      * ss. rewrite RegFun.add_spec_eq. condtac; ss.
-        econs 2. econs 2. econs; [|econs 3]; eauto. econs. s.
-        instantiate (1 := RegFun.add r1 1 rs_tgt).
-        revert RMW. condtac; ss. i. inv RMW.
-        replace (RegFile.eval_value rs_tgt v3) with (RegFile.eval_value (RegFun.add r1 1 rs_tgt) v3); try econs.
-        destruct v3; ss.
-        rewrite RegFun.add_spec_neq; ss. congr.
+      * ss. econs 2. econs 2. econs; [|econs 3]; eauto.
+        des_ifs; clarify. econs; eauto.
       * auto.
       * etrans; eauto.
       * etrans; eauto.
       * left. eapply paco11_mon.
-        { apply sim_itree_nil; eauto.
-          - revert RMW. condtac; ss. i. inv RMW. ss.
+        { apply sim_itree_ret; eauto.
           - etrans; eauto. }
         { i. inv PR. }
 Qed.
 
 Lemma merge_update_update_sim_itree
       l or ow
-      r1 v1
-      r2 or2
+      v1 v2
+      or2
       (O: Ordering.le Ordering.seqcst or2 -> Ordering.le Ordering.seqcst ow)
       (OR2: Ordering.le or2 or):
   sim_itree eq
-            [Stmt.instr (Instr.update r1 l (Instr.fetch_add v1) or ow); Stmt.instr (Instr.update r2 l (Instr.fetch_add 0) or2 ow)]
-            [Stmt.instr (Instr.update r1 l (Instr.fetch_add v1) or ow); Stmt.instr (Instr.assign r2 r1)]
-            eq.
+            (ITree.trigger (MemE.update l (MemE.fetch_add v1) or ow);; ITree.trigger (MemE.update l (MemE.fetch_add v2) or2 ow))
+            (ITree.trigger (MemE.update l (MemE.fetch_add (v1 + v2)) or ow)).
 Proof.
+  replace (ITree.trigger (MemE.update l (MemE.fetch_add v1) or ow);; ITree.trigger (MemE.update l (MemE.fetch_add v2) or2 ow)) with
+      (Vis (MemE.update l (MemE.fetch_add v1) or ow)
+           (fun _ => Vis (MemE.update l (MemE.fetch_add v2) or2 ow) (fun r => Ret r))).
+  2:{ unfold ITree.trigger. grind. repeat f_equal. extensionality r. grind. }
+  replace (ITree.trigger (MemE.update l (MemE.fetch_add (v1 + v2)) or ow)) with
+      (Vis (MemE.update l (MemE.fetch_add (v1 + v2)) or ow)
+           (fun r => Ret r)).
+  2:{ unfold ITree.trigger. grind. }
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
-  { right. inv TERMINAL_TGT. }
+  { right. inv TERMINAL_TGT. apply f_equal with (f:=observe) in H; ss. }
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
   right.
-  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
-    try (inv STATE; inv INSTR); ss.
+  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0]; ss;
+    try (dependent destruction STATE); ss; clarify.
   - (* promise *)
     exploit sim_local_promise; eauto. i. des.
     esplits; try apply SC; eauto ; ss.
@@ -601,23 +623,25 @@ Proof.
           - auto.
         }
         { econs. econs. econs 2. econs; [|econs 4]; try exact STEP4; try exact STEP_SRC0; eauto.
-          - econs. econs. s. eauto.
+          - econs; eauto. s. eauto.
           - auto.
         }
       * econs 2. econs 2. econs; [|econs 4]; eauto.
-        { econs. econs. s. rewrite ? Const.add_0_r. eauto. }
-        { inv RMW. eapply merge_write_read; try exact STEP2; viewtac.
+        { econs; eauto. s. rewrite Const.add_assoc. eauto. }
+        { eapply merge_write_read; try exact STEP2; viewtac.
           - inv STEP4. s. repeat (try condtac; aggrtac).
+            rename or into ordr.
             destruct or2, ordr; inv H; inv OR2; inv COND.
           - inv STEP4. s. repeat (try condtac; aggrtac).
+            rename or into ordr.
             destruct or2, ordr; inv H; inv OR2; inv COND.
         }
       * auto.
       * etrans; eauto.
       * etrans; eauto.
       * left. eapply paco11_mon.
-        { apply assign_sim_thread; eauto.
-          - s. unfold RegFun.find. unfold RegFun.add at 4. condtac; [|congr]. auto.
+        { apply sim_itree_ret; eauto.
+          - rewrite Const.add_assoc. eauto.
           - etrans; eauto.
         }
         { i. inv PR. }
@@ -630,19 +654,21 @@ Proof.
         { econs. econs. s. eauto. }
         { auto. }
       * econs 2. econs 2. econs; [|econs 4]; eauto.
-        { econs. econs. s. rewrite ? Const.add_0_r. eauto. }
-        { inv RMW. eapply merge_write_read; try exact STEP2; viewtac.
+        { econs; eauto. ss. rewrite Const.add_assoc. eauto. }
+        { eapply merge_write_read; try exact STEP2; viewtac.
           - inv STEP_SRC. s. repeat (try condtac; aggrtac).
+            rename or into ordr.
             destruct or2, ordr; inv H; inv OR2; inv COND.
           - inv STEP_SRC. s. repeat (try condtac; aggrtac).
+            rename or into ordr.
             destruct or2, ordr; inv H; inv OR2; inv COND.
         }
       * auto.
       * etrans; eauto.
       * etrans; eauto.
       * left. eapply paco11_mon.
-        { apply assign_sim_thread; eauto.
-          - s. unfold RegFun.find. unfold RegFun.add at 4. condtac; [|congr]. auto.
+        { apply sim_itree_ret; eauto.
+          - rewrite Const.add_assoc. auto.
           - etrans; eauto.
         }
         { i. inv PR. }
@@ -654,18 +680,23 @@ Qed.
 Lemma merge_fence_fence_sim_itree
       ordr ordw:
   sim_itree eq
-            [Stmt.instr (Instr.fence ordr ordw); Stmt.instr (Instr.fence ordr ordw)]
-            [Stmt.instr (Instr.fence ordr ordw)]
-            eq.
+            (ITree.trigger (MemE.fence ordr ordw);; ITree.trigger (MemE.fence ordr ordw))
+            (ITree.trigger (MemE.fence ordr ordw)).
 Proof.
+  replace (ITree.trigger (MemE.fence ordr ordw);; ITree.trigger (MemE.fence ordr ordw)) with
+      (Vis (MemE.fence ordr ordw) (fun _ => Vis (MemE.fence ordr ordw) (fun r => Ret r))).
+  2:{ unfold ITree.trigger. grind. repeat f_equal. extensionality r. grind. }
+  replace (ITree.trigger (MemE.fence ordr ordw)) with
+      (Vis (MemE.fence ordr ordw) (fun r => Ret r)).
+  2:{ unfold ITree.trigger. grind. }
   pcofix CIH. ii. subst. pfold. ii. splits; ii.
-  { right. inv TERMINAL_TGT. }
+  { right. inv TERMINAL_TGT. apply f_equal with (f:=observe) in H; ss. }
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
   right.
-  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
-    try (inv STATE; inv INSTR); ss.
+  inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0]; ss;
+    try (dependent destruction STATE); ss; clarify.
   - (* promise *)
     exploit sim_local_promise; eauto. i. des.
     esplits; try apply SC; eauto; ss.
@@ -683,6 +714,6 @@ Proof.
     + etrans; eauto.
     + auto.
     + left. eapply paco11_mon.
-      * apply sim_itree_nil; eauto. etrans; eauto.
+      * apply sim_itree_ret; eauto. etrans; eauto.
       * ii. inv PR.
 Qed.
