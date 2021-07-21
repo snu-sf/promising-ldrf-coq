@@ -198,7 +198,7 @@ Proof.
         { econs. eauto. }
         { etrans; eauto.
           destruct e; by inv STEP; ss; dependent destruction STATE; inv REORDER. }
-    + destruct SIM. dependent destruction STEP; ss; dependent destruction STATE.
+    + destruct SIM. dependent destruction STEP; ss; dependent destruction STATE. destruct e; ss.
   - exploit sim_store_mon; eauto. i. des.
     exploit sim_store_step; eauto. i. des; eauto.
     + right. esplits; eauto.

@@ -416,14 +416,12 @@ Proof.
     + econs; eauto.
     + econs 2. econs. ss.
     + left. apply sim_trace_ret. ss.
+  - left. red. esplits; eauto. econs.
   - right. esplits; eauto.
     + econs; eauto.
     + econs 2. econs. ss.
     + left. apply sim_trace_ret. ss.
-  - right. esplits; eauto.
-    + econs; eauto.
-    + econs 2. econs. ss.
-    + left. apply sim_trace_ret. ss.
+  Unshelve. all: try exact ITree.spin.
 Qed.
 
 Lemma sim_trace_choose r:
@@ -555,22 +553,22 @@ Proof.
     gbase. eauto.
   - pclearbot. gstep. econs.
     { ii. inv TERMINAL_TGT. apply f_equal with (f:=observe) in H; ss. }
-    ii. ss. right.
-    dependent destruction STEP_TGT.
-    + esplits; [econs; refl|eauto|econs 2|gbase; apply CIH; eauto]; econs; eauto.
-    + esplits; [econs; refl|eauto|econs 2|gbase; apply CIH; eauto]; econs; eauto.
-    + esplits; [econs; refl|eauto|econs 2|gbase; apply CIH; eauto]; econs; eauto.
-    + esplits; [econs; refl|eauto|econs 2|gbase; apply CIH; eauto]; econs; eauto.
-    + esplits; [econs; refl|eauto|econs 2|gbase; apply CIH; eauto]; econs; eauto.
-    + esplits; [econs; refl|eauto|econs 2|gbase; apply CIH; eauto]; econs; eauto.
-    + esplits; [econs; refl|eauto|econs 2|gbase; apply CIH; eauto]; econs; eauto.
-    + esplits; [econs; refl|eauto|econs 2|gbase; apply CIH; eauto]; econs; eauto.
+    ii. ss. dependent destruction STEP_TGT.
+    + right. esplits; [econs; refl|eauto|econs 2|gbase; apply CIH; eauto]; econs; eauto.
+    + right. esplits; [econs; refl|eauto|econs 2|gbase; apply CIH; eauto]; econs; eauto.
+    + right. esplits; [econs; refl|eauto|econs 2|gbase; apply CIH; eauto]; econs; eauto.
+    + right. esplits; [econs; refl|eauto|econs 2|gbase; apply CIH; eauto]; econs; eauto.
+    + right. esplits; [econs; refl|eauto|econs 2|gbase; apply CIH; eauto]; econs; eauto.
+    + right. esplits; [econs; refl|eauto|econs 2|gbase; apply CIH; eauto]; econs; eauto.
+    + right. esplits; [econs; refl|eauto|econs 2|gbase; apply CIH; eauto]; econs; eauto.
+    + left. econs. esplits; eauto. econs.
   - guclo tauF_l_uclo. econs; eauto. econs. eapply bisim_is_eq. symmetry. eapply itree_eta.
   - gstep. econs.
     { ii. inv TERMINAL_TGT. apply f_equal with (f:=observe) in H; ss. }
     ii. ss. right.
     dependent destruction STEP_TGT.
     esplits; [econs; refl|eauto|econs 1|]. gbase. eauto.
+  Unshelve. all: try exact ITree.spin.
 Qed.
 
 Lemma sim_trace_refl R (itr: itree MemE.t R):
@@ -597,10 +595,11 @@ Proof.
   pfold. unfold _sim_trace. splits; i.
   - left.
     unfold lang_steps_failure. esplits; eauto.
-    econs. ss.
+    econs.
   - left.
     unfold lang_steps_failure. esplits; eauto.
-    econs. ss.
+    econs.
+  Unshelve. all: try exact ITree.spin.
 Qed.
 
 Lemma sim_itree_replace_abort R (itr: itree MemE.t R):
@@ -625,7 +624,8 @@ Proof.
   - inv TERMINAL_TGT. apply f_equal with (f:=observe) in H; ss.
   - left.
     unfold lang_steps_failure. esplits; eauto.
-    econs. econs.
+    econs.
+  Unshelve. all: try exact ITree.spin.
 Qed.
 
 Lemma sim_itree_elim_after_abort R (k: ktree MemE.t _ R):
@@ -635,4 +635,5 @@ Lemma sim_itree_elim_after_abort R (k: ktree MemE.t _ R):
 Proof.
   apply sim_trace_sim_itree.
   apply sim_trace_elim_after_abort; ss.
+  Unshelve. all: try exact ITree.spin.
 Qed.

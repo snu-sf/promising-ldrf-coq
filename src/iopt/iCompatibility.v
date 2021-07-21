@@ -159,14 +159,18 @@ Lemma lang_step_deseq
       ILang.step e (ktr r) itr2) \/
   (exists itr2',
       itr2 = itr2' >>= ktr /\
-      ILang.step e itr1 itr2').
+      ILang.step e itr1 itr2') \/
+  (itr1 = Vis MemE.abort (Empty_set_rect _) /\
+   e = ProgramEvent.failure)
+.
 Proof.
   ides itr1.
   { rewrite bind_ret_l in STEP. left. esplits; eauto. }
   { rewrite bind_tau in STEP. dependent destruction STEP.
-    right. esplits; eauto. econs. eauto. }
-  { right. rewrite bind_vis in STEP.
-    dependent destruction STEP; try by (esplits; eauto; econs; eauto). }
+    right. left. esplits; eauto. econs. eauto. }
+  { rewrite bind_vis in STEP.
+    dependent destruction STEP; try by (right; left; esplits; eauto; econs; eauto).
+    right. right. splits; auto. f_equal. f_equal. extensionality v. ss. }
 Qed.
 
 Lemma thread_step_deseq
@@ -186,15 +190,19 @@ Lemma thread_step_deseq
       itr2 = itr2' >>= ktr /\
       Thread.step pf e
                   (Thread.mk (lang _) itr1 lc1 sc1 mem1)
-                  (Thread.mk (lang _) itr2' lc2 sc2 mem2)).
+                  (Thread.mk (lang _) itr2' lc2 sc2 mem2)) \/
+  (itr1 = Vis MemE.abort (Empty_set_rect _) /\
+   e = ThreadEvent.failure)
+.
 Proof.
   inv STEP.
-  - inv STEP0. right. esplits; eauto.
+  - inv STEP0. right. left. esplits; eauto.
     econs 1. econs; eauto.
   - inv STEP0; ss.
     apply lang_step_deseq in STATE. des; clarify.
     { left. esplits; eauto. econs 2. econs; eauto. }
-    { right. esplits; eauto. econs 2. econs; eauto. }
+    { right. left. esplits; eauto. econs 2. econs; eauto. }
+    { destruct e; ss; auto. }
 Qed.
 
 Lemma sim_rtc
@@ -455,6 +463,13 @@ Proof.
         { eapply rclo11_clo_base. eapply ctx_bind; eauto.
           eapply _sim_ktree_mon; cycle 1; eauto.
         }
+    + left. exploit STEP.
+      { right. instantiate (5:=ThreadEvent.failure). econs; eauto.
+        ss. econs; eauto. }
+      i. des; ss.
+      unfold Thread.steps_failure in *. des. destruct e2, e3. esplits.
+      { eapply rtc_internal_step_bind; eauto. }
+      { eapply step_bind; eauto. }
   - (* tau iter *)
     ii.
     inversion LOCAL. exploit SimPromises.sem_bot_inv; eauto. i.
@@ -487,6 +502,7 @@ Proof.
           i. eapply rclo11_base. eauto. }
         { eapply ctx_ret; eauto. }
       }
+  Unshelve. all: try exact ITree.spin.
 Qed.
 
 Inductive iter_ctx (sim_thread:SIM_THREAD): SIM_THREAD :=

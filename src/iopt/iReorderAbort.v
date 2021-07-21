@@ -49,8 +49,8 @@ Inductive reorder_abort: forall R (i2:MemE.t R), Prop :=
 .
 
 Inductive sim_abort: forall R
-                            (st_src:itree MemE.t (unit * R)%type) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t)
-                            (st_tgt:itree MemE.t (unit * R)%type) (lc_tgt:Local.t) (sc1_tgt:TimeMap.t) (mem1_tgt:Memory.t), Prop :=
+                            (st_src:itree MemE.t (void * R)%type) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t)
+                            (st_tgt:itree MemE.t (void * R)%type) (lc_tgt:Local.t) (sc1_tgt:TimeMap.t) (mem1_tgt:Memory.t), Prop :=
 | sim_abort_intro
     R (i2: MemE.t R)
     lc1_src sc1_src mem1_src
@@ -108,7 +108,7 @@ Lemma sim_abort_steps_failure
       (SIM: @sim_abort R
                        st1_src lc1_src sc1_src mem1_src
                        st1_tgt lc1_tgt sc1_tgt mem1_tgt):
-  Thread.steps_failure (Thread.mk (lang (unit * R)%type) st1_src lc1_src sc1_src mem1_src).
+  Thread.steps_failure (Thread.mk (lang (void * R)%type) st1_src lc1_src sc1_src mem1_src).
 Proof.
   destruct SIM. inv FAILURE. unfold Thread.steps_failure.
   dependent destruction REORDER.
@@ -125,7 +125,7 @@ Proof.
         rewrite <- TVIEW. rewrite <- PROMISES in *. eauto.
   - (* store *)
     exploit (@LowerPromises.steps_promises_rel
-               (lang (unit * unit)%type) (Thread.mk (lang (unit * unit)%type) (Vis (MemE.write l2 v2 o2) (fun v2 => Vis (MemE.abort) (fun v1 => Ret (v1, v2))))
+               (lang (void * unit)%type) (Thread.mk (lang (void * unit)%type) (Vis (MemE.write l2 v2 o2) (fun v2 => Vis (MemE.abort) (fun v1 => Ret (v1, v2))))
                                                     lc1_src sc1_src mem1_src)); s; eauto.
     i. des. destruct e2. ss.
     exploit LowerPromises.rtc_opt_promise_step_future; eauto. s. i. des. subst.
@@ -140,7 +140,7 @@ Proof.
     + econs 2. econs; [econs; econs|]. econs. econs. ss.
   - (* fence *)
     exploit (@LowerPromises.steps_promises_rel
-               (lang (unit * unit)%type) (Thread.mk (lang (unit * unit)%type) (Vis (MemE.fence or2 ow2) (fun v2 => Vis (MemE.abort) (fun v1 => Ret (v1, v2))))
+               (lang (void * unit)%type) (Thread.mk (lang (void * unit)%type) (Vis (MemE.fence or2 ow2) (fun v2 => Vis (MemE.abort) (fun v1 => Ret (v1, v2))))
                                       lc1_src sc1_src mem1_src)); s; eauto.
     i. des. destruct e2. ss.
     exploit LowerPromises.rtc_opt_promise_step_future; eauto. s. i. des. inv STATE.

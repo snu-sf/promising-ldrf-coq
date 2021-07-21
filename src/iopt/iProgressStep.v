@@ -47,8 +47,8 @@ Proof.
     i. des.
     esplits. econs; [|econs 6]; eauto. econs. econs.
   - hexploit Local.bot_promise_consistent; eauto. i.
-    esplits. econs; [|econs 7]; eauto. econs. econs.
+    esplits. econs; [|econs 7]; eauto. econs.
   - esplits. econs; [|econs 1]; eauto. econs. econs.
 Grab Existential Variables.
-  all: try exact 0.
+  all: try exact 0. all: try exact ITree.spin.
 Qed.
