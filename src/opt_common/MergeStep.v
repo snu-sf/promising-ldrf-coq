@@ -174,7 +174,7 @@ Proof.
     - etrans; [apply WF0|]. etrans; eauto. left. auto.
   }
   { apply WF0. }
-  { eauto. }
+  { ss. }
   i. des.
   assert (REL1'_CLOSED: Memory.closed_opt_view released1' mem1).
   { unfold released1'. eapply TViewFacts.op_closed_released; eauto; try apply WF0.

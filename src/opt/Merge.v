@@ -102,10 +102,26 @@ Proof.
     + left. eapply paco11_mon.
       * apply assign_sim_thread; eauto. s. rewrite RegFun.add_spec_eq. auto.
       * i. inv PR.
+  - (* racy load *)
+    exploit sim_local_racy_read; try exact LOCAL1; eauto; try refl. i. des.
+    esplits.
+    + ss.
+    + econs 2; try refl. econs.
+      * econs. econs 2. econs; [|econs 9]; eauto. econs. econs.
+      * eauto.
+    + econs 2. econs 2. econs; [|econs 9]; eauto. econs. econs.
+    + ss.
+    + ss.
+    + ss.
+    + left. eapply paco9_mon.
+      * apply assign_sim_thread; eauto. s. rewrite RegFun.add_spec_eq. auto.
+      * i. inv PR.
 Qed.
 
 Lemma merge_load_store_sim_stmts
-      l or ow r1:
+      l or ow r1
+      (OR: Ordering.le Ordering.plain or)
+      (OW: Ordering.le Ordering.plain ow):
   sim_stmts eq
             [Stmt.instr (Instr.load r1 l or); Stmt.instr (Instr.store l (Value.reg r1) ow)]
             [Stmt.instr (Instr.update r1 l (Instr.fetch_add (Value.const 0)) or ow)]
@@ -116,21 +132,26 @@ Proof.
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
-  right.
   inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
     try (inv STATE; inv INSTR); ss.
   - (* promise *)
+    right.
     exploit sim_local_promise; eauto. i. des.
     esplits; try apply SC; eauto; ss.
     + econs 2. econs 1. econs; eauto.
     + auto.
-  - (* load *)
+  - (* update *)
+    right.
     clarify. rewrite Const.add_0_r in *.
-    exploit sim_local_read; try exact LOCAL; eauto; try refl. i. des.
+    exploit sim_local_read; try exact LOCAL; [..|refl|]; eauto. i. des.
     assert (VIEWLE: View.opt_le None releasedr) by eauto.
     exploit Local.read_step_future; try apply LOCAL1; eauto. i. des.
     exploit Local.read_step_future; try apply STEP_SRC; eauto. i. des.
-    hexploit sim_local_write; try apply VIEWLE; try exact SC; try exact LOCAL0; eauto; try refl. i. des.
+    hexploit sim_local_write; try apply VIEWLE; try exact SC; try exact LOCAL0;
+      try match goal with
+          | [|- is_true (Ordering.le _ _)] => refl
+          end; eauto.
+    i. des.
     rewrite SimPromises.unset_bot in *.
     esplits.
     + ss.
@@ -147,6 +168,27 @@ Proof.
     + left. eapply paco11_mon.
       * apply sim_stmts_nil; eauto.
       * ii. inv PR.
+  - (* racy update *)
+    left.
+    exploit sim_local_racy_update;
+      try match goal with
+          | [|- is_true (Ordering.le _ _)] => refl
+          end; eauto.
+    i. des.
+    inv x0; try by destruct ordr, ordw; ss.
+    unfold Thread.steps_failure. esplits.
+    + econs 2; try refl. econs.
+      * econs. econs 2. econs; [|econs 9].
+        { econs. econs. }
+        { econs; eauto; ss. inv RACE. econs; eauto.
+          eapply TimeFacts.le_lt_lt; eauto. apply WF_SRC. }
+      * ss.
+    + econs 2. econs; [|econs 10]; eauto.
+      * econs. econs.
+      * econs; eauto. ss.
+    + ss.
+Grab Existential Variables.
+{ ss. }
 Qed.
 
 
@@ -167,15 +209,16 @@ Proof.
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
-  right.
   inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
     try (inv STATE; inv INSTR); ss.
   - (* promise *)
+    right.
     exploit sim_local_promise; eauto. i. des.
     esplits; try apply SC; eauto; ss.
     + econs 2. econs 1. econs; eauto.
     + auto.
   - (* store *)
+    right.
     hexploit sim_local_write_bot; try exact LOCAL1; try exact SC; eauto; try refl; try by viewtac. i. des.
     exploit merge_write_read; try exact STEP_SRC; eauto using View.bot_spec. i. des.
     esplits.
@@ -190,12 +233,40 @@ Proof.
     + left. eapply paco11_mon.
       * apply assign_sim_thread; auto.
       * i. inv PR.
+  - (* na store *)
+    right.
+    exploit Local.write_undef_step_future; eauto. i. des.
+    exploit sim_local_write_undef; try exact LOCAL1; try exact SC; eauto; try refl. i. des.
+    exploit Local.write_undef_step_future; eauto. i. des.
+    rewrite SimPromises.unset_bot in *.
+    hexploit sim_local_write_bot; try exact LOCAL2; try exact SC0; eauto; try refl. i. des.
+    exploit merge_write_read; try exact STEP_SRC0; eauto using View.bot_spec. i.
+    esplits.
+    + ss.
+    + econs 2; [|econs 1]. econs.
+      * econs. econs 2. econs; [|econs 8]; eauto. econs. econs.
+      * eauto.
+    + econs 2. econs 2. econs; [|econs 2]; eauto. econs. econs.
+    + ss.
+    + ss.
+    + ss.
+    + left. eapply paco9_mon.
+      * apply assign_sim_thread; auto.
+      * i. inv PR.
+  - (* racy store *)
+    left.
+    exploit sim_local_racy_write; try exact LOCAL1; eauto; try refl. i. des.
+    unfold Thread.steps_failure. esplits.
+    + refl.
+    + econs 2. econs; [|econs 10]; eauto. econs. econs.
+    + ss.
 Qed.
 
 Lemma merge_store_store_sim_stmts
       l o
       v1
-      v2:
+      v2
+      (ORD: Ordering.le Ordering.plain o):
   sim_stmts eq
             [Stmt.instr (Instr.store l v1 o); Stmt.instr (Instr.store l v2 o)]
             [Stmt.instr (Instr.store l v2 o)]
@@ -206,18 +277,22 @@ Proof.
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
-  right.
   inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
     try (inv STATE; inv INSTR); ss.
   - (* promise *)
+    right.
     exploit sim_local_promise; eauto. i. des.
     esplits; try apply SC; eauto; ss.
     econs 2. econs 1; eauto. econs; eauto. eauto.
   - (* store *)
-    exploit Time.middle_spec; eauto.
+    right.
+    exploit Time.middle_spec.
     { inv LOCAL1. eapply MemoryFacts.write_time_lt. eauto. }
     i. des.
-    hexploit sim_local_write_bot; try exact LOCAL0; try exact SC; eauto; try refl; try by viewtac. i. des.
+    hexploit sim_local_write_bot;
+      try match goal with
+          | [|- is_true (Ordering.le _ _)] => refl
+          end; try exact LOCAL0; try exact SC; eauto; try refl; try by viewtac. i. des.
     exploit merge_write_write_None; try exact STEP_SRC; eauto; try by viewtac. i. des.
     + esplits.
       * ss.
@@ -251,13 +326,26 @@ Proof.
       * left. eapply paco11_mon.
         { apply sim_stmts_nil; eauto. etrans; eauto. }
         { ii. inv PR. }
+  - (* na store *)
+    inv LOCAL1. destruct ord; ss.
+  - (* racy store *)
+    left.
+    exploit sim_local_racy_write;
+      try match goal with
+          | [|- is_true (Ordering.le _ _)] => refl
+          end; try exact LOCAL1; eauto; try refl. i. des.
+    unfold Thread.steps_failure. esplits.
+    + refl.
+    + econs 2. econs; [|econs 10]; eauto. econs. econs.
+    + ss.
 Qed.
 
 Lemma merge_store_update_fetch_add_sim_stmts
       l o
       v1
       r2 or2
-      (ORD: Ordering.le Ordering.seqcst or2 -> Ordering.le Ordering.seqcst o):
+      (ORD: Ordering.le Ordering.seqcst or2 -> Ordering.le Ordering.seqcst o)
+      (ORDW: Ordering.le Ordering.plain o):
    sim_stmts eq
             [Stmt.instr (Instr.store l v1 o); Stmt.instr (Instr.update r2 l (Instr.fetch_add (Value.const 0)) or2 o)]
             [Stmt.instr (Instr.store l v1 o); Stmt.instr (Instr.assign r2 v1)]
@@ -268,18 +356,22 @@ Proof.
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
-  right.
   inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
     try (inv STATE; inv INSTR); ss.
   - (* promise *)
+    right.
     exploit sim_local_promise; eauto. i. des.
     esplits; try apply SC; eauto; ss.
     econs 2. econs 1; eauto. econs; eauto. eauto.
   - (* store *)
+    right.
     exploit Time.middle_spec; eauto.
     { inv LOCAL1. eapply MemoryFacts.write_time_lt. eauto. }
     i. des.
-    hexploit sim_local_write_bot; try exact LOCAL0; try exact SC; eauto; try refl; try by viewtac. i. des.
+    hexploit sim_local_write_bot; try exact LOCAL0;
+      try match goal with
+          | [|- is_true (Ordering.le _ _)] => refl
+          end; try exact SC; eauto; try refl; try by viewtac. i. des.
     exploit merge_write_write; try exact STEP_SRC; eauto; try by viewtac. i. des.
     exploit Local.promise_step_future; eauto. i. des.
     exploit Local.write_step_future; try apply STEP2; eauto; try by viewtac. i. des.
@@ -318,13 +410,26 @@ Proof.
       * left. eapply paco11_mon.
         { apply assign_sim_thread; eauto. etrans; eauto. }
         { i. inv PR. }
+  - (* na store *)
+    inv LOCAL1. destruct ord; ss.
+  - (* racy store *)
+    left.
+    exploit sim_local_racy_write;
+      try match goal with
+          | [|- is_true (Ordering.le _ _)] => refl
+          end; try exact LOCAL1; eauto; try refl. i. des.
+    unfold Thread.steps_failure. esplits.
+    + refl.
+    + econs 2. econs; [|econs 10]; eauto. econs. econs.
+    + ss.
 Qed.
 
 Lemma merge_store_update_cas_sim_stmts
       l o
       v1 v2
       r2 or2
-      (ORD: Ordering.le Ordering.seqcst or2 -> Ordering.le Ordering.seqcst o):
+      (ORD: Ordering.le Ordering.seqcst or2 -> Ordering.le Ordering.seqcst o)
+      (ORDW: Ordering.le Ordering.plain o):
    sim_stmts eq
             [Stmt.instr (Instr.store l v1 o); Stmt.instr (Instr.update r2 l (Instr.cas v1 v2) or2 o)]
             [Stmt.instr (Instr.store l v2 o); Stmt.instr (Instr.assign r2 (Value.const 1))]
@@ -335,18 +440,22 @@ Proof.
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
-  right.
   inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
     try (inv STATE; inv INSTR); ss.
   - (* promise *)
+    right.
     exploit sim_local_promise; eauto. i. des.
     esplits; try apply SC; eauto; ss.
     econs 2. econs 1; eauto. econs; eauto. eauto.
   - (* store *)
+    right.
     exploit Time.middle_spec; eauto.
     { inv LOCAL1. eapply MemoryFacts.write_time_lt. eauto. }
     i. des.
-    hexploit sim_local_write_bot; try exact LOCAL0; try exact SC; eauto; try refl; try by viewtac. i. des.
+    hexploit sim_local_write_bot; try exact LOCAL0;
+      try match goal with
+          | [|- is_true (Ordering.le _ _)] => refl
+          end; try exact SC; eauto; try refl; try by viewtac. i. des.
     exploit merge_write_write; try exact STEP_SRC; eauto; try by viewtac. i. des.
     + exploit Local.promise_step_future; eauto. i. des.
       exploit Local.write_step_future; try apply STEP2; eauto; try by viewtac. i. des.
@@ -389,6 +498,18 @@ Proof.
       * left. eapply paco11_mon.
         { apply assign_sim_thread; eauto. etrans; eauto. }
         { i. inv PR. }
+  - (* na store *)
+    inv LOCAL1. destruct ord; ss.
+  - (* racy store *)
+    left.
+    exploit sim_local_racy_write;
+      try match goal with
+          | [|- is_true (Ordering.le _ _)] => refl
+          end; try exact LOCAL1; eauto; try refl. i. des.
+    unfold Thread.steps_failure. esplits.
+    + refl.
+    + econs 2. econs; [|econs 10]; eauto. econs. econs.
+    + ss.
 Qed.
 
 
@@ -410,14 +531,15 @@ Proof.
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
-  right.
   inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
     try (inv STATE; inv INSTR); ss.
   - (* promise *)
+    right.
     exploit sim_local_promise; eauto. i. des.
     esplits; try apply SC; eauto; ss.
     econs 2. econs 1; eauto. econs; eauto. eauto.
   - (* update *)
+    right.
     exploit Local.read_step_future; eauto. i. des.
     exploit Local.write_step_future; eauto. i. des.
     exploit merge_write_read; try apply LOCAL2; eauto.
@@ -448,6 +570,17 @@ Proof.
     + left. eapply paco11_mon.
       * apply assign_sim_thread; auto. s. rewrite RegFun.add_spec_eq. inv RMW. auto.
       * i. inv PR.
+  - (* racy update *)
+    left.
+    exploit sim_local_racy_update;
+      try match goal with
+          | [|- is_true (Ordering.le _ _)] => refl
+          end; try exact LOCAL1; eauto; try refl. i. des.
+    unfold Thread.steps_failure. esplits.
+    + refl.
+    + econs 2. econs; [|econs 11]; eauto. econs. econs. ss.
+    + ss.
+      Unshelve. ss.
 Qed.
 
 Lemma merge_update_store_sim_stmts
@@ -467,14 +600,15 @@ Proof.
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
-  right.
   inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
     try (inv STATE; inv INSTR); ss.
   - (* promise *)
+    right.
     exploit sim_local_promise; eauto. i. des.
     esplits; try apply SC; eauto ; ss.
     econs 2. econs 1; eauto. econs; eauto. eauto.
   - (* update fail *)
+    right.
     des_ifs. exploit Local.read_step_future; eauto. i. des.
     exploit sim_local_read; try exact LOCAL1;
       try match goal with
@@ -496,6 +630,7 @@ Proof.
       * apply sim_stmts_nil; eauto.
       * i. inv PR.
   - (* update success *)
+    right.
     exploit Time.middle_spec; eauto.
     { inv LOCAL2. eapply MemoryFacts.write_time_lt. eauto. }
     i. des.
@@ -577,6 +712,36 @@ Proof.
           - revert RMW. condtac; ss. i. inv RMW. ss.
           - etrans; eauto. }
         { i. inv PR. }
+  - (* racy load *)
+    right.
+    revert RMW. condtac; ss. i. inv RMW.
+    exploit sim_local_racy_read; try exact LOCAL1; eauto; try refl. i. des.
+    esplits.
+    + ss.
+    + econs 2; try refl. econs.
+      * econs. econs 2. econs; [|econs 9]; eauto. econs. econs. ss.
+        rewrite COND. ss.
+      * eauto.
+    + econs 2. econs 2. econs; [|econs 1]; eauto. econs.
+    + ss.
+    + ss.
+    + ss.
+    + ss. rewrite RegFun.add_spec_eq. condtac; ss.
+      left. eapply paco9_mon.
+      * apply sim_stmts_nil; eauto.
+      * i. inv PR.
+  - (* racy update *)
+    left.
+    revert RMW. condtac; ss. i. inv RMW.
+    exploit sim_local_racy_update;
+      try match goal with
+          | [|- is_true (Ordering.le _ _)] => refl
+          end; try exact LOCAL1; eauto; try refl. i. des.
+    unfold Thread.steps_failure. esplits.
+    + refl.
+    + econs 2. econs; [|econs 11]; eauto. econs. econs. ss.
+      rewrite COND. ss.
+    + ss.
 Qed.
 
 Lemma merge_update_update_sim_stmts
@@ -595,14 +760,15 @@ Proof.
   { right. esplits; eauto.
     eapply sim_local_memory_bot; eauto.
   }
-  right.
   inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
     try (inv STATE; inv INSTR); ss.
   - (* promise *)
+    right.
     exploit sim_local_promise; eauto. i. des.
     esplits; try apply SC; eauto ; ss.
     econs 2. econs 1; eauto. econs; eauto. eauto.
   - (* update *)
+    right.
     exploit Time.middle_spec; eauto.
     { inv LOCAL2. eapply MemoryFacts.write_time_lt. eauto. }
     i. des.
@@ -677,6 +843,17 @@ Proof.
           - etrans; eauto.
         }
         { i. inv PR. }
+  - left.
+    exploit sim_local_racy_update;
+      try match goal with
+          | [|- is_true (Ordering.le _ _)] => refl
+          end; eauto.
+    i. des.
+    unfold Thread.steps_failure. esplits.
+    + refl.
+    + econs 2. econs; [|econs 11]; eauto. econs. econs. ss.
+    + ss.
+      Unshelve. ss.
 Qed.
 
 

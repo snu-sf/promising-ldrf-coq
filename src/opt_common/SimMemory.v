@@ -34,7 +34,7 @@ Inductive message_same_kind: forall (msg_src msg_tgt: Message.t), Prop :=
     (MSG_SRC: msg_src <> Message.reserve)
     (MSG_TGT: msg_tgt <> Message.reserve):
     message_same_kind msg_src msg_tgt
-| message_same_kine_reserve:
+| message_same_kind_reserve:
     message_same_kind Message.reserve Message.reserve
 .
 Hint Constructors message_same_kind.
@@ -503,7 +503,10 @@ Proof.
     { exploit MSG; eauto. i. des.
       exploit (EMPTY to); eauto. i. congr. }
     destruct (COVER loc from2). exploit H3; i.
-    { econs; eauto. econs; eauto. econs. ss. }
+    { econs; eauto. econs; ss.
+      - etrans; eauto.
+      - econs; ss.
+    }
     inv x. inv ITV. ss. inv TO.
     - exploit Memory.get_ts; try exact GET2. i. des.
       { subst. inv FROM0. }
