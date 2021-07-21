@@ -22,6 +22,7 @@ Require Import SimPromises.
 Require Import SimLocal.
 Require Import SimThread.
 Require Import iCompatibility.
+Require Import SimTraceCommon.
 
 Require Import ITreeLang.
 

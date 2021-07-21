@@ -22,17 +22,12 @@ Require Import SimPromises.
 Require Import SimLocal.
 Require Import SimThread.
 Require Import Compatibility.
+Require Import SimTraceCommon.
 
 Require Import Syntax.
 Require Import Semantics.
 
 Set Implicit Arguments.
-
-
-Definition lang_steps_failure (st1: State.t): Prop :=
-  exists st2 st3,
-    <<STEPS: rtc ((Language.step lang) ProgramEvent.silent) st1 st2>> /\
-    <<FAILURE: (Language.step lang) ProgramEvent.failure st2 st3>>.
 
 
 Definition SIM_TRACE :=
@@ -71,18 +66,6 @@ Qed.
 Hint Resolve _sim_trace_mon: paco.
 
 Definition sim_trace: SIM_TRACE := paco3 _sim_trace bot3.
-
-Lemma rtc_lang_tau_step_rtc_thread_tau_step
-      st1 st2 lc sc mem
-      (STEP: rtc ((Language.step lang) ProgramEvent.silent) st1 st2):
-  rtc (@Thread.tau_step lang) (Thread.mk lang st1 lc sc mem) (Thread.mk lang st2 lc sc mem).
-Proof.
-  induction STEP.
-  - econs 1.
-  - econs 2; eauto. econs.
-    + econs. econs 2. econs; [|econs 1]; eauto.
-    + ss.
-Qed.
 
 Lemma sim_trace_sim_thread
       sim_regs
