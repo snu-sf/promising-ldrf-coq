@@ -22,9 +22,6 @@ Require Import Thread.
 Require Import Configuration.
 Require Import Progress.
 
-Require Import Syntax.
-Require Import Semantics.
-
 Require Import PromiseConsistent.
 
 Require Import SimCommon.

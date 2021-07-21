@@ -20,9 +20,6 @@ Require Import Local.
 Require Import Thread.
 Require Import Configuration.
 
-Require Import Syntax.
-Require Import Semantics.
-
 Require Import PromiseConsistent.
 Require Import MemoryMerge.
 Require Import MemoryReorder.
