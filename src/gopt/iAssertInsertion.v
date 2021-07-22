@@ -115,7 +115,7 @@ Section AssertInsertion.
       + left. esplits; ss. econs 2. econs; eauto.
       + left. esplits; ss. econs 2. econs; eauto.
       + left. esplits; ss. econs 2. econs; eauto.
-        pcofix CIH. pfold. rewrite spin_unfold. econs. auto.
+        pcofix CIH. pfold. rewrite unfold_spin. econs. auto.
     - auto.
   Qed.
 

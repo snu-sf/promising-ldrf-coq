@@ -104,38 +104,38 @@ Module ILang.
   Definition is_terminal R (s: itree MemE.t R): Prop :=
     exists r, s = Ret r.
 
-  Inductive step:
-    forall R (e:ProgramEvent.t) (s1: itree MemE.t R) (s2: itree MemE.t R), Prop :=
+  Inductive step R:
+    forall (e:ProgramEvent.t) (s1: itree MemE.t R) (s2: itree MemE.t R), Prop :=
   | step_tau
-      R (itr: itree MemE.t R)
+      (itr: itree MemE.t R)
       itr1 (EQ: itr1 = itr)
     :
       @step R ProgramEvent.silent
             (Tau itr)
             itr1
   | step_choose
-      R (k: Const.t -> itree MemE.t R) val
+      (k: Const.t -> itree MemE.t R) val
       itr1 (EQ: itr1 = k val)
     :
       @step R ProgramEvent.silent
             (Vis (MemE.choose) k)
             itr1
   | step_read
-      R (k: Const.t -> itree MemE.t R) loc val ord
+      (k: Const.t -> itree MemE.t R) loc val ord
       itr1 (EQ: itr1 = k val)
     :
       @step R (ProgramEvent.read loc val ord)
             (Vis (MemE.read loc ord) k)
             itr1
   | step_write
-      R (k: unit -> itree MemE.t R) loc val ord
+      (k: unit -> itree MemE.t R) loc val ord
       itr1 (EQ: itr1 = k tt)
     :
       @step R (ProgramEvent.write loc val ord)
             (Vis (MemE.write loc val ord) k)
             itr1
   | step_update_success
-      R (k: Const.t -> itree MemE.t R) loc rmw valr valw valret ordr ordw
+      (k: Const.t -> itree MemE.t R) loc rmw valr valw valret ordr ordw
       (RMW: eval_rmw rmw valr = (valret, Some valw))
       itr1 (EQ: itr1 = k valret)
     :
@@ -143,7 +143,7 @@ Module ILang.
             (Vis (MemE.update loc rmw ordr ordw) k)
             itr1
   | step_update_failure
-      R (k: Const.t -> itree MemE.t R) loc rmw valr valret ordr ordw
+      (k: Const.t -> itree MemE.t R) loc rmw valr valret ordr ordw
       (RMW: eval_rmw rmw valr = (valret, None))
       itr1 (EQ: itr1 = k valret)
     :
@@ -151,21 +151,21 @@ Module ILang.
             (Vis (MemE.update loc rmw ordr ordw) k)
             itr1
   | step_fence
-      R (k: unit -> itree MemE.t R) ordr ordw
+      (k: unit -> itree MemE.t R) ordr ordw
       itr1 (EQ: itr1 = k tt)
     :
       @step R (ProgramEvent.fence ordr ordw)
             (Vis (MemE.fence ordr ordw) k)
             itr1
   | step_syscall
-      R (k: Const.t -> itree MemE.t R) valret args
+      (k: Const.t -> itree MemE.t R) valret args
       itr1 (EQ: itr1 = k valret)
     :
       @step R (ProgramEvent.syscall (Event.mk valret args))
             (Vis (MemE.syscall args) k)
             itr1
   | step_abort
-      R (k: void -> itree MemE.t R)
+      (k: void -> itree MemE.t R)
     :
       @step R (ProgramEvent.failure)
             (Vis (MemE.abort) k)
@@ -173,13 +173,13 @@ Module ILang.
   .
   #[export] Hint Constructors step: core.
 
-  Inductive opt_step:
-    forall R (e:ProgramEvent.t) (s1: itree MemE.t R) (s2: itree MemE.t R), Prop :=
+  Inductive opt_step R:
+    forall (e:ProgramEvent.t) (s1: itree MemE.t R) (s2: itree MemE.t R), Prop :=
   | opt_step_none
-      R (st: itree MemE.t R):
+      (st: itree MemE.t R):
       opt_step ProgramEvent.silent st st
   | opt_step_some
-      R e (st1 st2: itree MemE.t R)
+      e (st1 st2: itree MemE.t R)
       (STEP: step e st1 st2):
       opt_step e st1 st2
   .
@@ -207,7 +207,7 @@ Proof.
   econs. right. auto.
 Qed.
 
-Lemma spin_unfold E R
+Lemma unfold_spin E R
   :
     (ITree.spin: itree E R) = tau;;ITree.spin.
 Proof.
