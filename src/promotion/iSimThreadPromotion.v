@@ -273,43 +273,52 @@ Module SimThreadPromotion.
       + erewrite <- promise_eq_mem in GET; eauto.
   Qed.
 
-  (* Lemma promote_stmts_step *)
-  (*       l val stmt *)
-  (*       stmts1_src *)
-  (*       e stmts1_tgt st2_tgt *)
-  (*       (STMTS1: stmts1_tgt = promote_itree l val stmts1_src) *)
-  (*       (STEP_TGT: ILang.step e stmts1_tgt st2_tgt): *)
-  (*   exists st2_src, *)
-  (*     <<STEP_SRC: ILang.step e (State.mk regs1_src (stmt :: stmts1_src)) st2_src>> /\ *)
-  (*     <<STMTS2: (State.stmts st2_tgt) = promote_stmts l r (State.stmts st2_src)>>. *)
-  (* Proof. *)
-  (*   subst. inv STEP_TGT. *)
-  (*   - inv REGFREE. *)
-  (*     exploit RegFile.eq_except_instr; eauto. i. des. *)
-  (*     esplits. *)
-  (*     + econs; eauto. *)
-  (*     + ss. *)
-  (*     + ss. *)
-  (*   - inv REGFREE. *)
-  (*     esplits. *)
-  (*     + econs; eauto. *)
-  (*     + ss. *)
-  (*     + s. rewrite promote_stmts_app. *)
-  (*       exploit RegFile.eq_except_expr; eauto. i. rewrite x0. *)
-  (*       repeat condtac; ss. *)
-  (*       * unfold promote_stmts. inv STMT. *)
-  (*         repeat rewrite H0. refl. *)
-  (*       * unfold promote_stmts. inv STMT. *)
-  (*         repeat rewrite H1. refl. *)
-  (*   - inv REGFREE. *)
-  (*     esplits. *)
-  (*     + econs; eauto. *)
-  (*     + ss. *)
-  (*     + s. rewrite promote_stmts_app. *)
-  (*       rewrite promote_stmts_cons. *)
-  (*       unfold promote_stmts. inv STMT. ss. *)
-  (*       repeat rewrite H0. refl. *)
-  (* Qed. *)
+  Lemma promote_itree_step
+        l val X (i: MemE.t X) k
+        st1_tgt
+        e st2_tgt
+        (STMTS1: sim_state l val (Vis i k) st1_tgt)
+        (STEP_TGT: ILang.step (ThreadEvent.get_program_event e) st1_tgt st2_tgt)
+        (NORMAL: loc_free_event l i)
+    :
+      exists st2_src,
+        (<<STEP_SRC: ILang.step (ThreadEvent.get_program_event e) (Vis i k) st2_src>>) /\
+        (<<STMTS2: sim_state l val st2_src st2_tgt>>) /\
+        (<<NORMAL: ~ ThreadEvent.is_accessing_loc l e>>)
+  .
+  Proof.
+    subst. inv STMTS1. rewrite unfold_promote_itree in *. ss. destruct i.
+    - des_ifs; ss. dependent destruction STEP_TGT. esplits; eauto.
+      + rewrite <- x. econs; eauto.
+      + destruct e; ss; clarify.
+    - des_ifs; ss. dependent destruction STEP_TGT. esplits; eauto.
+      + rewrite <- x. econs; eauto.
+      + destruct e; ss; clarify.
+    - destruct rmw; des_ifs; ss; dependent destruction STEP_TGT.
+      + esplits; eauto.
+        * rewrite <- x. econs; eauto. ss.
+        * destruct e; ss; clarify.
+      + esplits; eauto.
+        * rewrite <- x. econs; eauto.
+        * destruct e; ss; clarify.
+      + esplits; eauto.
+        * rewrite <- x. econs; eauto.
+        * destruct e; ss; clarify.
+    - des_ifs; ss. dependent destruction STEP_TGT. esplits; eauto.
+      + rewrite <- x. econs; eauto.
+      + destruct e; ss; clarify.
+    - des_ifs; ss. dependent destruction STEP_TGT. esplits; eauto.
+      + rewrite <- x. econs; eauto.
+      + destruct e; ss; clarify.
+    - des_ifs; ss. dependent destruction STEP_TGT. esplits; eauto.
+      + rewrite <- x. econs; eauto.
+      + econs. apply bisim_is_eq. ginit. gcofix CIH.
+        gstep. red. cbn. econs. gbase. auto.
+      + destruct e; ss; clarify.
+    - des_ifs; ss. dependent destruction STEP_TGT. esplits; eauto.
+      + rewrite <- x. econs; eauto.
+      + destruct e; ss; clarify.
+  Qed.
 
   Lemma sim_thread_program_step
         l e1_src
@@ -329,418 +338,244 @@ Module SimThreadPromotion.
   Proof.
     destruct e1_src as [stmts1_src lc1_src sc1_src mem1_src].
     destruct e1_tgt as [stmts1_tgt lc1_tgt sc1_tgt mem1_tgt].
-    dup SIM1. inv SIM0. ss. inv STATE.
-  Admitted.
-
-
-  (*   unfold sim_state in *. des; cycle 1. *)
-  (*   { (* fa *) *)
-  (*     inv STATE. ss. subst. *)
-  (*     inv STEP_TGT. inv STATE. inv INSTR. *)
-  (*     destruct e_tgt; ss; try by inv LOCAL0. *)
-  (*     exploit PromotionProgress.progress_read; try eapply LATEST; eauto. *)
-  (*     { destruct released; eauto using View.bot_spec. } *)
-  (*     i. des. *)
-  (*     exploit Local.read_step_future; eauto. i. des. *)
-  (*     exploit PromotionProgress.progress_write; try exact WF2; eauto. *)
-  (*     { inv STEP. ss. } *)
-  (*     { etrans; try eapply TVIEW_FUTURE. *)
-  (*       destruct released; try apply View.bot_spec. *)
-  (*       eapply SAFE; eauto. } *)
-  (*     i. des. esplits. *)
-  (*     - econs 2. econs; cycle 1. *)
-  (*       + econs 4; eauto. *)
-  (*       + econs. econs. ss. *)
-  (*     - ss. *)
-  (*     - inv LOCAL0. econs; ss; eauto. *)
-  (*       + inv REGFREE. ss. *)
-  (*       + left. econs; eauto. ss. *)
-  (*         unfold RegFun.find. rewrite REGR. *)
-  (*         apply RegFile.eq_except_add; ss. *)
-  (*       + etrans; eauto. symmetry. etrans; eauto. *)
-  (*       + etrans; eauto. symmetry. ss. *)
-  (*       + ii. inv STEP. inv LC0. ss. inv STEP0. ss. *)
-  (*         inv WRITE. inv PROMISE. revert GETP. *)
-  (*         erewrite Memory.remove_o; eauto. condtac; ss. *)
-  (*         erewrite Memory.add_o; eauto. condtac; ss. i. *)
-  (*         guardH o. guardH o0. *)
-  (*         destruct (Loc.eq_dec loc l); try by subst; congr. *)
-  (*         exploit FULFILLABLE; eauto. i. des. split. *)
-  (*         * unfold tview_released_le_loc in *. *)
-  (*           unfold TView.write_tview. ss. *)
-  (*           unfold LocFun.add. condtac; ss. *)
-  (*         * unfold prev_released_le_loc in *. *)
-  (*           erewrite Memory.add_o; eauto. condtac; ss. *)
-  (*           des. subst. ss. *)
-  (*       + ss. unfold RegFun.add. condtac; ss; eauto. *)
-  (*         { subst. inv REGFREE. inv H1. ss. *)
-  (*           symmetry in REGFREE. *)
-  (*           apply RegSet.disjoint_add in REGFREE. des. *)
-  (*           exfalso. apply REGFREE. *)
-  (*           eapply RegSet.Facts.singleton_2; ss. } *)
-  (*         unfold RegFun.find. rewrite REGR. *)
-  (*         inv STEP0. inv WRITE. inv PROMISE. ss. *)
-  (*         exploit Memory.add_get0; try exact MEM0. i. des. *)
-  (*         replace (Memory.max_ts l mem0) with (Time.incr (Memory.max_ts l mem1_src)); eauto. *)
-  (*         exploit Memory.max_ts_spec; try exact GET0. i. des. inv MAX; ss. *)
-  (*         revert GET1. erewrite Memory.add_o; eauto. condtac; ss; try by des. *)
-  (*         guardH o. i. *)
-  (*         exploit Memory.max_ts_spec; try exact GET1. i. des. *)
-  (*         exploit TimeFacts.lt_le_lt; try exact H; try exact MAX. i. *)
-  (*         specialize (Time.incr_spec (Memory.max_ts l mem1_src)). i. *)
-  (*         rewrite x0 in H0. timetac. *)
-  (*       + exploit Local.write_step_future; eauto. i. des. *)
-  (*         inv STEP0. inv WRITE. inv PROMISE. ss. *)
-  (*         ii. revert GET. *)
-  (*         erewrite Memory.add_o; eauto. condtac; ss; i. *)
-  (*         * inv GET. rewrite H2 in *. ss. *)
-  (*         * etrans; try eapply TVIEW_FUTURE0. *)
-  (*           etrans; try eapply TVIEW_FUTURE; eauto. *)
-  (*   } *)
-  (*   { (* cas_sucess1 *) *)
-  (*     inv STATE. ss. subst. *)
-  (*     inv STEP_TGT. inv STATE. inv INSTR. ss. *)
-  (*     destruct e_tgt; ss; inv LOCAL0. *)
-  (*     esplits. *)
-  (*     - econs 1. *)
-  (*     - ss. *)
-  (*     - econs; s; eauto. *)
-  (*       do 3 right. left. econs; ss. *)
-  (*       + etrans; eauto. symmetry. *)
-  (*         apply RegFile.eq_except_singleton. *)
-  (*       + unfold RegFun.add. condtac; ss. *)
-  (*         symmetry. eapply RegFile.eq_except_value; eauto. *)
-  (*         inv REGFREE. inv H1. ss. *)
-  (*         symmetry in REGFREE. *)
-  (*         apply RegSet.disjoint_add in REGFREE. des. *)
-  (*         symmetry. eapply RegSet.disjoint_union_inv_r; eauto. *)
-  (*   } *)
-  (*   { (* cas_success2 *) *)
-  (*     inv STATE. ss. subst. *)
-  (*     inv STEP_TGT. inv STATE. inv INSTR. *)
-  (*     destruct e_tgt; ss; try by inv LOCAL0. *)
-  (*     exploit PromotionProgress.progress_read; try eapply LATEST; eauto. *)
-  (*     { destruct released; eauto using View.bot_spec. } *)
-  (*     i. des. *)
-  (*     exploit Local.read_step_future; eauto. i. des. *)
-  (*     exploit PromotionProgress.progress_write; try exact WF2; eauto. *)
-  (*     { inv STEP. ss. } *)
-  (*     { etrans; try eapply TVIEW_FUTURE. *)
-  (*       destruct released; try apply View.bot_spec. *)
-  (*       eapply SAFE; eauto. } *)
-  (*     i. des. esplits. *)
-  (*     - econs 2. econs; cycle 1. *)
-  (*       + econs 4; eauto. *)
-  (*       + econs. econs. ss. condtac; ss. *)
-  (*     - ss. *)
-  (*     - inv LOCAL0. econs; ss; eauto. *)
-  (*       + inv REGFREE. ss. *)
-  (*       + left. econs; eauto. ss. *)
-  (*         eapply RegFile.eq_except_add; eauto. *)
-  (*       + etrans; eauto. symmetry. etrans; eauto. *)
-  (*       + etrans; eauto. symmetry. ss. *)
-  (*       + ii. inv STEP. inv LC0. ss. inv STEP0. ss. *)
-  (*         inv WRITE. inv PROMISE. revert GETP. *)
-  (*         erewrite Memory.remove_o; eauto. condtac; ss. *)
-  (*         erewrite Memory.add_o; eauto. condtac; ss. i. *)
-  (*         guardH o. guardH o0. *)
-  (*         destruct (Loc.eq_dec loc l); try by subst; congr. *)
-  (*         exploit FULFILLABLE; eauto. i. des. split. *)
-  (*         * unfold tview_released_le_loc in *. *)
-  (*           unfold TView.write_tview. ss. *)
-  (*           unfold LocFun.add. condtac; ss. *)
-  (*         * unfold prev_released_le_loc in *. *)
-  (*           erewrite Memory.add_o; eauto. condtac; ss. *)
-  (*           des. subst. ss. *)
-  (*       + ss. unfold RegFun.add. condtac; ss; eauto. *)
-  (*         { subst. inv REGFREE. inv H1. ss. *)
-  (*           symmetry in REGFREE. *)
-  (*           apply RegSet.disjoint_add in REGFREE. des. *)
-  (*           exfalso. apply REGFREE. *)
-  (*           eapply RegSet.Facts.singleton_2; ss. } *)
-  (*         unfold RegFun.find. rewrite REGR. *)
-  (*         inv STEP0. inv WRITE. inv PROMISE. ss. *)
-  (*         exploit Memory.add_get0; try exact MEM0. i. des. *)
-  (*         replace (Memory.max_ts l mem0) with (Time.incr (Memory.max_ts l mem1_src)); eauto. *)
-  (*         exploit Memory.max_ts_spec; try exact GET0. i. des. inv MAX; ss. *)
-  (*         revert GET1. erewrite Memory.add_o; eauto. condtac; ss; try by des. *)
-  (*         guardH o. i. *)
-  (*         exploit Memory.max_ts_spec; try exact GET1. i. des. *)
-  (*         exploit TimeFacts.lt_le_lt; try exact H; try exact MAX. i. *)
-  (*         specialize (Time.incr_spec (Memory.max_ts l mem1_src)). i. *)
-  (*         rewrite x0 in H0. timetac. *)
-  (*       + exploit Local.write_step_future; eauto. i. des. *)
-  (*         inv STEP0. inv WRITE. inv PROMISE. ss. *)
-  (*         ii. revert GET. *)
-  (*         erewrite Memory.add_o; eauto. condtac; ss; i. *)
-  (*         * inv GET. rewrite H2 in *. ss. *)
-  (*         * etrans; try eapply TVIEW_FUTURE0. *)
-  (*           etrans; try eapply TVIEW_FUTURE; eauto. *)
-  (*   } *)
-  (*   { (* cas_fail *) *)
-  (*     inv STATE. ss. subst. *)
-  (*     inv STEP_TGT. inv STATE. inv INSTR. *)
-  (*     destruct e_tgt; ss; try by inv LOCAL0. *)
-  (*     exploit PromotionProgress.progress_read; try eapply LATEST; eauto. *)
-  (*     { destruct released; eauto using View.bot_spec. } *)
-  (*     i. des. esplits. *)
-  (*     - econs 2. econs; cycle 1. *)
-  (*       + econs 2; eauto. *)
-  (*       + econs. econs. ss. condtac; ss. congr. *)
-  (*     - ss. *)
-  (*     - inv LOCAL0. econs; ss; eauto. *)
-  (*       + inv REGFREE. ss. *)
-  (*       + left. econs; eauto; ss. *)
-  (*         * apply RegFile.eq_except_add; auto. *)
-  (*         * unfold RegFun.add. condtac; ss. *)
-  (*           subst. inv REGFREE. inv H1. ss. *)
-  (*           symmetry in REGFREE. *)
-  (*           apply RegSet.disjoint_add in REGFREE. des. *)
-  (*           exfalso. apply REGFREE. *)
-  (*           apply RegSet.Facts.singleton_2; ss. *)
-  (*       + etrans; eauto. symmetry. ss. *)
-  (*       + ii. inv STEP. inv LC. ss. *)
-  (*         exploit FULFILLABLE; eauto. *)
-  (*       + inv STEP. inv LC. ss. *)
-  (*       + ii. etrans; try eapply SAFE; eauto. *)
-  (*         exploit Local.read_step_future; eauto. i. des. *)
-  (*         apply TVIEW_FUTURE. *)
-  (*   } *)
-
-  (*   (* synch *) *)
-  (*   inv STATE. ss. *)
-  (*   exploit promote_stmts_cases; eauto. i. des. *)
-  (*   { (* nil *) *)
-  (*     subst. inv STEP_TGT. *)
-  (*     unfold promote_stmts in *. ss. inv STATE. *)
-  (*   } *)
-  (*   { (* load *) *)
-  (*     rewrite STMTS_TGT in *. *)
-  (*     inv STEP_TGT. inv STATE. inv INSTR. *)
-  (*     destruct e_tgt; ss; try by inv LOCAL0. *)
-  (*     exploit PromotionProgress.progress_read; try eapply LATEST; eauto. *)
-  (*     { destruct released; eauto using View.bot_spec. } *)
-  (*     i. des. esplits. *)
-  (*     - econs 2. econs; cycle 1. *)
-  (*       + econs 2; eauto. *)
-  (*       + econs. econs. *)
-  (*     - ss. *)
-  (*     - inv LOCAL0. econs; ss; eauto. *)
-  (*       + inv REGFREE. ss. *)
-  (*       + left. econs; eauto; ss. *)
-  (*         * apply RegFile.eq_except_add; auto. *)
-  (*         * unfold RegFun.add. condtac; ss. *)
-  (*       + etrans; eauto. symmetry. ss. *)
-  (*       + ii. inv STEP. inv LC. ss. *)
-  (*         exploit FULFILLABLE; eauto. *)
-  (*       + inv STEP. inv LC. ss. *)
-  (*       + ii. etrans; try eapply SAFE; eauto. *)
-  (*         exploit Local.read_step_future; eauto. i. des. *)
-  (*         apply TVIEW_FUTURE. *)
-  (*   } *)
-  (*   { (* store *) *)
-  (*     rewrite STMTS_TGT in *. *)
-  (*     inv STEP_TGT. inv STATE. inv INSTR. *)
-  (*     destruct e_tgt; ss; try by inv LOCAL0. *)
-  (*     exploit PromotionProgress.progress_write; try exact WF1_SRC; try exact SC1_SRC; eauto. *)
-  (*     { ss. apply View.bot_spec. } *)
-  (*     i. des. esplits. *)
-  (*     - econs 2. econs; cycle 1. *)
-  (*       + econs 3; eauto. *)
-  (*       + econs. econs. *)
-  (*     - ss. *)
-  (*     - inv LOCAL0. econs; ss; eauto. *)
-  (*       + inv REGFREE. ss. *)
-  (*       + left. econs; eauto; ss. *)
-  (*         etrans; eauto. symmetry. *)
-  (*         apply RegFile.eq_except_singleton. *)
-  (*       + etrans; eauto. symmetry. ss. *)
-  (*       + etrans; eauto. symmetry. ss. *)
-  (*       + ii. inv STEP. inv LC. ss. *)
-  (*         inv WRITE. inv PROMISE. revert GETP. *)
-  (*         erewrite Memory.remove_o; eauto. condtac; ss. *)
-  (*         erewrite Memory.add_o; eauto. condtac; ss. i. *)
-  (*         guardH o. guardH o0. *)
-  (*         destruct (Loc.eq_dec loc l); try by subst; congr. *)
-  (*         exploit FULFILLABLE; eauto. i. des. split. *)
-  (*         * unfold tview_released_le_loc in *. *)
-  (*           unfold TView.write_tview. ss. *)
-  (*           unfold LocFun.add. condtac; ss. *)
-  (*         * unfold prev_released_le_loc in *. *)
-  (*           erewrite Memory.add_o; eauto. condtac; ss. *)
-  (*           des. subst. ss. *)
-  (*       + ss. unfold RegFun.add. condtac; ss. *)
-  (*         inv STEP. inv WRITE. inv PROMISE. ss. *)
-  (*         exploit Memory.add_get0; try exact MEM0. i. des. *)
-  (*         erewrite <- RegFile.eq_except_value; eauto; cycle 1. *)
-  (*         { inv REGFREE. inv H1. ss. } *)
-  (*         replace (Memory.max_ts l mem0) with (Time.incr (Memory.max_ts l mem1_src)); eauto. *)
-  (*         exploit Memory.max_ts_spec; try exact GET0. i. des. inv MAX; ss. *)
-  (*         revert GET1. erewrite Memory.add_o; eauto. condtac; ss; try by des. *)
-  (*         guardH o. i. *)
-  (*         exploit Memory.max_ts_spec; try exact GET1. i. des. *)
-  (*         exploit TimeFacts.lt_le_lt; try exact H; try exact MAX. i. *)
-  (*         specialize (Time.incr_spec (Memory.max_ts l mem1_src)). i. *)
-  (*         rewrite x0 in H0. timetac. *)
-  (*       + exploit Local.write_step_future; eauto. i. des. *)
-  (*         inv STEP. inv WRITE. inv PROMISE. ss. *)
-  (*         ii. revert GET. *)
-  (*         erewrite Memory.add_o; eauto. condtac; ss; i. *)
-  (*         * inv GET. rewrite H2 in *. ss. *)
-  (*         * etrans; try eapply TVIEW_FUTURE; eauto. *)
-  (*   } *)
-  (*   { (* fa *) *)
-  (*     ss. subst. rewrite STMTS_TGT in *. *)
-  (*     inv STEP_TGT. inv STATE. inv INSTR. ss. *)
-  (*     destruct e_tgt; ss; inv LOCAL0. *)
-  (*     esplits. *)
-  (*     - econs 1. *)
-  (*     - ss. *)
-  (*     - econs; s; eauto. *)
-  (*       right. left. econs; ss. *)
-  (*       + etrans; eauto. symmetry. *)
-  (*         apply RegFile.eq_except_singleton. *)
-  (*       + unfold RegFun.add. condtac; ss. *)
-  (*         erewrite <- RegFile.eq_except_value; eauto. *)
-  (*         inv REGFREE. inv H1. ss. *)
-  (*         symmetry in REGFREE. *)
-  (*         apply RegSet.disjoint_add in REGFREE. des. *)
-  (*         symmetry. ss. *)
-  (*   } *)
-  (*   { (* cas *) *)
-  (*     ss. subst. rewrite STMTS_TGT in *. *)
-  (*     inv STEP_TGT. inv STATE. *)
-  (*     destruct e_tgt; ss; inv LOCAL0. *)
-  (*     esplits. *)
-  (*     - econs 1. *)
-  (*     - ss. *)
-  (*     - econs; s; eauto. condtac; ss. *)
-  (*       + right. right. left. econs; ss. *)
-  (*         unfold Op2.const_eq, RegFun.find in *. des_ifs; ss. *)
-  (*         rewrite e. symmetry. *)
-  (*         eapply RegFile.eq_except_value; eauto. *)
-  (*         inv REGFREE. inv H2. ss. *)
-  (*         symmetry in REGFREE. *)
-  (*         apply RegSet.disjoint_add in REGFREE. des. *)
-  (*         symmetry. eapply RegSet.disjoint_union_inv_l; eauto. *)
-  (*       + do 4 right. econs; ss. *)
-  (*         unfold Op2.const_eq, RegFun.find in *. des_ifs; ss. *)
-  (*         ii. rewrite H in *. apply n. *)
-  (*         eapply RegFile.eq_except_value; eauto. *)
-  (*         inv REGFREE. inv H3. ss. *)
-  (*         symmetry in REGFREE. *)
-  (*         apply RegSet.disjoint_add in REGFREE. des. *)
-  (*         symmetry. eapply RegSet.disjoint_union_inv_l; eauto. *)
-  (*   } *)
-  (*   { (* ite *) *)
-  (*     ss. subst. rewrite STMTS_TGT in *. *)
-  (*     inv STEP_TGT. inv STATE. *)
-  (*     destruct e_tgt; ss; inv LOCAL0. *)
-  (*     esplits. *)
-  (*     - econs 2. econs; [|eauto]. econs 2. *)
-  (*     - ss. *)
-  (*     - econs; s; eauto. *)
-  (*       + inv REGFREE. inv H2. *)
-  (*         eapply Forall_app; ss. condtac; ss. *)
-  (*       + left. erewrite RegFile.eq_except_expr; eauto; cycle 1. *)
-  (*         { inv REGFREE. inv H2. ss. } *)
-  (*         condtac; ss. *)
-  (*         * econs; ss. rewrite promote_stmts_app. ss. *)
-  (*         * econs; ss. rewrite promote_stmts_app. ss. *)
-  (*   } *)
-  (*   { (* dowhile *) *)
-  (*     ss. subst. rewrite STMTS_TGT in *. *)
-  (*     inv STEP_TGT. inv STATE. *)
-  (*     destruct e_tgt; ss; inv LOCAL0. *)
-  (*     esplits. *)
-  (*     - econs 2. econs; [|eauto]. econs 3. *)
-  (*     - ss. *)
-  (*     - econs; s; eauto. *)
-  (*       + inv REGFREE. inv H2. *)
-  (*         eapply Forall_app; ss. repeat econs; ss. *)
-  (*       + left. econs; ss. *)
-  (*         rewrite promote_stmts_app. ss. *)
-  (*   } *)
-  (*   { (* locfree *) *)
-  (*     inv STEP_TGT. *)
-  (*     hexploit loc_free_step_is_accessing_loc; eauto. *)
-  (*     { eapply promote_stmts_loc_free. } *)
-  (*     intro LOC. *)
-  (*     exploit program_step; try eapply SIM1; try exact LOCAL; eauto. s. i. des. *)
-  (*     rewrite promote_stmts_cons in STMTS_TGT. *)
-  (*     replace (stmt :: promote_stmts l r stmts'_src) with *)
-  (*         ([stmt] ++ promote_stmts l r stmts'_src) in STMTS_TGT by ss. *)
-  (*     exploit List.app_inv_tail; try exact STMTS_TGT. i. *)
-  (*     rewrite promote_stmts_cons in STATE. *)
-  (*     rewrite x0 in STATE. ss. *)
-  (*     exploit promote_stmts_step; try eapply STATE; eauto; try by inv REGFREE. i. des. *)
-  (*     esplits. *)
-  (*     - econs 2. econs; try exact STEP_SRC. *)
-  (*       rewrite EVENT2. exact STEP_SRC0. *)
-  (*     - ss. *)
-  (*     - econs; eauto; ss. *)
-  (*       + eapply step_reg_free; eauto. ss. *)
-  (*       + left. econs; eauto. *)
-  (*       + assert (VAL: regs1_tgt r = (State.regs st2) r). *)
-  (*         { inv STATE; ss. destruct i; inv INSTR; ss. *)
-  (*           - unfold RegFun.add. condtac; ss. subst. *)
-  (*             exfalso. inv REGFREE. inv H1. ss. *)
-  (*             symmetry in REGFREE. *)
-  (*             apply RegSet.disjoint_add in REGFREE. des. *)
-  (*             apply REGFREE. *)
-  (*             eapply RegSet.Facts.singleton_2; ss. *)
-  (*           - unfold RegFun.add. condtac; ss. subst. *)
-  (*             exfalso. inv REGFREE. inv H1. ss. *)
-  (*             unfold RegSet.disjoint in REGFREE. *)
-  (*             apply (REGFREE lhs); eauto using RegSet.Facts.singleton_2. *)
-  (*           - unfold RegFun.add. condtac; ss. subst. *)
-  (*             exfalso. inv REGFREE. inv H1. ss. *)
-  (*             symmetry in REGFREE. *)
-  (*             apply RegSet.disjoint_add in REGFREE. des. *)
-  (*             apply REGFREE. *)
-  (*             eapply RegSet.Facts.singleton_2; ss. *)
-  (*           - unfold RegFun.add. condtac; ss. subst. *)
-  (*             exfalso. inv REGFREE. inv H1. ss. *)
-  (*             symmetry in REGFREE. *)
-  (*             apply RegSet.disjoint_add in REGFREE. des. *)
-  (*             apply REGFREE. *)
-  (*             eapply RegSet.Facts.singleton_2; ss. *)
-  (*           - unfold RegFun.add. condtac; ss. subst. *)
-  (*             exfalso. inv REGFREE. inv H1. ss. *)
-  (*             symmetry in REGFREE. *)
-  (*             apply RegSet.disjoint_add in REGFREE. des. *)
-  (*             apply REGFREE. *)
-  (*             eapply RegSet.Facts.singleton_2; ss. *)
-  (*         } *)
-  (*         cut (forall to, Memory.get l to mem1_src = Memory.get l to mem2_src). *)
-  (*         { i. exploit eq_loc_max_ts; eauto. i. *)
-  (*           rewrite <- VAL. rewrite <- x1. rewrite <- H. *)
-  (*           inv SIM1. eauto. } *)
-  (*         rewrite <- ThreadEvent.eq_program_event_eq_loc in *; eauto. *)
-  (*         unfold ThreadEvent.is_accessing_loc in *. inv STEP_SRC; ss. *)
-  (*         * inv LOCAL1. inv WRITE. eapply promise_eq_mem; eauto. *)
-  (*         * inv LOCAL2. inv WRITE. eapply promise_eq_mem; eauto. *)
-  (*       + i. rewrite <- ThreadEvent.eq_program_event_eq_loc in *; eauto. *)
-  (*         unfold ThreadEvent.is_accessing_loc in *. *)
-  (*         inv STEP_SRC; ss; try by inv LOCAL1; ss. *)
-  (*         * inv LOCAL1. inv WRITE. ss. *)
-  (*           erewrite Memory.remove_o; eauto. condtac; ss. *)
-  (*           erewrite <- promise_eq_promises; eauto. *)
-  (*         * inv LOCAL1. inv LOCAL2. inv WRITE. ss. *)
-  (*           erewrite Memory.remove_o; eauto. condtac; ss. *)
-  (*           erewrite <- promise_eq_promises; eauto. *)
-  (*       + ii. exploit Local.program_step_future; try exact STEP_SRC; eauto. i. des. *)
-  (*         etrans; try eapply TVIEW_FUTURE. *)
-  (*         inv SIM1. ss. revert GET. *)
-  (*         rewrite <- ThreadEvent.eq_program_event_eq_loc in *; eauto. *)
-  (*         unfold ThreadEvent.is_accessing_loc in *. *)
-  (*         inv STEP_SRC; ss; eauto; try by inv LOCAL1; ss; eauto. *)
-  (*         * inv LOCAL2. inv WRITE. ss. *)
-  (*           erewrite <- promise_eq_mem; eauto. *)
-  (*         * inv LOCAL2. inv LOCAL3. inv WRITE. ss. *)
-  (*           erewrite <- promise_eq_mem; eauto. *)
-  (*   } *)
-  (* Qed. *)
+    dup SIM1. inv SIM0. ss. inv STATE. inv STEP_TGT. des.
+    ides stmts1_src.
+    (* ret *)
+    { rewrite unfold_promote_itree in STATE. inv STATE. }
+    (* tau *)
+    { rewrite unfold_promote_itree in STATE. inv STATE. inv LOCAL0; ss. esplits; eauto.
+      { econs 2. econs 1; eauto. econs; eauto. }
+      { ss. }
+      { econs; eauto. ss. }
+    }
+    (* normal *)
+    destruct (classic (loc_free_event l e)) as [NORMAL|PROMOTE].
+    { exploit promote_itree_step; eauto. i. des.
+      exploit program_step; try eapply SIM1; try exact LOCAL; eauto.
+      s. i. des. esplits.
+      { econs 2. econs.
+        { rewrite EVENT2. eauto. }
+        { eauto. }
+      }
+      { ss. }
+      { econs; ss.
+        + eauto.
+        + cut (forall to, Memory.get l to mem1_src = Memory.get l to mem2_src).
+          { i. hexploit eq_loc_max_ts; eauto. i.
+            rewrite <- H. rewrite <- H0.
+            inv SIM1. ss. eauto. }
+          unfold ThreadEvent.is_accessing_loc in *. inv STEP_SRC0; eauto.
+          * dependent destruction STATE; destruct e_tgt; ss; clarify.
+            inv LOCAL1. inv WRITE. eapply promise_eq_mem; eauto.
+          * dependent destruction STATE; destruct e_tgt; ss; clarify.
+            inv LOCAL2. inv WRITE. eapply promise_eq_mem; eauto.
+        + i. unfold ThreadEvent.is_accessing_loc in *.
+          inv STEP_SRC0; ss; try by inv LOCAL1; ss.
+          * inv LOCAL1. inv WRITE. ss.
+            erewrite Memory.remove_o; eauto. condtac; ss.
+            erewrite <- promise_eq_promises; eauto.
+            destruct  e_tgt; ss; clarify.
+          * inv LOCAL1. inv LOCAL2. inv WRITE. ss.
+            erewrite Memory.remove_o; eauto. condtac; ss.
+            erewrite <- promise_eq_promises; eauto.
+            destruct  e_tgt; ss; clarify.
+        + ii. exploit Local.program_step_future; try exact STEP_SRC; eauto. i. des.
+          etrans; try eapply TVIEW_FUTURE.
+          inv SIM1. ss. revert GET.
+          unfold ThreadEvent.is_accessing_loc in *.
+          inv STEP_SRC0; ss; eauto; try by inv LOCAL1; ss; eauto.
+          * inv LOCAL2. inv WRITE. ss.
+            erewrite <- promise_eq_mem; eauto.
+            destruct  e_tgt; ss; clarify.
+          * inv LOCAL2. inv LOCAL3. inv WRITE. ss.
+            erewrite <- promise_eq_mem; eauto.
+            destruct  e_tgt; ss; clarify.
+      }
+    }
+    rewrite unfold_promote_itree in STATE. destruct e; ss.
+    (* load *)
+    { des_ifs; ss.
+      inv STATE. destruct e_tgt; ss; try by inv LOCAL0.
+      exploit PromotionProgress.progress_read; try eapply LATEST; eauto.
+      { destruct released; eauto using View.bot_spec. }
+      i. des. esplits.
+      - econs 2. econs; cycle 1.
+        + econs 2; eauto.
+        + econs. econs.
+      - ss.
+      - inv LOCAL0; ss. econs; ss; eauto.
+        + etrans; eauto. symmetry. ss.
+        + ii. inv STEP. inv LC. ss.
+          exploit FULFILLABLE; eauto.
+        + inv STEP. inv LC. ss.
+        + ii. etrans; try eapply SAFE; eauto.
+          exploit Local.read_step_future; eauto. i. des.
+          apply TVIEW_FUTURE.
+    }
+    (* store *)
+    { des_ifs; ss.
+      inv STATE. destruct e_tgt; ss; try by inv LOCAL0.
+      exploit PromotionProgress.progress_write; try exact WF1_SRC; try exact SC1_SRC; eauto.
+      { ss. apply View.bot_spec. }
+      i. des. esplits.
+      - econs 2. econs; cycle 1.
+        + econs 3; eauto.
+        + econs. econs.
+      - ss.
+      - inv LOCAL0. econs; ss; eauto.
+        + etrans; eauto. symmetry. ss.
+        + etrans; eauto. symmetry. ss.
+        + ii. inv STEP. inv LC. ss.
+          inv WRITE. inv PROMISE. revert GETP.
+          erewrite Memory.remove_o; eauto. condtac; ss.
+          erewrite Memory.add_o; eauto. condtac; ss. i.
+          guardH o. guardH o0.
+          destruct (Loc.eq_dec loc l); try by subst; congr.
+          exploit FULFILLABLE; eauto. i. des. split.
+          * unfold tview_released_le_loc in *.
+            unfold TView.write_tview. ss.
+            unfold LocFun.add. condtac; ss.
+          * unfold prev_released_le_loc in *.
+            erewrite Memory.add_o; eauto. condtac; ss.
+            des. subst. ss.
+        + inv STEP. inv WRITE. inv PROMISE. ss.
+          exploit Memory.add_get0; try exact MEM0. i. des.
+          replace (Memory.max_ts l mem0) with (Time.incr (Memory.max_ts l mem1_src)); eauto.
+          exploit Memory.max_ts_spec; try exact GET0. i. des. inv MAX; ss.
+          revert GET1. erewrite Memory.add_o; eauto. condtac; ss; try by des.
+          guardH o. i.
+          exploit Memory.max_ts_spec; try exact GET1. i. des.
+          exploit TimeFacts.lt_le_lt; try exact H; try exact MAX. i.
+          specialize (Time.incr_spec (Memory.max_ts l mem1_src)). i.
+          rewrite x0 in H1. timetac.
+        + exploit Local.write_step_future; eauto. i. des.
+          inv STEP. inv WRITE. inv PROMISE. ss.
+          ii. revert GET.
+          erewrite Memory.add_o; eauto. condtac; ss; i.
+          * inv GET. rewrite H3 in *. ss.
+          * etrans; try eapply TVIEW_FUTURE; eauto.
+    }
+    { des_ifs; ss.
+      (* fa *)
+      { inv STATE. destruct e_tgt; ss; try by inv LOCAL0.
+        exploit PromotionProgress.progress_read; try eapply LATEST; eauto.
+        { destruct released; eauto using View.bot_spec. }
+        i. des.
+        exploit Local.read_step_future; eauto. i. des.
+        exploit PromotionProgress.progress_write; try exact WF2; eauto.
+        { inv STEP. ss. }
+        { etrans; try eapply TVIEW_FUTURE.
+          destruct released; try apply View.bot_spec.
+          eapply SAFE; eauto. }
+        i. des. esplits.
+        - econs 2. econs; cycle 1.
+          + econs 4; eauto.
+          + econs. econs. ss.
+        - ss.
+        - inv LOCAL0. econs; ss; eauto.
+          + etrans; eauto. symmetry. etrans; eauto.
+          + etrans; eauto. symmetry. ss.
+          + ii. inv STEP. inv LC0. ss. inv STEP0. ss.
+            inv WRITE. inv PROMISE. revert GETP.
+            erewrite Memory.remove_o; eauto. condtac; ss.
+            erewrite Memory.add_o; eauto. condtac; ss. i.
+            guardH o. guardH o0.
+            destruct (Loc.eq_dec loc l); try by subst; congr.
+            exploit FULFILLABLE; eauto. i. des. split.
+            * unfold tview_released_le_loc in *.
+              unfold TView.write_tview. ss.
+              unfold LocFun.add. condtac; ss.
+            * unfold prev_released_le_loc in *.
+              erewrite Memory.add_o; eauto. condtac; ss.
+              des. subst. ss.
+          + inv STEP0. inv WRITE. inv PROMISE. ss.
+            exploit Memory.add_get0; try exact MEM0. i. des.
+            replace (Memory.max_ts l mem0) with (Time.incr (Memory.max_ts l mem1_src)); eauto.
+            exploit Memory.max_ts_spec; try exact GET0. i. des. inv MAX; ss.
+            revert GET1. erewrite Memory.add_o; eauto. condtac; ss; try by des.
+            guardH o. i.
+            exploit Memory.max_ts_spec; try exact GET1. i. des.
+            exploit TimeFacts.lt_le_lt; try exact H; try exact MAX. i.
+            specialize (Time.incr_spec (Memory.max_ts l mem1_src)). i.
+            rewrite x0 in H1. timetac.
+          + exploit Local.write_step_future; eauto. i. des.
+            inv STEP0. inv WRITE. inv PROMISE. ss.
+            ii. revert GET.
+            erewrite Memory.add_o; eauto. condtac; ss; i.
+            * inv GET. rewrite H3 in *. ss.
+            * etrans; try eapply TVIEW_FUTURE0.
+              etrans; try eapply TVIEW_FUTURE; eauto.
+      }
+      (* cas success *)
+      { inv STATE. destruct e_tgt; ss; try by inv LOCAL0.
+        exploit PromotionProgress.progress_read; try eapply LATEST; eauto.
+        { destruct released; eauto using View.bot_spec. }
+        i. des.
+        exploit Local.read_step_future; eauto. i. des.
+        exploit PromotionProgress.progress_write; try exact WF2; eauto.
+        { inv STEP. ss. }
+        { etrans; try eapply TVIEW_FUTURE.
+          destruct released; try apply View.bot_spec.
+          eapply SAFE; eauto. }
+        i. des. esplits.
+        - econs 2. econs; cycle 1.
+          + econs 4; eauto.
+          + econs; eauto. ss. condtac; ss.
+        - ss.
+        - inv LOCAL0. econs; ss; eauto.
+          + etrans; eauto. symmetry. etrans; eauto.
+          + etrans; eauto. symmetry. ss.
+          + ii. inv STEP. inv LC0. ss. inv STEP0. ss.
+            inv WRITE. inv PROMISE. revert GETP.
+            erewrite Memory.remove_o; eauto. condtac; ss.
+            erewrite Memory.add_o; eauto. condtac; ss. i.
+            guardH o. guardH o0.
+            destruct (Loc.eq_dec loc l); try by subst; congr.
+            exploit FULFILLABLE; eauto. i. des. split.
+            * unfold tview_released_le_loc in *.
+              unfold TView.write_tview. ss.
+              unfold LocFun.add. condtac; ss.
+            * unfold prev_released_le_loc in *.
+              erewrite Memory.add_o; eauto. condtac; ss.
+              des. subst. ss.
+          + inv STEP0. inv WRITE. inv PROMISE. ss.
+            exploit Memory.add_get0; try exact MEM0. i. des.
+            replace (Memory.max_ts l mem0) with (Time.incr (Memory.max_ts l mem1_src)); eauto.
+            exploit Memory.max_ts_spec; try exact GET0. i. des. inv MAX; ss.
+            revert GET1. erewrite Memory.add_o; eauto. condtac; ss; try by des.
+            guardH o. i.
+            exploit Memory.max_ts_spec; try exact GET1. i. des.
+            exploit TimeFacts.lt_le_lt; try exact H; try exact MAX. i.
+            specialize (Time.incr_spec (Memory.max_ts l mem1_src)). i.
+            rewrite x0 in H1. timetac.
+          + exploit Local.write_step_future; eauto. i. des.
+            inv STEP0. inv WRITE. inv PROMISE. ss.
+            ii. revert GET.
+            erewrite Memory.add_o; eauto. condtac; ss; i.
+            * inv GET. rewrite H3 in *. ss.
+            * etrans; try eapply TVIEW_FUTURE0.
+              etrans; try eapply TVIEW_FUTURE; eauto.
+      }
+      (* cas fail *)
+      { inv STATE. destruct e_tgt; ss; try by inv LOCAL0.
+        exploit PromotionProgress.progress_read; try eapply LATEST; eauto.
+        { destruct released; eauto using View.bot_spec. }
+        i. des. esplits.
+        - econs 2. econs; cycle 1.
+          + econs 2; eauto.
+          + econs; eauto. ss. condtac; ss. congr.
+        - ss.
+        - inv LOCAL0. econs; ss; eauto.
+          + etrans; eauto. symmetry. ss.
+          + ii. inv STEP. inv LC. ss.
+            exploit FULFILLABLE; eauto.
+          + inv STEP. inv LC. ss.
+          + ii. etrans; try eapply SAFE; eauto.
+            exploit Local.read_step_future; eauto. i. des.
+            apply TVIEW_FUTURE.
+      }
+    }
+  Qed.
 
   Lemma sim_thread_step
         l e1_src
@@ -1396,4 +1231,5 @@ Module SimThreadPromotion.
       + econs; [econs; exact STEP|]. ss.
       + ss.
   Qed.
+  End TYPE.
 End SimThreadPromotion.

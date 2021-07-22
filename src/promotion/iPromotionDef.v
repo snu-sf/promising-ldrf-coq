@@ -50,8 +50,8 @@ CoFixpoint promote_itree (l: Loc.t) (st: Const.t) R (itr: itree MemE.t R): itree
   | VisF (MemE.update loc (MemE.cas old new) ordr ordw) k =>
     if Loc.eq_dec loc l
     then tau;; (if (Const.eq_dec st old)
-                then promote_itree l 1 (k new)
-                else promote_itree l 0 (k st))
+                then promote_itree l new (k 1)
+                else promote_itree l st (k 0))
     else Vis (MemE.update loc (MemE.cas old new) ordr ordw) (fun r => promote_itree l st (k r))
   | VisF e k => Vis e (fun r => promote_itree l st (k r))
   end.
@@ -76,8 +76,8 @@ Lemma unfold_promote_itree l st R (itr: itree MemE.t R):
   | VisF (MemE.update loc (MemE.cas old new) ordr ordw) k =>
     if Loc.eq_dec loc l
     then tau;; (if (Const.eq_dec st old)
-                then promote_itree l 1 (k new)
-                else promote_itree l 0 (k st))
+                then promote_itree l new (k 1)
+                else promote_itree l st (k 0))
     else Vis (MemE.update loc (MemE.cas old new) ordr ordw) (fun r => promote_itree l st (k r))
   | VisF e k => Vis e (fun r => promote_itree l st (k r))
   end.
