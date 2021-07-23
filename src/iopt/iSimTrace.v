@@ -126,61 +126,62 @@ Proof.
       unfold lang_steps_failure, Thread.steps_failure in *. des.
       exploit rtc_lang_tau_step_rtc_thread_tau_step; try exact STEPS. i.
       esplits; eauto.
-      hexploit sim_local_promise_consistent; eauto. i. des.
-      econs 2. econs; eauto.
+      * hexploit sim_local_promise_consistent; eauto. i. des.
+        econs 2. econs; [|econs 7]; eauto.
+      * ss.
     + right.
       exploit rtc_lang_tau_step_rtc_thread_tau_step; eauto. i.
       esplits; eauto.
   - i. right.
     exploit sim_local_memory_bot; eauto. i.
     esplits; eauto.
-  - ii. inv STEP_TGT; inv STEP0; [|inv LOCAL0].
-    + right.
+  - ii. inv STEP_TGT; inv STEP0.
+    { (* promise *)
+      right.
       exploit sim_local_promise_bot; eauto. i. des.
       esplits; (try exact SC); eauto; ss.
-      econs 2. econs 1. econs; eauto. gbase. eauto.
-    + exploit STEP; eauto. i. des.
-      * left.
-        unfold lang_steps_failure, Thread.steps_failure in *. des.
-        exploit rtc_lang_tau_step_rtc_thread_tau_step; try exact STEPS. i.
-        esplits; eauto.
-        hexploit sim_local_promise_consistent; eauto. i. des.
-        econs 2. econs; eauto.
-      * right.
-        inv EVT. dependent destruction STEP_SRC.
-        { esplits;
-            (try by apply rtc_lang_tau_step_rtc_thread_tau_step; eauto);
-            (try exact SC);
-            eauto; ss.
-          { econs 1. }
-          { gbase. inv SIM0; eauto.
-            { exploit H; eauto. i. eapply GF in x.
-              eapply CIH0. eapply _sim_thread_mon; eauto.
-              i. eapply rclo11_clo_base. right. gbase. auto.
-            }
-          }
-        }
-        { esplits;
-            (try by apply rtc_lang_tau_step_rtc_thread_tau_step; eauto);
-            (try exact SC);
-            eauto; ss.
-          { econs 2. econs 2. econs; [|econs 1]; eauto. }
-          { gbase. inv SIM0; eauto.
-            { exploit H; eauto. i. eapply GF in x.
-              eapply CIH0. eapply _sim_thread_mon; eauto.
-              i. eapply rclo11_clo_base. right. gbase. auto.
-            }
-          }
-        }
-    + exploit STEP; eauto. i. des.
-      { left.
-        unfold lang_steps_failure, Thread.steps_failure in *. des.
-        exploit rtc_lang_tau_step_rtc_thread_tau_step; try exact STEPS. i.
-        esplits; eauto.
-        hexploit sim_local_promise_consistent; eauto. i. des.
-        econs 2. econs; eauto. }
+      econs 2. econs 1. econs; eauto. gbase. eauto. }
+    exploit STEP; eauto. i. des.
+    { (* failure *)
+      left.
+      unfold lang_steps_failure, Thread.steps_failure in *. des.
+      exploit rtc_lang_tau_step_rtc_thread_tau_step; try exact STEPS. i.
+      esplits; eauto.
+      - hexploit sim_local_promise_consistent; eauto. i. des.
+        econs 2. econs; [|econs 7]; eauto.
+      - ss.
+    }
+    inv LOCAL0; ss.
+    + (* silent *)
       right.
-      inv EVT. dependent destruction STEP_SRC.
+      inv EVT. inv STEP_SRC.
+      * esplits;
+          (try by apply rtc_lang_tau_step_rtc_thread_tau_step; eauto);
+          (try exact SC);
+          eauto; ss.
+        { econs 1. }
+        { ss. }
+        { gbase. inv SIM0; eauto.
+          { exploit H; eauto. i. eapply GF in x.
+            eapply CIH0. eapply _sim_thread_mon; eauto.
+            i. eapply rclo11_clo_base. right. gbase. auto.
+          }
+        }
+      * esplits;
+          (try by apply rtc_lang_tau_step_rtc_thread_tau_step; eauto);
+          (try exact SC);
+          eauto; ss.
+        { econs 2. econs 2. econs; [|econs 1]; eauto. }
+        { ss. }
+        { gbase. inv SIM0; eauto.
+          { exploit H; eauto. i. eapply GF in x.
+            eapply CIH0. eapply _sim_thread_mon; eauto.
+            i. eapply rclo11_clo_base. right. gbase. auto.
+          }
+        }
+    + (* read *)
+      right.
+      inv EVT. inv STEP_SRC.
       exploit sim_local_read; eauto. i. des.
       esplits;
         (try by apply rtc_lang_tau_step_rtc_thread_tau_step; eauto);
@@ -194,16 +195,11 @@ Proof.
           eapply CIH0. eapply _sim_thread_mon; eauto.
           i. eapply rclo11_clo_base. right. gbase. auto.
         }
-    + exploit STEP; eauto. i. des.
-      { left.
-        unfold lang_steps_failure, Thread.steps_failure in *. des.
-        exploit rtc_lang_tau_step_rtc_thread_tau_step; try exact STEPS. i.
-        esplits; eauto.
-        hexploit sim_local_promise_consistent; eauto. i. des.
-        econs 2. econs; eauto. }
+    + (* write *)
       right.
-      inv EVT. dependent destruction STEP_SRC.
+      inv EVT. inv STEP_SRC.
       hexploit sim_local_write_bot;
+        (try exact LOCAL1);
         (try exact LOCAL);
         (try exact SC);
         eauto; try refl; try by viewtac. i. des.
@@ -220,15 +216,9 @@ Proof.
           eapply CIH0. eapply _sim_thread_mon; eauto.
           i. eapply rclo11_clo_base. right. gbase. auto.
         }
-    + exploit STEP; eauto. i. des.
-      { left.
-        unfold lang_steps_failure, Thread.steps_failure in *. des.
-        exploit rtc_lang_tau_step_rtc_thread_tau_step; try exact STEPS. i.
-        esplits; eauto.
-        hexploit sim_local_promise_consistent; eauto. i. des.
-        econs 2. econs; eauto. }
+    + (* update *)
       right.
-      inv EVT. dependent destruction STEP_SRC.
+      inv EVT. inv STEP_SRC.
       exploit Local.read_step_future; eauto. i. des.
       exploit sim_local_read; eauto; try refl. i. des.
       exploit Local.read_step_future; eauto. i. des.
@@ -249,15 +239,9 @@ Proof.
           eapply CIH0. eapply _sim_thread_mon; eauto.
           i. eapply rclo11_clo_base. right. gbase. auto.
         }
-    + exploit STEP; eauto. i. des.
-      { left.
-        unfold lang_steps_failure, Thread.steps_failure in *. des.
-        exploit rtc_lang_tau_step_rtc_thread_tau_step; try exact STEPS. i.
-        esplits; eauto.
-        hexploit sim_local_promise_consistent; eauto. i. des.
-        econs 2. econs; eauto. }
+    + (* fence *)
       right.
-      inv EVT. dependent destruction STEP_SRC.
+      inv EVT. inv STEP_SRC.
       exploit sim_local_fence;
         (try exact LOCAL);
         (try exact SC);
@@ -275,15 +259,9 @@ Proof.
           eapply CIH0. eapply _sim_thread_mon; eauto.
           i. eapply rclo11_clo_base. right. gbase. auto.
         }
-    + exploit STEP; eauto. i. des.
-      { left.
-        unfold lang_steps_failure, Thread.steps_failure in *. des.
-        exploit rtc_lang_tau_step_rtc_thread_tau_step; try exact STEPS. i.
-        esplits; eauto.
-        hexploit sim_local_promise_consistent; eauto. i. des.
-        econs 2. econs; eauto. }
+    + (* syscall *)
       right.
-      inv EVT. dependent destruction STEP_SRC.
+      inv EVT. inv STEP_SRC.
       exploit sim_local_fence;
         (try exact LOCAL);
         (try exact SC);
@@ -302,22 +280,79 @@ Proof.
           eapply CIH0. eapply _sim_thread_mon; eauto.
           i. eapply rclo11_clo_base. right. gbase. auto.
         }
-    + exploit STEP; eauto. i. des.
-      { left.
-        unfold lang_steps_failure, Thread.steps_failure in *. des.
-        exploit rtc_lang_tau_step_rtc_thread_tau_step; try exact STEPS. i.
-        esplits; eauto.
-        hexploit sim_local_promise_consistent; eauto. i. des.
-        econs 2. econs; eauto. }
+    + (* failure *)
       left.
-      inv EVT. dependent destruction STEP_SRC.
+      inv EVT. inv STEP_SRC.
       exploit sim_local_failure;
         (try exact LOCAL);
         eauto. i. des.
       unfold Thread.steps_failure.
       esplits;
         (try by apply rtc_lang_tau_step_rtc_thread_tau_step; eauto).
-      econs 2. econs; [|econs 7]; eauto.
+      * econs 2. econs; [|econs 7]; eauto.
+      * ss.
+    + (* na write *)
+      right.
+      inv EVT. inv STEP_SRC.
+      exploit Local.write_undef_step_future; eauto. i. des.
+      exploit sim_local_write_undef;
+        (try exact LOCAL);
+        (try exact SC);
+        eauto; try refl. i. des.
+      exploit Local.write_undef_step_future; eauto. i. des.
+      rewrite SimPromises.unset_bot in *.
+      hexploit sim_local_write_bot;
+        (try exact LOCAL0);
+        (try exact SC0);
+        eauto; try refl; try by viewtac. i. des.
+      esplits;
+        (try by apply rtc_lang_tau_step_rtc_thread_tau_step; eauto);
+        (try exact SC3).
+      * ss.
+      * econs 2. econs 2. econs; [|econs 8]; eauto.
+      * ss.
+      * ss.
+      * gbase. inv SIM0; eauto.
+        { exploit H; eauto. i. eapply GF in x.
+          eapply CIH0. eapply _sim_thread_mon; eauto.
+          i. eapply rclo11_clo_base. right. gbase. auto.
+        }
+    + (* racy read*)
+      right.
+      inv EVT. inv STEP_SRC.
+      exploit sim_local_racy_read; eauto. i. des.
+      esplits;
+        (try by apply rtc_lang_tau_step_rtc_thread_tau_step; eauto);
+        (try exact SC).
+      * ss.
+      * econs 2. econs 2. econs; [|econs 9]; eauto.
+      * ss.
+      * ss.
+      * gbase. inv SIM0; eauto.
+        { exploit H; eauto. i. eapply GF in x.
+          eapply CIH0. eapply _sim_thread_mon; eauto.
+          i. eapply rclo11_clo_base. right. gbase. auto.
+        }
+    + (* racy write *)
+      left.
+      inv EVT. inv STEP_SRC.
+      exploit sim_local_racy_write; eauto. i. des.
+      unfold Thread.steps_failure.
+      esplits;
+        (try by apply rtc_lang_tau_step_rtc_thread_tau_step; eauto);
+        (try exact SC).
+      * econs 2. econs; [|econs 10]; eauto.
+      * ss.
+    + (* racy update *)
+      left.
+      inv EVT. inv STEP_SRC.
+      exploit sim_local_racy_update; eauto. i. des.
+      unfold Thread.steps_failure.
+      esplits;
+        (try by apply rtc_lang_tau_step_rtc_thread_tau_step; eauto);
+        (try exact SC).
+      * econs 2. econs; [|econs 11]; eauto.
+      * ss.
 Qed.
 
 Lemma sim_trace_sim_thread R_src R_tgt
