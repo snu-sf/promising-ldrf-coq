@@ -113,7 +113,7 @@ Proof.
     + ss.
     + ss.
     + ss.
-    + left. eapply paco9_mon.
+    + left. eapply paco11_mon.
       * apply assign_sim_thread; eauto. s. rewrite RegFun.add_spec_eq. auto.
       * i. inv PR.
 Qed.
@@ -250,7 +250,7 @@ Proof.
     + ss.
     + ss.
     + ss.
-    + left. eapply paco9_mon.
+    + left. eapply paco11_mon.
       * apply assign_sim_thread; auto.
       * i. inv PR.
   - (* racy store *)
@@ -727,7 +727,7 @@ Proof.
     + ss.
     + ss.
     + ss. rewrite RegFun.add_spec_eq. condtac; ss.
-      left. eapply paco9_mon.
+      left. eapply paco11_mon.
       * apply sim_stmts_nil; eauto.
       * i. inv PR.
   - (* racy update *)

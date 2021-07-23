@@ -116,6 +116,10 @@ Proof.
   - econs; [|econs 5]; s; eauto. apply lang_step_bind. auto.
   - econs; [|econs 6]; s; eauto. apply lang_step_bind. auto.
   - econs; [|econs 7]; s; eauto. apply lang_step_bind. auto.
+  - econs; [|econs 8]; s; eauto. apply lang_step_bind. auto.
+  - econs; [|econs 9]; s; eauto. apply lang_step_bind. auto.
+  - econs; [|econs 10]; s; eauto. apply lang_step_bind. auto.
+  - econs; [|econs 11]; s; eauto. apply lang_step_bind. auto.
 Qed.
 
 Lemma step_bind R0 R1
@@ -370,7 +374,7 @@ Proof.
         unfold Thread.steps_failure in *. des.
         destruct e2, e3.
         eapply rtc_internal_step_bind in STEPS.
-        eapply step_bind in FAILURE0.
+        eapply step_bind in STEP_FAILURE.
         esplits; eauto.
       - inversion LOCAL. exploit SimPromises.sem_bot_inv; eauto. i.
         destruct lc2_src. ss. subst.
@@ -390,7 +394,7 @@ Proof.
         + left.
           unfold Thread.steps_failure in *. des.
           destruct e2.
-          esplits; [|eauto].
+          esplits; [|eauto|eauto].
           etrans; try exact STEPS0.
           eapply rtc_internal_step_bind in STEPS.
           rewrite bind_ret_l in STEPS. eauto.
@@ -407,7 +411,7 @@ Proof.
         unfold Thread.steps_failure in *. des.
         destruct e2, e3.
         eapply rtc_internal_step_bind in STEPS.
-        eapply step_bind in FAILURE0.
+        eapply step_bind in STEP_FAILURE.
         esplits; eauto.
       - right.
         destruct lc_tgt, lc2_src. ss. subst.
@@ -421,7 +425,7 @@ Proof.
         unfold Thread.steps_failure in *. des.
         destruct e2, e3. ss.
         eapply rtc_internal_step_bind in STEPS.
-        eapply step_bind in FAILURE0.
+        eapply step_bind in STEP_FAILURE.
         esplits; eauto.
       * inversion LOCAL. exploit SimPromises.sem_bot_inv; eauto. i. subst.
         destruct lc2_src. inv TERMINAL_SRC. ss. subst.
@@ -440,7 +444,7 @@ Proof.
           unfold Thread.steps_failure in *. des.
           destruct e2, e3.
           eapply rtc_internal_step_bind in STEPS.
-          esplits; try exact FAILURE0.
+          esplits; try exact STEP_FAILURE; [|eauto].
           etrans; eauto. rewrite bind_ret_l. eauto. }
         { right.
           esplits; cycle 2; eauto.
@@ -454,7 +458,7 @@ Proof.
         unfold Thread.steps_failure in *. des.
         destruct e2, e3.
         eapply rtc_internal_step_bind in STEPS.
-        eapply step_bind in FAILURE0.
+        eapply step_bind in STEP_FAILURE.
         esplits; eauto.
       * right.
         destruct lc2_src. destruct lc3_src.
@@ -468,7 +472,7 @@ Proof.
       { right. instantiate (5:=ThreadEvent.failure). econs; eauto.
         ss. econs; eauto. }
       i. des; ss.
-      unfold Thread.steps_failure in *. des. destruct e2, e3. esplits.
+      unfold Thread.steps_failure in *. des. destruct e2, e3. esplits; [..|eauto].
       { eapply rtc_internal_step_bind; eauto. }
       { eapply step_bind; eauto. }
   - (* tau iter *)
