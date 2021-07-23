@@ -21,7 +21,6 @@ Require Import SimMemory.
 Require Import SimPromises.
 Require Import SimLocal.
 Require Import SimThread.
-Require Import iCompatibility.
 
 Set Implicit Arguments.
 
