@@ -31,40 +31,55 @@ Require Import ITreeLib.
 Set Implicit Arguments.
 
 
-Definition SIM_VAL R_src R_tgt := forall (r_src:R_src) (r_tgt:R_tgt), Prop.
+Definition SIM_VAL R_src R_tgt := forall (w: world) (r_src:R_src) (r_tgt:R_tgt), Prop.
 
 
-Variant sim_terminal R_src R_tgt
+Variant sim_terminal R_src R_tgt (w0: world)
            (sim_ret:SIM_VAL R_src R_tgt)
            (st_src: itree MemE.t R_src) (st_tgt: itree MemE.t R_tgt): Prop :=
 | sim_terminal_intro
-    r0 r1
-    (SIMRET: sim_ret r0 r1)
+    r0 r1 w1
+    (SIMRET: sim_ret w1 r0 r1)
     (SRC: st_src = Ret r0)
     (TGT: st_tgt = Ret r1)
+    (WORLD: world_le w0 w1)
 .
 
 Definition _sim_itree
            (sim_thread:SIM_THREAD world)
+           (w0: world)
            R_src R_tgt
            (sim_ret:SIM_VAL R_src R_tgt)
            (itr_src: itree MemE.t R_src) (itr_tgt: itree MemE.t R_tgt): Prop :=
-  forall lc_src lc_tgt sc0_src sc0_tgt mem0_src mem0_tgt w0
-         (LOCAL: sim_local w0 lc_src lc_tgt),
+  forall lc_src lc_tgt sc0_src sc0_tgt mem0_src mem0_tgt w1
+         (LOCAL: sim_local w1 lc_src lc_tgt)
+         (WORLD: world_le w0 w1),
     sim_thread
       (lang R_src) (lang R_tgt)
-      (sim_terminal sim_ret)
-      w0
+      (sim_terminal w1 sim_ret)
+      w1
       itr_src lc_src sc0_src mem0_src
       itr_tgt lc_tgt sc0_tgt mem0_tgt.
 
 Definition _sim_ktree
            (sim_thread:SIM_THREAD world)
+           (w0: world)
            R_src0 R_tgt0 R_src1 R_tgt1
            (sim_ret0:SIM_VAL R_src0 R_tgt0)
            (ktr_src: R_src0 -> itree MemE.t R_src1)
            (ktr_tgt: R_tgt0 -> itree MemE.t R_tgt1)
            (sim_ret1:SIM_VAL R_src1 R_tgt1): Prop :=
+  forall lc_src lc_tgt sc0_src sc0_tgt mem0_src mem0_tgt r_src r_tgt w1
+         (LOCAL: sim_local w1 lc_src lc_tgt)
+         (WORLD: world_le w0 w1)
+         (RET: sim_ret0 w1 r_src r_tgt),
+    sim_thread
+      (lang R_src0) (lang R_tgt0)
+      (sim_terminal w1 sim_ret1)
+      w1
+      (ktr_src r_src) lc_src sc0_src mem0_src
+      (ktr_tgt r_tgt) lc_tgt sc0_tgt mem0_tgt.
+
   forall r_src r_tgt
          (RET: sim_ret0 r_src r_tgt),
     _sim_itree sim_thread sim_ret1 (ktr_src r_src) (ktr_tgt r_tgt).
