@@ -889,3 +889,4 @@ Grab Existential Variables.
 Qed.
 
 End WORLD.
+Hint Resolve _sim_thread_mon: paco.
