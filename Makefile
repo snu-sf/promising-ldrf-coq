@@ -10,6 +10,7 @@ COQTHEORIES  := \
 	src/invariant/*.v \
 	src/gopt/*.v \
 	src/promotion/*.v \
+	src/gsim/*.v \
 #	src/ldrfpf/*.v \
 #	src/ldrfra/*.v \
 #	src/ldrfsc/*.v \
@@ -35,9 +36,10 @@ Makefile.coq: Makefile $(COQTHEORIES)
    echo "-R src/invariant $(COQMODULE)"; \
    echo "-R src/gopt $(COQMODULE)"; \
    echo "-R src/promotion $(COQMODULE)"; \
-   echo "-R src/ldrfpf $(COQMODULE)"; \
-   echo "-R src/ldrfra $(COQMODULE)"; \
-   echo "-R src/ldrfsc $(COQMODULE)"; \
+   echo "-R src/gsim $(COQMODULE)"; \
+   # echo "-R src/ldrfpf $(COQMODULE)"; \
+   # echo "-R src/ldrfra $(COQMODULE)"; \
+   # echo "-R src/ldrfsc $(COQMODULE)"; \
    \
    echo $(COQTHEORIES)) > _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq
