@@ -91,23 +91,77 @@ Proof.
     apply WRITABLE.
 Qed.
 
-Lemma write_undef_step_promise_consistent
-      lc1 sc1 mem1 loc from to ord lc2 sc2 mem2 kind
-      (STEP: Local.write_undef_step lc1 sc1 mem1 loc from to ord lc2 sc2 mem2 kind)
-      (CONS: Local.promise_consistent lc2):
-  Local.promise_consistent lc1.
+Lemma memory_write_promise_consistent
+      ts promises1 mem1 loc from to msg promises2 mem2 kind
+      (TO: Time.lt ts to)
+      (STEP: Memory.write promises1 mem1 loc from to msg promises2 mem2 kind)
+      (CONS: forall to' from' msg'
+               (PROMISE: Memory.get loc to' promises2 = Some (from', msg'))
+               (MSG: msg' <> Message.reserve),
+          Time.lt ts to'):
+  forall to' from' msg'
+    (PROMISE: Memory.get loc to' promises1 = Some (from', msg'))
+    (MSG: msg' <> Message.reserve),
+    Time.lt ts to'.
 Proof.
-  inv STEP. inv WRITE. ii.
+  i. inv STEP.
   exploit Memory.promise_get1_promise; eauto.
-  { inv PROMISE; ss. }
+  { inv PROMISE0; ss.
+    exploit Memory.remove_get0; try exact PROMISES. i. des.
+    exploit Memory.remove_get0; try exact REMOVE. i. des. congr.
+  }
   i. des.
-  destruct (Memory.get loc0 ts promises2) as [[]|] eqn:X.
+  destruct (Memory.get loc to' promises2) as [[]|] eqn:X.
   - dup X. revert X0.
     erewrite Memory.remove_o; eauto. condtac; ss; i.
     rewrite GET in *. inv X0.
-    apply CONS in X. ss. exploit X; try by (inv MSG_LE; ss).
-  - exploit fulfill_unset_promises; eauto. i. des. subst.
-    apply WRITABLE.
+    apply CONS in X; ss.
+    ii. subst. inv MSG_LE. ss.
+  - exploit fulfill_unset_promises; eauto. i. des. subst. ss.
+Qed.
+
+Lemma write_na_promise_consistent
+      ts' ts promises1 mem1 loc from to val promises2 mem2 kind
+      (TS: Time.le ts' ts)
+      (STEP: Memory.write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+      (CONS: forall to' from' msg
+               (PROMISE: Memory.get loc to' promises2 = Some (from', msg))
+               (MSG: msg <> Message.reserve),
+          Time.lt ts' to'):
+  forall to' from' msg
+    (PROMISE: Memory.get loc to' promises1 = Some (from', msg))
+    (MSG: msg <> Message.reserve),
+    Time.lt ts' to'.
+Proof.
+  induction STEP; i.
+  { hexploit memory_write_promise_consistent; try exact CONS; eauto.
+    eapply TimeFacts.le_lt_lt; eauto.
+  }
+  eapply memory_write_promise_consistent; try exact WRITE_EX; eauto.
+  { eapply TimeFacts.le_lt_lt; eauto. }
+  eapply IHSTEP; eauto.
+  econs. eapply TimeFacts.le_lt_lt; eauto.
+Qed.
+
+Lemma write_na_step_promise_consistent
+      lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 kind
+      (STEP: Local.write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 kind)
+      (CONS: Local.promise_consistent lc2):
+  Local.promise_consistent lc1.
+Proof.
+  inv STEP. ii.
+  destruct (classic (loc0 = loc)); cycle 1.
+  - hexploit Memory.write_na_get_diff_promise; try exact WRITE; eauto.
+    i. rewrite <- H0 in PROMISE.
+    exploit CONS; eauto. s.
+    unfold TimeMap.join, TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
+    condtac; ss.
+    rewrite TimeFacts.le_join_l; try apply Time.bot_spec. ss.
+  - subst.
+    eapply write_na_promise_consistent; try exact WRITE; eauto; try refl.
+    i. eapply TimeFacts.le_lt_lt; cycle 1.
+    { eapply CONS; eauto. }
+    s. unfold TimeMap.join. apply Time.join_l.
 Qed.
 
 Lemma fence_step_promise_consistent
@@ -151,8 +205,7 @@ Proof.
     eapply write_step_promise_consistent; eauto.
   - eapply fence_step_promise_consistent; eauto.
   - eapply fence_step_promise_consistent; eauto.
-  - eapply write_undef_step_promise_consistent; eauto.
-    eapply write_step_promise_consistent; eauto.
+  - eapply write_na_step_promise_consistent; eauto.
 Qed.
 
 Lemma opt_step_promise_consistent

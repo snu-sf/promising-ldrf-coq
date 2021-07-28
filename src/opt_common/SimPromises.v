@@ -319,25 +319,19 @@ Module SimPromises.
   Lemma remove_tgt
         pview inv
         loc from to msg
-        promises1_src mem1_src
-        promises1_tgt mem1_tgt promises2_tgt
+        promises1_src promises1_tgt promises2_tgt
         (REMOVE_TGT: Memory.remove promises1_tgt loc from to msg promises2_tgt)
-        (INV1: sem pview inv promises1_src promises1_tgt)
-        (SIM1: sim_memory mem1_src mem1_tgt)
-        (LE1_SRC: Memory.le promises1_src mem1_src)
-        (LE1_TGT: Memory.le promises1_tgt mem1_tgt)
-        (FINITE1_TGT: Memory.finite promises1_tgt):
+        (INV1: sem pview inv promises1_src promises1_tgt):
       <<INV2: sem (unset loc to pview) (set loc to inv) promises1_src promises2_tgt>> /\
       <<INV2': mem loc to inv = false>>.
   Proof.
-    hexploit Memory.remove_future; eauto. i. des.
     exploit Memory.remove_get0; [eauto|]. i. des.
-    inv INV1. exploit LE0; eauto. i.
+    inv INV1. exploit LE; eauto. i.
     esplits.
     - econs.
       + ii. revert LHS.
         erewrite Memory.remove_o; eauto. condtac; ss. i.
-        exploit LE0; eauto.
+        exploit LE; eauto.
         unfold none_if, none_if_released. repeat condtac; ss.
         * revert COND1. rewrite unset_o. condtac; ss; [|congr].
           guardH o. des. subst. unguardH o. des; congr.
@@ -362,14 +356,10 @@ Module SimPromises.
   Lemma remove_src
         pview inv
         loc from to msg
-        promises1_src mem1_src
-        promises1_tgt mem1_tgt
+        promises1_src promises1_tgt
         (INV1: sem pview inv promises1_src promises1_tgt)
         (INV1': mem loc to inv)
-        (SIM1: sim_memory mem1_src mem1_tgt)
-        (GET: Memory.get loc to promises1_src = Some (from, msg))
-        (LE1_SRC: Memory.le promises1_src mem1_src)
-        (LE1_TGT: Memory.le promises1_tgt mem1_tgt):
+        (GET: Memory.get loc to promises1_src = Some (from, msg)):
     exists promises2_src,
       <<REMOVE_SRC: Memory.remove promises1_src loc from to msg promises2_src>> /\
       <<INV2: sem pview (unset loc to inv) promises2_src promises1_tgt>>.
@@ -396,24 +386,16 @@ Module SimPromises.
   Lemma remove
         pview inv
         loc from to msg
-        promises1_src mem1_src
-        promises1_tgt mem1_tgt promises2_tgt
-        (MSG_WF: Message.wf msg)
-        (TIME: Time.lt from to)
+        promises1_src promises1_tgt promises2_tgt
         (REMOVE_TGT: Memory.remove promises1_tgt loc from to msg promises2_tgt)
-        (INV1: sem pview inv promises1_src promises1_tgt)
-        (SIM1: sim_memory mem1_src mem1_tgt)
-        (LE1_SRC: Memory.le promises1_src mem1_src)
-        (LE1_TGT: Memory.le promises1_tgt mem1_tgt)
-        (FINITE1_TGT: Memory.finite promises1_tgt):
+        (INV1: sem pview inv promises1_src promises1_tgt):
     exists promises2_src,
       <<REMOVE_SRC: Memory.remove promises1_src loc from to (none_if loc to pview msg) promises2_src>> /\
       <<INV2: sem (unset loc to pview) inv promises2_src promises2_tgt>>.
   Proof.
-    hexploit Memory.remove_future; try apply REMOVE_TGT; eauto. i. des.
     exploit remove_tgt; eauto. i. des.
     exploit Memory.remove_get0; eauto. i. des.
-    inv INV1. exploit LE0; eauto. i.
+    inv INV1. exploit LE; eauto. i.
     exploit remove_src; try apply set_eq; eauto. i. des.
     esplits; eauto.
     rewrite unset_set in INV0; auto.
@@ -422,16 +404,9 @@ Module SimPromises.
   Lemma remove_bot
         inv
         loc from to msg
-        promises1_src mem1_src
-        promises1_tgt mem1_tgt promises2_tgt
-        (MSG_WF: Message.wf msg)
-        (TIME: Time.lt from to)
+        promises1_src promises1_tgt promises2_tgt
         (REMOVE_TGT: Memory.remove promises1_tgt loc from to msg promises2_tgt)
-        (INV1: sem bot inv promises1_src promises1_tgt)
-        (SIM1: sim_memory mem1_src mem1_tgt)
-        (LE1_SRC: Memory.le promises1_src mem1_src)
-        (LE1_TGT: Memory.le promises1_tgt mem1_tgt)
-        (FINITE1_TGT: Memory.finite promises1_tgt):
+        (INV1: sem bot inv promises1_src promises1_tgt):
     exists promises2_src,
       <<REMOVE_SRC: Memory.remove promises1_src loc from to msg promises2_src>> /\
       <<INV2: sem bot inv promises2_src promises2_tgt>>.
@@ -441,6 +416,89 @@ Module SimPromises.
     esplits; eauto.
     replace bot with (unset loc to bot); ss. apply ext. i.
     rewrite unset_o. condtac; ss.
+  Qed.
+
+  Lemma write
+        pview inv
+        loc from to msg
+        promises1_src mem1_src
+        promises1_tgt mem1_tgt promises2_tgt mem2_tgt
+        kind_tgt
+        (WRITE_TGT: Memory.write promises1_tgt mem1_tgt loc from to msg promises2_tgt mem2_tgt kind_tgt)
+        (INV1: sem pview inv promises1_src promises1_tgt)
+        (SIM1: sim_memory mem1_src mem1_tgt)
+        (LE1_SRC: Memory.le promises1_src mem1_src)
+        (LE1_TGT: Memory.le promises1_tgt mem1_tgt)
+        (MEM1_SRC: Memory.closed mem1_src)
+        (MEM1_TGT: Memory.closed mem1_tgt):
+    exists promises2_src mem2_src,
+      <<WRITE_SRC: Memory.write promises1_src mem1_src loc from to (none_if loc to pview msg) promises2_src mem2_src (kind_transf loc to pview kind_tgt)>> /\
+      <<INV2: sem (unset loc to pview) inv promises2_src promises2_tgt>> /\
+      <<SIM2: sim_memory mem2_src mem2_tgt>>.
+  Proof.
+    inv WRITE_TGT.
+    exploit promise; eauto. i. des.
+    exploit remove; try exact REMOVE; eauto. i. des.
+    esplits; eauto.
+  Qed.
+
+  Lemma write_na
+        inv
+        loc from to val
+        ts_src promises1_src mem1_src
+        ts_tgt promises1_tgt mem1_tgt promises2_tgt mem2_tgt
+        kind_tgt
+        (WRITE_TGT: Memory.write_na ts_tgt promises1_tgt mem1_tgt loc from to val promises2_tgt mem2_tgt kind_tgt)
+        (INV1: sem bot inv promises1_src promises1_tgt)
+        (SIM1: sim_memory mem1_src mem1_tgt)
+        (TS: Time.le ts_src ts_tgt)
+        (LE1_SRC: Memory.le promises1_src mem1_src)
+        (LE1_TGT: Memory.le promises1_tgt mem1_tgt)
+        (MEM1_SRC: Memory.closed mem1_src)
+        (MEM1_TGT: Memory.closed mem1_tgt):
+    exists promises2_src mem2_src,
+      <<PROMISE_SRC: Memory.write_na ts_src promises1_src mem1_src loc from to val promises2_src mem2_src kind_tgt>> /\
+      <<INV2: sem bot inv promises2_src promises2_tgt>> /\
+      <<SIM2: sim_memory mem2_src mem2_tgt>>.
+  Proof.
+    revert ts_src promises1_src mem1_src INV1 SIM1 TS LE1_SRC MEM1_SRC.
+    induction WRITE_TGT; i.
+    { exploit write; eauto. i. des. ss.
+      rewrite unset_bot in *.
+      replace (none_if_released loc to bot None) with (@None View.t) in *; cycle 1.
+      { unfold none_if_released. condtac; ss. }
+      replace (kind_transf loc to bot kind) with kind in *; cycle 1.
+      { unfold kind_transf. destruct kind; ss.
+        - destruct msg3; ss.
+        - destruct msg1; ss.
+      }
+      esplits; eauto. econs 1; eauto.
+      eapply TimeFacts.le_lt_lt; eauto.
+    }
+
+    exploit write; eauto. i. des.
+    rewrite unset_bot in *.
+    replace (none_if loc to' bot msg') with msg' in *; cycle 1.
+    { destruct msg'; ss. }
+    replace (kind_transf loc to bot kind) with kind in *; cycle 1.
+    { unfold kind_transf. destruct kind; ss.
+      - destruct msg3; ss.
+      - destruct msg1; ss.
+    }
+    hexploit Memory.write_le; try exact WRITE_EX; eauto. i. des.
+    hexploit Memory.write_le; try exact WRITE_SRC; eauto. i. des.
+    hexploit Memory.write_closed; try exact WRITE_EX; eauto; i.
+    { unguard. des; subst; eauto. }
+    { unguard. des; subst; eauto. econs. apply Time.bot_spec. }
+    hexploit Memory.write_closed; try exact WRITE_SRC; eauto; i.
+    { unguard. des; subst; eauto. }
+    { unguard. des; subst; eauto. econs. apply Time.bot_spec. }
+    exploit IHWRITE_TGT; try exact INV2; try exact SIM2; eauto; try refl. i. des.
+    esplits.
+    - econs 2; eauto.
+      eapply TimeFacts.le_lt_lt; eauto.
+    - ss.
+    - ss.
   Qed.
 
   Lemma sem_bot promises:

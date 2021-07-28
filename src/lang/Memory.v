@@ -1336,6 +1336,46 @@ Module Memory.
     inv OP; eauto using add_closed, split_closed, lower_closed, cancel_closed.
   Qed.
 
+  Lemma promise_closed
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (CLOSED: closed mem1)
+        (MSG_CLOSED: closed_message msg mem2)
+        (MSG_TS: message_to msg loc to):
+    closed mem2.
+  Proof.
+    eapply op_closed; eauto.
+    eapply promise_op; eauto.
+  Qed.
+
+  Lemma write_closed
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
+        (CLOSED: closed mem1)
+        (MSG_CLOSED: closed_message msg mem2)
+        (MSG_TS: message_to msg loc to):
+    closed mem2.
+  Proof.
+    inv WRITE.
+    eapply promise_closed; eauto.
+  Qed.
+
+  Lemma write_na_closed
+        ts promises1 mem1 loc from to val promises2 mem2 kind
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        (CLOSED: closed mem1):
+    closed mem2.
+  Proof.
+    induction WRITE.
+    { eapply write_closed; eauto.
+      econs. apply Time.bot_spec. }
+    apply IHWRITE.
+    eapply write_closed; eauto.
+    - unguard. des; subst; eauto.
+    - unguard. des; subst; eauto.
+      econs. apply Time.bot_spec.
+  Qed.
+
   Lemma promise_closed_timemap
         times
         promises1 mem1 loc from to msg promises2 mem2 kind

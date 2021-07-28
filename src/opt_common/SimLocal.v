@@ -214,9 +214,6 @@ Proof.
   }
   exploit SimPromises.remove; try exact REMOVE;
     try exact MEM1; try apply LOCAL1; eauto.
-  { apply WF1_SRC. }
-  { apply WF1_TGT. }
-  { apply WF1_TGT. }
   i. des. esplits.
   - econs; eauto.
     + SimPromises.none_if_tac.
@@ -260,41 +257,6 @@ Proof.
   { rewrite SimPromises.bot_spec. intuition. }
   i. des. esplits; eauto.
   rewrite SimPromises.unset_bot in *; ss.
-Qed.
-
-Lemma sim_local_fulfill_undef
-      pview
-      lc1_src sc1_src mem1_src
-      lc1_tgt sc1_tgt mem1_tgt
-      lc2_tgt sc2_tgt
-      loc from to ord_src ord_tgt
-      (ORD: Ordering.le ord_src ord_tgt)
-      (STEP_TGT: fulfill_undef_step lc1_tgt sc1_tgt loc from to ord_tgt lc2_tgt sc2_tgt)
-      (LOCAL1: sim_local pview lc1_src lc1_tgt)
-      (SC1: TimeMap.le sc1_src sc1_tgt)
-      (MEM1: sim_memory mem1_src mem1_tgt)
-      (WF1_SRC: Local.wf lc1_src mem1_src)
-      (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
-      (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
-      (SC1_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
-      (MEM1_SRC: Memory.closed mem1_src)
-      (MEM1_TGT: Memory.closed mem1_tgt):
-  exists lc2_src sc2_src,
-    <<STEP_SRC: fulfill_undef_step lc1_src sc1_src loc from to ord_src lc2_src sc2_src>> /\
-    <<LOCAL2: sim_local (SimPromises.unset loc to pview) lc2_src lc2_tgt>> /\
-    <<SC2: TimeMap.le sc2_src sc2_tgt>>.
-Proof.
-  inv STEP_TGT.
-  exploit SimPromises.remove; try exact REMOVE;
-    try exact MEM1; try apply LOCAL1; eauto.
-  { apply WF1_SRC. }
-  { apply WF1_TGT. }
-  { apply WF1_TGT. }
-  i. des. esplits.
-  - econs; eauto.
-    eapply TViewFacts.writable_mon; try exact WRITABLE; eauto. apply LOCAL1.
-  - econs; eauto. apply LOCAL1.
-  - ss.
 Qed.
 
 Lemma sim_local_promise_not_lower
@@ -410,15 +372,14 @@ Proof.
   - rewrite SimPromises.unset_bot in *; ss.
 Qed.
 
-Lemma sim_local_write_undef
-      pview
+Lemma sim_local_write_na
       lc1_src sc1_src mem1_src
       lc1_tgt sc1_tgt mem1_tgt
       lc2_tgt sc2_tgt mem2_tgt
-      loc from to ord_src ord_tgt kind
+      loc from to val ord_src ord_tgt kind
       (ORD: Ordering.le ord_src ord_tgt)
-      (STEP_TGT: Local.write_undef_step lc1_tgt sc1_tgt mem1_tgt loc from to ord_tgt lc2_tgt sc2_tgt mem2_tgt kind)
-      (LOCAL1: sim_local pview lc1_src lc1_tgt)
+      (STEP_TGT: Local.write_na_step lc1_tgt sc1_tgt mem1_tgt loc from to val ord_tgt lc2_tgt sc2_tgt mem2_tgt kind)
+      (LOCAL1: sim_local SimPromises.bot lc1_src lc1_tgt)
       (SC1: TimeMap.le sc1_src sc1_tgt)
       (MEM1: sim_memory mem1_src mem1_tgt)
       (WF1_SRC: Local.wf lc1_src mem1_src)
@@ -428,22 +389,17 @@ Lemma sim_local_write_undef
       (MEM1_SRC: Memory.closed mem1_src)
       (MEM1_TGT: Memory.closed mem1_tgt):
   exists lc2_src sc2_src mem2_src,
-    <<STEP_SRC: Local.write_undef_step lc1_src sc1_src mem1_src loc from to
-                                       ord_src lc2_src sc2_src mem2_src
-                                       (SimPromises.kind_transf loc to pview kind)>> /\
-    <<LOCAL2: sim_local (SimPromises.unset loc to pview) lc2_src lc2_tgt>> /\
+    <<STEP_SRC: Local.write_na_step lc1_src sc1_src mem1_src loc from to val ord_src lc2_src sc2_src mem2_src kind>> /\
+    <<LOCAL2: sim_local SimPromises.bot lc2_src lc2_tgt>> /\
     <<SC2: TimeMap.le sc2_src sc2_tgt>> /\
     <<MEM2: sim_memory mem2_src mem2_tgt>>.
 Proof.
-  exploit write_undef_promise_fulfill_undef; eauto. i. des.
-  exploit Local.promise_step_future; eauto. i. des.
-  exploit sim_local_promise; eauto. i. des.
-  exploit Local.promise_step_future; eauto. i. des.
-  exploit sim_local_fulfill_undef; try apply STEP2;
-    try apply LOCAL2; try apply MEM2; eauto.
+  inv STEP_TGT.
+  exploit SimPromises.write_na;
+    try apply WRITE; try apply LOCAL1; try apply WF1_SRC; try apply WF1_TGT; eauto.
   i. des.
-  exploit promise_fulfill_undef_write_undef; try exact STEP_SRC; eauto. i.
-  esplits; eauto.
+  esplits; eauto. econs; s; eauto.
+  apply TViewFacts.write_tview_mon; try apply LOCAL1; eauto. apply WF1_TGT.
 Qed.
 
 Lemma sim_local_update
@@ -699,11 +655,7 @@ Proof.
     esplits; (try by econs; [|econs 6]; eauto); ss.
   - exploit sim_local_failure; eauto. i. des.
     esplits; (try by econs; [|econs 7]; eauto); ss.
-  - exploit Local.write_undef_step_future; eauto. i. des.
-    exploit sim_local_write_undef; eauto; try refl. i. des.
-    exploit Local.write_undef_step_future; eauto. i. des.
-    rewrite SimPromises.unset_bot in *.
-    hexploit sim_local_write_bot; try exact LOCAL2; eauto; try refl. i. des.
+  - exploit sim_local_write_na; eauto; try refl. i. des.
     esplits; (try by econs; [|econs 8]; eauto); ss.
   - exploit sim_local_racy_read; eauto; try refl. i. des.
     esplits; (try by econs; [|econs 9]; eauto); ss.
