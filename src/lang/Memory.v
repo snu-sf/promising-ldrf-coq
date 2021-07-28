@@ -406,6 +406,22 @@ Module Memory.
   .
   Hint Constructors write.
 
+  Inductive write_na (ts: Time.t)
+                              (promises1 mem1: t) (loc: Loc.t) (from to: Time.t) (val: Const.t)
+                              (promises2 mem2: t) (kind: op_kind): Prop :=
+  | write_na_base
+      (WRITABLE: Time.lt ts to)
+      (WRITE: write promises1 mem1 loc from to (Message.concrete val None) promises2 mem2 kind)
+  | write_na_write
+      from' to' msg' promises' mem' kind'
+      (WRITABLE_EX: Time.lt ts to')
+      (MSG_EX: __guard__ (msg' = Message.undef \/
+                          exists val', msg' = Message.concrete val' None))
+      (WRITE_EX: write promises1 mem1 loc from' to' msg' promises' mem' kind')
+      (WRITE_NA: write_na to' promises' mem' loc from to val promises2 mem2 kind)
+  .
+  Hint Constructors write_na.
+
 
   (* Lemmas on add, split, lower & remove *)
 
@@ -572,45 +588,180 @@ Module Memory.
     erewrite remove_o; eauto. condtac; eauto.
   Qed.
 
-  Lemma add_bot_none
-        mem1 mem2 loc from to msg
-        (ADD: add mem1 loc from to msg mem2)
-        (BOT: bot_none mem1):
-    <<BOT: bot_none mem2>>.
+
+  (* Lemmas on op *)
+
+  Lemma promise_op
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind):
+    op mem1 loc from to msg mem2 kind.
   Proof.
-    ii. erewrite add_o; eauto. condtac; ss.
-    des. subst. inv ADD. inv ADD0. inv TO.
+    inv PROMISE.
+    - econs 1. ss.
+    - econs 2. ss.
+    - econs 3. ss.
+    - econs 4; ss.
   Qed.
 
-  Lemma split_bot_none
-        mem1 mem2 loc ts1 ts2 ts3 msg2 msg3
-        (SPLIT: split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2)
-        (BOT: bot_none mem1):
-    <<BOT: bot_none mem2>>.
+  Lemma promise_op_promise
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind):
+    op promises1 loc from to msg promises2 kind.
   Proof.
-    ii. erewrite split_o; eauto. repeat (condtac; ss).
-    - des. subst. inv SPLIT. inv SPLIT0. inv TS12.
-    - des; subst; try congr. inv SPLIT. inv SPLIT0. inv TS23.
+    inv PROMISE.
+    - econs 1. ss.
+    - econs 2. ss.
+    - econs 3. ss.
+    - econs 4; ss.
   Qed.
 
-  Lemma lower_bot_none
-        mem1 mem2 loc from to msg1 msg2
-        (LOWER: lower mem1 loc from to msg1 msg2 mem2)
-        (BOT: bot_none mem1):
-    <<BOT: bot_none mem2>>.
+  Lemma write_op
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind):
+    op mem1 loc from to msg mem2 kind.
   Proof.
-    ii. erewrite lower_o; eauto. condtac; ss.
-    des. subst. inv LOWER. inv LOWER0. inv TS.
+    inv WRITE. eapply promise_op; eauto.
   Qed.
 
-  Lemma remove_bot_none
-        mem1 mem2 loc from to msg
-        (CANCEL: remove mem1 loc from to msg mem2)
-        (BOT: bot_none mem1):
-    <<BOT: bot_none mem2>>.
+  Lemma op_get1
+        m1 loc from to msg m2 kind
+        l f t m
+        (OP: op m1 loc from to msg m2 kind)
+        (KIND: op_kind_is_cancel kind = false)
+        (GET: get l t m1 = Some (f, m)):
+    exists f' m',
+      <<GET: get l t m2 = Some (f', m')>> /\
+      <<FROM: Time.le f f'>> /\
+      <<MSG_LE: Message.le m' m>>.
   Proof.
-    ii. erewrite remove_o; eauto. condtac; ss.
+    inv OP; ss.
+    - exploit add_get1; eauto. i. des. esplits; eauto; refl.
+    - exploit split_get1; eauto. i. des. esplits; eauto; refl.
+    - exploit lower_get1; eauto. i. des. esplits; eauto; refl.
   Qed.
+
+  Lemma op_get2
+        m1 l f t msg m2 k
+        (OP: op m1 l f t msg m2 k)
+        (KIND: op_kind_is_cancel k = false):
+    get l t m2 = Some (f, msg).
+  Proof.
+    inv OP; ss.
+    - erewrite add_o; eauto. condtac; ss. des; congr.
+    - erewrite split_o; eauto. condtac; ss. des; congr.
+    - erewrite lower_o; eauto. condtac; ss. des; congr.
+  Qed.
+
+  Lemma future_get1
+        loc from to val released mem1 mem2
+        (LE: future mem1 mem2)
+        (GET: get loc to mem1 = Some (from, Message.concrete val released)):
+    exists from' msg',
+      <<GET: get loc to mem2 = Some (from', msg')>> /\
+      <<FROM: Time.le from from'>> /\
+      <<MSG_LE: Message.le msg' (Message.concrete val released)>>.
+  Proof.
+    revert from val released GET. induction LE.
+    { i. esplits; eauto; refl. }
+    i. inv H.
+    destruct (op_kind_is_cancel kind) eqn:KIND.
+    - destruct kind; ss. inv OP.
+      exploit IHLE.
+      { erewrite remove_o; eauto. condtac; ss; eauto.
+        des. subst.
+        exploit remove_get0; eauto. i. des. congr. }
+      i. des.
+      esplits; eauto.
+    - exploit op_get1; eauto. i. des. inv MSG_LE.
+      exploit IHLE; eauto. i. des.
+      esplits; eauto. etrans; eauto.
+  Qed.
+
+  Lemma promise_get0
+        promises1 promises2 mem1 mem2
+        loc from to msg kind
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (KIND: op_kind_is_cancel kind = false):
+    <<GET_PROMISES: get loc to promises2 = Some (from, msg)>> /\
+    <<GET_MEM: get loc to mem2 = Some (from, msg)>>.
+  Proof.
+    inv PROMISE; ss.
+    - erewrite (add_o _ _ PROMISES).
+      erewrite (add_o _ _ MEM).
+      condtac; ss. des; congr.
+    - erewrite (split_o _ _ PROMISES).
+      erewrite (split_o _ _ MEM).
+      repeat condtac; ss; des; intuition.
+    - erewrite (lower_o _ _ PROMISES).
+      erewrite (lower_o _ _ MEM).
+      condtac; ss. des; congr.
+  Qed.
+
+  Lemma promise_get1
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        l t f m
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (KIND: op_kind_is_cancel kind = false)
+        (GET: get l t mem1 = Some (f, m)):
+    exists f' m',
+      <<GET: get l t mem2 = Some (f', m')>> /\
+      <<FROM: Time.le f f'>> /\
+      <<MSG_LE: Message.le m' m>>.
+  Proof.
+    inv PROMISE; ss.
+    - eapply op_get1; eauto.
+    - eapply op_get1; eauto.
+    - eapply op_get1; eauto.
+  Qed.
+
+  Lemma promise_get1_promise
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        l t f m
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (KIND: op_kind_is_cancel kind = false)
+        (GET: get l t promises1 = Some (f, m)):
+    exists f' m',
+      <<GET: get l t promises2 = Some (f', m')>> /\
+      <<FROM: Time.le f f'>> /\
+      <<MSG_LE: Message.le m' m>>.
+  Proof.
+    inv PROMISE; eapply op_get1; eauto.
+  Qed.
+
+  Lemma promise_get2
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (KIND: op_kind_is_cancel kind = false):
+    <<GET_PROMISE: get loc to promises2 = Some (from, msg)>> /\
+    <<GET_MEM: get loc to mem2 = Some (from, msg)>>.
+  Proof.
+    inv PROMISE; splits; eauto using op_get2.
+  Qed.
+
+  Lemma write_not_cancel
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind):
+    op_kind_is_cancel kind = false.
+  Proof.
+    inv WRITE. inv PROMISE; ss.
+    exploit remove_get0; try exact PROMISES. i. des.
+    exploit remove_get0; try exact REMOVE. i. des. congr.
+  Qed.
+
+  Lemma write_get2
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind):
+    <<GET_PROMISE: get loc to promises2 = None>> /\
+    <<GET_MEM: get loc to mem2 = Some (from, msg)>>.
+  Proof.
+    exploit write_not_cancel; eauto. i.
+    inv WRITE. splits.
+    - erewrite remove_o; eauto. condtac; ss. des; ss.
+    - eapply promise_get2; eauto.
+  Qed.
+
+
+  (* inhabited *)
 
   Lemma add_inhabited
         mem1 mem2 loc from to msg
@@ -655,64 +806,8 @@ Module Memory.
     rewrite INHABITED in GET. ss.
   Qed.
 
-
-  (* Lemmas on op *)
-
-  Lemma promise_op
-        promises1 mem1 loc from to msg promises2 mem2 kind
-        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind):
-    op mem1 loc from to msg mem2 kind.
-  Proof.
-    inv PROMISE.
-    - econs 1. ss.
-    - econs 2. ss.
-    - econs 3. ss.
-    - econs 4; ss.
-  Qed.
-
-  Lemma promise_op_promise
-        promises1 mem1 loc from to msg promises2 mem2 kind
-        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind):
-    op promises1 loc from to msg promises2 kind.
-  Proof.
-    inv PROMISE.
-    - econs 1. ss.
-    - econs 2. ss.
-    - econs 3. ss.
-    - econs 4; ss.
-  Qed.
-
-  Lemma op_get1
-        m1 loc from to msg m2 kind
-        l f t m
-        (OP: op m1 loc from to msg m2 kind)
-        (KIND: op_kind_is_cancel kind = false)
-        (GET: get l t m1 = Some (f, m)):
-    exists f' m',
-      <<GET: get l t m2 = Some (f', m')>> /\
-      <<FROM: Time.le f f'>> /\
-      <<MSG_LE: Message.le m' m>>.
-  Proof.
-    inv OP; ss.
-    - exploit add_get1; eauto. i. des. esplits; eauto; refl.
-    - exploit split_get1; eauto. i. des. esplits; eauto; refl.
-    - exploit lower_get1; eauto. i. des. esplits; eauto; refl.
-  Qed.
-
-  Lemma op_get2
-        m1 l f t msg m2 k
-        (OP: op m1 l f t msg m2 k)
-        (KIND: op_kind_is_cancel k = false):
-    get l t m2 = Some (f, msg).
-  Proof.
-    inv OP; ss.
-    - erewrite add_o; eauto. condtac; ss. des; congr.
-    - erewrite split_o; eauto. condtac; ss. des; congr.
-    - erewrite lower_o; eauto. condtac; ss. des; congr.
-  Qed.
-
-  Lemma op_inhabited kind
-        mem1 mem2 loc from to msg
+  Lemma op_inhabited
+        mem1 mem2 loc from to msg kind
         (OP: op mem1 loc from to msg mem2 kind)
         (INHABITED: inhabited mem1):
     inhabited mem2.
@@ -724,29 +819,176 @@ Module Memory.
     - eapply cancel_inhabited; eauto.
   Qed.
 
-  Lemma future_get1
-        loc from to val released mem1 mem2
-        (LE: future mem1 mem2)
-        (GET: get loc to mem1 = Some (from, Message.concrete val released)):
-    exists from' msg',
-      <<GET: get loc to mem2 = Some (from', msg')>> /\
-      <<FROM: Time.le from from'>> /\
-      <<MSG_LE: Message.le msg' (Message.concrete val released)>>.
+  Lemma promise_inhabited
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (INHABITED: inhabited mem1):
+    inhabited mem2.
   Proof.
-    revert from val released GET. induction LE.
-    { i. esplits; eauto; refl. }
-    i. inv H.
-    destruct (op_kind_is_cancel kind) eqn:KIND.
-    - destruct kind; ss. inv OP.
-      exploit IHLE.
-      { erewrite remove_o; eauto. condtac; ss; eauto.
-        des. subst.
-        exploit remove_get0; eauto. i. des. congr. }
-      i. des.
-      esplits; eauto.
-    - exploit op_get1; eauto. i. des. inv MSG_LE.
-      exploit IHLE; eauto. i. des.
-      esplits; eauto. etrans; eauto.
+    exploit promise_op; eauto. i.
+    eapply op_inhabited; eauto.
+  Qed.
+
+  Lemma write_inhabited
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
+        (INHABITED: inhabited mem1):
+    inhabited mem2.
+  Proof.
+    inv WRITE. eauto using promise_inhabited.
+  Qed.
+
+  Lemma write_na_inhabited
+        ts promises1 mem1 loc from to val promises2 mem2 kind
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        (INHABITED: inhabited mem1):
+    inhabited mem2.
+  Proof.
+    induction WRITE; eauto using write_inhabited.
+  Qed.
+
+
+  (* bot_none *)
+
+  Lemma add_bot_none
+        mem1 mem2 loc from to msg
+        (ADD: add mem1 loc from to msg mem2)
+        (BOT: bot_none mem1):
+    <<BOT: bot_none mem2>>.
+  Proof.
+    ii. erewrite add_o; eauto. condtac; ss.
+    des. subst. inv ADD. inv ADD0. inv TO.
+  Qed.
+
+  Lemma split_bot_none
+        mem1 mem2 loc ts1 ts2 ts3 msg2 msg3
+        (SPLIT: split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2)
+        (BOT: bot_none mem1):
+    <<BOT: bot_none mem2>>.
+  Proof.
+    ii. erewrite split_o; eauto. repeat (condtac; ss).
+    - des. subst. inv SPLIT. inv SPLIT0. inv TS12.
+    - des; subst; try congr. inv SPLIT. inv SPLIT0. inv TS23.
+  Qed.
+
+  Lemma lower_bot_none
+        mem1 mem2 loc from to msg1 msg2
+        (LOWER: lower mem1 loc from to msg1 msg2 mem2)
+        (BOT: bot_none mem1):
+    <<BOT: bot_none mem2>>.
+  Proof.
+    ii. erewrite lower_o; eauto. condtac; ss.
+    des. subst. inv LOWER. inv LOWER0. inv TS.
+  Qed.
+
+  Lemma remove_bot_none
+        mem1 mem2 loc from to msg
+        (CANCEL: remove mem1 loc from to msg mem2)
+        (BOT: bot_none mem1):
+    <<BOT: bot_none mem2>>.
+  Proof.
+    ii. erewrite remove_o; eauto. condtac; ss.
+  Qed.
+
+  Lemma op_bot_none
+        mem1 loc from to msg mem2 kind
+        (OP: op mem1 loc from to msg mem2 kind)
+        (BOT: bot_none mem1):
+    <<BOT: bot_none mem2>>.
+  Proof.
+    inv OP.
+    - eapply add_bot_none; eauto.
+    - eapply split_bot_none; eauto.
+    - eapply lower_bot_none; eauto.
+    - eapply remove_bot_none; eauto.
+  Qed.
+
+  Lemma promise_bot_none
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (BOT: bot_none promises1):
+    <<BOT: bot_none promises2>>.
+  Proof.
+    exploit promise_op_promise; eauto. i.
+    eapply op_bot_none; eauto.
+  Qed.
+
+  Lemma write_bot_none
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
+        (BOT: bot_none promises1):
+    <<BOT: bot_none promises2>>.
+  Proof.
+    inv WRITE.
+    eapply remove_bot_none; eauto.
+    eapply promise_bot_none; eauto.
+  Qed.
+
+  Lemma write_na_bot_none
+        ts promises1 mem1 loc from to val promises2 mem2 kind
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        (BOT: bot_none promises1):
+    <<BOT: bot_none promises2>>.
+  Proof.
+    induction WRITE; eauto using write_bot_none.
+    apply IHWRITE.
+    eapply write_bot_none; eauto.
+  Qed.
+
+
+  (* le *)
+
+  Lemma remove_le
+        promises1 loc from to msg promises2 mem
+        (REMOVE: remove promises1 loc from to msg promises2)
+        (LE1: le promises1 mem):
+    <<LE2: le promises2 mem>>.
+  Proof.
+    ii. revert LHS.
+    erewrite remove_o; eauto. condtac; ss. eauto.
+  Qed.
+
+  Lemma promise_le
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (LE_PROMISES1: le promises1 mem1)
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind):
+    <<LE_PROMISES2: le promises2 mem2>>.
+  Proof.
+    inv PROMISE.
+    - ii. revert LHS.
+      erewrite add_o; eauto. erewrite (@add_o mem2); try exact MEM; eauto.
+      condtac; ss. auto.
+    - ii. revert LHS.
+      erewrite split_o; eauto. erewrite (@split_o mem2); try exact MEM; eauto.
+      repeat condtac; ss. auto.
+    - ii. revert LHS.
+      erewrite lower_o; eauto. erewrite (@lower_o mem2); try exact MEM; eauto.
+      condtac; ss. auto.
+    - ii. revert LHS.
+      erewrite remove_o; eauto. erewrite (@remove_o mem2); try exact MEM; eauto.
+      condtac; ss. auto.
+  Qed.
+
+  Lemma write_le
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (LE_PROMISES1: le promises1 mem1)
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind):
+    <<LE_PROMISES2: le promises2 mem2>>.
+  Proof.
+    inv WRITE.
+    eapply remove_le; eauto.
+    eapply promise_le; eauto.
+  Qed.
+
+  Lemma write_na_le
+        ts promises1 mem1 loc from to val promises2 mem2 kind
+        (LE_PROMISES1: le promises1 mem1)
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind):
+    <<LE_PROMISES2: le promises2 mem2>>.
+  Proof.
+    induction WRITE; eauto using write_le.
+    apply IHWRITE.
+    eapply write_le; eauto.
   Qed.
 
 
@@ -1126,6 +1368,68 @@ Module Memory.
     inv CLOSED; econs. eapply promise_closed_view; eauto.
   Qed.
 
+  Lemma write_closed_timemap
+        times
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
+        (CLOSED: closed_timemap times mem1):
+    closed_timemap times mem2.
+  Proof.
+    eapply op_closed_timemap; eauto.
+    eapply write_op. eauto.
+  Qed.
+
+  Lemma write_closed_view
+        view
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
+        (CLOSED: closed_view view mem1):
+    closed_view view mem2.
+  Proof.
+    eapply op_closed_view; eauto.
+    eapply write_op. eauto.
+  Qed.
+
+  Lemma write_closed_opt_view
+        view
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (CLOSED: closed_opt_view view mem1)
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind):
+    closed_opt_view view mem2.
+  Proof.
+    inv CLOSED; econs. eapply write_closed_view; eauto.
+  Qed.
+
+  Lemma write_na_closed_timemap
+        times
+        ts promises1 mem1 loc from to val promises2 mem2 kind
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        (CLOSED: closed_timemap times mem1):
+    closed_timemap times mem2.
+  Proof.
+    induction WRITE; eauto using write_closed_timemap.
+  Qed.
+
+  Lemma write_na_closed_view
+        view
+        ts promises1 mem1 loc from to val promises2 mem2 kind
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        (CLOSED: closed_view view mem1):
+    closed_view view mem2.
+  Proof.
+    induction WRITE; eauto using write_closed_view.
+  Qed.
+
+  Lemma write_na_closed_opt_view
+        view
+        ts promises1 mem1 loc from to val promises2 mem2 kind
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        (CLOSED: closed_opt_view view mem1):
+    closed_opt_view view mem2.
+  Proof.
+    inv CLOSED; econs. eapply write_na_closed_view; eauto.
+  Qed.
+
   Lemma future_closed_timemap
         times mem1 mem2
         (CLOSED: closed_timemap times mem1)
@@ -1271,6 +1575,73 @@ Module Memory.
     inv OP; eauto using add_get_diff, split_get_diff, lower_get_diff, remove_get_diff.
   Qed.
 
+  Lemma promise_get_diff
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        loc'
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (LOC: loc' <> loc):
+    forall to', get loc' to' mem2 = get loc' to' mem1.
+  Proof.
+    inv PROMISE; eauto using add_get_diff, split_get_diff, lower_get_diff, remove_get_diff.
+  Qed.
+
+  Lemma promise_get_diff_promise
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        loc'
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (LOC: loc' <> loc):
+    forall to', get loc' to' promises2 = get loc' to' promises1.
+  Proof.
+    inv PROMISE; eauto using add_get_diff, split_get_diff, lower_get_diff, remove_get_diff.
+  Qed.
+
+  Lemma write_get_diff
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        loc'
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
+        (LOC: loc' <> loc):
+    forall to', get loc' to' mem2 = get loc' to' mem1.
+  Proof.
+    i. inv WRITE.
+    eauto using promise_get_diff.
+  Qed.
+
+  Lemma write_get_diff_promise
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        loc'
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
+        (LOC: loc' <> loc):
+    forall to', get loc' to' promises2 = get loc' to' promises1.
+  Proof.
+    i. inv WRITE.
+    erewrite remove_get_diff; try exact REMOVE; ss.
+    eauto using promise_get_diff_promise.
+  Qed.
+
+  Lemma write_na_get_diff
+        ts promises1 mem1 loc from to val promises2 mem2 kind
+        loc'
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        (LOC: loc' <> loc):
+    forall to', get loc' to' mem2 = get loc' to' mem1.
+  Proof.
+    induction WRITE; eauto using write_get_diff.
+    i. erewrite IHWRITE; eauto.
+    eapply write_get_diff; eauto.
+  Qed.
+
+  Lemma write_na_get_diff_promise
+        ts promises1 mem1 loc from to val promises2 mem2 kind
+        loc'
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        (LOC: loc' <> loc):
+    forall to', get loc' to' promises2 = get loc' to' promises1.
+  Proof.
+    induction WRITE; eauto using write_get_diff_promise.
+    i. erewrite IHWRITE; eauto.
+    eapply write_get_diff_promise; eauto.
+  Qed.
+
 
   (* finite *)
 
@@ -1337,6 +1708,275 @@ Module Memory.
     finite mem2.
   Proof.
     inv OP; eauto using add_finite, split_finite, lower_finite, remove_finite.
+  Qed.
+
+  Lemma promise_finite
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (FINITE: finite promises1):
+    finite promises2.
+  Proof.
+    exploit promise_op_promise; eauto. i.
+    eapply op_finite; eauto.
+  Qed.
+
+  Lemma write_finite
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
+        (FINITE: finite promises1):
+    finite promises2.
+  Proof.
+    inv WRITE.
+    eapply remove_finite; eauto.
+    eapply promise_finite; eauto.
+  Qed.
+
+  Lemma write_na_finite
+        ts promises1 mem1 loc from to val promises2 mem2 kind
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        (FINITE: finite promises1):
+    finite promises2.
+  Proof.
+    induction WRITE; eauto using write_finite.
+  Qed.
+
+
+  (* future *)
+
+  Lemma op_future
+        mem1 loc from to msg mem2 kind
+        (OP: op mem1 loc from to msg mem2 kind)
+        (CLOSED1: closed mem1)
+        (MSG_CLOSED: closed_message msg mem2)
+        (MSG_TS: message_to msg loc to):
+    <<CLOSED2: closed mem2>> /\
+    <<FUTURE: future mem1 mem2>> /\
+    <<MSG_WF: Message.wf msg>>.
+  Proof.
+    hexploit op_inhabited; try apply CLOSED1; eauto. i. splits; auto.
+    - eapply op_closed; eauto.
+    - econs 2; eauto.
+    - inv OP.
+      + inv ADD. inv ADD0. ss.
+      + inv SPLIT. inv SPLIT0. ss.
+      + inv LOWER. inv LOWER0. ss.
+      + econs.
+  Qed.
+
+  Lemma promise_future
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (LE_PROMISES1: le promises1 mem1)
+        (FINITE1: finite promises1)
+        (BOT1: bot_none promises1)
+        (CLOSED1: closed mem1)
+        (MSG_CLOSED: closed_message msg mem2)
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind):
+    <<LE_PROMISES2: le promises2 mem2>> /\
+    <<FINITE2: finite promises2>> /\
+    <<BOT2: bot_none promises2>> /\
+    <<CLOSED2: closed mem2>> /\
+    <<FUTURE: future mem1 mem2>>.
+  Proof.
+    hexploit promise_le; eauto. i. des.
+    hexploit promise_inhabited; try apply CLOSED1; eauto. i.
+    hexploit promise_finite; eauto. i.
+    hexploit promise_bot_none; eauto. i.
+    hexploit op_future; eauto.
+    { eapply promise_op. eauto. }
+    { by inv PROMISE. }
+    i. des. eauto.
+  Qed.
+
+  Lemma promise_disjoint
+        promises1 mem1 loc from to msg promises2 mem2 ctx kind
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (LE_CTX: le ctx mem1)
+        (DISJOINT: disjoint promises1 ctx):
+    <<DISJOINT: disjoint promises2 ctx>> /\
+    <<LE_CTX: le ctx mem2>>.
+  Proof.
+    inv PROMISE.
+    - splits.
+      + inv DISJOINT. econs. i. revert GET1. erewrite add_o; eauto. condtac; ss.
+        * des. subst. i. inv GET1. splits.
+          { inv MEM. inv ADD. eauto. }
+          { ii. inv H. inv MEM. inv ADD. inv TO. }
+        * i. eapply DISJOINT0; eauto.
+      + ii. erewrite add_o; eauto. condtac; ss; eauto.
+        des. subst. exfalso. inv MEM. inv ADD. eapply DISJOINT0; eauto.
+        * apply Interval.mem_ub. auto.
+        * apply Interval.mem_ub.
+          destruct (Cell.WF (mem1 loc)). exploit VOLUME; eauto. i. des; auto.
+          inv x. inv TO.
+    - splits.
+      + inv DISJOINT. econs. i. revert GET1. erewrite split_o; eauto. repeat condtac; ss.
+        * des. subst. i. inv GET1.
+          exploit split_get0; try exact PROMISES; eauto. i. des.
+          exploit DISJOINT0; try exact GET0; eauto. i. des.
+          splits.
+          { eapply Interval.le_disjoint; eauto. econs; [refl|].
+            left. inv MEM. inv SPLIT. auto.
+          }
+          { ii. inv H. inv MEM. inv SPLIT. inv TS12. }
+        * guardH o. des. subst. i. inv GET1.
+          exploit split_get0; try exact PROMISES; eauto. i. des.
+          exploit DISJOINT0; try exact GET0; eauto. i. des.
+          splits.
+          { eapply Interval.le_disjoint; eauto. econs; [|refl].
+            left. inv MEM. inv SPLIT. auto.
+          }
+          { ii. inv H. inv MEM. inv SPLIT. inv TS23. }
+        * i. eapply DISJOINT0; eauto.
+      + ii. erewrite split_o; eauto. repeat condtac; ss; eauto.
+        * des. subst. exfalso. inv DISJOINT. exploit DISJOINT0; eauto.
+          { hexploit split_get0; try exact PROMISES; eauto. i. des. eauto. }
+          i. des. eapply x.
+          { inv MEM. inv SPLIT. econs. eauto. left. auto. }
+          { apply Interval.mem_ub.
+            destruct (Cell.WF (mem1 loc)). exploit VOLUME; eauto. i. des; auto.
+            inv x1. inv MEM. inv SPLIT. inv TS12.
+          }
+        * guardH o. des. subst. exfalso. inv DISJOINT. exploit DISJOINT0; eauto.
+          { hexploit split_get0; try exact PROMISES; eauto. i. des. eauto. }
+          i. des. eapply x.
+          { apply Interval.mem_ub. inv MEM. inv SPLIT. etrans; eauto. }
+          { apply Interval.mem_ub.
+            destruct (Cell.WF (ctx loc)). exploit VOLUME; eauto. i. des; auto.
+            inv x1. inv MEM. inv SPLIT. inv TS23.
+          }
+    - splits.
+      + inv DISJOINT. econs. i. revert GET1. erewrite lower_o; eauto. condtac; ss.
+        * des. subst. i. inv GET1. eapply DISJOINT0; eauto.
+          hexploit lower_get0; try eapply PROMISES; eauto. i. des. eauto.
+        * i. eapply DISJOINT0; eauto.
+      + ii. erewrite lower_o; eauto. condtac; ss; eauto.
+        des. subst. exfalso. eapply disjoint_get; eauto.
+        hexploit lower_get0; try exact PROMISES; eauto. i. des. eauto.
+    - splits.
+      + inv DISJOINT. econs. i. revert GET1. erewrite remove_o; eauto. condtac; ss.
+        des. subst. i. inv GET1. eapply DISJOINT0; eauto.
+        hexploit remove_get0; try eapply PROMISES; eauto.
+      + ii. erewrite remove_o; eauto. condtac; ss; eauto.
+        des. subst. exfalso. eapply disjoint_get; eauto.
+        hexploit remove_get0; try exact PROMISES; eauto. i. des. eauto.
+  Qed.
+
+  Lemma remove_future
+        promises1 mem1 loc from to msg promises2
+        (REMOVE: remove promises1 loc from to msg promises2)
+        (LE: le promises1 mem1)
+        (FINITE: finite promises1):
+    <<LE: le promises2 mem1>> /\
+    <<FINITE: finite promises2>>.
+  Proof.
+    hexploit remove_le; eauto. i. des.
+    hexploit remove_finite; eauto.
+  Qed.
+
+  Lemma remove_disjoint
+        promises1 loc from to msg promises2 ctx
+        (REMOVE: remove promises1 loc from to msg promises2)
+        (DISJOINT: disjoint promises1 ctx):
+    <<DISJOINT: disjoint promises2 ctx>>.
+  Proof.
+    econs. i. revert GET1. erewrite remove_o; eauto. condtac; ss.
+    i. eapply DISJOINT; eauto.
+  Qed.
+
+  Lemma write_future
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
+        (CLOSED: closed mem1)
+        (MSG_CLOSED: closed_message msg mem2)
+        (LE: le promises1 mem1)
+        (FINITE: finite promises1)
+        (BOT: bot_none promises1):
+    <<CLOSED: closed mem2>> /\
+    <<LE: le promises2 mem2>> /\
+    <<FINITE: finite promises2>> /\
+    <<BOT: bot_none promises2>> /\
+    <<FUTURE: future mem1 mem2>>.
+  Proof.
+    inv WRITE.
+    hexploit promise_future; eauto. i. des.
+    hexploit remove_future; eauto. i. des.
+    hexploit remove_bot_none; eauto.
+  Qed.
+
+  Lemma write_disjoint
+        promises1 mem1 loc from to msg promises2 mem2 ctx kind
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
+        (DISJOINT: disjoint promises1 ctx)
+        (LE_CTX: le ctx mem1):
+    <<DISJOINT: disjoint promises2 ctx>> /\
+    <<LE_CTX: le ctx mem2>>.
+  Proof.
+    inv WRITE.
+    hexploit promise_disjoint; try apply PROMISE; eauto. i. des.
+    hexploit remove_disjoint; try apply REMOVE; eauto.
+  Qed.
+
+  Lemma write_promises_bot
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
+        (PROMISES: promises1 = Memory.bot):
+    promises2 = Memory.bot.
+  Proof.
+    subst. inv WRITE. inv PROMISE.
+    - apply ext. i.
+      exploit add_get0; try exact PROMISES. i. des.
+      exploit remove_get0; eauto. i. des.
+      erewrite remove_o; eauto. condtac; ss.
+      + des. subst. ss.
+      + erewrite add_o; eauto. condtac; ss.
+    - exploit split_get0; try exact PROMISES. i. des.
+      rewrite bot_get in *. ss.
+    - exploit lower_get0; try exact PROMISES. i. des.
+      rewrite bot_get in *. ss.
+    - exploit remove_get0; try exact PROMISES. i. des.
+      rewrite bot_get in *. ss.
+  Qed.
+
+  Lemma write_na_future
+        ts promises1 mem1 loc from to val promises2 mem2 kind
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        (CLOSED: closed mem1)
+        (LE: le promises1 mem1)
+        (FINITE: finite promises1)
+        (BOT: bot_none promises1):
+    <<CLOSED: closed mem2>> /\
+    <<LE: le promises2 mem2>> /\
+    <<FINITE: finite promises2>> /\
+    <<BOT: bot_none promises2>> /\
+    <<FUTURE: future mem1 mem2>>.
+  Proof.
+    induction WRITE; eauto using write_future.
+    exploit write_future; eauto.
+    { unguard. des; subst; eauto. }
+    i. des.
+    exploit IHWRITE; eauto. i. des.
+    splits; auto. etrans; eauto.
+  Qed.
+
+  Lemma write_na_disjoint
+        ts promises1 mem1 loc from to val promises2 mem2 ctx kind
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        (DISJOINT: disjoint promises1 ctx)
+        (LE_CTX: le ctx mem1):
+    <<DISJOINT: disjoint promises2 ctx>> /\
+    <<LE_CTX: le ctx mem2>>.
+  Proof.
+    induction WRITE; eauto using write_disjoint.
+    exploit Memory.write_disjoint; try exact WRITE_EX; eauto. i. des. eauto.
+  Qed.
+
+  Lemma write_na_promises_bot
+        ts promises1 mem1 loc from to val promises2 mem2 kind
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        (PROMISES: promises1 = Memory.bot):
+    promises2 = Memory.bot.
+  Proof.
+    induction WRITE; eauto using write_promises_bot.
   Qed.
 
 
@@ -1797,378 +2437,6 @@ Module Memory.
   Proof.
     inv MAX. inv VIEW.
     econs; eapply max_concrete_timemap_spec; eauto.
-  Qed.
-
-
-  (* Lemmas on promise & remove *)
-
-  Lemma promise_get0
-        promises1 promises2 mem1 mem2
-        loc from to msg kind
-        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
-        (KIND: op_kind_is_cancel kind = false):
-    <<GET_PROMISES: get loc to promises2 = Some (from, msg)>> /\
-    <<GET_MEM: get loc to mem2 = Some (from, msg)>>.
-  Proof.
-    inv PROMISE; ss.
-    - erewrite (add_o _ _ PROMISES).
-      erewrite (add_o _ _ MEM).
-      condtac; ss. des; congr.
-    - erewrite (split_o _ _ PROMISES).
-      erewrite (split_o _ _ MEM).
-      repeat condtac; ss; des; intuition.
-    - erewrite (lower_o _ _ PROMISES).
-      erewrite (lower_o _ _ MEM).
-      condtac; ss. des; congr.
-  Qed.
-
-  Lemma promise_get1
-        promises1 mem1 loc from to msg promises2 mem2 kind
-        l t f m
-        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
-        (KIND: op_kind_is_cancel kind = false)
-        (GET: get l t mem1 = Some (f, m)):
-    exists f' m',
-      <<GET: get l t mem2 = Some (f', m')>> /\
-      <<FROM: Time.le f f'>> /\
-      <<MSG_LE: Message.le m' m>>.
-  Proof.
-    inv PROMISE; ss.
-    - eapply op_get1; eauto.
-    - eapply op_get1; eauto.
-    - eapply op_get1; eauto.
-  Qed.
-
-  Lemma promise_get1_promise
-        promises1 mem1 loc from to msg promises2 mem2 kind
-        l t f m
-        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
-        (KIND: op_kind_is_cancel kind = false)
-        (GET: get l t promises1 = Some (f, m)):
-    exists f' m',
-      <<GET: get l t promises2 = Some (f', m')>> /\
-      <<FROM: Time.le f f'>> /\
-      <<MSG_LE: Message.le m' m>>.
-  Proof.
-    inv PROMISE; eapply op_get1; eauto.
-  Qed.
-
-  Lemma promise_get2
-        promises1 mem1 loc from to msg promises2 mem2 kind
-        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
-        (KIND: op_kind_is_cancel kind = false):
-    <<GET_PROMISE: get loc to promises2 = Some (from, msg)>> /\
-    <<GET_MEM: get loc to mem2 = Some (from, msg)>>.
-  Proof.
-    inv PROMISE; splits; eauto using op_get2.
-  Qed.
-
-  Lemma promise_get_diff
-        promises1 mem1 loc from to msg promises2 mem2 kind
-        loc'
-        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
-        (LOC: loc' <> loc):
-    forall to', get loc' to' mem2 = get loc' to' mem1.
-  Proof.
-    inv PROMISE; eauto using add_get_diff, split_get_diff, lower_get_diff, remove_get_diff.
-  Qed.
-
-  Lemma promise_get_diff_promise
-        promises1 mem1 loc from to msg promises2 mem2 kind
-        loc'
-        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
-        (LOC: loc' <> loc):
-    forall to', get loc' to' promises2 = get loc' to' promises1.
-  Proof.
-    inv PROMISE; eauto using add_get_diff, split_get_diff, lower_get_diff, remove_get_diff.
-  Qed.
-
-  Lemma promise_inhabited
-        promises1 mem1 loc from to msg promises2 mem2 kind
-        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
-        (INHABITED: inhabited mem1):
-    inhabited mem2.
-  Proof.
-    exploit promise_op; eauto. i.
-    eapply op_inhabited; eauto.
-  Qed.
-
-  Lemma op_future
-        mem1 loc from to msg mem2 kind
-        (OP: op mem1 loc from to msg mem2 kind)
-        (CLOSED1: closed mem1)
-        (MSG_CLOSED: closed_message msg mem2)
-        (MSG_TS: message_to msg loc to):
-    <<CLOSED2: closed mem2>> /\
-    <<FUTURE: future mem1 mem2>> /\
-    <<MSG_WF: Message.wf msg>>.
-  Proof.
-    hexploit op_inhabited; try apply CLOSED1; eauto. i. splits; auto.
-    - eapply op_closed; eauto.
-    - econs 2; eauto.
-    - inv OP.
-      + inv ADD. inv ADD0. ss.
-      + inv SPLIT. inv SPLIT0. ss.
-      + inv LOWER. inv LOWER0. ss.
-      + econs.
-  Qed.
-
-  Lemma promise_le
-        promises1 mem1 loc from to msg promises2 mem2 kind
-        (LE_PROMISES1: le promises1 mem1)
-        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind):
-    <<LE_PROMISES2: le promises2 mem2>>.
-  Proof.
-    inv PROMISE.
-    - ii. revert LHS.
-      erewrite add_o; eauto. erewrite (@add_o mem2); try exact MEM; eauto.
-      condtac; ss. auto.
-    - ii. revert LHS.
-      erewrite split_o; eauto. erewrite (@split_o mem2); try exact MEM; eauto.
-      repeat condtac; ss. auto.
-    - ii. revert LHS.
-      erewrite lower_o; eauto. erewrite (@lower_o mem2); try exact MEM; eauto.
-      condtac; ss. auto.
-    - ii. revert LHS.
-      erewrite remove_o; eauto. erewrite (@remove_o mem2); try exact MEM; eauto.
-      condtac; ss. auto.
-  Qed.
-
-  Lemma promise_future
-        promises1 mem1 loc from to msg promises2 mem2 kind
-        (LE_PROMISES1: le promises1 mem1)
-        (FINITE1: finite promises1)
-        (BOT1: bot_none promises1)
-        (CLOSED1: closed mem1)
-        (MSG_CLOSED: closed_message msg mem2)
-        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind):
-    <<LE_PROMISES2: le promises2 mem2>> /\
-    <<FINITE2: finite promises2>> /\
-    <<BOT2: bot_none promises2>> /\
-    <<CLOSED2: closed mem2>> /\
-    <<FUTURE: future mem1 mem2>>.
-  Proof.
-    hexploit promise_le; eauto. i. des.
-    hexploit op_inhabited; try apply CLOSED1.
-    { eapply promise_op. eauto. }
-    hexploit op_finite; eauto.
-    { eapply promise_op_promise. eauto. }
-    hexploit op_future; eauto.
-    { eapply promise_op. eauto. }
-    { by inv PROMISE. }
-    i. des.
-    splits; auto.
-    inv PROMISE.
-    - eapply add_bot_none; eauto.
-    - eapply split_bot_none; eauto.
-    - eapply lower_bot_none; eauto.
-    - eapply remove_bot_none; eauto.
-  Qed.
-
-  Lemma promise_disjoint
-        promises1 mem1 loc from to msg promises2 mem2 ctx kind
-        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
-        (LE_CTX: le ctx mem1)
-        (DISJOINT: disjoint promises1 ctx):
-    <<DISJOINT: disjoint promises2 ctx>> /\
-    <<LE_CTX: le ctx mem2>>.
-  Proof.
-    inv PROMISE.
-    - splits.
-      + inv DISJOINT. econs. i. revert GET1. erewrite add_o; eauto. condtac; ss.
-        * des. subst. i. inv GET1. splits.
-          { inv MEM. inv ADD. eauto. }
-          { ii. inv H. inv MEM. inv ADD. inv TO. }
-        * i. eapply DISJOINT0; eauto.
-      + ii. erewrite add_o; eauto. condtac; ss; eauto.
-        des. subst. exfalso. inv MEM. inv ADD. eapply DISJOINT0; eauto.
-        * apply Interval.mem_ub. auto.
-        * apply Interval.mem_ub.
-          destruct (Cell.WF (mem1 loc)). exploit VOLUME; eauto. i. des; auto.
-          inv x. inv TO.
-    - splits.
-      + inv DISJOINT. econs. i. revert GET1. erewrite split_o; eauto. repeat condtac; ss.
-        * des. subst. i. inv GET1.
-          exploit split_get0; try exact PROMISES; eauto. i. des.
-          exploit DISJOINT0; try exact GET0; eauto. i. des.
-          splits.
-          { eapply Interval.le_disjoint; eauto. econs; [refl|].
-            left. inv MEM. inv SPLIT. auto.
-          }
-          { ii. inv H. inv MEM. inv SPLIT. inv TS12. }
-        * guardH o. des. subst. i. inv GET1.
-          exploit split_get0; try exact PROMISES; eauto. i. des.
-          exploit DISJOINT0; try exact GET0; eauto. i. des.
-          splits.
-          { eapply Interval.le_disjoint; eauto. econs; [|refl].
-            left. inv MEM. inv SPLIT. auto.
-          }
-          { ii. inv H. inv MEM. inv SPLIT. inv TS23. }
-        * i. eapply DISJOINT0; eauto.
-      + ii. erewrite split_o; eauto. repeat condtac; ss; eauto.
-        * des. subst. exfalso. inv DISJOINT. exploit DISJOINT0; eauto.
-          { hexploit split_get0; try exact PROMISES; eauto. i. des. eauto. }
-          i. des. eapply x.
-          { inv MEM. inv SPLIT. econs. eauto. left. auto. }
-          { apply Interval.mem_ub.
-            destruct (Cell.WF (mem1 loc)). exploit VOLUME; eauto. i. des; auto.
-            inv x1. inv MEM. inv SPLIT. inv TS12.
-          }
-        * guardH o. des. subst. exfalso. inv DISJOINT. exploit DISJOINT0; eauto.
-          { hexploit split_get0; try exact PROMISES; eauto. i. des. eauto. }
-          i. des. eapply x.
-          { apply Interval.mem_ub. inv MEM. inv SPLIT. etrans; eauto. }
-          { apply Interval.mem_ub.
-            destruct (Cell.WF (ctx loc)). exploit VOLUME; eauto. i. des; auto.
-            inv x1. inv MEM. inv SPLIT. inv TS23.
-          }
-    - splits.
-      + inv DISJOINT. econs. i. revert GET1. erewrite lower_o; eauto. condtac; ss.
-        * des. subst. i. inv GET1. eapply DISJOINT0; eauto.
-          hexploit lower_get0; try eapply PROMISES; eauto. i. des. eauto.
-        * i. eapply DISJOINT0; eauto.
-      + ii. erewrite lower_o; eauto. condtac; ss; eauto.
-        des. subst. exfalso. eapply disjoint_get; eauto.
-        hexploit lower_get0; try exact PROMISES; eauto. i. des. eauto.
-    - splits.
-      + inv DISJOINT. econs. i. revert GET1. erewrite remove_o; eauto. condtac; ss.
-        des. subst. i. inv GET1. eapply DISJOINT0; eauto.
-        hexploit remove_get0; try eapply PROMISES; eauto.
-      + ii. erewrite remove_o; eauto. condtac; ss; eauto.
-        des. subst. exfalso. eapply disjoint_get; eauto.
-        hexploit remove_get0; try exact PROMISES; eauto. i. des. eauto.
-  Qed.
-
-  Lemma remove_future
-        promises1 mem1 loc from to msg promises2
-        (REMOVE: remove promises1 loc from to msg promises2)
-        (LE: le promises1 mem1)
-        (FINITE: finite promises1):
-    <<LE: le promises2 mem1>> /\
-    <<FINITE: finite promises2>>.
-  Proof.
-    split.
-    - ii. revert LHS. erewrite remove_o; eauto. condtac; ss. eauto.
-    - eapply remove_finite; eauto.
-  Qed.
-
-  Lemma remove_disjoint
-        promises1 loc from to msg promises2 ctx
-        (REMOVE: remove promises1 loc from to msg promises2)
-        (DISJOINT: disjoint promises1 ctx):
-    <<DISJOINT: disjoint promises2 ctx>>.
-  Proof.
-    econs. i. revert GET1. erewrite remove_o; eauto. condtac; ss.
-    i. eapply DISJOINT; eauto.
-  Qed.
-
-  Lemma write_not_cancel
-        promises1 mem1 loc from to msg promises2 mem2 kind
-        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind):
-    op_kind_is_cancel kind = false.
-  Proof.
-    inv WRITE. inv PROMISE; ss.
-    exploit remove_get0; try exact PROMISES. i. des.
-    exploit remove_get0; try exact REMOVE. i. des. congr.
-  Qed.
-
-  Lemma write_get2
-        promises1 mem1 loc from to msg promises2 mem2 kind
-        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind):
-    <<GET_PROMISE: get loc to promises2 = None>> /\
-    <<GET_MEM: get loc to mem2 = Some (from, msg)>>.
-  Proof.
-    exploit write_not_cancel; eauto. i.
-    inv WRITE. splits.
-    - erewrite remove_o; eauto. condtac; ss. des; ss.
-    - eapply promise_get2; eauto.
-  Qed.
-
-  Lemma write_get_diff
-        promises1 mem1 loc from to msg promises2 mem2 kind
-        loc'
-        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
-        (LOC: loc' <> loc):
-    forall to', get loc' to' mem2 = get loc' to' mem1.
-  Proof.
-    i. inv WRITE.
-    eauto using promise_get_diff.
-  Qed.
-
-  Lemma write_get_diff_promise
-        promises1 mem1 loc from to msg promises2 mem2 kind
-        loc'
-        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
-        (LOC: loc' <> loc):
-    forall to', get loc' to' promises2 = get loc' to' promises1.
-  Proof.
-    i. inv WRITE.
-    erewrite remove_get_diff; try exact REMOVE; ss.
-    eauto using promise_get_diff_promise.
-  Qed.
-
-  Lemma write_inhabited
-        promises1 mem1 loc from to msg promises2 mem2 kind
-        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
-        (INHABITED: inhabited mem1):
-    inhabited mem2.
-  Proof.
-    inv WRITE. eauto using promise_inhabited.
-  Qed.
-
-  Lemma write_future
-        promises1 mem1 loc from to msg promises2 mem2 kind
-        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
-        (CLOSED: closed mem1)
-        (MSG_CLOSED: closed_message msg mem2)
-        (LE: le promises1 mem1)
-        (FINITE: finite promises1)
-        (BOT: bot_none promises1):
-    <<CLOSED: closed mem2>> /\
-    <<LE: le promises2 mem2>> /\
-    <<FINITE: finite promises2>> /\
-    <<BOT: bot_none promises2>> /\
-    <<FUTURE: future mem1 mem2>>.
-  Proof.
-    inv WRITE.
-    hexploit promise_future; eauto. i. des.
-    hexploit remove_future; eauto. i. des.
-    splits; auto.
-    ii. erewrite remove_o; eauto. condtac; ss.
-  Qed.
-
-  Lemma write_disjoint
-        promises1 mem1 loc from to msg promises2 mem2 ctx kind
-        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
-        (DISJOINT: disjoint promises1 ctx)
-        (LE_CTX: le ctx mem1):
-    <<DISJOINT: disjoint promises2 ctx>> /\
-    <<LE_CTX: le ctx mem2>>.
-  Proof.
-    inv WRITE.
-    hexploit promise_disjoint; try apply PROMISE; eauto. i. des.
-    hexploit remove_disjoint; try apply REMOVE; eauto.
-  Qed.
-
-  Lemma write_promises_bot
-        promises1 mem1 loc from to msg promises2 mem2 kind
-        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
-        (PROMISES: promises1 = Memory.bot):
-    promises2 = Memory.bot.
-  Proof.
-    subst. inv WRITE. inv PROMISE.
-    - apply ext. i.
-      exploit add_get0; try exact PROMISES. i. des.
-      exploit remove_get0; eauto. i. des.
-      erewrite remove_o; eauto. condtac; ss.
-      + des. subst. ss.
-      + erewrite add_o; eauto. condtac; ss.
-    - exploit split_get0; try exact PROMISES. i. des.
-      rewrite bot_get in *. ss.
-    - exploit lower_get0; try exact PROMISES. i. des.
-      rewrite bot_get in *. ss.
-    - exploit remove_get0; try exact PROMISES. i. des.
-      rewrite bot_get in *. ss.
   Qed.
 
 
@@ -2763,27 +3031,4 @@ Module Memory.
     - erewrite remove_o; eauto. condtac; ss.
       i. eapply GET_PREV; eauto.
   Qed.
-
-  (* Lemma promise_get_from *)
-  (*       promises1 mem1 loc from to msg promises2 mem2 kind *)
-  (*       l t f v r *)
-  (*       (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind) *)
-  (*       (GET: get l t mem1 = Some (f, Message.concrete v r)): *)
-  (*   exists t' v' r', *)
-  (*     get l t' mem2 = Some (f, Message.concrete v' r'). *)
-  (* Proof. *)
-  (*   inv PROMISE. *)
-  (*   - exploit add_get1; eauto. *)
-  (*   - exploit split_get1; eauto. i. des. *)
-  (*     exploit split_get0; eauto. i. des. *)
-  (*     dup GET2. revert GET2. *)
-  (*     erewrite split_o; eauto. repeat condtac; ss; i. *)
-  (*     + des. subst. inv GET2. congr. *)
-  (*     + guardH o. des. subst. inv GET2.  *)
-  (*       rewrite GET in *. inv GET1. eauto. *)
-  (*     + rewrite GET in *. inv GET2. eauto. *)
-  (*   - exploit lower_get1; eauto. i. des. inv MSG_LE. eauto. *)
-  (*   - exploit remove_get1; try exact GET; eauto. i. des; eauto. *)
-  (*     subst. exploit remove_get0; try exact MEM. i. des. congr. *)
-  (* Qed. *)
 End Memory.
