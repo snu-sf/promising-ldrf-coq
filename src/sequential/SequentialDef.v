@@ -28,21 +28,196 @@ Module Perm.
     | _, _ => false
     end.
 End Perm.
-Definition flag := bool.
+
+Variant flag :=
+| unwritten
+| written
+| promised
+.
+
+Definition flag_le (f_src f_tgt: flag): bool :=
+  match f_src, f_tgt with
+  | promised, _ => false
+  | written, _ => true
+  | unwritten, unwritten => true
+  | _, _ => false
+  end.
+
+Definition Perms := Loc.t -> Perm.t.
 
 Module SeqMemory.
   Definition t := Loc.t -> Const.t * flag.
 
   Definition update (loc: Loc.t) (val: Const.t) (m: t): t :=
-    fun loc' => if Loc.eq_dec loc' loc then (val, true) else (m loc').
+    fun loc' => if Loc.eq_dec loc' loc then (val, written) else (m loc').
 
   Definition le (m_src m_tgt: t): Prop :=
     forall loc,
       match (m_src loc), (m_tgt loc) with
       | (v_src, f_src), (v_tgt, f_tgt) =>
-        v_src = v_tgt /\ (f_tgt = true -> f_src = true)
+        v_src = v_tgt /\ flag_le f_src f_tgt
       end.
 End SeqMemory.
+
+
+Module SeqState.
+Section LANG.
+  Variable lang: language.
+
+  Record t :=
+    mk {
+        state: lang.(Language.state);
+        memory: SeqMemory.t;
+      }.
+
+  (* without oracle *)
+  Variant na_local_step (p: Perms):
+    forall (e: MachineEvent.t)
+           (pe: ProgramEvent.t)
+           (m0: SeqMemory.t)
+           (m1: SeqMemory.t), Prop :=
+  | na_local_step_silent
+      m
+    :
+      na_local_step
+        p
+        (MachineEvent.silent) (ProgramEvent.silent)
+        m m
+  | na_local_step_read
+      m
+      loc val ord
+      (ORD: Ordering.le ord Ordering.na)
+      (VAL: Perm.le Perm.full (p loc) -> fst (m loc) = val)
+    :
+      na_local_step
+        p
+        (MachineEvent.silent) (ProgramEvent.read loc val ord)
+        m m
+  | na_local_step_write
+      m0 m1 e
+      loc val ord
+      (ORD: Ordering.le ord Ordering.na)
+      (MEM: SeqMemory.update loc val m0 = m1)
+      (PERM: e = if Perm.le Perm.full (p loc) then MachineEvent.silent else MachineEvent.failure)
+    :
+      na_local_step
+        p
+        e (ProgramEvent.write loc val ord)
+        m0 m1
+  | na_local_step_failure
+      m
+    :
+      na_local_step
+        p
+        (MachineEvent.failure) (ProgramEvent.failure)
+        m m
+  | na_local_step_update
+      m
+      loc valr valw ordr ordw
+      (ORD: __guard__(Ordering.le ordr Ordering.na \/ Ordering.le ordw Ordering.na))
+    :
+      na_local_step
+        p
+        (MachineEvent.failure) (ProgramEvent.update loc valr valw ordr ordw)
+        m m
+  .
+
+  Variant na_step (p: Perms): MachineEvent.t -> t -> t -> Prop :=
+  | na_step_intro
+      st0 st1 m0 m1 e pe
+      (LANG: lang.(Language.step) pe st0 st1)
+      (LOCAL: na_local_step p e pe m0 m1)
+    :
+      na_step p e (mk st0 m0) (mk st1 m1)
+  .
+End LANG.
+End SeqState.
+
+
+Variant sort :=
+| rlx (* no change *)
+| srlx (
+| acq
+| rel
+| relacq
+| event
+| upd
+.
+
+  perms
+  mem_src
+  mem_tgt
+  written_src
+  written_tgt
+  proms_src
+
+
+Variant at_step:
+  forall
+    (s: sort)
+    (p0: Perms)
+    (m_src0: SeqMemory.t)
+    (m_tgt0: SeqMemory.t)
+    (proms0: Proms)
+    (p1: Perms)
+    (m_src1: SeqMemory.t)
+    (m_tgt1: SeqMemory.t)
+    (proms1: Proms), Prop :=
+| at_step_rlx
+    p m_src m_tgt proms
+  :
+    at_step
+      rlx
+      p m_src m_tgt proms
+      p m_src m_tgt proms
+| at_step
+
+(* srlx *)
+| (* rel *)
+| (* acq *)
+
+
+| at_step_srlx
+    p m_src m_tgt proms
+  :
+    at_step
+      rlx
+      p m_src m_tgt proms
+      p m_src m_tgt proms
+.
+
+
+
+
+
+Variant at_step:
+  forall
+    (p0: Perms)
+    (m_src0: SeqMemory.t)
+    (m_tgt0: SeqMemory.t)
+    (proms0: Proms)
+    (p1: Perms)
+    (m_src1: SeqMemory.t)
+    (m_tgt1: SeqMemory.t)
+    (proms1: Proms), Prop :=
+| at_step_rlx
+
+
+
+    rlx fence
+    rlx
+
+
+    rlx/plain load
+    rlx/plain store
+    srlx store
+    acq load
+    rel store
+    upd
+
+
+
+
 
 Module Released.
   Definition t := Loc.t -> option (Const.t * flag).
@@ -124,8 +299,6 @@ Variant wf_diff (d: diffs): forall (e: ProgramEvent.t), Prop :=
   :
     wf_diff d (ProgramEvent.update loc valr valw ordr ordw)
 .
-
-Definition Perms := Loc.t -> Perm.t.
 
 Variant update_perms (d: diffs) (p0 p1: perms)
 
