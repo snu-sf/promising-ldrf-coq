@@ -261,19 +261,34 @@ Module Local.
   .
   Hint Constructors write_step.
 
-  Inductive write_undef_step (lc1:t) (sc1:TimeMap.t) (mem1:Memory.t)
-                             (loc:Loc.t) (from to:Time.t) (ord:Ordering.t)
-                             (lc2:t) (sc2:TimeMap.t) (mem2:Memory.t) (kind:Memory.op_kind): Prop :=
-  | write_undef_step_intro
-      promises2
-      (NA: Ordering.le ord Ordering.na)
-      (WRITABLE: TView.writable lc1.(tview).(TView.cur) sc1 loc to ord)
-      (WRITE: Memory.write lc1.(promises) mem1 loc from to Message.undef promises2 mem2 kind)
-      (LC2: lc2 = mk lc1.(tview) promises2)
-      (SC2: sc2 = sc1):
-      write_undef_step lc1 sc1 mem1 loc from to ord lc2 sc2 mem2 kind
+  Inductive write_na_messages (ts: Time.t)
+                              (promises1 mem1: Memory.t) (loc: Loc.t) (from to: Time.t) (val: Const.t)
+                              (promises2 mem2: Memory.t) (kind: Memory.op_kind): Prop :=
+  | write_na_messages_base
+      (WRITABLE: Time.lt ts to)
+      (WRITE: Memory.write promises1 mem1 loc from to (Message.concrete val None) promises2 mem2 kind)
+  | write_na_messages_write
+      from' to' msg' promises' mem' kind'
+      (WRITABLE_EX: Time.lt ts to')
+      (MSG_EX: __guard__ (msg' = Message.undef \/
+                          exists val', msg' = Message.concrete val' None))
+      (WRITE_EX: Memory.write promises1 mem1 loc from' to' msg' promises' mem' kind')
+      (WRITE_NA: write_na_messages to' promises' mem' loc from to val promises2 mem2 kind)
   .
-  Hint Constructors write_undef_step.
+  Hint Constructors write_na_messages.
+
+  Inductive write_na_step (lc1:t) (sc1:TimeMap.t) (mem1:Memory.t)
+                          (loc:Loc.t) (from to:Time.t) (val:Const.t) (ord:Ordering.t)
+                          (lc2:t) (sc2:TimeMap.t) (mem2:Memory.t) (kind:Memory.op_kind): Prop :=
+  | write_na_step_intro
+      promises2
+      (ORD: Ordering.le ord Ordering.na)
+      (WRITE: write_na_messages (View.rlx (TView.cur (tview lc1)) loc)
+                                (promises lc1) mem1 loc from to val promises2 mem2 kind)
+      (LC2: lc2 = mk (TView.write_tview (tview lc1) sc1 loc to ord) promises2)
+      (SC2: sc2 = sc1)
+  .
+  Hint Constructors write_na_step.
 
   Inductive fence_step (lc1:t) (sc1:TimeMap.t) (ordr ordw:Ordering.t) (lc2:t) (sc2:TimeMap.t): Prop :=
   | fence_step_intro
@@ -372,17 +387,11 @@ Module Local.
       lc1 sc1 mem1
       (LOCAL: failure_step lc1):
       program_step ThreadEvent.failure lc1 sc1 mem1 lc1 sc1 mem1
-  | step_na_write
-      loc ord val released
+  | step_write_na
       lc1 sc1 mem1
-      from1 to1 kind1
-      lc2 sc2 mem2
-      from2 to2 kind2
-      lc3 sc3 mem3
-      (LT: Time.lt to1 to2)
-      (LOCAL1: write_undef_step lc1 sc1 mem1 loc from1 to1 ord lc2 sc2 mem2 kind1)
-      (LOCAL2: write_step lc2 sc2 mem2 loc from2 to2 val None released ord lc3 sc3 mem3 kind2):
-      program_step (ThreadEvent.write loc from2 to2 val released ord) lc1 sc1 mem1 lc3 sc3 mem3
+      loc from to val ord lc2 sc2 mem2 kind
+      (LOCAL: write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 kind):
+      program_step (ThreadEvent.write loc from to val None ord) lc1 sc1 mem1 lc2 sc2 mem2
   | step_racy_read
       lc1 sc1 mem1
       loc val ord
@@ -482,9 +491,50 @@ Module Local.
     - inv WRITE. inv PROMISE; try inv TS; ss.
   Qed.
 
-  Lemma write_undef_step_future
-        lc1 sc1 mem1 loc from to ord lc2 sc2 mem2 kind
-        (STEP: write_undef_step lc1 sc1 mem1 loc from to ord lc2 sc2 mem2 kind)
+  Lemma write_na_messages_future
+        tview sc ord
+        ts promises1 mem1 loc from to val promises2 mem2 kind
+        (ORD: Ordering.le ord Ordering.na)
+        (WRITE: write_na_messages ts promises1 mem1 loc from to val promises2 mem2 kind)
+        (WF_TVIEW1: TView.wf tview)
+        (CLOSED_TVIEW1: TView.closed tview mem1)
+        (CLOSED_SC1: Memory.closed_timemap sc mem1)
+        (LE1: Memory.le promises1 mem1)
+        (FINITE1: Memory.finite promises1)
+        (BOT1: Memory.bot_none promises1)
+        (CLOSED1: Memory.closed mem1):
+    (<<WF_TVIEW2: TView.wf (TView.write_tview tview sc loc to ord)>>) /\
+    (<<CLOSED_TVIEW2: TView.closed (TView.write_tview tview sc loc to ord) mem2>>) /\
+    (<<LE2: Memory.le promises2 mem2>>) /\
+    (<<FINITE2: Memory.finite promises2>>) /\
+    (<<BOT2: Memory.bot_none promises2>>) /\
+    (<<CLOSED2: Memory.closed mem2>>) /\
+    (<<MEM_FUTURE: Memory.future mem1 mem2>>).
+  Proof.
+    induction WRITE.
+    { exploit TViewFacts.write_future; eauto.
+      { inv WRITE. eapply Memory.promise_op.
+        replace None with (TView.write_released tview sc loc to None ord) in PROMISE; eauto.
+        unfold TView.write_released.
+        condtac; ss. destruct ord; ss.
+      }
+      i. des.
+      exploit Memory.write_future; eauto. i. des.
+      splits; auto.
+    }
+    exploit Memory.write_future; eauto.
+    { unguard. des; subst; eauto. }
+    i. des.
+    exploit IHWRITE; eauto.
+    { eapply TView.future_closed; eauto. }
+    { eapply Memory.future_closed_timemap; eauto. }
+    i. des.
+    splits; auto. etrans; eauto.
+  Qed.
+
+  Lemma write_na_step_future
+        lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 kind
+        (STEP: write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 kind)
         (WF1: wf lc1 mem1)
         (SC1: Memory.closed_timemap sc1 mem1)
         (CLOSED1: Memory.closed mem1):
@@ -496,11 +546,10 @@ Module Local.
     <<MEM_FUTURE: Memory.future mem1 mem2>>.
   Proof.
     inv WF1. inv STEP.
-    exploit Memory.write_future; try apply WRITE; eauto. i. des.
+    exploit write_na_messages_future; eauto. i. des.
     splits; eauto; try refl.
-    - econs; ss. inv TVIEW_CLOSED.
-      econs; eauto using Memory.future_closed_view.
     - eauto using Memory.future_closed_timemap.
+    - apply TViewFacts.write_tview_incr. ss.
   Qed.
 
   Lemma write_step_non_cancel
@@ -570,11 +619,11 @@ Module Local.
     - exploit read_step_future; eauto. i. des.
       exploit write_step_future; eauto; try by econs. i. des.
       esplits; eauto. etrans; eauto.
-    - exploit fence_step_future; eauto. i. des. esplits; eauto; try refl.
-    - exploit fence_step_future; eauto. i. des. esplits; eauto; try refl.
-    - exploit write_undef_step_future; eauto. i. des.
-      exploit write_step_future; eauto. i. des.
-      esplits; eauto; try refl; etrans; eauto.
+    - exploit fence_step_future; eauto. i. des.
+      esplits; eauto; try refl.
+    - exploit fence_step_future; eauto. i. des.
+      esplits; eauto; try refl.
+    - exploit write_na_step_future; eauto.
   Qed.
 
   Lemma promise_step_inhabited
@@ -586,6 +635,15 @@ Module Local.
     inv STEP. eauto using Memory.promise_inhabited.
   Qed.
 
+  Lemma write_na_messages_inhabited
+        ts promises1 mem1 loc from to val promises2 mem2 kind
+        (WRITE: write_na_messages ts promises1 mem1 loc from to val promises2 mem2 kind)
+        (INHABITED1: Memory.inhabited mem1):
+    <<INHABITED2: Memory.inhabited mem2>>.
+  Proof.
+    induction WRITE; eauto using Memory.write_inhabited.
+  Qed.
+
   Lemma program_step_inhabited
         e lc1 sc1 mem1 lc2 sc2 mem2
         (STEP: program_step e lc1 sc1 mem1 lc2 sc2 mem2)
@@ -595,7 +653,7 @@ Module Local.
     inv STEP; eauto.
     - inv LOCAL. eauto using Memory.write_inhabited.
     - inv LOCAL2. eauto using Memory.write_inhabited.
-    - inv LOCAL1. inv LOCAL2. eauto using Memory.write_inhabited.
+    - inv LOCAL. eauto using write_na_messages_inhabited.
   Qed.
 
 
@@ -647,9 +705,28 @@ Module Local.
     inv WRITE. eapply TView.promise_closed; eauto.
   Qed.
 
-  Lemma write_undef_step_disjoint
-        lc1 sc1 mem1 lc2 sc2 loc from to ord mem2 kind lc
-        (STEP: write_undef_step lc1 sc1 mem1 loc from to ord lc2 sc2 mem2 kind)
+  Lemma write_na_messages_disjoint
+        ts promises1 mem1 loc from to val promises2 mem2 kind promises
+        (WRITE: write_na_messages ts promises1 mem1 loc from to val promises2 mem2 kind)
+        (LE1: Memory.le promises1 mem1)
+        (FINITE1: Memory.finite promises1)
+        (BOT1: Memory.bot_none promises1)
+        (CLOSED1: Memory.closed mem1)
+        (DISJOINT1: Memory.disjoint promises1 promises)
+        (LE: Memory.le promises mem1):
+    (<<DISJOINT2: Memory.disjoint promises2 promises>>) /\
+    (<<LE: Memory.le promises mem2>>).
+  Proof.
+    induction WRITE.
+    { exploit Memory.write_disjoint; try exact WRITE; eauto. }
+    exploit Memory.write_future; try exact WRITE_EX; eauto.
+    { unguard. des; subst; eauto. }
+    exploit Memory.write_disjoint; try exact WRITE_EX; eauto. i. des. eauto.
+  Qed.
+
+  Lemma write_na_step_disjoint
+        lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 kind lc
+        (STEP: write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 kind)
         (WF1: wf lc1 mem1)
         (SC1: Memory.closed_timemap sc1 mem1)
         (CLOSED1: Memory.closed mem1)
@@ -658,10 +735,11 @@ Module Local.
     <<DISJOINT2: disjoint lc2 lc>> /\
     <<WF: wf lc mem2>>.
   Proof.
+    exploit write_na_step_future; eauto. i. des.
     inv WF1. inv DISJOINT1. inversion WF. inv STEP.
-    exploit Memory.write_disjoint; try apply WRITE; eauto. i. des.
+    exploit write_na_messages_disjoint; try apply WRITE; eauto. i. des.
     splits; ss. econs; eauto.
-    inv WRITE. eapply TView.promise_closed; eauto.
+    eapply TView.future_closed; eauto.
   Qed.
 
   Lemma fence_step_disjoint
@@ -704,9 +782,16 @@ Module Local.
       exploit write_step_disjoint; eauto.
     - exploit fence_step_disjoint; eauto.
     - exploit fence_step_disjoint; eauto.
-    - exploit write_undef_step_future; eauto. i. des.
-      exploit write_undef_step_disjoint; eauto. i. des.
-      exploit write_step_disjoint; eauto.
+    - exploit write_na_step_disjoint; eauto.
+  Qed.
+
+  Lemma write_na_messages_promises_bot
+        ts promises1 mem1 loc from to val promises2 mem2 kind
+        (WRITE: write_na_messages ts promises1 mem1 loc from to val promises2 mem2 kind)
+        (PROMISES1: promises1 = Memory.bot):
+    <<PROMISES2: promises2 = Memory.bot>>.
+  Proof.
+    induction WRITE; eauto using Memory.write_promises_bot.
   Qed.
 
   Lemma program_step_promises_bot
@@ -719,8 +804,31 @@ Module Local.
     - eapply Memory.write_promises_bot; eauto.
     - inv LOCAL1. inv LOCAL2.
       eapply Memory.write_promises_bot; eauto.
-    - inv LOCAL1. inv LOCAL2.
-      do 2 (eapply Memory.write_promises_bot; eauto).
+    - eapply write_na_messages_promises_bot; eauto.
+  Qed.
+
+  Lemma write_na_messages_get_diff_promise
+        ts promises1 mem1 loc from to val promises2 mem2 kind
+        loc'
+        (WRITE: write_na_messages ts promises1 mem1 loc from to val promises2 mem2 kind)
+        (LOC: loc' <> loc):
+    forall to', Memory.get loc' to' promises2 = Memory.get loc' to' promises1.
+  Proof.
+    induction WRITE; eauto using Memory.write_get_diff_promise.
+    i. rewrite IHWRITE; eauto.
+    eapply Memory.write_get_diff_promise; eauto.
+  Qed.
+
+  Lemma write_na_messages_get_diff
+        ts promises1 mem1 loc from to val promises2 mem2 kind
+        loc'
+        (WRITE: write_na_messages ts promises1 mem1 loc from to val promises2 mem2 kind)
+        (LOC: loc' <> loc):
+    forall to', Memory.get loc' to' mem2 = Memory.get loc' to' mem1.
+  Proof.
+    induction WRITE; eauto using Memory.write_get_diff.
+    i. rewrite IHWRITE; eauto.
+    eapply Memory.write_get_diff; eauto.
   Qed.
 
   Lemma program_step_get_diff_promises
@@ -735,9 +843,8 @@ Module Local.
       erewrite <- Memory.write_get_diff_promise; eauto.
     - i. inv LOCAL1. inv LOCAL2. s.
       erewrite <- Memory.write_get_diff_promise; eauto.
-    - i. inv LOCAL1. inv LOCAL2. ss.
-      erewrite <- Memory.write_get_diff_promise; try exact WRITE; eauto.
-      erewrite <- Memory.write_get_diff_promise; eauto.
+    - i. inv LOCAL.
+      erewrite <- write_na_messages_get_diff_promise; eauto.
   Qed.
 
   Lemma program_step_get_diff
@@ -752,8 +859,7 @@ Module Local.
       erewrite <- Memory.write_get_diff; eauto.
     - i. inv LOCAL1. inv LOCAL2. s.
       erewrite <- Memory.write_get_diff; eauto.
-    - i. inv LOCAL1. inv LOCAL2. ss.
-      erewrite <- Memory.write_get_diff; try exact WRITE; eauto.
-      erewrite <- Memory.write_get_diff; eauto.
+    - i. inv LOCAL.
+      erewrite <- write_na_messages_get_diff; try exact WRITE; eauto.
   Qed.
 End Local.

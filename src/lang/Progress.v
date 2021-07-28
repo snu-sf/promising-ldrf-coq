@@ -21,63 +21,6 @@ Require Import Thread.
 Set Implicit Arguments.
 
 
-Lemma write_promise
-      promises1 mem1 loc from to msg promises2 mem2 kind
-      (WRITE: Memory.write promises1 mem1 loc from to msg promises2 mem2 kind)
-      (PROMISES: promises1 = Memory.bot):
-  promises2 = Memory.bot.
-Proof.
-  subst. apply Memory.ext. i. rewrite Memory.bot_get.
-  exploit Memory.write_not_cancel; eauto. i. inv WRITE.
-  erewrite Memory.remove_o; eauto. condtac; ss. guardH o.
-  inv PROMISE; ss.
-  - erewrite Memory.add_o; eauto. condtac; ss.
-    apply Memory.bot_get.
-  - erewrite Memory.split_o; eauto. repeat condtac; ss.
-    + guardH o0. des. subst.
-      exploit Memory.split_get0; try exact PROMISES; eauto. i. des.
-      rewrite Memory.bot_get in *. congr.
-    + apply Memory.bot_get.
-  - erewrite Memory.lower_o; eauto. condtac; ss.
-    apply Memory.bot_get.
-Qed.
-
-Lemma write_step_promise
-      lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
-      (STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
-      (PROMISES: lc1.(Local.promises) = Memory.bot):
-  lc2.(Local.promises) = Memory.bot.
-Proof.
-  inv STEP.
-  eapply write_promise; eauto.
-Qed.
-
-Lemma write_undef_step_promise
-      lc1 sc1 mem1 loc from to ord lc2 sc2 mem2 kind
-      (STEP: Local.write_undef_step lc1 sc1 mem1 loc from to ord lc2 sc2 mem2 kind)
-      (PROMISES: lc1.(Local.promises) = Memory.bot):
-  lc2.(Local.promises) = Memory.bot.
-Proof.
-  inv STEP.
-  eapply write_promise; eauto.
-Qed.
-
-Lemma program_step_promise
-      lang e
-      st1 lc1 sc1 mem1
-      st2 lc2 sc2 mem2
-      (STEP: Thread.program_step e (Thread.mk lang st1 lc1 sc1 mem1) (Thread.mk lang st2 lc2 sc2 mem2))
-      (PROMISES: (Local.promises lc1) = Memory.bot):
-  (Local.promises lc2) = Memory.bot.
-Proof.
-  inv STEP. inv LOCAL; ss; try by inv LOCAL0.
-  - eapply write_step_promise; eauto.
-  - eapply write_step_promise; eauto.
-    inv LOCAL1. auto.
-  - eapply write_step_promise; eauto.
-    eapply write_undef_step_promise; eauto.
-Qed.
-
 Lemma closed_timemap_max_ts
       loc tm mem
       (CLOSED: Memory.closed_timemap tm mem):
