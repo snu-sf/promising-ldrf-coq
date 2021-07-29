@@ -44,6 +44,19 @@ Module SeqMemory.
       end.
 End SeqMemory.
 
+Module Released.
+  Definition t := Loc.t -> option (Const.t * flag).
+
+  Definition le (rels0 rels: t): Prop :=
+    forall loc,
+      match (rels0 loc), (rels1 loc) with
+      | Some (
+
+
+
+Definition released_vals: Type := Loc.t -> option (Comn
+
+Definition mem_diff:
 
 
 Variant diff :=
