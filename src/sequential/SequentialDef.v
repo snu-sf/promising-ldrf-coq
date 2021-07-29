@@ -35,15 +35,22 @@ Module SeqMemory.
 
   Definition update (loc: Loc.t) (val: Const.t) (m: t): t :=
     fun loc' => if Loc.eq_dec loc' loc then (val, true) else (m loc').
+
+  Definition le (m_src m_tgt: t): Prop :=
+    forall loc,
+      match (m_src loc), (m_tgt loc) with
+      | (v_src, f_src), (v_tgt, f_tgt) =>
+        v_src = v_tgt /\ (f_tgt = true -> f_src = true)
+      end.
 End SeqMemory.
 
 
 
 Variant diff :=
 | diff_rlx
-| diff_rel (val: Const.t) (f: flag)
+| diff_rel (* (val: Const.t) (f: flag) *)
 | diff_acq (val: Const.t)
-| diff_relacq (valw: Const.t) (f: flag) (valr: Const.t)
+| diff_relacq (* (valw: Const.t) (f: flag) *) (valr: Const.t)
 .
 
 Definition diffs := Loc.t -> diff.
@@ -56,7 +63,7 @@ Definition is_acq (d: diff): bool :=
 
 Definition is_rel (d: diff): bool :=
   match d with
-  | diff_rel _ _  => true
+  | diff_rel => true
   | _ => false
   end.
 
@@ -107,6 +114,8 @@ Variant wf_diff (d: diffs): forall (e: ProgramEvent.t), Prop :=
 
 Definition Perms := Loc.t -> Perm.t.
 
+Variant update_perms (d: diffs) (p0 p1: perms)
+
 
 Module Oracle.
   Definition t: Type. Admitted.
@@ -127,24 +136,9 @@ End Oracle.
 
 
 
-Definition
 
 
-Module SeqLocal.
-  Variant step:
-    forall (e: ProgramEvent.t)
-           (m0: SeqMemory.t) (p0: Perms) (o0: Oracle)
-           (m1: SeqMemory.t) (p1: Perms) (o1: Oracle), Prop :=
-  .
-End SeqLocal.
-
-
-
-De
-
-
-
-Module State.
+Module SeqState.
 Section LANG.
   Variable lang: language.
 
@@ -152,12 +146,10 @@ Section LANG.
     mk {
         state: lang.(Language.state);
         memory: SeqMemory.t;
-        perm: Perms;
-        oracle: Oracle;
       }.
 
   (* without oracle *)
-  Variant na_local_step (p: Perms) (o: Oracle):
+  Variant na_local_step (p: Perms):
     forall (e: MachineEvent.t)
            (pe: ProgramEvent.t)
            (m0: SeqMemory.t)
@@ -166,7 +158,7 @@ Section LANG.
       m
     :
       na_local_step
-        p o
+        p
         (MachineEvent.silent) (ProgramEvent.silent)
         m m
   | na_local_step_read
@@ -176,7 +168,7 @@ Section LANG.
       (VAL: Perm.le Perm.full (p loc) -> fst (m loc) = val)
     :
       na_local_step
-        p o
+        p
         (MachineEvent.silent) (ProgramEvent.read loc val ord)
         m m
   | na_local_step_write
@@ -187,14 +179,14 @@ Section LANG.
       (PERM: e = if Perm.le Perm.full (p loc) then MachineEvent.silent else MachineEvent.failure)
     :
       na_local_step
-        p o
+        p
         e (ProgramEvent.write loc val ord)
         m0 m1
   | na_local_step_failure
       m
     :
       na_local_step
-        p o
+        p
         (MachineEvent.failure) (ProgramEvent.failure)
         m m
   | na_local_step_update
@@ -203,19 +195,101 @@ Section LANG.
       (ORD: __guard__(Ordering.le ordr Ordering.na \/ Ordering.le ordw Ordering.na))
     :
       na_local_step
-        p o
+        p
         (MachineEvent.failure) (ProgramEvent.update loc valr valw ordr ordw)
         m m
   .
 
-  Variant na_step: MachineEvent.t -> t -> t -> Prop :=
+  Variant na_step (p: Perms): MachineEvent.t -> t -> t -> Prop :=
   | na_step_intro
-      p o
       st0 st1 m0 m1 e pe
       (LANG: lang.(Language.step) pe st0 st1)
-      (LOCAL: na_local_step p o e pe m0 m1)
+      (LOCAL: na_local_step p e pe m0 m1)
     :
-      na_step e (mk st0 m0 p o) (mk st1 m1 p o)
+      na_step p e (mk st0 m0) (mk st1 m1)
+  .
+End LANG.
+End SeqState.
+
+Module SeqThread.
+Section LANG.
+  Variable lang: language.
+
+  Record t :=
+    mk {
+        state: SeqState.t lang;
+        perm: Perms;
+        oracle: Oracle.t;
+      }.
+
+  Variant na_step:
+    forall (e: MachineEvent.t) (th0: t) (th1: t), Prop :=
+  | na_step_intro
+      p o e st0 st1
+      (STEP: SeqState.na_step p e st0 st1)
+    :
+      na_step e (mk st0 p o) (mk st1 p o)
+  .
+
+  Lemma na_state_steps_na_steps p o st0 st1
+        (STEPS: rtc (SeqState.na_step p MachineEvent.silent) st0 st1)
+    :
+      rtc (na_step MachineEvent.silent) (mk st0 p o) (mk st1 p o).
+  Proof.
+    induction STEPS.
+    - refl.
+    - econs; eauto. econs; eauto.
+  Qed.
+
+  Variant at_local_step (p: Perms):
+    forall (e: MachineEvent.t)
+           (pe: ProgramEvent.t)
+           (m0: SeqMemory.t)
+           (m1: SeqMemory.t), Prop :=
+  | na_local_step_silent
+      m
+    :
+      na_local_step
+        p
+        (MachineEvent.silent) (ProgramEvent.silent)
+        m m
+  | na_local_step_read
+      m
+      loc val ord
+      (ORD: Ordering.le ord Ordering.na)
+      (VAL: Perm.le Perm.full (p loc) -> fst (m loc) = val)
+    :
+      na_local_step
+        p
+        (MachineEvent.silent) (ProgramEvent.read loc val ord)
+        m m
+  | na_local_step_write
+      m0 m1 e
+      loc val ord
+      (ORD: Ordering.le ord Ordering.na)
+      (MEM: SeqMemory.update loc val m0 = m1)
+      (PERM: e = if Perm.le Perm.full (p loc) then MachineEvent.silent else MachineEvent.failure)
+    :
+      na_local_step
+        p
+        e (ProgramEvent.write loc val ord)
+        m0 m1
+  | na_local_step_failure
+      m
+    :
+      na_local_step
+        p
+        (MachineEvent.failure) (ProgramEvent.failure)
+        m m
+  | na_local_step_update
+      m
+      loc valr valw ordr ordw
+      (ORD: __guard__(Ordering.le ordr Ordering.na \/ Ordering.le ordw Ordering.na))
+    :
+      na_local_step
+        p
+        (MachineEvent.failure) (ProgramEvent.update loc valr valw ordr ordw)
+        m m
   .
 
   Variant at_step: MachineEvent.t -> t -> t -> Prop :=
@@ -260,72 +334,146 @@ Section LANG.
     :
       at_step (MachineEvent.syscall e) (mk st0 m0 p0 o0) (mk st1 m1 p1 o1)
   .
+End LANG.
+End State.
 
-  Local.program_step
+Section SIMULATION.
+  Variable lang_src: language.
+  Variable lang_tgt: language.
 
-ProgramEvent.t
+  Variable sim_terminal: forall (st_src:(Language.state lang_src)) (st_tgt:(Language.state lang_tgt)), Prop.
 
-  | na_step_read
-      st0 st1
-      m p o
-      loc val ord
-      (STEP: lang.(Language.step) (ProgramEvent.read loc val ord) st0 st1)
-      (ORD: Ordering.le ord Ordering.na)
-      (VAL: Perm.le Perm.full (p loc) -> fst (m loc) = val)
-    :
-      na_step MachineEvent.silent (mk st0 m p o) (mk st1 m p o)
-  | na_step_write
-      st0 st1
-      m0 p o
-      loc val ord
-      m1 e
-      (STEP: lang.(Language.step) (ProgramEvent.write loc val ord) st0 st1)
-      (ORD: Ordering.le ord Ordering.na)
-      (MEM: SeqMemory.update loc val m0 = m1)
-      (PERM: e = if Perm.le Perm.full (p loc) then MachineEvent.silent else MachineEvent.failure)
-    :
-      na_step e (mk st0 m0 p o) (mk st1 m1 p o)
-  .
+  Definition SIM_SEQ :=
+    forall
+      (p: Perms)
+      (st_src: lang_src.(Language.state))
+      (mem_src: SeqMemory.t)
+      (st_tgt: lang_tgt.(Language.state))
+      (mem_tgt: SeqMemory.t), Prop.
 
-
-  | na_step_write_race
-      st0 st1
-      m0 p o m1
-      loc val ord
-      (STEP: lang.(Language.step) (ProgramEvent.write loc val ord) st0 st1)
-      (ORD: Ordering.le ord Ordering.na)
-      (MEM: SeqMemory.update loc val m0 = m1)
-    :
-      na_step MachineEvent.silent (mk st0 m0 p o) (mk st1 m1 p o)
-  .
-
-  | na_step_racy_read
-      st0 st1
-      loc val ord
-      (STEP: lang.(Language.step) (ProgramEvent.read loc val ord) st0 st1)
-      (ORD: Ordering.le ord Ordering.na)
-      m p o
-    :
-      na_step (mk st0 m p o) (mk st1 m p o)
-  .
-
-
-Ordering.t
-
-
-  | na_step_silent
-      st0 st1
-      (STEP: lang.(Language.step) ProgramEvent.silent st0 st1)
-      m p o
-    :
-      na_step (mk st0 m p o) (mk st1 m p o)
-  .
-
-ProgramEvent.t
+  Inductive _sim_seq
+            (sim_seq: SIM_SEQ)
+            (p: Perms)
+            (st_src0: lang_src.(Language.state))
+            (mem_src0: SeqMemory.t)
+            (st_tgt0: lang_tgt.(Language.state))
+            (mem_tgt0: SeqMemory.t): Prop :=
+  | sim_seq_step
+      (NASTEP: forall st_tgt1 e
+                      (STEP_TGT: State.na_step
 
 
 
-Definition update_mem :=
+
+
+      (TERMINAL: forall (TERMINAL_TGT: (Language.is_terminal lang_tgt) st1_tgt),
+          (<<FAILURE: Thread.steps_failure (Thread.mk _ st1_src lc1_src sc1_src mem1_src)>>) \/
+          exists st2_src lc2_src sc2_src mem2_src w2,
+            (<<STEPS: rtc (@Thread.tau_step _)
+                          (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
+                          (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>>) /\
+            (<<SC: sim_timemap w2 sc2_src sc1_tgt>>) /\
+            (<<MEMORY: sim_memory w2 mem2_src mem1_tgt>>) /\
+            (<<TERMINAL_SRC: (Language.is_terminal lang_src) st2_src>>) /\
+            (<<LOCAL: sim_local w2 lc2_src lc1_tgt>>) /\
+            (<<TERMINAL: sim_terminal st2_src st1_tgt>>) /\
+            (<<WORLD: world_le w1 w2>>)>>) /\
+
+
+    (M<
+
+
+
+             (st1_src:(Language.state lang_src)) (lc1_src:Local.t) (sc0_src:TimeMap.t) (mem0_src:Memory.t)
+             (st1_tgt:(Language.state lang_tgt)) (lc1_tgt:Local.t) (sc0_tgt:TimeMap.t) (mem0_tgt:Memory.t): Prop :=
+    forall w1 sc1_src mem1_src
+           sc1_tgt mem1_tgt
+           (SC: sim_timemap w1 sc1_src sc1_tgt)
+           (MEMORY: sim_memory w1 mem1_src mem1_tgt)
+           (SC_FUTURE_SRC: TimeMap.le sc0_src sc1_src)
+           (SC_FUTURE_TGT: TimeMap.le sc0_tgt sc1_tgt)
+           (MEM_FUTURE_SRC: Memory.future_weak mem0_src mem1_src)
+           (MEM_FUTURE_TGT: Memory.future_weak mem0_tgt mem1_tgt)
+           (WF_SRC: Local.wf lc1_src mem1_src)
+           (WF_TGT: Local.wf lc1_tgt mem1_tgt)
+           (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
+           (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
+           (MEM_SRC: Memory.closed mem1_src)
+           (MEM_TGT: Memory.closed mem1_tgt)
+           (CONS_TGT: Local.promise_consistent lc1_tgt)
+           (WORLD: world_le w0 w1),
+      (<<TERMINAL:
+         forall (TERMINAL_TGT: (Language.is_terminal lang_tgt) st1_tgt),
+           (<<FAILURE: Thread.steps_failure (Thread.mk _ st1_src lc1_src sc1_src mem1_src)>>) \/
+           exists st2_src lc2_src sc2_src mem2_src w2,
+             (<<STEPS: rtc (@Thread.tau_step _)
+                           (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
+                           (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>>) /\
+             (<<SC: sim_timemap w2 sc2_src sc1_tgt>>) /\
+             (<<MEMORY: sim_memory w2 mem2_src mem1_tgt>>) /\
+             (<<TERMINAL_SRC: (Language.is_terminal lang_src) st2_src>>) /\
+             (<<LOCAL: sim_local w2 lc2_src lc1_tgt>>) /\
+             (<<TERMINAL: sim_terminal st2_src st1_tgt>>) /\
+             (<<WORLD: world_le w1 w2>>)>>) /\
+      (<<PROMISES:
+         forall (PROMISES_TGT: (Local.promises lc1_tgt) = Memory.bot),
+           (<<FAILURE: Thread.steps_failure (Thread.mk _ st1_src lc1_src sc1_src mem1_src)>>) \/
+           exists st2_src lc2_src sc2_src mem2_src,
+             (<<STEPS: rtc (@Thread.tau_step _)
+                           (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
+                           (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>>) /\
+             (<<PROMISES_SRC: (Local.promises lc2_src) = Memory.bot>>)>>) /\
+      (<<STEP: _sim_thread_step _ _ (@sim_thread lang_src lang_tgt sim_terminal)
+                                w1
+                                st1_src lc1_src sc1_src mem1_src
+                                st1_tgt lc1_tgt sc1_tgt mem1_tgt>>).
+
+
+  Inductive _sim
+            (sim:
+               forall
+                 (st_src: lang.(Language.state))
+                 (mem_src: SeqMemory.t)
+                 (p_src: Perms)
+                 (st_tgt: lang.(Language.state))
+                 (mem_tgt: SeqMemory.t)
+                 (p_tgt: Perms), Prop):
+    forall
+      (st_src: lang.(Language.state))
+      (mem_src: SeqMemory.t)
+      (p_src: Perms)
+      (st_tgt: lang.(Language.state))
+      (mem_tgt: SeqMemory.t)
+      (p_tgt: Perms), Prop :=
+  | sim_final
+      st_src mem_src p_src st_tgt mem_tgt p_tgt
+      (TGT: lang.(Language.is_terminal) st_tgt)
+      (SRC: lang.(Language.is_terminal) st_src)
+
+sim_thread
+
+
+  Definition SIM_TERMINAL (lang_src lang_tgt:language) :=
+    forall (st_src:(Language.state lang_src)) (st_tgt:(Language.state lang_tgt)), Prop.
+
+  Definition SIM_THREAD :=
+    forall (lang_src lang_tgt:language) (sim_terminal: SIM_TERMINAL lang_src lang_tgt)
+           (w: world)
+           (st1_src:(Language.state lang_src)) (lc1_src:Local.t) (sc0_src:TimeMap.t) (mem0_src:Memory.t)
+           (st1_tgt:(Language.state lang_tgt)) (lc1_tgt:Local.t) (sc0_tgt:TimeMap.t) (mem0_tgt:Memory.t), Prop.
+
+
+
+
+Language.t
+
+
+          state: lang.(Language.state);
+        memory: SeqMemory.t;
+        perm: Perms;
+
+
+
 
 Module Memory.
   Definition t := Loc.t -> Cell.t.
