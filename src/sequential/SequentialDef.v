@@ -74,6 +74,8 @@ Module SeqCell.
      ii. destruct x, y, z; ss.
      des. subst. splits; auto. etrans; eauto.
    Qed.
+
+   Definition init (v: Const.t): t := (v, unwritten).    
 End SeqCell.
 
 
@@ -95,6 +97,9 @@ Module SeqMemory.
   Proof.
     ii. etrans; eauto.
   Qed.
+
+  Definition init (vals: Loc.t -> Const.t): t :=
+    fun loc => SeqCell.init (vals loc).
 End SeqMemory.
 
 
@@ -186,33 +191,33 @@ End SeqState.
 
 Variant diff :=
 | diff_rlx (* no change *)
-| diff_acq
+| diff_acq (v: Const.t)
 | diff_rel
-| diff_reset
+| diff_reset (v: Const.t)
 .
 
 Definition diffs := Loc.t -> diff.
 
 Definition update_mem
-           (d: diffs) (v_diff: Loc.t -> Const.t) (m0: SeqMemory.t): SeqMemory.t :=
+           (d: diffs) (m0: SeqMemory.t): SeqMemory.t :=
   fun loc =>
     match (d loc) with
     | diff_rlx | diff_rel => m0 loc
-    | diff_acq | diff_reset => (v_diff loc, unwritten)
+    | diff_acq v | diff_reset v => (v, unwritten)
     end.
 
 Definition update_perm (d: diffs) (p0: Perms): Perms :=
   fun loc =>
     match (d loc) with
-    | diff_rlx | diff_reset => p0 loc
-    | diff_acq => Perm.full
+    | diff_rlx | diff_reset _ => p0 loc
+    | diff_acq _ => Perm.full
     | diff_rel => Perm.none
     end.
 
 Definition match_mem (d: diffs) (mem_src mem_tgt: SeqMemory.t) :=
   forall loc,
     match (d loc) with
-    | diff_rel | diff_reset => SeqCell.le (mem_src loc) (mem_tgt loc)
+    | diff_rel | diff_reset _ => SeqCell.le (mem_src loc) (mem_tgt loc)
     | _ => True
     end.
 
@@ -222,8 +227,8 @@ Definition wf_diff_perms (d: diffs) (p: Perms): Prop :=
     match (d loc), (p loc) with
     | diff_rlx, _ => True
     | diff_rel, Perm.full => True
-    | diff_reset, Perm.full => True
-    | diff_acq, Perm.none => True
+    | diff_reset _, Perm.full => True
+    | diff_acq _, Perm.none => True
     | _, _ => False
     end.
 
@@ -233,31 +238,31 @@ Definition wf_diff_event (d: diffs) (e: ProgramEvent.t): Prop :=
   | ProgramEvent.read loc _ ord =>
     forall loc' (NEQ: loc' <> loc),
       match (d loc') with
-      | diff_rel | diff_reset => False
-      | diff_acq => Ordering.le Ordering.acqrel ord
+      | diff_rel | diff_reset _ => False
+      | diff_acq _ => Ordering.le Ordering.acqrel ord
       | diff_rlx => True
       end
   | ProgramEvent.write loc _ ord =>
     forall loc' (NEQ: loc' <> loc),
       match (d loc') with
-      | diff_acq | diff_reset => False
+      | diff_acq _ | diff_reset _ => False
       | diff_rel => Ordering.le Ordering.acqrel ord
       | diff_rlx => True
       end
   | ProgramEvent.update loc _ _ ordr ordw =>
     forall loc' (NEQ: loc' <> loc),
       match (d loc') with
-      | diff_reset => False
+      | diff_reset _ => False
       | diff_rel => Ordering.le Ordering.acqrel ordw
-      | diff_acq => Ordering.le Ordering.acqrel ordr
+      | diff_acq _ => Ordering.le Ordering.acqrel ordr
       | diff_rlx => True
       end
   | ProgramEvent.fence ordr ordw =>
     forall loc',
       match (d loc') with
-      | diff_reset => False
+      | diff_reset _ => False
       | diff_rel => Ordering.le Ordering.acqrel ordw
-      | diff_acq => Ordering.le Ordering.acqrel ordr
+      | diff_acq _ => Ordering.le Ordering.acqrel ordr
       | diff_rlx => True
       end
   | _ => True
@@ -311,13 +316,13 @@ Section SIMULATION.
          exists st_src1 st_src2,
            (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
            (<<STEP: lang_src.(Language.step) e st_src1.(SeqState.state) st_src2>>) /\
-           (<<SIM: forall d v_diff
+           (<<SIM: forall d
                           (DIFF: wf_diff_event d e)
                           (PERM: wf_diff_perms d p0),
                (<<MEM: match_mem d st_src1.(SeqState.memory) st_tgt0.(SeqState.memory)>>) /\
                (<<SIM: sim_seq (update_perm d p0)
-                           (SeqState.mk _ st_src2 (update_mem d v_diff st_src1.(SeqState.memory)))
-                           (SeqState.mk _ st_tgt1 (update_mem d v_diff st_tgt0.(SeqState.memory)))>>)>>)>>).
+                           (SeqState.mk _ st_src2 (update_mem d st_src1.(SeqState.memory)))
+                           (SeqState.mk _ st_tgt1 (update_mem d st_tgt0.(SeqState.memory)))>>)>>)>>).
 
   Lemma sim_seq_mon: monotone3 _sim_seq.
   Proof.
@@ -393,8 +398,12 @@ Section ADEQUACY.
   Variable R: Type.
 
   Definition sim_seq_itree (st_src: itree MemE.t R) (st_tgt: itree MemE.t R): Prop :=
-    forall p m,
-      sim_seq eq p (SeqState.mk (lang R) st_src m) (SeqState.mk (lang R) st_tgt m).
+    forall p vals,
+      sim_seq
+        eq
+        p
+        (SeqState.mk (lang R) st_src (SeqMemory.init vals))
+        (SeqState.mk (lang R) st_tgt (SeqMemory.init vals)).
 
   Theorem adequacy_seq:
     sim_seq_itree <2= sim_itree eq.
