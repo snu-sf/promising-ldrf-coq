@@ -4,13 +4,13 @@ COQTHEORIES  := \
 	src/while/*.v \
 	src/itree/*.v \
 	src/prop/*.v \
-	src/opt_common/*.v \
 	src/opt/*.v \
-	src/iopt/*.v \
-	src/invariant/*.v \
-	src/gopt/*.v \
-	src/promotion/*.v \
-	src/gsim/*.v \
+	src/opt/while/*.v \
+	src/opt/itree/*.v \
+#	src/invariant/*.v \
+#	src/gopt/*.v \
+#	src/promotion/*.v \
+#	src/gsim/*.v \
 #	src/ldrfpf/*.v \
 #	src/ldrfra/*.v \
 #	src/ldrfsc/*.v \
@@ -30,13 +30,11 @@ Makefile.coq: Makefile $(COQTHEORIES)
    echo "-R src/while $(COQMODULE)"; \
    echo "-R src/itree $(COQMODULE)"; \
    echo "-R src/prop $(COQMODULE)"; \
-   echo "-R src/opt_common $(COQMODULE)"; \
    echo "-R src/opt $(COQMODULE)"; \
-   echo "-R src/iopt $(COQMODULE)"; \
-   echo "-R src/invariant $(COQMODULE)"; \
-   echo "-R src/gopt $(COQMODULE)"; \
-   echo "-R src/promotion $(COQMODULE)"; \
-   echo "-R src/gsim $(COQMODULE)"; \
+   # echo "-R src/invariant $(COQMODULE)"; \
+   # echo "-R src/gopt $(COQMODULE)"; \
+   # echo "-R src/promotion $(COQMODULE)"; \
+   # echo "-R src/gsim $(COQMODULE)"; \
    # echo "-R src/ldrfpf $(COQMODULE)"; \
    # echo "-R src/ldrfra $(COQMODULE)"; \
    # echo "-R src/ldrfsc $(COQMODULE)"; \
