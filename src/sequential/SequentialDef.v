@@ -327,8 +327,9 @@ Section SIMULATION.
       i. exploit SIM; eauto. i. des. esplits; eauto. }
   Qed.
 
-  Definition sim_seq := paco3 _sim_seq.
+  Definition sim_seq := paco3 _sim_seq bot3.
 End SIMULATION.
+Arguments sim_seq [_] [_] _ _ _.
 #[export] Hint Resolve sim_seq_mon: paco.
 
 
@@ -388,13 +389,15 @@ End SeqThread.
 Require Import ITreeLang.
 Require Import iCompatibility.
 
-(* Section ADEQUACY. *)
-(*   Variable sim_terminal: *)
-(*     forall R_src R_tgt *)
-(*            (sim_ret:SIM_VAL R_src R_tgt) *)
-(*            (st_src: itree MemE.t R_src) (st_tgt: itree MemE.t R_tgt), Prop. *)
+Section ADEQUACY.
+  Variable R: Type.
 
-(*   Variable R_src R_tgt: Type. *)
+  Definition sim_seq_itree (st_src: itree MemE.t R) (st_tgt: itree MemE.t R): Prop :=
+    forall p m,
+      sim_seq eq p (SeqState.mk (lang R) st_src m) (SeqState.mk (lang R) st_tgt m).
 
-(*   Definition sim_seq_itree (st_src: itree MemE.t R_src) (st_tgt: itree MemE.t R_tgt): Prop := *)
-(*     forall p m, sim_seq (sim_terminal _ _) *)
+  Theorem adequacy_seq:
+    sim_seq_itree <2= sim_itree eq.
+  Proof.
+  Admitted.
+End ADEQUACY.
