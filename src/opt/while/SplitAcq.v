@@ -60,6 +60,27 @@ Inductive sim_acquired: forall (st_src:(Language.state lang)) (lc_src:Local.t) (
       (State.mk rs [Stmt.instr (Instr.fence Ordering.acqrel Ordering.plain)]) lc1_tgt sc1_tgt mem1_tgt
 .
 
+Lemma sim_local_sim_acquired
+      rs
+      lc_src sc_src mem_src
+      lc_tgt sc_tgt mem_tgt
+      (SIM: sim_local SimPromises.bot lc_src lc_tgt)
+      (SC1: TimeMap.le sc_src sc_tgt)
+      (MEM1: sim_memory mem_src mem_tgt)
+      (WF_SRC: Local.wf lc_src mem_src)
+      (WF_TGT: Local.wf lc_tgt mem_tgt)
+      (SC_SRC: Memory.closed_timemap sc_src mem_src)
+      (SC_TGT: Memory.closed_timemap sc_tgt mem_tgt)
+      (MEM_SRC: Memory.closed mem_src)
+      (MEM_TGT: Memory.closed mem_tgt):
+  sim_acquired (State.mk rs []) lc_src sc_src mem_src
+               (State.mk rs [Stmt.instr (Instr.fence Ordering.acqrel Ordering.plain)]) lc_tgt sc_tgt mem_tgt.
+Proof.
+  econs; eauto.
+  inv SIM. econs; ss. etrans; eauto.
+  apply TViewFacts.read_fence_tview_incr. apply WF_TGT.
+Qed.
+
 Lemma sim_acquired_mon
       st_src lc_src sc1_src mem1_src
       st_tgt lc_tgt sc1_tgt mem1_tgt
@@ -143,14 +164,15 @@ Proof.
   { right. esplits; eauto.
     inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   }
-  right.
   inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
     try (inv STATE; inv INSTR; inv SPLIT); ss.
   - (* promise *)
+    right.
     exploit sim_local_promise; eauto. i. des.
     esplits; try apply SC; eauto; ss.
     econs 2. econs 1; eauto. econs; eauto. eauto.
   - (* load *)
+    right.
     exploit Local.read_step_future; eauto. i. des.
     exploit sim_local_read_acquired; eauto. i. des.
     exploit Local.read_step_future; eauto. i. des.
@@ -161,6 +183,7 @@ Proof.
     + auto.
     + left. eapply paco11_mon; [apply sim_acquired_sim_thread|]; ss.
   - (* update-load *)
+    right.
     exploit Local.read_step_future; eauto. i. des.
     exploit sim_local_read_acquired; eauto. i. des.
     exploit Local.read_step_future; eauto. i. des.
@@ -171,6 +194,7 @@ Proof.
     + auto.
     + left. eapply paco11_mon; [apply sim_acquired_sim_thread|]; ss.
   - (* update *)
+    right.
     exploit Local.read_step_future; eauto. i. des.
     exploit sim_local_read_acquired; eauto. i. des.
     exploit Local.read_step_future; eauto. i. des.
@@ -193,4 +217,29 @@ Proof.
       * econs. econs. eauto.
     + auto.
     + left. eapply paco11_mon; [apply sim_acquired_sim_thread|]; ss.
+  - (* racy read *)
+    right.
+    exploit sim_local_racy_read_acquired; try exact LOCAL1; eauto. i. des.
+    esplits; try apply SC; eauto; ss.
+    + econs 2. econs 2. econs; cycle 1.
+      * econs 9; eauto.
+      * econs. econs.
+    + ss.
+    + left. eapply paco11_mon; [apply sim_acquired_sim_thread|]; ss.
+      apply sim_local_sim_acquired; eauto.
+  - (* racy read *)
+    right.
+    exploit sim_local_racy_read_acquired; try exact LOCAL1; eauto. i. des.
+    esplits; try apply SC; eauto; ss.
+    + econs 2. econs 2. econs; [|econs 9]; eauto. econs. econs. eauto.
+    + ss.
+    + left. eapply paco11_mon; [apply sim_acquired_sim_thread|]; ss.
+      apply sim_local_sim_acquired; eauto.
+  - (* racy update *)
+    left.
+    exploit sim_local_racy_update_acquired; try exact LOCAL1; eauto. i. des.
+    unfold Thread.steps_failure.
+    esplits; try refl.
+    + econs 2. econs; [|econs 11]; eauto. econs. econs. eauto.
+    + ss.
 Qed.

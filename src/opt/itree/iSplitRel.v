@@ -148,6 +148,32 @@ Proof.
     + econs 2. econs 2. econs; [|econs 4]; eauto. econs; eauto.
     + ss.
     + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
+  - (* na write *)
+    inv LOCAL1. inv ORD.
+  - (* racy read *)
+    right.
+    dependent destruction H.
+    exploit sim_local_racy_read; try exact LOCAL1; eauto; try refl. i. des.
+    esplits; try apply SC; eauto; ss.
+    + econs 2. econs 2. econs; [|econs 9]; eauto. econs; eauto.
+    + ss.
+    + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
+  - (* racy write *)
+    left.
+    dependent destruction H.
+    exploit sim_local_racy_write_released; try exact LOCAL1; eauto. i. des.
+    unfold Thread.steps_failure.
+    esplits; try refl.
+    + econs 2. econs; [|econs 10]; eauto. econs; eauto.
+    + ss.
+  - (* racy update *)
+    left.
+    dependent destruction H.
+    exploit sim_local_racy_update_released; try exact LOCAL1; eauto. i. des.
+    unfold Thread.steps_failure.
+    esplits; try refl.
+    + econs 2. econs; [|econs 11]; eauto. econs; eauto.
+    + ss.
 Qed.
 
 Lemma sim_released_sim_thread R:

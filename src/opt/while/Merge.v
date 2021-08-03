@@ -235,12 +235,8 @@ Proof.
       * i. inv PR.
   - (* na store *)
     right.
-    exploit Local.write_undef_step_future; eauto. i. des.
-    exploit sim_local_write_undef; try exact LOCAL1; try exact SC; eauto; try refl. i. des.
-    exploit Local.write_undef_step_future; eauto. i. des.
-    rewrite SimPromises.unset_bot in *.
-    hexploit sim_local_write_bot; try exact LOCAL2; try exact SC0; eauto; try refl. i. des.
-    exploit merge_write_read; try exact STEP_SRC0; eauto using View.bot_spec. i.
+    exploit sim_local_write_na; try exact LOCAL1; try exact SC; eauto; try refl. i. des.
+    exploit merge_write_na_read; try exact STEP_SRC; eauto. i.
     esplits.
     + ss.
     + econs 2; [|econs 1]. econs.

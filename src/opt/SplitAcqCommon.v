@@ -112,10 +112,6 @@ Proof.
   }
   exploit SimPromises.remove_bot; try exact REMOVE;
     try exact MEM1; try apply LOCAL1; eauto.
-  { econs. ss. }
-  { apply WF1_SRC. }
-  { apply WF1_TGT. }
-  { apply WF1_TGT. }
   i. des. esplits.
   - econs; eauto.
     inv WRITABLE. econs.
@@ -214,4 +210,44 @@ Proof.
     + rewrite <- ? View.join_l. apply TVIEW.
     + inv MEM1_TGT. exploit CLOSED; eauto. i. des.
       apply View.unwrap_opt_wf. inv MSG_WF. ss.
+Qed.
+
+Lemma sim_local_racy_read_acquired
+      lc1_src mem1_src
+      lc1_tgt mem1_tgt
+      loc val
+      (STEP_TGT: Local.racy_read_step lc1_tgt mem1_tgt loc val Ordering.relaxed)
+      (LOCAL1: sim_local SimPromises.bot lc1_src lc1_tgt)
+      (MEM1: sim_memory mem1_src mem1_tgt)
+      (WF1_SRC: Local.wf lc1_src mem1_src)
+      (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
+      (MEM1_SRC: Memory.closed mem1_src)
+      (MEM1_TGT: Memory.closed mem1_tgt):
+  <<STEP_SRC: Local.racy_read_step lc1_src mem1_src loc val Ordering.acqrel>>.
+Proof.
+  exploit sim_local_racy_read; try exact STEP_TGT;
+    try exact LOCAL1; try exact MEM1; try refl; eauto. i. des.
+  inv x0. econs; eauto.
+  inv RACE. econs; eauto.
+Qed.
+
+Lemma sim_local_racy_update_acquired
+      lc1_src mem1_src
+      lc1_tgt mem1_tgt
+      loc ow
+      (STEP_TGT: Local.racy_update_step lc1_tgt mem1_tgt loc Ordering.relaxed ow)
+      (LOCAL1: sim_local SimPromises.bot lc1_src lc1_tgt)
+      (MEM1: sim_memory mem1_src mem1_tgt)
+      (WF1_SRC: Local.wf lc1_src mem1_src)
+      (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
+      (MEM1_SRC: Memory.closed mem1_src)
+      (MEM1_TGT: Memory.closed mem1_tgt):
+  <<STEP_SRC: Local.racy_update_step lc1_src mem1_src loc Ordering.acqrel ow>>.
+Proof.
+  exploit sim_local_racy_update; try exact STEP_TGT;
+    try exact LOCAL1; try exact MEM1; try refl; eauto. i. des.
+  inv x0.
+  - econs 1; eauto.
+  - econs 2; eauto.
+  - econs 3; eauto.
 Qed.

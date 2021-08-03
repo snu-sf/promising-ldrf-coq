@@ -294,29 +294,21 @@ Proof.
     + (* na write *)
       right.
       inv EVT. inv STEP_SRC.
-      exploit Local.write_undef_step_future; eauto. i. des.
-      exploit sim_local_write_undef;
+      exploit sim_local_write_na;
         (try exact LOCAL);
         (try exact SC);
         eauto; try refl. i. des.
-      exploit Local.write_undef_step_future; eauto. i. des.
-      rewrite SimPromises.unset_bot in *.
-      hexploit sim_local_write_bot;
-        (try exact LOCAL0);
-        (try exact SC0);
-        eauto; try refl; try by viewtac. i. des.
       esplits;
         (try by apply rtc_lang_tau_step_rtc_thread_tau_step; eauto);
-        (try exact SC3).
+        (try exact SC2).
       * ss.
       * econs 2. econs 2. econs; [|econs 8]; eauto.
       * ss.
       * ss.
       * gbase. inv SIM0; eauto.
-        { exploit H; eauto. i. eapply GF in x.
-          eapply CIH0. eapply _sim_thread_mon; eauto.
-          i. eapply rclo11_clo_base. right. gbase. auto.
-        }
+        exploit H; eauto. i. eapply GF in x.
+        eapply CIH0. eapply _sim_thread_mon; eauto.
+        i. eapply rclo11_clo_base. right. gbase. auto.
     + (* racy read*)
       right.
       inv EVT. inv STEP_SRC.

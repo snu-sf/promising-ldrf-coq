@@ -66,10 +66,6 @@ Proof.
   }
   exploit SimPromises.remove_bot; try exact REMOVE;
     try exact MEM1; try apply LOCAL1; eauto.
-  { econs. ss. }
-  { apply WF1_SRC. }
-  { apply WF1_TGT. }
-  { apply WF1_TGT. }
   i. des. esplits.
   - econs; eauto.
     inv WRITABLE. econs; ss. eapply TimeFacts.le_lt_lt; [apply LOCAL1|apply TS].
@@ -129,4 +125,49 @@ Proof.
     eapply sim_local_nonsynch_loc; eauto.
   }
   i. des. esplits; eauto. etrans; eauto.
+Qed.
+
+Lemma sim_local_racy_write_released
+      lc1_src sc1_src mem1_src
+      lc1_tgt sc1_tgt mem1_tgt
+      loc
+      (STEP_TGT: Local.racy_write_step lc1_tgt mem1_tgt loc Ordering.strong_relaxed)
+      (LOCAL1: sim_local SimPromises.bot lc1_src lc1_tgt)
+      (SC1: TimeMap.le sc1_src sc1_tgt)
+      (MEM1: sim_memory mem1_src mem1_tgt)
+      (WF1_SRC: Local.wf lc1_src mem1_src)
+      (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
+      (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
+      (SC1_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
+      (MEM1_SRC: Memory.closed mem1_src)
+      (MEM1_TGT: Memory.closed mem1_tgt):
+  <<STEP_SRC: Local.racy_write_step lc1_src mem1_src loc Ordering.acqrel>>.
+Proof.
+  exploit sim_local_racy_write; try exact STEP_TGT;
+    try exact LOCAL1; try exact SC1; try exact MEM1; try refl; eauto. i. des.
+  inv x0. econs; eauto.
+Qed.
+
+Lemma sim_local_racy_update_released
+      lc1_src sc1_src mem1_src
+      lc1_tgt sc1_tgt mem1_tgt
+      loc ordr
+      (STEP_TGT: Local.racy_update_step lc1_tgt mem1_tgt loc ordr Ordering.strong_relaxed)
+      (LOCAL1: sim_local SimPromises.bot lc1_src lc1_tgt)
+      (SC1: TimeMap.le sc1_src sc1_tgt)
+      (MEM1: sim_memory mem1_src mem1_tgt)
+      (WF1_SRC: Local.wf lc1_src mem1_src)
+      (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
+      (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
+      (SC1_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
+      (MEM1_SRC: Memory.closed mem1_src)
+      (MEM1_TGT: Memory.closed mem1_tgt):
+  <<STEP_SRC: Local.racy_update_step lc1_src mem1_src loc ordr Ordering.acqrel>>.
+Proof.
+  exploit sim_local_racy_update; try exact STEP_TGT;
+    try exact LOCAL1; try exact SC1; try exact MEM1; try refl; eauto. i. des.
+  inv x0.
+  - econs 1; eauto.
+  - econs 2; eauto.
+  - econs 3; eauto.
 Qed.

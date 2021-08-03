@@ -118,10 +118,6 @@ Proof.
   }
   exploit SimPromises.remove_bot; try exact REMOVE;
     try exact MEM1; try apply LOCAL1; eauto.
-  { econs. ss. }
-  { apply WF1_SRC. }
-  { apply WF1_TGT. }
-  { apply WF1_TGT. }
   i. des. esplits.
   - econs; eauto.
     inv WRITABLE. econs.

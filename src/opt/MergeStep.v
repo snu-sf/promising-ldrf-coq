@@ -86,6 +86,52 @@ Proof.
     etrans; apply WF0.
 Qed.
 
+Lemma merge_write_na_read
+      loc from to val ord1 ord2 kind
+      lc0 sc0 mem0
+      lc1 sc1 mem1
+      (WF0: Local.wf lc0 mem0)
+      (SC0: Memory.closed_timemap sc0 mem0)
+      (MEM0: Memory.closed mem0)
+      (STEP: Local.write_na_step lc0 sc0 mem0 loc from to val ord1 lc1 sc1 mem1 kind):
+  Local.read_step lc1 mem1 loc to val None ord2 lc1.
+Proof.
+  inv STEP.
+  remember (View.rlx (TView.cur (Local.tview lc0)) loc) as ts.
+  assert (TS: Time.le (View.rlx (TView.cur (Local.tview lc0)) loc) ts) by (subst; refl).
+  clear Heqts.
+  destruct lc0 as [tview0 promises0]. ss.
+  revert TS WF0 SC0 MEM0.
+  induction WRITE; i.
+  { exploit Memory.write_get2; eauto. i. des.
+    econs; eauto; ss.
+    - econs; i.
+      + unfold View.join, TimeMap.join. ss.
+        unfold TimeMap.singleton, Loc.LocFun.add, Loc.LocFun.find. condtac; ss.
+        eapply Time.join_spec; try refl.
+        inv WF0. inv TVIEW_WF.
+        etrans; try eapply CUR. ss.
+        etrans; eauto. econs; eauto.
+      + unfold View.join, TimeMap.join. ss.
+        unfold TimeMap.singleton, Loc.LocFun.add, Loc.LocFun.find. condtac; ss.
+        eapply Time.join_spec; try refl.
+        etrans; eauto. econs; eauto.
+    - unfold TView.read_tview, TView.write_released, TView.write_tview. s.
+      f_equal.
+      apply TView.antisym; econs;
+        repeat (try condtac; aggrtac; rewrite <- ? View.join_l; try apply WF0; eauto).
+  }
+
+  exploit Memory.write_future; try exact WRITE_EX; eauto; try apply WF0.
+  { unguard. des; subst; eauto. }
+  i. des.
+  apply IHWRITE; eauto.
+  - etrans; eauto. econs. ss.
+  - econs; eauto; try apply WF0.
+    eapply TView.future_closed; try apply WF0; eauto.
+  - eapply Memory.future_closed_timemap; eauto.
+Qed.
+
 Lemma promise_promise_promise
       loc from to msg1 msg2 kind
       lc0 mem0

@@ -231,20 +231,13 @@ Proof.
       right.
       inv SIM0; [|done].
       inv EVT. inv STEP_SRC.
-      exploit Local.write_undef_step_future; eauto. i. des.
-      exploit sim_local_write_undef;
+      exploit sim_local_write_na;
         (try exact LOCAL);
         (try exact SC);
         eauto; try refl. i. des.
-      exploit Local.write_undef_step_future; eauto. i. des.
-      rewrite SimPromises.unset_bot in *.
-      hexploit sim_local_write_bot;
-        (try exact LOCAL0);
-        (try exact SC0);
-        eauto; try refl; try by viewtac. i. des.
       esplits;
         (try by apply rtc_lang_tau_step_rtc_thread_tau_step; eauto);
-        (try exact SC3).
+        (try exact SC2).
       * ss.
       * econs 2. econs 2. econs; [|econs 8]; eauto.
       * ss.
