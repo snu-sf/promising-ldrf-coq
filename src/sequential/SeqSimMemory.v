@@ -35,21 +35,51 @@ Module Mapping.
       ver: version;
     }.
 
+  Definition versions := Loc.t -> Time.t -> option version.
+
   Record wf (f: t): Prop :=
     { map_finite: forall ver loc, exists l, forall ts fts (MAP: f ver loc ts = Some fts), List.In (ts, fts) l;
-      mapping_map_lt: forall loc ts0 ts1 fts0 fts1
-                             (MAP0: f.(map) f.(ver) loc ts0 = Some fts0) (MAP0: f.(map) f.(ver) loc ts1 = Some fts1),
+      mapping_map_lt: forall ver loc ts0 ts1 fts0 fts1
+                             (MAP0: f.(map) ver loc ts0 = Some fts0) (MAP0: f.(map) ver loc ts1 = Some fts1),
           Time.lt ts0 ts1 <-> Time.lt fts0 fts1;
       version_time_incr: forall v loc ts fts0 fts1
                                 (VER: v <= f.(ver))
                                 (MAP0: f.(map) f.(ver) loc ts = Some fts0) (MAP0: f.(map) v loc ts = Some fts1),
           Time.le fts0 fts1;
+      mapping_empty: forall v (VER: f.(ver) < v) loc ts, f v loc ts = None;
     }.
+
+  Lemma mapping_map_le (f: t) (WF: wf f):
+    forall ver loc ts0 ts1 fts0 fts1
+           (MAP0: f.(map) ver loc ts0 = Some fts0) (MAP0: f.(map) ver loc ts1 = Some fts1),
+      Time.le ts0 ts1 <-> Time.le fts0 fts1.
+  Proof.
+    i. split.
+    { i. destruct (Time.le_lt_dec fts0 fts1); auto.
+      erewrite <- mapping_map_lt in l; eauto. timetac. }
+    { i. destruct (Time.le_lt_dec ts0 ts1); auto.
+      erewrite mapping_map_lt in l; eauto. timetac. }
+  Qed.
+
+  Lemma mapping_map_eq (f: t) (WF: wf f):
+    forall ver loc ts0 ts1 fts0 fts1
+           (MAP0: f.(map) ver loc ts0 = Some fts0) (MAP0: f.(map) ver loc ts1 = Some fts1),
+      ts0 = ts1 <-> fts0 = fts1.
+  Proof.
+    i. split.
+    { i. subst. apply TimeFacts.antisym.
+      { erewrite <- mapping_map_le; eauto. refl. }
+      { erewrite <- mapping_map_le; eauto. refl. }
+    }
+    { i. subst. apply TimeFacts.antisym.
+      { erewrite mapping_map_le; eauto. refl. }
+      { erewrite mapping_map_le; eauto. refl. }
+    }
+  Qed.
 
   Definition le (f0 f1: t): Prop :=
     (<<VER: f0.(ver) <= f1.(ver)>>) /\
     (<<TIME: forall v loc ts fts
-                    (VER: v <= f0.(ver))
                     (MAP: f0.(map) v loc ts = Some fts), f1.(map) v loc ts = Some fts>>)
   .
 
@@ -60,18 +90,136 @@ Module Mapping.
   Qed.
   Next Obligation.
   Proof.
-    unfold le. ii. des. splits; auto.
-    { etrans; eauto. }
-    { i. eapply TIME0 in MAP; eauto. eapply TIME in MAP; eauto.
-      etrans; eauto. }
+    unfold le. ii. des. splits; auto. etrans; eauto.
   Qed.
 
   Section MAP.
     Variable f: t.
     Hypothesis WF: wf f.
 
+    Section VER.
+      Variable v: version.
+
+      Definition time_map_ver (loc: Loc.t) (ts_src ts_tgt: Time.t): Prop :=
+        f v loc ts_tgt = Some ts_src.
+
+      Definition timemap_map_ver (tm_src tm_tgt: TimeMap.t): Prop :=
+        forall loc, time_map_ver loc (tm_src loc) (tm_tgt loc).
+
+      Record view_map_ver (vw_src vw_tgt: View.t): Prop :=
+        { pln_map_ver: timemap_map_ver vw_src.(View.pln) vw_tgt.(View.pln);
+          rlx_map_ver: timemap_map_ver vw_src.(View.rlx) vw_tgt.(View.rlx);
+        }.
+
+      Variant opt_view_map_ver:
+        forall (vw_src vw_tgt: option View.t), Prop :=
+      | some_view_map_ver
+          vw_src vw_tgt
+          (MAP: view_map_ver vw_src vw_tgt)
+        :
+          opt_view_map_ver (Some vw_src) (Some vw_tgt)
+      | none_view_map_ver
+        :
+          opt_view_map_ver None None
+      .
+    End VER.
+
+
     Definition time_map (loc: Loc.t) (ts_src ts_tgt: Time.t): Prop :=
-      exists v ts, (<<VER: v <= f.(ver)>>) /\ (<<MAP: f v loc ts_tgt = Some ts>>) /\ (<<TLE: Time.le ts_src ts>>).
+      exists v ts, (<<MAP: f v loc ts_tgt = Some ts>>) /\ (<<TS: Time.le ts_src ts>>).
+
+    Definition timemap_map (tm_src tm_tgt: TimeMap.t): Prop :=
+      forall loc, time_map loc (tm_src loc) (tm_tgt loc).
+
+    Record view_map (vw_src vw_tgt: View.t): Prop :=
+      { pln_map: timemap_map vw_src.(View.pln) vw_tgt.(View.pln);
+        rlx_map: timemap_map vw_src.(View.rlx) vw_tgt.(View.rlx);
+      }.
+
+    Variant opt_view_map:
+      forall (vw_src vw_tgt: option View.t), Prop :=
+    | some_view_map
+        vw_src vw_tgt
+        (MAP: view_map vw_src vw_tgt)
+      :
+        opt_view_map (Some vw_src) (Some vw_tgt)
+    | none_view_map
+      :
+        opt_view_map None None
+    .
+
+    Variant released_map (f: t) (vers: versions) (prom: Memory.t)
+            (rel_src: Loc.t -> View.t) (rel_tgt: Loc.t -> View.t): Prop :=
+      forall loc ts from val released
+             (GET: Memory.get loc ts prom = Some (from, Message.concrete val (Some released))),
+      exists v, (<<VER: versions loc ts = Some v>>) /\
+                (<<MAP:
+
+        view_map
+
+
+          List.In (View.join (rel loc) (View.singleton_ur loc ts)) (views loc ts)
+
+
+
+  Definition joined_released
+             (views: Loc.t -> Time.t -> list View.t)
+             (prom: Memory.t)
+             (rel: Loc.t -> View.t): Prop :=
+    forall loc ts from val released
+           (GET: Memory.get loc ts prom = Some (from, Message.concrete val (Some released))),
+      List.In (View.join (rel loc) (View.singleton_ur loc ts)) (views loc ts)
+  .
+
+
+
+    TView.t
+
+    Variant opt_view_map:
+      forall (vw_src vw_tgt: option View.t), Prop :=
+    | some_view_map
+        vw_src vw_tgt
+        (MAP: view_map vw_src vw_tgt)
+      :
+        opt_view_map (Some vw_src) (Some vw_tgt)
+    | none_view_map
+      :
+        opt_view_map None None
+    .
+
+
+    Definition
+
+    Definition timemap_map_ver (tm_src tm_tgt: TimeMap.t): Prop :=
+      forall loc, time_map_ver loc (tm_src loc) (tm_tgt loc).
+
+    Record view_map_ver (vw_src vw_tgt: View.t): Prop :=
+      { pln_map_ver: timemap_map_ver vw_src.(View.pln) vw_tgt.(View.pln);
+        rlx_map_ver: timemap_map_ver vw_src.(View.rlx) vw_tgt.(View.rlx);
+      }.
+
+    Variant opt_view_map_ver:
+      forall (vw_src vw_tgt: option View.t), Prop :=
+    | some_view_map_ver
+        vw_src vw_tgt
+        (MAP: view_map_ver vw_src vw_tgt)
+      :
+        opt_view_map_ver (Some vw_src) (Some vw_tgt)
+    | none_view_map_ver
+      :
+        opt_view_map_ver None None
+    .
+
+
+
+
+        { pln_map: timemap_map_ver vw_src.(View.pln) vw_tgt.(View.pln);
+          rlx_map: timemap_map_ver vw_src.(View.rlx) vw_tgt.(View.rlx);
+        }.
+
+
+
+(<<VER: v <= f.(ver)>>) /\ (<<MAP: f v loc ts_tgt = Some ts>>) /\ (<<TLE: Time.le ts_src ts>>).
 
     Definition timemap_map (tm_src tm_tgt: TimeMap.t): Prop :=
       forall loc, time_map loc (tm_src loc) (tm_tgt loc).
