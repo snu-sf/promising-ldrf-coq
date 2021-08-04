@@ -153,7 +153,21 @@ Proof.
     left.
     eapply sim_abort_steps_failure. econs; eauto.
     eapply sim_local_failure; eauto.
-Grab Existential Variables.
-  { econs 2. }
-  { econs. econs 3. }
-Qed.
+  - (* na write *)
+    inv LOCAL1. inv REORDER0; destruct ord; ss.
+  - (* racy read *)
+    right.
+    admit.
+  - (* racy read-update *)
+    right.
+    admit.
+  - (* racy write *)
+    left.
+    admit.
+  - (* racy update *)
+    left.
+    admit.
+(* Grab Existential Variables. *)
+(*   { econs 2. } *)
+(*   { econs. econs 3. } *)
+Admitted.

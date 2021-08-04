@@ -35,7 +35,8 @@ Set Implicit Arguments.
 Inductive reorder_store l1 v1 o1: forall (i2:Instr.t), Prop :=
 | reorder_store_load
     r2 l2 o2
-    (ORD1: Ordering.le o1 Ordering.relaxed)
+    (ORD11: Ordering.le o1 Ordering.relaxed)
+    (ORD12: Ordering.le Ordering.plain o1)
     (ORD2: Ordering.le o2 Ordering.relaxed)
     (LOC: l1 <> l2)
     (REGS: RegSet.disjoint (Instr.regs_of (Instr.store l1 v1 o1))
@@ -43,7 +44,9 @@ Inductive reorder_store l1 v1 o1: forall (i2:Instr.t), Prop :=
     reorder_store l1 v1 o1 (Instr.load r2 l2 o2)
 | reorder_store_store
     l2 v2 o2
-    (ORD1: Ordering.le o1 Ordering.relaxed)
+    (ORD11: Ordering.le o1 Ordering.relaxed)
+    (ORD12: Ordering.le Ordering.plain o1)
+    (ORD2: Ordering.le Ordering.plain o2)
     (LOC: l1 <> l2):
     reorder_store l1 v1 o1 (Instr.store l2 v2 o2)
 (* reordering update; store is unsound *)
@@ -114,11 +117,12 @@ Lemma sim_store_step
                      st1_src lc1_src sc1_src mem1_src
                      st1_tgt lc1_tgt sc1_tgt mem1_tgt.
 Proof.
-  inv SIM. ii. right.
+  inv SIM. ii.
   exploit fulfill_step_future; eauto; try viewtac. i. des.
   inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
     try (inv STATE; inv INSTR; inv REORDER); ss.
   - (* promise *)
+    right.
     exploit Local.promise_step_future; eauto. i. des.
     exploit sim_local_promise; try exact LOCAL0; (try by etrans; eauto); eauto. i. des.
     exploit reorder_fulfill_promise; try exact FULFILL; try exact STEP_SRC; eauto. i. des.
@@ -133,6 +137,7 @@ Proof.
     + right. econs; eauto.
       eapply Memory.future_closed_timemap; eauto.
   - (* load *)
+    right.
     exploit sim_local_read; try exact LOCAL0; (try by etrans; eauto); eauto; try refl. i. des.
     exploit reorder_fulfill_read; try exact FULFILL; try exact STEP_SRC; eauto. i. des.
     exploit Local.read_step_future; try exact STEP1; eauto. i. des.
@@ -152,7 +157,11 @@ Proof.
     + etrans; eauto.
     + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
   - (* store *)
-    hexploit sim_local_write_bot; try exact LOCAL1; eauto; try refl; try by viewtac. i. des.
+    right.
+    hexploit sim_local_write_bot; try exact LOCAL1;
+      try match goal with
+          | [|- is_true (Ordering.le _ _)] => refl
+          end; eauto; try refl; try by viewtac. i. des.
     hexploit reorder_fulfill_write_sim_memory; try exact FULFILL; try exact STEP_SRC; eauto; try by viewtac. i. des.
     exploit Local.write_step_future; try exact STEP1; eauto; try by viewtac. i. des.
     exploit fulfill_write_sim_memory; eauto; try by viewtac. i. des.
@@ -167,6 +176,38 @@ Proof.
     + etrans; eauto. etrans; eauto.
     + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
       etrans; eauto.
+  - (* na write *)
+    inv LOCAL1. destruct ord; ss.
+  - (* racy read *)
+    right.
+    exploit sim_local_racy_read; try exact LOCAL1; eauto; try refl. i. des.
+    exploit reorder_fulfill_racy_read; try exact FULFILL; eauto. i. des.
+    exploit fulfill_write_sim_memory; eauto. i. des.
+    esplits.
+    + ss.
+    + econs 2; eauto. econs.
+      * econs. econs 2. econs; [|econs 9]; eauto. econs. econs.
+      * auto.
+    + econs 2. econs 2. econs; [|econs 3]; eauto. econs.
+      erewrite <- RegFile.eq_except_value; eauto.
+      * econs.
+      * symmetry. eauto.
+      * apply RegFile.eq_except_singleton.
+    + auto.
+    + ss.
+    + etrans; eauto.
+    + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
+  - (* racy write *)
+    left.
+    exploit sim_local_racy_write; try exact LOCAL1;
+      try match goal with
+          | [|- is_true (Ordering.le _ _)] => refl
+          end; eauto; try refl. i. des.
+    exploit reorder_fulfill_racy_write; try exact FULFILL; eauto. i. des.
+    unfold Thread.steps_failure.
+    esplits; try refl.
+    + econs 2. econs; [|econs 10]; eauto. econs. econs.
+    + ss.
 Qed.
 
 Lemma sim_store_sim_thread:
@@ -182,7 +223,7 @@ Proof.
     destruct th2. exploit sim_store_step; eauto.
     { econs 2. eauto. }
     i. des; eauto.
-    + exploit program_step_promise; eauto. i.
+    + exploit Thread.program_step_promises_bot; eauto. s. i.
       exploit Thread.rtc_tau_step_future; eauto. s. i. des.
       exploit Thread.opt_step_future; eauto. s. i. des.
       exploit Thread.program_step_future; eauto. s. i. des.
@@ -193,7 +234,7 @@ Proof.
       exploit PROMISES; eauto. i. des.
       * left.
         unfold Thread.steps_failure in *. des.
-        esplits; [|eauto].
+        esplits; [|eauto|]; ss.
         etrans; eauto. etrans; [|eauto].
         inv STEP_SRC; eauto. econs 2; eauto. econs; eauto.
         { econs. eauto. }

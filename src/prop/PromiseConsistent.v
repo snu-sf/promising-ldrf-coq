@@ -20,6 +20,8 @@ Require Import TView.
 Require Import Local.
 Require Import Thread.
 
+Require Import FulfillStep.
+
 Set Implicit Arguments.
 
 
@@ -68,6 +70,24 @@ Proof.
   des. subst. exploit Memory.remove_get0; eauto. i. des.
   rewrite GET in TH1. inv TH1.
   esplits; eauto. refl.
+Qed.
+
+Lemma fulfill_step_promise_consistent
+      lc1 sc1 loc from to val releasedm released ord lc2 sc2
+      (STEP: fulfill_step lc1 sc1 loc from to val releasedm released ord lc2 sc2)
+      (CONS: Local.promise_consistent lc2):
+  Local.promise_consistent lc1.
+Proof.
+  inv STEP. ii.
+  destruct (Memory.get loc0 ts promises2) as [[]|] eqn:X.
+  - dup X. revert X.
+    erewrite Memory.remove_o; eauto. condtac; ss. i.
+    rewrite X in *. inv PROMISE.
+    exploit CONS; eauto. s. i.
+    eapply TimeFacts.le_lt_lt; eauto.
+    unfold TimeMap.join. apply Time.join_l.
+  - exploit fulfill_unset_promises; eauto. i. des. subst.
+    apply WRITABLE.
 Qed.
 
 Lemma write_step_promise_consistent

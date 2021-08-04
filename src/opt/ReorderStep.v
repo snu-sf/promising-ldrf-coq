@@ -21,6 +21,7 @@ Require Import Progress.
 Require Import MemoryReorder.
 Require Import MemoryMerge.
 Require Import FulfillStep.
+Require Import PromiseConsistent.
 
 Require Import SimMemory.
 Require Import SimPromises.
@@ -332,6 +333,41 @@ Proof.
     repeat condtac; aggrtac.
 Qed.
 
+Lemma reorder_read_racy_read
+      loc1 ts1 val1 released1 ord1
+      loc2 val2 ord2
+      lc0 mem0
+      lc1
+      (STEP1: Local.read_step lc0 mem0 loc1 ts1 val1 released1 ord1 lc1)
+      (STEP2: Local.racy_read_step lc1 mem0 loc2 val2 ord2):
+  <<STEP1: Local.racy_read_step lc0 mem0 loc2 val2 ord2>> /\
+  <<STEP2: Local.read_step lc0 mem0 loc1 ts1 val1 released1 ord1 lc1>>.
+Proof.
+  inv STEP1. inv STEP2. ss.
+  splits; eauto.
+  econs; try exact GET0; eauto.
+  eapply TViewFacts.racy_readable_mon; try apply RACE; eauto; try refl.
+  apply TViewFacts.read_tview_incr.
+Qed.
+
+Lemma reorder_read_racy_write
+      loc1 ts1 val1 released1 ord1
+      loc2 ord2
+      lc0 mem0
+      lc1
+      (STEP1: Local.read_step lc0 mem0 loc1 ts1 val1 released1 ord1 lc1)
+      (STEP2: Local.racy_write_step lc1 mem0 loc2 ord2):
+  <<STEP1: Local.racy_write_step lc0 mem0 loc2 ord2>>.
+Proof.
+  inv STEP2.
+  hexploit read_step_promise_consistent; eauto. i.
+  inv STEP1. ss.
+  econs; try exact GET0; eauto.
+  eapply TViewFacts.racy_writable_mon; try apply RACE; eauto; try refl.
+  apply TViewFacts.read_tview_incr.
+Qed.
+
+
 Lemma reorder_fulfill_read
       loc1 from1 to1 val1 releasedm1 released1 ord1
       loc2 ts2 val2 released2 ord2
@@ -519,6 +555,47 @@ Proof.
   hexploit reorder_fulfill_write_sim_memory; try exact STEP4; try exact STEP3; eauto. i. des.
   esplits; eauto.
 Qed.
+
+Lemma reorder_fulfill_racy_read
+      loc1 from1 to1 val1 releasedm1 released1 ord1
+      loc2 val2 ord2
+      lc0 sc0 mem0
+      lc1 sc1
+      (LOC: loc1 <> loc2)
+      (STEP1: fulfill_step lc0 sc0 loc1 from1 to1 val1 releasedm1 released1 ord1 lc1 sc1)
+      (STEP2: Local.racy_read_step lc1 mem0 loc2 val2 ord2):
+  <<STEP1: Local.racy_read_step lc0 mem0 loc2 val2 ord2>> /\
+  <<STEP2: fulfill_step lc0 sc0 loc1 from1 to1 val1 releasedm1 released1 ord1 lc1 sc1>>.
+Proof.
+  splits; auto.
+  inv STEP1. inv STEP2. ss.
+  econs; try exact GET; eauto.
+  - revert GETP. erewrite Memory.remove_o; eauto.
+    condtac; ss. des. subst. ss.
+  - eapply TViewFacts.racy_readable_mon; try apply RACE; eauto; try refl.
+    apply View.join_l.
+Qed.
+
+Lemma reorder_fulfill_racy_write
+      loc1 from1 to1 val1 releasedm1 released1 ord1
+      loc2 ord2
+      lc0 sc0 mem0
+      lc1 sc1
+      (LOC: loc1 <> loc2)
+      (STEP1: fulfill_step lc0 sc0 loc1 from1 to1 val1 releasedm1 released1 ord1 lc1 sc1)
+      (STEP2: Local.racy_write_step lc1 mem0 loc2 ord2):
+  <<STEP1: Local.racy_write_step lc0 mem0 loc2 ord2>>.
+Proof.
+  inv STEP2.
+  hexploit fulfill_step_promise_consistent; eauto. i.
+  inv STEP1. ss.
+  econs; try exact GET; eauto.
+  - revert GETP. erewrite Memory.remove_o; eauto.
+    condtac; ss. des. subst. ss.
+  - eapply TViewFacts.racy_writable_mon; try apply RACE; eauto; try refl.
+    apply View.join_l.
+Qed.
+
 
 Lemma reorder_update_read
       loc1 ts1 val1 released1 ord1

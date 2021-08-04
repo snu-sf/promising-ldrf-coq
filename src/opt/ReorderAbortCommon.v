@@ -75,14 +75,14 @@ Lemma write_step_consistent
     <<STEP: Local.write_step lc1 sc1 mem1 loc from to val None released ord lc2 sc2 mem2 kind>> /\
     <<CONS2: Local.promise_consistent lc2>>.
 Proof.
-  destruct (classic (exists f t v r, Memory.get loc t (Local.promises lc1) =
-                                Some (f, Message.concrete v r))).
+  destruct (classic (exists f t m, Memory.get loc t (Local.promises lc1) = Some (f, m) /\
+                              m <> Message.reserve)).
   { des.
     exploit Memory.min_concrete_ts_exists; eauto. i. des.
     exploit Memory.min_concrete_ts_spec; eauto. i. des.
     exploit Memory.get_ts; try exact GET. i. des.
     { subst. inv WF1. rewrite BOT in *. ss. }
-    clear f t v r H MIN.
+    clear f t m H H0 MIN.
     exploit progress_write_step_split; try exact GET; eauto.
     { ss. unfold TimeMap.bot. apply Time.bot_spec. }
     i. des.
@@ -93,10 +93,9 @@ Proof.
       erewrite Memory.remove_o; eauto. condtac; ss. des; ss.
       erewrite Memory.split_o; eauto. repeat condtac; ss; i.
       - des; ss. subst. refl.
-      - des; ss.
-        exploit Memory.min_concrete_ts_spec; eauto. i. des. ss. }
+      - des; ss. 
+        exploit Memory.min_concrete_ts_spec; try exact PROMISE; eauto. i. des. ss. }
     inv x2. inv WRITE. inv PROMISE0. ss.
-    clear RESERVE.
     unfold TimeMap.join, TimeMap.singleton.
     unfold LocFun.add, LocFun.init, LocFun.find.
     condtac; ss.

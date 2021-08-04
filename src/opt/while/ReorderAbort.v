@@ -39,7 +39,8 @@ Inductive reorder_abort: forall (i2:Instr.t), Prop :=
     reorder_abort (Instr.load r2 l2 o2)
 | reorder_abort_store
     l2 v2 o2
-    (ORD: Ordering.le o2 Ordering.acqrel):
+    (ORD21: Ordering.le o2 Ordering.acqrel)
+    (ORD22: Ordering.le Ordering.plain o2):
     reorder_abort (Instr.store l2 v2 o2)
 | reorder_abort_fence
     or2 ow2
@@ -111,10 +112,11 @@ Proof.
     + econs 2; try refl. econs.
       * econs. econs 2. econs; [|econs 2]; eauto. econs. econs.
       * ss.
-    + econs 2. econs.
+    + econs 2. econs; [|econs 7].
       * econs. econs.
-      * econs. econs. ii.
+      * econs. ii.
         rewrite <- TVIEW. rewrite <- PROMISES in *. eauto.
+    + ss.
   - (* store *)
     exploit (@LowerPromises.steps_promises_rel
                lang (Thread.mk lang (State.mk rs [Stmt.instr (Instr.store l2 v2 o2); Stmt.instr Instr.abort])
@@ -129,7 +131,10 @@ Proof.
     + eapply rtc_n1; eauto. econs.
       * econs. econs 2. econs; [|econs 3; eauto]. econs. econs.
       * ss.
-    + econs 2. econs; [econs; econs|]. econs. econs. ss.
+    + econs 2. econs; [|econs 7].
+      * econs. econs.
+      * econs. ss.
+    + ss.
   - (* fence *)
     exploit (@LowerPromises.steps_promises_rel
                lang (Thread.mk lang (State.mk rs [Stmt.instr (Instr.fence or2 ow2); Stmt.instr Instr.abort])
@@ -143,9 +148,11 @@ Proof.
     i. des.
     esplits.
     + eapply rtc_n1; eauto. econs.
-      * econs. econs 2. econs; [|econs 5; eauto]. econs. econs.
+      * econs. econs 2. econs; [|econs 5]; eauto. econs. econs.
       * ss.
-    + econs 2. econs; [econs; econs|]. econs. econs.
-      exploit fence_step_future; eauto. i. des.
-      ii. rewrite <- PROMISES in *. rewrite <- TVIEW0. eauto.
+    + econs 2. econs; [|econs 7].
+      * econs. econs.
+      * exploit fence_step_future; eauto. i. des.
+        econs. ii. rewrite <- PROMISES in *. rewrite <- TVIEW0. eauto.
+    + ss.
 Qed.
