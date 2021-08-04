@@ -2315,11 +2315,12 @@ Module Memory.
     Cell.min_concrete_ts (mem loc) ts.
 
   Lemma min_concrete_ts_exists
-        mem loc from to val released
-        (INHABITED: get loc to mem = Some (from, Message.concrete val released)):
+        mem loc from to msg
+        (INHABITED: get loc to mem = Some (from, msg))
+        (RESERVE: msg <> Message.reserve):
     exists ts, min_concrete_ts mem loc ts.
   Proof.
-    eapply Cell.min_concrete_ts_exists. apply INHABITED.
+    eapply Cell.min_concrete_ts_exists; eauto.
   Qed.
 
   Lemma min_concrete_ts_inj
@@ -2332,10 +2333,11 @@ Module Memory.
   Qed.
 
   Lemma min_concrete_ts_spec
-        loc ts from val released mem mts
+        loc ts from msg mem mts
         (MIN: min_concrete_ts mem loc mts)
-        (GET: get loc ts mem = Some (from, Message.concrete val released)):
-    <<GET: exists from val' released', get loc mts mem = Some (from, Message.concrete val' released')>> /\
+        (GET: get loc ts mem = Some (from, msg))
+        (RESERVE: msg <> Message.reserve):
+    <<GET: exists from msg', get loc mts mem = Some (from, msg') /\ msg' <> Message.reserve>> /\
     <<MIN: Time.le mts ts>>.
   Proof.
     eapply Cell.min_concrete_ts_spec; eauto.

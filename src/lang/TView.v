@@ -534,9 +534,8 @@ Module TViewFacts.
   Qed.
 
   Lemma racy_writable_mon
-        view1 view2 loc ts ord1 ord2
+        view1 view2 loc ts
         (VIEW: View.le view1 view2)
-        (ORD: Ordering.le ord1 ord2)
         (RACE: TView.racy_writable view2 loc ts):
     TView.racy_writable view1 loc ts.
   Proof.

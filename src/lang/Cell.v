@@ -778,9 +778,12 @@ Module Cell.
 
   Inductive min_concrete_ts (cell: t) (ts: Time.t): Prop :=
   | min_concrete_ts_intro
-      (GET: exists from val released, get ts cell = Some (from, Message.concrete val released))
-      (MIN: forall to from' val' released'
-              (GET: get to cell = Some (from', Message.concrete val' released')),
+      from msg
+      (GET: get ts cell = Some (from, msg))
+      (RESERVE: msg <> Message.reserve)
+      (MIN: forall to from' msg'
+              (GET: get to cell = Some (from', msg'))
+              (RESERVE: msg' <> Message.reserve),
           Time.le ts to)
   .
 
@@ -845,27 +848,30 @@ Module Cell.
   Qed.
 
   Lemma min_concrete_ts_exists
-        from to val released cell
-        (INHABITED: get to cell = Some (from, Message.concrete val released)):
+        from to msg cell
+        (INHABITED: get to cell = Some (from, msg))
+        (RESERVE: msg <> Message.reserve):
     exists ts, min_concrete_ts cell ts.
   Proof.
     destruct cell. unfold get in *. ss.
     remember (DOMap.elements raw0) as l eqn:DOM.
     exploit (min_concrete_ts_exists_aux
-               to (from, Message.concrete val released) l
+               to (from, msg) l
                (fun (a: Time.t * Message.t) => match a with
-                                            | (_, Message.concrete _ _) => true
-                                            | _ => false
+                                            | (_, Message.reserve) => false
+                                            | _ => true
                                             end)).
-    { ss. }
+    { destruct msg; ss. }
     { subst. eapply DOMap.elements_correct. auto. }
-    i. des. destruct min_a. destruct t1; ss.
+    i. des. destruct min_a.
     exists min_t. econs.
     - subst. esplits. unfold get. ss.
       eapply DOMap.elements_complete. eauto.
+    - destruct t1; ss.
     - i. unfold get in GET. ss.
       apply DOMap.elements_correct in GET. subst.
-      eapply x2; eauto.
+      eapply x2; eauto. ss.
+      destruct msg'; ss.
   Qed.
 
   Lemma min_concrete_ts_inj
@@ -874,19 +880,21 @@ Module Cell.
         (MIN2: min_concrete_ts cell ts2):
     ts1 = ts2.
   Proof.
-    inv MIN1. inv MIN2. des.
-    apply MIN0 in GET. apply MIN in GET0.
+    inv MIN1. inv MIN2.
+    apply MIN0 in GET; eauto.
+    apply MIN in GET0; eauto.
     apply TimeFacts.antisym; auto.
   Qed.
 
   Lemma min_concrete_ts_spec
-        ts from val released cell mts
+        ts from msg cell mts
         (MIN: min_concrete_ts cell mts)
-        (GET: get ts cell = Some (from, Message.concrete val released)):
-    <<GET: exists f v r, get mts cell = Some (f, Message.concrete v r)>> /\
+        (GET: get ts cell = Some (from, msg))
+        (RESERVE: msg <> Message.reserve):
+    <<GET: exists f m, get mts cell = Some (f, m) /\ m <> Message.reserve>> /\
     <<MIN: Time.le mts ts>>.
   Proof.
-    inv MIN. des. esplits; eauto.
+    inv MIN. esplits; eauto.
   Qed.
 
 
