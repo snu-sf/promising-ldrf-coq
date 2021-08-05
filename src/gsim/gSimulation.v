@@ -39,7 +39,7 @@ Variable world_le: world -> world -> Prop.
 
 Hypothesis world_le_PreOrder: PreOrder world_le.
 
-Variable sim_memory: forall (w: world) (mem_src mem_tgt:Memory.t), Prop.
+Variable sim_memory: forall (b: bool) (w: world) (mem_src mem_tgt:Memory.t), Prop.
 Variable sim_timemap: forall (w: world) (sc_src sc_tgt: TimeMap.t), Prop.
 Variable sim_local: forall (w: world) (lc_src lc_tgt:Local.t), Prop.
 
@@ -57,7 +57,7 @@ Hypothesis sim_memory_cap: forall
     mem1_src mem2_src
     mem1_tgt mem2_tgt
     sc1_src sc1_tgt
-    (MEM1: sim_memory w1 mem1_src mem1_tgt)
+    (MEM1: sim_memory false w1 mem1_src mem1_tgt)
     (CAP_SRC: Memory.cap mem1_src mem2_src)
     (CAP_TGT: Memory.cap mem1_tgt mem2_tgt)
     (MEM1_SRC: Memory.closed mem1_src)
@@ -65,7 +65,7 @@ Hypothesis sim_memory_cap: forall
     (CLOSED_SRC: Memory.closed_timemap sc1_src mem1_src)
     (CLOSED_TGT: Memory.closed_timemap sc1_tgt mem1_tgt),
     exists w2,
-      (<<MEM2: sim_memory w2 mem2_src mem2_tgt>>) /\
+      (<<MEM2: sim_memory true w2 mem2_src mem2_tgt>>) /\
       (<<TIMEMAP: sim_timemap w2 sc1_src sc1_tgt>>) /\
       (<<WORLD: world_le w1 w2>>)
 .
@@ -85,7 +85,7 @@ Section SimulationThread.
              (lang_src lang_tgt:language)
              (sim_thread: forall (w1: world) (st1_src:(Language.state lang_src)) (lc1_src:Local.t) (sc0_src:TimeMap.t) (mem0_src:Memory.t)
                                  (st1_tgt:(Language.state lang_tgt)) (lc1_tgt:Local.t) (sc0_tgt:TimeMap.t) (mem0_tgt:Memory.t), Prop)
-             (w0: world)
+             b (w0: world)
              st1_src lc1_src sc1_src mem1_src
              st1_tgt lc1_tgt sc1_tgt mem1_tgt
     :=
@@ -104,22 +104,29 @@ Section SimulationThread.
                                        (Thread.mk _ st3_src lc3_src sc3_src mem3_src)>>) /\
           (<<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>>) /\
           (<<SC3: sim_timemap w3 sc3_src sc3_tgt>>) /\
-          (<<MEMORY3: sim_memory w3 mem3_src mem3_tgt>>) /\
+          (<<MEMORY3: sim_memory b w3 mem3_src mem3_tgt>>) /\
           (<<SIM: sim_thread w3 st3_src lc3_src sc3_src mem3_src st3_tgt lc3_tgt sc3_tgt mem3_tgt>>) /\
           (<<WORLD: world_le w0 w3>>)
   .
+
+  Variant future_sort: forall (b0 b1: bool)
+                              (mem0_src mem1_src mem0_tgt mem1_tgt: Memory.t)
+                              (prom_src prom_tgt: Memory.t)
+                              (sc0_src sc1_src sc0_tgt sc1_tgt: TimeMap.t), Prop :=
+  | future_sort_true_true
+      b0 b1 mem0_src mem1_src mem0_tgt mem1_tgt prom_src prom_tgt sc0_
 
   Definition _sim_thread
              (sim_thread: SIM_THREAD)
              (lang_src lang_tgt:language)
              (sim_terminal: SIM_TERMINAL lang_src lang_tgt)
-             (w0: world)
+             (b0: bool) (w0: world)
              (st1_src:(Language.state lang_src)) (lc1_src:Local.t) (sc0_src:TimeMap.t) (mem0_src:Memory.t)
              (st1_tgt:(Language.state lang_tgt)) (lc1_tgt:Local.t) (sc0_tgt:TimeMap.t) (mem0_tgt:Memory.t): Prop :=
-    forall w1 sc1_src mem1_src
+    forall b1 w1 sc1_src mem1_src
            sc1_tgt mem1_tgt
            (SC: sim_timemap w1 sc1_src sc1_tgt)
-           (MEMORY: sim_memory w1 mem1_src mem1_tgt)
+           (MEMORY: sim_memory b1 w1 mem1_src mem1_tgt)
            (SC_FUTURE_SRC: TimeMap.le sc0_src sc1_src)
            (SC_FUTURE_TGT: TimeMap.le sc0_tgt sc1_tgt)
            (MEM_FUTURE_SRC: Memory.future_weak mem0_src mem1_src)
@@ -131,7 +138,8 @@ Section SimulationThread.
            (MEM_SRC: Memory.closed mem1_src)
            (MEM_TGT: Memory.closed mem1_tgt)
            (CONS_TGT: Local.promise_consistent lc1_tgt)
-           (WORLD: world_le w0 w1),
+           (WORLD: world_le w0 w1)
+           (CAP: b1 = true -> sc1_src = sc0_src /\ sc1_tgt = sc0_tgt /\ mem1_src = mem0_src /\ mem1_tgt = mem0_tgt /\ w0 = w1),
       (<<TERMINAL:
          forall (TERMINAL_TGT: (Language.is_terminal lang_tgt) st1_tgt),
            (<<FAILURE: Thread.steps_failure (Thread.mk _ st1_src lc1_src sc1_src mem1_src)>>) \/
@@ -140,7 +148,7 @@ Section SimulationThread.
                            (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
                            (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>>) /\
              (<<SC: sim_timemap w2 sc2_src sc1_tgt>>) /\
-             (<<MEMORY: sim_memory w2 mem2_src mem1_tgt>>) /\
+             (<<MEMORY: sim_memory b w2 mem2_src mem1_tgt>>) /\
              (<<TERMINAL_SRC: (Language.is_terminal lang_src) st2_src>>) /\
              (<<LOCAL: sim_local w2 lc2_src lc1_tgt>>) /\
              (<<TERMINAL: sim_terminal st2_src st1_tgt>>) /\
@@ -154,9 +162,10 @@ Section SimulationThread.
                            (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>>) /\
              (<<PROMISES_SRC: (Local.promises lc2_src) = Memory.bot>>)>>) /\
       (<<STEP: _sim_thread_step _ _ (@sim_thread lang_src lang_tgt sim_terminal)
-                                w1
+                                b w1
                                 st1_src lc1_src sc1_src mem1_src
-                                st1_tgt lc1_tgt sc1_tgt mem1_tgt>>).
+                                st1_tgt lc1_tgt sc1_tgt mem1_tgt>>)
+  .
 
   Lemma _sim_thread_mon: monotone12 _sim_thread.
   Proof.
