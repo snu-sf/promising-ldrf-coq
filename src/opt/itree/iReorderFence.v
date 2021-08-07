@@ -38,7 +38,8 @@ Inductive reorder_fence (or1 ow1:Ordering.t): forall R (i2:MemE.t R), Prop :=
 | reorder_fence_store
     l2 v2 o2
     (ORDR1: Ordering.le or1 Ordering.acqrel)
-    (ORDW1: Ordering.le ow1 Ordering.relaxed):
+    (ORDW1: Ordering.le ow1 Ordering.relaxed)
+    (ORD2: Ordering.le Ordering.plain o2):
     reorder_fence or1 ow1 (MemE.write l2 v2 o2)
 | reorder_fence_update
     l2 rmw2 or2 ow2
@@ -65,6 +66,31 @@ Inductive sim_fence: forall R
       (Vis i2 (fun r => Ret (tt, r))) lc1_tgt sc1_tgt mem1_tgt
 .
 
+Lemma read_fence_wf
+      tview ord
+      (WF: TView.wf tview):
+  TView.wf (TView.read_fence_tview tview ord).
+Proof.
+  inv WF. econs; ss; condtac; eauto. refl.
+Qed.
+
+Lemma sim_fence_sim_local
+      R
+      st_src lc_src sc_src mem_src
+      st_tgt lc_tgt sc_tgt mem_tgt
+      (WF_SRC: TView.wf lc_src.(Local.tview))
+      (SIM: @sim_fence R st_src lc_src sc_src mem_src st_tgt lc_tgt sc_tgt mem_tgt):
+  sim_local SimPromises.bot lc_src lc_tgt.
+Proof.
+  inv SIM. inv FENCE. inv LOCAL. ss.
+  econs; eauto. etrans; eauto.
+  etrans; cycle 1.
+  { eapply TViewFacts.write_fence_tview_incr.
+    eapply read_fence_wf; eauto.
+  }
+  eapply TViewFacts.read_fence_tview_incr. apply WF_SRC.
+Qed.
+
 Lemma sim_fence_step
       R
       st1_src lc1_src sc0_src mem0_src
@@ -90,12 +116,14 @@ Lemma sim_fence_step
                      st1_src lc1_src sc1_src mem1_src
                      st1_tgt lc1_tgt sc1_tgt mem1_tgt.
 Proof.
-  destruct SIM. ii. right.
+  i. exploit sim_fence_sim_local; eauto; try apply WF_SRC. intro SIM_LC.
+  destruct SIM. ii.
   exploit future_fence_step; try apply FENCE; eauto; i.
   { inv REORDER; etrans; eauto. }
   inv STEP_TGT; [inv STEP|dependent destruction STEP; inv LOCAL0; ss; dependent destruction STATE; inv REORDER]; ss.
   - (* promise *)
-    exploit sim_local_promise; eauto.
+    right.
+    exploit sim_local_promise; try exact LOCAL; eauto.
     { eapply Local.fence_step_future; eauto. }
     i. des.
     exploit reorder_fence_promise; try apply x0; try apply STEP_SRC; eauto.
@@ -106,8 +134,9 @@ Proof.
     + eauto.
     + right. econs; eauto.
   - (* load *)
+    right.
     guardH ORD2.
-    exploit sim_local_read; try exact LOCAL0; try apply SC; eauto; try refl; viewtac.
+    exploit sim_local_read; try exact LOCAL0; try exact LOCAL; try apply SC; eauto; try refl; viewtac.
     { eapply Local.fence_step_future; eauto. }
     i. des.
     exploit reorder_fence_read; try apply x0; try apply STEP_SRC; eauto; try by viewtac. i. des.
@@ -123,8 +152,9 @@ Proof.
     + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
       etrans; eauto.
   - (* update-load *)
+    right.
     guardH ORDR2.
-    exploit sim_local_read; try exact LOCAL0; try apply SC; eauto; try refl; viewtac.
+    exploit sim_local_read; try exact LOCAL0; try exact LOCAL; try apply SC; eauto; try refl; viewtac.
     { eapply Local.fence_step_future; eauto. }
     i. des.
     exploit reorder_fence_read; try apply x0; try apply STEP_SRC; eauto; try by viewtac. i. des.
@@ -140,7 +170,11 @@ Proof.
     + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
       etrans; eauto.
   - (* store *)
-    hexploit sim_local_write_bot; try exact LOCAL1; try apply SC; eauto; try refl; viewtac.
+    right.
+    hexploit sim_local_write_bot; try exact LOCAL1; try exact LOCAL; try apply SC;
+      try match goal with
+          | [|- is_true (Ordering.le _ _)] => refl
+          end; eauto; try refl; viewtac.
     { eapply Local.fence_step_future; eauto. }
     i. des.
     exploit reorder_fence_write; try apply x0; try apply STEP_SRC; eauto; try by viewtac. i. des.
@@ -156,9 +190,10 @@ Proof.
     + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
       etrans; eauto.
   - (* update *)
+    right.
     guardH ORDR2.
     exploit Local.read_step_future; eauto. i. des.
-    exploit sim_local_read; try exact LOCAL1; try apply SC; eauto; try refl; viewtac.
+    exploit sim_local_read; try exact LOCAL1; try exact LOCAL; try apply SC; eauto; try refl; viewtac.
     { eapply Local.fence_step_future; eauto. }
     i. des.
     exploit reorder_fence_read; try apply x0; try apply STEP_SRC; eauto; try by viewtac. i. des.
@@ -179,6 +214,54 @@ Proof.
     + etrans; eauto.
     + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
       etrans; eauto.
+  - (* na write *)
+    inv LOCAL1. destruct ord; ss.
+  - (* racy read *)
+    right. guardH ORD2.
+    exploit sim_local_racy_read; try exact SIM_LC; eauto; try refl. i. des.
+    esplits.
+    + ss.
+    + econs 2; [|econs 1]. econs.
+      * econs. econs 2. econs; [|econs 9]; eauto. econs. econs.
+      * eauto.
+    + econs 2. econs 2. econs; [|econs 5]; eauto. econs. econs.
+    + auto.
+    + ss.
+    + ss.
+    + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
+  - (* racy read *)
+    right. guardH ORDR2.
+    exploit sim_local_racy_read; try exact SIM_LC; eauto; try refl. i. des.
+    esplits.
+    + ss.
+    + econs 2; [|econs 1]. econs.
+      * econs. econs 2. econs; [|econs 9]; eauto. econs; eauto.
+      * eauto.
+    + econs 2. econs 2. econs; [|econs 5]; eauto. econs. econs.
+    + auto.
+    + ss.
+    + ss.
+    + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
+  - (* racy write *)
+    left.
+    exploit sim_local_racy_write; try exact LOCAL1; try exact SIM_LC;
+      try match goal with
+          | [|- is_true (Ordering.le _ _)] => refl
+          end; eauto.
+    i. des.
+    unfold Thread.steps_failure. esplits; try refl.
+    + econs 2. econs; [|econs 10]; eauto. econs. econs.
+    + ss.
+  - (* racy update *)
+    left. guardH ORDR2.
+    exploit sim_local_racy_update; try exact LOCAL1; try exact SIM_LC;
+      try match goal with
+          | [|- is_true (Ordering.le _ _)] => refl
+          end; eauto.
+    i. des.
+    unfold Thread.steps_failure. esplits; try refl.
+    + econs 2. econs; [|econs 11]; eauto. econs; eauto.
+    + ss.
 Qed.
 
 Lemma sim_fence_sim_thread R:

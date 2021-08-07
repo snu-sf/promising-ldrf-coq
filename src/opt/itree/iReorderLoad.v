@@ -37,6 +37,7 @@ Inductive reorder_load l1 o1: forall R (i2:MemE.t R), Prop :=
 | reorder_load_store
     l2 v2 o2
     (ORD: Ordering.le o1 Ordering.acqrel \/ Ordering.le o2 Ordering.acqrel)
+    (ORD2: Ordering.le Ordering.plain o2)
     (LOC: l1 <> l2):
     reorder_load l1 o1 (MemE.write l2 v2 o2)
 | reorder_load_update
@@ -53,8 +54,8 @@ Inductive reorder_load l1 o1: forall R (i2:MemE.t R), Prop :=
 .
 
 Inductive sim_load: forall R
-                           (st_src:itree MemE.t (Const.t * R)%type) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t)
-                           (st_tgt:itree MemE.t (Const.t * R)%type) (lc_tgt:Local.t) (sc1_tgt:TimeMap.t) (mem1_tgt:Memory.t), Prop :=
+                      (st_src:itree MemE.t (Const.t * R)%type) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t)
+                      (st_tgt:itree MemE.t (Const.t * R)%type) (lc_tgt:Local.t) (sc1_tgt:TimeMap.t) (mem1_tgt:Memory.t), Prop :=
 | sim_load_intro
     R
     l1 ts1 v1 released1 o1 (i2: MemE.t R)
@@ -75,7 +76,39 @@ Inductive sim_load: forall R
     sim_load
       (Vis i2 (fun v2 => Vis (MemE.read l1 o1) (fun v1 => Ret (v1, v2)))) lc1_src sc1_src mem1_src
       (Vis i2 (fun v2 => Ret (v1, v2))) lc1_tgt sc1_tgt mem1_tgt
+| sim_load_racy_read
+    R
+    l1 v1 o1 (i2: MemE.t R)
+    lc1_src sc1_src mem1_src
+    lc1_tgt sc1_tgt mem1_tgt
+    (REORDER: reorder_load l1 o1 i2)
+    (READ: Local.racy_read_step lc1_src mem1_src l1 v1 o1)
+    (LOCAL: sim_local SimPromises.bot lc1_src lc1_tgt)
+    (SC: TimeMap.le sc1_src sc1_tgt)
+    (MEMORY: sim_memory mem1_src mem1_tgt)
+    (WF_SRC: Local.wf lc1_src mem1_src)
+    (WF_TGT: Local.wf lc1_tgt mem1_tgt)
+    (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
+    (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
+    (MEM_SRC: Memory.closed mem1_src)
+    (MEM_TGT: Memory.closed mem1_tgt):
+    sim_load
+      (Vis i2 (fun v2 => Vis (MemE.read l1 o1) (fun v1 => Ret (v1, v2)))) lc1_src sc1_src mem1_src
+      (Vis i2 (fun v2 => Ret (v1, v2))) lc1_tgt sc1_tgt mem1_tgt
 .
+
+Lemma sim_load_sim_local
+      R
+      st_src lc_src sc_src mem_src
+      st_tgt lc_tgt sc_tgt mem_tgt
+      (SIM: @sim_load R st_src lc_src sc_src mem_src st_tgt lc_tgt sc_tgt mem_tgt):
+  sim_local SimPromises.bot lc_src lc_tgt.
+Proof.
+  inv SIM; eauto.
+  exploit Local.read_step_future; eauto. i. des.
+  inv READ. inv LOCAL. ss.
+  econs; eauto. etrans; eauto.
+Qed.
 
 Lemma sim_load_mon
       R
@@ -101,8 +134,11 @@ Lemma sim_load_mon
             st_src lc_src sc2_src mem2_src
             st_tgt lc_tgt sc2_tgt mem2_tgt.
 Proof.
-  dependent destruction SIM1. exploit future_read_step; try exact READ; eauto. i. des.
-  econs; eauto. etrans; eauto.
+  dependent destruction SIM1.
+  - exploit future_read_step; try exact READ; eauto. i. des.
+    econs; eauto. etrans; eauto.
+  - exploit future_racy_read_step; try exact READ; eauto. i. des.
+    econs 2; eauto.
 Qed.
 
 Lemma sim_load_step
@@ -116,93 +152,292 @@ Lemma sim_load_step
                    st1_src lc1_src sc1_src mem1_src
                    st1_tgt lc1_tgt sc1_tgt mem1_tgt.
 Proof.
-  dependent destruction SIM. ii. right.
-  exploit Local.read_step_future; eauto. i. des.
-  inv STEP_TGT; [inv STEP|dependent destruction STEP; inv LOCAL0; ss; dependent destruction STATE; inv REORDER].
-  - (* promise *)
-    exploit Local.promise_step_future; eauto. i. des.
-    exploit sim_local_promise_bot; eauto. i. des.
-    exploit reorder_read_promise; try exact READ; try exact STEP_SRC; eauto. i. des.
-    exploit Local.promise_step_future; eauto. i. des.
-    esplits; try apply SC; eauto; ss.
-    + econs 2. econs. econs; eauto.
-    + right. econs; eauto. etrans; eauto.
-  - (* load *)
-    exploit sim_local_read; (try by etrans; eauto); eauto; try refl. i. des.
-    exploit reorder_read_read; try exact READ; try exact STEP_SRC; eauto. i. des.
-    esplits.
-    + ss.
-    + econs 2; [|econs 1]. econs.
-      * econs. econs 2. econs; [|econs 2]; eauto. econs. econs.
-      * eauto.
-    + econs 2. econs 2. econs; [|econs 2]; eauto. econs. econs.
-    + eauto.
-    + eauto.
-    + eauto.
-    + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
-  - (* update-load *)
-    guardH ORDW2.
-    exploit sim_local_read; (try by etrans; eauto); eauto; try refl. i. des.
-    exploit reorder_read_read; try exact READ; try exact STEP_SRC; try by eauto. i. des.
-    esplits.
-    + ss.
-    + econs 2; [|econs 1]. econs.
-      * econs. econs 2. econs; [|econs 2]; eauto. econs; eauto.
-      * eauto.
-    + econs 2. econs 2. econs; [|econs 2]; eauto. econs. econs.
-    + eauto.
-    + eauto.
-    + eauto.
-    + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
-  - (* store *)
-    guardH ORD.
-    hexploit sim_local_write_bot; try exact LOCAL1; try exact SC;
-      try exact WF2; try refl; eauto; try by viewtac. i. des.
-    exploit reorder_read_write; try exact READ; try exact STEP_SRC; eauto; try by viewtac. i. des.
-    esplits.
-    + ss.
-    + econs 2; [|econs 1]. econs.
-      * econs. econs 2. econs; [|econs 3]; eauto. econs; eauto.
-      * eauto.
-    + econs 2. econs 2. econs; [|econs 2]; eauto. econs. econs.
-    + eauto.
-    + eauto.
-    + etrans; eauto.
-    + left. eapply paco11_mon; [apply sim_itree_ret|]; ss. etrans; eauto.
-  - (* update *)
-    guardH ORDW2.
-    exploit Local.read_step_future; try exact LOCAL1; eauto. i. des.
-    exploit sim_local_read; try exact LOCAL1; eauto; try refl. i. des.
-    exploit Local.read_step_future; try exact STEP_SRC; eauto. i. des.
-    hexploit sim_local_write_bot; try exact LOCAL2; try exact SC; eauto; try refl. i. des.
-    exploit reorder_read_read; try exact READ; try exact STEP_SRC; eauto; try congr. i. des.
-    exploit Local.read_step_future; try exact STEP1; eauto. i. des.
-    exploit reorder_read_write; try exact STEP2; try exact STEP_SRC0; eauto; try congr. i. des.
-    esplits.
-    + ss.
-    + econs 2; [|econs 1]. econs.
-      * econs. econs 2. econs; [|econs 4]; eauto. econs; eauto.
-      * eauto.
-    + econs 2. econs 2. econs; [|econs 2]; eauto. econs. econs.
-    + eauto.
-    + eauto.
-    + etrans; eauto.
-    + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
-      * etrans; eauto.
-  - (* fence *)
-    exploit sim_local_fence; try exact LOCAL1; try exact SC; eauto; try refl. i. des.
-    exploit reorder_read_fence; try exact READ; try exact STEP_SRC; eauto. i. des.
-    esplits.
-    + ss.
-    + econs 2; [|econs 1]. econs.
-      * econs. econs 2. econs; [|econs 5]; eauto. econs. econs.
-      * eauto.
-    + econs 2. econs 2. econs; [|econs 2]; eauto. econs. econs.
-    + eauto.
-    + etrans; eauto.
-    + eauto.
-    + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
-      etrans; eauto.
+  exploit sim_load_sim_local; eauto. intro SIM_LC.
+  dependent destruction SIM.
+  { (* read *)
+    ii.
+    exploit Local.read_step_future; eauto. i. des.
+    inv STEP_TGT; [inv STEP|dependent destruction STEP; inv LOCAL0; ss; dependent destruction STATE; inv REORDER].
+    - (* promise *)
+      right.
+      exploit Local.promise_step_future; eauto. i. des.
+      exploit sim_local_promise_bot; try exact LOCAL; eauto. i. des.
+      exploit reorder_read_promise; try exact READ; try exact STEP_SRC; eauto. i. des.
+      exploit Local.promise_step_future; eauto. i. des.
+      esplits; try apply SC; eauto; ss.
+      + econs 2. econs. econs; eauto.
+      + right. econs; eauto. etrans; eauto.
+    - (* load *)
+      right.
+      exploit sim_local_read; try exact LOCAL; (try by etrans; eauto); eauto; try refl. i. des.
+      exploit reorder_read_read; try exact READ; try exact STEP_SRC; eauto. i. des.
+      esplits.
+      + ss.
+      + econs 2; [|econs 1]. econs.
+        * econs. econs 2. econs; [|econs 2]; eauto. econs. econs.
+        * eauto.
+      + econs 2. econs 2. econs; [|econs 2]; eauto. econs. econs.
+      + eauto.
+      + eauto.
+      + eauto.
+      + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
+    - (* update-load *)
+      right.
+      guardH ORDW2.
+      exploit sim_local_read; try exact LOCAL; (try by etrans; eauto); eauto; try refl. i. des.
+      exploit reorder_read_read; try exact READ; try exact STEP_SRC; try by eauto. i. des.
+      esplits.
+      + ss.
+      + econs 2; [|econs 1]. econs.
+        * econs. econs 2. econs; [|econs 2]; eauto. econs; eauto.
+        * eauto.
+      + econs 2. econs 2. econs; [|econs 2]; eauto. econs. econs.
+      + eauto.
+      + eauto.
+      + eauto.
+      + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
+    - (* store *)
+      right.
+      guardH ORD.
+      hexploit sim_local_write_bot; try exact LOCAL1; try exact SC;
+        try exact WF2; try refl; eauto; try by viewtac. i. des.
+      exploit reorder_read_write; try exact READ; try exact STEP_SRC; eauto; try by viewtac. i. des.
+      esplits.
+      + ss.
+      + econs 2; [|econs 1]. econs.
+        * econs. econs 2. econs; [|econs 3]; eauto. econs; eauto.
+        * eauto.
+      + econs 2. econs 2. econs; [|econs 2]; eauto. econs. econs.
+      + eauto.
+      + eauto.
+      + etrans; eauto.
+      + left. eapply paco11_mon; [apply sim_itree_ret|]; ss. etrans; eauto.
+    - (* update *)
+      right.
+      guardH ORDW2.
+      exploit Local.read_step_future; try exact LOCAL1; eauto. i. des.
+      exploit sim_local_read; try exact LOCAL1; try exact LOCAL; eauto; try refl. i. des.
+      exploit Local.read_step_future; try exact STEP_SRC; eauto. i. des.
+      hexploit sim_local_write_bot; try exact LOCAL2; try exact SC; eauto; try refl. i. des.
+      exploit reorder_read_read; try exact READ; try exact STEP_SRC; eauto; try congr. i. des.
+      exploit Local.read_step_future; try exact STEP1; eauto. i. des.
+      exploit reorder_read_write; try exact STEP2; try exact STEP_SRC0; eauto; try congr. i. des.
+      esplits.
+      + ss.
+      + econs 2; [|econs 1]. econs.
+        * econs. econs 2. econs; [|econs 4]; eauto. econs; eauto.
+        * eauto.
+      + econs 2. econs 2. econs; [|econs 2]; eauto. econs. econs.
+      + eauto.
+      + eauto.
+      + etrans; eauto.
+      + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
+        * etrans; eauto.
+    - (* fence *)
+      right.
+      exploit sim_local_fence; try exact LOCAL1; try exact LOCAL; try exact SC; eauto; try refl. i. des.
+      exploit reorder_read_fence; try exact READ; try exact STEP_SRC; eauto. i. des.
+      esplits.
+      + ss.
+      + econs 2; [|econs 1]. econs.
+        * econs. econs 2. econs; [|econs 5]; eauto. econs. econs.
+        * eauto.
+      + econs 2. econs 2. econs; [|econs 2]; eauto. econs. econs.
+      + eauto.
+      + etrans; eauto.
+      + eauto.
+      + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
+        etrans; eauto.
+    - (* na write *)
+      inv LOCAL1. destruct ord; ss.
+    - (* racy read *)
+      right.
+      exploit sim_local_racy_read; try exact LOCAL; eauto; try refl. i. des.
+      exploit reorder_read_racy_read; try exact READ; try exact x0; eauto. i. des.
+      esplits.
+      + ss.
+      + econs 2; [|econs 1]. econs.
+        * econs. econs 2. econs; [|econs 9]; eauto. econs. econs.
+        * eauto.
+      + econs 2. econs 2. econs; [|econs 2]; eauto. econs. econs.
+      + eauto.
+      + eauto.
+      + eauto.
+      + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
+    - (* racy read *)
+      right. guardH ORDW2.
+      exploit sim_local_racy_read; try exact LOCAL; eauto; try refl. i. des.
+      exploit reorder_read_racy_read; try exact READ; try exact x0; eauto; ss. i. des.
+      esplits.
+      + ss.
+      + econs 2; [|econs 1]. econs.
+        * econs. econs 2. econs; [|econs 9]; eauto. econs; eauto.
+        * ss.
+      + econs 2. econs 2. econs; [|econs 2]; eauto. econs. econs.
+      + eauto.
+      + eauto.
+      + eauto.
+      + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
+    - (* racy write *)
+      left. guardH ORD.
+      exploit sim_local_racy_write; try exact LOCAL1; try exact SIM_LC;
+        try match goal with
+            | [|- is_true (Ordering.le _ _)] => refl
+            end; eauto.
+      i. des.
+      unfold Thread.steps_failure. esplits; try refl.
+      + econs 2. econs; [|econs 10]; eauto. econs. eauto.
+      + ss.
+    - (* racy update *)
+      left. guardH ORDW2.
+      exploit sim_local_racy_update; try exact LOCAL1; try exact SIM_LC;
+        try match goal with
+            | [|- is_true (Ordering.le _ _)] => refl
+            end; eauto.
+      i. des.
+      unfold Thread.steps_failure. esplits; try refl.
+      + econs 2. econs; [|econs 11]; eauto. econs; eauto.
+      + ss.
+  }
+
+  { (* racy read *)
+    ii.
+    inv STEP_TGT; [inv STEP|dependent destruction STEP; inv LOCAL0; ss; dependent destruction STATE; inv REORDER].
+    - (* promise *)
+      right.
+      exploit Local.promise_step_future; eauto. i. des.
+      exploit sim_local_promise_bot; eauto. i. des.
+      exploit reorder_racy_read_promise; try exact READ; try exact STEP_SRC; eauto. i. des.
+      exploit Local.promise_step_future; try exact STEP_SRC; eauto. i. des.
+      esplits; try apply SC; eauto; ss.
+      + econs 2. econs. econs; eauto.
+      + right. econs 2; eauto.
+    - (* load *)
+      right.
+      exploit sim_local_read; (try by etrans; eauto); eauto; try refl. i. des.
+      exploit reorder_racy_read_read; try exact READ; try exact STEP_SRC; eauto. i. des.
+      esplits.
+      + ss.
+      + econs 2; [|econs 1]. econs.
+        * econs. econs 2. econs; [|econs 2]; eauto. econs. econs.
+        * eauto.
+      + econs 2. econs 2. econs; [|econs 9]; eauto. econs. econs.
+      + eauto.
+      + eauto.
+      + eauto.
+      + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
+    - (* update-load *)
+      right.
+      guardH ORDW2.
+      exploit sim_local_read; (try by etrans; eauto); eauto; try refl. i. des.
+      exploit reorder_racy_read_read; try exact READ; try exact STEP_SRC; try by eauto. i. des.
+      esplits.
+      + ss.
+      + econs 2; [|econs 1]. econs.
+        * econs. econs 2. econs; [|econs 2]; eauto. econs; eauto.
+        * eauto.
+      + econs 2. econs 2. econs; [|econs 9]; eauto. econs. econs.
+      + eauto.
+      + eauto.
+      + eauto.
+      + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
+    - (* store *)
+      right.
+      guardH ORD.
+      hexploit sim_local_write_bot; try exact LOCAL1; try exact SC;
+        try exact WF_SRC; try exact WF_TGT; try refl; eauto; try by viewtac. i. des.
+      exploit reorder_racy_read_write; try exact READ; eauto. i. des.
+      esplits.
+      + ss.
+      + econs 2; [|econs 1]. econs.
+        * econs. econs 2. econs; [|econs 3]; eauto. econs. eauto.
+        * eauto.
+      + econs 2. econs 2. econs; [|econs 9]; eauto. econs. econs.
+      + eauto.
+      + eauto.
+      + ss.
+      + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
+    - (* update *)
+      right.
+      guardH ORDW2.
+      exploit Local.read_step_future; try exact LOCAL1; eauto. i. des.
+      exploit sim_local_read; try exact LOCAL1; eauto; try refl. i. des.
+      exploit Local.read_step_future; try exact STEP_SRC; eauto. i. des.
+      hexploit sim_local_write_bot; try exact LOCAL2; try exact SC; eauto; try refl. i. des.
+      exploit reorder_racy_read_update; try exact READ; eauto. i. des.
+      esplits.
+      + ss.
+      + econs 2; [|econs 1]. econs.
+        * econs. econs 2. econs; [|econs 4]; eauto. econs; eauto.
+        * eauto.
+      + econs 2. econs 2. econs; [|econs 9]; eauto. econs. econs.
+      + eauto.
+      + eauto.
+      + ss.
+      + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
+    - (* fence *)
+      right.
+      exploit sim_local_fence; try exact LOCAL1; try exact SC; eauto; try refl. i. des.
+      exploit reorder_racy_read_fence; try exact READ; try exact STEP_SRC; eauto. i. des.
+      esplits.
+      + ss.
+      + econs 2; [|econs 1]. econs.
+        * econs. econs 2. econs; [|econs 5]; eauto. econs. econs.
+        * eauto.
+      + econs 2. econs 2. econs; [|econs 9]; eauto. econs. econs.
+      + eauto.
+      + ss.
+      + eauto.
+      + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
+    - (* na write *)
+      inv LOCAL1. destruct ord; ss.
+    - (* racy read *)
+      right.
+      exploit sim_local_racy_read; try exact LOCAL; eauto; try refl. i. des.
+      esplits.
+      + ss.
+      + econs 2; [|econs 1]. econs.
+        * econs. econs 2. econs; [|econs 9]; eauto. econs. econs.
+        * eauto.
+      + econs 2. econs 2. econs; [|econs 9]; try exact READ. econs. econs.
+      + eauto.
+      + eauto.
+      + eauto.
+      + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
+    - (* racy read *)
+      right. guardH ORDW2.
+      exploit sim_local_racy_read; try exact LOCAL; eauto; try refl. i. des.
+      esplits.
+      + ss.
+      + econs 2; [|econs 1]. econs.
+        * econs. econs 2. econs; [|econs 9]; eauto. econs; eauto.
+        * eauto.
+      + econs 2. econs 2. econs; [|econs 9]; try exact READ. econs. econs.
+      + eauto.
+      + eauto.
+      + eauto.
+      + left. eapply paco11_mon; [apply sim_itree_ret|]; ss.
+    - (* racy write *)
+      left. guardH ORD.
+      exploit sim_local_racy_write; try exact LOCAL1; try exact SIM_LC;
+        try match goal with
+            | [|- is_true (Ordering.le _ _)] => refl
+            end; eauto.
+      i. des.
+      unfold Thread.steps_failure. esplits; try refl.
+      + econs 2. econs; [|econs 10]; eauto. econs. econs.
+      + ss.
+    - (* racy update *)
+      left. guardH ORDW2.
+      exploit sim_local_racy_update; try exact LOCAL1; try exact SIM_LC;
+        try match goal with
+            | [|- is_true (Ordering.le _ _)] => refl
+            end; eauto.
+      i. des.
+      unfold Thread.steps_failure. esplits; try refl.
+      + econs 2. econs; [|econs 11]; eauto. econs; eauto.
+      + ss.
+  }
 Qed.
 
 Lemma sim_load_sim_thread R:
@@ -212,8 +447,11 @@ Proof.
   - inv TERMINAL_TGT. inv PR; ss.
   - right.
     esplits; eauto.
-    inv PR. inv READ. inv LOCAL. ss.
-    apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
+    inv PR.
+    + inv READ. inv LOCAL. ss.
+      apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
+    + inv READ. inv LOCAL. ss.
+      apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   - exploit sim_load_mon; eauto. i.
     exploit sim_load_step; eauto. i. des; eauto.
     + right. esplits; eauto.
