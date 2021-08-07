@@ -407,8 +407,8 @@ Module Memory.
   Hint Constructors write.
 
   Inductive write_na (ts: Time.t)
-                              (promises1 mem1: t) (loc: Loc.t) (from to: Time.t) (val: Const.t)
-                              (promises2 mem2: t) (kind: op_kind): Prop :=
+                     (promises1 mem1: t) (loc: Loc.t) (from to: Time.t) (val: Const.t)
+                     (promises2 mem2: t) (kind: op_kind): Prop :=
   | write_na_base
       (WRITABLE: Time.lt ts to)
       (WRITE: write promises1 mem1 loc from to (Message.concrete val None) promises2 mem2 kind)
@@ -653,15 +653,16 @@ Module Memory.
   Qed.
 
   Lemma future_get1
-        loc from to val released mem1 mem2
+        loc from to msg mem1 mem2
         (LE: future mem1 mem2)
-        (GET: get loc to mem1 = Some (from, Message.concrete val released)):
+        (GET: get loc to mem1 = Some (from, msg))
+        (RESERVE: msg <> Message.reserve):
     exists from' msg',
       <<GET: get loc to mem2 = Some (from', msg')>> /\
       <<FROM: Time.le from from'>> /\
-      <<MSG_LE: Message.le msg' (Message.concrete val released)>>.
+      <<MSG_LE: Message.le msg' msg>>.
   Proof.
-    revert from val released GET. induction LE.
+    revert from msg GET RESERVE. induction LE.
     { i. esplits; eauto; refl. }
     i. inv H.
     destruct (op_kind_is_cancel kind) eqn:KIND.
@@ -670,10 +671,13 @@ Module Memory.
       { erewrite remove_o; eauto. condtac; ss; eauto.
         des. subst.
         exploit remove_get0; eauto. i. des. congr. }
+      { ss. }
       i. des.
       esplits; eauto.
-    - exploit op_get1; eauto. i. des. inv MSG_LE.
-      exploit IHLE; eauto. i. des.
+    - exploit op_get1; eauto. i. des.
+      exploit IHLE; eauto.
+      { inv MSG_LE; ss. }
+      i. des.
       esplits; eauto. etrans; eauto.
   Qed.
 
@@ -2226,13 +2230,14 @@ Module Memory.
   Qed.
 
   Lemma future_weak_get1
-        loc from to val released mem1 mem2
+        loc from to msg mem1 mem2
         (FUTURE: future_weak mem1 mem2)
-        (GET: get loc to mem1 = Some (from, Message.concrete val released)):
+        (GET: get loc to mem1 = Some (from, msg))
+        (RESERVE: msg <> Message.reserve):
     exists from' msg',
       <<GET: get loc to mem2 = Some (from', msg')>> /\
       <<FROM: Time.le from from'>> /\
-      <<MSG_LE: Message.le msg' (Message.concrete val released)>>.
+      <<MSG_LE: Message.le msg' msg>>.
   Proof.
     inv FUTURE. exploit SOUND; eauto; ss. i. des.
     - subst. esplits; eauto. refl.
@@ -3072,5 +3077,67 @@ Module Memory.
       + i. eapply GET_PREV; eauto.
     - erewrite remove_o; eauto. condtac; ss.
       i. eapply GET_PREV; eauto.
+  Qed.
+
+
+  (* non-promised *)
+
+  Lemma promise_non_promised
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        l f t m
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (GET: Memory.get l t mem1 = Some (f, m))
+        (GETP: Memory.get l t promises1 = None):
+    (<<GET: Memory.get l t mem2 = Some (f, m)>>) /\
+    (<<GETP: Memory.get l t promises2 = None>>).
+  Proof.
+    inv PROMISE.
+    - erewrite (@Memory.add_o mem2); eauto.
+      erewrite (@Memory.add_o promises2); eauto.
+      condtac; ss. des. subst.
+      exploit Memory.add_get0; try exact MEM. i. des. congr.
+    - erewrite (@Memory.split_o mem2); eauto.
+      erewrite (@Memory.split_o promises2); eauto.
+      repeat (condtac; ss).
+      + des. subst.
+        exploit Memory.split_get0; try exact MEM. i. des. congr.
+      + guardH o. des. subst.
+        exploit Memory.split_get0; try exact PROMISES. i. des. congr.
+    - erewrite (@Memory.lower_o mem2); eauto.
+      erewrite (@Memory.lower_o promises2); eauto.
+      condtac; ss. des. subst.
+      exploit Memory.lower_get0; try exact PROMISES. i. des. congr.
+    - erewrite (@Memory.remove_o mem2); eauto.
+      erewrite (@Memory.remove_o promises2); eauto.
+      condtac; ss. des. subst.
+      exploit Memory.remove_get0; try exact PROMISES. i. des. congr.
+  Qed.
+
+  Lemma write_non_promised
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        l f t m
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
+        (GET: Memory.get l t mem1 = Some (f, m))
+        (GETP: Memory.get l t promises1 = None):
+    (<<GET: Memory.get l t mem2 = Some (f, m)>>) /\
+    (<<GETP: Memory.get l t promises2 = None>>).
+  Proof.
+    inv WRITE.
+    exploit promise_non_promised; eauto. i. des.
+    split; auto.
+    erewrite (@Memory.remove_o promises2); eauto. condtac; ss.
+  Qed.
+
+  Lemma write_na_non_promised
+        ts promises1 mem1 loc from to val promises2 mem2 kind
+        l f t m
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        (GET: Memory.get l t mem1 = Some (f, m))
+        (GETP: Memory.get l t promises1 = None):
+    (<<GET: Memory.get l t mem2 = Some (f, m)>>) /\
+    (<<GETP: Memory.get l t promises2 = None>>).
+  Proof.
+    induction WRITE; eauto using write_non_promised.
+    exploit write_non_promised; eauto. i. des. eauto.
   Qed.
 End Memory.

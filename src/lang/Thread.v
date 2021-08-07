@@ -638,5 +638,36 @@ Module Thread.
       eapply rtc_implies; [|eauto].
       i. inv H. eauto.
     Qed.
+
+
+    (* non-promised *)
+
+    Lemma step_non_promised
+          pf e e1 e2
+          l f t m
+          (STEP: step pf e e1 e2)
+          (GET: Memory.get l t e1.(Thread.memory) = Some (f, m))
+          (GETP: Memory.get l t e1.(Thread.local).(Local.promises) = None):
+      (<<GET: Memory.get l t e2.(Thread.memory) = Some (f, m)>>) /\
+      (<<GETP: Memory.get l t e2.(Thread.local).(Local.promises) = None>>).
+    Proof.
+      inv STEP; inv STEP0.
+      - eapply Local.promise_step_non_promised; eauto.
+      - eapply Local.program_step_non_promised; eauto.
+    Qed.
+
+    Lemma rtc_tau_step_non_promised
+          e1 e2
+          l f t m
+          (STEP: rtc tau_step e1 e2)
+          (GET: Memory.get l t e1.(Thread.memory) = Some (f, m))
+          (GETP: Memory.get l t e1.(Thread.local).(Local.promises) = None):
+      (<<GET: Memory.get l t e2.(Thread.memory) = Some (f, m)>>) /\
+      (<<GETP: Memory.get l t e2.(Thread.local).(Local.promises) = None>>).
+    Proof.
+      induction STEP; eauto using step_non_promised.
+      inv H. inv TSTEP.
+      exploit step_non_promised; eauto. i. des. eauto.
+    Qed.
   End Thread.
 End Thread.

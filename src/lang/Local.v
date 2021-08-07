@@ -785,4 +785,34 @@ Module Local.
     - i. inv LOCAL.
       erewrite <- Memory.write_na_get_diff; try exact WRITE; eauto.
   Qed.
+
+  Lemma promise_step_non_promised
+        lc1 mem1 loc from to msg lc2 mem2 kind
+        l f t m
+        (STEP: promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
+        (GET: Memory.get l t mem1 = Some (f, m))
+        (GETP: Memory.get l t lc1.(Local.promises) = None):
+    (<<GET: Memory.get l t mem2 = Some (f, m)>>) /\
+    (<<GETP: Memory.get l t lc2.(Local.promises) = None>>).
+  Proof.
+    inv STEP. eauto using Memory.promise_non_promised.
+  Qed.
+
+  Lemma program_step_non_promised
+        e lc1 sc1 mem1 lc2 sc2 mem2
+        l f t m
+        (STEP: program_step e lc1 sc1 mem1 lc2 sc2 mem2)
+        (GET: Memory.get l t mem1 = Some (f, m))
+        (GETP: Memory.get l t lc1.(Local.promises) = None):
+    (<<GET: Memory.get l t mem2 = Some (f, m)>>) /\
+    (<<GETP: Memory.get l t lc2.(Local.promises) = None>>).
+  Proof.
+    inv STEP; eauto; try by (inv LOCAL; eauto).
+    - inv LOCAL.
+      eauto using Memory.write_non_promised.
+    - inv LOCAL1. inv LOCAL2.
+      eauto using Memory.write_non_promised.
+    - inv LOCAL.
+      eauto using Memory.write_na_non_promised.
+  Qed.
 End Local.

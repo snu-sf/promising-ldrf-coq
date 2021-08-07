@@ -157,9 +157,15 @@ Proof.
     inv LOCAL1. inv REORDER0; destruct ord; ss.
   - (* racy read *)
     right.
-    admit.
+    exploit sim_local_racy_read; eauto; try refl. i. des.
+    esplits; try apply SC; eauto; ss.
+    + econs 1.
+    + auto.
+    + left. eapply paco11_mon; [apply sim_load_sim_thread|]; ss.
+      econs 2; eauto.
   - (* racy read-update *)
     right.
+    
     admit.
   - (* racy write *)
     left.
