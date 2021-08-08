@@ -26,6 +26,7 @@ Require Import MemoryMerge.
 Require Import FulfillStep.
 
 Set Implicit Arguments.
+  
 
 Definition version := nat.
 
@@ -227,7 +228,7 @@ Module Mapping.
               (<<GET: Memory.get loc fto prom_src = Some (from, msg)>>))
     .
 
-    Variant sim_memory (vers: versions) (mem_src mem_tgt: Memory.t): Prop :=
+    Variant sim_memory (b: bool) (vers: versions) (mem_src mem_tgt: Memory.t): Prop :=
     | sim_memory_intro
         (CONCRETE: forall loc to from val released
                           (GET: Memory.get loc to mem_tgt = Some (from, Message.concrete val released)),
