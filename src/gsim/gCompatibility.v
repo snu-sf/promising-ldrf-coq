@@ -408,6 +408,7 @@ Proof.
           { splits; auto. }
           { splits; try refl. }
         }
+        { refl. }
         i. ss. des. exploit TERMINAL0; try by econs.
         { econs. eauto. }
         i. des.
@@ -461,6 +462,7 @@ Proof.
           { splits; auto. }
           { splits; try refl. }
         }
+        { refl. }
         i. ss. des.
         exploit STEP0; eauto. i. des.
         { left.
