@@ -33,14 +33,12 @@ Require Import Program.
 Set Implicit Arguments.
 
 
-(* TODO: remove Memory.closed condition in Memory.cap_inv Memory.cap_future_weak *)
 Lemma memory_cap_future
       mem0 mem1
       (CAP: Memory.cap mem0 mem1)
   :
     Memory.future_weak mem0 mem1.
 Admitted.
-
 
 (* TODO: use FutureCertify to prove it *)
 Module UndefCertify.
@@ -129,6 +127,216 @@ Module UndefCertify.
 End UndefCertify.
 
 
+Module CapFlex.
+  Record cap_flex (mem1 mem2: Memory.t) (tm: TimeMap.t): Prop :=
+    {
+      cap_flex_le: Memory.le mem1 mem2;
+      cap_flex_middle: forall loc from1 to1 from2 to2
+                              (ADJ: Memory.adjacent loc from1 to1 from2 to2 mem1)
+                              (TO: Time.lt to1 from2),
+          Memory.get loc from2 mem2 = Some (to1, Message.reserve);
+      cap_flex_back: forall loc, Memory.get loc (tm loc) mem2 =
+                                 Some (Memory.max_ts loc mem1, Message.reserve);
+      cap_flex_complete: forall loc from to msg
+                               (GET1: Memory.get loc to mem1 = None)
+                               (GET2: Memory.get loc to mem2 = Some (from, msg)),
+          (exists f m, Memory.get loc from mem1 = Some (f, m));
+    }
+  .
+
+  Lemma cap_flex_inv
+        mem1 mem2 tm
+        loc from to msg
+        (CAP: cap_flex mem1 mem2 tm)
+        (GET: Memory.get loc to mem2 = Some (from, msg))
+        (TM: forall loc, Time.lt (Memory.max_ts loc mem1) (tm loc))
+    :
+    Memory.get loc to mem1 = Some (from, msg) \/
+    (Memory.get loc to mem1 = None /\
+     exists from1 to2,
+        Memory.adjacent loc from1 from to to2 mem1 /\
+        Time.lt from to /\
+        msg = Message.reserve) \/
+    (Memory.get loc to mem1 = None /\
+     from = Memory.max_ts loc mem1 /\
+     to = tm loc /\
+     msg = Message.reserve).
+  Proof.
+    inv CAP. move GET at bottom.
+    destruct (Memory.get loc to mem1) as [[]|] eqn:GET1.
+    { exploit cap_flex_le0; eauto. i.
+      rewrite GET in x. inv x. auto. }
+    right. exploit cap_flex_complete0; eauto. i. des.
+    exploit Memory.max_ts_spec; eauto. i. des. inv MAX.
+    - left.
+      exploit Memory.adjacent_exists; try eapply H; eauto. i. des.
+      assert (LT: Time.lt from from2).
+      { clear cap_flex_middle0 cap_flex_back0 cap_flex_complete0 GET0 H.
+        (* clear MIDDLE BACK COMPLETE GET0 H. *)
+        inv x1. rewrite GET0 in x. inv x.
+        exploit Memory.get_ts; try exact GET2. i. des.
+        { subst. inv TS. }
+        destruct (Time.le_lt_dec from2 from); auto.
+        inv l.
+        - exfalso.
+          exploit Memory.get_ts; try exact GET0. i. des.
+          { subst. inv H. }
+          exploit Memory.get_disjoint; [exact GET0|exact GET2|..]. i. des.
+          { subst. timetac. }
+          apply (x2 from); econs; ss.
+          + refl.
+          + econs. auto.
+        - exfalso. inv H.
+          exploit cap_flex_le0; try exact GET2. i.
+          exploit Memory.get_ts; try exact GET. i. des.
+          { subst. rewrite GET1 in GET0. inv GET0. }
+          exploit Memory.get_disjoint; [exact GET|exact x|..]. i. des.
+          { subst. rewrite GET1 in GET2. inv GET2. }
+          destruct (Time.le_lt_dec to to2).
+          + apply (x3 to); econs; ss. refl.
+          + apply (x3 to2); econs; ss.
+            * econs. auto.
+            * refl.
+      }
+      exploit cap_flex_middle0; try eapply x1; eauto. i.
+      destruct (Time.eq_dec to from2).
+      + subst. rewrite GET in x0. inv x0. esplits; eauto.
+      + exfalso. inv x1.
+        exploit Memory.get_ts; try exact GET. i. des.
+        { subst. rewrite GET1 in x. inv x. }
+        exploit Memory.get_ts; try exact x0. i. des.
+        { subst. exploit cap_flex_le0; try exact GET3. i.
+          exploit Memory.get_disjoint; [exact GET|exact x1|..]. i. des.
+          { subst. rewrite GET1 in GET3. inv GET3. }
+          destruct (Time.le_lt_dec to to2).
+          - apply (x4 to); econs; ss. refl.
+          - apply (x4 to2); econs; ss.
+            + econs. auto.
+            + refl.
+        }
+        exploit Memory.get_disjoint; [exact GET|exact x0|..]. i. des; try congr.
+        destruct (Time.le_lt_dec to from2).
+        * apply (x4 to); econs; ss. refl.
+        * apply (x4 from2); econs; ss.
+          { econs. auto. }
+          { refl. }
+    - right. inv H. do 2 (split; auto).
+      rewrite GET0 in x. inv x.
+      specialize (cap_flex_back0 loc).
+      exploit Memory.get_ts; try exact GET. i. des; try congr.
+      exploit Memory.get_disjoint; [exact GET|exact cap_flex_back0|..]. i. des.
+      { subst. esplits; eauto. }
+      exfalso.
+      destruct (Time.le_lt_dec to (tm loc)).
+      + apply (x1 to); econs; ss. refl.
+      + apply (x1 (tm loc)); econs; s;
+          eauto using TM; try refl.
+        econs. ss.
+  Qed.
+
+  Lemma cap_flex_exists
+        mem1 tm
+        (CLOSED1: Memory.closed mem1)
+        (TM: forall loc, Time.lt (Memory.max_ts loc mem1) (tm loc))
+    :
+      exists mem2, (<<CAP: cap_flex mem1 mem2 tm>>).
+  Proof.
+  Admitted.
+
+  Lemma cap_cap_flex mem1 mem2
+        (CAP: Memory.cap mem1 mem2)
+    :
+      cap_flex mem1 mem2 (fun loc => Time.incr (Memory.max_ts loc mem1)).
+  Proof.
+    inv CAP. econs; eauto.
+  Qed.
+
+  Lemma cap_flex_max_ts mem1 mem2 tm
+        (CLOSED: Memory.closed mem1)
+        (CAP: cap_flex mem1 mem2 tm)
+        (TM: forall loc, Time.lt (Memory.max_ts loc mem1) (tm loc))
+    :
+      forall loc,
+        Memory.max_ts loc mem2 = tm loc.
+  Proof.
+    i. set (BACK:=(cap_flex_back CAP) loc).
+    exploit Memory.max_ts_spec; try exact BACK. i. des.
+    apply TimeFacts.antisym; ss.
+    destruct (Time.le_lt_dec (Memory.max_ts loc mem2) (tm loc)); ss.
+    exploit cap_flex_inv; try exact GET; eauto. i. des.
+    - exploit Memory.max_ts_spec; try exact x0. i. des.
+      exploit TimeFacts.lt_le_lt; try exact l; try exact MAX0. i.
+      specialize (TM loc). rewrite x1 in TM. timetac.
+    - inv x1. exploit Memory.get_ts; try exact GET2. i. des.
+      { rewrite x1 in *. inv l. }
+      exploit Memory.max_ts_spec; try exact GET2. i. des.
+      exploit TimeFacts.lt_le_lt; try exact x1; try exact MAX0. i.
+      rewrite x3 in l. specialize (TM loc). rewrite l in TM. timetac.
+    - subst. rewrite x2 in *. timetac.
+  Qed.
+
+  Lemma cap_flex_covered
+        mem0 mem1 tm
+        (CAP: cap_flex mem0 mem1 tm)
+        (CLOSED: Memory.closed mem0)
+        (TM: forall loc, Time.lt (Memory.max_ts loc mem0) (tm loc))
+        loc to
+    :
+      Interval.mem (Time.bot, (tm loc)) to
+      <->
+      covered loc to mem1.
+  Proof.
+  Admitted.
+
+  Lemma cap_flex_closed mem cap tm
+        (CAP: cap_flex mem cap tm)
+        (TM: forall loc, Time.lt (Memory.max_ts loc mem) (tm loc))
+        (CLOSED: Memory.closed mem)
+    :
+      Memory.closed cap.
+  Proof.
+  Admitted.
+
+  Lemma cap_flex_wf
+        lc mem1 mem2 tm
+        (CAP: cap_flex mem1 mem2 tm)
+        (WF: Local.wf lc mem1):
+    Local.wf lc mem2.
+  Proof.
+  Admitted.
+
+  Lemma cap_flex_future_weak
+        mem1 mem2 tm
+        (CAP: cap_flex mem1 mem2 tm)
+        (TM: forall loc, Time.lt (Memory.max_ts loc mem1) (tm loc)):
+    Memory.future_weak mem1 mem2.
+  Proof.
+    econs; ii.
+    { eapply CAP in GET. esplits; eauto. refl. }
+    { eapply cap_flex_inv in GET2; eauto. des; clarify. }
+    { eapply cap_flex_inv in GET2; eauto. des; clarify. }
+  Qed.
+
+  Definition consistent (tm: TimeMap.t) lang (e: Thread.t lang): Prop :=
+    forall mem1
+           (CAP: cap_flex (Thread.memory e) mem1 tm),
+      (<<FAILURE: Thread.steps_failure (Thread.mk _ (Thread.state e) (Thread.local e) (Thread.sc e) mem1)>>) \/
+      exists e2,
+        ( <<STEPS: rtc (@Thread.tau_step _) (Thread.mk _ (Thread.state e) (Thread.local e) (Thread.sc e) mem1) e2>>) /\
+        (<<PROMISES: (Local.promises (Thread.local e2)) = Memory.bot>>).
+
+  Lemma consistent_thread_consistent lang st lc sc mem tm
+        (CONSISTENT: consistent tm (Thread.mk lang st lc sc mem))
+        (LOCAL: Local.wf lc mem)
+        (MEMORY: Memory.closed mem)
+        (SC: Memory.closed_timemap sc mem)
+        (TM: forall loc, Time.lt (Memory.max_ts loc mem) (tm loc))
+    :
+      Thread.consistent (Thread.mk lang st lc sc mem).
+  Proof.
+  Admitted.
+End CapFlex.      
+  
 
 Section WORLD.
 
