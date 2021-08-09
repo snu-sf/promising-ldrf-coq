@@ -413,7 +413,7 @@ Proof.
           exploit SIM2; eauto. i. eapply GF in x0.
           red in x0. red in x0. des. clear CAP. ss.
           exploit FUTURE1; try apply SC0; eauto.
-          { instantiate (5:=b1). red. destruct b1.
+          { red. destruct b.
             { splits; auto. }
             { splits; try refl. }
           }
@@ -468,7 +468,7 @@ Proof.
           exploit SIM2; eauto. i. eapply GF in x.
           red in x. red in x. des. clear CAP.
           exploit FUTURE1; try apply SC0; eauto.
-          { instantiate (5:=b1). red. destruct b1.
+          { red. destruct b.
             { splits; auto. }
             { splits; try refl. }
           }

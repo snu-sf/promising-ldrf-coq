@@ -379,32 +379,11 @@ Variable sim_memory: forall (b: bool) (w: world) (mem_src mem_tgt:Memory.t), Pro
 Variable sim_timemap: forall (w: world) (sc_src sc_tgt: TimeMap.t), Prop.
 Variable sim_local: forall (w: world) (lc_src lc_tgt:Local.t), Prop.
 
-Hypothesis sim_local_world_mon: forall (w0 w1: world) (WORLD: world_le w0 w1),
-    sim_local w0 <2= sim_local w1.
-
 Hypothesis sim_local_memory_bot:
   forall w lc_src lc_tgt
          (SIM: sim_local w lc_src lc_tgt)
          (BOT: (Local.promises lc_tgt) = Memory.bot),
     (Local.promises lc_src) = Memory.bot.
-
-Hypothesis sim_memory_cap: forall
-    w1
-    mem1_src mem2_src
-    mem1_tgt mem2_tgt
-    sc1_src sc1_tgt
-    (MEM1: sim_memory false w1 mem1_src mem1_tgt)
-    (CAP_SRC: Memory.cap mem1_src mem2_src)
-    (CAP_TGT: Memory.cap mem1_tgt mem2_tgt)
-    (MEM1_SRC: Memory.closed mem1_src)
-    (MEM1_TGT: Memory.closed mem1_tgt)
-    (CLOSED_SRC: Memory.closed_timemap sc1_src mem1_src)
-    (CLOSED_TGT: Memory.closed_timemap sc1_tgt mem1_tgt),
-    exists w2,
-      (<<MEM2: sim_memory true w2 mem2_src mem2_tgt>>) /\
-      (<<TIMEMAP: sim_timemap w2 sc1_src sc1_tgt>>) /\
-      (<<WORLD: world_le w1 w2>>)
-.
 
 
 Section SimulationThread.
@@ -446,41 +425,34 @@ Section SimulationThread.
   .
 
   Definition sim_memory_future
-             (b0 b1: bool)
+             (b0: bool)
              (prom_src prom_tgt: Memory.t)
              (mem0_src mem1_src mem0_tgt mem1_tgt: Memory.t)
              (sc0_src sc1_src sc0_tgt sc1_tgt: TimeMap.t)
              (w0 w1: world): Prop :=
-    match b0, b1 with
-    | false, false =>
-      (<<MEMSRC: Memory.future_weak mem0_src mem1_src>>) /\
-      (<<MEMTGT: Memory.future_weak mem0_tgt mem1_tgt>>) /\
-      (<<SCSRC: TimeMap.le sc0_src sc1_src>>) /\
-      (<<SCTGT: TimeMap.le sc0_tgt sc1_tgt>>) /\
-      (<<WORLD: world_le w0 w1>>)
-    | false, true =>
-      (<<MEMSRC: Memory.cap mem0_src mem1_src>>) /\
-      (<<MEMTGT: Memory.cap mem0_tgt mem1_tgt>>) /\
-      (<<SCSRC: sc1_src = sc0_src>>) /\
-      (<<SCTGT: sc1_tgt = sc0_tgt>>) /\
-      (<<WORLD: world_le w0 w1>>)
-    | true, false => False
-    | true, true =>
+    if b0
+    then
       (<<MEMSRC: mem1_src = mem0_src>>) /\
       (<<MEMTGT: mem1_tgt = mem0_tgt>>) /\
       (<<SCSRC: sc1_src = sc0_src>>) /\
       (<<SCTGT: sc1_tgt = sc0_tgt>>) /\
       (<<WORLD: w1 = w0>>)
-    end.
+    else
+      (<<MEMSRC: Memory.future_weak mem0_src mem1_src>>) /\
+      (<<MEMTGT: Memory.future_weak mem0_tgt mem1_tgt>>) /\
+      (<<SCSRC: TimeMap.le sc0_src sc1_src>>) /\
+      (<<SCTGT: TimeMap.le sc0_tgt sc1_tgt>>) /\
+      (<<WORLD: world_le w0 w1>>)
+  .
 
   Lemma sim_future_memory_sc_future
-        (b0 b1: bool)
+        (b0: bool)
         (prom_src prom_tgt: Memory.t)
         (mem0_src mem1_src mem0_tgt mem1_tgt: Memory.t)
         (sc0_src sc1_src sc0_tgt sc1_tgt: TimeMap.t)
         (w0 w1: world)
         (FUTURE: sim_memory_future
-                   b0 b1
+                   b0
                    prom_src prom_tgt
                    mem0_src mem1_src mem0_tgt mem1_tgt
                    sc0_src sc1_src sc0_tgt sc1_tgt
@@ -492,12 +464,8 @@ Section SimulationThread.
       (<<MEM_FUTURE_TGT: Memory.future_weak mem0_tgt mem1_tgt>>) /\
       (<<WORLD: world_le w0 w1>>).
   Proof.
-    destruct b0, b1; ss; des; subst.
+    destruct b0; ss; des; subst.
     - splits; try refl.
-    - splits; try refl.
-      { eapply memory_cap_future; eauto. }
-      { eapply memory_cap_future; eauto. }
-      { auto. }
     - splits; auto.
   Qed.
 
@@ -508,10 +476,10 @@ Section SimulationThread.
              (b0: bool) (w0: world)
              (st1_src:(Language.state lang_src)) (lc1_src:Local.t) (sc0_src:TimeMap.t) (mem0_src:Memory.t)
              (st1_tgt:(Language.state lang_tgt)) (lc1_tgt:Local.t) (sc0_tgt:TimeMap.t) (mem0_tgt:Memory.t): Prop :=
-    (<<FUTURE: forall b1 w1 sc1_src mem1_src
+    (<<FUTURE: forall w1 sc1_src mem1_src
                       sc1_tgt mem1_tgt
                       (SC: sim_timemap w1 sc1_src sc1_tgt)
-                      (MEMORY: sim_memory b1 w1 mem1_src mem1_tgt)
+                      (MEMORY: sim_memory b0 w1 mem1_src mem1_tgt)
                       (WF_SRC: Local.wf lc1_src mem1_src)
                       (WF_TGT: Local.wf lc1_tgt mem1_tgt)
                       (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
@@ -520,7 +488,7 @@ Section SimulationThread.
                       (MEM_TGT: Memory.closed mem1_tgt)
                       (CONS_TGT: Local.promise_consistent lc1_tgt)
                       (FUTURE: sim_memory_future
-                                 b0 b1
+                                 b0
                                  (lc1_src.(Local.promises)) (lc1_tgt.(Local.promises))
                                  mem0_src mem1_src mem0_tgt mem1_tgt
                                  sc0_src sc1_src sc0_tgt sc1_tgt
@@ -535,13 +503,13 @@ Section SimulationThread.
                              (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
                              (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>>) /\
                (<<SC: sim_timemap w2 sc2_src sc1_tgt>>) /\
-               (<<MEMORY: sim_memory b1 w2 mem2_src mem1_tgt>>) /\
+               (<<MEMORY: sim_memory b0 w2 mem2_src mem1_tgt>>) /\
                (<<TERMINAL_SRC: (Language.is_terminal lang_src) st2_src>>) /\
                (<<LOCAL: sim_local w2 lc2_src lc1_tgt>>) /\
                (<<TERMINAL: sim_terminal st2_src st1_tgt>>) /\
                (<<WORLD: world_le w1 w2>>)>>) /\
         (<<PROMISES:
-           forall (BOOL: b0 = true /\ b1 = true)
+           forall (BOOL: b0 = true)
                   (PROMISES_TGT: (Local.promises lc1_tgt) = Memory.bot),
              (<<FAILURE: Thread.steps_failure (Thread.mk _ st1_src lc1_src sc0_src mem0_src)>>) \/
              exists st2_src lc2_src sc2_src mem2_src,
@@ -550,7 +518,7 @@ Section SimulationThread.
                              (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>>) /\
                (<<PROMISES_SRC: (Local.promises lc2_src) = Memory.bot>>)>>) /\
         (<<STEP: _sim_thread_step _ _ (@sim_thread lang_src lang_tgt sim_terminal)
-                                  b1 w1
+                                  b0 w1
                                   st1_src lc1_src sc1_src mem1_src
                                   st1_tgt lc1_tgt sc1_tgt mem1_tgt>>)>>) /\
     (<<CAP: forall (BOOL: b0 = false)
@@ -1012,8 +980,6 @@ Section Simulation.
 End Simulation.
 Hint Resolve _sim_mon: paco.
 
-
-Definition admitt: forall P, P. Admitted.
 
 Lemma sim_adequacy
       ths_src sc_src mem_src
