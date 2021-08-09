@@ -305,6 +305,14 @@ Module CapFlex.
   Proof.
   Admitted.
 
+  Lemma cap_flex_closed_timemap
+        mem1 mem2 sc tm
+        (CAP: cap_flex mem1 mem2 tm)
+        (CLOSED: Memory.closed_timemap sc mem1):
+    Memory.closed_timemap sc mem2.
+  Proof.
+  Admitted.
+
   Lemma cap_flex_future_weak
         mem1 mem2 tm
         (CAP: cap_flex mem1 mem2 tm)
@@ -316,6 +324,16 @@ Module CapFlex.
     { eapply cap_flex_inv in GET2; eauto. des; clarify. }
     { eapply cap_flex_inv in GET2; eauto. des; clarify. }
   Qed.
+
+  Lemma cap_flex_inj
+        mem mem1 mem2 tm
+        (CAP1: cap_flex mem mem1 tm)
+        (CAP2: cap_flex mem mem2 tm)
+        (CLOSED: Memory.closed mem)
+        (TM: forall loc, Time.lt (Memory.max_ts loc mem) (tm loc)):
+    mem1 = mem2.
+  Proof.
+  Admitted.
 
   Definition consistent (tm: TimeMap.t) lang (e: Thread.t lang): Prop :=
     forall mem1
@@ -335,6 +353,18 @@ Module CapFlex.
       Thread.consistent (Thread.mk lang st lc sc mem).
   Proof.
   Admitted.
+
+  Lemma thread_consistent_consistent lang st lc sc mem tm
+        (CONSISTENT: Thread.consistent (Thread.mk lang st lc sc mem))
+        (LOCAL: Local.wf lc mem)
+        (MEMORY: Memory.closed mem)
+        (SC: Memory.closed_timemap sc mem)
+        (TM: forall loc, Time.lt (Memory.max_ts loc mem) (tm loc))
+    :
+      consistent tm (Thread.mk lang st lc sc mem).
+  Proof.
+  Admitted.
+
 End CapFlex.
 
 
@@ -524,15 +554,36 @@ Section SimulationThread.
                                   b1 w1
                                   st1_src lc1_src sc1_src mem1_src
                                   st1_tgt lc1_tgt sc1_tgt mem1_tgt>>)>>) /\
-    (<<CERTIFICATION: True>>)
+    (<<CAP: forall (BOOL: b0 = false)
+                             (MEMORY: sim_memory b0 w0 mem0_src mem0_tgt)
+                             (WF_SRC: Local.wf lc1_src mem0_src)
+                             (WF_TGT: Local.wf lc1_tgt mem0_tgt)
+                             (SC_SRC: Memory.closed_timemap sc0_src mem0_src)
+                             (SC_TGT: Memory.closed_timemap sc0_tgt mem0_tgt)
+                             (MEM_SRC: Memory.closed mem0_src)
+                             (MEM_TGT: Memory.closed mem0_tgt)
+                             (CONS_TGT: Local.promise_consistent lc1_tgt),
+        exists tm_src tm_tgt,
+          (<<TMSRC: forall loc, Time.lt (Memory.max_ts loc mem0_src) (tm_src loc)>>) /\
+          (<<TMTGT: forall loc, Time.lt (Memory.max_ts loc mem0_tgt) (tm_tgt loc)>>) /\
+          (<<CAP: forall cap_src cap_tgt
+                         (CAPSRC: CapFlex.cap_flex mem0_src cap_src tm_src)
+                         (CAPTGT: CapFlex.cap_flex mem0_tgt cap_tgt tm_tgt),
+              exists w3,
+                (<<SC3: sim_timemap w3 sc0_src sc0_tgt>>) /\
+                (<<MEMORY3: sim_memory true w3 cap_src cap_tgt>>) /\
+                (<<SIM: sim_thread _ _ sim_terminal true w3 st1_src lc1_src sc0_src cap_src st1_tgt lc1_tgt sc0_tgt cap_tgt>>) /\
+                (<<WORLD: world_le w0 w3>>)>>)>>)
   .
 
   Lemma _sim_thread_mon: monotone13 _sim_thread.
   Proof.
     ii. red in IN. des. red. splits; auto.
     ii. exploit FUTURE; eauto. i. des. splits; auto.
-    ii. exploit STEP; eauto. i. des; eauto.
-    right. esplits; eauto.
+    { ii. exploit STEP; eauto. i. des; eauto.
+      right. esplits; eauto. }
+    { ii. exploit CAP; eauto. i. des. esplits; eauto.
+      i. exploit CAP0; eauto. i. des. esplits; eauto. }
   Qed.
   Hint Resolve _sim_thread_mon: paco.
 
@@ -545,13 +596,17 @@ Section SimulationThread.
     sim_thread sim_terminal1 <10= sim_thread sim_terminal2.
   Proof.
     pcofix CIH. i. punfold PR. pfold.
-    red in PR. red. des. splits; auto. ii.
-    exploit FUTURE; eauto. i. des. splits; auto.
-    - i. exploit TERMINAL; eauto. i. des; eauto.
-      right. esplits; eauto.
-    - ii. exploit STEP; eauto. i. des; eauto.
-      inv SIM0; [|done].
-      right. esplits; eauto.
+    red in PR. red. des. splits; auto.
+    { ii. exploit FUTURE; eauto. i. des. splits; auto.
+      { i. exploit TERMINAL; eauto. i. des; eauto.
+        right. esplits; eauto. }
+      { ii. exploit STEP; eauto. i. des; eauto.
+        inv SIM0; [|done].
+        right. esplits; eauto. }
+    }
+    { i. exploit CAP; eauto. i. des. esplits; eauto.
+      i. exploit CAP0; eauto. i. des. esplits; eauto.
+      inv SIM0; [|done]. right. auto. }
   Qed.
 End SimulationThread.
 Hint Resolve _sim_thread_mon: paco.
@@ -807,24 +862,6 @@ Proof.
     etrans; eauto.
 Qed.
 
-Lemma sim_thread_future_false_true
-      lang_src lang_tgt
-      sim_terminal
-      st_src lc_src sc1_src mem1_src mem2_src w1
-      st_tgt lc_tgt sc1_tgt mem1_tgt mem2_tgt w2
-      (SIM: @sim_thread lang_src lang_tgt sim_terminal false w1 st_src lc_src sc1_src mem1_src st_tgt lc_tgt sc1_tgt mem1_tgt)
-      (MEM_FUTURE_SRC: Memory.cap mem1_src mem2_src)
-      (MEM_FUTURE_TGT: Memory.cap mem1_tgt mem2_tgt)
-      (WORLD: world_le w1 w2):
-  sim_thread sim_terminal true w2 st_src lc_src sc1_src mem2_src st_tgt lc_tgt sc1_tgt mem2_tgt.
-Proof.
-Admitted.
-(*   pfold. ii. *)
-(*   punfold SIM. destruct b1; ss; des; subst. *)
-(*   exploit SIM; (try by etrans; eauto); eauto; ss. *)
-(*   eapply UndefCertify.cap_unchanged; auto. *)
-(* Qed. *)
-
 Lemma sim_thread_future
       lang_src lang_tgt
       sim_terminal
@@ -846,37 +883,23 @@ Proof.
   { etrans; eauto. }
 Qed.
 
-Lemma cap_property
-      mem1 mem2 lc sc
-      (CAP: Memory.cap mem1 mem2)
+Lemma cap_flex_property
+      mem1 mem2 lc sc tm
+      (CAP: CapFlex.cap_flex mem1 mem2 tm)
       (WF: Local.wf lc mem1)
       (SC: Memory.closed_timemap sc mem1)
-      (CLOSED: Memory.closed mem1):
+      (CLOSED: Memory.closed mem1)
+      (TM: forall loc, Time.lt (Memory.max_ts loc mem1) (tm loc)):
   (<<FUTURE: Memory.future_weak mem1 mem2>>) /\
   (<<WF: Local.wf lc mem2>>) /\
   (<<SC: Memory.closed_timemap sc mem2>>) /\
   (<<CLOSED: Memory.closed mem2>>).
 Proof.
   splits.
-  - eapply Memory.cap_future_weak; eauto.
-  - eapply Local.cap_wf; eauto.
-  - eapply Memory.cap_closed_timemap; eauto.
-  - eapply Memory.cap_closed; eauto.
-Qed.
-
-(* TODO: remove *)
-
-Lemma sc_property
-      sc1 sc2 mem
-      (MAX: Memory.max_concrete_timemap mem sc2)
-      (SC1: Memory.closed_timemap sc1 mem)
-      (MEM: Memory.closed mem):
-  (<<SC2: Memory.closed_timemap sc2 mem>>) /\
-  (<<LE: TimeMap.le sc1 sc2>>).
-Proof.
-  splits.
-  - eapply Memory.max_concrete_timemap_closed; eauto.
-  - eapply Memory.max_concrete_timemap_spec; eauto.
+  - eapply CapFlex.cap_flex_future_weak; eauto.
+  - eapply CapFlex.cap_flex_wf; eauto.
+  - eapply CapFlex.cap_flex_closed_timemap; eauto.
+  - eapply CapFlex.cap_flex_closed; eauto.
 Qed.
 
 Lemma sim_thread_consistent
@@ -899,22 +922,30 @@ Lemma sim_thread_consistent
 Proof.
   hexploit consistent_promise_consistent; eauto. s. i.
   generalize SIM. intro X.
-  ii. ss.
-  exploit Memory.cap_exists; try exact MEM_TGT. i. des.
-  exploit cap_property; try exact CAP; eauto. i. des.
-  exploit cap_property; try exact CAP0; eauto. i. des.
-  exploit sim_memory_cap; try exact MEMORY; eauto. i. des.
+  red in X. punfold X. red in X. des. clear FUTURE.
+  exploit CAP; eauto. i. des.
+  exploit CapFlex.cap_flex_exists; try exact MEM_TGT; eauto. i. des.
+  exploit CapFlex.cap_flex_exists; try exact MEM_SRC; eauto. i. des.
+  exploit CAP0; eauto. i. des. inv SIM0; [|done].
+  assert (SIM0: sim_thread_past sim_terminal true w3 st_src lc_src sc_src mem0 st_tgt lc_tgt sc_tgt mem2) by auto.
+  exploit cap_flex_property; try exact CAP1; eauto. i. des.
+  exploit cap_flex_property; try exact CAP2; eauto. i. des.
+  eapply CapFlex.consistent_thread_consistent; eauto.
+  eapply CapFlex.thread_consistent_consistent in CONSISTENT; eauto.
   exploit CONSISTENT; eauto. s. i. des.
-  - left. inv FAILURE. des.
-    exploit sim_thread_future_false_true; try exact SIM; eauto. i.
-    exploit sim_thread_plus_step; try exact STEPS; try exact FAILURE; try exact x2; eauto; try refl.
+  - left. inv FAILURE. des. s.
+    assert (mem1 = mem0).
+    { eapply CapFlex.cap_flex_inj; eauto. } subst.
+    exploit sim_thread_plus_step; try exact STEPS; try exact FAILURE; eauto; try refl.
     { inv STEP_FAILURE; inv STEP; ss. inv LOCAL; ss; inv LOCAL0; ss. }
-    i. des; ss.
-  - hexploit Local.bot_promise_consistent; eauto. i.
-    exploit sim_thread_future_false_true; try exact SIM; eauto. i.
+    i. ss. des; ss.
+  - ii. ss.
+    assert (mem1 = mem0).
+    { eapply CapFlex.cap_flex_inj; eauto. } subst.
+    hexploit Local.bot_promise_consistent; eauto. i.
     exploit sim_thread_rtc_step; try apply STEPS; try exact x1; eauto; try refl.
     i. des; eauto.
-    destruct e2. ss. punfold SIM0. red in SIM0. des.
+    destruct e2. ss. punfold SIM1. red in SIM1. des.
     exploit FUTURE1; eauto; ss. i. des.
     exploit PROMISES0; eauto. i. des.
     + left. unfold Thread.steps_failure in *. des.
