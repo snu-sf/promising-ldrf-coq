@@ -45,7 +45,7 @@ Module UndefCertify.
   Definition certified (c: Configuration.t): Prop. Admitted.
 
   Lemma step_certified c0 c1 e tid
-        (STEP: Configuration.step e tid c0 c1)        
+        (STEP: Configuration.step e tid c0 c1)
         (CERTIFIED: certified c0)
         (WF: Configuration.wf c0)
     :
@@ -53,7 +53,7 @@ Module UndefCertify.
   Admitted.
 
   Lemma rtc_step_certified c0 c1
-        (STEPS: rtc Configuration.tau_step c0 c1)        
+        (STEPS: rtc Configuration.tau_step c0 c1)
         (CERTIFIED: certified c0)
         (WF: Configuration.wf c0)
     :
@@ -64,7 +64,7 @@ Module UndefCertify.
     { eapply step_certified; eauto. }
     { eapply Configuration.step_future; eauto. }
   Qed.
-  
+
   Lemma certified_init s
     :
       certified (Configuration.init s).
@@ -96,7 +96,7 @@ Module UndefCertify.
   Proof.
     ii. eapply Memory.cap_inv in GET; eauto. des; ss.
   Admitted.
-  
+
   Lemma step_unchanged c0 c1 tid e
         (CERTIFIED: certified c0)
         (WF: Configuration.wf c0)
@@ -335,8 +335,8 @@ Module CapFlex.
       Thread.consistent (Thread.mk lang st lc sc mem).
   Proof.
   Admitted.
-End CapFlex.      
-  
+End CapFlex.
+
 
 Section WORLD.
 
@@ -478,19 +478,36 @@ Section SimulationThread.
              (b0: bool) (w0: world)
              (st1_src:(Language.state lang_src)) (lc1_src:Local.t) (sc0_src:TimeMap.t) (mem0_src:Memory.t)
              (st1_tgt:(Language.state lang_tgt)) (lc1_tgt:Local.t) (sc0_tgt:TimeMap.t) (mem0_tgt:Memory.t): Prop :=
-    (<<TERMINAL:
-       forall (TERMINAL_TGT: (Language.is_terminal lang_tgt) st1_tgt),
-         (<<FAILURE: Thread.steps_failure (Thread.mk _ st1_src lc1_src sc0_src mem0_src)>>) \/
-         exists st2_src lc2_src sc2_src mem2_src w2,
-           (<<STEPS: rtc (@Thread.tau_step _)
-                         (Thread.mk _ st1_src lc1_src sc0_src mem0_src)
-                         (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>>) /\
-           (<<SC: sim_timemap w2 sc2_src sc0_tgt>>) /\
-           (<<MEMORY: sim_memory b0 w2 mem2_src mem0_tgt>>) /\
-           (<<TERMINAL_SRC: (Language.is_terminal lang_src) st2_src>>) /\
-           (<<LOCAL: sim_local w2 lc2_src lc1_tgt>>) /\
-           (<<TERMINAL: sim_terminal st2_src st1_tgt>>) /\
-           (<<WORLD: world_le w0 w2>>)>>) /\
+    (<<TERMINAL: forall b1 w1 sc1_src mem1_src
+                        sc1_tgt mem1_tgt
+                        (SC: sim_timemap w1 sc1_src sc1_tgt)
+                        (MEMORY: sim_memory b1 w1 mem1_src mem1_tgt)
+                        (WF_SRC: Local.wf lc1_src mem1_src)
+                        (WF_TGT: Local.wf lc1_tgt mem1_tgt)
+                        (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
+                        (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
+                        (MEM_SRC: Memory.closed mem1_src)
+                        (MEM_TGT: Memory.closed mem1_tgt)
+                        (CONS_TGT: Local.promise_consistent lc1_tgt)
+                        (FUTURE: sim_memory_future
+                                   b0 b1
+                                   lc1_src.(Local.promises) lc1_tgt.(Local.promises)
+                                                                      mem0_src mem1_src mem0_tgt mem1_tgt
+                                                                      sc0_src sc1_src sc0_tgt sc1_tgt
+                                                                      w0 w1)
+                        (UNCHANGED: UndefCertify.unchanged lc1_src.(Local.promises) mem0_src mem1_src),
+        forall (TERMINAL_TGT: (Language.is_terminal lang_tgt) st1_tgt),
+          (<<FAILURE: Thread.steps_failure (Thread.mk _ st1_src lc1_src sc1_src mem1_src)>>) \/
+          exists st2_src lc2_src sc2_src mem2_src w2,
+            (<<STEPS: rtc (@Thread.tau_step _)
+                          (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
+                          (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>>) /\
+            (<<SC: sim_timemap w2 sc2_src sc1_tgt>>) /\
+            (<<MEMORY: sim_memory b1 w2 mem2_src mem1_tgt>>) /\
+            (<<TERMINAL_SRC: (Language.is_terminal lang_src) st2_src>>) /\
+            (<<LOCAL: sim_local w2 lc2_src lc1_tgt>>) /\
+            (<<TERMINAL: sim_terminal st2_src st1_tgt>>) /\
+            (<<WORLD: world_le w1 w2>>)>>) /\
     (<<PROMISES:
        forall (PROMISES_TGT: (Local.promises lc1_tgt) = Memory.bot),
          (<<FAILURE: Thread.steps_failure (Thread.mk _ st1_src lc1_src sc0_src mem0_src)>>) \/
@@ -891,7 +908,6 @@ Lemma sim_thread_consistent
 Proof.
   hexploit consistent_promise_consistent; eauto. s. i.
   generalize SIM. intro X.
-  punfold X. exploit X; eauto; ss; splits; try refl. i. des.
   ii. ss.
   exploit Memory.cap_exists; try exact MEM_TGT. i. des.
   exploit cap_property; try exact CAP; eauto. i. des.
@@ -901,23 +917,19 @@ Proof.
   - left. inv FAILURE. des.
     exploit sim_thread_future_false_true; try exact SIM; eauto. i.
     exploit sim_thread_plus_step; try exact STEPS; try exact FAILURE; try exact x2; eauto; try refl.
-    { inv STEP_FAILURE; inv STEP0; ss. inv LOCAL; ss; inv LOCAL0; ss. }
+    { inv STEP_FAILURE; inv STEP; ss. inv LOCAL; ss; inv LOCAL0; ss. }
     i. des; ss.
   - hexploit Local.bot_promise_consistent; eauto. i.
     exploit sim_thread_future_false_true; try exact SIM; eauto. i.
     exploit sim_thread_rtc_step; try apply STEPS; try exact x1; eauto; try refl.
     i. des; eauto.
-    destruct e2. ss.
-    punfold SIM0. exploit SIM0; eauto; ss. i. des.
-    exploit PROMISES1; eauto. i. des.
+    destruct e2. ss. punfold SIM0. red in SIM0. des.
+    exploit PROMISES0; eauto. i. des.
     + left. unfold Thread.steps_failure in *. des.
       esplits; [|eauto|eauto]. etrans; eauto.
     + right. eexists (Thread.mk _ _ _ _ _). splits; [|eauto].
       etrans; eauto.
 Qed.
-
-
-
 
 Section Simulation.
   Definition SIM :=
@@ -986,7 +998,7 @@ Lemma sim_adequacy
       ths_tgt sc_tgt mem_tgt w
       (WF_SRC: Configuration.wf (Configuration.mk ths_src sc_src mem_src))
       (WF_TGT: Configuration.wf (Configuration.mk ths_tgt sc_tgt mem_tgt))
-      (CERTIFIED: UndefCertify.certified (Configuration.mk ths_src sc_src mem_src))      
+      (CERTIFIED: UndefCertify.certified (Configuration.mk ths_src sc_src mem_src))
       (SC: sim_timemap w sc_src sc_tgt)
       (MEMORY: sim_memory false w mem_src mem_tgt)
       (SIM: sim w ths_src sc_src mem_src ths_tgt sc_tgt mem_tgt):
@@ -1214,16 +1226,15 @@ Proof.
     exploit (IN a); eauto. i. des.
     exploit TERMINAL_TGT; eauto. i. des.
     hexploit Local.terminal_promise_consistent; eauto. i.
-    red in x2. des. punfold SIM0.
-    exploit SIM0; try exact x; try exact x0; try exact SC; try exact SC0; eauto.
+    red in x2. des. punfold SIM0. red in SIM0. des.
+    exploit TERMINAL; try exact x; try exact x0; try exact SC; try exact SC0; eauto.
     { ss. splits; eauto using Memory.future_future_weak.
       { etrans; eauto. eapply Memory.future_future_weak; eauto. }
       { etrans; eauto. eapply Memory.future_future_weak; eauto. }
       { etrans; eauto. }
     }
-    { etrans; eauto. }    
+    { etrans; eauto. }
     i. des.
-    exploit TERMINAL; eauto. i. des.
     + (* failure *)
       left. unfold Thread.steps_failure in FAILURE. des.
       exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
@@ -1244,7 +1255,7 @@ Proof.
       { assert (NEQ: tid <> a).
         { inv NODUP. ii. clarify. }
         rewrite IdentMap.gso in FIND; auto.
-        transitivity mem1_src. 
+        transitivity mem1_src.
         { eapply UNCHANGED0; eauto. }
         { eapply UNCHANGED1; eauto. }
       }
@@ -1291,7 +1302,7 @@ Proof.
       esplits; eauto. rewrite <- EVENT_FAILURE. econs; eauto. destruct e; ss.
 
     + assert (OPTSTEP: Configuration.opt_step
-                         (ThreadEvent.get_machine_event e0) tid_tgt  
+                         (ThreadEvent.get_machine_event e0) tid_tgt
                          (Configuration.mk ths_src sc1_src mem1_src)
                          (Configuration.mk (IdentMap.add tid_tgt (existT _ lang_src st3_src, lc3_src) ths_src) sc3_src mem3_src)).
       { inv STEP0.
