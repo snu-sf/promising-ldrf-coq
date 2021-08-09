@@ -478,72 +478,60 @@ Section SimulationThread.
              (b0: bool) (w0: world)
              (st1_src:(Language.state lang_src)) (lc1_src:Local.t) (sc0_src:TimeMap.t) (mem0_src:Memory.t)
              (st1_tgt:(Language.state lang_tgt)) (lc1_tgt:Local.t) (sc0_tgt:TimeMap.t) (mem0_tgt:Memory.t): Prop :=
-    (<<TERMINAL: forall b1 w1 sc1_src mem1_src
-                        sc1_tgt mem1_tgt
-                        (SC: sim_timemap w1 sc1_src sc1_tgt)
-                        (MEMORY: sim_memory b1 w1 mem1_src mem1_tgt)
-                        (WF_SRC: Local.wf lc1_src mem1_src)
-                        (WF_TGT: Local.wf lc1_tgt mem1_tgt)
-                        (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
-                        (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
-                        (MEM_SRC: Memory.closed mem1_src)
-                        (MEM_TGT: Memory.closed mem1_tgt)
-                        (CONS_TGT: Local.promise_consistent lc1_tgt)
-                        (FUTURE: sim_memory_future
-                                   b0 b1
-                                   lc1_src.(Local.promises) lc1_tgt.(Local.promises)
-                                                                      mem0_src mem1_src mem0_tgt mem1_tgt
-                                                                      sc0_src sc1_src sc0_tgt sc1_tgt
-                                                                      w0 w1)
-                        (UNCHANGED: UndefCertify.unchanged lc1_src.(Local.promises) mem0_src mem1_src),
-        forall (TERMINAL_TGT: (Language.is_terminal lang_tgt) st1_tgt),
-          (<<FAILURE: Thread.steps_failure (Thread.mk _ st1_src lc1_src sc1_src mem1_src)>>) \/
-          exists st2_src lc2_src sc2_src mem2_src w2,
-            (<<STEPS: rtc (@Thread.tau_step _)
-                          (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
-                          (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>>) /\
-            (<<SC: sim_timemap w2 sc2_src sc1_tgt>>) /\
-            (<<MEMORY: sim_memory b1 w2 mem2_src mem1_tgt>>) /\
-            (<<TERMINAL_SRC: (Language.is_terminal lang_src) st2_src>>) /\
-            (<<LOCAL: sim_local w2 lc2_src lc1_tgt>>) /\
-            (<<TERMINAL: sim_terminal st2_src st1_tgt>>) /\
-            (<<WORLD: world_le w1 w2>>)>>) /\
-    (<<PROMISES:
-       forall (PROMISES_TGT: (Local.promises lc1_tgt) = Memory.bot),
-         (<<FAILURE: Thread.steps_failure (Thread.mk _ st1_src lc1_src sc0_src mem0_src)>>) \/
-         exists st2_src lc2_src sc2_src mem2_src,
-           (<<STEPS: rtc (@Thread.tau_step _)
-                         (Thread.mk _ st1_src lc1_src sc0_src mem0_src)
-                         (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>>) /\
-           (<<PROMISES_SRC: (Local.promises lc2_src) = Memory.bot>>)>>) /\
-    (<<STEP: forall b1 w1 sc1_src mem1_src
-                    sc1_tgt mem1_tgt
-                    (SC: sim_timemap w1 sc1_src sc1_tgt)
-                    (MEMORY: sim_memory b1 w1 mem1_src mem1_tgt)
-                    (WF_SRC: Local.wf lc1_src mem1_src)
-                    (WF_TGT: Local.wf lc1_tgt mem1_tgt)
-                    (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
-                    (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
-                    (MEM_SRC: Memory.closed mem1_src)
-                    (MEM_TGT: Memory.closed mem1_tgt)
-                    (CONS_TGT: Local.promise_consistent lc1_tgt)
-                    (FUTURE: sim_memory_future
-                               b0 b1
-                               lc1_src.(Local.promises) lc1_tgt.(Local.promises)
-                                                                  mem0_src mem1_src mem0_tgt mem1_tgt
-                                                                  sc0_src sc1_src sc0_tgt sc1_tgt
-                                                                  w0 w1)
-                    (UNCHANGED: UndefCertify.unchanged lc1_src.(Local.promises) mem0_src mem1_src),
+    (<<FUTURE: forall b1 w1 sc1_src mem1_src
+                      sc1_tgt mem1_tgt
+                      (SC: sim_timemap w1 sc1_src sc1_tgt)
+                      (MEMORY: sim_memory b1 w1 mem1_src mem1_tgt)
+                      (WF_SRC: Local.wf lc1_src mem1_src)
+                      (WF_TGT: Local.wf lc1_tgt mem1_tgt)
+                      (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
+                      (SC_TGT: Memory.closed_timemap sc1_tgt mem1_tgt)
+                      (MEM_SRC: Memory.closed mem1_src)
+                      (MEM_TGT: Memory.closed mem1_tgt)
+                      (CONS_TGT: Local.promise_consistent lc1_tgt)
+                      (FUTURE: sim_memory_future
+                                 b0 b1
+                                 (lc1_src.(Local.promises)) (lc1_tgt.(Local.promises))
+                                 mem0_src mem1_src mem0_tgt mem1_tgt
+                                 sc0_src sc1_src sc0_tgt sc1_tgt
+                                 w0 w1)
+                      (UNCHANGED: UndefCertify.unchanged lc1_src.(Local.promises) mem0_src mem1_src),
+        (<<TERMINAL:
+           forall
+             (BOOL: b0 = false /\ b1 = false)
+             (TERMINAL_TGT: (Language.is_terminal lang_tgt) st1_tgt),
+             (<<FAILURE: Thread.steps_failure (Thread.mk _ st1_src lc1_src sc1_src mem1_src)>>) \/
+             exists st2_src lc2_src sc2_src mem2_src w2,
+               (<<STEPS: rtc (@Thread.tau_step _)
+                             (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
+                             (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>>) /\
+               (<<SC: sim_timemap w2 sc2_src sc1_tgt>>) /\
+               (<<MEMORY: sim_memory b1 w2 mem2_src mem1_tgt>>) /\
+               (<<TERMINAL_SRC: (Language.is_terminal lang_src) st2_src>>) /\
+               (<<LOCAL: sim_local w2 lc2_src lc1_tgt>>) /\
+               (<<TERMINAL: sim_terminal st2_src st1_tgt>>) /\
+               (<<WORLD: world_le w1 w2>>)>>) /\
+        (<<PROMISES:
+           forall (BOOL: b0 = true /\ b1 = true)
+                  (PROMISES_TGT: (Local.promises lc1_tgt) = Memory.bot),
+             (<<FAILURE: Thread.steps_failure (Thread.mk _ st1_src lc1_src sc0_src mem0_src)>>) \/
+             exists st2_src lc2_src sc2_src mem2_src,
+               (<<STEPS: rtc (@Thread.tau_step _)
+                             (Thread.mk _ st1_src lc1_src sc0_src mem0_src)
+                             (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>>) /\
+               (<<PROMISES_SRC: (Local.promises lc2_src) = Memory.bot>>)>>) /\
         (<<STEP: _sim_thread_step _ _ (@sim_thread lang_src lang_tgt sim_terminal)
                                   b1 w1
                                   st1_src lc1_src sc1_src mem1_src
-                                  st1_tgt lc1_tgt sc1_tgt mem1_tgt>>)>>)
+                                  st1_tgt lc1_tgt sc1_tgt mem1_tgt>>)>>) /\
+    (<<CERTIFICATION: True>>)
   .
 
   Lemma _sim_thread_mon: monotone13 _sim_thread.
   Proof.
-    ii. red in IN. des. red. splits; auto. ii.
-    exploit STEP; try apply SC; eauto. i. des; eauto.
+    ii. red in IN. des. red. splits; auto.
+    ii. exploit FUTURE; eauto. i. des. splits; auto.
+    ii. exploit STEP; eauto. i. des; eauto.
     right. esplits; eauto.
   Qed.
   Hint Resolve _sim_thread_mon: paco.
@@ -557,7 +545,8 @@ Section SimulationThread.
     sim_thread sim_terminal1 <10= sim_thread sim_terminal2.
   Proof.
     pcofix CIH. i. punfold PR. pfold.
-    red in PR. red. des. splits; auto.
+    red in PR. red. des. splits; auto. ii.
+    exploit FUTURE; eauto. i. des. splits; auto.
     - i. exploit TERMINAL; eauto. i. des; eauto.
       right. esplits; eauto.
     - ii. exploit STEP; eauto. i. des; eauto.
@@ -632,6 +621,7 @@ Proof.
   hexploit step_promise_consistent; eauto. s. i. red in SIM. destruct b; ss.
   { punfold SIM. red in SIM. des.
     exploit Thread.step_future; eauto. s. i. des.
+    exploit FUTURE; eauto; ss. i. des.
     exploit STEP0; eauto; ss.
     i. des; eauto.
     inv SIM; [|done]. right.
@@ -641,6 +631,7 @@ Proof.
   }
   { des. punfold SIM0. red in SIM0. des.
     exploit Thread.step_future; eauto. s. i. des.
+    exploit FUTURE; eauto; ss. i. des.
     exploit STEP0; eauto; ss.
     i. des; eauto.
     inv SIM; [|done]. right.
@@ -924,6 +915,7 @@ Proof.
     exploit sim_thread_rtc_step; try apply STEPS; try exact x1; eauto; try refl.
     i. des; eauto.
     destruct e2. ss. punfold SIM0. red in SIM0. des.
+    exploit FUTURE1; eauto; ss. i. des.
     exploit PROMISES0; eauto. i. des.
     + left. unfold Thread.steps_failure in *. des.
       esplits; [|eauto|eauto]. etrans; eauto.
@@ -1227,13 +1219,15 @@ Proof.
     exploit TERMINAL_TGT; eauto. i. des.
     hexploit Local.terminal_promise_consistent; eauto. i.
     red in x2. des. punfold SIM0. red in SIM0. des.
-    exploit TERMINAL; try exact x; try exact x0; try exact SC; try exact SC0; eauto.
+    exploit FUTURE; eauto; ss.
     { ss. splits; eauto using Memory.future_future_weak.
       { etrans; eauto. eapply Memory.future_future_weak; eauto. }
       { etrans; eauto. eapply Memory.future_future_weak; eauto. }
       { etrans; eauto. }
     }
     { etrans; eauto. }
+    i. des.
+    exploit TERMINAL; eauto. i. des.
     i. des.
     + (* failure *)
       left. unfold Thread.steps_failure in FAILURE. des.
@@ -1283,6 +1277,7 @@ Proof.
     { remember (Threads.tids ths_src) as tids eqn:TIDS_SRC.
       exploit tids_find; [exact TIDS_SRC|exact TIDS_TGT|..]. i. des.
       exploit x1; eauto. i. des. rewrite FIND_SRC in x. inv x. }
+    dup WF_SRC. dup WF_TGT.
     inv WF_SRC. inv WF_TGT. inv WF. inv WF0. ss.
     exploit SIM0; eauto. i. des.
     exploit sim_thread_future; eauto using Memory.future_future_weak. i.
@@ -1300,7 +1295,6 @@ Proof.
       unfold Configuration.steps_failure.
       destruct e3. ss.
       esplits; eauto. rewrite <- EVENT_FAILURE. econs; eauto. destruct e; ss.
-
     + assert (OPTSTEP: Configuration.opt_step
                          (ThreadEvent.get_machine_event e0) tid_tgt
                          (Configuration.mk ths_src sc1_src mem1_src)
@@ -1319,13 +1313,10 @@ Proof.
         }
       }
       exploit Configuration.opt_step_future; eauto.
-      { econs; eauto; ss. }
       i. ss. des.
       exploit Configuration.step_future; eauto.
-      { econs; eauto; ss. }
       i. ss. des.
       exploit UndefCertify.opt_step_unchanged; eauto.
-      { econs; eauto; ss. }
       i. des; auto.
       right. esplits; eauto. right. eapply CIH; ss.
       { rewrite Threads.tids_add. rewrite Threads.tids_add.
