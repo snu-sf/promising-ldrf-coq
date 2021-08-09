@@ -528,7 +528,6 @@ Section SimulationThread.
                       (UNCHANGED: UndefCertify.unchanged lc1_src.(Local.promises) mem0_src mem1_src),
         (<<TERMINAL:
            forall
-             (BOOL: b0 = false /\ b1 = false)
              (TERMINAL_TGT: (Language.is_terminal lang_tgt) st1_tgt),
              (<<FAILURE: Thread.steps_failure (Thread.mk _ st1_src lc1_src sc1_src mem1_src)>>) \/
              exists st2_src lc2_src sc2_src mem2_src w2,
@@ -555,14 +554,14 @@ Section SimulationThread.
                                   st1_src lc1_src sc1_src mem1_src
                                   st1_tgt lc1_tgt sc1_tgt mem1_tgt>>)>>) /\
     (<<CAP: forall (BOOL: b0 = false)
-                             (MEMORY: sim_memory b0 w0 mem0_src mem0_tgt)
-                             (WF_SRC: Local.wf lc1_src mem0_src)
-                             (WF_TGT: Local.wf lc1_tgt mem0_tgt)
-                             (SC_SRC: Memory.closed_timemap sc0_src mem0_src)
-                             (SC_TGT: Memory.closed_timemap sc0_tgt mem0_tgt)
-                             (MEM_SRC: Memory.closed mem0_src)
-                             (MEM_TGT: Memory.closed mem0_tgt)
-                             (CONS_TGT: Local.promise_consistent lc1_tgt),
+                   (MEMORY: sim_memory b0 w0 mem0_src mem0_tgt)
+                   (WF_SRC: Local.wf lc1_src mem0_src)
+                   (WF_TGT: Local.wf lc1_tgt mem0_tgt)
+                   (SC_SRC: Memory.closed_timemap sc0_src mem0_src)
+                   (SC_TGT: Memory.closed_timemap sc0_tgt mem0_tgt)
+                   (MEM_SRC: Memory.closed mem0_src)
+                   (MEM_TGT: Memory.closed mem0_tgt)
+                   (CONS_TGT: Local.promise_consistent lc1_tgt),
         exists tm_src tm_tgt,
           (<<TMSRC: forall loc, Time.lt (Memory.max_ts loc mem0_src) (tm_src loc)>>) /\
           (<<TMTGT: forall loc, Time.lt (Memory.max_ts loc mem0_tgt) (tm_tgt loc)>>) /\

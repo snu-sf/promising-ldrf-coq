@@ -353,193 +353,216 @@ Proof.
   eapply wrespect13_uclo; auto.
   econs; auto. i. destruct PR.
   - (* ret *)
-    ii.
-    splits; s; ii.
-    { right. inv TERMINAL_TGT. ss. esplits; eauto; ss.
-      - econs; eauto.
-      - eapply sim_future_memory_sc_future in FUTURE; eauto.
-        2:{ typeclasses eauto. (* why? *) }
-        des. eapply sim_local_world_mon; eauto.
-      - econs; eauto.
-      - refl.
-    }
-    { right. subst. esplits; eauto. eapply sim_local_memory_bot; eauto. }
-    inv STEP_TGT; try by inv STEP; inv STATE.
-    inv STEP; ss.
-    exploit sim_local_promise; try apply MEMORY; eauto.
-    { eapply sim_future_memory_sc_future in FUTURE; eauto.
-      2:{ typeclasses eauto. (* why? *) }
-      des. eapply sim_local_world_mon; eauto. }
-    i. des.
-    right. esplits; try apply MEM2.
-    + ss.
-    + eauto.
-    + econs 2. econs 1. econs; eauto.
-    + eauto.
-    + eapply sim_timemap_world_mon; eauto.
-    + eapply rclo13_clo_base. eapply ctx_ret; auto.
-    + auto.
-  - (* bind *)
-    ii. ss. eapply GF in SIM1.
-    exploit SIM1; try apply SC; eauto. i. des.
-    splits; s; ii.
-    { inv TERMINAL_TGT. ides itr1.
-      2: { eapply f_equal with (f:=observe) in H. ss. }
-      2: { eapply f_equal with (f:=observe) in H. ss. }
-      rewrite bind_ret_l in H.
-      exploit TERMINAL; try by econs. i. des.
-      - left.
-        unfold Thread.steps_failure in *. des.
-        destruct e2, e3.
-        eapply rtc_internal_step_bind in STEPS.
-        eapply step_bind in STEP_FAILURE.
-        esplits; eauto.
-      - inv TERMINAL_SRC.
-        exploit Thread.rtc_tau_step_future; eauto. s. i. des.
-        inv TERMINAL0. ss.
-        assert (x0 = r1).
-        { eapply f_equal with (f:=observe) in SRC. ss. clarify. }
-        assert (r0 = r2).
-        { eapply f_equal with (f:=observe) in TGT. ss. clarify. }
-        subst.
-        exploit SIM2; eauto. i. eapply GF in x0.
-        exploit x0; try apply SC0; eauto.
-        { instantiate (5:=b1). red. destruct b1.
-          { splits; auto. }
-          { splits; try refl. }
-        }
-        { refl. }
-        i. ss. des. exploit TERMINAL0; try by econs.
-        { econs. eauto. }
-        i. des.
-        + left.
-          unfold Thread.steps_failure in *. des.
-          destruct e2.
-          esplits; [|eauto|eauto].
-          etrans; try exact STEPS0.
-          eapply rtc_internal_step_bind in STEPS.
-          rewrite bind_ret_l in STEPS. eauto.
-        + right.
-          esplits; cycle 1; eauto.
-          * rewrite bind_ret_l. eauto.
-          * etrans; eauto.
-          * etrans; [|eauto].
-            eapply rtc_internal_step_bind in STEPS.
-            rewrite bind_ret_l in STEPS. eauto.
-    }
-    { exploit PROMISES; eauto. i. des.
-      - left.
-        unfold Thread.steps_failure in *. des.
-        destruct e2, e3.
-        eapply rtc_internal_step_bind in STEPS.
-        eapply step_bind in STEP_FAILURE.
-        esplits; eauto.
-      - right.
-        destruct lc_tgt, lc2_src. ss. subst.
-        esplits; [|eauto].
-        + eapply rtc_internal_step_bind. apply STEPS.
-        + ss.
-    }
-    hexploit thread_step_deseq; eauto. i. des; clarify.
-    + exploit TERMINAL; try by econs. i. des.
-      * left.
-        unfold Thread.steps_failure in *. des.
-        destruct e2, e3. ss.
-        eapply rtc_internal_step_bind in STEPS.
-        eapply step_bind in STEP_FAILURE.
-        esplits; eauto.
-      * inv TERMINAL_SRC. ss. subst.
-        exploit Thread.rtc_tau_step_future; eauto. s. i. des.
-        inv TERMINAL0. ss. subst.
-        assert (x = r1).
-        { eapply f_equal with (f:=observe) in SRC. ss. clarify. }
-        assert (r0 = r2).
-        { eapply f_equal with (f:=observe) in TGT. ss. clarify. }
-        subst.
-        exploit SIM2; eauto. i. eapply GF in x.
-        exploit x; try apply SC0; eauto.
-        { instantiate (5:=b1). red. destruct b1.
-          { splits; auto. }
-          { splits; try refl. }
-        }
-        { refl. }
-        i. ss. des.
-        exploit STEP0; eauto. i. des.
-        { left.
-          unfold Thread.steps_failure in *. des.
-          destruct e2, e3.
-          eapply rtc_internal_step_bind in STEPS.
-          esplits; try exact STEP_FAILURE; [|eauto].
-          etrans; eauto. rewrite bind_ret_l. eauto. }
-        { right.
-          esplits; cycle 2; eauto.
-          - eapply rclo13_base. auto.
-          - etrans; eauto.
-          - eapply rtc_internal_step_bind in STEPS.
-            etrans; [apply STEPS|eauto].
-            rewrite bind_ret_l. eauto. }
-    + destruct lc3_tgt.
-      exploit STEP; eauto. i. des.
-      * left.
-        unfold Thread.steps_failure in *. des.
-        destruct e2, e3.
-        eapply rtc_internal_step_bind in STEPS.
-        eapply step_bind in STEP_FAILURE.
-        esplits; eauto.
-      * right.
-        destruct lc2_src. destruct lc3_src.
-        esplits; [|M|M| | | | |]; Mskip eauto.
-        { eapply rtc_internal_step_bind. eauto. }
-        { eapply opt_step_bind. eauto. }
-        { eapply rclo13_clo_base. eapply ctx_bind; eauto.
-          eapply _sim_ktree_mon; cycle 1; eauto.
-        }
-    + left. exploit STEP.
-      { right. instantiate (5:=ThreadEvent.failure). econs; eauto.
-        ss. econs; eauto. }
-      i. des; ss.
-      unfold Thread.steps_failure in *. des. destruct e2, e3. esplits; [..|eauto].
-      { eapply rtc_internal_step_bind; eauto. }
-      { eapply step_bind; eauto. }
-  - (* tau iter *)
-    ii.
-    splits; s; ii.
-    { inv TERMINAL_TGT. eapply f_equal with (f:=observe) in H. ss. }
-    { right. subst. esplits; eauto. eapply sim_local_memory_bot; eauto. }
-    right. inv STEP_TGT; ss.
-    + (* promise *)
+    rr. split.
+    { ii. splits; s; ii.
+      { right. inv TERMINAL_TGT. ss. esplits; eauto; ss.
+        - econs; eauto.
+        - eapply sim_future_memory_sc_future in FUTURE; eauto.
+          2:{ typeclasses eauto. (* why? *) }
+          des. eapply sim_local_world_mon; eauto.
+        - econs; eauto.
+        - refl.
+      }
+      { right. subst. esplits; eauto. eapply sim_local_memory_bot; eauto. }
+      inv STEP_TGT; try by inv STEP; inv STATE.
       inv STEP; ss.
       exploit sim_local_promise; try apply MEMORY; eauto.
       { eapply sim_future_memory_sc_future in FUTURE; eauto.
         2:{ typeclasses eauto. (* why? *) }
         des. eapply sim_local_world_mon; eauto. }
       i. des.
-      esplits; try apply MEM2; eauto; ss.
-      { econs 2. econs 1. econs; eauto. }
-      { eauto. }
-      { eapply sim_timemap_world_mon; eauto. }
-      { eapply rclo13_clo_base. eapply ctx_tau_iter; eauto.
-        eapply _sim_ktree_mon; cycle 1; eauto.
+      right. esplits; try apply MEM2.
+      + ss.
+      + eauto.
+      + econs 2. econs 1. econs; eauto.
+      + eauto.
+      + eapply sim_timemap_world_mon; eauto.
+      + eapply rclo13_clo_base. eapply ctx_ret; auto.
+      + auto.
+    }
+    { ii. subst. hexploit sim_cap; eauto.
+      i. des. esplits; eauto.
+      i. hexploit CAP; eauto. i. des. esplits; eauto.
+      eapply rclo13_clo_base. econs; eauto.
+    }
+  - (* bind *)
+    eapply GF in SIM1. red in SIM1. red in SIM1. des.
+    red. red. split.
+    { clear CAP. ii. ss.
+      exploit FUTURE; try apply SC; eauto. i. des.
+      splits; s; ii.
+      { inv TERMINAL_TGT. ides itr1.
+        2: { eapply f_equal with (f:=observe) in H. ss. }
+        2: { eapply f_equal with (f:=observe) in H. ss. }
+        rewrite bind_ret_l in H.
+        exploit TERMINAL; (try by econs); auto. i. des.
+        - left.
+          unfold Thread.steps_failure in *. des.
+          destruct e2, e3.
+          eapply rtc_internal_step_bind in STEPS.
+          eapply step_bind in STEP_FAILURE.
+          esplits; eauto.
+        - inv TERMINAL_SRC.
+          exploit Thread.rtc_tau_step_future; eauto. s. i. des.
+          inv TERMINAL0. ss.
+          assert (x0 = r1).
+          { eapply f_equal with (f:=observe) in SRC. ss. clarify. }
+          assert (r0 = r2).
+          { eapply f_equal with (f:=observe) in TGT. ss. clarify. }
+          subst.
+          exploit SIM2; eauto. i. eapply GF in x0.
+          red in x0. red in x0. des. clear CAP. ss.
+          exploit FUTURE1; try apply SC0; eauto.
+          { instantiate (5:=b1). red. destruct b1.
+            { splits; auto. }
+            { splits; try refl. }
+          }
+          { refl. }
+          i. ss. des. exploit TERMINAL0; try by econs.
+          { econs. eauto. }
+          i. des.
+          + left.
+            unfold Thread.steps_failure in *. des.
+            destruct e2.
+            esplits; [|eauto|eauto].
+            etrans; try exact STEPS0.
+            eapply rtc_internal_step_bind in STEPS.
+            rewrite bind_ret_l in STEPS. eauto.
+          + right.
+            esplits; cycle 1; eauto.
+            * rewrite bind_ret_l. eauto.
+            * etrans; eauto.
+            * etrans; [|eauto].
+              eapply rtc_internal_step_bind in STEPS.
+              rewrite bind_ret_l in STEPS. eauto.
       }
-    + (* tau *)
-      inv STEP. ss. inv LOCAL0; dependent destruction STATE.
-      esplits; try apply MEMORY; eauto; ss.
-      { econs 2. econs 2. econs; [|econs 1]; eauto. econs; eauto. }
-      { rewrite unfold_iter_eq. rewrite unfold_iter_eq.
-        eapply rclo13_clo. eapply ctx_bind; eauto.
+      { exploit PROMISES; eauto. i. des.
+        - left.
+          unfold Thread.steps_failure in *. des.
+          destruct e2, e3.
+          eapply rtc_internal_step_bind in STEPS.
+          eapply step_bind in STEP_FAILURE.
+          esplits; eauto.
+        - right.
+          destruct lc_tgt, lc2_src. ss. subst.
+          esplits; [|eauto].
+          + eapply rtc_internal_step_bind. apply STEPS.
+          + ss.
+      }
+      hexploit thread_step_deseq; eauto. i. des; clarify.
+      + exploit TERMINAL; (try by econs); auto. i. des.
+        * left.
+          unfold Thread.steps_failure in *. des.
+          destruct e2, e3. ss.
+          eapply rtc_internal_step_bind in STEPS.
+          eapply step_bind in STEP_FAILURE.
+          esplits; eauto.
+        * inv TERMINAL_SRC. ss. subst.
+          exploit Thread.rtc_tau_step_future; eauto. s. i. des.
+          inv TERMINAL0. ss. subst.
+          assert (x = r1).
+          { eapply f_equal with (f:=observe) in SRC. ss. clarify. }
+          assert (r0 = r2).
+          { eapply f_equal with (f:=observe) in TGT. ss. clarify. }
+          subst.
+          exploit SIM2; eauto. i. eapply GF in x.
+          red in x. red in x. des. clear CAP.
+          exploit FUTURE1; try apply SC0; eauto.
+          { instantiate (5:=b1). red. destruct b1.
+            { splits; auto. }
+            { splits; try refl. }
+          }
+          { refl. }
+          i. ss. des.
+          exploit STEP0; eauto. i. des.
+          { left.
+            unfold Thread.steps_failure in *. des.
+            destruct e2, e3.
+            eapply rtc_internal_step_bind in STEPS.
+            esplits; try exact STEP_FAILURE; [|eauto].
+            etrans; eauto. rewrite bind_ret_l. eauto. }
+          { right.
+            esplits; cycle 2; eauto.
+            - eapply rclo13_base. auto.
+            - etrans; eauto.
+            - eapply rtc_internal_step_bind in STEPS.
+              etrans; [apply STEPS|eauto].
+              rewrite bind_ret_l. eauto. }
+      + destruct lc3_tgt.
+        exploit STEP; eauto. i. des.
+        * left.
+          unfold Thread.steps_failure in *. des.
+          destruct e2, e3.
+          eapply rtc_internal_step_bind in STEPS.
+          eapply step_bind in STEP_FAILURE.
+          esplits; eauto.
+        * right.
+          destruct lc2_src. destruct lc3_src.
+          esplits; [|M|M| | | | |]; Mskip eauto.
+          { eapply rtc_internal_step_bind. eauto. }
+          { eapply opt_step_bind. eauto. }
+          { eapply rclo13_clo_base. eapply ctx_bind; eauto.
+            eapply _sim_ktree_mon; cycle 1; eauto.
+          }
+      + left. exploit STEP.
+        { right. instantiate (5:=ThreadEvent.failure). econs; eauto.
+          ss. econs; eauto. }
+        i. des; ss.
+        unfold Thread.steps_failure in *. des. destruct e2, e3. esplits; [..|eauto].
+        { eapply rtc_internal_step_bind; eauto. }
+        { eapply step_bind; eauto. }
+    }
+    { ii. exploit CAP; eauto. i. des. esplits; eauto.
+      i. exploit CAP0; eauto. i. des. esplits; eauto.
+      eapply rclo13_clo_base. econs; eauto.
+      eapply _sim_ktree_mon; [|eauto]. auto.
+    }
+  - (* tau iter *)
+    red. red. split.
+    { ii.
+      splits; s; ii.
+      { inv TERMINAL_TGT. eapply f_equal with (f:=observe) in H. ss. }
+      { right. subst. esplits; eauto. eapply sim_local_memory_bot; eauto. }
+      right. inv STEP_TGT; ss.
+      + (* promise *)
+        inv STEP; ss.
+        exploit sim_local_promise; try apply MEMORY; eauto.
         { eapply sim_future_memory_sc_future in FUTURE; eauto.
           2:{ typeclasses eauto. (* why? *) }
-          des. eapply rclo13_base. eapply LE. eapply SIM; eauto.
-          eapply sim_local_world_mon; eauto.
-        }
-        ii. eapply rclo13_clo. inv RET.
-        { eapply ctx_tau_iter; eauto.
+          des. eapply sim_local_world_mon; eauto. }
+        i. des.
+        esplits; try apply MEM2; eauto; ss.
+        { econs 2. econs 1. econs; eauto. }
+        { eauto. }
+        { eapply sim_timemap_world_mon; eauto. }
+        { eapply rclo13_clo_base. eapply ctx_tau_iter; eauto.
           eapply _sim_ktree_mon; cycle 1; eauto.
-          i. eapply rclo13_base. eauto. }
-        { eapply ctx_ret; eauto. }
-      }
-      { refl. }
-  Unshelve. all: try exact ITree.spin.
+        }
+      + (* tau *)
+        inv STEP. ss. inv LOCAL0; dependent destruction STATE.
+        esplits; try apply MEMORY; eauto; ss.
+        { econs 2. econs 2. econs; [|econs 1]; eauto. econs; eauto. }
+        { rewrite unfold_iter_eq. rewrite unfold_iter_eq.
+          eapply rclo13_clo. eapply ctx_bind; eauto.
+          { eapply sim_future_memory_sc_future in FUTURE; eauto.
+            2:{ typeclasses eauto. (* why? *) }
+            des. eapply rclo13_base. eapply LE. eapply SIM; eauto.
+            eapply sim_local_world_mon; eauto.
+          }
+          ii. eapply rclo13_clo. inv RET.
+          { eapply ctx_tau_iter; eauto.
+            eapply _sim_ktree_mon; cycle 1; eauto.
+            i. eapply rclo13_base. eauto. }
+          { eapply ctx_ret; eauto. }
+        }
+        { refl. }
+    }
+    { ii. subst. hexploit sim_cap; eauto.
+      i. des. esplits; eauto.
+      i. hexploit CAP; eauto. i. des. esplits; eauto.
+      eapply rclo13_clo. econs 3; eauto.
+      eapply _sim_ktree_mon; [|eauto]. i. eapply rclo13_base. auto.
+    }
 Qed.
 
 Inductive iter_ctx (sim_thread:SIM_THREAD world): SIM_THREAD world :=

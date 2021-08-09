@@ -27,6 +27,7 @@ Require Import MemoryMerge.
 Require Import FulfillStep.
 Require Import PromiseConsistent.
 
+Require Import gSimulation.
 Require Import Program.
 
 
@@ -55,23 +56,28 @@ Lemma sim_local_memory_bot:
     (Local.promises lc_src) = Memory.bot.
 Admitted.
 
-Lemma sim_memory_cap: forall
-    w1
-    mem1_src mem2_src
-    mem1_tgt mem2_tgt
-    sc1_src sc1_tgt
-    (MEM1: sim_memory false w1 mem1_src mem1_tgt)
-    (CAP_SRC: Memory.cap mem1_src mem2_src)
-    (CAP_TGT: Memory.cap mem1_tgt mem2_tgt)
-    (MEM1_SRC: Memory.closed mem1_src)
-    (MEM1_TGT: Memory.closed mem1_tgt)
-    (CLOSED_SRC: Memory.closed_timemap sc1_src mem1_src)
-    (CLOSED_TGT: Memory.closed_timemap sc1_tgt mem1_tgt),
-    exists w2,
-      (<<MEM2: sim_memory true w2 mem2_src mem2_tgt>>) /\
-      (<<TIMEMAP: sim_timemap w2 sc1_src sc1_tgt>>) /\
-      (<<WORLD: world_le w1 w2>>)
-.
+Lemma sim_cap mem0_src mem0_tgt sc0_src sc0_tgt lc1_src lc1_tgt w0
+      (MEMORY: sim_memory false w0 mem0_src mem0_tgt)
+      (LOCAL: sim_local w0 lc1_src lc1_tgt)
+      (WF_SRC: Local.wf lc1_src mem0_src)
+      (WF_TGT: Local.wf lc1_tgt mem0_tgt)
+      (SC_SRC: Memory.closed_timemap sc0_src mem0_src)
+      (SC_TGT: Memory.closed_timemap sc0_tgt mem0_tgt)
+      (MEM_SRC: Memory.closed mem0_src)
+      (MEM_TGT: Memory.closed mem0_tgt)
+      (CONS_TGT: Local.promise_consistent lc1_tgt)
+  :
+    exists tm_src tm_tgt,
+      (<<TMSRC: forall loc, Time.lt (Memory.max_ts loc mem0_src) (tm_src loc)>>) /\
+      (<<TMTGT: forall loc, Time.lt (Memory.max_ts loc mem0_tgt) (tm_tgt loc)>>) /\
+      (<<CAP: forall cap_src cap_tgt
+                     (CAPSRC: CapFlex.cap_flex mem0_src cap_src tm_src)
+                     (CAPTGT: CapFlex.cap_flex mem0_tgt cap_tgt tm_tgt),
+          exists w3,
+            (<<SC3: sim_timemap w3 sc0_src sc0_tgt>>) /\
+            (<<MEMORY3: sim_memory true w3 cap_src cap_tgt>>) /\
+            (<<LOCAL: sim_local w3 lc1_src lc1_tgt>>) /\
+            (<<WORLD: world_le w0 w3>>)>>).
 Admitted.
 
 Lemma sim_local_promise
