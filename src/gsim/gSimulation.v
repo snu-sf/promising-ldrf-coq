@@ -29,351 +29,24 @@ Require Import PromiseConsistent.
 
 Require Import Program.
 
+Require Import gSimAux.
 
 Set Implicit Arguments.
 
-
-Lemma memory_cap_future
-      mem0 mem1
-      (CAP: Memory.cap mem0 mem1)
-  :
-    Memory.future_weak mem0 mem1.
-Admitted.
-
-(* TODO: use FutureCertify to prove it *)
-Module UndefCertify.
-  Definition certified (c: Configuration.t): Prop. Admitted.
-
-  Lemma step_certified c0 c1 e tid
-        (STEP: Configuration.step e tid c0 c1)
-        (CERTIFIED: certified c0)
-        (WF: Configuration.wf c0)
-    :
-      certified c1.
-  Admitted.
-
-  Lemma rtc_step_certified c0 c1
-        (STEPS: rtc Configuration.tau_step c0 c1)
-        (CERTIFIED: certified c0)
-        (WF: Configuration.wf c0)
-    :
-      certified c1.
-  Proof.
-    revert CERTIFIED WF. induction STEPS; auto.
-    i. inv H. eapply IHSTEPS; auto.
-    { eapply step_certified; eauto. }
-    { eapply Configuration.step_future; eauto. }
-  Qed.
-
-  Lemma certified_init s
-    :
-      certified (Configuration.init s).
-  Admitted.
-
-  Definition unchanged (prom: Memory.t) (mem0 mem1: Memory.t): Prop :=
-    forall loc to from
-           (UNDEF: Memory.get loc to prom = Some (from, Message.undef)),
-    forall ts1 ts0 msg
-           (GET: Memory.get loc ts1 mem1 = Some (ts0, msg))
-           (CONCRETE: msg <> Message.reserve),
-      Memory.get loc ts1 mem0 = Some (ts0, msg).
-
-  Program Instance unchanged_PreOrder prom: PreOrder (unchanged prom).
-  Next Obligation.
-  Proof.
-    ii. eauto.
-  Qed.
-  Next Obligation.
-  Proof.
-    ii. eauto.
-  Qed.
-
-  Lemma cap_unchanged mem0 mem1 prom
-        (CAP: Memory.cap mem0 mem1)
-        (* (CLOSED: Memory.closed mem0) *)
-    :
-      unchanged prom mem0 mem1.
-  Proof.
-    ii. eapply Memory.cap_inv in GET; eauto. des; ss.
-  Admitted.
-
-  Lemma step_unchanged c0 c1 tid e
-        (CERTIFIED: certified c0)
-        (WF: Configuration.wf c0)
-        (STEP: Configuration.step e tid c0 c1)
-    :
-      ((<<UNCHANGED: forall tid' st lc
-                            (TID: tid' <> tid)
-                            (TID: IdentMap.find tid' c0.(Configuration.threads) = Some (st, lc)),
-           UndefCertify.unchanged lc.(Local.promises) c0.(Configuration.memory) c1.(Configuration.memory)>>) \/
-       (<<FAILURE: Configuration.steps_failure c0>>)).
-  Admitted.
-
-  Lemma opt_step_unchanged c0 c1 tid e
-        (CERTIFIED: certified c0)
-        (WF: Configuration.wf c0)
-        (STEP: Configuration.opt_step e tid c0 c1)
-    :
-      ((<<UNCHANGED: forall tid' st lc
-                            (TID: tid' <> tid)
-                            (TID: IdentMap.find tid' c0.(Configuration.threads) = Some (st, lc)),
-           UndefCertify.unchanged lc.(Local.promises) c0.(Configuration.memory) c1.(Configuration.memory)>>) \/
-       (<<FAILURE: Configuration.steps_failure c0>>)).
-  Proof.
-    inv STEP.
-    { left. red. i. refl. }
-    { eapply step_unchanged; eauto. }
-  Qed.
-End UndefCertify.
-
-
-Module CapFlex.
-  Record cap_flex (mem1 mem2: Memory.t) (tm: TimeMap.t): Prop :=
-    {
-      cap_flex_le: Memory.le mem1 mem2;
-      cap_flex_middle: forall loc from1 to1 from2 to2
-                              (ADJ: Memory.adjacent loc from1 to1 from2 to2 mem1)
-                              (TO: Time.lt to1 from2),
-          Memory.get loc from2 mem2 = Some (to1, Message.reserve);
-      cap_flex_back: forall loc, Memory.get loc (tm loc) mem2 =
-                                 Some (Memory.max_ts loc mem1, Message.reserve);
-      cap_flex_complete: forall loc from to msg
-                               (GET1: Memory.get loc to mem1 = None)
-                               (GET2: Memory.get loc to mem2 = Some (from, msg)),
-          (exists f m, Memory.get loc from mem1 = Some (f, m));
-    }
-  .
-
-  Lemma cap_flex_inv
-        mem1 mem2 tm
-        loc from to msg
-        (CAP: cap_flex mem1 mem2 tm)
-        (GET: Memory.get loc to mem2 = Some (from, msg))
-        (TM: forall loc, Time.lt (Memory.max_ts loc mem1) (tm loc))
-    :
-    Memory.get loc to mem1 = Some (from, msg) \/
-    (Memory.get loc to mem1 = None /\
-     exists from1 to2,
-        Memory.adjacent loc from1 from to to2 mem1 /\
-        Time.lt from to /\
-        msg = Message.reserve) \/
-    (Memory.get loc to mem1 = None /\
-     from = Memory.max_ts loc mem1 /\
-     to = tm loc /\
-     msg = Message.reserve).
-  Proof.
-    inv CAP. move GET at bottom.
-    destruct (Memory.get loc to mem1) as [[]|] eqn:GET1.
-    { exploit cap_flex_le0; eauto. i.
-      rewrite GET in x. inv x. auto. }
-    right. exploit cap_flex_complete0; eauto. i. des.
-    exploit Memory.max_ts_spec; eauto. i. des. inv MAX.
-    - left.
-      exploit Memory.adjacent_exists; try eapply H; eauto. i. des.
-      assert (LT: Time.lt from from2).
-      { clear cap_flex_middle0 cap_flex_back0 cap_flex_complete0 GET0 H.
-        (* clear MIDDLE BACK COMPLETE GET0 H. *)
-        inv x1. rewrite GET0 in x. inv x.
-        exploit Memory.get_ts; try exact GET2. i. des.
-        { subst. inv TS. }
-        destruct (Time.le_lt_dec from2 from); auto.
-        inv l.
-        - exfalso.
-          exploit Memory.get_ts; try exact GET0. i. des.
-          { subst. inv H. }
-          exploit Memory.get_disjoint; [exact GET0|exact GET2|..]. i. des.
-          { subst. timetac. }
-          apply (x2 from); econs; ss.
-          + refl.
-          + econs. auto.
-        - exfalso. inv H.
-          exploit cap_flex_le0; try exact GET2. i.
-          exploit Memory.get_ts; try exact GET. i. des.
-          { subst. rewrite GET1 in GET0. inv GET0. }
-          exploit Memory.get_disjoint; [exact GET|exact x|..]. i. des.
-          { subst. rewrite GET1 in GET2. inv GET2. }
-          destruct (Time.le_lt_dec to to2).
-          + apply (x3 to); econs; ss. refl.
-          + apply (x3 to2); econs; ss.
-            * econs. auto.
-            * refl.
-      }
-      exploit cap_flex_middle0; try eapply x1; eauto. i.
-      destruct (Time.eq_dec to from2).
-      + subst. rewrite GET in x0. inv x0. esplits; eauto.
-      + exfalso. inv x1.
-        exploit Memory.get_ts; try exact GET. i. des.
-        { subst. rewrite GET1 in x. inv x. }
-        exploit Memory.get_ts; try exact x0. i. des.
-        { subst. exploit cap_flex_le0; try exact GET3. i.
-          exploit Memory.get_disjoint; [exact GET|exact x1|..]. i. des.
-          { subst. rewrite GET1 in GET3. inv GET3. }
-          destruct (Time.le_lt_dec to to2).
-          - apply (x4 to); econs; ss. refl.
-          - apply (x4 to2); econs; ss.
-            + econs. auto.
-            + refl.
-        }
-        exploit Memory.get_disjoint; [exact GET|exact x0|..]. i. des; try congr.
-        destruct (Time.le_lt_dec to from2).
-        * apply (x4 to); econs; ss. refl.
-        * apply (x4 from2); econs; ss.
-          { econs. auto. }
-          { refl. }
-    - right. inv H. do 2 (split; auto).
-      rewrite GET0 in x. inv x.
-      specialize (cap_flex_back0 loc).
-      exploit Memory.get_ts; try exact GET. i. des; try congr.
-      exploit Memory.get_disjoint; [exact GET|exact cap_flex_back0|..]. i. des.
-      { subst. esplits; eauto. }
-      exfalso.
-      destruct (Time.le_lt_dec to (tm loc)).
-      + apply (x1 to); econs; ss. refl.
-      + apply (x1 (tm loc)); econs; s;
-          eauto using TM; try refl.
-        econs. ss.
-  Qed.
-
-  Lemma cap_flex_exists
-        mem1 tm
-        (CLOSED1: Memory.closed mem1)
-        (TM: forall loc, Time.lt (Memory.max_ts loc mem1) (tm loc))
-    :
-      exists mem2, (<<CAP: cap_flex mem1 mem2 tm>>).
-  Proof.
-  Admitted.
-
-  Lemma cap_cap_flex mem1 mem2
-        (CAP: Memory.cap mem1 mem2)
-    :
-      cap_flex mem1 mem2 (fun loc => Time.incr (Memory.max_ts loc mem1)).
-  Proof.
-    inv CAP. econs; eauto.
-  Qed.
-
-  Lemma cap_flex_max_ts mem1 mem2 tm
-        (CLOSED: Memory.closed mem1)
-        (CAP: cap_flex mem1 mem2 tm)
-        (TM: forall loc, Time.lt (Memory.max_ts loc mem1) (tm loc))
-    :
-      forall loc,
-        Memory.max_ts loc mem2 = tm loc.
-  Proof.
-    i. set (BACK:=(cap_flex_back CAP) loc).
-    exploit Memory.max_ts_spec; try exact BACK. i. des.
-    apply TimeFacts.antisym; ss.
-    destruct (Time.le_lt_dec (Memory.max_ts loc mem2) (tm loc)); ss.
-    exploit cap_flex_inv; try exact GET; eauto. i. des.
-    - exploit Memory.max_ts_spec; try exact x0. i. des.
-      exploit TimeFacts.lt_le_lt; try exact l; try exact MAX0. i.
-      specialize (TM loc). rewrite x1 in TM. timetac.
-    - inv x1. exploit Memory.get_ts; try exact GET2. i. des.
-      { rewrite x1 in *. inv l. }
-      exploit Memory.max_ts_spec; try exact GET2. i. des.
-      exploit TimeFacts.lt_le_lt; try exact x1; try exact MAX0. i.
-      rewrite x3 in l. specialize (TM loc). rewrite l in TM. timetac.
-    - subst. rewrite x2 in *. timetac.
-  Qed.
-
-  Lemma cap_flex_covered
-        mem0 mem1 tm
-        (CAP: cap_flex mem0 mem1 tm)
-        (CLOSED: Memory.closed mem0)
-        (TM: forall loc, Time.lt (Memory.max_ts loc mem0) (tm loc))
-        loc to
-    :
-      Interval.mem (Time.bot, (tm loc)) to
-      <->
-      covered loc to mem1.
-  Proof.
-  Admitted.
-
-  Lemma cap_flex_closed mem cap tm
-        (CAP: cap_flex mem cap tm)
-        (TM: forall loc, Time.lt (Memory.max_ts loc mem) (tm loc))
-        (CLOSED: Memory.closed mem)
-    :
-      Memory.closed cap.
-  Proof.
-  Admitted.
-
-  Lemma cap_flex_wf
-        lc mem1 mem2 tm
-        (CAP: cap_flex mem1 mem2 tm)
-        (WF: Local.wf lc mem1):
-    Local.wf lc mem2.
-  Proof.
-  Admitted.
-
-  Lemma cap_flex_closed_timemap
-        mem1 mem2 sc tm
-        (CAP: cap_flex mem1 mem2 tm)
-        (CLOSED: Memory.closed_timemap sc mem1):
-    Memory.closed_timemap sc mem2.
-  Proof.
-  Admitted.
-
-  Lemma cap_flex_future_weak
-        mem1 mem2 tm
-        (CAP: cap_flex mem1 mem2 tm)
-        (TM: forall loc, Time.lt (Memory.max_ts loc mem1) (tm loc)):
-    Memory.future_weak mem1 mem2.
-  Proof.
-    econs; ii.
-    { eapply CAP in GET. esplits; eauto. refl. }
-    { eapply cap_flex_inv in GET2; eauto. des; clarify. }
-    { eapply cap_flex_inv in GET2; eauto. des; clarify. }
-  Qed.
-
-  Lemma cap_flex_inj
-        mem mem1 mem2 tm
-        (CAP1: cap_flex mem mem1 tm)
-        (CAP2: cap_flex mem mem2 tm)
-        (CLOSED: Memory.closed mem)
-        (TM: forall loc, Time.lt (Memory.max_ts loc mem) (tm loc)):
-    mem1 = mem2.
-  Proof.
-  Admitted.
-
-  Definition consistent (tm: TimeMap.t) lang (e: Thread.t lang): Prop :=
-    forall mem1
-           (CAP: cap_flex (Thread.memory e) mem1 tm),
-      (<<FAILURE: Thread.steps_failure (Thread.mk _ (Thread.state e) (Thread.local e) (Thread.sc e) mem1)>>) \/
-      exists e2,
-        ( <<STEPS: rtc (@Thread.tau_step _) (Thread.mk _ (Thread.state e) (Thread.local e) (Thread.sc e) mem1) e2>>) /\
-        (<<PROMISES: (Local.promises (Thread.local e2)) = Memory.bot>>).
-
-  Lemma consistent_thread_consistent lang st lc sc mem tm
-        (CONSISTENT: consistent tm (Thread.mk lang st lc sc mem))
-        (LOCAL: Local.wf lc mem)
-        (MEMORY: Memory.closed mem)
-        (SC: Memory.closed_timemap sc mem)
-        (TM: forall loc, Time.lt (Memory.max_ts loc mem) (tm loc))
-    :
-      Thread.consistent (Thread.mk lang st lc sc mem).
-  Proof.
-  Admitted.
-
-  Lemma thread_consistent_consistent lang st lc sc mem tm
-        (CONSISTENT: Thread.consistent (Thread.mk lang st lc sc mem))
-        (LOCAL: Local.wf lc mem)
-        (MEMORY: Memory.closed mem)
-        (SC: Memory.closed_timemap sc mem)
-        (TM: forall loc, Time.lt (Memory.max_ts loc mem) (tm loc))
-    :
-      consistent tm (Thread.mk lang st lc sc mem).
-  Proof.
-  Admitted.
-
-End CapFlex.
 
 
 Section WORLD.
 
 Variable world: Type.
-Variable world_le: world -> world -> Prop.
 
-Context `{world_le_PreOrder: @PreOrder _ world_le}.
+Variable world_messages_le: Messages.t -> world -> world -> Prop.
+Hypothesis world_messages_le_refl: forall msgs w, world_messages_le msgs w w.
+Hypothesis world_messages_le_trans:
+  forall msgs w0 w1 w2 (LE0: world_messages_le msgs w0 w1) (LE1: world_messages_le msgs w1 w2),
+    world_messages_le msgs w0 w2.
+Hypothesis world_messages_le_mon:
+  forall msgs0 msgs1 (MSGS: msgs0 <4= msgs1),
+    world_messages_le msgs1 <2= world_messages_le msgs0.
 
 Variable sim_memory: forall (b: bool) (w: world) (mem_src mem_tgt:Memory.t), Prop.
 Variable sim_timemap: forall (w: world) (sc_src sc_tgt: TimeMap.t), Prop.
@@ -421,7 +94,7 @@ Section SimulationThread.
           (<<SC3: sim_timemap w3 sc3_src sc3_tgt>>) /\
           (<<MEMORY3: sim_memory b0 w3 mem3_src mem3_tgt>>) /\
           (<<SIM: sim_thread b0 w3 st3_src lc3_src sc3_src mem3_src st3_tgt lc3_tgt sc3_tgt mem3_tgt>>) /\
-          (<<WORLD: world_le w0 w3>>)
+          (<<WORLD: world_messages_le (unchangable mem1_src lc1_src.(Local.promises)) w0 w3>>)
   .
 
   Definition sim_memory_future
@@ -442,7 +115,7 @@ Section SimulationThread.
       (<<MEMTGT: Memory.future_weak mem0_tgt mem1_tgt>>) /\
       (<<SCSRC: TimeMap.le sc0_src sc1_src>>) /\
       (<<SCTGT: TimeMap.le sc0_tgt sc1_tgt>>) /\
-      (<<WORLD: world_le w0 w1>>)
+      (<<WORLD: world_messages_le (Messages.of_memory prom_src) w0 w1>>)
   .
 
   Lemma sim_future_memory_sc_future
@@ -462,10 +135,11 @@ Section SimulationThread.
       (<<SC_FUTURE_TGT: TimeMap.le sc0_tgt sc1_tgt>>) /\
       (<<MEM_FUTURE_SRC: Memory.future_weak mem0_src mem1_src>>) /\
       (<<MEM_FUTURE_TGT: Memory.future_weak mem0_tgt mem1_tgt>>) /\
-      (<<WORLD: world_le w0 w1>>).
+      (<<WORLD: world_messages_le (Messages.of_memory prom_src) w0 w1>>)
+  .
   Proof.
     destruct b0; ss; des; subst.
-    - splits; try refl.
+    - splits; try refl. apply world_messages_le_refl.
     - splits; auto.
   Qed.
 
@@ -507,7 +181,7 @@ Section SimulationThread.
                (<<TERMINAL_SRC: (Language.is_terminal lang_src) st2_src>>) /\
                (<<LOCAL: sim_local w2 lc2_src lc1_tgt>>) /\
                (<<TERMINAL: sim_terminal st2_src st1_tgt>>) /\
-               (<<WORLD: world_le w1 w2>>)>>) /\
+               (<<WORLD: world_messages_le (unchangable mem1_src lc1_src.(Local.promises)) w1 w2>>)>>) /\
         (<<PROMISES:
            forall (BOOL: b0 = true)
                   (PROMISES_TGT: (Local.promises lc1_tgt) = Memory.bot),
@@ -539,8 +213,7 @@ Section SimulationThread.
               exists w3,
                 (<<SC3: sim_timemap w3 sc0_src sc0_tgt>>) /\
                 (<<MEMORY3: sim_memory true w3 cap_src cap_tgt>>) /\
-                (<<SIM: sim_thread _ _ sim_terminal true w3 st1_src lc1_src sc0_src cap_src st1_tgt lc1_tgt sc0_tgt cap_tgt>>) /\
-                (<<WORLD: world_le w0 w3>>)>>)>>)
+                (<<SIM: sim_thread _ _ sim_terminal true w3 st1_src lc1_src sc0_src cap_src st1_tgt lc1_tgt sc0_tgt cap_tgt>>)>>)>>)
   .
 
   Lemma _sim_thread_mon: monotone13 _sim_thread.
@@ -587,7 +260,7 @@ Definition sim_thread_past lang_src lang_tgt sim_terminal (b: bool) w st_src lc_
       (<<SC_FUTURE_TGT: TimeMap.le sc_tgt' sc_tgt>>) /\
       (<<MEM_FUTURE_SRC: Memory.future_weak mem_src' mem_src>>) /\
       (<<MEM_FUTURE_TGT: Memory.future_weak mem_tgt' mem_tgt>>) /\
-      (<<WORLD: world_le w' w>>) /\
+      (<<WORLD: world_messages_le (Messages.of_memory lc_src.(Local.promises)) w' w>>) /\
       (<<UNCHANGED: UndefCertify.unchanged lc_src.(Local.promises) mem_src' mem_src>>)
 .
 Arguments sim_thread_past: simpl never.
@@ -638,7 +311,8 @@ Lemma sim_thread_step
     (<<MEM_SRC: Memory.closed mem3_src>>) /\
     (<<MEM_TGT: Memory.closed mem3_tgt>>) /\
     (<<SIM: sim_thread sim_terminal b w3 st3_src lc3_src sc3_src mem3_src st3_tgt lc3_tgt sc3_tgt mem3_tgt>>) /\
-    (<<WORLD: world_le w1 w3>>).
+    (<<WORLD: world_messages_le (unchangable mem1_src lc1_src.(Local.promises)) w1 w3>>)
+.
 Proof.
   hexploit step_promise_consistent; eauto. s. i. red in SIM. destruct b; ss.
   { punfold SIM. red in SIM. des.
@@ -703,13 +377,12 @@ Lemma sim_thread_opt_step
     (<<MEM_SRC: Memory.closed mem3_src>>) /\
     (<<MEM_TGT: Memory.closed mem3_tgt>>) /\
     (<<SIM: sim_thread_past sim_terminal b w3 st3_src lc3_src sc3_src mem3_src st3_tgt lc3_tgt sc3_tgt mem3_tgt>>) /\
-    (<<WORLD: world_le w1 w3>>)
+    (<<WORLD: world_messages_le (unchangable mem1_src lc1_src.(Local.promises)) w1 w3>>)
 .
 Proof.
   inv STEP.
   - right. esplits; eauto; ss.
     { econs 1. }
-    { refl. }
   - exploit sim_thread_step; eauto. i. des; eauto.
     right. esplits; eauto. eapply sim_thread_sim_thread_past; eauto.
 Qed.
@@ -745,13 +418,13 @@ Lemma sim_thread_rtc_step
     (<<MEM_SRC: Memory.closed mem2_src>>) /\
     (<<MEM_TGT: Memory.closed (Thread.memory e2_tgt)>>) /\
     (<<SIM: sim_thread_past sim_terminal b w2 st2_src lc2_src sc2_src mem2_src (Thread.state e2_tgt) (Thread.local e2_tgt) (Thread.sc e2_tgt) (Thread.memory e2_tgt)>>) /\
-    (<<WORLD: world_le w1 w2>>)
+    (<<WORLD: world_messages_le (unchangable mem1_src lc1_src.(Local.promises)) w1 w2>>)
 .
 Proof.
   revert w1 SC MEMORY WF_SRC WF_TGT SC_SRC SC_TGT MEM_SRC MEM_TGT SIM.
   revert st1_src lc1_src sc1_src mem1_src.
   induction STEPS; i.
-  { right. esplits; eauto. refl. }
+  { right. esplits; eauto. }
   inv H. inv TSTEP. destruct x, y. ss.
   exploit Thread.step_future; eauto. s. i. des.
   hexploit rtc_tau_step_promise_consistent; eauto. s. i.
@@ -767,11 +440,14 @@ Proof.
     + destruct e, e_src; ss.
   - right. destruct z. ss.
     esplits; try apply MEMORY1; eauto.
-    2:{ etrans; eauto. }
-    etrans; [eauto|]. etrans; [|eauto]. inv STEP0; eauto.
-    econs 2; eauto. econs.
-    + econs. eauto.
-    + destruct e, e_src; ss.
+    { etrans; [eauto|]. etrans; [|eauto]. inv STEP0; eauto.
+      econs 2; eauto. econs.
+      + econs. eauto.
+      + destruct e, e_src; ss. }
+    { eapply world_messages_le_trans; [eauto|].
+      eapply world_messages_le_mon; [|eauto].
+      i. eapply rtc_step_unchangable in STEPS0; eauto.
+      eapply opt_step_unchangable in STEP0; eauto. }
 Qed.
 
 Lemma sim_thread_plus_step
@@ -812,7 +488,7 @@ Lemma sim_thread_plus_step
     (<<MEM_SRC: Memory.closed mem3_src>>) /\
     (<<MEM_TGT: Memory.closed (Thread.memory e3_tgt)>>) /\
     (<<SIM: sim_thread sim_terminal b w3 st3_src lc3_src sc3_src mem3_src (Thread.state e3_tgt) (Thread.local e3_tgt) (Thread.sc e3_tgt) (Thread.memory e3_tgt)>>) /\
-    (<<WORLD: world_le w1 w3>>)
+    (<<WORLD: world_messages_le (unchangable mem1_src lc1_src.(Local.promises)) w1 w3>>)
 .
 Proof.
   destruct e1_tgt, e2_tgt, e3_tgt. ss.
@@ -824,9 +500,11 @@ Proof.
   - left. inv FAILURE. des.
     unfold Thread.steps_failure. esplits; [|eauto|eauto].
     etrans; eauto.
-  - right. rewrite STEPS1 in STEPS0.
+  - right. dup STEPS0. rewrite STEPS1 in STEPS0.
     esplits; try exact STEPS0; try exact STEP0; eauto.
-    etrans; eauto.
+    eapply world_messages_le_trans; [eauto|].
+    eapply world_messages_le_mon; [|eauto].
+    i. eapply rtc_step_unchangable in STEPS2; eauto.
 Qed.
 
 Lemma sim_thread_future
@@ -839,12 +517,11 @@ Lemma sim_thread_future
       (SC_FUTURE_TGT: TimeMap.le sc1_tgt sc2_tgt)
       (MEM_FUTURE_SRC: Memory.future_weak mem1_src mem2_src)
       (MEM_FUTURE_TGT: Memory.future_weak mem1_tgt mem2_tgt)
-      (WORLD: world_le w1 w2)
+      (WORLD: world_messages_le (Messages.of_memory lc_src.(Local.promises)) w1 w2)
       (UNCHANGED: UndefCertify.unchanged lc_src.(Local.promises) mem1_src mem2_src):
   sim_thread_past sim_terminal false w2 st_src lc_src sc2_src mem2_src st_tgt lc_tgt sc2_tgt mem2_tgt.
 Proof.
   red in SIM. red. des. ss. esplits; eauto.
-  { etrans; eauto. }
   { etrans; eauto. }
   { etrans; eauto. }
   { etrans; eauto. }
@@ -942,7 +619,9 @@ Section Simulation.
            (SC_FUTURE_TGT: TimeMap.le sc0_tgt sc1_tgt)
            (MEM_FUTURE_SRC: Memory.future mem0_src mem1_src)
            (MEM_FUTURE_TGT: Memory.future mem0_tgt mem1_tgt)
-           (WORLD: world_le w0 w1)
+           (WORLD: forall tid st lc
+                              (TID: IdentMap.find tid ths1_src = Some (st, lc)),
+               world_messages_le (Messages.of_memory lc.(Local.promises)) w0 w1)
            (UNCHANGED: forall tid st lc
                               (TID: IdentMap.find tid ths1_src = Some (st, lc)),
                UndefCertify.unchanged lc.(Local.promises) mem0_src mem1_src),
@@ -953,8 +632,7 @@ Section Simulation.
              (<<STEPS_SRC: rtc Configuration.tau_step (Configuration.mk ths1_src sc1_src mem1_src) (Configuration.mk ths2_src sc2_src mem2_src)>>) /\
              (<<SC: sim_timemap w2 sc2_src sc1_tgt>>) /\
              (<<MEMORY: sim_memory false w2 mem2_src mem1_tgt>>) /\
-             (<<TERMINAL_SRC: Threads.is_terminal ths2_src>>) /\
-             (<<WORLD: world_le w1 w2>>)>>) /\
+             (<<TERMINAL_SRC: Threads.is_terminal ths2_src>>)>>) /\
       (<<STEP:
          forall e tid_tgt ths3_tgt sc3_tgt mem3_tgt
                 (STEP_TGT: Configuration.step e tid_tgt (Configuration.mk ths1_tgt sc1_tgt mem1_tgt) (Configuration.mk ths3_tgt sc3_tgt mem3_tgt)),
@@ -964,8 +642,7 @@ Section Simulation.
              (<<STEP_SRC: Configuration.opt_step e tid_src (Configuration.mk ths2_src sc2_src mem2_src) (Configuration.mk ths3_src sc3_src mem3_src)>>) /\
              (<<SC3: sim_timemap w3 sc3_src sc3_tgt>>) /\
              (<<MEMORY3: sim_memory false w3 mem3_src mem3_tgt>>) /\
-             (<<SIM: sim w3 ths3_src sc3_src mem3_src ths3_tgt sc3_tgt mem3_tgt>>) /\
-             (<<WORLD: world_le w1 w3>>)>>).
+             (<<SIM: sim w3 ths3_src sc3_src mem3_src ths3_tgt sc3_tgt mem3_tgt>>)>>).
 
   Lemma _sim_mon: monotone7 _sim.
   Proof.
@@ -1051,29 +728,6 @@ Proof.
         eapply UndefCertify.step_certified; eauto.
         eapply UndefCertify.rtc_step_certified; eauto.
 Qed.
-
-
-Lemma sim_future
-      ths_src sc1_src sc2_src mem1_src mem2_src
-      ths_tgt sc1_tgt sc2_tgt mem1_tgt mem2_tgt
-      w1 w2
-      (SIM: sim w1 ths_src sc1_src mem1_src ths_tgt sc1_tgt mem1_tgt)
-      (SC_FUTURE_SRC: TimeMap.le sc1_src sc2_src)
-      (SC_FUTURE_TGT: TimeMap.le sc1_tgt sc2_tgt)
-      (MEM_FUTURE_SRC: Memory.future mem1_src mem2_src)
-      (MEM_FUTURE_TGT: Memory.future mem1_tgt mem2_tgt)
-      (WORLD: world_le w1 w2)
-      (UNCHANGED: forall tid st lc
-                         (TID: IdentMap.find tid ths_src = Some (st, lc)),
-          UndefCertify.unchanged lc.(Local.promises) mem1_src mem2_src):
-  sim w2 ths_src sc2_src mem2_src ths_tgt sc2_tgt mem2_tgt.
-Proof.
-  pfold. ii.
-  punfold SIM. exploit SIM; (try by etrans; eauto); eauto.
-Qed.
-
-
-
 
 Lemma tids_find
       tids ths_src ths_tgt
@@ -1185,6 +839,11 @@ Proof.
                                (FIND: IdentMap.find tid ths_src = Some (st, lc)),
                UndefCertify.unchanged (Local.promises lc) mem0_src mem1_src).
     { i. eapply UNCHANGED; eauto. }
+    assert (WORLD0: forall tid st lc
+                           (TID: List.In tid (IdentSet.elements tids))
+                           (FIND: IdentMap.find tid ths_src = Some (st, lc)),
+               world_messages_le (Messages.of_memory lc.(Local.promises)) w w1).
+    { i. eapply WORLD; eauto. }
     assert (TIDS_MEM: forall tid, List.In tid (IdentSet.elements tids) -> IdentSet.mem tid tids = true).
     { i. rewrite IdentSet.mem_spec.
       rewrite <- IdentSet.elements_spec1.
@@ -1193,7 +852,7 @@ Proof.
     { specialize (IdentSet.elements_spec2w tids). i.
       clear - H. induction H; econs; eauto. }
     revert NOTIN IN TIDS_MEM NODUP.
-    move tids at top. clear SIM0 UNCHANGED. revert_until CIH.
+    move tids at top. clear SIM0 UNCHANGED WORLD. revert_until CIH.
     induction (IdentSet.elements tids); i.
     { right. esplits; eauto; try refl. ii. exploit NOTIN; eauto. }
     destruct (IdentMap.find a ths_src) as [[[lang_src st_src] lc_src]|] eqn:ASRC;
@@ -1205,7 +864,10 @@ Proof.
     { exploit IHl; [exact TIDS_SRC|exact TIDS_TGT|exact SC1|exact MEMORY1|..]; eauto; i.
       - eapply UNCHANGED0; eauto. ss. auto.
       - eapply NOTIN; eauto. ii. inv H; ss. congr.
-      - eapply IN; eauto. econs 2; eauto.
+      - exploit IN; eauto.
+        { econs 2; eauto. }
+        { i. des. esplits; eauto. eapply sim_thread_future; eauto; try refl.
+          eapply WORLD0; eauto. econs 2; eauto.  }
       - eapply TIDS_MEM; eauto. econs 2; eauto.
       - inv NODUP. ss.
     }
@@ -1219,7 +881,6 @@ Proof.
     { ss. splits; eauto using Memory.future_future_weak.
       { etrans; eauto. eapply Memory.future_future_weak; eauto. }
       { etrans; eauto. eapply Memory.future_future_weak; eauto. }
-      { etrans; eauto. }
     }
     { etrans; eauto. }
     i. des.
@@ -1256,14 +917,19 @@ Proof.
       { rewrite IdentMap.gsspec in H0. revert H0. condtac; ss; i.
         - subst. inv NODUP. congr.
         - exploit IN; eauto. i. des.
-          esplits. eapply sim_thread_future; eauto; try refl. }
+          esplits. eapply sim_thread_future; eauto; try refl.
+          eapply world_messages_le_trans.
+          { eapply WORLD0; eauto. }
+          { eapply world_messages_le_mon; [|eauto].
+            destruct lc_src0, lc_src.
+            eapply other_promise_unchangable; eauto. }
+      }
       { inv NODUP. ss. }
       des.
       * left.
         unfold Configuration.steps_failure in *. des. esplits; [|eauto].
         etrans; eauto.
       * right. esplits; cycle 1; eauto.
-        { etrans; eauto. }
         { etrans; eauto. }
 
   - (* STEP CASE *)
@@ -1277,14 +943,15 @@ Proof.
     inv WF_SRC. inv WF_TGT. inv WF. inv WF0. ss.
     exploit SIM0; eauto. i. des.
     exploit sim_thread_future; eauto using Memory.future_future_weak. i.
-    exploit sim_thread_plus_step; try exact STEPS; try exact x1;
+    exploit sim_thread_plus_step; try exact STEPS;
       eauto using Memory.future_future_weak.
-    { s. destruct (classic (ThreadEvent.get_machine_event e0 = MachineEvent.failure)).
+    { destruct (classic (ThreadEvent.get_machine_event e0 = MachineEvent.failure)).
       - inv STEP; inv STEP0; ss. inv LOCAL; ss; inv LOCAL0; ss.
       - exploit Thread.rtc_tau_step_future; eauto. s. i. des.
         exploit Thread.step_future; eauto. s. i. des.
         hexploit consistent_promise_consistent; eauto.
     }
+    { s. eapply sim_thread_future; eauto; try refl. }
     s. i. des.
     + left.
       unfold Thread.steps_failure in FAILURE. des.
@@ -1323,7 +990,12 @@ Proof.
           eapply sim_thread_future; eauto.
           { eapply Memory.future_future_weak. etrans; eauto. }
           { eapply Memory.future_future_weak. etrans; eauto. }
-          { etrans; eauto. }
+          { eapply world_messages_le_trans.
+            { eapply WORLD; eauto. }
+            { eapply world_messages_le_mon; [|eauto].
+              destruct lc_src, lc_src0.
+              eapply other_promise_unchangable; eauto. }
+          }
           { etrans; eauto. }
         }
       }
