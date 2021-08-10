@@ -40,13 +40,13 @@ Section WORLD.
 Variable world: Type.
 
 Variable world_messages_le: Messages.t -> world -> world -> Prop.
-Hypothesis world_messages_le_refl: forall msgs w, world_messages_le msgs w w.
-Hypothesis world_messages_le_trans:
-  forall msgs w0 w1 w2 (LE0: world_messages_le msgs w0 w1) (LE1: world_messages_le msgs w1 w2),
-    world_messages_le msgs w0 w2.
+Context `{world_messages_le_PreOrder: forall msgs, PreOrder (world_messages_le msgs)}.
+
 Hypothesis world_messages_le_mon:
-  forall msgs0 msgs1 (MSGS: msgs0 <4= msgs1),
-    world_messages_le msgs1 <2= world_messages_le msgs0.
+  forall msgs0 msgs1 w0 w1
+         (LE: world_messages_le msgs1 w0 w1)
+         (MSGS: msgs0 <4= msgs1),
+    world_messages_le msgs0 w0 w1.
 
 Variable sim_memory: forall (b: bool) (w: world) (mem_src mem_tgt:Memory.t), Prop.
 Variable sim_timemap: forall (w: world) (sc_src sc_tgt: TimeMap.t), Prop.
@@ -139,7 +139,7 @@ Section SimulationThread.
   .
   Proof.
     destruct b0; ss; des; subst.
-    - splits; try refl. apply world_messages_le_refl.
+    - splits; try refl.
     - splits; auto.
   Qed.
 
@@ -383,6 +383,7 @@ Proof.
   inv STEP.
   - right. esplits; eauto; ss.
     { econs 1. }
+    { refl. }
   - exploit sim_thread_step; eauto. i. des; eauto.
     right. esplits; eauto. eapply sim_thread_sim_thread_past; eauto.
 Qed.
@@ -424,7 +425,7 @@ Proof.
   revert w1 SC MEMORY WF_SRC WF_TGT SC_SRC SC_TGT MEM_SRC MEM_TGT SIM.
   revert st1_src lc1_src sc1_src mem1_src.
   induction STEPS; i.
-  { right. esplits; eauto. }
+  { right. esplits; eauto. refl. }
   inv H. inv TSTEP. destruct x, y. ss.
   exploit Thread.step_future; eauto. s. i. des.
   hexploit rtc_tau_step_promise_consistent; eauto. s. i.
@@ -444,8 +445,8 @@ Proof.
       econs 2; eauto. econs.
       + econs. eauto.
       + destruct e, e_src; ss. }
-    { eapply world_messages_le_trans; [eauto|].
-      eapply world_messages_le_mon; [|eauto].
+    { etrans; [eauto|].
+      eapply world_messages_le_mon; eauto.
       i. eapply rtc_step_unchangable in STEPS0; eauto.
       eapply opt_step_unchangable in STEP0; eauto. }
 Qed.
@@ -502,8 +503,8 @@ Proof.
     etrans; eauto.
   - right. dup STEPS0. rewrite STEPS1 in STEPS0.
     esplits; try exact STEPS0; try exact STEP0; eauto.
-    eapply world_messages_le_trans; [eauto|].
-    eapply world_messages_le_mon; [|eauto].
+    etrans; [eauto|].
+    eapply world_messages_le_mon; eauto.
     i. eapply rtc_step_unchangable in STEPS2; eauto.
 Qed.
 
@@ -522,6 +523,7 @@ Lemma sim_thread_future
   sim_thread_past sim_terminal false w2 st_src lc_src sc2_src mem2_src st_tgt lc_tgt sc2_tgt mem2_tgt.
 Proof.
   red in SIM. red. des. ss. esplits; eauto.
+  { etrans; eauto. }
   { etrans; eauto. }
   { etrans; eauto. }
   { etrans; eauto. }
@@ -863,6 +865,7 @@ Proof.
       exploit x1; eauto. i. des. rewrite ASRC in x. inv x. }
     { exploit IHl; [exact TIDS_SRC|exact TIDS_TGT|exact SC1|exact MEMORY1|..]; eauto; i.
       - eapply UNCHANGED0; eauto. ss. auto.
+      - refl.
       - eapply NOTIN; eauto. ii. inv H; ss. congr.
       - exploit IN; eauto.
         { econs 2; eauto. }
@@ -881,6 +884,7 @@ Proof.
     { ss. splits; eauto using Memory.future_future_weak.
       { etrans; eauto. eapply Memory.future_future_weak; eauto. }
       { etrans; eauto. eapply Memory.future_future_weak; eauto. }
+      { etrans; eauto. }
     }
     { etrans; eauto. }
     i. des.
@@ -910,6 +914,7 @@ Proof.
         { eapply UNCHANGED0; eauto. }
         { eapply UNCHANGED1; eauto. }
       }
+      { refl. }
       { rewrite IdentMap.gsspec in FIND. revert FIND. condtac; ss; i.
         - subst. Configuration.simplify. split; auto.
           inv THREAD. econs. eapply sim_local_memory_bot; eauto.
@@ -918,9 +923,9 @@ Proof.
         - subst. inv NODUP. congr.
         - exploit IN; eauto. i. des.
           esplits. eapply sim_thread_future; eauto; try refl.
-          eapply world_messages_le_trans.
+          etrans.
           { eapply WORLD0; eauto. }
-          { eapply world_messages_le_mon; [|eauto].
+          { eapply world_messages_le_mon; [eauto|].
             destruct lc_src0, lc_src.
             eapply other_promise_unchangable; eauto. }
       }
@@ -951,7 +956,6 @@ Proof.
         exploit Thread.step_future; eauto. s. i. des.
         hexploit consistent_promise_consistent; eauto.
     }
-    { s. eapply sim_thread_future; eauto; try refl. }
     s. i. des.
     + left.
       unfold Thread.steps_failure in FAILURE. des.
@@ -990,9 +994,9 @@ Proof.
           eapply sim_thread_future; eauto.
           { eapply Memory.future_future_weak. etrans; eauto. }
           { eapply Memory.future_future_weak. etrans; eauto. }
-          { eapply world_messages_le_trans.
+          { etrans.
             { eapply WORLD; eauto. }
-            { eapply world_messages_le_mon; [|eauto].
+            { eapply world_messages_le_mon; [eauto|].
               destruct lc_src, lc_src0.
               eapply other_promise_unchangable; eauto. }
           }

@@ -27,6 +27,7 @@ Require Import MemoryMerge.
 Require Import FulfillStep.
 Require Import PromiseConsistent.
 
+Require Import gSimAux.
 Require Import gSimulation.
 Require Import Program.
 
@@ -34,18 +35,30 @@ Require Import Program.
 Set Implicit Arguments.
 
 Definition world: Type. Admitted.
-Definition world_le: world -> world -> Prop. Admitted.
-Instance world_le_PreOrder: PreOrder world_le. Admitted.
+Definition world_messages_le: Messages.t -> world -> world -> Prop. Admitted.
+
+Instance world_messages_le_PreOrder: forall msgs, PreOrder (world_messages_le msgs). Admitted.
+
+Lemma world_messages_le_mon:
+  forall msgs0 msgs1 w0 w1
+         (LE: world_messages_le msgs1 w0 w1)
+         (MSGS: msgs0 <4= msgs1),
+    world_messages_le msgs0 w0 w1.
+Admitted.
 
 Definition sim_memory: forall (b: bool) (w: world) (mem_src mem_tgt:Memory.t), Prop. Admitted.
 Definition sim_timemap: forall (w: world) (sc_src sc_tgt: TimeMap.t), Prop. Admitted.
 Definition sim_local: forall (w: world) (lc_src lc_tgt:Local.t), Prop. Admitted.
 
-Definition sim_local_world_mon: forall (w0 w1: world) (WORLD: world_le w0 w1),
-    sim_local w0 <2= sim_local w1.
+Definition sim_local_world_mon:
+  forall lc_src lc_tgt
+         (w0 w1: world)
+         (SIM: sim_local w0 lc_src lc_tgt)
+         (WORLD: world_messages_le (Messages.of_memory (Local.promises lc_src)) w0 w1),
+    sim_local w1 lc_src lc_tgt.
 Admitted.
 
-Definition sim_timemap_world_mon: forall (w0 w1: world) (WORLD: world_le w0 w1),
+Definition sim_timemap_world_mon: forall msgs (w0 w1: world) (WORLD: world_messages_le msgs w0 w1),
     sim_timemap w0 <2= sim_timemap w1.
 Admitted.
 
@@ -77,7 +90,7 @@ Lemma sim_cap mem0_src mem0_tgt sc0_src sc0_tgt lc1_src lc1_tgt w0
             (<<SC3: sim_timemap w3 sc0_src sc0_tgt>>) /\
             (<<MEMORY3: sim_memory true w3 cap_src cap_tgt>>) /\
             (<<LOCAL: sim_local w3 lc1_src lc1_tgt>>) /\
-            (<<WORLD: world_le w0 w3>>)>>).
+            (<<WORLD: world_messages_le (unchangable mem0_src lc1_src.(Local.promises)) w0 w3>>)>>).
 Admitted.
 
 Lemma sim_local_promise
@@ -97,5 +110,5 @@ Lemma sim_local_promise
     (<<STEP_SRC: Local.promise_step lc1_src mem1_src loc from to msg_src lc2_src mem2_src kind_src>>) /\
     (<<LOCAL2: sim_local w1 lc2_src lc2_tgt>>) /\
     (<<MEM2: sim_memory b w1 mem2_src mem2_tgt>>) /\
-    (<<WORLD: world_le w0 w1>>).
+    (<<WORLD: world_messages_le (unchangable mem1_src lc1_src.(Local.promises)) w0 w1>>).
 Admitted.

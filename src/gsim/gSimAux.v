@@ -389,6 +389,13 @@ Section UNCHANGABLE.
       (NPROM: Memory.get l t prom = None)
   .
 
+  Lemma promise_step_unchangable lc1 mem1 loc from to msg lc2 mem2 kind
+        (STEP: Local.promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
+    :
+      unchangable mem1 (Local.promises lc1) <4=
+      unchangable mem2 (Local.promises lc2).
+  Admitted.
+
   Lemma step_unchangable pf e lang (th0 th1: Thread.t lang)
         (STEP: Thread.step pf e th0 th1)
     :

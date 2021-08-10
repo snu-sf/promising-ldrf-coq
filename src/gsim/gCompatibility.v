@@ -20,6 +20,7 @@ Require Import Configuration.
 
 Require Import FulfillStep.
 
+Require Import gSimAux.
 Require Import gSimMemory.
 Require Import gSimulation.
 
@@ -46,13 +47,11 @@ Variant sim_terminal R_src R_tgt
 
 Definition _sim_itree
            (sim_thread:SIM_THREAD world)
-           (w0: world)
            R_src R_tgt
            (sim_ret:SIM_VAL R_src R_tgt)
            (itr_src: itree MemE.t R_src) (itr_tgt: itree MemE.t R_tgt): Prop :=
   forall b lc_src lc_tgt sc0_src sc0_tgt mem0_src mem0_tgt w1
-         (LOCAL: sim_local w1 lc_src lc_tgt)
-         (WORLD: world_le w0 w1),
+         (LOCAL: sim_local w1 lc_src lc_tgt),
     sim_thread
       (lang R_src) (lang R_tgt)
       (sim_terminal sim_ret)
@@ -67,13 +66,13 @@ Definition _sim_ktree
            (ktr_src: R_src0 -> itree MemE.t R_src1)
            (ktr_tgt: R_tgt0 -> itree MemE.t R_tgt1)
            (sim_ret1:SIM_VAL R_src1 R_tgt1): Prop :=
-  forall r_src r_tgt w
+  forall r_src r_tgt
          (RET: sim_ret0 r_src r_tgt),
-    _sim_itree sim_thread w sim_ret1 (ktr_src r_src) (ktr_tgt r_tgt).
+    _sim_itree sim_thread sim_ret1 (ktr_src r_src) (ktr_tgt r_tgt).
 
 Lemma _sim_itree_mon
       s1 s2 (S: s1 <13= s2):
-  @_sim_itree s1 <6= @_sim_itree s2.
+  @_sim_itree s1 <5= @_sim_itree s2.
 Proof.
   ii. apply S. apply PR; auto.
 Qed.
@@ -337,7 +336,7 @@ Proof.
   eapply bisimulation_is_eq. eapply unfold_iter.
 Qed.
 
-Definition _sim_thread := @_sim_thread world world_le sim_memory sim_timemap sim_local.
+Definition _sim_thread := @_sim_thread world world_messages_le sim_memory sim_timemap sim_local.
 
 Lemma _sim_thread_mon: monotone13 _sim_thread.
 Proof.
@@ -358,8 +357,8 @@ Proof.
       { right. inv TERMINAL_TGT. ss. esplits; eauto; ss.
         - econs; eauto.
         - eapply sim_future_memory_sc_future in FUTURE; eauto.
-          2:{ typeclasses eauto. (* why? *) }
-          des. eapply sim_local_world_mon; eauto.
+          { des. eapply sim_local_world_mon; eauto. }
+          { typeclasses eauto. }
         - econs; eauto.
         - refl.
       }
@@ -368,8 +367,9 @@ Proof.
       inv STEP; ss.
       exploit sim_local_promise; try apply MEMORY; eauto.
       { eapply sim_future_memory_sc_future in FUTURE; eauto.
-        2:{ typeclasses eauto. (* why? *) }
-        des. eapply sim_local_world_mon; eauto. }
+        { des. eapply sim_local_world_mon; eauto. }
+        { i. typeclasses eauto. }
+      }
       i. des.
       right. esplits; try apply MEM2.
       + ss.
@@ -432,6 +432,8 @@ Proof.
             esplits; cycle 1; eauto.
             * rewrite bind_ret_l. eauto.
             * etrans; eauto.
+              eapply world_messages_le_mon; eauto.
+              i. eapply rtc_step_unchangable in STEPS; eauto.
             * etrans; [|eauto].
               eapply rtc_internal_step_bind in STEPS.
               rewrite bind_ret_l in STEPS. eauto.
@@ -485,6 +487,8 @@ Proof.
             esplits; cycle 2; eauto.
             - eapply rclo13_base. auto.
             - etrans; eauto.
+              eapply world_messages_le_mon; eauto.
+              i. eapply rtc_step_unchangable in STEPS; eauto.
             - eapply rtc_internal_step_bind in STEPS.
               etrans; [apply STEPS|eauto].
               rewrite bind_ret_l. eauto. }
@@ -606,7 +610,7 @@ Proof.
   rewrite unfold_iter_eq. rewrite unfold_iter_eq.
   guclo ctx_compat. eapply ctx_bind.
   { gbase. eapply _sim_thread_mon.
-    { eapply GF. eapply (@SIM i_src i_tgt); eauto. refl. }
+    { eapply GF. eapply (@SIM i_src i_tgt); eauto. }
     { i. eapply rclo13_base. eauto. }
   }
   { ii. inv RET.
@@ -619,15 +623,15 @@ Proof.
   }
 Qed.
 
-Definition sim_itree := @_sim_itree (sim_thread world_le sim_memory sim_timemap sim_local).
-Definition sim_ktree := @_sim_ktree (sim_thread world_le sim_memory sim_timemap sim_local).
+Definition sim_itree := @_sim_itree (sim_thread world_messages_le sim_memory sim_timemap sim_local).
+Definition sim_ktree := @_sim_ktree (sim_thread world_messages_le sim_memory sim_timemap sim_local).
 
-Lemma sim_itree_mon R_src R_tgt w0
+Lemma sim_itree_mon R_src R_tgt
       sim_ret0 sim_ret1
       itr_src itr_tgt
       (SIM01: sim_ret0 <2= sim_ret1)
-      (SIM: @sim_itree w0 R_src R_tgt sim_ret0 itr_src itr_tgt):
-  sim_itree w0 sim_ret1 itr_src itr_tgt.
+      (SIM: @sim_itree R_src R_tgt sim_ret0 itr_src itr_tgt):
+  sim_itree sim_ret1 itr_src itr_tgt.
 Proof.
   ii. eapply sim_thread_mon; [|eauto].
   i. inv PR. econs; eauto.
@@ -638,35 +642,35 @@ Hint Resolve cpn13_wcompat: paco.
 
 Lemma sim_itree_ret R_src R_tgt (sim_ret: SIM_VAL R_src R_tgt)
       r_src r_tgt
-      (SIM: sim_ret r_src r_tgt) w:
-  @sim_itree w R_src R_tgt sim_ret (Ret r_src) (Ret r_tgt).
+      (SIM: sim_ret r_src r_tgt):
+  @sim_itree R_src R_tgt sim_ret (Ret r_src) (Ret r_tgt).
 Proof.
   ii. ginit. guclo ctx_compat. econs 1; eauto.
 Qed.
 
 Lemma sim_itree_bind
-      R_src0 R_tgt0 R_src1 R_tgt1 w
+      R_src0 R_tgt0 R_src1 R_tgt1
       (sim_ret0: SIM_VAL R_src0 R_tgt0)
       (sim_ret1: SIM_VAL R_src1 R_tgt1)
       itr_src itr_tgt k_src k_tgt
-      (SIM1: sim_itree w sim_ret0 itr_src itr_tgt)
+      (SIM1: sim_itree sim_ret0 itr_src itr_tgt)
       (SIM2: sim_ktree sim_ret0 k_src k_tgt sim_ret1):
-  sim_itree w sim_ret1 (itr_src >>= k_src) (itr_tgt >>= k_tgt).
+  sim_itree sim_ret1 (itr_src >>= k_src) (itr_tgt >>= k_tgt).
 Proof.
   ii. ginit. guclo ctx_compat. econs 2.
   - gfinal. right. apply SIM1; auto.
-  - ii. gfinal. right. eapply SIM2; auto. refl.
+  - ii. gfinal. right. eapply SIM2; auto.
 Qed.
 
 Lemma sim_itree_iter
-      I_src I_tgt R_src R_tgt w
+      I_src I_tgt R_src R_tgt
       (sim_ret0: SIM_VAL I_src I_tgt) (sim_ret1: SIM_VAL R_src R_tgt)
       (body_src: I_src -> itree MemE.t (I_src + R_src))
       (body_tgt: I_tgt -> itree MemE.t (I_tgt + R_tgt))
       (SIM: sim_ktree sim_ret0 body_src body_tgt (sum_rel sim_ret0 sim_ret1))
       i_src i_tgt
       (VAL: sim_ret0 i_src i_tgt):
-  sim_itree w sim_ret1 (ITree.iter body_src i_src) (ITree.iter body_tgt i_tgt).
+  sim_itree sim_ret1 (ITree.iter body_src i_src) (ITree.iter body_tgt i_tgt).
 Proof.
   ii. ginit. guclo iter_ctx_compat. econs; eauto.
   eapply _sim_ktree_mon; cycle 1; eauto.
@@ -692,8 +696,8 @@ Lemma sim_ktree_bind
   sim_ktree sim_ret0 (fun r => k1_src r >>= k2_src) (fun r => k1_tgt r >>= k2_tgt) sim_ret2.
 Proof.
   ii. ginit. guclo ctx_compat. econs 2.
-  - gfinal. right. eapply SIM1; auto. refl.
-  - ii. gfinal. right. eapply SIM2; auto. refl.
+  - gfinal. right. eapply SIM1; auto.
+  - ii. gfinal. right. eapply SIM2; auto.
 Qed.
 
 Lemma sim_ktree_iter
@@ -708,3 +712,4 @@ Proof.
   eapply _sim_ktree_mon; cycle 1; eauto.
   ii. gfinal. right. eauto.
 Qed.
+h
