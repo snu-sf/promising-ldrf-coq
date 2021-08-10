@@ -91,16 +91,13 @@ Inductive sim_update: forall (st_src:(Language.state lang)) (lc_src:Local.t) (sc
     sim_update
       (State.mk rs [Stmt.instr i2; Stmt.instr (Instr.update r1 l1 rmw1 or1 ow1)]) lc1_src sc1_src mem1_src
       (State.mk (RegFun.add r1 vret1 rs) [Stmt.instr i2]) lc1_tgt sc1_tgt mem1_tgt
-| sim_update_racy_update
-    r1 l1 vr1 vret1 vw1 rmw1 or1 ow1 i2 rs
+| sim_update_racy_read
+    r1 l1 vr1 vret1 rmw1 or1 ow1 i2 rs
     lc1_src sc1_src mem1_src
     lc1_tgt sc1_tgt mem1_tgt
-    (RMW: RegFile.eval_rmw rs rmw1 vr1 = (vret1, vw1))
+    (RMW: RegFile.eval_rmw rs rmw1 vr1 = (vret1, None))
     (REORDER: reorder_update r1 l1 rmw1 or1 ow1 i2)
-    (RACY_UPDATE: match vw1 with
-                  | Some val => Local.racy_update_step lc1_src mem1_src l1 or1 ow1
-                  | None => Local.racy_read_step lc1_src mem1_src l1 vr1 or1
-                  end)
+    (RACY_READ: Local.racy_read_step lc1_src mem1_src l1 vr1 or1)
     (LOCAL: sim_local SimPromises.bot lc1_src lc1_tgt)
     (SC: TimeMap.le sc1_src sc1_tgt)
     (MEMORY: sim_memory mem1_src mem1_tgt)
@@ -155,11 +152,8 @@ Proof.
     }
     i. des.
     econs; [eauto|..]; s; eauto; etrans; eauto.
-  - destruct vw1 as [vw1|].
-    + exploit future_racy_update_step; try exact RACY_UPDATE; eauto. i. des.
-      econs 2; eauto.
-    + exploit future_racy_read_step; try exact RACY_UPDATE; eauto. i. des.
-      econs 2; eauto.
+  - exploit future_racy_read_step; try exact RACY_READ; eauto. i. des.
+    econs 2; eauto.
 Grab Existential Variables.
 { econs 2. }
 { econs. econs 3. }
@@ -381,152 +375,92 @@ Proof.
     }
   }
 
-  { (* racy update *)
-    destruct vw1 as [vw1|]; cycle 1.
-    { ii. ss.
-      inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
-        try (inv STATE; inv INSTR; inv REORDER); ss.
-      - (* promise *)
-        right.
-        exploit Local.promise_step_future; eauto. i. des.
-        exploit sim_local_promise_bot; eauto. i. des.
-        exploit reorder_racy_read_promise; try exact RACY_UPDATE; try exact STEP_SRC; eauto. i. des.
-        exploit Local.promise_step_future; try exact STEP_SRC; eauto. i. des.
-        esplits; try apply SC; eauto; ss.
-        + econs 2. econs. econs; eauto.
-        + eauto.
-        + right. econs 2; eauto.
-      - (* load *)
-        right.
-        apply RegSet.disjoint_add in REGS. des.
-        exploit sim_local_read; (try by etrans; eauto); eauto; try refl. i. des.
-        exploit reorder_racy_read_read; try exact RACY_UPDATE; try exact STEP_SRC; eauto; ss. i. des.
-        esplits.
-        + ss.
-        + econs 2; [|econs 1]. econs.
-          * econs. econs 2. econs; [|econs 2]; eauto. econs. econs.
-          * eauto.
-        + econs 2. econs 2. econs; [|econs 9]; eauto. econs. econs.
-          erewrite RegFile.eq_except_rmw; eauto; cycle 1.
-          * apply RegFile.eq_except_singleton.
-          * symmetry. eauto.
-        + eauto.
-        + eauto.
-        + eauto.
-        + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
-          apply RegFun.add_add. ii. subst. eapply REGS.
-          apply RegSet.singleton_spec. eauto.
-      - (* store *)
-        right.
-        guardH ORD21.
-        apply RegSet.disjoint_add in REGS. des.
-        hexploit sim_local_write_bot; try exact LOCAL1; try exact SC;
-          try exact WF_SRC; try exact WF_TGT; try refl; eauto; try by viewtac. i. des.
-        exploit reorder_racy_read_write; try exact RACY_UPDATE; eauto. i. des.
-        esplits.
-        + ss.
-        + econs 2; [|econs 1]. econs.
-          * econs. econs 2. econs; [|econs 3]; eauto. econs.
-            erewrite RegFile.eq_except_value; cycle 2.
-            { apply RegFile.eq_except_singleton. }
-            { econs. }
-            { ii. apply RegSet.singleton_spec in LHS. subst. congr. }
-          * eauto.
-        + econs 2. econs 2. econs; [|econs 9]; eauto. econs. econs. eauto.
-        + eauto.
-        + eauto.
-        + ss.
-        + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
-      - (* na write *)
-        inv LOCAL1. destruct ord; ss.
-      - (* racy read *)
-        right.
-        apply RegSet.disjoint_add in REGS. des.
-        exploit sim_local_racy_read; try exact LOCAL; eauto; try refl. i. des.
-        esplits.
-        + ss.
-        + econs 2; [|econs 1]. econs.
-          * econs. econs 2. econs; [|econs 9]; eauto. econs. econs.
-          * eauto.
-        + econs 2. econs 2. econs; [|econs 9]; try exact RACY_UPDATE. econs. econs.
-          erewrite RegFile.eq_except_rmw; eauto; cycle 1.
-          * apply RegFile.eq_except_singleton.
-          * symmetry. eauto.
-        + eauto.
-        + eauto.
-        + eauto.
-        + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
-          apply RegFun.add_add. ii. subst. eapply REGS.
-          apply RegSet.singleton_spec. eauto.
-      - (* racy write *)
-        left. guardH ORD21.
-        exploit sim_local_racy_write; try exact LOCAL1; try apply RACY_UPDATE;
-          try match goal with
-              | [|- is_true (Ordering.le _ _)] => refl
-              end; eauto.
-        i. des.
-        unfold Thread.steps_failure. esplits; try refl.
-        + econs 2. econs; [|econs 10]; eauto. econs. econs.
-        + ss.
-    }
-
-    { ii. left. unfold Thread.steps_failure.
-      inv REORDER.
-      - (* load *)
-        exploit progress_read_step_cur; try exact WF_SRC; eauto. i. des.
-        exploit read_step_cur_future; try exact READ; eauto. i. des.
-        esplits.
-        + econs 2; try refl. econs.
-          * econs. econs 2. econs; [|econs 2]; eauto. econs. econs.
-          * ss.
-        + econs 2. econs; [|econs 11].
-          * econs. econs.
-            erewrite RegFile.eq_except_rmw; eauto; cycle 1.
-            { apply RegFile.eq_except_singleton. }
-            { ii. eapply REGS; eauto.
-              apply RegSet.add_spec. auto.
-            }
-          * assert (CONS: Local.promise_consistent lc2).
-            { ii. rewrite <- PROMISES, <- TVIEW in *. inv RACY_UPDATE; eauto. }
-            inv RACY_UPDATE.
-            { econs 1; eauto. }
-            { econs 2; eauto. }
-            { econs 3; eauto; try congr.
-              inv RACE. econs. rewrite <- TVIEW. ss.
-            }
-        + ss.
-      - (* store *)
-        guardH ORD21.
-        exploit (@LowerPromises.steps_promises_rel
-                   lang (Thread.mk lang (State.mk rs [Stmt.instr (Instr.store l2 v2 o2); Stmt.instr (Instr.update r1 l1 rmw1 or1 ow1)])
-                                   lc1_src sc1_src mem1_src)); s; eauto.
-        i. des. destruct e2, state. ss.
-        exploit LowerPromises.rtc_opt_promise_step_future; eauto. s. i. des. inv STATE.
-        hexploit LowerPromises.promises_rel_promise_consistent; eauto; i.
-        { inv RACY_UPDATE; eauto. }
-        hexploit LowerPromises.promises_rel_nonsynch; eauto. i.
-        exploit Thread.rtc_tau_step_future; try exact STEPS0; eauto. s. i. des.
-        exploit write_step_consistent; try exact WF2; eauto. i. des.
-        esplits.
-        + eapply rtc_n1; eauto. econs.
-          * econs. econs 2. econs; [|econs 3; eauto]. econs. econs.
-          * ss.
-        + econs 2. econs; [|econs 11].
-          * econs. econs. eauto.
-          * inv RACY_UPDATE.
-            { econs 1; eauto. }
-            { econs 2; eauto. }
-            { exploit Thread.rtc_tau_step_non_promised; try exact STEPS0; eauto. s. i. des.
-              exploit Local.program_step_non_promised; [econs 3|..]; try exact STEP; eauto. i. des.
-              econs 3; eauto; try congr.
-              inv RACE. econs. rewrite TVIEW in TS.
-              inv STEP. ss.
-              apply TimeFacts.join_spec_lt; auto.
-              unfold TimeMap.singleton, Loc.LocFun.add, Loc.LocFun.init, Loc.LocFun.find. condtac; ss.
-              eapply TimeFacts.le_lt_lt; eauto. apply Time.bot_spec.
-            }
-        + ss.
-    }
+  { (* racy update-load *)
+    ii. ss.
+    inv STEP_TGT; [inv STEP|inv STEP; inv LOCAL0];
+      try (inv STATE; inv INSTR; inv REORDER); ss.
+    - (* promise *)
+      right.
+      exploit Local.promise_step_future; eauto. i. des.
+      exploit sim_local_promise_bot; eauto. i. des.
+      exploit reorder_racy_read_promise; try exact RACY_READ; try exact STEP_SRC; eauto. i. des.
+      exploit Local.promise_step_future; try exact STEP_SRC; eauto. i. des.
+      esplits; try apply SC; eauto; ss.
+      + econs 2. econs. econs; eauto.
+      + eauto.
+      + right. econs 2; eauto.
+    - (* load *)
+      right.
+      apply RegSet.disjoint_add in REGS. des.
+      exploit sim_local_read; (try by etrans; eauto); eauto; try refl. i. des.
+      exploit reorder_racy_read_read; try exact RACY_READ; try exact STEP_SRC; eauto; ss. i. des.
+      esplits.
+      + ss.
+      + econs 2; [|econs 1]. econs.
+        * econs. econs 2. econs; [|econs 2]; eauto. econs. econs.
+        * eauto.
+      + econs 2. econs 2. econs; [|econs 9]; eauto. econs. econs.
+        erewrite RegFile.eq_except_rmw; eauto; cycle 1.
+        * apply RegFile.eq_except_singleton.
+        * symmetry. eauto.
+      + eauto.
+      + eauto.
+      + eauto.
+      + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
+        apply RegFun.add_add. ii. subst. eapply REGS.
+        apply RegSet.singleton_spec. eauto.
+    - (* store *)
+      right.
+      guardH ORD21.
+      apply RegSet.disjoint_add in REGS. des.
+      hexploit sim_local_write_bot; try exact LOCAL1; try exact SC;
+        try exact WF_SRC; try exact WF_TGT; try refl; eauto; try by viewtac. i. des.
+      exploit reorder_racy_read_write; try exact RACY_READ; eauto. i. des.
+      esplits.
+      + ss.
+      + econs 2; [|econs 1]. econs.
+        * econs. econs 2. econs; [|econs 3]; eauto. econs.
+          erewrite RegFile.eq_except_value; cycle 2.
+          { apply RegFile.eq_except_singleton. }
+          { econs. }
+          { ii. apply RegSet.singleton_spec in LHS. subst. congr. }
+        * eauto.
+      + econs 2. econs 2. econs; [|econs 9]; eauto. econs. econs. eauto.
+      + eauto.
+      + eauto.
+      + ss.
+      + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
+    - (* na write *)
+      inv LOCAL1. destruct ord; ss.
+    - (* racy read *)
+      right.
+      apply RegSet.disjoint_add in REGS. des.
+      exploit sim_local_racy_read; try exact LOCAL; eauto; try refl. i. des.
+      esplits.
+      + ss.
+      + econs 2; [|econs 1]. econs.
+        * econs. econs 2. econs; [|econs 9]; eauto. econs. econs.
+        * eauto.
+      + econs 2. econs 2. econs; [|econs 9]; try exact RACY_READ. econs. econs.
+        erewrite RegFile.eq_except_rmw; eauto; cycle 1.
+        * apply RegFile.eq_except_singleton.
+        * symmetry. eauto.
+      + eauto.
+      + eauto.
+      + eauto.
+      + left. eapply paco11_mon; [apply sim_stmts_nil|]; ss.
+        apply RegFun.add_add. ii. subst. eapply REGS.
+        apply RegSet.singleton_spec. eauto.
+    - (* racy write *)
+      left. guardH ORD21.
+      exploit sim_local_racy_write; try exact LOCAL1; try apply RACY_READ;
+        try match goal with
+            | [|- is_true (Ordering.le _ _)] => refl
+            end; eauto.
+      i. des.
+      unfold Thread.steps_failure. esplits; try refl.
+      + econs 2. econs; [|econs 10]; eauto. econs. econs.
+      + ss.
   }
 Grab Existential Variables.
 { econs 2. }
@@ -611,4 +545,82 @@ Proof.
     + right. esplits; eauto.
       left. eapply paco11_mon; eauto. ss.
     + right. esplits; eauto.
+Qed.
+
+Inductive sim_update_race:
+  forall (st_src:(Language.state lang)) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t), Prop :=
+| sim_update_race_intro
+    r1 l1 vr1 vret1 vw1 rmw1 or1 ow1 i2 rs
+    lc1_src sc1_src mem1_src
+    (RMW: RegFile.eval_rmw rs rmw1 vr1 = (vret1, Some vw1))
+    (REORDER: reorder_update r1 l1 rmw1 or1 ow1 i2)
+    (RACY_UPDATE: Local.racy_update_step lc1_src mem1_src l1 or1 ow1)
+    (WF_SRC: Local.wf lc1_src mem1_src)
+    (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
+    (MEM_SRC: Memory.closed mem1_src):
+    sim_update_race
+      (State.mk rs [Stmt.instr i2; Stmt.instr (Instr.update r1 l1 rmw1 or1 ow1)]) lc1_src sc1_src mem1_src
+.
+
+Lemma sim_update_race_steps_failure
+      st1_src lc1_src sc1_src mem1_src
+      (SIM: sim_update_race st1_src lc1_src sc1_src mem1_src):
+  Thread.steps_failure (Thread.mk lang st1_src lc1_src sc1_src mem1_src).
+Proof.
+  unfold Thread.steps_failure.
+  inv SIM. inv REORDER.
+  - (* load *)
+    exploit progress_read_step_cur; try exact WF_SRC; eauto. i. des.
+    exploit read_step_cur_future; try exact READ; eauto. i. des.
+    esplits.
+    + econs 2; try refl. econs.
+      * econs. econs 2. econs; [|econs 2]; eauto. econs. econs.
+      * ss.
+    + econs 2. econs; [|econs 11].
+      * econs. econs.
+        erewrite RegFile.eq_except_rmw; eauto; cycle 1.
+        { apply RegFile.eq_except_singleton. }
+        { ii. eapply REGS; eauto.
+          apply RegSet.add_spec. auto.
+        }
+      * assert (CONS: Local.promise_consistent lc2).
+        { ii. rewrite <- PROMISES, <- TVIEW in *. inv RACY_UPDATE; eauto. }
+        inv RACY_UPDATE.
+        { econs 1; eauto. }
+        { econs 2; eauto. }
+        { econs 3; eauto; try congr.
+          inv RACE. econs. rewrite <- TVIEW. ss.
+        }
+    + ss.
+  - (* store *)
+    guardH ORD21.
+    exploit (@LowerPromises.steps_promises_rel
+               lang (Thread.mk lang (State.mk rs [Stmt.instr (Instr.store l2 v2 o2); Stmt.instr (Instr.update r1 l1 rmw1 or1 ow1)])
+                               lc1_src sc1_src mem1_src)); s; eauto.
+    i. des. destruct e2, state. ss.
+    exploit LowerPromises.rtc_opt_promise_step_future; eauto. s. i. des. inv STATE.
+    hexploit LowerPromises.promises_rel_promise_consistent; eauto; i.
+    { inv RACY_UPDATE; eauto. }
+    hexploit LowerPromises.promises_rel_nonsynch; eauto. i.
+    exploit Thread.rtc_tau_step_future; try exact STEPS0; eauto. s. i. des.
+    exploit write_step_consistent; try exact WF2; eauto. i. des.
+    esplits.
+    + eapply rtc_n1; eauto. econs.
+      * econs. econs 2. econs; [|econs 3; eauto]. econs. econs.
+      * ss.
+    + econs 2. econs; [|econs 11].
+      * econs. econs. eauto.
+      * inv RACY_UPDATE.
+        { econs 1; eauto. }
+        { econs 2; eauto. }
+        { exploit Thread.rtc_tau_step_non_promised; try exact STEPS0; eauto. s. i. des.
+          exploit Local.program_step_non_promised; [econs 3|..]; try exact STEP; eauto. i. des.
+          econs 3; eauto; try congr.
+          inv RACE. econs. rewrite TVIEW in TS.
+          inv STEP. ss.
+          apply TimeFacts.join_spec_lt; auto.
+          unfold TimeMap.singleton, Loc.LocFun.add, Loc.LocFun.init, Loc.LocFun.find. condtac; ss.
+          eapply TimeFacts.le_lt_lt; eauto. apply Time.bot_spec.
+        }
+    + ss.
 Qed.

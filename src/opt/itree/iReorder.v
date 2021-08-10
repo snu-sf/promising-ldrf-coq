@@ -95,6 +95,14 @@ Proof.
     + left. eapply paco11_mon; [apply sim_load_sim_thread|]; ss.
       econs; eauto.
       eapply Local.read_step_future; eauto.
+  - (* racy read *)
+    right.
+    exploit sim_local_racy_read; eauto; try refl. i. des.
+    esplits; try apply SC; eauto; ss.
+    + econs 1.
+    + auto.
+    + left. eapply paco11_mon; [apply sim_load_sim_thread|]; ss.
+      econs 2; eauto.
   - (* store *)
     right.
     exploit Local.write_step_future; eauto; try by viewtac. i. des.
@@ -111,6 +119,12 @@ Proof.
     + auto.
     + left. eapply paco11_mon; [apply sim_store_sim_thread|done].
       econs; eauto.
+  - (* na write *)
+    inv LOCAL1. inv REORDER; destruct ord; ss.
+  - (* racy write *)
+    left.
+    eapply sim_store_race_steps_failure. econs; eauto.
+    eapply sim_local_racy_write; eauto; try refl.
   - (* update *)
     right.
     exploit Local.read_step_future; eauto. i. des.
@@ -135,6 +149,10 @@ Proof.
     + left. eapply paco11_mon; [apply sim_update_sim_thread|done].
       econs; [eauto|..]; s; eauto.
       etrans; eauto.
+  - (* racy update *)
+    left.
+    eapply sim_update_race_steps_failure; eauto. econs; eauto.
+    eapply sim_local_racy_update; eauto; try refl.
   - (* update-load *)
     right.
     exploit sim_local_read; eauto; try refl. i. des.
@@ -144,6 +162,14 @@ Proof.
     + left. eapply paco11_mon; [apply sim_update_sim_thread|]; ss.
       econs; [eauto|..]; s; eauto.
       eapply Local.read_step_future; eauto.
+  - (* racy update-load *)
+    right.
+    exploit sim_local_racy_read; eauto; try refl. i. des.
+    esplits; try apply SC; eauto; ss.
+    + econs 1.
+    + ss.
+    + left. eapply paco11_mon; [apply sim_update_sim_thread|]; ss.
+      econs 2; eauto.
   - (* fence *)
     right.
     exploit sim_local_fence; try apply SC; eauto; try refl. i. des.
@@ -161,7 +187,6 @@ Proof.
     eapply sim_abort_steps_failure. econs; eauto.
     eapply sim_local_failure; eauto.
 Grab Existential Variables.
-  { i. exact ITree.spin. }
   { econs 2. }
   { econs. econs 3. }
 Qed.

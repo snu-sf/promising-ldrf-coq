@@ -39,7 +39,8 @@ Inductive reorder_release_fenceF: forall (i2:Instr.t), Prop :=
     reorder_release_fenceF (Instr.load r2 l2 o2)
 | reorder_release_fenceF_store
     l2 v2 o2
-    (ORD2: Ordering.le o2 Ordering.plain \/ Ordering.le Ordering.acqrel o2):
+    (ORD21: Ordering.le o2 Ordering.plain \/ Ordering.le Ordering.acqrel o2)
+    (ORD22: Ordering.le Ordering.plain o2):
     reorder_release_fenceF (Instr.store l2 v2 o2)
 | reorder_release_fenceF_update
     r2 l2 rmw2 or2 ow2
@@ -136,8 +137,9 @@ Proof.
   { right. esplits; eauto.
     inv LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto. rewrite PROMISES. auto.
   }
-  right. inv STEP_TGT.
+  inv STEP_TGT.
   { (* promise *)
+    right.
     inv STEP.
     exploit sim_local_promise_bot; eauto. i. des.
     esplits; try apply SC; eauto; ss.
@@ -150,6 +152,7 @@ Proof.
   exploit Local.fence_step_future; eauto. i. des.
   inv STEP. inv LOCAL1; inv STATE; inv INSTR; inv REORDER.
   - (* load *)
+    right.
     exploit sim_local_read_relfenced; eauto; try refl. i. des.
     esplits.
     + ss.
@@ -163,6 +166,7 @@ Proof.
     + left. eapply paco11_mon; [apply sim_release_fenceF_sim_thread|]; ss.
       econs. eauto.
   - (* update-load *)
+    right.
     guardH ORDW2.
     exploit sim_local_read_relfenced; eauto; try refl. i. des.
     esplits.
@@ -177,9 +181,12 @@ Proof.
     + left. eapply paco11_mon; [apply sim_release_fenceF_sim_thread|]; ss.
       econs. eauto.
   - (* write *)
-    guardH ORD2.
-    hexploit sim_local_write_relfenced; try exact SC; eauto;
-      (try refl); (try by econs). i. des.
+    right.
+    guardH ORD21.
+    hexploit sim_local_write_relfenced; try exact SC;
+      try match goal with
+          | [|- is_true (Ordering.le _ _)] => refl
+          end; eauto; (try by econs). i. des.
     esplits.
     + ss.
     + etrans; [eauto|]. econs 2; [|refl]. econs.
@@ -193,12 +200,15 @@ Proof.
     + left. eapply paco11_mon; [apply sim_release_fenceF_sim_thread|]; ss.
       econs. eauto.
   - (* update *)
+    right.
     guardH ORDW2.
     exploit Local.read_step_future; eauto. i. des.
     exploit sim_local_read_relfenced; eauto; try refl. i. des.
     exploit Local.read_step_future; eauto. i. des.
-    hexploit sim_local_write_relfenced; try exact SC; eauto;
-      (try refl); (try by econs). i. des.
+    hexploit sim_local_write_relfenced; try exact SC;
+      try match goal with
+          | [|- is_true (Ordering.le _ _)] => refl
+          end; eauto; (try by econs). i. des.
     esplits.
     + ss.
     + etrans; [eauto|]. econs 2; [|refl]. econs.
@@ -213,6 +223,7 @@ Proof.
     + left. eapply paco11_mon; [apply sim_release_fenceF_sim_thread|]; ss.
       econs. eauto.
   - (* fence *)
+    right.
     exploit sim_local_fence_relfenced; try exact SC; eauto; try refl. i. des.
     esplits.
     + ss.
@@ -227,4 +238,61 @@ Proof.
     + auto.
     + left. eapply paco11_mon; [apply sim_release_fenceF_sim_thread|]; ss.
       econs. eauto.
+  - (* na write *)
+    inv LOCAL3. destruct ord; ss.
+  - (* racy read *)
+    right.
+    exploit sim_local_racy_read_relfenced; eauto; try refl. i. des.
+    esplits.
+    + ss.
+    + etrans; [eauto|]. econs 2; [|refl]. econs.
+      * econs. econs 2. econs; [|econs 5]; eauto. econs. econs.
+      * ss.
+    + econs 2. econs 2. econs; [|econs 9]; eauto. econs. econs.
+    + auto.
+    + etrans; eauto.
+    + auto.
+    + left. eapply paco11_mon; [apply sim_release_fenceF_sim_thread|]; ss.
+      econs. eauto.
+  - (* racy update-load *)
+    right.
+    guardH ORDW2.
+    exploit sim_local_racy_read_relfenced; eauto; try refl. i. des.
+    esplits.
+    + ss.
+    + etrans; [eauto|]. econs 2; [|refl]. econs.
+      * econs. econs 2. econs; [|econs 5]; eauto. econs. econs.
+      * ss.
+    + econs 2. econs 2. econs; [|econs 9]; eauto. econs. econs. eauto.
+    + auto.
+    + etrans; eauto.
+    + auto.
+    + left. eapply paco11_mon; [apply sim_release_fenceF_sim_thread|]; ss.
+      econs. eauto.
+  - (* racy write *)
+    left.
+    guardH ORD21.
+    exploit sim_local_racy_write_relfenced;
+      try match goal with
+          | [|- is_true (Ordering.le _ _)] => refl
+          end; eauto. i. des.
+    unfold Thread.steps_failure. esplits.
+    + etrans; [eauto|]. econs 2; [|refl]. econs.
+      * econs. econs 2. econs; [|econs 5]; eauto. econs. econs.
+      * ss.
+    + econs 2. econs; [|econs 10]; eauto. econs. econs.
+    + ss.
+  - (* racy update *)
+    left.
+    guardH ORDW2.
+    exploit sim_local_racy_update_relfenced;
+      try match goal with
+          | [|- is_true (Ordering.le _ _)] => refl
+          end; eauto. i. des.
+    unfold Thread.steps_failure. esplits.
+    + etrans; [eauto|]. econs 2; [|refl]. econs.
+      * econs. econs 2. econs; [|econs 5]; eauto. econs. econs.
+      * ss.
+    + econs 2. econs; [|econs 11]; eauto. econs. econs. eauto.
+    + ss.
 Qed.

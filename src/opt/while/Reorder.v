@@ -165,15 +165,21 @@ Proof.
       econs 2; eauto.
   - (* racy read-update *)
     right.
-    
-    admit.
+    exploit sim_local_racy_read; eauto; try refl. i. des.
+    esplits; try apply SC; eauto; ss.
+    + econs 1.
+    + ss.
+    + left. eapply paco11_mon; [apply sim_update_sim_thread|]; ss.
+      econs 2; eauto.
   - (* racy write *)
     left.
-    admit.
+    eapply sim_store_race_steps_failure; eauto. econs; eauto.
+    eapply sim_local_racy_write; eauto; try refl.
   - (* racy update *)
     left.
-    admit.
-(* Grab Existential Variables. *)
-(*   { econs 2. } *)
-(*   { econs. econs 3. } *)
-Admitted.
+    eapply sim_update_race_steps_failure; eauto. econs; eauto.
+    eapply sim_local_racy_update; eauto; try refl.
+Unshelve.
+  { econs. econs 3. }
+  { econs 2. }
+Qed.

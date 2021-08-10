@@ -166,10 +166,6 @@ Proof.
   }
   exploit SimPromises.remove; try exact REMOVE;
     try exact MEM1; try apply LOCAL1; eauto.
-  { econs. ss. }
-  { apply WF1_SRC. }
-  { apply WF1_TGT. }
-  { apply WF1_TGT. }
   i. des. esplits.
   - econs; eauto.
     + unfold SimPromises.none_if_released. condtac.
@@ -343,6 +339,76 @@ Proof.
     + etrans; eauto. apply WF1_TGT.
   - unfold TView.write_fence_sc.
     repeat (condtac; viewtac).
+Qed.
+
+Lemma sim_local_racy_read_relfenced
+      pview
+      lc1_src mem1_src
+      lc1_tgt mem1_tgt
+      loc val ord_src ord_tgt
+      (STEP_TGT: Local.racy_read_step lc1_tgt mem1_tgt loc val ord_tgt)
+      (LOCAL1: sim_local pview lc1_src (local_relfenced lc1_tgt))
+      (MEM1: sim_memory mem1_src mem1_tgt)
+      (ORD: Ordering.le ord_src ord_tgt):
+    <<STEP_SRC: Local.racy_read_step lc1_src mem1_src loc val ord_src>>.
+Proof.
+  inv LOCAL1. inv STEP_TGT.
+  exploit sim_memory_get; try apply GET; try apply MEM1. i. des.
+  econs; eauto.
+  - destruct (Memory.get loc to (Local.promises lc1_src)) as [[]|] eqn:GETP_SRC; ss.
+    inv PROMISES. exploit COMPLETE; eauto. i. ss.
+  - eapply TViewFacts.racy_readable_mon; eauto. apply TVIEW.
+  - ii. subst. inv MSG. ss.
+  - i. exploit MSG2; try by (destruct ord_src, ord_tgt; ss).
+    i. subst. inv MSG. ss.
+Qed.
+
+Lemma sim_local_racy_write_relfenced
+      pview
+      lc1_src mem1_src
+      lc1_tgt mem1_tgt
+      loc ord_src ord_tgt
+      (STEP_TGT: Local.racy_write_step lc1_tgt mem1_tgt loc ord_tgt)
+      (LOCAL1: sim_local pview lc1_src (local_relfenced lc1_tgt))
+      (MEM1: sim_memory mem1_src mem1_tgt)
+      (ORD: Ordering.le ord_src ord_tgt):
+    <<STEP_SRC: Local.racy_write_step lc1_src mem1_src loc ord_src>>.
+Proof.
+  dup LOCAL1. inv LOCAL1. inv STEP_TGT.
+  exploit sim_memory_get; try apply GET; try apply MEM1. i. des.
+  econs; eauto.
+  - destruct (Memory.get loc to (Local.promises lc1_src)) as [[]|] eqn:GETP_SRC; ss.
+    inv PROMISES. exploit COMPLETE; eauto. i. ss.
+  - eapply TViewFacts.racy_writable_mon; eauto. apply TVIEW.
+  - ii. subst. inv MSG. ss.
+  - i. exploit MSG2; try by (destruct ord_src, ord_tgt; ss).
+    i. subst. inv MSG. ss.
+  - eapply sim_local_promise_consistent; try apply LOCAL0.
+    ii. ss. eapply CONSISTENT; eauto.
+Qed.
+
+Lemma sim_local_racy_update_relfenced
+      pview
+      lc1_src mem1_src
+      lc1_tgt mem1_tgt
+      loc ordr_src ordw_src ordr_tgt ordw_tgt
+      (STEP_TGT: Local.racy_update_step lc1_tgt mem1_tgt loc ordr_tgt ordw_tgt)
+      (LOCAL1: sim_local pview lc1_src (local_relfenced lc1_tgt))
+      (MEM1: sim_memory mem1_src mem1_tgt)
+      (ORDR: Ordering.le ordr_src ordr_tgt)
+      (ORDW: Ordering.le ordw_src ordw_tgt):
+    <<STEP_SRC: Local.racy_update_step lc1_src mem1_src loc ordr_src ordw_src>>.
+Proof.
+  hexploit sim_local_promise_consistent; try exact LOCAL1.
+  { ii. ss. inv STEP_TGT; eauto. }
+  i. des.
+  inv LOCAL1. inv STEP_TGT; eauto.
+  exploit sim_memory_get; try apply GET; try apply MEM1. i. des.
+  econs 3; eauto.
+  - destruct (Memory.get loc to (Local.promises lc1_src)) as [[]|] eqn:GETP_SRC; ss.
+    inv PROMISES. exploit COMPLETE; eauto. i. ss.
+  - eapply TViewFacts.racy_writable_mon; eauto. apply TVIEW.
+  - ii. subst. inv MSG. ss.
 Qed.
 
 Lemma sim_local_intro_relfenced
