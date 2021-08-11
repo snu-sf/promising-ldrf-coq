@@ -23,6 +23,7 @@ Require Import FulfillStep.
 Require Import gSimAux.
 Require Import gSimMemory.
 Require Import gSimulation.
+Require Import JoinedView.
 
 Require Import Program.
 
@@ -50,14 +51,15 @@ Definition _sim_itree
            R_src R_tgt
            (sim_ret:SIM_VAL R_src R_tgt)
            (itr_src: itree MemE.t R_src) (itr_tgt: itree MemE.t R_tgt): Prop :=
-  forall b lc_src lc_tgt sc0_src sc0_tgt mem0_src mem0_tgt w1
-         (LOCAL: sim_local w1 lc_src lc_tgt),
+  forall b lc_src lc_tgt sc0_src sc0_tgt mem0_src mem0_tgt w1 views1
+         (LOCAL: sim_local w1 views1 lc_src lc_tgt),
     sim_thread
       (lang R_src) (lang R_tgt)
       (sim_terminal sim_ret)
       b w1
       itr_src lc_src sc0_src mem0_src
-      itr_tgt lc_tgt sc0_tgt mem0_tgt.
+      itr_tgt lc_tgt sc0_tgt mem0_tgt
+      views1.
 
 Definition _sim_ktree
            (sim_thread:SIM_THREAD world)
@@ -71,14 +73,14 @@ Definition _sim_ktree
     _sim_itree sim_thread sim_ret1 (ktr_src r_src) (ktr_tgt r_tgt).
 
 Lemma _sim_itree_mon
-      s1 s2 (S: s1 <13= s2):
+      s1 s2 (S: s1 <14= s2):
   @_sim_itree s1 <5= @_sim_itree s2.
 Proof.
   ii. apply S. apply PR; auto.
 Qed.
 
 Lemma _sim_ktree_mon
-      s1 s2 (S: s1 <13= s2):
+      s1 s2 (S: s1 <14= s2):
   @_sim_ktree s1 <8= @_sim_ktree s2.
 Proof.
   ii. apply S. eapply PR; eauto.
@@ -264,28 +266,30 @@ Global Hint Resolve cpn11_wcompat: paco.
 
 Inductive ctx (sim_thread:SIM_THREAD world): SIM_THREAD world :=
 | ctx_ret
-    R_src R_tgt b w0
+    R_src R_tgt b w0 views0
     (sim_ret:SIM_VAL R_src R_tgt)
     sc0_src mem0_src
     sc0_tgt mem0_tgt
     lc_src lc_tgt (r_src: R_src) (r_tgt: R_tgt)
     (RET: sim_ret r_src r_tgt)
-    (LOCAL: sim_local w0 lc_src lc_tgt):
+    (LOCAL: sim_local w0 views0 lc_src lc_tgt):
     @ctx sim_thread
          (lang R_src) (lang R_tgt)
          (sim_terminal sim_ret)
          b w0
          (Ret r_src) lc_src sc0_src mem0_src
          (Ret r_tgt) lc_tgt sc0_tgt mem0_tgt
+         views0
 | ctx_bind
-    R_src0 R_tgt0 R_src1 R_tgt1 b w0
+    R_src0 R_tgt0 R_src1 R_tgt1 b w0 views0
     (sim_ret1:SIM_VAL R_src0 R_tgt0) (sim_ret2:SIM_VAL R_src1 R_tgt1)
     itr0 k0 lc_src sc0_src mem0_src
     itr1 k1 lc_tgt sc0_tgt mem0_tgt
     (SIM1: sim_thread (lang R_src0) (lang R_tgt0) (sim_terminal sim_ret1)
                       b w0
                       itr0 lc_src sc0_src mem0_src
-                      itr1 lc_tgt sc0_tgt mem0_tgt)
+                      itr1 lc_tgt sc0_tgt mem0_tgt
+                      views0)
     (SIM2: _sim_ktree sim_thread sim_ret1 k0 k1 sim_ret2):
     @ctx sim_thread
          (lang R_src1) (lang R_tgt1)
@@ -293,8 +297,9 @@ Inductive ctx (sim_thread:SIM_THREAD world): SIM_THREAD world :=
          b w0
          (itr0 >>= k0) lc_src sc0_src mem0_src
          (itr1 >>= k1) lc_tgt sc0_tgt mem0_tgt
+         views0
 | ctx_tau_iter
-    I_src I_tgt R_src R_tgt b w0
+    I_src I_tgt R_src R_tgt b w0 views0
     (sim_ret0: SIM_VAL I_src I_tgt) (sim_ret1: SIM_VAL R_src R_tgt)
     sc0_src mem0_src
     sc0_tgt mem0_tgt
@@ -304,7 +309,7 @@ Inductive ctx (sim_thread:SIM_THREAD world): SIM_THREAD world :=
     (SIM: _sim_ktree sim_thread sim_ret0 body_src body_tgt (sum_rel sim_ret0 sim_ret1))
     i_src i_tgt
     (VAL: sim_ret0 i_src i_tgt)
-    (LOCAL: sim_local w0 lc_src lc_tgt)
+    (LOCAL: sim_local w0 views0 lc_src lc_tgt)
   :
     @ctx sim_thread
          (lang R_src) (lang R_tgt)
@@ -312,9 +317,10 @@ Inductive ctx (sim_thread:SIM_THREAD world): SIM_THREAD world :=
          b w0
          (tau;;(ITree.iter body_src i_src)) lc_src sc0_src mem0_src
          (tau;;(ITree.iter body_tgt i_tgt)) lc_tgt sc0_tgt mem0_tgt
+         views0
 .
 
-Lemma ctx_mon: monotone13 ctx.
+Lemma ctx_mon: monotone14 ctx.
 Proof.
   ii. destruct IN.
   - econs 1; eauto.
@@ -338,18 +344,20 @@ Qed.
 
 Definition _sim_thread := @_sim_thread world world_messages_le sim_memory sim_timemap sim_local.
 
-Lemma _sim_thread_mon: monotone13 _sim_thread.
+Lemma _sim_thread_mon: monotone14 _sim_thread.
 Proof.
   eapply _sim_thread_mon.
 Qed.
+Hint Resolve _sim_thread_mon: paco.
+Hint Resolve cpn14_wcompat: paco.
 
 Lemma ctx_compat:
-  ctx <14= gupaco13 _sim_thread (cpn13 _sim_thread).
+  ctx <15= gupaco14 _sim_thread (cpn14 _sim_thread).
 Proof.
-  assert (MON: monotone13 _sim_thread).
+  assert (MON: monotone14 _sim_thread).
   (* paco tactics do not work well without this *)
   { eapply _sim_thread_mon; eauto. }
-  eapply wrespect13_uclo; auto.
+  eapply wrespect14_uclo; auto.
   econs; auto. i. destruct PR.
   - (* ret *)
     rr. split.
@@ -357,33 +365,35 @@ Proof.
       { right. inv TERMINAL_TGT. ss. esplits; eauto; ss.
         - econs; eauto.
         - eapply sim_future_memory_sc_future in FUTURE; eauto.
-          { des. eapply sim_local_world_mon; eauto. }
+          { des. eapply sim_local_mon; eauto. }
           { typeclasses eauto. }
         - econs; eauto.
         - refl.
       }
       { right. subst. esplits; eauto. eapply sim_local_memory_bot; eauto. }
-      inv STEP_TGT; try by inv STEP; inv STATE.
-      inv STEP; ss.
-      exploit sim_local_promise; try apply MEMORY; eauto.
+      inv STEP_TGT.
+      inv STEP; try by inv STEP0; inv STATE.
+      inv STEP0; ss.
+      hexploit (@sim_local_promise b w1 views1 views2); eauto.
       { eapply sim_future_memory_sc_future in FUTURE; eauto.
-        { des. eapply sim_local_world_mon; eauto. }
+        { des. eapply sim_local_mon; eauto. }
         { i. typeclasses eauto. }
       }
+      { i. subst. eapply PROMISE; eauto. }
       i. des.
       right. esplits; try apply MEM2.
       + ss.
       + eauto.
       + econs 2. econs 1. econs; eauto.
       + eauto.
-      + eapply sim_timemap_world_mon; eauto.
-      + eapply rclo13_clo_base. eapply ctx_ret; auto.
+      + eapply sim_timemap_mon; eauto.
+      + eapply rclo14_clo_base. eapply ctx_ret; auto.
       + auto.
     }
     { ii. subst. hexploit sim_cap; eauto.
       i. des. esplits; eauto.
       i. hexploit CAP; eauto. i. des. esplits; eauto.
-      eapply rclo13_clo_base. econs; eauto.
+      eapply rclo14_clo_base. econs; eauto.
     }
   - (* bind *)
     eapply GF in SIM1. red in SIM1. red in SIM1. des.
@@ -413,6 +423,7 @@ Proof.
           exploit SIM2; eauto. i. eapply GF in x0.
           red in x0. red in x0. des. clear CAP. ss.
           exploit FUTURE1; try apply SC0; eauto.
+          { refl. }
           { red. destruct b.
             { splits; auto. }
             { splits; try refl. }
@@ -451,6 +462,7 @@ Proof.
           + eapply rtc_internal_step_bind. apply STEPS.
           + ss.
       }
+      inv STEP_TGT.
       hexploit thread_step_deseq; eauto. i. des; clarify.
       + exploit TERMINAL; (try by econs); auto. i. des.
         * left.
@@ -470,13 +482,14 @@ Proof.
           exploit SIM2; eauto. i. eapply GF in x.
           red in x. red in x. des. clear CAP.
           exploit FUTURE1; try apply SC0; eauto.
+          { refl. }
           { red. destruct b.
             { splits; auto. }
             { splits; try refl. }
           }
           { refl. }
           i. ss. des.
-          exploit STEP0; eauto. i. des.
+          exploit STEP1; eauto. i. des.
           { left.
             unfold Thread.steps_failure in *. des.
             destruct e2, e3.
@@ -485,7 +498,7 @@ Proof.
             etrans; eauto. rewrite bind_ret_l. eauto. }
           { right.
             esplits; cycle 2; eauto.
-            - eapply rclo13_base. auto.
+            - eapply rclo14_base. auto.
             - etrans; eauto.
               eapply world_messages_le_mon; eauto.
               i. eapply rtc_step_unchangable in STEPS; eauto.
@@ -505,12 +518,14 @@ Proof.
           esplits; [|M|M| | | | |]; Mskip eauto.
           { eapply rtc_internal_step_bind. eauto. }
           { eapply opt_step_bind. eauto. }
-          { eapply rclo13_clo_base. eapply ctx_bind; eauto.
+          { eapply rclo14_clo_base. eapply ctx_bind; eauto.
             eapply _sim_ktree_mon; cycle 1; eauto.
           }
-      + left. exploit STEP.
-        { right. instantiate (5:=ThreadEvent.failure). econs; eauto.
-          ss. econs; eauto. }
+      + left. inv STEP0; inv STEP1. inv LOCAL. exploit STEP.
+        { instantiate (6:=ThreadEvent.failure).
+          econs; eauto. econs 2. ss. econs; eauto. econs; eauto.
+        }
+        { ss. }
         i. des; ss.
         unfold Thread.steps_failure in *. des. destruct e2, e3. esplits; [..|eauto].
         { eapply rtc_internal_step_bind; eauto. }
@@ -518,7 +533,7 @@ Proof.
     }
     { ii. exploit CAP; eauto. i. des. esplits; eauto.
       i. exploit CAP0; eauto. i. des. esplits; eauto.
-      eapply rclo13_clo_base. econs; eauto.
+      eapply rclo14_clo_base. econs; eauto.
       eapply _sim_ktree_mon; [|eauto]. auto.
     }
   - (* tau iter *)
@@ -527,36 +542,40 @@ Proof.
       splits; s; ii.
       { inv TERMINAL_TGT. eapply f_equal with (f:=observe) in H. ss. }
       { right. subst. esplits; eauto. eapply sim_local_memory_bot; eauto. }
-      right. inv STEP_TGT; ss.
+      assert (VIEWSLE0: views_le views1 views2).
+      { eapply JThread.step_future; eauto. }
+      right. inv STEP_TGT. inv STEP; ss.
       + (* promise *)
-        inv STEP; ss.
+        inv STEP0; ss.
         exploit sim_local_promise; try apply MEMORY; eauto.
         { eapply sim_future_memory_sc_future in FUTURE; eauto.
           2:{ typeclasses eauto. (* why? *) }
-          des. eapply sim_local_world_mon; eauto. }
+          des. eapply sim_local_mon; eauto. }
+        { i. subst. eapply PROMISE; eauto. }
         i. des.
         esplits; try apply MEM2; eauto; ss.
         { econs 2. econs 1. econs; eauto. }
         { eauto. }
-        { eapply sim_timemap_world_mon; eauto. }
-        { eapply rclo13_clo_base. eapply ctx_tau_iter; eauto.
+        { eapply sim_timemap_mon; eauto. }
+        { eapply rclo14_clo_base. eapply ctx_tau_iter; eauto.
           eapply _sim_ktree_mon; cycle 1; eauto.
         }
       + (* tau *)
-        inv STEP. ss. inv LOCAL0; dependent destruction STATE.
-        esplits; try apply MEMORY; eauto; ss.
+        inv STEP0. ss. inv LOCAL0; dependent destruction STATE.
+        esplits; eauto; ss.
         { econs 2. econs 2. econs; [|econs 1]; eauto. econs; eauto. }
+        { eapply sim_memory_mon; eauto. }
         { rewrite unfold_iter_eq. rewrite unfold_iter_eq.
-          eapply rclo13_clo. eapply ctx_bind; eauto.
+          eapply rclo14_clo. eapply ctx_bind; eauto.
           { eapply sim_future_memory_sc_future in FUTURE; eauto.
             2:{ typeclasses eauto. (* why? *) }
-            des. eapply rclo13_base. eapply LE. eapply SIM; eauto.
-            eapply sim_local_world_mon; eauto.
+            des. eapply rclo14_base. eapply LE. eapply SIM; eauto.
+            eapply sim_local_mon; eauto. etrans; eauto.
           }
-          ii. eapply rclo13_clo. inv RET.
+          ii. eapply rclo14_clo. inv RET.
           { eapply ctx_tau_iter; eauto.
             eapply _sim_ktree_mon; cycle 1; eauto.
-            i. eapply rclo13_base. eauto. }
+            i. eapply rclo14_base. eauto. }
           { eapply ctx_ret; eauto. }
         }
         { refl. }
@@ -564,14 +583,14 @@ Proof.
     { ii. subst. hexploit sim_cap; eauto.
       i. des. esplits; eauto.
       i. hexploit CAP; eauto. i. des. esplits; eauto.
-      eapply rclo13_clo. econs 3; eauto.
-      eapply _sim_ktree_mon; [|eauto]. i. eapply rclo13_base. auto.
+      eapply rclo14_clo. econs 3; eauto.
+      eapply _sim_ktree_mon; [|eauto]. i. eapply rclo14_base. auto.
     }
 Qed.
 
 Inductive iter_ctx (sim_thread:SIM_THREAD world): SIM_THREAD world :=
 | ctx_iter
-    I_src I_tgt R_src R_tgt b w0
+    I_src I_tgt R_src R_tgt b w0 views
     (sim_ret0: SIM_VAL I_src I_tgt) (sim_ret1: SIM_VAL R_src R_tgt)
     sc0_src mem0_src
     sc0_tgt mem0_tgt
@@ -581,7 +600,7 @@ Inductive iter_ctx (sim_thread:SIM_THREAD world): SIM_THREAD world :=
     (SIM: _sim_ktree sim_thread sim_ret0 body_src body_tgt (sum_rel sim_ret0 sim_ret1))
     i_src i_tgt
     (VAL: sim_ret0 i_src i_tgt)
-    (LOCAL: sim_local w0 lc_src lc_tgt)
+    (LOCAL: sim_local w0 views lc_src lc_tgt)
   :
     @iter_ctx sim_thread
               (lang R_src) (lang R_tgt)
@@ -589,9 +608,10 @@ Inductive iter_ctx (sim_thread:SIM_THREAD world): SIM_THREAD world :=
               b w0
               (ITree.iter body_src i_src) lc_src sc0_src mem0_src
               (ITree.iter body_tgt i_tgt) lc_tgt sc0_tgt mem0_tgt
+              views
 .
 
-Lemma iter_ctx_mon: monotone13 iter_ctx.
+Lemma iter_ctx_mon: monotone14 iter_ctx.
 Proof.
   ii. destruct IN.
   econs; eauto. ii. eapply LE. eapply SIM; eauto.
@@ -599,25 +619,25 @@ Qed.
 Hint Resolve iter_ctx_mon.
 
 Lemma iter_ctx_compat:
-  iter_ctx <14= gupaco13 _sim_thread (cpn13 _sim_thread).
+  iter_ctx <15= gupaco14 _sim_thread (cpn14 _sim_thread).
 Proof.
-  assert (MON: monotone13 _sim_thread).
+  assert (MON: monotone14 _sim_thread).
   (* paco tactics do not work well without this *)
   { eapply _sim_thread_mon; eauto. }
-  eapply grespect13_uclo; auto.
+  eapply grespect14_uclo; auto.
   econs; auto. i. destruct PR.
-  eapply rclo13_clo_base. eapply cpn13_gupaco; [eauto with paco|].
+  eapply rclo14_clo_base. eapply cpn14_gupaco; [eauto with paco|].
   rewrite unfold_iter_eq. rewrite unfold_iter_eq.
   guclo ctx_compat. eapply ctx_bind.
   { gbase. eapply _sim_thread_mon.
     { eapply GF. eapply (@SIM i_src i_tgt); eauto. }
-    { i. eapply rclo13_base. eauto. }
+    { i. eapply rclo14_base. eauto. }
   }
   { ii. inv RET.
     { guclo ctx_compat. eapply ctx_tau_iter; eauto.
       eapply _sim_ktree_mon; cycle 1; eauto.
       i. gbase. eapply _sim_thread_mon; eauto.
-      i. eapply rclo13_base. eauto.
+      i. eapply rclo14_base. eauto.
     }
     { guclo ctx_compat. eapply ctx_ret; eauto. }
   }
@@ -636,9 +656,6 @@ Proof.
   ii. eapply sim_thread_mon; [|eauto].
   i. inv PR. econs; eauto.
 Qed.
-
-Hint Resolve _sim_thread_mon: paco.
-Hint Resolve cpn13_wcompat: paco.
 
 Lemma sim_itree_ret R_src R_tgt (sim_ret: SIM_VAL R_src R_tgt)
       r_src r_tgt
@@ -712,4 +729,3 @@ Proof.
   eapply _sim_ktree_mon; cycle 1; eauto.
   ii. gfinal. right. eauto.
 Qed.
-h

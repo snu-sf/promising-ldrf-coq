@@ -49,13 +49,13 @@ Hypothesis world_messages_le_mon:
          (MSGS: msgs0 <4= msgs1),
     world_messages_le msgs0 w0 w1.
 
-Variable sim_memory: forall (b: bool) (w: world) (mem_src mem_tgt:Memory.t), Prop.
+Variable sim_memory: forall (b: bool) (w: world) (views: Loc.t -> Time.t -> list View.t) (mem_src mem_tgt:Memory.t), Prop.
 Variable sim_timemap: forall (w: world) (sc_src sc_tgt: TimeMap.t), Prop.
-Variable sim_local: forall (w: world) (lc_src lc_tgt:Local.t), Prop.
+Variable sim_local: forall (w: world) (views: Loc.t -> Time.t -> list View.t) (lc_src lc_tgt:Local.t), Prop.
 
 Hypothesis sim_local_memory_bot:
-  forall w lc_src lc_tgt
-         (SIM: sim_local w lc_src lc_tgt)
+  forall w views lc_src lc_tgt
+         (SIM: sim_local w views lc_src lc_tgt)
          (BOT: (Local.promises lc_tgt) = Memory.bot),
     (Local.promises lc_src) = Memory.bot.
 
@@ -83,7 +83,8 @@ Section SimulationThread.
              (STEP_TGT: JThread.step pf_tgt e_tgt
                                      (Thread.mk _ st1_tgt lc1_tgt sc1_tgt mem1_tgt)
                                      (Thread.mk _ st3_tgt lc3_tgt sc3_tgt mem3_tgt)
-                                     views0 views1),
+                                     views0 views1)
+             (CONS_TGT: Local.promise_consistent lc3_tgt),
         (<<FAILURE: Thread.steps_failure (Thread.mk _ st1_src lc1_src sc1_src mem1_src)>>) \/
         exists e_src st2_src lc2_src sc2_src mem2_src st3_src lc3_src sc3_src mem3_src w3,
           (<<FAILURE: ThreadEvent.get_machine_event e_tgt <> MachineEvent.failure>>) /\
@@ -95,7 +96,7 @@ Section SimulationThread.
                                        (Thread.mk _ st3_src lc3_src sc3_src mem3_src)>>) /\
           (<<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>>) /\
           (<<SC3: sim_timemap w3 sc3_src sc3_tgt>>) /\
-          (<<MEMORY3: sim_memory b0 w3 mem3_src mem3_tgt>>) /\
+          (<<MEMORY3: sim_memory b0 w3 views1 mem3_src mem3_tgt>>) /\
           (<<SIM: sim_thread b0 w3 st3_src lc3_src sc3_src mem3_src st3_tgt lc3_tgt sc3_tgt mem3_tgt views1>>) /\
           (<<WORLD: world_messages_le (unchangable mem1_src lc1_src.(Local.promises)) w0 w3>>)
   .
@@ -163,7 +164,7 @@ Section SimulationThread.
     (<<FUTURE: forall w1 sc1_src mem1_src
                       sc1_tgt mem1_tgt views1
                       (SC: sim_timemap w1 sc1_src sc1_tgt)
-                      (MEMORY: sim_memory b0 w1 mem1_src mem1_tgt)
+                      (MEMORY: sim_memory b0 w1 views1 mem1_src mem1_tgt)
                       (WF_SRC: Local.wf lc1_src mem1_src)
                       (WF_TGT: Local.wf lc1_tgt mem1_tgt)
                       (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
@@ -192,9 +193,9 @@ Section SimulationThread.
                              (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
                              (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>>) /\
                (<<SC: sim_timemap w2 sc2_src sc1_tgt>>) /\
-               (<<MEMORY: sim_memory b0 w2 mem2_src mem1_tgt>>) /\
+               (<<MEMORY: sim_memory b0 w2 views1 mem2_src mem1_tgt>>) /\
                (<<TERMINAL_SRC: (Language.is_terminal lang_src) st2_src>>) /\
-               (<<LOCAL: sim_local w2 lc2_src lc1_tgt>>) /\
+               (<<LOCAL: sim_local w2 views1 lc2_src lc1_tgt>>) /\
                (<<TERMINAL: sim_terminal st2_src st1_tgt>>) /\
                (<<WORLD: world_messages_le (unchangable mem1_src lc1_src.(Local.promises)) w1 w2>>)>>) /\
         (<<PROMISES:
@@ -212,7 +213,7 @@ Section SimulationThread.
                                   st1_tgt lc1_tgt sc1_tgt mem1_tgt
                                   views1>>)>>) /\
     (<<CAP: forall (BOOL: b0 = false)
-                   (MEMORY: sim_memory b0 w0 mem0_src mem0_tgt)
+                   (MEMORY: sim_memory b0 w0 views0 mem0_src mem0_tgt)
                    (WF_SRC: Local.wf lc1_src mem0_src)
                    (WF_TGT: Local.wf lc1_tgt mem0_tgt)
                    (SC_SRC: Memory.closed_timemap sc0_src mem0_src)
@@ -230,7 +231,7 @@ Section SimulationThread.
                          (CAPTGT: Memory.cap mem0_tgt cap_tgt),
               exists w3,
                 (<<SC3: sim_timemap w3 sc0_src sc0_tgt>>) /\
-                (<<MEMORY3: sim_memory true w3 cap_src cap_tgt>>) /\
+                (<<MEMORY3: sim_memory true w3 views0 cap_src cap_tgt>>) /\
                 (<<SIM: sim_thread _ _ sim_terminal true w3 st1_src lc1_src sc0_src cap_src st1_tgt lc1_tgt sc0_tgt cap_tgt views0 >>)>>)>>)
   .
 
@@ -304,7 +305,7 @@ Lemma sim_thread_step
                           (Thread.mk _ st3_tgt lc3_tgt sc3_tgt mem3_tgt)
                           views1 views3)
       (SC: sim_timemap w1 sc1_src sc1_tgt)
-      (MEMORY: sim_memory b w1 mem1_src mem1_tgt)
+      (MEMORY: sim_memory b w1 views1 mem1_src mem1_tgt)
       (WF_SRC: Local.wf lc1_src mem1_src)
       (WF_TGT: Local.wf lc1_tgt mem1_tgt)
       (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
@@ -327,7 +328,7 @@ Lemma sim_thread_step
                             (Thread.mk _ st3_src lc3_src sc3_src mem3_src)>>) /\
     (<<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>>) /\
     (<<SC: sim_timemap w3 sc3_src sc3_tgt>>) /\
-    (<<MEMORY: sim_memory b w3 mem3_src mem3_tgt>>) /\
+    (<<MEMORY: sim_memory b w3 views3 mem3_src mem3_tgt>>) /\
     (<<WF_SRC: Local.wf lc3_src mem3_src>>) /\
     (<<WF_TGT: Local.wf lc3_tgt mem3_tgt>>) /\
     (<<SC_SRC: Memory.closed_timemap sc3_src mem3_src>>) /\
@@ -381,7 +382,7 @@ Lemma sim_thread_opt_step
                                (Thread.mk _ st3_tgt lc3_tgt sc3_tgt mem3_tgt)
                                views1 views3)
       (SC: sim_timemap w1 sc1_src sc1_tgt)
-      (MEMORY: sim_memory b w1 mem1_src mem1_tgt)
+      (MEMORY: sim_memory b w1 views1 mem1_src mem1_tgt)
       (WF_SRC: Local.wf lc1_src mem1_src)
       (WF_TGT: Local.wf lc1_tgt mem1_tgt)
       (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
@@ -404,7 +405,7 @@ Lemma sim_thread_opt_step
                              (Thread.mk _ st3_src lc3_src sc3_src mem3_src)>>) /\
     (<<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>>) /\
     (<<SC: sim_timemap w3 sc3_src sc3_tgt>>) /\
-    (<<MEMORY: sim_memory b w3 mem3_src mem3_tgt>>) /\
+    (<<MEMORY: sim_memory b w3 views3 mem3_src mem3_tgt>>) /\
     (<<WF_SRC: Local.wf lc3_src mem3_src>>) /\
     (<<WF_TGT: Local.wf lc3_tgt mem3_tgt>>) /\
     (<<SC_SRC: Memory.closed_timemap sc3_src mem3_src>>) /\
@@ -435,7 +436,7 @@ Lemma sim_thread_rtc_step
       views1 views2
       (STEPS: @JThread.rtc_tau lang_tgt e1_tgt e2_tgt views1 views2)
       (SC: sim_timemap w1 sc1_src (Thread.sc e1_tgt))
-      (MEMORY: sim_memory b w1 mem1_src (Thread.memory e1_tgt))
+      (MEMORY: sim_memory b w1 views1 mem1_src (Thread.memory e1_tgt))
       (WF_SRC: Local.wf lc1_src mem1_src)
       (WF_TGT: Local.wf (Thread.local e1_tgt) (Thread.memory e1_tgt))
       (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
@@ -453,7 +454,7 @@ Lemma sim_thread_rtc_step
                   (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
                   (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>>) /\
     (<<SC: sim_timemap w2 sc2_src (Thread.sc e2_tgt)>>) /\
-    (<<MEMORY: sim_memory b w2 mem2_src (Thread.memory e2_tgt)>>) /\
+    (<<MEMORY: sim_memory b w2 views2 mem2_src (Thread.memory e2_tgt)>>) /\
     (<<WF_SRC: Local.wf lc2_src mem2_src>>) /\
     (<<WF_TGT: Local.wf (Thread.local e2_tgt) (Thread.memory e2_tgt)>>) /\
     (<<SC_SRC: Memory.closed_timemap sc2_src mem2_src>>) /\
@@ -508,7 +509,7 @@ Lemma sim_thread_plus_step
       (STEPS: @JThread.rtc_tau lang_tgt e1_tgt e2_tgt views1 views2)
       (STEP: @JThread.step lang_tgt pf_tgt e_tgt e2_tgt e3_tgt views2 views3)
       (SC: sim_timemap w1 sc1_src (Thread.sc e1_tgt))
-      (MEMORY: sim_memory b w1 mem1_src (Thread.memory e1_tgt))
+      (MEMORY: sim_memory b w1 views1 mem1_src (Thread.memory e1_tgt))
       (WF_SRC: Local.wf lc1_src mem1_src)
       (WF_TGT: Local.wf (Thread.local e1_tgt) (Thread.memory e1_tgt))
       (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
@@ -531,7 +532,7 @@ Lemma sim_thread_plus_step
                             (Thread.mk _ st3_src lc3_src sc3_src mem3_src)>>) /\
     (<<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>>) /\
     (<<SC: sim_timemap w3 sc3_src (Thread.sc e3_tgt)>>) /\
-    (<<MEMORY: sim_memory b w3 mem3_src (Thread.memory e3_tgt)>>) /\
+    (<<MEMORY: sim_memory b w3 views3 mem3_src (Thread.memory e3_tgt)>>) /\
     (<<WF_SRC: Local.wf lc3_src mem3_src>>) /\
     (<<WF_TGT: Local.wf (Thread.local e3_tgt) (Thread.memory e3_tgt)>>) /\
     (<<SC_SRC: Memory.closed_timemap sc3_src mem3_src>>) /\
@@ -663,7 +664,7 @@ Lemma sim_thread_consistent
       views
       (SIM: sim_thread sim_terminal false w st_src lc_src sc_src mem_src st_tgt lc_tgt sc_tgt mem_tgt views)
       (SC: sim_timemap w sc_src sc_tgt)
-      (MEMORY: sim_memory false w mem_src mem_tgt)
+      (MEMORY: sim_memory false w views mem_src mem_tgt)
       (WF_SRC: Local.wf lc_src mem_src)
       (WF_TGT: Local.wf lc_tgt mem_tgt)
       (SC_SRC: Memory.closed_timemap sc_src mem_src)
@@ -730,7 +731,7 @@ Section Simulation.
     forall w1 sc1_src mem1_src
            sc1_tgt mem1_tgt views1
            (SC1: sim_timemap w1 sc1_src sc1_tgt)
-           (MEMORY1: sim_memory false w1 mem1_src mem1_tgt)
+           (MEMORY1: sim_memory false w1 views1 mem1_src mem1_tgt)
            (WF_SRC: Configuration.wf (Configuration.mk ths1_src sc1_src mem1_src))
            (WF_TGT: JConfiguration.wf views1 (Configuration.mk ths1_tgt sc1_tgt mem1_tgt))
            (CERTIFIED: UndefCertify.certified (Configuration.mk ths1_src sc1_src mem1_src))
@@ -751,7 +752,7 @@ Section Simulation.
            exists ths2_src sc2_src mem2_src w2,
              (<<STEPS_SRC: rtc Configuration.tau_step (Configuration.mk ths1_src sc1_src mem1_src) (Configuration.mk ths2_src sc2_src mem2_src)>>) /\
              (<<SC: sim_timemap w2 sc2_src sc1_tgt>>) /\
-             (<<MEMORY: sim_memory false w2 mem2_src mem1_tgt>>) /\
+             (<<MEMORY: sim_memory false w2 views1 mem2_src mem1_tgt>>) /\
              (<<TERMINAL_SRC: Threads.is_terminal ths2_src>>)>>) /\
       (<<STEP:
          forall e tid_tgt ths3_tgt sc3_tgt mem3_tgt views3
@@ -761,7 +762,7 @@ Section Simulation.
              (<<STEPS_SRC: rtc Configuration.tau_step (Configuration.mk ths1_src sc1_src mem1_src) (Configuration.mk ths2_src sc2_src mem2_src)>>) /\
              (<<STEP_SRC: Configuration.opt_step e tid_src (Configuration.mk ths2_src sc2_src mem2_src) (Configuration.mk ths3_src sc3_src mem3_src)>>) /\
              (<<SC3: sim_timemap w3 sc3_src sc3_tgt>>) /\
-             (<<MEMORY3: sim_memory false w3 mem3_src mem3_tgt>>) /\
+             (<<MEMORY3: sim_memory false w3 views3 mem3_src mem3_tgt>>) /\
              (<<SIM: sim w3 ths3_src sc3_src mem3_src ths3_tgt sc3_tgt mem3_tgt views3>>)>>).
 
   Lemma _sim_mon: monotone8 _sim.
@@ -787,7 +788,7 @@ Lemma sim_adequacy
       (WF_TGT: Configuration.wf (Configuration.mk ths_tgt sc_tgt mem_tgt))
       (CERTIFIED: UndefCertify.certified (Configuration.mk ths_src sc_src mem_src))
       (SC: sim_timemap w sc_src sc_mid)
-      (MEMORY: sim_memory false w mem_src mem_mid)
+      (MEMORY: sim_memory false w views mem_src mem_mid)
       (SIM: sim w ths_src sc_src mem_src ths_mid sc_mid mem_mid views)
       (JSIM: JSim.sim_configuration
                views
@@ -1090,7 +1091,6 @@ Proof.
       - exploit JThread.tau_steps_future; eauto. s. i. des.
         exploit JThread.step_future; eauto. s. i. des.
         hexploit JThread.consistent_thread_consistent; eauto.
-        { eapply CONSISTENT. ii. clarify. }
         i. hexploit consistent_promise_consistent; eauto.
     }
     s. i. des.
@@ -1109,13 +1109,11 @@ Proof.
             rewrite <- EVENT. rewrite <- EVENT0. esplits; eauto.
             + econs 2. econs; eauto. i.
               eapply sim_thread_consistent; eauto.
-              eapply CONSISTENT. ii. clarify.
           - ss. inv X. rewrite IdentMap.gsident; auto.
             rewrite <- EVENT. ss.
         }
         { rewrite <- EVENT. econs. econs; eauto.
           i. eapply sim_thread_consistent; eauto.
-          eapply CONSISTENT. ii. clarify.
         }
       }
       exploit Configuration.opt_step_future; eauto.

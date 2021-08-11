@@ -750,7 +750,7 @@ Module JConfiguration.
       (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
       (STEPS: JThread.rtc_tau (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) e2 views1 views2)
       (STEP: JThread.step pf e e2 (Thread.mk _ st3 lc3 sc3 memory3) views2 views3)
-      (CONSISTENT: forall (NORMAL: e <> ThreadEvent.failure),
+      (CONSISTENT: forall (NORMAL: ThreadEvent.get_machine_event e <> MachineEvent.failure),
           JThread.consistent (Thread.mk _ st3 lc3 sc3 memory3) views3)
     :
       step (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) (Configuration.threads c1)) sc3 memory3) views1 views3
@@ -899,7 +899,8 @@ Module JConfiguration.
       (CANCELS: rtc (@JThread.cancel_step views1 lang) (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) e2)
       (STEP: JThread.opt_step e e2 e3 views1 views2)
       (RESERVES: rtc (@JThread.reserve_step views2 _) e3 (Thread.mk _ st4 lc4 sc4 memory4))
-      (CONSISTENT: e <> ThreadEvent.failure -> JThread.consistent (Thread.mk _ st4 lc4 sc4 memory4) views2):
+      (CONSISTENT: forall (NORMAL: ThreadEvent.get_machine_event e <> MachineEvent.failure),
+          JThread.consistent (Thread.mk _ st4 lc4 sc4 memory4) views2):
       single_step e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) (Configuration.threads c1)) sc4 memory4) views1 views2
   .
   Hint Constructors single_step.
