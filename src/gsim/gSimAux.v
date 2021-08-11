@@ -314,6 +314,14 @@ Module CapFlex.
   Proof.
   Admitted.
 
+  Lemma cap_flex_closed_view
+        mem1 mem2 vw tm
+        (CAP: cap_flex mem1 mem2 tm)
+        (CLOSED: Memory.closed_view vw mem1):
+    Memory.closed_view vw mem2.
+  Proof.
+  Admitted.
+
   Lemma cap_flex_future_weak
         mem1 mem2 tm
         (CAP: cap_flex mem1 mem2 tm)

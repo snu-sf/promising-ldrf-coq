@@ -29,6 +29,7 @@ Require Import PromiseConsistent.
 
 Require Import Program.
 
+Require Import JoinedView.
 Require Import gSimAux.
 
 Set Implicit Arguments.
@@ -67,20 +68,22 @@ Section SimulationThread.
     forall (lang_src lang_tgt:language) (sim_terminal: SIM_TERMINAL lang_src lang_tgt)
            (b: bool) (w: world)
            (st1_src:(Language.state lang_src)) (lc1_src:Local.t) (sc0_src:TimeMap.t) (mem0_src:Memory.t)
-           (st1_tgt:(Language.state lang_tgt)) (lc1_tgt:Local.t) (sc0_tgt:TimeMap.t) (mem0_tgt:Memory.t), Prop.
+           (st1_tgt:(Language.state lang_tgt)) (lc1_tgt:Local.t) (sc0_tgt:TimeMap.t) (mem0_tgt:Memory.t) (views0: Loc.t -> Time.t -> list View.t), Prop.
 
   Definition _sim_thread_step
              (lang_src lang_tgt:language)
              (sim_thread: forall (b1: bool) (w1: world) (st1_src:(Language.state lang_src)) (lc1_src:Local.t) (sc0_src:TimeMap.t) (mem0_src:Memory.t)
-                                 (st1_tgt:(Language.state lang_tgt)) (lc1_tgt:Local.t) (sc0_tgt:TimeMap.t) (mem0_tgt:Memory.t), Prop)
+                                 (st1_tgt:(Language.state lang_tgt)) (lc1_tgt:Local.t) (sc0_tgt:TimeMap.t) (mem0_tgt:Memory.t) (views0: Loc.t -> Time.t -> list View.t), Prop)
              b0 (w0: world)
              st1_src lc1_src sc1_src mem1_src
              st1_tgt lc1_tgt sc1_tgt mem1_tgt
+             (views0: Loc.t -> Time.t -> list View.t)
     :=
-      forall pf_tgt e_tgt st3_tgt lc3_tgt sc3_tgt mem3_tgt
-             (STEP_TGT: Thread.step pf_tgt e_tgt
-                                    (Thread.mk _ st1_tgt lc1_tgt sc1_tgt mem1_tgt)
-                                    (Thread.mk _ st3_tgt lc3_tgt sc3_tgt mem3_tgt)),
+      forall pf_tgt e_tgt st3_tgt lc3_tgt sc3_tgt mem3_tgt views1
+             (STEP_TGT: JThread.step pf_tgt e_tgt
+                                     (Thread.mk _ st1_tgt lc1_tgt sc1_tgt mem1_tgt)
+                                     (Thread.mk _ st3_tgt lc3_tgt sc3_tgt mem3_tgt)
+                                     views0 views1),
         (<<FAILURE: Thread.steps_failure (Thread.mk _ st1_src lc1_src sc1_src mem1_src)>>) \/
         exists e_src st2_src lc2_src sc2_src mem2_src st3_src lc3_src sc3_src mem3_src w3,
           (<<FAILURE: ThreadEvent.get_machine_event e_tgt <> MachineEvent.failure>>) /\
@@ -93,7 +96,7 @@ Section SimulationThread.
           (<<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>>) /\
           (<<SC3: sim_timemap w3 sc3_src sc3_tgt>>) /\
           (<<MEMORY3: sim_memory b0 w3 mem3_src mem3_tgt>>) /\
-          (<<SIM: sim_thread b0 w3 st3_src lc3_src sc3_src mem3_src st3_tgt lc3_tgt sc3_tgt mem3_tgt>>) /\
+          (<<SIM: sim_thread b0 w3 st3_src lc3_src sc3_src mem3_src st3_tgt lc3_tgt sc3_tgt mem3_tgt views1>>) /\
           (<<WORLD: world_messages_le (unchangable mem1_src lc1_src.(Local.promises)) w0 w3>>)
   .
 
@@ -102,20 +105,23 @@ Section SimulationThread.
              (prom_src prom_tgt: Memory.t)
              (mem0_src mem1_src mem0_tgt mem1_tgt: Memory.t)
              (sc0_src sc1_src sc0_tgt sc1_tgt: TimeMap.t)
-             (w0 w1: world): Prop :=
+             (w0 w1: world)
+             (views0 views1: Loc.t -> Time.t -> list View.t): Prop :=
     if b0
     then
       (<<MEMSRC: mem1_src = mem0_src>>) /\
       (<<MEMTGT: mem1_tgt = mem0_tgt>>) /\
       (<<SCSRC: sc1_src = sc0_src>>) /\
       (<<SCTGT: sc1_tgt = sc0_tgt>>) /\
-      (<<WORLD: w1 = w0>>)
+      (<<WORLD: w1 = w0>>) /\
+      (<<VIEWS: views1 = views0>>)
     else
       (<<MEMSRC: Memory.future_weak mem0_src mem1_src>>) /\
       (<<MEMTGT: Memory.future_weak mem0_tgt mem1_tgt>>) /\
       (<<SCSRC: TimeMap.le sc0_src sc1_src>>) /\
       (<<SCTGT: TimeMap.le sc0_tgt sc1_tgt>>) /\
-      (<<WORLD: world_messages_le (Messages.of_memory prom_src) w0 w1>>)
+      (<<WORLD: world_messages_le (Messages.of_memory prom_src) w0 w1>>) /\
+      (<<VIEWS: views_le views0 views1>>)
   .
 
   Lemma sim_future_memory_sc_future
@@ -124,18 +130,21 @@ Section SimulationThread.
         (mem0_src mem1_src mem0_tgt mem1_tgt: Memory.t)
         (sc0_src sc1_src sc0_tgt sc1_tgt: TimeMap.t)
         (w0 w1: world)
+        (views0 views1: Loc.t -> Time.t -> list View.t)
         (FUTURE: sim_memory_future
                    b0
                    prom_src prom_tgt
                    mem0_src mem1_src mem0_tgt mem1_tgt
                    sc0_src sc1_src sc0_tgt sc1_tgt
-                   w0 w1)
+                   w0 w1
+                   views0 views1)
     :
       (<<SC_FUTURE_SRC: TimeMap.le sc0_src sc1_src>>) /\
       (<<SC_FUTURE_TGT: TimeMap.le sc0_tgt sc1_tgt>>) /\
       (<<MEM_FUTURE_SRC: Memory.future_weak mem0_src mem1_src>>) /\
       (<<MEM_FUTURE_TGT: Memory.future_weak mem0_tgt mem1_tgt>>) /\
-      (<<WORLD: world_messages_le (Messages.of_memory prom_src) w0 w1>>)
+      (<<WORLD: world_messages_le (Messages.of_memory prom_src) w0 w1>>) /\
+      (<<VIEWS: views_le views0 views1>>)
   .
   Proof.
     destruct b0; ss; des; subst.
@@ -149,9 +158,10 @@ Section SimulationThread.
              (sim_terminal: SIM_TERMINAL lang_src lang_tgt)
              (b0: bool) (w0: world)
              (st1_src:(Language.state lang_src)) (lc1_src:Local.t) (sc0_src:TimeMap.t) (mem0_src:Memory.t)
-             (st1_tgt:(Language.state lang_tgt)) (lc1_tgt:Local.t) (sc0_tgt:TimeMap.t) (mem0_tgt:Memory.t): Prop :=
+             (st1_tgt:(Language.state lang_tgt)) (lc1_tgt:Local.t) (sc0_tgt:TimeMap.t) (mem0_tgt:Memory.t)
+             (views0: Loc.t -> Time.t -> list View.t): Prop :=
     (<<FUTURE: forall w1 sc1_src mem1_src
-                      sc1_tgt mem1_tgt
+                      sc1_tgt mem1_tgt views1
                       (SC: sim_timemap w1 sc1_src sc1_tgt)
                       (MEMORY: sim_memory b0 w1 mem1_src mem1_tgt)
                       (WF_SRC: Local.wf lc1_src mem1_src)
@@ -161,12 +171,17 @@ Section SimulationThread.
                       (MEM_SRC: Memory.closed mem1_src)
                       (MEM_TGT: Memory.closed mem1_tgt)
                       (CONS_TGT: Local.promise_consistent lc1_tgt)
+                      (REL: joined_released views1 lc1_tgt.(Local.promises) lc1_tgt.(Local.tview).(TView.rel))
+                      (JOINED: joined_memory views1 mem1_tgt)
+                      (VIEWS: wf_views views1)
+                      (VIEWSLE: views_le views0 views1)
                       (FUTURE: sim_memory_future
                                  b0
                                  (lc1_src.(Local.promises)) (lc1_tgt.(Local.promises))
                                  mem0_src mem1_src mem0_tgt mem1_tgt
                                  sc0_src sc1_src sc0_tgt sc1_tgt
-                                 w0 w1)
+                                 w0 w1
+                                 views0 views1)
                       (UNCHANGED: UndefCertify.unchanged lc1_src.(Local.promises) mem0_src mem1_src),
         (<<TERMINAL:
            forall
@@ -194,7 +209,8 @@ Section SimulationThread.
         (<<STEP: _sim_thread_step _ _ (@sim_thread lang_src lang_tgt sim_terminal)
                                   b0 w1
                                   st1_src lc1_src sc1_src mem1_src
-                                  st1_tgt lc1_tgt sc1_tgt mem1_tgt>>)>>) /\
+                                  st1_tgt lc1_tgt sc1_tgt mem1_tgt
+                                  views1>>)>>) /\
     (<<CAP: forall (BOOL: b0 = false)
                    (MEMORY: sim_memory b0 w0 mem0_src mem0_tgt)
                    (WF_SRC: Local.wf lc1_src mem0_src)
@@ -203,20 +219,22 @@ Section SimulationThread.
                    (SC_TGT: Memory.closed_timemap sc0_tgt mem0_tgt)
                    (MEM_SRC: Memory.closed mem0_src)
                    (MEM_TGT: Memory.closed mem0_tgt)
-                   (CONS_TGT: Local.promise_consistent lc1_tgt),
-        exists tm_src tm_tgt,
-          (<<TMSRC: forall loc, Time.lt (Memory.max_ts loc mem0_src) (tm_src loc)>>) /\
-          (<<TMTGT: forall loc, Time.lt (Memory.max_ts loc mem0_tgt) (tm_tgt loc)>>) /\
+                   (CONS_TGT: Local.promise_consistent lc1_tgt)
+                   (REL: joined_released views0 lc1_tgt.(Local.promises) lc1_tgt.(Local.tview).(TView.rel))
+                   (JOINED: joined_memory views0 mem0_tgt)
+                   (VIEWS: wf_views views0),
+        exists tm_src,
+          (<<TM: forall loc, Time.lt (Memory.max_ts loc mem0_src) (tm_src loc)>>) /\
           (<<CAP: forall cap_src cap_tgt
                          (CAPSRC: CapFlex.cap_flex mem0_src cap_src tm_src)
-                         (CAPTGT: CapFlex.cap_flex mem0_tgt cap_tgt tm_tgt),
+                         (CAPTGT: Memory.cap mem0_tgt cap_tgt),
               exists w3,
                 (<<SC3: sim_timemap w3 sc0_src sc0_tgt>>) /\
                 (<<MEMORY3: sim_memory true w3 cap_src cap_tgt>>) /\
-                (<<SIM: sim_thread _ _ sim_terminal true w3 st1_src lc1_src sc0_src cap_src st1_tgt lc1_tgt sc0_tgt cap_tgt>>)>>)>>)
+                (<<SIM: sim_thread _ _ sim_terminal true w3 st1_src lc1_src sc0_src cap_src st1_tgt lc1_tgt sc0_tgt cap_tgt views0 >>)>>)>>)
   .
 
-  Lemma _sim_thread_mon: monotone13 _sim_thread.
+  Lemma _sim_thread_mon: monotone14 _sim_thread.
   Proof.
     ii. red in IN. des. red. splits; auto.
     ii. exploit FUTURE; eauto. i. des. splits; auto.
@@ -227,13 +245,13 @@ Section SimulationThread.
   Qed.
   Hint Resolve _sim_thread_mon: paco.
 
-  Definition sim_thread: SIM_THREAD := paco13 _sim_thread bot13.
+  Definition sim_thread: SIM_THREAD := paco14 _sim_thread bot14.
 
   Lemma sim_thread_mon
         (lang_src lang_tgt:language)
         (sim_terminal1 sim_terminal2: SIM_TERMINAL lang_src lang_tgt)
         (SIM: sim_terminal1 <2= sim_terminal2):
-    sim_thread sim_terminal1 <10= sim_thread sim_terminal2.
+    sim_thread sim_terminal1 <11= sim_thread sim_terminal2.
   Proof.
     pcofix CIH. i. punfold PR. pfold.
     red in PR. red. des. splits; auto.
@@ -251,22 +269,23 @@ Section SimulationThread.
 End SimulationThread.
 Hint Resolve _sim_thread_mon: paco.
 
-Definition sim_thread_past lang_src lang_tgt sim_terminal (b: bool) w st_src lc_src sc_src mem_src st_tgt lc_tgt sc_tgt mem_tgt :=
+Definition sim_thread_past lang_src lang_tgt sim_terminal (b: bool) w st_src lc_src sc_src mem_src st_tgt lc_tgt sc_tgt mem_tgt views :=
   if b
-  then sim_thread sim_terminal true w st_src lc_src sc_src mem_src st_tgt lc_tgt sc_tgt mem_tgt
-  else exists w' sc_src' mem_src' sc_tgt' mem_tgt',
-      (<<SIM: @sim_thread lang_src lang_tgt sim_terminal false w' st_src lc_src sc_src' mem_src' st_tgt lc_tgt sc_tgt' mem_tgt'>>) /\
+  then sim_thread sim_terminal true w st_src lc_src sc_src mem_src st_tgt lc_tgt sc_tgt mem_tgt views
+  else exists w' sc_src' mem_src' sc_tgt' mem_tgt' views',
+      (<<SIM: @sim_thread lang_src lang_tgt sim_terminal false w' st_src lc_src sc_src' mem_src' st_tgt lc_tgt sc_tgt' mem_tgt' views'>>) /\
       (<<SC_FUTURE_SRC: TimeMap.le sc_src' sc_src>>) /\
       (<<SC_FUTURE_TGT: TimeMap.le sc_tgt' sc_tgt>>) /\
       (<<MEM_FUTURE_SRC: Memory.future_weak mem_src' mem_src>>) /\
       (<<MEM_FUTURE_TGT: Memory.future_weak mem_tgt' mem_tgt>>) /\
       (<<WORLD: world_messages_le (Messages.of_memory lc_src.(Local.promises)) w' w>>) /\
-      (<<UNCHANGED: UndefCertify.unchanged lc_src.(Local.promises) mem_src' mem_src>>)
+      (<<UNCHANGED: UndefCertify.unchanged lc_src.(Local.promises) mem_src' mem_src>>) /\
+      (<<VIEW: views_le views' views>>)
 .
 Arguments sim_thread_past: simpl never.
 
 Lemma sim_thread_sim_thread_past:
-  sim_thread <13= sim_thread_past.
+  sim_thread <14= sim_thread_past.
 Proof.
   ii. red. destruct x3; auto. esplits; eauto; try refl.
 Qed.
@@ -279,9 +298,11 @@ Lemma sim_thread_step
       st1_src lc1_src sc1_src mem1_src
       st1_tgt lc1_tgt sc1_tgt mem1_tgt
       st3_tgt lc3_tgt sc3_tgt mem3_tgt
-      (STEP: @Thread.step lang_tgt pf_tgt e_tgt
+      views1 views3
+      (STEP: @JThread.step lang_tgt pf_tgt e_tgt
                           (Thread.mk _ st1_tgt lc1_tgt sc1_tgt mem1_tgt)
-                          (Thread.mk _ st3_tgt lc3_tgt sc3_tgt mem3_tgt))
+                          (Thread.mk _ st3_tgt lc3_tgt sc3_tgt mem3_tgt)
+                          views1 views3)
       (SC: sim_timemap w1 sc1_src sc1_tgt)
       (MEMORY: sim_memory b w1 mem1_src mem1_tgt)
       (WF_SRC: Local.wf lc1_src mem1_src)
@@ -291,7 +312,10 @@ Lemma sim_thread_step
       (MEM_SRC: Memory.closed mem1_src)
       (MEM_TGT: Memory.closed mem1_tgt)
       (CONS_TGT: Local.promise_consistent lc3_tgt)
-      (SIM: sim_thread_past sim_terminal b w1 st1_src lc1_src sc1_src mem1_src st1_tgt lc1_tgt sc1_tgt mem1_tgt):
+      (REL: joined_released views1 lc1_tgt.(Local.promises) lc1_tgt.(Local.tview).(TView.rel))
+      (JOINED: joined_memory views1 mem1_tgt)
+      (VIEWS: wf_views views1)
+      (SIM: sim_thread_past sim_terminal b w1 st1_src lc1_src sc1_src mem1_src st1_tgt lc1_tgt sc1_tgt mem1_tgt views1):
   (<<FAILURE: Thread.steps_failure (Thread.mk lang_src st1_src lc1_src sc1_src mem1_src)>>) \/
   exists e_src st2_src lc2_src sc2_src mem2_src st3_src lc3_src sc3_src mem3_src w3,
     (<<FAILURE: ThreadEvent.get_machine_event e_tgt <> MachineEvent.failure>>) /\
@@ -310,13 +334,19 @@ Lemma sim_thread_step
     (<<SC_TGT: Memory.closed_timemap sc3_tgt mem3_tgt>>) /\
     (<<MEM_SRC: Memory.closed mem3_src>>) /\
     (<<MEM_TGT: Memory.closed mem3_tgt>>) /\
-    (<<SIM: sim_thread sim_terminal b w3 st3_src lc3_src sc3_src mem3_src st3_tgt lc3_tgt sc3_tgt mem3_tgt>>) /\
-    (<<WORLD: world_messages_le (unchangable mem1_src lc1_src.(Local.promises)) w1 w3>>)
+    (<<SIM: sim_thread sim_terminal b w3 st3_src lc3_src sc3_src mem3_src st3_tgt lc3_tgt sc3_tgt mem3_tgt views3>>) /\
+    (<<WORLD: world_messages_le (unchangable mem1_src lc1_src.(Local.promises)) w1 w3>>) /\
+    (<<REL: joined_released views3 lc3_tgt.(Local.promises) lc3_tgt.(Local.tview).(TView.rel)>>) /\
+    (<<JOINED: joined_memory views3 mem3_tgt>>) /\
+    (<<VIEWS: wf_views views3>>)
 .
 Proof.
-  hexploit step_promise_consistent; eauto. s. i. red in SIM. destruct b; ss.
+  hexploit step_promise_consistent.
+  { eapply JThread.step_thread_step; eauto. }
+  all: eauto.
+  s. i. red in SIM. destruct b; ss.
   { punfold SIM. red in SIM. des.
-    exploit Thread.step_future; eauto. s. i. des.
+    exploit JThread.step_future; eauto. s. i. des.
     exploit FUTURE; eauto; ss. i. des.
     exploit STEP0; eauto; ss.
     i. des; eauto.
@@ -326,7 +356,7 @@ Proof.
     esplits; eauto.
   }
   { des. punfold SIM0. red in SIM0. des.
-    exploit Thread.step_future; eauto. s. i. des.
+    exploit JThread.step_future; eauto. s. i. des.
     exploit FUTURE; eauto; ss. i. des.
     exploit STEP0; eauto; ss.
     i. des; eauto.
@@ -345,9 +375,11 @@ Lemma sim_thread_opt_step
       st1_src lc1_src sc1_src mem1_src
       st1_tgt lc1_tgt sc1_tgt mem1_tgt
       st3_tgt lc3_tgt sc3_tgt mem3_tgt
-      (STEP: @Thread.opt_step lang_tgt e_tgt
-                              (Thread.mk _ st1_tgt lc1_tgt sc1_tgt mem1_tgt)
-                              (Thread.mk _ st3_tgt lc3_tgt sc3_tgt mem3_tgt))
+      views1 views3
+      (STEP: @JThread.opt_step lang_tgt e_tgt
+                               (Thread.mk _ st1_tgt lc1_tgt sc1_tgt mem1_tgt)
+                               (Thread.mk _ st3_tgt lc3_tgt sc3_tgt mem3_tgt)
+                               views1 views3)
       (SC: sim_timemap w1 sc1_src sc1_tgt)
       (MEMORY: sim_memory b w1 mem1_src mem1_tgt)
       (WF_SRC: Local.wf lc1_src mem1_src)
@@ -357,7 +389,10 @@ Lemma sim_thread_opt_step
       (MEM_SRC: Memory.closed mem1_src)
       (MEM_TGT: Memory.closed mem1_tgt)
       (CONS_TGT: Local.promise_consistent lc3_tgt)
-      (SIM: sim_thread_past sim_terminal b w1 st1_src lc1_src sc1_src mem1_src st1_tgt lc1_tgt sc1_tgt mem1_tgt):
+      (REL: joined_released views1 lc1_tgt.(Local.promises) lc1_tgt.(Local.tview).(TView.rel))
+      (JOINED: joined_memory views1 mem1_tgt)
+      (VIEWS: wf_views views1)
+      (SIM: sim_thread_past sim_terminal b w1 st1_src lc1_src sc1_src mem1_src st1_tgt lc1_tgt sc1_tgt mem1_tgt views1):
   (<<FAILURE: Thread.steps_failure (Thread.mk lang_src st1_src lc1_src sc1_src mem1_src)>>) \/
   exists e_src st2_src lc2_src sc2_src mem2_src st3_src lc3_src sc3_src mem3_src w3,
     (<<FAILURE: ThreadEvent.get_machine_event e_tgt <> MachineEvent.failure>>) /\
@@ -376,15 +411,18 @@ Lemma sim_thread_opt_step
     (<<SC_TGT: Memory.closed_timemap sc3_tgt mem3_tgt>>) /\
     (<<MEM_SRC: Memory.closed mem3_src>>) /\
     (<<MEM_TGT: Memory.closed mem3_tgt>>) /\
-    (<<SIM: sim_thread_past sim_terminal b w3 st3_src lc3_src sc3_src mem3_src st3_tgt lc3_tgt sc3_tgt mem3_tgt>>) /\
-    (<<WORLD: world_messages_le (unchangable mem1_src lc1_src.(Local.promises)) w1 w3>>)
+    (<<SIM: sim_thread_past sim_terminal b w3 st3_src lc3_src sc3_src mem3_src st3_tgt lc3_tgt sc3_tgt mem3_tgt views3>>) /\
+    (<<WORLD: world_messages_le (unchangable mem1_src lc1_src.(Local.promises)) w1 w3>>) /\
+    (<<REL: joined_released views3 lc3_tgt.(Local.promises) lc3_tgt.(Local.tview).(TView.rel)>>) /\
+    (<<JOINED: joined_memory views3 mem3_tgt>>) /\
+    (<<VIEWS: wf_views views3>>)
 .
 Proof.
   inv STEP.
   - right. esplits; eauto; ss.
     { econs 1. }
     { refl. }
-  - exploit sim_thread_step; eauto. i. des; eauto.
+  - hexploit sim_thread_step; eauto. i. des; eauto.
     right. esplits; eauto. eapply sim_thread_sim_thread_past; eauto.
 Qed.
 
@@ -394,7 +432,8 @@ Lemma sim_thread_rtc_step
       b w1
       st1_src lc1_src sc1_src mem1_src
       e1_tgt e2_tgt
-      (STEPS: rtc (@Thread.tau_step lang_tgt) e1_tgt e2_tgt)
+      views1 views2
+      (STEPS: @JThread.rtc_tau lang_tgt e1_tgt e2_tgt views1 views2)
       (SC: sim_timemap w1 sc1_src (Thread.sc e1_tgt))
       (MEMORY: sim_memory b w1 mem1_src (Thread.memory e1_tgt))
       (WF_SRC: Local.wf lc1_src mem1_src)
@@ -404,7 +443,10 @@ Lemma sim_thread_rtc_step
       (MEM_SRC: Memory.closed mem1_src)
       (MEM_TGT: Memory.closed (Thread.memory e1_tgt))
       (CONS_TGT: Local.promise_consistent (Thread.local e2_tgt))
-      (SIM: sim_thread_past sim_terminal b w1 st1_src lc1_src sc1_src mem1_src (Thread.state e1_tgt) (Thread.local e1_tgt) (Thread.sc e1_tgt) (Thread.memory e1_tgt)):
+      (REL: joined_released views1 (Thread.local e1_tgt).(Local.promises) (Thread.local e1_tgt).(Local.tview).(TView.rel))
+      (JOINED: joined_memory views1 (Thread.memory e1_tgt))
+      (VIEWS: wf_views views1)
+      (SIM: sim_thread_past sim_terminal b w1 st1_src lc1_src sc1_src mem1_src (Thread.state e1_tgt) (Thread.local e1_tgt) (Thread.sc e1_tgt) (Thread.memory e1_tgt) views1):
   (<<FAILURE: Thread.steps_failure (Thread.mk lang_src st1_src lc1_src sc1_src mem1_src)>>) \/
   exists st2_src lc2_src sc2_src mem2_src w2,
     (<<STEPS: rtc (@Thread.tau_step lang_src)
@@ -418,18 +460,23 @@ Lemma sim_thread_rtc_step
     (<<SC_TGT: Memory.closed_timemap (Thread.sc e2_tgt) (Thread.memory e2_tgt)>>) /\
     (<<MEM_SRC: Memory.closed mem2_src>>) /\
     (<<MEM_TGT: Memory.closed (Thread.memory e2_tgt)>>) /\
-    (<<SIM: sim_thread_past sim_terminal b w2 st2_src lc2_src sc2_src mem2_src (Thread.state e2_tgt) (Thread.local e2_tgt) (Thread.sc e2_tgt) (Thread.memory e2_tgt)>>) /\
-    (<<WORLD: world_messages_le (unchangable mem1_src lc1_src.(Local.promises)) w1 w2>>)
+    (<<SIM: sim_thread_past sim_terminal b w2 st2_src lc2_src sc2_src mem2_src (Thread.state e2_tgt) (Thread.local e2_tgt) (Thread.sc e2_tgt) (Thread.memory e2_tgt) views2>>) /\
+    (<<WORLD: world_messages_le (unchangable mem1_src lc1_src.(Local.promises)) w1 w2>>) /\
+    (<<REL: joined_released views2 (Thread.local e2_tgt).(Local.promises) (Thread.local e2_tgt).(Local.tview).(TView.rel)>>) /\
+    (<<JOINED: joined_memory views2 (Thread.memory e2_tgt)>>) /\
+    (<<VIEWS: wf_views views2>>)
 .
 Proof.
   revert w1 SC MEMORY WF_SRC WF_TGT SC_SRC SC_TGT MEM_SRC MEM_TGT SIM.
   revert st1_src lc1_src sc1_src mem1_src.
   induction STEPS; i.
   { right. esplits; eauto. refl. }
-  inv H. inv TSTEP. destruct x, y. ss.
-  exploit Thread.step_future; eauto. s. i. des.
-  hexploit rtc_tau_step_promise_consistent; eauto. s. i.
-  exploit sim_thread_step; eauto. i. des; eauto.
+  destruct e1, e2.
+  exploit JThread.step_future; eauto. s. i. des.
+  hexploit rtc_tau_step_promise_consistent.
+  { eapply JThread.tau_steps_thread_tau_steps. eauto. }
+  all: ss. i.
+  hexploit sim_thread_step; eauto. i. des; eauto.
   exploit IHSTEPS; eauto.
   { eapply sim_thread_sim_thread_past. eauto. }
   i. des.
@@ -439,8 +486,7 @@ Proof.
     econs 2; eauto. econs.
     + econs. eauto.
     + destruct e, e_src; ss.
-  - right. destruct z. ss.
-    esplits; try apply MEMORY1; eauto.
+  - right. esplits; try apply MEMORY1; eauto.
     { etrans; [eauto|]. etrans; [|eauto]. inv STEP0; eauto.
       econs 2; eauto. econs.
       + econs. eauto.
@@ -458,8 +504,9 @@ Lemma sim_thread_plus_step
       b w1
       st1_src lc1_src sc1_src mem1_src
       e1_tgt e2_tgt e3_tgt
-      (STEPS: rtc (@Thread.tau_step lang_tgt) e1_tgt e2_tgt)
-      (STEP: @Thread.step lang_tgt pf_tgt e_tgt e2_tgt e3_tgt)
+      views1 views2 views3
+      (STEPS: @JThread.rtc_tau lang_tgt e1_tgt e2_tgt views1 views2)
+      (STEP: @JThread.step lang_tgt pf_tgt e_tgt e2_tgt e3_tgt views2 views3)
       (SC: sim_timemap w1 sc1_src (Thread.sc e1_tgt))
       (MEMORY: sim_memory b w1 mem1_src (Thread.memory e1_tgt))
       (WF_SRC: Local.wf lc1_src mem1_src)
@@ -469,7 +516,10 @@ Lemma sim_thread_plus_step
       (MEM_SRC: Memory.closed mem1_src)
       (MEM_TGT: Memory.closed (Thread.memory e1_tgt))
       (CONS_TGT: Local.promise_consistent (Thread.local e3_tgt))
-      (SIM: sim_thread_past sim_terminal b w1 st1_src lc1_src sc1_src mem1_src (Thread.state e1_tgt) (Thread.local e1_tgt) (Thread.sc e1_tgt) (Thread.memory e1_tgt)):
+      (REL: joined_released views1 (Thread.local e1_tgt).(Local.promises) (Thread.local e1_tgt).(Local.tview).(TView.rel))
+      (JOINED: joined_memory views1 (Thread.memory e1_tgt))
+      (VIEWS: wf_views views1)
+      (SIM: sim_thread_past sim_terminal b w1 st1_src lc1_src sc1_src mem1_src (Thread.state e1_tgt) (Thread.local e1_tgt) (Thread.sc e1_tgt) (Thread.memory e1_tgt) views1):
   (<<FAILURE: Thread.steps_failure (Thread.mk lang_src st1_src lc1_src sc1_src mem1_src)>>) \/
   exists e_src st2_src lc2_src sc2_src mem2_src st3_src lc3_src sc3_src mem3_src w3,
     (<<FAILURE: ThreadEvent.get_machine_event e_tgt <> MachineEvent.failure>>) /\
@@ -488,16 +538,21 @@ Lemma sim_thread_plus_step
     (<<SC_TGT: Memory.closed_timemap (Thread.sc e3_tgt) (Thread.memory e3_tgt)>>) /\
     (<<MEM_SRC: Memory.closed mem3_src>>) /\
     (<<MEM_TGT: Memory.closed (Thread.memory e3_tgt)>>) /\
-    (<<SIM: sim_thread sim_terminal b w3 st3_src lc3_src sc3_src mem3_src (Thread.state e3_tgt) (Thread.local e3_tgt) (Thread.sc e3_tgt) (Thread.memory e3_tgt)>>) /\
-    (<<WORLD: world_messages_le (unchangable mem1_src lc1_src.(Local.promises)) w1 w3>>)
+    (<<SIM: sim_thread sim_terminal b w3 st3_src lc3_src sc3_src mem3_src (Thread.state e3_tgt) (Thread.local e3_tgt) (Thread.sc e3_tgt) (Thread.memory e3_tgt) views3>>) /\
+    (<<WORLD: world_messages_le (unchangable mem1_src lc1_src.(Local.promises)) w1 w3>>) /\
+    (<<REL: joined_released views3 (Thread.local e3_tgt).(Local.promises) (Thread.local e3_tgt).(Local.tview).(TView.rel)>>) /\
+    (<<JOINED: joined_memory views3 (Thread.memory e3_tgt)>>) /\
+    (<<VIEWS: wf_views views3>>)
 .
 Proof.
   destruct e1_tgt, e2_tgt, e3_tgt. ss.
-  exploit Thread.rtc_tau_step_future; eauto. s. i. des.
-  hexploit step_promise_consistent; eauto. s. i.
-  exploit sim_thread_rtc_step; eauto. s. i. des; eauto.
+  exploit JThread.tau_steps_future; eauto. s. i. des.
+  hexploit step_promise_consistent.
+  { eapply JThread.step_thread_step. eauto. }
+  all: ss. i.
+  hexploit sim_thread_rtc_step; eauto. s. i. des; eauto.
   exploit Thread.rtc_tau_step_future; try exact STEPS0; eauto. s. i. des.
-  exploit sim_thread_step; try exact STEP; try exact SIM0; eauto. s. i. des.
+  hexploit sim_thread_step; try exact STEP; try exact SIM0; eauto. s. i. des.
   - left. inv FAILURE. des.
     unfold Thread.steps_failure. esplits; [|eauto|eauto].
     etrans; eauto.
@@ -511,22 +566,42 @@ Qed.
 Lemma sim_thread_future
       lang_src lang_tgt
       sim_terminal
-      st_src lc_src sc1_src sc2_src mem1_src mem2_src w1
-      st_tgt lc_tgt sc1_tgt sc2_tgt mem1_tgt mem2_tgt w2
-      (SIM: @sim_thread_past lang_src lang_tgt sim_terminal false w1 st_src lc_src sc1_src mem1_src st_tgt lc_tgt sc1_tgt mem1_tgt)
+      st_src lc_src sc1_src sc2_src mem1_src mem2_src w1 views1
+      st_tgt lc_tgt sc1_tgt sc2_tgt mem1_tgt mem2_tgt w2 views2
+      (SIM: @sim_thread_past lang_src lang_tgt sim_terminal false w1 st_src lc_src sc1_src mem1_src st_tgt lc_tgt sc1_tgt mem1_tgt views1)
       (SC_FUTURE_SRC: TimeMap.le sc1_src sc2_src)
       (SC_FUTURE_TGT: TimeMap.le sc1_tgt sc2_tgt)
       (MEM_FUTURE_SRC: Memory.future_weak mem1_src mem2_src)
       (MEM_FUTURE_TGT: Memory.future_weak mem1_tgt mem2_tgt)
       (WORLD: world_messages_le (Messages.of_memory lc_src.(Local.promises)) w1 w2)
-      (UNCHANGED: UndefCertify.unchanged lc_src.(Local.promises) mem1_src mem2_src):
-  sim_thread_past sim_terminal false w2 st_src lc_src sc2_src mem2_src st_tgt lc_tgt sc2_tgt mem2_tgt.
+      (UNCHANGED: UndefCertify.unchanged lc_src.(Local.promises) mem1_src mem2_src)
+      (VIEWS: views_le views1 views2):
+  sim_thread_past sim_terminal false w2 st_src lc_src sc2_src mem2_src st_tgt lc_tgt sc2_tgt mem2_tgt views2.
 Proof.
   red in SIM. red. des. ss. esplits; eauto.
   { etrans; eauto. }
   { etrans; eauto. }
   { etrans; eauto. }
   { etrans; eauto. }
+  { etrans; eauto. }
+Qed.
+
+Lemma cap_property
+      mem1 mem2 lc sc
+      (CAP: Memory.cap mem1 mem2)
+      (WF: Local.wf lc mem1)
+      (SC: Memory.closed_timemap sc mem1)
+      (CLOSED: Memory.closed mem1):
+  (<<FUTURE: Memory.future_weak mem1 mem2>>) /\
+  (<<WF: Local.wf lc mem2>>) /\
+  (<<SC: Memory.closed_timemap sc mem2>>) /\
+  (<<CLOSED: Memory.closed mem2>>).
+Proof.
+  splits.
+  - eapply Memory.cap_future_weak; eauto.
+  - eapply Local.cap_wf; eauto.
+  - eapply Memory.cap_closed_timemap; eauto.
+  - eapply Memory.cap_closed; eauto.
 Qed.
 
 Lemma cap_flex_property
@@ -548,13 +623,45 @@ Proof.
   - eapply CapFlex.cap_flex_closed; eauto.
 Qed.
 
+Lemma joined_memory_cap_flex views mem cap tm
+      (JOINED: joined_memory views mem)
+      (CAP: CapFlex.cap_flex mem cap tm)
+      (CLOSED: Memory.closed mem)
+      (TM: forall loc, Time.lt (Memory.max_ts loc mem) (tm loc))
+  :
+    joined_memory views cap.
+Proof.
+  inv JOINED. econs.
+  - i. eapply CapFlex.cap_flex_inv in GET; eauto. des; eauto; clarify.
+  - i. exploit ONLY; eauto. i. des.
+    eapply CapFlex.cap_flex_le in GET; eauto.
+  - i. eapply List.Forall_impl; try apply CLOSED0; eauto.
+    i. ss. eapply CapFlex.cap_flex_closed_view; eauto.
+Qed.
+
+Lemma joined_memory_cap views mem cap
+      (JOINED: joined_memory views mem)
+      (CAP: Memory.cap mem cap)
+      (CLOSED: Memory.closed mem)
+  :
+    joined_memory views cap.
+Proof.
+  inv JOINED. econs.
+  - i. eapply Memory.cap_inv in GET; eauto. des; eauto; clarify.
+  - i. exploit ONLY; eauto. i. des.
+    eapply Memory.cap_le in GET; eauto. refl.
+  - i. eapply List.Forall_impl; try apply CLOSED0; eauto.
+    i. ss. eapply Memory.cap_closed_view; eauto.
+Qed.
+
 Lemma sim_thread_consistent
       lang_src lang_tgt
       sim_terminal
       w
       st_src lc_src sc_src mem_src
       st_tgt lc_tgt sc_tgt mem_tgt
-      (SIM: sim_thread sim_terminal false w st_src lc_src sc_src mem_src st_tgt lc_tgt sc_tgt mem_tgt)
+      views
+      (SIM: sim_thread sim_terminal false w st_src lc_src sc_src mem_src st_tgt lc_tgt sc_tgt mem_tgt views)
       (SC: sim_timemap w sc_src sc_tgt)
       (MEMORY: sim_memory false w mem_src mem_tgt)
       (WF_SRC: Local.wf lc_src mem_src)
@@ -563,27 +670,36 @@ Lemma sim_thread_consistent
       (SC_TGT: Memory.closed_timemap sc_tgt mem_tgt)
       (MEM_SRC: Memory.closed mem_src)
       (MEM_TGT: Memory.closed mem_tgt)
-      (CONSISTENT: Thread.consistent (Thread.mk lang_tgt st_tgt lc_tgt sc_tgt mem_tgt)):
+      (REL: joined_released views lc_tgt.(Local.promises) lc_tgt.(Local.tview).(TView.rel))
+      (JOINED: joined_memory views mem_tgt)
+      (VIEWS: wf_views views)
+      (CONSISTENT: JThread.consistent (Thread.mk lang_tgt st_tgt lc_tgt sc_tgt mem_tgt) views):
   Thread.consistent (Thread.mk lang_src st_src lc_src sc_src mem_src).
 Proof.
-  hexploit consistent_promise_consistent; eauto. s. i.
+  hexploit consistent_promise_consistent.
+  { eapply JThread.consistent_thread_consistent. eauto. }
+  all: ss. i.
   generalize SIM. intro X.
   red in X. punfold X. red in X. des. clear FUTURE.
   exploit CAP; eauto. i. des.
-  exploit CapFlex.cap_flex_exists; try exact MEM_TGT; eauto. i. des.
+  exploit Memory.cap_exists; try exact MEM_TGT; eauto. i. des.
   exploit CapFlex.cap_flex_exists; try exact MEM_SRC; eauto. i. des.
   exploit CAP0; eauto. i. des. inv SIM0; [|done].
-  assert (SIM0: sim_thread_past sim_terminal true w3 st_src lc_src sc_src mem0 st_tgt lc_tgt sc_tgt mem2) by auto.
-  exploit cap_flex_property; try exact CAP1; eauto. i. des.
+  assert (SIM0: sim_thread_past sim_terminal true w3 st_src lc_src sc_src mem0 st_tgt lc_tgt sc_tgt mem2 views) by auto.
+  exploit cap_property; try exact CAP1; eauto. i. des.
   exploit cap_flex_property; try exact CAP2; eauto. i. des.
+  exploit joined_memory_cap; eauto. intros JOINED0.
   eapply CapFlex.consistent_thread_consistent; eauto.
-  eapply CapFlex.thread_consistent_consistent in CONSISTENT; eauto.
   exploit CONSISTENT; eauto. s. i. des.
-  - left. inv FAILURE. des. s.
+  - left. des. s.
     assert (mem1 = mem0).
     { eapply CapFlex.cap_flex_inj; eauto. } subst.
+    assert (JSTEP: JThread.step true ThreadEvent.failure e2 e3 views2 views2).
+    { eapply JThread.tau_steps_future in STEPS; eauto. des. ss.
+      dup FAILURE0. inv FAILURE0; inv STEP. inv LOCAL.
+      econs; eauto; ss. }
     exploit sim_thread_plus_step; try exact STEPS; try exact FAILURE; eauto; try refl.
-    { inv STEP_FAILURE; inv STEP; ss. inv LOCAL; ss; inv LOCAL0; ss. }
+    { inv FAILURE0; inv STEP; ss. inv LOCAL; ss; inv LOCAL0; ss. }
     i. ss. des; ss.
   - ii. ss.
     assert (mem1 = mem0).
@@ -592,7 +708,7 @@ Proof.
     exploit sim_thread_rtc_step; try apply STEPS; try exact x1; eauto; try refl.
     i. des; eauto.
     destruct e2. ss. punfold SIM1. red in SIM1. des.
-    exploit FUTURE1; eauto; ss. i. des.
+    hexploit FUTURE1; eauto; ss. dup REL. i. des.
     exploit PROMISES0; eauto. i. des.
     + left. unfold Thread.steps_failure in *. des.
       esplits; [|eauto|eauto]. etrans; eauto.
@@ -603,24 +719,26 @@ Qed.
 Section Simulation.
   Definition SIM :=
     forall (w: world) (ths1_src:Threads.t) (sc0_src:TimeMap.t) (mem0_src:Memory.t)
-      (ths1_tgt:Threads.t) (sc0_tgt:TimeMap.t) (mem0_tgt:Memory.t), Prop.
+      (ths1_tgt:Threads.t) (sc0_tgt:TimeMap.t) (mem0_tgt:Memory.t) (views0: Loc.t -> Time.t -> list View.t), Prop.
 
   Definition _sim
              (sim: SIM)
              (w0: world)
              (ths1_src:Threads.t) (sc0_src:TimeMap.t) (mem0_src:Memory.t)
-             (ths1_tgt:Threads.t) (sc0_tgt:TimeMap.t) (mem0_tgt:Memory.t): Prop :=
+             (ths1_tgt:Threads.t) (sc0_tgt:TimeMap.t) (mem0_tgt:Memory.t)
+             (views0: Loc.t -> Time.t -> list View.t): Prop :=
     forall w1 sc1_src mem1_src
-           sc1_tgt mem1_tgt
+           sc1_tgt mem1_tgt views1
            (SC1: sim_timemap w1 sc1_src sc1_tgt)
            (MEMORY1: sim_memory false w1 mem1_src mem1_tgt)
            (WF_SRC: Configuration.wf (Configuration.mk ths1_src sc1_src mem1_src))
-           (WF_TGT: Configuration.wf (Configuration.mk ths1_tgt sc1_tgt mem1_tgt))
+           (WF_TGT: JConfiguration.wf views1 (Configuration.mk ths1_tgt sc1_tgt mem1_tgt))
            (CERTIFIED: UndefCertify.certified (Configuration.mk ths1_src sc1_src mem1_src))
            (SC_FUTURE_SRC: TimeMap.le sc0_src sc1_src)
            (SC_FUTURE_TGT: TimeMap.le sc0_tgt sc1_tgt)
            (MEM_FUTURE_SRC: Memory.future mem0_src mem1_src)
            (MEM_FUTURE_TGT: Memory.future mem0_tgt mem1_tgt)
+           (VIEWS_FUTURE: views_le views0 views1)
            (WORLD: forall tid st lc
                               (TID: IdentMap.find tid ths1_src = Some (st, lc)),
                world_messages_le (Messages.of_memory lc.(Local.promises)) w0 w1)
@@ -636,17 +754,17 @@ Section Simulation.
              (<<MEMORY: sim_memory false w2 mem2_src mem1_tgt>>) /\
              (<<TERMINAL_SRC: Threads.is_terminal ths2_src>>)>>) /\
       (<<STEP:
-         forall e tid_tgt ths3_tgt sc3_tgt mem3_tgt
-                (STEP_TGT: Configuration.step e tid_tgt (Configuration.mk ths1_tgt sc1_tgt mem1_tgt) (Configuration.mk ths3_tgt sc3_tgt mem3_tgt)),
+         forall e tid_tgt ths3_tgt sc3_tgt mem3_tgt views3
+                (STEP_TGT: JConfiguration.step e tid_tgt (Configuration.mk ths1_tgt sc1_tgt mem1_tgt) (Configuration.mk ths3_tgt sc3_tgt mem3_tgt) views1 views3),
            (<<FAILURE: Configuration.steps_failure (Configuration.mk ths1_src sc1_src mem1_src)>>) \/
            exists tid_src ths2_src sc2_src mem2_src ths3_src sc3_src mem3_src w3,
              (<<STEPS_SRC: rtc Configuration.tau_step (Configuration.mk ths1_src sc1_src mem1_src) (Configuration.mk ths2_src sc2_src mem2_src)>>) /\
              (<<STEP_SRC: Configuration.opt_step e tid_src (Configuration.mk ths2_src sc2_src mem2_src) (Configuration.mk ths3_src sc3_src mem3_src)>>) /\
              (<<SC3: sim_timemap w3 sc3_src sc3_tgt>>) /\
              (<<MEMORY3: sim_memory false w3 mem3_src mem3_tgt>>) /\
-             (<<SIM: sim w3 ths3_src sc3_src mem3_src ths3_tgt sc3_tgt mem3_tgt>>)>>).
+             (<<SIM: sim w3 ths3_src sc3_src mem3_src ths3_tgt sc3_tgt mem3_tgt views3>>)>>).
 
-  Lemma _sim_mon: monotone7 _sim.
+  Lemma _sim_mon: monotone8 _sim.
   Proof.
     ii. exploit IN; try apply SC1; eauto. i. des.
     splits; eauto. i.
@@ -655,30 +773,38 @@ Section Simulation.
   Qed.
   Hint Resolve _sim_mon: paco.
 
-  Definition sim: SIM := paco7 _sim bot7.
+  Definition sim: SIM := paco8 _sim bot8.
 End Simulation.
 Hint Resolve _sim_mon: paco.
 
 
 Lemma sim_adequacy
       ths_src sc_src mem_src
-      ths_tgt sc_tgt mem_tgt w
+      ths_mid sc_mid mem_mid
+      ths_tgt sc_tgt mem_tgt w views
       (WF_SRC: Configuration.wf (Configuration.mk ths_src sc_src mem_src))
+      (WF_MID: JConfiguration.wf views (Configuration.mk ths_mid sc_mid mem_mid))
       (WF_TGT: Configuration.wf (Configuration.mk ths_tgt sc_tgt mem_tgt))
       (CERTIFIED: UndefCertify.certified (Configuration.mk ths_src sc_src mem_src))
-      (SC: sim_timemap w sc_src sc_tgt)
-      (MEMORY: sim_memory false w mem_src mem_tgt)
-      (SIM: sim w ths_src sc_src mem_src ths_tgt sc_tgt mem_tgt):
+      (SC: sim_timemap w sc_src sc_mid)
+      (MEMORY: sim_memory false w mem_src mem_mid)
+      (SIM: sim w ths_src sc_src mem_src ths_mid sc_mid mem_mid views)
+      (JSIM: JSim.sim_configuration
+               views
+               (Configuration.mk ths_mid sc_mid mem_mid)
+               (Configuration.mk ths_tgt sc_tgt mem_tgt)):
   behaviors Configuration.step (Configuration.mk ths_tgt sc_tgt mem_tgt) <1=
   behaviors Configuration.step (Configuration.mk ths_src sc_src mem_src).
 Proof.
   s. i.
-  revert w WF_SRC WF_TGT CERTIFIED SC MEMORY SIM.
+  revert w WF_SRC WF_MID WF_TGT CERTIFIED SC MEMORY SIM JSIM.
   revert ths_src sc_src mem_src.
+  revert ths_mid sc_mid mem_mid.
   remember (Configuration.mk ths_tgt sc_tgt mem_tgt).
-  revert ths_tgt sc_tgt mem_tgt Heqt.
+  revert views ths_tgt sc_tgt mem_tgt Heqt.
   induction PR; i; subst.
   - punfold SIM0. exploit SIM0; eauto; try refl. i. des.
+    hexploit JSim.sim_configuration_terminal; eauto. i.
     exploit TERMINAL0; eauto. i. des.
     + inv FAILURE. des.
       eapply rtc_tau_step_behavior; eauto.
@@ -686,40 +812,46 @@ Proof.
     + eapply rtc_tau_step_behavior; eauto.
       econs 1. eauto.
   - destruct c2.
+    hexploit JSim.step_sim_configuration; eauto. i. des. destruct c_src1.
     punfold SIM0. exploit SIM0; eauto; try refl. i. des.
-    exploit STEP0; eauto. i. des.
+    hexploit STEP1; eauto. i. des.
     + inv FAILURE. des.
       eapply rtc_tau_step_behavior; eauto.
       econs 3. eauto.
-    + inv SIM1; [|done].
+    + inv SIM2; [|done].
       eapply rtc_tau_step_behavior; eauto.
-      exploit Configuration.step_future; try apply STEP; eauto. i. des.
+      exploit Configuration.step_future; try exact STEP; eauto. i. des.
       exploit Configuration.rtc_step_future; eauto. i. des.
+      exploit Configuration.opt_step_future; eauto. i. des.
       inv STEP_SRC. econs 2; [eauto|].
-      exploit Configuration.step_future; try apply STEP1; auto. i. des.
+      exploit JConfiguration.step_future; eauto. i. des.
       eapply IHPR; eauto.
       eapply UndefCertify.step_certified; eauto.
       eapply UndefCertify.rtc_step_certified; eauto.
   - destruct c2.
+    hexploit JSim.step_sim_configuration; eauto. i. des. destruct c_src1.
     punfold SIM0. exploit SIM0; eauto; try refl. i. des.
-    exploit STEP0; eauto. i. des.
+    hexploit STEP1; eauto. i. des.
     + inv FAILURE. des.
       eapply rtc_tau_step_behavior; eauto.
       econs 3; eauto.
-    + inv SIM1; [|done].
+    + inv SIM2; [|done].
       eapply rtc_tau_step_behavior; eauto.
-      exploit Configuration.step_future; try apply STEP; eauto. i. des.
+      exploit Configuration.step_future; try exact STEP; eauto. i. des.
+      exploit JConfiguration.step_future; eauto. i. des.
       exploit Configuration.rtc_step_future; eauto. i. des.
       inv STEP_SRC. econs 3; eauto.
   - destruct c2.
+    hexploit JSim.step_sim_configuration; eauto. i. des. destruct c_src1.
     punfold SIM0. exploit SIM0; eauto; try refl. i. des.
-    exploit STEP0; eauto. i. des.
+    hexploit STEP1; eauto. i. des.
     + inv FAILURE. des.
       eapply rtc_tau_step_behavior; eauto.
       econs 3; eauto.
-    + inv SIM1; [|done].
+    + inv SIM2; [|done].
       eapply rtc_tau_step_behavior; eauto.
-      exploit Configuration.step_future; try apply STEP; eauto. i. des.
+      exploit Configuration.step_future; try exact STEP; eauto. i. des.
+      exploit JConfiguration.step_future; eauto. i. des.
       exploit Configuration.rtc_step_future; eauto. i. des.
       inv STEP_SRC.
       * eapply IHPR; eauto.
@@ -804,19 +936,19 @@ Qed.
 
 Lemma sim_thread_sim
       ths_src sc0_src mem0_src
-      ths_tgt sc0_tgt mem0_tgt w
+      ths_tgt sc0_tgt mem0_tgt w views
       (TIDS: Threads.tids ths_src = Threads.tids ths_tgt)
       (SIM: forall tid lang_src st_src lc_src lang_tgt st_tgt lc_tgt,
           IdentMap.find tid ths_src = Some (existT _ lang_src st_src, lc_src) ->
           IdentMap.find tid ths_tgt = Some (existT _ lang_tgt st_tgt, lc_tgt) ->
           exists sim_terminal,
-            @sim_thread_past lang_src lang_tgt sim_terminal false w st_src lc_src sc0_src mem0_src st_tgt lc_tgt sc0_tgt mem0_tgt)
+            @sim_thread_past lang_src lang_tgt sim_terminal false w st_src lc_src sc0_src mem0_src st_tgt lc_tgt sc0_tgt mem0_tgt views)
   :
-    sim w ths_src sc0_src mem0_src ths_tgt sc0_tgt mem0_tgt.
+    sim w ths_src sc0_src mem0_src ths_tgt sc0_tgt mem0_tgt views.
 Proof.
   remember (Threads.tids ths_src) as tids eqn:TIDS_SRC.
   rename TIDS into TIDS_TGT.
-  revert w ths_src sc0_src mem0_src ths_tgt sc0_tgt mem0_tgt tids TIDS_SRC TIDS_TGT SIM.
+  revert w views ths_src sc0_src mem0_src ths_tgt sc0_tgt mem0_tgt tids TIDS_SRC TIDS_TGT SIM.
   pcofix CIH. i. pfold. ii. splits.
   - (* TERMINAL CASE *)
     assert (NOTIN: forall tid lang_src st_src lc_src
@@ -834,7 +966,7 @@ Proof.
                IdentMap.find tid ths_src = Some (existT _ lang_src st_src, lc_src) ->
                IdentMap.find tid ths_tgt = Some (existT _ lang_tgt st_tgt, lc_tgt) ->
                exists sim_terminal,
-                 @sim_thread_past lang_src lang_tgt sim_terminal false w st_src lc_src sc0_src mem0_src st_tgt lc_tgt sc0_tgt mem0_tgt).
+                 @sim_thread_past lang_src lang_tgt sim_terminal false w st_src lc_src sc0_src mem0_src st_tgt lc_tgt sc0_tgt mem0_tgt views).
     { eauto. }
     assert (UNCHANGED0: forall tid st lc
                                (TID: List.In tid (IdentSet.elements tids))
@@ -875,15 +1007,18 @@ Proof.
       - inv NODUP. ss.
     }
     generalize WF_SRC. intro X. inv X. ss. inv WF. exploit THREADS; eauto. i.
-    generalize WF_TGT. intro X. inv X. ss. inv WF. exploit THREADS0; eauto. i.
+    generalize WF_TGT. intro X. inv X. inv WF.
+    ss. inv WF0. exploit THREADS0; eauto. i.
     exploit (IN a); eauto. i. des.
     exploit TERMINAL_TGT; eauto. i. des.
     hexploit Local.terminal_promise_consistent; eauto. i.
     red in x2. des. punfold SIM0. red in SIM0. des.
     exploit FUTURE; eauto; ss.
+    { etrans; eauto. }
     { ss. splits; eauto using Memory.future_future_weak.
       { etrans; eauto. eapply Memory.future_future_weak; eauto. }
       { etrans; eauto. eapply Memory.future_future_weak; eauto. }
+      { etrans; eauto. }
       { etrans; eauto. }
     }
     { etrans; eauto. }
@@ -945,16 +1080,18 @@ Proof.
       exploit tids_find; [exact TIDS_SRC|exact TIDS_TGT|..]. i. des.
       exploit x1; eauto. i. des. rewrite FIND_SRC in x. inv x. }
     dup WF_SRC. dup WF_TGT.
-    inv WF_SRC. inv WF_TGT. inv WF. inv WF0. ss.
+    inv WF_SRC. inv WF_TGT. inv WF. inv WF0. inv WF. ss.
     exploit SIM0; eauto. i. des.
     exploit sim_thread_future; eauto using Memory.future_future_weak. i.
     exploit sim_thread_plus_step; try exact STEPS;
       eauto using Memory.future_future_weak.
     { destruct (classic (ThreadEvent.get_machine_event e0 = MachineEvent.failure)).
-      - inv STEP; inv STEP0; ss. inv LOCAL; ss; inv LOCAL0; ss.
-      - exploit Thread.rtc_tau_step_future; eauto. s. i. des.
-        exploit Thread.step_future; eauto. s. i. des.
-        hexploit consistent_promise_consistent; eauto.
+      - inv STEP. inv STEP0; inv STEP; ss. inv LOCAL; ss; inv LOCAL0; ss.
+      - exploit JThread.tau_steps_future; eauto. s. i. des.
+        exploit JThread.step_future; eauto. s. i. des.
+        hexploit JThread.consistent_thread_consistent; eauto.
+        { eapply CONSISTENT. ii. clarify. }
+        i. hexploit consistent_promise_consistent; eauto.
     }
     s. i. des.
     + left.
@@ -969,19 +1106,21 @@ Proof.
       { inv STEP0.
         { generalize (rtc_tail STEPS0). intro X. des.
           - inv X0. inv TSTEP. ss.
-            rewrite <- EVENT0. rewrite <- EVENT1. esplits; eauto.
+            rewrite <- EVENT. rewrite <- EVENT0. esplits; eauto.
             + econs 2. econs; eauto. i.
               eapply sim_thread_consistent; eauto.
+              eapply CONSISTENT. ii. clarify.
           - ss. inv X. rewrite IdentMap.gsident; auto.
-            rewrite <- EVENT0. ss.
+            rewrite <- EVENT. ss.
         }
-        { rewrite <- EVENT0. econs. econs; eauto.
+        { rewrite <- EVENT. econs. econs; eauto.
           i. eapply sim_thread_consistent; eauto.
+          eapply CONSISTENT. ii. clarify.
         }
       }
       exploit Configuration.opt_step_future; eauto.
       i. ss. des.
-      exploit Configuration.step_future; eauto.
+      exploit JConfiguration.step_future; eauto.
       i. ss. des.
       exploit UndefCertify.opt_step_unchanged; eauto.
       i. des; auto.
@@ -1000,6 +1139,7 @@ Proof.
               destruct lc_src, lc_src0.
               eapply other_promise_unchangable; eauto. }
           }
+          { etrans; eauto. }
           { etrans; eauto. }
         }
       }
