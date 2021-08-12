@@ -28,15 +28,20 @@ Require Import FulfillStep.
 Set Implicit Arguments.
 
 
+
+
 Definition version := nat.
 
 Module Mapping.
   Record t: Type :=
-    { map:> version -> Loc.t -> Time.t -> option Time.t;
-      ver: version;
-    }.
+    mk
+      { map:> version -> Loc.t -> Time.t -> option Time.t;
+        ver: version;
+      }.
 
   Definition versions := Loc.t -> Time.t -> option version.
+
+  Definition world := (t * versions)%type.
 
   Record wf (f: t): Prop :=
     { map_finite: forall ver loc, exists l, forall ts fts (MAP: f ver loc ts = Some fts), List.In (ts, fts) l;
