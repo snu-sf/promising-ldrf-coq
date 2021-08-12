@@ -15,6 +15,14 @@ Require Import Event.
 
 Set Implicit Arguments.
 
+
+Definition get_machine_event (e: ProgramEvent.t): MachineEvent.t :=
+  match e with
+  | ProgramEvent.syscall e => MachineEvent.syscall e
+  | ProgramEvent.failure => MachineEvent.failure
+  | _ => MachineEvent.silent
+  end.
+
 Module Perm.
   Variant t: Type :=
   | none
@@ -95,6 +103,12 @@ Module SeqCell.
    Proof.
      destruct c0, c1. ss. des; auto.
    Qed.
+
+   Definition is_written (c: t): Prop :=
+     match c with
+     | (_, Flag.written) => True
+     | _ => False
+     end.
 
    Definition init (v: Const.t): t := (v, Flag.unwritten).
 End SeqCell.
@@ -396,13 +410,14 @@ Section LANG.
   Variant at_step:
     forall (e: MachineEvent.t) (th0: t) (th1: t), Prop :=
   | at_step_intro
-      p0 p1 o0 o1 e d st0 st1 m0 m1
+      p0 p1 o0 o1 e d st0 st1 m0 m1 me
       (STEP: lang.(Language.step) e st0 st1)
       (ORACLE: Oracle.step p0 e d o0 o1)
       (PERM: p1 = update_perm kept_bot d p0)
       (MEM: m1 = update_mem kept_bot Flag.unwritten d m0)
+      (EVENT: me = get_machine_event e)
     :
-      at_step MachineEvent.silent (mk (SeqState.mk _ st0 m0) p0 o0) (mk (SeqState.mk _ st1 m1) p1 o1)
+      at_step me (mk (SeqState.mk _ st0 m0) p0 o0) (mk (SeqState.mk _ st1 m1) p1 o1)
   .
 
   Variant step (e: MachineEvent.t) (th0: t) (th1: t): Prop :=
@@ -416,6 +431,14 @@ Section LANG.
     exists th1 th2,
       (<<STEPS: rtc (step MachineEvent.silent) th0 th1>>) /\
       (<<FAILURE: step MachineEvent.failure th1 th2>>).
+
+  Definition certified (mem: SeqMemory.t) (th0: t): Prop :=
+    exists th1,
+      (<<STEPS: rtc (step MachineEvent.silent) th0 th1>>) /\
+      (<<MEM: forall loc
+                     (PERM: th0.(perm) loc = Perm.full)
+                     (WRITTEN: SeqCell.is_written (mem loc)),
+          SeqCell.is_written (th1.(state).(SeqState.memory) loc)>>).
 End LANG.
 End SeqThread.
 
@@ -425,6 +448,77 @@ Section SIMULATION.
   Variable lang_tgt: language.
 
   Variable sim_terminal: forall (st_src:(Language.state lang_src)) (st_tgt:(Language.state lang_tgt)), Prop.
+
+
+  Variant _sim_seq_gen
+          (sim_seq_gen:
+             forall
+               (p0: Perms)
+               (st_src0: SeqState.t lang_src)
+               (st_tgt0: SeqState.t lang_tgt), Prop)
+    :
+      forall
+        (p0: Perms)
+        (st_src0: SeqState.t lang_src)
+        (st_tgt0: SeqState.t lang_tgt), Prop :=
+  | sim_seq_gen_intro
+      (p0: Perms)
+      (st_src0: SeqState.t lang_src)
+      (st_tgt0: SeqState.t lang_tgt)
+      (TERMINAL:
+         forall (TERMINAL_TGT: lang_tgt.(Language.is_terminal) st_tgt0.(SeqState.state)),
+         exists st_src1,
+           (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
+           (<<TERMINAL_SRC: lang_src.(Language.is_terminal) st_src1.(SeqState.state)>>) /\
+           (<<TERMINAL: sim_terminal st_src1.(SeqState.state) st_tgt0.(SeqState.state)>>) /\
+           (<<MEM: SeqMemory.le st_src1.(SeqState.memory) st_tgt0.(SeqState.memory)>>))
+      (NASTEP:
+         forall st_tgt1 e (STEP_TGT: SeqState.na_step p0 e st_tgt0 st_tgt1),
+         exists st_src1 st_src2,
+           (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
+           (<<STEP: SeqState.na_opt_step p0 e st_src1 st_src2>>) /\
+           (<<SIM: sim_seq_gen p0 st_src2 st_tgt1>>))
+      (ATSTEP:
+         forall st_tgt1 e
+                (STEP_TGT: lang_tgt.(Language.step) e st_tgt0.(SeqState.state) st_tgt1)
+                (ATOMIC: is_atomic_event e),
+         exists k st_src1 st_src2,
+           (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
+           (<<STEP: lang_src.(Language.step) e st_src1.(SeqState.state) st_src2>>) /\
+           (<<SIM: forall d
+                          (EVENT: wf_diff_event d e)
+                          (PERM: wf_diff_perms d p0),
+               (<<MEM: match_mem k d st_src1.(SeqState.memory) st_tgt0.(SeqState.memory)>>) /\
+               (<<SIM: sim_seq_gen (update_perm k d p0)
+                                   (SeqState.mk _ st_src2 (update_mem k Flag.unwritten d st_src1.(SeqState.memory)))
+                                   (SeqState.mk _ st_tgt1 (update_mem k Flag.written d st_tgt0.(SeqState.memory)))>>)>>))
+      (CERTIFIED: forall o (WF: Oracle.wf o),
+          SeqThread.certified st_tgt0.(SeqState.memory) (SeqThread.mk st_src0 p0 o))
+    :
+      _sim_seq_gen sim_seq_gen p0 st_src0 st_tgt0
+  | sim_seq_gen_failure
+      (p0: Perms)
+      (st_src0: SeqState.t lang_src)
+      (st_tgt0: SeqState.t lang_tgt)
+      (FAILURE: forall o (WF: Oracle.wf o),
+          SeqThread.failure (SeqThread.mk st_src0 p0 o))
+    :
+      _sim_seq_gen sim_seq_gen p0 st_src0 st_tgt0
+  .
+
+  Lemma sim_seq_gen_mon: monotone3 _sim_seq_gen.
+  Proof.
+    ii. inv IN.
+    { econs 1; eauto.
+      { i. hexploit NASTEP; eauto. i. des. esplits; eauto. }
+      { i. exploit ATSTEP; eauto. i. des. esplits; eauto.
+        i. hexploit SIM; eauto. i. des. esplits; eauto. }
+    }
+    { econs 2; eauto. }
+  Qed.
+
+  Definition sim_seq_gen := paco3 _sim_seq_gen bot3.
+
 
 
   Inductive _sim_seq
@@ -485,7 +579,7 @@ Section SIMULATION.
       (p0: Perms)
       (st_src0: SeqState.t lang_src)
       (st_tgt0: SeqState.t lang_tgt)
-      (FAILURE: forall o,
+      (FAILURE: forall o (WF: Oracle.wf o),
           SeqThread.failure (SeqThread.mk st_src0 p0 o))
     :
       _sim_seq sim_seq p0 st_src0 st_tgt0
@@ -549,7 +643,7 @@ Section SIMULATION.
           (p0: Perms)
           (st_src0: SeqState.t lang_src)
           (st_tgt0: SeqState.t lang_tgt)
-          (FAILURE: forall o,
+          (FAILURE: forall o (WF: Oracle.wf o),
               SeqThread.failure (SeqThread.mk st_src0 p0 o)),
           P p0 st_src0 st_tgt0)
     :
