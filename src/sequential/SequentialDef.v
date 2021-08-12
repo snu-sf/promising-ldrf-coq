@@ -29,39 +29,38 @@ Module Perm.
     end.
 End Perm.
 
-Variant flag :=
-| unwritten
-| written
-| promised
-.
+Module Flag.
+  Variant t :=
+  | unwritten
+  | written
+  .
 
-Definition flag_le (f_src f_tgt: flag): bool :=
-  match f_src, f_tgt with
-  | written, _ => true
-  | unwritten, unwritten => true
-  | unwritten, promised => true
-  | promised, promised => true
-  | _, _ => false
-  end.
+  Definition le (f_src f_tgt: t): bool :=
+    match f_src, f_tgt with
+    | written, _ => true
+    | unwritten, unwritten => true
+    | _, _ => false
+    end.
 
-Program Instance flag_le_PreOrder: PreOrder flag_le.
-Next Obligation.
-Proof.
-  ii. destruct x; ss.
-Qed.
-Next Obligation.
-Proof.
-  ii. destruct x, y, z; ss.
-Qed.
+  Program Instance le_PreOrder: PreOrder le.
+  Next Obligation.
+  Proof.
+    ii. destruct x; ss.
+  Qed.
+  Next Obligation.
+  Proof.
+    ii. destruct x, y, z; ss.
+  Qed.
+End Flag.
 
 Definition Perms := Loc.t -> Perm.t.
 
 Module SeqCell.
-   Definition t := (Const.t * flag)%type.
+   Definition t := (Const.t * Flag.t)%type.
 
    Definition le (c0 c1: t): Prop :=
      match c0, c1 with
-     | (v0, f0), (v1, f1) => v0 = v1 /\ flag_le f0 f1
+     | (v0, f0), (v1, f1) => v0 = v1 /\ Flag.le f0 f1
      end.
 
    Program Instance le_PreOrder: PreOrder le.
@@ -75,7 +74,29 @@ Module SeqCell.
      des. subst. splits; auto. etrans; eauto.
    Qed.
 
-   Definition init (v: Const.t): t := (v, unwritten).    
+   Definition flag_le (c0 c1: t): Prop :=
+     match c0, c1 with
+     | (v0, f0), (v1, f1) => Flag.le f0 f1
+     end.
+
+   Program Instance flag_le_PreOrder: PreOrder flag_le.
+   Next Obligation.
+   Proof.
+     ii. destruct x; ss. refl.
+   Qed.
+   Next Obligation.
+   Proof.
+     ii. destruct x, y, z; ss.
+     des. subst. splits; auto. etrans; eauto.
+   Qed.
+
+   Lemma le_flag_le c0 c1 (LE: le c0 c1):
+     flag_le c0 c1.
+   Proof.
+     destruct c0, c1. ss. des; auto.
+   Qed.
+
+   Definition init (v: Const.t): t := (v, Flag.unwritten).
 End SeqCell.
 
 
@@ -83,7 +104,7 @@ Module SeqMemory.
   Definition t := Loc.t -> SeqCell.t.
 
   Definition update (loc: Loc.t) (val: Const.t) (m: t): t :=
-    fun loc' => if Loc.eq_dec loc' loc then (val, written) else (m loc').
+    fun loc' => if Loc.eq_dec loc' loc then (val, Flag.written) else (m loc').
 
   Definition le (m_src m_tgt: t): Prop :=
     forall loc, SeqCell.le (m_src loc) (m_tgt loc).
@@ -113,7 +134,6 @@ Section LANG.
         memory: SeqMemory.t;
       }.
 
-  (* without oracle *)
   Variant na_local_step (p: Perms):
     forall (e: MachineEvent.t)
            (pe: ProgramEvent.t)
@@ -198,29 +218,42 @@ Variant diff :=
 
 Definition diffs := Loc.t -> diff.
 
+Definition kept := Loc.t -> bool.
+Definition kept_bot: kept := fun _ => false.
+
+Definition update_flag (k: bool) (f_new: Flag.t) (c: SeqCell.t): SeqCell.t :=
+  match c with
+  | (v, f_old) => if k then (v, f_new) else (v, f_old)
+  end.
+
 Definition update_mem
+           (k: kept) (f_new: Flag.t)
            (d: diffs) (m0: SeqMemory.t): SeqMemory.t :=
   fun loc =>
     match (d loc) with
-    | diff_rlx | diff_rel => m0 loc
-    | diff_acq v | diff_reset v => (v, unwritten)
+    | diff_rlx | diff_rel => update_flag (k loc) f_new (m0 loc)
+    | diff_acq v | diff_reset v => (v, Flag.unwritten)
     end.
 
-Definition update_perm (d: diffs) (p0: Perms): Perms :=
+Definition update_perm (k: kept) (d: diffs) (p0: Perms): Perms :=
   fun loc =>
     match (d loc) with
     | diff_rlx | diff_reset _ => p0 loc
     | diff_acq _ => Perm.full
-    | diff_rel => Perm.none
+    | diff_rel => if (k loc) then p0 loc else Perm.none
     end.
 
-Definition match_mem (d: diffs) (mem_src mem_tgt: SeqMemory.t) :=
+Definition match_mem (k: kept) (d: diffs) (mem_src mem_tgt: SeqMemory.t) :=
   forall loc,
     match (d loc) with
-    | diff_rel | diff_reset _ => SeqCell.le (mem_src loc) (mem_tgt loc)
-    | _ => True
+    | diff_acq _ | diff_rlx => True
+    | diff_reset _ => SeqCell.le (mem_src loc) (mem_tgt loc)
+    | diff_rel => k loc \/ SeqCell.le (mem_src loc) (mem_tgt loc)
     end.
 
+Definition match_flag (mem_src mem_tgt: SeqMemory.t) :=
+  forall loc,
+    SeqCell.flag_le (mem_src loc) (mem_tgt loc).
 
 Definition wf_diff_perms (d: diffs) (p: Perms): Prop :=
   forall loc,
@@ -278,66 +311,13 @@ Definition is_atomic_event (e: ProgramEvent.t): Prop :=
     Ordering.le Ordering.plain ordr /\ Ordering.le Ordering.plain ordw
   end.
 
-
-Section SIMULATION.
-  Variable lang_src: language.
-  Variable lang_tgt: language.
-
-  Variable sim_terminal: forall (st_src:(Language.state lang_src)) (st_tgt:(Language.state lang_tgt)), Prop.
-
-  Definition _sim_seq
-             (sim_seq:
-                forall
-                  (p0: Perms)
-                  (st_src0: SeqState.t lang_src)
-                  (st_tgt0: SeqState.t lang_tgt), Prop)
-    :
-      forall
-        (p0: Perms)
-        (st_src0: SeqState.t lang_src)
-        (st_tgt0: SeqState.t lang_tgt), Prop :=
-    fun p0 st_src0 st_tgt0 =>
-      (<<TERMINAL:
-         forall (TERMINAL_TGT: lang_tgt.(Language.is_terminal) st_tgt0.(SeqState.state)),
-         exists st_src1,
-           (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
-           (<<TERMINAL_SRC: lang_src.(Language.is_terminal) st_src1.(SeqState.state)>>) /\
-           (<<TERMINAL: sim_terminal st_src1.(SeqState.state) st_tgt0.(SeqState.state)>>)>>) /\
-      (<<NASTEP:
-         forall st_tgt1 e (STEP_TGT: SeqState.na_step p0 e st_tgt0 st_tgt1),
-         exists st_src1 st_src2,
-           (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
-           (<<STEP: SeqState.na_opt_step p0 e st_src1 st_src2>>) /\
-           (<<SIM: sim_seq p0 st_src2 st_tgt1>>)>>) /\
-      (<<ATSTEP:
-         forall st_tgt1 e
-                (STEP_TGT: lang_tgt.(Language.step) e st_tgt0.(SeqState.state) st_tgt1)
-                (ATOMIC: is_atomic_event e),
-         exists st_src1 st_src2,
-           (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
-           (<<STEP: lang_src.(Language.step) e st_src1.(SeqState.state) st_src2>>) /\
-           (<<SIM: forall d
-                          (DIFF: wf_diff_event d e)
-                          (PERM: wf_diff_perms d p0),
-               (<<MEM: match_mem d st_src1.(SeqState.memory) st_tgt0.(SeqState.memory)>>) /\
-               (<<SIM: sim_seq (update_perm d p0)
-                           (SeqState.mk _ st_src2 (update_mem d st_src1.(SeqState.memory)))
-                           (SeqState.mk _ st_tgt1 (update_mem d st_tgt0.(SeqState.memory)))>>)>>)>>).
-
-  Lemma sim_seq_mon: monotone3 _sim_seq.
-  Proof.
-    unfold _sim_seq. ii. des. esplits; eauto.
-    { i. exploit NASTEP; eauto. i. des. esplits; eauto. }
-    { i. exploit ATSTEP; eauto. i. des. esplits; eauto.
-      i. exploit SIM; eauto. i. des. esplits; eauto. }
-  Qed.
-
-  Definition sim_seq := paco3 _sim_seq bot3.
-End SIMULATION.
-Arguments sim_seq [_] [_] _ _ _.
-#[export] Hint Resolve sim_seq_mon: paco.
-
-
+Definition is_acq_event (e: ProgramEvent.t): Prop :=
+  match e with
+  | ProgramEvent.fence ordr _ => Ordering.le Ordering.acqrel ordr
+  | ProgramEvent.read _ _ ord => Ordering.le Ordering.acqrel ord
+  | ProgramEvent.update _ _ _ _ _ => True
+  | _ => False
+  end.
 
 
 
@@ -345,17 +325,41 @@ Module Oracle.
   Definition t: Type. Admitted.
 
   Definition step:
-    forall (e: ProgramEvent.t)
+    forall (p0: Perms)
+           (e: ProgramEvent.t)
            (d: diffs)
            (o0: t)
            (o1: t), Prop.
   Admitted.
 
-  Lemma step_wf e d o0 o1
-        (STEP: step e d o0 o1)
+  Variant _wf (wf: t -> Prop): t -> Prop :=
+  | wf_intro
+      o0
+      (DIFF: forall p0 e d o1
+                    (STEP: step p0 e d o0 o1),
+          (<<EVENT: wf_diff_event d e>>) /\
+          (<<PERM: wf_diff_perms d p0>>) /\
+          (<<WF: wf o1>>))
+      (LOAD: forall p0 loc ord
+                    (ORD: Ordering.le ord Ordering.strong_relaxed),
+          exists val d o1, (<<STEP: step p0 (ProgramEvent.read loc val ord) d o0 o1>>))
+      (STORE: forall p0 loc ord val,
+          exists d o1, (<<STEP: step p0 (ProgramEvent.write loc val ord) d o0 o1>>))
+      (FENCE: forall p0 ordr ordw
+                     (ORD: Ordering.le ordr Ordering.strong_relaxed),
+          exists d o1, (<<STEP: step p0 (ProgramEvent.fence ordr ordw) d o0 o1>>))
     :
-      wf_diff_event d e.
-  Admitted.
+      _wf wf o0
+  .
+
+  Lemma wf_mon: monotone1 _wf.
+  Proof.
+    ii. inv IN. econs; eauto. i.
+    exploit DIFF; eauto. i. des. splits; auto.
+  Qed.
+  #[export] Hint Resolve wf_mon: paco.
+
+  Definition wf := paco1 _wf bot1.
 End Oracle.
 
 
@@ -388,8 +392,198 @@ Section LANG.
     - refl.
     - econs; eauto. econs; eauto.
   Qed.
+
+  Variant at_step:
+    forall (e: MachineEvent.t) (th0: t) (th1: t), Prop :=
+  | at_step_intro
+      p0 p1 o0 o1 e d st0 st1 m0 m1
+      (STEP: lang.(Language.step) e st0 st1)
+      (ORACLE: Oracle.step p0 e d o0 o1)
+      (PERM: p1 = update_perm kept_bot d p0)
+      (MEM: m1 = update_mem kept_bot Flag.unwritten d m0)
+    :
+      at_step MachineEvent.silent (mk (SeqState.mk _ st0 m0) p0 o0) (mk (SeqState.mk _ st1 m1) p1 o1)
+  .
+
+  Variant step (e: MachineEvent.t) (th0: t) (th1: t): Prop :=
+  | step_na_step
+      (STEP: na_step e th0 th1)
+  | step_at_step
+      (STEP: at_step e th0 th1)
+  .
+
+  Definition failure (th0: t): Prop :=
+    exists th1 th2,
+      (<<STEPS: rtc (step MachineEvent.silent) th0 th1>>) /\
+      (<<FAILURE: step MachineEvent.failure th1 th2>>).
 End LANG.
 End SeqThread.
+
+
+Section SIMULATION.
+  Variable lang_src: language.
+  Variable lang_tgt: language.
+
+  Variable sim_terminal: forall (st_src:(Language.state lang_src)) (st_tgt:(Language.state lang_tgt)), Prop.
+
+
+  Inductive _sim_seq
+            (sim_seq:
+               forall
+                 (p0: Perms)
+                 (st_src0: SeqState.t lang_src)
+                 (st_tgt0: SeqState.t lang_tgt), Prop)
+    :
+      forall
+        (p0: Perms)
+        (st_src0: SeqState.t lang_src)
+        (st_tgt0: SeqState.t lang_tgt), Prop :=
+  | sim_seq_intro
+      (synch: bool)
+      (p0: Perms)
+      (st_src0: SeqState.t lang_src)
+      (st_tgt0: SeqState.t lang_tgt)
+      (TERMINAL:
+         forall (TERMINAL_TGT: lang_tgt.(Language.is_terminal) st_tgt0.(SeqState.state)),
+         exists st_src1,
+           (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
+           (<<TERMINAL_SRC: lang_src.(Language.is_terminal) st_src1.(SeqState.state)>>) /\
+           (<<TERMINAL: sim_terminal st_src1.(SeqState.state) st_tgt0.(SeqState.state)>>) /\
+           (<<MEM: SeqMemory.le st_src1.(SeqState.memory) st_tgt0.(SeqState.memory)>>))
+      (NASTEP:
+         forall st_tgt1 e (STEP_TGT: SeqState.na_step p0 e st_tgt0 st_tgt1),
+         exists st_src1 st_src2,
+           (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
+           (<<STEP: SeqState.na_opt_step p0 e st_src1 st_src2>>) /\
+           (<<SIM: forall (SYNC: synch = true), sim_seq p0 st_src2 st_tgt1>>) /\
+           (<<SIM: forall (SYNC: synch = false), _sim_seq sim_seq p0 st_src2 st_tgt1>>) /\
+           (<<FLAG: forall (SYNC: synch = true), match_flag st_src2.(SeqState.memory) st_tgt1.(SeqState.memory)>>))
+      (ATSTEP:
+         forall st_tgt1 e
+                (STEP_TGT: lang_tgt.(Language.step) e st_tgt0.(SeqState.state) st_tgt1)
+                (ATOMIC: is_atomic_event e),
+         exists k st_src1 st_src2,
+           (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
+           (<<STEP: lang_src.(Language.step) e st_src1.(SeqState.state) st_src2>>) /\
+           (<<FLAG: forall (SYNC: synch = true \/ is_acq_event e),
+               match_flag st_src1.(SeqState.memory) st_tgt0.(SeqState.memory)>>) /\
+           (<<SIM: forall d
+                          (EVENT: wf_diff_event d e)
+                          (PERM: wf_diff_perms d p0),
+               (<<MEM: match_mem k d st_src1.(SeqState.memory) st_tgt0.(SeqState.memory)>>) /\
+               (<<SIM: forall (SYNC: synch = true),
+                   sim_seq (update_perm k d p0)
+                           (SeqState.mk _ st_src2 (update_mem k Flag.unwritten d st_src1.(SeqState.memory)))
+                           (SeqState.mk _ st_tgt1 (update_mem k Flag.written d st_tgt0.(SeqState.memory)))>>) /\
+               (<<SIM: forall (SYNC: synch = false),
+                   _sim_seq sim_seq (update_perm k d p0)
+                            (SeqState.mk _ st_src2 (update_mem k Flag.unwritten d st_src1.(SeqState.memory)))
+                            (SeqState.mk _ st_tgt1 (update_mem k Flag.written d st_tgt0.(SeqState.memory)))>>)>>))
+    :
+      _sim_seq sim_seq p0 st_src0 st_tgt0
+  | sim_seq_failure
+      (p0: Perms)
+      (st_src0: SeqState.t lang_src)
+      (st_tgt0: SeqState.t lang_tgt)
+      (FAILURE: forall o,
+          SeqThread.failure (SeqThread.mk st_src0 p0 o))
+    :
+      _sim_seq sim_seq p0 st_src0 st_tgt0
+  .
+
+  Lemma sim_seq_ind
+        (sim_seq: forall
+            (p0: Perms)
+            (st_src0: SeqState.t lang_src)
+            (st_tgt0: SeqState.t lang_tgt), Prop)
+        (P: forall
+            (p0: Perms)
+            (st_src0: SeqState.t lang_src)
+            (st_tgt0: SeqState.t lang_tgt), Prop)
+        (STEP: forall
+            (synch: bool)
+            (p0: Perms)
+            (st_src0: SeqState.t lang_src)
+            (st_tgt0: SeqState.t lang_tgt)
+            (TERMINAL:
+               forall (TERMINAL_TGT: lang_tgt.(Language.is_terminal) st_tgt0.(SeqState.state)),
+               exists st_src1,
+                 (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
+                 (<<TERMINAL_SRC: lang_src.(Language.is_terminal) st_src1.(SeqState.state)>>) /\
+                 (<<TERMINAL: sim_terminal st_src1.(SeqState.state) st_tgt0.(SeqState.state)>>) /\
+                 (<<MEM: SeqMemory.le st_src1.(SeqState.memory) st_tgt0.(SeqState.memory)>>))
+            (NASTEP:
+               forall st_tgt1 e (STEP_TGT: SeqState.na_step p0 e st_tgt0 st_tgt1),
+               exists st_src1 st_src2,
+                 (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
+                 (<<STEP: SeqState.na_opt_step p0 e st_src1 st_src2>>) /\
+                 (<<SIM: forall (SYNC: synch = true), sim_seq p0 st_src2 st_tgt1>>) /\
+                 (<<SIM: forall (SYNC: synch = false), _sim_seq sim_seq p0 st_src2 st_tgt1 /\ P p0 st_src2 st_tgt1>>) /\
+                 (<<FLAG: forall (SYNC: synch = true), match_flag st_src2.(SeqState.memory) st_tgt1.(SeqState.memory)>>))
+            (ATSTEP:
+               forall st_tgt1 e
+                      (STEP_TGT: lang_tgt.(Language.step) e st_tgt0.(SeqState.state) st_tgt1)
+                      (ATOMIC: is_atomic_event e),
+               exists k st_src1 st_src2,
+                 (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
+                 (<<STEP: lang_src.(Language.step) e st_src1.(SeqState.state) st_src2>>) /\
+                 (<<FLAG: forall (SYNC: synch = true \/ is_acq_event e),
+                     match_flag st_src1.(SeqState.memory) st_tgt0.(SeqState.memory)>>) /\
+                 (<<SIM: forall d
+                                (EVENT: wf_diff_event d e)
+                                (PERM: wf_diff_perms d p0),
+                     (<<MEM: match_mem k d st_src1.(SeqState.memory) st_tgt0.(SeqState.memory)>>) /\
+                     (<<SIM: forall (SYNC: synch = true),
+                         sim_seq (update_perm k d p0)
+                                 (SeqState.mk _ st_src2 (update_mem k Flag.unwritten d st_src1.(SeqState.memory)))
+                                 (SeqState.mk _ st_tgt1 (update_mem k Flag.written d st_tgt0.(SeqState.memory)))>>) /\
+                     (<<SIM: forall (SYNC: synch = false),
+                         _sim_seq sim_seq (update_perm k d p0)
+                                  (SeqState.mk _ st_src2 (update_mem k Flag.unwritten d st_src1.(SeqState.memory)))
+                                  (SeqState.mk _ st_tgt1 (update_mem k Flag.written d st_tgt0.(SeqState.memory))) /\
+                         P (update_perm k d p0)
+                           (SeqState.mk _ st_src2 (update_mem k Flag.unwritten d st_src1.(SeqState.memory)))
+                           (SeqState.mk _ st_tgt1 (update_mem k Flag.written d st_tgt0.(SeqState.memory)))>>)>>)),
+            P p0 st_src0 st_tgt0)
+      (FAILURE: forall
+          (p0: Perms)
+          (st_src0: SeqState.t lang_src)
+          (st_tgt0: SeqState.t lang_tgt)
+          (FAILURE: forall o,
+              SeqThread.failure (SeqThread.mk st_src0 p0 o)),
+          P p0 st_src0 st_tgt0)
+    :
+      forall p0 st_src0 st_tgt0 (SIM: _sim_seq sim_seq p0 st_src0 st_tgt0), P p0 st_src0 st_tgt0.
+  Proof.
+    fix IH 4. i. inv SIM.
+    { eapply STEP.
+      { eauto. }
+      { i. hexploit NASTEP; eauto. i. des. esplits; eauto. }
+      { i. hexploit ATSTEP; eauto. i. des. esplits; eauto.
+        i. hexploit SIM; eauto. i. des. esplits; eauto. }
+    }
+    { eapply FAILURE; eauto. }
+  Qed.
+
+  Lemma sim_seq_mon: monotone3 _sim_seq.
+  Proof.
+    ii. eapply sim_seq_ind; eauto.
+    { i. econs 1; eauto.
+      { i. hexploit NASTEP; eauto. i. des. esplits; eauto. i. eapply SIM0; auto. }
+      { i. exploit ATSTEP; eauto. i. des. esplits; eauto.
+        i. hexploit SIM; eauto. i. des. esplits; eauto. i. eapply SIM1; eauto. }
+    }
+    { i. econs 2; eauto. }
+  Qed.
+
+  Definition sim_seq := paco3 _sim_seq bot3.
+End SIMULATION.
+Arguments sim_seq [_] [_] _ _ _.
+#[export] Hint Resolve sim_seq_mon: paco.
+
+
+
+
 
 Require Import ITreeLang.
 Require Import iCompatibility.
