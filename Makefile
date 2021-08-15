@@ -5,8 +5,8 @@ COQTHEORIES  := \
 	src/itree/*.v \
 	src/prop/*.v \
 	src/opt/*.v \
-	src/opt/while/*.v \
 	src/opt/itree/*.v \
+#	src/opt/while/*.v \
 #	src/invariant/*.v \
 #	src/gopt/*.v \
 #	src/promotion/*.v \

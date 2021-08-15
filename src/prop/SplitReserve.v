@@ -30,14 +30,14 @@ Inductive split_reserve
 .
 Hint Constructors split_reserve.
 
-Lemma split_reserve_write prom0 mem0 loc from to val released prom1 mem1 ts3 prom2
-      (SEMI: split_reserve prom0 mem0 loc from to (Message.concrete val released) prom1 mem1 (Memory.op_kind_split ts3 Message.reserve))
-      (REMOVE: Memory.remove prom1 loc from to (Message.concrete val released) prom2)
+Lemma split_reserve_write prom0 mem0 loc from to msg prom1 mem1 ts3 prom2
+      (SEMI: split_reserve prom0 mem0 loc from to msg prom1 mem1 (Memory.op_kind_split ts3 Message.reserve))
+      (REMOVE: Memory.remove prom1 loc from to msg prom2)
       (MLE: Memory.le prom0 mem0)
   :
     exists prom_mid0 mem_mid0 mem_mid1,
       (<<REMOVE: Memory.promise prom0 mem0 loc from ts3 Message.reserve prom_mid0 mem_mid0 Memory.op_kind_cancel>>) /\
-      (<<ADDMESSAGE: Memory.write prom_mid0 mem_mid0 loc from to val released prom_mid0 mem_mid1 Memory.op_kind_add>>) /\
+      (<<ADDMESSAGE: Memory.write prom_mid0 mem_mid0 loc from to msg prom_mid0 mem_mid1 Memory.op_kind_add>>) /\
       (<<ADDRESERVE: Memory.promise prom_mid0 mem_mid1 loc to ts3 Message.reserve prom2 mem1 Memory.op_kind_add>>).
 Proof.
   inv SEMI. des. clarify.
@@ -68,7 +68,7 @@ Proof.
   intros [prom_mid2 PROMFULFILL].
   assert (prom_mid2 = prom_mid0).
   { eapply MemoryFacts.add_remove_eq; eauto. } subst.
-  assert (WRTIE0: Memory.write prom_mid0 mem_mid0 loc from to val' released' prom_mid0 mem_mid1 Memory.op_kind_add).
+  assert (WRTIE0: Memory.write prom_mid0 mem_mid0 loc from to (Message.concrete val' released') prom_mid0 mem_mid1 Memory.op_kind_add).
   { econs; eauto. econs; eauto. i.
     erewrite Memory.remove_o in GET4; eauto. des_ifs. guardH o.
     exploit Memory.get_disjoint.
@@ -105,7 +105,6 @@ Proof.
     { unguard. ss. des; clarify. }
     { eapply x1; eauto. inv LHS. econs; eauto. }
   }
-  { econs. }
   intros [mem_mid2 MEMADDRESERVE].
   exploit (@Memory.add_exists_le prom_mid0 mem_mid1 loc to ts3 Message.reserve); eauto.
   intros [prom_mid2 PROMADDRESERVE].
@@ -126,7 +125,7 @@ Proof.
     erewrite (@Memory.split_o mem1 mem0); eauto. des_ifs.
     ss. des; clarify.
   }
-  subst. esplits; eauto. econs; eauto. ss.
+  subst. esplits; eauto.
 Qed.
 
 Lemma split_reserve_promise prom0 mem0 loc from to msg prom1 mem1 ts3
@@ -199,7 +198,6 @@ Proof.
     { unguard. ss. des; clarify. }
     { eapply x1; eauto. inv LHS. econs; eauto. }
   }
-  { econs. }
   intros [mem_mid2 MEMADDRESERVE].
   exploit (@Memory.add_exists_le prom_mid1 mem_mid1 loc to ts3 Message.reserve); eauto.
   intros [prom_mid2 PROMADDRESERVE].
@@ -220,7 +218,6 @@ Proof.
     ss. des; clarify.
   }
   subst. esplits; eauto.
-  { econs; eauto. ss. }
   { i. eapply memory_concrete_le_closed_msg; try apply H. ii.
     erewrite (@Memory.split_o mem1 mem0) in GET4; eauto.
     erewrite (@Memory.add_o mem_mid1 mem_mid0); eauto.

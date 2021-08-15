@@ -850,6 +850,17 @@ Section MEMORYLEMMAS.
     ii. erewrite Memory.remove_o in LHS; eauto. des_ifs.
   Qed.
 
+  Lemma write_promises_le prom0 mem0 loc from to msg prom1 mem1 kind
+        (MLE: Memory.le prom0 mem0)
+        (STEP: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
+  :
+    Memory.le prom1 mem1.
+  Proof.
+    inv STEP.
+    eapply Memory.promise_le in PROMISE; eauto. red in PROMISE.
+    eapply remove_le in REMOVE; eauto. etrans; eauto.
+  Qed.
+
   Lemma step_promises_le lang (th0 th1: Thread.t lang) e
         (MLE: Memory.le (Local.promises (Thread.local th0)) (Thread.memory th0))
         (STEP: Thread.step_allpf e th0 th1)
@@ -861,16 +872,17 @@ Section MEMORYLEMMAS.
       eapply Memory.promise_le; eauto.
     - inv STEP. inv LOCAL; ss.
       + inv LOCAL0; ss.
-      + inv LOCAL0. ss. inv WRITE.
-        eapply Memory.promise_le in PROMISE; eauto. red in PROMISE.
-        eapply remove_le in REMOVE.
-        etrans; eauto.
-      + inv LOCAL1. inv LOCAL2. ss. inv WRITE.
-        eapply Memory.promise_le in PROMISE; eauto. red in PROMISE.
-        eapply remove_le in REMOVE.
-        etrans; eauto.
+      + inv LOCAL0. ss. eapply write_promises_le; eauto.
+      + inv LOCAL1. inv LOCAL2. ss. eapply write_promises_le; eauto.
       + inv LOCAL0; ss.
       + inv LOCAL0; ss.
+      + inv LOCAL0; ss. destruct lc1. ss.
+        remember (View.rlx (TView.cur tview) loc).
+        clear STATE Heqt. revert MLE.
+        induction WRITE; auto.
+        * i. eapply write_promises_le; eauto.
+        * i. eapply IHWRITE; eauto.
+          eapply write_promises_le; eauto.
   Qed.
 
   Lemma trace_steps_promises_le lang tr (th0 th1: Thread.t lang)
@@ -940,36 +952,10 @@ Section MEMORYLEMMAS.
   Definition attatched_time (mem: Memory.t) (loc: Loc.t) (to: Time.t) :=
     exists to' msg, <<GET: Memory.get loc to' mem = Some (to, msg)>>.
 
-  Lemma write_succeed_valid prom mem1 loc from1 to1 val released
-        (MLE: Memory.le prom mem1)
-        (NCOVER: forall t (COVER: covered loc t mem1),
-            ~ Interval.mem (from1, to1) t)
-        (TO: Time.le (View.rlx (View.unwrap released) loc) to1)
-        (FROMTO: Time.lt from1 to1)
-        (NOATTATCH: ~ attatched_time mem1 loc to1)
-        (MSGWF: Message.wf (Message.concrete val released))
-    :
-      exists mem2,
-        (<<WRITE: Memory.write prom mem1 loc from1 to1 val released prom mem2 Memory.op_kind_add>>).
-  Proof.
-    exploit Memory.add_exists; eauto.
-    { instantiate (1:=mem1). instantiate (1:=loc).
-      ii. eapply NCOVER; eauto. econs; eauto. }
-    i. des. exists mem2.
-    exploit Memory.add_exists_le; eauto. i. des.
-    econs.
-    - econs; eauto; ss.
-      i. eapply NOATTATCH; eauto. econs; eauto.
-    - exploit Memory.remove_exists; eauto.
-      { eapply Memory.add_get0 in x1. des. eauto. } i. des.
-      exploit MemoryFacts.MemoryFacts.add_remove_eq; eauto.
-      i. clarify.
-  Qed.
-
-  Lemma write_disjoint promises1 mem1 loc from1 to1 val released promises3 mem2 kind
+  Lemma write_disjoint promises1 mem1 loc from1 to1 msg promises3 mem2 kind
         (MLE: Memory.le promises1 mem1)
         (WRITE: Memory.write
-                  promises1 mem1 loc from1 to1 val released promises3 mem2 kind)
+                  promises1 mem1 loc from1 to1 msg promises3 mem2 kind)
         to
         (INT: Interval.mem (from1, to1) to)
     :
@@ -985,7 +971,8 @@ Section MEMORYLEMMAS.
       etrans; eauto. left. auto.
     - left. dup PROMISES. eapply Memory.lower_get0 in PROMISES. des.
       econs; eauto.
-    - clarify.
+    - left. eapply Memory.remove_get0 in PROMISES. des.
+      econs; eauto.
   Qed.
 
   Lemma write_msg_wf v prom v' prom'
@@ -1004,16 +991,16 @@ Section MEMORYLEMMAS.
   Proof.
     inv WRITE. inv WRITE0. inv PROMISE.
     - inv TS. inv MEM. inv ADD. esplits; eauto. ii. clarify.
-      unfold attatched_time in *. des. exploit ATTACH; eauto.
+      unfold attatched_time in *. des. exploit ATTACH; eauto. ss.
     - inv TS. inv MEM. inv SPLIT. esplits; eauto. ii. clarify.
     - inv TS. inv MEM. inv LOWER. esplits; eauto. ii. clarify.
     - clarify.
   Qed.
 
   Lemma memory_write_bot_add
-        mem1 loc from1 to1 val released promises3 mem2 kind
+        mem1 loc from1 to1 msg promises3 mem2 kind
         (WRITE: Memory.write
-                  Memory.bot mem1 loc from1 to1 val released promises3 mem2 kind)
+                  Memory.bot mem1 loc from1 to1 msg promises3 mem2 kind)
     :
       kind = Memory.op_kind_add.
   Proof.
@@ -1022,7 +1009,20 @@ Section MEMORYLEMMAS.
       rewrite Memory.bot_get in *. clarify.
     - exfalso. eapply Memory.lower_get0 in PROMISES. des.
       rewrite Memory.bot_get in *. clarify.
-    - clarify.
+    - eapply Memory.remove_get0 in PROMISES. des.
+      rewrite Memory.bot_get in *. clarify.
+  Qed.
+
+  Lemma promise_bot_write_no_promise
+        promises1 mem1 loc from1 to1 msg promises3 mem2 kind
+        (WRITE: Memory.write promises1 mem1 loc from1 to1 msg promises3 mem2 kind)
+        (BOT: promises1 = Memory.bot)
+    :
+      promises3 = Memory.bot.
+  Proof.
+    inv WRITE.
+    exploit memory_write_bot_add; eauto. i. clarify.
+    exploit MemoryFacts.MemoryFacts.write_add_promises; eauto.
   Qed.
 
   Lemma promise_bot_no_promise P lang (th0 th1: Thread.t lang) e
@@ -1035,11 +1035,14 @@ Section MEMORYLEMMAS.
     inv STEP. eapply NOPROMISE in SAT. inv STEP0. inv STEP.
     - inv STEP0; des; clarify.
     - inv STEP0. ss. inv LOCAL; try inv LOCAL0; ss.
-      + rewrite BOT in *. exploit memory_write_bot_add; eauto. i. clarify.
-        exploit MemoryFacts.MemoryFacts.write_add_promises; eauto.
-      + inv LOCAL1. inv LOCAL2. ss. rewrite BOT in *.
-        exploit memory_write_bot_add; eauto. i. clarify.
-        exploit MemoryFacts.MemoryFacts.write_add_promises; eauto.
+      + eapply promise_bot_write_no_promise; eauto.
+      + inv LOCAL1. inv LOCAL2. ss.
+        eapply promise_bot_write_no_promise; eauto.
+      + revert BOT. remember (Local.promises lc1).
+        remember (View.rlx (TView.cur (Local.tview lc1)) loc).
+        clear Heqt Heqt0 STATE. induction WRITE.
+        { i. eapply promise_bot_write_no_promise; eauto. }
+        { i. eapply IHWRITE. eapply promise_bot_write_no_promise; eauto. }
   Qed.
 
   Lemma promise_bot_no_promise_rtc P lang (th0 th1: Thread.t lang)
@@ -1104,6 +1107,27 @@ Section MEMORYLEMMAS.
       rewrite BOTNONE in *. clarify.
   Qed.
 
+  Lemma write_include_boundary prom0 mem0 loc from to msg prom1 mem1 kind
+        (PROMISE: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
+        (BOTNONE: Memory.bot_none prom0)
+    :
+      Interval.mem (from, to) to.
+  Proof.
+    inv PROMISE. eapply promise_include_boundary; eauto.
+  Qed.
+
+  Lemma write_na_include_boundary ts prom0 mem0 loc from to val prom1 mem1 kind
+        (PROMISE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 kind)
+        (BOTNONE: Memory.bot_none prom0)
+    :
+      Interval.mem (from, to) to.
+  Proof.
+    revert BOTNONE. induction PROMISE.
+    { i. eapply write_include_boundary; eauto. }
+    { i. eapply IHPROMISE; eauto.
+      eapply Memory.write_bot_none; eauto. }
+  Qed.
+
   Lemma step_write_not_in_boundary
         MSGS lang (th0 th1: Thread.t lang) pf e
         (STEP: Thread.step pf e th0 th1)
@@ -1120,6 +1144,8 @@ Section MEMORYLEMMAS.
         eapply promise_include_boundary; eauto.
       + inv LOCAL1. inv LOCAL2. inv WRITE. eapply WRITENOTIN; eauto.
         eapply promise_include_boundary; eauto.
+      + inv LOCAL0. eapply WRITENOTIN.
+        eapply write_na_include_boundary; eauto.
   Qed.
 
   Lemma promise_wf_event prom0 mem0 loc from to msg prom1 mem1 kind
@@ -1137,13 +1163,24 @@ Section MEMORYLEMMAS.
       clarify. erewrite INHABITED in GET1. clarify.
   Qed.
 
-  Lemma write_wf_event prom0 mem0 loc from to val released prom1 mem1 kind
-        (WRITE: Memory.write prom0 mem0 loc from to val released prom1 mem1 kind)
+  Lemma write_wf_event prom0 mem0 loc from to msg prom1 mem1 kind
+        (WRITE: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
         (INHABITED: Memory.inhabited mem0)
     :
       Time.lt from to.
   Proof.
     inv WRITE. eapply promise_wf_event; eauto.
+  Qed.
+
+  Lemma write_na_wf_event ts prom0 mem0 loc from to val prom1 mem1 kind
+        (WRITE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 kind)
+        (INHABITED: Memory.inhabited mem0)
+    :
+      Time.lt from to.
+  Proof.
+    revert INHABITED. induction WRITE.
+    { inv WRITE. eapply promise_wf_event; eauto. }
+    { i. eapply IHWRITE. eapply Memory.write_inhabited; eauto. }
   Qed.
 
   Lemma step_wf_event lang P (th0 th1: Thread.t lang) e
@@ -1158,6 +1195,7 @@ Section MEMORYLEMMAS.
     - inv STEP0. inv LOCAL; ss.
       + inv LOCAL0. eapply write_wf_event; eauto.
       + inv LOCAL1. inv LOCAL2. eapply write_wf_event; eauto.
+      + inv LOCAL0. eapply write_na_wf_event; eauto.
   Qed.
 
   Lemma steps_wf_event lang P (th0 th1: Thread.t lang)
@@ -1503,6 +1541,25 @@ Section UNCHANGABLES.
     erewrite Memory.remove_o; eauto. des_ifs.
   Qed.
 
+  Lemma unchangable_write mem0 prom0 loc from to msg prom1 mem1 kind
+        (PROMISE: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
+    :
+      unchangable mem0 prom0 <4= unchangable mem1 prom1.
+  Proof.
+    i. inv PROMISE. eapply unchangable_promise in PROMISE0; eauto.
+    eapply unchangable_remove; eauto.
+  Qed.
+
+  Lemma unchangable_write_na ts mem0 prom0 loc from to val prom1 mem1 kind
+        (PROMISE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 kind)
+    :
+      unchangable mem0 prom0 <4= unchangable mem1 prom1.
+  Proof.
+    induction PROMISE.
+    { eapply unchangable_write; eauto. }
+    { i. eapply IHPROMISE. eapply unchangable_write; eauto. }
+  Qed.
+
   Lemma unchangable_increase pf e lang (th0 th1: Thread.t lang)
         (STEP: Thread.step pf e th0 th1)
     :
@@ -1513,11 +1570,10 @@ Section UNCHANGABLES.
     - inv STEP0; ss. inv LOCAL. i.
       hexploit unchangable_promise; eauto.
     - i. inv STEP0; ss. inv LOCAL; try inv LOCAL0; ss.
-      + inv WRITE. exploit unchangable_promise; eauto.
-        eapply unchangable_remove; eauto.
+      + eapply unchangable_write; eauto.
       + inv LOCAL1. inv LOCAL2. ss. inv WRITE.
-        exploit unchangable_promise; eauto.
-        eapply unchangable_remove; eauto.
+        eapply unchangable_write; eauto.
+      + eapply unchangable_write_na; eauto.
   Qed.
 
   Lemma unchangable_rtc_increase P lang (th0 th1: Thread.t lang)
@@ -1636,15 +1692,32 @@ Section UNCHANGABLES.
       econs; eauto.
   Qed.
 
-  Lemma step_write_not_in_write promises1 mem1 loc from1 to1 val released promises3 mem2 kind
+  Lemma step_write_not_in_write promises1 mem1 loc from1 to1 msg promises3 mem2 kind
         (MLE: Memory.le promises1 mem1)
-        (WRITE: Memory.write promises1 mem1 loc from1 to1 val released promises3 mem2 kind)
+        (WRITE: Memory.write promises1 mem1 loc from1 to1 msg promises3 mem2 kind)
         t
         (IN: Interval.mem (from1, to1) t)
     :
       ~ unwritable mem1 promises1 loc t.
   Proof.
     inv WRITE. eapply step_write_not_in_promise; eauto.
+  Qed.
+
+  Lemma step_write_na_not_in_write ts promises1 mem1 loc from1 to1 msg promises3 mem2 kind
+        (MLE: Memory.le promises1 mem1)
+        (WRITE: Memory.write_na ts promises1 mem1 loc from1 to1 msg promises3 mem2 kind)
+        t
+        (IN: Interval.mem (from1, to1) t)
+    :
+      ~ unwritable mem1 promises1 loc t.
+  Proof.
+    revert t IN MLE. induction WRITE.
+    { i. eapply step_write_not_in_write; eauto. }
+    { i. eapply IHWRITE in IN; eauto.
+      { ii. inv H. eapply IN.  eapply unchangable_write in UNCH; eauto.
+        econs; eauto. }
+      { eapply write_promises_le; eauto. }
+    }
   Qed.
 
   Lemma step_write_not_in lang (th_tgt th_tgt': Thread.t lang) e_tgt pf
@@ -1660,6 +1733,7 @@ Section UNCHANGABLES.
     - inv STEP0; ss. inv LOCAL; ss.
       + inv LOCAL0. ii. exploit step_write_not_in_write; eauto.
       + inv LOCAL1. inv LOCAL2. ss. ii. exploit step_write_not_in_write; eauto.
+      + inv LOCAL0. ii. exploit step_write_na_not_in_write; eauto.
   Qed.
 
   Lemma unwritable_increase pf e lang (th0 th1: Thread.t lang)
@@ -1858,6 +1932,19 @@ Section UNCHANGABLES.
     { erewrite remove_covered in COVERED; eauto. des; auto. }
   Qed.
 
+  Lemma write_write_not_in_covered prom0 prom1 mem0 mem1 MSGS
+        loc from to msg kind
+        (WRITE: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
+        (NOTIN: kind = Memory.op_kind_add ->
+                forall ts (ITV: Interval.mem (from, to) ts), ~ MSGS loc ts)
+        l t
+        (COVERED: covered l t mem1)
+    :
+      covered l t mem0 \/ ~ MSGS l t.
+  Proof.
+    inv WRITE. eapply promise_write_not_in_covered; eauto.
+  Qed.
+
   Lemma step_write_not_in_covered MSGS lang (th0 th1: Thread.t lang) pf e
         (STEP: Thread.step pf e th0 th1)
         (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
@@ -1875,8 +1962,9 @@ Section UNCHANGABLES.
     { inv STEP0; ss. inv LOCAL0; auto.
       - inv LOCAL1. inv WRITE. ss. eapply promise_write_not_in_covered; eauto.
       - inv LOCAL2. inv WRITE. ss. eapply promise_write_not_in_covered; eauto.
+      - admit. (* it's not true *)
     }
-  Qed.
+  Admitted.
 
   Lemma steps_write_not_in_covered P MSGS lang (th0 th1: Thread.t lang)
         (STEPS: rtc (tau (@pred_step P lang)) th0 th1)
@@ -1961,11 +2049,28 @@ Section PROMISED.
       exploit Memory.split_get1; eauto. i. des.
       econs; eauto.
     - ii. inv PR.
-      exploit Memory.lower_get1; eauto. i. des.
-      inv MSG_LE. econs; eauto.
+      exploit Memory.lower_get1; eauto. i. des. inv MSG_LE. econs; eauto.
     - ii. inv PR. econs; eauto.
       erewrite Memory.remove_o; eauto. des_ifs; eauto.
       eapply Memory.remove_get0 in MEM. ss; des; clarify.
+  Qed.
+
+  Lemma concrete_promised_increase_write promises1 mem1 loc from to msg promises2 mem2 kind
+        (STEP: Memory.write promises1 mem1 loc from to msg promises2 mem2 kind)
+    :
+      concrete_promised mem1 <2= concrete_promised mem2.
+  Proof.
+    inv STEP. eapply concrete_promised_increase_promise; eauto.
+  Qed.
+
+  Lemma concrete_promised_increase_write_na ts promises1 mem1 loc from to msg promises2 mem2 kind
+        (STEP: Memory.write_na ts promises1 mem1 loc from to msg promises2 mem2 kind)
+    :
+      concrete_promised mem1 <2= concrete_promised mem2.
+  Proof.
+    induction STEP.
+    { eapply concrete_promised_increase_write; eauto. }
+    { i. eapply IHSTEP. eapply concrete_promised_increase_write; eauto. }
   Qed.
 
   Lemma concrete_promised_increase lang (th0 th1: Thread.t lang) pf e
@@ -1977,10 +2082,12 @@ Section PROMISED.
     - inv STEP0. ss. inv LOCAL.
       eapply concrete_promised_increase_promise; eauto.
     - inv STEP0; ss. inv LOCAL; ss.
-      + inv LOCAL0. inv WRITE.
-        eapply concrete_promised_increase_promise; eauto.
-      + inv LOCAL1. inv LOCAL2. inv WRITE.
-        eapply concrete_promised_increase_promise; eauto.
+      + inv LOCAL0.
+        eapply concrete_promised_increase_write; eauto.
+      + inv LOCAL1. inv LOCAL2.
+        eapply concrete_promised_increase_write; eauto.
+      + inv LOCAL0.
+        eapply concrete_promised_increase_write_na; eauto.
   Qed.
 
   Lemma rtc_concrete_promised_increase lang (th0 th1: Thread.t lang)
@@ -2009,8 +2116,6 @@ Section PROMISED.
     inv STEP; ss.
     { i. eapply rtc_concrete_promised_increase in STEPS; eauto.
       eapply concrete_promised_increase in STEP0; eauto. }
-    { i. eapply rtc_concrete_promised_increase in STEPS; eauto.
-      eapply concrete_promised_increase in STEP0; eauto. }
   Qed.
 
   Lemma memory_future_concrete_promised mem0 mem1
@@ -2018,9 +2123,9 @@ Section PROMISED.
     :
       concrete_promised mem0 <2= concrete_promised mem1.
   Proof.
-    ii. inv PR. eapply FUTURE in GET. des.
-    { econs; eauto. }
-    { econs; eauto. }
+    ii. inv PR. eapply FUTURE in GET; ss. des.
+    { subst. econs; eauto. }
+    { inv GET3. econs; eauto. }
   Qed.
 
 End PROMISED.
@@ -2048,38 +2153,19 @@ Section UNCHANGEDON.
     inv NOTIN. econs; eauto.
   Qed.
 
-  Lemma write_not_in_unchanged_on_write L v v' prom'
-        loc from to val releasedm released ord sc sc'
+  Lemma write_not_in_unchanged_on_write L prom'
+        loc from to msg
         mem_tgt mem_tgt' kind
-        (WRITE: Local.write_step
-                  (Local.mk v Memory.bot) sc mem_tgt
-                  loc from to val releasedm released ord
-                  (Local.mk v' prom') sc' mem_tgt' kind)
+        (WRITE: Memory.write Memory.bot mem_tgt loc from to msg prom' mem_tgt' kind)
         (NOTIN: forall t (IN: Interval.mem (from, to) t), ~ (L loc t))
     :
       unchanged_on L mem_tgt mem_tgt'.
   Proof.
-    inv WRITE. ss. clarify.
     exploit memory_write_bot_add; eauto. i. clarify.
-    inv WRITE0. inv PROMISE. econs.
+    inv WRITE. inv PROMISE. econs.
     - i. rewrite add_covered in COV; eauto. des; auto.
       clarify. exfalso. eapply NOTIN; eauto.
     - ii. eapply Memory.add_get1; eauto.
-  Qed.
-
-  Lemma write_not_in_unchanged_on P L e lang (th0 th1: Thread.t lang)
-        (STEP: pred_step P e th0 th1)
-        (PRED: P <1= (write_not_in L /1\ no_promise))
-        (BOT: (Local.promises (Thread.local th0)) = Memory.bot)
-    :
-      unchanged_on L (Thread.memory th0) (Thread.memory th1).
-  Proof.
-    inv STEP. eapply PRED in SAT. des. inv STEP0. inv STEP.
-    - inv STEP0; ss; des; clarify.
-    - des. inv STEP0. ss. inv LOCAL; try refl.
-      + destruct lc1, lc2. ss. clarify. exploit write_not_in_unchanged_on_write; eauto.
-      + inv LOCAL1. ss.
-        destruct lc1, lc2. ss. clarify. exploit write_not_in_unchanged_on_write; eauto.
   Qed.
 
 End UNCHANGEDON.
@@ -2087,52 +2173,8 @@ End UNCHANGEDON.
 
 Section PROMISEFREE.
 
-  Lemma promise_free_no_promise P lang (th0 th1: Thread.t lang) e
-        (NOPROMISE: (Local.promises (Thread.local th0)) = Memory.bot)
-        (STEP: pred_step P e th0 th1)
-        (PRED: P <1= promise_free)
-  :
-    (<<STEP: pred_step P e th0 th1>>) /\
-    (<<NOPROMISE: (Local.promises (Thread.local th1)) = Memory.bot>>).
-  Proof.
-    inv STEP. dup SAT. eapply PRED in SAT. inv STEP0. inv STEP.
-    - inv STEP0. inv LOCAL. inv PROMISE; ss; des; clarify.
-      + rewrite NOPROMISE in *.
-        eapply Memory.lower_get0 in PROMISES. des.
-        erewrite Memory.bot_get in *. clarify.
-      + rewrite NOPROMISE in *.
-        eapply Memory.remove_get0 in PROMISES. des.
-        erewrite Memory.bot_get in *. clarify.
-    - inv STEP0. inv LOCAL.
-      + ss. esplits; eauto. econs; eauto. econs; eauto.
-        econs 2; eauto. econs; eauto.
-      + ss. esplits; eauto.
-        * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
-        * inv LOCAL0. ss.
-      + ss. esplits; eauto.
-        * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
-        * inv LOCAL0. rewrite NOPROMISE in *.
-          exploit memory_write_bot_add; eauto. i. clarify.
-          inv WRITE. inv PROMISE. ss.
-          symmetry. eapply MemoryMerge.add_remove; eauto.
-      + ss. esplits; eauto.
-        * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
-        * inv LOCAL1. inv LOCAL2. rewrite NOPROMISE in *.
-          exploit memory_write_bot_add; eauto. i. clarify.
-          inv WRITE. inv PROMISE. ss.
-          symmetry. eapply MemoryMerge.add_remove; eauto.
-      + ss. esplits; eauto.
-        * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
-        * inv LOCAL0. ss.
-      + ss. esplits; eauto.
-        * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
-        * inv LOCAL0. ss.
-      + ss. esplits; eauto.
-        * econs; eauto. econs; eauto. econs 2; eauto. econs; eauto.
-  Qed.
-
-  Lemma write_promises_decrease prom0 mem0 loc from to val realeased prom1 mem1 kind
-        (WRITE: Memory.write prom0 mem0 loc from to val realeased prom1 mem1 kind)
+  Lemma write_promises_decrease prom0 mem0 loc from to msg prom1 mem1 kind
+        (WRITE: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
     :
       concrete_promised prom1 <2= concrete_promised prom0.
   Proof.
@@ -2154,7 +2196,18 @@ Section PROMISEFREE.
       erewrite Memory.lower_o in GET; eauto. des_ifs.
       + ss; des; clarify.
       + econs; eauto.
-    - clarify.
+    - apply Memory.remove_get0 in PROMISES.
+      apply Memory.remove_get0 in REMOVE. des. clarify.
+  Qed.
+
+  Lemma write_na_promises_decrease ts prom0 mem0 loc from to msg prom1 mem1 kind
+        (WRITE: Memory.write_na ts prom0 mem0 loc from to msg prom1 mem1 kind)
+    :
+      concrete_promised prom1 <2= concrete_promised prom0.
+  Proof.
+    induction WRITE.
+    { eapply write_promises_decrease; eauto. }
+    { i. eapply write_promises_decrease; eauto. }
   Qed.
 
   Lemma pf_step_promises_decrease P lang e (th0 th1: Thread.t lang)
@@ -2168,7 +2221,7 @@ Section PROMISEFREE.
     - inv STEP0. ss. inv LOCAL. ss. inv PROMISE; clarify.
       + inv PR. erewrite Memory.lower_o in GET; eauto. des_ifs.
         * ss; des. clarify. eapply Memory.lower_get0 in PROMISES.
-          des. econs; eauto.
+          des. inv MSG_LE; ss. econs; eauto.
         * econs; eauto.
       + inv PR. erewrite Memory.remove_o in GET; eauto. des_ifs.
         econs; eauto.
@@ -2178,6 +2231,7 @@ Section PROMISEFREE.
       + inv LOCAL1. inv LOCAL2. ss. eapply write_promises_decrease; eauto.
       + inv LOCAL0. ss.
       + inv LOCAL0. ss.
+      + inv LOCAL0. ss. eapply write_na_promises_decrease; eauto.
   Qed.
 
   Lemma pf_step_rtc_promises_decrease P lang (th0 th1: Thread.t lang)
@@ -2212,15 +2266,26 @@ Proof.
     erewrite Memory.remove_o; cycle 1; eauto. des_ifs; eauto.
 Qed.
 
-Lemma write_memory_le prom0 mem0 loc from to val released prom1 mem1 kind
+Lemma write_memory_le prom0 mem0 loc from to msg prom1 mem1 kind
       (MLE: Memory.le prom0 mem0)
-      (PROMISE: Memory.write prom0 mem0 loc from to val released prom1 mem1 kind)
+      (PROMISE: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
   :
     Memory.le prom1 mem1.
 Proof.
   inv PROMISE. etrans.
   - eapply remove_le; eauto.
   - eapply promise_memory_le; eauto.
+Qed.
+
+Lemma write_na_memory_le ts prom0 mem0 loc from to msg prom1 mem1 kind
+      (MLE: Memory.le prom0 mem0)
+      (WRITE: Memory.write_na ts prom0 mem0 loc from to msg prom1 mem1 kind)
+  :
+    Memory.le prom1 mem1.
+Proof.
+  revert MLE. induction WRITE.
+  { i. eapply write_memory_le; eauto. }
+  { i. eapply IHWRITE. eapply write_memory_le; eauto. }
 Qed.
 
 Lemma step_memory_le lang (th0 th1: Thread.t lang) pf e
@@ -2236,18 +2301,7 @@ Proof.
     + eapply write_memory_le; eauto.
     + inv LOCAL1. inv LOCAL2. ss.
       eapply write_memory_le; eauto.
-Qed.
-
-Lemma pf_step_memory_le lang (th0 th1: Thread.t lang) e
-      (STEP: pred_step no_promise e th0 th1)
-      (BOT: (Local.promises (Thread.local th0)) = Memory.bot)
-  :
-    Memory.le (Thread.memory th0) (Thread.memory th1).
-Proof.
-  exploit write_not_in_unchanged_on; eauto.
-  - i. instantiate (1:=fun _ _ => False).
-    ss. splits; eauto. unfold write_not_in. des_ifs.
-  - i. inv x0. auto.
+    + eapply write_na_memory_le; eauto.
 Qed.
 
 Inductive configuration_step: forall (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
@@ -2256,7 +2310,7 @@ Inductive configuration_step: forall (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Con
     (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
     (STEPS: rtc (@Thread.tau_step _) (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) e2)
     (STEP: Thread.step pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
-    (CONSISTENT: forall (EVENT: e <> ThreadEvent.failure),
+    (CONSISTENT: forall (EVENT: ThreadEvent.get_machine_event e <> MachineEvent.failure),
         Thread.consistent (Thread.mk _ st3 lc3 sc3 memory3))
   :
     configuration_step (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) (Configuration.threads c1)) sc3 memory3)
@@ -2269,11 +2323,10 @@ Proof.
   split.
   - i. inv H.
     + replace MachineEvent.failure with (ThreadEvent.get_machine_event ThreadEvent.failure); auto.
-      econs; eauto. i. clarify.
-    + econs; eauto.
+      econs; eauto.
   - i. inv H. destruct (classic (e0 = ThreadEvent.failure)).
     + clarify. econs 1; eauto.
-    + econs 2; eauto.
+    + econs; eauto.
 Qed.
 
 Definition no_reserves (proms: Memory.t): Prop :=
@@ -2450,13 +2503,15 @@ Section CANCEL.
     - des. clarify. erewrite Memory.lower_o; eauto. des_ifs.
       + ss. des. clarify.
         eapply lower_succeed_wf in PROMISES. des. clarify.
+        inv MSG_LE. ss.
       + esplits; eauto.
     - clarify.
   Qed.
 
-  Lemma remove_not_cacncel_reserves_same prom0 loc from to val released prom1
-        (REMOVE: Memory.remove prom0 loc from to (Message.concrete val released) prom1)
+  Lemma remove_not_cacncel_reserves_same prom0 loc from to msg prom1
+        (REMOVE: Memory.remove prom0 loc from to msg prom1)
         loc0 to0 from0
+        (RESERVE: msg <> Message.reserve)
         (GET: Memory.get loc0 to0 prom0 = Some (from0, Message.reserve))
     :
       exists from1,
@@ -2468,6 +2523,41 @@ Section CANCEL.
     instantiate (1:=loc0) in REMOVE0. des_ifs.
     - ss. des. clarify.
     - esplits. etrans; eauto.
+  Qed.
+
+  Lemma write_not_cancel_reserves_same
+        prom0 prom1 mem0 mem1 msg loc from to kind
+        (WRITE: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
+        (RESERVE: msg <> Message.reserve)
+        loc' to' from'
+        (GET: Memory.get loc' to' prom0 = Some (from', Message.reserve))
+    :
+      exists from'',
+        Memory.get loc' to' prom1 = Some (from'', Message.reserve).
+  Proof.
+    inv WRITE. ss.
+    eapply promise_not_cacncel_reserves_same in GET; cycle 1; eauto.
+    { ii. clarify. inv PROMISE.
+      apply Memory.remove_get0 in PROMISES.
+      apply Memory.remove_get0 in REMOVE. des. clarify. } des.
+    eapply remove_not_cacncel_reserves_same in REMOVE; eauto.
+  Qed.
+
+  Lemma write_na_not_cancel_reserves_same
+        ts prom0 prom1 mem0 mem1 val loc from to kind
+        (WRITE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 kind)
+        loc' to' from'
+        (GET: Memory.get loc' to' prom0 = Some (from', Message.reserve))
+    :
+      exists from'',
+        Memory.get loc' to' prom1 = Some (from'', Message.reserve).
+  Proof.
+    revert loc' to' from' GET. induction WRITE.
+    { i. eapply write_not_cancel_reserves_same; eauto. ss. }
+    { i. eapply write_not_cancel_reserves_same in WRITE_EX; eauto.
+      { des. eapply IHWRITE; eauto. }
+      { destruct MSG_EX; des; clarify; ss. }
+    }
   Qed.
 
   Lemma step_not_cancel_reserves_same P lang e th0 th1
@@ -2483,20 +2573,20 @@ Section CANCEL.
     - inv STEP. des. ss. inv LOCAL.
       eapply promise_not_cacncel_reserves_same; eauto.
       ii. clarify. des_ifs. inv PROMISE; ss.
+      inv PROMISE. ss.
     - inv STEP. inv LOCAL; ss.
       + esplits; eauto.
       + inv LOCAL0. esplits; eauto.
-      + inv LOCAL0. inv WRITE. ss.
-        eapply promise_not_cacncel_reserves_same in GET; cycle 1; eauto.
-        { ii. clarify. inv PROMISE. clarify. } des.
-        eapply remove_not_cacncel_reserves_same in GET; cycle 1; eauto.
-      + inv LOCAL2. inv WRITE. ss. inv LOCAL1. ss.
-        eapply promise_not_cacncel_reserves_same in GET; cycle 1; eauto.
-        { ii. clarify. inv PROMISE. clarify. } des.
-        eapply remove_not_cacncel_reserves_same in GET; cycle 1; eauto.
+      + inv LOCAL0. eapply write_not_cancel_reserves_same; eauto. ss.
+      + inv LOCAL2. inv LOCAL1. ss.
+        eapply write_not_cancel_reserves_same; eauto. ss.
       + inv LOCAL0. esplits; eauto.
       + inv LOCAL0. esplits; eauto.
       + inv LOCAL0. esplits; eauto.
+      + inv LOCAL0. eapply write_na_not_cancel_reserves_same; eauto.
+      + inv LOCAL0. esplits; eauto.
+      + inv LOCAL0. esplits; eauto.
+      + inv LOCAL0; esplits; eauto.
   Qed.
 
   Lemma steps_not_cancel_reserves_same P lang th0 th1
@@ -2670,6 +2760,11 @@ Section NOSC.
         esplits. econs 2; eauto. econs; eauto. econs; eauto. econs; eauto. ss. f_equal.
         unfold TView.write_fence_tview. ss. des_ifs.
       + esplits. econs 2; eauto. econs; eauto.
+      + esplits. econs 2; eauto. econs; eauto.
+        inv LOCAL0. eapply Local.step_write_na; eauto.
+      + esplits. econs 2; eauto. econs; eauto.
+      + esplits. econs 2; eauto. econs; eauto.
+      + esplits. econs 2; eauto. econs; eauto.
   Qed.
 
   Lemma no_sc_any_sc_traced
@@ -2732,6 +2827,7 @@ Section NOSC.
       { inv LOCAL2; ss. }
       { inv LOCAL0; ss.
         unfold TView.write_fence_sc. des_ifs. }
+      { inv LOCAL0. ss. }
     }
   Qed.
 
@@ -2952,10 +3048,11 @@ Section CONCRETELE.
     concrete_promised mem0 <2= concrete_promised mem1.
 
   Definition concrete_messages_le (mem0 mem1: Memory.t): Prop :=
-    forall loc to from0 val released
-           (GET0: Memory.get loc to mem0 = Some (from0, Message.concrete val released)),
+    forall loc to from0 msg
+           (GET0: Memory.get loc to mem0 = Some (from0, msg))
+           (RESERVE: msg <> Message.reserve),
     exists from1,
-      (<<GET1: Memory.get loc to mem1 = Some (from1, Message.concrete val released)>>).
+      (<<GET1: Memory.get loc to mem1 = Some (from1, msg)>>).
 
   Global Program Instance concrete_promised_le_PreOrder: PreOrder concrete_promised_le.
   Next Obligation.
@@ -2977,67 +3074,66 @@ Section CONCRETELE.
     :
       concrete_messages_le <2= concrete_promised_le.
   Proof.
-    ii. inv PR0. eapply PR in GET. des. econs; eauto.
+    ii. inv PR0. exploit PR; eauto; ss. i. des. econs; eauto.
   Qed.
 
-  Lemma concrete_promised_le_closed_timemap
+  Lemma concrete_messages_le_closed_timemap
         mem0 mem1 tm
-        (CONCRETELE: concrete_promised_le mem0 mem1)
+        (CONCRETELE: concrete_messages_le mem0 mem1)
         (CLOSED: Memory.closed_timemap tm mem0)
     :
       Memory.closed_timemap tm mem1.
   Proof.
     ii. specialize (CLOSED loc). des.
-    exploit CONCRETELE.
-    { econs; eauto. }
-    i. inv x. eauto.
+    exploit CONCRETELE; eauto; ss.
+    i. inv x. des. eauto.
   Qed.
 
-  Lemma concrete_promised_le_closed_view
+  Lemma concrete_messages_le_closed_view
         mem0 mem1 vw
-        (CONCRETELE: concrete_promised_le mem0 mem1)
+        (CONCRETELE: concrete_messages_le mem0 mem1)
         (CLOSED: Memory.closed_view vw mem0)
     :
       Memory.closed_view vw mem1.
   Proof.
     inv CLOSED. econs.
-    { eapply concrete_promised_le_closed_timemap; try apply PLN; eauto. }
-    { eapply concrete_promised_le_closed_timemap; try apply RLX; eauto. }
+    { eapply concrete_messages_le_closed_timemap; try apply PLN; eauto. }
+    { eapply concrete_messages_le_closed_timemap; try apply RLX; eauto. }
   Qed.
 
-  Lemma concrete_promised_le_closed_opt_view
+  Lemma concrete_messages_le_closed_opt_view
         mem0 mem1 vw
-        (CONCRETELE: concrete_promised_le mem0 mem1)
+        (CONCRETELE: concrete_messages_le mem0 mem1)
         (CLOSED: Memory.closed_opt_view vw mem0)
     :
       Memory.closed_opt_view vw mem1.
   Proof.
     inv CLOSED; econs.
-    eapply concrete_promised_le_closed_view; eauto.
+    eapply concrete_messages_le_closed_view; eauto.
   Qed.
 
-  Lemma concrete_promised_le_closed_message
+  Lemma concrete_messages_le_closed_message
         mem0 mem1 msg
-        (CONCRETELE: concrete_promised_le mem0 mem1)
+        (CONCRETELE: concrete_messages_le mem0 mem1)
         (CLOSED: Memory.closed_message msg mem0)
     :
       Memory.closed_message msg mem1.
   Proof.
     inv CLOSED; econs.
-    eapply concrete_promised_le_closed_opt_view; eauto.
+    eapply concrete_messages_le_closed_opt_view; eauto.
   Qed.
 
-  Lemma concrete_promised_le_closed_tview
+  Lemma concrete_messages_le_closed_tview
         mem0 mem1 tvw
-        (CONCRETELE: concrete_promised_le mem0 mem1)
+        (CONCRETELE: concrete_messages_le mem0 mem1)
         (CLOSED: TView.closed tvw mem0)
     :
       TView.closed tvw mem1.
   Proof.
     inv CLOSED. econs.
-    { i. eapply concrete_promised_le_closed_view; try apply REL; eauto. }
-    { eapply concrete_promised_le_closed_view; try apply CUR; eauto. }
-    { eapply concrete_promised_le_closed_view; try apply ACQ; eauto. }
+    { i. eapply concrete_messages_le_closed_view; try apply REL; eauto. }
+    { eapply concrete_messages_le_closed_view; try apply CUR; eauto. }
+    { eapply concrete_messages_le_closed_view; try apply ACQ; eauto. }
   Qed.
 
   Lemma memory_le_concrete_messages_le
@@ -3047,16 +3143,16 @@ Section CONCRETELE.
     ii. eapply PR in GET0. eauto.
   Qed.
 
-  Lemma concrete_promised_le_local_wf
+  Lemma concrete_messages_le_local_wf
         mem0 mem1 lc
         (LOCAL: Local.wf lc mem0)
-        (CONCRETELE: concrete_promised_le mem0 mem1)
+        (CONCRETELE: concrete_messages_le mem0 mem1)
         (MLE: Memory.le (Local.promises lc) mem1)
     :
       Local.wf lc mem1.
   Proof.
     inv LOCAL. econs; eauto.
-    eapply concrete_promised_le_closed_tview; eauto.
+    eapply concrete_messages_le_closed_tview; eauto.
   Qed.
 
 End CONCRETELE.
@@ -3117,7 +3213,7 @@ Section PROMISEWRITING.
     { eapply Memory.split_get1 in GET; eauto. des.
       exists f', released. splits; auto; try by refl. }
     { eapply Memory.lower_get1 in GET; eauto. des. inv MSG_LE.
-      exists from, released1. splits; auto; try by refl. }
+      exists from, released0. splits; auto; try by refl. }
     { dup GET. eapply Memory.remove_get1 in GET; eauto. des.
       { subst. eapply Memory.remove_get0 in PROMISES. des. clarify. }
       { exists from, released. splits; auto; try by refl. }
@@ -3171,8 +3267,9 @@ Section PROMISEWRITING.
         }
         { left. esplits; eauto. }
       }
+      { admit. (* it's not true *) }
     }
-  Qed.
+  Admitted.
 
   Lemma steps_promise_decrease_promise_writing_event lang (th0 th1: Thread.t lang) tr
         (STEPS: Trace.steps tr th0 th1)
@@ -3246,8 +3343,9 @@ Section WFTIME.
     { inv STEP0. ss. inv LOCAL; ss.
       { inv LOCAL0. inv WRITE. des. eapply promise_memory_times_wf; eauto. }
       { inv LOCAL2. inv WRITE. des. eapply promise_memory_times_wf; eauto. }
+      { admit. (* it's not true *) }
     }
-  Qed.
+  Admitted.
 
   Lemma steps_memory_times_wf times P lang (th0 th1: Thread.t lang)
         (STEPS: rtc (tau (@pred_step P lang)) th0 th1)
@@ -3308,7 +3406,7 @@ Section PROMISED.
       concrete_promised mem2 =
       fun loc' =>
         if (Loc.eq_dec loc' loc)
-        then fun ts' => if (Time.eq_dec ts' to) then (msg <> Message.reserve) else concrete_promised mem1 loc' ts'
+        then fun ts' => if (Time.eq_dec ts' to) then (exists val released, msg = Message.concrete val released) else concrete_promised mem1 loc' ts'
         else concrete_promised mem1 loc'.
   Proof.
     extensionality loc'. extensionality ts'.
@@ -3316,13 +3414,14 @@ Section PROMISED.
     split; i.
     - inv H. erewrite Memory.add_o in GET; eauto.
       des_ifs.
+      + ss. des; clarify. eauto.
       + ss. des; clarify.
       + ss. des; clarify.
-      + econs; eauto.
+      + ss. des; clarify. econs; eauto.
       + ss. des; clarify.
       + econs; eauto.
     - des_ifs.
-      + destruct msg; ss. econs. eapply Memory.add_get0; eauto.
+      + des. clarify. econs; eauto. eapply Memory.add_get0; eauto.
       + inv H.
         eapply Memory.add_get1 in GET; eauto. econs; eauto.
       + inv H.
@@ -3346,7 +3445,6 @@ Section PROMISED.
 
   Lemma concrete_promised_lower mem1 loc from to msg1 msg2 mem2
         (LOWER: Memory.lower mem1 loc from to msg1 msg2 mem2)
-        (MSG: msg1 <> Message.reserve)
     :
       concrete_promised mem2 = concrete_promised mem1.
   Proof.
@@ -3355,11 +3453,11 @@ Section PROMISED.
     split; i.
     - inv H. erewrite Memory.lower_o in GET; eauto. des_ifs.
       + ss. des; clarify.
-        exploit lower_succeed_wf; eauto. i. des. inv MSG_LE; clarify.
-        econs; eauto.
+        exploit lower_succeed_wf; eauto. i. des.
+        inv MSG_LE. econs; eauto.
       + econs; eauto.
     - inv H. eapply Memory.lower_get1 in GET; eauto.
-      des. inv MSG_LE. econs; eauto.
+      des. inv MSG_LE; ss. econs; eauto.
   Qed.
 
   Lemma promised_split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2
@@ -3393,7 +3491,7 @@ Section PROMISED.
       concrete_promised mem2 =
       fun loc' =>
         if (Loc.eq_dec loc' loc)
-        then fun ts' => if (Time.eq_dec ts' ts2) then (msg2 <> Message.reserve) else concrete_promised mem1 loc' ts'
+        then fun ts' => if (Time.eq_dec ts' ts2) then (exists val released, msg2 = Message.concrete val released) else concrete_promised mem1 loc' ts'
         else concrete_promised mem1 loc'.
   Proof.
     extensionality loc'. extensionality ts'.
@@ -3401,11 +3499,12 @@ Section PROMISED.
     split; i.
     - inv H. erewrite Memory.split_o in GET; eauto.
       des_ifs; try by (des; ss; clarify).
-      + ss. des; clarify. econs. eapply (Memory.split_get0 SPLIT); eauto.
+      + eauto.
+      + ss. des; clarify. econs; eauto. eapply (Memory.split_get0 SPLIT); eauto.
       + econs; eauto.
       + econs; eauto.
     - des_ifs.
-      + destruct msg2; ss. econs. eapply (Memory.split_get0 SPLIT); eauto.
+      + des. clarify. econs; eauto. eapply (Memory.split_get0 SPLIT); eauto.
       + inv H. eapply Memory.split_get1 in GET; eauto.
         des. econs; eauto.
       + inv H. eapply Memory.split_get1 in GET; eauto.
@@ -3481,8 +3580,6 @@ Section RESERVEFUTURE.
     inv HD; clarify.
     - econs; [|refl]. econs; eauto.
     - econs; [|refl]. econs; eauto.
-    - econs; [|refl]. econs; eauto.
-    - econs; [|refl]. econs; eauto.
   Qed.
 
   Lemma reserve_future_concrete_promised prom0 mem0 prom1 mem1
@@ -3494,7 +3591,6 @@ Section RESERVEFUTURE.
     inv HD; des; clarify.
     - inv PR. erewrite Memory.add_o in GET; eauto.
       des_ifs. econs; eauto.
-    - apply lower_succeed_wf in MEM. des. inv MSG_LE.
     - inv PR. erewrite Memory.remove_o in GET; eauto.
       des_ifs. econs; eauto.
   Qed.
@@ -3529,7 +3625,7 @@ Section RESERVEFUTURE.
     - eapply Memory.add_bot_none; eauto.
     - eapply Memory.split_bot_none; eauto.
     - eapply Memory.lower_bot_none; eauto.
-    - eapply Memory.cancel_bot_none; eauto.
+    - eapply Memory.remove_bot_none; eauto.
   Qed.
 
   Lemma reserve_future_memory_finite prom0 mem0 prom1 mem1
@@ -3557,7 +3653,6 @@ Section RESERVEFUTURE.
     - erewrite Memory.add_o; eauto.
       des_ifs. ss. des; clarify.
       eapply Memory.add_get0 in MEM. des. clarify.
-    - apply lower_succeed_wf in MEM. des. inv MSG_LE.
     - erewrite Memory.remove_o; eauto.
       des_ifs. ss. des; clarify.
       eapply Memory.remove_get0 in MEM. des. clarify.
@@ -3574,7 +3669,6 @@ Section RESERVEFUTURE.
     - erewrite Memory.add_o; eauto.
       des_ifs. ss. des; clarify.
       eapply Memory.add_get0 in PROMISES. des. clarify.
-    - apply lower_succeed_wf in PROMISES. des. inv MSG_LE.
     - erewrite Memory.remove_o; eauto.
       des_ifs. ss. des; clarify.
       eapply Memory.remove_get0 in PROMISES. des. clarify.
@@ -3598,8 +3692,6 @@ Section RESERVEFUTURE.
       - erewrite Memory.add_o; eauto. des_ifs.
         ss. des; clarify.
         eapply Memory.add_get0 in MEM. des. clarify. }
-    { apply split_succeed_wf in PROMISES. des. clarify. }
-    { apply lower_succeed_wf in PROMISES. des. clarify. inv MSG_LE. }
     { eapply IHFUTURE; eauto.
       - erewrite Memory.remove_o; eauto. des_ifs.
         ss. des; clarify.
@@ -3638,16 +3730,16 @@ Section RESERVEFUTURE.
     all: eauto. i. des. ss. eapply IHFUTURE; eauto.
   Qed.
 
-  Lemma reserve_future_concrete_same_promise2 prom0 mem0 prom1 mem1 loc from to val released
+  Lemma reserve_future_concrete_same_promise2 prom0 mem0 prom1 mem1 loc from to msg
         (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
-        (GET: Memory.get loc to prom1 = Some (from, Message.concrete val released))
+        (GET: Memory.get loc to prom1 = Some (from, msg))
+        (RESERVE: msg <> Message.reserve)
     :
-      Memory.get loc to prom0 = Some (from, Message.concrete val released).
+      Memory.get loc to prom0 = Some (from, msg).
   Proof.
     ginduction FUTURE; auto. i. apply IHFUTURE in GET; auto.
     inv HD; des; clarify.
     - erewrite Memory.add_o in GET; eauto. des_ifs.
-    - erewrite Memory.lower_o in GET; eauto. des_ifs.
     - erewrite Memory.remove_o in GET; eauto. des_ifs.
   Qed.
 
@@ -3747,7 +3839,7 @@ Section SEMICLOSED.
       semi_closed_timemap tm mem1 loc ts.
   Proof.
     ii. specialize (CLOSED l). des.
-    - eapply Memory.future_weak_get1 in GET; eauto. des.
+    - eapply Memory.future_weak_get1 in GET; eauto; ss. des.
       inv MSG_LE. eauto.
     - subst. eauto.
   Qed.
@@ -3911,6 +4003,9 @@ Section SEMICLOSED.
       val released mem loc ts
       (CLOSED: semi_closed_opt_view released mem loc ts):
       semi_closed_message (Message.concrete val released) mem loc ts
+  | semi_closed_message_undef
+      mem loc ts:
+      semi_closed_message Message.undef mem loc ts
   | semi_closed_message_reserve
       mem loc ts:
       semi_closed_message Message.reserve mem loc ts
@@ -4002,7 +4097,7 @@ Section SEMICLOSED.
     ii. specialize (CLOSED l). des.
     { exploit CONCRETE.
       { econs; eauto. }
-      i. inv x. eauto.
+      i. inv x. left. eauto.
     }
     { clarify. auto. }
   Qed.
@@ -4128,9 +4223,9 @@ Section CONCRETEMAX.
       TimeMap.le tm0 tm1.
   Proof.
     ii. specialize (MAX0 loc). specialize (MAX1 loc). inv MAX0. des.
-    { eapply FUTURE in GET. des.
-      { eapply MAX1 in GET. eauto. }
-      { eapply MAX1 in GET. eauto. }
+    { eapply FUTURE in GET; ss. des.
+      { subst. eapply MAX1 in GET. eauto. }
+      { inv GET3. eapply MAX1 in GET. eauto. }
     }
     { eapply MAX1 in GET. auto. }
   Qed.
