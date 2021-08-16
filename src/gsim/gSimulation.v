@@ -181,6 +181,7 @@ Section SimulationThread.
                       (CONS_TGT: Local.promise_consistent lc1_tgt)
                       (REL: joined_released views1 lc1_tgt.(Local.promises) lc1_tgt.(Local.tview).(TView.rel))
                       (JOINED: joined_memory views1 mem1_tgt)
+                      (FINMEMORY: fin1 <4= unchangable mem1_tgt lc1_tgt.(Local.promises))
                       (VIEWS: wf_views views1)
                       (VIEWSLE: views_le views0 views1)
                       (FUTURE: sim_memory_future
@@ -300,6 +301,16 @@ Proof.
   ii. destruct x13. red. destruct x3; auto. esplits; eauto; try refl.
 Qed.
 
+Lemma committed_same prom mem fin
+  :
+    fin \4/ committed mem prom mem prom = fin.
+Proof.
+  extensionality loc. extensionality to. extensionality from. extensionality msg.
+  eapply Coq.Logic.PropExtensionality.propositional_extensionality.
+  split; auto. i. des; auto.
+  exfalso. inv H. ss.
+Qed.
+
 Lemma sim_thread_step
       lang_src lang_tgt
       sim_terminal
@@ -324,6 +335,7 @@ Lemma sim_thread_step
       (CONS_TGT: Local.promise_consistent lc3_tgt)
       (REL: joined_released views1 lc1_tgt.(Local.promises) lc1_tgt.(Local.tview).(TView.rel))
       (JOINED: joined_memory views1 mem1_tgt)
+      (FINMEMORY: fin1 <4= unchangable mem1_tgt lc1_tgt.(Local.promises))
       (VIEWS: wf_views views1)
       (SIM: sim_thread_past sim_terminal b w1 st1_src lc1_src sc1_src mem1_src st1_tgt lc1_tgt sc1_tgt mem1_tgt (views1, fin1))
       (FIN: fin3 = fin1 \4/ committed mem1_tgt lc1_tgt.(Local.promises) mem3_tgt lc3_tgt.(Local.promises)):
@@ -349,7 +361,8 @@ Lemma sim_thread_step
     (<<WORLD: world_messages_le (unchangable mem1_src lc1_src.(Local.promises)) w1 w3>>) /\
     (<<REL: joined_released views3 lc3_tgt.(Local.promises) lc3_tgt.(Local.tview).(TView.rel)>>) /\
     (<<JOINED: joined_memory views3 mem3_tgt>>) /\
-    (<<VIEWS: wf_views views3>>)
+    (<<VIEWS: wf_views views3>>) /\
+    (<<FINMEMORY: fin3 <4= unchangable mem3_tgt lc3_tgt.(Local.promises)>>)
 .
 Proof.
   hexploit step_promise_consistent.
@@ -365,29 +378,27 @@ Proof.
     inv SIM; [|done]. right.
     exploit Thread.rtc_tau_step_future; eauto. s. i. des.
     exploit Thread.opt_step_future; eauto. s. i. des.
-    esplits; eauto.
+    esplits; eauto. i. des.
+    { eapply FINMEMORY in PR.
+      eapply JThread.step_thread_step in STEP.
+      eapply step_unchangable in STEP; eauto. }
+    { inv PR. auto. }
   }
   { des. punfold SIM0. red in SIM0. des.
     exploit JThread.step_future; eauto. s. i. des.
     exploit FUTURE; eauto; ss.
-    { splits; auto. i. eapply FIN0. eauto. }
+    { splits; auto. }
     i. des. exploit STEP0; eauto; ss.
     i. des; eauto.
     inv SIM; [|done]. right.
     exploit Thread.rtc_tau_step_future; eauto. s. i. des.
     exploit Thread.opt_step_future; eauto. s. i. des.
-    esplits; eauto.
+    esplits; eauto. i. des.
+    { eapply FINMEMORY in PR.
+      eapply JThread.step_thread_step in STEP.
+      eapply step_unchangable in STEP; eauto. }
+    { inv PR. auto. }
   }
-Qed.
-
-Lemma committed_same prom mem fin
-  :
-    fin \4/ committed mem prom mem prom = fin.
-Proof.
-  extensionality loc. extensionality to. extensionality from. extensionality msg.
-  eapply Coq.Logic.PropExtensionality.propositional_extensionality.
-  split; auto. i. des; auto.
-  exfalso. inv H. ss.
 Qed.
 
 Lemma sim_thread_opt_step
@@ -414,6 +425,7 @@ Lemma sim_thread_opt_step
       (CONS_TGT: Local.promise_consistent lc3_tgt)
       (REL: joined_released views1 lc1_tgt.(Local.promises) lc1_tgt.(Local.tview).(TView.rel))
       (JOINED: joined_memory views1 mem1_tgt)
+      (FINMEMORY: fin1 <4= unchangable mem1_tgt lc1_tgt.(Local.promises))
       (VIEWS: wf_views views1)
       (SIM: sim_thread_past sim_terminal b w1 st1_src lc1_src sc1_src mem1_src st1_tgt lc1_tgt sc1_tgt mem1_tgt (views1, fin1))
       (FIN: fin3 = fin1 \4/ committed mem1_tgt lc1_tgt.(Local.promises) mem3_tgt lc3_tgt.(Local.promises)):
@@ -439,7 +451,8 @@ Lemma sim_thread_opt_step
     (<<WORLD: world_messages_le (unchangable mem1_src lc1_src.(Local.promises)) w1 w3>>) /\
     (<<REL: joined_released views3 lc3_tgt.(Local.promises) lc3_tgt.(Local.tview).(TView.rel)>>) /\
     (<<JOINED: joined_memory views3 mem3_tgt>>) /\
-    (<<VIEWS: wf_views views3>>)
+    (<<VIEWS: wf_views views3>>) /\
+    (<<FINMEMORY: fin3 <4= unchangable mem3_tgt lc3_tgt.(Local.promises)>>)
 .
 Proof.
   inv STEP.
@@ -447,6 +460,7 @@ Proof.
     { econs 1. }
     { rewrite committed_same. auto. }
     { refl. }
+    { i. des; auto. inv PR; ss. }
   - hexploit sim_thread_step; eauto; ss. i. des; eauto.
     right. esplits; eauto. eapply sim_thread_sim_thread_past; eauto.
 Qed.
@@ -470,6 +484,7 @@ Lemma sim_thread_rtc_step
       (CONS_TGT: Local.promise_consistent (Thread.local e2_tgt))
       (REL: joined_released views1 (Thread.local e1_tgt).(Local.promises) (Thread.local e1_tgt).(Local.tview).(TView.rel))
       (JOINED: joined_memory views1 (Thread.memory e1_tgt))
+      (FINMEMORY: fin1 <4= unchangable e1_tgt.(Thread.memory) e1_tgt.(Thread.local).(Local.promises))
       (VIEWS: wf_views views1)
       (SIM: sim_thread_past sim_terminal b w1 st1_src lc1_src sc1_src mem1_src (Thread.state e1_tgt) (Thread.local e1_tgt) (Thread.sc e1_tgt) (Thread.memory e1_tgt) (views1, fin1))
       (FIN: fin2 = fin1 \4/ committed (Thread.memory e1_tgt) (Thread.local e1_tgt).(Local.promises) (Thread.memory e2_tgt) (Thread.local e2_tgt).(Local.promises)):
@@ -490,15 +505,17 @@ Lemma sim_thread_rtc_step
     (<<WORLD: world_messages_le (unchangable mem1_src lc1_src.(Local.promises)) w1 w2>>) /\
     (<<REL: joined_released views2 (Thread.local e2_tgt).(Local.promises) (Thread.local e2_tgt).(Local.tview).(TView.rel)>>) /\
     (<<JOINED: joined_memory views2 (Thread.memory e2_tgt)>>) /\
-    (<<VIEWS: wf_views views2>>)
+    (<<VIEWS: wf_views views2>>) /\
+    (<<FINMEMORY: fin2 <4= unchangable e2_tgt.(Thread.memory) e2_tgt.(Thread.local).(Local.promises)>>)
 .
 Proof.
-  revert w1 SC MEMORY WF_SRC WF_TGT SC_SRC SC_TGT MEM_SRC MEM_TGT SIM FIN.
+  revert w1 SC MEMORY WF_SRC WF_TGT SC_SRC SC_TGT MEM_SRC MEM_TGT SIM FINMEMORY FIN.
   revert st1_src lc1_src sc1_src mem1_src fin1 fin2.
   induction STEPS; i.
   { right. esplits; eauto.
     { subst. rewrite committed_same. auto. }
     { refl. }
+    { subst. i. des; auto. inv PR; ss. }
   }
   destruct e1, e2.
   exploit JThread.step_future; eauto. s. i. des.
@@ -506,8 +523,8 @@ Proof.
   { eapply JThread.tau_steps_thread_tau_steps. eauto. }
   all: ss. i.
   hexploit sim_thread_step; eauto; ss. i. des; eauto.
-  exploit IHSTEPS; eauto; ss.
-  { eapply sim_thread_sim_thread_past. eauto. }
+  hexploit IHSTEPS; try exact FINMEMORY0; eauto; ss.
+  { eapply sim_thread_sim_thread_past; eauto. }
   i. des.
   - left. inv FAILURE0. des.
     unfold Thread.steps_failure. esplits; [|eauto|eauto].
@@ -544,6 +561,7 @@ Proof.
       eapply world_messages_le_mon; eauto.
       i. eapply rtc_step_unchangable in STEPS0; eauto.
       eapply opt_step_unchangable in STEP0; eauto. }
+    { i. subst. des; auto. inv PR; auto. }
 Qed.
 
 Lemma sim_thread_plus_step
@@ -568,6 +586,7 @@ Lemma sim_thread_plus_step
       (CONS_TGT: Local.promise_consistent (Thread.local e3_tgt))
       (REL: joined_released views1 (Thread.local e1_tgt).(Local.promises) (Thread.local e1_tgt).(Local.tview).(TView.rel))
       (JOINED: joined_memory views1 (Thread.memory e1_tgt))
+      (FINMEMORY: fin1 <4= unchangable e1_tgt.(Thread.memory) e1_tgt.(Thread.local).(Local.promises))
       (VIEWS: wf_views views1)
       (SIM: sim_thread_past sim_terminal b w1 st1_src lc1_src sc1_src mem1_src (Thread.state e1_tgt) (Thread.local e1_tgt) (Thread.sc e1_tgt) (Thread.memory e1_tgt) (views1, fin1))
       (FIN: fin3 = fin1 \4/ committed (Thread.memory e1_tgt) (Thread.local e1_tgt).(Local.promises) (Thread.memory e3_tgt) (Thread.local e3_tgt).(Local.promises)):
@@ -593,7 +612,8 @@ Lemma sim_thread_plus_step
     (<<WORLD: world_messages_le (unchangable mem1_src lc1_src.(Local.promises)) w1 w3>>) /\
     (<<REL: joined_released views3 (Thread.local e3_tgt).(Local.promises) (Thread.local e3_tgt).(Local.tview).(TView.rel)>>) /\
     (<<JOINED: joined_memory views3 (Thread.memory e3_tgt)>>) /\
-    (<<VIEWS: wf_views views3>>)
+    (<<VIEWS: wf_views views3>>) /\
+    (<<FINMEMORY: fin3 <4= unchangable e3_tgt.(Thread.memory) e3_tgt.(Thread.local).(Local.promises)>>)
 .
 Proof.
   destruct e1_tgt, e2_tgt, e3_tgt. ss.
@@ -629,9 +649,10 @@ Proof.
           eapply rtc_step_unchangable in STEPS; eauto. }
       }
     }
-    etrans; [eauto|].
-    eapply world_messages_le_mon; eauto.
-    i. eapply rtc_step_unchangable in STEPS2; eauto.
+    { etrans; [eauto|].
+      eapply world_messages_le_mon; eauto.
+      i. eapply rtc_step_unchangable in STEPS2; eauto. }
+    { i. subst. des; auto. inv PR. auto. }
 Qed.
 
 Lemma sim_thread_future
@@ -744,6 +765,7 @@ Lemma sim_thread_consistent
       (MEM_TGT: Memory.closed mem_tgt)
       (REL: joined_released views lc_tgt.(Local.promises) lc_tgt.(Local.tview).(TView.rel))
       (JOINED: joined_memory views mem_tgt)
+      (FINMEMORY: fin <4= unchangable mem_tgt lc_tgt.(Local.promises))
       (VIEWS: wf_views views)
       (CONSISTENT: JThread.consistent (Thread.mk lang_tgt st_tgt lc_tgt sc_tgt mem_tgt) views):
   Thread.consistent (Thread.mk lang_src st_src lc_src sc_src mem_src).
@@ -762,6 +784,9 @@ Proof.
   exploit cap_flex_property; try exact CAP2; eauto. i. des.
   exploit joined_memory_cap; eauto. intros JOINED0.
   eapply CapFlex.consistent_thread_consistent; eauto.
+  assert (FINMEMORY0: fin <4= unchangable mem2 (Local.promises lc_tgt)).
+  { i. apply FINMEMORY in PR. inv PR. econs; eauto.
+    eapply Memory.cap_le; eauto. refl. }
   exploit CONSISTENT; eauto. s. i. des.
   - left. des. s.
     assert (mem1 = mem0).
@@ -780,7 +805,7 @@ Proof.
     exploit sim_thread_rtc_step; try apply STEPS; try exact x1; eauto; try refl.
     i. des; eauto.
     destruct e2. ss. punfold SIM1. red in SIM1. des.
-    hexploit FUTURE1; eauto; ss.
+    hexploit FUTURE1; try apply FINMEMORY1; eauto; ss.
     { splits; ss. } dup REL. i. des.
     exploit PROMISES0; eauto. i. des.
     + left. unfold Thread.steps_failure in *. des.
@@ -1009,67 +1034,6 @@ Proof.
     rewrite -> IdentMap.gsident; auto.
 Qed.
 
-Definition step_finalized e tid c0 c1
-           (STEP: Configuration.step e tid c0 c1)
-           (WF: Configuration.wf c0)
-  :
-    finalized c0 <4= finalized c1.
-Proof.
-  ii. inv STEP.
-  hexploit finalized_unchangable; eauto. i.
-  hexploit rtc_step_unchangable; eauto. i.
-  hexploit step_unchangable; eauto. i. ss.
-  inv H1. econs; eauto. i. ss.
-  rewrite IdentMap.gsspec in TID0. des_ifs.
-  inv PR. eapply NPROM0; eauto.
-Qed.
-
-Definition opt_step_finalized e tid c0 c1
-           (STEP: Configuration.opt_step e tid c0 c1)
-           (WF: Configuration.wf c0)
-  :
-    finalized c0 <4= finalized c1.
-Proof.
-  inv STEP.
-  { i. clarify. }
-  { eapply step_finalized; eauto. }
-Qed.
-
-Definition step_committed_finalized e tid c0 c1 st0 st1 lc0 lc1
-           (STEP: Configuration.step e tid c0 c1)
-           (FIND0: IdentMap.find tid c0.(Configuration.threads) = Some (st0, lc0))
-           (FIND1: IdentMap.find tid c1.(Configuration.threads) = Some (st1, lc1))
-           (WF: Configuration.wf c0)
-  :
-    committed c0.(Configuration.memory) lc0.(Local.promises) c1.(Configuration.memory) lc1.(Local.promises) <4= finalized c1.
-Proof.
-  hexploit Configuration.step_future; eauto. i. des.
-  ii. inv PR. dup UNCHANGABLE. inv UNCHANGABLE. econs; eauto.
-  i. inv STEP. ss.
-  rewrite IdentMap.gss in FIND1. clarify.
-  dup TID. rewrite IdentMap.gsspec in TID. des_ifs.
-  destruct (Memory.get x0 x1 lc.(Local.promises)) as [[from msg]|] eqn:EQ; auto.
-  exfalso. eapply NUNCHANGABLE.
-  destruct c0, lc, lc0. ss.
-  eapply other_promise_unchangable with (tid1:=tid) (tid2:=tid0); eauto.
-  econs; eauto. inv WF2. ss.
-  inv WF0. destruct st. exploit THREADS; eauto.
-  i. inv x4. ss. rewrite EQ. eapply PROMISES in EQ. clarify.
-Qed.
-
-Definition opt_step_committed_finalized e tid c0 c1 st0 st1 lc0 lc1
-           (STEP: Configuration.opt_step e tid c0 c1)
-           (FIND0: IdentMap.find tid c0.(Configuration.threads) = Some (st0, lc0))
-           (FIND1: IdentMap.find tid c1.(Configuration.threads) = Some (st1, lc1))
-           (WF: Configuration.wf c0)
-  :
-    committed c0.(Configuration.memory) lc0.(Local.promises) c1.(Configuration.memory) lc1.(Local.promises) <4= finalized c1.
-Proof.
-  inv STEP.
-  { i. clarify. inv PR; ss. }
-  { eapply step_committed_finalized; eauto. }
-Qed.
-
 Lemma sim_thread_sim
       ths_src sc0_src mem0_src
       ths_tgt sc0_tgt mem0_tgt w views
@@ -1157,6 +1121,7 @@ Proof.
       { etrans; eauto. eapply Memory.future_future_weak; eauto. }
       { etrans; eauto. }
       { etrans; eauto. }
+      { i. eapply FIN in PR. eapply finalized_unchangable in PR; eauto. }
     }
     { etrans; eauto. }
     i. des.
@@ -1221,7 +1186,7 @@ Proof.
     exploit SIM0; eauto. i. des.
     exploit sim_thread_future; eauto using Memory.future_future_weak. i.
     hexploit sim_thread_plus_step; try exact STEPS;
-      eauto using Memory.future_future_weak; ss.
+      try apply x1; eauto using Memory.future_future_weak; ss.
     { destruct (classic (ThreadEvent.get_machine_event e0 = MachineEvent.failure)).
       - inv STEP. inv STEP0; inv STEP; ss. inv LOCAL; ss; inv LOCAL0; ss.
       - exploit JThread.tau_steps_future; eauto. s. i. des.
@@ -1229,6 +1194,7 @@ Proof.
         hexploit JThread.consistent_thread_consistent; eauto.
         i. hexploit consistent_promise_consistent; eauto.
     }
+    { i. eapply finalized_unchangable in PR; eauto. }
     s. i. des.
     + left.
       unfold Thread.steps_failure in FAILURE. des.

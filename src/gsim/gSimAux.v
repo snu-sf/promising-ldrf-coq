@@ -467,9 +467,16 @@ Section FINALIZED.
     i. inv PR. econs; eauto.
   Qed.
 
-  Definition finalized_incr e tid c0 c1
-             (WF: Configuration.wf c0)
+  Variant committed (mem0 prom0 mem1 prom1: Memory.t)
+          (l: Loc.t) (t: Time.t) (from: Time.t) (msg: Message.t): Prop :=
+  | committed_intro
+      (UNCHANGABLE: unchangable mem1 prom1 l t from msg)
+      (NUNCHANGABLE: ~ unchangable mem0 prom0 l t from msg)
+  .
+
+  Definition step_finalized e tid c0 c1
              (STEP: Configuration.step e tid c0 c1)
+             (WF: Configuration.wf c0)
     :
       finalized c0 <4= finalized c1.
   Proof.
@@ -482,18 +489,11 @@ Section FINALIZED.
     inv PR. eapply NPROM0; eauto.
   Qed.
 
-  Variant committed (mem0 prom0 mem1 prom1: Memory.t)
-          (l: Loc.t) (t: Time.t) (from: Time.t) (msg: Message.t): Prop :=
-  | committed_intro
-      (UNCHANGABLE: unchangable mem1 prom1 l t from msg)
-      (NUNCHANGABLE: ~ unchangable mem0 prom0 l t from msg)
-  .
-
-  Definition finalized_committed e tid c0 c1 st0 st1 lc0 lc1
-             (WF: Configuration.wf c0)
+  Definition step_committed_finalized e tid c0 c1 st0 st1 lc0 lc1
              (STEP: Configuration.step e tid c0 c1)
              (FIND0: IdentMap.find tid c0.(Configuration.threads) = Some (st0, lc0))
              (FIND1: IdentMap.find tid c1.(Configuration.threads) = Some (st1, lc1))
+             (WF: Configuration.wf c0)
     :
       committed c0.(Configuration.memory) lc0.(Local.promises) c1.(Configuration.memory) lc1.(Local.promises) <4= finalized c1.
   Proof.

@@ -51,7 +51,7 @@ Definition _sim_itree
            R_src R_tgt
            (sim_ret:SIM_VAL R_src R_tgt)
            (itr_src: itree MemE.t R_src) (itr_tgt: itree MemE.t R_tgt): Prop :=
-  forall b lc_src lc_tgt sc0_src sc0_tgt mem0_src mem0_tgt w1 views1
+  forall b lc_src lc_tgt sc0_src sc0_tgt mem0_src mem0_tgt w1 views1 fin1
          (LOCAL: sim_local w1 views1 lc_src lc_tgt),
     sim_thread
       (lang R_src) (lang R_tgt)
@@ -59,7 +59,7 @@ Definition _sim_itree
       b w1
       itr_src lc_src sc0_src mem0_src
       itr_tgt lc_tgt sc0_tgt mem0_tgt
-      views1.
+      (views1, fin1).
 
 Definition _sim_ktree
            (sim_thread:SIM_THREAD world)
@@ -266,7 +266,7 @@ Global Hint Resolve cpn11_wcompat: paco.
 
 Inductive ctx (sim_thread:SIM_THREAD world): SIM_THREAD world :=
 | ctx_ret
-    R_src R_tgt b w0 views0
+    R_src R_tgt b w0 views0 fin0
     (sim_ret:SIM_VAL R_src R_tgt)
     sc0_src mem0_src
     sc0_tgt mem0_tgt
@@ -279,9 +279,9 @@ Inductive ctx (sim_thread:SIM_THREAD world): SIM_THREAD world :=
          b w0
          (Ret r_src) lc_src sc0_src mem0_src
          (Ret r_tgt) lc_tgt sc0_tgt mem0_tgt
-         views0
+         (views0, fin0)
 | ctx_bind
-    R_src0 R_tgt0 R_src1 R_tgt1 b w0 views0
+    R_src0 R_tgt0 R_src1 R_tgt1 b w0 views0 fin0
     (sim_ret1:SIM_VAL R_src0 R_tgt0) (sim_ret2:SIM_VAL R_src1 R_tgt1)
     itr0 k0 lc_src sc0_src mem0_src
     itr1 k1 lc_tgt sc0_tgt mem0_tgt
@@ -289,7 +289,7 @@ Inductive ctx (sim_thread:SIM_THREAD world): SIM_THREAD world :=
                       b w0
                       itr0 lc_src sc0_src mem0_src
                       itr1 lc_tgt sc0_tgt mem0_tgt
-                      views0)
+                      (views0, fin0))
     (SIM2: _sim_ktree sim_thread sim_ret1 k0 k1 sim_ret2):
     @ctx sim_thread
          (lang R_src1) (lang R_tgt1)
@@ -297,9 +297,9 @@ Inductive ctx (sim_thread:SIM_THREAD world): SIM_THREAD world :=
          b w0
          (itr0 >>= k0) lc_src sc0_src mem0_src
          (itr1 >>= k1) lc_tgt sc0_tgt mem0_tgt
-         views0
+         (views0, fin0)
 | ctx_tau_iter
-    I_src I_tgt R_src R_tgt b w0 views0
+    I_src I_tgt R_src R_tgt b w0 views0 fin0
     (sim_ret0: SIM_VAL I_src I_tgt) (sim_ret1: SIM_VAL R_src R_tgt)
     sc0_src mem0_src
     sc0_tgt mem0_tgt
@@ -317,7 +317,7 @@ Inductive ctx (sim_thread:SIM_THREAD world): SIM_THREAD world :=
          b w0
          (tau;;(ITree.iter body_src i_src)) lc_src sc0_src mem0_src
          (tau;;(ITree.iter body_tgt i_tgt)) lc_tgt sc0_tgt mem0_tgt
-         views0
+         (views0, fin0)
 .
 
 Lemma ctx_mon: monotone14 ctx.
@@ -426,7 +426,7 @@ Proof.
           { refl. }
           { red. destruct b.
             { splits; auto. }
-            { splits; try refl. }
+            { splits; try refl. auto. }
           }
           { refl. }
           i. ss. des. exploit TERMINAL0; try by econs.
@@ -485,11 +485,11 @@ Proof.
           { refl. }
           { red. destruct b.
             { splits; auto. }
-            { splits; try refl. }
+            { splits; try refl. auto. }
           }
           { refl. }
           i. ss. des.
-          exploit STEP1; eauto. i. des.
+          hexploit STEP1; eauto; ss. i. des.
           { left.
             unfold Thread.steps_failure in *. des.
             destruct e2, e3.
@@ -506,7 +506,7 @@ Proof.
               etrans; [apply STEPS|eauto].
               rewrite bind_ret_l. eauto. }
       + destruct lc3_tgt.
-        exploit STEP; eauto. i. des.
+        hexploit STEP; eauto; ss. i. des.
         * left.
           unfold Thread.steps_failure in *. des.
           destruct e2, e3.
@@ -521,7 +521,7 @@ Proof.
           { eapply rclo14_clo_base. eapply ctx_bind; eauto.
             eapply _sim_ktree_mon; cycle 1; eauto.
           }
-      + left. inv STEP0; inv STEP1. inv LOCAL. exploit STEP.
+      + left. inv STEP0; inv STEP1. inv LOCAL. hexploit STEP; ss.
         { instantiate (6:=ThreadEvent.failure).
           econs; eauto. econs 2. ss. econs; eauto. econs; eauto.
         }
@@ -590,7 +590,7 @@ Qed.
 
 Inductive iter_ctx (sim_thread:SIM_THREAD world): SIM_THREAD world :=
 | ctx_iter
-    I_src I_tgt R_src R_tgt b w0 views
+    I_src I_tgt R_src R_tgt b w0 views fin
     (sim_ret0: SIM_VAL I_src I_tgt) (sim_ret1: SIM_VAL R_src R_tgt)
     sc0_src mem0_src
     sc0_tgt mem0_tgt
@@ -608,7 +608,7 @@ Inductive iter_ctx (sim_thread:SIM_THREAD world): SIM_THREAD world :=
               b w0
               (ITree.iter body_src i_src) lc_src sc0_src mem0_src
               (ITree.iter body_tgt i_tgt) lc_tgt sc0_tgt mem0_tgt
-              views
+              (views, fin)
 .
 
 Lemma iter_ctx_mon: monotone14 iter_ctx.
