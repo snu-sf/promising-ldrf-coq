@@ -6,11 +6,12 @@ COQTHEORIES  := \
 	src/prop/*.v \
 	src/opt/*.v \
 	src/opt/itree/*.v \
+	src/gsim/*.v \
+	src/sequential/*.v \
 #	src/opt/while/*.v \
 #	src/invariant/*.v \
 #	src/gopt/*.v \
 #	src/promotion/*.v \
-#	src/gsim/*.v \
 #	src/ldrfpf/*.v \
 #	src/ldrfra/*.v \
 #	src/ldrfsc/*.v \
@@ -31,6 +32,8 @@ Makefile.coq: Makefile $(COQTHEORIES)
    echo "-R src/itree $(COQMODULE)"; \
    echo "-R src/prop $(COQMODULE)"; \
    echo "-R src/opt $(COQMODULE)"; \
+   echo "-R src/gsim $(COQMODULE)"; \
+   echo "-R src/sequential $(COQMODULE)"; \
    # echo "-R src/invariant $(COQMODULE)"; \
    # echo "-R src/gopt $(COQMODULE)"; \
    # echo "-R src/promotion $(COQMODULE)"; \

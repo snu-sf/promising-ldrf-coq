@@ -448,3 +448,66 @@ Section UNCHANGABLE.
       + econs; ss; eauto. refl.
   Qed.
 End UNCHANGABLE.
+
+
+Section FINALIZED.
+  Variant finalized (c: Configuration.t) (l: Loc.t) (t: Time.t) (from: Time.t) (msg: Message.t): Prop :=
+  | finalized_intro
+      (GET: Memory.get l t c.(Configuration.memory) = Some (from, msg))
+      (NPROM: forall tid st lc
+                     (TID: IdentMap.find tid c.(Configuration.threads) = Some (st, lc)),
+          Memory.get l t lc.(Local.promises) = None)
+  .
+
+  Lemma finalized_unchangable c tid st lc
+        (FIND: IdentMap.find tid c.(Configuration.threads) = Some (st, lc))
+    :
+      finalized c <4= unchangable c.(Configuration.memory) lc.(Local.promises).
+  Proof.
+    i. inv PR. econs; eauto.
+  Qed.
+
+  Definition finalized_incr e tid c0 c1
+             (WF: Configuration.wf c0)
+             (STEP: Configuration.step e tid c0 c1)
+    :
+      finalized c0 <4= finalized c1.
+  Proof.
+    ii. inv STEP.
+    hexploit finalized_unchangable; eauto. i.
+    hexploit rtc_step_unchangable; eauto. i.
+    hexploit step_unchangable; eauto. i. ss.
+    inv H1. econs; eauto. i. ss.
+    rewrite IdentMap.gsspec in TID0. des_ifs.
+    inv PR. eapply NPROM0; eauto.
+  Qed.
+
+  Variant committed (mem0 prom0 mem1 prom1: Memory.t)
+          (l: Loc.t) (t: Time.t) (from: Time.t) (msg: Message.t): Prop :=
+  | committed_intro
+      (UNCHANGABLE: unchangable mem1 prom1 l t from msg)
+      (NUNCHANGABLE: ~ unchangable mem0 prom0 l t from msg)
+  .
+
+  Definition finalized_committed e tid c0 c1 st0 st1 lc0 lc1
+             (WF: Configuration.wf c0)
+             (STEP: Configuration.step e tid c0 c1)
+             (FIND0: IdentMap.find tid c0.(Configuration.threads) = Some (st0, lc0))
+             (FIND1: IdentMap.find tid c1.(Configuration.threads) = Some (st1, lc1))
+    :
+      committed c0.(Configuration.memory) lc0.(Local.promises) c1.(Configuration.memory) lc1.(Local.promises) <4= finalized c1.
+  Proof.
+    hexploit Configuration.step_future; eauto. i. des.
+    ii. inv PR. dup UNCHANGABLE. inv UNCHANGABLE. econs; eauto.
+    i. inv STEP. ss.
+    rewrite IdentMap.gss in FIND1. clarify.
+    dup TID. rewrite IdentMap.gsspec in TID. des_ifs.
+    destruct (Memory.get x0 x1 lc.(Local.promises)) as [[from msg]|] eqn:EQ; auto.
+    exfalso. eapply NUNCHANGABLE.
+    destruct c0, lc, lc0. ss.
+    eapply other_promise_unchangable with (tid1:=tid) (tid2:=tid0); eauto.
+    econs; eauto. inv WF2. ss.
+    inv WF0. destruct st. exploit THREADS; eauto.
+    i. inv x4. ss. rewrite EQ. eapply PROMISES in EQ. clarify.
+  Qed.
+End FINALIZED.
