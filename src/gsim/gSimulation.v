@@ -281,15 +281,16 @@ Hint Resolve _sim_thread_mon: paco.
 Definition sim_thread_past lang_src lang_tgt sim_terminal (b: bool) w st_src lc_src sc_src mem_src st_tgt lc_tgt sc_tgt mem_tgt '(views, fin) :=
   if b
   then sim_thread sim_terminal true w st_src lc_src sc_src mem_src st_tgt lc_tgt sc_tgt mem_tgt (views, fin)
-  else exists w' sc_src' mem_src' sc_tgt' mem_tgt' views',
-      (<<SIM: @sim_thread lang_src lang_tgt sim_terminal false w' st_src lc_src sc_src' mem_src' st_tgt lc_tgt sc_tgt' mem_tgt' (views', fin)>>) /\
+  else exists w' sc_src' mem_src' sc_tgt' mem_tgt' views' fin',
+      (<<SIM: @sim_thread lang_src lang_tgt sim_terminal false w' st_src lc_src sc_src' mem_src' st_tgt lc_tgt sc_tgt' mem_tgt' (views', fin')>>) /\
       (<<SC_FUTURE_SRC: TimeMap.le sc_src' sc_src>>) /\
       (<<SC_FUTURE_TGT: TimeMap.le sc_tgt' sc_tgt>>) /\
       (<<MEM_FUTURE_SRC: Memory.future_weak mem_src' mem_src>>) /\
       (<<MEM_FUTURE_TGT: Memory.future_weak mem_tgt' mem_tgt>>) /\
       (<<WORLD: world_messages_le (Messages.of_memory lc_src.(Local.promises)) w' w>>) /\
       (<<UNCHANGED: UndefCertify.unchanged lc_src.(Local.promises) mem_src' mem_src>>) /\
-      (<<VIEW: views_le views' views>>)
+      (<<VIEW: views_le views' views>>) /\
+      (<<FIN: fin' <4= fin>>)
 .
 Arguments sim_thread_past: simpl never.
 
@@ -369,7 +370,7 @@ Proof.
   { des. punfold SIM0. red in SIM0. des.
     exploit JThread.step_future; eauto. s. i. des.
     exploit FUTURE; eauto; ss.
-    { splits; auto. i. apply PR. }
+    { splits; auto. i. eapply FIN0. eauto. }
     i. des. exploit STEP0; eauto; ss.
     i. des; eauto.
     inv SIM; [|done]. right.
@@ -637,7 +638,7 @@ Lemma sim_thread_future
       lang_src lang_tgt
       sim_terminal
       st_src lc_src sc1_src sc2_src mem1_src mem2_src w1 views1
-      st_tgt lc_tgt sc1_tgt sc2_tgt mem1_tgt mem2_tgt w2 views2 fin1
+      st_tgt lc_tgt sc1_tgt sc2_tgt mem1_tgt mem2_tgt w2 views2 fin1 fin2
       (SIM: @sim_thread_past lang_src lang_tgt sim_terminal false w1 st_src lc_src sc1_src mem1_src st_tgt lc_tgt sc1_tgt mem1_tgt (views1, fin1))
       (SC_FUTURE_SRC: TimeMap.le sc1_src sc2_src)
       (SC_FUTURE_TGT: TimeMap.le sc1_tgt sc2_tgt)
@@ -645,8 +646,9 @@ Lemma sim_thread_future
       (MEM_FUTURE_TGT: Memory.future_weak mem1_tgt mem2_tgt)
       (WORLD: world_messages_le (Messages.of_memory lc_src.(Local.promises)) w1 w2)
       (UNCHANGED: UndefCertify.unchanged lc_src.(Local.promises) mem1_src mem2_src)
-      (VIEWS: views_le views1 views2):
-  sim_thread_past sim_terminal false w2 st_src lc_src sc2_src mem2_src st_tgt lc_tgt sc2_tgt mem2_tgt (views2, fin1).
+      (VIEWS: views_le views1 views2)
+      (FIN: fin1 <4= fin2):
+  sim_thread_past sim_terminal false w2 st_src lc_src sc2_src mem2_src st_tgt lc_tgt sc2_tgt mem2_tgt (views2, fin2).
 Proof.
   red in SIM. red. des. ss. esplits; eauto.
   { etrans; eauto. }
@@ -1007,6 +1009,67 @@ Proof.
     rewrite -> IdentMap.gsident; auto.
 Qed.
 
+Definition step_finalized e tid c0 c1
+           (STEP: Configuration.step e tid c0 c1)
+           (WF: Configuration.wf c0)
+  :
+    finalized c0 <4= finalized c1.
+Proof.
+  ii. inv STEP.
+  hexploit finalized_unchangable; eauto. i.
+  hexploit rtc_step_unchangable; eauto. i.
+  hexploit step_unchangable; eauto. i. ss.
+  inv H1. econs; eauto. i. ss.
+  rewrite IdentMap.gsspec in TID0. des_ifs.
+  inv PR. eapply NPROM0; eauto.
+Qed.
+
+Definition opt_step_finalized e tid c0 c1
+           (STEP: Configuration.opt_step e tid c0 c1)
+           (WF: Configuration.wf c0)
+  :
+    finalized c0 <4= finalized c1.
+Proof.
+  inv STEP.
+  { i. clarify. }
+  { eapply step_finalized; eauto. }
+Qed.
+
+Definition step_committed_finalized e tid c0 c1 st0 st1 lc0 lc1
+           (STEP: Configuration.step e tid c0 c1)
+           (FIND0: IdentMap.find tid c0.(Configuration.threads) = Some (st0, lc0))
+           (FIND1: IdentMap.find tid c1.(Configuration.threads) = Some (st1, lc1))
+           (WF: Configuration.wf c0)
+  :
+    committed c0.(Configuration.memory) lc0.(Local.promises) c1.(Configuration.memory) lc1.(Local.promises) <4= finalized c1.
+Proof.
+  hexploit Configuration.step_future; eauto. i. des.
+  ii. inv PR. dup UNCHANGABLE. inv UNCHANGABLE. econs; eauto.
+  i. inv STEP. ss.
+  rewrite IdentMap.gss in FIND1. clarify.
+  dup TID. rewrite IdentMap.gsspec in TID. des_ifs.
+  destruct (Memory.get x0 x1 lc.(Local.promises)) as [[from msg]|] eqn:EQ; auto.
+  exfalso. eapply NUNCHANGABLE.
+  destruct c0, lc, lc0. ss.
+  eapply other_promise_unchangable with (tid1:=tid) (tid2:=tid0); eauto.
+  econs; eauto. inv WF2. ss.
+  inv WF0. destruct st. exploit THREADS; eauto.
+  i. inv x4. ss. rewrite EQ. eapply PROMISES in EQ. clarify.
+Qed.
+
+Definition opt_step_committed_finalized e tid c0 c1 st0 st1 lc0 lc1
+           (STEP: Configuration.opt_step e tid c0 c1)
+           (FIND0: IdentMap.find tid c0.(Configuration.threads) = Some (st0, lc0))
+           (FIND1: IdentMap.find tid c1.(Configuration.threads) = Some (st1, lc1))
+           (WF: Configuration.wf c0)
+  :
+    committed c0.(Configuration.memory) lc0.(Local.promises) c1.(Configuration.memory) lc1.(Local.promises) <4= finalized c1.
+Proof.
+  inv STEP.
+  { i. clarify. inv PR; ss. }
+  { eapply step_committed_finalized; eauto. }
+Qed.
+
 Lemma sim_thread_sim
       ths_src sc0_src mem0_src
       ths_tgt sc0_tgt mem0_tgt w views
@@ -1015,7 +1078,7 @@ Lemma sim_thread_sim
           IdentMap.find tid ths_src = Some (existT _ lang_src st_src, lc_src) ->
           IdentMap.find tid ths_tgt = Some (existT _ lang_tgt st_tgt, lc_tgt) ->
           exists sim_terminal,
-            @sim_thread_past lang_src lang_tgt sim_terminal false w st_src lc_src sc0_src mem0_src st_tgt lc_tgt sc0_tgt mem0_tgt views)
+            @sim_thread_past lang_src lang_tgt sim_terminal false w st_src lc_src sc0_src mem0_src st_tgt lc_tgt sc0_tgt mem0_tgt (views, finalized (Configuration.mk ths_tgt sc0_tgt mem0_tgt)))
   :
     sim w ths_src sc0_src mem0_src ths_tgt sc0_tgt mem0_tgt views.
 Proof.
@@ -1039,8 +1102,9 @@ Proof.
                IdentMap.find tid ths_src = Some (existT _ lang_src st_src, lc_src) ->
                IdentMap.find tid ths_tgt = Some (existT _ lang_tgt st_tgt, lc_tgt) ->
                exists sim_terminal,
-                 @sim_thread_past lang_src lang_tgt sim_terminal false w st_src lc_src sc0_src mem0_src st_tgt lc_tgt sc0_tgt mem0_tgt views).
-    { eauto. }
+                 @sim_thread_past lang_src lang_tgt sim_terminal false w st_src lc_src sc0_src mem0_src st_tgt lc_tgt sc0_tgt mem0_tgt (views, finalized (Configuration.mk ths_tgt sc1_tgt mem1_tgt))).
+    { i. hexploit SIM0; eauto. i. des. esplits.
+      eapply sim_thread_future; eauto; try refl. }
     assert (UNCHANGED0: forall tid st lc
                                (TID: List.In tid (IdentSet.elements tids))
                                (FIND: IdentMap.find tid ths_src = Some (st, lc)),
@@ -1059,7 +1123,7 @@ Proof.
     { specialize (IdentSet.elements_spec2w tids). i.
       clear - H. induction H; econs; eauto. }
     revert NOTIN IN TIDS_MEM NODUP.
-    move tids at top. clear SIM0 UNCHANGED WORLD. revert_until CIH.
+    move tids at top. clear SIM0 UNCHANGED WORLD. clear FINSRC. revert_until CIH.
     induction (IdentSet.elements tids); i.
     { right. esplits; eauto; try refl. ii. exploit NOTIN; eauto. }
     destruct (IdentMap.find a ths_src) as [[[lang_src st_src] lc_src]|] eqn:ASRC;
@@ -1156,8 +1220,8 @@ Proof.
     inv WF_SRC. inv WF_TGT. inv WF. inv WF0. inv WF. ss.
     exploit SIM0; eauto. i. des.
     exploit sim_thread_future; eauto using Memory.future_future_weak. i.
-    exploit sim_thread_plus_step; try exact STEPS;
-      eauto using Memory.future_future_weak.
+    hexploit sim_thread_plus_step; try exact STEPS;
+      eauto using Memory.future_future_weak; ss.
     { destruct (classic (ThreadEvent.get_machine_event e0 = MachineEvent.failure)).
       - inv STEP. inv STEP0; inv STEP; ss. inv LOCAL; ss; inv LOCAL0; ss.
       - exploit JThread.tau_steps_future; eauto. s. i. des.
@@ -1198,7 +1262,13 @@ Proof.
       { rewrite Threads.tids_add. rewrite Threads.tids_add.
         f_equal. auto. }
       { i. apply sim_thread_sim_thread_past in SIM1. Configuration.simplify.
-        { esplits; eauto. }
+        { esplits; eauto. eapply sim_thread_future; eauto; try refl.
+          i. ss. inv WF_TGT0.
+          eapply JConfiguration.step_configuration_step in STEP_TGT0. des.
+          { eapply step_finalized; eauto. }
+          { eapply step_committed_finalized; eauto.
+            ss. apply IdentMap.gss. }
+        }
         { exploit SIM0; eauto. i. des. esplits; eauto.
           eapply sim_thread_future; eauto.
           { eapply Memory.future_future_weak. etrans; eauto. }
@@ -1211,6 +1281,8 @@ Proof.
           }
           { etrans; eauto. }
           { etrans; eauto. }
+          { eapply JConfiguration.step_configuration_step in STEP_TGT0. inv WF_TGT0.
+            i. eapply step_finalized; eauto. }
         }
       }
 Qed.
