@@ -77,6 +77,16 @@ Variant lower_local: forall (lc_src lc_tgt: Local.t), Prop :=
     lower_local (Local.mk tvw_src prom) (Local.mk tvw_tgt prom)
 .
 
+Program Instance lower_local_PreOrder: PreOrder lower_local.
+Next Obligation.
+Proof.
+  ii. destruct x. econs; eauto. refl.
+Qed.
+Next Obligation.
+Proof.
+  ii. inv H; inv H0. econs; eauto. etrans; eauto.
+Qed.
+
 Lemma lower_local_consistent lc_src lc_tgt
       (LOCAL: lower_local lc_src lc_tgt)
       (CONSISTENT: Local.promise_consistent lc_tgt)
