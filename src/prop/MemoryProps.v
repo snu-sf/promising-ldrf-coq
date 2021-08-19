@@ -4231,3 +4231,58 @@ Section CONCRETEMAX.
   Qed.
 
 End CONCRETEMAX.
+
+
+Lemma view_join_dist vw0 vw1 vw2
+  :
+    View.join vw0 (View.join vw1 vw2) = View.join (View.join vw0 vw1) (View.join vw0 vw2).
+Proof.
+  rewrite <- (@View.le_join_l vw0 vw0) at 1; try refl.
+  erewrite View.join_assoc. erewrite View.join_assoc. f_equal.
+  erewrite <- View.join_assoc. erewrite <- View.join_assoc. f_equal.
+  eapply View.join_comm.
+Qed.
+
+Lemma singleton_ur_join loc ts0 ts1
+  :
+    View.join (View.singleton_ur loc ts0) (View.singleton_ur loc ts1)
+    =
+    View.singleton_ur loc (Time.join ts0 ts1).
+Proof.
+  unfold Time.join. des_ifs.
+  - eapply View.le_join_r. eapply View.singleton_ur_spec.
+    + eapply View.singleton_ur_wf.
+    + ss. unfold TimeMap.singleton. setoid_rewrite LocFun.add_spec_eq. auto.
+  - eapply View.le_join_l. eapply View.singleton_ur_spec.
+    + eapply View.singleton_ur_wf.
+    + ss. unfold TimeMap.singleton. setoid_rewrite LocFun.add_spec_eq. left. auto.
+Qed.
+
+Lemma non_silent_step_promise_consistent lang pf e th0 th1
+      (STEP: @Thread.step lang pf e th0 th1)
+      (EVENT: ThreadEvent.get_machine_event e <> MachineEvent.silent)
+  :
+    (<<CONS0: Local.promise_consistent th0.(Thread.local)>>) /\
+    (<<CONS1: Local.promise_consistent th1.(Thread.local)>>) /\
+    (<<PF: pf = true>>).
+Proof.
+  inv STEP.
+  { inv STEP0; ss. }
+  inv STEP0. inv LOCAL; ss.
+  { inv LOCAL0. hexploit PROMISES; auto. i. splits; auto.
+    { eapply Local.bot_promise_consistent; eauto. }
+    { eapply Local.bot_promise_consistent; eauto. }
+  }
+  { inv LOCAL0. splits; auto. }
+  { inv LOCAL0. splits; auto. }
+  { inv LOCAL0; splits; auto. }
+Qed.
+
+Lemma lower_same_same mem1 mem0 loc from to msg
+      (LOWER: Memory.lower mem0 loc from to msg msg mem1)
+  :
+    mem1 = mem0.
+Proof.
+  eapply Memory.ext. i. erewrite (@Memory.lower_o mem1); eauto.
+  des_ifs. ss. des; clarify. eapply Memory.lower_get0 in LOWER. des; clarify.
+Qed.

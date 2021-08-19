@@ -26,6 +26,7 @@ Require Import MemorySplit.
 Require Import MemoryMerge.
 Require Import FulfillStep.
 Require Import PromiseConsistent.
+Require Import MemoryProps.
 
 Require Import Program.
 
@@ -791,12 +792,20 @@ Proof.
   - left. des. s.
     assert (mem1 = mem0).
     { eapply CapFlex.cap_flex_inj; eauto. } subst.
-    assert (JSTEP: JThread.step true ThreadEvent.failure e2 e3 views2 views2).
+    assert (JSTEP: JThread.step true e e2 e3 views2 views2).
     { eapply JThread.tau_steps_future in STEPS; eauto. des. ss.
-      dup FAILURE0. inv FAILURE0; inv STEP. inv LOCAL.
-      econs; eauto; ss. }
+      inv STEP_FAILURE.
+      { inv STEP; ss. }
+      inv STEP. inv LOCAL; ss.
+      { econs; ss. econs 2; ss. econs; eauto. }
+      { econs; ss. econs 2; ss. econs; ss. econs; eauto. }
+      { econs; ss. econs 2; ss. econs; ss. econs; eauto. }
+    }
     hexploit sim_thread_plus_step; try exact STEPS; try exact FAILURE; eauto; try refl.
-    { inv FAILURE0; inv STEP; ss. inv LOCAL; ss; inv LOCAL0; ss. }
+    { hexploit non_silent_step_promise_consistent; eauto.
+      { rewrite EVENT_FAILURE. ss. }
+      i. des; auto.
+    }
     i. ss. des; ss.
   - ii. ss.
     assert (mem1 = mem0).
