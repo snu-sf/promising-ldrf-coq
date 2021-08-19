@@ -113,6 +113,43 @@ Proof.
   eexists. esplits; eauto; try refl.
 Qed.
 
+Lemma step_split_pure lang (th0 th2: Thread.t lang) pf e views0 views2
+      (STEP: JThread.step pf e th0 th2 views0 views2)
+      (NPROMISE: no_promise e)
+      (NRELEASE: ~ release_event e)
+      (MEM: th2.(Thread.memory) = th0.(Thread.memory))
+  :
+    exists th1,
+      (<<PROMISES: joined_promise_steps th0 th1 views0 views2>>) /\
+      (<<LOWER: rtc lower_step th1 th2>>) /\
+      (<<MEM: th1.(Thread.memory) = th2.(Thread.memory)>>) /\
+      (<<SC: th1.(Thread.sc) = th2.(Thread.sc)>>).
+Proof.
+  inv STEP. assert (views2 = views0).
+  { extensionality loc. extensionality ts.
+    destruct (classic (views2 loc ts = views0 loc ts)); auto.
+    hexploit VIEWSLE; eauto. i. des.
+    rewrite MEM in *. clarify.
+  }
+  assert (SC: th2.(Thread.sc) = th0.(Thread.sc)).
+  { inv STEP0; inv STEP; auto. inv LOCAL; ss.
+    { inv LOCAL0; ss. }
+    { inv LOCAL1; inv LOCAL2; ss. }
+    { inv LOCAL0; ss.
+      unfold TView.write_fence_sc.
+      destruct (Ordering.le Ordering.seqcst ordw) eqn:ORD; ss.
+      exfalso. eapply NRELEASE. destruct ordw; ss.
+    }
+    { inv LOCAL0; ss. }
+  }
+  subst. esplits.
+  { econs. }
+  { econs; [|econs]. econs; eauto.
+    rewrite MEM. refl. }
+  { auto. }
+  { auto. }
+Qed.
+
 Lemma step_split lang (th0 th2: Thread.t lang) pf e views0 views2
       (STEP: JThread.step pf e th0 th2 views0 views2)
       (NRELEASE: ~ release_event e)
@@ -123,7 +160,7 @@ Lemma step_split lang (th0 th2: Thread.t lang) pf e views0 views2
       (<<MEM: th1.(Thread.memory) = th2.(Thread.memory)>>) /\
       (<<SC: th1.(Thread.sc) = th2.(Thread.sc)>>).
 Proof.
-  inv STEP. inv STEP0.
+  dup STEP. inv STEP. inv STEP1.
   { inv STEP. esplits.
     { econs; [|econs]. econs; eauto.
       { econs. econs; eauto. }
@@ -133,38 +170,42 @@ Proof.
     { ss. }
   }
   { inv STEP. inv LOCAL; ss.
-    { esplits.
-      { econs; [|econs]
-        {
+    { eapply step_split_pure; eauto; ss. }
+    { eapply step_split_pure; eauto; ss. }
+    { inv LOCAL0. ss. inv WRITE. esplits.
+      { econs; [|econs]. econs.
+        { econs. econs; ss. econs.
+          { eauto. }
+          { admit. }
+          { ss. }
+        }
+        { i. clarify. admit. }
+        { i. ss. hexploit VIEWSLE; eauto. i. des. splits; auto.
+          esplits; eauto. rewrite VIEW.
+          admit.
+        }
+        { auto. }
+        { auto. }
+        { ss. admit. }
+      }
+      { econs; [|econs]. econs.
 
-
-      { eauto. }
-
-        eauto.  ss. econs.
-
-        econs.
-        {
-
-
-  /\
-
-
-      /\
-
-      (<<STEP: Thread.step pf th0 th2>>).
-
-
-
-
-destruct (Thread.local th); ss.
+          auto.
 
 
 
 
-        Thread.mk _ st0 lc0 sc1 mem1) (Thread.mk _ st1 lc1' sc1 mem1')>>) /\
-      (<<LOCAL: lower_local lc1' lc1>>) /\
-      (<<MEM: lower_memory mem1' mem1>>).
+          { econs.
 
+
+
+      admit. }
+    { admit. }
+    { eapply step_split_pure; eauto; ss. }
+    { admit. }
+    { eapply step_split_pure; eauto; ss. }
+  }
+Admitted.
 
       lang (st0 st1: Language.state lang) (lc0 lc1: Local.t)
            (mem0: Memory.t)

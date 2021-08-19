@@ -454,7 +454,7 @@ Module JThread.
       (VIEWSLE: forall loc ts (NEQ: views2 loc ts <> views1 loc ts),
           (<<NIL: views1 loc ts = []>>) /\
           exists from val released,
-            (<<GET: Memory.get loc ts (Thread.memory e2) = Some (from, Message.concrete val released)>>) /\
+            (<<GET: Memory.get loc ts (Thread.memory e2) = Some (from, Message.concrete val (Some released))>>) /\
             (<<NONE: Memory.get loc ts (Thread.memory e1) = None>>) /\
             (<<VIEW: views2 loc ts = (View.join ((Local.tview (Thread.local e2)).(TView.rel) loc) (View.singleton_ur loc ts))
                                        ::(all_join_views (View.singleton_ur loc ts) (views1 loc from))>>))
@@ -1464,6 +1464,21 @@ Module JSim.
     eapply View.unwrap_opt_le in RELEASED. inv RELEASED. auto.
   Qed.
 
+  Let unwrap_views (vw: option View.t) (views: list View.t): list View.t :=
+    match vw with
+    | Some _ => views
+    | _ => []
+    end.
+
+  Lemma max_le_joined_opt_view_joined2
+        views view max
+        (MAXLE: max_le_joined_opt_view views view max)
+    :
+      joined_opt_view (unwrap_views view views) max.
+  Proof.
+    inv MAXLE; econs. eapply max_le_joined_view_joined; eauto.
+  Qed.
+
   Lemma sim_local_promise
         views1
         lc1_src mem1_src
@@ -1499,7 +1514,7 @@ Module JSim.
         (<<VIEWSLE: forall loc ts (NEQ: views2 loc ts <> views1 loc ts),
             (<<NIL: views1 loc ts = []>>) /\
             exists from val released,
-              (<<GET: Memory.get loc ts mem2_src = Some (from, Message.concrete val released)>>) /\
+              (<<GET: Memory.get loc ts mem2_src = Some (from, Message.concrete val (Some released))>>) /\
               (<<NONE: Memory.get loc ts mem1_src = None>>) /\
               (<<VIEW: views2 loc ts = (View.join ((TView.rel (Local.tview lc2_src)) loc) (View.singleton_ur loc ts))
                                          ::(all_join_views (View.singleton_ur loc ts) (views1 loc from))>>)>>) /\
@@ -1547,7 +1562,7 @@ Module JSim.
         { unfold views. econs; eauto.
           eapply all_join_views_wf; eauto. eapply View.singleton_ur_wf. }
         set (views2 := fun l t => if (loc_ts_eq_dec (l, t) (loc, to))
-                                  then views
+                                  then unwrap_views released_tgt views
                                   else views1 l t).
         hexploit (@max_le_joined_opt_view_exists views released_tgt); auto. i. des.
 
@@ -1578,14 +1593,15 @@ Module JSim.
             + ss. des; clarify. exfalso. eapply Time.lt_strorder; eauto.
             + ss. des; clarify. splits; auto.
               * inv MAX. eapply max_le_joined_view_joined; eauto.
-              * i. right. eapply all_join_views_in; eauto.
+              * i. inv MAX. ss. right. eapply all_join_views_in; eauto.
             + ss. des; clarify. exfalso. eapply NOATTACH; eauto. ss.
             + eapply COMPLETE; eauto.
           - unfold views2. i. des_ifs.
             + ss. des; clarify. esplits. eapply Memory.add_get0; eauto.
             + guardH o. exploit ONLY; eauto. i. des. erewrite Memory.add_get1; eauto.
           - unfold views2. ii. des_ifs.
-            + ss. des; clarify. unfold views. econs; auto.
+            + ss. des; clarify. destruct released_tgt; ss.
+              unfold views. econs; auto.
               eapply all_join_views_closed; eauto.
               eapply List.Forall_impl; try apply CLOSED0. ss.
               i. eapply Memory.add_closed_view; eauto.
@@ -1609,23 +1625,27 @@ Module JSim.
             erewrite (@Memory.add_o prom2_src); eauto.
             erewrite (@Memory.add_o promises2); eauto. des_ifs.
             ss. des; clarify. econs; eauto.
-            inv MAX; eauto. right. ii. clarify.
+            { inv MAX; econs. eauto. }
+            { inv MAX; eauto. right. ss. }
         }
         { eapply sim_memory_add; cycle 1; eauto. econs.
           eapply max_le_joined_opt_view_le; eauto. }
         { assumption. }
-        { ii. unfold views2. des_ifs. }
+        { ii. unfold views2. des_ifs. destruct released_tgt; ss. }
         { ss. ii. unfold views2.
           erewrite (@Memory.add_o prom2_src) in *; eauto. des_ifs; eauto.
-          ss. des; clarify. auto. }
+          ss. des; clarify. inv MAX; ss; auto. }
         { i. unfold views2. des_ifs; ss; des; clarify.
-          eapply max_le_joined_opt_view_joined; eauto. }
-        { unfold views2. i. des_ifs. ss. des; subst. split.
-          - inv JOINMEM1. apply NNPP. ii. exploit ONLY; eauto. i. des.
-            eapply Memory.add_get0 in MEM_SRC. des. clarify.
-          - unfold views. esplits; eauto.
-            { eapply Memory.add_get0; eauto. }
-            { eapply Memory.add_get0; eauto. }
+          eapply max_le_joined_opt_view_joined2; eauto. }
+        { unfold views2. i. des_ifs. ss. des; subst.
+          assert (NIL: [] = views1 loc to).
+          { inv JOINMEM1. apply NNPP. ii. exploit ONLY; eauto. i. des.
+            eapply Memory.add_get0 in MEM_SRC. des. clarify. }
+          split; auto.
+          inv MAX; ss.
+          unfold views. esplits; eauto.
+          { eapply Memory.add_get0; eauto. }
+          { eapply Memory.add_get0; eauto. }
         }
         { econs; eauto. eapply max_le_joined_opt_view_le; eauto. }
         { eauto. }
@@ -1741,7 +1761,7 @@ Module JSim.
           eapply all_join_views_wf; eauto. eapply View.singleton_ur_wf. }
 
         set (views2 := fun l t => if (loc_ts_eq_dec (l, t) (loc, to))
-                                  then views
+                                  then unwrap_views released'0 views
                                   else views1 l t).
         hexploit (@max_le_joined_opt_view_exists views released'0); auto. i. des.
 
@@ -1768,11 +1788,10 @@ Module JSim.
             + ss. des; clarify. exfalso. eapply Time.lt_strorder; eauto.
             + ss. des; clarify. splits; auto.
               * inv MAX. eapply max_le_joined_view_joined; eauto.
-              * i. right. eapply all_join_views_in; eauto.
+              * i. inv MAX. ss. right. eapply all_join_views_in; eauto.
             + ss. des; clarify. exploit COMPLETE; eauto. i. des. splits; auto.
-              ii; ss. des; auto.
-              * subst.
-                erewrite View.join_assoc. erewrite singleton_ur_join.
+              ii; ss. destruct released'0; ss. des; auto.
+              * subst. erewrite View.join_assoc. erewrite singleton_ur_join.
                 unfold Time.join. des_ifs.
                 { inv LOCAL1. ss. exploit REL1; eauto. }
                 { exfalso. eapply Time.lt_strorder. etrans; eauto. }
@@ -1801,7 +1820,8 @@ Module JSim.
             hexploit (ONLY loc ts3); eauto. i. des; clarify.
             eapply Memory.split_get0 in MEM_SRC. des; clarify. eauto.
           - unfold views2. i. des_ifs.
-            + ss. des; clarify. unfold views. econs; auto.
+            + ss. des; clarify. destruct released'0; ss.
+              unfold views. econs; auto.
               eapply all_join_views_closed; eauto.
               eapply List.Forall_impl; try apply CLOSED0. ss.
               i. eapply Memory.split_closed_view; eauto.
@@ -1823,8 +1843,12 @@ Module JSim.
         { inv LOCAL1. econs; eauto.
           - ii. erewrite (@Memory.split_o prom2_src); eauto.
             erewrite (@Memory.split_o promises2); eauto. unfold views2. des_ifs.
-            + ss. des; clarify. econs; eauto.
-              inv MAX; eauto. right. ii. clarify.
+            + ss. des; clarify. inv MAX; ss.
+              { econs; eauto.
+                { econs; eauto. }
+                { right. ii. clarify. }
+              }
+              { econs; eauto. econs; eauto. }
             + ss. des; clarify.
               specialize (PROMISES0 loc ts3).
               rewrite GETSRC in *. erewrite GET2 in *.
@@ -1833,20 +1857,23 @@ Module JSim.
         { eapply sim_memory_split; cycle 1; eauto. econs.
           eapply max_le_joined_opt_view_le; eauto. }
         { assumption. }
-        { ii. unfold views2. des_ifs. }
+        { ii. unfold views2. des_ifs. destruct released'0; ss. }
         { ss. ii. erewrite (@Memory.split_o prom2_src) in *; eauto. unfold views2.
           des_ifs; eauto.
-          - ss. des; clarify. unfold views.
+          - ss. des; clarify. unfold views. inv MAX. ss.
             econs; ss; auto.
           - ss. des; clarify. eapply REL1; eauto. }
         { i. clarify. unfold views2. des_ifs; ss; des; ss.
-          eapply max_le_joined_opt_view_joined; eauto. }
-        { unfold views2. i. des_ifs. ss. des; subst. split.
-          - inv JOINMEM1. apply NNPP. ii. exploit ONLY; eauto. i. des.
-            eapply Memory.split_get0 in MEM_SRC. des. clarify.
-          - unfold views. esplits; eauto.
-            { eapply Memory.split_get0 in MEM_SRC. des. eauto. }
-            { eapply Memory.split_get0; eauto. }
+          eapply max_le_joined_opt_view_joined2; eauto. }
+        { unfold views2. i. des_ifs. ss. des; subst.
+          assert (NIL: [] = views1 loc to).
+          { inv JOINMEM1. apply NNPP. ii. exploit ONLY; eauto. i. des.
+            eapply Memory.split_get0 in MEM_SRC. des. clarify. }
+          split; auto.
+          inv MAX; ss.
+          unfold views. esplits; eauto.
+          { eapply Memory.split_get0 in MEM_SRC. des. eauto. }
+          { eapply Memory.split_get0; eauto. }
         }
         { econs; eauto. eapply max_le_joined_opt_view_le; eauto. }
         { eauto. }
@@ -2044,7 +2071,7 @@ Module JSim.
         (<<VIEWSLE: forall loc ts (NEQ: views2 loc ts <> views1 loc ts),
             (<<NIL: views1 loc ts = []>>) /\
             exists from val released,
-              (<<GET: Memory.get loc ts mem2_src = Some (from, Message.concrete val released)>>) /\
+              (<<GET: Memory.get loc ts mem2_src = Some (from, Message.concrete val (Some released))>>) /\
               (<<NONE: Memory.get loc ts mem1_src = None>>) /\
               (<<VIEW: views2 loc ts = (View.join ((TView.rel (Local.tview lc2_src)) loc) (View.singleton_ur loc ts))
                                          ::(all_join_views (View.singleton_ur loc ts) (views1 loc from))>>)>>) /\
@@ -2129,7 +2156,7 @@ Module JSim.
       set (views :=((TView.rel (write_tview)) loc)
                      ::(all_join_views (View.singleton_ur loc to) (views1 loc from))).
       set (views2 := fun (l: Loc.t) (t: Time.t) => if (loc_ts_eq_dec (l, t) (loc, to))
-                                                   then views
+                                                   then unwrap_views released_src views
                                                    else views1 l t).
 
       assert (NOATTACH: forall ts msg
@@ -2195,7 +2222,7 @@ Module JSim.
                 { eapply joined_view_incl; eauto. i. ss. auto. }
                 { eapply joined_view_exact; ss; auto. }
               + erewrite View.join_bot_l. eapply joined_view_exact; ss; auto.
-            - i. right. eapply all_join_views_in; eauto.
+            - i. rewrite H2. ss. right. eapply all_join_views_in; eauto.
           }
           destruct (loc_ts_eq_dec (loc0, from0) (loc, to)).
           { guardH o. ss. des; subst. exfalso. eauto. }
@@ -2205,7 +2232,8 @@ Module JSim.
           + guardH o. exploit ONLY; eauto. i. des.
             eapply Memory.add_get1 in GET; eauto.
         - i. unfold views2. destruct (loc_ts_eq_dec (loc0, ts) (loc, to)).
-          + unfold views. ss. des; subst. unfold views. econs.
+          + unfold views. ss. des; subst.
+            destruct released_src; ss. unfold views. econs.
             * inv RELEASED_CLOSED. ss.
             * eapply all_join_views_closed.
               { eapply Memory.singleton_ur_closed_view.
@@ -2233,7 +2261,8 @@ Module JSim.
       - eauto.
       - eapply sim_memory_add; cycle 1; eauto.
       - eauto.
-      - unfold views2. ii. condtac; auto. ss. des; subst.
+      - unfold views2. ii. condtac; auto. destruct released_src; ss.
+        ss. des; subst.
         inv WF_TVIEW. ss. econs; auto.
         eapply all_join_views_wf; eauto. eapply View.singleton_ur_wf.
       - unfold views2. ii. ss.
@@ -2253,17 +2282,19 @@ Module JSim.
             exfalso. eapply Time.lt_strorder. etrans; eauto.
           }
       - unfold views2. i.
-        destruct (loc_ts_eq_dec (loc0, ts) (loc, to)); ss. des. subst. splits.
-        + inv JOINMEM1. apply NNPP. ii.
+        destruct (loc_ts_eq_dec (loc0, ts) (loc, to)); ss. des. subst.
+        assert (NIL: [] = views1 loc to).
+        { inv JOINMEM1. apply NNPP. ii.
           hexploit ONLY; eauto. i. des.
-          eapply Memory.add_get0 in MEM_SRC. des. rewrite GET in *. ss.
-        + unfold views. esplits; eauto.
-          * eapply Memory.add_get0 in MEM_SRC. des. eauto.
-          * eapply Memory.add_get0; eauto.
-          * f_equal. symmetry. eapply View.le_join_l.
-            setoid_rewrite LocFun.add_spec_eq. condtac.
-            { eapply View.join_r. }
-            { eapply View.join_r. }
+          eapply Memory.add_get0 in MEM_SRC. des. rewrite GET in *. ss. }
+        splits; ss. destruct released_src; ss.
+        unfold views. esplits; eauto.
+        * eapply Memory.add_get0 in MEM_SRC. des. eauto.
+        * eapply Memory.add_get0; eauto.
+        * f_equal. symmetry. eapply View.le_join_l.
+          setoid_rewrite LocFun.add_spec_eq. condtac.
+          { eapply View.join_r. }
+          { eapply View.join_r. }
       - inv SIMMSG. eauto.
     }
 
@@ -2272,7 +2303,7 @@ Module JSim.
       set (views :=((TView.rel (write_tview)) loc)
                      ::(all_join_views (View.singleton_ur loc to) (views1 loc from))).
       set (views2 := fun (l: Loc.t) (t: Time.t) => if (loc_ts_eq_dec (l, t) (loc, to))
-                                                   then views
+                                                   then unwrap_views released_src views
                                                    else views1 l t).
 
       assert (exists msg3_src,
@@ -2315,14 +2346,14 @@ Module JSim.
                 { eapply joined_view_incl; eauto. i. ss. auto. }
                 { eapply joined_view_exact; ss; auto. }
               + erewrite View.join_bot_l. eapply joined_view_exact; ss; auto.
-            - i. right. eapply all_join_views_in; eauto.
+            - i. rewrite H2. ss. right. eapply all_join_views_in; eauto.
           }
           destruct (loc_ts_eq_dec (loc0, ts) (loc, ts3)).
           { ss. des; subst; ss. inv GET.
             destruct (loc_ts_eq_dec (loc, from0) (loc, from0)); cycle 1.
             { ss. des; ss. }
             hexploit (COMPLETE loc ts3); eauto. i. des. splits; auto.
-            unfold views. i. ss. des; subst.
+            unfold views. i. destruct released_src; ss. des; subst.
             - inv LOCAL1. ss. exploit REL1; eauto. i.
               setoid_rewrite LocFun.add_spec_eq. condtac.
               + exploit RELEASE_SRC; eauto. i. subst. ss.
@@ -2353,7 +2384,7 @@ Module JSim.
           + guardH o. exploit ONLY; eauto. i. des.
             eapply Memory.split_get1 in GET; eauto. des. eauto.
         - i. unfold views2. destruct (loc_ts_eq_dec (loc0, ts) (loc, to)).
-          + unfold views. ss. des; subst. econs.
+          + unfold views. ss. destruct released_src; ss. des; subst. econs.
             * inv TVIEW_CLOSED. setoid_rewrite LocFun.add_spec_eq. condtac.
               { eapply Memory.join_closed_view.
                 - eapply Memory.split_closed_view; eauto.
@@ -2401,7 +2432,8 @@ Module JSim.
       - auto.
       - eapply sim_memory_split; cycle 1; eauto.
       - eauto.
-      - unfold views2. ii. condtac; auto. ss. des; subst.
+      - unfold views2. ii. condtac; auto. destruct released_src; ss.
+        ss. des; subst.
         inv WF_TVIEW. ss. econs; auto.
         eapply all_join_views_wf; eauto. eapply View.singleton_ur_wf.
       - unfold views2. ii. ss.
@@ -2431,10 +2463,12 @@ Module JSim.
         }
 
       - unfold views2. i.
-        destruct (loc_ts_eq_dec (loc0, ts) (loc, to)); ss. des. subst. splits.
-        + inv JOINMEM1. apply NNPP. ii.
+        destruct (loc_ts_eq_dec (loc0, ts) (loc, to)); ss. des. subst.
+        assert (NIL: [] = views1 loc to).
+        { inv JOINMEM1. apply NNPP. ii.
           hexploit ONLY; eauto. i. des.
-          eapply Memory.split_get0 in MEM_SRC. des. rewrite GET in *. ss.
+          eapply Memory.split_get0 in MEM_SRC. des. rewrite GET in *. ss. }
+        splits; auto. destruct released_src; ss.
         + unfold views. esplits; eauto.
           * eapply Memory.split_get0 in MEM_SRC. des. eauto.
           * eapply Memory.split_get0; eauto.
