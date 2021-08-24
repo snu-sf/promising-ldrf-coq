@@ -37,6 +37,10 @@ Module Perm.
     end.
 End Perm.
 
+Module Perms.
+  Definition t := Loc.t -> Perm.t.
+End Perms.
+
 Module Flag.
   Variant t :=
   | unwritten
@@ -61,7 +65,11 @@ Module Flag.
   Qed.
 End Flag.
 
-Definition Perms := Loc.t -> Perm.t.
+
+Module Flags.
+  Definition t := Loc.t -> Flag.t.
+End Flags.
+
 
 Module SeqCell.
    Definition t := (Const.t * Flag.t)%type.
@@ -167,7 +175,7 @@ Section LANG.
         memory: SeqMemory.t;
       }.
 
-  Variant na_local_step (p: Perms):
+  Variant na_local_step (p: Perms.t):
     forall (e: MachineEvent.t)
            (pe: ProgramEvent.t)
            (m0: SeqMemory.t)
@@ -218,7 +226,7 @@ Section LANG.
         m m
   .
 
-  Variant na_step (p: Perms): MachineEvent.t -> t -> t -> Prop :=
+  Variant na_step (p: Perms.t): MachineEvent.t -> t -> t -> Prop :=
   | na_step_intro
       st0 st1 m0 m1 e pe
       (LANG: lang.(Language.step) pe st0 st1)
@@ -227,7 +235,7 @@ Section LANG.
       na_step p e (mk st0 m0) (mk st1 m1)
   .
 
-  Variant na_opt_step (p: Perms): MachineEvent.t -> t -> t -> Prop :=
+  Variant na_opt_step (p: Perms.t): MachineEvent.t -> t -> t -> Prop :=
   | na_opt_step_some
       e st0 st1
       (STEP: na_step p e st0 st1)
@@ -268,7 +276,7 @@ Definition update_mem
     | diff_acq v | diff_reset v => (v, Flag.unwritten)
     end.
 
-Definition update_perm (d: diffs) (p0: Perms): Perms :=
+Definition update_perm (d: diffs) (p0: Perms.t): Perms.t :=
   fun loc =>
     match (d loc) with
     | diff_rlx | diff_reset _ => p0 loc
@@ -280,7 +288,7 @@ Definition match_mem (k: kept) (mem_src mem_tgt: SeqMemory.t) :=
   forall loc, k loc \/ SeqCell.le (mem_src loc) (mem_tgt loc).
 
 
-Definition wf_diff_perms (d: diffs) (p: Perms): Prop :=
+Definition wf_diff_perms (d: diffs) (p: Perms.t): Prop :=
   forall loc,
     match (d loc), (p loc) with
     | diff_rlx, _ => True
@@ -351,7 +359,7 @@ Module Oracle.
   Definition t: Type. Admitted.
 
   Definition step:
-    forall (p0: Perms)
+    forall (p0: Perms.t)
            (e: ProgramEvent.t)
            (d: diffs)
            (o0: t)
@@ -396,7 +404,7 @@ Section LANG.
   Record t :=
     mk {
         state: SeqState.t lang;
-        perm: Perms;
+        perm: Perms.t;
         oracle: Oracle.t;
       }.
 
@@ -472,16 +480,16 @@ Section SIMULATION.
   Variant _sim_seq
           (sim_seq:
              forall
-               (p0: Perms)
+               (p0: Perms.t)
                (st_src0: SeqState.t lang_src)
                (st_tgt0: SeqState.t lang_tgt), Prop)
     :
       forall
-        (p0: Perms)
+        (p0: Perms.t)
         (st_src0: SeqState.t lang_src)
         (st_tgt0: SeqState.t lang_tgt), Prop :=
   | sim_seq_intro
-      (p0: Perms)
+      (p0: Perms.t)
       (st_src0: SeqState.t lang_src)
       (st_tgt0: SeqState.t lang_tgt)
       (TERMINAL:
@@ -503,7 +511,6 @@ Section SIMULATION.
                 (ATOMIC: is_atomic_event e),
          exists k st_src1 st_src2,
            (<<MEM: match_mem k st_src1.(SeqState.memory) st_tgt0.(SeqState.memory)>>) /\
-           (<<FLAG: is_acq_event
            (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
            (<<STEP: lang_src.(Language.step) e st_src1.(SeqState.state) st_src2>>) /\
            (<<SIM: forall d
@@ -517,7 +524,7 @@ Section SIMULATION.
     :
       _sim_seq sim_seq p0 st_src0 st_tgt0
   | sim_seq_failure
-      (p0: Perms)
+      (p0: Perms.t)
       (st_src0: SeqState.t lang_src)
        (st_tgt0: SeqState.t lang_tgt)
       (FAILURE: forall o (WF: Oracle.wf o),
