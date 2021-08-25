@@ -88,6 +88,47 @@ Proof.
   { apply View.bot_spec. }
 Qed.
 
+
+Lemma max_readable_view_mon mem prom tvw0 tvw1 loc ts val
+      (MAX: max_readable mem prom loc ts val)
+      (TS: tvw0.(TView.cur).(View.pln) loc = ts)
+      (TVIEW: TView.le tvw0 tvw1)
+      (CONS: Local.promise_consistent (Local.mk tvw1 prom))
+      (WF: Local.wf (Local.mk tvw1 prom) mem)
+  :
+    max_readable mem prom loc (tvw1.(TView.cur).(View.pln) loc) val.
+Proof.
+  subst. replace (tvw1.(TView.cur).(View.pln) loc) with (tvw0.(TView.cur).(View.pln) loc); auto.
+  apply TimeFacts.antisym.
+  { apply TVIEW. }
+  destruct (Time.le_lt_dec (tvw1.(TView.cur).(View.pln) loc) (tvw0.(TView.cur).(View.pln) loc)); auto.
+  inv MAX. inv WF.
+  inv TVIEW_CLOSED. inv CUR. specialize (PLN loc). des.
+  exploit MAX0; eauto; ss.
+  i. exploit CONS; eauto; ss. i.
+  exfalso. eapply Time.lt_strorder.
+  eapply TimeFacts.lt_le_lt; [eapply x0|]. eapply TVIEW_WF.
+Qed.
+
+Lemma non_max_readable_future mem0 mem1 prom tvw loc ts
+      (MAX: forall val, ~ max_readable mem0 prom loc ts val)
+      (TS: tvw.(TView.cur).(View.pln) loc = ts)
+      (FUTURE: Memory.future_weak mem0 mem1)
+      (WF: Local.wf (Local.mk tvw prom) mem0)
+  :
+    forall val, ~ max_readable mem1 prom loc ts val.
+Proof.
+  subst. ii. inv H.
+  inv WF. inv TVIEW_CLOSED. inv CUR. specialize (PLN loc). des. ss.
+  hexploit Memory.future_weak_get1; eauto; ss. i. des.
+  inv MSG_LE. eapply MAX. econs; eauto. i.
+  hexploit Memory.future_weak_get1; eauto; ss. i. des.
+  exploit MAX0; eauto.
+  { inv MSG_LE; ss. }
+  i. eapply PROMISES in x. clarify. auto.
+Qed.
+
+
 Lemma max_readable_read_only mem prom tvw loc ts val
       ts' val' released lc
       (MAX: max_readable mem prom loc ts val)
@@ -148,6 +189,7 @@ Proof.
   i. clarify.
 Admitted.
 
+
 Lemma max_readable_read mem prom tvw loc ts val
       (MAX: max_readable mem prom loc ts val)
       (TS: tvw.(TView.cur).(View.pln) loc = ts)
@@ -161,6 +203,404 @@ Proof.
   ss. f_equal. rewrite read_tview_max; auto. apply WF.
 Qed.
 
+
+Variant fulfilled_memory (loc: Loc.t) (mem0 mem1: Memory.t): Prop :=
+| fulfilled_memory_intro
+    (OTHER: forall loc' (NEQ: loc' <> loc) to,
+        Memory.get loc' to mem1 = Memory.get loc' to mem0)
+    (GET: forall to from msg1
+                 (GET: Memory.get loc to mem1 = Some (from, msg1)),
+        exists msg0,
+          (<<GET: Memory.get loc to mem0 = Some (from, msg0)>>) /\
+          (<<MSG_LE: Message.le msg1 msg0>>))
+.
+
+Program Instance fulfilled_memory_PreOrder loc: PreOrder (fulfilled_memory loc).
+Next Obligation.
+Proof.
+  ii. econs; eauto. i. exists msg1. splits; auto. refl.
+Qed.
+Next Obligation.
+Proof.
+  ii. inv H. inv H0. econs.
+  { i. transitivity (Memory.get loc' to y); eauto. }
+  { i. exploit GET0; eauto. i. des.
+    exploit GET; eauto. i. des. esplits; eauto. etrans; eauto. }
+Qed.
+
+Lemma fulfilled_memory_lower loc from to msg0 msg1 mem0 mem1
+      (LOWER: Memory.lower mem0 loc from to msg0 msg1 mem1)
+  :
+    fulfilled_memory loc mem0 mem1.
+Proof.
+  econs.
+  { i. erewrite (@Memory.lower_o mem1); eauto. des_ifs. des; clarify. }
+  { i. erewrite (@Memory.lower_o mem1) in GET; eauto. des_ifs.
+    { ss. des; clarify.
+      eapply Memory.lower_get0 in LOWER. des. esplits; eauto. }
+    { ss. des; clarify. esplits; eauto. refl. }
+  }
+Qed.
+
+Lemma fulfilled_memory_cancel loc from to msg mem0 mem1
+      (CANCEL: Memory.remove mem0 loc from to msg mem1)
+  :
+    fulfilled_memory loc mem0 mem1.
+Proof.
+  econs.
+  { i. erewrite (@Memory.remove_o mem1); eauto. des_ifs. des; clarify. }
+  { i. erewrite (@Memory.remove_o mem1) in GET; eauto. des_ifs.
+    ss. des; clarify. esplits; eauto. refl. }
+Qed.
+
+Lemma fulfilled_memory_max_ts loc mem0 mem1
+      (INHABITED: Memory.inhabited mem1)
+      (FULFILLED: fulfilled_memory loc mem0 mem1)
+  :
+    Time.le (Memory.max_ts loc mem1) (Memory.max_ts loc mem0).
+Proof.
+  specialize (INHABITED loc).
+  apply Memory.max_ts_spec in INHABITED. des.
+  apply FULFILLED in GET. des.
+  apply Memory.max_ts_spec in GET0. des. auto.
+Qed.
+
+Lemma fulfilled_memory_get0 loc mem0 mem1
+      (FULFILLED: fulfilled_memory loc mem0 mem1)
+      l to from msg1
+      (GET: Memory.get l to mem1 = Some (from, msg1))
+  :
+    exists msg0,
+      (<<GET: Memory.get l to mem0 = Some (from, msg0)>>) /\
+      (<<MSG_LE: Message.le msg1 msg0>>).
+Proof.
+  destruct (Loc.eq_dec l loc).
+  { subst. eapply FULFILLED in GET. des. eauto. }
+  { inv FULFILLED. rewrite OTHER in GET; auto.
+    esplits; eauto. refl. }
+Qed.
+
+Lemma fulfilled_memory_get1 loc mem0 mem1
+      (FULFILLED: fulfilled_memory loc mem0 mem1)
+      (FUTURE: Memory.future mem0 mem1)
+      l to from msg0
+      (GET: Memory.get l to mem0 = Some (from, msg0))
+      (RESERVE: msg0 <> Message.reserve)
+  :
+    exists msg1,
+      (<<GET: Memory.get l to mem1 = Some (from, msg1)>>) /\
+      (<<MSG_LE: Message.le msg1 msg0>>).
+Proof.
+  dup GET. eapply Memory.future_get1 in GET; eauto. des.
+  dup GET1. destruct (Loc.eq_dec l loc).
+  { subst. eapply FULFILLED in GET2. des. clarify. eauto. }
+  { inv FULFILLED. rewrite OTHER in GET2; auto. clarify. eauto. }
+Qed.
+
+Lemma remove_reserves_loc prom0 mem0 loc
+      (MLE: Memory.le prom0 mem0)
+      (FIN: Memory.finite prom0)
+      (INHABITED: Memory.inhabited mem0)
+  :
+    exists prom1 mem1,
+      (<<RESERVE: reserve_future_memory prom0 mem0 prom1 mem1>>) /\
+      (<<MEM: fulfilled_memory loc mem0 mem1>>) /\
+      (<<RESERVE: forall to from msg
+                         (GET: Memory.get loc to prom1 = Some (from, msg)),
+          msg <> Message.reserve>>) /\
+      (<<PROMISES: forall loc' to,
+          Memory.get loc' to prom1 =
+          if Loc.eq_dec loc' loc
+          then match (Memory.get loc' to prom0) with
+               | Some (from, Message.reserve) => None
+               | x => x
+               end
+          else Memory.get loc' to prom0>>) /\
+      (<<INHABITED: Memory.inhabited mem1>>).
+Proof.
+  hexploit (wf_cell_msgs_exists (prom0 loc)). i. des. clear WFMSGS.
+  hexploit (@list_filter_exists _ (fun '(_, _, msg) => msg = Message.reserve) l).
+  i. des.
+  assert (exists rs,
+             forall from to (GET: Memory.get loc to prom0 = Some (from, Message.reserve)),
+               List.In to rs).
+  { exists (List.map (snd <*> fst) l').  i.
+    hexploit (proj1 (COMPLETE0 (from, to, Message.reserve))).
+    { split; auto. apply COMPLETE. auto. }
+    i. eapply List.in_map with (f:=(snd <*> fst)) in H. auto.
+  }
+  clear l l' COMPLETE COMPLETE0. des. ginduction rs.
+  { i. exists prom0, mem0. splits.
+    { econs. }
+    { refl. }
+    { ii. subst. eapply H in GET; eauto. }
+    { i. des_ifs. hexploit H; eauto. ss. }
+    { auto. }
+  }
+  { i. destruct (classic (exists from, Memory.get loc a prom0 = Some (from, Message.reserve))).
+    { des.
+      hexploit (@Memory.remove_exists prom0 loc from a Message.reserve); auto.
+      i. des.
+      hexploit (@Memory.remove_exists_le prom0 mem0); eauto. i. des.
+      assert (REMOVE: Memory.promise prom0 mem0 loc from a Message.reserve mem2 mem1 Memory.op_kind_cancel).
+      { econs; eauto. }
+      hexploit (IHrs mem2 mem1 loc); auto.
+      { eapply promise_memory_le; eauto. }
+      { eapply Memory.remove_finite; eauto. }
+      { apply Memory.promise_inhabited in REMOVE; auto. }
+      { i. erewrite Memory.remove_o in GET; eauto. des_ifs.
+        ss. des; clarify. apply H in GET. des; clarify. }
+      { i. des. exists prom1, mem3. splits.
+        { econs; eauto. }
+        { etrans; eauto. eapply fulfilled_memory_cancel; eauto. }
+        { auto. }
+        { i. rewrite PROMISES.
+          erewrite (@Memory.remove_o mem2); eauto.
+          des_ifs; ss; des; clarify.
+        }
+        { auto. }
+      }
+    }
+    { eapply (IHrs prom0 mem0 loc); eauto. i.
+      hexploit H; eauto. i. ss. des; clarify.
+      exfalso. eapply H0. eauto.
+    }
+  }
+Qed.
+
+Lemma max_readable_na_write mem0 prom0 loc ts from to val1
+      (WF: Memory.le prom0 mem0)
+      (BOT: Memory.bot_none prom0)
+      (RESERVE: forall to' from' msg'
+                       (GET: Memory.get loc to' prom0 = Some (from', msg')),
+          (<<RESERVE: msg' <> Message.reserve>>) /\
+          (<<TS: Time.le ts from'>>))
+      (CLOSED: __guard__ (exists from' msg',
+                             (<<GET: Memory.get loc ts mem0 = Some (from', msg')>>) /\ (<<RESERVE: msg' <> Message.reserve>>)))
+      (FROM: Time.le (Memory.max_ts loc mem0) from)
+      (TO: Time.lt from to)
+  :
+    exists mem1 prom1 mem2,
+      (<<MEM: fulfilled_memory loc mem0 mem1>>) /\
+      (<<ADD: Memory.add mem1 loc from to (Message.concrete val1 None) mem2>>) /\
+      (<<PROMISES: forall loc' ts',
+          Memory.get loc' ts' prom1 =
+          if Loc.eq_dec loc' loc
+          then None
+          else Memory.get loc' ts' prom0>>) /\
+      (<<WRITE: Memory.write_na ts prom0 mem0 loc from to val1 prom1 mem2 Memory.op_kind_add>>) /\
+      (<<MAX: Memory.max_ts loc mem2 = to>>)
+.
+Proof.
+  hexploit (wf_cell_msgs_exists (prom0 loc)). i. des.
+  red in WFMSGS. des.
+  cut (List.Forall (fun '(from', _, msg) => (<<RESERVE: msg <> Message.reserve>>) /\ (<<TS: Time.le ts from'>>)) l); cycle 1.
+  { eapply List.Forall_forall.
+    intros [[from' to'] msg]. ii. subst.
+    eapply COMPLETE in H. eapply RESERVE in H. auto. }
+  clear RESERVE. intros RESERVE.
+  ginduction l.
+  { i. exists mem0, prom0.
+    hexploit (@Memory.add_exists mem0 loc from to (Message.concrete val1 None)); eauto.
+    { ii. eapply Memory.max_ts_spec in GET2. des.
+      inv LHS. inv RHS. ss. eapply Time.lt_strorder.
+      eapply TimeFacts.le_lt_lt.
+      { eapply FROM. }
+      eapply TimeFacts.lt_le_lt.
+      { eapply FROM0. }
+      etrans.
+      { eapply TO1. }
+      auto.
+    }
+    i. des.
+    hexploit (@Memory.add_exists_le prom0 mem0); eauto.
+    i. des. exists mem2. splits; eauto.
+    { refl. }
+    { i. des_ifs. destruct (Memory.get loc ts' prom0) as [[]|] eqn:EQ; auto.
+      exfalso. eapply COMPLETE in EQ. ss. }
+    { econs 1.
+      { red in CLOSED. des. eapply Memory.max_ts_spec in GET. des.
+        eapply TimeFacts.le_lt_lt.
+        { eapply MAX. }
+        eapply TimeFacts.le_lt_lt.
+        { eapply FROM. }
+        { eapply TO. }
+      }
+      { econs.
+        { econs; eauto.
+          { econs; ss. apply Time.bot_spec. }
+          { i. hexploit memory_get_ts_le; [apply GET|]. i.
+            apply Memory.max_ts_spec in GET. des.
+            eapply Time.lt_strorder.
+            eapply TimeFacts.le_lt_lt.
+            { eapply H1. }
+            eapply TimeFacts.le_lt_lt.
+            { eapply MAX. }
+            eapply TimeFacts.le_lt_lt.
+            { eapply FROM. }
+            { auto. }
+          }
+        }
+        { hexploit (@Memory.remove_exists promises2).
+          { eapply Memory.add_get0; eauto. }
+          i. des. hexploit MemoryMerge.add_remove; [apply H0|apply H1|].
+          i. subst. auto.
+        }
+      }
+    }
+    { dup H. eapply Memory.add_get0 in H. des.
+      apply Memory.max_ts_spec in GET0. des.
+      apply TimeFacts.antisym; auto.
+      erewrite Memory.add_o in GET1; eauto. des_ifs.
+      { ss. des; clarify. }
+      { ss. des; clarify.
+        apply Memory.max_ts_spec in GET1. des.
+        etrans; eauto. etrans; eauto. left. auto.
+      }
+    }
+  }
+  { i. inv DISJOINT. inv MSGSWF.
+    hexploit (proj2 (COMPLETE from0 to0 msg)).
+    { left. auto. }
+    i. red in H. des.
+    { subst. exfalso.
+      specialize (BOT loc). unfold Memory.get in BOT. rewrite BOT in H. clarify.
+    }
+    inv RESERVE. des.
+    assert (exists msg',
+               (<<MSG_LE: Message.le msg' msg>>) /\
+               (<<MSG_EX: __guard__ (msg' = Message.undef \/
+                                     exists val', msg' = Message.concrete val' None)>>)).
+    { destruct msg; ss.
+      { exists (Message.concrete val None). splits; auto. right. eauto. }
+      { exists Message.undef. splits; auto. left. eauto. }
+    }
+    des.
+    hexploit (@Memory.lower_exists prom0 loc from0 to0 msg msg'); auto.
+    { red in MSG_EX. des; subst; eauto. }
+    i. des.
+    hexploit (@Memory.lower_exists_le prom0 mem0); eauto.
+    i. des.
+    hexploit (@Memory.remove_exists mem2 loc from0 to0 msg').
+    { eapply Memory.lower_get0 in H0. des; auto. }
+    i. des.
+    assert (WRITE: Memory.write prom0 mem0 loc from0 to0 msg' mem3 mem1 (Memory.op_kind_lower msg)).
+    { econs; eauto. econs; eauto.
+      { red in MSG_EX. des; subst; eauto. econs. apply Time.bot_spec. }
+      { red in MSG_EX. des; subst; ss. }
+    }
+    hexploit (IHl mem1 mem3 loc to0 from to val1); auto.
+    { eapply write_promises_le; eauto. }
+    { eapply Memory.write_bot_none; eauto. }
+    { red. esplits.
+      { eapply Memory.lower_get0 in H1. des; eauto. }
+      { red in MSG_EX. des; subst; ss. }
+    }
+    { replace (Memory.max_ts loc mem1) with (Memory.max_ts loc mem0); auto.
+      dup H1. apply Memory.lower_get0 in H1. des. apply TimeFacts.antisym.
+      { apply Memory.max_ts_spec in GET. des.
+        eapply Memory.lower_get1 in GET1; eauto. des.
+        apply Memory.max_ts_spec in GET2. des. auto. }
+      { apply Memory.max_ts_spec in GET0. des.
+        erewrite Memory.lower_o in GET1; eauto. des_ifs.
+        { ss. des; clarify. apply Memory.max_ts_spec in GET. des; auto. }
+        { ss. des; clarify. apply Memory.max_ts_spec in GET1. des; auto. }
+      }
+    }
+    { i. split.
+      { i. red in H5. setoid_rewrite (@Memory.remove_o mem3) in H5; eauto.
+        erewrite (@Memory.lower_o mem2) in H5; eauto. des_ifs. ss. des; clarify.
+        apply COMPLETE in H5. des; clarify.
+      }
+      { i. hexploit (proj2 (COMPLETE from1 to1 msg0)).
+        { right. auto. }
+        i. red. setoid_rewrite (@Memory.remove_o mem3); eauto.
+        erewrite (@Memory.lower_o mem2); eauto. des_ifs. exfalso.
+        ss. eapply List.Forall_forall in HD; eauto. ss. des; subst.
+        rewrite H in *. clarify. timetac.
+      }
+    }
+    { dup H4. eapply List.Forall_forall. intros [[?from ?to] ?msg] IN. split.
+      { eapply List.Forall_forall in H4; eauto. ss. des; auto. }
+      { eapply List.Forall_forall in HD; eauto. ss. }
+    }
+    i. des. esplits.
+    { etrans; [|eauto]. eapply fulfilled_memory_lower; eauto. }
+    { eauto. }
+    { i. rewrite PROMISES. des_ifs.
+      erewrite (@Memory.remove_o mem3); eauto.
+      erewrite (@Memory.lower_o mem2); eauto. des_ifs. ss. des; clarify. }
+    { econs 2.
+      { instantiate (1:=to0). eapply TimeFacts.le_lt_lt; eauto. }
+      { eapply MSG_EX. }
+      { eauto. }
+      { eauto. }
+    }
+    { auto. }
+  }
+Qed.
+
+Lemma max_readable_na_write_step mem0 prom0 tvw0 loc ts from to val0 val1 sc
+      (MAX: max_readable mem0 prom0 loc ts val0)
+      (TS: tvw0.(TView.cur).(View.pln) loc = ts)
+      (WF: Local.wf (Local.mk tvw0 prom0) mem0)
+      (INHABITED: Memory.inhabited mem0)
+      (CONS: Local.promise_consistent (Local.mk tvw0 prom0))
+      (FROM: Time.le (Memory.max_ts loc mem0) from)
+      (TO: Time.lt from to)
+  :
+    exists mem1 mem2 mem3 prom1 prom3 tvw1,
+      (<<RESERVE: reserve_future_memory prom0 mem0 prom1 mem1>>) /\
+      (<<LOWER: fulfilled_memory loc mem0 mem2>>) /\
+      (<<ADD: Memory.add mem2 loc from to (Message.concrete val1 None) mem3>>) /\
+      (<<PROMISES: forall loc' ts',
+          Memory.get loc' ts' prom3 =
+          if Loc.eq_dec loc' loc
+          then None
+          else Memory.get loc' ts' prom0>>) /\
+      (<<WRITE: Local.write_na_step (Local.mk tvw0 prom1) sc mem1 loc from to val1 Ordering.na (Local.mk tvw1 prom3) sc mem3 Memory.op_kind_add>>) /\
+      (<<MAX: max_readable mem3 prom3 (tvw1.(TView.cur).(View.pln) loc) to val1>>) /\
+      (<<MAXTS: Memory.max_ts loc mem3 = ts>>)
+.
+Proof.
+  hexploit (@remove_reserves_loc prom0 mem0 loc).
+  { apply WF. }
+  { apply WF. }
+  { auto. }
+  i. des.
+  hexploit (@max_readable_na_write mem1 prom1 loc ts from to val1); auto.
+  { eapply reserve_future_memory_le; eauto. apply WF. }
+  { eapply reserve_future_memory_bot_none; eauto. apply WF. }
+  { i. assert (<<RESERE: msg' <> Message.reserve>> /\ <<GET: Memory.get loc to' prom0 = Some (from', msg')>>).
+    { rewrite PROMISES in GET. des_ifs. }
+    des. split; auto.
+    inv MAX. hexploit memory_get_disjoint_strong.
+    { apply WF. apply GET0. }
+    { apply GET1. }
+    i. des; clarify.
+    exploit CONS; eauto. i. ss.
+    exfalso. eapply Time.lt_strorder.
+    eapply TimeFacts.lt_le_lt.
+    { eapply x. }
+    etrans.
+    { left. apply TS0. }
+    { eapply WF. }
+  }
+  { inv MAX. eapply fulfilled_memory_get1 in GET; eauto; ss.
+    { des. esplits; eauto. red. esplits; eauto. inv MSG_LE; ss. }
+    { eapply reserve_future_future; eauto. }
+  }
+  { etrans; eauto.
+    eapply fulfilled_memory_max_ts; eauto. }
+  i. des. eexists mem1, mem2, mem3, prom1, prom2, _. splits; auto.
+  { etrans; eauto. }
+  { i. rewrite PROMISES0. rewrite PROMISES. des_ifs. }
+  { econs; ss. subst.
+
+
+    admit. }
+  { admit. }
+Admitted.
 
 Lemma non_max_readable_race mem prom tvw loc
       (MAX: forall val, ~ max_readable mem prom loc (tvw.(TView.cur).(View.pln) loc) val)
@@ -213,81 +653,3 @@ Proof.
   econs; eauto; ss. econs.
   admit.
 Admitted.
-
-
-
-  apply WF.
-
-
-
-  mem loc Ordering.na
-  )
-
-
-    False.
-
-
-
-Qed.
-
-  exploit MAX0; eauto.
-  {
-
-
-
-    (<<TS: ts' = ts>>) /\ (<<VAL: val' = val>>) /\ (<<LOCAL: lc = Local.mk tvw prom>>).
-Proof.
-
-
-    { apply WF. }
-  }
-
-  _ View.bot).
-  2:{ apply View.bot_spec. }
-  rewrite (@View.le_join_l _ View.bot).
-  2:{ apply View.bot_spec. }
-  rewrite View.le_join_l.
-  2:{ apply View.singleton_rw_spec.
-      { apply WF. }
-      { apply WF. }
-  }
-  rewrite View.le_join_l.
-  2:{ apply View.singleton_rw_spec.
-      { apply WF. }
-      { transitivity (View.rlx (TView.cur tvw) loc).
-        { apply WF. }
-        { apply WF. }
-      }
-  }
-
-        apply WF. }
-  }
-
-
-      {
-
-
-  rewrite View.le_join_l.
-  2:{ apply View.bot_spec. }
-
-
-
-
-Local.program_step
-
-  ss.
-
-  splits; auto.
-
-
-
-
-    (<<LOCAL:
-
-
-
-Lemma max_readable_read mem prom tvw loc ts val
-      (MAX: max_readable mem prom loc ts)
-      (TS: tvw.(TView.cur).(View.rlx) loc = ts)
-  :
-    Local.read_step (Local.mk prom
