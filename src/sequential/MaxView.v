@@ -740,31 +740,7 @@ Proof.
     { eapply added_memory_nil. }
     { eapply added_memory_nil. }
   }
-  { inv FORALL. s
-
-
-    i. ss.
-
-
-.
-Proof.
-
-    Lemma wf_cell_msgs_exists c
-    :
-      exists l,
-        (<<COMPLETE:
-           forall from to msg,
-             (<<GET: Cell.get to c = Some (from, msg)>>) <->
-             (<<IN: List.In (from, to, msg) l>>)>>) /\
-        (<<WFMSGS: wf_cell_msgs l>>).
-  Proof.
-
-
-
-
-      semi_closed_message
-
-
-
-
-  wf_cell_msgs_exists
+  { inv FORALL. destruct a as [[from to] msg]. des.
+    admit.
+  }
+Admitted.
