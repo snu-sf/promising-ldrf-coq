@@ -374,7 +374,7 @@ Lemma max_readable_na_write mem0 prom0 loc ts from to val1
       (RESERVE: forall to' from' msg'
                        (GET: Memory.get loc to' prom0 = Some (from', msg')),
           (<<RESERVE: msg' <> Message.reserve>>) /\
-          (<<TS: Time.le ts from'>>))
+          (<<TS: Time.lt ts to'>>))
       (CLOSED: __guard__ (exists from' msg',
                              (<<GET: Memory.get loc ts mem0 = Some (from', msg')>>) /\ (<<RESERVE: msg' <> Message.reserve>>)))
       (FROM: Time.le (Memory.max_ts loc mem0) from)
@@ -389,12 +389,13 @@ Lemma max_readable_na_write mem0 prom0 loc ts from to val1
           then None
           else Memory.get loc' ts' prom0>>) /\
       (<<WRITE: Memory.write_na ts prom0 mem0 loc from to val1 prom1 mem2 Memory.op_kind_add>>) /\
+      (<<NONE: Memory.get loc to prom1 = None>>) /\
       (<<MAX: Memory.max_ts loc mem2 = to>>)
 .
 Proof.
   hexploit (wf_cell_msgs_exists (prom0 loc)). i. des.
   red in WFMSGS. des.
-  cut (List.Forall (fun '(from', _, msg) => (<<RESERVE: msg <> Message.reserve>>) /\ (<<TS: Time.le ts from'>>)) l); cycle 1.
+  cut (List.Forall (fun '(from', to', msg) => (<<RESERVE: msg <> Message.reserve>>) /\ (<<TS: Time.lt ts to'>>)) l); cycle 1.
   { eapply List.Forall_forall.
     intros [[from' to'] msg]. ii. subst.
     eapply COMPLETE in H. eapply RESERVE in H. auto. }
@@ -448,6 +449,7 @@ Proof.
         }
       }
     }
+    { eapply Memory.add_get0; eauto. }
     { dup H. eapply Memory.add_get0 in H. des.
       apply Memory.max_ts_spec in GET0. des.
       apply TimeFacts.antisym; auto.
@@ -522,7 +524,11 @@ Proof.
     }
     { dup H4. eapply List.Forall_forall. intros [[?from ?to] ?msg] IN. split.
       { eapply List.Forall_forall in H4; eauto. ss. des; auto. }
-      { eapply List.Forall_forall in HD; eauto. ss. }
+      { eapply List.Forall_forall in HD; eauto. ss.
+        eapply List.Forall_forall in H2; eauto. ss. des.
+        { subst. eapply List.Forall_forall in H5; eauto. ss. des. inv TS1. }
+        { eapply TimeFacts.le_lt_lt; eauto. }
+      }
     }
     i. des. esplits.
     { etrans; [|eauto]. eapply fulfilled_memory_lower; eauto. }
@@ -531,11 +537,12 @@ Proof.
       erewrite (@Memory.remove_o mem3); eauto.
       erewrite (@Memory.lower_o mem2); eauto. des_ifs. ss. des; clarify. }
     { econs 2.
-      { instantiate (1:=to0). eapply TimeFacts.le_lt_lt; eauto. }
+      { instantiate (1:=to0). auto. }
       { eapply MSG_EX. }
       { eauto. }
       { eauto. }
     }
+    { auto. }
     { auto. }
   }
 Qed.
@@ -559,8 +566,9 @@ Lemma max_readable_na_write_step mem0 prom0 tvw0 loc ts from to val0 val1 sc
           then None
           else Memory.get loc' ts' prom0>>) /\
       (<<WRITE: Local.write_na_step (Local.mk tvw0 prom1) sc mem1 loc from to val1 Ordering.na (Local.mk tvw1 prom3) sc mem3 Memory.op_kind_add>>) /\
-      (<<MAX: max_readable mem3 prom3 (tvw1.(TView.cur).(View.pln) loc) to val1>>) /\
-      (<<MAXTS: Memory.max_ts loc mem3 = ts>>)
+      (<<VIEW: tvw1.(TView.cur).(View.pln) loc = to>>) /\
+      (<<MAXTS: Memory.max_ts loc mem3 = to>>) /\
+      (<<MAX: max_readable mem3 prom3 loc to val1>>)
 .
 Proof.
   hexploit (@remove_reserves_loc prom0 mem0 loc).
@@ -568,26 +576,18 @@ Proof.
   { apply WF. }
   { auto. }
   i. des.
-  hexploit (@max_readable_na_write mem1 prom1 loc ts from to val1); auto.
+  hexploit (@max_readable_na_write mem1 prom1 loc (View.rlx (TView.cur tvw0) loc) from to val1); auto.
   { eapply reserve_future_memory_le; eauto. apply WF. }
   { eapply reserve_future_memory_bot_none; eauto. apply WF. }
   { i. assert (<<RESERE: msg' <> Message.reserve>> /\ <<GET: Memory.get loc to' prom0 = Some (from', msg')>>).
     { rewrite PROMISES in GET. des_ifs. }
     des. split; auto.
-    inv MAX. hexploit memory_get_disjoint_strong.
-    { apply WF. apply GET0. }
-    { apply GET1. }
-    i. des; clarify.
-    exploit CONS; eauto. i. ss.
-    exfalso. eapply Time.lt_strorder.
-    eapply TimeFacts.lt_le_lt.
-    { eapply x. }
-    etrans.
-    { left. apply TS0. }
-    { eapply WF. }
+    exploit CONS; eauto.
   }
-  { inv MAX. eapply fulfilled_memory_get1 in GET; eauto; ss.
-    { des. esplits; eauto. red. esplits; eauto. inv MSG_LE; ss. }
+  { inv WF. inv TVIEW_CLOSED. inv CUR. ss.
+    specialize (RLX loc). des.
+    eapply fulfilled_memory_get1 in RLX; eauto; ss.
+    { des. red. esplits; eauto. inv MSG_LE; ss. }
     { eapply reserve_future_future; eauto. }
   }
   { etrans; eauto.
@@ -595,12 +595,22 @@ Proof.
   i. des. eexists mem1, mem2, mem3, prom1, prom2, _. splits; auto.
   { etrans; eauto. }
   { i. rewrite PROMISES0. rewrite PROMISES. des_ifs. }
-  { econs; ss. subst.
-
-
-    admit. }
-  { admit. }
-Admitted.
+  { econs; ss. subst. eauto. }
+  { ss. unfold TimeMap.join. replace (TimeMap.singleton loc to loc) with to.
+    { apply TimeFacts.le_join_r.
+      inv WF. inv TVIEW_CLOSED. inv CUR. ss.
+      specialize (PLN loc). des.
+      apply Memory.max_ts_spec in PLN. des.
+      etrans; eauto. etrans; eauto. left. auto.
+    }
+    { symmetry. unfold TimeMap.singleton. apply LocFun.add_spec_eq. }
+  }
+  { subst. econs.
+    { eapply Memory.add_get0; eauto. }
+    { auto. }
+    { i. eapply Memory.max_ts_spec in GET. des. timetac. }
+  }
+Qed.
 
 Lemma non_max_readable_race mem prom tvw loc
       (MAX: forall val, ~ max_readable mem prom loc (tvw.(TView.cur).(View.pln) loc) val)
@@ -653,3 +663,108 @@ Proof.
   econs; eauto; ss. econs.
   admit.
 Admitted.
+
+Lemma add_max_ts mem0 loc from to msg mem1
+      (ADD: Memory.add mem0 loc from to msg mem1)
+      (TO: Time.le (Memory.max_ts loc mem0) to)
+  :
+    Memory.max_ts loc mem1 = to.
+Proof.
+  hexploit Memory.add_get0; eauto. i. des.
+  eapply Memory.max_ts_spec in GET0. des.
+  erewrite Memory.add_o in GET1; eauto. des_ifs.
+  { ss. des; clarify. }
+  { ss. des; clarify.
+    apply Memory.max_ts_spec in GET1. des.
+    apply TimeFacts.antisym; auto. etrans; eauto.
+  }
+Qed.
+
+Variant added_memory loc msgs mem0 mem1: Prop :=
+| added_memory_intro
+    (MLE: Memory.le mem0 mem1)
+    (OTHER: forall loc' (NEQ: loc' <> loc) to, Memory.get loc' to mem1 = Memory.get loc' to mem0)
+    (COMPLETE: forall from to msg
+                      (IN: List.In (from, to, msg) msgs),
+        Memory.get loc to mem1 = Some (from, msg))
+    (SOUND: forall from to msg
+                   (GET: Memory.get loc to mem1 = Some (from, msg)),
+        (<<GET: Memory.get loc to mem0 = Some (from, msg)>>) \/
+        (<<IN: List.In (from, to, msg) msgs>>))
+.
+
+Lemma added_memory_nil loc mem
+  :
+    added_memory loc [] mem mem.
+Proof.
+  econs; eauto.
+  { refl. }
+  { i. ss. }
+Qed.
+
+Lemma added_memory_cons loc from to msg msgs mem0 mem1 mem2
+      (ADD: Memory.add mem0 loc from to msg mem1)
+      (ADDED: added_memory loc msgs mem1 mem2)
+  :
+    added_memory loc ((from, to, msg)::msgs) mem0 mem2.
+Proof.
+  inv ADDED. econs; eauto.
+  { etrans; eauto. ii. eapply Memory.add_get1 in LHS; eauto. }
+  { i. rewrite OTHER; auto.
+    erewrite (@Memory.add_o mem1); eauto. des_ifs.
+    ss. des; clarify.
+  }
+  { i. ss. des; clarify.
+    { eapply MLE. eapply Memory.add_get0; eauto. }
+    { apply COMPLETE; auto. }
+  }
+  { i. apply SOUND in GET. des; ss; auto.
+    erewrite Memory.add_o in GET0; eauto. des_ifs; auto.
+    ss. des; clarify. auto.
+  }
+Qed.
+
+Lemma add_promises_latest lang (st: lang.(Language.state)) tvw sc
+      prom0 mem0
+      loc msgs
+      (WFMSGS: wf_cell_msgs msgs)
+      (FORALL: List.Forall (fun '(from, to, msg) => (<<MAX: Time.le (Memory.max_ts loc mem0) from>>) /\ (<<TS: Time.lt from to>>) /\ (<<MSGTO: Memory.message_to msg loc to>>) /\ (<<WF: Message.wf msg>>) /\ (<<CLOSED: semi_closed_message msg mem0 loc to>>)) msgs)
+  :
+    exists prom1 mem1,
+      (<<STEPS: rtc (@Thread.tau_step lang) (Thread.mk _ st (Local.mk tvw prom0) sc mem0) (Thread.mk _ st (Local.mk tvw prom1) sc mem1)>>) /\
+      (<<MEM: added_memory loc msgs mem0 mem1>>) /\
+      (<<PROMISES: added_memory loc msgs prom0 prom1>>).
+Proof.
+  ginduction msgs; i.
+  { esplits; eauto.
+    { eapply added_memory_nil. }
+    { eapply added_memory_nil. }
+  }
+  { inv FORALL. s
+
+
+    i. ss.
+
+
+.
+Proof.
+
+    Lemma wf_cell_msgs_exists c
+    :
+      exists l,
+        (<<COMPLETE:
+           forall from to msg,
+             (<<GET: Cell.get to c = Some (from, msg)>>) <->
+             (<<IN: List.In (from, to, msg) l>>)>>) /\
+        (<<WFMSGS: wf_cell_msgs l>>).
+  Proof.
+
+
+
+
+      semi_closed_message
+
+
+
+
+  wf_cell_msgs_exists
