@@ -23,6 +23,16 @@ Definition get_machine_event (e: ProgramEvent.t): MachineEvent.t :=
   | _ => MachineEvent.silent
   end.
 
+Definition is_atomic_event (e: ProgramEvent.t): Prop :=
+  match e with
+  | ProgramEvent.silent | ProgramEvent.failure => False
+  | ProgramEvent.syscall _ | ProgramEvent.fence _ _ => True
+  | ProgramEvent.read _ _ ord => Ordering.le Ordering.plain ord
+  | ProgramEvent.write _ _ ord => Ordering.le Ordering.plain ord
+  | ProgramEvent.update _ _ _ ordr ordw =>
+    Ordering.le Ordering.plain ordr /\ Ordering.le Ordering.plain ordw
+  end.
+
 Module Perm.
   Variant t: Type :=
   | none
@@ -70,13 +80,20 @@ Module SeqCell.
    Definition t := (Const.t * Flag.t)%type.
 
 
-   Definition unflag: t -> t :=
+   Definition deflag: t -> t :=
      fun '(v, f) => (v, Flag.unwritten).
 
    (* checked at final *)
    Definition le (c0 c1: t): Prop :=
      match c0, c1 with
      | (v0, f0), (v1, f1) => v0 = v1 /\ Flag.le f0 f1
+     end.
+
+   (* checked every moment *)
+   Definition le_partial (c0 c1: t): Prop :=
+     match c0, c1 with
+     | (v0, f0), (v1, f1) =>
+       f0 = Flag.written \/ (v0 = v1 /\ Flag.le f0 f1)
      end.
 
    Program Instance le_PreOrder: PreOrder le.
@@ -89,32 +106,6 @@ Module SeqCell.
      ii. destruct x, y, z; ss.
      des. subst. splits; auto. etrans; eauto.
    Qed.
-
-
-   (* checked at acquire *)
-   Definition le_flag (c0 c1: t): Prop :=
-     match c0, c1 with
-     | (v0, f0), (v1, f1) => Flag.le f0 f1
-     end.
-
-   Program Instance le_flag_PreOrder: PreOrder le_flag.
-   Next Obligation.
-   Proof.
-     ii. destruct x; ss. refl.
-   Qed.
-   Next Obligation.
-   Proof.
-     ii. destruct x, y, z; ss.
-     des. subst. splits; auto. etrans; eauto.
-   Qed.
-
-
-   (* checked every moment *)
-   Definition le_partial (c0 c1: t): Prop :=
-     match c0, c1 with
-     | (v0, f0), (v1, f1) =>
-       f0 = Flag.written \/ (v0 = v1 /\ Flag.le f0 f1)
-     end.
 
    Program Instance le_partial_PreOrder: PreOrder le_partial.
    Next Obligation.
@@ -129,17 +120,9 @@ Module SeqCell.
      { right. split; auto. etrans; eauto. }
    Qed.
 
-
    Lemma le_le_partial c0 c1 (LE: le c0 c1)
      :
        le_partial c0 c1.
-   Proof.
-     destruct c0, c1. ss. des; auto.
-   Qed.
-
-   Lemma le_le_flag c0 c1 (LE: le c0 c1)
-     :
-       le_flag c0 c1.
    Proof.
      destruct c0, c1. ss. des; auto.
    Qed.
@@ -155,40 +138,33 @@ Module SeqMemory.
     fun loc' => if Loc.eq_dec loc' loc then (val, Flag.written) else (m loc').
 
 
-  Definition le_loc (loc: Loc.t) (m_src m_tgt: t): Prop :=
-    SeqCell.le (m_src loc) (m_tgt loc).
-
   Definition le (m_src m_tgt: t): Prop :=
     forall loc, SeqCell.le (m_src loc) (m_tgt loc).
-
-  Definition le_flag (m_src m_tgt: t): Prop :=
-    forall loc, SeqCell.le_flag (m_src loc) (m_tgt loc).
 
   Definition le_partial (m_src m_tgt: t): Prop :=
     forall loc, SeqCell.le_partial (m_src loc) (m_tgt loc).
 
+  Definition match_event (e: ProgramEvent.t) (m_src m_tgt: t): Prop :=
+    match e with
+    | ProgramEvent.silent => True
+    | ProgramEvent.read loc _ ord =>
+      (SeqCell.le (m_src loc) (m_tgt loc)) /\
+      (Ordering.le Ordering.acqrel ord -> le_partial m_src m_tgt)
+    | ProgramEvent.write loc _ _ =>
+      (SeqCell.le (m_src loc) (m_tgt loc))
+    | ProgramEvent.update loc _ _ _ _ =>
+      (SeqCell.le (m_src loc) (m_tgt loc)) /\
+      (le_partial m_src m_tgt)
+    | ProgramEvent.fence ordr ordw =>
+      (ordw = Ordering.seqcst -> le m_src m_tgt) /\
+      (Ordering.le Ordering.acqrel ordr -> le_partial m_src m_tgt)
+    | ProgramEvent.syscall _ =>
+      le m_src m_tgt
+    | ProgramEvent.failure => True
+    end.
 
-  Program Instance le_loc_PreOrder (loc: Loc.t): PreOrder (le_loc loc).
-  Next Obligation.
-  Proof.
-    ii. unfold le_loc in *. refl.
-  Qed.
-  Next Obligation.
-  Proof.
-    ii. unfold le_loc in *. etrans; eauto.
-  Qed.
 
   Program Instance le_PreOrder: PreOrder le.
-  Next Obligation.
-  Proof.
-    ii. refl.
-  Qed.
-  Next Obligation.
-  Proof.
-    ii. etrans; eauto.
-  Qed.
-
-  Program Instance le_flag_PreOrder: PreOrder le_flag.
   Next Obligation.
   Proof.
     ii. refl.
@@ -208,13 +184,16 @@ Module SeqMemory.
     ii. etrans; eauto.
   Qed.
 
-
-  Lemma le_le_loc loc m_src m_tgt (LE: le m_src m_tgt)
-    :
-      le_loc loc m_src m_tgt.
+  Program Instance match_event_PreOrder e: PreOrder (match_event e).
+  Next Obligation.
   Proof.
-    apply LE.
+    ii. destruct e; ss; splits; i; try by refl.
   Qed.
+  Next Obligation.
+  Proof.
+    ii. destruct e; ss; des; splits; i; try by (etrans; eauto).
+  Qed.
+
 
   Lemma le_le_partial m_src m_tgt (LE: le m_src m_tgt)
     :
@@ -223,11 +202,14 @@ Module SeqMemory.
     ii. eapply SeqCell.le_le_partial. auto.
   Qed.
 
-  Lemma le_le_flag m_src m_tgt (LE: le m_src m_tgt)
+  Lemma le_match_event e m_src m_tgt (LE: le m_src m_tgt)
     :
-      le_flag m_src m_tgt.
+      match_event e m_src m_tgt.
   Proof.
-    ii. eapply SeqCell.le_le_flag. auto.
+    destruct e; ss.
+    { split; auto. i. apply le_le_partial; auto. }
+    { split; auto. i. apply le_le_partial; auto. }
+    { split; auto. i. apply le_le_partial; auto. }
   Qed.
 
   Definition init (vals: Loc.t -> Const.t): t :=
@@ -324,13 +306,13 @@ Variant diff :=
 | diff_none
 | diff_acq (v: Const.t)
 | diff_rel
-| diff_unflag
+| diff_deflag
 | diff_update (v: Const.t)
 .
 
 Definition non_release_diff (d: diff): Prop :=
   match d with
-  | diff_rel | diff_unflag => False
+  | diff_rel | diff_deflag => False
   | _ => True
   end.
 
@@ -342,14 +324,14 @@ Definition update_mem
     let (v0, f0) := (m0 loc) in
     match (d loc) with
     | diff_none => (v0, f0)
-    | diff_rel | diff_unflag => (v0, Flag.unwritten)
+    | diff_rel | diff_deflag => (v0, Flag.unwritten)
     | diff_acq v1 | diff_update v1 => (v1, f0)
     end.
 
 Definition update_perm (d: diffs) (p0: Perms.t): Perms.t :=
   fun loc =>
     match (d loc) with
-    | diff_none | diff_update _ | diff_unflag => p0 loc
+    | diff_none | diff_update _ | diff_deflag => p0 loc
     | diff_acq _ => Perm.full
     | diff_rel => Perm.none
     end.
@@ -362,7 +344,7 @@ Definition wf_diff_perms (d: diffs) (p: Perms.t): Prop :=
     | diff_rel, Perm.full => True
     | diff_update _, Perm.full => True
     | diff_acq _, Perm.none => True
-    | diff_unflag, Perm.full => True
+    | diff_deflag, Perm.full => True
     | _, _ => False
     end.
 
@@ -372,7 +354,7 @@ Definition wf_diff_event (d: diffs) (e: ProgramEvent.t): Prop :=
   | ProgramEvent.read loc _ ord =>
     forall loc' (NEQ: loc' <> loc),
       match (d loc') with
-      | diff_rel | diff_update _ | diff_unflag => False
+      | diff_rel | diff_update _ | diff_deflag => False
       | diff_acq _ => Ordering.le Ordering.acqrel ord
       | diff_none => True
       end
@@ -380,14 +362,14 @@ Definition wf_diff_event (d: diffs) (e: ProgramEvent.t): Prop :=
     forall loc' (NEQ: loc' <> loc),
       match (d loc') with
       | diff_acq _ | diff_update _ => False
-      | diff_rel | diff_unflag => Ordering.le Ordering.acqrel ord
+      | diff_rel | diff_deflag => Ordering.le Ordering.acqrel ord
       | diff_none => True
       end
   | ProgramEvent.update loc _ _ ordr ordw =>
     forall loc' (NEQ: loc' <> loc),
       match (d loc') with
       | diff_update _ => False
-      | diff_rel | diff_unflag => Ordering.le Ordering.acqrel ordw
+      | diff_rel | diff_deflag => Ordering.le Ordering.acqrel ordw
       | diff_acq _ => Ordering.le Ordering.acqrel ordr
       | diff_none => True
       end
@@ -395,41 +377,12 @@ Definition wf_diff_event (d: diffs) (e: ProgramEvent.t): Prop :=
     forall loc',
       match (d loc') with
       | diff_update _ => False
-      | diff_rel | diff_unflag => Ordering.le Ordering.acqrel ordw
+      | diff_rel | diff_deflag => Ordering.le Ordering.acqrel ordw
       | diff_acq _ => Ordering.le Ordering.acqrel ordr
       | diff_none => True
       end
   | _ => True
   end.
-
-
-Definition target_loc (e: ProgramEvent.t) (loc: Loc.t): Prop :=
-  match e with
-  | ProgramEvent.syscall _ => True
-  | ProgramEvent.read loc' _ _ => loc = loc'
-  | ProgramEvent.write loc' _ _ => loc = loc'
-  | ProgramEvent.update loc' _ _ _ _ => loc = loc'
-  | _ => False
-  end.
-
-Definition is_atomic_event (e: ProgramEvent.t): Prop :=
-  match e with
-  | ProgramEvent.silent | ProgramEvent.failure => False
-  | ProgramEvent.syscall _ | ProgramEvent.fence _ _ => True
-  | ProgramEvent.read _ _ ord => Ordering.le Ordering.plain ord
-  | ProgramEvent.write _ _ ord => Ordering.le Ordering.plain ord
-  | ProgramEvent.update _ _ _ ordr ordw =>
-    Ordering.le Ordering.plain ordr /\ Ordering.le Ordering.plain ordw
-  end.
-
-Definition is_acquire_event (e: ProgramEvent.t): Prop :=
-  match e with
-  | ProgramEvent.fence ordr _ => Ordering.le Ordering.acqrel ordr
-  | ProgramEvent.read _ _ ord => Ordering.le Ordering.acqrel ord
-  | ProgramEvent.update _ _ _ _ _ => True
-  | _ => False
-  end.
-
 
 
 Module Oracle.
@@ -540,80 +493,122 @@ Section SIMULATION.
 
   Variable sim_terminal: forall (st_src:(Language.state lang_src)) (st_tgt:(Language.state lang_tgt)), Prop.
 
+  Definition sim_seq_terminal_case
+             (p0: Perms.t)
+             (st_src0: SeqState.t lang_src)
+             (st_tgt0: SeqState.t lang_tgt): Prop :=
+    forall (TERMINAL_TGT: lang_tgt.(Language.is_terminal) st_tgt0.(SeqState.state)),
+    exists st_src1,
+      (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
+      (<<TERMINAL_SRC: lang_src.(Language.is_terminal) st_src1.(SeqState.state)>>) /\
+      (<<TERMINAL: sim_terminal st_src1.(SeqState.state) st_tgt0.(SeqState.state)>>) /\
+      (<<MEM: SeqMemory.le st_src1.(SeqState.memory) st_tgt0.(SeqState.memory)>>).
+
+  Definition sim_seq_na_step_case
+             (sim_seq:
+                forall
+                  (p0: Perms.t)
+                  (st_src0: SeqState.t lang_src)
+                  (st_tgt0: SeqState.t lang_tgt), Prop)
+             (p0: Perms.t)
+             (st_src0: SeqState.t lang_src)
+             (st_tgt0: SeqState.t lang_tgt): Prop :=
+    forall st_tgt1 e (STEP_TGT: SeqState.na_step p0 e st_tgt0 st_tgt1),
+    exists st_src1 st_src2,
+      (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
+      (<<STEP: SeqState.na_opt_step p0 e st_src1 st_src2>>) /\
+      (<<SIM: sim_seq p0 st_src2 st_tgt1>>).
+
+  Definition sim_seq_at_step_case
+             (sim_seq:
+                forall
+                  (p0: Perms.t)
+                  (st_src0: SeqState.t lang_src)
+                  (st_tgt0: SeqState.t lang_tgt), Prop)
+             (p0: Perms.t)
+             (st_src0: SeqState.t lang_src)
+             (st_tgt0: SeqState.t lang_tgt): Prop :=
+    forall st_tgt1 e
+           (STEP_TGT: lang_tgt.(Language.step) e st_tgt0.(SeqState.state) st_tgt1)
+           (ATOMIC: is_atomic_event e),
+    exists st_src1 st_src2,
+      (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
+      (<<MEM: SeqMemory.match_event e st_src1.(SeqState.memory) st_tgt0.(SeqState.memory)>>) /\
+      (<<STEP: lang_src.(Language.step) e st_src1.(SeqState.state) st_src2>>) /\
+      (<<SIM: forall d
+                     (EVENT: wf_diff_event d e)
+                     (PERM: wf_diff_perms d p0),
+          (<<SIM: sim_seq (update_perm d p0)
+                          (SeqState.mk _ st_src2 (update_mem d st_src1.(SeqState.memory)))
+                          (SeqState.mk _ st_tgt1 (update_mem d st_tgt0.(SeqState.memory)))>>)>>).
+
+  Definition sim_seq_partial_case
+             (p0: Perms.t)
+             (st_src0: SeqState.t lang_src)
+             (st_tgt0: SeqState.t lang_tgt): Prop :=
+    forall o (WF: Oracle.wf o),
+    exists th,
+      (<<STEPS: rtc (SeqThread.step MachineEvent.silent) (SeqThread.mk st_src0 p0 o) th>>) /\
+      ((<<MEM: SeqMemory.le_partial th.(SeqThread.state).(SeqState.memory) st_tgt0.(SeqState.memory)>>) \/ (<<FAILURE: SeqThread.failure th>>)).
+
+  Definition sim_seq_failure_case
+             (p0: Perms.t)
+             (st_src0: SeqState.t lang_src): Prop :=
+    forall o (WF: Oracle.wf o),
+    exists th,
+      (<<STEPS: rtc (SeqThread.step MachineEvent.silent) (SeqThread.mk st_src0 p0 o) th>>) /\
+      (<<FAILURE: SeqThread.failure th>>).
+
+
   Variant _sim_seq
           (sim_seq:
              forall
                (p0: Perms.t)
                (st_src0: SeqState.t lang_src)
                (st_tgt0: SeqState.t lang_tgt), Prop)
-    :
-      forall
-        (p0: Perms.t)
-        (st_src0: SeqState.t lang_src)
-        (st_tgt0: SeqState.t lang_tgt), Prop :=
-  | sim_seq_intro
-      (p0: Perms.t)
-      (st_src0: SeqState.t lang_src)
-      (st_tgt0: SeqState.t lang_tgt)
-      (TERMINAL:
-         forall (TERMINAL_TGT: lang_tgt.(Language.is_terminal) st_tgt0.(SeqState.state)),
-         exists st_src1,
-           (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
-           (<<TERMINAL_SRC: lang_src.(Language.is_terminal) st_src1.(SeqState.state)>>) /\
-           (<<TERMINAL: sim_terminal st_src1.(SeqState.state) st_tgt0.(SeqState.state)>>) /\
-           (<<MEM: SeqMemory.le st_src1.(SeqState.memory) st_tgt0.(SeqState.memory)>>))
-      (NASTEP:
-         forall st_tgt1 e (STEP_TGT: SeqState.na_step p0 e st_tgt0 st_tgt1),
-         exists st_src1 st_src2,
-           (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
-           (<<STEP: SeqState.na_opt_step p0 e st_src1 st_src2>>) /\
-           (<<SIM: sim_seq p0 st_src2 st_tgt1>>))
-      (ATSTEP:
-         forall st_tgt1 e
-                (STEP_TGT: lang_tgt.(Language.step) e st_tgt0.(SeqState.state) st_tgt1)
-                (ATOMIC: is_atomic_event e),
-         exists st_src1 st_src2,
-           (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
-           (<<FLAG: is_acquire_event e -> SeqMemory.le_flag st_src1.(SeqState.memory) st_tgt0.(SeqState.memory)>>) /\
-           (<<MEM: forall loc (LOC: target_loc e loc),
-               SeqMemory.le_loc loc st_src1.(SeqState.memory) st_tgt0.(SeqState.memory)>>) /\
-           (<<STEP: lang_src.(Language.step) e st_src1.(SeqState.state) st_src2>>) /\
-           (<<SIM: forall d
-                          (EVENT: wf_diff_event d e)
-                          (PERM: wf_diff_perms d p0),
-               (<<SIM: sim_seq (update_perm d p0)
-                               (SeqState.mk _ st_src2 (update_mem d st_src1.(SeqState.memory)))
-                               (SeqState.mk _ st_tgt1 (update_mem d st_tgt0.(SeqState.memory)))>>)>>))
-      (PARTIAL: forall o (WF: Oracle.wf o),
-          exists th,
-            (<<STEPS: rtc (SeqThread.step MachineEvent.silent) (SeqThread.mk st_src0 p0 o) th>>) /\
-            ((<<MEM: SeqMemory.le_partial th.(SeqThread.state).(SeqState.memory) st_tgt0.(SeqState.memory)>>) \/ (<<FAILURE: SeqThread.failure th>>)))
-    :
-      _sim_seq sim_seq p0 st_src0 st_tgt0
+          (p0: Perms.t)
+          (st_src0: SeqState.t lang_src)
+          (st_tgt0: SeqState.t lang_tgt): Prop :=
+  | sim_seq_normal
+      (TERMINAL: sim_seq_terminal_case p0 st_src0 st_tgt0)
+      (NASTEP: sim_seq_na_step_case sim_seq p0 st_src0 st_tgt0)
+      (ATSTEP: sim_seq_at_step_case sim_seq p0 st_src0 st_tgt0)
+      (PARTIAL: sim_seq_partial_case p0 st_src0 st_tgt0)
   | sim_seq_failure
-      (p0: Perms.t)
-      (st_src0: SeqState.t lang_src)
-      (st_tgt0: SeqState.t lang_tgt)
-      (FAILURE: forall o (WF: Oracle.wf o),
-          exists th,
-            (<<STEPS: rtc (SeqThread.step MachineEvent.silent) (SeqThread.mk st_src0 p0 o) th>>) /\
-            (<<FAILURE: SeqThread.failure th>>))
-    :
-      _sim_seq sim_seq p0 st_src0 st_tgt0
+      (FAILURE: sim_seq_failure_case p0 st_src0)
   .
+
+  Definition sim_seq := paco3 _sim_seq bot3.
+  Arguments sim_seq: clear implicits.
 
   Lemma sim_seq_mon: monotone3 _sim_seq.
   Proof.
     ii. inv IN.
     { econs 1; eauto.
-      { i. hexploit NASTEP; eauto. i. des. esplits; eauto. }
-      { i. exploit ATSTEP; eauto. i. des. esplits; eauto.
+      { ii. exploit NASTEP; eauto. i. des. esplits; eauto. }
+      { ii. exploit ATSTEP; eauto. i. des. esplits; eauto.
         i. hexploit SIM; eauto. }
     }
     { econs 2; eauto. }
   Qed.
 
-  Definition sim_seq := paco3 _sim_seq bot3.
+
+  Lemma sim_seq_partial_imm p st_src st_tgt
+        (MEM: SeqMemory.le_partial st_src.(SeqState.memory) st_tgt.(SeqState.memory))
+    :
+      sim_seq_partial_case p st_src st_tgt.
+  Proof.
+    ii. esplits; [refl|]. left. auto.
+  Qed.
+
+  Lemma sim_seq_failure_imm p0 st_src0 st_tgt0 st_src1
+        (FAILURE: SeqState.na_step p0 MachineEvent.failure st_src0 st_src1)
+    :
+      sim_seq p0 st_src0 st_tgt0.
+  Proof.
+    pfold. right. red. i. esplits; [refl|].
+    econs. left. econs. eauto.
+  Qed.
 End SIMULATION.
 Arguments sim_seq [_] [_] _ _ _.
 #[export] Hint Resolve sim_seq_mon: paco.
