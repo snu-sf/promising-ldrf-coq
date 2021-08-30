@@ -146,6 +146,7 @@ Proof.
   exploit sim_local_racy_write; try exact STEP_TGT;
     try exact LOCAL1; try exact SC1; try exact MEM1; try refl; eauto. i. des.
   inv x0. econs; eauto.
+  inv RACE. econs; eauto.
 Qed.
 
 Lemma sim_local_racy_update_released

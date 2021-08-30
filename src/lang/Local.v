@@ -292,25 +292,26 @@ Module Local.
   .
   Hint Constructors failure_step.
 
-  Inductive racy_read_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (val:Const.t) (ord:Ordering.t): Prop :=
-  | racy_read_step_intro
+  Inductive is_racy (lc1:t) (mem1:Memory.t) (loc:Loc.t) (ord:Ordering.t): Prop :=
+  | is_racy_intro
       from to msg
       (GET: Memory.get loc to mem1 = Some (from, msg))
       (GETP: Memory.get loc to lc1.(promises) = None)
-      (RACE: TView.racy_readable lc1.(tview).(TView.cur) loc to ord)
+      (RACE: TView.racy_view lc1.(tview).(TView.cur) loc to)
       (MSG1: msg <> Message.reserve)
       (MSG2: Ordering.le Ordering.plain ord -> msg = Message.undef)
+  .
+  Hint Constructors is_racy.
+
+  Inductive racy_read_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (val:Const.t) (ord:Ordering.t): Prop :=
+  | racy_read_step_intro
+      (RACE: is_racy lc1 mem1 loc ord)
   .
   Hint Constructors racy_read_step.
 
   Inductive racy_write_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (ord:Ordering.t): Prop :=
   | racy_write_step_intro
-      from to msg
-      (GET: Memory.get loc to mem1 = Some (from, msg))
-      (GETP: Memory.get loc to lc1.(promises) = None)
-      (RACE: TView.racy_writable lc1.(tview).(TView.cur) loc to)
-      (MSG1: msg <> Message.reserve)
-      (MSG2: Ordering.le Ordering.plain ord -> msg = Message.undef)
+      (RACE: is_racy lc1 mem1 loc ord)
       (CONSISTENT: promise_consistent lc1)
   .
   Hint Constructors racy_write_step.
@@ -323,11 +324,7 @@ Module Local.
       (ORDW: Ordering.le ordw Ordering.na)
       (CONSISTENT: promise_consistent lc1)
   | racy_update_step_intro
-      from to msg
-      (GET: Memory.get loc to mem1 = Some (from, msg))
-      (GETP: Memory.get loc to lc1.(promises) = None)
-      (RACE: TView.racy_writable lc1.(tview).(TView.cur) loc to)
-      (MSG: msg = Message.undef)
+      (RACE: is_racy lc1 mem1 loc ordr)
       (CONSISTENT: promise_consistent lc1)
   .
   Hint Constructors racy_update_step.

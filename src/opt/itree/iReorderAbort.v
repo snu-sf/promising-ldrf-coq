@@ -81,7 +81,7 @@ Proof.
     + econs 2. econs; [|econs 7].
       * econs; eauto.
       * econs. ii.
-        rewrite <- TVIEW. rewrite <- PROMISES in *. eauto.
+        rewrite <- TVIEW_RLX. rewrite <- PROMISES in *. eauto.
     + ss.
   - (* store *)
     exploit (@LowerPromises.steps_promises_rel

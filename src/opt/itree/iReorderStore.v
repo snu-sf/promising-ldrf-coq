@@ -286,9 +286,10 @@ Proof.
       * ss.
     + econs 2. econs; [|econs 10].
       * econs. econs.
-      * inv RACY_WRITE. econs; eauto; try congr.
-        { inv RACE. econs. congr. }
-        { ii. rewrite <- PROMISES, <- TVIEW in *. eauto. }
+      * inv RACY_WRITE. econs.
+        { inv RACE. econs; eauto; try congr.
+          unfold TView.racy_view. rewrite <- TVIEW_PLN; ss. }
+        { ii. rewrite <- PROMISES, <- TVIEW_RLX in *. eauto. }
     + ss.
   - (* store *)
     exploit (@LowerPromises.steps_promises_rel
@@ -308,13 +309,14 @@ Proof.
       * ss.
     + econs 2. econs; [|econs 10].
       * econs. econs.
-      * inv RACY_WRITE.
+      * inv RACY_WRITE. inv RACE.
         exploit Thread.rtc_tau_step_non_promised; try exact STEPS0; eauto. s. i. des.
         exploit Local.program_step_non_promised; [econs 3|..]; try exact STEP; eauto. i. des.
+        econs; eauto.
         econs; eauto; try congr.
-        inv RACE. econs. rewrite TVIEW in TS.
+        rewrite TVIEW in RACE0.
         inv STEP. ss.
-        apply TimeFacts.join_spec_lt; auto.
+        apply TimeFacts.join_spec_lt; auto. ss.
         unfold TimeMap.singleton, Loc.LocFun.add, Loc.LocFun.init, Loc.LocFun.find. condtac; ss.
         eapply TimeFacts.le_lt_lt; eauto. apply Time.bot_spec.
     + ss.

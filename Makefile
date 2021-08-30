@@ -5,6 +5,7 @@ COQTHEORIES  := \
 	src/itree/*.v \
 	src/prop/*.v \
 	src/opt/*.v \
+	src/opt/while/*.v \
 	src/opt/itree/*.v \
 	src/gsim/*.v \
 	src/sequential/*.v \

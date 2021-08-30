@@ -1133,22 +1133,20 @@ Proof.
       * inv STEP2. left. auto.
       * right. esplits. econs; eauto.
   - (* racy read *)
-    inv LOCAL0. inv LOCAL2. ss.
+    inv LOCAL0. inv LOCAL2. inv RACE. ss.
     exploit MemoryFacts.promise_get_inv_diff; try exact PROMISE; eauto.
     { ii. inv H.
-      exploit Memory.promise_get2; try exact PROMISE; try by (destruct kind; ss). i. des.
-      congr. }
+      exploit Memory.promise_get2; try exact PROMISE; try by (destruct kind; ss). i. des. congr. }
     i. des.
     destruct (Memory.get loc0 to0 lc1.(Local.promises)) as [[]|] eqn:GETP1.
     { exploit Memory.promise_get1_promise; eauto; try by (destruct kind; ss). i. des. congr. }
     esplits; eauto. right. esplits. econs; eauto.
   - (* racy write *)
-    inv LOCAL0. inv LOCAL2. ss.
+    inv LOCAL0. inv LOCAL2. inv RACE. ss.
     hexploit promise_step_promise_consistent; eauto. i.
     exploit MemoryFacts.promise_get_inv_diff; try exact PROMISE; eauto.
     { ii. inv H0.
-      exploit Memory.promise_get2; try exact PROMISE; try by (destruct kind; ss). i. des.
-      congr. }
+      exploit Memory.promise_get2; try exact PROMISE; try by (destruct kind; ss). i. des. congr. }
     i. des.
     destruct (Memory.get loc0 to0 lc1.(Local.promises)) as [[]|] eqn:GETP1.
     { exploit Memory.promise_get1_promise; eauto; try by (destruct kind; ss). i. des. congr. }
@@ -1158,10 +1156,10 @@ Proof.
     inv LOCAL0. inv LOCAL2; ss.
     { esplits; eauto. right. esplits. econs; eauto. }
     { esplits; eauto. right. esplits. econs; eauto. }
+    inv RACE. ss.
     exploit MemoryFacts.promise_get_inv_diff; try exact PROMISE; eauto.
     { ii. inv H0.
-      exploit Memory.promise_get2; try exact PROMISE; try by (destruct kind; ss). i. des.
-      congr. }
+      exploit Memory.promise_get2; try exact PROMISE; try by (destruct kind; ss). i. des. congr. }
     i. des.
     destruct (Memory.get loc0 to0 lc1.(Local.promises)) as [[]|] eqn:GETP1.
     { exploit Memory.promise_get1_promise; eauto; try by (destruct kind; ss). i. des. congr. }

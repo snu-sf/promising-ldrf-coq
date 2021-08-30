@@ -545,6 +545,29 @@ Proof.
   hexploit sim_local_promise_consistent; eauto.
 Qed.
 
+Lemma sim_local_is_racy
+      pview
+      lc1_src mem1_src
+      lc1_tgt mem1_tgt
+      loc ord_src ord_tgt
+      (RACE_TGT: Local.is_racy lc1_tgt mem1_tgt loc ord_tgt)
+      (LOCAL1: sim_local pview lc1_src lc1_tgt)
+      (MEM1: sim_memory mem1_src mem1_tgt)
+      (WF1_SRC: Local.wf lc1_src mem1_src)
+      (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
+      (ORD: Ordering.le ord_src ord_tgt):
+  <<RACE_SRC: Local.is_racy lc1_src mem1_src loc ord_src>>.
+Proof.
+  inv RACE_TGT.
+  exploit sim_memory_get; eauto. i. des.
+  exploit SimPromises.get_None; [apply LOCAL1|..]; eauto. i. des.
+  econs; eauto.
+  - eapply TViewFacts.racy_view_mon; eauto. apply LOCAL1.
+  - inv MSG; ss.
+  - i. exploit MSG2; try by destruct ord_src, ord_tgt; inv ORD.
+    i. subst. inv MSG. ss.
+Qed.
+
 Lemma sim_local_racy_read
       pview
       lc1_src mem1_src
@@ -559,13 +582,7 @@ Lemma sim_local_racy_read
   <<STEP_SRC: Local.racy_read_step lc1_src mem1_src loc val ord_src>>.
 Proof.
   inv STEP_TGT.
-  exploit sim_memory_get; eauto. i. des.
-  exploit SimPromises.get_None; [apply LOCAL1|..]; eauto. i. des.
-  econs; eauto.
-  - eapply TViewFacts.racy_readable_mon; eauto. apply LOCAL1.
-  - inv MSG; ss.
-  - i. exploit MSG2; try by destruct ord_src, ord_tgt; inv ORD.
-    i. subst. inv MSG. ss.
+  exploit sim_local_is_racy; eauto.
 Qed.
 
 Lemma sim_local_racy_write
@@ -582,14 +599,8 @@ Lemma sim_local_racy_write
   <<STEP_SRC: Local.racy_write_step lc1_src mem1_src loc ord_src>>.
 Proof.
   inv STEP_TGT.
-  exploit sim_memory_get; eauto. i. des.
-  exploit SimPromises.get_None; [apply LOCAL1|..]; eauto. i. des.
-  econs; eauto.
-  - eapply TViewFacts.racy_writable_mon; eauto. apply LOCAL1.
-  - inv MSG; ss.
-  - i. exploit MSG2; try by destruct ord_src, ord_tgt; inv ORD.
-    i. subst. inv MSG. ss.
-  - eapply sim_local_promise_consistent; eauto.
+  exploit sim_local_is_racy; eauto. i. des.
+  hexploit sim_local_promise_consistent; eauto.
 Qed.
 
 Lemma sim_local_racy_update
@@ -607,11 +618,8 @@ Lemma sim_local_racy_update
   <<STEP_SRC: Local.racy_update_step lc1_src mem1_src loc ordr_src ordw_src>>.
 Proof.
   inv STEP_TGT; try by hexploit sim_local_promise_consistent; eauto.
-  exploit sim_memory_get; eauto. i. des. inv MSG.
-  exploit SimPromises.get_None; [apply LOCAL1|..]; eauto. i. des.
-  econs 3; eauto.
-  - eapply TViewFacts.racy_writable_mon; eauto. apply LOCAL1.
-  - eapply sim_local_promise_consistent; eauto.
+  exploit sim_local_is_racy; eauto. i. des.
+  hexploit sim_local_promise_consistent; eauto.
 Qed.
 
 Lemma sim_local_program_step

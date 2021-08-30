@@ -33,21 +33,31 @@ Lemma read_step_cur_future
       (ORD: Ordering.le ord Ordering.relaxed)
       (READ: Local.read_step lc1 mem1 loc ((TView.cur (Local.tview lc1)).(View.rlx) loc) val released ord lc2):
   <<PROMISES: (Local.promises lc1) = (Local.promises lc2)>> /\
-  <<TVIEW: (TView.cur (Local.tview lc1)).(View.rlx) = (TView.cur (Local.tview lc2)).(View.rlx)>>.
+  <<TVIEW_RLX: (TView.cur (Local.tview lc1)).(View.rlx) = (TView.cur (Local.tview lc2)).(View.rlx)>> /\
+  <<TVIEW_PLN: forall l (LOC: l <> loc),
+      (TView.cur (Local.tview lc1)).(View.pln) l = (TView.cur (Local.tview lc2)).(View.pln) l>>.
 Proof.
   destruct lc1 as [tview1 promises1]. inv READ. ss.
-  esplits; eauto. condtac; ss; try by destruct ord.
-  apply TimeMap.antisym.
-  - etrans; [|apply TimeMap.join_l]. apply TimeMap.join_l.
-  - apply TimeMap.join_spec; auto using TimeMap.bot_spec.
-    apply TimeMap.join_spec; try refl.
-    unfold View.singleton_ur_if. condtac; ss.
-    + ii. unfold TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
-      condtac; try apply Time.bot_spec.
-      subst. refl.
-    + ii. unfold TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
-      condtac; try apply Time.bot_spec.
-      subst. refl.
+  esplits; eauto.
+  - condtac; ss; try by destruct ord.
+    apply TimeMap.antisym.
+    + etrans; [|apply TimeMap.join_l]. apply TimeMap.join_l.
+    + apply TimeMap.join_spec; auto using TimeMap.bot_spec.
+      apply TimeMap.join_spec; try refl.
+      unfold View.singleton_ur_if. condtac; ss.
+      * ii. unfold TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
+        condtac; try apply Time.bot_spec.
+        subst. refl.
+      * ii. unfold TimeMap.singleton, LocFun.add, LocFun.init, LocFun.find.
+        condtac; try apply Time.bot_spec.
+        subst. refl.
+  - i. condtac; ss; try by destruct ord.
+    unfold TimeMap.join, TimeMap.bot.
+    rewrite TimeFacts.le_join_l; try apply Time.bot_spec.
+    rewrite TimeFacts.le_join_l; ss.
+    etrans; [|apply Time.bot_spec].
+    unfold View.singleton_ur_if. condtac; ss; try refl.
+    unfold TimeMap.singleton, LocFun.add, LocFun.init. condtac; ss. refl.
 Qed.
 
 Lemma fence_step_future

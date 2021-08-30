@@ -157,19 +157,15 @@ Module TView <: JoinableType.
     - apply View.join_spec; eauto.
   Qed.
 
+  Definition racy_view (view: View.t) (loc: Loc.t) (ts: Time.t): Prop :=
+    Time.lt (view.(View.pln) loc) ts.
+
   Inductive readable
             (view1:View.t) (loc:Loc.t) (ts:Time.t) (released:option View.t) (ord:Ordering.t): Prop :=
   | readable_intro
       (PLN: Time.le ((View.pln view1) loc) ts)
       (RLX: Ordering.le Ordering.relaxed ord ->
             Time.le ((View.rlx view1) loc) ts)
-  .
-
-  Inductive racy_readable (view1: View.t) (loc: Loc.t) (ts: Time.t) (ord: Ordering.t): Prop :=
-  | racy_readable_intro
-      (PLN: Time.lt (view1.(View.pln) loc) ts)
-      (RLX: Ordering.le Ordering.relaxed ord ->
-            Time.lt (view1.(View.rlx) loc) ts)
   .
 
   Definition read_tview
@@ -190,11 +186,6 @@ Module TView <: JoinableType.
             (view1:View.t) (sc1:TimeMap.t) (loc:Loc.t) (ts:Time.t) (ord:Ordering.t): Prop :=
   | writable_intro
       (TS: Time.lt ((View.rlx view1) loc) ts)
-  .
-
-  Inductive racy_writable (view1: View.t) (loc: Loc.t) (ts: Time.t): Prop :=
-  | racy_writable_intro
-      (TS: Time.lt (view1.(View.rlx) loc) ts)
   .
 
   Definition write_tview
@@ -494,6 +485,16 @@ Module TViewFacts.
     unfold TView.write_fence_sc. condtac; tac.
   Qed.
 
+  Lemma racy_view_mon
+        view1 view2 loc ts
+        (VIEW: View.le view1 view2)
+        (RACE: TView.racy_view view2 loc ts):
+    TView.racy_view view1 loc ts.
+  Proof.
+    eapply TimeFacts.le_lt_lt; eauto.
+    etrans; try apply VIEW. refl.
+  Qed.
+
   Lemma readable_mon
         view1 view2 loc ts released1 released2 ord1 ord2
         (VIEW: View.le view1 view2)
@@ -507,20 +508,6 @@ Module TViewFacts.
     - etrans; [apply VIEW|]. apply RLX. etrans; eauto.
   Qed.
 
-  Lemma racy_readable_mon
-        view1 view2 loc ts ord1 ord2
-        (VIEW: View.le view1 view2)
-        (ORD: Ordering.le ord1 ord2)
-        (RACE: TView.racy_readable view2 loc ts ord2):
-    TView.racy_readable view1 loc ts ord1.
-  Proof.
-    inv RACE. econs; eauto.
-    - eapply TimeFacts.le_lt_lt; eauto.
-      etrans; try apply VIEW. refl.
-    - i. eapply TimeFacts.le_lt_lt; [apply VIEW|].
-      apply RLX. etrans; eauto.
-  Qed.
-
   Lemma writable_mon
         view1 view2 sc1 sc2 loc ts ord1 ord2
         (VIEW: View.le view1 view2)
@@ -530,16 +517,6 @@ Module TViewFacts.
     TView.writable view1 sc1 loc ts ord1.
   Proof.
     inv WRITABLE. econs; eauto.
-    - eapply TimeFacts.le_lt_lt; try apply VIEW; auto.
-  Qed.
-
-  Lemma racy_writable_mon
-        view1 view2 loc ts
-        (VIEW: View.le view1 view2)
-        (RACE: TView.racy_writable view2 loc ts):
-    TView.racy_writable view1 loc ts.
-  Proof.
-    inv RACE. econs; eauto.
     - eapply TimeFacts.le_lt_lt; try apply VIEW; auto.
   Qed.
 

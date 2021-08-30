@@ -584,12 +584,13 @@ Proof.
           apply RegSet.add_spec. auto.
         }
       * assert (CONS: Local.promise_consistent lc2).
-        { ii. rewrite <- PROMISES, <- TVIEW in *. inv RACY_UPDATE; eauto. }
+        { ii. rewrite <- PROMISES, <- TVIEW_RLX in *. inv RACY_UPDATE; eauto. }
         inv RACY_UPDATE.
         { econs 1; eauto. }
         { econs 2; eauto. }
-        { econs 3; eauto; try congr.
-          inv RACE. econs. rewrite <- TVIEW. ss.
+        { econs 3; eauto.
+          inv RACE. econs; eauto; try congr.
+          unfold TView.racy_view. rewrite <- TVIEW_PLN; ss.
         }
     + ss.
   - (* store *)
@@ -613,12 +614,13 @@ Proof.
       * inv RACY_UPDATE.
         { econs 1; eauto. }
         { econs 2; eauto. }
-        { exploit Thread.rtc_tau_step_non_promised; try exact STEPS0; eauto. s. i. des.
+        { inv RACE.
+          exploit Thread.rtc_tau_step_non_promised; try exact STEPS0; eauto. s. i. des.
           exploit Local.program_step_non_promised; [econs 3|..]; try exact STEP; eauto. i. des.
-          econs 3; eauto; try congr.
-          inv RACE. econs. rewrite TVIEW in TS.
+          econs 3; eauto. econs; eauto; try congr.
+          rewrite TVIEW in *.
           inv STEP. ss.
-          apply TimeFacts.join_spec_lt; auto.
+          apply TimeFacts.join_spec_lt; auto. ss.
           unfold TimeMap.singleton, Loc.LocFun.add, Loc.LocFun.init, Loc.LocFun.find. condtac; ss.
           eapply TimeFacts.le_lt_lt; eauto. apply Time.bot_spec.
         }

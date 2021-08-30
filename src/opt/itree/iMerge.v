@@ -155,14 +155,11 @@ Proof.
     inv x0; try by destruct ordr, ordw; ss.
     unfold Thread.steps_failure. esplits.
     + econs 2; try refl. econs.
-      * econs. econs 2. econs; [|econs 9].
-        { econs. econs. }
-        { econs; eauto; ss. inv RACE. econs; eauto.
-          eapply TimeFacts.le_lt_lt; eauto. apply WF_SRC. }
+      * econs. econs 2. econs; [|econs 9]; eauto. econs. econs.
       * ss.
-    + econs 2. econs; [|econs 10]; eauto.
+    + econs 2. econs; [|econs 10].
       * econs. econs.
-      * econs; eauto. ss.
+      * econs; eauto. inv RACE. econs; eauto.
     + ss.
   Unshelve.
   { ss. }

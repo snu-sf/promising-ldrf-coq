@@ -212,6 +212,24 @@ Proof.
       apply View.unwrap_opt_wf. inv MSG_WF. ss.
 Qed.
 
+Lemma sim_local_is_racy_acquired
+      lc1_src mem1_src
+      lc1_tgt mem1_tgt
+      loc
+      (STEP_TGT: Local.is_racy lc1_tgt mem1_tgt loc Ordering.relaxed)
+      (LOCAL1: sim_local SimPromises.bot lc1_src lc1_tgt)
+      (MEM1: sim_memory mem1_src mem1_tgt)
+      (WF1_SRC: Local.wf lc1_src mem1_src)
+      (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
+      (MEM1_SRC: Memory.closed mem1_src)
+      (MEM1_TGT: Memory.closed mem1_tgt):
+  <<STEP_SRC: Local.is_racy lc1_src mem1_src loc Ordering.acqrel>>.
+Proof.
+  exploit sim_local_is_racy; try exact STEP_TGT;
+    try exact LOCAL1; try exact MEM1; try refl; eauto. i. des.
+  inv x0. econs; eauto.
+Qed.
+
 Lemma sim_local_racy_read_acquired
       lc1_src mem1_src
       lc1_tgt mem1_tgt
@@ -225,10 +243,8 @@ Lemma sim_local_racy_read_acquired
       (MEM1_TGT: Memory.closed mem1_tgt):
   <<STEP_SRC: Local.racy_read_step lc1_src mem1_src loc val Ordering.acqrel>>.
 Proof.
-  exploit sim_local_racy_read; try exact STEP_TGT;
-    try exact LOCAL1; try exact MEM1; try refl; eauto. i. des.
-  inv x0. econs; eauto.
-  inv RACE. econs; eauto.
+  inv STEP_TGT.
+  exploit sim_local_is_racy_acquired; eauto.
 Qed.
 
 Lemma sim_local_racy_update_acquired
@@ -250,4 +266,5 @@ Proof.
   - econs 1; eauto.
   - econs 2; eauto.
   - econs 3; eauto.
+    inv RACE. econs; eauto.
 Qed.
