@@ -141,9 +141,9 @@ Proof.
 Qed.
 
 Lemma write_na_promise_consistent
-      ts' ts promises1 mem1 loc from to val promises2 mem2 kind
+      ts' ts promises1 mem1 loc from to val promises2 mem2 msgs kind
       (TS: Time.le ts' ts)
-      (STEP: Memory.write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+      (STEP: Memory.write_na ts promises1 mem1 loc from to val promises2 mem2 msgs kind)
       (CONS: forall to' from' msg
                (PROMISE: Memory.get loc to' promises2 = Some (from', msg))
                (MSG: msg <> Message.reserve),
@@ -164,8 +164,8 @@ Proof.
 Qed.
 
 Lemma write_na_step_promise_consistent
-      lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 kind
-      (STEP: Local.write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 kind)
+      lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 msgs kind
+      (STEP: Local.write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 msgs kind)
       (CONS: Local.promise_consistent lc2):
   Local.promise_consistent lc1.
 Proof.

@@ -447,8 +447,9 @@ Module SimPromises.
         loc from to val
         ts_src promises1_src mem1_src
         ts_tgt promises1_tgt mem1_tgt promises2_tgt mem2_tgt
-        kind_tgt
-        (WRITE_TGT: Memory.write_na ts_tgt promises1_tgt mem1_tgt loc from to val promises2_tgt mem2_tgt kind_tgt)
+        msgs_tgt kind_tgt
+        (WRITE_TGT: Memory.write_na ts_tgt promises1_tgt mem1_tgt loc from to val
+                                    promises2_tgt mem2_tgt msgs_tgt kind_tgt)
         (INV1: sem bot inv promises1_src promises1_tgt)
         (SIM1: sim_memory mem1_src mem1_tgt)
         (TS: Time.le ts_src ts_tgt)
@@ -457,7 +458,8 @@ Module SimPromises.
         (MEM1_SRC: Memory.closed mem1_src)
         (MEM1_TGT: Memory.closed mem1_tgt):
     exists promises2_src mem2_src,
-      <<PROMISE_SRC: Memory.write_na ts_src promises1_src mem1_src loc from to val promises2_src mem2_src kind_tgt>> /\
+      <<PROMISE_SRC: Memory.write_na ts_src promises1_src mem1_src loc from to val
+                                     promises2_src mem2_src msgs_tgt kind_tgt>> /\
       <<INV2: sem bot inv promises2_src promises2_tgt>> /\
       <<SIM2: sim_memory mem2_src mem2_tgt>>.
   Proof.

@@ -87,13 +87,13 @@ Proof.
 Qed.
 
 Lemma merge_write_na_read
-      loc from to val ord1 ord2 kind
+      loc from to val ord1 ord2 msgs kind
       lc0 sc0 mem0
       lc1 sc1 mem1
       (WF0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
-      (STEP: Local.write_na_step lc0 sc0 mem0 loc from to val ord1 lc1 sc1 mem1 kind):
+      (STEP: Local.write_na_step lc0 sc0 mem0 loc from to val ord1 lc1 sc1 mem1 msgs kind):
   Local.read_step lc1 mem1 loc to val None ord2 lc1.
 Proof.
   inv STEP.

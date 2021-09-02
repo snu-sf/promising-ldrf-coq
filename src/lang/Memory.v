@@ -408,17 +408,22 @@ Module Memory.
 
   Inductive write_na (ts: Time.t)
                      (promises1 mem1: t) (loc: Loc.t) (from to: Time.t) (val: Const.t)
-                     (promises2 mem2: t) (kind: op_kind): Prop :=
+                     (promises2 mem2: t):
+    forall (msgs: list (Time.t * Time.t * Message.t)) (kind: op_kind), Prop :=
   | write_na_base
+      kind
       (WRITABLE: Time.lt ts to)
-      (WRITE: write promises1 mem1 loc from to (Message.concrete val None) promises2 mem2 kind)
+      (WRITE: write promises1 mem1 loc from to (Message.concrete val None) promises2 mem2 kind):
+      write_na ts promises1 mem1 loc from to val promises2 mem2 [] kind
   | write_na_write
+      msgs kind
       from' to' msg' promises' mem' kind'
       (WRITABLE_EX: Time.lt ts to')
       (MSG_EX: __guard__ (msg' = Message.undef \/
                           exists val', msg' = Message.concrete val' None))
       (WRITE_EX: write promises1 mem1 loc from' to' msg' promises' mem' kind')
-      (WRITE_NA: write_na to' promises' mem' loc from to val promises2 mem2 kind)
+      (WRITE_NA: write_na to' promises' mem' loc from to val promises2 mem2 msgs kind):
+      write_na ts promises1 mem1 loc from to val promises2 mem2 ((from', to', msg')::msgs) kind
   .
   Hint Constructors write_na.
 
@@ -843,8 +848,8 @@ Module Memory.
   Qed.
 
   Lemma write_na_inhabited
-        ts promises1 mem1 loc from to val promises2 mem2 kind
-        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        ts promises1 mem1 loc from to val promises2 mem2 msgs kind
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 msgs kind)
         (INHABITED: inhabited mem1):
     inhabited mem2.
   Proof.
@@ -929,8 +934,8 @@ Module Memory.
   Qed.
 
   Lemma write_na_bot_none
-        ts promises1 mem1 loc from to val promises2 mem2 kind
-        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        ts promises1 mem1 loc from to val promises2 mem2 msgs kind
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 msgs kind)
         (BOT: bot_none promises1):
     <<BOT: bot_none promises2>>.
   Proof.
@@ -985,9 +990,9 @@ Module Memory.
   Qed.
 
   Lemma write_na_le
-        ts promises1 mem1 loc from to val promises2 mem2 kind
+        ts promises1 mem1 loc from to val promises2 mem2 msgs kind
         (LE_PROMISES1: le promises1 mem1)
-        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind):
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 msgs kind):
     <<LE_PROMISES2: le promises2 mem2>>.
   Proof.
     induction WRITE; eauto using write_le.
@@ -1365,8 +1370,8 @@ Module Memory.
   Qed.
 
   Lemma write_na_closed
-        ts promises1 mem1 loc from to val promises2 mem2 kind
-        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        ts promises1 mem1 loc from to val promises2 mem2 msgs kind
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 msgs kind)
         (CLOSED: closed mem1):
     closed mem2.
   Proof.
@@ -1446,8 +1451,8 @@ Module Memory.
 
   Lemma write_na_closed_timemap
         times
-        ts promises1 mem1 loc from to val promises2 mem2 kind
-        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        ts promises1 mem1 loc from to val promises2 mem2 msgs kind
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 msgs kind)
         (CLOSED: closed_timemap times mem1):
     closed_timemap times mem2.
   Proof.
@@ -1456,8 +1461,8 @@ Module Memory.
 
   Lemma write_na_closed_view
         view
-        ts promises1 mem1 loc from to val promises2 mem2 kind
-        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        ts promises1 mem1 loc from to val promises2 mem2 msgs kind
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 msgs kind)
         (CLOSED: closed_view view mem1):
     closed_view view mem2.
   Proof.
@@ -1466,8 +1471,8 @@ Module Memory.
 
   Lemma write_na_closed_opt_view
         view
-        ts promises1 mem1 loc from to val promises2 mem2 kind
-        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        ts promises1 mem1 loc from to val promises2 mem2 msgs kind
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 msgs kind)
         (CLOSED: closed_opt_view view mem1):
     closed_opt_view view mem2.
   Proof.
@@ -1663,9 +1668,9 @@ Module Memory.
   Qed.
 
   Lemma write_na_get_diff
-        ts promises1 mem1 loc from to val promises2 mem2 kind
+        ts promises1 mem1 loc from to val promises2 mem2 msgs kind
         loc'
-        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 msgs kind)
         (LOC: loc' <> loc):
     forall to', get loc' to' mem2 = get loc' to' mem1.
   Proof.
@@ -1675,9 +1680,9 @@ Module Memory.
   Qed.
 
   Lemma write_na_get_diff_promise
-        ts promises1 mem1 loc from to val promises2 mem2 kind
+        ts promises1 mem1 loc from to val promises2 mem2 msgs kind
         loc'
-        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 msgs kind)
         (LOC: loc' <> loc):
     forall to', get loc' to' promises2 = get loc' to' promises1.
   Proof.
@@ -1776,8 +1781,8 @@ Module Memory.
   Qed.
 
   Lemma write_na_finite
-        ts promises1 mem1 loc from to val promises2 mem2 kind
-        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        ts promises1 mem1 loc from to val promises2 mem2 msgs kind
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 msgs kind)
         (FINITE: finite promises1):
     finite promises2.
   Proof.
@@ -1982,8 +1987,8 @@ Module Memory.
   Qed.
 
   Lemma write_na_future
-        ts promises1 mem1 loc from to val promises2 mem2 kind
-        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        ts promises1 mem1 loc from to val promises2 mem2 msgs kind
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 msgs kind)
         (CLOSED: closed mem1)
         (LE: le promises1 mem1)
         (FINITE: finite promises1)
@@ -2003,8 +2008,9 @@ Module Memory.
   Qed.
 
   Lemma write_na_disjoint
-        ts promises1 mem1 loc from to val promises2 mem2 ctx kind
-        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        ts promises1 mem1 loc from to val promises2 mem2 msgs kind
+        ctx
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 msgs kind)
         (DISJOINT: disjoint promises1 ctx)
         (LE_CTX: le ctx mem1):
     <<DISJOINT: disjoint promises2 ctx>> /\
@@ -2015,8 +2021,8 @@ Module Memory.
   Qed.
 
   Lemma write_na_promises_bot
-        ts promises1 mem1 loc from to val promises2 mem2 kind
-        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        ts promises1 mem1 loc from to val promises2 mem2 msgs kind
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 msgs kind)
         (PROMISES: promises1 = Memory.bot):
     promises2 = Memory.bot.
   Proof.
@@ -3129,9 +3135,9 @@ Module Memory.
   Qed.
 
   Lemma write_na_non_promised
-        ts promises1 mem1 loc from to val promises2 mem2 kind
+        ts promises1 mem1 loc from to val promises2 mem2 msgs kind
         l f t m
-        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 msgs kind)
         (GET: Memory.get l t mem1 = Some (f, m))
         (GETP: Memory.get l t promises1 = None):
     (<<GET: Memory.get l t mem2 = Some (f, m)>>) /\

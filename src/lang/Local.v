@@ -28,6 +28,7 @@ Module ThreadEvent.
   | silent
   | read (loc:Loc.t) (ts:Time.t) (val:Const.t) (released:option View.t) (ord:Ordering.t)
   | write (loc:Loc.t) (from to:Time.t) (val:Const.t) (released:option View.t) (ord:Ordering.t)
+  | na_write (loc:Loc.t) (msgs:list (Time.t * Time.t * Message.t)) (from to:Time.t) (val:Const.t) (released:option View.t) (ord:Ordering.t)
   | update (loc:Loc.t) (tsr tsw:Time.t) (valr valw:Const.t) (releasedr releasedw:option View.t) (ordr ordw:Ordering.t)
   | fence (ordr ordw:Ordering.t)
   | syscall (e:Event.t)
@@ -50,6 +51,7 @@ Module ThreadEvent.
     | silent => ProgramEvent.silent
     | read loc _ val _ ord => ProgramEvent.read loc val ord
     | write loc _ _ val _ ord => ProgramEvent.write loc val ord
+    | na_write loc _ _ _ val _ ord => ProgramEvent.write loc val ord
     | update loc _ _ valr valw _ _ ordr ordw => ProgramEvent.update loc valr valw ordr ordw
     | fence ordr ordw => ProgramEvent.fence ordr ordw
     | syscall ev => ProgramEvent.syscall ev
@@ -84,6 +86,7 @@ Module ThreadEvent.
   Definition is_writing (e:t): option (Loc.t * Time.t * Time.t * Const.t * option View.t * Ordering.t) :=
     match e with
     | write loc from to val released ord => Some (loc, from, to, val, released, ord)
+    | na_write loc msgs from to val released ord => Some (loc, from, to, val, released, ord)
     | update loc tsr tsw _ valw _ releasedw _ ordw => Some (loc, tsr, tsw, valw, releasedw, ordw)
     | _ => None
     end.
@@ -92,6 +95,7 @@ Module ThreadEvent.
     match e with
     | read loc ts _ _ _ => Some (loc, ts)
     | write loc _ ts _ _ _ => Some (loc, ts)
+    | na_write loc _ _ ts _ _ _ => Some (loc, ts)
     | update loc _ ts _ _ _ _ _ _ => Some (loc, ts)
     | _ => None
     end.
@@ -100,6 +104,7 @@ Module ThreadEvent.
     match e with
     | read loc _ _ _ _
     | write loc _ _ _ _ _
+    | na_write loc _ _ _ _ _ _
     | update loc _ _ _ _ _ _ _ _
     | racy_read loc _ _
     | racy_write loc _ _
@@ -263,12 +268,13 @@ Module Local.
 
   Inductive write_na_step (lc1:t) (sc1:TimeMap.t) (mem1:Memory.t)
                           (loc:Loc.t) (from to:Time.t) (val:Const.t) (ord:Ordering.t)
-                          (lc2:t) (sc2:TimeMap.t) (mem2:Memory.t) (kind:Memory.op_kind): Prop :=
+                          (lc2:t) (sc2:TimeMap.t) (mem2:Memory.t)
+                          (msgs: list (Time.t * Time.t * Message.t)) (kind:Memory.op_kind): Prop :=
   | write_na_step_intro
       promises2
       (ORD: Ordering.le ord Ordering.na)
       (WRITE: Memory.write_na (View.rlx (TView.cur (tview lc1)) loc)
-                              (promises lc1) mem1 loc from to val promises2 mem2 kind)
+                              (promises lc1) mem1 loc from to val promises2 mem2 msgs kind)
       (LC2: lc2 = mk (TView.write_tview (tview lc1) sc1 loc to ord) promises2)
       (SC2: sc2 = sc1)
   .
@@ -370,9 +376,9 @@ Module Local.
       program_step ThreadEvent.failure lc1 sc1 mem1 lc1 sc1 mem1
   | step_write_na
       lc1 sc1 mem1
-      loc from to val ord lc2 sc2 mem2 kind
-      (LOCAL: write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 kind):
-      program_step (ThreadEvent.write loc from to val None ord) lc1 sc1 mem1 lc2 sc2 mem2
+      loc from to val ord lc2 sc2 mem2 msgs kind
+      (LOCAL: write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 msgs kind):
+      program_step (ThreadEvent.na_write loc msgs from to val None ord) lc1 sc1 mem1 lc2 sc2 mem2
   | step_racy_read
       lc1 sc1 mem1
       loc val ord
@@ -474,9 +480,9 @@ Module Local.
 
   Lemma write_na_future
         tview sc ord
-        ts promises1 mem1 loc from to val promises2 mem2 kind
+        ts promises1 mem1 loc from to val promises2 mem2 msgs kind
         (ORD: Ordering.le ord Ordering.na)
-        (WRITE: Memory.write_na ts promises1 mem1 loc from to val promises2 mem2 kind)
+        (WRITE: Memory.write_na ts promises1 mem1 loc from to val promises2 mem2 msgs kind)
         (WF_TVIEW1: TView.wf tview)
         (CLOSED_TVIEW1: TView.closed tview mem1)
         (CLOSED_SC1: Memory.closed_timemap sc mem1)
@@ -514,8 +520,8 @@ Module Local.
   Qed.
 
   Lemma write_na_step_future
-        lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 kind
-        (STEP: write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 kind)
+        lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 msgs kind
+        (STEP: write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 msgs kind)
         (WF1: wf lc1 mem1)
         (SC1: Memory.closed_timemap sc1 mem1)
         (CLOSED1: Memory.closed mem1):
@@ -678,8 +684,8 @@ Module Local.
   Qed.
 
   Lemma write_na_step_disjoint
-        lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 kind lc
-        (STEP: write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 kind)
+        lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 msgs kind lc
+        (STEP: write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 msgs kind)
         (WF1: wf lc1 mem1)
         (SC1: Memory.closed_timemap sc1 mem1)
         (CLOSED1: Memory.closed mem1)
