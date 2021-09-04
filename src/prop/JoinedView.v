@@ -1033,6 +1033,13 @@ Module JSim.
       sim_event
         (ThreadEvent.write loc from to val released_src ord)
         (ThreadEvent.write loc from to val released_tgt ord)
+  | sim_event_ma_write
+      loc msgs from to val released_src released_tgt ord
+      (RELEASED: View.opt_le released_src released_tgt)
+    :
+      sim_event
+        (ThreadEvent.na_write loc msgs from to val released_src ord)
+        (ThreadEvent.na_write loc msgs from to val released_tgt ord)
   | sim_event_update
       loc tsr tsw valr valw releasedr_src releasedr_tgt releasedw_src releasedw_tgt ordr ordw
       (RELEASEDR: View.opt_le releasedr_src releasedr_tgt)
@@ -1080,7 +1087,7 @@ Module JSim.
   Hint Constructors sim_event.
 
   Global Program Instance sim_event_PreOrder: PreOrder sim_event.
-  Next Obligation. ii. destruct x; econs; eauto; refl. Qed.
+  Next Obligation. ii. destruct x; try (econs; eauto); refl. Qed.
   Next Obligation. ii. inv H; inv H0; econs; eauto; etrans; eauto. Qed.
 
   Lemma sim_event_program_event e_src e_tgt
@@ -1255,6 +1262,34 @@ Module JSim.
       exploit COMPLETE; eauto. i. des. auto.
   Qed.
 
+  Lemma sim_local_is_racy
+        views
+        lc1_src mem1_src
+        lc1_tgt mem1_tgt
+        loc ord_src ord_tgt
+        (STEP_TGT: Local.is_racy lc1_tgt mem1_tgt loc ord_tgt)
+        (LOCAL1: sim_local views lc1_src lc1_tgt)
+        (MEM1: sim_memory mem1_src mem1_tgt)
+        (WF1_SRC: Local.wf lc1_src mem1_src)
+        (WF1_TGT: Local.wf lc1_tgt mem1_tgt)
+        (MEM1_SRC: Memory.closed mem1_src)
+        (MEM1_TGT: Memory.closed mem1_tgt)
+        (JOINMEM: joined_memory views mem1_src)
+        (REL: joined_released views (Local.promises lc1_src) (TView.rel (Local.tview lc1_src)))
+        (ORD: Ordering.le ord_src ord_tgt)
+    :
+      Local.is_racy lc1_src mem1_src loc ord_src
+  .
+  Proof.
+    inv LOCAL1. inv STEP_TGT.
+    exploit sim_memory_get; try apply GET; eauto. i. des. econs; eauto.
+    { specialize (PROMISES loc to). ss. rewrite GETP in *. inv PROMISES; auto. }
+    { eapply TViewFacts.racy_view_mon; eauto.
+      ss. eapply TVIEW. }
+    { inv MSG; ss. }
+    { i. hexploit MSG2; eauto. i. subst. inv MSG; ss. }
+  Qed.
+
   Lemma sim_local_racy_read
         views
         lc1_src mem1_src
@@ -1274,13 +1309,7 @@ Module JSim.
       Local.racy_read_step lc1_src mem1_src loc val ord_src
   .
   Proof.
-    inv LOCAL1. inv STEP_TGT.
-    exploit sim_memory_get; try apply GET; eauto. i. des. econs; eauto.
-    { specialize (PROMISES loc to). ss. rewrite GETP in *. inv PROMISES; auto. }
-    { eapply TViewFacts.racy_readable_mon; eauto.
-      ss. eapply TVIEW. }
-    { inv MSG; ss. }
-    { i. hexploit MSG2; eauto. i. subst. inv MSG; ss. }
+    inv LOCAL1. inv STEP_TGT. econs; eauto. eapply sim_local_is_racy; eauto.
   Qed.
 
   Lemma sim_local_nonsynch_loc
@@ -1394,13 +1423,8 @@ Module JSim.
       Local.racy_write_step lc1_src mem1_src loc ord_src
   .
   Proof.
-    inv LOCAL1. inv STEP_TGT.
-    exploit sim_memory_get; try apply GET; eauto. i. des. econs; eauto.
-    { specialize (PROMISES loc to). ss. rewrite GETP in *. inv PROMISES; auto. }
-    { eapply TViewFacts.racy_writable_mon; eauto.
-      ss. eapply TVIEW. }
-    { inv MSG; ss. }
-    { i. hexploit MSG2; eauto. i. subst. inv MSG; ss. }
+    inv LOCAL1. inv STEP_TGT. econs; eauto.
+    { eapply sim_local_is_racy; eauto. }
     { eapply sim_local_promise_consistent; eauto. }
   Qed.
 
@@ -1433,12 +1457,8 @@ Module JSim.
       { etrans; eauto. }
       { eapply sim_local_promise_consistent; eauto. }
     }
-    { exploit sim_memory_get; try apply GET; eauto.
-      i. des. econs 3; eauto.
-      { specialize (PROMISES loc to). ss. rewrite GETP in *. inv PROMISES; auto. }
-      { eapply TViewFacts.racy_writable_mon; eauto.
-        ss. eapply TVIEW. }
-      { inv MSG; ss. }
+    { econs 3; eauto.
+      { eapply sim_local_is_racy; eauto. }
       { eapply sim_local_promise_consistent; eauto. }
     }
   Qed.
@@ -2732,9 +2752,9 @@ Module JSim.
         views1
         prom1_src mem1_src prom1_tgt mem1_tgt prom2_tgt mem2_tgt
         (loc: Loc.t)
-        from to val kind_tgt rel
+        from to val msgs kind_tgt rel
         ts_tgt ts_src
-        (STEP_TGT: Memory.write_na ts_tgt prom1_tgt mem1_tgt loc from to val prom2_tgt mem2_tgt kind_tgt)
+        (STEP_TGT: Memory.write_na ts_tgt prom1_tgt mem1_tgt loc from to val prom2_tgt mem2_tgt msgs kind_tgt)
         (MEM1: sim_memory mem1_src mem1_tgt)
         (PROM1: sim_joined_promises views1 prom1_src prom1_tgt)
         (REL1: joined_released views1 prom1_src rel)
@@ -2745,7 +2765,7 @@ Module JSim.
         (JOINED: joined_memory views1 mem1_src)
     :
       exists prom2_src mem2_src kind_src,
-        (<<STEP_SRC: Memory.write_na ts_src prom1_src mem1_src loc from to val prom2_src mem2_src kind_src>>) /\
+        (<<STEP_SRC: Memory.write_na ts_src prom1_src mem1_src loc from to val prom2_src mem2_src msgs kind_src>>) /\
         (<<MEM2: sim_memory mem2_src mem2_tgt>>) /\
         (<<JOINED: joined_memory views1 mem2_src>>) /\
         (<<PROM2: sim_joined_promises views1 prom2_src prom2_tgt>>) /\
@@ -2781,9 +2801,9 @@ Module JSim.
         lc1_tgt sc1_tgt mem1_tgt
         lc2_tgt sc2_tgt mem2_tgt
         (loc: Loc.t)
-        from to val ord_src ord_tgt kind
+        from to val ord_src ord_tgt msgs kind
         (ORD: Ordering.le ord_src ord_tgt)
-        (STEP_TGT: Local.write_na_step lc1_tgt sc1_tgt mem1_tgt loc from to val ord_tgt lc2_tgt sc2_tgt mem2_tgt kind)
+        (STEP_TGT: Local.write_na_step lc1_tgt sc1_tgt mem1_tgt loc from to val ord_tgt lc2_tgt sc2_tgt mem2_tgt msgs kind)
         (LOCAL1: sim_local views1 lc1_src lc1_tgt)
         (SC1: TimeMap.le sc1_src sc1_tgt)
         (MEM1: sim_memory mem1_src mem1_tgt)
@@ -2800,7 +2820,7 @@ Module JSim.
     :
       exists kind_src lc2_src sc2_src mem2_src,
         (<<STEP_SRC: Local.write_na_step lc1_src sc1_src mem1_src loc from to val
-                                         ord_src lc2_src sc2_src mem2_src kind_src>>) /\
+                                         ord_src lc2_src sc2_src mem2_src msgs kind_src>>) /\
         (<<LOCAL2: sim_local views1 lc2_src lc2_tgt>>) /\
         (<<SC2: TimeMap.le sc2_src sc2_tgt>>) /\
         (<<MEM2: sim_memory mem2_src mem2_tgt>>) /\
@@ -2975,7 +2995,7 @@ Module JSim.
       + hexploit sim_local_write_na_step; eauto.
         { refl. }
         i. des.
-        eexists (ThreadEvent.write _ _ _ _ _ _). esplits.
+        eexists (ThreadEvent.na_write _ _ _ _ _ _ _). esplits.
         * econs.
           { econs 2; eauto. econs; eauto. }
           { ss. }

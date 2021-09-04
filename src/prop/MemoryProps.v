@@ -1116,8 +1116,8 @@ Section MEMORYLEMMAS.
     inv PROMISE. eapply promise_include_boundary; eauto.
   Qed.
 
-  Lemma write_na_include_boundary ts prom0 mem0 loc from to val prom1 mem1 kind
-        (PROMISE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 kind)
+  Lemma write_na_include_boundary ts prom0 mem0 loc from to val prom1 mem1 msgs kind
+        (PROMISE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 msgs kind)
         (BOTNONE: Memory.bot_none prom0)
     :
       Interval.mem (from, to) to.
@@ -1144,8 +1144,6 @@ Section MEMORYLEMMAS.
         eapply promise_include_boundary; eauto.
       + inv LOCAL1. inv LOCAL2. inv WRITE. eapply WRITENOTIN; eauto.
         eapply promise_include_boundary; eauto.
-      + inv LOCAL0. eapply WRITENOTIN.
-        eapply write_na_include_boundary; eauto.
   Qed.
 
   Lemma promise_wf_event prom0 mem0 loc from to msg prom1 mem1 kind
@@ -1172,8 +1170,8 @@ Section MEMORYLEMMAS.
     inv WRITE. eapply promise_wf_event; eauto.
   Qed.
 
-  Lemma write_na_wf_event ts prom0 mem0 loc from to val prom1 mem1 kind
-        (WRITE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 kind)
+  Lemma write_na_wf_event ts prom0 mem0 loc from to val prom1 mem1 msgs kind
+        (WRITE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 msgs kind)
         (INHABITED: Memory.inhabited mem0)
     :
       Time.lt from to.
@@ -1195,7 +1193,6 @@ Section MEMORYLEMMAS.
     - inv STEP0. inv LOCAL; ss.
       + inv LOCAL0. eapply write_wf_event; eauto.
       + inv LOCAL1. inv LOCAL2. eapply write_wf_event; eauto.
-      + inv LOCAL0. eapply write_na_wf_event; eauto.
   Qed.
 
   Lemma steps_wf_event lang P (th0 th1: Thread.t lang)
@@ -1550,8 +1547,8 @@ Section UNCHANGABLES.
     eapply unchangable_remove; eauto.
   Qed.
 
-  Lemma unchangable_write_na ts mem0 prom0 loc from to val prom1 mem1 kind
-        (PROMISE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 kind)
+  Lemma unchangable_write_na ts mem0 prom0 loc from to val prom1 mem1 msgs kind
+        (PROMISE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 msgs kind)
     :
       unchangable mem0 prom0 <4= unchangable mem1 prom1.
   Proof.
@@ -1703,9 +1700,9 @@ Section UNCHANGABLES.
     inv WRITE. eapply step_write_not_in_promise; eauto.
   Qed.
 
-  Lemma step_write_na_not_in_write ts promises1 mem1 loc from1 to1 msg promises3 mem2 kind
+  Lemma step_write_na_not_in_write ts promises1 mem1 loc from1 to1 msg promises3 mem2 msgs kind
         (MLE: Memory.le promises1 mem1)
-        (WRITE: Memory.write_na ts promises1 mem1 loc from1 to1 msg promises3 mem2 kind)
+        (WRITE: Memory.write_na ts promises1 mem1 loc from1 to1 msg promises3 mem2 msgs kind)
         t
         (IN: Interval.mem (from1, to1) t)
     :
@@ -1733,7 +1730,6 @@ Section UNCHANGABLES.
     - inv STEP0; ss. inv LOCAL; ss.
       + inv LOCAL0. ii. exploit step_write_not_in_write; eauto.
       + inv LOCAL1. inv LOCAL2. ss. ii. exploit step_write_not_in_write; eauto.
-      + inv LOCAL0. ii. exploit step_write_na_not_in_write; eauto.
   Qed.
 
   Lemma unwritable_increase pf e lang (th0 th1: Thread.t lang)
@@ -2063,8 +2059,8 @@ Section PROMISED.
     inv STEP. eapply concrete_promised_increase_promise; eauto.
   Qed.
 
-  Lemma concrete_promised_increase_write_na ts promises1 mem1 loc from to msg promises2 mem2 kind
-        (STEP: Memory.write_na ts promises1 mem1 loc from to msg promises2 mem2 kind)
+  Lemma concrete_promised_increase_write_na ts promises1 mem1 loc from to msg promises2 mem2 msgs kind
+        (STEP: Memory.write_na ts promises1 mem1 loc from to msg promises2 mem2 msgs kind)
     :
       concrete_promised mem1 <2= concrete_promised mem2.
   Proof.
@@ -2200,8 +2196,8 @@ Section PROMISEFREE.
       apply Memory.remove_get0 in REMOVE. des. clarify.
   Qed.
 
-  Lemma write_na_promises_decrease ts prom0 mem0 loc from to msg prom1 mem1 kind
-        (WRITE: Memory.write_na ts prom0 mem0 loc from to msg prom1 mem1 kind)
+  Lemma write_na_promises_decrease ts prom0 mem0 loc from to msg prom1 mem1 msgs kind
+        (WRITE: Memory.write_na ts prom0 mem0 loc from to msg prom1 mem1 msgs kind)
     :
       concrete_promised prom1 <2= concrete_promised prom0.
   Proof.
@@ -2277,9 +2273,9 @@ Proof.
   - eapply promise_memory_le; eauto.
 Qed.
 
-Lemma write_na_memory_le ts prom0 mem0 loc from to msg prom1 mem1 kind
+Lemma write_na_memory_le ts prom0 mem0 loc from to msg prom1 mem1 msgs kind
       (MLE: Memory.le prom0 mem0)
-      (WRITE: Memory.write_na ts prom0 mem0 loc from to msg prom1 mem1 kind)
+      (WRITE: Memory.write_na ts prom0 mem0 loc from to msg prom1 mem1 msgs kind)
   :
     Memory.le prom1 mem1.
 Proof.
@@ -2544,8 +2540,8 @@ Section CANCEL.
   Qed.
 
   Lemma write_na_not_cancel_reserves_same
-        ts prom0 prom1 mem0 mem1 val loc from to kind
-        (WRITE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 kind)
+        ts prom0 prom1 mem0 mem1 val loc from to msgs kind
+        (WRITE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 msgs kind)
         loc' to' from'
         (GET: Memory.get loc' to' prom0 = Some (from', Message.reserve))
     :

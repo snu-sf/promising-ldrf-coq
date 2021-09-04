@@ -33,6 +33,8 @@ Makefile.coq: Makefile $(COQTHEORIES)
    echo "-R src/itree $(COQMODULE)"; \
    echo "-R src/prop $(COQMODULE)"; \
    echo "-R src/opt $(COQMODULE)"; \
+   echo "-R src/opt/while $(COQMODULE)"; \
+   echo "-R src/opt/itree $(COQMODULE)"; \
    echo "-R src/gsim $(COQMODULE)"; \
    echo "-R src/sequential $(COQMODULE)"; \
    # echo "-R src/invariant $(COQMODULE)"; \
