@@ -152,9 +152,9 @@ Module SeqMemory.
       (Ordering.le Ordering.acqrel ord -> le_partial m_src m_tgt)
     | ProgramEvent.write loc _ _ =>
       (SeqCell.le (m_src loc) (m_tgt loc))
-    | ProgramEvent.update loc _ _ _ _ =>
+    | ProgramEvent.update loc _ _ ordr _ =>
       (SeqCell.le (m_src loc) (m_tgt loc)) /\
-      (le_partial m_src m_tgt)
+      (Ordering.le Ordering.acqrel ordr -> le_partial m_src m_tgt)
     | ProgramEvent.fence ordr ordw =>
       (ordw = Ordering.seqcst -> le m_src m_tgt) /\
       (Ordering.le Ordering.acqrel ordr -> le_partial m_src m_tgt)
