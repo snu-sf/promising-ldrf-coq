@@ -358,13 +358,13 @@ Qed.
 
 Lemma lower_memory_write_na mem_src0 mem_tgt0
       (MEM: lower_memory mem_src0 mem_tgt0)
-      ts_src ts_tgt loc from to prom0 val prom1 mem_tgt1 kind_tgt
-      (WRITETGT: Memory.write_na ts_tgt prom0 mem_tgt0 loc from to val prom1 mem_tgt1 kind_tgt)
+      ts_src ts_tgt loc from to prom0 val prom1 mem_tgt1 msgs kind_tgt
+      (WRITETGT: Memory.write_na ts_tgt prom0 mem_tgt0 loc from to val prom1 mem_tgt1 msgs kind_tgt)
       (MLE: Memory.le prom0 mem_src0)
       (TS: Time.le ts_src ts_tgt)
   :
     exists mem_src1 kind_src,
-      (<<WRITESRC: Memory.write_na ts_src prom0 mem_src0 loc from to val prom1 mem_src1 kind_src>>) /\
+      (<<WRITESRC: Memory.write_na ts_src prom0 mem_src0 loc from to val prom1 mem_src1 msgs kind_src>>) /\
       (<<MEM: lower_memory mem_src1 mem_tgt1>>) /\
       (<<KIND: JSim.sim_op_kind kind_src kind_tgt>>).
 Proof.
@@ -499,16 +499,16 @@ Qed.
 
 Lemma lower_memory_na_write_step mem_src0 mem_tgt0
       (MEM: lower_memory mem_src0 mem_tgt0)
-      lc_src0 lc_tgt0 sc_tgt0 loc from to val ord lc_tgt1 sc_tgt1 mem_tgt1 kind_tgt
+      lc_src0 lc_tgt0 sc_tgt0 loc from to val ord lc_tgt1 sc_tgt1 mem_tgt1 msgs kind_tgt
       sc_src0
-      (STEP: Local.write_na_step lc_tgt0 sc_tgt0 mem_tgt0 loc from to val ord lc_tgt1 sc_tgt1 mem_tgt1 kind_tgt)
+      (STEP: Local.write_na_step lc_tgt0 sc_tgt0 mem_tgt0 loc from to val ord lc_tgt1 sc_tgt1 mem_tgt1 msgs kind_tgt)
       (LOCAL: lower_local lc_src0 lc_tgt0)
       (SC: TimeMap.le sc_src0 sc_tgt0)
       (WFSRC: Local.wf lc_src0 mem_src0)
       (WFTGT: Local.wf lc_tgt0 mem_tgt0)
   :
     exists lc_src1 mem_src1 kind_src sc_src1,
-      (<<STEP: Local.write_na_step lc_src0 sc_src0 mem_src0 loc from to val ord lc_src1 sc_src1 mem_src1 kind_src>>) /\
+      (<<STEP: Local.write_na_step lc_src0 sc_src0 mem_src0 loc from to val ord lc_src1 sc_src1 mem_src1 msgs kind_src>>) /\
       (<<MEM: lower_memory mem_src1 mem_tgt1>>) /\
       (<<LOCAL: lower_local lc_src1 lc_tgt1>>) /\
       (<<SC: TimeMap.le sc_src1 sc_tgt1>>) /\
@@ -520,6 +520,24 @@ Proof.
   { ss. eapply TVIEW. }
   i. des. ss. esplits; eauto.
   econs; ss. eapply TViewFacts.write_tview_mon; eauto. eapply WFTGT.
+Qed.
+
+Lemma lower_memory_is_racy mem_src0 mem_tgt0
+      (MEM: lower_memory mem_src0 mem_tgt0)
+      lc_src0 lc_tgt0
+      loc ord
+      (RACE: Local.is_racy lc_tgt0 mem_tgt0 loc ord)
+      (LOCAL: lower_local lc_src0 lc_tgt0)
+  :
+    Local.is_racy lc_src0 mem_src0 loc ord.
+Proof.
+  inv LOCAL. inv RACE.
+  hexploit lower_memory_get; eauto. i. des.
+  hexploit TViewFacts.racy_view_mon; eauto.
+  { eapply TVIEW. }
+  i. econs; eauto.
+  { inv MESSAGE; ss. }
+  { i. hexploit MSG2; auto. i. subst. inv MESSAGE; ss. }
 Qed.
 
 Lemma lower_memory_program_step mem_src0 mem_tgt0
@@ -561,40 +579,19 @@ Proof.
     eexists (ThreadEvent.failure). esplits; eauto.
     econs. econs. eapply lower_local_consistent; eauto. }
   { hexploit lower_memory_na_write_step; eauto. i. des.
-    eexists (ThreadEvent.write _ _ _ _ _ _). esplits; eauto. }
-  { inv LOCAL. inv LOCAL0. hexploit lower_memory_get; eauto. i. des.
-    hexploit TViewFacts.racy_readable_mon; eauto.
-    { eapply TVIEW. }
-    { refl. }
-    i. eexists (ThreadEvent.racy_read _ _ _). esplits; eauto.
-    { eapply Local.step_racy_read. econs; eauto.
-      { inv MESSAGE; ss. }
-      { i. hexploit MSG2; auto. i. subst. inv MESSAGE; ss. }
-    }
-    { econs; eauto. }
-  }
-  { inv LOCAL. inv LOCAL0. hexploit lower_memory_get; eauto. i. des.
-    hexploit TViewFacts.racy_writable_mon; eauto.
-    { eapply TVIEW. }
-    i. eexists (ThreadEvent.racy_write _ _ _). esplits; eauto.
-    { eapply Local.step_racy_write. econs; eauto.
-      { inv MESSAGE; ss. }
-      { i. hexploit MSG2; auto. i. subst. inv MESSAGE; ss. }
-      {  eapply lower_local_consistent; eauto. econs; eauto. }
-    }
-    { econs; eauto. }
-  }
+    eexists (ThreadEvent.na_write _ _ _ _ _ _ _). esplits; eauto. }
+  { inv LOCAL0. hexploit lower_memory_is_racy; eauto. i.
+    eexists (ThreadEvent.racy_read _ _ _). esplits; eauto. }
+  { inv LOCAL0. hexploit lower_memory_is_racy; eauto. i.
+    eexists (ThreadEvent.racy_write _ _ _). esplits; eauto.
+    econs; eauto. econs; eauto.
+    eapply lower_local_consistent; eauto. }
   { eexists (ThreadEvent.racy_update _ _ _ _ _). esplits; eauto.
     { econs. inv LOCAL0.
       { econs 1; auto. eapply lower_local_consistent; eauto. }
       { econs 2; auto. eapply lower_local_consistent; eauto. }
-      { inv LOCAL. hexploit lower_memory_get; eauto. i. des.
-        hexploit TViewFacts.racy_writable_mon; eauto.
-        { eapply TVIEW. }
-        i. econs 3; eauto.
-        { inv MESSAGE; ss. }
-        { eapply lower_local_consistent; eauto. econs; eauto. }
-      }
+      { hexploit lower_memory_is_racy; eauto. i.
+        econs 3; eauto. eapply lower_local_consistent; eauto. }
     }
   }
 Qed.

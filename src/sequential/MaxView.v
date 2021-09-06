@@ -160,35 +160,40 @@ Proof.
   apply read_tview_max. apply WF.
 Qed.
 
-Lemma max_readable_not_read_race mem prom tvw loc ts val
-      val'
+Lemma max_readable_not_racy mem prom tvw loc ts val ord
       (MAX: max_readable mem prom loc ts val)
       (TS: tvw.(TView.cur).(View.pln) loc = ts)
-      (READ: Local.racy_read_step (Local.mk tvw prom) mem loc val' Ordering.na)
+      (RACE: Local.is_racy (Local.mk tvw prom) mem loc ord)
       (WF: Local.wf (Local.mk tvw prom) mem)
   :
     False.
 Proof.
-  inv READ. inv RACE. ss.
-  inv MAX. exploit MAX0; eauto.
-  i. clarify.
+  inv RACE. inv MAX. ss. exploit MAX0; eauto.
+  i. ss. clarify.
 Qed.
 
-Lemma max_readable_not_write_race mem prom tvw loc ts val
+Lemma max_readable_not_read_race mem prom tvw loc ts val
+      val' ord
       (MAX: max_readable mem prom loc ts val)
       (TS: tvw.(TView.cur).(View.pln) loc = ts)
-      (WRITE: Local.racy_write_step (Local.mk tvw prom) mem loc Ordering.na)
+      (READ: Local.racy_read_step (Local.mk tvw prom) mem loc val' ord)
       (WF: Local.wf (Local.mk tvw prom) mem)
   :
     False.
 Proof.
-  inv WRITE. inv RACE. ss.
-  inv MAX. exploit MAX0; eauto.
-  { admit. }
-  { red. destruct msg; ss; eauto. }
-  i. clarify.
-Admitted.
+  inv READ. eapply max_readable_not_racy; eauto.
+Qed.
 
+Lemma max_readable_not_write_race mem prom tvw loc ts val ord
+      (MAX: max_readable mem prom loc ts val)
+      (TS: tvw.(TView.cur).(View.pln) loc = ts)
+      (WRITE: Local.racy_write_step (Local.mk tvw prom) mem loc ord)
+      (WF: Local.wf (Local.mk tvw prom) mem)
+  :
+    False.
+Proof.
+  inv WRITE. eapply max_readable_not_racy; eauto.
+Qed.
 
 Lemma max_readable_read mem prom tvw loc ts val
       (MAX: max_readable mem prom loc ts val)
@@ -380,7 +385,7 @@ Lemma max_readable_na_write mem0 prom0 loc ts from to val1
       (FROM: Time.le (Memory.max_ts loc mem0) from)
       (TO: Time.lt from to)
   :
-    exists mem1 prom1 mem2,
+    exists mem1 prom1 mem2 msgs,
       (<<MEM: fulfilled_memory loc mem0 mem1>>) /\
       (<<ADD: Memory.add mem1 loc from to (Message.concrete val1 None) mem2>>) /\
       (<<PROMISES: forall loc' ts',
@@ -388,7 +393,7 @@ Lemma max_readable_na_write mem0 prom0 loc ts from to val1
           if Loc.eq_dec loc' loc
           then None
           else Memory.get loc' ts' prom0>>) /\
-      (<<WRITE: Memory.write_na ts prom0 mem0 loc from to val1 prom1 mem2 Memory.op_kind_add>>) /\
+      (<<WRITE: Memory.write_na ts prom0 mem0 loc from to val1 prom1 mem2 msgs Memory.op_kind_add>>) /\
       (<<NONE: Memory.get loc to prom1 = None>>) /\
       (<<MAX: Memory.max_ts loc mem2 = to>>)
 .
@@ -415,7 +420,7 @@ Proof.
     }
     i. des.
     hexploit (@Memory.add_exists_le prom0 mem0); eauto.
-    i. des. exists mem2. splits; eauto.
+    i. des. exists mem2. esplits; eauto.
     { refl. }
     { i. des_ifs. destruct (Memory.get loc ts' prom0) as [[]|] eqn:EQ; auto.
       exfalso. eapply COMPLETE in EQ. ss. }
@@ -556,7 +561,7 @@ Lemma max_readable_na_write_step mem0 prom0 tvw0 loc ts from to val0 val1 sc
       (FROM: Time.le (Memory.max_ts loc mem0) from)
       (TO: Time.lt from to)
   :
-    exists mem1 mem2 mem3 prom1 prom3 tvw1,
+    exists mem1 mem2 mem3 prom1 prom3 tvw1 msgs,
       (<<RESERVE: reserve_future_memory prom0 mem0 prom1 mem1>>) /\
       (<<LOWER: fulfilled_memory loc mem0 mem2>>) /\
       (<<ADD: Memory.add mem2 loc from to (Message.concrete val1 None) mem3>>) /\
@@ -565,7 +570,7 @@ Lemma max_readable_na_write_step mem0 prom0 tvw0 loc ts from to val0 val1 sc
           if Loc.eq_dec loc' loc
           then None
           else Memory.get loc' ts' prom0>>) /\
-      (<<WRITE: Local.write_na_step (Local.mk tvw0 prom1) sc mem1 loc from to val1 Ordering.na (Local.mk tvw1 prom3) sc mem3 Memory.op_kind_add>>) /\
+      (<<WRITE: Local.write_na_step (Local.mk tvw0 prom1) sc mem1 loc from to val1 Ordering.na (Local.mk tvw1 prom3) sc mem3 msgs Memory.op_kind_add>>) /\
       (<<VIEW: tvw1.(TView.cur).(View.pln) loc = to>>) /\
       (<<MAXTS: Memory.max_ts loc mem3 = to>>) /\
       (<<MAX: max_readable mem3 prom3 loc to val1>>)
@@ -592,7 +597,7 @@ Proof.
   }
   { etrans; eauto.
     eapply fulfilled_memory_max_ts; eauto. }
-  i. des. eexists mem1, mem2, mem3, prom1, prom2, _. splits; auto.
+  i. des. eexists mem1, mem2, mem3, prom1, prom2, _. esplits; auto.
   { etrans; eauto. }
   { i. rewrite PROMISES0. rewrite PROMISES. des_ifs. }
   { econs; ss. subst. eauto. }
@@ -617,11 +622,7 @@ Lemma non_max_readable_race mem prom tvw loc
       (WF: Local.wf (Local.mk tvw prom) mem)
       (CONS: Local.promise_consistent (Local.mk tvw prom))
   :
-    exists from to msg,
-      (<<GET: Memory.get loc to mem = Some (from, msg)>>) /\
-      (<<NONE: Memory.get loc to prom = None>>) /\
-      (<<RESERVE: msg <> Message.reserve>>) /\
-      (<<TS: Time.lt (tvw.(TView.cur).(View.pln) loc) to>>).
+    Local.is_racy (Local.mk tvw prom) mem loc Ordering.na.
 Proof.
   inv WF. inv TVIEW_CLOSED. inv CUR. ss.
   specialize (PLN loc). des.
@@ -633,9 +634,9 @@ Proof.
     eapply TVIEW_WF.
   }
   { i. eapply NNPP. ii.
-    eapply H. esplits; eauto.
-    destruct (Memory.get loc ts' prom) as [[]|] eqn:EQ; auto.
-    exploit PROMISES; eauto. i. clarify.
+    eapply H. econs; eauto; ss.
+    { destruct (Memory.get loc ts' prom) as [[]|] eqn:EQ; auto.
+      exploit PROMISES; eauto. i. clarify. }
   }
 Qed.
 
@@ -647,8 +648,7 @@ Lemma non_max_readable_read mem prom tvw loc ts val'
   :
     Local.racy_read_step (Local.mk tvw prom) mem loc val' Ordering.na.
 Proof.
-  subst. hexploit non_max_readable_race; eauto. i. des.
-  econs; eauto; ss.
+  subst. hexploit non_max_readable_race; eauto.
 Qed.
 
 Lemma non_max_readable_write mem prom tvw loc ts
@@ -659,10 +659,8 @@ Lemma non_max_readable_write mem prom tvw loc ts
   :
     Local.racy_write_step (Local.mk tvw prom) mem loc Ordering.na.
 Proof.
-  subst. hexploit non_max_readable_race; eauto. i. des.
-  econs; eauto; ss. econs.
-  admit.
-Admitted.
+  subst. hexploit non_max_readable_race; eauto.
+Qed.
 
 Lemma add_max_ts mem0 loc from to msg mem1
       (ADD: Memory.add mem0 loc from to msg mem1)
