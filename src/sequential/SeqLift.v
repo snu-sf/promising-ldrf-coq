@@ -107,23 +107,3 @@ Lemma sim_make_promise f_tgt w0 lc_src lc_tgt mem_src0 mem_tgt0 mem_tgt1
       (<<LOCAL: sim_local flags_bot f_tgt false w1 lc_src lc_tgt>>) /\
       (<<WORLD: world_messages_le (Messages.of_memory lc_src.(Local.promises)) w0 w1>>).
 Admitted.
-
-
-
-
-Lemma sim_cap f_tgt w0 views0 lc_src lc_tgt mem_src0 mem_tgt0 mem_tgt1
-      (LOCAL: sim_local flags_bot f_tgt false w0 views0 lc_src lc_tgt)
-      (MEM: sim_memory flags_bot false w0 views0 mem_src0 mem_tgt0)
-      (CAP: Memory.cap mem_tgt0 mem_tgt1)
-  :
-    exists tm_src mem_src1 w1,
-      (<<TM: forall loc, Time.lt (Memory.max_ts loc mem_src0) (tm_src loc)>>) /\
-      (<<CAP: CapFlex.cap_flex mem_src0 mem_src1 tm_src>>) /\
-      (<<MEM: sim_memory flags_bot true w1 views0 mem_src1 mem_tgt1>>) /\
-      (<<LOCAL: sim_local flags_bot f_tgt false w1 views0 lc_src lc_tgt>>) /\
-      (<<WORLD: world_messages_le (Messages.of_memory lc_src.(Local.promises)) w0 w1>>).
-Admitted.
-
-(* Lemma sim_memory_promise *)
-
-(* Memory.promise *)
