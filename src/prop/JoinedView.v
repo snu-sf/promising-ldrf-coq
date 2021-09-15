@@ -1033,7 +1033,7 @@ Module JSim.
       sim_event
         (ThreadEvent.write loc from to val released_src ord)
         (ThreadEvent.write loc from to val released_tgt ord)
-  | sim_event_ma_write
+  | sim_event_na_write
       loc msgs from to val released_src released_tgt ord
       (RELEASED: View.opt_le released_src released_tgt)
     :
@@ -2752,9 +2752,9 @@ Module JSim.
         views1
         prom1_src mem1_src prom1_tgt mem1_tgt prom2_tgt mem2_tgt
         (loc: Loc.t)
-        from to val msgs kind_tgt rel
+        from to val msgs kinds_tgt kind_tgt rel
         ts_tgt ts_src
-        (STEP_TGT: Memory.write_na ts_tgt prom1_tgt mem1_tgt loc from to val prom2_tgt mem2_tgt msgs kind_tgt)
+        (STEP_TGT: Memory.write_na ts_tgt prom1_tgt mem1_tgt loc from to val prom2_tgt mem2_tgt msgs kinds_tgt kind_tgt)
         (MEM1: sim_memory mem1_src mem1_tgt)
         (PROM1: sim_joined_promises views1 prom1_src prom1_tgt)
         (REL1: joined_released views1 prom1_src rel)
@@ -2764,8 +2764,8 @@ Module JSim.
         (TS: Time.le ts_src ts_tgt)
         (JOINED: joined_memory views1 mem1_src)
     :
-      exists prom2_src mem2_src kind_src,
-        (<<STEP_SRC: Memory.write_na ts_src prom1_src mem1_src loc from to val prom2_src mem2_src msgs kind_src>>) /\
+      exists prom2_src mem2_src kinds_src kind_src,
+        (<<STEP_SRC: Memory.write_na ts_src prom1_src mem1_src loc from to val prom2_src mem2_src msgs kinds_src kind_src>>) /\
         (<<MEM2: sim_memory mem2_src mem2_tgt>>) /\
         (<<JOINED: joined_memory views1 mem2_src>>) /\
         (<<PROM2: sim_joined_promises views1 prom2_src prom2_tgt>>) /\
@@ -2801,9 +2801,9 @@ Module JSim.
         lc1_tgt sc1_tgt mem1_tgt
         lc2_tgt sc2_tgt mem2_tgt
         (loc: Loc.t)
-        from to val ord_src ord_tgt msgs kind
+        from to val ord_src ord_tgt msgs kinds kind
         (ORD: Ordering.le ord_src ord_tgt)
-        (STEP_TGT: Local.write_na_step lc1_tgt sc1_tgt mem1_tgt loc from to val ord_tgt lc2_tgt sc2_tgt mem2_tgt msgs kind)
+        (STEP_TGT: Local.write_na_step lc1_tgt sc1_tgt mem1_tgt loc from to val ord_tgt lc2_tgt sc2_tgt mem2_tgt msgs kinds kind)
         (LOCAL1: sim_local views1 lc1_src lc1_tgt)
         (SC1: TimeMap.le sc1_src sc1_tgt)
         (MEM1: sim_memory mem1_src mem1_tgt)
@@ -2818,9 +2818,9 @@ Module JSim.
         (REL1: joined_released views1 (Local.promises lc1_src) (TView.rel (Local.tview lc1_src)))
         (CONS_TGT: Local.promise_consistent lc2_tgt)
     :
-      exists kind_src lc2_src sc2_src mem2_src,
+      exists kinds_src kind_src lc2_src sc2_src mem2_src,
         (<<STEP_SRC: Local.write_na_step lc1_src sc1_src mem1_src loc from to val
-                                         ord_src lc2_src sc2_src mem2_src msgs kind_src>>) /\
+                                         ord_src lc2_src sc2_src mem2_src msgs kinds_src kind_src>>) /\
         (<<LOCAL2: sim_local views1 lc2_src lc2_tgt>>) /\
         (<<SC2: TimeMap.le sc2_src sc2_tgt>>) /\
         (<<MEM2: sim_memory mem2_src mem2_tgt>>) /\

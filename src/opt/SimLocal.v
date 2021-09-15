@@ -376,9 +376,9 @@ Lemma sim_local_write_na
       lc1_src sc1_src mem1_src
       lc1_tgt sc1_tgt mem1_tgt
       lc2_tgt sc2_tgt mem2_tgt
-      loc from to val ord_src ord_tgt msgs kind
+      loc from to val ord_src ord_tgt msgs kinds kind
       (ORD: Ordering.le ord_src ord_tgt)
-      (STEP_TGT: Local.write_na_step lc1_tgt sc1_tgt mem1_tgt loc from to val ord_tgt lc2_tgt sc2_tgt mem2_tgt msgs kind)
+      (STEP_TGT: Local.write_na_step lc1_tgt sc1_tgt mem1_tgt loc from to val ord_tgt lc2_tgt sc2_tgt mem2_tgt msgs kinds kind)
       (LOCAL1: sim_local SimPromises.bot lc1_src lc1_tgt)
       (SC1: TimeMap.le sc1_src sc1_tgt)
       (MEM1: sim_memory mem1_src mem1_tgt)
@@ -389,7 +389,7 @@ Lemma sim_local_write_na
       (MEM1_SRC: Memory.closed mem1_src)
       (MEM1_TGT: Memory.closed mem1_tgt):
   exists lc2_src sc2_src mem2_src,
-    <<STEP_SRC: Local.write_na_step lc1_src sc1_src mem1_src loc from to val ord_src lc2_src sc2_src mem2_src msgs kind>> /\
+    <<STEP_SRC: Local.write_na_step lc1_src sc1_src mem1_src loc from to val ord_src lc2_src sc2_src mem2_src msgs kinds kind>> /\
     <<LOCAL2: sim_local SimPromises.bot lc2_src lc2_tgt>> /\
     <<SC2: TimeMap.le sc2_src sc2_tgt>> /\
     <<MEM2: sim_memory mem2_src mem2_tgt>>.

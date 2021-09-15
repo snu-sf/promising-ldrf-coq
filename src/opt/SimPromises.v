@@ -447,9 +447,9 @@ Module SimPromises.
         loc from to val
         ts_src promises1_src mem1_src
         ts_tgt promises1_tgt mem1_tgt promises2_tgt mem2_tgt
-        msgs_tgt kind_tgt
+        msgs kinds kind
         (WRITE_TGT: Memory.write_na ts_tgt promises1_tgt mem1_tgt loc from to val
-                                    promises2_tgt mem2_tgt msgs_tgt kind_tgt)
+                                    promises2_tgt mem2_tgt msgs kinds kind)
         (INV1: sem bot inv promises1_src promises1_tgt)
         (SIM1: sim_memory mem1_src mem1_tgt)
         (TS: Time.le ts_src ts_tgt)
@@ -459,7 +459,7 @@ Module SimPromises.
         (MEM1_TGT: Memory.closed mem1_tgt):
     exists promises2_src mem2_src,
       <<PROMISE_SRC: Memory.write_na ts_src promises1_src mem1_src loc from to val
-                                     promises2_src mem2_src msgs_tgt kind_tgt>> /\
+                                     promises2_src mem2_src msgs kinds kind>> /\
       <<INV2: sem bot inv promises2_src promises2_tgt>> /\
       <<SIM2: sim_memory mem2_src mem2_tgt>>.
   Proof.
@@ -484,6 +484,11 @@ Module SimPromises.
     { destruct msg'; ss. }
     replace (kind_transf loc to bot kind) with kind in *; cycle 1.
     { unfold kind_transf. destruct kind; ss.
+      - destruct msg3; ss.
+      - destruct msg1; ss.
+    }
+    replace (kind_transf loc to' bot kind') with kind' in *; cycle 1.
+    { unfold kind_transf. destruct kind'; ss.
       - destruct msg3; ss.
       - destruct msg1; ss.
     }

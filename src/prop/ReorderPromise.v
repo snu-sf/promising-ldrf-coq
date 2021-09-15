@@ -937,8 +937,8 @@ Proof.
 Qed.
 
 Lemma write_na_promise_consistent
-      ts promises1 mem1 loc from to val promises2 mem2 msgs kind
-      (WRITE: Memory.write_na ts promises1 mem1 loc from to val promises2 mem2 msgs kind)
+      ts promises1 mem1 loc from to val promises2 mem2 msgs kinds kind
+      (WRITE: Memory.write_na ts promises1 mem1 loc from to val promises2 mem2 msgs kinds kind)
       (CONS: forall f t m
                (GET: Memory.get loc t promises2 = Some (f, m))
                (RESERVE: m <> Message.reserve),
@@ -956,16 +956,16 @@ Lemma reorder_promise_write_na_memory
       promises1 mem1
       promises2 mem2
       loc1 from1 to1 msg1 kind1
-      ts loc2 from2 to2 val2 msgs2 kind2
+      ts loc2 from2 to2 val2 msgs2 kinds2 kind2
       (PROMISE: Memory.promise promises0 mem0 loc1 from1 to1 msg1 promises1 mem1 kind1)
-      (WRITE: Memory.write_na ts promises1 mem1 loc2 from2 to2 val2 promises2 mem2 msgs2 kind2)
+      (WRITE: Memory.write_na ts promises1 mem1 loc2 from2 to2 val2 promises2 mem2 msgs2 kinds2 kind2)
       (NONPF: Memory.op_kind_is_cancel kind1 = false)
       (CONS: forall f t m
                (GET: Memory.get loc2 t promises2 = Some (f, m))
                (RESERVE: m <> Message.reserve),
           Time.lt to2 t):
-  exists kind2' promises1' mem1',
-    <<WRITE: Memory.write_na ts promises0 mem0 loc2 from2 to2 val2 promises1' mem1' msgs2 kind2'>> /\
+  exists kinds2' kind2' promises1' mem1',
+    <<WRITE: Memory.write_na ts promises0 mem0 loc2 from2 to2 val2 promises1' mem1' msgs2 kinds2' kind2'>> /\
     (<<PROMISE: __guard__
                   ((promises2, mem2, loc1) = (promises1', mem1', loc2) \/
                    (exists from1' kind1',
@@ -992,16 +992,16 @@ Lemma reorder_promise_write_na
       lc1 mem1
       lc2 sc2 mem2
       loc1 from1 to1 msg1 kind1
-      loc2 from2 to2 val2 ord2 msgs2 kind2
+      loc2 from2 to2 val2 ord2 msgs2 kinds2 kind2
       (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 msg1 lc1 mem1 kind1)
-      (STEP2: Local.write_na_step lc1 sc0 mem1 loc2 from2 to2 val2 ord2 lc2 sc2 mem2 msgs2 kind2)
+      (STEP2: Local.write_na_step lc1 sc0 mem1 loc2 from2 to2 val2 ord2 lc2 sc2 mem2 msgs2 kinds2 kind2)
       (NONPF: Memory.op_kind_is_cancel kind1 = false)
       (LOCAL0: Local.wf lc0 mem0)
       (SC0: Memory.closed_timemap sc0 mem0)
       (MEM0: Memory.closed mem0)
       (CONS: Local.promise_consistent lc2):
-  (exists kind2' lc1' mem1',
-     <<STEP1: Local.write_na_step lc0 sc0 mem0 loc2 from2 to2 val2 ord2 lc1' sc2 mem1' msgs2 kind2'>> /\
+  (exists kinds2' kind2' lc1' mem1',
+     <<STEP1: Local.write_na_step lc0 sc0 mem0 loc2 from2 to2 val2 ord2 lc1' sc2 mem1' msgs2 kinds2' kind2'>> /\
      <<STEP2: __guard__
                 ((lc2, mem2, loc1) = (lc1', mem1', loc2) \/
                  (exists from1' kind1',

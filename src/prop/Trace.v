@@ -232,13 +232,14 @@ Module Trace.
   Qed.
 
   Definition consistent lang (e:Thread.t lang) (tr: t): Prop :=
-    forall mem1 sc1
-           (CAP: Memory.cap (Thread.memory e) mem1)
-           (SC_MAX: Memory.max_concrete_timemap mem1 sc1),
+    forall mem1
+           (CAP: Memory.cap (Thread.memory e) mem1),
     exists e2,
-      (<<STEPS: steps tr (Thread.mk _ (Thread.state e) (Thread.local e) sc1 mem1) e2>>) /\
+      (<<STEPS: steps tr (Thread.mk _ (Thread.state e) (Thread.local e) (Thread.sc e) mem1) e2>>) /\
       (<<SILENT: List.Forall (fun lce => ThreadEvent.get_machine_event (snd lce) = MachineEvent.silent) tr>>) /\
-      ((<<FAILURE: exists e3, Thread.step true ThreadEvent.failure e2 e3 >>) \/
+      ((<<FAILURE: exists e e3,
+           Thread.step true e e2 e3 /\
+           ThreadEvent.get_machine_event e = MachineEvent.failure>>) \/
        (<<PROMISES: (Local.promises (Thread.local e2)) = Memory.bot>>)).
 
   Lemma consistent_thread_consistent lang (e: Thread.t lang) tr
@@ -250,6 +251,7 @@ Module Trace.
     { left. unfold Thread.steps_failure. esplits.
       { eapply silent_steps_tau_steps in STEPS; eauto. }
       { eauto. }
+      { ss. }
     }
     { right. esplits.
       { eapply silent_steps_tau_steps in STEPS; eauto. }
@@ -265,20 +267,16 @@ Module Trace.
         (<<CONSISTENT: consistent e tr>>).
   Proof.
     exploit Memory.cap_exists; eauto. i. des.
-    exploit Memory.max_concrete_timemap_exists; eauto.
-    { eapply Memory.cap_closed; eauto. } i. des.
     exploit CONSISTENT; eauto. i. des.
     { unfold Thread.steps_failure in *. des.
       eapply tau_steps_silent_steps in STEPS. des.
       exists tr. ii.
       exploit (@Memory.cap_inj (Thread.memory e) mem2 mem1); eauto. i. subst.
-      exploit (@Memory.max_concrete_timemap_inj mem1 tm sc1); eauto. i. subst.
       esplits; eauto.
     }
     { eapply tau_steps_silent_steps in STEPS. des.
       exists tr. ii.
       exploit (@Memory.cap_inj (Thread.memory e) mem2 mem1); eauto. i. subst.
-      exploit (@Memory.max_concrete_timemap_inj mem1 tm sc1); eauto. i. subst.
       esplits; eauto.
     }
   Qed.
@@ -329,7 +327,7 @@ Module Trace.
       (SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr')
       (STEP: Thread.step pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
       (TR: tr = tr'++[((Thread.local e2), e)])
-      (CONSISTENT: forall (EVENT: e <> ThreadEvent.failure),
+      (CONSISTENT: forall (EVENT: ThreadEvent.get_machine_event e <> MachineEvent.failure),
           Thread.consistent (Thread.mk _ st3 lc3 sc3 memory3))
     :
       configuration_step tr (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) (Configuration.threads c1)) sc3 memory3)
@@ -341,9 +339,8 @@ Module Trace.
       Configuration.step e tid c1 c2.
   Proof.
     inv STEP. eapply silent_steps_tau_steps in STEPS; eauto.
-    destruct (classic (e0 = ThreadEvent.failure)).
-    { subst. ss. econs 1; eauto. }
-    { econs 2; eauto. }
+    destruct (classic (ThreadEvent.get_machine_event e0 = MachineEvent.failure));
+      econs; eauto.
   Qed.
 
   Lemma configuration_step_step e tid c1 c2
@@ -353,11 +350,9 @@ Module Trace.
         (<<STEP: configuration_step tr e tid c1 c2>>).
   Proof.
     inv STEP.
-    { replace MachineEvent.failure with (ThreadEvent.get_machine_event ThreadEvent.failure); auto.
-      eapply tau_steps_silent_steps in STEPS. des. esplits.
-      econs; eauto. ss. }
-    { eapply tau_steps_silent_steps in STEPS. des. esplits.
-      econs; eauto. }
+    replace MachineEvent.failure with (ThreadEvent.get_machine_event ThreadEvent.failure); auto.
+    eapply tau_steps_silent_steps in STEPS. des. esplits.
+    econs; eauto.
   Qed.
 
 End Trace.

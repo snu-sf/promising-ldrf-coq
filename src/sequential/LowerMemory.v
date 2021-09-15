@@ -358,13 +358,13 @@ Qed.
 
 Lemma lower_memory_write_na mem_src0 mem_tgt0
       (MEM: lower_memory mem_src0 mem_tgt0)
-      ts_src ts_tgt loc from to prom0 val prom1 mem_tgt1 msgs kind_tgt
-      (WRITETGT: Memory.write_na ts_tgt prom0 mem_tgt0 loc from to val prom1 mem_tgt1 msgs kind_tgt)
+      ts_src ts_tgt loc from to prom0 val prom1 mem_tgt1 msgs kinds_tgt kind_tgt
+      (WRITETGT: Memory.write_na ts_tgt prom0 mem_tgt0 loc from to val prom1 mem_tgt1 msgs kinds_tgt kind_tgt)
       (MLE: Memory.le prom0 mem_src0)
       (TS: Time.le ts_src ts_tgt)
   :
-    exists mem_src1 kind_src,
-      (<<WRITESRC: Memory.write_na ts_src prom0 mem_src0 loc from to val prom1 mem_src1 msgs kind_src>>) /\
+    exists mem_src1 kinds_src kind_src,
+      (<<WRITESRC: Memory.write_na ts_src prom0 mem_src0 loc from to val prom1 mem_src1 msgs kinds_src kind_src>>) /\
       (<<MEM: lower_memory mem_src1 mem_tgt1>>) /\
       (<<KIND: JSim.sim_op_kind kind_src kind_tgt>>).
 Proof.
@@ -499,16 +499,16 @@ Qed.
 
 Lemma lower_memory_na_write_step mem_src0 mem_tgt0
       (MEM: lower_memory mem_src0 mem_tgt0)
-      lc_src0 lc_tgt0 sc_tgt0 loc from to val ord lc_tgt1 sc_tgt1 mem_tgt1 msgs kind_tgt
+      lc_src0 lc_tgt0 sc_tgt0 loc from to val ord lc_tgt1 sc_tgt1 mem_tgt1 msgs kinds_tgt kind_tgt
       sc_src0
-      (STEP: Local.write_na_step lc_tgt0 sc_tgt0 mem_tgt0 loc from to val ord lc_tgt1 sc_tgt1 mem_tgt1 msgs kind_tgt)
+      (STEP: Local.write_na_step lc_tgt0 sc_tgt0 mem_tgt0 loc from to val ord lc_tgt1 sc_tgt1 mem_tgt1 msgs kinds_tgt kind_tgt)
       (LOCAL: lower_local lc_src0 lc_tgt0)
       (SC: TimeMap.le sc_src0 sc_tgt0)
       (WFSRC: Local.wf lc_src0 mem_src0)
       (WFTGT: Local.wf lc_tgt0 mem_tgt0)
   :
-    exists lc_src1 mem_src1 kind_src sc_src1,
-      (<<STEP: Local.write_na_step lc_src0 sc_src0 mem_src0 loc from to val ord lc_src1 sc_src1 mem_src1 msgs kind_src>>) /\
+    exists lc_src1 mem_src1 kinds_src kind_src sc_src1,
+      (<<STEP: Local.write_na_step lc_src0 sc_src0 mem_src0 loc from to val ord lc_src1 sc_src1 mem_src1 msgs kinds_src kind_src>>) /\
       (<<MEM: lower_memory mem_src1 mem_tgt1>>) /\
       (<<LOCAL: lower_local lc_src1 lc_tgt1>>) /\
       (<<SC: TimeMap.le sc_src1 sc_tgt1>>) /\
