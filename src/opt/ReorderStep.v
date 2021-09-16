@@ -22,6 +22,7 @@ Require Import MemoryReorder.
 Require Import MemoryMerge.
 Require Import FulfillStep.
 Require Import PromiseConsistent.
+Require Export ReorderStepPromise.
 
 Require Import SimMemory.
 Require Import SimPromises.
@@ -213,26 +214,6 @@ Proof.
     + apply TViewFacts.read_tview_mon; try refl; try apply WF0; eauto.
       inv MEM0. exploit CLOSED0; eauto. i. des. inv MSG_WF. auto.
     + apply SimPromises.sem_bot.
-Qed.
-
-Lemma reorder_read_promise_diff
-      loc1 ts1 val1 released1 ord1
-      loc2 from2 to2 msg2 kind2
-      lc0 mem0
-      lc1
-      lc2 mem2
-      (DIFF: (loc1, ts1) <> (loc2, to2))
-      (WF0: Local.wf lc0 mem0)
-      (MEM0: Memory.closed mem0)
-      (STEP1: Local.read_step lc0 mem0 loc1 ts1 val1 released1 ord1 lc1)
-      (STEP2: Local.promise_step lc1 mem0 loc2 from2 to2 msg2 lc2 mem2 kind2):
-  exists lc1',
-    <<STEP1: Local.promise_step lc0 mem0 loc2 from2 to2 msg2 lc1' mem2 kind2>> /\
-    <<STEP2: Local.read_step lc1' mem2 loc1 ts1 val1 released1 ord1 lc2>>.
-Proof.
-  inv STEP1. inv STEP2. ss.
-  exploit MemoryFacts.promise_get1_diff; eauto. i. des.
-  esplits; eauto.
 Qed.
 
 Lemma reorder_read_fulfill
@@ -962,30 +943,6 @@ Proof.
       eapply TViewFacts.read_fence_future; eauto; apply WF0.
 Qed.
 
-Lemma reorder_fence_promise
-      ordr1 ordw1
-      loc2 from2 to2 msg2
-      lc0 sc0 mem0
-      lc1 sc1
-      lc2 mem2
-      kind
-      (ORDW1: Ordering.le ordw1 Ordering.relaxed)
-      (WF0: Local.wf lc0 mem0)
-      (MEM0: Memory.closed mem0)
-      (STEP1: Local.fence_step lc0 sc0 ordr1 ordw1 lc1 sc1)
-      (STEP2: Local.promise_step lc1 mem0 loc2 from2 to2 msg2 lc2 mem2 kind):
-  exists lc1',
-    <<STEP1: Local.promise_step lc0 mem0 loc2 from2 to2 msg2 lc1' mem2 kind>> /\
-    <<STEP2: Local.fence_step lc1' sc0 ordr1 ordw1 lc2 sc1>>.
-Proof.
-  inv STEP1. inv STEP2. ss.
-  esplits.
-  - econs; eauto.
-  - econs; eauto.
-    + s. i. destruct ordw1; inv ORDW1; inv H.
-    + s. i. destruct ordw1; inv ORDW1; inv H.
-Qed.
-
 Lemma reorder_fence_fulfill
       ordr1 ordw1
       loc2 from2 to2 val2 releasedm2 released2 ord2
@@ -1154,39 +1111,6 @@ Proof.
   - eapply TimeFacts.le_lt_lt; eauto. apply Time.bot_spec.
 Qed.
 
-Lemma reorder_is_racy_promise
-      loc1 ord1
-      loc2 from2 to2 msg2 kind2
-      lc0 mem0
-      lc2 mem2
-      (WF0: Local.wf lc0 mem0)
-      (MEM0: Memory.closed mem0)
-      (STEP1: Local.is_racy lc0 mem0 loc1 ord1)
-      (STEP2: Local.promise_step lc0 mem0 loc2 from2 to2 msg2 lc2 mem2 kind2):
-  <<STEP: Local.is_racy lc2 mem2 loc1 ord1>>.
-Proof.
-  inv STEP1. inv STEP2.
-  exploit Memory.promise_future; try exact PROMISE; try apply WF0; eauto. i. des.
-  exploit Memory.future_get1; eauto. i. des.
-  econs; eauto; ss.
-  - destruct (Memory.get loc1 to promises2) as [[]|] eqn:X; ss.
-    revert X. inv PROMISE; ss.
-    + erewrite Memory.add_o; eauto. condtac; ss; try congr.
-      i. des. inv X.
-      exploit Memory.add_get0; try exact MEM. i. des. congr.
-    + erewrite Memory.split_o; eauto. repeat (condtac; ss); try congr.
-      * i. des. inv X.
-        exploit Memory.split_get0; try exact MEM. i. des. congr.
-      * guardH o. i. des. inv X.
-        exploit Memory.split_get0; try exact PROMISES. i. des. congr.
-    + erewrite Memory.lower_o; eauto. condtac; ss; try congr.
-      i. des. inv X.
-      exploit Memory.lower_get0; try exact PROMISES. i. des. congr.
-    + erewrite Memory.remove_o; eauto. condtac; ss; try congr.
-  - inv MSG_LE; ss.
-  - i. exploit MSG2; eauto. i. subst. inv MSG_LE. ss.
-Qed.
-
 Lemma reorder_is_racy_fulfill
       loc1 ord1
       loc2 from2 to2 val2 releasedm2 released2 ord2
@@ -1281,21 +1205,6 @@ Lemma reorder_racy_read_read
 Proof.
   inv STEP1.
   exploit reorder_is_racy_read; eauto.
-Qed.
-
-Lemma reorder_racy_read_promise
-      loc1 val1 ord1
-      loc2 from2 to2 msg2 kind2
-      lc0 mem0
-      lc2 mem2
-      (WF0: Local.wf lc0 mem0)
-      (MEM0: Memory.closed mem0)
-      (STEP1: Local.racy_read_step lc0 mem0 loc1 val1 ord1)
-      (STEP2: Local.promise_step lc0 mem0 loc2 from2 to2 msg2 lc2 mem2 kind2):
-  <<STEP: Local.racy_read_step lc2 mem2 loc1 val1 ord1>>.
-Proof.
-  inv STEP1.
-  exploit reorder_is_racy_promise; eauto.
 Qed.
 
 Lemma reorder_racy_read_fulfill
