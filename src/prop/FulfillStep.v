@@ -107,3 +107,25 @@ Proof.
   inv FULFILL. inv REMOVE. unfold LocFun.add. s.
   condtac; [congr|]. auto.
 Qed.
+
+Lemma fulfill_write
+      lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2
+      (FULFILL: fulfill_step lc1 sc1 loc from to val releasedm released ord lc2 sc2)
+      (WF: Local.wf lc1 mem1)
+      (CLOSED: Memory.closed mem1)
+      (ORD: Ordering.le ord Ordering.relaxed)
+      (REL: released = TView.write_released (Local.tview lc1) sc1 loc to releasedm ord):
+  Local.write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem1
+                   (Memory.op_kind_lower (Message.concrete val released)).
+Proof.
+  inv FULFILL.
+  exploit Memory.remove_get0; eauto. i. des.
+  exploit Memory.get_ts; try exact GET. i. des.
+  { subst. inv WF. rewrite BOT in *. ss. }
+  inv WF. exploit PROMISES; eauto. i.
+  exploit Memory.lower_exists_same; try exact GET; try refl; eauto. i.
+  exploit Memory.lower_exists_same; try exact x; try refl; eauto. i.
+  esplits. econs; eauto; try by (destruct ord; ss).
+  econs; [econs 3; eauto|]; ss.
+  inv CLOSED. exploit CLOSED0; eauto. i. des. ss.
+Qed.

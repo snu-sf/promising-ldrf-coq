@@ -82,7 +82,79 @@ Proof.
   econs. eauto using lower_closed_view_inv.
 Qed.
 
-Lemma reorder_write_promise
+Lemma write_na_lower_closed_message_inv
+      msg
+      ts promises1 mem1 loc from to val promises2 mem2 msgs kinds kind
+      (CLOSED: Memory.closed_message msg mem2)
+      (KINDS: List.Forall Memory.op_kind_is_lower kinds)
+      (KIND: Memory.op_kind_is_lower kind)
+      (WRITE: Memory.write_na ts promises1 mem1 loc from to val promises2 mem2 msgs kinds kind):
+  Memory.closed_message msg mem1.
+Proof.
+  induction WRITE.
+  - inv WRITE. inv PROMISE; ss.
+    eauto using lower_closed_message_inv.
+  - inv KINDS. exploit IHWRITE; eauto. i.
+    inv WRITE_EX. inv PROMISE; ss.
+    eauto using lower_closed_message_inv.
+Qed.
+
+Lemma reorder_memory_write_lower_promise
+      promises0 mem0 loc1 from1 to1 msg1 promises1 mem1 kind1
+      loc2 from2 to2 msg2 promises2 mem2 kind2
+      (LE: Memory.le promises0 mem0)
+      (KIND1: Memory.op_kind_is_lower kind1)
+      (WRITE: Memory.write promises0 mem0 loc1 from1 to1 msg1 promises1 mem1 kind1)
+      (PROMISE: Memory.promise promises1 mem1 loc2 from2 to2 msg2 promises2 mem2 kind2):
+  exists promises1' mem1',
+    (<<PROMISE: Memory.promise promises0 mem0 loc2 from2 to2 msg2 promises1' mem1' kind2>>) /\
+    (<<WRITE: Memory.write promises1' mem1' loc1 from1 to1 msg1 promises2 mem2 kind1>>).
+Proof.
+  inv WRITE.
+  destruct (classic ((loc1, to1) = (loc2, to2))).
+  { inv H.
+    exploit Memory.promise_get0; try exact PROMISE0.
+    { destruct kind1; ss. }
+    i. des.
+    exploit Memory.remove_get0; eauto. i. des. clear GET.
+    inv PROMISE.
+    - exploit Memory.add_get0; try exact MEM. i. des. congr.
+    - exploit Memory.split_get0; try exact MEM. i. des. congr.
+    - exploit Memory.lower_get0; try exact PROMISES. i. des. congr.
+    - exploit Memory.remove_get0; try exact PROMISES. i. des. congr.
+  }
+
+  hexploit Memory.promise_le; try apply LE; eauto. i. des.
+  exploit MemoryReorder.remove_promise; try exact REMOVE; eauto. i. des.
+  inv PROMISE0; ss. inv x0; ss.
+  { exploit MemoryReorder.lower_add; try exact PROMISES; eauto. i. des.
+    exploit MemoryReorder.lower_add; try exact MEM; eauto. i. des.
+    esplits; eauto. econs; eauto.
+    i. exploit Memory.lower_get1; try exact GET; eauto. i. des. eauto.
+  }
+  { exploit MemoryReorder.lower_split; try exact PROMISES; eauto. i. des.
+    exploit MemoryReorder.lower_split; try exact MEM; eauto. i. des.
+    unguard; des; try congr.
+    { inv FROM1. inv FROM0. inv PROMISE; ss.
+      exploit Memory.remove_get0; eauto. i. des.
+      exploit Memory.split_get0; try exact PROMISES1; eauto. i. des.
+      congr.
+    }
+    inv FROM3. inv FROM2.
+    esplits; eauto.
+  }
+  { exploit MemoryReorder.lower_lower; try exact PROMISES; eauto. i.
+    exploit MemoryReorder.lower_lower; try exact MEM; eauto. i.
+    des; subst; try congr.
+    esplits; eauto.
+  }
+  { exploit MemoryReorder.lower_remove; try exact PROMISES; eauto. i. des.
+    exploit MemoryReorder.lower_remove; try exact MEM; eauto. i. des.
+    esplits; eauto.
+  }
+Qed.  
+
+Lemma reorder_write_lower_promise
       loc1 from1 to1 val1 releasedm1 released1 ord1 kind1
       loc2 from2 to2 msg2 kind2
       lc0 sc0 mem0
@@ -94,65 +166,68 @@ Lemma reorder_write_promise
       (STEP1: Local.write_step lc0 sc0 mem0 loc1 from1 to1 val1 releasedm1 released1 ord1 lc1 sc1 mem1 kind1)
       (STEP2: Local.promise_step lc1 mem1 loc2 from2 to2 msg2 lc2 mem2 kind2):
   exists lc1' mem1',
-    <<STEP1: Local.promise_step lc0 mem0 loc2 from2 to2 msg2 lc1' mem1' kind2>> /\
-    <<STEP2: Local.write_step lc1' sc0 mem1' loc1 from1 to1 val1 releasedm1 released1 ord1 lc2 sc1 mem2 kind1>>.
+    (<<STEP1: Local.promise_step lc0 mem0 loc2 from2 to2 msg2 lc1' mem1' kind2>>) /\
+    (<<STEP2: Local.write_step lc1' sc0 mem1' loc1 from1 to1 val1 releasedm1 released1 ord1 lc2 sc1 mem2 kind1>>).
 Proof.
-  inv STEP1. inv WRITE. inv STEP2. ss.
-  destruct (classic ((loc1, to1) = (loc2, to2))).
-  { inv H.
-    exploit Memory.promise_get0; try exact PROMISE.
-    { destruct kind1; ss. }
-    i. des.
-    exploit Memory.remove_get0; eauto. i. des. clear GET.
-    inv PROMISE0.
-    - exploit Memory.add_get0; try exact MEM. i. des. congr.
-    - exploit Memory.split_get0; try exact MEM. i. des. congr.
-    - exploit Memory.lower_get0; try exact PROMISES. i. des. congr.
-    - exploit Memory.remove_get0; try exact PROMISES. i. des. congr.
-  }
-
-  hexploit Memory.promise_le; try apply WF0; eauto. i. des.
-  exploit MemoryReorder.remove_promise; try exact REMOVE; eauto. i. des.
-  inv PROMISE; ss. inv x0; ss.
-  { exploit MemoryReorder.lower_add; try exact PROMISES; eauto. i. des.
-    exploit MemoryReorder.lower_add; try exact MEM; eauto. i. des.
-    esplits.
-    - econs; [econs; eauto|..]; eauto.
-      + i. exploit Memory.lower_get1; try exact GET; eauto. i. des. eauto.
-      + eapply lower_closed_message_inv; eauto.
-    - econs; eauto. destruct ord1; ss.
-  }
-  { exploit MemoryReorder.lower_split; try exact PROMISES; eauto. i. des.
-    exploit MemoryReorder.lower_split; try exact MEM; eauto. i. des.
-    unguard; des; try congr.
-    { inv FROM1. inv FROM0. inv PROMISE0; ss.
-      exploit Memory.remove_get0; eauto. i. des.
-      exploit Memory.split_get0; try exact PROMISES1; eauto. i. des.
-      congr.
-    }
-    inv FROM3. inv FROM2.
-    esplits.
-    - econs; [econs; eauto|..]; eauto.
-      eapply lower_closed_message_inv; eauto.
-    - econs; eauto. destruct ord1; ss.
-  }
-  { exploit MemoryReorder.lower_lower; try exact PROMISES; eauto. i.
-    exploit MemoryReorder.lower_lower; try exact MEM; eauto. i.
-    des; subst; try congr.
-    esplits.
-    - econs; [econs; eauto|..]; eauto.
-      eapply lower_closed_message_inv; eauto.
-    - econs; eauto. destruct ord1; ss.
-  }
-  { exploit MemoryReorder.lower_remove; try exact PROMISES; eauto. i. des.
-    exploit MemoryReorder.lower_remove; try exact MEM; eauto. i. des.
-    esplits.
-    - econs; [econs; eauto|..]; eauto.
-    - econs; eauto. destruct ord1; ss.
-  }
+  inv STEP1. inv STEP2. ss.
+  exploit reorder_memory_write_lower_promise; try apply WF0; eauto. i. des.
+  esplits.
+  - econs; eauto.
+    inv WRITE0. inv PROMISE1; ss.
+    eapply lower_closed_message_inv; eauto.
+  - econs; eauto. destruct ord1; ss.
 Qed.
 
-Lemma reorder_update_write_promise_diff
+Lemma reorder_memory_write_na_lower_promise
+      ts promises0 mem0 loc1 from1 to1 val1 promises1 mem1 msgs1 kinds1 kind1
+      loc2 from2 to2 msg2 promises2 mem2 kind2
+      (LE: Memory.le promises0 mem0)
+      (KINDS1: List.Forall Memory.op_kind_is_lower kinds1)
+      (KIND1: Memory.op_kind_is_lower kind1)
+      (WRITE: Memory.write_na ts promises0 mem0 loc1 from1 to1 val1 promises1 mem1 msgs1 kinds1 kind1)
+      (PROMISE: Memory.promise promises1 mem1 loc2 from2 to2 msg2 promises2 mem2 kind2):
+  exists promises1' mem1',
+    (<<PROMISE: Memory.promise promises0 mem0 loc2 from2 to2 msg2 promises1' mem1' kind2>>) /\
+    (<<WRITE: Memory.write_na ts promises1' mem1' loc1 from1 to1 val1 promises2 mem2 msgs1 kinds1 kind1>>).
+Proof.
+  induction WRITE.
+  { exploit reorder_memory_write_lower_promise; eauto. i. des.
+    esplits; eauto.
+  }
+  inv KINDS1.
+  hexploit Memory.write_le; eauto. i. des.
+  exploit IHWRITE; eauto. i. des.
+  exploit reorder_memory_write_lower_promise; try exact WRITE_EX; eauto. i. des.
+  esplits; eauto.
+Qed.
+
+Lemma reorder_write_na_lower_promise
+      loc1 from1 to1 val1 ord1 msgs1 kinds1 kind1
+      loc2 from2 to2 msg2 kind2
+      lc0 sc0 mem0
+      lc1 sc1 mem1
+      lc2 mem2
+      (WF0: Local.wf lc0 mem0)
+      (KINDS1: List.Forall Memory.op_kind_is_lower kinds1)
+      (KIND1: Memory.op_kind_is_lower kind1)
+      (ORD1: Ordering.le ord1 Ordering.relaxed)
+      (STEP1: Local.write_na_step lc0 sc0 mem0 loc1 from1 to1 val1 ord1
+                                  lc1 sc1 mem1 msgs1 kinds1 kind1)
+      (STEP2: Local.promise_step lc1 mem1 loc2 from2 to2 msg2 lc2 mem2 kind2):
+  exists lc1' mem1',
+    (<<STEP1: Local.promise_step lc0 mem0 loc2 from2 to2 msg2 lc1' mem1' kind2>>) /\
+    (<<STEP2: Local.write_na_step lc1' sc0 mem1' loc1 from1 to1 val1 ord1
+                                  lc2 sc1 mem2 msgs1 kinds1 kind1>>).
+Proof.
+  inv STEP1. inv STEP2. ss.
+  exploit reorder_memory_write_na_lower_promise; try apply WF0; eauto. i. des.
+  esplits.
+  - econs; eauto.
+    eapply write_na_lower_closed_message_inv; eauto.
+  - econs; eauto.
+Qed.
+
+Lemma reorder_update_lower_promise_diff
       lc0 sc0 mem0
       loc1 ts1 val1 released1 ord1 lc1
       from2 to2 val2 released2 ord2 lc2 sc2 mem2 kind2
@@ -171,7 +246,7 @@ Lemma reorder_update_write_promise_diff
     (<<STEP3: Local.write_step lc2' sc0 mem1' loc1 from2 to2 val2 released1 released2 ord2 lc3 sc2 mem3 kind2>>).
 Proof.
   exploit Local.read_step_future; eauto. i. des.
-  exploit reorder_write_promise; try exact STEP2; eauto. i. des.
+  exploit reorder_write_lower_promise; try exact STEP2; eauto. i. des.
   exploit reorder_read_promise_diff; try exact STEP1; eauto. i. des.
   esplits; eauto.
 Qed.
