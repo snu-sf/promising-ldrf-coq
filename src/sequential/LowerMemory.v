@@ -30,6 +30,104 @@ Require Import MemoryProps.
 Set Implicit Arguments.
 
 
+Inductive lower_event: forall (e_src e_tgt: ThreadEvent.t), Prop :=
+| lower_event_promise
+    loc from to msg kind
+  :
+  lower_event
+    (ThreadEvent.promise loc from to msg kind)
+    (ThreadEvent.promise loc from to msg kind)
+| lower_event_silent
+  :
+  lower_event
+    ThreadEvent.silent
+    ThreadEvent.silent
+| lower_event_read
+    loc ts val released_src released_tgt ord
+    (RELEASED: View.opt_le released_src released_tgt)
+  :
+  lower_event
+    (ThreadEvent.read loc ts val released_src ord)
+    (ThreadEvent.read loc ts val released_tgt ord)
+| lower_event_write
+    loc from to val released_src released_tgt ord
+    (RELEASED: View.opt_le released_src released_tgt)
+  :
+  lower_event
+    (ThreadEvent.write loc from to val released_src ord)
+    (ThreadEvent.write loc from to val released_tgt ord)
+| lower_event_na_write
+    loc msgs from to val released_src released_tgt ord
+    (RELEASED: View.opt_le released_src released_tgt)
+  :
+  lower_event
+    (ThreadEvent.na_write loc msgs from to val released_src ord)
+    (ThreadEvent.na_write loc msgs from to val released_tgt ord)
+| lower_event_update
+    loc tsr tsw valr valw releasedr_src releasedr_tgt releasedw_src releasedw_tgt ordr ordw
+    (RELEASEDR: View.opt_le releasedr_src releasedr_tgt)
+    (RELEASEDW: View.opt_le releasedw_src releasedw_tgt)
+  :
+  lower_event
+    (ThreadEvent.update loc tsr tsw valr valw releasedr_src releasedw_src ordr ordw)
+    (ThreadEvent.update loc tsr tsw valr valw releasedr_tgt releasedw_tgt ordr ordw)
+| lower_event_fence
+    ordr ordw
+  :
+  lower_event
+    (ThreadEvent.fence ordr ordw)
+    (ThreadEvent.fence ordr ordw)
+| lower_event_syscall
+    e
+  :
+  lower_event
+    (ThreadEvent.syscall e)
+    (ThreadEvent.syscall e)
+| lower_event_failure
+  :
+  lower_event
+    ThreadEvent.failure
+    ThreadEvent.failure
+| lower_event_racy_read
+    loc val ord
+  :
+  lower_event
+    (ThreadEvent.racy_read loc val ord)
+    (ThreadEvent.racy_read loc val ord)
+| lower_event_racy_write
+    loc val ord
+  :
+  lower_event
+    (ThreadEvent.racy_write loc val ord)
+    (ThreadEvent.racy_write loc val ord)
+| lower_event_racy_update
+    loc valr valw ordr ordw
+  :
+  lower_event
+    (ThreadEvent.racy_update loc valr valw ordr ordw)
+    (ThreadEvent.racy_update loc valr valw ordr ordw)
+.
+Hint Constructors lower_event.
+
+Global Program Instance lower_event_PreOrder: PreOrder lower_event.
+Next Obligation. ii. destruct x; try (econs; eauto); refl. Qed.
+Next Obligation. ii. inv H; inv H0; econs; eauto; etrans; eauto. Qed.
+
+Lemma lower_event_program_event
+      e_src e_tgt
+      (EVENT: lower_event e_src e_tgt):
+  ThreadEvent.get_program_event e_src = ThreadEvent.get_program_event e_tgt.
+Proof.
+  inv EVENT; ss.
+Qed.
+
+Lemma lower_event_machine_event
+      e_src e_tgt
+      (EVENT: lower_event e_src e_tgt):
+  ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt.
+Proof.
+  inv EVENT; ss.
+Qed.
 
 Variant lower_memory_content: forall (cnt_src cnt_tgt: option (Loc.t * Message.t)), Prop :=
 | lower_memory_content_none
@@ -356,7 +454,8 @@ Proof.
   }
 Qed.
 
-Lemma lower_memory_write_na mem_src0 mem_tgt0
+Lemma lower_memory_write_na
+      mem_src0 mem_tgt0
       (MEM: lower_memory mem_src0 mem_tgt0)
       ts_src ts_tgt loc from to prom0 val prom1 mem_tgt1 msgs kinds_tgt kind_tgt
       (WRITETGT: Memory.write_na ts_tgt prom0 mem_tgt0 loc from to val prom1 mem_tgt1 msgs kinds_tgt kind_tgt)
@@ -366,6 +465,7 @@ Lemma lower_memory_write_na mem_src0 mem_tgt0
     exists mem_src1 kinds_src kind_src,
       (<<WRITESRC: Memory.write_na ts_src prom0 mem_src0 loc from to val prom1 mem_src1 msgs kinds_src kind_src>>) /\
       (<<MEM: lower_memory mem_src1 mem_tgt1>>) /\
+      (<<KINDS: List.Forall2 JSim.sim_op_kind kinds_src kinds_tgt>>) /\
       (<<KIND: JSim.sim_op_kind kind_src kind_tgt>>).
 Proof.
   revert mem_src0 ts_src TS MEM MLE. induction WRITETGT.
@@ -497,7 +597,8 @@ Proof.
   }
 Qed.
 
-Lemma lower_memory_na_write_step mem_src0 mem_tgt0
+Lemma lower_memory_write_na_step
+      mem_src0 mem_tgt0
       (MEM: lower_memory mem_src0 mem_tgt0)
       lc_src0 lc_tgt0 sc_tgt0 loc from to val ord lc_tgt1 sc_tgt1 mem_tgt1 msgs kinds_tgt kind_tgt
       sc_src0
@@ -512,6 +613,7 @@ Lemma lower_memory_na_write_step mem_src0 mem_tgt0
       (<<MEM: lower_memory mem_src1 mem_tgt1>>) /\
       (<<LOCAL: lower_local lc_src1 lc_tgt1>>) /\
       (<<SC: TimeMap.le sc_src1 sc_tgt1>>) /\
+      (<<KINDS: List.Forall2 JSim.sim_op_kind kinds_src kinds_tgt>>) /\
       (<<KIND: JSim.sim_op_kind kind_src kind_tgt>>)
 .
 Proof.
@@ -557,7 +659,7 @@ Lemma lower_memory_program_step mem_src0 mem_tgt0
       (<<MEM: lower_memory mem_src1 mem_tgt1>>) /\
       (<<LOCAL: lower_local lc_src1 lc_tgt1>>) /\
       (<<SC: TimeMap.le sc_src1 sc_tgt1>>) /\
-      (<<EVENT: JSim.sim_event e_src e_tgt>>)
+      (<<EVENT: lower_event e_src e_tgt>>)
 .
 Proof.
   inv STEP.
@@ -578,7 +680,7 @@ Proof.
   { inv LOCAL0.
     eexists (ThreadEvent.failure). esplits; eauto.
     econs. econs. eapply lower_local_consistent; eauto. }
-  { hexploit lower_memory_na_write_step; eauto. i. des.
+  { hexploit lower_memory_write_na_step; eauto. i. des.
     eexists (ThreadEvent.na_write _ _ _ _ _ _ _). esplits; eauto. }
   { inv LOCAL0. hexploit lower_memory_is_racy; eauto. i.
     eexists (ThreadEvent.racy_read _ _ _). esplits; eauto. }
@@ -613,7 +715,7 @@ Lemma lower_memory_thread_step lang st0 st1 mem_src0 mem_tgt0
       (<<MEM: lower_memory mem_src1 mem_tgt1>>) /\
       (<<LOCAL: lower_local lc_src1 lc_tgt1>>) /\
       (<<SC: TimeMap.le sc_src1 sc_tgt1>>) /\
-      (<<EVENT: JSim.sim_event e_src e_tgt>>)
+      (<<EVENT: lower_event e_src e_tgt>>)
 .
 Proof.
   inv STEP.
@@ -621,11 +723,10 @@ Proof.
     { inv LOCAL. eapply WFSRC. }
     i. des. esplits; eauto.
     { econs 1. econs; eauto. }
-    { refl. }
   }
   { inv STEP0. hexploit lower_memory_program_step; eauto.
     i. des. esplits; eauto.
-    econs 2. econs; eauto. erewrite JSim.sim_event_program_event; eauto.
+    econs 2. econs; eauto. erewrite lower_event_program_event; eauto.
   }
 Qed.
 
@@ -646,7 +747,7 @@ Lemma lower_memory_thread_opt_step lang st0 st1 mem_src0 mem_tgt0
       (<<MEM: lower_memory mem_src1 mem_tgt1>>) /\
       (<<LOCAL: lower_local lc_src1 lc_tgt1>>) /\
       (<<SC: TimeMap.le sc_src1 sc_tgt1>>) /\
-      (<<EVENT: JSim.sim_event e_src e_tgt>>)
+      (<<EVENT: lower_event e_src e_tgt>>)
 .
 Proof.
   inv STEP.
