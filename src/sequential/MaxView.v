@@ -385,7 +385,7 @@ Lemma max_readable_na_write mem0 prom0 loc ts from to val1
       (FROM: Time.le (Memory.max_ts loc mem0) from)
       (TO: Time.lt from to)
   :
-    exists mem1 prom1 mem2 msgs,
+    exists mem1 prom1 mem2 msgs ks,
       (<<MEM: fulfilled_memory loc mem0 mem1>>) /\
       (<<ADD: Memory.add mem1 loc from to (Message.concrete val1 None) mem2>>) /\
       (<<PROMISES: forall loc' ts',
@@ -393,7 +393,7 @@ Lemma max_readable_na_write mem0 prom0 loc ts from to val1
           if Loc.eq_dec loc' loc
           then None
           else Memory.get loc' ts' prom0>>) /\
-      (<<WRITE: Memory.write_na ts prom0 mem0 loc from to val1 prom1 mem2 msgs Memory.op_kind_add>>) /\
+      (<<WRITE: Memory.write_na ts prom0 mem0 loc from to val1 prom1 mem2 msgs ks Memory.op_kind_add>>) /\
       (<<NONE: Memory.get loc to prom1 = None>>) /\
       (<<MAX: Memory.max_ts loc mem2 = to>>)
 .
@@ -561,7 +561,7 @@ Lemma max_readable_na_write_step mem0 prom0 tvw0 loc ts from to val0 val1 sc
       (FROM: Time.le (Memory.max_ts loc mem0) from)
       (TO: Time.lt from to)
   :
-    exists mem1 mem2 mem3 prom1 prom3 tvw1 msgs,
+    exists mem1 mem2 mem3 prom1 prom3 tvw1 msgs ks,
       (<<RESERVE: reserve_future_memory prom0 mem0 prom1 mem1>>) /\
       (<<LOWER: fulfilled_memory loc mem0 mem2>>) /\
       (<<ADD: Memory.add mem2 loc from to (Message.concrete val1 None) mem3>>) /\
@@ -570,7 +570,7 @@ Lemma max_readable_na_write_step mem0 prom0 tvw0 loc ts from to val0 val1 sc
           if Loc.eq_dec loc' loc
           then None
           else Memory.get loc' ts' prom0>>) /\
-      (<<WRITE: Local.write_na_step (Local.mk tvw0 prom1) sc mem1 loc from to val1 Ordering.na (Local.mk tvw1 prom3) sc mem3 msgs Memory.op_kind_add>>) /\
+      (<<WRITE: Local.write_na_step (Local.mk tvw0 prom1) sc mem1 loc from to val1 Ordering.na (Local.mk tvw1 prom3) sc mem3 msgs ks Memory.op_kind_add>>) /\
       (<<VIEW: tvw1.(TView.cur).(View.pln) loc = to>>) /\
       (<<MAXTS: Memory.max_ts loc mem3 = to>>) /\
       (<<MAX: max_readable mem3 prom3 loc to val1>>)
