@@ -100,9 +100,27 @@ Module Flag.
   Qed.
 End Flag.
 
+Module Flags.
+  Definition t := Loc.t -> Flag.t.
+
+  Definition le (f_src f_tgt: t): Prop :=
+    forall loc, Flag.le (f_src loc) (f_tgt loc).
+
+  Program Instance le_PreOrder: PreOrder le.
+  Next Obligation.
+  Proof.
+    ii. refl.
+  Qed.
+  Next Obligation.
+  Proof.
+    ii. etrans; eauto.
+  Qed.
+End Flags.
 
 Module SeqCell.
    Definition t := (Const.t * Flag.t)%type.
+
+   Definition flag (c: t): Flag.t := snd c.
 
    Definition debt (c: t): t :=
      let (v, f) := c in (v, Flag.debt).
@@ -121,9 +139,7 @@ Module SeqCell.
 
    (* checked every moment *)
    Definition le_partial (c0 c1: t): Prop :=
-     match c0, c1 with
-     | (v0, f0), (v1, f1) => Flag.le f0 f1
-     end.
+     Flag.le (flag c0) (flag c1).
 
    Program Instance le_PreOrder: PreOrder le.
    Next Obligation.
@@ -139,11 +155,11 @@ Module SeqCell.
    Program Instance le_partial_PreOrder: PreOrder le_partial.
    Next Obligation.
    Proof.
-     ii. destruct x; ss. refl.
+     ii. unfold le_partial in *. refl.
    Qed.
    Next Obligation.
    Proof.
-     ii. destruct x, y, z; ss. etrans; eauto.
+     ii. unfold le_partial in *. etrans; eauto.
    Qed.
 
    Lemma le_le_partial c0 c1 (LE: le c0 c1)
@@ -172,6 +188,8 @@ End SeqCell.
 Module SeqMemory.
   Definition t := Loc.t -> SeqCell.t.
 
+  Definition flags (m: t): Flags.t := fun loc => snd (m loc).
+
   Definition write (loc: Loc.t) (val: Const.t) (m: t): t :=
     fun loc' => if Loc.eq_dec loc' loc then SeqCell.write val  else (m loc').
 
@@ -182,7 +200,7 @@ Module SeqMemory.
     forall loc, SeqCell.le (m_tgt loc) (m_src loc).
 
   Definition le_partial (m_tgt m_src: t): Prop :=
-    forall loc, SeqCell.le_partial (m_tgt loc) (m_src loc).
+    Flags.le (flags m_tgt) (flags m_src).
 
   Definition match_event (e: ProgramEvent.t) (m_tgt m_src: t): Prop :=
     match e with
