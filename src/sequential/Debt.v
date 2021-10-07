@@ -33,6 +33,22 @@ Definition is_atomic_event (e: ProgramEvent.t): Prop :=
     Ordering.le Ordering.plain ordr /\ Ordering.le Ordering.plain ordw
   end.
 
+Definition is_release_event (e: ProgramEvent.t): Prop :=
+  match e with
+  | ProgramEvent.syscall _ => True
+  | ProgramEvent.silent | ProgramEvent.failure | ProgramEvent.read _ _ _ => False
+  | ProgramEvent.fence _ ord | ProgramEvent.write _ _ ord | ProgramEvent.update _ _ _ _ ord => Ordering.le Ordering.strong_relaxed ord
+  end.
+
+Definition is_acquire_event (e: ProgramEvent.t): Prop :=
+  match e with
+  | ProgramEvent.syscall _ => True
+  | ProgramEvent.update _ _ _ _ _ => True (* PS2.1 forbids RMW-W reordering *)
+  | ProgramEvent.silent | ProgramEvent.failure | ProgramEvent.write _ _ _ => False
+  | ProgramEvent.fence ord _ | ProgramEvent.read _ _ ord => Ordering.le Ordering.acqrel ord
+  end.
+
+
 Module Perm.
   Variant t: Type :=
   | none
@@ -84,6 +100,12 @@ Module SeqCell.
 
    Definition debt (c: t): t :=
      let (v, f) := c in (v, Flag.debt).
+
+   Definition write (v: Const.t): t :=
+     (v, Flag.written).
+
+   Definition update (v1: Const.t) (c: t): t :=
+     let (v0, f) := c in (v1, f).
 
    (* checked at final *)
    Definition le (c0 c1: t): Prop :=
@@ -144,9 +166,11 @@ End SeqCell.
 Module SeqMemory.
   Definition t := Loc.t -> SeqCell.t.
 
-  Definition update (loc: Loc.t) (val: Const.t) (m: t): t :=
-    fun loc' => if Loc.eq_dec loc' loc then (val, Flag.written) else (m loc').
+  Definition write (loc: Loc.t) (val: Const.t) (m: t): t :=
+    fun loc' => if Loc.eq_dec loc' loc then SeqCell.write val  else (m loc').
 
+  Definition update (loc: Loc.t) (val: Const.t) (m: t): t :=
+    fun loc' => if Loc.eq_dec loc' loc then SeqCell.update val (m loc') else (m loc').
 
   Definition le (m_src m_tgt: t): Prop :=
     forall loc, SeqCell.le (m_src loc) (m_tgt loc).
@@ -225,8 +249,17 @@ Module SeqMemory.
   Definition init (vals: Loc.t -> Const.t): t :=
     fun loc => SeqCell.init (vals loc).
 
-  Definition release (m_before m_released m_after: t): Prop :=
-    forall loc, SeqCell.release (m_before loc) (m_released loc) (m_after loc).
+  Variant release: forall (m_before: t) (m_released: option t) (m_after: t), Prop :=
+  | release_some
+      m_before m_released m_after
+      (RELEASE: forall loc, SeqCell.release (m_before loc) (m_released loc) (m_after loc))
+    :
+      release m_before (Some m_released) m_after
+  | release_none
+      m
+    :
+      release m None m
+  .
 End SeqMemory.
 
 
@@ -327,17 +360,15 @@ Definition diffs := Loc.t -> diff.
 Definition update_mem
            (d: diffs) (m0: SeqMemory.t): SeqMemory.t :=
   fun loc =>
-    let (v0, f0) := (m0 loc) in
     match (d loc) with
-    | diff_none => (v0, f0)
-    | diff_rel => (v0, Flag.unwritten)
-    | diff_acq v1 | diff_update v1 => (v1, f0)
+    | diff_none | diff_rel => m0 loc
+    | diff_acq v1 | diff_update v1 => SeqCell.update v1 (m0 loc)
     end.
 
 Definition update_perm (d: diffs) (p0: Perms.t): Perms.t :=
   fun loc =>
     match (d loc) with
-    | diff_none | diff_update _ | diff_deflag => p0 loc
+    | diff_none | diff_update _ => p0 loc
     | diff_acq _ => Perm.full
     | diff_rel => Perm.none
     end.
@@ -360,7 +391,7 @@ Definition wf_diff_event (d: diffs) (e: ProgramEvent.t): Prop :=
   | ProgramEvent.read loc _ ord =>
     forall loc' (NEQ: loc' <> loc),
       match (d loc') with
-      | diff_rel | diff_update _ | diff_deflag => False
+      | diff_rel | diff_update _ => False
       | diff_acq _ => Ordering.le Ordering.acqrel ord
       | diff_none => True
       end
@@ -368,14 +399,14 @@ Definition wf_diff_event (d: diffs) (e: ProgramEvent.t): Prop :=
     forall loc' (NEQ: loc' <> loc),
       match (d loc') with
       | diff_acq _ | diff_update _ => False
-      | diff_rel | diff_deflag => Ordering.le Ordering.acqrel ord
+      | diff_rel => Ordering.le Ordering.acqrel ord
       | diff_none => True
       end
   | ProgramEvent.update loc _ _ ordr ordw =>
     forall loc' (NEQ: loc' <> loc),
       match (d loc') with
       | diff_update _ => False
-      | diff_rel | diff_deflag => Ordering.le Ordering.acqrel ordw
+      | diff_rel => Ordering.le Ordering.acqrel ordw
       | diff_acq _ => Ordering.le Ordering.acqrel ordr
       | diff_none => True
       end
@@ -383,11 +414,17 @@ Definition wf_diff_event (d: diffs) (e: ProgramEvent.t): Prop :=
     forall loc',
       match (d loc') with
       | diff_update _ => False
-      | diff_rel | diff_deflag => Ordering.le Ordering.acqrel ordw
+      | diff_rel => Ordering.le Ordering.acqrel ordw
       | diff_acq _ => Ordering.le Ordering.acqrel ordr
       | diff_none => True
       end
   | _ => True
+  end.
+
+Definition wf_released (m_released: option SeqMemory.t) (e: ProgramEvent.t): Prop :=
+  match m_released with
+  | Some _ => is_release_event e
+  | None => ~ is_release_event e
   end.
 
 
@@ -399,29 +436,32 @@ Module Oracle.
            (mem0: SeqMemory.t)
            (e: ProgramEvent.t)
            (d: diffs)
+           (m_released: option SeqMemory.t)
            (o0: t)
            (o1: t), Prop.
   Admitted.
 
+  Definition progress e o0 p0 mem0 d: Prop :=
+    forall m_released (WF: wf_released m_released e),
+      exists o1, step p0 mem0 e d m_released o0 o1.
+
   Variant _wf (wf: t -> Prop): t -> Prop :=
   | wf_intro
-      o0
-      (DIFF: forall p0 mem0 e d o1
-                    (STEP: step p0 mem0 e d o0 o1),
+      (o0: t)
+      (WF: forall p0 mem0 e d (m_released: option SeqMemory.t) (o1: t)
+                  (STEP: step p0 mem0 e d m_released o0 o1),
           (<<EVENT: wf_diff_event d e>>) /\
           (<<PERM: wf_diff_perms d p0>>) /\
-          (<<WF: wf o1>>))
+          (<<RELEASED: wf_released m_released e>>) /\
+          (<<ORACLE: wf o1>>))
       (LOAD: forall p0 mem0 loc ord
                     (ORD: Ordering.le ord Ordering.strong_relaxed),
-          exists v d o1, (<<STEP: step p0 mem0 (ProgramEvent.read loc v ord) d o0 o1>>) /\
-                         (<<NOREL: forall loc, non_release_diff (d loc)>>))
+          exists v d, progress (ProgramEvent.read loc v ord) o0 p0 mem0 d)
       (STORE: forall p0 mem0 loc ord val,
-          exists d o1, (<<STEP: step p0 mem0 (ProgramEvent.write loc val ord) d o0 o1>>) /\
-                       (<<NOREL: forall loc, non_release_diff (d loc)>>))
+          exists d, progress (ProgramEvent.write loc val ord) o0 p0 mem0 d)
       (FENCE: forall p0 mem0 ordr ordw
                      (ORD: Ordering.le ordr Ordering.strong_relaxed),
-          exists d o1, (<<STEP: step p0 mem0 (ProgramEvent.fence ordr ordw) d o0 o1>>) /\
-                       (<<NOREL: forall loc, non_release_diff (d loc)>>))
+          exists d, progress (ProgramEvent.fence ordr ordw) o0 p0 mem0 d)
     :
       _wf wf o0
   .
@@ -429,7 +469,7 @@ Module Oracle.
   Lemma wf_mon: monotone1 _wf.
   Proof.
     ii. inv IN. econs; eauto. i.
-    exploit DIFF; eauto. i. des. splits; auto.
+    exploit WF; eauto. i. des. splits; auto.
   Qed.
   #[export] Hint Resolve wf_mon: paco.
 
@@ -470,12 +510,13 @@ Section LANG.
   Variant at_step:
     forall (e: MachineEvent.t) (th0: t) (th1: t), Prop :=
   | at_step_intro
-      p0 p1 o0 o1 e d st0 st1 m0 m1 me
+      p0 p1 o0 o1 e d m_released st0 st1 m0 m_upd m1 me
       (STEP: lang.(Language.step) e st0 st1)
-      (ORACLE: Oracle.step p0 m0 e d o0 o1)
+      (ORACLE: Oracle.step p0 m0 e d m_released o0 o1)
       (PERM: p1 = update_perm d p0)
-      (MEM: m1 = update_mem d m0)
+      (MEM: m_upd = update_mem d m0)
       (EVENT: me = get_machine_event e)
+      (RELEASE: SeqMemory.release m_upd m_released m1)
     :
       at_step me (mk (SeqState.mk _ st0 m0) p0 o0) (mk (SeqState.mk _ st1 m1) p1 o1)
   .
