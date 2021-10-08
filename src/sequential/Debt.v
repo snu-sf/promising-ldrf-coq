@@ -528,24 +528,26 @@ Section LANG.
   Qed.
 
   Variant at_step:
-    forall (e: MachineEvent.t) (th0: t) (th1: t), Prop :=
+    forall (e: ProgramEvent.t) (d: diffs) (m_released: option SeqMemory.t)
+           (th0: t) (th1: t), Prop :=
   | at_step_intro
-      p0 p1 o0 o1 e d m_released st0 st1 m0 m_upd m1 me
+      p0 p1 o0 o1 e d m_released st0 st1 m0 m_upd m1
       (STEP: lang.(Language.step) e st0 st1)
       (ORACLE: Oracle.step p0 m0 e d m_released o0 o1)
       (PERM: p1 = update_perm d p0)
       (MEM: m_upd = update_mem d m0)
-      (EVENT: me = get_machine_event e)
       (RELEASE: SeqMemory.release m_upd m_released m1)
     :
-      at_step me (mk (SeqState.mk _ st0 m0) p0 o0) (mk (SeqState.mk _ st1 m1) p1 o1)
+      at_step e d m_released (mk (SeqState.mk _ st0 m0) p0 o0) (mk (SeqState.mk _ st1 m1) p1 o1)
   .
 
   Variant step (e: MachineEvent.t) (th0: t) (th1: t): Prop :=
   | step_na_step
       (STEP: na_step e th0 th1)
   | step_at_step
-      (STEP: at_step e th0 th1)
+      pe d m_released
+      (EVENT: e = get_machine_event pe)
+      (STEP: at_step pe d m_released th0 th1)
   .
 
   Definition failure (th0: t): Prop :=
@@ -676,6 +678,13 @@ Section SIMULATION.
     pfold. right. red. i. esplits; [refl|].
     econs. left. econs. eauto.
   Qed.
+
+  Definition sim_seq_all (st_src: lang_src.(Language.state)) (st_tgt: lang_tgt.(Language.state)): Prop :=
+    forall p vals,
+      sim_seq
+        p
+        (SeqState.mk _ st_src (SeqMemory.init vals))
+        (SeqState.mk _ st_tgt (SeqMemory.init vals)).
 End SIMULATION.
 Arguments sim_seq [_] [_] _ _ _.
 #[export] Hint Resolve sim_seq_mon: paco.
@@ -691,12 +700,7 @@ Section ADEQUACY.
   Variable R: Type.
 
   Definition sim_seq_itree (st_src: itree MemE.t R) (st_tgt: itree MemE.t R): Prop :=
-    forall p vals,
-      sim_seq
-        eq
-        p
-        (SeqState.mk (lang R) st_src (SeqMemory.init vals))
-        (SeqState.mk (lang R) st_tgt (SeqMemory.init vals)).
+    @sim_seq_all (lang R) (lang R) eq st_src st_tgt.
 
   Theorem adequacy_seq:
     sim_seq_itree <2= sim_itree eq.
