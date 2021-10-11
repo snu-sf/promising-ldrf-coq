@@ -38,6 +38,7 @@ Require Import Trace.
 Require Import gSimAux.
 
 Set Implicit Arguments.
+Set Nested Proofs Allowed.
 
 
 Definition is_promise (e: ThreadEvent.t): Prop :=
@@ -325,7 +326,7 @@ Proof.
 
   { exploit lower_memory_fence_step; try exact LC1; eauto; try refl. i. des.
     replace sc_src1 with sc2 in *; cycle 1.
-    { inv LOCAL0. inv STEP. 
+    { inv LOCAL0. inv STEP.
       unfold TView.write_fence_sc. condtac; ss. destruct ordw; ss.
     }
     esplits.
@@ -461,6 +462,15 @@ Lemma Forall2_refl
   List.Forall2 f a a.
 Proof.
   induction a; eauto.
+Qed.
+
+Lemma Forall2_symm
+      A (f: A -> A -> Prop) (a b: list A)
+      (SYMM: forall x y, f x y -> f y x)
+      (FORALL: List.Forall2 f a b):
+  List.Forall2 f b a.
+Proof.
+  induction FORALL; eauto.
 Qed.
 
 Lemma Forall2_trans
@@ -784,6 +794,21 @@ Proof.
   }
 Qed.
 
+Lemma write_lower_promises
+      promises1 mem1 loc from to msg promises2 mem2 kind
+      l t
+      (WRITE: Memory.write promises1 mem1 loc from to msg promises2 mem2 kind)
+      (KIND: Memory.op_kind_is_lower kind):
+  Memory.get l t promises2 =
+  if loc_ts_eq_dec (l, t) (loc, to)
+  then None
+  else Memory.get l t promises1.
+Proof.
+  inv WRITE. inv PROMISE; ss.
+  erewrite Memory.remove_o; eauto. condtac; ss.
+  erewrite Memory.lower_o; eauto. condtac; ss.
+Qed.
+
 Lemma split_step
       lang pf e (th0 th2: Thread.t lang)
       (STEP: Thread.step pf e th0 th2)
@@ -924,7 +949,7 @@ Proof.
     { econs; try apply LOCAL; eauto.
       eapply TView.future_closed; eauto. apply LOCAL. }
     { econs. eapply TimeFacts.le_lt_lt; eauto. }
-    i. des.
+    i. des. clear IHWRITE.
     exploit split_memory_write; try exact WRITE_EX.
     { unguard. des; subst; ss. }
     i. des.
@@ -942,7 +967,27 @@ Proof.
     - congr.
     - exploit memory_write_lower_refl_inv; try exact WRITE0. i. congr.
     - congr.
-    - clear IHWRITE.
+    - destruct th1, th2'. ss. subst.
+      i. inv PR. destruct (classic ((x1, x2) = (loc, to'))).
+      { inv H. right. econs.
+        - eapply unchangable_write_na; eauto.
+          inv WRITE0. inv PROMISE0.
+          exploit Memory.lower_get0; try exact PROMISES. i. des.
+          exploit Memory.lower_get0; try exact MEM. i. des.
+          exploit Memory.remove_get0; try exact REMOVE. i. des.
+          rewrite GET in *. inv GET0. econs; eauto.
+        - ii. exploit unchangable_promise; eauto. i.
+          exploit unchangable_rtc_increase; try exact STEPS; eauto. s. i. inv x6.
+          inv WRITE0. inv PROMISE0.
+          exploit Memory.lower_get0; try exact PROMISES. i. des. congr.
+      }
+      specialize (x5 x1 x2 x3 x4). exploit x5.
+      { econs. erewrite write_lower_promises; try exact WRITE0; eauto.
+        condtac; ss. des. subst. ss.
+      }
+      i. des; eauto.
+      right. inv x7. econs; eauto. ii.
+      apply NUNCHANGABLE. eapply unchangable_write; try exact WRITE_EX. ss.
   }
 
   { exploit step_split_pure; eauto; ss. i. des. esplits; eauto. }
@@ -1153,6 +1198,75 @@ Proof.
   { refl. }
 Qed.
 
+Lemma op_messages
+      promises1 loc from to msg promises2 kind
+      promises1' promises2'
+      fin
+      (OP: Memory.op promises1 loc from to msg promises2 kind)
+      (OP': Memory.op promises1' loc from to msg promises2' kind)
+      (MESSAGES1: Messages.of_memory promises1 <4= (Messages.of_memory promises1' \4/ fin)):
+  Messages.of_memory promises2 <4= (Messages.of_memory promises2' \4/ fin).
+Proof.
+  i. inv PR. revert GET.
+  inv OP; inv OP'; ss.
+  - erewrite Memory.add_o; eauto. condtac; ss; i.
+    + des. inv GET.
+      exploit Memory.add_get0; try exact ADD0. i. des.
+      left. econs. eauto.
+    + guardH o.
+      exploit MESSAGES1; try by (econs; eauto). i. des; eauto.
+      left. econs. inv x.
+      erewrite Memory.add_o; eauto. condtac; ss.
+  - erewrite Memory.split_o; eauto. repeat (condtac; ss); i.
+    + des. inv GET.
+      exploit Memory.split_get0; try exact SPLIT0. i. des.
+      left. econs. eauto.
+    + guardH o. des. inv GET.
+      exploit Memory.split_get0; try exact SPLIT0. i. des.
+      left. econs. eauto.
+    + guardH o. guardH o0.
+      exploit MESSAGES1; try by (econs; eauto). i. des; eauto.
+      left. econs. inv x.
+      erewrite Memory.split_o; eauto. repeat (condtac; ss).
+  - erewrite Memory.lower_o; eauto. condtac; ss; i.
+    + des. inv GET.
+      exploit Memory.lower_get0; try exact LOWER0. i. des.
+      left. econs. eauto.
+    + guardH o.
+      exploit MESSAGES1; try by (econs; eauto). i. des; eauto.
+      left. econs. inv x.
+      erewrite Memory.lower_o; eauto. condtac; ss.
+  - erewrite Memory.remove_o; eauto. condtac; ss; i.
+    guardH o.
+    exploit MESSAGES1; try by (econs; eauto). i. des; eauto.
+    left. econs. inv x.
+    erewrite Memory.remove_o; eauto. condtac; ss.
+Qed.
+
+Lemma promise_steps_messages
+      lang tr tr' (th1 th2 th1' th2': Thread.t lang)
+      fin
+      (STEPS: Trace.steps tr th1 th2)
+      (STEPS': Trace.steps tr' th1' th2')
+      (PROMISE: List.Forall (fun x => is_promise (snd x)) tr)
+      (TRACE: List.Forall2 (fun x y => snd x = snd y) tr tr')
+      (MESSAGES: Messages.of_memory th1.(Thread.local).(Local.promises) <4=
+                   (Messages.of_memory th1'.(Thread.local).(Local.promises) \4/ fin)):
+  __guard__ (Messages.of_memory th2.(Thread.local).(Local.promises) <4=
+             (Messages.of_memory th2'.(Thread.local).(Local.promises) \4/ fin)).
+Proof.
+  revert tr' th1' th2' STEPS' PROMISE TRACE MESSAGES.
+  induction STEPS; i; subst.
+  { inv TRACE. inv STEPS'; ss. }
+  inv TRACE. inv PROMISE. inv STEPS'. inv TR. ss. subst.
+  eapply IHSTEPS; eauto.
+  clear STEPS IHSTEPS STEPS0.
+  inv STEP; inv STEP1; try by (inv LOCAL; ss).
+  inv STEP0; inv STEP; try by (inv LOCAL0; ss).
+  inv LOCAL. inv LOCAL0. ss.
+  eapply op_messages; try eapply Memory.promise_op_promise; eauto.
+Qed.
+
 Lemma delayed_step
       lang (st0 st1 st2: Language.state lang) lc0 lc1 lc2
       mem1 sc1 mem2 sc2 fin
@@ -1204,13 +1318,20 @@ Proof.
     + etrans; eauto.
     + ss.
     + ss.
-  - 
-Admitted.
+  - hexploit promise_steps_messages; [exact STEPS1|exact PROMISES|..]; ss.
+    { repeat (eapply trace_eq_promise; eauto). }
+    { eapply Forall2_symm; eauto.
+      eapply Forall2_trans; eauto. congr.
+    }
+    { i. eapply FIN; eauto. }
+    i. exploit H1; eauto. i. des; eauto.
+    exploit FIN0; eauto. i. des; eauto.
+Qed.
 
 Lemma delayed_future
       mem1 sc1
       lang (st0 st1: lang.(Language.state)) lc0 lc1 mem0 sc0 fin0 fin1
-      (DELAYED: delayed st0 st1 lc0 lc1 mem0 sc0 fin0)
+      (DELAYED: delayed st0 st1 lc0 lc1 sc0 mem0 fin0)
       (MEM: Memory.closed mem1)
       (SC: Memory.closed_timemap sc1 mem1)
       (LOCAL: Local.wf lc1 mem1)
@@ -1219,5 +1340,5 @@ Lemma delayed_future
       (SC_FUTURE: TimeMap.le sc0 sc1)
       (FIN_FUTURE: fin0 <4= fin1)
   :
-    delayed st0 st1 lc0 lc1 mem1 sc1 fin1.
+    delayed st0 st1 lc0 lc1 sc1 mem1 fin1.
 Admitted.
