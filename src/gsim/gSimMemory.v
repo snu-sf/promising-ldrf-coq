@@ -27,6 +27,7 @@ Require Import MemoryMerge.
 Require Import FulfillStep.
 Require Import PromiseConsistent.
 Require Import JoinedView.
+Require Import MemoryProps.
 
 Require Import gSimAux.
 Require Import gSimulation.

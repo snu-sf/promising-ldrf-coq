@@ -26,6 +26,7 @@ Require Import MemorySplit.
 Require Import MemoryMerge.
 Require Import FulfillStep.
 Require Import PromiseConsistent.
+Require Import MemoryProps.
 
 Require Import Program.
 
@@ -391,11 +392,11 @@ End Messages.
 
 (* TODO: from MemoryProps.v *)
 Section UNCHANGABLE.
-  Inductive unchangable (mem prom: Memory.t) (l: Loc.t) (t: Time.t) (from: Time.t) (msg: Message.t): Prop :=
-  | unchangable_intro
-      (GET: Memory.get l t mem = Some (from, msg))
-      (NPROM: Memory.get l t prom = None)
-  .
+  (* Inductive unchangable (mem prom: Memory.t) (l: Loc.t) (t: Time.t) (from: Time.t) (msg: Message.t): Prop := *)
+  (* | unchangable_intro *)
+  (*     (GET: Memory.get l t mem = Some (from, msg)) *)
+  (*     (NPROM: Memory.get l t prom = None) *)
+  (* . *)
 
   Lemma promise_step_unchangable lc1 mem1 loc from to msg lc2 mem2 kind
         (STEP: Local.promise_step lc1 mem1 loc from to msg lc2 mem2 kind)

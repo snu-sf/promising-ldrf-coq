@@ -24,6 +24,7 @@ Require Import gSimAux.
 Require Import gSimMemory.
 Require Import gSimulation.
 Require Import JoinedView.
+Require Import MemoryProps.
 
 Require Import Program.
 
