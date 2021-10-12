@@ -46,14 +46,6 @@ Definition is_release_event (e: ProgramEvent.t): Prop :=
   | ProgramEvent.fence _ ord | ProgramEvent.write _ _ ord | ProgramEvent.update _ _ _ _ ord => Ordering.le Ordering.strong_relaxed ord
   end.
 
-Definition is_acquire_event (e: ProgramEvent.t): Prop :=
-  match e with
-  | ProgramEvent.syscall _ => True
-  | ProgramEvent.update _ _ _ _ _ => True (* PS2.1 forbids RMW-W reordering *)
-  | ProgramEvent.silent | ProgramEvent.failure | ProgramEvent.write _ _ _ => False
-  | ProgramEvent.fence ord _ | ProgramEvent.read _ _ ord => Ordering.le Ordering.acqrel ord
-  end.
-
 
 Module Perm.
   Variant t: Type :=
@@ -80,8 +72,8 @@ Module Flag.
   | debt
   .
 
-  Definition le (f_src f_tgt: t): bool :=
-    match f_src, f_tgt with
+  Definition le (f_tgt f_src: t): bool :=
+    match f_tgt, f_src with
     | debt, _ => true
     | _, debt => false
     | unwritten, _ => true
@@ -103,8 +95,8 @@ End Flag.
 Module Flags.
   Definition t := Loc.t -> Flag.t.
 
-  Definition le (f_src f_tgt: t): Prop :=
-    forall loc, Flag.le (f_src loc) (f_tgt loc).
+  Definition le (f_tgt f_src: t): Prop :=
+    forall loc, Flag.le (f_tgt loc) (f_src loc).
 
   Program Instance le_PreOrder: PreOrder le.
   Next Obligation.
@@ -421,20 +413,20 @@ Definition wf_diff_event (d: diffs) (e: ProgramEvent.t): Prop :=
     forall loc' (NEQ: loc' <> loc),
       match (d loc') with
       | diff_acq _ => False
-      | diff_rel => Ordering.le Ordering.acqrel ord
+      | diff_rel => Ordering.le Ordering.strong_relaxed ord
       | diff_none => True
       end
   | ProgramEvent.update loc _ _ ordr ordw =>
     forall loc' (NEQ: loc' <> loc),
       match (d loc') with
-      | diff_rel => Ordering.le Ordering.acqrel ordw
+      | diff_rel => Ordering.le Ordering.strong_relaxed ordw
       | diff_acq _ => Ordering.le Ordering.acqrel ordr
       | diff_none => True
       end
   | ProgramEvent.fence ordr ordw =>
     forall loc',
       match (d loc') with
-      | diff_rel => Ordering.le Ordering.acqrel ordw
+      | diff_rel => Ordering.le Ordering.strong_relaxed ordw
       | diff_acq _ => Ordering.le Ordering.acqrel ordr
       | diff_none => True
       end
@@ -493,7 +485,8 @@ Module Oracle.
       (STORE: forall p0 c0 loc ord val,
           exists d, progress (ProgramEvent.write loc val ord) o0 p0 c0 d)
       (FENCE: forall p0 ordr ordw
-                     (ORD: Ordering.le ordr Ordering.strong_relaxed),
+                     (ORDR: Ordering.le ordr Ordering.strong_relaxed)
+                     (ORDW: Ordering.le ordw Ordering.acqrel),
           exists d, progress (ProgramEvent.fence ordr ordw) o0 p0 None d)
     :
       _wf wf o0
