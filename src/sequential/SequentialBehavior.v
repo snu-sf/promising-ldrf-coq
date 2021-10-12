@@ -45,16 +45,16 @@ Module SeqEvent.
   Variant t: Set :=
   | read
       (loc: Loc.t) (val: Const.t) (ord: Ordering.t)
-      (d: diffs) (c: SeqCell.t) (f: option Flags.t)
+      (d: diffs) (c: SeqCell.t)
   | write
       (loc: Loc.t) (val: Const.t) (ord: Ordering.t)
       (d: diffs) (c: SeqCell.t) (m_released: option SeqMemory.t)
   | update
       (loc: Loc.t) (valr: Const.t) (valw: Const.t) (ordr: Ordering.t) (ordw: Ordering.t)
-      (d: diffs) (c: SeqCell.t) (f: option Flags.t) (m_released: option SeqMemory.t)
+      (d: diffs) (c: SeqCell.t) (m_released: option SeqMemory.t)
   | fence
       (ordr: Ordering.t) (ordw: Ordering.t)
-      (d: diffs) (f: option Flags.t) (m_released: option SeqMemory.t)
+      (d: diffs) (m_released: option SeqMemory.t)
   | syscall
       (e: Event.t)
       (d: diffs) (f: Flags.t) (m_released: SeqMemory.t)
@@ -64,28 +64,22 @@ Module SeqEvent.
     match e with
     | ProgramEvent.silent | ProgramEvent.failure => None
     | ProgramEvent.read loc val ord =>
-      let f := if Ordering.le Ordering.acqrel ord
-               then (Some (SeqMemory.flags m)) else None in
-      Some (read loc val ord d (m loc) f)
+      Some (read loc val ord d (m loc))
     | ProgramEvent.write loc val ord =>
       let m_released := if Ordering.le Ordering.strong_relaxed ord
                         then m_released
                         else None in
       Some (write loc val ord d (m loc) m_released)
     | ProgramEvent.update loc valr valw ordr ordw =>
-      let f := if Ordering.le Ordering.acqrel ordr
-               then (Some (SeqMemory.flags m)) else None in
       let m_released := if Ordering.le Ordering.strong_relaxed ordw
                         then m_released
                         else None in
-      Some (update loc valr valw ordr ordw d (m loc) f m_released)
+      Some (update loc valr valw ordr ordw d (m loc) m_released)
     | ProgramEvent.fence ordr ordw =>
-      let f := if Ordering.le Ordering.acqrel ordr
-               then (Some (SeqMemory.flags m)) else None in
       let m_released := if Ordering.le Ordering.strong_relaxed ordw
                         then m_released
                         else None in
-      Some (fence ordr ordw d f m_released)
+      Some (fence ordr ordw d m_released)
     | ProgramEvent.syscall e =>
       let f := (SeqMemory.flags m) in
       match m_released with
@@ -97,11 +91,10 @@ Module SeqEvent.
 
   Variant le: t -> t -> Prop :=
   | le_read
-      loc val ord d c0 c1 f0 f1
+      loc val ord d c0 c1
       (CELL: SeqCell.le c0 c1)
-      (FLAGS: option_rel Flags.le f0 f1)
     :
-      le (read loc val ord d c0 f0) (read loc val ord d c1 f1)
+      le (read loc val ord d c0) (read loc val ord d c1)
   | le_write
       loc val ord d c0 c1 m0 m1
       (CELL: SeqCell.le c0 c1)
@@ -109,21 +102,18 @@ Module SeqEvent.
     :
       le (write loc val ord d c0 m0) (write loc val ord d c1 m1)
   | le_update
-      loc valr valw ordr ordw d c0 c1 f0 f1 m0 m1
+      loc valr valw ordr ordw d c0 c1 m0 m1
       (CELL: SeqCell.le c0 c1)
-      (FLAGS: option_rel Flags.le f0 f1)
       (RELEASED: option_rel SeqMemory.le m0 m1)
     :
-      le (update loc valr valw ordr ordw d c0 f0 m0) (update loc valr valw ordr ordw d c1 f1 m1)
+      le (update loc valr valw ordr ordw d c0 m0) (update loc valr valw ordr ordw d c1 m1)
   | le_fence
-      ordr ordw d f0 f1 m0 m1
-      (FLAGS: option_rel Flags.le f0 f1)
+      ordr ordw d m0 m1
       (RELEASED: option_rel SeqMemory.le m0 m1)
     :
-      le (fence ordr ordw d f0 m0) (fence ordr ordw d f1 m1)
+      le (fence ordr ordw d m0) (fence ordr ordw d m1)
   | le_syscall
       e d f0 f1 m0 m1
-      (FLAGS: Flags.le f0 f1)
       (RELEASED: SeqMemory.le m0 m1)
     :
       le (syscall e d f0 m0) (syscall e d f1 m1)

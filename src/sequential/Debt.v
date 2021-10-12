@@ -447,41 +447,54 @@ Definition wf_released (m_released: option SeqMemory.t) (e: ProgramEvent.t): Pro
   | None => ~ is_release_event e
   end.
 
+Definition wf_cell (c: option SeqCell.t) (e: ProgramEvent.t): Prop :=
+  match e with
+  | ProgramEvent.read _ _ _ | ProgramEvent.write _ _ _ | ProgramEvent.update _ _ _ _ _ => is_some c
+  | _ => ~ is_some c
+  end.
+
+Definition get_cell (e: ProgramEvent.t) (m: SeqMemory.t): option SeqCell.t :=
+  match e with
+  | ProgramEvent.read loc _ _ | ProgramEvent.write loc _ _ | ProgramEvent.update loc _ _ _ _ => Some (m loc)
+  | _ => None
+  end.
+
 
 Module Oracle.
   Definition t: Type. Admitted.
 
   Definition step:
     forall (p0: Perms.t)
-           (mem0: SeqMemory.t)
            (e: ProgramEvent.t)
+           (c0: option SeqCell.t)
            (d: diffs)
            (m_released: option SeqMemory.t)
            (o0: t)
            (o1: t), Prop.
   Admitted.
 
-  Definition progress e o0 p0 mem0 d: Prop :=
+  Definition progress e o0 p0 c0 d: Prop :=
     forall m_released (WF: wf_released m_released e),
-      exists o1, step p0 mem0 e d m_released o0 o1.
+      exists o1, step p0 e c0 d m_released o0 o1.
 
   Variant _wf (wf: t -> Prop): t -> Prop :=
   | wf_intro
       (o0: t)
-      (WF: forall p0 mem0 e d (m_released: option SeqMemory.t) (o1: t)
-                  (STEP: step p0 mem0 e d m_released o0 o1),
+      (WF: forall p0 e c0 d (m_released: option SeqMemory.t) (o1: t)
+                  (STEP: step p0 e c0 d m_released o0 o1),
           (<<EVENT: wf_diff_event d e>>) /\
           (<<PERM: wf_diff_perms (is_accessing e) d p0>>) /\
+          (<<CELL: wf_cell c0 e>>) /\
           (<<RELEASED: wf_released m_released e>>) /\
           (<<ORACLE: wf o1>>))
-      (LOAD: forall p0 mem0 loc ord
+      (LOAD: forall p0 c0 loc ord
                     (ORD: Ordering.le ord Ordering.strong_relaxed),
-          exists v d, progress (ProgramEvent.read loc v ord) o0 p0 mem0 d)
-      (STORE: forall p0 mem0 loc ord val,
-          exists d, progress (ProgramEvent.write loc val ord) o0 p0 mem0 d)
-      (FENCE: forall p0 mem0 ordr ordw
+          exists v d, progress (ProgramEvent.read loc v ord) o0 p0 (Some c0) d)
+      (STORE: forall p0 c0 loc ord val,
+          exists d, progress (ProgramEvent.write loc val ord) o0 p0 c0 d)
+      (FENCE: forall p0 ordr ordw
                      (ORD: Ordering.le ordr Ordering.strong_relaxed),
-          exists d, progress (ProgramEvent.fence ordr ordw) o0 p0 mem0 d)
+          exists d, progress (ProgramEvent.fence ordr ordw) o0 p0 None d)
     :
       _wf wf o0
   .
@@ -533,7 +546,7 @@ Section LANG.
   | at_step_intro
       p0 p1 o0 o1 e d m_released st0 st1 m0 m_upd m1
       (STEP: lang.(Language.step) e st0 st1)
-      (ORACLE: Oracle.step p0 m0 e d m_released o0 o1)
+      (ORACLE: Oracle.step p0 e (get_cell e m0) d m_released o0 o1)
       (PERM: p1 = update_perm d p0)
       (MEM: m_upd = update_mem d m0)
       (RELEASE: SeqMemory.release m_upd m_released m1)
