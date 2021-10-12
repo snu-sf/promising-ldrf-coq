@@ -95,15 +95,24 @@ Lemma sim_memory_lower f_src b w mem_src mem_tgt0 mem_tgt1
     sim_memory f_src b w mem_src mem_tgt1.
 Admitted.
 
-Lemma sim_make_promise f_tgt w0 lc_src lc_tgt mem_src0 mem_tgt0 mem_tgt1
-      (LOCAL: sim_local flags_bot f_tgt false w0 lc_src lc_tgt)
-      (MEM: sim_memory flags_bot false w0 mem_src0 mem_tgt0)
-      (CAP: Memory.cap mem_tgt0 mem_tgt1)
+Lemma sim_make_promise lang_src
+      (st_src: lang_src.(Language.state))
+      f_src f_tgt w0 lc_src lc_tgt mem_src mem_tgt sc_src
+      loc b
+      (LOCAL: sim_local f_src f_tgt false w0 lc_src lc_tgt)
+      (MEM: sim_memory flags_bot false w0 mem_src mem_tgt)
   :
-    exists tm_src mem_src1 w1,
-      (<<TM: forall loc, Time.lt (Memory.max_ts loc mem_src0) (tm_src loc)>>) /\
-      (<<CAP: CapFlex.cap_flex mem_src0 mem_src1 tm_src>>) /\
-      (<<MEM: sim_memory flags_bot true w1 mem_src1 mem_tgt1>>) /\
-      (<<LOCAL: sim_local flags_bot f_tgt false w1 lc_src lc_tgt>>) /\
-      (<<WORLD: world_messages_le (Messages.of_memory lc_src.(Local.promises)) w0 w1>>).
+    exists mem_src' lc_src' w1,
+      (<<STEPS: rtc (@Thread.tau_step _)
+                    (Thread.mk _ st_src lc_src sc_src mem_src)
+                    (Thread.mk _ st_src lc_src' sc_src mem_src')>>) /\
+      (<<LOCAL: sim_local f_src f_tgt false w1 lc_src' lc_tgt>>) /\
+      (<<MEM: sim_memory f_src false w1 mem_src' mem_tgt>>) /\
+      (<<WORLD: world_messages_le (unchangable mem_src lc_src.(Local.promises)) w0 w1>>).
 Admitted.
+
+
+
+
+Definition update_flgas (f: flags) (l: Loc.t) (b: bool): flags :=
+  fun l' => if (Loc.eq_dec l' l) then b else f l'.
