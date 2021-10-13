@@ -516,12 +516,14 @@ Proof.
   rewrite x0. eauto.
 Qed.
 
-Lemma lower_step_sc
+Lemma lower_step_future
       lang e (th1 th2: Thread.t lang)
       (STEP: lower_step e th1 th2):
-  th1.(Thread.sc) = th2.(Thread.sc).
+  (<<SC: th1.(Thread.sc) = th2.(Thread.sc)>>) /\
+  (<<MEM: lower_memory th2.(Thread.memory) th1.(Thread.memory)>>).
 Proof.
-  inv STEP. inv STEP0. inv LOCAL; ss.
+  inv STEP. split; ss.
+  inv STEP0. inv LOCAL; ss.
   - inv LOCAL0. ss.
   - inv LOCAL2. ss.
   - inv LOCAL0.
@@ -530,13 +532,16 @@ Proof.
   - inv LOCAL0. ss.
 Qed.
 
-Lemma lower_steps_sc
+Lemma lower_steps_future
       lang (th1 th2: Thread.t lang)
       (STEPS: rtc (tau lower_step) th1 th2):
-  th1.(Thread.sc) = th2.(Thread.sc).
+  (<<SC: th1.(Thread.sc) = th2.(Thread.sc)>>) /\
+  (<<MEM: lower_memory th2.(Thread.memory) th1.(Thread.memory)>>).
 Proof.
   induction STEPS; eauto.
-  inv H. exploit lower_step_sc; try exact TSTEP; eauto. i. congr.
+  { splits; ss. refl. }
+  inv H. exploit lower_step_future; try exact TSTEP; eauto. i. des.
+  splits; try congr. etrans; eauto.
 Qed.
 
 
@@ -792,6 +797,22 @@ Proof.
     exploit Memory.remove_get0; try exact PROMISES. i. des.
     congr.
   }
+Qed.
+
+Lemma lower_remove_remove
+      mem1 loc from to msg1 msg2 mem2 mem3
+      (LOWER: Memory.lower mem1 loc from to msg1 msg2 mem2)
+      (REMOVE: Memory.remove mem2 loc from to msg2 mem3):
+  Memory.remove mem1 loc from to msg1 mem3.
+Proof.
+  exploit Memory.lower_get0; eauto. i. des.
+  exploit Memory.remove_exists; try exact GET. i. des.
+  replace mem0 with mem3 in *; ss.
+  apply Memory.ext. i.
+  erewrite Memory.remove_o; eauto.
+  erewrite Memory.lower_o; eauto.
+  erewrite (@Memory.remove_o mem0); eauto.
+  condtac; ss.
 Qed.
 
 Lemma write_lower_promises
@@ -1304,7 +1325,7 @@ Proof.
   exploit same_memory_promise_steps; [exact PROMISES|exact STEPS1|..]; eauto.
   { eapply Forall2_trans; eauto. congr. }
   s. i. subst. destruct th1'. ss.
-  exploit lower_steps_sc; try exact STEPS2. s. i. subst.
+  exploit lower_steps_future; try exact STEPS2. s. i. des. subst.
   exploit promise_steps_sc; try exact STEPS1; eauto.
   { repeat (eapply trace_eq_promise; eauto). }
   s. i. subst.
@@ -1328,17 +1349,433 @@ Proof.
     exploit FIN0; eauto. i. des; eauto.
 Qed.
 
+Lemma writable_mon_non_release
+      view1 view2 sc1 sc2 loc ts ord1 ord2
+      (VIEW: View.le view1 view2)
+      (ORD: Ordering.le ord1 ord2)
+      (WRITABLE: TView.writable view2 sc2 loc ts ord2):
+  TView.writable view1 sc1 loc ts ord1.
+Proof.
+  inv WRITABLE. econs; eauto.
+  eapply TimeFacts.le_lt_lt; try apply VIEW; auto.
+Qed.
+
+Lemma write_tview_mon_non_release
+      tview1 tview2 sc1 sc2 loc ts ord1 ord2
+      (TVIEW: TView.le tview1 tview2)
+      (WF2: TView.wf tview2)
+      (ORD: Ordering.le ord1 ord2):
+  TView.le
+    (TView.write_tview tview1 sc1 loc ts ord1)
+    (TView.write_tview tview2 sc2 loc ts ord2).
+Proof.
+  unfold TView.write_tview, View.singleton_ur_if.
+  econs; repeat (condtac; aggrtac);
+    (try by etrans; [apply TVIEW|aggrtac]);
+    (try by rewrite <- ? View.join_r; econs; aggrtac);
+    (try apply WF2).
+Qed.
+
+Lemma read_fence_tview_mon_non_release
+      tview1 tview2 ord1 ord2
+      (TVIEW: TView.le tview1 tview2)
+      (WF2: TView.wf tview2)
+      (ORD: Ordering.le ord1 ord2):
+  TView.le
+    (TView.read_fence_tview tview1 ord1)
+    (TView.read_fence_tview tview2 ord2).
+Proof.
+  unfold TView.read_fence_tview.
+  econs; repeat (condtac; aggrtac);
+    (try by etrans; [apply TVIEW|aggrtac]);
+    (try by rewrite <- ? View.join_r; aggrtac;
+     rewrite <- ? TimeMap.join_r; apply TVIEW).
+Qed.
+
+Lemma write_fence_tview_mon_non_release
+      tview1 tview2 sc1 sc2 ord1 ord2
+      (TVIEW: TView.le tview1 tview2)
+      (ORD: Ordering.le ord1 ord2)
+      (WF1: TView.wf tview1)
+      (NREL: Ordering.le ord2 Ordering.strong_relaxed):
+  TView.le
+    (TView.write_fence_tview tview1 sc1 ord1)
+    (TView.write_fence_tview tview2 sc2 ord2).
+Proof.
+  unfold TView.write_fence_tview, TView.write_fence_sc.
+  econs; repeat (condtac; aggrtac).
+  all: try by destruct ord1, ord2; ss.
+  all: try by etrans; [apply TVIEW|aggrtac].
+Qed.
+
+Lemma future_write_lower
+      promises1 mem1 loc from to msg promises2 mem2 kind
+      mem1' msg'
+      (WRITE: Memory.write promises1 mem1 loc from to msg promises2 mem2 kind)
+      (KIND: Memory.op_kind_is_lower kind)
+      (LE1: Memory.le promises1 mem1')
+      (MSG_LE: Message.le msg' msg)
+      (MSG_WF: Message.wf msg')
+      (MSG_CLOSED: Memory.closed_message msg' mem1')
+      (FUTURE1: Memory.future_weak mem1 mem1'):
+  exists mem2',
+    (<<WRITE': Memory.write promises1 mem1' loc from to msg' promises2 mem2' kind>>) /\
+    (<<FUTURE2: Memory.future_weak mem2 mem2'>>).
+Proof.
+  inv WRITE. inv PROMISE; ss.
+  exploit Memory.lower_get0; try exact PROMISES. i. des.
+  exploit Memory.lower_exists; try exact GET; try eapply MSG_WF.
+  { inv MEM. inv LOWER. ss. }
+  { etrans; eauto. }
+  i. des.
+  exploit Memory.lower_exists_le; try apply LE1; eauto. i. des.
+  exploit Memory.lower_get0; try exact x0. i. des.
+  exploit Memory.remove_exists; try exact GET2. i. des.
+  exploit lower_remove_remove; try exact PROMISES; eauto. i.
+  exploit lower_remove_remove; try exact x0; eauto. i.
+  exploit Memory.remove_inj; [exact x4|exact x3|]. i. subst.
+  clear x3 x4.
+  esplits.
+  { econs; try exact x2. econs; eauto.
+    - inv MSG_LE; ss. inv TS. econs. etrans; eauto.
+      inv RELEASED; try apply Time.bot_spec. apply LE.
+    - ii. subst. inv MSG_LE. ss.
+  }
+  { clear - FUTURE1 MEM x1 MSG_LE MSG_WF MSG_CLOSED TS.
+    inv FUTURE1. econs; i.
+    - revert GET. erewrite Memory.lower_o; eauto. condtac; ss; i.
+      + des. inv GET.
+        exploit Memory.lower_get0; try exact x1. i. des.
+        esplits; eauto; try refl. right. splits; ss.
+        eapply Memory.lower_closed_message; eauto.
+      + guardH o.
+        erewrite Memory.lower_o; eauto. condtac; ss. guardH o0.
+        exploit SOUND; eauto. i. des; esplits; eauto.
+        right. splits; auto.
+        eapply Memory.lower_closed_message; eauto.
+    - revert GET2. erewrite Memory.lower_o; eauto. condtac; ss; i.
+      + des. inv GET2. inv MSG_LE. inv MSG_WF. inv MSG_CLOSED. inv TS. splits; ss.
+        * eapply Memory.lower_closed_opt_view; eauto.
+        * etrans; eauto. inv RELEASED; try apply Time.bot_spec. apply LE.
+      + guardH o.
+        revert GET1. erewrite Memory.lower_o; eauto. condtac; ss. i. guardH o0.
+        exploit COMPLETE1; eauto. i. des. splits; auto.
+        eapply Memory.lower_closed_opt_view; eauto.
+    - revert GET2. erewrite Memory.lower_o; eauto. condtac; ss; i.
+      + des. inv GET2. inv MSG_LE. inv MSG_WF. inv MSG_CLOSED. inv TS. splits; ss.
+        * eapply Memory.lower_closed_opt_view; eauto.
+        * etrans; eauto. inv RELEASED; try apply Time.bot_spec. apply LE.
+      + guardH o.
+        revert GET1. erewrite Memory.lower_o; eauto. condtac; ss. i. guardH o0.
+        exploit COMPLETE2; eauto. i. des. splits; auto.
+        eapply Memory.lower_closed_opt_view; eauto.
+  }
+Qed.
+
+Lemma future_write_na_lower
+      ts promises1 mem1 loc from to val promises2 mem2 msgs kinds kind
+      ts' mem1'
+      (WRITE: Memory.write_na ts promises1 mem1 loc from to val promises2 mem2 msgs kinds kind)
+      (KINDS: List.Forall (fun x => Memory.op_kind_is_lower x) kinds)
+      (KIND: Memory.op_kind_is_lower kind)
+      (LE1: Memory.le promises1 mem1')
+      (TS: Time.le ts' ts)
+      (FUTURE1: Memory.future_weak mem1 mem1'):
+  exists mem2',
+    (<<WRITE': Memory.write_na ts' promises1 mem1' loc from to val promises2 mem2' msgs kinds kind>>) /\
+    (<<FUTURE2: Memory.future_weak mem2 mem2'>>).
+Proof.
+  revert ts' mem1' LE1 TS FUTURE1. induction WRITE; i.
+  { exploit future_write_lower; eauto. i. des.
+    esplits.
+    - econs 1; eauto. eapply TimeFacts.le_lt_lt; eauto.
+    - ss.
+  }
+  inv KINDS.
+  exploit future_write_lower; try exact WRITE_EX; try exact LE1; try refl; eauto.
+  { unguard. des; subst; ss. econs. ss. }
+  { unguard. des; subst; ss. econs. ss. }
+  i. des.
+  hexploit Memory.write_le; try exact WRITE'; eauto. i. des.
+  exploit IHWRITE; eauto; try refl. i. des.
+  esplits.
+  - econs 2; eauto. eapply TimeFacts.le_lt_lt; eauto.
+  - ss.
+Qed.
+
+Lemma future_read_step
+      lc1 mem1 loc to val released ord lc2
+      lc1' mem1'
+      (STEP: Local.read_step lc1 mem1 loc to val released ord lc2)
+      (LOCAL1: lower_local lc1' lc1)
+      (MEM1: Memory.future_weak mem1 mem1')
+      (WF: Local.wf lc1 mem1)
+      (CLOSED: Memory.closed mem1):
+  exists lc2' released',
+    (<<STEP': Local.read_step lc1' mem1' loc to val released' ord lc2'>>) /\
+    (<<RELEASED: View.opt_le released' released>>) /\
+    (<<LOCAL2: lower_local lc2' lc2>>).
+Proof.
+  inv STEP.
+  exploit Memory.future_weak_get1; try exact GET; eauto; ss. i. des. inv MSG_LE.
+  esplits.
+  - econs; eauto.
+    inv LOCAL1. ss.
+    eapply TViewFacts.readable_mon; try apply TVIEW; eauto. refl.
+  - ss.
+  - inv LOCAL1. ss. econs.
+    eapply TViewFacts.read_tview_mon; try apply TVIEW; eauto.
+    + apply WF.
+    + inv CLOSED. exploit CLOSED0; eauto. i. des. inv MSG_WF. ss.
+    + refl.
+Qed.
+
+Lemma future_write_step
+      lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
+      lc1' sc1' mem1' releasedm'
+      (STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
+      (KIND: Memory.op_kind_is_lower kind)
+      (LOCAL1: lower_local lc1' lc1)
+      (MEM1: Memory.future_weak mem1 mem1')
+      (RELM_LE: View.opt_le releasedm' releasedm)
+      (RELM_WF: View.opt_wf releasedm)
+      (RELM_CLOSED: Memory.closed_opt_view releasedm mem1)
+      (RELM_WF': View.opt_wf releasedm')
+      (RELM_CLOSED': Memory.closed_opt_view releasedm' mem1')
+      (WF: Local.wf lc1 mem1)
+      (WF': Local.wf lc1' mem1')
+      (CLOSED: Memory.closed mem1)
+      (CLOSED': Memory.closed mem1'):
+  exists released' lc2' sc2' mem2',
+    (<<STEP': Local.write_step lc1' sc1' mem1' loc from to val releasedm' released' ord lc2' sc2' mem2' kind>>) /\
+    (<<LOCAL2: lower_local lc2' lc2>>) /\
+    (<<MEM2: Memory.future_weak mem2 mem2'>>).
+Proof.
+  inv STEP. inv LOCAL1. ss.
+  exploit TViewFacts.write_future0; try apply WF'; try apply RELM_WF'. s. i. des.
+  exploit future_write_lower; try exact WRITE.
+  { ss. }
+  { apply WF'. }
+  { econs. eapply TViewFacts.write_released_mon; eauto; try refl. apply WF. }
+  { eauto. }
+  { econs. unfold TView.write_released. condtac; ss. econs.
+    apply Memory.join_closed_view.
+    - inv RELM_CLOSED'; ss. inv CLOSED'. econs; ii; eauto.
+    - unfold LocFun.add. condtac; ss.
+      inv WRITE. inv PROMISE; ss.
+      exploit Memory.lower_get0; try exact MEM. i. des. inv MSG_LE.
+      exploit Memory.future_weak_get1; try exact GET; eauto; ss. i. des. inv MSG_LE.
+      condtac; apply Memory.join_closed_view; try apply WF'; viewtac.
+  }
+  { ss. }
+  i. des. esplits.
+  - econs; eauto. ss.
+    eapply writable_mon_non_release; eauto; try refl. apply TVIEW.
+  - econs; ss. eapply write_tview_mon_non_release; eauto; try refl. apply WF.
+  - ss.
+Qed.
+
+Lemma future_write_na_step
+      lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 msgs kinds kind
+      lc1' sc1' mem1'
+      (STEP: Local.write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 msgs kinds kind)
+      (KINDS: List.Forall (fun x => Memory.op_kind_is_lower x) kinds)
+      (KIND: Memory.op_kind_is_lower kind)
+      (LOCAL1: lower_local lc1' lc1)
+      (MEM1: Memory.future_weak mem1 mem1')
+      (WF: Local.wf lc1 mem1)
+      (WF': Local.wf lc1' mem1')
+      (CLOSED: Memory.closed mem1)
+      (CLOSED': Memory.closed mem1'):
+  exists lc2' sc2' mem2',
+    (<<STEP': Local.write_na_step lc1' sc1' mem1' loc from to val ord lc2' sc2' mem2' msgs kinds kind>>) /\
+    (<<LOCAL2: lower_local lc2' lc2>>) /\
+    (<<MEM2: Memory.future_weak mem2 mem2'>>).
+Proof.
+  inv STEP. inv LOCAL1. ss.
+  exploit future_write_na_lower; try exact WRITE; try exact MEM1;
+    eauto; try apply WF'; try apply TVIEW. i. des.
+  esplits.
+  - econs; eauto.
+  - econs; ss. eapply write_tview_mon_non_release; eauto; try refl. apply WF.
+  - ss.
+Qed.
+
+Lemma future_is_racy
+      lc1 mem1 loc ord
+      lc1' mem1'
+      (STEP: Local.is_racy lc1 mem1 loc ord)
+      (LOCAL1: lower_local lc1' lc1)
+      (MEM1: Memory.future_weak mem1 mem1')
+      (WF: Local.wf lc1 mem1)
+      (CLOSED: Memory.closed mem1):
+  <<STEP': Local.is_racy lc1' mem1' loc ord>>.
+Proof.
+  inv STEP. inv LOCAL1. ss.
+  exploit Memory.future_weak_get1; eauto. i. des.
+  econs; eauto; ss.
+  - eapply TViewFacts.racy_view_mon; try apply TVIEW; eauto.
+  - ii. subst. inv MSG_LE. ss.
+  - i. exploit MSG2; eauto. i. subst. inv MSG_LE. ss.
+Qed.
+
+Lemma future_lower_step
+      lang e
+      st1 lc1 sc1 mem1
+      st2 lc2 sc2 mem2
+      lc1' sc1' mem1'
+      (STEP: @lower_step lang e (Thread.mk _ st1 lc1 sc1 mem1) (Thread.mk _ st2 lc2 sc2 mem2))
+      (LOCAL1: lower_local lc1' lc1)
+      (MEM1: Memory.future_weak mem1 mem1')
+      (WF: Local.wf lc1 mem1)
+      (WF': Local.wf lc1' mem1')
+      (SC: Memory.closed_timemap sc1 mem1)
+      (SC': Memory.closed_timemap sc1' mem1')
+      (CLOSED: Memory.closed mem1)
+      (CLOSED': Memory.closed mem1'):
+  exists e' lc2' sc2' mem2',
+    (<<STEP': lower_step e' (Thread.mk _ st1 lc1' sc1' mem1') (Thread.mk _ st2 lc2' sc2' mem2')>>) /\
+    (<<EVENT: ThreadEvent.get_machine_event e = ThreadEvent.get_machine_event e'>>) /\
+    (<<LOCAL2: lower_local lc2' lc2>>) /\
+    (<<MEM2: Memory.future_weak mem2 mem2'>>).
+Proof.
+  inv STEP. inv STEP0. inv LOCAL; ss.
+  { (* silent *)
+    esplits; eauto.
+    - econs; [econs; eauto|..]; eauto. refl.
+    - ss.
+  }
+
+  { (* read *)
+    exploit future_read_step; try exact LOCAL0; try exact LOCAL1; try exact MEM1; eauto. i. des.
+    esplits.
+    - econs.
+      + econs; [|econs 2]; eauto.
+      + ss.
+      + ss. refl.
+    - ss.
+    - ss.
+    - ss.
+  }
+
+  { (* write *)
+    exploit future_write_step; try exact LOCAL0; try exact LOCAL1; try exact SC1; try exact MEM1; eauto.
+    { inv LOCAL0. eapply write_lower_memory_lower; eauto. }
+    i. des. esplits.
+    - econs.
+      + econs; [|econs 3]; eauto.
+      + ss.
+      + ss. inv LOCAL0. inv STEP'.
+        eapply write_lower_lower_memory; eauto.
+        eapply write_lower_memory_lower; try exact WRITE; eauto.
+    - ss.
+    - ss.
+    - ss.
+  }
+
+  { (* update *)
+    exploit future_read_step; try exact LOCAL0; try exact LOCAL1; try exact MEM1; eauto. i. des.
+    exploit Local.read_step_future; try exact LOCAL0; eauto. i. des.
+    exploit Local.read_step_future; try exact STEP'; eauto. i. des.
+    exploit future_write_step; try exact LOCAL2;
+      try exact LOCAL3; try exact SC1; try exact MEM1; try exact RELEASED; eauto.
+    { inv LOCAL2. eapply write_lower_memory_lower; eauto. }
+    i. des. esplits.
+    - econs.
+      + econs; [|econs 4]; eauto.
+      + ss.
+      + ss. inv LOCAL2. inv STEP'0.
+        eapply write_lower_lower_memory; eauto.
+        eapply write_lower_memory_lower; try exact WRITE; eauto.
+    - ss.
+    - ss.
+    - ss.
+  }
+
+  { (* fence *)
+    inv LOCAL0. esplits.
+    - econs.
+      + econs; [|econs 5]; eauto. econs; eauto; ss. i. subst. ss.
+      + ss.
+      + ss. refl.
+    - ss.
+    - inv LOCAL1. econs. ss.
+      eapply write_fence_tview_mon_non_release; eauto; try refl.
+      + eapply read_fence_tview_mon_non_release; eauto; try refl. apply WF.
+      + eapply TViewFacts.read_fence_future; apply WF'.
+      + destruct ordw; ss.
+    - ss.
+  }
+
+  { (* na write *)
+    exploit future_write_na_step; try exact LOCAL0; try exact LOCAL1; try exact SC1; try exact MEM1; eauto.
+    { inv LOCAL0. eapply write_na_lower_memory_lower; eauto. }
+    { inv LOCAL0. eapply write_na_lower_memory_lower; eauto. }
+    i. des. esplits.
+    - econs.
+      + econs; [|econs 8]; eauto.
+      + ss.
+      + ss. inv LOCAL0. inv STEP'.
+        eapply write_na_lower_lower_memory; eauto;
+          eapply write_na_lower_memory_lower; try exact WRITE; eauto.
+    - ss.
+    - ss.
+    - ss.
+  }
+
+  { (* racy read *)
+    inv LOCAL0.
+    exploit future_is_racy; try exact RACE; try exact LOCAL1; try exact MEM1; eauto. i. des.
+    esplits.
+    - econs.
+      + econs; [|econs 9]; eauto.
+      + ss.
+      + ss. refl.
+    - ss.
+    - ss.
+    - ss.
+  }
+Qed.
+
 Lemma delayed_future
       mem1 sc1
       lang (st0 st1: lang.(Language.state)) lc0 lc1 mem0 sc0 fin0 fin1
       (DELAYED: delayed st0 st1 lc0 lc1 sc0 mem0 fin0)
-      (MEM: Memory.closed mem1)
+      (WF0': Local.wf lc0 mem1)
+      (WF1': Local.wf lc1 mem1)
       (SC: Memory.closed_timemap sc1 mem1)
-      (LOCAL: Local.wf lc1 mem1)
-      (FIN: fin1 <4= unchangable mem1 lc1.(Local.promises))
-      (MEM_FUTURE: Memory.future mem0 mem1)
-      (SC_FUTURE: TimeMap.le sc0 sc1)
-      (FIN_FUTURE: fin0 <4= fin1)
-  :
+      (MEM: Memory.closed mem1)
+      (MEM_FUTURE: Memory.future_weak mem0 mem1)
+      (FIN_FUTURE: fin0 <4= fin1):
     delayed st0 st1 lc0 lc1 sc1 mem1 fin1.
-Admitted.
+Proof.
+  unfold delayed in *. des. splits; auto.
+  { i. hexploit FIN; eauto. i. des; eauto. }
+  clear fin0 fin1 FIN FIN_FUTURE.
+  cut (exists lc2' sc2' mem1',
+          rtc (tau lower_step) (Thread.mk _ st0 lc0 sc1 mem1) (Thread.mk _ st1 lc2' sc2' mem1') /\
+          lower_local lc2' lc1').
+  { i. des.
+    exploit lower_steps_future; try exact H. s. i. des. subst.
+    esplits; eauto. etrans; eauto.
+  }
+  clear lc1 LOCAL1 LOCAL WF1' MEM1.
+  rename LOCAL0 into WF0, WF0' into WF.
+  assert (LOCAL: lower_local lc0 lc0) by refl.
+  revert LOCAL WF. generalize lc0 at 1 3 4.
+  remember (Thread.mk lang st0 lc0 sc0 mem0) as th0.
+  remember (Thread.mk lang st1 lc1' sc0 mem') as th1.
+  move STEPS at top. revert_until STEPS.
+  induction STEPS; i; subst.
+  { inv Heqth1. esplits; eauto. }
+  inv H. destruct y.
+  exploit lower_step_future; try exact TSTEP. s. i. des. subst.
+  exploit future_lower_step; try exact TSTEP;
+    try exact LOCAL; try exact MEM_FUTURE; eauto. i. des.
+  exploit Thread.step_future; try eapply lower_step_step; try exact TSTEP; eauto. s. i. des.
+  exploit Thread.step_future; try eapply lower_step_step; try exact STEP'; eauto. s. i. des.
+  exploit IHSTEPS; try exact LOCAL2; try exact MEM2; eauto. i. des.
+  esplits.
+  - econs 2; eauto. econs; eauto. congr.
+  - ss.
+Qed.
