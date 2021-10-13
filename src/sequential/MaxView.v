@@ -32,9 +32,9 @@ Require Import JoinedView.
 
 Set Implicit Arguments.
 
-Variant max_readable (mem prom: Memory.t) (loc: Loc.t) (ts: Time.t) (val: Const.t): Prop :=
+Variant max_readable (mem prom: Memory.t) (loc: Loc.t) (ts: Time.t) (val: Const.t) (released: option View.t): Prop :=
 | max_readable_intro
-    from released
+    from
     (GET: Memory.get loc ts mem = Some (from, Message.concrete val released))
     (NONE: Memory.get loc ts prom = None)
     (MAX: forall ts' from' msg
@@ -44,11 +44,11 @@ Variant max_readable (mem prom: Memory.t) (loc: Loc.t) (ts: Time.t) (val: Const.
         Memory.get loc ts' prom = Some (from', msg))
 .
 
-Lemma max_readable_inj mem prom loc ts0 ts1 val0 val1
-      (MAX0: max_readable mem prom loc ts0 val0)
-      (MAX1: max_readable mem prom loc ts1 val1)
+Lemma max_readable_inj mem prom loc ts0 ts1 val0 val1 released0 released1
+      (MAX0: max_readable mem prom loc ts0 val0 released0)
+      (MAX1: max_readable mem prom loc ts1 val1 released1)
   :
-    (<<TS: ts0 = ts1>>) /\ (<<VAL: val0 = val1>>).
+    (<<TS: ts0 = ts1>>) /\ (<<VAL: val0 = val1>>) /\ (<<RELEASED: released0 = released1>>).
 Proof.
   inv MAX0. inv MAX1.
   assert (ts0 = ts1).
@@ -89,14 +89,14 @@ Proof.
 Qed.
 
 
-Lemma max_readable_view_mon mem prom tvw0 tvw1 loc ts val
-      (MAX: max_readable mem prom loc ts val)
+Lemma max_readable_view_mon mem prom tvw0 tvw1 loc ts val released
+      (MAX: max_readable mem prom loc ts val released)
       (TS: tvw0.(TView.cur).(View.pln) loc = ts)
       (TVIEW: TView.le tvw0 tvw1)
       (CONS: Local.promise_consistent (Local.mk tvw1 prom))
       (WF: Local.wf (Local.mk tvw1 prom) mem)
   :
-    max_readable mem prom loc (tvw1.(TView.cur).(View.pln) loc) val.
+    max_readable mem prom loc (tvw1.(TView.cur).(View.pln) loc) val released.
 Proof.
   subst. replace (tvw1.(TView.cur).(View.pln) loc) with (tvw0.(TView.cur).(View.pln) loc); auto.
   apply TimeFacts.antisym.
@@ -111,12 +111,12 @@ Proof.
 Qed.
 
 Lemma non_max_readable_future mem0 mem1 prom tvw loc ts
-      (MAX: forall val, ~ max_readable mem0 prom loc ts val)
+      (MAX: forall val released, ~ max_readable mem0 prom loc ts val released)
       (TS: tvw.(TView.cur).(View.pln) loc = ts)
       (FUTURE: Memory.future_weak mem0 mem1)
       (WF: Local.wf (Local.mk tvw prom) mem0)
   :
-    forall val, ~ max_readable mem1 prom loc ts val.
+    forall val released, ~ max_readable mem1 prom loc ts val released.
 Proof.
   subst. ii. inv H.
   inv WF. inv TVIEW_CLOSED. inv CUR. specialize (PLN loc). des. ss.
@@ -129,15 +129,15 @@ Proof.
 Qed.
 
 
-Lemma max_readable_read_only mem prom tvw loc ts val
-      ts' val' released lc
-      (MAX: max_readable mem prom loc ts val)
+Lemma max_readable_read_only mem prom tvw loc ts val released
+      ts' val' released' lc
+      (MAX: max_readable mem prom loc ts val released)
       (TS: tvw.(TView.cur).(View.pln) loc = ts)
-      (READ: Local.read_step (Local.mk tvw prom) mem loc ts' val' released Ordering.na lc)
+      (READ: Local.read_step (Local.mk tvw prom) mem loc ts' val' released' Ordering.na lc)
       (CONS: Local.promise_consistent lc)
       (WF: Local.wf (Local.mk tvw prom) mem)
   :
-    (<<TS: ts' = ts>>) /\ (<<VAL: val' = val>>) /\ (<<LOCAL: lc = Local.mk tvw prom>>).
+    (<<TS: ts' = ts>>) /\ (<<VAL: val' = val>>) /\ (<<RELEASED: released' = released>>) /\ (<<LOCAL: lc = Local.mk tvw prom>>).
 Proof.
   inv READ. ss. assert (ts' = tvw.(TView.cur).(View.pln) loc).
   { apply TimeFacts.antisym.
@@ -160,8 +160,8 @@ Proof.
   apply read_tview_max. apply WF.
 Qed.
 
-Lemma max_readable_not_racy mem prom tvw loc ts val ord
-      (MAX: max_readable mem prom loc ts val)
+Lemma max_readable_not_racy mem prom tvw loc ts val released ord
+      (MAX: max_readable mem prom loc ts val released)
       (TS: tvw.(TView.cur).(View.pln) loc = ts)
       (RACE: Local.is_racy (Local.mk tvw prom) mem loc ord)
       (WF: Local.wf (Local.mk tvw prom) mem)
@@ -172,9 +172,9 @@ Proof.
   i. ss. clarify.
 Qed.
 
-Lemma max_readable_not_read_race mem prom tvw loc ts val
+Lemma max_readable_not_read_race mem prom tvw loc ts val released
       val' ord
-      (MAX: max_readable mem prom loc ts val)
+      (MAX: max_readable mem prom loc ts val released)
       (TS: tvw.(TView.cur).(View.pln) loc = ts)
       (READ: Local.racy_read_step (Local.mk tvw prom) mem loc val' ord)
       (WF: Local.wf (Local.mk tvw prom) mem)
@@ -184,8 +184,8 @@ Proof.
   inv READ. eapply max_readable_not_racy; eauto.
 Qed.
 
-Lemma max_readable_not_write_race mem prom tvw loc ts val ord
-      (MAX: max_readable mem prom loc ts val)
+Lemma max_readable_not_write_race mem prom tvw loc ts val released ord
+      (MAX: max_readable mem prom loc ts val released)
       (TS: tvw.(TView.cur).(View.pln) loc = ts)
       (WRITE: Local.racy_write_step (Local.mk tvw prom) mem loc ord)
       (WF: Local.wf (Local.mk tvw prom) mem)
@@ -195,8 +195,8 @@ Proof.
   inv WRITE. eapply max_readable_not_racy; eauto.
 Qed.
 
-Lemma max_readable_read mem prom tvw loc ts val
-      (MAX: max_readable mem prom loc ts val)
+Lemma max_readable_read mem prom tvw loc ts val released
+      (MAX: max_readable mem prom loc ts val released)
       (TS: tvw.(TView.cur).(View.pln) loc = ts)
       (WF: Local.wf (Local.mk tvw prom) mem)
   :
@@ -552,8 +552,8 @@ Proof.
   }
 Qed.
 
-Lemma max_readable_na_write_step mem0 prom0 tvw0 loc ts from to val0 val1 sc
-      (MAX: max_readable mem0 prom0 loc ts val0)
+Lemma max_readable_na_write_step mem0 prom0 tvw0 loc ts from to val0 val1 released sc
+      (MAX: max_readable mem0 prom0 loc ts val0 released)
       (TS: tvw0.(TView.cur).(View.pln) loc = ts)
       (WF: Local.wf (Local.mk tvw0 prom0) mem0)
       (INHABITED: Memory.inhabited mem0)
@@ -573,7 +573,7 @@ Lemma max_readable_na_write_step mem0 prom0 tvw0 loc ts from to val0 val1 sc
       (<<WRITE: Local.write_na_step (Local.mk tvw0 prom1) sc mem1 loc from to val1 Ordering.na (Local.mk tvw1 prom3) sc mem3 msgs ks Memory.op_kind_add>>) /\
       (<<VIEW: tvw1.(TView.cur).(View.pln) loc = to>>) /\
       (<<MAXTS: Memory.max_ts loc mem3 = to>>) /\
-      (<<MAX: max_readable mem3 prom3 loc to val1>>)
+      (<<MAX: max_readable mem3 prom3 loc to val1 None>>)
 .
 Proof.
   hexploit (@remove_reserves_loc prom0 mem0 loc).
@@ -618,7 +618,7 @@ Proof.
 Qed.
 
 Lemma non_max_readable_race mem prom tvw loc
-      (MAX: forall val, ~ max_readable mem prom loc (tvw.(TView.cur).(View.pln) loc) val)
+      (MAX: forall val released, ~ max_readable mem prom loc (tvw.(TView.cur).(View.pln) loc) val released)
       (WF: Local.wf (Local.mk tvw prom) mem)
       (CONS: Local.promise_consistent (Local.mk tvw prom))
   :
@@ -641,7 +641,7 @@ Proof.
 Qed.
 
 Lemma non_max_readable_read mem prom tvw loc ts val'
-      (MAX: forall val, ~ max_readable mem prom loc ts val)
+      (MAX: forall val released, ~ max_readable mem prom loc ts val released)
       (TS: tvw.(TView.cur).(View.pln) loc = ts)
       (WF: Local.wf (Local.mk tvw prom) mem)
       (CONS: Local.promise_consistent (Local.mk tvw prom))
@@ -652,7 +652,7 @@ Proof.
 Qed.
 
 Lemma non_max_readable_write mem prom tvw loc ts
-      (MAX: forall val, ~ max_readable mem prom loc ts val)
+      (MAX: forall val released, ~ max_readable mem prom loc ts val released)
       (TS: tvw.(TView.cur).(View.pln) loc = ts)
       (WF: Local.wf (Local.mk tvw prom) mem)
       (CONS: Local.promise_consistent (Local.mk tvw prom))

@@ -36,8 +36,23 @@ Set Implicit Arguments.
 
 Definition world: Type. Admitted.
 Variable world_messages_le: Messages.t -> world -> world -> Prop.
+
+Definition value_map := Loc.t -> option Const.t.
+
+Definition value_map_le (vm0 vm1: value_map): Prop :=
+  forall loc,
+    match (vm0 loc), (vm1 loc) with
+    | _, None => True
+    | Some v0, Some v1 => v0 = v1
+    | _, _ => False
+    end.
+
+
 Definition flags := Loc.t -> bool.
 Definition flags_bot: flags := fun _ => false.
+
+Definition flags_le (f_tgt f_src: flags): Prop :=
+  forall loc, (f_tgt loc) -> (f_src loc).
 
 Definition update_flags (f: flags) (l: Loc.t) (b: bool): flags :=
   fun l' => if (Loc.eq_dec l' l) then b else f l'.
