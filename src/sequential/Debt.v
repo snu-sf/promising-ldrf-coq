@@ -577,7 +577,7 @@ Section SIMULATION.
       (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
       (<<TERMINAL_SRC: lang_src.(Language.is_terminal) st_src1.(SeqState.state)>>) /\
       (<<TERMINAL: sim_terminal st_src1.(SeqState.state) st_tgt0.(SeqState.state)>>) /\
-      (<<MEM: SeqMemory.le st_src1.(SeqState.memory) st_tgt0.(SeqState.memory)>>).
+      (<<MEM: SeqMemory.le st_tgt0.(SeqState.memory) st_src1.(SeqState.memory)>>).
 
   Definition sim_seq_na_step_case
              (sim_seq:
@@ -610,12 +610,16 @@ Section SIMULATION.
       (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
       (<<MEM: SeqMemory.match_event e st_tgt0.(SeqState.memory) st_src1.(SeqState.memory)>>) /\
       (<<STEP: lang_src.(Language.step) e st_src1.(SeqState.state) st_src2>>) /\
-      (<<SIM: forall d
+      (<<SIM: forall d mem_released mem_tgt
                      (EVENT: wf_diff_event d e)
-                     (PERM: wf_diff_perms (is_accessing e) d p0),
-          (<<SIM: sim_seq (update_perm d p0)
-                          (SeqState.mk _ st_src2 (update_mem d st_src1.(SeqState.memory)))
-                          (SeqState.mk _ st_tgt1 (update_mem d st_tgt0.(SeqState.memory)))>>)>>).
+                     (PERM: wf_diff_perms (is_accessing e) d p0)
+                     (RELEASED: wf_released mem_released e)
+                     (MEM: SeqMemory.release (update_mem d st_tgt0.(SeqState.memory)) mem_released mem_tgt),
+          exists mem_src,
+            (<<MEM: SeqMemory.release (update_mem d st_src1.(SeqState.memory)) mem_released mem_src>>) /\
+            (<<SIM: sim_seq (update_perm d p0)
+                            (SeqState.mk _ st_src2 mem_src)
+                            (SeqState.mk _ st_tgt1 mem_tgt)>>)>>).
 
   Definition sim_seq_partial_case
              (p0: Perms.t)
@@ -662,7 +666,7 @@ Section SIMULATION.
     { econs 1; eauto.
       { ii. exploit NASTEP; eauto. i. des. esplits; eauto. }
       { ii. exploit ATSTEP; eauto. i. des. esplits; eauto.
-        i. hexploit SIM; eauto. }
+        i. hexploit SIM; eauto. i. des. esplits; eauto. }
     }
     { econs 2; eauto. }
   Qed.
