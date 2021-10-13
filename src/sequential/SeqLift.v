@@ -30,6 +30,8 @@ Require Import gSimAux.
 Require Import LowerMemory.
 Require Import JoinedView.
 
+Require Import MaxView.
+
 Set Implicit Arguments.
 
 Definition world: Type. Admitted.
@@ -37,7 +39,7 @@ Variable world_messages_le: Messages.t -> world -> world -> Prop.
 Definition flags := Loc.t -> bool.
 Definition flags_bot: flags := fun _ => false.
 
-Definition update_flgas (f: flags) (l: Loc.t) (b: bool): flags :=
+Definition update_flags (f: flags) (l: Loc.t) (b: bool): flags :=
   fun l' => if (Loc.eq_dec l' l) then b else f l'.
 
 
@@ -95,10 +97,30 @@ Lemma sim_memory_lower f_src b w mem_src mem_tgt0 mem_tgt1
     sim_memory f_src b w mem_src mem_tgt1.
 Admitted.
 
-Lemma sim_make_promise lang_src
+Lemma sim_make_promise_match lang_src
       (st_src: lang_src.(Language.state))
       f_src f_tgt w0 lc_src lc_tgt mem_src mem_tgt sc_src
-      loc b
+      loc
+      (FLAG: f_src loc = true)
+      (LOCAL: sim_local f_src f_tgt false w0 lc_src lc_tgt)
+      (MEM: sim_memory flags_bot false w0 mem_src mem_tgt)
+      (VAL: forall ts_tgt v (MAX: max_readable mem_tgt lc_tgt.(Local.promises) loc ts_tgt v),
+          exists ts_src, max_readable mem_src lc_src.(Local.promises) loc ts_src v)
+  :
+    exists mem_src' lc_src' w1,
+      (<<STEPS: rtc (@Thread.tau_step _)
+                    (Thread.mk _ st_src lc_src sc_src mem_src)
+                    (Thread.mk _ st_src lc_src' sc_src mem_src')>>) /\
+      (<<LOCAL: sim_local (update_flags f_src loc false) (update_flags f_tgt loc false) false w1 lc_src' lc_tgt>>) /\
+      (<<MEM: sim_memory f_src false w1 mem_src' mem_tgt>>) /\
+      (<<WORLD: world_messages_le (unchangable mem_src lc_src.(Local.promises)) w0 w1>>).
+Admitted.
+
+Lemma sim_make_promise_not_match lang_src
+      (st_src: lang_src.(Language.state))
+      f_src f_tgt w0 lc_src lc_tgt mem_src mem_tgt sc_src
+      loc
+      (FLAG: f_src loc = true)
       (LOCAL: sim_local f_src f_tgt false w0 lc_src lc_tgt)
       (MEM: sim_memory flags_bot false w0 mem_src mem_tgt)
   :
@@ -106,13 +128,7 @@ Lemma sim_make_promise lang_src
       (<<STEPS: rtc (@Thread.tau_step _)
                     (Thread.mk _ st_src lc_src sc_src mem_src)
                     (Thread.mk _ st_src lc_src' sc_src mem_src')>>) /\
-      (<<LOCAL: sim_local f_src f_tgt false w1 lc_src' lc_tgt>>) /\
+      (<<LOCAL: sim_local (update_flags f_src loc false) (update_flags f_tgt loc true) false w1 lc_src' lc_tgt>>) /\
       (<<MEM: sim_memory f_src false w1 mem_src' mem_tgt>>) /\
       (<<WORLD: world_messages_le (unchangable mem_src lc_src.(Local.promises)) w0 w1>>).
 Admitted.
-
-
-
-
-Definition update_flgas (f: flags) (l: Loc.t) (b: bool): flags :=
-  fun l' => if (Loc.eq_dec l' l) then b else f l'.
