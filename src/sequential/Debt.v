@@ -46,6 +46,14 @@ Definition is_release_event (e: ProgramEvent.t): Prop :=
   | ProgramEvent.fence _ ord | ProgramEvent.write _ _ ord | ProgramEvent.update _ _ _ _ ord => Ordering.le Ordering.strong_relaxed ord
   end.
 
+Definition is_acquire_event (e: ProgramEvent.t): Prop :=
+  match e with
+  | ProgramEvent.syscall _ => True
+  | ProgramEvent.silent | ProgramEvent.failure | ProgramEvent.write _ _ _ => False
+  | ProgramEvent.read _ _ ord | ProgramEvent.update _ _ _ ord _ => Ordering.le Ordering.acqrel ord
+  | ProgramEvent.fence ordr ordw => ordw = Ordering.seqcst  \/ Ordering.le Ordering.acqrel ordr
+  end.
+
 
 Module Perm.
   Variant t: Type :=
@@ -182,37 +190,17 @@ Module SeqMemory.
 
   Definition flags (m: t): Flags.t := fun loc => snd (m loc).
 
-  Definition write (loc: Loc.t) (val: Const.t) (m: t): t :=
-    fun loc' => if Loc.eq_dec loc' loc then SeqCell.write val  else (m loc').
+  Definition update (loc: Loc.t) (c: SeqCell.t) (m: t): t :=
+    fun loc' => if Loc.eq_dec loc' loc then c else (m loc').
 
-  Definition update (loc: Loc.t) (val: Const.t) (m: t): t :=
-    fun loc' => if Loc.eq_dec loc' loc then SeqCell.update val (m loc') else (m loc').
+  Definition write (loc: Loc.t) (val: Const.t) (m: t): t :=
+    update loc (SeqCell.write val) m.
 
   Definition le (m_tgt m_src: t): Prop :=
     forall loc, SeqCell.le (m_tgt loc) (m_src loc).
 
   Definition le_partial (m_tgt m_src: t): Prop :=
     Flags.le (flags m_tgt) (flags m_src).
-
-  Definition match_event (e: ProgramEvent.t) (m_tgt m_src: t): Prop :=
-    match e with
-    | ProgramEvent.silent => True
-    | ProgramEvent.read loc _ ord =>
-      (SeqCell.le (m_tgt loc) (m_src loc)) /\
-      (Ordering.le Ordering.acqrel ord -> le_partial m_tgt m_src)
-    | ProgramEvent.write loc _ _ =>
-      (SeqCell.le (m_tgt loc) (m_src loc))
-    | ProgramEvent.update loc _ _ ordr _ =>
-      (SeqCell.le (m_tgt loc) (m_src loc)) /\
-      (Ordering.le Ordering.acqrel ordr -> le_partial m_tgt m_src)
-    | ProgramEvent.fence ordr ordw =>
-      (ordw = Ordering.seqcst -> le m_tgt m_src) /\
-      (Ordering.le Ordering.acqrel ordr -> le_partial m_tgt m_src)
-    | ProgramEvent.syscall _ =>
-      le m_tgt m_src
-    | ProgramEvent.failure => True
-    end.
-
 
   Program Instance le_PreOrder: PreOrder le.
   Next Obligation.
@@ -234,32 +222,12 @@ Module SeqMemory.
     ii. etrans; eauto.
   Qed.
 
-  Program Instance match_event_PreOrder e: PreOrder (match_event e).
-  Next Obligation.
-  Proof.
-    ii. destruct e; ss; splits; i; try by refl.
-  Qed.
-  Next Obligation.
-  Proof.
-    ii. destruct e; ss; des; splits; i; try by (etrans; eauto).
-  Qed.
-
 
   Lemma le_le_partial m_tgt m_src (LE: le m_tgt m_src)
     :
       le_partial m_tgt m_src.
   Proof.
     ii. eapply SeqCell.le_le_partial. auto.
-  Qed.
-
-  Lemma le_match_event e m_tgt m_src (LE: le m_tgt m_src)
-    :
-      match_event e m_tgt m_src.
-  Proof.
-    destruct e; ss.
-    { split; auto. i. apply le_le_partial; auto. }
-    { split; auto. i. apply le_le_partial; auto. }
-    { split; auto. i. apply le_le_partial; auto. }
   Qed.
 
   Definition init (vals: Loc.t -> Const.t): t :=
@@ -315,7 +283,7 @@ Section LANG.
       m0 m1 e
       loc val ord
       (ORD: Ordering.le ord Ordering.na)
-      (MEM: SeqMemory.update loc val m0 = m1)
+      (MEM: SeqMemory.write loc val m0 = m1)
       (PERM: e = if Perm.le Perm.full (p loc) then MachineEvent.silent else MachineEvent.failure)
     :
       na_local_step
@@ -439,16 +407,23 @@ Definition wf_released (m_released: option SeqMemory.t) (e: ProgramEvent.t): Pro
   | None => ~ is_release_event e
   end.
 
-Definition wf_cell (c: option SeqCell.t) (e: ProgramEvent.t): Prop :=
-  match e with
-  | ProgramEvent.read _ _ _ | ProgramEvent.write _ _ _ | ProgramEvent.update _ _ _ _ _ => is_some c
-  | _ => ~ is_some c
+Definition match_cell (l: option Loc.t) (c: option SeqCell.t) (m: SeqMemory.t): Prop :=
+  match l, c with
+  | Some l, Some c => SeqCell.le c (m l)
+  | None, None => True
+  | _, _ => False
   end.
 
-Definition get_cell (e: ProgramEvent.t) (m: SeqMemory.t): option SeqCell.t :=
-  match e with
-  | ProgramEvent.read loc _ _ | ProgramEvent.write loc _ _ | ProgramEvent.update loc _ _ _ _ => Some (m loc)
-  | _ => None
+Definition update_cell (l: option Loc.t) (c: option SeqCell.t) (m: SeqMemory.t): SeqMemory.t :=
+  match l, c with
+  | Some l, Some c => SeqMemory.update l c m
+  | _, _ => m
+  end.
+
+Definition wf_cell (c: option SeqCell.t) (e: ProgramEvent.t): Prop :=
+  match (is_accessing e) with
+  | Some loc => is_some c
+  | _ => ~ is_some c
   end.
 
 
@@ -537,11 +512,12 @@ Section LANG.
     forall (e: ProgramEvent.t) (d: diffs) (m_released: option SeqMemory.t)
            (th0: t) (th1: t), Prop :=
   | at_step_intro
-      p0 p1 o0 o1 e d m_released st0 st1 m0 m_upd m1
+      p0 p1 o0 o1 e c d m_released st0 st1 m0 m_upd m1
       (STEP: lang.(Language.step) e st0 st1)
-      (ORACLE: Oracle.step p0 e (get_cell e m0) d m_released o0 o1)
+      (ORACLE: Oracle.step p0 e c d m_released o0 o1)
+      (CELL: match_cell (is_accessing e) c m0)
       (PERM: p1 = update_perm d p0)
-      (MEM: m_upd = update_mem d m0)
+      (MEM: m_upd = update_mem d (update_cell (is_accessing e) c m0))
       (RELEASE: SeqMemory.release m_upd m_released m1)
     :
       at_step e d m_released (mk (SeqState.mk _ st0 m0) p0 o0) (mk (SeqState.mk _ st1 m1) p1 o1)
@@ -608,15 +584,18 @@ Section SIMULATION.
            (ATOMIC: is_atomic_event e),
     exists st_src1 st_src2,
       (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
-      (<<MEM: SeqMemory.match_event e st_tgt0.(SeqState.memory) st_src1.(SeqState.memory)>>) /\
+      (<<MEM: is_acquire_event e -> SeqMemory.le_partial st_tgt0.(SeqState.memory) st_src1.(SeqState.memory)>>) /\
       (<<STEP: lang_src.(Language.step) e st_src1.(SeqState.state) st_src2>>) /\
-      (<<SIM: forall d mem_released mem_tgt
+      (<<SIM: forall d c mem_released mem_tgt
                      (EVENT: wf_diff_event d e)
                      (PERM: wf_diff_perms (is_accessing e) d p0)
                      (RELEASED: wf_released mem_released e)
-                     (MEM: SeqMemory.release (update_mem d st_tgt0.(SeqState.memory)) mem_released mem_tgt),
+                     (CELL: wf_cell c e)
+                     (MATCH: match_cell (is_accessing e) c st_tgt0.(SeqState.memory))
+                     (MEM: SeqMemory.release (update_mem d (update_cell (is_accessing e) c st_tgt0.(SeqState.memory))) mem_released mem_tgt),
           exists mem_src,
-            (<<MEM: SeqMemory.release (update_mem d st_src1.(SeqState.memory)) mem_released mem_src>>) /\
+            (<<MATCH: match_cell (is_accessing e) c st_src1.(SeqState.memory)>>) /\
+            (<<MEM: SeqMemory.release (update_mem d (update_cell (is_accessing e) c st_src1.(SeqState.memory))) mem_released mem_src>>) /\
             (<<SIM: sim_seq (update_perm d p0)
                             (SeqState.mk _ st_src2 mem_src)
                             (SeqState.mk _ st_tgt1 mem_tgt)>>)>>).
