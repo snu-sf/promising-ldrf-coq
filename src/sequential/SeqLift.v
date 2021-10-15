@@ -116,6 +116,18 @@ Admitted.
 
 
 
+
+
+Lemma sim_promise_consistent
+      vm f_src f_tgt b w lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt
+      (LOCAL: sim_local vm f_src f_tgt false w lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt)
+      (MEM: sim_memory flags_bot b w mem_src mem_tgt)
+      (SC: sim_timemap flags_bot b w sc_src sc_tgt)
+      (CONSISTENT: Local.promise_consistent lc_tgt)
+  :
+    Local.promise_consistent lc_src.
+Admitted.
+
 Lemma sim_cap vm f_tgt w0 lc_src lc_tgt mem_src0 mem_tgt0 mem_tgt1 sc_src sc_tgt
       (LOCAL: sim_local vm flags_bot f_tgt false w0 lc_src lc_tgt mem_src0 mem_tgt0 sc_src sc_tgt)
       (MEM: sim_memory flags_bot false w0 mem_src0 mem_tgt0)
@@ -153,12 +165,12 @@ Admitted.
 
 Lemma sim_make_promise_match lang_src
       (st_src: lang_src.(Language.state))
-      vm f_src f_tgt w0 lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt
+      vm f_src f_tgt b w0 lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt
       loc v
       (FLAG: f_src loc = true)
       (LOCAL: sim_local vm f_src f_tgt false w0 lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt)
-      (MEM: sim_memory flags_bot false w0 mem_src mem_tgt)
-      (SC: sim_timemap flags_bot false w0 sc_src sc_tgt)
+      (MEM: sim_memory flags_bot b w0 mem_src mem_tgt)
+      (SC: sim_timemap flags_bot b w0 sc_src sc_tgt)
       (VAL: vm loc = Some (v, v))
   :
     exists mem_src' lc_src' w1,
@@ -166,18 +178,18 @@ Lemma sim_make_promise_match lang_src
                     (Thread.mk _ st_src lc_src sc_src mem_src)
                     (Thread.mk _ st_src lc_src' sc_src mem_src')>>) /\
       (<<LOCAL: sim_local vm (update_flags f_src loc false) (update_flags f_tgt loc false) false w1 lc_src' lc_tgt mem_src' mem_tgt sc_src sc_tgt>>) /\
-      (<<MEM: sim_memory f_src false w1 mem_src' mem_tgt>>) /\
+      (<<MEM: sim_memory f_src b w1 mem_src' mem_tgt>>) /\
       (<<WORLD: world_messages_le (unchangable mem_src lc_src.(Local.promises)) w0 w1>>).
 Admitted.
 
 Lemma sim_make_promise_not_match lang_src
       (st_src: lang_src.(Language.state))
-      vm f_src f_tgt w0 lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt
+      vm f_src f_tgt b w0 lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt
       loc v_src v_tgt
       (FLAG: f_src loc = true)
       (LOCAL: sim_local vm f_src f_tgt false w0 lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt)
-      (MEM: sim_memory flags_bot false w0 mem_src mem_tgt)
-      (SC: sim_timemap flags_bot false w0 sc_src sc_tgt)
+      (MEM: sim_memory flags_bot b w0 mem_src mem_tgt)
+      (SC: sim_timemap flags_bot b w0 sc_src sc_tgt)
       (VAL: vm loc = Some (v_src, v_tgt))
   :
     exists mem_src' lc_src' w1,
@@ -185,6 +197,54 @@ Lemma sim_make_promise_not_match lang_src
                     (Thread.mk _ st_src lc_src sc_src mem_src)
                     (Thread.mk _ st_src lc_src' sc_src mem_src')>>) /\
       (<<LOCAL: sim_local vm (update_flags f_src loc false) (update_flags f_tgt loc true) false w1 lc_src' lc_tgt mem_src' mem_tgt sc_src sc_tgt>>) /\
-      (<<MEM: sim_memory f_src false w1 mem_src' mem_tgt>>) /\
+      (<<MEM: sim_memory f_src b w1 mem_src' mem_tgt>>) /\
       (<<WORLD: world_messages_le (unchangable mem_src lc_src.(Local.promises)) w0 w1>>).
+Admitted.
+
+Lemma sim_na_racy_read_tgt
+      vm f_src f_tgt b w lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt
+      loc val ord
+      (LOCAL: sim_local vm f_src f_tgt false w lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt)
+      (MEM: sim_memory flags_bot b w mem_src mem_tgt)
+      (SC: sim_timemap flags_bot b w sc_src sc_tgt)
+      (READ: Local.racy_read_step lc_tgt mem_tgt loc val ord)
+  :
+    (<<VALUE: vm loc = None>>) /\
+    (<<ORD: ord = Ordering.na>>).
+Admitted.
+
+Lemma sim_na_read_tgt
+      vm f_src f_tgt b w lc_src lc_tgt0 mem_src mem_tgt sc_src sc_tgt
+      lc_tgt1 loc ts val released
+      (LOCAL: sim_local vm f_src f_tgt false w lc_src lc_tgt0 mem_src mem_tgt sc_src sc_tgt)
+      (MEM: sim_memory flags_bot b w mem_src mem_tgt)
+      (SC: sim_timemap flags_bot b w sc_src sc_tgt)
+      (READ: Local.read_step lc_tgt0 mem_tgt loc ts val released Ordering.na lc_tgt1)
+  :
+    forall v_src v_tgt (VALUE: vm loc = Some (v_src, v_tgt)), v_tgt = val.
+Admitted.
+
+Lemma sim_na_racy_write_tgt
+      vm f_src f_tgt b w lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt
+      loc ord
+      (LOCAL: sim_local vm f_src f_tgt false w lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt)
+      (MEM: sim_memory flags_bot b w mem_src mem_tgt)
+      (SC: sim_timemap flags_bot b w sc_src sc_tgt)
+      (READ: Local.racy_write_step lc_tgt mem_tgt loc ord)
+  :
+    (<<VALUE: vm loc = None>>) /\
+    (<<ORD: ord = Ordering.na>>).
+Admitted.
+
+Lemma sim_na_write_tgt
+      vm f_src f_tgt b w lc_src lc_tgt0 mem_src mem_tgt0 sc_src sc_tgt0
+      loc ord mem_tgt1 lc_tgt1 sc_tgt1 from to val ord
+      (LOCAL: sim_local vm f_src f_tgt false w lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt)
+      (MEM: sim_memory flags_bot b w mem_src mem_tgt)
+      (SC: sim_timemap flags_bot b w sc_src sc_tgt)
+      (READ: Local.write_na_step lc_tgt0 sc_tgt0 mem_tgt0 loc from to val ord lc_tgt1 sc_tgt1 mem_tgt1 msgs kinds kind)
+      (LOWER: lower_memory th1.(Thread.memory) th0.(Thread.memory)
+  :
+    (<<VALUE: vm loc = None>>) /\
+    (<<ORD: ord = Ordering.na>>).
 Admitted.
