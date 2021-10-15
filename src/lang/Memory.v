@@ -2656,6 +2656,53 @@ Module Memory.
     setoid_rewrite Memory.remove_o; eauto.
   Qed.
 
+  Lemma op_inj
+        mem loc from to msg mem1 mem2 kind
+        (OP1: op mem loc from to msg mem1 kind)
+        (OP2: op mem loc from to msg mem2 kind):
+    mem1 = mem2.
+  Proof.
+    inv OP1; inv OP2;
+      eauto using add_inj, split_inj, lower_inj, remove_inj.
+  Qed.
+
+  Lemma promise_inj
+        promises mem loc from to msg promises1 promises2 mem1 mem2 kind
+        (PROMISE1: promise promises mem loc from to msg promises1 mem1 kind)
+        (PROMISE2: promise promises mem loc from to msg promises2 mem2 kind):
+    promises1 = promises2 /\ mem1 = mem2.
+  Proof.
+    exploit promise_op; try exact PROMISE1. i.
+    exploit promise_op; try exact PROMISE2. i.
+    exploit promise_op_promise; try exact PROMISE1. i.
+    exploit promise_op_promise; try exact PROMISE2. i.
+    exploit op_inj; [exact x0|exact x1|]. i. subst.
+    exploit op_inj; [exact x2|exact x3|]. i. subst.
+    eauto.
+  Qed.
+
+  Lemma write_inj
+        promises mem loc from to msg promises1 promises2 mem1 mem2 kind
+        (WRITE1: write promises mem loc from to msg promises1 mem1 kind)
+        (WRITE2: write promises mem loc from to msg promises2 mem2 kind):
+    promises1 = promises2 /\ mem1 = mem2.
+  Proof.
+    inv WRITE1. inv WRITE2.
+    exploit promise_inj; [exact PROMISE|exact PROMISE0|]. i. des. subst.
+    exploit remove_inj; [exact REMOVE|exact REMOVE0|]; eauto.
+  Qed.
+
+  Lemma write_na_inj
+        ts promises mem loc from to msg promises1 promises2 mem1 mem2 msgs kinds kind
+        (WRITE1: write_na ts promises mem loc from to msg promises1 mem1 msgs kinds kind)
+        (WRITE2: write_na ts promises mem loc from to msg promises2 mem2 msgs kinds kind):
+    promises1 = promises2 /\ mem1 = mem2.
+  Proof.
+    revert promises2 mem2 WRITE2.
+    induction WRITE1; i; inv WRITE2; eauto using write_inj.
+    exploit write_inj; [exact WRITE_EX|exact WRITE_EX0|]. i. des. subst. eauto.
+  Qed.
+
   Lemma remove_exists
         mem1 loc from to msg
         (GET: get loc to mem1 = Some (from, msg)):
