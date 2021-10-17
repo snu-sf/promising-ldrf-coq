@@ -31,13 +31,430 @@ Require Import LowerMemory.
 Require Import JoinedView.
 
 Require Import MaxView.
+Require Import Delayed.
 
 Set Implicit Arguments.
 
 
-Definition world: Type. Admitted.
-Variable world_messages_le: Messages.t -> world -> world -> Prop.
 
+Definition version := nat.
+Definition version_le := le.
+
+Module Mapping.
+  Record t: Type :=
+    mk
+      { map:> version -> Loc.t -> Time.t -> option Time.t;
+        ver: version;
+      }.
+
+  Record wf (f: t): Prop :=
+    { map_finite: forall v loc, exists l, forall ts fts (MAP: f v loc ts = Some fts), List.In (ts, fts) l;
+      mapping_map_lt: forall v loc ts0 ts1 fts0 fts1
+                             (MAP0: f.(map) v loc ts0 = Some fts0) (MAP0: f.(map) v loc ts1 = Some fts1),
+          Time.lt ts0 ts1 <-> Time.lt fts0 fts1;
+      mapping_incr: forall v0 v1 loc ts fts0
+                           (VER0: v0 <= v1)
+                           (VER1: v1 <= f.(ver))
+                           (MAP0: f.(map) v0 loc ts = Some fts0),
+          exists fts1,
+            (<<MAP: f.(map) v1 loc ts = Some fts1>>) /\
+            (<<TS: Time.le fts0 fts1>>);
+      version_time_incr: forall v loc ts fts0 fts1
+                                (VER: v <= f.(ver))
+                                (MAP0: f.(map) f.(ver) loc ts = Some fts0) (MAP0: f.(map) v loc ts = Some fts1),
+          Time.le fts0 fts1;
+      mapping_empty: forall v (VER: f.(ver) < v) loc ts, f v loc ts = None;
+      mapping_bot: forall loc, f.(map) 0 loc Time.bot = Some Time.bot;
+    }.
+
+  Lemma mapping_map_le (f: t) (WF: wf f):
+    forall v loc ts0 ts1 fts0 fts1
+           (MAP0: f.(map) v loc ts0 = Some fts0) (MAP0: f.(map) v loc ts1 = Some fts1),
+      Time.le ts0 ts1 <-> Time.le fts0 fts1.
+  Proof.
+    i. split.
+    { i. destruct (Time.le_lt_dec fts0 fts1); auto.
+      erewrite <- mapping_map_lt in l; eauto. timetac. }
+    { i. destruct (Time.le_lt_dec ts0 ts1); auto.
+      erewrite mapping_map_lt in l; eauto. timetac. }
+  Qed.
+
+  Lemma mapping_map_eq (f: t) (WF: wf f):
+    forall v loc ts0 ts1 fts0 fts1
+           (MAP0: f.(map) v loc ts0 = Some fts0) (MAP0: f.(map) v loc ts1 = Some fts1),
+      ts0 = ts1 <-> fts0 = fts1.
+  Proof.
+    i. split.
+    { i. subst. apply TimeFacts.antisym.
+      { erewrite <- mapping_map_le; eauto. refl. }
+      { erewrite <- mapping_map_le; eauto. refl. }
+    }
+    { i. subst. apply TimeFacts.antisym.
+      { erewrite mapping_map_le; eauto. refl. }
+      { erewrite mapping_map_le; eauto. refl. }
+    }
+  Qed.
+End Mapping.
+
+Definition versions := Loc.t -> Time.t -> option version.
+
+Definition world := (Mapping.t * versions)%type.
+
+Definition version_wf (w: world) (v: version): Prop :=
+  (<<VER: v <= (fst w).(Mapping.ver)>>) /\
+  (<<WF: Mapping.wf (fst w)>>).
+
+Definition world_messages_le (msgs: Messages.t) (f0 f1: world): Prop :=
+  (<<VER: (fst f0).(Mapping.ver) <= (fst f1).(Mapping.ver)>>) /\
+  (<<TIME: forall v (VER: v <= (fst f0).(Mapping.ver)),
+      (fst f1).(Mapping.map) v = (fst f0).(Mapping.map) v>>) /\
+  (<<VERSIONS: forall loc from to msg ts v
+                      (MSG: msgs loc from to msg)
+                      (RESERVE: msg <> Message.reserve)
+                      (VER: (snd f0) loc ts = Some v)
+                      (TS: Time.lt ts to),
+      (snd f1) loc ts = Some v>>) /\
+  (<<MAPPING: forall loc from to msg
+                     (MSG: msgs loc from to msg)
+                     (RESERVE: msg <> Message.reserve),
+      (fst f0).(Mapping.map) (fst f0).(Mapping.ver) loc to =
+      (fst f1).(Mapping.map) (fst f1).(Mapping.ver) loc to>>).
+
+Program Instance world_messages_le_PreOrder: forall msgs, PreOrder (world_messages_le msgs).
+Next Obligation.
+Proof.
+  ii. red. splits; ss.
+Qed.
+Next Obligation.
+Proof.
+  ii. unfold world_messages_le in *. des. splits.
+  { etrans; eauto. }
+  { i. transitivity ((fst y).(Mapping.map) v); eauto.
+    eapply TIME; eauto. etrans; eauto. }
+  { ii. transitivity eapply SAME; eauto. }
+Qed.
+
+Lemma world_messages_le_mon:
+  forall msgs0 msgs1 w0 w1
+         (LE: world_messages_le msgs1 w0 w1)
+         (MSGS: msgs0 <4= msgs1),
+    world_messages_le msgs0 w0 w1.
+Proof.
+  unfold world_messages_le in *. i. des. splits; auto.
+  i. eapply SAME; eauto.
+Qed.
+
+Definition sim_timestamp_exact (l: Loc.t) (w: world) (v: version) (ts_src ts_tgt: Time.t) :=
+  w.(Mapping.map) v l ts_tgt = Some ts_src.
+
+Definition sim_timestamp (l: Loc.t) (w: world) (v: version) (ts_src ts_tgt: Time.t) :=
+  exists ts_src' ts_tgt',
+    (<<TSSRC: Time.le ts_src ts_src'>>) /\
+    (<<TSTGT: Time.le ts_tgt' ts_tgt>>) /\
+    (<<SIM: sim_timestamp_exact l w v ts_src' ts_tgt'>>).
+
+Lemma sim_timestamp_exact_sim l w v ts_src ts_tgt
+      (EXACT: sim_timestamp_exact l w v ts_src ts_tgt)
+  :
+    sim_timestamp l w v ts_src ts_tgt.
+Proof.
+  exists ts_src, ts_tgt. splits; auto; try refl.
+Qed.
+
+Lemma sim_timestamp_mon l msgs w0 v0 w1 v1 ts_src0 ts_tgt0 ts_src1 ts_tgt1
+      (SIM: sim_timestamp l w0 v0 ts_src1 ts_tgt0)
+      (WF0: version_wf w0 v0)
+      (WF1: version_wf w1 v1)
+      (VER: version_le v0 v1)
+      (MAP: world_messages_le msgs w0 w1)
+      (TSSRC: Time.le ts_src0 ts_src1)
+      (TSTGT: Time.le ts_tgt0 ts_tgt1)
+  :
+    sim_timestamp l w1 v1 ts_src0 ts_tgt1.
+Proof.
+
+Admitted.
+
+Definition sim_timemap (w: world) (v: version) (tm_src tm_tgt: TimeMap.t): Prop :=
+  forall l, sim_timestamp l w v (tm_src l) (tm_tgt l).
+
+Lemma sim_timemap_mon msgs w0 v0 w1 v1 tm_src0 tm_tgt0 tm_src1 tm_tgt1
+      (SIM: sim_timemap w0 v0 tm_src1 tm_tgt0)
+      (WF0: version_wf w0 v0)
+      (WF1: version_wf w1 v1)
+      (VER: version_le v0 v1)
+      (MAP: world_messages_le msgs w0 w1)
+      (TMSRC: TimeMap.le tm_src0 tm_src1)
+      (TMTGT: TimeMap.le tm_tgt0 tm_tgt1)
+  :
+    sim_timemap w1 v1 tm_src0 tm_tgt1.
+Proof.
+  ii. eapply sim_timestamp_mon; eauto.
+Qed.
+
+Record sim_view (w: world) (v: version) (vw_src vw_tgt: View.t): Prop :=
+  mk_sim_view {
+      sim_view_pln: sim_timemap w v vw_src.(View.pln) vw_tgt.(View.pln);
+      sim_view_rlx: sim_timemap w v vw_src.(View.rlx) vw_tgt.(View.rlx);
+    }.
+
+Lemma sim_view_mon msgs w0 v0 w1 v1 vw_src0 vw_tgt0 vw_src1 vw_tgt1
+      (SIM: sim_view w0 v0 vw_src1 vw_tgt0)
+      (WF0: version_wf w0 v0)
+      (WF1: version_wf w1 v1)
+      (VER: version_le v0 v1)
+      (MAP: world_messages_le msgs w0 w1)
+      (VWSRC: View.le vw_src0 vw_src1)
+      (VWTGT: View.le vw_tgt0 vw_tgt1)
+  :
+    sim_view w1 v1 vw_src0 vw_tgt1.
+Proof.
+  econs.
+  { eapply sim_timemap_mon.
+    { eapply sim_view_pln; eauto. }
+    all: eauto.
+    { eapply VWSRC. }
+    { eapply VWTGT. }
+  }
+  { eapply sim_timemap_mon.
+    { eapply sim_view_rlx; eauto. }
+    all: eauto.
+    { eapply VWSRC. }
+    { eapply VWTGT. }
+  }
+Qed.
+
+Variant sim_opt_view (w: world) (v: version): forall (vw_src vw_tgt: option View.t), Prop :=
+| sim_opt_view_some
+    vw_src vw_tgt
+    (SIM: sim_view w v vw_src vw_tgt)
+  :
+    sim_opt_view w v (Some vw_src) (Some vw_tgt)
+| sim_opt_view_none
+    vw_tgt
+  :
+    sim_opt_view w v None vw_tgt
+.
+
+Lemma sim_opt_view_mon msgs w0 v0 w1 v1 vw_src0 vw_tgt0 vw_src1 vw_tgt1
+      (SIM: sim_opt_view w0 v0 vw_src1 vw_tgt0)
+      (WF0: version_wf w0 v0)
+      (WF1: version_wf w1 v1)
+      (VER: version_le v0 v1)
+      (MAP: world_messages_le msgs w0 w1)
+      (VWSRC: View.opt_le vw_src0 vw_src1)
+      (VWTGT: View.opt_le vw_tgt0 vw_tgt1)
+  :
+    sim_opt_view w1 v1 vw_src0 vw_tgt1.
+Proof.
+  inv SIM.
+  { inv VWSRC; inv VWTGT; econs.
+    eapply sim_view_mon; eauto. }
+  { inv VWSRC; inv VWTGT; econs. }
+Qed.
+
+Variant sim_timemap_loc: forall
+    (l: Loc.t)
+    (w: world) (v: version)
+    (ts_src: Time.t) (tm_src tm_tgt: TimeMap.t), Prop :=
+| sim_timemap_loc_intro
+    l w v tm_src tm_tgt
+    (SIM: forall l' (LOC: l' <> l), sim_timestamp l' w v (tm_src l') (tm_tgt l'))
+  :
+    sim_timemap_loc l w v (tm_src l) tm_src tm_tgt
+.
+
+Lemma sim_timemap_loc_sim l w v ts_src tm_src tm_tgt
+      (SIM: sim_timemap_loc l w v ts_src tm_src tm_tgt)
+      (TS: sim_timestamp l w v ts_src (tm_tgt l))
+  :
+    sim_timemap w v tm_src tm_tgt.
+Proof.
+  inv SIM. ii. destruct (Loc.eq_dec l l0); clarify; auto.
+Qed.
+
+Record sim_view_loc (l: Loc.t) (w: world) (v: version)
+       (ts_src: Time.t) (vw_src vw_tgt: View.t): Prop :=
+  mk_sim_view_loc {
+      sim_view_loc_pln: sim_timemap_loc l w v ts_src vw_src.(View.pln) vw_tgt.(View.pln);
+      sim_view_loc_rlx: sim_timemap_loc l w v ts_src vw_src.(View.rlx) vw_tgt.(View.rlx);
+    }.
+
+Lemma sim_view_loc_sim l w v ts_src vw_src vw_tgt
+      (SIM: sim_view_loc l w v ts_src vw_src vw_tgt)
+      (PLN: sim_timestamp l w v ts_src (vw_tgt.(View.pln) l))
+      (RLX: sim_timestamp l w v ts_src (vw_tgt.(View.rlx) l))
+  :
+    sim_view w v vw_src vw_tgt.
+Proof.
+  econs.
+  { eapply sim_timemap_loc_sim; eauto. eapply sim_view_loc_pln; eauto. }
+  { eapply sim_timemap_loc_sim; eauto. eapply sim_view_loc_rlx; eauto. }
+Qed.
+
+Variant sim_opt_view_loc (l: Loc.t) (w: world) (v: version) (ts_src: Time.t)
+  : forall (vw_src vw_tgt: option View.t), Prop :=
+| sim_opt_view_loc_some
+    vw_src vw_tgt
+    (SIM: sim_view_loc l w v ts_src vw_src vw_tgt)
+  :
+    sim_opt_view_loc l w v ts_src (Some vw_src) (Some vw_tgt)
+| sim_opt_view_loc_none
+    vw_tgt
+  :
+    sim_opt_view_loc l w v ts_src None vw_tgt
+.
+
+Lemma sim_opt_view_loc_sim l w v ts_src vw_src vw_tgt
+      (SIM: sim_opt_view_loc l w v ts_src vw_src vw_tgt)
+      (SOME: forall vw_tgt' (EQ: vw_tgt = Some vw_tgt'),
+          (<<PLN: sim_timestamp l w v ts_src (vw_tgt'.(View.pln) l)>>) /\
+          (<<RLX: sim_timestamp l w v ts_src (vw_tgt'.(View.rlx) l)>>))
+  :
+    sim_opt_view w v vw_src vw_tgt.
+Proof.
+  inv SIM; econs. eapply sim_view_loc_sim; eauto.
+  { eapply SOME; eauto. }
+  { eapply SOME; eauto. }
+Qed.
+
+Record sim_timestamp_max (l: Loc.t) (w: world) (v: version) (ts_src ts_tgt: Time.t): Prop :=
+  sim_timestamp_max_intro {
+      sim_timestamp_max_sim: sim_timestamp l w v ts_src ts_tgt;
+      sim_timestamp_max_max: forall ts (SIM: sim_timestamp l w v ts ts_tgt),
+          Time.le ts ts_src;
+    }.
+
+Lemma sim_timestamp_max_exists l w v ts_tgt
+  :
+    exists ts_src, <<MAX: sim_timestamp_max l w v ts_src ts_tgt>>.
+Admitted.
+
+Variant sim_timemap_loc_max: forall
+    (l: Loc.t)
+    (w: world) (v: version)
+    (ts_src: Time.t) (tm_src tm_tgt: TimeMap.t), Prop :=
+| sim_timemap_loc_max_intro
+    l w v tm_src tm_tgt
+    (SIM: forall l' (LOC: l' <> l), sim_timestamp_max l' w v (tm_src l') (tm_tgt l'))
+  :
+    sim_timemap_loc_max l w v (tm_src l) tm_src tm_tgt
+.
+
+Lemma sim_timemap_loc_max_sim l w v ts_src tm_src tm_tgt
+      (SIM: sim_timemap_loc_max l w v ts_src tm_src tm_tgt)
+  :
+    sim_timemap_loc l w v ts_src tm_src tm_tgt.
+Proof.
+  inv SIM. econs. i. eapply sim_timestamp_max_sim; eauto.
+Qed.
+
+Lemma sim_timemap_loc_max_max l w v ts_src tm_src tm_tgt tm
+      (MAX: sim_timemap_loc_max l w v ts_src tm_src tm_tgt)
+      (SIM: sim_timemap_loc l w v ts_src tm tm_tgt)
+  :
+    TimeMap.le tm tm_src.
+Proof.
+  ii. inv SIM. inv MAX. destruct (Loc.eq_dec l loc); clarify.
+  { rewrite H3. auto. refl. }
+  { eapply sim_timestamp_max_max; eauto. }
+Qed.
+
+Lemma sim_timemap_loc_max_exists l w v ts_src tm_tgt
+  :
+    exists tm_src, <<MAX: sim_timemap_loc_max l w v ts_src tm_src tm_tgt>>.
+Proof.
+  hexploit (choice (fun l' ts => (l <> l' -> sim_timestamp_max l' w v ts (tm_tgt l')) /\ (l = l' -> ts = ts_src))).
+  { i. destruct (Loc.eq_dec l x).
+    { exists ts_src. splits; ss. }
+    { hexploit sim_timestamp_max_exists. i. des.
+      exists ts_src0. splits; ss. i. eapply MAX. }
+  }
+  i. des. exists f. subst. replace ts_src with (f l).
+  { econs; eauto. i. specialize (H l'). des. auto. }
+  { specialize (H l). des. auto. }
+Qed.
+
+Record sim_view_loc_max (l: Loc.t) (w: world) (v: version)
+       (ts_src: Time.t) (vw_src vw_tgt: View.t): Prop :=
+  mk_sim_view_loc_max {
+      sim_view_loc_max_pln: sim_timemap_loc_max l w v ts_src vw_src.(View.pln) vw_tgt.(View.pln);
+      sim_view_loc_max_rlx: sim_timemap_loc_max l w v ts_src vw_src.(View.rlx) vw_tgt.(View.rlx);
+    }.
+
+Lemma sim_view_loc_max_sim l w v ts_src vw_src vw_tgt
+      (SIM: sim_view_loc_max l w v ts_src vw_src vw_tgt)
+  :
+    sim_view_loc l w v ts_src vw_src vw_tgt.
+Proof.
+  inv SIM. econs.
+  { eapply sim_timemap_loc_max_sim; eauto. }
+  { eapply sim_timemap_loc_max_sim; eauto. }
+Qed.
+
+Lemma sim_view_loc_max_max l w v ts_src vw_src vw_tgt vw
+      (MAX: sim_view_loc_max l w v ts_src vw_src vw_tgt)
+      (SIM: sim_view_loc l w v ts_src vw vw_tgt)
+  :
+    View.le vw vw_src.
+Proof.
+  inv MAX. inv SIM. econs.
+  { eapply sim_timemap_loc_max_max; eauto. }
+  { eapply sim_timemap_loc_max_max; eauto. }
+Qed.
+
+Lemma sim_view_loc_max_exists l w v ts_src vw_tgt
+  :
+    exists vw_src, <<MAX: sim_view_loc_max l w v ts_src vw_src vw_tgt>>.
+Proof.
+  hexploit (@sim_timemap_loc_max_exists l w v ts_src vw_tgt.(View.pln)); auto.
+  i. des.
+  hexploit (@sim_timemap_loc_max_exists l w v ts_src vw_tgt.(View.rlx)); auto.
+  i. des.
+  exists (View.mk tm_src tm_src0). econs; eauto.
+Qed.
+
+Variant sim_opt_view_loc_max (l: Loc.t) (w: world) (v: version) (ts_src: Time.t)
+  : forall (vw_src vw_tgt: option View.t), Prop :=
+| sim_opt_view_loc_max_some
+    vw_src vw_tgt
+    (SIM: sim_view_loc_max l w v ts_src vw_src vw_tgt)
+  :
+    sim_opt_view_loc_max l w v ts_src (Some vw_src) (Some vw_tgt)
+| sim_opt_view_loc_max_none
+  :
+    sim_opt_view_loc_max l w v ts_src None None
+.
+
+Lemma sim_opt_view_loc_max_sim l w v ts_src vw_src vw_tgt
+      (SIM: sim_opt_view_loc_max l w v ts_src vw_src vw_tgt)
+  :
+    sim_opt_view_loc l w v ts_src vw_src vw_tgt.
+Proof.
+  inv SIM; econs. eapply sim_view_loc_max_sim; eauto.
+Qed.
+
+Lemma sim_opt_view_loc_max_max l w v ts_src vw_src vw_tgt vw
+      (MAX: sim_opt_view_loc_max l w v ts_src vw_src vw_tgt)
+      (SIM: sim_opt_view_loc l w v ts_src vw vw_tgt)
+  :
+    View.opt_le vw vw_src.
+Proof.
+  inv MAX; inv SIM; econs.
+  eapply sim_view_loc_max_max; eauto.
+Qed.
+
+Lemma sim_opt_view_loc_max_exists l w v ts_src vw_tgt
+  :
+    exists vw_src, <<MAX: sim_opt_view_loc_max l w v ts_src vw_src vw_tgt>>.
+Proof.
+  destruct vw_tgt as [vw|].
+  { hexploit sim_view_loc_max_exists. i. des.
+    eexists (Some _). econs; eauto. }
+  { exists None. econs. }
+Qed.
+
+Local.write_step
 
 Definition flags := Loc.t -> bool.
 Definition flags_bot: flags := fun _ => false.
@@ -63,6 +480,9 @@ Definition value_map_le (vm0 vm1: value_map): Prop :=
     | Some vs0, Some vs1 => vs0 = vs1
     | _, _ => False
     end.
+
+Definition update_value_map (vm: value_map) (l: Loc.t) (vs: option (Const.t * Const.t)) :=
+  fun l' => if (Loc.eq_dec l' l) then vs else vm l'.
 
 
 Definition sim_local (vm: value_map) (f_src: flags) (f_tgt: flags)
@@ -112,6 +532,7 @@ Lemma sim_timemap_lower f_src w sc_src sc_tgt0 sc_tgt1
   :
     sim_timemap f_src false w sc_src sc_tgt1.
 Admitted.
+
 
 
 
@@ -169,8 +590,8 @@ Lemma sim_make_promise_match lang_src
       loc v
       (FLAG: f_src loc = true)
       (LOCAL: sim_local vm f_src f_tgt false w0 lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt)
-      (MEM: sim_memory flags_bot b w0 mem_src mem_tgt)
-      (SC: sim_timemap flags_bot b w0 sc_src sc_tgt)
+      (MEM: sim_memory f_src b w0 mem_src mem_tgt)
+      (SC: sim_timemap f_src b w0 sc_src sc_tgt)
       (VAL: vm loc = Some (v, v))
   :
     exists mem_src' lc_src' w1,
@@ -178,7 +599,7 @@ Lemma sim_make_promise_match lang_src
                     (Thread.mk _ st_src lc_src sc_src mem_src)
                     (Thread.mk _ st_src lc_src' sc_src mem_src')>>) /\
       (<<LOCAL: sim_local vm (update_flags f_src loc false) (update_flags f_tgt loc false) false w1 lc_src' lc_tgt mem_src' mem_tgt sc_src sc_tgt>>) /\
-      (<<MEM: sim_memory f_src b w1 mem_src' mem_tgt>>) /\
+      (<<MEM: sim_memory (update_flags f_src loc false) b w1 mem_src' mem_tgt>>) /\
       (<<WORLD: world_messages_le (unchangable mem_src lc_src.(Local.promises)) w0 w1>>).
 Admitted.
 
@@ -188,8 +609,8 @@ Lemma sim_make_promise_not_match lang_src
       loc v_src v_tgt
       (FLAG: f_src loc = true)
       (LOCAL: sim_local vm f_src f_tgt false w0 lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt)
-      (MEM: sim_memory flags_bot b w0 mem_src mem_tgt)
-      (SC: sim_timemap flags_bot b w0 sc_src sc_tgt)
+      (MEM: sim_memory f_src b w0 mem_src mem_tgt)
+      (SC: sim_timemap f_src b w0 sc_src sc_tgt)
       (VAL: vm loc = Some (v_src, v_tgt))
   :
     exists mem_src' lc_src' w1,
@@ -197,6 +618,23 @@ Lemma sim_make_promise_not_match lang_src
                     (Thread.mk _ st_src lc_src sc_src mem_src)
                     (Thread.mk _ st_src lc_src' sc_src mem_src')>>) /\
       (<<LOCAL: sim_local vm (update_flags f_src loc false) (update_flags f_tgt loc true) false w1 lc_src' lc_tgt mem_src' mem_tgt sc_src sc_tgt>>) /\
+      (<<MEM: sim_memory (update_flags f_src loc false) b w1 mem_src' mem_tgt>>) /\
+      (<<WORLD: world_messages_le (unchangable mem_src lc_src.(Local.promises)) w0 w1>>).
+Admitted.
+
+Lemma sim_make_lower lang_src
+      (st_src: lang_src.(Language.state))
+      vm f_src f_tgt b w0 lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt
+      loc
+      (LOCAL: sim_local vm f_src f_tgt false w0 lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt)
+      (MEM: sim_memory f_src b w0 mem_src mem_tgt)
+      (SC: sim_timemap f_src b w0 sc_src sc_tgt)
+  :
+    exists mem_src' lc_src' w1,
+      (<<STEPS: rtc (@Thread.tau_step _)
+                    (Thread.mk _ st_src lc_src sc_src mem_src)
+                    (Thread.mk _ st_src lc_src' sc_src mem_src')>>) /\
+      (<<LOCAL: sim_local vm f_src (update_flags f_tgt loc true) false w1 lc_src' lc_tgt mem_src' mem_tgt sc_src sc_tgt>>) /\
       (<<MEM: sim_memory f_src b w1 mem_src' mem_tgt>>) /\
       (<<WORLD: world_messages_le (unchangable mem_src lc_src.(Local.promises)) w0 w1>>).
 Admitted.
@@ -205,8 +643,8 @@ Lemma sim_na_racy_read_tgt
       vm f_src f_tgt b w lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt
       loc val ord
       (LOCAL: sim_local vm f_src f_tgt false w lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt)
-      (MEM: sim_memory flags_bot b w mem_src mem_tgt)
-      (SC: sim_timemap flags_bot b w sc_src sc_tgt)
+      (MEM: sim_memory f_src b w mem_src mem_tgt)
+      (SC: sim_timemap f_src b w sc_src sc_tgt)
       (READ: Local.racy_read_step lc_tgt mem_tgt loc val ord)
   :
     (<<VALUE: vm loc = None>>) /\
@@ -217,8 +655,8 @@ Lemma sim_na_read_tgt
       vm f_src f_tgt b w lc_src lc_tgt0 mem_src mem_tgt sc_src sc_tgt
       lc_tgt1 loc ts val released
       (LOCAL: sim_local vm f_src f_tgt false w lc_src lc_tgt0 mem_src mem_tgt sc_src sc_tgt)
-      (MEM: sim_memory flags_bot b w mem_src mem_tgt)
-      (SC: sim_timemap flags_bot b w sc_src sc_tgt)
+      (MEM: sim_memory f_src b w mem_src mem_tgt)
+      (SC: sim_timemap f_src b w sc_src sc_tgt)
       (READ: Local.read_step lc_tgt0 mem_tgt loc ts val released Ordering.na lc_tgt1)
   :
     forall v_src v_tgt (VALUE: vm loc = Some (v_src, v_tgt)), v_tgt = val.
@@ -228,9 +666,9 @@ Lemma sim_na_racy_write_tgt
       vm f_src f_tgt b w lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt
       loc ord
       (LOCAL: sim_local vm f_src f_tgt false w lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt)
-      (MEM: sim_memory flags_bot b w mem_src mem_tgt)
-      (SC: sim_timemap flags_bot b w sc_src sc_tgt)
-      (READ: Local.racy_write_step lc_tgt mem_tgt loc ord)
+      (MEM: sim_memory f_src b w mem_src mem_tgt)
+      (SC: sim_timemap f_src b w sc_src sc_tgt)
+      (WRITE: Local.racy_write_step lc_tgt mem_tgt loc ord)
   :
     (<<VALUE: vm loc = None>>) /\
     (<<ORD: ord = Ordering.na>>).
@@ -238,13 +676,69 @@ Admitted.
 
 Lemma sim_na_write_tgt
       vm f_src f_tgt b w lc_src lc_tgt0 mem_src mem_tgt0 sc_src sc_tgt0
-      loc ord mem_tgt1 lc_tgt1 sc_tgt1 from to val ord
-      (LOCAL: sim_local vm f_src f_tgt false w lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt)
-      (MEM: sim_memory flags_bot b w mem_src mem_tgt)
-      (SC: sim_timemap flags_bot b w sc_src sc_tgt)
-      (READ: Local.write_na_step lc_tgt0 sc_tgt0 mem_tgt0 loc from to val ord lc_tgt1 sc_tgt1 mem_tgt1 msgs kinds kind)
-      (LOWER: lower_memory th1.(Thread.memory) th0.(Thread.memory)
+      loc mem_tgt1 lc_tgt1 sc_tgt1 from to val ord msgs kinds kind v_src v_tgt
+      (LOCAL: sim_local vm f_src f_tgt false w lc_src lc_tgt0 mem_src mem_tgt0 sc_src sc_tgt0)
+      (MEM: sim_memory f_src b w mem_src mem_tgt0)
+      (SC: sim_timemap f_src b w sc_src sc_tgt0)
+      (WRITE: Local.write_na_step lc_tgt0 sc_tgt0 mem_tgt0 loc from to val ord lc_tgt1 sc_tgt1 mem_tgt1 msgs kinds kind)
+      (LOWER: lower_memory mem_tgt1 mem_tgt0)
+      (FLAG: f_tgt loc = true)
+      (VALUES: vm loc = Some (v_src, v_tgt))
   :
-    (<<VALUE: vm loc = None>>) /\
-    (<<ORD: ord = Ordering.na>>).
+    (<<LOCAL: sim_local (update_value_map vm loc (Some (v_src, val))) f_src f_tgt false w lc_src lc_tgt1 mem_src mem_tgt1 sc_src sc_tgt1>>) /\
+    (<<MEM: sim_memory f_src b w mem_src mem_tgt1>>) /\
+    (<<SC: sim_timemap f_src b w sc_src sc_tgt1>>) /\
+    (<<ORD: ord = Ordering.na>>) /\
+    (<<SC: sc_tgt1 = sc_tgt0>>).
+Admitted.
+
+Lemma sim_na_read_src
+      vm f_src f_tgt b w lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt
+      loc v_src v_tgt
+      (LOCAL: sim_local vm f_src f_tgt false w lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt)
+      (MEM: sim_memory f_src b w mem_src mem_tgt)
+      (SC: sim_timemap f_src b w sc_src sc_tgt)
+      (VALUE: vm loc = Some (v_src, v_tgt))
+  :
+    exists ts released,
+      (<<READ: Local.read_step lc_src mem_src loc ts v_src released Ordering.na lc_src>>).
+Admitted.
+
+Lemma sim_na_racy_read_src
+      vm f_src f_tgt b w lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt
+      loc val
+      (LOCAL: sim_local vm f_src f_tgt false w lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt)
+      (MEM: sim_memory f_src b w mem_src mem_tgt)
+      (SC: sim_timemap f_src b w sc_src sc_tgt)
+      (VALUE: vm loc = None)
+  :
+    Local.racy_read_step lc_src mem_src loc val Ordering.na.
+Admitted.
+
+Lemma sim_na_racy_write_src
+      vm f_src f_tgt b w lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt
+      loc
+      (LOCAL: sim_local vm f_src f_tgt false w lc_src lc_tgt mem_src mem_tgt sc_src sc_tgt)
+      (MEM: sim_memory f_src b w mem_src mem_tgt)
+      (SC: sim_timemap f_src b w sc_src sc_tgt)
+      (VALUE: vm loc = None)
+  :
+    Local.racy_write_step lc_src mem_src loc Ordering.na.
+Admitted.
+
+Lemma sim_na_write_src
+      vm f_src f_tgt b w lc_src0 lc_tgt mem_src0 mem_tgt sc_src sc_tgt
+      loc v_src v_tgt val
+      (LOCAL: sim_local vm f_src f_tgt false w lc_src0 lc_tgt mem_src0 mem_tgt sc_src sc_tgt)
+      (MEM: sim_memory f_src b w mem_src0 mem_tgt)
+      (SC: sim_timemap f_src b w sc_src sc_tgt)
+      (VALUE: vm loc = Some (v_src, v_tgt))
+  :
+    let f_src := update_flags f_src loc true in
+    let vm := (update_value_map vm loc (Some (val, v_tgt))) in
+    exists from to msgs kinds kind lc_src1 mem_src1,
+      (<<WRITE: Local.write_na_step lc_src0 sc_src mem_src0 loc from to val Ordering.na lc_src1 sc_src mem_src1 msgs kinds kind>>) /\
+      (<<LOCAL: sim_local vm f_src f_tgt false w lc_src1 lc_tgt mem_src1 mem_tgt sc_src sc_tgt>>) /\
+      (<<MEM: sim_memory f_src b w mem_src1 mem_tgt>>) /\
+      (<<SC: sim_timemap f_src b w sc_src sc_tgt>>).
 Admitted.
