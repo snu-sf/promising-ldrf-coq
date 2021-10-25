@@ -26,7 +26,6 @@ Require Import Cover.
 Require Import MemorySplit.
 Require Import MemoryMerge.
 Require Import FulfillStep.
-Require Import JoinedView.
 Require Import Pred.
 Require Import Trace.
 Require Import MemoryProps.
@@ -275,7 +274,7 @@ Lemma lower_memory_lower_step
       (CLOSED1': Memory.closed mem1'):
   exists e' lc2' mem2',
     (<<STEP: lower_step e' (Thread.mk lang st1 lc1' sc1 mem1') (Thread.mk lang st2 lc2' sc2 mem2')>>) /\
-    (<<EVENT: JSim.sim_event e' e>>) /\
+    (<<EVENT: lower_event e' e>>) /\
     (<<LC2: lower_local lc2' lc2>>) /\
     (<<MEM2: lower_memory mem2' mem2>>).
 Proof.
@@ -1486,7 +1485,7 @@ Lemma future_write_na_lower
     (<<FUTURE2: Memory.future_weak mem2 mem2'>>).
 Proof.
   revert ts' mem1' LE1 TS FUTURE1. induction WRITE; i.
-  { exploit future_write_lower; eauto. i. des.
+  { exploit future_write_lower; try eassumption; try refl; eauto. i. des.
     esplits.
     - econs 1; eauto. eapply TimeFacts.le_lt_lt; eauto.
     - ss.
@@ -1520,8 +1519,9 @@ Proof.
   exploit Memory.future_weak_get1; try exact GET; eauto; ss. i. des. inv MSG_LE.
   esplits.
   - econs; eauto.
-    inv LOCAL1. ss.
-    eapply TViewFacts.readable_mon; try apply TVIEW; eauto. refl.
+    + etrans; eauto.
+    + inv LOCAL1. ss.
+      eapply TViewFacts.readable_mon; try apply TVIEW; eauto. refl.
   - ss.
   - inv LOCAL1. ss. econs.
     eapply TViewFacts.read_tview_mon; try apply TVIEW; eauto.
@@ -1556,7 +1556,7 @@ Proof.
   exploit future_write_lower; try exact WRITE.
   { ss. }
   { apply WF'. }
-  { econs. eapply TViewFacts.write_released_mon; eauto; try refl. apply WF. }
+  { econs; [refl|]. eapply TViewFacts.write_released_mon; eauto; try refl. apply WF. }
   { eauto. }
   { econs. unfold TView.write_released. condtac; ss. econs.
     apply Memory.join_closed_view.

@@ -77,6 +77,7 @@ Proof.
     hexploit Memory.promise_future; try apply PROMISE; try apply WF0; eauto; try by viewtac. i. des.
     eapply Memory.promise_get2; eauto.
     inv PROMISE; ss.
+  - refl.
   - inv WRITABLE. unfold TView.write_released. s.
     econs; repeat (try condtac; aggrtac); (try by left; eauto).
     + etrans; [|left; eauto]. apply WF0.
@@ -105,6 +106,7 @@ Proof.
   induction WRITE; i.
   { exploit Memory.write_get2; eauto. i. des.
     econs; eauto; ss.
+    - refl.
     - econs; i.
       + unfold View.join, TimeMap.join. ss.
         unfold TimeMap.singleton, Loc.LocFun.add, Loc.LocFun.find. condtac; ss.

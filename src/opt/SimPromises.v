@@ -239,11 +239,11 @@ Module SimPromises.
       { none_if_tac; econs; ss.
         inv MEM. inv LOWER. inv MSG_WF. ss. }
       { none_if_tac; destruct msg0; ss; try by inv MSG_LE.
-        inv MEM. inv LOWER. inv MSG_LE. econs. refl. }
+        inv MEM. inv LOWER. inv MSG_LE. econs; eauto. }
       i. des.
       exploit Memory.lower_exists_le; try apply LE1_SRC; eauto. i. des.
       exploit sim_memory_lower; try exact SIM1; try exact x1; try exact x2; eauto.
-      { none_if_tac; try refl. econs. econs. }
+      { none_if_tac; try refl. econs; eauto. refl. }
       i. esplits; eauto.
       + econs 3; eauto.
         * none_if_tac; viewtac. econs. viewtac.

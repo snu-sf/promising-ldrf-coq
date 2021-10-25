@@ -24,13 +24,12 @@ Require Import Cover.
 Require Import MemorySplit.
 Require Import MemoryMerge.
 Require Import FulfillStep.
-Require Import JoinedView.
 Require Import MemoryProps.
 
 Set Implicit Arguments.
 
 
-Inductive lower_event: forall (e_src e_tgt: ThreadEvent.t), Prop :=
+Variant lower_event: forall (e_src e_tgt: ThreadEvent.t), Prop :=
 | lower_event_promise
     loc from to msg kind
   :
@@ -109,8 +108,33 @@ Inductive lower_event: forall (e_src e_tgt: ThreadEvent.t), Prop :=
 .
 Hint Constructors lower_event.
 
+Variant lower_op_kind: forall (kind_src kind_tgt: Memory.op_kind), Prop :=
+| lower_op_kind_add
+  :
+    lower_op_kind Memory.op_kind_add Memory.op_kind_add
+| lower_op_kind_split
+    ts msg_src msg_tgt
+    (MSG: Message.le msg_src msg_tgt)
+  :
+    lower_op_kind (Memory.op_kind_split ts msg_src) (Memory.op_kind_split ts msg_tgt)
+| lower_op_kind_lower
+    msg_src msg_tgt
+    (MSG: Message.le msg_src msg_tgt)
+  :
+    lower_op_kind (Memory.op_kind_lower msg_src) (Memory.op_kind_lower msg_tgt)
+| lower_op_kind_cancel
+  :
+    lower_op_kind Memory.op_kind_cancel Memory.op_kind_cancel
+.
+Hint Constructors lower_op_kind.
+
+
 Global Program Instance lower_event_PreOrder: PreOrder lower_event.
 Next Obligation. ii. destruct x; try (econs; eauto); refl. Qed.
+Next Obligation. ii. inv H; inv H0; econs; eauto; etrans; eauto. Qed.
+
+Global Program Instance lower_op_kind_PreOrder: PreOrder lower_op_kind.
+Next Obligation. ii. destruct x; econs; eauto; refl. Qed.
 Next Obligation. ii. inv H; inv H0; econs; eauto; etrans; eauto. Qed.
 
 Lemma lower_event_program_event
@@ -383,7 +407,7 @@ Lemma lower_memory_write mem_src0 mem_tgt0
     exists mem_src1 kind_src,
       (<<WRITESRC: Memory.write prom0 mem_src0 loc from to msg_src prom1 mem_src1 kind_src>>) /\
       (<<MEM: lower_memory mem_src1 mem_tgt1>>) /\
-      (<<KIND: JSim.sim_op_kind kind_src kind_tgt>>).
+      (<<KIND: lower_op_kind kind_src kind_tgt>>).
 Proof.
   inv WRITETGT. inv PROMISE.
   { hexploit lower_memory_add; eauto. i. des.
@@ -465,11 +489,14 @@ Lemma lower_memory_write_na
     exists mem_src1 kinds_src kind_src,
       (<<WRITESRC: Memory.write_na ts_src prom0 mem_src0 loc from to val prom1 mem_src1 msgs kinds_src kind_src>>) /\
       (<<MEM: lower_memory mem_src1 mem_tgt1>>) /\
-      (<<KINDS: List.Forall2 JSim.sim_op_kind kinds_src kinds_tgt>>) /\
-      (<<KIND: JSim.sim_op_kind kind_src kind_tgt>>).
+      (<<KINDS: List.Forall2 lower_op_kind kinds_src kinds_tgt>>) /\
+      (<<KIND: lower_op_kind kind_src kind_tgt>>).
 Proof.
   revert mem_src0 ts_src TS MEM MLE. induction WRITETGT.
-  { i. hexploit lower_memory_write; eauto.
+  { i. hexploit lower_memory_write;
+         try match goal with
+             | [|- Message.le _ _] => refl
+             end; eauto.
     i. des. esplits; eauto. econs; eauto. eapply TimeFacts.le_lt_lt; eauto.
   }
   { i. hexploit lower_memory_write; try eassumption.
@@ -523,6 +550,7 @@ Proof.
   { eapply TVIEW. }
   { refl. }
   i. esplits; eauto.
+  { econs; eauto. etrans; eauto. }
   { econs; eauto. ss. eapply read_tview_mon; eauto. refl. }
   { eapply CLOSED in GETSRC. des. inv MSG_WF. auto. }
 Qed.
@@ -566,7 +594,7 @@ Lemma lower_memory_write_step mem_src0 mem_tgt0
       (<<LOCAL: lower_local lc_src1 lc_tgt1>>) /\
       (<<RELEASEDW: View.opt_le releasedw_src releasedw_tgt>>) /\
       (<<SC: TimeMap.le sc_src1 sc_tgt1>>) /\
-      (<<KIND: JSim.sim_op_kind kind_src kind_tgt>>)
+      (<<KIND: lower_op_kind kind_src kind_tgt>>)
 .
 Proof.
   inv LOCAL. inv STEP.
@@ -575,7 +603,7 @@ Proof.
   { refl. }
   i. ss. hexploit lower_memory_write; try eassumption.
   { eapply WFSRC. }
-  { econs. eapply TViewFacts.write_released_mon; try eassumption.
+  { econs; [refl|]. eapply TViewFacts.write_released_mon; try eassumption.
     { eapply WFTGT. }
     { refl. }
   }
@@ -613,8 +641,8 @@ Lemma lower_memory_write_na_step
       (<<MEM: lower_memory mem_src1 mem_tgt1>>) /\
       (<<LOCAL: lower_local lc_src1 lc_tgt1>>) /\
       (<<SC: TimeMap.le sc_src1 sc_tgt1>>) /\
-      (<<KINDS: List.Forall2 JSim.sim_op_kind kinds_src kinds_tgt>>) /\
-      (<<KIND: JSim.sim_op_kind kind_src kind_tgt>>)
+      (<<KINDS: List.Forall2 lower_op_kind kinds_src kinds_tgt>>) /\
+      (<<KIND: lower_op_kind kind_src kind_tgt>>)
 .
 Proof.
   inv LOCAL. inv STEP. hexploit lower_memory_write_na; try eassumption.

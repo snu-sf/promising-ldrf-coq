@@ -13,7 +13,99 @@ From PromisingLib Require Import Language.
 Set Implicit Arguments.
 
 
-Module Const := Nat.
+Module Const.
+  Definition num_t: Type := nat.
+
+  Variant t :=
+  | num (n: num_t)
+  | undef
+  .
+
+  Definition of_nat (n: nat): t := num n.
+  Definition zero: t := num 0.
+  Definition one: t := num 1.
+
+  Definition eqb (a b: t): option bool :=
+    match a, b with
+    | num a, num b => Some (a =? b)
+    | _, _ => None
+    end.
+
+  Definition add (a b: t): t :=
+    match a, b with
+    | num a, num b => num (a + b)
+    | _, _ => undef
+    end.
+
+  Definition le (lhs rhs: t): bool :=
+    match lhs, rhs with
+    | num x, num y => x =? y
+    | _, undef => true
+    | _, _ => false
+    end.
+
+  Lemma eqb_refl a: eqb a a <> Some false.
+  Proof.
+    destruct a; ss. rewrite Nat.eqb_refl. ss.
+  Qed.
+
+  Lemma add_0_l a: add (num 0) a = a.
+  Proof.
+    destruct a; ss.
+  Qed.
+
+  Lemma add_0_r a: add a (num 0) = a.
+  Proof.
+    destruct a; ss.
+    rewrite Nat.add_0_r. ss.
+  Qed.
+
+  Lemma add_assoc a b c:
+    add a (add b c) = add (add a b) c.
+  Proof.
+    destruct a, b, c; ss.
+    rewrite Nat.add_assoc. ss.
+  Qed.
+
+  Lemma antisym
+        a b
+        (AB: le a b)
+        (BA: le b a):
+    a = b.
+  Proof.
+    destruct a, b; ss.
+    inv AB. rewrite Nat.eqb_eq in H0. subst. ss.
+  Qed.
+
+  Lemma le_num_inv
+        c n
+        (LE: le c (num n)):
+    c = num n.
+  Proof.
+    destruct c; ss.
+    inv LE. rewrite Nat.eqb_eq in H0. subst. ss.
+  Qed.
+
+  Lemma undef_le_inv
+        c
+        (LE: le undef c):
+    c = undef.
+  Proof.
+    destruct c; ss.
+  Qed.
+
+  Global Program Instance le_PreOrder: PreOrder le.
+  Next Obligation.
+    ii. destruct x; ss. rewrite Nat.eqb_refl. ss.
+  Qed.
+  Next Obligation.
+    ii. destruct x, y, z; ss. inv H. inv H0.
+    rewrite Nat.eqb_eq in H1, H2. subst.
+    rewrite Nat.eqb_refl. ss.
+  Qed.
+End Const.
+Coercion Const.num: Const.num_t >-> Const.t.
+Coercion Const.of_nat: nat >-> Const.t.
 
 
 Module Ordering.

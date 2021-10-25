@@ -101,7 +101,8 @@ Proof.
   inv LOCAL1. inv STEP_TGT.
   exploit sim_memory_get; try apply GET; try apply MEM1. i. des. inv MSG.
   esplits; eauto.
-  - econs; eauto. eapply TViewFacts.readable_mon; eauto. apply TVIEW.
+  - econs; eauto; try by etrans; eauto.
+    eapply TViewFacts.readable_mon; eauto. apply TVIEW.
   - econs; eauto. inv TVIEW. ss. econs; s.
     + i. unfold LocFun.find. etrans; [by apply WF1_SRC|].
       eauto using View.join_l.

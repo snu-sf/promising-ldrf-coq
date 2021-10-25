@@ -56,7 +56,7 @@ Proof.
     exploit PLN; eauto.
   }
   des. inv MEM. exploit CLOSED; eauto. i. des.
-  esplits. econs; eauto.
+  esplits. econs; eauto; try refl.
   - econs; viewtac.
   - f_equal. apply TView.antisym.
     + apply TViewFacts.read_tview_incr.
