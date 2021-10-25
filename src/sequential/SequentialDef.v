@@ -18,6 +18,9 @@ Set Implicit Arguments.
 
 Definition const_le: Const.t -> Const.t -> bool. Admitted.
 
+Instance const_le_PreOrder: PreOrder const_le. Admitted.
+
+
 Definition get_machine_event (e: ProgramEvent.t): MachineEvent.t :=
   match e with
   | ProgramEvent.syscall e => MachineEvent.syscall e
@@ -421,6 +424,16 @@ Module ValueMap.
 
   Definition le (vs0 vs1: t): Prop :=
     forall loc, const_le (vs0 loc) (vs1 loc).
+
+  Program Instance le_PreOrder: PreOrder le.
+  Next Obligation.
+  Proof.
+    ii. refl.
+  Qed.
+  Next Obligation.
+  Proof.
+    ii. etrans; eauto.
+  Qed.
 End ValueMap.
 
 
@@ -464,6 +477,16 @@ Module SeqMemory.
 
   Definition le (m0 m1: t): Prop :=
     ValueMap.le m0.(value_map) m1.(value_map) /\ Flags.le m0.(flags) m1.(flags).
+
+  Program Instance le_PreOrder: PreOrder le.
+  Next Obligation.
+  Proof.
+    ii. split; refl.
+  Qed.
+  Next Obligation.
+  Proof.
+    ii. inv H. inv H0. split; etrans; eauto.
+  Qed.
 End SeqMemory.
 
 
