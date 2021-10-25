@@ -42,7 +42,7 @@ Qed.
 
 
 Module SeqTrace.
-  Variant output: Set :=
+  Variant output: Type :=
   | term (m: SeqMemory.t)
   | partial (f: Flags.t)
   | ub

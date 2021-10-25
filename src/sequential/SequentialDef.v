@@ -16,10 +16,6 @@ Require Import Event.
 Set Implicit Arguments.
 
 
-Definition const_le: Const.t -> Const.t -> bool. Admitted.
-
-Instance const_le_PreOrder: PreOrder const_le. Admitted.
-
 
 Definition get_machine_event (e: ProgramEvent.t): MachineEvent.t :=
   match e with
@@ -419,11 +415,11 @@ Module ValueMap.
     fun loc => if (cond loc) then (vs loc) else (vs_acq loc).
 
   Definition release (vs_rel: t) (vs: t): Flags.t :=
-    fun loc => if (const_le (vs_rel loc) (vs loc))
+    fun loc => if (Const.le (vs_rel loc) (vs loc))
                then Flag.written else Flag.unwritten.
 
   Definition le (vs0 vs1: t): Prop :=
-    forall loc, const_le (vs0 loc) (vs1 loc).
+    forall loc, Const.le (vs0 loc) (vs1 loc).
 
   Program Instance le_PreOrder: PreOrder le.
   Next Obligation.
@@ -466,7 +462,7 @@ Module SeqMemory.
       (f_old: Flag.t) (f_new: Flag.t) (m0 m1: t), Prop :=
   | update_intro
       loc v_old v_new f_old f_new m0
-      (VAL: const_le v_old (m0.(value_map) loc))
+      (VAL: Const.le v_old (m0.(value_map) loc))
       (FLAG: Flag.le f_old (m0.(flags) loc))
     :
       update
@@ -616,7 +612,7 @@ Section LANG.
       m
       loc val ord
       (ORD: Ordering.le ord Ordering.na)
-      (VAL: Perm.le Perm.high (p loc) -> const_le val (SeqMemory.read loc m))
+      (VAL: Perm.le Perm.high (p loc) -> Const.le val (SeqMemory.read loc m))
     :
       na_local_step
         p
