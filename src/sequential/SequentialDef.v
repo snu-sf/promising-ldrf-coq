@@ -16,6 +16,8 @@ Require Import Event.
 Set Implicit Arguments.
 
 
+Definition const_le: Const.t -> Const.t -> bool. Admitted.
+
 Definition get_machine_event (e: ProgramEvent.t): MachineEvent.t :=
   match e with
   | ProgramEvent.syscall e => MachineEvent.syscall e
@@ -23,44 +25,91 @@ Definition get_machine_event (e: ProgramEvent.t): MachineEvent.t :=
   | _ => MachineEvent.silent
   end.
 
-Definition is_atomic_event (e: ProgramEvent.t): Prop :=
+Definition is_atomic_event (e: ProgramEvent.t): bool :=
   match e with
-  | ProgramEvent.silent | ProgramEvent.failure => False
-  | ProgramEvent.syscall _ | ProgramEvent.fence _ _ => True
+  | ProgramEvent.silent | ProgramEvent.failure => false
+  | ProgramEvent.syscall _ | ProgramEvent.fence _ _ => true
   | ProgramEvent.read _ _ ord => Ordering.le Ordering.plain ord
   | ProgramEvent.write _ _ ord => Ordering.le Ordering.plain ord
   | ProgramEvent.update _ _ _ ordr ordw =>
-    Ordering.le Ordering.plain ordr /\ Ordering.le Ordering.plain ordw
+    Ordering.le Ordering.plain ordr && Ordering.le Ordering.plain ordw
   end.
+
+Module Locs.
+  Variant t: Type :=
+  | all
+  | none
+  | single (loc: Loc.t)
+  .
+
+  Definition released (e: ProgramEvent.t) :=
+    match e with
+    | ProgramEvent.syscall _ => all
+    | ProgramEvent.silent | ProgramEvent.failure => none
+    | ProgramEvent.read loc _ _ => single loc
+    | ProgramEvent.fence _ ord => if (Ordering.le Ordering.strong_relaxed ord) then all else none
+    | ProgramEvent.write loc _ ord | ProgramEvent.update loc _ _ _ ord => if (Ordering.le Ordering.strong_relaxed ord) then all else (single loc)
+    end.
+
+  Definition acquired (e: ProgramEvent.t) :=
+    match e with
+    | ProgramEvent.syscall _ => all
+    | ProgramEvent.silent | ProgramEvent.failure => none
+    | ProgramEvent.write loc _ _ => single loc
+    | ProgramEvent.fence ordr ordw => if (Ordering.le Ordering.strong_relaxed ordr || Ordering.le Ordering.seqcst ordw) then all else none
+    | ProgramEvent.read loc _ ord | ProgramEvent.update loc _ _ ord _ => if (Ordering.le Ordering.strong_relaxed ord) then all else (single loc)
+    end.
+End Locs.
+
+
+Definition is_accessing (e: ProgramEvent.t) (l: Loc.t): bool :=
+  match e with
+  | ProgramEvent.silent | ProgramEvent.failure | ProgramEvent.syscall _ | ProgramEvent.fence _ _ => false
+  | ProgramEvent.read l' _ _ | ProgramEvent.write l' _ _ | ProgramEvent.update l' _ _ _ _ => Loc.eq_dec l l'
+  end.
+
+Definition released_locs (e: ProgramEvent.t) (l: Loc.t): bool :=
+  (is_accessing e l)
+  ||
+  (match e with
+   | ProgramEvent.syscall _ => true
+   | ProgramEvent.silent | ProgramEvent.failure | ProgramEvent.read _ _ _ => false
+   | ProgramEvent.fence _ ord | ProgramEvent.write _ _ ord | ProgramEvent.update _ _ _ _ ord => Ordering.le Ordering.strong_relaxed ord
+   end).
+
+Definition acquired_locs (e: ProgramEvent.t) (l: Loc.t): bool :=
+  (is_accessing e l)
+  ||
+  (match e with
+   | ProgramEvent.syscall _ => true
+   | ProgramEvent.silent | ProgramEvent.failure | ProgramEvent.write _ _ _ => false
+   | ProgramEvent.read _ _ ord | ProgramEvent.update _ _ _ ord _ => Ordering.le Ordering.acqrel ord
+   | ProgramEvent.fence ordr ordw => Ordering.le Ordering.seqcst ordw || Ordering.le Ordering.acqrel ordr
+   end).
+
 
 Module Perm.
   Variant t: Type :=
-  | none
-  | full
+  | low
+  | high
   .
+
+  Definition meet (p0 p1: t): t :=
+    match p0, p1 with
+    | high, high => high
+    | _, _ => low
+    end.
+
+  Definition join (p0 p1: t): t :=
+    match p0, p1 with
+    | low, low => low
+    | _, _ => high
+    end.
 
   Definition le (p0 p1: t): bool :=
     match p0, p1 with
-    | none, _ => true
-    | _, full => true
-    | _, _ => false
-    end.
-End Perm.
-
-Module Perms.
-  Definition t := Loc.t -> Perm.t.
-End Perms.
-
-Module Flag.
-  Variant t :=
-  | unwritten
-  | written
-  .
-
-  Definition le (f_src f_tgt: t): bool :=
-    match f_src, f_tgt with
-    | written, _ => true
-    | unwritten, unwritten => true
+    | low, _ => true
+    | _, high => true
     | _, _ => false
     end.
 
@@ -73,15 +122,817 @@ Module Flag.
   Proof.
     ii. destruct x, y, z; ss.
   Qed.
+
+  Lemma meet_le_l p0 p1:
+    le (meet p0 p1) p0.
+  Proof.
+    destruct p0, p1; ss.
+  Qed.
+
+  Lemma meet_le_r p0 p1:
+    le (meet p0 p1) p1.
+  Proof.
+    destruct p0, p1; ss.
+  Qed.
+
+  Lemma meet_spec p0 p1 p
+        (LE0: le p p0)
+        (LE1: le p p1)
+    :
+      le p (meet p0 p1).
+  Proof.
+    destruct p, p0, p1; ss.
+  Qed.
+
+  Lemma meet_mon_l p0 p1 p
+        (LE: le p0 p1)
+    :
+      le (meet p0 p) (meet p1 p).
+  Proof.
+    destruct p, p0, p1; ss.
+  Qed.
+
+  Lemma meet_mon_r p0 p1 p
+        (LE: le p0 p1)
+    :
+      le (meet p p0) (meet p p1).
+  Proof.
+    destruct p, p0, p1; ss.
+  Qed.
+
+  Lemma join_ge_l p0 p1:
+    le p0 (join p0 p1).
+  Proof.
+    destruct p0, p1; ss.
+  Qed.
+
+  Lemma join_ge_r p0 p1:
+    le p1 (join p0 p1).
+  Proof.
+    destruct p0, p1; ss.
+  Qed.
+
+  Lemma join_spec p0 p1 p
+        (LE0: le p0 p)
+        (LE1: le p1 p)
+    :
+      le (join p0 p1) p.
+  Proof.
+    destruct p, p0, p1; ss.
+  Qed.
+
+  Lemma join_mon_l p0 p1 p
+        (LE: le p0 p1)
+    :
+      le (join p0 p) (join p1 p).
+  Proof.
+    destruct p, p0, p1; ss.
+  Qed.
+
+  Lemma join_mon_r p0 p1 p
+        (LE: le p0 p1)
+    :
+      le (join p p0) (join p p1).
+  Proof.
+    destruct p, p0, p1; ss.
+  Qed.
+End Perm.
+
+
+Module Perms.
+  Definition t := Loc.t -> Perm.t.
+
+  Definition meet (p0 p1: t): t :=
+    fun loc => Perm.meet (p0 loc) (p1 loc).
+
+  Definition join (p0 p1: t): t :=
+    fun loc => Perm.join (p0 loc) (p1 loc).
+
+  Definition meet_loc (loc: Loc.t) (p0: Perm.t) (p1: t): t :=
+    fun loc' => if Loc.eq_dec loc loc' then Perm.meet p0 (p1 loc) else p1 loc'.
+
+  Definition join_loc (loc: Loc.t) (p0: Perm.t) (p1: t): t :=
+    fun loc' => if Loc.eq_dec loc loc' then Perm.join p0 (p1 loc) else p1 loc'.
+
+  Definition acquired (p: t) (p_acq: t): Loc.t -> bool :=
+    fun loc => Perm.le (p_acq loc) (p loc).
+
+  Definition le (p0 p1: t): Prop :=
+    forall loc, Perm.le (p0 loc) (p1 loc).
+
+  Program Instance le_PreOrder: PreOrder le.
+  Next Obligation.
+  Proof.
+    ii. refl.
+  Qed.
+  Next Obligation.
+  Proof.
+    ii. etrans; eauto.
+  Qed.
+
+  Lemma meet_le_l p0 p1:
+    le (meet p0 p1) p0.
+  Proof.
+    ii. eapply Perm.meet_le_l; eauto.
+  Qed.
+
+  Lemma meet_le_r p0 p1:
+    le (meet p0 p1) p1.
+  Proof.
+    ii. eapply Perm.meet_le_r; eauto.
+  Qed.
+
+  Lemma meet_spec p0 p1 p
+        (LE0: le p p0)
+        (LE1: le p p1)
+    :
+      le p (meet p0 p1).
+  Proof.
+    ii. eapply Perm.meet_spec; eauto.
+  Qed.
+
+  Lemma meet_mon_l p0 p1 p
+        (LE: le p0 p1)
+    :
+      le (meet p0 p) (meet p1 p).
+  Proof.
+    ii. eapply Perm.meet_mon_l; eauto.
+  Qed.
+
+  Lemma meet_mon_r p0 p1 p
+        (LE: le p0 p1)
+    :
+      le (meet p p0) (meet p p1).
+  Proof.
+    ii. eapply Perm.meet_mon_r; eauto.
+  Qed.
+
+  Lemma join_ge_l p0 p1:
+    le p0 (join p0 p1).
+  Proof.
+    ii. eapply Perm.join_ge_l; eauto.
+  Qed.
+
+  Lemma join_ge_r p0 p1:
+    le p1 (join p0 p1).
+  Proof.
+    ii. eapply Perm.join_ge_r; eauto.
+  Qed.
+
+  Lemma join_spec p0 p1 p
+        (LE0: le p0 p)
+        (LE1: le p1 p)
+    :
+      le (join p0 p1) p.
+  Proof.
+    ii. eapply Perm.join_spec; eauto.
+  Qed.
+
+  Lemma join_mon_l p0 p1 p
+        (LE: le p0 p1)
+    :
+      le (join p0 p) (join p1 p).
+  Proof.
+    ii. eapply Perm.join_mon_l; eauto.
+  Qed.
+
+  Lemma join_mon_r p0 p1 p
+        (LE: le p0 p1)
+    :
+      le (join p p0) (join p p1).
+  Proof.
+    ii. eapply Perm.join_mon_r; eauto.
+  Qed.
+End Perms.
+
+
+Module Flag.
+  Variant t :=
+  | written
+  | unwritten
+  .
+
+  Definition meet (f0 f1: t): t :=
+    match f0, f1 with
+    | written, written => written
+    | _, _ => unwritten
+    end.
+
+  Definition le (f0 f1: t): bool :=
+    match f0, f1 with
+    | unwritten, _ => true
+    | _, unwritten => false
+    | _, written => true
+    end.
+
+  Program Instance le_PreOrder: PreOrder le.
+  Next Obligation.
+  Proof.
+    ii. destruct x; ss.
+  Qed.
+  Next Obligation.
+  Proof.
+    ii. destruct x, y, z; ss.
+  Qed.
+
+  Lemma meet_le_l f0 f1:
+    le (meet f0 f1) f0.
+  Proof.
+    destruct f0, f1; ss.
+  Qed.
+
+  Lemma meet_le_r f0 f1:
+    le (meet f0 f1) f1.
+  Proof.
+    destruct f0, f1; ss.
+  Qed.
+
+  Lemma meet_spec f0 f1 f
+        (LE0: le f f0)
+        (LE1: le f f1)
+    :
+      le f (meet f0 f1).
+  Proof.
+    destruct f, f0, f1; ss.
+  Qed.
+
+  Lemma meet_mon_l f0 f1 f
+        (LE: le f0 f1)
+    :
+      le (meet f0 f) (meet f1 f).
+  Proof.
+    destruct f, f0, f1; ss.
+  Qed.
+
+  Lemma meet_mon_r f0 f1 f
+        (LE: le f0 f1)
+    :
+      le (meet f f0) (meet f f1).
+  Proof.
+    destruct f, f0, f1; ss.
+  Qed.
 End Flag.
 
+
+Module Flags.
+  Definition t := Loc.t -> Flag.t.
+
+  Definition write (loc: Loc.t) (f: t): t :=
+    fun loc' => if Loc.eq_dec loc' loc then Flag.written else (f loc').
+
+  Definition meet (f0 f1: t): t :=
+    fun loc => Flag.meet (f0 loc) (f1 loc).
+
+  Definition meet_loc (loc: Loc.t) (f0: Flag.t) (f1: Flags.t): t :=
+    fun loc' => if (Loc.eq_dec loc loc') then Flag.meet f0 (f1 loc) else f1 loc'.
+
+  Definition le (f0 f1: t): Prop :=
+    forall loc, Flag.le (f0 loc) (f1 loc).
+
+  Program Instance le_PreOrder: PreOrder le.
+  Next Obligation.
+  Proof.
+    ii. refl.
+  Qed.
+  Next Obligation.
+  Proof.
+    ii. etrans; eauto.
+  Qed.
+
+  Lemma meet_le_l f0 f1:
+    le (meet f0 f1) f0.
+  Proof.
+    ii. eapply Flag.meet_le_l; eauto.
+  Qed.
+
+  Lemma meet_le_r f0 f1:
+    le (meet f0 f1) f1.
+  Proof.
+    ii. eapply Flag.meet_le_r; eauto.
+  Qed.
+
+  Lemma meet_spec f0 f1 f
+        (LE0: le f f0)
+        (LE1: le f f1)
+    :
+      le f (meet f0 f1).
+  Proof.
+    ii. eapply Flag.meet_spec; eauto.
+  Qed.
+
+  Lemma meet_mon_l f0 f1 f
+        (LE: le f0 f1)
+    :
+      le (meet f0 f) (meet f1 f).
+  Proof.
+    ii. eapply Flag.meet_mon_l; eauto.
+  Qed.
+
+  Lemma meet_mon_r f0 f1 f
+        (LE: le f0 f1)
+    :
+      le (meet f f0) (meet f f1).
+  Proof.
+    ii. eapply Flag.meet_mon_r; eauto.
+  Qed.
+End Flags.
+
+
+Module ValueMap.
+  Definition t := Loc.t -> Const.t.
+
+  Definition write (loc: Loc.t) (v: Const.t) (vs: t): t :=
+    fun loc' => if Loc.eq_dec loc' loc then v else (vs loc').
+
+  Definition read (loc: Loc.t) (vs: t) := vs loc.
+
+  Definition acquire (cond: Loc.t -> bool) (vs_acq: t) (vs: t): t :=
+    fun loc => if (cond loc) then (vs loc) else (vs_acq loc).
+
+  Definition release (vs_rel: t) (vs: t): Flags.t :=
+    fun loc => if (const_le (vs_rel loc) (vs loc))
+               then Flag.written else Flag.unwritten.
+
+  Definition acquire_loc (loc: Loc.t) (cond: bool) (v_acq: Const.t) (vs: t): t :=
+    fun loc' => if (Loc.eq_dec loc loc') then (if cond then (vs loc) else v_acq) else (vs loc').
+
+  Definition le (vs0 vs1: t): Prop :=
+    forall loc, const_le (vs0 loc) (vs1 loc).
+End ValueMap.
+
+
+Module Diff.
+  Variant acquired_loc: Type :=
+  | mk_acquired_loc (p_acq: Perm.t) (f_acq: Flag.t) (v_acq: Const.t)
+  .
+
+  Variant acquired_all: Type :=
+  | mk_acquired_all (p_acq: Perms.t) (f_acq: Flags.t) (v_acq: ValueMap.t)
+  .
+
+  Variant released_loc: Type :=
+  | mk_released_loc (p_rel: Perm.t) (f_rel: Flag.t)
+  .
+
+  Variant released_all: Type :=
+  | mk_released_all (p_rel: Perms.t) (f_rel: Flags.t) (v_rel: ValueMap.t)
+  .
+End Diff.
+
+
+Module SeqMemory.
+  Record t :=
+    mk {
+        value_map: ValueMap.t;
+        flags: Flags.t;
+      }.
+
+  Definition read (loc: Loc.t) (m: t): Const.t :=
+    ValueMap.read loc m.(value_map).
+
+  Definition write (loc: Loc.t) (v: Const.t) (m: t): t :=
+    mk (ValueMap.write loc v m.(value_map)) (Flags.write loc m.(flags)).
+
+  Definition can_acquire (f: Flags.t) (m: t): Prop :=
+    Flags.le f m.(flags).
+
+  Definition can_access (loc: Loc.t) (f: Flag.t) (m: t): Prop :=
+    Flag.le f (m.(flags) loc).
+
+  Definition acquire_all (cond: Loc.t -> bool) (vs_acq: ValueMap.t) (m: t): t :=
+    mk (ValueMap.acquire cond vs_acq m.(value_map)) m.(flags).
+
+  Definition acquire_loc (cond: bool) (loc: Loc.t) (v_acq: Const.t) (m: t): t :=
+    mk (ValueMap.acquire_loc loc cond v_acq m.(value_map)) m.(flags).
+
+  Definition release_all (f_rel: Flags.t) (vs_rel: ValueMap.t) (m: t): t :=
+    mk m.(value_map) (Flags.meet (Flags.meet f_rel (ValueMap.release vs_rel m.(value_map))) m.(flags)).
+
+  Definition release_loc (loc: Loc.t) (f_rel: Flag.t) (m: t): t :=
+    mk m.(value_map) (Flags.meet_loc loc f_rel m.(flags)).
+End SeqMemory.
+
+
+Module SeqEvent.
+  Variant t: Type :=
+  | syscall
+      (e: Event.t)
+      (acq: Diff.acquired_all)
+      (rel: Diff.released_all)
+  | fence_relaxed
+      (ordr: Ordering.t) (ordw: Ordering.t)
+  | fence_acquire
+      (ordr: Ordering.t) (ordw: Ordering.t)
+      (acq: Diff.acquired_all)
+  | fence_release
+      (ordr: Ordering.t) (ordw: Ordering.t)
+      (rel: Diff.released_all)
+  | fence_acquire_release
+      (ordr: Ordering.t) (ordw: Ordering.t)
+      (acq: Diff.acquired_all)
+      (rel: Diff.released_all)
+  | read_relaxed
+      (loc: Loc.t) (val: Const.t) (ord: Ordering.t)
+      (acq: Diff.acquired_loc)
+      (rel: Diff.released_loc)
+  | read_acquire
+      (loc: Loc.t) (val: Const.t) (ord: Ordering.t)
+      (acq: Diff.acquired_all)
+      (rel: Diff.released_loc)
+  | write_relaxed
+      (loc: Loc.t) (val: Const.t) (ord: Ordering.t)
+      (acq: Diff.acquired_loc)
+      (rel: Diff.released_loc)
+  | write_release
+      (loc: Loc.t) (val: Const.t) (ord: Ordering.t)
+      (acq: Diff.acquired_loc)
+      (rel: Diff.released_all)
+  | update_relaxed
+      (loc: Loc.t) (valr: Const.t) (valw: Const.t) (ordr: Ordering.t) (ordw: Ordering.t)
+      (acq: Diff.acquired_loc)
+      (rel: Diff.released_loc)
+  | update_acquire
+      (loc: Loc.t) (valr: Const.t) (valw: Const.t) (ordr: Ordering.t) (ordw: Ordering.t)
+      (acq: Diff.acquired_all)
+      (rel: Diff.released_loc)
+  | update_release
+      (loc: Loc.t) (valr: Const.t) (valw: Const.t) (ordr: Ordering.t) (ordw: Ordering.t)
+      (acq: Diff.acquired_loc)
+      (rel: Diff.released_all)
+  | update_acquire_release
+      (loc: Loc.t) (valr: Const.t) (valw: Const.t) (ordr: Ordering.t) (ordw: Ordering.t)
+      (acq: Diff.acquired_all)
+      (rel: Diff.released_all)
+  .
+
+  Definition get_program_event (e: t): ProgramEvent.t :=
+    match e with
+    | syscall e _ _ => ProgramEvent.syscall e
+    | fence_relaxed ordr ordw => ProgramEvent.fence ordr ordw
+    | fence_acquire ordr ordw _ => ProgramEvent.fence ordr ordw
+    | fence_release ordr ordw _ => ProgramEvent.fence ordr ordw
+    | fence_acquire_release ordr ordw _ _ => ProgramEvent.fence ordr ordw
+    | read_relaxed loc val ord _ _ => ProgramEvent.read loc val ord
+    | read_acquire loc val ord _ _ => ProgramEvent.read loc val ord
+    | write_relaxed loc val ord _ _ => ProgramEvent.write loc val ord
+    | write_release loc val ord _ _ => ProgramEvent.write loc val ord
+    | update_relaxed loc valr valw ordr ordw _ _ => ProgramEvent.update loc valr valw ordr ordw
+    | update_acquire loc valr valw ordr ordw _ _ => ProgramEvent.update loc valr valw ordr ordw
+    | update_release loc valr valw ordr ordw _ _ => ProgramEvent.update loc valr valw ordr ordw
+    | update_acquire_release loc valr valw ordr ordw _ _ => ProgramEvent.update loc valr valw ordr ordw
+    end.
+
+  Variant step_acquire_all:
+    forall (acq: Diff.acquired_all) (p0: Perms.t) (m0: SeqMemory.t) (p1: Perms.t) (m1: SeqMemory.t), Prop :=
+  | step_acquire_all_intro
+      p0 m0 p1 m1
+      p_acq f_acq v_acq
+      (ACQ: SeqMemory.can_acquire f_acq m0)
+      (PERM: p1 = Perms.join p_acq p0)
+      (MEM: m1 = SeqMemory.acquire_all (Perms.acquired p0 p_acq) v_acq m0)
+    :
+      step_acquire_all
+        (Diff.mk_acquired_all p_acq f_acq v_acq)
+        p0 m0 p1 m1
+  .
+
+  Variant step_acquire_loc:
+    forall (loc: Loc.t) (acq: Diff.acquired_loc) (p0: Perms.t) (m0: SeqMemory.t) (p1: Perms.t) (m1: SeqMemory.t), Prop :=
+  | step_acquire_loc_intro
+      p0 m0 p1 m1
+      loc p_acq f_acq v_acq
+      (PERM: p1 = Perms.join_loc loc p_acq p0)
+      (ACQ: SeqMemory.can_access loc f_acq m0)
+      (MEM: m1 = SeqMemory.acquire_loc (Perm.le p_acq (p0 loc)) loc v_acq m0)
+    :
+      step_acquire_loc
+        loc
+        (Diff.mk_acquired_loc p_acq f_acq v_acq)
+        p0 m0 p1 m1
+  .
+
+  Variant step_release_all:
+    forall (rel: Diff.released_all) (p0: Perms.t) (m0: SeqMemory.t) (p1: Perms.t) (m1: SeqMemory.t), Prop :=
+  | step_release_all_intro
+      p0 m0 p1 m1
+      p_rel f_rel v_rel
+      (PERM: p1 = Perms.meet p_rel p0)
+      (MEM: m1 = SeqMemory.release_all f_rel v_rel m0)
+    :
+      step_release_all
+        (Diff.mk_released_all p_rel f_rel v_rel)
+        p0 m0 p1 m1
+  .
+
+  Variant step_release_loc:
+    forall (loc: Loc.t) (rel: Diff.released_loc) (p0: Perms.t) (m0: SeqMemory.t) (p1: Perms.t) (m1: SeqMemory.t), Prop :=
+  | step_release_loc_intro
+      p0 m0 p1 m1
+      loc p_rel f_rel
+      (PERM: p1 = Perms.meet_loc loc p_rel p0)
+      (MEM: m1 = SeqMemory.release_loc loc f_rel m0)
+    :
+      step_release_loc
+        loc
+        (Diff.mk_released_loc p_rel f_rel)
+        p0 m0 p1 m1
+  .
+
+  Variant step: forall (e: t) (p0: Perms.t) (m0: SeqMemory.t) (p1: Perms.t) (m1: SeqMemory.t), Prop :=
+  | step_syscall
+      e acq rel
+      p0 m0 p1 m1 p2 m2
+      (ACQ: step_acquire_all acq p0 m0 p1 m1)
+      (REL: step_release_all rel p1 m1 p2 m2)
+    :
+      step (syscall e acq rel) p0 m0 p2 m2
+  | step_fence_relaxed
+      ordr ordw
+      p m
+      (ORDR: Ordering.le ordr Ordering.relaxed)
+      (ORDW: Ordering.le ordw Ordering.relaxed)
+    :
+      step (fence_relaxed ordr ordw) p m p m
+  | step_fence_acquire
+      ordr ordw acq
+      p0 m0 p1 m1
+      (ORDR: Ordering.le ordr Ordering.relaxed)
+      (ORDW: Ordering.le ordw Ordering.relaxed)
+      (ACQ: step_acquire_all acq p0 m0 p1 m1)
+    :
+      step (fence_acquire ordr ordw acq) p0 m0 p1 m1
+  | step_fence_release
+      ordr ordw rel
+      p0 m0 p1 m1
+      (ORDR: Ordering.le ordr Ordering.relaxed)
+      (ORDW: Ordering.le Ordering.strong_relaxed ordw)
+      (NONSC: Ordering.le ordw Ordering.acqrel)
+      (REL: step_release_all rel p0 m0 p1 m1)
+    :
+      step (fence_release ordr ordw rel) p0 m0 p1 m1
+  | step_fence_acquire_release
+      ordr ordw acq rel
+      p0 m0 p1 m1 p2 m2
+      (ORDR: Ordering.le Ordering.strong_relaxed ordr \/ Ordering.le Ordering.seqcst ordw)
+      (ORDW: Ordering.le Ordering.strong_relaxed ordw \/ Ordering.le Ordering.seqcst ordw)
+      (ACQ: step_acquire_all acq p0 m0 p1 m1)
+      (REL: step_release_all rel p1 m1 p2 m2)
+    :
+      step (fence_acquire_release ordr ordw acq rel) p0 m0 p2 m2
+  | step_read_relaxed
+      loc val ord acq rel
+      p0 m0 p1 m1 p2 m2
+      (ORD: Ordering.le ord Ordering.relaxed)
+      (ACQ: step_acquire_loc loc acq p0 m0 p1 m1)
+      (READ: SeqMemory.read loc m1 = val)
+      (REL: step_release_loc loc rel p1 m1 p2 m2)
+    :
+      step (read_relaxed loc val ord acq rel) p0 m0 p2 m2
+  | step_read_acquire
+      loc val ord acq rel
+      p0 m0 p1 m1 p2 m2
+      (ORD: Ordering.le Ordering.strong_relaxed ord)
+      (ACQ: step_acquire_all acq p0 m0 p1 m1)
+      (READ: SeqMemory.read loc m1 = val)
+      (REL: step_release_loc loc rel p1 m1 p2 m2)
+    :
+      step (read_acquire loc val ord acq rel) p0 m0 p2 m2
+  | step_write_relaxed
+      loc val ord acq rel
+      p0 m0 p1 m1 m2 p3 m3
+      (ORD: Ordering.le ord Ordering.relaxed)
+      (ACQ: step_acquire_loc loc acq p0 m0 p1 m1)
+      (WRITE: SeqMemory.write loc val m1 = m2)
+      (REL: step_release_loc loc rel p1 m2 p3 m3)
+    :
+      step (write_relaxed loc val ord acq rel) p0 m0 p3 m3
+  | step_write_release
+      loc val ord acq rel
+      p0 m0 p1 m1 m2 p3 m3
+      (ORD: Ordering.le Ordering.strong_relaxed ord)
+      (ACQ: step_acquire_loc loc acq p0 m0 p1 m1)
+      (WRITE: SeqMemory.write loc val m1 = m2)
+      (REL: step_release_all rel p1 m2 p3 m3)
+    :
+      step (write_release loc val ord acq rel) p0 m0 p3 m3
+  | step_update_relaxed
+      loc valr valw ordr ordw acq rel
+      p0 m0 p1 m1 m2 p3 m3
+      (ORDR: Ordering.le ordr Ordering.relaxed)
+      (ORDW: Ordering.le ordw Ordering.relaxed)
+      (ACQ: step_acquire_loc loc acq p0 m0 p1 m1)
+      (READ: SeqMemory.read loc m1 = valr)
+      (WRITE: SeqMemory.write loc valw m1 = m2)
+      (REL: step_release_loc loc rel p1 m2 p3 m3)
+    :
+      step (update_relaxed loc valr valw ordr ordw acq rel) p0 m0 p3 m3
+  | step_update_acquire
+      loc valr valw ordr ordw acq rel
+      p0 m0 p1 m1 m2 p3 m3
+      (ORDR: Ordering.le ordr Ordering.relaxed)
+      (ORDW: Ordering.le ordw Ordering.relaxed)
+      (ACQ: step_acquire_all acq p0 m0 p1 m1)
+      (READ: SeqMemory.read loc m1 = valr)
+      (WRITE: SeqMemory.write loc valw m1 = m2)
+      (REL: step_release_loc loc rel p1 m2 p3 m3)
+    :
+      step (update_acquire loc valr valw ordr ordw acq rel) p0 m0 p3 m3
+  | step_update_release
+      loc valr valw ordr ordw acq rel
+      p0 m0 p1 m1 m2 p3 m3
+      (ORDR: Ordering.le ordr Ordering.relaxed)
+      (ORDW: Ordering.le ordw Ordering.relaxed)
+      (ACQ: step_acquire_loc loc acq p0 m0 p1 m1)
+      (READ: SeqMemory.read loc m1 = valr)
+      (WRITE: SeqMemory.write loc valw m1 = m2)
+      (REL: step_release_all rel p1 m2 p3 m3)
+    :
+      step (update_release loc valr valw ordr ordw acq rel) p0 m0 p3 m3
+  | step_update_acquire_release
+      loc valr valw ordr ordw acq rel
+      p0 m0 p1 m1 m2 p3 m3
+      (ORDR: Ordering.le ordr Ordering.relaxed)
+      (ORDW: Ordering.le ordw Ordering.relaxed)
+      (ACQ: step_acquire_all acq p0 m0 p1 m1)
+      (READ: SeqMemory.read loc m1 = valr)
+      (WRITE: SeqMemory.write loc valw m1 = m2)
+      (REL: step_release_all rel p1 m2 p3 m3)
+    :
+      step (update_acquire_release loc valr valw ordr ordw acq rel) p0 m0 p3 m3
+  .
+End SeqEvent.
+
+
+Module
+
+  Variant acquired: Type :=
+  | acquired_none
+  | acquired_loc
+      (loc: Loc.t) (p_acq: Perm.t) (f_acq: Flag.t) (v_acq: Const.t)
+  | acquired_all
+      (p_acq: Perms.t) (f_acq: Flags.t) (v_acq: ValueMap.t)
+  .
+
+  Variant released: Type :=
+  | released_none
+  | released_loc
+      (loc: Loc.t) (p_rel: Perm.t) (f_rel: Flag.t)
+  | released_all
+      (p_rel: Perms.t) (f_rel: Flags.t) (v_rel: ValueMap.t)
+  .
+
+  Definition wf (e: ProgramEvent.t) (acq: acquired) (rel: released): Prop :=
+    (<<ACQ: match acq, (Locs.acquired e) with
+            | acquired_none, Locs.none => True
+            | acquired_loc l0 _ _ _, Locs.single l1 => l0 = l1
+            | acquired_all _ _ _, Locs.all => True
+            | _, _ => False
+            end>>) /\
+    (<<REL: match rel, (Locs.released e) with
+            | released_none, Locs.none => True
+            | released_loc l0 _ _ _, Locs.single l1 => l0 = l1
+            | released_all _ _ _, Locs.all => True
+            | _, _ => False
+            end>>).
+
+  | wf_intro
+      (WFRELEASED:
+
+ Type :=
+
+
+
+  Variant t: Type :=
+  | syscall
+      (e: Event.t)
+      (p_acq: Perms.t) (f_acq: Flags.t) (v_acq: ValueMap.t)
+      (p_rel: Perms.t) (f_rel: Flags.t) (v_rel: ValueMap.t)
+  | fence_relaxed
+      (ordr: Ordering.t) (ordw: Ordering.t)
+  | fence_acquire
+      (ordr: Ordering.t) (ordw: Ordering.t)
+      (p_acq: Perms.t) (f_acq: Flags.t) (v_acq: ValueMap.t)
+  | fence_release
+      (ordr: Ordering.t) (ordw: Ordering.t)
+      (p_rel: Perms.t) (f_rel: Flags.t) (v_rel: ValueMap.t)
+  | fence_acquire_release
+      (ordr: Ordering.t) (ordw: Ordering.t)
+      (p_acq: Perms.t) (f_acq: Flags.t) (v_acq: ValueMap.t)
+      (p_rel: Perms.t) (f_rel: Flags.t) (v_rel: ValueMap.t)
+  | read_relaxed
+      (L: Loc.t) (v: Const.t) (ord: Ordering.t)
+      (p_acq: Perm.t) (f_acq: Flag.t) (v_acq: Const.t)
+      (p_rel: Perm.t) (f_rel: Flag.t) (v_rel: Const.t)
+  | read_acquire
+      (L: Loc.t) (v: Const.t) (ord: Ordering.t)
+      (p_acq: Perms.t) (f_acq: Flags.t) (v_acq: ValueMap.t)
+      (p_rel: Perm.t) (f_rel: Flag.t) (v_rel: Const.t)
+  | write_relaxed
+      (L: Loc.t) (v: Const.t) (ord: Ordering.t)
+      (p_acq: Perm.t) (f_acq: Flag.t) (v_acq: Const.t)
+      (p_rel: Perm.t) (f_rel: Flag.t) (v_rel: Const.t)
+  | write_release
+      (L: Loc.t) (v: Const.t) (ord: Ordering.t)
+      (p_acq: Perm.t) (f_acq: Flag.t) (v_acq: Const.t)
+      (p_rel: Perms.t) (f_rel: Flags.t) (v_rel: ValueMap.t)
+  | update_relaxed
+      (L: Loc.t) (valr: Const.t) (valw: Const.t) (ordr: Ordering.t) (ordw: Ordering.t)
+      (ordr: Ordering.t) (ordw: Ordering.t)
+      (p_acq: Perm.t) (f_acq: Flag.t) (v_acq: Const.t)
+      (p_rel: Perm.t) (f_rel: Flag.t) (v_rel: Const.t)
+  | update_acquire
+      (L: Loc.t) (valr: Const.t) (valw: Const.t) (ordr: Ordering.t) (ordw: Ordering.t)
+      (ordr: Ordering.t) (ordw: Ordering.t)
+      (p_acq: Perm.t) (f_acq: Flag.t) (v_acq: Const.t)
+      (p_rel: Perm.t) (f_rel: Flag.t) (v_rel: Const.t)
+  .
+
+  | update_acquire
+      (L: Loc.t) (valr: Const.t) (valw: Const.t) (ordr: Ordering.t) (ordw: Ordering.t)
+      (ordr: Ordering.t) (ordw: Ordering.t)
+  | update_
+      (L: Loc.t) (valr: Const.t) (valw: Const.t) (ordr: Ordering.t) (ordw: Ordering.t)
+      (ordr: Ordering.t) (ordw: Ordering.t)
+  | update_relaxed
+      (L: Loc.t) (valr: Const.t) (valw: Const.t) (ordr: Ordering.t) (ordw: Ordering.t)
+      (ordr: Ordering.t) (ordw: Ordering.t)
+  | fence_acquire
+      (ordr: Ordering.t) (ordw: Ordering.t)
+      (p_acq: Perms.t) (f_acq: Flags.t) (v_acq: ValueMap.t)
+  | fence_release
+      (ordr: Ordering.t) (ordw: Ordering.t)
+      (p_rel: Perms.t) (f_rel: Flags.t) (v_rel: ValueMap.t)
+  | fence_acquire_release
+      (ordr: Ordering.t) (ordw: Ordering.t)
+      (p_acq: Perms.t) (f_acq: Flags.t) (v_acq: ValueMap.t)
+      (p_rel: Perms.t) (f_rel: Flags.t) (v_rel: ValueMap.t)
+  .
+
+
+
+ProgramEvent.t
+
+(p_acq:
+
+
+
+
+syscall
+fence
+fence acq
+fence rel
+fence acq rel
+rlx read
+acq read
+rlx write
+rel write
+rlx update
+acq update
+rel update
+rel acq update
+
+
+fence
+fence acq
+fence rel
+fence acq rel
+rlx read
+acq read
+rlx write
+rel write
+
+
+update
+
+
+
+
+Definition is_atomic_event (e: ProgramEvent.t): bool :=
+  match e with
+  | ProgramEvent.silent | ProgramEvent.failure => false
+  | ProgramEvent.syscall _ | ProgramEvent.fence _ _ => true
+  | ProgramEvent.read _ _ ord => Ordering.le Ordering.plain ord
+  | ProgramEvent.write _ _ ord => Ordering.le Ordering.plain ord
+  | ProgramEvent.update _ _ _ ordr ordw =>
+    Ordering.le Ordering.plain ordr && Ordering.le Ordering.plain ordw
+  end.
+
+
+Module Oracle.
 
 Module SeqCell.
    Definition t := (Const.t * Flag.t)%type.
 
+   Definition flag (c: t): Flag.t := snd c.
 
-   Definition deflag: t -> t :=
-     fun '(v, f) => (v, Flag.unwritten).
+   Definition debt (c: t): t :=
+     let (v, f) := c in (v, Flag.debt).
+
+   Definition write (v: Const.t): t :=
+     (v, Flag.written).
+
+   Definition update (v1: Const.t) (c: t): t :=
+     let (v0, f) := c in (v1, f).
 
    (* checked at final *)
    Definition le (c0 c1: t): Prop :=
@@ -91,10 +942,7 @@ Module SeqCell.
 
    (* checked every moment *)
    Definition le_partial (c0 c1: t): Prop :=
-     match c0, c1 with
-     | (v0, f0), (v1, f1) =>
-       f0 = Flag.written \/ (v0 = v1 /\ Flag.le f0 f1)
-     end.
+     Flag.le (flag c0) (flag c1).
 
    Program Instance le_PreOrder: PreOrder le.
    Next Obligation.
@@ -110,14 +958,11 @@ Module SeqCell.
    Program Instance le_partial_PreOrder: PreOrder le_partial.
    Next Obligation.
    Proof.
-     ii. destruct x; ss. right. split; auto. refl.
+     ii. unfold le_partial in *. refl.
    Qed.
    Next Obligation.
    Proof.
-     ii. destruct x, y, z; ss.
-     des; subst; auto.
-     { left. destruct t1; ss. }
-     { right. split; auto. etrans; eauto. }
+     ii. unfold le_partial in *. etrans; eauto.
    Qed.
 
    Lemma le_le_partial c0 c1 (LE: le c0 c1)
@@ -128,41 +973,37 @@ Module SeqCell.
    Qed.
 
    Definition init (v: Const.t): t := (v, Flag.unwritten).
+
+   Variant release: forall (c_before c_released c_after: t), Prop :=
+   | release_normal
+       c0 c1
+       (LE: le c0 c1)
+     :
+       release c1 c0 c0
+   | release_debt
+       c0 c1
+     :
+       release c0 c1 (debt c0)
+   .
 End SeqCell.
 
 
 Module SeqMemory.
   Definition t := Loc.t -> SeqCell.t.
 
-  Definition update (loc: Loc.t) (val: Const.t) (m: t): t :=
-    fun loc' => if Loc.eq_dec loc' loc then (val, Flag.written) else (m loc').
+  Definition flags (m: t): Flags.t := fun loc => snd (m loc).
 
+  Definition update (loc: Loc.t) (c: SeqCell.t) (m: t): t :=
+    fun loc' => if Loc.eq_dec loc' loc then c else (m loc').
 
-  Definition le (m_src m_tgt: t): Prop :=
-    forall loc, SeqCell.le (m_src loc) (m_tgt loc).
+  Definition write (loc: Loc.t) (val: Const.t) (m: t): t :=
+    update loc (SeqCell.write val) m.
 
-  Definition le_partial (m_src m_tgt: t): Prop :=
-    forall loc, SeqCell.le_partial (m_src loc) (m_tgt loc).
+  Definition le (m_tgt m_src: t): Prop :=
+    forall loc, SeqCell.le (m_tgt loc) (m_src loc).
 
-  Definition match_event (e: ProgramEvent.t) (m_src m_tgt: t): Prop :=
-    match e with
-    | ProgramEvent.silent => True
-    | ProgramEvent.read loc _ ord =>
-      (SeqCell.le (m_src loc) (m_tgt loc)) /\
-      (Ordering.le Ordering.acqrel ord -> le_partial m_src m_tgt)
-    | ProgramEvent.write loc _ _ =>
-      (SeqCell.le (m_src loc) (m_tgt loc))
-    | ProgramEvent.update loc _ _ ordr _ =>
-      (SeqCell.le (m_src loc) (m_tgt loc)) /\
-      (Ordering.le Ordering.acqrel ordr -> le_partial m_src m_tgt)
-    | ProgramEvent.fence ordr ordw =>
-      (ordw = Ordering.seqcst -> le m_src m_tgt) /\
-      (Ordering.le Ordering.acqrel ordr -> le_partial m_src m_tgt)
-    | ProgramEvent.syscall _ =>
-      le m_src m_tgt
-    | ProgramEvent.failure => True
-    end.
-
+  Definition le_partial (m_tgt m_src: t): Prop :=
+    Flags.le (flags m_tgt) (flags m_src).
 
   Program Instance le_PreOrder: PreOrder le.
   Next Obligation.
@@ -184,36 +1025,28 @@ Module SeqMemory.
     ii. etrans; eauto.
   Qed.
 
-  Program Instance match_event_PreOrder e: PreOrder (match_event e).
-  Next Obligation.
-  Proof.
-    ii. destruct e; ss; splits; i; try by refl.
-  Qed.
-  Next Obligation.
-  Proof.
-    ii. destruct e; ss; des; splits; i; try by (etrans; eauto).
-  Qed.
 
-
-  Lemma le_le_partial m_src m_tgt (LE: le m_src m_tgt)
+  Lemma le_le_partial m_tgt m_src (LE: le m_tgt m_src)
     :
-      le_partial m_src m_tgt.
+      le_partial m_tgt m_src.
   Proof.
     ii. eapply SeqCell.le_le_partial. auto.
   Qed.
 
-  Lemma le_match_event e m_src m_tgt (LE: le m_src m_tgt)
-    :
-      match_event e m_src m_tgt.
-  Proof.
-    destruct e; ss.
-    { split; auto. i. apply le_le_partial; auto. }
-    { split; auto. i. apply le_le_partial; auto. }
-    { split; auto. i. apply le_le_partial; auto. }
-  Qed.
-
   Definition init (vals: Loc.t -> Const.t): t :=
     fun loc => SeqCell.init (vals loc).
+
+  Variant release: forall (m_before: t) (m_released: option t) (m_after: t), Prop :=
+  | release_some
+      m_before m_released m_after
+      (RELEASE: forall loc, SeqCell.release (m_before loc) (m_released loc) (m_after loc))
+    :
+      release m_before (Some m_released) m_after
+  | release_none
+      m
+    :
+      release m None m
+  .
 End SeqMemory.
 
 
@@ -253,7 +1086,7 @@ Section LANG.
       m0 m1 e
       loc val ord
       (ORD: Ordering.le ord Ordering.na)
-      (MEM: SeqMemory.update loc val m0 = m1)
+      (MEM: SeqMemory.write loc val m0 = m1)
       (PERM: e = if Perm.le Perm.full (p loc) then MachineEvent.silent else MachineEvent.failure)
     :
       na_local_step
@@ -304,84 +1137,96 @@ End SeqState.
 
 Variant diff :=
 | diff_none
-| diff_acq (v: Const.t)
 | diff_rel
-| diff_deflag
-| diff_update (v: Const.t)
+| diff_acq (v: Const.t)
 .
-
-Definition non_release_diff (d: diff): Prop :=
-  match d with
-  | diff_rel | diff_deflag => False
-  | _ => True
-  end.
 
 Definition diffs := Loc.t -> diff.
 
 Definition update_mem
            (d: diffs) (m0: SeqMemory.t): SeqMemory.t :=
   fun loc =>
-    let (v0, f0) := (m0 loc) in
     match (d loc) with
-    | diff_none => (v0, f0)
-    | diff_rel | diff_deflag => (v0, Flag.unwritten)
-    | diff_acq v1 | diff_update v1 => (v1, f0)
+    | diff_none | diff_rel => m0 loc
+    | diff_acq v1 => SeqCell.update v1 (m0 loc)
     end.
 
 Definition update_perm (d: diffs) (p0: Perms.t): Perms.t :=
   fun loc =>
     match (d loc) with
-    | diff_none | diff_update _ | diff_deflag => p0 loc
+    | diff_none => p0 loc
     | diff_acq _ => Perm.full
     | diff_rel => Perm.none
     end.
 
 
-Definition wf_diff_perms (d: diffs) (p: Perms.t): Prop :=
+Definition wf_diff_perms (l: option Loc.t) (d: diffs) (p: Perms.t): Prop :=
   forall loc,
     match (d loc), (p loc) with
     | diff_none, _ => True
     | diff_rel, Perm.full => True
-    | diff_update _, Perm.full => True
     | diff_acq _, Perm.none => True
-    | diff_deflag, Perm.full => True
+    | diff_acq _, Perm.full => l = Some loc
     | _, _ => False
     end.
 
 Definition wf_diff_event (d: diffs) (e: ProgramEvent.t): Prop :=
   match e with
   | ProgramEvent.syscall _ => True
-  | ProgramEvent.read loc _ ord =>
+  | ProgramEvent.read loc val ord =>
     forall loc' (NEQ: loc' <> loc),
       match (d loc') with
-      | diff_rel | diff_update _ | diff_deflag => False
+      | diff_rel => False
       | diff_acq _ => Ordering.le Ordering.acqrel ord
       | diff_none => True
       end
   | ProgramEvent.write loc _ ord =>
     forall loc' (NEQ: loc' <> loc),
       match (d loc') with
-      | diff_acq _ | diff_update _ => False
-      | diff_rel | diff_deflag => Ordering.le Ordering.acqrel ord
+      | diff_acq _ => False
+      | diff_rel => Ordering.le Ordering.strong_relaxed ord
       | diff_none => True
       end
   | ProgramEvent.update loc _ _ ordr ordw =>
     forall loc' (NEQ: loc' <> loc),
       match (d loc') with
-      | diff_update _ => False
-      | diff_rel | diff_deflag => Ordering.le Ordering.acqrel ordw
+      | diff_rel => Ordering.le Ordering.strong_relaxed ordw
       | diff_acq _ => Ordering.le Ordering.acqrel ordr
       | diff_none => True
       end
   | ProgramEvent.fence ordr ordw =>
     forall loc',
       match (d loc') with
-      | diff_update _ => False
-      | diff_rel | diff_deflag => Ordering.le Ordering.acqrel ordw
+      | diff_rel => Ordering.le Ordering.strong_relaxed ordw
       | diff_acq _ => Ordering.le Ordering.acqrel ordr
       | diff_none => True
       end
   | _ => True
+  end.
+
+Definition wf_released (m_released: option SeqMemory.t) (e: ProgramEvent.t): Prop :=
+  match m_released with
+  | Some _ => is_release_event e
+  | None => ~ is_release_event e
+  end.
+
+Definition match_cell (l: option Loc.t) (c: option SeqCell.t) (m: SeqMemory.t): Prop :=
+  match l, c with
+  | Some l, Some c => SeqCell.le c (m l)
+  | None, None => True
+  | _, _ => False
+  end.
+
+Definition update_cell (l: option Loc.t) (c: option SeqCell.t) (m: SeqMemory.t): SeqMemory.t :=
+  match l, c with
+  | Some l, Some c => SeqMemory.update l c m
+  | _, _ => m
+  end.
+
+Definition wf_cell (c: option SeqCell.t) (e: ProgramEvent.t): Prop :=
+  match (is_accessing e) with
+  | Some loc => is_some c
+  | _ => ~ is_some c
   end.
 
 
@@ -390,32 +1235,37 @@ Module Oracle.
 
   Definition step:
     forall (p0: Perms.t)
-           (mem0: SeqMemory.t)
            (e: ProgramEvent.t)
+           (c0: option SeqCell.t)
            (d: diffs)
+           (m_released: option SeqMemory.t)
            (o0: t)
            (o1: t), Prop.
   Admitted.
 
+  Definition progress e o0 p0 c0 d: Prop :=
+    forall m_released (WF: wf_released m_released e),
+      exists o1, step p0 e c0 d m_released o0 o1.
+
   Variant _wf (wf: t -> Prop): t -> Prop :=
   | wf_intro
-      o0
-      (DIFF: forall p0 mem0 e d o1
-                    (STEP: step p0 mem0 e d o0 o1),
+      (o0: t)
+      (WF: forall p0 e c0 d (m_released: option SeqMemory.t) (o1: t)
+                  (STEP: step p0 e c0 d m_released o0 o1),
           (<<EVENT: wf_diff_event d e>>) /\
-          (<<PERM: wf_diff_perms d p0>>) /\
-          (<<WF: wf o1>>))
-      (LOAD: forall p0 mem0 loc ord
+          (<<PERM: wf_diff_perms (is_accessing e) d p0>>) /\
+          (<<CELL: wf_cell c0 e>>) /\
+          (<<RELEASED: wf_released m_released e>>) /\
+          (<<ORACLE: wf o1>>))
+      (LOAD: forall p0 c0 loc ord
                     (ORD: Ordering.le ord Ordering.strong_relaxed),
-          exists v d o1, (<<STEP: step p0 mem0 (ProgramEvent.read loc v ord) d o0 o1>>) /\
-                         (<<NOREL: forall loc, non_release_diff (d loc)>>))
-      (STORE: forall p0 mem0 loc ord val,
-          exists d o1, (<<STEP: step p0 mem0 (ProgramEvent.write loc val ord) d o0 o1>>) /\
-                       (<<NOREL: forall loc, non_release_diff (d loc)>>))
-      (FENCE: forall p0 mem0 ordr ordw
-                     (ORD: Ordering.le ordr Ordering.strong_relaxed),
-          exists d o1, (<<STEP: step p0 mem0 (ProgramEvent.fence ordr ordw) d o0 o1>>) /\
-                       (<<NOREL: forall loc, non_release_diff (d loc)>>))
+          exists v d, progress (ProgramEvent.read loc v ord) o0 p0 (Some c0) d)
+      (STORE: forall p0 c0 loc ord val,
+          exists d, progress (ProgramEvent.write loc val ord) o0 p0 c0 d)
+      (FENCE: forall p0 ordr ordw
+                     (ORDR: Ordering.le ordr Ordering.strong_relaxed)
+                     (ORDW: Ordering.le ordw Ordering.acqrel),
+          exists d, progress (ProgramEvent.fence ordr ordw) o0 p0 None d)
     :
       _wf wf o0
   .
@@ -423,7 +1273,7 @@ Module Oracle.
   Lemma wf_mon: monotone1 _wf.
   Proof.
     ii. inv IN. econs; eauto. i.
-    exploit DIFF; eauto. i. des. splits; auto.
+    exploit WF; eauto. i. des. splits; auto.
   Qed.
   #[export] Hint Resolve wf_mon: paco.
 
@@ -462,23 +1312,27 @@ Section LANG.
   Qed.
 
   Variant at_step:
-    forall (e: MachineEvent.t) (th0: t) (th1: t), Prop :=
+    forall (e: ProgramEvent.t) (d: diffs) (m_released: option SeqMemory.t)
+           (th0: t) (th1: t), Prop :=
   | at_step_intro
-      p0 p1 o0 o1 e d st0 st1 m0 m1 me
+      p0 p1 o0 o1 e c d m_released st0 st1 m0 m_upd m1
       (STEP: lang.(Language.step) e st0 st1)
-      (ORACLE: Oracle.step p0 m0 e d o0 o1)
+      (ORACLE: Oracle.step p0 e c d m_released o0 o1)
+      (CELL: match_cell (is_accessing e) c m0)
       (PERM: p1 = update_perm d p0)
-      (MEM: m1 = update_mem d m0)
-      (EVENT: me = get_machine_event e)
+      (MEM: m_upd = update_mem d (update_cell (is_accessing e) c m0))
+      (RELEASE: SeqMemory.release m_upd m_released m1)
     :
-      at_step me (mk (SeqState.mk _ st0 m0) p0 o0) (mk (SeqState.mk _ st1 m1) p1 o1)
+      at_step e d m_released (mk (SeqState.mk _ st0 m0) p0 o0) (mk (SeqState.mk _ st1 m1) p1 o1)
   .
 
   Variant step (e: MachineEvent.t) (th0: t) (th1: t): Prop :=
   | step_na_step
       (STEP: na_step e th0 th1)
   | step_at_step
-      (STEP: at_step e th0 th1)
+      pe d m_released
+      (EVENT: e = get_machine_event pe)
+      (STEP: at_step pe d m_released th0 th1)
   .
 
   Definition failure (th0: t): Prop :=
@@ -502,7 +1356,7 @@ Section SIMULATION.
       (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
       (<<TERMINAL_SRC: lang_src.(Language.is_terminal) st_src1.(SeqState.state)>>) /\
       (<<TERMINAL: sim_terminal st_src1.(SeqState.state) st_tgt0.(SeqState.state)>>) /\
-      (<<MEM: SeqMemory.le st_src1.(SeqState.memory) st_tgt0.(SeqState.memory)>>).
+      (<<MEM: SeqMemory.le st_tgt0.(SeqState.memory) st_src1.(SeqState.memory)>>).
 
   Definition sim_seq_na_step_case
              (sim_seq:
@@ -533,14 +1387,21 @@ Section SIMULATION.
            (ATOMIC: is_atomic_event e),
     exists st_src1 st_src2,
       (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
-      (<<MEM: SeqMemory.match_event e st_src1.(SeqState.memory) st_tgt0.(SeqState.memory)>>) /\
+      (<<MEM: is_acquire_event e -> SeqMemory.le_partial st_tgt0.(SeqState.memory) st_src1.(SeqState.memory)>>) /\
       (<<STEP: lang_src.(Language.step) e st_src1.(SeqState.state) st_src2>>) /\
-      (<<SIM: forall d
+      (<<SIM: forall d c mem_released mem_tgt
                      (EVENT: wf_diff_event d e)
-                     (PERM: wf_diff_perms d p0),
-          (<<SIM: sim_seq (update_perm d p0)
-                          (SeqState.mk _ st_src2 (update_mem d st_src1.(SeqState.memory)))
-                          (SeqState.mk _ st_tgt1 (update_mem d st_tgt0.(SeqState.memory)))>>)>>).
+                     (PERM: wf_diff_perms (is_accessing e) d p0)
+                     (RELEASED: wf_released mem_released e)
+                     (CELL: wf_cell c e)
+                     (MATCH: match_cell (is_accessing e) c st_tgt0.(SeqState.memory))
+                     (MEM: SeqMemory.release (update_mem d (update_cell (is_accessing e) c st_tgt0.(SeqState.memory))) mem_released mem_tgt),
+          exists mem_src,
+            (<<MATCH: match_cell (is_accessing e) c st_src1.(SeqState.memory)>>) /\
+            (<<MEM: SeqMemory.release (update_mem d (update_cell (is_accessing e) c st_src1.(SeqState.memory))) mem_released mem_src>>) /\
+            (<<SIM: sim_seq (update_perm d p0)
+                            (SeqState.mk _ st_src2 mem_src)
+                            (SeqState.mk _ st_tgt1 mem_tgt)>>)>>).
 
   Definition sim_seq_partial_case
              (p0: Perms.t)
@@ -549,7 +1410,7 @@ Section SIMULATION.
     forall o (WF: Oracle.wf o),
     exists th,
       (<<STEPS: rtc (SeqThread.step MachineEvent.silent) (SeqThread.mk st_src0 p0 o) th>>) /\
-      ((<<MEM: SeqMemory.le_partial th.(SeqThread.state).(SeqState.memory) st_tgt0.(SeqState.memory)>>) \/ (<<FAILURE: SeqThread.failure th>>)).
+      ((<<MEM: SeqMemory.le_partial st_tgt0.(SeqState.memory) th.(SeqThread.state).(SeqState.memory)>>) \/ (<<FAILURE: SeqThread.failure th>>)).
 
   Definition sim_seq_failure_case
              (p0: Perms.t)
@@ -587,14 +1448,14 @@ Section SIMULATION.
     { econs 1; eauto.
       { ii. exploit NASTEP; eauto. i. des. esplits; eauto. }
       { ii. exploit ATSTEP; eauto. i. des. esplits; eauto.
-        i. hexploit SIM; eauto. }
+        i. hexploit SIM; eauto. i. des. esplits; eauto. }
     }
     { econs 2; eauto. }
   Qed.
 
 
   Lemma sim_seq_partial_imm p st_src st_tgt
-        (MEM: SeqMemory.le_partial st_src.(SeqState.memory) st_tgt.(SeqState.memory))
+        (MEM: SeqMemory.le_partial st_tgt.(SeqState.memory) st_src.(SeqState.memory))
     :
       sim_seq_partial_case p st_src st_tgt.
   Proof.
@@ -609,6 +1470,13 @@ Section SIMULATION.
     pfold. right. red. i. esplits; [refl|].
     econs. left. econs. eauto.
   Qed.
+
+  Definition sim_seq_all (st_src: lang_src.(Language.state)) (st_tgt: lang_tgt.(Language.state)): Prop :=
+    forall p vals,
+      sim_seq
+        p
+        (SeqState.mk _ st_src (SeqMemory.init vals))
+        (SeqState.mk _ st_tgt (SeqMemory.init vals)).
 End SIMULATION.
 Arguments sim_seq [_] [_] _ _ _.
 #[export] Hint Resolve sim_seq_mon: paco.
@@ -624,12 +1492,7 @@ Section ADEQUACY.
   Variable R: Type.
 
   Definition sim_seq_itree (st_src: itree MemE.t R) (st_tgt: itree MemE.t R): Prop :=
-    forall p vals,
-      sim_seq
-        eq
-        p
-        (SeqState.mk (lang R) st_src (SeqMemory.init vals))
-        (SeqState.mk (lang R) st_tgt (SeqMemory.init vals)).
+    @sim_seq_all (lang R) (lang R) eq st_src st_tgt.
 
   Theorem adequacy_seq:
     sim_seq_itree <2= sim_itree eq.

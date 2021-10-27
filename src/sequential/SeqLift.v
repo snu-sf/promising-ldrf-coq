@@ -44,6 +44,7 @@ Module Mapping.
   Record t: Type :=
     mk
       { map:> version -> Loc.t -> Time.t -> option Time.t;
+        (* tops: Loc.t -> option Time.t; *)
         ver: version;
       }.
 
@@ -59,13 +60,16 @@ Module Mapping.
           exists fts1,
             (<<MAP: f.(map) v1 loc ts = Some fts1>>) /\
             (<<TS: Time.le fts0 fts1>>);
-      version_time_incr: forall v loc ts fts0 fts1
-                                (VER: v <= f.(ver))
-                                (MAP0: f.(map) f.(ver) loc ts = Some fts0) (MAP0: f.(map) v loc ts = Some fts1),
-          Time.le fts0 fts1;
       mapping_empty: forall v (VER: f.(ver) < v) loc ts, f v loc ts = None;
       mapping_bot: forall loc, f.(map) 0 loc Time.bot = Some Time.bot;
+      (* mapping_tops: forall v loc ts fts top *)
+      (*                      (TOP: f.(tops) loc = Some top) *)
+      (*                      (MAP: f.(map) v loc ts = Some fts), *)
+      (*     Time.lt fts top; *)
+      (* mapping_tops_finite: exists l, forall loc top (TOP: f.(tops) loc = Some top), List.In loc l; *)
     }.
+
+  (* Definition no_top (f: t): Prop := forall loc, f.(tops) loc = None. *)
 
   Lemma mapping_map_le (f: t) (WF: wf f):
     forall v loc ts0 ts1 fts0 fts1
@@ -98,27 +102,253 @@ End Mapping.
 
 Definition versions := Loc.t -> Time.t -> option version.
 
-Definition world := (Mapping.t * versions)%type.
+Definition versions_wf (f: Mapping.t) (vers: versions): Prop :=
+  forall loc to ver (VER: vers loc to = Some ver),
+    ver <= f.(Mapping.ver).
+
+Definition version_wf (f: Mapping.t) (v: version): Prop :=
+  v <= f.(Mapping.ver).
+
+Definition mapping_messages_le (msgs: Messages.t) (f0 f1: Mapping.t): Prop :=
+  (<<VER: f0.(Mapping.ver) <= f1.(Mapping.ver)>>) /\
+  (<<TIME: forall v (VER: v <= f0.(Mapping.ver)),
+      f1.(Mapping.map) v = f0.(Mapping.map) v>>) /\
+  (<<MAPPING: forall loc from ffrom to msg
+                     (MSG: msgs loc from to msg)
+                     (RESERVE: msg <> Message.reserve)
+                     (MAP: f0.(Mapping.map) f0.(Mapping.ver) loc from = Some ffrom),
+      f1.(Mapping.map) f1.(Mapping.ver) loc from = Some ffrom>>)
+.
+
+Definition versions_messages_le (msgs: Messages.t) (vers0 vers1: versions): Prop :=
+  forall loc from to msg ts v
+         (MSG: msgs loc from to msg)
+         (RESERVE: msg <> Message.reserve)
+         (VER: vers0 loc ts = Some v)
+         (TS: Time.lt ts to),
+    vers1 loc ts = Some v.
+
+Program Instance mapping_messages_le_PreOrder: forall msgs, PreOrder (mapping_messages_le msgs).
+Next Obligation.
+Proof.
+  ii. red. splits; ss.
+Qed.
+Next Obligation.
+Proof.
+  ii. unfold mapping_messages_le in *. des. splits; eauto.
+  { etrans; eauto. }
+  { i. transitivity (y.(Mapping.map) v); eauto.
+    eapply TIME; eauto. etrans; eauto. }
+Qed.
+
+Program Instance versions_messages_le_PreOrder: forall msgs, PreOrder (versions_messages_le msgs).
+Next Obligation.
+Proof.
+  ii. eauto.
+Qed.
+Next Obligation.
+Proof.
+  ii. eauto.
+Qed.
+
+Lemma mapping_messages_le_mon:
+  forall msgs0 msgs1 f0 f1
+         (LE: mapping_messages_le msgs1 f0 f1)
+         (MSGS: msgs0 <4= msgs1),
+    mapping_messages_le msgs0 f0 f1.
+Proof.
+  unfold mapping_messages_le in *. i. des. splits; eauto.
+Qed.
+
+Lemma versions_messages_le_mon:
+  forall msgs0 msgs1 f0 f1
+         (LE: versions_messages_le msgs1 f0 f1)
+         (MSGS: msgs0 <4= msgs1),
+    versions_messages_le msgs0 f0 f1.
+Proof.
+  ii. eauto.
+Qed.
+
+Lemma mapping_latest_wf f
+  :
+    version_wf f f.(Mapping.ver).
+Proof.
+  red. refl.
+Qed.
+
+Lemma version_wf_mon v0 v1 f0 f1 msgs
+      (MAPPING: mapping_messages_le msgs f0 f1)
+      (VER: v0 <= v1)
+      (WF: version_wf f0 v1)
+  :
+    version_wf f1 v0.
+Proof.
+  unfold version_wf in *. etrans; eauto. etrans; eauto. eapply MAPPING.
+Qed.
+
+Definition sim_timestamp_exact (l: Loc.t) (f: Mapping.t) (v: version) (ts_src ts_tgt: Time.t) :=
+  f.(Mapping.map) v l ts_tgt = Some ts_src.
+
+Definition sim_timestamp (l: Loc.t) (f: Mapping.t) (v: version) (ts_src ts_tgt: Time.t) :=
+  exists ts_src' ts_tgt',
+    (<<TSSRC: Time.le ts_src ts_src'>>) /\
+    (<<TSTGT: Time.le ts_tgt' ts_tgt>>) /\
+    (<<SIM: sim_timestamp_exact l f v ts_src' ts_tgt'>>).
+
+Record sim_timestamp_max (l: Loc.t) (f: Mapping.t) (v: version) (ts_src ts_tgt: Time.t): Prop :=
+  sim_timestamp_max_intro {
+      sim_timestamp_max_sim: sim_timestamp l f v ts_src ts_tgt;
+      sim_timestamp_max_max: forall ts (SIM: sim_timestamp l f v ts ts_tgt),
+          Time.le ts ts_src;
+    }.
+
+Lemma sim_timestamp_exact_sim l f v ts_src ts_tgt
+      (EXACT: sim_timestamp_exact l f v ts_src ts_tgt)
+  :
+    sim_timestamp l f v ts_src ts_tgt.
+Proof.
+  exists ts_src, ts_tgt. splits; auto; try refl.
+Qed.
+
+Lemma sim_timestamp_exact_max l f v ts_src ts_tgt
+      (EXACT: sim_timestamp_exact l f v ts_src ts_tgt)
+      (WF: Mapping.wf f)
+  :
+    sim_timestamp_max l f v ts_src ts_tgt.
+Proof.
+  econs.
+  { eapply sim_timestamp_exact_sim. eauto. }
+  { i. unfold sim_timestamp, sim_timestamp_exact in *. des.
+    etrans; eauto. erewrite <- Mapping.mapping_map_le; eauto. }
+Qed.
+
+Lemma sim_timestamp_max_exists l f v ts_tgt
+  :
+    exists ts_src, <<MAX: sim_timestamp_max l f v ts_src ts_tgt>>.
+Proof.
+Admitted.
+
+Lemma sim_timestamp_mon_src l f v ts_src0 ts_src1 ts_tgt
+      (SIM: sim_timestamp l f v ts_src1 ts_tgt)
+      (TS: Time.le ts_src0 ts_src1)
+  :
+    sim_timestamp l f v ts_src0 ts_tgt.
+Proof.
+  unfold sim_timestamp in *. des.
+  esplits; [..|eauto]; auto. etrans; eauto.
+Qed.
+
+Lemma sim_timestamp_mon_tgt l f v ts_src ts_tgt0 ts_tgt1
+      (SIM: sim_timestamp l f v ts_src ts_tgt0)
+      (TS: Time.le ts_tgt0 ts_tgt1)
+  :
+    sim_timestamp l f v ts_src ts_tgt1.
+Proof.
+  unfold sim_timestamp in *. des.
+  esplits; [..|eauto]; auto. etrans; eauto.
+Qed.
+
+Lemma sim_timestamp_exact_mon_ver l f v0 v1 ts_src0 ts_tgt
+      (SIM: sim_timestamp_exact l f v0 ts_src0 ts_tgt)
+      (VER: v0 <= v1)
+      (WF: Mapping.wf f)
+      (VERWF: version_wf f v1)
+  :
+    exists ts_src1, (<<TS: Time.le ts_src0 ts_src1>>) /\ (<<SIM: sim_timestamp_exact l f v1 ts_src1 ts_tgt>>).
+Proof.
+  unfold sim_timestamp_exact in *.
+  eapply Mapping.mapping_incr in SIM; eauto. des. esplits; eauto.
+Qed.
+
+Lemma sim_timestamp_mon_ver l f v0 v1 ts_src ts_tgt
+      (SIM: sim_timestamp l f v0 ts_src ts_tgt)
+      (VER: v0 <= v1)
+      (WF: Mapping.wf f)
+      (VERWF: version_wf f v1)
+  :
+    sim_timestamp l f v1 ts_src ts_tgt.
+Proof.
+  unfold sim_timestamp in *. des.
+  eapply sim_timestamp_exact_mon_ver in SIM; eauto. des.
+  esplits; [..|eauto]; eauto.
+Qed.
+
+Lemma sim_timestamp_exact_mon_mapping l msgs f0 f1 v ts_src ts_tgt
+      (WF: Mapping.wf f0)
+      (VERWF: version_wf f0 v)
+      (MAP: mapping_messages_le msgs f0 f1)
+  :
+    sim_timestamp_exact l f0 v ts_src ts_tgt <-> sim_timestamp_exact l f1 v ts_src ts_tgt.
+Proof.
+  unfold sim_timestamp_exact, mapping_messages_le in *. des.
+  rewrite TIME; eauto.
+Qed.
+
+Lemma sim_timestamp_mon_mapping l msgs f0 f1 v ts_src ts_tgt
+      (WF: Mapping.wf f0)
+      (VERWF: version_wf f0 v)
+      (MAP: mapping_messages_le msgs f0 f1)
+  :
+    sim_timestamp l f0 v ts_src ts_tgt <-> sim_timestamp l f1 v ts_src ts_tgt.
+Proof.
+  unfold sim_timestamp in *. split.
+  { i. des. esplits; eauto.
+    erewrite <- sim_timestamp_exact_mon_mapping; eauto. }
+  { i. des. esplits; eauto.
+    erewrite sim_timestamp_exact_mon_mapping; eauto. }
+Qed.
+
+Lemma sim_timestamp_max_mon_mapping l msgs f0 f1 v ts_src ts_tgt
+      (WF: Mapping.wf f0)
+      (VERWF: version_wf f0 v)
+      (MAP: mapping_messages_le msgs f0 f1)
+  :
+    sim_timestamp_max l f0 v ts_src ts_tgt <-> sim_timestamp_max l f1 v ts_src ts_tgt.
+Proof.
+  split.
+  { i. econs.
+    { erewrite <- sim_timestamp_mon_mapping; eauto. eapply sim_timestamp_max_sim; eauto. }
+    { i. erewrite <- sim_timestamp_mon_mapping in SIM; eauto.
+      eapply sim_timestamp_max_max; eauto. }
+  }
+  { i. econs.
+    { erewrite sim_timestamp_mon_mapping; eauto. eapply sim_timestamp_max_sim; eauto. }
+    { i. erewrite sim_timestamp_mon_mapping in SIM; eauto.
+      eapply sim_timestamp_max_max; eauto. }
+  }
+Qed.
+
+Record world :=
+  mk_world {
+      mapping:> Mapping.t;
+      vers: versions;
+    }.
+
+Definition world_wf (w: world): Prop :=
+  (<<MAPPING: Mapping.wf w.(mapping)>>) /\
+  (<<VERS: forall loc to ver (VER: w.(vers) loc to = Some ver),
+      ver <= w.(mapping).(Mapping.ver)>>)
+.
 
 Definition version_wf (w: world) (v: version): Prop :=
-  (<<VER: v <= (fst w).(Mapping.ver)>>) /\
-  (<<WF: Mapping.wf (fst w)>>).
+  (<<VER: v <= w.(mapping).(Mapping.ver)>>).
 
-Definition world_messages_le (msgs: Messages.t) (f0 f1: world): Prop :=
-  (<<VER: (fst f0).(Mapping.ver) <= (fst f1).(Mapping.ver)>>) /\
-  (<<TIME: forall v (VER: v <= (fst f0).(Mapping.ver)),
-      (fst f1).(Mapping.map) v = (fst f0).(Mapping.map) v>>) /\
+Definition world_messages_le (msgs: Messages.t) (w0 w1: world): Prop :=
+  (<<VER: w0.(mapping).(Mapping.ver) <= w1.(mapping).(Mapping.ver)>>) /\
+  (<<TIME: forall v (VER: v <= w0.(mapping).(Mapping.ver)),
+      w1.(mapping).(Mapping.map) v = w0.(mapping).(Mapping.map) v>>) /\
   (<<VERSIONS: forall loc from to msg ts v
                       (MSG: msgs loc from to msg)
                       (RESERVE: msg <> Message.reserve)
-                      (VER: (snd f0) loc ts = Some v)
+                      (VER: w0.(vers) loc ts = Some v)
                       (TS: Time.lt ts to),
-      (snd f1) loc ts = Some v>>) /\
-  (<<MAPPING: forall loc from to msg
+      w1.(vers) loc ts = Some v>>) /\
+  (<<MAPPING: forall loc from ffrom to msg
                      (MSG: msgs loc from to msg)
-                     (RESERVE: msg <> Message.reserve),
-      (fst f0).(Mapping.map) (fst f0).(Mapping.ver) loc to =
-      (fst f1).(Mapping.map) (fst f1).(Mapping.ver) loc to>>).
+                     (RESERVE: msg <> Message.reserve)
+                     (MAP: w0.(mapping).(Mapping.map) w0.(mapping).(Mapping.ver) loc from = Some ffrom),
+      w1.(mapping).(Mapping.map) w1.(mapping).(Mapping.ver) loc from = Some ffrom>>)
+.
 
 Program Instance world_messages_le_PreOrder: forall msgs, PreOrder (world_messages_le msgs).
 Next Obligation.
@@ -127,11 +357,10 @@ Proof.
 Qed.
 Next Obligation.
 Proof.
-  ii. unfold world_messages_le in *. des. splits.
+  ii. unfold world_messages_le in *. des. splits; eauto.
   { etrans; eauto. }
-  { i. transitivity ((fst y).(Mapping.map) v); eauto.
+  { i. transitivity (y.(mapping).(Mapping.map) v); eauto.
     eapply TIME; eauto. etrans; eauto. }
-  { ii. transitivity eapply SAME; eauto. }
 Qed.
 
 Lemma world_messages_le_mon:
@@ -140,12 +369,11 @@ Lemma world_messages_le_mon:
          (MSGS: msgs0 <4= msgs1),
     world_messages_le msgs0 w0 w1.
 Proof.
-  unfold world_messages_le in *. i. des. splits; auto.
-  i. eapply SAME; eauto.
+  unfold world_messages_le in *. i. des. splits; eauto.
 Qed.
 
 Definition sim_timestamp_exact (l: Loc.t) (w: world) (v: version) (ts_src ts_tgt: Time.t) :=
-  w.(Mapping.map) v l ts_tgt = Some ts_src.
+  w.(mapping).(Mapping.map) v l ts_tgt = Some ts_src.
 
 Definition sim_timestamp (l: Loc.t) (w: world) (v: version) (ts_src ts_tgt: Time.t) :=
   exists ts_src' ts_tgt',
@@ -172,6 +400,7 @@ Lemma sim_timestamp_mon l msgs w0 v0 w1 v1 ts_src0 ts_tgt0 ts_src1 ts_tgt1
   :
     sim_timestamp l w1 v1 ts_src0 ts_tgt1.
 Proof.
+
 
 Admitted.
 
