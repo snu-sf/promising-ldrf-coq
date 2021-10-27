@@ -3159,32 +3159,36 @@ Section PROMISEWRITING.
             (loc: Loc.t) (from to: Time.t) (val: Const.t) (released: option View.t)
   : forall (e: ThreadEvent.t), Prop :=
   | writing_event_write
-      from' released' ord
+      from' val' released' ord
       (FROM: Time.le from from')
       (TO: Time.le from' to)
+      (VAL: Const.le val val')
       (RELEASED: View.opt_le released' released)
       (ORD: Ordering.le ord Ordering.relaxed)
     :
       promise_writing_event
         loc from to val released
-        (ThreadEvent.write loc from' to val released' ord)
+        (ThreadEvent.write loc from' to val' released' ord)
   | writing_event_update
-      from' released' ord valr releasedr ordr
+      from' val' released' ord valr releasedr ordr
       (FROM: Time.le from from')
       (TO: Time.le from' to)
+      (VAL: Const.le val val')
       (RELEASED: View.opt_le released' released)
       (ORD: Ordering.le ord Ordering.relaxed)
     :
       promise_writing_event
         loc from to val released
-        (ThreadEvent.update loc from' to valr val releasedr released' ordr ord)
+        (ThreadEvent.update loc from' to valr val' releasedr released' ordr ord)
   .
   Hint Constructors promise_writing_event.
 
-  Lemma promise_writing_event_mon loc from to val released from' released' e
+  Lemma promise_writing_event_mon
+        loc from to val released from' val' released' e
         (FROM: Time.le from from')
+        (VAL: Const.le val val')
         (RELEASED: View.opt_le released' released)
-        (WRITING: promise_writing_event loc from' to val released' e)
+        (WRITING: promise_writing_event loc from' to val' released' e)
     :
       promise_writing_event loc from to val released e.
   Proof.
@@ -3197,21 +3201,22 @@ Section PROMISEWRITING.
         loc from to val released
         (GET: Memory.get loc to prom0 = Some (from, Message.concrete val released))
     :
-      exists from' released',
+      exists val' from' released',
         (<<FROM: Time.le from from'>>) /\
+        (<<VAL: Const.le val val'>>) /\
         (<<RELEASED: View.opt_le released' released>>) /\
-        (<<GET: Memory.get loc to prom1 = Some (from', Message.concrete val released')>>).
+        (<<GET: Memory.get loc to prom1 = Some (from', Message.concrete val' released')>>).
   Proof.
     inv PROMISE.
     { eapply Memory.add_get1 in GET; eauto.
-      exists from, released. splits; auto; try by refl. }
+      exists val, from, released. splits; auto; try by refl. }
     { eapply Memory.split_get1 in GET; eauto. des.
-      exists f', released. splits; auto; try by refl. }
+      exists val, f', released. splits; auto; try by refl. }
     { eapply Memory.lower_get1 in GET; eauto. des. inv MSG_LE.
-      exists from, released0. splits; auto; try by refl. }
+      exists val0, from, released0. splits; auto; try by refl. }
     { dup GET. eapply Memory.remove_get1 in GET; eauto. des.
       { subst. eapply Memory.remove_get0 in PROMISES. des. clarify. }
-      { exists from, released. splits; auto; try by refl. }
+      { exists val, from, released. splits; auto; try by refl. }
     }
   Qed.
 
@@ -3220,22 +3225,24 @@ Section PROMISEWRITING.
         loc from to val released
         (GET: Memory.get loc to (Local.promises (Thread.local th0)) = Some (from, Message.concrete val released))
     :
-      (exists from' released',
+      (exists val' from' released',
           (<<FROM: Time.le from from'>>) /\
+          (<<VAL: Const.le val val'>>) /\
           (<<RELEASED: View.opt_le released' released>>) /\
-          (<<GET: Memory.get loc to (Local.promises (Thread.local th1)) = Some (from', Message.concrete val released')>>)) \/
+          (<<GET: Memory.get loc to (Local.promises (Thread.local th1)) = Some (from', Message.concrete val' released')>>)) \/
       (promise_writing_event loc from to val released e).
   Proof.
     inv STEP.
     { left. inv STEP0; ss. inv LOCAL.
       eapply promise_promise_decrease in GET; eauto. }
     { inv STEP0; ss.
-      inv LOCAL; try by (inv LOCAL0; left; exists from, released; splits; auto; refl).
-      { left; exists from, released; splits; auto; refl. }
+      inv LOCAL; try by (inv LOCAL0; left; exists val, from, released; splits; auto; refl).
+      { left; exists val, from, released; splits; auto; refl. }
       { inv LOCAL0. ss. inv WRITE.
         eapply promise_promise_decrease in PROMISE; eauto. des.
         dup GET0. eapply Memory.remove_get1 in GET0; eauto. des.
-        { subst. eapply Memory.remove_get0 in REMOVE. des. clarify.
+        { subst. eapply Memory.remove_get0 in REMOVE. des.
+          rewrite GET1 in *. inv GET0.
           right. econs; eauto.
           { eapply memory_get_ts_le; eauto. }
           apply NNPP. ii.
@@ -3250,7 +3257,8 @@ Section PROMISEWRITING.
       { inv LOCAL1. inv LOCAL2. ss. inv WRITE.
         eapply promise_promise_decrease in PROMISE; eauto. des.
         dup GET1. eapply Memory.remove_get1 in GET1; eauto. des.
-        { subst. eapply Memory.remove_get0 in REMOVE. des. clarify.
+        { subst. eapply Memory.remove_get0 in REMOVE. des.
+          rewrite GET2 in *. inv GET1.
           right. econs; eauto.
           { eapply memory_get_ts_le; eauto. }
           apply NNPP. ii.
@@ -3271,23 +3279,21 @@ Section PROMISEWRITING.
         loc from to val released
         (GET: Memory.get loc to (Local.promises (Thread.local th0)) = Some (from, Message.concrete val released))
     :
-      (exists from' released',
+      (exists from' val' released',
           (<<FROM: Time.le from from'>>) /\
+          (<<VAL: Const.le val val'>>) /\
           (<<RELEASED: View.opt_le released' released>>) /\
-          (<<GET: Memory.get loc to (Local.promises (Thread.local th1)) = Some (from', Message.concrete val released')>>)) \/
+          (<<GET: Memory.get loc to (Local.promises (Thread.local th1)) = Some (from', Message.concrete val' released')>>)) \/
       (exists th e,
           (<<WRITING: promise_writing_event loc from to val released e>>) /\
           (<<IN: List.In (th, e) tr>>)
       ).
   Proof.
     ginduction STEPS.
-    { i. left. exists from, released. splits; auto; try refl. }
+    { i. left. exists from, val, released. splits; auto; try refl. }
     { subst. i. exploit step_promise_decrease_promise_writing_event; eauto. i. des.
       { exploit IHSTEPS; eauto. i. des.
-        { left. exists from'0, released'0. splits; auto.
-          { etrans; eauto. }
-          { etrans; eauto. }
-        }
+        { left. exists from'0, val'0, released'0. splits; auto; etrans; eauto. }
         { right. ss. esplits; eauto.
           eapply promise_writing_event_mon; eauto. }
       }
