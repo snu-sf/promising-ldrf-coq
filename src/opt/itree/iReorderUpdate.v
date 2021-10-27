@@ -68,7 +68,7 @@ Inductive sim_update: forall R
     lc1_tgt sc1_tgt mem1_tgt
     lc2_src
     lc3_src sc3_src
-    (RMW: ILang.eval_rmw rmw1 vr1 = (vret1, vw1))
+    (RMW: ILang.eval_rmw rmw1 vr1 vret1 vw1)
     (REORDER: reorder_update l1 or1 ow1 i2)
     (READ: Local.read_step lc1_src mem1_src l1 from1 vr1 releasedr1 or1 lc2_src)
     (FULFILL: match vw1 with
@@ -92,7 +92,7 @@ Inductive sim_update: forall R
     l1 vr1 vret1 rmw1 or1 ow1 (i2: MemE.t R)
     lc1_src sc1_src mem1_src
     lc1_tgt sc1_tgt mem1_tgt
-    (RMW: ILang.eval_rmw rmw1 vr1 = (vret1, None))
+    (RMW: ILang.eval_rmw rmw1 vr1 vret1 None)
     (REORDER: reorder_update l1 or1 ow1 i2)
     (RACY_READ: Local.racy_read_step lc1_src mem1_src l1 vr1 or1)
     (LOCAL: sim_local SimPromises.bot lc1_src lc1_tgt)
@@ -422,11 +422,11 @@ Proof.
     dup x0. dependent destruction x1.
     { exploit (progress_program_step_non_update
                  i2
-                 (fun r => Ret (fst (ILang.eval_rmw rmw1 vr1), r))); eauto.
+                 (fun r => Ret (vret1, r))); eauto.
       { inv REORDER; ss. }
       i. des.
       destruct th2. exploit sim_update_step; eauto.
-      { rewrite RMW in *. ss. econs 2. eauto. }
+      { econs 2. eauto. }
       i. des; eauto.
       + exploit Thread.program_step_promises_bot; eauto. s. i.
         exploit Thread.rtc_tau_step_future; eauto. s. i. des.
@@ -457,11 +457,11 @@ Proof.
     }
     { exploit (progress_program_step_non_update
                  i2
-                 (fun r => Ret (fst (ILang.eval_rmw rmw1 vr1), r))); eauto.
+                 (fun r => Ret (vret1, r))); eauto.
       { inv REORDER; ss. }
       i. des.
       destruct th2. exploit sim_update_step; eauto.
-      { rewrite RMW in *. ss. econs 2. eauto. }
+      { econs 2. eauto. }
       i. des; eauto.
       + exploit Thread.program_step_promises_bot; eauto. s. i.
         exploit Thread.rtc_tau_step_future; eauto. s. i. des.
@@ -503,7 +503,7 @@ Inductive sim_update_race:
     R
     l1 vr1 vret1 vw1 rmw1 or1 ow1 (i2: MemE.t R)
     lc1_src sc1_src mem1_src
-    (RMW: ILang.eval_rmw rmw1 vr1 = (vret1, Some vw1))
+    (RMW: ILang.eval_rmw rmw1 vr1 vret1 (Some vw1))
     (REORDER: reorder_update l1 or1 ow1 i2)
     (RACY_UPDATE: Local.racy_update_step lc1_src mem1_src l1 or1 ow1)
     (WF_SRC: Local.wf lc1_src mem1_src)

@@ -149,6 +149,7 @@ Module LowerPromises.
                                   (Message.concrete val None)); eauto.
     { exploit Memory.get_ts; eauto. i. des; ss.
       subst. rewrite BOT in GET1. ss. }
+    { econs; eauto. refl. }
     i. des.
     esplits; eauto.
     - econs; i.

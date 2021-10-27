@@ -164,7 +164,8 @@ Proof.
   inv LOCAL1. inv STEP_TGT.
   exploit sim_memory_get; try apply GET; eauto. i. des.
   inv MSG. esplits; eauto.
-  - econs; eauto. eapply TViewFacts.readable_mon; eauto. apply TVIEW.
+  - econs; eauto; (try etrans; eauto).
+    eapply TViewFacts.readable_mon; eauto. apply TVIEW.
   - econs; eauto. s. apply TViewFacts.read_tview_mon; auto.
     + apply WF1_TGT.
     + inv MEM1_TGT. exploit CLOSED; eauto. i. des. inv MSG_WF. auto.

@@ -2124,7 +2124,8 @@ Module Memory.
       exploit SOUND; eauto; ss. i. des.
       + subst. exploit get_ts; try exact x. i. des; subst; eauto. inv x2.
       + exploit get_ts; try exact x. i. des.
-        * subst. inv x3. inv RELEASED. eauto.
+        * subst. inv x3. inv RELEASED.
+          exploit Const.undef_le_inv; eauto. i. subst. eauto.
         * inv x5.
   Qed.
 

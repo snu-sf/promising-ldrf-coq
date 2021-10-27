@@ -46,7 +46,8 @@ Lemma future_read_step
 Proof.
   inv STEP. exploit Memory.future_weak_get1; eauto; ss. i. des. inv MSG_LE.
   esplits.
-  - econs; eauto. eapply TViewFacts.readable_mon; eauto; refl.
+  - econs; eauto; try by etrans; eauto.
+    eapply TViewFacts.readable_mon; eauto; refl.
   - auto.
   - econs; s.
     + apply TViewFacts.read_tview_mon; auto.
@@ -208,7 +209,7 @@ Proof.
   }
   exploit Memory.promise_get1; eauto. i. des. inv MSG_LE.
   esplits; eauto.
-  - econs; eauto.
+  - econs; eauto; try by etrans; eauto.
     s. eapply TViewFacts.readable_mon; eauto; try refl.
   - s. econs; ss.
     + apply TViewFacts.read_tview_mon; try refl; try apply WF0; eauto.

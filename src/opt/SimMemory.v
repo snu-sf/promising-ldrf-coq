@@ -829,7 +829,8 @@ Proof.
   { apply WF1. eapply Memory.remove_get0. eauto. }
   i. des.
   exploit MemorySplit.remove_promise_remove;
-    try exact REMOVE; eauto; try apply WF1; try by econs; eauto.
+    try exact REMOVE; (try by econs; try exact REL_LE; try refl); eauto;
+      try eapply WF1; try by econs; eauto.
   { econs. inv REL_LE; try apply Time.bot_spec.
     cut (Time.le (View.rlx (View.unwrap (Some lhs)) loc)
                  (View.rlx (View.unwrap (Some rhs)) loc)).
@@ -868,7 +869,8 @@ Proof.
   { eapply Memory.promise_get2; eauto. inv PROMISE0; ss. }
   s. i. des.
   exploit MemorySplit.remove_promise_remove;
-    try exact REMOVE; eauto; try apply WF2; try by econs; eauto.
+    try exact REMOVE; (try by econs; try exact REL_LE; try refl); eauto;
+      try apply WF2; try by econs; eauto.
   { econs. inv REL_LE; try apply Time.bot_spec.
     cut (Time.le (View.rlx (View.unwrap (Some lhs)) loc)
                  (View.rlx (View.unwrap (Some rhs)) loc)).

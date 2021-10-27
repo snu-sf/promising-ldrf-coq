@@ -242,9 +242,10 @@ Module Local.
 
   Inductive read_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (to:Time.t) (val:Const.t) (released:option View.t) (ord:Ordering.t) (lc2:t): Prop :=
   | read_step_intro
-      from
+      from val'
       tview2
-      (GET: Memory.get loc to mem1 = Some (from, Message.concrete val released))
+      (GET: Memory.get loc to mem1 = Some (from, Message.concrete val' released))
+      (VAL: Const.le val val')
       (READABLE: TView.readable (TView.cur (tview lc1)) loc to released ord)
       (TVIEW: TView.read_tview (tview lc1) loc to released ord = tview2)
       (LC2: lc2 = mk tview2 (promises lc1)):

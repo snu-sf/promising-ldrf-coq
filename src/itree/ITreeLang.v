@@ -30,8 +30,6 @@ Open Scope cat_scope.
 Open Scope monad_scope.
 Open Scope itree_scope.
 
-Set Implicit Arguments.
-
 Require Import RelationClasses.
 Require Import List.
 
@@ -44,6 +42,9 @@ From PromisingLib Require Import Language.
 Require Import Event.
 Require Export ITreeLib.
 Require Export Program.
+
+Set Implicit Arguments.
+
 
 Module MemE.
   Variant rmw :=
@@ -89,17 +90,27 @@ Module MemE.
 End MemE.
 
 
-
 Module ILang.
-  Definition eval_rmw (rmw:MemE.rmw) (val:Const.t): Const.t * option Const.t :=
-    match rmw with
-    | MemE.fetch_add addendum =>
-      (Const.add val addendum, Some (Const.add val addendum))
-    | MemE.cas o n =>
-      if Const.eq_dec o val
-      then (1, Some n)
-      else (0, None)
-    end.
+  Variant eval_rmw: forall (rmw:MemE.rmw) (valr:Const.t) (valret: Const.t) (valw: option Const.t), Prop :=
+  | eval_rmw_fetch_add
+      addendum valr valret valw
+      (VALRET: valret = Const.add valr addendum)
+      (VALW: valw = Some (Const.add valr addendum)):
+      eval_rmw (MemE.fetch_add addendum) valr valret valw
+  | eval_rmw_cas_success
+      o n valr valret valw
+      (CMP: Const.eqb o valr <> Some false)
+      (VALRET: valret = Const.one)
+      (VALW: valw = Some n):
+      eval_rmw (MemE.cas o n) valr valret valw
+  | eval_rmw_cas_fail
+      o n valr valret valw
+      (CMP: Const.eqb o valr <> Some true)
+      (VALRET: valret = Const.zero)
+      (VALW: valw = None):
+      eval_rmw (MemE.cas o n) valr valret valw
+  .
+  #[export] Hint Constructors eval_rmw.
 
   Definition is_terminal R (s: itree MemE.t R): Prop :=
     exists r, s = Ret r.
@@ -136,7 +147,7 @@ Module ILang.
             itr1
   | step_update_success
       (k: Const.t -> itree MemE.t R) loc rmw valr valw valret ordr ordw
-      (RMW: eval_rmw rmw valr = (valret, Some valw))
+      (RMW: eval_rmw rmw valr valret (Some valw))
       itr1 (EQ: itr1 = k valret)
     :
       @step R (ProgramEvent.update loc valr valw ordr ordw)
@@ -144,7 +155,7 @@ Module ILang.
             itr1
   | step_update_failure
       (k: Const.t -> itree MemE.t R) loc rmw valr valret ordr ordw
-      (RMW: eval_rmw rmw valr = (valret, None))
+      (RMW: eval_rmw rmw valr valret None)
       itr1 (EQ: itr1 = k valret)
     :
       @step R (ProgramEvent.read loc valr ordr)

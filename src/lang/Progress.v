@@ -100,7 +100,7 @@ Proof.
   dup MEM1. inv MEM0.
   exploit (Memory.max_concrete_ts_exists); eauto. i. des.
   exploit (Memory.max_concrete_ts_spec); eauto. i. des.
-  esplits; eauto. econs; eauto.
+  esplits; eauto. econs; eauto; try refl.
   econs; i; eapply Memory.max_concrete_ts_spec2; eauto; apply WF1.
 Qed.
 
@@ -114,7 +114,7 @@ Lemma progress_read_step_cur
 Proof.
   dup WF1. inv WF0. inv TVIEW_CLOSED. inv CUR.
   specialize (RLX loc). des.
-  esplits. econs; eauto.
+  esplits. econs; eauto; try refl.
   econs; try apply TVIEW_WF; try refl.
 Qed.
 

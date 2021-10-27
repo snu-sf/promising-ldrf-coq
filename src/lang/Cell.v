@@ -19,6 +19,7 @@ Set Implicit Arguments.
 
 
 Module Message.
+  (* TODO: undef -> na message *)
   Inductive t :=
   | concrete (val: Const.t) (released: option View.t)
   | undef
@@ -26,13 +27,14 @@ Module Message.
   .
   Hint Constructors t.
 
-  Definition elt: t := concrete 0 None.
+  Definition elt: t := concrete Const.undef None.
 
   Inductive le : t -> t -> Prop :=
   | le_concrete
-      val released released'
+      val val' released released'
+      (VAL: Const.le val' val)
       (RELEASED: View.opt_le released released'):
-      le (concrete val released) (concrete val released')
+      le (concrete val released) (concrete val' released')
   | le_undef:
       le undef undef
   | le_reserve:
@@ -42,10 +44,10 @@ Module Message.
 
   Program Instance le_PreOrder: PreOrder le.
   Next Obligation.
-    ii. destruct x; econs. refl.
+    ii. destruct x; econs; refl.
   Qed.
   Next Obligation.
-    ii. inv H; inv H0; econs. etrans; eauto.
+    ii. inv H; inv H0; econs; etrans; eauto.
   Qed.
 
   Lemma antisym a b
@@ -53,8 +55,9 @@ Module Message.
         (BA: le b a):
     a = b.
   Proof.
-    inv AB; inv BA; ss.
-    f_equal. apply View.opt_antisym; auto.
+    inv AB; inv BA; ss. f_equal.
+    - apply Const.antisym; auto.
+    - apply View.opt_antisym; auto.
   Qed.
 
   Inductive wf: t -> Prop :=

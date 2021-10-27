@@ -196,7 +196,7 @@ Proof.
   inv LOCAL1. inv STEP_TGT.
   exploit sim_memory_get; try apply GET; try apply MEM1. i. des. inv MSG.
   esplits; eauto.
-  - econs; eauto. inv READABLE. econs; ss; i.
+  - econs; eauto; try by (etrans; eauto). inv READABLE. econs; ss; i.
     + rewrite <- PLN. apply TVIEW.
     + rewrite <- RLX; ss. apply TVIEW.
   - econs; eauto. s.

@@ -212,6 +212,7 @@ Module MemoryFacts.
   Proof.
     exploit (@Memory.lower_exists promises1 loc from to
                                   (Message.concrete val released) (Message.concrete val None)); eauto.
+    { econs; eauto. refl. }
     i. des.
     exploit Memory.lower_exists_le; eauto. i. des.
     esplits. econs; eauto; ss. econs. apply Time.bot_spec.
