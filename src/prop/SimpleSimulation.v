@@ -55,7 +55,7 @@ Lemma sim_adequacy
       (WF_SRC: Configuration.wf c_src)
       (WF_TGT: Configuration.wf c_tgt)
       (SIM: sim c_src c_tgt):
-  behaviors Configuration.step c_tgt <1= behaviors Configuration.step c_src.
+  behaviors Configuration.step c_tgt <2= behaviors Configuration.step c_src.
 Proof.
   i. revert c_src WF_SRC WF_TGT SIM.
   induction PR; i.
@@ -81,4 +81,5 @@ Proof.
     exploit Configuration.opt_step_future; try exact STEP_SRC; eauto. i. des.
     inv SIM1; ss. inv STEP_SRC; eauto.
     econs 4; eauto.
+  - econs 5.
 Qed.

@@ -351,7 +351,12 @@ Section JOINED.
     :
       Message.le max msg.
   Proof.
-    inv MAX; eauto. inv MAXLE; eauto. inv MAXLE0; eauto.
+    inv MAX; eauto. inv MAXLE; eauto.
+    { econs; ss.
+      { refl. }
+      { inv MAXLE0; eauto. }
+    }
+    { econs; ss. refl. }
   Qed.
 
   Definition joined_released
@@ -1253,7 +1258,9 @@ Module JSim.
     exploit sim_memory_get; try apply GET; eauto. i. des.
     inv MSG. esplits.
     - eauto.
-    - econs; eauto. eapply TViewFacts.readable_mon; eauto. apply TVIEW.
+    - econs; eauto.
+      { etrans; eauto. }
+      eapply TViewFacts.readable_mon; eauto. apply TVIEW.
     - econs; eauto. s. apply TViewFacts.read_tview_mon; auto.
       + apply WF1_TGT.
       + inv MEM1_TGT. exploit CLOSED; eauto. i. des. inv MSG_WF. auto.
@@ -1648,7 +1655,7 @@ Module JSim.
             { inv MAX; econs. eauto. }
             { inv MAX; eauto. right. ss. }
         }
-        { eapply sim_memory_add; cycle 1; eauto. econs.
+        { eapply sim_memory_add; cycle 1; eauto. econs; [refl|].
           eapply max_le_joined_opt_view_le; eauto. }
         { assumption. }
         { ii. unfold views2. des_ifs. destruct released_tgt; ss. }
@@ -1667,7 +1674,7 @@ Module JSim.
           { eapply Memory.add_get0; eauto. }
           { eapply Memory.add_get0; eauto. }
         }
-        { econs; eauto. eapply max_le_joined_opt_view_le; eauto. }
+        { econs; eauto; [refl|]. eapply max_le_joined_opt_view_le; eauto. }
         { eauto. }
         { ss. }
         { ss. }
@@ -1874,7 +1881,7 @@ Module JSim.
               rewrite GETSRC in *. erewrite GET2 in *.
               inv PROMISES0; eauto.
         }
-        { eapply sim_memory_split; cycle 1; eauto. econs.
+        { eapply sim_memory_split; cycle 1; eauto. econs; [refl|].
           eapply max_le_joined_opt_view_le; eauto. }
         { assumption. }
         { ii. unfold views2. des_ifs. destruct released'0; ss. }
@@ -1895,7 +1902,7 @@ Module JSim.
           { eapply Memory.split_get0 in MEM_SRC. des. eauto. }
           { eapply Memory.split_get0; eauto. }
         }
-        { econs; eauto. eapply max_le_joined_opt_view_le; eauto. }
+        { econs; eauto; [refl|]. eapply max_le_joined_opt_view_le; eauto. }
         { eauto. }
         { ss. }
         { ss. }
@@ -1946,9 +1953,9 @@ Module JSim.
 
         assert (RELEASEDLE: View.opt_le max released_src).
         { eapply max_le_joined_opt_view_le_le; eauto. }
-        hexploit (@Memory.lower_exists prom_src loc from to (Message.concrete val released_src) (Message.concrete val max)); auto.
+        hexploit (@Memory.lower_exists prom_src loc from to (Message.concrete val' released_src) (Message.concrete val max)); auto.
         intros [prom2_src PROMISES_SRC].
-        hexploit (@Memory.lower_exists_le prom_src mem1_src loc from to (Message.concrete val released_src) (Message.concrete val max)); eauto.
+        hexploit (@Memory.lower_exists_le prom_src mem1_src loc from to (Message.concrete val' released_src) (Message.concrete val max)); eauto.
         { inv WF1_SRC. auto. }
         intros [mem2_src MEM_SRC].
 
@@ -1981,7 +1988,7 @@ Module JSim.
             ss. des; clarify. econs; eauto.
             unguard. des; auto. clarify. inv RELEASEDLE. inv MAX. auto.
         }
-        { eapply sim_memory_lower; cycle 1; eauto. econs.
+        { eapply sim_memory_lower; cycle 1; eauto. econs; [refl|].
           eapply max_le_joined_opt_view_le; eauto. }
         { assumption. }
         { auto. }
@@ -1989,8 +1996,8 @@ Module JSim.
           ss. des; clarify. inv RELEASEDLE. eapply REL1; eauto. }
         { i. clarify. eapply max_le_joined_opt_view_joined; eauto. }
         { i. clarify. }
-        { econs; eauto. eapply max_le_joined_opt_view_le; eauto. }
-        { econs; eauto. econs; eauto. eapply max_le_joined_opt_view_le; eauto. }
+        { econs; eauto; [refl|]. eapply max_le_joined_opt_view_le; eauto. }
+        { econs; eauto. econs; eauto; [refl|]. eapply max_le_joined_opt_view_le; eauto. }
         { ss. }
         { ss. }
       }
@@ -2168,7 +2175,7 @@ Module JSim.
     }
 
     assert (SIMMSG: Message.le (Message.concrete val released_src) (Message.concrete val released_tgt)).
-    { econs; eauto. inv STEP_TGT. inv LOCAL1. inv WF1_TGT.
+    { econs; eauto; [refl|]. inv STEP_TGT. inv LOCAL1. inv WF1_TGT.
       eapply TViewFacts.write_released_mon; eauto. }
 
     inv STEP_TGT. inv WRITE. inv PROMISE.
@@ -2530,7 +2537,7 @@ Module JSim.
       }
 
       assert (MSG_LE_SRC: Message.le (Message.concrete val released_src) (Message.concrete val0 released_src0)).
-      { inv MSG_LE. econs. eapply max_le_joined_opt_view_max; eauto.
+      { inv MSG_LE. econs; auto. eapply max_le_joined_opt_view_max; eauto.
         etrans; eauto.
         inv WF1_TGT. eapply TViewFacts.write_released_mon; eauto.
       }
@@ -2718,7 +2725,7 @@ Module JSim.
       { specialize (PROM1 loc to).
         rewrite GET in PROM1. inv PROM1; eauto. esplits; eauto. }
       des. hexploit (@Memory.lower_exists prom1_src loc from to msg0_src); eauto.
-      { inv CONTENT; ss. inv MSG_LE; ss. unguard. econs. des; clarify. }
+      { inv CONTENT; ss. inv MSG_LE; ss. unguard. econs; auto. des; clarify. }
       i. des.
       hexploit (@Memory.lower_exists_le prom1_src mem1_src); eauto. i. des.
       hexploit (@Memory.remove_exists mem2 loc from to).
@@ -3568,7 +3575,7 @@ Module JSim.
         (WF_SRC: JConfiguration.wf views0 c_src0)
         (WF_TGT: Configuration.wf c_tgt0)
     :
-      behaviors Configuration.step c_tgt0 <1=
+      behaviors Configuration.step c_tgt0 <2=
       behaviors Configuration.step c_src0.
   Proof.
     ii. revert views0 c_src0 SIM WF_SRC. induction PR.
@@ -3580,6 +3587,7 @@ Module JSim.
         { eapply Configuration.step_future in STEP; eauto. des. auto. }
         { eapply JConfiguration.step_future in STEP0; eauto. des. auto. }
       }
+      { auto. }
     - i. exploit step_sim_configuration; eauto. i. des.
       econs 3.
       { eapply JConfiguration.step_configuration_step; eauto. }
@@ -3590,6 +3598,7 @@ Module JSim.
         { eapply Configuration.step_future in STEP; eauto. des. auto. }
         { eapply JConfiguration.step_future in STEP0; eauto. des. auto. }
       }
+    - i. econs 5.
   Qed.
 
   (* Lemma machine_behavior views0 c_src0 c_tgt0 *)

@@ -219,6 +219,32 @@ Module Event.
     output: Const.t;
     inputs: list Const.t;
   }.
+
+  Definition le (e0 e1: t): Prop :=
+    e0.(output) = e1.(output) /\ Forall2 Const.le e0.(inputs) e1.(inputs).
+
+  (* TODO: PromisingLib *)
+  Global Program Instance PreOrder_Forall2 A R `{PreOrder A R}: PreOrder (Forall2 R).
+  Next Obligation.
+  Proof.
+    ii. induction x; ss. econs; ss. refl.
+  Qed.
+  Next Obligation.
+  Proof.
+    intros x. induction x; ii.
+    { inv H0; inv H1. econs. }
+    { inv H0; inv H1. econs; eauto. etrans; eauto. }
+  Qed.
+
+  Global Program Instance le_PreOrder: PreOrder le.
+  Next Obligation.
+    ii. red. splits; ss. refl.
+  Qed.
+  Next Obligation.
+    ii. unfold le in *. des. splits; ss.
+    { etrans; eauto. }
+    { etrans; eauto. }
+  Qed.
 End Event.
 
 
@@ -289,6 +315,24 @@ Module ProgramEvent.
   | ord_failure:
       ord failure failure
   .
+
+  Definition le (e0 e1: t): Prop :=
+    match e0, e1 with
+    | write loc0 val0 ord0, write loc1 val1 ord1 =>
+      loc0 = loc1 /\ Const.le val0 val1 /\ ord0 = ord1
+    | update loc0 valr0 valw0 ordr0 ordw0, update loc1 valr1 valw1 ordr1 ordw1 =>
+      loc0 = loc1 /\ valr0 = valr1 /\ Const.le valw0 valw1 /\ ordr0 = ordr1 /\ ordw0 = ordw1
+    | syscall e0, syscall e1 => Event.le e0 e1
+    | _, _ => e0 = e1
+    end.
+
+  Global Program Instance le_PreOrder: PreOrder le.
+  Next Obligation.
+    ii. destruct x; ss; splits; try refl.
+  Qed.
+  Next Obligation.
+    ii. destruct x, y, z; ss; des; subst; splits; etrans; eauto.
+  Qed.
 End ProgramEvent.
 
 

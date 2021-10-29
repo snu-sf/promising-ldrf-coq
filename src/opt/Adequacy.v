@@ -30,7 +30,7 @@ Lemma sim_adequacy
       (SC: TimeMap.le sc_src sc_tgt)
       (MEMORY: sim_memory mem_src mem_tgt)
       (SIM: sim ths_src sc_src mem_src ths_tgt sc_tgt mem_tgt):
-  behaviors Configuration.step (Configuration.mk ths_tgt sc_tgt mem_tgt) <1=
+  behaviors Configuration.step (Configuration.mk ths_tgt sc_tgt mem_tgt) <2=
   behaviors Configuration.step (Configuration.mk ths_src sc_src mem_src).
 Proof.
   s. i.
@@ -83,4 +83,5 @@ Proof.
       * econs 4; eauto.
         exploit Configuration.step_future; try apply STEP1; eauto. s. i. des.
         eapply IHPR; eauto.
+  - econs 5.
 Qed.

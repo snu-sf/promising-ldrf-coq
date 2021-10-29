@@ -902,7 +902,7 @@ Lemma sim_adequacy
                views
                (Configuration.mk ths_mid sc_mid mem_mid)
                (Configuration.mk ths_tgt sc_tgt mem_tgt)):
-  behaviors Configuration.step (Configuration.mk ths_tgt sc_tgt mem_tgt) <1=
+  behaviors Configuration.step (Configuration.mk ths_tgt sc_tgt mem_tgt) <2=
   behaviors Configuration.step (Configuration.mk ths_src sc_src mem_src).
 Proof.
   s. i.
@@ -932,7 +932,7 @@ Proof.
       exploit Configuration.step_future; try exact STEP; eauto. i. des.
       exploit Configuration.rtc_step_future; eauto. i. des.
       exploit Configuration.opt_step_future; eauto. i. des.
-      inv STEP_SRC. econs 2; [eauto|].
+      inv STEP_SRC. econs 2; [eauto| |auto].
       exploit JConfiguration.step_future; eauto. i. des.
       eapply IHPR; eauto.
       eapply UndefCertify.step_certified; eauto.
@@ -970,6 +970,7 @@ Proof.
         eapply IHPR; eauto.
         eapply UndefCertify.step_certified; eauto.
         eapply UndefCertify.rtc_step_certified; eauto.
+  - econs 5.
 Qed.
 
 Lemma tids_find
