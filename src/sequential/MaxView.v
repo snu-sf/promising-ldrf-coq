@@ -137,7 +137,7 @@ Lemma max_readable_read_only mem prom tvw loc ts val released
       (CONS: Local.promise_consistent lc)
       (WF: Local.wf (Local.mk tvw prom) mem)
   :
-    (<<TS: ts' = ts>>) /\ (<<VAL: val' = val>>) /\ (<<RELEASED: released' = released>>) /\ (<<LOCAL: lc = Local.mk tvw prom>>).
+    (<<TS: ts' = ts>>) /\ (<<VAL: Const.le val' val>>) /\ (<<RELEASED: released' = released>>) /\ (<<LOCAL: lc = Local.mk tvw prom>>).
 Proof.
   inv READ. ss. assert (ts' = tvw.(TView.cur).(View.pln) loc).
   { apply TimeFacts.antisym.
@@ -195,13 +195,14 @@ Proof.
   inv WRITE. eapply max_readable_not_racy; eauto.
 Qed.
 
-Lemma max_readable_read mem prom tvw loc ts val released
-      (MAX: max_readable mem prom loc ts val released)
+Lemma max_readable_read mem prom tvw loc ts val0 val1 released
+      (MAX: max_readable mem prom loc ts val1 released)
       (TS: tvw.(TView.cur).(View.pln) loc = ts)
       (WF: Local.wf (Local.mk tvw prom) mem)
+      (VAL: Const.le val0 val1)
   :
     exists released,
-      (<<READ: Local.read_step (Local.mk tvw prom) mem loc ts val released Ordering.na (Local.mk tvw prom)>>).
+      (<<READ: Local.read_step (Local.mk tvw prom) mem loc ts val0 released Ordering.na (Local.mk tvw prom)>>).
 Proof.
   inv MAX. esplits. econs; eauto.
   { econs; ss. refl. }
@@ -479,7 +480,10 @@ Proof.
                (<<MSG_EX: __guard__ (msg' = Message.undef \/
                                      exists val', msg' = Message.concrete val' None)>>)).
     { destruct msg; ss.
-      { exists (Message.concrete val None). splits; auto. right. eauto. }
+      { exists (Message.concrete val None). splits; auto.
+        { econs; ss. refl. }
+        { right. eauto. }
+      }
       { exists Message.undef. splits; auto. left. eauto. }
     }
     des.
