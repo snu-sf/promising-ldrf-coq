@@ -501,15 +501,34 @@ Module SeqEvent.
         out_released: option (Perms.t);
       }.
 
-  Definition wf (e: ProgramEvent.t) (i: input) (o: output): Prop :=
-    (<<UPDATEIN: forall loc,
+  Definition wf_input (e: ProgramEvent.t) (i: input): Prop :=
+    (<<UPDATE: forall loc,
         ((exists v_old f_old, i.(in_accessed) = Some (loc, v_old, f_old)) <-> is_accessing e = Some loc)>>) /\
-    (<<UPDATEOUT: is_some o.(out_accessed) <-> is_some (is_accessing e)>>) /\
-    (<<ACQUIREIN: is_some i.(in_acquired) <-> is_acquire e>>) /\
-    (<<ACQUIREOUT: is_some o.(out_acquired) <-> is_acquire e>>) /\
-    (<<RELEASEIN: is_some i.(in_released) <-> is_release e>>) /\
-    (<<RELEASEOUT: is_some o.(out_released) <-> is_release e>>)
+    (<<ACQUIRE: is_some i.(in_acquired) <-> is_acquire e>>) /\
+    (<<RELEASE: is_some i.(in_released) <-> is_release e>>)
   .
+
+  Definition wf_output (e: ProgramEvent.t) (o: output): Prop :=
+    (<<UPDATE: is_some o.(out_accessed) <-> is_some (is_accessing e)>>) /\
+    (<<ACQUIRE: is_some o.(out_acquired) <-> is_acquire e>>) /\
+    (<<RELEASE: is_some o.(out_released) <-> is_release e>>)
+  .
+
+  Lemma wf_input_le e0 e1 i
+        (EVENT: ProgramEvent.le e0 e1)
+    :
+      wf_input e0 i <-> wf_input e1 i.
+  Proof.
+    unfold wf_input. destruct e0, e1; ss; des; clarify.
+  Qed.
+
+  Lemma wf_output_le e0 e1 o
+        (EVENT: ProgramEvent.le e0 e1)
+    :
+      wf_output e0 o <-> wf_output e1 o.
+  Proof.
+    unfold wf_output. destruct e0, e1; ss; des; clarify.
+  Qed.
 
   Variant step_update:
     forall (i: option (Loc.t * Const.t * Flag.t))(o: option (Perm.t * Const.t * Flag.t))
@@ -690,13 +709,16 @@ Module Oracle.
   .
 
   Definition progress pe o0: Prop :=
-    forall i o (WF: SeqEvent.wf pe i o), exists o1, step pe i o o0 o1.
+    forall i (WF: SeqEvent.wf_input pe i),
+    exists o o1, (<<STEP: step pe i o o0 o1>>) /\ (<<WF: SeqEvent.wf_output pe o>>).
 
   Variant _wf (wf: t -> Prop): t -> Prop :=
   | wf_intro
       (o0: t)
       (WF: forall pe i o o1 (STEP: step pe i o o0 o1),
-          (<<EVENT: SeqEvent.wf pe i o>>) /\ (<<ORACLE: wf o1>>))
+          (<<INPUT: SeqEvent.wf_input pe i>>) /\
+          (<<OUTPUT: SeqEvent.wf_output pe o>>) /\
+          (<<ORACLE: wf o1>>))
       (LOAD: forall loc ord,
           exists val, progress (ProgramEvent.read loc val ord) o0)
       (STORE: forall loc ord val,
@@ -752,13 +774,14 @@ Section LANG.
     forall (e: ProgramEvent.t) (i: SeqEvent.input) (o: SeqEvent.output)
            (th0: t) (th1: t), Prop :=
   | at_step_intro
-      e i o
+      e0 e1 i o
       st0 st1 p0 p1 o0 o1 m0 m1
-      (LANG: lang.(Language.step) e st0 st1)
-      (ORACLE: Oracle.step e i o o0 o1)
+      (LANG: lang.(Language.step) e1 st0 st1)
+      (EVENT: ProgramEvent.le e0 e1)
+      (ORACLE: Oracle.step e0 i o o0 o1)
       (MEM: SeqEvent.step i o p0 m0 p1 m1)
     :
-      at_step e i o (mk (SeqState.mk _ st0 m0) p0 o0) (mk (SeqState.mk _ st1 m1) p1 o1)
+      at_step e0 i o (mk (SeqState.mk _ st0 m0) p0 o0) (mk (SeqState.mk _ st1 m1) p1 o1)
   .
 
   Variant step (e: MachineEvent.t) (th0: t) (th1: t): Prop :=
@@ -817,14 +840,16 @@ Section SIMULATION.
              (p0: Perms.t)
              (st_src0: SeqState.t lang_src)
              (st_tgt0: SeqState.t lang_tgt): Prop :=
-    forall st_tgt1 e
-           (STEP_TGT: lang_tgt.(Language.step) e st_tgt0.(SeqState.state) st_tgt1)
-           (ATOMIC: is_atomic_event e),
-    exists st_src1 st_src2,
+    forall st_tgt1 e_tgt
+           (STEP_TGT: lang_tgt.(Language.step) e_tgt st_tgt0.(SeqState.state) st_tgt1)
+           (ATOMIC: is_atomic_event e_tgt),
+    exists st_src1 st_src2 e_src,
       (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
-      (<<STEP: lang_src.(Language.step) e st_src1.(SeqState.state) st_src2>>) /\
+      (<<STEP: lang_src.(Language.step) e_src st_src1.(SeqState.state) st_src2>>) /\
+      (<<EVENT: ProgramEvent.le e_src e_tgt>>) /\
       (<<SIM: forall i o p1 mem_tgt
-                     (EVENT: SeqEvent.wf e i o)
+                     (INPUT: SeqEvent.wf_input e_tgt i)
+                     (OUTPUT: SeqEvent.wf_output e_tgt o)
                      (STEP_TGT: SeqEvent.step i o p0 st_tgt0.(SeqState.memory) p1 mem_tgt),
           exists mem_src,
             (<<STEP_SRC: SeqEvent.step i o p0 st_src1.(SeqState.memory) p1 mem_src>>) /\

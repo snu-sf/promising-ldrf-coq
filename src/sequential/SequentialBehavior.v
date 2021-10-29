@@ -28,18 +28,6 @@ Proof.
   ii. destruct x, y, z; ss. etrans; eauto.
 Qed.
 
-Program Instance Forall2_PreOrder A R `{@PreOrder A R}: PreOrder (Forall2 R).
-Next Obligation.
-Proof.
-  ii. induction x; econs; auto. refl.
-Qed.
-Next Obligation.
-Proof.
-  intros x. induction x.
-  { ii. inv H0; inv H1. econs. }
-  { ii. inv H0; inv H1. econs; eauto. etrans; eauto. }
-Qed.
-
 
 Module SeqTrace.
   Variant output: Type :=
