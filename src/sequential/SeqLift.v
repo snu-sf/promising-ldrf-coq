@@ -911,6 +911,72 @@ Variant sim_message_max
 .
 
 
+Definition top_time (loc: Loc.t) (top: Time.t) (f: Mapping.t): Prop :=
+  forall ts fts
+         (MAP: f.(Mapping.map) f.(Mapping.ver) loc ts = Some fts),
+    Time.lt fts top.
+
+Definition top_times (f: Mapping.t) (tops: Loc.t -> option Time.t): Prop :=
+  (<<MAX: forall loc ts fts top
+                 (TOP: tops loc = Some top)
+                 (MAP: f.(Mapping.map) f.(Mapping.ver) loc ts = Some fts),
+      Time.lt fts top>>) /\
+  (<<FIN: exists l, forall loc top (TOP: tops loc = Some top), List.In loc l>>)
+.
+
+Lemma top_time_exists f loc ts
+      (WF: Mapping.wf f)
+  :
+    exists top, (<<TOP: top_time loc top f>>) /\ (<<TS: Time.lt ts top>>).
+Proof.
+  hexploit Mapping.map_finite; eauto. i. des.
+  hexploit (@finite_greatest (fun _ => True) (List.map snd l)).
+  i. des.
+  { exists (Time.incr (Time.join ts to)). split.
+    { ii. eapply TimeFacts.le_lt_lt; [|eapply Time.incr_spec].
+      etrans; [|eapply Time.join_r]. eapply GREATEST; ss.
+      eapply H in MAP. eapply List.in_map with (f:=snd) in MAP; auto. }
+    { eapply TimeFacts.le_lt_lt; [|eapply Time.incr_spec]. eapply Time.join_l. }
+  }
+  { exists (Time.incr ts). split.
+    { ii. eapply H in MAP. eapply List.in_map with (f:=snd) in MAP.
+      exfalso. eapply EMPTY; eauto. }
+    { eapply Time.incr_spec. }
+  }
+Qed.
+
+Lemma mapping_add_exists f loc ts
+      (WF: Mapping.wf f)
+  :
+    exists top, (<<
+
+
+
+
+Lemma mapping_add_time f loc ts
+      (TOP: top_time
+      (WF: Mapping.wf f)
+
+
+Definition max_times := Loc.t -> option Time.t.
+
+Definition max_times_wf (f: Mapping.t) (top: max_times): Prop :=
+  (<<MAX: forall loc ts fts max
+                 (TOP: top loc = Some max)
+                 (MAP: f.(Mapping.map) f.(Mapping.ver) loc ts = Some fts),
+      Time.lt fts max>>) /\
+  (<<FIN: exists l, forall loc max (TOP: top loc = Some max), List.In loc l>>)
+.
+
+
+
+Lemma max_times_mon (f0 f1: Mapping.t)
+      (LE:
+
+
+
+ (f:
+
 
 
 
