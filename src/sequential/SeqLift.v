@@ -36,6 +36,9 @@ Require Import Delayed.
 Set Implicit Arguments.
 
 
+Definition flag := bool.
+Definition flags := Loc.t -> flag.
+
 Definition version := nat.
 Definition version_le := le.
 
@@ -179,6 +182,15 @@ Qed.
 
 Definition sim_timestamp_exact (l: Loc.t) (f: Mapping.t) (v: version) (ts_src ts_tgt: Time.t) :=
   f.(Mapping.map) v l ts_tgt = Some ts_src.
+
+Lemma sim_timestamp_exact_unique l f v ts_src0 ts_src1 ts_tgt
+      (SIM0: sim_timestamp_exact l f v ts_src0 ts_tgt)
+      (SIM1: sim_timestamp_exact l f v ts_src1 ts_tgt)
+  :
+    ts_src0 = ts_src1.
+Proof.
+  unfold sim_timestamp_exact in *. clarify.
+Qed.
 
 Definition sim_timestamp (l: Loc.t) (f: Mapping.t) (v: version) (ts_src ts_tgt: Time.t) :=
   exists ts_src' ts_tgt',
@@ -894,22 +906,6 @@ Proof.
 Qed.
 
 
-Variant sim_message_max
-        (f: Mapping.t) (v: version):
-  forall (msg_src msg_tgt: Message.t), Prop :=
-| sim_message_max_concrete
-    val vw_src vw_tgt
-    (SIM: sim_opt_view_max (fun _ => True) f v vw_src vw_tgt)
-  :
-    sim_message_max f v (Message.concrete val vw_src) (Message.concrete val vw_tgt)
-| sim_message_max_undef
-  :
-    sim_message_max f v Message.undef Message.undef
-| sim_message_max_reserve
-  :
-    sim_message_max f v Message.reserve Message.reserve
-.
-
 
 Definition top_time (loc: Loc.t) (top: Time.t) (f: Mapping.t): Prop :=
   forall ts fts
@@ -945,7 +941,286 @@ Proof.
   }
 Qed.
 
-Lemma mapping_add_exists f loc ts
+
+Variant sim_message_max
+        (f: Mapping.t):
+  forall (v: option version) (msg_src msg_tgt: Message.t), Prop :=
+| sim_message_max_concrete
+    v val_src val_tgt vw_src vw_tgt
+    (VAL: Const.le val_tgt val_src)
+    (SIM: sim_opt_view_max (fun _ => True) f v vw_src vw_tgt)
+  :
+    sim_message_max f (Some v) (Message.concrete val_src vw_src) (Message.concrete val_tgt vw_tgt)
+| sim_message_max_undef
+    v
+  :
+    sim_message_max f v Message.undef Message.undef
+| sim_message_max_reserve
+    v
+  :
+    sim_message_max f v Message.reserve Message.reserve
+.
+
+Variant sim_promises_map_extern
+        (v: version)
+        (f: Mapping.t)
+        (vers: versions)
+        (prom_src prom_tgt: Memory.t)
+        (flag_tgt: Loc.t -> flag): Prop :=
+| promises_map_latest_intro
+    (MESSAGE: forall loc to from msg_tgt
+                     (GET: Memory.get loc to prom_tgt = Some (from, msg_tgt))
+                     (RESERVE: msg_tgt <> Message.reserve),
+        exists fto ffrom msg_src,
+          (<<FROM: sim_timestamp_exact loc f v ffrom from>>) /\
+          (<<FROMEXACT: forall (RESERVE: msg_tgt <> Message.reserve),
+              sim_timestamp_exact loc f f.(Mapping.ver) ffrom from>>) /\
+          (<<TO: sim_timestamp loc f f.(Mapping.ver) fto to>>) /\
+          (<<GET: Memory.get loc fto prom_src = Some (ffrom, msg_src)>>) /\
+          (<<MSG: sim_message_max f (vers loc to) msg_src msg_tgt>>))
+.
+
+    (RESERVE: forall loc to from
+                     (GET: Memory.get loc to prom_tgt = Some (from, Message.reserve)),
+        exists v fto ffrom,
+          (<<VER: vers loc to = Some v>>) /\
+          (<<FROM: sim_timestamp_exact loc f v ffrom from>>) /\
+          (<<TO: sim_timestamp_exact loc f v fto to>>) /\
+          (<<GET: Memory.get loc fto prom_src = Some (ffrom, Message.reserve)>>))
+.
+
+    (SOUND: forall loc fto ffrom fmsg
+                   (FLAGTRUE: flag_tgt loc = false)
+                   (GET: Memory.get loc fto prom_src = Some (ffrom, fmsg)),
+        exists to from msg,
+          (<<FROM: sim_timemap_exact loc f v fto to>>) /\
+          (<<GET: Memory.get loc fto prom_src = Some (from, msg)>>))
+.
+
+
+
+    (UNDEF: forall loc to from
+                   (GET: Memory.get loc to prom_src = Some (from, Message.undef)),
+        exists fto ffrom,
+          (<<FROM: sim_timestamp_exact loc f f.(Mapping.ver) ffrom from>>) /\
+          (<<TO: sim_timestamp loc f f.(Mapping.ver) fto to>>) /\
+          (<<GET: Memory.get loc fto prom_src = Some (ffrom, Message.undef)>>))
+.
+
+    (CONCRETE: forall loc to from val released
+                      (FLAGFALSE: flag_src loc = false)
+                      (GET: Memory.get loc to prom_tgt = Some (from, Message.concrete val released)),
+        exists v fto ffrom freleased,
+          (<<VER: vers loc to = Some v>>) /\
+          (<<FROM: time_map_latest loc ffrom from>>) /\
+          (<<TO: time_map_latest loc fto to>>) /\
+          (<<RELEASED: opt_view_map_ver v freleased released>>) /\
+          (<<GET: Memory.get loc fto prom_src = Some (ffrom, Message.concrete val freleased)>>))
+    (RESERVE: forall loc to from
+                     (FLAGFALSE: flag_src loc = false)
+                     (GET: Memory.get loc to prom_tgt = Some (from, Message.reserve)),
+        exists fto ffrom,
+          (<<FROM: time_map_latest loc ffrom from>>) /\
+          (<<TO: time_map_latest loc fto to>>) /\
+          (<<GET: Memory.get loc fto prom_src = Some (ffrom, Message.reserve)>>))
+    (SOUND: forall loc fto ffrom fmsg
+                   (FLAGTRUE: flag_tgt loc = false)
+                   (GET: Memory.get loc fto prom_src = Some (ffrom, fmsg)),
+        exists to from msg,
+          (<<TO: time_map_latest loc fto to>>) /\
+          (<<GET: Memory.get loc fto prom_src = Some (from, msg)>>))
+
+
+
+
+    (FLAGFALSE: forall loc (SRC: flag_src loc = false) (TGT: flag_tgt loc = true),
+        exists to from, (<<GET: Memory.get loc to prom_tgt = Some (from, Message.undef)>>))
+    (FLAGTRUE: forall loc (SRC: flag_src loc = true),
+        forall to, Memory.get loc to prom_src = None)
+    (UNDEF: forall loc to from
+                   (FLAGFALSE: flag_src loc = false)
+                   (GET: Memory.get loc to prom_tgt = Some (from, Message.undef)),
+        exists fto ffrom,
+          (<<FROM: time_map_latest loc ffrom from>>) /\
+          (<<TO: time_map_latest loc fto to>>) /\
+          (<<GET: Memory.get loc fto prom_src = Some (ffrom, Message.undef)>>))
+    (CONCRETE: forall loc to from val released
+                      (FLAGFALSE: flag_src loc = false)
+                      (GET: Memory.get loc to prom_tgt = Some (from, Message.concrete val released)),
+        exists v fto ffrom freleased,
+          (<<VER: vers loc to = Some v>>) /\
+          (<<FROM: time_map_latest loc ffrom from>>) /\
+          (<<TO: time_map_latest loc fto to>>) /\
+          (<<RELEASED: opt_view_map_ver v freleased released>>) /\
+          (<<GET: Memory.get loc fto prom_src = Some (ffrom, Message.concrete val freleased)>>))
+    (RESERVE: forall loc to from
+                     (FLAGFALSE: flag_src loc = false)
+                     (GET: Memory.get loc to prom_tgt = Some (from, Message.reserve)),
+        exists fto ffrom,
+          (<<FROM: time_map_latest loc ffrom from>>) /\
+          (<<TO: time_map_latest loc fto to>>) /\
+          (<<GET: Memory.get loc fto prom_src = Some (ffrom, Message.reserve)>>))
+    (SOUND: forall loc fto ffrom fmsg
+                   (FLAGTRUE: flag_tgt loc = false)
+                   (GET: Memory.get loc fto prom_src = Some (ffrom, fmsg)),
+        exists to from msg,
+          (<<TO: time_map_latest loc fto to>>) /\
+          (<<GET: Memory.get loc fto prom_src = Some (from, msg)>>))
+.
+
+Cell.t
+
+
+Variant sim_promises_cell (latest: bool) (flag_src: bool) (flag_tgt: bool)
+        (ts: Time.t)
+        (vers: Time.t -> option version) (c_src c_tgt: Cell.t): Prop :=
+| sim_promises_cell_latest_true
+    (BOT: forall (FLAG: flag_src) to, Cell.get to c_src = None)
+| sim_promises_cell_latest_false
+    (CONSISTENT: forall (FLAG: flag_tgt) to from msg
+                        (MSG: msg <> Message.reserve)
+                        (GET: Cell.get to c_src = Some (from, msg)),
+        Time.lt ts to)
+    (COMPLETE:
+       sim_timemap
+
+.
+
+add
+split
+lower
+
+
+
+Variant promises_map_latest (vers: versions) (prom_src prom_tgt: Memory.t)
+        (flag_src: flags) (flag_tgt: flags): Prop :=
+  | promises_map_latest_intro
+      (FLAGFALSE: forall loc (SRC: flag_src loc = false) (TGT: flag_tgt loc = true),
+          exists to from, (<<GET: Memory.get loc to prom_tgt = Some (from, Message.undef)>>))
+      (FLAGTRUE: forall loc (SRC: flag_src loc = true),
+          forall to, Memory.get loc to prom_src = None)
+      (UNDEF: forall loc to from
+                     (FLAGFALSE: flag_src loc = false)
+                     (GET: Memory.get loc to prom_tgt = Some (from, Message.undef)),
+          exists fto ffrom,
+            (<<FROM: time_map_latest loc ffrom from>>) /\
+            (<<TO: time_map_latest loc fto to>>) /\
+            (<<GET: Memory.get loc fto prom_src = Some (ffrom, Message.undef)>>))
+      (CONCRETE: forall loc to from val released
+                        (FLAGFALSE: flag_src loc = false)
+                        (GET: Memory.get loc to prom_tgt = Some (from, Message.concrete val released)),
+          exists v fto ffrom freleased,
+            (<<VER: vers loc to = Some v>>) /\
+            (<<FROM: time_map_latest loc ffrom from>>) /\
+            (<<TO: time_map_latest loc fto to>>) /\
+            (<<RELEASED: opt_view_map_ver v freleased released>>) /\
+            (<<GET: Memory.get loc fto prom_src = Some (ffrom, Message.concrete val freleased)>>))
+      (RESERVE: forall loc to from
+                       (FLAGFALSE: flag_src loc = false)
+                       (GET: Memory.get loc to prom_tgt = Some (from, Message.reserve)),
+          exists fto ffrom,
+            (<<FROM: time_map_latest loc ffrom from>>) /\
+            (<<TO: time_map_latest loc fto to>>) /\
+            (<<GET: Memory.get loc fto prom_src = Some (ffrom, Message.reserve)>>))
+      (SOUND: forall loc fto ffrom fmsg
+                     (FLAGTRUE: flag_tgt loc = false)
+                     (GET: Memory.get loc fto prom_src = Some (ffrom, fmsg)),
+          exists to from msg,
+            (<<TO: time_map_latest loc fto to>>) /\
+            (<<GET: Memory.get loc fto prom_src = Some (from, msg)>>))
+.
+Cell.t
+
+Variant promises_map (vers: versions) (prom_src prom_tgt: Memory.t)
+        (flag_src: flags) (flag_tgt: flags): Prop :=
+  | promises_map_intro
+      (FLAGFALSE: forall loc (SRC: flag_src loc = false) (TGT: flag_tgt loc = true),
+          exists to from, (<<GET: Memory.get loc to prom_tgt = Some (from, Message.undef)>>))
+      (FLAGTRUE: forall loc (SRC: flag_src loc = true),
+          forall to, Memory.get loc to prom_src = None)
+      (UNDEF: forall loc to from
+                     (FLAGFALSE: flag_src loc = false)
+                     (GET: Memory.get loc to prom_tgt = Some (from, Message.undef)),
+          exists fto ffrom,
+            (<<FROM: time_map_latest loc ffrom from>>) /\
+            (<<TO: time_map_latest loc fto to>>) /\
+            (<<GET: Memory.get loc fto prom_src = Some (ffrom, Message.undef)>>))
+      (CONCRETE: forall loc to from val released
+                        (FLAGFALSE: flag_src loc = false)
+                        (GET: Memory.get loc to prom_tgt = Some (from, Message.concrete val released)),
+          exists v fto ffrom freleased,
+            (<<VER: vers loc to = Some v>>) /\
+            (<<FROM: time_map_latest loc ffrom from>>) /\
+            (<<TO: time_map_latest loc fto to>>) /\
+            (<<RELEASED: opt_view_map_ver v freleased released>>) /\
+            (<<GET: Memory.get loc fto prom_src = Some (ffrom, Message.concrete val freleased)>>))
+      (RESERVE: forall loc to from
+                       (FLAGFALSE: flag_src loc = false)
+                       (GET: Memory.get loc to prom_tgt = Some (from, Message.reserve)),
+          exists v fto ffrom,
+            (<<FROM: time_map_ver v loc ffrom from>>) /\
+            (<<TO: time_map_ver v loc fto to>>) /\
+            (<<GET: Memory.get loc fto prom_src = Some (ffrom, Message.reserve)>>))
+      (SOUND: forall loc fto ffrom fmsg
+                     (FLAGTRUE: flag_tgt loc = false)
+                     (GET: Memory.get loc fto prom_src = Some (ffrom, fmsg))
+                     (NRESERVE: fmsg <> Message.reserve),
+          exists to from msg,
+            (<<TO: time_map_latest loc fto to>>) /\
+            (<<GET: Memory.get loc fto prom_src = Some (from, msg)>>))
+      (SOUNDRESERVE: forall loc fto ffrom
+                            (FLAGTRUE: flag_tgt loc = false)
+                            (GET: Memory.get loc fto prom_src = Some (ffrom, Message.reserve)),
+          exists v to from,
+            (<<FROM: time_map_ver v loc ffrom from>>) /\
+            (<<TO: time_map_ver v loc fto to>>) /\
+            (<<GET: Memory.get loc to prom_tgt = Some (from, Message.reserve)>>) /\
+            (<<UNIQUE: forall v' ffrom' fto' msg'
+                              (MAP: time_map_ver v' loc fto' to)
+                              (GET: Memory.get loc fto' prom_src = Some (ffrom', msg')),
+                fto' = fto>>))
+.
+
+Variant sim_memory_latest
+        (vers: versions) (mem_src mem_tgt: Memory.t): Prop :=
+  | sim_memory_latest_intro
+      (CONCRETE: forall loc to from val released
+                        (GET: Memory.get loc to mem_tgt = Some (from, Message.concrete val released)),
+          exists fto ffrom rel,
+            (<<TO: time_map_latest loc fto to>>) /\
+            (<<GET: Memory.get loc fto mem_src = Some (ffrom, Message.concrete val rel)>>) /\
+            (<<RELEASED: forall freleased (EQ: rel = Some freleased),
+                exists v vw,
+                  (<<VER: vers loc to = Some v>>) /\
+                  (<<MAP: opt_view_map_ver v vw released>>) /\
+                  (<<VIEW: View.opt_le rel vw>>)>>))
+      (UNDEF: forall loc to from
+                     (GET: Memory.get loc to mem_tgt = Some (from, Message.undef)),
+          exists fto ffrom,
+            (<<TO: time_map_latest loc fto to>>) /\
+            (<<GET: Memory.get loc fto mem_src = Some (ffrom, Message.undef)>>))
+      (COVER: forall loc fto ffrom msg
+                     (GET: Memory.get loc fto mem_src = Some (ffrom, msg)),
+          exists to from fto' ffrom',
+            (<<TS: Time.le fto fto'>>) /\
+            (<<TS: Time.le ffrom' ffrom>>) /\
+            (<<FROM: time_map_latest loc ffrom' from>>) /\
+            (<<TO: time_map_latest loc fto' to>>) /\
+            (<<COVERED: forall ts (ITV: Interval.mem (from, to) ts), covered loc ts mem_tgt>>))
+.
+
+
+Lemma mapping_add_exists f0 msgs loc ts
+      (WF: Mapping.wf f)
+      (MSG: forall msg (RESERVE: msg <> Message.reserve), ~ msgs loc ts msg)
+  :
+    exists f1 fts,
+      (<<MAP: sim_timestamp_exact loc f1 f1.(Mapping.ver) ts fts>>) /\
+      (<<LE: mapping_messages_le msgs f0 f1>>) /\
+      (<<WF: Mapping.wf f>>).
+
+
+
       (WF: Mapping.wf f)
   :
     exists top, (<<
