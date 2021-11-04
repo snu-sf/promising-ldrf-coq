@@ -990,44 +990,45 @@ Section LANG.
       at_step e0 i0 o (mk (SeqState.mk _ st0 m0) p0 o0) (mk (SeqState.mk _ st1 m1) p1 o1)
   .
 
-  Variant step (e: MachineEvent.t) (th0: t) (th1: t): Prop :=
-  | step_na_step
-      (STEP: na_step e th0 th1)
-  | step_at_step
-      pe i o
-      (EVENT: e = get_machine_event pe)
-      (STEP: at_step pe i o th0 th1)
+  Definition failure (th0: t): Prop :=
+    exists th1, (<<FAILURE: na_step MachineEvent.failure th0 th1>>).
+
+  Inductive steps: forall
+      (tr: list (ProgramEvent.t * SeqEvent.input * Oracle.output))
+      (th0 th1: t), Prop :=
+  | steps_base
+      th
+    :
+      steps [] th th
+  | steps_na_step
+      tr th0 th1 th2
+      (STEP: na_step MachineEvent.silent th0 th1)
+      (STEPS: steps tr th1 th2)
+    :
+      steps tr th0 th2
+  | steps_at_step
+      e i o tr th0 th1 th2
+      (STEP: at_step e i o th0 th1)
+      (STEPS: steps tr th1 th2)
+    :
+      steps ((e, i, o)::tr) th0 th2
   .
 
-  Definition failure (th0: t): Prop :=
-    exists th1, (<<FAILURE: step MachineEvent.failure th0 th1>>).
-
-  Inductive non_acquire_steps: forall (d: Flags.t) (th0: t) (th1: t), Prop :=
-  | non_acquire_steps_base
-      th
+  Inductive writing_trace: forall
+      (d: Flags.t)
+      (tr: list (ProgramEvent.t * SeqEvent.input * Oracle.output))
+      (w: Flags.t), Prop :=
+  | writing_trace_base
+      d
     :
-      non_acquire_steps th.(state).(SeqState.memory).(SeqMemory.flags) th th
-  | non_acquire_steps_failure
-      th
-      (FAIL: failure th)
+      writing_trace d [] Flags.bot
+  | writing_trace_cons
+      tr e i o d w
+      (TRACE: writing_trace (Flags.minus d (SeqEvent.written i)) tr w)
+      (ACQUIRE: ~ is_acquire e)
+      (ACCESS: forall loc (SOME: is_accessing e = Some loc), d loc = false)
     :
-      non_acquire_steps Flags.top th th
-  | non_acquire_steps_na_step
-      th0 th1 th2 d
-      (STEP: na_step MachineEvent.silent th0 th1)
-      (STEPS: non_acquire_steps d th1 th2)
-    :
-      non_acquire_steps d th0 th2
-  | non_acquire_steps_at_step
-      th0 th1 th2 pe i o d
-      (STEP: at_step pe i o th0 th1)
-      (STEPS: non_acquire_steps d th1 th2)
-      (ACQUIRE: ~ is_acquire pe)
-      (SILENT: get_machine_event pe = MachineEvent.silent)
-    :
-      non_acquire_steps
-        (Flags.join (SeqEvent.written i) (Flags.sub_opt (is_accessing pe) d))
-        th0 th2
+      writing_trace d ((e, i, o)::tr) (Flags.join (SeqEvent.written i) w)
   .
 End LANG.
 End SeqThread.
@@ -1103,18 +1104,19 @@ Section SIMULATION.
              (st_src0: SeqState.t lang_src)
              (st_tgt0: SeqState.t lang_tgt): Prop :=
     forall o (WF: Oracle.wf o),
-    exists th w,
-      (<<STEPS: SeqThread.non_acquire_steps w (SeqThread.mk st_src0 p0 o) th>>) /\
-      (<<FLAGS: Flags.le (Flags.join d0 st_tgt0.(SeqState.memory).(SeqMemory.flags)) w>>)
+    exists th tr w,
+      (<<STEPS: SeqThread.steps tr (SeqThread.mk st_src0 p0 o) th>>) /\
+      (<<TRACE: SeqThread.writing_trace d0 tr w>>) /\
+      ((<<FLAGS: Flags.le (Flags.join d0 st_tgt0.(SeqState.memory).(SeqMemory.flags)) (Flags.join w th.(SeqThread.state).(SeqState.memory).(SeqMemory.flags))>>) \/ (<<FAILURE: SeqThread.failure th>>))
   .
 
   Definition sim_seq_failure_case
              (p0: Perms.t) (d0: Flags.t)
              (st_src0: SeqState.t lang_src): Prop :=
     forall o (WF: Oracle.wf o),
-    exists th w,
-      (<<STEPS: SeqThread.non_acquire_steps w (SeqThread.mk st_src0 p0 o) th>>) /\
-      (<<FLAGS: Flags.le d0 w>>) /\
+    exists th tr w,
+      (<<STEPS: SeqThread.steps tr (SeqThread.mk st_src0 p0 o) th>>) /\
+      (<<TRACE: SeqThread.writing_trace d0 tr w>>) /\
       (<<FAILURE: SeqThread.failure th>>)
   .
 
@@ -1157,7 +1159,7 @@ Section SIMULATION.
     :
       sim_seq_partial_case p d st_src st_tgt.
   Proof.
-    ii. esplits; [econs 1|]. ss.
+    ii. esplits; [econs 1|econs|]; eauto.
   Qed.
 
   Lemma sim_seq_failure_imm p0 d st_src0 st_tgt0 st_src1
@@ -1165,10 +1167,8 @@ Section SIMULATION.
     :
       sim_seq p0 d st_src0 st_tgt0.
   Proof.
-    pfold. right. red. i. esplits.
-    { econs 2. econs. left. econs. eauto. }
-    { eapply Flags.top_spec. }
-    { econs. left. econs. eauto. }
+    pfold. right. red. i. esplits; [econs 1|econs|].
+    red. esplits. econs. eauto.
   Qed.
 
   Definition sim_seq_all (st_src: lang_src.(Language.state)) (st_tgt: lang_tgt.(Language.state)): Prop :=
