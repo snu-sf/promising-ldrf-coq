@@ -17,6 +17,16 @@ Set Implicit Arguments.
 
 
 
+Program Instance option_rel_PreOrder A R `{@PreOrder A R}: PreOrder (option_rel R).
+Next Obligation.
+Proof.
+  ii. destruct x; ss. refl.
+Qed.
+Next Obligation.
+Proof.
+  ii. destruct x, y, z; ss. etrans; eauto.
+Qed.
+
 Definition get_machine_event (e: ProgramEvent.t): MachineEvent.t :=
   match e with
   | ProgramEvent.syscall e => MachineEvent.syscall e
@@ -272,29 +282,13 @@ End Perms.
 
 
 Module Flag.
-  Variant t :=
-  | written
-  | unwritten
-  .
+  Definition t := bool.
 
-  Definition diff (f0 f1: t): t :=
-    match f1 with
-    | written => unwritten
-    | unwritten => f0
-    end.
+  Definition meet (f0 f1: t): t := andb f0 f1.
 
-  Definition meet (f0 f1: t): t :=
-    match f0, f1 with
-    | written, written => written
-    | _, _ => unwritten
-    end.
+  Definition join (f0 f1: t): t := orb f0 f1.
 
-  Definition le (f0 f1: t): bool :=
-    match f0, f1 with
-    | unwritten, _ => true
-    | _, unwritten => false
-    | _, written => true
-    end.
+  Definition le (f0 f1: t): bool := implb f0 f1.
 
   Program Instance le_PreOrder: PreOrder le.
   Next Obligation.
@@ -342,22 +336,67 @@ Module Flag.
   Proof.
     destruct f, f0, f1; ss.
   Qed.
+
+  Lemma join_ge_l f0 f1:
+    le f0 (join f0 f1).
+  Proof.
+    destruct f0, f1; ss.
+  Qed.
+
+  Lemma join_ge_r f0 f1:
+    le f1 (join f0 f1).
+  Proof.
+    destruct f0, f1; ss.
+  Qed.
+
+  Lemma join_spec f0 f1 f
+        (LE0: le f0 f)
+        (LE1: le f1 f)
+    :
+      le (join f0 f1) f.
+  Proof.
+    destruct f, f0, f1; ss.
+  Qed.
+
+  Lemma join_mon_l f0 f1 f
+        (LE: le f0 f1)
+    :
+      le (join f0 f) (join f1 f).
+  Proof.
+    destruct f, f0, f1; ss.
+  Qed.
+
+  Lemma join_mon_r f0 f1 f
+        (LE: le f0 f1)
+    :
+      le (join f f0) (join f f1).
+  Proof.
+    destruct f, f0, f1; ss.
+  Qed.
 End Flag.
 
 
 Module Flags.
   Definition t := Loc.t -> Flag.t.
 
-  Definition empty: t := fun _ => Flag.unwritten.
+  Definition empty: t := fun _ => false.
 
-  Definition diff (f0 f1: t): t :=
-    fun loc => Flag.diff (f0 loc) (f1 loc).
+  Definition is_empty (f: t): Prop := forall loc, f loc = false.
 
   Definition update (loc: Loc.t) (f: Flag.t) (fs: t): t :=
     fun loc' => if Loc.eq_dec loc' loc then f else (fs loc').
 
+  Definition add (loc: Loc.t) (f: t): t :=
+    fun loc' => if Loc.eq_dec loc' loc then true else (f loc').
+
+  Definition sub (loc: Loc.t) (f: t): t :=
+    fun loc' => if Loc.eq_dec loc' loc then false else (f loc').
+
   Definition meet (f0 f1: t): t :=
     fun loc => Flag.meet (f0 loc) (f1 loc).
+
+  Definition join (f0 f1: t): t :=
+    fun loc => Flag.join (f0 loc) (f1 loc).
 
   Definition le (f0 f1: t): Prop :=
     forall loc, Flag.le (f0 loc) (f1 loc).
@@ -408,6 +447,43 @@ Module Flags.
   Proof.
     ii. eapply Flag.meet_mon_r; eauto.
   Qed.
+
+  Lemma join_ge_l f0 f1:
+    le f0 (join f0 f1).
+  Proof.
+    ii. eapply Flag.join_ge_l; eauto.
+  Qed.
+
+  Lemma join_ge_r f0 f1:
+    le f1 (join f0 f1).
+  Proof.
+    ii. eapply Flag.join_ge_r; eauto.
+  Qed.
+
+  Lemma join_spec f0 f1 f
+        (LE0: le f0 f)
+        (LE1: le f1 f)
+    :
+      le (join f0 f1) f.
+  Proof.
+    ii. eapply Flag.join_spec; eauto.
+  Qed.
+
+  Lemma join_mon_l f0 f1 f
+        (LE: le f0 f1)
+    :
+      le (join f0 f) (join f1 f).
+  Proof.
+    ii. eapply Flag.join_mon_l; eauto.
+  Qed.
+
+  Lemma join_mon_r f0 f1 f
+        (LE: le f0 f1)
+    :
+      le (join f f0) (join f f1).
+  Proof.
+    ii. eapply Flag.join_mon_r; eauto.
+  Qed.
 End Flags.
 
 
@@ -422,9 +498,8 @@ Module ValueMap.
   Definition acquire (cond: Loc.t -> bool) (vs_acq: t) (vs: t): t :=
     fun loc => if (cond loc) then (vs loc) else (vs_acq loc).
 
-  Definition diff (vs_src: t) (vs_tgt: t): Flags.t :=
-    fun loc => if (Const.le (vs_tgt loc) (vs_src loc))
-               then Flag.written else Flag.unwritten.
+  Definition release (vs: t) (d: Flags.t): t :=
+    fun loc => if (d loc) then Const.undef else (vs loc).
 
   Definition le (vs0 vs1: t): Prop :=
     forall loc, Const.le (vs0 loc) (vs1 loc).
@@ -446,129 +521,148 @@ Module SeqMemory.
     mk {
         value_map: ValueMap.t;
         flags: Flags.t;
+        deferred: Flags.t;
       }.
 
   Definition read (loc: Loc.t) (m: t): Const.t :=
     ValueMap.read loc m.(value_map).
 
   Definition write (loc: Loc.t) (v: Const.t) (m: t): t :=
-    mk (ValueMap.write loc v m.(value_map)) (Flags.update loc Flag.written m.(flags)).
+    mk (ValueMap.write loc v m.(value_map))
+       (Flags.update loc true m.(flags))
+       (Flags.update loc false m.(deferred)).
 
-  Definition update (loc: Loc.t) (v: Const.t) (m: t): t :=
-    mk (ValueMap.write loc v m.(value_map)) (Flags.update loc Flag.unwritten m.(flags)).
+  Variant acquire (cond: Loc.t -> bool) (v_acq: ValueMap.t):
+    forall (m_before: t) (f: Flags.t) (m_after: t), Prop :=
+  | acquire_intro
+      m
+      (DEFERRED: Flags.is_empty m.(deferred))
+    :
+      acquire
+        cond
+        v_acq
+        m
+        (m.(flags))
+        (mk (ValueMap.acquire cond v_acq m.(value_map)) m.(flags) m.(deferred)).
 
-  Definition acquire (cond: Loc.t -> bool) (vs_acq: ValueMap.t) (m: t): t :=
-    mk (ValueMap.acquire cond vs_acq m.(value_map)) m.(flags).
+  Variant release:
+    forall (m_before: t) (f_rel: Flags.t) (v_rel: ValueMap.t) (m_after: t), Prop :=
+  | release_intro
+      d m
+      (DEFERRED: Flags.is_empty m.(deferred))
+    :
+      release
+        m
+        (Flags.join d m.(flags))
+        (ValueMap.release m.(value_map) d)
+        (mk m.(value_map) Flags.empty d)
+  .
 
-  Definition release (m: t): t :=
-    mk m.(value_map) Flags.empty.
-
-  Definition le (m0 m1: t): Prop :=
-    ValueMap.le m0.(value_map) m1.(value_map) /\ Flags.le m0.(flags) m1.(flags).
-
-  Program Instance le_PreOrder: PreOrder le.
-  Next Obligation.
-  Proof.
-    ii. split; refl.
-  Qed.
-  Next Obligation.
-  Proof.
-    ii. inv H. inv H0. split; etrans; eauto.
-  Qed.
+  Variant update:
+    forall
+      (loc: Loc.t) (v_new: Const.t)
+      (m_before: t)
+      (v: Const.t) (f: Flag.t)
+      (m_after: t), Prop :=
+  | update_intro
+      m loc v_new
+      (DEFERRED: m.(deferred) loc = false)
+    :
+      update
+        loc
+        v_new
+        m
+        (m.(value_map) loc)
+        (m.(flags) loc)
+        (mk (ValueMap.write loc v_new m.(value_map))
+            (Flags.update loc false m.(flags))
+            (m.(deferred)))
+  .
 End SeqMemory.
 
 
-Module OracleEvent.
-  Record t :=
-    mk {
-        accessed: option (Perm.t * Const.t);
-        acquired: option (Perms.t * ValueMap.t);
-        released: option (Perms.t);
-      }.
-
-  Definition wf (pe: ProgramEvent.t) (e: t): Prop :=
-    (<<ACCESS: is_some e.(accessed) <-> is_some (is_accessing pe)>>) /\
-    (<<ACQUIRE: is_some e.(acquired) <-> is_acquire pe>>) /\
-    (<<RELEASE: is_some e.(released) <-> is_release pe>>)
-  .
-End OracleEvent.
-
 Module SeqEvent.
-  Record t :=
-    mk {
-        accessed: option (Loc.t * Const.t * Flag.t * Perm.t * Const.t);
-        acquired: option (Flags.t * Perms.t * ValueMap.t);
-        released: option (Perms.t * ValueMap.t * Flags.t);
-      }.
-
-  Variant accessed_le: forall (e0 e1: (Loc.t * Const.t * Flag.t * Perm.t * Const.t)), Prop :=
-  | accessed_le_intro
-      l v0 v1 f0 f1 p v_new
-      (VAL: Const.le v0 v1)
-      (FLAG: Flag.le f0 f1)
-    :
-      accessed_le (l, v0, f0, p, v_new) (l, v1, f1, p, v_new)
-  .
-
-  Variant acquired_le: forall (e0 e1: (Flags.t * Perms.t * ValueMap.t)), Prop :=
-  | acquired_le_intro
-      l f0 f1 p v_acq
-      (FLAG: Flag.le f0 f1)
-    :
-      acquired_le (f0, p, v_acq) (f1, p, v_acq)
-  .
-
-
-
-    match e0 option_rel
-
- (e0 e1:
-
-  Definition wf_input (e: ProgramEvent.t) (i: input): Prop :=
-    (<<UPDATE: forall loc,
-        ((exists v_old f_old, i.(in_accessed) = Some (loc, v_old, f_old)) <-> is_accessing e = Some loc)>>) /\
-    (<<ACQUIRE: is_some i.(in_acquired) <-> is_acquire e>>) /\
-    (<<RELEASE: is_some i.(in_released) <-> is_release e>>)
-  .
-
-
-  Definition get_oracle_event
-
   Record input :=
     mk_input {
-        in_accessed: option (Loc.t * Const.t * Flag.t);
-        in_acquired: option (Flags.t);
-        in_released: option (ValueMap.t * Flags.t);
-      }.
-
-  Record oracle_input :=
-    mk_input {
-        oracle_in_accessed: option (Loc.t * Const.t * Flag.t);
-        oracle_in_acquired: option (Flags.t);
-        in_released: option (ValueMap.t * Flags.t);
+        in_access: option (Loc.t * Const.t * Flag.t);
+        in_acquire: option (Flags.t);
+        in_release: option (ValueMap.t * Flags.t);
       }.
 
   Record output :=
     mk_output {
-        out_accessed: option (Perm.t * Const.t);
-        out_acquired: option (Perms.t * ValueMap.t);
-        out_released: option (Perms.t);
+        out_access: option (Perm.t * Const.t);
+        out_acquire: option (Perms.t * ValueMap.t);
+        out_release: option (Perms.t);
       }.
+
+  Definition in_access_le (i0 i1: (Loc.t * Const.t * Flag.t)): Prop :=
+    match i0, i1 with
+    | (l0, v0, f0), (l1, v1, f1) =>
+      (<<LOC: l0 = l1>>) /\ (<<VAL: Const.le v0 v1>>) /\ (<<FLAG: Flag.le f0 f1>>)
+    end.
+
+  Definition in_acquire_le (i0 i1: Flags.t): Prop :=
+    (<<FLAG: Flags.le i0 i1>>).
+
+  Definition in_release_le (i0 i1: (ValueMap.t * Flags.t)): Prop :=
+    match i0, i1 with
+    | (v0, f0), (v1, f1) =>
+      (<<VAL: ValueMap.le v0 v1>>) /\ (<<FLAG: Flags.le f0 f1>>)
+    end.
+
+  Definition input_le (i0 i1: input): Prop :=
+    (<<ACCESS: option_rel in_access_le i0.(in_access) i1.(in_access)>>) /\
+    (<<ACQUIRE: option_rel in_acquire_le i0.(in_acquire) i1.(in_acquire)>>) /\
+    (<<RELEASE: option_rel in_release_le i0.(in_release) i1.(in_release)>>)
+  .
+
+  Program Instance in_access_le_PreOrder: PreOrder in_access_le.
+  Next Obligation.
+  Proof.
+    ii. unfold in_access_le. des_ifs. splits; refl.
+  Qed.
+  Next Obligation.
+  Proof.
+    ii. unfold in_access_le in *. des_ifs. des. splits; etrans; eauto.
+  Qed.
+
+  Program Instance in_acquire_le_PreOrder: PreOrder in_acquire_le.
+
+  Program Instance in_release_le_PreOrder: PreOrder in_release_le.
+  Next Obligation.
+  Proof.
+    ii. unfold in_release_le. des_ifs. splits; refl.
+  Qed.
+  Next Obligation.
+  Proof.
+    ii. unfold in_release_le in *. des_ifs. des. splits; etrans; eauto.
+  Qed.
+
+  Program Instance input_le_PreOrder: PreOrder input_le.
+  Next Obligation.
+  Proof.
+    ii. unfold input_le. splits; refl.
+  Qed.
+  Next Obligation.
+  Proof.
+    ii. unfold input_le in *. des. splits; etrans; eauto.
+  Qed.
 
   Definition wf_input (e: ProgramEvent.t) (i: input): Prop :=
     (<<UPDATE: forall loc,
-        ((exists v_old f_old, i.(in_accessed) = Some (loc, v_old, f_old)) <-> is_accessing e = Some loc)>>) /\
-    (<<ACQUIRE: is_some i.(in_acquired) <-> is_acquire e>>) /\
-    (<<RELEASE: is_some i.(in_released) <-> is_release e>>)
+        ((exists v_old f_old, i.(in_access) = Some (loc, v_old, f_old)) <-> is_accessing e = Some loc)>>) /\
+    (<<ACQUIRE: is_some i.(in_acquire) <-> is_acquire e>>) /\
+    (<<RELEASE: is_some i.(in_release) <-> is_release e>>)
   .
 
   Definition wf_output (e: ProgramEvent.t) (o: output): Prop :=
-    (<<UPDATE: is_some o.(out_accessed) <-> is_some (is_accessing e)>>) /\
-    (<<ACQUIRE: is_some o.(out_acquired) <-> is_acquire e>>) /\
-    (<<RELEASE: is_some o.(out_released) <-> is_release e>>)
+    (<<UPDATE: is_some o.(out_access) <-> is_some (is_accessing e)>>) /\
+    (<<ACQUIRE: is_some o.(out_acquire) <-> is_acquire e>>) /\
+    (<<RELEASE: is_some o.(out_release) <-> is_release e>>)
   .
 
-  Lemma wf_input_le e0 e1 i
+  Lemma wf_input_event_le e0 e1 i
         (EVENT: ProgramEvent.le e0 e1)
     :
       wf_input e0 i <-> wf_input e1 i.
@@ -576,7 +670,7 @@ Module SeqEvent.
     unfold wf_input. destruct e0, e1; ss; des; clarify.
   Qed.
 
-  Lemma wf_output_le e0 e1 o
+  Lemma wf_output_event_le e0 e1 o
         (EVENT: ProgramEvent.le e0 e1)
     :
       wf_output e0 o <-> wf_output e1 o.
@@ -585,8 +679,7 @@ Module SeqEvent.
   Qed.
 
   Variant step_update:
-    forall (i: option (Loc.t * Const.t * Flag.t))
-           (o: option (Perm.t * Const.t))
+    forall (i: option (Loc.t * Const.t * Flag.t))(o: option (Perm.t * Const.t))
            (p0: Perms.t) (m0: SeqMemory.t) (p1: Perms.t) (m1: SeqMemory.t), Prop :=
   | step_update_none
       p m
@@ -595,13 +688,13 @@ Module SeqEvent.
         None None
         p m p m
   | step_update_some
-      loc v_old f_old p_new v_new
+      loc v f p_new v_new
       p0 m0 p1 m1
       (PERM: p1 = Perms.update loc p_new p0)
-      (MEM: SeqMemory.update loc v_old f_old v_new m0 m1)
+      (MEM: SeqMemory.update loc v_new m0 v f m1)
     :
       step_update
-        (Some (loc, v_old, f_old)) (Some (p_new, v_new))
+        (Some (loc, v, f)) (Some (p_new, v_new))
         p0 m0 p1 m1
   .
 
@@ -615,13 +708,13 @@ Module SeqEvent.
         None None
         p m p m
   | step_acquire_some
-      p_acq v_acq
+      p_acq v_acq f
       p0 m0 p1 m1
       (PERM: p1 = Perms.join p0 p_acq)
-      (MEM: m1 = SeqMemory.acquire (Perms.acquired p0 p_acq) v_acq m0)
+      (MEM: SeqMemory.acquire (Perms.acquired p0 p_acq) v_acq m0 f m1)
     :
       step_acquire
-        (Some m0.(SeqMemory.flags)) (Some (p_acq, v_acq))
+        (Some f) (Some (p_acq, v_acq))
         p0 m0 p1 m1
   .
 
@@ -638,7 +731,7 @@ Module SeqEvent.
       p_rel v_rel f_rel
       p0 m0 p1 m1
       (PERM: p1 = Perms.meet p0 p_rel)
-      (MEM: m1 = SeqMemory.release f_rel v_rel m0)
+      (MEM: SeqMemory.release m0 f_rel v_rel m0)
     :
       step_release
         (Some (v_rel, f_rel)) (Some p_rel)
@@ -650,9 +743,9 @@ Module SeqEvent.
            (p0: Perms.t) (m0: SeqMemory.t) (p1: Perms.t) (m1: SeqMemory.t), Prop :=
   | step_intro
       i o p0 m0 p1 m1 p2 m2 p3 m3
-      (UPD: step_update i.(in_accessed) o.(out_accessed) p0 m0 p1 m1)
-      (ACQ: step_acquire i.(in_acquired) o.(out_acquired) p1 m1 p2 m2)
-      (REL: step_release i.(in_released) o.(out_released) p2 m2 p3 m3)
+      (UPD: step_update i.(in_access) o.(out_access) p0 m0 p1 m1)
+      (ACQ: step_acquire i.(in_acquire) o.(out_acquire) p1 m1 p2 m2)
+      (REL: step_release i.(in_release) o.(out_release) p2 m2 p3 m3)
     :
       step i o p0 m0 p3 m3
   .
@@ -828,14 +921,15 @@ Section LANG.
     forall (e: ProgramEvent.t) (i: SeqEvent.input) (o: SeqEvent.output)
            (th0: t) (th1: t), Prop :=
   | at_step_intro
-      e0 e1 i o
+      e0 e1 i0 i1 o
       st0 st1 p0 p1 o0 o1 m0 m1
       (LANG: lang.(Language.step) e1 st0 st1)
       (EVENT: ProgramEvent.le e0 e1)
-      (ORACLE: Oracle.step e0 i o o0 o1)
-      (MEM: SeqEvent.step i o p0 m0 p1 m1)
+      (INPUT: SeqEvent.input_le i0 i1)
+      (ORACLE: Oracle.step e0 i0 o o0 o1)
+      (MEM: SeqEvent.step i1 o p0 m0 p1 m1)
     :
-      at_step e0 i o (mk (SeqState.mk _ st0 m0) p0 o0) (mk (SeqState.mk _ st1 m1) p1 o1)
+      at_step e0 i0 o (mk (SeqState.mk _ st0 m0) p0 o0) (mk (SeqState.mk _ st1 m1) p1 o1)
   .
 
   Variant step (e: MachineEvent.t) (th0: t) (th1: t): Prop :=
@@ -849,6 +943,16 @@ Section LANG.
 
   Definition failure (th0: t): Prop :=
     exists th1, (<<FAILURE: step MachineEvent.failure th0 th1>>).
+
+  Variant non_acquire_step (e: MachineEvent.t) (th0: t) (th1: t): Prop :=
+  | non_acquire_step_na_step
+      (STEP: na_step e th0 th1)
+  | non_acquire_step_at_step
+      pe i o
+      (ACQUIRE: ~ is_acquire pe)
+      (EVENT: e = get_machine_event pe)
+      (STEP: at_step pe i o th0 th1)
+  .
 End LANG.
 End SeqThread.
 
@@ -863,12 +967,16 @@ Section SIMULATION.
              (p0: Perms.t)
              (st_src0: SeqState.t lang_src)
              (st_tgt0: SeqState.t lang_tgt): Prop :=
-    forall (TERMINAL_TGT: lang_tgt.(Language.is_terminal) st_tgt0.(SeqState.state)),
+    forall (TERMINAL_TGT: lang_tgt.(Language.is_terminal) st_tgt0.(SeqState.state))
+           (DEFERRED: Flags.is_empty st_tgt0.(SeqState.memory).(SeqMemory.deferred)),
     exists st_src1,
       (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
       (<<TERMINAL_SRC: lang_src.(Language.is_terminal) st_src1.(SeqState.state)>>) /\
       (<<TERMINAL: sim_terminal st_src1.(SeqState.state) st_tgt0.(SeqState.state)>>) /\
-      (<<MEM: SeqMemory.le st_tgt0.(SeqState.memory) st_src1.(SeqState.memory)>>).
+      (<<VALUE: ValueMap.le st_tgt0.(SeqState.memory).(SeqMemory.value_map) st_tgt0.(SeqState.memory).(SeqMemory.value_map)>>) /\
+      (<<FLAG: Flags.le st_tgt0.(SeqState.memory).(SeqMemory.flags) st_tgt0.(SeqState.memory).(SeqMemory.flags)>>) /\
+      (<<DEFERRED: Flags.is_empty st_src0.(SeqState.memory).(SeqMemory.deferred)>>)
+  .
 
   Definition sim_seq_na_step_case
              (sim_seq:
@@ -901,12 +1009,13 @@ Section SIMULATION.
       (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
       (<<STEP: lang_src.(Language.step) e_src st_src1.(SeqState.state) st_src2>>) /\
       (<<EVENT: ProgramEvent.le e_src e_tgt>>) /\
-      (<<SIM: forall i o p1 mem_tgt
-                     (INPUT: SeqEvent.wf_input e_tgt i)
+      (<<SIM: forall i_tgt o p1 mem_tgt
+                     (INPUT: SeqEvent.wf_input e_tgt i_tgt)
                      (OUTPUT: SeqEvent.wf_output e_tgt o)
-                     (STEP_TGT: SeqEvent.step i o p0 st_tgt0.(SeqState.memory) p1 mem_tgt),
-          exists mem_src,
-            (<<STEP_SRC: SeqEvent.step i o p0 st_src1.(SeqState.memory) p1 mem_src>>) /\
+                     (STEP_TGT: SeqEvent.step i_tgt o p0 st_tgt0.(SeqState.memory) p1 mem_tgt),
+          exists i_src mem_src,
+            (<<STEP_SRC: SeqEvent.step i_src o p0 st_src1.(SeqState.memory) p1 mem_src>>) /\
+            (<<INPUT: SeqEvent.input_le i_tgt i_src>>) /\
             (<<SIM: sim_seq p1
                             (SeqState.mk _ st_src2 mem_src)
                             (SeqState.mk _ st_tgt1 mem_tgt)>>)>>).
@@ -915,17 +1024,20 @@ Section SIMULATION.
              (p0: Perms.t)
              (st_src0: SeqState.t lang_src)
              (st_tgt0: SeqState.t lang_tgt): Prop :=
-    forall o (WF: Oracle.wf o),
+    forall o (WF: Oracle.wf o)
+           (DEFERRED: Flags.is_empty st_tgt0.(SeqState.memory).(SeqMemory.deferred)),
     exists th,
-      (<<STEPS: rtc (SeqThread.step MachineEvent.silent) (SeqThread.mk st_src0 p0 o) th>>) /\
-      ((<<FLAG: Flags.le st_tgt0.(SeqState.memory).(SeqMemory.flags) th.(SeqThread.state).(SeqState.memory).(SeqMemory.flags)>>) \/ (<<FAILURE: SeqThread.failure th>>)).
+      (<<STEPS: rtc (SeqThread.non_acquire_step MachineEvent.silent) (SeqThread.mk st_src0 p0 o) th>>) /\
+      ((<<FLAG: Flags.le st_tgt0.(SeqState.memory).(SeqMemory.flags) th.(SeqThread.state).(SeqState.memory).(SeqMemory.flags)>>) /\
+       (<<DEFERRED: Flags.is_empty th.(SeqThread.state).(SeqState.memory).(SeqMemory.deferred)>>)
+       \/ (<<FAILURE: SeqThread.failure th>>)).
 
   Definition sim_seq_failure_case
              (p0: Perms.t)
              (st_src0: SeqState.t lang_src): Prop :=
     forall o (WF: Oracle.wf o),
     exists th,
-      (<<STEPS: rtc (SeqThread.step MachineEvent.silent) (SeqThread.mk st_src0 p0 o) th>>) /\
+      (<<STEPS: rtc (SeqThread.non_acquire_step MachineEvent.silent) (SeqThread.mk st_src0 p0 o) th>>) /\
       (<<FAILURE: SeqThread.failure th>>).
 
 
@@ -964,10 +1076,11 @@ Section SIMULATION.
 
   Lemma sim_seq_partial_imm p st_src st_tgt
         (FLAGS: Flags.le st_tgt.(SeqState.memory).(SeqMemory.flags) st_src.(SeqState.memory).(SeqMemory.flags))
+        (DEFERRED: Flags.is_empty st_tgt.(SeqState.memory).(SeqMemory.deferred) -> Flags.is_empty st_src.(SeqState.memory).(SeqMemory.deferred))
     :
       sim_seq_partial_case p st_src st_tgt.
   Proof.
-    ii. esplits; [refl|]. left. auto.
+    ii. esplits; [refl|]. left. splits; auto.
   Qed.
 
   Lemma sim_seq_failure_imm p0 st_src0 st_tgt0 st_src1
