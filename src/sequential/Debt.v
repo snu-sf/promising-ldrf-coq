@@ -17,6 +17,16 @@ Set Implicit Arguments.
 
 
 
+Program Instance option_rel_PreOrder A R `{@PreOrder A R}: PreOrder (option_rel R).
+Next Obligation.
+Proof.
+  ii. destruct x; ss. refl.
+Qed.
+Next Obligation.
+Proof.
+  ii. destruct x, y, z; ss. etrans; eauto.
+Qed.
+
 Definition get_machine_event (e: ProgramEvent.t): MachineEvent.t :=
   match e with
   | ProgramEvent.syscall e => MachineEvent.syscall e
@@ -574,32 +584,85 @@ End SeqMemory.
 Module SeqEvent.
   Record input :=
     mk_input {
-        in_accessed: option (Loc.t * Const.t * Flag.t);
-        in_acquired: option (Flags.t);
-        in_released: option (ValueMap.t * Flags.t);
+        in_access: option (Loc.t * Const.t * Flag.t);
+        in_acquire: option (Flags.t);
+        in_release: option (ValueMap.t * Flags.t);
       }.
 
   Record output :=
     mk_output {
-        out_accessed: option (Perm.t * Const.t);
-        out_acquired: option (Perms.t * ValueMap.t);
-        out_released: option (Perms.t);
+        out_access: option (Perm.t * Const.t);
+        out_acquire: option (Perms.t * ValueMap.t);
+        out_release: option (Perms.t);
       }.
+  
+  Definition in_access_le (i0 i1: (Loc.t * Const.t * Flag.t)): Prop :=
+    match i0, i1 with
+    | (l0, v0, f0), (l1, v1, f1) =>
+      (<<LOC: l0 = l1>>) /\ (<<VAL: Const.le v0 v1>>) /\ (<<FLAG: Flag.le f0 f1>>)
+    end.
+
+  Definition in_acquire_le (i0 i1: Flags.t): Prop :=
+    (<<FLAG: Flags.le i0 i1>>).
+
+  Definition in_release_le (i0 i1: (ValueMap.t * Flags.t)): Prop :=
+    match i0, i1 with
+    | (v0, f0), (v1, f1) =>
+      (<<VAL: ValueMap.le v0 v1>>) /\ (<<FLAG: Flags.le f0 f1>>)
+    end.
+
+  Definition input_le (i0 i1: input): Prop :=
+    (<<ACCESS: option_rel in_access_le i0.(in_access) i1.(in_access)>>) /\
+    (<<ACQUIRE: option_rel in_acquire_le i0.(in_acquire) i1.(in_acquire)>>) /\
+    (<<RELEASE: option_rel in_release_le i0.(in_release) i1.(in_release)>>)
+  .
+
+  Program Instance in_access_le_PreOrder: PreOrder in_access_le.
+  Next Obligation.
+  Proof.
+    ii. unfold in_access_le. des_ifs. splits; refl.
+  Qed.
+  Next Obligation.
+  Proof.
+    ii. unfold in_access_le in *. des_ifs. des. splits; etrans; eauto.
+  Qed.
+
+  Program Instance in_acquire_le_PreOrder: PreOrder in_acquire_le.
+
+  Program Instance in_release_le_PreOrder: PreOrder in_release_le.
+  Next Obligation.
+  Proof.
+    ii. unfold in_release_le. des_ifs. splits; refl.
+  Qed.
+  Next Obligation.
+  Proof.
+    ii. unfold in_release_le in *. des_ifs. des. splits; etrans; eauto.
+  Qed.
+
+  Program Instance input_le_PreOrder: PreOrder input_le.
+  Next Obligation.
+  Proof.
+    ii. unfold input_le. splits; refl.
+  Qed.
+  Next Obligation.
+  Proof.
+    ii. unfold input_le in *. des. splits; etrans; eauto.
+  Qed.
 
   Definition wf_input (e: ProgramEvent.t) (i: input): Prop :=
     (<<UPDATE: forall loc,
-        ((exists v_old f_old, i.(in_accessed) = Some (loc, v_old, f_old)) <-> is_accessing e = Some loc)>>) /\
-    (<<ACQUIRE: is_some i.(in_acquired) <-> is_acquire e>>) /\
-    (<<RELEASE: is_some i.(in_released) <-> is_release e>>)
+        ((exists v_old f_old, i.(in_access) = Some (loc, v_old, f_old)) <-> is_accessing e = Some loc)>>) /\
+    (<<ACQUIRE: is_some i.(in_acquire) <-> is_acquire e>>) /\
+    (<<RELEASE: is_some i.(in_release) <-> is_release e>>)
   .
 
   Definition wf_output (e: ProgramEvent.t) (o: output): Prop :=
-    (<<UPDATE: is_some o.(out_accessed) <-> is_some (is_accessing e)>>) /\
-    (<<ACQUIRE: is_some o.(out_acquired) <-> is_acquire e>>) /\
-    (<<RELEASE: is_some o.(out_released) <-> is_release e>>)
+    (<<UPDATE: is_some o.(out_access) <-> is_some (is_accessing e)>>) /\
+    (<<ACQUIRE: is_some o.(out_acquire) <-> is_acquire e>>) /\
+    (<<RELEASE: is_some o.(out_release) <-> is_release e>>)
   .
 
-  Lemma wf_input_le e0 e1 i
+  Lemma wf_input_event_le e0 e1 i
         (EVENT: ProgramEvent.le e0 e1)
     :
       wf_input e0 i <-> wf_input e1 i.
@@ -607,7 +670,7 @@ Module SeqEvent.
     unfold wf_input. destruct e0, e1; ss; des; clarify.
   Qed.
 
-  Lemma wf_output_le e0 e1 o
+  Lemma wf_output_event_le e0 e1 o
         (EVENT: ProgramEvent.le e0 e1)
     :
       wf_output e0 o <-> wf_output e1 o.
@@ -680,9 +743,9 @@ Module SeqEvent.
            (p0: Perms.t) (m0: SeqMemory.t) (p1: Perms.t) (m1: SeqMemory.t), Prop :=
   | step_intro
       i o p0 m0 p1 m1 p2 m2 p3 m3
-      (UPD: step_update i.(in_accessed) o.(out_accessed) p0 m0 p1 m1)
-      (ACQ: step_acquire i.(in_acquired) o.(out_acquired) p1 m1 p2 m2)
-      (REL: step_release i.(in_released) o.(out_released) p2 m2 p3 m3)
+      (UPD: step_update i.(in_access) o.(out_access) p0 m0 p1 m1)
+      (ACQ: step_acquire i.(in_acquire) o.(out_acquire) p1 m1 p2 m2)
+      (REL: step_release i.(in_release) o.(out_release) p2 m2 p3 m3)
     :
       step i o p0 m0 p3 m3
   .
@@ -858,14 +921,15 @@ Section LANG.
     forall (e: ProgramEvent.t) (i: SeqEvent.input) (o: SeqEvent.output)
            (th0: t) (th1: t), Prop :=
   | at_step_intro
-      e0 e1 i o
+      e0 e1 i0 i1 o
       st0 st1 p0 p1 o0 o1 m0 m1
       (LANG: lang.(Language.step) e1 st0 st1)
       (EVENT: ProgramEvent.le e0 e1)
-      (ORACLE: Oracle.step e0 i o o0 o1)
-      (MEM: SeqEvent.step i o p0 m0 p1 m1)
+      (INPUT: SeqEvent.input_le i0 i1)
+      (ORACLE: Oracle.step e0 i0 o o0 o1)
+      (MEM: SeqEvent.step i1 o p0 m0 p1 m1)
     :
-      at_step e0 i o (mk (SeqState.mk _ st0 m0) p0 o0) (mk (SeqState.mk _ st1 m1) p1 o1)
+      at_step e0 i0 o (mk (SeqState.mk _ st0 m0) p0 o0) (mk (SeqState.mk _ st1 m1) p1 o1)
   .
 
   Variant step (e: MachineEvent.t) (th0: t) (th1: t): Prop :=
@@ -903,14 +967,15 @@ Section SIMULATION.
              (p0: Perms.t)
              (st_src0: SeqState.t lang_src)
              (st_tgt0: SeqState.t lang_tgt): Prop :=
-    forall (TERMINAL_TGT: lang_tgt.(Language.is_terminal) st_tgt0.(SeqState.state)),
+    forall (TERMINAL_TGT: lang_tgt.(Language.is_terminal) st_tgt0.(SeqState.state))
+           (DEFERRED: Flags.is_empty st_tgt0.(SeqState.memory).(SeqMemory.deferred)),
     exists st_src1,
       (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
       (<<TERMINAL_SRC: lang_src.(Language.is_terminal) st_src1.(SeqState.state)>>) /\
       (<<TERMINAL: sim_terminal st_src1.(SeqState.state) st_tgt0.(SeqState.state)>>) /\
       (<<VALUE: ValueMap.le st_tgt0.(SeqState.memory).(SeqMemory.value_map) st_tgt0.(SeqState.memory).(SeqMemory.value_map)>>) /\
       (<<FLAG: Flags.le st_tgt0.(SeqState.memory).(SeqMemory.flags) st_tgt0.(SeqState.memory).(SeqMemory.flags)>>) /\
-      (<<DEFERRED: Flags.is_empty st_tgt0.(SeqState.memory).(SeqMemory.deferred) -> Flags.is_empty st_src0.(SeqState.memory).(SeqMemory.deferred)>>)
+      (<<DEFERRED: Flags.is_empty st_src0.(SeqState.memory).(SeqMemory.deferred)>>)
   .
 
   Definition sim_seq_na_step_case
@@ -944,12 +1009,13 @@ Section SIMULATION.
       (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
       (<<STEP: lang_src.(Language.step) e_src st_src1.(SeqState.state) st_src2>>) /\
       (<<EVENT: ProgramEvent.le e_src e_tgt>>) /\
-      (<<SIM: forall i o p1 mem_tgt
-                     (INPUT: SeqEvent.wf_input e_tgt i)
+      (<<SIM: forall i_tgt o p1 mem_tgt
+                     (INPUT: SeqEvent.wf_input e_tgt i_tgt)
                      (OUTPUT: SeqEvent.wf_output e_tgt o)
-                     (STEP_TGT: SeqEvent.step i o p0 st_tgt0.(SeqState.memory) p1 mem_tgt),
-          exists mem_src,
-            (<<STEP_SRC: SeqEvent.step i o p0 st_src1.(SeqState.memory) p1 mem_src>>) /\
+                     (STEP_TGT: SeqEvent.step i_tgt o p0 st_tgt0.(SeqState.memory) p1 mem_tgt),
+          exists i_src mem_src,
+            (<<STEP_SRC: SeqEvent.step i_src o p0 st_src1.(SeqState.memory) p1 mem_src>>) /\
+            (<<INPUT: SeqEvent.input_le i_tgt i_src>>) /\
             (<<SIM: sim_seq p1
                             (SeqState.mk _ st_src2 mem_src)
                             (SeqState.mk _ st_tgt1 mem_tgt)>>)>>).

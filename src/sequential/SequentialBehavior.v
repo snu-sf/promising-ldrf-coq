@@ -14,24 +14,14 @@ From PromisingLib Require Import Loc.
 Require Import Event.
 Require Import List.
 
-Require Import SequentialDef.
+Require Import Debt.
 
 Set Implicit Arguments.
-
-Program Instance option_rel_PreOrder A R `{@PreOrder A R}: PreOrder (option_rel R).
-Next Obligation.
-Proof.
-  ii. destruct x; ss. refl.
-Qed.
-Next Obligation.
-Proof.
-  ii. destruct x, y, z; ss. etrans; eauto.
-Qed.
 
 
 Module SeqTrace.
   Variant output: Type :=
-  | term (m: SeqMemory.t)
+  | term (v: ValueMap.t) (f: Flags.t)
   | partial (f: Flags.t)
   | ub
   .
@@ -40,10 +30,11 @@ Module SeqTrace.
 
   Variant le: t -> t -> Prop :=
   | le_term
-      es m_src m_tgt
-      (MEMORY: SeqMemory.le m_tgt m_src)
+      es v_src v_tgt f_src f_tgt
+      (VAL: ValueMap.le v_tgt v_src)
+      (FLAG: Flags.le f_tgt f_src)
     :
-      le (es, term m_tgt) (es, term m_src)
+      le (es, term v_tgt f_tgt) (es, term v_src f_src)
   | le_pterm
       es_src es_tgt f_src f_tgt
       (EVENTS: exists es, es_tgt = es_src ++ es)
@@ -60,7 +51,7 @@ Module SeqTrace.
   Next Obligation.
   Proof.
     ii. destruct x as [? []].
-    { econs. refl. }
+    { econs; refl. }
     { econs 2; [|refl]. exists [].
       rewrite app_nil_r. auto. }
     { econs 3. }
@@ -68,7 +59,7 @@ Module SeqTrace.
   Next Obligation.
   Proof.
     ii. inv H; inv H0.
-    { econs 1; eauto. etrans; eauto. }
+    { econs 1; etrans; eauto. }
     { econs 3. }
     { des; subst. econs 2.
       { eexists. rewrite app_assoc. eauto. }
@@ -100,14 +91,16 @@ Section LANG.
 
   Inductive behavior: forall (th0: SeqThread.t lang) (tr: SeqTrace.t), Prop :=
   | behavior_term
-      st m p o
+      st v f d p o
       (TERMINAL: lang.(Language.is_terminal) st)
+      (DEFERRED: Flags.is_empty d)
     :
-      behavior (SeqThread.mk (SeqState.mk _ st m) p o) ([], SeqTrace.term m)
+      behavior (SeqThread.mk (SeqState.mk _ st (SeqMemory.mk v f d)) p o) ([], SeqTrace.term v f)
   | behavior_partial
-      st m p o
+      st v f d p o
+      (DEFERRED: Flags.is_empty d)
     :
-      behavior (SeqThread.mk (SeqState.mk _ st m) p o) ([], SeqTrace.partial (SeqMemory.flags m))
+      behavior (SeqThread.mk (SeqState.mk _ st (SeqMemory.mk v f d)) p o) ([], SeqTrace.partial f)
   | behavior_ub
       st m p o
       (FAILURE: SeqThread.failure (SeqThread.mk (SeqState.mk _ st m) p o))
