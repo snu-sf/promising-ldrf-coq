@@ -296,8 +296,8 @@ Module Flag.
 
   Definition minus (f0 f1: t): t :=
     match f1 with
-    | true => f0
-    | false => f1
+    | true => false
+    | false => f0
     end.
 
   Definition le (f0 f1: t): bool := implb f0 f1.
@@ -382,6 +382,22 @@ Module Flag.
         (LE: le f0 f1)
     :
       le (join f f0) (join f f1).
+  Proof.
+    destruct f, f0, f1; ss.
+  Qed.
+
+  Lemma minus_mon_l f0 f1 f
+        (LE: le f1 f0)
+    :
+      le (minus f1 f) (minus f0 f).
+  Proof.
+    destruct f, f0, f1; ss.
+  Qed.
+
+  Lemma minus_mon_r f0 f1 f
+        (LE: le f1 f0)
+    :
+      le (minus f f0) (minus f f1).
   Proof.
     destruct f, f0, f1; ss.
   Qed.
@@ -518,6 +534,22 @@ Module Flags.
       le (join f f0) (join f f1).
   Proof.
     ii. eapply Flag.join_mon_r; eauto.
+  Qed.
+
+  Lemma minus_mon_l f0 f1 f
+        (LE: le f1 f0)
+    :
+      le (minus f1 f) (minus f0 f).
+  Proof.
+    ii. eapply Flag.minus_mon_l; eauto.
+  Qed.
+
+  Lemma minus_mon_r f0 f1 f
+        (LE: le f1 f0)
+    :
+      le (minus f f0) (minus f f1).
+  Proof.
+    ii. eapply Flag.minus_mon_r; eauto.
   Qed.
 End Flags.
 
@@ -713,11 +745,6 @@ Module SeqEvent.
        | _ => Flags.bot
        end).
 
-  Definition deferred_step_wf
-             (i_src i_tgt: input)
-             (d0 d1: Flags.t): Prop :=
-    Flags.le (Flags.join d0 (written i_tgt)) (Flags.join d1 (written i_src)).
-
   Definition get_oracle_input (i: input): Oracle.input :=
     Oracle.mk_input
       (i.(in_access))
@@ -764,11 +791,99 @@ Module SeqEvent.
       (<<VAL: forall loc (UNDEFERRED: d loc = false), Const.le (v0 loc) (v1 loc)>>)
     end.
 
-  Definition input_match (d: Flags.t) (i0 i1: input): Prop :=
-    (<<ACCESS: option_rel (in_access_match d) i0.(in_access) i1.(in_access)>>) /\
-    (<<ACQUIRE: option_rel (in_acquire_match d) i0.(in_acquire) i1.(in_acquire)>>) /\
-    (<<RELEASE: option_rel (in_release_match d) i0.(in_release) i1.(in_release)>>)
+  Definition input_match (d0 d1: Flags.t) (i_src i_tgt: input): Prop :=
+    (<<ACCESS: option_rel (in_access_match d0) i_src.(in_access) i_tgt.(in_access)>>) /\
+    (<<ACQUIRE: option_rel (in_acquire_match d0) i_src.(in_acquire) i_tgt.(in_acquire)>>) /\
+    (<<RELEASE: option_rel (in_release_match d1) i_src.(in_release) i_tgt.(in_release)>>) /\
+    (<<DEFERRED: Flags.le (Flags.join d0 (written i_tgt)) (Flags.join d1 (written i_src))>>)
   .
+
+  Lemma in_access_match_mon d0 d1 i_src i_tgt
+        (MATCH: in_access_match d1 i_src i_tgt)
+        (FLAG: Flags.le d0 d1)
+    :
+      in_access_match d0 i_src i_tgt.
+  Proof.
+    unfold in_access_match in *. des_ifs.
+    des; clarify. splits; auto.
+    etrans; eauto. eapply Flag.join_mon_r; eauto.
+  Qed.
+
+  Lemma in_acquire_match_mon d0 d1 i_src i_tgt
+        (MATCH: in_acquire_match d1 i_src i_tgt)
+        (FLAG: Flags.le d0 d1)
+    :
+      in_acquire_match d0 i_src i_tgt.
+  Proof.
+    unfold in_acquire_match in *. des. red.
+    etrans; eauto. eapply Flags.join_mon_l; eauto.
+  Qed.
+
+  Lemma in_release_match_mon d0 d1 i_src i_tgt
+        (MATCH: in_release_match d0 i_src i_tgt)
+        (FLAG: Flags.le d0 d1)
+    :
+      in_release_match d1 i_src i_tgt.
+  Proof.
+    unfold in_release_match in *. des_ifs.
+    ii. eapply MATCH. specialize (FLAG loc).
+    destruct (d0 loc), (d1 loc); ss.
+  Qed.
+
+  Lemma input_match_mon d_before0 d_before1 d_after0 d_after1 i_src i_tgt
+        (MATCH: input_match d_before1 d_after0 i_src i_tgt)
+        (DBEFORE: Flags.le d_before0 d_before1)
+        (DAFTER: Flags.le d_after0 d_after1)
+    :
+      input_match d_before0 d_after1 i_src i_tgt.
+  Proof.
+    unfold input_match in *. des. splits.
+    { destruct (in_access i_src), (in_access i_tgt); ss.
+      eapply in_access_match_mon; eauto. }
+    { destruct (in_acquire i_src), (in_acquire i_tgt); ss.
+      eapply in_acquire_match_mon; eauto. }
+    { destruct (in_release i_src), (in_release i_tgt); ss.
+      eapply in_release_match_mon; eauto. }
+    { transitivity (Flags.join d_after0 (written i_src)).
+      { etrans; eauto. eapply Flags.join_mon_l; eauto. }
+      { eapply Flags.join_mon_l; eauto. }
+    }
+  Qed.
+
+  Lemma in_access_match_bot i
+    :
+      in_access_match Flags.bot i i.
+  Proof.
+    destruct i. unfold in_access_match. des_ifs. splits; auto.
+    { refl. }
+    { eapply Flag.join_spec; ss. refl. }
+  Qed.
+
+  Lemma in_acquire_match_bot i
+    :
+      in_acquire_match Flags.bot i i.
+  Proof.
+    unfold in_acquire_match. red.
+    eapply Flags.join_spec; ss. refl.
+  Qed.
+
+  Lemma in_release_match_bot i
+    :
+      in_release_match Flags.bot i i.
+  Proof.
+    unfold in_release_match. des_ifs. ii. refl.
+  Qed.
+
+  Lemma input_match_bot i
+    :
+      input_match Flags.bot Flags.bot i i.
+  Proof.
+    unfold input_match. splits.
+    { destruct (in_access i); ss. eapply in_access_match_bot. }
+    { destruct (in_acquire i); ss. eapply in_acquire_match_bot. }
+    { destruct (in_release i); ss. eapply in_release_match_bot. }
+    { refl. }
+  Qed.
 
   Definition wf_input (e: ProgramEvent.t) (i: input): Prop :=
     (<<UPDATE: forall loc,
@@ -948,6 +1063,8 @@ End SeqState.
 Module SeqThread.
 Section LANG.
   Variable lang: language.
+  Variable state_step:
+    Perms.t -> MachineEvent.t -> SeqState.t lang -> SeqState.t lang -> Prop.
 
   Record t :=
     mk {
@@ -960,13 +1077,13 @@ Section LANG.
     forall (e: MachineEvent.t) (th0: t) (th1: t), Prop :=
   | na_step_intro
       p o e st0 st1
-      (STEP: SeqState.na_step p e st0 st1)
+      (STEP: state_step p e st0 st1)
     :
       na_step e (mk st0 p o) (mk st1 p o)
   .
 
   Lemma na_state_steps_na_steps p o st0 st1
-        (STEPS: rtc (SeqState.na_step p MachineEvent.silent) st0 st1)
+        (STEPS: rtc (state_step p MachineEvent.silent) st0 st1)
     :
       rtc (na_step MachineEvent.silent) (mk st0 p o) (mk st1 p o).
   Proof.
@@ -1030,6 +1147,22 @@ Section LANG.
     :
       writing_trace d ((e, i, o)::tr) (Flags.join (SeqEvent.written i) w)
   .
+
+  Lemma writing_trace_mon d0 d1 tr w
+        (DEFERRED: Flags.le d0 d1)
+        (WRITING: writing_trace d1 tr w)
+    :
+      writing_trace d0 tr w.
+  Proof.
+    revert d0 DEFERRED. induction WRITING.
+    { econs 1. }
+    { econs 2.
+      { eapply IHWRITING. eapply Flags.minus_mon_l; eauto. }
+      { eauto. }
+      { i. eapply ACCESS in SOME.
+        specialize (DEFERRED loc). destruct (d loc), (d0 loc); ss. }
+    }
+  Qed.
 End LANG.
 End SeqThread.
 
@@ -1091,8 +1224,7 @@ Section SIMULATION.
                      (STEP_TGT: SeqEvent.step i_tgt o p0 st_tgt0.(SeqState.memory) p1 mem_tgt),
           exists i_src mem_src d1,
             (<<STEP_SRC: SeqEvent.step i_src o p0 st_src1.(SeqState.memory) p1 mem_src>>) /\
-            (<<DEFERRED: SeqEvent.deferred_step_wf i_src i_tgt d0 d1>>) /\
-            (<<MATCH: SeqEvent.input_match d1 i_src i_tgt>>) /\
+            (<<MATCH: SeqEvent.input_match d0 d1 i_src i_tgt>>) /\
             (<<SIM: sim_seq p1
                             d1
                             (SeqState.mk _ st_src2 mem_src)
@@ -1105,9 +1237,9 @@ Section SIMULATION.
              (st_tgt0: SeqState.t lang_tgt): Prop :=
     forall o (WF: Oracle.wf o),
     exists th tr w,
-      (<<STEPS: SeqThread.steps tr (SeqThread.mk st_src0 p0 o) th>>) /\
+      (<<STEPS: SeqThread.steps (@SeqState.na_step _) tr (SeqThread.mk st_src0 p0 o) th>>) /\
       (<<TRACE: SeqThread.writing_trace d0 tr w>>) /\
-      ((<<FLAGS: Flags.le (Flags.join d0 st_tgt0.(SeqState.memory).(SeqMemory.flags)) (Flags.join w th.(SeqThread.state).(SeqState.memory).(SeqMemory.flags))>>) \/ (<<FAILURE: SeqThread.failure th>>))
+      ((<<FLAGS: Flags.le (Flags.join d0 st_tgt0.(SeqState.memory).(SeqMemory.flags)) (Flags.join w th.(SeqThread.state).(SeqState.memory).(SeqMemory.flags))>>) \/ (<<FAILURE: SeqThread.failure (@SeqState.na_step _) th>>))
   .
 
   Definition sim_seq_failure_case
@@ -1115,9 +1247,9 @@ Section SIMULATION.
              (st_src0: SeqState.t lang_src): Prop :=
     forall o (WF: Oracle.wf o),
     exists th tr w,
-      (<<STEPS: SeqThread.steps tr (SeqThread.mk st_src0 p0 o) th>>) /\
+      (<<STEPS: SeqThread.steps (@SeqState.na_step _) tr (SeqThread.mk st_src0 p0 o) th>>) /\
       (<<TRACE: SeqThread.writing_trace d0 tr w>>) /\
-      (<<FAILURE: SeqThread.failure th>>)
+      (<<FAILURE: SeqThread.failure (@SeqState.na_step _) th>>)
   .
 
 

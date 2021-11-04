@@ -20,62 +20,102 @@ Set Implicit Arguments.
 
 
 Module SeqTrace.
-  Variant output: Type :=
+  Variant result: Type :=
   | term (v: ValueMap.t) (f: Flags.t)
   | partial (f: Flags.t)
   | ub
   .
 
-  Definition t: Type := list (ProgramEvent.t * SeqEvent.input * Oracle.output) * output.
+  Definition t: Type := list (ProgramEvent.t * SeqEvent.input * Oracle.output) * result.
 
-  Variant le: t -> t -> Prop :=
+  Inductive le: Flags.t -> t -> t -> Prop :=
   | le_term
-      es v_src v_tgt f_src f_tgt
+      d es v_src v_tgt f_src f_tgt
       (VAL: ValueMap.le v_tgt v_src)
-      (FLAG: Flags.le f_tgt f_src)
+      (FLAG: Flags.le (Flags.join d f_tgt) f_src)
     :
-      le (es, term v_tgt f_tgt) (es, term v_src f_src)
-  | le_pterm
-      es_src es_tgt f_src f_tgt
-      (EVENTS: exists es, es_tgt = es_src ++ es)
-      (FLAGS: Flags.le f_tgt f_src)
+      le d (es, term v_tgt f_tgt) (es, term v_src f_src)
+  | le_partial
+      d tr_src f_src f_tgt w
+      (TRACE: SeqThread.writing_trace d tr_src w)
+      (FLAG: Flags.le (Flags.join d f_tgt) (Flags.join w f_src))
     :
-      le (es_tgt, partial f_tgt) (es_src, partial f_src)
+      le d ([], partial f_tgt) (tr_src, partial f_src)
   | le_ub
-      es tr_tgt
+      d tr_src tr_tgt w
+      (TRACE: SeqThread.writing_trace d tr_src w)
     :
-      le tr_tgt (es, ub)
+      le d tr_tgt (tr_src, ub)
+  | le_cons
+      d0 d1 e i_src i_tgt o tr_src tr_tgt r_src r_tgt
+      (LE: le d1 (tr_tgt, r_tgt) (tr_src, r_src))
+      (MATCH: SeqEvent.input_match d0 d1 i_src i_tgt)
+    :
+      le d0 ((e, i_tgt, o)::tr_tgt, r_tgt) ((e, i_src, o)::tr_src, r_src)
   .
 
-  Program Instance le_PreOrder: PreOrder le.
+  Lemma le_deferred_mon d0 d1 tr0 tr1
+        (DEFERRED: Flags.le d0 d1)
+        (LE: le d1 tr0 tr1)
+    :
+      le d0 tr0 tr1.
+  Proof.
+    induction LE.
+    { econs 1; eauto. etrans; eauto.
+      eapply Flags.join_mon_l. eauto. }
+    { econs 2.
+      { eapply SeqThread.writing_trace_mon; eauto. }
+      { etrans; eauto. eapply Flags.join_mon_l; eauto. }
+    }
+    { econs 3; eauto. eapply SeqThread.writing_trace_mon; eauto. }
+    { econs 4.
+      { eauto. }
+      { eapply SeqEvent.input_match_mon; eauto. refl. }
+    }
+  Qed.
+
+  Program Instance le_PreOrder: PreOrder (le Flags.bot).
   Next Obligation.
   Proof.
-    ii. destruct x as [? []].
-    { econs; refl. }
-    { econs 2; [|refl]. exists [].
-      rewrite app_nil_r. auto. }
-    { econs 3. }
+    ii. destruct x. induction l.
+    { destruct r.
+      { econs 1; refl. }
+      { econs 2; eauto.
+        { econs 1. }
+        { refl. }
+      }
+      { econs 3; eauto. econs 1. }
+    }
+    { destruct a as [[e i] o]. econs 4; eauto.
+      eapply SeqEvent.input_match_bot; eauto. }
   Qed.
   Next Obligation.
   Proof.
-    ii. inv H; inv H0.
-    { econs 1; etrans; eauto. }
-    { econs 3. }
-    { des; subst. econs 2.
-      { eexists. rewrite app_assoc. eauto. }
-      { etrans; eauto. }
+    ii.
+
+
+    destruct x.c
+
+    destruct x. induction l.
+    { destruct r.
+      { econs 1; refl. }
+      { econs 2; eauto.
+        { econs 1. }
+        { refl. }
+      }
+      { econs 3; eauto. econs 1. }
     }
-    { econs 3. }
-    { econs 3. }
+    { destruct a as [[e i] o]. econs 4; eauto.
+      eapply SeqEvent.input_match_bot; eauto. }
   Qed.
 
   Definition incl (b0: t -> Prop) (b1: t -> Prop): Prop :=
-    forall tr0, b0 tr0 -> exists tr1, b1 tr1 /\ le tr0 tr1.
+    forall tr0, b0 tr0 -> exists tr1, b1 tr1 /\ le Flags.bot tr0 tr1.
 
   Program Instance incl_PreOrder: PreOrder incl.
   Next Obligation.
   Proof.
-    ii. exists tr0. split; auto. refl.
+    ii. exists tr0. split; refl. refl.
   Qed.
   Next Obligation.
   Proof.
