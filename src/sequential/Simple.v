@@ -1049,7 +1049,7 @@ Section SIMULATION.
       (<<TERMINAL_SRC: lang_src.(Language.is_terminal) st_src1.(SeqState.state)>>) /\
       (<<TERMINAL: sim_terminal st_src1.(SeqState.state) st_tgt0.(SeqState.state)>>) /\
       (<<VALUE: ValueMap.le st_tgt0.(SeqState.memory).(SeqMemory.value_map) st_tgt0.(SeqState.memory).(SeqMemory.value_map)>>) /\
-      (<<FLAG: Flags.le st_tgt0.(SeqState.memory).(SeqMemory.flags) (Flags.join d0 st_tgt0.(SeqState.memory).(SeqMemory.flags))>>)
+      (<<FLAG: Flags.le (Flags.join d0 st_tgt0.(SeqState.memory).(SeqMemory.flags)) st_src1.(SeqState.memory).(SeqMemory.flags)>>)
   .
 
   Definition sim_seq_na_step_case
@@ -1189,13 +1189,14 @@ Require Import ITreeLang.
 Require Import iCompatibility.
 
 Section ADEQUACY.
-  Variable R: Type.
+  Variable R_src R_tgt: Type.
+  Variable sim_val: R_src -> R_tgt -> Prop.
 
-  Definition sim_seq_itree (st_src: itree MemE.t R) (st_tgt: itree MemE.t R): Prop :=
-    @sim_seq_all (lang R) (lang R) eq st_src st_tgt.
+  Definition sim_seq_itree (st_src: itree MemE.t R_src) (st_tgt: itree MemE.t R_tgt): Prop :=
+    @sim_seq_all (lang R_src) (lang R_tgt) (sim_terminal sim_val) st_src st_tgt.
 
   Theorem adequacy_seq:
-    sim_seq_itree <2= sim_itree eq.
+    sim_seq_itree <2= sim_itree sim_val.
   Proof.
   Admitted.
 End ADEQUACY.
