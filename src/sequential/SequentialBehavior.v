@@ -14,7 +14,7 @@ From PromisingLib Require Import Loc.
 Require Import Event.
 Require Import List.
 
-Require Import Debt.
+Require Import Simple.
 
 Set Implicit Arguments.
 
@@ -26,7 +26,7 @@ Module SeqTrace.
   | ub
   .
 
-  Definition t: Type := list (ProgramEvent.t * SeqEvent.input * SeqEvent.output) * output.
+  Definition t: Type := list (ProgramEvent.t * SeqEvent.input * Oracle.output) * output.
 
   Variant le: t -> t -> Prop :=
   | le_term
@@ -91,16 +91,14 @@ Section LANG.
 
   Inductive behavior: forall (th0: SeqThread.t lang) (tr: SeqTrace.t), Prop :=
   | behavior_term
-      st v f d p o
+      st v f p o
       (TERMINAL: lang.(Language.is_terminal) st)
-      (DEFERRED: Flags.is_empty d)
     :
-      behavior (SeqThread.mk (SeqState.mk _ st (SeqMemory.mk v f d)) p o) ([], SeqTrace.term v f)
+      behavior (SeqThread.mk (SeqState.mk _ st (SeqMemory.mk v f)) p o) ([], SeqTrace.term v f)
   | behavior_partial
-      st v f d p o
-      (DEFERRED: Flags.is_empty d)
+      st v f p o
     :
-      behavior (SeqThread.mk (SeqState.mk _ st (SeqMemory.mk v f d)) p o) ([], SeqTrace.partial f)
+      behavior (SeqThread.mk (SeqState.mk _ st (SeqMemory.mk v f)) p o) ([], SeqTrace.partial f)
   | behavior_ub
       st m p o
       (FAILURE: SeqThread.failure (SeqThread.mk (SeqState.mk _ st m) p o))
