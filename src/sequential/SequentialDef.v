@@ -17,6 +17,16 @@ Set Implicit Arguments.
 
 
 
+Program Instance option_rel_PreOrder A R `{@PreOrder A R}: PreOrder (option_rel R).
+Next Obligation.
+Proof.
+  ii. destruct x; ss. refl.
+Qed.
+Next Obligation.
+Proof.
+  ii. destruct x, y, z; ss. etrans; eauto.
+Qed.
+
 Definition get_machine_event (e: ProgramEvent.t): MachineEvent.t :=
   match e with
   | ProgramEvent.syscall e => MachineEvent.syscall e
@@ -283,6 +293,12 @@ Module Flag.
     | _, _ => unwritten
     end.
 
+  Definition sub (f0 f1: t): t :=
+    match f1 with
+    | written => unwritten
+    | unwritten => f0
+    end.
+
   Definition le (f0 f1: t): bool :=
     match f0, f1 with
     | unwritten, _ => true
@@ -347,6 +363,13 @@ Module Flags.
 
   Definition update (loc: Loc.t) (f: Flag.t) (fs: t): t :=
     fun loc' => if Loc.eq_dec loc' loc then f else (fs loc').
+
+  Definition sub (f0 f1: t): t :=
+    fun loc =>
+      match (f1 loc) with
+      | Flag.written => Flag.unwritten
+      | _ => f0 loc
+      end.
 
   Definition meet (f0 f1: t): t :=
     fun loc => Flag.meet (f0 loc) (f1 loc).
@@ -414,9 +437,8 @@ Module ValueMap.
   Definition acquire (cond: Loc.t -> bool) (vs_acq: t) (vs: t): t :=
     fun loc => if (cond loc) then (vs loc) else (vs_acq loc).
 
-  Definition release (vs_rel: t) (vs: t): Flags.t :=
-    fun loc => if (Const.le (vs_rel loc) (vs loc))
-               then Flag.written else Flag.unwritten.
+  Definition release (cond: Loc.t -> bool) (vs: t): t :=
+    fun loc => if (cond loc) then (vs loc) else Const.undef.
 
   Definition le (vs0 vs1: t): Prop :=
     forall loc, Const.le (vs0 loc) (vs1 loc).
@@ -445,6 +467,32 @@ Module SeqMemory.
 
   Definition write (loc: Loc.t) (v: Const.t) (m: t): t :=
     mk (ValueMap.write loc v m.(value_map)) (Flags.write loc m.(flags)).
+
+  Variant acquire (cond: Loc.t -> bool) (v_acq: ValueMap.t):
+    forall (m_before: t) (f: Flags.t) (m_after: t), Prop :=
+  | acquire_intro
+      m
+    :
+      acquire
+        cond
+        v_acq
+        m
+        (m.(flags))
+        (mk (ValueMap.acquire cond v_acq m.(value_map)) m.(flags))
+  .
+
+  Variant release:
+    forall (m_before: t) (f_rel: Flags.t) (v_rel: ValueMap.t) (m_after: t), Prop :=
+  | release_intro
+      d m
+    :
+      release
+        m
+        (Flags.sub
+           (ValueMap.release m.(value_map) d)
+           (mk m.(value_map)  d)
+         .
+
 
   Definition can_acquire (f: Flags.t) (m: t): Prop :=
     Flags.le f m.(flags).

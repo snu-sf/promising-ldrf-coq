@@ -595,7 +595,7 @@ Module SeqEvent.
         out_acquire: option (Perms.t * ValueMap.t);
         out_release: option (Perms.t);
       }.
-  
+
   Definition in_access_le (i0 i1: (Loc.t * Const.t * Flag.t)): Prop :=
     match i0, i1 with
     | (l0, v0, f0), (l1, v1, f1) =>
