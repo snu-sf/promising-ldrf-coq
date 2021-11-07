@@ -30,11 +30,11 @@ Module SeqTrace.
 
   Inductive le: Flags.t -> t -> t -> Prop :=
   | le_term
-      d es v_src v_tgt f_src f_tgt
+      d v_src v_tgt f_src f_tgt
       (VAL: ValueMap.le v_tgt v_src)
       (FLAG: Flags.le (Flags.join d f_tgt) f_src)
     :
-      le d (es, term v_tgt f_tgt) (es, term v_src f_src)
+      le d ([], term v_tgt f_tgt) ([], term v_src f_src)
   | le_partial
       d tr_src f_src f_tgt w
       (TRACE: SeqThread.writing_trace d tr_src w)
@@ -91,23 +91,20 @@ Module SeqTrace.
   Qed.
   Next Obligation.
   Proof.
-    ii.
-
-
-    destruct x.c
-
-    destruct x. induction l.
-    { destruct r.
-      { econs 1; refl. }
-      { econs 2; eauto.
-        { econs 1. }
-        { refl. }
+    ii. destruct z. ginduction l.
+    { i. inv H0.
+      { inv H. econs 1.
+        { etrans; eauto. }
+        { etrans; eauto. }
       }
-      { econs 3; eauto. econs 1. }
+      { inv TRACE. inv H. inv TRACE. econs 2.
+        { econs. }
+        { etrans; eauto. }
+      }
+      { econs 3. econs. }
     }
-    { destruct a as [[e i] o]. econs 4; eauto.
-      eapply SeqEvent.input_match_bot; eauto. }
-  Qed.
+    { i.
+  Admitted.
 
   Definition incl (b0: t -> Prop) (b1: t -> Prop): Prop :=
     forall tr0, b0 tr0 -> exists tr1, b1 tr1 /\ le Flags.bot tr0 tr1.
@@ -115,7 +112,7 @@ Module SeqTrace.
   Program Instance incl_PreOrder: PreOrder incl.
   Next Obligation.
   Proof.
-    ii. exists tr0. split; refl. refl.
+    ii. exists tr0. split; auto. refl.
   Qed.
   Next Obligation.
   Proof.
@@ -128,34 +125,42 @@ End SeqTrace.
 Module SeqBehavior.
 Section LANG.
   Variable lang: language.
+  Variable state_step:
+    Perms.t -> MachineEvent.t -> SeqState.t lang -> SeqState.t lang -> Prop.
 
-  Inductive behavior: forall (th0: SeqThread.t lang) (tr: SeqTrace.t), Prop :=
-  | behavior_term
-      st v f p o
+  Variant final_state: forall (th: SeqThread.t lang) (r: SeqTrace.result), Prop :=
+  | final_state_term
+      st v0 v1 f0 f1 p o
       (TERMINAL: lang.(Language.is_terminal) st)
+      (VALUE: ValueMap.le v0 v1)
+      (FLAG: Flags.le f0 f1)
     :
-      behavior (SeqThread.mk (SeqState.mk _ st (SeqMemory.mk v f)) p o) ([], SeqTrace.term v f)
-  | behavior_partial
-      st v f p o
+      final_state
+        (SeqThread.mk (SeqState.mk _ st (SeqMemory.mk v1 f1)) p o)
+        (SeqTrace.term v0 f0)
+  | final_state_partial
+      st v f0 f1 p o
+      (FLAG: Flags.le f0 f1)
     :
-      behavior (SeqThread.mk (SeqState.mk _ st (SeqMemory.mk v f)) p o) ([], SeqTrace.partial f)
-  | behavior_ub
-      st m p o
-      (FAILURE: SeqThread.failure (SeqThread.mk (SeqState.mk _ st m) p o))
+      final_state
+        (SeqThread.mk (SeqState.mk _ st (SeqMemory.mk v f1)) p o)
+        (SeqTrace.partial f0)
+  | final_state_ub
+      th
+      (FAILURE: SeqThread.failure state_step th)
     :
-      behavior (SeqThread.mk (SeqState.mk _ st m) p o) ([], SeqTrace.ub)
-  | behavior_na_step
-      th0 th1 tr
-      (STEP: SeqThread.na_step MachineEvent.silent th0 th1)
-      (BEHAVIOR: behavior th1 tr)
+      final_state
+        th
+        (SeqTrace.ub)
+  .
+
+  Variant behavior: forall (th0: SeqThread.t lang) (tr: SeqTrace.t), Prop :=
+  | behavior_intro
+      th0 th1 tr r
+      (STEPS: SeqThread.steps state_step tr th0 th1)
+      (FINAL: final_state th1 r)
     :
-      behavior th0 tr
-  | behavior_at_step
-      e i o th0 th1 es st
-      (STEP: SeqThread.at_step e i o th0 th1)
-      (BEHAVIOR: behavior th1 (es, st))
-    :
-      behavior th0 ((e, i, o)::es, st)
+      behavior th0 (tr, r)
   .
 End LANG.
 
@@ -165,8 +170,8 @@ Definition refine
   : Prop :=
   forall o p m (WF: Oracle.wf o),
     SeqTrace.incl
-      (behavior (SeqThread.mk (SeqState.mk _ st_tgt m) p o))
-      (behavior (SeqThread.mk (SeqState.mk _ st_src m) p o)) .
+      (behavior (@SeqState.na_step _) (SeqThread.mk (SeqState.mk _ st_tgt m) p o))
+      (behavior (@SeqState.na_step _) (SeqThread.mk (SeqState.mk _ st_src m) p o)) .
 End SeqBehavior.
 
 
@@ -214,11 +219,25 @@ End DETERMINISM.
 
 Section ADEQUACY.
   Variable lang_src lang_tgt: language.
+  Variable state_step:
+    Perms.t -> MachineEvent.t -> SeqState.t lang_src -> SeqState.t lang_src -> Prop.
+
+  Hypothesis state_step_subset: state_step <4= (@SeqState.na_step _).
+
+  Hypothesis state_step_determ:
+    forall p st e0 e1 st0 st1
+           (STEP0: state_step p e0 st st0)
+           (STEP1: state_step p e1 st st1),
+      e0 = e1 /\ st0 = st1.
 
   Theorem refinement_imply_simulation
           (st_src: lang_src.(Language.state)) (st_tgt: lang_tgt.(Language.state))
-          (DETERM: deterministic _ st_src)
           (REFINE: SeqBehavior.refine _ _ st_tgt st_src)
+          (DETERM: deterministic _ st_src)
+          (TOP: forall o p m (WF: Oracle.wf o),
+              SeqBehavior.behavior (@SeqState.na_step _) (SeqThread.mk (SeqState.mk _ st_src m) p o)
+              <1=
+              SeqBehavior.behavior state_step (SeqThread.mk (SeqState.mk _ st_src m) p o))
     :
       sim_seq_all _ _ (fun _ _ => True) st_src st_tgt.
   Proof.
