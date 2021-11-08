@@ -1100,28 +1100,124 @@ Variant sim_memory_cap
               covered loc ts mem_tgt>>))
 .
 
-(* Definition mapping_update (f0: Mapping.t) (f1: Loc.t -> Time.t -> option Time.t): Mapping.t := *)
-(*   Mapping.mk *)
-(*     (fun v loc ts => if PeanoNat.Nat.eq_dec v (S f0.(Mapping.ver)) *)
-(*                      then f1 loc ts *)
-(*                      else *)
-(*                        match (f1 loc ts) with *)
-(*                        | Some fts => Some fts *)
-(*                        | None => f0.(Mapping.map) v loc ts *)
-(*                        end) *)
-(*     (S f0.(Mapping.ver)) *)
-(* . *)
+Definition mapping_update (f: Mapping.t) loc ts fts: Mapping.t :=
+  Mapping.mk
+    (fun v => if PeanoNat.Nat.eq_dec v (S f.(Mapping.ver))
+              then
+                fun loc' ts' =>
+                  if (loc_ts_eq_dec (loc, ts) (loc', ts'))
+                  then Some fts
+                  else f.(Mapping.map) f.(Mapping.ver) loc' ts'
+              else
+                f.(Mapping.map) v)
+    (S f.(Mapping.ver))
+.
 
-(* Lemma mapping_update_wf f0 f1 *)
-(*       (WF: Mapping.wf f0) *)
-(*       (FIN: forall loc, exists l, forall ts fts (MAP: f1 loc ts = Some fts), List.In (ts, fts) l) *)
-(*       (INCR: forall loc ts fts0 fts1 *)
-(*                     (MAP0: f0.(Mapping.map) f0.(Mapping.ver) loc ts = Some fts0) *)
-(*                     (MAP1: f1 loc ts = Some fts1), *)
-(*           Time.le fts0 fts1) *)
-(*       (MAPLT:  *)
-(*   : *)
-(*     Mapping.wf (mapping_update f0 f1). *)
+Lemma mapping_update_old f loc ts fts loc0 ts0 fts0
+      (MAP: sim_timestamp_exact loc0 f f.(Mapping.ver) fts0 ts0)
+  :
+    (sim_timestamp_exact loc0 (mapping_update f loc ts fts) (mapping_update f loc ts fts).(Mapping.ver) fts0 ts0) \/
+    (loc0 = loc /\ ts = ts0).
+Proof.
+  unfold sim_timestamp_exact in *. ss. des_ifs; auto.
+  ss. des; clarify. auto.
+Qed.
+
+Lemma mapping_update_new f loc ts fts
+  :
+    sim_timestamp_exact loc (mapping_update f loc ts fts) (mapping_update f loc ts fts).(Mapping.ver) fts ts.
+Proof.
+  unfold sim_timestamp_exact in *. ss. des_ifs; auto.
+  ss. des; clarify.
+Qed.
+
+Require Import Lia.
+
+Lemma mapping_update_wf f loc ts fts
+      (WF: Mapping.wf f)
+      (INCR: forall fts' (MAP: sim_timestamp_exact loc f f.(Mapping.ver) fts' ts),
+          Time.le fts' fts)
+      (LEFT: forall ts' fts'
+                    (LT: Time.lt ts' ts)
+                    (MAP: sim_timestamp_exact loc f f.(Mapping.ver) fts' ts'),
+          Time.lt fts' fts)
+      (RIGHT: forall ts' fts'
+                     (LT: Time.lt ts ts')
+                     (MAP: sim_timestamp_exact loc f f.(Mapping.ver) fts' ts'),
+          Time.lt fts fts')
+  :
+    Mapping.wf (mapping_update f loc ts fts).
+Proof.
+  econs.
+  { i. destruct (PeanoNat.Nat.eq_dec v (S f.(Mapping.ver))).
+    { clarify.
+      hexploit (Mapping.map_finite WF f.(Mapping.ver) loc0); eauto. i. des.
+      exists ((ts, fts)::l). i.
+      unfold mapping_update in *. ss. des_ifs.
+      { ss. des; clarify. auto. }
+      { right. eapply H; eauto. }
+    }
+    { hexploit (Mapping.map_finite WF v loc0); eauto. i. des.
+      exists l. i.
+      unfold mapping_update in *. ss. des_ifs.
+      eapply H; eauto.
+    }
+  }
+  { i. unfold mapping_update in *. ss. des_ifs.
+    { ss. des; clarify. split; i; timetac. }
+    { ss. des; clarify. split.
+      { i. hexploit LEFT; eauto. }
+      { i. destruct (Time.le_lt_dec ts1 ts0); auto. inv l; ss.
+        eapply RIGHT in H0; eauto.
+        exfalso. eapply Time.lt_strorder. etrans; eauto. }
+    }
+    { ss. des; clarify. split.
+      { i. hexploit RIGHT; eauto. }
+      { i. destruct (Time.le_lt_dec ts1 ts0); auto. inv l; ss.
+        2:{ exfalso. eapply o; ss. }
+        eapply LEFT in H0; eauto.
+        exfalso. eapply Time.lt_strorder. etrans; eauto. }
+    }
+    { clear o o0. eapply Mapping.mapping_map_lt; eauto. }
+    { eapply Mapping.mapping_map_lt; eauto. }
+  }
+  { i. ss. des_ifs.
+    { ss. des; clarify. esplits; eauto. refl. }
+    { ss. des; clarify. }
+    { ss. des; clarify. esplits; eauto.
+      hexploit (@Mapping.mapping_incr _ WF v0 f.(Mapping.ver)); eauto.
+      { lia. }
+      i. des. transitivity fts1; eauto.
+    }
+    { ss. des; clarify. }
+    { ss. esplits; eauto. refl. }
+    { clear o.
+      hexploit (@Mapping.mapping_incr _ WF v0 f.(Mapping.ver)); eauto.
+      lia.
+    }
+    { ss. des; clarify. exfalso. lia. }
+    { clear o. exfalso. lia. }
+    { eapply Mapping.mapping_incr; eauto. lia. }
+  }
+  { i. ss. des_ifs; try by lia.
+    eapply Mapping.mapping_empty; eauto. lia. }
+  { i. ss. eapply Mapping.mapping_bot; eauto. }
+Qed.
+
+Lemma mapping_update_le (msgs: Messages.t) f loc ts fts
+      (MAP: forall fts0 to msg
+                   (SIM: sim_timestamp_exact loc f f.(Mapping.ver) fts0 ts)
+                   (MSG: msgs loc ts to msg),
+          msg = Message.reserve)
+  :
+    mapping_messages_le msgs f (mapping_update f loc ts fts).
+Proof.
+  red. splits.
+  { ss. lia. }
+  { i. ss. des_ifs. exfalso. lia. }
+  { i. ss. des_ifs. ss. des; clarify.
+    exfalso. eapply RESERVE. eapply MAP; eauto. }
+Qed.
 
 Lemma mapping_add msgs f0 loc ts
       (WF: Mapping.wf f0)
@@ -1156,77 +1252,67 @@ Proof.
   hexploit (@finite_least (fun ts' => Time.le ts ts' /\ exists fts, Mapping.map f0 f0.(Mapping.ver) loc ts' = Some fts) (List.map fst l)). i. des.
   { inv SAT.
     2:{ inv H2. exfalso. eapply H; eauto. }
-    exists (Mapping.mk (S f0.(Mapping.ver))
-                       (fun loc0 ts0 =>
-                          if loc_ts_eq_dec (loc0, ts0) (loc, ts)
-                          then Some (Time.middle fts fts0)
-                          else f0.(Mapping.map) f0.(Mapping.ver)
-    admit.
-  }
-  { exists (Mapping.mk
-
-
-i.
-
-  2:{
-    exfalso. hexploit (Mapping.mapping_bot); eauto. i.
-    eapply sim_timestamp_exact_mon_ver with (v1:=f0.(Mapping.ver)) in H1; eauto.
-    { des. eapply EMPTY.
-      { hexploit H; eauto. i.
-        eapply List.in_map with (f:=fst) in H0; ss; eauto. }
-      { split.
-        { eapply Time.bot_spec. }
-        { esplits; eauto. }
+    assert (LT: Time.lt fts fts0).
+    { erewrite <- Mapping.mapping_map_lt; cycle 2; eauto. }
+    exists (mapping_update f0 loc ts (Time.middle fts fts0)), (Time.middle fts fts0).
+    splits.
+    { eapply mapping_update_wf; eauto.
+      { i. exfalso. eapply H; eauto. }
+      { i. hexploit (GREATEST (fst (ts', fts'))).
+        { eapply List.in_map; eauto. }
+        { splits; eauto. ss. left. auto. }
+        i. ss. eapply (@TimeFacts.le_lt_lt _ fts).
+        { erewrite <- Mapping.mapping_map_le; cycle 2; eauto. }
+        { eapply Time.middle_spec; eauto. }
+      }
+      { i. hexploit (LEAST (fst (ts', fts'))).
+        { eapply List.in_map; eauto. }
+        { splits; eauto. ss. left. auto. }
+        i. ss. eapply (@TimeFacts.lt_le_lt _ fts0).
+        { eapply Time.middle_spec; eauto. }
+        { erewrite <- Mapping.mapping_map_le; cycle 2; eauto. }
       }
     }
-    { eapply le_0_n. }
-    { eapply mapping_latest_wf. }
+    { eapply mapping_update_le; eauto. i.
+      exfalso. eapply H; eauto. }
+    { unfold sim_timestamp_exact. ss. des_ifs. ss. des; clarify. }
+    { unfold sim_timestamp_exact. i. ss. des_ifs. ss. des; clarify.
+      exfalso. eapply H; eauto. }
   }
-
-
-  i.
-
-urefl.
-
-  }
-
-
-
-
-  hexploit (@finite_greatest (fun ts' => Time.le ts' ts /\ exists fts, Mapping.map f0 f0.(Mapping.ver) loc ts' = Some fts) (List.map fst l)).
-
-
-
-  i. des.
-  { exists fts. econs.
-    { eapply sim_timestamp_mon_tgt; eauto.
-      eapply sim_timestamp_exact_sim. red. eauto. }
-    { i. unfold sim_timestamp in *. des.
-      assert (LE: Time.le ts_tgt' to).
-      { eapply GREATEST; eauto.
-        eapply H in SIM. eapply List.in_map with (f:=fst) in SIM; ss; eauto. }
-      transitivity ts_src'; eauto.
-      erewrite Mapping.mapping_map_le in LE; eauto.
-    }
-  }
-  { exfalso. hexploit (Mapping.mapping_bot); eauto. i.
-    eapply sim_timestamp_exact_mon_ver with (v1:=v) in H0; eauto.
-    { des. eapply EMPTY.
-      { hexploit H; eauto. i.
-        eapply List.in_map with (f:=fst) in H0; ss; eauto. }
-      { split.
-        { eapply Time.bot_spec. }
-        { esplits; eauto. }
+  { exists (mapping_update f0 loc ts (Time.incr fts)), (Time.incr fts).
+    splits.
+    { eapply mapping_update_wf; eauto.
+      { i. exfalso. eapply H; eauto. }
+      { i. hexploit (GREATEST (fst (ts', fts'))).
+        { eapply List.in_map; eauto. }
+        { splits; eauto. ss. left. auto. }
+        i. ss. eapply (@TimeFacts.le_lt_lt _ fts).
+        { erewrite <- Mapping.mapping_map_le; cycle 2; eauto. }
+        { eapply Time.incr_spec; eauto. }
+      }
+      { i. exfalso. eapply EMPTY.
+        { eapply List.in_map. eapply H0. eapply MAP. }
+        { ss. splits; eauto. left. auto. }
       }
     }
-    { eapply le_0_n. }
+    { eapply mapping_update_le; eauto. i.
+      exfalso. eapply H; eauto. }
+    { unfold sim_timestamp_exact. ss. des_ifs. ss. des; clarify. }
+    { unfold sim_timestamp_exact. i. ss. des_ifs. ss. des; clarify.
+      exfalso. eapply H; eauto. }
   }
+Qed.
 
-
-
-
-
-
+Lemma mapping_update_latest msgs f0 loc ts
+      (WF: Mapping.wf f0)
+  :
+    exists f1 fts,
+      (<<WF: Mapping.wf f1>>) /\
+      (<<MAPLE: mapping_messages_le msgs f0 f1>>) /\
+      (<<MAP: sim_timestamp_exact loc f1 f1.(Mapping.ver) fts ts>>) /\
+      (<<MAPEQ: forall loc0 ts0 fts0 (MAP: sim_timestamp_exact loc0 f0 f0.(Mapping.ver) fts0 ts0),
+          sim_timestamp_exact loc0 f1 f1.(Mapping.ver) fts0 ts0>>).
+Proof.
 
 
 Variant sim_memory
