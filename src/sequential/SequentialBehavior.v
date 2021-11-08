@@ -128,39 +128,36 @@ Section LANG.
   Variable state_step:
     Perms.t -> MachineEvent.t -> SeqState.t lang -> SeqState.t lang -> Prop.
 
-  Variant final_state: forall (th: SeqThread.t lang) (r: SeqTrace.result), Prop :=
-  | final_state_term
+  Inductive behavior: forall (th0: SeqThread.t lang) (tr: SeqTrace.t), Prop :=
+  | behavior_term
       st v0 v1 f0 f1 p o
       (TERMINAL: lang.(Language.is_terminal) st)
       (VALUE: ValueMap.le v0 v1)
       (FLAG: Flags.le f0 f1)
     :
-      final_state
-        (SeqThread.mk (SeqState.mk _ st (SeqMemory.mk v1 f1)) p o)
-        (SeqTrace.term v0 f0)
-  | final_state_partial
+      behavior (SeqThread.mk (SeqState.mk _ st (SeqMemory.mk v1 f1)) p o) ([], SeqTrace.term v0 f0)
+  | behavior_partial
       st v f0 f1 p o
       (FLAG: Flags.le f0 f1)
     :
-      final_state
-        (SeqThread.mk (SeqState.mk _ st (SeqMemory.mk v f1)) p o)
-        (SeqTrace.partial f0)
-  | final_state_ub
-      th
-      (FAILURE: SeqThread.failure state_step th)
+      behavior (SeqThread.mk (SeqState.mk _ st (SeqMemory.mk v f1)) p o) ([], SeqTrace.partial f0)
+  | behavior_ub
+      st m p o tr r
+      (FAILURE: SeqThread.failure state_step (SeqThread.mk (SeqState.mk _ st m) p o))
     :
-      final_state
-        th
-        (SeqTrace.ub)
-  .
-
-  Variant behavior: forall (th0: SeqThread.t lang) (tr: SeqTrace.t), Prop :=
-  | behavior_intro
-      th0 th1 tr r
-      (STEPS: SeqThread.steps state_step tr th0 th1)
-      (FINAL: final_state th1 r)
+      behavior (SeqThread.mk (SeqState.mk _ st m) p o) (tr, r)
+  | behavior_na_step
+      th0 th1 tr
+      (STEP: SeqThread.na_step state_step MachineEvent.silent th0 th1)
+      (BEHAVIOR: behavior th1 tr)
     :
-      behavior th0 (tr, r)
+      behavior th0 tr
+  | behavior_at_step
+      e i o th0 th1 es st
+      (STEP: SeqThread.at_step e i o th0 th1)
+      (BEHAVIOR: behavior th1 (es, st))
+    :
+      behavior th0 ((e, i, o)::es, st)
   .
 End LANG.
 
