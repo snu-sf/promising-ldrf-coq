@@ -166,10 +166,10 @@ Definition refine
            (lang_tgt lang_src: language)
            (st_tgt: lang_tgt.(Language.state)) (st_src: lang_src.(Language.state))
   : Prop :=
-  forall o p m (WF: Oracle.wf o),
+  forall p m o (WF: Oracle.wf o),
     SeqTrace.incl
       (behavior (@SeqState.na_step _) (SeqThread.mk (SeqState.mk _ st_tgt m) p o))
-      (behavior (@SeqState.na_step _) (SeqThread.mk (SeqState.mk _ st_src m) p o)) .
+      (behavior (@SeqState.na_step _) (SeqThread.mk (SeqState.mk _ st_src m) p o)).
 End SeqBehavior.
 
 
@@ -177,17 +177,22 @@ Section DETERMINISM.
   Variable lang: language.
 
   Definition similar (e0 e1: ProgramEvent.t): Prop :=
-    e0 = e1 \/
     match e0, e1 with
-    | ProgramEvent.read loc0 val0 ord0, ProgramEvent.write loc1 val1 ord1 =>
+    | ProgramEvent.read loc0 val0 ord0, ProgramEvent.read loc1 val1 ord1 =>
       loc0 = loc1 /\ ord0 = ord1
+    | ProgramEvent.write loc0 val0 ord0, ProgramEvent.write loc1 val1 ord1 =>
+      loc0 = loc1 /\ ord0 = ord1 /\ val0 = val1
     | ProgramEvent.update loc0 valr0 valw0 ordr0 ordw0, ProgramEvent.update loc1 valr1 valw1 ordr1 ordw1 =>
       loc0 = loc1 /\ ordr0 = ordr1 /\ ordw0 = ordw1 /\ (valr0 = valr1 -> valw0 = valw1)
     | ProgramEvent.read loc0 val0 ord0, ProgramEvent.update loc1 valr1 valw1 ordr1 ordw1 =>
       loc0 = loc1 /\ val0 <> valr1
     | ProgramEvent.update loc0 valr0 valw0 ordr0 ordw0, ProgramEvent.read loc1 val1 ord1 =>
       loc0 = loc1 /\ valr0 <> val1
-    | _, _ => False
+    | ProgramEvent.fence ordr0 ordw0, ProgramEvent.fence ordr1 ordw1 =>
+      ordr0 = ordr1 /\ ordw0 = ordw1
+    | ProgramEvent.syscall e0, ProgramEvent.syscall e1 =>
+      e0 = e1
+    | _, _ => True
     end.
 
   Variant _deterministic (deterministic: lang.(Language.state) -> Prop) (st0: lang.(Language.state)): Prop :=
@@ -228,16 +233,155 @@ Section ADEQUACY.
            (STEP1: state_step p e1 st st1),
       e0 = e1 /\ st0 = st1.
 
-  Theorem refinement_imply_simulation
+  Lemma refine_mon
+        (st_tgt: lang_tgt.(Language.state)) (st_src: lang_src.(Language.state))
+        (REFINE: SeqBehavior.refine _ _ st_tgt st_src)
+        (TOP: forall p m o (WF: Oracle.wf o),
+            SeqBehavior.behavior (@SeqState.na_step _) (SeqThread.mk (SeqState.mk _ st_src m) p o)
+            <1=
+            SeqBehavior.behavior state_step (SeqThread.mk (SeqState.mk _ st_src m) p o)):
+    forall p m o (WF: Oracle.wf o),
+      SeqTrace.incl
+        (SeqBehavior.behavior (@SeqState.na_step _) (SeqThread.mk (SeqState.mk _ st_tgt m) p o))
+        (SeqBehavior.behavior state_step (SeqThread.mk (SeqState.mk _ st_src m) p o)).
+  Proof.
+    ii. specialize (TOP p m o WF).
+    exploit REFINE; eauto. i. des. eauto.
+  Qed.
+
+  Inductive state_steps (lang: language)
+                        (step: forall (p: Perms.t) (e: MachineEvent.t) (st1 st2: SeqState.t lang), Prop):
+    forall (tr: list (ProgramEvent.t * SeqEvent.input * Oracle.output))
+      (st1 st2: SeqState.t lang) (p1 p2: Perms.t), Prop :=
+  | state_steps_refl
+      st p:
+      state_steps step [] st st p p
+  | state_steps_na_step
+      tr st1 st2 st3 p1 p2
+      (STEPS: state_steps step tr st1 st2 p1 p2)
+      (STEP: step p2 MachineEvent.silent st2 st3):
+      state_steps step tr st1 st3 p1 p2
+  | state_steps_at_step
+      tr st1 st2 p1 p2
+      e i o st3 mem3 p3
+      (STEPS: state_steps step tr st1 st2 p1 p2)
+      (LSTEP: lang.(Language.step) e st2.(SeqState.state) st3)
+      (ESTEP: SeqEvent.step i o p2 st2.(SeqState.memory) p3 mem3):
+      state_steps step (tr ++ [(e, i, o)]) st1 (SeqState.mk _ st3 mem3) p1 p3
+  .
+
+  Inductive match_traces: forall (d: Flags.t) (tr_src tr_tgt: list (ProgramEvent.t * SeqEvent.input * Oracle.output)), Prop :=
+  | match_traces_nil:
+      match_traces Flags.bot [] []
+  | match_traces_cons
+      d1 tr_src tr_tgt d2
+      e_src i_src o_src
+      e_tgt i_tgt o_tgt
+      (MATCH: match_traces d1 tr_src tr_tgt)
+      (EVENT: ProgramEvent.le e_src e_tgt)
+      (INPUT: SeqEvent.input_match d1 d2 i_src i_tgt)
+      (OUTPUT: o_src = o_tgt):
+      match_traces d2 (tr_src ++ [(e_src, i_src, o_src)]) (tr_tgt ++ [(e_tgt, i_tgt, o_tgt)])
+  .
+
+  Definition oracle_simple_output (i: Oracle.input): Oracle.output :=
+    let 'Oracle.mk_input acc acq rel := i in
+    Oracle.mk_output
+      (if is_some acc then Some (Perm.low, Const.undef) else None)
+      (if is_some acq then Some (fun _ => Perm.low, fun _ => Const.undef) else None)
+      (if is_some rel then Some (fun _ => Perm.low) else None).
+
+  Definition oracle_similar_input (i1 i2: Oracle.input): bool :=
+    andb (eqb (is_some i1.(Oracle.in_access)) (is_some i2.(Oracle.in_access)))
+         (andb (eqb (is_some i1.(Oracle.in_acquire)) (is_some i2.(Oracle.in_acquire)))
+               (eqb (is_some i1.(Oracle.in_release)) (is_some i2.(Oracle.in_release)))).
+
+  Definition oracle_output_of_event
+             (i: Oracle.input) (o: Oracle.output) (i_src: Oracle.input): Oracle.output :=
+    if oracle_similar_input i i_src
+    then o
+    else oracle_simple_output i_src.
+
+  Variant oracle_step_of_event (i: Oracle.input) (o: Oracle.output) (orc: Oracle.t):
+    forall (pe: ProgramEvent.t) (i: Oracle.input) (o: Oracle.output) (orc0 orc1: option orc.(Oracle._t)), Prop :=
+  | oracle_step_of_event_None
+      pe i_src:
+      oracle_step_of_event i o orc pe i_src (oracle_output_of_event i o i_src)
+                           None (Some orc.(Oracle._o))
+  | oracle_step_of_event_Some
+      pe i_src o_src orc0 orc1
+      (STEP: orc.(Oracle._step) pe i_src o_src orc0 orc1):
+      oracle_step_of_event i o orc pe i_src o_src (Some orc0) (Some orc1)
+  .
+
+  Definition oracle_of_event (i: Oracle.input) (o: Oracle.output) (orc: Oracle.t): Oracle.t :=
+    Oracle.mk (oracle_step_of_event i o orc) None.
+
+  Fixpoint oracle_of_trace
+           (tr: list (ProgramEvent.t * SeqEvent.input * Oracle.output)) (orc: Oracle.t): Oracle.t :=
+    match tr with
+    | [] => orc
+    | (_, i, o) :: tr =>
+      oracle_of_event (SeqEvent.get_oracle_input i) o (oracle_of_trace tr orc)
+    end.
+
+  Lemma refinement_implies_simulation_aux
+        (st_src: lang_src.(Language.state)) (st_tgt: lang_tgt.(Language.state))
+        (REFINE: forall p m o (WF: Oracle.wf o),
+            SeqTrace.incl
+              (SeqBehavior.behavior (@SeqState.na_step _) (SeqThread.mk (SeqState.mk _ st_tgt m) p o))
+              (SeqBehavior.behavior state_step (SeqThread.mk (SeqState.mk _ st_src m) p o)))
+        (DETERM: deterministic _ st_src)
+        p m p1 d
+        tr_src st1_src
+        tr_tgt st1_tgt
+        (STEPS_SRC: state_steps state_step tr_src (SeqState.mk _ st_src m) st1_src p p1)
+        (STEPS_TGT: state_steps (@SeqState.na_step lang_tgt) tr_tgt (SeqState.mk _ st_tgt m) st1_tgt p p1)
+        (TRACES: match_traces d tr_src tr_tgt):
+      sim_seq (fun _ _ => True) p1 d st1_src st1_tgt.
+  Proof.
+    specialize (REFINE p m).
+    revert p1 d tr_src st1_src tr_tgt st1_tgt STEPS_SRC STEPS_TGT TRACES.
+    pcofix CIH. i. pfold.
+    destruct (classic (sim_seq_failure_case p1 d st1_src)).
+    { econs 2; eauto. }
+
+    econs.
+    { (* terminal *)
+      admit.
+    }
+
+    { (* na step *)
+      ii. destruct e.
+      { esplits; eauto; try by econs 2.
+        right. eapply CIH; eauto.
+        econs 2; eauto.
+      }
+      { inv STEP_TGT. inv LOCAL; ss. destruct (p1 loc); ss. }
+      admit.
+    }
+
+    { (* at step *)
+      admit.
+    }
+
+    { (* partial *)
+      admit.
+    }
+  Admitted.
+
+  Theorem refinement_implies_simulation
           (st_src: lang_src.(Language.state)) (st_tgt: lang_tgt.(Language.state))
           (REFINE: SeqBehavior.refine _ _ st_tgt st_src)
           (DETERM: deterministic _ st_src)
-          (TOP: forall o p m (WF: Oracle.wf o),
+          (TOP: forall p m o (WF: Oracle.wf o),
               SeqBehavior.behavior (@SeqState.na_step _) (SeqThread.mk (SeqState.mk _ st_src m) p o)
               <1=
               SeqBehavior.behavior state_step (SeqThread.mk (SeqState.mk _ st_src m) p o))
     :
       sim_seq_all _ _ (fun _ _ => True) st_src st_tgt.
   Proof.
-  Admitted.
+    ii. eapply refinement_implies_simulation_aux; eauto; try by econs 1.
+    ii. exploit REFINE; eauto. i. des. eauto.
+  Qed.
 End ADEQUACY.
