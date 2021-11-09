@@ -1033,6 +1033,149 @@ Definition reserve_vers_wf (f: Mapping.ts) (vers: reserve_versions): Prop :=
                       (SIM0: sim_timestamp_exact (f loc) v' fto to'),
         v = v' /\ to' = to>>).
 
+Module ReserveMap.
+  Record t :=
+    mk {
+        to_tgt: Loc.t -> Time.t -> option Time.t;
+        to_src: Loc.t -> Time.t -> option Time.t;
+      }.
+
+  Definition wf (rmap: t): Prop :=
+    forall loc ts_src ts_tgt,
+      (rmap.(to_tgt) loc ts_src = Some ts_tgt)
+      <->
+      (rmap.(to_src) loc ts_tgt = Some ts_src).
+End ReserveMap.
+
+
+Variant sim_promises
+        (f: Mapping.ts)
+        (vers: versions)
+        (rmap: ReserveMap.t)
+        (prom_src prom_tgt: Memory.t): Prop :=
+| sim_promises_intro
+    (MESSAGE: forall loc to from msg_tgt
+                     (GET: Memory.get loc to prom_tgt = Some (from, msg_tgt)),
+        exists fto ffrom msg_src,
+          (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ffrom from>>) /\
+          (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto to>>) /\
+          (<<GET: Memory.get loc fto prom_src = Some (ffrom, msg_src)>>) /\
+          (<<MSG: sim_message_max f (vers loc to) msg_src msg_tgt>>))
+    (SOUND: forall loc fto ffrom msg_src
+                   (GET: Memory.get loc fto prom_src = Some (ffrom, msg_src)),
+        exists to from msg_tgt,
+          (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto to>>) /\
+          (<<GET: Memory.get loc to prom_tgt = Some (from, msg_tgt)>>))
+.
+
+Variant sim_memory
+        (f: Mapping.ts)
+        (vers: versions)
+        (rmap: Loc.t -> Time.t -> option Time.t)
+        (mem_src mem_tgt: Memory.t)
+        (flag_tgt: Loc.t -> flag)
+  : Prop :=
+| sim_memory_intro
+    (MESSAGE: forall loc to from msg_tgt
+                     (GET: Memory.get loc to mem_tgt = Some (from, msg_tgt))
+                     (RESERVE: msg_tgt <> Message.reserve),
+        exists fto ffrom msg_src,
+          (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto to>>) /\
+          (<<GET: Memory.get loc fto mem_src = Some (ffrom, msg_src)>>) /\
+          (<<MSG: sim_message f (vers loc to) msg_src msg_tgt>>))
+    (SOUND: forall loc fto0 ffrom1 msg_src
+                   (GET: Memory.get loc fto0 mem_src = Some (ffrom1, msg_src))
+                   (RESERVE: msg_src <> Message.reserve),
+        exists fto1 ffrom0 to from msg_tgt,
+          (<<TS0: Time.le ffrom0 ffrom1>>) /\
+          (<<TS1: Time.le fto0 fto1>>) /\
+          (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ffrom0 from>>) /\
+          (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto1 to>>) /\
+          (<<GET: Memory.get loc to mem_tgt = Some (from, msg_tgt)>>) /\
+          (<<RESERVE: msg_tgt <> Message.reserve>>))
+.
+
+
+Variant sim_promises
+        (f: Mapping.ts)
+        (vers: versions)
+        (rvers: Loc.t -> Time.t -> option Time.t)
+        (prom_src prom_tgt: Memory.t): Prop :=
+| sim_promises_intro
+    (MESSAGE: forall loc to from msg_tgt
+                     (GET: Memory.get loc to prom_tgt = Some (from, msg_tgt)),
+        exists fto ffrom msg_src,
+          (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ffrom from>>) /\
+          (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto to>>) /\
+          (<<GET: Memory.get loc fto prom_src = Some (ffrom, msg_src)>>) /\
+          (<<MSG: sim_message_max f (vers loc to) msg_src msg_tgt>>) /\
+          (<<RESERVE: msg_tgt = Message.reserve -> rvers loc to = Some (f loc).(Mapping.ver)>>))
+    (SOUND: forall loc fto ffrom msg_src
+                   (GET: Memory.get loc fto prom_src = Some (ffrom, msg_src)),
+        exists to from msg_tgt,
+          (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto to>>) /\
+          (<<GET: Memory.get loc to prom_tgt = Some (from, msg_tgt)>>))
+.
+
+Variant sim_promises
+        (f: Mapping.ts)
+        (vers: versions)
+        (rvers: Loc.t -> Time.t -> option Time.t)
+        (prom_src prom_tgt: Memory.t): Prop :=
+| sim_promises_intro
+    (MESSAGE: forall loc to from msg_tgt
+                     (GET: Memory.get loc to prom_tgt = Some (from, msg_tgt)),
+        exists fto ffrom msg_src,
+          (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ffrom from>>) /\
+          (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto to>>) /\
+          (<<GET: Memory.get loc fto prom_src = Some (ffrom, msg_src)>>) /\
+          (<<MSG: sim_message_max f (vers loc to) msg_src msg_tgt>>) /\
+          (<<RESERVE: msg_tgt = Message.reserve -> rvers loc to = Some (f loc).(Mapping.ver)>>))
+    (SOUND: forall loc fto ffrom msg_src
+                   (GET: Memory.get loc fto prom_src = Some (ffrom, msg_src)),
+        exists to from msg_tgt,
+          (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto to>>) /\
+          (<<GET: Memory.get loc to prom_tgt = Some (from, msg_tgt)>>))
+.
+
+Variant sim_memory
+        (f: Mapping.ts)
+        (vers: versions)
+        (reserve_vers: Loc.t -> Time.t -> option Time.t)
+        (mem_src mem_tgt: Memory.t)
+        (flag_tgt: Loc.t -> flag)
+  : Prop :=
+| sim_memory_intro
+    (MESSAGE: forall loc to from msg_tgt
+                     (GET: Memory.get loc to mem_tgt = Some (from, msg_tgt))
+                     (RESERVE: msg_tgt <> Message.reserve),
+        exists fto ffrom msg_src,
+          (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto to>>) /\
+          (<<GET: Memory.get loc fto mem_src = Some (ffrom, msg_src)>>) /\
+          (<<MSG: sim_message f (vers loc to) msg_src msg_tgt>>))
+    (SOUND: forall loc fto0 ffrom1 msg_src
+                   (GET: Memory.get loc fto0 mem_src = Some (ffrom1, msg_src))
+                   (RESERVE: msg_src <> Message.reserve),
+        exists fto1 ffrom0 to from msg_tgt,
+          (<<TS0: Time.le ffrom0 ffrom1>>) /\
+          (<<TS1: Time.le fto0 fto1>>) /\
+          (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ffrom0 from>>) /\
+          (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto1 to>>) /\
+          (<<GET: Memory.get loc to mem_tgt = Some (from, msg_tgt)>>) /\
+          (<<RESERVE: msg_tgt <> Message.reserve>>))
+.
+
+    (SOUNDRESERVE: forall loc fto ffrom
+                          (GET: Memory.get loc fto mem_src = Some (ffrom, Message.reserve)),
+        exists v to from,
+          (<<VER: reserve_vers loc to = Some v>>) /\
+          (<<TO: sim_timestamp_exact (f loc) v fto to>>) /\
+          (<<FROM: sim_timestamp_exact (f loc) v ffrom from>>) /\
+          (<<GET: Memory.get loc to mem_tgt = Some (from, Message.reserve)>>))
+.
+
+
+
 Variant sim_promises_extern
         (f: Mapping.ts)
         (vers: versions)
@@ -1068,23 +1211,38 @@ Variant sim_promises_extern
           (<<GET: Memory.get loc to prom_tgt = Some (from, Message.reserve)>>))
 .
 
-Variant sim_promises
+Variant sim_memory
         (f: Mapping.ts)
         (vers: versions)
-        (prom_src prom_tgt: Memory.t): Prop :=
-| sim_promises_intro
+        (reserve_vers: reserve_versions)
+        (mem_src mem_tgt: Memory.t)
+        (flag_tgt: Loc.t -> flag)
+  : Prop :=
+| sim_memory_intro
     (MESSAGE: forall loc to from msg_tgt
-                     (GET: Memory.get loc to prom_tgt = Some (from, msg_tgt)),
+                     (GET: Memory.get loc to mem_tgt = Some (from, msg_tgt))
+                     (RESERVE: msg_tgt <> Message.reserve),
         exists fto ffrom msg_src,
-          (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ffrom from>>) /\
           (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto to>>) /\
-          (<<GET: Memory.get loc fto prom_src = Some (ffrom, msg_src)>>) /\
-          (<<MSG: sim_message_max f (vers loc to) msg_src msg_tgt>>))
-    (SOUND: forall loc fto ffrom msg_src
-                   (GET: Memory.get loc fto prom_src = Some (ffrom, msg_src)),
-        exists to from msg_tgt,
-          (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto to>>) /\
-          (<<GET: Memory.get loc to prom_tgt = Some (from, msg_tgt)>>))
+          (<<GET: Memory.get loc fto mem_src = Some (ffrom, msg_src)>>) /\
+          (<<MSG: sim_message f (vers loc to) msg_src msg_tgt>>))
+    (SOUND: forall loc fto0 ffrom1 msg_src
+                   (GET: Memory.get loc fto0 mem_src = Some (ffrom1, msg_src))
+                   (RESERVE: msg_src <> Message.reserve),
+        exists fto1 ffrom0 to from msg_tgt,
+          (<<TS0: Time.le ffrom0 ffrom1>>) /\
+          (<<TS1: Time.le fto0 fto1>>) /\
+          (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ffrom0 from>>) /\
+          (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto1 to>>) /\
+          (<<GET: Memory.get loc to mem_tgt = Some (from, msg_tgt)>>) /\
+          (<<RESERVE: msg_tgt <> Message.reserve>>))
+    (SOUNDRESERVE: forall loc fto ffrom
+                          (GET: Memory.get loc fto mem_src = Some (ffrom, Message.reserve)),
+        exists v to from,
+          (<<VER: reserve_vers loc to = Some v>>) /\
+          (<<TO: sim_timestamp_exact (f loc) v fto to>>) /\
+          (<<FROM: sim_timestamp_exact (f loc) v ffrom from>>) /\
+          (<<GET: Memory.get loc to mem_tgt = Some (from, Message.reserve)>>))
 .
 
 Variant sim_memory
