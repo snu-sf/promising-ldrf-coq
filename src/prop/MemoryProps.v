@@ -1957,7 +1957,7 @@ Section UNCHANGABLES.
     { inv STEP0; ss. inv LOCAL0; auto.
       - inv LOCAL1. inv WRITE. ss. eapply promise_write_not_in_covered; eauto.
       - inv LOCAL2. inv WRITE. ss. eapply promise_write_not_in_covered; eauto.
-      - admit. (* it's not true *)
+      - admit. (* TODO: handle na write *)
     }
   Admitted.
 
@@ -3270,7 +3270,7 @@ Section PROMISEWRITING.
         }
         { left. esplits; eauto. }
       }
-      { admit. (* it's not true *) }
+      { admit. (* TODO: handle na write *) }
     }
   Admitted.
 
@@ -3344,7 +3344,7 @@ Section WFTIME.
     { inv STEP0. ss. inv LOCAL; ss.
       { inv LOCAL0. inv WRITE. des. eapply promise_memory_times_wf; eauto. }
       { inv LOCAL2. inv WRITE. des. eapply promise_memory_times_wf; eauto. }
-      { admit. (* it's not true *) }
+      { admit. (* TODO: handle na write *) }
     }
   Admitted.
 
