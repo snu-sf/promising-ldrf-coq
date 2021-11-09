@@ -47,11 +47,12 @@ Module SeqTrace.
     :
       le d tr_tgt (tr_src, ub)
   | le_cons
-      d0 d1 e i_src i_tgt o tr_src tr_tgt r_src r_tgt
+      d0 d1 e_src e_tgt i_src i_tgt o tr_src tr_tgt r_src r_tgt
       (LE: le d1 (tr_tgt, r_tgt) (tr_src, r_src))
       (MATCH: SeqEvent.input_match d0 d1 i_src i_tgt)
+      (EVENT: ProgramEvent.le e_tgt e_src)
     :
-      le d0 ((e, i_tgt, o)::tr_tgt, r_tgt) ((e, i_src, o)::tr_src, r_src)
+      le d0 ((e_tgt, i_tgt, o)::tr_tgt, r_tgt) ((e_src, i_src, o)::tr_src, r_src)
   .
 
   Lemma le_deferred_mon d0 d1 tr0 tr1
@@ -71,6 +72,7 @@ Module SeqTrace.
     { econs 4.
       { eauto. }
       { eapply SeqEvent.input_match_mon; eauto. refl. }
+      { eauto. }
     }
   Qed.
 
@@ -87,7 +89,9 @@ Module SeqTrace.
       { econs 3; eauto. econs 1. }
     }
     { destruct a as [[e i] o]. econs 4; eauto.
-      eapply SeqEvent.input_match_bot; eauto. }
+      { eapply SeqEvent.input_match_bot; eauto. }
+      { refl. }
+    }
   Qed.
   Next Obligation.
   Proof.
@@ -130,17 +134,14 @@ Section LANG.
 
   Inductive behavior: forall (th0: SeqThread.t lang) (tr: SeqTrace.t), Prop :=
   | behavior_term
-      st v0 v1 f0 f1 p o
+      st v f p o
       (TERMINAL: lang.(Language.is_terminal) st)
-      (VALUE: ValueMap.le v0 v1)
-      (FLAG: Flags.le f0 f1)
     :
-      behavior (SeqThread.mk (SeqState.mk _ st (SeqMemory.mk v1 f1)) p o) ([], SeqTrace.term v0 f0)
+      behavior (SeqThread.mk (SeqState.mk _ st (SeqMemory.mk v f)) p o) ([], SeqTrace.term v f)
   | behavior_partial
-      st v f0 f1 p o
-      (FLAG: Flags.le f0 f1)
+      st v f p o
     :
-      behavior (SeqThread.mk (SeqState.mk _ st (SeqMemory.mk v f1)) p o) ([], SeqTrace.partial f0)
+      behavior (SeqThread.mk (SeqState.mk _ st (SeqMemory.mk v f)) p o) ([], SeqTrace.partial f)
   | behavior_ub
       st m p o tr r
       (FAILURE: SeqThread.failure state_step (SeqThread.mk (SeqState.mk _ st m) p o))

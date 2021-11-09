@@ -669,6 +669,48 @@ Module Oracle.
     (<<RELEASE: is_some o.(out_release) <-> is_release e>>)
   .
 
+  Definition in_access_le (i0 i1: (Loc.t * Const.t * Flag.t)): Prop :=
+    match i0, i1 with
+    | (l0, v0, f0), (l1, v1, f1) =>
+      (<<LOC: l0 = l1>>) /\ (<<VAL: Const.le v0 v1>>) /\
+      (<<FLAG: Flag.le f0 f1>>)
+    end.
+
+  Definition in_acquire_le (i0 i1: unit): Prop := i0 = i1.
+
+  Definition in_release_le (i0 i1: unit): Prop := i0 = i1.
+
+  Definition input_le (i0 i1: input): Prop :=
+    (<<ACCESS: option_rel in_access_le i0.(in_access) i1.(in_access)>>) /\
+    (<<ACQUIRE: option_rel in_acquire_le i0.(in_acquire) i1.(in_acquire)>>) /\
+    (<<RELEASE: option_rel in_release_le i0.(in_release) i1.(in_release)>>)
+  .
+
+  Program Instance in_access_le_PreOrder: PreOrder in_access_le.
+  Next Obligation.
+  Proof.
+    ii. unfold in_access_le. des_ifs. splits; refl.
+  Qed.
+  Next Obligation.
+  Proof.
+    ii. unfold in_access_le in *. des_ifs. des. splits; etrans; eauto.
+  Qed.
+
+  Program Instance in_acquire_le_PreOrder: PreOrder in_acquire_le.
+
+  Program Instance in_release_le_PreOrder: PreOrder in_release_le.
+
+  Program Instance input_le_PreOrder: PreOrder input_le.
+  Next Obligation.
+  Proof.
+    ii. unfold input_le. splits; refl.
+  Qed.
+  Next Obligation.
+  Proof.
+    ii. unfold input_le in *. des. splits; etrans; eauto.
+  Qed.
+
+
   Lemma wf_output_event_le e0 e1 o
         (EVENT: ProgramEvent.le e0 e1)
     :
@@ -750,29 +792,6 @@ Module SeqEvent.
       (i.(in_access))
       (option_map (fun _ => tt) i.(in_acquire))
       (option_map (fun _ => tt) i.(in_release))
-  .
-
-  Definition in_access_le (i0 i1: (Loc.t * Const.t * Flag.t)): Prop :=
-    match i0, i1 with
-    | (l0, v0, f0), (l1, v1, f1) =>
-      (<<LOC: l0 = l1>>) /\ (<<VAL: Const.le v0 v1>>) /\
-      (<<FLAG: Flag.le f0 f1>>)
-    end.
-
-  Definition in_acquire_le (i0 i1: Flags.t): Prop :=
-    (<<FLAG: Flags.le i0 i1>>).
-
-  Definition in_release_le (i0 i1: (ValueMap.t * Flags.t)): Prop :=
-    match i0, i1 with
-    | (v0, f0), (v1, f1) =>
-      (<<VAL: ValueMap.le v0 v1>>) /\
-      (<<FLAG: Flags.le f0 f1>>)
-    end.
-
-  Definition input_le (i0 i1: input): Prop :=
-    (<<ACCESS: option_rel in_access_le i0.(in_access) i1.(in_access)>>) /\
-    (<<ACQUIRE: option_rel in_acquire_le i0.(in_acquire) i1.(in_acquire)>>) /\
-    (<<RELEASE: option_rel in_release_le i0.(in_release) i1.(in_release)>>)
   .
 
   Definition in_access_match (d: Flags.t) (i_src i_tgt: (Loc.t * Const.t * Flag.t)): Prop :=
@@ -1100,11 +1119,11 @@ Section LANG.
       st0 st1 p0 p1 o0 o1 m0 m1
       (LANG: lang.(Language.step) e1 st0 st1)
       (EVENT: ProgramEvent.le e0 e1)
-      (INPUT: SeqEvent.input_le i0 i1)
-      (ORACLE: Oracle.step e0 (SeqEvent.get_oracle_input i0) o o0 o1)
+      (INPUT: Oracle.input_le i0 (SeqEvent.get_oracle_input i1))
+      (ORACLE: Oracle.step e0 i0 o o0 o1)
       (MEM: SeqEvent.step i1 o p0 m0 p1 m1)
     :
-      at_step e0 i0 o (mk (SeqState.mk _ st0 m0) p0 o0) (mk (SeqState.mk _ st1 m1) p1 o1)
+      at_step e1 i1 o (mk (SeqState.mk _ st0 m0) p0 o0) (mk (SeqState.mk _ st1 m1) p1 o1)
   .
 
   Definition failure (th0: t): Prop :=
@@ -1143,7 +1162,7 @@ Section LANG.
       tr e i o d w
       (TRACE: writing_trace (Flags.minus d (SeqEvent.written i)) tr w)
       (ACQUIRE: ~ is_acquire e)
-      (ACCESS: forall loc (SOME: is_accessing e = Some loc), d loc = false)
+      (ACCESS: forall loc (SOME: is_accessing e = Some loc), (d loc = false) \/ (SeqEvent.written i loc = true))
     :
       writing_trace d ((e, i, o)::tr) (Flags.join (SeqEvent.written i) w)
   .
@@ -1159,8 +1178,8 @@ Section LANG.
     { econs 2.
       { eapply IHWRITING. eapply Flags.minus_mon_l; eauto. }
       { eauto. }
-      { i. eapply ACCESS in SOME.
-        specialize (DEFERRED loc). destruct (d loc), (d0 loc); ss. }
+      { i. eapply ACCESS in SOME. des; auto.
+        specialize (DEFERRED loc). destruct (d loc), (d0 loc); ss. auto. }
     }
   Qed.
 End LANG.
