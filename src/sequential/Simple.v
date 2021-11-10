@@ -776,16 +776,20 @@ Module SeqEvent.
         in_release: option (ValueMap.t * Flags.t);
       }.
 
+  Definition in_access_written (i: option (Loc.t * Const.t * Flag.t)): Flags.t :=
+    match i with
+    | Some (loc, _, true) => Flags.add loc Flags.bot
+    | _ => Flags.bot
+    end.
+
+  Definition in_release_written (i: option (ValueMap.t * Flags.t)): Flags.t :=
+    match i with
+    | Some (_, f) => f
+    | _ => Flags.bot
+    end.
+
   Definition written (i: input): Flags.t :=
-    Flags.join
-      (match i.(in_access) with
-       | Some (loc, _, true) => Flags.add loc Flags.bot
-       | _ => Flags.bot
-       end)
-      (match i.(in_release) with
-       | Some (_, f) => f
-       | _ => Flags.bot
-       end).
+    Flags.join (in_access_written i.(in_access)) (in_release_written i.(in_release)).
 
   Definition get_oracle_input (i: input): Oracle.input :=
     Oracle.mk_input
@@ -794,59 +798,105 @@ Module SeqEvent.
       (option_map (fun _ => tt) i.(in_release))
   .
 
-  Definition in_access_match (d: Flags.t) (i_src i_tgt: (Loc.t * Const.t * Flag.t)): Prop :=
-    match i_tgt, i_src with
-    | (l0, v0, f0), (l1, v1, f1) =>
-      (<<LOC: l0 = l1>>) /\ (<<VAL: Const.le v0 v1>>) /\
-      (<<FLAG: Flag.le (Flag.join f0 (d l0)) f1>>)
-    end.
-
-  Definition in_acquire_match (d: Flags.t) (i_src i_tgt: Flags.t): Prop :=
-    (<<FLAG: Flags.le (Flags.join d i_tgt) i_src>>).
-
-  Definition in_release_match (d: Flags.t) (i_src i_tgt: (ValueMap.t * Flags.t)): Prop :=
-    match i_tgt, i_src with
-    | (v0, f0), (v1, f1) =>
-      (<<VAL: forall loc (UNDEFERRED: d loc = false), Const.le (v0 loc) (v1 loc)>>)
-    end.
-
-  Definition input_match (d0 d1: Flags.t) (i_src i_tgt: input): Prop :=
-    (<<ACCESS: option_rel (in_access_match d0) i_src.(in_access) i_tgt.(in_access)>>) /\
-    (<<ACQUIRE: option_rel (in_acquire_match d0) i_src.(in_acquire) i_tgt.(in_acquire)>>) /\
-    (<<RELEASE: option_rel (in_release_match d1) i_src.(in_release) i_tgt.(in_release)>>) /\
-    (<<DEFERRED: Flags.le (Flags.join d0 (written i_tgt)) (Flags.join d1 (written i_src))>>)
+  Variant in_access_match: forall (d0 d1: Flags.t) (i_src i_tgt: option (Loc.t * Const.t * Flag.t)), Prop :=
+  | in_access_match_none
+      d0 d1
+      (FLAG: Flags.le d0 d1)
+    :
+      in_access_match d0 d1 None None
+  | in_access_match_some
+      d0 d1
+      l v_src v_tgt f_src f_tgt
+      (VAL: Const.le v_tgt v_src)
+      (FLAG: Flag.le (Flag.join f_tgt (d0 l)) f_src)
+      (DEFERRED: forall loc (LOC: loc <> l), Flag.le (d0 loc) (d1 loc))
+    :
+      in_access_match d0 d1 (Some (l, v_src, f_src)) (Some (l, v_tgt, f_tgt))
   .
 
-  Lemma in_access_match_mon d0 d1 i_src i_tgt
-        (MATCH: in_access_match d1 i_src i_tgt)
-        (FLAG: Flags.le d0 d1)
+  Variant in_acquire_match: forall (d0 d1: Flags.t) (i_src i_tgt: option (Flags.t)), Prop :=
+  | in_acquire_match_none
+      d0 d1
+      (FLAG: Flags.le d0 d1)
     :
-      in_access_match d0 i_src i_tgt.
+      in_acquire_match d0 d1 None None
+  | in_acquire_match_some
+      d0 d1
+      f_src f_tgt
+      (FLAG: Flags.le (Flags.join f_tgt d0) f_src)
+    :
+      in_acquire_match d0 d1 (Some f_src) (Some f_tgt)
+  .
+
+  Variant in_release_match: forall (d0 d1: Flags.t) (i_src i_tgt: option (ValueMap.t * Flags.t)), Prop :=
+  | in_release_match_none
+      d0 d1
+      (FLAG: Flags.le d0 d1)
+    :
+      in_release_match d0 d1 None None
+  | in_release_match_some
+      d0 d1
+      v_src v_tgt f_src f_tgt
+      (VAL: forall loc (UNDEFERRED: d1 loc = false), Const.le (v_tgt loc) (v_src loc))
+      (DEFERRED: Flags.le (Flags.join f_tgt d0) (Flags.join f_src d1))
+    :
+      in_release_match d0 d1 (Some (v_src, f_src)) (Some (v_tgt, f_tgt))
+  .
+
+  Variant input_match (d0 d3: Flags.t) (i_src i_tgt: input): Prop :=
+  | input_match_intro
+      d1 d2
+      (ACCESS: in_access_match d0 d1 i_src.(in_access) i_tgt.(in_access))
+      (ACQUIRE: in_acquire_match d1 d2 i_src.(in_acquire) i_tgt.(in_acquire))
+      (RELEASE: in_release_match d2 d3 i_src.(in_release) i_tgt.(in_release))
+    :
+      input_match d0 d3 i_src i_tgt
+  .
+
+  Lemma in_access_match_mon d_before0 d_before1 d_after0 d_after1
+        i_src i_tgt
+        (MATCH: in_access_match d_before1 d_after0 i_src i_tgt)
+        (BEFORE: Flags.le d_before0 d_before1)
+        (AFTER: Flags.le d_after0 d_after1)
+    :
+      in_access_match d_before0 d_after1 i_src i_tgt.
   Proof.
-    unfold in_access_match in *. des_ifs.
-    des; clarify. splits; auto.
-    etrans; eauto. eapply Flag.join_mon_r; eauto.
+    inv MATCH; econs; eauto.
+    { etrans; eauto. etrans; eauto. }
+    { etrans; eauto. eapply Flag.join_mon_r. eauto. }
+    { i. transitivity (d_before1 loc); auto. transitivity (d_after0 loc); auto. }
   Qed.
 
-  Lemma in_acquire_match_mon d0 d1 i_src i_tgt
-        (MATCH: in_acquire_match d1 i_src i_tgt)
-        (FLAG: Flags.le d0 d1)
+  Lemma in_acquire_match_mon d_before0 d_before1 d_after0 d_after1
+        i_src i_tgt
+        (MATCH: in_acquire_match d_before1 d_after0 i_src i_tgt)
+        (BEFORE: Flags.le d_before0 d_before1)
+        (AFTER: Flags.le d_after0 d_after1)
     :
-      in_acquire_match d0 i_src i_tgt.
+      in_acquire_match d_before0 d_after1 i_src i_tgt.
   Proof.
-    unfold in_acquire_match in *. des. red.
-    etrans; eauto. eapply Flags.join_mon_l; eauto.
+    inv MATCH; econs; eauto.
+    { etrans; eauto. etrans; eauto. }
+    { etrans; eauto. eapply Flags.join_mon_r. eauto. }
   Qed.
 
-  Lemma in_release_match_mon d0 d1 i_src i_tgt
-        (MATCH: in_release_match d0 i_src i_tgt)
-        (FLAG: Flags.le d0 d1)
+  Lemma in_release_match_mon d_before0 d_before1 d_after0 d_after1
+        i_src i_tgt
+        (MATCH: in_release_match d_before1 d_after0 i_src i_tgt)
+        (BEFORE: Flags.le d_before0 d_before1)
+        (AFTER: Flags.le d_after0 d_after1)
     :
-      in_release_match d1 i_src i_tgt.
+      in_release_match d_before0 d_after1 i_src i_tgt.
   Proof.
-    unfold in_release_match in *. des_ifs.
-    ii. eapply MATCH. specialize (FLAG loc).
-    destruct (d0 loc), (d1 loc); ss.
+    inv MATCH; econs; eauto.
+    { etrans; eauto. etrans; eauto. }
+    { i. eapply VAL; eauto. specialize (AFTER loc).
+      destruct (d_after0 loc), (d_after1 loc); ss. }
+    { transitivity (Flags.join f_tgt d_before1).
+      { eapply Flags.join_mon_r; eauto. }
+      etrans; eauto.
+      { eapply Flags.join_mon_r; eauto. }
+    }
   Qed.
 
   Lemma input_match_mon d_before0 d_before1 d_after0 d_after1 i_src i_tgt
@@ -856,52 +906,46 @@ Module SeqEvent.
     :
       input_match d_before0 d_after1 i_src i_tgt.
   Proof.
-    unfold input_match in *. des. splits.
-    { destruct (in_access i_src), (in_access i_tgt); ss.
-      eapply in_access_match_mon; eauto. }
-    { destruct (in_acquire i_src), (in_acquire i_tgt); ss.
-      eapply in_acquire_match_mon; eauto. }
-    { destruct (in_release i_src), (in_release i_tgt); ss.
-      eapply in_release_match_mon; eauto. }
-    { transitivity (Flags.join d_after0 (written i_src)).
-      { etrans; eauto. eapply Flags.join_mon_l; eauto. }
-      { eapply Flags.join_mon_l; eauto. }
-    }
+    inv MATCH. econs.
+    { eapply in_access_match_mon; eauto. refl. }
+    { eapply in_acquire_match_mon; eauto; refl. }
+    { eapply in_release_match_mon; eauto. refl. }
   Qed.
 
-  Lemma in_access_match_bot i
+  Lemma in_access_match_bot d i
     :
-      in_access_match Flags.bot i i.
+      in_access_match Flags.bot d i i.
   Proof.
-    destruct i. unfold in_access_match. des_ifs. splits; auto.
+    destruct i as [[[] ?]|]; econs; eauto; ss.
     { refl. }
-    { eapply Flag.join_spec; ss. refl. }
+    { eapply Flag.join_spec; eauto. refl. }
   Qed.
 
-  Lemma in_acquire_match_bot i
+  Lemma in_acquire_match_bot d i
     :
-      in_acquire_match Flags.bot i i.
+      in_acquire_match Flags.bot d i i.
   Proof.
-    unfold in_acquire_match. red.
-    eapply Flags.join_spec; ss. refl.
+    destruct i as [|]; econs; eauto; ss.
+    { eapply Flags.join_spec; eauto; ss. refl. }
   Qed.
 
-  Lemma in_release_match_bot i
+  Lemma in_release_match_bot d i
     :
-      in_release_match Flags.bot i i.
+      in_release_match Flags.bot d i i.
   Proof.
-    unfold in_release_match. des_ifs. ii. refl.
+    destruct i as [[]|]; econs; eauto; ss.
+    { i. refl. }
+    { eapply Flags.join_mon_r. ss. }
   Qed.
 
-  Lemma input_match_bot i
+  Lemma input_match_bot d i
     :
-      input_match Flags.bot Flags.bot i i.
+      input_match Flags.bot d i i.
   Proof.
-    unfold input_match. splits.
-    { destruct (in_access i); ss. eapply in_access_match_bot. }
-    { destruct (in_acquire i); ss. eapply in_acquire_match_bot. }
-    { destruct (in_release i); ss. eapply in_release_match_bot. }
-    { refl. }
+    econs.
+    { eapply in_access_match_bot. }
+    { eapply in_acquire_match_bot. }
+    { eapply in_release_match_bot. }
   Qed.
 
   Definition wf_input (e: ProgramEvent.t) (i: input): Prop :=
@@ -972,7 +1016,7 @@ Module SeqEvent.
       p_rel v_rel f_rel
       p0 m0 p1 m1
       (PERM: p1 = Perms.meet p0 p_rel)
-      (MEM: SeqMemory.release m0 f_rel v_rel m0)
+      (MEM: SeqMemory.release m0 f_rel v_rel m1)
     :
       step_release
         (Some (v_rel, f_rel)) (Some p_rel)
@@ -990,6 +1034,77 @@ Module SeqEvent.
     :
       step i o p0 m0 p3 m3
   .
+
+  Lemma step_update_match i_src i_tgt d0 d1 o p0 m0 p1 m1
+        (STEP: step_update i_src o p0 m0 p1 m1)
+        (MATCH: in_access_match d0 d1 i_src i_tgt)
+    :
+      in_access_match (Flags.join d0 m0.(SeqMemory.flags)) (Flags.join d1 m1.(SeqMemory.flags)) i_src i_tgt.
+  Proof.
+    inv STEP.
+    { inv MATCH. econs; eauto. eapply Flags.join_mon_l. auto. }
+    inv MEM. ss. inv MATCH. econs; eauto.
+    { unfold Flags.join. destruct f_tgt, (d0 loc), (SeqMemory.flags m0 loc); ss. }
+    { i. unfold Flags.join, Flags.update. des_ifs.
+      eapply Flag.join_mon_l. auto. }
+  Qed.
+
+  Lemma step_acquire_match i_src i_tgt d0 d1 o p0 m0 p1 m1
+        (STEP: step_acquire i_src o p0 m0 p1 m1)
+        (MATCH: in_acquire_match d0 d1 i_src i_tgt)
+    :
+      in_acquire_match (Flags.join d0 m0.(SeqMemory.flags)) (Flags.join d1 m1.(SeqMemory.flags)) i_src i_tgt.
+  Proof.
+    inv STEP.
+    { inv MATCH. econs; eauto. eapply Flags.join_mon_l. auto. }
+    inv MEM. ss. inv MATCH. econs; eauto.
+    eapply Flags.join_spec.
+    { etrans; eauto. eapply Flags.join_ge_l. }
+    { eapply Flags.join_spec; eauto.
+      { etrans; eauto. eapply Flags.join_ge_r. }
+      { refl. }
+    }
+  Qed.
+
+  Lemma step_release_match i_src i_tgt d0 d1 o p0 m0 p1 m1
+        (STEP: step_release i_src o p0 m0 p1 m1)
+        (MATCH: in_release_match d0 d1 i_src i_tgt)
+    :
+      in_release_match (Flags.join d0 m0.(SeqMemory.flags)) (Flags.join d1 m1.(SeqMemory.flags)) i_src i_tgt.
+  Proof.
+    inv STEP.
+    { inv MATCH. econs; eauto. eapply Flags.join_mon_l. auto. }
+    inv MEM. ss. inv MATCH. econs; eauto.
+    { i. eapply VAL; eauto.
+      unfold Flags.join in UNDEFERRED. destruct (d1 loc); ss. }
+    { eapply Flags.join_spec.
+      { etrans; [eapply Flags.join_ge_l|]. etrans; [eauto|].
+        eapply Flags.join_spec.
+        { eapply Flags.join_ge_l. }
+        { etrans; [|eapply Flags.join_ge_r]. eapply Flags.join_ge_l. }
+      }
+      { eapply Flags.join_spec.
+        { etrans; [eapply Flags.join_ge_r|]. etrans; [eauto|].
+          eapply Flags.join_spec.
+          { eapply Flags.join_ge_l. }
+          { etrans; [|eapply Flags.join_ge_r]. eapply Flags.join_ge_l. }
+        }
+        { eapply Flags.join_ge_l. }
+      }
+    }
+  Qed.
+
+  Lemma step_input_match i_src i_tgt d0 d1 o p0 m0 p1 m1
+        (STEP: step i_src o p0 m0 p1 m1)
+        (MATCH: input_match d0 d1 i_src i_tgt)
+    :
+      input_match (Flags.join d0 m0.(SeqMemory.flags)) (Flags.join d1 m1.(SeqMemory.flags)) i_src i_tgt.
+  Proof.
+    inv STEP. inv MATCH. econs.
+    { eapply step_update_match; eauto. }
+    { eapply step_acquire_match; eauto. }
+    { eapply step_release_match; eauto. }
+  Qed.
 End SeqEvent.
 
 
