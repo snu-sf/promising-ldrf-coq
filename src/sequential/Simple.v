@@ -1316,7 +1316,7 @@ Section SIMULATION.
       (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
       (<<TERMINAL_SRC: lang_src.(Language.is_terminal) st_src1.(SeqState.state)>>) /\
       (<<TERMINAL: sim_terminal st_src1.(SeqState.state) st_tgt0.(SeqState.state)>>) /\
-      (<<VALUE: ValueMap.le st_tgt0.(SeqState.memory).(SeqMemory.value_map) st_tgt0.(SeqState.memory).(SeqMemory.value_map)>>) /\
+      (<<VALUE: ValueMap.le st_tgt0.(SeqState.memory).(SeqMemory.value_map) st_src1.(SeqState.memory).(SeqMemory.value_map)>>) /\
       (<<FLAG: Flags.le (Flags.join d0 st_tgt0.(SeqState.memory).(SeqMemory.flags)) st_src1.(SeqState.memory).(SeqMemory.flags)>>)
   .
 
