@@ -1233,6 +1233,7 @@ Section LANG.
       e0 e1 i0 i1 o
       st0 st1 p0 p1 o0 o1 m0 m1
       (LANG: lang.(Language.step) e1 st0 st1)
+      (ATOMIC: is_atomic_event e1)
       (EVENT: ProgramEvent.le e0 e1)
       (INPUT: Oracle.input_le i0 (SeqEvent.get_oracle_input i1))
       (ORACLE: Oracle.step e0 i0 o o0 o1)
