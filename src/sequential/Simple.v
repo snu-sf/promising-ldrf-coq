@@ -44,10 +44,10 @@ Definition is_atomic_event (e: ProgramEvent.t): bool :=
     Ordering.le Ordering.plain ordr && Ordering.le Ordering.plain ordw
   end.
 
-Definition is_accessing (e: ProgramEvent.t): option Loc.t :=
+Definition is_accessing (e: ProgramEvent.t): option (Loc.t * Const.t) :=
   match e with
   | ProgramEvent.silent | ProgramEvent.failure | ProgramEvent.syscall _ | ProgramEvent.fence _ _ => None
-  | ProgramEvent.read l _ _ | ProgramEvent.write l _ _ | ProgramEvent.update l _ _ _ _ => Some l
+  | ProgramEvent.read l v _ | ProgramEvent.write l v _ | ProgramEvent.update l _ v _ _ => Some (l, v)
   end.
 
 Definition is_release (e: ProgramEvent.t): bool :=
@@ -658,13 +658,14 @@ Module Oracle.
 
   Definition wf_input (e: ProgramEvent.t) (i: input): Prop :=
     (<<UPDATE: forall loc,
-        ((exists v_old f_old, i.(in_access) = Some (loc, v_old, f_old)) <-> is_accessing e = Some loc)>>) /\
+        ((exists v_old f_old, i.(in_access) = Some (loc, v_old, f_old)) <-> exists v_new, is_accessing e = Some (loc, v_new))>>) /\
     (<<ACQUIRE: is_some i.(in_acquire) <-> is_acquire e>>) /\
     (<<RELEASE: is_some i.(in_release) <-> is_release e>>)
   .
 
   Definition wf_output (e: ProgramEvent.t) (o: output): Prop :=
-    (<<UPDATE: is_some o.(out_access) <-> is_some (is_accessing e)>>) /\
+    (<<UPDATE: forall v_new,
+        (exists p, o.(out_access) = Some (p, v_new)) <-> (exists l, is_accessing e = Some (l, v_new))>>) /\
     (<<ACQUIRE: is_some o.(out_acquire) <-> is_acquire e>>) /\
     (<<RELEASE: is_some o.(out_release) <-> is_release e>>)
   .
@@ -710,14 +711,6 @@ Module Oracle.
     ii. unfold input_le in *. des. splits; etrans; eauto.
   Qed.
 
-
-  Lemma wf_output_event_le e0 e1 o
-        (EVENT: ProgramEvent.le e0 e1)
-    :
-      wf_output e0 o <-> wf_output e1 o.
-  Proof.
-    unfold wf_output. destruct e0, e1; ss; des; clarify.
-  Qed.
 
   Record t :=
     mk {
@@ -950,7 +943,7 @@ Module SeqEvent.
 
   Definition wf_input (e: ProgramEvent.t) (i: input): Prop :=
     (<<UPDATE: forall loc,
-        ((exists v_old f_old, i.(in_access) = Some (loc, v_old, f_old)) <-> is_accessing e = Some loc)>>) /\
+        ((exists v_old f_old, i.(in_access) = Some (loc, v_old, f_old)) <-> (exists v, is_accessing e = Some (loc, v)))>>) /\
     (<<ACQUIRE: is_some i.(in_acquire) <-> is_acquire e>>) /\
     (<<RELEASE: is_some i.(in_release) <-> is_release e>>)
   .
@@ -961,6 +954,18 @@ Module SeqEvent.
       wf_input e0 i <-> wf_input e1 i.
   Proof.
     unfold wf_input. destruct e0, e1; ss; des; clarify.
+    { split; i; des; splits; i; split; eauto.
+      { i. eapply UPDATE in H. des. inv H. eauto. }
+      { i. eapply UPDATE. des. inv H. eauto. }
+      { i. eapply UPDATE in H. des. inv H. eauto. }
+      { i. eapply UPDATE. des. inv H. eauto. }
+    }
+    { split; i; des; splits; i; split; eauto.
+      { i. eapply UPDATE in H. des. inv H. eauto. }
+      { i. eapply UPDATE. des. inv H. eauto. }
+      { i. eapply UPDATE in H. des. inv H. eauto. }
+      { i. eapply UPDATE. des. inv H. eauto. }
+    }
   Qed.
 
   Variant step_update:
@@ -1278,7 +1283,7 @@ Section LANG.
       tr e i o d w
       (TRACE: writing_trace (Flags.minus d (SeqEvent.written i)) tr w)
       (ACQUIRE: ~ is_acquire e)
-      (ACCESS: forall loc (SOME: is_accessing e = Some loc), (d loc = false) \/ (SeqEvent.written i loc = true))
+      (ACCESS: forall loc val (SOME: is_accessing e = Some (loc, val)), (d loc = false) \/ (SeqEvent.written i loc = true))
     :
       writing_trace d ((e, i, o)::tr) (Flags.join (SeqEvent.written i) w)
   .
