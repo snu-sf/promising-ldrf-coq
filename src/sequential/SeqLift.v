@@ -227,10 +227,6 @@ Module Mapping.
 End Mapping.
 
 
-Definition versions_wf (f: Mapping.ts) (vers: versions): Prop :=
-  forall loc to ver (VER: vers loc to = Some ver),
-    version_le ver (Mapping.vers f).
-
 Definition reserve_versions_wf (f: Mapping.ts) (rvers: reserve_versions): Prop :=
   forall loc to ver (VER: rvers loc to = Some ver),
     le ver (Mapping.vers f loc).
@@ -246,6 +242,9 @@ Definition opt_version_wf (f: Mapping.ts) (v: option version): Prop :=
   | Some v => version_wf f v
   | None => True
   end.
+
+Definition versions_wf (f: Mapping.ts) (vers: versions): Prop :=
+  forall loc to, opt_version_wf f (vers loc to).
 
 Lemma version_le_version_wf f v
   :
@@ -2366,36 +2365,33 @@ Proof.
   des. inv MSG_LE. eauto.
 Qed.
 
-
-(* Lemma sim_memory_add f vers mem_tgt0 mem_tgt1 mem_src0 *)
-(*       loc from_tgt to_tgt from_src to_src msg_tgt msg_src *)
-(*       (ADDTGT: Memory.add mem_tgt0 loc from_tgt to_tgt msg_tgt0 msg_tgt1 mem_tgt1) *)
-(*       (FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt) *)
-(*       (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt) *)
-(*       (MSGWF: Message.wf msg_src1) *)
-(*       (MSG: sim_message f (vers loc to_tgt) msg_src1 msg_tgt1) *)
-(*       (PROMS: sim_promises f vers mem_src0 mem_tgt0) *)
-(*       (WF: Mapping.wfs f) *)
-(*   : *)
-(*     exists from_src msg_src0 mem_src1, *)
-(*       (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt>>) /\ *)
-(*       (<<MSG: sim_message_max f (vers loc to_tgt) msg_src0 msg_tgt0>>)/\ *)
-(*       (<<GET: Memory.get loc to_src mem_src0 = Some (from_src, msg_src0)>>) /\ *)
-(*       (<<MSGLE: Message.le msg_src1 msg_src0>>) /\ *)
-(*       (<<LOWER: Memory.lower mem_src0 loc from_src to_src msg_src0 msg_src1 mem_src1>>). *)
-(* Proof. *)
-(*   pose proof (mapping_latest_wf_loc (f loc)) as VERWF. *)
-(*   hexploit lower_succeed_wf; eauto. i. des. *)
-(*   hexploit sim_promises_get; eauto. i. des. *)
-(*   eapply sim_timestamp_exact_inject in TS; eauto. clarify. *)
-(*   assert (MSGLE: Message.le msg_src1 msg_src). *)
-(*   { eapply sim_message_max_max; eauto. *)
-(*     eapply sim_message_mon_tgt; eauto. } *)
-(*   hexploit (@Memory.lower_exists mem_src0 loc from_src to_src msg_src msg_src1); eauto. *)
-(*   { eapply sim_timestamp_lt; [| |eapply TS0|..]; eauto. *)
-(*     eapply sim_timestamp_exact_sim; eauto. } *)
-(*   i. des. esplits; eauto. *)
-(* Qed. *)
+Lemma sim_memory_add f vers mem_tgt0 mem_tgt1 mem_src0
+      loc from_tgt to_tgt from_src to_src msg_tgt msg_src
+      (ADDTGT: Memory.add mem_tgt0 loc from_tgt to_tgt msg_tgt mem_tgt1)
+      (MEM: sim_memory f vers mem_src0 mem_tgt0)
+      (MSG: sim_message f (vers loc to_tgt) msg_src msg_tgt)
+      (FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt)
+      (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
+      (WF: Mapping.wfs f)
+      (MSGWF: Message.wf msg_src)
+  :
+    exists mem_src1,
+      (<<ADD: Memory.add mem_src0 loc from_src to_src msg_src mem_src1>>) /\
+      (<<ATTACH: forall (NOATTACH: forall to' msg (GET: Memory.get loc to' mem_tgt0 = Some (to_tgt, msg)), False)
+                        to' msg
+                        (GET: Memory.get loc to' mem_src0 = Some (to_src, msg)), False>>).
+Proof.
+  pose proof (mapping_latest_wf_loc (f loc)) as VERWF.
+  hexploit add_succeed_wf; eauto. i. des.
+  hexploit (@Memory.add_exists mem_src0 loc from_src to_src msg_src).
+  { eapply sim_memory_space; eauto. }
+  { eapply sim_timestamp_exact_lt; eauto. }
+  { eauto. }
+  i. des. esplits; eauto.
+  i. eapply sim_memory_attach; eauto.
+  { ii. inv H0. eapply DISJOINT; eauto. econs; ss. refl. }
+  { eapply TimeFacts.le_lt_lt; eauto. eapply Time.bot_spec. }
+Qed.
 
 
 (* Variant sim_promises *)
