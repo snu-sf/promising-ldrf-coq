@@ -421,7 +421,8 @@ Proof.
 Qed.
 
 
-Definition sim_timestamp (f: Mapping.t) (v: nat) (ts_src ts_tgt: Time.t) :=
+Definition sim_timestamp (b: bool) (f: Mapping.t) (v: nat) (ts_src ts_tgt: Time.t) :=
+  ((<<FLAG: b = true>>) /\ (<<CLOSED: Mapping.closed f v ts_src>>)) \/
   exists ts_src' ts_tgt',
     (<<TSSRC: Time.le ts_src ts_src'>>) /\
     (<<TSTGT: Time.le ts_tgt' ts_tgt>>) /\
@@ -429,20 +430,22 @@ Definition sim_timestamp (f: Mapping.t) (v: nat) (ts_src ts_tgt: Time.t) :=
     (<<CLOSED: Mapping.closed f v ts_src>>)
 .
 
-Record sim_timestamp_max (f: Mapping.t) (v: nat) (ts_src ts_tgt: Time.t): Prop :=
+Record sim_timestamp_max b (f: Mapping.t) (v: nat) (ts_src ts_tgt: Time.t): Prop :=
   sim_timestamp_max_intro {
-      sim_timestamp_max_sim: sim_timestamp f v ts_src ts_tgt;
-      sim_timestamp_max_max: forall ts (SIM: sim_timestamp f v ts ts_tgt),
+      sim_timestamp_max_sim: sim_timestamp b f v ts_src ts_tgt;
+      sim_timestamp_max_max: forall ts (SIM: sim_timestamp b f v ts ts_tgt),
           Time.le ts ts_src;
     }.
 
-Lemma sim_timestamp_exact_sim f v ts_src ts_tgt
+Lemma sim_timestamp_exact_sim b f v ts_src ts_tgt
       (EXACT: sim_timestamp_exact f v ts_src ts_tgt)
       (CLOSED: Mapping.closed f v ts_src)
   :
-    sim_timestamp f v ts_src ts_tgt.
+    sim_timestamp b f v ts_src ts_tgt.
 Proof.
-  exists ts_src, ts_tgt. splits; auto; try refl.
+  destruct b.
+  { left. eauto. }
+  { right. exists ts_src, ts_tgt. splits; auto; try refl. }
 Qed.
 
 Lemma sim_timestamp_exact_max f v ts_src ts_tgt
@@ -450,62 +453,71 @@ Lemma sim_timestamp_exact_max f v ts_src ts_tgt
       (CLOSED: Mapping.closed f v ts_src)
       (WF: Mapping.wf f)
   :
-    sim_timestamp_max f v ts_src ts_tgt.
+    sim_timestamp_max false f v ts_src ts_tgt.
 Proof.
   econs.
   { eapply sim_timestamp_exact_sim; eauto. }
-  { i. unfold sim_timestamp, sim_timestamp_exact in *. des.
+  { i. unfold sim_timestamp, sim_timestamp_exact in *. des; clarify.
     etrans; eauto. erewrite <- Mapping.mapping_map_le; eauto. }
 Qed.
 
-Lemma sim_timestamp_mon_tgt f v ts_src ts_tgt0 ts_tgt1
-      (SIM: sim_timestamp f v ts_src ts_tgt0)
+Lemma sim_timestamp_mon_tgt b f v ts_src ts_tgt0 ts_tgt1
+      (SIM: sim_timestamp b f v ts_src ts_tgt0)
       (TS: Time.le ts_tgt0 ts_tgt1)
   :
-    sim_timestamp f v ts_src ts_tgt1.
+    sim_timestamp b f v ts_src ts_tgt1.
 Proof.
   unfold sim_timestamp in *. des.
-  esplits; [..|eauto|]; auto. etrans; eauto.
+  { left. esplits; [..|eauto|]; auto. }
+  { right. esplits; [..|eauto|]; auto. etrans; eauto. }
 Qed.
 
-Lemma sim_timestamp_mon_ver f v0 v1 ts_src ts_tgt
-      (SIM: sim_timestamp f v0 ts_src ts_tgt)
+Lemma sim_timestamp_mon_ver b f v0 v1 ts_src ts_tgt
+      (SIM: sim_timestamp b f v0 ts_src ts_tgt)
       (VER: v0 <= v1)
       (WF: Mapping.wf f)
       (VERWF: loc_version_wf f v1)
   :
-    sim_timestamp f v1 ts_src ts_tgt.
+    sim_timestamp b f v1 ts_src ts_tgt.
 Proof.
   unfold sim_timestamp in *. des.
-  eapply sim_timestamp_exact_mon_ver in SIM; eauto. des.
-  esplits; [..|eauto|]; eauto.
-  eapply sim_closed_mon_ver; eauto.
+  { left. esplits; eauto. eapply sim_closed_mon_ver; eauto. }
+  { right. eapply sim_timestamp_exact_mon_ver in SIM; eauto. des.
+    esplits; [..|eauto|]; eauto.
+    eapply sim_closed_mon_ver; eauto.
+  }
 Qed.
 
-Lemma sim_timestamp_mon_mapping f0 f1 v ts_src ts_tgt
+Lemma sim_timestamp_mon_mapping b f0 f1 v ts_src ts_tgt
       (WF: Mapping.wf f0)
       (VERWF: loc_version_wf f0 v)
       (MAP: Mapping.le f0 f1)
   :
-    sim_timestamp f0 v ts_src ts_tgt <-> sim_timestamp f1 v ts_src ts_tgt.
+    sim_timestamp b f0 v ts_src ts_tgt <-> sim_timestamp b f1 v ts_src ts_tgt.
 Proof.
   unfold sim_timestamp in *. split.
-  { i. des. esplits; eauto.
-    { erewrite <- sim_timestamp_exact_mon_mapping; eauto. }
-    { erewrite <- sim_closed_mon_mapping; eauto. }
+  { i. des.
+    { left. esplits; eauto. erewrite <- sim_closed_mon_mapping; eauto. }
+    { right. esplits; eauto.
+      { erewrite <- sim_timestamp_exact_mon_mapping; eauto. }
+      { erewrite <- sim_closed_mon_mapping; eauto. }
+    }
   }
-  { i. des. esplits; eauto.
-    { erewrite sim_timestamp_exact_mon_mapping; eauto. }
-    { erewrite sim_closed_mon_mapping; eauto. }
+  { i. des.
+    { left. esplits; eauto. erewrite sim_closed_mon_mapping; eauto. }
+    { right. esplits; eauto.
+      { erewrite sim_timestamp_exact_mon_mapping; eauto. }
+      { erewrite sim_closed_mon_mapping; eauto. }
+    }
   }
 Qed.
 
-Lemma sim_timestamp_max_mon_mapping f0 f1 v ts_src ts_tgt
+Lemma sim_timestamp_max_mon_mapping b f0 f1 v ts_src ts_tgt
       (WF: Mapping.wf f0)
       (VERWF: loc_version_wf f0 v)
       (MAP: Mapping.le f0 f1)
   :
-    sim_timestamp_max f0 v ts_src ts_tgt <-> sim_timestamp_max f1 v ts_src ts_tgt.
+    sim_timestamp_max b f0 v ts_src ts_tgt <-> sim_timestamp_max b f1 v ts_src ts_tgt.
 Proof.
   split.
   { i. econs.
@@ -520,13 +532,13 @@ Proof.
   }
 Qed.
 
-Lemma sim_timestamp_bot f v ts
+Lemma sim_timestamp_bot b f v ts
       (WF: Mapping.wf f)
       (VERWF: loc_version_wf f v)
   :
-    sim_timestamp f v Time.bot ts.
+    sim_timestamp b f v Time.bot ts.
 Proof.
-  hexploit Mapping.mapping_bot; eauto. i.
+  right. hexploit Mapping.mapping_bot; eauto. i.
   eapply Mapping.mapping_incr with (v1:=v) in H; eauto.
   { des. exists fts1, Time.bot. esplits; ss; eauto.
     { eapply Time.bot_spec. }
@@ -535,16 +547,16 @@ Proof.
   { eapply le_0_n. }
 Qed.
 
-Lemma sim_timestamp_max_exists f v ts_tgt
+Lemma sim_timestamp_max_exists b f v ts_tgt
       (WF: Mapping.wf f)
       (VER: loc_version_wf f v)
   :
-    exists ts_src, <<MAX: sim_timestamp_max f v ts_src ts_tgt>>.
+    exists ts_src, <<MAX: sim_timestamp_max b f v ts_src ts_tgt>>.
 Proof.
   hexploit mapping_times_finite_exact; eauto. i. des.
-  hexploit (@finite_greatest (fun ts => sim_timestamp f v ts ts_tgt) l). i. des.
+  hexploit (@finite_greatest (fun ts => sim_timestamp b f v ts ts_tgt) l). i. des.
   { exists to. red. econs; auto. i.
-    eapply GREATEST; eauto. eapply H. red in SIM. des. eauto.
+    eapply GREATEST; eauto. eapply H. red in SIM. des; eauto.
   }
   { exfalso. eapply EMPTY.
     { eapply H. eapply sim_closed_bot; eauto. }
