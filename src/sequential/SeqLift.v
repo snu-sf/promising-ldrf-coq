@@ -1583,12 +1583,15 @@ Qed.
 
 
 Variant sim_promises
+        (flag_src: Loc.t -> bool)
+        (flag_tgt: Loc.t -> option Time.t)
         (f: Mapping.ts)
         (vers: versions)
         (* (rmap: ReserveMap.t) *)
         (prom_src prom_tgt: Memory.t): Prop :=
 | sim_promises_intro
     (MESSAGE: forall loc to from msg_tgt
+                     (FLAGSRC: flag_src loc = false)
                      (GET: Memory.get loc to prom_tgt = Some (from, msg_tgt)),
         exists fto ffrom msg_src,
           (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ffrom from>>) /\
@@ -1597,14 +1600,20 @@ Variant sim_promises
           (<<MSG: sim_message_max f (vers loc to) msg_src msg_tgt>>))
     (SOUND: forall loc fto ffrom msg_src
                    (GET: Memory.get loc fto prom_src = Some (ffrom, msg_src)),
-        exists to from msg_tgt,
-          (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto to>>) /\
-          (<<GET: Memory.get loc to prom_tgt = Some (from, msg_tgt)>>))
+        (exists to from msg_tgt,
+            (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto to>>) /\
+            (<<GET: Memory.get loc to prom_tgt = Some (from, msg_tgt)>>)) \/
+        (exists vw, (<<FLAG: flag_tgt loc = Some vw>>) /\ (<<TS: msg_src <> Message.reserve -> Time.lt vw fto>>)))
+    (NONE: forall loc to
+                  (FLAGSRC: flag_src loc = true),
+        Memory.get loc to prom_src = None)
 .
 
-Lemma sim_promises_get f vers prom_src prom_tgt loc from_tgt to_tgt msg_tgt
-      (SIM: sim_promises f vers prom_src prom_tgt)
+Lemma sim_promises_get flag_src flag_tgt
+      f vers prom_src prom_tgt loc from_tgt to_tgt msg_tgt
+      (SIM: sim_promises flag_src flag_tgt f vers prom_src prom_tgt)
       (GET: Memory.get loc to_tgt prom_tgt = Some (from_tgt, msg_tgt))
+      (FLAG: flag_src loc = false)
   :
     exists from_src to_src msg_src,
       (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt>>) /\
@@ -1615,35 +1624,55 @@ Proof.
   inv SIM. hexploit MESSAGE; eauto. i. des. esplits; eauto.
 Qed.
 
-Lemma sim_promises_get_if f vers prom_src prom_tgt loc from_src to_src msg_src
-      (SIM: sim_promises f vers prom_src prom_tgt)
+Lemma sim_promises_get_if flag_src flag_tgt f vers prom_src prom_tgt loc from_src to_src msg_src
+      (SIM: sim_promises flag_src flag_tgt f vers prom_src prom_tgt)
       (GET: Memory.get loc to_src prom_src = Some (from_src, msg_src))
   :
-    exists from_tgt to_tgt msg_tgt,
-      (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt>>) /\
-      (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt>>) /\
-      (<<GET: Memory.get loc to_tgt prom_tgt = Some (from_tgt, msg_tgt)>>) /\
-      (<<MSG: sim_message_max f (vers loc to_tgt) msg_src msg_tgt>>).
+    (exists from_tgt to_tgt msg_tgt,
+        (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt>>) /\
+        (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt>>) /\
+        (<<GET: Memory.get loc to_tgt prom_tgt = Some (from_tgt, msg_tgt)>>) /\
+        (<<MSG: sim_message_max f (vers loc to_tgt) msg_src msg_tgt>>)) \/
+    (exists vw, (<<FLAG: flag_tgt loc = Some vw>>) /\ (<<TS: msg_src <> Message.reserve -> Time.lt vw to_src>>))
+.
 Proof.
   inv SIM. hexploit SOUND; eauto. i. des.
-  hexploit MESSAGE; eauto. i. des.
-  hexploit sim_timestamp_exact_inject.
-  { eapply TO. }
-  { eapply TO0. }
-  i. clarify. esplits; eauto.
+  { hexploit MESSAGE; eauto.
+    { destruct (flag_src loc) eqn:FLAG; auto.
+      hexploit NONE; eauto. rewrite GET. ss.
+    }
+    i. des.
+    hexploit sim_timestamp_exact_inject.
+    { eapply TO. }
+    { eapply TO0. }
+    i. clarify. left. esplits; eauto.
+  }
+  { right. esplits; eauto. }
 Qed.
 
-Lemma add_sim_promises f vers mem_tgt0 mem_tgt1 mem_src0 mem_src1
+Lemma sim_promises_none flag_src flag_tgt
+      f vers prom_src prom_tgt loc
+      (SIM: sim_promises flag_src flag_tgt f vers prom_src prom_tgt)
+      (FLAG: flag_src loc = true)
+  :
+    forall to, Memory.get loc to prom_src = None.
+Proof.
+  inv SIM. eauto.
+Qed.
+
+
+Lemma add_sim_promises flag_src flag_tgt f vers mem_tgt0 mem_tgt1 mem_src0 mem_src1
       loc from_tgt to_tgt from_src to_src msg_tgt msg_src
       (ADDTGT: Memory.add mem_tgt0 loc from_tgt to_tgt msg_tgt mem_tgt1)
-      (PROMS: sim_promises f vers mem_src0 mem_tgt0)
+      (PROMS: sim_promises flag_src flag_tgt f vers mem_src0 mem_tgt0)
       (ADDSRC: Memory.add mem_src0 loc from_src to_src msg_src mem_src1)
       (FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt)
       (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
       (MSG: sim_message_max f (vers loc to_tgt) msg_src msg_tgt)
       (WF: Mapping.wfs f)
+      (FLAGSRC: flag_src loc = false)
   :
-    sim_promises f vers mem_src1 mem_tgt1.
+    sim_promises flag_src flag_tgt f vers mem_src1 mem_tgt1.
 Proof.
   econs.
   { i. erewrite Memory.add_o in GET; eauto. des_ifs.
@@ -1657,22 +1686,28 @@ Proof.
     }
   }
   { i. erewrite Memory.add_o in GET; eauto. des_ifs.
-    { ss. des; clarify. esplits; eauto.
+    { ss. des; clarify. left. esplits; eauto.
       eapply Memory.add_get0; eauto. }
     { guardH o. hexploit sim_promises_get_if; eauto. i. des.
-      esplits; eauto. eapply Memory.add_get1; eauto. }
+      { left. esplits; eauto. eapply Memory.add_get1; eauto. }
+      { right. esplits; eauto. }
+    }
+  }
+  { i. erewrite Memory.add_o; eauto. des_ifs.
+    { exfalso. ss. des; clarify. }
+    { eapply sim_promises_none; eauto. }
   }
 Qed.
 
-Lemma remove_sim_promises f vers mem_tgt0 mem_tgt1 mem_src0 mem_src1
+Lemma remove_sim_promises flag_src flag_tgt f vers mem_tgt0 mem_tgt1 mem_src0 mem_src1
       loc from_tgt to_tgt from_src to_src msg_tgt msg_src
       (REMOVETGT: Memory.remove mem_tgt0 loc from_tgt to_tgt msg_tgt mem_tgt1)
-      (PROMS: sim_promises f vers mem_src0 mem_tgt0)
+      (PROMS: sim_promises flag_src flag_tgt f vers mem_src0 mem_tgt0)
       (REMOVESRC: Memory.remove mem_src0 loc from_src to_src msg_src mem_src1)
       (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
       (WF: Mapping.wfs f)
   :
-    sim_promises f vers mem_src1 mem_tgt1.
+    sim_promises flag_src flag_tgt f vers mem_src1 mem_tgt1.
 Proof.
   econs.
   { i. erewrite Memory.remove_o in GET; eauto. des_ifs.
@@ -1684,32 +1719,41 @@ Proof.
   }
   { i. erewrite Memory.remove_o in GET; eauto. des_ifs.
     guardH o. hexploit sim_promises_get_if; eauto. i. des.
-    esplits; eauto. erewrite <- GET0.
-    erewrite Memory.remove_o; eauto. des_ifs. exfalso.
-    unguard. ss. des; clarify.
-    eapply o. eapply sim_timestamp_exact_inject; eauto.
+    { left. esplits; eauto. erewrite <- GET0.
+      erewrite Memory.remove_o; eauto. des_ifs. exfalso.
+      unguard. ss. des; clarify.
+      eapply o. eapply sim_timestamp_exact_inject; eauto.
+    }
+    { right. esplits; eauto. }
+  }
+  { i. erewrite Memory.remove_o; eauto. des_ifs.
+    eapply sim_promises_none; eauto.
   }
 Qed.
 
-Lemma lower_sim_promises f vers mem_tgt0 mem_tgt1 mem_src0 mem_src1
+Lemma lower_sim_promises flag_src flag_tgt f vers mem_tgt0 mem_tgt1 mem_src0 mem_src1
       loc from_tgt to_tgt from_src to_src
       msg_tgt0 msg_tgt1 msg_src0 msg_src1
       (LOWERTGT: Memory.lower mem_tgt0 loc from_tgt to_tgt msg_tgt0 msg_tgt1 mem_tgt1)
-      (PROMS: sim_promises f vers mem_src0 mem_tgt0)
+      (PROMS: sim_promises flag_src flag_tgt f vers mem_src0 mem_tgt0)
       (LOWERSRC: Memory.lower mem_src0 loc from_src to_src msg_src0 msg_src1 mem_src1)
       (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
       (MSG: sim_message_max f (vers loc to_tgt) msg_src1 msg_tgt1)
       (WF: Mapping.wfs f)
   :
-    sim_promises f vers mem_src1 mem_tgt1.
+    sim_promises flag_src flag_tgt f vers mem_src1 mem_tgt1.
 Proof.
   pose proof (mapping_latest_wf_loc (f loc)) as VERWF.
   hexploit lower_succeed_wf; [eapply LOWERSRC|]. i. des.
   hexploit lower_succeed_wf; [eapply LOWERTGT|]. i. des.
-  hexploit sim_promises_get_if; eauto. i. des.
-  eapply sim_timestamp_exact_unique in TO; eauto. clarify.
+  assert (FLAGSRC: flag_src loc = false).
+  { destruct (flag_src loc) eqn:FLAGSRC; auto. exfalso.
+    erewrite sim_promises_none in GET; eauto. ss.
+  }
+  hexploit sim_promises_get; eauto. i. des.
+  eapply sim_timestamp_exact_inject in TO; eauto. clarify.
   econs.
-  { i. erewrite Memory.lower_o in GET0; eauto. des_ifs.
+  { i. erewrite Memory.lower_o in GET; eauto. des_ifs.
     { ss. des; clarify. esplits; eauto.
       eapply Memory.lower_get0; eauto. }
     { guardH o. hexploit sim_promises_get; eauto. i. des.
@@ -1719,23 +1763,29 @@ Proof.
       eapply o. eapply sim_timestamp_exact_unique; eauto.
     }
   }
-  { i. erewrite Memory.lower_o in GET0; eauto. des_ifs.
-    { ss. des; clarify. esplits; eauto.
+  { i. erewrite Memory.lower_o in GET; eauto. des_ifs.
+    { ss. des; clarify. left. esplits; eauto.
       eapply Memory.lower_get0; eauto. }
     { guardH o. hexploit sim_promises_get_if; eauto. i. des.
-      esplits; eauto. erewrite Memory.lower_o; eauto.
-      rewrite <- GET2. des_ifs. exfalso.
-      unguard. ss. des; clarify.
-      eapply o. eapply sim_timestamp_exact_inject; eauto.
+      { left. esplits; eauto. erewrite Memory.lower_o; eauto.
+        rewrite <- GET2. des_ifs. exfalso.
+        unguard. ss. des; clarify.
+        eapply o. eapply sim_timestamp_exact_inject; eauto.
+      }
+      { right. esplits; eauto. }
     }
+  }
+  { i. erewrite Memory.lower_o; eauto. des_ifs.
+    { ss. des; clarify. }
+    { eapply sim_promises_none; eauto. }
   }
 Qed.
 
-Lemma split_sim_promises f vers mem_tgt0 mem_tgt1 mem_src0 mem_src1
+Lemma split_sim_promises flag_src flag_tgt f vers mem_tgt0 mem_tgt1 mem_src0 mem_src1
       loc ts_tgt0 ts_tgt1 ts_tgt2 ts_src0 ts_src1 ts_src2
       msg_tgt0 msg_tgt1 msg_src0 msg_src1
       (SPLITTGT: Memory.split mem_tgt0 loc ts_tgt0 ts_tgt1 ts_tgt2 msg_tgt0 msg_tgt1 mem_tgt1)
-      (MEM: sim_promises f vers mem_src0 mem_tgt0)
+      (MEM: sim_promises flag_src flag_tgt f vers mem_src0 mem_tgt0)
       (SPLITSRC: Memory.split mem_src0 loc ts_src0 ts_src1 ts_src2 msg_src0 msg_src1 mem_src1)
       (TS1: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ts_src1 ts_tgt1)
       (TS2: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ts_src2 ts_tgt2)
@@ -1745,19 +1795,23 @@ Lemma split_sim_promises f vers mem_tgt0 mem_tgt1 mem_src0 mem_src1
       (RESERVESRC1: msg_src1 <> Message.reserve)
       (WF: Mapping.wfs f)
   :
-    sim_promises f vers mem_src1 mem_tgt1.
+    sim_promises flag_src flag_tgt f vers mem_src1 mem_tgt1.
 Proof.
   pose proof (mapping_latest_wf_loc (f loc)) as VERWF.
   hexploit Memory.split_get0; [eapply SPLITTGT|]. i. des.
   hexploit Memory.split_get0; [eapply SPLITSRC|]. i. des. clarify.
-  hexploit sim_promises_get_if; eauto. i. des.
-  eapply sim_timestamp_exact_unique in TS2; eauto. clarify.
+  assert (FLAGSRC: flag_src loc = false).
+  { destruct (flag_src loc) eqn:FLAGSRC; auto. exfalso.
+    erewrite sim_promises_none in GET4; eauto. ss.
+  }
+  hexploit sim_promises_get; eauto. i. des.
+  eapply sim_timestamp_exact_inject in TS2; eauto. clarify.
   econs.
-  { i. erewrite Memory.split_o in GET0; eauto. des_ifs.
+  { i. erewrite Memory.split_o in GET4; eauto. des_ifs.
     { ss. des; clarify. esplits; eauto. }
     { ss. des; clarify. esplits; eauto. }
     { guardH o. guardH o0.
-      hexploit sim_promises_get; [|eapply GET0|..]; eauto.
+      hexploit sim_promises_get; [|eapply GET4|..]; eauto.
       i. des. esplits; eauto.
       erewrite Memory.split_o; eauto. rewrite <- GET8. des_ifs.
       { exfalso. unguard. ss. des; clarify. }
@@ -1765,25 +1819,135 @@ Proof.
         eapply o0. eapply sim_timestamp_exact_unique; eauto.   }
     }
   }
-  { i. erewrite Memory.split_o in GET0; eauto. des_ifs.
-    { ss. des; clarify. esplits; eauto. }
-    { ss. des; clarify. esplits; eauto. }
+  { i. erewrite Memory.split_o in GET4; eauto. des_ifs.
+    { ss. des; clarify. left. esplits; eauto. }
+    { ss. des; clarify. left. esplits; eauto. }
     { guardH o. guardH o0.
       hexploit sim_promises_get_if; eauto. i. des.
-      esplits; eauto. erewrite Memory.split_o; eauto.
-      rewrite <- GET8. des_ifs.
-      { exfalso. unguard. ss. des; clarify. }
-      { exfalso. unguard. ss. des; clarify.
-        eapply o0. eapply sim_timestamp_exact_inject; eauto. }
+      { left. esplits; eauto. erewrite Memory.split_o; eauto.
+        rewrite <- GET8. des_ifs.
+        { exfalso. unguard. ss. des; clarify. }
+        { exfalso. unguard. ss. des; clarify.
+          eapply o0. eapply sim_timestamp_exact_inject; eauto. }
+      }
+      { right. esplits; eauto. }
     }
+  }
+  { i. erewrite Memory.split_o; eauto. des_ifs.
+    { ss. des; clarify. }
+    { ss. des; clarify. }
+    { eapply sim_promises_none; eauto. }
+  }
+Qed.
+
+Lemma src_writtten_sim_promises flag_src flag_tgt f vers mem_tgt mem_src loc
+      (PROMS: sim_promises flag_src flag_tgt f vers mem_src mem_tgt)
+      (FLAGSRC: flag_src loc = true)
+  :
+    sim_promises flag_src (fun loc' => if (Loc.eq_dec loc loc') then None else flag_tgt loc') f vers mem_src mem_tgt.
+Proof.
+  econs.
+  { i. hexploit sim_promises_get; eauto. i. des. esplits; eauto. }
+  { i. hexploit sim_promises_get_if; eauto. i. des.
+    { left. esplits; eauto. }
+    { right. esplits; eauto. des_ifs.
+      exfalso. erewrite sim_promises_none in GET; eauto. ss.
+    }
+  }
+  { i. eapply sim_promises_none; eauto. }
+Qed.
+
+Lemma tgt_written_sim_promises flag_src flag_tgt f vers mem_tgt mem_src loc ts
+      (PROMS: sim_promises flag_src flag_tgt f vers mem_src mem_tgt)
+      (CONSISTENT: forall from to msg (GET: Memory.get loc to mem_src = Some (from, msg)) (RESERVE: msg <> Message.reserve),
+          Time.lt ts to)
+  :
+    sim_promises flag_src (fun loc' => if (Loc.eq_dec loc loc') then Some ts else flag_tgt loc') f vers mem_src mem_tgt.
+Proof.
+  econs.
+  { i. hexploit sim_promises_get; eauto. i. des. esplits; eauto. }
+  { i. hexploit sim_promises_get_if; eauto. i. des.
+    { left. esplits; eauto. }
+    { right. des_ifs; eauto. esplits; eauto. }
+  }
+  { i. eapply sim_promises_none; eauto. }
+Qed.
+
+Lemma tgt_write_sim_promises flag_src flag_tgt f vers mem_tgt0 mem_tgt1 mem_src ts
+      loc from to msg
+      (FULFILLTGT: Memory.remove mem_tgt0 loc from to msg mem_tgt1)
+      (PROMS: sim_promises flag_src flag_tgt f vers mem_src mem_tgt0)
+      (FLAGSRC: flag_tgt loc = Some ts)
+  :
+    sim_promises flag_src flag_tgt f vers mem_src mem_tgt1.
+Proof.
+  econs.
+  { i. erewrite Memory.remove_o in GET; eauto. des_ifs.
+    hexploit sim_promises_get; eauto. i. des.
+    { esplits; eauto. }
+    { esplits; eauto. }
+  }
+  { i. destruct (Loc.eq_dec loc loc0).
+    { hexploit sim_promises_get_if; eauto. i. des.
+    { destruct (
+
+left. esplits; eauto. erewrite Memory.remove_o; eauto. des_ifs.
+      { exfalso. ss. des; clarify. admit. }
+      {
+
+
+ hexploit sim_promises_get; eauto. i. des. esplits; eauto. }
+  { i. hexploit sim_promises_get_if; eauto. i. des.
+    { left. esplits; eauto. }
+    { right. des_ifs; eauto. esplits; eauto. }
+  }
+  { i. eapply sim_promises_none; eauto. }
+  {
+
+  pose proof (mapping_latest_wf_loc (f loc)) as VERWF.
+  hexploit lower_succeed_wf; [eapply LOWERSRC|]. i. des.
+  hexploit lower_succeed_wf; [eapply LOWERTGT|]. i. des.
+  assert (FLAGSRC: flag_src loc = false).
+  { destruct (flag_src loc) eqn:FLAGSRC; auto. exfalso.
+    erewrite sim_promises_none in GET; eauto. ss.
+  }
+  hexploit sim_promises_get; eauto. i. des.
+  eapply sim_timestamp_exact_inject in TO; eauto. clarify.
+  econs.
+  { i. erewrite Memory.lower_o in GET; eauto. des_ifs.
+    { ss. des; clarify. esplits; eauto.
+      eapply Memory.lower_get0; eauto. }
+    { guardH o. hexploit sim_promises_get; eauto. i. des.
+      esplits; eauto. erewrite Memory.lower_o; eauto.
+      rewrite <- GET2. des_ifs. exfalso.
+      unguard. ss. des; clarify.
+      eapply o. eapply sim_timestamp_exact_unique; eauto.
+    }
+  }
+  { i. erewrite Memory.lower_o in GET; eauto. des_ifs.
+    { ss. des; clarify. left. esplits; eauto.
+      eapply Memory.lower_get0; eauto. }
+    { guardH o. hexploit sim_promises_get_if; eauto. i. des.
+      { left. esplits; eauto. erewrite Memory.lower_o; eauto.
+        rewrite <- GET2. des_ifs. exfalso.
+        unguard. ss. des; clarify.
+        eapply o. eapply sim_timestamp_exact_inject; eauto.
+      }
+      { right. esplits; eauto. }
+    }
+  }
+  { i. erewrite Memory.lower_o; eauto. des_ifs.
+    { ss. des; clarify. }
+    { eapply sim_promises_none; eauto. }
   }
 Qed.
 
 
-Lemma sim_promises_cancel f vers mem_tgt0 mem_tgt1 mem_src0
+Lemma sim_promises_cancel flag_src flag_tgt f vers mem_tgt0 mem_tgt1 mem_src0
       loc from_tgt to_tgt
       (REMOVETGT: Memory.remove mem_tgt0 loc from_tgt to_tgt Message.reserve mem_tgt1)
-      (PROMS: sim_promises f vers mem_src0 mem_tgt0)
+      (PROMS: sim_promises flag_src flag_tgt f vers mem_src0 mem_tgt0)
+      (FLAGSRC: flag_src loc = false)
   :
     exists from_src to_src mem_src1,
       (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt>>) /\
@@ -1796,13 +1960,14 @@ Proof.
   i. des. inv MSG. hexploit Memory.remove_exists; eauto. i. des. esplits; eauto.
 Qed.
 
-Lemma sim_promises_split f vers mem_tgt0 mem_tgt1 mem_src0
+Lemma sim_promises_split flag_src flag_tgt f vers mem_tgt0 mem_tgt1 mem_src0
       loc ts_tgt0 ts_tgt1 ts_tgt2 msg_tgt0 msg_tgt1 msg_src0 ts_src1
       (SPLITTGT: Memory.split mem_tgt0 loc ts_tgt0 ts_tgt1 ts_tgt2 msg_tgt0 msg_tgt1 mem_tgt1)
       (TS: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ts_src1 ts_tgt1)
       (MSGWF: Message.wf msg_src0)
-      (PROMS: sim_promises f vers mem_src0 mem_tgt0)
+      (PROMS: sim_promises flag_src flag_tgt f vers mem_src0 mem_tgt0)
       (WF: Mapping.wfs f)
+      (FLAGSRC: flag_src loc = false)
   :
     exists ts_src0 ts_src2 msg_src1 mem_src1,
       (<<TS0: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ts_src0 ts_tgt0>>) /\
@@ -1820,14 +1985,15 @@ Proof.
   i. des. esplits; eauto.
 Qed.
 
-Lemma sim_promises_lower f vers mem_tgt0 mem_tgt1 mem_src0
+Lemma sim_promises_lower flag_src flag_tgt f vers mem_tgt0 mem_tgt1 mem_src0
       loc from_tgt to_tgt to_src msg_tgt0 msg_tgt1 msg_src1
       (LOWERTGT: Memory.lower mem_tgt0 loc from_tgt to_tgt msg_tgt0 msg_tgt1 mem_tgt1)
       (TS: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
       (MSGWF: Message.wf msg_src1)
       (MSG: sim_message f (vers loc to_tgt) msg_src1 msg_tgt1)
-      (PROMS: sim_promises f vers mem_src0 mem_tgt0)
+      (PROMS: sim_promises flag_src flag_tgt f vers mem_src0 mem_tgt0)
       (WF: Mapping.wfs f)
+      (FLAGSRC: flag_src loc = false)
   :
     exists from_src msg_src0 mem_src1,
       (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt>>) /\
