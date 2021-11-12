@@ -2355,81 +2355,47 @@ Proof.
   { eauto. }
 Qed.
 
-
-
-
-Lemma sim_timemap_closed_mem f mem loc tm_src tm_tgt
-      (CLOSED: sim_closed_mem f mem0)
-      (SIM: sim_timemap (fun _ => True) f v tm_src tm_tgt)
-  :
-    Memory.closed_timemap
-
-
-      (
-
 Lemma sim_closed_mem_future f mem0 mem1
       (CLOSED: sim_closed_mem f mem0)
       (FUTURE: Memory.future_weak mem0 mem1)
   :
     sim_closed_mem f mem1.
 Proof.
-  inv CLOSED. econs.
-
-
-
-Lemma sim_closed_mon f
-
-
-add, split,
-
-Lemma
-
-Memory.message_to
-
-Lemma sim_memory_close_timestamp f vers mem_src mem_tgt loc ts_tgt ts_src
-      (MEM: sim_memory f vers mem_src mem_tgt)
-      (SIM: sim_timestamp_exact (f loc) v ts_src ts_tgt)
-      (CLOSED: exists from val released, Memory.get loc mem_tgt mem_src = Some (from,
-
-      (e
-
-
-
-Memory.closed_timemap
-Memory.message_to
-
-
-Lemma sim_memory_add f vers mem_tgt0 mem_tgt1 mem_src0
-      loc from_tgt to_tgt from_src to_src msg_tgt msg_src
-      (ADDTGT: Memory.add mem_tgt0 loc from_tgt to_tgt msg_tgt0 msg_tgt1 mem_tgt1)
-      (FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt)
-      (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
-      (MSGWF: Message.wf msg_src1)
-      (MSG: sim_message f (vers loc to_tgt) msg_src1 msg_tgt1)
-      (PROMS: sim_promises f vers mem_src0 mem_tgt0)
-      (WF: Mapping.wfs f)
-  :
-    exists from_src msg_src0 mem_src1,
-      (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt>>) /\
-      (<<MSG: sim_message_max f (vers loc to_tgt) msg_src0 msg_tgt0>>)/\
-      (<<GET: Memory.get loc to_src mem_src0 = Some (from_src, msg_src0)>>) /\
-      (<<MSGLE: Message.le msg_src1 msg_src0>>) /\
-      (<<LOWER: Memory.lower mem_src0 loc from_src to_src msg_src0 msg_src1 mem_src1>>).
-Proof.
-  pose proof (mapping_latest_wf_loc (f loc)) as VERWF.
-  hexploit lower_succeed_wf; eauto. i. des.
-  hexploit sim_promises_get; eauto. i. des.
-  eapply sim_timestamp_exact_inject in TS; eauto. clarify.
-  assert (MSGLE: Message.le msg_src1 msg_src).
-  { eapply sim_message_max_max; eauto.
-    eapply sim_message_mon_tgt; eauto. }
-  hexploit (@Memory.lower_exists mem_src0 loc from_src to_src msg_src msg_src1); eauto.
-  { eapply sim_timestamp_lt; [| |eapply TS0|..]; eauto.
-    eapply sim_timestamp_exact_sim; eauto. }
-  i. des. esplits; eauto.
+  inv CLOSED. econs. i. eapply CLOSED0 in MAP. des.
+  eapply Memory.future_weak_get1 in MAP; eauto; ss.
+  des. inv MSG_LE. eauto.
 Qed.
 
-Memory.promise
+
+(* Lemma sim_memory_add f vers mem_tgt0 mem_tgt1 mem_src0 *)
+(*       loc from_tgt to_tgt from_src to_src msg_tgt msg_src *)
+(*       (ADDTGT: Memory.add mem_tgt0 loc from_tgt to_tgt msg_tgt0 msg_tgt1 mem_tgt1) *)
+(*       (FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt) *)
+(*       (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt) *)
+(*       (MSGWF: Message.wf msg_src1) *)
+(*       (MSG: sim_message f (vers loc to_tgt) msg_src1 msg_tgt1) *)
+(*       (PROMS: sim_promises f vers mem_src0 mem_tgt0) *)
+(*       (WF: Mapping.wfs f) *)
+(*   : *)
+(*     exists from_src msg_src0 mem_src1, *)
+(*       (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt>>) /\ *)
+(*       (<<MSG: sim_message_max f (vers loc to_tgt) msg_src0 msg_tgt0>>)/\ *)
+(*       (<<GET: Memory.get loc to_src mem_src0 = Some (from_src, msg_src0)>>) /\ *)
+(*       (<<MSGLE: Message.le msg_src1 msg_src0>>) /\ *)
+(*       (<<LOWER: Memory.lower mem_src0 loc from_src to_src msg_src0 msg_src1 mem_src1>>). *)
+(* Proof. *)
+(*   pose proof (mapping_latest_wf_loc (f loc)) as VERWF. *)
+(*   hexploit lower_succeed_wf; eauto. i. des. *)
+(*   hexploit sim_promises_get; eauto. i. des. *)
+(*   eapply sim_timestamp_exact_inject in TS; eauto. clarify. *)
+(*   assert (MSGLE: Message.le msg_src1 msg_src). *)
+(*   { eapply sim_message_max_max; eauto. *)
+(*     eapply sim_message_mon_tgt; eauto. } *)
+(*   hexploit (@Memory.lower_exists mem_src0 loc from_src to_src msg_src msg_src1); eauto. *)
+(*   { eapply sim_timestamp_lt; [| |eapply TS0|..]; eauto. *)
+(*     eapply sim_timestamp_exact_sim; eauto. } *)
+(*   i. des. esplits; eauto. *)
+(* Qed. *)
 
 
 (* Variant sim_promises *)
