@@ -1109,6 +1109,69 @@ Module SeqEvent.
     { eapply step_acquire_match; eauto. }
     { eapply step_release_match; eauto. }
   Qed.
+
+  Lemma step_update_inj
+        p m
+        i1 o1 p1 m1
+        i2 o2 p2 m2
+        (STEP1: step_update i1 o1 p m p1 m1)
+        (STEP2: step_update i2 o2 p m p2 m2)
+        (INPUT: forall loc1 v1 f1 loc2 v2 f2
+                  (IN1: i1 = Some (loc1, v1, f1))
+                  (IN2: i2 = Some (loc2, v2, f2)),
+            loc1 = loc2)
+        (OUTPUT: o1 = o2):
+    i1 = i2 /\ p1 = p2 /\ m1 = m2.
+  Proof.
+    subst. inv STEP1; inv STEP2; ss.
+    exploit INPUT; eauto. i. subst.
+    inv MEM. inv MEM0. ss.
+  Qed.
+
+  Lemma step_acquire_inj
+        p m
+        i1 o1 p1 m1
+        i2 o2 p2 m2
+        (STEP1: step_acquire i1 o1 p m p1 m1)
+        (STEP2: step_acquire i2 o2 p m p2 m2)
+        (OUTPUT: o1 = o2):
+    i1 = i2 /\ p1 = p2 /\ m1 = m2.
+  Proof.
+    subst. inv STEP1; inv STEP2; ss.
+    inv MEM. inv MEM0. ss.
+  Qed.
+
+  Lemma step_release_inj
+        p m
+        i1 o1 p1 m1
+        i2 o2 p2 m2
+        (STEP1: step_release i1 o1 p m p1 m1)
+        (STEP2: step_release i2 o2 p m p2 m2)
+        (OUTPUT: o1 = o2):
+    i1 = i2 /\ p1 = p2 /\ m1 = m2.
+  Proof.
+    subst. inv STEP1; inv STEP2; ss.
+    inv MEM. inv MEM0. ss.
+  Qed.
+
+  Lemma step_inj
+        p m
+        i1 o1 p1 m1
+        i2 o2 p2 m2
+        (STEP1: step i1 o1 p m p1 m1)
+        (STEP2: step i2 o2 p m p2 m2)
+        (INPUT: forall loc1 v1 f1 loc2 v2 f2
+                  (IN1: i1.(in_access) = Some (loc1, v1, f1))
+                  (IN2: i2.(in_access) = Some (loc2, v2, f2)),
+            loc1 = loc2)
+        (OUTPUT: o1 = o2):
+    i1 = i2 /\ p1 = p2 /\ m1 = m2.
+  Proof.
+    destruct i1, i2. inv STEP1. inv STEP2. ss.
+    exploit step_update_inj; [exact UPD|exact UPD0|..]; eauto. i. des. subst.
+    exploit step_acquire_inj; [exact ACQ|exact ACQ0|..]; eauto. i. des. subst.
+    exploit step_release_inj; [exact REL|exact REL0|..]; eauto. i. des. subst. ss.
+  Qed.
 End SeqEvent.
 
 
