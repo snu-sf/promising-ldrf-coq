@@ -58,11 +58,19 @@ Definition release_event (e: ThreadEvent.t): Prop :=
   | _ => False
   end.
 
+Definition is_na_write (e: ThreadEvent.t): Prop :=
+  match e with
+  | ThreadEvent.na_write _ _ _ _ _ _ _ => True
+  | ThreadEvent.write _ _ _ _ _ ord => Ordering.le ord Ordering.na
+  | _ => False
+  end.
+
 Variant lower_step {lang} e (th0 th1: Thread.t lang): Prop :=
 | lower_step_intro
     (STEP: Thread.program_step e th0 th1)
     (NRELEASE: ~ release_event e)
     (MEM: lower_memory th1.(Thread.memory) th0.(Thread.memory))
+    (SAME: is_na_write e -> th1.(Thread.memory) = th0.(Thread.memory))
 .
 
 Lemma lower_step_step lang:
@@ -78,6 +86,12 @@ Proof.
   i. inv PR. econs. econs 2. ss.
 Qed.
 
+Definition is_lower_kind (kind: Memory.op_kind) (msg: Message.t): Prop :=
+  match kind with
+  | Memory.op_kind_lower msg' => msg = msg'
+  | _ => False
+  end.
+
 Lemma write_lower_memory_lower
       prom0 mem0 loc from to msg prom1 mem1 kind
       (WRITE: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
@@ -91,6 +105,19 @@ Proof.
     hexploit lower_memory_get_inv; try apply GET1; eauto. i. des; clarify. }
   { eapply Memory.remove_get0 in MEM. des.
     hexploit lower_memory_get; eauto. i. des; clarify. }
+Qed.
+
+Lemma write_same_memory_same
+      prom0 mem0 loc from to msg prom1 mem1 kind
+      (WRITE: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
+      (LOWER: mem1 = mem0):
+  is_lower_kind kind msg.
+Proof.
+  inv WRITE. inv PROMISE; eauto.
+  { eapply Memory.add_get0 in MEM. des. clarify. }
+  { eapply Memory.split_get0 in MEM. des. clarify. }
+  { eapply Memory.lower_get0 in MEM. des. clarify. }
+  { eapply Memory.remove_get0 in MEM. des. clarify. }
 Qed.
 
 Lemma write_na_future
@@ -112,34 +139,32 @@ Qed.
 Lemma write_na_lower_memory_lower
       ts prom0 mem0 loc from to msg prom1 mem1 msgs kinds kind
       (WRITE: Memory.write_na ts prom0 mem0 loc from to msg prom1 mem1 msgs kinds kind)
-      (LOWER: lower_memory mem1 mem0)
+      (LOWER: mem1 = mem0)
   :
-    (<<KINDS: List.Forall (fun kind => Memory.op_kind_is_lower kind) kinds>>) /\
-    (<<KIND: Memory.op_kind_is_lower kind>>).
+    (<<KINDS: List.Forall2 (fun kind '(_, _, msg) => is_lower_kind kind msg) kinds msgs>>) /\
+    (<<KIND: is_lower_kind kind (Message.concrete msg None)>>)
+.
 Proof.
-  induction WRITE; eauto using write_lower_memory_lower.
+  induction WRITE.
+  { hexploit write_same_memory_same; eauto. }
   exploit write_na_future; try exact WRITE. i.
   inv WRITE_EX. inv PROMISE.
   - exploit Memory.add_get0; try exact MEM. i. des.
     exploit Memory.future_get1; try exact GET0; eauto.
     { unguard. des; subst; ss. }
-    i. des.
-    inv LOWER. exploit LOWER0.
-    erewrite GET. erewrite GET1. i. inv x.
+    i. des. clarify.
   - exploit Memory.split_get0; try exact MEM. i. des.
-    exploit Memory.future_get1; try exact GET1; eauto. i. des.
-    inv LOWER. exploit LOWER0.
-    erewrite GET. erewrite GET3. i. inv x.
-  - cut (lower_memory mem2 mem').
-    { i. exploit IHWRITE; eauto. i. des. auto. }
-    econs. i.
+    exploit Memory.future_get1; try exact GET1; eauto. i. des. clarify.
+  - cut (mem1 = mem').
+    { i. clarify. exploit IHWRITE; eauto. i. des. splits; auto.
+      econs; eauto. ss. eapply Memory.lower_get0 in MEM. des; clarify. }
+    eapply Memory.ext. i.
     erewrite (@Memory.lower_o mem'); eauto. condtac; ss.
-    + des. subst.
-      exploit Memory.lower_get0; try exact MEM. i. des.
-      exploit Memory.future_get1; try exact GET0; eauto. i. des.
-      inv LOWER. exploit LOWER0. erewrite GET. i. inv x.
-      rewrite <- H0 in *. inv GET1. econs. eauto.
-    + inv LOWER. eauto.
+    des. subst.
+    exploit Memory.lower_get0; try exact MEM. i. des.
+    exploit Memory.future_get1; try exact GET0; eauto. i. des. clarify.
+    rewrite GET1. f_equal. f_equal.
+    eapply Message.antisym; eauto.
   - unguard. des; subst; ss.
 Qed.
 
@@ -152,12 +177,22 @@ Proof.
   inv STEP. eapply write_lower_memory_lower; eauto.
 Qed.
 
+Lemma write_step_lower_memory_lower_same
+      lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
+      (STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
+      (LOWER: mem2 = mem1):
+  is_lower_kind kind (Message.concrete val released).
+Proof.
+  inv STEP. eapply write_same_memory_same; eauto.
+Qed.
+
 Lemma write_na_step_lower_memory_lower
       lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 msgs kinds kind
       (STEP: Local.write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 msgs kinds kind)
-      (LOWER: lower_memory mem2 mem1):
-  (<<KINDS: List.Forall (fun kind => Memory.op_kind_is_lower kind) kinds>>) /\
-  (<<KIND: Memory.op_kind_is_lower kind>>).
+      (LOWER: mem2 = mem1):
+    (<<KINDS: List.Forall2 (fun kind '(_, _, msg) => is_lower_kind kind msg) kinds msgs>>) /\
+    (<<KIND: is_lower_kind kind (Message.concrete val None)>>)
+.
 Proof.
   inv STEP. eapply write_na_lower_memory_lower; eauto.
 Qed.
@@ -175,16 +210,30 @@ Proof.
   rewrite GET. econs. ss.
 Qed.
 
+Lemma write_lower_lower_memory_same
+      promises1 mem1 loc from to msg promises2 mem2 kind
+      (WRITE: Memory.write promises1 mem1 loc from to msg promises2 mem2 kind)
+      (KIND: is_lower_kind kind msg):
+  mem2 = mem1.
+Proof.
+  inv WRITE. inv PROMISE; ss. eapply Memory.ext. i.
+  erewrite (@Memory.lower_o mem2); eauto.
+  condtac; ss; try refl. des. subst.
+  exploit Memory.lower_get0; try exact MEM. i. des.
+  rewrite GET. econs.
+Qed.
+
 Lemma write_na_lower_lower_memory
       ts promises1 mem1 loc from to val promises2 mem2 msgs kinds kind
       (WRITE: Memory.write_na ts promises1 mem1 loc from to val promises2 mem2 msgs kinds kind)
-      (KINDS: List.Forall (fun kind => Memory.op_kind_is_lower kind) kinds)
-      (KIND: Memory.op_kind_is_lower kind):
-  lower_memory mem2 mem1.
+      (KINDS: List.Forall2 (fun kind '(_, _, msg) => is_lower_kind kind msg) kinds msgs)
+      (KIND: is_lower_kind kind (Message.concrete val None)):
+  mem2 = mem1.
 Proof.
   induction WRITE; eauto using write_lower_lower_memory.
+  { inv WRITE; ss. inv PROMISE; ss. clarify. eapply lower_same_same; eauto. }
   inv KINDS. etrans; try eapply IHWRITE; eauto.
-  eapply write_lower_lower_memory; eauto.
+  inv WRITE_EX; ss. inv PROMISE; ss. clarify. eapply lower_same_same; eauto.
 Qed.
 
 Lemma write_step_lower_lower_memory
@@ -196,12 +245,21 @@ Proof.
   inv STEP. eapply write_lower_lower_memory; eauto.
 Qed.
 
+Lemma write_step_lower_lower_memory_same
+      lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
+      (STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind)
+      (KIND: is_lower_kind kind (Message.concrete val released)):
+  mem2 = mem1.
+Proof.
+  inv STEP. eapply write_lower_lower_memory_same; eauto.
+Qed.
+
 Lemma write_na_step_lower_lower_memory
       lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 msgs kinds kind
       (STEP: Local.write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 msgs kinds kind)
-      (KINDS: List.Forall (fun kind => Memory.op_kind_is_lower kind) kinds)
-      (KIND: Memory.op_kind_is_lower kind):
-  lower_memory mem2 mem1.
+      (KINDS: List.Forall2 (fun kind '(_, _, msg) => is_lower_kind kind msg) kinds msgs)
+      (KIND: is_lower_kind kind (Message.concrete val None)):
+  mem2 = mem1.
 Proof.
   inv STEP. eapply write_na_lower_lower_memory; eauto.
 Qed.
@@ -299,9 +357,16 @@ Proof.
     { inv LOCAL0. inv STEP. ss. }
     esplits.
     - econs; [econs; try econs 3|..]; eauto; ss.
-      exploit write_step_lower_memory_lower; try exact LOCAL0; eauto. i.
-      inv KIND; ss.
-      eapply write_step_lower_lower_memory; eauto.
+      { exploit write_step_lower_memory_lower; try exact LOCAL0; eauto. i.
+        inv KIND; ss.
+        eapply write_step_lower_lower_memory; eauto.
+      }
+      { i. subst.
+        i. exploit write_step_lower_memory_lower_same; try exact LOCAL0; eauto. i.
+        destruct kind; ss. subst.
+        eapply write_step_lower_lower_memory_same; eauto. ss.
+        inv LOCAL0; inv STEP. destruct ord; ss.
+      }
     - econs. ss.
     - ss.
     - ss.
@@ -339,14 +404,15 @@ Proof.
     replace sc_src1 with sc2 in *; cycle 1.
     { inv LOCAL0. inv STEP. ss. }
     esplits.
-    - econs; [econs; try econs 8|..]; eauto; ss.
-      exploit write_na_step_lower_memory_lower; try exact LOCAL0; eauto. i. des.
-      eapply write_na_step_lower_lower_memory; eauto.
-      { clear - KINDS KINDS0.
-        induction KINDS; ss.
-        inv KINDS0. inv H; ss. econs; ss. eauto.
+    - assert (mem_src1 = mem1').
+      { exploit write_na_step_lower_memory_lower; try exact LOCAL0; eauto. i. des.
+        eapply write_na_step_lower_lower_memory; eauto.
+        { clear - KINDS KINDS0.
+          induction KINDS; ss.
+        }
+        { subst. auto. }
       }
-      { inv KIND; ss. }
+      econs; [econs; try econs 8|..]; eauto; ss. subst. refl.
     - econs; ss.
     - ss.
     - ss.
@@ -933,6 +999,7 @@ Proof.
           * ss.
         + ss.
         + refl.
+        + ss.
       - ss.
     }
 
@@ -1067,11 +1134,25 @@ Proof.
     exploit reorder_write_lower_promise; eauto.
     { destruct ord; ss. }
     i. des.
-    exploit write_step_lower_lower_memory; try exact STEP2; eauto. i.
-    esplits.
-    - econs. econs; eauto.
-    - econs; ss. econs; eauto.
-    - ss.
+    destruct (Ordering.le ord Ordering.na) eqn:EQ.
+    { hexploit SAME; auto. i. subst.
+      hexploit write_step_lower_memory_lower_same; try apply LOCAL1; eauto. i.
+      hexploit write_step_lower_lower_memory_same; try exact STEP2; eauto.
+      i. subst. esplits.
+      - econs. econs; eauto.
+      - econs; ss.
+        { econs; eauto. }
+        { refl. }
+      - ss.
+    }
+    { exploit write_step_lower_lower_memory; try exact STEP2; eauto. i.
+      esplits.
+      - econs. econs; eauto.
+      - econs; ss.
+        { econs; eauto. }
+        { rewrite EQ. ss. }
+      - ss.
+    }
   }
 
   { exploit Local.read_step_future; eauto. i. des.
@@ -1119,13 +1200,19 @@ Proof.
   }
 
   { exploit write_na_step_lower_memory_lower; eauto. i. des.
-    exploit reorder_write_na_lower_promise; eauto.
+    exploit reorder_write_na_lower_promise; try apply LOCAL1; eauto.
+    { eapply List.Forall_forall. i.
+      eapply list_Forall2_in2 in KINDS; eauto. des. des_ifs. destruct x; ss.
+    }
+    { destruct kind0; ss. }
     { inv LOCAL1. destruct ord; ss. }
     i. des.
     exploit write_na_step_lower_lower_memory; try exact STEP2; eauto. i.
     esplits.
     - econs. econs; eauto.
-    - econs; ss. econs; eauto.
+    - econs; ss.
+      { econs; eauto. }
+      { subst. refl. }
     - ss.
   }
 
@@ -1653,6 +1740,7 @@ Proof.
       + econs; [|econs 2]; eauto.
       + ss.
       + ss. refl.
+      + ss.
     - ss.
     - ss.
     - ss.
@@ -1668,6 +1756,9 @@ Proof.
       + ss. inv LOCAL0. inv STEP'.
         eapply write_lower_lower_memory; eauto.
         eapply write_lower_memory_lower; try exact WRITE; eauto.
+      + i. ss. inv LOCAL0. inv STEP'.
+        eapply write_lower_lower_memory_same; eauto.
+        eapply write_same_memory_same in WRITE; eauto. destruct ord; ss.
     - ss.
     - ss.
     - ss.
@@ -1687,6 +1778,7 @@ Proof.
       + ss. inv LOCAL2. inv STEP'0.
         eapply write_lower_lower_memory; eauto.
         eapply write_lower_memory_lower; try exact WRITE; eauto.
+      + i. ss.
     - ss.
     - ss.
     - ss.
@@ -1698,6 +1790,7 @@ Proof.
       + econs; [|econs 5]; eauto. econs; eauto; ss. i. subst. ss.
       + ss.
       + ss. refl.
+      + ss.
     - ss.
     - inv LOCAL1. econs. ss.
       eapply write_fence_tview_mon_non_release; eauto; try refl.
@@ -1708,16 +1801,25 @@ Proof.
   }
 
   { (* na write *)
+    hexploit SAME; eauto. i. subst.
+    hexploit write_na_step_lower_memory_lower; eauto. i. des.
     exploit future_write_na_step; try exact LOCAL0; try exact LOCAL1; try exact SC1; try exact MEM1; eauto.
-    { inv LOCAL0. eapply write_na_lower_memory_lower; eauto. }
-    { inv LOCAL0. eapply write_na_lower_memory_lower; eauto. }
-    i. des. esplits.
+    { eapply List.Forall_forall. i.
+      eapply list_Forall2_in2 in KINDS; eauto. des. des_ifs. destruct x; ss.
+    }
+    { destruct kind; ss. }
+    i. des.
+    assert (mem2' = mem1').
+    { ss. inv LOCAL0. inv STEP'.
+      eapply write_na_lower_lower_memory; eauto;
+        eapply write_na_lower_memory_lower; try exact WRITE; eauto.
+    }
+    subst. esplits.
     - econs.
       + econs; [|econs 8]; eauto.
       + ss.
-      + ss. inv LOCAL0. inv STEP'.
-        eapply write_na_lower_lower_memory; eauto;
-          eapply write_na_lower_memory_lower; try exact WRITE; eauto.
+      + ss. refl.
+      + ss.
     - ss.
     - ss.
     - ss.
@@ -1731,6 +1833,7 @@ Proof.
       + econs; [|econs 9]; eauto.
       + ss.
       + ss. refl.
+      + ss.
     - ss.
     - ss.
     - ss.
