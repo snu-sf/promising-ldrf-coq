@@ -651,7 +651,7 @@ Module Oracle.
 
   Record output :=
     mk_output {
-        out_access: option (Perm.t * Const.t);
+        out_access: option (Perm.t);
         out_acquire: option (Perms.t * ValueMap.t);
         out_release: option (Perms.t);
       }.
@@ -664,8 +664,7 @@ Module Oracle.
   .
 
   Definition wf_output (e: ProgramEvent.t) (o: output): Prop :=
-    (<<UPDATE: forall v_new,
-        (exists p, o.(out_access) = Some (p, v_new)) <-> (exists l, is_accessing e = Some (l, v_new))>>) /\
+    (<<UPDATE: is_some o.(out_access) <-> is_accessing e>>) /\
     (<<ACQUIRE: is_some o.(out_acquire) <-> is_acquire e>>) /\
     (<<RELEASE: is_some o.(out_release) <-> is_release e>>)
   .
@@ -764,14 +763,14 @@ End Oracle.
 Module SeqEvent.
   Record input :=
     mk_input {
-        in_access: option (Loc.t * Const.t * Flag.t);
+        in_access: option (Loc.t * Const.t * Flag.t * Const.t);
         in_acquire: option (Flags.t);
         in_release: option (ValueMap.t * Flags.t);
       }.
 
-  Definition in_access_written (i: option (Loc.t * Const.t * Flag.t)): Flags.t :=
+  Definition in_access_written (i: option (Loc.t * Const.t * Flag.t * Const.t)): Flags.t :=
     match i with
-    | Some (loc, _, true) => Flags.add loc Flags.bot
+    | Some (loc, _, true, _) => Flags.add loc Flags.bot
     | _ => Flags.bot
     end.
 
@@ -786,12 +785,12 @@ Module SeqEvent.
 
   Definition get_oracle_input (i: input): Oracle.input :=
     Oracle.mk_input
-      (i.(in_access))
+      (option_map (fun '(loc, v_old, f, v_new) => (loc, v_old, f)) i.(in_access))
       (option_map (fun _ => tt) i.(in_acquire))
       (option_map (fun _ => tt) i.(in_release))
   .
 
-  Variant in_access_match: forall (d0 d1: Flags.t) (i_src i_tgt: option (Loc.t * Const.t * Flag.t)), Prop :=
+  Variant in_access_match: forall (d0 d1: Flags.t) (i_src i_tgt: option (Loc.t * Const.t * Flag.t * Const.t)), Prop :=
   | in_access_match_none
       d0 d1
       (FLAG: Flags.le d0 d1)
@@ -799,12 +798,12 @@ Module SeqEvent.
       in_access_match d0 d1 None None
   | in_access_match_some
       d0 d1
-      l v_src v_tgt f_src f_tgt
+      l v_src v_tgt f_src f_tgt v_new_src v_new_tgt
       (VAL: Const.le v_tgt v_src)
       (FLAG: Flag.le (Flag.join f_tgt (d0 l)) f_src)
       (DEFERRED: forall loc (LOC: loc <> l), Flag.le (d0 loc) (d1 loc))
     :
-      in_access_match d0 d1 (Some (l, v_src, f_src)) (Some (l, v_tgt, f_tgt))
+      in_access_match d0 d1 (Some (l, v_src, f_src, v_new_src)) (Some (l, v_tgt, f_tgt, v_new_tgt))
   .
 
   Variant in_acquire_match: forall (d0 d1: Flags.t) (i_src i_tgt: option (Flags.t)), Prop :=
@@ -909,7 +908,7 @@ Module SeqEvent.
     :
       in_access_match Flags.bot d i i.
   Proof.
-    destruct i as [[[] ?]|]; econs; eauto; ss.
+    destruct i as [[[[] ?] ?]|]; econs; eauto; ss.
     { refl. }
     { eapply Flag.join_spec; eauto. refl. }
   Qed.
@@ -942,34 +941,34 @@ Module SeqEvent.
   Qed.
 
   Definition wf_input (e: ProgramEvent.t) (i: input): Prop :=
-    (<<UPDATE: forall loc,
-        ((exists v_old f_old, i.(in_access) = Some (loc, v_old, f_old)) <-> (exists v, is_accessing e = Some (loc, v)))>>) /\
+    (<<UPDATE: forall loc v_new,
+        ((exists v_old f_old, i.(in_access) = Some (loc, v_old, f_old, v_new)) <-> (is_accessing e = Some (loc, v_new)))>>) /\
     (<<ACQUIRE: is_some i.(in_acquire) <-> is_acquire e>>) /\
     (<<RELEASE: is_some i.(in_release) <-> is_release e>>)
   .
 
-  Lemma wf_input_event_le e0 e1 i
-        (EVENT: ProgramEvent.le e0 e1)
-    :
-      wf_input e0 i <-> wf_input e1 i.
-  Proof.
-    unfold wf_input. destruct e0, e1; ss; des; clarify.
-    { split; i; des; splits; i; split; eauto.
-      { i. eapply UPDATE in H. des. inv H. eauto. }
-      { i. eapply UPDATE. des. inv H. eauto. }
-      { i. eapply UPDATE in H. des. inv H. eauto. }
-      { i. eapply UPDATE. des. inv H. eauto. }
-    }
-    { split; i; des; splits; i; split; eauto.
-      { i. eapply UPDATE in H. des. inv H. eauto. }
-      { i. eapply UPDATE. des. inv H. eauto. }
-      { i. eapply UPDATE in H. des. inv H. eauto. }
-      { i. eapply UPDATE. des. inv H. eauto. }
-    }
-  Qed.
+  (* Lemma wf_input_event_le e0 e1 i *)
+  (*       (EVENT: ProgramEvent.le e0 e1) *)
+  (*   : *)
+  (*     wf_input e0 i <-> wf_input e1 i. *)
+  (* Proof. *)
+  (*   unfold wf_input. destruct e0, e1; ss; des; clarify. *)
+  (*   { split; i; des; splits; i; split; eauto. *)
+  (*     { i. eapply UPDATE in H. des. inv H. eauto. } *)
+  (*     { i. eapply UPDATE. des. inv H. eauto. } *)
+  (*     { i. eapply UPDATE in H. des. inv H. eauto. } *)
+  (*     { i. eapply UPDATE. des. inv H. eauto. } *)
+  (*   } *)
+  (*   { split; i; des; splits; i; split; eauto. *)
+  (*     { i. eapply UPDATE in H. des. inv H. eauto. } *)
+  (*     { i. eapply UPDATE. des. inv H. eauto. } *)
+  (*     { i. eapply UPDATE in H. des. inv H. eauto. } *)
+  (*     { i. eapply UPDATE. des. inv H. eauto. } *)
+  (*   } *)
+  (* Qed. *)
 
   Variant step_update:
-    forall (i: option (Loc.t * Const.t * Flag.t)) (o: option (Perm.t * Const.t))
+    forall (i: option (Loc.t * Const.t * Flag.t * Const.t)) (o: option (Perm.t))
            (p0: Perms.t) (m0: SeqMemory.t) (p1: Perms.t) (m1: SeqMemory.t), Prop :=
   | step_update_none
       p m
@@ -984,7 +983,7 @@ Module SeqEvent.
       (MEM: SeqMemory.update loc v_new m0 v f m1)
     :
       step_update
-        (Some (loc, v, f)) (Some (p_new, v_new))
+        (Some (loc, v, f, v_new)) (Some (p_new))
         p0 m0 p1 m1
   .
 
@@ -1365,6 +1364,7 @@ Section SIMULATION.
           exists i_src mem_src d1,
             (<<STEP_SRC: SeqEvent.step i_src o p0 st_src1.(SeqState.memory) p1 mem_src>>) /\
             (<<MATCH: SeqEvent.input_match d0 d1 i_src i_tgt>>) /\
+            (<<INPUT: SeqEvent.wf_input e_src i_src>>) /\
             (<<SIM: sim_seq p1
                             d1
                             (SeqState.mk _ st_src2 mem_src)
