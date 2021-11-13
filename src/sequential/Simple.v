@@ -1242,6 +1242,7 @@ Section LANG.
       (INPUT: Oracle.input_le i0 (SeqEvent.get_oracle_input i1))
       (ORACLE: Oracle.step e0 i0 o o0 o1)
       (MEM: SeqEvent.step i1 o p0 m0 p1 m1)
+      (INPUT: SeqEvent.wf_input e1 i1)
     :
       at_step e1 i1 o (mk (SeqState.mk _ st0 m0) p0 o0) (mk (SeqState.mk _ st1 m1) p1 o1)
   .
