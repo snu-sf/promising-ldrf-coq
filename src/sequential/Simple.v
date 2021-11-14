@@ -16,7 +16,6 @@ Require Import Event.
 Set Implicit Arguments.
 
 
-
 Program Instance option_rel_PreOrder A R `{@PreOrder A R}: PreOrder (option_rel R).
 Next Obligation.
 Proof.
@@ -1116,15 +1115,16 @@ Module SeqEvent.
         i2 o2 p2 m2
         (STEP1: step_update i1 o1 p m p1 m1)
         (STEP2: step_update i2 o2 p m p2 m2)
-        (INPUT: forall loc1 v1 f1 loc2 v2 f2
-                  (IN1: i1 = Some (loc1, v1, f1))
-                  (IN2: i2 = Some (loc2, v2, f2)),
-            loc1 = loc2)
+        (INPUT: forall loc1 v_old1 f1 v_new1
+                  loc2 v_old2 f2 v_new2
+                  (IN1: i1 = Some (loc1, v_old1, f1, v_new1))
+                  (IN2: i2 = Some (loc2, v_old2, f2, v_new2)),
+            loc1 = loc2 /\ v_new1 = v_new2)
         (OUTPUT: o1 = o2):
     i1 = i2 /\ p1 = p2 /\ m1 = m2.
   Proof.
     subst. inv STEP1; inv STEP2; ss.
-    exploit INPUT; eauto. i. subst.
+    exploit INPUT; eauto. i. des. subst.
     inv MEM. inv MEM0. ss.
   Qed.
 
@@ -1160,10 +1160,11 @@ Module SeqEvent.
         i2 o2 p2 m2
         (STEP1: step i1 o1 p m p1 m1)
         (STEP2: step i2 o2 p m p2 m2)
-        (INPUT: forall loc1 v1 f1 loc2 v2 f2
-                  (IN1: i1.(in_access) = Some (loc1, v1, f1))
-                  (IN2: i2.(in_access) = Some (loc2, v2, f2)),
-            loc1 = loc2)
+        (INPUT: forall loc1 v_old1 f1 v_new1
+                  loc2 v_old2 f2 v_new2
+                  (IN1: i1.(in_access) = Some (loc1, v_old1, f1, v_new1))
+                  (IN2: i2.(in_access) = Some (loc2, v_old2, f2, v_new2)),
+            loc1 = loc2 /\ v_new1 = v_new2)
         (OUTPUT: o1 = o2):
     i1 = i2 /\ p1 = p2 /\ m1 = m2.
   Proof.
