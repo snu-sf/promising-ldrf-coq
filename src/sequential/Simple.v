@@ -1421,7 +1421,7 @@ Section SIMULATION.
     exists st_src1 st_src2 e_src,
       (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
       (<<STEP: lang_src.(Language.step) e_src st_src1.(SeqState.state) st_src2>>) /\
-      (<<EVENT: ProgramEvent.le e_src e_tgt>>) /\
+      (<<EVENT: ProgramEvent.le e_tgt e_src>>) /\
       (<<SIM: forall i_tgt o p1 mem_tgt
                      (INPUT: SeqEvent.wf_input e_tgt i_tgt)
                      (OUTPUT: Oracle.wf_output e_tgt o)
