@@ -2587,7 +2587,7 @@ Variant sim_memory
         (exists fto1 ffrom0 to from,
             (<<TS0: Time.le ffrom0 ffrom1>>) /\
             (<<TS1: Time.le fto0 fto1>>) /\
-            (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ffrom0 from>>) /\
+            (<<FROM: __guard__((ffrom0 = Time.bot /\ from = Time.bot) \/ sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ffrom0 from)>>) /\
             (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto1 to>>) /\
             (<<COVERED: forall ts (ITV: Interval.mem (from, to) ts),
                 covered loc ts mem_tgt>>)) \/
@@ -2616,7 +2616,7 @@ Lemma sim_memory_sound flag_src f vers mem_src mem_tgt loc fto0 ffrom1 msg_src
     (exists fto1 ffrom0 to from,
         (<<TS0: Time.le ffrom0 ffrom1>>) /\
         (<<TS1: Time.le fto0 fto1>>) /\
-        (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ffrom0 from>>) /\
+        (<<FROM: __guard__((ffrom0 = Time.bot /\ from = Time.bot) \/ sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ffrom0 from)>>) /\
         (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto1 to>>) /\
         (<<COVERED: forall ts (ITV: Interval.mem (from, to) ts),
             covered loc ts mem_tgt>>)) \/
@@ -2635,12 +2635,12 @@ Lemma sim_memory_sound_strong flag_src f vers mem_src mem_tgt loc fto0 ffrom1 ms
     (exists fto1 ffrom0 to from,
         (<<TS0: Time.le ffrom0 ffrom1>>) /\
         (<<TS1: Time.le fto0 fto1>>) /\
-        (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ffrom0 from>>) /\
+        (<<FROM: __guard__((ffrom0 = Time.bot /\ from = Time.bot) \/ sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ffrom0 from)>>) /\
         (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto1 to>>) /\
         (<<COVERED: forall ts (ITV: Interval.mem (from, to) ts),
             covered loc ts mem_tgt>>) /\
         (<<MAX: forall from' ffrom'
-                       (MAP: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ffrom' from')
+                       (MAP: __guard__((ffrom' = Time.bot /\ from' = Time.bot) \/ sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ffrom' from'))
                        (TS: Time.le ffrom' ffrom1),
             Time.le ffrom' ffrom0>>) /\
         (<<MIN: forall to' fto'
@@ -2654,31 +2654,58 @@ Proof.
   pose proof (mapping_latest_wf_loc (f loc)) as VERWF.
   inv SIM. hexploit SOUND; eauto. i. des; eauto. left.
   hexploit mapping_map_finite_exact; eauto. i. des.
-  hexploit (@finite_greatest (fun ts => Time.le ts ffrom1) (List.map snd l)). i. des; cycle 1.
-  { exfalso. eapply EMPTY.
-    { eapply List.in_map. eapply H. eapply FROM. }
-    { eauto. }
+  hexploit (@finite_greatest (fun ts => Time.le ts ffrom1) (Time.bot::(List.map snd l))). i. des; cycle 1.
+  { exfalso. unguard. des.
+    { eapply EMPTY.
+      { left. auto. }
+      { eapply Time.bot_spec. }
+    }
+    { eapply EMPTY.
+      { right. eapply List.in_map. eapply H. eapply FROM. }
+      { eauto. }
+    }
   }
   hexploit (@finite_least (fun ts => Time.le fto0 ts) (List.map snd l)). i. des; cycle 1.
   { exfalso. eapply EMPTY.
     { eapply List.in_map. eapply H. eapply TO. }
     { eauto. }
   }
-  eapply List.in_map_iff in IN. eapply List.in_map_iff in IN0. des. clarify.
-  destruct x, x0. eapply H in IN2. eapply H in IN1. ss.
-  eexists t0, t2. esplits; eauto.
+  assert (exists t0, __guard__((to0 = Time.bot /\ t0 = Time.bot) \/ sim_timestamp_exact (f loc) (Mapping.ver (f loc)) to0 t0)).
+  { ss. des.
+    { exists Time.bot. left. auto. }
+    { eapply List.in_map_iff in IN. des. clarify.
+      destruct x. eapply H in IN1. esplits. right. eauto.
+    }
+  }
+  des. clear IN.
+  eapply List.in_map_iff in IN0. des. clarify.
+  destruct x. eapply H in IN1. ss.
+  eexists t1, to0. esplits; eauto.
   { i. eapply COVERED. eapply Interval.le_mem; eauto. econs; eauto; ss.
-    { eapply sim_timestamp_exact_le_if; eauto.
-      eapply GREATEST; eauto. refine (List.in_map snd _ (_, _) _).
-      eapply H; eauto.
+    { unguard. des; clarify; try by eapply Time.bot_spec.
+      { hexploit (GREATEST ffrom0); eauto.
+        { right. refine (List.in_map snd _ (_, _) _). eapply H; eauto. }
+        i. destruct (Time.le_lt_dec from Time.bot); auto.
+        hexploit sim_timestamp_lt.
+        { eapply sim_timestamp_bot; eauto. }
+        { eapply FROM. }
+        { eauto. }
+        { eauto. }
+        { eauto. }
+        i. exfalso. timetac.
+      }
+      { eapply sim_timestamp_exact_le_if; eauto.
+        eapply GREATEST; eauto. right. refine (List.in_map snd _ (_, _) _).
+        eapply H; eauto.
+      }
     }
     { eapply sim_timestamp_exact_le_if; eauto.
       eapply LEAST; eauto. refine (List.in_map snd _ (_, _) _).
       eapply H; eauto.
     }
   }
-  { i. eapply GREATEST; eauto.
-    refine (List.in_map snd _ (_, _) _). eapply H; eauto.
+  { i. eapply GREATEST; eauto. inv MAP; des; clarify; auto.
+    right. refine (List.in_map snd _ (_, _) _). eapply H; eauto.
   }
   { i. eapply LEAST; eauto.
     refine (List.in_map snd _ (_, _) _). eapply H; eauto.
@@ -2711,7 +2738,9 @@ Proof.
     }
     { i. eapply COVERED. inv ITV. econs; ss.
       eapply TimeFacts.le_lt_lt; eauto.
-      eapply sim_timestamp_exact_le_if; eauto.
+      unguard. des; clarify.
+      { eapply Time.bot_spec. }
+      { eapply sim_timestamp_exact_le_if; eauto. }
     }
     i. des. inv TS2.
     { eapply COVER. econs; eauto. econs; ss.
@@ -2719,6 +2748,24 @@ Proof.
     { inv H. eapply ATTACH; eauto. }
   }
   { clarify. }
+Qed.
+
+Lemma sim_timestamp_exact_bot f v
+      (WF: Mapping.wf f)
+      (VERWF: loc_version_wf f v)
+  :
+    exists fbot,
+      (<<SIM: sim_timestamp_exact f v fbot Time.bot>>) /\
+      (<<BOT: forall ts fts (MAP: sim_timestamp_exact f v fts ts),
+          Time.le fbot fts>>).
+Proof.
+  hexploit sim_timestamp_exact_mon_ver.
+  { eapply Mapping.mapping_bot; eauto. }
+  { lia. }
+  { eauto. }
+  { eauto. }
+  i. des. esplits; eauto. i.
+  eapply sim_timestamp_exact_le; eauto. eapply Time.bot_spec.
 Qed.
 
 Lemma sim_memory_space flag_src f vers mem_src mem_tgt loc from_tgt to_tgt from_src to_src
@@ -2741,7 +2788,18 @@ Proof.
   hexploit sim_memory_sound; eauto. i. des.
   { assert (Interval.disjoint (from0, to0) (from_tgt, to_tgt)).
     { ii. eapply (get_disjoint_covered_disjoint DISJOINT); eauto. }
-    eapply sim_disjoint in H; cycle 2; eauto. eapply (H ts); auto.
+    assert (DISJ: Interval.disjoint (ffrom0, fto1) (from_src, to_src)).
+    { unguard. des.
+      { clarify. hexploit (@sim_timestamp_exact_bot (f loc) (f loc).(Mapping.ver)); eauto.
+        i. des. eapply sim_disjoint in H; cycle 1; eauto.
+        ii. eapply H; eauto.
+        inv LHS. econs; ss.
+        inv RHS. ss. eapply TimeFacts.le_lt_lt; [|eauto].
+        eapply BOT; eauto.
+      }
+      { eapply sim_disjoint; eauto. }
+    }
+    eapply (DISJ ts); auto.
     inv ITV. econs; ss.
     { eapply TimeFacts.le_lt_lt; eauto. }
     { etrans; eauto. }
@@ -2776,7 +2834,7 @@ Proof.
     { ss. des; clarify. left. esplits.
       { refl. }
       { refl. }
-      { eauto. }
+      { right. eauto. }
       { eauto. }
       i. econs.
       { eapply Memory.add_get0; eauto. }
@@ -2814,27 +2872,55 @@ Proof.
     guardH o. hexploit sim_memory_sound_strong; eauto. i. des; eauto.
     left. esplits; eauto. i. eapply remove_covered; eauto.
     splits; auto. eapply not_and_or. ii. des; subst.
-    eapply sim_disjoint_if; [..|eapply ITV|eapply H0]; eauto.
-    ii. ss.
-    hexploit memory_get_disjoint_strong.
-    { eapply GET. }
-    { eapply Memory.remove_get0; eauto. }
-    i. unguard. des; clarify.
-    { hexploit MIN; [|eapply TS|..]; eauto. i.
-      inv LHS. inv RHS. ss.
-      eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
-      { eapply FROM2. }
-      etrans.
-      { eapply TO1. }
-      { eauto. }
+    destruct FROM0 as [FROM0|FROM0]; des; clarify.
+    { hexploit (@sim_timestamp_exact_bot (f loc) (f loc).(Mapping.ver)); eauto. i. des.
+      eapply sim_disjoint_if; [..|eapply ITV|eapply H0]; eauto.
+      ii. ss.
+      hexploit memory_get_disjoint_strong.
+      { eapply GET. }
+      { eapply Memory.remove_get0; eauto. }
+      i. unguard. des; clarify.
+      { hexploit MIN; [|eapply TS|..]; eauto. i.
+        inv LHS. inv RHS. ss.
+        eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+        { eapply FROM1. }
+        etrans.
+        { eapply TO1. }
+        { eauto. }
+      }
+      { hexploit MAX; [|eapply TS|..]; eauto. i.
+        inv LHS. inv RHS. ss.
+        eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+        { eapply FROM0. }
+        etrans.
+        { eapply TO2. }
+        etrans.
+        { eapply H. }
+        { eapply Time.bot_spec. }
+      }
     }
-    { hexploit MAX; [|eapply TS|..]; eauto. i.
-      inv LHS. inv RHS. ss.
-      eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
-      { eapply FROM1. }
-      etrans.
-      { eapply TO2. }
-      { eauto. }
+    { eapply sim_disjoint_if; [..|eapply ITV|eapply H0]; eauto.
+      ii. ss.
+      hexploit memory_get_disjoint_strong.
+      { eapply GET. }
+      { eapply Memory.remove_get0; eauto. }
+      i. unguard. des; clarify.
+      { hexploit MIN; [|eapply TS|..]; eauto. i.
+        inv LHS. inv RHS. ss.
+        eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+        { eapply FROM2. }
+        etrans.
+        { eapply TO1. }
+        { eauto. }
+      }
+      { hexploit MAX; [|eapply TS|..]; eauto. i.
+        inv LHS. inv RHS. ss.
+        eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+        { eapply FROM1. }
+        etrans.
+        { eapply TO2. }
+        { eauto. }
+      }
     }
   }
 Qed.
@@ -3254,13 +3340,12 @@ Proof.
   }
   { i. hexploit sim_memory_sound; eauto. i. des.
     { left. esplits; eauto.
-      { eapply sim_timestamp_exact_mon_strong; eauto. }
+      { unguard. des; clarify; auto. right. eapply sim_timestamp_exact_mon_strong; eauto. }
       { eapply sim_timestamp_exact_mon_strong; eauto. }
     }
     { right. esplits; eauto. }
   }
 Qed.
-
 
 Lemma cap_sim_memory f0 vers mem_tgt0 mem_tgt1 mem_src0 mem_src1
       (MEM: sim_memory (fun _ => None) f0 vers mem_src0 mem_tgt0)
@@ -3330,10 +3415,10 @@ Proof.
     { etrans; eauto. eapply Memory.max_ts_spec in GET. des.
       erewrite <- Memory.cap_max_ts; eauto.
     }
-    { admit. }
+    { left. auto. }
     { i. eapply memory_cap_covered; eauto. }
   }
-Admitted.
+Qed.
 
 
 (* Variant sim_promises *)
