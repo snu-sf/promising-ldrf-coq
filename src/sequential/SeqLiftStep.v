@@ -108,7 +108,7 @@ Variant sim_local
     Local.t -> Local.t -> Prop :=
 | sim_local_intro
     tvw_src tvw_tgt prom_src prom_tgt rel_vers
-    (TVIEWW: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
+    (TVIEW: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
     (PROMISES: sim_promises flag_src flag_tgt f vers prom_src prom_tgt)
     (RELVERS: wf_release_vers vers prom_tgt rel_vers)
     (FLAGTGT: forall loc ts (FLAG: flag_tgt loc = Some ts),
@@ -157,35 +157,63 @@ Proof.
   { eapply FLAGTGT in FLAG. subst. auto. }
 Qed.
 
-Variant max_values_src (vs: Loc.t -> option Const.t)
+Lemma sim_local_racy f vers flag_src flag_tgt lc_src lc_tgt mem_src mem_tgt loc
+      (CONSISTENT: Local.promise_consistent lc_tgt)
+      (MEM: sim_memory flag_src f vers mem_src mem_tgt)
+      (SIM: sim_local f vers flag_src flag_tgt lc_src lc_tgt)
+      (WF: Mapping.wfs f)
+      (RACY: Local.is_racy lc_tgt mem_tgt loc Ordering.na)
+      (FLAGSRC: flag_src loc = None)
+      (FLAGTGT: flag_tgt loc = None)
+  :
+    Local.is_racy lc_src mem_src loc Ordering.na.
+Proof.
+  inv RACY. hexploit sim_memory_get; eauto. i. des. econs; eauto.
+  { inv SIM. ss.
+    destruct (Memory.get loc to_src prom_src) eqn:EQ; ss.
+    destruct p. hexploit sim_promises_get_if; eauto. i. des; ss; clarify.
+    eapply sim_timestamp_exact_unique in TO; eauto; clarify.
+  }
+  { unfold TView.racy_view in *. eapply sim_timestamp_lt; eauto.
+    { inv SIM. ss. eapply TVIEW. auto. }
+    { eapply mapping_latest_wf_loc. }
+  }
+  { inv MSG; ss. }
+  { i. hexploit MSG2; auto. i. inv MSG; ss. }
+Qed.
+
+Variant max_value_src (loc: Loc.t) (v: option Const.t)
         (mem: Memory.t)
   :
     forall (lc: Local.t), Prop :=
-| max_values_src_intro
+| max_value_src_intro
     tvw prom
-    (MAX: forall loc v0 (VAL: vs loc = Some v0),
-        exists released v1,
+    (MAX: forall v0 (VAL: v = Some v0),
+        exists released,
           (<<MAX: max_readable
                     mem
                     prom
                     loc
                     (tvw.(TView.cur).(View.pln) loc)
-                    v1 released>>) /\
-          (<<VAL: Const.le v0 v1>>))
-    (NONMAX: forall loc (VAL: vs loc = None),
+                    v0 released>>))
+    (NONMAX: forall (VAL: v = None),
         forall val released,
           ~ max_readable mem prom loc (tvw.(TView.cur).(View.pln) loc) val released)
   :
-    max_values_src vs mem (Local.mk tvw prom)
+    max_value_src loc v mem (Local.mk tvw prom)
 .
 
-Variant max_values_tgt (vs: Loc.t -> option Const.t)
+Definition max_values_src (vs: Loc.t -> option Const.t)
+           (mem: Memory.t) (lc: Local.t): Prop :=
+  forall loc, max_value_src loc (vs loc) mem lc.
+
+Variant max_value_tgt (loc: Loc.t) (v: option Const.t)
         (mem: Memory.t)
   :
     forall (lc: Local.t), Prop :=
-| max_values_tgt_intro
+| max_value_tgt_intro
     tvw prom
-    (MAX: forall loc v1 (VAL: vs loc = Some v1),
+    (MAX: forall v1 (VAL: v = Some v1),
         exists released v0,
           (<<MAX: max_readable
                     mem
@@ -195,8 +223,26 @@ Variant max_values_tgt (vs: Loc.t -> option Const.t)
                     v0 released>>) /\
           (<<VAL: Const.le v0 v1>>))
   :
-    max_values_tgt vs mem (Local.mk tvw prom)
+    max_value_tgt loc v mem (Local.mk tvw prom)
 .
+
+Definition max_values_tgt (vs: Loc.t -> option Const.t)
+           (mem: Memory.t) (lc: Local.t): Prop :=
+  forall loc, max_value_tgt loc (vs loc) mem lc.
+
+Lemma max_value_tgt_mon loc v mem lc0 lc1
+      (MAXTGT: max_value_tgt loc v mem lc0)
+      (PROM: lc0.(Local.promises) = lc1.(Local.promises))
+      (TVIEW: TView.le lc0.(Local.tview) lc1.(Local.tview))
+      (LOCAL: Local.wf lc1 mem)
+      (CONSISTENT: Local.promise_consistent lc1)
+  :
+    max_value_tgt loc v mem lc1.
+Proof.
+  inv MAXTGT. ss. subst. destruct lc1. econs. i.
+  hexploit MAX; eauto. i. des. ss.
+  hexploit max_readable_view_mon; eauto.
+Qed.
 
 Lemma max_values_tgt_mon vs mem lc0 lc1
       (MAXTGT: max_values_tgt vs mem lc0)
@@ -207,9 +253,7 @@ Lemma max_values_tgt_mon vs mem lc0 lc1
   :
     max_values_tgt vs mem lc1.
 Proof.
-  inv MAXTGT. ss. subst. destruct lc1. econs. i.
-  hexploit MAX; eauto. i. des. ss.
-  hexploit max_readable_view_mon; eauto.
+  ii. eapply max_value_tgt_mon; eauto.
 Qed.
 
 Variant sim_thread
@@ -227,6 +271,73 @@ Variant sim_thread
     (MAXTGT: max_values_tgt vs_tgt mem_tgt lc_tgt)
     (PERM: forall loc, option_rel (fun _ _ => True) (vs_src loc) (vs_tgt loc))
 .
+
+Lemma max_value_src_exists loc mem lc
+  :
+    exists v,
+      (<<MAX: max_value_src loc v mem lc>>).
+Proof.
+  destruct (classic (exists val released, max_readable mem lc.(Local.promises) loc (View.pln (TView.cur lc.(Local.tview)) loc) val released)).
+  { des. exists (Some val). splits. destruct lc. econs; ss.
+    i. clarify. esplits; eauto.
+  }
+  { exists None. splits. destruct lc. econs; ss.
+    ii. eapply H. eauto.
+  }
+Qed.
+
+Lemma race_non_max_readable mem prom tvw loc
+      (MAX: Local.is_racy (Local.mk tvw prom) mem loc Ordering.na)
+  :
+    forall val released, ~ max_readable mem prom loc (tvw.(TView.cur).(View.pln) loc) val released.
+Proof.
+  ii. inv H. inv MAX.
+  eapply MAX0 in RACE; eauto. ss. clarify.
+Qed.
+
+Lemma no_flag_max_value_same f vers flag_src flag_tgt lc_src lc_tgt mem_src mem_tgt loc v
+      (MEM: sim_memory flag_src f vers mem_src mem_tgt)
+      (LOCAL: sim_local f vers flag_src flag_tgt lc_src lc_tgt)
+      (FLAGSRC: flag_src loc = None)
+      (FLAGTGT: flag_tgt loc = None)
+      (MAX: max_value_src loc (Some v) mem_src lc_src)
+      (LOCALWF: Local.wf lc_tgt mem_tgt)
+      (CONSISTENT: Local.promise_consistent lc_tgt)
+      (WF: Mapping.wfs f)
+  :
+    max_value_tgt loc (Some v) mem_tgt lc_tgt.
+Proof.
+  inv MAX. destruct lc_tgt. econs. i. clarify.
+  hexploit MAX0; eauto. i. des.
+  assert (exists val released, max_readable mem_tgt promises loc (View.pln (TView.cur tview) loc) val released).
+  { apply NNPP. ii. hexploit non_max_readable_race.
+    { ii. eapply H; eauto. }
+    { eauto. }
+    { eauto. }
+    { i. eapply sim_local_racy in H0; eauto.
+      eapply race_non_max_readable in H0; eauto. }
+  }
+  des. esplits; eauto. inv H.
+  hexploit sim_memory_get; eauto; ss. i. des.
+  hexploit sim_timestamp_le.
+  2:{ eapply TO. }
+  2:{ refl. }
+  { inv LOCAL. eapply TVIEW; ss. }
+  { eauto. }
+  { eapply mapping_latest_wf_loc. }
+  i. inv MAX. inv H.
+  { hexploit MAX2; eauto.
+    { inv MSG; ss. }
+    i. hexploit sim_promises_get_if; eauto.
+    { inv LOCAL. eauto. }
+    i. des.
+    2:{ rewrite FLAGTGT in *; ss. }
+    eapply sim_timestamp_exact_unique in TO; eauto.
+    2:{ eapply mapping_latest_wf_loc. }
+    subst. clarify.
+  }
+  { inv H0. clarify. inv MSG; auto. }
+Qed.
 
 Lemma sim_thread_tgt_read_na
       f vers flag_src flag_tgt vs_src vs_tgt
@@ -255,7 +366,7 @@ Proof.
       { inv READ; ss. }
     }
   }
-  { i. inv SIM. inv MAXTGT.
+  { i. inv SIM. specialize (MAXTGT loc). inv MAXTGT.
     hexploit MAX; eauto. i. des.
     hexploit max_readable_read_only; eauto.
     i. des; auto. etrans; eauto.
@@ -275,7 +386,7 @@ Lemma sim_thread_tgt_read_na_racy
     vs_tgt loc = None.
 Proof.
   destruct (vs_tgt loc) eqn:VAL; auto.
-  inv SIM. inv MAXTGT. hexploit MAX; eauto. i. des.
+  inv SIM. specialize (MAXTGT loc). inv MAXTGT. hexploit MAX; eauto. i. des.
   exfalso. eapply max_readable_not_read_race; eauto.
   Unshelve.
 Qed.
@@ -294,12 +405,12 @@ Lemma sim_thread_src_read_na
     exists to vw,
       Local.read_step lc_src mem_src loc to val_src vw Ordering.na lc_src.
 Proof.
-  inv SIM. inv MAXSRC. hexploit MAX; eauto. i. des.
+  inv SIM. specialize (MAXSRC loc). inv MAXSRC. hexploit MAX; eauto. i. des.
   hexploit max_readable_read.
   { eauto. }
   { eauto. }
   { eauto. }
-  { instantiate (1:=val_src). etrans; eauto. }
+  { instantiate (1:=val_src). auto. }
   i. des. esplits; eauto.
 Qed.
 
@@ -317,7 +428,7 @@ Lemma sim_thread_src_read_na_racy
   :
     Local.racy_read_step lc_src mem_src loc val_src Ordering.na.
 Proof.
-  inv SIM. inv MAXSRC.
+  inv SIM. specialize (MAXSRC loc). inv MAXSRC.
   hexploit non_max_readable_read; eauto.
   eapply sim_local_consistent; eauto.
 Qed.
@@ -335,7 +446,7 @@ Lemma sim_thread_tgt_write_na_racy
     vs_tgt loc = None.
 Proof.
   destruct (vs_tgt loc) eqn:VAL; auto.
-  inv SIM. inv MAXTGT. hexploit MAX; eauto. i. des.
+  inv SIM. specialize (MAXTGT loc). inv MAXTGT. hexploit MAX; eauto. i. des.
   exfalso. eapply max_readable_not_write_race; eauto.
 Qed.
 
@@ -353,7 +464,7 @@ Lemma sim_thread_src_write_na_racy
   :
     Local.racy_write_step lc_src mem_src loc Ordering.na.
 Proof.
-  inv SIM. inv MAXSRC.
+  inv SIM. specialize (MAXSRC loc). inv MAXSRC.
   hexploit non_max_readable_write; eauto.
   eapply sim_local_consistent; eauto.
 Qed.
@@ -388,7 +499,7 @@ Lemma cap_max_values_src vs mem cap lc
   :
     max_values_src vs cap lc.
 Proof.
-  inv MAX. econs.
+  ii. specialize (MAX loc). inv MAX. econs.
   { i. hexploit MAX0; eauto. i. des. esplits; eauto.
     erewrite <- cap_max_readable; eauto. eapply LOCAL.
   }
@@ -405,7 +516,7 @@ Lemma cap_max_values_tgt vs mem cap lc
   :
     max_values_tgt vs cap lc.
 Proof.
-  inv MAX. econs.
+  ii. specialize (MAX loc). inv MAX. econs.
   i. hexploit MAX0; eauto. i. des. esplits; eauto.
   erewrite <- cap_max_readable; eauto. eapply LOCAL.
 Qed.
@@ -671,6 +782,18 @@ Proof.
   { i. eapply SIM. }
 Qed.
 
+Variant update_access_values
+        (vs_src0 vs_tgt0: Loc.t -> option Const.t)
+        (vs_src1 vs_tgt1: Loc.t -> option Const.t): Prop :=
+
+Variant acquired_values
+        (loc
+        (vs_src0 vs_tgt0: Loc.t -> option Const.t)
+        (vs_src1 vs_tgt1: Loc.t -> option Const.t): Prop :=
+| acquired_values_intro
+
+
+
 Lemma sim_thread_read
       f vers flag_src flag_tgt vs_src0 vs_tgt0
       mem_src mem_tgt lc_src0 lc_tgt0 sc_src sc_tgt
@@ -681,13 +804,15 @@ Lemma sim_thread_read
               mem_src mem_tgt lc_src0 lc_tgt0 sc_src sc_tgt)
       (CONSISTNET: Local.promise_consistent lc_tgt1)
       (LOCAL: Local.wf lc_tgt0 mem_tgt)
-      (MEM: Memory.closed mem_tgt)
+      (MEMSRC: Memory.closed mem_src)
+      (MEMTGT: Memory.closed mem_tgt)
       (FLAGSRC: flag_src loc = None)
       (FLAGTGT: flag_tgt loc = None)
       (ACQ: forall loc (ORD: Ordering.le Ordering.acqrel ord)
                    (FLAG: flag_src loc = None),
           flag_tgt loc = None)
       (WF: Mapping.wfs f)
+      (VERS: versions_wf f vers)
   :
     exists lc_src1 to_src released_src vs_src1 vs_tgt1,
       (<<READ: Local.read_step lc_src0 mem_src loc to_src val released_src ord lc_src1>>) /\
@@ -695,7 +820,12 @@ Lemma sim_thread_read
       (<<RELEASED: sim_opt_view (fun loc0 => loc0 <> loc) f (vers loc to_tgt) released_src released_tgt>>) /\
       (<<SIM: sim_thread
                 f vers flag_src flag_tgt vs_src1 vs_tgt1
-                mem_src mem_tgt lc_src1 lc_tgt1 sc_src sc_tgt>>)
+                mem_src mem_tgt lc_src1 lc_tgt1 sc_src sc_tgt>>) /\
+      (<<VALS: forall loc0,
+
+
+
+
 .
 Proof.
   inv READ. inv SIM.
@@ -711,10 +841,26 @@ Proof.
   }
   { eauto. }
   { auto. }
-    { inv LOCAL0. econs; eauto; ss.
-      { econs; eauto.
-        { eapply sim_read_tview; eauto.
-          {
+  { inv LOCAL0. econs; eauto; ss.
+    { econs; eauto.
+      { eapply sim_read_tview; eauto.
+        { rewrite H0. auto. }
+        { eapply MEMSRC in GET0. des. eapply message_to_time_le_opt_view; eauto. }
+        { eapply MEMTGT in GET. des. eapply message_to_time_le_opt_view; eauto. }
+      }
+      { i. auto. admit. }
+      { i. auto. admit. }
+    }
+    { admit. }
+    { admit. }
+  }
+
+          }
+
+
+            Memory.get
+
+            <- H0.
 
 admit. }
     { admit. }
