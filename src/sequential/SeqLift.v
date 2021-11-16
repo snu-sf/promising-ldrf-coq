@@ -3420,6 +3420,47 @@ Proof.
   }
 Qed.
 
+Lemma added_memory_sim_memory f0 f1 flag_src vers mem_tgt mem_src0 mem_src1 loc ts_tgt ts_src msgs
+      (MEM: sim_memory flag_src f0 vers mem_src0 mem_tgt)
+      (WF: Mapping.wfs f0)
+      (VERS: versions_wf f0 vers)
+      (ADDED: added_memory loc msgs mem_src0 mem_src1)
+      (FLAG: flag_src loc = Some ts_src)
+      (TS: forall from_tgt msg_tgt
+                  (RESERVE: msg_tgt <> Message.reserve)
+                  (GETTGT: Memory.get loc ts_tgt mem_tgt = Some (from_tgt, msg_tgt)),
+          exists from_src msg_src,
+            (<<GETSRC: Memory.get loc ts_src mem_src0 = Some (from_src, msg_src)>>) /\
+            (<<MSG: sim_message false f0 (vers loc ts_tgt) msg_src msg_tgt>>))
+      (MSGCOMPLETE: forall to_tgt from_tgt msg_tgt
+                           (RESERVE: msg_tgt <> Message.reserve)
+                           (GETTGT: Memory.get loc to_tgt mem_tgt = Some (from_tgt, msg_tgt))
+                           (TS: Time.lt ts_tgt to_tgt),
+          exists to_src from_src msg_src,
+            (<<TO: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
+            (<<MSG: sim_message false f0 (vers loc to_tgt) msg_src msg_tgt>>) /\
+            (<<IN: List.In (from_src, to_src, msg_src) msgs>>))
+      (MSGSOUND: forall to_src from_src msg_src
+                        (IN: List.In (from_src, to_src, msg_src) msgs),
+          exists to_tgt from_tgt msg_tgt,
+            (<<TO: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
+            (<<FROM: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
+            (<<GET: Memory.get loc to_tgt mem_tgt = Some (from_tgt, msg_tgt)>>))
+      (MAPWF: Mapping.wf f1)
+      (MAPLE: Mapping.le (f0 loc) f1)
+      (SHIFTSAME: forall to fto
+                         (TS: Time.lt to ts_tgt)
+                         (MAP: sim_timestamp_exact (f0 loc) (f0 loc).(Mapping.ver) fto to),
+          sim_timestamp_exact f1 f1.(Mapping.ver) fto to)
+      (SHIFTTS: sim_timestamp_exact f1 f1.(Mapping.ver) ts_src ts_tgt)
+  :
+    sim_memory
+      (fun loc' => if Loc.eq_dec loc' loc then None else flag_src loc')
+      (fun loc' => if Loc.eq_dec loc' loc then f1 else f0 loc')
+      vers mem_src1 mem_tgt.
+Proof.
+Admitted.
+
 
 (* Variant sim_promises *)
 (*         (f: Mapping.ts) *)
