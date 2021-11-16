@@ -239,6 +239,16 @@ Section DETERMINISM.
 End DETERMINISM.
 #[export] Hint Resolve deterministic_mon: paco.
 
+Lemma deterministic_steps
+      lang e1 e2 st st1 st2
+      (DETERM: deterministic lang st)
+      (STEP1: lang.(Language.step) e1 st st1)
+      (STEP2: lang.(Language.step) e2 st st2):
+  similar e1 e2 /\ (e1 = e2 -> st1 = st2).
+Proof.
+  punfold DETERM. inv DETERM. eauto.
+Qed.
+
 Lemma step_deterministic
       lang e st0 st1
       (DETERM: deterministic lang st0)
@@ -958,7 +968,7 @@ Section ADEQUACY.
     apply IHSTEP; eauto.
     exploit state_step_subset; eauto. i. inv x0. s.
     punfold DETERM. inv DETERM. exploit PRESERVE; eauto. i.
-    inv x; try done.
+    inv x; ss.
   Qed.
 
   Lemma state_step_behavior_ub
@@ -993,7 +1003,18 @@ Section ADEQUACY.
     apply IHSTEP; eauto.
     exploit state_step_subset; eauto. i. inv x0. s.
     punfold DETERM. inv DETERM. exploit PRESERVE; eauto. i.
-    inv x; try done.
+    inv x; ss.
+  Qed.
+
+  Lemma rtc_na_step_deterministic
+        lang p st1 st2
+        (DETERM: deterministic _ st1.(SeqState.state))
+        (STEPS: rtc (@SeqState.na_step lang p MachineEvent.silent) st1 st2):
+    deterministic _ st2.(SeqState.state).
+  Proof.
+    induction STEPS; ss.
+    apply IHSTEPS. inv H. ss.
+    eapply step_deterministic; eauto.
   Qed.
 
   Lemma rtc_state_step_deterministic
@@ -1005,6 +1026,17 @@ Section ADEQUACY.
     induction STEP; ss.
     exploit state_step_subset; eauto. i. inv x0.
     apply IHSTEP. eapply step_deterministic; eauto.
+  Qed.
+
+  Lemma state_steps_deterministic
+        tr st1 st2 p1 p2
+        (DETERM: deterministic _ st1.(SeqState.state))
+        (STEP: state_steps state_step tr st1 st2 p1 p2):
+    deterministic _ st2.(SeqState.state).
+  Proof.
+    induction STEP; ss.
+    apply IHSTEP. exploit rtc_state_step_deterministic; eauto. i.
+    eapply step_deterministic; eauto.
   Qed.
 
   Lemma wf_input_in_access
@@ -1063,6 +1095,22 @@ Section ADEQUACY.
       esplits; [econs 2; eauto|]; eauto.
     - exploit IHBEH; eauto. i. des.
       esplits; [econs 3; eauto|]; eauto.
+  Qed.
+
+  Lemma behavior_steps_at_step
+        lang step (th1: SeqThread.t lang) e i o tr r
+        (BEH: SeqBehavior.behavior step th1 ((e, i, o) :: tr, r)):
+    exists st2 st3,
+      (<<STEPS: rtc (step th1.(SeqThread.perm) MachineEvent.silent) th1.(SeqThread.state) st2>>) /\
+      (<<STEP: lang.(Language.step) e st2.(SeqState.state) st3>>).
+  Proof.
+    remember ((e, i, o) :: tr, r) as res.
+    revert e i o tr r Heqres.
+    dependent induction BEH; i; inv Heqres; ss.
+    - exploit IHBEH; eauto. i. des.
+      inv STEP. ss.
+      esplits; [econs 2; eauto|]; eauto.
+    - inv STEP. ss. esplits; eauto.
   Qed.
 
   Lemma at_step_behavior
@@ -1190,7 +1238,6 @@ Section ADEQUACY.
     { exploit behavior_steps_ub; eauto. i. des.
       inv TRACE. ss. esplits; eauto.
     }    
-
     exploit rtc_state_step_behavior_ub; eauto. i. inv TRACE.
     exploit rtc_state_step_deterministic; eauto. i.
     destruct tr_src' as [|[[e' i'] o'] tr_src'].
@@ -1209,11 +1256,44 @@ Section ADEQUACY.
         rewrite x2 in *.
         exploit na_local_step_na_event; eauto. ss.
     }
-
     exploit at_step_behavior; try exact LSTEP; try exact x0; eauto. i. des. inv EVENT.
     exploit IHSTEPS; try exact H3; try eapply BEH2; eauto.
     { eapply step_deterministic; try eapply LSTEP; eauto. }
     i. des. subst. esplits; eauto. ss.
+  Qed.
+
+  Lemma steps_behavior_prefix_partial
+        tr_src tr_tgt
+        st1 st2 p1 p2
+        orc_init orc tr_src' e i o tr_src_ex f_src
+        (DETERM: deterministic _ st1.(SeqState.state))
+        (TRACE: Forall2 simple_match_event tr_src tr_tgt)
+        (STRACE: Forall2 simple_match_event tr_src' tr_tgt)
+        (STEPS: state_steps state_step tr_src st1 st2 p1 p2)
+        (ORACLE: oracle_follows_trace orc_init tr_tgt orc)
+        (BEH: SeqBehavior.behavior state_step (SeqThread.mk st1 p1 orc)
+                                   (tr_src' ++ [(e, i, o)] ++ tr_src_ex, SeqTrace.partial f_src)):
+    exists orc',
+      (<<LE1: oracle_le orc' orc_init>>) /\
+        (<<LE2: oracle_le orc_init orc'>>) /\
+        (<<TRACES: tr_src = tr_src'>>) /\
+        (<<BEH_EX: SeqBehavior.behavior state_step (SeqThread.mk st2 p2 orc')
+                                        ((e, i, o) :: tr_src_ex, SeqTrace.partial f_src)>>).
+  Proof.
+    revert tr_src' tr_tgt orc TRACE STRACE ORACLE BEH.
+    induction STEPS; i.
+    { inv TRACE. inv STRACE. inv ORACLE. esplits; eauto. }
+    exploit rtc_state_step_behavior; eauto.
+    { destruct tr_src'; ss. }
+    i. inv TRACE. inv STRACE.
+    exploit at_step_behavior; try exact LSTEP; try exact x0; eauto.
+    { eapply rtc_state_step_deterministic; eauto. }
+    i. des. subst.
+    exploit IHSTEPS; try exact H5; try eapply BEH2; eauto.
+    { eapply step_deterministic; try eapply LSTEP; eauto.
+      eapply rtc_state_step_deterministic; eauto.
+    }
+    i. des. subst. esplits; eauto.
   Qed.
 
   Lemma trace_le_cases
@@ -1262,6 +1342,20 @@ Section ADEQUACY.
     induction STEPS; try by econs 1.
     { econs 2; eauto. inv STEP. econs. eauto. }
     { econs 3; eauto. }
+  Qed.
+
+  Lemma simple_match_last_inv
+        tr_src tr_tgt e_tgt
+        (MATCH: Forall2 simple_match_event tr_src (tr_tgt ++ [e_tgt])):
+    exists tr_src' e_src,
+      tr_src = tr_src' ++ [e_src] /\
+        Forall2 simple_match_event tr_src' tr_tgt /\
+        simple_match_event e_src e_tgt.
+  Proof.
+    revert tr_src MATCH. induction tr_tgt; ss; i.
+    { inv MATCH. inv H3. esplits; eauto. ss. }
+    inv MATCH. exploit IHtr_tgt; eauto. i. des. subst.
+    esplits; eauto. ss.
   Qed.
 
   Lemma refinement_implies_simulation_aux
@@ -1372,12 +1466,36 @@ Section ADEQUACY.
              (e_src : ProgramEvent.t),
               rtc (SeqState.na_step p1 MachineEvent.silent) st1_src st_src1 /\
               Language.step lang_src e_src (SeqState.state st_src1) st_src2 /\
-              ProgramEvent.le e_src e_tgt).
+              ProgramEvent.le e_tgt e_src).
       { i. des. esplits; eauto. i.
         exploit steps_behavior_at_step; eauto.
         { instantiate (2:=orc). eapply oracle_of_trace_follows. }
+        intro BEH_TGT. des.
+        exploit REFINE; try exact BEH_TGT.
+        { eapply oracle_of_trace_wf.
+          - eapply state_steps_wf_trace; eauto.
+          - eapply add_oracle_wf; eauto.
+            eapply wf_input_oracle_wf_input. ss.
+        }
         i. des.
-        admit.
+        exploit trace_le_cases; eauto. i. des; try congr; subst.
+        { (* src partial *)
+          inv PARTIAL0.
+          exploit simple_match_last_inv; try exact PARTIAL1. i. des. subst. clear PARTIAL1.
+          (* exploit state_steps_deterministic; eauto; ss. i. *)
+          (* exploit rtc_na_step_deterministic; eauto. i. *)
+          (* exploit deterministic_steps;[|exact  *)
+          destruct e_src0 as [[e_src0 i_src] o_src]. inv x3.
+          rewrite <- app_assoc in x.
+          exploit steps_behavior_prefix_partial; try exact STEPS_SRC; try exact x; eauto.
+          { eapply match_trace_simple_match; eauto. }
+          { apply oracle_of_trace_follows. }
+          i. des. symmetry in TRACES0. subst.
+          (** TODO *)
+          exploit behavior_steps_at_step; eauto. s. i. des.
+          esplits; try exact STEP; ss.
+          eapply rtc_implies; try eapply STEPS. eauto.
+        }
       }
 
       specialize (event_step_exists_full e_tgt p1 st1_tgt.(SeqState.memory)). i. des.
@@ -1392,55 +1510,21 @@ Section ADEQUACY.
       }
       i. des.
       exploit trace_le_cases; eauto. i. des; try congr; subst.
-      { (* partial *)
+      { (* src partial *)
         inv PARTIAL0.
-
-        Lemma steps_behavior_prefix_partial
-              tr_src tr_tgt
-              st1 st2 p1 p2
-              orc_init orc tr_src' e i o tr_src_ex f_src
-              (DETERM: deterministic _ st1.(SeqState.state))
-              (TRACE: Forall2 simple_match_event tr_src tr_tgt)
-              (STRACE: Forall2 simple_match_event tr_src' tr_tgt)
-              (STEPS: state_steps state_step tr_src st1 st2 p1 p2)
-              (ORACLE: oracle_follows_trace orc_init tr_tgt orc)
-              (BEH: SeqBehavior.behavior state_step (SeqThread.mk st1 p1 orc)
-                                         (tr_src' ++ [(e, i, o)] ++ tr_src_ex, SeqTrace.partial f_src)):
-          (<<TRACES: tr_src = tr_src'>>) /\
-          exists st3,
-            (<<NASTEPS: rtc (state_step p2 MachineEvent.silent) st2 st3>>) /\
-            (<<TERMINAL: lang_src.(Language.is_terminal) st3.(SeqState.state)>>) /\
-            (<<VALUE_MAP: st3.(SeqState.memory).(SeqMemory.value_map) = v_src>>) /\
-            (<<FLAGS: st3.(SeqState.memory).(SeqMemory.flags) = f_src>>).
-        Proof.
-          revert tr_src' tr_tgt orc v_src f_src TRACE STRACE ORACLE BEH.
-          induction STEPS; i.
-          { clear ORACLE DETERM. inv TRACE. inv STRACE. split; ss.
-            remember (SeqThread.mk st p orc) as th1.
-            remember ([], SeqTrace.term v_src f_src) as tr.
-            revert st v_src f_src Heqth1 Heqtr.
-            induction BEH; i; inv Heqth1; try inv Heqtr.
-            - esplits; eauto; ss.
-            - inv STEP. exploit IHBEH; eauto. i. des. esplits.
-              + econs 2; eauto.
-              + ss.
-              + ss.
-              + ss.
-          }
-          exploit rtc_state_step_behavior; eauto.
-          { ii. subst. inv STRACE. inv TRACE. }
-          i. inv TRACE. inv STRACE.
-          exploit at_step_behavior; try exact LSTEP; try exact x0; eauto.
-          { eapply rtc_state_step_deterministic; eauto. }
-          i. des. subst.
-          exploit IHSTEPS; try exact H5; try eapply BEH2; eauto.
-          { eapply step_deterministic; try eapply LSTEP; eauto.
-            eapply rtc_state_step_deterministic; eauto.
-          }
-          i. des. subst. esplits; eauto.
-        Qed.
+        exploit simple_match_last_inv; try exact PARTIAL1. i. des. subst. clear PARTIAL1.
+        destruct e_src as [[e_src i_src] o_src]. inv x3.
+        rewrite <- app_assoc in x.
+        exploit steps_behavior_prefix_partial; try exact STEPS_SRC; try exact x; eauto.
+        { eapply match_trace_simple_match; eauto. }
+        { apply oracle_of_trace_follows. }
+        i. des. symmetry in TRACES0. subst.
+        exploit behavior_steps_at_step; eauto. s. i. des.
+        esplits; try exact STEP; ss.
+        eapply rtc_implies; try eapply STEPS. eauto.
       }
-      { admit.
+      { (* src ub *)
+        admit.
       }
     }
 
