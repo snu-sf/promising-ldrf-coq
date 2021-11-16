@@ -1,6 +1,7 @@
 Require Import Bool.
 Require Import RelationClasses.
 Require Import List.
+Require Import Program.
 
 From sflib Require Import sflib.
 From Paco Require Import paco.
@@ -60,7 +61,7 @@ Proof.
 Qed.
 
 
-(* facts on oracle *)
+(** oracle_le *)
 
 Variant _oracle_le (oracle_le: Oracle.t -> Oracle.t -> Prop): Oracle.t -> Oracle.t -> Prop :=
 | oracle_le_intro
@@ -117,6 +118,32 @@ Next Obligation.
   right. eapply CIH; eauto.
 Qed.
 
+Lemma oracle_le_steps
+      lang step tr (st1: SeqState.t lang) p1 orc1 orc1' st2 p2 orc2
+      (ORACLE: oracle_le orc1 orc1')
+      (STEPS: SeqThread.steps step tr
+                              (SeqThread.mk st1 p1 orc1)
+                              (SeqThread.mk st2 p2 orc2)):
+  exists orc2',
+    SeqThread.steps step tr
+                    (SeqThread.mk st1 p1 orc1')
+                    (SeqThread.mk st2 p2 orc2').
+Proof.
+  remember (SeqThread.mk st1 p1 orc1) as th1.
+  remember (SeqThread.mk st2 p2 orc2) as th2.
+  revert st1 p1 orc1 orc1' st2 p2 orc2 ORACLE Heqth1 Heqth2.
+  dependent induction STEPS; i; subst.
+  { inv Heqth2. esplits. econs 1. }
+  { inv STEP. exploit IHSTEPS; eauto. i. des.
+    esplits. econs 2; eauto. econs. ss.
+  }
+  { inv STEP. punfold ORACLE. inv ORACLE.
+    exploit LE; eauto. i. des. inv LE1; try done.
+    exploit IHSTEPS; try eapply H; eauto. i. des.
+    esplits. econs 3; try exact x. econs; eauto.
+  }
+Qed.
+
 Lemma wf_in_access_some
       (i: option (Loc.t * Const.t * Flag.t * Const.t)) e
       (WF: forall loc v_new,
@@ -169,11 +196,14 @@ Proof.
   - destruct in_release; ss.
 Qed.
 
+
+(** dummy_oracle *)
+
 Definition dummy_oracle_step
-           (pe: ProgramEvent.t) (i: Oracle.input) (o: Oracle.output) (orc0 orc1: unit): Prop :=
+           (_t: Type) (pe: ProgramEvent.t) (i: Oracle.input) (o: Oracle.output) (orc0 orc1: _t): Prop :=
   Oracle.wf_input pe i /\ o = oracle_simple_output i.
 
-Definition dummy_oracle: Oracle.t := Oracle.mk dummy_oracle_step tt.
+Definition dummy_oracle: Oracle.t := Oracle.mk (@dummy_oracle_step unit) tt.
 
 Lemma dummy_oracle_wf: Oracle.wf dummy_oracle.
 Proof.
@@ -191,6 +221,9 @@ Proof.
     Unshelve.
     all: ss.
 Qed.
+
+
+(** oracle_of_trace *)
 
 Definition oracle_similar_input_access (i1 i2: option (Loc.t * Const.t * Flag.t)): bool :=
   match i1, i2 with
@@ -335,7 +368,8 @@ Inductive oracle_follows_trace (orc0: Oracle.t):
   forall (tr: list (ProgramEvent.t * SeqEvent.input * Oracle.output)) (orc: Oracle.t), Prop :=
 | oracle_follows_trace_nil
     orc
-    (LE: oracle_le orc orc0):
+    (LE1: oracle_le orc orc0)
+    (LE2: oracle_le orc0 orc):
     oracle_follows_trace orc0 [] orc
 | oracle_follows_trace_cons
     e i o tr orc1
@@ -364,14 +398,24 @@ Proof.
   generalize _o at 1.
   revert _o i o FOLLOWS.
   induction tr; i.
-  { inv FOLLOWS. econs 1.
-    revert orc0 _o _o0 LE. pcofix CIH. i. pfold. econs. i.
-    inv STEP. existT_elim. subst. inv STEP0. ss.
-    punfold LE. inv LE. exploit LE0.
-    { econs. eauto. }
-    i. des. inv LE1; try done.
-    exploit CIH; eauto. i.
-    esplits; eauto.
+  { inv FOLLOWS. econs.
+    - clear LE2. revert orc0 _o _o0 LE1.
+      pcofix CIH. i. pfold. econs. i.
+      inv STEP. existT_elim. subst. inv STEP0. ss.
+      punfold LE1. inv LE1. exploit LE.
+      { econs. eauto. }
+      i. des. inv LE1; try done.
+      exploit CIH; eauto. i.
+      esplits; eauto.
+    - clear LE1. revert orc0 _o _o0 LE2.
+      pcofix CIH. i. pfold. econs. i.
+      punfold LE2. inv LE2. exploit LE; eauto. i. des.
+      inv LE1; try done.
+      inv STEP0. existT_elim. subst.
+      exploit CIH; eauto. i.
+      esplits.
+      { econs. econs. eauto. }
+      right. eauto.
   }
   inv FOLLOWS. econs; i.
   - inv STEP. existT_elim. subst. inv STEP0.
@@ -388,7 +432,7 @@ Lemma oracle_of_trace_follows tr orc_init:
   oracle_follows_trace orc_init tr (oracle_of_trace tr orc_init).
 Proof.
   induction tr.
-  { econs. ss. apply oracle_le_refl. }
+  { econs; ss; apply oracle_le_refl. }
   destruct a as [[e i] o]. econs; i.
   - inv STEP. existT_elim. subst. inv STEP0.
     unfold oracle_output_of_event. condtac; ss. splits; ss. i.
@@ -503,4 +547,137 @@ Proof.
     - eapply oracle_output_of_event_wf; eauto.
       apply wf_input_oracle_wf_input. ss.
   }
+Qed.
+
+
+(** add_oracle *)
+
+Inductive add_oracle_t (_t: Type): Type :=
+| add_oracle_init (orc: _t)
+| add_oracle_orc (orc: _t)
+.
+
+Variant add_oracle_step (e: ProgramEvent.t) (i: Oracle.input) (o: Oracle.output)
+        (_t: Type) (step: ProgramEvent.t -> Oracle.input -> Oracle.output -> _t -> _t -> Prop):
+  forall (e: ProgramEvent.t) (i: Oracle.input) (o: Oracle.output)
+    (orc0 orc1: add_oracle_t _t), Prop :=
+| add_oracle_step_init_event
+    orc0:
+    add_oracle_step e i o step e i o (add_oracle_init orc0) (add_oracle_orc orc0)
+| add_oracle_step_init_orc
+    e' i' o' orc0 orc1
+    (STEP: step e' i' o' orc0 orc1):
+    add_oracle_step e i o step e' i' o' (add_oracle_init orc0) (add_oracle_orc orc1)
+| add_oracle_step_orc
+    e' i' o' orc0 orc1
+    (STEP: step e' i' o' orc0 orc1):
+    add_oracle_step e i o step e' i' o' (add_oracle_orc orc0) (add_oracle_orc orc1)
+.
+
+Definition add_oracle
+           (e: ProgramEvent.t) (i: Oracle.input) (o: Oracle.output) (orc: Oracle.t): Oracle.t :=
+  Oracle.mk (add_oracle_step e i o orc.(Oracle._step)) (add_oracle_init orc.(Oracle._o)).
+
+Lemma add_oracle_orc_le e i o _t step orc:
+  oracle_le (Oracle.mk (@add_oracle_step e i o _t step) (add_oracle_orc orc)) (Oracle.mk step orc).
+Proof.
+  revert orc. pcofix CIH. i. pfold. econs. i.
+  inv STEP. existT_elim. subst. inv STEP0. esplits.
+  - econs. eauto.
+  - right. ss.
+Qed.
+
+Lemma add_oracle_spec
+      e i o orc_init
+      e' i' o' orc0 orc1
+      (ORACLE: orc0 = add_oracle e i o orc_init)
+      (STEP: Oracle.step e' i' o' orc0 orc1):
+  (e' = e /\ i' = i /\ o' = o /\ oracle_le orc1 orc_init) \/
+  (exists orc_init1,
+      (<<STEP: Oracle.step e' i' o' orc_init orc_init1>>) /\
+      (<<LE: oracle_le orc1 orc_init1>>)).
+Proof.
+  subst. inv STEP. existT_elim. subst. inv STEP0.
+  - left. splits; ss.
+    destruct orc_init. ss. eapply add_oracle_orc_le; eauto.
+  - right. destruct orc_init. ss. esplits.
+    + econs. eauto.
+    + eapply add_oracle_orc_le; eauto.
+Qed.
+
+Lemma add_oracle_init_progress
+      e i o _t step orc
+      e'
+      (PROGRESS: Oracle.progress e' (Oracle.mk step orc)):
+  Oracle.progress e' (Oracle.mk (@add_oracle_step e i o _t step) (add_oracle_init orc)).
+Proof.
+  unfold Oracle.progress in *. i.
+  exploit PROGRESS; eauto. i. des.
+  inv STEP. existT_elim. subst.
+  esplits; eauto. econs. econs. eauto.
+Qed.
+
+Lemma add_oracle_orc_progress
+      e i o _t step orc
+      e'
+      (PROGRESS: Oracle.progress e' (Oracle.mk step orc)):
+  Oracle.progress e' (Oracle.mk (@add_oracle_step e i o _t step) (add_oracle_orc orc)).
+Proof.
+  unfold Oracle.progress in *. i.
+  exploit PROGRESS; eauto. i. des.
+  inv STEP. existT_elim. subst.
+  esplits; eauto. econs. econs. eauto.
+Qed.
+
+Lemma add_oracle_orc_wf
+      e i o _t step orc
+      (WF: Oracle.wf (Oracle.mk step orc)):
+  Oracle.wf (Oracle.mk (@add_oracle_step e i o _t step) (add_oracle_orc orc)).
+Proof.
+  revert orc WF. pcofix CIH. i.
+  punfold WF. inv WF.
+  pfold. econs; i; eauto using add_oracle_orc_progress.
+  - inv STEP. existT_elim. subst. inv STEP0.
+    exploit WF0; [econs; eauto|]. i. des.
+    inv ORACLE; try done. splits; auto.
+  - specialize (LOAD loc ord). des. exists val.
+    apply add_oracle_orc_progress. ss.
+Qed.
+
+Lemma add_oracle_wf
+      e i o orc_init
+      (WF_INPUT: Oracle.wf_input e i)
+      (WF_OUTPUT: Oracle.wf_output e o)
+      (WF: Oracle.wf orc_init):
+  Oracle.wf (add_oracle e i o orc_init).
+Proof.
+  destruct orc_init.
+  dup WF. punfold WF. inv WF.
+  pfold. econs; i; eauto using add_oracle_init_progress.
+  { inv STEP. existT_elim. subst. inv STEP0.
+    - splits; auto. left. apply add_oracle_orc_wf. ss.
+    - exploit WF1; [econs; eauto|]. i. des.
+      inv ORACLE; try done. splits; ss.
+      left. eapply add_oracle_orc_wf. ss.
+  }
+  { specialize (LOAD loc ord). des. exists val.
+    eapply add_oracle_init_progress. ss.
+  }
+Qed.
+
+Definition oracle_input_of_event (e: ProgramEvent.t) (m: SeqMemory.t): Oracle.input :=
+  Oracle.mk_input
+    (match is_accessing e with
+     | Some (loc, _) => Some (loc, m.(SeqMemory.value_map) loc, m.(SeqMemory.flags) loc)
+     | None => None
+     end)
+    (if is_acquire e then Some () else None)
+    (if is_release e then Some () else None)
+.
+
+Lemma oracle_input_of_event_wf e m:
+  Oracle.wf_input e (oracle_input_of_event e m).
+Proof.
+  unfold Oracle.wf_input. splits; ss; try by des_ifs.
+  ss. des_ifs; split; i; des; inv H; eauto.
 Qed.

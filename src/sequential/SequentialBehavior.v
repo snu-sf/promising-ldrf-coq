@@ -255,6 +255,22 @@ Section ADEQUACY.
   Variable state_step:
     Perms.t -> MachineEvent.t -> SeqState.t lang_src -> SeqState.t lang_src -> Prop.
 
+  Definition lang_read_value (lang: language): Prop :=
+    (<<READ: forall loc val ord st1 st2 val'
+               (STEP: lang.(Language.step) (ProgramEvent.read loc val ord) st1 st2),
+        (<<READ': exists st2',
+            lang.(Language.step) (ProgramEvent.read loc val' ord) st1 st2'>>) \/
+        (<<UPDATE': exists valw ordw st2',
+            lang.(Language.step) (ProgramEvent.update loc val' valw ord ordw) st1 st2'>>)>>) /\
+    (<<UPDATE: forall loc valr valw ordr ordw st1 st2 valr'
+               (STEP: lang.(Language.step) (ProgramEvent.update loc valr valw ordr ordw) st1 st2),
+        (<<READ': exists st2',
+            lang.(Language.step) (ProgramEvent.read loc valr' ordr) st1 st2'>>) \/
+        (<<UPDATE': exists valw' st2',
+            lang.(Language.step) (ProgramEvent.update loc valr' valw' ordr ordw) st1 st2'>>)>>).
+
+  Hypothesis lang_read_value_src: lang_read_value lang_src.
+
   Hypothesis state_step_subset: state_step <4= (@SeqState.na_step _).
 
   Hypothesis state_step_determ:
@@ -277,6 +293,113 @@ Section ADEQUACY.
   Proof.
     ii. specialize (TOP p m o WF).
     exploit REFINE; eauto. i. des. eauto.
+  Qed.
+
+
+  (** lemmas on event and event step *)
+
+  Lemma le_is_accessing
+        e1 e2
+        (LE: ProgramEvent.le e1 e2):
+    is_accessing e1 <-> is_accessing e2.
+  Proof.
+    destruct e1, e2; ss; inv LE; des; subst; ss.
+  Qed.
+
+  Lemma le_is_acquire
+        e1 e2
+        (LE: ProgramEvent.le e1 e2):
+    is_acquire e1 <-> is_acquire e2.
+  Proof.
+    destruct e1, e2; ss; inv LE; des; subst; ss.
+  Qed.
+
+  Lemma le_is_release
+        e1 e2
+        (LE: ProgramEvent.le e1 e2):
+    is_release e1 <-> is_release e2.
+  Proof.
+    destruct e1, e2; ss; inv LE; des; subst; ss.
+  Qed.
+
+  Lemma le_wf_output
+        e1 e2 o
+        (LE: ProgramEvent.le e1 e2):
+    Oracle.wf_output e1 o <-> Oracle.wf_output e2 o.
+  Proof.
+    unfold Oracle.wf_output. unnw.
+    erewrite le_is_accessing, le_is_acquire, le_is_release; eauto.
+  Qed.
+
+  Lemma event_step_update_exists
+        e (o: option Perm.t) p1 m1
+        (WF_OUTPUT: o <-> is_accessing e):
+    exists i,
+      (<<WF: forall loc v_new,
+          ((exists v_old f_old, i = Some (loc, v_old, f_old, v_new)) <->
+           (is_accessing e = Some (loc, v_new)))>>) /\
+      exists p2 m2, (<<STEP: SeqEvent.step_update i o p1 m1 p2 m2>>).
+  Proof.
+    exists (match is_accessing e with
+       | Some (loc, v_new) =>
+         Some (loc, m1.(SeqMemory.value_map) loc, m1.(SeqMemory.flags) loc, v_new)
+       | None => None
+       end).
+    split.
+    { split; i; des_ifs; des; ss; eauto. inv H. ss. }
+    { des_ifs; destruct o; try by intuition.
+      - esplits. econs; eauto. econs.
+      - esplits. econs.
+    }
+  Qed.
+
+  Lemma event_step_acquire_exists
+        e (o: option (Perms.t * ValueMap.t)) p1 m1
+        (WF_OUTPUT: o <-> is_acquire e):
+    exists (i: option Flags.t),
+      (<<WF: i <-> is_acquire e>>) /\
+      exists p2 m2, (<<STEP: SeqEvent.step_acquire i o p1 m1 p2 m2>>).
+  Proof.
+    exists (if is_acquire e then Some m1.(SeqMemory.flags) else None).
+    split.
+    { split; i; des_ifs; des; ss; eauto. }
+    { des_ifs; destruct o as [[]|]; try by intuition.
+      - esplits. econs; eauto. econs.
+      - esplits. econs.
+    }
+  Qed.
+
+  Lemma event_step_release_exists
+        e (o: option Perms.t) p1 m1
+        (WF_OUTPUT: o <-> is_release e):
+    exists (i: option (ValueMap.t * Flags.t)),
+      (<<WF: i <-> is_release e>>) /\
+      exists p2 m2, (<<STEP: SeqEvent.step_release i o p1 m1 p2 m2>>).
+  Proof.
+    exists (if is_release e then Some (m1.(SeqMemory.value_map), m1.(SeqMemory.flags)) else None).
+    split.
+    { split; i; des_ifs; des; ss; eauto. }
+    { des_ifs; destruct o; try by intuition.
+      - esplits. econs; eauto. econs.
+      - esplits. econs.
+    }
+  Qed.
+
+  Lemma event_step_exists
+        e o p1 m1
+        (WF_OUTPUT: Oracle.wf_output e o):
+    exists i,
+      (<<WF: SeqEvent.wf_input e i>>) /\
+      exists p2 m2,
+        (<<STEP: SeqEvent.step i o p1 m1 p2 m2>>).
+  Proof.
+    unfold Oracle.wf_output in *. destruct o. ss. splitsH.
+    exploit (event_step_update_exists e out_access p1 m1); ss. i. des.
+    exploit (event_step_acquire_exists e out_acquire p2 m2); ss. i. des.
+    exploit (event_step_release_exists e out_release p0 m0); ss. i. des.
+    exists (SeqEvent.mk_input i i0 i1). split.
+    - unfold SeqEvent.wf_input. splits; ss.
+    - esplits. econs; eauto.
   Qed.
 
 
@@ -553,6 +676,141 @@ Section ADEQUACY.
       econs 5; try eapply IHSTEPS; try eapply FOLLOWS; eauto.
       destruct st0, st3. econs; eauto; try refl.
   Qed.
+
+  Lemma steps_behavior_ub
+        lang step orc0 tr (st0 st1 st2 st3: SeqState.t lang) p0 p1 orc
+        (STEPS: state_steps step tr st0 st1 p0 p1)
+        (NASTEPS: rtc (step p1 MachineEvent.silent) st1 st2)
+        (FAILURE: step p1 MachineEvent.failure st2 st3)
+        (ORACLE: oracle_follows_trace orc0 tr orc):
+    SeqBehavior.behavior step (SeqThread.mk st0 p0 orc) (tr, SeqTrace.ub).
+  Proof.
+    revert orc ORACLE. induction STEPS; i.
+    - eapply na_steps_behavior; eauto.
+      destruct st2. econs 3; eauto. econs. econs. eauto.
+    - eapply na_steps_behavior; eauto.
+      inv ORACLE. exploit COMPLETE; try refl.
+      { eapply wf_input_oracle_wf_input; eauto. }
+      i. des. exploit SOUND; eauto. i. des. exploit x0; try refl. i. des.
+      econs 5; try eapply IHSTEPS; try eapply FOLLOWS; eauto.
+      destruct st0, st4. econs; eauto; try refl.
+  Qed.
+
+  Lemma event_step_oracle_input
+        e ie o p1 m1 p2 m2
+        (WF: SeqEvent.wf_input e ie)
+        (STEP: SeqEvent.step ie o p1 m1 p2 m2):
+    SeqEvent.get_oracle_input ie = oracle_input_of_event e m1.
+  Proof.
+    destruct ie. inv STEP; ss.
+    unfold SeqEvent.wf_input, SeqEvent.get_oracle_input, oracle_input_of_event in *.
+    ss. splitsH.
+    repeat f_equal.
+    - inv UPD; ss; des_ifs; ss.
+      + specialize (H t t0). des. exploit H5; eauto. i. des. ss.
+      + specialize (H t t0). des. exploit H5; eauto. i. des. inv x.
+        inv MEM. ss.
+      + specialize (H loc v_new). des. exploit H; eauto. i. ss.
+    - inv ACQ; ss; condtac; ss; intuition.
+    - inv REL; ss; condtac; ss; intuition.
+  Qed.
+
+  Lemma steps_behavior_at_step
+        lang step orc0 tr (st0 st1 st2: SeqState.t lang) p0 p1 orc
+        e i o st3 p3 m3
+        (STEPS: state_steps step tr st0 st1 p0 p1)
+        (NASTEPS: rtc (step p1 MachineEvent.silent) st1 st2)
+        (ATSTEP: lang.(Language.step) e st2.(SeqState.state) st3)
+        (ESTEP: SeqEvent.step i o p1 st2.(SeqState.memory) p3 m3)
+        (ATOMIC: is_atomic_event e)
+        (INPUT: SeqEvent.wf_input e i)
+        (OUTPUT: Oracle.wf_output e o)
+        (ORACLE: oracle_follows_trace (add_oracle e (SeqEvent.get_oracle_input i) o orc0) tr orc):
+      exists f, SeqBehavior.behavior step (SeqThread.mk st0 p0 orc)
+                                (tr ++ [(e, i, o)], SeqTrace.partial f).
+  Proof.
+    revert orc ORACLE. induction STEPS; i.
+    { destruct st2. ss. destruct m3. ss.
+      assert (exists orc', Oracle.step e (SeqEvent.get_oracle_input i) o orc orc').
+      { inv ORACLE. punfold LE2. inv LE2.
+        exploit LE.
+        { econs. econs 1. }
+        i. des. esplits; eauto.
+      }
+      des.
+      esplits.
+      eapply na_steps_behavior; eauto. econs 5.
+      - econs; try refl; eauto.
+      - econs 2.
+    }
+    clear INPUT OUTPUT.
+    inv ORACLE. exploit COMPLETE; try refl.
+    { eapply wf_input_oracle_wf_input; eauto. }
+    i. des. exploit SOUND; eauto. i. des. exploit x0; try refl. i. des.
+    exploit IHSTEPS; eauto. i. des. esplits; eauto. ss.
+    eapply na_steps_behavior; eauto.
+    econs 5; try eapply IHSTEPS; try eapply FOLLOWS; eauto.
+    destruct st0, st4. econs; eauto; try refl.
+  Qed.
+
+  Lemma event_step_exists_full e p1 m1:
+    exists i o p2 m2,
+      (<<WF_INPUT: SeqEvent.wf_input e i>>) /\
+      (<<WF_OUTPUT: Oracle.wf_output e o>>) /\
+      (<<ESTEP: SeqEvent.step i o p1 m1 p2 m2>>).
+  Proof.
+    specialize (oracle_input_of_event_wf e m1). i.
+    exploit oracle_simple_output_wf; eauto. i.
+    exploit event_step_exists; eauto. i. des. esplits; eauto.
+  Qed.
+
+  (* Lemma steps_behavior_at_step *)
+  (*       lang step orc0 tr (st0 st1 st2: SeqState.t lang) p0 p1 orc *)
+  (*       e i o st3 *)
+  (*       (STEPS: state_steps step tr st0 st1 p0 p1) *)
+  (*       (NASTEPS: rtc (step p1 MachineEvent.silent) st1 st2) *)
+  (*       (ATSTEP: lang.(Language.step) e st2.(SeqState.state) st3) *)
+  (*       (ATOMIC: is_atomic_event e) *)
+  (*       (INPUT: i = oracle_input_of_event e st2.(SeqState.memory)) *)
+  (*       (OUTPUT: o = oracle_simple_output i) *)
+  (*       (ORACLE: oracle_follows_trace (add_oracle e i o orc0) tr orc): *)
+  (*   exists ie f, *)
+  (*     (<<INPUT: i = SeqEvent.get_oracle_input ie>>) /\ *)
+  (*     (<<BEH: SeqBehavior.behavior step (SeqThread.mk st0 p0 orc) *)
+  (*                                  (tr ++ [(e, ie, o)], SeqTrace.partial f)>>). *)
+  (* Proof. *)
+  (*   revert orc ORACLE. induction STEPS; i. *)
+  (*   { destruct st2. ss. *)
+  (*     assert (exists orc', Oracle.step e i o orc orc'). *)
+  (*     { inv ORACLE. punfold LE2. inv LE2. *)
+  (*       exploit LE. *)
+  (*       { econs. econs 1. } *)
+  (*       i. des. esplits; eauto. *)
+  (*     } *)
+  (*     i. des. *)
+  (*     exploit oracle_input_of_event_wf. rewrite <- INPUT. i. *)
+  (*     exploit oracle_simple_output_wf; eauto. i. *)
+  (*     exploit event_step_exists; eauto. *)
+  (*     instantiate (1:=memory). *)
+  (*     instantiate (1:=p). *)
+  (*     i. des. destruct m2. *)
+  (*     exploit event_step_oracle_input; try exact WF; eauto. rewrite <- INPUT. i. subst. *)
+  (*     esplits. *)
+  (*     - eauto. *)
+  (*     - eapply na_steps_behavior; eauto. econs 5. *)
+  (*       + econs; try refl; eauto. *)
+  (*         rewrite x2. eauto. *)
+  (*       + econs 2. *)
+  (*   } *)
+  (*   clear INPUT OUTPUT. *)
+  (*   inv ORACLE. exploit COMPLETE; try refl. *)
+  (*   { eapply wf_input_oracle_wf_input; eauto. } *)
+  (*   i. des. exploit SOUND; eauto. i. des. exploit x0; try refl. i. des. *)
+  (*   exploit IHSTEPS; eauto. i. des. esplits; eauto. ss. *)
+  (*   eapply na_steps_behavior; eauto. *)
+  (*   econs 5; try eapply IHSTEPS; try eapply FOLLOWS; eauto. *)
+  (*   destruct st0, st4. econs; eauto; try refl. *)
+  (* Qed. *)
   
   Lemma wf_input_wf_output
         e i o p1 m1 p2 m2
@@ -994,32 +1252,6 @@ Section ADEQUACY.
     - inv UB. right. right.
       esplits; eauto.
   Qed.
-  
-  Lemma oracle_le_steps
-        lang step tr (st1: SeqState.t lang) p1 orc1 orc1' st2 p2 orc2
-        (ORACLE: oracle_le orc1 orc1')
-        (STEPS: SeqThread.steps step tr
-                                (SeqThread.mk st1 p1 orc1)
-                                (SeqThread.mk st2 p2 orc2)):
-    exists orc2',
-      SeqThread.steps step tr
-                      (SeqThread.mk st1 p1 orc1')
-                      (SeqThread.mk st2 p2 orc2').
-  Proof.
-    remember (SeqThread.mk st1 p1 orc1) as th1.
-    remember (SeqThread.mk st2 p2 orc2) as th2.
-    revert st1 p1 orc1 orc1' st2 p2 orc2 ORACLE Heqth1 Heqth2.
-    dependent induction STEPS; i; subst.
-    { inv Heqth2. esplits. econs 1. }
-    { inv STEP. exploit IHSTEPS; eauto. i. des.
-      esplits. econs 2; eauto. econs. ss.
-    }
-    { inv STEP. punfold ORACLE. inv ORACLE.
-      exploit LE; eauto. i. des. inv LE1; try done.
-      exploit IHSTEPS; try eapply H; eauto. i. des.
-      esplits. econs 3; try exact x. econs; eauto.
-    }
-  Qed.
 
   Lemma steps_implies
         lang step1 step2 tr (th1 th2: SeqThread.t lang)
@@ -1095,7 +1327,7 @@ Section ADEQUACY.
         i. des. subst.
         exfalso.
         inv ORACLE2. destruct th. ss.
-        exploit oracle_le_steps; try exact LE; try exact STEPS. i. des.
+        exploit oracle_le_steps; try exact LE1; try exact STEPS. i. des.
         exploit steps_implies; try exact x2; try apply state_step_subset. i.
         eapply NONUB0; eauto; cycle 1.
         { unfold SeqThread.failure. esplits. econs. eauto. }
@@ -1113,30 +1345,11 @@ Section ADEQUACY.
         inv STEP_TGT. inv LOCAL; ss. destruct (p1 loc); ss.
       }
       { (* failure *)
-
-        Lemma steps_behavior_ub
-              lang step orc0 tr (st0 st1 st2 st3: SeqState.t lang) p0 p1 orc
-              (STEPS: state_steps step tr st0 st1 p0 p1)
-              (NASTEPS: rtc (step p1 MachineEvent.silent) st1 st2)
-              (FAILURE: step p1 MachineEvent.failure st2 st3)
-              (ORACLE: oracle_follows_trace orc0 tr orc):
-          SeqBehavior.behavior step (SeqThread.mk st0 p0 orc) (tr, SeqTrace.ub).
-        Proof.
-          revert orc ORACLE. induction STEPS; i.
-          - eapply na_steps_behavior; eauto.
-            destruct st2. econs 3; eauto. econs. econs. eauto.
-          - eapply na_steps_behavior; eauto.
-            inv ORACLE. exploit COMPLETE; try refl.
-            { eapply wf_input_oracle_wf_input; eauto. }
-            i. des. exploit SOUND; eauto. i. des. exploit x0; try refl. i. des.
-            econs 5; try eapply IHSTEPS; try eapply FOLLOWS; eauto.
-            destruct st0, st4. econs; eauto; try refl.
-        Qed.
         exploit steps_behavior_ub; eauto.
         { eapply (oracle_of_trace_follows tr_tgt orc). }
         intro BEH_TGT.
         exploit REFINE; try exact BEH_TGT.
-        { apply oracle_of_trace_wf. eapply state_steps_wf_trace; eauto. ss. }
+        { apply oracle_of_trace_wf; ss. eapply state_steps_wf_trace; eauto. }
         i. des.
         exploit trace_le_cases; eauto. i. des; try congr. subst.
         exploit steps_behavior_prefix_ub; try exact STEPS_SRC; try exact x; eauto.
@@ -1145,7 +1358,7 @@ Section ADEQUACY.
         i. des. subst.
         exfalso.
         inv ORACLE2. destruct th. ss.
-        exploit oracle_le_steps; try exact LE; try exact STEPS. i. des.
+        exploit oracle_le_steps; try exact LE1; try exact STEPS. i. des.
         exploit steps_implies; try exact x2; try apply state_step_subset. i.
         eapply NONUB0; eauto; cycle 1.
         { unfold SeqThread.failure. esplits. econs. eauto. }
@@ -1155,133 +1368,80 @@ Section ADEQUACY.
 
     { (* at step *)
       ii.
-      cut (exists (st_src1 : SeqState.t lang_src) (st_src2 : Language.state lang_src) 
+      cut (exists (st_src1 : SeqState.t lang_src) (st_src2 : Language.state lang_src)
              (e_src : ProgramEvent.t),
               rtc (SeqState.na_step p1 MachineEvent.silent) st1_src st_src1 /\
               Language.step lang_src e_src (SeqState.state st_src1) st_src2 /\
               ProgramEvent.le e_src e_tgt).
       { i. des. esplits; eauto. i.
-        Lemma le_is_accessing
-              e1 e2
-              (LE: ProgramEvent.le e1 e2):
-          is_accessing e1 <-> is_accessing e2.
-        Proof.
-          destruct e1, e2; ss; inv LE; des; subst; ss.
-        Qed.
-        Lemma le_is_acquire
-              e1 e2
-              (LE: ProgramEvent.le e1 e2):
-          is_acquire e1 <-> is_acquire e2.
-        Proof.
-          destruct e1, e2; ss; inv LE; des; subst; ss.
-        Qed.
-        Lemma le_is_release
-              e1 e2
-              (LE: ProgramEvent.le e1 e2):
-          is_release e1 <-> is_release e2.
-        Proof.
-          destruct e1, e2; ss; inv LE; des; subst; ss.
-        Qed.
-
-        Lemma le_wf_output
-              e1 e2 o
-              (LE: ProgramEvent.le e1 e2):
-          Oracle.wf_output e1 o <-> Oracle.wf_output e2 o.
-        Proof.
-          unfold Oracle.wf_output. unnw.
-          erewrite le_is_accessing, le_is_acquire, le_is_release; eauto.
-        Qed.
-        Lemma event_step_update_exists
-              e (o: option Perm.t) p1 m1
-              (WF_OUTPUT: o <-> is_accessing e):
-          exists i,
-            (<<WF: forall loc v_new,
-                ((exists v_old f_old, i = Some (loc, v_old, f_old, v_new)) <->
-                 (is_accessing e = Some (loc, v_new)))>>) /\
-            exists p2 m2, (<<STEP: SeqEvent.step_update i o p1 m1 p2 m2>>).
-        Proof.
-          exists (match is_accessing e with
-             | Some (loc, v_new) =>
-               Some (loc, m1.(SeqMemory.value_map) loc, m1.(SeqMemory.flags) loc, v_new)
-             | None => None
-             end).
-          split.
-          { split; i; des_ifs; des; ss; eauto. inv H. ss. }
-          { des_ifs; destruct o; try by intuition.
-            - esplits. econs; eauto. econs.
-            - esplits. econs.
-          }
-        Qed.
-        Lemma event_step_acquire_exists
-              e (o: option (Perms.t * ValueMap.t)) p1 m1
-              (WF_OUTPUT: o <-> is_acquire e):
-          exists (i: option Flags.t),
-            (<<WF: i <-> is_acquire e>>) /\
-            exists p2 m2, (<<STEP: SeqEvent.step_acquire i o p1 m1 p2 m2>>).
-        Proof.
-          exists (if is_acquire e then Some m1.(SeqMemory.flags) else None).
-          split.
-          { split; i; des_ifs; des; ss; eauto. }
-          { des_ifs; destruct o as [[]|]; try by intuition.
-            - esplits. econs; eauto. econs.
-            - esplits. econs.
-          }
-        Qed.
-        Lemma event_step_release_exists
-              e (o: option Perms.t) p1 m1
-              (WF_OUTPUT: o <-> is_release e):
-          exists (i: option (ValueMap.t * Flags.t)),
-            (<<WF: i <-> is_release e>>) /\
-            exists p2 m2, (<<STEP: SeqEvent.step_release i o p1 m1 p2 m2>>).
-        Proof.
-          exists (if is_release e then Some (m1.(SeqMemory.value_map), m1.(SeqMemory.flags)) else None).
-          split.
-          { split; i; des_ifs; des; ss; eauto. }
-          { des_ifs; destruct o; try by intuition.
-            - esplits. econs; eauto. econs.
-            - esplits. econs.
-          }
-        Qed.
-        Lemma event_step_exists
-              e o p1 m1
-              (WF_OUTPUT: Oracle.wf_output e o):
-          exists i,
-            (<<WF: SeqEvent.wf_input e i>>) /\
-            exists p2 m2,
-              (<<STEP: SeqEvent.step i o p1 m1 p2 m2>>).
-        Proof.
-          unfold Oracle.wf_output in *. destruct o. ss. splitsH.
-          exploit (event_step_update_exists e out_access p1 m1); ss. i. des.
-          exploit (event_step_acquire_exists e out_acquire p2 m2); ss. i. des.
-          exploit (event_step_release_exists e out_release p0 m0); ss. i. des.
-          exists (SeqEvent.mk_input i i0 i1). split.
-          - unfold SeqEvent.wf_input. splits; ss.
-          - esplits. econs; eauto.
-        Qed.
-        exploit (@event_step_exists e_src o p1 st_src1.(SeqState.memory)).
-        { erewrite le_wf_output; eauto. }
+        exploit steps_behavior_at_step; eauto.
+        { instantiate (2:=orc). eapply oracle_of_trace_follows. }
         i. des.
         admit.
       }
-      Lemma steps_behavior_ub
-            lang step orc0 tr (st0 st1 st2 st3: SeqState.t lang) p0 p1 orc
-            (STEPS: state_steps step tr st0 st1 p0 p1)
-            (NASTEPS: rtc (step p1 MachineEvent.silent) st1 st2)
-            (FAILURE: step p1 MachineEvent.failure st2 st3)
-            (ORACLE: oracle_follows_trace orc0 tr orc):
-        SeqBehavior.behavior step (SeqThread.mk st0 p0 orc) (tr, SeqTrace.ub).
-      Proof.
-        revert orc ORACLE. induction STEPS; i.
-        - eapply na_steps_behavior; eauto.
-          destruct st2. econs 3; eauto. econs. econs. eauto.
-        - eapply na_steps_behavior; eauto.
-          inv ORACLE. exploit COMPLETE; try refl.
-          { eapply wf_input_oracle_wf_input; eauto. }
-          i. des. exploit SOUND; eauto. i. des. exploit x0; try refl. i. des.
-          econs 5; try eapply IHSTEPS; try eapply FOLLOWS; eauto.
-          destruct st0, st4. econs; eauto; try refl.
-      Qed.
-      admit.
+
+      specialize (event_step_exists_full e_tgt p1 st1_tgt.(SeqState.memory)). i. des.
+      exploit steps_behavior_at_step; eauto.
+      { instantiate (2:=orc). eapply oracle_of_trace_follows. }
+      intro BEH_TGT. des.
+      exploit REFINE; try exact BEH_TGT.
+      { eapply oracle_of_trace_wf.
+        - eapply state_steps_wf_trace; eauto.
+        - eapply add_oracle_wf; eauto.
+          eapply wf_input_oracle_wf_input. ss.
+      }
+      i. des.
+      exploit trace_le_cases; eauto. i. des; try congr; subst.
+      { (* partial *)
+        inv PARTIAL0.
+
+        Lemma steps_behavior_prefix_partial
+              tr_src tr_tgt
+              st1 st2 p1 p2
+              orc_init orc tr_src' e i o tr_src_ex f_src
+              (DETERM: deterministic _ st1.(SeqState.state))
+              (TRACE: Forall2 simple_match_event tr_src tr_tgt)
+              (STRACE: Forall2 simple_match_event tr_src' tr_tgt)
+              (STEPS: state_steps state_step tr_src st1 st2 p1 p2)
+              (ORACLE: oracle_follows_trace orc_init tr_tgt orc)
+              (BEH: SeqBehavior.behavior state_step (SeqThread.mk st1 p1 orc)
+                                         (tr_src' ++ [(e, i, o)] ++ tr_src_ex, SeqTrace.partial f_src)):
+          (<<TRACES: tr_src = tr_src'>>) /\
+          exists st3,
+            (<<NASTEPS: rtc (state_step p2 MachineEvent.silent) st2 st3>>) /\
+            (<<TERMINAL: lang_src.(Language.is_terminal) st3.(SeqState.state)>>) /\
+            (<<VALUE_MAP: st3.(SeqState.memory).(SeqMemory.value_map) = v_src>>) /\
+            (<<FLAGS: st3.(SeqState.memory).(SeqMemory.flags) = f_src>>).
+        Proof.
+          revert tr_src' tr_tgt orc v_src f_src TRACE STRACE ORACLE BEH.
+          induction STEPS; i.
+          { clear ORACLE DETERM. inv TRACE. inv STRACE. split; ss.
+            remember (SeqThread.mk st p orc) as th1.
+            remember ([], SeqTrace.term v_src f_src) as tr.
+            revert st v_src f_src Heqth1 Heqtr.
+            induction BEH; i; inv Heqth1; try inv Heqtr.
+            - esplits; eauto; ss.
+            - inv STEP. exploit IHBEH; eauto. i. des. esplits.
+              + econs 2; eauto.
+              + ss.
+              + ss.
+              + ss.
+          }
+          exploit rtc_state_step_behavior; eauto.
+          { ii. subst. inv STRACE. inv TRACE. }
+          i. inv TRACE. inv STRACE.
+          exploit at_step_behavior; try exact LSTEP; try exact x0; eauto.
+          { eapply rtc_state_step_deterministic; eauto. }
+          i. des. subst.
+          exploit IHSTEPS; try exact H5; try eapply BEH2; eauto.
+          { eapply step_deterministic; try eapply LSTEP; eauto.
+            eapply rtc_state_step_deterministic; eauto.
+          }
+          i. des. subst. esplits; eauto.
+        Qed.
+      }
+      { admit.
+      }
     }
 
     { (* partial *)
