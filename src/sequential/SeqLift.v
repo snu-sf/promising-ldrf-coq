@@ -896,48 +896,108 @@ Proof.
   eapply sim_timestamp_bot; eauto.
 Qed.
 
-Definition sim_timemap_max (L: Loc.t -> Prop) (f: Mapping.ts) (v: version) (tm_src tm_tgt: TimeMap.t): Prop :=
-  forall l (LOC: L l), sim_timestamp_max (f l) (v l) (tm_src l) (tm_tgt l).
 
-Lemma sim_timemap_max_sim (L: Loc.t -> Prop) f v tm_src tm_tgt
-      (SIM: sim_timemap_max L f v tm_src tm_tgt)
+Definition time_le_timemap (loc: Loc.t) (ts: Time.t) (tm: TimeMap.t): Prop :=
+  Time.le (tm loc) ts.
+
+Record time_le_view (loc: Loc.t) (ts: Time.t) (vw: View.t): Prop :=
+  time_le_view_intro {
+      time_le_view_pln: time_le_timemap loc ts vw.(View.pln);
+      time_le_view_rlx: time_le_timemap loc ts vw.(View.rlx);
+    }.
+
+Variant time_le_opt_view (loc: Loc.t) (ts: Time.t):
+  forall (vw: option View.t), Prop :=
+| time_le_opt_view_some
+    vw
+    (EXACT: time_le_view loc ts vw)
   :
-    sim_timemap L f v tm_src tm_tgt.
+    time_le_opt_view loc ts (Some vw)
+| time_le_opt_view_none
+  :
+    time_le_opt_view loc ts None
+.
+
+Definition time_exact_timemap (loc: Loc.t) (ts: Time.t) (tm: TimeMap.t): Prop :=
+  tm loc = ts.
+
+Record time_exact_view (loc: Loc.t) (ts: Time.t) (vw: View.t): Prop :=
+  time_exact_view_intro {
+      time_exact_view_pln: time_exact_timemap loc ts vw.(View.pln);
+      time_exact_view_rlx: time_exact_timemap loc ts vw.(View.rlx);
+    }.
+
+Variant time_exact_opt_view (loc: Loc.t) (ts: Time.t):
+  forall (vw: option View.t), Prop :=
+| time_exact_opt_view_some
+    vw
+    (EXACT: time_exact_view loc ts vw)
+  :
+    time_exact_opt_view loc ts (Some vw)
+| time_exact_opt_view_none
+  :
+    time_exact_opt_view loc ts None
+.
+
+Variant sim_timemap_max (loc: Loc.t) (ts_src: Time.t)
+        (f: Mapping.ts) (v: version) (tm_src tm_tgt: TimeMap.t): Prop :=
+| sim_timemap_max_intro
+    (MAX: forall l (LOC: l <> loc),
+        sim_timestamp_max (f l) (v l) (tm_src l) (tm_tgt l))
+    (LE: time_exact_timemap loc ts_src tm_src)
+.
+
+Lemma sim_timemap_max_sim loc ts_src f v tm_src tm_tgt
+      (SIM: sim_timemap_max loc ts_src f v tm_src tm_tgt)
+  :
+    sim_timemap (fun loc0 => loc0 <> loc) f v tm_src tm_tgt.
 Proof.
-  ii. eapply sim_timestamp_max_sim; eauto.
+  ii. eapply sim_timestamp_max_sim; eauto. eapply SIM. auto.
 Qed.
 
-Lemma sim_timemap_max_max f v tm_src tm_tgt
+Lemma sim_timemap_max_max loc ts_src f v tm_src tm_tgt
       tm
-      (MAX: sim_timemap_max (fun _ => True) f v tm_src tm_tgt)
-      (SIM: sim_timemap (fun _ => True) f v tm tm_tgt)
+      (MAX: sim_timemap_max loc ts_src f v tm_src tm_tgt)
+      (SIM: sim_timemap (fun loc0 => loc0 <> loc) f v tm tm_tgt)
+      (LE: time_le_timemap loc ts_src tm)
   :
     TimeMap.le tm tm_src.
 Proof.
-  ii. eapply sim_timestamp_max_max; eauto.
+  ii. destruct (Loc.eq_dec loc0 loc).
+  { subst. inv MAX. rewrite LE0. auto. }
+  { eapply sim_timestamp_max_max; eauto. eapply MAX. auto. }
 Qed.
 
-Lemma sim_timemap_max_mon_mapping L f0 f1 v tm_src tm_tgt
+Lemma sim_timemap_max_mon_mapping loc ts_src f0 f1 v tm_src tm_tgt
       (WF: Mapping.wfs f0)
       (VERWF: version_wf f0 v)
       (MAP: Mapping.les f0 f1)
   :
-    sim_timemap_max L f0 v tm_src tm_tgt <-> sim_timemap_max L f1 v tm_src tm_tgt.
+    sim_timemap_max loc ts_src f0 v tm_src tm_tgt <-> sim_timemap_max loc ts_src f1 v tm_src tm_tgt.
 Proof.
   split; ii.
-  { erewrite <- sim_timestamp_max_mon_mapping; eauto. }
-  { erewrite sim_timestamp_max_mon_mapping; eauto. }
+  { inv H. econs; auto.
+    i. erewrite <- sim_timestamp_max_mon_mapping; eauto. }
+  { inv H. econs; auto.
+    i. erewrite sim_timestamp_max_mon_mapping; eauto. }
 Qed.
 
-Lemma sim_timemap_max_exists L f v tm_tgt
+Lemma sim_timemap_max_exists loc ts_src f v tm_tgt
       (WF: Mapping.wfs f)
       (VER: version_wf f v)
   :
-    exists tm_src, <<MAX: sim_timemap_max L f v tm_src tm_tgt>>.
+    exists tm_src, <<MAX: sim_timemap_max loc ts_src f v tm_src tm_tgt>>.
 Proof.
-  hexploit (choice (fun loc ts => sim_timestamp_max (f loc) (v loc) ts (tm_tgt loc))).
-  { i. eapply sim_timestamp_max_exists; eauto. }
-  i. des. exists f0. ii. eauto.
+  hexploit (choice (fun loc0 ts => (loc0 <> loc -> sim_timestamp_max (f loc0) (v loc0) ts (tm_tgt loc0)) /\ (loc0 = loc -> ts = ts_src))).
+  { i. destruct (Loc.eq_dec x loc).
+    { exists ts_src. splits; ss. }
+    { hexploit sim_timestamp_max_exists; eauto. i. des.
+      exists ts_src0. splits; eauto. i. ss.
+    }
+  }
+  i. des. exists f0. splits. econs.
+  { i. specialize (H l). des. auto. }
+  { specialize (H loc). des. apply H0; auto. }
 Qed.
 
 
@@ -1064,27 +1124,28 @@ Proof.
   { eapply sim_timemap_singleton; eauto. }
 Qed.
 
-Record sim_view_max (L: Loc.t -> Prop)
+Record sim_view_max (loc: Loc.t) (ts_src: Time.t)
        (f: Mapping.ts) (v: version) (vw_src vw_tgt: View.t) :=
   sim_view_max_intro {
-      sim_view_max_pln: sim_timemap_max L f v vw_src.(View.pln) vw_tgt.(View.pln);
-      sim_view_max_rlx: sim_timemap_max L f v vw_src.(View.rlx) vw_tgt.(View.rlx);
+      sim_view_max_pln: sim_timemap_max loc ts_src f v vw_src.(View.pln) vw_tgt.(View.pln);
+      sim_view_max_rlx: sim_timemap_max loc ts_src f v vw_src.(View.rlx) vw_tgt.(View.rlx);
     }.
 
-Lemma sim_view_max_sim (L: Loc.t -> Prop) f v vw_src vw_tgt
-      (SIM: sim_view_max L f v vw_src vw_tgt)
+Lemma sim_view_max_sim loc ts_src f v vw_src vw_tgt
+      (SIM: sim_view_max loc ts_src f v vw_src vw_tgt)
   :
-    sim_view L f v vw_src vw_tgt.
+    sim_view (fun loc0 => loc0 <> loc) f v vw_src vw_tgt.
 Proof.
   econs.
   { eapply sim_timemap_max_sim; eauto. eapply SIM. }
   { eapply sim_timemap_max_sim; eauto. eapply SIM. }
 Qed.
 
-Lemma sim_view_max_max f v vw_src vw_tgt
+Lemma sim_view_max_max loc ts_src f v vw_src vw_tgt
       vw
-      (MAX: sim_view_max (fun _ => True) f v vw_src vw_tgt)
-      (SIM: sim_view (fun _ => True) f v vw vw_tgt)
+      (MAX: sim_view_max loc ts_src f v vw_src vw_tgt)
+      (SIM: sim_view (fun loc0 => loc0 <> loc) f v vw vw_tgt)
+      (LE: time_le_view loc ts_src vw)
   :
     View.le vw vw_src.
 Proof.
@@ -1092,19 +1153,21 @@ Proof.
   { eapply sim_timemap_max_max; eauto.
     { eapply MAX. }
     { eapply SIM. }
+    { apply LE. }
   }
   { eapply sim_timemap_max_max; eauto.
     { eapply MAX. }
     { eapply SIM. }
+    { apply LE. }
   }
 Qed.
 
-Lemma sim_view_max_mon_mapping L f0 f1 v vw_src vw_tgt
+Lemma sim_view_max_mon_mapping loc ts_src f0 f1 v vw_src vw_tgt
       (WF: Mapping.wfs f0)
       (VERWF: version_wf f0 v)
       (MAP: Mapping.les f0 f1)
   :
-    sim_view_max L f0 v vw_src vw_tgt <-> sim_view_max L f1 v vw_src vw_tgt.
+    sim_view_max loc ts_src f0 v vw_src vw_tgt <-> sim_view_max loc ts_src f1 v vw_src vw_tgt.
 Proof.
   split; i.
   { econs.
@@ -1117,11 +1180,11 @@ Proof.
   }
 Qed.
 
-Lemma sim_view_max_exists L f v vw_tgt
+Lemma sim_view_max_exists loc ts_src f v vw_tgt
       (WF: Mapping.wfs f)
       (VER: version_wf f v)
   :
-    exists vw_src, <<MAX: sim_view_max L f v vw_src vw_tgt>>.
+    exists vw_src, <<MAX: sim_view_max loc ts_src f v vw_src vw_tgt>>.
 Proof.
   hexploit sim_timemap_max_exists; eauto. i. des.
   hexploit sim_timemap_max_exists; eauto. i. des.
@@ -1131,15 +1194,15 @@ Qed.
 
 
 Variant sim_opt_view (L: Loc.t -> Prop)
-        (f: Mapping.ts) (v: version):
-  forall (vw_src vw_tgt: option View.t), Prop :=
+        (f: Mapping.ts):
+  forall (v: option version) (vw_src vw_tgt: option View.t), Prop :=
 | sim_opt_view_some
-    vw_src vw_tgt
+    v vw_src vw_tgt
     (SIM: sim_view L f v vw_src vw_tgt)
   :
-    sim_opt_view L f v (Some vw_src) (Some vw_tgt)
+    sim_opt_view L f (Some v) (Some vw_src) (Some vw_tgt)
 | sim_opt_view_none
-    vw
+    v vw
   :
     sim_opt_view L f v None vw
 .
@@ -1156,19 +1219,20 @@ Qed.
 
 Lemma sim_opt_view_mon_ver L f v0 v1 vw_src vw_tgt
       (SIM: sim_opt_view L f v0 vw_src vw_tgt)
-      (VER: version_le v0 v1)
+      (VER: opt_version_le v0 v1)
       (WF: Mapping.wfs f)
-      (VERWF: version_wf f v1)
+      (VERWF: opt_version_wf f v1)
   :
     sim_opt_view L f v1 vw_src vw_tgt.
 Proof.
-  inv SIM; econs.
-  eapply sim_view_mon_ver; eauto.
+  inv SIM.
+  { destruct v1; ss. econs. eapply sim_view_mon_ver; eauto. }
+  { econs. }
 Qed.
 
 Lemma sim_opt_view_mon_mapping L f0 f1 v vw_src vw_tgt
       (WF: Mapping.wfs f0)
-      (VERWF: version_wf f0 v)
+      (VERWF: opt_version_wf f0 v)
       (MAP: Mapping.les f0 f1)
   :
     sim_opt_view L f0 v vw_src vw_tgt <-> sim_opt_view L f1 v vw_src vw_tgt.
@@ -1188,58 +1252,64 @@ Proof.
   eapply sim_view_mon_locs; eauto.
 Qed.
 
-Lemma sim_opt_view_unwrap l f v
+Lemma sim_opt_view_unwrap l f v0 v1
       vw_src vw_tgt
-      (SIM: sim_opt_view l f v vw_src vw_tgt)
+      (SIM: sim_opt_view l f v0 vw_src vw_tgt)
       (WF: Mapping.wfs f)
-      (VERWF: version_wf f v)
+      (VERWF: version_wf f v1)
+      (VER: forall v (VER: v0 = Some v), version_le v v1)
   :
-    sim_view l f v (View.unwrap vw_src) (View.unwrap vw_tgt).
+    sim_view l f v1 (View.unwrap vw_src) (View.unwrap vw_tgt).
 Proof.
-  inv SIM; ss. eapply sim_view_bot; eauto.
+  inv SIM; ss.
+  { hexploit VER; eauto. i.
+    eapply sim_view_mon_ver; eauto. }
+  { eapply sim_view_bot; eauto. }
 Qed.
 
-Variant sim_opt_view_max (L: Loc.t -> Prop)
-        (f: Mapping.ts) (v: version):
-  forall (vw_src vw_tgt: option View.t), Prop :=
+Variant sim_opt_view_max loc ts_src
+        (f: Mapping.ts):
+  forall (v: option version) (vw_src vw_tgt: option View.t), Prop :=
 | sim_opt_view_max_some
-    vw_src vw_tgt
-    (SIM: sim_view_max L f v vw_src vw_tgt)
+    v vw_src vw_tgt
+    (SIM: sim_view_max loc ts_src f v vw_src vw_tgt)
   :
-    sim_opt_view_max L f v (Some vw_src) (Some vw_tgt)
+    sim_opt_view_max loc ts_src f (Some v) (Some vw_src) (Some vw_tgt)
 | sim_opt_view_max_none
+    v
   :
-    sim_opt_view_max L f v None None
+    sim_opt_view_max loc ts_src f v None None
 .
 
-Lemma sim_opt_view_max_sim (L: Loc.t -> Prop) f v vw_src vw_tgt
-      (SIM: sim_opt_view_max L f v vw_src vw_tgt)
+Lemma sim_opt_view_max_sim loc ts_src f v vw_src vw_tgt
+      (SIM: sim_opt_view_max loc ts_src f v vw_src vw_tgt)
   :
-    sim_opt_view L f v vw_src vw_tgt.
+    sim_opt_view (fun loc0 => loc0 <> loc) f v vw_src vw_tgt.
 Proof.
   inv SIM; econs.
   eapply sim_view_max_sim; eauto.
 Qed.
 
-Lemma sim_opt_view_max_max f v vw_src vw_tgt
+Lemma sim_opt_view_max_max loc ts_src f v vw_src vw_tgt
       vw
-      (MAX: sim_opt_view_max (fun _ => True) f v vw_src vw_tgt)
-      (SIM: sim_opt_view (fun _ => True) f v vw vw_tgt)
+      (MAX: sim_opt_view_max loc ts_src f v vw_src vw_tgt)
+      (SIM: sim_opt_view (fun loc0 => loc0 <> loc) f v vw vw_tgt)
+      (LE: time_le_opt_view loc ts_src vw)
   :
     View.opt_le vw vw_src.
 Proof.
   inv MAX; inv SIM.
-  { econs. eapply sim_view_max_max; eauto. }
+  { econs. eapply sim_view_max_max; eauto. inv LE. auto. }
   { econs. }
   { econs. }
 Qed.
 
-Lemma sim_opt_view_max_mon_mapping L f0 f1 v vw_src vw_tgt
+Lemma sim_opt_view_max_mon_mapping loc ts_src f0 f1 v vw_src vw_tgt
       (WF: Mapping.wfs f0)
-      (VERWF: version_wf f0 v)
+      (VERWF: opt_version_wf f0 v)
       (MAP: Mapping.les f0 f1)
   :
-    sim_opt_view_max L f0 v vw_src vw_tgt <-> sim_opt_view_max L f1 v vw_src vw_tgt.
+    sim_opt_view_max loc ts_src f0 v vw_src vw_tgt <-> sim_opt_view_max loc ts_src f1 v vw_src vw_tgt.
 Proof.
   split; i.
   { inv H; econs.
@@ -1250,18 +1320,19 @@ Proof.
   }
 Qed.
 
-Lemma sim_opt_view_max_exists L f v vw_tgt
+Lemma sim_opt_view_max_exists loc ts_src f v vw_tgt
       (WF: Mapping.wfs f)
-      (VER: version_wf f v)
+      (VER: forall (SOME: vw_tgt <> None),
+          exists v0, (<<EQ: v = Some v0>>) /\ (<<WF: version_wf f v0>>))
   :
-    exists vw_src, <<MAX: sim_opt_view_max L f v vw_src vw_tgt>>.
+    exists vw_src, <<MAX: sim_opt_view_max loc ts_src f v vw_src vw_tgt>>.
 Proof.
   destruct vw_tgt as [vw_tgt|].
-  { hexploit sim_view_max_exists; eauto. i. des.
+  { hexploit VER; ss. i. des. clarify.
+    hexploit sim_view_max_exists; eauto. i. des.
     eexists (Some _). econs; eauto. }
   { exists None. econs. }
 Qed.
-
 
 
 Definition top_time (top: Time.t) (f: Mapping.t): Prop :=
@@ -1307,47 +1378,47 @@ Proof.
   }
 Qed.
 
-
 Variant sim_message
         (flag_tgt: bool)
+        (loc: Loc.t)
         (f: Mapping.ts):
   forall (v: option version) (msg_src msg_tgt: Message.t), Prop :=
 | sim_message_concrete
     v val_src val_tgt vw_src vw_tgt
     (VAL: Const.le val_tgt val_src)
-    (SIM: sim_opt_view (fun _ => True) f v vw_src vw_tgt)
+    (SIM: sim_opt_view (fun loc0 => loc0 <> loc) f (Some v) vw_src vw_tgt)
     (FLAG: flag_tgt = false)
   :
-    sim_message flag_tgt f (Some v) (Message.concrete val_src vw_src) (Message.concrete val_tgt vw_tgt)
+    sim_message flag_tgt loc f (Some v) (Message.concrete val_src vw_src) (Message.concrete val_tgt vw_tgt)
 | sim_message_undef
     v
   :
-    sim_message flag_tgt f (Some v) Message.undef Message.undef
+    sim_message flag_tgt loc f (Some v) Message.undef Message.undef
 | sim_message_reserve
     v
   :
-    sim_message flag_tgt f v Message.reserve Message.reserve
+    sim_message flag_tgt loc f v Message.reserve Message.reserve
 | sim_message_none
     v val_src val_tgt vw_tgt
     (VAL: Const.le val_tgt val_src)
     (FLAG: flag_tgt = true)
   :
-    sim_message flag_tgt f (Some v) (Message.concrete val_src None) (Message.concrete val_tgt vw_tgt)
+    sim_message flag_tgt loc f (Some v) (Message.concrete val_src None) (Message.concrete val_tgt vw_tgt)
 .
 
-Lemma sim_message_flag_mon flag_tgt f v msg_src msg_tgt
-      (SIM: sim_message flag_tgt f v msg_src msg_tgt)
+Lemma sim_message_flag_mon flag_tgt loc f v msg_src msg_tgt
+      (SIM: sim_message flag_tgt loc f v msg_src msg_tgt)
   :
-    sim_message false f v msg_src msg_tgt.
+    sim_message false loc f v msg_src msg_tgt.
 Proof.
   inv SIM; econs; eauto. econs.
 Qed.
 
-Lemma sim_message_mon_tgt flag_tgt f v msg_src msg_tgt0 msg_tgt1
-      (SIM: sim_message flag_tgt f v msg_src msg_tgt0)
+Lemma sim_message_mon_tgt flag_tgt loc f v msg_src msg_tgt0 msg_tgt1
+      (SIM: sim_message flag_tgt loc f v msg_src msg_tgt0)
       (MSG: Message.le msg_tgt0 msg_tgt1)
   :
-    sim_message flag_tgt f v msg_src msg_tgt1.
+    sim_message flag_tgt loc f v msg_src msg_tgt1.
 Proof.
   inv SIM; inv MSG.
   { econs; eauto.
@@ -1359,13 +1430,13 @@ Proof.
   { econs 4; eauto. etrans; eauto. }
 Qed.
 
-Lemma sim_message_mon_ver flag_tgt f v0 v1 msg_src msg_tgt
-      (SIM: sim_message flag_tgt f v0 msg_src msg_tgt)
+Lemma sim_message_mon_ver flag_tgt loc f v0 v1 msg_src msg_tgt
+      (SIM: sim_message flag_tgt loc f v0 msg_src msg_tgt)
       (VER: option_rel version_le v0 v1)
       (WF: Mapping.wfs f)
       (VERWF: opt_version_wf f v1)
   :
-    sim_message flag_tgt f v1 msg_src msg_tgt.
+    sim_message flag_tgt loc f v1 msg_src msg_tgt.
 Proof.
   inv SIM.
   { ss. des_ifs. econs; eauto. eapply sim_opt_view_mon_ver; eauto. }
@@ -1374,12 +1445,12 @@ Proof.
   { ss. des_ifs. econs 4; eauto. }
 Qed.
 
-Lemma sim_message_mon_mapping flag_tgt f0 f1 v msg_src msg_tgt
+Lemma sim_message_mon_mapping flag_tgt loc f0 f1 v msg_src msg_tgt
       (WF: Mapping.wfs f0)
       (VERWF: opt_version_wf f0 v)
       (MAP: Mapping.les f0 f1)
   :
-    sim_message flag_tgt f0 v msg_src msg_tgt <-> sim_message flag_tgt f1 v msg_src msg_tgt.
+    sim_message flag_tgt loc f0 v msg_src msg_tgt <-> sim_message flag_tgt loc f1 v msg_src msg_tgt.
 Proof.
   split; i.
   { inv H; try by (econs; auto). econs 1; eauto.
@@ -1389,33 +1460,34 @@ Qed.
 
 Variant sim_message_max
         (flag_tgt: bool)
+        (loc: Loc.t) (ts_src: Time.t)
         (f: Mapping.ts):
   forall (v: option version) (msg_src msg_tgt: Message.t), Prop :=
 | sim_message_max_concrete
     v val vw_src vw_tgt
-    (SIM: sim_opt_view_max (fun _ => True) f v vw_src vw_tgt)
+    (SIM: sim_opt_view_max loc ts_src f (Some v) vw_src vw_tgt)
     (FLAG: flag_tgt = false)
   :
-    sim_message_max flag_tgt f (Some v) (Message.concrete val vw_src) (Message.concrete val vw_tgt)
+    sim_message_max flag_tgt loc ts_src f (Some v) (Message.concrete val vw_src) (Message.concrete val vw_tgt)
 | sim_message_max_undef
     v
   :
-    sim_message_max flag_tgt f (Some v) Message.undef Message.undef
+    sim_message_max flag_tgt loc ts_src f (Some v) Message.undef Message.undef
 | sim_message_max_reserve
     v
   :
-    sim_message_max flag_tgt f v Message.reserve Message.reserve
+    sim_message_max flag_tgt loc ts_src f v Message.reserve Message.reserve
 | sim_message_max_none
     v val vw_tgt
     (FLAG: flag_tgt = true)
   :
-    sim_message_max flag_tgt f (Some v) (Message.concrete val None) (Message.concrete val vw_tgt)
+    sim_message_max flag_tgt loc ts_src f (Some v) (Message.concrete val None) (Message.concrete val vw_tgt)
 .
 
-Lemma sim_message_max_sim flag_tgt f v msg_src msg_tgt
-      (SIM: sim_message_max flag_tgt f v msg_src msg_tgt)
+Lemma sim_message_max_sim flag_tgt loc ts_src f v msg_src msg_tgt
+      (SIM: sim_message_max flag_tgt loc ts_src f v msg_src msg_tgt)
   :
-    sim_message flag_tgt f v msg_src msg_tgt.
+    sim_message flag_tgt loc f v msg_src msg_tgt.
 Proof.
   inv SIM.
   { econs 1; eauto.
@@ -1427,15 +1499,30 @@ Proof.
   { econs 4; eauto. refl. }
 Qed.
 
-Lemma sim_message_max_max flag_tgt f v msg_src msg_tgt
+Lemma message_to_time_le_opt_view loc to val released
+      (MSGTO: Memory.message_to (Message.concrete val released) loc to)
+      (MSGWF: Message.wf (Message.concrete val released))
+  :
+    time_le_opt_view loc to released.
+Proof.
+  inv MSGTO. destruct released; ss; econs. econs.
+  { inv MSGWF. inv WF. red. etrans; eauto. eapply WF0. }
+  { eauto. }
+Qed.
+
+Lemma sim_message_max_max flag_tgt loc ts_src f v msg_src msg_tgt
       msg
-      (MAX: sim_message_max flag_tgt f v msg_src msg_tgt)
-      (SIM: sim_message flag_tgt f v msg msg_tgt)
+      (MAX: sim_message_max flag_tgt loc ts_src f v msg_src msg_tgt)
+      (SIM: sim_message flag_tgt loc f v msg msg_tgt)
+      (MSGTO: Memory.message_to msg loc ts_src)
+      (MSGWF: Message.wf msg)
   :
     Message.le msg msg_src.
 Proof.
   inv MAX; inv SIM.
-  { econs; eauto. eapply sim_opt_view_max_max; eauto. }
+  { econs; eauto. eapply sim_opt_view_max_max; eauto.
+    eapply message_to_time_le_opt_view; eauto.
+  }
   { econs; eauto. }
   { econs. }
   { ss. }
@@ -1443,12 +1530,12 @@ Proof.
   { econs; eauto. }
 Qed.
 
-Lemma sim_message_max_mon_mapping flag_tgt f0 f1 v msg_src msg_tgt
+Lemma sim_message_max_mon_mapping flag_tgt loc ts_src f0 f1 v msg_src msg_tgt
       (WF: Mapping.wfs f0)
       (VERWF: opt_version_wf f0 v)
       (MAP: Mapping.les f0 f1)
   :
-    sim_message_max flag_tgt f0 v msg_src msg_tgt <-> sim_message_max flag_tgt f1 v msg_src msg_tgt.
+    sim_message_max flag_tgt loc ts_src f0 v msg_src msg_tgt <-> sim_message_max flag_tgt loc ts_src f1 v msg_src msg_tgt.
 Proof.
   split; i.
   { inv H.
@@ -1465,25 +1552,89 @@ Proof.
   }
 Qed.
 
-Lemma sim_message_max_exists flag_tgt f v msg_tgt
+Lemma sim_message_max_exists flag_tgt loc ts_src f v msg_tgt
       (WF: Mapping.wfs f)
       (VER: forall (RESERVE: msg_tgt <> Message.reserve),
           exists v0, (<<EQ: v = Some v0>>) /\ (<<WF: version_wf f v0>>))
   :
-    exists msg_src, <<MAX: sim_message_max flag_tgt f v msg_src msg_tgt>>.
+    exists msg_src, <<MAX: sim_message_max flag_tgt loc ts_src f v msg_src msg_tgt>>.
 Proof.
   destruct msg_tgt.
   { hexploit VER; ss. i. des; clarify.
     destruct flag_tgt.
     { exists (Message.concrete val None). econs 4; eauto. }
-    { hexploit sim_opt_view_max_exists; eauto. i. des.
-      esplits; eauto. econs; eauto.
+    { hexploit VER; ss. i. des. clarify.
+      hexploit sim_opt_view_max_exists.
+      { eauto. }
+      { i. eapply VER. ss. }
+      i. des. esplits; eauto. econs; eauto.
     }
   }
   { hexploit VER; ss. i. des; clarify.
     esplits. econs. }
   { esplits. econs. }
 Qed.
+
+Lemma sim_message_max_msg_to flag_tgt loc ts_src f v msg_src msg_tgt
+      (MAX: sim_message_max flag_tgt loc ts_src f v msg_src msg_tgt)
+  :
+    Memory.message_to msg_src loc ts_src.
+Proof.
+  inv MAX; econs.
+  { inv SIM; ss.
+    { eapply sim_view_max_rlx in SIM0.
+      inv SIM0. rewrite LE. refl.
+    }
+    { eapply Time.bot_spec. }
+  }
+  { ss. eapply Time.bot_spec. }
+Qed.
+
+Lemma sim_message_max_msg_wf flag_tgt loc ts_src f v msg_src msg_tgt
+      (MAX: sim_message_max flag_tgt loc ts_src f v msg_src msg_tgt)
+      (WF: Message.wf msg_tgt)
+  :
+    Message.wf msg_src.
+Proof.
+  inv MAX; econs; eauto. inv WF. inv SIM; econs.
+  inv WF0. econs. eapply sim_timemap_max_max.
+  { eapply SIM0. }
+  { eapply sim_timemap_mon_tgt.
+    2:{ eapply WF. }
+    eapply sim_timemap_max_sim. eapply SIM0.
+  }
+  { red. eapply sim_view_max_pln in SIM0.
+    inv SIM0. rewrite LE. refl.
+  }
+Qed.
+
+(* Lemma sim_timestamp_max_closed f v loc ts_src ts_tgt *)
+(*       (CLOSED: exists from_tgt val_tgt released_tgt, *)
+(*           Memory.get loc ts_tgt = Some (from, Message.concrete val_tgt released_tgt)) *)
+(*   : *)
+
+
+
+
+
+Lemma sim_message_max_msg_closed flag_tgt loc ts_src f v msg_src msg_tgt
+      (MAX: sim_message_max flag_tgt loc ts_src f v msg_src msg_tgt)
+      (WF: Message.closed msg_tgt)
+  :
+    Message.wf msg_src.
+Proof.
+  inv MAX; econs; eauto. inv WF. inv SIM; econs.
+  inv WF0. econs. eapply sim_timemap_max_max.
+  { eapply SIM0. }
+  { eapply sim_timemap_mon_tgt.
+    2:{ eapply WF. }
+    eapply sim_timemap_max_sim. eapply SIM0.
+  }
+  { red. eapply sim_view_max_pln in SIM0.
+    inv SIM0. rewrite LE. refl.
+  }
+Qed.
+
 
 Definition mapping_update_latest (f: Mapping.t)
            (mapping: Time.t -> option Time.t) (times: Time.t -> Prop) :=
@@ -2092,7 +2243,7 @@ Variant sim_promises
           (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ffrom from>>) /\
           (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto to>>) /\
           (<<GET: Memory.get loc fto prom_src = Some (ffrom, msg_src)>>) /\
-          (<<MSG: sim_message_max (flag_tgt loc) f (vers loc to) msg_src msg_tgt>>))
+          (<<MSG: sim_message_max (flag_tgt loc) loc fto f (vers loc to) msg_src msg_tgt>>))
     (SOUND: forall loc fto ffrom msg_src
                    (GET: Memory.get loc fto prom_src = Some (ffrom, msg_src)),
         (exists to from msg_tgt,
@@ -2114,7 +2265,7 @@ Lemma sim_promises_get flag_src flag_tgt
       (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt>>) /\
       (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt>>) /\
       (<<GET: Memory.get loc to_src prom_src = Some (from_src, msg_src)>>) /\
-      (<<MSG: sim_message_max (flag_tgt loc) f (vers loc to_tgt) msg_src msg_tgt>>).
+      (<<MSG: sim_message_max (flag_tgt loc) loc to_src f (vers loc to_tgt) msg_src msg_tgt>>).
 Proof.
   inv SIM. hexploit MESSAGE; eauto. i. des. esplits; eauto.
 Qed.
@@ -2127,7 +2278,7 @@ Lemma sim_promises_get_if flag_src flag_tgt f vers prom_src prom_tgt loc from_sr
         (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt>>) /\
         (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt>>) /\
         (<<GET: Memory.get loc to_tgt prom_tgt = Some (from_tgt, msg_tgt)>>) /\
-        (<<MSG: sim_message_max (flag_tgt loc) f (vers loc to_tgt) msg_src msg_tgt>>)) \/
+        (<<MSG: sim_message_max (flag_tgt loc) loc to_src f (vers loc to_tgt) msg_src msg_tgt>>)) \/
     (exists vw, (<<FLAG: flag_tgt loc = Some vw>>) /\ (<<TS: msg_src <> Message.reserve -> Time.lt vw to_src>>))
 .
 Proof.
@@ -2163,7 +2314,7 @@ Lemma add_sim_promises flag_src flag_tgt f vers mem_tgt0 mem_tgt1 mem_src0 mem_s
       (ADDSRC: Memory.add mem_src0 loc from_src to_src msg_src mem_src1)
       (FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt)
       (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
-      (MSG: sim_message_max (flag_tgt loc) f (vers loc to_tgt) msg_src msg_tgt)
+      (MSG: sim_message_max (flag_tgt loc) loc to_src f (vers loc to_tgt) msg_src msg_tgt)
       (WF: Mapping.wfs f)
       (FLAGSRC: flag_src loc = None)
   :
@@ -2233,7 +2384,7 @@ Lemma lower_sim_promises flag_src flag_tgt f vers mem_tgt0 mem_tgt1 mem_src0 mem
       (PROMS: sim_promises flag_src flag_tgt f vers mem_src0 mem_tgt0)
       (LOWERSRC: Memory.lower mem_src0 loc from_src to_src msg_src0 msg_src1 mem_src1)
       (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
-      (MSG: sim_message_max (flag_tgt loc) f (vers loc to_tgt) msg_src1 msg_tgt1)
+      (MSG: sim_message_max (flag_tgt loc) loc to_src f (vers loc to_tgt) msg_src1 msg_tgt1)
       (WF: Mapping.wfs f)
   :
     sim_promises flag_src flag_tgt f vers mem_src1 mem_tgt1.
@@ -2284,7 +2435,7 @@ Lemma split_sim_promises flag_src flag_tgt f vers mem_tgt0 mem_tgt1 mem_src0 mem
       (SPLITSRC: Memory.split mem_src0 loc ts_src0 ts_src1 ts_src2 msg_src0 msg_src1 mem_src1)
       (TS1: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ts_src1 ts_tgt1)
       (TS2: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ts_src2 ts_tgt2)
-      (MSG: sim_message_max (flag_tgt loc) f (vers loc ts_tgt1) msg_src0 msg_tgt0)
+      (MSG: sim_message_max (flag_tgt loc) loc ts_src1 f (vers loc ts_tgt1) msg_src0 msg_tgt0)
       (RESERVETGT0: msg_tgt0 <> Message.reserve)
       (RESERVETGT1: msg_tgt1 <> Message.reserve)
       (RESERVESRC1: msg_src1 <> Message.reserve)
@@ -2427,7 +2578,7 @@ Lemma sim_promises_split flag_src flag_tgt f vers mem_tgt0 mem_tgt1 mem_src0
     exists ts_src0 ts_src2 msg_src1 mem_src1,
       (<<TS0: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ts_src0 ts_tgt0>>) /\
       (<<TS2: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ts_src2 ts_tgt2>>) /\
-      (<<MSG: sim_message_max (flag_tgt loc) f (vers loc ts_tgt2) msg_src1 msg_tgt1>>)/\
+      (<<MSG: sim_message_max (flag_tgt loc) loc ts_src2 f (vers loc ts_tgt2) msg_src1 msg_tgt1>>)/\
       (<<GET: Memory.get loc ts_src2 mem_src0 = Some (ts_src0, msg_src1)>>) /\
       (<<SPLIT: Memory.split mem_src0 loc ts_src0 ts_src1 ts_src2 msg_src0 msg_src1 mem_src1>>).
 Proof.
@@ -2446,13 +2597,14 @@ Lemma sim_promises_lower flag_src flag_tgt f vers mem_tgt0 mem_tgt1 mem_src0
       (TS: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
       (MSGWF: Message.wf msg_src1)
       (PROMS: sim_promises flag_src flag_tgt f vers mem_src0 mem_tgt0)
-      (MSG: sim_message (flag_tgt loc) f (vers loc to_tgt) msg_src1 msg_tgt1)
+      (MSG: sim_message (flag_tgt loc) loc f (vers loc to_tgt) msg_src1 msg_tgt1)
+      (MSGTO: Memory.message_to msg_src1 loc to_src)
       (WF: Mapping.wfs f)
       (FLAGSRC: flag_src loc = None)
   :
     exists from_src msg_src0 mem_src1,
       (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt>>) /\
-      (<<MSG: sim_message_max (flag_tgt loc) f (vers loc to_tgt) msg_src0 msg_tgt0>>)/\
+      (<<MSG: sim_message_max (flag_tgt loc) loc to_src f (vers loc to_tgt) msg_src0 msg_tgt0>>)/\
       (<<GET: Memory.get loc to_src mem_src0 = Some (from_src, msg_src0)>>) /\
       (<<MSGLE: Message.le msg_src1 msg_src0>>) /\
       (<<LOWER: Memory.lower mem_src0 loc from_src to_src msg_src0 msg_src1 mem_src1>>).
@@ -2650,7 +2802,7 @@ Variant sim_memory
         exists fto ffrom msg_src,
           (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto to>>) /\
           (<<GET: Memory.get loc fto mem_src = Some (ffrom, msg_src)>>) /\
-          (<<MSG: sim_message false f (vers loc to) msg_src msg_tgt>>))
+          (<<MSG: sim_message false loc f (vers loc to) msg_src msg_tgt>>))
     (SOUND: forall loc fto0 ffrom1 msg_src
                    (GET: Memory.get loc fto0 mem_src = Some (ffrom1, msg_src)),
         (exists fto1 ffrom0 to from,
@@ -2677,7 +2829,7 @@ Lemma sim_memory_get flag_src f vers mem_src mem_tgt loc from_tgt to_tgt msg_tgt
     exists from_src to_src msg_src,
       (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt>>) /\
       (<<GET: Memory.get loc to_src mem_src = Some (from_src, msg_src)>>) /\
-      (<<MSG: sim_message false f (vers loc to_tgt) msg_src msg_tgt>>).
+      (<<MSG: sim_message false loc f (vers loc to_tgt) msg_src msg_tgt>>).
 Proof.
   inv SIM. hexploit MESSAGE; eauto. i. des. esplits; eauto.
 Qed.
@@ -2880,7 +3032,7 @@ Lemma add_sim_memory flag_src f vers mem_tgt0 mem_tgt1 mem_src0 mem_src1
       (ADDSRC: Memory.add mem_src0 loc from_src to_src msg_src mem_src1)
       (FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt)
       (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
-      (MSG: sim_message false f (vers loc to_tgt) msg_src msg_tgt)
+      (MSG: sim_message false loc f (vers loc to_tgt) msg_src msg_tgt)
       (WF: Mapping.wfs f)
   :
     sim_memory flag_src f vers mem_src1 mem_tgt1.
@@ -3001,7 +3153,7 @@ Lemma split_sim_memory flag_src f vers mem_tgt0 mem_tgt1 mem_src0 mem_src1
       (MEM: sim_memory flag_src f vers mem_src0 mem_tgt0)
       (SPLITSRC: Memory.split mem_src0 loc ts_src0 ts_src1 ts_src2 msg_src0 msg_src1 mem_src1)
       (TS: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ts_src1 ts_tgt1)
-      (MSG: sim_message false f (vers loc ts_tgt1) msg_src0 msg_tgt0)
+      (MSG: sim_message false loc f (vers loc ts_tgt1) msg_src0 msg_tgt0)
       (RESERVETGT0: msg_tgt0 <> Message.reserve)
       (RESERVETGT1: msg_tgt1 <> Message.reserve)
       (RESERVESRC1: msg_src1 <> Message.reserve)
@@ -3054,7 +3206,7 @@ Lemma lower_sim_memory flag_src f vers mem_tgt0 mem_tgt1 mem_src0 mem_src1
       (MEM: sim_memory flag_src f vers mem_src0 mem_tgt0)
       (LOWERSRC: Memory.lower mem_src0 loc from_src to_src msg_src0 msg_src1 mem_src1)
       (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
-      (MSG: sim_message false f (vers loc to_tgt) msg_src1 msg_tgt1)
+      (MSG: sim_message false loc f (vers loc to_tgt) msg_src1 msg_tgt1)
       (RESERVE: msg_tgt1 <> Message.reserve)
       (WF: Mapping.wfs f)
   :
@@ -3093,7 +3245,7 @@ Lemma sim_memory_add flag_src f vers mem_tgt0 mem_tgt1 mem_src0
       loc from_tgt to_tgt from_src to_src msg_tgt msg_src
       (ADDTGT: Memory.add mem_tgt0 loc from_tgt to_tgt msg_tgt mem_tgt1)
       (MEM: sim_memory flag_src f vers mem_src0 mem_tgt0)
-      (MSG: sim_message false f (vers loc to_tgt) msg_src msg_tgt)
+      (MSG: sim_message false loc f (vers loc to_tgt) msg_src msg_tgt)
       (FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt)
       (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
       (WF: Mapping.wfs f)
@@ -3527,7 +3679,7 @@ Lemma added_memory_sim_memory f0 f1 flag_src vers mem_tgt mem_src0 mem_src1 loc
       (ADDED: added_memory loc msgs mem_src0 mem_src1)
       (FLAG: flag_src loc = Some ts_src)
       (TS: Memory.get loc ts_src mem_src0 = Some (from_new, msg_new))
-      (MSGNEW: sim_message false f0 (vers loc ts_tgt) msg_new msg)
+      (MSGNEW: sim_message false loc f0 (vers loc ts_tgt) msg_new msg)
       (GETTGT: Memory.get loc ts_tgt mem_tgt = Some (from, msg))
       (RESERVE: msg <> Message.reserve)
       (MSGCOMPLETE: forall to_tgt from_tgt msg_tgt
@@ -3536,7 +3688,7 @@ Lemma added_memory_sim_memory f0 f1 flag_src vers mem_tgt mem_src0 mem_src1 loc
                            (TS: Time.lt ts_tgt to_tgt),
           exists to_src from_src msg_src,
             (<<TO: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
-            (<<MSG: sim_message false f0 (vers loc to_tgt) msg_src msg_tgt>>) /\
+            (<<MSG: sim_message false loc f0 (vers loc to_tgt) msg_src msg_tgt>>) /\
             (<<IN: List.In (from_src, to_src, msg_src) msgs>>))
       (MSGSOUND: forall to_src from_src msg_src
                         (IN: List.In (from_src, to_src, msg_src) msgs),
