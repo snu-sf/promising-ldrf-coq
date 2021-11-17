@@ -1336,37 +1336,35 @@ Section LANG.
   .
 
   Inductive writing_trace: forall
-      (d: Flags.t)
       (tr: list (ProgramEvent.t * SeqEvent.input * Oracle.output))
       (w: Flags.t), Prop :=
   | writing_trace_base
-      d
     :
-      writing_trace d [] Flags.bot
+      writing_trace [] Flags.bot
   | writing_trace_cons
-      tr e i o d w
-      (TRACE: writing_trace (Flags.minus d (SeqEvent.written i)) tr w)
+      tr e i o w
+      (TRACE: writing_trace tr w)
       (ACQUIRE: ~ is_acquire e)
-      (ACCESS: forall loc val (SOME: is_accessing e = Some (loc, val)), (d loc = false) \/ (SeqEvent.written i loc = true))
     :
-      writing_trace d ((e, i, o)::tr) (Flags.join (SeqEvent.written i) w)
+      writing_trace ((e, i, o)::tr) (Flags.join (SeqEvent.written i) w)
   .
 
-  Lemma writing_trace_mon d0 d1 tr w
-        (DEFERRED: Flags.le d0 d1)
-        (WRITING: writing_trace d1 tr w)
-    :
-      writing_trace d0 tr w.
-  Proof.
-    revert d0 DEFERRED. induction WRITING.
-    { econs 1. }
-    { econs 2.
-      { eapply IHWRITING. eapply Flags.minus_mon_l; eauto. }
-      { eauto. }
-      { i. eapply ACCESS in SOME. des; auto.
-        specialize (DEFERRED loc). destruct (d loc), (d0 loc); ss. auto. }
-    }
-  Qed.
+  (* Lemma writing_trace_mon d0 d1 tr w *)
+  (*       (DEFERRED: Flags.le d0 d1) *)
+  (*       (WRITING: writing_trace d1 tr w) *)
+  (*   : *)
+  (*     writing_trace d0 tr w. *)
+  (* Proof. *)
+  (*   revert d0 DEFERRED. induction WRITING. *)
+  (*   { econs 1. } *)
+  (*   { econs 2. *)
+  (*     { eapply IHWRITING. eapply Flags.minus_mon_l; eauto. } *)
+  (*     { eauto. } *)
+  (*     { i. eapply ACCESS in SOME. des; auto. *)
+  (*       specialize (DEFERRED loc). destruct (d loc), (d0 loc); ss. auto. } *)
+  (*   } *)
+  (* Qed. *)
+
 End LANG.
 End SeqThread.
 
@@ -1443,17 +1441,17 @@ Section SIMULATION.
     forall o (WF: Oracle.wf o),
     exists th tr w,
       (<<STEPS: SeqThread.steps (@SeqState.na_step _) tr (SeqThread.mk st_src0 p0 o) th>>) /\
-      (<<TRACE: SeqThread.writing_trace d0 tr w>>) /\
+      (<<TRACE: SeqThread.writing_trace tr w>>) /\
       ((<<FLAGS: Flags.le (Flags.join d0 st_tgt0.(SeqState.memory).(SeqMemory.flags)) (Flags.join w th.(SeqThread.state).(SeqState.memory).(SeqMemory.flags))>>) \/ (<<FAILURE: SeqThread.failure (@SeqState.na_step _) th>>))
   .
 
   Definition sim_seq_failure_case
-             (p0: Perms.t) (d0: Flags.t)
+             (p0: Perms.t)
              (st_src0: SeqState.t lang_src): Prop :=
     forall o (WF: Oracle.wf o),
     exists th tr w,
       (<<STEPS: SeqThread.steps (@SeqState.na_step _) tr (SeqThread.mk st_src0 p0 o) th>>) /\
-      (<<TRACE: SeqThread.writing_trace d0 tr w>>) /\
+      (<<TRACE: SeqThread.writing_trace tr w>>) /\
       (<<FAILURE: SeqThread.failure (@SeqState.na_step _) th>>)
   .
 
@@ -1473,7 +1471,7 @@ Section SIMULATION.
       (ATSTEP: sim_seq_at_step_case sim_seq p0 d0 st_src0 st_tgt0)
       (PARTIAL: sim_seq_partial_case p0 d0 st_src0 st_tgt0)
   | sim_seq_failure
-      (FAILURE: sim_seq_failure_case p0 d0 st_src0)
+      (FAILURE: sim_seq_failure_case p0 st_src0)
   .
 
   Definition sim_seq := paco4 _sim_seq bot4.

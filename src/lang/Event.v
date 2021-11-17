@@ -37,6 +37,18 @@ Module Const.
     | _, _ => undef
     end.
 
+  Definition sub (a b: t): t :=
+    match a, b with
+    | num a, num b => num (a - b)
+    | _, _ => undef
+    end.
+
+  Definition mul (a b: t): t :=
+    match a, b with
+    | num a, num b => num (a * b)
+    | _, _ => undef
+    end.
+
   Definition le (lhs rhs: t): bool :=
     match lhs, rhs with
     | num x, num y => x =? y
