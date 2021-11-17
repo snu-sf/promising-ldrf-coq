@@ -49,6 +49,12 @@ Definition is_accessing (e: ProgramEvent.t): option (Loc.t * Const.t) :=
   | ProgramEvent.read l v _ | ProgramEvent.write l v _ | ProgramEvent.update l _ v _ _ => Some (l, v)
   end.
 
+Definition is_updating (e: ProgramEvent.t): bool :=
+  match e with
+  | ProgramEvent.update _ _ _ _ _ => true
+  | _ => false
+  end.
+
 Definition is_release (e: ProgramEvent.t): bool :=
   match e with
   | ProgramEvent.syscall _ => true
@@ -742,6 +748,8 @@ Module Oracle.
           exists val, progress (ProgramEvent.read loc val ord) o0)
       (STORE: forall loc ord val,
           progress (ProgramEvent.write loc val ord) o0)
+      (UPDATE: forall loc ordr ordw,
+          exists valr, forall valw, progress (ProgramEvent.update loc valr valw ordr ordw) o0)
       (FENCE: forall ordr ordw,
           progress (ProgramEvent.fence ordr ordw) o0)
     :
@@ -1173,6 +1181,69 @@ Module SeqEvent.
     exploit step_acquire_inj; [exact ACQ|exact ACQ0|..]; eauto. i. des. subst.
     exploit step_release_inj; [exact REL|exact REL0|..]; eauto. i. des. subst. ss.
   Qed.
+
+  Lemma step_update_inj_perms
+        p
+        i1 o1 m1 p1 m1'
+        i2 o2 m2 p2 m2'
+        (STEP1: step_update i1 o1 p m1 p1 m1')
+        (STEP2: step_update i2 o2 p m2 p2 m2')
+        (INPUT: forall loc1 v_old1 f1 v_new1
+                  loc2 v_old2 f2 v_new2
+                  (IN1: i1 = Some (loc1, v_old1, f1, v_new1))
+                  (IN2: i2 = Some (loc2, v_old2, f2, v_new2)),
+            loc1 = loc2)
+        (OUTPUT: o1 = o2):
+    p1 = p2.
+  Proof.
+    subst. inv STEP1; inv STEP2; ss.
+    exploit INPUT; eauto. i. des. subst.
+    inv MEM. inv MEM0. ss.
+  Qed.
+
+  Lemma step_acquire_inj_perms
+        p
+        i1 o1 m1 p1 m1'
+        i2 o2 m2 p2 m2'
+        (STEP1: step_acquire i1 o1 p m1 p1 m1')
+        (STEP2: step_acquire i2 o2 p m2 p2 m2')
+        (OUTPUT: o1 = o2):
+    p1 = p2.
+  Proof.
+    subst. inv STEP1; inv STEP2; ss.
+  Qed.
+
+  Lemma step_release_inj_perms
+        p
+        i1 o1 m1 p1 m1'
+        i2 o2 m2 p2 m2'
+        (STEP1: step_release i1 o1 p m1 p1 m1')
+        (STEP2: step_release i2 o2 p m2 p2 m2')
+        (OUTPUT: o1 = o2):
+    p1 = p2.
+  Proof.
+    subst. inv STEP1; inv STEP2; ss.
+  Qed.
+
+  Lemma step_inj_perms
+        p
+        i1 o1 m1 p1 m1'
+        i2 o2 m2 p2 m2'
+        (STEP1: step i1 o1 p m1 p1 m1')
+        (STEP2: step i2 o2 p m2 p2 m2')
+        (INPUT: forall loc1 v_old1 f1 v_new1
+                  loc2 v_old2 f2 v_new2
+                  (IN1: i1.(in_access) = Some (loc1, v_old1, f1, v_new1))
+                  (IN2: i2.(in_access) = Some (loc2, v_old2, f2, v_new2)),
+            loc1 = loc2)
+        (OUTPUT: o1 = o2):
+    p1 = p2.
+  Proof.
+    destruct i1, i2. inv STEP1. inv STEP2. ss.
+    exploit step_update_inj_perms; [exact UPD|exact UPD0|..]; eauto. i. subst.
+    exploit step_acquire_inj_perms; [exact ACQ|exact ACQ0|..]; eauto. i. subst.
+    exploit step_release_inj_perms; [exact REL|exact REL0|..]; eauto.
+  Qed.
 End SeqEvent.
 
 
@@ -1344,6 +1415,7 @@ Section LANG.
   | writing_trace_cons
       tr e i o w
       (TRACE: writing_trace tr w)
+      (UPDATE: ~ is_updating e)
       (ACQUIRE: ~ is_acquire e)
     :
       writing_trace ((e, i, o)::tr) (Flags.join (SeqEvent.written i) w)
@@ -1364,7 +1436,6 @@ Section LANG.
   (*       specialize (DEFERRED loc). destruct (d loc), (d0 loc); ss. auto. } *)
   (*   } *)
   (* Qed. *)
-
 End LANG.
 End SeqThread.
 

@@ -216,6 +216,9 @@ Proof.
     econs. econs; eauto.
   - esplits; try eapply oracle_simple_output_wf; eauto.
     econs. econs; eauto.
+  - exists Const.undef. ii.
+    esplits; try eapply oracle_simple_output_wf; eauto.
+    econs. econs; eauto.
   - esplits; try eapply oracle_simple_output_wf; eauto.
     econs. econs; eauto.
     Unshelve.
@@ -503,6 +506,12 @@ Proof.
     inv STEP. existT_elim. subst.
     esplits; eauto. econs. econs. eauto.
   }
+  { clear - UPDATE.
+    specialize (UPDATE loc ordr ordw). des. exists valr.
+    ii. exploit UPDATE; eauto. i. des.
+    inv STEP. existT_elim. subst.
+    esplits; eauto. econs. econs. eauto.
+  }
   { clear - FENCE.
     ii. exploit FENCE; eauto. i. des.
     inv STEP. existT_elim. subst.
@@ -531,7 +540,7 @@ Proof.
     - exists v. ii. esplits.
       + econs. econs; eauto. destruct e; ss; inv READING; ss.
       + eapply oracle_output_of_event_wf; eauto.
-      apply wf_input_oracle_wf_input. ss.
+        apply wf_input_oracle_wf_input. ss.
     - exists Const.undef. ii. esplits.
       + econs. econs; eauto. destruct e; ss.
       + eapply oracle_output_of_event_wf; eauto.
@@ -541,6 +550,16 @@ Proof.
     - econs. econs; eauto. destruct e; ss.
     - eapply oracle_output_of_event_wf; eauto.
       apply wf_input_oracle_wf_input. ss.
+  }
+  { destruct (reading_value_of e) as [v|] eqn:READING.
+    - exists v. ii. esplits.
+      + econs. econs; eauto. destruct e; ss; inv READING; ss.
+      + eapply oracle_output_of_event_wf; eauto.
+        apply wf_input_oracle_wf_input. ss.
+    - exists Const.undef. ii. esplits.
+      + econs. econs; eauto. destruct e; ss.
+      + eapply oracle_output_of_event_wf; eauto.
+        apply wf_input_oracle_wf_input. ss.
   }
   { ii. esplits.
     - econs. econs; eauto. destruct e; ss.
@@ -642,6 +661,8 @@ Proof.
     inv ORACLE; try done. splits; auto.
   - specialize (LOAD loc ord). des. exists val.
     apply add_oracle_orc_progress. ss.
+  - specialize (UPDATE loc ordr ordw). des. exists valr. i.
+    apply add_oracle_orc_progress. ss.
 Qed.
 
 Lemma add_oracle_wf
@@ -663,6 +684,85 @@ Proof.
   { specialize (LOAD loc ord). des. exists val.
     eapply add_oracle_init_progress. ss.
   }
+  { specialize (UPDATE loc ordr ordw). des. exists valr. i.
+    eapply add_oracle_init_progress. ss.
+  }
+Qed.
+
+Lemma nil_steps_any_oracle
+      lang step st1 p1 orc1 st2 p2 orc2 orc
+      (STEPS: SeqThread.steps step [] (@SeqThread.mk lang st1 p1 orc1) (SeqThread.mk st2 p2 orc2)):
+  orc1 = orc2 /\
+  SeqThread.steps step [] (SeqThread.mk st1 p1 orc) (SeqThread.mk st2 p2 orc).
+Proof.
+  dependent induction STEPS; ss.
+  - split; ss. econs.
+  - destruct th1.
+    exploit IHSTEPS; eauto. i. des.
+    inv STEP. splits; ss.
+    econs 2; eauto. econs. ss.
+Qed.
+
+Lemma steps_cons_inv
+      lang step e i o tr st1 p1 orc1 th4
+      (STEPS: SeqThread.steps step ((e, i, o) :: tr)
+                              (@SeqThread.mk lang st1 p1 orc1) th4):
+  exists st2 th3,
+    (<<NASTEPS: SeqThread.steps step [] (SeqThread.mk st1 p1 orc1) (SeqThread.mk st2 p1 orc1)>>) /\
+    (<<ATSTEP: SeqThread.at_step e i o (SeqThread.mk st2 p1 orc1) th3>>) /\
+    (<<STEPS: SeqThread.steps step tr th3 th4>>).
+Proof.
+  dependent induction STEPS; ss.
+  - destruct th1. inv STEP.
+    exploit IHSTEPS; eauto. i. des.
+    esplits; eauto. econs 2; eauto. econs. ss.
+  - esplits; eauto. econs 1.
+Qed.
+
+Lemma steps_app
+      lang step tr1 tr2 (th1 th2 th3: SeqThread.t lang)
+      (STEPS1: SeqThread.steps step tr1 th1 th2)
+      (STEPS2: SeqThread.steps step tr2 th2 th3):
+  SeqThread.steps step (tr1 ++ tr2) th1 th3.
+Proof.
+  induction STEPS1; ss.
+  - econs 2; eauto.
+  - econs 3; eauto.
+Qed.
+
+Lemma add_oracle_steps_inv
+      lang step e i o orc tr st1 p1 orc1 st2 p2 orc2
+      (ORACLE: oracle_le orc1 (add_oracle e i o orc))
+      (STEPS: SeqThread.steps step tr
+                              (@SeqThread.mk lang st1 p1 orc1)
+                              (SeqThread.mk st2 p2 orc2)):
+  (exists orc2',
+      SeqThread.steps step tr
+                      (SeqThread.mk st1 p1 orc)
+                      (SeqThread.mk st2 p2 orc2')) \/
+  (exists e' i' o' tr',
+      (<<TRACE: tr = (e', i', o') :: tr'>>) /\
+      (<<EVENT: ProgramEvent.le e e'>>) /\
+      (<<INPUT: Oracle.input_le i (SeqEvent.get_oracle_input i')>>) /\
+      (<<OUTPUT: o' = o>>)).
+Proof.
+  destruct tr.
+  { left. exploit nil_steps_any_oracle; eauto. i. des. esplits; eauto. }
+  destruct p as [[e' i'] o'].
+  exploit steps_cons_inv; eauto. i. des. clear STEPS.
+  inv ATSTEP.
+  punfold ORACLE. inv ORACLE. exploit LE; eauto. i. des. inv LE1; ss.
+  exploit add_oracle_spec; eauto. i. des; subst.
+  { right. esplits; eauto. }
+  left.
+  exploit oracle_le_steps; try exact STEPS0.
+  { eapply oracle_le_trans; eauto. }
+  i. des. exists orc2'.
+  replace ((e', i', o') :: tr) with ([] ++ (e', i', o') :: tr).
+  eapply steps_app.
+  { eapply nil_steps_any_oracle; eauto. }
+  econs 3; eauto; ss.
+  econs; eauto. ss.
 Qed.
 
 Definition oracle_input_of_event (e: ProgramEvent.t) (m: SeqMemory.t): Oracle.input :=
