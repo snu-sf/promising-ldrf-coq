@@ -1608,33 +1608,79 @@ Proof.
   }
 Qed.
 
-(* Lemma sim_timestamp_max_closed f v loc ts_src ts_tgt *)
-(*       (CLOSED: exists from_tgt val_tgt released_tgt, *)
-(*           Memory.get loc ts_tgt = Some (from, Message.concrete val_tgt released_tgt)) *)
-(*   : *)
+Definition sim_closed_memory (f: Mapping.ts) (mem: Memory.t): Prop :=
+  forall loc ts (CLOSED: Mapping.closed (f loc) (f loc).(Mapping.ver) ts),
+  exists from val released,
+    Memory.get loc ts mem = Some (from, Message.concrete val released).
 
-
-
-
-
-Lemma sim_message_max_msg_closed flag_tgt loc ts_src f v msg_src msg_tgt
-      (MAX: sim_message_max flag_tgt loc ts_src f v msg_src msg_tgt)
-      (WF: Message.closed msg_tgt)
+Lemma sim_closed_memory_future f mem0 mem1
+      (CLOSED: sim_closed_memory f mem0)
+      (FUTURE: Memory.future_weak mem0 mem1)
   :
-    Message.wf msg_src.
+    sim_closed_memory f mem1.
 Proof.
-  inv MAX; econs; eauto. inv WF. inv SIM; econs.
-  inv WF0. econs. eapply sim_timemap_max_max.
-  { eapply SIM0. }
-  { eapply sim_timemap_mon_tgt.
-    2:{ eapply WF. }
-    eapply sim_timemap_max_sim. eapply SIM0.
-  }
-  { red. eapply sim_view_max_pln in SIM0.
-    inv SIM0. rewrite LE. refl.
+  ii. exploit CLOSED; eauto. i. des.
+  eapply Memory.future_weak_get1 in x; eauto; ss.
+  des. inv MSG_LE. esplits; eauto.
+Qed.
+
+Lemma sim_closed_memory_sim_timemap loc ts_src f v tm_src tm_tgt mem
+      (SIM: sim_timemap_max loc ts_src f v tm_src tm_tgt)
+      (MEM: sim_closed_memory f mem)
+      (WF: Mapping.wfs f)
+      (VER: version_wf f v)
+  :
+    semi_closed_timemap tm_src mem loc ts_src.
+Proof.
+  ii. inv SIM. destruct (Loc.eq_dec l loc).
+  { subst. right. splits; auto. }
+  { left. exploit MAX; eauto. i.
+    eapply sim_timestamp_max_sim in x. unfold sim_timestamp in *. des.
+    exploit MEM.
+    { eapply sim_closed_mon_ver; eauto.
+      { eapply VER. }
+      { eapply mapping_latest_wf_loc. }
+    }
+    i. des. eauto.
   }
 Qed.
 
+Lemma sim_closed_memory_sim_view loc ts_src f v vw_src vw_tgt mem
+      (SIM: sim_view_max loc ts_src f v vw_src vw_tgt)
+      (MEM: sim_closed_memory f mem)
+      (WF: Mapping.wfs f)
+      (VER: version_wf f v)
+  :
+    semi_closed_view vw_src mem loc ts_src.
+Proof.
+  econs.
+  { eapply sim_closed_memory_sim_timemap; eauto. eapply SIM. }
+  { eapply sim_closed_memory_sim_timemap; eauto. eapply SIM. }
+Qed.
+
+Lemma sim_closed_memory_sim_opt_view loc ts_src f v vw_src vw_tgt mem
+      (SIM: sim_opt_view_max loc ts_src f v vw_src vw_tgt)
+      (MEM: sim_closed_memory f mem)
+      (WF: Mapping.wfs f)
+      (VER: opt_version_wf f v)
+  :
+    semi_closed_opt_view vw_src mem loc ts_src.
+Proof.
+  inv SIM; econs. eapply sim_closed_memory_sim_view; eauto.
+Qed.
+
+Lemma sim_closed_memory_sim_message flag_tgt loc ts_src f v msg_src msg_tgt mem
+      (SIM: sim_message_max flag_tgt loc ts_src f v msg_src msg_tgt)
+      (MEM: sim_closed_memory f mem)
+      (WF: Mapping.wfs f)
+      (VER: opt_version_wf f v)
+  :
+    semi_closed_message msg_src mem loc ts_src.
+Proof.
+  inv SIM; econs.
+  { eapply sim_closed_memory_sim_opt_view; eauto. }
+  { econs. }
+Qed.
 
 Definition mapping_update_latest (f: Mapping.t)
            (mapping: Time.t -> option Time.t) (times: Time.t -> Prop) :=
@@ -2802,7 +2848,8 @@ Variant sim_memory
         exists fto ffrom msg_src,
           (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto to>>) /\
           (<<GET: Memory.get loc fto mem_src = Some (ffrom, msg_src)>>) /\
-          (<<MSG: sim_message false loc f (vers loc to) msg_src msg_tgt>>))
+          (<<MSG: sim_message false loc f (vers loc to) msg_src msg_tgt>>) /\
+          (<<CLOSED: Mapping.closed (f loc) (f loc).(Mapping.ver) fto>>))
     (SOUND: forall loc fto0 ffrom1 msg_src
                    (GET: Memory.get loc fto0 mem_src = Some (ffrom1, msg_src)),
         (exists fto1 ffrom0 to from,
@@ -2829,7 +2876,8 @@ Lemma sim_memory_get flag_src f vers mem_src mem_tgt loc from_tgt to_tgt msg_tgt
     exists from_src to_src msg_src,
       (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt>>) /\
       (<<GET: Memory.get loc to_src mem_src = Some (from_src, msg_src)>>) /\
-      (<<MSG: sim_message false loc f (vers loc to_tgt) msg_src msg_tgt>>).
+      (<<MSG: sim_message false loc f (vers loc to_tgt) msg_src msg_tgt>>) /\
+      (<<CLOSED: Mapping.closed (f loc) (f loc).(Mapping.ver) to_src>>).
 Proof.
   inv SIM. hexploit MESSAGE; eauto. i. des. esplits; eauto.
 Qed.
@@ -3032,6 +3080,7 @@ Lemma add_sim_memory flag_src f vers mem_tgt0 mem_tgt1 mem_src0 mem_src1
       (ADDSRC: Memory.add mem_src0 loc from_src to_src msg_src mem_src1)
       (FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt)
       (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
+      (CLOSED: Mapping.closed (f loc) (f loc).(Mapping.ver) to_src)
       (MSG: sim_message false loc f (vers loc to_tgt) msg_src msg_tgt)
       (WF: Mapping.wfs f)
   :
@@ -3154,6 +3203,7 @@ Lemma split_sim_memory flag_src f vers mem_tgt0 mem_tgt1 mem_src0 mem_src1
       (SPLITSRC: Memory.split mem_src0 loc ts_src0 ts_src1 ts_src2 msg_src0 msg_src1 mem_src1)
       (TS: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ts_src1 ts_tgt1)
       (MSG: sim_message false loc f (vers loc ts_tgt1) msg_src0 msg_tgt0)
+      (CLOSED: Mapping.closed (f loc) (f loc).(Mapping.ver) ts_src1)
       (RESERVETGT0: msg_tgt0 <> Message.reserve)
       (RESERVETGT1: msg_tgt1 <> Message.reserve)
       (RESERVESRC1: msg_src1 <> Message.reserve)
@@ -3215,7 +3265,13 @@ Proof.
   econs.
   { i. erewrite Memory.lower_o in GET; eauto. des_ifs.
     { ss. des; clarify. esplits; eauto.
-      eapply Memory.lower_get0; eauto.
+      { eapply Memory.lower_get0; eauto. }
+      { eapply lower_succeed_wf in LOWERTGT. des.
+        hexploit sim_memory_get; eauto.
+        { inv MSG_LE; ss. }
+        i. des. eapply sim_timestamp_exact_inject in TO; eauto.
+        subst. auto.
+      }
     }
     { guardH o. hexploit sim_memory_get; eauto. i. des.
       esplits; eauto. erewrite Memory.lower_o; eauto. des_ifs; eauto.
@@ -3570,6 +3626,52 @@ Proof.
   ii. eapply opt_version_wf_mapping_mon; eauto.
 Qed.
 
+Lemma sim_timemap_mon_latest L f0 f1 tm_src tm_tgt
+      (SIM: sim_timemap L f0 (Mapping.vers f0) tm_src tm_tgt)
+      (LE: Mapping.les f0 f1)
+      (WF0: Mapping.wfs f0)
+      (WF1: Mapping.wfs f1)
+  :
+    sim_timemap L f1 (Mapping.vers f1) tm_src tm_tgt.
+Proof.
+  eapply sim_timemap_mon_ver; auto.
+  { erewrite <- sim_timemap_mon_mapping; eauto. eapply mapping_latest_wf. }
+  { eapply version_le_version_wf.
+    eapply version_wf_mapping_mon; eauto. eapply mapping_latest_wf.
+  }
+  { eapply mapping_latest_wf. }
+Qed.
+
+Lemma sim_view_mon_latest L f0 f1 vw_src vw_tgt
+      (SIM: sim_view L f0 (Mapping.vers f0) vw_src vw_tgt)
+      (LE: Mapping.les f0 f1)
+      (WF0: Mapping.wfs f0)
+      (WF1: Mapping.wfs f1)
+  :
+    sim_view L f1 (Mapping.vers f1) vw_src vw_tgt.
+Proof.
+  econs.
+  { eapply sim_timemap_mon_latest; eauto. eapply SIM. }
+  { eapply sim_timemap_mon_latest; eauto. eapply SIM. }
+Qed.
+
+Lemma sim_closed_mon_latest f0 f1 ts
+      (CLOSED: Mapping.closed f0 f0.(Mapping.ver) ts)
+      (LE: Mapping.le f0 f1)
+      (WF0: Mapping.wf f0)
+      (WF1: Mapping.wf f1)
+  :
+    Mapping.closed f1 f1.(Mapping.ver) ts.
+Proof.
+  eapply sim_closed_mon_ver.
+  { erewrite <- sim_closed_mon_mapping; [..|eauto]; eauto.
+    eapply mapping_latest_wf_loc.
+  }
+  { eapply LE. }
+  { eauto. }
+  { eapply mapping_latest_wf_loc. }
+Qed.
+
 Lemma sim_memory_mon_strong flag_src f0 f1 vers mem_src mem_tgt
       (SIM: sim_memory flag_src f0 vers mem_src mem_tgt)
       (LE: Mapping.les_strong f0 f1)
@@ -3585,6 +3687,9 @@ Proof.
     { eapply sim_timestamp_exact_mon_strong; eauto. }
     { erewrite <- sim_message_mon_mapping; eauto.
       eapply Mapping.les_strong_les; eauto.
+    }
+    { eapply sim_closed_mon_latest; eauto.
+      eapply Mapping.le_strong_le; eauto.
     }
   }
   { i. hexploit sim_memory_sound; eauto. i. des.
@@ -3657,6 +3762,7 @@ Proof.
     { eapply PRESERVE; eauto. refl. }
     { eapply Memory.cap_le; eauto. refl. }
     { erewrite <- sim_message_mon_mapping; eauto. }
+    { eapply sim_closed_mon_latest; eauto. }
   }
   { i. left. hexploit (H loc). i. des.
     exists fcap, Time.bot, (Time.incr (Memory.max_ts loc mem_tgt0)), Time.bot.
@@ -3689,6 +3795,7 @@ Lemma added_memory_sim_memory f0 f1 flag_src vers mem_tgt mem_src0 mem_src1 loc
           exists to_src from_src msg_src,
             (<<TO: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
             (<<MSG: sim_message false loc f0 (vers loc to_tgt) msg_src msg_tgt>>) /\
+            (<<CLOSED: Mapping.closed f1 f1.(Mapping.ver) to_src>>) /\
             (<<IN: List.In (from_src, to_src, msg_src) msgs>>))
       (MSGSOUND: forall to_src from_src msg_src
                         (IN: List.In (from_src, to_src, msg_src) msgs),
@@ -3703,6 +3810,7 @@ Lemma added_memory_sim_memory f0 f1 flag_src vers mem_tgt mem_src0 mem_src1 loc
                          (MAP: sim_timestamp_exact (f0 loc) (f0 loc).(Mapping.ver) fto to),
           sim_timestamp_exact f1 f1.(Mapping.ver) fto to)
       (SHIFTTS: sim_timestamp_exact f1 f1.(Mapping.ver) ts_src ts_tgt)
+      (CLOSEDTS: Mapping.closed f1 f1.(Mapping.ver) ts_src)
   :
     sim_memory
       (fun loc' => if Loc.eq_dec loc' loc then None else flag_src loc')
@@ -3755,6 +3863,7 @@ Proof.
       { eapply SHIFTSAME; eauto. }
       { eapply MLE; eauto. }
       { erewrite <- sim_message_mon_mapping; eauto. }
+      { eapply sim_closed_mon_latest; eauto. }
     }
     { inv EQ. clarify. esplits; eauto.
       erewrite <- sim_message_mon_mapping; eauto.

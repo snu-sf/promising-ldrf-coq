@@ -39,35 +39,6 @@ Require Import SeqLift.
 (* Require Import Simple. *)
 
 
-Lemma sim_timemap_mon_latest L f0 f1 tm_src tm_tgt
-      (SIM: sim_timemap L f0 (Mapping.vers f0) tm_src tm_tgt)
-      (LE: Mapping.les f0 f1)
-      (WF0: Mapping.wfs f0)
-      (WF1: Mapping.wfs f1)
-  :
-    sim_timemap L f1 (Mapping.vers f1) tm_src tm_tgt.
-Proof.
-  eapply sim_timemap_mon_ver; auto.
-  { erewrite <- sim_timemap_mon_mapping; eauto. eapply mapping_latest_wf. }
-  { eapply version_le_version_wf.
-    eapply version_wf_mapping_mon; eauto. eapply mapping_latest_wf.
-  }
-  { eapply mapping_latest_wf. }
-Qed.
-
-Lemma sim_view_mon_latest L f0 f1 vw_src vw_tgt
-      (SIM: sim_view L f0 (Mapping.vers f0) vw_src vw_tgt)
-      (LE: Mapping.les f0 f1)
-      (WF0: Mapping.wfs f0)
-      (WF1: Mapping.wfs f1)
-  :
-    sim_view L f1 (Mapping.vers f1) vw_src vw_tgt.
-Proof.
-  econs.
-  { eapply sim_timemap_mon_latest; eauto. eapply SIM. }
-  { eapply sim_timemap_mon_latest; eauto. eapply SIM. }
-Qed.
-
 Record sim_tview
        (f: Mapping.ts)
        (flag_src: Loc.t -> option Time.t)
@@ -564,76 +535,141 @@ Proof.
   { eapply mapping_latest_wf_loc. }
 Qed.
 
-Lemma sim_view_singleton_ur_if l (L: Loc.t -> Prop) f v
-      ts_src ts_tgt cond
-      (SIM: L l -> sim_timestamp (f l) (v l) ts_src ts_tgt)
+Lemma semi_sim_timemap_join loc f v to_src to_tgt tm_src tm_tgt
+      (SIM: sim_timemap (fun loc0 => loc0 <> loc) f v tm_src tm_tgt)
+      (TS: sim_timestamp (f loc) (v loc) to_src to_tgt)
+      (LESRC: time_le_timemap loc to_src tm_src)
+      (LETGT: time_le_timemap loc to_tgt tm_tgt)
       (WF: Mapping.wfs f)
-      (VERWF: version_wf f v)
+      (VER: version_wf f v)
   :
-    sim_view L f v (View.singleton_ur_if cond l ts_src) (View.singleton_ur_if cond l ts_tgt).
+    sim_timemap (fun _ => True) f v (TimeMap.join (TimeMap.singleton loc to_src) tm_src) (TimeMap.join (TimeMap.singleton loc to_tgt) tm_tgt).
 Proof.
-  unfold View.singleton_ur_if. des_ifs.
-  { eapply sim_view_singleton_ur; eauto. }
-  { eapply sim_view_singleton_rw; eauto. }
+  ii. destruct (Loc.eq_dec l loc).
+  { subst. unfold TimeMap.join.
+    repeat rewrite TimeFacts.le_join_l.
+    { eapply sim_timemap_singleton; ss. }
+    { unfold TimeMap.singleton. setoid_rewrite LocFun.add_spec_eq.
+      eapply LETGT. }
+    { unfold TimeMap.singleton. setoid_rewrite LocFun.add_spec_eq.
+      eapply LESRC. }
+  }
+  { eapply sim_timestamp_join; eauto.
+    unfold TimeMap.singleton. setoid_rewrite LocFun.add_spec_neq; eauto.
+    eapply sim_timestamp_bot; eauto.
+  }
 Qed.
 
-Lemma message_to_time_le_opt_view loc to val released
-      (MSGTO: Memory.message_to (Message.concrete val released) loc to)
+Lemma semi_sim_view_join loc f v to_src to_tgt vw_src vw_tgt
+      (SIM: sim_view (fun loc0 => loc0 <> loc) f v vw_src vw_tgt)
+      (TS: sim_timestamp (f loc) (v loc) to_src to_tgt)
+      (LESRC: time_le_view loc to_src vw_src)
+      (LETGT: time_le_view loc to_tgt vw_tgt)
+      (WF: Mapping.wfs f)
+      (VER: version_wf f v)
   :
-    time_le_opt_view loc to released.
+    sim_view (fun _ => True) f v (View.join (View.singleton_ur loc to_src) vw_src) (View.join (View.singleton_ur loc to_tgt) vw_tgt).
 Proof.
-  invMS
+  econs.
+  { eapply semi_sim_timemap_join; eauto.
+    { eapply SIM. }
+    { eapply LESRC. }
+    { eapply LETGT. }
+  }
+  { eapply semi_sim_timemap_join; eauto.
+    { eapply SIM. }
+    { eapply LESRC. }
+    { eapply LETGT. }
+  }
+Qed.
 
-      loc to
+Lemma semi_sim_opt_view_join loc f v to_src to_tgt released_src released_tgt
+      (SIM: sim_opt_view (fun loc0 => loc0 <> loc) f (Some v) released_src released_tgt)
+      (TS: sim_timestamp (f loc) (v loc) to_src to_tgt)
+      (LESRC: time_le_opt_view loc to_src released_src)
+      (LETGT: time_le_opt_view loc to_tgt released_tgt)
+      (WF: Mapping.wfs f)
+      (VER: version_wf f v)
+  :
+    sim_view (fun _ => True) f v (View.join (View.singleton_ur loc to_src) (View.unwrap released_src)) (View.join (View.singleton_ur loc to_tgt) (View.unwrap released_tgt)).
+Proof.
+  inv SIM; ss.
+  { inv LESRC. inv LETGT. eapply semi_sim_view_join; eauto. }
+  { eapply sim_view_join; eauto.
+    { eapply sim_view_singleton_ur; eauto. }
+    { eapply sim_view_bot; eauto. }
+  }
+Qed.
 
+Lemma sim_opt_view_mon_opt_ver L f v0 v1 vw_src vw_tgt
+      (SIM: sim_opt_view L f v0 vw_src vw_tgt)
+      (VER: forall v0' (VER: v0 = Some v0'),
+          exists v1', (<<VER: v1 = Some v1'>>) /\(<<VERLE: version_le v0' v1'>>))
+      (WF: Mapping.wfs f)
+      (VERWF: opt_version_wf f v1)
+  :
+    sim_opt_view L f v1 vw_src vw_tgt.
+Proof.
+  destruct v0.
+  { hexploit VER; eauto. i. des. clarify.
+    eapply sim_opt_view_mon_ver; eauto.
+  }
+  { inv SIM. econs. }
+Qed.
 
-time_le_opt_view
-
-Lemma sim_read_tview f flag_src flag_tgt tvw_src tvw_tgt
+Lemma sim_read_tview f flag_src flag_tgt tvw_src tvw_tgt v
       loc to_src released_src ord to_tgt released_tgt
       (SIM: sim_tview f flag_src flag_tgt tvw_src tvw_tgt)
       (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
       (CLOSED: Mapping.closed (f loc) (Mapping.vers f loc) to_src)
+      (RELEASED: sim_opt_view (fun loc0 => loc0 <> loc) f v released_src released_tgt)
       (WF: Mapping.wfs f)
+      (VERWF: opt_version_wf f v)
+      (LESRC: time_le_opt_view loc to_src released_src)
+      (LETGT: time_le_opt_view loc to_tgt released_tgt)
   :
     sim_tview f flag_src flag_tgt (TView.read_tview tvw_src loc to_src released_src ord) (TView.read_tview tvw_tgt loc to_tgt released_tgt ord).
 Proof.
   pose proof (mapping_latest_wf f).
+  assert (TM: sim_timestamp (f loc) (Mapping.vers f loc) to_src to_tgt).
+  { eapply sim_timestamp_exact_sim; eauto. }
+  assert (JOIN: sim_view (fun loc0 => flag_src loc0 = None) f (Mapping.vers f)
+                         (View.join (View.singleton_ur loc to_src) (View.unwrap released_src))
+                         (View.join (View.singleton_ur loc to_tgt) (View.unwrap released_tgt))).
+  { eapply sim_view_mon_locs.
+    { eapply semi_sim_opt_view_join; eauto.
+      eapply sim_opt_view_mon_opt_ver; eauto.
+      i. clarify. splits; eauto.
+    }
+    { ss. }
+  }
   econs.
   { eapply SIM. }
   { ss. rewrite View.join_assoc. rewrite View.join_assoc.
     eapply sim_view_join; eauto.
     { eapply SIM. }
     unfold View.singleton_ur_if. des_ifs.
-    { admit. }
-    { admit. }
+    { eapply sim_view_join; eauto.
+      { eapply sim_view_singleton_ur; eauto. }
+      { eapply sim_view_bot; eauto. }
+    }
     { destruct ord; ss. }
-    { admit. }
+    { eapply sim_view_join; eauto.
+      { eapply sim_view_singleton_rw; eauto. }
+      { eapply sim_view_bot; eauto. }
+    }
   }
-
-    {
-
-
-eapply sim_view_join; eauto.
-      { eapply SIM. }
-      { eapply sim_view_singleton_ur_if; eauto.
-        i. eapply sim_timestamp_exact_sim; eauto.
-      }
-    }
-    { des_ifs.
-      { admit. }
-      { eapply sim_view_join; eauto.
-        { eapply sim_view_join; eauto.
-          { eapply SIM. }
-          { ss. eapply sim_view_singleton_rw; eauto.
-            i. eapply sim_timestamp_exact_sim; eauto.
-          }
-        }
-        { eapply sim_view_bot; eauto. }
-      }
-    }
+  { ss. rewrite View.join_assoc. rewrite View.join_assoc.
+    eapply sim_view_join; eauto.
     { eapply SIM. }
-Admitted.
+    unfold View.singleton_ur_if. des_ifs.
+    { eapply sim_view_join; eauto.
+      { eapply sim_view_singleton_rw; eauto. }
+      { eapply sim_view_bot; eauto. }
+    }
+  }
+  { i. eapply SIM. }
+Qed.
 
 Lemma sim_thread_read
       f vers flag_src flag_tgt vs_src0 vs_tgt0
@@ -659,7 +695,7 @@ Lemma sim_thread_read
       (<<RELEASED: sim_opt_view (fun loc0 => loc0 <> loc) f (vers loc to_tgt) released_src released_tgt>>) /\
       (<<SIM: sim_thread
                 f vers flag_src flag_tgt vs_src1 vs_tgt1
-                mem_src mem_tgt lc_src0 lc_tgt1 sc_src sc_tgt>>)
+                mem_src mem_tgt lc_src1 lc_tgt1 sc_src sc_tgt>>)
 .
 Proof.
   inv READ. inv SIM.
@@ -674,9 +710,13 @@ Proof.
     }
   }
   { eauto. }
-  { rewrite H0. admit. }
-  { econs; eauto.
-    { inv LOCAL0. econs; eauto. ss. admit. }
+  { auto. }
+    { inv LOCAL0. econs; eauto; ss.
+      { econs; eauto.
+        { eapply sim_read_tview; eauto.
+          {
+
+admit. }
     { admit. }
   }
 Admitted.
