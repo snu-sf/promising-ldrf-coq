@@ -22,7 +22,6 @@ Require Import OracleFacts.
 Require Import SimAux.
 
 Set Implicit Arguments.
-Set Nested Proofs Allowed.
 
 
 Module SeqTrace.
@@ -81,53 +80,60 @@ Module SeqTrace.
     }
   Qed.
 
-  Program Instance le_PreOrder: PreOrder (le Flags.bot).
-  Next Obligation.
-  Proof.
-    ii. destruct x. induction l.
-    { destruct r.
-      { econs 1; refl. }
-      { econs 2; eauto.
-        { econs 1. }
-        { refl. }
-      }
-      { econs 3; eauto. econs 1. }
-    }
-    { destruct a as [[e i] o]. econs 4; eauto.
-      { eapply SeqEvent.input_match_bot; eauto. }
-      { refl. }
-    }
-  Qed.
-  Next Obligation.
-  Proof.
-    ii. destruct z. ginduction l.
-    { i. inv H0.
-      { inv H. econs 1.
-        { etrans; eauto. }
-        { etrans; eauto. }
-      }
-      { inv TRACE. inv H. inv TRACE. econs 2.
-        { econs. }
-        { etrans; eauto. }
-      }
-      { econs 3. econs. }
-    }
-    { i.
-  Admitted.
+  (* Program Instance le_PreOrder: PreOrder (le Flags.bot). *)
+  (* Next Obligation. *)
+  (* Proof. *)
+  (*   ii. destruct x. induction l. *)
+  (*   { destruct r. *)
+  (*     { econs 1; refl. } *)
+  (*     { econs 2; eauto. *)
+  (*       { econs 1. } *)
+  (*       { refl. } *)
+  (*     } *)
+  (*     { econs 3; eauto. econs 1. } *)
+  (*   } *)
+  (*   { destruct a as [[e i] o]. econs 4; eauto. *)
+  (*     { eapply SeqEvent.input_match_bot; eauto. } *)
+  (*     { refl. } *)
+  (*   } *)
+  (* Qed. *)
+  (* Next Obligation. *)
+  (* Proof. *)
+  (*   ii. destruct z. ginduction l. *)
+  (*   { i. inv H0. *)
+  (*     { inv H. econs 1. *)
+  (*       { etrans; eauto. } *)
+  (*       { etrans; eauto. } *)
+  (*     } *)
+  (*     { inv TRACE. inv H. inv TRACE. econs 2. *)
+  (*       { econs. } *)
+  (*       { etrans; eauto. } *)
+  (*     } *)
+  (*     { econs 3. econs. } *)
+  (*   } *)
+  (*   { i. inv H0. *)
+  (*     { inv H. econs 2; eauto. *)
+  (*       inv TRACE0. etrans; eauto. *)
+  (*     } *)
+  (*     { econs; eauto. } *)
+  (*     { inv H. *)
+  (*       { inv LE. *)
+  (*         { econs 2. *)
+  (* Admitted. *)
 
   Definition incl (b0: t -> Prop) (b1: t -> Prop): Prop :=
     forall tr0, b0 tr0 -> exists tr1, b1 tr1 /\ le Flags.bot tr0 tr1.
 
-  Program Instance incl_PreOrder: PreOrder incl.
-  Next Obligation.
-  Proof.
-    ii. exists tr0. split; auto. refl.
-  Qed.
-  Next Obligation.
-  Proof.
-    ii. apply H in H1. des. apply H0 in H1. des.
-    esplits; eauto. etrans; eauto.
-  Qed.
+  (* Program Instance incl_PreOrder: PreOrder incl. *)
+  (* Next Obligation. *)
+  (* Proof. *)
+  (*   ii. exists tr0. split; auto. refl. *)
+  (* Qed. *)
+  (* Next Obligation. *)
+  (* Proof. *)
+  (*   ii. apply H in H1. des. apply H0 in H1. des. *)
+  (*   esplits; eauto. etrans; eauto. *)
+  (* Qed. *)
 End SeqTrace.
 
 
@@ -1848,6 +1854,43 @@ Section ADEQUACY.
     destruct th1. exploit IHSTEPS; eauto. i. clear IHSTEPS.
     inv STEP. econs 2; eauto.
   Qed.
+  
+  Lemma behavior_step_inv
+        st1 p1 orc1
+        e st2 st3
+        e' i o tr r
+        (DETERM: deterministic _ st1.(SeqState.state))
+        (NASTEPS: rtc (state_step p1 MachineEvent.silent) st1 st2)
+        (LSTEP: lang_src.(Language.step) e st2.(SeqState.state) st3)
+        (ATOMIC: is_atomic_event e)
+        (BEH: SeqBehavior.behavior state_step (SeqThread.mk st1 p1 orc1)
+                                   ((e', i, o) :: tr, r)):
+    exists th3,
+      SeqThread.at_step e' i o (SeqThread.mk st2 p1 orc1) th3.
+  Proof.
+    induction NASTEPS.
+    { inv BEH; ss; eauto.
+      inv STEP. exploit state_step_subset; eauto. i.
+      inv x0. exploit deterministic_step; [|exact LSTEP|exact LANG|]; ss. i. des.
+      punfold DETERM. inv DETERM.
+      rewrite similar_is_atomic in ATOMIC; eauto;
+        try by (i; subst; eapply NO_NA_UPDATE; eauto).
+      inv LOCAL; ss; try destruct ord; ss.
+    }
+    inv BEH; ss.
+    { inv STEP. exploit state_step_determ; [exact H|exact STEP0|]. i. des. subst.
+      exploit IHNASTEPS; eauto.
+      exploit state_step_subset; eauto. i. inv x1. ss.
+      eapply step_deterministic; eauto.
+    }
+    { inv STEP. exploit state_step_subset; eauto. i.
+      inv x. exploit deterministic_step; [|exact LANG|exact LANG0|]; ss. i. des.
+      punfold DETERM. inv DETERM.
+      rewrite similar_is_atomic in ATOMIC0; eauto;
+        try by (i; subst; eapply NO_NA_UPDATE; eauto).
+      inv LOCAL; ss; try destruct ord; ss.
+    }
+  Qed.
 
   Lemma deterministic_steps_inv
         p1 st1 st2 e st3
@@ -2280,42 +2323,6 @@ Section ADEQUACY.
           i. des; ss. subst. inv x5.
           exploit match_trace_le_partial_step; try exact x2; eauto. i. des.
           exploit SeqEvent.input_match_mon; try exact INPUT_MATCH; try exact MIN; try refl. i.
-          Lemma behavior_step_inv
-                st1 p1 orc1
-                e st2 st3
-                e' i o tr r
-                (DETERM: deterministic _ st1.(SeqState.state))
-                (NASTEPS: rtc (state_step p1 MachineEvent.silent) st1 st2)
-                (LSTEP: lang_src.(Language.step) e st2.(SeqState.state) st3)
-                (ATOMIC: is_atomic_event e)
-                (BEH: SeqBehavior.behavior state_step (SeqThread.mk st1 p1 orc1)
-                                           ((e', i, o) :: tr, r)):
-            exists th3,
-              SeqThread.at_step e' i o (SeqThread.mk st2 p1 orc1) th3.
-          Proof.
-            induction NASTEPS.
-            { inv BEH; ss; eauto.
-              inv STEP. exploit state_step_subset; eauto. i.
-              inv x0. exploit deterministic_step; [|exact LSTEP|exact LANG|]; ss. i. des.
-              punfold DETERM. inv DETERM.
-              rewrite similar_is_atomic in ATOMIC; eauto;
-                try by (i; subst; eapply NO_NA_UPDATE; eauto).
-              inv LOCAL; ss; try destruct ord; ss.
-            }
-            inv BEH; ss.
-            { inv STEP. exploit state_step_determ; [exact H|exact STEP0|]. i. des. subst.
-              exploit IHNASTEPS; eauto.
-              exploit state_step_subset; eauto. i. inv x1. ss.
-              eapply step_deterministic; eauto.
-            }
-            { inv STEP. exploit state_step_subset; eauto. i.
-              inv x. exploit deterministic_step; [|exact LANG|exact LANG0|]; ss. i. des.
-              punfold DETERM. inv DETERM.
-              rewrite similar_is_atomic in ATOMIC0; eauto;
-                try by (i; subst; eapply NO_NA_UPDATE; eauto).
-              inv LOCAL; ss; try destruct ord; ss.
-            }
-          Qed.
           exploit behavior_step_inv; try exact BEH_EX; eauto.
           { eapply state_steps_deterministic; eauto. ss. }
           { erewrite <- le_is_atomic; try exact ATOMIC; eauto. }

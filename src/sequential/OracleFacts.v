@@ -770,7 +770,7 @@ Qed.
 
 Definition oracle_input_of_event (e: ProgramEvent.t) (m: SeqMemory.t): Oracle.input :=
   Oracle.mk_input
-    (match is_accessing e with
+    (match is_acessing e with
      | Some (loc, _) => Some (loc, m.(SeqMemory.value_map) loc, m.(SeqMemory.flags) loc)
      | None => None
      end)
