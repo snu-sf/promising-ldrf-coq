@@ -1089,6 +1089,7 @@ Section UPTO.
   Qed.
 
 
+
   Variant deferred_le_sf_ctx
           (sim_seq:
              forall
@@ -1173,6 +1174,486 @@ Section UPTO.
   Proof.
     guclo deferred_le_sf_ctx_spec. econs; eauto. etrans; eauto. apply Flags.join_ge_l.
   Qed.
+
+
+
+  Variant seqevent_in_access_le (i0 i1: SeqEvent.input) : Prop :=
+  | in_access_none
+      (IN0: i0.(SeqEvent.in_access) = None)
+      (IN1: i1.(SeqEvent.in_access) = None)
+  | in_access_some
+      l v0 f0 v1 f1 vn
+      (VAL: Const.le v0 v1)
+      (FLAG: Flag.le f0 f1)
+      (IN0: i0.(SeqEvent.in_access) = Some (l, v0, f0, vn))
+      (IN1: i1.(SeqEvent.in_access) = Some (l, v1, f1, vn))
+  .
+
+  Variant seqevent_in_acquire_le (i0 i1: SeqEvent.input) : Prop :=
+  | in_acquire_none
+      (IN0: i0.(SeqEvent.in_acquire) = None)
+      (IN1: i1.(SeqEvent.in_acquire) = None)
+  | in_acquire_some
+      f0 f1
+      (FLAG: Flags.le f0 f1)
+      (IN0: i0.(SeqEvent.in_acquire) = Some f0)
+      (IN1: i1.(SeqEvent.in_acquire) = Some f1)
+  .
+
+  Variant seqevent_in_release_le (i0 i1: SeqEvent.input) : Prop :=
+  | in_release_none
+      (IN0: i0.(SeqEvent.in_release) = None)
+      (IN1: i1.(SeqEvent.in_release) = None)
+  | in_release_some
+      v0 f0 v1 f1
+      (VAL: ValueMap.le v0 v1)
+      (FLAG: Flags.le f0 f1)
+      (IN0: i0.(SeqEvent.in_release) = Some (v0, f0))
+      (IN1: i1.(SeqEvent.in_release) = Some (v1, f1))
+  .
+
+  Definition seqevent_input_le (i0 i1: SeqEvent.input) :=
+    (<<LEINACC: seqevent_in_access_le i0 i1>>) /\ (<<LEINACQ: seqevent_in_acquire_le i0 i1>>) /\
+    (<<LEINREL: seqevent_in_release_le i0 i1>>).
+
+  Lemma input_le_same_oracle_input
+        i0 i1 i2
+        (LE: seqevent_input_le i1 i2)
+        (INPUT: Oracle.input_le i0 (SeqEvent.get_oracle_input i1))
+    :
+      Oracle.input_le i0 (SeqEvent.get_oracle_input i2).
+  Proof.
+    destruct i0, i1, i2. unfold seqevent_input_le in LE. unfold Oracle.input_le in *. des. ss. splits.
+    2:{ destruct in_acquire0, in_acquire1, in_acquire; ss. inv LEINACQ; ss. inv LEINACQ; ss. }
+    2:{ destruct in_release0, in_release1, in_release; ss. inv LEINREL; ss. inv LEINREL; ss. }
+    clear ACQUIRE RELEASE LEINACQ LEINREL. inv LEINACC; ss; subst; ss.
+    destruct in_access; ss. unfold Oracle.in_access_le in *. des_ifs. des; clarify. splits; auto.
+    - etrans; eauto.
+    - etrans; eauto.
+  Qed.
+
+  Lemma input_le_wf
+        ev i1 i2
+        (LE: seqevent_input_le i1 i2)
+        (INPUT: SeqEvent.wf_input ev i1)
+    :
+      SeqEvent.wf_input ev i2.
+  Proof.
+    destruct i1, i2. unfold seqevent_input_le in LE. unfold SeqEvent.wf_input in *. des. ss. splits.
+    2:{ destruct in_acquire0, in_acquire, (is_acquire ev); ss. inv LEINACQ; ss. inv LEINACQ; ss. }
+    2:{ destruct in_release0, in_release, (is_release ev); ss. inv LEINREL; ss. inv LEINREL; ss. }
+    clear ACQUIRE ACQUIRE0 RELEASE RELEASE0 LEINACQ LEINREL. inv LEINACC; ss; subst; ss.
+    i. split; i.
+    - des. clarify. eapply UPDATE; eauto.
+    - hexploit UPDATE; clear UPDATE. i; des. clear H0. hexploit H1; clear H1; eauto. i; des. inv H0. eauto.
+  Qed.
+
+  Definition trace_le0 (t0 t1: (ProgramEvent.t * SeqEvent.input * Oracle.output)) : Prop :=
+    let '(pe0, i0, o0) := t0 in
+    let '(pe1, i1, o1) := t1 in
+    (<<LEPE: pe0 = pe1>>) /\ (<<LEIN: seqevent_input_le i0 i1>>) /\ (o0 = o1).
+
+  Definition trace_le (tr0 tr1: list (ProgramEvent.t * SeqEvent.input * Oracle.output)) :=
+    List.Forall2 trace_le0 tr0 tr1.
+
+  Lemma writing_trace_mon_on_trace
+        tr0 tr w
+        (TRACE: SeqThread.writing_trace tr w)
+        (LE: trace_le tr tr0)
+    :
+      exists w0, SeqThread.writing_trace tr0 w0.
+  Proof.
+    depgen tr0. induction TRACE; i; ss.
+    { inv LE. exists Flags.bot. econs. }
+    inv LE. rename l' into tr2. destruct y as [y o2]. destruct y as [e2 i2]. eapply IHTRACE in H3. des. clear IHTRACE.
+    unfold trace_le0 in *. des. clarify. eexists. econs; eauto.
+  Qed.
+
+
+  Definition mem_le (m0 m1: SeqMemory.t) : Prop :=
+    (<<LEF: Flags.le m0.(SeqMemory.flags) m1.(SeqMemory.flags)>>) /\
+    (<<LEV: ValueMap.le m0.(SeqMemory.value_map) m1.(SeqMemory.value_map)>>).
+
+
+  Ltac unfold_many2 := unfold SeqMemory.write in *; unfold_many; ss.
+
+  Lemma thread_na_step_le
+        memory1 memory0 state o p th1
+        (LE: mem_le memory1 memory0)
+        (STEPS: SeqThread.na_step (SeqState.na_step (lang:=lang_src)) MachineEvent.silent
+                                  {|
+                                    SeqThread.state := {| SeqState.state := state; SeqState.memory := memory1 |};
+                                    SeqThread.perm := p;
+                                    SeqThread.oracle := o
+                                  |} th1)
+    :
+      exists th0,
+        (<<STEPS: SeqThread.na_step (SeqState.na_step (lang:=lang_src)) MachineEvent.silent
+                                   {| SeqThread.state := {| SeqState.state := state; SeqState.memory := memory0 |};
+                                      SeqThread.perm := p;
+                                      SeqThread.oracle := o |}
+                                   th0>>) /\
+        (<<STATE: (th1.(SeqThread.state).(SeqState.state)) = (th0.(SeqThread.state).(SeqState.state))>>) /\
+        (<<PERM: (th1.(SeqThread.perm)) = (th0.(SeqThread.perm))>>) /\
+        (<<ORACLE: (th1.(SeqThread.oracle)) = (th0.(SeqThread.oracle))>>) /\
+        (<<MEMLE: mem_le (th1.(SeqThread.state).(SeqState.memory)) (th0.(SeqThread.state).(SeqState.memory))>>).
+  Proof.
+    unfold mem_le in LE. des. inv STEPS. inv STEP. inv LOCAL; ss.
+    - esplits. econs. econs. eauto. econs. all: ss.
+    - esplits. econs. econs. eauto. econs; auto. i. destruct (p loc); ss. etrans. eapply VAL; eauto. eapply LEV. all: ss.
+    - esplits. econs. econs. eauto. econs; auto. all: ss. econs; eauto.
+      + ii. unfold_many2. des_ifs.
+      + ii. unfold_many2. des_ifs. refl.
+  Qed.
+
+  Lemma seqevent_step_le
+        memory1 memory0 p i1 oo p1 m1
+        (LE: mem_le memory1 memory0)
+        (STEP: SeqEvent.step i1 oo p memory1 p1 m1)
+    :
+      exists i0 m0,
+        (<<STEPS: SeqEvent.step i0 oo p memory0 p1 m0>>) /\
+        (<<INLE: seqevent_input_le i1 i0>>) /\
+        (<<MEMLE: mem_le m1 m0>>).
+  Proof.
+    unfold mem_le in LE. des.
+    destruct (SeqEvent.in_access i1) eqn:IACC, (SeqEvent.in_acquire i1) eqn:IACQ, (SeqEvent.in_release i1) eqn:IREL.
+    { destruct p0 as [p0 vn]. destruct p0 as [p0 f]. destruct p0 as [l v]. destruct p2 as [vm fs].
+      inv STEP. rewrite IACC in UPD. rewrite IACQ in ACQ. rewrite IREL in REL. inv UPD. inv REL. inv ACQ.
+      destruct oo; ss; clarify. inv MEM. inv MEM0. inv MEM1. ss. destruct i1; ss; clarify.
+      eexists (SeqEvent.mk_input _ _ _). esplits.
+      - econs; ss.
+        + econs; eauto. econs; eauto.
+        + econs; eauto. econs; eauto.
+        + econs; eauto. econs; eauto.
+      - ss. unfold seqevent_input_le. splits; ss.
+        + econs 2. 3,4: ss. 1,2: eauto.
+        + econs 2. 2,3: ss. ii. unfold_flags. des_ifs.
+        + econs 2. 3,4: ss.
+          * ii. unfold_many2. des_ifs. refl. refl.
+          * ii. unfold_flags. des_ifs.
+      - ss. econs; ss. ii. unfold_many2. des_ifs. refl. refl.
+    }
+    { destruct p0 as [p0 vn]. destruct p0 as [p0 f]. destruct p0 as [l v].
+      inv STEP. rewrite IACC in UPD. rewrite IACQ in ACQ. rewrite IREL in REL. inv UPD. inv REL. inv ACQ.
+      destruct oo; ss; clarify. inv MEM. inv MEM0. ss. destruct i1; ss; clarify.
+      eexists (SeqEvent.mk_input _ _ _). esplits.
+      - econs; ss.
+        + econs; eauto. econs; eauto.
+        + econs; eauto. econs; eauto.
+        + econs; eauto.
+      - ss. unfold seqevent_input_le. splits; ss.
+        + econs 2. 3,4: ss. 1,2: eauto.
+        + econs 2. 2,3: ss. ii. unfold_flags. des_ifs.
+        + econs 1. all: ss.
+      - ss. econs; ss.
+        + ii. unfold_flags. des_ifs.
+        + ii. unfold_many2. des_ifs. refl. refl.
+    }
+    { destruct p0 as [p0 vn]. destruct p0 as [p0 f]. destruct p0 as [l v]. destruct p2 as [vm fs].
+      inv STEP. rewrite IACC in UPD. rewrite IACQ in ACQ. rewrite IREL in REL. inv UPD. inv REL. inv ACQ.
+      destruct oo; ss; clarify. inv MEM. inv MEM0. ss. destruct i1; ss; clarify.
+      eexists (SeqEvent.mk_input _ _ _). esplits.
+      - econs; ss.
+        + econs; eauto. econs; eauto.
+        + econs; eauto.
+        + econs; eauto. econs; eauto.
+      - ss. unfold seqevent_input_le. splits; ss.
+        + econs 2. 3,4: ss. 1,2: eauto.
+        + econs 1. all: ss.
+        + econs 2. 3,4: ss.
+          * ii. unfold_many2. des_ifs. refl.
+          * ii. unfold_flags. des_ifs.
+      - ss. econs; ss. ii. unfold_many2. des_ifs. refl.
+    }
+    { destruct p0 as [p0 vn]. destruct p0 as [p0 f]. destruct p0 as [l v].
+      inv STEP. rewrite IACC in UPD. rewrite IACQ in ACQ. rewrite IREL in REL. inv UPD. inv REL. inv ACQ.
+      destruct oo; ss; clarify. inv MEM. ss. destruct i1; ss; clarify.
+      eexists (SeqEvent.mk_input _ _ _). esplits.
+      - econs; ss.
+        + econs; eauto. econs; eauto.
+        + econs; eauto.
+        + econs; eauto.
+      - ss. unfold seqevent_input_le. splits; ss.
+        + econs 2. 3,4: ss. 1,2: eauto.
+        + econs 1. all: ss.
+        + econs 1. all: ss.
+      - ss. econs; ss.
+        + ii. unfold_flags. des_ifs.
+        + ii. unfold_many2. des_ifs. refl.
+    }
+    { destruct p0 as [vm fs].
+      inv STEP. rewrite IACC in UPD. rewrite IACQ in ACQ. rewrite IREL in REL. inv UPD. inv REL. inv ACQ.
+      destruct oo; ss; clarify. inv MEM. inv MEM0. ss. destruct i1; ss; clarify.
+      eexists (SeqEvent.mk_input _ _ _). esplits.
+      - econs; ss.
+        + econs; eauto.
+        + econs; eauto. econs; eauto.
+        + econs; eauto. econs; eauto.
+      - ss. unfold seqevent_input_le. splits; ss.
+        + econs 1. all: ss.
+        + econs 2. 2,3: ss. ii. unfold_flags. des_ifs.
+        + econs 2. 3,4: ss.
+          * ii. unfold_many2. des_ifs. refl.
+          * ii. unfold_flags. des_ifs.
+      - ss. econs; ss. ii. unfold_many2. des_ifs. refl.
+    }
+    { inv STEP. rewrite IACC in UPD. rewrite IACQ in ACQ. rewrite IREL in REL. inv UPD. inv REL. inv ACQ.
+      destruct oo; ss; clarify. inv MEM. ss. destruct i1; ss; clarify.
+      eexists (SeqEvent.mk_input _ _ _). esplits.
+      - econs; ss.
+        + econs; eauto.
+        + econs; eauto. econs; eauto.
+        + econs; eauto.
+      - ss. unfold seqevent_input_le. splits; ss.
+        + econs 1. all: ss.
+        + econs 2. 2,3: ss. ii. unfold_flags. des_ifs.
+        + econs 1. all: ss.
+      - ss. econs; ss. ii. unfold_many2. des_ifs. refl.
+    }
+    { destruct p0 as [vm fs].
+      inv STEP. rewrite IACC in UPD. rewrite IACQ in ACQ. rewrite IREL in REL. inv UPD. inv REL. inv ACQ.
+      destruct oo; ss; clarify. inv MEM. ss. destruct i1; ss; clarify.
+      eexists (SeqEvent.mk_input _ _ _). esplits.
+      - econs; ss.
+        + econs; eauto.
+        + econs; eauto.
+        + econs; eauto. econs; eauto.
+      - ss. unfold seqevent_input_le. splits; ss.
+        + econs 1. all: ss.
+        + econs 1. all: ss.
+        + econs 2. 3,4: ss. all: auto.
+      - ss.
+    }
+    { inv STEP. rewrite IACC in UPD. rewrite IACQ in ACQ. rewrite IREL in REL. inv UPD. inv REL. inv ACQ.
+      destruct oo; ss; clarify. ss. destruct i1; ss; clarify.
+      eexists (SeqEvent.mk_input _ _ _). esplits.
+      - econs; ss.
+        + econs; eauto.
+        + econs; eauto.
+        + econs; eauto.
+      - ss. unfold seqevent_input_le. splits; ss.
+        + econs 1. all: ss.
+        + econs 1. all: ss.
+        + econs 1. all: ss.
+      - ss.
+    }
+  Qed.
+
+  Lemma thread_at_step_le
+        memory1 memory0 state p o ev i1 oo th1
+        (* (WF: Oracle.wf o) *)
+        (LE: mem_le memory1 memory0)
+        (STEPS: SeqThread.at_step (lang:=lang_src) ev i1 oo
+                                  {|
+                                    SeqThread.state := {| SeqState.state := state; SeqState.memory := memory1 |};
+                                    SeqThread.perm := p;
+                                    SeqThread.oracle := o
+                                  |} th1)
+    :
+      exists i0 th0,
+        (<<STEPS: SeqThread.at_step (lang:=lang_src) ev i0 oo
+                                    {| SeqThread.state := {| SeqState.state := state; SeqState.memory := memory0 |};
+                                       SeqThread.perm := p;
+                                       SeqThread.oracle := o |}
+                                    th0>>) /\
+        (<<INLE: seqevent_input_le i1 i0>>) /\
+        (<<STATE: (th1.(SeqThread.state).(SeqState.state)) = (th0.(SeqThread.state).(SeqState.state))>>) /\
+        (<<PERM: (th1.(SeqThread.perm)) = (th0.(SeqThread.perm))>>) /\
+        (<<ORACLE: (th1.(SeqThread.oracle)) = (th0.(SeqThread.oracle))>>) /\
+        (<<MEMLE: mem_le (th1.(SeqThread.state).(SeqState.memory)) (th0.(SeqThread.state).(SeqState.memory))>>).
+  Proof.
+    dup LE. rename LE0 into MEMLE. unfold mem_le in LE. des. inv STEPS.
+    destruct (is_accessing ev) eqn:ACC, (is_acquire ev) eqn:ACQ, (is_release ev) eqn:REL.
+    { destruct p0 as [l v]. hexploit red_acq_rel_full; eauto. i; des. ss.
+      hexploit seqevent_step_le; eauto. i; des. esplits; eauto.
+      { econs; eauto. eapply input_le_same_oracle_input; eauto. eapply input_le_wf; eauto. }
+      all: ss.
+    }
+    { destruct p0 as [l v]. hexploit red_acq_full; eauto. i; des. ss.
+      hexploit seqevent_step_le; eauto. i; des. esplits; eauto.
+      { econs; eauto. eapply input_le_same_oracle_input; eauto. eapply input_le_wf; eauto. }
+      all: ss.
+    }
+    { destruct p0 as [l v]. hexploit red_rel_full; eauto. i; des. ss.
+      hexploit seqevent_step_le; eauto. i; des. esplits; eauto.
+      { econs; eauto. eapply input_le_same_oracle_input; eauto. eapply input_le_wf; eauto. }
+      all: ss.
+    }
+    { destruct p0 as [l v]. hexploit red_rlx_full; eauto. i; des. ss.
+      hexploit seqevent_step_le; eauto. i; des. esplits; eauto.
+      { econs; eauto. eapply input_le_same_oracle_input; eauto. eapply input_le_wf; eauto. }
+      all: ss.
+    }
+    { hexploit red_acq_rel2_full; eauto. i; des. ss.
+      hexploit seqevent_step_le; eauto. i; des. esplits; eauto.
+      { econs; eauto. eapply input_le_same_oracle_input; eauto. eapply input_le_wf; eauto. }
+      all: ss.
+    }
+    { hexploit red_acq2_full; eauto. i; des. ss.
+      hexploit seqevent_step_le; eauto. i; des. esplits; eauto.
+      { econs; eauto. eapply input_le_same_oracle_input; eauto. eapply input_le_wf; eauto. }
+      all: ss.
+    }
+    { hexploit red_rel2_full; eauto. i; des. ss.
+      hexploit seqevent_step_le; eauto. i; des. esplits; eauto.
+      { econs; eauto. eapply input_le_same_oracle_input; eauto. eapply input_le_wf; eauto. }
+      all: ss.
+    }
+    { hexploit red_rlx2_full; eauto. i; des. ss.
+      hexploit seqevent_step_le; eauto. i; des. esplits; eauto.
+      { econs; eauto. eapply input_le_same_oracle_input; eauto. eapply input_le_wf; eauto. }
+      all: ss.
+    }
+  Qed.
+
+
+  Lemma thread_steps_le
+        tr1 th1 th2 th0
+        (WF: Oracle.wf th1.(SeqThread.oracle))
+        (STATE: th1.(SeqThread.state).(SeqState.state) = th0.(SeqThread.state).(SeqState.state))
+        (MEMLE: mem_le th1.(SeqThread.state).(SeqState.memory) th0.(SeqThread.state).(SeqState.memory))
+        (PERM: th1.(SeqThread.perm) = th0.(SeqThread.perm))
+        (ORACLE: th1.(SeqThread.oracle) = th0.(SeqThread.oracle))
+        (STEPS: SeqThread.steps (SeqState.na_step (lang:=lang_src)) tr1 th1 th2)
+    :
+      exists tr0 th3,
+        (<<STEPS: SeqThread.steps (SeqState.na_step (lang:=lang_src)) tr0 th0 th3>>) /\
+        (<<STATE: (th3.(SeqThread.state).(SeqState.state)) = (th2.(SeqThread.state).(SeqState.state))>>) /\
+        (<<PERM: (th3.(SeqThread.perm)) = (th2.(SeqThread.perm))>>) /\
+        (<<ORACLE: (th3.(SeqThread.oracle)) = (th2.(SeqThread.oracle))>>) /\
+        (<<TRACE: trace_le tr1 tr0>>) /\
+        (<<MEMLE: mem_le th2.(SeqThread.state).(SeqState.memory) th3.(SeqThread.state).(SeqState.memory)>>).
+  Proof.
+    depgen th0. depgen WF. induction STEPS; i.
+    - esplits. econs 1. all: ss.
+    - destruct th0, th3; ss; clarify. destruct state, state0; ss; clarify.
+      hexploit thread_na_step_le; eauto. i; des.
+      hexploit IHSTEPS.
+      { inv STEP; ss. }
+      eapply STATE. all: auto. i; des.
+      esplits; eauto. econs 2. eapply STEPS0. eauto. 
+    - destruct th0, th3; ss; clarify. destruct state, state0; ss; clarify.
+      hexploit thread_at_step_le; eauto. i; des.
+      hexploit IHSTEPS.
+      { inv STEP; ss. clarify. punfold WF. 2:eapply Oracle.wf_mon. inv WF. hexploit WF0; eauto. i; des. pclearbot. auto. }
+      eapply STATE. all: auto. i; des.
+      esplits; eauto. econs 3. eapply STEPS0. eauto.
+      econs 2; eauto. ss.
+  Qed.
+
+  Lemma seqthread_failure_diff_mem
+        th th3
+        (FAILURE : SeqThread.failure (SeqState.na_step (lang:=lang_src)) th)
+        (STATE : SeqState.state (SeqThread.state th3) = SeqState.state (SeqThread.state th))
+        (PERM : SeqThread.perm th3 = SeqThread.perm th)
+        (* (ORACLE : SeqThread.oracle th3 = SeqThread.oracle th) *)
+        (* (MEMLE : mem_le (SeqState.memory (SeqThread.state th)) (SeqState.memory (SeqThread.state th3))) *)
+    :
+      SeqThread.failure (SeqState.na_step (lang:=lang_src)) th3.
+  Proof.
+    inv FAILURE. inv H. inv STEP. ss. destruct th3. ss. destruct state. ss. clarify. inv LOCAL.
+    - econs. econs. econs; eauto. econs; eauto.
+    - econs. econs. econs; eauto. econs; eauto.
+    - econs. econs. econs; eauto. econs; eauto.
+  Qed.
+
+
+  Variant mem_le_ctx
+          (sim_seq:
+             forall
+               (p0: Perms.t) (d0: Flags.t)
+               (st_src0: SeqState.t lang_src)
+               (st_tgt0: SeqState.t lang_tgt), Prop)
+          (p0: Perms.t) (d0: Flags.t)
+          (st_src0: SeqState.t lang_src)
+          (st_tgt0: SeqState.t lang_tgt): Prop :=
+  | flags_le_ctx_intro
+      st_src1
+      (MEMLE: mem_le st_src1.(SeqState.memory) st_src0.(SeqState.memory))
+      (STATE: st_src1.(SeqState.state) = st_src0.(SeqState.state))
+      (SIM: sim_seq p0 d0 st_src1 st_tgt0).
+
+  Lemma mem_le_ctx_mon: monotone4 mem_le_ctx.
+  Proof. ii. inv IN. econs 1; eauto. Qed.
+
+  Hint Resolve mem_le_ctx_mon: paco.
+
+  Lemma mem_le_ctx_wrespectful: wrespectful4 (@_sim_seq lang_src lang_tgt sim_terminal) mem_le_ctx.
+  Proof.
+    econs; eauto with paco.
+    ii. inv PR. dup SIM. apply GF in SIM. inv SIM.
+    2:{ econs 2. unfold sim_seq_failure_case in *. i. hexploit FAILURE; clear FAILURE; eauto. i; des.
+        hexploit thread_steps_le. 6: eauto. all: ss.
+        instantiate (1:= {| SeqThread.state := x2; SeqThread.perm := x0; SeqThread.oracle := o |}).
+        all: ss. i; des. hexploit writing_trace_mon_on_trace. eauto. eauto. i; des.
+        esplits. eapply STEPS0. eauto. eapply seqthread_failure_diff_mem; eauto.
+    }
+    econs 1.
+    4:{ unfold sim_seq_partial_case in PARTIAL.
+        ii. hexploit PARTIAL; clear PARTIAL; eauto. i; des.
+        - esplits; eauto.
+          hexploit partial_step_flags; eauto. i. ss.
+          left. etrans. eapply Flags.join_mon_l. eapply LESF.
+          etrans. rewrite <- flags_join_assoc.
+          match goal with | [|- _ (_ _ (Flags.join ?a ?b)) _] => replace (Flags.join a b) with (Flags.join b a) end.
+          2:{ apply flags_join_comm. }
+          rewrite flags_join_assoc. eapply Flags.join_mon_l. eapply FLAGS.
+          rewrite flags_join_comm.
+          apply Flags.join_spec; auto. rewrite flags_join_comm. auto. refl.
+        - esplits; eauto.
+    }
+    { clear NASTEP ATSTEP PARTIAL. unfold sim_seq_terminal_case in *. i.
+      hexploit TERMINAL; clear TERMINAL; eauto. i; des.
+      eexists. splits; eauto.
+      etrans. eapply Flags.join_mon_l. eapply LESF. rewrite <- flags_join_assoc.
+      match goal with | [|- _ (_ _ (Flags.join ?a ?b)) _] => replace (Flags.join a b) with (Flags.join b a) end.
+      2:{ apply flags_join_comm. }
+      rewrite flags_join_assoc. etrans. eapply Flags.join_mon_l. eapply FLAG.
+      hexploit na_steps_flags; eauto. i. rewrite flags_join_comm.
+      hexploit Flags.join_spec. eapply H. refl. i; auto.
+    }
+    { clear TERMINAL ATSTEP PARTIAL. unfold sim_seq_na_step_case in *. i.
+      hexploit NASTEP; clear NASTEP; eauto. i; des.
+      do 2 eexists. splits; eauto. eapply rclo4_clo_base. econs; eauto.
+      hexploit opt_na_step_flags_events; eauto. i.
+      hexploit na_steps_flags; eauto. i. etrans. eapply LESF. apply Flags.join_mon_r.
+      etrans. eapply H0. auto.
+    }
+    { clear TERMINAL NASTEP PARTIAL. unfold sim_seq_at_step_case in *. i.
+      hexploit ATSTEP; clear ATSTEP; eauto. i; des.
+      do 3 eexists. splits; eauto. i. hexploit SIM; clear SIM; eauto. i; des.
+      do 2 eexists. eexists. esplits; eauto.
+      2:{ eapply rclo4_clo_base. econs. refl. eauto. }
+      ss. eapply SeqEvent.input_match_mon.
+      3: refl.
+      { eapply SeqEvent.step_input_match. eapply STEP_SRC. eapply MATCH. }
+      etrans. eapply LESF. apply Flags.join_mon_r. eapply na_steps_flags; eauto.
+    }
+  Qed.
+
+  Lemma deferred_le_sf_ctx_spec: deferred_le_sf_ctx <5=
+                                 gupaco4 (@_sim_seq lang_src lang_tgt sim_terminal)
+                                         (cpn4 (@_sim_seq lang_src lang_tgt sim_terminal)).
+  Proof. i. eapply wrespect4_uclo; eauto with paco. eapply deferred_le_sf_ctx_wrespectful. Qed.
+
+
+  Lemma sim_seq_upto_deferred
+        g p d0 d1 src tgt
+        (LE: Flags.le d0 d1)
+        (SIM: gupaco4 (@_sim_seq lang_src lang_tgt sim_terminal)
+                      (cpn4 (@_sim_seq lang_src lang_tgt sim_terminal)) g p d1 src tgt)
+    :
+      gupaco4 (@_sim_seq lang_src lang_tgt sim_terminal)
+              (cpn4 (@_sim_seq lang_src lang_tgt sim_terminal)) g p d0 src tgt.
+  Proof.
+    guclo deferred_le_sf_ctx_spec. econs; eauto. etrans; eauto. apply Flags.join_ge_l.
+  Qed.
+
+
+
+
+
 
 End UPTO.
 Hint Resolve cpn4_wcompat: paco.
