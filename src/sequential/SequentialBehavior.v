@@ -271,6 +271,104 @@ Proof.
 Qed.
 
 
+Section RECEPTIVE.
+  Variable lang: language.
+
+  Variant _receptive (receptive: lang.(Language.state) -> Prop) (st0: lang.(Language.state)): Prop :=
+  | receptive_intro
+      (PRESERVE:
+         forall e st1 (STEP: lang.(Language.step) e st0 st1),
+           receptive st1)
+      (READ:
+         forall loc val ord st1
+           (STEP: lang.(Language.step) (ProgramEvent.read loc val ord) st0 st1),
+         forall val',
+           (exists st1', lang.(Language.step) (ProgramEvent.read loc val' ord) st0 st1') \/
+           (exists valw ordr ordw st1',
+               lang.(Language.step) (ProgramEvent.update loc val' valw ordr ordw) st0 st1'))
+      (UPDATE:
+         forall loc valr valw ordr ordw st1
+           (STEP: lang.(Language.step) (ProgramEvent.update loc valr valw ordr ordw) st0 st1),
+         forall val',
+           (exists st1', lang.(Language.step) (ProgramEvent.read loc val' ordr) st0 st1') \/
+           (exists valw' st1',
+               lang.(Language.step) (ProgramEvent.update loc val' valw' ordr ordw) st0 st1'))
+  .
+
+  Lemma receptive_mon: monotone1 _receptive.
+  Proof.
+    ii. inv IN. econs; eauto.
+  Qed.
+  Hint Resolve receptive_mon: paco.
+
+  Definition receptive := paco1 _receptive bot1.
+End RECEPTIVE.
+#[export] Hint Resolve receptive_mon: paco.
+
+Definition wsimilar (e0 e1: ProgramEvent.t): Prop :=
+  match e0, e1 with
+  | ProgramEvent.read loc0 val0 ord0, ProgramEvent.read loc1 val1 ord1 =>
+    loc0 = loc1 /\ ord0 = ord1
+  | ProgramEvent.write loc0 val0 ord0, ProgramEvent.write loc1 val1 ord1 =>
+    loc0 = loc1 /\ ord0 = ord1 /\ val0 = val1
+  | ProgramEvent.update loc0 valr0 valw0 ordr0 ordw0, ProgramEvent.update loc1 valr1 valw1 ordr1 ordw1 =>
+    loc0 = loc1 /\ ordr0 = ordr1 /\ ordw0 = ordw1
+  | ProgramEvent.read loc0 val0 ord0, ProgramEvent.update loc1 valr1 valw1 ordr1 ordw1 =>
+    loc0 = loc1 /\ ord0 = ordr1
+  | ProgramEvent.update loc0 valr0 valw0 ordr0 ordw0, ProgramEvent.read loc1 val1 ord1 =>
+    loc0 = loc1 /\ ordr0 = ord1
+  | ProgramEvent.fence ordr0 ordw0, ProgramEvent.fence ordr1 ordw1 =>
+    ordr0 = ordr1 /\ ordw0 = ordw1
+  | _, _ => e0 = e1
+  end.
+
+Lemma similar_wsimilar
+      e1 e2
+      (SIMILAR: similar e1 e2):
+  wsimilar e1 e2.
+Proof.
+  destruct e1, e2; ss; des; subst; ss.
+Qed.
+
+Lemma receptive_oracle_progress
+      lang e st1 st2
+      orc1
+      (RECEPTIVE: receptive _ st1)
+      (ORACLE: Oracle.wf orc1)
+      (STEP: lang.(Language.step) e st1 st2)
+      (ATOMIC: is_atomic_event e):
+  exists e',
+    (<<LOC: wsimilar e e'>>) /\
+    (<<ATOMIC: is_atomic_event e'>>) /\
+    (<<PROGRESS: Oracle.progress e' orc1>>).
+Proof.
+  punfold RECEPTIVE. inv RECEPTIVE.
+  punfold ORACLE. inv ORACLE.
+  destruct e; ss.
+  - specialize (LOAD loc ord). des.
+    esplits; try exact LOAD; eauto. ss.
+  - specialize (STORE loc ord val).
+    esplits; try exact STORE; eauto. ss.
+  - specialize (UPDATE0 loc ordr ordw). des.
+    esplits; try eapply UPDATE0; eauto. ss.
+  - specialize (FENCE ordr ordw).
+    esplits; try exact FENCE; eauto. ss.
+  - esplits; try apply SYSCALL; eauto.
+    Unshelve.
+    ss.
+Qed.
+
+Lemma step_receptive
+      lang e st1 st2
+      (RECEPTIVE: receptive lang st1)
+      (STEP: lang.(Language.step) e st1 st2):
+  receptive _ st2.
+Proof.
+  punfold RECEPTIVE. inv RECEPTIVE.
+  exploit PRESERVE; eauto. i. inv x; ss.
+Qed.
+
+
 Section ADEQUACY.
   Variable lang_src lang_tgt: language.
   Variable state_step:
@@ -341,6 +439,44 @@ Section ADEQUACY.
     is_release e1 <-> is_release e2.
   Proof.
     destruct e1, e2; ss; inv LE; des; subst; ss.
+  Qed.
+
+  Lemma le_is_accessing_loc
+        e1 e2
+        (LE: ProgramEvent.le e1 e2):
+    (exists loc v1 v2,
+        is_accessing e1 = Some (loc, v1) /\ is_accessing e2 = Some (loc, v2)) \/
+    (is_accessing e1 = None /\ is_accessing e2 = None).
+  Proof.
+    destruct e1, e2; des; subst; try inv LE; ss; eauto; left; esplits; eauto.
+  Qed.
+
+  Lemma similar_is_accessing_loc
+        e1 e2
+        (SIMILAR: similar e1 e2):
+    (exists loc v1 v2,
+        is_accessing e1 = Some (loc, v1) /\ is_accessing e2 = Some (loc, v2)) \/
+    (is_accessing e1 = None /\ is_accessing e2 = None).
+  Proof.
+    destruct e1, e2; des; subst; try inv SIMILAR; ss; eauto; left; esplits; eauto.
+  Qed.
+
+  Lemma wsimilar_is_accessing_loc
+        e1 e2
+        (WSIMILAR: wsimilar e1 e2):
+    (exists loc v1 v2,
+        is_accessing e1 = Some (loc, v1) /\ is_accessing e2 = Some (loc, v2)) \/
+    (is_accessing e1 = None /\ is_accessing e2 = None).
+  Proof.
+    destruct e1, e2; des; subst; try inv WSIMILAR; ss; eauto; left; esplits; eauto.
+  Qed.
+
+  Lemma wsimilar_is_acquire
+        e1 e2
+        (WSIMILAR: wsimilar e1 e2):
+    is_acquire e1 <-> is_acquire e2.
+  Proof.
+    destruct e1, e2; des; subst; try inv WSIMILAR; ss. des. subst. ss.
   Qed.
 
   Lemma le_wf_output
@@ -688,6 +824,43 @@ Section ADEQUACY.
     eapply match_trace_cons; eauto.
   Qed.
 
+  Lemma writing_trace_no_acquire
+        tr w
+        (WRITING: SeqThread.writing_trace tr w):
+    forall e i o (IN: List.In (e, i, o) tr), ~ is_acquire e.
+  Proof.
+    induction WRITING; ss. i. inv IN; eauto. inv H. eauto.
+  Qed.
+
+  Lemma trace_le_ub_acquire_match
+        P d_init tr_src e_src i_src o tr_src_ex tr_tgt e_tgt i_tgt res_tgt
+        (TRACE: Forall2 P tr_src tr_tgt)
+        (ACQUIRE: is_acquire e_src)
+        (LE: SeqTrace.le d_init
+                         (tr_tgt ++ [(e_tgt, i_tgt, o)], res_tgt)
+                         (tr_src ++ [(e_src, i_src, o)] ++ tr_src_ex, SeqTrace.ub)):
+    exists d1 d2,
+      (<<MATCH: match_trace SeqEvent.input_match d_init d1 tr_src tr_tgt>>) /\
+      (<<EVENT: ProgramEvent.le e_tgt e_src>>) /\
+      (<<INPUT_MATCH: SeqEvent.input_match d1 d2 i_src i_tgt>>).
+  Proof.
+    remember (tr_src ++ [(e_src, i_src, o)] ++ tr_src_ex, SeqTrace.ub) as r_src.
+    remember (tr_tgt ++ [(e_tgt, i_tgt, o)], res_tgt) as r_tgt.
+    revert tr_src e_src i_src o tr_src_ex tr_tgt e_tgt i_tgt res_tgt TRACE ACQUIRE Heqr_src Heqr_tgt.
+    induction LE; i; subst; ss.
+    { inv Heqr_src.
+      hexploit writing_trace_no_acquire; eauto.
+      { rewrite in_app_iff. right. econs 1. eauto. }
+      i. ss.
+    }
+    inv TRACE; ss.
+    { inv Heqr_src. inv Heqr_tgt. esplits; eauto. econs. }
+    inv Heqr_src. inv Heqr_tgt.
+    exploit IHLE; eauto. i. des. clear IHLE.
+    esplits; eauto.
+    eapply match_trace_cons; eauto.
+  Qed.
+
   Lemma writing_trace_app
         l1 l2 w
         (WRITING: SeqThread.writing_trace (l1 ++ l2) w):
@@ -811,6 +984,26 @@ Section ADEQUACY.
       (<<MIN: Flags.le d d1>>).
   Proof.
     exploit trace_le_partial_step_match; try exact LE.
+    { eapply match_trace_simple_match; eauto. }
+    i. des. esplits; eauto.
+    eapply min_match_trace_min; eauto.
+  Qed.
+
+  Lemma match_trace_le_ub_acquire
+        d
+        tr_src e_src i_src o tr_src_ex
+        tr_tgt e_tgt i_tgt f_tgt
+        (MIN_TRACE: match_trace (min_match SeqEvent.input_match) Flags.bot d tr_src tr_tgt)
+        (ACQUIRE: is_acquire e_src)
+        (LE: SeqTrace.le Flags.bot
+                         (tr_tgt ++ [(e_tgt, i_tgt, o)], SeqTrace.partial f_tgt)
+                         (tr_src ++ [(e_src, i_src, o)] ++ tr_src_ex, SeqTrace.ub)):
+    exists d1 d2,
+      (<<EVENT: ProgramEvent.le e_tgt e_src>>) /\
+      (<<INPUT_MATCH: SeqEvent.input_match d1 d2 i_src i_tgt>>) /\
+      (<<MIN: Flags.le d d1>>).
+  Proof.
+    exploit trace_le_ub_acquire_match; try exact LE; eauto.
     { eapply match_trace_simple_match; eauto. }
     i. des. esplits; eauto.
     eapply min_match_trace_min; eauto.
@@ -998,54 +1191,6 @@ Section ADEQUACY.
     exploit oracle_simple_output_wf; eauto. i.
     exploit event_step_exists; eauto. i. des. esplits; eauto.
   Qed.
-
-  (* Lemma steps_behavior_at_step *)
-  (*       lang step orc0 tr (st0 st1 st2: SeqState.t lang) p0 p1 orc *)
-  (*       e i o st3 *)
-  (*       (STEPS: state_steps step tr st0 st1 p0 p1) *)
-  (*       (NASTEPS: rtc (step p1 MachineEvent.silent) st1 st2) *)
-  (*       (ATSTEP: lang.(Language.step) e st2.(SeqState.state) st3) *)
-  (*       (ATOMIC: is_atomic_event e) *)
-  (*       (INPUT: i = oracle_input_of_event e st2.(SeqState.memory)) *)
-  (*       (OUTPUT: o = oracle_simple_output i) *)
-  (*       (ORACLE: oracle_follows_trace (add_oracle e i o orc0) tr orc): *)
-  (*   exists ie f, *)
-  (*     (<<INPUT: i = SeqEvent.get_oracle_input ie>>) /\ *)
-  (*     (<<BEH: SeqBehavior.behavior step (SeqThread.mk st0 p0 orc) *)
-  (*                                  (tr ++ [(e, ie, o)], SeqTrace.partial f)>>). *)
-  (* Proof. *)
-  (*   revert orc ORACLE. induction STEPS; i. *)
-  (*   { destruct st2. ss. *)
-  (*     assert (exists orc', Oracle.step e i o orc orc'). *)
-  (*     { inv ORACLE. punfold LE2. inv LE2. *)
-  (*       exploit LE. *)
-  (*       { econs. econs 1. } *)
-  (*       i. des. esplits; eauto. *)
-  (*     } *)
-  (*     i. des. *)
-  (*     exploit oracle_input_of_event_wf. rewrite <- INPUT. i. *)
-  (*     exploit oracle_simple_output_wf; eauto. i. *)
-  (*     exploit event_step_exists; eauto. *)
-  (*     instantiate (1:=memory). *)
-  (*     instantiate (1:=p). *)
-  (*     i. des. destruct m2. *)
-  (*     exploit event_step_oracle_input; try exact WF; eauto. rewrite <- INPUT. i. subst. *)
-  (*     esplits. *)
-  (*     - eauto. *)
-  (*     - eapply na_steps_behavior; eauto. econs 5. *)
-  (*       + econs; try refl; eauto. *)
-  (*         rewrite x2. eauto. *)
-  (*       + econs 2. *)
-  (*   } *)
-  (*   clear INPUT OUTPUT. *)
-  (*   inv ORACLE. exploit COMPLETE; try refl. *)
-  (*   { eapply wf_input_oracle_wf_input; eauto. } *)
-  (*   i. des. exploit SOUND; eauto. i. des. exploit x0; try refl. i. des. *)
-  (*   exploit IHSTEPS; eauto. i. des. esplits; eauto. ss. *)
-  (*   eapply na_steps_behavior; eauto. *)
-  (*   econs 5; try eapply IHSTEPS; try eapply FOLLOWS; eauto. *)
-  (*   destruct st0, st4. econs; eauto; try refl. *)
-  (* Qed. *)
   
   Lemma wf_input_wf_output
         e i o p1 m1 p2 m2
@@ -1209,6 +1354,28 @@ Section ADEQUACY.
     induction STEP; ss.
     apply IHSTEP. exploit rtc_state_step_deterministic; eauto. i.
     eapply step_deterministic; eauto.
+  Qed.
+
+  Lemma rtc_na_step_receptive
+        lang p st1 st2
+        (RECEPTIVE: receptive _ st1.(SeqState.state))
+        (STEPS: rtc (@SeqState.na_step lang p MachineEvent.silent) st1 st2):
+    receptive _ st2.(SeqState.state).
+  Proof.
+    induction STEPS; ss.
+    apply IHSTEPS. inv H. ss.
+    eapply step_receptive; eauto.
+  Qed.
+
+  Lemma state_steps_receptive
+        lang tr st1 st2 p1 p2
+        (RECEPTIVE: receptive lang st1.(SeqState.state))
+        (STEP: state_steps (@SeqState.na_step _) tr st1 st2 p1 p2):
+    receptive _ st2.(SeqState.state).
+  Proof.
+    induction STEP; ss.
+    apply IHSTEP. exploit rtc_na_step_receptive; eauto. i.
+    eapply step_receptive; eauto.
   Qed.
 
   Lemma wf_input_in_access
@@ -1646,7 +1813,7 @@ Section ADEQUACY.
                                 (SeqThread.mk st1 p1 orc1) (SeqThread.mk st4 p4 orc4)):
     exists st3' p3 orc3,
       similar e e' /\
-        SeqThread.at_step e' i o (SeqThread.mk st2 p1 orc1) (SeqThread.mk st3' p3 orc3).
+      SeqThread.at_step e' i o (SeqThread.mk st2 p1 orc1) (SeqThread.mk st3' p3 orc3).
   Proof.
     exploit steps_cons_inv; eauto. i. des.
     exploit steps_nil_rtc_step; eauto. i.
@@ -1673,6 +1840,22 @@ Section ADEQUACY.
     - exploit state_step_determ; [exact H|exact H0|..]. i. des. subst. ss.
   Qed.
 
+  Definition wf_in_access_old (m: SeqMemory.t) (i: option (Loc.t * Const.t * Flag.t * Const.t)): Prop :=
+    match i with
+    | Some (loc, v_old, f_old, _) =>
+      v_old = m.(SeqMemory.value_map) loc /\
+      f_old = m.(SeqMemory.flags) loc
+    | None => True
+    end.
+
+  Lemma event_step_wf_in_access_old
+        i o p1 m1 p2 m2
+        (STEP: SeqEvent.step i o p1 m1 p2 m2):
+    wf_in_access_old m1 i.(SeqEvent.in_access).
+  Proof.
+    inv STEP; ss. inv UPD; ss. inv MEM; ss.
+  Qed.
+
   Lemma refinement_implies_simulation_aux
         (st_src: lang_src.(Language.state)) (st_tgt: lang_tgt.(Language.state))
         (REFINE: forall p m o (WF: Oracle.wf o),
@@ -1680,6 +1863,7 @@ Section ADEQUACY.
               (SeqBehavior.behavior (@SeqState.na_step _) (SeqThread.mk (SeqState.mk _ st_tgt m) p o))
               (SeqBehavior.behavior state_step (SeqThread.mk (SeqState.mk _ st_src m) p o)))
         (DETERM: deterministic _ st_src)
+        (RECEPTIVE: receptive _ st_tgt)
         p m p1 d
         tr_src st1_src
         tr_tgt st0_tgt st1_tgt
@@ -1920,6 +2104,107 @@ Section ADEQUACY.
             + econs; eauto.
         }
         subst.
+
+        exploit deterministic_steps_inv; try exact STEPS; try exact H1; eauto.
+        { eapply state_steps_deterministic; eauto. ss. }
+        { erewrite <- le_is_atomic; eauto. }
+        i. des.
+        exploit similar_le_eq; try exact x2; eauto. i. symmetry in x4. subst.
+        inv x1. ss.
+        exploit SeqEvent.step_inj_perms; [exact STEP_TGT0|exact MEM|..]; ss.
+        { clear - INPUT INPUT2 EVENT. i.
+          destruct i', i_tgt. ss. subst.
+          unfold SeqEvent.wf_input in *. ss. splitsH. clear H1 H2 H4 H5.
+          specialize (H loc2 v_new2). des. exploit H; eauto. i.
+          specialize (H0 loc1 v_new1). des. exploit H0; eauto. i.
+          destruct e_src, e_tgt; ss; des; subst; inv x; inv x0; ss; inv EVENT; ss.
+        }
+        i. subst.
+
+        cut (exists d1', SeqEvent.input_match d d1' i' i_tgt).
+        { i. des.
+          exploit min_input_match_exists; try exact H3. i. des.
+          esplits; try eapply MIN; eauto.
+          right. eapply CIH; eauto.
+          - eapply state_steps_last; eauto.
+          - eapply state_steps_last; eauto.
+          - econs; eauto.
+        }
+
+        destruct (is_acquire e_src) eqn:ACQ.
+        { exploit match_trace_le_ub_acquire; try exact x0; eauto. i. des.
+          exploit SeqEvent.input_match_mon; try exact INPUT_MATCH; eauto. refl.
+        }
+
+        cut (__guard__ (
+                 exists e_src' e_tgt' d1' i_src' i_tgt',
+                   (<<WSIMLAR: wsimilar e_tgt e_tgt'>>) /\
+                   (<<LE': ProgramEvent.le e_tgt' e_src'>>) /\
+                   (<<WF_SRC: SeqEvent.wf_input e_src' i_src'>>) /\
+                   (<<WF_TGT: SeqEvent.wf_input e_tgt' i_tgt'>>) /\
+                   (<<WF_ACCESS_SRC: wf_in_access_old m0 i_src'.(SeqEvent.in_access)>>) /\
+                   (<<WF_ACCESS_TGT: wf_in_access_old st1_tgt.(SeqState.memory) i_tgt'.(SeqEvent.in_access)>>) /\
+                   (<<IMATCH: SeqEvent.input_match d d1' i_src' i_tgt'>>))).
+        { exploit event_step_wf_in_access_old; try exact MEM. intro WF_OLD_SRC.
+          exploit event_step_wf_in_access_old; try exact STEP_TGT0. intro WF_OLD_TGT.
+          clear - H2 INPUT EVENT INPUT2 WF_OLD_SRC WF_OLD_TGT ACQ.
+          i. unguard. des. inv IMATCH.
+          unfold SeqEvent.wf_input in *. splitsH.
+          destruct i', i_tgt, i_src', i_tgt'. ss.
+          exists Flags.top. econs; ss.
+          - clear ACQUIRE RELEASE H1 H3 H5 H6 H8 H9 H11 H12.
+            instantiate (1:=d1). inv ACCESS.
+            + exploit wsimilar_is_accessing_loc; eauto. i. des.
+              { rewrite x0, x1 in *.
+                specialize (H loc v2). des. exploit H1; eauto. i. des. ss. }
+              exploit le_is_accessing_loc; try exact EVENT; eauto. i. des; try congr.
+              exploit le_is_accessing_loc; try exact LE'; eauto. i. des; try congr.
+              rewrite x0, x1, x3, x5 in *. ss.
+              destruct in_access as [[[[]]]|].
+              { specialize (H4 t t2). des. exploit H4; eauto. ss. }
+              destruct in_access0 as [[[[]]]|].
+              { specialize (H7 t t2). des. exploit H7; eauto. ss. }
+              econs. ss.
+            + exploit wsimilar_is_accessing_loc; eauto. i. des; cycle 1.
+              { rewrite x0, x1 in *.
+                specialize (H l v_new_tgt). des. exploit H; eauto. ss. }
+              exploit le_is_accessing_loc; try exact EVENT; eauto. i. des; try congr.
+              exploit le_is_accessing_loc; try exact LE'; eauto. i. des; try congr.
+              rewrite x0, x1, x3, x5 in *. ss.
+              destruct in_access as [[[[]]]|]; cycle 1.
+              { specialize (H4 loc0 v3). des. exploit H1; eauto. i. des. ss. }
+              destruct in_access0 as [[[[]]]|]; cycle 1.
+              { specialize (H7 loc v1). des. exploit H1; eauto. i. des. ss. }
+              inv x2. inv x4. ss. des. subst.
+              specialize (H7 loc1 v0). des. exploit H1; eauto. i. des. inv x.
+              specialize (H0 loc1 v5). des. exploit H3; eauto. i. des. inv x.
+              specialize (H4 loc1 v3). des. exploit H5; eauto. i. des. inv x.
+              econs; eauto.
+          - clear ACCESS RELEASE H H3 H0 H6 H4 H9 H7 H12.
+            instantiate (1:=d2).
+            exploit wsimilar_is_acquire; eauto. i.
+            exploit le_is_acquire; try exact EVENT. i.
+            exploit le_is_acquire; try exact LE'. i.
+            inv ACQUIRE.
+            + destruct in_acquire, in_acquire0, (is_acquire e_src), (is_acquire e_tgt),
+              (is_acquire e_src'), (is_acquire e_tgt'); intuition.
+              econs. ss.
+            + destruct in_acquire, in_acquire0, (is_acquire e_src), (is_acquire e_tgt),
+              (is_acquire e_src'), (is_acquire e_tgt'); intuition.
+          - clear ACCESS ACQUIRE H H1 H0 H5 H4 H8 H7 H11.
+            exploit le_is_release; try exact EVENT. i.
+            rewrite <- H12 in x0. rewrite <- H9 in x0.
+            destruct in_release, in_release0; try by intuition.
+            + destruct p, p0. econs; ss.
+              rewrite Flags.join_top_r. apply Flags.top_spec.
+            + econs. apply Flags.top_spec.
+        }
+
+        exploit receptive_oracle_progress; try exact STEP_TGT; try exact WF; eauto.
+        { eapply rtc_na_step_receptive; eauto.
+          eapply state_steps_receptive; eauto. ss.
+        }
+        i. des.
         admit.
       }
     }
@@ -1978,6 +2263,7 @@ Section ADEQUACY.
           (st_src: lang_src.(Language.state)) (st_tgt: lang_tgt.(Language.state))
           (REFINE: SeqBehavior.refine _ _ st_tgt st_src)
           (DETERM: deterministic _ st_src)
+          (RECEPTIVE: receptive _ st_tgt)
           (TOP: forall p m o (WF: Oracle.wf o),
               SeqBehavior.behavior (@SeqState.na_step _) (SeqThread.mk (SeqState.mk _ st_src m) p o)
               <1=

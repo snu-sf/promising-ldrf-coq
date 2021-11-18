@@ -541,6 +541,20 @@ Module Flags.
     ii. eapply Flag.join_mon_r; eauto.
   Qed.
 
+  Lemma join_top_l f: join f top = top.
+  Proof.
+    extensionality x.
+    unfold join, top; ss.
+    unfold Flag.join. destruct (f x); ss.
+  Qed.
+
+  Lemma join_top_r f: join f top = top.
+  Proof.
+    extensionality x.
+    unfold join, top; ss.
+    unfold join. destruct (f x); ss.
+  Qed.
+
   Lemma minus_mon_l f0 f1 f
         (LE: le f1 f0)
     :
@@ -752,6 +766,7 @@ Module Oracle.
           exists valr, forall valw, progress (ProgramEvent.update loc valr valw ordr ordw) o0)
       (FENCE: forall ordr ordw,
           progress (ProgramEvent.fence ordr ordw) o0)
+      (SYSCALL: forall e, progress (ProgramEvent.syscall e) o0)
     :
       _wf wf o0
   .

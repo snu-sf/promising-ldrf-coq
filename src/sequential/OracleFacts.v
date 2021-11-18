@@ -221,6 +221,8 @@ Proof.
     econs. econs; eauto.
   - esplits; try eapply oracle_simple_output_wf; eauto.
     econs. econs; eauto.
+  - esplits; try eapply oracle_simple_output_wf; eauto.
+    econs. econs; eauto.
     Unshelve.
     all: ss.
 Qed.
@@ -517,6 +519,11 @@ Proof.
     inv STEP. existT_elim. subst.
     esplits; eauto. econs. econs. eauto.
   }
+  { clear - SYSCALL.
+    ii. exploit SYSCALL; eauto. i. des.
+    inv STEP. existT_elim. subst.
+    esplits; eauto. econs. econs. eauto.
+  }
 Qed.
 
 Lemma oracle_of_trace_wf
@@ -560,6 +567,11 @@ Proof.
       + econs. econs; eauto. destruct e; ss.
       + eapply oracle_output_of_event_wf; eauto.
         apply wf_input_oracle_wf_input. ss.
+  }
+  { ii. esplits.
+    - econs. econs; eauto. destruct e; ss.
+    - eapply oracle_output_of_event_wf; eauto.
+      apply wf_input_oracle_wf_input. ss.
   }
   { ii. esplits.
     - econs. econs; eauto. destruct e; ss.
