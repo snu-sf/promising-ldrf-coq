@@ -127,6 +127,20 @@ Qed.
 Definition versions := Loc.t -> Time.t -> option version.
 Definition reserve_versions := Loc.t -> Time.t -> option nat.
 
+Definition versions_le (vers0 vers1: versions): Prop :=
+  forall loc ts v (VER: vers0 loc ts = Some v),
+    vers1 loc ts = Some v.
+
+Program Instance versions_le_PreOrder: PreOrder versions_le.
+Next Obligation.
+Proof.
+  ii. auto.
+Qed.
+Next Obligation.
+Proof.
+  ii. eapply H0; eauto.
+Qed.
+
 Module Mapping.
   Record t: Type :=
     mk
