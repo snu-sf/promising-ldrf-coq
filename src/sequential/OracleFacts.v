@@ -211,13 +211,12 @@ Proof.
   - inv STEP. existT_elim. subst. inv STEP0. splits; ss.
     + apply oracle_simple_output_wf; ss.
     + right. destruct x2. ss.
-  - exists Const.undef. ii.
-    esplits; try eapply oracle_simple_output_wf; eauto.
-    econs. econs; eauto.
+  - exists Const.undef. split; ii.
+    + esplits; try eapply oracle_simple_output_wf; eauto.
+      econs. econs; eauto.
+    + esplits; try eapply oracle_simple_output_wf; eauto.
+      econs. econs; eauto.
   - esplits; try eapply oracle_simple_output_wf; eauto.
-    econs. econs; eauto.
-  - exists Const.undef. ii.
-    esplits; try eapply oracle_simple_output_wf; eauto.
     econs. econs; eauto.
   - esplits; try eapply oracle_simple_output_wf; eauto.
     econs. econs; eauto.
@@ -498,19 +497,16 @@ Proof.
     inv ORACLE; try done. right. eauto.
   }
   { clear - LOAD.
-    specialize (LOAD loc ord). des. exists val.
-    ii. exploit LOAD; eauto. i. des.
-    inv STEP. existT_elim. subst.
-    esplits; eauto. econs. econs. eauto.
+    specialize (LOAD loc ord). des. exists val. split; ii.
+    - exploit LOAD; eauto. i. des.
+      inv STEP. existT_elim. subst.
+      esplits; eauto. econs. econs. eauto.
+    - exploit LOAD0; eauto. i. des.
+      inv STEP. existT_elim. subst.
+      esplits; eauto. econs. econs. eauto.
   }
   { clear - STORE.
     ii. exploit STORE; eauto. i. des.
-    inv STEP. existT_elim. subst.
-    esplits; eauto. econs. econs. eauto.
-  }
-  { clear - UPDATE.
-    specialize (UPDATE loc ordr ordw). des. exists valr.
-    ii. exploit UPDATE; eauto. i. des.
     inv STEP. existT_elim. subst.
     esplits; eauto. econs. econs. eauto.
   }
@@ -544,29 +540,29 @@ Proof.
     left. apply option_oracle_wf. auto.
   }
   { destruct (reading_value_of e) as [v|] eqn:READING.
-    - exists v. ii. esplits.
-      + econs. econs; eauto. destruct e; ss; inv READING; ss.
-      + eapply oracle_output_of_event_wf; eauto.
-        apply wf_input_oracle_wf_input. ss.
-    - exists Const.undef. ii. esplits.
-      + econs. econs; eauto. destruct e; ss.
-      + eapply oracle_output_of_event_wf; eauto.
-        apply wf_input_oracle_wf_input. ss.
+    - exists v. split; ii.
+      + esplits.
+        * econs. econs; eauto. destruct e; ss; inv READING; ss.
+        * eapply oracle_output_of_event_wf; eauto.
+          apply wf_input_oracle_wf_input. ss.
+      + esplits.
+        * econs. econs; eauto. destruct e; ss; inv READING; ss.
+        * eapply oracle_output_of_event_wf; eauto.
+          apply wf_input_oracle_wf_input. ss.
+    - exists Const.undef. split; ii.
+      + esplits.
+        * econs. econs; eauto. destruct e; ss.
+        * eapply oracle_output_of_event_wf; eauto.
+          apply wf_input_oracle_wf_input. ss.
+      + esplits.
+        * econs. econs; eauto. destruct e; ss.
+        * eapply oracle_output_of_event_wf; eauto.
+          apply wf_input_oracle_wf_input. ss.
   }
   { ii. esplits.
     - econs. econs; eauto. destruct e; ss.
     - eapply oracle_output_of_event_wf; eauto.
       apply wf_input_oracle_wf_input. ss.
-  }
-  { destruct (reading_value_of e) as [v|] eqn:READING.
-    - exists v. ii. esplits.
-      + econs. econs; eauto. destruct e; ss; inv READING; ss.
-      + eapply oracle_output_of_event_wf; eauto.
-        apply wf_input_oracle_wf_input. ss.
-    - exists Const.undef. ii. esplits.
-      + econs. econs; eauto. destruct e; ss.
-      + eapply oracle_output_of_event_wf; eauto.
-        apply wf_input_oracle_wf_input. ss.
   }
   { ii. esplits.
     - econs. econs; eauto. destruct e; ss.
@@ -672,9 +668,7 @@ Proof.
     exploit WF0; [econs; eauto|]. i. des.
     inv ORACLE; try done. splits; auto.
   - specialize (LOAD loc ord). des. exists val.
-    apply add_oracle_orc_progress. ss.
-  - specialize (UPDATE loc ordr ordw). des. exists valr. i.
-    apply add_oracle_orc_progress. ss.
+    split; i; apply add_oracle_orc_progress; ss.
 Qed.
 
 Lemma add_oracle_wf
@@ -694,10 +688,7 @@ Proof.
       left. eapply add_oracle_orc_wf. ss.
   }
   { specialize (LOAD loc ord). des. exists val.
-    eapply add_oracle_init_progress. ss.
-  }
-  { specialize (UPDATE loc ordr ordw). des. exists valr. i.
-    eapply add_oracle_init_progress. ss.
+    split; i; eapply add_oracle_init_progress; ss.
   }
 Qed.
 

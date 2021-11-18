@@ -284,8 +284,8 @@ Section RECEPTIVE.
            (STEP: lang.(Language.step) (ProgramEvent.read loc val ord) st0 st1),
          forall val',
            (exists st1', lang.(Language.step) (ProgramEvent.read loc val' ord) st0 st1') \/
-           (exists valw ordr ordw st1',
-               lang.(Language.step) (ProgramEvent.update loc val' valw ordr ordw) st0 st1'))
+           (exists valw ordw st1',
+               lang.(Language.step) (ProgramEvent.update loc val' valw ord ordw) st0 st1'))
       (UPDATE:
          forall loc valr valw ordr ordw st1
            (STEP: lang.(Language.step) (ProgramEvent.update loc valr valw ordr ordw) st0 st1),
@@ -293,6 +293,10 @@ Section RECEPTIVE.
            (exists st1', lang.(Language.step) (ProgramEvent.read loc val' ordr) st0 st1') \/
            (exists valw' st1',
                lang.(Language.step) (ProgramEvent.update loc val' valw' ordr ordw) st0 st1'))
+      (NO_NA_UPDATE:
+         forall loc valr valw ordr ordw st1
+           (STEP: lang.(Language.step) (ProgramEvent.update loc valr valw ordr ordw) st0 st1),
+           Ordering.le Ordering.plain ordr /\ Ordering.le Ordering.plain ordw)
   .
 
   Lemma receptive_mon: monotone1 _receptive.
@@ -337,8 +341,9 @@ Lemma receptive_oracle_progress
       (ORACLE: Oracle.wf orc1)
       (STEP: lang.(Language.step) e st1 st2)
       (ATOMIC: is_atomic_event e):
-  exists e',
-    (<<LOC: wsimilar e e'>>) /\
+  exists e' st2',
+    (<<EVENT: wsimilar e e'>>) /\
+    (<<STEP: lang.(Language.step) e' st1 st2'>>) /\
     (<<ATOMIC: is_atomic_event e'>>) /\
     (<<PROGRESS: Oracle.progress e' orc1>>).
 Proof.
@@ -346,16 +351,21 @@ Proof.
   punfold ORACLE. inv ORACLE.
   destruct e; ss.
   - specialize (LOAD loc ord). des.
-    esplits; try exact LOAD; eauto. ss.
+    exploit READ; eauto. i. des.
+    + esplits; eauto. ss.
+    + exploit NO_NA_UPDATE; eauto. i. des.
+      esplits; eauto; ss.
+      destruct ord, ordw; ss.
   - specialize (STORE loc ord val).
     esplits; try exact STORE; eauto. ss.
-  - specialize (UPDATE0 loc ordr ordw). des.
-    esplits; try eapply UPDATE0; eauto. ss.
+  - specialize (LOAD loc ordr). des.
+    exploit UPDATE; eauto. i. des.
+    + esplits; eauto. ss. destruct ordr; ss.
+    + exploit NO_NA_UPDATE; eauto. i. des.
+      esplits; eauto; ss.
   - specialize (FENCE ordr ordw).
     esplits; try exact FENCE; eauto. ss.
   - esplits; try apply SYSCALL; eauto.
-    Unshelve.
-    ss.
 Qed.
 
 Lemma step_receptive
@@ -1154,8 +1164,8 @@ Section ADEQUACY.
         (INPUT: SeqEvent.wf_input e i)
         (OUTPUT: Oracle.wf_output e o)
         (ORACLE: oracle_follows_trace (add_oracle e (SeqEvent.get_oracle_input i) o orc0) tr orc):
-      exists f, SeqBehavior.behavior step (SeqThread.mk st0 p0 orc)
-                                (tr ++ [(e, i, o)], SeqTrace.partial f).
+    SeqBehavior.behavior step (SeqThread.mk st0 p0 orc)
+                         (tr ++ [(e, i, o)], SeqTrace.partial m3.(SeqMemory.flags)).
   Proof.
     revert orc ORACLE. induction STEPS; i.
     { destruct st2. ss. destruct m3. ss.
@@ -1164,6 +1174,43 @@ Section ADEQUACY.
         exploit LE.
         { econs. econs 1. }
         i. des. esplits; eauto.
+      }
+      des.
+      esplits.
+      eapply na_steps_behavior; eauto. econs 5.
+      - econs; try refl; eauto.
+      - econs 2.
+    }
+    clear INPUT OUTPUT.
+    inv ORACLE. exploit COMPLETE; try refl.
+    { eapply wf_input_oracle_wf_input; eauto. }
+    i. des. exploit SOUND; eauto. i. des. exploit x0; try refl. i. des.
+    exploit IHSTEPS; eauto. i. des. esplits; eauto. ss.
+    eapply na_steps_behavior; eauto.
+    econs 5; try eapply IHSTEPS; try eapply FOLLOWS; eauto.
+    destruct st0, st4. econs; eauto; try refl.
+  Qed.
+
+  Lemma steps_behavior_oracle_step
+        lang step orc0 tr (st0 st1 st2: SeqState.t lang) p0 p1 orc
+        e i o st3 p3 m3 orc1
+        (STEPS: state_steps step tr st0 st1 p0 p1)
+        (NASTEPS: rtc (step p1 MachineEvent.silent) st1 st2)
+        (ATSTEP: lang.(Language.step) e st2.(SeqState.state) st3)
+        (ESTEP: SeqEvent.step i o p1 st2.(SeqState.memory) p3 m3)
+        (ATOMIC: is_atomic_event e)
+        (INPUT: SeqEvent.wf_input e i)
+        (OUTPUT: Oracle.wf_output e o)
+        (ORACLE: oracle_follows_trace orc0 tr orc)
+        (OSTEP: Oracle.step e (SeqEvent.get_oracle_input i) o orc0 orc1):
+    SeqBehavior.behavior step (SeqThread.mk st0 p0 orc)
+                         (tr ++ [(e, i, o)], SeqTrace.partial m3.(SeqMemory.flags)).
+  Proof.
+    revert orc ORACLE. induction STEPS; i.
+    { destruct st2. ss. destruct m3. ss.
+      assert (exists orc', Oracle.step e (SeqEvent.get_oracle_input i) o orc orc').
+      { inv ORACLE. punfold LE2. inv LE2.
+        exploit LE; eauto. i. des. eauto.
       }
       des.
       esplits.
@@ -2200,12 +2247,110 @@ Section ADEQUACY.
             + econs. apply Flags.top_spec.
         }
 
+        clear CIH INPUT OUTPUT STEP_TGT0 BEH_TGT x0 x STEPS FAILURE LE1 LE2 EVENT INPUT0
+              i_tgt o mem_tgt p3 i' tr' orc2 state0 perm oracle st3
+              orc3 x2 e0 i0 st1 m1 LANG ATOMIC0 EVENT0 INPUT1 ORACLE MEM INPUT2.
         exploit receptive_oracle_progress; try exact STEP_TGT; try exact WF; eauto.
         { eapply rtc_na_step_receptive; eauto.
           eapply state_steps_receptive; eauto. ss.
         }
         i. des.
-        admit.
+        exploit PROGRESS.
+        { eapply (oracle_input_of_event_wf e' st1_tgt.(SeqState.memory)). }
+        i. des.
+        exploit event_step_exists; try exact WF0.
+        instantiate (1:=st1_tgt.(SeqState.memory)).
+        instantiate (1:=p1).
+        i. des.
+        exploit event_step_oracle_input; try exact STEP0; eauto. i. rewrite <- x0 in *.
+
+        exploit steps_behavior_oracle_step; try exact STEPS_TGT; try exact STEP; eauto.
+        { eapply oracle_of_trace_follows. }
+        i. exploit REFINE; try exact x1.
+        { apply oracle_of_trace_wf; ss.  eapply state_steps_wf_trace; eauto. }
+        i. des.
+        exploit trace_le_cases; try exact x2. i. des; try congr.
+        { (* src partial *)
+          inv PARTIAL0.
+          exploit simple_match_last_inv; try exact PARTIAL1. i. des. subst.
+          rewrite <- app_assoc in *.
+          exploit steps_behavior_prefix_partial; try exact x; try exact STEPS_SRC; eauto.
+          { eapply match_trace_simple_match; eauto. }
+          { eapply oracle_of_trace_follows. }
+          i. des; ss. subst. inv x5.
+          exploit match_trace_le_partial_step; try exact x2; eauto. i. des.
+          exploit SeqEvent.input_match_mon; try exact INPUT_MATCH; try exact MIN; try refl. i.
+          Lemma behavior_step_inv
+                st1 p1 orc1
+                e st2 st3
+                e' i o tr r
+                (DETERM: deterministic _ st1.(SeqState.state))
+                (NASTEPS: rtc (state_step p1 MachineEvent.silent) st1 st2)
+                (LSTEP: lang_src.(Language.step) e st2.(SeqState.state) st3)
+                (ATOMIC: is_atomic_event e)
+                (BEH: SeqBehavior.behavior state_step (SeqThread.mk st1 p1 orc1)
+                                           ((e', i, o) :: tr, r)):
+            exists th3,
+              SeqThread.at_step e' i o (SeqThread.mk st2 p1 orc1) th3.
+          Proof.
+            induction NASTEPS.
+            { inv BEH; ss; eauto.
+              inv STEP. exploit state_step_subset; eauto. i.
+              inv x0. exploit deterministic_step; [|exact LSTEP|exact LANG|]; ss. i. des.
+              punfold DETERM. inv DETERM.
+              rewrite similar_is_atomic in ATOMIC; eauto;
+                try by (i; subst; eapply NO_NA_UPDATE; eauto).
+              inv LOCAL; ss; try destruct ord; ss.
+            }
+            inv BEH; ss.
+            { inv STEP. exploit state_step_determ; [exact H|exact STEP0|]. i. des. subst.
+              exploit IHNASTEPS; eauto.
+              exploit state_step_subset; eauto. i. inv x1. ss.
+              eapply step_deterministic; eauto.
+            }
+            { inv STEP. exploit state_step_subset; eauto. i.
+              inv x. exploit deterministic_step; [|exact LANG|exact LANG0|]; ss. i. des.
+              punfold DETERM. inv DETERM.
+              rewrite similar_is_atomic in ATOMIC0; eauto;
+                try by (i; subst; eapply NO_NA_UPDATE; eauto).
+              inv LOCAL; ss; try destruct ord; ss.
+            }
+          Qed.
+          exploit behavior_step_inv; try exact BEH_EX; eauto.
+          { eapply state_steps_deterministic; eauto. ss. }
+          { erewrite <- le_is_atomic; try exact ATOMIC; eauto. }
+          i. des. inv x6.
+          unguard. esplits; try exact x5; eauto.
+          - eapply event_step_wf_in_access_old; eauto.
+          - eapply event_step_wf_in_access_old; eauto.
+        }
+        { (* src ub *)
+          subst.
+          exploit steps_behavior_prefix_ub; try exact STEPS_SRC; try exact x; eauto.
+          { eapply match_trace_simple_match; eauto. }
+          { apply oracle_of_trace_follows. }
+          i. des. subst. inv ORACLE2.
+          exploit trace_le_ub_step_match; try eapply x2.
+          { eapply match_trace_simple_match; eauto. }
+          i. des.
+          - exfalso. destruct th. ss.
+            exploit oracle_le_steps; try exact STEPS; eauto. i. des.
+            eapply NONUB0.
+            + eapply steps_implies; try eapply x5. eauto.
+            + eauto.
+            + unfold SeqThread.failure. esplits. econs.
+              eapply state_step_subset; eauto.
+          - subst. destruct th. ss.
+            exploit deterministic_steps_inv; try exact STEPS; eauto.
+            { eapply state_steps_deterministic; eauto. ss. }
+            { erewrite <- le_is_atomic; try exact ATOMIC; eauto. }
+            i. des. inv x3.
+            hexploit min_match_trace_min; try exact MATCH; eauto. i.
+            exploit SeqEvent.input_match_mon; try exact INPUT; try exact H3; try refl. i.
+            unguard. esplits; try exact x5; eauto.
+            + eapply event_step_wf_in_access_old; eauto.
+            + eapply event_step_wf_in_access_old; eauto.
+        }
       }
     }
 
@@ -2257,7 +2402,7 @@ Section ADEQUACY.
         unfold SeqThread.failure. esplits. econs. eauto.
       }
     }
-  Admitted.
+  Qed.
 
   Theorem refinement_implies_simulation
           (st_src: lang_src.(Language.state)) (st_tgt: lang_tgt.(Language.state))

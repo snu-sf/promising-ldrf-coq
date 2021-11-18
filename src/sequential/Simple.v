@@ -758,12 +758,11 @@ Module Oracle.
           (<<INPUT: wf_input pe i>>) /\
           (<<OUTPUT: wf_output pe o>>) /\
           (<<ORACLE: wf o1>>))
-      (LOAD: forall loc ord,
-          exists val, progress (ProgramEvent.read loc val ord) o0)
+      (LOAD: forall loc ord, exists val,
+            progress (ProgramEvent.read loc val ord) o0 /\
+            forall valw ordw, progress (ProgramEvent.update loc val valw ord ordw) o0)
       (STORE: forall loc ord val,
           progress (ProgramEvent.write loc val ord) o0)
-      (UPDATE: forall loc ordr ordw,
-          exists valr, forall valw, progress (ProgramEvent.update loc valr valw ordr ordw) o0)
       (FENCE: forall ordr ordw,
           progress (ProgramEvent.fence ordr ordw) o0)
       (SYSCALL: forall e, progress (ProgramEvent.syscall e) o0)
