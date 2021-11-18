@@ -50,6 +50,63 @@ Require Import ITreeLang.
 
 
 
+
+
+Section LANG.
+
+  Definition is_na_inst (i: Inst.t) :=
+    match i with
+    | Inst.skip
+    | Inst.assign _ _
+    | Inst.abort
+    | Inst.choose _ =>
+      True
+    | Inst.load _ _ ord
+    | Inst.store _ _ ord =>
+      Ordering.le ord Ordering.na
+    | Inst.update _ _ _ ordr ordw =>
+      (Ordering.le ordr Ordering.na) \/ (Ordering.le ordw Ordering.na)
+    | _ => False
+    end.
+
+  Definition update_mem_na (v: Const.t) (i: Inst.t) (m: SeqMemory.t) :=
+    match i with
+    | Inst.store lhs _ _ =>
+      SeqMemory.write lhs v m
+    | _ =>
+      m
+    end.
+
+  Variant match_inst_pe: Inst.t -> ProgramEvent.t -> Prop :=
+  | match_inst_pe_load
+      lhs rhs ord val
+    :
+      match_inst_pe (Inst.load lhs rhs ord) (ProgramEvent.read rhs val ord)
+  | match_inst_pe_store
+      lhs rhs ord val
+    :
+      match_inst_pe (Inst.store lhs rhs ord) (ProgramEvent.write lhs val ord)
+  | match_inst_pe_update_failure
+      lhs loc rmw ordr ordw val
+    :
+      match_inst_pe (Inst.update lhs loc rmw ordr ordw) (ProgramEvent.read loc val ordr)
+  | match_inst_pe_update_success
+      lhs loc rmw ordr ordw valr valw
+    :
+      match_inst_pe (Inst.update lhs loc rmw ordr ordw) (ProgramEvent.update loc valr valw ordr ordw)
+  | match_inst_pe_fence
+      ordr ordw
+    :
+      match_inst_pe (Inst.fence ordr ordw) (ProgramEvent.fence ordr ordw)
+  | match_inst_pe_syscall
+      lhs rhses sev
+    :
+      match_inst_pe (Inst.syscall lhs rhses) (ProgramEvent.syscall sev).
+
+End LANG.
+
+
+
 Section SIMAUX.
 
   Variable R_src R_tgt: Type.
@@ -296,245 +353,4 @@ Section SIMAUX.
   Qed.
 
 End SIMAUX.
-
-
-
-
-
-Section UPTO.
-
-  Variable lang_src: language.
-  Variable lang_tgt: language.
-
-  Variable sim_terminal: forall (st_src:(Language.state lang_src)) (st_tgt:(Language.state lang_tgt)), Prop.
-
-  Lemma event_step_flags
-        i o p0 p1 m0 m1
-        (STEP: SeqEvent.step i o p0 m0 p1 m1)
-    :
-      Flags.le (SeqMemory.flags m0)
-               (Flags.join (SeqMemory.flags m1) (SeqEvent.written i)).
-  Proof.
-    inv STEP.
-    inv ACQ.
-    { clear H. inv UPD.
-      { clear H. inv REL.
-        - clear H. unfold SeqEvent.written. rewrite <- H1. rewrite <- H2.
-          rewrite flags_join_bot_l. rewrite flags_join_bot_r. refl.
-        - clear H. unfold SeqEvent.written. rewrite <- H1. rewrite <- H2.
-          rewrite flags_join_bot_l.
-          inv MEM. ss. rewrite flags_join_bot_l. refl.
-      }
-      { clear H. inv REL.
-        - clear H. unfold SeqEvent.written. rewrite <- H1. rewrite <- H2.
-          inv MEM. ss. des_ifs.
-          + ii. unfold Flags.update, Flags.add, Flags.join. des_ifs. apply Flag.join_ge_l.
-          + ii. unfold Flags.update, Flags.add, Flags.join. des_ifs. apply Flag.join_ge_l.
-        - clear H. unfold SeqEvent.written. rewrite <- H1. rewrite <- H2.
-          inv MEM. ss. inv MEM0. ss. des_ifs.
-          + ii. unfold Flags.update, Flags.add, Flags.join. des_ifs. do 2 rewrite flag_join_bot_l. refl.
-          + ii. unfold Flags.update, Flags.add, Flags.join. des_ifs. do 2 rewrite flag_join_bot_l. refl.
-      }
-    }
-    { clear H. inv MEM. ss. inv UPD; ss.
-      { clear H. inv REL; ss.
-        - clear H. apply Flags.join_ge_l.
-        - clear H. inv MEM; ss. unfold SeqEvent.written. rewrite <- H1. rewrite <- H2.
-          do 2 rewrite flags_join_bot_l. refl.
-      }
-      { clear H. inv REL; ss.
-        - clear H. unfold SeqEvent.written. rewrite <- H1. rewrite <- H2.
-          inv MEM. ss. des_ifs.
-          + ii. unfold Flags.update, Flags.add, Flags.join. des_ifs. apply Flag.join_ge_l.
-          + ii. unfold Flags.update, Flags.add, Flags.join. des_ifs. apply Flag.join_ge_l.
-        - clear H. unfold SeqEvent.written. rewrite <- H1. rewrite <- H2.
-          inv MEM. ss. inv MEM0. ss. des_ifs.
-          + ii. unfold Flags.update, Flags.add, Flags.join. des_ifs. do 2 rewrite flag_join_bot_l. refl.
-          + ii. unfold Flags.update, Flags.add, Flags.join. des_ifs. do 2 rewrite flag_join_bot_l. refl.
-      }
-    }
-  Qed.
-
-  Lemma at_step_flags
-        e i o (th0 th1: SeqThread.t (lang_src))
-        (STEP: SeqThread.at_step e i o th0 th1)
-    :
-      Flags.le (SeqMemory.flags (SeqState.memory (SeqThread.state th0)))
-               (Flags.join (SeqMemory.flags (SeqState.memory (SeqThread.state th1))) (SeqEvent.written i)).
-  Proof.
-    inv STEP. ss. eapply event_step_flags; eauto.
-  Qed.
-
-
-  Lemma one_na_step_flags
-        (st1 st2: SeqState.t (lang_src)) p
-        (STEP: SeqState.na_step p MachineEvent.silent st1 st2)
-    :
-      Flags.le st1.(SeqState.memory).(SeqMemory.flags) st2.(SeqState.memory).(SeqMemory.flags).
-  Proof.
-    inv STEP. inv LOCAL; try refl. des_ifs.
-    destruct m0; ss. ii. unfold Flags.update. condtac.
-    - destruct (flags loc0); ss.
-    - refl.
-  Qed.
-
-  Lemma na_step_flags
-        (th0 th1: SeqThread.t (lang_src))
-        (STEP: SeqThread.na_step (@SeqState.na_step lang_src) MachineEvent.silent th0 th1)
-    :
-      Flags.le (SeqMemory.flags (SeqState.memory (SeqThread.state th0)))
-               (SeqMemory.flags (SeqState.memory (SeqThread.state th1))).
-  Proof.
-    inv STEP. eapply one_na_step_flags; eauto.
-  Qed.
-
-  Lemma na_steps_flags
-        (st1 st2: SeqState.t (lang_src)) p
-        (STEPS: rtc (SeqState.na_step p MachineEvent.silent) st1 st2)
-    :
-      Flags.le st1.(SeqState.memory).(SeqMemory.flags) st2.(SeqState.memory).(SeqMemory.flags).
-  Proof.
-    induction STEPS.
-    { refl. }
-    hexploit one_na_step_flags; eauto.
-    i. etrans; eauto.
-  Qed.
-
-  Lemma one_na_step_flags_events
-        (st1 st2: SeqState.t (lang_src)) p e
-        (STEP: SeqState.na_step p e st1 st2)
-    :
-      Flags.le st1.(SeqState.memory).(SeqMemory.flags) st2.(SeqState.memory).(SeqMemory.flags).
-  Proof.
-    destruct e.
-    { eapply one_na_step_flags; eauto. }
-    - inv STEP. inv LOCAL. des_ifs.
-    - inv STEP. inv LOCAL; ss; try refl.
-      des_ifs. ii. unfold Flags.update. clear Heq. des_ifs. destruct (SeqMemory.flags m0 loc); ss. refl.
-  Qed.
-
-  Lemma opt_na_step_flags_events
-        (st1 st2: SeqState.t (lang_src)) p e
-        (STEP: SeqState.na_opt_step p e st1 st2)
-    :
-      Flags.le st1.(SeqState.memory).(SeqMemory.flags) st2.(SeqState.memory).(SeqMemory.flags).
-  Proof.
-    inv STEP. eapply one_na_step_flags_events; eauto. refl.
-  Qed.
-
-
-  Lemma partial_step_flags tr w th0 th1
-        (STEPS: SeqThread.steps (@SeqState.na_step lang_src) tr th0 th1)
-        (WF: Oracle.wf th0.(SeqThread.oracle))
-        (TRACE: SeqThread.writing_trace tr w)
-    :
-      (Flags.le (th0.(SeqThread.state).(SeqState.memory).(SeqMemory.flags))
-                (Flags.join th1.(SeqThread.state).(SeqState.memory).(SeqMemory.flags) w)).
-  Proof.
-    depgen w. induction STEPS; i; ss.
-    { inv TRACE. rewrite flags_join_bot_r. refl. }
-    { hexploit IHSTEPS; clear IHSTEPS; eauto.
-      { inv STEP. ss. }
-      { i. hexploit na_step_flags; eauto. i. etrans. 2:eauto. auto. }
-    }
-    inv TRACE.
-    hexploit IHSTEPS; clear IHSTEPS; eauto.
-    { inv STEP. ss. unfold Oracle.wf in WF. punfold WF. 2: eapply Oracle.wf_mon.
-      inv WF. hexploit WF0; clear WF0; eauto. i; des. pclearbot. auto. }
-    i. rename H into IH.
-    hexploit at_step_flags; eauto. i. etrans. eauto. clear H.
-    match goal with | [|-_ _ (_ ?a (_ ?b ?c))] =>
-                      replace (Flags.join a (Flags.join b c)) with (Flags.join (Flags.join a c) b) end.
-    2:{ rewrite flags_join_comm. rewrite flags_join_assoc. symmetry.
-        rewrite flags_join_assoc. f_equal. rewrite flags_join_comm. auto. }
-    apply Flags.join_mon_l. auto.
-  Qed.
-
-
-  Variant deferred_le_sf_ctx
-          (sim_seq:
-             forall
-               (p0: Perms.t) (d0: Flags.t)
-               (st_src0: SeqState.t lang_src)
-               (st_tgt0: SeqState.t lang_tgt), Prop)
-          (p0: Perms.t) (d0: Flags.t)
-          (st_src0: SeqState.t lang_src)
-          (st_tgt0: SeqState.t lang_tgt): Prop :=
-  | deferred_le_sf_ctx_intro
-      d1
-      (LESF: Flags.le d0 (Flags.join d1 (st_src0.(SeqState.memory).(SeqMemory.flags))))
-      (SIM: sim_seq p0 d1 st_src0 st_tgt0).
-
-  Lemma deferred_le_sf_ctx_mon: monotone4 deferred_le_sf_ctx.
-  Proof. ii. inv IN. econs 1; eauto. Qed.
-
-  Hint Resolve deferred_le_sf_ctx_mon: paco.
-
-  Lemma deferred_le_sf_ctx_wrespectful: wrespectful4 (@_sim_seq lang_src lang_tgt sim_terminal) deferred_le_sf_ctx.
-  Proof.
-    econs; eauto with paco.
-    ii. inv PR. dup SIM. apply GF in SIM. inv SIM.
-    2:{ econs 2. unfold sim_seq_failure_case in *. i. hexploit FAILURE; clear FAILURE; eauto. }
-    econs 1.
-    4:{ unfold sim_seq_partial_case in PARTIAL.
-        ii. hexploit PARTIAL; clear PARTIAL; eauto. i; des.
-        - esplits; eauto.
-          hexploit partial_step_flags; eauto. i. ss.
-          left. etrans. eapply Flags.join_mon_l. eapply LESF.
-          etrans. rewrite <- flags_join_assoc.
-          match goal with | [|- _ (_ _ (Flags.join ?a ?b)) _] => replace (Flags.join a b) with (Flags.join b a) end.
-          2:{ apply flags_join_comm. }
-          rewrite flags_join_assoc. eapply Flags.join_mon_l. eapply FLAGS.
-          rewrite flags_join_comm.
-          apply Flags.join_spec; auto. rewrite flags_join_comm. auto. refl.
-        - esplits; eauto.
-    }
-    { clear NASTEP ATSTEP PARTIAL. unfold sim_seq_terminal_case in *. i.
-      hexploit TERMINAL; clear TERMINAL; eauto. i; des.
-      eexists. splits; eauto.
-      etrans. eapply Flags.join_mon_l. eapply LESF. rewrite <- flags_join_assoc.
-      match goal with | [|- _ (_ _ (Flags.join ?a ?b)) _] => replace (Flags.join a b) with (Flags.join b a) end.
-      2:{ apply flags_join_comm. }
-      rewrite flags_join_assoc. etrans. eapply Flags.join_mon_l. eapply FLAG.
-      hexploit na_steps_flags; eauto. i. rewrite flags_join_comm.
-      hexploit Flags.join_spec. eapply H. refl. i; auto.
-    }
-    { clear TERMINAL ATSTEP PARTIAL. unfold sim_seq_na_step_case in *. i.
-      hexploit NASTEP; clear NASTEP; eauto. i; des.
-      do 2 eexists. splits; eauto. eapply rclo4_clo_base. econs; eauto.
-      hexploit opt_na_step_flags_events; eauto. i.
-      hexploit na_steps_flags; eauto. i. etrans. eapply LESF. apply Flags.join_mon_r.
-      etrans. eapply H0. auto.
-    }
-    { clear TERMINAL NASTEP PARTIAL. unfold sim_seq_at_step_case in *. i.
-      hexploit ATSTEP; clear ATSTEP; eauto. i; des.
-      do 3 eexists. splits; eauto. i. hexploit SIM; clear SIM; eauto. i; des.
-      do 2 eexists. eexists. esplits; eauto.
-      2:{ eapply rclo4_clo_base. econs. refl. eauto. }
-      ss. eapply SeqEvent.input_match_mon.
-      3: refl.
-      { eapply SeqEvent.step_input_match. eapply STEP_SRC. eapply MATCH. }
-      etrans. eapply LESF. apply Flags.join_mon_r. eapply na_steps_flags; eauto.
-    }
-  Qed.
-
-  Lemma deferred_le_sf_ctx_spec: deferred_le_sf_ctx <5=
-                                 gupaco4 (@_sim_seq lang_src lang_tgt sim_terminal)
-                                         (cpn4 (@_sim_seq lang_src lang_tgt sim_terminal)).
-  Proof. i. eapply wrespect4_uclo; eauto with paco. eapply deferred_le_sf_ctx_wrespectful. Qed.
-
-
-  Lemma sim_seq_upto_deferred
-        g p d0 d1 src tgt
-        (LE: Flags.le d0 d1)
-        (SIM: gupaco4 (@_sim_seq lang_src lang_tgt sim_terminal)
-                      (cpn4 (@_sim_seq lang_src lang_tgt sim_terminal)) g p d1 src tgt)
-    :
-      gupaco4 (@_sim_seq lang_src lang_tgt sim_terminal)
-              (cpn4 (@_sim_seq lang_src lang_tgt sim_terminal)) g p d0 src tgt.
-  Proof.
-    guclo deferred_le_sf_ctx_spec. econs; eauto. etrans; eauto. apply Flags.join_ge_l.
-  Qed.
-
-End UPTO.
 Hint Resolve cpn4_wcompat: paco.
