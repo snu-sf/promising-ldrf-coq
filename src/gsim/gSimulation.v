@@ -192,8 +192,7 @@ Section SimulationThread.
                                  sc0_src sc1_src sc0_tgt sc1_tgt
                                  w0 w1
                                  views0 views1
-                                 fin0 fin1)
-                      (UNCHANGED: UndefCertify.unchanged lc1_src.(Local.promises) mem0_src mem1_src),
+                                 fin0 fin1),
         (<<TERMINAL:
            forall
              (TERMINAL_TGT: (Language.is_terminal lang_tgt) st1_tgt),
@@ -234,15 +233,13 @@ Section SimulationThread.
                    (REL: joined_released views0 lc1_tgt.(Local.promises) lc1_tgt.(Local.tview).(TView.rel))
                    (JOINED: joined_memory views0 mem0_tgt)
                    (VIEWS: wf_views views0),
-        exists tm_src,
-          (<<TM: forall loc, Time.lt (Memory.max_ts loc mem0_src) (tm_src loc)>>) /\
-          (<<CAP: forall cap_src cap_tgt
-                         (CAPSRC: CapFlex.cap_flex mem0_src cap_src tm_src)
-                         (CAPTGT: Memory.cap mem0_tgt cap_tgt),
-              exists w3,
-                (<<SC3: sim_timemap w3 sc0_src sc0_tgt>>) /\
-                (<<MEMORY3: sim_memory true w3 views0 cap_src cap_tgt>>) /\
-                (<<SIM: sim_thread _ _ sim_terminal true w3 st1_src lc1_src sc0_src cap_src st1_tgt lc1_tgt sc0_tgt cap_tgt (views0, fin0)>>)>>)>>)
+        (<<CAP: forall cap_src cap_tgt
+                       (CAPSRC: Memory.cap mem0_src cap_src)
+                       (CAPTGT: Memory.cap mem0_tgt cap_tgt),
+            exists w3,
+              (<<SC3: sim_timemap w3 sc0_src sc0_tgt>>) /\
+              (<<MEMORY3: sim_memory true w3 views0 cap_src cap_tgt>>) /\
+              (<<SIM: sim_thread _ _ sim_terminal true w3 st1_src lc1_src sc0_src cap_src st1_tgt lc1_tgt sc0_tgt cap_tgt (views0, fin0)>>)>>)>>)
   .
 
   Lemma _sim_thread_mon: monotone14 _sim_thread.
@@ -251,8 +248,7 @@ Section SimulationThread.
     ii. exploit FUTURE; eauto. i. des. splits; auto.
     { ii. exploit STEP; eauto. i. des; eauto.
       right. esplits; eauto. }
-    { ii. exploit CAP; eauto. i. des. esplits; eauto.
-      i. exploit CAP0; eauto. i. des. esplits; eauto. }
+    { ii. exploit CAP; eauto. i. des. esplits; eauto. }
   Qed.
   Hint Resolve _sim_thread_mon: paco.
 
@@ -274,7 +270,6 @@ Section SimulationThread.
         right. esplits; eauto. }
     }
     { i. exploit CAP; eauto. i. des. esplits; eauto.
-      i. exploit CAP0; eauto. i. des. esplits; eauto.
       inv SIM0; [|done]. right. auto. }
   Qed.
 End SimulationThread.
@@ -290,7 +285,6 @@ Definition sim_thread_past lang_src lang_tgt sim_terminal (b: bool) w st_src lc_
       (<<MEM_FUTURE_SRC: Memory.future_weak mem_src' mem_src>>) /\
       (<<MEM_FUTURE_TGT: Memory.future_weak mem_tgt' mem_tgt>>) /\
       (<<WORLD: world_messages_le (Messages.of_memory lc_src.(Local.promises)) w' w>>) /\
-      (<<UNCHANGED: UndefCertify.unchanged lc_src.(Local.promises) mem_src' mem_src>>) /\
       (<<VIEW: views_le views' views>>) /\
       (<<FIN: fin' <4= fin>>)
 .
@@ -667,13 +661,11 @@ Lemma sim_thread_future
       (MEM_FUTURE_SRC: Memory.future_weak mem1_src mem2_src)
       (MEM_FUTURE_TGT: Memory.future_weak mem1_tgt mem2_tgt)
       (WORLD: world_messages_le (Messages.of_memory lc_src.(Local.promises)) w1 w2)
-      (UNCHANGED: UndefCertify.unchanged lc_src.(Local.promises) mem1_src mem2_src)
       (VIEWS: views_le views1 views2)
       (FIN: fin1 <4= fin2):
   sim_thread_past sim_terminal false w2 st_src lc_src sc2_src mem2_src st_tgt lc_tgt sc2_tgt mem2_tgt (views2, fin2).
 Proof.
   red in SIM. red. des. ss. esplits; eauto.
-  { etrans; eauto. }
   { etrans; eauto. }
   { etrans; eauto. }
   { etrans; eauto. }
@@ -696,41 +688,6 @@ Proof.
   - eapply Local.cap_wf; eauto.
   - eapply Memory.cap_closed_timemap; eauto.
   - eapply Memory.cap_closed; eauto.
-Qed.
-
-Lemma cap_flex_property
-      mem1 mem2 lc sc tm
-      (CAP: CapFlex.cap_flex mem1 mem2 tm)
-      (WF: Local.wf lc mem1)
-      (SC: Memory.closed_timemap sc mem1)
-      (CLOSED: Memory.closed mem1)
-      (TM: forall loc, Time.lt (Memory.max_ts loc mem1) (tm loc)):
-  (<<FUTURE: Memory.future_weak mem1 mem2>>) /\
-  (<<WF: Local.wf lc mem2>>) /\
-  (<<SC: Memory.closed_timemap sc mem2>>) /\
-  (<<CLOSED: Memory.closed mem2>>).
-Proof.
-  splits.
-  - eapply CapFlex.cap_flex_future_weak; eauto.
-  - eapply CapFlex.cap_flex_wf; eauto.
-  - eapply CapFlex.cap_flex_closed_timemap; eauto.
-  - eapply CapFlex.cap_flex_closed; eauto.
-Qed.
-
-Lemma joined_memory_cap_flex views mem cap tm
-      (JOINED: joined_memory views mem)
-      (CAP: CapFlex.cap_flex mem cap tm)
-      (CLOSED: Memory.closed mem)
-      (TM: forall loc, Time.lt (Memory.max_ts loc mem) (tm loc))
-  :
-    joined_memory views cap.
-Proof.
-  inv JOINED. econs.
-  - i. eapply CapFlex.cap_flex_inv in GET; eauto. des; eauto; clarify.
-  - i. exploit ONLY; eauto. i. des.
-    eapply CapFlex.cap_flex_le in GET; eauto.
-  - i. eapply List.Forall_impl; try apply CLOSED0; eauto.
-    i. ss. eapply CapFlex.cap_flex_closed_view; eauto.
 Qed.
 
 Lemma joined_memory_cap views mem cap
@@ -776,22 +733,20 @@ Proof.
   all: ss. i.
   generalize SIM. intro X.
   red in X. punfold X. red in X. des. clear FUTURE.
-  exploit CAP; eauto. i. des.
   exploit Memory.cap_exists; try exact MEM_TGT; eauto. i. des.
-  exploit CapFlex.cap_flex_exists; try exact MEM_SRC; eauto. i. des.
-  exploit CAP0; eauto. i. des. inv SIM0; [|done].
+  exploit Memory.cap_exists; try exact MEM_SRC; eauto. i. des.
+  exploit CAP; eauto. i. des. inv SIM0; [|done].
   assert (SIM0: sim_thread_past sim_terminal true w3 st_src lc_src sc_src mem0 st_tgt lc_tgt sc_tgt mem2 (views, fin)) by auto.
+  exploit cap_property; try exact CAP0; eauto. i. des.
   exploit cap_property; try exact CAP1; eauto. i. des.
-  exploit cap_flex_property; try exact CAP2; eauto. i. des.
   exploit joined_memory_cap; eauto. intros JOINED0.
-  eapply CapFlex.consistent_thread_consistent; eauto.
   assert (FINMEMORY0: fin <4= unchangable mem2 (Local.promises lc_tgt)).
   { i. apply FINMEMORY in PR. inv PR. econs; eauto.
     eapply Memory.cap_le; eauto. refl. }
   exploit CONSISTENT; eauto. s. i. des.
   - left. des. s.
     assert (mem1 = mem0).
-    { eapply CapFlex.cap_flex_inj; eauto. } subst.
+    { eapply Memory.cap_inj; eauto. } subst.
     assert (JSTEP: JThread.step true e e2 e3 views2 views2).
     { eapply JThread.tau_steps_future in STEPS; eauto. des. ss.
       inv STEP_FAILURE.
@@ -809,7 +764,7 @@ Proof.
     i. ss. des; ss.
   - ii. ss.
     assert (mem1 = mem0).
-    { eapply CapFlex.cap_flex_inj; eauto. } subst.
+    { eapply Memory.cap_inj; eauto. } subst.
     hexploit Local.bot_promise_consistent; eauto. i.
     exploit sim_thread_rtc_step; try apply STEPS; try exact x1; eauto; try refl.
     i. des; eauto.
@@ -840,7 +795,6 @@ Section Simulation.
            (MEMORY1: sim_memory false w1 views1 mem1_src mem1_tgt)
            (WF_SRC: Configuration.wf (Configuration.mk ths1_src sc1_src mem1_src))
            (WF_TGT: JConfiguration.wf views1 (Configuration.mk ths1_tgt sc1_tgt mem1_tgt))
-           (CERTIFIED: UndefCertify.certified (Configuration.mk ths1_src sc1_src mem1_src))
            (SC_FUTURE_SRC: TimeMap.le sc0_src sc1_src)
            (SC_FUTURE_TGT: TimeMap.le sc0_tgt sc1_tgt)
            (MEM_FUTURE_SRC: Memory.future mem0_src mem1_src)
@@ -849,9 +803,6 @@ Section Simulation.
            (WORLD: forall tid st lc
                           (TID: IdentMap.find tid ths1_src = Some (st, lc)),
                world_messages_le (Messages.of_memory lc.(Local.promises)) w0 w1)
-           (UNCHANGED: forall tid st lc
-                              (TID: IdentMap.find tid ths1_src = Some (st, lc)),
-               UndefCertify.unchanged lc.(Local.promises) mem0_src mem1_src)
            (FINTGT: finalized (Configuration.mk ths1_tgt sc0_tgt mem0_tgt) <4= finalized (Configuration.mk ths1_tgt sc1_tgt mem1_tgt))
            (FINSRC: finalized (Configuration.mk ths1_src sc0_src mem0_src) <4= finalized (Configuration.mk ths1_src sc1_src mem1_src)),
       (<<TERMINAL:
@@ -894,7 +845,6 @@ Lemma sim_adequacy
       (WF_SRC: Configuration.wf (Configuration.mk ths_src sc_src mem_src))
       (WF_MID: JConfiguration.wf views (Configuration.mk ths_mid sc_mid mem_mid))
       (WF_TGT: Configuration.wf (Configuration.mk ths_tgt sc_tgt mem_tgt))
-      (CERTIFIED: UndefCertify.certified (Configuration.mk ths_src sc_src mem_src))
       (SC: sim_timemap w sc_src sc_mid)
       (MEMORY: sim_memory false w views mem_src mem_mid)
       (SIM: sim w ths_src sc_src mem_src ths_mid sc_mid mem_mid views)
@@ -906,7 +856,7 @@ Lemma sim_adequacy
   behaviors Configuration.step (Configuration.mk ths_src sc_src mem_src).
 Proof.
   s. i.
-  revert w WF_SRC WF_MID WF_TGT CERTIFIED SC MEMORY SIM JSIM.
+  revert w WF_SRC WF_MID WF_TGT SC MEMORY SIM JSIM.
   revert ths_src sc_src mem_src.
   revert ths_mid sc_mid mem_mid.
   remember (Configuration.mk ths_tgt sc_tgt mem_tgt).
@@ -935,8 +885,6 @@ Proof.
       inv STEP_SRC. econs 2; [eauto| |auto].
       exploit JConfiguration.step_future; eauto. i. des.
       eapply IHPR; eauto.
-      eapply UndefCertify.step_certified; eauto.
-      eapply UndefCertify.rtc_step_certified; eauto.
   - destruct c2.
     hexploit JSim.step_sim_configuration; eauto. i. des. destruct c_src1.
     punfold SIM0. exploit SIM0; eauto; try refl. i. des.
@@ -964,12 +912,9 @@ Proof.
       exploit Configuration.rtc_step_future; eauto. i. des.
       inv STEP_SRC.
       * eapply IHPR; eauto.
-        eapply UndefCertify.rtc_step_certified; eauto.
       * econs 4; eauto.
         exploit Configuration.step_future; try apply STEP1; eauto. s. i. des.
         eapply IHPR; eauto.
-        eapply UndefCertify.step_certified; eauto.
-        eapply UndefCertify.rtc_step_certified; eauto.
   - econs 5.
 Qed.
 
@@ -1009,17 +954,10 @@ Lemma thread_rtc_step_rtc_step
       (STEPS: rtc (@Thread.tau_step lang_src)
                   (Thread.mk lang_src st1_src lc1_src sc1_src mem1_src)
                   (Thread.mk lang_src st2_src lc2_src sc2_src mem2_src))
-      (LOCAL: Local.promises lc2_src = Memory.bot)
-      (CERTIFIED: UndefCertify.certified (Configuration.mk ths1_src sc1_src mem1_src)):
+      (LOCAL: Local.promises lc2_src = Memory.bot):
   (<<STEPS: rtc Configuration.tau_step
                 (Configuration.mk ths1_src sc1_src mem1_src)
-                (Configuration.mk (IdentMap.add tid (existT _ lang_src st2_src, lc2_src) ths1_src) sc2_src mem2_src)>>) /\
-  ((<<UNCHANGED: forall tid' st lc
-                        (TID: tid' <> tid)
-                        (TID: IdentMap.find tid' ths1_src = Some (st, lc)),
-       UndefCertify.unchanged lc.(Local.promises) mem1_src mem2_src>>) \/
-   (<<FAILURE: Configuration.steps_failure (Configuration.mk ths1_src sc1_src mem1_src)>>))
-.
+                (Configuration.mk (IdentMap.add tid (existT _ lang_src st2_src, lc2_src) ths1_src) sc2_src mem2_src)>>).
 Proof.
   inv WF_SRC. inv WF. ss. exploit THREADS; eauto. i.
   exploit Thread.rtc_tau_step_future; eauto. s. i. des.
@@ -1031,15 +969,9 @@ Proof.
                      (Configuration.mk (IdentMap.add tid (existT _ lang_src st2_src, lc2_src) ths1_src) sc2_src mem2_src)).
     { rewrite <- EVENT. econs; ss; eauto.
       ii. ss. esplits; eauto. }
-    split.
-    { econs; eauto. econs; eauto. }
-    { ii. eapply (@UndefCertify.step_unchanged
-                    (Configuration.mk ths1_src sc1_src mem1_src)
-                    (Configuration.mk (IdentMap.add tid (existT _ lang_src st2_src, lc2_src) ths1_src) sc2_src mem2_src)); eauto.
-      econs; eauto; ss. }
+    econs; eauto. econs; eauto.
   - inv H.
     replace (IdentMap.add tid (existT _ lang_src st2_src, lc2_src) ths1_src) with ths1_src; auto.
-    { split; auto. left. red. i. refl. }
     apply IdentMap.eq_leibniz. ii.
     rewrite -> IdentMap.gsident; auto.
 Qed.
@@ -1079,11 +1011,6 @@ Proof.
                  @sim_thread_past lang_src lang_tgt sim_terminal false w st_src lc_src sc0_src mem0_src st_tgt lc_tgt sc0_tgt mem0_tgt (views, finalized (Configuration.mk ths_tgt sc1_tgt mem1_tgt))).
     { i. hexploit SIM0; eauto. i. des. esplits.
       eapply sim_thread_future; eauto; try refl. }
-    assert (UNCHANGED0: forall tid st lc
-                               (TID: List.In tid (IdentSet.elements tids))
-                               (FIND: IdentMap.find tid ths_src = Some (st, lc)),
-               UndefCertify.unchanged (Local.promises lc) mem0_src mem1_src).
-    { i. eapply UNCHANGED; eauto. }
     assert (WORLD0: forall tid st lc
                            (TID: List.In tid (IdentSet.elements tids))
                            (FIND: IdentMap.find tid ths_src = Some (st, lc)),
@@ -1097,7 +1024,7 @@ Proof.
     { specialize (IdentSet.elements_spec2w tids). i.
       clear - H. induction H; econs; eauto. }
     revert NOTIN IN TIDS_MEM NODUP.
-    move tids at top. clear SIM0 UNCHANGED WORLD. clear FINSRC. revert_until CIH.
+    move tids at top. clear SIM0 WORLD. clear FINSRC. revert_until CIH.
     induction (IdentSet.elements tids); i.
     { right. esplits; eauto; try refl. ii. exploit NOTIN; eauto. }
     destruct (IdentMap.find a ths_src) as [[[lang_src st_src] lc_src]|] eqn:ASRC;
@@ -1107,7 +1034,6 @@ Proof.
     { exploit tids_find; [apply TIDS_SRC|apply TIDS_TGT|..]. i. des.
       exploit x1; eauto. i. des. rewrite ASRC in x. inv x. }
     { exploit IHl; [exact TIDS_SRC|exact TIDS_TGT|exact SC1|exact MEMORY1|..]; eauto; i.
-      - eapply UNCHANGED0; eauto. ss. auto.
       - refl.
       - eapply NOTIN; eauto. ii. inv H; ss. congr.
       - exploit IN; eauto.
@@ -1133,7 +1059,6 @@ Proof.
       { etrans; eauto. }
       { i. eapply FIN in PR. eapply finalized_unchangable in PR; eauto. }
     }
-    { etrans; eauto. }
     i. des.
     exploit TERMINAL; eauto. i. des.
     i. des.
@@ -1153,14 +1078,6 @@ Proof.
           try (etrans; [exact SC_FUTURE_SRC|exact SC_FUTURE]);
           try (etrans; [exact MEM_FUTURE_SRC|exact MEM_FUTURE]); eauto; i.
       { rewrite Threads.tids_add. rewrite IdentSet.add_mem; eauto. }
-      { eapply UndefCertify.rtc_step_certified; eauto. }
-      { assert (NEQ: tid <> a).
-        { inv NODUP. ii. clarify. }
-        rewrite IdentMap.gso in FIND; auto.
-        transitivity mem1_src.
-        { eapply UNCHANGED0; eauto. }
-        { eapply UNCHANGED1; eauto. }
-      }
       { refl. }
       { rewrite IdentMap.gsspec in FIND. revert FIND. condtac; ss; i.
         - subst. Configuration.simplify. split; auto.
@@ -1232,8 +1149,6 @@ Proof.
       i. ss. des.
       exploit JConfiguration.step_future; eauto.
       i. ss. des.
-      exploit UndefCertify.opt_step_unchanged; eauto.
-      i. des; auto.
       right. esplits; eauto. right. eapply CIH; ss.
       { rewrite Threads.tids_add. rewrite Threads.tids_add.
         f_equal. auto. }
@@ -1255,7 +1170,6 @@ Proof.
               destruct lc_src, lc_src0.
               eapply other_promise_unchangable; eauto. }
           }
-          { etrans; eauto. }
           { etrans; eauto. }
           { eapply JConfiguration.step_configuration_step in STEP_TGT0. inv WF_TGT0.
             i. eapply step_finalized; eauto. }
