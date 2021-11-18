@@ -19,7 +19,6 @@ Require Import Simple.
 Require Import SeqLib.
 
 Set Implicit Arguments.
-Set Nested Proofs Allowed.
 
 
 #[export] Hint Resolve Oracle.wf_mon: paco.
@@ -770,7 +769,7 @@ Qed.
 
 Definition oracle_input_of_event (e: ProgramEvent.t) (m: SeqMemory.t): Oracle.input :=
   Oracle.mk_input
-    (match is_acessing e with
+    (match is_accessing e with
      | Some (loc, _) => Some (loc, m.(SeqMemory.value_map) loc, m.(SeqMemory.flags) loc)
      | None => None
      end)
