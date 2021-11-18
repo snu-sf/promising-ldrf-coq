@@ -1248,6 +1248,70 @@ Section UPTO.
     - hexploit UPDATE; clear UPDATE. i; des. clear H0. hexploit H1; clear H1; eauto. i; des. inv H0. eauto.
   Qed.
 
+  Lemma input_le_written_le
+        i1 i2
+        (LEIN : seqevent_input_le i1 i2)
+    :
+      Flags.le (SeqEvent.written i1) (SeqEvent.written i2).
+  Proof.
+    destruct i1, i2. unfold seqevent_input_le in LEIN. des; ss. unfold SeqEvent.written. ss.
+    clear LEINACQ. inv LEINACC; ss; subst; ss.
+    - rewrite ! flags_join_bot_l. inv LEINREL; ss; subst ;ss.
+    - inv LEINREL; ss; subst ;ss.
+      + des_ifs. refl.
+      + des_ifs.
+        * apply Flags.join_mon_r. auto.
+        * rewrite ! flags_join_bot_l. etrans. eauto. apply Flags.join_ge_r.
+  Qed.
+
+  Lemma input_le_match
+        x1 d1 i1 i2 i_tgt
+        (MATCH : SeqEvent.input_match x1 d1 i1 i_tgt)
+        (INLE : seqevent_input_le i1 i2)
+    :
+      SeqEvent.input_match x1 d1 i2 i_tgt.
+  Proof.
+    destruct i1, i2. unfold seqevent_input_le in INLE. des; ss. inv MATCH. ss.
+    inv LEINACC; ss.
+    { inv LEINACQ; ss.
+      { inv LEINREL; ss; clarify.
+        - econs; ss; eauto.
+        - econs; ss; eauto. inv RELEASE. econs; eauto.
+          + i. etrans; eauto.
+          + etrans; eauto. apply Flags.join_mon_l; auto.
+      }
+      { inv LEINREL; ss; clarify.
+        - econs; ss; eauto. inv ACQUIRE; ss. econs; eauto. etrans; eauto.
+        - inv RELEASE; inv ACQUIRE. ss. econs; ss; eauto.
+          + rewrite <- H3. econs; eauto. etrans; eauto.
+          + rewrite <- H4. econs; eauto.
+            * i. etrans; eauto.
+            * etrans; eauto. apply Flags.join_mon_l; auto.
+      }
+    }
+    { inv LEINACQ; ss.
+      { inv ACCESS; ss. inv LEINREL; ss; subst.
+        - econs; ss; eauto. rewrite <- H6. econs; eauto. etrans; eauto. etrans; eauto.
+        - inv RELEASE; ss. econs; ss; eauto.
+          + rewrite <- H6. econs; eauto. etrans; eauto. etrans; eauto.
+          + rewrite <- H4. econs; eauto.
+            * i. etrans; eauto.
+            * etrans; eauto. apply Flags.join_mon_l; auto.
+      }
+      { inv ACCESS; ss. inv ACQUIRE; ss. inv LEINREL; ss; subst.
+        - econs; ss; eauto.
+          + rewrite <- H6. econs; eauto. etrans; eauto. etrans; eauto.
+          + rewrite <- H3. econs; eauto. etrans; eauto.
+        - inv RELEASE; ss. econs; ss; eauto.
+          + rewrite <- H6. econs; eauto. etrans; eauto. etrans; eauto.
+          + rewrite <- H3. econs; eauto. etrans; eauto.
+          + rewrite <- H5. econs; eauto.
+            * i. etrans; eauto.
+            * etrans; eauto. apply Flags.join_mon_l; auto.
+      }
+    }
+  Qed.
+
   Definition trace_le0 (t0 t1: (ProgramEvent.t * SeqEvent.input * Oracle.output)) : Prop :=
     let '(pe0, i0, o0) := t0 in
     let '(pe1, i1, o1) := t1 in
@@ -1261,12 +1325,13 @@ Section UPTO.
         (TRACE: SeqThread.writing_trace tr w)
         (LE: trace_le tr tr0)
     :
-      exists w0, SeqThread.writing_trace tr0 w0.
+      exists w0, (SeqThread.writing_trace tr0 w0) /\ (Flags.le w w0).
   Proof.
     depgen tr0. induction TRACE; i; ss.
-    { inv LE. exists Flags.bot. econs. }
+    { inv LE. exists Flags.bot. split. econs. refl. }
     inv LE. rename l' into tr2. destruct y as [y o2]. destruct y as [e2 i2]. eapply IHTRACE in H3. des. clear IHTRACE.
-    unfold trace_le0 in *. des. clarify. eexists. econs; eauto.
+    unfold trace_le0 in *. des. clarify. eexists. split. econs; eauto.
+    etrans. eapply Flags.join_mon_r. eauto. apply Flags.join_mon_l. apply input_le_written_le; auto.
   Qed.
 
 
@@ -1304,6 +1369,85 @@ Section UPTO.
     - esplits. econs. econs. eauto. econs; auto. all: ss. econs; eauto.
       + ii. unfold_many2. des_ifs.
       + ii. unfold_many2. des_ifs. refl.
+  Qed.
+
+  Lemma state_na_step_le
+        st_src1 x2 x0 ev
+        (MEMLE: mem_le (SeqState.memory st_src1) (SeqState.memory x2))
+        (STATE: SeqState.state st_src1 = SeqState.state x2)
+        (st_src0: SeqState.t lang_src)
+        (STEP : SeqState.na_step x0 ev st_src1 st_src0)
+    :
+      exists st_src2 : SeqState.t lang_src,
+        (<<STEPS: SeqState.na_step x0 ev x2 st_src2>>) /\
+        (<<STATE: SeqState.state st_src2 = SeqState.state st_src0>>) /\
+        (<<MEMLE: mem_le (SeqState.memory st_src0) (SeqState.memory st_src2)>>).
+  Proof.
+    destruct st_src1, x2; ss.
+    inv STEP. inv LOCAL; ss; subst.
+    - esplits.
+      { econs; eauto. econs. }
+      all: ss.
+    - esplits.
+      { econs; eauto. econs; eauto. i. destruct (x0 loc); ss. etrans. eapply VAL; eauto. unfold mem_le in MEMLE; des. apply LEV. }
+      all: ss.
+    - destruct (x0 loc) eqn:PERMCASE; ss.
+      + esplits.
+        { econs; eauto. econs; eauto. rewrite PERMCASE. ss. }
+        all: ss. unfold mem_le in *. des. unfold_many2. split; ii.
+        * des_ifs.
+        * des_ifs. refl.
+      + esplits.
+        { econs; eauto. econs; eauto. rewrite PERMCASE. ss. }
+        all: ss. unfold mem_le in *. des. unfold_many2. split; ii.
+        * des_ifs.
+        * des_ifs. refl.
+    - esplits.
+      { econs; eauto. econs. }
+      all: ss.
+    - esplits.
+      { econs; eauto. econs. auto. }
+      all: ss.
+  Qed.
+
+  Lemma state_na_steps_le
+        st_src1 x2 x0
+        (MEMLE: mem_le (SeqState.memory st_src1) (SeqState.memory x2))
+        (STATE: SeqState.state st_src1 = SeqState.state x2)
+        (st_src0: SeqState.t lang_src)
+        (STEPS : rtc (SeqState.na_step x0 MachineEvent.silent) st_src1 st_src0)
+    :
+      exists st_src2 : SeqState.t lang_src,
+        (<<STEPS: rtc (SeqState.na_step x0 MachineEvent.silent) x2 st_src2>>) /\
+        (<<STATE: SeqState.state st_src2 = SeqState.state st_src0>>) /\
+        (<<MEMLE: mem_le (SeqState.memory st_src0) (SeqState.memory st_src2)>>).
+  Proof.
+    depgen x2. induction STEPS; i; ss.
+    { esplits. refl. all: auto. }
+    destruct x, x2; ss.
+    inv H. inv LOCAL; ss; subst.
+    - specialize IHSTEPS with {| SeqState.state := st1; SeqState.memory := memory0 |}.
+      hexploit IHSTEPS; clear IHSTEPS; ss. i; des.
+      esplits.
+      { econs 2. econs. eauto. econs. eapply STEPS0. }
+      all: auto.
+    - specialize IHSTEPS with {| SeqState.state := st1; SeqState.memory := memory0 |}.
+      hexploit IHSTEPS; clear IHSTEPS; ss. i; des.
+      esplits.
+      { econs 2. econs. eauto. econs; auto. i. destruct (x0 loc); ss.
+        { unfold mem_le in MEMLE. des. etrans. eapply VAL; auto. apply LEV. }
+          eapply STEPS0. }
+      all: auto.
+    - destruct (x0 loc) eqn:PERMCASE; ss.
+      specialize IHSTEPS with {| SeqState.state := st1; SeqState.memory := SeqMemory.write loc val memory0 |}.
+      hexploit IHSTEPS; clear IHSTEPS; ss.
+      { unfold mem_le in *. des. unfold_many2. split; ss.
+        - ii. des_ifs.
+        - ii. des_ifs. refl.
+      }
+      i; des. esplits.
+      { econs 2. econs. eauto. econs; auto. rewrite PERMCASE. ss. eapply STEPS0. }
+      all: auto.
   Qed.
 
   Lemma seqevent_step_le
@@ -1592,68 +1736,68 @@ Section UPTO.
     econs 1.
     4:{ unfold sim_seq_partial_case in PARTIAL.
         ii. hexploit PARTIAL; clear PARTIAL; eauto. i; des.
-        - esplits; eauto.
-          hexploit partial_step_flags; eauto. i. ss.
-          left. etrans. eapply Flags.join_mon_l. eapply LESF.
-          etrans. rewrite <- flags_join_assoc.
-          match goal with | [|- _ (_ _ (Flags.join ?a ?b)) _] => replace (Flags.join a b) with (Flags.join b a) end.
-          2:{ apply flags_join_comm. }
-          rewrite flags_join_assoc. eapply Flags.join_mon_l. eapply FLAGS.
-          rewrite flags_join_comm.
-          apply Flags.join_spec; auto. rewrite flags_join_comm. auto. refl.
-        - esplits; eauto.
+        - hexploit thread_steps_le. 6: eauto. all: ss.
+          instantiate (1:= {| SeqThread.state := x2; SeqThread.perm := x0; SeqThread.oracle := o |}).
+          all: ss. i; des.
+          hexploit writing_trace_mon_on_trace. eauto. eauto. i; des.
+          esplits; eauto.
+          left. depgen FLAGS. depgen MEMLE0. depgen H0. clear; i. etrans; eauto.
+          etrans. eapply Flags.join_mon_l. eauto. apply Flags.join_mon_r.
+          unfold mem_le in MEMLE0. des. auto.
+        - hexploit thread_steps_le. 6: eauto. all: ss.
+          instantiate (1:= {| SeqThread.state := x2; SeqThread.perm := x0; SeqThread.oracle := o |}).
+          all: ss. i; des.
+          hexploit writing_trace_mon_on_trace. eauto. eauto. i; des.
+          esplits; eauto.
+          right. eapply seqthread_failure_diff_mem; eauto.
     }
     { clear NASTEP ATSTEP PARTIAL. unfold sim_seq_terminal_case in *. i.
       hexploit TERMINAL; clear TERMINAL; eauto. i; des.
-      eexists. splits; eauto.
-      etrans. eapply Flags.join_mon_l. eapply LESF. rewrite <- flags_join_assoc.
-      match goal with | [|- _ (_ _ (Flags.join ?a ?b)) _] => replace (Flags.join a b) with (Flags.join b a) end.
-      2:{ apply flags_join_comm. }
-      rewrite flags_join_assoc. etrans. eapply Flags.join_mon_l. eapply FLAG.
-      hexploit na_steps_flags; eauto. i. rewrite flags_join_comm.
-      hexploit Flags.join_spec. eapply H. refl. i; auto.
+      hexploit state_na_steps_le; eauto. i; des. unfold mem_le in *; des.
+      exists st_src2. splits; auto. rewrite STATE0; auto. rewrite STATE0; auto.
+      etrans; eauto. etrans; eauto.
     }
     { clear TERMINAL ATSTEP PARTIAL. unfold sim_seq_na_step_case in *. i.
       hexploit NASTEP; clear NASTEP; eauto. i; des.
-      do 2 eexists. splits; eauto. eapply rclo4_clo_base. econs; eauto.
-      hexploit opt_na_step_flags_events; eauto. i.
-      hexploit na_steps_flags; eauto. i. etrans. eapply LESF. apply Flags.join_mon_r.
-      etrans. eapply H0. auto.
+      hexploit state_na_steps_le; eauto. i; des. unfold mem_le in *; des.
+      inv STEP.
+      - hexploit state_na_step_le. 3: eapply STEP0. instantiate (1:=st_src3). all: ss. i; des.
+        exists st_src3, st_src4. splits; auto. econs 1; auto.
+        eapply rclo4_clo_base. econs; eauto.
+      - esplits. eapply STEPS0. econs 2.
+        eapply rclo4_clo_base. econs. 3: eauto. all: auto. econs; eauto.
     }
     { clear TERMINAL NASTEP PARTIAL. unfold sim_seq_at_step_case in *. i.
       hexploit ATSTEP; clear ATSTEP; eauto. i; des.
-      do 3 eexists. splits; eauto. i. hexploit SIM; clear SIM; eauto. i; des.
-      do 2 eexists. eexists. esplits; eauto.
-      2:{ eapply rclo4_clo_base. econs. refl. eauto. }
-      ss. eapply SeqEvent.input_match_mon.
-      3: refl.
-      { eapply SeqEvent.step_input_match. eapply STEP_SRC. eapply MATCH. }
-      etrans. eapply LESF. apply Flags.join_mon_r. eapply na_steps_flags; eauto.
+      hexploit state_na_steps_le; eauto. i; des. esplits; eauto. rewrite STATE0; eauto. i.
+      hexploit SIM; clear SIM; eauto. i; des.
+      hexploit seqevent_step_le. 2: eapply STEP_SRC. eapply MEMLE0. i; des.
+      hexploit input_le_match; eauto. i; des.
+      esplits. eapply STEPS1.
+      { eauto. }
+      { eapply input_le_wf; eauto. }
+      apply rclo4_clo_base. econs. 3: eauto. all: ss.
     }
   Qed.
 
-  Lemma deferred_le_sf_ctx_spec: deferred_le_sf_ctx <5=
-                                 gupaco4 (@_sim_seq lang_src lang_tgt sim_terminal)
-                                         (cpn4 (@_sim_seq lang_src lang_tgt sim_terminal)).
-  Proof. i. eapply wrespect4_uclo; eauto with paco. eapply deferred_le_sf_ctx_wrespectful. Qed.
+  Lemma mem_le_ctx_spec: mem_le_ctx <5=
+                         gupaco4 (@_sim_seq lang_src lang_tgt sim_terminal)
+                                 (cpn4 (@_sim_seq lang_src lang_tgt sim_terminal)).
+  Proof. i. eapply wrespect4_uclo; eauto with paco. eapply mem_le_ctx_wrespectful. Qed.
 
 
-  Lemma sim_seq_upto_deferred
-        g p d0 d1 src tgt
-        (LE: Flags.le d0 d1)
+  Lemma sim_seq_upto_mem
+        g p d st_src0 st_src1 tgt
+        (MEMLE: mem_le st_src1.(SeqState.memory) st_src0.(SeqState.memory))
+        (STATE: st_src1.(SeqState.state) = st_src0.(SeqState.state))
         (SIM: gupaco4 (@_sim_seq lang_src lang_tgt sim_terminal)
-                      (cpn4 (@_sim_seq lang_src lang_tgt sim_terminal)) g p d1 src tgt)
+                      (cpn4 (@_sim_seq lang_src lang_tgt sim_terminal)) g p d st_src1 tgt)
     :
       gupaco4 (@_sim_seq lang_src lang_tgt sim_terminal)
-              (cpn4 (@_sim_seq lang_src lang_tgt sim_terminal)) g p d0 src tgt.
+              (cpn4 (@_sim_seq lang_src lang_tgt sim_terminal)) g p d st_src0 tgt.
   Proof.
-    guclo deferred_le_sf_ctx_spec. econs; eauto. etrans; eauto. apply Flags.join_ge_l.
+    guclo mem_le_ctx_spec. econs; eauto.
   Qed.
-
-
-
-
-
 
 End UPTO.
 Hint Resolve cpn4_wcompat: paco.
