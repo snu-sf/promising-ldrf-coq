@@ -21,6 +21,7 @@ Require Import OracleFacts.
 
 Require Import SeqAux.
 Require Import SimAux.
+Require Import SeqAux.
 
 Set Implicit Arguments.
 
@@ -608,7 +609,7 @@ Section ADEQUACY.
     { exists d1. econs; [econs 1; refl|]. i. inv MATCH. ss. }
     exists Flags.bot. econs; ss. econs; eauto.
   Qed.
-  
+
   Lemma min_release_match_exists
         d1 d2 i_src i_tgt
         (MATCH: SeqEvent.in_release_match d1 d2 i_src i_tgt):
@@ -1245,7 +1246,7 @@ Section ADEQUACY.
     exploit oracle_simple_output_wf; eauto. i.
     exploit event_step_exists; eauto. i. des. esplits; eauto.
   Qed.
-  
+
   Lemma wf_input_wf_output
         e i o p1 m1 p2 m2
         (STEP: SeqEvent.step i o p1 m1 p2 m2)
@@ -1448,7 +1449,7 @@ Section ADEQUACY.
     specialize (UPDATE loc2 v_new2). des. exploit UPDATE; eauto. i.
     rewrite x in *. inv x0. ss.
   Qed.
-  
+
   Lemma wf_input_similar
         e i1 i2
         (WF1: SeqEvent.wf_input e i1)
@@ -1580,7 +1581,7 @@ Section ADEQUACY.
     punfold DETERM. inv DETERM.
     exploit STEP_STEP; [exact LSTEP|exact LANG|]. i. des.
     destruct y as [[ey iy] oy].
-    replace o with oy in * by (inv EVENT1; ss).       
+    replace o with oy in * by (inv EVENT1; ss).
     replace e0 with e in *; cycle 1.
     { clear - ORACLE EVENT1 ORACLE0 x EVENT.
       inv EVENT1. clear INPUT.
@@ -1656,7 +1657,7 @@ Section ADEQUACY.
     }
     i. des. subst. esplits; eauto.
   Qed.
-  
+
   Lemma steps_behavior_prefix_ub
         tr_src tr_tgt
         st1 st2 p1 p2
@@ -1676,7 +1677,7 @@ Section ADEQUACY.
     induction STEPS; i.
     { exploit behavior_steps_ub; eauto. i. des.
       inv TRACE. ss. esplits; eauto.
-    }    
+    }
     exploit rtc_state_step_behavior_ub; eauto. i. inv TRACE.
     exploit rtc_state_step_deterministic; eauto. i.
     destruct tr_src' as [|[[e' i'] o'] tr_src'].
@@ -1855,7 +1856,7 @@ Section ADEQUACY.
     destruct th1. exploit IHSTEPS; eauto. i. clear IHSTEPS.
     inv STEP. econs 2; eauto.
   Qed.
-  
+
   Lemma behavior_step_inv
         st1 p1 orc1
         e st2 st3

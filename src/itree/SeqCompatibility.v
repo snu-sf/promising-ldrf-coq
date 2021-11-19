@@ -51,6 +51,9 @@ Require Import ITreeLang.
 
 Definition SIM_VAL R_src R_tgt := forall (r_src:R_src) (r_tgt:R_tgt), Prop.
 
+Definition SIM_TERMINAL (lang_src lang_tgt:language) :=
+  forall (st_src:(Language.state lang_src)) (st_tgt:(Language.state lang_tgt)), Prop.
+
 Variant sim_terminal R_src R_tgt
            (sim_ret:SIM_VAL R_src R_tgt)
            (st_src: itree MemE.t R_src) (st_tgt: itree MemE.t R_tgt): Prop :=
@@ -60,6 +63,12 @@ Variant sim_terminal R_src R_tgt
     (SRC: st_src = Ret r0)
     (TGT: st_tgt = Ret r1)
 .
+
+Definition SIM_SEQ :=
+  forall (lang_src lang_tgt:language) (sim_terminal: SIM_TERMINAL lang_src lang_tgt)
+         (p0: Perms.t) (d0: Flags.t)
+         (st_src0: SeqState.t lang_src)
+         (st_tgt0: SeqState.t lang_tgt), Prop.
 
 Definition _sim_itree
            (sim_seq:SIM_SEQ)
@@ -664,5 +673,3 @@ Proof.
   eapply _sim_ktree_mon; cycle 1; eauto.
   ii. gfinal. right. eauto.
 Qed.
-
-

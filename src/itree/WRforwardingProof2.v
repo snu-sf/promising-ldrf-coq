@@ -506,13 +506,13 @@ Section PROOF.
       (PARTIAL: sim_seq_partial_case p Flags.bot src tgt)
       (SIM: forall up lenv1 mem1,
           (<<MD1: match_data (inst_gd i mp) up mem1 lenv1>>) ->
-          gupaco4 (_sim_seq term) (cpn4 (_sim_seq term)) g up Flags.bot
+          gupaco7 _sim_seq (cpn7 _sim_seq) g _ _ term up Flags.bot
                   (@SeqState.mk (lang _) (src_k (lenv1, ())) mem1)
                   (@SeqState.mk (lang _) (tgt_k (lenv1, ())) mem1))
       (LE: le2 mp' mp)
       (OPT: (Opt4.do_opt O4) mp' i)
       (IOPT: i_opt = (Opt4.opt_inst O4) mp' i),
-      gpaco4 (_sim_seq term) (cpn4 (_sim_seq term)) r g p Flags.bot src tgt.
+      gpaco7 _sim_seq (cpn7 _sim_seq) r g _ _ term p Flags.bot src tgt.
   Proof.
     i. clarify. destruct i; clarify. ss. des_ifs.
     rewrite ! denote_stmt_inst. rewrite denote_inst_load. rewrite denote_inst_assign.

@@ -207,11 +207,11 @@ Section SIM.
         (PARTIAL: sim_seq_partial_case p Flags.bot src tgt)
         (SIM: forall up lenv1 mem1,
             (<<MD1: match_data (inst_gd i mp) up mem1 lenv1>>) ->
-            gupaco4 (_sim_seq term) (cpn4 (_sim_seq term)) g up Flags.bot
+            gupaco7 _sim_seq (cpn7 _sim_seq) g _ _ term up Flags.bot
                     (@SeqState.mk (lang _) (src_k (lenv1, ())) mem1)
                     (@SeqState.mk (lang _) (tgt_k (lenv1, ())) mem1))
     :
-      gpaco4 (_sim_seq term) (cpn4 (_sim_seq term)) r g p Flags.bot src tgt.
+      gpaco7 _sim_seq (cpn7 _sim_seq) r g _ _ term p Flags.bot src tgt.
   Proof.
     clarify.
     destruct i; clarify.
@@ -507,13 +507,13 @@ Section SIM.
       (PARTIAL: sim_seq_partial_case p Flags.bot src tgt)
       (SIM: forall up lenv1 mem1,
           (<<MD1: match_data (inst_gd i mp) up mem1 lenv1>>) ->
-          gupaco4 (_sim_seq term) (cpn4 (_sim_seq term)) g up Flags.bot
+          gupaco7 _sim_seq (cpn7 _sim_seq) g _ _ term up Flags.bot
                   (@SeqState.mk (lang _) (src_k (lenv1, ())) mem1)
                   (@SeqState.mk (lang _) (tgt_k (lenv1, ())) mem1))
       (LE: le2 mp' mp)
       (OPT: (Opt4.do_opt O4) mp' i)
       (IOPT: i_opt = (Opt4.opt_inst O4) mp' i),
-      gpaco4 (_sim_seq term) (cpn4 (_sim_seq term)) r g p Flags.bot src tgt.
+      gpaco7 _sim_seq (cpn7 _sim_seq) r g _ _ term p Flags.bot src tgt.
 
   Hypothesis block_d_dec: forall blk p d f (FUN: f = @block_d O4 blk p), (Opt4.le O4) (f (f d)) (f d).
   Hypothesis block_d_fix: forall blk f (FUN: f = @block_d O4 blk) p,
@@ -550,11 +550,11 @@ Section SIM.
       rewrite ! denote_block_cons. rewrite ! denote_stmt_ite. grind.
       + eapply sim_seq_tau; ss. apply partial_same_mem; auto.
         match goal with
-        | [|- gupaco4 _ _ _ _ _ ?x _] =>
+        | [|- gupaco7 _ _ _  _ _ _ _ _ ?x _] =>
           replace x with (build_state (add_block sb2 b_src) le mem) end.
         2:{ unfold build_state, itr_code. rewrite denote_add_block. grind. }
         match goal with
-        | [|- gupaco4 _ _ _ _ _  _ ?x] =>
+        | [|- gupaco7 _ _ _ _ _ _ _ _  _ ?x] =>
           replace x with (build_state (add_block tb2 b_tgt) le mem) end.
         2:{ unfold build_state, itr_code. rewrite denote_add_block. grind. }
         gbase. eapply CIH.
@@ -562,11 +562,11 @@ Section SIM.
         eapply match_code4_add_block; eauto. eapply (@MLattice.meet_is_min_r (ML2 O4)).
       + eapply sim_seq_tau; ss. apply partial_same_mem; auto.
         match goal with
-        | [|- gupaco4 _ _ _ _ _ {| SeqState.state := ?x; SeqState.memory := _ |} _] =>
+        | [|- gupaco7 _ _ _ _ _ _ _ _ {| SeqState.state := ?x; SeqState.memory := _ |} _] =>
           replace x with (itr_code (add_block sb1 b_src) le) end.
         2:{ unfold itr_code. rewrite denote_add_block. grind. }
         match goal with
-        | [|- gupaco4 _ _ _ _ _  _ {| SeqState.state := ?x; SeqState.memory := _ |}] =>
+        | [|- gupaco7 _ _ _ _ _ _ _ _  _ {| SeqState.state := ?x; SeqState.memory := _ |}] =>
           replace x with (itr_code (add_block tb1 b_tgt) le) end.
         2:{ unfold itr_code. rewrite denote_add_block. grind. }
         gbase. eapply CIH.
@@ -586,14 +586,14 @@ Section SIM.
       + rewrite ! denote_block_cons. rewrite ! denote_stmt_inst. rewrite ! denote_inst_skip. ired.
         eapply sim_seq_tau; ss. apply partial_same_mem; auto.
         match goal with
-        | [|- gupaco4 _ _ _ _ _ ?x _] =>
+        | [|- gupaco7 _ _ _ _ _ _ _ _ ?x _] =>
           replace x with (build_state (add_block sb (cons Inst.skip (cons (while e sb) b_src))) le mem) end.
         2:{ unfold build_state, itr_code. f_equal. rewrite ! denote_add_block. grind.
             rewrite ! denote_block_cons. grind. rewrite ! denote_block_cons. grind.
             rewrite denote_block_nil. grind.
         }
         match goal with
-        | [|- gupaco4 _ _ _ _ _ _ ?x] =>
+        | [|- gupaco7 _ _ _ _ _ _ _ _ _ ?x] =>
           replace x with (build_state (add_block tb (cons Inst.skip (cons (while e tb) b_tgt))) le mem) end.
         2:{ unfold build_state, itr_code. f_equal. rewrite ! denote_add_block. grind.
             rewrite ! denote_block_cons. grind. rewrite ! denote_block_cons. grind.

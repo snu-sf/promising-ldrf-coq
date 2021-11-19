@@ -195,11 +195,11 @@ Section SIM.
       (SIM: forall tgt_l',
           (<<ML: match_le tb src_l tgt_l'>>) ->
           (<<RET: src_l ret_reg = tgt_l' ret_reg>>) ->
-          (gupaco4 (_sim_seq term) (cpn4 (_sim_seq term)) g p Flags.bot
+          (gupaco7 _sim_seq (cpn7 _sim_seq) g _ _ term p Flags.bot
                    (build_state src_code src_l mem)
                    (build_state tgt_code tgt_l' mem)))
     ,
-      gpaco4 (_sim_seq term) (cpn4 (_sim_seq term)) r g p Flags.bot
+      gpaco7 _sim_seq (cpn7 _sim_seq) r g _ _ term p Flags.bot
              (build_state src_code src_l mem)
              (build_state (cons (intro_inst gd d) (add_block (intro_insts (update_g gd d) ds) tgt_code)) tgt_l mem).
 

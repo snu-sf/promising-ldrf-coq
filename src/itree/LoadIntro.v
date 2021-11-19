@@ -434,11 +434,11 @@ Section SIM.
       (SIM: forall tgt_l',
           (<<ML: match_le tb src_l tgt_l'>>) ->
           (<<RET: src_l ret_reg = tgt_l' ret_reg>>) ->
-          (gupaco4 (_sim_seq term) (cpn4 (_sim_seq term)) g p Flags.bot
+          (gupaco7 _sim_seq (cpn7 _sim_seq) g _ _ term p Flags.bot
                    (build_state src_code src_l mem)
                    (build_state tgt_code tgt_l' mem)))
     ,
-      gpaco4 (_sim_seq term) (cpn4 (_sim_seq term)) r g p Flags.bot
+      gpaco7 _sim_seq (cpn7 _sim_seq) r g _ _ term p Flags.bot
              (build_state src_code src_l mem)
              (build_state (cons (intro_inst gd d) (add_block (intro_insts (update_g gd d) ds) tgt_code)) tgt_l mem).
   Proof.
@@ -477,10 +477,10 @@ Section SIM.
     { econs 2. }
     red. ired.
     match goal with
-    | [|- gpaco4 _ _ _ _ _ _ ?a _ ] => replace a with (build_state src_code src_l m1) end.
+    | [|- gpaco7 _ _ _ _ _ _ _ _ _ ?a _ ] => replace a with (build_state src_code src_l m1) end.
     2: ss.
     match goal with
-    | [|- gpaco4 _ _ _ _ _ _ _ ?b ] => replace b with
+    | [|- gpaco7 _ _ _ _ _ _ _ _ _ _ ?b ] => replace b with
           (build_state (cons (Inst.load (update_g gd d) a Ordering.na)
                              (add_block (intro_insts (update_g (update_g gd d) a) ds) tgt_code))
                        (ITreeLang.update gd val tgt_l)

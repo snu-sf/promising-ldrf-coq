@@ -136,7 +136,7 @@ Section SIMAUX.
         (TERMINAL_TGT : Language.is_terminal (lang _) (SeqState.state tgt))
         (TERM: sim_seq_terminal_case term p d src tgt)
     :
-      gpaco4 (_sim_seq term) (cpn4 (_sim_seq term)) r g p d src tgt.
+      gpaco7 _sim_seq (cpn7 _sim_seq) r g _ _ term p d src tgt.
   Proof.
     gstep. econs 1; i.
     1: eauto.
@@ -162,9 +162,9 @@ Section SIMAUX.
         r g p d (src tgt: SeqState.t (lang _))
         (PARTIAL: sim_seq_partial_case p d src tgt)
         (NATGT: exists st_tgt1 e, (SeqState.na_step p e tgt st_tgt1) /\ (<<NOUB: not (ubM e)>>))
-        (NA: sim_seq_na_step_case (gupaco4 (_sim_seq term) (cpn4 (_sim_seq term)) g) p d src tgt)
+        (NA: sim_seq_na_step_case (gupaco7 _sim_seq (cpn7 _sim_seq) g _ _ term) p d src tgt)
     :
-      gpaco4 (_sim_seq term) (cpn4 (_sim_seq term)) r g p d src tgt.
+      gpaco7 _sim_seq (cpn7 _sim_seq) r g _ _ term p d src tgt.
   Proof.
     gstep. econs 1; i.
     2:{ auto. }
@@ -213,9 +213,9 @@ Section SIMAUX.
         (ATGT: exists st_tgt1 e,
             (<<STEP: Language.step _ e (SeqState.state tgt) st_tgt1>>) /\
             (<<ATOMIC: is_atomic_event e>>))
-        (AT: sim_seq_at_step_case (gupaco4 (_sim_seq term) (cpn4 (_sim_seq term)) g) p d src tgt)
+        (AT: sim_seq_at_step_case (gupaco7 _sim_seq (cpn7 _sim_seq) g _ _ term) p d src tgt)
     :
-      gpaco4 (_sim_seq term) (cpn4 (_sim_seq term)) r g p d src tgt.
+      gpaco7 _sim_seq (cpn7 _sim_seq) r g _ _ term p d src tgt.
   Proof.
     gstep. econs 1; i.
     3:{ eauto. }
@@ -258,11 +258,11 @@ Section SIMAUX.
         (SRC: src = @SeqState.mk (lang _) (tau;; src_t) src_m)
         (TGT: tgt = @SeqState.mk (lang _) (tau;; tgt_t) tgt_m)
         (PARTIAL: sim_seq_partial_case p d src tgt)
-        (SIM: gupaco4 (_sim_seq term) (cpn4 (_sim_seq term)) g p d
+        (SIM: gupaco7 _sim_seq (cpn7 _sim_seq) g _ _ term p d
                       (@SeqState.mk (lang _) src_t src_m)
                       (@SeqState.mk (lang _) tgt_t tgt_m))
     :
-      gpaco4 (_sim_seq term) (cpn4 (_sim_seq term)) r g p d src tgt.
+      gpaco7 _sim_seq (cpn7 _sim_seq) r g _ _ term p d src tgt.
   Proof.
     clarify.
     eapply sim_seq_na; eauto.
@@ -287,11 +287,11 @@ Section SIMAUX.
         (SRC: src = @SeqState.mk (lang _) (src_t) src_m)
         (TGT: tgt = @SeqState.mk (lang _) (tau;; tgt_t) tgt_m)
         (PARTIAL: sim_seq_partial_case p d src tgt)
-        (SIM: gupaco4 (_sim_seq term) (cpn4 (_sim_seq term)) g p d
+        (SIM: gupaco7 _sim_seq (cpn7 _sim_seq) g _ _ term p d
                       (@SeqState.mk (lang _) src_t src_m)
                       (@SeqState.mk (lang _) tgt_t tgt_m))
     :
-      gpaco4 (_sim_seq term) (cpn4 (_sim_seq term)) r g p d src tgt.
+      gpaco7 _sim_seq (cpn7 _sim_seq) r g _ _ term p d src tgt.
   Proof.
     clarify.
     eapply sim_seq_na; eauto.
@@ -318,7 +318,7 @@ Section SIMAUX.
 
   Lemma sim_seq_ub:
     forall r g p d src tgt src_m tgt_m,
-      gpaco4 (_sim_seq term) (cpn4 (_sim_seq term)) r g p d
+      gpaco7 _sim_seq (cpn7 _sim_seq) r g _ _ term p d
              (@SeqState.mk (lang _) (v <- trigger MemE.abort;; src v) src_m)
              (@SeqState.mk (lang _) (tgt) tgt_m).
   Proof.
@@ -353,4 +353,4 @@ Section SIMAUX.
   Qed.
 
 End SIMAUX.
-Hint Resolve cpn4_wcompat: paco.
+Hint Resolve cpn7_wcompat: paco.

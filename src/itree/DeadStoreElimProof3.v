@@ -1418,11 +1418,11 @@ Section PROOF.
                                tgt_m)
       (SIM: forall up le1 sm tm,
           (<<MM1: match_mem mp sm tm>>) ->
-          gupaco4 (_sim_seq term) (cpn4 (_sim_seq term)) g up (to_deferred mp)
+          gupaco7 _sim_seq (cpn7 _sim_seq) g _ _ term up (to_deferred mp)
                   (@SeqState.mk (lang _) (` x : lunit <- denote_block le1 b_src;; (let (le2, _) := x in Ret (le2 ret_reg))) sm)
                   (@SeqState.mk (lang _) (` x : lunit <- denote_block le1 b_tgt;; (let (le2, _) := x in Ret (le2 ret_reg))) tm))
     ,
-      gpaco4 (_sim_seq term) (cpn4 (_sim_seq term)) r g p (to_deferred (inst_gd i mp)) src tgt.
+      gpaco7 _sim_seq (cpn7 _sim_seq) r g _ _ term p (to_deferred (inst_gd i mp)) src tgt.
   Proof.
     i. clarify; ss. destruct i; ss.
     des_ifs; ss.

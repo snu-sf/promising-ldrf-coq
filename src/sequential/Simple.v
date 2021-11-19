@@ -1455,9 +1455,9 @@ End SeqThread.
 
 
 Section SIMULATION.
+Section LANG.
   Variable lang_src: language.
   Variable lang_tgt: language.
-
   Variable sim_terminal: forall (st_src:(Language.state lang_src)) (st_tgt:(Language.state lang_tgt)), Prop.
 
   Definition sim_seq_terminal_case
@@ -1513,8 +1513,7 @@ Section SIMULATION.
             (<<STEP_SRC: SeqEvent.step i_src o p0 st_src1.(SeqState.memory) p1 mem_src>>) /\
             (<<MATCH: SeqEvent.input_match d0 d1 i_src i_tgt>>) /\
             (<<INPUT: SeqEvent.wf_input e_src i_src>>) /\
-            (<<SIM: sim_seq p1
-                            d1
+            (<<SIM: sim_seq p1 d1
                             (SeqState.mk _ st_src2 mem_src)
                             (SeqState.mk _ st_tgt1 mem_tgt)>>)>>)
   .
@@ -1540,29 +1539,42 @@ Section SIMULATION.
       (<<FAILURE: SeqThread.failure (@SeqState.na_step _) th>>)
   .
 
+  Lemma sim_seq_partial_imm p d st_src st_tgt
+        (FLAGS: Flags.le (Flags.join d st_tgt.(SeqState.memory).(SeqMemory.flags)) st_src.(SeqState.memory).(SeqMemory.flags))
+    :
+      sim_seq_partial_case p d st_src st_tgt.
+  Proof.
+    ii. esplits; [econs 1|econs|]; eauto.
+  Qed.
+End LANG.
 
+Section SIM.
   Variant _sim_seq
           (sim_seq:
              forall
+               (lang_src: language) (lang_tgt: language)
+               (sim_terminal: forall (st_src:(Language.state lang_src)) (st_tgt:(Language.state lang_tgt)), Prop)
                (p0: Perms.t) (d0: Flags.t)
                (st_src0: SeqState.t lang_src)
                (st_tgt0: SeqState.t lang_tgt), Prop)
+          (lang_src: language) (lang_tgt: language)
+          (sim_terminal: forall (st_src:(Language.state lang_src)) (st_tgt:(Language.state lang_tgt)), Prop)
           (p0: Perms.t) (d0: Flags.t)
           (st_src0: SeqState.t lang_src)
           (st_tgt0: SeqState.t lang_tgt): Prop :=
   | sim_seq_normal
-      (TERMINAL: sim_seq_terminal_case p0 d0 st_src0 st_tgt0)
-      (NASTEP: sim_seq_na_step_case sim_seq p0 d0 st_src0 st_tgt0)
-      (ATSTEP: sim_seq_at_step_case sim_seq p0 d0 st_src0 st_tgt0)
+      (TERMINAL: sim_seq_terminal_case sim_terminal p0 d0 st_src0 st_tgt0)
+      (NASTEP: sim_seq_na_step_case (sim_seq _ _ sim_terminal) p0 d0 st_src0 st_tgt0)
+      (ATSTEP: sim_seq_at_step_case (sim_seq _ _ sim_terminal) p0 d0 st_src0 st_tgt0)
       (PARTIAL: sim_seq_partial_case p0 d0 st_src0 st_tgt0)
   | sim_seq_failure
       (FAILURE: sim_seq_failure_case p0 st_src0)
   .
 
-  Definition sim_seq := paco4 _sim_seq bot4.
+  Definition sim_seq := paco7 _sim_seq bot7.
   Arguments sim_seq: clear implicits.
 
-  Lemma sim_seq_mon: monotone4 _sim_seq.
+  Lemma sim_seq_mon: monotone7 _sim_seq.
   Proof.
     ii. inv IN.
     { econs 1; eauto.
@@ -1573,30 +1585,26 @@ Section SIMULATION.
     { econs 2; eauto. }
   Qed.
 
-
-  Lemma sim_seq_partial_imm p d st_src st_tgt
-        (FLAGS: Flags.le (Flags.join d st_tgt.(SeqState.memory).(SeqMemory.flags)) st_src.(SeqState.memory).(SeqMemory.flags))
-    :
-      sim_seq_partial_case p d st_src st_tgt.
-  Proof.
-    ii. esplits; [econs 1|econs|]; eauto.
-  Qed.
-
-  Lemma sim_seq_failure_imm p0 d st_src0 st_tgt0 st_src1
+  Lemma sim_seq_failure_imm lang_src lang_tgt sim_terminal
+        p0 d st_src0 st_tgt0 st_src1
         (FAILURE: SeqState.na_step p0 MachineEvent.failure st_src0 st_src1)
     :
-      sim_seq p0 d st_src0 st_tgt0.
+      @sim_seq lang_src lang_tgt sim_terminal p0 d st_src0 st_tgt0.
   Proof.
     pfold. right. red. i. esplits; [econs 1|econs|].
     red. esplits. econs. eauto.
   Qed.
 
-  Definition sim_seq_all (st_src: lang_src.(Language.state)) (st_tgt: lang_tgt.(Language.state)): Prop :=
+  Definition sim_seq_all lang_src lang_tgt sim_terminal
+             (st_src: lang_src.(Language.state)) (st_tgt: lang_tgt.(Language.state)): Prop :=
     forall p m,
-      sim_seq
+      @sim_seq
+        _ _
+        sim_terminal
         p Flags.bot
         (SeqState.mk _ st_src m)
         (SeqState.mk _ st_tgt m).
+End SIM.
 End SIMULATION.
 Arguments sim_seq [_] [_] _ _ _.
 #[export] Hint Resolve sim_seq_mon: paco.
