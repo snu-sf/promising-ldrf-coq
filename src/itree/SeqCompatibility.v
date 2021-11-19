@@ -51,21 +51,6 @@ Require Import SimAux.
 Require Import SeqAux.
 
 
-Definition SIM_VAL R_src R_tgt := forall (r_src:R_src) (r_tgt:R_tgt), Prop.
-
-Definition SIM_TERMINAL (lang_src lang_tgt:language) :=
-  forall (st_src:(Language.state lang_src)) (st_tgt:(Language.state lang_tgt)), Prop.
-
-Variant sim_terminal R_src R_tgt
-           (sim_ret:SIM_VAL R_src R_tgt)
-           (st_src: itree MemE.t R_src) (st_tgt: itree MemE.t R_tgt): Prop :=
-| sim_terminal_intro
-    r0 r1
-    (SIMRET: sim_ret r0 r1)
-    (SRC: st_src = Ret r0)
-    (TGT: st_tgt = Ret r1)
-.
-
 Definition SIM_SEQ :=
   forall (lang_src lang_tgt:language) (sim_terminal: SIM_TERMINAL lang_src lang_tgt)
          (p0: Perms.t) (d0: Flags.t)
@@ -626,7 +611,7 @@ Qed.
 Definition sim_seq_itree := @_sim_itree sim_seq.
 Definition sim_seq_ktree := @_sim_ktree sim_seq.
 
-Lemma sim_seq_mon lang_src lang_tgt sim_terminal0 sim_terminal1
+Lemma sim_seq_ret_mon lang_src lang_tgt sim_terminal0 sim_terminal1
       p f th_src th_tgt
       (SIM01: sim_terminal0 <2= sim_terminal1)
       (SIM: @sim_seq lang_src lang_tgt sim_terminal0 p f th_src th_tgt):
@@ -657,7 +642,7 @@ Lemma sim_seq_itree_mon R_src R_tgt
       (SIM: @sim_seq_itree R_src R_tgt sim_ret0 itr_src itr_tgt):
   sim_seq_itree sim_ret1 itr_src itr_tgt.
 Proof.
-  ii. eapply sim_seq_mon.
+  ii. eapply sim_seq_ret_mon.
   2:{ eauto. }
   i. inv PR. econs; eauto.
 Qed.
@@ -767,3 +752,16 @@ Proof.
   { refl. }
   { refl. }
 Qed.
+
+Lemma sim_seq_weak_mon: monotone7 sim_seq_weak.
+Proof.
+  ii. inv IN.
+  { econs 1; eauto.
+    { ii. exploit NASTEP; eauto. i. des. esplits; eauto. }
+    { ii. exploit ATSTEP; eauto. i. des. esplits; eauto.
+      i. exploit SIM; eauto. i. des. esplits; eauto.
+    }
+  }
+  { econs 2; eauto. }
+Qed.
+Hint Resolve sim_seq_weak_mon.

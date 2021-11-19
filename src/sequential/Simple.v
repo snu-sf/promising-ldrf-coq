@@ -1571,6 +1571,28 @@ Section SIM.
       (FAILURE: sim_seq_failure_case p0 st_src0)
   .
 
+  Variant sim_seq_weak
+          (sim_seq:
+             forall
+               (lang_src: language) (lang_tgt: language)
+               (sim_terminal: forall (st_src:(Language.state lang_src)) (st_tgt:(Language.state lang_tgt)), Prop)
+               (p0: Perms.t) (d0: Flags.t)
+               (st_src0: SeqState.t lang_src)
+               (st_tgt0: SeqState.t lang_tgt), Prop)
+          (lang_src: language) (lang_tgt: language)
+          (sim_terminal: forall (st_src:(Language.state lang_src)) (st_tgt:(Language.state lang_tgt)), Prop)
+          (p0: Perms.t) (d0: Flags.t)
+          (st_src0: SeqState.t lang_src)
+          (st_tgt0: SeqState.t lang_tgt): Prop :=
+  | sim_seq_weak_normal
+      (TERMINAL: sim_seq_terminal_case sim_terminal p0 d0 st_src0 st_tgt0)
+      (NASTEP: sim_seq_na_step_case (sim_seq _ _ sim_terminal) p0 d0 st_src0 st_tgt0)
+      (ATSTEP: sim_seq_at_step_case (sim_seq _ _ sim_terminal) p0 d0 st_src0 st_tgt0)
+  | sim_seq_weak_failure
+      (FAILURE: sim_seq_failure_case p0 st_src0)
+  .
+
+
   Definition sim_seq := paco7 _sim_seq bot7.
   Arguments sim_seq: clear implicits.
 
@@ -1614,17 +1636,26 @@ Arguments sim_seq [_] [_] _ _ _.
 
 
 Require Import ITreeLang.
-Require Import iCompatibility.
 
-Section ADEQUACY.
+Definition SIM_VAL R_src R_tgt := forall (r_src:R_src) (r_tgt:R_tgt), Prop.
+
+Definition SIM_TERMINAL (lang_src lang_tgt:language) :=
+  forall (st_src:(Language.state lang_src)) (st_tgt:(Language.state lang_tgt)), Prop.
+
+Variant sim_terminal R_src R_tgt
+           (sim_ret:SIM_VAL R_src R_tgt)
+           (st_src: itree MemE.t R_src) (st_tgt: itree MemE.t R_tgt): Prop :=
+| sim_terminal_intro
+    r0 r1
+    (SIMRET: sim_ret r0 r1)
+    (SRC: st_src = Ret r0)
+    (TGT: st_tgt = Ret r1)
+.
+
+Section ITREE.
   Variable R_src R_tgt: Type.
   Variable sim_val: R_src -> R_tgt -> Prop.
 
   Definition sim_seq_itree (st_src: itree MemE.t R_src) (st_tgt: itree MemE.t R_tgt): Prop :=
     @sim_seq_all (lang R_src) (lang R_tgt) (sim_terminal sim_val) st_src st_tgt.
-
-  Theorem adequacy_seq:
-    sim_seq_itree <2= sim_itree sim_val.
-  Proof.
-  Admitted.
-End ADEQUACY.
+End ITREE.

@@ -42,7 +42,6 @@ From PromisingLib Require Import Axioms.
 Require Import Event.
 Require Export ITreeLib.
 Require Export Program.
-Require Import iCompatibility.
 
 Require Import Simple.
 Require Import FlagAux.
