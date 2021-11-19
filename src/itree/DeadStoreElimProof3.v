@@ -884,10 +884,10 @@ Section PARTIAL.
           instantiate (1:=ord) in H0. instantiate (1:=rhs) in H0.
           hexploit exists_input_no_acq.
           match goal with | [H: Oracle.progress ?a _ |- _] => instantiate (1:=a); ss end. destruct ord; ss.
-          i. des. unfold Oracle.progress in H0. eapply H0 in H2; clear H0. des.
-          hexploit H1; clear H1; eauto. i; des. hexploit WF0; clear WF0; eauto. i; des. clear WF. pclearbot.
+          i. des. unfold Oracle.progress in H0. eapply H0 in H3; clear H0. des.
+          hexploit H2; clear H2; eauto. i; des. hexploit WF0; clear WF0; eauto. i; des. clear WF. pclearbot.
           hexploit IHMD; clear IHMD.
-          i. unfold sim_seq_partial_case in H1. hexploit H1; clear H1.
+          i. unfold sim_seq_partial_case in H2. hexploit H2; clear H2.
           { eapply ORACLE0. }
           i. des.
           { exists th. eexists (List.cons _ tr). eexists. splits; ss.
