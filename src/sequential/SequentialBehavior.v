@@ -121,7 +121,6 @@ Module SeqTrace.
   (*     { inv H. *)
   (*       { inv LE. *)
   (*         { econs 2. *)
-  (* Admitted. *)
 
   Definition incl (b0: t -> Prop) (b1: t -> Prop): Prop :=
     forall tr0, b0 tr0 -> exists tr1, b1 tr1 /\ le Flags.bot tr0 tr1.
