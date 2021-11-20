@@ -26,6 +26,7 @@ make build -j
 ### The PS model with non-atomics (Section 5)
 - `src/lang/` - Semantics of PS
 - `src/opt/` - Compiler transformations on atomics
+
 It is based on the Coq development of PS2.1 (https://github.com/snu-sf/promising-ldrf-coq)
 
 ### Adequacy (Section 6)
