@@ -18,10 +18,10 @@ make build -j
 
 ### Optimizer and Soundness Proof (Section 4)
 - `src/itree/ITreeLang.v` - A language for optimization
-- `src/itree/WRforwarding.v` and `src/itree/WRforwardingProof2.v` - Store-to-Load Forwarding and its soundness
-- `src/itree/RRforwarding.v` and `src/itree/RRforwardingProof2.v` - Load-to-Load Forwarding and its soundness
-- `src/itree/DeadStoreElim.v` and `src/itree/DeadStoreElimProof3.v` - Write-after-Write Elimination and its soundness
-- `src/itree/LoadIntro.v` - Loop Invariant Code Motion and it soundness
+- `src/itree/WRforwarding.v` and `src/itree/WRforwardingProof2.v` - Store-to-Load Forwarding and its soundness (Theorem WWfwd_sim)
+- `src/itree/RRforwarding.v` and `src/itree/RRforwardingProof2.v` - Load-to-Load Forwarding and its soundness (Theorem RRfwd_sim)
+- `src/itree/DeadStoreElim.v` and `src/itree/DeadStoreElimProof3.v` - Write-after-Write Elimination and its soundness (Theorem DSE_sim)
+- `src/itree/LoadIntro.v` - Loop Invariant Code Motion and it soundness (Theorem LICM_LoadIntro_sim)
 
 ### The PS model with non-atomics (Section 5)
 - `src/lang/` - Semantics of PS
@@ -30,5 +30,5 @@ make build -j
 It is based on the Coq development of PS2.1 (https://github.com/snu-sf/promising-ldrf-coq)
 
 ### Adequacy (Section 6)
-- `src/sequential/SequentialAdequacy.v` - Adequacy of SEQ
+- `src/sequential/SequentialAdequacy.v` - Adequacy of SEQ (Theorem seq_adequacy)
 - `src/sequential/SeqCompatibility.v` - Compatibility Lemmas of simulation 
