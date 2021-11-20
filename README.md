@@ -1,4 +1,4 @@
-# Sequential Reasoning forUnder Weak MemoryOptimizing Compilers Concurrency (supplemental material)
+# Sequential Reasoning for Optimizing Compilers Under Weak Memory Concurrency (supplemental material)
 
 ## Build
 - Requirement: opam (>=2.0.0), Coq 8.13.2 
