@@ -1,17 +1,16 @@
 COQMODULE    := Promising2
 COQTHEORIES  := \
 	src/lang/*.v \
-	src/while/*.v \
 	src/itree/*.v \
 	src/prop/*.v \
 	src/opt/*.v \
-	src/opt/while/*.v \
 	src/opt/itree/*.v \
 	src/gsim/*.v \
 	src/sequential/*.v \
  	src/promotion/*.v \
  	src/ldrfpf/*.v \
  	src/ldrfra/*.v \
+# src/while/*.v \
 #	src/opt/while/*.v \
 #	src/invariant/*.v \
 #	src/gopt/*.v \
@@ -29,7 +28,6 @@ quick: Makefile.coq
 
 Makefile.coq: Makefile $(COQTHEORIES)
 	(echo "-R src/lang $(COQMODULE)"; \
-   echo "-R src/while $(COQMODULE)"; \
    echo "-R src/itree $(COQMODULE)"; \
    echo "-R src/prop $(COQMODULE)"; \
    echo "-R src/opt $(COQMODULE)"; \
@@ -39,11 +37,6 @@ Makefile.coq: Makefile $(COQTHEORIES)
    echo "-R src/promotion $(COQMODULE)"; \
    echo "-R src/ldrfpf $(COQMODULE)"; \
    echo "-R src/ldrfra $(COQMODULE)"; \
-   # echo "-R src/opt/while $(COQMODULE)"; \
-   # echo "-R src/invariant $(COQMODULE)"; \
-   # echo "-R src/gopt $(COQMODULE)"; \
-   # echo "-R src/gsim $(COQMODULE)"; \
-   # echo "-R src/ldrfsc $(COQMODULE)"; \
    \
    echo $(COQTHEORIES)) > _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq
