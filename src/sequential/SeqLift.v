@@ -4035,7 +4035,7 @@ Qed.
 (*     (<<ORD: ord = Ordering.na>>). *)
 (* Admitted. *)
 
-(* Lemma sim_na_write_tgt *)
+(* Lemma sim_write_na_tgt *)
 (*       vm f_src f_tgt b w lc_src lc_tgt0 mem_src mem_tgt0 sc_src sc_tgt0 *)
 (*       loc mem_tgt1 lc_tgt1 sc_tgt1 from to val ord msgs kinds kind v_src v_tgt *)
 (*       (LOCAL: sim_local vm f_src f_tgt false w lc_src lc_tgt0 mem_src mem_tgt0 sc_src sc_tgt0) *)
@@ -4087,7 +4087,7 @@ Qed.
 (*     Local.racy_write_step lc_src mem_src loc Ordering.na. *)
 (* Admitted. *)
 
-(* Lemma sim_na_write_src *)
+(* Lemma sim_write_na_src *)
 (*       vm f_src f_tgt b w lc_src0 lc_tgt mem_src0 mem_tgt sc_src sc_tgt *)
 (*       loc v_src v_tgt val *)
 (*       (LOCAL: sim_local vm f_src f_tgt false w lc_src0 lc_tgt mem_src0 mem_tgt sc_src sc_tgt) *)

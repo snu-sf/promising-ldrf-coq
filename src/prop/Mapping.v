@@ -2328,18 +2328,27 @@ Section MAPPED.
     eapply TimeFacts.le_lt_lt; eauto. inv VIEW. inv CUR. ss.
   Qed.
 
+  Lemma promise_consistent_local_map
+        lc flc
+        (LOCAL: local_map lc flc)
+        (CONS: Local.promise_consistent lc):
+    Local.promise_consistent flc.
+  Proof.
+    destruct lc, flc. inv LOCAL. ss.
+    eapply promise_consistent_mon.
+    { eapply promise_consistent_map; eauto. }
+    { eauto. }
+    { refl. }
+  Qed.
+
   Lemma failure_step_map lc0 flc0
         (LOCAL: local_map lc0 flc0)
         (FAILURE: Local.failure_step lc0)
     :
       Local.failure_step flc0.
   Proof.
-    inv LOCAL. inv FAILURE. econs.
-    destruct lc0, flc0; ss.
-    eapply promise_consistent_mon.
-    { eapply promise_consistent_map; eauto. }
-    { eauto. }
-    { refl. }
+    inv FAILURE. econs.
+    eapply promise_consistent_local_map; eauto.
   Qed.
 
   Lemma racy_view_map
@@ -2378,6 +2387,51 @@ Section MAPPED.
     - ii. subst. inv MSGLE. inv MSG. ss.
     - i. exploit MSG2; eauto. i. subst.
       inv MSG. inv MSGLE. ss.
+  Qed.
+
+  Lemma racy_read_step_map
+        lc mem loc val ord
+        flc fmem
+        (MAP_LT: mapping_map_lt)
+        (LOCAL: local_map lc flc)
+        (MEM: memory_map mem fmem)
+        (WF: Local.wf lc mem)
+        (UNWRITABLE: collapsable_unwritable (Local.promises lc) mem)
+        (RACE: Local.racy_read_step lc mem loc val ord):
+    Local.racy_read_step flc fmem loc val ord.
+  Proof.
+    inv RACE. econs. eauto using is_racy_map.
+  Qed.
+
+  Lemma racy_write_step_map
+        lc mem loc ord
+        flc fmem
+        (MAP_LT: mapping_map_lt)
+        (LOCAL: local_map lc flc)
+        (MEM: memory_map mem fmem)
+        (WF: Local.wf lc mem)
+        (UNWRITABLE: collapsable_unwritable (Local.promises lc) mem)
+        (RACE: Local.racy_write_step lc mem loc ord):
+    Local.racy_write_step flc fmem loc ord.
+  Proof.
+    inv RACE. econs; eauto using is_racy_map, promise_consistent_local_map.
+  Qed.
+
+  Lemma racy_update_step_map
+        lc mem loc ordr ordw
+        flc fmem
+        (MAP_LT: mapping_map_lt)
+        (LOCAL: local_map lc flc)
+        (MEM: memory_map mem fmem)
+        (WF: Local.wf lc mem)
+        (UNWRITABLE: collapsable_unwritable (Local.promises lc) mem)
+        (RACE: Local.racy_update_step lc mem loc ordr ordw):
+    Local.racy_update_step flc fmem loc ordr ordw.
+  Proof.
+    inv RACE.
+    - econs 1; eauto using promise_consistent_local_map.
+    - econs 2; eauto using promise_consistent_local_map.
+    - econs 3; eauto using is_racy_map, promise_consistent_local_map.
   Qed.
 
   Definition mappable_time loc to :=
@@ -2511,7 +2565,7 @@ Section MAPPED.
     | ThreadEvent.write loc from to val released ordw =>
       (<<FROM: mappable_time loc from>>) /\
       (<<TO: mappable_time loc to>>)
-    | ThreadEvent.na_write loc msgs from to val released ord =>
+    | ThreadEvent.write_na loc msgs from to val released ord =>
       (<<MSGS: List.Forall
                  (fun m => mappable_time loc (fst (fst m)) /\ mappable_time loc (snd (fst m)))
                  msgs>>) /\
@@ -2555,9 +2609,36 @@ Section MAPPED.
     { des. splits; eauto. }
   Qed.
 
+  Lemma mappable_messages_exists
+        loc (msgs: list (Time.t * Time.t * Message.t))
+        (MAPPABLE: List.Forall
+                     (fun m => mappable_time loc (fst (fst m)) /\ mappable_time loc (snd (fst m)))
+                     msgs):
+    exists ffts, List.Forall2
+              (fun m fm =>
+                 f loc (fst (fst m)) (fst fm) /\
+                 f loc (snd (fst m)) (snd fm))
+              msgs ffts.
+  Proof.
+    induction msgs; eauto.
+    destruct a as [[from to] msg].
+    inv MAPPABLE. unfold mappable_time in H1. des. ss.
+    exploit IHmsgs; eauto. i. des.
+    exists ((fto0, fto) :: ffts). econs 2; eauto.
+  Qed.
+
+  Lemma mapping_map_lt_non_collapsable
+        (MAP_LT: mapping_map_lt):
+    forall loc to, non_collapsable loc to.
+  Proof.
+    ii. unfold collapsed in *. des.
+    exploit MAP_LT; try exact TLE; eauto. i. timetac.
+  Qed.
+
   Lemma step_map
         P lang th0 th1 fth0 st0 st1 lc0 lc1 flc0
         sc0 sc1 fsc0 fsc0' mem0 mem1 fmem0 e
+        (MAP_LT: mapping_map_lt)
         (MAPPABLE: P <1= mappable_evt)
         (STEP: (@pred_step P lang) e th0 th1)
         (TH_TGT0: th0 = Thread.mk lang st0 lc0 sc0 mem0)
@@ -2667,7 +2748,15 @@ Section MAPPED.
         * econs; eauto.
         * econs; eauto. econs 2; eauto. econs; eauto.
           econs; eauto. eapply failure_step_map; eauto.
-      + admit.
+      + unfold mappable_time in SAT. des.
+        exploit mappable_messages_exists; eauto. i. des.
+        hexploit write_na_step_map; try apply LOCAL1; try eassumption.
+        { apply mapping_map_lt_non_collapsable. ss. }
+        { clear - MAP_LT. induction msgs; ss. econs; eauto.
+          eapply mapping_map_lt_non_collapsable. ss. }
+        i. des. esplits; eauto.
+        * econs; eauto.
+        admit.
       + admit.
       + admit.
       + admit.

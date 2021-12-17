@@ -59,9 +59,9 @@ Definition release_event (e: ThreadEvent.t): Prop :=
   | _ => False
   end.
 
-Definition is_na_write (e: ThreadEvent.t): Prop :=
+Definition is_write_na (e: ThreadEvent.t): Prop :=
   match e with
-  | ThreadEvent.na_write _ _ _ _ _ _ _ => True
+  | ThreadEvent.write_na _ _ _ _ _ _ _ => True
   | ThreadEvent.write _ _ _ _ _ ord => Ordering.le ord Ordering.na
   | _ => False
   end.
@@ -71,7 +71,7 @@ Variant lower_step {lang} e (th0 th1: Thread.t lang): Prop :=
     (STEP: Thread.program_step e th0 th1)
     (NRELEASE: ~ release_event e)
     (MEM: lower_memory th1.(Thread.memory) th0.(Thread.memory))
-    (SAME: is_na_write e -> th1.(Thread.memory) = th0.(Thread.memory))
+    (SAME: is_write_na e -> th1.(Thread.memory) = th0.(Thread.memory))
 .
 
 Lemma lower_step_step lang:

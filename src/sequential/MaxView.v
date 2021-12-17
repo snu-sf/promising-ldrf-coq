@@ -374,7 +374,7 @@ Proof.
   }
 Qed.
 
-Lemma max_readable_na_write mem0 prom0 loc ts from to val1
+Lemma max_readable_write_na mem0 prom0 loc ts from to val1
       (WF: Memory.le prom0 mem0)
       (BOT: Memory.bot_none prom0)
       (RESERVE: forall to' from' msg'
@@ -556,7 +556,7 @@ Proof.
   }
 Qed.
 
-Lemma max_readable_na_write_step mem0 prom0 tvw0 loc ts from to val0 val1 released sc
+Lemma max_readable_write_na_step mem0 prom0 tvw0 loc ts from to val0 val1 released sc
       (MAX: max_readable mem0 prom0 loc ts val0 released)
       (TS: tvw0.(TView.cur).(View.pln) loc = ts)
       (WF: Local.wf (Local.mk tvw0 prom0) mem0)
@@ -585,7 +585,7 @@ Proof.
   { apply WF. }
   { auto. }
   i. des.
-  hexploit (@max_readable_na_write mem1 prom1 loc (View.rlx (TView.cur tvw0) loc) from to val1); auto.
+  hexploit (@max_readable_write_na mem1 prom1 loc (View.rlx (TView.cur tvw0) loc) from to val1); auto.
   { eapply reserve_future_memory_le; eauto. apply WF. }
   { eapply reserve_future_memory_bot_none; eauto. apply WF. }
   { i. assert (<<RESERE: msg' <> Message.reserve>> /\ <<GET: Memory.get loc to' prom0 = Some (from', msg')>>).

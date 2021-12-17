@@ -1038,13 +1038,13 @@ Module JSim.
       sim_event
         (ThreadEvent.write loc from to val released_src ord)
         (ThreadEvent.write loc from to val released_tgt ord)
-  | sim_event_na_write
+  | sim_event_write_na
       loc msgs from to val released_src released_tgt ord
       (RELEASED: View.opt_le released_src released_tgt)
     :
       sim_event
-        (ThreadEvent.na_write loc msgs from to val released_src ord)
-        (ThreadEvent.na_write loc msgs from to val released_tgt ord)
+        (ThreadEvent.write_na loc msgs from to val released_src ord)
+        (ThreadEvent.write_na loc msgs from to val released_tgt ord)
   | sim_event_update
       loc tsr tsw valr valw releasedr_src releasedr_tgt releasedw_src releasedw_tgt ordr ordw
       (RELEASEDR: View.opt_le releasedr_src releasedr_tgt)
@@ -3002,7 +3002,7 @@ Module JSim.
       + hexploit sim_local_write_na_step; eauto.
         { refl. }
         i. des.
-        eexists (ThreadEvent.na_write _ _ _ _ _ _ _). esplits.
+        eexists (ThreadEvent.write_na _ _ _ _ _ _ _). esplits.
         * econs.
           { econs 2; eauto. econs; eauto. }
           { ss. }
