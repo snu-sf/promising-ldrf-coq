@@ -71,7 +71,7 @@ Section GOODFUTURE.
          (f: Loc.t -> Time.t -> Time.t -> Prop): Prop :=
     {
       good_future_map_map_lt:
-        mapping_map_lt f;
+        mapping_map_lt_iff f;
       good_future_map_map_bot:
         mapping_map_bot f;
       good_future_map_ident:
@@ -95,7 +95,7 @@ Section GOODFUTURE.
     hexploit (@choice
                 Loc.t (Time.t -> Time.t -> Prop)
                 (fun loc f =>
-                   (<<MAPLT: mapping_map_lt_loc f>>) /\
+                   (<<MAPLT: mapping_map_lt_iff_loc f>>) /\
                    (<<IDENT: forall ts (TS: Time.le ts (max loc)),
                        f ts ts>>) /\
                    (<<MAX: forall ts fts
@@ -109,7 +109,7 @@ Section GOODFUTURE.
                   (times loc)); ss.
       { refl. } intros [f SPEC]. exists f. des. splits; auto.
       { i. destruct (Time.le_lt_dec ts (max loc)).
-        { exploit mapping_map_lt_loc_map_eq.
+        { exploit mapping_map_lt_iff_loc_map_eq.
           { eapply MAPLT. }
           { eapply MAP. }
           { eapply SAME; eauto. }
@@ -119,7 +119,7 @@ Section GOODFUTURE.
       }
     }
     intros [f SPEC]. exists f. econs.
-    { eapply mapping_map_lt_locwise.
+    { eapply mapping_map_lt_iff_locwise.
       i. specialize (SPEC loc). des. auto. }
     { ii. specialize (SPEC loc). des.
       eapply IDENT. eapply Time.bot_spec. }

@@ -68,7 +68,7 @@ Module Mapping.
   Record wf (f: t): Prop :=
     { map_finite: forall v, exists l, forall ts fts (MAP: f v ts = Some fts),
             List.In (ts, fts) l;
-      mapping_map_lt: forall v ts0 ts1 fts0 fts1
+      mapping_map_lt_iff: forall v ts0 ts1 fts0 fts1
                              (MAP0: f.(map) v ts0 = Some fts0) (MAP0: f.(map) v ts1 = Some fts1),
           Time.lt ts0 ts1 <-> Time.lt fts0 fts1;
       mapping_incr: forall v0 v1 ts fts0
@@ -160,9 +160,9 @@ Module Mapping.
   Proof.
     i. split.
     { i. destruct (Time.le_lt_dec fts0 fts1); auto.
-      erewrite <- mapping_map_lt in l; eauto. timetac. }
+      erewrite <- mapping_map_lt_iff in l; eauto. timetac. }
     { i. destruct (Time.le_lt_dec ts0 ts1); auto.
-      erewrite mapping_map_lt in l; eauto. timetac. }
+      erewrite mapping_map_lt_iff in l; eauto. timetac. }
   Qed.
 
   Lemma mapping_map_eq (f: t) (WF: wf f):
@@ -578,7 +578,7 @@ Lemma sim_timestamp_exact_lt f v
     Time.lt ts_src0 ts_src1.
 Proof.
   unfold sim_timestamp in *. des.
-  erewrite <- Mapping.mapping_map_lt; cycle 1; eauto.
+  erewrite <- Mapping.mapping_map_lt_iff; cycle 1; eauto.
 Qed.
 
 Lemma sim_timestamp_le f v
@@ -608,7 +608,7 @@ Lemma sim_timestamp_lt f v
 Proof.
   unfold sim_timestamp in *. des.
   eapply TimeFacts.le_lt_lt; eauto.
-  erewrite <- Mapping.mapping_map_lt; cycle 1; eauto.
+  erewrite <- Mapping.mapping_map_lt_iff; cycle 1; eauto.
   eapply TimeFacts.le_lt_lt; eauto.
 Qed.
 
@@ -682,7 +682,7 @@ Lemma sim_timestamp_exact_lt_if f v
     Time.lt ts_tgt0 ts_tgt1.
 Proof.
   unfold sim_timestamp_exact in *.
-  erewrite Mapping.mapping_map_lt; eauto.
+  erewrite Mapping.mapping_map_lt_iff; eauto.
 Qed.
 
 Lemma sim_timestamp_exact_unique f v ts_src ts_tgt0 ts_tgt1
@@ -1471,8 +1471,8 @@ Proof.
         eapply LEFT in H0; eauto.
         exfalso. eapply Time.lt_strorder. etrans; eauto. }
     }
-    { eapply Mapping.mapping_map_lt; eauto. }
-    { eapply Mapping.mapping_map_lt; eauto. }
+    { eapply Mapping.mapping_map_lt_iff; eauto. }
+    { eapply Mapping.mapping_map_lt_iff; eauto. }
   }
   { i. ss. des_ifs.
     { ss. des; clarify. esplits; eauto. refl. }
@@ -1562,7 +1562,7 @@ Proof.
   { inv SAT.
     2:{ inv H2. exfalso. eapply H; eauto. }
     assert (LT: Time.lt fts fts0).
-    { erewrite <- Mapping.mapping_map_lt; cycle 2; try eassumption.
+    { erewrite <- Mapping.mapping_map_lt_iff; cycle 2; try eassumption.
       transitivity ts; eauto. }
     exists (mapping_update f0 ts (Time.middle fts fts0)), (Time.middle fts fts0).
     splits.

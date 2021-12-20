@@ -56,12 +56,11 @@ Variant lower_event: forall (e_src e_tgt: ThreadEvent.t), Prop :=
     (ThreadEvent.write loc from to val released_src ord)
     (ThreadEvent.write loc from to val released_tgt ord)
 | lower_event_write_na
-    loc msgs from to val released_src released_tgt ord
-    (RELEASED: View.opt_le released_src released_tgt)
+    loc msgs from to val ord
   :
   lower_event
-    (ThreadEvent.write_na loc msgs from to val released_src ord)
-    (ThreadEvent.write_na loc msgs from to val released_tgt ord)
+    (ThreadEvent.write_na loc msgs from to val ord)
+    (ThreadEvent.write_na loc msgs from to val ord)
 | lower_event_update
     loc tsr tsw valr valw releasedr_src releasedr_tgt releasedw_src releasedw_tgt ordr ordw
     (RELEASEDR: View.opt_le releasedr_src releasedr_tgt)
@@ -688,7 +687,7 @@ Proof.
     eexists (ThreadEvent.failure). esplits; eauto.
     econs. econs. eapply lower_local_consistent; eauto. }
   { hexploit lower_memory_write_na_step; eauto. i. des.
-    eexists (ThreadEvent.write_na _ _ _ _ _ _ _). esplits; eauto. }
+    eexists (ThreadEvent.write_na _ _ _ _ _ _). esplits; eauto. }
   { inv LOCAL0. hexploit lower_memory_is_racy; eauto. i.
     eexists (ThreadEvent.racy_read _ _ _). esplits; eauto. }
   { inv LOCAL0. hexploit lower_memory_is_racy; eauto. i.

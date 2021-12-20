@@ -29,7 +29,7 @@ Module ThreadEvent.
   | read (loc:Loc.t) (ts:Time.t) (val:Const.t) (released:option View.t) (ord:Ordering.t)
   | write (loc:Loc.t) (from to:Time.t) (val:Const.t) (released:option View.t) (ord:Ordering.t)
   | write_na (loc:Loc.t) (msgs:list (Time.t * Time.t * Message.t))
-             (from to:Time.t) (val:Const.t) (released:option View.t) (ord:Ordering.t)
+             (from to:Time.t) (val:Const.t) (ord:Ordering.t)
   | update (loc:Loc.t) (tsr tsw:Time.t) (valr valw:Const.t)
            (releasedr releasedw:option View.t) (ordr ordw:Ordering.t)
   | fence (ordr ordw:Ordering.t)
@@ -53,7 +53,7 @@ Module ThreadEvent.
     | silent => ProgramEvent.silent
     | read loc _ val _ ord => ProgramEvent.read loc val ord
     | write loc _ _ val _ ord => ProgramEvent.write loc val ord
-    | write_na loc _ _ _ val _ ord => ProgramEvent.write loc val ord
+    | write_na loc _ _ _ val ord => ProgramEvent.write loc val ord
     | update loc _ _ valr valw _ _ ordr ordw => ProgramEvent.update loc valr valw ordr ordw
     | fence ordr ordw => ProgramEvent.fence ordr ordw
     | syscall ev => ProgramEvent.syscall ev
@@ -88,7 +88,7 @@ Module ThreadEvent.
   Definition is_writing (e:t): option (Loc.t * Time.t * Time.t * Const.t * option View.t * Ordering.t) :=
     match e with
     | write loc from to val released ord => Some (loc, from, to, val, released, ord)
-    | write_na loc msgs from to val released ord => Some (loc, from, to, val, released, ord)
+    | write_na loc msgs from to val ord => Some (loc, from, to, val, None, ord)
     | update loc tsr tsw _ valw _ releasedw _ ordw => Some (loc, tsr, tsw, valw, releasedw, ordw)
     | _ => None
     end.
@@ -97,7 +97,7 @@ Module ThreadEvent.
     match e with
     | read loc ts _ _ _ => Some (loc, ts)
     | write loc _ ts _ _ _ => Some (loc, ts)
-    | write_na loc _ _ ts _ _ _ => Some (loc, ts)
+    | write_na loc _ _ ts _ _ => Some (loc, ts)
     | update loc _ ts _ _ _ _ _ _ => Some (loc, ts)
     | _ => None
     end.
@@ -106,7 +106,7 @@ Module ThreadEvent.
     match e with
     | read loc _ _ _ _
     | write loc _ _ _ _ _
-    | write_na loc _ _ _ _ _ _
+    | write_na loc _ _ _ _ _
     | update loc _ _ _ _ _ _ _ _
     | racy_read loc _ _
     | racy_write loc _ _
@@ -383,7 +383,7 @@ Module Local.
       lc1 sc1 mem1
       loc from to val ord lc2 sc2 mem2 msgs kinds kind
       (LOCAL: write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 msgs kinds kind):
-      program_step (ThreadEvent.write_na loc msgs from to val None ord) lc1 sc1 mem1 lc2 sc2 mem2
+      program_step (ThreadEvent.write_na loc msgs from to val ord) lc1 sc1 mem1 lc2 sc2 mem2
   | step_racy_read
       lc1 sc1 mem1
       loc val ord

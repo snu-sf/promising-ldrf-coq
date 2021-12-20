@@ -200,7 +200,7 @@ Section SIMTIME.
     assert (IDENT: map_ident_in_memory (fun loc ts fts => ts = fts /\ Time.lt ts (maxmap loc))
                                        (Configuration.memory c_tgt0)).
     { ii. splits; auto. eapply TimeFacts.le_lt_lt; eauto. }
-    assert (MAPLT0: mapping_map_lt (fun loc ts fts => ts = fts /\ Time.lt ts (maxmap loc))).
+    assert (MAPLT0: mapping_map_lt_iff (fun loc ts fts => ts = fts /\ Time.lt ts (maxmap loc))).
     { ii. des. subst. auto. }
 
     dup STEP. dep_inv STEP.

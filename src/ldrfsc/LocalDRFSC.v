@@ -157,7 +157,7 @@ Section SIM.
   .
   Proof.
     destruct (classic (SCRace.race L fe0)) as [RACE|RACE]; auto. left.
-    assert (MAPLT: mapping_map_lt ident_map).
+    assert (MAPLT: mapping_map_lt_iff ident_map).
     { eapply ident_map_lt. }
     assert (MAPLE: mapping_map_le ident_map).
     { eapply ident_map_le. }
@@ -169,14 +169,14 @@ Section SIM.
       exploit promise_map; try apply PROMISE; eauto; ss.
       { eapply FLOCAL. }
       { eapply LOCAL0. }
-      { eapply mapping_map_lt_non_collapsable; eauto. }
+      { eapply mapping_map_lt_iff_non_collapsable; eauto. }
       { eapply ident_map_message. }
       i. des. inv LOCAL0.
       eexists _, (Thread.mk _ st (Local.mk (Local.tview flc) fprom1) fsc fmem1).
       esplits; eauto.
       { econs; eauto.
         { econs; eauto. }
-        { eapply mapping_map_lt_collapsable_unwritable; eauto. }
+        { eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }
       }
       { econs 1. econs.
         { econs; eauto. eapply closed_message_map; eauto.
@@ -196,7 +196,7 @@ Section SIM.
         { eapply ident_map_bot. }
         { eapply FLOCAL. } i. des.
         exists (ThreadEvent.read loc fto val freleased ord). esplits.
-        { econs; eauto. eapply mapping_map_lt_collapsable_unwritable; eauto. }
+        { econs; eauto. eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }
         { econs 2; eauto. econs; eauto. econs 2; eauto. econs; eauto.
           ii. destruct (Time.le_lt_dec to' fto); auto. exfalso. eapply RACE.
           unfold SCRace.race, SCLocal.non_maximal. esplits; eauto; ss.
@@ -212,10 +212,10 @@ Section SIM.
         { econs 2. }
         { refl. }
         { refl. }
-        { eapply mapping_map_lt_non_collapsable; eauto. }
+        { eapply mapping_map_lt_iff_non_collapsable; eauto. }
         i. des.
         exists (ThreadEvent.write loc from to val freleasedw ord). esplits.
-        { econs; eauto. eapply mapping_map_lt_collapsable_unwritable; eauto. }
+        { econs; eauto. eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }
         { econs 2; eauto. econs; eauto. econs 3; eauto. econs; eauto.
           ii. destruct (Time.le_lt_dec to to'); auto. exfalso. eapply RACE.
           unfold SCRace.race, SCLocal.non_maximal. esplits; eauto; ss.
@@ -232,12 +232,12 @@ Section SIM.
         { eapply ident_map_bot. }
         { eapply WF0. }
         { eapply WF0. }
-        { eapply mapping_map_lt_collapsable_unwritable; eauto. }
+        { eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }
         { refl. }
-        { eapply mapping_map_lt_non_collapsable; eauto. }
+        { eapply mapping_map_lt_iff_non_collapsable; eauto. }
         i. des.
         exists (ThreadEvent.update loc fto tsw valr valw freleased freleasedw ordr ordw). esplits.
-        { econs; eauto. eapply mapping_map_lt_collapsable_unwritable; eauto. }
+        { econs; eauto. eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }
         { econs 2; eauto. econs; eauto. econs 4; eauto.
           { econs; eauto.
             ii. destruct (Time.le_lt_dec to' fto); auto. exfalso. eapply RACE.
@@ -282,7 +282,7 @@ Section SIM.
   Lemma sc_race_map f lang (th0 fth0: Thread.t lang)
         (RACE: SCRace.race L th0)
         (THREAD: thread_map f th0 fth0)
-        (MAPLT: mapping_map_lt f)
+        (MAPLT: mapping_map_lt_iff f)
     :
       SCRace.race L fth0.
   Proof.
@@ -358,7 +358,7 @@ Section SIM.
           exists fto, ffrom, fto, ffrom. esplits; eauto; try refl.
           i. econs; eauto. eapply Memory.cap_le; eauto. refl.
       }
-      { eapply mapping_map_lt_collapsable_unwritable. eapply ident_map_lt. }
+      { eapply mapping_map_lt_iff_collapsable_unwritable. eapply ident_map_lt. }
       { eapply ident_map_timemap. }
       { instantiate (1:=max). instantiate (1:=(Thread.sc e0)).
         eapply Memory.max_concrete_timemap_spec; eauto.

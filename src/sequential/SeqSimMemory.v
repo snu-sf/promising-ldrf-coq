@@ -45,7 +45,7 @@ Module Mapping.
 
   Record wf (f: t): Prop :=
     { map_finite: forall ver loc, exists l, forall ts fts (MAP: f ver loc ts = Some fts), List.In (ts, fts) l;
-      mapping_map_lt: forall ver loc ts0 ts1 fts0 fts1
+      mapping_map_lt_iff: forall ver loc ts0 ts1 fts0 fts1
                              (MAP0: f.(map) ver loc ts0 = Some fts0) (MAP0: f.(map) ver loc ts1 = Some fts1),
           Time.lt ts0 ts1 <-> Time.lt fts0 fts1;
       version_time_incr: forall v loc ts fts0 fts1
@@ -62,9 +62,9 @@ Module Mapping.
   Proof.
     i. split.
     { i. destruct (Time.le_lt_dec fts0 fts1); auto.
-      erewrite <- mapping_map_lt in l; eauto. timetac. }
+      erewrite <- mapping_map_lt_iff in l; eauto. timetac. }
     { i. destruct (Time.le_lt_dec ts0 ts1); auto.
-      erewrite mapping_map_lt in l; eauto. timetac. }
+      erewrite mapping_map_lt_iff in l; eauto. timetac. }
   Qed.
 
   Lemma mapping_map_eq (f: t) (WF: wf f):

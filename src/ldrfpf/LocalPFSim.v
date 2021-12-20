@@ -1634,9 +1634,9 @@ Section SIM.
     { eauto. }
     intros MEMORYMAP. destruct th_src1. ss.
     hexploit trace_steps_map; try apply MEMORYMAP.
-    { eapply mapping_map_lt_map_le. eapply MAP. }
+    { eapply mapping_map_lt_iff_map_le. eapply MAP. }
     { eapply MAP. }
-    { eapply mapping_map_lt_map_eq. eapply MAP. }
+    { eapply mapping_map_lt_iff_map_eq. eapply MAP. }
     { eapply wf_time_mapped_mappable; eauto.
       i. ss. eapply MAP in IN0. eauto. }
     { eauto. }
@@ -1662,7 +1662,7 @@ Section SIM.
         eapply sim_memory_strong_sim_memory; eauto. }
       { eapply MAP. }
     }
-    { eapply mapping_map_lt_collapsable_unwritable. eapply MAP. }
+    { eapply mapping_map_lt_iff_collapsable_unwritable. eapply MAP. }
     { eapply map_ident_in_memory_closed_timemap.
       { ii. eapply MAP; auto.
         erewrite (@sim_memory_same_max_ts_eq L times mem_src mem_src') in TS; eauto.
@@ -1690,8 +1690,8 @@ Section SIM.
       esplits; eauto. ss. unguard. des.
       { left. esplits. econs 2. econs; eauto. econs.
         eapply failure_step_map; eauto.
-        { eapply mapping_map_lt_map_le. eapply MAP. }
-        { eapply mapping_map_lt_map_eq. eapply MAP. }
+        { eapply mapping_map_lt_iff_map_le. eapply MAP. }
+        { eapply mapping_map_lt_iff_map_eq. eapply MAP. }
         eapply sim_failure_step; cycle 1.
         { eapply sim_local_strong_sim_local; eauto. }
         eapply JSim.sim_local_failure; eauto.
@@ -2643,7 +2643,7 @@ Section SIM.
                 (fun loc ts fts => ts = fts /\ Time.lt ts (tm loc))
                 (Configuration.memory c0)).
     { ii. split; auto. eapply TimeFacts.le_lt_lt; eauto. }
-    assert (MAPLT: mapping_map_lt (fun loc ts fts => ts = fts /\ Time.lt ts (tm loc))).
+    assert (MAPLT: mapping_map_lt_iff (fun loc ts fts => ts = fts /\ Time.lt ts (tm loc))).
     { ii. des. subst. auto. }
     eapply wf_time_mapped_mappable in TIME; cycle 1.
     { instantiate (1:=(fun loc ts fts => ts = fts /\ Time.lt ts (tm loc))).
@@ -2651,16 +2651,16 @@ Section SIM.
     eapply Forall_app_inv in TIME. des.
     eapply Forall_app_inv in FORALL1. des.
     destruct e2. ss. hexploit trace_steps_map; try apply STEPS; eauto.
-    { eapply mapping_map_lt_map_le; eauto. }
+    { eapply mapping_map_lt_iff_map_le; eauto. }
     { eapply map_ident_in_memory_bot; eauto. }
-    { eapply mapping_map_lt_map_eq; eauto. }
+    { eapply mapping_map_lt_iff_map_eq; eauto. }
     { eapply WF0; eauto. }
     { eapply WF1; eauto. }
     { eapply WF1. }
     { eapply WF0. }
     { eapply WF1. }
     { eapply WF0. }
-    { eapply mapping_map_lt_collapsable_unwritable; eauto. }
+    { eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }
     i. des.
     hexploit Trace.steps_future; try apply STEPS; ss; eauto.
     { eapply WF0; eauto. }
@@ -2671,11 +2671,11 @@ Section SIM.
     { eapply WF1. }
     { eapply WF1. } i. des.
     hexploit step_map; try apply MEM0; eauto.
-    { eapply mapping_map_lt_map_le; eauto. }
+    { eapply mapping_map_lt_iff_map_le; eauto. }
     { eapply map_ident_in_memory_bot; eauto. }
-    { eapply mapping_map_lt_map_eq; eauto. }
+    { eapply mapping_map_lt_iff_map_eq; eauto. }
     { inv FORALL3. econs; eauto. econs. eauto. }
-    { eapply mapping_map_lt_collapsable_unwritable; eauto. }
+    { eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }
     i. des. inv STEP. ss.
     assert (EVENT: ThreadEvent.get_machine_event fe = ThreadEvent.get_machine_event e0).
     { eapply tevent_map_same_machine_event; eauto. }
@@ -2779,7 +2779,7 @@ Section SIM.
     :
       exists c2 tr_cert' f e',
         (<<STEP: times_configuration_step times (tr ++ tr_cert') [] e' tid c0 c2>>) /\
-        (<<MAPLT: mapping_map_lt f>>) /\
+        (<<MAPLT: mapping_map_lt_iff f>>) /\
         (<<MAPIDENT:
            forall loc ts fts to
                   (CONCRETE: concrete_promised (Configuration.memory c1) loc to)
@@ -3165,7 +3165,7 @@ Section SIM.
     assert (IDENT: map_ident_in_memory (fun loc ts fts => ts = fts /\ Time.lt ts (maxmap loc))
                                        (Configuration.memory c_tgt0)).
     { ii. splits; auto. eapply TimeFacts.le_lt_lt; eauto. }
-    assert (MAPLT0: mapping_map_lt (fun loc ts fts => ts = fts /\ Time.lt ts (maxmap loc))).
+    assert (MAPLT0: mapping_map_lt_iff (fun loc ts fts => ts = fts /\ Time.lt ts (maxmap loc))).
     { ii. des. subst. auto. }
 
     dup STEP. dep_inv STEP.

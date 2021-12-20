@@ -61,7 +61,7 @@ Definition release_event (e: ThreadEvent.t): Prop :=
 
 Definition is_write_na (e: ThreadEvent.t): Prop :=
   match e with
-  | ThreadEvent.write_na _ _ _ _ _ _ _ => True
+  | ThreadEvent.write_na _ _ _ _ _ _ => True
   | ThreadEvent.write _ _ _ _ _ ord => Ordering.le ord Ordering.na
   | _ => False
   end.

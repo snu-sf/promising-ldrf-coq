@@ -165,7 +165,7 @@ Proof.
   hexploit (@trace_times_list_exists tr0). i. des.
   set (tm := fun loc => Time.incr (Time.join (times_join (times loc)) (Memory.max_ts loc mem0))).
   set (f := (fun loc ts fts => ts = fts /\ Time.lt ts (tm loc))).
-  assert (MAPLT: mapping_map_lt f).
+  assert (MAPLT: mapping_map_lt_iff f).
   { unfold f. ii. des; subst; auto. }
   assert (IDENT: map_ident_in_memory f mem0).
   { ii. split; auto. eapply TimeFacts.le_lt_lt; eauto.
@@ -221,7 +221,7 @@ Proof.
     { eauto. }
     { eapply map_ident_in_memory_local; eauto. }
     { eauto. }
-    { eapply mapping_map_lt_collapsable_unwritable; eauto. }
+    { eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }
     { eapply map_ident_in_memory_closed_timemap; eauto. }
     { rewrite SC0. refl. }
     i. des. destruct e1. ss. esplits; try eassumption.

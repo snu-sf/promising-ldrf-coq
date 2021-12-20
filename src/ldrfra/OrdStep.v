@@ -477,7 +477,7 @@ Module OrdThread.
           (<<STEP: step pf fe fe0 fe1>>) /\
           (<<EVENT: tevent_map ident_map fe e>>).
     Proof.
-      assert (MAPLT: mapping_map_lt ident_map).
+      assert (MAPLT: mapping_map_lt_iff ident_map).
       { eapply ident_map_lt. }
       assert (MAPLE: mapping_map_le ident_map).
       { eapply ident_map_le. }
@@ -489,14 +489,14 @@ Module OrdThread.
         exploit promise_map; try apply PROMISE; eauto; ss.
         { eapply FLOCAL. }
         { eapply LOCAL0. }
-        { eapply mapping_map_lt_non_collapsable; eauto. }
+        { eapply mapping_map_lt_iff_non_collapsable; eauto. }
         { eapply ident_map_message. }
         i. des. inv LOCAL0.
         eexists _, (Thread.mk _ st (Local.mk (Local.tview flc) fprom1) fsc fmem1).
         esplits; eauto.
         { econs; eauto.
           { econs; eauto. }
-          { eapply mapping_map_lt_collapsable_unwritable; eauto. }
+          { eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }
         }
         { econs 1. econs.
           { econs; eauto. eapply closed_message_map; eauto.
@@ -516,7 +516,7 @@ Module OrdThread.
           { eapply ident_map_bot. }
           { eapply FLOCAL. } i. des.
           exists (ThreadEvent.read loc fto val freleased ord). esplits.
-          { econs; eauto. eapply mapping_map_lt_collapsable_unwritable; eauto. }
+          { econs; eauto. eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }
           { econs 2; eauto. econs; eauto. econs 2; eauto. econs; eauto. }
           { econs; eauto. }
         }
@@ -527,10 +527,10 @@ Module OrdThread.
           { econs 2. }
           { refl. }
           { refl. }
-          { eapply mapping_map_lt_non_collapsable; eauto. }
+          { eapply mapping_map_lt_iff_non_collapsable; eauto. }
           i. des.
           exists (ThreadEvent.write loc from to val freleasedw ord). esplits.
-          { econs; eauto. eapply mapping_map_lt_collapsable_unwritable; eauto. }
+          { econs; eauto. eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }
           { econs 2; eauto. econs; eauto. econs 3; eauto. econs; eauto. }
           { econs; eauto; ss. }
         }
@@ -543,12 +543,12 @@ Module OrdThread.
           { eapply ident_map_bot. }
           { eapply WF0. }
           { eapply WF0. }
-          { eapply mapping_map_lt_collapsable_unwritable; eauto. }
+          { eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }
           { refl. }
-          { eapply mapping_map_lt_non_collapsable; eauto. }
+          { eapply mapping_map_lt_iff_non_collapsable; eauto. }
           i. des.
           exists (ThreadEvent.update loc fto tsw valr valw freleased freleasedw ordr ordw). esplits.
-          { econs; eauto. eapply mapping_map_lt_collapsable_unwritable; eauto. }
+          { econs; eauto. eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }
           { econs 2; eauto. econs; eauto. econs 4; eauto.
             { econs; eauto. }
             { econs; eauto. }

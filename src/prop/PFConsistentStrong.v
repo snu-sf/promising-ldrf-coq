@@ -43,7 +43,7 @@ Section CONCRETEMAX.
   Lemma map_ident_concrete_promises mem prom tm (f: Loc.t -> Time.t -> Time.t -> Prop)
         (MAX: concrete_promise_max_timemap mem prom tm)
         (IDENT: forall loc ts (TS: Time.le ts (tm loc)), f loc ts ts)
-        (MAPLT: mapping_map_lt f)
+        (MAPLT: mapping_map_lt_iff f)
         (CLOSED: Memory.closed mem)
         (MLE: Memory.le prom mem)
     :
@@ -53,7 +53,7 @@ Section CONCRETEMAX.
     { ii. inv CONCRETE. eapply MAX in GET. auto. }
     econs.
     { i. exists to, from, msg. splits; auto.
-      { eapply mapping_map_lt_non_collapsable; eauto. }
+      { eapply mapping_map_lt_iff_non_collapsable; eauto. }
       { eapply IDENT. eapply MAX in GET; eauto. }
       { eapply map_ident_concrete_closed_message; eauto.
         eapply MLE in GET. eapply CLOSED; eauto. }
@@ -465,9 +465,9 @@ Proof.
   { ii. inv CONCRETE. eapply MAX in GET. eapply MAP; eauto. }
   destruct e1. ss.
   hexploit trace_steps_map.
-  { eapply mapping_map_lt_map_le. eapply MAP. }
+  { eapply mapping_map_lt_iff_map_le. eapply MAP. }
   { eapply MAP. }
-  { eapply mapping_map_lt_map_eq. eapply MAP. }
+  { eapply mapping_map_lt_iff_map_eq. eapply MAP. }
   { eapply wf_time_mapped_mappable.
     { eapply List.Forall_impl; eauto. i. ss. des; eauto. }
     { eapply cap_flex_map_complete; eauto. }
@@ -509,7 +509,7 @@ Proof.
     { eauto. }
     { eauto. }
   }
-  { eapply mapping_map_lt_collapsable_unwritable. eapply MAP. }
+  { eapply mapping_map_lt_iff_collapsable_unwritable. eapply MAP. }
   { eapply timemap_bot_map. eapply MAP. }
   { refl. } i. des.
   exists ftr, (Thread.mk _ state flc1 fsc1 fmem1). splits; auto.
@@ -521,7 +521,7 @@ Proof.
         eapply wf_time_evt_map in EVENT; eauto. eapply wf_time_evt_mon; try apply EVENT.
         i. ss. des. destruct (Time.le_lt_dec ts (max x1)).
         { left. assert (ts = x2).
-          { eapply mapping_map_lt_map_eq.
+          { eapply mapping_map_lt_iff_map_eq.
             { eapply MAP. }
             { ss. eapply MAP. eauto. }
             { eauto. }
@@ -539,8 +539,8 @@ Proof.
   { eapply list_Forall2_impl; eauto. i. ss. des. auto. }
   { ss. unguard. des; eauto.
     { left. esplits; eauto. eapply failure_step_map; eauto.
-      { eapply mapping_map_lt_map_le. eapply MAP. }
-      { eapply mapping_map_lt_map_eq. eapply MAP. }
+      { eapply mapping_map_lt_iff_map_le. eapply MAP. }
+      { eapply mapping_map_lt_iff_map_eq. eapply MAP. }
     }
     { right. splits.
       { inv LOCAL. erewrite PROMISES in *. eapply bot_promises_map; eauto. }
@@ -566,7 +566,7 @@ Definition pf_consistent_super_strong_easy lang (e0:Thread.t lang)
                                                 /1\ no_sc
                                                 /1\ wf_time_evt times) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) ftr >>) /\
     (<<CANCELNORMAL: cancel_normal_trace ftr>>) /\
-    (<<MAPLT: mapping_map_lt f>>) /\
+    (<<MAPLT: mapping_map_lt_iff f>>) /\
     (<<MAPIDENT: forall loc ts fts
                         (TS: Time.le fts (max loc))
                         (MAP: f loc ts fts),
@@ -680,14 +680,14 @@ Proof.
   }
   { eapply MAPALL. }
   { i. eapply MAPALL in TS; eauto.
-    eapply mapping_map_lt_inj.
+    eapply mapping_map_lt_iff_inj.
     { eapply MAPALL; eauto. }
     { ss. eauto. }
     { eauto. }
   }
   { i. destruct (Time.le_lt_dec ts (max loc)).
     { dup l. eapply MAPALL in l; eauto.
-      exploit mapping_map_lt_map_eq.
+      exploit mapping_map_lt_iff_map_eq.
       { eapply MAPALL. }
       { eapply MAP0. }
       { eapply l. }
@@ -784,7 +784,7 @@ Definition pf_consistent_super_strong_split lang (e0:Thread.t lang)
          (<<CONSISTENT: pf_consistent_special e2 (ftr_cancel ++ ftr1) times>>) /\
          (<<CANCELNORMAL: cancel_normal_trace (ftr_cancel ++ ftr1)>>)>>) /\
 
-    (<<MAPLT: mapping_map_lt f>>) /\
+    (<<MAPLT: mapping_map_lt_iff f>>) /\
     (<<MAPIDENT: forall loc ts fts
                         (TS: Time.le fts (max loc))
                         (MAP: f loc ts fts),
@@ -931,7 +931,7 @@ Proof.
       i. eapply cap_flex_covered; eauto.
     }
   }
-  { eapply mapping_map_lt_collapsable_unwritable. eapply ident_map_lt. }
+  { eapply mapping_map_lt_iff_collapsable_unwritable. eapply ident_map_lt. }
   { eapply ident_map_timemap. }
   { refl. }
   i. des. esplits.
@@ -1065,7 +1065,7 @@ Definition pf_consistent_super_strong_aux lang (e0:Thread.t lang)
          (<<CONSISTENT: pf_consistent_special e2 (ftr_cancel ++ ftr1) times>>) /\
          (<<CANCELNORMAL: cancel_normal_trace (ftr_cancel ++ ftr1)>>)>>) /\
 
-    (<<MAPLT: mapping_map_lt f>>) /\
+    (<<MAPLT: mapping_map_lt_iff f>>) /\
     (<<MAPIDENT: forall loc ts fts
                         (TS: Time.le fts (max loc))
                         (MAP: f loc ts fts),
@@ -1177,7 +1177,7 @@ Definition pf_consistent_super_strong_aux2 lang (e0:Thread.t lang)
          (<<CONSISTENT: pf_consistent_special e2 (ftr_cancel ++ ftr1) times>>) /\
          (<<CANCELNORMAL: cancel_normal_trace (ftr_cancel ++ ftr1)>>)>>) /\
 
-    (<<MAPLT: mapping_map_lt f>>) /\
+    (<<MAPLT: mapping_map_lt_iff f>>) /\
     (<<MAPIDENT: forall loc ts fts
                      (TS: Time.le fts (max loc))
                      (MAP: f loc ts fts),
@@ -1267,7 +1267,7 @@ Proof.
     eapply cap_flex_closed; eauto. i. eapply TM. }
   { econs; eauto.
     { eapply ident_map_local. }
-    { eapply mapping_map_lt_collapsable_unwritable. eapply ident_map_lt. }
+    { eapply mapping_map_lt_iff_collapsable_unwritable. eapply ident_map_lt. }
     { eapply ident_map_timemap. }
     { refl. }
   }
@@ -1454,7 +1454,7 @@ Proof.
         eapply Trace.steps_future in STEPS4; eauto. des.
         eapply ident_map_pf_consistent_super_strong_easy; eauto.
         econs; eauto.
-        eapply mapping_map_lt_collapsable_unwritable; eauto. eapply ident_map_lt; eauto.
+        eapply mapping_map_lt_iff_collapsable_unwritable; eauto. eapply ident_map_lt; eauto.
       }
     }
     { exists ftr_cancel, ftr2. splits; auto.
@@ -1548,7 +1548,7 @@ Definition pf_consistent_super_strong lang (e0:Thread.t lang)
          (<<GOOD: good_future tm mem1 (Thread.memory e2)>>) /\
          (<<SC: (Thread.sc e2) = sc>>)>>) /\
 
-    (<<MAPLT: mapping_map_lt f>>) /\
+    (<<MAPLT: mapping_map_lt_iff f>>) /\
     (<<MAPIDENT: forall loc ts fts
                         (TS: Time.le fts (max loc))
                         (MAP: f loc ts fts),
@@ -1873,7 +1873,7 @@ Lemma good_future_consistent times lang st lc_src lc_tgt sc_src sc_tgt mem_src m
       (DIVERGE: forall loc n, times loc (incr_time_seq n))
   :
     exists tr_good f_good,
-      (<<MAPLT: mapping_map_lt f_good>>) /\
+      (<<MAPLT: mapping_map_lt_iff f_good>>) /\
       (<<MAPIDENT: forall loc ts fts
                           (TS: Time.le fts (max_tgt loc))
                           (MAP: f_good loc ts fts),
@@ -1956,7 +1956,7 @@ Proof.
     eapply cap_flex_closed; eauto. }
   { eapply local_map_incr; eauto. eapply ident_map_lt; eauto. }
   { eauto. }
-  { eapply mapping_map_lt_collapsable_unwritable; eauto. eapply ident_map_lt. }
+  { eapply mapping_map_lt_iff_collapsable_unwritable; eauto. eapply ident_map_lt. }
   { eapply ident_map_timemap. }
   { refl. }
   i. des.
@@ -2371,7 +2371,7 @@ Definition pf_consistent_super_strong_promises_list lang (e0:Thread.t lang)
 
           (<<PROMCONSISTENT: Local.promise_consistent (Thread.local e1)>>) /\
 
-          (<<MAPLT: mapping_map_lt f>>) /\
+          (<<MAPLT: mapping_map_lt_iff f>>) /\
           (<<MAPIDENT: forall loc ts fts
                               (TS: Time.le fts (max loc))
                               (MAP: f loc ts fts),
@@ -2401,7 +2401,7 @@ Definition pf_consistent_super_strong_promises_list lang (e0:Thread.t lang)
 
           (<<CANCELNORMAL: cancel_normal_trace ftr>>) /\
 
-          (<<MAPLT: mapping_map_lt f>>) /\
+          (<<MAPLT: mapping_map_lt_iff f>>) /\
           (<<MAPIDENT: forall loc ts fts
                               (TS: Time.le fts (max loc))
                               (MAP: f loc ts fts),

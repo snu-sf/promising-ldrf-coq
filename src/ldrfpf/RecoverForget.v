@@ -475,9 +475,9 @@ Section RECOVER.
     { eauto. }
     intros MEMORYMAP. destruct th_src1. ss.
     hexploit trace_steps_map; try apply MEMORYMAP.
-    { eapply mapping_map_lt_map_le. eapply MAP. }
+    { eapply mapping_map_lt_iff_map_le. eapply MAP. }
     { eapply MAP. }
-    { eapply mapping_map_lt_map_eq. eapply MAP. }
+    { eapply mapping_map_lt_iff_map_eq. eapply MAP. }
     { eapply wf_time_mapped_mappable; eauto.
       i. ss. eapply MAP in IN0. eauto. }
     { eauto. }
@@ -503,7 +503,7 @@ Section RECOVER.
         eapply sim_memory_strong_sim_memory; eauto. }
       { eapply MAP. }
     }
-    { eapply mapping_map_lt_collapsable_unwritable. eapply MAP. }
+    { eapply mapping_map_lt_iff_collapsable_unwritable. eapply MAP. }
     { eapply map_ident_in_memory_closed_timemap.
       { ii. eapply MAP; auto.
         erewrite (@sim_memory_same_max_ts_eq L times mem_src mem_src') in TS; eauto.
@@ -530,8 +530,8 @@ Section RECOVER.
       esplits; eauto. ss. unguard. des.
       { left. esplits. econs 2. econs; eauto. econs.
         eapply failure_step_map; eauto.
-        { eapply mapping_map_lt_map_le. eapply MAP. }
-        { eapply mapping_map_lt_map_eq. eapply MAP. }
+        { eapply mapping_map_lt_iff_map_le. eapply MAP. }
+        { eapply mapping_map_lt_iff_map_eq. eapply MAP. }
         eapply sim_failure_step; cycle 1.
         { eapply sim_local_strong_sim_local; eauto. }
         eapply JSim.sim_local_failure; eauto.

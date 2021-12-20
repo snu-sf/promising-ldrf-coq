@@ -329,7 +329,7 @@ Section CAPFLEX.
          (f: Time.t -> Time.t -> Prop): Prop :=
     {
       cap_flex_map_loc_map_lt:
-        mapping_map_lt_loc f;
+        mapping_map_lt_iff_loc f;
       cap_flex_map_loc_map_bot:
         f Time.bot Time.bot;
       cap_flex_map_loc_ident:
@@ -352,7 +352,7 @@ Section CAPFLEX.
          (f: Loc.t -> Time.t -> Time.t -> Prop): Prop :=
     {
       cap_flex_map_map_lt:
-        mapping_map_lt f;
+        mapping_map_lt_iff f;
       cap_flex_map_map_bot:
         mapping_map_bot f;
       cap_flex_map_ident:
@@ -379,7 +379,7 @@ Section CAPFLEX.
       cap_flex_map max tm0 tm1 times f.
   Proof.
     econs.
-    { eapply mapping_map_lt_locwise.
+    { eapply mapping_map_lt_iff_locwise.
       eapply LOCWISE. }
     { ii. eapply LOCWISE. }
     { ii. eapply LOCWISE. auto. }
@@ -431,7 +431,7 @@ Section CAPFLEX.
       map_ident_concrete f mem0.
   Proof.
     ii. inv CONCRETE. eapply Memory.max_concrete_ts_spec in GET; eauto.
-    des. eapply MAP; eauto.
+    des. eapply MAP; eauto. etrans; eauto.
   Qed.
 
   Lemma concrete_messages_le_cap_flex_memory_map
@@ -451,7 +451,7 @@ Section CAPFLEX.
   Proof.
     assert (IDENT: map_ident_concrete f mem0).
     { ii. inv CONCRETE0. eapply Memory.max_concrete_ts_spec in GET; eauto.
-      des. eapply MAP; eauto. }
+      des. eapply MAP; eauto. etrans; eauto. }
     econs.
     { i. eapply (@cap_flex_inv mem0 cap0 tm0) in GET; eauto. des; eauto.
       destruct msg as [val released|]; auto. right.

@@ -50,7 +50,7 @@ Module CompressSteps.
       :
         exists (f: Loc.t -> Time.t -> Time.t -> Prop),
           (<<IDENT: map_ident_in_memory f mem_tgt>>) /\
-          (<<MAPLT: mapping_map_lt f>>) /\
+          (<<MAPLT: mapping_map_lt_iff f>>) /\
           (<<MEMORY: memory_map f mem_tgt mem_src>>) /\
           (<<COMPLETE: forall loc to (IN: List.In to (times loc)),
               exists fto, (<<MAPPED: f loc to fto>>)>>).
@@ -117,12 +117,12 @@ Module CompressSteps.
       hexploit (trace_times_list_exists tr). i. des.
       hexploit (spatial_memory_map times MEMORY); eauto. i. des.
       destruct e2. hexploit trace_steps_map; try apply STEPS0; try apply MEMORY0; eauto.
-      { eapply mapping_map_lt_map_le; eauto. }
+      { eapply mapping_map_lt_iff_map_le; eauto. }
       { eapply map_ident_in_memory_bot; eauto. }
-      { eapply mapping_map_lt_map_eq; eauto. }
+      { eapply mapping_map_lt_iff_map_eq; eauto. }
       { eapply wf_time_mapped_mappable; eauto. }
       { eapply map_ident_in_memory_local; eauto. }
-      { eapply mapping_map_lt_collapsable_unwritable; eauto. }
+      { eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }
       { eapply map_ident_in_memory_closed_timemap; eauto. }
       { refl. }
       i. des. inv FAILURE; inv STEP. inv LOCAL0. inv LOCAL1.
@@ -139,8 +139,8 @@ Module CompressSteps.
         destruct lc2, flc1. inv LOCAL. ss.
         eapply promise_consistent_mon.
         + eapply promise_consistent_map.
-          { eapply mapping_map_lt_map_le; eauto. }
-          { eapply mapping_map_lt_map_eq; eauto. }
+          { eapply mapping_map_lt_iff_map_le; eauto. }
+          { eapply mapping_map_lt_iff_map_eq; eauto. }
           { eapply TVIEW. }
           { eapply PROMISES. }
           { eapply CONSISTENT. }
@@ -171,12 +171,12 @@ Module CompressSteps.
       hexploit (trace_times_list_exists tr). i. des.
       hexploit (spatial_memory_map times MEMORY); eauto. i. des.
       destruct e2_tgt. hexploit trace_steps_map; try apply STEPS; try apply MEMORY0; eauto.
-      { eapply mapping_map_lt_map_le; eauto. }
+      { eapply mapping_map_lt_iff_map_le; eauto. }
       { eapply map_ident_in_memory_bot; eauto. }
-      { eapply mapping_map_lt_map_eq; eauto. }
+      { eapply mapping_map_lt_iff_map_eq; eauto. }
       { eapply wf_time_mapped_mappable; eauto. }
       { eapply map_ident_in_memory_local; eauto. }
-      { eapply mapping_map_lt_collapsable_unwritable; eauto. }
+      { eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }
       { eapply map_ident_in_memory_closed_timemap; eauto. }
       { refl. }
       i. des. esplits.
