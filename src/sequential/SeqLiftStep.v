@@ -730,9 +730,9 @@ Proof.
   { inv SIM. econs. }
 Qed.
 
-Lemma sim_read_tview f flag_src flag_tgt tvw_src tvw_tgt v
+Lemma sim_read_tview f flag_src rel_vers tvw_src tvw_tgt v
       loc to_src released_src ord to_tgt released_tgt
-      (SIM: sim_tview f flag_src flag_tgt tvw_src tvw_tgt)
+      (SIM: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
       (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
       (CLOSED: Mapping.closed (f loc) (Mapping.vers f loc) to_src)
       (RELEASED: sim_opt_view (fun loc0 => loc0 <> loc) f v released_src released_tgt)
@@ -741,7 +741,7 @@ Lemma sim_read_tview f flag_src flag_tgt tvw_src tvw_tgt v
       (LESRC: time_le_opt_view loc to_src released_src)
       (LETGT: time_le_opt_view loc to_tgt released_tgt)
   :
-    sim_tview f flag_src flag_tgt (TView.read_tview tvw_src loc to_src released_src ord) (TView.read_tview tvw_tgt loc to_tgt released_tgt ord).
+    sim_tview f flag_src rel_vers (TView.read_tview tvw_src loc to_src released_src ord) (TView.read_tview tvw_tgt loc to_tgt released_tgt ord).
 Proof.
   pose proof (mapping_latest_wf f).
   assert (TM: sim_timestamp (f loc) (Mapping.vers f loc) to_src to_tgt).
@@ -782,6 +782,244 @@ Proof.
     }
   }
   { i. eapply SIM. }
+Qed.
+
+Lemma sim_write_tview_normal f flag_src rel_vers tvw_src tvw_tgt sc_src sc_tgt
+      loc to_src ord to_tgt
+      (SIM: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
+      (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
+      (ORD: ~ Ordering.le Ordering.acqrel ord)
+      (CLOSED: Mapping.closed (f loc) (Mapping.vers f loc) to_src)
+      (WF: Mapping.wfs f)
+  :
+    sim_tview f flag_src rel_vers (TView.write_tview tvw_src sc_src loc to_src ord) (TView.write_tview tvw_tgt sc_tgt loc to_tgt ord).
+Proof.
+  pose proof (mapping_latest_wf f).
+  assert (TM: sim_timestamp (f loc) (Mapping.vers f loc) to_src to_tgt).
+  { eapply sim_timestamp_exact_sim; eauto. }
+  assert (JOIN: sim_view (fun loc0 => flag_src loc0 = None) f (Mapping.vers f)
+                         (View.singleton_ur loc to_src)
+                         (View.singleton_ur loc to_tgt)).
+  { apply sim_view_singleton_ur; eauto. }
+  econs; ss.
+  { ii. setoid_rewrite LocFun.add_spec. des_ifs.
+    { eapply sim_view_join; eauto.
+      { eapply SIM. }
+      { apply sim_view_singleton_ur; eauto; ss. eapply SIM. }
+      { eapply SIM. }
+    }
+    { eapply SIM. }
+  }
+  { eapply sim_view_join; eauto. eapply SIM. }
+  { eapply sim_view_join; eauto. eapply SIM. }
+  { eapply SIM. }
+Qed.
+
+Lemma sim_write_tview_release f flag_src rel_vers tvw_src tvw_tgt sc_src sc_tgt
+      loc to_src ord to_tgt
+      (SIM: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
+      (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
+      (FLAG: forall loc, flag_src loc = None)
+      (CLOSED: Mapping.closed (f loc) (Mapping.vers f loc) to_src)
+      (WF: Mapping.wfs f)
+  :
+    sim_tview f flag_src (fun loc0 => if Loc.eq_dec loc0 loc then (Mapping.vers f) else rel_vers loc0) (TView.write_tview tvw_src sc_src loc to_src ord) (TView.write_tview tvw_tgt sc_tgt loc to_tgt ord).
+Proof.
+  pose proof (mapping_latest_wf f).
+  assert (TM: sim_timestamp (f loc) (Mapping.vers f loc) to_src to_tgt).
+  { eapply sim_timestamp_exact_sim; eauto. }
+  assert (JOIN: forall L, sim_view L f (Mapping.vers f)
+                                   (View.singleton_ur loc to_src)
+                                   (View.singleton_ur loc to_tgt)).
+  { i. apply sim_view_singleton_ur; eauto. }
+  econs; ss.
+  { ii. setoid_rewrite LocFun.add_spec. des_ifs.
+    { eapply sim_view_join; eauto.
+      { eapply sim_view_mon_locs.
+        { eapply SIM. }
+        { i. ss. }
+      }
+    }
+    { eapply sim_view_join; eauto.
+      { eapply sim_view_mon_ver; auto.
+        { eapply SIM. }
+        { eapply version_le_version_wf. eapply SIM. }
+      }
+    }
+    { eapply SIM. }
+  }
+  { eapply sim_view_join; eauto. eapply SIM. }
+  { eapply sim_view_join; eauto. eapply SIM. }
+  { i. des_ifs. eapply SIM. }
+Qed.
+
+Lemma sim_read_fence_tview f flag_src rel_vers tvw_src tvw_tgt
+      ord
+      (SIM: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
+      (WF: Mapping.wfs f)
+  :
+    sim_tview f flag_src rel_vers (TView.read_fence_tview tvw_src ord) (TView.read_fence_tview tvw_tgt ord).
+Proof.
+  pose proof (mapping_latest_wf f).
+  econs; ss.
+  { eapply SIM. }
+  { des_ifs.
+    { eapply SIM. }
+    { eapply SIM. }
+  }
+  { eapply SIM. }
+  { eapply SIM. }
+Qed.
+
+Lemma sim_write_fence_tview_normal f flag_src rel_vers tvw_src tvw_tgt sc_src sc_tgt
+      ord
+      (SIM: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
+      (ORD: ~ Ordering.le Ordering.acqrel ord)
+      (WF: Mapping.wfs f)
+  :
+    sim_tview f flag_src rel_vers (TView.write_fence_tview tvw_src sc_src ord) (TView.write_fence_tview tvw_tgt sc_tgt ord).
+Proof.
+  pose proof (mapping_latest_wf f).
+  econs; ss.
+  { des_ifs. eapply SIM. }
+  { des_ifs.
+    { destruct ord; ss. }
+    { eapply SIM. }
+  }
+  { des_ifs.
+    { destruct ord; ss. }
+    { rewrite ! View.join_bot_r. eapply SIM. }
+  }
+  { eapply SIM. }
+Qed.
+
+Lemma sim_write_fence_tview_release f flag_src rel_vers tvw_src tvw_tgt sc_src sc_tgt
+      ord
+      (SIM: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
+      (SC: sim_timemap (fun _ => True) f (Mapping.vers f) sc_src sc_tgt)
+      (FLAG: forall loc, flag_src loc = None)
+      (WF: Mapping.wfs f)
+  :
+    sim_tview f flag_src (fun _ => Mapping.vers f) (TView.write_fence_tview tvw_src sc_src ord) (TView.write_fence_tview tvw_tgt sc_tgt ord).
+Proof.
+  pose proof (mapping_latest_wf f).
+  assert (JOIN: forall L, sim_timemap L f (Mapping.vers f)
+                                      (TView.write_fence_sc tvw_src sc_src ord)
+                                      (TView.write_fence_sc tvw_tgt sc_tgt ord)).
+  { i. unfold TView.write_fence_sc. des_ifs.
+    { eapply sim_timemap_join; eauto.
+      { eapply sim_timemap_mon_locs; eauto. ss. }
+      { eapply sim_timemap_mon_locs.
+        { eapply SIM. }
+        { ss. }
+      }
+    }
+    { eapply sim_timemap_mon_locs; eauto. ss. }
+  }
+  econs; ss.
+  { des_ifs.
+    { i. eapply sim_view_mon_locs.
+      { eapply SIM. }
+      { ss. }
+    }
+    { i. eapply sim_view_mon_locs.
+      { eapply sim_view_mon_ver; auto.
+        { eapply SIM. }
+        { eapply version_le_version_wf. eapply SIM. }
+      }
+      { ss. }
+    }
+  }
+  { des_ifs. eapply SIM. }
+  { eapply sim_view_join; auto.
+    { eapply SIM. }
+    { des_ifs. eapply sim_view_bot; auto. }
+  }
+Qed.
+
+Lemma sim_write_fence_sc f flag_src rel_vers tvw_src tvw_tgt sc_src sc_tgt
+      ord
+      (SIM: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
+      (SC: sim_timemap (fun _ => True) f (Mapping.vers f) sc_src sc_tgt)
+      (FLAG: Ordering.le Ordering.seqcst ord -> forall loc, flag_src loc = None)
+      (WF: Mapping.wfs f)
+  :
+    sim_timemap (fun _ => True) f (Mapping.vers f) (TView.write_fence_sc tvw_src sc_src ord) (TView.write_fence_sc tvw_tgt sc_tgt ord).
+Proof.
+  pose proof (mapping_latest_wf f).
+  unfold TView.write_fence_sc. des_ifs. eapply sim_timemap_join; auto.
+  eapply sim_timemap_mon_locs; eauto.
+  { eapply SIM. }
+  { ss. i. auto. }
+Qed.
+
+Lemma sim_write_released_normal f flag_src rel_vers tvw_src tvw_tgt sc_src sc_tgt
+      loc to_src ord to_tgt released_src released_tgt v
+      (SIM: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
+      (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
+      (RELEASED: sim_opt_view (fun loc0 => loc0 <> loc) f v released_src released_tgt)
+      (ORD: ~ Ordering.le Ordering.acqrel ord)
+      (VER: Ordering.le Ordering.relaxed ord -> v = Some (rel_vers loc))
+      (CLOSED: Mapping.closed (f loc) (Mapping.vers f loc) to_src)
+      (WF: Mapping.wfs f)
+  :
+    sim_opt_view (fun loc0 => loc0 <> loc) f v
+                 (TView.write_released tvw_src sc_src loc to_src released_src ord)
+                 (TView.write_released tvw_tgt sc_tgt loc to_tgt released_tgt ord).
+Proof.
+  pose proof (mapping_latest_wf f).
+  unfold TView.write_released. des_ifs.
+  { rewrite VER in *; auto. econs.
+    eapply sim_view_join; auto.
+    { eapply sim_opt_view_unwrap; eauto.
+      { eapply SIM. }
+      { i. clarify. }
+    }
+    { ss. setoid_rewrite LocFun.add_spec_eq. des_ifs.
+      eapply sim_view_join; auto.
+      { eapply SIM. }
+      { eapply sim_view_singleton_ur; auto; ss. apply SIM. }
+      { apply SIM. }
+    }
+    { apply SIM. }
+  }
+  { econs. }
+Qed.
+
+Lemma sim_write_released_release f flag_src rel_vers tvw_src tvw_tgt sc_src sc_tgt
+      loc to_src ord to_tgt released_src released_tgt v
+      (SIM: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
+      (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
+      (RELEASED: sim_opt_view (fun loc0 => loc0 <> loc) f v released_src released_tgt)
+      (VERWF: opt_version_wf f v)
+      (FLAG: forall loc, flag_src loc = None)
+      (CLOSED: Mapping.closed (f loc) (Mapping.vers f loc) to_src)
+      (WF: Mapping.wfs f)
+  :
+    sim_opt_view (fun loc0 => loc0 <> loc) f (Some (Mapping.vers f))
+                 (TView.write_released tvw_src sc_src loc to_src released_src ord)
+                 (TView.write_released tvw_tgt sc_tgt loc to_tgt released_tgt ord).
+Proof.
+  pose proof (mapping_latest_wf f).
+  unfold TView.write_released. des_ifs; econs.
+  eapply sim_view_join; auto.
+  { eapply sim_opt_view_unwrap; eauto. i. clarify. }
+  { ss. setoid_rewrite LocFun.add_spec_eq. des_ifs.
+    { eapply sim_view_join; auto.
+      { eapply sim_view_mon_locs; eauto.
+        { eapply SIM. }
+        { i. ss. }
+      }
+      { eapply sim_view_singleton_ur; auto; ss. }
+    }
+    { eapply sim_view_join; auto.
+      { eapply sim_view_mon_ver; auto.
+        { eapply SIM. }
+        { eapply version_le_version_wf. eapply SIM. }
+      }
+      { eapply sim_view_singleton_ur; auto; ss. }
+    }
+  }
 Qed.
 
 Variant initial_finalized: Messages.t :=
