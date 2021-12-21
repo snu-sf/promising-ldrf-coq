@@ -923,17 +923,16 @@ Proof.
   - exploit Memory.add_get1; try exact GET; eauto. i.
     exploit Memory.remove_get1; try exact x1; eauto. i. des.
     { subst. exploit Memory.add_get0; try exact PROMISES. i. des. congr. }
-    exploit CONS; try exact GET2; eauto. i. etrans; eauto.
+    exploit CONS; try exact GET2; eauto.
   - exploit Memory.split_get1; try exact GET; eauto. i. des.
     exploit Memory.remove_get1; try exact GET2; eauto. i. des.
     { subst. exploit Memory.split_get0; try exact PROMISES. i. des. congr. }
-    exploit CONS; try exact GET0; eauto. i. etrans; eauto.
+    exploit CONS; try exact GET0; eauto.
   - exploit Memory.lower_get1; try exact GET; eauto. i. des.
     exploit Memory.remove_get1; try exact GET2; eauto. i. des.
     { subst. exploit Memory.lower_get0; try exact PROMISES. i. des. congr. }
     exploit CONS; try exact GET0; eauto.
     { ii. subst. inv MSG_LE. ss. }
-    i. etrans; eauto.
 Qed.
 
 Lemma write_na_promise_consistent
