@@ -931,7 +931,7 @@ Proof.
       i. eapply cap_flex_covered; eauto.
     }
   }
-  { eapply mapping_map_lt_iff_collapsable_unwritable. eapply ident_map_lt. }
+  { eapply mapping_map_lt_iff_collapsable_unwritable. eapply ident_map_lt_iff. }
   { eapply ident_map_timemap. }
   { refl. }
   i. des. esplits.
@@ -1267,7 +1267,7 @@ Proof.
     eapply cap_flex_closed; eauto. i. eapply TM. }
   { econs; eauto.
     { eapply ident_map_local. }
-    { eapply mapping_map_lt_iff_collapsable_unwritable. eapply ident_map_lt. }
+    { eapply mapping_map_lt_iff_collapsable_unwritable. eapply ident_map_lt_iff. }
     { eapply ident_map_timemap. }
     { refl. }
   }
@@ -1454,7 +1454,7 @@ Proof.
         eapply Trace.steps_future in STEPS4; eauto. des.
         eapply ident_map_pf_consistent_super_strong_easy; eauto.
         econs; eauto.
-        eapply mapping_map_lt_iff_collapsable_unwritable; eauto. eapply ident_map_lt; eauto.
+        eapply mapping_map_lt_iff_collapsable_unwritable; eauto. eapply ident_map_lt_iff; eauto.
       }
     }
     { exists ftr_cancel, ftr2. splits; auto.
@@ -1954,9 +1954,9 @@ Proof.
     eapply cap_flex_closed; eauto. }
   { eapply Memory.closed_timemap_bot.
     eapply cap_flex_closed; eauto. }
-  { eapply local_map_incr; eauto. eapply ident_map_lt; eauto. }
+  { eapply local_map_incr; eauto. eapply ident_map_lt_iff; eauto. }
   { eauto. }
-  { eapply mapping_map_lt_iff_collapsable_unwritable; eauto. eapply ident_map_lt. }
+  { eapply mapping_map_lt_iff_collapsable_unwritable; eauto. eapply ident_map_lt_iff. }
   { eapply ident_map_timemap. }
   { refl. }
   i. des.

@@ -513,7 +513,7 @@ Module RAThread.
             { i. econs; eauto. }
           }
         }
-        { eapply mapping_map_lt_iff_collapsable_unwritable. eapply ident_map_lt. }
+        { eapply mapping_map_lt_iff_collapsable_unwritable. eapply ident_map_lt_iff. }
         { eapply ident_map_timemap. }
         { eapply Memory.max_concrete_timemap_spec; eauto.
           eapply Memory.cap_closed_timemap; eauto. }

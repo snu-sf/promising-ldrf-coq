@@ -3142,6 +3142,13 @@ Section IDENTMAP.
 
   Lemma ident_map_lt
     :
+      mapping_map_lt ident_map.
+  Proof.
+    unfold ident_map in *. ii. clarify.
+  Qed.
+
+  Lemma ident_map_lt_iff
+    :
       mapping_map_lt_iff ident_map.
   Proof.
     unfold ident_map in *. ii. clarify.
@@ -3151,7 +3158,7 @@ Section IDENTMAP.
     :
       mapping_map_le ident_map.
   Proof.
-    apply mapping_map_lt_iff_map_le, ident_map_lt.
+    apply mapping_map_lt_iff_map_le, ident_map_lt_iff.
   Qed.
 
   Lemma ident_map_bot
@@ -3165,7 +3172,7 @@ Section IDENTMAP.
     :
       mapping_map_eq ident_map.
   Proof.
-    apply mapping_map_lt_iff_map_eq, ident_map_lt.
+    apply mapping_map_lt_iff_map_eq, ident_map_lt_iff.
   Qed.
 
   Lemma ident_map_total
@@ -3210,7 +3217,7 @@ Section IDENTMAP.
     econs; i.
     - esplits; eauto.
       + eapply mapping_map_lt_iff_non_collapsable.
-        eapply ident_map_lt.
+        eapply ident_map_lt_iff.
       + refl.
       + eapply ident_map_message.
     - esplits; eauto; refl.
@@ -4219,7 +4226,7 @@ Section COMPOSE.
     ii. econs; eauto.
   Qed.
 
-  Lemma compose_map_lt f0 f1
+  Lemma compose_map_lt_iff f0 f1
         (MAPLT0: mapping_map_lt_iff f0)
         (MAPLT1: mapping_map_lt_iff f1)
     :
@@ -4345,7 +4352,7 @@ Section COMPOSE.
     - ii. exploit MAPPED; eauto. i. des; auto.
       exploit MAPPED0; eauto. i. des; auto. esplits; eauto.
       + eapply mapping_map_lt_iff_non_collapsable.
-        eapply compose_map_lt; eauto.
+        eapply compose_map_lt_iff; eauto.
       + eapply compose_map_msg; eauto.
     - ii. exploit ONLY0; eauto. i. des.
       exploit ONLY; eauto. i. des. esplits; eauto.

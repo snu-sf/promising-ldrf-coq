@@ -5,6 +5,7 @@ From sflib Require Import sflib.
 
 From PromisingLib Require Import Axioms.
 From PromisingLib Require Import Basic.
+From PromisingLib Require Import DenseOrder.
 From PromisingLib Require Import DataStructure.
 From PromisingLib Require Import Language.
 From PromisingLib Require Import Loc.
@@ -431,7 +432,7 @@ Section CAPFLEX.
       map_ident_concrete f mem0.
   Proof.
     ii. inv CONCRETE. eapply Memory.max_concrete_ts_spec in GET; eauto.
-    des. eapply MAP; eauto. etrans; eauto.
+    des. eapply MAP; eauto.
   Qed.
 
   Lemma concrete_messages_le_cap_flex_memory_map
@@ -451,10 +452,10 @@ Section CAPFLEX.
   Proof.
     assert (IDENT: map_ident_concrete f mem0).
     { ii. inv CONCRETE0. eapply Memory.max_concrete_ts_spec in GET; eauto.
-      des. eapply MAP; eauto. etrans; eauto. }
+      des. eapply MAP; eauto. }
     econs.
     { i. eapply (@cap_flex_inv mem0 cap0 tm0) in GET; eauto. des; eauto.
-      destruct msg as [val released|]; auto. right.
+      destruct (classic (msg = Message.reserve)); auto. right.
       exploit CONCRETE; eauto. i. des. esplits.
       { eapply cap_flex_map_ident; eauto. transitivity (maxmap loc); auto.
         eapply Memory.max_concrete_ts_spec; eauto. }

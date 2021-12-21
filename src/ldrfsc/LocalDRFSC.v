@@ -158,7 +158,7 @@ Section SIM.
   Proof.
     destruct (classic (SCRace.race L fe0)) as [RACE|RACE]; auto. left.
     assert (MAPLT: mapping_map_lt_iff ident_map).
-    { eapply ident_map_lt. }
+    { eapply ident_map_lt_iff. }
     assert (MAPLE: mapping_map_le ident_map).
     { eapply ident_map_le. }
     assert (MAPEQ: mapping_map_eq ident_map).
@@ -358,7 +358,7 @@ Section SIM.
           exists fto, ffrom, fto, ffrom. esplits; eauto; try refl.
           i. econs; eauto. eapply Memory.cap_le; eauto. refl.
       }
-      { eapply mapping_map_lt_iff_collapsable_unwritable. eapply ident_map_lt. }
+      { eapply mapping_map_lt_iff_collapsable_unwritable. eapply ident_map_lt_iff. }
       { eapply ident_map_timemap. }
       { instantiate (1:=max). instantiate (1:=(Thread.sc e0)).
         eapply Memory.max_concrete_timemap_spec; eauto.
@@ -383,7 +383,7 @@ Section SIM.
         }
         { eauto. }
         { refl. }
-      + eapply sc_race_map; eauto. eapply ident_map_lt.
+      + eapply sc_race_map; eauto. eapply ident_map_lt_iff.
     - assert (CONSISTENT0: Local.promise_consistent (Thread.local e')).
       { exploit SCThread.rtc_tau_step_future; try apply STEPS0; eauto.
         { eapply Local.cap_wf; eauto. }

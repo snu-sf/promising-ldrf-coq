@@ -478,7 +478,7 @@ Module OrdThread.
           (<<EVENT: tevent_map ident_map fe e>>).
     Proof.
       assert (MAPLT: mapping_map_lt_iff ident_map).
-      { eapply ident_map_lt. }
+      { eapply ident_map_lt_iff. }
       assert (MAPLE: mapping_map_le ident_map).
       { eapply ident_map_le. }
       assert (MAPEQ: mapping_map_eq ident_map).

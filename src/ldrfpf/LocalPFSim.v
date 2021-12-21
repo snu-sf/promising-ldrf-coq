@@ -2855,7 +2855,7 @@ Section SIM.
         { inv TRACE. inv STEPS0; ss.
           eexists _, [], ident_map, MachineEvent.silent.
           erewrite List.app_nil_r. splits; eauto.
-          { eapply ident_map_lt. }
+          { eapply ident_map_lt_iff. }
           right. splits; ss.
           i. erewrite IdentMap.gss in TID0. dep_clarify.
         }
@@ -2910,7 +2910,7 @@ Section SIM.
         inv LOCAL0; ss. eauto. }
       hexploit CERTBOTNIL; auto. i. subst.
       eexists _, [], ident_map. erewrite List.app_nil_r. esplits; eauto.
-      { eapply ident_map_lt. }
+      { eapply ident_map_lt_iff. }
       { left. auto. }
       { right. splits; ss.
         i. ss. erewrite IdentMap.gss in TID0. dep_clarify. }
@@ -2918,7 +2918,7 @@ Section SIM.
     { hexploit CERTBOT.
       { destruct e0; ss. auto. } i. subst.
       eexists _, [], ident_map. erewrite List.app_nil_r. esplits; eauto.
-      { eapply ident_map_lt. }
+      { eapply ident_map_lt_iff. }
       { left. auto. }
       { left. auto. }
     }

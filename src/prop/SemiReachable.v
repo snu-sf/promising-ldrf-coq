@@ -245,7 +245,7 @@ Module SemiReachable.
         { ss. }
         { ss. }
         { ss. }
-        { eapply mapping_map_lt_iff_collapsable_unwritable. eapply ident_map_lt. }
+        { eapply mapping_map_lt_iff_collapsable_unwritable. eapply ident_map_lt_iff. }
         { ss. }
         i. des. inv STEP0.
         assert (RECHABLE0: semi_reachable (Thread.mk _ state flc1 fsc1 fmem1)).
@@ -260,7 +260,7 @@ Module SemiReachable.
           i. eapply promise_consistent_mon; eauto. refl.
         }
         esplits; eauto. econs; eauto.
-        { eapply mapping_map_lt_iff_collapsable_unwritable; eauto. eapply ident_map_lt. }
+        { eapply mapping_map_lt_iff_collapsable_unwritable; eauto. eapply ident_map_lt_iff. }
       Qed.
 
       Lemma tau_steps_map_reachable lang (th0 th1 fth0: Thread.t lang)
@@ -316,7 +316,7 @@ Module SemiReachable.
               * refl.
             + i. eapply Memory.cap_le in GET; eauto; [|refl].
               left. exists fto, ffrom, fto, ffrom. splits; ss; try refl. i. econs; eauto.
-          - eapply mapping_map_lt_iff_collapsable_unwritable. eapply ident_map_lt.
+          - eapply mapping_map_lt_iff_collapsable_unwritable. eapply ident_map_lt_iff.
           - eapply ident_map_timemap.
           - eapply Memory.max_concrete_timemap_spec; eauto.
             eapply Memory.cap_closed_timemap; eauto.

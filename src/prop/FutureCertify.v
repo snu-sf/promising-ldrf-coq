@@ -28,7 +28,7 @@ Require Import Pred.
 Require Import Trace.
 Require Import MemoryProps.
 Require Import PFConsistent.
-Require Import PFConsistentStrong.
+(* Require Import PFConsistentStrong. *)
 
 Set Implicit Arguments.
 
@@ -61,6 +61,7 @@ Module FutureCertify.
       { eapply ident_map_le. }
       { eapply ident_map_bot. }
       { eapply ident_map_eq. }
+      { eapply ident_map_lt. }
       { i. eapply ident_map_mappable_evt. }
       { eapply STEPS. }
       { ss. }
@@ -73,11 +74,11 @@ Module FutureCertify.
       { eauto. }
       { eapply Memory.max_concrete_timemap_closed; eauto. }
       { eapply map_ident_in_memory_local; eauto; ss.
-        eapply ident_map_lt.
+        eapply ident_map_lt_iff.
       }
       { econs.
-        { i. destruct msg as [val released|]; auto. right.
-          exists to, from, (Message.concrete val released), (Message.concrete val released).
+        { i. destruct (classic (msg = Message.reserve)); auto. right.
+          exists to, from, msg.
           eapply Memory.cap_inv in GET; eauto. des; ss. esplits; eauto.
           { refl. }
           { eapply ident_map_message. }
@@ -89,7 +90,7 @@ Module FutureCertify.
           { i. econs; eauto. }
         }
       }
-      { eapply mapping_map_lt_iff_collapsable_unwritable. eapply ident_map_lt. }
+      { eapply mapping_map_lt_iff_collapsable_unwritable. eapply ident_map_lt_iff. }
       { eapply ident_map_timemap. }
       { eapply Memory.max_concrete_timemap_spec; eauto.
         eapply Memory.cap_closed_timemap; eauto. }
@@ -124,16 +125,17 @@ Module FutureCertify.
           (CONSISTENT: @Thread.consistent lang e):
       future_certify e.
     Proof.
-      eapply consistent_pf_consistent_super_strong in CONSISTENT; eauto. des.
-      exploit (@concrete_promise_max_timemap_exists (Thread.memory e) (Local.promises (Thread.local e))).
-      { eapply MEMORY. } i. des.
-      ii. exploit (CONSISTENT0 mem1 TimeMap.bot sc1); eauto. i. des.
-      eapply Trace.silent_steps_tau_steps in STEPS; cycle 1.
-      { eapply List.Forall_impl; eauto. i. ss. des. auto. }
-      unguard. des.
-      { left. unfold Thread.steps_failure. destruct e1. ss. esplits; eauto. }
-      { right. esplits; eauto. }
-    Qed.
+    (*   eapply consistent_pf_consistent_super_strong in CONSISTENT; eauto. des. *)
+    (*   exploit (@concrete_promise_max_timemap_exists (Thread.memory e) (Local.promises (Thread.local e))). *)
+    (*   { eapply MEMORY. } i. des. *)
+    (*   ii. exploit (CONSISTENT0 mem1 TimeMap.bot sc1); eauto. i. des. *)
+    (*   eapply Trace.silent_steps_tau_steps in STEPS; cycle 1. *)
+    (*   { eapply List.Forall_impl; eauto. i. ss. des. auto. } *)
+    (*   unguard. des. *)
+    (*   { left. unfold Thread.steps_failure. destruct e1. ss. esplits; eauto. } *)
+    (*   { right. esplits; eauto. } *)
+    (* Qed. *)
+    Admitted.
 
     Lemma future_consistent
           e sc' mem'
@@ -151,11 +153,8 @@ Module FutureCertify.
       ii. ss.
       eapply future_certify_exists; try exact CONSISTENT; eauto.
       - etrans; eauto. eapply Memory.cap_future_weak; eauto.
-      - etrans; eauto.
-        hexploit Memory.cap_closed_timemap; try exact SC'; eauto. i.
-        hexploit Memory.max_concrete_timemap_spec; eauto.
       - eapply Local.cap_wf; eauto.
-      - eapply Memory.max_concrete_timemap_closed; eauto.
+      - eapply Memory.cap_closed_timemap; eauto.
       - eapply Memory.cap_closed; eauto.
     Qed.
   End FutureCertify.
