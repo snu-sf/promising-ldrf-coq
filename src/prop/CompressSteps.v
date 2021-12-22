@@ -120,32 +120,65 @@ Module CompressSteps.
       { eapply mapping_map_lt_iff_map_le; eauto. }
       { eapply map_ident_in_memory_bot; eauto. }
       { eapply mapping_map_lt_iff_map_eq; eauto. }
+      { eapply mapping_map_lt_iff_map_lt; eauto. }
       { eapply wf_time_mapped_mappable; eauto. }
       { eapply map_ident_in_memory_local; eauto. }
       { eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }
       { eapply map_ident_in_memory_closed_timemap; eauto. }
       { refl. }
-      i. des. inv FAILURE; inv STEP. inv LOCAL0. inv LOCAL1.
-      esplits.
-      - eapply thread_steps_pred_steps.
-        eapply pred_steps_trace_steps2.
-        + eapply STEPS.
-        + instantiate (1:=fun _ => True). eapply List.Forall_forall. ii.
-          eapply list_Forall2_in in H; eauto. des.
-          eapply List.Forall_forall in EVENTS; try apply IN. destruct a, x.
-          ss. des. split; auto. rewrite <- TAU.
-          eapply tevent_map_same_machine_event; eauto.
-      - econs 2. econs; eauto. econs. econs.
-        destruct lc2, flc1. inv LOCAL. ss.
-        eapply promise_consistent_mon.
-        + eapply promise_consistent_map.
-          { eapply mapping_map_lt_iff_map_le; eauto. }
-          { eapply mapping_map_lt_iff_map_eq; eauto. }
-          { eapply TVIEW. }
-          { eapply PROMISES. }
-          { eapply CONSISTENT. }
-        + eauto.
-        + refl.
+      i. des.
+      inv STEP_FAILURE; inv STEP; ss. inv LOCAL0; ss.
+      { esplits.
+        - eapply thread_steps_pred_steps.
+          eapply pred_steps_trace_steps2.
+          + eapply STEPS.
+          + instantiate (1:=fun _ => True). eapply List.Forall_forall. ii.
+            eapply list_Forall2_in in H; eauto. des.
+            eapply List.Forall_forall in EVENTS; try apply IN. destruct a, x.
+            ss. des. split; auto. rewrite <- TAU.
+            eapply tevent_map_same_machine_event; eauto.
+        - econs 2. econs; [|econs 7]; eauto.
+          eapply failure_step_map; eauto.
+          + eapply mapping_map_lt_iff_map_le; eauto.
+          + eapply mapping_map_lt_iff_map_eq; eauto.
+        - ss.
+      }
+      { esplits.
+        - eapply thread_steps_pred_steps.
+          eapply pred_steps_trace_steps2.
+          + eapply STEPS.
+          + instantiate (1:=fun _ => True). eapply List.Forall_forall. ii.
+            eapply list_Forall2_in in H; eauto. des.
+            eapply List.Forall_forall in EVENTS; try apply IN. destruct a, x.
+            ss. des. split; auto. rewrite <- TAU.
+            eapply tevent_map_same_machine_event; eauto.
+        - econs 2. econs; [|econs 10]; eauto.
+          eapply racy_write_step_map; eauto.
+          + eapply mapping_map_lt_iff_map_le; eauto.
+          + eapply mapping_map_lt_iff_map_eq; eauto.
+          + eapply mapping_map_lt_iff_map_lt; eauto.
+          + exploit Trace.steps_future; try exact STEPS0; eauto. s. i. des. ss.
+          + eapply mapping_map_lt_iff_collapsable_unwritable; eauto.
+        - ss.
+      }
+      { esplits.
+        - eapply thread_steps_pred_steps.
+          eapply pred_steps_trace_steps2.
+          + eapply STEPS.
+          + instantiate (1:=fun _ => True). eapply List.Forall_forall. ii.
+            eapply list_Forall2_in in H; eauto. des.
+            eapply List.Forall_forall in EVENTS; try apply IN. destruct a, x.
+            ss. des. split; auto. rewrite <- TAU.
+            eapply tevent_map_same_machine_event; eauto.
+        - econs 2. econs; [|econs 11]; eauto.
+          eapply racy_update_step_map; eauto.
+          + eapply mapping_map_lt_iff_map_le; eauto.
+          + eapply mapping_map_lt_iff_map_eq; eauto.
+          + eapply mapping_map_lt_iff_map_lt; eauto.
+          + exploit Trace.steps_future; try exact STEPS0; eauto. s. i. des. ss.
+          + eapply mapping_map_lt_iff_collapsable_unwritable; eauto.
+        - ss.
+      }
     Qed.
 
     Lemma compress_steps_fulfill
@@ -174,6 +207,7 @@ Module CompressSteps.
       { eapply mapping_map_lt_iff_map_le; eauto. }
       { eapply map_ident_in_memory_bot; eauto. }
       { eapply mapping_map_lt_iff_map_eq; eauto. }
+      { eapply mapping_map_lt_iff_map_lt; eauto. }
       { eapply wf_time_mapped_mappable; eauto. }
       { eapply map_ident_in_memory_local; eauto. }
       { eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }

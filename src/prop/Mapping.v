@@ -2667,25 +2667,30 @@ Section MAPPED.
     | _ => True
     end.
 
-  (* Lemma wf_time_mapped_mappable (tr: Trace.t) times *)
-  (*       (WFTIME: List.Forall (fun em => wf_time_evt times (snd em)) tr) *)
-  (*       (COMPLETE: forall loc to (IN: times loc to), *)
-  (*           exists fto, (<<MAPPED: f loc to fto>>)) *)
-  (*   : *)
-  (*     List.Forall (fun em => mappable_evt (snd em)) tr. *)
-  (* Proof. *)
-  (*   eapply List.Forall_impl; eauto. i. ss. destruct a. destruct t0; ss. *)
-  (*   - des. split. *)
-  (*     + apply COMPLETE in FROM. des. esplit. eauto. *)
-  (*     + apply COMPLETE in TO. des. esplit. eauto. *)
-  (*   - des. split. *)
-  (*     + apply COMPLETE in FROM. des. esplit. eauto. *)
-  (*     + apply COMPLETE in TO. des. esplit. eauto. *)
-  (*   - admit. *)
-  (*   - des. split. *)
-  (*     + apply COMPLETE in FROM. des. esplit. eauto. *)
-  (*     + apply COMPLETE in TO. des. esplit. eauto. *)
-  (* Admitted. *)
+  Lemma wf_time_mapped_mappable (tr: Trace.t) times
+        (WFTIME: List.Forall (fun em => wf_time_evt times (snd em)) tr)
+        (COMPLETE: forall loc to (IN: times loc to),
+            exists fto, (<<MAPPED: f loc to fto>>))
+    :
+      List.Forall (fun em => mappable_evt (snd em)) tr.
+  Proof.
+    eapply List.Forall_impl; eauto. i. ss. destruct a. destruct t0; ss.
+    - des. split.
+      + apply COMPLETE in FROM. des. esplit. eauto.
+      + apply COMPLETE in TO. des. esplit. eauto.
+    - des. split.
+      + apply COMPLETE in FROM. des. esplit. eauto.
+      + apply COMPLETE in TO. des. esplit. eauto.
+    - des. splits.
+      + clear - MSGS COMPLETE. induction MSGS; ss.
+        des. econs; eauto. apply COMPLETE in H, H0. des.
+        split; esplit; eauto.
+      + apply COMPLETE in FROM. des. esplit. eauto.
+      + apply COMPLETE in TO. des. esplit. eauto.
+    - des. split.
+      + apply COMPLETE in FROM. des. esplit. eauto.
+      + apply COMPLETE in TO. des. esplit. eauto.
+  Qed.
 
   Lemma wf_time_evt_map times te fte
         (WF: wf_time_evt times te)
@@ -2696,6 +2701,11 @@ Section MAPPED.
     inv MAP; ss.
     { des. splits; eauto. }
     { des. splits; eauto. }
+    { des. splits; eauto.
+      clear - MSGS MSGS0. induction MSGS; eauto.
+      inv MSGS0. exploit IHMSGS; eauto. i. econs; eauto.
+      des. splits; eauto.
+    }
     { des. splits; eauto. }
   Qed.
 
@@ -3097,6 +3107,15 @@ Section MAPLT.
   Proof.
     ii. eapply mapping_map_lt_iff_loc_map_le; eauto.
     ii. eauto.
+  Qed.
+
+  Lemma mapping_map_lt_iff_map_lt f
+        (MAPLT: mapping_map_lt_iff f)
+    :
+      mapping_map_lt f.
+  Proof.
+    ii. exploit MAPLT; [exact MAP0|exact MAP1|].
+    i. rewrite x in *. ss.
   Qed.
 
   Lemma mapping_map_lt_iff_non_collapsable f

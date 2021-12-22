@@ -82,6 +82,9 @@ Section Pred.
       (<<FROM: P loc from>>) /\ (<<TO: P loc to>>)
     | ThreadEvent.write loc from to val released ordw =>
       (<<FROM: P loc from>>) /\ (<<TO: P loc to>>)
+    | ThreadEvent.write_na loc msgs from to val ordw =>
+      (<<MSGS: List.Forall (fun m => P loc (fst (fst m)) /\ P loc (snd (fst m))) msgs>>) /\
+      (<<FROM: P loc from>>) /\ (<<TO: P loc to>>)
     | ThreadEvent.update loc from to valr valw releasedr releasedw ordr ordw =>
       (<<FROM: P loc from>>) /\ (<<TO: P loc to>>)
     | _ => True
@@ -93,6 +96,8 @@ Section Pred.
       wf_time_evt P0 <1= wf_time_evt P1.
   Proof.
     ii. unfold wf_time_evt in *. des_ifs; des; splits; eauto.
+    clear - LE MSGS. induction MSGS; eauto.
+    econs; eauto. des. splits; eauto.
   Qed.
 
   Definition no_promise (e : ThreadEvent.t) : Prop :=
@@ -407,6 +412,38 @@ Section PredStep.
       des_ifs; ss; auto. }
     { exists (fun loc' => if Loc.eq_dec loc' loc then [from; to] else []).
       des_ifs; ss; auto. }
+    { exists (fun loc' => if Loc.eq_dec loc' loc
+                  then from :: to :: (List.fold_left (fun l m => fst (fst m) :: snd (fst m) :: l) msgs [])
+                  else []).
+      condtac; ss. splits; auto.
+      induction msgs; eauto.
+      destruct a as [[f t] m]. ss. econs; ss.
+      - clear. split; right; right.
+        + remember [f; t] as l0.
+          assert (List.In f l0) by (subst; ss; eauto). clear Heql0.
+          revert l0 H. induction msgs; i; ss; eauto.
+          eapply IHmsgs. econs 2. econs 2. ss.
+        + remember [f; t] as l0.
+          assert (List.In t l0) by (subst; ss; eauto). clear Heql0.
+          revert l0 H. induction msgs; i; ss; eauto.
+          eapply IHmsgs. econs 2. econs 2. ss.
+      - remember [f; t] as l0. clear - IHmsgs.
+        replace l0 with ([] ++ l0) by ss.
+        remember [] as l1. clear - IHmsgs.
+        revert l0 l1 IHmsgs. induction msgs; eauto; i.
+        inv IHmsgs0. ss. econs.
+        + clear. split; right; right.
+          * remember (fst (fst a) :: snd (fst a) :: l1 ++ l0) as l2.
+            assert (List.In (fst (fst a)) l2) by (subst; ss; eauto). clear Heql2.
+            revert l2 H. induction msgs; i; ss; eauto.
+            eapply IHmsgs. econs 2. econs 2. ss.
+          * remember (fst (fst a) :: snd (fst a) :: l1 ++ l0) as l2.
+            assert (List.In (snd (fst a)) l2) by (subst; ss; eauto). clear Heql2.
+            revert l2 H. induction msgs; i; ss; eauto.
+            eapply IHmsgs. econs 2. econs 2. ss.
+        + replace (fst (fst a) :: snd (fst a) :: l1 ++ l0) with
+              ((fst (fst a) :: snd (fst a) :: l1) ++ l0); auto.
+    }
     { exists (fun loc' => if Loc.eq_dec loc' loc then [tsr; tsw] else []).
       des_ifs; ss; auto. }
   Qed.
