@@ -3976,3 +3976,261 @@ Proof.
   }
   { i. des_ifs. eapply sim_memory_top; eauto. }
 Qed.
+
+Lemma lower_lower_memory mem0 mem1 loc from to msg0 msg1
+      (LOWER: Memory.lower mem0 loc from to msg0 msg1 mem1)
+  :
+    lower_memory mem1 mem0.
+Proof.
+  econs. ii. erewrite (@Memory.lower_o mem1); eauto. des_ifs.
+  { ss. des; clarify. eapply lower_succeed_wf in LOWER. des.
+    rewrite GET. econs; eauto.
+  }
+  { refl. }
+Qed.
+
+Variant lower_none_content: option (Time.t * Message.t) -> option (Time.t * Message.t) -> Prop :=
+| lower_none_content_none
+  :
+    lower_none_content None None
+| lower_none_content_reserve
+    from
+  :
+    lower_none_content (Some (from, Message.reserve)) (Some (from, Message.reserve))
+| lower_none_content_undef
+    from
+  :
+    lower_none_content (Some (from, Message.undef)) (Some (from, Message.undef))
+| lower_none_content_concrete
+    from val released
+  :
+    lower_none_content (Some (from, Message.concrete val None)) (Some (from, Message.concrete val released))
+.
+
+Variant lower_none_list mem0 mem1 loc (tos: list Time.t): Prop :=
+| lower_list_mem_intro
+    (OTHERLOC: forall loc0 ts (NEQ: loc0 <> loc),
+        Memory.get loc0 ts mem1 = Memory.get loc0 ts mem0)
+    (OTHERTS: forall ts (NIN: ~ List.In ts tos),
+        Memory.get loc ts mem1 = Memory.get loc ts mem0)
+    (SAMETS: forall ts (IN: List.In ts tos),
+        lower_none_content (Memory.get loc ts mem1) (Memory.get loc ts mem0))
+.
+
+Lemma memory_lower_o2 mem1 mem2 loc from to msg1 msg2 l t
+      (LOWER: Memory.lower mem1 loc from to msg1 msg2 mem2)
+  :
+    Memory.get l t mem1 =
+    (if loc_ts_eq_dec (l, t) (loc, to)
+     then Some (from, msg1)
+     else Memory.get l t mem2).
+Proof.
+  erewrite (@Memory.lower_o mem2 mem1); eauto. des_ifs.
+  ss. des; clarify. eapply Memory.lower_get0 in LOWER. des; auto.
+Qed.
+
+Lemma tgt_flag_up_sim_promises flag_src flag_tgt f vers prom_src0 prom_tgt mem_src0 mem_tgt loc ts
+      (PROMS: sim_promises flag_src flag_tgt f vers prom_src0 prom_tgt)
+      (MEM: sim_memory flag_src f vers mem_src0 mem_tgt)
+      (TS: forall from to msg
+                  (GET: Memory.get loc to prom_src0 = Some (from, msg))
+                  (MSG: msg <> Message.reserve), Time.lt ts to)
+      (FLAG: flag_tgt loc = None)
+      (MLE: Memory.le prom_src0 mem_src0)
+      (INHABITED: Memory.inhabited mem_src0)
+  :
+    forall tvw lang st sc,
+    exists prom_src1 mem_src1,
+      (<<STEPS: rtc (@Thread.tau_step _)
+                    (Thread.mk lang st (Local.mk tvw prom_src0) sc mem_src0)
+                    (Thread.mk _ st (Local.mk tvw prom_src1) sc mem_src1)>>) /\
+      (<<PROMS: sim_promises flag_src (fun loc' => if (Loc.eq_dec loc' loc) then (Some ts) else flag_tgt loc') f vers prom_src1 prom_tgt>>) /\
+      (<<MEM: sim_memory flag_src f vers mem_src1 mem_tgt>>) /\
+      (<<VALS: forall loc0 to val released,
+          max_readable mem_src0 prom_src0 loc0 to val released
+          <->
+          max_readable mem_src1 prom_src1 loc0 to val released>>)
+.
+Proof.
+  assert (exists dom,
+             (<<DOM: forall to from val released
+                            (GET: Memory.get loc to prom_src0 = Some (from, Message.concrete val (Some released))),
+                 List.In to dom>>)).
+  { hexploit (cell_finite_sound_exists (prom_src0 loc)). i. des.
+    hexploit (@list_filter_exists _ (fun to => exists from val released, Memory.get loc to prom_src0 = Some (from, Message.concrete val (Some released)))).
+    i. des. exists l'. ii. eapply COMPLETE0. splits; eauto.
+    eapply COMPLETE. eauto.
+  }
+  i. des.
+  cut (exists prom_src1 mem_src1,
+          (<<STEPS: rtc (@Thread.tau_step _)
+                        (Thread.mk lang st (Local.mk tvw prom_src0) sc mem_src0)
+                        (Thread.mk _ st (Local.mk tvw prom_src1) sc mem_src1)>>) /\
+          (<<LOWERPROMS: lower_none_list prom_src0 prom_src1 loc dom>>) /\
+          (<<VALS: forall loc0 to val released,
+              max_readable mem_src0 prom_src0 loc0 to val released
+              <->
+              max_readable mem_src1 prom_src1 loc0 to val released>>) /\
+          (<<MEM: sim_memory flag_src f vers mem_src1 mem_tgt>>)).
+  { i. des. esplits.
+    { eauto. }
+    { inv LOWERPROMS. econs.
+      { i. hexploit sim_promises_get; eauto. i. des. des_ifs.
+        { rewrite FLAG in *.
+          destruct (classic (List.In to_src dom)).
+          { hexploit SAMETS; eauto. i. rewrite GET0 in H0. inv H0.
+            { esplits; eauto. inv MSG; try by (econs; auto). }
+            { esplits; eauto. inv MSG; try by (econs; auto). }
+            { esplits; eauto. inv MSG; try by (econs; auto). }
+          }
+          { hexploit OTHERTS; eauto. i. esplits; eauto.
+            { rewrite H0. eauto. }
+            { inv MSG; try by (econs; auto).
+              destruct vw_src; try by (econs; auto).
+              exfalso. eapply H. eapply DOM. eauto.
+            }
+          }
+        }
+        { esplits; eauto. rewrite OTHERLOC; auto. }
+      }
+      { i. des_ifs.
+        { destruct (classic (List.In fto dom)).
+          { hexploit SAMETS; eauto. i. right. esplits; eauto. i.
+            rewrite GET in H0. inv H0; ss.
+            { eapply TS; eauto. }
+            { eapply TS; eauto. ss. }
+          }
+          { hexploit sim_promises_get_if.
+            { eauto. }
+            { rewrite <- OTHERTS; eauto. }
+            i. rewrite FLAG in *. des; clarify.
+            left. esplits; eauto.
+          }
+        }
+        { hexploit sim_promises_get_if.
+          { eauto. }
+          { rewrite <- OTHERLOC; eauto. }
+          i. des.
+          { left. esplits; eauto. }
+          { right. esplits; eauto. }
+        }
+      }
+      { i. hexploit sim_promises_none; eauto. i.
+        destruct (Loc.eq_dec loc0 loc); subst.
+        { destruct (classic (List.In to dom)).
+          { hexploit SAMETS; eauto. i.
+            rewrite H in H1. inv H1; auto.
+          }
+          { rewrite OTHERTS; auto. }
+        }
+        { rewrite OTHERLOC; eauto. }
+      }
+    }
+    { auto. }
+    { auto. }
+  }
+  { clear FLAG TS PROMS. revert prom_src0 mem_src0 DOM MEM MLE INHABITED.
+    induction dom; i; ss.
+    { esplits.
+      { refl. }
+      { econs; ss. }
+      { refl. }
+      { auto. }
+    }
+    { destruct (classic (exists from val released, <<GET: Memory.get loc a prom_src0 = Some (from, Message.concrete val (Some released))>>)).
+      { des.
+        hexploit (@Memory.lower_exists prom_src0 loc from a (Message.concrete val (Some released)) (Message.concrete val None)); auto.
+        { hexploit memory_get_ts_strong.
+          { eapply GET. }
+          i. des; clarify.
+          apply MLE in GET.
+          rewrite INHABITED in GET. clarify.
+        }
+        { econs; eauto. refl. }
+        i. des.
+        hexploit Memory.lower_exists_le; eauto. i. des.
+        assert (LOWER: Memory.promise prom_src0 mem_src0 loc from a (Message.concrete val None) mem2 mem0 (Memory.op_kind_lower (Message.concrete val (Some released)))).
+        { econs; eauto; ss. econs. ss. eapply Time.bot_spec. }
+        hexploit (@IHdom mem2 mem0); auto.
+        { i. erewrite Memory.lower_o in GET0; eauto. des_ifs.
+          hexploit DOM; eauto. i. des; clarify.
+        }
+        { eapply lower_src_sim_memory; eauto. }
+        { eapply promise_memory_le; eauto. }
+        { eapply Memory.lower_inhabited; eauto. }
+        i. des. exists prom_src1, mem_src1. esplits; eauto.
+        { econs; [|eapply STEPS]. econs.
+          { econs. econs 1. econs; ss. econs; eauto. }
+          { ss. }
+        }
+        { inv LOWERPROMS. econs.
+          { i. transitivity (Memory.get loc0 ts0 mem2); auto.
+            erewrite (@Memory.lower_o mem2); eauto.
+            des_ifs. ss. des; clarify.
+          }
+          { i. transitivity (Memory.get loc ts0 mem2); auto.
+            { apply OTHERTS. ii. apply NIN. ss; auto. }
+            { erewrite (@Memory.lower_o mem2); eauto.
+              des_ifs. ss. des; clarify. exfalso. eapply NIN; auto.
+            }
+          }
+          { i. ss. des.
+            { clarify. destruct (classic (List.In ts0 dom)); auto.
+              { apply SAMETS in H1. erewrite (@Memory.lower_o mem2) in H1; eauto.
+                des_ifs. ss. des; clarify.
+                rewrite GET. inv H1; try econs.
+              }
+              { apply OTHERTS in H1. rewrite H1.
+                erewrite (@Memory.lower_o mem2); eauto. des_ifs.
+                { ss. des; clarify. rewrite GET. econs. }
+                { ss. des; clarify. }
+              }
+            }
+            { eapply SAMETS in IN. erewrite (@Memory.lower_o mem2) in IN; eauto.
+              des_ifs. ss. des; clarify. rewrite GET.
+              inv IN; try by econs.
+            }
+          }
+        }
+        { i. erewrite <- VALS. split; i; des.
+          { inv H1. econs.
+            { erewrite Memory.lower_o; eauto. des_ifs; eauto.
+              exfalso. ss. des; clarify.
+            }
+            { erewrite Memory.lower_o; eauto. des_ifs; eauto.
+              exfalso. ss. des; clarify.
+            }
+            { i. erewrite Memory.lower_o in GET1; eauto.
+              erewrite (@Memory.lower_o mem2 prom_src0); eauto. des_ifs.
+              eapply MAX; eauto.
+            }
+          }
+          { inv H1. erewrite Memory.lower_o in GET0; eauto.
+            erewrite Memory.lower_o in NONE; eauto. des_ifs. guardH o.
+            econs; eauto. i.
+            erewrite memory_lower_o2 in GET1; eauto.
+            erewrite (@memory_lower_o2 prom_src0 mem2); eauto. des_ifs.
+            eapply MAX; eauto.
+          }
+        }
+      }
+      { hexploit (@IHdom prom_src0 mem_src0); auto.
+        { i. hexploit DOM; eauto. i. des; clarify.
+          exfalso. eapply H; eauto.
+        }
+        i. des. esplits; eauto. inv LOWERPROMS. econs.
+        { i. eapply OTHERLOC. auto. }
+        { i. eapply OTHERTS. ii. eapply NIN. ss; auto. }
+        { i. ss. des; clarify.
+          { destruct (classic (List.In ts0 dom)); auto.
+            eapply OTHERTS in H0. rewrite H0.
+            destruct (Memory.get loc ts0 prom_src0) as [[? []]|] eqn:EQ; try econs.
+            destruct released; try econs.
+            exfalso. eapply H; eauto.
+          }
+          { eapply SAMETS. auto. }
+        }
+      }
+    }
+  }
+Qed.
