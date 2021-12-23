@@ -543,6 +543,64 @@ Proof.
 Qed.
 
 Lemma na_write_max_readable
+      mem0 prom0 loc ts val_old released
+      prom1 mem1 msgs kinds kind from to val_new
+      (MAX: max_readable mem0 prom0 loc ts val_old released)
+      (WRITE: Memory.write_na ts prom0 mem0 loc from to val_new prom1 mem1 msgs kinds kind)
+      (LOWER: mem1 = mem0)
+  :
+    max_readable mem1 prom1 loc to val_new None.
+Proof.
+  hexploit write_na_lower_memory_lower; eauto. i. des.
+  destruct MAX.
+  remember (Message.concrete val_old released) as msg_old. clear Heqmsg_old.
+  revert from0 msg_old GET NONE MAX KINDS KIND. induction WRITE.
+  { i. destruct kind; ss. inv WRITE. inv PROMISE.
+    hexploit lower_same_same; [apply PROMISES|]. i. subst.
+    hexploit lower_same_same; [apply MEM|]. i. subst.
+    econs.
+    { eapply Memory.lower_get0; eauto. }
+    { erewrite Memory.remove_o; eauto. des_ifs. ss. des; clarify. }
+    { i. erewrite Memory.remove_o; eauto. des_ifs.
+      { ss. des; clarify. exfalso. eapply Time.lt_strorder; eauto. }
+      { eapply MAX; eauto. etrans; eauto. }
+    }
+  }
+  { i. inv KINDS. destruct kind'; ss. clarify.
+    inv WRITE_EX. inv PROMISE.
+    hexploit lower_same_same; [apply PROMISES|]. i. subst.
+    hexploit lower_same_same; [apply MEM|]. i. subst.
+    eapply IHWRITE; auto.
+    { eapply Memory.lower_get0; eauto. }
+    { erewrite Memory.remove_o; eauto. des_ifs. ss. des; clarify. }
+    { i. erewrite Memory.remove_o; eauto. des_ifs.
+      { ss. des; clarify. exfalso. eapply Time.lt_strorder; eauto. }
+      { eapply MAX; eauto. etrans; eauto. }
+    }
+  }
+Qed.
+
+Lemma ts_le_memory_write_na
+      ts0 prom0 mem0 loc from to val prom1 mem1 msgs kinds kind ts1
+      (WRITE: Memory.write_na ts1 prom0 mem0 loc from to val prom1 mem1 msgs kinds kind)
+      (TS: Time.le ts0 ts1)
+  :
+    Memory.write_na ts0 prom0 mem0 loc from to val prom1 mem1 msgs kinds kind.
+Proof.
+  revert ts0 TS. induction WRITE; i.
+  { econs 1; eauto. eapply TimeFacts.le_lt_lt; eauto. }
+  { econs 2; eauto. eapply TimeFacts.le_lt_lt; eauto. }
+Qed.
+
+Lemma write_na_ts_lt ts prom0 mem0 loc from to val prom1 mem1 msgs kinds kind
+      (WRITE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 msgs kinds kind)
+  :
+    Time.lt ts to.
+Proof.
+  induction WRITE; auto. etrans; eauto.
+Qed.
+
+Lemma na_write_step_max_readable
       mem0 lc0 loc ts val_old released ord
       lc1 mem1 msgs kinds kind sc0 sc1 from to val_new
       (MAX: max_readable mem0 lc0.(Local.promises) loc ts val_old released)
@@ -550,93 +608,32 @@ Lemma na_write_max_readable
       (WRITE: Local.write_na_step lc0 sc0 mem0 loc from to val_new ord lc1 sc1 mem1
                                   msgs kinds kind)
       (LOWER: mem1 = mem0)
-      (CONS: Local.promise_consistent lc0)
-  (* (WF: Local.wf lc0 mem0) *)
+      (WF: Local.wf lc0 mem0)
   :
     max_readable mem1 lc1.(Local.promises) loc (lc1.(Local.tview).(TView.cur).(View.pln) loc) val_new None.
 Proof.
-  destruct lc0. unfold Local.promise_consistent in CONS. ss. subst.
-  hexploit write_na_step_lower_memory_lower; eauto. i. des.
   inv WRITE. ss.
-  revert MAX KINDS KIND CONS. induction WRITE0.
-  { i. admit. }
-  { i. inv KINDS. destruct kind'; ss. inv WRITE_EX. inv PROMISE.
-    eapply IHWRITE0; auto.
-    2:{ i. erewrite Memory.remove_o in PROMISE; eauto.
-        erewrite Memory.lower_o in PROMISE; eauto. des_ifs.
-        eapply CONS; eauto.
-    }
-    inv MAX. econs; eauto.
-    { erewrite Memory.remove_o; eauto.
-      erewrite Memory.lower_o; eauto. des_ifs.
-    }
-    { i. erewrite Memory.remove_o; eauto.
-      erewrite Memory.lower_o; eauto. des_ifs.
-      { ss. des; clarify. exfalso. exploit CONS.
-        { eapply Memory.lower_get0 in PROMISES. des; eauto. }
-        { inv MSG_EX; des; ss. }
-        i. ts < to'
-
-exfalso.
-        eapply MAX0 in TS0.
-        {
-
-
-admit. }
-      { eapply MAX0; eauto. }
-    }
-
-    }
-
-eauto.
-
-
-eapply max_readable_not_racy; eauto.
+  exploit na_write_max_readable.
+  { eauto. }
+  { eapply ts_le_memory_write_na.
+    { eauto. }
+    { eapply WF. }
+  }
+  { auto. }
+  i.
+  match goal with
+  | |- _ ?vw _ _ => replace vw with to
+  end; auto.
+  unfold TimeMap.join.
+  replace ((TimeMap.singleton loc to) loc) with to.
+  2:{ unfold TimeMap.singleton. setoid_rewrite LocFun.add_spec. des_ifs. }
+  symmetry. eapply TimeFacts.le_join_r.
+  etrans.
+  2:{ left. eapply write_na_ts_lt; eauto. }
+  eapply WF.
 Qed.
 
-
-Lemma na_write_max_readable mem0 prom0 loc ts from to val1
-      (WF: Memory.le prom0 mem0)
-      (WRITE: Memory.na_write
-
-      (BOT: Memory.bot_none prom0)
-      (RESERVE: forall to' from' msg'
-                       (GET: Memory.get loc to' prom0 = Some (from', msg')),
-          (<<RESERVE: msg' <> Message.reserve>>) /\
-          (<<TS: Time.lt ts to'>>))
-      (CLOSED: __guard__ (exists from' msg',
-                             (<<GET: Memory.get loc ts mem0 = Some (from', msg')>>) /\ (<<RESERVE: msg' <> Message.reserve>>)))
-      (FROM: Time.le (Memory.max_ts loc mem0) from)
-      (TO: Time.lt from to)
-  :
-
-Lemma max_readable_na_write mem0 prom0 loc ts from to val1
-      (WF: Memory.le prom0 mem0)
-      (BOT: Memory.bot_none prom0)
-      (RESERVE: forall to' from' msg'
-                       (GET: Memory.get loc to' prom0 = Some (from', msg')),
-          (<<RESERVE: msg' <> Message.reserve>>) /\
-          (<<TS: Time.lt ts to'>>))
-      (CLOSED: __guard__ (exists from' msg',
-                             (<<GET: Memory.get loc ts mem0 = Some (from', msg')>>) /\ (<<RESERVE: msg' <> Message.reserve>>)))
-      (FROM: Time.le (Memory.max_ts loc mem0) from)
-      (TO: Time.lt from to)
-  :
-    exists mem1 prom1 mem2 msgs ks,
-      (<<MEM: fulfilled_memory loc mem0 mem1>>) /\
-      (<<ADD: Memory.add mem1 loc from to (Message.concrete val1 None) mem2>>) /\
-      (<<PROMISES: forall loc' ts',
-          Memory.get loc' ts' prom1 =
-          if Loc.eq_dec loc' loc
-          then None
-          else Memory.get loc' ts' prom0>>) /\
-      (<<WRITE: Memory.write_na ts prom0 mem0 loc from to val1 prom1 mem2 msgs ks Memory.op_kind_add>>) /\
-      (<<NONE: Memory.get loc to prom1 = None>>) /\
-      (<<MAX: Memory.max_ts loc mem2 = to>>)
-.
-
-
-Lemma sim_thread_tgt_write_na
+Lemma sim_thread_tgt_write_na_aux
       f vers flag_src flag_tgt vs_src vs_tgt
       mem_src mem_tgt0 lc_src lc_tgt0 sc_src sc_tgt0
       loc from to val_old val_new lc_tgt1 sc_tgt1 mem_tgt1 ord msgs kinds kind ts
@@ -721,13 +718,16 @@ Proof.
     { inv RELVERS. econs. i. eapply MLE in GET. eauto. }
   }
   { ii. des_ifs.
-    { inv WRITE. econs; ss. i.
-      clear CONSISTENT. clarify.
-
-admit. }
-    { hexploit (MAXTGT loc0). i.
-      inv H. inv WRITE. econs; ss.
-      i. hexploit MAX; eauto. i. des. esplits; eauto.
+    { specialize (MAXTGT loc). inv MAXTGT.
+      hexploit MAX; eauto. i. des.
+      hexploit na_write_step_max_readable.
+      { instantiate (5:=Local.mk _ _). eapply MAX0. }
+      all: ss; eauto.
+      i. destruct lc_tgt1. ss. econs. i. esplits; eauto.
+      clear - VAL1. clarify. refl.
+    }
+    { inv WRITE. ss. specialize (MAXTGT loc0). inv MAXTGT. econs; eauto.
+      i. ss. hexploit MAX; eauto. i. des. esplits; eauto.
       match goal with
       | |- _ ?vw _ _ => replace vw with (tvw.(TView.cur).(View.pln) loc0)
       end.
@@ -745,57 +745,44 @@ admit. }
   }
 Qed.
 
-rewrite <- VAL.
-
-
-Time.join unfold TimeMap.join, TimeMap.singleton.
-
-
-      inv MAX0. econs; eauto.
-
-
-clarify.
-
-
-econs.
-
-
-      eapply PROM.
-
-      h
-
-
-admit. }
-  {
-
-
-
-
-destruct ord; ss. }
-
-induction WRITE. inv WRITE.
-
-  inv
-
-     Proof.
-  hexploit Local.read_step_future; eauto.
-  i. des. splits.
-  { inv SIM. econs; eauto.
-    { eapply sim_local_tgt_mon; eauto.
-      { inv READ; ss. }
-    }
-    { eapply max_values_tgt_mon; eauto.
-      { inv READ; ss. }
-    }
-  }
-  { i. inv SIM. specialize (MAXTGT loc). inv MAXTGT.
-    hexploit MAX; eauto. i. des.
-    hexploit max_readable_read_only; eauto.
-    i. des; auto. etrans; eauto.
-  }
+Lemma sim_thread_tgt_write_na
+      f vers flag_src flag_tgt vs_src vs_tgt
+      mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src sc_tgt0
+      loc from to val_old val_new lc_tgt1 sc_tgt1 mem_tgt1 ord msgs kinds kind
+      (WRITE: Local.write_na_step lc_tgt0 sc_tgt0 mem_tgt0 loc from to val_new ord lc_tgt1 sc_tgt1 mem_tgt1 msgs kinds kind)
+      (LOWER: mem_tgt1 = mem_tgt0)
+      (SIM: sim_thread
+              f vers flag_src flag_tgt vs_src vs_tgt
+              mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src sc_tgt0)
+      (VAL: vs_tgt loc = Some val_old)
+      (CONSISTENT: Local.promise_consistent lc_tgt1)
+      (LOCALSRC: Local.wf lc_src0 mem_src0)
+      (LOCALTGT: Local.wf lc_tgt0 mem_tgt0)
+      (MEMSRC: Memory.closed mem_src0)
+      (MEMTGT: Memory.closed mem_tgt0)
+      (WF: Mapping.wfs f)
+      lang st
+  :
+    exists mem_src1 lc_src1 ts,
+      (<<STEPS: rtc (@Thread.tau_step _)
+                    (Thread.mk lang st lc_src0 sc_src mem_src0)
+                    (Thread.mk _ st lc_src1 sc_src mem_src1)>>) /\
+      (<<SIM: sim_thread
+                f vers flag_src
+                (fun loc0 => if Loc.eq_dec loc0 loc then Some ts else flag_tgt loc0)
+                vs_src
+                (fun loc0 => if Loc.eq_dec loc0 loc then Some val_new else vs_tgt loc0)
+                mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src sc_tgt1>>) /\
+      (<<ORD: ord = Ordering.na>>) /\
+      (<<SC: sc_tgt1 = sc_tgt0>>)
+.
+Proof.
+  hexploit sim_thread_tgt_flag_up; eauto.
+  { eapply PromiseConsistent.write_na_step_promise_consistent; eauto. }
+  i. des.
+  hexploit sim_thread_tgt_write_na_aux; eauto.
+  { ss. des_ifs. }
 Qed.
-
-Local.write_step
 
 Lemma cap_max_readable mem cap prom loc ts val released
       (CAP: Memory.cap mem cap)
