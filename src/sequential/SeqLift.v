@@ -2551,7 +2551,7 @@ Lemma src_writtten_sim_promises flag_src flag_tgt f vers mem_tgt mem_src loc ts
       (PROMS: sim_promises flag_src flag_tgt f vers mem_src mem_tgt)
       (FLAGSRC: flag_src loc = Some ts)
   :
-    sim_promises flag_src (fun loc' => if (Loc.eq_dec loc loc') then None else flag_tgt loc') f vers mem_src mem_tgt.
+    sim_promises flag_src (fun loc' => if (Loc.eq_dec loc' loc) then None else flag_tgt loc') f vers mem_src mem_tgt.
 Proof.
   econs.
   { i. hexploit sim_promises_get; eauto. i. des. esplits; eauto. des_ifs. }
@@ -3381,7 +3381,7 @@ Lemma add_src_sim_memory flag_src f vers mem_tgt mem_src0 mem_src1 ts
       (FLAG: flag_src loc = Some ts)
       (TS: Time.le ts from)
   :
-    sim_memory ((fun loc' => if (Loc.eq_dec loc loc') then (Some to) else flag_src loc')) f vers mem_src1 mem_tgt.
+    sim_memory ((fun loc' => if (Loc.eq_dec loc' loc) then (Some to) else flag_src loc')) f vers mem_src1 mem_tgt.
 Proof.
   assert (TOPLE: Time.le ts to).
   { etrans; eauto. left. eapply add_succeed_wf; eauto. }
@@ -3419,7 +3419,7 @@ Lemma src_write_sim_memory flag_src f vers mem_tgt mem_src loc ts
       (FLAG: flag_src loc = None)
       (TOP: top_time ts (f loc))
   :
-    sim_memory (fun loc' => if (Loc.eq_dec loc loc') then (Some ts) else flag_src loc') f vers mem_src mem_tgt.
+    sim_memory (fun loc' => if (Loc.eq_dec loc' loc) then (Some ts) else flag_src loc') f vers mem_src mem_tgt.
 Proof.
   econs.
   { i. hexploit sim_memory_get; eauto. i. des. esplits; eauto. }

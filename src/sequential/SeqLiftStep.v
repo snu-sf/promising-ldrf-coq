@@ -784,6 +784,83 @@ Proof.
   { ss. des_ifs. }
 Qed.
 
+Lemma reserve_future_steps prom0 mem0 prom1 mem1
+      (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
+      tvw sc lang st
+  :
+    rtc (@Thread.tau_step _)
+        (Thread.mk lang st (Local.mk tvw prom0) sc mem0)
+        (Thread.mk _ st (Local.mk tvw prom1) sc mem1).
+Proof.
+  induction FUTURE.
+  { refl. }
+  econs; [|eauto]. econs.
+  { econs. econs 1. econs; eauto. }
+  { ss. }
+Qed.
+
+Lemma sim_thread_src_write_na
+      f vers flag_src flag_tgt vs_src vs_tgt
+      mem_src0 mem_tgt lc_src0 lc_tgt sc_src sc_tgt
+      loc val_old val_new
+      (SIM: sim_thread
+              f vers flag_src flag_tgt vs_src vs_tgt
+              mem_src0 mem_tgt lc_src0 lc_tgt sc_src sc_tgt)
+      (VAL: vs_src loc = Some val_old)
+      (CONSISTENT: Local.promise_consistent lc_tgt)
+      (LOCALSRC: Local.wf lc_src0 mem_src0)
+      (LOCALTGT: Local.wf lc_tgt mem_tgt)
+      (MEMSRC: Memory.closed mem_src0)
+      (MEMTGT: Memory.closed mem_tgt)
+      (WF: Mapping.wfs f)
+      lang st
+  :
+    exists mem_src1 mem_src2 lc_src1 lc_src2 from to msgs kinds kind,
+      (<<STEPS: rtc (@Thread.tau_step _)
+                    (Thread.mk lang st lc_src0 sc_src mem_src0)
+                    (Thread.mk _ st lc_src1 sc_src mem_src1)>>) /\
+      (<<WRITE: Local.write_na_step lc_src1 sc_src mem_src1 loc from to val_new Ordering.na lc_src2 sc_src mem_src2 msgs kinds kind>>) /\
+      (<<SIM: sim_thread
+                f vers
+                (fun loc0 => if Loc.eq_dec loc0 loc then Some to else flag_src loc0)
+                (fun loc0 => if Loc.eq_dec loc0 loc then Some to else flag_tgt loc0)
+                (fun loc0 => if Loc.eq_dec loc0 loc then Some val_new else vs_src loc0)
+                vs_tgt
+                mem_src2 mem_tgt lc_src2 lc_tgt sc_src sc_tgt>>)
+.
+Proof.
+  inv SIM. hexploit (MAXSRC loc). i.
+  inv H. hexploit MAX; eauto. i. des.
+  hexploit max_readable_na_write_step; eauto.
+  { eapply MEMSRC. }
+  { eapply sim_local_consistent; eauto. }
+  { refl. }
+  { eapply Time.incr_spec. }
+  i. des. esplits.
+  { eapply reserve_future_steps. eapply RESERVE. }
+  { eauto. }
+  assert (MEM': sim_memory flag_src f vers mem_src0 mem_tgt).
+
+src_write_sim_memory
+
+  econs; auto.
+  { eapply add_src_sim_memory.
+    { eauto. }
+    { eauto.
+
+eapply src_write_sim_memory.
+
+
+  src_fulfill_sim_promises
+src_write_sim_memory
+  add_src_sim_memory
+
+
+
+  sim_memory
+
+Qed.
+
 Lemma cap_max_readable mem cap prom loc ts val released
       (CAP: Memory.cap mem cap)
       (MLE: Memory.le prom mem)
