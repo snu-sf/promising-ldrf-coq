@@ -3430,7 +3430,6 @@ Proof.
   { i. des_ifs. eapply sim_memory_top; eauto. }
 Qed.
 
-
 Variant versioned_memory (vers: versions) (mem: Memory.t): Prop :=
 | versioned_memory_intro
     (COMPLETE: forall loc to from val released
@@ -4035,7 +4034,6 @@ Lemma tgt_flag_up_sim_promises flag_src flag_tgt f vers prom_src0 prom_tgt mem_s
       (TS: forall from to msg
                   (GET: Memory.get loc to prom_src0 = Some (from, msg))
                   (MSG: msg <> Message.reserve), Time.lt ts to)
-      (FLAG: flag_tgt loc = None)
       (MLE: Memory.le prom_src0 mem_src0)
       (INHABITED: Memory.inhabited mem_src0)
   :
@@ -4045,6 +4043,8 @@ Lemma tgt_flag_up_sim_promises flag_src flag_tgt f vers prom_src0 prom_tgt mem_s
                     (Thread.mk lang st (Local.mk tvw prom_src0) sc mem_src0)
                     (Thread.mk _ st (Local.mk tvw prom_src1) sc mem_src1)>>) /\
       (<<PROMS: sim_promises flag_src (fun loc' => if (Loc.eq_dec loc' loc) then (Some ts) else flag_tgt loc') f vers prom_src1 prom_tgt>>) /\
+      (<<NONE: forall to from val released (GET: Memory.get loc to prom_src1 = Some (from, Message.concrete val released)),
+          released = None>>) /\
       (<<MEM: sim_memory flag_src f vers mem_src1 mem_tgt>>) /\
       (<<VALS: forall loc0 to val released,
           max_readable mem_src0 prom_src0 loc0 to val released
@@ -4076,8 +4076,7 @@ Proof.
     { eauto. }
     { inv LOWERPROMS. econs.
       { i. hexploit sim_promises_get; eauto. i. des. des_ifs.
-        { rewrite FLAG in *.
-          destruct (classic (List.In to_src dom)).
+        { destruct (classic (List.In to_src dom)).
           { hexploit SAMETS; eauto. i. rewrite GET0 in H0. inv H0.
             { esplits; eauto. inv MSG; try by (econs; auto). }
             { esplits; eauto. inv MSG; try by (econs; auto). }
@@ -4103,8 +4102,11 @@ Proof.
           { hexploit sim_promises_get_if.
             { eauto. }
             { rewrite <- OTHERTS; eauto. }
-            i. rewrite FLAG in *. des; clarify.
-            left. esplits; eauto.
+            i. des; clarify.
+            { left. esplits; eauto. }
+            { right. esplits; eauto. i.
+              eapply TS; eauto. rewrite <- OTHERTS; eauto.
+            }
           }
         }
         { hexploit sim_promises_get_if.
@@ -4126,10 +4128,16 @@ Proof.
         { rewrite OTHERLOC; eauto. }
       }
     }
+    { i. inv LOWERPROMS. destruct (classic (List.In to dom)).
+      { eapply SAMETS in H. rewrite GET in H. inv H. auto. }
+      { rewrite OTHERTS in GET; auto. destruct released; auto.
+        eapply DOM in GET; ss.
+      }
+    }
     { auto. }
     { auto. }
   }
-  { clear FLAG TS PROMS. revert prom_src0 mem_src0 DOM MEM MLE INHABITED.
+  { clear TS PROMS. revert prom_src0 mem_src0 DOM MEM MLE INHABITED.
     induction dom; i; ss.
     { esplits.
       { refl. }
@@ -4232,5 +4240,82 @@ Proof.
         }
       }
     }
+  }
+Qed.
+
+Lemma src_cancel_sim_promises flag_src f vers prom_src0 mem_src0 mem_tgt loc from to prom_src1 mem_src1
+      (CANCEL: Memory.promise prom_src0 mem_src0 loc from to Message.reserve prom_src1 mem_src1 Memory.op_kind_cancel)
+      (MEM: sim_memory flag_src f vers mem_src0 mem_tgt)
+      (MLE: Memory.le prom_src0 mem_src0)
+      (CLOSED: Memory.closed mem_src0)
+  :
+    (<<MEM: sim_memory flag_src f vers mem_src1 mem_tgt>>) /\
+    (<<PROM: forall loc0 (NEQ: loc0 <> loc) to0, Memory.get loc0 to0 prom_src1 = Memory.get loc0 to0 prom_src0>>) /\
+    (<<VALS: forall loc0 to val released,
+        max_readable mem_src0 prom_src0 loc0 to val released
+        <->
+        max_readable mem_src1 prom_src1 loc0 to val released>>)
+.
+Proof.
+  inv CANCEL. splits.
+  { econs.
+    { i. hexploit sim_memory_get; eauto. i. des. esplits; eauto.
+      erewrite (@Memory.remove_o mem_src1 mem_src0); eauto.
+      des_ifs; eauto. ss. des; clarify. exfalso.
+      eapply Memory.remove_get0 in MEM0. des; clarify. inv MSG0; ss.
+    }
+    { i. hexploit sim_memory_sound; eauto.
+      erewrite Memory.remove_o in GET; eauto. des_ifs. eauto.
+    }
+    { i. eapply sim_memory_top; eauto. }
+  }
+  { i. erewrite (@Memory.remove_o prom_src1 prom_src0); eauto. des_ifs.
+    ss. des; clarify.
+  }
+  { i. split.
+    { i. inv H. econs.
+      { erewrite Memory.remove_o; eauto. des_ifs; eauto.
+        eapply Memory.remove_get0 in MEM0. exfalso. ss. des; clarify.
+      }
+      { erewrite Memory.remove_o; eauto. des_ifs; eauto. }
+      { i. erewrite (@Memory.remove_o mem_src1 mem_src0) in GET0; eauto.
+        erewrite (@Memory.remove_o prom_src1 prom_src0); eauto. des_ifs; eauto.
+      }
+    }
+    { i. inv H. erewrite (@Memory.remove_o mem_src1 mem_src0) in GET; eauto.
+      erewrite (@Memory.remove_o prom_src1 prom_src0) in NONE; eauto. des_ifs; eauto.
+      econs; eauto. i. hexploit MAX; eauto.
+      { erewrite Memory.remove_o; eauto. des_ifs; eauto.
+        exfalso. apply Memory.remove_get0 in MEM0. ss. des; clarify.
+      }
+      { i. erewrite Memory.remove_o in H; eauto. des_ifs. }
+    }
+  }
+Qed.
+
+Lemma src_cancels_sim_promises flag_src f vers prom_src0 mem_src0 mem_tgt loc
+      prom_src1 mem_src1
+      (MEM: sim_memory flag_src f vers mem_src0 mem_tgt)
+      (CANCEL: cancel_future_memory loc prom_src0 mem_src0 prom_src1 mem_src1)
+      (MLE: Memory.le prom_src0 mem_src0)
+      (CLOSED: Memory.closed mem_src0)
+  :
+    (<<MEM: sim_memory flag_src f vers mem_src1 mem_tgt>>) /\
+    (<<PROM: forall loc0 (NEQ: loc0 <> loc) to0, Memory.get loc0 to0 prom_src1 = Memory.get loc0 to0 prom_src0>>) /\
+    (<<VALS: forall loc0 to val released,
+        max_readable mem_src0 prom_src0 loc0 to val released
+        <->
+        max_readable mem_src1 prom_src1 loc0 to val released>>)
+.
+Proof.
+  revert MLE CLOSED. induction CANCEL.
+  { i. splits; auto. }
+  { i. hexploit src_cancel_sim_promises; eauto. i. des.
+    hexploit IHCANCEL; eauto.
+    { eapply promise_memory_le; eauto. }
+    { eapply Memory.promise_closed; eauto. }
+    i. des. splits; auto.
+    { i. transitivity (Memory.get loc0 to0 prom1); auto. }
+    { i. transitivity (max_readable mem1 prom1 loc0 to0 val released); auto. }
   }
 Qed.

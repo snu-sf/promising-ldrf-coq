@@ -497,6 +497,8 @@ Lemma sim_thread_tgt_flag_up
       (<<STEPS: rtc (@Thread.tau_step _)
                     (Thread.mk lang st lc_src0 sc_src mem_src0)
                     (Thread.mk _ st lc_src1 sc_src mem_src1)>>) /\
+      (<<NONE: forall to from val released (GET: Memory.get loc to lc_src1.(Local.promises) = Some (from, Message.concrete val released)),
+          released = None>>) /\
       (<<SIM: sim_thread
                 f vers flag_src (fun loc0 => if Loc.eq_dec loc0 loc
                                              then Some (lc_src1.(Local.tview).(TView.cur).(View.rlx) loc)
@@ -504,15 +506,6 @@ Lemma sim_thread_tgt_flag_up
                 vs_src vs_tgt
                 mem_src1 mem_tgt lc_src1 lc_tgt sc_src sc_tgt>>).
 Proof.
-  destruct (flag_tgt loc) eqn:FLAG.
-  { esplits; [refl|].
-    match goal with
-    | |- _ ?flag_tgt' _ _ _ _ _ _ _ _ => replace flag_tgt' with flag_tgt; auto
-    end.
-    extensionality loc0. des_ifs.
-    inv SIM. inv LOCAL0.
-    hexploit FLAGTGT; eauto. i. clarify.
-  }
   inv SIM. dup LOCAL0. inv LOCAL0.
   hexploit tgt_flag_up_sim_promises.
   { eauto. }
@@ -520,10 +513,11 @@ Proof.
   { eapply sim_local_consistent in CONSISTENT; eauto.
     i. eapply CONSISTENT; eauto.
   }
-  { eauto. }
   { eapply LOCAL. }
   { eapply MEM. }
-  i. des. esplits; [eapply STEPS|..]. econs; eauto.
+  i. des. esplits; [eapply STEPS|..].
+  { i. ss. eapply NONE; eauto. }
+  econs; auto.
   { econs; eauto. i. des_ifs. auto. }
   { ii. hexploit (MAXSRC loc0). i. inv H. econs.
     { i. hexploit MAX; eauto. i. des. esplits. eapply VALS; eauto. }
@@ -829,37 +823,71 @@ Lemma sim_thread_src_write_na
                 mem_src2 mem_tgt lc_src2 lc_tgt sc_src sc_tgt>>)
 .
 Proof.
+  hexploit sim_thread_tgt_flag_up; eauto.
+  instantiate (1:=loc). clear SIM. i. des.
   inv SIM. hexploit (MAXSRC loc). i.
   inv H. hexploit MAX; eauto. i. des.
+  hexploit top_time_exists.
+  { eauto. }
+  i. des.
   hexploit max_readable_na_write_step; eauto.
-  { eapply MEMSRC. }
+  { admit. (* wf *) }
+  { admit. (* wf *) }
   { eapply sim_local_consistent; eauto. }
   { refl. }
-  { eapply Time.incr_spec. }
   i. des. esplits.
-  { eapply reserve_future_steps. eapply RESERVE. }
-  { eauto. }
-  assert (MEM': sim_memory flag_src f vers mem_src0 mem_tgt).
-
-src_write_sim_memory
-
-  econs; auto.
-  { eapply add_src_sim_memory.
+  { etrans.
     { eauto. }
-    { eauto.
+    { eapply reserve_future_steps. eapply cancel_future_reserve_future; eauto. }
+  }
+  { eauto. }
+  subst. hexploit src_cancels_sim_promises; eauto.
+  { admit. (* wf *) }
+  { admit. (* wf *) }
+  i. des. econs; auto.
+  { destruct (flag_src loc) eqn:FLAG.
+    { eapply add_src_sim_memory; eauto. admit. (* max *) }
+    { eapply src_write_sim_memory in MEM0; eauto.
+      match goal with
+      | |- _ ?flag _ _ _ _ =>
+        replace flag with
+            (fun loc' =>
+               if LocSet.Facts.eq_dec loc' loc
+               then Some (View.pln (TView.cur tvw1) loc)
+               else (fun loc'' =>
+                       if LocSet.Facts.eq_dec loc'' loc
+                       then Some (View.pln (TView.cur tvw1) loc)
+                       else flag_src loc'') loc')
+      end.
+      2:{ extensionality loc'. des_ifs. }
+      eapply add_src_sim_memory; eauto.
+      { des_ifs. }
+      { admit. (* max *) }
+    }
+  }
+  { dup LOCAL. ss. admit. }
+  { ii. specialize (MAXSRC loc0). inv MAXSRC. des_ifs.
+    { econs; ss. i. clarify. eauto. }
+    { admit. }
+  }
 
-eapply src_write_sim_memory.
+inv WRITE. ss. clarify. subst. ss. econs.
+      { i. exploit MAX2; eauto. i. des.
+        eapply VALS in MAX3. inv MAX3. esplits. econs.
+        { erewrite Memory.add_o; eauto. des_ifs; ss; des; clarify.
+          { eapply G
 
 
-  src_fulfill_sim_promises
-src_write_sim_memory
-  add_src_sim_memory
+ exploit MAX; eauto.
 
 
-
-  sim_memory
-
-Qed.
+admit. }
+    { admit. }
+  }
+  { i. des_ifs. hexploit (PERM loc). i.
+    rewrite VAL in H. destruct (vs_tgt loc); auto.
+  }
+Admitted.
 
 Lemma cap_max_readable mem cap prom loc ts val released
       (CAP: Memory.cap mem cap)

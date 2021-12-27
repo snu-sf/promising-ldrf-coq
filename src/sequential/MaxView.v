@@ -303,13 +303,37 @@ Proof.
   { inv FULFILLED. rewrite OTHER in GET2; auto. clarify. eauto. }
 Qed.
 
+Inductive cancel_future_memory (loc: Loc.t) : Memory.t -> Memory.t -> Memory.t -> Memory.t -> Prop :=
+| cancel_future_memory_base
+    prom0 mem0
+  :
+    cancel_future_memory loc prom0 mem0 prom0 mem0
+| cancel_future_memory_step
+    prom0 mem0 prom1 mem1 prom2 mem2
+    from to
+    (CANCEL: Memory.promise prom0 mem0 loc from to Message.reserve prom1 mem1 Memory.op_kind_cancel)
+    (FUTURE: cancel_future_memory loc prom1 mem1 prom2 mem2)
+  :
+    cancel_future_memory loc prom0 mem0 prom2 mem2
+.
+
+Lemma cancel_future_reserve_future loc prom0 mem0 prom1 mem1
+      (CANCEL: cancel_future_memory loc prom0 mem0 prom1 mem1)
+  :
+    reserve_future_memory prom0 mem0 prom1 mem1.
+Proof.
+  induction CANCEL; eauto.
+  { econs 1; eauto. }
+  { econs 2; eauto. }
+Qed.
+
 Lemma remove_reserves_loc prom0 mem0 loc
       (MLE: Memory.le prom0 mem0)
       (FIN: Memory.finite prom0)
       (INHABITED: Memory.inhabited mem0)
   :
     exists prom1 mem1,
-      (<<RESERVE: reserve_future_memory prom0 mem0 prom1 mem1>>) /\
+      (<<RESERVE: cancel_future_memory loc prom0 mem0 prom1 mem1>>) /\
       (<<MEM: fulfilled_memory loc mem0 mem1>>) /\
       (<<RESERVE: forall to from msg
                          (GET: Memory.get loc to prom1 = Some (from, msg)),
@@ -400,8 +424,11 @@ Lemma max_readable_write_na mem0 prom0 loc ts from to val1
           else Memory.get loc' ts' prom0>>) /\
       (<<WRITE: Memory.write_na ts prom0 mem0 loc from to val1 prom1 mem2 msgs ks Memory.op_kind_add>>) /\
       (<<NONE: Memory.get loc to prom1 = None>>) /\
-      (<<MAX: Memory.max_ts loc mem2 = to>>)
-.
+      (<<MAX: Memory.max_ts loc mem2 = to>>) /\
+      (<<OTHERS: forall loc0 (NEQ: loc0 <> loc) ts0 val0 released0,
+          max_readable mem0 prom0 loc0 ts0 val0 released0
+          <->
+          max_readable mem2 prom1 loc0 ts0 val0 released0>>).
 Proof.
   hexploit (wf_cell_msgs_exists (prom0 loc)). i. des.
   red in WFMSGS. des.
@@ -469,6 +496,22 @@ Proof.
       { ss. des; clarify.
         apply Memory.max_ts_spec in GET1. des.
         etrans; eauto. etrans; eauto. left. auto.
+      }
+    }
+    { i. split; i.
+      { inv H1. econs; auto.
+        { eapply Memory.add_get1; eauto. }
+        { i. erewrite Memory.add_o in GET0; eauto.
+          des_ifs; eauto. ss. des; clarify.
+        }
+      }
+      { inv H1. econs; auto.
+        { erewrite Memory.add_o in GET; eauto.
+          des_ifs; eauto. ss. des; clarify.
+        }
+        { i. eapply MAX; auto.
+          eapply Memory.add_get1; eauto.
+        }
       }
     }
   }
@@ -557,6 +600,33 @@ Proof.
     }
     { auto. }
     { auto. }
+    { i. etransitivity; [|eapply OTHERS]; auto.
+      split; i.
+      { inv H5. econs; auto.
+        { erewrite memory_lower_o2; eauto. .lower_get1; eauto. }
+        { i. erewrite Memory.add_o in GET0; eauto.
+          des_ifs; eauto. ss. des; clarify.
+        }
+      }
+      { inv H1. econs; auto.
+        { erewrite Memory.add_o in GET; eauto.
+          des_ifs; eauto. ss. des; clarify.
+        }
+        { i. eapply MAX; auto.
+          eapply Memory.add_get1; eauto.
+        }
+      }
+    }
+
+ split; i.
+      { inv H5. econs.
+        { erewrite Memory.add_o; eauto.
+          erewrite Memory.add_o; eauto.
+
+
+ eapply Memory.add_get1; eauto.
+
+
   }
 Qed.
 
@@ -573,10 +643,9 @@ Lemma max_readable_write_na_step mem0 prom0 tvw0 loc ts from to val0 val1 releas
       (TO: Time.lt from to)
   :
     exists mem1 mem2 mem3 prom1 prom3 tvw1 msgs ks,
-      (<<RESERVE: reserve_future_memory prom0 mem0 prom1 mem1>>) /\
+      (<<RESERVE: cancel_future_memory loc prom0 mem0 prom1 mem1>>) /\
       (<<LOWER: fulfilled_memory loc mem0 mem2>>) /\
-      (<<MEM: mem2 = mem0>>) /\
-      (<<MLE: Memory.le mem2 mem0>>) /\
+      (<<MEM: mem2 = mem1>>) /\
       (<<ADD: Memory.add mem2 loc from to (Message.concrete val1 None) mem3>>) /\
       (<<PROMISES: forall loc' ts',
           Memory.get loc' ts' prom3 =
@@ -594,9 +663,9 @@ Proof.
   { apply WF. }
   { eapply CLOSED. }
   i. des.
-  hexploit (@max_readable_write_na mem1 prom1 loc (View.rlx (TView.cur tvw0) loc) from to val1); auto.
-  { eapply reserve_future_memory_le; eauto. apply WF. }
-  { eapply reserve_future_memory_bot_none; eauto. apply WF. }
+  hexploit (@max_readable_na_write mem1 prom1 loc (View.rlx (TView.cur tvw0) loc) from to val1); auto.
+  { eapply reserve_future_memory_le;[apply WF|]. eapply cancel_future_reserve_future; eauto. }
+  { eapply reserve_future_memory_bot_none; [apply WF|]. eapply cancel_future_reserve_future; eauto. }
   { i. assert (<<RESERE: msg' <> Message.reserve>> /\ <<GET: Memory.get loc to' prom0 = Some (from', msg')>>).
     { rewrite PROMISES in GET. des_ifs. }
     des. split; auto.
@@ -607,17 +676,16 @@ Proof.
     specialize (RLX loc). des.
     eapply fulfilled_memory_get1 in RLX; eauto; ss.
     { des. red. esplits; eauto. inv MSG_LE; ss. }
-    { eapply reserve_future_future; eauto. }
+    { eapply reserve_future_future; eauto. eapply cancel_future_reserve_future; eauto. }
   }
   { etrans; eauto.
     eapply fulfilled_memory_max_ts; eauto. }
   { eapply reserve_future_memory_future; eauto.
-    eapply Memory.closed_timemap_bot. eapply CLOSED. }
+    { eapply Memory.closed_timemap_bot. eapply CLOSED. }
+    { eapply cancel_future_reserve_future; eauto. }
+  }
   i. des. eexists mem1, mem2, mem3, prom1, prom2, _. esplits; auto.
   { etrans; eauto. }
-  { etrans; eauto. eapply Memory.ext.
-
-
   { i. rewrite PROMISES0. rewrite PROMISES. des_ifs. }
   { econs; ss. subst. eauto. }
   { ss. unfold TimeMap.join. replace (TimeMap.singleton loc to loc) with to.
