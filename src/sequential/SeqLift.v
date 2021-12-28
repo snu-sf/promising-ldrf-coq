@@ -2547,18 +2547,24 @@ Proof.
 Qed.
 
 
-Lemma src_writtten_sim_promises flag_src flag_tgt f vers mem_tgt mem_src loc ts
-      (PROMS: sim_promises flag_src flag_tgt f vers mem_src mem_tgt)
+Lemma src_writtten_sim_promises flag_src flag_tgt0 flag_tgt1
+      f vers mem_tgt mem_src loc ts
+      (PROMS: sim_promises flag_src flag_tgt0 f vers mem_src mem_tgt)
       (FLAGSRC: flag_src loc = Some ts)
+      (FLAGTGT: forall loc0 (NEQ: loc0 <> loc), flag_tgt1 loc0 = flag_tgt0 loc0)
   :
-    sim_promises flag_src (fun loc' => if (Loc.eq_dec loc' loc) then None else flag_tgt loc') f vers mem_src mem_tgt.
+    sim_promises flag_src flag_tgt1 f vers mem_src mem_tgt.
 Proof.
   econs.
-  { i. hexploit sim_promises_get; eauto. i. des. esplits; eauto. des_ifs. }
+  { i. hexploit sim_promises_get; eauto. i. des. esplits; eauto.
+    destruct (Loc.eq_dec loc0 loc); clarify.
+    rewrite FLAGTGT; auto.
+  }
   { i. hexploit sim_promises_get_if; eauto. i. des.
     { left. esplits; eauto. }
-    { right. des_ifs; eauto.
-      exfalso. erewrite sim_promises_none in GET; eauto. ss.
+    { right. destruct (Loc.eq_dec loc0 loc); clarify.
+      { hexploit sim_promises_none; eauto. i. rewrite GET in H. clarify. }
+      { esplits; eauto. rewrite FLAGTGT; auto. }
     }
   }
   { i. eapply sim_promises_none; eauto. }
@@ -2690,7 +2696,7 @@ Lemma src_fulfill_sim_promises flag_src flag_tgt f vers mem_tgt mem_src0 mem_src
           then None
           else Memory.get loc' ts' mem_src0)
   :
-    sim_promises (fun loc' => if (Loc.eq_dec loc loc') then Some ts else flag_src loc') flag_tgt f vers mem_src1 mem_tgt.
+    sim_promises (fun loc' => if (Loc.eq_dec loc' loc) then Some ts else flag_src loc') flag_tgt f vers mem_src1 mem_tgt.
 Proof.
   econs.
   { i. des_ifs. hexploit sim_promises_get; eauto. i. des.

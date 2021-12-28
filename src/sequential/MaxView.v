@@ -327,6 +327,160 @@ Proof.
   { econs 2; eauto. }
 Qed.
 
+Variant unchanged_loc_memory (loc: Loc.t) (mem0 mem1: Memory.t): Prop :=
+| unchanged_loc_memory_intro
+    (UNCH: forall to, Memory.get loc to mem1 = Memory.get loc to mem0)
+.
+
+Global Program Instance unchanged_loc_memory_Equivalence loc:
+  Equivalence (unchanged_loc_memory loc).
+Next Obligation.
+Proof.
+  ii. econs. auto.
+Qed.
+Next Obligation.
+Proof.
+  ii. inv H. econs; eauto.
+Qed.
+Next Obligation.
+Proof.
+  ii. inv H. inv H0. econs. i. etrans; eauto.
+Qed.
+
+Lemma unchanged_loc_max_readable prom0 mem0 prom1 mem1 loc
+      (MEM: unchanged_loc_memory loc mem0 mem1)
+      (PROM: unchanged_loc_memory loc prom0 prom1)
+  :
+    forall ts val released,
+      max_readable prom0 mem0 loc ts val released
+      <->
+      max_readable prom1 mem1 loc ts val released.
+Proof.
+  inv MEM. inv PROM.
+  i. split; i.
+  { inv H. econs.
+    { rewrite UNCH0. eauto. }
+    { rewrite UNCH. eauto. }
+    { i. rewrite UNCH. rewrite UNCH0 in GET0; eauto. }
+  }
+  { inv H. econs.
+    { rewrite <- UNCH0. eauto. }
+    { rewrite <- UNCH. eauto. }
+    { i. rewrite <- UNCH. rewrite <- UNCH0 in GET0; eauto. }
+  }
+Qed.
+
+Lemma add_unchanged_loc mem0 mem1 loc from to msg loc0
+      (ADD: Memory.add mem0 loc from to msg mem1)
+      (NEQ: loc0 <> loc)
+  :
+    unchanged_loc_memory loc0 mem0 mem1.
+Proof.
+  econs. i. erewrite (@Memory.add_o mem1 mem0); eauto.
+  des_ifs. ss. des; clarify.
+Qed.
+
+Lemma split_unchanged_loc mem0 mem1 loc ts0 ts1 ts2 msg0 msg1 loc0
+      (SPLIT: Memory.split mem0 loc ts0 ts1 ts2 msg0 msg1 mem1)
+      (NEQ: loc0 <> loc)
+  :
+    unchanged_loc_memory loc0 mem0 mem1.
+Proof.
+  econs. i. erewrite (@Memory.split_o mem1 mem0); eauto.
+  des_ifs; ss; des; clarify.
+Qed.
+
+Lemma lower_unchanged_loc mem0 mem1 loc from to msg0 msg1 loc0
+      (LOWER: Memory.lower mem0 loc from to msg0 msg1 mem1)
+      (NEQ: loc0 <> loc)
+  :
+    unchanged_loc_memory loc0 mem0 mem1.
+Proof.
+  econs. i. erewrite (@Memory.lower_o mem1 mem0); eauto.
+  des_ifs; ss; des; clarify.
+Qed.
+
+Lemma remove_unchanged_loc mem0 mem1 loc from to msg loc0
+      (REMOVE: Memory.remove mem0 loc from to msg mem1)
+      (NEQ: loc0 <> loc)
+  :
+    unchanged_loc_memory loc0 mem0 mem1.
+Proof.
+  econs. i. erewrite (@Memory.remove_o mem1 mem0); eauto.
+  des_ifs; ss; des; clarify.
+Qed.
+
+Lemma promise_unchanged_loc prom0 mem0 loc from to msg prom1 mem1 kind
+      loc0
+      (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
+      (NEQ: loc0 <> loc)
+  :
+    (<<MEM: unchanged_loc_memory loc0 mem0 mem1>>) /\
+    (<<PROM: unchanged_loc_memory loc0 prom0 prom1>>).
+Proof.
+  inv PROMISE.
+  { splits.
+    { eapply add_unchanged_loc; eauto. }
+    { eapply add_unchanged_loc; eauto. }
+  }
+  { splits.
+    { eapply split_unchanged_loc; eauto. }
+    { eapply split_unchanged_loc; eauto. }
+  }
+  { splits.
+    { eapply lower_unchanged_loc; eauto. }
+    { eapply lower_unchanged_loc; eauto. }
+  }
+  { splits.
+    { eapply remove_unchanged_loc; eauto. }
+    { eapply remove_unchanged_loc; eauto. }
+  }
+Qed.
+
+Lemma write_unchanged_loc prom0 mem0 loc from to msg prom1 mem1 kind
+      loc0
+      (WRITE: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
+      (NEQ: loc0 <> loc)
+  :
+    (<<MEM: unchanged_loc_memory loc0 mem0 mem1>>) /\
+    (<<PROM: unchanged_loc_memory loc0 prom0 prom1>>).
+Proof.
+  inv WRITE. eapply promise_unchanged_loc in PROMISE; eauto.
+  eapply remove_unchanged_loc in REMOVE; eauto.
+  des. splits; auto. etrans; eauto.
+Qed.
+
+Lemma cancel_future_unchanged_loc prom0 mem0 prom1 mem1 loc loc0
+      (CANCEL: cancel_future_memory loc prom0 mem0 prom1 mem1)
+      (NEQ: loc0 <> loc)
+  :
+    (<<MEM: unchanged_loc_memory loc0 mem0 mem1>>) /\
+    (<<PROM: unchanged_loc_memory loc0 prom0 prom1>>).
+Proof.
+  induction CANCEL.
+  { splits; refl. }
+  { eapply promise_unchanged_loc in CANCEL; eauto. des. splits.
+    { etrans; eauto. }
+    { etrans; eauto. }
+  }
+Qed.
+
+Lemma na_write_unchanged_loc ts prom0 mem0 loc from to val prom1 mem1 kinds msgs kind
+      loc0
+      (WRITE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 kinds msgs kind)
+      (NEQ: loc0 <> loc)
+  :
+    (<<MEM: unchanged_loc_memory loc0 mem0 mem1>>) /\
+    (<<PROM: unchanged_loc_memory loc0 prom0 prom1>>).
+Proof.
+  induction WRITE.
+  { eapply write_unchanged_loc; eauto. }
+  { hexploit IHWRITE; eauto. i. des.
+    eapply write_unchanged_loc in WRITE_EX; eauto.
+    des. splits; etrans; eauto.
+  }
+Qed.
+
 Lemma remove_reserves_loc prom0 mem0 loc
       (MLE: Memory.le prom0 mem0)
       (FIN: Memory.finite prom0)
@@ -424,11 +578,7 @@ Lemma max_readable_write_na mem0 prom0 loc ts from to val1
           else Memory.get loc' ts' prom0>>) /\
       (<<WRITE: Memory.write_na ts prom0 mem0 loc from to val1 prom1 mem2 msgs ks Memory.op_kind_add>>) /\
       (<<NONE: Memory.get loc to prom1 = None>>) /\
-      (<<MAX: Memory.max_ts loc mem2 = to>>) /\
-      (<<OTHERS: forall loc0 (NEQ: loc0 <> loc) ts0 val0 released0,
-          max_readable mem0 prom0 loc0 ts0 val0 released0
-          <->
-          max_readable mem2 prom1 loc0 ts0 val0 released0>>).
+      (<<MAX: Memory.max_ts loc mem2 = to>>).
 Proof.
   hexploit (wf_cell_msgs_exists (prom0 loc)). i. des.
   red in WFMSGS. des.
@@ -496,22 +646,6 @@ Proof.
       { ss. des; clarify.
         apply Memory.max_ts_spec in GET1. des.
         etrans; eauto. etrans; eauto. left. auto.
-      }
-    }
-    { i. split; i.
-      { inv H1. econs; auto.
-        { eapply Memory.add_get1; eauto. }
-        { i. erewrite Memory.add_o in GET0; eauto.
-          des_ifs; eauto. ss. des; clarify.
-        }
-      }
-      { inv H1. econs; auto.
-        { erewrite Memory.add_o in GET; eauto.
-          des_ifs; eauto. ss. des; clarify.
-        }
-        { i. eapply MAX; auto.
-          eapply Memory.add_get1; eauto.
-        }
       }
     }
   }
@@ -600,33 +734,6 @@ Proof.
     }
     { auto. }
     { auto. }
-    { i. etransitivity; [|eapply OTHERS]; auto.
-      split; i.
-      { inv H5. econs; auto.
-        { erewrite memory_lower_o2; eauto. .lower_get1; eauto. }
-        { i. erewrite Memory.add_o in GET0; eauto.
-          des_ifs; eauto. ss. des; clarify.
-        }
-      }
-      { inv H1. econs; auto.
-        { erewrite Memory.add_o in GET; eauto.
-          des_ifs; eauto. ss. des; clarify.
-        }
-        { i. eapply MAX; auto.
-          eapply Memory.add_get1; eauto.
-        }
-      }
-    }
-
- split; i.
-      { inv H5. econs.
-        { erewrite Memory.add_o; eauto.
-          erewrite Memory.add_o; eauto.
-
-
- eapply Memory.add_get1; eauto.
-
-
   }
 Qed.
 
