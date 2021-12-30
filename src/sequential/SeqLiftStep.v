@@ -273,6 +273,9 @@ Variant sim_thread
     (MAXSRC: max_values_src vs_src mem_src lc_src)
     (MAXTGT: max_values_tgt vs_tgt mem_tgt lc_tgt)
     (PERM: forall loc, option_rel (fun _ _ => True) (vs_src loc) (vs_tgt loc))
+    (FIN: __guard__(exists dom, (<<DOM: forall loc, (exists ts, flag_src loc = Some ts) <-> (List.In loc dom)>>)))
+    (VALEQ: forall loc (SRC: flag_src loc = None) (TGT: flag_tgt loc = None),
+        vs_src loc = vs_tgt loc)
 .
 
 Lemma max_value_src_exists loc mem lc
@@ -608,6 +611,7 @@ Proof.
     { i. hexploit MAX; eauto. i. des. esplits. eapply VALS; eauto. }
     { i. hexploit NONMAX; eauto. ii. eapply H. eapply VALS; eauto. }
   }
+  { i. ss. des_ifs. eauto. }
 Qed.
 
 Lemma lower_write_memory_le prom0 mem0 loc from to msg prom1 mem1 kind
@@ -822,6 +826,7 @@ Proof.
   { i. des_ifs. specialize (PERM loc).
     rewrite VAL in PERM. unfold option_rel in *. des_ifs.
   }
+  { i. des_ifs. eauto. }
 Qed.
 
 Lemma sim_thread_tgt_write_na
@@ -1646,6 +1651,11 @@ Proof.
   { i. des_ifs. hexploit (PERM loc). i.
     rewrite VAL in H0. destruct (vs_tgt loc); auto.
   }
+  { red in FIN. des. exists (loc::dom). ii. split; i.
+    { des. des_ifs; ss; auto. right. eapply DOM. eauto. }
+    { des_ifs; eauto. eapply DOM. ss. des; ss. intuition. }
+  }
+  { i. des_ifs. eapply VALEQ; eauto. des_ifs. }
 Qed.
 
 Lemma sim_thread_acquire
@@ -1801,6 +1811,10 @@ Proof.
   { i. hexploit (VALS loc). i. des.
     { rewrite SRC. rewrite TGT. auto. }
     { rewrite VALSRC. rewrite VALTGT. ss. }
+  }
+  { i. hexploit VALS; eauto. i. des.
+    { rewrite SRC0. rewrite TGT0. eauto. }
+    { rewrite VALSRC. rewrite VALTGT. auto. }
   }
 Qed.
 
@@ -2008,7 +2022,263 @@ Proof.
   }
 Qed.
 
+Lemma sim_thread_deflag_match_aux
+      f0 vers flag_src flag_tgt vs_src vs_tgt
+      mem_src0 mem_tgt lc_src0 lc_tgt sc_src sc_tgt
+      loc ts
+      (SIM: sim_thread
+              f0 vers flag_src flag_tgt vs_src vs_tgt
+              mem_src0 mem_tgt lc_src0 lc_tgt sc_src sc_tgt)
+      (CONSISTENT: Local.promise_consistent lc_tgt)
+      (LOCALSRC: Local.wf lc_src0 mem_src0)
+      (LOCALTGT: Local.wf lc_tgt mem_tgt)
+      (MEMSRC: Memory.closed mem_src0)
+      (MEMTGT: Memory.closed mem_tgt)
+      (SCSRC: Memory.closed_timemap sc_src mem_src0)
+      (SCTGT: Memory.closed_timemap sc_tgt mem_tgt)
+      (WF: Mapping.wfs f0)
+      (FLAG: flag_src loc = Some ts)
+      (VAL: option_rel Const.le (vs_tgt loc) (vs_src loc))
+      lang st
+  :
+    exists lc_src1 mem_src1 f1,
+      (<<STEPS: rtc (tau (@Thread.promise_step _ false))
+                    (Thread.mk lang st lc_src0 sc_src mem_src0)
+                    (Thread.mk _ st lc_src1 sc_src mem_src1)>>) /\
+      (<<SIM: sim_thread
+                f1 vers
+                (fun loc0 => if Loc.eq_dec loc0 loc then None else flag_src loc0)
+                (fun loc0 => if Loc.eq_dec loc0 loc then None else flag_tgt loc0)
+                vs_src vs_tgt
+                mem_src1 mem_tgt lc_src1 lc_tgt sc_src sc_tgt>>) /\
+      (<<WF: Mapping.wfs f1>>) /\
+      (<<MAPLE: Mapping.les f0 f1>>).
+Proof.
+Admitted.
 
+Lemma sim_thread_deflag_unmatch_aux
+      f0 vers flag_src flag_tgt vs_src vs_tgt
+      mem_src0 mem_tgt lc_src0 lc_tgt sc_src sc_tgt
+      loc ts
+      (SIM: sim_thread
+              f0 vers flag_src flag_tgt vs_src vs_tgt
+              mem_src0 mem_tgt lc_src0 lc_tgt sc_src sc_tgt)
+      (CONSISTENT: Local.promise_consistent lc_tgt)
+      (LOCALSRC: Local.wf lc_src0 mem_src0)
+      (LOCALTGT: Local.wf lc_tgt mem_tgt)
+      (MEMSRC: Memory.closed mem_src0)
+      (MEMTGT: Memory.closed mem_tgt)
+      (SCSRC: Memory.closed_timemap sc_src mem_src0)
+      (SCTGT: Memory.closed_timemap sc_tgt mem_tgt)
+      (WF: Mapping.wfs f0)
+      (FLAG: flag_src loc = Some ts)
+      lang st
+  :
+    exists lc_src1 mem_src1 f1 flag,
+      (<<STEPS: rtc (tau (@Thread.promise_step _ false))
+                    (Thread.mk lang st lc_src0 sc_src mem_src0)
+                    (Thread.mk _ st lc_src1 sc_src mem_src1)>>) /\
+      (<<SIM: sim_thread
+                f1 vers
+                (fun loc0 => if Loc.eq_dec loc0 loc then None else flag_src loc0)
+                (fun loc0 => if Loc.eq_dec loc0 loc then flag else flag_tgt loc0)
+                vs_src vs_tgt
+                mem_src1 mem_tgt lc_src1 lc_tgt sc_src sc_tgt>>) /\
+      (<<WF: Mapping.wfs f1>>) /\
+      (<<MAPLE: Mapping.les f0 f1>>).
+Proof.
+Admitted.
+
+Lemma sim_thread_deflag_match
+      f0 vers flag_src flag_tgt vs_src vs_tgt
+      mem_src0 mem_tgt lc_src0 lc_tgt sc_src sc_tgt
+      loc
+      (SIM: sim_thread
+              f0 vers flag_src flag_tgt vs_src vs_tgt
+              mem_src0 mem_tgt lc_src0 lc_tgt sc_src sc_tgt)
+      (CONSISTENT: Local.promise_consistent lc_tgt)
+      (LOCALSRC: Local.wf lc_src0 mem_src0)
+      (LOCALTGT: Local.wf lc_tgt mem_tgt)
+      (MEMSRC: Memory.closed mem_src0)
+      (MEMTGT: Memory.closed mem_tgt)
+      (SCSRC: Memory.closed_timemap sc_src mem_src0)
+      (SCTGT: Memory.closed_timemap sc_tgt mem_tgt)
+      (WF: Mapping.wfs f0)
+      (FLAG: flag_src loc = None -> flag_tgt loc = None)
+      (VAL: option_rel Const.le (vs_tgt loc) (vs_src loc))
+      lang st
+  :
+    exists lc_src1 mem_src1 f1,
+      (<<STEPS: rtc (tau (@Thread.promise_step _ false))
+                    (Thread.mk lang st lc_src0 sc_src mem_src0)
+                    (Thread.mk _ st lc_src1 sc_src mem_src1)>>) /\
+      (<<SIM: sim_thread
+                f1 vers
+                (fun loc0 => if Loc.eq_dec loc0 loc then None else flag_src loc0)
+                (fun loc0 => if Loc.eq_dec loc0 loc then None else flag_tgt loc0)
+                vs_src vs_tgt
+                mem_src1 mem_tgt lc_src1 lc_tgt sc_src sc_tgt>>) /\
+      (<<WF: Mapping.wfs f1>>) /\
+      (<<MAPLE: Mapping.les f0 f1>>).
+Proof.
+  destruct (flag_src loc) eqn:EQ.
+  { eapply sim_thread_deflag_match_aux; eauto. }
+  { esplits.
+    { refl. }
+    { replace (fun (loc0: Loc.t) => if LocSet.Facts.eq_dec loc0 loc then None else flag_src loc0) with flag_src.
+      2:{ extensionality loc0. des_ifs. }
+      replace (fun (loc0: Loc.t) => if LocSet.Facts.eq_dec loc0 loc then None else flag_tgt loc0) with flag_tgt.
+      2:{ extensionality loc0. des_ifs. eauto. }
+      eauto.
+    }
+    { eauto. }
+    { refl. }
+  }
+Qed.
+
+Lemma sim_thread_deflag_unmatch
+      f0 vers flag_src flag_tgt vs_src vs_tgt
+      mem_src0 mem_tgt lc_src0 lc_tgt sc_src sc_tgt
+      loc
+      (SIM: sim_thread
+              f0 vers flag_src flag_tgt vs_src vs_tgt
+              mem_src0 mem_tgt lc_src0 lc_tgt sc_src sc_tgt)
+      (CONSISTENT: Local.promise_consistent lc_tgt)
+      (LOCALSRC: Local.wf lc_src0 mem_src0)
+      (LOCALTGT: Local.wf lc_tgt mem_tgt)
+      (MEMSRC: Memory.closed mem_src0)
+      (MEMTGT: Memory.closed mem_tgt)
+      (SCSRC: Memory.closed_timemap sc_src mem_src0)
+      (SCTGT: Memory.closed_timemap sc_tgt mem_tgt)
+      (WF: Mapping.wfs f0)
+      lang st
+  :
+    exists lc_src1 mem_src1 f1 flag,
+      (<<STEPS: rtc (tau (@Thread.promise_step _ false))
+                    (Thread.mk lang st lc_src0 sc_src mem_src0)
+                    (Thread.mk _ st lc_src1 sc_src mem_src1)>>) /\
+      (<<SIM: sim_thread
+                f1 vers
+                (fun loc0 => if Loc.eq_dec loc0 loc then None else flag_src loc0)
+                (fun loc0 => if Loc.eq_dec loc0 loc then flag else flag_tgt loc0)
+                vs_src vs_tgt
+                mem_src1 mem_tgt lc_src1 lc_tgt sc_src sc_tgt>>) /\
+      (<<WF: Mapping.wfs f1>>) /\
+      (<<MAPLE: Mapping.les f0 f1>>).
+Proof.
+  destruct (flag_src loc) eqn:FLAG.
+  { eapply sim_thread_deflag_unmatch_aux; eauto. }
+  { esplits.
+    { refl. }
+    { instantiate (1:=flag_tgt loc).
+      replace (fun (loc0: Loc.t) => if LocSet.Facts.eq_dec loc0 loc then None else flag_src loc0) with flag_src.
+      2:{ extensionality loc0. des_ifs. }
+      replace (fun (loc0: Loc.t) => if LocSet.Facts.eq_dec loc0 loc then flag_tgt loc else flag_tgt loc0) with flag_tgt.
+      2:{ extensionality loc0. des_ifs. }
+      eauto.
+    }
+    { eauto. }
+    { refl. }
+  }
+Qed.
+
+Lemma sim_thread_deflag_all
+      dom
+  :
+    forall
+      f0 vers flag_src flag_tgt0 vs_src vs_tgt
+      mem_src0 mem_tgt lc_src0 lc_tgt sc_src sc_tgt
+      (D: Loc.t -> Prop)
+      (SIM: sim_thread
+              f0 vers flag_src flag_tgt0 vs_src vs_tgt
+              mem_src0 mem_tgt lc_src0 lc_tgt sc_src sc_tgt)
+      (CONSISTENT: Local.promise_consistent lc_tgt)
+      (LOCALSRC: Local.wf lc_src0 mem_src0)
+      (LOCALTGT: Local.wf lc_tgt mem_tgt)
+      (MEMSRC: Memory.closed mem_src0)
+      (MEMTGT: Memory.closed mem_tgt)
+      (SCSRC: Memory.closed_timemap sc_src mem_src0)
+      (SCTGT: Memory.closed_timemap sc_tgt mem_tgt)
+      (WF: Mapping.wfs f0)
+      (DEBT: forall loc, (<<DEBT: D loc>>) \/
+                         ((<<FLAG: flag_src loc = None -> flag_tgt0 loc = None>>) /\
+                          (<<VAL: option_rel Const.le (vs_tgt loc) (vs_src loc)>>)))
+      (FIN: forall loc ts (FLAG: flag_src loc = Some ts), List.In loc dom)
+      lang st,
+    exists lc_src1 mem_src1 f1 flag_tgt1,
+      (<<STEPS: rtc (tau (@Thread.promise_step _ false))
+                    (Thread.mk lang st lc_src0 sc_src mem_src0)
+                    (Thread.mk _ st lc_src1 sc_src mem_src1)>>) /\
+      (<<SIM: sim_thread
+                f1 vers
+                (fun _ => None)
+                flag_tgt1
+                vs_src vs_tgt
+                mem_src1 mem_tgt lc_src1 lc_tgt sc_src sc_tgt>>) /\
+      (<<WF: Mapping.wfs f1>>) /\
+      (<<MAPLE: Mapping.les f0 f1>>) /\
+      (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = None>>)>>)
+.
+Proof.
+  induction dom.
+  { i. assert (FLAG: flag_src = fun _ => None).
+    { extensionality loc. destruct (flag_src loc) eqn:FLAG; auto.
+      hexploit (FIN loc); eauto. ss.
+    }
+    subst. esplits.
+    { refl. }
+    { eauto. }
+    { auto. }
+    { refl. }
+    { i. hexploit DEBT; eauto. i. des; eauto. }
+  }
+  i.
+  cut (exists lc_src1 mem_src1 f1 flag,
+          (<<STEPS: rtc (tau (@Thread.promise_step _ false))
+                        (Thread.mk lang st lc_src0 sc_src mem_src0)
+                        (Thread.mk _ st lc_src1 sc_src mem_src1)>>) /\
+          (<<SIM: sim_thread
+                    f1 vers
+                    (fun loc0 => if Loc.eq_dec loc0 a then None else flag_src loc0)
+                    (fun loc0 => if Loc.eq_dec loc0 a then flag else flag_tgt0 loc0)
+                    vs_src vs_tgt
+                    mem_src1 mem_tgt lc_src1 lc_tgt sc_src sc_tgt>>) /\
+          (<<WF: Mapping.wfs f1>>) /\
+          (<<MAPLE: Mapping.les f0 f1>>) /\
+          (<<FLAG: __guard__(flag = None \/ D a)>>)).
+  { i. des.
+    hexploit Thread.rtc_tau_step_future.
+    { eapply rtc_implies; [|eapply STEPS]. i.
+      inv H. econs; eauto. econs. econs 1; eauto.
+    }
+    { eauto. }
+    { eauto. }
+    { eauto. }
+    i. ss. des.
+    hexploit IHdom; eauto.
+    { instantiate (1:=D). i. destruct (classic (D loc)); auto.
+      hexploit (DEBT loc). i. des; eauto.
+      right. splits; auto. des_ifs.
+      i. red in FLAG. des; ss.
+    }
+    { i. ss. des_ifs.
+      eapply FIN in FLAG0. des; ss. intuition.
+    }
+    i. des. esplits.
+    { etrans; eauto. }
+    { eauto. }
+    { eauto. }
+    { etrans; eauto. }
+    { auto. }
+  }
+  hexploit (DEBT a). i. des.
+  { hexploit sim_thread_deflag_unmatch; eauto. i. des.
+    esplits; eauto. right. eauto.
+  }
+  { hexploit sim_thread_deflag_match; eauto. i. des.
+    esplits; eauto. left. eauto.
+  }
+Qed.
 
 Variant initial_finalized: Messages.t :=
 | initial_finalized_intro
