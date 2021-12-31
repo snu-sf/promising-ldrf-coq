@@ -128,6 +128,27 @@ Proof.
   i. eapply PROMISES in x. clarify. auto.
 Qed.
 
+Lemma max_readable_read_only_aux mem prom tvw loc ts val released ord
+      ts' val' released' lc
+      (MAX: max_readable mem prom loc ts val released)
+      (TS: tvw.(TView.cur).(View.pln) loc = ts)
+      (READ: Local.read_step (Local.mk tvw prom) mem loc ts' val' released' ord lc)
+      (CONS: Local.promise_consistent lc)
+  :
+    (<<TS: ts' = ts>>) /\ (<<VAL: Const.le val' val>>) /\ (<<RELEASED: released' = released>>).
+Proof.
+  assert (ts' = ts).
+  { dup READ. inv READ.
+    apply TimeFacts.antisym.
+    { destruct (Time.le_lt_dec ts' (tvw.(TView.cur).(View.pln) loc)); auto.
+      inv MAX. hexploit MAX0; eauto; ss.
+      i. hexploit PromiseConsistent.promise_consistent_promise_read; eauto.
+      i. timetac.
+    }
+    { inv READABLE. auto. }
+  }
+  subst. inv MAX. inv READ. clarify.
+Qed.
 
 Lemma max_readable_read_only mem prom tvw loc ts val released
       ts' val' released' lc
@@ -139,25 +160,20 @@ Lemma max_readable_read_only mem prom tvw loc ts val released
   :
     (<<TS: ts' = ts>>) /\ (<<VAL: Const.le val' val>>) /\ (<<RELEASED: released' = released>>) /\ (<<LOCAL: lc = Local.mk tvw prom>>).
 Proof.
-  inv READ. ss. assert (ts' = tvw.(TView.cur).(View.pln) loc).
-  { apply TimeFacts.antisym.
-    { destruct (Time.le_lt_dec ts' (tvw.(TView.cur).(View.pln) loc)); auto.
-      inv MAX. hexploit MAX0; eauto; ss.
-      i. exploit CONS; eauto; ss. i.
-      des_ifs. ss.
-      change (Ordering.le Ordering.relaxed Ordering.na) with false in x.
-      ss. rewrite TimeMap.le_join_l in x.
-      2: { eapply TimeMap.bot_spec. }
-      unfold TimeMap.join, TimeMap.singleton in x.
-      setoid_rewrite LocFun.add_spec_eq in x.
-      exfalso. eapply Time.lt_strorder.
-      eapply TimeFacts.lt_le_lt; [eapply x|].
-      eapply Time.join_r.
-    }
-    { inv READABLE. auto. }
+  hexploit max_readable_read_only_aux; eauto.
+  i. des. splits; auto.
+  inv READ. ss. f_equal.
+  unfold TView.read_tview.
+  change (Ordering.le Ordering.relaxed Ordering.na) with false. ss.
+  change (Ordering.le Ordering.acqrel Ordering.na) with false. ss.
+  rewrite ! View.join_bot_r.
+  rewrite View.le_join_l; cycle 1.
+  { eapply View.singleton_rw_spec; [eapply WF|eapply WF].  }
+  rewrite View.le_join_l; cycle 1.
+  { eapply View.singleton_rw_spec; [eapply WF|].
+    transitivity (View.rlx (TView.cur tvw) loc); [eapply WF|eapply WF].
   }
-  subst. inv MAX. clarify. splits; auto. f_equal.
-  apply read_tview_max. apply WF.
+  destruct tvw; auto.
 Qed.
 
 Lemma max_readable_not_racy mem prom tvw loc ts val released ord
@@ -809,6 +825,48 @@ Proof.
     { auto. }
     { i. eapply Memory.max_ts_spec in GET. des. timetac. }
   }
+Qed.
+
+Lemma timemap_singleton_neq loc ts loc0
+      (NEQ: loc0 <> loc)
+  :
+    TimeMap.singleton loc ts loc0 = Time.bot.
+Proof.
+  unfold TimeMap.singleton. setoid_rewrite LocFun.add_spec_neq; auto.
+Qed.
+
+Lemma timemap_singleton_eq loc ts
+  :
+    TimeMap.singleton loc ts loc = ts.
+Proof.
+  unfold TimeMap.singleton. setoid_rewrite LocFun.add_spec_eq; auto.
+Qed.
+
+Lemma local_write_step_timestamp
+      lc0 sc0 mem0 loc from to val releasedm released ord lc1 sc1 mem1 kind
+      (WRITE: Local.write_step lc0 sc0 mem0 loc from to val releasedm released ord lc1 sc1 mem1 kind)
+      (WF: Local.wf lc0 mem0)
+  :
+    lc1.(Local.tview).(TView.cur).(View.pln) loc = to.
+Proof.
+  inv WRITE. ss. unfold TimeMap.join.
+  rewrite timemap_singleton_eq. apply TimeFacts.le_join_r.
+  inv WRITABLE. left. eapply TimeFacts.le_lt_lt; eauto.
+  eapply WF.
+Qed.
+
+Lemma write_max_readable
+      lc0 sc0 mem0 loc from to val releasedm released ord lc1 sc1 mem1 kind
+      val0 released0
+      (WRITE: Local.write_step lc0 sc0 mem0 loc from to val releasedm released ord lc1 sc1 mem1 kind)
+      (WF: Local.wf lc0 mem0)
+      (MAX: max_readable mem1 lc1.(Local.promises) loc (lc1.(Local.tview).(TView.cur).(View.pln) loc) val0 released0)
+  :
+    (<<VAL: val0 = val>>) /\ (<<RELEASED: released0 = released>>).
+Proof.
+  hexploit local_write_step_timestamp; eauto. i.
+  rewrite H in MAX. inv MAX. inv WRITE.
+  eapply Memory.write_get2 in WRITE0. des. clarify.
 Qed.
 
 Lemma non_max_readable_race mem prom tvw loc
