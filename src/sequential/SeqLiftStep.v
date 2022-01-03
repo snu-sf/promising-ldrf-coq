@@ -1849,7 +1849,7 @@ Qed.
 Definition local_read_fence_tview (tview1: TView.t) (sc1: TimeMap.t) (ord: Ordering.t): TView.t :=
   let acq2 :=
       if Ordering.le Ordering.seqcst ord
-      then View.join (TView.acq tview1) (View.mk sc1 sc1)
+      then View.mk (TimeMap.join sc1 tview1.(TView.acq).(View.rlx)) (TimeMap.join sc1 tview1.(TView.acq).(View.rlx))
       else TView.acq tview1 in
   TView.mk
     (TView.rel tview1)
@@ -1865,15 +1865,22 @@ Lemma local_read_fence_tview_wf tview sc ord
     TView.wf (local_read_fence_tview tview sc ord).
 Proof.
   econs; ss; des_ifs; ss; try by (eapply WF).
-  { eapply View.join_wf; [eapply WF|econs; ss; refl]. }
-  { eapply View.join_wf; [eapply WF|econs; ss; refl]. }
-  { i. etrans; [|eapply View.join_l].
-    transitivity (TView.cur tview); eapply WF.
+  { econs; ss. refl. }
+  { econs; ss. refl. }
+  { i. transitivity (TView.cur tview); [apply WF|].
+    transitivity (TView.acq tview); [apply WF|].
+    econs; ss.
+    { etrans; [|eapply TimeMap.join_r]. eapply WF. }
+    { etrans; [|eapply TimeMap.join_r]. refl. }
   }
-  { transitivity (TView.cur tview); eapply WF. }
+  { i. transitivity (TView.cur tview); apply WF. }
   { refl. }
   { refl. }
-  { i. etrans; [|eapply View.join_l]. eapply WF.}
+  { transitivity (TView.acq tview); [apply WF|].
+    econs; ss.
+    { etrans; [|eapply TimeMap.join_r]. eapply WF. }
+    { etrans; [|eapply TimeMap.join_r]. refl. }
+  }
 Qed.
 
 Lemma local_read_fence_tview_closed mem tview sc ord
@@ -1885,12 +1892,18 @@ Proof.
   econs; ss.
   { i. eapply TVIEW. }
   { des_ifs.
-    { eapply Memory.join_closed_view; eauto. eapply TVIEW. }
+    { econs; ss.
+      { eapply Memory.join_closed_timemap; auto. eapply TVIEW. }
+      { eapply Memory.join_closed_timemap; auto. eapply TVIEW. }
+    }
     { eapply TVIEW. }
     { eapply TVIEW. }
   }
   { des_ifs.
-    { eapply Memory.join_closed_view; eauto. eapply TVIEW. }
+    { econs; ss.
+      { eapply Memory.join_closed_timemap; auto. eapply TVIEW. }
+      { eapply Memory.join_closed_timemap; auto. eapply TVIEW. }
+    }
     { eapply TVIEW. }
   }
 Qed.
@@ -1903,12 +1916,19 @@ Proof.
   econs; ss.
   { i. refl. }
   { des_ifs.
-    { etrans; [|eapply View.join_l]. eapply WF. }
+    { transitivity (TView.acq tview); [apply WF|].
+      econs; ss.
+      { etrans; [|eapply TimeMap.join_r]. eapply WF. }
+      { etrans; [|eapply TimeMap.join_r]. refl. }
+    }
     { eapply WF. }
     { refl. }
   }
   { des_ifs.
-    { eapply View.join_l. }
+    { econs; ss.
+      { etrans; [|eapply TimeMap.join_r]. eapply WF. }
+      { etrans; [|eapply TimeMap.join_r]. refl. }
+    }
     { refl. }
   }
 Qed.
@@ -1985,21 +2005,6 @@ Proof.
   { refl. }
 Qed.
 
-Variant local_fence_read_step lc1 sc1 ord lc2: Prop :=
-| local_fence_read_step_intro
-    (LOCAL: lc2 = Local.mk
-                    (local_read_fence_tview lc1.(Local.tview) sc1 ord)
-                    (lc1.(Local.promises)))
-.
-
-Variant local_fence_write_step lc1 sc1 ord lc2 sc2: Prop :=
-| local_fence_write_step_intro
-    (LOCAL: lc2 = Local.mk
-                    (local_write_fence_tview lc1.(Local.tview) ord)
-                    (lc1.(Local.promises)))
-    (SC: sc2 = local_write_fence_sc lc1.(Local.tview) ord sc1)
-.
-
 Lemma timemap_bot_join_l tm
   :
     TimeMap.join TimeMap.bot tm = tm.
@@ -2042,6 +2047,183 @@ Proof.
   { destruct ord; ss. }
   { rewrite ! timemap_bot_join_r. rewrite ! timemap_bot_join_r in TS. timetac. }
 Qed.
+
+Variant local_fence_read_step lc1 sc1 ord lc2: Prop :=
+| local_fence_read_step_intro
+    (LOCAL: lc2 = Local.mk
+                    (local_read_fence_tview lc1.(Local.tview) sc1 ord)
+                    (lc1.(Local.promises)))
+.
+
+Variant local_fence_write_step lc1 sc1 ord lc2 sc2: Prop :=
+| local_fence_write_step_intro
+    (LOCAL: lc2 = Local.mk
+                    (local_write_fence_tview lc1.(Local.tview) ord)
+                    (lc1.(Local.promises)))
+    (SC: sc2 = local_write_fence_sc lc1.(Local.tview) ord sc1)
+    (RELEASE: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch lc1.(Local.promises))
+    (PROMISES: ord = Ordering.seqcst -> lc1.(Local.promises) = Memory.bot)
+.
+
+Definition sc_ord ordr ordw :=
+  if Ordering.le Ordering.seqcst ordw then Ordering.seqcst else ordr.
+
+Lemma local_fence_tview_sc_ord
+      tvw sc ordr ordw
+      (WF: TView.wf tvw)
+  :
+    TView.write_fence_tview (TView.read_fence_tview tvw (sc_ord ordr ordw)) sc ordw
+    =
+    TView.write_fence_tview (TView.read_fence_tview tvw ordr) sc ordw.
+Proof.
+  Local Transparent Ordering.le.
+  unfold sc_ord in *. des_ifs.
+  unfold TView.read_fence_tview, TView.write_fence_tview, TView.write_fence_sc.
+  destruct ordr eqn:ORDR, ordw eqn:ORDW; ss.
+  { f_equal. unfold sc_ord.
+
+Local.fence_step
+
+Lemma local_fence_step_sc_ord
+      lc0 sc0 ordr ordw lc2 sc1
+      (WF: TView.wf lc0.(Local.tview))
+  :
+    Local.fence_step lc0 sc0 ordr ordw lc2 sc1
+    <->
+    Local.fence_step lc0 sc0 (sc_ord ordr ordw) ordw lc2 sc1.
+Proof.
+  split.
+  { i. inv H. econs; ss.
+
+
+    exists lc1,
+      (<<STEP0: local_fence_read_step lc0 sc0 ordr lc1>>) /\
+      (<<STEP1: local_fence_write_step lc1 sc0 ordw lc2 sc1>>).
+
+
+Lemma local_fence_step lc0
+
+
+Lemma local_fence_tview_merge
+      tvw sc ordr ordw
+      (WF: TView.wf tvw)
+  :
+    local_write_fence_tview (local_read_fence_tview tvw sc (sc_ord ordr ordw)) ordw
+    =
+    TView.write_fence_tview (TView.read_fence_tview tvw ordr) sc ordw.
+Proof.
+  Local Transparent Ordering.le.
+  unfold local_write_fence_tview, local_read_fence_tview, TView.read_fence_tview, TView.write_fence_tview, TView.write_fence_sc.
+  destruct ordr eqn:ORDR, ordw eqn:ORDW; ss; f_equal; try by (symmetry; apply View.join_bot_r).
+  unfold View.join. ss. f_equal.
+  { symmetry. eapply TimeMap.le_join_r.
+    etrans; [|eapply TimeMap.join_r]. eapply WF.
+  }
+  { symmetry. eapply TimeMap.le_join_r.
+    eapply TimeMap.join_r.
+  }
+  Local Opaque Ordering.le.
+Qed.
+
+Lemma local_fence_tview_merge
+      tvw sc ordr ordw
+      (ORD: Ordering.le Ordering.seqcst ordw = Ordering.le Ordering.seqcst ordr)
+      (WF: TView.wf tvw)
+  :
+    local_write_fence_tview (local_read_fence_tview tvw sc ordr) ordw
+    =
+    TView.write_fence_tview (TView.read_fence_tview tvw ordr) sc ordw.
+Proof.
+  Local Transparent Ordering.le.
+  unfold local_write_fence_tview, local_read_fence_tview, TView.read_fence_tview, TView.write_fence_tview, TView.write_fence_sc.
+  destruct ordr eqn:ORDR, ordw eqn:ORDW; ss; f_equal; try by (symmetry; apply View.join_bot_r).
+  unfold View.join. ss. f_equal.
+  { symmetry. eapply TimeMap.le_join_r.
+    etrans; [|eapply TimeMap.join_r]. eapply WF.
+  }
+  { symmetry. eapply TimeMap.le_join_r.
+    eapply TimeMap.join_r.
+  }
+  Local Opaque Ordering.le.
+Qed.
+
+Lemma local_fence_sc_split
+      tvw sc ordr ordw
+      (ORD: Ordering.le Ordering.seqcst ordw = Ordering.le Ordering.seqcst ordr)
+      (WF: TView.wf tvw)
+  :
+    local_write_fence_sc (local_read_fence_tview tvw sc ordr) ordw sc =
+    TView.write_fence_sc (TView.read_fence_tview tvw ordr) sc ordw.
+Proof.
+  Local Transparent Ordering.le.
+  unfold local_write_fence_sc, local_read_fence_tview, TView.read_fence_tview, TView.write_fence_tview, TView.write_fence_sc.
+  destruct ordr eqn:ORDR, ordw eqn:ORDW; ss.
+  rewrite <- TimeMap.join_assoc. f_equal.
+  apply TimeMap.le_join_l. refl.
+Qed.
+
+Lemma local_fence_step_merge
+      lc0 sc0 ordr lc1 ordw lc2 sc1
+      (STEP0: local_fence_read_step lc0 sc0 ordr lc1)
+      (STEP1: local_fence_write_step lc1 sc0 ordw lc2 sc1)
+      (ORD: Ordering.le Ordering.seqcst ordw = Ordering.le Ordering.seqcst ordr)
+      (WF: TView.wf lc0.(Local.tview))
+  :
+    Local.fence_step lc0 sc0 ordr ordw lc2 sc1.
+Proof.
+  inv STEP0. inv STEP1. ss. econs; ss.
+  { rewrite local_fence_tview_merge; eauto. }
+  { rewrite local_fence_sc_split; eauto. }
+Qed.
+
+Lemma local_fence_step_split
+      lc0 sc0 ordr ordw lc2 sc1
+      (STEP: Local.fence_step lc0 sc0 ordr ordw lc2 sc1)
+      (WF: TView.wf lc0.(Local.tview))
+  :
+    exists lc1,
+      (<<STEP0: local_fence_read_step lc0 sc0 ordr lc1>>) /\
+      (<<STEP1: local_fence_write_step lc1 sc0 ordw lc2 sc1>>).
+
+
+  (ORD: Ordering.le Ordering.seqcst ordw = Ordering.le Ordering.seqcst ordr)
+
+
+    Local.fence_step lc0 sc0 ordr ordw lc2 sc1.
+Proof.
+  inv STEP0. inv STEP1. ss. econs; ss.
+  { rewrite local_fence_tview_merge; eauto. }
+  { rewrite local_fence_sc_split; eauto. }
+Qed.
+
+f_equal.
+
+  2:{
+
+
+
+  inv STEP0. inv STEP1. ss. econs; eauto. f_equal.
+  rewrite write_fence_tview_na. rewrite write_fence_sc_na.
+  rewrite read_fence_tview_na. auto.
+Qed.
+
+Lemma fence_step_split
+      lc0 sc0 ordr ordw lc2 sc2
+      (STEP: Local.fence_step lc0 sc0 ordr ordw lc2 sc2)
+  :
+    exists lc1 sc1,
+      (<<STEP0: Local.fence_step lc0 sc0 ordr Ordering.na lc1 sc1>>) /\
+      (<<STEP1: Local.fence_step lc1 sc1 Ordering.na ordw lc2 sc2>>).
+Proof.
+  inv STEP. esplits.
+  { econs; ss. }
+  { econs; eauto. ss. f_equal.
+    rewrite write_fence_tview_na. rewrite write_fence_sc_na.
+    rewrite read_fence_tview_na. auto.
+  }
+Qed.
+
+
 
 Lemma sim_thread_read
       f vers flag_src flag_tgt vs_src0 vs_tgt0
