@@ -159,165 +159,124 @@ Module Promotion.
             exploit SimThreadOther.sim_thread_promises_bot; eauto.
     }
 
-    destruct (Ident.eq_dec tid p); subst; inv STEP_TGT.
-    { (* promotion: failure *)
-      destruct c_src as [ths1_src sc1_src mem1_src].
-      destruct c_tgt as [ths1_tgt sc1_tgt mem1_tgt].
-      dup SIM. inv SIM0. des. ss.
-      clear FIND_SRC OTHER.
-      rewrite TID in FIND_TGT0. Configuration.simplify2.
-      dup WF_SRC. inv WF_SRC0. inv WF. ss.
-      exploit THREADS; eauto. intro WF1_SRC. clear DISJOINT THREADS.
-      dup WF_TGT. inv WF_TGT0. inv WF. ss.
-      exploit THREADS; eauto. intro WF1_TGT. clear DISJOINT THREADS.
-      exploit SimThreadPromotion.sim_thread_all_plus_step; eauto; ss. s. i. des.
-      destruct e_src; ss. inv STEP_SRC. destruct e3_src. ss.
-      assert (CSTEP: Configuration.step
-                       MachineEvent.failure p
-                       (Configuration.mk ths1_src sc1_src mem1_src)
-                       (Configuration.mk
-                          (IdentMap.add p (existT (fun (lang: language) => (Language.state lang)) (lang _) state0, local) ths1_src)
-                          sc memory)).
-      { econs 1; eauto. }
-      esplits; [econs 2; eauto|].
-      exploit Configuration.step_future; try exact CSTEP; eauto. s. i. des.
-      hexploit Thread.rtc_all_step_prev_None.
-      { eapply rtc_n1.
-        - eapply rtc_implies; try exact STEPS_SRC. apply tau_union.
-        - econs. econs. eapply STEP0. }
-      i. des.
-      right. apply CIH. econs; ss.
-      - repeat rewrite Threads.tids_add.
-        repeat rewrite IdentSet.add_mem; ss.
-        + rewrite Threads.tids_o. rewrite TID. ss.
-        + rewrite Threads.tids_o. rewrite FIND_SRC0. ss.
-      - i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i.
-        + inv FIND. ss.
-        + inv SIM. eapply FIND_SRC; eauto.
-      - i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i. eapply FIND_TGT; eauto.
-      - i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i.
-        inv FIND. auto.
-      - repeat rewrite IdentMap.gsspec. condtac; ss. esplits; eauto. right. auto.
-      - i. revert FIND_SRC. rewrite IdentMap.gsspec. condtac; ss; i.
-        revert FIND_TGT0. rewrite IdentMap.gsspec. condtac; ss; i.
-        exploit sim_conf_sim_thread_other; eauto. s. i.
-        eapply SimThreadOther.sim_thread_future; eauto; try apply SIM3.
-        inv WF_SRC. inv WF. ss. exploit THREADS; eauto.
-    }
-
-    destruct (classic (ThreadEvent.get_machine_event e0 = MachineEvent.silent)) eqn:SILENT.
-    { (* promotion: silent *)
-      destruct c_src as [ths1_src sc1_src mem1_src].
-      destruct c_tgt as [ths1_tgt sc1_tgt mem1_tgt].
-      dup SIM. inv SIM0. des. ss.
-      clear FIND_SRC OTHER.
-      rewrite TID in FIND_TGT0. Configuration.simplify2.
-      dup WF_SRC. inv WF_SRC0. inv WF. ss.
-      exploit THREADS; eauto. intro WF1_SRC. clear DISJOINT THREADS.
-      dup WF_TGT. inv WF_TGT0. inv WF. ss.
-      exploit THREADS; eauto. intro WF1_TGT. clear DISJOINT THREADS.
-      exploit SimThreadPromotion.sim_thread_all_plus_step; eauto.
-      { destruct e0; ss. }
-      s. i. des.
-      destruct e3_src. ss.
-      assert (CSTEP: Configuration.opt_step
-                       (ThreadEvent.get_machine_event e_src) p
-                       (Configuration.mk ths1_src sc1_src mem1_src)
-                       (Configuration.mk
-                          (IdentMap.add p (existT (fun (lang: language) => (Language.state lang)) (lang _) state0, local) ths1_src)
-                          sc memory)).
-      { inv STEP_SRC.
-        - destruct (rtc_tail STEPS_SRC).
-          + des. inv H0. inv TSTEP. ss. rewrite <- EVENT1.
-            econs 2. econs 2; eauto.
-            * ii. subst. ss.
-            * exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
+    inv STEP_TGT.
+    destruct (Ident.eq_dec tid p); subst.
+    { destruct (classic (ThreadEvent.get_machine_event e0 = MachineEvent.silent)) eqn:SILENT.
+      { (* promotion: silent *)
+        destruct c_src as [ths1_src sc1_src mem1_src].
+        destruct c_tgt as [ths1_tgt sc1_tgt mem1_tgt].
+        dup SIM. inv SIM0. des. ss.
+        clear FIND_SRC OTHER.
+        rewrite TID in FIND_TGT0. Configuration.simplify2.
+        dup WF_SRC. inv WF_SRC0. inv WF. ss.
+        exploit THREADS; eauto. intro WF1_SRC. clear DISJOINT THREADS.
+        dup WF_TGT. inv WF_TGT0. inv WF. ss.
+        exploit THREADS; eauto. intro WF1_TGT. clear DISJOINT THREADS.
+        exploit SimThreadPromotion.sim_thread_all_plus_step_silent; eauto. i. des.
+        destruct e3_src. ss.
+        assert (CSTEP: Configuration.opt_step
+                         (ThreadEvent.get_machine_event e_src) p
+                         (Configuration.mk ths1_src sc1_src mem1_src)
+                         (Configuration.mk
+                            (IdentMap.add p (existT (fun (lang: language) => (Language.state lang)) (lang _) state0, local) ths1_src)
+                            sc memory)).
+        { inv STEP_SRC.
+          - destruct (rtc_tail STEPS_SRC).
+            + des. inv H0. inv TSTEP. ss. rewrite <- EVENT1.
+              econs 2. econs; eauto. i.
+              exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
               exploit Thread.step_future; try exact STEP; eauto. s. i. des.
               exploit Thread.rtc_tau_step_future; try exact STEPS_SRC; eauto. s. i. des.
               eapply SimThreadPromotion.sim_thread_reserve_consistent; eauto.
-          + inv H.
-            replace (IdentMap.add p (existT (fun lang : language => Language.state lang) (lang _) state0, local) ths1_src)
-              with ths1_src; auto.
-            apply IdentMap.eq_leibniz. ii.
-            rewrite -> IdentMap.gsident; auto.
-        - econs 2. econs 2; eauto.
-          + ii. subst. ss. destruct e0; ss.
-          + exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
+              apply EVENT. ii. congr.
+            + inv H.
+              replace (IdentMap.add p (existT (fun lang : language => Language.state lang) (lang _) state0, local) ths1_src)
+                with ths1_src; auto.
+              apply IdentMap.eq_leibniz. ii.
+              rewrite -> IdentMap.gsident; auto.
+          - econs 2. econs; eauto.
+            exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
             exploit Thread.step_future; try exact STEP; eauto. s. i. des.
             exploit Thread.rtc_tau_step_future; try exact STEPS_SRC; eauto. s. i. des.
             exploit Thread.step_future; try exact STEP0; eauto. s. i. des.
             eapply SimThreadPromotion.sim_thread_reserve_consistent; eauto.
+            apply EVENT. ii. congr.
+        }
+        rewrite <- EVENT0. esplits; eauto.
+        exploit Configuration.opt_step_future; try exact CSTEP; eauto. s. i. des.
+        hexploit Thread.rtc_all_step_prev_None; try eapply Thread.tau_opt_all; eauto. s. i. des.
+        right. apply CIH. econs; ss.
+        - repeat rewrite Threads.tids_add.
+          repeat rewrite IdentSet.add_mem; ss.
+          + rewrite Threads.tids_o. rewrite TID. ss.
+          + rewrite Threads.tids_o. rewrite FIND_SRC0. ss.
+        - i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i.
+          + inv FIND. ss.
+          + inv SIM. eapply FIND_SRC; eauto.
+        - i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i. eapply FIND_TGT; eauto.
+        - i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i.
+          inv FIND. auto.
+        - repeat rewrite IdentMap.gsspec. condtac; ss. esplits; eauto. right. auto.
+        - i. revert FIND_SRC. rewrite IdentMap.gsspec. condtac; ss; i.
+          revert FIND_TGT0. rewrite IdentMap.gsspec. condtac; ss; i.
+          exploit sim_conf_sim_thread_other; eauto. s. i.
+          eapply SimThreadOther.sim_thread_future; eauto; try apply SIM3.
+          inv WF_SRC. inv WF. ss. exploit THREADS; eauto.
       }
-      rewrite <- EVENT0. esplits; eauto.
-      exploit Configuration.opt_step_future; try exact CSTEP; eauto. s. i. des.
-      hexploit Thread.rtc_all_step_prev_None; try eapply Thread.tau_opt_all; eauto. s. i. des.
-      right. apply CIH. econs; ss.
-      - repeat rewrite Threads.tids_add.
-        repeat rewrite IdentSet.add_mem; ss.
-        + rewrite Threads.tids_o. rewrite TID. ss.
-        + rewrite Threads.tids_o. rewrite FIND_SRC0. ss.
-      - i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i.
-        + inv FIND. ss.
-        + inv SIM. eapply FIND_SRC; eauto.
-      - i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i. eapply FIND_TGT; eauto.
-      - i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i.
-        inv FIND. auto.
-      - repeat rewrite IdentMap.gsspec. condtac; ss. esplits; eauto. right. auto.
-      - i. revert FIND_SRC. rewrite IdentMap.gsspec. condtac; ss; i.
-        revert FIND_TGT0. rewrite IdentMap.gsspec. condtac; ss; i.
-        exploit sim_conf_sim_thread_other; eauto. s. i.
-        eapply SimThreadOther.sim_thread_future; eauto; try apply SIM3.
-        inv WF_SRC. inv WF. ss. exploit THREADS; eauto.
-    }
 
-    { (* promotion: syscall *)
-      destruct c_src as [ths1_src sc1_src mem1_src].
-      destruct c_tgt as [ths1_tgt sc1_tgt mem1_tgt].
-      dup SIM. inv SIM0. des. ss.
-      clear FIND_SRC OTHER.
-      rewrite TID in FIND_TGT0. Configuration.simplify2.
-      dup WF_SRC. inv WF_SRC0. inv WF. ss.
-      exploit THREADS; eauto. intro WF1_SRC. clear DISJOINT THREADS.
-      dup WF_TGT. inv WF_TGT0. inv WF. ss.
-      exploit THREADS; eauto. intro WF1_TGT. clear DISJOINT THREADS.
-      destruct e0; ss.
-      exploit SimThreadPromotion.sim_thread_all_plus_step_syscall; eauto. s. i. des.
-      destruct e3_src. ss.
-      assert (CSTEP: Configuration.opt_step
-                       (ThreadEvent.get_machine_event e_src) p
-                       (Configuration.mk ths1_src sc1_src mem1_src)
-                       (Configuration.mk
-                          (IdentMap.add p (existT (fun (lang: language) => (Language.state lang)) (lang _) state0, local) ths1_src)
-                          sc memory)).
-      { econs 2. econs 2; eauto.
-        - ii. subst. ss.
-        - destruct e_src; ss. inv STEP_SRC; [inv STEP0|].
+      { (* promotion: failure, syscall *)
+        destruct c_src as [ths1_src sc1_src mem1_src].
+        destruct c_tgt as [ths1_tgt sc1_tgt mem1_tgt].
+        dup SIM. inv SIM0. des. ss.
+        clear FIND_SRC OTHER.
+        rewrite TID in FIND_TGT0. Configuration.simplify2.
+        dup WF_SRC. inv WF_SRC0. inv WF. ss.
+        exploit THREADS; eauto. intro WF1_SRC. clear DISJOINT THREADS.
+        dup WF_TGT. inv WF_TGT0. inv WF. ss.
+        exploit THREADS; eauto. intro WF1_TGT. clear DISJOINT THREADS.
+        exploit SimThreadPromotion.sim_thread_all_plus_step; eauto; ss. i. des.
+        destruct e3_src. ss.
+        assert (CSTEP: Configuration.step
+                         (ThreadEvent.get_machine_event e0) p
+                         (Configuration.mk ths1_src sc1_src mem1_src)
+                         (Configuration.mk
+                            (IdentMap.add p (existT (fun (lang: language) => (Language.state lang)) (lang _) state0, local) ths1_src)
+                            sc memory)).
+        { rewrite <- EVENT0. econs; eauto. i.
+          destruct e_src; ss; try congr.
+          inv STEP_SRC; [inv STEP0|].
           inv STEP0. inv LOCAL. inv LOCAL0. ss.
           ii. right. esplits; eauto.
+        }
+        esplits; [econs 2; eauto|].
+        exploit Configuration.step_future; try exact CSTEP; eauto. s. i. des.
+        hexploit Thread.rtc_all_step_prev_None.
+        { eapply rtc_n1.
+          - eapply rtc_implies; try exact STEPS_SRC. apply tau_union.
+          - econs. econs. eapply STEP_SRC.
+        }
+        i. des.
+        right. apply CIH. econs; ss.
+        - repeat rewrite Threads.tids_add.
+          repeat rewrite IdentSet.add_mem; ss.
+          + rewrite Threads.tids_o. rewrite TID. ss.
+          + rewrite Threads.tids_o. rewrite FIND_SRC0. ss.
+        - i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i.
+          + inv FIND. ss.
+          + inv SIM. eapply FIND_SRC; eauto.
+        - i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i. eapply FIND_TGT; eauto.
+        - i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i.
+          inv FIND. auto.
+        - repeat rewrite IdentMap.gsspec. condtac; ss. esplits; eauto. left. auto.
+        - i. revert FIND_SRC. rewrite IdentMap.gsspec. condtac; ss; i.
+          revert FIND_TGT0. rewrite IdentMap.gsspec. condtac; ss; i.
+          exploit sim_conf_sim_thread_other; eauto. s. i.
+          eapply SimThreadOther.sim_thread_future; eauto; try apply SIM3.
+          inv WF_SRC. inv WF. ss. exploit THREADS; eauto.
       }
-      rewrite <- EVENT0. esplits; eauto.
-      exploit Configuration.opt_step_future; try exact CSTEP; eauto. s. i. des.
-      hexploit Thread.rtc_all_step_prev_None; try eapply Thread.tau_opt_all; [|econs 2|]; eauto. s. i. des.
-      right. apply CIH. econs; ss.
-      - repeat rewrite Threads.tids_add.
-        repeat rewrite IdentSet.add_mem; ss.
-        + rewrite Threads.tids_o. rewrite TID. ss.
-        + rewrite Threads.tids_o. rewrite FIND_SRC0. ss.
-      - i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i.
-        + inv FIND. ss.
-        + inv SIM. eapply FIND_SRC; eauto.
-      - i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i. eapply FIND_TGT; eauto.
-      - i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i.
-        inv FIND. auto.
-      - repeat rewrite IdentMap.gsspec. condtac; ss. esplits; eauto. left. auto.
-      - i. revert FIND_SRC. rewrite IdentMap.gsspec. condtac; ss; i.
-        revert FIND_TGT0. rewrite IdentMap.gsspec. condtac; ss; i.
-        exploit sim_conf_sim_thread_other; eauto. s. i.
-        eapply SimThreadOther.sim_thread_future; eauto; try apply SIM3.
-        inv WF_SRC. inv WF. ss. exploit THREADS; eauto.
     }
 
-    { (* other: failure *)
+    { (* other *)
       exploit sim_conf_find; eauto. i. des.
       exploit x1; eauto. i. des. clear x0 x1.
       destruct c_src as [ths1_src sc1_src mem1_src].
@@ -331,22 +290,41 @@ Module Promotion.
       exploit THREADS; eauto. intro WF1_SRC. clear DISJOINT THREADS.
       dup WF_TGT. inv WF_TGT0. inv WF. ss.
       exploit THREADS; eauto. intro WF1_TGT. clear DISJOINT THREADS.
-      exploit SimThreadOther.sim_thread_plus_step; eauto. s. i. des.
-      destruct e_src; ss. inv STEP_SRC. destruct e3_src. ss.
-      assert (CSTEP: Configuration.step
-                       MachineEvent.failure tid
+      exploit SimThreadOther.sim_thread_plus_step; eauto.
+      { econs 2; eauto. }
+      s. i. des.
+      destruct e3_src. ss.
+      assert (CSTEP: Configuration.opt_step
+                       (ThreadEvent.get_machine_event e_src) tid
                        (Configuration.mk ths1_src sc1_src mem1_src)
                        (Configuration.mk
                           (IdentMap.add tid (existT (fun (lang: language) => (Language.state lang)) (lang _) state0, local) ths1_src)
                           sc memory)).
-      { econs 1; eauto. }
-      esplits; [econs 2; eauto|].
-      exploit Configuration.step_future; try exact CSTEP; eauto. s. i. des.
-      hexploit Thread.rtc_all_step_prev_None.
-      { eapply rtc_n1.
-        - eapply rtc_implies; try exact STEPS_SRC. apply tau_union.
-        - econs. econs. eapply STEP0. }
-      i. des.
+      { inv STEP_SRC.
+        - destruct (rtc_tail STEPS_SRC).
+          + des. inv H0. inv TSTEP. ss. rewrite <- EVENT1.
+            econs 2. econs; eauto.
+            exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
+            exploit Thread.step_future; try exact STEP; eauto. s. i. des.
+            exploit Thread.rtc_tau_step_future; try exact STEPS_SRC; eauto. s. i. des.
+            eapply SimThreadOther.sim_thread_consistent; eauto.
+            apply EVENT. congr.
+          + inv H.
+            replace (IdentMap.add tid (existT (fun lang : language => Language.state lang) (lang _) state0, local) ths1_src)
+              with ths1_src; auto.
+            apply IdentMap.eq_leibniz. ii.
+            rewrite -> IdentMap.gsident; auto.
+        - econs 2. econs; eauto.
+          exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
+          exploit Thread.step_future; try exact STEP; eauto. s. i. des.
+          exploit Thread.rtc_tau_step_future; try exact STEPS_SRC; eauto. s. i. des.
+          exploit Thread.step_future; try exact STEP0; eauto. s. i. des.
+          eapply SimThreadOther.sim_thread_consistent; eauto.
+          apply EVENT. congr.
+      }
+      rewrite <- EVENT0. esplits; eauto.
+      exploit Configuration.opt_step_future; try exact CSTEP; eauto. s. i. des.
+      hexploit Thread.rtc_all_step_prev_None; try eapply Thread.tau_opt_all; eauto. s. i. des.
       right. apply CIH. econs; ss.
       - repeat rewrite Threads.tids_add.
         repeat rewrite IdentSet.add_mem; ss.
@@ -367,78 +345,6 @@ Module Promotion.
       - i. revert FIND_SRC. rewrite IdentMap.gsspec. condtac; ss; i.
         + subst. revert FIND_TGT0. rewrite IdentMap.gsspec. condtac; ss; i. Configuration.simplify2.
         + revert FIND_TGT0. rewrite IdentMap.gsspec. condtac; ss; i.
-          exploit sim_conf_sim_thread_other; eauto. s. i.
-          eapply SimThreadOther.sim_thread_future; eauto; try apply SIM3.
-          inv WF_SRC. inv WF. ss. exploit THREADS; eauto.
-    }
-
-    { (* other: normal *)
-      exploit sim_conf_find; eauto. i. des.
-      exploit x1; eauto. i. des. clear x0 x1.
-      destruct c_src as [ths1_src sc1_src mem1_src].
-      destruct c_tgt as [ths1_tgt sc1_tgt mem1_tgt].
-      dup SIM. inv SIM0. ss.
-      exploit FIND_SRC; eauto. i. subst.
-      exploit FIND_TGT; eauto. i. subst.
-      clear FIND_SRC FIND_TGT PROMOTION OTHER.
-      exploit sim_conf_sim_thread_other; eauto. s. intro SIM_TH.
-      dup WF_SRC. inv WF_SRC0. inv WF. ss.
-      exploit THREADS; eauto. intro WF1_SRC. clear DISJOINT THREADS.
-      dup WF_TGT. inv WF_TGT0. inv WF. ss.
-      exploit THREADS; eauto. intro WF1_TGT. clear DISJOINT THREADS.
-      exploit SimThreadOther.sim_thread_plus_step; eauto. s. i. des.
-      destruct e3_src. ss.
-      assert (CSTEP: Configuration.opt_step
-                       (ThreadEvent.get_machine_event e_src) tid
-                       (Configuration.mk ths1_src sc1_src mem1_src)
-                       (Configuration.mk
-                          (IdentMap.add tid (existT (fun (lang: language) => (Language.state lang)) (lang _) state0, local) ths1_src)
-                          sc memory)).
-      { inv STEP_SRC.
-        - destruct (rtc_tail STEPS_SRC).
-          + des. inv H0. inv TSTEP. ss. rewrite <- EVENT1.
-            econs 2. econs 2; eauto.
-            * ii. subst. ss.
-            * exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
-              exploit Thread.step_future; try exact STEP; eauto. s. i. des.
-              exploit Thread.rtc_tau_step_future; try exact STEPS_SRC; eauto. s. i. des.
-              eapply SimThreadOther.sim_thread_consistent; eauto.
-          + inv H.
-            replace (IdentMap.add tid (existT (fun lang : language => Language.state lang) (lang _) state0, local) ths1_src)
-              with ths1_src; auto.
-            apply IdentMap.eq_leibniz. ii.
-            rewrite -> IdentMap.gsident; auto.
-        - econs 2. econs 2; eauto.
-          + ii. subst. ss. destruct e0; ss.
-          + exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
-            exploit Thread.step_future; try exact STEP; eauto. s. i. des.
-            exploit Thread.rtc_tau_step_future; try exact STEPS_SRC; eauto. s. i. des.
-            exploit Thread.step_future; try exact STEP0; eauto. s. i. des.
-            eapply SimThreadOther.sim_thread_consistent; eauto.
-      }
-      rewrite <- EVENT0. esplits; eauto.
-      exploit Configuration.opt_step_future; try exact CSTEP; eauto. s. i. des.
-      hexploit Thread.rtc_all_step_prev_None; try eapply Thread.tau_opt_all; eauto. s. i. des.
-      right. apply CIH. econs; ss.
-      - repeat rewrite Threads.tids_add.
-        repeat rewrite IdentSet.add_mem; ss.
-        + rewrite Threads.tids_o. rewrite TID. ss.
-        + rewrite Threads.tids_o. rewrite x. ss.
-      - i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i.
-        + inv FIND. ss.
-        + inv SIM. eapply FIND_SRC; eauto.
-      - i. revert FIND. rewrite IdentMap.gsspec. condtac; ss; i.
-        + inv FIND. ss.
-        + inv SIM. eapply FIND_TGT; eauto.
-      - i. revert FIND. rewrite IdentMap.gsspec. condtac; try congr.
-        i. eapply FIND_TGT_PROMOTE; eauto.
-      - repeat rewrite IdentMap.gsspec. condtac; try congr.
-        inv SIM. des. ss. esplits; eauto.
-        eapply SimThreadPromotion.sim_thread_all_future; eauto; try apply SIM3.
-        inv WF_SRC. inv WF. ss. exploit THREADS; eauto.
-      - i. revert FIND_SRC. rewrite IdentMap.gsspec. condtac; ss; i.
-        + subst. revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i. Configuration.simplify2.
-        + revert FIND_TGT. rewrite IdentMap.gsspec. condtac; ss; i.
           exploit sim_conf_sim_thread_other; eauto. s. i.
           eapply SimThreadOther.sim_thread_future; eauto; try apply SIM3.
           inv WF_SRC. inv WF. ss. exploit THREADS; eauto.
@@ -476,7 +382,7 @@ Module Promotion.
       (PROMOTION: exists syn_src syn_tgt,
           <<FIND_SRC: IdentMap.find p program_src = Some (existT _ (lang (R_tid p)) syn_src)>> /\
           <<FIND_TGT: IdentMap.find p program_tgt = Some (existT _ (lang _) syn_tgt)>> /\
-          <<PROMOTE: syn_tgt = promote_itree l 0 syn_src>>)
+          <<PROMOTE: syn_tgt = promote_itree l Const.undef syn_src>>)
       (OTHER: forall tid syn_src syn_tgt
                 (TID: tid <> p)
                 (FIND_SRC: IdentMap.find tid program_src = Some (existT _ (lang (R_tid tid)) syn_src))
@@ -541,7 +447,7 @@ Module Promotion.
       rewrite FIND_SRC0. rewrite FIND_TGT0. ss.
       esplits; eauto.
       left. econs; ss; try refl.
-      + instantiate (1 := 0). econs; eauto.
+      + instantiate (1 := Const.undef). econs; eauto.
       + ii. rewrite Memory.bot_get in *. ss.
       + replace (Memory.max_ts l Memory.init) with Time.bot by ss.
         unfold Memory.get, Memory.init, Cell.get, Cell.init, Cell.Raw.init. ss.
@@ -565,7 +471,7 @@ Module Promotion.
   Theorem promote_behavior
           p l program_src program_tgt
           (PROMOTE: promote_program p l program_src program_tgt):
-    behaviors Configuration.step (Configuration.init program_tgt) <1=
+    behaviors Configuration.step (Configuration.init program_tgt) <2=
     behaviors Configuration.step (Configuration.init program_src).
   Proof.
     exploit init_sim_conf; eauto. i. des.

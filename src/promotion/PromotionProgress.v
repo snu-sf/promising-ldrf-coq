@@ -75,7 +75,7 @@ Module PromotionProgress.
       <<LC: sim_local l lc1 lc2>>.
   Proof.
     esplits.
-    - econs; eauto.
+    - econs; eauto; try refl.
       econs; i; eapply Memory.max_ts_spec2; apply WF1.
     - econs; try refl. econs; ss.
       + eapply progress_read_aux.

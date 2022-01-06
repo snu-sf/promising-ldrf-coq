@@ -45,13 +45,14 @@ CoFixpoint promote_itree (l: Loc.t) (st: Const.t) R (itr: itree MemE.t R): itree
     else Vis (MemE.write loc val ord) (fun r => promote_itree l st (k r))
   | VisF (MemE.update loc (MemE.fetch_add addendum) ordr ordw) k =>
     if Loc.eq_dec loc l
-    then tau;;(promote_itree l (st + addendum) (k (st + addendum)))
+    then tau;;(promote_itree l (Const.add st addendum) (k (Const.add st addendum)))
     else Vis (MemE.update loc (MemE.fetch_add addendum) ordr ordw) (fun r => promote_itree l st (k r))
   | VisF (MemE.update loc (MemE.cas old new) ordr ordw) k =>
     if Loc.eq_dec loc l
-    then tau;; (if (Const.eq_dec st old)
-                then promote_itree l new (k 1)
-                else promote_itree l st (k 0))
+    then tau;; (match Const.eqb st old with
+                | Some true => promote_itree l new (k 1)
+                | _ => promote_itree l st (k 0)
+                end)
     else Vis (MemE.update loc (MemE.cas old new) ordr ordw) (fun r => promote_itree l st (k r))
   | VisF e k => Vis e (fun r => promote_itree l st (k r))
   end.
@@ -71,13 +72,14 @@ Lemma unfold_promote_itree l st R (itr: itree MemE.t R):
     else Vis (MemE.write loc val ord) (fun r => promote_itree l st (k r))
   | VisF (MemE.update loc (MemE.fetch_add addendum) ordr ordw) k =>
     if Loc.eq_dec loc l
-    then tau;;(promote_itree l (st + addendum) (k (st + addendum)))
+    then tau;;(promote_itree l (Const.add st addendum) (k (Const.add st addendum)))
     else Vis (MemE.update loc (MemE.fetch_add addendum) ordr ordw) (fun r => promote_itree l st (k r))
   | VisF (MemE.update loc (MemE.cas old new) ordr ordw) k =>
     if Loc.eq_dec loc l
-    then tau;; (if (Const.eq_dec st old)
-                then promote_itree l new (k 1)
-                else promote_itree l st (k 0))
+    then tau;; (match Const.eqb st old with
+                | Some true => promote_itree l new (k 1)
+                | _ => promote_itree l st (k 0)
+                end)
     else Vis (MemE.update loc (MemE.cas old new) ordr ordw) (fun r => promote_itree l st (k r))
   | VisF e k => Vis e (fun r => promote_itree l st (k r))
   end.
@@ -144,6 +146,7 @@ Proof.
       { econs. right. auto. }
       { econs; auto. }
       { econs; auto. }
+      { econs; auto. }
     }
     { econs; auto. ss. }
     { econs; auto. ss. }
@@ -179,8 +182,8 @@ Proof.
   punfold LOCFREE.
   inv STEP; try (by destruct e); ss;
     dependent destruction LOCFREE.
-  - destruct e; ss. clarify.
-  - destruct e; ss. clarify.
-  - destruct e; ss. clarify.
-  - destruct e; ss. clarify.
+  - destruct e; ss; clarify.
+  - destruct e; ss; clarify.
+  - destruct e; ss; clarify.
+  - destruct e; ss; clarify.
 Qed.
