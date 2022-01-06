@@ -2009,7 +2009,7 @@ Proof.
   { refl. }
 Qed.
 
-Definition local_write_fence_sc (tview1: TView.t) (ord: Ordering.t) (sc: TimeMap.t): TimeMap.t :=
+Definition local_write_fence_sc (tview1: TView.t) (sc: TimeMap.t) (ord: Ordering.t): TimeMap.t :=
   if Ordering.le Ordering.seqcst ord
   then (TimeMap.join sc (View.rlx (TView.cur tview1)))
   else sc
@@ -2019,7 +2019,7 @@ Lemma local_write_fence_sc_closed mem tview sc ord
       (TVIEW: TView.closed tview mem)
       (SC: Memory.closed_timemap sc mem)
   :
-    Memory.closed_timemap (local_write_fence_sc tview ord sc) mem.
+    Memory.closed_timemap (local_write_fence_sc tview sc ord) mem.
 Proof.
   unfold local_write_fence_sc. des_ifs.
   eapply Memory.join_closed_timemap; auto. eapply TVIEW.
@@ -2027,7 +2027,7 @@ Qed.
 
 Lemma local_write_fence_sc_incr tview sc ord
   :
-    TimeMap.le sc (local_write_fence_sc tview ord sc).
+    TimeMap.le sc (local_write_fence_sc tview sc ord).
 Proof.
   unfold local_write_fence_sc. des_ifs.
   { eapply TimeMap.join_l. }
@@ -2089,7 +2089,7 @@ Variant local_fence_write_step lc1 sc1 ord lc2 sc2: Prop :=
     (LOCAL: lc2 = Local.mk
                     (local_write_fence_tview lc1.(Local.tview) ord)
                     (lc1.(Local.promises)))
-    (SC: sc2 = local_write_fence_sc lc1.(Local.tview) ord sc1)
+    (SC: sc2 = local_write_fence_sc lc1.(Local.tview) sc1 ord)
     (RELEASE: Ordering.le Ordering.strong_relaxed ord -> Memory.nonsynch lc1.(Local.promises))
     (PROMISES: ord = Ordering.seqcst -> lc1.(Local.promises) = Memory.bot)
 .
@@ -2109,7 +2109,7 @@ Lemma local_fence_sc_merge
       tvw sc ordr ordw
       (WF: TView.wf tvw)
   :
-    local_write_fence_sc (local_read_fence_tview tvw sc ordr ordw) ordw sc =
+    local_write_fence_sc (local_read_fence_tview tvw sc ordr ordw) sc ordw =
     TView.write_fence_sc (TView.read_fence_tview tvw ordr) sc ordw.
 Proof.
   assert (IDEM: forall tm, TimeMap.join tm tm = tm).
@@ -2150,6 +2150,92 @@ Proof.
   inv STEP. esplits.
   { econs; eauto. }
   { econs; ss. rewrite local_fence_sc_merge; auto. }
+Qed.
+
+Lemma sim_local_read_fence_tview f flag_src rel_vers tvw_src tvw_tgt sc_src sc_tgt
+      ordr ordw
+      (SIM: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
+      (SC: sim_timemap (fun _ => True) f (Mapping.vers f) sc_src sc_tgt)
+      (FLAG: Ordering.le Ordering.seqcst ordw -> forall loc, flag_src loc = None)
+      (WF: Mapping.wfs f)
+  :
+    sim_tview f flag_src rel_vers (local_read_fence_tview tvw_src sc_src ordr ordw) (local_read_fence_tview tvw_tgt sc_tgt ordr ordw).
+Proof.
+  pose proof (mapping_latest_wf f).
+  assert (READ: sim_tview f flag_src rel_vers (TView.read_fence_tview tvw_src ordr) (TView.read_fence_tview tvw_tgt ordr)).
+  { eapply sim_read_fence_tview; eauto. }
+  assert (WRITE: forall L, sim_timemap L f (Mapping.vers f) (TView.write_fence_sc (TView.read_fence_tview tvw_src ordr) sc_src ordw) (TView.write_fence_sc (TView.read_fence_tview tvw_tgt ordr) sc_tgt ordw)).
+  { i. eapply sim_timemap_mon_locs.
+    { eapply sim_write_fence_sc; eauto. }
+    { ss. }
+  }
+  econs; ss.
+  { eapply SIM. }
+  { des_ifs.
+    { eapply SIM. }
+    { eapply SIM. }
+  }
+  { eapply sim_view_join; eauto.
+    { eapply SIM. }
+    { des_ifs. eapply sim_view_bot; eauto. }
+  }
+  { eapply SIM. }
+Qed.
+
+Lemma sim_local_write_fence_tview_normal f flag_src rel_vers tvw_src tvw_tgt
+      ord
+      (SIM: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
+      (ORD: ~ Ordering.le Ordering.acqrel ord)
+      (WF: Mapping.wfs f)
+  :
+    sim_tview f flag_src rel_vers (local_write_fence_tview tvw_src ord) (local_write_fence_tview tvw_tgt ord).
+Proof.
+  pose proof (mapping_latest_wf f).
+  econs; ss.
+  { i. des_ifs. eapply SIM. }
+  { eapply SIM. }
+  { eapply SIM. }
+  { eapply SIM. }
+Qed.
+
+Lemma sim_local_write_fence_tview_release f flag_src rel_vers tvw_src tvw_tgt
+      ord
+      (SIM: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
+      (FLAG: forall loc, flag_src loc = None)
+      (WF: Mapping.wfs f)
+  :
+    sim_tview f flag_src (fun _ => Mapping.vers f) (local_write_fence_tview tvw_src ord) (local_write_fence_tview tvw_tgt ord).
+Proof.
+  pose proof (mapping_latest_wf f).
+  econs; ss.
+  { i. des_ifs.
+    { eapply sim_view_mon_locs.
+      { eapply SIM. }
+      { i. ss. }
+    }
+    { eapply sim_view_mon_ver; auto.
+      { eapply SIM. }
+      { eapply version_le_version_wf. eapply SIM. }
+    }
+  }
+  { eapply SIM. }
+  { eapply SIM. }
+Qed.
+
+Lemma sim_local_write_fence_sc f flag_src rel_vers tvw_src tvw_tgt sc_src sc_tgt
+      ord
+      (SIM: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
+      (SC: sim_timemap (fun _ => True) f (Mapping.vers f) sc_src sc_tgt)
+      (FLAG: Ordering.le Ordering.seqcst ord -> forall loc, flag_src loc = None)
+      (WF: Mapping.wfs f)
+  :
+    sim_timemap (fun _ => True) f (Mapping.vers f) (local_write_fence_sc tvw_src sc_src ord) (local_write_fence_sc tvw_tgt sc_tgt ord).
+Proof.
+  pose proof (mapping_latest_wf f).
+  unfold local_write_fence_sc. des_ifs. eapply sim_timemap_join; auto.
+  eapply sim_timemap_mon_locs; eauto.
+  { eapply SIM. }
+  { ss. i. auto. }
 Qed.
 
 Lemma sim_thread_read
@@ -2271,6 +2357,165 @@ Proof.
     }
   }
 Qed.
+
+Lemma sim_thread_read_fence_step
+      f vers flag_src flag_tgt vs_src0 vs_tgt0
+      mem_src mem_tgt lc_src0 lc_tgt0 sc_src sc_tgt
+      lc_tgt1 ordr ordw
+      (SIM: sim_thread
+              f vers flag_src flag_tgt vs_src0 vs_tgt0
+              mem_src mem_tgt lc_src0 lc_tgt0 sc_src sc_tgt)
+      (READ: local_fence_read_step lc_tgt0 sc_tgt ordr ordw lc_tgt1)
+      (CONSISTENT: Local.promise_consistent lc_tgt1)
+      (LOCALSRC: Local.wf lc_src0 mem_src)
+      (LOCALTGT: Local.wf lc_tgt0 mem_tgt)
+      (MEMSRC: Memory.closed mem_src)
+      (MEMTGT: Memory.closed mem_tgt)
+      (SCSRC: Memory.closed_timemap sc_src mem_src)
+      (SCTGT: Memory.closed_timemap sc_tgt mem_tgt)
+      (WF: Mapping.wfs f)
+      (VERS: versions_wf f vers)
+      (ACQFLAG: forall loc ts
+                    (SRC: flag_src loc = None) (TGT: flag_tgt loc = Some ts),
+          ~ Ordering.le Ordering.acqrel ordr)
+      (RELFLAG: forall loc ts
+                    (SRC: flag_src loc = None) (TGT: flag_tgt loc = Some ts),
+          ~ Ordering.le Ordering.seqcst ordw)
+  :
+    exists lc_src1 vs_src1 vs_tgt1,
+      (<<READ: local_fence_read_step lc_src0 sc_src ordr ordw lc_src1>>) /\
+      (<<SIM: sim_thread
+                f vers flag_src flag_tgt vs_src1 vs_tgt1
+                mem_src mem_tgt lc_src1 lc_tgt1 sc_src sc_tgt>>) /\
+      (<<VALS: forall loc0,
+          ((<<SRC: vs_src1 loc0 = vs_src0 loc0>>) /\ (<<TGT: vs_tgt1 loc0 = vs_tgt0 loc0>>)) \/
+          (exists val0,
+              (<<NONESRC: vs_src0 loc0 = None>>) /\ (<<NONETGT: vs_tgt0 loc0 = None>>) /\
+              (<<VALSRC: vs_src1 loc0 = Some val0>>) /\ (<<VALTGT: vs_tgt1 loc0 = Some val0>>) /\
+              (<<ORD: Ordering.le Ordering.acqrel ordr>>))>>).
+Proof.
+  destruct lc_src0 as [tvw_src0 prom_src].
+  destruct lc_tgt0 as [tvw_tgt0 prom_tgt]. inv READ. ss.
+  dup SIM. inv SIM. inv LOCAL.
+  assert (VIEW: sim_tview f flag_src rel_vers (local_read_fence_tview tvw_src0 sc_src ordr ordw) (local_read_fence_tview tvw_tgt0 sc_tgt ordr ordw)).
+  { eapply sim_local_read_fence_tview; eauto. }
+  hexploit sim_thread_acquire; eauto.
+  { inv LOCALSRC. econs; auto; s.
+    { eapply local_read_fence_tview_wf; eauto. }
+    { eapply local_read_fence_tview_closed; eauto. }
+  }
+  { inv LOCALTGT. econs; auto; s.
+    { eapply local_read_fence_tview_wf; eauto. }
+    { eapply local_read_fence_tview_closed; eauto. }
+  }
+  { eapply local_read_fence_tview_incr. eapply LOCALSRC. }
+  { eapply local_read_fence_tview_incr. eapply LOCALTGT. }
+  { i. hexploit ACQFLAG; eauto. i. ss. des_ifs; ss.
+    unfold TView.read_fence_tview, TView.write_fence_sc. ss. des_ifs.
+
+    destruct
+
+    {
+
+
+eapply sim_local_read_fence_tview; eauto.
+
+sim_local_read_fence_tview
+     : forall (f : Mapping.ts) (flag_src : Loc.t -> option Time.t) (rel_vers : Loc.t -> version) (tvw_src tvw_tgt : TView.t)
+         (sc_src sc_tgt : TimeMap.t) (ordr ordw : Ordering.t),
+       sim_tview f flag_src rel_vers tvw_src tvw_tgt ->
+       sim_timemap (fun _ : Loc.t => True) f (Mapping.vers f) sc_src sc_tgt ->
+       (Ordering.le Ordering.seqcst ordw -> forall loc : Loc.t, flag_src loc = None) ->
+       Mapping.wfs f ->
+       sim_tview f flag_src rel_vers (local_read_fence_tview tvw_src sc_src ordr ordw)
+         (local_read_fence_tview tvw_tgt sc_tgt ordr ordw)
+eauto. }
+  { admit. }
+  { eauto.
+
+  dup SIM. inv SIM. inv LOCAL. inv READ.
+  hexploit sim_memory_get; eauto; ss. i. des. inv MSG; ss.
+  assert (READSRC: exists tvw_src1, (<<READSRC: forall val (VAL: Const.le val val_src), Local.read_step (Local.mk tvw_src0 prom_src) mem_src loc to_src val vw_src ord (Local.mk tvw_src1 prom_src)>>) /\
+                           (<<SIM: sim_tview f flag_src rel_vers tvw_src1 (TView.read_tview tvw_tgt0 loc to_tgt released_tgt ord)>>)).
+  { esplits.
+    { i. econs; eauto.
+      { ss. inv TVIEW. eapply sim_readable; eauto. }
+    }
+    { ss. eapply sim_read_tview; eauto.
+      { rewrite H0. eapply VERS. }
+      { eapply MEMSRC in GET0. des.
+        eapply message_to_time_le_opt_view; eauto.
+      }
+      { eapply MEMTGT in GET. des.
+        eapply message_to_time_le_opt_view; eauto.
+      }
+    }
+  }
+  des. hexploit READSRC0; [refl|..]. intros READSRC.
+  hexploit Local.read_step_future; eauto. i. des. ss.
+  hexploit sim_thread_acquire; eauto.
+  { i. hexploit FLAG; eauto. i.
+    assert (LOC: loc0 <> loc).
+    { ii. subst. rewrite FLAGTGT in TGT. ss. }
+    inv READSRC. ss. inv LC2. splits.
+    { ss. destruct (Ordering.le Ordering.acqrel ord); ss.
+      rewrite timemap_bot_join_r.
+      unfold TimeMap.join.
+      rewrite TimeFacts.le_join_l; auto.
+      destruct (Ordering.le Ordering.relaxed ord); ss.
+      { rewrite timemap_singleton_neq; auto. eapply Time.bot_spec. }
+      { eapply Time.bot_spec. }
+    }
+    { ss. destruct (Ordering.le Ordering.acqrel ord); ss.
+      rewrite timemap_bot_join_r.
+      unfold TimeMap.join.
+      rewrite TimeFacts.le_join_l; auto.
+      destruct (Ordering.le Ordering.relaxed ord); ss.
+      { rewrite timemap_singleton_neq; auto. eapply Time.bot_spec. }
+      { rewrite timemap_singleton_neq; auto. eapply Time.bot_spec. }
+    }
+  }
+  i. des. esplits; eauto.
+  { etrans; eauto. }
+  { i. specialize (MAXSRC loc). rewrite VAL1 in MAXSRC. inv MAXSRC.
+    hexploit MAX; eauto. i. des.
+    hexploit max_readable_read_only_aux; eauto.
+    { inv SIM2. eapply sim_local_consistent; eauto. }
+    i. des. subst. inv MAX0.
+    rewrite GET1 in GET0. inv GET0. auto.
+  }
+  i. hexploit VALS; eauto. i. des.
+  { left. eauto. }
+  { right. esplits; eauto. destruct (Loc.eq_dec loc0 loc).
+    { subst. right. splits; auto. red in VAL1. des.
+      replace (View.pln (TView.cur tvw_src1) loc) with to_src in VAL1.
+      { rewrite GET0 in VAL1. inv VAL1. etrans; eauto. }
+      symmetry. inv READSRC. inv LC2. ss.
+      eapply read_tview_incr; eauto.
+      { eapply message_to_time_le_opt_view; eauto.
+        eapply MEMSRC; eauto.
+      }
+      { inv READABLE0. ss. }
+    }
+    { left. inv READSRC. inv LC2. ss.
+      destruct (Ordering.le Ordering.acqrel ord); auto.
+      ss. rewrite timemap_bot_join_r in TS.
+      unfold TimeMap.join in TS. rewrite TimeFacts.le_join_l in TS; auto.
+      { timetac. }
+      { destruct (Ordering.le Ordering.relaxed ord); ss.
+        { rewrite timemap_singleton_neq; auto. eapply Time.bot_spec. }
+        { apply Time.bot_spec. }
+      }
+    }
+  }
+
+
+  inv READ. esplits.
+  { econs; eauto. }
+  { inv SIM. econs; eauto.
+    {
+
+
 
 Require Import Pred.
 
