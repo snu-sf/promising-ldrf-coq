@@ -495,72 +495,68 @@ Module Thread.
 
     (* step_prev_None *)
 
-    (* Lemma step_prev_None *)
-    (*       pf e e1 e2 *)
-    (*       (STEP: step pf e e1 e2): *)
-    (*   <<PREV: Memory.prev_None e1.(memory) e2.(memory)>>. *)
-    (* Proof. *)
-    (*   inv STEP; inv STEP0; inv LOCAL; ss; *)
-    (*     try by ii; eapply GET_PREV; eauto. *)
-    (*   - eapply Memory.promise_prev_None; eauto. *)
-    (*   - inv LOCAL0. inv WRITE. ss. *)
-    (*     eapply Memory.promise_prev_None; eauto. *)
-    (*   - inv LOCAL1. inv LOCAL2. inv WRITE. ss. *)
-    (*     eapply Memory.promise_prev_None; eauto. *)
-    (* Qed. *)
+    Lemma step_prev_None
+          pf e e1 e2
+          (STEP: step pf e e1 e2):
+      <<PREV: Memory.prev_None e1.(memory) e2.(memory)>>.
+    Proof.
+      inv STEP; inv STEP0; inv LOCAL; ss;
+        try by ii; eapply GET_PREV; eauto.
+      - eapply Memory.promise_prev_None; eauto.
+      - inv LOCAL0.
+        eapply Memory.write_prev_None; eauto.
+      - inv LOCAL1. inv LOCAL2. ss.
+        eapply Memory.write_prev_None; eauto.
+      - inv LOCAL0.
+        eapply Memory.write_na_prev_None; eauto.
+    Qed.
 
-    (* Lemma opt_step_prev_None *)
-    (*       e e1 e2 *)
-    (*       (STEP: opt_step e e1 e2): *)
-    (*   <<PREV: Memory.prev_None e1.(memory) e2.(memory)>>. *)
-    (* Proof. *)
-    (*   inv STEP; eauto using step_prev_None. *)
-    (*   ii. eapply GET_PREV; eauto. *)
-    (* Qed. *)
+    Lemma opt_step_prev_None
+          e e1 e2
+          (STEP: opt_step e e1 e2):
+      <<PREV: Memory.prev_None e1.(memory) e2.(memory)>>.
+    Proof.
+      inv STEP; eauto using step_prev_None.
+      ii. eapply GET_PREV; eauto.
+    Qed.
 
-    (* Lemma rtc_tau_step_prev_None *)
-    (*       e1 e2 *)
-    (*       (STEPS: rtc tau_step e1 e2): *)
-    (*   <<PREV: Memory.prev_None e1.(memory) e2.(memory)>>. *)
-    (* Proof. *)
-    (*   induction STEPS. *)
-    (*   - ii. eapply GET_PREV; eauto. *)
-    (*   - inv H. inv TSTEP. *)
-    (*     inv STEP; inv STEP0; inv LOCAL; ss; ii. *)
-    (*     + exploit Memory.promise_get_from; eauto. i. des. *)
-    (*       hexploit Memory.promise_prev_None; eauto. i. *)
-    (*       eapply IHSTEPS; eauto. *)
-    (*     + inv LOCAL0. inv WRITE. *)
-    (*       exploit Memory.promise_get_from; eauto. i. des. *)
-    (*       hexploit Memory.promise_prev_None; eauto. i. *)
-    (*       eapply IHSTEPS; eauto. *)
-    (*     + inv LOCAL1. inv LOCAL2. inv WRITE. ss. *)
-    (*       exploit Memory.promise_get_from; try exact GET; eauto. i. des. *)
-    (*       hexploit Memory.promise_prev_None; eauto. i. *)
-    (*       eapply IHSTEPS; eauto. *)
-    (* Qed. *)
+    Lemma rtc_tau_step_prev_None
+          e1 e2
+          (STEPS: rtc tau_step e1 e2):
+      <<PREV: Memory.prev_None e1.(memory) e2.(memory)>>.
+    Proof.
+      induction STEPS.
+      - ii. eapply GET_PREV; eauto.
+      - inv H. inv TSTEP.
+        hexploit step_prev_None; eauto. i. des.
+        inv STEP; inv STEP0; inv LOCAL; ss.
+        + eapply Memory.prev_None_promise_prev_None; eauto.
+        + inv LOCAL0.
+          eapply Memory.prev_None_write_prev_None; eauto.
+        + inv LOCAL1. inv LOCAL2. ss.
+          eapply Memory.prev_None_write_prev_None; eauto.
+        + inv LOCAL0.
+          eapply Memory.prev_None_write_na_prev_None; eauto.
+    Qed.
 
-    (* Lemma rtc_all_step_prev_None *)
-    (*       e1 e2 *)
-    (*       (STEPS: rtc all_step e1 e2): *)
-    (*   <<PREV: Memory.prev_None e1.(memory) e2.(memory)>>. *)
-    (* Proof. *)
-    (*   induction STEPS. *)
-    (*   - ii. eapply GET_PREV; eauto. *)
-    (*   - inv H. inv USTEP. *)
-    (*     inv STEP; inv STEP0; inv LOCAL; ss; ii. *)
-    (*     + exploit Memory.promise_get_from; eauto. i. des. *)
-    (*       hexploit Memory.promise_prev_None; eauto. i. *)
-    (*       eapply IHSTEPS; eauto. *)
-    (*     + inv LOCAL0. inv WRITE. *)
-    (*       exploit Memory.promise_get_from; eauto. i. des. *)
-    (*       hexploit Memory.promise_prev_None; eauto. i. *)
-    (*       eapply IHSTEPS; eauto. *)
-    (*     + inv LOCAL1. inv LOCAL2. inv WRITE. ss. *)
-    (*       exploit Memory.promise_get_from; try exact GET; eauto. i. des. *)
-    (*       hexploit Memory.promise_prev_None; eauto. i. *)
-    (*       eapply IHSTEPS; eauto. *)
-    (* Qed. *)
+    Lemma rtc_all_step_prev_None
+          e1 e2
+          (STEPS: rtc all_step e1 e2):
+      <<PREV: Memory.prev_None e1.(memory) e2.(memory)>>.
+    Proof.
+      induction STEPS.
+      - ii. eapply GET_PREV; eauto.
+      - inv H. inv USTEP.
+        hexploit step_prev_None; eauto. i. des.
+        inv STEP; inv STEP0; inv LOCAL; ss.
+        + eapply Memory.prev_None_promise_prev_None; eauto.
+        + inv LOCAL0.
+          eapply Memory.prev_None_write_prev_None; eauto.
+        + inv LOCAL1. inv LOCAL2. ss.
+          eapply Memory.prev_None_write_prev_None; eauto.
+        + inv LOCAL0.
+          eapply Memory.prev_None_write_na_prev_None; eauto.
+    Qed.
 
     Inductive reserve_step (e1 e2:t): Prop :=
     | reserve_step_intro

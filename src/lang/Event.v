@@ -61,6 +61,12 @@ Module Const.
     destruct a; ss. rewrite Nat.eqb_refl. ss.
   Qed.
 
+  Lemma eqb_sym a b: eqb a b = eqb b a.
+  Proof.
+    destruct a, b; ss.
+    rewrite Nat.eqb_sym. ss.
+  Qed.
+
   Lemma add_0_l a: add (num 0) a = a.
   Proof.
     destruct a; ss.

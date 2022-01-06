@@ -3090,26 +3090,30 @@ Module Memory.
 
   (* prev_None *)
 
+  Ltac contra := match goal with
+                 | [ |- ?P] => destruct (classic P); ss; exfalso
+                 end.
+
   Definition prev_None (mem1 mem2: t): Prop :=
-    forall loc from to val released
-      (GET: get loc to mem1 = Some (from, Message.concrete val released))
-      (GET_PREV: forall from' val' released',
-          get loc from mem1 <> Some (from', Message.concrete val' released')),
-    forall from' val' released',
-      get loc from mem2 <> Some (from', Message.concrete val' released').
+    forall loc from to msg
+      (GET: get loc to mem1 = Some (from, msg))
+      (RESERVE: msg <> Message.reserve)
+      (GET_PREV: forall from' msg' (GET_PREV: get loc from mem1 = Some (from', msg')),
+          msg' = Message.reserve),
+    forall from' msg' (GET2: get loc from mem2 = Some (from', msg')),
+      msg' = Message.reserve.
 
   Lemma promise_prev_None
         promises1 mem1 loc from to msg promises2 mem2 kind
         (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind):
     prev_None mem1 mem2.
   Proof.
-    ii. revert H. inv PROMISE.
-    - erewrite add_o; eauto. condtac; ss.
-      + i. des. subst. inv H. eapply ATTACH; eauto. ss.
-      + i. eapply GET_PREV; eauto.
-    - des. subst.
-      erewrite split_o; eauto. repeat condtac; ss.
-      + i. des. subst. inv H.
+    ii. contra.
+    revert GET2. inv PROMISE.
+    - erewrite add_o; eauto. condtac; ss; eauto.
+      i. des. inv GET2. eauto.
+    - erewrite split_o; eauto. repeat condtac; ss; eauto.
+      + i. des. inv GET2.
         exploit split_get0; try exact MEM. i. des.
         inv MEM. inv SPLIT.
         exploit get_ts; try exact GET. i. des.
@@ -3122,15 +3126,87 @@ Module Memory.
         * apply (x1 ts3); econs; ss; try refl.
           { econs; ss. }
           { etrans; eauto. }
-      + guardH o. i. des. subst. inv H.
-        exploit split_get0; try exact MEM. i. des. congr.
-      + i. eapply GET_PREV; eauto.
-    - erewrite lower_o; eauto. condtac; ss.
-      + i. des. subst. inv H.
-        exploit lower_get0; try exact MEM. i. des. inv MSG_LE. congr.
-      + i. eapply GET_PREV; eauto.
-    - erewrite remove_o; eauto. condtac; ss.
-      i. eapply GET_PREV; eauto.
+      + guardH o. i. des. inv GET2.
+        exploit split_get0; try exact MEM. i. des.
+        exploit GET_PREV; eauto.
+    - erewrite lower_o; eauto. condtac; ss; eauto.
+      i. des. inv GET2.
+      exploit lower_get0; try exact MEM. i. des.
+      exploit GET_PREV; eauto. i. subst. inv MSG_LE. ss.
+    - erewrite remove_o; eauto. condtac; ss; eauto.
+  Qed.
+
+  Lemma write_prev_None
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind):
+    prev_None mem1 mem2.
+  Proof.
+    inv WRITE. eauto using promise_prev_None.
+  Qed.
+
+  Lemma promise_get_from
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        l t f m
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (GET: get l t mem1 = Some (f, m))
+        (RESERVE: m <> Message.reserve):
+    exists t' m',
+      (<<GET2: get l t' mem2 = Some (f, m')>>) /\
+      (<<RESERVE2: m' <> Message.reserve>>).
+  Proof.
+    inv PROMISE.
+    - exploit add_get1; eauto.
+    - exploit split_get1; eauto. i. des.
+      exploit split_get0; eauto. i. des.
+      dup GET2. revert GET2.
+      erewrite split_o; eauto. repeat condtac; ss; i.
+      + des. subst. inv GET2. congr.
+      + guardH o. des. subst. inv GET2.
+        rewrite GET in *. inv GET1. eauto.
+      + rewrite GET in *. inv GET2. eauto.
+    - exploit lower_get1; eauto. i. des. esplits; eauto.
+      ii. subst. inv MSG_LE. ss.
+    - exploit remove_get1; try exact GET; eauto. i. des; eauto.
+      subst. exploit remove_get0; try exact MEM. i. des. congr.
+  Qed.
+
+  Lemma prev_None_promise_prev_None
+        mem
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (PREV: prev_None mem2 mem)
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind):
+    prev_None mem1 mem.
+  Proof.
+    ii. exploit promise_get_from; eauto. i. des.
+    hexploit promise_prev_None; eauto.
+  Qed.
+
+  Lemma prev_None_write_prev_None
+        mem
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        (PREV: prev_None mem2 mem)
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind):
+    prev_None mem1 mem.
+  Proof.
+    inv WRITE. eauto using prev_None_promise_prev_None.
+  Qed.
+
+  Lemma prev_None_write_na_prev_None
+        mem
+        ts promises1 mem1 loc from to msg promises2 mem2 msgs kinds kind
+        (PREV: prev_None mem2 mem)
+        (WRITE: write_na ts promises1 mem1 loc from to msg promises2 mem2 msgs kinds kind):
+    prev_None mem1 mem.
+  Proof.
+    induction WRITE; eauto using prev_None_write_prev_None.
+  Qed.
+
+  Lemma write_na_prev_None
+        ts promises1 mem1 loc from to msg promises2 mem2 msgs kinds kind
+        (WRITE: write_na ts promises1 mem1 loc from to msg promises2 mem2 msgs kinds kind):
+    prev_None mem1 mem2.
+  Proof.
+    induction WRITE; eauto using write_prev_None, prev_None_write_prev_None.
   Qed.
 
 
