@@ -2306,10 +2306,10 @@ Variant sim_promises
           (<<MSG: sim_message_max (flag_tgt loc) loc fto f (vers loc to) msg_src msg_tgt>>))
     (SOUND: forall loc fto ffrom msg_src
                    (GET: Memory.get loc fto prom_src = Some (ffrom, msg_src)),
-        (exists to from msg_tgt,
-            (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto to>>) /\
-            (<<GET: Memory.get loc to prom_tgt = Some (from, msg_tgt)>>)) \/
-        (exists vw, (<<FLAG: flag_tgt loc = Some vw>>) /\ (<<TS: msg_src <> Message.reserve -> Time.lt vw fto>>)))
+        ((exists to from msg_tgt,
+             (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto to>>) /\
+             (<<GET: Memory.get loc to prom_tgt = Some (from, msg_tgt)>>)) \/
+         (exists vw, (<<FLAG: flag_tgt loc = Some vw>>) /\ (<<TS: msg_src <> Message.reserve -> Time.lt vw fto>>) /\ (<<SYNC: forall val released (MSG: msg_src = Message.concrete val (Some released)), False>>))))
     (NONE: forall loc to ts
                   (FLAGSRC: flag_src loc = Some ts),
         Memory.get loc to prom_src = None)
@@ -2339,7 +2339,7 @@ Lemma sim_promises_get_if flag_src flag_tgt f vers prom_src prom_tgt loc from_sr
         (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt>>) /\
         (<<GET: Memory.get loc to_tgt prom_tgt = Some (from_tgt, msg_tgt)>>) /\
         (<<MSG: sim_message_max (flag_tgt loc) loc to_src f (vers loc to_tgt) msg_src msg_tgt>>)) \/
-    (exists vw, (<<FLAG: flag_tgt loc = Some vw>>) /\ (<<TS: msg_src <> Message.reserve -> Time.lt vw to_src>>))
+    (exists vw, (<<FLAG: flag_tgt loc = Some vw>>) /\ (<<TS: msg_src <> Message.reserve -> Time.lt vw to_src>>) /\ (<<SYNC: forall val released (MSG: msg_src = Message.concrete val (Some released)), False>>))
 .
 Proof.
   inv SIM. hexploit SOUND; eauto. i. des.
@@ -2599,9 +2599,11 @@ Proof.
   }
   { i. hexploit sim_promises_get_if; eauto. i. des.
     { destruct (loc_ts_eq_dec (loc, to) (loc0, to_tgt)).
-      { ss. des; clarify. right. esplits; eauto. i.
-        eapply sim_timestamp_lt; eauto.
-        eapply mapping_latest_wf_loc.
+      { ss. des; clarify. right. esplits; eauto.
+        { i. eapply sim_timestamp_lt; eauto.
+          eapply mapping_latest_wf_loc.
+        }
+        { i. subst. rewrite FLAGTGT in *. inv MSG. ss. }
       }
       { left. esplits; eauto.
         erewrite Memory.remove_o; eauto. des_ifs.
@@ -4100,10 +4102,12 @@ Proof.
       }
       { i. des_ifs.
         { destruct (classic (List.In fto dom)).
-          { hexploit SAMETS; eauto. i. right. esplits; eauto. i.
-            rewrite GET in H0. inv H0; ss.
-            { eapply TS; eauto. }
-            { eapply TS; eauto. ss. }
+          { hexploit SAMETS; eauto. i. right. esplits; eauto.
+            { i. rewrite GET in H0. inv H0; ss.
+              { eapply TS; eauto. }
+              { eapply TS; eauto. ss. }
+            }
+            { i. subst. rewrite GET in *. inv H0. }
           }
           { hexploit sim_promises_get_if.
             { eauto. }
@@ -4323,5 +4327,48 @@ Proof.
     i. des. splits; auto.
     { i. transitivity (Memory.get loc0 to0 prom1); auto. }
     { i. transitivity (max_readable mem1 prom1 loc0 to0 val released); auto. }
+  }
+Qed.
+
+Lemma sim_promises_nonsynch_loc flag_src flag_tgt f vers
+      prom_src prom_tgt loc
+      (SIM: sim_promises flag_src flag_tgt f vers prom_src prom_tgt)
+      (NONSYNCH: flag_tgt loc = None -> Memory.nonsynch_loc loc prom_tgt)
+  :
+    Memory.nonsynch_loc loc prom_src.
+Proof.
+  ii. hexploit sim_promises_get_if; eauto. i. des.
+  { inv MSG; ss. hexploit NONSYNCH; eauto.
+    { destruct (flag_tgt loc); ss. }
+    i. eapply H in GET0; eauto. subst. inv SIM0. auto.
+  }
+  { des_ifs. destruct released; auto. exfalso. eapply SYNC; eauto. }
+Qed.
+
+Lemma sim_promises_nonsynch flag_src flag_tgt f vers
+      prom_src prom_tgt
+      (SIM: sim_promises flag_src flag_tgt f vers prom_src prom_tgt)
+      (NONSYNCH: Memory.nonsynch prom_tgt)
+  :
+    Memory.nonsynch prom_src.
+Proof.
+  intros loc. eapply sim_promises_nonsynch_loc; eauto.
+Qed.
+
+Lemma sim_promises_bot flag_src flag_tgt f vers
+      prom_src prom_tgt
+      (SIM: sim_promises flag_src flag_tgt f vers prom_src prom_tgt)
+      (BOT: prom_tgt = Memory.bot)
+      (FLAG: forall loc (NONE: flag_src loc = None), flag_tgt loc = None)
+  :
+    prom_src = Memory.bot.
+Proof.
+  subst. eapply Memory.ext. i. rewrite Memory.bot_get.
+  destruct (Memory.get loc ts prom_src) eqn:EQ; auto.
+  destruct p. hexploit sim_promises_get_if; eauto. i. des.
+  { rewrite Memory.bot_get in GET. ss. }
+  { destruct (flag_src loc) eqn:SRC.
+    { hexploit sim_promises_none; eauto. i. rewrite H in EQ. ss. }
+    { exfalso. eapply FLAG in SRC. clarify. }
   }
 Qed.
