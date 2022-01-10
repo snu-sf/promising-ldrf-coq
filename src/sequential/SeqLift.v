@@ -4372,3 +4372,325 @@ Proof.
     { exfalso. eapply FLAG in SRC. clarify. }
   }
 Qed.
+
+Variant wf_release_vers (vers: versions) (prom_tgt: Memory.t) (rel_vers: Loc.t -> version): Prop :=
+| wf_release_vers_intro
+    (PROM: forall loc from to val released
+                  (GET: Memory.get loc to prom_tgt = Some (from, Message.concrete val (Some released))),
+        exists v,
+          (<<VER: vers loc to = Some v>>) /\
+          (<<REL: rel_vers loc = v>>))
+.
+
+Lemma sim_memory_mon_vers flag_src f vers0 vers1 mem_src mem_tgt
+      (SIM: sim_memory flag_src f vers0 mem_src mem_tgt)
+      (VERS: versions_le vers0 vers1)
+      (WFS: Mapping.wfs f)
+  :
+    sim_memory flag_src f vers1 mem_src mem_tgt.
+Proof.
+  econs.
+  { ii. hexploit sim_memory_get; eauto. i. des. esplits; eauto. inv MSG.
+    { exploit VERS; eauto. i. rewrite x. econs 1; eauto. }
+    { exploit VERS; eauto. i. rewrite x. econs 2; eauto. }
+    { econs 3; eauto. }
+    { exploit VERS; eauto. i. rewrite x. econs 4; eauto. }
+  }
+  { i. hexploit sim_memory_sound; eauto. }
+  { i. eapply sim_memory_top; eauto. }
+Qed.
+
+Lemma sim_promises_mon_vers flag_src flag_tgt f vers0 vers1 mem_src mem_tgt
+      (SIM: sim_promises flag_src flag_tgt f vers0 mem_src mem_tgt)
+      (VERS: versions_le vers0 vers1)
+      (WFS: Mapping.wfs f)
+  :
+    sim_promises flag_src flag_tgt f vers1 mem_src mem_tgt.
+Proof.
+  econs.
+  { ii. hexploit sim_promises_get; eauto. i. des. esplits; eauto. inv MSG.
+    { exploit VERS; eauto. i. rewrite x. econs 1; eauto. }
+    { exploit VERS; eauto. i. rewrite x. econs 2; eauto. }
+    { econs 3; eauto. }
+    { exploit VERS; eauto. i. rewrite x. econs 4; eauto. }
+  }
+  { i. hexploit sim_promises_get_if; eauto. i. des.
+    { left. esplits; eauto. }
+    { right. esplits; eauto. }
+  }
+  { i. hexploit sim_promises_none; eauto. }
+Qed.
+
+Lemma sim_promises_mon_strong flag_src flag_tgt f0 f1 vers mem_src mem_tgt
+      (SIM: sim_promises flag_src flag_tgt f0 vers mem_src mem_tgt)
+      (LE: Mapping.les_strong f0 f1)
+      (WF0: Mapping.wfs f0)
+      (WF1: Mapping.wfs f1)
+      (VERS: versions_wf f0 vers)
+      (SAME: forall loc ts (FLAG: flag_src loc = Some ts), f1 loc = f0 loc)
+  :
+    sim_promises flag_src flag_tgt f1 vers mem_src mem_tgt.
+Proof.
+  econs.
+  { ii. hexploit sim_promises_get; eauto. i. des. esplits; eauto.
+    { eapply sim_timestamp_exact_mon_strong; eauto. }
+    { eapply sim_timestamp_exact_mon_strong; eauto. }
+    { erewrite <- sim_message_max_mon_mapping; eauto.
+      eapply Mapping.les_strong_les; eauto.
+    }
+  }
+  { i. hexploit sim_promises_get_if; eauto. i. des.
+    { left. esplits; eauto. eapply sim_timestamp_exact_mon_strong; eauto. }
+    { right. esplits; eauto. }
+  }
+  { i. hexploit sim_promises_none; eauto. }
+Qed.
+
+Lemma version_wf_join f v0 v1
+      (WF0: version_wf f v0)
+      (WF1: version_wf f v1)
+  :
+    version_wf f (version_join v0 v1).
+Proof.
+  ii. unfold version_join.
+  destruct (Max.max_dec (v0 loc) (v1 loc)).
+  { rewrite e. auto. }
+  { rewrite e. auto. }
+Qed.
+
+Lemma opt_version_wf_join f v0 v1
+      (WF0: opt_version_wf f v0)
+      (WF1: opt_version_wf f v1)
+  :
+    opt_version_wf f (opt_version_join v0 v1).
+Proof.
+  destruct v0, v1; ss. eapply version_wf_join; eauto.
+Qed.
+
+Lemma sim_promise_add
+      flag_src flag_tgt f0 vers0 mem_src0 mem_tgt0 prom_src0 prom_tgt0
+      loc from_tgt to_tgt msg_tgt prom_tgt1 mem_tgt1 rel_vers
+      (ADD: Memory.promise prom_tgt0 mem_tgt0 loc from_tgt to_tgt msg_tgt prom_tgt1 mem_tgt1 Memory.op_kind_add)
+      (MEM: sim_memory flag_src f0 vers0 mem_src0 mem_tgt0)
+      (PROM: sim_promises flag_src flag_tgt f0 vers0 prom_src0 prom_tgt0)
+      (FLAG: flag_src loc = None)
+      (MAPWF: Mapping.wfs f0)
+      (VERSWF: versions_wf f0 vers0)
+      (RELVERS: wf_release_vers vers0 prom_tgt0 rel_vers)
+      (VERSIONED: versioned_memory vers0 mem_tgt0)
+      (VERS: forall loc0, version_wf f0 (rel_vers loc0))
+      (MLESRC: Memory.le prom_src0 mem_src0)
+      (MAPCLOSED: sim_closed_memory f0 mem_src0)
+  :
+    exists f1 vers1 from_src to_src msg_src prom_src1 mem_src1,
+      (<<ADD: Memory.promise prom_src0 mem_src0 loc from_src to_src msg_src prom_src1 mem_src1 Memory.op_kind_add>>) /\
+      (<<MEM: sim_memory flag_src f1 vers1 mem_src1 mem_tgt1>>) /\
+      (<<PROM: sim_promises flag_src flag_tgt f1 vers1 prom_src1 prom_tgt1>>) /\
+      (<<MAPLE: Mapping.les_strong f0 f1>>) /\
+      (<<MAPWF: Mapping.wfs f1>>) /\
+      (<<VERSLE: versions_le vers0 vers1>>) /\
+      (<<VERSWF: versions_wf f1 vers1>>) /\
+      (<<RELVERS: wf_release_vers vers1 prom_tgt1 rel_vers>>) /\
+      (<<VERSIONED: versioned_memory vers1 mem_tgt1>>) /\
+      (<<CLOSED: Memory.closed_message msg_src mem_src1>>) /\
+      (<<MAPCLOSED: sim_closed_memory f1 mem_src1>>)
+.
+Proof.
+  hexploit (@mapping_add (f0 loc) from_tgt).
+  { eapply MAPWF. }
+  i. des.
+  hexploit (@mapping_add f1 to_tgt); eauto.
+  i. des. inv ADD.
+  hexploit (@mapping_update_times f2 (eq fts0)); eauto.
+  { exists [fts0]. i. ss. auto. }
+  i. des.
+  set (f' := fun loc0 => if Loc.eq_dec loc0 loc then f3 else (f0 loc0)).
+  set (vers' :=
+         match msg_tgt with
+         | Message.reserve => vers0
+         | _ => fun loc0 ts0 =>
+                  if loc_ts_eq_dec (loc0, ts0) (loc, to_tgt)
+                  then opt_version_join (vers0 loc from_tgt) (Some (rel_vers loc))
+                  else vers0 loc0 ts0
+         end).
+  assert (MAPWF0: Mapping.wfs f').
+  { ii. unfold f'. des_ifs. }
+  assert (MAPLESTR: Mapping.les_strong f0 f').
+  { ii. subst f'. ss. des_ifs.
+    { etrans; eauto. etrans; eauto. }
+    { refl. }
+  }
+  assert (MAPLES: Mapping.les f0 f').
+  { eapply Mapping.les_strong_les; eauto. }
+  assert (VERSLE: versions_le vers0 vers').
+  { assert (VERNEQ: vers0 loc to_tgt = None).
+    { destruct (vers0 loc to_tgt) eqn:VER; auto.
+      inv VERSIONED. eapply SOUND in VER. des.
+      eapply Memory.add_get0 in MEM0. des. clarify.
+    }
+    ii. unfold vers'. des_ifs; ss; des; clarify.
+  }
+  assert (VERSWF0: versions_wf f' vers').
+  { ii. hexploit (VERSWF loc0 to). intros VERWF.
+    eapply opt_version_wf_mapping_mon in VERWF; eauto.
+    unfold vers'. des_ifs.
+    { ss. eapply opt_version_wf_join; eauto.
+      { eapply opt_version_wf_mapping_mon; eauto. }
+      { eapply version_wf_mapping_mon; eauto. }
+    }
+    { ss. eapply opt_version_wf_join; eauto.
+      { eapply opt_version_wf_mapping_mon; eauto. }
+      { eapply version_wf_mapping_mon; eauto. }
+    }
+  }
+  hexploit sim_message_max_exists.
+  { eauto. }
+  { instantiate (1:=vers' loc to_tgt). instantiate (1:=msg_tgt).
+    i. replace (vers' loc to_tgt) with (opt_version_join (vers0 loc from_tgt) (Some (rel_vers loc))).
+    2:{ unfold vers'. des_ifs; ss; des; clarify. }
+    { hexploit (VERSWF loc from_tgt). i.
+      destruct (vers0 loc from_tgt) eqn:VERFROM.
+      { ss. esplits; eauto. eapply version_wf_join; eauto.
+        { eapply version_wf_mapping_mon; eauto. }
+        { eapply version_wf_mapping_mon; eauto. }
+      }
+      { ss. esplits; eauto. eapply version_wf_mapping_mon; eauto. }
+    }
+  }
+  instantiate (3:=flag_tgt loc). i. des.
+  hexploit add_succeed_wf; eauto. i. des.
+  hexploit sim_message_max_msg_wf; eauto. intros MSG_SRC.
+  hexploit sim_memory_add.
+  { eapply MEM0. }
+  { eapply sim_memory_mon_vers.
+    { eapply sim_memory_mon_strong; eauto. ii. unfold f'. des_ifs. }
+    { eauto. }
+    { eauto. }
+  }
+  { eapply sim_message_flag_mon. eapply sim_message_max_sim; eauto. }
+  { unfold f'. des_ifs.
+    eapply sim_timestamp_exact_mon_strong; [..|eauto]; eauto.
+    etrans; eauto.
+  }
+  { unfold f'. des_ifs.
+    eapply sim_timestamp_exact_mon_strong; [..|eauto]; eauto.
+  }
+  { eauto. }
+  { eauto. }
+  { eauto. }
+  i. des.
+  hexploit add_sim_memory.
+  { eapply MEM0. }
+  { eapply sim_memory_mon_vers.
+    { eapply sim_memory_mon_strong; eauto. ii. unfold f'. des_ifs. }
+    { eauto. }
+    { eauto. }
+  }
+  { eapply ADD. }
+  { unfold f'. des_ifs.
+    eapply sim_timestamp_exact_mon_strong; [..|eauto]; eauto.
+    etrans; eauto.
+  }
+  { unfold f'. des_ifs.
+    eapply sim_timestamp_exact_mon_strong; [..|eauto]; eauto.
+  }
+  { unfold f'. des_ifs. eapply TIMES1. eauto. }
+  { eapply sim_message_flag_mon. eapply sim_message_max_sim; eauto. }
+  { eauto. }
+  intros MEM1.
+  hexploit Memory.add_exists_le.
+  { eapply MLESRC. }
+  { eauto. }
+  intros ADDPROM. des. hexploit add_sim_promises.
+  { eapply PROMISES. }
+  { eapply sim_promises_mon_vers.
+    { eapply sim_promises_mon_strong; eauto. ii. unfold f'. des_ifs. }
+    { eauto. }
+    { eauto. }
+  }
+  { eapply ADDPROM. }
+  { unfold f'. des_ifs.
+    eapply sim_timestamp_exact_mon_strong; [..|eauto]; eauto.
+    etrans; eauto.
+  }
+  { unfold f'. des_ifs.
+    eapply sim_timestamp_exact_mon_strong; [..|eauto]; eauto.
+  }
+  { eauto. }
+  { eauto. }
+  { eauto. }
+  intros PROM0. esplits.
+  { econs; eauto.
+    { eapply sim_message_max_msg_to; eauto. }
+    { i. eapply ATTACH0; eauto. i.
+      eapply ATTACH; eauto. inv MAX; ss.
+    }
+  }
+  { eauto. }
+  { eauto. }
+  { eauto. }
+  { eauto. }
+  { eauto. }
+  { eauto. }
+  { econs. inv RELVERS. i. erewrite Memory.add_o in GET; eauto. des_ifs; eauto.
+    { ss. des; clarify. unfold vers'. des_ifs; ss; des; clarify. eauto. }
+    { exploit PROM1; eauto. i.
+      unfold vers'. des_ifs; ss; des; clarify.
+    }
+  }
+  { destruct msg_tgt.
+    { eapply versioned_memory_add; eauto.
+
+      esplits; eauto.
+admit. }
+
+
+eauto. }
+  { eauto. }
+
+EAUTO.
+    { eauto.
+
+inv MAX.
+    { admit. }
+    { econs 2; eauto. }
+    { econs 3; eauto. }
+    { econs 4; eauto. }
+
+ econs 1; eauto.
+
+eauto. eapply sim_message_max_sim; eauto. }
+  { eauto. }
+  { eauto. }
+  { eauto. }
+
+    eapply sim_timestamp_exact_mon_strong; [..|eauto]; eauto.
+  }
+
+rewrite FLAG. i. }
+  {
+
+
+
+add_succeed_wf
+Memory.add promise
+Thread.promise_step
+Local.promise_step
+
+
+Loc.eq_dec loc0 loc then f2 else (f0 loc0)).
+
+
+  { eapply MAPWF. }
+
+
+
+.
+
+Thread.promise_step
+Local.promise_step
+
+Lemma sim_promise_step
+      (PROMTGT: Memory.promise prom_tgt0 mem_tgt0 loc from_tgt to_tgt msg_tgt prom_tgt1 mem_tgt1)
+  :
+    exists
