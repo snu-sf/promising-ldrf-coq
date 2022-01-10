@@ -997,4 +997,188 @@ Module MemoryReorder.
     - econs; eauto. inv MEM. inv LOWER. inv MSG_LE; ss.
     - econs; eauto.
   Qed.
+
+  Lemma promise_cancel
+        promises0 mem0
+        promises1 mem1
+        promises2 mem2
+        loc1 from1 to1 msg1 kind1
+        loc2 from2 to2 msg2
+        (PROMISE1: Memory.promise promises0 mem0 loc1 from1 to1 msg1 promises1 mem1 kind1)
+        (CANCEL2: Memory.promise promises1 mem1 loc2 from2 to2 msg2 promises2 mem2 Memory.op_kind_cancel):
+    (loc1 = loc2 /\ from1 = from2 /\ to1 = to2 /\ msg1 = Message.reserve /\ msg2 = Message.reserve /\
+     kind1 = Memory.op_kind_add /\ promises0 = promises2 /\ mem0 = mem2) \/
+    exists promises1' mem1',
+      (<<CANCEL1: Memory.promise promises0 mem0 loc2 from2 to2 msg2 promises1' mem1' Memory.op_kind_cancel>>) /\
+      (<<PROMISE2: Memory.promise promises1' mem1' loc1 from1 to1 msg1 promises2 mem2 kind1>>).
+  Proof.
+    inv CANCEL2. inv PROMISE1; ss.
+    - destruct (classic ((loc1, to1) = (loc2, to2))).
+      + inv H.
+        exploit add_remove_same; try exact PROMISES0; eauto. i. des. subst.
+        exploit add_remove_same; try exact MEM0; eauto. i. des. subst.
+        left. splits; auto.
+      + exploit add_remove; try exact PROMISES0; eauto. i. des.
+        exploit add_remove; try exact MEM0; eauto. i. des.
+        right. esplits; eauto. econs; eauto.
+        i. revert GET.
+        erewrite Memory.remove_o; eauto. condtac; ss. eauto.
+    - des. destruct (classic ((loc1, ts3) = (loc2, to2))).
+      + clarify.
+        exploit split_remove_same; try exact PROMISES0; eauto. i. des. subst.
+        exploit split_remove_same; try exact MEM1; eauto. i. des. subst. ss.
+      + destruct (classic ((loc1, to1) = (loc2, to2))).
+        { des. inv H0.
+          exploit Memory.split_get0; try exact MEM0. i. des.
+          exploit Memory.remove_get0; try exact MEM. i. des. congr. }
+        exploit split_remove; try exact PROMISES0; eauto. i. des.
+        exploit split_remove; try exact MEM0; eauto. i. des.
+        right. esplits; eauto.
+    - des. subst.
+      destruct (classic ((loc1, to1) = (loc2, to2))).
+      + inv H.
+        exploit lower_remove_same; try exact PROMISES0; eauto. i. des. subst.
+        exploit lower_remove_same; try exact MEM1; eauto. i. des. subst.
+        exploit Memory.lower_get0; try exact MEM0. i. des. inv MSG_LE. ss.
+      + exploit lower_remove; try exact PROMISES0; eauto. i. des.
+        exploit lower_remove; try exact MEM0; eauto. i. des.
+        right. esplits; eauto.
+    - exploit remove_remove; try apply PROMISES0; eauto. i. des.
+      exploit remove_remove; try apply MEM0; eauto. i. des.
+      right. esplits; eauto.
+  Qed.
+
+  Lemma write_cancel
+        promises0 mem0
+        promises1 mem1
+        promises2 mem2
+        loc1 from1 to1 msg1 kind1
+        loc2 from2 to2 msg2
+        (WRITE1: Memory.write promises0 mem0 loc1 from1 to1 msg1 promises1 mem1 kind1)
+        (CANCEL2: Memory.promise promises1 mem1 loc2 from2 to2 msg2 promises2 mem2 Memory.op_kind_cancel):
+    exists promises1' mem1',
+      (<<CANCEL1: Memory.promise promises0 mem0 loc2 from2 to2 msg2 promises1' mem1' Memory.op_kind_cancel>>) /\
+      (<<WRITE2: Memory.write promises1' mem1' loc1 from1 to1 msg1 promises2 mem2 kind1>>).
+  Proof.
+    inv WRITE1. inv CANCEL2.
+    exploit remove_remove; [exact REMOVE|exact PROMISES|]. i. des.
+    exploit promise_cancel; try exact PROMISE; eauto. i. des.
+    { subst.
+      exploit Memory.remove_get0; try exact REMOVE1. i. des.
+      exploit Memory.remove_get0; try exact REMOVE2. i. des. congr.
+    }
+    esplits; eauto.
+  Qed.
+
+  Lemma write_na_cancel
+        promises0 mem0
+        promises1 mem1
+        promises2 mem2
+        ts loc1 from1 to1 val1 msgs1 kinds1 kind1
+        loc2 from2 to2 msg2
+        (WRITE1: Memory.write_na ts promises0 mem0 loc1 from1 to1 val1 promises1 mem1 msgs1 kinds1 kind1)
+        (CANCEL2: Memory.promise promises1 mem1 loc2 from2 to2 msg2 promises2 mem2 Memory.op_kind_cancel):
+    exists promises1' mem1',
+      (<<CANCEL1: Memory.promise promises0 mem0 loc2 from2 to2 msg2 promises1' mem1' Memory.op_kind_cancel>>) /\
+      (<<WRITE2: Memory.write_na ts promises1' mem1' loc1 from1 to1 val1 promises2 mem2 msgs1 kinds1 kind1>>).
+  Proof.
+    induction WRITE1.
+    { exploit write_cancel; eauto. i. des. esplits; eauto. }
+    exploit IHWRITE1; eauto. i. des.
+    exploit write_cancel; eauto. i. des. esplits; eauto.
+  Qed.
+
+  Lemma reserve_promise
+        prom0 mem0
+        prom1 mem1
+        prom2 mem2
+        loc1 from1 to1
+        loc2 from2 to2 msg2 kind2
+        (STEP1: Memory.promise prom0 mem0 loc1 from1 to1 Message.reserve prom1 mem1 Memory.op_kind_add)
+        (STEP2: Memory.promise prom1 mem1 loc2 from2 to2 msg2 prom2 mem2 kind2):
+    (loc1 = loc2 /\ from1 = from2 /\ to1 = to2 /\ msg2 = Message.reserve /\
+     kind2 = Memory.op_kind_cancel /\ prom0 = prom2 /\ mem0 = mem2) \/
+    (exists prom1' mem1',
+        (<<STEP1: Memory.promise prom0 mem0 loc2 from2 to2 msg2 prom1' mem1' kind2>>) /\
+        (<<STEP2: Memory.promise prom1' mem1' loc1 from1 to1 Message.reserve prom2 mem2 Memory.op_kind_add>>)).
+  Proof.
+    inv STEP1. inv STEP2; ss.
+    - (* reserve/add *)
+      exploit add_add; try exact PROMISES; try exact PROMISES0; eauto. i. des.
+      exploit add_add; try exact MEM; try exact MEM0; eauto. i. des.
+      right. esplits.
+      + econs; eauto; try congr.
+        i. exploit Memory.add_get1; try exact MEM; eauto.
+      + econs; eauto.
+    - (* reserve/split *)
+      exploit add_split; try exact PROMISES; try exact PROMISES0; eauto. i.
+      des; clarify.
+      exploit add_split; try exact MEM; try exact MEM0; eauto. i. des; [congr|].
+      right. esplits.
+      + econs 2; eauto.
+      + econs; eauto.
+    - (* reserve/lower *)
+      des. subst.
+      exploit add_lower; try exact PROMISES; try exact PROMISES0; eauto. i.
+      des; subst.
+      + left. inv PROMISES0. inv LOWER. inv MSG_LE. ss.
+      + exploit add_lower; try exact MEM; try exact MEM0; eauto. i. des; [congr|].
+        right. esplits.
+        * econs; eauto.
+        * econs; eauto.
+    - (* reserve/cancel *)
+      destruct (classic ((loc1, to1) = (loc2, to2))).
+      + inv H.
+        exploit add_remove_same; try exact PROMISES0; eauto. i. des. subst.
+        exploit add_remove_same; try exact MEM0; eauto. i. des. subst.
+        left. splits; auto.
+      + exploit add_remove; try exact PROMISES0; eauto. i. des.
+        exploit add_remove; try exact MEM0; eauto. i. des.
+        right. esplits; eauto.
+  Qed.
+
+  Lemma reserve_write
+        prom0 mem0
+        prom1 mem1
+        prom2 mem2
+        loc1 from1 to1
+        loc2 from2 to2 msg2 kind2
+        (STEP1: Memory.promise prom0 mem0 loc1 from1 to1 Message.reserve prom1 mem1 Memory.op_kind_add)
+        (STEP2: Memory.write prom1 mem1 loc2 from2 to2 msg2 prom2 mem2 kind2)
+        (MSG: msg2 <> Message.reserve):
+    exists prom1' mem1',
+      (<<STEP1: Memory.write prom0 mem0 loc2 from2 to2 msg2 prom1' mem1' kind2>>) /\
+      (<<STEP2: Memory.promise prom1' mem1' loc1 from1 to1 Message.reserve prom2 mem2 Memory.op_kind_add>>).
+  Proof.
+    inv STEP2.
+    exploit reserve_promise; try eauto. i. des; ss.
+    inv STEP2.
+    exploit add_remove; try exact PROMISES; eauto.
+    { ii. inv H.
+      exploit Memory.add_get0; try exact PROMISES. i. des.
+      exploit Memory.remove_get0; try exact REMOVE. i. des.
+      rewrite GET0 in *. inv GET1. ss.
+    }
+    i. des. esplits; eauto.
+  Qed.
+
+  Lemma reserve_write_na
+        prom0 mem0
+        prom1 mem1
+        prom2 mem2
+        loc1 from1 to1
+        ts loc2 from2 to2 val2 msgs2 kinds2 kind2
+        (STEP1: Memory.promise prom0 mem0 loc1 from1 to1 Message.reserve prom1 mem1 Memory.op_kind_add)
+        (STEP2: Memory.write_na ts prom1 mem1 loc2 from2 to2 val2 prom2 mem2 msgs2 kinds2 kind2):
+    exists prom1' mem1',
+      (<<STEP1: Memory.write_na ts prom0 mem0 loc2 from2 to2 val2 prom1' mem1' msgs2 kinds2 kind2>>) /\
+      (<<STEP2: Memory.promise prom1' mem1' loc1 from1 to1 Message.reserve prom2 mem2 Memory.op_kind_add>>).
+  Proof.
+    revert prom0 mem0 STEP1. induction STEP2; i.
+    { exploit reserve_write; eauto; ss. i. des. esplits; eauto. }
+    exploit reserve_write; eauto.
+    { unguard. des; subst; ss. }
+    i. des.
+    exploit IHSTEP2; eauto. i. des. esplits; eauto.
+  Qed.
 End MemoryReorder.

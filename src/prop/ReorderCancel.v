@@ -31,7 +31,6 @@ Require Import MemoryProps.
 Set Implicit Arguments.
 
 
-
 Lemma reorder_read_cancel
       lc0 mem0
       lc1 mem1
@@ -85,76 +84,35 @@ Lemma reorder_write_cancel
       (<<STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 msg1 lc1' mem1' Memory.op_kind_cancel>>) /\
       (<<STEP2: Local.write_step lc1' sc0 mem1' loc2 from2 to2 val2 releasedm2 released2 ord2 lc2 sc2 mem2 kind2>>).
 Proof.
-  inv STEP2. inv PROMISE.
-  inv STEP1. ss. inv WRITE.
-  exploit MemoryReorder.remove_remove.
-  { eapply REMOVE. }
-  { eapply PROMISES. } i. des.
-  assert (LOCTS: (loc2, to2) <> (loc1, to1)).
-  { ii. clarify. apply Memory.remove_get0 in MEM. inv PROMISE.
-    - apply Memory.add_get0 in MEM0. des. clarify.
-    - apply Memory.split_get0 in MEM0. des. clarify.
-    - apply Memory.lower_get0 in MEM0. des. clarify.
-    - clarify. }
-  inv PROMISE.
-  - exploit MemoryReorder.add_remove.
-    { eapply LOCTS. }
-    { eapply PROMISES0. }
-    { eauto. } i. des.
-    exploit MemoryReorder.add_remove.
-    { eapply LOCTS. }
-    { eapply MEM0. }
-    { eauto. } i. des.
-    esplits.
-    + econs; eauto.
-    + econs; ss.
-      * econs.
-        { econs 1; eauto.
-          i. erewrite Memory.remove_o in GET; eauto.
-          des_ifs. eapply ATTACH; eauto. }
-        { eauto. }
-      * intros ORD. eapply RELEASE in ORD.
-        eapply remove_non_synch_loc; eauto.
-  - destruct (classic ((loc2, ts3) = (loc1, to1))) as [|LOCTS2]; clarify.
-    { exploit MemoryReorder.split_remove_same.
-      { eapply PROMISES0. }
-      { eauto. } i. des. clarify.
-    }
-    { exploit MemoryReorder.split_remove.
-      { eapply LOCTS. }
-      { eapply LOCTS2. }
-      { eapply PROMISES0. }
-      { eauto. } i. des.
-      exploit MemoryReorder.split_remove.
-      { eapply LOCTS. }
-      { eapply LOCTS2. }
-      { eapply MEM0. }
-      { eauto. } i. des.
-      esplits.
-      + econs; eauto.
-      + econs; ss.
-        * econs.
-          { econs 2; eauto. }
-          { eauto. }
-        * intros ORD. eapply RELEASE in ORD.
-          eapply remove_non_synch_loc; eauto. }
-  - exploit MemoryReorder.lower_remove.
-    { eapply LOCTS. }
-    { eapply PROMISES0. }
-    { eauto. } i. des.
-    exploit MemoryReorder.lower_remove.
-    { eapply LOCTS. }
-    { eapply MEM0. }
-    { eauto. } i. des.
-    esplits.
-    + econs; eauto.
-    + econs; ss.
-      * econs.
-        { econs 3; eauto. }
-        { eauto. }
-      * intros ORD. eapply RELEASE in ORD.
-        eapply remove_non_synch_loc; eauto.
-  - clarify.
+  inv STEP1. inv STEP2. ss.
+  exploit MemoryReorder.write_cancel; [exact WRITE| exact PROMISE|]. i. des.
+  esplits.
+  - econs; eauto.
+    inv CANCEL1. eapply Memory.cancel_closed_message; eauto.
+  - econs; eauto.
+    i. hexploit RELEASE; eauto. i. inv CANCEL1.
+    eapply remove_non_synch_loc; eauto.
+Qed.
+
+Lemma reorder_write_na_cancel
+      lc0 sc0 mem0
+      lc1 mem1
+      lc2 sc2 mem2
+      loc1 from1 to1 msg1
+      loc2 from2 to2 val2 ord2 msgs2 kinds2 kind2
+      (STEP1: Local.write_na_step lc0 sc0 mem0 loc2 from2 to2 val2 ord2 lc1 sc2 mem1 msgs2 kinds2 kind2)
+      (STEP2: Local.promise_step lc1 mem1 loc1 from1 to1 msg1 lc2 mem2 Memory.op_kind_cancel)
+  :
+    exists lc1' mem1',
+      (<<STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 msg1 lc1' mem1' Memory.op_kind_cancel>>) /\
+      (<<STEP2: Local.write_na_step lc1' sc0 mem1' loc2 from2 to2 val2 ord2 lc2 sc2 mem2 msgs2 kinds2 kind2>>).
+Proof.
+  inv STEP1. inv STEP2. ss.
+  exploit MemoryReorder.write_na_cancel; [exact WRITE|exact PROMISE|]. i. des.
+  esplits.
+  - econs; eauto.
+    inv CANCEL1. eapply Memory.cancel_closed_message; eauto.
+  - econs; eauto.
 Qed.
 
 Lemma reorder_fence_cancel
@@ -177,6 +135,92 @@ Proof.
     + i. ss. subst. erewrite PROMISES in *; auto.
       inv PROMISE. eapply Memory.remove_get0 in PROMISES0. des.
       erewrite Memory.bot_get in *. ss.
+Qed.
+
+Lemma reorder_promise_consistent_cancel
+      lc1 mem1 loc from to msg lc2 mem2
+      (CONS: Local.promise_consistent lc1)
+      (STEP: Local.promise_step lc1 mem1 loc from to msg lc2 mem2 Memory.op_kind_cancel):
+  (<<CONS: Local.promise_consistent lc2>>).
+Proof.
+  inv STEP. inv PROMISE. ii. ss.
+  revert PROMISE. erewrite Memory.remove_o; eauto. condtac; ss. eauto.
+Qed.
+
+Lemma reorder_failure_cancel
+      lc1 mem1
+      lc2 mem2
+      loc1 from1 to1 msg1
+      (STEP1: Local.failure_step lc1)
+      (STEP2: Local.promise_step lc1 mem1 loc1 from1 to1 msg1 lc2 mem2 Memory.op_kind_cancel):
+  (<<STEP2: Local.failure_step lc2>>).
+Proof.
+  inv STEP1. econs.
+  eapply reorder_promise_consistent_cancel; eauto.
+Qed.
+
+Lemma reorder_is_racy_cancel
+      lc1 mem1
+      lc2 mem2
+      loc2 ord2
+      loc1 from1 to1 msg1
+      (RACY: Local.is_racy lc1 mem1 loc2 ord2)
+      (STEP: Local.promise_step lc1 mem1 loc1 from1 to1 msg1 lc2 mem2 Memory.op_kind_cancel):
+  (<<RACY: Local.is_racy lc2 mem2 loc2 ord2>>).
+Proof.
+  inv RACY. inv STEP. inv PROMISE.
+  exploit Memory.remove_get1; try exact GET; eauto. i. des.
+  { subst.
+    exploit Memory.remove_get0; try exact PROMISES. i. des. congr.
+  }
+  econs; eauto. s.
+  erewrite Memory.remove_o; eauto. condtac; ss.
+Qed.
+
+Lemma reorder_racy_read_cancel
+      lc1 mem1
+      lc2 mem2
+      loc2 val2 ord2
+      loc1 from1 to1 msg1
+      (STEP1: Local.racy_read_step lc1 mem1 loc2 val2 ord2)
+      (STEP2: Local.promise_step lc1 mem1 loc1 from1 to1 msg1 lc2 mem2 Memory.op_kind_cancel):
+  (<<STEP2: Local.racy_read_step lc2 mem2 loc2 val2 ord2>>).
+Proof.
+  inv STEP1. econs.
+  eapply reorder_is_racy_cancel; eauto.
+Qed.
+
+Lemma reorder_racy_write_cancel
+      lc1 mem1
+      lc2 mem2
+      loc2 ord2
+      loc1 from1 to1 msg1
+      (STEP1: Local.racy_write_step lc1 mem1 loc2 ord2)
+      (STEP2: Local.promise_step lc1 mem1 loc1 from1 to1 msg1 lc2 mem2 Memory.op_kind_cancel):
+  (<<STEP2: Local.racy_write_step lc2 mem2 loc2 ord2>>).
+Proof.
+  inv STEP1. econs.
+  - eapply reorder_is_racy_cancel; eauto.
+  - eapply reorder_promise_consistent_cancel; eauto.
+Qed.
+
+Lemma reorder_racy_update_cancel
+      lc1 mem1
+      lc2 mem2
+      loc2 ordr2 ordw2
+      loc1 from1 to1 msg1
+      (STEP1: Local.racy_update_step lc1 mem1 loc2 ordr2 ordw2)
+      (STEP2: Local.promise_step lc1 mem1 loc1 from1 to1 msg1 lc2 mem2 Memory.op_kind_cancel):
+  (<<STEP2: Local.racy_update_step lc2 mem2 loc2 ordr2 ordw2>>).
+Proof.
+  inv STEP1.
+  - econs 1; eauto.
+    eapply reorder_promise_consistent_cancel; eauto.
+  - econs 2; eauto.
+    eapply reorder_promise_consistent_cancel; eauto.
+  - econs 3; eauto.
+    + eapply reorder_is_racy_cancel; eauto.
+    + eapply reorder_promise_consistent_cancel; eauto.
 Qed.
 
 Lemma reorder_step_cancel
@@ -220,12 +264,21 @@ Proof.
     + exploit reorder_fence_cancel; eauto. i. des. esplits.
       * econs 1. econs; eauto.
       * econs 2. econs; eauto; ss.
-    + esplits.
+    + exploit reorder_failure_cancel; eauto. i. des. esplits.
       * econs 1. econs; eauto.
       * econs 2. econs; eauto.
-        econs. econs. inv LOCAL1. inv LOCAL. inv PROMISE.
-        ii. ss. erewrite Memory.remove_o in PROMISE; eauto. des_ifs.
-        eapply CONSISTENT; eauto.
+    + exploit reorder_write_na_cancel; eauto. i. des. esplits.
+      * econs 1. econs; eauto.
+      * econs 2. econs; eauto.
+    + exploit reorder_racy_read_cancel; eauto. i. des. esplits.
+      * econs 1. econs; eauto.
+      * econs 2. econs; eauto.
+    + exploit reorder_racy_write_cancel; eauto. i. des. esplits.
+      * econs 1. econs; eauto.
+      * econs 2. econs; eauto.
+    + exploit reorder_racy_update_cancel; eauto. i. des. esplits.
+      * econs 1. econs; eauto.
+      * econs 2. econs; eauto.
 Qed.
 
 Lemma reorder_step_cancels

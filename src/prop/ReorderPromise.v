@@ -125,44 +125,14 @@ Lemma reorder_promise_promise_cancel
       <<STEP1: Local.promise_step lc0 mem0 loc2 from2 to2 msg2 lc1' mem1' kind2>> /\
       <<STEP2: Local.promise_step lc1' mem1' loc1 from1 to1 msg1 lc2 mem2 kind1>>).
 Proof.
-  inv STEP1. inv STEP2. ss. inv PROMISE0; inv KIND2. inv PROMISE; ss.
-  - destruct (classic ((loc1, to1) = (loc2, to2))).
-    + inv H.
-      exploit MemoryReorder.add_remove_same; try exact PROMISES0; eauto. i. des. subst.
-      exploit MemoryReorder.add_remove_same; try exact MEM0; eauto. i. des. subst.
-      left. splits; auto. destruct lc0; ss.
-    + exploit MemoryReorder.add_remove; try exact PROMISES0; eauto. i. des.
-      exploit MemoryReorder.add_remove; try exact MEM0; eauto. i. des.
-      right. esplits; eauto. econs; eauto.
-      * econs; eauto.
-        i. revert GET.
-        erewrite Memory.remove_o; eauto. condtac; ss. eauto.
-      * eapply Memory.cancel_closed_message; eauto.
-  - des. destruct (classic ((loc1, ts3) = (loc2, to2))).
-    + clarify.
-      exploit MemoryReorder.split_remove_same; try exact PROMISES0; eauto. i. des. subst.
-      exploit MemoryReorder.split_remove_same; try exact MEM1; eauto. i. des. subst. ss.
-    + destruct (classic ((loc1, to1) = (loc2, to2))).
-      { des. inv H0.
-        exploit Memory.split_get0; try exact MEM0. i. des.
-        exploit Memory.remove_get0; try exact MEM. i. des. congr. }
-      exploit MemoryReorder.split_remove; try exact PROMISES0; eauto. i. des.
-      exploit MemoryReorder.split_remove; try exact MEM0; eauto. i. des.
-      right. esplits; eauto. econs; eauto.
-      eapply Memory.cancel_closed_message; eauto.
-  - des. subst.
-    destruct (classic ((loc1, to1) = (loc2, to2))).
-    + inv H.
-      exploit MemoryReorder.lower_remove_same; try exact PROMISES0; eauto. i. des. subst.
-      exploit MemoryReorder.lower_remove_same; try exact MEM1; eauto. i. des. subst.
-      exploit Memory.lower_get0; try exact MEM0. i. des. inv MSG_LE. ss.
-    + exploit MemoryReorder.lower_remove; try exact PROMISES0; eauto. i. des.
-      exploit MemoryReorder.lower_remove; try exact MEM0; eauto. i. des.
-      right. esplits; eauto. econs; eauto.
-      eapply Memory.cancel_closed_message; eauto.
-  - exploit MemoryReorder.remove_remove; try apply PROMISES0; eauto. i. des.
-    exploit MemoryReorder.remove_remove; try apply MEM0; eauto. i. des.
-    right. esplits; eauto.
+  inv STEP1. inv STEP2. ss. destruct kind2; ss.
+  exploit MemoryReorder.promise_cancel; try exact PROMISE; eauto. i. des.
+  - left. splits; auto. destruct lc0; ss. subst. ss.
+  - right. esplits.
+    + econs; eauto.
+      inv CANCEL1. eapply Memory.cancel_closed_message; eauto.
+    + econs; eauto.
+      inv PROMISE0. eapply Memory.cancel_closed_message; eauto.
 Qed.
 
 Lemma reorder_promise_promise

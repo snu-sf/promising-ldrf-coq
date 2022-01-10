@@ -16,6 +16,10 @@ Require Import Cell.
 Set Implicit Arguments.
 
 
+Ltac contra := match goal with
+               | [ |- ?P] => destruct (classic P); ss; exfalso
+               end.
+
 Module Memory.
   Definition t := Loc.t -> Cell.t.
 
@@ -3089,10 +3093,6 @@ Module Memory.
 
 
   (* prev_None *)
-
-  Ltac contra := match goal with
-                 | [ |- ?P] => destruct (classic P); ss; exfalso
-                 end.
 
   Definition prev_None (mem1 mem2: t): Prop :=
     forall loc from to msg

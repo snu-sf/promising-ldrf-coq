@@ -31,7 +31,6 @@ Require Import MemoryProps.
 Set Implicit Arguments.
 
 
-
 Lemma reorder_abort_reserve
       lang
       pf th0 th1 th2
@@ -68,54 +67,6 @@ Proof.
 Qed.
 
 Lemma reorder_reserve_promise
-      prom0 mem0
-      prom1 mem1
-      prom2 mem2
-      loc1 from1 to1
-      loc2 from2 to2 msg2 kind2
-      (STEP1: Memory.promise prom0 mem0 loc1 from1 to1 Message.reserve prom1 mem1 Memory.op_kind_add)
-      (STEP2: Memory.promise prom1 mem1 loc2 from2 to2 msg2 prom2 mem2 kind2):
-  (loc1 = loc2 /\ from1 = from2 /\ to1 = to2 /\ msg2 = Message.reserve /\ kind2 = Memory.op_kind_cancel /\
-   prom0 = prom2 /\ mem0 = mem2) \/
-  (exists prom1' mem1',
-      <<STEP1: Memory.promise prom0 mem0 loc2 from2 to2 msg2 prom1' mem1' kind2>> /\
-      <<STEP2: Memory.promise prom1' mem1' loc1 from1 to1 Message.reserve prom2 mem2 Memory.op_kind_add>>).
-Proof.
-  inv STEP1. inv STEP2; ss.
-  - (* reserve/add *)
-    exploit MemoryReorder.add_add; try exact PROMISES; try exact PROMISES0; eauto. i. des.
-    exploit MemoryReorder.add_add; try exact MEM; try exact MEM0; eauto. i. des.
-    right. esplits.
-    + econs; eauto; try congr.
-      i. exploit Memory.add_get1; try exact MEM; eauto.
-    + econs; eauto. ss.
-  - (* reserve/split *)
-    exploit MemoryReorder.add_split; try exact PROMISES; try exact PROMISES0; eauto. i.
-    des; clarify.
-    + exploit MemoryReorder.add_split; try exact MEM; try exact MEM0; eauto. i. des; [congr|].
-      right. esplits.
-      * econs 2; eauto.
-      * econs; eauto. ss.
-  - (* reserve/lower *)
-    des. subst.
-    exploit MemoryReorder.add_lower; try exact PROMISES; try exact PROMISES0; eauto. i.
-    des; clarify.
-    + exploit MemoryReorder.add_lower; try exact MEM; try exact MEM0; eauto. i. des; [congr|].
-      right. esplits.
-      * econs; eauto.
-      * econs; eauto. ss.
-  - (* reserve/cancel *)
-    destruct (classic ((loc1, to1) = (loc2, to2))).
-    + inv H.
-      exploit MemoryReorder.add_remove_same; try exact PROMISES0; eauto. i. des. subst.
-      exploit MemoryReorder.add_remove_same; try exact MEM0; eauto. i. des. subst.
-      left. splits; auto.
-    + exploit MemoryReorder.add_remove; try exact PROMISES0; eauto. i. des.
-      exploit MemoryReorder.add_remove; try exact MEM0; eauto. i. des.
-      right. esplits; eauto. econs; eauto. ss.
-Qed.
-
-Lemma reorder_promise_reserve_promise
       lc0 mem0
       lc1 mem1
       lc2 mem2
@@ -130,7 +81,7 @@ Lemma reorder_promise_reserve_promise
       <<STEP2: Local.promise_step lc1' mem1' loc1 from1 to1 Message.reserve lc2 mem2 Memory.op_kind_add>>).
 Proof.
   inv STEP1. inv STEP2. ss.
-  exploit reorder_reserve_promise; eauto. i. des; subst.
+  exploit MemoryReorder.reserve_promise; eauto. i. des; subst.
   { left. splits; auto. destruct lc0; auto. }
   right. esplits.
   { econs; eauto. inv STEP2.
@@ -157,28 +108,6 @@ Lemma add_non_synch prom0 loc from to msg prom1
 Proof.
   ii. eapply Memory.add_get1 in GET; eauto.
   des_ifs. exploit NONSYNCH; eauto.
-Qed.
-
-Lemma reorder_reserve_fence
-      lc0 mem0
-      lc1 mem1
-      lc2
-      loc1 from1 to1
-      ord1 ord2 sc0 sc1
-      (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 Message.reserve lc1 mem1 Memory.op_kind_add)
-      (STEP2: Local.fence_step lc1 sc0 ord1 ord2 lc2 sc1)
-  :
-    exists lc1',
-      (<<STEP1: Local.fence_step lc0 sc0 ord1 ord2 lc1' sc1>>) /\
-      (<<STEP2: Local.promise_step lc1' mem0 loc1 from1 to1 Message.reserve lc2 mem1 Memory.op_kind_add>>).
-Proof.
-  inv STEP1. inv STEP2. ss. esplits.
-  - econs; eauto.
-    + inv PROMISE. i. eapply add_non_synch; eauto.
-    + i. ss. subst. erewrite PROMISES in *; auto.
-      inv PROMISE. eapply Memory.add_get0 in PROMISES0. des.
-      erewrite Memory.bot_get in *. ss.
-  - econs; eauto.
 Qed.
 
 Lemma reorder_reserve_read
@@ -213,24 +142,125 @@ Lemma reorder_reserve_write
       (<<STEP1: Local.write_step lc0 sc0 mem0 loc2 from2 to2 val2 releasedm2 released2 ord2 lc1' sc2 mem1' kind2>>) /\
       (<<STEP2: Local.promise_step lc1' mem1' loc1 from1 to1 Message.reserve lc2 mem2 Memory.op_kind_add>>).
 Proof.
-  inv STEP1. inv STEP2. ss. inv WRITE.
-  exploit reorder_reserve_promise.
-  { eapply PROMISE. }
-  { eapply PROMISE0. }
-  i. des; clarify.
-  i. des; clarify.
-  assert (LOCTS: (loc1, to1) <> (loc2, to2)).
-  { ii. clarify. inv PROMISE.
-    eapply Memory.add_get0 in MEM. des. inv PROMISE0; ss.
-    { eapply Memory.add_get0 in MEM. des. clarify. }
-    { des. subst. eapply Memory.split_get0 in MEM. des. clarify. }
-    { des. subst. eapply Memory.lower_get0 in MEM. des. clarify. }
-  }
-  exploit MemoryReorder.add_remove; eauto.
-  { inv STEP2. eauto. }
-  i. des. esplits.
+  inv STEP1. inv STEP2. ss.
+  exploit MemoryReorder.reserve_write; eauto; ss. i. des.
+  esplits.
   { econs; eauto. i. inv PROMISE. eapply add_non_synch_loc; eauto. }
-  { econs; eauto. ss. inv STEP2. econs; eauto. }
+  { econs; eauto. }
+Qed.
+
+Lemma reorder_reserve_write_na
+      lc0 sc0 mem0
+      lc1 mem1
+      lc2 sc2 mem2
+      loc1 from1 to1
+      loc2 from2 to2 val2 ord2 msgs2 kinds2 kind2
+      (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 Message.reserve lc1 mem1 Memory.op_kind_add)
+      (STEP2: Local.write_na_step lc1 sc0 mem1 loc2 from2 to2 val2 ord2 lc2 sc2 mem2 msgs2 kinds2 kind2)
+  :
+    exists lc1' mem1',
+      (<<STEP1: Local.write_na_step lc0 sc0 mem0 loc2 from2 to2 val2 ord2 lc1' sc2 mem1' msgs2 kinds2 kind2>>) /\
+      (<<STEP2: Local.promise_step lc1' mem1' loc1 from1 to1 Message.reserve lc2 mem2 Memory.op_kind_add>>).
+Proof.
+  inv STEP1. inv STEP2. ss.
+  exploit MemoryReorder.reserve_write_na; eauto; ss. i. des.
+  esplits; eauto.
+Qed.
+
+Lemma reorder_reserve_fence
+      lc0 mem0
+      lc1 mem1
+      lc2
+      loc1 from1 to1
+      ord1 ord2 sc0 sc1
+      (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 Message.reserve lc1 mem1 Memory.op_kind_add)
+      (STEP2: Local.fence_step lc1 sc0 ord1 ord2 lc2 sc1)
+  :
+    exists lc1',
+      (<<STEP1: Local.fence_step lc0 sc0 ord1 ord2 lc1' sc1>>) /\
+      (<<STEP2: Local.promise_step lc1' mem0 loc1 from1 to1 Message.reserve lc2 mem1 Memory.op_kind_add>>).
+Proof.
+  inv STEP1. inv STEP2. ss. esplits.
+  - econs; eauto.
+    + inv PROMISE. i. eapply add_non_synch; eauto.
+    + i. ss. subst. erewrite PROMISES in *; auto.
+      inv PROMISE. eapply Memory.add_get0 in PROMISES0. des.
+      erewrite Memory.bot_get in *. ss.
+  - econs; eauto.
+Qed.
+
+Lemma reorder_reserve_promise_consistent
+      lc0 mem0 loc1 from1 to1 lc1 mem1
+      (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 Message.reserve lc1 mem1 Memory.op_kind_add)
+      (CONS: Local.promise_consistent lc1):
+  Local.promise_consistent lc0.
+Proof.
+  inv STEP1. inv PROMISE.
+  ii. eapply Memory.add_get1 in PROMISE; eauto.
+Qed.
+
+Lemma reorder_reserve_failure
+      lc0 mem0 loc1 from1 to1 lc1 mem1
+      (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 Message.reserve lc1 mem1 Memory.op_kind_add)
+      (STEP2: Local.failure_step lc1):
+  Local.failure_step lc0.
+Proof.
+  inv STEP2. econs.
+  eapply reorder_reserve_promise_consistent; eauto.
+Qed.
+
+Lemma reorder_reserve_is_racy
+      lc0 mem0 loc1 from1 to1 lc1 mem1
+      loc2 ord2
+      (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 Message.reserve lc1 mem1 Memory.op_kind_add)
+      (STEP2: Local.is_racy lc1 mem1 loc2 ord2):
+  Local.is_racy lc0 mem0 loc2 ord2.
+Proof.
+  inv STEP1. inv PROMISE. inv STEP2. ss.
+  revert GET. erewrite Memory.add_o; eauto.
+  revert GETP. erewrite Memory.add_o; eauto.
+  condtac; ss; try congr. i.
+  econs; eauto.
+Qed.
+
+Lemma reorder_reserve_racy_read
+      lc0 mem0 loc1 from1 to1 lc1 mem1
+      loc2 val2 ord2
+      (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 Message.reserve lc1 mem1 Memory.op_kind_add)
+      (STEP2: Local.racy_read_step lc1 mem1 loc2 val2 ord2):
+  Local.racy_read_step lc0 mem0 loc2 val2 ord2.
+Proof.
+  inv STEP2. econs.
+  eapply reorder_reserve_is_racy; eauto.
+Qed.
+
+Lemma reorder_reserve_racy_write
+      lc0 mem0 loc1 from1 to1 lc1 mem1
+      loc2 ord2
+      (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 Message.reserve lc1 mem1 Memory.op_kind_add)
+      (STEP2: Local.racy_write_step lc1 mem1 loc2 ord2):
+  Local.racy_write_step lc0 mem0 loc2 ord2.
+Proof.
+  inv STEP2. econs.
+  - eapply reorder_reserve_is_racy; eauto.
+  - eapply reorder_reserve_promise_consistent; eauto.
+Qed.
+
+Lemma reorder_reserve_racy_update
+      lc0 mem0 loc1 from1 to1 lc1 mem1
+      loc2 ordr2 ordw2
+      (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 Message.reserve lc1 mem1 Memory.op_kind_add)
+      (STEP2: Local.racy_update_step lc1 mem1 loc2 ordr2 ordw2):
+  Local.racy_update_step lc0 mem0 loc2 ordr2 ordw2.
+Proof.
+  inv STEP2.
+  - econs 1; eauto.
+    eapply reorder_reserve_promise_consistent; eauto.
+  - econs 2; eauto.
+    eapply reorder_reserve_promise_consistent; eauto.
+  - econs 3; eauto.
+    + eapply reorder_reserve_is_racy; eauto.
+    + eapply reorder_reserve_promise_consistent; eauto.
 Qed.
 
 Lemma reorder_reserve_step
@@ -249,7 +279,7 @@ Proof.
   unfold ThreadEvent.is_reserve in *. des_ifs.
   inv STEP1; inv STEP; [|inv LOCAL]. ss.
   inv STEP2; ss.
-  - inv STEP. ss. exploit reorder_promise_reserve_promise; eauto.
+  - inv STEP. ss. exploit reorder_reserve_promise; eauto.
     i. des; clarify; eauto.
     left. esplits.
     + econs 1. econs; eauto.
@@ -275,11 +305,21 @@ Proof.
     + exploit reorder_reserve_fence; eauto. i. des. esplits.
       * econs 2. econs; eauto.
       * econs 1. econs; eauto; ss.
-    + esplits.
+    + exploit reorder_reserve_failure; eauto. i. esplits.
       * econs 2. econs; eauto.
-        econs. econs. inv LOCAL. inv LOCAL1. inv PROMISE.
-        ii. eapply Memory.add_get1 in PROMISE; eauto.
-      * econs 1. econs; eauto.
+      * econs 1. econs; eauto; ss.
+    + exploit reorder_reserve_write_na; eauto. i. des. esplits.
+      * econs 2. econs; eauto.
+      * econs 1. econs; eauto; ss.
+    + exploit reorder_reserve_racy_read; eauto. i. esplits.
+      * econs 2. econs; eauto.
+      * econs 1. econs; eauto; ss.
+    + exploit reorder_reserve_racy_write; eauto. i. esplits.
+      * econs 2. econs; eauto.
+      * econs 1. econs; eauto; ss.
+    + exploit reorder_reserve_racy_update; eauto. i. esplits.
+      * econs 2. econs; eauto.
+      * econs 1. econs; eauto; ss.
 Qed.
 
 Lemma reorder_reserves_step
