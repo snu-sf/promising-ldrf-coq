@@ -50,6 +50,30 @@ Proof.
   { ss. }
 Qed.
 
+Lemma write_covered_increase prom0 prom1 mem0 mem1
+      loc from to msg kind
+      (WRITE: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
+      loc0 ts0
+      (COVERED: covered loc0 ts0 mem0)
+  :
+    covered loc0 ts0 mem1.
+Proof.
+  exploit Memory.write_not_cancel; eauto. i.
+  inv WRITE. eapply promise_not_cancel_covered_increase; eauto.
+  ii. subst. ss.
+Qed.
+
+Lemma write_na_covered_increase prom0 prom1 mem0 mem1
+      ts loc from to msg msgs kinds kind
+      (WRITE: Memory.write_na ts prom0 mem0 loc from to msg prom1 mem1 msgs kinds kind)
+      loc0 ts0
+      (COVERED: covered loc0 ts0 mem0)
+  :
+    covered loc0 ts0 mem1.
+Proof.
+  induction WRITE; eauto using write_covered_increase.
+Qed.
+
 Lemma step_not_cancel_covered_increase lang (th0 th1: Thread.t lang) pf e
       (STEP: Thread.step pf e th0 th1)
       (NOTCANCEL: ~ ThreadEvent.is_cancel e)
@@ -60,14 +84,13 @@ Lemma step_not_cancel_covered_increase lang (th0 th1: Thread.t lang) pf e
 Proof.
   inv STEP.
   { inv STEP0. inv LOCAL. ss.
-    eapply promise_not_cancel_covered_increase; eauto. destruct kind; ss.
-    des_ifs. inv PROMISE; ss.
+    eapply promise_not_cancel_covered_increase; eauto. ii. subst.
+    inv PROMISE. ss.
   }
   { inv STEP0. inv LOCAL; auto.
-    { inv LOCAL0. inv WRITE. eapply promise_not_cancel_covered_increase; eauto.
-      destruct kind; ss. inv PROMISE; ss. }
-    { inv LOCAL2. inv WRITE. eapply promise_not_cancel_covered_increase; eauto.
-      destruct kind; ss. inv PROMISE; ss. }
+    { inv LOCAL0. eapply write_covered_increase; eauto. }
+    { inv LOCAL2. eapply write_covered_increase; eauto. }
+    { inv LOCAL0. eapply write_na_covered_increase; eauto. }
   }
 Qed.
 
@@ -296,6 +319,93 @@ Section LIFT.
     { ss. }
   Qed.
 
+  Lemma step_lifting_write prom0 prom1 mem0 mem1 cap0
+        loc from to msg kind
+        (spaces lefts: Loc.t -> Time.t -> Prop)
+        (WRITE: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
+        (WRITENOTIN: forall ts (ITV: Interval.mem (from, to) ts), ~ spaces loc ts)
+        (WRITENOTTO: ~ lefts loc to)
+        (SOUND: Memory.le mem0 cap0)
+        (SPACES:
+           forall loc ts (COV: covered loc ts cap0),
+             <<COV: covered loc ts mem0>> \/ <<SPACE: spaces loc ts>>)
+        (LEFTS:
+           forall loc ts (UNATTACHABLE: unattachable cap0 loc ts),
+             <<COV: unattachable mem0 loc ts>> \/ <<LEFT: lefts loc ts>>)
+        (MEM0: Memory.closed mem0)
+        (PROM0: Memory.le prom0 mem0)
+        (PROM1: Memory.le prom0 cap0)
+    :
+      exists cap1,
+        (<<STEP: Memory.write prom0 cap0 loc from to msg prom1 cap1 kind>>) /\
+        (<<SOUND: Memory.le mem1 cap1>>) /\
+        (<<SPACES:
+           forall loc ts (COV: covered loc ts cap1),
+             <<COV: covered loc ts mem1>> \/ spaces loc ts>>) /\
+        (<<LEFTS:
+           forall loc ts (UNATTACHABLE: unattachable cap1 loc ts),
+             <<COV: unattachable mem1 loc ts>> \/ lefts loc ts>>).
+  Proof.
+    inv WRITE. exploit step_lifting_promise; eauto.
+    { exploit Memory.write_not_cancel; eauto. ii. subst. ss. }
+    i. des.
+    esplits; eauto.
+  Qed.
+
+  Lemma step_lifting_write_na prom0 prom1 mem0 mem1 cap0
+        ts loc from to msg msgs kinds kind
+        (spaces lefts: Loc.t -> Time.t -> Prop)
+        (WRITE: Memory.write_na ts prom0 mem0 loc from to msg prom1 mem1 msgs kinds kind)
+        (WRITENOTIN: forall ts (ITV: Interval.mem (from, to) ts), ~ spaces loc ts)
+        (WRITENOTIN_MSGS:
+           List.Forall (fun m => forall ts (ITV: Interval.mem (fst m) ts), ~ spaces loc ts) msgs)
+        (WRITENOTTO: ~ lefts loc to)
+        (WRITENOTTO_MSGS: List.Forall (fun m => ~ lefts loc (snd (fst m))) msgs)
+        (SOUND: Memory.le mem0 cap0)
+        (SPACES:
+           forall loc ts (COV: covered loc ts cap0),
+             <<COV: covered loc ts mem0>> \/ <<SPACE: spaces loc ts>>)
+        (LEFTS:
+           forall loc ts (UNATTACHABLE: unattachable cap0 loc ts),
+             <<COV: unattachable mem0 loc ts>> \/ <<LEFT: lefts loc ts>>)
+        (MEM0: Memory.closed mem0)
+        (PROM0: Memory.le prom0 mem0)
+        (PROM1: Memory.le prom0 cap0)
+    :
+      exists cap1,
+        (<<STEP: Memory.write_na ts prom0 cap0 loc from to msg prom1 cap1 msgs kinds kind>>) /\
+        (<<SOUND: Memory.le mem1 cap1>>) /\
+        (<<SPACES:
+           forall loc ts (COV: covered loc ts cap1),
+             <<COV: covered loc ts mem1>> \/ spaces loc ts>>) /\
+        (<<LEFTS:
+           forall loc ts (UNATTACHABLE: unattachable cap1 loc ts),
+             <<COV: unattachable mem1 loc ts>> \/ lefts loc ts>>).
+  Proof.
+    move WRITE at top. revert_until WRITE.
+    induction WRITE; i.
+    { exploit step_lifting_write; eauto. i. des. esplits; eauto. }
+    inv WRITENOTIN_MSGS. ss. inv WRITENOTTO_MSGS. ss.
+    exploit step_lifting_write; eauto. i. des.
+    exploit IHWRITE; eauto.
+    { eapply Memory.write_closed; eauto.
+      - unguard. des; subst; econs; eauto.
+      - unguard. des; subst; econs; eauto. apply Time.bot_spec.
+    }
+    { eapply Memory.write_le; try exact WRITE_EX; eauto. }
+    { eapply Memory.write_le; try exact STEP; eauto. }
+    i. des. esplits; eauto.
+  Qed.
+
+  Lemma step_lifting_is_racy
+        lc0 mem0 loc ord cap0
+        (RACE: Local.is_racy lc0 mem0 loc ord)
+        (SOUND: Memory.le mem0 cap0):
+    (<<STEP: Local.is_racy lc0 cap0 loc ord>>).
+  Proof.
+    inv RACE. exploit SOUND; eauto.
+  Qed. 
+
   Lemma step_lifting lang st0 st1 lc0 lc1 sc0 sc1 mem0 mem1 cap0 pf e
         (spaces lefts: Loc.t -> Time.t -> Prop)
         (STEP: Thread.step pf e (Thread.mk lang st0 lc0 sc0 mem0) (Thread.mk _ st1 lc1 sc1 mem1))
@@ -309,7 +419,7 @@ Section LIFT.
         (LEFTS:
            forall loc ts (UNATACHABLE: unattachable cap0 loc ts),
              <<COV: unattachable mem0 loc ts>> \/ <<LEFT: lefts loc ts>>)
-       (MEM0: Memory.closed mem0)
+        (MEM0: Memory.closed mem0)
         (LOCAL0: Local.wf lc0 mem0)
         (SC0: Memory.closed_timemap sc0 mem0)
     :
@@ -327,7 +437,7 @@ Section LIFT.
     inv STEP.
     { inv STEP0. inv LOCAL. ss.
       destruct (Memory.op_kind_is_cancel kind) eqn:KIND; ss.
-      { destruct kind; ss. des_ifs. inv PROMISE; ss. }
+      { destruct kind; ss. inv PROMISE; ss. }
       exploit step_lifting_promise; eauto.
       { eapply LOCAL0. }
       { transitivity mem0; eauto. eapply LOCAL0. }
@@ -339,21 +449,36 @@ Section LIFT.
     { inv STEP0. inv LOCAL.
       { esplits; eauto. }
       { inv LOCAL1. eapply SOUND in GET. esplits; eauto. }
-      { inv LOCAL1. inv WRITE. exploit step_lifting_promise; eauto.
+      { inv LOCAL1.
+        exploit step_lifting_write; eauto.
         { eapply LOCAL0. }
         { transitivity mem0; eauto. eapply LOCAL0. }
-        { destruct kind; ss. inv PROMISE; ss. }
+        i. des. esplits; eauto.
+      }
+      { inv LOCAL1. eapply SOUND in GET. inv LOCAL2.
+        exploit step_lifting_write; eauto.
+        { eapply LOCAL0. }
+        { transitivity mem0; eauto. eapply LOCAL0. }
         i. des. esplits; eauto. econs 2; eauto.
       }
-      { inv LOCAL1. eapply SOUND in GET. inv LOCAL2. inv WRITE.
-        exploit step_lifting_promise; eauto.
+      { esplits; eauto. }
+      { esplits; eauto. }
+      { esplits; eauto. } 
+      { inv LOCAL1. ss. des.
+        exploit step_lifting_write_na; eauto.
         { eapply LOCAL0. }
         { transitivity mem0; eauto. eapply LOCAL0. }
-        { destruct kind; ss. inv PROMISE; ss. }
-        i. des. esplits; eauto. econs 2; eauto. econs; eauto. }
-      { esplits; eauto. }
-      { esplits; eauto. }
-      { esplits; eauto. }
+        i. des. esplits; eauto.
+      }
+      { inv LOCAL1. exploit step_lifting_is_racy; eauto. i. des.
+        esplits; eauto.
+      }
+      { inv LOCAL1. exploit step_lifting_is_racy; eauto. i. des.
+        esplits; eauto.
+      }
+      { inv LOCAL1; try by (esplits; eauto).
+        exploit step_lifting_is_racy; eauto. i. des. esplits; eauto.
+      }
     }
   Qed.
 
@@ -454,85 +579,6 @@ Proof.
 Qed.
 
 
-Lemma promise_needed_spaces prom0 prom1 mem0 mem1
-      loc from to msg kind
-      (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
-      (WF: kind <> Memory.op_kind_cancel)
-  :
-    ((<<ALREADY: forall ts (ITV: Interval.mem (from, to) ts), covered loc ts mem0>>) /\
-     (<<COVERED: forall loc ts, covered loc ts mem1 <-> covered loc ts mem0>>))
-    \/
-    ((<<NEW: forall ts (ITV: Interval.mem (from, to) ts), ~ covered loc ts mem0>>) /\
-     (<<COVERED: forall loc0 ts0,
-         covered loc0 ts0 mem1 <-> covered loc0 ts0 mem0 \/ (loc0 = loc /\ Interval.mem (from, to) ts0)>>) /\
-     (<<WF: Time.lt from to>>))
-.
-Proof.
-  inv PROMISE.
-  { right. exploit add_succeed_wf; try apply MEM. i. des. splits; auto.
-    { ii. inv H. eapply DISJOINT; eauto. }
-    { i. erewrite (@add_covered mem1); eauto. }
-  }
-  { left. exploit split_succeed_wf; try apply MEM. i. des. splits; auto.
-    { ii. econs; eauto. eapply Interval.le_mem; eauto. econs; ss.
-      { refl. }
-      { left. auto. }
-    }
-    { i. eapply split_covered; eauto. }
-  }
-  { left. exploit lower_succeed_wf; try apply MEM. i. des. splits; auto.
-    { ii. econs; eauto. }
-    { i. eapply lower_covered; eauto. }
-  }
-  { ss. }
-Qed.
-
-Lemma step_needed_spaces lang (th0 th1: Thread.t lang) pf e
-      (times: Loc.t -> Time.t -> Prop)
-      (STEP: Thread.step pf e th0 th1)
-      (NOTCANCEL: ~ ThreadEvent.is_cancel e)
-      (WFTIME: wf_time_evt times e)
-  :
-    ((<<ALREADY: write_not_in (fun loc0 ts0 => ~ covered loc0 ts0 (Thread.memory th0)) e>>) /\
-     (<<COVERED: forall loc ts, covered loc ts (Thread.memory th1) <-> covered loc ts (Thread.memory th0)>>))
-    \/
-    exists loc from to,
-      (<<NEW: forall ts (ITV: Interval.mem (from, to) ts), ~ covered loc ts (Thread.memory th0)>>) /\
-      (<<COVERED: forall loc0 ts0,
-          covered loc0 ts0 (Thread.memory th1) <-> covered loc0 ts0 (Thread.memory th0) \/ (loc0 = loc /\ Interval.mem (from, to) ts0)>>) /\
-      (<<WF: Time.lt from to>>) /\
-      (<<TIMES: times loc from /\ times loc to>>) /\
-      (<<EVENT: write_not_in (fun loc0 ts0 => ~ (loc0 = loc /\ Interval.mem (from, to) ts0)) e>>).
-Proof.
-  inv STEP.
-  { inv STEP0. inv LOCAL. ss.
-    destruct (Memory.op_kind_is_cancel kind) eqn:KIND.
-    { destruct kind; ss. des_ifs. inv PROMISE; ss. }
-    exploit promise_needed_spaces; eauto.
-    { destruct kind; ss. }
-    i. des.
-    { left. splits; auto. }
-    { right. esplits; eauto. }
-  }
-  { inv STEP0. inv LOCAL; try by (splits; eauto); ss.
-    { ss. inv LOCAL0. inv WRITE.
-      exploit promise_needed_spaces; eauto.
-      { destruct kind; ss. inv PROMISE; ss. }
-      i. des.
-      { left. esplits; eauto. }
-      { right. esplits; eauto. }
-    }
-    { ss. inv LOCAL2. inv WRITE.
-      exploit promise_needed_spaces; eauto.
-      { destruct kind; ss. inv PROMISE; ss. }
-      i. des.
-      { left. esplits; eauto. }
-      { right. esplits; eauto. }
-    }
-  }
-Qed.
-
-
 Inductive reservations_added:
   forall (l: list (Loc.t * Interval.t)) (mem0 mem1: Memory.t), Prop :=
 | reservations_added_base
@@ -576,7 +622,6 @@ Proof.
     { eapply Memory.remove_get0; eauto. }
     i. ss. des; clarify. symmetry. auto.
   }
-  { econs. }
   i. des. replace mem1 with mem3; auto. eapply Memory.ext.
   i. erewrite (@Memory.add_o mem3 mem0); eauto.
   erewrite (@Memory.remove_o mem0 mem1); eauto. des_ifs.
@@ -602,6 +647,198 @@ Hint Constructors disjoint_intervals.
 
 
 
+Lemma promise_needed_spaces prom0 prom1 mem0 mem1
+      loc from to msg kind
+      (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
+      (WF: kind <> Memory.op_kind_cancel)
+  :
+    ((<<ALREADY: forall ts (ITV: Interval.mem (from, to) ts), covered loc ts mem0>>) /\
+     (<<COVERED: forall loc ts, covered loc ts mem1 <-> covered loc ts mem0>>))
+    \/
+    ((<<NEW: forall ts (ITV: Interval.mem (from, to) ts), ~ covered loc ts mem0>>) /\
+     (<<COVERED: forall loc0 ts0,
+         covered loc0 ts0 mem1 <-> covered loc0 ts0 mem0 \/ (loc0 = loc /\ Interval.mem (from, to) ts0)>>) /\
+     (<<WF: Time.lt from to>>))
+.
+Proof.
+  inv PROMISE.
+  { right. exploit add_succeed_wf; try apply MEM. i. des. splits; auto.
+    { ii. inv H. eapply DISJOINT; eauto. }
+    { i. erewrite (@add_covered mem1); eauto. }
+  }
+  { left. exploit split_succeed_wf; try apply MEM. i. des. splits; auto.
+    { ii. econs; eauto. eapply Interval.le_mem; eauto. econs; ss.
+      { refl. }
+      { left. auto. }
+    }
+    { i. eapply split_covered; eauto. }
+  }
+  { left. exploit lower_succeed_wf; try apply MEM. i. des. splits; auto.
+    { ii. econs; eauto. }
+    { i. eapply lower_covered; eauto. }
+  }
+  { ss. }
+Qed.
+
+Lemma write_needed_spaces prom0 prom1 mem0 mem1
+      loc from to msg kind
+      (WRITE: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
+  :
+    ((<<ALREADY: forall ts (ITV: Interval.mem (from, to) ts), covered loc ts mem0>>) /\
+     (<<COVERED: forall loc ts, covered loc ts mem1 <-> covered loc ts mem0>>))
+    \/
+    ((<<NEW: forall ts (ITV: Interval.mem (from, to) ts), ~ covered loc ts mem0>>) /\
+     (<<COVERED: forall loc0 ts0,
+         covered loc0 ts0 mem1 <-> covered loc0 ts0 mem0 \/ (loc0 = loc /\ Interval.mem (from, to) ts0)>>) /\
+     (<<WF: Time.lt from to>>))
+.
+Proof.
+  exploit Memory.write_not_cancel; eauto. i.
+  inv WRITE. eapply promise_needed_spaces; eauto.
+  destruct kind; ss.
+Qed.
+
+Lemma write_na_needed_spaces
+      ts prom0 mem0 loc from to val prom1 mem1 msgs kinds kind
+      ord
+      (WRITE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 msgs kinds kind):
+  exists l,
+    (<<L: forall loc' from' to' (IN: List.In (loc', (from', to')) l),
+        loc = loc' /\
+        (from' = from /\ to' = to \/
+         exists msg, List.In (from', to', msg) msgs)>>) /\
+    (<<WRITENOTIN: write_not_in
+                     (fun loc ts => ~ (covered loc ts mem0 \/ intervals_sum l loc ts))
+                     (ThreadEvent.write_na loc msgs from to val ord)>>) /\
+    (<<DISJOINT: disjoint_intervals l>>) /\
+    (<<NITV: forall loc ts (ITV: intervals_sum l loc ts), ~ covered loc ts mem0>>) /\
+    (<<COVERED: forall loc ts, covered loc ts mem1 <-> covered loc ts mem0 \/ intervals_sum l loc ts>>).
+Proof.
+Admitted.
+
+(* Lemma step_needed_spaces lang (th0 th1: Thread.t lang) pf e *)
+(*       (times: Loc.t -> Time.t -> Prop) *)
+(*       (STEP: Thread.step pf e th0 th1) *)
+(*       (NOTCANCEL: ~ ThreadEvent.is_cancel e) *)
+(*       (WFTIME: wf_time_evt times e) *)
+(*   : *)
+(*     ((<<ALREADY: write_not_in (fun loc0 ts0 => ~ covered loc0 ts0 (Thread.memory th0)) e>>) /\ *)
+(*      (<<COVERED: forall loc ts, covered loc ts (Thread.memory th1) <-> covered loc ts (Thread.memory th0)>>)) *)
+(*     \/ *)
+(*     exists loc from to, *)
+(*       (<<NEW: forall ts (ITV: Interval.mem (from, to) ts), ~ covered loc ts (Thread.memory th0)>>) /\ *)
+(*       (<<COVERED: forall loc0 ts0, *)
+(*           covered loc0 ts0 (Thread.memory th1) <-> covered loc0 ts0 (Thread.memory th0) \/ (loc0 = loc /\ Interval.mem (from, to) ts0)>>) /\ *)
+(*       (<<WF: Time.lt from to>>) /\ *)
+(*       (<<TIMES: times loc from /\ times loc to>>) /\ *)
+(*       (<<EVENT: write_not_in (fun loc0 ts0 => ~ (loc0 = loc /\ Interval.mem (from, to) ts0)) e>>). *)
+(* Proof. *)
+(*   inv STEP. *)
+(*   { inv STEP0. inv LOCAL. ss. *)
+(*     destruct (Memory.op_kind_is_cancel kind) eqn:KIND. *)
+(*     { destruct kind; ss. inv PROMISE; ss. } *)
+(*     exploit promise_needed_spaces; eauto. *)
+(*     { destruct kind; ss. } *)
+(*     i. des. *)
+(*     { left. splits; auto. } *)
+(*     { right. esplits; eauto. } *)
+(*   } *)
+(*   { inv STEP0. inv LOCAL; try by (splits; eauto); ss. *)
+(*     { ss. inv LOCAL0. inv WRITE. *)
+(*       exploit promise_needed_spaces; eauto. *)
+(*       { destruct kind; ss. inv PROMISE; ss. } *)
+(*       i. des. *)
+(*       { left. esplits; eauto. } *)
+(*       { right. esplits; eauto. } *)
+(*     } *)
+(*     { ss. inv LOCAL2. inv WRITE. *)
+(*       exploit promise_needed_spaces; eauto. *)
+(*       { destruct kind; ss. inv PROMISE; ss. } *)
+(*       i. des. *)
+(*       { left. esplits; eauto. } *)
+(*       { right. esplits; eauto. } *)
+(*     } *)
+(*     admit. *)
+(*   } *)
+(* Admitted. *)
+
+Lemma step_needed_spaces lang (th0 th1: Thread.t lang) pf e
+      (times: Loc.t -> Time.t -> Prop)
+      (STEP: Thread.step pf e th0 th1)
+      (NOTCANCEL: ~ ThreadEvent.is_cancel e)
+      (WFTIME: wf_time_evt times e)
+  :
+    exists l,
+      (<<WRITENOTIN:
+         write_not_in (fun loc ts => ~ (covered loc ts (Thread.memory th0) \/ intervals_sum l loc ts)) e>>) /\
+      (<<DISJOINT: disjoint_intervals l>>) /\
+      (<<NITV: forall loc ts (ITV: intervals_sum l loc ts), ~ covered loc ts (Thread.memory th0)>>) /\
+      (<<COVERED: forall loc ts,
+          covered loc ts (Thread.memory th1) <-> covered loc ts (Thread.memory th0) \/ intervals_sum l loc ts>>) /\
+      (<<TIMES: List.Forall (fun locitv =>
+                               times (fst locitv) (fst (snd locitv)) /\
+                               times (fst locitv) (snd (snd locitv))) l>>)
+.
+Proof.
+  inv STEP; inv STEP0; inv LOCAL; ss.
+  { exploit promise_needed_spaces; eauto.
+    { ii. subst. inv PROMISE; ss. }
+    i. des.
+    { exists []. splits; auto.
+      - condtac; ss. ii. exploit ALREADY; eauto.
+      - i. rewrite COVERED. split; eauto. i. des; eauto. inv H.
+    }
+    { exists [(loc, (from, to))]. splits; auto.
+      - condtac; ss. ii. hexploit NEW; eauto.
+      - i. inv ITV; ss. des. subst. eauto.
+      - i. rewrite COVERED. split; i; des; eauto.
+        + right. econs; eauto.
+        + inv H; ss. des. eauto.
+    }
+  }
+  { exists []. splits; eauto. i. split; i; des; eauto. inv H. }
+  { exists []. splits; eauto. i. split; i; des; eauto. inv H. }
+  { inv LOCAL0. exploit write_needed_spaces; eauto. i. des.
+    { exists []. splits; auto.
+      i. rewrite COVERED. split; eauto. i. des; eauto. inv H.
+    }
+    { exists [(loc, (from, to))]. splits; auto.
+      - ii. apply H. right. econs. eauto.
+      - i. inv ITV; ss. des. subst. eauto.
+      - i. rewrite COVERED. split; i; des; eauto.
+        + right. econs; eauto.
+        + inv H; ss. des. eauto.
+    }
+  }
+  { inv LOCAL1. inv LOCAL2. ss.
+    exploit write_needed_spaces; eauto. i. des.
+    { exists []. splits; auto.
+      i. rewrite COVERED. split; eauto. i. des; eauto. inv H.
+    }
+    { exists [(loc, (tsr, tsw))]. splits; auto.
+      - ii. apply H. right. econs. eauto.
+      - i. inv ITV; ss. des. subst. eauto.
+      - i. rewrite COVERED. split; i; des; eauto.
+        + right. econs; eauto.
+        + inv H; ss. des. eauto.
+    }
+  }
+  { exists []. splits; eauto. i. split; i; des; eauto. inv H. }
+  { exists []. splits; eauto. i. split; i; des; eauto. inv H. }
+  { exists []. splits; eauto. i. split; i; des; eauto. inv H. }
+  { inv LOCAL0. exploit write_na_needed_spaces; eauto.
+    instantiate (1 := ord). s. i. des.
+    exists l. splits; eauto.
+    rewrite List.Forall_forall. i.
+    destruct x as [loc' [from' to']].
+    exploit L; eauto. i. des; subst; ss.
+    rewrite List.Forall_forall in MSGS.
+    exploit MSGS; eauto.
+  }
+  { exists []. splits; eauto. i. split; i; des; eauto. inv H. }
+  { exists []. splits; eauto. i. split; i; des; eauto. inv H. }
+  { exists []. splits; eauto. i. split; i; des; eauto. inv H. }
+Qed.
 
 Lemma traced_steps_needed_spaces lang (th0 th1: Thread.t lang) tr
       (times: Loc.t -> Time.t -> Prop)

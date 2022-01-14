@@ -60,6 +60,9 @@ Section Pred.
     match e with
     | ThreadEvent.write loc from to _ _ _ =>
       ~ MSGS loc to
+    | ThreadEvent.write_na loc msgs from to _ _ =>
+      ~ MSGS loc to /\
+      List.Forall (fun m => ~ MSGS loc (snd (fst m))) msgs
     | ThreadEvent.update loc from to _ _ _ _ _ _ =>
       ~ MSGS loc to
     | ThreadEvent.promise loc from to _ kind =>
@@ -129,6 +132,9 @@ Section Pred.
     match e with
     | ThreadEvent.write loc from to _ _ _ =>
       forall t (IN: Interval.mem (from, to) t), ~ (MSGS loc t)
+    | ThreadEvent.write_na loc msgs from to val ord =>
+      (forall t (IN: Interval.mem (from, to) t), ~ (MSGS loc t)) /\
+      List.Forall (fun m => forall t (IN: Interval.mem (fst m) t), ~ (MSGS loc t)) msgs
     | ThreadEvent.update loc from to _ _ _ _ _ _ =>
       forall t (IN: Interval.mem (from, to) t), ~ (MSGS loc t)
     | ThreadEvent.promise loc from to _ kind =>
@@ -173,6 +179,10 @@ Section Pred.
     i. unfold write_not_in in *. des_ifs.
     - ii. eapply NOTIN; eauto.
     - ii. eapply NOTIN; eauto.
+    - des. splits.
+      + ii. eapply NOTIN; eauto.
+      + induction NOTIN0; eauto. econs; eauto.
+        ii. eapply H; eauto.
     - ii. eapply NOTIN; eauto.
   Qed.
 
@@ -190,6 +200,14 @@ Section Pred.
     - ii. eapply NOTIN; eauto.
       eapply LE in H; eauto. inv IN.
       eapply TimeFacts.le_lt_lt; eauto. eapply Time.bot_spec.
+    - des. splits.
+      + ii. eapply NOTIN; eauto.
+        eapply LE in H; eauto. inv IN.
+        eapply TimeFacts.le_lt_lt; eauto. eapply Time.bot_spec.
+      + induction NOTIN0; eauto. econs; eauto.
+        ii. eapply H; eauto.
+        eapply LE in H0; eauto. inv IN.
+        eapply TimeFacts.le_lt_lt; eauto. eapply Time.bot_spec.
     - ii. eapply NOTIN; eauto.
       eapply LE in H; eauto. inv IN.
       eapply TimeFacts.le_lt_lt; eauto. eapply Time.bot_spec.

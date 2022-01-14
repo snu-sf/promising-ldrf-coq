@@ -95,9 +95,7 @@ Section MAPPED.
     unfold collapsed in *. des.
     hexploit (map_eq MAP0 MAP4). i. subst.
     hexploit (map_eq MAP3 MAP5). i. subst.
-    exploit TimeFacts.antisym; eauto.
-    { etrans; eauto. }
-    i. subst.
+    exploit TimeFacts.antisym; eauto. i. subst.
     exploit TimeFacts.antisym; eauto. i. subst.
     esplits; eauto.
   Qed.
@@ -3360,6 +3358,14 @@ Section IDENTMAP.
     inv MAP; auto.
     { inv FROM. inv TO. inv KIND; ss. }
     { inv FROM. inv TO. ss. }
+    { ss. des. split.
+      - inv FROM. inv TO. ss.
+      - clear from to NOTIN ffrom fto FROM TO.
+        revert fmsgs MSGS0. induction NOTIN0; i; inv MSGS0; ss.
+        des. econs; eauto.
+        destruct x as [[] ?], y as [[] ?]. ss.
+        inv H2. inv H0. ss.
+    }
     { inv FROM. inv TO. ss. }
   Qed.
 
@@ -3950,7 +3956,7 @@ Section SHIFTMAP.
       - ss. eauto.
     }
     { assert (LEFTRIGHT: Time.lt (snd fts_left) (fst fts_right)).
-      { eapply (mapping_map_lt_iff_pair_loc_lt MAPLT); eauto. etrans; eauto. }
+      { eapply (mapping_map_lt_iff_pair_loc_lt MAPLT); eauto. }
       esplits.
       - eapply mapping_map_lt_iff_pair_loc_update_one.
         + eauto.

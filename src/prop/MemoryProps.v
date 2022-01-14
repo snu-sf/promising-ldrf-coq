@@ -497,7 +497,7 @@ Section CELL.
         * destruct (Time.le_lt_dec to a).
           { left. exists a. esplits; ss; eauto.
             i. des; clarify; eauto; try refl.
-            etrans; eauto. }
+          }
           { left. exists to. esplits; ss; eauto.
             i. des; clarify; eauto. left. eauto. }
         * left. exists a. esplits; ss; eauto.
@@ -551,7 +551,7 @@ Section CELL.
       + des.
         * destruct (Time.le_lt_dec a to).
           { left. exists a. esplits; ss; eauto.
-            i. des; clarify; eauto; try refl. etrans; eauto. }
+            i. des; clarify; eauto; try refl. }
           { left. exists to. esplits; ss; eauto.
             i. des; clarify; eauto. left. eauto. }
         * left. exists a. esplits; ss; eauto.
@@ -728,7 +728,7 @@ Section MEMORYLEMMAS.
           { exfalso. eapply Time.lt_strorder.
             eapply TimeFacts.le_lt_lt; eauto. }
           { exfalso. eapply Time.lt_strorder.
-            eapply TimeFacts.le_lt_lt; eauto. etrans; eauto. }
+            eapply TimeFacts.le_lt_lt; eauto. }
   Qed.
 
   Lemma memory_get_from_mon mem loc from0 from1 to0 to1 msg0 msg1
@@ -1142,6 +1142,22 @@ Section MEMORYLEMMAS.
       + inv LOCAL0. inv WRITE. eapply WRITENOTIN; eauto.
         eapply promise_include_boundary; eauto.
       + inv LOCAL1. inv LOCAL2. inv WRITE. eapply WRITENOTIN; eauto.
+        eapply promise_include_boundary; eauto.
+      + inv LOCAL0. induction WRITE.
+        { split; eauto.
+          inv WRITE. eapply WRITENOTIN; eauto.
+          eapply promise_include_boundary; eauto.
+        }
+        inv WRITENOTIN. inv H0. ss.
+        exploit IHWRITE; eauto.
+        { eapply Memory.write_bot_none; eauto. }
+        { eapply Memory.write_finite; eauto. }
+        { eapply Memory.write_le; eauto. }
+        { inv TVIEW_CLOSED.
+          econs; i; eapply Memory.write_closed_view; eauto.
+        }
+        i. des. split; auto. econs; ss.
+        inv WRITE_EX. eapply H3; eauto.
         eapply promise_include_boundary; eauto.
   Qed.
 
@@ -1699,21 +1715,25 @@ Section UNCHANGABLES.
     inv WRITE. eapply step_write_not_in_promise; eauto.
   Qed.
 
-  Lemma step_write_na_not_in_write ts promises1 mem1 loc from1 to1 msg promises3 mem2 msgs kinds kind
+  Lemma step_write_not_in_write_na ts promises1 mem1 loc from1 to1 msg promises3 mem2 msgs kinds kind
         (MLE: Memory.le promises1 mem1)
         (WRITE: Memory.write_na ts promises1 mem1 loc from1 to1 msg promises3 mem2 msgs kinds kind)
-        t
-        (IN: Interval.mem (from1, to1) t)
     :
-      ~ unwritable mem1 promises1 loc t.
+      (forall t (IN: Interval.mem (from1, to1) t), ~ unwritable mem1 promises1 loc t) /\
+      List.Forall
+        (fun m => forall t (IN: Interval.mem (fst m) t), ~ unwritable mem1 promises1 loc t)
+        msgs.
   Proof.
-    revert t IN MLE. induction WRITE.
-    { i. eapply step_write_not_in_write; eauto. }
-    { i. eapply IHWRITE in IN; eauto.
-      { ii. inv H. eapply IN.  eapply unchangable_write in UNCH; eauto.
-        econs; eauto. }
-      { eapply write_promises_le; eauto. }
-    }
+    revert MLE. induction WRITE; i.
+    { split; ss. eapply step_write_not_in_write; eauto. }
+    hexploit Memory.write_le; eauto. i. des.
+    exploit IHWRITE; eauto. i. des. split.
+    - ii. eapply x; eauto. inv H0. econs; eauto.
+      eapply unchangable_write; eauto.
+    - econs; eauto using step_write_not_in_write.
+      rewrite List.Forall_forall in *. ii.
+      eapply x0; eauto. inv H1. econs; eauto.
+      eapply unchangable_write; eauto.
   Qed.
 
   Lemma step_write_not_in lang (th_tgt th_tgt': Thread.t lang) e_tgt pf
@@ -1729,6 +1749,7 @@ Section UNCHANGABLES.
     - inv STEP0; ss. inv LOCAL; ss.
       + inv LOCAL0. ii. exploit step_write_not_in_write; eauto.
       + inv LOCAL1. inv LOCAL2. ss. ii. exploit step_write_not_in_write; eauto.
+      + inv LOCAL0. exploit step_write_not_in_write_na; eauto.
   Qed.
 
   Lemma unwritable_increase pf e lang (th0 th1: Thread.t lang)
