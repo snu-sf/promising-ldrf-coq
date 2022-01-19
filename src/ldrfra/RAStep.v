@@ -170,7 +170,7 @@ Module RAThread.
                L (ThreadEvent.promise loc from to Message.reserve Memory.op_kind_add) rels)
             at 2 by ss.
         econs. econs 1; eauto.
-        ii. inv PROMISE.
+        ii. inv PROMISE. ss.
       - ss.
     Qed.
 
@@ -478,7 +478,9 @@ Module RAThread.
       replace (ReleaseWrites.append L e rels1) with (ReleaseWrites.append L fe rels1) in STEPS0; cycle 1.
       { unfold ReleaseWrites.append. destruct e; inv EVENT; ss.
         - inv FROM. inv TO. refl.
-        - inv FROM. inv TO. refl. }
+        - inv FROM. inv TO. refl.
+        - inv FROM. inv TO. refl.
+      }
       econs; [econs 1; eauto|..]; eauto.
       destruct e; inv EVENT; ss.
     Qed.
@@ -581,9 +583,9 @@ Module RAThread.
     Qed.
 
     Lemma write_get_None
-          promises1 mem1 loc' from' to' val released promises2 mem2 kind
+          promises1 mem1 loc' from' to' msg' promises2 mem2 kind
           loc from to msg
-          (WRITE: Memory.write promises1 mem1 loc' from' to' val released promises2 mem2 kind)
+          (WRITE: Memory.write promises1 mem1 loc' from' to' msg' promises2 mem2 kind)
           (PROMISES1: Memory.get loc to promises1 = None)
           (MEM1: Memory.get loc to mem1 = Some (from, msg)):
       (<<PROMISES2: Memory.get loc to promises2 = None>>) /\
@@ -702,15 +704,9 @@ Module RAThread.
     Proof.
       inv STEP. inv STEP0; inv STEP; inv LOCAL; ss; try by (inv LOCAL0; ss).
       - destruct (L loc) eqn:LOC.
-        + ii. destruct msg.
-          { exploit PF; ss. }
+        + ii. destruct msg; try by exploit PF; ss.
           revert GET. inv PROMISE; ss.
           * erewrite Memory.add_o; eauto. condtac; ss; eauto.
-            i. des. subst. inv GET. ss.
-          * erewrite Memory.split_o; eauto. repeat (condtac; ss; eauto).
-            { i. des. subst. inv GET. ss. }
-            { guardH o. i. des. subst. inv GET. ss. }
-          * erewrite Memory.lower_o; eauto. condtac; ss; eauto.
             i. des. subst. inv GET. ss.
           * erewrite Memory.remove_o; eauto. condtac; ss; eauto.
         + ii. revert GET. inv PROMISE; ss.
@@ -808,44 +804,45 @@ Module RAThread.
           (LOC: L loc)
           (EVENT: forall from val released ord,
               ThreadEvent.is_writing e <> Some (loc, from, to, val, released, ord))
-          (GET1: forall from val released,
-              Memory.get loc to (Thread.memory e1) <> Some (from, Message.concrete val released)):
-      <<GET2: forall from val released,
-        Memory.get loc to (Thread.memory e2) <> Some (from, Message.concrete val released)>>.
+          (GET1: forall from msg (GET: Memory.get loc to (Thread.memory e1) = Some (from, msg)),
+              msg = Message.reserve):
+      <<GET2: forall from msg (GET: Memory.get loc to (Thread.memory e2) = Some (from, msg)),
+          msg = Message.reserve>>.
     Proof.
       i. inv STEP. inv STEP0; inv STEP; inv LOCAL; ss; eauto.
       - inv PROMISE.
         + erewrite Memory.add_o; eauto. condtac; ss; eauto.
-          des. subst. ii. clarify. exploit PF; ss.
+          des. subst. ii. clarify. exploit PF; eauto.
         + erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
-          * des. subst. exploit PF; eauto.
-          * guardH o. des. subst. exploit PF; eauto.
+          * des. subst. ii. clarify. exploit PF; eauto.
+          * guardH o. des. subst. ii. clarify.
+            exploit PF; eauto. i. subst. ss.
         + erewrite Memory.lower_o; eauto. condtac; ss; eauto.
           des. subst. ii. clarify. exploit PF; ss.
         + erewrite Memory.remove_o; eauto. condtac; ss; eauto.
       - inv LOCAL0. inv STEP. inv WRITE. inv PROMISE; ss.
         + erewrite Memory.add_o; eauto. condtac; ss; eauto.
-          des. subst. exploit EVENT; eauto.
+          des. subst. exploit EVENT; eauto. ss.
         + erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
-          * des. subst. exploit EVENT; eauto.
-          * des. subst. exploit EVENT; eauto.
+          * des. subst. exploit EVENT; eauto. ss.
+          * des. subst. exploit EVENT; eauto. ss.
           * guardH o. des. subst.
             exploit Memory.split_get0; try exact MEM. i. des.
-            exploit GET1; eauto.
+            exploit GET1; eauto. ss.
         + erewrite Memory.lower_o; eauto. condtac; ss; eauto.
-          des. subst. exploit EVENT; eauto.
+          des. subst. exploit EVENT; eauto. ss.
       - inv LOCAL1. inv STEP.
         inv LOCAL2. inv STEP. inv WRITE. inv PROMISE; ss.
         + erewrite Memory.add_o; eauto. condtac; ss; eauto.
-          des. subst. exploit EVENT; eauto.
+          des. subst. exploit EVENT; eauto. ss.
         + erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
-          * des. subst. exploit EVENT; eauto.
-          * des. subst. exploit EVENT; eauto.
+          * des. subst. exploit EVENT; eauto. ss.
+          * des. subst. exploit EVENT; eauto. ss.
           * guardH o. des. subst.
             exploit Memory.split_get0; try exact MEM. i. des.
-            exploit GET1; eauto.
+            exploit GET1; eauto. ss.
         + erewrite Memory.lower_o; eauto. condtac; ss; eauto.
-          des. subst. exploit EVENT; eauto.
+          des. subst. exploit EVENT; eauto. ss.
     Qed.
 
     Lemma opt_step_non_concrete
@@ -854,10 +851,10 @@ Module RAThread.
           (LOC: L loc)
           (EVENT: forall from val released ord,
               ThreadEvent.is_writing e <> Some (loc, from, to, val, released, ord))
-          (GET1: forall from val released,
-              Memory.get loc to (Thread.memory e1) <> Some (from, Message.concrete val released)):
-      <<GET2: forall from val released,
-        Memory.get loc to (Thread.memory e2) <> Some (from, Message.concrete val released)>>.
+          (GET1: forall from msg (GET: Memory.get loc to (Thread.memory e1) = Some (from, msg)),
+              msg = Message.reserve):
+      <<GET2: forall from msg (GET: Memory.get loc to (Thread.memory e2) = Some (from, msg)),
+          msg = Message.reserve>>.
     Proof.
       inv STEP; eauto.
       eapply step_non_concrete; eauto.
@@ -867,30 +864,31 @@ Module RAThread.
           e1 e2 loc to
           (STEPS: rtc (@Thread.reserve_step lang) e1 e2)
           (LOC: L loc)
-          (GET1: forall from val released,
-              Memory.get loc to (Thread.memory e1) <> Some (from, Message.concrete val released)):
-      <<GET2: forall from val released,
-        Memory.get loc to (Thread.memory e2) <> Some (from, Message.concrete val released)>>.
+          (GET1: forall from msg (GET: Memory.get loc to (Thread.memory e1) = Some (from, msg)),
+              msg = Message.reserve):
+      <<GET2: forall from msg (GET: Memory.get loc to (Thread.memory e2) = Some (from, msg)),
+          msg = Message.reserve>>.
     Proof.
       induction STEPS; eauto. i.
       eapply IHSTEPS; eauto. i.
       inv H. inv STEP; inv STEP0; inv LOCAL. inv PROMISE; ss.
-      erewrite Memory.add_o; eauto. condtac; ss; eauto.
+      revert GET. erewrite Memory.add_o; eauto. condtac; ss; eauto.
+      i. des. clarify.
     Qed.
 
     Lemma cancel_steps_non_concrete
           e1 e2 loc to
           (STEPS: rtc (@Thread.cancel_step lang) e1 e2)
           (LOC: L loc)
-          (GET1: forall from val released,
-              Memory.get loc to (Thread.memory e1) <> Some (from, Message.concrete val released)):
-      <<GET2: forall from val released,
-        Memory.get loc to (Thread.memory e2) <> Some (from, Message.concrete val released)>>.
+          (GET1: forall from msg (GET: Memory.get loc to (Thread.memory e1) = Some (from, msg)),
+              msg = Message.reserve):
+      <<GET2: forall from msg (GET: Memory.get loc to (Thread.memory e2) = Some (from, msg)),
+          msg = Message.reserve>>.
     Proof.
       induction STEPS; eauto. i.
       eapply IHSTEPS; eauto. i.
       inv H. inv STEP; inv STEP0; inv LOCAL. inv PROMISE; ss.
-      erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+      revert GET. erewrite Memory.remove_o; eauto. condtac; ss; eauto.
     Qed.
   End RAThread.
 End RAThread.
@@ -909,7 +907,7 @@ Module RAConfiguration.
         (CANCELS: rtc (@Thread.cancel_step _) (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) e2)
         (STEP: RAThread.opt_step L rels1 rels2 e e2 e3)
         (RESERVES: rtc (@Thread.reserve_step _) e3 (Thread.mk _ st4 lc4 sc4 memory4))
-        (CONSISTENT: e <> ThreadEvent.failure ->
+        (CONSISTENT: ThreadEvent.get_machine_event e <> MachineEvent.failure ->
                      OrdThread.consistent L Ordering.acqrel (Thread.mk _ st4 lc4 sc4 memory4)):
         step e tid rels1 rels2
              c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) (Configuration.threads c1)) sc4 memory4)
@@ -1236,10 +1234,10 @@ Module RAConfiguration.
           (LOC: L loc)
           (EVENT: forall from val released ord,
               ThreadEvent.is_writing e <> Some (loc, from, to, val, released, ord))
-          (GET1: forall from val released,
-              Memory.get loc to (Configuration.memory c1) <> Some (from, Message.concrete val released)):
-      <<GET2: forall from val released,
-        Memory.get loc to (Configuration.memory c2) <> Some (from, Message.concrete val released)>>.
+          (GET1: forall from msg (GET: Memory.get loc to (Configuration.memory c1) = Some (from, msg)),
+              msg = Message.reserve):
+      <<GET2: forall from msg (GET: Memory.get loc to (Configuration.memory c2) = Some (from, msg)),
+          msg = Message.reserve>>.
     Proof.
       inv STEP. ss.
       hexploit RAThread.cancel_steps_non_concrete; eauto. i. des.

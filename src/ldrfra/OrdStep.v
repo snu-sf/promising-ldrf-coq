@@ -25,8 +25,8 @@ Require Import Configuration.
 Require Import PromiseConsistent.
 Require Import Mapping.
 
-Require Import PFStep.
-
+Require Import PFStep
+.
 Set Implicit Arguments.
 
 
@@ -501,7 +501,7 @@ Module OrdThread.
         { econs 1. econs.
           { econs; eauto. eapply closed_message_map; eauto.
             eapply ident_map_message. }
-          { inv KIND; ss. inv MSG; ss. }
+          { inv KIND; ss. }
           { unfold PF.pf_event in *. i. inv PROMISE1. eauto. }
         }
         { econs; eauto; ss. eapply ident_map_message. }
@@ -595,7 +595,7 @@ Module OrdConfiguration.
         (CANCELS: rtc (@Thread.cancel_step _) (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) e2)
         (STEP: OrdThread.opt_step L ordc e e2 e3)
         (RESERVES: rtc (@Thread.reserve_step _) e3 (Thread.mk _ st4 lc4 sc4 memory4))
-        (CONSISTENT: e <> ThreadEvent.failure ->
+        (CONSISTENT: ThreadEvent.get_machine_event e <> MachineEvent.failure ->
                      OrdThread.consistent L ordc (Thread.mk _ st4 lc4 sc4 memory4)):
         step e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) (Configuration.threads c1)) sc4 memory4)
     .

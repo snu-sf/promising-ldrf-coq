@@ -210,8 +210,8 @@ Module Configuration.
       (TID: IdentMap.find tid (threads c1) = Some (existT _ lang st1, lc1))
       (STEPS: rtc (@Thread.tau_step _) (Thread.mk _ st1 lc1 (sc c1) (memory c1)) e2)
       (STEP: Thread.step pf e e2 (Thread.mk _ st3 lc3 sc3 memory3))
-      (EVENT: ThreadEvent.get_machine_event e <> MachineEvent.failure
-                   -> Thread.consistent (Thread.mk _ st3 lc3 sc3 memory3)):
+      (EVENT: ThreadEvent.get_machine_event e <> MachineEvent.failure ->
+              Thread.consistent (Thread.mk _ st3 lc3 sc3 memory3)):
       step (ThreadEvent.get_machine_event e) tid
            c1
            (mk (IdentMap.add tid (existT _ _ st3, lc3) (threads c1)) sc3 memory3)

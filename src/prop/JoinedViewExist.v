@@ -188,7 +188,7 @@ Proof.
   - intros loc.
     eapply (well_founded_ind (message_from_to_well_founded CLOSED loc) (fun to => List.Forall (fun vw => Memory.closed_view vw mem) (make_views CLOSED f loc to))); eauto.
     intros to. i. rewrite make_views_red.
-    destruct (Memory.get loc to mem) as [[from [val [released|]|]]|] eqn:EQ; eauto.
+    destruct (Memory.get loc to mem) as [[from [val [released|]| |]]|] eqn:EQ; eauto.
     eapply Forall_app.
     + des_ifs. eapply WF in Heq. des; auto.
     + econs.
@@ -207,7 +207,7 @@ Proof.
   intros loc.
   eapply (well_founded_ind (message_from_to_well_founded CLOSED loc) (fun to => List.Forall View.wf (make_views CLOSED f loc to))).
   intros to. i. rewrite make_views_red.
-  destruct (Memory.get loc to mem) as [[from [val [released|]|]]|] eqn:EQ; eauto.
+  destruct (Memory.get loc to mem) as [[from [val [released|]| |]]|] eqn:EQ; eauto.
   eapply Forall_app.
   + des_ifs. eapply WF in Heq; eauto.
   + econs.

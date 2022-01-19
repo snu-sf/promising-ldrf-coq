@@ -138,12 +138,9 @@ Section GOODFUTURE.
       memory_map f mem0 mem1.
   Proof.
     econs.
-    { i. destruct msg as [val released|]; auto. right.
-      exploit Memory.future_weak_get1.
-      { eapply FUTURE. }
-      { eapply GET. }
-      i. des.
-      exists to, from', (Message.concrete val released), msg'. splits; auto.
+    { i. destruct (classic (msg = Message.reserve)); auto. right.
+      exploit Memory.future_weak_get1; try eapply FUTURE; eauto. i. des.
+      exists to, from', msg, msg'. splits; auto.
       { eapply good_future_map_ident; eauto.
         eapply Memory.max_ts_spec in GET. des. eauto. }
       { eapply map_ident_in_memory_closed_message.
@@ -282,16 +279,16 @@ Section GOODFUTURE.
     assert (IDENT: map_ident_in_memory (fun loc ts fts => ts = fts /\ Time.lt ts (tm loc)) mem).
     { ii. split; auto. eapply TimeFacts.le_lt_lt; eauto. }
     econs.
-    { i. destruct msg as [val released|]; auto.
-      exploit Memory.max_ts_spec; try apply GET. i. des. dup GET.
-      eapply (good_future_future FUTURE) in GET.
-      destruct GET as [from' [released' [GET [FROM RELEASED]]]]. guardH RELEASED.
+    { i. destruct (classic (msg = Message.reserve)); auto.
+      exploit Memory.max_ts_spec; try apply GET; eauto. i. des. dup GET.
+      eapply (good_future_future FUTURE) in GET; eauto.
+      destruct GET as [from' [msg' [GET [FROM MSG]]]]. guardH MSG.
       right. esplits.
       { ss. }
       { eapply TimeFacts.le_lt_lt; eauto. }
       { eapply map_ident_in_memory_closed_message; eauto.
         eapply CLOSED; eauto. }
-      { econs 1. instantiate (1:=released'). unguard. des; auto. subst. refl. }
+      { instantiate (1:=msg'). unguard. des; auto. subst. refl. }
       { eauto. }
     }
     { i. destruct (Time.le_lt_dec (tm loc) ffrom).
