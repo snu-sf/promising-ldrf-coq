@@ -100,7 +100,7 @@ Section LocalDRFRA.
       + erewrite Memory.add_o; eauto. condtac; ss.
         { des. subst. ss. }
         guardH o. i. split; ss.
-        unfold ReleaseWrites.append in *. ss. split; i.
+        unfold RelWrites.append in *. ss. split; i.
         * apply RELS. repeat condtac; ss. right. ss.
         * exploit RELS0; eauto. repeat condtac; ss. i. des; ss.
           inv x. ss.
@@ -111,14 +111,14 @@ Section LocalDRFRA.
           exploit Memory.split_get0; try exact PROMISES0. i. des.
           exploit PROMISES; try exact GET1; ss. }
         guardH o0. i. split; ss.
-        unfold ReleaseWrites.append in *. ss. split; i.
+        unfold RelWrites.append in *. ss. split; i.
         * apply RELS. repeat condtac; ss. right. ss.
         * exploit RELS0; eauto. repeat condtac; ss. i. des; ss.
           inv x. ss.
       + erewrite Memory.lower_o; eauto. condtac; ss.
         { des. subst. ss. }
         guardH o. i. split; ss.
-        unfold ReleaseWrites.append in *. ss. split; i.
+        unfold RelWrites.append in *. ss. split; i.
         * apply RELS. repeat condtac; ss. right. ss.
         * exploit RELS0; eauto. repeat condtac; ss. i. des; ss.
           inv x. ss.
@@ -137,7 +137,7 @@ Section LocalDRFRA.
       + erewrite Memory.add_o; eauto. condtac; ss.
         { des. subst. ss. }
         guardH o. i. split; ss.
-        unfold ReleaseWrites.append in *. ss. split; i.
+        unfold RelWrites.append in *. ss. split; i.
         * apply RELS. repeat condtac; ss. right. ss.
         * exploit RELS0; eauto. repeat condtac; ss. i. des; ss.
           inv x. ss.
@@ -148,14 +148,14 @@ Section LocalDRFRA.
           exploit Memory.split_get0; try exact PROMISES0. i. des.
           exploit PROMISES; try exact GET2; ss. }
         guardH o0. i. split; ss.
-        unfold ReleaseWrites.append in *. ss. split; i.
+        unfold RelWrites.append in *. ss. split; i.
         * apply RELS. repeat condtac; ss. right. ss.
         * exploit RELS0; eauto. repeat condtac; ss. i. des; ss.
           inv x. ss.
       + erewrite Memory.lower_o; eauto. condtac; ss.
         { des. subst. ss. }
         guardH o. i. split; ss.
-        unfold ReleaseWrites.append in *. ss. split; i.
+        unfold RelWrites.append in *. ss. split; i.
         * apply RELS. repeat condtac; ss. right. ss.
         * exploit RELS0; eauto. repeat condtac; ss. i. des; ss.
           inv x. ss.
@@ -219,7 +219,7 @@ Section LocalDRFRA.
     exploit RAConfiguration.steps_rels_incl; eauto. i. des.
     rewrite x1. apply List.in_or_app. right.
     inv STEP. inv STEP0; ss. inv STEP.
-    unfold ReleaseWrites.append. rewrite EVENT.
+    unfold RelWrites.append. rewrite EVENT.
     condtac; ss. condtac; [|destruct ord; ss]. left. ss.
   Qed.
 

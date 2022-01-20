@@ -45,7 +45,7 @@ Module PFtoRASimThread.
     .
     Hint Constructors normal_thread.
 
-    Inductive stable_thread (rels: ReleaseWrites.t) (e: Thread.t lang): Prop :=
+    Inductive stable_thread (rels: RelWrites.t) (e: Thread.t lang): Prop :=
     | stable_thread_intro
         (STABLE_TVIEW: Stable.stable_tview L (Thread.memory e) (Local.tview (Thread.local e)))
         (STABLE_SC: Stable.stable_timemap L (Thread.memory e) (Thread.sc e))
@@ -88,7 +88,7 @@ Module PFtoRASimThread.
         (ACQ: (TView.acq tview_src) = (TView.acq tview_tgt))
     .
 
-    Inductive sim_local (rels: ReleaseWrites.t) (lc_src lc_tgt: Local.t): Prop :=
+    Inductive sim_local (rels: RelWrites.t) (lc_src lc_tgt: Local.t): Prop :=
     | sim_local_intro
         (TVIEW: sim_tview (Local.tview lc_src) (Local.tview lc_tgt))
         (PROMISES: (Local.promises lc_src) = (Local.promises lc_tgt))
@@ -114,7 +114,7 @@ Module PFtoRASimThread.
       ii. inv H; inv H0; ss; econs; eauto. des_ifs. etrans; eauto.
     Qed.
 
-    Inductive sim_memory (rels: ReleaseWrites.t) (mem_src mem_tgt: Memory.t): Prop :=
+    Inductive sim_memory (rels: RelWrites.t) (mem_src mem_tgt: Memory.t): Prop :=
     | sim_memory_intro
         (SOUND: forall loc from to msg_src
                   (GET_SRC: Memory.get loc to mem_src = Some (from, msg_src)),
@@ -132,7 +132,7 @@ Module PFtoRASimThread.
               <<GET_TGT: Memory.get loc to mem_tgt = Some (from, Message.concrete val (Some released))>>)
     .
 
-    Inductive sim_statelocal (rels: ReleaseWrites.t):
+    Inductive sim_statelocal (rels: RelWrites.t):
       forall (sl_src sl_tgt: {lang : language & Language.state lang} * Local.t), Prop :=
     | sim_statelocal_intro
         lang st lc_src lc_tgt
@@ -141,7 +141,7 @@ Module PFtoRASimThread.
     .
     Hint Constructors sim_statelocal.
 
-    Inductive sim_thread (rels: ReleaseWrites.t) (e_src e_tgt: Thread.t lang): Prop :=
+    Inductive sim_thread (rels: RelWrites.t) (e_src e_tgt: Thread.t lang): Prop :=
     | sim_thread_intro
         (STATE: (Thread.state e_src) = (Thread.state e_tgt))
         (LOCAL: sim_local rels (Thread.local e_src) (Thread.local e_tgt))
@@ -480,8 +480,8 @@ Module PFtoRASimThread.
           rels lc_src lc_tgt mem_src mem_tgt
           (LC: sim_local rels lc_src lc_tgt)
           (MEM: sim_memory rels mem_src mem_tgt):
-      <<RELS_WF_SRC: ReleaseWrites.wf rels (Local.promises lc_src) mem_src>> /\
-      <<RELS_WF_TGT: ReleaseWrites.wf rels (Local.promises lc_tgt) mem_tgt>>.
+      <<RELS_WF_SRC: RelWrites.wf rels (Local.promises lc_src) mem_src>> /\
+      <<RELS_WF_TGT: RelWrites.wf rels (Local.promises lc_tgt) mem_tgt>>.
     Proof.
       inv LC. inv MEM. split; ii.
       - exploit REL_WRITES; eauto. i. des. esplits; eauto.
@@ -1572,9 +1572,9 @@ Module PFtoRASimThread.
       exists e_src e2_src,
         (<<STEP_SRC: OrdThread.step L Ordering.acqrel pf e_src e1_src e2_src>>) /\
         __guard__ (
-            (<<SIM2: sim_thread (ReleaseWrites.append L e_src rels) e2_src e2_tgt>>) /\
+            (<<SIM2: sim_thread (RelWrites.append L e_src rels) e2_src e2_tgt>>) /\
             (<<EVENT: sim_event e_src e_tgt>>) /\
-            (<<STABLE2_SRC: stable_thread (ReleaseWrites.append L e_src rels) e2_src>>) /\
+            (<<STABLE2_SRC: stable_thread (RelWrites.append L e_src rels) e2_src>>) /\
             (<<NORMAL2_SRC: normal_thread e2_src>>) /\
             (<<NORMAL2_TGT: normal_thread e2_tgt>>)
             \/
@@ -1623,7 +1623,7 @@ Module PFtoRASimThread.
         + hexploit write_step_loc; try exact LOCAL0; eauto; ss. i. des.
           esplits.
           * econs 2. econs; [|econs 3]; eauto.
-          * left. rewrite REL in *. unfold ReleaseWrites.append. ss. rewrite LOC.
+          * left. rewrite REL in *. unfold RelWrites.append. ss. rewrite LOC.
             esplits; ss. econs; ss. inv STEP_SRC.
             exploit Local.write_step_future; try eapply STEP; eauto. i. des.
             inv STEP. ss.
@@ -1632,7 +1632,7 @@ Module PFtoRASimThread.
           { apply Stable.bot_stable_view. ss. }
           i. des. esplits.
           * econs 2. econs; [|econs 3]; eauto.
-          * left. unfold ReleaseWrites.append. ss. rewrite LOC.
+          * left. unfold RelWrites.append. ss. rewrite LOC.
             esplits; ss. econs; ss. inv STEP_SRC.
             exploit Local.write_step_future; try eapply STEP; eauto. i. des.
             inv STEP. ss.
@@ -1655,7 +1655,7 @@ Module PFtoRASimThread.
             i. des. esplits.
             { econs 2. econs; [|econs 4]; eauto. }
             { left. rewrite REL in *.
-              unfold ReleaseWrites.append. ss. rewrite LOC in *.
+              unfold RelWrites.append. ss. rewrite LOC in *.
               esplits; ss. econs; ss.
               inv STEP_SRC0. exploit Local.write_step_future; try exact STEP; eauto. i. des.
               inv STEP. ss.
@@ -1816,7 +1816,7 @@ Module PFtoRASimThread.
             eapply STABLE_MEMORY; eauto. left. congr. }
           i. des. esplits.
           * econs 2. econs; [|econs 4]; eauto.
-          * left. unfold ReleaseWrites.append. ss. rewrite LOC.
+          * left. unfold RelWrites.append. ss. rewrite LOC.
             esplits; ss. econs; ss.
             inv STEP_SRC0.
             exploit Local.write_step_future; try exact STEP0; eauto. i. des.

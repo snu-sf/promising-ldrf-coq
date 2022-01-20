@@ -103,7 +103,7 @@ Module Stable.
         (ACQ: stable_view mem (TView.acq tview))
     .
 
-    Definition stable_memory (rels: ReleaseWrites.t) (mem: Memory.t): Prop :=
+    Definition stable_memory (rels: RelWrites.t) (mem: Memory.t): Prop :=
       forall loc from to val released
         (LOC: ~ L loc \/ List.In (loc, to) rels)
         (GET: Memory.get loc to mem = Some (from, Message.concrete val (Some released))),
@@ -448,7 +448,7 @@ Module Stable.
           (NORMAL_MEM1: normal_memory mem1)
           (STABLE_TVIEW1: stable_tview mem1 (Local.tview lc1))
           (STABLE_MEM1: stable_memory rels mem1)
-          (RELS_WF1: ReleaseWrites.wf rels (Local.promises lc1) mem1)
+          (RELS_WF1: RelWrites.wf rels (Local.promises lc1) mem1)
           (MSG: forall val released
                   (MSG: msg = Message.concrete val (Some released)),
               normal_view released /\ stable_view mem2 released)
@@ -457,7 +457,7 @@ Module Stable.
       <<NORMAL_MEM2: normal_memory mem2>> /\
       <<STABLE_TVIEW2: stable_tview mem2 (Local.tview lc2)>> /\
       <<STABLE_MEM2: stable_memory rels mem2>> /\
-      <<RELS_WF2: ReleaseWrites.wf rels (Local.promises lc2) mem2>>.
+      <<RELS_WF2: RelWrites.wf rels (Local.promises lc2) mem2>>.
     Proof.
       inv STEP. exploit promise; try apply WF1; eauto. i. des.
       splits; auto. ii. ss.
@@ -556,14 +556,14 @@ Module Stable.
           (NORMAL_MEM1: normal_memory mem1)
           (STABLE_TVIEW1: stable_tview mem1 (Local.tview lc1))
           (STABLE_MEM1: stable_memory rels mem1)
-          (RELS_WF1: ReleaseWrites.wf rels (Local.promises lc1) mem1)
+          (RELS_WF1: RelWrites.wf rels (Local.promises lc1) mem1)
           (LOC: L loc)
           (REL: List.In (loc, to) rels)
           (ORD: Ordering.le Ordering.acqrel ord)
           (STEP: Local.read_step lc1 mem1 loc to val released ord lc2):
       <<NORMAL_TVIEW2: normal_tview (Local.tview lc2)>> /\
       <<STABLE_TVIEW2: stable_tview mem1 (Local.tview lc2)>> /\
-      <<RELS_WF2: ReleaseWrites.wf rels (Local.promises lc2) mem1>>.
+      <<RELS_WF2: RelWrites.wf rels (Local.promises lc2) mem1>>.
     Proof.
       inv STEP. ss. splits; ss.
       - inv NORMAL_TVIEW1. econs; ss.
@@ -651,12 +651,12 @@ Module Stable.
           (NORMAL_MEM1: normal_memory mem1)
           (STABLE_TVIEW1: stable_tview mem1 (Local.tview lc1))
           (STABLE_MEM1: stable_memory rels mem1)
-          (RELS_WF1: ReleaseWrites.wf rels (Local.promises lc1) mem1)
+          (RELS_WF1: RelWrites.wf rels (Local.promises lc1) mem1)
           (LOC: ~ L loc)
           (STEP: Local.read_step lc1 mem1 loc to val released ord lc2):
       <<NORMAL_TVIEW2: normal_tview (Local.tview lc2)>> /\
       <<STABLE_TVIEW2: stable_tview mem1 (Local.tview lc2)>> /\
-      <<RELS_WF2: ReleaseWrites.wf rels (Local.promises lc2) mem1>>.
+      <<RELS_WF2: RelWrites.wf rels (Local.promises lc2) mem1>>.
     Proof.
       inv STEP. ss. splits; ss.
       - inv NORMAL_TVIEW1. econs; ss.
@@ -688,7 +688,7 @@ Module Stable.
           (WF1: Local.wf lc1 mem1)
           (SC1: Memory.closed_timemap sc1 mem1)
           (MEM1: Memory.closed mem1)
-          (RELS_WF1: ReleaseWrites.wf rels (Local.promises lc1) mem1)
+          (RELS_WF1: RelWrites.wf rels (Local.promises lc1) mem1)
           (NORMAL_TVIEW1: normal_tview (Local.tview lc1))
           (NORMAL_MEM1: normal_memory mem1)
           (STABLE_TVIEW1: stable_tview mem1 (Local.tview lc1))
@@ -703,7 +703,7 @@ Module Stable.
       <<NORMAL_MEM2: normal_memory mem2>> /\
       <<STABLE_TVIEW2: stable_tview mem2 (Local.tview lc2)>> /\
       <<STABLE_MEM2: stable_memory (if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels) mem2>> /\
-      <<RELS_WF2: ReleaseWrites.wf (if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels) 
+      <<RELS_WF2: RelWrites.wf (if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels) 
                                    (Local.promises lc2) mem2>>.
     Proof.
       exploit Local.write_step_future; eauto. i. des.
@@ -953,14 +953,14 @@ Module Stable.
           (NORMAL_MEM1: normal_memory mem1)
           (STABLE_TVIEW1: stable_tview mem1 (Local.tview lc1))
           (STABLE_MEM1: stable_memory rels mem1)
-          (RELS_WF1: ReleaseWrites.wf rels (Local.promises lc1) mem1)
+          (RELS_WF1: RelWrites.wf rels (Local.promises lc1) mem1)
           (LOC: L loc)
           (STEP: Local.write_step lc1 sc1 mem1 loc from to val None released ord lc2 sc2 mem2 kind):
       <<NORMAL_TVIEW2: normal_tview (Local.tview lc2)>> /\
       <<NORMAL_MEM2: normal_memory mem2>> /\
       <<STABLE_TVIEW2: stable_tview mem2 (Local.tview lc2)>> /\
       <<STABLE_MEM2: stable_memory (if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels) mem2>> /\
-      <<RELS_WF2: ReleaseWrites.wf (if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels) 
+      <<RELS_WF2: RelWrites.wf (if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels) 
                                    (Local.promises lc2) mem2>>.
     Proof.
       eapply write_step_loc; eauto; ss.
@@ -976,7 +976,7 @@ Module Stable.
           (NORMAL_MEM1: normal_memory mem1)
           (STABLE_TVIEW1: stable_tview mem1 (Local.tview lc1))
           (STABLE_MEM1: stable_memory rels mem1)
-          (RELS_WF1: ReleaseWrites.wf rels (Local.promises lc1) mem1)
+          (RELS_WF1: RelWrites.wf rels (Local.promises lc1) mem1)
           (LOC: ~ L loc)
           (WF_RELEASEDM: View.opt_wf releasedm)
           (CLOSED_RELEASEDM: Memory.closed_opt_view releasedm mem1)
@@ -987,7 +987,7 @@ Module Stable.
       <<NORMAL_MEM2: normal_memory mem2>> /\
       <<STABLE_TVIEW2: stable_tview mem2 (Local.tview lc2)>> /\
       <<STABLE_MEM2: stable_memory rels mem2>> /\
-      <<RELS_WF2: ReleaseWrites.wf rels (Local.promises lc2) mem2>>.
+      <<RELS_WF2: RelWrites.wf rels (Local.promises lc2) mem2>>.
     Proof.
       exploit Local.write_step_future; eauto. i. des.
       inv STEP. inv WRITE. ss.
@@ -1149,14 +1149,14 @@ Module Stable.
           (NORMAL_MEM1: normal_memory mem1)
           (STABLE_TVIEW1: stable_tview mem1 (Local.tview lc1))
           (STABLE_MEM1: stable_memory rels mem1)
-          (RELS_WF1: ReleaseWrites.wf rels (Local.promises lc1) mem1)
+          (RELS_WF1: RelWrites.wf rels (Local.promises lc1) mem1)
           (LOC: ~ L loc)
           (STEP: Local.write_step lc1 sc1 mem1 loc from to val None released ord lc2 sc2 mem2 kind):
       <<NORMAL_TVIEW2: normal_tview (Local.tview lc2)>> /\
       <<NORMAL_MEM2: normal_memory mem2>> /\
       <<STABLE_TVIEW2: stable_tview mem2 (Local.tview lc2)>> /\
       <<STABLE_MEM2: stable_memory rels mem2>> /\
-      <<RELS_WF2: ReleaseWrites.wf rels (Local.promises lc2) mem2>>.
+      <<RELS_WF2: RelWrites.wf rels (Local.promises lc2) mem2>>.
     Proof.
       eapply write_step_other; eauto; ss.
       apply bot_stable_view. apply MEM1.
@@ -1168,12 +1168,12 @@ Module Stable.
           (NORMAL_TVIEW1: normal_tview (Local.tview lc1))
           (STABLE_TVIEW1: stable_tview mem1 (Local.tview lc1))
           (STABLE_SC1: stable_timemap mem1 sc1)
-          (RELS_WF1: ReleaseWrites.wf rels (Local.promises lc1) mem1)
+          (RELS_WF1: RelWrites.wf rels (Local.promises lc1) mem1)
           (STEP: Local.fence_step lc1 sc1 ordr ordw lc2 sc2):
       <<NORMAL_TVIEW2: normal_tview (Local.tview lc2)>> /\
       <<STABLE_TVIEW2: stable_tview mem1 (Local.tview lc2)>> /\
       <<STABLE_SC2: stable_timemap mem1 sc2>> /\
-      <<RELS_WF2: ReleaseWrites.wf rels (Local.promises lc2) mem1>>.
+      <<RELS_WF2: RelWrites.wf rels (Local.promises lc2) mem1>>.
     Proof.
       inv STEP. ss. splits; ss.
       - inv NORMAL_TVIEW1.

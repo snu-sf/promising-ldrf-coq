@@ -32,15 +32,16 @@ Require Import RelWrites.
 Set Implicit Arguments.
 
 
-Module RAThread.
-  Section RAThread.
+Module RelThread.
+  Section RelThread.
     Variable lang: language.
     Variable L: Loc.t -> bool.
+    Variable ordc: Ordering.t.
 
     Inductive step rels1: forall (rels2: RelWrites.t) (e: ThreadEvent.t) (e1 e2: Thread.t lang), Prop :=
     | step_intro
         pf e e1 e2
-        (STEP: @OrdThread.step lang L Ordering.acqrel pf e e1 e2):
+        (STEP: @OrdThread.step lang L ordc pf e e1 e2):
         step rels1 (RelWrites.append L e rels1) e e1 e2
     .
 
@@ -84,7 +85,7 @@ Module RAThread.
     Lemma step_ord_step
           rels1 rels2 e e1 e2
           (STEP: step rels1 rels2 e e1 e2):
-      exists pf, OrdThread.step L Ordering.acqrel pf e e1 e2.
+      exists pf, OrdThread.step L ordc pf e e1 e2.
     Proof.
       inv STEP. eauto.
     Qed.
@@ -92,7 +93,7 @@ Module RAThread.
     Lemma steps_ord_steps
           rels1 rels2 e1 e2
           (STEPS: steps rels1 rels2 e1 e2):
-      rtc (OrdThread.all_step L Ordering.acqrel) e1 e2.
+      rtc (OrdThread.all_step L ordc) e1 e2.
     Proof.
       induction STEPS; eauto.
       exploit step_ord_step; eauto. i. des.
@@ -102,7 +103,7 @@ Module RAThread.
     Lemma tau_steps_ord_tau_steps
           rels1 rels2 e1 e2
           (STEPS: tau_steps rels1 rels2 e1 e2):
-      rtc (@OrdThread.tau_step lang L Ordering.acqrel) e1 e2.
+      rtc (@OrdThread.tau_step lang L ordc) e1 e2.
     Proof.
       induction STEPS; eauto.
       inv STEP; ss.
@@ -111,7 +112,7 @@ Module RAThread.
 
     Lemma ord_tau_steps_tau_steps
           e1 e2
-          (STEPS: rtc (@OrdThread.tau_step lang L Ordering.acqrel) e1 e2):
+          (STEPS: rtc (@OrdThread.tau_step lang L ordc) e1 e2):
       forall rels1, exists rels2,
           tau_steps rels1 rels2 e1 e2.
     Proof.
@@ -165,7 +166,7 @@ Module RAThread.
     Lemma tau_steps_rtc_tau_step
           rels1 rels2 e1 e2
           (STEPS: tau_steps rels1 rels2 e1 e2):
-      rtc (@OrdThread.tau_step lang L Ordering.acqrel) e1 e2.
+      rtc (@OrdThread.tau_step lang L ordc) e1 e2.
     Proof.
       induction STEPS; eauto.
       econs 2; eauto. inv STEP; ss.
@@ -464,10 +465,10 @@ Module RAThread.
           (CAP: Memory.cap (Thread.memory e1) mem1)
           (SC_MAX: Memory.max_concrete_timemap mem1 sc1)
           (STEPS: tau_steps rels1 rels2 (Thread.mk lang (Thread.state e1) (Thread.local e1) sc1 mem1) e2)
-          (STEP: RAThread.step rels2 rels3 e e2 e3):
+          (STEP: RelThread.step rels2 rels3 e e2 e3):
         exists rels3' e' e2' e3',
           (<<STEPS: tau_steps rels1 rels2 e1 e2'>>) /\
-          (<<STEP: RAThread.step rels2 rels3' e' e2' e3'>>) /\
+          (<<STEP: RelThread.step rels2 rels3' e' e2' e3'>>) /\
           (<<LOCAL: local_map ident_map (Thread.local e2) (Thread.local e2')>>) /\
           (<<EVENT: tevent_map ident_map e' e>>).
     Proof.
@@ -861,13 +862,14 @@ Module RAThread.
       inv H. inv STEP; inv STEP0; inv LOCAL. inv PROMISE; ss.
       revert GET. erewrite Memory.remove_o; eauto. condtac; ss; eauto.
     Qed.
-  End RAThread.
-End RAThread.
+  End RelThread.
+End RelThread.
 
 
-Module RAConfiguration.
-  Section RAConfiguration.
+Module RelConfiguration.
+  Section RelConfiguration.
     Variable L: Loc.t -> bool.
+    Variable ordc: Ordering.t.
 
     Inductive step:
       forall (e: ThreadEvent.t) (tid: Ident.t) (rels1 rels2: RelWrites.t) (c1 c2: Configuration.t), Prop :=
@@ -876,10 +878,10 @@ Module RAConfiguration.
         e tid c1 lang st1 lc1 e2 e3 st4 lc4 sc4 memory4
         (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
         (CANCELS: rtc (@Thread.cancel_step _) (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) e2)
-        (STEP: RAThread.opt_step L rels1 rels2 e e2 e3)
+        (STEP: RelThread.opt_step L ordc rels1 rels2 e e2 e3)
         (RESERVES: rtc (@Thread.reserve_step _) e3 (Thread.mk _ st4 lc4 sc4 memory4))
         (CONSISTENT: ThreadEvent.get_machine_event e <> MachineEvent.failure ->
-                     OrdThread.consistent L Ordering.acqrel (Thread.mk _ st4 lc4 sc4 memory4)):
+                     OrdThread.consistent L ordc (Thread.mk _ st4 lc4 sc4 memory4)):
         step e tid rels1 rels2
              c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) (Configuration.threads c1)) sc4 memory4)
     .
@@ -908,7 +910,7 @@ Module RAConfiguration.
     Lemma step_ord_step
           e tid rels1 rels2 c1 c2
           (STEP: step e tid rels1 rels2 c1 c2):
-      OrdConfiguration.step L Ordering.acqrel e tid c1 c2.
+      OrdConfiguration.step L ordc e tid c1 c2.
     Proof.
       inv STEP. econs; eauto. inv STEP0; [econs 1|].
       inv STEP. econs 2. eauto.
@@ -917,7 +919,7 @@ Module RAConfiguration.
     Lemma steps_ord_steps
           rels1 rels2 c1 c2
           (STEPS: steps rels1 rels2 c1 c2):
-      rtc (@OrdConfiguration.all_step L Ordering.acqrel) c1 c2.
+      rtc (@OrdConfiguration.all_step L ordc) c1 c2.
     Proof.
       induction STEPS; eauto.
       exploit step_ord_step; eauto. i. econs 2; eauto.
@@ -933,21 +935,21 @@ Module RAConfiguration.
       inv WF1. inv WF. inv STEP; s.
       exploit THREADS; eauto. i.
       exploit Thread.rtc_cancel_step_future; try exact CANCELS; eauto. s. i. des.
-      exploit RAThread.opt_step_future; try exact STEP0; eauto. i. des.
+      exploit RelThread.opt_step_future; try exact STEP0; eauto. i. des.
       exploit Thread.rtc_reserve_step_future; try exact RESERVES; eauto. s. i. des.
       econs; ss. econs.
       - i. Configuration.simplify.
         + exploit THREADS; try apply TH1; eauto. i.
           exploit Thread.rtc_tau_step_disjoint; try eapply rtc_implies;
             try eapply Thread.cancel_step_tau_step; try exact CANCELS; eauto. i. des.
-          exploit RAThread.opt_step_disjoint; try exact STEP0; eauto. i. des.
+          exploit RelThread.opt_step_disjoint; try exact STEP0; eauto. i. des.
           exploit Thread.rtc_tau_step_disjoint; try eapply rtc_implies;
             try eapply Thread.reserve_step_tau_step; try exact RESERVES; eauto. s. i. des.
           symmetry. ss.
         + exploit THREADS; try apply TH1; eauto. i.
           exploit Thread.rtc_tau_step_disjoint; try eapply rtc_implies;
             try eapply Thread.cancel_step_tau_step; try exact CANCELS; eauto. i. des.
-          exploit RAThread.opt_step_disjoint; try exact STEP0; eauto. i. des.
+          exploit RelThread.opt_step_disjoint; try exact STEP0; eauto. i. des.
           exploit Thread.rtc_tau_step_disjoint; try eapply rtc_implies;
             try eapply Thread.reserve_step_tau_step; try exact RESERVES; eauto. s. i. des.
           ss.
@@ -956,7 +958,7 @@ Module RAConfiguration.
         exploit THREADS; try apply TH; eauto. i. exploit THREADS; try apply TH1; eauto. i.
         exploit Thread.rtc_tau_step_disjoint; try eapply rtc_implies;
           try eapply Thread.cancel_step_tau_step; try exact CANCELS; eauto. i. des.
-        exploit RAThread.opt_step_disjoint; try exact STEP0; eauto. i. des.
+        exploit RelThread.opt_step_disjoint; try exact STEP0; eauto. i. des.
         exploit Thread.rtc_tau_step_disjoint; try eapply rtc_implies;
           try eapply Thread.reserve_step_tau_step; try exact RESERVES; eauto. s. i. des.
         ss.
@@ -974,7 +976,7 @@ Module RAConfiguration.
       inv STEP. s.
       inv WF1. inv WF. exploit THREADS; eauto. i. clear DISJOINT THREADS.
       exploit Thread.rtc_cancel_step_future; eauto. s. i. des.
-      exploit RAThread.opt_step_future; eauto. i. des.
+      exploit RelThread.opt_step_future; eauto. i. des.
       exploit Thread.rtc_reserve_step_future; eauto. s. i. des.
       splits; (etrans; [etrans|]; eauto).
     Qed.
@@ -1019,19 +1021,19 @@ Module RAConfiguration.
       split; cycle 1.
       { inv STEP. inv STEP0; inv STEP; inv LOCAL; ss.
         - inv LOCAL0. inv STEP. exploit Memory.write_get2; eauto. i. des.
-          exploit RAThread.reserve_steps_get_None; eauto. i. des. inv WRITE. ss.
+          exploit RelThread.reserve_steps_get_None; eauto. i. des. inv WRITE. ss.
         - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP.
           exploit Memory.write_get2; eauto. i. des.
-          exploit RAThread.reserve_steps_get_None; eauto. i. des. inv WRITE. ss.
+          exploit RelThread.reserve_steps_get_None; eauto. i. des. inv WRITE. ss.
       }
       ii. revert FIND. rewrite IdentMap.gsspec. condtac; ss.
       { i. inv FIND.
         inv STEP. inv STEP0; inv STEP; inv LOCAL; ss.
         - inv LOCAL0. inv STEP. exploit Memory.write_get2; eauto. i. des.
-          exploit RAThread.reserve_steps_get_None; eauto. i. des. inv WRITE. ss.
+          exploit RelThread.reserve_steps_get_None; eauto. i. des. inv WRITE. ss.
         - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP.
           exploit Memory.write_get2; eauto. i. des.
-          exploit RAThread.reserve_steps_get_None; eauto. i. des. inv WRITE. ss.
+          exploit RelThread.reserve_steps_get_None; eauto. i. des. inv WRITE. ss.
       }
 
       i. inv WF1. inv WF. hexploit DISJOINT; eauto. i.
@@ -1041,7 +1043,7 @@ Module RAConfiguration.
         try eapply Thread.cancel_step_tau_step; try exact CANCELS; eauto. i. des.
       exploit Thread.rtc_tau_step_future; try eapply rtc_implies;
         try eapply Thread.cancel_step_tau_step; try exact CANCELS; eauto. s. i. des.
-      exploit RAThread.step_future; try exact STEP; eauto. i. des.
+      exploit RelThread.step_future; try exact STEP; eauto. i. des.
       inv STEP. inv STEP0; inv STEP; inv LOCAL; inv WRITE; ss.
       - inv LOCAL0. inv STEP. inv WRITE.
         exploit Memory.promise_disjoint; try eapply WF; try eapply DISJOINT2; eauto. i. des.
@@ -1081,9 +1083,9 @@ Module RAConfiguration.
     Proof.
       inv STEP. ss.
       exploit PROMISES1; eauto. i.
-      exploit RAThread.cancel_steps_get_None; eauto. i. des.
-      exploit RAThread.opt_step_get_None; eauto. i. des.
-      exploit RAThread.reserve_steps_get_None; eauto. i. des.
+      exploit RelThread.cancel_steps_get_None; eauto. i. des.
+      exploit RelThread.opt_step_get_None; eauto. i. des.
+      exploit RelThread.reserve_steps_get_None; eauto. i. des.
       splits; eauto. i.
       revert FIND. rewrite IdentMap.gsspec. condtac; eauto. i. inv FIND. ss.
     Qed.
@@ -1120,15 +1122,16 @@ Module RAConfiguration.
     Proof.
       ii. inv STEP. inv STEP0; ss.
       hexploit RELS1; eauto. i.
-      hexploit (@RAThread.steps_rels_wf lang L); try eapply RAThread.tau_steps_steps;
-        try eapply RAThread.cancel_steps_tau_steps; eauto; ss; eauto. i.
+      hexploit (@RelThread.steps_rels_wf lang L ordc);
+        try eapply RelThread.tau_steps_steps;
+        try eapply RelThread.cancel_steps_tau_steps; eauto; ss; eauto. i.
       inv STEP. inv STEP0; inv STEP; inv LOCAL; ss.
       - inv LOCAL0. inv STEP. inv WRITE0.
-        exploit RAThread.promise_rels_wf; eauto. i. des.
+        exploit RelThread.promise_rels_wf; eauto. i. des.
         exploit Memory.promise_get0; eauto; try by (inv PROMISE; ss). i. des.
         congr.
       - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP. inv WRITE0. ss.
-        exploit RAThread.promise_rels_wf; eauto. i. des.
+        exploit RelThread.promise_rels_wf; eauto. i. des.
         exploit Memory.promise_get0; eauto; try by (inv PROMISE; ss). i. des.
         congr.
     Qed.
@@ -1139,7 +1142,7 @@ Module RAConfiguration.
     Definition reserve_only (c: Configuration.t): Prop :=
       forall tid lang st lc
         (FIND: IdentMap.find tid (Configuration.threads c) = Some (existT _ lang st, lc)),
-        RAThread.reserve_only L (Local.promises lc).
+        RelThread.reserve_only L (Local.promises lc).
 
     Lemma init_reserve_only s:
       reserve_only (Configuration.init s).
@@ -1163,9 +1166,9 @@ Module RAConfiguration.
       inv FIND. apply inj_pair2 in H1. subst.
       unfold reserve_only in RESERVE.
       hexploit RESERVE; eauto. i.
-      hexploit RAThread.cancel_steps_reserve_only; try exact CANCELS; eauto. i. des.
-      hexploit RAThread.opt_step_reserve_only; try exact STEP0; eauto. i.
-      hexploit RAThread.reserve_steps_reserve_only; try exact RESERVES; eauto.
+      hexploit RelThread.cancel_steps_reserve_only; try exact CANCELS; eauto. i. des.
+      hexploit RelThread.opt_step_reserve_only; try exact STEP0; eauto. i.
+      hexploit RelThread.reserve_steps_reserve_only; try exact RESERVES; eauto.
     Qed.
 
     Lemma steps_reserve_only
@@ -1211,17 +1214,18 @@ Module RAConfiguration.
           msg = Message.reserve>>.
     Proof.
       inv STEP. ss.
-      hexploit RAThread.cancel_steps_non_concrete; eauto. i. des.
-      hexploit RAThread.opt_step_non_concrete; eauto. i. des.
-      hexploit RAThread.reserve_steps_non_concrete; eauto.
+      hexploit RelThread.cancel_steps_non_concrete; eauto. i. des.
+      hexploit RelThread.opt_step_non_concrete; eauto. i. des.
+      hexploit RelThread.reserve_steps_non_concrete; eauto.
     Qed.
-  End RAConfiguration.
-End RAConfiguration.
+  End RelConfiguration.
+End RelConfiguration.
 
 
-Module RARaceW.
-  Section RARace.
+Module RelRARace.
+  Section RelRARace.
     Variable L: Loc.t -> bool.
+    Variable ordc: Ordering.t.
 
     Definition ra_race (rels: RelWrites.t) (tview: TView.t) (loc: Loc.t) (to: Time.t) (ordr: Ordering.t): Prop :=
       (<<LOC: L loc>>) /\
@@ -1232,24 +1236,24 @@ Module RARaceW.
     Definition ra_race_steps (rels: RelWrites.t) (c: Configuration.t): Prop :=
       exists tid rels2 rels3 rels4
         c2 lang st2 lc2 e loc to val released ord e3 e4,
-        (<<STEPS: RAConfiguration.steps L rels rels2 c c2>>) /\
+        (<<STEPS: RelConfiguration.steps L ordc rels rels2 c c2>>) /\
         (<<TID: IdentMap.find tid (Configuration.threads c2) = Some (existT _ lang st2, lc2)>>) /\
-        (<<THREAD_STEPS: RAThread.steps L rels2 rels3
-                                        (Thread.mk _ st2 lc2 (Configuration.sc c2) (Configuration.memory c2)) e3>>) /\
+        (<<THREAD_STEPS: RelThread.steps L ordc rels2 rels3
+                                         (Thread.mk _ st2 lc2 (Configuration.sc c2) (Configuration.memory c2)) e3>>) /\
         (<<CONS: Local.promise_consistent (Thread.local e3)>>) /\
-        (<<THREAD_STEP: RAThread.step L rels3 rels4 e e3 e4>>) /\
+        (<<THREAD_STEP: RelThread.step L ordc rels3 rels4 e e3 e4>>) /\
         (<<READ: ThreadEvent.is_reading e = Some (loc, to, val, released, ord)>>) /\
         (<<RARACE: ra_race rels3 (Local.tview (Thread.local e3)) loc to ord>>).
 
     Definition racefree (rels: RelWrites.t) (c: Configuration.t): Prop :=
       forall tid rels2 rels3 rels4
         c2 lang st2 lc2 e loc to val released ord e3 e4
-        (STEPS: RAConfiguration.steps L rels rels2 c c2)
+        (STEPS: RelConfiguration.steps L ordc rels rels2 c c2)
         (TID: IdentMap.find tid (Configuration.threads c2) = Some (existT _ lang st2, lc2))
-        (THREAD_STEPS: RAThread.steps L rels2 rels3
-                                      (Thread.mk _ st2 lc2 (Configuration.sc c2) (Configuration.memory c2)) e3)
+        (THREAD_STEPS: RelThread.steps L ordc rels2 rels3
+                                       (Thread.mk _ st2 lc2 (Configuration.sc c2) (Configuration.memory c2)) e3)
         (CONS: Local.promise_consistent (Thread.local e3))
-        (THREAD_STEP: RAThread.step L rels3 rels4 e e3 e4)
+        (THREAD_STEP: RelThread.step L ordc rels3 rels4 e e3 e4)
         (READ: ThreadEvent.is_reading e = Some (loc, to, val, released, ord))
         (RARACE: ra_race rels3 (Local.tview (Thread.local e3)) loc to ord),
         False.
@@ -1260,7 +1264,7 @@ Module RARaceW.
     Lemma step_racefree
           e tid rels1 rels2 c1 c2
           (RACEFREE: racefree rels1 c1)
-          (STEP: RAConfiguration.step L e tid rels1 rels2 c1 c2):
+          (STEP: RelConfiguration.step L ordc e tid rels1 rels2 c1 c2):
       racefree rels2 c2.
     Proof.
       ii. eapply RACEFREE; eauto. econs 2; eauto.
@@ -1268,12 +1272,12 @@ Module RARaceW.
 
     Lemma step_ord_step
           e tid rels1 rels2 c1 c2
-          (STEP: RAConfiguration.step L e tid rels1 rels2 c1 c2):
-      OrdConfiguration.step L Ordering.acqrel e tid c1 c2.
+          (STEP: RelConfiguration.step L ordc e tid rels1 rels2 c1 c2):
+      OrdConfiguration.step L ordc e tid c1 c2.
     Proof.
       inv STEP. econs; eauto. inv STEP0.
       - econs 1.
       - inv STEP. econs 2. eauto.
     Qed.
-  End RARace.
-End RARaceW.
+  End RelRARace.
+End RelRARace.

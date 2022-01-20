@@ -215,12 +215,12 @@ Module PFtoRAThread.
     .
     Hint Constructors wf_j.
 
-    Inductive wf_ra (rels: ReleaseWrites.t) (e: Thread.t lang): Prop :=
+    Inductive wf_ra (rels: RelWrites.t) (e: Thread.t lang): Prop :=
     | wf_ra_intro
         (WF: Local.wf (Thread.local e) (Thread.memory e))
         (SC: Memory.closed_timemap (Thread.sc e) (Thread.memory e))
         (MEM: Memory.closed (Thread.memory e))
-        (RELS: ReleaseWrites.wf rels (Local.promises (Thread.local e)) (Thread.memory e))
+        (RELS: RelWrites.wf rels (Local.promises (Thread.local e)) (Thread.memory e))
     .
     Hint Constructors wf_ra.
 
@@ -450,7 +450,7 @@ Module PFtoRAThread.
 
     (* sim_thread *)
 
-    Inductive sim_thread (views: Loc.t -> Time.t -> list View.t) (rels: ReleaseWrites.t)
+    Inductive sim_thread (views: Loc.t -> Time.t -> list View.t) (rels: RelWrites.t)
                          (e_pf e_j e_ra: Thread.t lang): Prop :=
     | sim_thread_intro
         (SIM_JOINED: JSim.sim_thread views e_j e_pf)
@@ -488,7 +488,7 @@ Module PFtoRAThread.
         (<<EVENT_J: JSim.sim_event e_j e_pf>>) /\
         (<<STEP_RA: OrdThread.step L Ordering.acqrel pf_j e_ra e1_ra e2_ra>>) /\
         __guard__
-          ((<<SIM2: sim_thread views2 (ReleaseWrites.append L e_ra rels1) e2_pf e2_j e2_ra>>) /\
+          ((<<SIM2: sim_thread views2 (RelWrites.append L e_ra rels1) e2_pf e2_j e2_ra>>) /\
            (<<EVENT_RA: PFtoRASimThread.sim_event e_ra e_j>>) \/
            (<<CONS: Local.promise_consistent (Thread.local e1_ra)>>) /\
            (<<RACE: exists loc to val released ord,
@@ -596,7 +596,7 @@ Module PFtoRAThread.
       exploit Local.promise_step_future; try exact STEP_SRC; eauto. s. i. des.
       econs; ss; eauto.
       - inv SIM1. inv SIM_RA. econs; ss; eauto.
-      - unfold ReleaseWrites.append. ss. econs; ss; eauto.
+      - unfold RelWrites.append. ss. econs; ss; eauto.
         inv SIM1. ss.
         eapply Stable.future_stable_view; try exact FUTURE0; try eapply SIM; ss.
         apply STABLE_RA.

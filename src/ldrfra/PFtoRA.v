@@ -52,12 +52,12 @@ Module PFtoRA.
 
     Definition wf_j := JConfiguration.wf.
 
-    Inductive wf_ra (rels: ReleaseWrites.t) (c: Configuration.t): Prop :=
+    Inductive wf_ra (rels: RelWrites.t) (c: Configuration.t): Prop :=
     | wf_ra_intro
         (WF: Configuration.wf c)
         (RELS: forall tid lang st lc
                  (TH: IdentMap.find tid (Configuration.threads c) = Some (existT _ lang st, lc)),
-            ReleaseWrites.wf rels (Local.promises lc) (Configuration.memory c))
+            RelWrites.wf rels (Local.promises lc) (Configuration.memory c))
     .
 
     Lemma wf_pf_thread
@@ -172,7 +172,7 @@ Module PFtoRA.
 
     (* sim *)
 
-    Inductive sim_thread_sl (views: Loc.t -> Time.t -> list View.t) (rels: ReleaseWrites.t)
+    Inductive sim_thread_sl (views: Loc.t -> Time.t -> list View.t) (rels: RelWrites.t)
               (sc_pf sc_j sc_ra: TimeMap.t) (mem_pf mem_j mem_ra: Memory.t):
       forall (sl_pf sl_j sl_ra: {lang: language & Language.state lang} * Local.t), Prop :=
     | sim_thread_sl_intro
@@ -185,7 +185,7 @@ Module PFtoRA.
                       (existT _ lang st_pf, lc_pf) (existT _ lang st_j, lc_j) (existT _ lang st_ra, lc_ra)
     .
 
-    Inductive sim_conf (views: Loc.t -> Time.t -> list View.t) (rels: ReleaseWrites.t):
+    Inductive sim_conf (views: Loc.t -> Time.t -> list View.t) (rels: RelWrites.t):
       forall (c_pf c_j c_ra: Configuration.t), Prop :=
     | sim_conf_intro
         ths_pf sc_pf mem_pf
@@ -576,11 +576,11 @@ Module PFtoRA.
       { inv WRITE0; inv EVENT_J; inv EVENT_RA; ss.
         - hexploit RAConfiguration.write_rels; try exact STEP_RA; try eapply x2; ss. i.
           inv STEP_RA. inv STEP0; ss. inv STEP1.
-          unfold ReleaseWrites.append. ss. condtac; ss. condtac; ss.
+          unfold RelWrites.append. ss. condtac; ss. condtac; ss.
           destruct ordw; ss.
         - hexploit RAConfiguration.write_rels; try exact STEP_RA; try eapply x2; ss. i.
           inv STEP_RA. inv STEP0; ss. inv STEP1.
-          unfold ReleaseWrites.append. ss. condtac; ss. condtac; ss.
+          unfold RelWrites.append. ss. condtac; ss. condtac; ss.
           destruct ordw; ss.
       }
       exploit step_pf_future; try exact STEP; eauto. i. des.

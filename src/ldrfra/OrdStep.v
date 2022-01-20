@@ -25,8 +25,8 @@ Require Import Configuration.
 Require Import PromiseConsistent.
 Require Import Mapping.
 
-Require Import PFStep
-.
+Require Import PFStep.
+
 Set Implicit Arguments.
 
 
