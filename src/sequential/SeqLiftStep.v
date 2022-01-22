@@ -93,15 +93,6 @@ Proof.
   { eapply SIM. }
 Qed.
 
-Variant wf_release_vers (vers: versions) (prom_tgt: Memory.t) (rel_vers: Loc.t -> version): Prop :=
-| wf_release_vers_intro
-    (PROM: forall loc from to val released
-                  (GET: Memory.get loc to prom_tgt = Some (from, Message.concrete val (Some released))),
-        exists v,
-          (<<VER: vers loc to = Some v>>) /\
-          (<<REL: rel_vers loc = v>>))
-.
-
 Variant sim_local
         (f: Mapping.ts) (vers: versions)
         (flag_src: Loc.t -> option Time.t)
@@ -216,15 +207,14 @@ Variant max_value_tgt (loc: Loc.t) (v: option Const.t)
     forall (lc: Local.t), Prop :=
 | max_value_tgt_intro
     tvw prom
-    (MAX: forall v1 (VAL: v = Some v1),
-        exists released v0,
+    (MAX: forall v0 (VAL: v = Some v0),
+        exists released,
           (<<MAX: max_readable
                     mem
                     prom
                     loc
                     (tvw.(TView.cur).(View.pln) loc)
-                    v0 released>>) /\
-          (<<VAL: Const.le v0 v1>>))
+                    v0 released>>))
   :
     max_value_tgt loc v mem (Local.mk tvw prom)
 .
@@ -240,7 +230,7 @@ Lemma max_value_tgt_mon loc v mem lc0 lc1
       (LOCAL: Local.wf lc1 mem)
       (CONSISTENT: Local.promise_consistent lc1)
   :
-    max_value_tgt loc v mem lc1.
+  max_value_tgt loc v mem lc1.
 Proof.
   inv MAXTGT. ss. subst. destruct lc1. econs. i.
   hexploit MAX; eauto. i. des. ss.
@@ -383,19 +373,21 @@ Proof.
     { rewrite PLN. eauto. }
   }
 Qed.
-Lemma no_flag_max_value_same f vers flag_src flag_tgt lc_src lc_tgt mem_src mem_tgt loc v
+
+Lemma no_flag_max_value_same f vers flag_src flag_tgt lc_src lc_tgt mem_src mem_tgt loc v_src
       (MEM: sim_memory flag_src f vers mem_src mem_tgt)
       (LOCAL: sim_local f vers flag_src flag_tgt lc_src lc_tgt)
       (FLAGSRC: flag_src loc = None)
       (FLAGTGT: flag_tgt loc = None)
-      (MAX: max_value_src loc (Some v) mem_src lc_src)
+      (MAX: max_value_src loc (Some v_src) mem_src lc_src)
       (LOCALWF: Local.wf lc_tgt mem_tgt)
       (CONSISTENT: Local.promise_consistent lc_tgt)
       (WF: Mapping.wfs f)
   :
-    max_value_tgt loc (Some v) mem_tgt lc_tgt.
+  exists v_tgt,
+    (<<MAX: max_value_tgt loc (Some v_tgt) mem_tgt lc_tgt>>) /\ (<<VAL: Const.le v_tgt v_src>>).
 Proof.
-  inv MAX. destruct lc_tgt. econs. i. clarify.
+  inv MAX. destruct lc_tgt. i. clarify.
   hexploit MAX0; eauto. i. des.
   assert (exists val released, max_readable mem_tgt promises loc (View.pln (TView.cur tview) loc) val released).
   { apply NNPP. ii. hexploit non_max_readable_race.
@@ -405,8 +397,9 @@ Proof.
     { i. eapply sim_local_racy in H0; eauto.
       eapply race_non_max_readable in H0; eauto. }
   }
-  des. esplits; eauto. inv H.
-  hexploit sim_memory_get; eauto; ss. i. des.
+  des. exists val. esplits.
+  { econs; eauto. i. clarify. esplits; eauto. }
+  inv H. hexploit sim_memory_get; eauto; ss. i. des.
   hexploit sim_timestamp_le.
   2:{ eapply TO. }
   2:{ refl. }
@@ -424,7 +417,7 @@ Proof.
     2:{ eapply mapping_latest_wf_loc. }
     subst. clarify.
   }
-  { inv H0. clarify. inv MSG; auto. }
+  { inv H0. clarify. esplits; eauto. inv MSG; auto. }
 Qed.
 
 Lemma sim_thread_tgt_read_na
@@ -457,7 +450,7 @@ Proof.
   { i. inv SIM. specialize (MAXTGT loc). inv MAXTGT.
     hexploit MAX; eauto. i. des.
     hexploit max_readable_read_only; eauto.
-    i. des; auto. etrans; eauto.
+    i. des; auto.
   }
 Qed.
 
@@ -806,8 +799,8 @@ Proof.
       hexploit na_write_step_max_readable.
       { instantiate (5:=Local.mk _ _). eapply MAX0. }
       all: ss; eauto.
-      i. destruct lc_tgt1. ss. econs. i. esplits; eauto.
-      clear - VAL1. clarify. refl.
+      i. destruct lc_tgt1. ss. econs. i. clarify.
+      esplits; eauto.
     }
     { inv WRITE. ss. specialize (MAXTGT loc0). inv MAXTGT. econs; eauto.
       i. ss. hexploit MAX; eauto. i. des. esplits; eauto.
@@ -1218,16 +1211,13 @@ Qed.
 Lemma sim_write_tview_release f flag_src rel_vers tvw_src tvw_tgt sc_src sc_tgt
       loc to_src ord to_tgt
       (SIM: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
-      (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
+      (TO: sim_timestamp (f loc) (f loc).(Mapping.ver) to_src to_tgt)
       (FLAG: forall loc, flag_src loc = None)
-      (CLOSED: Mapping.closed (f loc) (Mapping.vers f loc) to_src)
       (WF: Mapping.wfs f)
   :
     sim_tview f flag_src (fun loc0 => if Loc.eq_dec loc0 loc then (Mapping.vers f) else rel_vers loc0) (TView.write_tview tvw_src sc_src loc to_src ord) (TView.write_tview tvw_tgt sc_tgt loc to_tgt ord).
 Proof.
   pose proof (mapping_latest_wf f).
-  assert (TM: sim_timestamp (f loc) (Mapping.vers f loc) to_src to_tgt).
-  { eapply sim_timestamp_exact_sim; eauto. }
   assert (JOIN: forall L, sim_view L f (Mapping.vers f)
                                    (View.singleton_ur loc to_src)
                                    (View.singleton_ur loc to_tgt)).
@@ -1353,12 +1343,11 @@ Qed.
 Lemma sim_write_released_normal f flag_src rel_vers tvw_src tvw_tgt sc_src sc_tgt
       loc to_src ord to_tgt released_src released_tgt v
       (SIM: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
-      (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
       (RELEASED: sim_opt_view (fun loc0 => loc0 <> loc) f v released_src released_tgt)
       (ORD: ~ Ordering.le Ordering.acqrel ord)
-      (VER: Ordering.le Ordering.relaxed ord -> v = Some (rel_vers loc))
-      (CLOSED: Mapping.closed (f loc) (Mapping.vers f loc) to_src)
+      (VER: Ordering.le Ordering.relaxed ord -> opt_version_le (Some (rel_vers loc)) v)
       (WF: Mapping.wfs f)
+      (VERWF: opt_version_wf f v)
   :
     sim_opt_view (fun loc0 => loc0 <> loc) f v
                  (TView.write_released tvw_src sc_src loc to_src released_src ord)
@@ -1366,19 +1355,14 @@ Lemma sim_write_released_normal f flag_src rel_vers tvw_src tvw_tgt sc_src sc_tg
 Proof.
   pose proof (mapping_latest_wf f).
   unfold TView.write_released. des_ifs.
-  { rewrite VER in *; auto. econs.
+  { destruct v; ss. econs.
     eapply sim_view_join; auto.
-    { eapply sim_opt_view_unwrap; eauto.
-      { eapply SIM. }
-      { i. clarify. }
-    }
+    { eapply sim_opt_view_unwrap; eauto. i. clarify. }
     { ss. setoid_rewrite LocFun.add_spec_eq. des_ifs.
       eapply sim_view_join; auto.
-      { eapply SIM. }
-      { eapply sim_view_singleton_ur; auto; ss. apply SIM. }
-      { apply SIM. }
+      { eapply sim_view_mon_ver; eauto. eapply SIM. }
+      { eapply sim_view_singleton_ur; auto; ss. }
     }
-    { apply SIM. }
   }
   { econs. }
 Qed.
@@ -1670,13 +1654,15 @@ Lemma sim_thread_acquire
                 mem_src mem_tgt (Local.mk tvw_src1 prom_src) (Local.mk tvw_tgt1 prom_tgt) sc_src sc_tgt>>) /\
       (<<VALS: forall loc,
           ((<<SRC: vs_src1 loc = vs_src0 loc>>) /\ (<<TGT: vs_tgt1 loc = vs_tgt0 loc>>)) \/
-          (exists val,
+          (exists val_src val_tgt,
               (<<FLAGSRC: flag_src loc = None>>) /\
-              (<<FLAGTGT: flag_tgt loc = None>>) /\
-              (<<NONESRC: vs_src0 loc = None>>) /\ (<<NONETGT: vs_tgt0 loc = None>>) /\
-              (<<VALSRC: vs_src1 loc = Some val>>) /\ (<<VALTGT: vs_tgt1 loc = Some val>>) /\
-              (<<TS: Time.lt (tvw_src0.(TView.cur).(View.pln) loc) (tvw_src1.(TView.cur).(View.pln) loc)>>) /\
-              (<<VAL: __guard__(exists from released, Memory.get loc (tvw_src1.(TView.cur).(View.pln) loc) mem_src = Some (from, Message.concrete val released))>>))>>)
+                (<<FLAGTGT: flag_tgt loc = None>>) /\
+                (<<NONESRC: vs_src0 loc = None>>) /\ (<<NONETGT: vs_tgt0 loc = None>>) /\
+                (<<VALSRC: vs_src1 loc = Some val_src>>) /\ (<<VALTGT: vs_tgt1 loc = Some val_tgt>>) /\
+                (<<VALLE: Const.le val_tgt val_src>>) /\
+                (<<TS: Time.lt (tvw_src0.(TView.cur).(View.pln) loc) (tvw_src1.(TView.cur).(View.pln) loc)>>) /\
+                (<<VALSRC: __guard__(exists from released, Memory.get loc (tvw_src1.(TView.cur).(View.pln) loc) mem_src = Some (from, Message.concrete val_src released))>>) /\
+                (<<VALTGT: __guard__(exists from released, Memory.get loc (tvw_tgt1.(TView.cur).(View.pln) loc) mem_tgt = Some (from, Message.concrete val_tgt released))>>))>>)
 .
 Proof.
   assert (SIMLOCAL: sim_local f vers flag_src flag_tgt (Local.mk tvw_src1 prom_src) (Local.mk tvw_tgt1 prom_tgt)).
@@ -1727,7 +1713,7 @@ Proof.
                  (<<NONESRC: vs_src0 loc = None>>) /\
                  (<<VALSRC: vs_src1 loc = Some val>>) /\
                  (<<TS: Time.lt (tvw_src0.(TView.cur).(View.pln) loc) (tvw_src1.(TView.cur).(View.pln) loc)>>) /\
-                 (<<VAL: __guard__(exists from released, Memory.get loc (tvw_src1.(TView.cur).(View.pln) loc) mem_src = Some (from, Message.concrete val released))>>))).
+                 (<<VALSRC: __guard__(exists from released, Memory.get loc (tvw_src1.(TView.cur).(View.pln) loc) mem_src = Some (from, Message.concrete val released))>>))).
   { inv SIM. i. destruct (vs_src0 loc) eqn:VAL0.
     { left. eapply max_value_src_inj; eauto.
       eapply max_value_src_mon.
@@ -1755,43 +1741,51 @@ Proof.
       red. esplits; eauto.
     }
   }
-  set (vs_tgt1 := fun loc => match (vs_src0 loc), (vs_src1 loc) with
-                             | None, Some v => Some v
-                             | _, _ => vs_tgt0 loc
-                             end).
-  assert (VALS: forall loc,
-             ((<<SRC: vs_src1 loc = vs_src0 loc>>) /\ (<<TGT: vs_tgt1 loc = vs_tgt0 loc>>)) \/
-             (exists val,
-                 (<<FLAGSRC: flag_src loc = None>>) /\
-                 (<<FLAGTGT: flag_tgt loc = None>>) /\
-                 (<<NONESRC: vs_src0 loc = None>>) /\ (<<NONETGT: vs_tgt0 loc = None>>) /\
-                 (<<VALSRC: vs_src1 loc = Some val>>) /\ (<<VALTGT: vs_tgt1 loc = Some val>>) /\
-                 (<<TS: Time.lt (tvw_src0.(TView.cur).(View.pln) loc) (tvw_src1.(TView.cur).(View.pln) loc)>>) /\
-                 (<<VAL: __guard__(exists from released, Memory.get loc (tvw_src1.(TView.cur).(View.pln) loc) mem_src = Some (from, Message.concrete val released))>>))).
-  { subst vs_tgt1. i. hexploit (VALSRC loc). i. des.
-    { left. esplits; eauto. rewrite <- SRC. des_ifs. }
-    { right. esplits; eauto.
-      { destruct (flag_tgt loc) eqn:FLAG; auto. exfalso.
-        exploit FLAGS; eauto. i. des. rewrite PLN in TS. timetac.
+  hexploit (choice (fun loc v =>
+                      (<<MAXTGT: max_value_tgt loc v mem_tgt (Local.mk tvw_tgt1 prom_tgt)>>) /\
+                      (((<<SRC: vs_src1 loc = vs_src0 loc>>) /\ (<<TGT: v = vs_tgt0 loc>>)) \/
+                         (exists val_src val_tgt,
+                             (<<FLAGSRC: flag_src loc = None>>) /\
+                               (<<FLAGTGT: flag_tgt loc = None>>) /\
+                               (<<NONESRC: vs_src0 loc = None>>) /\ (<<NONETGT: vs_tgt0 loc = None>>) /\
+                               (<<VALSRC: vs_src1 loc = Some val_src>>) /\ (<<VALTGT: v = Some val_tgt>>) /\
+                               (<<VALLE: Const.le val_tgt val_src>>) /\
+                               (<<TS: Time.lt (tvw_src0.(TView.cur).(View.pln) loc) (tvw_src1.(TView.cur).(View.pln) loc)>>) /\
+                               (<<VALRC: __guard__(exists from released, Memory.get loc (tvw_src1.(TView.cur).(View.pln) loc) mem_src = Some (from, Message.concrete val_src released))>>) /\
+                               (<<VALTGT: __guard__(exists from released, Memory.get loc (tvw_tgt1.(TView.cur).(View.pln) loc) mem_tgt = Some (from, Message.concrete val_tgt released))>>))))).
+  { intros loc. hexploit (VALSRC loc). i. des.
+    { exists (vs_tgt0 loc). esplits; auto.
+      { inv SIM. eapply max_value_tgt_mon; eauto. }
+    }
+    { assert (FLAG: flag_tgt loc = None).
+      { destruct (flag_tgt loc) eqn:FLAG; auto.
+        hexploit FLAGS; eauto. i. des. rewrite PLN in TS. timetac.
       }
+      hexploit no_flag_max_value_same; eauto.
+      { inv SIM. eauto. }
+      { specialize (MAX loc). rewrite VALSRC0 in MAX. eauto. }
+      i. des. exists (Some v_tgt). esplits; auto.
+      right. esplits; eauto.
       { inv SIM. specialize (PERM loc).
         rewrite NONESRC in PERM. ss. des_ifs.
       }
-      { rewrite NONESRC. rewrite VALSRC0. auto. }
+      { inv MAX0. hexploit MAX1; eauto. i. des.
+        inv MAX0. red. esplits; eauto.
+      }
     }
   }
-  clear VALSRC. exists vs_src1, vs_tgt1. splits; auto.
-  inv SIM.
-  econs; auto.
-  { ii. specialize (VALS loc). des.
-    { rewrite TGT. eapply max_value_tgt_mon; eauto. }
-    { rewrite VALTGT. eapply no_flag_max_value_same; eauto.
-      specialize (MAX loc). rewrite VALSRC in MAX. auto.
+  clear VALSRC. intros [vs_tgt1 MAXTGT].
+  exists vs_src1, vs_tgt1. splits; auto.
+  { inv SIM.
+    econs; auto.
+    { ii. hexploit (MAXTGT loc). i. des; auto. }
+    { i. hexploit (MAXTGT loc). i. des.
+      { rewrite SRC. rewrite TGT. auto. }
+      { rewrite VALSRC. rewrite VALTGT. ss. }
     }
   }
-  { i. hexploit (VALS loc). i. des.
-    { rewrite SRC. rewrite TGT. auto. }
-    { rewrite VALSRC. rewrite VALTGT. ss. }
+  { i. hexploit (MAXTGT loc). i. des; eauto.
+    right. esplits; eauto.
   }
 Qed.
 
@@ -2049,12 +2043,11 @@ Proof.
   eapply TimeMap.le_join_l. eapply TimeMap.bot_spec.
 Qed.
 
-Lemma read_tview_incr
+Lemma read_tview_incr_rlx
       tvw loc ts vw ord
       (WF: time_le_opt_view loc ts vw)
       (READABLE: Time.le (View.pln (TView.cur tvw) loc) ts)
-      (TS: Time.lt (View.pln (TView.cur tvw) loc)
-                   (View.pln (TView.cur (TView.read_tview tvw loc ts vw ord)) loc))
+      (ORD: Ordering.le Ordering.relaxed ord)
   :
     View.pln (TView.cur (TView.read_tview tvw loc ts vw ord)) loc = ts.
 Proof.
@@ -2069,13 +2062,22 @@ Proof.
       { eapply Time.bot_spec. }
     }
   }
-  { rewrite ! timemap_bot_join_r. rewrite ! timemap_bot_join_r in TS.
-    unfold TimeMap.join, Time.join in *. des_ifs.
-    { rewrite timemap_singleton_eq. auto. }
-    { timetac. }
+  { rewrite ! timemap_bot_join_r.
+    unfold TimeMap.join. rewrite timemap_singleton_eq.
+    eapply TimeFacts.le_join_r. auto.
   }
+Qed.
+
+Lemma read_tview_pln
+      tvw loc ts vw ord
+      (READABLE: Time.le (View.pln (TView.cur tvw) loc) ts)
+      (ORD: ~ Ordering.le Ordering.relaxed ord)
+  :
+  View.pln (TView.cur (TView.read_tview tvw loc ts vw ord)) loc = View.pln (TView.cur tvw) loc.
+Proof.
+  unfold TView.read_tview, View.singleton_ur_if. ss. des_ifs; ss.
   { destruct ord; ss. }
-  { rewrite ! timemap_bot_join_r. rewrite ! timemap_bot_join_r in TS. timetac. }
+  rewrite ! timemap_bot_join_r. auto.
 Qed.
 
 Variant local_fence_read_step lc1 sc1 ordr ordw lc2: Prop :=
@@ -2270,11 +2272,11 @@ Qed.
 Lemma sim_thread_read
       f vers flag_src flag_tgt vs_src0 vs_tgt0
       mem_src mem_tgt lc_src0 lc_tgt0 sc_src sc_tgt
-      lc_tgt1 loc to_tgt val_tgt released_tgt ord
+      lc_tgt1 loc to_tgt val_tgt0 released_tgt ord
       (SIM: sim_thread
               f vers flag_src flag_tgt vs_src0 vs_tgt0
               mem_src mem_tgt lc_src0 lc_tgt0 sc_src sc_tgt)
-      (READ: Local.read_step lc_tgt0 mem_tgt loc to_tgt val_tgt released_tgt ord lc_tgt1)
+      (READ: Local.read_step lc_tgt0 mem_tgt loc to_tgt val_tgt0 released_tgt ord lc_tgt1)
       (CONSISTENT: Local.promise_consistent lc_tgt1)
       (LOCALSRC: Local.wf lc_src0 mem_src)
       (LOCALTGT: Local.wf lc_tgt0 mem_tgt)
@@ -2290,22 +2292,24 @@ Lemma sim_thread_read
                     (SRC: flag_src loc = None) (TGT: flag_tgt loc = Some ts),
           ~ Ordering.le Ordering.acqrel ord)
   :
-    exists val_src to_src released_src lc_src1 vs_src1 vs_tgt1,
-      (<<READ: forall val (VAL: Const.le val val_src), Local.read_step lc_src0 mem_src loc to_src val released_src ord lc_src1>>) /\
+    exists val_tgt1 val_src1 to_src released_src lc_src1 vs_src1 vs_tgt1,
+      (<<READ: forall val (VAL: Const.le val val_src1), Local.read_step lc_src0 mem_src loc to_src val released_src ord lc_src1>>) /\
       (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt>>) /\
       (<<RELEASED: sim_opt_view (fun loc0 => loc0 <> loc) f (vers loc to_tgt) released_src released_tgt>>) /\
       (<<SIM: sim_thread
                 f vers flag_src flag_tgt vs_src1 vs_tgt1
                 mem_src mem_tgt lc_src1 lc_tgt1 sc_src sc_tgt>>) /\
-      (<<VAL: Const.le val_tgt val_src>>) /\
-      (<<NUPDATE: forall val (VAL: vs_src0 loc = Some val), val = val_src>>) /\
+      (<<VAL: Const.le val_tgt1 val_src1>>) /\
+      (<<NUPDATESRC: forall val (VAL: vs_src0 loc = Some val), val = val_src1>>) /\
+      (<<NUPDATETGT: forall val (VAL: vs_tgt0 loc = Some val), val = val_tgt1>>) /\
       (<<VALS: forall loc0,
           ((<<SRC: vs_src1 loc0 = vs_src0 loc0>>) /\ (<<TGT: vs_tgt1 loc0 = vs_tgt0 loc0>>)) \/
-          (exists val0,
+          (exists val_src val_tgt,
               (<<NONESRC: vs_src0 loc0 = None>>) /\ (<<NONETGT: vs_tgt0 loc0 = None>>) /\
-              (<<VALSRC: vs_src1 loc0 = Some val0>>) /\ (<<VALTGT: vs_tgt1 loc0 = Some val0>>) /\
+              (<<VALSRC: vs_src1 loc0 = Some val_src>>) /\ (<<VALTGT: vs_tgt1 loc0 = Some val_tgt>>) /\
+              (<<VALLE: Const.le val_tgt val_src>>) /\
               ((<<ORD: Ordering.le Ordering.acqrel ord>>) \/
-               ((<<LOC: loc0 = loc>>) /\ (<<VAL: val0 = val_src>>))))>>).
+               ((<<LOC: loc0 = loc>>) /\ (<<SRC: val_src = val_src1>>) /\ (<<TGT: val_tgt = val_tgt1>>))))>>).
 Proof.
   hexploit Local.read_step_future; eauto. i. des.
   destruct lc_src0 as [tvw_src0 prom_src].
@@ -2353,7 +2357,6 @@ Proof.
     }
   }
   i. des. esplits; eauto.
-  { etrans; eauto. }
   { i. specialize (MAXSRC loc). rewrite VAL1 in MAXSRC. inv MAXSRC.
     hexploit MAX; eauto. i. des.
     hexploit max_readable_read_only_aux; eauto.
@@ -2361,18 +2364,41 @@ Proof.
     i. des. subst. inv MAX0.
     rewrite GET1 in GET0. inv GET0. auto.
   }
+  { i. specialize (MAXTGT loc). rewrite VAL1 in MAXTGT. inv MAXTGT.
+    hexploit MAX; eauto. i. des.
+    hexploit max_readable_read_only_aux; eauto.
+    i. des. subst. inv MAX0.
+    rewrite GET1 in GET. inv GET. auto.
+  }
   i. hexploit VALS; eauto. i. des.
   { left. eauto. }
   { right. esplits; eauto. destruct (Loc.eq_dec loc0 loc).
-    { subst. right. splits; auto. red in VAL1. des.
-      replace (View.pln (TView.cur tvw_src1) loc) with to_src in VAL1.
-      { rewrite GET0 in VAL1. inv VAL1. etrans; eauto. }
-      symmetry. inv READSRC. inv LC2. ss.
-      eapply read_tview_incr; eauto.
-      { eapply message_to_time_le_opt_view; eauto.
-        eapply MEMSRC; eauto.
+    { assert (ORD: Ordering.le Ordering.relaxed ord).
+      { inv READSRC. inv LC2.
+        eapply NNPP. ii. eapply read_tview_pln in H.
+        { rewrite H in TS. timetac. }
+        { inv READABLE0. ss. }
       }
-      { inv READABLE0. ss. }
+      subst. right. splits; auto.
+      { red in VALSRC0. des.
+        replace (View.pln (TView.cur tvw_src1) loc) with to_src in VALSRC0.
+        { rewrite GET0 in VALSRC0. inv VALSRC0. auto. }
+        symmetry. inv READSRC. inv LC2.
+        ss. eapply read_tview_incr_rlx; eauto.
+        { eapply message_to_time_le_opt_view; eauto.
+          eapply MEMSRC; eauto.
+        }
+        { inv READABLE0. ss. }
+      }
+      { red in VALTGT0. des.
+        replace (View.pln (TView.cur (TView.read_tview tvw_tgt0 loc to_tgt released_tgt ord)) loc) with to_tgt in VALTGT0.
+        { rewrite GET in VALTGT0. inv VALTGT0. auto. }
+        symmetry. eapply read_tview_incr_rlx; eauto.
+        { eapply message_to_time_le_opt_view; eauto.
+          eapply MEMTGT; eauto.
+        }
+        { inv READABLE. ss. }
+      }
     }
     { left. inv READSRC. inv LC2. ss.
       destruct (Ordering.le Ordering.acqrel ord); auto.
@@ -2418,9 +2444,10 @@ Lemma sim_thread_read_fence_step
                 mem_src mem_tgt lc_src1 lc_tgt1 sc_src sc_tgt>>) /\
       (<<VALS: forall loc0,
           ((<<SRC: vs_src1 loc0 = vs_src0 loc0>>) /\ (<<TGT: vs_tgt1 loc0 = vs_tgt0 loc0>>)) \/
-          (exists val0,
+          (exists val_src val_tgt,
               (<<NONESRC: vs_src0 loc0 = None>>) /\ (<<NONETGT: vs_tgt0 loc0 = None>>) /\
-              (<<VALSRC: vs_src1 loc0 = Some val0>>) /\ (<<VALTGT: vs_tgt1 loc0 = Some val0>>) /\
+              (<<VALSRC: vs_src1 loc0 = Some val_src>>) /\ (<<VALTGT: vs_tgt1 loc0 = Some val_tgt>>) /\
+              (<<VALLE: Const.le val_tgt val_src>>) /\
               (<<ORD: Ordering.le Ordering.acqrel ordr \/ Ordering.le Ordering.seqcst ordw>>))>>).
 Proof.
   assert (exists lc_src1, (<<READ: local_fence_read_step lc_src0 sc_src ordr ordw lc_src1>>)).
@@ -2922,7 +2949,9 @@ Proof.
       { econs.
         { eapply sim_local_write_fence_tview_release; eauto. }
         { eauto. }
-        { econs. i. eapply SYNC in GET; eauto. ss. }
+        { econs. i. inv RELVERS. hexploit PROM; eauto. i. des.
+          esplits; eauto. i. eapply SYNC in GET; eauto. subst. ss.
+        }
         { eauto. }
         { eauto. }
       }
@@ -2990,9 +3019,10 @@ Lemma sim_thread_fence_step_normal
                 mem_src mem_tgt lc_src1 lc_tgt1 sc_src1 sc_tgt1>>) /\
       (<<VALS: forall loc0,
           ((<<SRC: vs_src1 loc0 = vs_src0 loc0>>) /\ (<<TGT: vs_tgt1 loc0 = vs_tgt0 loc0>>)) \/
-          (exists val0,
+          (exists val_src val_tgt,
               (<<NONESRC: vs_src0 loc0 = None>>) /\ (<<NONETGT: vs_tgt0 loc0 = None>>) /\
-              (<<VALSRC: vs_src1 loc0 = Some val0>>) /\ (<<VALTGT: vs_tgt1 loc0 = Some val0>>) /\
+              (<<VALSRC: vs_src1 loc0 = Some val_src>>) /\ (<<VALTGT: vs_tgt1 loc0 = Some val_tgt>>) /\
+              (<<VALLE: Const.le val_tgt val_src>>) /\
               (<<ORD: Ordering.le Ordering.acqrel ordr \/ Ordering.le Ordering.seqcst ordw>>))>>).
 Proof.
   hexploit local_fence_step_split; eauto.
@@ -3049,9 +3079,10 @@ Lemma sim_thread_fence_step_release
                 mem_src1 mem_tgt lc_src2 lc_tgt1 sc_src1 sc_tgt1>>) /\
       (<<VALS: forall loc0,
           ((<<SRC: vs_src1 loc0 = vs_src0 loc0>>) /\ (<<TGT: vs_tgt1 loc0 = vs_tgt0 loc0>>)) \/
-          (exists val0,
+          (exists val_src val_tgt,
               (<<NONESRC: vs_src0 loc0 = None>>) /\ (<<NONETGT: vs_tgt0 loc0 = None>>) /\
-              (<<VALSRC: vs_src1 loc0 = Some val0>>) /\ (<<VALTGT: vs_tgt1 loc0 = Some val0>>) /\
+              (<<VALSRC: vs_src1 loc0 = Some val_src>>) /\ (<<VALTGT: vs_tgt1 loc0 = Some val_tgt>>) /\
+              (<<VALLE: Const.le val_tgt val_src>>) /\
               (<<ORD: Ordering.le Ordering.acqrel ordr \/ Ordering.le Ordering.seqcst ordw>>))>>) /\
       (<<WF: Mapping.wfs f1>>) /\
       (<<MAPLE: Mapping.les f0 f1>>) /\
@@ -3071,8 +3102,8 @@ Proof.
   { i. hexploit (DEBT loc). i. des; eauto. right. esplits; eauto.
     hexploit (VALS loc). i. des.
     { rewrite SRC. rewrite TGT. auto. }
-    { rewrite VALTGT. rewrite VALSRC. ss. refl. }
-    { rewrite VALTGT. rewrite VALSRC. ss. refl. }
+    { rewrite VALTGT. rewrite VALSRC. ss. }
+    { rewrite VALTGT. rewrite VALSRC. ss. }
   }
   i. des. hexploit Thread.rtc_tau_step_future.
   { eapply rtc_implies; [|eauto]. i. inv H. inv TSTEP. econs; eauto. }
@@ -3094,54 +3125,345 @@ Proof.
   { eauto. }
 Qed.
 
+Lemma write_max_readable_none
+      lc0 sc0 mem0 loc from to val releasedm released ord lc1 sc1 mem1 kind
+      val0 released0
+      (WRITE: Local.write_step lc0 sc0 mem0 loc from to val releasedm released ord lc1 sc1 mem1 kind)
+      (WF: Local.wf lc0 mem0)
+      (MAX: max_readable mem0 lc0.(Local.promises) loc (lc0.(Local.tview).(TView.cur).(View.pln) loc) val0 released0)
+  :
+  max_readable mem1 lc1.(Local.promises) loc (lc1.(Local.tview).(TView.cur).(View.pln) loc) val released.
+Proof.
+  hexploit local_write_step_timestamp; eauto. i.
+  destruct lc0, lc1. ss; clarify.
+  inv WRITE. hexploit Memory.write_get2; eauto. i. des. clarify.
+  inv MAX. econs; eauto. i.
+  destruct (Memory.get loc ts' promises2) eqn:EQ.
+  { destruct p. eapply write_promises_le in WRITE0; eauto.
+    { eapply WRITE0 in EQ. clarify. }
+    { eapply WF. }
+  }
+  ss. exfalso.
+  assert (exists from', Memory.get loc ts' mem0 = Some (from', msg)).
+  { inv WRITE0. eapply MemoryFacts.promise_get_inv_diff in GET0; eauto.
+    ii. clarify. timetac.
+  }
+  des. hexploit MAX0; eauto.
+  { eapply TimeFacts.le_lt_lt; eauto. rewrite H1. ss. eapply Time.join_l. }
+  i. inv WRITE0. erewrite Memory.remove_o in EQ; eauto. des_ifs.
+  { ss. des; clarify. timetac. }
+  ss. des; auto. inv PROMISE.
+  { erewrite Memory.add_o in EQ; eauto. des_ifs. }
+  { erewrite Memory.split_o in EQ; eauto. des_ifs. }
+  { erewrite Memory.lower_o in EQ; eauto. des_ifs. }
+  { ss. }
+Qed.
+
+Lemma writable_message_to tvw sc loc from to releasedm ord
+      (WRITABLE: TView.writable (TView.cur tvw) sc loc to ord)
+      (WF: TView.wf tvw)
+      (TS: Time.lt from to)
+      (MSG: Time.le (View.rlx (View.unwrap releasedm) loc) from)
+  :
+  Time.le (View.rlx (View.unwrap (TView.write_released tvw sc loc to releasedm ord)) loc) to.
+Proof.
+  assert (TIME: Time.le (View.rlx (View.unwrap releasedm) loc) to).
+  { etrans; eauto. left. auto. }
+  unfold TView.write_released. ss. des_ifs; ss.
+  { eapply Time.join_spec; auto.
+    setoid_rewrite LocFun.add_spec_eq.
+    eapply Time.join_spec; auto; ss.
+    { left. eapply WRITABLE. }
+    { rewrite timemap_singleton_eq. refl. }
+  }
+  { eapply Time.join_spec; auto.
+    setoid_rewrite LocFun.add_spec_eq.
+    eapply Time.join_spec; auto; ss.
+    { etrans.
+      { eapply WF. }
+      { left. eapply WRITABLE. }
+    }
+    { rewrite timemap_singleton_eq. refl. }
+  }
+  { eapply Time.bot_spec. }
+Qed.
+
+Lemma sim_thread_write_aux
+      f0 vers0 flag_src flag_tgt vs_src0 vs_tgt0
+      mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0
+      val_tgt val_src releasedm_tgt releasedm_src
+      lc_tgt1 mem_tgt1 loc from_tgt to_tgt to_src from_src
+      released_tgt ord sc_tgt1 kind_tgt
+      (SIM: sim_thread
+              f0 vers0 flag_src flag_tgt vs_src0 vs_tgt0
+              mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0)
+      (WRITE: Local.write_step lc_tgt0 sc_tgt0 mem_tgt0 loc from_tgt to_tgt val_tgt releasedm_tgt released_tgt ord lc_tgt1 sc_tgt1 mem_tgt1 kind_tgt)
+      (RELEASEDM: sim_opt_view (fun loc0 => loc0 <> loc) f0 (vers0 loc from_tgt) releasedm_src releasedm_tgt)
+      (MSGTOSRC: Time.le (View.rlx (View.unwrap releasedm_src) loc) from_src)
+      (TO: sim_timestamp_exact (f0 loc) (f0 loc).(Mapping.ver) to_src to_tgt)
+      (FROM: sim_timestamp_exact (f0 loc) (f0 loc).(Mapping.ver) from_src from_tgt)
+      (CONSISTENT: Local.promise_consistent lc_tgt1)
+      (LOCALSRC: Local.wf lc_src0 mem_src0)
+      (LOCALTGT: Local.wf lc_tgt0 mem_tgt0)
+      (MEMSRC: Memory.closed mem_src0)
+      (MEMTGT: Memory.closed mem_tgt0)
+      (SCSRC: Memory.closed_timemap sc_src0 mem_src0)
+      (SCTGT: Memory.closed_timemap sc_tgt0 mem_tgt0)
+      (WF: Mapping.wfs f0)
+      (VERS: versions_wf f0 vers0)
+      (FLAGSRC: flag_src loc = None)
+      (FLAGTGT: flag_tgt loc = None)
+      (LOWER: Memory.op_kind_is_lower kind_tgt)
+      (VAL: Const.le val_tgt val_src)
+      (ORD: ~ Ordering.le Ordering.strong_relaxed ord)
+      (WFSRC: View.opt_wf releasedm_src)
+      (WFTGT: View.opt_wf releasedm_tgt)
+      (CLOSEDMSRC: Memory.closed_opt_view releasedm_src mem_src0)
+      (CLOSEDMTGT: Memory.closed_opt_view releasedm_tgt mem_tgt0)
+  :
+  exists f1 vers1 released_src lc_src1 vs_src1 vs_tgt1 mem_src1 sc_src1 kind_src from_src,
+    (<<WRITE: Local.write_step lc_src0 sc_src0 mem_src0 loc from_src to_src val_src releasedm_src released_src ord lc_src1 sc_src1 mem_src1 kind_src>>) /\
+      (<<SIM: sim_thread
+                f1 vers1 flag_src flag_tgt vs_src1 vs_tgt1
+                mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src1 sc_tgt1>>) /\
+      (<<WF: Mapping.wfs f1>>) /\
+      (<<MAPLE: Mapping.les_strong f0 f1>>) /\
+      (<<VERSLE: versions_le vers0 vers1>>) /\
+      (<<VERSWF: versions_wf f1 vers1>>) /\
+      (<<VALS: forall loc0,
+          ((<<SRC: vs_src1 loc0 = vs_src0 loc0>>) /\ (<<TGT: vs_tgt1 loc0 = vs_tgt0 loc0>>) /\ (<<LOC: loc0 <> loc>>)) \/
+            ((<<LOC: loc0 = loc>>) /\
+               ((<<VALSRC: vs_src1 loc0 = Some val_src>> /\ <<VALTGT: vs_tgt1 loc0 = Some val_tgt>>) \/
+                  (<<VALSRC0: vs_src0 loc0 = None>> /\ <<VALTGT0: vs_tgt0 loc0 = None>> /\ <<VALSRC1: vs_src1 loc0 = None>> /\ <<VALTGT1: vs_tgt1 loc0 = None>>)))>>).
+Proof.
+  hexploit Local.write_step_future; eauto. i. des.
+  destruct lc_src0 as [tvw_src0 prom_src].
+  destruct lc_tgt0 as [tvw_tgt0 prom_tgt].
+  dup SIM. inv SIM. inv LOCAL. dup WRITE. guardH WRITE. inv WRITE. ss.
+  set (msg_src := Message.concrete val_tgt (TView.write_released tvw_tgt0 sc_tgt0 loc to_tgt releasedm_tgt ord)).
+  assert (SIMMSG: sim_message (flag_tgt loc) loc f0 (opt_version_join (vers0 loc from_tgt) (Some (rel_vers loc)))
+                              (Message.concrete val_src (TView.write_released tvw_src0 sc_src0 loc to_src releasedm_src ord))
+                              (Message.concrete val_tgt (TView.write_released tvw_tgt0 sc_tgt0 loc to_tgt releasedm_tgt ord))).
+  { clear WRITE0.
+    replace (opt_version_join (vers0 loc from_tgt) (Some (rel_vers loc))) with
+      (Some (match (vers0 loc from_tgt) with
+             | Some v => version_join v (rel_vers loc)
+             | None => (rel_vers loc)
+             end)).
+    { rewrite FLAGTGT. econs; auto.
+      assert (VERWF: version_wf f0 match vers0 loc from_tgt with
+                                   | Some v => version_join v (rel_vers loc)
+                                   | None => rel_vers loc
+                                   end).
+      { des_ifs; ss.
+        { eapply version_wf_join; eauto.
+          { exploit VERS. rewrite Heq. ss. }
+          { inv TVIEW. auto. }
+        }
+        { inv TVIEW. auto. }
+      }
+      eapply sim_write_released_normal; eauto.
+      { eapply sim_opt_view_mon_ver; eauto.
+        { des_ifs. ss. eapply version_join_l. }
+      }
+      { destruct ord; ss. }
+      { i. ss. des_ifs. eapply version_join_r; eauto. }
+    }
+    { destruct (vers0 loc from_tgt); auto. }
+  }
+  assert (WRITABLE0: TView.writable (TView.cur tvw_src0) sc_src0 loc to_src ord).
+  { eapply sim_writable; eauto.
+    { inv TVIEW. eauto. }
+    { ss. }
+  }
+  hexploit sim_memory_write; eauto.
+  { eapply LOCALSRC. }
+  { admit. (* versioned_memory vers mem_tgt0 *) }
+  { inv TVIEW. eauto. }
+  { admit. (* sim_closed_memory f mem_src0 *) }
+  { econs. eapply TViewFacts.write_future0; eauto. eapply LOCALSRC. }
+  { econs; ss. eapply writable_message_to; eauto.
+    { eapply LOCALSRC. }
+    { eapply sim_timestamp_exact_lt; eauto.
+      { eapply MemoryFacts.write_time_lt; eauto. }
+      { eapply mapping_latest_wf_loc. }
+    }
+  }
+  { red. eauto. }
+  i. des.
+  assert (from_src0 = from_src).
+  { eapply sim_timestamp_exact_inject; eauto.
+    eapply sim_timestamp_exact_mon_strong; eauto.
+  }
+  subst.
+  set (tvw_src1 := TView.write_tview tvw_src0 sc_src0 loc to_src ord).
+  set (tvw_tgt1 := TView.write_tview tvw_tgt0 sc_tgt0 loc to_tgt ord).
+  assert (exists released_src,
+             (<<WRITE: Local.write_step (Local.mk tvw_src0 prom_src) sc_src0 mem_src0 loc from_src
+                                        to_src val_src releasedm_src released_src ord (Local.mk tvw_src1 prom_src1) sc_src0 mem_src1 kind_src>>) /\
+               (<<LOCAL: sim_local f1 vers1 flag_src flag_tgt (Local.mk tvw_src1 prom_src1) (Local.mk (TView.write_tview tvw_tgt0 sc_tgt0 loc to_tgt ord) promises2)>>)).
+  { esplits.
+    { econs; eauto. ss. }
+    { ss. econs.
+      { eapply sim_write_tview_normal; eauto.
+        { eapply sim_tview_mon_latest; eauto. eapply Mapping.les_strong_les; eauto. }
+        { eapply sim_timestamp_exact_mon_strong; eauto. }
+        { destruct ord; ss. }
+        { admit. (* Mapping.closed (f1 loc) (Mapping.vers f1 loc) to_src *) }
+      }
+      { eauto. }
+      { eauto. }
+      { i. ss. destruct (Loc.eq_dec loc0 loc).
+        { subst. rewrite FLAGTGT in FLAG. ss. }
+        { unfold TimeMap.join. rewrite timemap_singleton_neq; auto.
+          rewrite TimeFacts.le_join_l; auto. eapply Time.bot_spec.
+        }
+      }
+      { i. ss. destruct (Loc.eq_dec loc0 loc).
+        { subst. rewrite FLAGSRC in FLAG. ss. }
+        { unfold TimeMap.join. rewrite timemap_singleton_neq; auto.
+          rewrite ! TimeFacts.le_join_l; auto.
+          { eapply Time.bot_spec. }
+          { eapply Time.bot_spec. }
+        }
+      }
+    }
+  }
+  des.
+  hexploit max_value_src_exists. i. des.
+  set (vs_src1 := fun loc0 => if Loc.eq_dec loc0 loc then v else vs_src0 loc0).
+  set (vs_tgt1 := fun loc0 => if Loc.eq_dec loc0 loc then match v with
+                                                          | Some _ => Some val_tgt
+                                                          | None => None
+                                                          end else vs_tgt0 loc0).
+  esplits.
+  { eauto. }
+  { eauto. }
+  { econs.
+    { eapply sim_timemap_mon_latest; eauto. eapply Mapping.les_strong_les; eauto. }
+    { eauto. }
+    { eauto. }
+    { instantiate (1:=vs_src1). ii. unfold vs_src1.
+      clear WRITE0. des_ifs.
+      { eauto. }
+      { assert (TS: View.pln (TView.cur tvw_src1) loc0 = View.pln (TView.cur tvw_src0) loc0).
+        { ss. unfold TimeMap.join. rewrite timemap_singleton_neq; auto.
+          rewrite TimeFacts.le_join_l; auto. eapply Time.bot_spec.
+        }
+        specialize (MAXSRC loc0). inv MAXSRC. econs.
+        { i. hexploit MAX0; eauto. i. des. esplits; eauto. rewrite TS.
+          eapply write_unchanged_loc in CANCEL; eauto. des.
+          erewrite <- unchanged_loc_max_readable; eauto.
+        }
+        { rewrite TS. i. eapply write_unchanged_loc in CANCEL; eauto. des.
+          erewrite <- unchanged_loc_max_readable; eauto.
+        }
+      }
+    }
+    { instantiate (1:=vs_tgt1). ii. unfold vs_tgt1. condtac.
+      { econs. i. destruct v; ss. subst. inv VAL0.
+        hexploit no_flag_max_value_same; eauto.
+        i. des. inv MAX0. hexploit MAX1; auto. i. des.
+        eapply write_max_readable in WRITE0; eauto.
+        des. subst. esplits; eauto.
+      }
+      { assert (TS: View.pln (TView.cur (tvw_tgt1)) loc0 = View.pln (TView.cur tvw_tgt0) loc0).
+        { ss. unfold TimeMap.join. rewrite timemap_singleton_neq; auto.
+          rewrite TimeFacts.le_join_l; auto. eapply Time.bot_spec.
+        }
+        specialize (MAXTGT loc0). inv MAXTGT. econs. i. hexploit MAX0; eauto.
+        i. des. esplits. rewrite TS.
+        eapply write_unchanged_loc in WRITE1; eauto. des.
+        erewrite <- unchanged_loc_max_readable; eauto.
+      }
+    }
+    { unfold vs_src1, vs_tgt1. i. clear WRITE0. des_ifs. }
+    { eauto. }
+  }
+  { eauto. }
+  { eauto. }
+  { eauto. }
+  { eauto. }
+  { i. unfold vs_src1, vs_tgt1. clear WRITE0. des_ifs.
+    { right. splits; auto. left. splits; auto. f_equal.
+      inv MAX. hexploit MAX0; eauto. i. des.
+      eapply write_max_readable in WRITE; eauto. des; auto.
+    }
+    { right. splits; auto. right.
+      assert (NONE: vs_src0 loc = None).
+      { destruct (vs_src0 loc) eqn:SOME; auto.
+        specialize (MAXSRC loc). inv MAXSRC. hexploit MAX0; eauto.
+        i. des. eapply write_max_readable_none in WRITE; eauto.
+        inv MAX. exfalso. eapply NONMAX0; eauto.
+      }
+      splits; auto. specialize (PERM loc).
+      rewrite NONE in PERM. destruct (vs_tgt0 loc); ss.
+    }
+    { left. auto. }
+  }
+Admitted.
+
+Lemma sim_thread_write
+      f vers flag_src flag_tgt vs_src0 vs_tgt0
+      mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0
+      val_tgt val_src releasedm_tgt releasedm_src
+      lc_tgt1 mem_tgt1 loc from_tgt to_tgt
+      released_tgt ord sc_tgt1 kind_tgt
+      (SIM: sim_thread
+              f vers flag_src flag_tgt vs_src0 vs_tgt0
+              mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0)
+      (WRITE: Local.write_step lc_tgt0 sc_tgt0 mem_tgt0 loc from_tgt to_tgt val_tgt releasedm_tgt released_tgt ord lc_tgt1 sc_tgt1 mem_tgt1 kind_tgt)
+      (RELEASEDM: sim_opt_view (fun loc0 => loc0 <> loc) f (vers loc from_tgt) releasedm_src releasedm_tgt)
+      (CONSISTENT: Local.promise_consistent lc_tgt1)
+      (LOCALSRC: Local.wf lc_src0 mem_src0)
+      (LOCALTGT: Local.wf lc_tgt0 mem_tgt0)
+      (MEMSRC: Memory.closed mem_src0)
+      (MEMTGT: Memory.closed mem_tgt0)
+      (SCSRC: Memory.closed_timemap sc_src0 mem_src0)
+      (SCTGT: Memory.closed_timemap sc_tgt0 mem_tgt0)
+      (WF: Mapping.wfs f)
+      (VERS: versions_wf f vers)
+      (FLAGSRC: flag_src loc = None)
+      (FLAGTGT: flag_tgt loc = None)
+      (LOWER: Memory.op_kind_is_lower kind_tgt)
+      (VAL: Const.le val_tgt val_src)
+      (ORD: ~ Ordering.le Ordering.strong_relaxed ord)
+      (WFSRC: View.opt_wf releasedm_src)
+      (WFTGT: View.opt_wf releasedm_tgt)
+      (CLOSEDMSRC: Memory.closed_opt_view releasedm_src mem_src0)
+      (CLOSEDMTGT: Memory.closed_opt_view releasedm_tgt mem_tgt0)
+  :
+  exists from_src to_src released_src lc_src1 vs_src1 vs_tgt1 mem_src1 sc_src1 kind_src,
+    (<<WRITE: Local.write_step lc_src0 sc_src0 mem_src0 loc from_src to_src val_src releasedm_src released_src ord lc_src1 sc_src1 mem_src1 kind_src>>) /\
+      (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt>>) /\
+      (<<RELEASED: sim_opt_view (fun loc0 => loc0 <> loc) f (vers loc to_tgt) released_src released_tgt>>) /\
+      (<<SIM: sim_thread
+                f vers flag_src flag_tgt vs_src1 vs_tgt1
+                mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src1 sc_tgt1>>).
+Proof.
+  hexploit Local.write_step_future; eauto. i. des.
+  destruct lc_src0 as [tvw_src0 prom_src].
+  destruct lc_tgt0 as [tvw_tgt0 prom_tgt].
+  dup SIM. inv SIM. inv LOCAL. inv WRITE. ss.
+  hexploit sim_memory_write; eauto.
+  { eapply LOCALSRC. }
+  { admit. (* versioned_memory vers mem_tgt0 *) }
+  { inv TVIEW. eauto. }
+  { admit. (* sim_closed_memory f mem_src0 *) }
+  {
+
+  SIM.
+
+  eauto. }
+  { eauto.
 
 
+  inv WRITE. ss.
 
-       (* Lemma sim_thread_write *)
-       (*       f vers flag_src flag_tgt vs_src0 vs_tgt0 *)
-       (*       mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0 *)
-       (*       val_tgt val_src releasedm_tgt releasedm_src *)
-       (*       lc_tgt1 mem_tgt1 loc from_tgt to_tgt *)
-       (*       released_tgt ord sc_tgt1 kind_tgt *)
-       (*       (SIM: sim_thread *)
-       (*               f vers flag_src flag_tgt vs_src0 vs_tgt0 *)
-       (*               mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0) *)
-       (*       (READ: Local.write_step lc_tgt0 sc_tgt0 mem_tgt0 loc from_tgt to_tgt val_tgt releasedm_tgt released_tgt ord lc_tgt1 sc_tgt1 mem_tgt1 kind_tgt) *)
-       (*       (RELEASEDM: sim_opt_view (fun loc0 => loc0 <> loc) f (vers loc to_tgt) releasedm_src releasedm_tgt) *)
-       (*       (CONSISTENT: Local.promise_consistent lc_tgt1) *)
-       (*       (LOCALSRC: Local.wf lc_src0 mem_src0) *)
-       (*       (LOCALTGT: Local.wf lc_tgt0 mem_tgt0) *)
-       (*       (MEMSRC: Memory.closed mem_src0) *)
-       (*       (MEMTGT: Memory.closed mem_tgt0) *)
-       (*       (SCSRC: Memory.closed_timemap sc_src0 mem_src0) *)
-       (*       (SCTGT: Memory.closed_timemap sc_tgt0 mem_tgt0) *)
-       (*       (WF: Mapping.wfs f) *)
-       (*       (VERS: versions_wf f vers) *)
-       (*       (FLAGSRC: flag_src loc = None) *)
-       (*       (FLAGTGT: flag_tgt loc = None) *)
-       (*       (FLAG: forall loc ts *)
-       (*                     (SRC: flag_src loc = None) (TGT: flag_tgt loc = Some ts), *)
-       (*           ~ Ordering.le Ordering.acqrel ord) *)
-       (*       (LOWER: Memory.op_kind_is_lower kind_tgt) *)
-       (*       (ORD: ~ Ordering.le Ordering.strong_relaxed ord) *)
-       (*       (VAL: Const.le val_tgt val_src) *)
-       (*   : *)
-       (*     exists from_src to_src released_src lc_src1 vs_src1 vs_tgt1 mem_src1 sc_src1, *)
-       (*       (<<READ: Local.read_step lc_src0 mem_src0 loc to_src val_src released_src ord lc_src1>>) /\ *)
-       (*       (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt>>) /\ *)
-       (*       (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt>>) /\ *)
-       (*       (<<RELEASED: sim_opt_view (fun loc0 => loc0 <> loc) f (vers loc to_tgt) released_src released_tgt>>) /\ *)
-       (*       (<<SIM: sim_thread *)
-       (*                 f vers flag_src flag_tgt vs_src1 vs_tgt1 *)
-       (*                 mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src1 sc_tgt1>>) /\ *)
-       (*       (<<VALS: forall loc0, *)
-       (*           ((<<SRC: vs_src1 loc0 = vs_src0 loc0>>) /\ (<<TGT: vs_tgt1 loc0 = vs_tgt0 loc0>>)) \/ *)
-       (*           (exists val0, *)
-       (*               (<<VALSRC: vs_src1 loc0 = Some val0>>) /\ (<<VALTGT: vs_tgt1 loc0 = Some val0>>) /\ *)
-       (*               ((<<ORD: Ordering.le Ordering.acqrel ord>>) \/ *)
-       (*                ((<<LOC: loc0 = loc>>) /\ (<<VAL: Const.le val val0>>))))>>). *)
-       (* Proof. *)
-       (*   hexploit Local.read_step_future; eauto. i. des. *)
+  inv WRITE.
+
+
+         (*   hexploit Local.read_step_future; eauto. i. des. *)
        (*   destruct lc_src0 as [tvw_src0 prom_src]. *)
        (*   destruct lc_tgt0 as [tvw_tgt0 prom_tgt]. *)
        (*   dup SIM. inv SIM. inv LOCAL. inv READ. *)
