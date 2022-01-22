@@ -5205,7 +5205,8 @@ Lemma sim_memory_write
       (<<VERSWF: versions_wf f1 vers1>>) /\
       (<<RELVERS: wf_release_vers vers1 prom_tgt1 rel_vers>>) /\
       (<<VERSIONED: versioned_memory vers1 mem_tgt1>>) /\
-      (<<TIMES: sim_closed_memory f1 mem_src1>>)
+      (<<TIMES: sim_closed_memory f1 mem_src1>>) /\
+      (<<CLOSED: Mapping.closed (f1 loc) (Mapping.vers f1 loc) to_src>>)
 .
 Proof.
   assert (exists (f': Mapping.t) from_src,

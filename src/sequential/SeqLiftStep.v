@@ -3309,7 +3309,6 @@ Proof.
         { eapply sim_tview_mon_latest; eauto. eapply Mapping.les_strong_les; eauto. }
         { eapply sim_timestamp_exact_mon_strong; eauto. }
         { destruct ord; ss. }
-        { admit. (* Mapping.closed (f1 loc) (Mapping.vers f1 loc) to_src *) }
       }
       { eauto. }
       { eauto. }
@@ -3337,7 +3336,6 @@ Proof.
                                                           | None => None
                                                           end else vs_tgt0 loc0).
   esplits.
-  { eauto. }
   { eauto. }
   { econs.
     { eapply sim_timemap_mon_latest; eauto. eapply Mapping.les_strong_les; eauto. }
