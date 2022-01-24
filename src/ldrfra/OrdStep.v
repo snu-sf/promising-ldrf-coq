@@ -33,12 +33,13 @@ Set Implicit Arguments.
 Module OrdLocal.
   Section OrdLocal.
     Variable L: Loc.t -> bool.
-    Variable ordc: Ordering.t.
+    Variable ordcr: Ordering.t.
+    Variable ordcw: Ordering.t.
 
     Inductive read_step (lc1:Local.t) (mem1:Memory.t) (loc:Loc.t) (to:Time.t) (val:Const.t) (released:option View.t) (ord:Ordering.t) (lc2:Local.t): Prop :=
     | read_step_intro
         ord'
-        (ORD: ord' = if L loc then Ordering.join ord ordc else ord)
+        (ORD: ord' = if L loc then Ordering.join ord ordcr else ord)
         (STEP: Local.read_step lc1 mem1 loc to val released ord' lc2)
     .
     Hint Constructors read_step.
@@ -49,10 +50,38 @@ Module OrdLocal.
               (lc2:Local.t) (sc2:TimeMap.t) (mem2:Memory.t) (kind:Memory.op_kind): Prop :=
     | write_step_intro
         ord'
-        (ORD: ord' = if L loc then Ordering.join ord ordc else ord)
+        (ORD: ord' = if L loc then Ordering.join ord ordcw else ord)
         (STEP: Local.write_step lc1 sc1 mem1 loc from to val releasedm released ord' lc2 sc2 mem2 kind)
     .
     Hint Constructors write_step.
+
+    Inductive write_na_step (lc1:Local.t) (sc1:TimeMap.t) (mem1:Memory.t)
+                            (loc:Loc.t) (from to:Time.t) (val:Const.t) (ord:Ordering.t)
+                            (lc2:Local.t) (sc2:TimeMap.t) (mem2:Memory.t)
+                            (msgs: list (Time.t * Time.t * Message.t))
+                            (kinds: list Memory.op_kind) (kind:Memory.op_kind): Prop :=
+    | write_na_step_intro
+        ord'
+        (ORD: ord' = if L loc then Ordering.join ord ordcw else ord)
+        (STEP: Local.write_na_step lc1 sc1 mem1 loc from to val ord' lc2 sc2 mem2 msgs kinds kind)
+    .
+    Hint Constructors write_na_step.
+
+    Inductive racy_read_step (lc1:Local.t) (mem1:Memory.t) (loc:Loc.t) (val:Const.t) (ord:Ordering.t): Prop :=
+    | racy_read_step_intro
+        ord'
+        (ORD: ord' = if L loc then Ordering.join ord ordcr else ord)
+        (STEP: Local.racy_read_step lc1 mem1 loc val ord')
+    .
+    Hint Constructors racy_read_step.
+
+    Inductive racy_write_step (lc1:Local.t) (mem1:Memory.t) (loc:Loc.t) (ord:Ordering.t): Prop :=
+    | racy_write_step_intro
+        ord'
+        (ORD: ord' = if L loc then Ordering.join ord ordcw else ord)
+        (STEP: Local.racy_write_step lc1 mem1 loc ord')
+    .
+    Hint Constructors racy_write_step.
 
     Inductive program_step:
       forall (e:ThreadEvent.t) (lc1:Local.t) (sc1:TimeMap.t) (mem1:Memory.t) (lc2:Local.t) (sc2:TimeMap.t) (mem2:Memory.t), Prop :=
@@ -91,7 +120,27 @@ Module OrdLocal.
     | step_failure
         lc1 sc1 mem1
         (LOCAL: Local.failure_step lc1):
-        program_step ThreadEvent.failure lc1 sc1 mem1 lc1 sc1 mem1
+      program_step ThreadEvent.failure lc1 sc1 mem1 lc1 sc1 mem1
+    | step_write_na
+        lc1 sc1 mem1
+        loc from to val ord lc2 sc2 mem2 msgs kinds kind
+        (LOCAL: write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 msgs kinds kind):
+      program_step (ThreadEvent.write_na loc msgs from to val ord) lc1 sc1 mem1 lc2 sc2 mem2
+    | step_racy_read
+        lc1 sc1 mem1
+        loc val ord
+        (LOCAL: racy_read_step lc1 mem1 loc val ord):
+      program_step (ThreadEvent.racy_read loc val ord) lc1 sc1 mem1 lc1 sc1 mem1
+    | step_racy_write
+        lc1 sc1 mem1
+        loc val ord
+        (LOCAL: racy_write_step lc1 mem1 loc ord):
+      program_step (ThreadEvent.racy_write loc val ord) lc1 sc1 mem1 lc1 sc1 mem1
+    | step_racy_update
+        lc1 sc1 mem1
+        loc valr valw ordr ordw
+        (LOCAL: Local.racy_update_step lc1 mem1 loc ordr ordw):
+      program_step (ThreadEvent.racy_update loc valr valw ordr ordw) lc1 sc1 mem1 lc1 sc1 mem1
     .
     Hint Constructors program_step.
 
@@ -145,6 +194,11 @@ Module OrdLocal.
       - exploit Local.fence_step_future; eauto. i. des. esplits; eauto; try refl.
       - exploit Local.fence_step_future; eauto. i. des. esplits; eauto; try refl.
       - esplits; eauto; try refl.
+      - inv LOCAL.
+        exploit Local.write_na_step_future; eauto.
+      - esplits; eauto; try refl.
+      - esplits; eauto; try refl.
+      - esplits; eauto; try refl.
     Qed.
 
     Lemma program_step_inhabited
@@ -154,10 +208,9 @@ Module OrdLocal.
       <<INHABITED2: Memory.inhabited mem2>>.
     Proof.
       inv STEP; eauto.
-      - inv LOCAL. inv STEP. inv WRITE.
-        inv PROMISE; eauto using Memory.add_inhabited, Memory.split_inhabited, Memory.lower_inhabited, Memory.cancel_inhabited.
-      - inv LOCAL2. inv STEP. inv WRITE.
-        inv PROMISE; eauto using Memory.add_inhabited, Memory.split_inhabited, Memory.lower_inhabited, Memory.cancel_inhabited.
+      - inv LOCAL. inv STEP. eapply Memory.write_inhabited; eauto.
+      - inv LOCAL2. inv STEP. eapply Memory.write_inhabited; eauto.
+      - inv LOCAL. inv STEP. eapply Memory.write_na_inhabited; eauto.
     Qed.
 
 
@@ -185,6 +238,10 @@ Module OrdLocal.
       - exploit Local.fence_step_disjoint; eauto.
       - exploit Local.fence_step_disjoint; eauto.
       - esplits; eauto.
+      - inv LOCAL. exploit Local.write_na_step_disjoint; eauto.
+      - esplits; eauto.
+      - esplits; eauto.
+      - esplits; eauto.
     Qed.
 
     Lemma program_step_promises_bot
@@ -197,6 +254,56 @@ Module OrdLocal.
       - eapply Memory.write_promises_bot; eauto.
       - inv LOCAL1. inv LOCAL2. inv STEP. inv STEP0.
         eapply Memory.write_promises_bot; eauto.
+      - eapply Memory.write_na_promises_bot; eauto.
+    Qed.
+
+
+    (* reserve only *)
+
+    Definition reserve_only (promises: Memory.t): Prop :=
+      forall loc from to msg
+        (LOC: L loc)
+        (GET: Memory.get loc to promises = Some (from, msg)),
+        msg = Message.reserve.
+
+    Lemma write_reserve_only
+          promises1 mem1 loc from to msg promises2 mem2 kind
+          (PROMISES1: reserve_only promises1)
+          (WRITE: Memory.write promises1 mem1 loc from to msg promises2 mem2 kind):
+      reserve_only promises2.
+    Proof.
+      ii. revert GET. inv WRITE.
+      erewrite Memory.remove_o; eauto. condtac; ss. guardH o.
+      inv PROMISE; ss.
+      - erewrite Memory.add_o; eauto. condtac; ss; eauto.
+      - erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
+        guardH o0. i. des. inv GET.
+        exploit Memory.split_get0; try exact PROMISES. i. des.
+        exploit PROMISES1; try exact GET0; ss.
+      - erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+      - erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+    Qed.
+
+    Lemma write_na_reserve_only
+          ts promises1 mem1 loc from to msg promises2 mem2 msgs kinds kind
+          (PROMISES1: reserve_only promises1)
+          (WRITE: Memory.write_na ts promises1 mem1 loc from to msg promises2 mem2 msgs kinds kind):
+      reserve_only promises2.
+    Proof.
+      induction WRITE; eauto using write_reserve_only.
+    Qed.
+
+    Lemma program_step_reserve_only
+          e lc1 sc1 mem1 lc2 sc2 mem2
+          (PROMISES1: reserve_only (Local.promises lc1))
+          (STEP: program_step e lc1 sc1 mem1 lc2 sc2 mem2):
+      <<PROMISES2: reserve_only (Local.promises lc2)>>.
+    Proof.
+      inv STEP; try inv LOCAL; try inv STEP; ss.
+      - eapply write_reserve_only; eauto.
+      - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP. ss.
+        eapply write_reserve_only; eauto.
+      - eapply write_na_reserve_only; eauto.
     Qed.
   End OrdLocal.
 End OrdLocal.
@@ -206,14 +313,15 @@ Module OrdThread.
   Section OrdThread.
     Variable lang: language.
     Variable L: Loc.t -> bool.
-    Variable ordc: Ordering.t.
+    Variable ordcr: Ordering.t.
+    Variable ordcw: Ordering.t.
 
     Inductive program_step (e:ThreadEvent.t): forall (e1 e2:Thread.t lang), Prop :=
     | program_step_intro
         st1 lc1 sc1 mem1
         st2 lc2 sc2 mem2
         (STATE: (Language.step lang) (ThreadEvent.get_program_event e) st1 st2)
-        (LOCAL: OrdLocal.program_step L ordc e lc1 sc1 mem1 lc2 sc2 mem2):
+        (LOCAL: OrdLocal.program_step L ordcr ordcw e lc1 sc1 mem1 lc2 sc2 mem2):
         program_step e (Thread.mk lang st1 lc1 sc1 mem1) (Thread.mk lang st2 lc2 sc2 mem2)
     .
     Hint Constructors program_step.
@@ -431,6 +539,7 @@ Module OrdThread.
           eapply write_step_promise_consistent; eauto.
         + eapply fence_step_promise_consistent; eauto.
         + eapply fence_step_promise_consistent; eauto.
+        + inv LOCAL0. eapply write_na_step_promise_consistent; eauto.
     Qed.
 
     Lemma rtc_all_step_promise_consistent
@@ -577,7 +686,71 @@ Module OrdThread.
           { econs 2; eauto. econs; eauto. econs 7; eauto. }
           { econs; eauto; ss. }
         }
+        { inv LOCAL2. hexploit write_na_step_map; try eassumption; eauto.
+          { eapply ident_map_bot. }
+          { eapply FLOCAL. }
+          { eapply FLOCAL. }
+          { refl. }
+          { refl. }
+          { eapply mapping_map_lt_iff_non_collapsable; eauto. }
+          { instantiate (1 := List.map fst msgs). clear.
+            induction msgs; ss.
+            econs; eauto. destruct a as [[]]. ss.
+          }
+          { rewrite List.Forall_forall. i.
+            eapply mapping_map_lt_iff_non_collapsable; eauto.
+          }
+          i. des.
+          exists (ThreadEvent.write_na loc fmsgs from to val ord). esplits.
+          { econs; eauto. eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }
+          { econs 2; eauto. econs; eauto. econs 8; eauto. econs; eauto. }
+          { econs; eauto; ss. }
+        }
+        { inv LOCAL2. exploit racy_read_step_map; eauto.
+          { apply ident_map_lt. }
+          i. exists (ThreadEvent.racy_read loc val ord). esplits.
+          { econs; eauto. }
+          { econs 2; eauto. econs; eauto. econs 9; eauto. econs; eauto. }
+          { econs; eauto; ss. }
+        }
+        { inv LOCAL2. exploit racy_write_step_map; eauto.
+          { apply ident_map_lt. }
+          i. exists (ThreadEvent.racy_write loc val ord). esplits.
+          { econs; eauto. }
+          { econs 2; eauto. econs; eauto. econs 10; eauto. econs; eauto. }
+          { econs; eauto; ss. }
+        }
+        { exploit racy_update_step_map; eauto.
+          { apply ident_map_lt. }
+          i. exists (ThreadEvent.racy_update loc valr valw ordr ordw). esplits.
+          { econs; eauto. }
+          { econs 2; eauto. econs; eauto. econs 11; eauto. }
+          { econs; eauto; ss. }
+        }
       }
+    Qed.
+
+
+    (* reserve only *)
+
+    Lemma step_reserve_only
+          pf e e1 e2
+          (PROMISES1: OrdLocal.reserve_only L (Local.promises (Thread.local e1)))
+          (STEP: step pf e e1 e2):
+      <<PROMISES2: OrdLocal.reserve_only L (Local.promises (Thread.local e2))>>.
+    Proof.
+      inv STEP; inv STEP0; eauto using OrdLocal.program_step_reserve_only.
+      ii. revert GET. inv LOCAL. inv PROMISE; ss.
+      - erewrite Memory.add_o; eauto. condtac; ss; eauto.
+        i. des. inv GET. exploit PF; eauto.
+      - erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
+        + i. des. inv GET. exploit PF; eauto.
+        + guardH o. i. des. inv GET.
+          exploit Memory.split_get0; try exact PROMISES. i. des.
+          exploit PF; try exact GET0; eauto.
+      - erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+        i. des. inv GET. exploit PF; eauto.
+      - erewrite Memory.remove_o; eauto. condtac; ss; eauto.
     Qed.
   End OrdThread.
 End OrdThread.
@@ -586,17 +759,18 @@ End OrdThread.
 Module OrdConfiguration.
   Section OrdConfiguration.
     Variable L: Loc.t -> bool.
-    Variable ordc: Ordering.t.
+    Variable ordcr: Ordering.t.
+    Variable ordcw: Ordering.t.
 
     Inductive step: forall (e: ThreadEvent.t) (tid: Ident.t) (c1 c2: Configuration.t), Prop :=
     | step_intro
         e tid c1 lang st1 lc1 e2 e3 st4 lc4 sc4 memory4
         (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
         (CANCELS: rtc (@Thread.cancel_step _) (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) e2)
-        (STEP: OrdThread.opt_step L ordc e e2 e3)
+        (STEP: OrdThread.opt_step L ordcr ordcw e e2 e3)
         (RESERVES: rtc (@Thread.reserve_step _) e3 (Thread.mk _ st4 lc4 sc4 memory4))
         (CONSISTENT: ThreadEvent.get_machine_event e <> MachineEvent.failure ->
-                     OrdThread.consistent L ordc (Thread.mk _ st4 lc4 sc4 memory4)):
+                     OrdThread.consistent L ordcr ordcw (Thread.mk _ st4 lc4 sc4 memory4)):
         step e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) (Configuration.threads c1)) sc4 memory4)
     .
     Hint Constructors step.

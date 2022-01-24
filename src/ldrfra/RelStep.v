@@ -36,12 +36,13 @@ Module RelThread.
   Section RelThread.
     Variable lang: language.
     Variable L: Loc.t -> bool.
-    Variable ordc: Ordering.t.
+    Variable ordcr: Ordering.t.
+    Variable ordcw: Ordering.t.
 
     Inductive step rels1: forall (rels2: RelWrites.t) (e: ThreadEvent.t) (e1 e2: Thread.t lang), Prop :=
     | step_intro
         pf e e1 e2
-        (STEP: @OrdThread.step lang L ordc pf e e1 e2):
+        (STEP: @OrdThread.step lang L ordcr ordcw pf e e1 e2):
         step rels1 (RelWrites.append L e rels1) e e1 e2
     .
 
@@ -85,7 +86,7 @@ Module RelThread.
     Lemma step_ord_step
           rels1 rels2 e e1 e2
           (STEP: step rels1 rels2 e e1 e2):
-      exists pf, OrdThread.step L ordc pf e e1 e2.
+      exists pf, OrdThread.step L ordcr ordcw pf e e1 e2.
     Proof.
       inv STEP. eauto.
     Qed.
@@ -93,7 +94,7 @@ Module RelThread.
     Lemma steps_ord_steps
           rels1 rels2 e1 e2
           (STEPS: steps rels1 rels2 e1 e2):
-      rtc (OrdThread.all_step L ordc) e1 e2.
+      rtc (OrdThread.all_step L ordcr ordcw) e1 e2.
     Proof.
       induction STEPS; eauto.
       exploit step_ord_step; eauto. i. des.
@@ -103,7 +104,7 @@ Module RelThread.
     Lemma tau_steps_ord_tau_steps
           rels1 rels2 e1 e2
           (STEPS: tau_steps rels1 rels2 e1 e2):
-      rtc (@OrdThread.tau_step lang L ordc) e1 e2.
+      rtc (@OrdThread.tau_step lang L ordcr ordcw) e1 e2.
     Proof.
       induction STEPS; eauto.
       inv STEP; ss.
@@ -112,7 +113,7 @@ Module RelThread.
 
     Lemma ord_tau_steps_tau_steps
           e1 e2
-          (STEPS: rtc (@OrdThread.tau_step lang L ordc) e1 e2):
+          (STEPS: rtc (@OrdThread.tau_step lang L ordcr ordcw) e1 e2):
       forall rels1, exists rels2,
           tau_steps rels1 rels2 e1 e2.
     Proof.
@@ -166,7 +167,7 @@ Module RelThread.
     Lemma tau_steps_rtc_tau_step
           rels1 rels2 e1 e2
           (STEPS: tau_steps rels1 rels2 e1 e2):
-      rtc (@OrdThread.tau_step lang L ordc) e1 e2.
+      rtc (@OrdThread.tau_step lang L ordcr ordcw) e1 e2.
     Proof.
       induction STEPS; eauto.
       econs 2; eauto. inv STEP; ss.
@@ -287,60 +288,13 @@ Module RelThread.
 
     (* RelWrites.wf *)
 
-    Lemma promise_rels_wf
-          rels promises1 mem1 loc from to msg promises2 mem2 kind
-          (RELS1: RelWrites.wf rels promises1 mem1)
-          (PROMISE: Memory.promise promises1 mem1 loc from to msg promises2 mem2 kind):
-      RelWrites.wf rels promises2 mem2.
-    Proof.
-      ii. exploit RELS1; eauto. i. des. inv PROMISE; ss.
-      - exploit Memory.add_get1; try exact x0; eauto. i. esplits; eauto.
-        erewrite Memory.add_o; eauto. condtac; ss. des. subst.
-        exploit Memory.add_get0; try exact MEM. i. des. congr.
-      - exploit Memory.split_get1; try exact x0; eauto. i. des. subst. esplits; eauto.
-        erewrite Memory.split_o; eauto. repeat condtac; ss.
-        + des. subst. exploit Memory.split_get0; try exact MEM. i. des. congr.
-        + guardH o. des. subst.
-          exploit Memory.split_get0; try exact PROMISES. i. des. congr.
-      - exploit Memory.lower_get1; try exact x0; eauto. i. des. subst. inv MSG_LE.
-        esplits; eauto.
-        erewrite Memory.lower_o; eauto. condtac; ss. des. subst.
-        exploit Memory.lower_get0; try exact PROMISES. i. des. congr.
-      - erewrite (@Memory.remove_o promises2); eauto.
-        erewrite (@Memory.remove_o mem2); eauto. condtac; ss; eauto.
-        des. subst. exploit Memory.remove_get0; try exact PROMISES. i. des. congr.
-    Qed.
-
     Lemma step_rels_wf
           rels1 rels2 e e1 e2
           (RELS1: RelWrites.wf rels1 (Local.promises (Thread.local e1)) (Thread.memory e1))
           (STEP: step rels1 rels2 e e1 e2):
       RelWrites.wf rels2 (Local.promises (Thread.local e2)) (Thread.memory e2).
     Proof.
-      inv STEP. unfold RelWrites.append.
-      inv STEP0; inv STEP; inv LOCAL; ss.
-      - eauto using promise_rels_wf.
-      - inv LOCAL0. inv STEP. ss.
-      - inv LOCAL0. inv STEP. inv WRITE. ss.
-        hexploit promise_rels_wf; eauto. i.
-        cut (RelWrites.wf rels1 promises2 mem2).
-        { i. repeat condtac; ss. ii. inv IN; eauto. inv H1.
-          exploit Memory.promise_get0; eauto; try by (inv PROMISE; ss). i. des.
-          exploit Memory.remove_get0; eauto. i. des.
-          esplits; eauto. }
-        ii. exploit H; eauto. i. des. esplits; eauto.
-        erewrite Memory.remove_o; eauto. condtac; ss.
-      - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP. inv WRITE. ss.
-        hexploit promise_rels_wf; eauto. i.
-        cut (RelWrites.wf rels1 promises2 mem2).
-        { i. repeat condtac; ss. ii. inv IN; eauto. inv H1.
-          exploit Memory.promise_get0; eauto; try by (inv PROMISE; ss). i. des.
-          exploit Memory.remove_get0; eauto. i. des.
-          esplits; eauto. }
-        ii. exploit H; eauto. i. des. esplits; eauto.
-        erewrite Memory.remove_o; eauto. condtac; ss.
-      - inv LOCAL0. ss.
-      - inv LOCAL0. ss.
+      inv STEP. eauto using RelWrites.step_wf.
     Qed.
 
     Lemma steps_rels_wf
@@ -353,31 +307,6 @@ Module RelThread.
       apply IHSTEPS. eapply step_rels_wf; eauto.
     Qed.
 
-    Lemma promise_rels_disjoint
-          promises1 mem1 loc from to msg promises2 mem2 kind
-          promises
-          (PROMISE: Memory.promise promises1 mem1 loc from to msg promises2 mem2 kind)
-          (DISJOINT: Memory.disjoint promises1 promises)
-          (LE: Memory.le promises mem1):
-      Memory.get loc to promises = None.
-    Proof.
-      destruct (Memory.get loc to promises) as [[]|] eqn:GETP; ss.
-      exploit LE; eauto. i.
-      inv PROMISE; ss.
-      - exploit Memory.add_get0; try exact MEM. i. des. congr.
-      - exploit Memory.split_get0; try exact MEM. i. des. congr.
-      - exploit Memory.lower_get0; try exact PROMISES. i. des.
-        inv DISJOINT. exploit DISJOINT0; eauto. i. des. exfalso.
-        exploit Memory.get_ts; try exact GETP. i. des; try congr.
-        exploit Memory.get_ts; try exact GET. i. des; try congr.
-        apply (x0 to); econs; try refl; ss.
-      - exploit Memory.remove_get0; try exact PROMISES. i. des.
-        inv DISJOINT. exploit DISJOINT0; eauto. i. des. exfalso.
-        exploit Memory.get_ts; try exact GETP. i. des; try congr.
-        exploit Memory.get_ts; try exact GET. i. des; try congr.
-        apply (x0 to); econs; try refl; ss.
-    Qed.
-
     Lemma step_rels_disjoint
           rels1 rels2 e e1 e2 promises
           (RELS1: RelWrites.wf rels1 (Local.promises (Thread.local e1)) (Thread.memory e1))
@@ -387,22 +316,7 @@ Module RelThread.
           (RELS: RelWrites.wf rels1 promises (Thread.memory e1)):
       RelWrites.wf rels2 promises (Thread.memory e2).
     Proof.
-      hexploit step_rels_wf; eauto. ii.
-      exploit H; eauto. i. des. esplits; eauto.
-      inv STEP. unfold RelWrites.append in *.
-      inv STEP0; inv STEP; inv LOCAL; ss.
-      - exploit RELS; eauto. i. des. ss.
-      - exploit RELS; eauto. i. des. ss.
-      - exploit RELS; eauto. i. des. ss.
-      - inv LOCAL0. inv STEP. inv WRITE. ss. revert IN.
-        repeat condtac; ss; i; des; try by (exploit RELS; eauto; i; des; ss).
-        inv IN. eapply promise_rels_disjoint; eauto.
-      - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP. inv WRITE. ss. revert IN.
-        repeat condtac; ss; i; des; try by (exploit RELS; eauto; i; des; ss).
-        inv IN. eapply promise_rels_disjoint; eauto.
-      - exploit RELS; eauto. i. des. ss.
-      - exploit RELS; eauto. i. des. ss.
-      - exploit RELS; eauto. i. des. ss.
+      inv STEP. eauto using RelWrites.step_disjoint.
     Qed.
 
     Lemma steps_rels_disjoint
@@ -569,6 +483,21 @@ Module RelThread.
       erewrite Memory.remove_o; eauto. condtac; ss.
     Qed.
 
+    Lemma write_na_get_None
+          ts promises1 mem1 loc' from' to' val' promises2 mem2 msgs kinds kind
+          loc from to msg
+          (WRITE: Memory.write_na ts promises1 mem1 loc' from' to' val' promises2 mem2 msgs kinds kind)
+          (PROMISES1: Memory.get loc to promises1 = None)
+          (MEM1: Memory.get loc to mem1 = Some (from, msg)):
+      (<<PROMISES2: Memory.get loc to promises2 = None>>) /\
+      (<<MEM2: Memory.get loc to mem2 = Some (from, msg)>>) /\
+      (<<LOCTS: __guard__ (loc' <> loc \/ to' <> to)>>).
+    Proof.
+      induction WRITE; eauto using write_get_None.
+      exploit write_get_None; eauto. i. des.
+      apply IHWRITE; auto.
+    Qed.
+
     Lemma step_get_None
           e rels1 rels2 e1 e2
           loc from to msg
@@ -582,14 +511,17 @@ Module RelThread.
       inv STEP. inv STEP0; inv STEP; inv LOCAL; ss.
       - exploit promise_get_None; eauto. i. des. splits; ss.
       - inv LOCAL0. inv STEP. ss.
-      - inv LOCAL0. inv STEP.
+      - inv LOCAL0. inv STEP. ss.
         exploit write_get_None; eauto. i. des. splits; ss.
         ii. inv H. unguard. des; ss.
-      - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP.
+      - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP. ss.
         exploit write_get_None; eauto. i. des. splits; ss.
         ii. inv H. unguard. des; ss.
       - inv LOCAL0. ss.
       - inv LOCAL0. ss.
+      - inv LOCAL0. inv STEP. ss.
+        exploit write_na_get_None; eauto. i. des. splits; ss.
+        ii. inv H. unguard. des; ss.
     Qed.
 
     Lemma opt_step_get_None
@@ -662,60 +594,20 @@ Module RelThread.
 
     (* reserve_only *)
 
-    Definition reserve_only (promises: Memory.t): Prop :=
-      forall loc from to msg
-        (LOC: L loc)
-        (GET: Memory.get loc to promises = Some (from, msg)),
-        msg = Message.reserve.
-
     Lemma step_reserve_only
           rels1 rels2 e e1 e2
-          (PROMISES1: reserve_only (Local.promises (Thread.local e1)))
+          (PROMISES1: OrdLocal.reserve_only L (Local.promises (Thread.local e1)))
           (STEP: step rels1 rels2 e e1 e2):
-      <<PROMISES2: reserve_only (Local.promises (Thread.local e2))>>.
+      <<PROMISES2: OrdLocal.reserve_only L (Local.promises (Thread.local e2))>>.
     Proof.
-      inv STEP. inv STEP0; inv STEP; inv LOCAL; ss; try by (inv LOCAL0; ss).
-      - destruct (L loc) eqn:LOC.
-        + ii. destruct msg; try by exploit PF; ss.
-          revert GET. inv PROMISE; ss.
-          * erewrite Memory.add_o; eauto. condtac; ss; eauto.
-            i. des. subst. inv GET. ss.
-          * erewrite Memory.remove_o; eauto. condtac; ss; eauto.
-        + ii. revert GET. inv PROMISE; ss.
-          * erewrite Memory.add_o; eauto. condtac; ss; eauto.
-            i. des. subst. congr.
-          * erewrite Memory.split_o; eauto. repeat (condtac; ss; eauto).
-            { i. des. subst. congr. }
-            { guardH o. i. des. subst. congr. }
-          * erewrite Memory.lower_o; eauto. condtac; ss; eauto.
-            i. des. subst. congr.
-          * erewrite Memory.remove_o; eauto. condtac; ss; eauto.
-      - inv LOCAL0. inv STEP. ss.
-      - inv LOCAL0. inv STEP. inv WRITE. ss.
-        ii. revert GET. erewrite Memory.remove_o; eauto. condtac; ss.
-        guardH o. inv PROMISE; ss.
-        + erewrite Memory.add_o; eauto. condtac; ss; eauto.
-        + erewrite Memory.split_o; eauto. condtac; ss. condtac; ss; eauto.
-          guardH o0. i. des. inv GET.
-          exploit Memory.split_get0; try exact PROMISES. i. des.
-          exploit PROMISES1; try exact GET0; eauto.
-        + erewrite Memory.lower_o; eauto. condtac; ss; eauto.
-      - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP. inv WRITE. ss.
-        ii. revert GET0. erewrite Memory.remove_o; eauto. condtac; ss.
-        guardH o. inv PROMISE; ss.
-        + erewrite Memory.add_o; eauto. condtac; ss; eauto.
-        + erewrite Memory.split_o; eauto. condtac; ss. condtac; ss; eauto.
-          guardH o0. i. des. inv GET0.
-          exploit Memory.split_get0; try exact PROMISES. i. des.
-          exploit PROMISES1; try exact GET0; eauto.
-        + erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+      inv STEP. eauto using OrdThread.step_reserve_only.
     Qed.
 
     Lemma opt_step_reserve_only
           rels1 rels2 e e1 e2
-          (PROMISES1: reserve_only (Local.promises (Thread.local e1)))
+          (PROMISES1: OrdLocal.reserve_only L (Local.promises (Thread.local e1)))
           (STEP: opt_step rels1 rels2 e e1 e2):
-      <<PROMISES2: reserve_only (Local.promises (Thread.local e2))>>.
+      <<PROMISES2: OrdLocal.reserve_only L (Local.promises (Thread.local e2))>>.
     Proof.
       inv STEP; ss.
       eapply step_reserve_only; eauto.
@@ -723,9 +615,9 @@ Module RelThread.
 
     Lemma reserve_step_reserve_only
           e1 e2
-          (PROMISES1: reserve_only (Local.promises (Thread.local e1)))
+          (PROMISES1: OrdLocal.reserve_only L (Local.promises (Thread.local e1)))
           (STEP: @Thread.reserve_step lang e1 e2):
-      <<PROMISES2: reserve_only (Local.promises (Thread.local e2))>>.
+      <<PROMISES2: OrdLocal.reserve_only L (Local.promises (Thread.local e2))>>.
     Proof.
       inv STEP. inv STEP0; inv STEP; inv LOCAL. inv PROMISE. ss. ii.
       revert GET. erewrite Memory.add_o; eauto. condtac; ss; eauto.
@@ -734,9 +626,9 @@ Module RelThread.
 
     Lemma cancel_step_reserve_only
           e1 e2
-          (PROMISES1: reserve_only (Local.promises (Thread.local e1)))
+          (PROMISES1: OrdLocal.reserve_only L (Local.promises (Thread.local e1)))
           (STEP: @Thread.cancel_step lang e1 e2):
-      <<PROMISES2: reserve_only (Local.promises (Thread.local e2))>>.
+      <<PROMISES2: OrdLocal.reserve_only L (Local.promises (Thread.local e2))>>.
     Proof.
       inv STEP. inv STEP0; inv STEP; inv LOCAL. inv PROMISE. ss. ii.
       revert GET. erewrite Memory.remove_o; eauto. condtac; ss; eauto.
@@ -744,9 +636,9 @@ Module RelThread.
 
     Lemma reserve_steps_reserve_only
           e1 e2
-          (PROMISES1: reserve_only (Local.promises (Thread.local e1)))
+          (PROMISES1: OrdLocal.reserve_only L (Local.promises (Thread.local e1)))
           (STEPS: rtc (@Thread.reserve_step lang) e1 e2):
-      <<PROMISES2: reserve_only (Local.promises (Thread.local e2))>>.
+      <<PROMISES2: OrdLocal.reserve_only L (Local.promises (Thread.local e2))>>.
     Proof.
       induction STEPS; ss.
       hexploit reserve_step_reserve_only; eauto.
@@ -754,9 +646,9 @@ Module RelThread.
 
     Lemma cancel_steps_reserve_only
           e1 e2
-          (PROMISES1: reserve_only (Local.promises (Thread.local e1)))
+          (PROMISES1: OrdLocal.reserve_only L (Local.promises (Thread.local e1)))
           (STEPS: rtc (@Thread.cancel_step lang) e1 e2):
-      <<PROMISES2: reserve_only (Local.promises (Thread.local e2))>>.
+      <<PROMISES2: OrdLocal.reserve_only L (Local.promises (Thread.local e2))>>.
     Proof.
       induction STEPS; ss.
       hexploit cancel_step_reserve_only; eauto.
@@ -770,98 +662,98 @@ Module RelThread.
       inv STEP. unfold RelWrites.append. des_ifs; eauto.
     Qed.
 
-    Lemma step_non_concrete
-          rels1 rels2 e e1 e2 loc to
-          (STEP: step rels1 rels2 e e1 e2)
-          (LOC: L loc)
-          (EVENT: forall from val released ord,
-              ThreadEvent.is_writing e <> Some (loc, from, to, val, released, ord))
-          (GET1: forall from msg (GET: Memory.get loc to (Thread.memory e1) = Some (from, msg)),
-              msg = Message.reserve):
-      <<GET2: forall from msg (GET: Memory.get loc to (Thread.memory e2) = Some (from, msg)),
-          msg = Message.reserve>>.
-    Proof.
-      i. inv STEP. inv STEP0; inv STEP; inv LOCAL; ss; eauto.
-      - inv PROMISE.
-        + erewrite Memory.add_o; eauto. condtac; ss; eauto.
-          des. subst. ii. clarify. exploit PF; eauto.
-        + erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
-          * des. subst. ii. clarify. exploit PF; eauto.
-          * guardH o. des. subst. ii. clarify.
-            exploit PF; eauto. i. subst. ss.
-        + erewrite Memory.lower_o; eauto. condtac; ss; eauto.
-          des. subst. ii. clarify. exploit PF; ss.
-        + erewrite Memory.remove_o; eauto. condtac; ss; eauto.
-      - inv LOCAL0. inv STEP. inv WRITE. inv PROMISE; ss.
-        + erewrite Memory.add_o; eauto. condtac; ss; eauto.
-          des. subst. exploit EVENT; eauto. ss.
-        + erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
-          * des. subst. exploit EVENT; eauto. ss.
-          * des. subst. exploit EVENT; eauto. ss.
-          * guardH o. des. subst.
-            exploit Memory.split_get0; try exact MEM. i. des.
-            exploit GET1; eauto. ss.
-        + erewrite Memory.lower_o; eauto. condtac; ss; eauto.
-          des. subst. exploit EVENT; eauto. ss.
-      - inv LOCAL1. inv STEP.
-        inv LOCAL2. inv STEP. inv WRITE. inv PROMISE; ss.
-        + erewrite Memory.add_o; eauto. condtac; ss; eauto.
-          des. subst. exploit EVENT; eauto. ss.
-        + erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
-          * des. subst. exploit EVENT; eauto. ss.
-          * des. subst. exploit EVENT; eauto. ss.
-          * guardH o. des. subst.
-            exploit Memory.split_get0; try exact MEM. i. des.
-            exploit GET1; eauto. ss.
-        + erewrite Memory.lower_o; eauto. condtac; ss; eauto.
-          des. subst. exploit EVENT; eauto. ss.
-    Qed.
+    (* Lemma step_non_concrete *)
+    (*       rels1 rels2 e e1 e2 loc to *)
+    (*       (STEP: step rels1 rels2 e e1 e2) *)
+    (*       (LOC: L loc) *)
+    (*       (EVENT: forall from val released ord, *)
+    (*           ThreadEvent.is_writing e <> Some (loc, from, to, val, released, ord)) *)
+    (*       (GET1: forall from msg (GET: Memory.get loc to (Thread.memory e1) = Some (from, msg)), *)
+    (*           msg = Message.reserve): *)
+    (*   <<GET2: forall from msg (GET: Memory.get loc to (Thread.memory e2) = Some (from, msg)), *)
+    (*       msg = Message.reserve>>. *)
+    (* Proof. *)
+    (*   i. inv STEP. inv STEP0; inv STEP; inv LOCAL; ss; eauto. *)
+    (*   - inv PROMISE. *)
+    (*     + erewrite Memory.add_o; eauto. condtac; ss; eauto. *)
+    (*       des. subst. ii. clarify. exploit PF; eauto. *)
+    (*     + erewrite Memory.split_o; eauto. repeat condtac; ss; eauto. *)
+    (*       * des. subst. ii. clarify. exploit PF; eauto. *)
+    (*       * guardH o. des. subst. ii. clarify. *)
+    (*         exploit PF; eauto. i. subst. ss. *)
+    (*     + erewrite Memory.lower_o; eauto. condtac; ss; eauto. *)
+    (*       des. subst. ii. clarify. exploit PF; ss. *)
+    (*     + erewrite Memory.remove_o; eauto. condtac; ss; eauto. *)
+    (*   - inv LOCAL0. inv STEP. inv WRITE. inv PROMISE; ss. *)
+    (*     + erewrite Memory.add_o; eauto. condtac; ss; eauto. *)
+    (*       des. subst. exploit EVENT; eauto. ss. *)
+    (*     + erewrite Memory.split_o; eauto. repeat condtac; ss; eauto. *)
+    (*       * des. subst. exploit EVENT; eauto. ss. *)
+    (*       * des. subst. exploit EVENT; eauto. ss. *)
+    (*       * guardH o. des. subst. *)
+    (*         exploit Memory.split_get0; try exact MEM. i. des. *)
+    (*         exploit GET1; eauto. ss. *)
+    (*     + erewrite Memory.lower_o; eauto. condtac; ss; eauto. *)
+    (*       des. subst. exploit EVENT; eauto. ss. *)
+    (*   - inv LOCAL1. inv STEP. *)
+    (*     inv LOCAL2. inv STEP. inv WRITE. inv PROMISE; ss. *)
+    (*     + erewrite Memory.add_o; eauto. condtac; ss; eauto. *)
+    (*       des. subst. exploit EVENT; eauto. ss. *)
+    (*     + erewrite Memory.split_o; eauto. repeat condtac; ss; eauto. *)
+    (*       * des. subst. exploit EVENT; eauto. ss. *)
+    (*       * des. subst. exploit EVENT; eauto. ss. *)
+    (*       * guardH o. des. subst. *)
+    (*         exploit Memory.split_get0; try exact MEM. i. des. *)
+    (*         exploit GET1; eauto. ss. *)
+    (*     + erewrite Memory.lower_o; eauto. condtac; ss; eauto. *)
+    (*       des. subst. exploit EVENT; eauto. ss. *)
+    (* Qed. *)
 
-    Lemma opt_step_non_concrete
-          rels1 rels2 e e1 e2 loc to
-          (STEP: opt_step rels1 rels2 e e1 e2)
-          (LOC: L loc)
-          (EVENT: forall from val released ord,
-              ThreadEvent.is_writing e <> Some (loc, from, to, val, released, ord))
-          (GET1: forall from msg (GET: Memory.get loc to (Thread.memory e1) = Some (from, msg)),
-              msg = Message.reserve):
-      <<GET2: forall from msg (GET: Memory.get loc to (Thread.memory e2) = Some (from, msg)),
-          msg = Message.reserve>>.
-    Proof.
-      inv STEP; eauto.
-      eapply step_non_concrete; eauto.
-    Qed.
+    (* Lemma opt_step_non_concrete *)
+    (*       rels1 rels2 e e1 e2 loc to *)
+    (*       (STEP: opt_step rels1 rels2 e e1 e2) *)
+    (*       (LOC: L loc) *)
+    (*       (EVENT: forall from val released ord, *)
+    (*           ThreadEvent.is_writing e <> Some (loc, from, to, val, released, ord)) *)
+    (*       (GET1: forall from msg (GET: Memory.get loc to (Thread.memory e1) = Some (from, msg)), *)
+    (*           msg = Message.reserve): *)
+    (*   <<GET2: forall from msg (GET: Memory.get loc to (Thread.memory e2) = Some (from, msg)), *)
+    (*       msg = Message.reserve>>. *)
+    (* Proof. *)
+    (*   inv STEP; eauto. *)
+    (*   eapply step_non_concrete; eauto. *)
+    (* Qed. *)
 
-    Lemma reserve_steps_non_concrete
-          e1 e2 loc to
-          (STEPS: rtc (@Thread.reserve_step lang) e1 e2)
-          (LOC: L loc)
-          (GET1: forall from msg (GET: Memory.get loc to (Thread.memory e1) = Some (from, msg)),
-              msg = Message.reserve):
-      <<GET2: forall from msg (GET: Memory.get loc to (Thread.memory e2) = Some (from, msg)),
-          msg = Message.reserve>>.
-    Proof.
-      induction STEPS; eauto. i.
-      eapply IHSTEPS; eauto. i.
-      inv H. inv STEP; inv STEP0; inv LOCAL. inv PROMISE; ss.
-      revert GET. erewrite Memory.add_o; eauto. condtac; ss; eauto.
-      i. des. clarify.
-    Qed.
+    (* Lemma reserve_steps_non_concrete *)
+    (*       e1 e2 loc to *)
+    (*       (STEPS: rtc (@Thread.reserve_step lang) e1 e2) *)
+    (*       (LOC: L loc) *)
+    (*       (GET1: forall from msg (GET: Memory.get loc to (Thread.memory e1) = Some (from, msg)), *)
+    (*           msg = Message.reserve): *)
+    (*   <<GET2: forall from msg (GET: Memory.get loc to (Thread.memory e2) = Some (from, msg)), *)
+    (*       msg = Message.reserve>>. *)
+    (* Proof. *)
+    (*   induction STEPS; eauto. i. *)
+    (*   eapply IHSTEPS; eauto. i. *)
+    (*   inv H. inv STEP; inv STEP0; inv LOCAL. inv PROMISE; ss. *)
+    (*   revert GET. erewrite Memory.add_o; eauto. condtac; ss; eauto. *)
+    (*   i. des. clarify. *)
+    (* Qed. *)
 
-    Lemma cancel_steps_non_concrete
-          e1 e2 loc to
-          (STEPS: rtc (@Thread.cancel_step lang) e1 e2)
-          (LOC: L loc)
-          (GET1: forall from msg (GET: Memory.get loc to (Thread.memory e1) = Some (from, msg)),
-              msg = Message.reserve):
-      <<GET2: forall from msg (GET: Memory.get loc to (Thread.memory e2) = Some (from, msg)),
-          msg = Message.reserve>>.
-    Proof.
-      induction STEPS; eauto. i.
-      eapply IHSTEPS; eauto. i.
-      inv H. inv STEP; inv STEP0; inv LOCAL. inv PROMISE; ss.
-      revert GET. erewrite Memory.remove_o; eauto. condtac; ss; eauto.
-    Qed.
+    (* Lemma cancel_steps_non_concrete *)
+    (*       e1 e2 loc to *)
+    (*       (STEPS: rtc (@Thread.cancel_step lang) e1 e2) *)
+    (*       (LOC: L loc) *)
+    (*       (GET1: forall from msg (GET: Memory.get loc to (Thread.memory e1) = Some (from, msg)), *)
+    (*           msg = Message.reserve): *)
+    (*   <<GET2: forall from msg (GET: Memory.get loc to (Thread.memory e2) = Some (from, msg)), *)
+    (*       msg = Message.reserve>>. *)
+    (* Proof. *)
+    (*   induction STEPS; eauto. i. *)
+    (*   eapply IHSTEPS; eauto. i. *)
+    (*   inv H. inv STEP; inv STEP0; inv LOCAL. inv PROMISE; ss. *)
+    (*   revert GET. erewrite Memory.remove_o; eauto. condtac; ss; eauto. *)
+    (* Qed. *)
   End RelThread.
 End RelThread.
 
@@ -869,7 +761,7 @@ End RelThread.
 Module RelConfiguration.
   Section RelConfiguration.
     Variable L: Loc.t -> bool.
-    Variable ordc: Ordering.t.
+    Variable ordcr ordcw: Ordering.t.
 
     Inductive step:
       forall (e: ThreadEvent.t) (tid: Ident.t) (rels1 rels2: RelWrites.t) (c1 c2: Configuration.t), Prop :=
@@ -878,10 +770,10 @@ Module RelConfiguration.
         e tid c1 lang st1 lc1 e2 e3 st4 lc4 sc4 memory4
         (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
         (CANCELS: rtc (@Thread.cancel_step _) (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) e2)
-        (STEP: RelThread.opt_step L ordc rels1 rels2 e e2 e3)
+        (STEP: RelThread.opt_step L ordcr ordcw rels1 rels2 e e2 e3)
         (RESERVES: rtc (@Thread.reserve_step _) e3 (Thread.mk _ st4 lc4 sc4 memory4))
         (CONSISTENT: ThreadEvent.get_machine_event e <> MachineEvent.failure ->
-                     OrdThread.consistent L ordc (Thread.mk _ st4 lc4 sc4 memory4)):
+                     OrdThread.consistent L ordcr ordcw (Thread.mk _ st4 lc4 sc4 memory4)):
         step e tid rels1 rels2
              c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) (Configuration.threads c1)) sc4 memory4)
     .
@@ -910,7 +802,7 @@ Module RelConfiguration.
     Lemma step_ord_step
           e tid rels1 rels2 c1 c2
           (STEP: step e tid rels1 rels2 c1 c2):
-      OrdConfiguration.step L ordc e tid c1 c2.
+      OrdConfiguration.step L ordcr ordcw e tid c1 c2.
     Proof.
       inv STEP. econs; eauto. inv STEP0; [econs 1|].
       inv STEP. econs 2. eauto.
@@ -919,7 +811,7 @@ Module RelConfiguration.
     Lemma steps_ord_steps
           rels1 rels2 c1 c2
           (STEPS: steps rels1 rels2 c1 c2):
-      rtc (@OrdConfiguration.all_step L ordc) c1 c2.
+      rtc (@OrdConfiguration.all_step L ordcr ordcw) c1 c2.
     Proof.
       induction STEPS; eauto.
       exploit step_ord_step; eauto. i. econs 2; eauto.
@@ -1006,218 +898,218 @@ Module RelConfiguration.
         splits; ss; etrans; eauto.
     Qed.
 
-    Lemma write_get_None
-          e tid rels1 rels2 c1 c2
-          loc from to val released ord
-          (WF1: Configuration.wf c1)
-          (STEP: step e tid rels1 rels2 c1 c2)
-          (WRITE: ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord)):
-      (<<PROMISES: forall tid lang st lc
-                     (FIND: IdentMap.find tid (Configuration.threads c2) = Some (existT _ lang st, lc)),
-          Memory.get loc to (Local.promises lc) = None>>) /\
-      (<<MEM: Memory.get loc to (Configuration.memory c2) = Some (from, Message.concrete val released)>>).
-    Proof.
-      inv STEP. inv STEP0; ss.
-      split; cycle 1.
-      { inv STEP. inv STEP0; inv STEP; inv LOCAL; ss.
-        - inv LOCAL0. inv STEP. exploit Memory.write_get2; eauto. i. des.
-          exploit RelThread.reserve_steps_get_None; eauto. i. des. inv WRITE. ss.
-        - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP.
-          exploit Memory.write_get2; eauto. i. des.
-          exploit RelThread.reserve_steps_get_None; eauto. i. des. inv WRITE. ss.
-      }
-      ii. revert FIND. rewrite IdentMap.gsspec. condtac; ss.
-      { i. inv FIND.
-        inv STEP. inv STEP0; inv STEP; inv LOCAL; ss.
-        - inv LOCAL0. inv STEP. exploit Memory.write_get2; eauto. i. des.
-          exploit RelThread.reserve_steps_get_None; eauto. i. des. inv WRITE. ss.
-        - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP.
-          exploit Memory.write_get2; eauto. i. des.
-          exploit RelThread.reserve_steps_get_None; eauto. i. des. inv WRITE. ss.
-      }
+    (* Lemma write_get_None *)
+    (*       e tid rels1 rels2 c1 c2 *)
+    (*       loc from to val released ord *)
+    (*       (WF1: Configuration.wf c1) *)
+    (*       (STEP: step e tid rels1 rels2 c1 c2) *)
+    (*       (WRITE: ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord)): *)
+    (*   (<<PROMISES: forall tid lang st lc *)
+    (*                  (FIND: IdentMap.find tid (Configuration.threads c2) = Some (existT _ lang st, lc)), *)
+    (*       Memory.get loc to (Local.promises lc) = None>>) /\ *)
+    (*   (<<MEM: Memory.get loc to (Configuration.memory c2) = Some (from, Message.concrete val released)>>). *)
+    (* Proof. *)
+    (*   inv STEP. inv STEP0; ss. *)
+    (*   split; cycle 1. *)
+    (*   { inv STEP. inv STEP0; inv STEP; inv LOCAL; ss. *)
+    (*     - inv LOCAL0. inv STEP. exploit Memory.write_get2; eauto. i. des. *)
+    (*       exploit RelThread.reserve_steps_get_None; eauto. i. des. inv WRITE. ss. *)
+    (*     - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP. *)
+    (*       exploit Memory.write_get2; eauto. i. des. *)
+    (*       exploit RelThread.reserve_steps_get_None; eauto. i. des. inv WRITE. ss. *)
+    (*   } *)
+    (*   ii. revert FIND. rewrite IdentMap.gsspec. condtac; ss. *)
+    (*   { i. inv FIND. *)
+    (*     inv STEP. inv STEP0; inv STEP; inv LOCAL; ss. *)
+    (*     - inv LOCAL0. inv STEP. exploit Memory.write_get2; eauto. i. des. *)
+    (*       exploit RelThread.reserve_steps_get_None; eauto. i. des. inv WRITE. ss. *)
+    (*     - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP. *)
+    (*       exploit Memory.write_get2; eauto. i. des. *)
+    (*       exploit RelThread.reserve_steps_get_None; eauto. i. des. inv WRITE. ss. *)
+    (*   } *)
 
-      i. inv WF1. inv WF. hexploit DISJOINT; eauto. i.
-      exploit THREADS; try eapply TID. i.
-      exploit THREADS; try eapply FIND. i.
-      exploit Thread.rtc_tau_step_disjoint; try eapply rtc_implies;
-        try eapply Thread.cancel_step_tau_step; try exact CANCELS; eauto. i. des.
-      exploit Thread.rtc_tau_step_future; try eapply rtc_implies;
-        try eapply Thread.cancel_step_tau_step; try exact CANCELS; eauto. s. i. des.
-      exploit RelThread.step_future; try exact STEP; eauto. i. des.
-      inv STEP. inv STEP0; inv STEP; inv LOCAL; inv WRITE; ss.
-      - inv LOCAL0. inv STEP. inv WRITE.
-        exploit Memory.promise_disjoint; try eapply WF; try eapply DISJOINT2; eauto. i. des.
-        exploit Memory.promise_get0; eauto; try by (inv PROMISE; ss). i. des.
-        destruct (Memory.get loc to (Local.promises lc)) as [[]|] eqn:GETP; ss.
-        exfalso.
-        exploit MemoryFacts.promise_time_lt; eauto; try by (inv PROMISE; ss). i.
-        inv DISJOINT0. hexploit DISJOINT1; eauto. i. des.
-        exploit Memory.get_ts; try exact GETP. i. des.
-        { subst. ss. }
-        apply (H0 to); econs; ss; refl.
-      - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP. inv WRITE.
-        exploit Memory.promise_disjoint; try eapply WF; try eapply DISJOINT2; eauto. i. des.
-        exploit Memory.promise_get0; eauto; try by (inv PROMISE; ss). i. des.
-        destruct (Memory.get loc to (Local.promises lc)) as [[]|] eqn:GETP; ss.
-        exfalso.
-        exploit MemoryFacts.promise_time_lt; eauto; try by (inv PROMISE; ss). i.
-        inv DISJOINT0. hexploit DISJOINT1; eauto. i. des.
-        exploit Memory.get_ts; try exact GETP. i. des.
-        { subst. ss. }
-        apply (H0 to); econs; ss; refl.
-    Qed.
+    (*   i. inv WF1. inv WF. hexploit DISJOINT; eauto. i. *)
+    (*   exploit THREADS; try eapply TID. i. *)
+    (*   exploit THREADS; try eapply FIND. i. *)
+    (*   exploit Thread.rtc_tau_step_disjoint; try eapply rtc_implies; *)
+    (*     try eapply Thread.cancel_step_tau_step; try exact CANCELS; eauto. i. des. *)
+    (*   exploit Thread.rtc_tau_step_future; try eapply rtc_implies; *)
+    (*     try eapply Thread.cancel_step_tau_step; try exact CANCELS; eauto. s. i. des. *)
+    (*   exploit RelThread.step_future; try exact STEP; eauto. i. des. *)
+    (*   inv STEP. inv STEP0; inv STEP; inv LOCAL; inv WRITE; ss. *)
+    (*   - inv LOCAL0. inv STEP. inv WRITE. *)
+    (*     exploit Memory.promise_disjoint; try eapply WF; try eapply DISJOINT2; eauto. i. des. *)
+    (*     exploit Memory.promise_get0; eauto; try by (inv PROMISE; ss). i. des. *)
+    (*     destruct (Memory.get loc to (Local.promises lc)) as [[]|] eqn:GETP; ss. *)
+    (*     exfalso. *)
+    (*     exploit MemoryFacts.promise_time_lt; eauto; try by (inv PROMISE; ss). i. *)
+    (*     inv DISJOINT0. hexploit DISJOINT1; eauto. i. des. *)
+    (*     exploit Memory.get_ts; try exact GETP. i. des. *)
+    (*     { subst. ss. } *)
+    (*     apply (H0 to); econs; ss; refl. *)
+    (*   - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP. inv WRITE. *)
+    (*     exploit Memory.promise_disjoint; try eapply WF; try eapply DISJOINT2; eauto. i. des. *)
+    (*     exploit Memory.promise_get0; eauto; try by (inv PROMISE; ss). i. des. *)
+    (*     destruct (Memory.get loc to (Local.promises lc)) as [[]|] eqn:GETP; ss. *)
+    (*     exfalso. *)
+    (*     exploit MemoryFacts.promise_time_lt; eauto; try by (inv PROMISE; ss). i. *)
+    (*     inv DISJOINT0. hexploit DISJOINT1; eauto. i. des. *)
+    (*     exploit Memory.get_ts; try exact GETP. i. des. *)
+    (*     { subst. ss. } *)
+    (*     apply (H0 to); econs; ss; refl. *)
+    (* Qed. *)
 
-    Lemma step_get_None
-          e tid rels1 rels2 c1 c2
-          loc from to msg
-          (STEP: step e tid rels1 rels2 c1 c2)
-          (PROMISES1: forall tid lang st lc
-                       (FIND: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st, lc)),
-              Memory.get loc to (Local.promises lc) = None)
-          (MEM1: Memory.get loc to (Configuration.memory c1) = Some (from, msg)):
-      (<<PROMISES2: forall tid lang st lc
-                     (FIND: IdentMap.find tid (Configuration.threads c2) = Some (existT _ lang st, lc)),
-          Memory.get loc to (Local.promises lc) = None>>) /\
-      (<<MEM2: Memory.get loc to (Configuration.memory c2) = Some (from, msg)>>) /\
-      (<<EVENT: forall from' val released ord, ThreadEvent.is_writing e <> Some (loc, from', to, val, released, ord)>>).
-    Proof.
-      inv STEP. ss.
-      exploit PROMISES1; eauto. i.
-      exploit RelThread.cancel_steps_get_None; eauto. i. des.
-      exploit RelThread.opt_step_get_None; eauto. i. des.
-      exploit RelThread.reserve_steps_get_None; eauto. i. des.
-      splits; eauto. i.
-      revert FIND. rewrite IdentMap.gsspec. condtac; eauto. i. inv FIND. ss.
-    Qed.
+    (* Lemma step_get_None *)
+    (*       e tid rels1 rels2 c1 c2 *)
+    (*       loc from to msg *)
+    (*       (STEP: step e tid rels1 rels2 c1 c2) *)
+    (*       (PROMISES1: forall tid lang st lc *)
+    (*                    (FIND: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st, lc)), *)
+    (*           Memory.get loc to (Local.promises lc) = None) *)
+    (*       (MEM1: Memory.get loc to (Configuration.memory c1) = Some (from, msg)): *)
+    (*   (<<PROMISES2: forall tid lang st lc *)
+    (*                  (FIND: IdentMap.find tid (Configuration.threads c2) = Some (existT _ lang st, lc)), *)
+    (*       Memory.get loc to (Local.promises lc) = None>>) /\ *)
+    (*   (<<MEM2: Memory.get loc to (Configuration.memory c2) = Some (from, msg)>>) /\ *)
+    (*   (<<EVENT: forall from' val released ord, ThreadEvent.is_writing e <> Some (loc, from', to, val, released, ord)>>). *)
+    (* Proof. *)
+    (*   inv STEP. ss. *)
+    (*   exploit PROMISES1; eauto. i. *)
+    (*   exploit RelThread.cancel_steps_get_None; eauto. i. des. *)
+    (*   exploit RelThread.opt_step_get_None; eauto. i. des. *)
+    (*   exploit RelThread.reserve_steps_get_None; eauto. i. des. *)
+    (*   splits; eauto. i. *)
+    (*   revert FIND. rewrite IdentMap.gsspec. condtac; eauto. i. inv FIND. ss. *)
+    (* Qed. *)
 
-    Lemma steps_rels
-          rels1 rels2 c1 c2
-          loc from to msg
-          (STEPS: steps rels1 rels2 c1 c2)
-          (PROMISES1: forall tid lang st lc
-                       (FIND: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st, lc)),
-              Memory.get loc to (Local.promises lc) = None)
-          (MEM1: Memory.get loc to (Configuration.memory c1) = Some (from, msg))
-          (RELS1: ~ List.In (loc, to) rels1):
-      ~ List.In (loc, to) rels2.
-    Proof.
-      induction STEPS; ss.
-      exploit step_get_None; eauto. i. des.
-      eapply IHSTEPS; eauto.
-      ii. inv STEP. ss. inv STEP0; ss. inv STEP.
-      unfold RelWrites.append in H. des_ifs. inv H; ss. inv H0.
-      eapply EVENT; eauto.
-    Qed.
+    (* Lemma steps_rels *)
+    (*       rels1 rels2 c1 c2 *)
+    (*       loc from to msg *)
+    (*       (STEPS: steps rels1 rels2 c1 c2) *)
+    (*       (PROMISES1: forall tid lang st lc *)
+    (*                    (FIND: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st, lc)), *)
+    (*           Memory.get loc to (Local.promises lc) = None) *)
+    (*       (MEM1: Memory.get loc to (Configuration.memory c1) = Some (from, msg)) *)
+    (*       (RELS1: ~ List.In (loc, to) rels1): *)
+    (*   ~ List.In (loc, to) rels2. *)
+    (* Proof. *)
+    (*   induction STEPS; ss. *)
+    (*   exploit step_get_None; eauto. i. des. *)
+    (*   eapply IHSTEPS; eauto. *)
+    (*   ii. inv STEP. ss. inv STEP0; ss. inv STEP. *)
+    (*   unfold RelWrites.append in H. des_ifs. inv H; ss. inv H0. *)
+    (*   eapply EVENT; eauto. *)
+    (* Qed. *)
 
-    Lemma write_rels
-          e tid rels1 rels2 c1 c2
-          loc from to val released ord
-          (WF1: Configuration.wf c1)
-          (RELS1: forall tid lang st lc
-                    (TH: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st, lc)),
-              RelWrites.wf rels1 (Local.promises lc) (Configuration.memory c1))
-          (STEP: step e tid rels1 rels2 c1 c2)
-          (WRITE: ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord)):
-      ~ List.In (loc, to) rels1.
-    Proof.
-      ii. inv STEP. inv STEP0; ss.
-      hexploit RELS1; eauto. i.
-      hexploit (@RelThread.steps_rels_wf lang L ordc);
-        try eapply RelThread.tau_steps_steps;
-        try eapply RelThread.cancel_steps_tau_steps; eauto; ss; eauto. i.
-      inv STEP. inv STEP0; inv STEP; inv LOCAL; ss.
-      - inv LOCAL0. inv STEP. inv WRITE0.
-        exploit RelThread.promise_rels_wf; eauto. i. des.
-        exploit Memory.promise_get0; eauto; try by (inv PROMISE; ss). i. des.
-        congr.
-      - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP. inv WRITE0. ss.
-        exploit RelThread.promise_rels_wf; eauto. i. des.
-        exploit Memory.promise_get0; eauto; try by (inv PROMISE; ss). i. des.
-        congr.
-    Qed.
+    (* Lemma write_rels *)
+    (*       e tid rels1 rels2 c1 c2 *)
+    (*       loc from to val released ord *)
+    (*       (WF1: Configuration.wf c1) *)
+    (*       (RELS1: forall tid lang st lc *)
+    (*                 (TH: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st, lc)), *)
+    (*           RelWrites.wf rels1 (Local.promises lc) (Configuration.memory c1)) *)
+    (*       (STEP: step e tid rels1 rels2 c1 c2) *)
+    (*       (WRITE: ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord)): *)
+    (*   ~ List.In (loc, to) rels1. *)
+    (* Proof. *)
+    (*   ii. inv STEP. inv STEP0; ss. *)
+    (*   hexploit RELS1; eauto. i. *)
+    (*   hexploit (@RelThread.steps_rels_wf lang L ordcr ordcw); *)
+    (*     try eapply RelThread.tau_steps_steps; *)
+    (*     try eapply RelThread.cancel_steps_tau_steps; eauto; ss; eauto. i. *)
+    (*   inv STEP. inv STEP0; inv STEP; inv LOCAL; ss. *)
+    (*   - inv LOCAL0. inv STEP. inv WRITE0. *)
+    (*     exploit RelThread.promise_rels_wf; eauto. i. des. *)
+    (*     exploit Memory.promise_get0; eauto; try by (inv PROMISE; ss). i. des. *)
+    (*     congr. *)
+    (*   - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP. inv WRITE0. ss. *)
+    (*     exploit RelThread.promise_rels_wf; eauto. i. des. *)
+    (*     exploit Memory.promise_get0; eauto; try by (inv PROMISE; ss). i. des. *)
+    (*     congr. *)
+    (* Qed. *)
 
 
     (* reserve_only *)
 
-    Definition reserve_only (c: Configuration.t): Prop :=
-      forall tid lang st lc
-        (FIND: IdentMap.find tid (Configuration.threads c) = Some (existT _ lang st, lc)),
-        RelThread.reserve_only L (Local.promises lc).
+    (* Definition reserve_only (c: Configuration.t): Prop := *)
+    (*   forall tid lang st lc *)
+    (*     (FIND: IdentMap.find tid (Configuration.threads c) = Some (existT _ lang st, lc)), *)
+    (*     RelThread.reserve_only L (Local.promises lc). *)
 
-    Lemma init_reserve_only s:
-      reserve_only (Configuration.init s).
-    Proof.
-      ii. unfold Configuration.init, Threads.init in *. ss.
-      rewrite IdentMap.Facts.map_o in *.
-      destruct (@UsualFMapPositive.UsualPositiveMap'.find
-                  (@sigT _ (@Language.syntax ProgramEvent.t)) tid s); inv FIND.
-      ss. rewrite Memory.bot_get in *. ss.
-    Qed.
+    (* Lemma init_reserve_only s: *)
+    (*   reserve_only (Configuration.init s). *)
+    (* Proof. *)
+    (*   ii. unfold Configuration.init, Threads.init in *. ss. *)
+    (*   rewrite IdentMap.Facts.map_o in *. *)
+    (*   destruct (@UsualFMapPositive.UsualPositiveMap'.find *)
+    (*               (@sigT _ (@Language.syntax ProgramEvent.t)) tid s); inv FIND. *)
+    (*   ss. rewrite Memory.bot_get in *. ss. *)
+    (* Qed. *)
 
-    Lemma step_reserve_only
-          tid e rels1 rels2 c1 c2
-          (RESERVE: reserve_only c1)
-          (STEP: step tid e rels1 rels2 c1 c2):
-      reserve_only c2.
-    Proof.
-      inv STEP. ii. ss.
-      revert FIND. rewrite IdentMap.gsspec. condtac; ss; i; cycle 1.
-      { eapply RESERVE; eauto. }
-      inv FIND. apply inj_pair2 in H1. subst.
-      unfold reserve_only in RESERVE.
-      hexploit RESERVE; eauto. i.
-      hexploit RelThread.cancel_steps_reserve_only; try exact CANCELS; eauto. i. des.
-      hexploit RelThread.opt_step_reserve_only; try exact STEP0; eauto. i.
-      hexploit RelThread.reserve_steps_reserve_only; try exact RESERVES; eauto.
-    Qed.
+    (* Lemma step_reserve_only *)
+    (*       tid e rels1 rels2 c1 c2 *)
+    (*       (RESERVE: reserve_only c1) *)
+    (*       (STEP: step tid e rels1 rels2 c1 c2): *)
+    (*   reserve_only c2. *)
+    (* Proof. *)
+    (*   inv STEP. ii. ss. *)
+    (*   revert FIND. rewrite IdentMap.gsspec. condtac; ss; i; cycle 1. *)
+    (*   { eapply RESERVE; eauto. } *)
+    (*   inv FIND. apply inj_pair2 in H1. subst. *)
+    (*   unfold reserve_only in RESERVE. *)
+    (*   hexploit RESERVE; eauto. i. *)
+    (*   hexploit RelThread.cancel_steps_reserve_only; try exact CANCELS; eauto. i. des. *)
+    (*   hexploit RelThread.opt_step_reserve_only; try exact STEP0; eauto. i. *)
+    (*   hexploit RelThread.reserve_steps_reserve_only; try exact RESERVES; eauto. *)
+    (* Qed. *)
 
-    Lemma steps_reserve_only
-          rels1 rels2 c1 c2
-          (RESERVE: reserve_only c1)
-          (STEPS: steps rels1 rels2 c1 c2):
-      reserve_only c2.
-    Proof.
-      induction STEPS; ss.
-      hexploit step_reserve_only; eauto.
-    Qed.
+    (* Lemma steps_reserve_only *)
+    (*       rels1 rels2 c1 c2 *)
+    (*       (RESERVE: reserve_only c1) *)
+    (*       (STEPS: steps rels1 rels2 c1 c2): *)
+    (*   reserve_only c2. *)
+    (* Proof. *)
+    (*   induction STEPS; ss. *)
+    (*   hexploit step_reserve_only; eauto. *)
+    (* Qed. *)
 
-    Lemma step_rels_incl
-          e tid rels1 rels2 c1 c2
-          (STEP: step e tid rels1 rels2 c1 c2):
-      rels2 = rels1 \/ exists a, rels2 = a :: rels1.
-    Proof.
-      inv STEP. inv STEP0; eauto. inv STEP.
-      unfold RelWrites.append. des_ifs; eauto.
-    Qed.
+    (* Lemma step_rels_incl *)
+    (*       e tid rels1 rels2 c1 c2 *)
+    (*       (STEP: step e tid rels1 rels2 c1 c2): *)
+    (*   rels2 = rels1 \/ exists a, rels2 = a :: rels1. *)
+    (* Proof. *)
+    (*   inv STEP. inv STEP0; eauto. inv STEP. *)
+    (*   unfold RelWrites.append. des_ifs; eauto. *)
+    (* Qed. *)
 
-    Lemma steps_rels_incl
-          rels1 rels2 c1 c2
-          (STEPS: steps rels1 rels2 c1 c2):
-      exists rels, rels2 = rels ++ rels1.
-    Proof.
-      induction STEPS.
-      - exists []. ss.
-      - des. exploit step_rels_incl; eauto. i. des; subst.
-        + exists rels. ss.
-        + exists (rels ++ [a]). rewrite <- List.app_assoc. ss.
-    Qed.
+    (* Lemma steps_rels_incl *)
+    (*       rels1 rels2 c1 c2 *)
+    (*       (STEPS: steps rels1 rels2 c1 c2): *)
+    (*   exists rels, rels2 = rels ++ rels1. *)
+    (* Proof. *)
+    (*   induction STEPS. *)
+    (*   - exists []. ss. *)
+    (*   - des. exploit step_rels_incl; eauto. i. des; subst. *)
+    (*     + exists rels. ss. *)
+    (*     + exists (rels ++ [a]). rewrite <- List.app_assoc. ss. *)
+    (* Qed. *)
 
-    Lemma step_non_concrete
-          e tid rels1 rels2 c1 c2 loc to
-          (STEP: step e tid rels1 rels2 c1 c2)
-          (LOC: L loc)
-          (EVENT: forall from val released ord,
-              ThreadEvent.is_writing e <> Some (loc, from, to, val, released, ord))
-          (GET1: forall from msg (GET: Memory.get loc to (Configuration.memory c1) = Some (from, msg)),
-              msg = Message.reserve):
-      <<GET2: forall from msg (GET: Memory.get loc to (Configuration.memory c2) = Some (from, msg)),
-          msg = Message.reserve>>.
-    Proof.
-      inv STEP. ss.
-      hexploit RelThread.cancel_steps_non_concrete; eauto. i. des.
-      hexploit RelThread.opt_step_non_concrete; eauto. i. des.
-      hexploit RelThread.reserve_steps_non_concrete; eauto.
-    Qed.
+    (* Lemma step_non_concrete *)
+    (*       e tid rels1 rels2 c1 c2 loc to *)
+    (*       (STEP: step e tid rels1 rels2 c1 c2) *)
+    (*       (LOC: L loc) *)
+    (*       (EVENT: forall from val released ord, *)
+    (*           ThreadEvent.is_writing e <> Some (loc, from, to, val, released, ord)) *)
+    (*       (GET1: forall from msg (GET: Memory.get loc to (Configuration.memory c1) = Some (from, msg)), *)
+    (*           msg = Message.reserve): *)
+    (*   <<GET2: forall from msg (GET: Memory.get loc to (Configuration.memory c2) = Some (from, msg)), *)
+    (*       msg = Message.reserve>>. *)
+    (* Proof. *)
+    (*   inv STEP. ss. *)
+    (*   hexploit RelThread.cancel_steps_non_concrete; eauto. i. des. *)
+    (*   hexploit RelThread.opt_step_non_concrete; eauto. i. des. *)
+    (*   hexploit RelThread.reserve_steps_non_concrete; eauto. *)
+    (* Qed. *)
   End RelConfiguration.
 End RelConfiguration.
 
@@ -1225,7 +1117,7 @@ End RelConfiguration.
 Module RelRARace.
   Section RelRARace.
     Variable L: Loc.t -> bool.
-    Variable ordc: Ordering.t.
+    Variable ordcr ordcw: Ordering.t.
 
     Definition ra_race (rels: RelWrites.t) (tview: TView.t) (loc: Loc.t) (to: Time.t) (ordr: Ordering.t): Prop :=
       (<<LOC: L loc>>) /\
@@ -1236,24 +1128,24 @@ Module RelRARace.
     Definition ra_race_steps (rels: RelWrites.t) (c: Configuration.t): Prop :=
       exists tid rels2 rels3 rels4
         c2 lang st2 lc2 e loc to val released ord e3 e4,
-        (<<STEPS: RelConfiguration.steps L ordc rels rels2 c c2>>) /\
+        (<<STEPS: RelConfiguration.steps L ordcr ordcw rels rels2 c c2>>) /\
         (<<TID: IdentMap.find tid (Configuration.threads c2) = Some (existT _ lang st2, lc2)>>) /\
-        (<<THREAD_STEPS: RelThread.steps L ordc rels2 rels3
+        (<<THREAD_STEPS: RelThread.steps L ordcr ordcw rels2 rels3
                                          (Thread.mk _ st2 lc2 (Configuration.sc c2) (Configuration.memory c2)) e3>>) /\
         (<<CONS: Local.promise_consistent (Thread.local e3)>>) /\
-        (<<THREAD_STEP: RelThread.step L ordc rels3 rels4 e e3 e4>>) /\
+        (<<THREAD_STEP: RelThread.step L ordcr ordcw rels3 rels4 e e3 e4>>) /\
         (<<READ: ThreadEvent.is_reading e = Some (loc, to, val, released, ord)>>) /\
         (<<RARACE: ra_race rels3 (Local.tview (Thread.local e3)) loc to ord>>).
 
     Definition racefree (rels: RelWrites.t) (c: Configuration.t): Prop :=
       forall tid rels2 rels3 rels4
         c2 lang st2 lc2 e loc to val released ord e3 e4
-        (STEPS: RelConfiguration.steps L ordc rels rels2 c c2)
+        (STEPS: RelConfiguration.steps L ordcr ordcw rels rels2 c c2)
         (TID: IdentMap.find tid (Configuration.threads c2) = Some (existT _ lang st2, lc2))
-        (THREAD_STEPS: RelThread.steps L ordc rels2 rels3
+        (THREAD_STEPS: RelThread.steps L ordcr ordcw rels2 rels3
                                        (Thread.mk _ st2 lc2 (Configuration.sc c2) (Configuration.memory c2)) e3)
         (CONS: Local.promise_consistent (Thread.local e3))
-        (THREAD_STEP: RelThread.step L ordc rels3 rels4 e e3 e4)
+        (THREAD_STEP: RelThread.step L ordcr ordcw rels3 rels4 e e3 e4)
         (READ: ThreadEvent.is_reading e = Some (loc, to, val, released, ord))
         (RARACE: ra_race rels3 (Local.tview (Thread.local e3)) loc to ord),
         False.
@@ -1264,7 +1156,7 @@ Module RelRARace.
     Lemma step_racefree
           e tid rels1 rels2 c1 c2
           (RACEFREE: racefree rels1 c1)
-          (STEP: RelConfiguration.step L ordc e tid rels1 rels2 c1 c2):
+          (STEP: RelConfiguration.step L ordcr ordcw e tid rels1 rels2 c1 c2):
       racefree rels2 c2.
     Proof.
       ii. eapply RACEFREE; eauto. econs 2; eauto.
@@ -1272,8 +1164,8 @@ Module RelRARace.
 
     Lemma step_ord_step
           e tid rels1 rels2 c1 c2
-          (STEP: RelConfiguration.step L ordc e tid rels1 rels2 c1 c2):
-      OrdConfiguration.step L ordc e tid c1 c2.
+          (STEP: RelConfiguration.step L ordcr ordcw e tid rels1 rels2 c1 c2):
+      OrdConfiguration.step L ordcr ordcw e tid c1 c2.
     Proof.
       inv STEP. econs; eauto. inv STEP0.
       - econs 1.
