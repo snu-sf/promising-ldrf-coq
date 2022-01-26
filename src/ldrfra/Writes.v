@@ -27,26 +27,26 @@ Require Import OrdStep.
 Set Implicit Arguments.
 
 
-Module RelWrites.
-  Section RelWrites.
+Module Writes.
+  Section Writes.
     Variable L: Loc.t -> bool.
 
-    Definition t: Type := list (Loc.t * Time.t).
+    Definition t: Type := list (Loc.t * Time.t * Ordering.t).
 
     Definition append (e: ThreadEvent.t) (rels: t): t :=
       match ThreadEvent.is_writing e with
       | Some (loc, from, to, val, released, ord) =>
         if L loc
-        then if Ordering.le Ordering.acqrel ord then (loc, to) :: rels else rels
+        then if Ordering.le Ordering.acqrel ord then (loc, to, ord) :: rels else rels
         else rels
       | None => rels
       end.
 
     Definition wf (rels: t) (promises mem: Memory.t): Prop :=
-      forall loc to (IN: List.In (loc, to) rels),
+      forall loc to ord (IN: List.In (loc, to, ord) rels),
         Memory.get loc to promises = None /\
         exists from val released,
-          Memory.get loc to mem = Some (from, Message.concrete val (Some released)).
+          Memory.get loc to mem = Some (from, Message.concrete val released).
 
     Lemma append_app e rels1 rels2:
       append e rels1 ++ rels2 = append e (rels1 ++ rels2).
@@ -92,11 +92,11 @@ Module RelWrites.
     Qed.
 
     Lemma write_wf_incr
-          rels promises1 mem1 loc from to msg promises2 mem2 kind
+          rels promises1 mem1 loc from to msg promises2 mem2 kind ord
           (RELS1: wf rels promises1 mem1)
           (WRITE: Memory.write promises1 mem1 loc from to msg promises2 mem2 kind)
           (MSG: exists val released, msg = Message.concrete val (Some released)):
-      wf ((loc, to)::rels) promises2 mem2.
+      wf ((loc, to, ord)::rels) promises2 mem2.
     Proof.
       des. hexploit write_wf; eauto. ii.
       inv IN; eauto. inv H0.
@@ -200,7 +200,7 @@ Module RelWrites.
     Proof.
       hexploit step_wf; eauto. ii.
       exploit H; eauto. i. des. esplits; eauto.
-      unfold RelWrites.append in *.
+      unfold append in *.
       inv STEP; inv STEP0; inv LOCAL; ss.
       - exploit RELS; eauto. i. des. ss.
       - exploit RELS; eauto. i. des. ss.
@@ -221,5 +221,5 @@ Module RelWrites.
       - exploit RELS; eauto. i. des. ss.
       - exploit RELS; eauto. i. des. ss.
     Qed.
-  End RelWrites.
-End RelWrites.
+  End Writes.
+End Writes.
