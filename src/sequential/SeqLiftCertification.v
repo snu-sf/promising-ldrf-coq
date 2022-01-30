@@ -55,7 +55,7 @@ Variant sim_thread_sol
       (CONS: Local.promise_consistent lc)
       (DEBT: forall loc to from msg
                     (GET: Memory.get loc to lc.(Local.promises) = Some (from, msg)),
-          D loc)
+          (<<MSG: msg <> Message.reserve>>) /\ (<<DEBT: D loc>>))
       (NSYNC: forall loc, Memory.nonsynch_loc loc lc.(Local.promises))
       (VALS: forall loc,
         exists from released,
@@ -132,7 +132,7 @@ Lemma sim_thread_none
 Proof.
   eapply Memory.ext. i. rewrite Memory.bot_get.
   inv SIM. destruct (Memory.get loc ts lc.(Local.promises)) eqn:GET; auto.
-  destruct p. exploit DEBT0; eauto. i.
+  destruct p. exploit DEBT0; eauto. i. des.
   exfalso. eapply DEBT; eauto.
 Qed.
 
@@ -348,8 +348,6 @@ Proof.
   }
 Qed.
 
-Require Import SplitReserve.
-
 Lemma write_tview_other_rlx
       tvw sc loc ts ord loc0
       (NEQ: loc0 <> loc)
@@ -402,25 +400,20 @@ Lemma sim_thread_sol_write
       (SIM: sim_thread_sol vs P D mem0 lc0)
       (LOCAL: Local.wf lc0 mem0)
       (MEM: Memory.closed mem0)
-      lang st
   :
-  exists lc1 mem1 lc2 mem2 from to released kind,
-    (<<STEPS: rtc (@Thread.tau_step _)
-                  (Thread.mk lang st lc0 sc mem0)
-                  (Thread.mk _ st lc1 sc mem1)>>) /\
-    (<<WRITE: Local.write_step lc1 sc mem1 loc from to val None released ord lc2 sc mem2 kind>>) /\
-    (<<SIM: sim_thread_sol (fun loc0 => if Loc.eq_dec loc0 loc then val else vs loc0) (fun loc0 => P loc0 \/ loc0 = loc) D mem2 lc2>>)
+  exists lc1 mem1 from to released kind,
+    (<<WRITE: Local.write_step lc0 sc mem0 loc from to val None released ord lc1 sc mem1 kind>>) /\
+    (<<SIM: sim_thread_sol (fun loc0 => if Loc.eq_dec loc0 loc then val else vs loc0) (fun loc0 => P loc0 \/ loc0 = loc) D mem1 lc1>>)
 .
 Proof.
   Local Opaque TView.write_tview.
   destruct lc0 as [tvw0 prom0].
-  assert (exists prom1 mem1 lc2 mem2 from to released kind,
-             (<<STEPS: rtc (@Thread.tau_step _)
-                           (Thread.mk lang st (Local.mk tvw0 prom0) sc mem0)
-                           (Thread.mk _ st (Local.mk tvw0 prom1) sc mem1)>>) /\
-             (<<WRITE: Local.write_step (Local.mk tvw0 prom1) sc mem1 loc from to val None released ord lc2 sc mem2 kind>>) /\
-             (<<CONS: Local.promise_consistent lc2>>) /\
-             (<<NSYNC: forall loc, Memory.nonsynch_loc loc lc2.(Local.promises)>>)).
+  assert (exists lc1 mem1 from to released kind,
+             (<<WRITE: Local.write_step (Local.mk tvw0 prom0) sc mem0 loc from to val None released ord lc1 sc mem1 kind>>) /\
+             (<<CONS: Local.promise_consistent lc1>>) /\
+             (<<NSYNC: forall loc, Memory.nonsynch_loc loc lc1.(Local.promises)>>) /\
+             (<<GET: forall from0 to0 msg0 (GET: Memory.get loc to0 lc1.(Local.promises) = Some (from0, msg0)),
+               exists from1, Memory.get loc to0 prom0 = Some (from1, msg0)>>)).
   { set (msg := fun ts => Message.concrete val (TView.write_released tvw0 sc loc ts None ord)).
     assert (MSGWF: forall ts, Message.wf (msg ts)).
     { i. unfold msg. econs.
@@ -439,22 +432,56 @@ Proof.
         inv LOCAL. ss. specialize (BOT loc). setoid_rewrite GET in BOT. ss.
       }
       set (ts := Time.middle from to).
+      hexploit (Time.middle_spec TS). i. des.
       assert (WRITABLE: TView.writable tvw0.(TView.cur) sc loc ts ord).
-      { econs. inv SIM. hexploit (VALS loc). i. des.
-        eapply Memory.max_ts_spec in GET. des.
-        eapply TimeFacts.le_lt_lt.
-        { eapply MAX. }
-        { eapply Time.incr_spec. }
+      { econs. eapply TimeFacts.le_lt_lt; [|eauto].
+        inv SIM. hexploit (VALS loc). i. des.
+        eapply memory_get_from_mon; eauto.
+        { eapply LOCAL. eauto. }
+        exploit CONS; eauto. eapply DEBT; eauto.
       }
-
-
-      Memory.split_exists
-
-      destruct (classic (xmsg0 = Message.reserve)).
-
-      Memory.promise
-
-      admit. }
+      hexploit (@Memory.split_exists prom0 loc from ts to (msg ts) msg0); eauto.
+      i. des.
+      hexploit Memory.split_exists_le.
+      { eapply LOCAL. }
+      { eauto. }
+      i. des.
+      hexploit Memory.remove_exists.
+      { eapply Memory.split_get0 in H1. des. eapply GET2. }
+      i. des.
+      assert (WRITE: Memory.write prom0 mem0 loc from ts (msg ts) mem3 mem1 (Memory.op_kind_split to msg0)).
+      { econs; eauto.
+        { econs 2; eauto.
+          { ss. }
+          { inv SIM. eapply DEBT; eauto. }
+        }
+      }
+      esplits.
+      { econs; eauto. inv SIM. eauto. }
+      { ii. ss. destruct (Loc.eq_dec loc0 loc).
+        { subst. rewrite write_tview_same_rlx; auto.
+          erewrite Memory.remove_o in PROMISE; eauto.
+          erewrite Memory.split_o in PROMISE; eauto. des_ifs.
+          { ss. des; clarify. }
+          { ss. des; clarify. eapply LEAST in PROMISE; eauto.
+            eapply TimeFacts.lt_le_lt; eauto.
+          }
+        }
+        { rewrite write_tview_other_rlx; auto. inv SIM. eapply CONS; eauto.
+          ss. erewrite <- Memory.write_get_diff_promise; eauto.
+        }
+      }
+      { ii. ss. inv SIM. erewrite Memory.remove_o in GET0; eauto.
+        erewrite Memory.split_o in GET0; eauto. des_ifs.
+        { ss. des; clarify. eapply NSYNC in GET; eauto. }
+        { eapply NSYNC in GET0; eauto. }
+      }
+      { i. ss. erewrite Memory.remove_o in GET0; eauto.
+        erewrite Memory.split_o in GET0; eauto. des_ifs.
+        { ss. des; clarify. esplits. eauto. }
+        { eauto. }
+      }
+    }
     { assert (WRITABLE: TView.writable tvw0.(TView.cur) sc loc (Time.incr (Memory.max_ts loc mem0)) ord).
       { econs. inv SIM. hexploit (VALS loc). i. des.
         eapply Memory.max_ts_spec in GET. des.
@@ -472,7 +499,6 @@ Proof.
       { eapply LOCAL. }
       { eauto. }
       i. des. esplits.
-      { refl. }
       { econs; eauto.
         { econs; eauto.
           { econs; eauto. i. ss.
@@ -496,109 +522,25 @@ Proof.
         { rewrite write_tview_other_rlx; auto. inv SIM. eapply CONS; eauto. }
       }
       { inv SIM. eauto. }
-    }
-
-
-
-      { ss. rewrite SAMERLX. eapply Memory.add_get0 in H. des. ; eauto.
-
-    }
-
-
-          {
-
-            eapply MAX. }
-
-
-  destruct (classic (exists val released, <<MAX: max_readable mem0 prom0 loc (tvw0.(TView.cur).(View.pln) loc) val released>>)).
-  2:{ left. inv SIM. econs; eauto. eapply non_max_readable_race; eauto. }
-  right. des.
-  inv SIM. hexploit max_readable_na_write_step; eauto.
-  { i. exploit NSYNC; eauto. }
-  { refl. }
-  { eapply Time.incr_spec. }
-  i. des. esplits.
-  { eapply reserve_future_steps. eapply cancel_future_reserve_future; eauto. }
-  { eauto. }
-  assert (OTHERPLN: forall loc0 (NEQ: loc0 <> loc),
-             tvw1.(TView.cur).(View.pln) loc0 = tvw0.(TView.cur).(View.pln) loc0).
-  { inv WRITE. i. ss. des_ifs. ss.
-    unfold TimeMap.join. eapply TimeFacts.le_join_l.
-    rewrite timemap_singleton_neq; auto. eapply Time.bot_spec.
-  }
-  assert (OTHERRLX: forall loc0 (NEQ: loc0 <> loc),
-             tvw1.(TView.cur).(View.rlx) loc0 = tvw0.(TView.cur).(View.rlx) loc0).
-  { inv WRITE. i. ss. des_ifs. ss.
-    unfold TimeMap.join. eapply TimeFacts.le_join_l.
-    rewrite timemap_singleton_neq; auto. eapply Time.bot_spec.
-  }
-  assert (SAMERLX: tvw1.(TView.cur).(View.rlx) loc = tvw1.(TView.cur).(View.pln) loc).
-  { rewrite VIEW. inv WRITE. clarify. ss.
-    unfold TimeMap.join. rewrite timemap_singleton_eq.
-    eapply TimeFacts.le_join_r.
-    hexploit (VALS loc). i. des.
-    eapply Memory.max_ts_spec in GET. des. etrans; eauto.
-    left. eapply Time.incr_spec.
-  }
-  econs.
-  { ii. ss. rewrite PROMISES in PROMISE. des_ifs.
-    rewrite OTHERRLX; eauto.
-  }
-  { ii. ss. rewrite PROMISES in GET. des_ifs. eauto. }
-  { ii. ss. rewrite PROMISES in GET. des_ifs. eapply NSYNC in GET; eauto. }
-  { ii. ss. des_ifs.
-    { rewrite SAMERLX. rewrite VIEW. inv MAX0. eauto. }
-    { erewrite Memory.add_o; eauto. des_ifs.
-      { ss. des; clarify. }
-      clear o. rewrite OTHERRLX; auto.
-      inv LOWER. rewrite OTHER; auto.
+      { eauto. }
     }
   }
-  { i. ss. destruct (Loc.eq_dec loc0 loc); auto. left.
-    inv WRITE. clarify. eapply na_write_unchanged_loc in WRITE0; eauto.
-    eapply cancel_future_unchanged_loc in RESERVE; eauto. des.
-    rewrite OTHERPLN in MAX1; auto.
-    des. eapply PERM. eapply unchanged_loc_max_readable; [..|eauto].
-    { etrans; eauto. }
-    { etrans; eauto. }
+  des. esplits; eauto. inv SIM. inv WRITE. ss. econs; eauto; ss.
+  { i. destruct (Loc.eq_dec loc0 loc).
+    { subst. eapply GET in GET0. des. eauto. }
+    { erewrite Memory.write_get_diff_promise in GET0; eauto. }
+  }
+  { i. des_ifs.
+    { rewrite write_tview_same_rlx; auto.
+      esplits. eapply Memory.write_get2; eauto.
+    }
+    { rewrite write_tview_other_rlx; auto.
+      erewrite Memory.write_get_diff; eauto.
+    }
+  }
+  { i. destruct (Loc.eq_dec loc0 loc); auto. left.
+    rewrite write_tview_other_pln in MAX; auto.
+    eapply write_unchanged_loc in WRITE0; eauto. des.
+    eapply PERM; eauto. eapply unchanged_loc_max_readable; eauto.
   }
 Qed.
-
-    write
-
-
-  | step_write_na : forall (lc1 : Local.t) (sc1 : TimeMap.t)
-                      (mem1 : Memory.t) (loc : Loc.t)
-                      (from to : Time.t) (val : Const.t)
-                      (ord : Ordering.t) (lc2 : Local.t)
-                      (sc2 : TimeMap.t) (mem2 : Memory.t)
-                      (msgs : list (Time.t * Time.t * Message.t))
-                      (kinds : list Memory.op_kind) (kind : Memory.op_kind),
-                    Local.write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2
-                      mem2 msgs kinds kind ->
-                    Local.program_step
-                      (ThreadEvent.na_write loc msgs from to val None ord) lc1 sc1
-                      mem1 lc2 sc2 mem2
-  | step_racy_read : forall (lc1 : Local.t) (sc1 : TimeMap.t)
-                       (mem1 : Memory.t) (loc : Loc.t)
-                       (val : Const.t) (ord : Ordering.t),
-                     Local.racy_read_step lc1 mem1 loc val ord ->
-                     Local.program_step (ThreadEvent.racy_read loc val ord) lc1
-                       sc1 mem1 lc1 sc1 mem1
-  | step_racy_write : forall (lc1 : Local.t) (sc1 : TimeMap.t)
-                        (mem1 : Memory.t) (loc : Loc.t)
-                        (val : Const.t) (ord : Ordering.t),
-                      Local.racy_write_step lc1 mem1 loc ord ->
-                      Local.program_step (ThreadEvent.racy_write loc val ord) lc1
-                        sc1 mem1 lc1 sc1 mem1
-  | step_racy_update : forall (lc1 : Local.t) (sc1 : TimeMap.t)
-                         (mem1 : Memory.t) (loc : Loc.t)
-                         (valr valw : Const.t) (ordr ordw : Ordering.t),
-                       Local.racy_update_step lc1 mem1 loc ordr ordw ->
-                       Local.program_step
-                         (ThreadEvent.racy_update loc valr valw ordr ordw) lc1 sc1
-                         mem1 lc1 sc1 mem1
-
-
-
-  Local.program_step

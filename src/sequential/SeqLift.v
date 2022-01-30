@@ -2312,7 +2312,7 @@ Variant sim_promises
         ((exists to from msg_tgt,
              (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto to>>) /\
              (<<GET: Memory.get loc to prom_tgt = Some (from, msg_tgt)>>)) \/
-         (exists vw, (<<FLAG: flag_tgt loc = Some vw>>) /\ (<<TS: msg_src <> Message.reserve -> Time.lt vw fto>>) /\ (<<SYNC: forall val released (MSG: msg_src = Message.concrete val (Some released)), False>>))))
+         (exists vw, (<<FLAG: flag_tgt loc = Some vw>>) /\ (<<TS: Time.lt vw fto>>) /\ (<<RESERVE: msg_src <> Message.reserve>>) /\ (<<SYNC: forall val released (MSG: msg_src = Message.concrete val (Some released)), False>>))))
     (NONE: forall loc to ts
                   (FLAGSRC: flag_src loc = Some ts),
         Memory.get loc to prom_src = None)
@@ -2342,7 +2342,7 @@ Lemma sim_promises_get_if flag_src flag_tgt f vers prom_src prom_tgt loc from_sr
         (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt>>) /\
         (<<GET: Memory.get loc to_tgt prom_tgt = Some (from_tgt, msg_tgt)>>) /\
         (<<MSG: sim_message_max (flag_tgt loc) loc to_src f (vers loc to_tgt) msg_src msg_tgt>>)) \/
-    (exists vw, (<<FLAG: flag_tgt loc = Some vw>>) /\ (<<TS: msg_src <> Message.reserve -> Time.lt vw to_src>>) /\ (<<SYNC: forall val released (MSG: msg_src = Message.concrete val (Some released)), False>>))
+    (exists vw, (<<FLAG: flag_tgt loc = Some vw>>) /\ (<<TS: Time.lt vw to_src>>) /\ (<<RESERVE: msg_src <> Message.reserve>>) /\ (<<SYNC: forall val released (MSG: msg_src = Message.concrete val (Some released)), False>>))
 .
 Proof.
   inv SIM. hexploit SOUND; eauto. i. des.
@@ -2659,6 +2659,7 @@ Lemma tgt_write_sim_promises flag_src flag_tgt f vers mem_tgt0 mem_tgt1 mem_src 
           (<<SIM: sim_timestamp (f loc) (f loc).(Mapping.ver) ts ts_tgt>>) /\
           (<<LT: Time.lt ts_tgt to>>))
       (WF: Mapping.wfs f)
+      (MSG: msg <> Message.reserve)
   :
     sim_promises flag_src flag_tgt f vers mem_src mem_tgt1.
 Proof.
@@ -2674,7 +2675,8 @@ Proof.
         { i. eapply sim_timestamp_lt; eauto.
           eapply mapping_latest_wf_loc.
         }
-        { i. subst. rewrite FLAGTGT in *. inv MSG. ss. }
+        { eapply Memory.remove_get0 in FULFILLTGT. des. clarify. inv MSG0; ss. }
+        { i. subst. rewrite FLAGTGT in *. inv MSG0. ss. }
       }
       { left. esplits; eauto.
         erewrite Memory.remove_o; eauto. des_ifs.
@@ -4177,12 +4179,21 @@ Proof.
       }
       { i. des_ifs.
         { destruct (classic (List.In fto dom)).
-          { hexploit SAMETS; eauto. i. right. esplits; eauto.
-            { i. rewrite GET in H0. inv H0; ss.
-              { eapply TS; eauto. }
-              { eapply TS; eauto. ss. }
+          { des. hexploit SAMETS; eauto. i.
+            destruct (classic (msg_src = Message.reserve)).
+            { rewrite GET in H0. subst. inv H0.
+              hexploit sim_promises_get_if.
+              { eauto. }
+              { eauto. }
+              i. des; clarify. left. esplits; eauto.
             }
-            { i. subst. rewrite GET in *. inv H0. }
+            { right. esplits; eauto.
+              { i. rewrite GET in H0. inv H0; ss.
+                { eapply TS; eauto; ss. }
+                { eapply TS; eauto; ss. }
+              }
+              { i. subst. rewrite GET in *. inv H0; ss. }
+            }
           }
           { hexploit sim_promises_get_if.
             { eauto. }

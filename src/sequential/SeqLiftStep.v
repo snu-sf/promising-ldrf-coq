@@ -151,16 +151,16 @@ Proof.
   { eapply FLAGTGT in FLAG. subst. auto. }
 Qed.
 
-Lemma sim_local_racy f vers flag_src flag_tgt lc_src lc_tgt mem_src mem_tgt loc
+Lemma sim_local_racy f vers flag_src flag_tgt lc_src lc_tgt mem_src mem_tgt loc ord
       (CONSISTENT: Local.promise_consistent lc_tgt)
       (MEM: sim_memory flag_src f vers mem_src mem_tgt)
       (SIM: sim_local f vers flag_src flag_tgt lc_src lc_tgt)
       (WF: Mapping.wfs f)
-      (RACY: Local.is_racy lc_tgt mem_tgt loc Ordering.na)
+      (RACY: Local.is_racy lc_tgt mem_tgt loc ord)
       (FLAGSRC: flag_src loc = None)
       (FLAGTGT: flag_tgt loc = None)
   :
-    Local.is_racy lc_src mem_src loc Ordering.na.
+    Local.is_racy lc_src mem_src loc ord.
 Proof.
   inv RACY. hexploit sim_memory_get; eauto. i. des. econs; eauto.
   { inv SIM. ss.
@@ -713,6 +713,42 @@ Proof.
   eapply WF.
 Qed.
 
+Lemma write_promise_reserve_same
+      prom0 mem0 loc from to msg prom1 mem1 kind
+      loc0 to0 from0
+      (WRITE: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
+      (RESERVE: Memory.get loc0 to0 prom0 = Some (from0, Message.reserve))
+      (MSG: msg <> Message.reserve)
+  :
+  Memory.get loc0 to0 prom1 = Some (from0, Message.reserve).
+Proof.
+  inv WRITE. erewrite Memory.remove_o; eauto. inv PROMISE.
+  { erewrite Memory.add_o; eauto. des_ifs. ss. des; clarify.
+    eapply Memory.add_get0 in PROMISES. des; clarify. }
+  { erewrite Memory.split_o; eauto. des_ifs.
+    { ss. des; clarify. eapply Memory.split_get0 in PROMISES. des; clarify. }
+    { ss. des; clarify. eapply Memory.split_get0 in PROMISES. des; clarify. }
+  }
+  { erewrite Memory.lower_o; eauto. des_ifs. ss. des; clarify.
+    eapply Memory.lower_get0 in PROMISES. des; clarify. inv MSG_LE; ss. }
+  { ss. }
+Qed.
+
+Lemma write_na_promise_reserve_same
+      ts prom0 mem0 loc from to val prom1 mem1 msgs kinds kind
+      loc0 to0 from0
+      (WRITE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 msgs kinds kind)
+      (RESERVE: Memory.get loc0 to0 prom0 = Some (from0, Message.reserve))
+  :
+  Memory.get loc0 to0 prom1 = Some (from0, Message.reserve).
+Proof.
+  revert loc0 to0 from0 RESERVE. induction WRITE.
+  { i. eapply write_promise_reserve_same; eauto. ss. }
+  { i. eapply IHWRITE. eapply write_promise_reserve_same; eauto.
+    unguard. des; clarify.
+  }
+Qed.
+
 Lemma sim_thread_tgt_write_na_aux
       f vers flag_src flag_tgt vs_src vs_tgt
       mem_src mem_tgt0 lc_src lc_tgt0 sc_src sc_tgt0
@@ -785,10 +821,16 @@ Proof.
         i. des. esplits; eauto.
       }
       { i. destruct (Loc.eq_dec loc0 loc).
-        { subst. right. esplits; eauto.
-          { eapply FLAGTGT in FLAG. subst. i. eapply CONSSRC; eauto. }
-          { i. subst. eapply sim_promises_nonsynch_loc in GET; eauto; ss.
-            rewrite FLAG. ss.
+        { subst. destruct (classic (msg_src = Message.reserve)).
+          { subst. hexploit sim_promises_get_if; eauto. i. des; ss.
+            left. inv MSG. esplits; eauto.
+            eapply write_na_promise_reserve_same; eauto.
+          }
+          { right. esplits; eauto.
+            { eapply FLAGTGT in FLAG. subst. i. eapply CONSSRC; eauto. }
+            { i. subst. eapply sim_promises_nonsynch_loc in GET; eauto; ss.
+              rewrite FLAG. ss.
+            }
           }
         }
         { hexploit sim_promises_get_if; eauto. i. des.
@@ -4288,4 +4330,67 @@ Proof.
       }
     }
   }
+Qed.
+
+Lemma sim_thread_racy_write_step
+      f vers flag_src flag_tgt vs_src vs_tgt
+      mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt
+      loc ord
+      (SIM: sim_thread
+              f vers flag_src flag_tgt vs_src vs_tgt
+              mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt)
+      (CONSISTENT: Local.promise_consistent lc_tgt)
+      (RACE: Local.racy_write_step lc_tgt mem_tgt loc ord)
+      (FLAGSRC: flag_src loc = None)
+      (FLAGTGT: flag_tgt loc = None)
+      (WF: Mapping.wfs f)
+  :
+  Local.racy_write_step lc_src mem_src loc ord.
+Proof.
+  inv SIM. inv RACE. econs.
+  { eapply sim_local_racy; eauto. }
+  { eapply sim_local_consistent; eauto. }
+Qed.
+
+Lemma sim_thread_racy_update_step
+      f vers flag_src flag_tgt vs_src vs_tgt
+      mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt
+      loc ordr ordw
+      (SIM: sim_thread
+              f vers flag_src flag_tgt vs_src vs_tgt
+              mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt)
+      (CONSISTENT: Local.promise_consistent lc_tgt)
+      (RACE: Local.racy_update_step lc_tgt mem_tgt loc ordr ordw)
+      (FLAGSRC: flag_src loc = None)
+      (FLAGTGT: flag_tgt loc = None)
+      (WF: Mapping.wfs f)
+  :
+  Local.racy_update_step lc_src mem_src loc ordr ordw.
+Proof.
+  inv SIM. inv RACE.
+  { econs 1; eauto. eapply sim_local_consistent; eauto. }
+  { econs 2; eauto. eapply sim_local_consistent; eauto. }
+  { econs 3; eauto.
+    { eapply sim_local_racy; eauto. }
+    { eapply sim_local_consistent; eauto. }
+  }
+Qed.
+
+Lemma sim_thread_racy_read_step
+      f vers flag_src flag_tgt vs_src vs_tgt
+      mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt
+      loc val_tgt ord
+      (SIM: sim_thread
+              f vers flag_src flag_tgt vs_src vs_tgt
+              mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt)
+      (READ: Local.racy_read_step lc_tgt mem_tgt loc val_tgt ord)
+      (CONSISTENT: Local.promise_consistent lc_tgt)
+      (WF: Mapping.wfs f)
+      (FLAGSRC: flag_src loc = None)
+      (FLAGTGT: flag_tgt loc = None)
+  :
+  forall val_src, Local.racy_read_step lc_src mem_src loc val_src ord.
+Proof.
+  inv SIM. inv READ. inv RACE. econs.
+  eapply sim_local_racy; eauto.
 Qed.
