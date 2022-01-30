@@ -103,7 +103,7 @@ Proof.
     { eapply Memory.split_get0 in MEM. des. apply GET6. }
     i. des.
     { unguard. ss. des; clarify. }
-    { eapply x1; eauto. inv LHS. econs; eauto. }
+    { eapply x1; eauto. inv LHS. econs; eauto. etrans; eauto. }
   }
   intros [mem_mid2 MEMADDRESERVE].
   exploit (@Memory.add_exists_le prom_mid0 mem_mid1 loc to ts3 Message.reserve); eauto.
@@ -196,7 +196,7 @@ Proof.
     { eapply Memory.split_get0 in MEM. des. apply GET6. }
     i. des.
     { unguard. ss. des; clarify. }
-    { eapply x1; eauto. inv LHS. econs; eauto. }
+    { eapply x1; eauto. inv LHS. econs; eauto. etrans; eauto. }
   }
   intros [mem_mid2 MEMADDRESERVE].
   exploit (@Memory.add_exists_le prom_mid1 mem_mid1 loc to ts3 Message.reserve); eauto.
