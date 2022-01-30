@@ -37,16 +37,22 @@ Module Writes.
       match ThreadEvent.is_writing e with
       | Some (loc, from, to, val, released, ord) =>
         if L loc
-        then if Ordering.le Ordering.acqrel ord then (loc, to, ord) :: rels else rels
+        then (loc, to, ord) :: rels
         else rels
       | None => rels
       end.
 
-    Definition wf (rels: t) (promises mem: Memory.t): Prop :=
-      forall loc to ord (IN: List.In (loc, to, ord) rels),
-        Memory.get loc to promises = None /\
-        exists from val released,
-          Memory.get loc to mem = Some (from, Message.concrete val released).
+    Variant wf (rels: t) (mem: Memory.t): Prop :=
+    | wf_intro
+        (SOUND: forall loc to ord (IN: List.In (loc, to, ord) rels),
+            L loc /\
+            exists from val released,
+              Memory.get loc to mem = Some (from, Message.concrete val released))
+        (COMPLETE: forall loc from to val released
+                     (LOC: L loc)
+                     (GET: Memory.get loc to mem = Some (from, Message.concrete val released)),
+            exists ord, List.In (loc, to, ord) rels)
+    .
 
     Lemma append_app e rels1 rels2:
       append e rels1 ++ rels2 = append e (rels1 ++ rels2).
@@ -56,89 +62,116 @@ Module Writes.
 
     Lemma promise_wf
           rels promises1 mem1 loc from to msg promises2 mem2 kind
-          (RELS1: wf rels promises1 mem1)
-          (PROMISE: Memory.promise promises1 mem1 loc from to msg promises2 mem2 kind):
-      wf rels promises2 mem2.
+          (RELS1: wf rels mem1)
+          (PROMISE: Memory.promise promises1 mem1 loc from to msg promises2 mem2 kind)
+          (MSG: L loc -> msg = Message.reserve):
+      wf rels mem2.
     Proof.
-      ii. exploit RELS1; eauto. i. des. inv PROMISE; ss.
-      - exploit Memory.add_get1; try exact x0; eauto. i. esplits; eauto.
-        erewrite Memory.add_o; eauto. condtac; ss. des. subst.
-        exploit Memory.add_get0; try exact MEM. i. des. congr.
-      - exploit Memory.split_get1; try exact x0; eauto. i. des. subst. esplits; eauto.
-        erewrite Memory.split_o; eauto. repeat condtac; ss.
-        + des. subst. exploit Memory.split_get0; try exact MEM. i. des. congr.
-        + guardH o. des. subst.
-          exploit Memory.split_get0; try exact PROMISES. i. des. congr.
-      - exploit Memory.lower_get1; try exact x0; eauto. i. des. inv MSG_LE.
-        dup GET2. revert GET2. erewrite Memory.lower_o; eauto. condtac; ss.
-        + i. des. inv GET2.
-          exploit Memory.lower_get0; try exact PROMISES. i. des. congr.
-        + guardH o. i. rewrite GET2 in *. inv x0. esplits; eauto.
-          erewrite Memory.lower_o; eauto. condtac; ss.
-      - erewrite (@Memory.remove_o promises2); eauto.
-        erewrite (@Memory.remove_o mem2); eauto. condtac; ss; eauto.
-        des. subst. exploit Memory.remove_get0; try exact PROMISES. i. des. congr.
+      inv RELS1. econs; i.
+      { exploit SOUND; eauto. i. des. split; ss.
+        inv PROMISE; ss.
+        - exploit Memory.add_get1; try exact x0; eauto.
+        - exploit Memory.split_get1; try exact x0; eauto. i. des. eauto.
+        - exploit Memory.lower_get1; try exact x0; eauto. i. des. inv MSG_LE. eauto.
+        - erewrite (@Memory.remove_o mem2); eauto. condtac; ss; eauto.
+          des. subst. exploit Memory.remove_get0; try exact MEM. i. des. congr.
+      }
+      { revert GET. inv PROMISE; ss.
+        - erewrite Memory.add_o; eauto. condtac; ss; eauto.
+          i. des. clarify. exploit MSG; ss.
+        - erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
+          + i. des. clarify. exploit MSG; ss.
+          + guardH o. i. des. clarify. exploit MSG; ss.
+        - erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+          i. des. clarify. exploit MSG; ss.
+        - erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+      }
     Qed.
 
     Lemma write_wf
+          ord
           rels promises1 mem1 loc from to msg promises2 mem2 kind
-          (RELS1: wf rels promises1 mem1)
+          (RELS1: wf rels mem1)
+          (MSG: L loc -> exists val released, msg = Message.concrete val released)
           (WRITE: Memory.write promises1 mem1 loc from to msg promises2 mem2 kind):
-      wf rels promises2 mem2.
+      wf (if L loc then (loc, to, ord) :: rels else rels) mem2.
     Proof.
-      inv WRITE. hexploit promise_wf; eauto. i.
-      ii. exploit H; eauto. i. des. esplits; eauto.
-      erewrite Memory.remove_o; eauto. condtac; ss.
+      condtac; cycle 1.
+      { inv WRITE. eapply promise_wf; eauto. rewrite COND. ss. }
+      inv RELS1. inv WRITE. econs; i.
+      { inv IN.
+        { clarify. split; ss.
+          exploit MSG; eauto. i. des. subst.
+          exploit Memory.promise_get0; try exact PROMISE.
+          { destruct kind; ss. inv PROMISE. ss. }
+          i. des. eauto.
+        }
+        exploit SOUND; eauto. i. des. split; ss.
+        exploit MSG; eauto. i. des. subst.
+        inv PROMISE; ss.
+        - exploit Memory.add_get1; try exact x0; eauto.
+        - exploit Memory.split_get1; try exact x0; eauto. i. des. eauto.
+        - exploit Memory.lower_get1; try exact x0; eauto. i. des. inv MSG_LE. eauto.
+      }
+      { revert GET. inv PROMISE; ss.
+        - erewrite Memory.add_o; eauto. condtac; ss.
+          + i. des. clarify. eauto.
+          + guardH o. i. exploit COMPLETE; eauto. i. des. eauto.
+        - erewrite Memory.split_o; eauto. repeat condtac; ss.
+          + i. des. clarify. eauto.
+          + guardH o. i. des. clarify.
+            exploit Memory.split_get0; try exact MEM. i. des.
+            exploit COMPLETE; try exact GET0; eauto. i. des. eauto.
+          + guardH o. guardH o0. i.
+            exploit COMPLETE; eauto. i. des. eauto.
+        - erewrite Memory.lower_o; eauto. condtac; ss.
+          + i. des. clarify. eauto.
+          + guardH o. i. exploit COMPLETE; eauto. i. des. eauto.
+        - exploit MSG; eauto. i. des. subst. ss.
+      }
     Qed.
 
-    Lemma write_wf_incr
-          rels promises1 mem1 loc from to msg promises2 mem2 kind ord
-          (RELS1: wf rels promises1 mem1)
-          (WRITE: Memory.write promises1 mem1 loc from to msg promises2 mem2 kind)
-          (MSG: exists val released, msg = Message.concrete val (Some released)):
-      wf ((loc, to, ord)::rels) promises2 mem2.
+    Lemma write_wf_other
+          rels promises1 mem1 loc from to msg promises2 mem2 kind
+          (RELS1: wf rels mem1)
+          (LOC: ~ L loc)
+          (WRITE: Memory.write promises1 mem1 loc from to msg promises2 mem2 kind):
+      wf rels mem2.
     Proof.
-      des. hexploit write_wf; eauto. ii.
-      inv IN; eauto. inv H0.
-      exploit Memory.write_not_cancel; eauto. i.
-      inv WRITE. exploit Memory.promise_get0; eauto. i. des.
-      exploit Memory.remove_get0; eauto. i. des.
-      esplits; eauto.
+      exploit (@write_wf Ordering.na); try exact WRITE; eauto; ss.
+      condtac; ss.
     Qed.
 
     Lemma write_na_wf
           rels ts promises1 mem1 loc from to msg promises2 mem2 msgs kinds kind
-          (RELS1: wf rels promises1 mem1)
+          (RELS1: wf rels mem1)
+          (LOC: ~ L loc)
           (WRITE: Memory.write_na ts promises1 mem1 loc from to msg promises2 mem2 msgs kinds kind):
-      wf rels promises2 mem2.
+      wf rels mem2.
     Proof.
-      induction WRITE; eauto using write_wf.
+      induction WRITE.
+      - exploit write_wf_other; eauto.
+      - apply IHWRITE; ss.
+        exploit write_wf_other; try exact WRITE_EX; eauto.
     Qed.
 
     Lemma step_wf
           ordcr ordcw rels lang pf e e1 e2
-          (RELS1: wf rels (Local.promises (Thread.local e1)) (Thread.memory e1))
+          (RELS1: wf rels (Thread.memory e1))
+          (ORDCW: Ordering.le Ordering.plain ordcw)
           (STEP: @OrdThread.step lang L ordcr ordcw pf e e1 e2):
-      wf (append e rels) (Local.promises (Thread.local e2)) (Thread.memory e2).
+      wf (append e rels) (Thread.memory e2).
     Proof.
       unfold append.
       inv STEP; inv STEP0; inv LOCAL; try inv LOCAL0; ss.
       - eapply promise_wf; eauto.
-      - inv STEP. ss.
-      - inv STEP. hexploit write_wf; eauto. i.
-        repeat condtac; eauto.
-        revert WRITE. unfold TView.write_released.
-        condtac; try by destruct ord, ordcw; ss. i.
-        hexploit write_wf_incr; try exact WRITE; eauto.
+      - inv STEP. eapply write_wf; eauto.
       - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP. ss.
-        hexploit write_wf; eauto. i.
-        repeat condtac; eauto.
-        revert WRITE. unfold TView.write_released.
-        condtac; try by destruct ordw, ordcw; ss. i.
-        hexploit write_wf_incr; try exact WRITE; eauto.
-      - inv STEP. hexploit write_na_wf; eauto. i.
-        repeat condtac; eauto.
-        destruct ord, ordcw; ss.
+        eapply write_wf; eauto.
+      - inv STEP. revert ORD. condtac; ss.
+        { destruct ord, ordcw; ss. }
+        hexploit write_na_wf; eauto. rewrite COND. ss.
+      - inv STEP. eapply write_wf; eauto.
     Qed.
 
     Lemma promise_disjoint
@@ -189,37 +222,37 @@ Module Writes.
       exploit Memory.write_disjoint; try exact WRITE_EX; eauto. i. des. eauto.
     Qed.
 
-    Lemma step_disjoint
-          ordrc ordwc rels lang pf e e1 e2 promises
-          (RELS1: wf rels (Local.promises (Thread.local e1)) (Thread.memory e1))
-          (STEP: @OrdThread.step lang L ordrc ordwc pf e e1 e2)
-          (DISJOINT: Memory.disjoint (Local.promises (Thread.local e1)) promises)
-          (LE: Memory.le promises (Thread.memory e1))
-          (RELS: wf rels promises (Thread.memory e1)):
-      wf (append e rels) promises (Thread.memory e2).
-    Proof.
-      hexploit step_wf; eauto. ii.
-      exploit H; eauto. i. des. esplits; eauto.
-      unfold append in *.
-      inv STEP; inv STEP0; inv LOCAL; ss.
-      - exploit RELS; eauto. i. des. ss.
-      - exploit RELS; eauto. i. des. ss.
-      - exploit RELS; eauto. i. des. ss.
-      - inv LOCAL0. inv STEP. ss. revert IN.
-        repeat condtac; ss; i; des; try by (exploit RELS; eauto; i; des; ss).
-        inv IN. eapply write_disjoint; eauto.
-      - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP. ss. revert IN.
-        repeat condtac; ss; i; des; try by (exploit RELS; eauto; i; des; ss).
-        inv IN. eapply write_disjoint; eauto.
-      - exploit RELS; eauto. i. des. ss.
-      - exploit RELS; eauto. i. des. ss.
-      - exploit RELS; eauto. i. des. ss.
-      - inv LOCAL0. inv STEP. ss. revert IN.
-        repeat condtac; ss; i; des; try by (exploit RELS; eauto; i; des; ss).
-        inv IN. eapply write_na_disjoint; eauto.
-      - exploit RELS; eauto. i. des. ss.
-      - exploit RELS; eauto. i. des. ss.
-      - exploit RELS; eauto. i. des. ss.
-    Qed.
+    (* Lemma step_disjoint *)
+    (*       ordrc ordwc rels lang pf e e1 e2 promises *)
+    (*       (RELS1: wf rels (Local.promises (Thread.local e1)) (Thread.memory e1)) *)
+    (*       (STEP: @OrdThread.step lang L ordrc ordwc pf e e1 e2) *)
+    (*       (DISJOINT: Memory.disjoint (Local.promises (Thread.local e1)) promises) *)
+    (*       (LE: Memory.le promises (Thread.memory e1)) *)
+    (*       (RELS: wf rels promises (Thread.memory e1)): *)
+    (*   wf (append e rels) promises (Thread.memory e2). *)
+    (* Proof. *)
+    (*   hexploit step_wf; eauto. ii. *)
+    (*   exploit H; eauto. i. des. esplits; eauto. *)
+    (*   unfold append in *. *)
+    (*   inv STEP; inv STEP0; inv LOCAL; ss. *)
+    (*   - exploit RELS; eauto. i. des. ss. *)
+    (*   - exploit RELS; eauto. i. des. ss. *)
+    (*   - exploit RELS; eauto. i. des. ss. *)
+    (*   - inv LOCAL0. inv STEP. ss. revert IN. *)
+    (*     repeat condtac; ss; i; des; try by (exploit RELS; eauto; i; des; ss). *)
+    (*     inv IN. eapply write_disjoint; eauto. *)
+    (*   - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP. ss. revert IN. *)
+    (*     repeat condtac; ss; i; des; try by (exploit RELS; eauto; i; des; ss). *)
+    (*     inv IN. eapply write_disjoint; eauto. *)
+    (*   - exploit RELS; eauto. i. des. ss. *)
+    (*   - exploit RELS; eauto. i. des. ss. *)
+    (*   - exploit RELS; eauto. i. des. ss. *)
+    (*   - inv LOCAL0. inv STEP. ss. revert IN. *)
+    (*     repeat condtac; ss; i; des; try by (exploit RELS; eauto; i; des; ss). *)
+    (*     inv IN. eapply write_na_disjoint; eauto. *)
+    (*   - exploit RELS; eauto. i. des. ss. *)
+    (*   - exploit RELS; eauto. i. des. ss. *)
+    (*   - exploit RELS; eauto. i. des. ss. *)
+    (* Qed. *)
   End Writes.
 End Writes.

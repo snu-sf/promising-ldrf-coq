@@ -3270,4 +3270,17 @@ Module Memory.
     induction WRITE; eauto using write_non_promised.
     exploit write_non_promised; eauto. i. des. eauto.
   Qed.
+
+  Lemma write_na_times
+        ts promises1 mem1 loc from to val promises2 mem2 msgs kinds kind
+        (WRITE: write_na ts promises1 mem1 loc from to val promises2 mem2 msgs kinds kind):
+    List.Forall (fun m => Time.lt ts (snd (fst m))) msgs /\
+    Time.lt ts to.
+  Proof.
+    induction WRITE; eauto.
+    des. split; [|etrans; eauto].
+    econs; eauto.
+    rewrite List.Forall_forall in *. i.
+    etrans; eauto.
+  Qed.
 End Memory.

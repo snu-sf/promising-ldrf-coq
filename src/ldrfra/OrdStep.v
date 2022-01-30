@@ -57,13 +57,20 @@ Module OrdLocal.
 
     Inductive write_na_step (lc1:Local.t) (sc1:TimeMap.t) (mem1:Memory.t)
                             (loc:Loc.t) (from to:Time.t) (val:Const.t) (ord:Ordering.t)
-                            (lc2:Local.t) (sc2:TimeMap.t) (mem2:Memory.t)
-                            (msgs: list (Time.t * Time.t * Message.t))
-                            (kinds: list Memory.op_kind) (kind:Memory.op_kind): Prop :=
-    | write_na_step_intro
-        ord'
+                            (lc2:Local.t) (sc2:TimeMap.t) (mem2:Memory.t):
+      forall (msgs: list (Time.t * Time.t * Message.t))
+        (kinds: list Memory.op_kind) (kind:Memory.op_kind), Prop :=
+    | write_na_step_na
+        ord' msgs kinds kind
         (ORD: ord' = if L loc then Ordering.join ord ordcw else ord)
-        (STEP: Local.write_na_step lc1 sc1 mem1 loc from to val ord' lc2 sc2 mem2 msgs kinds kind)
+        (STEP: Local.write_na_step lc1 sc1 mem1 loc from to val ord' lc2 sc2 mem2 msgs kinds kind):
+      write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 msgs kinds kind
+    | write_na_step_at
+        released ord' kind
+        (NA: Ordering.le ord Ordering.na)
+        (ORD: ord' = if L loc then Ordering.join ord ordcw else ord)
+        (STEP: Local.write_step lc1 sc1 mem1 loc from to val None released ord' lc2 sc2 mem2 kind):
+      write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 [] [] kind
     .
     Hint Constructors write_na_step.
 
@@ -195,7 +202,8 @@ Module OrdLocal.
       - exploit Local.fence_step_future; eauto. i. des. esplits; eauto; try refl.
       - esplits; eauto; try refl.
       - inv LOCAL.
-        exploit Local.write_na_step_future; eauto.
+        + exploit Local.write_na_step_future; eauto.
+        + exploit Local.write_step_future; eauto. i. des. splits; ss.
       - esplits; eauto; try refl.
       - esplits; eauto; try refl.
       - esplits; eauto; try refl.
@@ -210,7 +218,9 @@ Module OrdLocal.
       inv STEP; eauto.
       - inv LOCAL. inv STEP. eapply Memory.write_inhabited; eauto.
       - inv LOCAL2. inv STEP. eapply Memory.write_inhabited; eauto.
-      - inv LOCAL. inv STEP. eapply Memory.write_na_inhabited; eauto.
+      - inv LOCAL.
+        + inv STEP. eapply Memory.write_na_inhabited; eauto.
+        + inv STEP. eapply Memory.write_inhabited; eauto.
     Qed.
 
 
@@ -238,7 +248,9 @@ Module OrdLocal.
       - exploit Local.fence_step_disjoint; eauto.
       - exploit Local.fence_step_disjoint; eauto.
       - esplits; eauto.
-      - inv LOCAL. exploit Local.write_na_step_disjoint; eauto.
+      - inv LOCAL.
+        + exploit Local.write_na_step_disjoint; eauto.
+        + exploit Local.write_step_disjoint; eauto.
       - esplits; eauto.
       - esplits; eauto.
       - esplits; eauto.
@@ -255,6 +267,7 @@ Module OrdLocal.
       - inv LOCAL1. inv LOCAL2. inv STEP. inv STEP0.
         eapply Memory.write_promises_bot; eauto.
       - eapply Memory.write_na_promises_bot; eauto.
+      - eapply Memory.write_promises_bot; eauto.
     Qed.
 
 
@@ -304,6 +317,7 @@ Module OrdLocal.
       - inv LOCAL1. inv STEP. inv LOCAL2. inv STEP. ss.
         eapply write_reserve_only; eauto.
       - eapply write_na_reserve_only; eauto.
+      - eapply write_reserve_only; eauto.
     Qed.
   End OrdLocal.
 End OrdLocal.
@@ -539,7 +553,9 @@ Module OrdThread.
           eapply write_step_promise_consistent; eauto.
         + eapply fence_step_promise_consistent; eauto.
         + eapply fence_step_promise_consistent; eauto.
-        + inv LOCAL0. eapply write_na_step_promise_consistent; eauto.
+        + inv LOCAL0.
+          * eapply write_na_step_promise_consistent; eauto.
+          * eapply write_step_promise_consistent; eauto.
     Qed.
 
     Lemma rtc_all_step_promise_consistent
@@ -686,25 +702,41 @@ Module OrdThread.
           { econs 2; eauto. econs; eauto. econs 7; eauto. }
           { econs; eauto; ss. }
         }
-        { inv LOCAL2. hexploit write_na_step_map; try eassumption; eauto.
-          { eapply ident_map_bot. }
-          { eapply FLOCAL. }
-          { eapply FLOCAL. }
-          { refl. }
-          { refl. }
-          { eapply mapping_map_lt_iff_non_collapsable; eauto. }
-          { instantiate (1 := List.map fst msgs). clear.
-            induction msgs; ss.
-            econs; eauto. destruct a as [[]]. ss.
+        { inv LOCAL2.
+          { hexploit write_na_step_map; try eassumption; eauto.
+            { eapply ident_map_bot. }
+            { eapply FLOCAL. }
+            { eapply FLOCAL. }
+            { refl. }
+            { refl. }
+            { eapply mapping_map_lt_iff_non_collapsable; eauto. }
+            { instantiate (1 := List.map fst msgs). clear.
+              induction msgs; ss.
+              econs; eauto. destruct a as [[]]. ss.
+            }
+            { rewrite List.Forall_forall. i.
+              eapply mapping_map_lt_iff_non_collapsable; eauto.
+            }
+            i. des.
+            exists (ThreadEvent.write_na loc fmsgs from to val ord). esplits.
+            { econs; eauto. eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }
+            { econs 2; eauto. econs; eauto. econs 8; eauto. econs; eauto. }
+            { econs; eauto; ss. }
           }
-          { rewrite List.Forall_forall. i.
-            eapply mapping_map_lt_iff_non_collapsable; eauto.
+          { hexploit write_step_map; try eassumption; eauto.
+            { eapply ident_map_bot. }
+            { eapply FLOCAL. }
+            { eapply FLOCAL. }
+            { econs 2. }
+            { refl. }
+            { refl. }
+            { eapply mapping_map_lt_iff_non_collapsable; eauto. }
+            i. des.
+            exists (ThreadEvent.write_na loc [] from to val ord). esplits.
+            { econs; eauto. eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }
+            { econs 2; eauto. econs; eauto. econs 8; eauto. econs 2; eauto. }
+            { econs; eauto; ss. }
           }
-          i. des.
-          exists (ThreadEvent.write_na loc fmsgs from to val ord). esplits.
-          { econs; eauto. eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }
-          { econs 2; eauto. econs; eauto. econs 8; eauto. econs; eauto. }
-          { econs; eauto; ss. }
         }
         { inv LOCAL2. exploit racy_read_step_map; eauto.
           { apply ident_map_lt. }

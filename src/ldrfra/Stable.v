@@ -279,7 +279,9 @@ Module Normal.
         inv STEP. ss. eapply get_normal_view; eauto.
       - hexploit fence_step; eauto.
       - hexploit fence_step; eauto.
-      - inv LOCAL. hexploit write_na_step; eauto.
+      - inv LOCAL.
+        + hexploit write_na_step; eauto.
+        + hexploit write_step; eauto. ss.
     Qed.
   End Normal.
 End Normal.

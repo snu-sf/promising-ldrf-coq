@@ -289,55 +289,57 @@ Module WThread.
 
     Lemma step_writes_wf
           rels1 rels2 e e1 e2
-          (RELS1: Writes.wf rels1 (Local.promises (Thread.local e1)) (Thread.memory e1))
+          (ORDCW: Ordering.le Ordering.plain ordcw)
+          (RELS1: Writes.wf L rels1 (Thread.memory e1))
           (STEP: step rels1 rels2 e e1 e2):
-      Writes.wf rels2 (Local.promises (Thread.local e2)) (Thread.memory e2).
+      Writes.wf L rels2 (Thread.memory e2).
     Proof.
-      inv STEP. eauto using Writes.step_wf.
+      inv STEP. eapply Writes.step_wf; eauto.
     Qed.
 
     Lemma steps_writes_wf
           rels1 rels2 e1 e2
-          (RELS1: Writes.wf rels1 (Local.promises (Thread.local e1)) (Thread.memory e1))
+          (ORDCW: Ordering.le Ordering.plain ordcw)
+          (RELS1: Writes.wf L rels1 (Thread.memory e1))
           (STEPS: steps rels1 rels2 e1 e2):
-      Writes.wf rels2 (Local.promises (Thread.local e2)) (Thread.memory e2).
+      Writes.wf L rels2 (Thread.memory e2).
     Proof.
       induction STEPS; eauto.
       apply IHSTEPS. eapply step_writes_wf; eauto.
     Qed.
 
-    Lemma step_rels_disjoint
-          rels1 rels2 e e1 e2 promises
-          (RELS1: Writes.wf rels1 (Local.promises (Thread.local e1)) (Thread.memory e1))
-          (STEP: step rels1 rels2 e e1 e2)
-          (DISJOINT: Memory.disjoint (Local.promises (Thread.local e1)) promises)
-          (LE: Memory.le promises (Thread.memory e1))
-          (RELS: Writes.wf rels1 promises (Thread.memory e1)):
-      Writes.wf rels2 promises (Thread.memory e2).
-    Proof.
-      inv STEP. eauto using Writes.step_disjoint.
-    Qed.
+    (* Lemma step_rels_disjoint *)
+    (*       rels1 rels2 e e1 e2 promises *)
+    (*       (RELS1: Writes.wf L rels1 (Local.promises (Thread.local e1)) (Thread.memory e1)) *)
+    (*       (STEP: step rels1 rels2 e e1 e2) *)
+    (*       (DISJOINT: Memory.disjoint (Local.promises (Thread.local e1)) promises) *)
+    (*       (LE: Memory.le promises (Thread.memory e1)) *)
+    (*       (RELS: Writes.wf L rels1 promises (Thread.memory e1)): *)
+    (*   Writes.wf L rels2 promises (Thread.memory e2). *)
+    (* Proof. *)
+    (*   inv STEP. eauto using Writes.step_disjoint. *)
+    (* Qed. *)
 
-    Lemma steps_rels_disjoint
-          rels1 rels2 e1 e2 lc
-          (RELS1: Writes.wf rels1 (Local.promises (Thread.local e1)) (Thread.memory e1))
-          (STEPS: steps rels1 rels2 e1 e2)
-          (WF1: Local.wf (Thread.local e1) (Thread.memory e1))
-          (SC1: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
-          (CLOSED1: Memory.closed (Thread.memory e1))
-          (DISJOINT: Local.disjoint (Thread.local e1) lc)
-          (WF: Local.wf lc (Thread.memory e1))
-          (RELS: Writes.wf rels1 (Local.promises lc) (Thread.memory e1)):
-      Writes.wf rels2 (Local.promises lc) (Thread.memory e2).
-    Proof.
-      induction STEPS; ss.
-      hexploit step_rels_disjoint; eauto; try apply DISJOINT; try apply WF. i.
-      hexploit step_writes_wf; eauto. i.
-      inv STEP.
-      exploit OrdThread.step_future; eauto. i. des.
-      exploit OrdThread.step_disjoint; eauto. i. des.
-      eapply IHSTEPS; eauto.
-    Qed.
+    (* Lemma steps_rels_disjoint *)
+    (*       rels1 rels2 e1 e2 lc *)
+    (*       (RELS1: Writes.wf L rels1 (Local.promises (Thread.local e1)) (Thread.memory e1)) *)
+    (*       (STEPS: steps rels1 rels2 e1 e2) *)
+    (*       (WF1: Local.wf (Thread.local e1) (Thread.memory e1)) *)
+    (*       (SC1: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1)) *)
+    (*       (CLOSED1: Memory.closed (Thread.memory e1)) *)
+    (*       (DISJOINT: Local.disjoint (Thread.local e1) lc) *)
+    (*       (WF: Local.wf lc (Thread.memory e1)) *)
+    (*       (RELS: Writes.wf L rels1 (Local.promises lc) (Thread.memory e1)): *)
+    (*   Writes.wf L rels2 (Local.promises lc) (Thread.memory e2). *)
+    (* Proof. *)
+    (*   induction STEPS; ss. *)
+    (*   hexploit step_rels_disjoint; eauto; try apply DISJOINT; try apply WF. i. *)
+    (*   hexploit step_writes_wf; eauto. i. *)
+    (*   inv STEP. *)
+    (*   exploit OrdThread.step_future; eauto. i. des. *)
+    (*   exploit OrdThread.step_disjoint; eauto. i. des. *)
+    (*   eapply IHSTEPS; eauto. *)
+    (* Qed. *)
 
 
     Lemma cap_tau_steps_current_tau_steps
@@ -518,8 +520,12 @@ Module WThread.
         ii. inv H. unguard. des; ss.
       - inv LOCAL0. ss.
       - inv LOCAL0. ss.
-      - inv LOCAL0. inv STEP. ss.
-        exploit write_na_get_None; eauto. i. des. splits; ss.
+      - inv LOCAL0.
+        + inv STEP. ss.
+          exploit write_na_get_None; eauto. i. des. splits; ss.
+          ii. inv H. unguard. des; ss.
+        + inv STEP. ss.
+        exploit write_get_None; eauto. i. des. splits; ss.
         ii. inv H. unguard. des; ss.
     Qed.
 
@@ -1006,7 +1012,7 @@ Module WConfiguration.
     (*       (WF1: Configuration.wf c1) *)
     (*       (RELS1: forall tid lang st lc *)
     (*                 (TH: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st, lc)), *)
-    (*           Writes.wf rels1 (Local.promises lc) (Configuration.memory c1)) *)
+    (*           Writes.wf L rels1 (Local.promises lc) (Configuration.memory c1)) *)
     (*       (STEP: step e tid rels1 rels2 c1 c2) *)
     (*       (WRITE: ThreadEvent.is_writing e = Some (loc, from, to, val, released, ord)): *)
     (*   ~ List.In (loc, to) rels1. *)
@@ -1118,53 +1124,49 @@ Module RARaceW.
     Variable L: Loc.t -> bool.
     Variable ordcr ordcw: Ordering.t.
 
-    Definition wr_race (rels: Writes.t) (tview: TView.t) (loc: Loc.t) (to: Time.t) (ord: Ordering.t): Prop :=
-      exists ordw,
+    Definition wr_race (rels: Writes.t) (tview: TView.t) (loc: Loc.t) (ord: Ordering.t): Prop :=
+      exists to ordw,
         (<<LOC: L loc>>) /\
         (<<HIGHER: Time.lt ((View.rlx (TView.cur tview)) loc) to>>) /\
         (<<IN: List.In (loc, to, ordw) rels>>) /\
         ((<<ORDW: Ordering.le ordw Ordering.strong_relaxed>>) \/
          (<<ORDR: Ordering.le ord Ordering.strong_relaxed>>)).
 
-    Definition ww_race (rels: Writes.t) (tview: TView.t) (loc: Loc.t) (to: Time.t) (ord: Ordering.t): Prop :=
-      exists ordw,
+    Definition ww_race (rels: Writes.t) (tview: TView.t) (loc: Loc.t) (ord: Ordering.t): Prop :=
+      exists to ordw,
         (<<LOC: L loc>>) /\
         (<<HIGHER: Time.lt ((View.rlx (TView.cur tview)) loc) to>>) /\
         (<<IN: List.In (loc, to, ordw) rels>>) /\
         ((<<ORDW1: Ordering.le ordw Ordering.na>>) \/
-         (<<ORDW2: Ordering.le ord Ordering.na>>)).
+           (<<ORDW2: Ordering.le ord Ordering.na>>)).
+
+    Definition ra_race (rels: Writes.t) (tview: TView.t) (e: ProgramEvent.t): Prop :=
+      (exists loc val ord,
+          (<<READ: ProgramEvent.is_reading e = Some (loc, val, ord)>>) /\
+          (<<WRRACE: wr_race rels tview loc ord>>)) \/
+      (exists loc val ord,
+          (<<WRITE: ProgramEvent.is_writing e = Some (loc, val, ord)>>) /\
+          (<<WWRACE: ww_race rels tview loc ord>>)).
 
     Definition ra_race_steps (rels: Writes.t) (c: Configuration.t): Prop :=
-      exists tid rels2 rels3 rels4
-        c2 lang st2 lc2 e loc to ord e3 e4,
+      exists tid rels2 rels3 c2 lang st2 lc2 e e3 st4,
         (<<STEPS: WConfiguration.steps L ordcr ordcw rels rels2 c c2>>) /\
         (<<TID: IdentMap.find tid (Configuration.threads c2) = Some (existT _ lang st2, lc2)>>) /\
         (<<THREAD_STEPS: WThread.steps L ordcr ordcw rels2 rels3
-                                         (Thread.mk _ st2 lc2 (Configuration.sc c2) (Configuration.memory c2)) e3>>) /\
+                                       (Thread.mk _ st2 lc2 (Configuration.sc c2) (Configuration.memory c2)) e3>>) /\
         (<<CONS: Local.promise_consistent (Thread.local e3)>>) /\
-        (<<THREAD_STEP: WThread.step L ordcr ordcw rels3 rels4 e e3 e4>>) /\
-        (<<RARACE: (exists val released,
-                       (<<READ: ThreadEvent.is_reading e = Some (loc, to, val, released, ord)>>) /\
-                       (<<WRRACE: wr_race rels3 (Local.tview (Thread.local e3)) loc to ord>>)) \/
-                   (exists from to' val released,
-                       (<<WRITE: ThreadEvent.is_writing e = Some (loc, from, to', val, released, ord)>>) /\
-                       (<<WWRACE: ww_race rels3 (Local.tview (Thread.local e3)) loc to ord>>))>>).
+        (<<THREAD_STEP: lang.(Language.step) e e3.(Thread.state) st4>>) /\
+        (<<RARACE: ra_race rels3 (Local.tview (Thread.local e3)) e>>).
 
     Definition racefree (rels: Writes.t) (c: Configuration.t): Prop :=
-      forall tid rels2 rels3 rels4
-        c2 lang st2 lc2 e loc to ord e3 e4
+      forall tid rels2 rels3 c2 lang st2 lc2 e e3 st4
         (STEPS: WConfiguration.steps L ordcr ordcw rels rels2 c c2)
         (TID: IdentMap.find tid (Configuration.threads c2) = Some (existT _ lang st2, lc2))
         (THREAD_STEPS: WThread.steps L ordcr ordcw rels2 rels3
                                        (Thread.mk _ st2 lc2 (Configuration.sc c2) (Configuration.memory c2)) e3)
         (CONS: Local.promise_consistent (Thread.local e3))
-        (THREAD_STEP: WThread.step L ordcr ordcw rels3 rels4 e e3 e4)
-        (RARACE: (exists val released,
-                     (<<READ: ThreadEvent.is_reading e = Some (loc, to, val, released, ord)>>) /\
-                     (<<WRRACE: wr_race rels3 (Local.tview (Thread.local e3)) loc to ord>>)) \/
-                 (exists from to' val released,
-                     (<<WRITE: ThreadEvent.is_writing e = Some (loc, from, to', val, released, ord)>>) /\
-                     (<<WWRACE: ww_race rels3 (Local.tview (Thread.local e3)) loc to ord>>))),
+        (THREAD_STEP: lang.(Language.step) e e3.(Thread.state) st4)
+        (RARACE: ra_race rels3 (Local.tview (Thread.local e3)) e),
         False.
 
     Definition racefree_syn (syn: Threads.syntax): Prop :=
