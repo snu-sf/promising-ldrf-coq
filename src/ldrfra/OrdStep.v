@@ -319,6 +319,21 @@ Module OrdLocal.
       - eapply write_na_reserve_only; eauto.
       - eapply write_reserve_only; eauto.
     Qed.
+
+    Lemma reserve_only_write_add
+          promises1 mem1 loc from to msg promises2 mem2 kind
+          (RESERVE_ONLY: reserve_only promises1)
+          (LOC: L loc)
+          (WRITE: Memory.write promises1 mem1 loc from to msg promises2 mem2 kind):
+      kind = Memory.op_kind_add.
+    Proof.
+      inv WRITE. inv PROMISE; ss; exfalso.
+      - exploit Memory.split_get0; try exact PROMISES. i. des. eauto.
+      - exploit Memory.lower_get0; try exact PROMISES. i. des.
+        exploit RESERVE_ONLY; eauto. i. subst. inv MSG_LE. ss.
+      - exploit Memory.remove_get0; try exact PROMISES. i. des.
+        exploit Memory.remove_get0; try exact REMOVE. i. des. congr.
+    Qed.
   End OrdLocal.
 End OrdLocal.
 

@@ -284,21 +284,6 @@ Module PFtoAPFSimThread.
       exploit Memory.add_get1; try exact ADD; eauto.
     Qed.
 
-    Lemma reserve_only_write_add
-          promises1 mem1 loc from to msg promises2 mem2 kind
-          (RESERVE_ONLY: OrdLocal.reserve_only L promises1)
-          (LOC: L loc)
-          (WRITE: Memory.write promises1 mem1 loc from to msg promises2 mem2 kind):
-      kind = Memory.op_kind_add.
-    Proof.
-      inv WRITE. inv PROMISE; ss; exfalso.
-      - exploit Memory.split_get0; try exact PROMISES. i. des. eauto.
-      - exploit Memory.lower_get0; try exact PROMISES. i. des.
-        exploit RESERVE_ONLY; eauto. i. subst. inv MSG_LE. ss.
-      - exploit Memory.remove_get0; try exact PROMISES. i. des.
-        exploit Memory.remove_get0; try exact REMOVE. i. des. congr.
-    Qed.
-
     Lemma reorder_write_write_na
           promises0 mem0 loc from1 to1 msg1 promises1 mem1 kind1
           ts from2 to2 val2 promises2 mem2 msgs2 kinds2 kind2
@@ -310,18 +295,18 @@ Module PFtoAPFSimThread.
         (<<WRITE_NA: Memory.write_na ts promises0 mem0 loc from2 to2 val2 promises2 mem1' msgs2 kinds2 kind2>>) /\
         (<<ADD: Memory.add mem1' loc from1 to1 msg1 mem2>>).
     Proof.
-      exploit reserve_only_write_add; eauto. i. subst.
+      exploit OrdLocal.reserve_only_write_add; eauto. i. subst.
       exploit write_add_memory_add; eauto. i. des. subst.
       clear WRITE. revert ts mem0 mem1 promises2 mem2 kinds2 ADD WRITE_NA.
       induction msgs2 as [|[to' msg'] msgs]; i.
       { inv WRITE_NA.
-        exploit reserve_only_write_add; eauto. i. subst.
+        exploit OrdLocal.reserve_only_write_add; eauto. i. subst.
         exploit reorder_add_write_add; eauto. i. des.
         esplits; eauto.
       }
       inv WRITE_NA.
       hexploit OrdLocal.write_reserve_only; try exact WRITE_EX; eauto. i.
-      exploit reserve_only_write_add; try exact WRITE_EX; eauto. i. subst.
+      exploit OrdLocal.reserve_only_write_add; try exact WRITE_EX; eauto. i. subst.
       exploit reorder_add_write_add; try exact ADD; eauto. i. des.
       exploit write_add_memory_add; try exact WRITE_EX. i. des. subst. clear ADD1.
       exploit IHmsgs; try exact ADD0; try exact WRITE_NA0. i. des.
@@ -350,7 +335,7 @@ Module PFtoAPFSimThread.
         esplits; eauto using sim_memory_cons.
       }
       inv WRITE_TGT.
-      exploit reserve_only_write_add; try exact WRITE_EX; eauto. i. subst.
+      exploit OrdLocal.reserve_only_write_add; try exact WRITE_EX; eauto. i. subst.
       exploit reorder_write_write_na; eauto. i. des.
       exploit IHmsgs; try exact WRITE_NA0; eauto. i. des.
       esplits; eauto.

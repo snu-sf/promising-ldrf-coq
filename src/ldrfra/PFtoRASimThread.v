@@ -25,7 +25,7 @@ Require Import MemoryMerge.
 
 Require Import PFStep.
 Require Import OrdStep.
-Require Import RAStep.
+Require Import WStep.
 Require Import Stable.
 
 Set Implicit Arguments.
@@ -92,7 +92,7 @@ Module PFtoRASimThread.
     | sim_local_intro
         (TVIEW: sim_tview (Local.tview lc_src) (Local.tview lc_tgt))
         (PROMISES: (Local.promises lc_src) = (Local.promises lc_tgt))
-        (RESERVE: RAThread.reserve_only L (Local.promises lc_src))
+        (RESERVE: OrdLocal.reserve_only L (Local.promises lc_src))
         (REL_WRITES_NONE: forall loc to (IN: List.In (loc, to) rels),
             Memory.get loc to (Local.promises lc_src) = None)
     .
@@ -495,7 +495,7 @@ Module PFtoRASimThread.
     Lemma promise
           rels mem1_src
           promises1 mem1_tgt loc from to msg promises2 mem2_tgt kind
-          (PROMISES1: RAThread.reserve_only L promises1)
+          (PROMISES1: OrdLocal.reserve_only L promises1)
           (REL1: forall loc to (IN: List.In (loc, to) rels),
               Memory.get loc to promises1 = None)
           (MEM1: sim_memory rels mem1_src mem1_tgt)
@@ -505,7 +505,7 @@ Module PFtoRASimThread.
           (MSG: L loc -> msg = Message.reserve):
       exists mem2_src,
         <<STEP_SRC: Memory.promise promises1 mem1_src loc from to msg promises2 mem2_src kind>> /\
-        <<PROMISES2: RAThread.reserve_only L promises2>> /\
+        <<PROMISES2: OrdLocal.reserve_only L promises2>> /\
         <<REL2: forall loc to (IN: List.In (loc, to) rels),
             Memory.get loc to promises2 = None>> /\
         <<MEM2: sim_memory rels mem2_src mem2_tgt>>.
