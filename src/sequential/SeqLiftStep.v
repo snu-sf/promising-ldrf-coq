@@ -2533,7 +2533,8 @@ Lemma sim_thread_deflag_match_aux
                 mem_src1 mem_tgt lc_src1 lc_tgt sc_src sc_tgt>>) /\
       (<<WF: Mapping.wfs f1>>) /\
       (<<MAPLE: Mapping.les f0 f1>>) /\
-      (<<UNCH: forall loc0 (NEQ: loc0 <> loc), f1 loc0 = f0 loc0>>)
+      (<<UNCH: forall loc0 (NEQ: loc0 <> loc), f1 loc0 = f0 loc0>>) /\
+      (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>)
 .
 Proof.
 Admitted.
@@ -2568,7 +2569,8 @@ Lemma sim_thread_deflag_unmatch_aux
                 mem_src1 mem_tgt lc_src1 lc_tgt sc_src sc_tgt>>) /\
       (<<WF: Mapping.wfs f1>>) /\
       (<<MAPLE: Mapping.les f0 f1>>) /\
-      (<<UNCH: forall loc0 (NEQ: loc0 <> loc), f1 loc0 = f0 loc0>>)
+      (<<UNCH: forall loc0 (NEQ: loc0 <> loc), f1 loc0 = f0 loc0>>) /\
+      (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>)
 .
 Proof.
 Admitted.
@@ -2604,7 +2606,8 @@ Lemma sim_thread_deflag_match
                 mem_src1 mem_tgt lc_src1 lc_tgt sc_src sc_tgt>>) /\
       (<<WF: Mapping.wfs f1>>) /\
       (<<MAPLE: Mapping.les f0 f1>>) /\
-      (<<UNCH: forall loc0 (NEQ: loc0 <> loc), f1 loc0 = f0 loc0>>)
+      (<<UNCH: forall loc0 (NEQ: loc0 <> loc), f1 loc0 = f0 loc0>>) /\
+      (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>)
 .
 Proof.
   destruct (flag_src loc) eqn:EQ.
@@ -2620,6 +2623,7 @@ Proof.
     { eauto. }
     { refl. }
     { auto. }
+    { eapply map_future_memory_refl. }
   }
 Qed.
 
@@ -2652,7 +2656,8 @@ Lemma sim_thread_deflag_unmatch
                 mem_src1 mem_tgt lc_src1 lc_tgt sc_src sc_tgt>>) /\
       (<<WF: Mapping.wfs f1>>) /\
       (<<MAPLE: Mapping.les f0 f1>>) /\
-      (<<UNCH: forall loc0 (NEQ: loc0 <> loc), f1 loc0 = f0 loc0>>)
+      (<<UNCH: forall loc0 (NEQ: loc0 <> loc), f1 loc0 = f0 loc0>>) /\
+      (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>)
 .
 Proof.
   destruct (flag_src loc) eqn:FLAG.
@@ -2669,6 +2674,7 @@ Proof.
     { eauto. }
     { refl. }
     { auto. }
+    { eapply map_future_memory_refl. }
   }
 Qed.
 
@@ -2708,7 +2714,8 @@ Lemma sim_thread_deflag_all_aux
       (<<WF: Mapping.wfs f1>>) /\
       (<<MAPLE: Mapping.les f0 f1>>) /\
       (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = None>>)>>) /\
-      (<<UNCH: forall loc (NIN: ~ List.In loc dom), f1 loc = f0 loc>>)
+      (<<UNCH: forall loc (NIN: ~ List.In loc dom), f1 loc = f0 loc>>) /\
+      (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>)
 .
 Proof.
   induction dom.
@@ -2723,6 +2730,7 @@ Proof.
     { refl. }
     { i. hexploit DEBT; eauto. i. des; eauto. }
     { ss. }
+    { eapply map_future_memory_refl. }
   }
   i.
   cut (exists lc_src1 mem_src1 f1 flag,
@@ -2738,7 +2746,9 @@ Proof.
           (<<WF: Mapping.wfs f1>>) /\
           (<<MAPLE: Mapping.les f0 f1>>) /\
           (<<FLAG: __guard__(flag = None \/ D a)>>) /\
-          (<<UNCH: forall loc (NEQ: loc <> a), f1 loc = f0 loc>>)).
+          (<<UNCH: forall loc (NEQ: loc <> a), f1 loc = f0 loc>>) /\
+          (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>)
+      ).
   { i. des.
     hexploit Thread.rtc_tau_step_future.
     { eapply rtc_implies; [|eapply STEPS]. i.
@@ -2764,6 +2774,16 @@ Proof.
     { etrans; eauto. }
     { auto. }
     { i. rewrite UNCH0; auto. }
+    { eapply map_future_memory_trans; eauto.
+      hexploit Thread.rtc_tau_step_future.
+      { eapply rtc_implies; [|eapply STEPS0].
+        i. inv H. econs; eauto. inv TSTEP. auto.
+      }
+      { eauto. }
+      { eauto. }
+      { eauto. }
+      i. ss. des. eapply Memory.future_future_weak; eauto.
+    }
   }
   hexploit (DEBT a). intros [|[]].
   { hexploit sim_thread_deflag_unmatch; eauto. i. des.
@@ -2807,7 +2827,8 @@ Lemma sim_thread_deflag_all
       (<<WF: Mapping.wfs f1>>) /\
       (<<MAPLE: Mapping.les f0 f1>>) /\
       (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = None>>)>>) /\
-      (<<UNCH: forall loc (FLAG: flag_src loc = None), f1 loc = f0 loc>>)
+      (<<UNCH: forall loc (FLAG: flag_src loc = None), f1 loc = f0 loc>>) /\
+      (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>)
 .
 Proof.
   dup SIM. inv SIM. red in FIN. des.
@@ -3126,7 +3147,8 @@ Lemma sim_thread_fence_step_release
               (<<ORD: Ordering.le Ordering.acqrel ordr \/ Ordering.le Ordering.seqcst ordw>>))>>) /\
       (<<WF: Mapping.wfs f1>>) /\
       (<<MAPLE: Mapping.les f0 f1>>) /\
-      (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = None>>)>>)
+      (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = None>>)>>) /\
+      (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>)
 .
 Proof.
   hexploit local_fence_step_split; eauto.
@@ -3160,6 +3182,7 @@ Proof.
   { eauto. }
   { eauto. }
   { i. hexploit (VALS loc0). i. des; eauto. }
+  { eauto. }
   { eauto. }
   { eauto. }
   { eauto. }
@@ -3855,7 +3878,8 @@ Lemma sim_thread_write_step_release
             ((<<LOC: loc0 = loc>>) /\
                ((<<VALSRC: vs_src1 loc0 = Some val_src>> /\ <<VALTGT: vs_tgt1 loc0 = Some val_tgt>>) \/
                   (<<VALSRC0: vs_src0 loc0 = None>> /\ <<VALTGT0: vs_tgt0 loc0 = None>> /\ <<VALSRC1: vs_src1 loc0 = None>> /\ <<VALTGT1: vs_tgt1 loc0 = None>>)))>>) /\
-      (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = None>>)>>)
+      (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = None>>)>>) /\
+      (<<MAPFUTURE: map_future_memory f0 f1 mem_src2>>)
 .
 Proof.
   hexploit (@sim_thread_deflag_all (fun loc0 => D loc0 /\ loc0 <> loc)); eauto.
@@ -3885,6 +3909,12 @@ Proof.
   { eapply local_write_step_merge; eauto. }
   { etrans; eauto. eapply Mapping.les_strong_les; eauto. }
   { i. specialize (FLAG loc0). des; auto. }
+  { eapply map_future_memory_trans; eauto.
+    { eapply map_future_memory_les_strong; eauto. }
+    { eapply Local.write_step_future in WRITE0; eauto. des.
+      eapply Memory.future_future_weak; auto.
+    }
+  }
 Qed.
 
 Lemma sim_thread_update_step_normal
@@ -4106,7 +4136,8 @@ Lemma sim_thread_update_step_release
         ((<<SRC: vs_src1 loc = Some valw_src>>) /\ (<<TGT: vs_tgt1 loc = Some valw_tgt>>)) \/
         ((<<SRCNONE0: vs_src0 loc = None>>) /\ (<<TGTNONE0: vs_tgt0 loc = None>>) /\
            (<<SRCNONE1: vs_src1 loc = None>>) /\ (<<TGTNONE0: vs_tgt1 loc = None>>))>>) /\
-      (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = None>>)>>)
+      (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = None>>)>>) /\
+      (<<MAPFUTURE: map_future_memory f0 f1 mem_src2>>)
 .
 Proof.
   assert (CONSISTENT0: Local.promise_consistent lc_tgt1).
@@ -4175,6 +4206,13 @@ Proof.
     { rewrite <- TGT. auto. }
   }
   { i. specialize (FLAG0 loc0). des; auto. }
+  { eapply map_future_memory_trans; eauto.
+    { eapply map_future_memory_les_strong; eauto. }
+    { eapply Local.write_step_future in WRITE; eauto.
+      { des. eapply Memory.future_future_weak; auto. }
+      { eapply Memory.future_closed_opt_view; eauto. }
+    }
+  }
 Qed.
 
 Lemma semi_closed_timemap_closed
