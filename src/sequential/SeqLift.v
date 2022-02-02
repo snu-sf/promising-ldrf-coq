@@ -2962,6 +2962,11 @@ Variant sim_memory
     (TOP: forall loc ts
                  (FLAG: flag_src loc = Some ts),
         top_time ts (f loc))
+    (UNDEF: forall loc ts
+                 (FLAG: flag_src loc = Some ts),
+      exists to from,
+        (<<GET: Memory.get loc to mem_src = Some (from, Message.undef)>>) /\
+        (<<TOP: top_time from (f loc)>>))
 .
 
 Lemma sim_memory_get flag_src f vers mem_src mem_tgt loc from_tgt to_tgt msg_tgt
@@ -3003,6 +3008,17 @@ Lemma sim_memory_top flag_src f vers mem_src mem_tgt loc ts
       (FLAG: flag_src loc = Some ts)
   :
     top_time ts (f loc).
+Proof.
+  inv SIM. eauto.
+Qed.
+
+Lemma sim_memory_undef flag_src f vers mem_src mem_tgt loc ts
+      (SIM: sim_memory flag_src f vers mem_src mem_tgt)
+      (FLAG: flag_src loc = Some ts)
+  :
+  exists to from,
+    (<<GET: Memory.get loc to mem_src = Some (from, Message.undef)>>) /\
+    (<<TOP: top_time from (f loc)>>).
 Proof.
   inv SIM. eauto.
 Qed.
@@ -3215,6 +3231,9 @@ Proof.
     }
   }
   { i. eapply sim_memory_top; eauto. }
+  { i. hexploit sim_memory_undef; eauto. i. des.
+    esplits; eauto. eapply Memory.add_get1; eauto.
+  }
 Qed.
 
 Lemma remove_sim_memory flag_src f vers mem_tgt0 mem_tgt1 mem_src0 mem_src1
@@ -3292,6 +3311,11 @@ Proof.
     }
   }
   { i. eapply sim_memory_top; eauto. }
+  { i. hexploit sim_memory_undef; eauto. i. des.
+    esplits; eauto. erewrite Memory.remove_o; eauto.
+    des_ifs; eauto. ss. des; clarify.
+    eapply Memory.remove_get0 in REMOVESRC. des. clarify.
+  }
 Qed.
 
 Lemma split_sim_memory flag_src f vers mem_tgt0 mem_tgt1 mem_src0 mem_src1
@@ -3349,6 +3373,10 @@ Proof.
     }
   }
   { i. eapply sim_memory_top; eauto. }
+  { i. hexploit sim_memory_undef; eauto. i. des.
+    eapply Memory.split_get1 in GET7; eauto. des. esplits; eauto.
+    eapply top_time_mon; eauto.
+  }
 Qed.
 
 Lemma lower_sim_memory flag_src f vers mem_tgt0 mem_tgt1 mem_src0 mem_src1
@@ -3398,6 +3426,9 @@ Proof.
     }
   }
   { i. eapply sim_memory_top; eauto. }
+  { i. hexploit sim_memory_undef; eauto. i. des.
+    eapply Memory.lower_get1 in GET; eauto. des. inv MSG_LE. esplits; eauto.
+  }
 Qed.
 
 Lemma sim_memory_add flag_src f vers mem_tgt0 mem_tgt1 mem_src0
@@ -3463,32 +3494,46 @@ Proof.
     des. hexploit sim_memory_sound; eauto.
   }
   { i. eapply sim_memory_top; eauto. }
+  { i. hexploit sim_memory_undef; eauto. i. des.
+    eapply Memory.lower_get1 in GET0; eauto. des. inv MSG_LE0. esplits; eauto.
+  }
 Qed.
 
-Lemma add_src_sim_memory flag_src f vers mem_tgt mem_src0 mem_src1 ts
-      loc from to msg
+Lemma add_src_sim_memory flag_src f vers mem_tgt mem_src0 mem_src1 mem_src2
+      loc from to0 to msg
       (MEM: sim_memory flag_src f vers mem_src0 mem_tgt)
-      (ADDSRC: Memory.add mem_src0 loc from to msg mem_src1)
-      (FLAG: flag_src loc = Some ts)
-      (TS: Time.le ts from)
+      (ADD0: Memory.add mem_src0 loc from to0 Message.undef mem_src1)
+      (ADD1: Memory.add mem_src1 loc to0 to msg mem_src2)
+      (TOP: top_time from (f loc))
+      (TS: forall ts (FLAG: flag_src loc = Some ts), Time.le ts from)
   :
-    sim_memory ((fun loc' => if (Loc.eq_dec loc' loc) then (Some to) else flag_src loc')) f vers mem_src1 mem_tgt.
+    sim_memory ((fun loc' => if (Loc.eq_dec loc' loc) then (Some to) else flag_src loc')) f vers mem_src2 mem_tgt.
 Proof.
-  assert (TOPLE: Time.le ts to).
-  { etrans; eauto. left. eapply add_succeed_wf; eauto. }
+  assert (TOPLE: forall ts (FLAG: flag_src loc = Some ts), Time.le ts to).
+  { i. etrans; eauto. left.
+    eapply add_succeed_wf in ADD0.
+    eapply add_succeed_wf in ADD1.
+    des. etrans; eauto.
+  }
   econs.
   { i. hexploit sim_memory_get; eauto. i. des.
-    esplits; eauto. eapply Memory.add_get1; eauto. }
+    esplits; eauto. eapply Memory.add_get1; eauto.
+    eapply Memory.add_get1; eauto.
+  }
   { i. erewrite Memory.add_o in GET; eauto.
+    erewrite Memory.add_o in GET; eauto.
     destruct (loc_ts_eq_dec (loc0, fto0) (loc, to)).
     { ss. des; clarify. right. des_ifs. esplits; eauto.
       { refl. }
-      { eapply top_time_mon.
-        { eapply sim_memory_top; eauto. }
-        { auto. }
+      { eapply top_time_mon; eauto. eapply add_succeed_wf in ADD0.
+        des. left. eauto.
       }
     }
-    { guardH o. hexploit sim_memory_sound; eauto. i. des.
+    destruct (loc_ts_eq_dec (loc0, fto0) (loc, to0)).
+    { ss. des; clarify. right. des_ifs. esplits; eauto.
+      eapply add_succeed_wf in ADD1. des. left. eauto.
+    }
+    { guardH o. guardH o0. hexploit sim_memory_sound; eauto. i. des.
       { left. esplits; eauto. }
       { right. des_ifs.
         { esplits; eauto. }
@@ -3497,28 +3542,21 @@ Proof.
     }
   }
   { i. des_ifs.
-    { eapply top_time_mon.
-      { eapply sim_memory_top; eauto. }
-      { auto. }
+    { eapply top_time_mon; eauto.
+      eapply add_succeed_wf in ADD0. eapply add_succeed_wf in ADD1.
+      des. left. etrans; eauto.
     }
-    { eapply sim_memory_top; eauto. }
+    { eapply sim_memory_top in FLAG; eauto. }
   }
-Qed.
-
-Lemma src_write_sim_memory flag_src f vers mem_tgt mem_src loc ts
-      (MEM: sim_memory flag_src f vers mem_src mem_tgt)
-      (FLAG: flag_src loc = None)
-      (TOP: top_time ts (f loc))
-  :
-    sim_memory (fun loc' => if (Loc.eq_dec loc' loc) then (Some ts) else flag_src loc') f vers mem_src mem_tgt.
-Proof.
-  econs.
-  { i. hexploit sim_memory_get; eauto. i. des. esplits; eauto. }
-  { i. hexploit sim_memory_sound; eauto. i. des.
-    { left. esplits; eauto. }
-    { right. esplits; eauto. des_ifs. }
+  { i. des_ifs.
+    { esplits.
+      { eapply Memory.add_get1; eauto. eapply Memory.add_get0; eauto. }
+      { eauto. }
+    }
+    { hexploit sim_memory_undef; eauto. i. des. esplits; eauto.
+      eapply Memory.add_get1; eauto. eapply Memory.add_get1; eauto.
+    }
   }
-  { i. des_ifs. eapply sim_memory_top; eauto. }
 Qed.
 
 Variant versioned_memory (vers: versions) (mem: Memory.t): Prop :=
@@ -3787,6 +3825,9 @@ Proof.
     { right. esplits; eauto. erewrite SAME; eauto. }
   }
   { i. erewrite SAME; eauto. eapply sim_memory_top; eauto. }
+  { i. hexploit sim_memory_undef; eauto. i. des.
+    esplits; eauto. erewrite SAME; eauto.
+  }
 Qed.
 
 Lemma cap_sim_memory f0 vers mem_tgt0 mem_tgt1 mem_src0 mem_src1
@@ -3867,6 +3908,7 @@ Proof.
       { i. eapply memory_cap_covered; eauto. }
     }
     { i. ss. }
+    { ss. }
   }
   { eapply sim_closed_memory_future.
     2:{ eapply Memory.cap_future_weak; eauto. }
@@ -4059,6 +4101,9 @@ Proof.
     }
   }
   { i. des_ifs. eapply sim_memory_top; eauto. }
+  { i. des_ifs. hexploit sim_memory_undef; eauto. i. des.
+    esplits; eauto.
+  }
 Qed.
 
 Lemma lower_lower_memory mem0 mem1 loc from to msg0 msg1
@@ -4364,6 +4409,11 @@ Proof.
       erewrite Memory.remove_o in GET; eauto. des_ifs. eauto.
     }
     { i. eapply sim_memory_top; eauto. }
+    { i. hexploit sim_memory_undef; eauto. i. des.
+      exists to0, from0. splits; auto.
+      erewrite Memory.remove_o; eauto. des_ifs.
+      ss. des; clarify. eapply Memory.remove_get0 in MEM0. des; clarify.
+    }
   }
   { i. erewrite (@Memory.remove_o prom_src1 prom_src0); eauto. des_ifs.
     ss. des; clarify.
@@ -4486,6 +4536,7 @@ Proof.
   }
   { i. hexploit sim_memory_sound; eauto. }
   { i. eapply sim_memory_top; eauto. }
+  { i. eapply sim_memory_undef; eauto. }
 Qed.
 
 Lemma sim_promises_mon_vers flag_src flag_tgt f vers0 vers1 mem_src mem_tgt

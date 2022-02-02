@@ -568,7 +568,66 @@ Proof.
   }
 Qed.
 
-Lemma max_readable_write_na mem0 prom0 loc ts from to val1
+Lemma ts_le_memory_write_na
+      ts0 prom0 mem0 loc from to val prom1 mem1 msgs kinds kind ts1
+      (WRITE: Memory.write_na ts1 prom0 mem0 loc from to val prom1 mem1 msgs kinds kind)
+      (TS: Time.le ts0 ts1)
+  :
+    Memory.write_na ts0 prom0 mem0 loc from to val prom1 mem1 msgs kinds kind.
+Proof.
+  revert ts0 TS. induction WRITE; i.
+  { econs 1; eauto. eapply TimeFacts.le_lt_lt; eauto. }
+  { econs 2; eauto. eapply TimeFacts.le_lt_lt; eauto. }
+Qed.
+
+Lemma write_na_ts_lt ts prom0 mem0 loc from to val prom1 mem1 msgs kinds kind
+      (WRITE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 msgs kinds kind)
+  :
+    Time.lt ts to.
+Proof.
+  induction WRITE; auto. etrans; eauto.
+Qed.
+
+Lemma add_max_ts mem0 loc from to msg mem1
+      (ADD: Memory.add mem0 loc from to msg mem1)
+      (CLOSED: Memory.closed mem0)
+  :
+  Memory.max_ts loc mem1 = if (Time.le_lt_dec to (Memory.max_ts loc mem0)) then (Memory.max_ts loc mem0) else to.
+Proof.
+  inv CLOSED. specialize (INHABITED loc).
+  eapply Memory.max_ts_spec in INHABITED. des.
+  eapply Memory.add_get1 in GET; eauto.
+  eapply Memory.max_ts_spec in GET. des; eauto.
+  hexploit Memory.add_get0; eauto. i. des.
+  hexploit Memory.max_ts_spec; eauto. i. des.
+  erewrite Memory.add_o in GET2; eauto. des_ifs.
+  { ss. des; clarify. eapply TimeFacts.antisym; auto. }
+  { ss. des; clarify. eapply TimeFacts.antisym; auto.
+    eapply Memory.max_ts_spec in GET2. des; eauto. }
+  { ss. des; clarify. }
+  { ss. des; clarify. eapply TimeFacts.antisym; auto.
+    eapply Memory.max_ts_spec in GET2. des; eauto.
+    left. eapply TimeFacts.le_lt_lt; eauto.
+  }
+Qed.
+
+Lemma le_add_max_ts mem0 loc from to msg mem1
+      (ADD: Memory.add mem0 loc from to msg mem1)
+      (TO: Time.le (Memory.max_ts loc mem0) to)
+  :
+    Memory.max_ts loc mem1 = to.
+Proof.
+  hexploit Memory.add_get0; eauto. i. des.
+  eapply Memory.max_ts_spec in GET0. des.
+  erewrite Memory.add_o in GET1; eauto. des_ifs.
+  { ss. des; clarify. }
+  { ss. des; clarify.
+    apply Memory.max_ts_spec in GET1. des.
+    apply TimeFacts.antisym; auto. etrans; eauto.
+  }
+Qed.
+
+Lemma max_readable_na_write mem0 prom0 loc ts from to0 to val1
       (WF: Memory.le prom0 mem0)
       (BOT: Memory.bot_none prom0)
       (RESERVE: forall to' from' msg'
@@ -580,21 +639,23 @@ Lemma max_readable_write_na mem0 prom0 loc ts from to val1
       (CLOSED: __guard__ (exists from' msg',
                              (<<GET: Memory.get loc ts mem0 = Some (from', msg')>>) /\ (<<RESERVE: msg' <> Message.reserve>>)))
       (FROM: Time.le (Memory.max_ts loc mem0) from)
-      (TO: Time.lt from to)
+      (TO0: Time.lt from to0)
+      (TO1: Time.lt to0 to)
       (MEM: Memory.closed mem0)
   :
-    exists mem1 prom1 mem2 msgs ks,
+    exists mem1 prom1 mem2 mem3 msgs ks,
       (<<MEM: fulfilled_memory loc mem0 mem1>>) /\
       (<<MLE: mem1 = mem0>>) /\
-      (<<ADD: Memory.add mem1 loc from to (Message.concrete val1 None) mem2>>) /\
+      (<<ADDUNDEF: Memory.add mem1 loc from to0 Message.undef mem2>>) /\
+      (<<ADDUNDEF: Memory.add mem2 loc to0 to (Message.concrete val1 None) mem3>>) /\
       (<<PROMISES: forall loc' ts',
           Memory.get loc' ts' prom1 =
           if Loc.eq_dec loc' loc
           then None
           else Memory.get loc' ts' prom0>>) /\
-      (<<WRITE: Memory.write_na ts prom0 mem0 loc from to val1 prom1 mem2 msgs ks Memory.op_kind_add>>) /\
+      (<<WRITE: Memory.write_na ts prom0 mem0 loc to0 to val1 prom1 mem3 msgs ks Memory.op_kind_add>>) /\
       (<<NONE: Memory.get loc to prom1 = None>>) /\
-      (<<MAX: Memory.max_ts loc mem2 = to>>).
+      (<<MAX: Memory.max_ts loc mem3 = to>>).
 Proof.
   hexploit (wf_cell_msgs_exists (prom0 loc)). i. des.
   red in WFMSGS. des.
@@ -606,89 +667,108 @@ Proof.
   clear RESERVE. intros RESERVE.
   ginduction l.
   { i. exists mem0, prom0.
-    hexploit (@Memory.add_exists mem0 loc from to (Message.concrete val1 None)); eauto.
-    { ii. eapply Memory.max_ts_spec in GET2. des.
-      inv LHS. inv RHS. ss. eapply Time.lt_strorder.
-      eapply TimeFacts.le_lt_lt.
-      { eapply FROM. }
-      eapply TimeFacts.lt_le_lt.
-      { eapply FROM0. }
-      etrans.
-      { eapply TO1. }
-      auto.
+    hexploit (@Memory.add_exists mem0 loc from to0 Message.undef); eauto.
+    { i. symmetry. eapply interval_le_disjoint.
+      etrans; [|eapply FROM]. eapply Memory.max_ts_spec in GET2. des; eauto.
     }
     i. des.
-    hexploit (@Memory.add_exists_le prom0 mem0); eauto.
-    i. des. exists mem2. esplits; eauto.
+    assert (WRITE0: Memory.write prom0 mem0 loc from to0 Message.undef prom0 mem2 Memory.op_kind_add).
+    { hexploit (@Memory.add_exists_le prom0 mem0); eauto. i. des.
+      hexploit Memory.remove_exists.
+      { eapply Memory.add_get0; eauto. }
+      i. des.
+      hexploit MemoryMerge.add_remove; eauto. i. subst.
+      econs; eauto. econs; eauto.
+      i. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+      { eapply TO0. }
+      etrans.
+      { apply memory_get_ts_le in GET. eauto. }
+      etrans.
+      { apply Memory.max_ts_spec in GET. des. eauto. }
+      { eauto. }
+    }
+    hexploit (@Memory.add_exists mem2 loc to0 to (Message.concrete val1 None)); eauto.
+    { i. symmetry. eapply interval_le_disjoint.
+      erewrite Memory.add_o in GET2; eauto. des_ifs.
+      { ss. des; clarify. refl. }
+      { guardH o. eapply Memory.max_ts_spec in GET2. des; eauto.
+        etrans; eauto. etrans; eauto. left. auto.
+      }
+    }
+    i. des.
+    assert (WRITE1: Memory.write prom0 mem2 loc to0 to (Message.concrete val1 None) prom0 mem1 Memory.op_kind_add).
+    { hexploit (@Memory.add_exists_le prom0 mem2); eauto.
+      { eapply write_memory_le; eauto. }
+      i. des.
+      hexploit Memory.remove_exists.
+      { eapply Memory.add_get0; eauto. }
+      i. des.
+      hexploit MemoryMerge.add_remove; eauto. i. subst.
+      econs; eauto. econs; eauto.
+      { econs; ss. eapply Time.bot_spec. }
+      i. erewrite Memory.add_o in GET; eauto. des_ifs.
+      { ss. des; clarify. eapply Time.lt_strorder. etrans; eauto. }
+      guardH o. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+      { eapply TO0. }
+      etrans.
+      { left. eauto. }
+      etrans.
+      { apply memory_get_ts_le in GET. eauto. }
+      etrans.
+      { apply Memory.max_ts_spec in GET. des. eauto. }
+      { eauto. }
+    }
+    exists mem2, mem1. esplits; eauto.
     { refl. }
     { i. des_ifs. destruct (Memory.get loc ts' prom0) as [[]|] eqn:EQ; auto.
       exfalso. eapply COMPLETE in EQ. ss. }
-    { econs 1.
+    { econs 2; [| |eauto|].
       { red in CLOSED. des. eapply Memory.max_ts_spec in GET. des.
         eapply TimeFacts.le_lt_lt.
         { eapply MAX. }
         eapply TimeFacts.le_lt_lt.
         { eapply FROM. }
-        { eapply TO. }
+        { auto. }
       }
-      { econs.
-        { econs; eauto.
-          { econs; ss. apply Time.bot_spec. }
-          { i. hexploit memory_get_ts_le; [apply GET|]. i.
-            apply Memory.max_ts_spec in GET. des.
-            eapply Time.lt_strorder.
-            eapply TimeFacts.le_lt_lt.
-            { eapply H1. }
-            eapply TimeFacts.le_lt_lt.
-            { eapply MAX. }
-            eapply TimeFacts.le_lt_lt.
-            { eapply FROM. }
-            { auto. }
-          }
-        }
-        { hexploit (@Memory.remove_exists promises2).
-          { eapply Memory.add_get0; eauto. }
-          i. des. hexploit MemoryMerge.add_remove; [apply H0|apply H1|].
-          i. subst. auto.
-        }
-      }
+      { left. eauto. }
+      econs 1; eauto.
     }
-    { eapply Memory.add_get0; eauto. }
-    { dup H. eapply Memory.add_get0 in H. des.
-      apply Memory.max_ts_spec in GET0. des.
-      apply TimeFacts.antisym; auto.
-      erewrite Memory.add_o in GET1; eauto. des_ifs.
-      { ss. des; clarify. }
-      { ss. des; clarify.
-        apply Memory.max_ts_spec in GET1. des.
-        etrans; eauto. etrans; eauto. left. auto.
+    { inv WRITE1. inv PROMISE. eapply Memory.add_get0; eauto. }
+    { erewrite add_max_ts; eauto.
+      2:{ eapply Memory.add_closed; eauto. }
+      erewrite add_max_ts; eauto.
+      des_ifs.
+      { exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+        { eapply TO0. }
+        etrans; eauto.
       }
+      { timetac. }
     }
   }
   { i. inv DISJOINT. inv MSGSWF.
-    hexploit (proj2 (COMPLETE from0 to0 msg)).
+    hexploit (proj2 (COMPLETE from0 to1 msg)).
     { left. auto. }
     i. red in H. des.
     { subst. exfalso.
       specialize (BOT loc). unfold Memory.get in BOT. rewrite BOT in H. clarify.
     }
     inv RESERVE. des.
-    hexploit (@Memory.lower_exists prom0 loc from0 to0 msg msg); auto.
+    hexploit (@Memory.lower_exists prom0 loc from0 to1 msg msg); auto.
     { refl. }
     i. des.
     hexploit (@Memory.lower_exists_le prom0 mem0); eauto.
     i. des.
-    hexploit (@Memory.remove_exists mem2 loc from0 to0 msg).
+    hexploit (@Memory.remove_exists mem2 loc from0 to1 msg).
     { eapply Memory.lower_get0 in H0. des; auto. }
     i. des.
-    assert (WRITE: Memory.write prom0 mem0 loc from0 to0 msg mem3 mem1 (Memory.op_kind_lower msg)).
+    assert (WRITE: Memory.write prom0 mem0 loc from0 to1 msg mem3 mem1 (Memory.op_kind_lower msg)).
     { econs; eauto. econs; eauto.
       { inv MEM. exploit CLOSED0.
         { eapply Memory.lower_get0 in H1. des; eauto. }
         i. des. auto.
       }
     }
-    hexploit (IHl mem1 mem3 loc to0 from to val1); auto.
+    hexploit (IHl mem1 mem3 loc to1 from to0 to val1); auto.
     { eapply write_promises_le; eauto. }
     { eapply Memory.write_bot_none; eauto. }
     { red. esplits.
@@ -712,7 +792,7 @@ Proof.
         erewrite (@Memory.lower_o mem2) in H5; eauto. des_ifs. ss. des; clarify.
         apply COMPLETE in H5. des; clarify.
       }
-      { i. hexploit (proj2 (COMPLETE from1 to1 msg0)).
+      { i. hexploit (proj2 (COMPLETE from1 to2 msg0)).
         { right. auto. }
         i. red. setoid_rewrite (@Memory.remove_o mem3); eauto.
         erewrite (@Memory.lower_o mem2); eauto. des_ifs. exfalso.
@@ -737,23 +817,26 @@ Proof.
     { etrans; [|eauto]. eapply fulfilled_memory_lower; eauto. }
     { etrans; eauto. eapply lower_same_same; eauto. }
     { eauto. }
+    { eauto. }
     { i. rewrite PROMISES. des_ifs.
       erewrite (@Memory.remove_o mem3); eauto.
       erewrite (@Memory.lower_o mem2); eauto. des_ifs. ss. des; clarify. }
-    { econs 2.
-      { instantiate (1:=to0). auto. }
-      { instantiate (1:=msg). red. destruct msg; ss; auto.
+    { econs 2; [| |eauto|eauto].
+      { auto. }
+      { red. destruct msg; ss; auto.
         right. hexploit NONE; eauto. i. subst. eauto.
       }
-      { eauto. }
-      { eauto. }
     }
     { auto. }
     { auto. }
   }
 Qed.
 
+<<<<<<< HEAD
 Lemma max_readable_write_na_step mem0 prom0 tvw0 loc ts from to val0 val1 released sc
+=======
+Lemma max_readable_na_write_step mem0 prom0 tvw0 loc ts from to0 to1 val0 val1 released sc
+>>>>>>> 30d76c9... wip
       (MAX: max_readable mem0 prom0 loc ts val0 released)
       (TS: tvw0.(TView.cur).(View.pln) loc = ts)
       (RESERVE: forall to' from' val' released'
@@ -763,22 +846,24 @@ Lemma max_readable_write_na_step mem0 prom0 tvw0 loc ts from to val0 val1 releas
       (CLOSED: Memory.closed mem0)
       (CONS: Local.promise_consistent (Local.mk tvw0 prom0))
       (FROM: Time.le (Memory.max_ts loc mem0) from)
-      (TO: Time.lt from to)
+      (TO0: Time.lt from to0)
+      (TO1: Time.lt to0 to1)
   :
-    exists mem1 mem2 mem3 prom1 prom3 tvw1 msgs ks,
+    exists mem1 mem2 mem3 mem4 prom1 prom3 tvw1 msgs ks,
       (<<RESERVE: cancel_future_memory loc prom0 mem0 prom1 mem1>>) /\
       (<<LOWER: fulfilled_memory loc mem0 mem2>>) /\
       (<<MEM: mem2 = mem1>>) /\
-      (<<ADD: Memory.add mem2 loc from to (Message.concrete val1 None) mem3>>) /\
+      (<<ADD0: Memory.add mem2 loc from to0 Message.undef mem3>>) /\
+      (<<ADD0: Memory.add mem3 loc to0 to1 (Message.concrete val1 None) mem4>>) /\
       (<<PROMISES: forall loc' ts',
           Memory.get loc' ts' prom3 =
           if Loc.eq_dec loc' loc
           then None
           else Memory.get loc' ts' prom0>>) /\
-      (<<WRITE: Local.write_na_step (Local.mk tvw0 prom1) sc mem1 loc from to val1 Ordering.na (Local.mk tvw1 prom3) sc mem3 msgs ks Memory.op_kind_add>>) /\
-      (<<VIEW: tvw1.(TView.cur).(View.pln) loc = to>>) /\
-      (<<MAXTS: Memory.max_ts loc mem3 = to>>) /\
-      (<<MAX: max_readable mem3 prom3 loc to val1 None>>)
+      (<<WRITE: Local.write_na_step (Local.mk tvw0 prom1) sc mem1 loc to0 to1 val1 Ordering.na (Local.mk tvw1 prom3) sc mem4 msgs ks Memory.op_kind_add>>) /\
+      (<<VIEW: tvw1.(TView.cur).(View.pln) loc = to1>>) /\
+      (<<MAXTS: Memory.max_ts loc mem4 = to1>>) /\
+      (<<MAX: max_readable mem4 prom3 loc to1 val1 None>>)
 .
 Proof.
   hexploit (@remove_reserves_loc prom0 mem0 loc).
@@ -786,7 +871,7 @@ Proof.
   { apply WF. }
   { eapply CLOSED. }
   i. des.
-  hexploit (@max_readable_na_write mem1 prom1 loc (View.rlx (TView.cur tvw0) loc) from to val1); auto.
+  hexploit (@max_readable_na_write mem1 prom1 loc (View.rlx (TView.cur tvw0) loc) from to0 to1 val1); auto.
   { eapply reserve_future_memory_le;[apply WF|]. eapply cancel_future_reserve_future; eauto. }
   { eapply reserve_future_memory_bot_none; [apply WF|]. eapply cancel_future_reserve_future; eauto. }
   { i. assert (<<RESERE: msg' <> Message.reserve>> /\ <<GET: Memory.get loc to' prom0 = Some (from', msg')>>).
@@ -807,16 +892,16 @@ Proof.
     { eapply Memory.closed_timemap_bot. eapply CLOSED. }
     { eapply cancel_future_reserve_future; eauto. }
   }
-  i. des. eexists mem1, mem2, mem3, prom1, prom2, _. esplits; auto.
+  i. des. eexists mem1, mem2, mem3, mem4, prom1, prom2, _. esplits; auto.
   { etrans; eauto. }
   { i. rewrite PROMISES0. rewrite PROMISES. des_ifs. }
   { econs; ss. subst. eauto. }
-  { ss. unfold TimeMap.join. replace (TimeMap.singleton loc to loc) with to.
+  { ss. unfold TimeMap.join. replace (TimeMap.singleton loc to1 loc) with to1.
     { apply TimeFacts.le_join_r.
       inv WF. inv TVIEW_CLOSED. inv CUR. ss.
       specialize (PLN loc). des.
       apply Memory.max_ts_spec in PLN. des.
-      etrans; eauto. etrans; eauto. left. auto.
+      etrans; eauto. etrans; eauto. left. etrans; eauto.
     }
     { symmetry. unfold TimeMap.singleton. apply LocFun.add_spec_eq. }
   }
@@ -912,22 +997,6 @@ Lemma non_max_readable_write mem prom tvw loc ts
     Local.racy_write_step (Local.mk tvw prom) mem loc Ordering.na.
 Proof.
   subst. hexploit non_max_readable_race; eauto.
-Qed.
-
-Lemma add_max_ts mem0 loc from to msg mem1
-      (ADD: Memory.add mem0 loc from to msg mem1)
-      (TO: Time.le (Memory.max_ts loc mem0) to)
-  :
-    Memory.max_ts loc mem1 = to.
-Proof.
-  hexploit Memory.add_get0; eauto. i. des.
-  eapply Memory.max_ts_spec in GET0. des.
-  erewrite Memory.add_o in GET1; eauto. des_ifs.
-  { ss. des; clarify. }
-  { ss. des; clarify.
-    apply Memory.max_ts_spec in GET1. des.
-    apply TimeFacts.antisym; auto. etrans; eauto.
-  }
 Qed.
 
 Variant added_memory loc msgs mem0 mem1: Prop :=

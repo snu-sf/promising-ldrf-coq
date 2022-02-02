@@ -1,3 +1,4 @@
+
 Require Import RelationClasses.
 
 From sflib Require Import sflib.
@@ -658,26 +659,6 @@ Proof.
       { eapply MAX; eauto. etrans; eauto. }
     }
   }
-Qed.
-
-Lemma ts_le_memory_write_na
-      ts0 prom0 mem0 loc from to val prom1 mem1 msgs kinds kind ts1
-      (WRITE: Memory.write_na ts1 prom0 mem0 loc from to val prom1 mem1 msgs kinds kind)
-      (TS: Time.le ts0 ts1)
-  :
-    Memory.write_na ts0 prom0 mem0 loc from to val prom1 mem1 msgs kinds kind.
-Proof.
-  revert ts0 TS. induction WRITE; i.
-  { econs 1; eauto. eapply TimeFacts.le_lt_lt; eauto. }
-  { econs 2; eauto. eapply TimeFacts.le_lt_lt; eauto. }
-Qed.
-
-Lemma write_na_ts_lt ts prom0 mem0 loc from to val prom1 mem1 msgs kinds kind
-      (WRITE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 msgs kinds kind)
-  :
-    Time.lt ts to.
-Proof.
-  induction WRITE; auto. etrans; eauto.
 Qed.
 
 Lemma na_write_step_max_readable
@@ -1564,6 +1545,7 @@ Proof.
   { eapply sim_local_consistent; eauto. }
   { instantiate (1:=top). left. eapply TS. }
   { eapply Time.incr_spec. }
+  { eapply Time.incr_spec. }
   i. des.
   hexploit reserve_future_steps.
   { eapply cancel_future_reserve_future; eauto. }
@@ -1576,7 +1558,7 @@ Proof.
   { eapply WF2. }
   i. des.
   hexploit Local.write_na_step_future; eauto. i. des.
-  assert (RLX: View.rlx (TView.cur tvw1) loc = Time.incr top).
+  assert (RLX: View.rlx (TView.cur tvw1) loc = Time.incr (Time.incr top)).
   { eapply TimeFacts.antisym.
     { rewrite <- MAXTS. inv WF1. ss.
       inv TVIEW_CLOSED. inv CUR. exploit RLX; eauto. i. des.
@@ -1598,31 +1580,12 @@ Proof.
   }
   econs; auto.
   { eapply sim_timemap_mon_locs; eauto. i. ss. des_ifs. }
-  { destruct (flag_src loc) eqn:FLAG.
-    { eapply add_src_sim_memory; eauto.
-      etransitivity; [|left; eapply TS].
-      inv LOCAL. hexploit FLAGSRC; eauto. i. des. subst.
-      inv WF2. ss. inv TVIEW_CLOSED. inv CUR.
-      exploit RLX0. i. des.
-      eapply Memory.max_ts_spec in x. des. eauto.
-    }
-    { eapply src_write_sim_memory in MEM0; eauto.
-      match goal with
-      | |- _ ?flag _ _ _ _ =>
-        replace flag with
-            (fun loc' =>
-               if LocSet.Facts.eq_dec loc' loc
-               then Some (Time.incr top)
-               else (fun loc'' =>
-                       if LocSet.Facts.eq_dec loc'' loc
-                       then Some top
-                       else flag_src loc'') loc')
-      end.
-      2:{ extensionality loc'. des_ifs. }
-      eapply add_src_sim_memory; try eassumption.
-      { des_ifs. }
-      { refl. }
-    }
+  { eapply add_src_sim_memory; eauto. i.
+    etransitivity; [|left; eapply TS].
+    inv LOCAL. hexploit FLAGSRC; eauto. i. des. subst.
+    inv WF2. ss. inv TVIEW_CLOSED. inv CUR.
+    exploit RLX0. i. des.
+    eapply Memory.max_ts_spec in x. des. eauto.
   }
   { dup LOCAL. ss. inv LOCAL0. econs.
     { inv WRITE. clarify. ss.
@@ -1651,7 +1614,10 @@ Proof.
         { econs. i. rewrite PROMISES. des_ifs. }
         { symmetry. etrans.
           { eapply cancel_future_unchanged_loc in RESERVE; eauto. des; eauto.  }
-          { eapply add_unchanged_loc; eauto. }
+          { etrans.
+            { eapply add_unchanged_loc; eauto. }
+            { eapply add_unchanged_loc; eauto. }
+          }
         }
       }
       { i. hexploit NONMAX0; eauto. i.
@@ -1660,7 +1626,10 @@ Proof.
         { econs. i. rewrite PROMISES. des_ifs. }
         { symmetry. etrans.
           { eapply cancel_future_unchanged_loc in RESERVE; eauto. des; eauto.  }
-          { eapply add_unchanged_loc; eauto. }
+          { etrans.
+            { eapply add_unchanged_loc; eauto. }
+            { eapply add_unchanged_loc; eauto. }
+          }
         }
       }
     }
