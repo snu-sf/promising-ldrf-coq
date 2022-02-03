@@ -237,6 +237,74 @@ Module Mapping.
     unfold le_strong, le in*. des. splits; auto.
   Qed.
 
+  Definition le_update (f0 f1: t): Prop :=
+    (<<LE: le f0 f1>>) /\
+    (<<WF: wf f0 -> wf f1>>) /\
+    (<<UPDATE: forall (WF0: wf f0)
+                      ts0 ts1 fts0 fts1 fts2
+                      (MAP0: f0.(map) f0.(ver) ts0 = Some fts0)
+                      (MAP2: f0.(map) f0.(ver) ts1 = Some fts1)
+                      (MAP1: f1.(map) f1.(ver) ts0 = Some fts2),
+        (<<EQ: fts0 = fts2>>) \/ (<<LT: Time.lt fts1 fts2>>)>>)
+  .
+
+  Program Instance le_update_PreOrder: PreOrder le_update.
+  Next Obligation.
+  Proof.
+    ii. unfold le_update. splits.
+    { refl. }
+    { auto. }
+    { i. clarify. left. auto. }
+  Qed.
+  Next Obligation.
+  Proof.
+    ii. unfold le_update in *. des. splits.
+    { etrans; eauto. }
+    { auto. }
+    i. hexploit WF0; eauto. i.
+    hexploit WF; eauto. i.
+    hexploit mapping_incr.
+    { eapply H. }
+    { eapply LE0. }
+    { refl. }
+    { red in LE0. des. rewrite MAP; [|refl]. eapply MAP0. }
+    i. des.
+    hexploit mapping_incr.
+    { eapply H. }
+    { eapply LE0. }
+    { refl. }
+    { red in LE0. des. rewrite MAP3; [|refl]. eapply MAP2. }
+    i. des. hexploit UPDATE.
+    { eauto. }
+    { eapply MAP. }
+    { eapply MAP3. }
+    { eauto. }
+    hexploit UPDATE0.
+    { eauto. }
+    { eapply MAP0. }
+    { eapply MAP2. }
+    { eauto. }
+    i. des; clarify; auto.
+    { right. eapply TimeFacts.le_lt_lt; eauto. }
+    { right. eapply TimeFacts.le_lt_lt; eauto. }
+  Qed.
+
+  Lemma le_strong_le_update f0 f1
+        (LE: le_strong f0 f1)
+        (WF: wf f1)
+    :
+      le_update f0 f1.
+  Proof.
+    unfold le_update. splits.
+    { eapply le_strong_le; eauto. }
+    { auto. }
+    { i. left. red in LE. des.
+      assert (ver f0 < ver f1 \/ ver f0 = ver f1) by lia. des.
+      { erewrite PRESERVE in MAP1; eauto. clarify. }
+      { rewrite <- H in MAP1. erewrite MAP in MAP1; [|refl]. clarify. }
+    }
+  Qed.
+
   Lemma mapping_map_le (f: t) (WF: wf f):
     forall v ts0 ts1 fts0 fts1
            (MAP0: f.(map) v ts0 = Some fts0) (MAP0: f.(map) v ts1 = Some fts1),
@@ -304,6 +372,28 @@ Module Mapping.
       les f0 f1.
   Proof.
     ii. eapply le_strong_le; eauto.
+  Qed.
+
+  Definition les_update (f0 f1: ts): Prop :=
+    forall loc, le_update (f0 loc) (f1 loc).
+
+  Program Instance les_update_PreOrder: PreOrder les_update.
+  Next Obligation.
+  Proof.
+    ii. refl.
+  Qed.
+  Next Obligation.
+  Proof.
+    ii. etrans; eauto.
+  Qed.
+
+  Lemma les_strong_les_update f0 f1
+        (LE: les_strong f0 f1)
+        (WF: wfs f1)
+    :
+      les_update f0 f1.
+  Proof.
+    ii. eapply le_strong_le_update; eauto.
   Qed.
 
   Definition closed (f: t) (v: nat) (ts: Time.t): Prop :=
@@ -3278,6 +3368,104 @@ Proof.
     eapply sim_timestamp_exact_mon_strong; eauto. }
   { eapply Mapping.les_strong_les; eauto. }
 Qed.
+
+Lemma sim_timestamp_exact_mon_exists
+      f0 f1 ts_src0 ts_tgt
+      (SIM: sim_timestamp_exact f0 f0.(Mapping.ver) ts_src0 ts_tgt)
+      (MAPLE: Mapping.le f0 f1)
+      (MAPWF0: Mapping.wf f0)
+      (MAPWF1: Mapping.wf f1)
+  :
+    exists ts_src1,
+      (<<SIM: sim_timestamp_exact f1 f1.(Mapping.ver) ts_src1 ts_tgt>>) /\
+      (<<TS: Time.le ts_src0 ts_src1>>).
+Proof.
+  hexploit sim_timestamp_exact_mon_ver.
+  { erewrite <- sim_timestamp_exact_mon_mapping; [eapply SIM|..].
+    { eauto. }
+    { eapply mapping_latest_wf_loc. }
+    { eapply MAPLE. }
+  }
+  { eapply MAPLE. }
+  { eauto. }
+  { eapply mapping_latest_wf_loc. }
+  i. des. esplits; eauto.
+Qed.
+
+Variant space_future_memory
+        (msgs: Messages.t)
+        (f0: Mapping.ts) (mem0: Memory.t)
+        (f1: Mapping.ts) (mem1: Memory.t): Prop :=
+| space_future_memory_intro
+    (SPACE: forall loc from_tgt to_tgt from0 to0 from1 to1
+                   (MSGS: msgs loc from_tgt to_tgt Message.reserve)
+                   (FROM0: sim_timestamp_exact (f0 loc) (f0 loc).(Mapping.ver) from0 from_tgt)
+                   (TO0: sim_timestamp_exact (f0 loc) (f0 loc).(Mapping.ver) to0 to_tgt)
+                   (FROM1: sim_timestamp_exact (f1 loc) (f1 loc).(Mapping.ver) from1 from_tgt)
+                   (TO1: sim_timestamp_exact (f1 loc) (f1 loc).(Mapping.ver) to1 to_tgt)
+                   ts
+                   (ITV: Interval.mem (from1, to1) ts)
+                   (COVERED: covered loc ts mem1),
+        ((<<FROM: from1 = from0>>) /\ (<<TO: to1 = to0>>)))
+.
+
+(* Lemma space_future_memory_space msgs mem0 f0 mem1 f1 *)
+(*       (FUTURE: space_future_memory msgs f0 mem0 f1 mem1) *)
+(*       loc from_tgt to_tgt from0 to0 from1 to1 *)
+(*       (MSGS: msgs loc from_tgt to_tgt Message.reserve) *)
+(*       (FROM0: sim_timestamp_exact (f0 loc) (f0 loc).(Mapping.ver) from0 from_tgt) *)
+(*       (TO0: sim_timestamp_exact (f0 loc) (f0 loc).(Mapping.ver) to0 to_tgt) *)
+(*       (FROM1: sim_timestamp_exact (f1 loc) (f1 loc).(Mapping.ver) from1 from_tgt) *)
+(*       (TO1: sim_timestamp_exact (f1 loc) (f1 loc).(Mapping.ver) to1 to_tgt) *)
+(*       ts *)
+(*       (ITV: Interval.mem (from1, to1) ts) *)
+(*       (COVERED: covered loc ts mem1) *)
+(*   : *)
+(*     ((<<FROM: from1 = from0>>) /\ (<<TO: to1 = to0>>)) \/ *)
+(*     (<<COVERED: covered loc ts mem0>>). *)
+(* Proof. *)
+(*   inv FUTURE. eauto. *)
+(* Qed. *)
+
+(* Lemma space_future_memory_mon_msgs *)
+(*       msgs0 msgs1 mem0 f0 mem1 f1 *)
+(*       (FUTURE: space_future_memory msgs1 f0 mem0 f1 mem1) *)
+(*       (MSGS: msgs0 <4= msgs1) *)
+(*   : *)
+(*     space_future_memory msgs0 f0 mem0 f1 mem1. *)
+(* Proof. *)
+(*   econs. i. hexploit space_future_memory_space; eauto. *)
+(* Qed. *)
+
+(* Lemma space_future_memory_refl *)
+(*       msgs mem f0 f1 *)
+(*       (LESTRONG: Mapping.les_strong f0 f1) *)
+(*       (WF: Mapping.wfs f0) *)
+(*   : *)
+(*     space_future_memory msgs f0 mem f1 mem. *)
+(* Proof. *)
+(*   econs. i. auto. *)
+(* Qed. *)
+
+(* Lemma space_future_memory_trans *)
+(*       msgs mem0 mem1 mem2 f0 f1 f2 *)
+(*       (FUTURE0: space_future_memory msgs f0 mem0 f1 mem1) *)
+(*       (FUTURE1: space_future_memory msgs f1 mem1 f2 mem2) *)
+(*       (MAPLE0: Mapping.les f0 f1) *)
+(*       (MAPLE1: Mapping.les f1 f2) *)
+(*       (MAPWF0: Mapping.wfs f0) *)
+(*       (MAPWF1: Mapping.wfs f1) *)
+(*       (MAPWF2: Mapping.wfs f2) *)
+(*   : *)
+(*     space_future_memory msgs f0 mem0 f2 mem2. *)
+(* Proof. *)
+(*   econs. i. *)
+(*   hexploit sim_timestamp_exact_mon_exists; [eapply FROM0|..]; eauto. i. des. *)
+(*   hexploit sim_timestamp_exact_mon_exists; [eapply TO0|..]; eauto. i. des. *)
+(*   hexploit space_future_memory_space; [eapply FUTURE1|..]; eauto. *)
+(*   i. des. *)
+(*   { subst. hexploit space_future_memory_space; [eapply FUTURE0|..]; eauto. *)
+(*     esplits; eauto. *)
 
 Lemma add_sim_memory flag_src f vers mem_tgt0 mem_tgt1 mem_src0 mem_src1
       loc from_tgt to_tgt from_src to_src msg_tgt msg_src
