@@ -23,6 +23,8 @@ Require Import Thread.
 
 Require Import MemoryMerge.
 Require Import MemoryReorder.
+Require Import Cover.
+Require Import MemoryProps.
 
 Require Import PFStep.
 Require Import OrdStep.
@@ -40,22 +42,22 @@ Module PFtoAPFSimThread.
 
     Variant sim_memory (rels: Writes.t) (mem_src mem_tgt: Memory.t): Prop :=
     | sim_memory_intro
-        (SOUND: Memory.le mem_src mem_tgt)
-        (COMPLETE1: forall loc (LOC: ~ L loc)
-                      from to msg (GET_TGT: Memory.get loc to mem_tgt = Some (from, msg)),
-            (<<GET_SRC: Memory.get loc to mem_src = Some (from, msg)>>))
-        (COMPLETE2: forall loc ts from to msg
-                      (LOC: L loc) (LE: Time.le ts to)
-                      (GET_TGT: Memory.get loc to mem_tgt = Some (from, msg)),
+        (EQ: forall loc (LOC: ~ L loc), mem_src loc = mem_tgt loc)
+        (COVER: forall loc ts, covered loc ts mem_src -> covered loc ts mem_tgt)
+        (SOUND: forall loc from to msg
+                  (GET_SRC: Memory.get loc to mem_src = Some (from, msg))
+                  (RESERVE: msg <> Message.reserve),
+            (<<GET_TGT: Memory.get loc to mem_tgt = Some (from, msg)>>))
+        (COMPLETE: forall loc ts from to msg
+                     (LOC: L loc) (LE: Time.le ts to)
+                     (GET_TGT: Memory.get loc to mem_tgt = Some (from, msg))
+                     (RESERVE: msg <> Message.reserve),
             (<<GET_SRC: Memory.get loc to mem_src = Some (from, msg)>>) \/
             exists from' to' val ord,
               (<<IN: List.In (loc, to', ord) rels>>) /\
               (<<LT: Time.lt ts to'>>) /\
               (<<ORD: Ordering.le ord Ordering.na>>) /\
               (<<GET_SRC: Memory.get loc to' mem_src = Some (from', Message.concrete val None)>>))
-        (RESERVE: forall loc from to
-                    (GET_TGT: Memory.get loc to mem_tgt = Some (from, Message.reserve)),
-            (<<GET_SRC: Memory.get loc to mem_src = Some (from, Message.reserve)>>))
     .
     Hint Constructors sim_memory.
 
@@ -85,7 +87,7 @@ Module PFtoAPFSimThread.
       sim_memory (a :: rels) mem_src mem_tgt.
     Proof.
       inv MEM. econs; eauto. i.
-      exploit COMPLETE2; eauto. i. des; eauto.
+      exploit COMPLETE; eauto. i. des; eauto.
       right. esplits; eauto. econs 2. ss.
     Qed.
 
@@ -104,16 +106,59 @@ Module PFtoAPFSimThread.
       sim_memory (rels' ++ rels) mem_src mem_tgt.
     Proof.
       inv MEM. econs; eauto. i.
-      exploit COMPLETE2; eauto. i. des; eauto.
+      exploit COMPLETE; eauto. i. des; eauto.
       right. esplits; eauto.
       apply List.in_or_app. eauto.
+    Qed.
+
+    Lemma well_ordered mem:
+      forall loc ts,
+      (forall to (LT: Time.lt ts to), Memory.get loc to mem = None) \/
+      (exists to from msg,
+          (<<TO: Time.lt ts to>>) /\
+          (<<GET: Memory.get loc to mem = Some (from, msg)>>) /\
+          (<<MIN: forall to' (LT1: Time.lt ts to') (LT2: Time.lt to' to),
+              Memory.get loc to' mem = None>>)).
+    Proof.
+      i. specialize (Cell.finite (mem loc)). i. des.
+      cut ((forall to (IN: List.In to dom) (LT: Time.lt ts to), Memory.get loc to mem = None) \/
+           (exists to from msg,
+               (<<IN: List.In to dom>>) /\
+               (<<TO: Time.lt ts to>>) /\
+               (<<GET: Memory.get loc to mem = Some (from, msg)>>) /\
+               (<<MIN: forall to' (IN: List.In to' dom)
+                         (LT1: Time.lt ts to') (LT2: Time.lt to' to),
+                   Memory.get loc to' mem = None>>))).
+      { i. des.
+        - left. i.
+          destruct (Memory.get loc to mem) as [[]|] eqn:GET; ss.
+          exploit H; eauto. i.
+          exploit H0; eauto. i. congr.
+        - right. esplits; eauto. i.
+          destruct (Memory.get loc to' mem) as [[]|] eqn:GET'; ss.
+          exploit H; try eapply GET'. i.
+          exploit MIN; try exact x; eauto. i. congr.
+      }
+      clear H. induction dom; try by (left; ss). des.
+      - destruct (TimeFacts.le_lt_dec a ts).
+        { left. i. inv IN; eauto. timetac. }
+        destruct (Memory.get loc a mem) as [[]|] eqn:GETA; cycle 1.
+        { left. i. inv IN; eauto. }
+        right. esplits; eauto; ss; eauto. i. des; timetac.
+      - right.
+        destruct (TimeFacts.le_lt_dec a ts).
+        { esplits; try exact GET; ss; eauto. i. des; eauto. subst. timetac. }
+        destruct (TimeFacts.le_lt_dec to a).
+        { esplits; try exact GET; ss; eauto. i. des; eauto. subst. timetac. }
+        destruct (Memory.get loc a mem) as [[]|] eqn:GETA; cycle 1.
+        { esplits; try exact GET; ss; eauto. i. des; eauto. subst. ss. }
+        esplits; try exact GETA; ss; eauto. i. des; eauto. subst. timetac.
     Qed.
 
     Lemma promise
           rels mem1_src
           promises1 mem1_tgt loc from to msg promises2 mem2_tgt kind
           (MEM1: sim_memory rels mem1_src mem1_tgt)
-          (WRITES1: Writes.wf L rels mem1_src)
           (LE1_SRC: Memory.le promises1 mem1_src)
           (PROMISE_TGT: Memory.promise promises1 mem1_tgt loc from to msg promises2 mem2_tgt kind):
       exists mem2_src,
@@ -123,41 +168,98 @@ Module PFtoAPFSimThread.
       inv MEM1. inv PROMISE_TGT; ss.
       { (* add *)
         exploit (@Memory.add_exists mem1_src loc from to msg).
-        { i. exploit SOUND; eauto. i.
-          exploit Memory.add_get0; try exact MEM. i. des.
-          exploit Memory.add_get1; try exact x; eauto. i.
-          exploit Memory.get_disjoint; [exact GET0|exact x1|]. i. des; subst; ss. congr.
+        { eapply covered_disjoint; eauto.
+          inv MEM. inv ADD. eauto.
         }
         { inv MEM. inv ADD. ss. }
         { inv MEM. inv ADD. ss. }
-        i. des. esplits; eauto. econs; ii.
+        i. des. esplits.
+        { econs; eauto. i.
+          exploit Memory.get_ts; try exact GET. i. des.
+          { subst. inv MEM. inv ADD. inv TO. }
+          specialize (well_ordered mem1_tgt loc to). i. des.
+          { exploit (COVER loc to').
+            { econs; eauto. econs; ss. refl. }
+            i. inv x2. inv ITV. ss.
+            rewrite H in GET0; ss.
+            eapply TimeFacts.lt_le_lt; eauto.
+          }
+          exploit Memory.get_ts; try exact GET0. i. des.
+          { subst. inv TO. }
+          destruct (TimeFacts.le_lt_dec to from0); cycle 1.
+          { exploit Memory.add_get1; try exact GET0; eauto. i.
+            exploit Memory.add_get0; try exact MEM. i. des.
+            exploit Memory.get_disjoint; [exact x3|exact GET2|]. i. des.
+            { subst. timetac. }
+            apply (x4 to); econs; ss; try refl.
+            - econs. ss.
+            - inv MEM. inv ADD. ss.
+          }
+          inv l; cycle 1.
+          { inv H. eapply ATTACH; eauto. }
+          cut (exists from1 to1 msg1,
+                  Memory.get loc to1 mem1_tgt = Some (from1, msg1) /\
+                  Time.lt from1 from0 /\ Time.lt to to1).
+          { i. des.
+            destruct (TimeFacts.le_lt_dec to0 to1).
+            - exploit Memory.get_disjoint; [exact GET0|exact H0|]. i. des; timetac.
+              apply (x3 to0); econs; ss; try refl. etrans; eauto.
+            - rewrite MIN in H0; ss.
+          }
+          destruct (TimeFacts.le_lt_dec to' from0).
+          { exploit (COVER loc to').
+            { econs; eauto. econs; ss. refl. }
+            i. inv x3. inv ITV. ss.
+            esplits; try exact GET1.
+            - eapply TimeFacts.lt_le_lt; eauto.
+            - exploit Memory.get_ts; try exact GET1. i. des; subst; timetac.
+              eapply TimeFacts.lt_le_lt; try exact TO0. ss.
+          }
+          { exploit (@Time.middle_spec to from0); ss. i. des.
+            exploit (COVER loc (Time.middle to from0)).
+            { econs; eauto. econs; ss. econs. etrans; eauto. }
+            i. inv x5. inv ITV. ss.
+            esplits; try exact GET1.
+            - etrans; try exact FROM; ss.
+            - eapply TimeFacts.lt_le_lt; try exact x3. ss.
+          }
+        }
+        econs; i.
+        - apply Cell.ext. i.
+          replace (Cell.get ts (mem2 loc0)) with (Memory.get loc0 ts mem2) by ss.
+          replace (Cell.get ts (mem2_tgt loc0)) with (Memory.get loc0 ts mem2_tgt) by ss.
+          erewrite (@Memory.add_o mem2); try exact x0.
+          erewrite (@Memory.add_o mem2_tgt); try exact MEM.
+          unfold Memory.get. rewrite EQ; ss.
+        - rewrite add_covered in H; try exact x0.
+          rewrite add_covered; try exact MEM.
+          des; eauto.
         - erewrite Memory.add_o; eauto.
-          revert LHS. erewrite Memory.add_o; try exact x0.
-          condtac; ss; eauto.
-        - erewrite Memory.add_o; eauto.
-          revert GET_TGT. erewrite Memory.add_o; try exact MEM.
+          revert GET_SRC. erewrite Memory.add_o; try exact x0.
           condtac; ss; eauto.
         - revert GET_TGT. erewrite Memory.add_o; try exact MEM.
           condtac; ss.
           + i. des. clarify.
             exploit Memory.add_get0; try exact x0. i. des. eauto.
-          + guardH o. i. exploit COMPLETE2; eauto. i. des.
+          + guardH o. i. exploit COMPLETE; eauto. i. des.
             * exploit Memory.add_get1; try exact GET_SRC; eauto.
             * exploit Memory.add_get1; try exact GET_SRC; eauto. i.
               right. esplits; try exact x1; eauto.
-        - erewrite Memory.add_o; eauto.
-          revert GET_TGT. erewrite Memory.add_o; try exact MEM.
-          condtac; ss; eauto.
       }
 
       { (* split *)
         exploit Memory.split_exists_le; try exact LE1_SRC; eauto. i. des.
         esplits; eauto. econs; ii.
+        - apply Cell.ext. i.
+          replace (Cell.get ts (mem2 loc0)) with (Memory.get loc0 ts mem2) by ss.
+          replace (Cell.get ts (mem2_tgt loc0)) with (Memory.get loc0 ts mem2_tgt) by ss.
+          erewrite (@Memory.split_o mem2); try exact x0.
+          erewrite (@Memory.split_o mem2_tgt); try exact MEM.
+          unfold Memory.get. rewrite EQ; ss.
+        - rewrite split_covered in H; try exact x0.
+          rewrite split_covered; try exact MEM. eauto.
         - erewrite Memory.split_o; eauto.
-          revert LHS. erewrite Memory.split_o; try exact x0.
-          repeat condtac; ss; eauto.
-        - erewrite Memory.split_o; eauto.
-          revert GET_TGT. erewrite Memory.split_o; try exact MEM.
+          revert GET_SRC. erewrite Memory.split_o; try exact x0.
           repeat condtac; ss; eauto.
         - revert GET_TGT. erewrite Memory.split_o; try exact MEM.
           repeat condtac; ss.
@@ -166,57 +268,58 @@ Module PFtoAPFSimThread.
           + guardH o. i. des. clarify.
             exploit Memory.split_get0; try exact x0. i. des. eauto.
           + guardH o. guardH o0.
-            i. exploit COMPLETE2; eauto. i. des.
+            i. exploit COMPLETE; eauto. i. des.
             * left. erewrite Memory.split_o; eauto. repeat condtac; ss; congr.
             * exploit Memory.split_get1; try exact GET_SRC; eauto. i. des.
               right. esplits; eauto.
-        - erewrite Memory.split_o; eauto.
-          revert GET_TGT. erewrite Memory.split_o; try exact MEM.
-          repeat condtac; ss; eauto.
       }
 
       { (* lower *)
         exploit Memory.lower_exists_le; try exact LE1_SRC; eauto. i. des.
         esplits; eauto. econs; ii.
+        - apply Cell.ext. i.
+          replace (Cell.get ts (mem2 loc0)) with (Memory.get loc0 ts mem2) by ss.
+          replace (Cell.get ts (mem2_tgt loc0)) with (Memory.get loc0 ts mem2_tgt) by ss.
+          erewrite (@Memory.lower_o mem2); try exact x0.
+          erewrite (@Memory.lower_o mem2_tgt); try exact MEM.
+          unfold Memory.get. rewrite EQ; ss.
+        - erewrite lower_covered in H; try exact x0.
+          erewrite lower_covered; try exact MEM. eauto.
         - erewrite Memory.lower_o; eauto.
-          revert LHS. erewrite Memory.lower_o; try exact x0.
-          condtac; ss; eauto.
-        - erewrite Memory.lower_o; eauto.
-          revert GET_TGT. erewrite Memory.lower_o; try exact MEM.
+          revert GET_SRC. erewrite Memory.lower_o; try exact x0.
           condtac; ss; eauto.
         - revert GET_TGT. erewrite Memory.lower_o; try exact MEM.
           condtac; ss.
           + i. des. clarify.
             exploit Memory.lower_get0; try exact x0. i. des. eauto.
-          + guardH o. i. exploit COMPLETE2; eauto. i. des.
+          + guardH o. i. exploit COMPLETE; eauto. i. des.
             * left. erewrite Memory.lower_o; eauto. condtac; ss; eauto.
             * exploit Memory.lower_get1; try exact GET_SRC; eauto. i. des.
               inv MSG_LE. inv RELEASED.
               right. esplits; eauto.
-        - erewrite Memory.lower_o; eauto.
-          revert GET_TGT. erewrite Memory.lower_o; try exact MEM.
-          condtac; ss; eauto.
       }
 
       { (* remove *)
         exploit Memory.remove_exists_le; try exact LE1_SRC; eauto. i. des.
         esplits; eauto. econs; ii.
+        - apply Cell.ext. i.
+          replace (Cell.get ts (mem2 loc0)) with (Memory.get loc0 ts mem2) by ss.
+          replace (Cell.get ts (mem2_tgt loc0)) with (Memory.get loc0 ts mem2_tgt) by ss.
+          erewrite (@Memory.remove_o mem2); try exact x0.
+          erewrite (@Memory.remove_o mem2_tgt); try exact MEM.
+          unfold Memory.get. rewrite EQ; ss.
+        - erewrite remove_covered in H; try exact x0.
+          erewrite remove_covered; try exact MEM. des; eauto.
         - erewrite Memory.remove_o; eauto.
-          revert LHS. erewrite Memory.remove_o; try exact x0.
-          condtac; ss; eauto.
-        - erewrite Memory.remove_o; eauto.
-          revert GET_TGT. erewrite Memory.remove_o; try exact MEM.
+          revert GET_SRC. erewrite Memory.remove_o; try exact x0.
           condtac; ss; eauto.
         - revert GET_TGT. erewrite Memory.remove_o; try exact MEM.
           condtac; ss.
-          guardH o. i. exploit COMPLETE2; eauto. i. des.
+          guardH o. i. exploit COMPLETE; eauto. i. des.
           + left. erewrite Memory.remove_o; eauto. condtac; ss; eauto.
           + exploit Memory.remove_get1; try exact GET_SRC; eauto. i. des.
             { subst. exploit Memory.remove_get0; try exact x0. i. des. congr. }
             right. esplits; eauto.
-        - erewrite Memory.remove_o; eauto.
-          revert GET_TGT. erewrite Memory.remove_o; try exact MEM.
-          condtac; ss; eauto.
       }
     Qed.
 
@@ -224,14 +327,14 @@ Module PFtoAPFSimThread.
           rels mem1_src
           promises1 mem1_tgt loc from to msg promises2 mem2_tgt kind
           (MEM1: sim_memory rels mem1_src mem1_tgt)
-          (WRITES1: Writes.wf L rels mem1_src)
           (LE1_SRC: Memory.le promises1 mem1_src)
           (WRITE_TGT: Memory.write promises1 mem1_tgt loc from to msg promises2 mem2_tgt kind):
       exists mem2_src,
         <<WRITE_SRC: Memory.write promises1 mem1_src loc from to msg promises2 mem2_src kind>> /\
         <<MEM2: sim_memory rels mem2_src mem2_tgt>>.
     Proof.
-      inv WRITE_TGT. exploit promise; eauto. i. des.
+      inv WRITE_TGT.
+      exploit promise; eauto; try apply MEM1_SRC. i. des.
       esplits; eauto.
     Qed.
 
@@ -239,7 +342,6 @@ Module PFtoAPFSimThread.
           rels mem1_src
           ts promises1 mem1_tgt loc from to val promises2 mem2_tgt msgs kinds kind
           (MEM1: sim_memory rels mem1_src mem1_tgt)
-          (WRITES1: Writes.wf L rels mem1_src)
           (LE1_SRC: Memory.le promises1 mem1_src)
           (LOC: ~ L loc)
           (WRITE_TGT: Memory.write_na ts promises1 mem1_tgt loc from to val promises2 mem2_tgt msgs kinds kind):
@@ -247,12 +349,11 @@ Module PFtoAPFSimThread.
         <<WRITE_SRC: Memory.write_na ts promises1 mem1_src loc from to val promises2 mem2_src msgs kinds kind>> /\
         <<MEM2: sim_memory rels mem2_src mem2_tgt>>.
     Proof.
-      revert mem1_src MEM1 WRITES1 LE1_SRC.
+      revert mem1_src MEM1 LE1_SRC.
       induction WRITE_TGT; i.
       { exploit write; eauto. i. des. eauto. }
       exploit write; eauto. i. des.
       hexploit Memory.write_le; try exact WRITE_SRC; eauto. i.
-      hexploit Writes.write_wf_other; try exact WRITE_SRC; eauto. i.
       exploit IHWRITE_TGT; try exact MEM2; eauto. i. des.
       esplits; eauto.
     Qed.
@@ -318,7 +419,6 @@ Module PFtoAPFSimThread.
           ts promises1 mem1_tgt loc from to val promises2 mem2_tgt msgs kinds kind
           ord
           (MEM1: sim_memory rels mem1_src mem1_tgt)
-          (WRITES1: Writes.wf L rels mem1_src)
           (RESERVE_ONLY: OrdLocal.reserve_only L promises1)
           (LE1_SRC: Memory.le promises1 mem1_src)
           (LOC: L loc)
@@ -341,20 +441,20 @@ Module PFtoAPFSimThread.
       esplits; eauto.
       exploit Memory.write_na_times; try exact WRITE_NA. i. des.
       clear - ORD LOC MSG_EX ADD MEM2 WRITE_SRC x1.
-      inv MEM2. econs.
-      - etrans; eauto. ii.
-        erewrite Memory.add_o; eauto. condtac; ss; eauto. des. subst.
-        exploit Memory.add_get0; eauto. i. des. congr.
-      - i. revert GET_TGT. erewrite Memory.add_o; eauto.
-        condtac; ss; eauto. i. des. clarify.
+      inv MEM2. econs; i.
+      - rewrite EQ; ss.
+        apply Cell.ext. i.
+        replace (Cell.get ts (mem2_tgt loc0)) with (Memory.get loc0 ts mem2_tgt) by ss.
+        erewrite (@Memory.add_o mem2_tgt); eauto.
+        condtac; ss. des; subst; ss.
+      - erewrite add_covered; try exact ADD. eauto.
+      - exploit SOUND; eauto. i. des.
+        exploit Memory.add_get1; try exact x; eauto.
       - i. revert GET_TGT. erewrite Memory.add_o; eauto.
         condtac; ss; eauto. i. des. clarify.
         exploit Memory.write_get2; try exact WRITE_SRC. i. des.
         right. esplits; eauto.
         eapply TimeFacts.le_lt_lt; eauto.
-      - i. revert GET_TGT. erewrite Memory.add_o; eauto.
-        condtac; ss; eauto. i. des. clarify.
-        unguard. des; ss.
     Qed.
 
     Lemma promise_step
@@ -362,7 +462,6 @@ Module PFtoAPFSimThread.
           lc1_tgt mem1_tgt loc from to msg lc2_tgt mem2_tgt kind
           (LC1: lc1_src = lc1_tgt)
           (MEM1: sim_memory rels mem1_src mem1_tgt)
-          (WRITES1: Writes.wf L rels mem1_src)
           (WF1_SRC: Local.wf lc1_src mem1_src)
           (STEP_TGT: Local.promise_step lc1_tgt mem1_tgt loc from to msg lc2_tgt mem2_tgt kind)
           (MSG1: forall promises2_src mem2_src
@@ -374,7 +473,7 @@ Module PFtoAPFSimThread.
         (<<MEM2: sim_memory rels mem2_src mem2_tgt>>).
     Proof.
       inv STEP_TGT.
-      exploit promise; try exact MEM; eauto; try apply WF1_SRC; try apply WF1_TGT. i. des.
+      exploit promise; try exact MEM; eauto; try apply WF1_SRC; try apply MEM1_SRC. i. des.
       esplits; eauto.
     Qed.
 
@@ -404,22 +503,22 @@ Module PFtoAPFSimThread.
       (<<RACE: RARaceW.wr_race L rels (Local.tview lc1_src) loc ord>>).
     Proof.
       inv MEM1. inv STEP_TGT.
-      destruct (Memory.get loc to mem1_src) as [[from_src msg_src]|] eqn:GET_SRC; cycle 1.
+      destruct (classic (Memory.get loc to mem1_src =
+                         Some (from, Message.concrete val' released))) eqn:GET_SRC; cycle 1.
       { (* race *)
         destruct (L loc) eqn:LOC; cycle 1.
-        { exploit COMPLETE1; eauto; try congr. }
+        { unfold Memory.get in GET. rewrite <- EQ in GET; ss. rewrite LOC. ss. }
         inv READABLE. inv NORMAL_TVIEW1.
-        exploit COMPLETE2; eauto. i. des; try congr.
+        exploit COMPLETE; eauto; ss. i. des; try congr.
         right. unfold RARaceW.wr_race.
         esplits; try exact ORD0; eauto.
         rewrite CUR; ss.
       }
-      exploit SOUND; eauto. i. rewrite x in *. inv GET.
       destruct (classic (L loc /\ Ordering.le ord Ordering.plain /\
                          Time.lt (View.rlx (TView.cur (Local.tview lc1_tgt)) loc) to)).
       { (* race *)
         right. des. unfold RARaceW.wr_race.
-        inv WRITES1. exploit COMPLETE; try exact GET_SRC; eauto. i. des.
+        inv WRITES1. exploit COMPLETE0; try exact GET_SRC; eauto. i. des.
         esplits; eauto.
       }
       left. esplits.
@@ -437,7 +536,6 @@ Module PFtoAPFSimThread.
           (LC1: lc1_src = lc1_tgt)
           (SC1: sc1_src = sc1_tgt)
           (MEM1: sim_memory rels mem1_src mem1_tgt)
-          (WRITES1: Writes.wf L rels mem1_src)
           (WF1_SRC: Local.wf lc1_src mem1_src)
           (STEP_TGT: Local.write_step lc1_tgt sc1_tgt mem1_tgt loc from to val
                                       releasedm released ord lc2_tgt sc2_tgt mem2_tgt kind):
@@ -467,7 +565,6 @@ Module PFtoAPFSimThread.
           (LC1: lc1_src = lc1_tgt)
           (SC1: sc1_src = sc1_tgt)
           (MEM1: sim_memory rels mem1_src mem1_tgt)
-          (WRITES1: Writes.wf L rels mem1_src)
           (WF1_SRC: Local.wf lc1_src mem1_src)
           (LOC: ~ L loc)
           (STEP_TGT: Local.write_na_step lc1_tgt sc1_tgt mem1_tgt loc from to val ord
@@ -490,7 +587,6 @@ Module PFtoAPFSimThread.
           (LC1: lc1_src = lc1_tgt)
           (SC1: sc1_src = sc1_tgt)
           (MEM1: sim_memory rels mem1_src mem1_tgt)
-          (WRITES1: Writes.wf L rels mem1_src)
           (RESERVE_ONLY1: OrdLocal.reserve_only L (Local.promises lc1_src))
           (WF1_SRC: Local.wf lc1_src mem1_src)
           (LOC: L loc)
@@ -533,13 +629,10 @@ Module PFtoAPFSimThread.
           (<<ORD: Ordering.le ordw Ordering.na>>)).
     Proof.
       inv MEM1. inv STEP_TGT.
-      destruct (Memory.get loc to mem1_src) as [[from_src msg_src]|] eqn:GET_SRC.
-      { exploit SOUND; eauto. i.
-        rewrite x in *. inv GET. eauto.
-      }
+      destruct (classic (Memory.get loc to mem1_src = Some (from, msg))) eqn:GET_SRC; eauto.
       destruct (L loc) eqn:LOC; cycle 1.
-      { exploit COMPLETE1; eauto. rewrite LOC. ss. }
-      exploit COMPLETE2; eauto.
+      { unfold Memory.get in GET. rewrite <- EQ in *; ss. rewrite LOC. ss. }
+      exploit COMPLETE; eauto.
       { econs. eauto. }
       i. des; eauto.
       right. esplits; eauto.
@@ -710,7 +803,7 @@ Module PFtoAPFSimThread.
           unfold Writes.append. ss. condtac; ss.
         + exploit write_na_step_other; try exact LOCAL; eauto; try congr. i. des.
           exploit Normal.write_na_step; try exact STEP_SRC; eauto. i. des.
-          left. esplits; [econs 8|..]; eauto.
+          left. esplits; [econs 8| | | |M| |]; eauto.
           * econs; eauto. condtac; ss. eauto.
           * unfold Writes.append. ss. condtac; ss.
       - exploit racy_read_step; try exact LOCAL; eauto. i. des.
@@ -722,6 +815,74 @@ Module PFtoAPFSimThread.
       - exploit racy_update_step; try exact LOCAL; eauto. i. des.
         + left. esplits; [econs 11|..]; eauto.
         + right. right. esplits; ss; eauto.
+    Qed.
+
+
+    (* cap *)
+
+    Lemma covered_max_ts
+          mem1 mem2
+          (INHABITED: Memory.inhabited mem1)
+          (COVER: forall loc ts, covered loc ts mem1 -> covered loc ts mem2):
+      forall loc, Time.le (Memory.max_ts loc mem1) (Memory.max_ts loc mem2).
+    Proof.
+      i. exploit (@Memory.max_ts_spec loc); try eapply INHABITED. i. des.
+      exploit Memory.get_ts; eauto. i. des.
+      { rewrite x1. apply Time.bot_spec. }
+      exploit COVER.
+      { econs; eauto. econs; try refl. ss. }
+      s. i. inv x. inv ITV. ss.
+      exploit Memory.max_ts_spec; try exact GET0. i. des.
+      etrans; eauto.
+    Qed.
+
+    Lemma sim_memory_cap
+          rels mem_src mem_tgt cap_src cap_tgt
+          (SIM: sim_memory rels mem_src mem_tgt)
+          (CLOSED_SRC: Memory.closed mem_src)
+          (CLOSED_TGT: Memory.closed mem_tgt)
+          (CAP_SRC: Memory.cap mem_src cap_src)
+          (CAP_TGT: Memory.cap mem_tgt cap_tgt):
+      sim_memory rels cap_src cap_tgt.
+    Proof.
+      dup SIM. inv SIM0. econs; i.
+      { apply Cell.ext. i.
+        destruct (Cell.get ts (cap_src loc)) as [[from1 msg1]|] eqn:GET1.
+        - inv CAP_TGT. exploit Memory.cap_inv; try exact CAP_SRC; eauto. i. des.
+          + unfold Memory.get in x0. rewrite EQ in x0; ss.
+            exploit SOUND0; eauto.
+          + subst. inv x1.
+            unfold Memory.get in MIDDLE. erewrite MIDDLE; eauto.
+            econs; (try by unfold Memory.get; rewrite <- EQ; eauto); ss.
+          + subst. unfold Memory.max_ts in *. rewrite EQ; ss. eauto.
+        - destruct (Cell.get ts (cap_tgt loc)) as [[from2 msg2]|] eqn:GET2; ss.
+          inv CAP_SRC. exploit Memory.cap_inv; try exact CAP_TGT; eauto. i. des.
+          + unfold Memory.get in x0. rewrite <- EQ in x0; ss.
+            exploit SOUND0; eauto. unfold Memory.get. i.
+            rewrite GET1 in x. ss.
+          + subst. inv x1.
+            unfold Memory.get in MIDDLE. erewrite MIDDLE in GET1; eauto.
+            econs; (try by unfold Memory.get; rewrite EQ; eauto); ss.
+          + subst. unfold Memory.max_ts, Memory.get in *.
+            rewrite <- EQ in GET1; ss. rewrite BACK in GET1. ss.
+      }
+      { rewrite <- memory_cap_covered; try exact CAP_TGT; eauto.
+        rewrite <- memory_cap_covered in H; try exact CAP_SRC; eauto.
+        inv H. ss. econs; ss. etrans; eauto.
+        exploit covered_max_ts; eauto; try apply CLOSED_SRC. i. inv x0.
+        - econs. apply Time.incr_mon. eauto.
+        - inv H. rewrite H1. refl.
+      }
+      { exploit Memory.cap_inv; try exact CAP_SRC; eauto. i. des; ss.
+        exploit SOUND; eauto. i. des.
+        inv CAP_TGT. exploit SOUND0; eauto.
+      }
+      { exploit Memory.cap_inv; try exact CAP_TGT; eauto. i. des; ss.
+        exploit COMPLETE; try exact x0; eauto. i. des.
+        - inv CAP_SRC. exploit SOUND0; eauto.
+        - inv CAP_SRC. exploit SOUND0; eauto. i.
+          right. esplits; eauto.
+      }
     Qed.
   End PFtoAPFSimThread.
 End PFtoAPFSimThread.
