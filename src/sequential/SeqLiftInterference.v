@@ -117,18 +117,18 @@ Lemma sim_thread_future
       lang st
   :
   exists lc_src2 sc_src2 mem_src2,
-    (<<STEPS: rtc (@Thread.tau_step lang) (Thread.mk lang st lc_src0 sc_src1 mem_src1) (Thread.mk lang st lc_src0 sc_src2 mem_src2)>>) /\
-      (<<FAILURE: Thread.steps_failure (Thread.mk lang st lc_src0 sc_src1 mem_src1)>>) \/
-      exists vs_src1 vs_tgt1,
-        (<<SIM: sim_thread
-                  f1 vers1 (fun _ => None) flag_tgt vs_src1 vs_tgt1
-                  mem_src2 mem_tgt1 lc_src2 lc_tgt0 sc_src2 sc_tgt1>>) /\
-          (<<VALSRC: forall loc val (VAL: vs_src1 loc = Some val),
-            exists val_old,
-              (<<VS: vs_src0 loc = Some val_old>>) /\
-                (<<VAL: Const.le val_old val>>)>>) /\
-          (<<VALTGT: forall loc val (VAL: vs_tgt1 loc = Some val), vs_tgt0 loc = Some val>>) /\
-          (<<CLOSED: sim_closed_memory f1 mem_src2>>)
+    (<<STEPS: rtc (@Thread.tau_step lang) (Thread.mk lang st lc_src0 sc_src1 mem_src1) (Thread.mk lang st lc_src2 sc_src2 mem_src2)>>) /\
+      ((<<FAILURE: Thread.steps_failure (Thread.mk lang st lc_src2 sc_src2 mem_src2)>>) \/
+         exists vs_src1 vs_tgt1,
+           (<<SIM: sim_thread
+                     f1 vers1 (fun _ => None) flag_tgt vs_src1 vs_tgt1
+                     mem_src2 mem_tgt1 lc_src2 lc_tgt0 sc_src2 sc_tgt1>>) /\
+             (<<VALSRC: forall loc val (VAL: vs_src1 loc = Some val),
+               exists val_old,
+                 (<<VS: vs_src0 loc = Some val_old>>) /\
+                   (<<VAL: Const.le val_old val>>)>>) /\
+             (<<VALTGT: forall loc val (VAL: vs_tgt1 loc = Some val), vs_tgt0 loc = Some val>>) /\
+             (<<CLOSED: sim_closed_memory f1 mem_src2>>))
 .
 Proof.
 Admitted.

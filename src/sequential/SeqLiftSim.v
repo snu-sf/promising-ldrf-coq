@@ -1442,6 +1442,107 @@ Section LIFT.
     }
   Qed.
 
+  Lemma sim_lift_interference_future:
+    forall
+      w0 p0 D smem_src smem_tgt mem_src0 mem_tgt0 lc_src0 lc_tgt sc_src0 sc_tgt0
+      w1 mem_src1 mem_tgt1 sc_src1 sc_tgt1
+      lang_src lang_tgt sim_terminal st_src st_tgt
+      (LIFT: sim_state_lift false w0 smem_src smem_tgt p0 D mem_src0 mem_tgt0 lc_src0 lc_tgt sc_src0 sc_tgt0)
+      (SIM: sim_seq_interference _ _ sim_terminal p0 D (SeqState.mk lang_src st_src smem_src) (SeqState.mk lang_tgt st_tgt smem_tgt))
+      (NOMIX: nomix _ st_src)
+      (CONSISTENT: Local.promise_consistent lc_tgt)
+      (WF_SRC0: Local.wf lc_src0 mem_src0)
+      (WF_TGT0: Local.wf lc_tgt mem_tgt0)
+      (SC_SRC0: Memory.closed_timemap sc_src0 mem_src0)
+      (SC_TGT0: Memory.closed_timemap sc_tgt0 mem_tgt0)
+      (MEM_SRC0: Memory.closed mem_src0)
+      (MEM_TGT0: Memory.closed mem_tgt0)
+      (CONS: Thread.consistent (Thread.mk lang_src st_src lc_src0 sc_src0 mem_src0))
+      (WF_SRC1: Local.wf lc_src0 mem_src1)
+      (WF_TGT1: Local.wf lc_tgt mem_tgt1)
+      (SC_SRC1: Memory.closed_timemap sc_src1 mem_src1)
+      (SC_TGT1: Memory.closed_timemap sc_tgt1 mem_tgt1)
+      (MEM_SRC1: Memory.closed mem_src1)
+      (MEM_TGT1: Memory.closed mem_tgt1)
+      (MEMSRC: Memory.future_weak mem_src0 mem_src1)
+      (MEMTGT: Memory.future_weak mem_tgt0 mem_tgt1)
+      (SCSRC: TimeMap.le sc_src0 sc_src1)
+      (SCTGT: TimeMap.le sc_tgt0 sc_tgt1)
+      (WORLD: world_messages_le (Messages.of_memory lc_src0.(Local.promises)) (Messages.of_memory lc_tgt.(Local.promises)) w0 w1)
+      (MEM: sim_memory_lift w1 mem_src1 mem_tgt1)
+      (SC: sim_timemap_lift w1 sc_src1 sc_tgt1)
+    ,
+    exists lc_src2 sc_src2 mem_src2,
+      (<<STEPS: rtc (@Thread.tau_step _)
+                    (Thread.mk _ st_src lc_src0 sc_src1 mem_src1)
+                    (Thread.mk _ st_src lc_src2 sc_src2 mem_src2)>>) /\
+        ((<<FAILURE: Thread.steps_failure (Thread.mk _ st_src lc_src2 sc_src2 mem_src2)>>) \/
+           (exists w2 p1,
+               (<<LIFT: sim_state_lift false w2 smem_src smem_tgt p1 D mem_src2 mem_tgt1 lc_src2 lc_tgt sc_src2 sc_tgt1>>) /\
+                 (<<SIM: sim_seq_interference _ _ sim_terminal p1 D (SeqState.mk lang_src st_src smem_src) (SeqState.mk lang_tgt st_tgt smem_tgt)>>) /\
+                 (<<SC: sim_timemap_lift w2 sc_src2 sc_tgt1>>) /\
+                 (<<MEM: sim_memory_lift w2 mem_src2 mem_tgt1>>) /\
+                 (<<WORLD: world_messages_le (unchangable mem_src1 lc_src0.(Local.promises)) (unchangable mem_tgt1 lc_tgt.(Local.promises)) w1 w2>>))).
+  Proof.
+    i. inv LIFT. destruct w1 as [[f1 vers1] mem_src1'].
+    red in WORLD. red in MEM. red in SC.
+    hexploit WORLD; eauto. i. des. subst.
+    hexploit INTERFERENCE; eauto. i. subst.
+    hexploit sim_thread_future; eauto. i. des.
+    { esplits; eauto. }
+    esplits; eauto. right.
+    hexploit (choice (fun loc p =>
+                        (<<NA: loc_na loc -> p = if (vs_src1 loc) then Perm.high else Perm.low>>) /\
+                          (<<AT: ~ loc_na loc -> p = p0 loc>>))).
+    { intros loc. destruct (classic (loc_na loc)).
+      { esplits; [eauto|]. ss. }
+      { esplits; [|eauto]. ss. }
+    }
+    intros [p1 PERM1].
+    esplits.
+    { econs; eauto.
+      { instantiate (1:=p1). ii.
+        specialize (PERM1 loc). des. rewrite NA0; auto.
+        hexploit (VALS loc); auto. i. des_ifs.
+        { inv SIM2. specialize (PERM loc).
+          rewrite Heq in PERM. destruct (vs_tgt1 loc) eqn:VAL; ss.
+          hexploit VALTGT; eauto. i.
+          hexploit VALSRC; eauto. i. des.
+          rewrite VS in H. rewrite H0 in H. inv H.
+          econs.
+          { etrans; eauto. }
+          { auto. }
+        }
+        { inv SIM2. specialize (PERM loc).
+          rewrite Heq in PERM. destruct (vs_tgt1 loc) eqn:VAL; ss.
+          econs.
+        }
+      }
+      { ii. ss. hexploit ATLOCS; eauto. i. des. splits; auto.
+        inv SIM2. specialize (PERM loc).
+        destruct (vs_src1 loc) eqn:VSRC, (vs_tgt1 loc) eqn:VTGT; ss.
+        hexploit VALSRC; eauto. i.
+        hexploit VALTGT; eauto. i. des.
+        rewrite VS in VAL. rewrite H0 in VAL. ss. etrans; eauto.
+      }
+    }
+    { eapply sim_seq_interference_mon; eauto.
+      ii. specialize (PERM1 loc). des.
+      destruct (classic (loc_na loc)).
+      { rewrite NA; auto. des_ifs. hexploit VALSRC; eauto. i. des.
+        hexploit (VALS loc); auto. i. rewrite VS in H0. inv H0. refl.
+      }
+      { rewrite AT; auto. refl. }
+    }
+    { inv SIM2. ss. eapply sim_timemap_mon_locs; eauto; ss. }
+    { inv SIM2. ss. }
+    { ss. i. splits; auto; try refl.
+      { hexploit Thread.rtc_tau_step_future; eauto. i. des; ss.
+        eapply Memory.future_future_weak; eauto.
+      }
+      { eapply map_future_memory_refl; eauto. }
+    }
+  Qed.
   Lemma sim_lift_past_future:
     forall
       w0 p0 D smem_src smem_tgt mem_src0 mem_tgt0 lc_src0 lc_tgt sc_src0 sc_tgt0
@@ -1474,44 +1575,154 @@ Section LIFT.
     ,
     exists lc_src2 sc_src2 mem_src2,
       (<<STEPS: rtc (@Thread.tau_step _)
-                    (Thread.mk _ st_src lc_src0 sc_src0 mem_src0)
+                    (Thread.mk _ st_src lc_src0 sc_src1 mem_src1)
                     (Thread.mk _ st_src lc_src2 sc_src2 mem_src2)>>) /\
-        ((<<FAILURE: Thread.steps_failure (Thread.mk _ st_src lc_src0 sc_src1 mem_src1)>>) \/
-           (exists w1 p1,
-               (<<LIFT: sim_state_lift false w1 smem_src smem_tgt p1 D mem_src2 mem_tgt1 lc_src2 lc_tgt sc_src2 sc_tgt1>>) /\
+        ((<<FAILURE: Thread.steps_failure (Thread.mk _ st_src lc_src2 sc_src2 mem_src2)>>) \/
+           (exists w2 p1,
+               (<<LIFT: sim_state_lift false w2 smem_src smem_tgt p1 D mem_src2 mem_tgt1 lc_src2 lc_tgt sc_src2 sc_tgt1>>) /\
                  (<<SIM: sim_seq_interference _ _ sim_terminal p1 D (SeqState.mk lang_src st_src smem_src) (SeqState.mk lang_tgt st_tgt smem_tgt)>>) /\
-                 (<<SC: sim_timemap_lift w1 sc_src2 sc_tgt1>>) /\
-                 (<<MEM: sim_memory_lift w1 mem_src2 mem_tgt1>>) /\
-                 (<<WORLD: world_messages_le (unchangable mem_src1 lc_src0.(Local.promises)) (unchangable mem_tgt1 lc_tgt.(Local.promises)) w0 w1>>))).
+                 (<<SC: sim_timemap_lift w2 sc_src2 sc_tgt1>>) /\
+                 (<<MEM: sim_memory_lift w2 mem_src2 mem_tgt1>>) /\
+                 (<<WORLD: world_messages_le (unchangable mem_src1 lc_src0.(Local.promises)) (unchangable mem_tgt1 lc_tgt.(Local.promises)) w1 w2>>))).
   Proof.
     i. inv LIFT. destruct w1 as [[f1 vers1] mem_src1'].
     red in WORLD. red in MEM. red in SC.
     hexploit WORLD; eauto. i. des. subst.
     hexploit INTERFERENCE; eauto. i. subst.
     hexploit sim_thread_future; eauto. i. des.
-    { esplits.
-      { refl. }
-      { left. eauto. }
+    { esplits; eauto. }
+    esplits; eauto. right.
+    hexploit (choice (fun loc p =>
+                        (<<NA: loc_na loc -> p = if (vs_src1 loc) then Perm.high else Perm.low>>) /\
+                          (<<AT: ~ loc_na loc -> p = p0 loc>>))).
+    { intros loc. destruct (classic (loc_na loc)).
+      { esplits; [eauto|]. ss. }
+      { esplits; [|eauto]. ss. }
     }
-    {
+    intros [p1 PERM1].
+    esplits.
+    { econs; eauto.
+      { instantiate (1:=p1). ii.
+        specialize (PERM1 loc). des. rewrite NA0; auto.
+        hexploit (VALS loc); auto. i. des_ifs.
+        { inv SIM2. specialize (PERM loc).
+          rewrite Heq in PERM. destruct (vs_tgt1 loc) eqn:VAL; ss.
+          hexploit VALTGT; eauto. i.
+          hexploit VALSRC; eauto. i. des.
+          rewrite VS in H. rewrite H0 in H. inv H.
+          econs.
+          { etrans; eauto. }
+          { auto. }
+        }
+        { inv SIM2. specialize (PERM loc).
+          rewrite Heq in PERM. destruct (vs_tgt1 loc) eqn:VAL; ss.
+          econs.
+        }
+      }
+      { ii. ss. hexploit ATLOCS; eauto. i. des. splits; auto.
+        inv SIM2. specialize (PERM loc).
+        destruct (vs_src1 loc) eqn:VSRC, (vs_tgt1 loc) eqn:VTGT; ss.
+        hexploit VALSRC; eauto. i.
+        hexploit VALTGT; eauto. i. des.
+        rewrite VS in VAL. rewrite H0 in VAL. ss. etrans; eauto.
+      }
+    }
+    { eapply sim_seq_interference_mon; eauto.
+      ii. specialize (PERM1 loc). des.
+      destruct (classic (loc_na loc)).
+      { rewrite NA; auto. des_ifs. hexploit VALSRC; eauto. i. des.
+        hexploit (VALS loc); auto. i. rewrite VS in H0. inv H0. refl.
+      }
+      { rewrite AT; auto. refl. }
+    }
+    { inv SIM2. ss. eapply sim_timemap_mon_locs; eauto; ss. }
+    { inv SIM2. ss. }
+    { ss. i. splits; auto; try refl.
+      { hexploit Thread.rtc_tau_step_future; eauto. i. des; ss.
+        eapply Memory.future_future_weak; eauto.
+      }
+      { eapply map_future_memory_refl; eauto. }
+    }
+  Qed.
 
+  Lemma sim_lift_interference_promise:
+    forall
+      w0 p D smem_src smem_tgt mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0
+      lang_src lang_tgt sim_terminal st_src st_tgt
+      lc_tgt1 mem_tgt1 loc from_tgt to_tgt msg_tgt kind_tgt
+      (LIFT: sim_state_lift false w0 smem_src smem_tgt p D mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0)
+      (SIM: sim_seq_interference _ _ sim_terminal p D (SeqState.mk lang_src st_src smem_src) (SeqState.mk lang_tgt st_tgt smem_tgt))
+      (NOMIX: nomix _ st_src)
+      (CONSISTENT: Local.promise_consistent lc_tgt1)
+      (WF_SRC0: Local.wf lc_src0 mem_src0)
+      (WF_TGT0: Local.wf lc_tgt0 mem_tgt0)
+      (SC_SRC0: Memory.closed_timemap sc_src0 mem_src0)
+      (SC_TGT0: Memory.closed_timemap sc_tgt0 mem_tgt0)
+      (MEM_SRC0: Memory.closed mem_src0)
+      (MEM_TGT0: Memory.closed mem_tgt0)
+      (PROMISE: Local.promise_step lc_tgt0 mem_tgt0 loc from_tgt to_tgt msg_tgt lc_tgt1 mem_tgt1 kind_tgt),
+    exists lc_src1 sc_src1 mem_src1,
+      (<<STEPS: rtc (@Thread.tau_step _)
+                    (Thread.mk _ st_src lc_src0 sc_src0 mem_src0)
+                    (Thread.mk _ st_src lc_src1 sc_src1 mem_src1)>>) /\
+        ((<<FAILURE: Thread.steps_failure (Thread.mk _ st_src lc_src1 sc_src1 mem_src1)>>) \/
+           (exists w1,
+               (<<LIFT: sim_state_lift false w1 smem_src smem_tgt p D mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src1 sc_tgt0>>) /\
+                 (<<SC: sim_timemap_lift w1 sc_src1 sc_tgt0>>) /\
+                 (<<MEM: sim_memory_lift w1 mem_src1 mem_tgt1>>) /\
+                 (<<WORLD: world_messages_le (unchangable mem_src1 lc_src0.(Local.promises)) (unchangable mem_tgt1 lc_tgt0.(Local.promises)) w0 w1>>))).
+  Proof.
+    i. inv LIFT.
+    hexploit INTERFERENCE; eauto. i. subst.
+    hexploit sim_thread_promise_step; eauto.
+    i. des. esplits.
+    { econs 2; [|refl]. econs.
+      { econs. econs 1. econs; eauto. }
+      { ss. }
+    }
+    right. esplits.
+    { econs; eauto. }
+    { inv SIM1. ss. eapply sim_timemap_mon_locs; eauto; ss. }
+    { inv SIM1. ss. }
+    { ss. i. splits; auto.
+      { eapply Mapping.les_strong_les; eauto. }
+      { hexploit Local.promise_step_future; eauto. i. des; ss.
+        eapply Memory.future_future_weak; eauto.
+      }
+      { eapply map_future_memory_les_strong; eauto. }
+    }
+  Qed.
 
-    { ss. inv SIM1. splits; auto. }
-
-
-        )>>).
-  .
-
-
-
-               (<<TERMINAL_SRC: (Language.is_terminal lang_src) st_src1>>) /\
-                 (<<BOT: lc_src1.(Local.promises) = Memory.bot>>) /\
-                 (<<SC: sim_timemap_lift w1 sc_src1 sc_tgt>>) /\
-                 (<<MEMORY: sim_memory_lift w1 mem_src1 mem_tgt>>) /\
-                 (<<WORLD: world_messages_le (unchangable mem_src1 lc_src1.(Local.promises)) (unchangable mem_tgt lc_tgt.(Local.promises)) w0 w1>>)).
-
-
-
+  Lemma sim_lift_interference_cap:
+    forall
+      w0 p D smem_src smem_tgt mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0
+      lang_src lang_tgt sim_terminal st_src st_tgt
+      cap_src cap_tgt
+      (LIFT: sim_state_lift false w0 smem_src smem_tgt p D mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0)
+      (SIM: sim_seq_interference _ _ sim_terminal p D (SeqState.mk lang_src st_src smem_src) (SeqState.mk lang_tgt st_tgt smem_tgt))
+      (NOMIX: nomix _ st_src)
+      (CONSISTENT: Local.promise_consistent lc_tgt0)
+      (WF_SRC0: Local.wf lc_src0 mem_src0)
+      (WF_TGT0: Local.wf lc_tgt0 mem_tgt0)
+      (SC_SRC0: Memory.closed_timemap sc_src0 mem_src0)
+      (SC_TGT0: Memory.closed_timemap sc_tgt0 mem_tgt0)
+      (MEM_SRC0: Memory.closed mem_src0)
+      (MEM_TGT0: Memory.closed mem_tgt0)
+      (CAPSRC: Memory.cap mem_src0 cap_src)
+      (CAPTGT: Memory.cap mem_tgt0 cap_tgt),
+      (exists w1,
+          (<<LIFT: sim_state_lift false w1 smem_src smem_tgt p D cap_src cap_tgt lc_src0 lc_tgt0 sc_src0 sc_tgt0>>) /\
+            (<<SC: sim_timemap_lift w1 sc_src0 sc_tgt0>>) /\
+            (<<MEM: sim_memory_lift w1 cap_src cap_tgt>>)).
+  Proof.
+    i. inv LIFT.
+    hexploit INTERFERENCE; eauto. i. subst.
+    hexploit sim_thread_cap; eauto.
+    i. des. esplits.
+    { econs; eauto. }
+    { inv SIM1. ss. eapply sim_timemap_mon_locs; eauto; ss. }
+    { inv SIM1. ss. }
+  Qed.
 
   Lemma sim_lift lang_src lang_tgt sim_terminal:
     forall
