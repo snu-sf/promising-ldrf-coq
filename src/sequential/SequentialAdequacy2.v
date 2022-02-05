@@ -29,6 +29,30 @@ Set Implicit Arguments.
 
 Section ADEQUACY2.
 
+  Lemma seq_event_input_match_to_oracle_input_le
+        d d1 i_src i_tgt i0
+        (MATCH: SeqEvent.input_match d d1 i_src i_tgt)
+        (INPUT: Oracle.input_le i0 (SeqEvent.get_oracle_input i_tgt))
+    :
+    Oracle.input_le i0 (SeqEvent.get_oracle_input i_src).
+  Proof.
+    destruct i_src, i_tgt. inv MATCH. ss.
+    destruct i0; ss.
+    unfold SeqEvent.get_oracle_input, Oracle.input_le in *. ss. des. splits.
+    - clear - ACCESS ACCESS0. destruct in_access, in_access0, in_access1; ss; clarify.
+      + unfold Oracle.in_access_le in *. des_ifs. des. clarify; ss.
+        inv ACCESS. splits; auto. etrans; eauto.
+        etrans. 2: eauto. etrans. eauto. apply Flag.join_ge_l.
+      + inv ACCESS.
+      + inv ACCESS.
+    - clear - ACQUIRE ACQUIRE0. destruct in_acquire, in_acquire0, in_acquire1; ss; clarify.
+      + inv ACQUIRE.
+      + inv ACQUIRE.
+    - clear - RELEASE RELEASE0. destruct in_release, in_release0, in_release1; ss; clarify.
+      + inv RELEASE.
+      + inv RELEASE.
+  Qed.
+
   Variable lang_src lang_tgt: language.
 
   Lemma thread_steps_app_behavior
@@ -149,6 +173,39 @@ Section ADEQUACY2.
           eexists. econs. eauto.
         - econs 3. econs.
     }
+
+    2:{ i. clarify; ss.
+        punfold SIM. inv SIM.
+        2:{ eapply sim_fail_ub; eauto. }
+        inv STEP.
+        clear TERMINAL NASTEP PARTIAL. unfold sim_seq_at_step_case in ATSTEP. ss.
+        hexploit ATSTEP; clear ATSTEP.
+        1,2: eauto.
+        i; des.
+        hexploit SIM; clear SIM.
+        1: eauto.
+        { punfold WF. inv WF. hexploit WF0; eauto. i; des. rewrite <- le_wf_output.
+          2: eapply EVENT. eauto. }
+        eauto.
+        i; des. pclearbot.
+        hexploit IHbehavior; clear IHbehavior.
+        3: refl.
+        { clear - WF ORACLE. punfold WF. inv WF. hexploit WF0; eauto. i; des. pclearbot. auto. }
+        { eapply step_receptive; eauto. }
+        eauto.
+        i; des. destruct tr1, st_src1. esplits.
+        - eapply na_steps_behavior. eauto. eapply SeqBehavior.behavior_at_step.
+          2: eauto.
+          ss. econs. eauto.
+          { rewrite <- le_is_atomic. eauto. etrans; eauto. refl. }
+          4,5: eauto.
+          3: eauto.
+          etrans; eauto. eapply seq_event_input_match_to_oracle_input_le; eauto.
+        - econs 4. eauto. auto. auto.
+    }
+
+    
+          
 
 
 
