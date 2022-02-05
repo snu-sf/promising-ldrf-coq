@@ -384,13 +384,13 @@ Section LIFT.
         (WF: Mapping.wfs f)
         (VERS: versions_wf f vers)
         (VERSIONED: versioned_memory vers mem_tgt)
-        (ATLOCS: forall loc (AT: loc_at loc),
+        (ATLOCS: forall loc (NNA: ~ loc_na loc),
             (<<FLAGSRC: flag_src loc = None>>) /\
               (<<FLAGTGT: flag_tgt loc = None>>) /\
               (<<VAL: option_rel Const.le (vs_tgt loc) (vs_src loc)>>))
       :
       sim_state_lift
-        (f, vers, mem_tgt)
+        (f, vers, mem_src)
         (SeqMemory.mk svs_src sflag_src) (SeqMemory.mk svs_tgt sflag_tgt)
         p D
         mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt
@@ -410,10 +410,10 @@ Section LIFT.
 
   Lemma sim_lift_tgt_na_write_step:
     forall
-      w p D smem_src smem_tgt0 mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0
+      w0 p D smem_src smem_tgt0 mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0
       mem_tgt1 lc_tgt1 sc_tgt1
       loc from to val msgs kinds kind
-      (LIFT: sim_state_lift w smem_src smem_tgt0 p D mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0)
+      (LIFT: sim_state_lift w0 smem_src smem_tgt0 p D mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0)
       (STEP: Local.write_na_step lc_tgt0 sc_tgt0 mem_tgt0 loc from to val Ordering.na lc_tgt1 sc_tgt1 mem_tgt1 msgs kinds kind)
       (NALOCS: loc_na loc)
       (LOWER: mem_tgt1 = mem_tgt0)
@@ -429,30 +429,38 @@ Section LIFT.
       (<<STEPS: rtc (@Thread.tau_step lang_src) (Thread.mk _ st_src lc_src0 sc_src0 mem_src0) (Thread.mk _ st_src lc_src1 sc_src1 mem_src1)>>) /\
         (<<STEP: SeqState.na_local_step p me (ProgramEvent.write loc val Ordering.na) smem_tgt0 smem_tgt1>>) /\
         (<<LIFT: forall (NORMAL: me <> MachineEvent.failure),
-            sim_state_lift w smem_src smem_tgt1 p D mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src1 sc_tgt1>>)
-  .
+          exists w1,
+            (<<LIFT: sim_state_lift w1 smem_src smem_tgt1 p D mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src1 sc_tgt1>>) /\
+              (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt0 lc_tgt0.(Local.promises)) w0 w1>>)>>).
   Proof.
     i. inv LIFT. destruct (vs_tgt loc) eqn:VAL.
     { hexploit sim_thread_tgt_write_na; eauto. i. des. esplits.
       { eauto. }
       { econs 3; eauto. }
-      { i. subst. econs; eauto.
-        { ii. unfold ValueMap.write. des_ifs; ss.
-          { des_ifs. hexploit (VALS loc); auto. i.
-            rewrite VAL in *. rewrite Heq0 in *.
-            inv H. econs; eauto. refl.
+      { i. subst. esplits; eauto.
+        { econs; eauto.
+          { ii. unfold ValueMap.write. des_ifs; ss.
+            { des_ifs. hexploit (VALS loc); auto. i.
+              rewrite VAL in *. rewrite Heq0 in *.
+              inv H. econs; eauto. refl.
+            }
+            { eapply VALS; eauto. }
           }
-          { eapply VALS; eauto. }
-        }
-        { ss. unfold Flags.update. ii. des_ifs.
-          { econs; ss; auto.
-            { i. destruct (flag_src loc), (D loc); ss. }
-            { eapply FLAGS; auto. }
+          { ss. unfold Flags.update. ii. des_ifs.
+            { econs; ss; auto.
+              { i. destruct (flag_src loc), (D loc); ss. }
+              { eapply FLAGS; auto. }
+            }
           }
+          { i. ss. des_ifs. eapply ATLOCS; eauto. }
         }
-        { i. ss. des_ifs.
-          { exfalso. eapply LOCDISJOINT; eauto. }
-          { eapply ATLOCS; eauto. }
+        { ss. splits; auto.
+          { refl. }
+          { refl. }
+          { eapply Thread.rtc_tau_step_future in STEPS; eauto.
+            i. des; ss. eapply Memory.future_future_weak; auto.
+          }
+          { eapply map_future_memory_refl. }
         }
       }
     }
@@ -468,9 +476,9 @@ Section LIFT.
 
   Lemma sim_lift_tgt_na_local_step:
     forall
-      w p D smem_src smem_tgt0 mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0
+      w0 p D smem_src smem_tgt0 mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0
       e pe mem_tgt1 lc_tgt1 sc_tgt1
-      (LIFT: sim_state_lift w smem_src smem_tgt0 p D mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0)
+      (LIFT: sim_state_lift w0 smem_src smem_tgt0 p D mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0)
       (STEP: Local.program_step e lc_tgt0 sc_tgt0 mem_tgt0 lc_tgt1 sc_tgt1 mem_tgt1)
       (EVENT: ThreadEvent.get_program_event e = pe)
       (NA: ~ is_atomic_event pe)
@@ -487,16 +495,18 @@ Section LIFT.
       lang_src st_src,
     exists lc_src1 mem_src1 sc_src1 me smem_tgt1,
       (<<STEPS: rtc (@Thread.tau_step lang_src) (Thread.mk _ st_src lc_src0 sc_src0 mem_src0) (Thread.mk _ st_src lc_src1 sc_src1 mem_src1)>>) /\
-      (<<STEP: SeqState.na_local_step p me pe smem_tgt0 smem_tgt1>>) /\
+        (<<STEP: SeqState.na_local_step p me pe smem_tgt0 smem_tgt1>>) /\
         (<<LIFT: forall (NORMAL: me <> MachineEvent.failure),
-            sim_state_lift w smem_src smem_tgt1 p D mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src1 sc_tgt1>>)
+            exists w1,
+              (<<LIFT: sim_state_lift w1 smem_src smem_tgt1 p D mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src1 sc_tgt1>>) /\
+                (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt0 lc_tgt0.(Local.promises)) w0 w1>>)>>)
   .
   Proof.
     i. inv STEP; ss.
     { esplits.
       { refl. }
       { econs 1. }
-      { eauto. }
+      { i. esplits; eauto. refl. }
     }
     { inv LIFT. destruct ord; ss. hexploit sim_thread_tgt_read_na; eauto.
       i. des. esplits.
@@ -505,7 +515,10 @@ Section LIFT.
         { des_ifs. }
         hexploit VAL; eauto. i. etrans; eauto.
       }
-      { i. econs; eauto. }
+      { i. esplits.
+        { econs; eauto. }
+        { ss. i. splits; auto; try refl. eapply map_future_memory_refl. }
+      }
     }
     { destruct ord; ss. eapply local_write_step_write_na_step in LOCAL.
       eapply sim_lift_tgt_na_write_step; eauto.
@@ -528,7 +541,10 @@ Section LIFT.
         rewrite H in H1. inv H1.
         rewrite <- H3 in *. ss.
       }
-      { i. econs; eauto. }
+      { i. esplits.
+        { econs; eauto. }
+        { ss. i. splits; auto; try refl. eapply map_future_memory_refl. }
+      }
     }
     { inv LIFT. destruct ord; ss. hexploit sim_thread_tgt_write_na_racy; eauto.
       i. esplits.
@@ -547,9 +563,9 @@ Section LIFT.
 
   Lemma sim_lift_src_na_local_step:
     forall
-      w p D smem_src0 smem_tgt mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt
+      w0 p D smem_src0 smem_tgt mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt
       pe me smem_src1
-      (LIFT: sim_state_lift w smem_src0 smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
+      (LIFT: sim_state_lift w0 smem_src0 smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
       (STEP: SeqState.na_local_step p me pe smem_src0 smem_src1)
       (NA: ~ is_atomic_event pe)
       (NALOCS: forall loc val (ACCESS: is_accessing pe = Some (loc, val)), loc_na loc)
@@ -568,8 +584,9 @@ Section LIFT.
         (<<MACHINE: ThreadEvent.get_machine_event e = me>>) /\
         (<<EVENT: ThreadEvent.get_program_event e = pe>>) /\
         (<<LIFT: forall (NORMAL: ThreadEvent.get_machine_event e <> MachineEvent.failure),
-            sim_state_lift w smem_src1 smem_tgt p D mem_src2 mem_tgt lc_src2 lc_tgt sc_src2 sc_tgt>>)
-  .
+          exists w1,
+            (<<LIFT: sim_state_lift w1 smem_src1 smem_tgt p D mem_src2 mem_tgt lc_src2 lc_tgt sc_src2 sc_tgt>>) /\
+              (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt lc_tgt.(Local.promises)) w0 w1>>)>>).
   Proof.
     i. inv STEP.
     { esplits.
@@ -577,7 +594,7 @@ Section LIFT.
       { eapply Local.step_silent. }
       { ss. }
       { ss. }
-      { auto. }
+      { i. esplits; eauto. refl. }
     }
     { inv LIFT. ss. hexploit (VALS loc); eauto. i. inv H.
       { hexploit sim_thread_src_read_na_racy; eauto. i.
@@ -586,7 +603,10 @@ Section LIFT.
         { eapply Local.step_racy_read; eauto. }
         { ss. }
         { ss. destruct ord; ss. }
-        { i. econs; eauto. }
+        { i. esplits; eauto.
+          { econs; eauto. }
+          { ss. i. splits; auto; try refl. eapply map_future_memory_refl. }
+        }
       }
       { hexploit sim_thread_src_read_na.
         { eauto. }
@@ -601,7 +621,10 @@ Section LIFT.
         { eapply Local.step_read; eauto. }
         { ss. }
         { ss. destruct ord; ss. }
-        { i. econs; eauto. }
+        { i. esplits.
+          { econs; eauto. }
+          { ss. i. splits; auto; try refl. eapply map_future_memory_refl. }
+        }
       }
     }
     { inv LIFT. ss. hexploit (VALS loc); eauto. i. inv H.
@@ -619,16 +642,27 @@ Section LIFT.
         { eapply Local.step_write_na; eauto. }
         { ss. }
         { ss. destruct ord; ss. }
-        { i. econs; eauto.
-          { ss. unfold ValueMap.write. ii. des_ifs.
-            { rewrite <- H1. rewrite <- H5. econs; eauto. refl. }
-            { eapply VALS; auto. }
+        { i. esplits.
+          { econs; eauto.
+            { ss. unfold ValueMap.write. ii. des_ifs.
+              { rewrite <- H1. rewrite <- H5. econs; eauto. refl. }
+              { eapply VALS; auto. }
+            }
+            { ss. unfold Flags.update. ii. des_ifs.
+            }
+            { i. ss. des_ifs.
+              { exfalso. eapply NNA; eauto. }
+              { eapply ATLOCS; eauto. }
+            }
           }
-          { ss. unfold Flags.update. ii. des_ifs.
-          }
-          { i. ss. des_ifs.
-            { exfalso. eapply LOCDISJOINT; eauto. }
-            { eapply ATLOCS; eauto. }
+          { ss. i. splits; auto; try refl.
+            { eapply Thread.rtc_tau_step_future in STEPS; eauto.
+              des; ss.
+              hexploit Local.write_na_step_future; eauto.
+              i. des; ss.
+              eapply Memory.future_future_weak; eauto. etrans; eauto.
+            }
+            { eapply map_future_memory_refl. }
           }
         }
       }
@@ -658,10 +692,10 @@ Section LIFT.
 
   Lemma sim_lift_src_na_step:
     forall
-      w p D smem_src0 smem_tgt mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt
+      w0 p D smem_src0 smem_tgt mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt
       me smem_src1
       lang_src st_src0 st_src1
-      (LIFT: sim_state_lift w smem_src0 smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
+      (LIFT: sim_state_lift w0 smem_src0 smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
       (STEP: SeqState.na_step p me (SeqState.mk _ st_src0 smem_src0) (SeqState.mk _ st_src1 smem_src1))
       (NOMIX: nomix _ st_src0)
       (CONSISTENT: Local.promise_consistent lc_tgt)
@@ -676,7 +710,9 @@ Section LIFT.
         (<<STEP: Thread.step pf e (Thread.mk _ st_src0 lc_src1 sc_src1 mem_src1) (Thread.mk _ st_src1 lc_src2 sc_src2 mem_src2)>>) /\
         (<<MACHINE: ThreadEvent.get_machine_event e = me>>) /\
         (<<LIFT: forall (NORMAL: ThreadEvent.get_machine_event e <> MachineEvent.failure),
-            sim_state_lift w smem_src1 smem_tgt p D mem_src2 mem_tgt lc_src2 lc_tgt sc_src2 sc_tgt>>) /\
+          exists w1,
+            (<<LIFT: sim_state_lift w1 smem_src1 smem_tgt p D mem_src2 mem_tgt lc_src2 lc_tgt sc_src2 sc_tgt>>) /\
+              (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt lc_tgt.(Local.promises)) w0 w1>>)>>) /\
         (<<NOMIX: nomix _ st_src1>>)
   .
   Proof.
@@ -700,10 +736,10 @@ Section LIFT.
 
   Lemma sim_lift_src_na_opt_step:
     forall
-      w p D smem_src0 smem_tgt mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt
+      w0 p D smem_src0 smem_tgt mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt
       me smem_src1
       lang_src st_src0 st_src1
-      (LIFT: sim_state_lift w smem_src0 smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
+      (LIFT: sim_state_lift w0 smem_src0 smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
       (STEP: SeqState.na_opt_step p me (SeqState.mk _ st_src0 smem_src0) (SeqState.mk _ st_src1 smem_src1))
       (NOMIX: nomix _ st_src0)
       (CONSISTENT: Local.promise_consistent lc_tgt)
@@ -718,7 +754,9 @@ Section LIFT.
         (<<STEP: Thread.opt_step e (Thread.mk _ st_src0 lc_src1 sc_src1 mem_src1) (Thread.mk _ st_src1 lc_src2 sc_src2 mem_src2)>>) /\
         (<<MACHINE: ThreadEvent.get_machine_event e = me>>) /\
         (<<LIFT: forall (NORMAL: ThreadEvent.get_machine_event e <> MachineEvent.failure),
-            sim_state_lift w smem_src1 smem_tgt p D mem_src2 mem_tgt lc_src2 lc_tgt sc_src2 sc_tgt>>) /\
+          exists w1,
+            (<<LIFT: sim_state_lift w1 smem_src1 smem_tgt p D mem_src2 mem_tgt lc_src2 lc_tgt sc_src2 sc_tgt>>) /\
+              (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt lc_tgt.(Local.promises)) w0 w1>>)>>) /\
         (<<NOMIX: nomix _ st_src1>>)
   .
   Proof.
@@ -729,6 +767,7 @@ Section LIFT.
     { esplits; eauto.
       { econs 1. }
       { ss. }
+      { esplits; eauto. refl. }
     }
   Qed.
 
@@ -737,8 +776,8 @@ Section LIFT.
       lang_src st_src0 st_src1
       p smem_src0 smem_src1
       (STEPS: rtc (SeqState.na_step p MachineEvent.silent) (SeqState.mk _ st_src0 smem_src0) (SeqState.mk _ st_src1 smem_src1))
-      w D smem_tgt mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt
-      (LIFT: sim_state_lift w smem_src0 smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
+      w0 D smem_tgt mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt
+      (LIFT: sim_state_lift w0 smem_src0 smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
       (NOMIX: nomix _ st_src0)
       (CONSISTENT: Local.promise_consistent lc_tgt)
       (WF_SRC: Local.wf lc_src0 mem_src0)
@@ -749,7 +788,9 @@ Section LIFT.
       (MEM_TGT: Memory.closed mem_tgt),
     exists lc_src1 mem_src1 sc_src1,
       (<<STEPS: rtc (@Thread.tau_step lang_src) (Thread.mk _ st_src0 lc_src0 sc_src0 mem_src0) (Thread.mk _ st_src1 lc_src1 sc_src1 mem_src1)>>) /\
-        (<<LIFT: sim_state_lift w smem_src1 smem_tgt p D mem_src1 mem_tgt lc_src1 lc_tgt sc_src1 sc_tgt>>) /\
+        (<<LIFT: exists w1,
+            (<<LIFT: sim_state_lift w1 smem_src1 smem_tgt p D mem_src1 mem_tgt lc_src1 lc_tgt sc_src1 sc_tgt>>) /\
+              (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt lc_tgt.(Local.promises)) w0 w1>>)>>) /\
         (<<NOMIX: nomix _ st_src1>>)
   .
   Proof.
@@ -760,7 +801,8 @@ Section LIFT.
     induction STEPS; i; clarify.
     { esplits.
       { refl. }
-      { auto. }
+      { eauto. }
+      { refl. }
       { auto. }
     }
     destruct y. hexploit sim_lift_src_na_step; eauto. i. des.
@@ -768,12 +810,13 @@ Section LIFT.
     hexploit Thread.step_future; eauto. i. des; ss.
     hexploit LIFT0; eauto.
     { rewrite MACHINE. ss. }
-    i. hexploit IHSTEPS; eauto. i. des. esplits.
+    i. des. hexploit IHSTEPS; eauto. i. des. esplits.
     { etrans; [eauto|]. econs.
       { econs; eauto. econs; eauto. }
       { eauto. }
     }
     { eauto. }
+    { etrans; eauto. }
     { eauto. }
   Qed.
 
@@ -1309,6 +1352,78 @@ Section LIFT.
       }
     }
   Qed.
+
+  Lemma sim_lift_terminal_case:
+    forall
+      w0 p D smem_src smem_tgt mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt
+      lang_src lang_tgt sim_terminal
+      (st_src0: lang_src.(Language.state)) (st_tgt: lang_tgt.(Language.state))
+      (LIFT: sim_state_lift w0 smem_src smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
+      (SIM: sim_seq_terminal_case sim_terminal p D (SeqState.mk _ st_src0 smem_src) (SeqState.mk _ st_tgt smem_tgt))
+      (TERMINAL: lang_tgt.(Language.is_terminal) st_tgt)
+      (BOT: lc_tgt.(Local.promises) = Memory.bot)
+      (NOMIX: nomix _ st_src0)
+      (CONSISTENT: Local.promise_consistent lc_tgt)
+      (WF_SRC: Local.wf lc_src0 mem_src0)
+      (WF_TGT: Local.wf lc_tgt mem_tgt)
+      (SC_SRC: Memory.closed_timemap sc_src0 mem_src0)
+      (SC_TGT: Memory.closed_timemap sc_tgt mem_tgt)
+      (MEM_SRC: Memory.closed mem_src0)
+      (MEM_TGT: Memory.closed mem_tgt),
+    exists st_src1 lc_src1 sc_src1 mem_src1,
+      (<<STEPS: rtc (@Thread.tau_step _)
+                    (Thread.mk _ st_src0 lc_src0 sc_src0 mem_src0)
+                    (Thread.mk _ st_src1 lc_src1 sc_src1 mem_src1)>>) /\
+        ((<<FAILURE: Thread.steps_failure (Thread.mk _ st_src1 lc_src1 sc_src1 mem_src1)>>) \/
+           exists w1,
+             (<<TERMINAL_SRC: (Language.is_terminal lang_src) st_src1>>) /\
+               (<<BOT: lc_src1.(Local.promises) = Memory.bot>>) /\
+               (<<SC: sim_timemap_lift w1 sc_src1 sc_tgt>>) /\
+               (<<MEMORY: sim_memory_lift w1 mem_src1 mem_tgt>>) /\
+               (<<WORLD: world_messages_le (unchangable mem_src1 lc_src1.(Local.promises)) (unchangable mem_tgt lc_tgt.(Local.promises)) w0 w1>>)).
+  Proof.
+    i. exploit SIM; eauto. i. des.
+    destruct st_src1. hexploit sim_lift_src_na_steps; eauto.
+    i. des. ss.
+    hexploit Thread.rtc_tau_step_future; eauto. i. des; ss.
+    inv LIFT1. ss. hexploit sim_thread_deflag_all; eauto.
+    { instantiate (1:=fun _ => False).
+      i. right. specialize (FLAGS loc). specialize (FLAG loc).
+      inv FLAGS. splits.
+      { i. rewrite H in *. ss. rewrite SRC in *.
+        unfold Flags.join in FLAG.
+        destruct (flag_tgt loc), (Flag.join (D loc) (sflag_tgt loc)); ss.
+        hexploit TGT; ss.
+      }
+      { specialize (VALUE loc). specialize (VALS loc). i.
+        left. destruct (classic (loc_na loc)).
+        { hexploit VALS; auto. i. inv H0; ss.
+          etrans; eauto. etrans; eauto.
+        }
+        { eapply ATLOCS; eauto. }
+      }
+    }
+    i. des. eapply rtc_implies in STEPS1; cycle 1.
+    { instantiate (1:=@Thread.tau_step _). i. inv H.
+      inv TSTEP. econs; eauto.
+    }
+    esplits.
+    { etrans; eauto. }
+    right. eexists (f1,  vers, mem_src2). esplits; eauto.
+    { inv SIM1. inv LOCAL.
+      eapply sim_promises_bot in PROMISES; eauto.
+      i. specialize (FLAG0 loc). des; ss.
+    }
+    { ss. inv SIM1. eapply sim_timemap_mon_locs; eauto; ss. }
+    { ss. splits; auto. inv SIM1. auto. }
+    { etrans; eauto. ss. i. splits; auto.
+      { refl. }
+      { eapply Thread.rtc_tau_step_future in STEPS1; eauto. des; ss.
+        eapply Memory.future_future_weak; eauto.
+      }
+    }
+  Qed.
+
 
   Lemma sim_lift lang_src lang_tgt sim_terminal:
     forall
