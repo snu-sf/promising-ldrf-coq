@@ -47,15 +47,16 @@ Require Import SeqLiftStep.
 
 
 Variant sim_thread_sol
+        (c: bool)
         (vs: Loc.t -> Const.t)
-        (P: Loc.t -> Prop)
-        (D: Loc.t -> Prop)
+        (P: Loc.t -> bool)
+        (D: Loc.t -> bool)
         mem lc: Prop :=
   | sim_thread_intro
       (CONS: Local.promise_consistent lc)
       (DEBT: forall loc to from msg
                     (GET: Memory.get loc to lc.(Local.promises) = Some (from, msg)),
-          (<<MSG: msg <> Message.reserve>>) /\ (<<DEBT: D loc>>))
+          (<<MSG: msg <> Message.reserve>>) /\ (<<DEBT: c = true -> D loc>>))
       (NSYNC: forall loc, Memory.nonsynch_loc loc lc.(Local.promises))
       (VALS: forall loc,
         exists from released,
@@ -64,59 +65,294 @@ Variant sim_thread_sol
           P loc)
 .
 
+Definition lowered_content (b: bool) (cnt0 cnt1: option (Time.t * Message.t)): Prop :=
+  (cnt0 = cnt1 /\ b = false) \/
+    cnt1 = match cnt0 with
+           | Some (_, Message.reserve) | None => None
+           | Some (from, Message.undef) => Some (from, Message.undef)
+           | Some (from, Message.concrete val released) => Some (from, Message.concrete val None)
+           end.
+
+Lemma lowered_content_trans b0 b1 b2 cnt0 cnt1 cnt2
+      (LOWER0: lowered_content b0 cnt0 cnt1)
+      (LOWER1: lowered_content b1 cnt1 cnt2)
+      (BOOL: b0 = false -> b1 = false -> b2 =false)
+  :
+  lowered_content b2 cnt0 cnt2.
+Proof.
+  unfold lowered_content in *. des; subst; auto.
+  right. des_ifs.
+Qed.
+
+Definition lowered_memory mem0 mem1: Prop :=
+  forall loc to, lowered_content false (Memory.get loc to mem0) (Memory.get loc to mem1).
+
+Program Instance lowered_memory_PreOrder: PreOrder lowered_memory.
+Next Obligation.
+Proof.
+  ii. left. auto.
+Qed.
+Next Obligation.
+Proof.
+  ii. specialize (H loc to). specialize (H0 loc to).
+  eapply lowered_content_trans; eauto.
+Qed.
+
+Lemma lower_none_lowered_memory mem0 loc from to val released mem1
+      (LOWER: Memory.lower mem0 loc from to (Message.concrete val released) (Message.concrete val None) mem1)
+  :
+  lowered_memory mem0 mem1.
+Proof.
+  ii. erewrite (@Memory.lower_o mem1); eauto. des_ifs.
+  { ss. des; clarify. right.
+    eapply Memory.lower_get0 in LOWER. des. rewrite GET. ss.
+  }
+  { left. auto. }
+Qed.
+
+Lemma cancel_lowered_memory mem0 loc from to  mem1
+      (CANCEL: Memory.remove mem0 loc from to Message.reserve mem1)
+  :
+  lowered_memory mem0 mem1.
+Proof.
+  ii. erewrite (@Memory.remove_o mem1); eauto. des_ifs.
+  { ss. des; clarify. right.
+    eapply Memory.remove_get0 in CANCEL. des. rewrite GET. ss.
+  }
+  { left. auto. }
+Qed.
+
+Lemma nonsynch_all
+      lang st
+      tvw prom0 mem0 sc
+      (LOCAL: Local.wf (Local.mk tvw prom0) mem0)
+  :
+  exists prom1 mem1,
+    (<<STEPS: rtc (@Thread.tau_step lang) (Thread.mk _ st (Local.mk tvw prom0) sc mem0) (Thread.mk _ st (Local.mk tvw prom1) sc mem1)>>) /\
+      (<<NONE: forall loc to,
+          Memory.get loc to prom1 = match Memory.get loc to prom0 with
+                                    | Some (_, Message.reserve) | None => None
+                                    | Some (from, Message.undef) => Some (from, Message.undef)
+                                    | Some (from, Message.concrete val released) => Some (from, Message.concrete val None)
+                                    end>>) /\
+      (<<MAX: forall loc val released,
+          max_readable mem0 prom0 loc (tvw.(TView.cur).(View.pln) loc) val released
+          <->
+            max_readable mem1 prom1 loc (tvw.(TView.cur).(View.pln) loc) val released>>) /\
+      (<<PRESERVE: forall loc to val released from
+                          (GET: Memory.get loc to mem0 = Some (from, Message.concrete val released)),
+        exists released', (<<GET: Memory.get loc to mem1 = Some (from, Message.concrete val released')>>)>>)
+.
+Proof.
+  inv LOCAL. clear TVIEW_WF TVIEW_CLOSED. rename PROMISES into MLE.
+  red in FINITE. des.
+  cut (exists prom1 mem1,
+             (<<STEPS: rtc (@Thread.tau_step lang) (Thread.mk _ st (Local.mk tvw prom0) sc mem0) (Thread.mk _ st (Local.mk tvw prom1) sc mem1)>>) /\
+               (<<NONE: forall loc to (IN: List.In (loc, to) dom),
+                   lowered_content true (Memory.get loc to prom0) (Memory.get loc to prom1)>>) /\
+               (<<MAX: forall loc val released,
+                   max_readable mem0 prom0 loc (tvw.(TView.cur).(View.pln) loc) val released
+                   <->
+                     max_readable mem1 prom1 loc (tvw.(TView.cur).(View.pln) loc) val released>>) /\
+               (<<LOWERPROM: lowered_memory prom0 prom1>>) /\
+               (<<LOWERMEM: lowered_memory mem0 mem1>>)).
+  { i. des. esplits; eauto.
+    { i. specialize (NONE loc to). unfold lowered_content in *.
+      destruct (Memory.get loc to prom0) as [[from msg]|] eqn:PROM.
+      { hexploit NONE; eauto. i; des; ss. }
+      { specialize (LOWERPROM loc to). rewrite PROM in LOWERPROM.
+        red in LOWERPROM. des; auto.
+      }
+    }
+    { i. specialize (LOWERMEM loc to). rewrite GET in LOWERMEM. des; eauto.
+      red in LOWERMEM. des; eauto.
+    }
+  }
+  clear FINITE. revert prom0 mem0 MLE BOT. induction dom.
+  { i. esplits.
+    { refl. }
+    { i. ss. }
+    { auto. }
+    { refl. }
+    { refl. }
+  }
+  i. destruct a as [loc to].
+  destruct (Memory.get loc to prom0) as [[from msg]|] eqn:GET.
+  { destruct msg.
+    { hexploit Memory.lower_exists.
+      { eapply GET. }
+      { hexploit memory_get_ts_strong; eauto. i. des; clarify.
+        rewrite BOT in GET. ss.
+      }
+      { instantiate (1:=Message.concrete val None). econs; ss. }
+      { econs; ss. refl. }
+      i. des.
+      hexploit Memory.lower_exists_le; eauto. i. des.
+      assert (PROMISE: Memory.promise prom0 mem0 loc from to (Message.concrete val None) mem2 mem1 (Memory.op_kind_lower (Message.concrete val released))).
+      { econs; eauto; ss. econs. eapply Time.bot_spec. }
+      hexploit (IHdom mem2 mem1); eauto.
+      { eapply promise_memory_le; eauto. }
+      { eapply Memory.promise_bot_none; eauto. }
+      i. des. esplits.
+      { econs 2.
+        { econs.
+          { econs. econs 1. econs; eauto. }
+          { ss. }
+        }
+        { eauto. }
+      }
+      { i. ss. des; clarify.
+        { eapply lowered_content_trans.
+          2:{ eapply LOWERPROM. }
+          2:{ instantiate (1:=true). ss. }
+          des; clarify.
+          { rewrite GET. erewrite (@Memory.lower_o mem2); eauto.
+            des_ifs; ss; des; clarify. right. auto.
+          }
+        }
+        { eapply lowered_content_trans.
+          2:{ eapply NONE; eauto. }
+          2:{ instantiate (1:=false). ss. }
+          eapply lower_none_lowered_memory; eauto.
+        }
+      }
+      { i. etrans; [|eapply MAX]. destruct (Loc.eq_dec loc0 loc); subst.
+        { eapply promise_max_readable; eauto. }
+        { eapply promise_unchanged_loc in PROMISE; eauto. des.
+          eapply unchanged_loc_max_readable; eauto.
+        }
+      }
+      { etrans; eauto. eapply lower_none_lowered_memory; eauto. }
+      { etrans; eauto. eapply lower_none_lowered_memory; eauto. }
+    }
+    { hexploit (IHdom prom0 mem0); eauto. i. des. esplits; eauto.
+      i. ss. des; clarify.
+      { eapply lowered_content_trans.
+        2:{ eapply LOWERPROM. }
+        2:{ instantiate (1:=true). ss. }
+        rewrite GET. right. auto.
+      }
+      { eapply NONE; auto. }
+    }
+    { hexploit Memory.remove_exists.
+      { eapply GET. }
+      i. des.
+      hexploit Memory.remove_exists_le; eauto. i. des.
+      assert (PROMISE: Memory.promise prom0 mem0 loc from to Message.reserve mem2 mem1 (Memory.op_kind_cancel)).
+      { econs; eauto; ss. }
+      hexploit (IHdom mem2 mem1); eauto.
+      { eapply promise_memory_le; eauto. }
+      { eapply Memory.promise_bot_none; eauto. }
+      i. des. esplits.
+      { econs 2.
+        { econs.
+          { econs. econs 1. econs; eauto. }
+          { ss. }
+        }
+        { eauto. }
+      }
+      { i. ss. des; clarify.
+        { eapply lowered_content_trans.
+          2:{ eapply LOWERPROM. }
+          2:{ instantiate (1:=true). ss. }
+          des; clarify.
+          { rewrite GET. erewrite (@Memory.remove_o mem2); eauto.
+            des_ifs; ss; des; clarify. right. auto.
+          }
+        }
+        { eapply lowered_content_trans.
+          2:{ eapply NONE; eauto. }
+          2:{ instantiate (1:=false). ss. }
+          eapply cancel_lowered_memory; eauto.
+        }
+      }
+      { i. etrans; [|eapply MAX]. destruct (Loc.eq_dec loc0 loc); subst.
+        { eapply promise_max_readable; eauto. }
+        { eapply promise_unchanged_loc in PROMISE; eauto. des.
+          eapply unchanged_loc_max_readable; eauto.
+        }
+      }
+      { etrans; eauto. eapply cancel_lowered_memory; eauto. }
+      { etrans; eauto. eapply cancel_lowered_memory; eauto. }
+    }
+  }
+  { hexploit (IHdom prom0 mem0); eauto. i. des. esplits; eauto.
+    i. ss. des; clarify.
+    { eapply lowered_content_trans.
+      2:{ eapply LOWERPROM. }
+      2:{ instantiate (1:=true). ss. }
+      rewrite GET. right. auto.
+    }
+    { eapply NONE; auto. }
+  }
+Qed.
+
 Lemma sim_thread_sim_thread_sol
-      f vers flag_src flag_tgt vs_src vs_tgt
-      mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt D
+      c f vers flag_src flag_tgt vs_src vs_tgt
+      mem_src0 mem_tgt lc_src0 lc_tgt sc_src sc_tgt D
       (SIM: sim_thread
               f vers flag_src flag_tgt vs_src vs_tgt
-              mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt)
-      (BOT: lc_tgt.(Local.promises) = Memory.bot)
-      (DEBT: forall loc (TGT: flag_src loc = None), flag_tgt loc = None \/ D loc)
+              mem_src0 mem_tgt lc_src0 lc_tgt sc_src sc_tgt)
+      (BOT: c = true -> lc_tgt.(Local.promises) = Memory.bot)
+      (CONSTGT: Local.promise_consistent lc_tgt)
+      (DEBT: forall loc (TGT: flag_src loc = None) (DEBT: D loc = false), flag_tgt loc = None)
       (WF: Mapping.wfs f)
-      (LOCAL: Local.wf lc_src mem_src)
+      (LOCAL: Local.wf lc_src0 mem_src0)
+      lang st
   :
-  exists vs,
-    (<<SIM: sim_thread_sol vs (fun loc => vs_src loc) D mem_src lc_src>>) /\
-    (<<VALS: forall loc val (VAL: vs_src loc = Some val), vs loc = val>>)
+  exists mem_src1 lc_src1 vs,
+    (<<STEPS: rtc (@Thread.tau_step lang) (Thread.mk _ st lc_src0 sc_src mem_src0) (Thread.mk _ st lc_src1 sc_src mem_src1)>>) /\
+      (<<SIM: sim_thread_sol c vs (fun loc => vs_src loc) D mem_src1 lc_src1>>) /\
+      (<<VALS: forall loc val (VAL: vs_src loc = Some val), vs loc = val>>)
 .
 Proof.
   hexploit (choice (fun loc val =>
                       exists from released,
-                        (<<GET: Memory.get loc (lc_src.(Local.tview).(TView.cur).(View.rlx) loc) mem_src = Some (from, Message.concrete val released)>>))).
+                        (<<GET: Memory.get loc (lc_src0.(Local.tview).(TView.cur).(View.rlx) loc) mem_src0 = Some (from, Message.concrete val released)>>))).
   { inv LOCAL. inv TVIEW_CLOSED. inv CUR.
     intros loc. hexploit (RLX loc). i. des. eauto.
   }
   intros [vs VALS]. inv SIM.
-  assert (CONSSRC: Local.promise_consistent lc_src).
-  { eapply sim_local_consistent; eauto. eapply Local.bot_promise_consistent; eauto. }
-  exists vs. splits.
+  assert (CONSSRC: Local.promise_consistent lc_src0).
+  { eapply sim_local_consistent; eauto. }
+  destruct lc_src0 as [tvw_src prom_src0].
+  hexploit nonsynch_all; eauto. i. des.
+  exists mem1, (Local.mk tvw_src prom1), vs. splits.
+  { eauto. }
   { econs; eauto.
+    { ii. ss. rewrite NONE in PROMISE. des_ifs.
+      { eapply CONSSRC; eauto; ss. }
+      { eapply CONSSRC; eauto; ss. }
+    }
     { inv LOCAL0. i. ss.
+      assert (exists msg', Memory.get loc to prom_src0 = Some (from, msg') /\ msg <> Message.reserve).
+      { rewrite NONE in GET. des_ifs.
+        { esplits; eauto; ss. }
+        { esplits; eauto; ss. }
+      }
+      des. splits; auto. i. subst.
       hexploit sim_promises_get_if; eauto. i. des.
-      { subst. rewrite Memory.bot_get in GET0. ss. }
+      { rewrite BOT in GET0; auto. rewrite Memory.bot_get in GET0. ss. }
       { destruct (flag_src loc) eqn:EQ.
-        { erewrite sim_promises_none in GET; eauto. ss. }
-        { hexploit DEBT; eauto. i. des; clarify. }
+        { erewrite sim_promises_none in H; eauto. ss. }
+        { destruct (D loc) eqn:DEBT0; eauto. hexploit DEBT; eauto. i. des; clarify. }
       }
     }
-    { inv LOCAL0. ss.
-      ii. des_ifs. hexploit sim_promises_get_if; eauto. i. des.
-      { subst. rewrite Memory.bot_get in GET0. ss. }
-      { destruct released; ss. exfalso. eapply SYNC; eauto. }
-    }
-    { i. ss. hexploit (MAXSRC loc). i. inv H.
+    { ii. ss. rewrite NONE in GET. des_ifs. }
+    { i. ss. specialize (VALS loc). des. hexploit PRESERVE; eauto. }
+    { i. ss. ss. hexploit (MAXSRC loc). i. inv H.
       destruct (vs_src loc) eqn:VAL; ss.
-      exfalso. eapply NONMAX; eauto.
+      exfalso. eapply NONMAX; eauto. eapply MAX; eauto.
     }
   }
   { i. hexploit (MAXSRC loc). i. inv H.
     hexploit (VALS loc). i.
-    hexploit MAX; eauto. i. des. ss. inv MAX0.
-    assert (TS: View.pln (TView.cur tvw) loc = View.rlx (TView.cur tvw) loc).
+    hexploit MAX0; eauto. i. des. ss. inv MAX1.
+    assert (TS: View.pln (TView.cur tvw_src) loc = View.rlx (TView.cur tvw_src) loc).
     { eapply TimeFacts.antisym.
       { eapply LOCAL. }
-      destruct (Time.le_lt_dec (View.rlx (TView.cur tvw) loc) (View.pln (TView.cur tvw) loc)); auto.
-      exfalso. eapply MAX1 in l; eauto; ss.
+      destruct (Time.le_lt_dec (View.rlx (TView.cur tvw_src) loc) (View.pln (TView.cur tvw_src) loc)); auto.
+      exfalso. eapply MAX2 in l; eauto; ss.
       exploit CONSSRC; eauto; ss. i. timetac.
     }
     rewrite TS in *. clarify.
@@ -125,20 +361,20 @@ Qed.
 
 Lemma sim_thread_none
       vs P D mem lc
-      (SIM: sim_thread_sol vs P D mem lc)
-      (DEBT: forall loc, ~ D loc)
+      (SIM: sim_thread_sol true vs P D mem lc)
+      (DEBT: forall loc, D loc = false)
   :
   lc.(Local.promises) = Memory.bot.
 Proof.
   eapply Memory.ext. i. rewrite Memory.bot_get.
   inv SIM. destruct (Memory.get loc ts lc.(Local.promises)) eqn:GET; auto.
   destruct p. exploit DEBT0; eauto. i. des.
-  exfalso. eapply DEBT; eauto.
+  exfalso. hexploit DEBT1; eauto. rewrite DEBT. ss.
 Qed.
 
 Lemma sim_thread_sol_failure
-      vs P D mem lc
-      (SIM: sim_thread_sol vs P D mem lc)
+      c vs P D mem lc
+      (SIM: sim_thread_sol c vs P D mem lc)
   :
   Local.failure_step lc.
 Proof.
@@ -146,14 +382,14 @@ Proof.
 Qed.
 
 Lemma sim_thread_sol_fence
-      vs P D mem lc0 sc ordr ordw
-      (SIM: sim_thread_sol vs P D mem lc0)
+      c vs P D mem lc0 sc ordr ordw
+      (SIM: sim_thread_sol c vs P D mem lc0)
       (ORDR: ~ Ordering.le Ordering.acqrel ordr)
       (ORDW: ~ Ordering.le Ordering.seqcst ordw)
   :
   exists lc1,
     (<<FENCE: Local.fence_step lc0 sc ordr ordw lc1 sc>>) /\
-    (<<SIM: sim_thread_sol vs P D mem lc1>>)
+    (<<SIM: sim_thread_sol c vs P D mem lc1>>)
 .
 Proof.
   inv SIM. esplits.
@@ -168,8 +404,8 @@ Proof.
 Qed.
 
 Lemma sim_thread_sol_racy
-      vs P D mem lc loc
-      (SIM: sim_thread_sol vs P D mem lc)
+      c vs P D mem lc loc
+      (SIM: sim_thread_sol c vs P D mem lc)
       (LOCAL: Local.wf lc mem)
       (ORD: ~ P loc)
   :
@@ -180,8 +416,8 @@ Proof.
 Qed.
 
 Lemma sim_thread_sol_read_na_racy
-      vs P D mem lc loc
-      (SIM: sim_thread_sol vs P D mem lc)
+      c vs P D mem lc loc
+      (SIM: sim_thread_sol c vs P D mem lc)
       (LOCAL: Local.wf lc mem)
       (ORD: ~ P loc)
       val
@@ -192,8 +428,8 @@ Proof.
 Qed.
 
 Lemma sim_thread_sol_write_na_racy
-      vs P D mem lc loc
-      (SIM: sim_thread_sol vs P D mem lc)
+      c vs P D mem lc loc
+      (SIM: sim_thread_sol c vs P D mem lc)
       (LOCAL: Local.wf lc mem)
       (ORD: ~ P loc)
   :
@@ -205,8 +441,8 @@ Proof.
 Qed.
 
 Lemma sim_thread_sol_read_na
-      vs P D mem lc loc val
-      (SIM: sim_thread_sol vs P D mem lc)
+      c vs P D mem lc loc val
+      (SIM: sim_thread_sol c vs P D mem lc)
       (LOCAL: Local.wf lc mem)
       (VAL: Const.le val (vs loc))
   :
@@ -231,15 +467,15 @@ Proof.
 Qed.
 
 Lemma sim_thread_sol_read
-      vs P D mem lc0 loc ord val
-      (SIM: sim_thread_sol vs P D mem lc0)
+      c vs P D mem lc0 loc ord val
+      (SIM: sim_thread_sol c vs P D mem lc0)
       (LOCAL: Local.wf lc0 mem)
       (ORD: ~ Ordering.le Ordering.acqrel ord)
       (VAL: Const.le val (vs loc))
   :
   exists ts released lc1,
     (<<READ: Local.read_step lc0 mem loc ts val released ord lc1>>) /\
-    (<<SIM: sim_thread_sol vs (fun loc0 => P loc0 \/ loc0 = loc) D mem lc1>>)
+    (<<SIM: sim_thread_sol c vs (fun loc0 => if (Loc.eq_dec loc0 loc) then true else P loc0) D mem lc1>>)
 .
 Proof.
   inv SIM. hexploit (VALS loc); eauto. i. des.
@@ -277,8 +513,8 @@ Proof.
 Qed.
 
 Lemma sim_thread_sol_write_na
-      vs P D mem0 lc0 sc loc val
-      (SIM: sim_thread_sol vs P D mem0 lc0)
+      c vs P D mem0 lc0 sc loc val
+      (SIM: sim_thread_sol c vs P D mem0 lc0)
       (LOCAL: Local.wf lc0 mem0)
       (MEM: Memory.closed mem0)
       lang st
@@ -290,7 +526,7 @@ Lemma sim_thread_sol_write_na
                   (Thread.mk lang st lc0 sc mem0)
                   (Thread.mk _ st lc1 sc mem1)>>) /\
     (<<WRITE: Local.write_na_step lc1 sc mem1 loc from to val Ordering.na lc2 sc mem2 msgs kinds kind>>) /\
-    (<<SIM: sim_thread_sol (fun loc0 => if Loc.eq_dec loc0 loc then val else vs loc0) (fun loc0 => P loc0 \/ loc0 = loc) D mem2 lc2>>)
+    (<<SIM: sim_thread_sol c (fun loc0 => if Loc.eq_dec loc0 loc then val else vs loc0) (fun loc0 => if (Loc.eq_dec loc0 loc) then true else P loc0) (fun loc0 => if (Loc.eq_dec loc0 loc) then false else D loc0) mem2 lc2>>)
 .
 Proof.
   destruct lc0 as [tvw0 prom0].
@@ -341,7 +577,7 @@ Proof.
       inv LOWER. rewrite OTHER; auto.
     }
   }
-  { i. ss. destruct (Loc.eq_dec loc0 loc); auto. left.
+  { i. ss. des_ifs.
     inv WRITE. clarify. eapply na_write_unchanged_loc in WRITE0; eauto.
     eapply cancel_future_unchanged_loc in RESERVE; eauto. des.
     rewrite OTHERPLN in MAX1; auto.
@@ -399,14 +635,14 @@ Proof.
 Qed.
 
 Lemma sim_thread_sol_write
-      vs P D mem0 lc0 sc loc ord val
-      (SIM: sim_thread_sol vs P D mem0 lc0)
+      c vs P D mem0 lc0 sc loc ord val
+      (SIM: sim_thread_sol c vs P D mem0 lc0)
       (LOCAL: Local.wf lc0 mem0)
       (MEM: Memory.closed mem0)
   :
   exists lc1 mem1 from to released kind,
     (<<WRITE: Local.write_step lc0 sc mem0 loc from to val None released ord lc1 sc mem1 kind>>) /\
-    (<<SIM: sim_thread_sol (fun loc0 => if Loc.eq_dec loc0 loc then val else vs loc0) (fun loc0 => P loc0 \/ loc0 = loc) D mem1 lc1>>)
+    (<<SIM: sim_thread_sol c (fun loc0 => if Loc.eq_dec loc0 loc then val else vs loc0) (fun loc0 => if (Loc.eq_dec loc0 loc) then true else P loc0) D mem1 lc1>>)
 .
 Proof.
   Local Opaque TView.write_tview.
@@ -541,7 +777,7 @@ Proof.
       erewrite Memory.write_get_diff; eauto.
     }
   }
-  { i. destruct (Loc.eq_dec loc0 loc); auto. left.
+  { i. des_ifs.
     rewrite write_tview_other_pln in MAX; auto.
     eapply write_unchanged_loc in WRITE0; eauto. des.
     eapply PERM; eauto. eapply unchanged_loc_max_readable; eauto.
