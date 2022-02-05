@@ -114,43 +114,51 @@ Lemma sim_thread_future
       (SCTGT1: Memory.closed_timemap sc_tgt1 mem_tgt1)
       (WF1: Mapping.wfs f1)
       (VERS1: versions_wf f1 vers1)
+      lang st
   :
-  exists vs_src1 vs_tgt1,
-    (<<SIM: sim_thread
-              f1 vers1 (fun _ => None) flag_tgt vs_src1 vs_tgt1
-              mem_src1 mem_tgt1 lc_src0 lc_tgt0 sc_src1 sc_tgt1>>) /\
-    (<<VALSRC: forall loc val (VAL: vs_src1 loc = Some val), vs_src0 loc = Some val>>) /\
-    (<<VALTGT: forall loc val (VAL: vs_tgt1 loc = Some val), vs_tgt0 loc = Some val>>)
+  exists lc_src2 sc_src2 mem_src2,
+    (<<STEPS: rtc (@Thread.tau_step lang) (Thread.mk lang st lc_src0 sc_src1 mem_src1) (Thread.mk lang st lc_src0 sc_src2 mem_src2)>>) /\
+      (<<FAILURE: Thread.steps_failure (Thread.mk lang st lc_src0 sc_src1 mem_src1)>>) \/
+      exists vs_src1 vs_tgt1,
+        (<<SIM: sim_thread
+                  f1 vers1 (fun _ => None) flag_tgt vs_src1 vs_tgt1
+                  mem_src2 mem_tgt1 lc_src2 lc_tgt0 sc_src2 sc_tgt1>>) /\
+          (<<VALSRC: forall loc val (VAL: vs_src1 loc = Some val),
+            exists val_old,
+              (<<VS: vs_src0 loc = Some val_old>>) /\
+                (<<VAL: Const.le val_old val>>)>>) /\
+          (<<VALTGT: forall loc val (VAL: vs_tgt1 loc = Some val), vs_tgt0 loc = Some val>>) /\
+          (<<CLOSED: sim_closed_memory f1 mem_src2>>)
 .
 Proof.
-  hexploit (@max_values_src_exists mem_src1 lc_src0).
-  intros [vs_src1 MAXSRC1]. des.
-  assert (VALSRC: forall loc val (VAL: vs_src1 loc = Some val), vs_src0 loc = Some val).
-  { admit. }
-  set (vs_tgt1 := fun loc => match vs_src1 loc with
-                             | Some _ => vs_tgt0 loc
-                             | None => None
-                             end).
-  esplits.
-  { inv SIM. econs.
-    { eapply sim_timemap_mon_locs; eauto. i. ss. }
-    { eauto. }
-    { inv LOCAL. econs; eauto.
-      { eapply sim_tview_mon_latest; eauto. }
-      { admit. }
-      { eapply wf_release_vers_versions_le; eauto. }
-    }
-    { eauto. }
-    { instantiate (1:=vs_tgt1). admit.
-    }
-    { i. unfold vs_tgt1. des_ifs.
-      hexploit VALSRC; eauto. i. hexploit (PERM loc).
-      rewrite H. auto.
-    }
-    { eauto. }
-    { eauto. }
-    { eauto. }
-  }
-  { auto. }
-  { unfold vs_tgt1. i. des_ifs. }
 Admitted.
+(*   hexploit (@max_values_src_exists mem_src1 lc_src0). *)
+(*   intros [vs_src1 MAXSRC1]. des. *)
+(*   assert (VALSRC: forall loc val (VAL: vs_src1 loc = Some val), vs_src0 loc = Some val). *)
+(*   { admit. } *)
+(*   set (vs_tgt1 := fun loc => match vs_src1 loc with *)
+(*                              | Some _ => vs_tgt0 loc *)
+(*                              | None => None *)
+(*                              end). *)
+(*   right. esplits. *)
+(*   { inv SIM. econs. *)
+(*     { eapply sim_timemap_mon_locs; eauto. i. ss. } *)
+(*     { eauto. } *)
+(*     { inv LOCAL. econs; eauto. *)
+(*       { eapply sim_tview_mon_latest; eauto. } *)
+(*       { admit. } *)
+(*       { eapply wf_release_vers_versions_le; eauto. } *)
+(*     } *)
+(*     { eauto. } *)
+(*     { instantiate (1:=vs_tgt1). admit. *)
+(*     } *)
+(*     { i. unfold vs_tgt1. des_ifs. *)
+(*       hexploit VALSRC; eauto. i. hexploit (PERM loc). *)
+(*       rewrite H. auto. *)
+(*     } *)
+(*     { eauto. } *)
+(*     { eauto. } *)
+(*     { eauto. } *)
+(*   } *)
+(*   { admit. } *)
+(* Admitted. *)

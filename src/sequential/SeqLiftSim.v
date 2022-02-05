@@ -39,6 +39,7 @@ Require Import JoinedView.
 Require Import SeqLift.
 Require Import SeqLiftStep.
 Require Import SeqLiftCertification.
+Require Import SeqLiftInterference.
 Require Import DelayedSimulation.
 Require Import Simple.
 
@@ -319,7 +320,10 @@ Section LIFT.
       match w with
       | (f, vers, mem_src') =>
           (<<MEMSRC: mem_src = mem_src'>>) /\
-            (<<SIM: sim_memory (fun _ => None) f vers mem_src mem_tgt>>)
+            (<<SIM: sim_memory (fun _ => None) f vers mem_src mem_tgt>>) /\
+            (<<VERSIONED: versioned_memory vers mem_tgt>>) /\
+            (<<SIMCLOSED: sim_closed_memory f mem_src>>) /\
+            (<<VERSWF: versions_wf f vers>>)
       end.
 
   Definition sim_timemap_lift: forall (w: world) (tm_src: TimeMap.t) (tm_tgt: TimeMap.t), Prop :=
@@ -363,7 +367,7 @@ Section LIFT.
              (flag_src: Loc.t -> option Time.t) (flag_tgt: Loc.t -> option Time.t): Prop :=
     forall loc, sim_flag_lift (d loc) (sflag_src loc) (sflag_tgt loc) (flag_src loc) (flag_tgt loc).
 
-  Variant sim_state_lift:
+  Variant sim_state_lift c:
     forall (w: world)
            (smem_src: SeqMemory.t) (smem_tgt: SeqMemory.t)
            (p: Perms.t)
@@ -383,18 +387,31 @@ Section LIFT.
         (FLAGS: sim_flags_lift D sflag_src sflag_tgt flag_src flag_tgt)
         (WF: Mapping.wfs f)
         (VERS: versions_wf f vers)
-        (VERSIONED: versioned_memory vers mem_tgt)
         (ATLOCS: forall loc (NNA: ~ loc_na loc),
             (<<FLAGSRC: flag_src loc = None>>) /\
               (<<FLAGTGT: flag_tgt loc = None>>) /\
               (<<VAL: option_rel Const.le (vs_tgt loc) (vs_src loc)>>))
+        (INTERFERENCE: c = false -> flag_src = fun _ => None)
+        (MAPWF: Mapping.wfs f)
+        (VERSWF: versions_wf f vers)
       :
       sim_state_lift
+        c
         (f, vers, mem_src)
         (SeqMemory.mk svs_src sflag_src) (SeqMemory.mk svs_tgt sflag_tgt)
         p D
         mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt
   .
+
+  Lemma sim_state_lift_cond_mon c0 c1
+        w smem_src smem_tgt p D mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt
+        (SIM: sim_state_lift c0 w smem_src smem_tgt p D mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt)
+        (COND: c1 = false -> c0 = false)
+    :
+    sim_state_lift c1 w smem_src smem_tgt p D mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt.
+  Proof.
+    inv SIM. econs; eauto.
+  Qed.
 
   Lemma rtc_steps_thread_failure lang th0 th1
         (STEPS: rtc (@Thread.tau_step lang) th0 th1)
@@ -413,7 +430,7 @@ Section LIFT.
       w0 p D smem_src smem_tgt0 mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0
       mem_tgt1 lc_tgt1 sc_tgt1
       loc from to val msgs kinds kind
-      (LIFT: sim_state_lift w0 smem_src smem_tgt0 p D mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0)
+      (LIFT: sim_state_lift true w0 smem_src smem_tgt0 p D mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0)
       (STEP: Local.write_na_step lc_tgt0 sc_tgt0 mem_tgt0 loc from to val Ordering.na lc_tgt1 sc_tgt1 mem_tgt1 msgs kinds kind)
       (NALOCS: loc_na loc)
       (LOWER: mem_tgt1 = mem_tgt0)
@@ -430,7 +447,7 @@ Section LIFT.
         (<<STEP: SeqState.na_local_step p me (ProgramEvent.write loc val Ordering.na) smem_tgt0 smem_tgt1>>) /\
         (<<LIFT: forall (NORMAL: me <> MachineEvent.failure),
           exists w1,
-            (<<LIFT: sim_state_lift w1 smem_src smem_tgt1 p D mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src1 sc_tgt1>>) /\
+            (<<LIFT: sim_state_lift true w1 smem_src smem_tgt1 p D mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src1 sc_tgt1>>) /\
               (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt0 lc_tgt0.(Local.promises)) w0 w1>>)>>).
   Proof.
     i. inv LIFT. destruct (vs_tgt loc) eqn:VAL.
@@ -478,7 +495,7 @@ Section LIFT.
     forall
       w0 p D smem_src smem_tgt0 mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0
       e pe mem_tgt1 lc_tgt1 sc_tgt1
-      (LIFT: sim_state_lift w0 smem_src smem_tgt0 p D mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0)
+      (LIFT: sim_state_lift true w0 smem_src smem_tgt0 p D mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0)
       (STEP: Local.program_step e lc_tgt0 sc_tgt0 mem_tgt0 lc_tgt1 sc_tgt1 mem_tgt1)
       (EVENT: ThreadEvent.get_program_event e = pe)
       (NA: ~ is_atomic_event pe)
@@ -498,7 +515,7 @@ Section LIFT.
         (<<STEP: SeqState.na_local_step p me pe smem_tgt0 smem_tgt1>>) /\
         (<<LIFT: forall (NORMAL: me <> MachineEvent.failure),
             exists w1,
-              (<<LIFT: sim_state_lift w1 smem_src smem_tgt1 p D mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src1 sc_tgt1>>) /\
+              (<<LIFT: sim_state_lift true w1 smem_src smem_tgt1 p D mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src1 sc_tgt1>>) /\
                 (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt0 lc_tgt0.(Local.promises)) w0 w1>>)>>)
   .
   Proof.
@@ -565,7 +582,7 @@ Section LIFT.
     forall
       w0 p D smem_src0 smem_tgt mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt
       pe me smem_src1
-      (LIFT: sim_state_lift w0 smem_src0 smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
+      (LIFT: sim_state_lift true w0 smem_src0 smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
       (STEP: SeqState.na_local_step p me pe smem_src0 smem_src1)
       (NA: ~ is_atomic_event pe)
       (NALOCS: forall loc val (ACCESS: is_accessing pe = Some (loc, val)), loc_na loc)
@@ -585,7 +602,7 @@ Section LIFT.
         (<<EVENT: ThreadEvent.get_program_event e = pe>>) /\
         (<<LIFT: forall (NORMAL: ThreadEvent.get_machine_event e <> MachineEvent.failure),
           exists w1,
-            (<<LIFT: sim_state_lift w1 smem_src1 smem_tgt p D mem_src2 mem_tgt lc_src2 lc_tgt sc_src2 sc_tgt>>) /\
+            (<<LIFT: sim_state_lift true w1 smem_src1 smem_tgt p D mem_src2 mem_tgt lc_src2 lc_tgt sc_src2 sc_tgt>>) /\
               (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt lc_tgt.(Local.promises)) w0 w1>>)>>).
   Proof.
     i. inv STEP.
@@ -654,6 +671,7 @@ Section LIFT.
               { exfalso. eapply NNA; eauto. }
               { eapply ATLOCS; eauto. }
             }
+            { ss. }
           }
           { ss. i. splits; auto; try refl.
             { eapply Thread.rtc_tau_step_future in STEPS; eauto.
@@ -695,7 +713,7 @@ Section LIFT.
       w0 p D smem_src0 smem_tgt mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt
       me smem_src1
       lang_src st_src0 st_src1
-      (LIFT: sim_state_lift w0 smem_src0 smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
+      (LIFT: sim_state_lift true w0 smem_src0 smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
       (STEP: SeqState.na_step p me (SeqState.mk _ st_src0 smem_src0) (SeqState.mk _ st_src1 smem_src1))
       (NOMIX: nomix _ st_src0)
       (CONSISTENT: Local.promise_consistent lc_tgt)
@@ -711,7 +729,7 @@ Section LIFT.
         (<<MACHINE: ThreadEvent.get_machine_event e = me>>) /\
         (<<LIFT: forall (NORMAL: ThreadEvent.get_machine_event e <> MachineEvent.failure),
           exists w1,
-            (<<LIFT: sim_state_lift w1 smem_src1 smem_tgt p D mem_src2 mem_tgt lc_src2 lc_tgt sc_src2 sc_tgt>>) /\
+            (<<LIFT: sim_state_lift true w1 smem_src1 smem_tgt p D mem_src2 mem_tgt lc_src2 lc_tgt sc_src2 sc_tgt>>) /\
               (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt lc_tgt.(Local.promises)) w0 w1>>)>>) /\
         (<<NOMIX: nomix _ st_src1>>)
   .
@@ -739,7 +757,7 @@ Section LIFT.
       w0 p D smem_src0 smem_tgt mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt
       me smem_src1
       lang_src st_src0 st_src1
-      (LIFT: sim_state_lift w0 smem_src0 smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
+      (LIFT: sim_state_lift true w0 smem_src0 smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
       (STEP: SeqState.na_opt_step p me (SeqState.mk _ st_src0 smem_src0) (SeqState.mk _ st_src1 smem_src1))
       (NOMIX: nomix _ st_src0)
       (CONSISTENT: Local.promise_consistent lc_tgt)
@@ -755,7 +773,7 @@ Section LIFT.
         (<<MACHINE: ThreadEvent.get_machine_event e = me>>) /\
         (<<LIFT: forall (NORMAL: ThreadEvent.get_machine_event e <> MachineEvent.failure),
           exists w1,
-            (<<LIFT: sim_state_lift w1 smem_src1 smem_tgt p D mem_src2 mem_tgt lc_src2 lc_tgt sc_src2 sc_tgt>>) /\
+            (<<LIFT: sim_state_lift true w1 smem_src1 smem_tgt p D mem_src2 mem_tgt lc_src2 lc_tgt sc_src2 sc_tgt>>) /\
               (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt lc_tgt.(Local.promises)) w0 w1>>)>>) /\
         (<<NOMIX: nomix _ st_src1>>)
   .
@@ -777,7 +795,7 @@ Section LIFT.
       p smem_src0 smem_src1
       (STEPS: rtc (SeqState.na_step p MachineEvent.silent) (SeqState.mk _ st_src0 smem_src0) (SeqState.mk _ st_src1 smem_src1))
       w0 D smem_tgt mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt
-      (LIFT: sim_state_lift w0 smem_src0 smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
+      (LIFT: sim_state_lift true w0 smem_src0 smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
       (NOMIX: nomix _ st_src0)
       (CONSISTENT: Local.promise_consistent lc_tgt)
       (WF_SRC: Local.wf lc_src0 mem_src0)
@@ -789,7 +807,7 @@ Section LIFT.
     exists lc_src1 mem_src1 sc_src1,
       (<<STEPS: rtc (@Thread.tau_step lang_src) (Thread.mk _ st_src0 lc_src0 sc_src0 mem_src0) (Thread.mk _ st_src1 lc_src1 sc_src1 mem_src1)>>) /\
         (<<LIFT: exists w1,
-            (<<LIFT: sim_state_lift w1 smem_src1 smem_tgt p D mem_src1 mem_tgt lc_src1 lc_tgt sc_src1 sc_tgt>>) /\
+            (<<LIFT: sim_state_lift true w1 smem_src1 smem_tgt p D mem_src1 mem_tgt lc_src1 lc_tgt sc_src1 sc_tgt>>) /\
               (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt lc_tgt.(Local.promises)) w0 w1>>)>>) /\
         (<<NOMIX: nomix _ st_src1>>)
   .
@@ -867,7 +885,7 @@ Section LIFT.
     forall
       w p D smem_src smem_tgt mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt
       lang_src st_src
-      (LIFT: sim_state_lift w smem_src smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
+      (LIFT: sim_state_lift true w smem_src smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
       (CONSISTENT: Local.promise_consistent lc_tgt)
       (WF_SRC: Local.wf lc_src0 mem_src0)
       (WF_TGT: Local.wf lc_tgt mem_tgt)
@@ -1254,7 +1272,7 @@ Section LIFT.
     forall
       w p D smem_src smem_tgt mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt
       lang st
-      (LIFT: sim_state_lift w smem_src smem_tgt p D mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt)
+      (LIFT: sim_state_lift true w smem_src smem_tgt p D mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt)
       (FAILURE: sim_seq_failure_case p (SeqState.mk _ st smem_src))
       (NOMIX: nomix _ st)
       (CONSISTENT: Local.promise_consistent lc_tgt)
@@ -1298,7 +1316,7 @@ Section LIFT.
       w p D smem_src smem_tgt mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt
       lang_src lang_tgt
       (st_src0: lang_src.(Language.state)) (st_tgt: lang_tgt.(Language.state))
-      (LIFT: sim_state_lift w smem_src smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
+      (LIFT: sim_state_lift true w smem_src smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
       (PARTIAL: sim_seq_partial_case p D (SeqState.mk _ st_src0 smem_src) (SeqState.mk _ st_tgt smem_tgt))
       (BOT: lc_tgt.(Local.promises) = Memory.bot)
       (NOMIX: nomix _ st_src0)
@@ -1358,7 +1376,7 @@ Section LIFT.
       w0 p D smem_src smem_tgt mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt
       lang_src lang_tgt sim_terminal
       (st_src0: lang_src.(Language.state)) (st_tgt: lang_tgt.(Language.state))
-      (LIFT: sim_state_lift w0 smem_src smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
+      (LIFT: sim_state_lift true w0 smem_src smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
       (SIM: sim_seq_terminal_case sim_terminal p D (SeqState.mk _ st_src0 smem_src) (SeqState.mk _ st_tgt smem_tgt))
       (TERMINAL: lang_tgt.(Language.is_terminal) st_tgt)
       (BOT: lc_tgt.(Local.promises) = Memory.bot)
@@ -1415,7 +1433,7 @@ Section LIFT.
       i. specialize (FLAG0 loc). des; ss.
     }
     { ss. inv SIM1. eapply sim_timemap_mon_locs; eauto; ss. }
-    { ss. splits; auto. inv SIM1. auto. }
+    { ss. inv SIM1. splits; auto. eapply versions_wf_mapping_mon; eauto. }
     { etrans; eauto. ss. i. splits; auto.
       { refl. }
       { eapply Thread.rtc_tau_step_future in STEPS1; eauto. des; ss.
@@ -1423,6 +1441,76 @@ Section LIFT.
       }
     }
   Qed.
+
+  Lemma sim_lift_past_future:
+    forall
+      w0 p0 D smem_src smem_tgt mem_src0 mem_tgt0 lc_src0 lc_tgt sc_src0 sc_tgt0
+      w1 mem_src1 mem_tgt1 sc_src1 sc_tgt1
+      lang_src lang_tgt sim_terminal st_src st_tgt
+      (LIFT: sim_state_lift false w0 smem_src smem_tgt p0 D mem_src0 mem_tgt0 lc_src0 lc_tgt sc_src0 sc_tgt0)
+      (SIM: sim_seq_interference _ _ sim_terminal p0 D (SeqState.mk lang_src st_src smem_src) (SeqState.mk lang_tgt st_tgt smem_tgt))
+      (NOMIX: nomix _ st_src)
+      (CONSISTENT: Local.promise_consistent lc_tgt)
+      (WF_SRC0: Local.wf lc_src0 mem_src0)
+      (WF_TGT0: Local.wf lc_tgt mem_tgt0)
+      (SC_SRC0: Memory.closed_timemap sc_src0 mem_src0)
+      (SC_TGT0: Memory.closed_timemap sc_tgt0 mem_tgt0)
+      (MEM_SRC0: Memory.closed mem_src0)
+      (MEM_TGT0: Memory.closed mem_tgt0)
+      (CONS: Thread.consistent (Thread.mk lang_src st_src lc_src0 sc_src0 mem_src0))
+      (WF_SRC1: Local.wf lc_src0 mem_src1)
+      (WF_TGT1: Local.wf lc_tgt mem_tgt1)
+      (SC_SRC1: Memory.closed_timemap sc_src1 mem_src1)
+      (SC_TGT1: Memory.closed_timemap sc_tgt1 mem_tgt1)
+      (MEM_SRC1: Memory.closed mem_src1)
+      (MEM_TGT1: Memory.closed mem_tgt1)
+      (MEMSRC: Memory.future_weak mem_src0 mem_src1)
+      (MEMTGT: Memory.future_weak mem_tgt0 mem_tgt1)
+      (SCSRC: TimeMap.le sc_src0 sc_src1)
+      (SCTGT: TimeMap.le sc_tgt0 sc_tgt1)
+      (WORLD: world_messages_le (Messages.of_memory lc_src0.(Local.promises)) (Messages.of_memory lc_tgt.(Local.promises)) w0 w1)
+      (MEM: sim_memory_lift w1 mem_src1 mem_tgt1)
+      (SC: sim_timemap_lift w1 sc_src1 sc_tgt1)
+    ,
+    exists lc_src2 sc_src2 mem_src2,
+      (<<STEPS: rtc (@Thread.tau_step _)
+                    (Thread.mk _ st_src lc_src0 sc_src0 mem_src0)
+                    (Thread.mk _ st_src lc_src2 sc_src2 mem_src2)>>) /\
+        ((<<FAILURE: Thread.steps_failure (Thread.mk _ st_src lc_src0 sc_src1 mem_src1)>>) \/
+           (exists w1 p1,
+               (<<LIFT: sim_state_lift false w1 smem_src smem_tgt p1 D mem_src2 mem_tgt1 lc_src2 lc_tgt sc_src2 sc_tgt1>>) /\
+                 (<<SIM: sim_seq_interference _ _ sim_terminal p1 D (SeqState.mk lang_src st_src smem_src) (SeqState.mk lang_tgt st_tgt smem_tgt)>>) /\
+                 (<<SC: sim_timemap_lift w1 sc_src2 sc_tgt1>>) /\
+                 (<<MEM: sim_memory_lift w1 mem_src2 mem_tgt1>>) /\
+                 (<<WORLD: world_messages_le (unchangable mem_src1 lc_src0.(Local.promises)) (unchangable mem_tgt1 lc_tgt.(Local.promises)) w0 w1>>))).
+  Proof.
+    i. inv LIFT. destruct w1 as [[f1 vers1] mem_src1'].
+    red in WORLD. red in MEM. red in SC.
+    hexploit WORLD; eauto. i. des. subst.
+    hexploit INTERFERENCE; eauto. i. subst.
+    hexploit sim_thread_future; eauto. i. des.
+    { esplits.
+      { refl. }
+      { left. eauto. }
+    }
+    {
+
+
+    { ss. inv SIM1. splits; auto. }
+
+
+        )>>).
+  .
+
+
+
+               (<<TERMINAL_SRC: (Language.is_terminal lang_src) st_src1>>) /\
+                 (<<BOT: lc_src1.(Local.promises) = Memory.bot>>) /\
+                 (<<SC: sim_timemap_lift w1 sc_src1 sc_tgt>>) /\
+                 (<<MEMORY: sim_memory_lift w1 mem_src1 mem_tgt>>) /\
+                 (<<WORLD: world_messages_le (unchangable mem_src1 lc_src1.(Local.promises)) (unchangable mem_tgt lc_tgt.(Local.promises)) w0 w1>>)).
+
+
 
 
   Lemma sim_lift lang_src lang_tgt sim_terminal:
