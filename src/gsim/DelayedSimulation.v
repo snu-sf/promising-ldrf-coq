@@ -180,7 +180,8 @@ Section SimulationThread.
              (w0: world)
              st1_src lc1_src sc1_src mem1_src
              st1_tgt lc1_tgt sc1_tgt mem1_tgt :=
-    forall (TERMINAL_TGT: (Language.is_terminal lang_tgt) st1_tgt),
+    forall (TERMINAL_TGT: (Language.is_terminal lang_tgt) st1_tgt)
+           (BOT: lc1_tgt.(Local.promises) = Memory.bot),
     exists st2_src lc2_src sc2_src mem2_src,
       (<<STEPS: rtc (@Thread.tau_step _)
                     (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
@@ -188,10 +189,25 @@ Section SimulationThread.
       ((<<FAILURE: Thread.steps_failure (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>>) \/
        exists w3,
          (<<TERMINAL_SRC: (Language.is_terminal lang_src) st2_src>>) /\
-         (<<BOT: lc1_tgt.(Local.promises) = Memory.bot -> lc2_src.(Local.promises) = Memory.bot>>) /\
+         (<<BOT: lc2_src.(Local.promises) = Memory.bot>>) /\
          (<<SC3: sim_timemap w3 sc2_src sc1_tgt>>) /\
          (<<MEMORY3: sim_memory w3 mem2_src mem1_tgt>>) /\
          (<<WORLD: world_messages_le (unchangable mem1_src lc1_src.(Local.promises)) (unchangable mem1_tgt lc1_tgt.(Local.promises)) w0 w3>>)).
+
+  Definition _sim_thread_certification
+             (lang_src lang_tgt:language)
+             (sim_thread: forall (b1: bool) (w1: world) (st1_src:(Language.state lang_src)) (lc1_src:Local.t) (sc0_src:TimeMap.t) (mem0_src:Memory.t)
+                                 (st1_tgt:(Language.state lang_tgt)) (lc1_tgt:Local.t) (sc0_tgt:TimeMap.t) (mem0_tgt:Memory.t), Prop)
+             (w0: world)
+             st1_src lc1_src sc1_src mem1_src
+             lc1_tgt :=
+    forall (BOT: lc1_tgt.(Local.promises) = Memory.bot),
+    exists st2_src lc2_src sc2_src mem2_src,
+      (<<STEPS: rtc (@Thread.tau_step lang_src)
+                    (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
+                    (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>>) /\
+      ((<<FAILURE: Thread.steps_failure (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>>) \/
+         (<<BOT: lc2_src.(Local.promises) = Memory.bot>>)).
 
   Definition _sim_thread_lower_step
              (lang_src lang_tgt:language)
@@ -241,6 +257,7 @@ Section SimulationThread.
       (MEM_TGT: Memory.closed mem0_tgt)
       (CONS_TGT: Local.promise_consistent lc1_tgt),
       ((<<RELEASE: _sim_thread_release_step _ _ (@sim_thread _ _) w0 st1_src lc1_src sc0_src mem0_src st1_tgt lc1_tgt sc0_tgt mem0_tgt>>) /\
+         (<<CERTIFICATION: _sim_thread_certification _ lang_tgt (@sim_thread _ _) w0 st1_src lc1_src sc0_src mem0_src lc1_tgt>>) /\
          (<<LOWER: _sim_thread_lower_step _ _ (@sim_thread _ _) w0 st1_src lc1_src sc0_src mem0_src st1_tgt lc1_tgt sc0_tgt mem0_tgt>>) /\
          (<<TERMINAL: _sim_thread_terminal _ _ (@sim_thread _ _) w0 st1_src lc1_src sc0_src mem0_src st1_tgt lc1_tgt sc0_tgt mem0_tgt>>) /\
          (<<PROMISE: b0 = false -> _sim_thread_promise_step _ _ (@sim_thread _ _) w0 st1_src lc1_src sc0_src mem0_src st1_tgt lc1_tgt sc0_tgt mem0_tgt>>) /\

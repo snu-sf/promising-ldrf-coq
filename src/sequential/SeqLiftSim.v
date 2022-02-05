@@ -361,7 +361,7 @@ Section LIFT.
   Definition sim_flags_lift
              (d: Flags.t) (sflag_src: Flags.t) (sflag_tgt: Flags.t)
              (flag_src: Loc.t -> option Time.t) (flag_tgt: Loc.t -> option Time.t): Prop :=
-    forall loc (NA: loc_na loc), sim_flag_lift (d loc) (sflag_src loc) (sflag_tgt loc) (flag_src loc) (flag_tgt loc).
+    forall loc, sim_flag_lift (d loc) (sflag_src loc) (sflag_tgt loc) (flag_src loc) (flag_tgt loc).
 
   Variant sim_state_lift:
     forall (w: world)
@@ -449,7 +449,6 @@ Section LIFT.
             { i. destruct (flag_src loc), (D loc); ss. }
             { eapply FLAGS; auto. }
           }
-          { eapply FLAGS; auto. }
         }
         { i. ss. des_ifs.
           { exfalso. eapply LOCDISJOINT; eauto. }
@@ -626,9 +625,6 @@ Section LIFT.
             { eapply VALS; auto. }
           }
           { ss. unfold Flags.update. ii. des_ifs.
-            econs; eauto.
-            { eapply FLAGS; eauto. }
-            { eapply FLAGS; eauto. }
           }
           { i. ss. des_ifs.
             { exfalso. eapply LOCDISJOINT; eauto. }
@@ -799,11 +795,11 @@ Section LIFT.
   Variant sim_flag_sol_lift (D: Flag.t) (d: bool) (W: Flag.t) (flag: Flag.t): Prop :=
     | sim_flag_sol_lift_intro
         (DEBT: d -> D)
-        (SS: Flag.join W flag -> ~ d)
+        (WRITTEN: Flag.join W flag -> ~ d)
   .
 
   Definition sim_flags_sol_lift (D: Flags.t) (d: Loc.t -> bool) (W: Flags.t) (flag: Flags.t): Prop :=
-    forall loc (NA: loc_na loc), sim_flag_sol_lift (D loc) (d loc) (W loc) (flag loc).
+    forall loc, sim_flag_sol_lift (D loc) (d loc) (W loc) (flag loc).
 
   Variant sim_state_sol_lift (c: bool):
     forall (smem: SeqMemory.t) (p: Perms.t) (D: Flags.t) (W: Flags.t)
@@ -815,7 +811,7 @@ Section LIFT.
         (SIM: sim_thread_sol c vs P d mem lc)
         (VAL: sim_vals_sol_lift p P svs vs)
         (FLAG: sim_flags_sol_lift D d W flag)
-        (OVALS: forall loc (NA: loc_at loc), ovs loc = vs loc)
+        (OVALS: forall loc (NA: loc_at loc), Const.le (ovs loc) (vs loc))
       :
       sim_state_sol_lift
         c
@@ -840,7 +836,9 @@ Section LIFT.
     exists lc_src1 mem_src1 sc_src1 o,
       (<<STEPS: rtc (@Thread.tau_step lang_src) (Thread.mk _ st_src lc_src0 sc_src0 mem_src0) (Thread.mk _ st_src lc_src1 sc_src1 mem_src1)>>) /\
         (<<LIFT: sim_state_sol_lift
-                   c smem_src p (Flags.join D smem_tgt.(SeqMemory.flags)) smem_src.(SeqMemory.flags) mem_src1 lc_src1 sc_src1 o>>).
+                   c smem_src p (Flags.join D smem_tgt.(SeqMemory.flags)) smem_src.(SeqMemory.flags) mem_src1 lc_src1 sc_src1 o>>) /\
+        (<<ORACLE: Oracle.wf o>>)
+  .
   Proof.
     i. inv LIFT.
     hexploit sim_thread_sim_thread_sol; eauto.
@@ -861,9 +859,11 @@ Section LIFT.
         destruct (D loc), (sflag_tgt loc), (sflag_src loc), (flag_tgt loc), (flag_src loc); ss.
       }
     }
+    { i. refl. }
+    { eapply CertOracle.to_oracle_wf. }
   Qed.
 
-  Lemma sim_lift_na_local_step c:
+  Lemma sim_lift_sol_na_local_step c:
     forall
       p D W smem0 mem0 lc0 sc0 o
       smem1 me pe
@@ -936,7 +936,6 @@ Section LIFT.
               { eapply VAL; auto. }
             }
             { ii. unfold Flags.update. ss. des_ifs.
-              eapply FLAG; auto.
             }
             { i. ss. des_ifs.
               { exfalso. eapply LOCDISJOINT; eauto. }
@@ -977,616 +976,339 @@ Section LIFT.
     }
   Qed.
 
-        failure; eauto. }
-      { eauto. }
-      { ss. }
-      { ss. }
-    }
+  Lemma perm_meet_high_r p
+    :
+    Perm.meet p Perm.high = p.
+  Proof.
+    destruct p; ss.
+  Qed.
 
-
-      sim_thread_failure; eauto.
-
-
-        }
-        { esplits.
-          { eauto. }
-          { eapply Local.step_write_na; eauto. }
-          { eauto. }
-          { ss. }
-          { i. econs; eauto.
-            { ii. unfold ValueMap.write. ss. des_ifs.
-              { rewrite <- H1. econs. refl. }
-              { eapply VAL; auto. }
-            }
-            { ii. unfold Flags.update. ss. des_ifs.
-              eapply FLAG; auto.
-            }
-            { i. ss. des_ifs.
-              { exfalso. eapply LOCDISJOINT; eauto. }
-              { eapply OVALS; eauto. }
-            }
-          }
-        }
-      }
-
-            }
-
-
-              eapply
-
-            { eauto.
-
-            ss. }
-        }
-
-        sim_thread_sol _read_na.
-        { eauto. }
-        { eauto. }
-        { etrans; [eapply VAL; auto|eapply VAL1]. }
-        i. des. esplits.
-        { refl. }
+  Lemma sim_lift_sol_at_step c:
+    forall
+      D W smem0 mem0 lc0 sc0
+      smem1 pe i o
+      lang st0 st1 p0 p1 o0 o1
+      (LIFT: sim_state_sol_lift c smem0 p0 D W mem0 lc0 sc0 o0)
+      (STEP: SeqThread.at_step pe i o (SeqThread.mk (SeqState.mk _ st0 smem0) p0 o0) (SeqThread.mk (SeqState.mk _ st1 smem1) p1 o1))
+      (ATLOCS: forall loc val (ACCESS: is_accessing pe = Some (loc, val)), loc_at loc)
+      (NUPDATE: ~ is_updating pe)
+      (NACQUIRE: ~ is_acquire pe)
+      (WF_SRC: Local.wf lc0 mem0)
+      (SC_SRC: Memory.closed_timemap sc0 mem0)
+      (MEM_SRC: Memory.closed mem0),
+    exists lc1 mem1 e sc1 pf,
+      (<<STEP: Thread.step pf e (Thread.mk lang st0 lc0 sc0 mem0) (Thread.mk _ st1 lc1 sc1 mem1)>>) /\
+        (<<EVENT: ThreadEvent.get_program_event e = pe>>) /\
+        (<<LIFT: forall (NORMAL: ThreadEvent.get_machine_event e <> MachineEvent.failure),
+            sim_state_sol_lift c smem1 p1 D (Flags.join W (SeqEvent.written i)) mem1 lc1 sc1 o1>>).
+  Proof.
+    i. inv LIFT. inv STEP. inv MEM.
+    assert (exists ovs1,
+               (<<ORACLE: o1 = (CertOracle.to_oracle ovs1)>>) /\
+                 (<<OSTEP: CertOracle.step e0 i0 o ovs ovs1>>)).
+    { dependent destruction ORACLE. esplits; eauto. }
+    clear ORACLE. des; clarify.
+    red in INPUT0. des. inv ACQ.
+    2:{ rewrite <- H0 in *. hexploit ACQUIRE; eauto. i. ss. }
+    inv OSTEP; ss; clarify.
+    { des_ifs; ss. hexploit OVALS; eauto. i.
+      hexploit sim_thread_sol_read; eauto.
+      i. des. esplits.
+      { econs 2. econs; cycle 1.
         { eapply Local.step_read; eauto. }
         { eauto. }
-        { ss. }
-        { i. econs; eauto. }
       }
-      { rewrite <- H1 in *.
-        hexploit sim_thread_sol_read_na_racy; eauto.
-        { rewrite <- H2. ss. }
-        i. des. esplits.
-        { refl. }
-        { eapply Local.step_racy_read; eauto. }
-        { eauto. }
-        { ss. }
-        { i. econs; eauto. }
+      { ss. }
+      { i. inv REL. inv UPD.
+        specialize (UPDATE loc0 v_new). des.
+        hexploit UPDATE; eauto. i. inv H2.
+        inv MEM. ss. econs; eauto.
+        { ii. unfold Perms.update, ValueMap.write.
+          destruct (LocSet.Facts.eq_dec loc0 loc), (LocSet.Facts.eq_dec loc loc0); subst; ss; auto.
+          econs. auto.
+        }
+        { ii. unfold SeqEvent.written. rewrite <- H4. rewrite <- H3. ss.
+          unfold Flags.add, Flags.join, Flags.update, Flags.bot.
+          hexploit (FLAG loc); eauto. i. inv H2.
+          destruct (flag loc0) eqn:EQ0, (LocSet.Facts.eq_dec loc loc0); subst; ss.
+          { rewrite EQ0 in *. econs; auto. }
+          { rewrite flag_join_bot_r. auto. }
+          { rewrite EQ0 in *. rewrite flag_join_bot_r. auto. econs; auto. }
+          { rewrite flag_join_bot_r. auto. }
+        }
       }
     }
-
-        ss.
-
-
-        destruct ord; ss. eauto. }
+    { destruct pe; ss. des. clarify.
+      inv UPD. inv MEM. ss. red in INPUT. des. ss.
+      rewrite <- H2 in *. ss.
+      destruct (Oracle.in_access i0) as [[[loc1 val1] flag1]|] eqn:ACCESS0; ss.
+      des; subst. hexploit (UPDATE loc v_new); eauto. i. des.
+      hexploit H1; eauto. i. inv H4.
+      hexploit sim_thread_sol_write; eauto.
+      i. des. esplits.
+      { econs 2. econs; cycle 1.
+        { eapply Local.step_write; eauto. }
         { eauto. }
-        {
-
-
-      destruct
-
-      esplits.
-      { refl. }
-      { eapply Local.step_silent. }
-      { eauto. }
-      { eauto. }
-      { eauto. }
+      }
+      { ss. }
+      i. inv REL.
+      { ss. econs; eauto.
+        { unfold Perms.update, ValueMap.write. ii.
+          repeat des_if; subst; ss.
+          { econs. refl. }
+          { eapply VAL; eauto. }
+        }
+        { unfold SeqEvent.written. rewrite <- H2. rewrite <- H5.
+          ss. rewrite flags_join_bot_r.
+          unfold Flags.add, Flags.update, Flags.join, Flags.bot. ii.
+          hexploit (FLAG loc0); eauto. i. inv H4. econs; auto.
+          destruct (flag loc) eqn:EQ0, (LocSet.Facts.eq_dec loc0 loc); subst.
+          { subst. rewrite flag_join_bot_r. rewrite EQ0 in *. auto. }
+          { rewrite flag_join_bot_r. auto. }
+          { subst. rewrite flag_join_bot_r. rewrite EQ0 in *. auto. }
+          { rewrite flag_join_bot_r. auto. }
+        }
+        { i. ss. condtac; subst; auto. }
+      }
+      { inv MEM. ss.
+        destruct (Ordering.le Ordering.strong_relaxed ord0); ss. inv H6.
+        econs; eauto.
+        { unfold Perms.meet, Perms.update, ValueMap.write. ii.
+          repeat condtac; subst; ss.
+          { econs. refl. }
+          { rewrite perm_meet_high_r. eapply VAL; eauto. }
+        }
+        { unfold SeqEvent.written. rewrite <- H2. rewrite <- H5. ss.
+          unfold Flags.add, Flags.update, Flags.join, Flags.bot. ii.
+          hexploit (FLAG loc0); eauto. i. inv H4. econs; auto.
+          destruct (flag loc) eqn:EQ0, (LocSet.Facts.eq_dec loc0 loc); subst.
+          { subst. rewrite flag_join_bot_r. rewrite EQ0 in *. auto. }
+          { rewrite flag_join_bot_r. auto. }
+          { subst. rewrite flag_join_bot_r. rewrite EQ0 in *. auto. }
+          { rewrite flag_join_bot_r. auto. }
+        }
+        { i. ss. condtac; subst; auto. }
+      }
     }
+    { destruct pe; ss. }
+    { hexploit sim_thread_sol_fence; eauto.
+      { instantiate (1:=ordr). destruct ordr, ordw; ss. }
+      { instantiate (1:=ordw). destruct ordr, ordw; ss. }
+      i. des. esplits.
+      { econs 2. econs; cycle 1.
+        { eapply Local.step_fence; eauto. }
+        { eauto. }
+      }
+      { ss. }
+      i. inv UPD. inv REL.
+      { econs; eauto. unfold SeqEvent.written.
+        rewrite <- H2. rewrite <- H3. ss.
+        rewrite flags_join_bot_r. auto.
+      }
+      { destruct (Ordering.le Ordering.strong_relaxed ordw); ss. clarify.
+        inv MEM. ss. econs; eauto.
+        { unfold Perms.meet. ii. rewrite perm_meet_high_r. auto. }
+        { unfold SeqEvent.written. rewrite <- H2. rewrite <- H3.
+          ss. rewrite flags_join_bot_l. unfold Flags.join, Flags.bot. ii.
+          hexploit (FLAG loc); eauto. i. inv H1. econs; auto.
+          rewrite flag_join_bot_r. auto.
+        }
+      }
+    }
+  Qed.
 
-
-            sim_state_lift w smem_src1 smem_tgt p D mem_src2 mem_tgt lc_src2 lc_tgt sc_src2 sc_tgt>>)
-
-
-
-      SeqState.na_local_step p e pe smem0 smem1
-
-SeqThread.na_step
- SeqThread.steps (SeqState.na_step (lang:=lang_src)) tr
-
-
-sim_seq_failure_case
-
-    ,
-    exists lc_src1 mem_src1 sc_src1 o,
-      (<<STEPS: rtc (@Thread.tau_step lang_src) (Thread.mk _ st_src lc_src0 sc_src0 mem_src0) (Thread.mk _ st_src lc_src1 sc_src1 mem_src1)>>) /\
-        (<<LIFT: sim_state_sol_lift c smem p D W mem lc sc o>>)
-
-                   (Flags.join D smem_tgt.(SeqMemory.flags)) smem_src.(SeqMemory.flags) mem_src1 lc_src1 sc_src1 o>>).
-  Proof.
-
-
-
-  Variant sim_flag_lift
-          (d: Flag.t) (sflag_src: Flag.t) (sflag_tgt: Flag.t)
-          (flag_src: option Time.t) (flag_tgt: option Time.t): Prop :=
-    | sim_flag_lift_intro
-        (TGT: d \/ sflag_tgt -> flag_tgt)
-        (SRC: sflag_src <-> flag_src)
-  .
-
-
-
-                                          svs: ValueMap.t) (
-
-             (P: Loc.t -> bool) (svs: ValueMap.t) (vs: Loc.t -> Const.t) :=
-    forall loc, sim_val_sol_lift (p loc) (P loc) (svs loc) (vs loc).
-
-  Definition sim_vals_sol_lift (p: Perms.t) (P: Loc.t -> bool) (svs: ValueMap.t) (vs: Loc.t -> Const.t) :=
-    forall loc, sim_val_sol_lift (p loc) (P loc) (svs loc) (vs loc).
-
-sim_val_lift
-
-
-                f vers flag_src flag_tgt vs_src vs_tgt mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt)
-        (VALS: sim_vals_lift p svs_src svs_tgt vs_src vs_tgt)
-        (FLAGS: sim_flags_lift D sflag_src sflag_tgt flag_src flag_tgt)
-        (WF: Mapping.wfs f)
-        (VERS: versions_wf f vers)
-        (VERSIONED: versioned_memory vers mem_tgt)
-      :
-      sim_state_lift
-        (f, vers, mem_tgt)
-        (SeqMemory.mk svs_src sflag_src) (SeqMemory.mk svs_tgt sflag_tgt)
-        p D
-        mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt
-  .
-
-  sim_seq_partial_case
-  SeqThread.
-
-  Variant sim_state_sol_lift: forall
-      (p: Perm.t)
-      (sv_src: Const.t) (sv_tgt: Const.t)
-      (v_src: option Const.t) (v_tgt: option Const.t), Prop :=
-    | sim_val_lift_low
-        sv_src sv_tgt
-      :
-      sim_val_lift Perm.low sv_src sv_tgt None None
-    | sim_val_lift_high
-        sv_src sv_tgt v_src v_tgt
-        (VALSRC: Const.le sv_src v_src)
-        (VALTGT: Const.le v_tgt sv_tgt)
-      :
-      sim_val_lift Perm.high sv_src sv_tgt (Some v_src) (Some v_tgt)
-  .
-
-  c vs P D mem lc
-
-    (sim
-
-  sim_thread_sol
-
-  Lemma sim_lift_sol_na_step:
-    forall
-      lang_src st_src0 st_src1
-      p smem_src0 smem_src1
-      (STEPS: rtc (SeqState.na_step p MachineEvent.silent) (SeqState.mk _ st_src0 smem_src0) (SeqState.mk _ st_src1 smem_src1))
-      w D smem_tgt mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt
-      (LIFT: sim_state_lift w smem_src0 smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
-      (CONSISTENT: Local.promise_consistent lc_tgt)
-      (WF_SRC: Local.wf lc_src0 mem_src0)
-      (WF_TGT: Local.wf lc_tgt mem_tgt)
-      (SC_SRC: Memory.closed_timemap sc_src0 mem_src0)
-      (SC_TGT: Memory.closed_timemap sc_tgt mem_tgt)
-      (MEM_SRC: Memory.closed mem_src0)
-      (MEM_TGT: Memory.closed mem_tgt),
-    exists lc_src1 mem_src1 sc_src1,
-      (<<STEPS: rtc (@Thread.tau_step lang_src) (Thread.mk _ st_src0 lc_src0 sc_src0 mem_src0) (Thread.mk _ st_src1 lc_src1 sc_src1 mem_src1)>>) /\
-        (<<LIFT: sim_state_lift w smem_src1 smem_tgt p D mem_src1 mem_tgt lc_src1 lc_tgt sc_src1 sc_tgt>>)
+  Lemma sim_lift_sol_steps c
+        tr
+        lang st0 st1 smem0 smem1 p0 p1 o0 o1
+        (STEPS: SeqThread.steps (@SeqState.na_step _) tr (SeqThread.mk (SeqState.mk _ st0 smem0) p0 o0) (SeqThread.mk (SeqState.mk _ st1 smem1) p1 o1))
+    :
+    forall mem0 lc0 sc0 w D W
+           (LIFT: sim_state_sol_lift c smem0 p0 D W mem0 lc0 sc0 o0)
+           (NOMIX: nomix _ st0)
+           (TRACE: SeqThread.writing_trace tr w)
+           (WF_SRC: Local.wf lc0 mem0)
+           (SC_SRC: Memory.closed_timemap sc0 mem0)
+           (MEM_SRC: Memory.closed mem0),
+      (<<FAILURE: Thread.steps_failure (Thread.mk _ st0 lc0 sc0 mem0)>>) \/
+        exists lc1 mem1 sc1,
+          (<<STEPS: rtc (@Thread.tau_step lang) (Thread.mk _ st0 lc0 sc0 mem0) (Thread.mk _ st1 lc1 sc1 mem1)>>) /\
+            (<<LIFT: sim_state_sol_lift c smem1 p1 D (Flags.join w W) mem1 lc1 sc1 o1>>) /\
+            (<<NOMIX: nomix _ st1>>)
   .
   Proof.
-    intros lang_src st_src0 st_src1 p smem_src0 smem_src1 STEPS.
-    remember (SeqState.mk _ st_src0 smem_src0) as th_src0.
-    remember (SeqState.mk _ st_src1 smem_src1) as th_src1.
-    revert st_src0 st_src1 smem_src0 smem_src1 Heqth_src0 Heqth_src1.
-    induction STEPS; i; clarify.
-    { esplits.
+    remember (SeqThread.mk (SeqState.mk _ st0 smem0) p0 o0) as th0.
+    remember (SeqThread.mk (SeqState.mk _ st1 smem1) p1 o1) as th1.
+    revert st0 st1 smem0 smem1 p0 p1 o0 o1 Heqth0 Heqth1. induction STEPS; i; clarify.
+    { inv TRACE. right. esplits.
       { refl. }
+      { rewrite flags_join_bot_l. auto. }
       { auto. }
     }
-    destruct y. hexploit sim_lift_src_na_step; eauto. i. des.
-    hexploit Thread.rtc_tau_step_future; eauto. i. des; ss.
-    hexploit Thread.step_future; eauto. i. des; ss.
-    hexploit LIFT0; eauto.
-    { rewrite MACHINE. ss. }
-    i. hexploit IHSTEPS; eauto. i. des. esplits.
-    { etrans; [eauto|]. econs.
-      { econs; eauto. econs; eauto. }
-      { eauto. }
+    { inv STEP. inv STEP0. hexploit sim_lift_sol_na_local_step; eauto.
+      { punfold NOMIX. exploit NOMIX; eauto. i. des.
+        eapply NA in ACCESS; auto. inv LOCAL; ss.
+        { destruct ord; ss. }
+        { destruct ord; ss. }
+      }
+      i. ss. des; subst.
+      { assert (STEPS1: rtc (@Thread.tau_step _) (Thread.mk _ st0 lc0 sc0 mem0) (Thread.mk _ st4 lc2 sc2 mem2)).
+        { etrans; [eauto|]. econs; [|refl]. econs; eauto.
+          econs. econs 2; eauto. econs; eauto.
+        }
+        clear STEPS0 STEP.
+        hexploit Thread.rtc_tau_step_future; eauto. i. des; ss.
+        hexploit LIFT0.
+        { rewrite MACHINE. ss. }
+        i. hexploit IHSTEPS; eauto.
+        { punfold NOMIX. exploit NOMIX; eauto. i. des. pclearbot. auto. }
+        i. des.
+        { left. eapply rtc_steps_thread_failure; eauto. }
+        { right. esplits.
+          { etrans; eauto. }
+          { eauto. }
+          { auto. }
+        }
+      }
+      { left. splits. red. esplits; eauto.
+        econs 2. econs; eauto.
+      }
     }
-    { eauto. }
+    { destruct th1. destruct state0. inv TRACE.
+      hexploit sim_lift_sol_at_step; eauto.
+      { inv STEP. punfold NOMIX. exploit NOMIX; eauto. i. des.
+        eapply AT in ACCESS; auto.
+      }
+      i. ss. des; subst.
+      { destruct (ThreadEvent.get_machine_event e0) eqn:EVENT.
+        { assert (STEP1: rtc (@Thread.tau_step _) (Thread.mk _ st0 lc0 sc0 mem0) (Thread.mk _ state0 lc1 sc1 mem1)).
+          { econs; [|refl]. econs; eauto. econs; eauto. }
+          hexploit Thread.rtc_tau_step_future; eauto. i. des; ss.
+          hexploit LIFT0; ss.
+          i. hexploit IHSTEPS; eauto.
+          { punfold NOMIX. inv STEP. exploit NOMIX; eauto. i. des. pclearbot. auto. }
+          i. des.
+          { left. eapply rtc_steps_thread_failure; eauto. }
+          { right. esplits.
+            { etrans; eauto. }
+            { replace (Flags.join (Flags.join (SeqEvent.written i) w0) W) with
+                (Flags.join w0 (Flags.join W (SeqEvent.written i))); auto.
+              unfold Flags.join. extensionality loc.
+              destruct (w0 loc), (W loc), (SeqEvent.written i loc); auto.
+            }
+            { auto. }
+          }
+        }
+        { destruct e0; ss. }
+        { left. splits. red. esplits; [refl| |eauto].
+          replace pf with true in STEP0; eauto.
+          inv STEP0; ss. inv STEP1; ss.
+        }
+      }
+    }
   Qed.
 
-  sim_thread_sole
-
-
-  Definition sim_vals_lift
-             (p: Perms.t) (svs_src: ValueMap.t) (svs_tgt: ValueMap.t)
-             (vs_src: Loc.t -> option Const.t) (vs_tgt: Loc.t -> option Const.t): Prop :=
-    forall loc, sim_val_lift (p loc) (svs_src loc) (svs_tgt loc) (vs_src loc) (vs_tgt loc).
-
-  Variant sim_flag_lift
-          (d: Flag.t) (sflag_src: Flag.t) (sflag_tgt: Flag.t)
-          (flag_src: option Time.t) (flag_tgt: option Time.t): Prop :=
-    | sim_flag_lift_intro
-        (TGT: d \/ sflag_tgt -> flag_tgt)
-        (SRC: sflag_src <-> flag_src)
-  .
-
-  Definition sim_flags_lift
-             (d: Flags.t) (sflag_src: Flags.t) (sflag_tgt: Flags.t)
-             (flag_src: Loc.t -> option Time.t) (flag_tgt: Loc.t -> option Time.t): Prop :=
-    forall loc, sim_flag_lift (d loc) (sflag_src loc) (sflag_tgt loc) (flag_src loc) (flag_tgt loc).
-
-  Variant sim_state_lift:
-    forall (w: world)
-           (smem_src: SeqMemory.t) (smem_tgt: SeqMemory.t)
-           (p: Perms.t)
-           (D: Flags.t)
-           (mem_src: Memory.t)
-           (mem_tgt: Memory.t)
-           (lc_src: Local.t)
-           (lc_tgt: Local.t)
-           (sc_src: TimeMap.t)
-           (sc_tgt: TimeMap.t), Prop :=
-    | sim_state_lift_intro
-        svs_src sflag_src svs_tgt sflag_tgt
-        p D f vers flag_src flag_tgt vs_src vs_tgt
-        mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt
-        (SIM: SeqLiftStep.sim_thread f vers flag_src flag_tgt vs_src vs_tgt mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt)
-        (VALS: sim_vals_lift p svs_src svs_tgt vs_src vs_tgt)
-        (FLAGS: sim_flags_lift D sflag_src sflag_tgt flag_src flag_tgt)
-        (WF: Mapping.wfs f)
-        (VERS: versions_wf f vers)
-        (VERSIONED: versioned_memory vers mem_tgt)
-      :
-      sim_state_lift
-        (f, vers, mem_tgt)
-        (SeqMemory.mk svs_src sflag_src) (SeqMemory.mk svs_tgt sflag_tgt)
-        p D
-        mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt
-  .
-
-
-  sim_thread_sole
-
-
-  SeqThread.steps (SeqState.na_step (lang:=lang_src)) tr
-    {| SeqThread.state := st_src0; SeqThread.perm := p0; SeqThread.oracle := o |} th >> /\
-  << SeqThread.writing_trace tr w >> /\ << SeqThread.failure (SeqState.na_step (lang:=lang_src)) th >>
-
-
-  sim_seq_failure_case
-
-  Lemma sim_lift_sole_step:
+  Lemma sim_lift_failure_case:
     forall
-      lang_src st_src0 st_src1
-      p smem_src0 smem_src1
-      (STEPS: rtc (SeqState.na_step p MachineEvent.silent) (SeqState.mk _ st_src0 smem_src0) (SeqState.mk _ st_src1 smem_src1))
-      w D smem_tgt mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt
-      (LIFT: sim_state_lift w smem_src0 smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
-      (CONSISTENT: Local.promise_consistent lc_tgt)
-      (WF_SRC: Local.wf lc_src0 mem_src0)
-      (WF_TGT: Local.wf lc_tgt mem_tgt)
-      (SC_SRC: Memory.closed_timemap sc_src0 mem_src0)
-      (SC_TGT: Memory.closed_timemap sc_tgt mem_tgt)
-      (MEM_SRC: Memory.closed mem_src0)
-      (MEM_TGT: Memory.closed mem_tgt),
-    exists lc_src1 mem_src1 sc_src1,
-      (<<STEPS: rtc (@Thread.tau_step lang_src) (Thread.mk _ st_src0 lc_src0 sc_src0 mem_src0) (Thread.mk _ st_src1 lc_src1 sc_src1 mem_src1)>>) /\
-        (<<LIFT: sim_state_lift w smem_src1 smem_tgt p D mem_src1 mem_tgt lc_src1 lc_tgt sc_src1 sc_tgt>>)
-  .
-  Proof.
-    intros lang_src st_src0 st_src1 p smem_src0 smem_src1 STEPS.
-    remember (SeqState.mk _ st_src0 smem_src0) as th_src0.
-    remember (SeqState.mk _ st_src1 smem_src1) as th_src1.
-    revert st_src0 st_src1 smem_src0 smem_src1 Heqth_src0 Heqth_src1.
-    induction STEPS; i; clarify.
-    { esplits.
-      { refl. }
-      { auto. }
-    }
-    destruct y. hexploit sim_lift_src_na_step; eauto. i. des.
-    hexploit Thread.rtc_tau_step_future; eauto. i. des; ss.
-    hexploit Thread.step_future; eauto. i. des; ss.
-    hexploit LIFT0; eauto.
-    { rewrite MACHINE. ss. }
-    i. hexploit IHSTEPS; eauto. i. des. esplits.
-    { etrans; [eauto|]. econs.
-      { econs; eauto. econs; eauto. }
-      { eauto. }
-    }
-    { eauto. }
-  Qed.
-
-
-
-CertOracle
-
-  Oracle.t
-
-
-sim_seq_na_step_case =
-fun (lang_src lang_tgt : language)
-  (sim_seq : Perms.t -> Flags.t -> SeqState.t lang_src -> SeqState.t lang_tgt -> Prop)
-  (p0 : Perms.t) (d0 : Flags.t) (st_src0 : SeqState.t lang_src) (st_tgt0 : SeqState.t lang_tgt) =>
-forall (st_tgt1 : SeqState.t lang_tgt) (e : MachineEvent.t),
-SeqState.na_step p0 e st_tgt0 st_tgt1 ->
-exists st_src1 st_src2 : SeqState.t lang_src,
-  << rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1 >> /\
-  << SeqState.na_opt_step p0 e st_src1 st_src2 >> /\ << sim_seq p0 d0 st_src2 st_tgt1 >>
-     : forall lang_src lang_tgt : language,
-       (Perms.t -> Flags.t -> SeqState.t lang_src -> SeqState.t lang_tgt -> Prop) ->
-       Perms.t -> Flags.t -> SeqState.t lang_src -> SeqState.t lang_tgt -> Prop
-
-
-
-    sim_seq_normal : sim_seq_terminal_case sim_terminal p0 d0 st_src0 st_tgt0 ->
-                     sim_seq_na_step_case (sim_seq lang_src lang_tgt sim_terminal) p0 d0 st_src0 st_tgt0 ->
-                     sim_seq_at_step_case (sim_seq lang_src lang_tgt sim_terminal) p0 d0 st_src0 st_tgt0 ->
-                     sim_seq_partial_case p0 d0 st_src0 st_tgt0 ->
-                     _sim_seq sim_seq sim_terminal p0 d0 st_src0 st_tgt0
-
-
-  _sim_seq
-
-      (EVENT: ThreadEvent.get_program_event e = pe)
-      (NA: ~ is_atomic_event pe)
-      (LOWER: is_na_write e -> mem_tgt1 = mem_tgt0)
-
-
-
-              (* (<<EVENT: me = MachineEvent.failure ->  *)
-
-        (<<STEP: Local.program_step SeqState.na_local_step p me pe smem_tgt0 smem_tgt1>>) /\
-        (<<LIFT: forall (NORMAL: me <> MachineEvent.failure),
-            sim_state_lift w smem_src smem_tgt1 p D mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src1 sc_tgt1>>)
-  .
-
-    Thread.program_step
-
-
-      (STEP: Local.program_step e lc_tgt0 sc_tgt0 mem_tgt0 lc_tgt1 sc_tgt1 mem_tgt1)
-      (EVENT: ThreadEvent.get_program_event e = pe)
-      (NA: ~ is_atomic_event pe)
-      (LOWER: is_na_write e -> mem_tgt1 = mem_tgt0)
-
-      (CONSISTENT: Local.promise_consistent lc_tgt1)
-      (WF_SRC: Local.wf lc_src0 mem_src0)
-      (WF_TGT: Local.wf lc_tgt0 mem_tgt0)
-      (SC_SRC: Memory.closed_timemap sc_src0 mem_src0)
-      (SC_TGT: Memory.closed_timemap sc_tgt0 mem_tgt0)
-      (MEM_SRC: Memory.closed mem_src0)
-      (MEM_TGT: Memory.closed mem_tgt0)
-      lang_src st_src,
-    exists lc_src1 mem_src1 sc_src1 me smem_tgt1,
-      (<<STEPS: rtc (@Thread.tau_step lang_src) (Thread.mk _ st_src lc_src0 sc_src0 mem_src0) (Thread.mk _ st_src lc_src1 sc_src1 mem_src1)>>) /\
-      (<<STEP: SeqState.na_local_step p me pe smem_tgt0 smem_tgt1>>) /\
-        (<<LIFT: forall (NORMAL: me <> MachineEvent.failure),
-            sim_state_lift w smem_src smem_tgt1 p D mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src1 sc_tgt1>>)
-  .
-  Proof.
-    i. inv STEP; ss.
-    { esplits.
-      { refl. }
-      { econs 1. }
-      { eauto. }
-    }
-    { inv LIFT. destruct ord; ss. hexploit sim_thread_tgt_read_na; eauto.
-      i. des. esplits.
-      { refl. }
-      { econs 2; eauto. i. ss. specialize (VALS loc). inv VALS.
-        { des_ifs. }
-        hexploit VAL; eauto. i. etrans; eauto.
-      }
-      { i. econs; eauto. }
-    }
-    { destruct ord; ss. eapply local_write_step_write_na_step in LOCAL.
-      eapply sim_lift_tgt_na_write_step; eauto.
-    }
-    { esplits.
-      { refl. }
-      { econs 5. red. destruct ordr, ordw; ss; auto. }
-      { ss. }
-    }
-    { esplits.
-      { refl. }
-      { econs 4. }
-      { ss. }
-    }
-    { destruct ord; ss. eapply sim_lift_tgt_na_write_step; eauto. }
-    { inv LIFT. destruct ord; ss. hexploit sim_thread_tgt_read_na_racy; eauto.
-      i. esplits.
-      { refl. }
-      { econs 2; eauto. i. specialize (VALS loc). rewrite H in VALS. inv VALS.
-        rewrite <- H2 in *. ss.
-      }
-      { i. econs; eauto. }
-    }
-    { inv LIFT. destruct ord; ss. hexploit sim_thread_tgt_write_na_racy; eauto.
-      i. esplits.
-      { refl. }
-      { econs 3; eauto. }
-      { i. specialize (VALS loc). rewrite H in VALS. inv VALS.
-        rewrite <- H1 in *. ss.
-      }
-    }
-    { esplits.
-      { refl. }
-      { econs 5. red. destruct ordr, ordw; ss; auto. }
-      { ss. }
-    }
-  Qed.
-
-
-    {
-
-      { i. econs; eauto. }
-
-    }}
-   {
-
-      eauto.
-
-      hexploit sim_thread_tgt_racy_read; eauto.
-      i. des. esplits.
-      { refl. }
-      { econs 2; eauto. i. ss. specialize (VALS loc). inv VALS.
-        { des_ifs. }
-        hexploit VAL; eauto. i. etrans; eauto.
-      }
-      { i. econs; eauto. }
-    }
-
-
-    {
-
-    }
-    {
-
-
-    { destruct ord; ss. hexploit sim_thread_tgt_read_na; eauto.
-      i. des. esplits.
-      { econs 2; eauto. i. ss. specialize (VALS loc). inv VALS.
-        { des_ifs. }
-        hexploit VAL; eauto. i. etrans; eauto.
-      }
-      { econs; eauto. }
-    }
-
-
-
-      esplits.
-
-      esplits; eauto.
-
-      sim_thread_tgt_read_na:
-  forall (f : Mapping.ts) (vers : versions) (flag_src flag_tgt : Loc.t -> option Time.t)
-    (vs_src vs_tgt : Loc.t -> option Const.t) (mem_src mem_tgt : Memory.t) (lc_src lc_tgt0 : Local.t)
-    (sc_src sc_tgt : TimeMap.t) (loc : Loc.t) (to_tgt : Time.t) (val_tgt : Const.t)
-    (vw_tgt : option View.t) (lc_tgt1 : Local.t),
-  Local.read_step lc_tgt0 mem_tgt loc to_tgt val_tgt vw_tgt Ordering.na lc_tgt1 ->
-  SeqLiftStep.sim_thread f vers flag_src flag_tgt vs_src vs_tgt mem_src mem_tgt lc_src lc_tgt0 sc_src sc_tgt ->
-  Local.promise_consistent lc_tgt1 ->
-  Local.wf lc_tgt0 mem_tgt ->
-  Memory.closed mem_tgt ->
-  <<
-  SeqLiftStep.sim_thread f vers flag_src flag_tgt vs_src vs_tgt mem_src mem_tgt lc_src lc_tgt1 sc_src sc_tgt >> /\
-  << forall val : Const.t, vs_tgt loc = Some val -> Const.le val_tgt val >>
-
-
-
-    P
-
-    SeqEvent.t
-      ProgramEvent.t
-
-
-        SeqState.na_local_step p e smem_tgt0 smem_tgt1),
-      (<<FAILURE
-         exists mem
-
-                Thread.program_step
-
-                Local.program_step
-
-
-      :
-
-                                    (Seq.mk
-
-    ,
-      @sim_thread
-        world world_messages_le sim_memory_lift sim_timemap_lift
-        lang_src lang_tgt true w st_src lc_src sc_src mem_src st_tgt lc_tgt sc_tgt mem_tgt.
-  Proof.
-    pcofix CIH. i. inv LIFT. pfold. ii. splits; ss.
-    { admit. }
-    { admit. }
-    { ii. punfold SIM. inv SIM. exploit TERMINAL; eauto. i. ss. des.
-
-
-  Lemma sim_lift_tgt_na_step
-        w p D smem_src smem_tgt mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt
-        (LIFT: sim_state_lift w smem_src smem_tgt p D mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt),
-    @_sim_thread_failure
-      world lang_src lang_tgt w st_src lc_src sc_src mem_src st_tgt lc_tgt sc_tgt mem_tgt.
-  Proof.
-    ii. red in SIM. inv SIM.
-
-    SeqState.t .na_local_step
-
-    | na_local_step_silent
-      m
-    :
-      na_local_step
-        p
-        (MachineEvent.silent) (ProgramEvent.silent)
-        m m
-  | na_local_step_read
-      m
-      loc val ord
-      (ORD: Ordering.le ord Ordering.na)
-      (VAL: Perm.le Perm.high (p loc) -> Const.le val (SeqMemory.read loc m))
-    :
-      na_local_step
-        p
-        (MachineEvent.silent) (ProgramEvent.read loc val ord)
-        m m
-  | na_local_step_write
-      m0 m1 e
-      loc val ord
-      (ORD: Ordering.le ord Ordering.na)
-      (MEM: SeqMemory.write loc val m0 = m1)
-      (PERM: e = if Perm.le Perm.high (p loc) then MachineEvent.silent else MachineEvent.failure)
-    :
-      na_local_step
-        p
-        e (ProgramEvent.write loc val ord)
-        m0 m1
-  | na_local_step_failure
-      m
-    :
-      na_local_step
-        p
-        (MachineEvent.failure) (ProgramEvent.failure)
-        m m
-  | na_local_step_update
-      m
-      loc valr valw ordr ordw
-      (ORD: __guard__(Ordering.le ordr Ordering.na \/ Ordering.le ordw Ordering.na))
-    :
-      na_local_step
-        p
-        (MachineEvent.failure) (ProgramEvent.update loc valr valw ordr ordw)
-        m m
-  .
-
-
-
-  Lemma sim_lift_failure lang_src lang_tgt:
-    forall
-      (st_src: lang_src.(Language.state)) (st_tgt: lang_tgt.(Language.state))
       w p D smem_src smem_tgt mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt
-      (SIM: sim_seq_failure_case p (SeqState.mk _ st_src smem_src))
-      (LIFT: sim_state_lift w smem_src smem_tgt p D mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt),
-      @_sim_thread_failure
-        world lang_src lang_tgt w st_src lc_src sc_src mem_src st_tgt lc_tgt sc_tgt mem_tgt.
+      lang st
+      (LIFT: sim_state_lift w smem_src smem_tgt p D mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt)
+      (FAILURE: sim_seq_failure_case p (SeqState.mk _ st smem_src))
+      (NOMIX: nomix _ st)
+      (CONSISTENT: Local.promise_consistent lc_tgt)
+      (WF_SRC: Local.wf lc_src mem_src)
+      (WF_TGT: Local.wf lc_tgt mem_tgt)
+      (SC_SRC: Memory.closed_timemap sc_src mem_src)
+      (SC_TGT: Memory.closed_timemap sc_tgt mem_tgt)
+      (MEM_SRC: Memory.closed mem_src)
+      (MEM_TGT: Memory.closed mem_tgt),
+      (<<FAILURE: Thread.steps_failure (Thread.mk lang st lc_src sc_src mem_src)>>).
   Proof.
-    ii. red in SIM. inv SIM.
+    i. hexploit sim_lift_sim_lift_sol; eauto.
+    { instantiate (1:=false). ss. }
+    i. des.
+    eapply rtc_steps_thread_failure; eauto.
+    hexploit Thread.rtc_tau_step_future; eauto. i. des; ss.
+    exploit FAILURE; eauto. i. des.
+    destruct th. destruct state0.
+    hexploit sim_lift_sol_steps; eauto. i. des; eauto.
+    inv FAILURE0. des. inv H. inv STEP.
+    hexploit Thread.rtc_tau_step_future; eauto. i. des; ss.
+    hexploit sim_lift_sol_na_local_step; eauto.
+    { punfold NOMIX0. exploit NOMIX0; eauto. i. des. eapply NA; eauto.
+      inv LOCAL; ss.
+      { destruct ord; ss. }
+      { red in ORD. destruct ordr, ordw; des; ss. }
+    }
+    i. des.
+    { eapply rtc_steps_thread_failure; eauto.
+      red. esplits; eauto. econs 2. econs; eauto.
+      rewrite EVENT. eauto.
+    }
+    { eapply rtc_steps_thread_failure; eauto.
+      red. esplits; eauto. econs 2. econs; eauto.
+      rewrite EVENT. eauto.
+    }
+  Qed.
 
-
-    Variant
-_sim_seq
-    (sim_seq : forall lang_src lang_tgt : language,
-               (Language.state lang_src -> Language.state lang_tgt -> Prop) ->
-               Perms.t ->
-               Flags.t -> SeqState.t lang_src -> SeqState.t lang_tgt -> Prop)
-(lang_src lang_tgt : language)
-(sim_terminal : Language.state lang_src -> Language.state lang_tgt -> Prop)
-(p0 : Perms.t) (d0 : Flags.t) (st_src0 : SeqState.t lang_src)
-(st_tgt0 : SeqState.t lang_tgt) : Prop :=
-    sim_seq_normal : sim_seq_terminal_case sim_terminal p0 d0 st_src0 st_tgt0 ->
-                     sim_seq_na_step_case
-                       (sim_seq lang_src lang_tgt sim_terminal) p0 d0 st_src0
-                       st_tgt0 ->
-                     sim_seq_at_step_case
-                       (sim_seq lang_src lang_tgt sim_terminal) p0 d0 st_src0
-                       st_tgt0 ->
-                     sim_seq_partial_case p0 d0 st_src0 st_tgt0 ->
-                     _sim_seq sim_seq sim_terminal p0 d0 st_src0 st_tgt0
-  | sim_seq_failure : sim_seq_failure_case p0 st_src0 ->
-                      _sim_seq sim_seq sim_terminal p0 d0 st_src0 st_tgt0
-
-
-  Lema
+  Lemma sim_lift_partial_case:
+    forall
+      w p D smem_src smem_tgt mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt
+      lang_src lang_tgt
+      (st_src0: lang_src.(Language.state)) (st_tgt: lang_tgt.(Language.state))
+      (LIFT: sim_state_lift w smem_src smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
+      (PARTIAL: sim_seq_partial_case p D (SeqState.mk _ st_src0 smem_src) (SeqState.mk _ st_tgt smem_tgt))
+      (BOT: lc_tgt.(Local.promises) = Memory.bot)
+      (NOMIX: nomix _ st_src0)
+      (CONSISTENT: Local.promise_consistent lc_tgt)
+      (WF_SRC: Local.wf lc_src0 mem_src0)
+      (WF_TGT: Local.wf lc_tgt mem_tgt)
+      (SC_SRC: Memory.closed_timemap sc_src0 mem_src0)
+      (SC_TGT: Memory.closed_timemap sc_tgt mem_tgt)
+      (MEM_SRC: Memory.closed mem_src0)
+      (MEM_TGT: Memory.closed mem_tgt),
+    exists st_src1 lc_src1 sc_src1 mem_src1,
+      (<<STEPS: rtc (@Thread.tau_step lang_src)
+                    (Thread.mk _ st_src0 lc_src0 sc_src0 mem_src0)
+                    (Thread.mk _ st_src1 lc_src1 sc_src1 mem_src1)>>) /\
+        ((<<FAILURE: Thread.steps_failure (Thread.mk _ st_src1 lc_src1 sc_src1 mem_src1)>>) \/
+           (<<BOT: lc_src1.(Local.promises) = Memory.bot>>)).
+  Proof.
+    i. hexploit sim_lift_sim_lift_sol; eauto.
+    i. des.
+    hexploit Thread.rtc_tau_step_future; eauto. i. des; ss.
+    exploit PARTIAL; eauto. i.
+    destruct x as [?th [?tr [?w [STEPS0 [WRITING FINAL]]]]].
+    guardH FINAL. destruct th. destruct state0. des.
+    hexploit sim_lift_sol_steps; eauto. i. des; eauto.
+    { esplits; eauto. } esplits.
+    { etrans; eauto. }
+    hexploit Thread.rtc_tau_step_future; eauto. i. des; ss.
+    red in FINAL. des.
+    { right. inv LIFT1. eapply sim_thread_none; eauto.
+      i. hexploit (FLAG loc). i. inv H.
+      specialize (FLAGS loc). unfold Flags.join in *.
+      destruct (d loc); auto. exfalso. eapply WRITTEN; auto.
+      ss. rewrite DEBT in FLAGS; auto.
+      destruct (w0 loc), (flag loc), (SeqMemory.flags smem_src loc); ss.
+    }
+    { left. inv FAILURE. des. inv H. inv STEP.
+      hexploit sim_lift_sol_na_local_step; eauto.
+      { punfold NOMIX0. exploit NOMIX0; eauto. i. des. eapply NA; eauto.
+        inv LOCAL; ss.
+        { destruct ord; ss. }
+        { red in ORD. destruct ordr, ordw; des; ss. }
+      }
+      i. des.
+      { eapply rtc_steps_thread_failure; eauto.
+        red. esplits; eauto. econs 2. econs; eauto.
+        rewrite EVENT. eauto.
+      }
+      { eapply rtc_steps_thread_failure; eauto.
+        red. esplits; eauto. econs 2. econs; eauto.
+        rewrite EVENT. eauto.
+      }
+    }
+  Qed.
 
   Lemma sim_lift lang_src lang_tgt sim_terminal:
     forall
@@ -1598,34 +1320,5 @@ _sim_seq
         world world_messages_le sim_memory_lift sim_timemap_lift
         lang_src lang_tgt true w st_src lc_src sc_src mem_src st_tgt lc_tgt sc_tgt mem_tgt.
   Proof.
-    pcofix CIH. i. inv LIFT. pfold. ii. splits; ss.
-    { admit. }
-    { admit. }
-    { ii. punfold SIM. inv SIM. exploit TERMINAL; eauto. i. ss. des.
-
-    econs.
-
-    punfold SIM.
-
-
-    rever
-
-    punfold SIM.
-
-
-      Local.init TimeMap.bot Memory.init st_tgt Local.init TimeMap.bot Memory.init (JConfiguration.init_views, initial_finalized).
-  Proof.
-
-
-  Lemma sim_lift_gsim lang_src lang_tgt sim_terminal
-        (st_src: lang_src.(Language.state)) (st_tgt: lang_tgt.(Language.state))
-        (SIM: @simo_seq_all _ _ sim_terminal st_src st_tgt)
-    :
-    @sim_thread
-      world world_messages_le sim_memory sim_timemap sim_local
-      lang_src lang_tgt sim_terminal false world_bot st_src Local.init TimeMap.bot Memory.init st_tgt Local.init TimeMap.bot Memory.init (JConfiguration.init_views, initial_finalized).
-  Proof.
-
-
   Admitted.
 End LIFT.
