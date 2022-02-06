@@ -2079,15 +2079,6 @@ Require Import Memory.
 Require Import Cell.
 Require Import Time.
 
-Lemma memory_init_get loc to from msg
-      (GET: Memory.get loc to Memory.init = Some (from, msg))
-  :
-    to = Time.bot /\ from = Time.bot /\ msg = Message.elt.
-Proof.
-  unfold Memory.get, Memory.init in *.
-  erewrite Cell.init_get in GET. des_ifs.
-Qed.
-
 Theorem seq_adequacy progs_src progs_tgt
         (TIDS: Threads.tids (Threads.init progs_src) = Threads.tids (Threads.init progs_tgt))
         (SEQREFINED: forall tid,
