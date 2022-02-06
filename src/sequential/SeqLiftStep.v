@@ -3968,9 +3968,9 @@ Lemma sim_thread_update_step_normal
               (<<VALLE: Const.le val_tgt val_src>>) /\
               (<<ORD: Ordering.le Ordering.acqrel ordr>>))>>) /\
       (<<UPDATED:
-        ((<<SRC: vs_src1 loc = Some valw_src>>) /\ (<<TGT: vs_tgt1 loc = Some valw_tgt>>)) \/
+        __guard__(((<<SRC: vs_src1 loc = Some valw_src>>) /\ (<<TGT: vs_tgt1 loc = Some valw_tgt>>)) \/
         ((<<SRCNONE0: vs_src0 loc = None>>) /\ (<<TGTNONE0: vs_tgt0 loc = None>>) /\
-         (<<SRCNONE1: vs_src1 loc = None>>) /\ (<<TGTNONE0: vs_tgt1 loc = None>>))>>).
+         (<<SRCNONE1: vs_src1 loc = None>>) /\ (<<TGTNONE0: vs_tgt1 loc = None>>)))>>).
 Proof.
   hexploit Local.read_step_future; eauto. i. des.
   hexploit Local.write_step_future; eauto. i. des. ss.
@@ -3991,7 +3991,7 @@ Proof.
       { rewrite TGT. auto. }
     }
   }
-  { specialize (VALS loc). specialize (VALS0 loc).
+  { red. specialize (VALS loc). specialize (VALS0 loc).
     des; ss; auto. right. splits; auto.
     { rewrite <- SRC. auto. }
     { rewrite <- TGT. auto. }
@@ -4136,9 +4136,9 @@ Lemma sim_thread_update_step_release
               (<<VALLE: Const.le val_tgt val_src>>) /\
               (<<ORD: Ordering.le Ordering.acqrel ordr>>))>>) /\
       (<<UPDATED:
-        ((<<SRC: vs_src1 loc = Some valw_src>>) /\ (<<TGT: vs_tgt1 loc = Some valw_tgt>>)) \/
+        __guard__(((<<SRC: vs_src1 loc = Some valw_src>>) /\ (<<TGT: vs_tgt1 loc = Some valw_tgt>>)) \/
         ((<<SRCNONE0: vs_src0 loc = None>>) /\ (<<TGTNONE0: vs_tgt0 loc = None>>) /\
-           (<<SRCNONE1: vs_src1 loc = None>>) /\ (<<TGTNONE0: vs_tgt1 loc = None>>))>>) /\
+           (<<SRCNONE1: vs_src1 loc = None>>) /\ (<<TGTNONE0: vs_tgt1 loc = None>>)))>>) /\
       (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = None>>)>>) /\
       (<<MAPFUTURE: map_future_memory f0 f1 mem_src2>>)
 .
@@ -4203,7 +4203,7 @@ Proof.
       { rewrite TGT. auto. }
     }
   }
-  { specialize (VALS loc). specialize (VALS0 loc).
+  { red. specialize (VALS loc). specialize (VALS0 loc).
     des; ss; auto. right. splits; auto.
     { rewrite <- SRC. auto. }
     { rewrite <- TGT. auto. }
