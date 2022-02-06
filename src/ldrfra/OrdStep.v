@@ -67,8 +67,9 @@ Module OrdLocal.
       write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 msgs kinds kind
     | write_na_step_at
         released ord' kind
+        (LOC: L loc)
         (NA: Ordering.le ord Ordering.na)
-        (ORD: ord' = if L loc then Ordering.join ord ordcw else ord)
+        (ORD: ord' = Ordering.join ord ordcw)
         (STEP: Local.write_step lc1 sc1 mem1 loc from to val None released ord' lc2 sc2 mem2 kind):
       write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 [] [] kind
     .
@@ -278,6 +279,26 @@ Module OrdLocal.
         (LOC: L loc)
         (GET: Memory.get loc to promises = Some (from, msg)),
         msg = Message.reserve.
+
+    Lemma promise_reserve_only
+          promises1 mem1 loc from to msg promises2 mem2 kind
+          (PROMISES1: reserve_only promises1)
+          (LOC: L loc -> msg = Message.reserve)
+          (PROMISE: Memory.promise promises1 mem1 loc from to msg promises2 mem2 kind):
+      reserve_only promises2.
+    Proof.
+      ii. revert GET. inv PROMISE; ss.
+      - erewrite Memory.add_o; eauto. condtac; ss; eauto.
+        i. des. clarify. eauto.
+      - erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
+        + i. des. clarify. eauto.
+        + guardH o. i. des. clarify.
+          exploit Memory.split_get0; try exact PROMISES. i. des.
+          exploit PROMISES1; eauto.
+      - erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+        i. des. clarify. eauto.
+      - erewrite Memory.remove_o; eauto. condtac; ss; eauto.
+    Qed.
 
     Lemma write_reserve_only
           promises1 mem1 loc from to msg promises2 mem2 kind

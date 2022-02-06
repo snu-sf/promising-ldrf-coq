@@ -32,7 +32,7 @@ Require Import LocalDRFPFView.
 Require Import OrdStep.
 Require Import Stable.
 Require Import RAStep.
-Require Import PFtoRASimThread.
+Require Import APFtoRASim.
 Require Import PFtoRA.
 
 Set Implicit Arguments.

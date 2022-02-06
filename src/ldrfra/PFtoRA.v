@@ -32,7 +32,7 @@ Require Import PFStep.
 Require Import OrdStep.
 Require Import RAStep.
 Require Import Stable.
-Require Import PFtoRASimThread.
+Require Import APFtoRASim.
 Require Import PFtoRAThread.
 
 Set Implicit Arguments.
@@ -302,7 +302,7 @@ Module PFtoRA.
           (<<STEP_J: JConfiguration.single_step e_j tid c1_j c2_j views1 views2>>) /\
           (<<STEP_RA: RAConfiguration.step L e_ra tid rels1 rels2 c1_ra c2_ra>>) /\
           (<<EVENT_J: JSim.sim_event e_j e_pf>>) /\
-          (<<EVENT_RA: PFtoRASimThread.sim_event e_ra e_j>>) /\
+          (<<EVENT_RA: APFtoRASim.sim_event e_ra e_j>>) /\
           (<<SIM2: sim_conf views2 rels2 c2_pf c2_j c2_ra>>)) \/
       (<<RACE: RARaceW.ra_race_steps L rels1 c1_ra>>).
     Proof.
@@ -516,7 +516,7 @@ Module PFtoRA.
       i. unfold RARaceW.ra_race_steps. des; cycle 1.
       { esplits; [econs 1|..]; eauto. s.
         eapply RAThread.tau_steps_steps; eapply RAThread.cancel_steps_tau_steps; eauto. }
-      hexploit PFtoRASimThread.sim_local_promise_consistent; try eapply SIM2.
+      hexploit APFtoRASim.sim_local_promise_consistent; try eapply SIM2.
       { inv SIM2. inv SIM_JOINED.
         apply inj_pair2 in H2. apply inj_pair2 in  H3. subst. ss.
         eapply JSim.sim_local_promise_consistent; eauto.

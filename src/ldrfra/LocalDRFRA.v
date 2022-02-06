@@ -33,7 +33,7 @@ Require Import OrdStep.
 Require Import Stable.
 Require Import RAStep.
 Require Import RARace.
-Require Import PFtoRASimThread.
+Require Import APFtoRASim.
 Require Import PFtoRA.
 
 Set Implicit Arguments.

@@ -35,8 +35,8 @@ Require Import Stable.
 Set Implicit Arguments.
 
 
-Module PFtoAPFSimThread.
-  Section PFtoAPFSimThread.
+Module PFtoAPFSim.
+  Section PFtoAPFSim.
     Variable lang: language.
     Variable L: Loc.t -> bool.
 
@@ -58,6 +58,10 @@ Module PFtoAPFSimThread.
               (<<LT: Time.lt ts to'>>) /\
               (<<ORD: Ordering.le ord Ordering.na>>) /\
               (<<GET_SRC: Memory.get loc to' mem_src = Some (from', Message.concrete val None)>>))
+        (UNDEF: forall loc from to msg
+                  (LOC: L loc)
+                  (GET: Memory.get loc to mem_src = Some (from, msg)),
+            msg <> Message.undef)
     .
     Hint Constructors sim_memory.
 
@@ -160,6 +164,7 @@ Module PFtoAPFSimThread.
           promises1 mem1_tgt loc from to msg promises2 mem2_tgt kind
           (MEM1: sim_memory rels mem1_src mem1_tgt)
           (LE1_SRC: Memory.le promises1 mem1_src)
+          (MSG: L loc -> msg <> Message.undef)
           (PROMISE_TGT: Memory.promise promises1 mem1_tgt loc from to msg promises2 mem2_tgt kind):
       exists mem2_src,
         <<PROMISE_SRC: Memory.promise promises1 mem1_src loc from to msg promises2 mem2_src kind>> /\
@@ -245,11 +250,13 @@ Module PFtoAPFSimThread.
             * exploit Memory.add_get1; try exact GET_SRC; eauto.
             * exploit Memory.add_get1; try exact GET_SRC; eauto. i.
               right. esplits; try exact x1; eauto.
+        - revert GET. erewrite Memory.add_o; eauto. condtac; ss; eauto.
+          i. des. clarify. eauto.
       }
 
       { (* split *)
         exploit Memory.split_exists_le; try exact LE1_SRC; eauto. i. des.
-        esplits; eauto. econs; ii.
+        esplits; eauto. econs; i.
         - apply Cell.ext. i.
           replace (Cell.get ts (mem2 loc0)) with (Memory.get loc0 ts mem2) by ss.
           replace (Cell.get ts (mem2_tgt loc0)) with (Memory.get loc0 ts mem2_tgt) by ss.
@@ -272,11 +279,16 @@ Module PFtoAPFSimThread.
             * left. erewrite Memory.split_o; eauto. repeat condtac; ss; congr.
             * exploit Memory.split_get1; try exact GET_SRC; eauto. i. des.
               right. esplits; eauto.
+        - revert GET. erewrite Memory.split_o; eauto. repeat condtac; ss; eauto.
+          + i. des. clarify. eauto.
+          + guardH o. ii. des. clarify.
+            exploit Memory.split_get0; try exact x0. i. des.
+            eapply UNDEF; eauto.
       }
 
       { (* lower *)
         exploit Memory.lower_exists_le; try exact LE1_SRC; eauto. i. des.
-        esplits; eauto. econs; ii.
+        esplits; eauto. econs; i.
         - apply Cell.ext. i.
           replace (Cell.get ts (mem2 loc0)) with (Memory.get loc0 ts mem2) by ss.
           replace (Cell.get ts (mem2_tgt loc0)) with (Memory.get loc0 ts mem2_tgt) by ss.
@@ -297,11 +309,13 @@ Module PFtoAPFSimThread.
             * exploit Memory.lower_get1; try exact GET_SRC; eauto. i. des.
               inv MSG_LE. inv RELEASED.
               right. esplits; eauto.
+        - revert GET. erewrite Memory.lower_o; eauto. condtac; ss; eauto.
+          i. des. clarify. eauto.
       }
 
       { (* remove *)
         exploit Memory.remove_exists_le; try exact LE1_SRC; eauto. i. des.
-        esplits; eauto. econs; ii.
+        esplits; eauto. econs; i.
         - apply Cell.ext. i.
           replace (Cell.get ts (mem2 loc0)) with (Memory.get loc0 ts mem2) by ss.
           replace (Cell.get ts (mem2_tgt loc0)) with (Memory.get loc0 ts mem2_tgt) by ss.
@@ -320,6 +334,7 @@ Module PFtoAPFSimThread.
           + exploit Memory.remove_get1; try exact GET_SRC; eauto. i. des.
             { subst. exploit Memory.remove_get0; try exact x0. i. des. congr. }
             right. esplits; eauto.
+        - revert GET. erewrite Memory.remove_o; eauto. condtac; ss; eauto.
       }
     Qed.
 
@@ -328,6 +343,7 @@ Module PFtoAPFSimThread.
           promises1 mem1_tgt loc from to msg promises2 mem2_tgt kind
           (MEM1: sim_memory rels mem1_src mem1_tgt)
           (LE1_SRC: Memory.le promises1 mem1_src)
+          (MSG: L loc -> msg <> Message.undef)
           (WRITE_TGT: Memory.write promises1 mem1_tgt loc from to msg promises2 mem2_tgt kind):
       exists mem2_src,
         <<WRITE_SRC: Memory.write promises1 mem1_src loc from to msg promises2 mem2_src kind>> /\
@@ -431,7 +447,7 @@ Module PFtoAPFSimThread.
       revert ts mem1_tgt promises2 mem2_tgt kinds MEM1 WRITE_TGT.
       induction msgs as [|[to' msg'] msgs]; i.
       { inv WRITE_TGT.
-        exploit write; eauto. i. des.
+        exploit write; eauto; ss. i. des.
         esplits; eauto using sim_memory_cons.
       }
       inv WRITE_TGT.
@@ -455,6 +471,7 @@ Module PFtoAPFSimThread.
         exploit Memory.write_get2; try exact WRITE_SRC. i. des.
         right. esplits; eauto.
         eapply TimeFacts.le_lt_lt; eauto.
+      - exploit Memory.write_get_inv; try exact GET; eauto.
     Qed.
 
     Lemma promise_step
@@ -466,7 +483,8 @@ Module PFtoAPFSimThread.
           (STEP_TGT: Local.promise_step lc1_tgt mem1_tgt loc from to msg lc2_tgt mem2_tgt kind)
           (MSG1: forall promises2_src mem2_src
                    (PROMISE: Memory.promise (Local.promises lc1_src) mem1_src loc from to msg promises2_src mem2_src kind),
-              Memory.closed_message msg mem2_src):
+              Memory.closed_message msg mem2_src)
+          (MSG2: L loc -> msg <> Message.undef):
       exists lc2_src mem2_src,
         (<<STEP_SRC: Local.promise_step lc1_src mem1_src loc from to msg lc2_src mem2_src kind>>) /\
         (<<LC2: lc2_src = lc2_tgt>>) /\
@@ -548,7 +566,7 @@ Module PFtoAPFSimThread.
         (<<MEM2: sim_memory rels mem2_src mem2_tgt>>).
     Proof.
       inv STEP_TGT.
-      exploit write; try exact MEM1; eauto; try apply WF1_SRC. i. des.
+      exploit write; try exact MEM1; eauto; try apply WF1_SRC; ss. i. des.
       esplits; eauto.
       econs; eauto. econs; eauto; try (condtac; ss).
       - unfold TView.write_released.
@@ -619,24 +637,34 @@ Module PFtoAPFSimThread.
           lc1_tgt mem1_tgt loc ord
           (LC1: lc1_src = lc1_tgt)
           (MEM1: sim_memory rels mem1_src mem1_tgt)
+          (WRITES1: Writes.wf L rels mem1_src)
           (NORMAL_TVIEW1: Normal.normal_tview L (Local.tview lc1_src))
           (STEP_TGT: Local.is_racy lc1_tgt mem1_tgt loc ord):
+      (<<LOC: ~ L loc>>) /\
       (<<STEP_SRC: Local.is_racy lc1_src mem1_src loc ord>>) \/
-      (exists to ordw,
-          (<<LOC: L loc>>) /\
-          (<<HIGHER: Time.lt (View.rlx (TView.cur (Local.tview lc1_src)) loc) to>>) /\
-          (<<IN: List.In (loc, to, ordw) rels>>) /\
-          (<<ORD: Ordering.le ordw Ordering.na>>)).
+      __guard__ (
+          exists to ordw,
+            (<<LOC: L loc>>) /\
+            (<<HIGHER: Time.lt (View.rlx (TView.cur (Local.tview lc1_src)) loc) to>>) /\
+            (<<IN: List.In (loc, to, ordw) rels>>) /\
+            ((<<ORDW: Ordering.le ordw Ordering.na>>) \/
+             (<<ORD: Ordering.le ord Ordering.na>>))).
     Proof.
       inv MEM1. inv STEP_TGT.
-      destruct (classic (Memory.get loc to mem1_src = Some (from, msg))) eqn:GET_SRC; eauto.
       destruct (L loc) eqn:LOC; cycle 1.
-      { unfold Memory.get in GET. rewrite <- EQ in *; ss. rewrite LOC. ss. }
+      { unfold Memory.get in GET. rewrite <- EQ in *; try congr.
+        left. splits; eauto.
+      }
+      right. unguard.
+      inv NORMAL_TVIEW1. rewrite CUR; try congr.
       exploit COMPLETE; eauto.
       { econs. eauto. }
-      i. des; eauto.
-      right. esplits; eauto.
-      inv NORMAL_TVIEW1. rewrite CUR; ss.
+      i. des.
+      - hexploit UNDEF; eauto. i. destruct msg; ss.
+        inv WRITES1. exploit COMPLETE0; eauto. i. des.
+        esplits; eauto.
+        destruct ord; eauto; exploit MSG2; ss.
+      - esplits; eauto.
     Qed.
 
     Lemma racy_read_step
@@ -644,16 +672,18 @@ Module PFtoAPFSimThread.
           lc1_tgt mem1_tgt loc val ord
           (LC1: lc1_src = lc1_tgt)
           (MEM1: sim_memory rels mem1_src mem1_tgt)
+          (WRITES1: Writes.wf L rels mem1_src)
           (NORMAL_TVIEW1: Normal.normal_tview L (Local.tview lc1_src))
           (STEP_TGT: Local.racy_read_step lc1_tgt mem1_tgt loc val ord):
+      (<<LOC: ~ L loc>>) /\
       (<<STEP_SRC: OrdLocal.racy_read_step L Ordering.na lc1_src mem1_src loc val ord>>) \/
       (<<RACE: RARaceW.wr_race L rels (Local.tview lc1_src) loc ord>>).
     Proof.
       inv STEP_TGT.
       exploit is_racy; eauto. i. des.
-      - left. econs; eauto. rewrite ordc_na; ss.
+      - left. splits; ss. econs; eauto. rewrite ordc_na; ss.
       - right. unfold RARaceW.wr_race.
-        esplits; eauto.
+        unguard; des; esplits; eauto.
     Qed.
 
     Lemma racy_write_step
@@ -664,22 +694,15 @@ Module PFtoAPFSimThread.
           (WRITES1: Writes.wf L rels mem1_src)
           (NORMAL_TVIEW1: Normal.normal_tview L (Local.tview lc1_src))
           (STEP_TGT: Local.racy_write_step lc1_tgt mem1_tgt loc ord):
+      (<<LOC: ~ L loc>>) /\
       (<<STEP_SRC: OrdLocal.racy_write_step L Ordering.plain lc1_src mem1_src loc ord>>) \/
       (<<RACE: RARaceW.ww_race L rels (Local.tview lc1_src) loc ord>>).
     Proof.
       inv STEP_TGT.
       exploit is_racy; eauto. i. des.
-      - destruct (L loc) eqn:LOC; cycle 1.
-        { left. econs; eauto. rewrite LOC. eauto. }
-        inv STEP_SRC. destruct msg; ss.
-        + inv WRITES1. exploit COMPLETE; eauto. i. des.
-          right. unfold RARaceW.ww_race.
-          inv NORMAL_TVIEW1. rewrite CUR; ss.
-          esplits; eauto. right.
-          destruct ord; ss; exploit MSG2; ss.
-        + left. econs; eauto.
+      - left. splits; ss. econs; eauto. condtac; ss.
       - right. unfold RARaceW.ww_race.
-        esplits; eauto.
+        unguard. des; esplits; eauto.
     Qed.
 
     Lemma racy_update_step
@@ -687,15 +710,18 @@ Module PFtoAPFSimThread.
           lc1_tgt mem1_tgt loc ordr ordw
           (LC1: lc1_src = lc1_tgt)
           (MEM1: sim_memory rels mem1_src mem1_tgt)
+          (WRITES1: Writes.wf L rels mem1_src)
           (NORMAL_TVIEW1: Normal.normal_tview L (Local.tview lc1_src))
           (STEP_TGT: Local.racy_update_step lc1_tgt mem1_tgt loc ordr ordw):
+      ((<<LOC: ~ L loc>>) \/ (<<ORDR: Ordering.le ordr Ordering.na>>) \/ (<<ORDW: Ordering.le ordw Ordering.na>>)) /\
       (<<STEP_SRC: Local.racy_update_step lc1_src mem1_src loc ordr ordw>>) \/
-      (<<RACE: RARaceW.ww_race L rels (Local.tview lc1_src) loc ordw>>).
+      (<<RACE: RARaceW.wr_race L rels (Local.tview lc1_src) loc ordr>>).
     Proof.
-      inv STEP_TGT; eauto.
-      exploit is_racy; eauto. i. des; eauto.
-      right. unfold RARaceW.ww_race.
-      esplits; eauto.
+      inv STEP_TGT; try by left; splits; eauto.
+      exploit is_racy; eauto. i. des.
+      - left. eauto.
+      - right. unfold RARaceW.wr_race.
+        unguard. des; esplits; eauto.
     Qed.
 
     Variant sim_event: forall (e_src e_tgt: ThreadEvent.t), Prop :=
@@ -762,6 +788,11 @@ Module PFtoAPFSimThread.
           (<<STEP_SRC: OrdLocal.program_step L Ordering.na Ordering.plain 
                                              e_src lc1_src sc1_src mem1_src lc2_src sc2_src mem2_src>>) /\
           (<<EVENT: sim_event e_src e_tgt>>) /\
+          (<<RACY_READ: forall loc val ord (EVENT: e_tgt = ThreadEvent.racy_read loc val ord), ~ L loc>>) /\
+          (<<RACY_WRITE: forall loc val ord (EVENT: e_tgt = ThreadEvent.racy_write loc val ord), ~ L loc>>) /\
+          (<<RACY_UPDATE: forall loc valr valw ordr ordw
+                            (EVENT: e_tgt = ThreadEvent.racy_update loc valr valw ordr ordw),
+              ~ L loc \/ Ordering.le ordr Ordering.na \/ Ordering.le ordw Ordering.na>>) /\
           (<<LC2: lc2_src = lc2_tgt>>) /\
           (<<SC2: sc2_src = sc2_tgt>>) /\
           (<<MEM2: sim_memory (Writes.append L e_src rels) mem2_src mem2_tgt>>) /\
@@ -770,14 +801,14 @@ Module PFtoAPFSimThread.
       (<<RACE: RARaceW.ra_race L rels (Local.tview lc1_src) (ThreadEvent.get_program_event e_tgt)>>).
     Proof.
       inv STEP_TGT.
-      - left. esplits; eauto. econs.
+      - left. esplits; eauto; ss. econs.
       - exploit read_step; eauto. i. des.
-        + left. esplits; eauto. econs. ss.
+        + left. esplits; eauto; ss. econs. ss.
         + right. left. ss. esplits; eauto.
       - exploit write_step; eauto. i. des.
         dup STEP_SRC. inv STEP_SRC0.
         exploit Normal.write_step; try exact STEP; eauto; ss. i. des.
-        left. esplits; [econs 3|..]; eauto.
+        left. esplits; [econs 3|..]; eauto; ss.
         eapply sim_memory_append; eauto.
       - exploit read_step; eauto. i. des; cycle 1.
         { right. left. esplits; ss; eauto. }
@@ -788,33 +819,115 @@ Module PFtoAPFSimThread.
         exploit Normal.write_step; try exact STEP0; eauto.
         { inv STEP. destruct releasedr; ss. eauto. }
         i. des.
-        left. esplits; [econs 4|..]; eauto.
+        left. esplits; [econs 4|..]; eauto; ss.
         eapply sim_memory_append; eauto.
-      - left. esplits; [econs 5|..]; eauto.
+      - left. esplits; [econs 5|..]; eauto; ss.
         exploit Normal.fence_step; eauto.
-      - left. esplits; [econs 6|..]; eauto.
+      - left. esplits; [econs 6|..]; eauto; ss.
         exploit Normal.fence_step; eauto.
-      - left. esplits; [econs 7|..]; eauto.
+      - left. esplits; [econs 7|..]; eauto; ss.
       - destruct (L loc) eqn:LOC.
         + exploit write_na_step_loc; try exact LOCAL; eauto. i. des.
           exploit (@Normal.ord_program_step L Ordering.na Ordering.plain);
             try econs 8; eauto; ss. i. des.
-          left. esplits; [econs 8|..]; eauto.
+          left. esplits; [econs 8|..]; eauto; ss.
           unfold Writes.append. ss. condtac; ss.
         + exploit write_na_step_other; try exact LOCAL; eauto; try congr. i. des.
           exploit Normal.write_na_step; try exact STEP_SRC; eauto. i. des.
-          left. esplits; [econs 8| | | |M| |]; eauto.
+          left. esplits; [econs 8| | | |M|..]; eauto; ss.
           * econs; eauto. condtac; ss. eauto.
           * unfold Writes.append. ss. condtac; ss.
       - exploit racy_read_step; try exact LOCAL; eauto. i. des.
-        + left. esplits; [econs 9|..]; eauto.
+        + left. esplits; [econs 9|..]; eauto; ss. i. clarify.
         + right. left. esplits; ss; eauto.
       - exploit racy_write_step; try exact LOCAL; eauto. i. des.
-        + left. esplits; [econs 10|..]; eauto.
+        + left. esplits; [econs 10|..]; eauto; ss. i. clarify.
         + right. right. esplits; ss; eauto.
-      - exploit racy_update_step; try exact LOCAL; eauto. i. des.
-        + left. esplits; [econs 11|..]; eauto.
+      - exploit racy_update_step; try exact LOCAL; eauto. i. inv x0.
+        + left. esplits; [econs 11|..]; eauto; ss.
+          * des; eauto.
+          * i. clarify. des; eauto.
+        + right. left. esplits; ss; eauto.
+    Qed.
+
+    Lemma thread_step
+          rels lc1_src sc1_src mem1_src
+          e_tgt lc1_tgt sc1_tgt mem1_tgt lc2_tgt sc2_tgt mem2_tgt
+          (LC1: lc1_src = lc1_tgt)
+          (SC1: sc1_src = sc1_tgt)
+          (MEM1: sim_memory rels mem1_src mem1_tgt)
+          (WRITES1: Writes.wf L rels mem1_src)
+          (RESERVE_ONLY1: OrdLocal.reserve_only L (Local.promises lc1_src))
+          (NORMAL_TVIEW1: Normal.normal_tview L (Local.tview lc1_src))
+          (NORMAL_MEM1: Normal.normal_memory L mem1_src)
+          (WF1_SRC: Local.wf lc1_src mem1_src)
+          (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
+          (MEM1_SRC: Memory.closed mem1_src)
+          (STEP_TGT: Local.program_step e_tgt lc1_tgt sc1_tgt mem1_tgt lc2_tgt sc2_tgt mem2_tgt):
+      (exists e_src lc2_src sc2_src mem2_src,
+          (<<STEP_SRC: OrdLocal.program_step L Ordering.na Ordering.plain 
+                                             e_src lc1_src sc1_src mem1_src lc2_src sc2_src mem2_src>>) /\
+          (<<EVENT: sim_event e_src e_tgt>>) /\
+          (<<RACY_READ: forall loc val ord (EVENT: e_tgt = ThreadEvent.racy_read loc val ord), ~ L loc>>) /\
+          (<<RACY_WRITE: forall loc val ord (EVENT: e_tgt = ThreadEvent.racy_write loc val ord), ~ L loc>>) /\
+          (<<RACY_UPDATE: forall loc valr valw ordr ordw
+                            (EVENT: e_tgt = ThreadEvent.racy_update loc valr valw ordr ordw),
+              ~ L loc \/ Ordering.le ordr Ordering.na \/ Ordering.le ordw Ordering.na>>) /\
+          (<<LC2: lc2_src = lc2_tgt>>) /\
+          (<<SC2: sc2_src = sc2_tgt>>) /\
+          (<<MEM2: sim_memory (Writes.append L e_src rels) mem2_src mem2_tgt>>) /\
+          (<<NORMAL_TVIEW2: Normal.normal_tview L (Local.tview lc2_src)>>) /\
+          (<<NORMAL_MEM2: Normal.normal_memory L mem2_src>>)) \/
+      (<<RACE: RARaceW.ra_race L rels (Local.tview lc1_src) (ThreadEvent.get_program_event e_tgt)>>).
+    Proof.
+      inv STEP_TGT.
+      - left. esplits; eauto; ss. econs.
+      - exploit read_step; eauto. i. des.
+        + left. esplits; eauto; ss. econs. ss.
+        + right. left. ss. esplits; eauto.
+      - exploit write_step; eauto. i. des.
+        dup STEP_SRC. inv STEP_SRC0.
+        exploit Normal.write_step; try exact STEP; eauto; ss. i. des.
+        left. esplits; [econs 3|..]; eauto; ss.
+        eapply sim_memory_append; eauto.
+      - exploit read_step; eauto. i. des; cycle 1.
+        { right. left. esplits; ss; eauto. }
+        dup STEP_SRC. inv STEP_SRC0.
+        exploit Local.read_step_future; try exact STEP; eauto. i. des.
+        exploit write_step; eauto. i. des.
+        dup STEP_SRC0. inv STEP_SRC1.
+        exploit Normal.write_step; try exact STEP0; eauto.
+        { inv STEP. destruct releasedr; ss. eauto. }
+        i. des.
+        left. esplits; [econs 4|..]; eauto; ss.
+        eapply sim_memory_append; eauto.
+      - left. esplits; [econs 5|..]; eauto; ss.
+        exploit Normal.fence_step; eauto.
+      - left. esplits; [econs 6|..]; eauto; ss.
+        exploit Normal.fence_step; eauto.
+      - left. esplits; [econs 7|..]; eauto; ss.
+      - destruct (L loc) eqn:LOC.
+        + exploit write_na_step_loc; try exact LOCAL; eauto. i. des.
+          exploit (@Normal.ord_program_step L Ordering.na Ordering.plain);
+            try econs 8; eauto; ss. i. des.
+          left. esplits; [econs 8|..]; eauto; ss.
+          unfold Writes.append. ss. condtac; ss.
+        + exploit write_na_step_other; try exact LOCAL; eauto; try congr. i. des.
+          exploit Normal.write_na_step; try exact STEP_SRC; eauto. i. des.
+          left. esplits; [econs 8| | | |M|..]; eauto; ss.
+          * econs; eauto. condtac; ss. eauto.
+          * unfold Writes.append. ss. condtac; ss.
+      - exploit racy_read_step; try exact LOCAL; eauto. i. des.
+        + left. esplits; [econs 9|..]; eauto; ss. i. clarify.
+        + right. left. esplits; ss; eauto.
+      - exploit racy_write_step; try exact LOCAL; eauto. i. des.
+        + left. esplits; [econs 10|..]; eauto; ss. i. clarify.
         + right. right. esplits; ss; eauto.
+      - exploit racy_update_step; try exact LOCAL; eauto. i. inv x0.
+        + left. esplits; [econs 11|..]; eauto; ss.
+          * des; eauto.
+          * i. clarify. des; eauto.
+        + right. left. esplits; ss; eauto.
     Qed.
 
 
@@ -883,6 +996,10 @@ Module PFtoAPFSimThread.
         - inv CAP_SRC. exploit SOUND0; eauto. i.
           right. esplits; eauto.
       }
+      { ii. subst.
+        exploit Memory.cap_inv; try exact CAP_SRC; eauto. i. des; ss.
+        eapply UNDEF; eauto.
+      }
     Qed.
-  End PFtoAPFSimThread.
-End PFtoAPFSimThread.
+  End PFtoAPFSim.
+End PFtoAPFSim.

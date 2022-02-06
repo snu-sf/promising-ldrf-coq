@@ -1138,7 +1138,7 @@ Module RARaceW.
         (<<HIGHER: Time.lt ((View.rlx (TView.cur tview)) loc) to>>) /\
         (<<IN: List.In (loc, to, ordw) rels>>) /\
         ((<<ORDW1: Ordering.le ordw Ordering.na>>) \/
-           (<<ORDW2: Ordering.le ord Ordering.na>>)).
+         (<<ORDW2: Ordering.le ord Ordering.na>>)).
 
     Definition ra_race (rels: Writes.t) (tview: TView.t) (e: ProgramEvent.t): Prop :=
       (exists loc val ord,

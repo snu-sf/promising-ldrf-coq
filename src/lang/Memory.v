@@ -661,6 +661,34 @@ Module Memory.
     - erewrite lower_o; eauto. condtac; ss. des; congr.
   Qed.
 
+  Lemma op_get_inv
+        m1 l f t msg m2 k
+        loc from to msg'
+        (OP: op m1 l f t msg m2 k)
+        (GET2: get loc to m2 = Some (from, msg')):
+    loc = l /\ from = f /\ to = t /\ msg' = msg \/
+    exists from1,
+      (<<GET: get loc to m1 = Some (from1, msg')>>) /\
+      (<<FROM: Time.le from1 from>>).
+  Proof.
+    revert GET2. inv OP.
+    - erewrite add_o; eauto. condtac; ss; i.
+      + des. clarify. eauto.
+      + right. esplits; eauto; refl.
+    - erewrite split_o; eauto. repeat condtac; ss; i.
+      + des. clarify. eauto.
+      + guardH o. des. clarify.
+        exploit split_get0; eauto. i. des.
+        right. esplits; eauto; try refl.
+        inv SPLIT. inv SPLIT0. econs. ss.
+      + right. esplits; eauto; refl.
+    - erewrite lower_o; eauto. condtac; ss; i.
+      + des. clarify. eauto.
+      + right. esplits; eauto; refl.
+    - erewrite remove_o; eauto. condtac; ss; i.
+      + right. esplits; eauto; refl.
+  Qed.
+
   Lemma future_get1
         loc from to msg mem1 mem2
         (LE: future mem1 mem2)
@@ -751,6 +779,20 @@ Module Memory.
     inv PROMISE; splits; eauto using op_get2.
   Qed.
 
+  Lemma promise_get_inv
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        loc2 to2 from2 msg2
+        (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind)
+        (GET2: get loc2 to2 mem2 = Some (from2, msg2)):
+    loc2 = loc /\ from2 = from /\ to2 = to /\ msg2 = msg \/
+    exists from1,
+      (<<GET: get loc2 to2 mem1 = Some (from1, msg2)>>) /\
+      (<<FROM: Time.le from1 from2>>).
+  Proof.
+    exploit promise_op; eauto. i.
+    eauto using op_get_inv.
+  Qed.
+
   Lemma write_not_cancel
         promises1 mem1 loc from to msg promises2 mem2 kind
         (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind):
@@ -771,6 +813,19 @@ Module Memory.
     inv WRITE. splits.
     - erewrite remove_o; eauto. condtac; ss. des; ss.
     - eapply promise_get2; eauto.
+  Qed.
+
+  Lemma write_get_inv
+        promises1 mem1 loc from to msg promises2 mem2 kind
+        loc2 to2 from2 msg2
+        (WRITE: write promises1 mem1 loc from to msg promises2 mem2 kind)
+        (GET2: get loc2 to2 mem2 = Some (from2, msg2)):
+    loc2 = loc /\ from2 = from /\ to2 = to /\ msg2 = msg \/
+    exists from1,
+      (<<GET: get loc2 to2 mem1 = Some (from1, msg2)>>) /\
+      (<<FROM: Time.le from1 from2>>).
+  Proof.
+    inv WRITE. eauto using promise_get_inv.
   Qed.
 
 

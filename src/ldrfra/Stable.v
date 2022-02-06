@@ -150,14 +150,16 @@ Module Normal.
 
     Lemma promise_step
           lc1 mem1 loc from to msg lc2 mem2 kind
+          (NORMAL_TVIEW1: normal_tview (Local.tview lc1))
           (NORMAL_MEM1: normal_memory mem1)
           (MSG: forall val released
                   (MSG: msg = Message.concrete val (Some released)),
               normal_view released)
           (STEP: Local.promise_step lc1 mem1 loc from to msg lc2 mem2 kind):
+      <<NORMAL_TVIEW2: normal_tview (Local.tview lc2)>> /\
       <<NORMAL_MEM2: normal_memory mem2>>.
     Proof.
-      inv STEP. eapply promise; eauto.
+      inv STEP. splits; ss. eapply promise; eauto.
     Qed.
 
     Lemma read_step
@@ -695,6 +697,29 @@ Module Stable.
         i. subst. unguard. des; ss.
     Qed.
 
+    Lemma stable_memory_strong_relaxed
+          rels mem loc to ord
+          (ORD: Ordering.le ord Ordering.strong_relaxed):
+      stable_memory rels mem <-> stable_memory ((loc, to, ord) :: rels) mem.
+    Proof.
+      split; ii.
+      - eapply H; eauto. des; eauto.
+        inv LOC; eauto. inv H0. destruct ord0; ss.
+      - eapply H; eauto. des; eauto.
+        right. esplits; eauto. right. ss.
+    Qed.
+
+    Lemma stable_memory_le
+          rels mem loc to ord1 ord2
+          (STABLE_MEM1: stable_memory ((loc, to, ord1) :: rels) mem)
+          (ORD: Ordering.le ord2 ord1):
+      stable_memory ((loc, to, ord2) :: rels) mem.
+    Proof.
+      ii. eapply STABLE_MEM1; eauto. des; eauto. inv LOC.
+      - inv H. right. esplits; [left; eauto|]. etrans; eauto.
+      - right. esplits; [right; eauto|]. ss.
+    Qed.
+
 
     (* step *)
 
@@ -848,8 +873,6 @@ Module Stable.
           { apply bot_stable_view; ss. }
     Qed.
 
-    Set Nested Proofs Allowed.
-
     Lemma write_tview_stable
           mem tview sc loc to ord
           (WF: TView.wf tview)
@@ -958,6 +981,40 @@ Module Stable.
           try eapply write_stable_view; eauto; try apply WF1.
         + apply Memory.unwrap_closed_opt_view; ss. apply MEM1.
         + apply Memory.unwrap_closed_opt_view; ss. apply MEM1.
+    Qed.
+
+    Lemma write_na_get_to
+          ts promises1 mem1 loc from to val promsies2 mem2 msgs kinds kind
+          (WRITE: Memory.write_na ts promises1 mem1 loc from to val promsies2 mem2 msgs kinds kind):
+      Memory.get loc to mem2 = Some (from, Message.concrete val None).
+    Proof.
+      induction WRITE; eauto.
+      exploit Memory.write_get2; eauto. i. des. ss.
+    Qed.
+
+    Lemma write_na_step
+          rels lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 msgs kinds kind
+          (WF1: Local.wf lc1 mem1)
+          (SC1: Memory.closed_timemap sc1 mem1)
+          (MEM1: Memory.closed mem1)
+          (RELS_WF1: Writes.wf L rels mem1)
+          (RESERVE_ONLY1: OrdLocal.reserve_only L (Local.promises lc1))
+          (STABLE_TVIEW1: stable_tview mem1 (Local.tview lc1))
+          (STABLE_MEM1: stable_memory rels mem1)
+          (STEP: Local.write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 msgs kinds kind):
+      <<STABLE_TVIEW2: stable_tview mem2 (Local.tview lc2)>> /\
+      <<STABLE_MEM2: stable_memory (if L loc then (loc, to, ord) :: rels else rels) mem2>>.
+    Proof.
+      exploit Local.write_na_step_future; try exact STEP; eauto. i. des.
+      inv STEP. ss.
+      hexploit write_na_stable_tview; eauto; try apply WF1. i.
+      exploit Memory.write_na_times; eauto. i. des.
+      hexploit write_tview_stable; try exact H; eauto; try apply WF1.
+      { econs. eauto. }
+      { i. apply write_na_get_to in WRITE. congr. }
+      i. splits; eauto.
+      eapply write_na_stable_memory; try exact WRITE; eauto.
+      condtac; ss. rewrite <- stable_memory_strong_relaxed; eauto.
     Qed.
 
     Lemma fence_step

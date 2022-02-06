@@ -32,7 +32,7 @@ Require Import PFStep.
 Require Import OrdStep.
 Require Import RAStep.
 Require Import Stable.
-Require Import PFtoRASimThread.
+Require Import APFtoRASim.
 
 Set Implicit Arguments.
 
@@ -454,11 +454,11 @@ Module PFtoRAThread.
                          (e_pf e_j e_ra: Thread.t lang): Prop :=
     | sim_thread_intro
         (SIM_JOINED: JSim.sim_thread views e_j e_pf)
-        (SIM_RA: PFtoRASimThread.sim_thread L rels e_ra e_j)
+        (SIM_RA: APFtoRASim.sim_thread L rels e_ra e_j)
 
-        (NORMAL_J: PFtoRASimThread.normal_thread L e_j)
-        (NORMAL_RA: PFtoRASimThread.normal_thread L e_ra)
-        (STABLE_RA: PFtoRASimThread.stable_thread L rels e_ra)
+        (NORMAL_J: APFtoRASim.normal_thread L e_j)
+        (NORMAL_RA: APFtoRASim.normal_thread L e_ra)
+        (STABLE_RA: APFtoRASim.stable_thread L rels e_ra)
         (CLOSED_VIEWS: closed_views views (Thread.memory e_ra))
         (NORMAL_VIEWS: normal_views views)
         (STABLE_VIEWS: stable_views (Thread.memory e_ra) views)
@@ -489,7 +489,7 @@ Module PFtoRAThread.
         (<<STEP_RA: OrdThread.step L Ordering.acqrel pf_j e_ra e1_ra e2_ra>>) /\
         __guard__
           ((<<SIM2: sim_thread views2 (RelWrites.append L e_ra rels1) e2_pf e2_j e2_ra>>) /\
-           (<<EVENT_RA: PFtoRASimThread.sim_event e_ra e_j>>) \/
+           (<<EVENT_RA: APFtoRASim.sim_event e_ra e_j>>) \/
            (<<CONS: Local.promise_consistent (Thread.local e1_ra)>>) /\
            (<<RACE: exists loc to val released ord,
                ThreadEvent.is_reading e_ra = Some (loc, to, val, released, ord) /\
@@ -500,7 +500,7 @@ Module PFtoRAThread.
                             e_src = ThreadEvent.promise loc from to msg kind /\ ~ L loc)); cycle 1.
       { (* normal step *)
         inv STEP.
-        hexploit PFtoRASimThread.thread_step; try exact STEP1; try eapply SIM1; eauto.
+        hexploit APFtoRASim.thread_step; try exact STEP1; try eapply SIM1; eauto.
         { i. subst. destruct (L loc) eqn:LOC.
           - split; ss. inv EVENT. destruct msg; ss. inv MSG.
             exploit PROMISE; eauto; ss.
@@ -541,13 +541,13 @@ Module PFtoRAThread.
           apply inj_pair2 in H4. subst.
           apply inj_pair2 in H5. subst. ss.
           hexploit JSim.sim_local_promise_consistent; try exact LOCAL; eauto. i. des.
-          eapply PFtoRASimThread.sim_local_promise_consistent; eauto.
+          eapply APFtoRASim.sim_local_promise_consistent; eauto.
       }
 
       (* promise on ~ L *)
       des. subst. dup STEP. inv STEP0.
       inv STEP1; [|inv STEP0; inv LOCAL]. inv STEP0. ss.
-      hexploit PFtoRASimThread.promise_step; try exact LOCAL; try eapply SIM1; eauto; try congr. s. i. des.
+      hexploit APFtoRASim.promise_step; try exact LOCAL; try eapply SIM1; eauto; try congr. s. i. des.
       destruct e1_ra. esplits; eauto.
       { econs.
         - econs; eauto.
@@ -582,12 +582,12 @@ Module PFtoRAThread.
           i. exploit PROMISE0; eauto. i. des.
           eapply joined_opt_view_stable_view; eauto.
       }
-      hexploit PFtoRASimThread.sim_memory_stable_tview; try eapply SIM1. s. i.
-      hexploit PFtoRASimThread.sim_memory_stable_memory; try eapply SIM1. s. i.
-      exploit PFtoRASimThread.sim_release_writes_wf; try eapply SIM1. s. i. des.
+      hexploit APFtoRASim.sim_memory_stable_tview; try eapply SIM1. s. i.
+      hexploit APFtoRASim.sim_memory_stable_memory; try eapply SIM1. s. i.
+      exploit APFtoRASim.sim_release_writes_wf; try eapply SIM1. s. i. des.
       hexploit Stable.promise_step; try exact LOCAL; try eapply SIM1; eauto.
       { i. subst. exploit MSG; eauto. i. des. split; ss.
-        eapply PFtoRASimThread.sim_memory_stable_view; eauto. }
+        eapply APFtoRASim.sim_memory_stable_view; eauto. }
       i. des.
       hexploit Stable.promise_step; try exact STEP_SRC; try eapply SIM1; eauto. i. des.
       split; try by econs.
@@ -639,7 +639,7 @@ Module PFtoRAThread.
           (<<STEP_J: JThread.step pf_j e_j e1_j e2_j views1 views2>>) /\
           (<<STEP_RA: RAThread.step L rels1 rels2 e_ra e1_ra e2_ra>>) /\
           (<<EVENT_J: JSim.sim_event e_j e_pf>>) /\
-          (<<EVENT_RA: PFtoRASimThread.sim_event e_ra e_j>>) /\
+          (<<EVENT_RA: APFtoRASim.sim_event e_ra e_j>>) /\
           (<<SIM2: sim_thread views2 rels2 e2_pf e2_j e2_ra>>)) \/
       (exists rels2 e_ra e2_ra loc to val released ord,
           (<<CONS_RA: Local.promise_consistent (Thread.local e1_ra)>>) /\
@@ -668,7 +668,7 @@ Module PFtoRAThread.
           (<<STEP_J: JThread.opt_step e_j e1_j e2_j views1 views2>>) /\
           (<<STEP_RA: RAThread.opt_step L rels1 rels2 e_ra e1_ra e2_ra>>) /\
           (<<EVENT_J: JSim.sim_event e_j e_pf>>) /\
-          (<<EVENT_RA: PFtoRASimThread.sim_event e_ra e_j>>) /\
+          (<<EVENT_RA: APFtoRASim.sim_event e_ra e_j>>) /\
           (<<SIM2: sim_thread views2 rels2 e2_pf e2_j e2_ra>>)) \/
       (exists rels2 e_ra e2_ra loc to val released ord,
           (<<CONS_RA: Local.promise_consistent (Thread.local e1_ra)>>) /\
@@ -754,7 +754,7 @@ Module PFtoRAThread.
       exploit JSim.sim_thread_reserve_step;
         try eapply SIM1; try eapply WF1_PF; try eapply WF1_J; eauto.
       i. des. inv STEP0. inv STEP1.
-      exploit PFtoRASimThread.reserve_step;
+      exploit APFtoRASim.reserve_step;
         try eapply SIM1; try eapply WF1_J; try eapply WF1_RA.
       { econs; eauto. }
       i. des.
@@ -812,7 +812,7 @@ Module PFtoRAThread.
       exploit JSim.sim_thread_cancel_step;
         try eapply SIM1; try eapply WF1_PF; try eapply WF1_J; eauto.
       i. des. inv STEP0. inv STEP1.
-      exploit PFtoRASimThread.cancel_step;
+      exploit APFtoRASim.cancel_step;
         try eapply SIM1; try eapply WF1_J; try eapply WF1_RA.
       { econs; eauto. }
       i. des.
@@ -933,9 +933,9 @@ Module PFtoRAThread.
           eapply SimMemory.sim_memory_max_concrete_timemap in MEM; eauto.
           subst. refl.
       - inv SIM_RA. econs; ss.
-        + exploit PFtoRASimThread.sim_memory_cap; eauto; try apply WF_J; try apply WF_RA. i.
-          eapply PFtoRASimThread.sim_memory_max_concrete_timemap; eauto.
-        + eapply PFtoRASimThread.sim_memory_cap; eauto; try apply WF_J; try apply WF_RA.
+        + exploit APFtoRASim.sim_memory_cap; eauto; try apply WF_J; try apply WF_RA. i.
+          eapply APFtoRASim.sim_memory_max_concrete_timemap; eauto.
+        + eapply APFtoRASim.sim_memory_cap; eauto; try apply WF_J; try apply WF_RA.
       - inv NORMAL_J. econs; ss.
         eapply Stable.cap_normal_memory; eauto. apply WF_J.
       - inv NORMAL_RA. econs; ss.
