@@ -2323,6 +2323,7 @@ Lemma sim_thread_read
                 f vers flag_src flag_tgt vs_src1 vs_tgt1
                 mem_src mem_tgt lc_src1 lc_tgt1 sc_src sc_tgt>>) /\
       (<<VAL: Const.le val_tgt1 val_src1>>) /\
+      (<<VALTGT: Const.le val_tgt0 val_tgt1>>) /\
       (<<NUPDATESRC: forall val (VAL: vs_src0 loc = Some val), val = val_src1>>) /\
       (<<NUPDATETGT: forall val (VAL: vs_tgt0 loc = Some val), val = val_tgt1>>) /\
       (<<VALS: forall loc0,
@@ -3956,6 +3957,7 @@ Lemma sim_thread_update_step_normal
                 f1 vers1 flag_src flag_tgt vs_src1 vs_tgt1
                 mem_src1 mem_tgt1 lc_src2 lc_tgt2 sc_src1 sc_tgt1>>) /\
       (<<VAL: Const.le val_tgt1 val_src1>>) /\
+      (<<VALTGT: Const.le valr_tgt val_tgt1>>) /\
       (<<NUPDATESRC: forall val (VAL: vs_src0 loc = Some val), val = val_src1>>) /\
       (<<NUPDATETGT: forall val (VAL: vs_tgt0 loc = Some val), val = val_tgt1>>) /\
       (<<VALS: forall loc0 (LOC: loc0 <> loc),
@@ -4109,7 +4111,7 @@ Lemma sim_thread_update_step_release
       (VAL: Const.le valw_tgt valw_src)
       lang st
   :
-    exists f1 vers1 val_tgt1 val_src1 from_src to_src releasedm_src released_src mem_src1 mem_src2 lc_src1 lc_src2 lc_src3 vs_src1 vs_tgt1 sc_src1 kind_src flag_tgt1,
+    exists val_src1 f1 vers1 val_tgt1 from_src to_src releasedm_src released_src mem_src1 mem_src2 lc_src1 lc_src2 lc_src3 vs_src1 vs_tgt1 sc_src1 kind_src flag_tgt1,
       (<<STEPS: rtc (tau (@pred_step is_promise _))
                     (Thread.mk lang st lc_src0 sc_src0 mem_src0)
                     (Thread.mk _ st lc_src1 sc_src0 mem_src1)>>) /\
@@ -4123,6 +4125,7 @@ Lemma sim_thread_update_step_release
                 f1 vers1 (fun _ => None) flag_tgt1 vs_src1 vs_tgt1
                 mem_src2 mem_tgt1 lc_src3 lc_tgt2 sc_src1 sc_tgt1>>) /\
       (<<VAL: Const.le val_tgt1 val_src1>>) /\
+      (<<VALTGT: Const.le valr_tgt val_tgt1>>) /\
       (<<NUPDATESRC: forall val (VAL: vs_src0 loc = Some val), val = val_src1>>) /\
       (<<NUPDATETGT: forall val (VAL: vs_tgt0 loc = Some val), val = val_tgt1>>) /\
       (<<VALS: forall loc0 (LOC: loc0 <> loc),
@@ -4157,8 +4160,8 @@ Proof.
     hexploit (DEBT loc0). i. des; auto. right. splits; auto.
     hexploit (VALS loc0). i. des.
     { rewrite SRC. rewrite TGT. auto. }
-    { left. rewrite VALTGT. rewrite VALSRC. ss. }
-    { left. rewrite VALTGT. rewrite VALSRC. ss. }
+    { left. rewrite VALTGT0. rewrite VALSRC. ss. }
+    { left. rewrite VALTGT0. rewrite VALSRC. ss. }
   }
   i. des. hexploit Thread.rtc_tau_step_future.
   { eapply rtc_implies; [|eauto]. i. inv H. inv TSTEP. econs; eauto. }
@@ -4189,8 +4192,8 @@ Proof.
     { inv SIM1. eauto. }
     { eauto. }
   }
-  i. des. esplits; eauto.
-  { clear - READ2. inv READ2. i. econs; eauto. etrans; eauto. }
+  i. des. exists val_src1. esplits; eauto.
+  { inv READ2. i. econs; eauto. etrans; eauto. }
   { eapply local_write_step_merge; eauto. }
   { etrans; eauto. eapply Mapping.les_strong_les; eauto. }
   { i. hexploit (VALS loc0). hexploit (VALS0 loc0). i. des; subst; ss.

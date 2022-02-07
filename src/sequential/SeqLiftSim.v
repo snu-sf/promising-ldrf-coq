@@ -459,87 +459,6 @@ Section LIFT.
     extensionality loc. eapply perm_antisym; eauto.
   Qed.
 
-  Lemma sim_seq_release lang_src lang_tgt sim_terminal
-        p0 d0 st_src0 st_tgt0
-        (SIM: sim_seq_at_step_case (@sim_seq lang_src lang_tgt sim_terminal) p0 d0 st_src0 st_tgt0)
-    :
-    forall st_tgt1 e_tgt
-           (STEP_TGT: lang_tgt.(Language.step) e_tgt st_tgt0.(SeqState.state) st_tgt1)
-           (ATOMIC: is_atomic_event e_tgt)
-           (RELEASE: is_release e_tgt),
-    exists st_src1 st_src2 e_src,
-      (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
-        (<<STEP: lang_src.(Language.step) e_src st_src1.(SeqState.state) st_src2>>) /\
-        (<<EVENT: ProgramEvent.le e_tgt e_src>>) /\
-        (<<SIM: forall i_tgt o p1 mem_tgt
-                       (INPUT: SeqEvent.wf_input e_tgt i_tgt)
-                       (OUTPUT: Oracle.wf_output e_tgt o)
-                       (STEP_TGT: SeqEvent.step i_tgt o p0 st_tgt0.(SeqState.memory) p1 mem_tgt),
-          exists i_src mem_src d1,
-            (<<STEP_SRC: SeqEvent.step i_src o p0 st_src1.(SeqState.memory) p1 mem_src>>) /\
-              (<<MATCH: SeqEvent.input_match d0 d1 i_src i_tgt>>) /\
-              (<<INPUT: SeqEvent.wf_input e_src i_src>>) /\
-              (<<SIM: sim_seq_interference
-                        _ _ sim_terminal
-                        p1 d1
-                        (SeqState.mk _ st_src2 mem_src)
-                        (SeqState.mk _ st_tgt1 mem_tgt)>>)>>).
-  Proof.
-    i. exploit SIM; eauto. i. des. esplits; eauto.
-    i. hexploit SIM0; eauto. i. des.
-    hexploit min_input_match_exists; eauto. i. des. inv MIN.
-    eexists _, _, d_min. esplits; eauto.
-    inv STEP_TGT0. inv REL.
-    { red in OUTPUT. des. hexploit RELEASE1; eauto.
-      i. rewrite <- H in *. ss.
-    }
-    ii.
-    hexploit (SIM0 i_tgt (Oracle.mk_output o.(Oracle.out_access) o.(Oracle.out_acquire) (Some p1))); eauto.
-    { red in OUTPUT. des. red. splits; auto. }
-    { econs.
-      { eauto. }
-      { eauto. }
-      { ss. rewrite <- H0. econs 2; eauto. }
-    }
-    i. des. inv STEP_SRC0. inv STEP_SRC. ss.
-    hexploit SeqEvent.step_update_inj.
-    { eapply UPD0. }
-    { eapply UPD1. }
-    { i. red in INPUT1. red in INPUT0. des; ss.
-      hexploit UPDATE0; eauto. i. des.
-      hexploit UPDATE; eauto. i. des.
-      hexploit H3.
-      { esplits. eapply IN1. }
-      i.
-      hexploit H1.
-      { esplits. eapply IN2. }
-      i. clarify.
-    }
-    { auto. }
-    i. des; clarify.
-    hexploit SeqEvent.step_acquire_inj.
-    { eapply ACQ0. }
-    { eapply ACQ1. }
-    { auto. }
-    i. des; clarify. inv REL0.
-    { rewrite <- H in H5. ss. }
-    inv REL. inv MEM0. inv MEM1.
-    assert (PERMEQ: Perms.meet p4 p1 = p1).
-    { clear - PERM. eapply perms_antisym.
-      { eapply Perms.meet_le_r. }
-      { eapply Perms.meet_spec.
-        { etrans; eauto. eapply Perms.meet_le_l. }
-        { refl. }
-      }
-    }
-    rewrite PERMEQ in SIM2. ginit.
-    guclo deferred_le_sf_ctx_spec. econs.
-    2:{ gfinal. right. eapply SIM2. }
-    ss. rewrite flags_join_bot_r.
-    eapply MIN0; eauto.
-    destruct i_src, i_src0; ss. clarify.
-  Qed.
-
   Definition perms_top: Perms.t := fun _ => Perm.high.
 
   Definition seq_memory_init: SeqMemory.t := (SeqMemory.mk (fun _ => Const.undef) Flags.bot).
@@ -559,6 +478,12 @@ Section LIFT.
   Definition world := (Mapping.ts * versions * Memory.t)%type.
 
   Definition world_bot: world := (fun _ => initial_mapping, initial_vers, Memory.init).
+
+  Definition sim_seq_cond (c: bool)
+             lang_src lang_tgt sim_terminal p D st_src st_tgt :=
+    if c
+    then @sim_seq lang_src lang_tgt sim_terminal p D st_src st_tgt
+    else @sim_seq_interference lang_src lang_tgt sim_terminal p D st_src st_tgt.
 
   Definition world_messages_le (msgs_src msgs_tgt: Messages.t) (w0: world) (w1: world): Prop :=
         match w0, w1 with
@@ -664,7 +589,7 @@ Section LIFT.
           (d: Flag.t) (sflag_src: Flag.t) (sflag_tgt: Flag.t)
           (flag_src: option Time.t) (flag_tgt: option Time.t): Prop :=
     | sim_flag_lift_intro
-        (TGT: flag_tgt -> Flag.join flag_src (Flag.join d sflag_tgt))
+        (TGT: Flag.le flag_tgt (Flag.join flag_src (Flag.join d sflag_tgt)))
         (SRC: sflag_src = flag_src)
   .
 
@@ -803,7 +728,7 @@ Section LIFT.
     }
     { esplits.
       { refl. }
-      { econs 3; eauto.}
+      { econs 3; ss. }
       { i. hexploit (VALS loc); auto. i.
         rewrite VAL in H. inv H.
         rewrite <- H1 in *. ss.
@@ -1731,7 +1656,6 @@ Section LIFT.
       { i. rewrite H in *. ss. rewrite SRC in *.
         unfold Flags.join in FLAG.
         destruct (flag_tgt loc), (Flag.join (D loc) (sflag_tgt loc)); ss.
-        hexploit TGT; ss.
       }
       { specialize (VALUE loc). specialize (VALS loc). i.
         left. destruct (classic (loc_na loc)).
@@ -2045,7 +1969,7 @@ Section LIFT.
     { inv SIM1. ss. }
   Qed.
 
-  Lemma wf_oracleoutput_exists e
+  Lemma wf_oracle_output_exists e
     :
     exists o, (<<WFOUT: Oracle.wf_output e o>>).
   Proof.
@@ -2056,104 +1980,588 @@ Section LIFT.
     splits. red. ss. des_ifs.
   Qed.
 
-  Lemma sim_seq_acquire_no_flag:
-    forall
-      p0 D0 smem_src0 smem_tgt0
-      lang_src lang_tgt sim_terminal st_src0 st_tgt0
-      e st_tgt1
-      (SIM: sim_seq_at_step_case (@sim_seq lang_src lang_tgt sim_terminal) p0 D0 (SeqState.mk lang_src st_src0 smem_src0) (SeqState.mk lang_tgt st_tgt0 smem_tgt0))
-      (STEPTGT: lang_tgt.(Language.step) e st_tgt0 st_tgt1)
-      (STEPSRC: lang_src.(Language.step) e
-
-  SeqEvent.step i_tgt o p0 (SeqState.memory st_tgt0) p1 mem_tgt ->
-  exists (i_src : SeqEvent.input) (mem_src : SeqMemory.t) (d1 : Flags.t),
-    << SeqEvent.step i_src o p0 (SeqState.memory st_src1) p1 mem_src >> /\
-    << SeqEvent.input_match d0 d1 i_src i_tgt >> /\
-
-      (NOMIXTGT: nomix _ st_tgt0)
-      (ATOMIC: is_atomic_event e)
-      (ACQUIRE: is_acquire e),
-    forall loc (NA: loc_na loc),
-      Flag.le (Flag.join (smem_tgt0.(SeqMemory.flags) loc) (D0 loc)) (smem_src0.(SeqMemory.flags) loc).
+  Lemma flag_join_false_r f0
+    :
+      Flag.join f0 false = f0.
   Proof.
-    i. punfold NOMIXTGT. exploit NOMIXTGT; eauto. i. des.
-    exploit SIM; eauto. i. des.
-    hexploit wf_oracleoutput_exists. i. des.
-    hexploit event_step_exists; eauto. i. des.
-    hexploit SIM0; eauto. i. des.
-    red in WF. des. inv MATCH. inv STEP1; ss. inv ACQUIRE2.
-    { hexploit ACQUIRE1; eauto. rewrite <- H3. ss. }
-    inv STEP_SRC. rewrite <- H2 in *. rewrite <- H3 in *.
-    inv ACQ. inv ACQ0. inv MEM. inv MEM0. ss.
-    inv ACCESS.
-    { inv UPD.
-      2:{ rewrite <- H1 in *. ss. }
-      inv UPD0.
-      2:{ rewrite <- H8 in *. ss. }
+    destruct f0; ss.
+  Qed.
 
-
-
-
+  Lemma sim_seq_atomic_step lang_src lang_tgt sim_terminal
+        p0 d0 st_src0 st_tgt0
+        (SIM: sim_seq_at_step_case (@sim_seq lang_src lang_tgt sim_terminal) p0 d0 st_src0 st_tgt0)
+    :
+    forall st_tgt1 e_tgt
+           (STEP_TGT: lang_tgt.(Language.step) e_tgt st_tgt0.(SeqState.state) st_tgt1)
+           (ATOMIC: is_atomic_event e_tgt),
+    exists st_src1 st_src2 e_src,
+      (<<STEPS: rtc (SeqState.na_step p0 MachineEvent.silent) st_src0 st_src1>>) /\
+        (<<STEP: lang_src.(Language.step) e_src st_src1.(SeqState.state) st_src2>>) /\
+        (<<EVENT: ProgramEvent.le e_tgt e_src>>) /\
+        (<<ACQ: forall (ACQUIRE: is_acquire e_tgt),
+            Flags.le (Flags.join st_tgt0.(SeqState.memory).(SeqMemory.flags) d0) (st_src1.(SeqState.memory).(SeqMemory.flags))>>) /\
+        (<<SIM: forall i_tgt o p1 mem_tgt
+                       (INPUT: SeqEvent.wf_input e_tgt i_tgt)
+                       (OUTPUT: Oracle.wf_output e_tgt o)
+                       (STEP_TGT: SeqEvent.step i_tgt o p0 st_tgt0.(SeqState.memory) p1 mem_tgt),
+          exists i_src mem_src d1,
+            (<<STEP_SRC: SeqEvent.step i_src o p0 st_src1.(SeqState.memory) p1 mem_src>>) /\
+              (<<MATCH: SeqEvent.input_match d0 d1 i_src i_tgt>>) /\
+              (<<INPUT: SeqEvent.wf_input e_src i_src>>) /\
+              (<<SIM: sim_seq_cond
+                        (negb (is_release e_tgt))
+                        _ _ sim_terminal
+                        p1 d1
+                        (SeqState.mk _ st_src2 mem_src)
+                        (SeqState.mk _ st_tgt1 mem_tgt)>>)>>).
+  Proof.
+    i. exploit SIM; eauto. i. des. esplits; eauto.
+    { i. hexploit wf_oracle_output_exists. i. des.
+      hexploit event_step_exists; eauto. i. des.
+      hexploit SIM0; eauto. i. des.
+      red in WF. des. inv MATCH. inv STEP0; ss. inv ACQUIRE2.
+      { hexploit ACQUIRE1; eauto. rewrite <- H3. ss. }
+      inv STEP_SRC. rewrite <- H2 in *. rewrite <- H3 in *.
+      inv ACQ. inv ACQ0. inv MEM. inv MEM0. ss.
       inv ACCESS.
+      { inv UPD.
+        2:{ rewrite <- H1 in *. ss. }
+        inv UPD0.
+        2:{ rewrite <- H8 in *. ss. }
+        etrans; eauto. eapply Flags.join_mon_r; auto.
+      }
+      { inv UPD.
+        { rewrite <- H1 in *. ss. }
+        inv UPD0.
+        { rewrite <- H8 in *. ss. }
+        inv MEM. inv MEM0. ss.
+        rewrite <- H7 in H1. rewrite <- H6 in H8. inv H8. inv H1.
+        move FLAG0 at bottom. move FLAG at bottom.
+        ii. specialize (FLAG loc). clear - FLAG0 FLAG DEFERRED.
+        unfold Flags.update, Flags.join in FLAG. unfold Flags.join. des_ifs.
+        etrans; eauto. eapply Flag.join_mon_r; auto.
+      }
+    }
+    i. hexploit SIM0; eauto. i. des.
+    hexploit min_input_match_exists; eauto. i. des. inv MIN.
+    destruct (is_release e_tgt) eqn:RELEASE; ss; eauto.
+    inv STEP_TGT0. inv REL.
+    { red in OUTPUT. des. hexploit RELEASE1; eauto.
+      i. rewrite <- H in *. ss.
+    }
+    esplits; eauto. ii.
+    hexploit (SIM0 i_tgt (Oracle.mk_output o.(Oracle.out_access) o.(Oracle.out_acquire) (Some p1))); eauto.
+    { red in OUTPUT. des. red. splits; auto. }
+    { econs.
+      { eauto. }
+      { eauto. }
+      { ss. rewrite <- H0. econs 2; eauto. }
+    }
+    i. des. inv STEP_SRC0. inv STEP_SRC. ss.
+    hexploit SeqEvent.step_update_inj.
+    { eapply UPD0. }
+    { eapply UPD1. }
+    { i. red in INPUT1. red in INPUT0. des; ss.
+      hexploit UPDATE0; eauto. i. des.
+      hexploit UPDATE; eauto. i. des.
+      hexploit H3.
+      { esplits. eapply IN1. }
+      i.
+      hexploit H1.
+      { esplits. eapply IN2. }
+      i. clarify.
+    }
+    { auto. }
+    i. des; clarify.
+    hexploit SeqEvent.step_acquire_inj.
+    { eapply ACQ0. }
+    { eapply ACQ1. }
+    { auto. }
+    i. des; clarify. inv REL0.
+    { rewrite <- H in H5. ss. }
+    inv REL. inv MEM0. inv MEM1.
+    assert (PERMEQ: Perms.meet p4 p1 = p1).
+    { clear - PERM. eapply perms_antisym.
+      { eapply Perms.meet_le_r. }
+      { eapply Perms.meet_spec.
+        { etrans; eauto. eapply Perms.meet_le_l. }
+        { reflexivity . }
+      }
+    }
+    rewrite PERMEQ in SIM2. ginit.
+    guclo deferred_le_sf_ctx_spec. econs.
+    2:{ gfinal. right. eapply SIM2. }
+    ss. rewrite flags_join_bot_r.
+    eapply MIN0; eauto.
+    destruct i_src, i_src0; ss. clarify.
+  Qed.
+
+  Definition lift_out_access (e: ProgramEvent.t): option Perm.t :=
+    (if (is_accessing e) then Some Perm.low else None).
+
+  Definition lift_out_acquire (e: ProgramEvent.t) (vs: Loc.t -> option Const.t):
+    option (Perms.t * ValueMap.t) :=
+    if (is_acquire e)
+    then
+      Some ((fun loc => if vs loc then Perm.high else Perm.low),
+            (fun loc => match vs loc with | Some v => v | _ => Const.undef end))
+    else
+      None.
+
+  Definition lift_out_release (e: ProgramEvent.t): option (Perms.t) :=
+    if (is_release e) then Some (fun _ => Perm.high) else None.
+
+  Definition lift_output (e: ProgramEvent.t) (vs: Loc.t -> option Const.t): Oracle.output :=
+    Oracle.mk_output (lift_out_access e) (lift_out_acquire e vs) (lift_out_release e).
+
+  Lemma lift_out_access_wf e:
+    lift_out_access e <-> is_accessing e.
+  Proof.
+    ss. unfold lift_out_access. des_ifs.
+  Qed.
+
+  Lemma lift_out_acquire_wf e vs:
+    lift_out_acquire e vs <-> is_acquire e.
+  Proof.
+    ss. unfold lift_out_acquire. des_ifs.
+  Qed.
+
+  Lemma lift_out_release_wf e:
+    lift_out_release e <-> is_release e.
+  Proof.
+    ss. unfold lift_out_release. des_ifs.
+  Qed.
+
+  Lemma lift_output_wf e vs
+    :
+      Oracle.wf_output e (lift_output e vs).
+  Proof.
+    red. splits.
+    { eapply lift_out_access_wf. }
+    { eapply lift_out_acquire_wf. }
+    { eapply lift_out_release_wf. }
+  Qed.
+
+  Definition seqevent_wf_in_access
+             (e: ProgramEvent.t) (i: option (Loc.t * Const.t * Flag.t * Const.t)): Prop :=
+    forall loc v_new,
+      (exists v_old f_old,
+          i = Some (loc, v_old, f_old, v_new)) <->
+      is_accessing e = Some (loc, v_new).
+
+  Definition seqevent_wf_in_acquire
+             (e: ProgramEvent.t) (i: option Flags.t): Prop :=
+    i <-> is_acquire e.
+
+  Definition seqevent_wf_in_release
+             (e: ProgramEvent.t) (i: option (ValueMap.t * Flags.t)): Prop :=
+    i <-> is_release e.
+
+  Lemma seqevent_wf_cons e i
+        (ACCESS: seqevent_wf_in_access e i.(SeqEvent.in_access))
+        (ACQUIRE: seqevent_wf_in_acquire e i.(SeqEvent.in_acquire))
+        (RELEASE: seqevent_wf_in_release e i.(SeqEvent.in_release))
+    :
+      SeqEvent.wf_input e i.
+  Proof.
+    red. splits; auto.
+  Qed.
+
+  Lemma seqevent_wf_destruct e i
+        (WF: SeqEvent.wf_input e i)
+    :
+      (<<ACCESS: seqevent_wf_in_access e i.(SeqEvent.in_access)>>) /\
+      (<<ACQUIRE: seqevent_wf_in_acquire e i.(SeqEvent.in_acquire)>>) /\
+      (<<RELEASE: seqevent_wf_in_release e i.(SeqEvent.in_release)>>).
+  Proof.
+    auto.
+  Qed.
+
+  Lemma sim_lift_event_step_access:
+    forall
+      e_tgt e_src
+      p0 svs_src0 svs_tgt0 vs_src0 vs_tgt0
+      D0 sflag_src0 sflag_tgt0 flag_src0 flag_tgt0
+      vs_src1 vs_tgt1
+      (EVENT: ProgramEvent.le e_tgt e_src)
+      (VALS: sim_vals_lift p0 svs_src0 svs_tgt0 vs_src0 vs_tgt0)
+      (FLAGS: sim_flags_lift D0 sflag_src0 sflag_tgt0 flag_src0 flag_tgt0)
+      (ATLOCS: forall loc (NNA: ~ loc_na loc),
+          (<<FLAGSRC: flag_src0 loc = None>>) /\
+          (<<FLAGTGT: flag_tgt0 loc = None>>) /\
+          (<<VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc)>>))
+      (AT: forall loc val (ACC: is_accessing e_tgt = Some (loc, val)), loc_at loc)
+      (VAL: forall loc,
+          ((<<SRC: vs_src1 loc = vs_src0 loc>>) /\ (<<TGT: vs_tgt1 loc = vs_tgt0 loc>>)) \/
+          exists val, (<<ACCESS: is_accessing e_tgt = Some (loc,  val)>>)),
+    exists i_tgt svs_tgt1 sflag_tgt1 p1,
+      (<<STEP_TGT: SeqEvent.step_update
+                     i_tgt (lift_out_access e_tgt)
+                     p0 (SeqMemory.mk svs_tgt0 sflag_tgt0)
+                     p1 (SeqMemory.mk svs_tgt1 sflag_tgt1)>>) /\
+      (<<INPUT_TGT: seqevent_wf_in_access e_tgt i_tgt>>) /\
+      (<<CONT: forall i_src svs_src1 sflag_src1 D1
+                      (INPUT_SRC: seqevent_wf_in_access e_src i_src)
+                      (MATCH: SeqEvent.in_access_match D0 D1 i_src i_tgt)
+                      (STEP_SRC: SeqEvent.step_update
+                                   i_src (lift_out_access e_tgt)
+                                   p0 (SeqMemory.mk svs_src0 sflag_src0)
+                                   p1 (SeqMemory.mk svs_src1 sflag_src1)),
+          (<<VALS: sim_vals_lift p1 svs_src1 svs_tgt1 vs_src1 vs_tgt1>>) /\
+          (<<FLAGS: sim_flags_lift D1 sflag_src1 sflag_tgt1 flag_src0 flag_tgt0>>)>>).
+  Proof.
+    i. hexploit (@event_step_update_exists e_tgt (lift_out_access e_tgt) p0 (SeqMemory.mk svs_src0 sflag_src0)).
+    { eapply lift_out_access_wf. }
+    i. des. inv STEP.
+    { exists None. esplits.
+      { econs. }
+      { eauto. }
+      i. inv MATCH. inv STEP_SRC. splits; auto.
+      { ii. hexploit (VAL loc). i. des.
+        { rewrite SRC. rewrite TGT. auto. }
+        { unfold lift_out_access in H1. rewrite ACCESS in H1. ss. }
+      }
+      { ii. specialize (FLAGS loc). inv FLAGS. econs; auto.
+        etrans; eauto. eapply Flag.join_mon_r. eapply Flag.join_mon_l. auto.
+      }
+    }
+    { inv MEM. hexploit WF; eauto. i. des. hexploit H; eauto. i.
+      unfold lift_out_access in *. rewrite H2 in *.
+      eexists (Some (loc, _, _, _)). esplits.
+      { econs; eauto. econs; eauto. }
+      { ss. red. rewrite H2. i. split; eauto.
+        { i. des. clarify. }
+        { i. clarify. eauto. }
+      }
+      i. ss. inv STEP_SRC. inv MEM. ss. inv MATCH. splits.
+      { ii. unfold ValueMap.write, Perms.update. condtac; subst.
+        { exfalso. eapply LOCDISJOINT; eauto. }
+        condtac; subst; ss.
+        hexploit (VAL loc0). i. des.
+        { rewrite SRC. rewrite TGT. auto. }
+        { inv ACCESS. ss. }
+      }
+      { ii. unfold Flags.update. specialize (FLAGS loc0). inv FLAGS. des_ifs.
+        { econs.
+          { rewrite SRC in FLAG. rewrite flag_join_false_r.
+            etrans; eauto. etrans; [|eapply Flag.join_ge_l].
+            eapply Flag.join_spec; [refl|]. rewrite flag_join_comm. auto.
+          }
+          { hexploit ATLOCS; eauto. i. des. rewrite FLAGSRC. ss. }
+        }
+        { econs; auto. etrans; eauto.
+          eapply Flag.join_mon_r. eapply Flag.join_mon_l. eapply DEFERRED; auto.
+        }
+      }
+    }
+  Qed.
+
+  Lemma sim_lift_event_step_acquire:
+    forall
+      e_tgt e_src
+      p0 svs_src0 svs_tgt0 vs_src0 vs_tgt0
+      D0 sflag_src0 sflag_tgt0 flag_src0 flag_tgt0
+      vs_src1 vs_tgt1
+      (EVENT: ProgramEvent.le e_tgt e_src)
+      (VALS: sim_vals_lift p0 svs_src0 svs_tgt0 vs_src0 vs_tgt0)
+      (FLAGS: sim_flags_lift D0 sflag_src0 sflag_tgt0 flag_src0 flag_tgt0)
+      (ATLOCS: forall loc (NNA: ~ loc_na loc),
+          (<<FLAGSRC: flag_src0 loc = None>>) /\
+          (<<FLAGTGT: flag_tgt0 loc = None>>) /\
+          (<<VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc)>>))
+      (VAL: forall loc (NA: loc_na loc),
+          ((<<SRC: vs_src1 loc = vs_src0 loc>>) /\ (<<TGT: vs_tgt1 loc = vs_tgt0 loc>>)) \/
+          (exists val_src val_tgt,
+              (<<NONESRC: vs_src0 loc = None>>) /\ (<<NONETGT: vs_tgt0 loc = None>>) /\
+              (<<VALSRC: vs_src1 loc = Some val_src>>) /\ (<<VALTGT: vs_tgt1 loc = Some val_tgt>>) /\
+              (<<VALLE: Const.le val_tgt val_src>>) /\
+              (<<ACQ: is_acquire e_tgt>>)))
+      (ACQFLAG: forall loc ts
+                       (SRC: flag_src0 loc = None) (TGT: flag_tgt0 loc = Some ts),
+          ~ is_acquire e_tgt),
+    exists i_tgt svs_tgt1 sflag_tgt1 p1,
+      (<<STEP_TGT: SeqEvent.step_acquire
+                     i_tgt (lift_out_acquire e_tgt vs_src1)
+                     p0 (SeqMemory.mk svs_tgt0 sflag_tgt0)
+                     p1 (SeqMemory.mk svs_tgt1 sflag_tgt1)>>) /\
+      (<<INPUT_TGT: seqevent_wf_in_acquire e_tgt i_tgt>>) /\
+      (<<CONT: forall i_src svs_src1 sflag_src1 D1
+                      (INPUT_SRC: seqevent_wf_in_acquire e_src i_src)
+                      (MATCH: SeqEvent.in_acquire_match D0 D1 i_src i_tgt)
+                      (STEP_SRC: SeqEvent.step_acquire
+                                   i_src (lift_out_acquire e_tgt vs_src1)
+                                   p0 (SeqMemory.mk svs_src0 sflag_src0)
+                                   p1 (SeqMemory.mk svs_src1 sflag_src1)),
+          (<<VALS: sim_vals_lift p1 svs_src1 svs_tgt1 vs_src1 vs_tgt1>>) /\
+          (<<FLAGS: sim_flags_lift D1 sflag_src1 sflag_tgt1 flag_src0 flag_tgt0>>)>>).
+  Proof.
+    i. hexploit (@event_step_acquire_exists e_tgt (lift_out_acquire e_tgt vs_src1) p0 (SeqMemory.mk svs_src0 sflag_src0)).
+    { eapply lift_out_acquire_wf. }
+    i. des. inv STEP.
+    { exists None. esplits.
+      { econs. }
+      { red. eauto. }
+      i. inv MATCH. inv STEP_SRC.
+      splits; auto.
+      { ii. hexploit (VAL loc); auto. i. des.
+        { rewrite SRC. rewrite TGT. auto. }
+        { hexploit WF0; eauto. ss. }
+      }
+      { ii. specialize (FLAGS loc). inv FLAGS. econs; auto.
+        etrans; eauto. eapply Flag.join_mon_r. eapply Flag.join_mon_l. auto.
+      }
+    }
+    { inv MEM. hexploit WF; eauto. i.
+      unfold lift_out_acquire in *. rewrite H in *. clarify.
+      eexists (Some _). esplits.
+      { econs; eauto. econs; eauto. }
+      { ss. }
+      i. ss. inv MATCH. inv STEP_SRC. inv MEM. ss. splits.
+      { ii. hexploit (VALS loc); eauto. i.
+        unfold ValueMap.acquire, Perms.acquired, Perms.join.
+        hexploit VAL; eauto. i. des.
+        { rewrite SRC. rewrite TGT. inv H0; ss.
+          { econs. }
+          { econs; eauto. }
+        }
+        { rewrite VALSRC. rewrite VALTGT.
+          rewrite NONESRC in *. rewrite NONETGT in *. inv H0; ss.
+          econs; eauto. refl.
+        }
+      }
+      { ii. hexploit (FLAGS loc); eauto. i.
+        specialize (FLAGS loc). inv FLAGS. econs; auto.
+        etrans; [|eapply Flag.join_ge_l].
+        destruct (flag_tgt0 loc) eqn:FLAGSRC, (flag_src0 loc) eqn:FLATGT; ss.
+        hexploit ACQFLAG; eauto. ss.
+      }
+    }
+  Qed.
+
+  Lemma sim_lift_event_step_release_normal:
+    forall
+      e_tgt e_src
+      p0 svs_src0 svs_tgt0 vs_src0 vs_tgt0
+      D0 sflag_src0 sflag_tgt0 flag_src0 flag_tgt0
+      (EVENT: ProgramEvent.le e_tgt e_src)
+      (VALS: sim_vals_lift p0 svs_src0 svs_tgt0 vs_src0 vs_tgt0)
+      (FLAGS: sim_flags_lift D0 sflag_src0 sflag_tgt0 flag_src0 flag_tgt0)
+      (ATLOCS: forall loc (NNA: ~ loc_na loc),
+          (<<FLAGSRC: flag_src0 loc = None>>) /\
+          (<<FLAGTGT: flag_tgt0 loc = None>>) /\
+          (<<VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc)>>))
+      (NORMAL: ~ is_release e_tgt),
+    exists i_tgt svs_tgt1 sflag_tgt1 p1,
+      (<<STEP_TGT: SeqEvent.step_release
+                     i_tgt (lift_out_release e_tgt)
+                     p0 (SeqMemory.mk svs_tgt0 sflag_tgt0)
+                     p1 (SeqMemory.mk svs_tgt1 sflag_tgt1)>>) /\
+      (<<INPUT_TGT: seqevent_wf_in_release e_tgt i_tgt>>) /\
+      (<<CONT: forall i_src svs_src1 sflag_src1 D1
+                      (INPUT_SRC: seqevent_wf_in_release e_src i_src)
+                      (MATCH: SeqEvent.in_release_match D0 D1 i_src i_tgt)
+                      (STEP_SRC: SeqEvent.step_release
+                                   i_src (lift_out_release e_tgt)
+                                   p0 (SeqMemory.mk svs_src0 sflag_src0)
+                                   p1 (SeqMemory.mk svs_src1 sflag_src1)),
+          (<<VALS: sim_vals_lift p1 svs_src1 svs_tgt1 vs_src0 vs_tgt0>>) /\
+          (<<FLAGS: sim_flags_lift D1 sflag_src1 sflag_tgt1 flag_src0 flag_tgt0>>)>>).
+  Proof.
+    i. hexploit (@event_step_release_exists e_tgt (lift_out_release e_tgt) p0 (SeqMemory.mk svs_src0 sflag_src0)).
+    { eapply lift_out_release_wf. }
+    i. des. inv STEP.
+    { exists None. esplits.
+      { econs. }
+      { red. eauto. }
+      i. inv MATCH. inv STEP_SRC.
+      splits; auto.
+      { ii. specialize (FLAGS loc). inv FLAGS. econs; auto.
+        etrans; eauto. eapply Flag.join_mon_r. eapply Flag.join_mon_l. auto.
+      }
+    }
+    { exfalso. eapply NORMAL. eapply WF. ss. }
+  Qed.
+
+  Lemma sim_lift_event_step_normal:
+    forall
+      e_tgt e_src
+      p0 svs_src0 svs_tgt0 vs_src0 vs_tgt0
+      D0 sflag_src0 sflag_tgt0 flag_src0 flag_tgt0
+      (EVENT: ProgramEvent.le e_tgt e_src)
+      (VALS: sim_vals_lift p0 svs_src0 svs_tgt0 vs_src0 vs_tgt0)
+      (FLAGS: sim_flags_lift D0 sflag_src0 sflag_tgt0 flag_src0 flag_tgt0)
+      (ATLOCS: forall loc (NNA: ~ loc_na loc),
+          (<<FLAGSRC: flag_src0 loc = None>>) /\
+          (<<FLAGTGT: flag_tgt0 loc = None>>) /\
+          (<<VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc)>>))
+      (NORMAL: ~ is_release e_tgt),
+    exists i_tgt svs_tgt1 sflag_tgt1 p1,
+      (<<STEP_TGT: SeqEvent.step_release
+                     i_tgt (lift_out_release e_tgt)
+                     p0 (SeqMemory.mk svs_tgt0 sflag_tgt0)
+                     p1 (SeqMemory.mk svs_tgt1 sflag_tgt1)>>) /\
+      (<<INPUT_TGT: seqevent_wf_in_release e_tgt i_tgt>>) /\
+      (<<CONT: forall i_src svs_src1 sflag_src1 D1
+                      (INPUT_SRC: seqevent_wf_in_release e_src i_src)
+                      (MATCH: SeqEvent.in_release_match D0 D1 i_src i_tgt)
+                      (STEP_SRC: SeqEvent.step_release
+                                   i_src (lift_out_release e_tgt)
+                                   p0 (SeqMemory.mk svs_src0 sflag_src0)
+                                   p1 (SeqMemory.mk svs_src1 sflag_src1)),
+          (<<VALS: sim_vals_lift p1 svs_src1 svs_tgt1 vs_src0 vs_tgt0>>) /\
+          (<<FLAGS: sim_flags_lift D1 sflag_src1 sflag_tgt1 flag_src0 flag_tgt0>>)>>).
+  Proof.
+    i. hexploit (@event_step_release_exists e_tgt (lift_out_release e_tgt) p0 (SeqMemory.mk svs_src0 sflag_src0)).
+    { eapply lift_out_release_wf. }
+    i. des. inv STEP.
+    { exists None. esplits.
+      { econs. }
+      { red. eauto. }
+      i. inv MATCH. inv STEP_SRC.
+      splits; auto.
+      { ii. specialize (FLAGS loc). inv FLAGS. econs; auto.
+        etrans; eauto. eapply Flag.join_mon_r. eapply Flag.join_mon_l. auto.
+      }
+    }
+    { exfalso. eapply NORMAL. eapply WF. ss. }
+  Qed.
+
+  Lemma sim_lift_event_step_release_release:
+    forall
+      e_tgt e_src
+      p0 svs_src0 svs_tgt0 vs_src0 vs_tgt0
+      D0 sflag_src0 sflag_tgt0 flag_src0 flag_tgt0
+      (EVENT: ProgramEvent.le e_tgt e_src)
+      (VALS: sim_vals_lift p0 svs_src0 svs_tgt0 vs_src0 vs_tgt0)
+      (FLAGS: sim_flags_lift D0 sflag_src0 sflag_tgt0 flag_src0 flag_tgt0)
+      (ATLOCS: forall loc (NNA: ~ loc_na loc),
+          (<<FLAGSRC: flag_src0 loc = None>>) /\
+          (<<FLAGTGT: flag_tgt0 loc = None>>) /\
+          (<<VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc)>>))
+      (RELEASE: is_release e_tgt)
+      (DEBT: forall
 
 
-      inv ACQ.
+,
+    exists i_tgt svs_tgt1 sflag_tgt1 p1,
+      (<<STEP_TGT: SeqEvent.step_release
+                     i_tgt (lift_out_release e_tgt)
+                     p0 (SeqMemory.mk svs_tgt0 sflag_tgt0)
+                     p1 (SeqMemory.mk svs_tgt1 sflag_tgt1)>>) /\
+      (<<INPUT_TGT: seqevent_wf_in_release e_tgt i_tgt>>) /\
+      (<<CONT: forall i_src svs_src1 sflag_src1 D1
+                      (INPUT_SRC: seqevent_wf_in_release e_src i_src)
+                      (MATCH: SeqEvent.in_release_match D0 D1 i_src i_tgt)
+                      (STEP_SRC: SeqEvent.step_release
+                                   i_src (lift_out_release e_tgt)
+                                   p0 (SeqMemory.mk svs_src0 sflag_src0)
+                                   p1 (SeqMemory.mk svs_src1 sflag_src1)),
+          (<<VALS: sim_vals_lift p1 svs_src1 svs_tgt1 vs_src0 vs_tgt0>>) /\
+          (<<FLAGS: sim_flags_lift D1 sflag_src1 sflag_tgt1 (fun _ => None) flag_tgt1>>)>>).
+  Proof.
+    i. hexploit (@event_step_release_exists e_tgt (lift_out_release e_tgt) p0 (SeqMemory.mk svs_src0 sflag_src0)).
+    { eapply lift_out_release_wf. }
+    i. des. inv STEP.
+    { exists None. esplits.
+      { econs. }
+      { red. eauto. }
+      i. inv MATCH. inv STEP_SRC.
+      splits; auto.
+      { ii. specialize (FLAGS loc). inv FLAGS. econs; auto.
+        etrans; eauto. eapply Flag.join_mon_r. eapply Flag.join_mon_l. auto.
+      }
+    }
+    { exfalso. eapply NORMAL. eapply WF. ss. }
+  Qed.
+
+  Lemma sim_lift_event_step_access_some:
+    forall
+      e
+
+      (SIM0: SeqLiftStep.sim_thread f vers flag_src0 flag_tgt0 vs_src0 vs_tgt0 mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0)
+      (SIM1: SeqLiftStep.sim_thread f vers flag_src1 flag_tgt1 vs_src1 vs_tgt1 mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src1 sc_tgt1)
+
+      (VALS: sim_vals_lift p svs_src0 svs_tgt0 vs_src0 vs_tgt0)
+      (FLAGS: sim_flags_lift D sflag_src0 sflag_tgt0 flag_src0 flag_tgt0)
+      (ATLOCS: forall loc (NNA: ~ loc_na loc),
+          (<<FLAGSRC: flag_src0 loc = None>>) /\
+          (<<FLAGTGT: flag_tgt0 loc = None>>) /\
+          (<<VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc)>>))
+      :
+    exists o,
+
+      Oracle.mk_output
+        (if (is_accessing e) then Perm.low else None)
+        (if (is_acquire e)
+         then (fun loc => if vs_src1 then Perm.high else Perm.low, fun loc => if vs_src1 then Perm.high else Perm.low)
+                                  (if (is_release e) then perms_top else None).
+
+Oracle.mk_output
+     : option Perm.t ->
+       option (Perms.t * ValueMap.t) -> option Perms.t -> Oracle.output
 
 
+forall i_tgt o p1 mem_tgt
+                       (INPUT: SeqEvent.wf_input e_tgt i_tgt)
+                       (OUTPUT: Oracle.wf_output e_tgt o)
+                       (STEP_TGT: SeqEvent.step i_tgt o p0 st_tgt0.(SeqState.memory) p1 mem_tgt),
+          exists i_src mem_src d1,
+            (<<STEP_SRC: SeqEvent.step i_src o p0 st_src1.(SeqState.memory) p1 mem_src>>) /\
+              (<<MATCH: SeqEvent.input_match d0 d1 i_src i_tgt>>) /\
+              (<<INPUT: SeqEvent.wf_input e_src i_src>>) /\
+              (<<DMIN: Flags.le d_min d1>>) /\
+              (<<SIM: sim_seq_cond
+                        (negb (is_release e_tgt))
+                        _ _ sim_terminal
+                        p1 d1
+                        (SeqState.mk _ st_src2 mem_src)
+                        (SeqState.mk _ st_tgt1 mem_tgt)>>)>>).
+  Proof.
 
-    hexploit SIM0; eauto.
-    {
 
-    inv
-
-
-    hexploit AT; eauto. i
-
-
-
-                            Flags.le (Flags.join f_tgt d0) f_src ->
-
-
-
+      (STEP_SRC: SeqEvent.step_update
+                   i_src o
+                   p0 (SeqMemory.mk svs_src0 sflag_src0)
+                   p1 (SeqMemory.mk svs_src1 sflag_src1))
       :
 
-      w0 p0 D0 smem_src0 smem_tgt0 mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0
-      lang_src lang_tgt sim_terminal st_src0 st_tgt0
-      e st_tgt1 lc_tgt1 sc_tgt1 mem_tgt1
-      (LIFT: sim_state_lift true w0 smem_src0 smem_tgt0 p0 D0 mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0)
-      (STEP: lower_step e (Thread.mk lang_tgt st_tgt0 lc_tgt0 sc_tgt0 mem_tgt0) (Thread.mk _ st_tgt1 lc_tgt1 sc_tgt1 mem_tgt1))
-      (SIM: sim_seq_at_step_case (@sim_seq lang_src lang_tgt sim_terminal) p0 D0 (SeqState.mk lang_src st_src0 smem_src0) (SeqState.mk lang_tgt st_tgt0 smem_tgt0))
-      (ATOMIC: is_atomic_event (ThreadEvent.get_program_event e))
-      (ACQUIRE: is_acquire
+        is_accessing
 
-      (NOMIXSRC: nomix _ st_src0)
-      (NOMIXTGT: nomix _ st_tgt0)
-      (CONSISTENT: Local.promise_consistent lc_tgt1)
-      (WF_SRC0: Local.wf lc_src0 mem_src0)
-      (WF_TGT0: Local.wf lc_tgt0 mem_tgt0)
-      (SC_SRC0: Memory.closed_timemap sc_src0 mem_src0)
-      (SC_TGT0: Memory.closed_timemap sc_tgt0 mem_tgt0)
-      (MEM_SRC0: Memory.closed mem_src0)
-      (MEM_TGT0: Memory.closed mem_tgt0),
-    exists st_src1 lc_src1 sc_src1 mem_src1,
-      (<<STEPS: rtc (@Thread.tau_step _)
-                    (Thread.mk _ st_src0 lc_src0 sc_src0 mem_src0)
-                    (Thread.mk _ st_src1 lc_src1 sc_src1 mem_src1)>>) /\
-        ((<<FAILURE: Thread.steps_failure (Thread.mk _ st_src1 lc_src1 sc_src1 mem_src1)>>) \/
-           (exists w1 p1 D1 smem_src1 smem_tgt1,
-               (<<LIFT: sim_state_lift true w1 smem_src1 smem_tgt1 p1 D1 mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src1 sc_tgt1>>) /\
-                 (<<SIM: @sim_seq_interference _ _ sim_terminal p1 D1 (SeqState.mk lang_src st_src1 smem_src1) (SeqState.mk lang_tgt st_tgt1 smem_tgt1)>>) /\
-                 (<<SC: sim_timemap_lift w1 sc_src1 sc_tgt1>>) /\
-                 (<<MEM: sim_memory_lift w1 mem_src1 mem_tgt1>>) /\
-                 (<<WORLD: world_messages_le (unchangable mem_src1 lc_src0.(Local.promises)) (unchangable mem_tgt1 lc_tgt0.(Local.promises)) w0 w1>>))) /\
-        (<<NOMIXSRC: nomix _ st_src1>>) /\
-        (<<NOMIXTGT: nomix _ st_tgt1>>)
-  .
-  Proof.
+(* SeqEvent.step *)
 
 
-  forall (loc0 : Loc.t) (ts0 : Time.t),
-  flag_src loc0 = None -> flag_tgt loc0 = Some ts0 -> ~ Ordering.le Ordering.acqrel ord
+(*       (STEP_TGT: SeqEvent.step_update *)
+(*                    i_src o *)
+(*                    p0 (SeqMemory.mk svs_tgt0 sflag_tgt0) *)
+(*                    p1 (SeqMemory.mk svs_tgt1 sflag_tgt1)) *)
+(*       : *)
+
+
+
+
+(*                    p1 *)
+(* p1 smem_tgt1) *)
+(*       (STEP_SRC: SeqEvent.step_update i_src o p0 smem_src0 p1 smem_src1), *)
+
+
+(*       (SeqEvent.step *)
+
+(*       w0 p0 D0 smem_src0 smem_tgt0 mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0 *)
+(*       lang_src lang_tgt sim_terminal st_src0 st_tgt0 *)
+(*       e st_tgt1 lc_tgt1 sc_tgt1 mem_tgt1 *)
+(*       (LIFT: sim_state_lift true w0 smem_src0 smem_tgt0 p0 D0 mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0) *)
+(*       (STEP_TGT: SeqEvent.step_update i_tgt o p0 smem_tgt0 p1 smem_tgt1) *)
+(*       (STEP_SRC: SeqEvent.step_update i_src o p0 smem_src0 p1 smem_src1), *)
+(*       sim_state_lift true w0 smem_src0 smem_tgt0 p0 D0 mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0. *)
+
+
+(*     (SIM: SeqLiftStep.sim_thread f vers flag_src flag_tgt vs_src vs_tgt mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt) *)
+(*       (VALS: sim_vals_lift p svs_src svs_tgt vs_src vs_tgt) *)
+(*       (FLAGS: sim_flags_lift D sflag_src sflag_tgt flag_src flag_tgt) *)
+(*       (ATLOCS: forall loc (NNA: ~ loc_na loc), *)
+(*           (<<FLAGSRC: flag_src loc = None>>) /\ *)
+(*           (<<FLAGTGT: flag_tgt loc = None>>) /\ *)
+(*           (<<VAL: option_rel Const.le (vs_tgt loc) (vs_src loc)>>)) *)
 
 
   Lemma sim_lift_lower_step:
@@ -2198,45 +2606,53 @@ Section LIFT.
     { eauto. }
     intros CONSTGT0. ss.
     inv STEP0.
-    exploit SIM; eauto. i. des.
+    hexploit sim_seq_atomic_step; eauto. i. des.
     destruct st_src1 as [st_src1 smem_src1].
     hexploit sim_lift_src_na_steps; eauto. i. des.
     hexploit Thread.rtc_tau_step_future; eauto. i. des; ss.
     punfold NOMIXTGT. exploit NOMIXTGT; eauto. i. des.
-
-    assert (EVENTLE: ProgramEvent.le (ThreadEvent.get_program_event e) e_src).
-    { admit. }
-
-    assert (exists i_src' i_tgt' D',
-               (<<WFTGT: SeqEvent.wf_input (ThreadEvent.get_program_event e) i_tgt'>>) /\
-               (<<MATCH: SeqEvent.input_match D0 D' i_src' i_tgt'>>)).
-    { hexploit wf_oracleoutput_exists. i. des.
-      hexploit event_step_exists; eauto. i. des.
-      hexploit SIM0; eauto. i. des. eauto.
+    punfold NOMIX. exploit NOMIX; eauto. i. des. pclearbot.
+    inv LIFT1.
+    assert (ACQFLAG: forall loc ts
+                            (NONE: flag_src loc = None)
+                            (SOME: flag_tgt loc = Some ts),
+               ~ is_acquire (ThreadEvent.get_program_event e)).
+    { ii. hexploit ACQ; eauto. i. ss.
+      hexploit (FLAGS loc); eauto. i. inv H1.
+      rewrite NONE in *. rewrite SOME in *. ss.
+      hexploit TGT; auto. rewrite flag_join_comm. i.
+      specialize (H0 loc). unfold Flags.join in H0.
+      rewrite H1 in H0. rewrite SRC in H0. ss.
     }
-    des. inv MATCH.
-
-    inv LIFT1. inv LOCAL; ss.
+    inv LOCAL; ss.
     { hexploit (ATLOCS loc); eauto. i. des.
       hexploit sim_thread_read; eauto.
-      { ii. red in WFTGT. des.
-        hexploit UPDATE; eauto. i. des.
-        hexploit H1; ss. i. des.
-        hexploit ACQUIRE1; eauto. i.
-        rewrite H2 in *. inv ACCESS. inv ACQUIRE.
-        { rewrite <- H9 in *. ss. }
-
-
-
-        {
-
-
-        admit. }
       i. des. subst. esplits.
       { etrans; [eauto|]. econs 2; [|refl]. econs.
         { econs. econs 2. econs; cycle 1.
           { eapply Local.step_read. eapply READ.
             instantiate (1:=val). etrans; eauto.
+          }
+          { eauto. }
+        }
+        { ss. }
+      }
+      { right. hexploit (SIM0
+
+SeqEvent.step
+
+
+admit. }
+      { auto. }
+      { auto. }
+    }
+
+ right.
+
+      right. esplits.
+
+
+etrans; eauto.
             rename val into xxxx.
           }
           { ss. dup STEP. }
