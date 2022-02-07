@@ -459,18 +459,18 @@ Module OrdThread.
     Hint Constructors opt_step.
 
     Definition steps_failure (e1: Thread.t lang): Prop :=
-      exists e2 e3,
+      exists e e2 e3,
         <<STEPS: rtc tau_step e1 e2>> /\
-        <<FAILURE: step true ThreadEvent.failure e2 e3>>.
+        <<STEP_FAILURE: step true e e2 e3>> /\
+        <<EVENT_FAILURE: ThreadEvent.get_machine_event e = MachineEvent.failure>>.
     Hint Unfold steps_failure.
 
     Definition consistent (e: Thread.t lang): Prop :=
-      forall mem1 sc1
-        (CAP: Memory.cap (Thread.memory e) mem1)
-        (SC_MAX: Memory.max_concrete_timemap mem1 sc1),
-        <<FAILURE: steps_failure (Thread.mk lang (Thread.state e) (Thread.local e) sc1 mem1)>> \/
+      forall mem1
+        (CAP: Memory.cap (Thread.memory e) mem1),
+        <<FAILURE: steps_failure (Thread.mk lang (Thread.state e) (Thread.local e) (Thread.sc e) mem1)>> \/
         exists e2,
-          <<STEPS: rtc tau_step (Thread.mk lang (Thread.state e) (Thread.local e) sc1 mem1) e2>> /\
+          <<STEPS: rtc tau_step (Thread.mk lang (Thread.state e) (Thread.local e) (Thread.sc e) mem1) e2>> /\
           <<PROMISES: (Local.promises (Thread.local e2)) = Memory.bot>>.
 
 

@@ -110,6 +110,37 @@ Module APFtoRASim.
     Hint Constructors sim_thread.
 
 
+    Lemma sim_tview_ra_race
+          rels tview_src tview_tgt e
+          (SIM: sim_tview tview_src tview_tgt):
+      RARaceW.ra_race L rels tview_src e <->
+      RARaceW.ra_race L rels tview_tgt e.
+    Proof.
+      inv SIM.
+      unfold RARaceW.ra_race, RARaceW.wr_race, RARaceW.ww_race.
+      split; i; des;
+        (try by left; esplits; eauto; congr);
+        (try by right; esplits; eauto; congr).
+    Qed.
+
+    Lemma sim_local_ra_race
+          rels lc_src lc_tgt e
+          (SIM: sim_local lc_src lc_tgt):
+      RARaceW.ra_race L rels (Local.tview lc_src) e <->
+      RARaceW.ra_race L rels (Local.tview lc_tgt) e.
+    Proof.
+      inv SIM. eapply sim_tview_ra_race; eauto.
+    Qed.
+
+    Lemma sim_thread_ra_race
+          rels e_src e_tgt e
+          (SIM: sim_thread rels e_src e_tgt):
+      RARaceW.ra_race L rels (Local.tview (Thread.local e_src)) e <->
+      RARaceW.ra_race L rels (Local.tview (Thread.local e_tgt)) e.
+    Proof.
+      inv SIM. eapply sim_local_ra_race; eauto.
+    Qed.
+
     Lemma sim_memory_ord_le
           loc to ord rels mem_src mem_tgt
           ord'
@@ -145,6 +176,15 @@ Module APFtoRASim.
     Proof.
       inv SIM. inv TVIEW. ii.
       rewrite PROMISES, CUR in *. eauto.
+    Qed.
+
+    Lemma sim_thread_promise_consistent
+          rels e_src e_tgt
+          (SIM: sim_thread rels e_src e_tgt)
+          (CONS: Local.promise_consistent (Thread.local e_tgt)):
+      Local.promise_consistent (Thread.local e_src).
+    Proof.
+      inv SIM. eapply sim_local_promise_consistent; eauto.
     Qed.
 
     Lemma sim_memory_closed_timemap_src
@@ -1304,7 +1344,7 @@ Module APFtoRASim.
     Qed.
 
 
-    Inductive sim_event: forall (e_src e_tgt: ThreadEvent.t), Prop :=
+    Variant sim_event: forall (e_src e_tgt: ThreadEvent.t), Prop :=
     | sim_event_promise
         loc from to msg kind:
       sim_event (ThreadEvent.promise loc from to msg kind)
@@ -1349,6 +1389,14 @@ Module APFtoRASim.
                 (ThreadEvent.racy_update loc valr valw ordr ordw)
     .
     Hint Constructors sim_event.
+
+    Lemma sim_event_eq_program_event
+          e_src e_tgt
+          (SIM: sim_event e_src e_tgt):
+      ThreadEvent.get_program_event e_src = ThreadEvent.get_program_event e_tgt.
+    Proof.
+      inv SIM; ss.
+    Qed.
 
     Lemma thread_step
           rels e1_src e1_tgt

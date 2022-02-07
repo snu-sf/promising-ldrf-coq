@@ -78,12 +78,19 @@ Module PFtoAPFSim.
     | sim_thread_intro
         (STATE: (Thread.state e_src) = (Thread.state e_tgt))
         (LOCAL: (Thread.local e_src) = (Thread.local e_tgt))
-        (* (RESERVE_ONLY: OrdLocal.reserve_only L (Local.promises (Thread.local e_src))) *)
-        (* (WRITES_WF: Writes.wf rels (Local.promises (Thread.local e_src)) (Thread.memory e_src)) *)
         (SC: (Thread.sc e_src) = (Thread.sc e_tgt))
         (MEMORY: sim_memory rels (Thread.memory e_src) (Thread.memory e_tgt))
     .
     Hint Constructors sim_thread.
+
+    Lemma sim_thread_promise_consistent
+          rels e_src e_tgt
+          (SIM: sim_thread rels e_src e_tgt)
+          (CONS: Local.promise_consistent (Thread.local e_tgt)):
+      Local.promise_consistent (Thread.local e_src).
+    Proof.
+      inv SIM. rewrite LOCAL in *. ss.
+    Qed.
 
     Lemma sim_memory_cons
           a rels mem_src mem_tgt
@@ -761,6 +768,14 @@ Module PFtoAPFSim.
     .
     Hint Constructors sim_event.
 
+    Lemma sim_event_eq_program_event
+          e_src e_tgt
+          (SIM: sim_event e_src e_tgt):
+      ThreadEvent.get_program_event e_src = ThreadEvent.get_program_event e_tgt.
+    Proof.
+      inv SIM; ss.
+    Qed.
+
     Lemma program_step
           rels lc1_src sc1_src mem1_src
           e_tgt lc1_tgt sc1_tgt mem1_tgt lc2_tgt sc2_tgt mem2_tgt
@@ -842,83 +857,118 @@ Module PFtoAPFSim.
     Qed.
 
     Lemma thread_step
-          rels lc1_src sc1_src mem1_src
-          e_tgt lc1_tgt sc1_tgt mem1_tgt lc2_tgt sc2_tgt mem2_tgt
-          (LC1: lc1_src = lc1_tgt)
-          (SC1: sc1_src = sc1_tgt)
-          (MEM1: sim_memory rels mem1_src mem1_tgt)
-          (WRITES1: Writes.wf L rels mem1_src)
-          (RESERVE_ONLY1: OrdLocal.reserve_only L (Local.promises lc1_src))
-          (NORMAL_TVIEW1: Normal.normal_tview L (Local.tview lc1_src))
-          (NORMAL_MEM1: Normal.normal_memory L mem1_src)
-          (WF1_SRC: Local.wf lc1_src mem1_src)
-          (SC1_SRC: Memory.closed_timemap sc1_src mem1_src)
-          (MEM1_SRC: Memory.closed mem1_src)
-          (STEP_TGT: Local.program_step e_tgt lc1_tgt sc1_tgt mem1_tgt lc2_tgt sc2_tgt mem2_tgt):
-      (exists e_src lc2_src sc2_src mem2_src,
-          (<<STEP_SRC: OrdLocal.program_step L Ordering.na Ordering.plain 
-                                             e_src lc1_src sc1_src mem1_src lc2_src sc2_src mem2_src>>) /\
+          rels e1_src e1_tgt
+          pf e_tgt e2_tgt
+          (SIM1: sim_thread rels e1_src e1_tgt)
+          (WRITES1: Writes.wf L rels (Thread.memory e1_src))
+          (RESERVE_ONLY1: OrdLocal.reserve_only L (Local.promises (Thread.local e1_src)))
+          (NORMAL1_SRC: Normal.normal_thread L e1_src)
+          (WF1_SRC: Local.wf (Thread.local e1_src) (Thread.memory e1_src))
+          (SC1_SRC: Memory.closed_timemap (Thread.sc e1_src) (Thread.memory e1_src))
+          (MEM1_SRC: Memory.closed (Thread.memory e1_src))
+          (PROMISE: forall loc from to msg kind
+                      (EVENT: e_tgt = ThreadEvent.promise loc from to msg kind),
+              L loc /\ msg = Message.reserve)
+          (STEP_TGT: Thread.step pf e_tgt e1_tgt e2_tgt):
+      (exists e_src e2_src,
+          (<<STEP_SRC: OrdThread.step L Ordering.na Ordering.plain pf e_src e1_src e2_src>>) /\
           (<<EVENT: sim_event e_src e_tgt>>) /\
           (<<RACY_READ: forall loc val ord (EVENT: e_tgt = ThreadEvent.racy_read loc val ord), ~ L loc>>) /\
           (<<RACY_WRITE: forall loc val ord (EVENT: e_tgt = ThreadEvent.racy_write loc val ord), ~ L loc>>) /\
           (<<RACY_UPDATE: forall loc valr valw ordr ordw
                             (EVENT: e_tgt = ThreadEvent.racy_update loc valr valw ordr ordw),
               ~ L loc \/ Ordering.le ordr Ordering.na \/ Ordering.le ordw Ordering.na>>) /\
-          (<<LC2: lc2_src = lc2_tgt>>) /\
-          (<<SC2: sc2_src = sc2_tgt>>) /\
-          (<<MEM2: sim_memory (Writes.append L e_src rels) mem2_src mem2_tgt>>) /\
-          (<<NORMAL_TVIEW2: Normal.normal_tview L (Local.tview lc2_src)>>) /\
-          (<<NORMAL_MEM2: Normal.normal_memory L mem2_src>>)) \/
-      (<<RACE: RARaceW.ra_race L rels (Local.tview lc1_src) (ThreadEvent.get_program_event e_tgt)>>).
+          (<<SIM2: sim_thread (Writes.append L e_src rels) e2_src e2_tgt>>) /\
+          (<<NORMAL2_SRC: Normal.normal_thread L e2_src>>)) \/
+      (<<RACE: RARaceW.ra_race L rels (Local.tview (Thread.local e1_src)) (ThreadEvent.get_program_event e_tgt)>>).
     Proof.
+      destruct e1_src as [st1_src lc1_src sc1_src mem1_src].
+      destruct e1_tgt as [st1_tgt lc1_tgt sc1_tgt mem1_tgt].
+      inv SIM1. inv NORMAL1_SRC. ss.
       inv STEP_TGT.
-      - left. esplits; eauto; ss. econs.
-      - exploit read_step; eauto. i. des.
-        + left. esplits; eauto; ss. econs. ss.
-        + right. left. ss. esplits; eauto.
-      - exploit write_step; eauto. i. des.
-        dup STEP_SRC. inv STEP_SRC0.
-        exploit Normal.write_step; try exact STEP; eauto; ss. i. des.
-        left. esplits; [econs 3|..]; eauto; ss.
-        eapply sim_memory_append; eauto.
-      - exploit read_step; eauto. i. des; cycle 1.
-        { right. left. esplits; ss; eauto. }
-        dup STEP_SRC. inv STEP_SRC0.
-        exploit Local.read_step_future; try exact STEP; eauto. i. des.
-        exploit write_step; eauto. i. des.
-        dup STEP_SRC0. inv STEP_SRC1.
-        exploit Normal.write_step; try exact STEP0; eauto.
-        { inv STEP. destruct releasedr; ss. eauto. }
-        i. des.
-        left. esplits; [econs 4|..]; eauto; ss.
-        eapply sim_memory_append; eauto.
-      - left. esplits; [econs 5|..]; eauto; ss.
-        exploit Normal.fence_step; eauto.
-      - left. esplits; [econs 6|..]; eauto; ss.
-        exploit Normal.fence_step; eauto.
-      - left. esplits; [econs 7|..]; eauto; ss.
-      - destruct (L loc) eqn:LOC.
-        + exploit write_na_step_loc; try exact LOCAL; eauto. i. des.
-          exploit (@Normal.ord_program_step L Ordering.na Ordering.plain);
-            try econs 8; eauto; ss. i. des.
-          left. esplits; [econs 8|..]; eauto; ss.
-          unfold Writes.append. ss. condtac; ss.
-        + exploit write_na_step_other; try exact LOCAL; eauto; try congr. i. des.
-          exploit Normal.write_na_step; try exact STEP_SRC; eauto. i. des.
-          left. esplits; [econs 8| | | |M|..]; eauto; ss.
-          * econs; eauto. condtac; ss. eauto.
-          * unfold Writes.append. ss. condtac; ss.
-      - exploit racy_read_step; try exact LOCAL; eauto. i. des.
-        + left. esplits; [econs 9|..]; eauto; ss. i. clarify.
-        + right. left. esplits; ss; eauto.
-      - exploit racy_write_step; try exact LOCAL; eauto. i. des.
-        + left. esplits; [econs 10|..]; eauto; ss. i. clarify.
-        + right. right. esplits; ss; eauto.
-      - exploit racy_update_step; try exact LOCAL; eauto. i. inv x0.
-        + left. esplits; [econs 11|..]; eauto; ss.
-          * des; eauto.
-          * i. clarify. des; eauto.
-        + right. left. esplits; ss; eauto.
+      { inv STEP. ss.
+        exploit PROMISE; eauto. i. des. subst.
+        exploit promise_step; try exact LOCAL; eauto; ss. i. des. subst.
+        left. esplits.
+        - econs 1; [econs|]; eauto. ii. clarify.
+        - ss.
+        - ss.
+        - ss.
+        - ss.
+        - ss.
+        - exploit Normal.promise_step; try exact STEP_SRC; eauto; ss. i. des.
+          econs; eauto.
+      }
+      inv STEP.
+      exploit program_step; try exact LOCAL; eauto; ss. i. des; eauto.
+      subst. left. esplits.
+      - econs 2. econs; [|eauto]. inv EVENT; eauto.
+      - ss.
+      - ss.
+      - ss.
+      - ss.
+      - ss.
+      - ss.
+    Qed.
+
+    Lemma reserve_step
+          rels e1_src e1_tgt e2_tgt
+          (SIM1: sim_thread rels e1_src e1_tgt)
+          (WRITES1: Writes.wf L rels (Thread.memory e1_src))
+          (RESERVE_ONLY1: OrdLocal.reserve_only L (Local.promises (Thread.local e1_src)))
+          (NORMAL1_SRC: Normal.normal_thread L e1_src)
+          (WF1_SRC: Local.wf (Thread.local e1_src) (Thread.memory e1_src))
+          (WF1_TGT: Local.wf (Thread.local e1_tgt) (Thread.memory e1_tgt))
+          (SC1_SRC: Memory.closed_timemap (Thread.sc e1_src) (Thread.memory e1_src))
+          (SC1_TGT: Memory.closed_timemap (Thread.sc e1_tgt) (Thread.memory e1_tgt))
+          (MEM1_SRC: Memory.closed (Thread.memory e1_src))
+          (MEM1_TGT: Memory.closed (Thread.memory e1_tgt))
+          (STEP_TGT: Thread.reserve_step e1_tgt e2_tgt):
+      exists e2_src,
+        (<<STEP_SRC: Thread.reserve_step e1_src e2_src>>) /\
+        (<<SIM2: sim_thread rels e2_src e2_tgt>>) /\
+        (<<NORMAL2_SRC: Normal.normal_thread L e2_src>>).
+    Proof.
+      destruct e1_src as [st1_src lc1_src sc1_src mem1_src].
+      destruct e1_tgt as [st1_tgt lc1_tgt sc1_tgt mem1_tgt].
+      inv SIM1. inv NORMAL1_SRC. ss.
+      inv STEP_TGT. inv STEP; inv STEP0; [|inv LOCAL].
+      exploit promise_step; try exact LOCAL; eauto; ss. i. des.
+      exploit Normal.promise_step; try exact STEP_SRC; eauto; ss. i. des.
+      esplits.
+      + econs 1. econs 1. econs; eauto.
+      + eauto.
+      + econs; eauto.
+    Qed.
+
+    Lemma cancel_step
+          rels e1_src e1_tgt e2_tgt
+          (SIM1: sim_thread rels e1_src e1_tgt)
+          (WRITES1: Writes.wf L rels (Thread.memory e1_src))
+          (RESERVE_ONLY1: OrdLocal.reserve_only L (Local.promises (Thread.local e1_src)))
+          (NORMAL1_SRC: Normal.normal_thread L e1_src)
+          (WF1_SRC: Local.wf (Thread.local e1_src) (Thread.memory e1_src))
+          (WF1_TGT: Local.wf (Thread.local e1_tgt) (Thread.memory e1_tgt))
+          (SC1_SRC: Memory.closed_timemap (Thread.sc e1_src) (Thread.memory e1_src))
+          (SC1_TGT: Memory.closed_timemap (Thread.sc e1_tgt) (Thread.memory e1_tgt))
+          (MEM1_SRC: Memory.closed (Thread.memory e1_src))
+          (MEM1_TGT: Memory.closed (Thread.memory e1_tgt))
+          (STEP_TGT: Thread.cancel_step e1_tgt e2_tgt):
+      exists e2_src,
+        (<<STEP_SRC: Thread.cancel_step e1_src e2_src>>) /\
+        (<<SIM2: sim_thread rels e2_src e2_tgt>>) /\
+        (<<NORMAL2_SRC: Normal.normal_thread L e2_src>>).
+    Proof.
+      destruct e1_src as [st1_src lc1_src sc1_src mem1_src].
+      destruct e1_tgt as [st1_tgt lc1_tgt sc1_tgt mem1_tgt].
+      inv SIM1. inv NORMAL1_SRC. ss.
+      inv STEP_TGT. inv STEP; inv STEP0; [|inv LOCAL].
+      exploit promise_step; try exact LOCAL; eauto; ss. i. des.
+      exploit Normal.promise_step; try exact STEP_SRC; eauto; ss. i. des.
+      esplits.
+      + econs 1. econs 1. econs; eauto.
+      + eauto.
+      + econs; eauto.
     Qed.
 
 

@@ -274,5 +274,18 @@ Module Writes.
     (*   - exploit RELS; eauto. i. des. ss. *)
     (*   - exploit RELS; eauto. i. des. ss. *)
     (* Qed. *)
+
+    Lemma cap_wf
+          rels mem cap
+          (CLOSED: Memory.closed mem)
+          (CAP: Memory.cap mem cap)
+          (WF: wf rels mem):
+      wf rels cap.
+    Proof.
+      inv WF. econs; i.
+      - exploit SOUND; eauto. i. des.
+        inv CAP. exploit SOUND0; eauto.
+      - exploit Memory.cap_inv; try exact GET; eauto. i. des; ss. eauto.
+    Qed.
   End Writes.
 End Writes.

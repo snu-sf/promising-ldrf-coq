@@ -342,7 +342,7 @@ Module WThread.
     (* Qed. *)
 
 
-    Lemma cap_tau_steps_current_tau_steps
+    Lemma cap_tau_steps_current_tau_steps_aux
           rels0 rels1 e0 e1 fe0
           (THREAD: thread_map ident_map e0 fe0)
           (STEPS: tau_steps rels0 rels1 e0 e1)
@@ -372,22 +372,18 @@ Module WThread.
       destruct e; inv EVENT; ss.
     Qed.
 
-    Lemma cap_plus_step_current_plus_step
-          rels1 rels2 rels3 e e1 e2 e3 sc1 mem1
+    Lemma cap_tau_steps_current_tau_steps
+          rels1 rels2 e1 e2 mem1
           (LOCAL: Local.wf (Thread.local e1) (Thread.memory e1))
           (MEMORY: Memory.closed (Thread.memory e1))
           (SC: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
           (CAP: Memory.cap (Thread.memory e1) mem1)
-          (SC_MAX: Memory.max_concrete_timemap mem1 sc1)
-          (STEPS: tau_steps rels1 rels2 (Thread.mk lang (Thread.state e1) (Thread.local e1) sc1 mem1) e2)
-          (STEP: WThread.step rels2 rels3 e e2 e3):
-        exists rels3' e' e2' e3',
+          (STEPS: tau_steps rels1 rels2 (Thread.mk lang (Thread.state e1) (Thread.local e1) (Thread.sc e1) mem1) e2):
+        exists e2',
           (<<STEPS: tau_steps rels1 rels2 e1 e2'>>) /\
-          (<<STEP: WThread.step rels2 rels3' e' e2' e3'>>) /\
-          (<<LOCAL: local_map ident_map (Thread.local e2) (Thread.local e2')>>) /\
-          (<<EVENT: tevent_map ident_map e' e>>).
+          (<<THREAD: thread_map ident_map e2 e2'>>).
     Proof.
-      exploit cap_tau_steps_current_tau_steps; try apply STEPS; eauto; ss.
+      exploit cap_tau_steps_current_tau_steps_aux; try apply STEPS; eauto; ss.
       { destruct e1. ss. econs; eauto.
         { eapply ident_map_local. }
         { econs.
@@ -404,16 +400,54 @@ Module WThread.
         }
         { eapply mapping_map_lt_iff_collapsable_unwritable. eapply ident_map_lt_iff. }
         { eapply ident_map_timemap. }
-        { eapply Memory.max_concrete_timemap_spec; eauto.
-          eapply Memory.cap_closed_timemap; eauto. }
+        { refl. }
       }
       { eapply Local.cap_wf; eauto. }
       { eapply Memory.cap_closed; eauto. }
-      { eapply Memory.max_concrete_timemap_closed; eauto. }
+      { eapply Memory.cap_closed_timemap; eauto. }
+      i. des. esplits; eauto.
+    Qed.
+
+    Lemma cap_plus_step_current_plus_step
+          rels1 rels2 rels3 e e1 e2 e3 mem1
+          (LOCAL: Local.wf (Thread.local e1) (Thread.memory e1))
+          (MEMORY: Memory.closed (Thread.memory e1))
+          (SC: Memory.closed_timemap (Thread.sc e1) (Thread.memory e1))
+          (CAP: Memory.cap (Thread.memory e1) mem1)
+          (STEPS: tau_steps rels1 rels2 (Thread.mk lang (Thread.state e1) (Thread.local e1) (Thread.sc e1) mem1) e2)
+          (STEP: WThread.step rels2 rels3 e e2 e3):
+        exists rels3' e' e2' e3',
+          (<<STEPS: tau_steps rels1 rels2 e1 e2'>>) /\
+          (<<STEP: WThread.step rels2 rels3' e' e2' e3'>>) /\
+          (<<LOCAL: local_map ident_map (Thread.local e2) (Thread.local e2')>>) /\
+          (<<EVENT: tevent_map ident_map e' e>>).
+    Proof.
+      exploit cap_tau_steps_current_tau_steps_aux; try apply STEPS; eauto; ss.
+      { destruct e1. ss. econs; eauto.
+        { eapply ident_map_local. }
+        { econs.
+          { i. eapply Memory.cap_inv in GET; eauto. des; auto.
+            right. exists to, from, msg, msg; splits; ss.
+            { eapply ident_map_message. }
+            { refl. }
+          }
+          { i. eapply CAP in GET. left. esplits; ss.
+            { refl. }
+            { refl. }
+            { i. econs; eauto. }
+          }
+        }
+        { eapply mapping_map_lt_iff_collapsable_unwritable. eapply ident_map_lt_iff. }
+        { eapply ident_map_timemap. }
+        { refl. }
+      }
+      { eapply Local.cap_wf; eauto. }
+      { eapply Memory.cap_closed; eauto. }
+      { eapply Memory.cap_closed_timemap; eauto. }
       i. des.
       exploit steps_future; try eapply tau_steps_steps; try apply STEPS; ss.
       { eapply Local.cap_wf; eauto. }
-      { eapply Memory.max_concrete_timemap_closed; eauto. }
+      { eapply Memory.cap_closed_timemap; eauto. }
       { eapply Memory.cap_closed; eauto. }
       i. des.
       exploit steps_future; try eapply tau_steps_steps; try apply STEPS0; ss. i. des.

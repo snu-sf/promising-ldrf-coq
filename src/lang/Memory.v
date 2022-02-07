@@ -16,10 +16,6 @@ Require Import Cell.
 Set Implicit Arguments.
 
 
-Ltac contra := match goal with
-               | [ |- ?P] => destruct (classic P); ss; exfalso
-               end.
-
 Module Memory.
   Definition t := Loc.t -> Cell.t.
 
@@ -3163,7 +3159,7 @@ Module Memory.
         (PROMISE: promise promises1 mem1 loc from to msg promises2 mem2 kind):
     prev_None mem1 mem2.
   Proof.
-    ii. contra.
+    ii. apply NNPP. ii.
     revert GET2. inv PROMISE.
     - erewrite add_o; eauto. condtac; ss; eauto.
       i. des. inv GET2. eauto.
