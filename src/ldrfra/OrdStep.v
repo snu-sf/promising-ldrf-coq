@@ -857,6 +857,26 @@ Module OrdThread.
         i. des. inv GET. exploit PF; eauto.
       - erewrite Memory.remove_o; eauto. condtac; ss; eauto.
     Qed.
+
+    Lemma reserve_step_reserve_only
+          e1 e2
+          (PROMISES1: OrdLocal.reserve_only L (Local.promises (Thread.local e1)))
+          (STEP: @Thread.reserve_step lang e1 e2):
+      <<PROMISES2: OrdLocal.reserve_only L (Local.promises (Thread.local e2))>>.
+    Proof.
+      inv STEP. inv STEP0; inv STEP; inv LOCAL. ss.
+      eapply OrdLocal.promise_reserve_only; eauto.
+      Qed.
+
+    Lemma cancel_step_reserve_only
+          e1 e2
+          (PROMISES1: OrdLocal.reserve_only L (Local.promises (Thread.local e1)))
+          (STEP: @Thread.cancel_step lang e1 e2):
+      <<PROMISES2: OrdLocal.reserve_only L (Local.promises (Thread.local e2))>>.
+    Proof.
+      inv STEP. inv STEP0; inv STEP; inv LOCAL. ss.
+      eapply OrdLocal.promise_reserve_only; eauto.
+      Qed.
   End OrdThread.
 End OrdThread.
 

@@ -174,6 +174,26 @@ Module Writes.
       - inv STEP. eapply write_wf; eauto.
     Qed.
 
+    Lemma reserve_step_wf
+          rels lang e1 e2
+          (RELS1: wf rels (Thread.memory e1))
+          (STEP: @Thread.reserve_step lang e1 e2):
+      wf rels (Thread.memory e2).
+    Proof.
+      inv STEP. inv STEP0; inv STEP; inv LOCAL. ss.
+      eapply promise_wf; eauto.
+    Qed.
+
+    Lemma cancel_step_wf
+          rels lang e1 e2
+          (RELS1: wf rels (Thread.memory e1))
+          (STEP: @Thread.cancel_step lang e1 e2):
+      wf rels (Thread.memory e2).
+    Proof.
+      inv STEP. inv STEP0; inv STEP; inv LOCAL. ss.
+      eapply promise_wf; eauto.
+    Qed.
+
     Lemma promise_disjoint
           promises1 mem1 loc from to msg promises2 mem2 kind
           promises
