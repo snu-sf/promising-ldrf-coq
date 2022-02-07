@@ -355,6 +355,43 @@ Module OrdLocal.
       - exploit Memory.remove_get0; try exact PROMISES. i. des.
         exploit Memory.remove_get0; try exact REMOVE. i. des. congr.
     Qed.
+
+    Lemma ordc_na
+          ordc ord loc
+          (ORDC: Ordering.le ordc Ordering.na):
+      (if L loc then Ordering.join ord ordc else ord) = ord.
+    Proof.
+      condtac; ss.
+      destruct ordc, ord; ss.
+    Qed.
+
+    Lemma write_step_le
+          lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
+          ordc'
+          (STEP: write_step lc1 sc1 mem1 loc from to val releasedm released
+                            (if L loc then Ordering.join ord ordc' else ord) lc2 sc2 mem2 kind)
+          (ORDC: Ordering.le ordc' ordcw):
+      write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind.
+    Proof.
+      econs; eauto.
+      inv STEP. condtac; ss.
+      replace (Ordering.join ord ordcw) with
+          (Ordering.join (Ordering.join ord ordc') ordcw); ss.
+      destruct ord, ordcw, ordc'; ss.
+    Qed.
+
+    Lemma racy_write_step_le
+          lc1 mem1 loc ord
+          ordc'
+          (STEP: racy_write_step lc1 mem1 loc (if L loc then Ordering.join ord ordc' else ord))
+          (ORDC: Ordering.le ordc' ordcw):
+      racy_write_step lc1 mem1 loc ord.
+    Proof.
+      inv STEP. econs; eauto. condtac; ss.
+      replace (Ordering.join ord ordcw) with
+          (Ordering.join (Ordering.join ord ordc') ordcw); ss.
+      destruct ord, ordcw, ordc'; ss.
+    Qed.
   End OrdLocal.
 End OrdLocal.
 

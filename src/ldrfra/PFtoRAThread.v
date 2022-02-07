@@ -30,8 +30,9 @@ Require Import JoinedView.
 
 Require Import PFStep.
 Require Import OrdStep.
-Require Import RAStep.
+Require Import WStep.
 Require Import Stable.
+Require Import PFtoAPFSim.
 Require Import APFtoRASim.
 
 Set Implicit Arguments.

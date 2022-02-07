@@ -495,15 +495,6 @@ Module PFtoAPFSim.
       esplits; eauto.
     Qed.
 
-    Lemma ordc_na
-          ordc ord loc
-          (ORDC: Ordering.le ordc Ordering.na):
-      (if L loc then Ordering.join ord ordc else ord) = ord.
-    Proof.
-      condtac; ss.
-      destruct ordc, ord; ss.
-    Qed.
-
     Lemma read_step
           rels lc1_src mem1_src
           lc1_tgt mem1_tgt loc to val released ord lc2_tgt
@@ -540,7 +531,7 @@ Module PFtoAPFSim.
         esplits; eauto.
       }
       left. esplits.
-      - econs; eauto. rewrite ordc_na; ss. eauto.
+      - econs; eauto. rewrite OrdLocal.ordc_na; ss. eauto.
       - ss.
       - exploit Normal.read_step; try exact WF1_SRC; eauto. i.
         inv READABLE. inv NORMAL_TVIEW1. rewrite CUR in *; ss.
@@ -681,7 +672,7 @@ Module PFtoAPFSim.
     Proof.
       inv STEP_TGT.
       exploit is_racy; eauto. i. des.
-      - left. splits; ss. econs; eauto. rewrite ordc_na; ss.
+      - left. splits; ss. econs; eauto. rewrite OrdLocal.ordc_na; ss.
       - right. unfold RARaceW.wr_race.
         unguard; des; esplits; eauto.
     Qed.

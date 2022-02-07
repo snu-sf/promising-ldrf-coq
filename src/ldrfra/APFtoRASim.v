@@ -1350,44 +1350,6 @@ Module APFtoRASim.
     .
     Hint Constructors sim_event.
 
-    Lemma ordc_na
-          ordc ord loc
-          (ORDC: Ordering.le ordc Ordering.na):
-      (if L loc then Ordering.join ord ordc else ord) = ord.
-    Proof.
-      condtac; ss.
-      destruct ordc, ord; ss.
-    Qed.
-
-    Lemma ord_write_step_le
-          ordc lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
-          ordc'
-          (STEP: OrdLocal.write_step L ordc lc1 sc1 mem1 loc from to val releasedm released
-                                     (if L loc then Ordering.join ord ordc' else ord) lc2 sc2 mem2 kind)
-          (ORDC: Ordering.le ordc' ordc):
-      OrdLocal.write_step L ordc lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind.
-    Proof.
-      econs; eauto.
-      inv STEP. condtac; ss.
-      replace (Ordering.join ord ordc) with
-          (Ordering.join (Ordering.join ord ordc') ordc); ss.
-      destruct ord, ordc, ordc'; ss.
-    Qed.
-
-    Lemma ord_racy_write_step_le
-          ordc lc1 mem1 loc ord
-          ordc'
-          (STEP: OrdLocal.racy_write_step L ordc lc1 mem1 loc
-                                          (if L loc then Ordering.join ord ordc' else ord))
-          (ORDC: Ordering.le ordc' ordc):
-      OrdLocal.racy_write_step L ordc lc1 mem1 loc ord.
-    Proof.
-      inv STEP. econs; eauto. condtac; ss.
-      replace (Ordering.join ord ordc) with
-          (Ordering.join (Ordering.join ord ordc') ordc); ss.
-      destruct ord, ordc, ordc'; ss.
-    Qed.
-
     Lemma thread_step
           rels e1_src e1_tgt
           pf e_tgt e2_tgt
@@ -1447,7 +1409,7 @@ Module APFtoRASim.
         + econs 2. econs; [|econs 1]. eauto.
         + unguard. esplits; ss.
       - (* read step *)
-        inv LOCAL1. rewrite ordc_na in *; ss.
+        inv LOCAL1. rewrite OrdLocal.ordc_na in *; ss.
         destruct (L loc) eqn:LOC.
         + exploit read_step_loc; try exact LOCAL0; eauto. i. unguardH x0. des.
           { left. esplits.
@@ -1462,7 +1424,7 @@ Module APFtoRASim.
       - (* write step *)
         inv LOCAL1. destruct (L loc) eqn:LOC.
         + hexploit write_step_loc; try exact LOCAL0; eauto; ss. i. des.
-          exploit ord_write_step_le.
+          exploit OrdLocal.write_step_le.
           { rewrite LOC. eauto. }
           { ss. }
           i. left. esplits.
@@ -1504,7 +1466,7 @@ Module APFtoRASim.
             { destruct released_src; ss. inv STEP_SRC. inv STEP1. eauto. }
             { destruct releasedr; ss. inv STEP. eauto. }
             i. des. left. esplits.
-            { apply ord_write_step_le in STEP_SRC0; ss.
+            { apply OrdLocal.write_step_le in STEP_SRC0; ss.
               econs 2. econs; [|econs 4]; eauto. destruct ordr; ss.
             }
             { unguard. unfold Writes.append. ss. rewrite LOC in *.
@@ -1586,7 +1548,7 @@ Module APFtoRASim.
               { eapply Stable.stable_memory_le; eauto. }
         }
       - (* racy read step *)
-        inv LOCAL1. rewrite ordc_na in STEP; ss.
+        inv LOCAL1. rewrite OrdLocal.ordc_na in STEP; ss.
         exploit racy_read_step; try exact LOCAL1; eauto. i. des.
         left. esplits.
         + econs 2. econs; [|econs 9]; eauto.
@@ -1594,7 +1556,7 @@ Module APFtoRASim.
       - (* racy write step *)
         inv LOCAL1.
         exploit racy_write_step; try exact LOCAL1; eauto. i. des.
-        apply ord_racy_write_step_le in x0; try by (destruct ord; ss).
+        apply OrdLocal.racy_write_step_le in x0; try by (destruct ord; ss).
         left. esplits.
         + econs 2. econs; [|econs 10]; eauto.
         + unguard. esplits; ss.
