@@ -3148,6 +3148,7 @@ Lemma sim_thread_fence_step_release
               (<<ORD: Ordering.le Ordering.acqrel ordr \/ Ordering.le Ordering.seqcst ordw>>))>>) /\
       (<<WF: Mapping.wfs f1>>) /\
       (<<MAPLE: Mapping.les f0 f1>>) /\
+      (<<VERSWF: versions_wf f1 vers>>) /\
       (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = None>>)>>) /\
       (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>)
 .
@@ -3185,6 +3186,7 @@ Proof.
   { i. hexploit (VALS loc0). i. des; eauto. }
   { eauto. }
   { eauto. }
+  { eapply versions_wf_mapping_mon; eauto. }
   { eauto. }
   { eauto. }
 Qed.

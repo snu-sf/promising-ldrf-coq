@@ -134,9 +134,9 @@ Section SimulationThread.
                     (Thread.mk _ st2_src lc2_src sc3_src mem3_src)>>) /\
       ((<<FAILURE: Thread.steps_failure (Thread.mk _ st2_src lc2_src sc3_src mem3_src)>>) \/
        exists w3,
-         (<<SC3: sim_timemap w3 sc2_src sc1_tgt>>) /\
-         (<<MEMORY3: sim_memory w3 mem2_src mem1_tgt>>) /\
-         (<<SIM: sim_thread false w3 st2_src lc2_src sc3_src mem3_src st1_tgt lc1_tgt sc1_tgt mem1_tgt>>) /\
+         (<<SC3: sim_timemap w3 sc3_src sc2_tgt>>) /\
+         (<<MEMORY3: sim_memory w3 mem3_src mem2_tgt>>) /\
+         (<<SIM: sim_thread false w3 st2_src lc2_src sc3_src mem3_src st1_tgt lc1_tgt sc2_tgt mem2_tgt>>) /\
          (<<WORLD: world_messages_le (unchangable mem2_src lc1_src.(Local.promises)) (unchangable mem2_tgt lc1_tgt.(Local.promises)) w1 w3>>))
   .
 
@@ -154,7 +154,6 @@ Section SimulationThread.
            (CONS_TGT: Local.promise_consistent lc3_tgt)
            (RELEASE: release_event e_tgt),
     exists st2_src lc2_src sc2_src mem2_src,
-      (<<FAILURE: ThreadEvent.get_machine_event e_tgt <> MachineEvent.failure>>) /\
       (<<STEPS: rtc (@Thread.tau_step _)
                     (Thread.mk _ st1_src lc1_src sc1_src mem1_src)
                     (Thread.mk _ st2_src lc2_src sc2_src mem2_src)>>) /\
