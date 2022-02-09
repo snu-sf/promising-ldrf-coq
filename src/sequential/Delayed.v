@@ -32,6 +32,7 @@ Require Import MemoryProps.
 Require Import LowerMemory.
 Require Import FulfillStep.
 Require Import ReorderStepPromise.
+Require Import Pred.
 Require Import Trace.
 
 Require Import SeqLib.
@@ -39,31 +40,6 @@ Require Import gSimAux.
 
 Set Implicit Arguments.
 
-
-Definition is_promise (e: ThreadEvent.t): Prop :=
-  match e with
-  | ThreadEvent.promise _ _ _ _ _ => True
-  | _ => False
-  end.
-
-Definition release_event (e: ThreadEvent.t): Prop :=
-  match e with
-  | ThreadEvent.update _ _ _ _ _ _ _ _ ordw => Ordering.le Ordering.strong_relaxed ordw
-  | ThreadEvent.write _ _ _ _ _ ord => Ordering.le Ordering.strong_relaxed ord
-  | ThreadEvent.fence _ ordw => Ordering.le Ordering.strong_relaxed ordw
-  | ThreadEvent.syscall _ => True
-  | ThreadEvent.failure => True
-  | ThreadEvent.racy_write _ _ _ _ => True
-  | ThreadEvent.racy_update _ _ _ _ _ _ => True
-  | _ => False
-  end.
-
-Definition is_write_na (e: ThreadEvent.t): Prop :=
-  match e with
-  | ThreadEvent.write_na _ _ _ _ _ _ => True
-  | ThreadEvent.write _ _ _ _ _ ord => Ordering.le ord Ordering.na
-  | _ => False
-  end.
 
 Variant lower_step {lang} e (th0 th1: Thread.t lang): Prop :=
 | lower_step_intro

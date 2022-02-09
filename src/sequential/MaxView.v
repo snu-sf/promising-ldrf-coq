@@ -1043,23 +1043,86 @@ Proof.
   }
 Qed.
 
-Lemma add_promises_latest lang (st: lang.(Language.state)) tvw sc
-      prom0 mem0
-      loc msgs
-      (WFMSGS: wf_cell_msgs msgs)
-      (FORALL: List.Forall (fun '(from, to, msg) => (<<MAX: Time.le (Memory.max_ts loc mem0) from>>) /\ (<<TS: Time.lt from to>>) /\ (<<MSGTO: Memory.message_to msg loc to>>) /\ (<<WF: Message.wf msg>>) /\ (<<CLOSED: semi_closed_message msg mem0 loc to>>)) msgs)
-  :
-    exists prom1 mem1,
-      (<<STEPS: rtc (@Thread.tau_step lang) (Thread.mk _ st (Local.mk tvw prom0) sc mem0) (Thread.mk _ st (Local.mk tvw prom1) sc mem1)>>) /\
-      (<<MEM: added_memory loc msgs mem0 mem1>>) /\
-      (<<PROMISES: added_memory loc msgs prom0 prom1>>).
+Require Import Pred.
+
+Lemma add_promises_latest lang (st: lang.(Language.state)) tvw sc loc msgs:
+  forall prom0 mem0
+         (WFMSGS: wf_cell_msgs msgs)
+         (MLE: Memory.le prom0 mem0)
+         (MEM: Memory.closed mem0)
+         (FORALL: List.Forall
+                    (fun '(from, to, msg) => (__guard__((<<MAX: Time.le (Memory.max_ts loc mem0) from>>) \/ (<<RESERVE: msg = Message.reserve>>) /\ (<<DISJOINT: forall to2 from2 msg2 (GET: Memory.get loc to2 mem0 = Some (from2, msg2)), Interval.disjoint (from, to) (from2, to2)>>))) /\ (<<TS: Time.lt from to>>) /\ (<<MSGTO: Memory.message_to msg loc to>>) /\ (<<WF: Message.wf msg>>) /\ (<<CLOSED: semi_closed_message msg mem0 loc to>>)) msgs),
+  exists prom1 mem1,
+    (<<STEPS: rtc (tau (@pred_step is_promise _)) (Thread.mk _ st (Local.mk tvw prom0) sc mem0) (Thread.mk _ st (Local.mk tvw prom1) sc mem1)>>) /\
+    (<<MEM: added_memory loc msgs mem0 mem1>>) /\
+    (<<PROMISES: added_memory loc msgs prom0 prom1>>).
 Proof.
-  ginduction msgs; i.
+  induction msgs; i.
   { esplits; eauto.
     { eapply added_memory_nil. }
     { eapply added_memory_nil. }
   }
   { inv FORALL. destruct a as [[from to] msg]. des.
-    admit.
+    red in WFMSGS. des. inv DISJOINT. inv MSGSWF. guardH H3.
+    hexploit (@Memory.add_exists mem0 loc from to msg); eauto.
+    { red in H1. des.
+      { i. symmetry. eapply interval_le_disjoint.
+        eapply Memory.max_ts_spec in GET2. des. etrans; eauto.
+      }
+      { eauto. }
+    }
+    i. des. hexploit Memory.add_exists_le; eauto. i. des.
+    assert (ADD: Memory.promise prom0 mem0 loc from to msg promises2 mem2 Memory.op_kind_add).
+    { econs; eauto. red in H1. des; ss.
+      i. hexploit Memory.max_ts_spec; eauto. i. des.
+      eapply memory_get_ts_le in GET. eapply Time.lt_strorder.
+      eapply TimeFacts.lt_le_lt.
+      { eapply TS. }
+      etrans.
+      { eapply GET. }
+      etrans.
+      { eapply MAX0. }
+      etrans.
+      { eapply MAX. }
+      { refl. }
+    }
+    assert (MSGCLOSED: Memory.closed_message msg mem2).
+    { destruct msg; eauto. eapply semi_closed_message_add; eauto. }
+    hexploit (IHmsgs promises2 mem2).
+    { red. splits; auto. }
+    { eapply promise_memory_le; eauto. }
+    { eapply Memory.promise_closed; eauto. }
+    { eapply List.Forall_forall.
+      intros [[from0 to0] msgs0]. i.
+      eapply List.Forall_forall in H2; eauto.
+      eapply List.Forall_forall in H4; eauto.
+      eapply List.Forall_forall in HD; eauto. ss. des; subst.
+      { timetac. }
+      splits; auto.
+      { red in H2. des.
+        { left. erewrite add_max_ts; eauto. des_ifs. }
+        { right. splits; auto. i.
+          erewrite Memory.add_o in GET; eauto. des_ifs.
+          { ss. des; clarify.
+            symmetry. eapply interval_le_disjoint. auto.
+          }
+          { eapply DISJOINT; eauto. }
+        }
+      }
+      { eapply semi_closed_message_future; eauto.
+        eapply Memory.future_future_weak. econs; [|refl].
+        econs; eauto.
+      }
+    }
+    i. des. esplits.
+    { econs 2; [|eauto]. econs.
+      { econs.
+        { econs 1. econs; ss. econs; eauto. }
+        { ss. }
+      }
+      { ss. }
+    }
+    { eapply added_memory_cons; eauto. }
+    { eapply added_memory_cons; eauto. }
   }
-Admitted.
+Qed.

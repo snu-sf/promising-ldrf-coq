@@ -1,4 +1,3 @@
-
 Require Import RelationClasses.
 
 From sflib Require Import sflib.
@@ -2501,6 +2500,88 @@ Proof.
   }
 Qed.
 
+Lemma promise_max_readable
+      prom0 mem0 loc from to msg prom1 mem1 kind tvw
+      (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
+  :
+  forall val0 released0,
+    max_readable mem0 prom0 loc tvw val0 released0 <-> max_readable mem1 prom1 loc tvw val0 released0.
+Proof.
+  i. split.
+  { intros MAX. inv MAX.
+    hexploit unchangable_promise.
+    { eauto. }
+    { econs; eauto. }
+    i. inv H. ss. econs; eauto.
+    i. inv PROMISE.
+    { erewrite Memory.add_o; eauto.
+      erewrite (@Memory.add_o mem1 mem0) in GET1; eauto. des_ifs.
+      eapply MAX0; eauto.
+    }
+    { erewrite Memory.split_o; eauto.
+      erewrite (@Memory.split_o mem1 mem0) in GET1; eauto. des_ifs.
+      eapply MAX0; eauto.
+    }
+    { erewrite Memory.lower_o; eauto.
+      erewrite (@Memory.lower_o mem1 mem0) in GET1; eauto. des_ifs.
+      eapply MAX0; eauto.
+    }
+    { erewrite Memory.remove_o; eauto.
+      erewrite (@Memory.remove_o mem1 mem0) in GET1; eauto. des_ifs.
+      eapply MAX0; eauto.
+    }
+  }
+  { i. inv H. inv PROMISE.
+    { erewrite Memory.add_o in GET; eauto.
+      erewrite Memory.add_o in NONE; eauto. des_ifs.
+      econs; eauto. i.
+      hexploit MAX; eauto.
+      { eapply Memory.add_get1; eauto. }
+      i. erewrite Memory.add_o in H; eauto.
+      des_ifs. ss. des; clarify.
+      eapply Memory.add_get0 in MEM. des; clarify.
+    }
+    { erewrite Memory.split_o in GET; eauto.
+      erewrite Memory.split_o in NONE; eauto. des_ifs.
+      econs; eauto. i.
+      hexploit Memory.split_o; [eapply MEM|]. i.
+      rewrite GET0 in H. des_ifs.
+      { ss. des; clarify. eapply Memory.split_get0 in MEM. des; clarify. }
+      { ss. des; clarify. eapply Memory.split_get0 in PROMISES.
+        eapply Memory.split_get0 in MEM. des; clarify.
+      }
+      { ss. des; clarify. hexploit MAX; eauto. i.
+        erewrite Memory.split_o in H0; eauto.
+        des_ifs; ss; des; clarify.
+      }
+    }
+    { erewrite Memory.lower_o in GET; eauto.
+      erewrite Memory.lower_o in NONE; eauto. des_ifs.
+      econs; eauto. i.
+      hexploit Memory.lower_o; [eapply MEM|]. i.
+      rewrite GET0 in H. des_ifs.
+      { ss. des; clarify. eapply Memory.lower_get0 in MEM. des; clarify.
+        eapply Memory.lower_get0 in PROMISES. des; eauto.
+      }
+      { ss. des; clarify. hexploit MAX; eauto. i.
+        erewrite Memory.lower_o in H0; eauto.
+        des_ifs; ss; des; clarify.
+      }
+    }
+    { erewrite Memory.remove_o in GET; eauto.
+      erewrite Memory.remove_o in NONE; eauto. des_ifs.
+      econs; eauto. i.
+      hexploit Memory.remove_o; [eapply MEM|]. i.
+      rewrite GET0 in H. des_ifs.
+      { ss. des; clarify. eapply Memory.remove_get0 in MEM. des; clarify. }
+      { ss. des; clarify. hexploit MAX; eauto. i.
+        erewrite Memory.remove_o in H0; eauto.
+        des_ifs; ss; des; clarify.
+      }
+    }
+  }
+Qed.
+
 Require Import Pred.
 
 Lemma sim_thread_deflag_match_aux
@@ -3997,88 +4078,6 @@ Proof.
     des; ss; auto. right. splits; auto.
     { rewrite <- SRC. auto. }
     { rewrite <- TGT. auto. }
-  }
-Qed.
-
-Lemma promise_max_readable
-      prom0 mem0 loc from to msg prom1 mem1 kind tvw
-      (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
-  :
-  forall val0 released0,
-    max_readable mem0 prom0 loc tvw val0 released0 <-> max_readable mem1 prom1 loc tvw val0 released0.
-Proof.
-  i. split.
-  { intros MAX. inv MAX.
-    hexploit unchangable_promise.
-    { eauto. }
-    { econs; eauto. }
-    i. inv H. ss. econs; eauto.
-    i. inv PROMISE.
-    { erewrite Memory.add_o; eauto.
-      erewrite (@Memory.add_o mem1 mem0) in GET1; eauto. des_ifs.
-      eapply MAX0; eauto.
-    }
-    { erewrite Memory.split_o; eauto.
-      erewrite (@Memory.split_o mem1 mem0) in GET1; eauto. des_ifs.
-      eapply MAX0; eauto.
-    }
-    { erewrite Memory.lower_o; eauto.
-      erewrite (@Memory.lower_o mem1 mem0) in GET1; eauto. des_ifs.
-      eapply MAX0; eauto.
-    }
-    { erewrite Memory.remove_o; eauto.
-      erewrite (@Memory.remove_o mem1 mem0) in GET1; eauto. des_ifs.
-      eapply MAX0; eauto.
-    }
-  }
-  { i. inv H. inv PROMISE.
-    { erewrite Memory.add_o in GET; eauto.
-      erewrite Memory.add_o in NONE; eauto. des_ifs.
-      econs; eauto. i.
-      hexploit MAX; eauto.
-      { eapply Memory.add_get1; eauto. }
-      i. erewrite Memory.add_o in H; eauto.
-      des_ifs. ss. des; clarify.
-      eapply Memory.add_get0 in MEM. des; clarify.
-    }
-    { erewrite Memory.split_o in GET; eauto.
-      erewrite Memory.split_o in NONE; eauto. des_ifs.
-      econs; eauto. i.
-      hexploit Memory.split_o; [eapply MEM|]. i.
-      rewrite GET0 in H. des_ifs.
-      { ss. des; clarify. eapply Memory.split_get0 in MEM. des; clarify. }
-      { ss. des; clarify. eapply Memory.split_get0 in PROMISES.
-        eapply Memory.split_get0 in MEM. des; clarify.
-      }
-      { ss. des; clarify. hexploit MAX; eauto. i.
-        erewrite Memory.split_o in H0; eauto.
-        des_ifs; ss; des; clarify.
-      }
-    }
-    { erewrite Memory.lower_o in GET; eauto.
-      erewrite Memory.lower_o in NONE; eauto. des_ifs.
-      econs; eauto. i.
-      hexploit Memory.lower_o; [eapply MEM|]. i.
-      rewrite GET0 in H. des_ifs.
-      { ss. des; clarify. eapply Memory.lower_get0 in MEM. des; clarify.
-        eapply Memory.lower_get0 in PROMISES. des; eauto.
-      }
-      { ss. des; clarify. hexploit MAX; eauto. i.
-        erewrite Memory.lower_o in H0; eauto.
-        des_ifs; ss; des; clarify.
-      }
-    }
-    { erewrite Memory.remove_o in GET; eauto.
-      erewrite Memory.remove_o in NONE; eauto. des_ifs.
-      econs; eauto. i.
-      hexploit Memory.remove_o; [eapply MEM|]. i.
-      rewrite GET0 in H. des_ifs.
-      { ss. des; clarify. eapply Memory.remove_get0 in MEM. des; clarify. }
-      { ss. des; clarify. hexploit MAX; eauto. i.
-        erewrite Memory.remove_o in H0; eauto.
-        des_ifs; ss; des; clarify.
-      }
-    }
   }
 Qed.
 
