@@ -1271,7 +1271,8 @@ Section LOCALPFRACE.
       (CANCELS: rtc (@Thread.cancel_step _) (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) e2)
       (STEP: Thread.opt_step e e2 e3)
       (RESERVES: rtc (@Thread.reserve_step _) e3 (Thread.mk _ st4 lc4 sc4 memory4))
-      (CONSISTENT: e <> ThreadEvent.failure -> PF.pf_consistent L (Thread.mk _ st4 lc4 sc4 memory4))
+      (CONSISTENT: ThreadEvent.get_machine_event e <> MachineEvent.failure ->
+                   PF.pf_consistent L (Thread.mk _ st4 lc4 sc4 memory4))
       (PF: PF.pf_event L e)
       (READ: racy_read loc ts (Thread.local e2) e)
     :

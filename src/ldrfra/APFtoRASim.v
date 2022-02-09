@@ -747,7 +747,9 @@ Module APFtoRASim.
           erewrite Stable.stable_tview_read_tview; eauto; try apply WF1_SRC.
       }
 
-      inv WRITES1. exploit COMPLETE0; eauto. i. des.
+      inv WRITES1. exploit COMPLETE0; eauto.
+      { ii. subst. inv H. }
+      i. des.
       destruct (Ordering.le ord0 Ordering.strong_relaxed) eqn:ORDW.
       { (* non release write *)
         right. unfold RARaceW.wr_race. esplits; eauto.

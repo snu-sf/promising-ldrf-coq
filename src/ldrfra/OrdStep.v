@@ -858,6 +858,16 @@ Module OrdThread.
       - erewrite Memory.remove_o; eauto. condtac; ss; eauto.
     Qed.
 
+    Lemma opt_step_reserve_only
+          e e1 e2
+          (PROMISES1: OrdLocal.reserve_only L (Local.promises (Thread.local e1)))
+          (STEP: opt_step e e1 e2):
+      <<PROMISES2: OrdLocal.reserve_only L (Local.promises (Thread.local e2))>>.
+    Proof.
+      inv STEP; eauto.
+      eapply step_reserve_only; eauto.
+    Qed.
+
     Lemma reserve_step_reserve_only
           e1 e2
           (PROMISES1: OrdLocal.reserve_only L (Local.promises (Thread.local e1)))
@@ -866,7 +876,7 @@ Module OrdThread.
     Proof.
       inv STEP. inv STEP0; inv STEP; inv LOCAL. ss.
       eapply OrdLocal.promise_reserve_only; eauto.
-      Qed.
+    Qed.
 
     Lemma cancel_step_reserve_only
           e1 e2
@@ -876,7 +886,51 @@ Module OrdThread.
     Proof.
       inv STEP. inv STEP0; inv STEP; inv LOCAL. ss.
       eapply OrdLocal.promise_reserve_only; eauto.
-      Qed.
+    Qed.
+
+    Lemma rtc_tau_step_reserve_only
+          e1 e2
+          (PROMISES1: OrdLocal.reserve_only L (Local.promises (Thread.local e1)))
+          (STEP: rtc tau_step e1 e2):
+      <<PROMISES2: OrdLocal.reserve_only L (Local.promises (Thread.local e2))>>.
+    Proof.
+      induction STEP; eauto.
+      apply IHSTEP. inv H. inv TSTEP.
+      eapply step_reserve_only; eauto.
+    Qed.
+
+    Lemma rtc_all_step_reserve_only
+          e1 e2
+          (PROMISES1: OrdLocal.reserve_only L (Local.promises (Thread.local e1)))
+          (STEP: rtc all_step e1 e2):
+      <<PROMISES2: OrdLocal.reserve_only L (Local.promises (Thread.local e2))>>.
+    Proof.
+      induction STEP; eauto.
+      apply IHSTEP. inv H. inv USTEP.
+      eapply step_reserve_only; eauto.
+    Qed.
+
+    Lemma rtc_reserve_step_reserve_only
+          e1 e2
+          (PROMISES1: OrdLocal.reserve_only L (Local.promises (Thread.local e1)))
+          (STEP: rtc (@Thread.reserve_step lang) e1 e2):
+      <<PROMISES2: OrdLocal.reserve_only L (Local.promises (Thread.local e2))>>.
+    Proof.
+      induction STEP; eauto.
+      apply IHSTEP.
+      eapply reserve_step_reserve_only; eauto.
+    Qed.
+
+    Lemma rtc_cancel_step_reserve_only
+          e1 e2
+          (PROMISES1: OrdLocal.reserve_only L (Local.promises (Thread.local e1)))
+          (STEP: rtc (@Thread.cancel_step lang) e1 e2):
+      <<PROMISES2: OrdLocal.reserve_only L (Local.promises (Thread.local e2))>>.
+    Proof.
+      induction STEP; eauto.
+      apply IHSTEP.
+      eapply cancel_step_reserve_only; eauto.
+    Qed.
   End OrdThread.
 End OrdThread.
 

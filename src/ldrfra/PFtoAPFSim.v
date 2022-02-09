@@ -534,7 +534,9 @@ Module PFtoAPFSim.
                          Time.lt (View.rlx (TView.cur (Local.tview lc1_tgt)) loc) to)).
       { (* race *)
         right. des. unfold RARaceW.wr_race.
-        inv WRITES1. exploit COMPLETE0; try exact GET_SRC; eauto. i. des.
+        inv WRITES1. exploit COMPLETE0; try exact GET_SRC; eauto.
+        { ii. subst. inv H1. }
+        i. des.
         esplits; eauto.
       }
       left. esplits.
@@ -659,7 +661,9 @@ Module PFtoAPFSim.
       { econs. eauto. }
       i. des.
       - hexploit UNDEF; eauto. i. destruct msg; ss.
-        inv WRITES1. exploit COMPLETE0; eauto. i. des.
+        inv WRITES1. exploit COMPLETE0; eauto.
+        { ii. subst. inv RACE. }
+        i. des.
         esplits; eauto.
         destruct ord; eauto; exploit MSG2; ss.
       - esplits; eauto.

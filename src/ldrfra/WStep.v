@@ -90,6 +90,16 @@ Module WThread.
       inv STEP. eauto.
     Qed.
 
+    Lemma opt_step_ord_opt_step
+          rels1 rels2 e e1 e2
+          (STEP: opt_step rels1 rels2 e e1 e2):
+      OrdThread.opt_step L ordcr ordcw e e1 e2.
+    Proof.
+      inv STEP; [econs 1|].
+      exploit step_ord_step; eauto. i. des.
+      econs 2. eauto.
+    Qed.
+
     Lemma steps_ord_steps
           rels1 rels2 e1 e2
           (STEPS: steps rels1 rels2 e1 e2):
@@ -1112,26 +1122,26 @@ Module WConfiguration.
     (*   hexploit step_reserve_only; eauto. *)
     (* Qed. *)
 
-    (* Lemma step_rels_incl *)
-    (*       e tid rels1 rels2 c1 c2 *)
-    (*       (STEP: step e tid rels1 rels2 c1 c2): *)
-    (*   rels2 = rels1 \/ exists a, rels2 = a :: rels1. *)
-    (* Proof. *)
-    (*   inv STEP. inv STEP0; eauto. inv STEP. *)
-    (*   unfold Writes.append. des_ifs; eauto. *)
-    (* Qed. *)
+    Lemma step_rels_incl
+          e tid rels1 rels2 c1 c2
+          (STEP: step e tid rels1 rels2 c1 c2):
+      rels2 = rels1 \/ exists a, rels2 = a :: rels1.
+    Proof.
+      inv STEP. inv STEP0; eauto. inv STEP.
+      unfold Writes.append. des_ifs; eauto.
+    Qed.
 
-    (* Lemma steps_rels_incl *)
-    (*       rels1 rels2 c1 c2 *)
-    (*       (STEPS: steps rels1 rels2 c1 c2): *)
-    (*   exists rels, rels2 = rels ++ rels1. *)
-    (* Proof. *)
-    (*   induction STEPS. *)
-    (*   - exists []. ss. *)
-    (*   - des. exploit step_rels_incl; eauto. i. des; subst. *)
-    (*     + exists rels. ss. *)
-    (*     + exists (rels ++ [a]). rewrite <- List.app_assoc. ss. *)
-    (* Qed. *)
+    Lemma steps_rels_incl
+          rels1 rels2 c1 c2
+          (STEPS: steps rels1 rels2 c1 c2):
+      exists rels, rels2 = rels ++ rels1.
+    Proof.
+      induction STEPS.
+      - exists []. ss.
+      - des. exploit step_rels_incl; eauto. i. des; subst.
+        + exists rels. ss.
+        + exists (rels ++ [a]). rewrite <- List.app_assoc. ss.
+    Qed.
 
     (* Lemma step_non_concrete *)
     (*       e tid rels1 rels2 c1 c2 loc to *)

@@ -50,6 +50,7 @@ Module Writes.
               Memory.get loc to mem = Some (from, Message.concrete val released))
         (COMPLETE: forall loc from to val released
                      (LOC: L loc)
+                     (TO: to <> Time.bot)
                      (GET: Memory.get loc to mem = Some (from, Message.concrete val released)),
             exists ord, List.In (loc, to, ord) rels)
     .
