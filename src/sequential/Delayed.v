@@ -1829,3 +1829,24 @@ Proof.
   - econs 2; eauto. econs; eauto. congr.
   - ss.
 Qed.
+
+Section CLOSED.
+  Variable loc_na: Loc.t -> Prop.
+
+  Definition closed_future_timemap (tm: TimeMap.t) (mem0 mem1: Memory.t): Prop :=
+    forall loc (NA: loc_na loc),
+      Memory.get loc (tm loc) mem1 = Memory.get loc (tm loc) mem0.
+
+  Record closed_future_view (vw: View.t) (mem0 mem1: Memory.t): Prop :=
+    closed_future_view_intro
+      { closed_future_pln: closed_future_timemap vw.(View.pln) mem0 mem1;
+        closed_future_rlx: closed_future_timemap vw.(View.rlx) mem0 mem1;
+      }.
+
+  Record closed_future_tview (tvw: TView.t) (mem0 mem1: Memory.t): Prop :=
+    closed_future_tview_intro
+      { closed_future_rel: forall loc, closed_future_view (tvw.(TView.rel) loc) mem0 mem1;
+        closed_future_cur: closed_future_view tvw.(TView.cur) mem0 mem1;
+        closed_future_acq: closed_future_view tvw.(TView.acq) mem0 mem1;
+      }.
+End CLOSED.

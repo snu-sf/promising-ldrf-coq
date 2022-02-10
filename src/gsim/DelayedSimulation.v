@@ -60,6 +60,8 @@ Variable sim_timemap: forall (w: world) (sc_src sc_tgt: TimeMap.t), Prop.
 
 
 Section SimulationThread.
+  Variable loc_na: Loc.t -> Prop.
+
   Definition SIM_THREAD :=
     forall (lang_src lang_tgt:language)
            (b: bool) (w: world)
@@ -119,6 +121,7 @@ Section SimulationThread.
            (MEMTGT: Memory.future_weak mem1_tgt mem2_tgt)
            (SCSRC: TimeMap.le sc1_src sc2_src)
            (SCTGT: TimeMap.le sc1_tgt sc2_tgt)
+           (CLOSEDFUTURE: closed_future_tview loc_na lc1_tgt.(Local.tview) mem1_tgt mem2_tgt)
            (WORLD: world_messages_le (Messages.of_memory lc1_src.(Local.promises)) (Messages.of_memory lc1_tgt.(Local.promises)) w0 w1)
            (SC: sim_timemap w1 sc2_src sc2_tgt)
            (MEMORY: sim_memory w1 mem2_src mem2_tgt)

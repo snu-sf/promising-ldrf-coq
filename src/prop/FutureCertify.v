@@ -160,4 +160,25 @@ Module FutureCertify.
     (* Qed. *)
     Admitted.
   End FutureCertify.
+
+  Lemma undef_added_failure lang st lc sc0 mem0 sc1 mem1
+        (CONSISTENT: Thread.consistent (Thread.mk lang st lc sc0 mem0))
+        (MEMLE: Memory.future_weak mem0 mem1)
+        (SCLE: TimeMap.le sc0 sc1)
+        (LOCAL: Local.wf lc mem0)
+        (MEM0: Memory.closed mem0)
+        (SC0: Memory.closed_timemap sc0 mem0)
+        (MEM1: Memory.closed mem1)
+        (SC1: Memory.closed_timemap sc1 mem1)
+        loc from0 to0 msg from1 to1
+        (GET0: Memory.get loc to0 lc.(Local.promises) = Some (from0, msg))
+        (MSG: msg <> Message.reserve)
+
+        (GET1: Memory.get loc to1 mem1 = Some (from1, Message.undef))
+        (TS: Time.lt to0 to1)
+        (NONE: Memory.get loc to1 mem0 = None)
+    :
+      Thread.steps_failure (Thread.mk _ st lc sc1 mem1).
+  Proof.
+  Admitted.
 End FutureCertify.

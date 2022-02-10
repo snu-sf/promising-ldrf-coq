@@ -1761,6 +1761,7 @@ Section LIFT.
       (MEM_TGT1: Memory.closed mem_tgt1)
       (MEMSRC: Memory.future_weak mem_src0 mem_src1)
       (MEMTGT: Memory.future_weak mem_tgt0 mem_tgt1)
+      (CLOSEDFUTURE: closed_future_tview loc_na lc_tgt.(Local.tview) mem_tgt0 mem_tgt1)
       (SCSRC: TimeMap.le sc_src0 sc_src1)
       (SCTGT: TimeMap.le sc_tgt0 sc_tgt1)
       (WORLD: world_messages_le (Messages.of_memory lc_src0.(Local.promises)) (Messages.of_memory lc_tgt.(Local.promises)) w0 w1)
@@ -1783,7 +1784,9 @@ Section LIFT.
     red in WORLD. red in MEM. red in SC.
     hexploit WORLD; eauto. i. des. subst.
     hexploit INTERFERENCE; eauto. i. subst.
-    hexploit SeqLiftInterference.sim_thread_future; eauto. i. des.
+    hexploit SeqLiftInterference.sim_thread_future; eauto.
+    { i. eapply ATLOCS; auto. }
+    i. des.
     { esplits; eauto. }
     esplits; eauto. right.
     hexploit (choice (fun loc p =>
@@ -1816,9 +1819,11 @@ Section LIFT.
       { ii. ss. hexploit ATLOCS; eauto. i. des. splits; auto.
         inv SIM2. specialize (PERM loc).
         destruct (vs_src1 loc) eqn:VSRC, (vs_tgt1 loc) eqn:VTGT; ss.
-        hexploit VALSRC; eauto. i.
-        hexploit VALTGT; eauto. i. des.
-        rewrite VS in VAL. rewrite H0 in VAL. ss. etrans; eauto.
+        hexploit no_flag_max_value_same; eauto.
+        { rewrite <- VSRC. eauto. }
+        i. des. inv MAX. hexploit (MAXTGT loc); eauto. i. inv H.
+        hexploit MAX; eauto. i. des. hexploit MAX0; eauto. i. des.
+        eapply max_readable_inj in MAX1; eauto. des. subst. auto.
       }
     }
     { eapply sim_seq_interference_mon; eauto.
@@ -3292,7 +3297,7 @@ Section LIFT.
       (NOMIXTGT: nomix _ st_tgt)
       (LIFT: sim_state_lift c w smem_src smem_tgt p D mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt),
       @sim_thread
-        world world_messages_le sim_memory_lift sim_timemap_lift
+        world world_messages_le sim_memory_lift sim_timemap_lift loc_na
         lang_src lang_tgt c w st_src lc_src sc_src mem_src st_tgt lc_tgt sc_tgt mem_tgt.
   Proof.
     assert (UPACO: upaco7 _sim_seq bot7 = sim_seq).
@@ -3382,7 +3387,7 @@ Section LIFT.
       (NOMIXSRC: nomix _ st_src)
       (NOMIXTGT: nomix _ st_tgt),
       @sim_thread
-        world world_messages_le sim_memory_lift sim_timemap_lift
+        world world_messages_le sim_memory_lift sim_timemap_lift loc_na
         lang_src lang_tgt false initial_world
         st_src Local.init TimeMap.bot Memory.init
         st_tgt Local.init TimeMap.bot Memory.init.
