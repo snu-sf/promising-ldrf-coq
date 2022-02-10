@@ -1829,7 +1829,7 @@ Section LIFT.
       }
       { rewrite AT; auto. refl. }
     }
-    { inv SIM2. ss. eapply sim_timemap_mon_locs; eauto; ss. }
+    { inv SIM2. ss. }
     { inv SIM2. ss. splits; auto. eapply sim_memory_sim_memory_interference; eauto. }
     { ss. i. splits; auto; try refl.
       { hexploit Thread.rtc_tau_step_future; eauto. i. des; ss.
@@ -1876,7 +1876,7 @@ Section LIFT.
     }
     right. esplits.
     { econs; eauto. }
-    { inv SIM1. ss. eapply sim_timemap_mon_locs; eauto; ss. }
+    { inv SIM1. ss. }
     { inv SIM1. ss. splits; auto. eapply sim_memory_sim_memory_interference; eauto. }
     { ss. i. splits; auto.
       { eapply Mapping.les_strong_les; eauto. }
@@ -1914,7 +1914,7 @@ Section LIFT.
     hexploit sim_thread_cap; eauto.
     i. des. esplits.
     { econs; eauto. }
-    { inv SIM1. ss. eapply sim_timemap_mon_locs; eauto; ss. }
+    { inv SIM1. ss. }
     { inv SIM1. ss. splits; auto. eapply sim_memory_sim_memory_interference; eauto. }
   Qed.
 
@@ -3123,7 +3123,7 @@ Section LIFT.
       hexploit DEBT; eauto. i. splits; auto.
     }
     { rewrite RELEASE in SIM3. ss. }
-    { inv SIM2. ss. splits; auto. eapply sim_timemap_mon_locs; eauto. ss. }
+    { inv SIM2. ss. }
     { inv SIM2. ss. splits; auto. eapply sim_memory_sim_memory_interference; eauto. }
     { etrans; eauto. ss. i. splits; eauto.
       eapply Thread.rtc_tau_step_future in STEPS1; eauto. ss. des.

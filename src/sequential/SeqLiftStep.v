@@ -267,7 +267,7 @@ Variant sim_thread
         mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt: Prop :=
 | sim_thread_intro
     srctm
-    (SC: sim_timemap (fun loc => flag_src loc = false) f (Mapping.vers f) sc_src sc_tgt)
+    (SC: sim_timemap (fun _ => True) f (Mapping.vers f) sc_src sc_tgt)
     (MEM: sim_memory srctm flag_src f vers mem_src mem_tgt)
     (LOCAL: sim_local f vers srctm flag_src flag_tgt lc_src lc_tgt)
     (MAXSRC: max_values_src vs_src mem_src lc_src)
@@ -1590,7 +1590,6 @@ Proof.
     setoid_rewrite LocFun.add_spec_neq; auto. eapply Time.bot_spec.
   }
   econs; auto.
-  { eapply sim_timemap_mon_locs; eauto. i. ss. des_ifs. }
   { eapply add_src_sim_memory; eauto. i.
     etransitivity; [|left; eapply TS].
     inv LOCAL. hexploit FLAGSRC; eauto. i. des. subst.
@@ -2294,15 +2293,17 @@ Qed.
 Lemma sim_local_write_fence_sc f flag_src rel_vers tvw_src tvw_tgt sc_src sc_tgt
       ord
       (SIM: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
-      (SC: sim_timemap (fun loc => flag_src loc = false) f (Mapping.vers f) sc_src sc_tgt)
+      (SC: sim_timemap (fun _ => True) f (Mapping.vers f) sc_src sc_tgt)
       (FLAG: Ordering.le Ordering.seqcst ord -> forall loc, flag_src loc = false)
       (WF: Mapping.wfs f)
   :
-    sim_timemap (fun loc => flag_src loc = false) f (Mapping.vers f) (local_write_fence_sc tvw_src sc_src ord) (local_write_fence_sc tvw_tgt sc_tgt ord).
+    sim_timemap (fun _ => True) f (Mapping.vers f) (local_write_fence_sc tvw_src sc_src ord) (local_write_fence_sc tvw_tgt sc_tgt ord).
 Proof.
   pose proof (mapping_latest_wf f).
   unfold local_write_fence_sc. des_ifs. eapply sim_timemap_join; auto.
-  eapply SIM.
+  eapply sim_timemap_mon_locs.
+  { eapply SIM. }
+  { i. eapply FLAG. auto. }
 Qed.
 
 Lemma sim_thread_read
@@ -2502,7 +2503,7 @@ Proof.
   inv READ. inv READ0. ss.
   dup SIM. inv SIM. inv LOCAL1.
   assert (VIEW: sim_tview f flag_src rel_vers (local_read_fence_tview tvw_src0 sc_src ordr ordw) (local_read_fence_tview tvw_tgt0 sc_tgt ordr ordw)).
-  { eapply sim_local_read_fence_tview; eauto. }
+  { eapply sim_local_read_fence_tview; eauto. eapply sim_timemap_mon_locs; eauto; ss. }
   hexploit sim_thread_acquire; eauto.
   { i. hexploit ACQFLAG; eauto. hexploit RELFLAG; eauto. i. ss. des_ifs; ss. }
   i. des. esplits; eauto.
@@ -3100,8 +3101,7 @@ Proof.
   esplits; eauto.
   { econs; eauto. }
   { econs; eauto; ss.
-    { eapply sim_local_write_fence_sc; eauto.
-      i. eapply RELFLAG. destruct ordw; ss. }
+    { eapply sim_local_write_fence_sc; eauto. i. eapply RELFLAG. destruct ordw; ss. }
     { destruct (Ordering.le Ordering.acqrel ordw) eqn:ORD.
       { econs.
         { eapply sim_local_write_fence_tview_release; eauto. }
