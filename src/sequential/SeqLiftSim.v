@@ -175,7 +175,7 @@ Proof.
 Qed.
 
 Lemma initial_sim_tview:
-  sim_tview initial_mappings (fun _ => None) (fun _ => initial_ver) TView.bot TView.bot.
+  sim_tview initial_mappings (fun _ => false) (fun _ => initial_ver) TView.bot TView.bot.
 Proof.
   econs.
   { i. eapply initial_sim_view. }
@@ -185,7 +185,7 @@ Proof.
 Qed.
 
 Lemma initial_sim_promises:
-  sim_promises (fun _ => None) (fun _ => None) initial_mappings initial_vers Memory.bot Memory.bot.
+  sim_promises TimeMap.bot (fun _ => false) (fun _ => false) initial_mappings initial_vers Memory.bot Memory.bot.
 Proof.
   econs.
   { i. rewrite Memory.bot_get in GET. ss. }
@@ -195,7 +195,7 @@ Qed.
 
 Lemma initial_sim_local
   :
-  sim_local initial_mappings initial_vers (fun _ => None) (fun _ => None) Local.init Local.init.
+  sim_local initial_mappings initial_vers TimeMap.bot (fun _ => false) (fun _ => false) Local.init Local.init.
 Proof.
   econs.
   { eapply initial_sim_tview. }
@@ -231,7 +231,7 @@ Qed.
 
 Lemma initial_sim_memory
   :
-  sim_memory (fun _ => None) initial_mappings initial_vers Memory.init Memory.init.
+  sim_memory_interference initial_mappings initial_vers Memory.init Memory.init.
 Proof.
   econs.
   { i. eapply memory_init_get_if in GET. des; clarify. esplits.
@@ -240,15 +240,13 @@ Proof.
     { eapply initial_sim_message. }
     { i. eapply initial_time_closed. }
   }
-  { i. eapply memory_init_get_if in GET. des; clarify. left. esplits.
+  { i. eapply memory_init_get_if in GET. des; clarify. esplits.
     { refl. }
     { refl. }
     { left. splits; eauto. }
     { eapply initial_sim_timestamp_exact. }
     { i. inv ITV. ss. timetac. }
   }
-  { i. ss. }
-  { i. ss. }
 Qed.
 
 Lemma initial_versioned_memory
@@ -284,13 +282,13 @@ Lemma initial_sim_thread
   :
   SeqLiftStep.sim_thread
     initial_mappings initial_vers
-    (fun _ => None) (fun _ => None)
+    (fun _ => false) (fun _ => false)
     (fun _ => Some Const.undef) (fun _ => Some Const.undef)
     Memory.init Memory.init Local.init Local.init TimeMap.bot TimeMap.bot.
 Proof.
   econs.
   { eapply initial_sim_timemap. }
-  { eapply initial_sim_memory. }
+  { eapply sim_memory_interference_sim_memory; ss. eapply initial_sim_memory. }
   { eapply initial_sim_local. }
   { ii. econs.
     { i. clarify. esplits. eapply initial_max_readable. }
@@ -535,7 +533,7 @@ Section LIFT.
       match w with
       | (f, vers, mem_src') =>
           (<<MEMSRC: mem_src = mem_src'>>) /\
-            (<<SIM: sim_memory (fun _ => None) f vers mem_src mem_tgt>>) /\
+            (<<SIM: sim_memory_interference f vers mem_src mem_tgt>>) /\
             (<<VERSIONED: versioned_memory vers mem_tgt>>) /\
             (<<SIMCLOSED: sim_closed_memory f mem_src>>) /\
             (<<VERSWF: versions_wf f vers>>)
@@ -588,7 +586,7 @@ Section LIFT.
 
   Variant sim_flag_lift
           (d: Flag.t) (sflag_src: Flag.t) (sflag_tgt: Flag.t)
-          (flag_src: option Time.t) (flag_tgt: option Time.t): Prop :=
+          (flag_src: bool) (flag_tgt: bool): Prop :=
     | sim_flag_lift_intro
         (TGT: Flag.le flag_tgt (Flag.join flag_src (Flag.join d sflag_tgt)))
         (SRC: sflag_src = flag_src)
@@ -596,7 +594,7 @@ Section LIFT.
 
   Definition sim_flags_lift
              (d: Flags.t) (sflag_src: Flags.t) (sflag_tgt: Flags.t)
-             (flag_src: Loc.t -> option Time.t) (flag_tgt: Loc.t -> option Time.t): Prop :=
+             (flag_src: Loc.t -> bool) (flag_tgt: Loc.t -> bool): Prop :=
     forall loc, sim_flag_lift (d loc) (sflag_src loc) (sflag_tgt loc) (flag_src loc) (flag_tgt loc).
 
   Variant sim_state_lift c:
@@ -618,10 +616,10 @@ Section LIFT.
         (VALS: sim_vals_lift p svs_src svs_tgt vs_src vs_tgt)
         (FLAGS: sim_flags_lift D sflag_src sflag_tgt flag_src flag_tgt)
         (ATLOCS: forall loc (NNA: ~ loc_na loc),
-            (<<FLAGSRC: flag_src loc = None>>) /\
-              (<<FLAGTGT: flag_tgt loc = None>>) /\
+            (<<FLAGSRC: flag_src loc = false>>) /\
+              (<<FLAGTGT: flag_tgt loc = false>>) /\
               (<<VAL: option_rel Const.le (vs_tgt loc) (vs_src loc)>>))
-        (INTERFERENCE: c = false -> flag_src = fun _ => None)
+        (INTERFERENCE: c = false -> flag_src = fun _ => false)
         (MAPWF: Mapping.wfs f)
         (VERSWF: versions_wf f vers)
       :
@@ -1199,10 +1197,8 @@ Section LIFT.
   .
   Proof.
     i. inv LIFT.
-    hexploit sim_thread_sim_thread_sol; eauto.
-    { instantiate (1:=fun loc => Flag.minus (flag_tgt loc) (flag_src loc)).
-      i. ss. destruct (flag_src loc), (flag_tgt loc); ss.
-    }
+    hexploit (@sim_thread_sim_thread_sol c (fun loc => Flag.minus (flag_tgt loc) (flag_src loc))); eauto.
+    { i. destruct (flag_src loc), (flag_tgt loc); ss. }
     i. des. esplits; eauto.
     econs; eauto.
     { ii. hexploit (VALS loc); eauto. i. inv H.
@@ -1729,7 +1725,10 @@ Section LIFT.
       i. specialize (FLAG0 loc). des; ss.
     }
     { ss. inv SIM1. eapply sim_timemap_mon_locs; eauto; ss. }
-    { ss. inv SIM1. splits; auto. eapply versions_wf_mapping_mon; eauto. }
+    { ss. inv SIM1. splits; auto.
+      { eapply sim_memory_sim_memory_interference; eauto. }
+      { eapply versions_wf_mapping_mon; eauto. }
+    }
     { etrans; eauto. ss. i. splits; auto.
       { refl. }
       { eapply Thread.rtc_tau_step_future in STEPS1; eauto. des; ss.
@@ -1831,7 +1830,7 @@ Section LIFT.
       { rewrite AT; auto. refl. }
     }
     { inv SIM2. ss. eapply sim_timemap_mon_locs; eauto; ss. }
-    { inv SIM2. ss. }
+    { inv SIM2. ss. splits; auto. eapply sim_memory_sim_memory_interference; eauto. }
     { ss. i. splits; auto; try refl.
       { hexploit Thread.rtc_tau_step_future; eauto. i. des; ss.
         eapply Memory.future_future_weak; eauto.
@@ -1878,7 +1877,7 @@ Section LIFT.
     right. esplits.
     { econs; eauto. }
     { inv SIM1. ss. eapply sim_timemap_mon_locs; eauto; ss. }
-    { inv SIM1. ss. }
+    { inv SIM1. ss. splits; auto. eapply sim_memory_sim_memory_interference; eauto. }
     { ss. i. splits; auto.
       { eapply Mapping.les_strong_les; eauto. }
       { hexploit Local.promise_step_future; eauto. i. des; ss.
@@ -1916,7 +1915,7 @@ Section LIFT.
     i. des. esplits.
     { econs; eauto. }
     { inv SIM1. ss. eapply sim_timemap_mon_locs; eauto; ss. }
-    { inv SIM1. ss. }
+    { inv SIM1. ss. splits; auto. eapply sim_memory_sim_memory_interference; eauto. }
   Qed.
 
   Lemma wf_oracle_output_exists e
@@ -2137,8 +2136,8 @@ Section LIFT.
       (VALS: sim_vals_lift p0 svs_src0 svs_tgt0 vs_src0 vs_tgt0)
       (FLAGS: sim_flags_lift D0 sflag_src0 sflag_tgt0 flag_src0 flag_tgt0)
       (ATLOCS: forall loc (NNA: ~ loc_na loc),
-          (<<FLAGSRC: flag_src0 loc = None>>) /\
-            (<<FLAGTGT: flag_tgt0 loc = None>>) /\
+          (<<FLAGSRC: flag_src0 loc = false>>) /\
+            (<<FLAGTGT: flag_tgt0 loc = false>>) /\
             (<<VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc)>>))
       (AT: forall loc val (ACC: is_accessing e_tgt = Some (loc, val)), loc_at loc)
       (VAL: forall loc (NA: loc_na loc),
@@ -2203,8 +2202,8 @@ Section LIFT.
       (VALS: sim_vals_lift p0 svs_src0 svs_tgt0 vs_src0 vs_tgt0)
       (FLAGS: sim_flags_lift D0 sflag_src0 sflag_tgt0 flag_src0 flag_tgt0)
       (ATLOCS: forall loc (NNA: ~ loc_na loc),
-          (<<FLAGSRC: flag_src0 loc = None>>) /\
-          (<<FLAGTGT: flag_tgt0 loc = None>>) /\
+          (<<FLAGSRC: flag_src0 loc = false>>) /\
+          (<<FLAGTGT: flag_tgt0 loc = false>>) /\
           (<<VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc)>>))
       (VAL: forall loc (NA: loc_na loc),
           ((<<SRC: vs_src1 loc = vs_src0 loc>>) /\ (<<TGT: vs_tgt1 loc = vs_tgt0 loc>>)) \/
@@ -2213,8 +2212,8 @@ Section LIFT.
               (<<VALSRC: vs_src1 loc = Some val_src>>) /\ (<<VALTGT: vs_tgt1 loc = Some val_tgt>>) /\
               (<<VALLE: Const.le val_tgt val_src>>) /\
               (<<ACQ: is_acquire e_tgt>>)))
-      (ACQFLAG: forall loc ts
-                       (SRC: flag_src0 loc = None) (TGT: flag_tgt0 loc = Some ts),
+      (ACQFLAG: forall loc
+                       (SRC: flag_src0 loc = false) (TGT: flag_tgt0 loc = true),
           ~ is_acquire e_tgt),
     forall i_src svs_src1 sflag_src1 D1
            i_tgt svs_tgt1 sflag_tgt1 p1 p'
@@ -2315,13 +2314,13 @@ Section LIFT.
       (FLAGS: sim_flags_lift D0 sflag_src0 sflag_tgt0 flag_src0 flag_tgt0)
       (NORMAL: is_release e_tgt)
       (ATLOCS: forall loc (NNA: ~ loc_na loc),
-          (<<FLAGSRC: flag_src0 loc = None>>) /\
-          (<<FLAGTGT: flag_tgt0 loc = None>>) /\
+          (<<FLAGSRC: flag_src0 loc = false>>) /\
+          (<<FLAGTGT: flag_tgt0 loc = false>>) /\
           (<<VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc)>>))
       (DEBT: forall loc
-                    (FLAG: flag_src0 loc = None -> flag_tgt0 loc = None)
+                    (FLAG: flag_src0 loc = false -> flag_tgt0 loc = false)
                     (VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc)),
-          flag_tgt1 loc = None),
+          flag_tgt1 loc = false),
     forall i_src svs_src1 sflag_src1 D1 i_tgt svs_tgt1 sflag_tgt1 p1 p'
            (INPUT_SRC: seqevent_wf_in_release e_src i_src)
            (INPUT_TGT: seqevent_wf_in_release e_tgt i_tgt)
@@ -2336,7 +2335,7 @@ Section LIFT.
                         p' (SeqMemory.mk svs_tgt1 sflag_tgt1)),
       (<<PERMEQ: p' = p1>>) /\
       (<<VALS: sim_vals_lift p1 svs_src1 svs_tgt1 vs_src0 vs_tgt0>>) /\
-      (<<FLAGS: sim_flags_lift D1 sflag_src1 sflag_tgt1 (fun _ => None) flag_tgt1>>).
+      (<<FLAGS: sim_flags_lift D1 sflag_src1 sflag_tgt1 (fun _ => false) flag_tgt1>>).
   Proof.
     i. inv MATCH.
     { exfalso. red in INPUT_TGT. rewrite NORMAL in INPUT_TGT.
@@ -2371,8 +2370,8 @@ Section LIFT.
       (VALS: sim_vals_lift p0 svs_src0 svs_tgt0 vs_src0 vs_tgt0)
       (FLAGS: sim_flags_lift D0 sflag_src0 sflag_tgt0 flag_src0 flag_tgt0)
       (ATLOCS: forall loc (NNA: ~ loc_na loc),
-          (<<FLAGSRC: flag_src0 loc = None>>) /\
-            (<<FLAGTGT: flag_tgt0 loc = None>>) /\
+          (<<FLAGSRC: flag_src0 loc = false>>) /\
+            (<<FLAGTGT: flag_tgt0 loc = false>>) /\
             (<<VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc)>>))
       (NORMAL: ~ is_release e_tgt)
       (AT: forall loc val (ACC: is_accessing e_tgt = Some (loc, val)), loc_at loc)
@@ -2383,8 +2382,8 @@ Section LIFT.
                   (<<VALSRC: vs_src1 loc = Some val_src>>) /\ (<<VALTGT: vs_tgt1 loc = Some val_tgt>>) /\
                   (<<VALLE: Const.le val_tgt val_src>>) /\
                   (<<ACQ: is_acquire e_tgt>>)))
-      (ACQFLAG: forall loc ts
-                       (SRC: flag_src0 loc = None) (TGT: flag_tgt0 loc = Some ts),
+      (ACQFLAG: forall loc
+                       (SRC: flag_src0 loc = false) (TGT: flag_tgt0 loc = true),
           ~ is_acquire e_tgt),
     forall i_src svs_src1 sflag_src1 D1 i_tgt svs_tgt1 sflag_tgt1 p1 p'
            (INPUT_SRC: SeqEvent.wf_input e_src i_src)
@@ -2429,8 +2428,8 @@ Section LIFT.
       (VALS: sim_vals_lift p0 svs_src0 svs_tgt0 vs_src0 vs_tgt0)
       (FLAGS: sim_flags_lift D0 sflag_src0 sflag_tgt0 flag_src0 flag_tgt0)
       (ATLOCS: forall loc (NNA: ~ loc_na loc),
-          (<<FLAGSRC: flag_src0 loc = None>>) /\
-          (<<FLAGTGT: flag_tgt0 loc = None>>) /\
+          (<<FLAGSRC: flag_src0 loc = false>>) /\
+          (<<FLAGTGT: flag_tgt0 loc = false>>) /\
           (<<VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc)>>))
       (RELEASE: is_release e_tgt)
       (AT: forall loc val (ACC: is_accessing e_tgt = Some (loc, val)), loc_at loc)
@@ -2440,19 +2439,19 @@ Section LIFT.
               ((<<NNA: ~ loc_na loc>>) \/ ((<<NONESRC: vs_src0 loc = None>>) /\ (<<NONETGT: vs_tgt0 loc = None>>) /\ (<<ACQ: is_acquire e_tgt>>))) /\
               (<<VALSRC: vs_src1 loc = Some val_src>>) /\ (<<VALTGT: vs_tgt1 loc = Some val_tgt>>) /\
               (<<VALLE: Const.le val_tgt val_src>>)))
-      (ACQFLAG: forall loc ts
-                       (SRC: flag_src0 loc = None) (TGT: flag_tgt0 loc = Some ts),
+      (ACQFLAG: forall loc
+                       (SRC: flag_src0 loc = false) (TGT: flag_tgt0 loc = true),
           ~ is_acquire e_tgt)
       (DEBT: forall loc
-                    (FLAG: flag_src0 loc = None -> flag_tgt0 loc = None)
+                    (FLAG: flag_src0 loc = false -> flag_tgt0 loc = false)
                     (VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc)),
-          flag_tgt1 loc = None)
+          flag_tgt1 loc = false)
       (INPUT_SRC: SeqEvent.wf_input e_src i_src)
       (INPUT_TGT: SeqEvent.wf_input e_tgt i_tgt)
       (MATCH: SeqEvent.input_match D0 D1 i_src i_tgt),
       (<<PERMEQ: p' = p1>>) /\
       (<<VALS: sim_vals_lift p1 svs_src1 svs_tgt1 vs_src1 vs_tgt1>>) /\
-      (<<FLAGS: sim_flags_lift D1 sflag_src1 sflag_tgt1 (fun _ => None) flag_tgt1>>).
+      (<<FLAGS: sim_flags_lift D1 sflag_src1 sflag_tgt1 (fun _ => false) flag_tgt1>>).
   Proof.
     i. inv MATCH. inv STEP_SRC. inv STEP_TGT.
     eapply seqevent_wf_destruct in INPUT_SRC.
@@ -2513,12 +2512,12 @@ Section LIFT.
         (ATOMIC: is_atomic_event pe_tgt)
         (NORMAL: ~ is_release pe_tgt)
         (ATLOCS: forall loc (NNA: ~ loc_na loc),
-            (<<FLAGSRC: flag_src0 loc = None>>) /\
-              (<<FLAGTGT: flag_tgt0 loc = None>>) /\
+            (<<FLAGSRC: flag_src0 loc = false>>) /\
+              (<<FLAGTGT: flag_tgt0 loc = false>>) /\
               (<<VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc)>>))
         (AT: forall loc val (ACC: is_accessing pe_tgt = Some (loc, val)), loc_at loc)
-        (ACQFLAG: forall loc ts
-                         (SRC: flag_src0 loc = None) (TGT: flag_tgt0 loc = Some ts),
+        (ACQFLAG: forall loc
+                         (SRC: flag_src0 loc = false) (TGT: flag_tgt0 loc = true),
             ~ is_acquire pe_tgt)
     :
     (<<FAILURE: Thread.steps_failure (Thread.mk lang st0 lc_src0 sc_src0 mem_src0)>>) \/
@@ -2744,12 +2743,12 @@ Section LIFT.
         (ATOMIC: is_atomic_event pe_tgt)
         (NORMAL: is_release pe_tgt)
         (ATLOCS: forall loc (NNA: ~ loc_na loc),
-            (<<FLAGSRC: flag_src0 loc = None>>) /\
-            (<<FLAGTGT: flag_tgt0 loc = None>>) /\
+            (<<FLAGSRC: flag_src0 loc = false>>) /\
+            (<<FLAGTGT: flag_tgt0 loc = false>>) /\
             (<<VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc)>>))
         (AT: forall loc val (ACC: is_accessing pe_tgt = Some (loc, val)), loc_at loc)
-        (ACQFLAG: forall loc ts
-                         (SRC: flag_src0 loc = None) (TGT: flag_tgt0 loc = Some ts),
+        (ACQFLAG: forall loc
+                         (SRC: flag_src0 loc = false) (TGT: flag_tgt0 loc = true),
             ~ is_acquire pe_tgt)
     :
       (<<FAILURE: Thread.steps_failure (Thread.mk lang st0 lc_src0 sc_src0 mem_src0)>>) \/
@@ -2758,7 +2757,7 @@ Section LIFT.
         (<<STEP: Thread.opt_step e_src (Thread.mk lang st0 lc_src1 sc_src1 mem_src1) (Thread.mk lang st1 lc_src2 sc_src2 mem_src2)>>) /\
         (<<STEPS1: rtc (@Thread.tau_step _) (Thread.mk lang st1 lc_src2 sc_src2 mem_src2) (Thread.mk lang st1 lc_src3 sc_src3 mem_src3)>>) /\
         (<<SIM: SeqLiftStep.sim_thread
-                  f1 vers1 (fun _ => None) flag_tgt1 vs_src1 vs_tgt1
+                  f1 vers1 (fun _ => false) flag_tgt1 vs_src1 vs_tgt1
                   mem_src3 mem_tgt1 lc_src3 lc_tgt1 sc_src3 sc_tgt1>>) /\
         (<<WF: Mapping.wfs f1>>) /\
         (<<MAPLE: Mapping.les f0 f1>>) /\
@@ -2773,22 +2772,22 @@ Section LIFT.
                 (<<VALSRC: vs_src1 loc = Some val_src>>) /\ (<<VALTGT: vs_tgt1 loc = Some val_tgt>>) /\
                 (<<VALLE: Const.le val_tgt val_src>>))>>) /\
         (<<DEBT: forall loc
-                        (FLAG: flag_src0 loc = None -> flag_tgt0 loc = None)
+                        (FLAG: flag_src0 loc = false -> flag_tgt0 loc = false)
                         (VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc)),
-            flag_tgt1 loc = None>>) /\
+            flag_tgt1 loc = false>>) /\
         (<<EVENT: machine_event_le (ThreadEvent.get_machine_event e_tgt) (ThreadEvent.get_machine_event e_src)>>)
   .
   Proof.
     assert (exists (D: Loc.t -> Prop),
                (<<MIN: forall loc
-                              (FLAG: flag_src0 loc = None -> flag_tgt0 loc = None)
+                              (FLAG: flag_src0 loc = false -> flag_tgt0 loc = false)
                               (VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc)),
                    ~ D loc>>) /\
                (<<DEBT: forall loc, (<<DEBT: D loc>>) \/
-                                    ((<<FLAG: flag_src0 loc = None -> flag_tgt0 loc = None>>) /\
-                                     (<<VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc) \/ flag_src0 loc = None>>))>>)).
-    { exists (fun loc => ~ ((<<FLAG: flag_src0 loc = None -> flag_tgt0 loc = None>>) /\
-                            (<<VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc) \/ flag_src0 loc = None>>))).
+                                    ((<<FLAG: flag_src0 loc = false -> flag_tgt0 loc = false>>) /\
+                                     (<<VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc) \/ flag_src0 loc = false>>))>>)).
+    { exists (fun loc => ~ ((<<FLAG: flag_src0 loc = false -> flag_tgt0 loc = false>>) /\
+                            (<<VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc) \/ flag_src0 loc = false>>))).
       splits.
       { i. ii. eapply H. auto. }
       { ii. eapply or_comm. eapply classic. }
@@ -3006,9 +3005,9 @@ Section LIFT.
     punfold NOMIXTGT. exploit NOMIXTGT; eauto. i. des.
     punfold NOMIX. exploit NOMIX; eauto. i. des. pclearbot.
     inv LIFT1.
-    assert (ACQFLAG: forall loc ts
-                            (NONE: flag_src loc = None)
-                            (SOME: flag_tgt loc = Some ts),
+    assert (ACQFLAG: forall loc
+                            (NONE: flag_src loc = false)
+                            (SOME: flag_tgt loc = true),
                ~ is_acquire (ThreadEvent.get_program_event e)).
     { ii. hexploit ACQ; eauto. i. ss.
       hexploit (FLAGS loc); eauto. i. inv H1.
@@ -3097,9 +3096,9 @@ Section LIFT.
     punfold NOMIXTGT. exploit NOMIXTGT; eauto. i. des.
     punfold NOMIX. exploit NOMIX; eauto. i. des. pclearbot.
     inv LIFT1.
-    assert (ACQFLAG: forall loc ts
-                            (NONE: flag_src loc = None)
-                            (SOME: flag_tgt loc = Some ts),
+    assert (ACQFLAG: forall loc
+                            (NONE: flag_src loc = false)
+                            (SOME: flag_tgt loc = true),
                ~ is_acquire (ThreadEvent.get_program_event e_tgt)).
     { ii. hexploit ACQ; eauto. i. ss.
       hexploit (FLAGS loc); eauto. i. inv H1.
@@ -3125,7 +3124,7 @@ Section LIFT.
     }
     { rewrite RELEASE in SIM3. ss. }
     { inv SIM2. ss. splits; auto. eapply sim_timemap_mon_locs; eauto. ss. }
-    { inv SIM2. ss. }
+    { inv SIM2. ss. splits; auto. eapply sim_memory_sim_memory_interference; eauto. }
     { etrans; eauto. ss. i. splits; eauto.
       eapply Thread.rtc_tau_step_future in STEPS1; eauto. ss. des.
       eapply Thread.opt_step_future in STEP0; eauto. ss. des.

@@ -106,8 +106,7 @@ Variant sim_local
     (PROMISES: sim_promises srctm flag_src flag_tgt f vers prom_src prom_tgt)
     (RELVERS: wf_release_vers vers prom_tgt rel_vers)
     (FLAGSRC: forall loc (FLAG: flag_src loc = true),
-        (<<RLX: tvw_src.(TView.cur).(View.rlx) loc = srctm loc>>) /\
-          (<<PLN: tvw_src.(TView.cur).(View.pln) loc = srctm loc>>))
+        (<<RLX: tvw_src.(TView.cur).(View.rlx) loc = tvw_src.(TView.cur).(View.pln) loc>>))
     (SRCTM: forall loc, srctm loc = tvw_src.(TView.cur).(View.rlx) loc)
   :
     sim_local
@@ -127,9 +126,9 @@ Proof.
   eapply sim_tview_tgt_mon; eauto.
 Qed.
 
-Lemma sim_local_consistent f vers flag_src flag_tgt lc_src lc_tgt
+Lemma sim_local_consistent f vers srctm flag_src flag_tgt lc_src lc_tgt
       (CONSISTENT: Local.promise_consistent lc_tgt)
-      (SIM: sim_local f vers flag_src flag_tgt lc_src lc_tgt)
+      (SIM: sim_local f vers srctm flag_src flag_tgt lc_src lc_tgt)
       (WF: Mapping.wfs f)
   :
     Local.promise_consistent lc_src.
@@ -141,7 +140,6 @@ Proof.
       { eapply sim_tview_cur. eauto. }
       { ss. destruct (flag_src loc) eqn:FLAG; auto.
         erewrite sim_promises_none in PROMISE; eauto; ss.
-        rewrite FLAG. ss.
       }
     }
     { eauto. }
@@ -152,13 +150,23 @@ Proof.
   { rewrite SRCTM in *. auto. }
 Qed.
 
-Lemma sim_local_racy f vers flag_src flag_tgt lc_src lc_tgt mem_src mem_tgt loc ord
+Lemma sim_local_consistent_ex f vers flag_src flag_tgt lc_src lc_tgt
       (CONSISTENT: Local.promise_consistent lc_tgt)
-      (MEM: sim_memory flag_src f vers mem_src mem_tgt)
-      (SIM: sim_local f vers flag_src flag_tgt lc_src lc_tgt)
+      (SIM: exists srctm, sim_local f vers srctm flag_src flag_tgt lc_src lc_tgt)
+      (WF: Mapping.wfs f)
+  :
+    Local.promise_consistent lc_src.
+Proof.
+  des. eapply sim_local_consistent; eauto.
+Qed.
+
+Lemma sim_local_racy f vers srctm flag_src flag_tgt lc_src lc_tgt mem_src mem_tgt loc ord
+      (CONSISTENT: Local.promise_consistent lc_tgt)
+      (MEM: sim_memory srctm flag_src f vers mem_src mem_tgt)
+      (SIM: sim_local f vers srctm flag_src flag_tgt lc_src lc_tgt)
       (WF: Mapping.wfs f)
       (RACY: Local.is_racy lc_tgt mem_tgt loc ord)
-      (FLAGSRC: flag_src loc = None)
+      (FLAGSRC: flag_src loc = false)
       (FLAGTGT: flag_tgt loc = false)
   :
     Local.is_racy lc_src mem_src loc ord.
@@ -252,19 +260,20 @@ Qed.
 
 Variant sim_thread
         (f: Mapping.ts) (vers: versions)
-        (flag_src: Loc.t -> option Time.t)
+        (flag_src: Loc.t -> bool)
         (flag_tgt: Loc.t -> bool)
         (vs_src: Loc.t -> option Const.t)
         (vs_tgt: Loc.t -> option Const.t)
         mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt: Prop :=
 | sim_thread_intro
-    (SC: sim_timemap (fun loc => flag_src loc = None) f (Mapping.vers f) sc_src sc_tgt)
-    (MEM: sim_memory flag_src f vers mem_src mem_tgt)
-    (LOCAL: sim_local f vers flag_src flag_tgt lc_src lc_tgt)
+    srctm
+    (SC: sim_timemap (fun loc => flag_src loc = false) f (Mapping.vers f) sc_src sc_tgt)
+    (MEM: sim_memory srctm flag_src f vers mem_src mem_tgt)
+    (LOCAL: sim_local f vers srctm flag_src flag_tgt lc_src lc_tgt)
     (MAXSRC: max_values_src vs_src mem_src lc_src)
     (MAXTGT: max_values_tgt vs_tgt mem_tgt lc_tgt)
     (PERM: forall loc, option_rel (fun _ _ => True) (vs_src loc) (vs_tgt loc))
-    (FIN: __guard__(exists dom, (<<DOM: forall loc, (exists ts, flag_src loc = Some ts) <-> (List.In loc dom)>>)))
+    (FIN: __guard__(exists dom, (<<DOM: forall loc, (flag_src loc = true) <-> (List.In loc dom)>>)))
     (VERSIONED: versioned_memory vers mem_tgt)
     (SIMCLOSED: sim_closed_memory f mem_src)
 .
@@ -331,14 +340,14 @@ Proof.
 Qed.
 
 Lemma sim_memory_src_flag_max_concrete
-      f vers flag_src
+      f vers srctm flag_src
       mem_src mem_tgt
-      (SIM: sim_memory flag_src f vers mem_src mem_tgt)
-      loc ts
-      (FLAG: flag_src loc = Some ts)
-      (CLOSED: exists from msg, Memory.get loc ts mem_src = Some (from, msg))
+      (SIM: sim_memory srctm flag_src f vers mem_src mem_tgt)
+      loc
+      (FLAG: flag_src loc = true)
+      (CLOSED: exists from msg, Memory.get loc (srctm loc) mem_src = Some (from, msg))
   :
-    Memory.max_ts loc mem_src = ts.
+    Memory.max_ts loc mem_src = srctm loc.
 Proof.
   des. hexploit Memory.max_ts_spec.
   { eapply CLOSED. }
@@ -352,35 +361,36 @@ Proof.
   { clarify. }
 Qed.
 
-Lemma max_value_src_flag_none f vers flag_src flag_tgt lc_src lc_tgt mem_src mem_tgt loc
-      (MEM: sim_memory flag_src f vers mem_src mem_tgt)
-      (LOCAL: sim_local f vers flag_src flag_tgt lc_src lc_tgt)
+Lemma max_value_src_flag_none f vers srctm flag_src flag_tgt lc_src lc_tgt mem_src mem_tgt loc
+      (MEM: sim_memory srctm flag_src f vers mem_src mem_tgt)
+      (LOCAL: sim_local f vers srctm flag_src flag_tgt lc_src lc_tgt)
       (MAX: max_value_src loc None mem_src lc_src)
       (LOCALWF: Local.wf lc_src mem_src)
       (WF: Mapping.wfs f)
   :
-    flag_src loc = None.
+    flag_src loc = false.
 Proof.
   destruct (flag_src loc) eqn:FLAG; auto. exfalso.
   inv LOCAL. hexploit FLAGSRC; eauto. i. des. subst.
   inv LOCALWF. inv TVIEW_CLOSED.
   inv CUR. exploit RLX; eauto. i. des. ss.
-  inv MAX. hexploit NONMAX; eauto. ii. eapply H. econs.
-  { rewrite PLN. eauto. }
-  { inv PROMISES. eapply NONE; eauto. rewrite FLAG. ss. }
-  { i. hexploit sim_memory_src_flag_max_concrete; eauto. i.
-    eapply Memory.max_ts_spec in GET. des.
-    rewrite H0 in MAX. exfalso.
+  inv MAX. hexploit NONMAX; eauto. ii. eapply H0. econs.
+  { rewrite <- H. eauto. }
+  { inv PROMISES. eapply NONE; eauto. }
+  { i. hexploit sim_memory_src_flag_max_concrete; eauto.
+    { rewrite SRCTM. eauto. }
+    i. eapply Memory.max_ts_spec in GET. des.
+    rewrite H1 in MAX. exfalso.
     eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
     { eapply TS. }
-    { rewrite PLN. eauto. }
+    { rewrite <- H. rewrite <- SRCTM. eauto. }
   }
 Qed.
 
-Lemma no_flag_max_value_same f vers flag_src flag_tgt lc_src lc_tgt mem_src mem_tgt loc v_src
-      (MEM: sim_memory flag_src f vers mem_src mem_tgt)
-      (LOCAL: sim_local f vers flag_src flag_tgt lc_src lc_tgt)
-      (FLAGSRC: flag_src loc = None)
+Lemma no_flag_max_value_same f vers srctm flag_src flag_tgt lc_src lc_tgt mem_src mem_tgt loc v_src
+      (MEM: sim_memory srctm flag_src f vers mem_src mem_tgt)
+      (LOCAL: sim_local f vers srctm flag_src flag_tgt lc_src lc_tgt)
+      (FLAGSRC: flag_src loc = false)
       (FLAGTGT: flag_tgt loc = false)
       (MAX: max_value_src loc (Some v_src) mem_src lc_src)
       (LOCALWF: Local.wf lc_tgt mem_tgt)
@@ -600,6 +610,7 @@ Proof.
   i. des. esplits; [eapply STEPS|..].
   { i. ss. eapply NONE; eauto. }
   econs; auto.
+  { eauto. }
   { econs; eauto. }
   { ii. hexploit (MAXSRC loc0). i. inv H. econs.
     { i. hexploit MAX; eauto. i. des. esplits. eapply VALS; eauto. }
@@ -783,7 +794,7 @@ Proof.
       }
     }
   }
-  hexploit sim_local_consistent.
+  hexploit sim_local_consistent_ex.
   { eapply PromiseConsistent.write_na_step_promise_consistent; eauto. }
   { inv SIM. eauto. }
   { auto. }
@@ -792,6 +803,7 @@ Proof.
   2:{ inv WRITE. auto. }
   inv SIM. econs; auto.
   { inv WRITE. auto. }
+  { eauto. }
   { inv WRITE. inv LOCAL0. econs; ss; auto.
     { eapply sim_tview_tgt_mon; eauto.
       eapply TViewFacts.write_tview_incr. eapply LOCAL.
@@ -995,7 +1007,7 @@ Lemma sim_thread_cap
       mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt
       cap_src cap_tgt
       (SIM: sim_thread
-              f0 vers (fun _ => None) flag_tgt vs_src vs_tgt
+              f0 vers (fun _ => false) flag_tgt vs_src vs_tgt
               mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt)
       (CAPSRC: Memory.cap mem_src cap_src)
       (CAPTGT: Memory.cap mem_tgt cap_tgt)
@@ -1010,7 +1022,7 @@ Lemma sim_thread_cap
       (<<MAPLE: Mapping.les f0 f1>>) /\
       (<<MAPWF: Mapping.wfs f1>>) /\
       (<<SIM: sim_thread
-                f1 vers (fun _ => None) flag_tgt vs_src vs_tgt
+                f1 vers (fun _ => false) flag_tgt vs_src vs_tgt
                 cap_src cap_tgt lc_src lc_tgt sc_src sc_tgt>>) /\
       (<<VERS: versions_wf f1 vers>>)
 .
@@ -1170,7 +1182,7 @@ Proof.
   pose proof (mapping_latest_wf f).
   assert (TM: sim_timestamp (f loc) (Mapping.vers f loc) to_src to_tgt).
   { eapply sim_timestamp_exact_sim; eauto. }
-  assert (JOIN: sim_view (fun loc0 => flag_src loc0 = None) f (Mapping.vers f)
+  assert (JOIN: sim_view (fun loc0 => flag_src loc0 = false) f (Mapping.vers f)
                          (View.join (View.singleton_ur loc to_src) (View.unwrap released_src))
                          (View.join (View.singleton_ur loc to_tgt) (View.unwrap released_tgt))).
   { eapply sim_view_mon_locs.
@@ -1221,7 +1233,7 @@ Proof.
   pose proof (mapping_latest_wf f).
   assert (TM: sim_timestamp (f loc) (Mapping.vers f loc) to_src to_tgt).
   { eapply sim_timestamp_exact_sim; eauto. }
-  assert (JOIN: sim_view (fun loc0 => flag_src loc0 = None) f (Mapping.vers f)
+  assert (JOIN: sim_view (fun loc0 => flag_src loc0 = false) f (Mapping.vers f)
                          (View.singleton_ur loc to_src)
                          (View.singleton_ur loc to_tgt)).
   { apply sim_view_singleton_ur; eauto. }
@@ -1243,7 +1255,7 @@ Lemma sim_write_tview_release f flag_src rel_vers tvw_src tvw_tgt sc_src sc_tgt
       loc to_src ord to_tgt
       (SIM: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
       (TO: sim_timestamp (f loc) (f loc).(Mapping.ver) to_src to_tgt)
-      (FLAG: forall loc, flag_src loc = None)
+      (FLAG: forall loc, flag_src loc = false)
       (WF: Mapping.wfs f)
   :
     sim_tview f flag_src (fun loc0 => if Loc.eq_dec loc0 loc then (Mapping.vers f) else rel_vers loc0) (TView.write_tview tvw_src sc_src loc to_src ord) (TView.write_tview tvw_tgt sc_tgt loc to_tgt ord).
@@ -1318,7 +1330,7 @@ Lemma sim_write_fence_tview_release f flag_src rel_vers tvw_src tvw_tgt sc_src s
       ord
       (SIM: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
       (SC: sim_timemap (fun _ => True) f (Mapping.vers f) sc_src sc_tgt)
-      (FLAG: forall loc, flag_src loc = None)
+      (FLAG: forall loc, flag_src loc = false)
       (WF: Mapping.wfs f)
   :
     sim_tview f flag_src (fun _ => Mapping.vers f) (TView.write_fence_tview tvw_src sc_src ord) (TView.write_fence_tview tvw_tgt sc_tgt ord).
@@ -1361,10 +1373,10 @@ Qed.
 Lemma sim_write_fence_sc f flag_src rel_vers tvw_src tvw_tgt sc_src sc_tgt
       ord
       (SIM: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
-      (SC: sim_timemap (fun loc => flag_src loc = None) f (Mapping.vers f) sc_src sc_tgt)
+      (SC: sim_timemap (fun loc => flag_src loc = false) f (Mapping.vers f) sc_src sc_tgt)
       (WF: Mapping.wfs f)
   :
-    sim_timemap (fun loc => flag_src loc = None) f (Mapping.vers f) (TView.write_fence_sc tvw_src sc_src ord) (TView.write_fence_sc tvw_tgt sc_tgt ord).
+    sim_timemap (fun loc => flag_src loc = false) f (Mapping.vers f) (TView.write_fence_sc tvw_src sc_src ord) (TView.write_fence_sc tvw_tgt sc_tgt ord).
 Proof.
   pose proof (mapping_latest_wf f).
   unfold TView.write_fence_sc. des_ifs. eapply sim_timemap_join; auto.
@@ -1404,7 +1416,7 @@ Lemma sim_write_released_release f flag_src rel_vers tvw_src tvw_tgt sc_src sc_t
       (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
       (RELEASED: sim_opt_view (fun loc0 => loc0 <> loc) f v released_src released_tgt)
       (VERWF: opt_version_wf f v)
-      (FLAG: forall loc, flag_src loc = None)
+      (FLAG: forall loc, flag_src loc = false)
       (CLOSED: Mapping.closed (f loc) (Mapping.vers f loc) to_src)
       (WF: Mapping.wfs f)
   :
@@ -1520,7 +1532,7 @@ Lemma sim_thread_src_write_na
       (<<WRITE: Local.write_na_step lc_src1 sc_src mem_src1 loc from to val_new Ordering.na lc_src2 sc_src mem_src2 msgs kinds kind>>) /\
       (<<SIM: sim_thread
                 f vers
-                (fun loc0 => if Loc.eq_dec loc0 loc then Some to else flag_src loc0)
+                (fun loc0 => if Loc.eq_dec loc0 loc then true else flag_src loc0)
                 (fun loc0 => if Loc.eq_dec loc0 loc then true else flag_tgt loc0)
                 (fun loc0 => if Loc.eq_dec loc0 loc then Some val_new else vs_src loc0)
                 vs_tgt
@@ -1583,7 +1595,7 @@ Proof.
     etransitivity; [|left; eapply TS].
     inv LOCAL. hexploit FLAGSRC; eauto. i. des. subst.
     inv WF2. ss. inv TVIEW_CLOSED. inv CUR.
-    exploit RLX0. i. des.
+    exploit RLX0. i. des. rewrite SRCTM.
     eapply Memory.max_ts_spec in x. des. eauto.
   }
   { dup LOCAL. ss. inv LOCAL0. econs.
@@ -1596,13 +1608,13 @@ Proof.
       { i. des_ifs. }
     }
     { eauto. }
-    { i. des_ifs. hexploit (FLAGTGT loc0 ts); eauto.
-      { des_ifs. }
-      i. subst. auto.
+    { i. des_ifs.
+      { rewrite VIEW. rewrite RLX. auto. }
+      { hexploit FLAGSRC; eauto. i. des.
+        rewrite OTHERRLX; auto. rewrite OTHERPLN; auto.
+      }
     }
-    { i. des_ifs. eapply FLAGSRC in FLAG. des. subst.
-      splits; auto. rewrite OTHERPLN; auto.
-    }
+    { i. des_ifs. rewrite OTHERRLX; auto. }
   }
   { ii. specialize (MAXSRC loc0). inv MAXSRC. des_ifs.
     { econs; ss. i. clarify. rewrite VIEW. eauto. }
@@ -1664,9 +1676,9 @@ Lemma sim_thread_acquire
       (LESRC: TView.le tvw_src0 tvw_src1)
       (LETGT: TView.le tvw_tgt0 tvw_tgt1)
       (RELVERS: wf_release_vers vers prom_tgt rel_vers)
-      (FLAGS: forall loc ts
-                     (SRC: flag_src loc = None)
-                     (TGT: flag_tgt loc = Some ts),
+      (FLAGS: forall loc
+                     (SRC: flag_src loc = false)
+                     (TGT: flag_tgt loc = true),
           (<<PLN: tvw_src1.(TView.cur).(View.pln) loc = tvw_src0.(TView.cur).(View.pln) loc>>) /\
           (<<RLX: tvw_src1.(TView.cur).(View.rlx) loc = tvw_src0.(TView.cur).(View.rlx) loc>>))
   :
@@ -1677,8 +1689,8 @@ Lemma sim_thread_acquire
       (<<VALS: forall loc,
           ((<<SRC: vs_src1 loc = vs_src0 loc>>) /\ (<<TGT: vs_tgt1 loc = vs_tgt0 loc>>)) \/
           (exists val_src val_tgt,
-              (<<FLAGSRC: flag_src loc = None>>) /\
-                (<<FLAGTGT: flag_tgt loc = None>>) /\
+              (<<FLAGSRC: flag_src loc = false>>) /\
+                (<<FLAGTGT: flag_tgt loc = false>>) /\
                 (<<NONESRC: vs_src0 loc = None>>) /\ (<<NONETGT: vs_tgt0 loc = None>>) /\
                 (<<VALSRC: vs_src1 loc = Some val_src>>) /\ (<<VALTGT: vs_tgt1 loc = Some val_tgt>>) /\
                 (<<VALLE: Const.le val_tgt val_src>>) /\
@@ -1687,40 +1699,38 @@ Lemma sim_thread_acquire
                 (<<VALTGT: __guard__(exists from released, Memory.get loc (tvw_tgt1.(TView.cur).(View.pln) loc) mem_tgt = Some (from, Message.concrete val_tgt released))>>))>>)
 .
 Proof.
-  assert (SIMLOCAL: sim_local f vers flag_src flag_tgt (Local.mk tvw_src1 prom_src) (Local.mk tvw_tgt1 prom_tgt)).
-  { inv SIM. inv LOCAL.
-    assert (VIEWEQ: forall loc ts
-                           (SRC: flag_src loc = Some ts),
-               (<<PLN: tvw_src1.(TView.cur).(View.pln) loc = tvw_src0.(TView.cur).(View.pln) loc>>) /\
-               (<<RLX: tvw_src1.(TView.cur).(View.rlx) loc = tvw_src0.(TView.cur).(View.rlx) loc>>)).
-    { i. hexploit FLAGSRC; eauto. i. des.
-      hexploit sim_memory_src_flag_max_concrete; eauto.
-      { inv LOCALSRC0. inv TVIEW_CLOSED. inv CUR. exploit RLX. i. des. eauto. }
-      i. subst.
-      inv LOCALSRC1. inv TVIEW_CLOSED. inv CUR. ss. splits.
-      { eapply TimeFacts.antisym.
-        { hexploit (PLN0 loc). i. des.
-          eapply Memory.max_ts_spec in H0. des.
-          rewrite H in MAX. rewrite <- PLN in MAX. auto.
-        }
-        { eapply LESRC. }
-      }
-      { eapply TimeFacts.antisym.
-        { hexploit (RLX loc). i. des.
-          eapply Memory.max_ts_spec in H0. des.
-          rewrite H in MAX. auto.
-        }
-        { eapply LESRC. }
-      }
+  assert (VIEWEQ: forall loc
+                         (SRC: flag_src loc = true),
+             (<<PLN: tvw_src1.(TView.cur).(View.pln) loc = tvw_src0.(TView.cur).(View.pln) loc>>) /\
+             (<<RLX: tvw_src1.(TView.cur).(View.rlx) loc = tvw_src0.(TView.cur).(View.rlx) loc>>)).
+  { inv SIM. inv LOCAL. i. hexploit FLAGSRC; eauto. i. des.
+    hexploit sim_memory_src_flag_max_concrete; eauto.
+    { rewrite SRCTM; eauto. inv LOCALSRC0. inv TVIEW_CLOSED. inv CUR.
+      exploit RLX. i. des. eauto.
     }
-    econs; eauto.
-    { i. destruct (flag_src loc) eqn:EQ.
-      { hexploit VIEWEQ; eauto. i. des.
-        rewrite RLX. eapply FLAGTGT; eauto.
+    i. subst.
+    inv LOCALSRC1. inv TVIEW_CLOSED. inv CUR. ss. splits.
+    { eapply TimeFacts.antisym.
+      { hexploit (PLN loc). i. des.
+        eapply Memory.max_ts_spec in H1. des.
+        rewrite H0 in MAX. rewrite SRCTM in MAX. auto. rewrite H in MAX. auto.
       }
-      { hexploit FLAGS; eauto. i. des.
-        rewrite RLX. eapply FLAGTGT; eauto.
+      { eapply LESRC. }
+    }
+    { eapply TimeFacts.antisym.
+      { hexploit (RLX loc). i. des.
+        eapply Memory.max_ts_spec in H1. des.
+        rewrite H0 in MAX. rewrite SRCTM in MAX. auto.
       }
+      { eapply LESRC. }
+    }
+  }
+  assert (SIMLOCAL: sim_local f vers tvw_src1.(TView.cur).(View.rlx) flag_src flag_tgt (Local.mk tvw_src1 prom_src) (Local.mk tvw_tgt1 prom_tgt)).
+  { inv SIM. inv LOCAL. econs; eauto.
+    { eapply sim_promises_change_no_flag; eauto. i.
+      rewrite SRCTM. destruct (flag_src loc) eqn:EQ.
+      { eapply VIEWEQ; auto. }
+      { eapply FLAGS; auto. }
     }
     { i. hexploit VIEWEQ; eauto. i. des.
       rewrite PLN. rewrite RLX. eapply FLAGSRC; eauto.
@@ -1731,7 +1741,7 @@ Proof.
   assert (VALSRC: forall loc,
              (<<SRC: vs_src1 loc = vs_src0 loc>>) \/
              (exists val,
-                 (<<FLAGSRC: flag_src loc = None>>) /\
+                 (<<FLAGSRC: flag_src loc = false>>) /\
                  (<<NONESRC: vs_src0 loc = None>>) /\
                  (<<VALSRC: vs_src1 loc = Some val>>) /\
                  (<<TS: Time.lt (tvw_src0.(TView.cur).(View.pln) loc) (tvw_src1.(TView.cur).(View.pln) loc)>>) /\
@@ -1763,12 +1773,16 @@ Proof.
       red. esplits; eauto.
     }
   }
+  assert (MEM: sim_memory (View.rlx (TView.cur tvw_src1)) flag_src f vers mem_src mem_tgt).
+  { inv SIM. inv LOCAL. eapply sim_memory_change_no_flag; eauto.
+    i. rewrite SRCTM. hexploit VIEWEQ; eauto. i. des. rewrite RLX. auto.
+  }
   hexploit (choice (fun loc v =>
                       (<<MAXTGT: max_value_tgt loc v mem_tgt (Local.mk tvw_tgt1 prom_tgt)>>) /\
                       (((<<SRC: vs_src1 loc = vs_src0 loc>>) /\ (<<TGT: v = vs_tgt0 loc>>)) \/
                          (exists val_src val_tgt,
-                             (<<FLAGSRC: flag_src loc = None>>) /\
-                               (<<FLAGTGT: flag_tgt loc = None>>) /\
+                             (<<FLAGSRC: flag_src loc = false>>) /\
+                               (<<FLAGTGT: flag_tgt loc = false>>) /\
                                (<<NONESRC: vs_src0 loc = None>>) /\ (<<NONETGT: vs_tgt0 loc = None>>) /\
                                (<<VALSRC: vs_src1 loc = Some val_src>>) /\ (<<VALTGT: v = Some val_tgt>>) /\
                                (<<VALLE: Const.le val_tgt val_src>>) /\
@@ -1779,12 +1793,11 @@ Proof.
     { exists (vs_tgt0 loc). esplits; auto.
       { inv SIM. eapply max_value_tgt_mon; eauto. }
     }
-    { assert (FLAG: flag_tgt loc = None).
+    { assert (FLAG: flag_tgt loc = false).
       { destruct (flag_tgt loc) eqn:FLAG; auto.
         hexploit FLAGS; eauto. i. des. rewrite PLN in TS. timetac.
       }
       hexploit no_flag_max_value_same; eauto.
-      { inv SIM. eauto. }
       { specialize (MAX loc). rewrite VALSRC0 in MAX. eauto. }
       i. des. exists (Some v_tgt). esplits; auto.
       right. esplits; eauto.
@@ -1798,8 +1811,9 @@ Proof.
   }
   clear VALSRC. intros [vs_tgt1 MAXTGT].
   exists vs_src1, vs_tgt1. splits; auto.
-  { inv SIM.
-    econs; auto.
+  { inv SIM. econs; auto.
+    { eapply MEM. }
+    { eauto. }
     { ii. hexploit (MAXTGT loc). i. des; auto. }
     { i. hexploit (MAXTGT loc). i. des.
       { rewrite SRC. rewrite TGT. auto. }
@@ -2214,7 +2228,7 @@ Qed.
 Lemma sim_local_read_fence_tview f flag_src rel_vers tvw_src tvw_tgt sc_src sc_tgt
       ordr ordw
       (SIM: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
-      (SC: sim_timemap (fun loc => flag_src loc = None) f (Mapping.vers f) sc_src sc_tgt)
+      (SC: sim_timemap (fun loc => flag_src loc = false) f (Mapping.vers f) sc_src sc_tgt)
       (WF: Mapping.wfs f)
   :
     sim_tview f flag_src rel_vers (local_read_fence_tview tvw_src sc_src ordr ordw) (local_read_fence_tview tvw_tgt sc_tgt ordr ordw).
@@ -2222,7 +2236,7 @@ Proof.
   pose proof (mapping_latest_wf f).
   assert (READ: sim_tview f flag_src rel_vers (TView.read_fence_tview tvw_src ordr) (TView.read_fence_tview tvw_tgt ordr)).
   { eapply sim_read_fence_tview; eauto. }
-  assert (WRITE: sim_timemap (fun loc => flag_src loc = None) f (Mapping.vers f) (TView.write_fence_sc (TView.read_fence_tview tvw_src ordr) sc_src ordw) (TView.write_fence_sc (TView.read_fence_tview tvw_tgt ordr) sc_tgt ordw)).
+  assert (WRITE: sim_timemap (fun loc => flag_src loc = false) f (Mapping.vers f) (TView.write_fence_sc (TView.read_fence_tview tvw_src ordr) sc_src ordw) (TView.write_fence_sc (TView.read_fence_tview tvw_tgt ordr) sc_tgt ordw)).
   { eapply sim_write_fence_sc; eauto. }
   econs; ss.
   { eapply SIM. }
@@ -2256,7 +2270,7 @@ Qed.
 Lemma sim_local_write_fence_tview_release f flag_src rel_vers tvw_src tvw_tgt
       ord
       (SIM: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
-      (FLAG: forall loc, flag_src loc = None)
+      (FLAG: forall loc, flag_src loc = false)
       (WF: Mapping.wfs f)
   :
     sim_tview f flag_src (fun _ => Mapping.vers f) (local_write_fence_tview tvw_src ord) (local_write_fence_tview tvw_tgt ord).
@@ -2280,11 +2294,11 @@ Qed.
 Lemma sim_local_write_fence_sc f flag_src rel_vers tvw_src tvw_tgt sc_src sc_tgt
       ord
       (SIM: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
-      (SC: sim_timemap (fun loc => flag_src loc = None) f (Mapping.vers f) sc_src sc_tgt)
-      (FLAG: Ordering.le Ordering.seqcst ord -> forall loc, flag_src loc = None)
+      (SC: sim_timemap (fun loc => flag_src loc = false) f (Mapping.vers f) sc_src sc_tgt)
+      (FLAG: Ordering.le Ordering.seqcst ord -> forall loc, flag_src loc = false)
       (WF: Mapping.wfs f)
   :
-    sim_timemap (fun loc => flag_src loc = None) f (Mapping.vers f) (local_write_fence_sc tvw_src sc_src ord) (local_write_fence_sc tvw_tgt sc_tgt ord).
+    sim_timemap (fun loc => flag_src loc = false) f (Mapping.vers f) (local_write_fence_sc tvw_src sc_src ord) (local_write_fence_sc tvw_tgt sc_tgt ord).
 Proof.
   pose proof (mapping_latest_wf f).
   unfold local_write_fence_sc. des_ifs. eapply sim_timemap_join; auto.
@@ -2308,10 +2322,10 @@ Lemma sim_thread_read
       (SCTGT: Memory.closed_timemap sc_tgt mem_tgt)
       (WF: Mapping.wfs f)
       (VERS: versions_wf f vers)
-      (FLAGSRC: flag_src loc = None)
-      (FLAGTGT: flag_tgt loc = None)
-      (FLAG: forall loc ts
-                    (SRC: flag_src loc = None) (TGT: flag_tgt loc = Some ts),
+      (FLAGSRC: flag_src loc = false)
+      (FLAGTGT: flag_tgt loc = false)
+      (FLAG: forall loc
+                    (SRC: flag_src loc = false) (TGT: flag_tgt loc = true),
           ~ Ordering.le Ordering.acqrel ord)
   :
     exists val_tgt1 val_src1 to_src released_src lc_src1 vs_src1 vs_tgt1,
@@ -2453,11 +2467,11 @@ Lemma sim_thread_read_fence_step
       (SCTGT: Memory.closed_timemap sc_tgt mem_tgt)
       (WF: Mapping.wfs f)
       (VERS: versions_wf f vers)
-      (ACQFLAG: forall loc ts
-                       (SRC: flag_src loc = None) (TGT: flag_tgt loc = Some ts),
+      (ACQFLAG: forall loc
+                       (SRC: flag_src loc = false) (TGT: flag_tgt loc = true),
           ~ Ordering.le Ordering.acqrel ordr)
-      (RELFLAG: forall loc ts
-                       (SRC: flag_src loc = None) (TGT: flag_tgt loc = Some ts),
+      (RELFLAG: forall loc
+                       (SRC: flag_src loc = false) (TGT: flag_tgt loc = true),
           ~ Ordering.le Ordering.seqcst ordw)
   :
     exists lc_src1 vs_src1 vs_tgt1,
@@ -2587,7 +2601,7 @@ Require Import Pred.
 Lemma sim_thread_deflag_match_aux
       f0 vers flag_src flag_tgt vs_src vs_tgt
       mem_src0 mem_tgt lc_src0 lc_tgt sc_src sc_tgt
-      loc ts
+      loc
       (SIM: sim_thread
               f0 vers flag_src flag_tgt vs_src vs_tgt
               mem_src0 mem_tgt lc_src0 lc_tgt sc_src sc_tgt)
@@ -2599,7 +2613,7 @@ Lemma sim_thread_deflag_match_aux
       (SCSRC: Memory.closed_timemap sc_src mem_src0)
       (SCTGT: Memory.closed_timemap sc_tgt mem_tgt)
       (WF: Mapping.wfs f0)
-      (FLAG: flag_src loc = Some ts)
+      (FLAG: flag_src loc = true)
       (VAL: option_rel Const.le (vs_tgt loc) (vs_src loc))
       lang st
   :
@@ -2609,8 +2623,8 @@ Lemma sim_thread_deflag_match_aux
                     (Thread.mk _ st lc_src1 sc_src mem_src1)>>) /\
       (<<SIM: sim_thread
                 f1 vers
-                (fun loc0 => if Loc.eq_dec loc0 loc then None else flag_src loc0)
-                (fun loc0 => if Loc.eq_dec loc0 loc then None else flag_tgt loc0)
+                (fun loc0 => if Loc.eq_dec loc0 loc then false else flag_src loc0)
+                (fun loc0 => if Loc.eq_dec loc0 loc then false else flag_tgt loc0)
                 vs_src vs_tgt
                 mem_src1 mem_tgt lc_src1 lc_tgt sc_src sc_tgt>>) /\
       (<<WF: Mapping.wfs f1>>) /\
@@ -2624,7 +2638,7 @@ Admitted.
 Lemma sim_thread_deflag_unmatch_aux
       f0 vers flag_src flag_tgt vs_src vs_tgt
       mem_src0 mem_tgt lc_src0 lc_tgt sc_src sc_tgt
-      loc ts
+      loc
       (SIM: sim_thread
               f0 vers flag_src flag_tgt vs_src vs_tgt
               mem_src0 mem_tgt lc_src0 lc_tgt sc_src sc_tgt)
@@ -2636,7 +2650,7 @@ Lemma sim_thread_deflag_unmatch_aux
       (SCSRC: Memory.closed_timemap sc_src mem_src0)
       (SCTGT: Memory.closed_timemap sc_tgt mem_tgt)
       (WF: Mapping.wfs f0)
-      (FLAG: flag_src loc = Some ts)
+      (FLAG: flag_src loc = true)
       lang st
   :
     exists lc_src1 mem_src1 f1 flag,
@@ -2645,7 +2659,7 @@ Lemma sim_thread_deflag_unmatch_aux
                     (Thread.mk _ st lc_src1 sc_src mem_src1)>>) /\
       (<<SIM: sim_thread
                 f1 vers
-                (fun loc0 => if Loc.eq_dec loc0 loc then None else flag_src loc0)
+                (fun loc0 => if Loc.eq_dec loc0 loc then false else flag_src loc0)
                 (fun loc0 => if Loc.eq_dec loc0 loc then flag else flag_tgt loc0)
                 vs_src vs_tgt
                 mem_src1 mem_tgt lc_src1 lc_tgt sc_src sc_tgt>>) /\
@@ -2672,8 +2686,8 @@ Lemma sim_thread_deflag_match
       (SCSRC: Memory.closed_timemap sc_src mem_src0)
       (SCTGT: Memory.closed_timemap sc_tgt mem_tgt)
       (WF: Mapping.wfs f0)
-      (FLAG: flag_src loc = None -> flag_tgt loc = None)
-      (VAL: option_rel Const.le (vs_tgt loc) (vs_src loc) \/ flag_src loc = None)
+      (FLAG: flag_src loc = false -> flag_tgt loc = false)
+      (VAL: option_rel Const.le (vs_tgt loc) (vs_src loc) \/ flag_src loc = false)
       lang st
   :
     exists lc_src1 mem_src1 f1,
@@ -2682,8 +2696,8 @@ Lemma sim_thread_deflag_match
                     (Thread.mk _ st lc_src1 sc_src mem_src1)>>) /\
       (<<SIM: sim_thread
                 f1 vers
-                (fun loc0 => if Loc.eq_dec loc0 loc then None else flag_src loc0)
-                (fun loc0 => if Loc.eq_dec loc0 loc then None else flag_tgt loc0)
+                (fun loc0 => if Loc.eq_dec loc0 loc then false else flag_src loc0)
+                (fun loc0 => if Loc.eq_dec loc0 loc then false else flag_tgt loc0)
                 vs_src vs_tgt
                 mem_src1 mem_tgt lc_src1 lc_tgt sc_src sc_tgt>>) /\
       (<<WF: Mapping.wfs f1>>) /\
@@ -2696,9 +2710,9 @@ Proof.
   { des; ss. eapply sim_thread_deflag_match_aux; eauto. }
   { esplits.
     { refl. }
-    { replace (fun (loc0: Loc.t) => if LocSet.Facts.eq_dec loc0 loc then None else flag_src loc0) with flag_src.
+    { replace (fun (loc0: Loc.t) => if LocSet.Facts.eq_dec loc0 loc then false else flag_src loc0) with flag_src.
       2:{ extensionality loc0. des_ifs. }
-      replace (fun (loc0: Loc.t) => if LocSet.Facts.eq_dec loc0 loc then None else flag_tgt loc0) with flag_tgt.
+      replace (fun (loc0: Loc.t) => if LocSet.Facts.eq_dec loc0 loc then false else flag_tgt loc0) with flag_tgt.
       2:{ extensionality loc0. des_ifs. eauto. }
       eauto.
     }
@@ -2732,7 +2746,7 @@ Lemma sim_thread_deflag_unmatch
                     (Thread.mk _ st lc_src1 sc_src mem_src1)>>) /\
       (<<SIM: sim_thread
                 f1 vers
-                (fun loc0 => if Loc.eq_dec loc0 loc then None else flag_src loc0)
+                (fun loc0 => if Loc.eq_dec loc0 loc then false else flag_src loc0)
                 (fun loc0 => if Loc.eq_dec loc0 loc then flag else flag_tgt loc0)
                 vs_src vs_tgt
                 mem_src1 mem_tgt lc_src1 lc_tgt sc_src sc_tgt>>) /\
@@ -2747,7 +2761,7 @@ Proof.
   { esplits.
     { refl. }
     { instantiate (1:=flag_tgt loc).
-      replace (fun (loc0: Loc.t) => if LocSet.Facts.eq_dec loc0 loc then None else flag_src loc0) with flag_src.
+      replace (fun (loc0: Loc.t) => if LocSet.Facts.eq_dec loc0 loc then false else flag_src loc0) with flag_src.
       2:{ extensionality loc0. des_ifs. }
       replace (fun (loc0: Loc.t) => if LocSet.Facts.eq_dec loc0 loc then flag_tgt loc else flag_tgt loc0) with flag_tgt.
       2:{ extensionality loc0. des_ifs. }
@@ -2779,9 +2793,9 @@ Lemma sim_thread_deflag_all_aux
       (SCTGT: Memory.closed_timemap sc_tgt mem_tgt)
       (WF: Mapping.wfs f0)
       (DEBT: forall loc, (<<DEBT: D loc>>) \/
-                         ((<<FLAG: flag_src loc = None -> flag_tgt0 loc = None>>) /\
-                          (<<VAL: option_rel Const.le (vs_tgt loc) (vs_src loc) \/ flag_src loc = None>>)))
-      (FIN: forall loc ts (FLAG: flag_src loc = Some ts), List.In loc dom)
+                         ((<<FLAG: flag_src loc = false -> flag_tgt0 loc = false>>) /\
+                          (<<VAL: option_rel Const.le (vs_tgt loc) (vs_src loc) \/ flag_src loc = false>>)))
+      (FIN: forall loc (FLAG: flag_src loc = true), List.In loc dom)
       lang st,
     exists lc_src1 mem_src1 f1 flag_tgt1,
       (<<STEPS: rtc (tau (@pred_step is_promise _))
@@ -2789,19 +2803,19 @@ Lemma sim_thread_deflag_all_aux
                     (Thread.mk _ st lc_src1 sc_src mem_src1)>>) /\
       (<<SIM: sim_thread
                 f1 vers
-                (fun _ => None)
+                (fun _ => false)
                 flag_tgt1
                 vs_src vs_tgt
                 mem_src1 mem_tgt lc_src1 lc_tgt sc_src sc_tgt>>) /\
       (<<WF: Mapping.wfs f1>>) /\
       (<<MAPLE: Mapping.les f0 f1>>) /\
-      (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = None>>)>>) /\
+      (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = false>>)>>) /\
       (<<UNCH: forall loc (NIN: ~ List.In loc dom), f1 loc = f0 loc>>) /\
       (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>)
 .
 Proof.
   induction dom.
-  { i. assert (FLAG: flag_src = fun _ => None).
+  { i. assert (FLAG: flag_src = fun _ => false).
     { extensionality loc. destruct (flag_src loc) eqn:FLAG; auto.
       hexploit (FIN loc); eauto. ss.
     }
@@ -2821,13 +2835,13 @@ Proof.
                         (Thread.mk _ st lc_src1 sc_src mem_src1)>>) /\
           (<<SIM: sim_thread
                     f1 vers
-                    (fun loc0 => if Loc.eq_dec loc0 a then None else flag_src loc0)
+                    (fun loc0 => if Loc.eq_dec loc0 a then false else flag_src loc0)
                     (fun loc0 => if Loc.eq_dec loc0 a then flag else flag_tgt0 loc0)
                     vs_src vs_tgt
                     mem_src1 mem_tgt lc_src1 lc_tgt sc_src sc_tgt>>) /\
           (<<WF: Mapping.wfs f1>>) /\
           (<<MAPLE: Mapping.les f0 f1>>) /\
-          (<<FLAG: __guard__(flag = None \/ D a)>>) /\
+          (<<FLAG: __guard__(flag = false \/ D a)>>) /\
           (<<UNCH: forall loc (NEQ: loc <> a), f1 loc = f0 loc>>) /\
           (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>)
       ).
@@ -2892,8 +2906,8 @@ Lemma sim_thread_deflag_all
       (SCTGT: Memory.closed_timemap sc_tgt mem_tgt)
       (WF: Mapping.wfs f0)
       (DEBT: forall loc, (<<DEBT: D loc>>) \/
-                         ((<<FLAG: flag_src loc = None -> flag_tgt0 loc = None>>) /\
-                          (<<VAL: option_rel Const.le (vs_tgt loc) (vs_src loc) \/ flag_src loc = None>>)))
+                         ((<<FLAG: flag_src loc = false -> flag_tgt0 loc = false>>) /\
+                          (<<VAL: option_rel Const.le (vs_tgt loc) (vs_src loc) \/ flag_src loc = false>>)))
       lang st
   :
     exists lc_src1 mem_src1 f1 flag_tgt1,
@@ -2902,14 +2916,14 @@ Lemma sim_thread_deflag_all
                     (Thread.mk _ st lc_src1 sc_src mem_src1)>>) /\
       (<<SIM: sim_thread
                 f1 vers
-                (fun _ => None)
+                (fun _ => false)
                 flag_tgt1
                 vs_src vs_tgt
                 mem_src1 mem_tgt lc_src1 lc_tgt sc_src sc_tgt>>) /\
       (<<WF: Mapping.wfs f1>>) /\
       (<<MAPLE: Mapping.les f0 f1>>) /\
-      (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = None>>)>>) /\
-      (<<UNCH: forall loc (FLAG: flag_src loc = None), f1 loc = f0 loc>>) /\
+      (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = false>>)>>) /\
+      (<<UNCH: forall loc (FLAG: flag_src loc = false), f1 loc = f0 loc>>) /\
       (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>)
 .
 Proof.
@@ -3065,7 +3079,7 @@ Lemma sim_thread_write_fence_step
       (SCTGT: Memory.closed_timemap sc_tgt0 mem_tgt)
       (WF: Mapping.wfs f)
       (VERS: versions_wf f vers)
-      (RELFLAG: forall loc (ORD: Ordering.le Ordering.acqrel ordw), flag_src loc = None)
+      (RELFLAG: forall loc (ORD: Ordering.le Ordering.acqrel ordw), flag_src loc = false)
       (SYNC: forall (ORD: Ordering.le Ordering.acqrel ordw), Memory.nonsynch lc_tgt0.(Local.promises))
   :
     exists lc_src1 sc_src1,
@@ -3150,8 +3164,8 @@ Lemma sim_thread_fence_step_normal
       (SCTGT: Memory.closed_timemap sc_tgt0 mem_tgt)
       (WF: Mapping.wfs f)
       (VERS: versions_wf f vers)
-      (ACQFLAG: forall loc ts
-                       (SRC: flag_src loc = None) (TGT: flag_tgt loc = Some ts),
+      (ACQFLAG: forall loc
+                       (SRC: flag_src loc = false) (TGT: flag_tgt loc = true),
           ~ Ordering.le Ordering.acqrel ordr)
       (ORD: ~ Ordering.le Ordering.acqrel ordw)
   :
@@ -3201,15 +3215,15 @@ Lemma sim_thread_fence_step_release
       (SCTGT: Memory.closed_timemap sc_tgt0 mem_tgt)
       (WF: Mapping.wfs f0)
       (VERS: versions_wf f0 vers)
-      (ACQFLAG: forall loc ts
-                       (SRC: flag_src loc = None) (TGT: flag_tgt loc = Some ts),
+      (ACQFLAG: forall loc
+                       (SRC: flag_src loc = false) (TGT: flag_tgt loc = true),
           ~ Ordering.le Ordering.acqrel ordr)
-      (RELFLAG: forall loc ts
-                       (SRC: flag_src loc = None) (TGT: flag_tgt loc = Some ts),
+      (RELFLAG: forall loc
+                       (SRC: flag_src loc = false) (TGT: flag_tgt loc = true),
           ~ Ordering.le Ordering.seqcst ordw)
       (DEBT: forall loc, (<<DEBT: D loc>>) \/
-                         ((<<FLAG: flag_src loc = None -> flag_tgt loc = None>>) /\
-                          (<<VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc) \/ flag_src loc = None>>)))
+                         ((<<FLAG: flag_src loc = false -> flag_tgt loc = false>>) /\
+                          (<<VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc) \/ flag_src loc = false>>)))
       lang st
   :
     exists lc_src1 lc_src2 sc_src1 vs_src1 vs_tgt1 f1 flag_tgt1 mem_src1,
@@ -3218,7 +3232,7 @@ Lemma sim_thread_fence_step_release
                     (Thread.mk lang st lc_src1 sc_src1 mem_src)
                     (Thread.mk _ st lc_src2 sc_src1 mem_src1)>>) /\
       (<<SIM: sim_thread
-                f1 vers (fun _ => None) flag_tgt1 vs_src1 vs_tgt1
+                f1 vers (fun _ => false) flag_tgt1 vs_src1 vs_tgt1
                 mem_src1 mem_tgt lc_src2 lc_tgt1 sc_src1 sc_tgt1>>) /\
       (<<VALS: forall loc0,
           ((<<SRC: vs_src1 loc0 = vs_src0 loc0>>) /\ (<<TGT: vs_tgt1 loc0 = vs_tgt0 loc0>>)) \/
@@ -3230,7 +3244,7 @@ Lemma sim_thread_fence_step_release
       (<<WF: Mapping.wfs f1>>) /\
       (<<MAPLE: Mapping.les f0 f1>>) /\
       (<<VERSWF: versions_wf f1 vers>>) /\
-      (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = None>>)>>) /\
+      (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = false>>)>>) /\
       (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>)
 .
 Proof.
@@ -3358,8 +3372,8 @@ Lemma sim_thread_write_aux
       (SCTGT: Memory.closed_timemap sc_tgt0 mem_tgt0)
       (WF: Mapping.wfs f0)
       (VERS: versions_wf f0 vers0)
-      (FLAGSRC: flag_src loc = None)
-      (FLAGTGT: flag_tgt loc = None)
+      (FLAGSRC: flag_src loc = false)
+      (FLAGTGT: flag_tgt loc = false)
       (VAL: Const.le val_tgt val_src)
       (ORD: ~ Ordering.le Ordering.strong_relaxed ord)
       (WFSRC: View.opt_wf releasedm_src)
@@ -3445,7 +3459,7 @@ Proof.
   assert (exists released_src,
              (<<WRITE: Local.write_step (Local.mk tvw_src0 prom_src) sc_src0 mem_src0 loc from_src
                                         to_src val_src releasedm_src released_src ord (Local.mk tvw_src1 prom_src1) sc_src0 mem_src1 kind_src>>) /\
-               (<<LOCAL: sim_local f1 vers1 flag_src flag_tgt (Local.mk tvw_src1 prom_src1) (Local.mk (TView.write_tview tvw_tgt0 sc_tgt0 loc to_tgt ord) promises2)>>)).
+               (<<LOCAL: sim_local f1 vers1 tvw_src1.(TView.cur).(View.rlx) flag_src flag_tgt (Local.mk tvw_src1 prom_src1) (Local.mk (TView.write_tview tvw_tgt0 sc_tgt0 loc to_tgt ord) promises2)>>)).
   { esplits.
     { econs; eauto. ss. }
     { ss. econs.
@@ -3454,22 +3468,15 @@ Proof.
         { eapply sim_timestamp_exact_mon_strong; eauto. }
         { destruct ord; ss. }
       }
-      { eauto. }
-      { eauto. }
-      { i. ss. destruct (Loc.eq_dec loc0 loc).
-        { subst. rewrite FLAGTGT in FLAG. ss. }
-        { unfold TimeMap.join. rewrite timemap_singleton_neq; auto.
-          rewrite TimeFacts.le_join_l; auto. eapply Time.bot_spec.
-        }
+      { eapply sim_promises_change_no_flag; eauto. i. rewrite SRCTM.
+        unfold TimeMap.join. rewrite TimeFacts.le_join_l; auto.
+        rewrite timemap_singleton_neq; auto.
+        { eapply Time.bot_spec. }
+        { ii. subst. rewrite FLAG in *. ss. }
       }
-      { i. ss. destruct (Loc.eq_dec loc0 loc).
-        { subst. rewrite FLAGSRC in FLAG. ss. }
-        { unfold TimeMap.join. rewrite timemap_singleton_neq; auto.
-          rewrite ! TimeFacts.le_join_l; auto.
-          { eapply Time.bot_spec. }
-          { eapply Time.bot_spec. }
-        }
-      }
+      { eauto. }
+      { i. ss. unfold TimeMap.join. rewrite FLAGSRC0; ss. }
+      { ss. }
     }
   }
   des.
@@ -3479,6 +3486,13 @@ Proof.
                                                           | Some _ => Some val_tgt
                                                           | None => None
                                                           end else vs_tgt0 loc0).
+  assert (MEM1: sim_memory tvw_src1.(TView.cur).(View.rlx) flag_src f1 vers1 mem_src1 mem_tgt1).
+  { eapply sim_memory_change_no_flag; eauto. i.
+    subst tvw_src1. ss. rewrite SRCTM. eapply TimeFacts.le_join_l.
+    rewrite timemap_singleton_neq; auto.
+    { eapply Time.bot_spec. }
+    { ii. subst. rewrite FLAG in *. ss. }
+  }
   esplits.
   { eauto. }
   { econs.
@@ -3556,7 +3570,7 @@ Lemma sim_thread_mapping_add
               mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt)
       (WF: Mapping.wfs f0)
       (VERS: versions_wf f0 vers)
-      (FLAG: flag_src loc = None)
+      (FLAG: flag_src loc = false)
   :
   exists f1 ts_src,
       (<<SIM: sim_thread
@@ -3613,8 +3627,8 @@ Lemma sim_thread_write_step_normal
       (SCTGT: Memory.closed_timemap sc_tgt0 mem_tgt0)
       (WF: Mapping.wfs f0)
       (VERS: versions_wf f0 vers0)
-      (FLAGSRC: flag_src loc = None)
-      (FLAGTGT: flag_tgt loc = None)
+      (FLAGSRC: flag_src loc = false)
+      (FLAGTGT: flag_tgt loc = false)
       (VAL: Const.le val_tgt val_src)
       (ORD: ~ Ordering.le Ordering.strong_relaxed ord)
   :
@@ -3665,8 +3679,8 @@ Lemma sim_thread_write_update_normal
       (SCTGT: Memory.closed_timemap sc_tgt0 mem_tgt0)
       (WF: Mapping.wfs f0)
       (VERS: versions_wf f0 vers0)
-      (FLAGSRC: flag_src loc = None)
-      (FLAGTGT: flag_tgt loc = None)
+      (FLAGSRC: flag_src loc = false)
+      (FLAGTGT: flag_tgt loc = false)
       (VAL: Const.le val_tgt val_src)
       (ORD: ~ Ordering.le Ordering.strong_relaxed ord)
       (WFSRC: View.opt_wf releasedm_src)
@@ -3842,7 +3856,7 @@ Qed.
 Lemma sim_write_sync_tview_release f flag_src rel_vers tvw_src tvw_tgt
       loc ord
       (SIM: sim_tview f flag_src rel_vers tvw_src tvw_tgt)
-      (FLAG: forall loc, flag_src loc = None)
+      (FLAG: forall loc, flag_src loc = false)
       (WF: Mapping.wfs f)
   :
   sim_tview f flag_src (fun loc0 => if Loc.eq_dec loc0 loc then (Mapping.vers f) else rel_vers loc0) (local_write_sync_tview tvw_src loc ord) (local_write_sync_tview tvw_tgt loc ord).
@@ -3882,7 +3896,7 @@ Lemma sim_thread_write_sync_step
       (SCTGT: Memory.closed_timemap sc_tgt mem_tgt)
       (WF: Mapping.wfs f)
       (VERS: versions_wf f vers)
-      (RELFLAG: forall loc (ORD: Ordering.le Ordering.strong_relaxed ord), flag_src loc = None)
+      (RELFLAG: forall loc (ORD: Ordering.le Ordering.strong_relaxed ord), flag_src loc = false)
   :
     exists lc_src1,
       (<<READ: local_write_sync_step lc_src0 loc ord lc_src1>>) /\
@@ -3908,7 +3922,7 @@ Proof.
         eapply SYNC in GET; eauto. ss.
       }
       { i. ss. eauto. }
-      { i. ss. eauto. }
+      { i. ss. }
     }
     { econs; eauto. eapply sim_write_sync_tview_normal; eauto.
       destruct ord; ss.
@@ -3937,12 +3951,12 @@ Lemma sim_thread_write_step_release
       (SCTGT: Memory.closed_timemap sc_tgt0 mem_tgt0)
       (WF: Mapping.wfs f0)
       (VERS: versions_wf f0 vers0)
-      (FLAGSRC: flag_src loc = None)
-      (FLAGTGT: flag_tgt0 loc = None)
+      (FLAGSRC: flag_src loc = false)
+      (FLAGTGT: flag_tgt0 loc = false)
       (VAL: Const.le val_tgt val_src)
       (DEBT: forall loc, (<<DEBT: D loc>>) \/
-                           ((<<FLAG: flag_src loc = None -> flag_tgt0 loc = None>>) /\
-                            (<<VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc) \/ flag_src loc = None>>)))
+                           ((<<FLAG: flag_src loc = false -> flag_tgt0 loc = false>>) /\
+                            (<<VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc) \/ flag_src loc = false>>)))
       lang st
   :
   exists f1 vers1 released_src lc_src1 lc_src2 vs_src1 vs_tgt1 mem_src1 mem_src2 sc_src1 kind_src from_src to_src flag_tgt1,
@@ -3951,7 +3965,7 @@ Lemma sim_thread_write_step_release
                     (Thread.mk _ st lc_src1 sc_src0 mem_src1)>>) /\
       (<<WRITE: Local.write_step lc_src1 sc_src0 mem_src1 loc from_src to_src val_src None released_src ord lc_src2 sc_src1 mem_src2 kind_src>>) /\
       (<<SIM: sim_thread
-                f1 vers1 (fun _ => None) flag_tgt1 vs_src1 vs_tgt1
+                f1 vers1 (fun _ => false) flag_tgt1 vs_src1 vs_tgt1
                 mem_src2 mem_tgt1 lc_src2 lc_tgt1 sc_src1 sc_tgt1>>) /\
       (<<WF: Mapping.wfs f1>>) /\
       (<<MAPLE: Mapping.les f0 f1>>) /\
@@ -3962,7 +3976,7 @@ Lemma sim_thread_write_step_release
             ((<<LOC: loc0 = loc>>) /\
                ((<<VALSRC: vs_src1 loc0 = Some val_src>> /\ <<VALTGT: vs_tgt1 loc0 = Some val_tgt>>) \/
                   (<<VALSRC0: vs_src0 loc0 = None>> /\ <<VALTGT0: vs_tgt0 loc0 = None>> /\ <<VALSRC1: vs_src1 loc0 = None>> /\ <<VALTGT1: vs_tgt1 loc0 = None>>)))>>) /\
-      (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = None>>)>>) /\
+      (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = false>>)>>) /\
       (<<MAPFUTURE: map_future_memory f0 f1 mem_src2>>)
 .
 Proof.
@@ -4021,10 +4035,10 @@ Lemma sim_thread_update_step_normal
       (SCTGT: Memory.closed_timemap sc_tgt0 mem_tgt0)
       (WF: Mapping.wfs f0)
       (VERS: versions_wf f0 vers0)
-      (FLAGSRC: flag_src loc = None)
-      (FLAGTGT: flag_tgt loc = None)
-      (FLAG: forall loc ts
-                    (SRC: flag_src loc = None) (TGT: flag_tgt loc = Some ts),
+      (FLAGSRC: flag_src loc = false)
+      (FLAGTGT: flag_tgt loc = false)
+      (FLAG: forall loc
+                    (SRC: flag_src loc = false) (TGT: flag_tgt loc = true),
           ~ Ordering.le Ordering.acqrel ordr)
       (VAL: Const.le valw_tgt valw_src)
       (ORD: ~ Ordering.le Ordering.strong_relaxed ordw)
@@ -4101,14 +4115,14 @@ Lemma sim_thread_update_step_release
       (SCTGT: Memory.closed_timemap sc_tgt0 mem_tgt0)
       (WF: Mapping.wfs f0)
       (VERS: versions_wf f0 vers0)
-      (FLAGSRC: flag_src loc = None)
-      (FLAGTGT: flag_tgt0 loc = None)
-      (FLAG: forall loc ts
-                    (SRC: flag_src loc = None) (TGT: flag_tgt0 loc = Some ts),
+      (FLAGSRC: flag_src loc = false)
+      (FLAGTGT: flag_tgt0 loc = false)
+      (FLAG: forall loc
+                    (SRC: flag_src loc = false) (TGT: flag_tgt0 loc = true),
           ~ Ordering.le Ordering.acqrel ordr)
       (DEBT: forall loc, (<<DEBT: D loc>>) \/
-                           ((<<FLAG: flag_src loc = None -> flag_tgt0 loc = None>>) /\
-                            (<<VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc) \/ flag_src loc = None>>)))
+                           ((<<FLAG: flag_src loc = false -> flag_tgt0 loc = false>>) /\
+                            (<<VAL: option_rel Const.le (vs_tgt0 loc) (vs_src0 loc) \/ flag_src loc = false>>)))
       (VAL: Const.le valw_tgt valw_src)
       lang st
   :
@@ -4123,7 +4137,7 @@ Lemma sim_thread_update_step_release
       (<<VERSLE: versions_le vers0 vers1>>) /\
       (<<VERSWF: versions_wf f1 vers1>>) /\
       (<<SIM: sim_thread
-                f1 vers1 (fun _ => None) flag_tgt1 vs_src1 vs_tgt1
+                f1 vers1 (fun _ => false) flag_tgt1 vs_src1 vs_tgt1
                 mem_src2 mem_tgt1 lc_src3 lc_tgt2 sc_src1 sc_tgt1>>) /\
       (<<VAL: Const.le val_tgt1 val_src1>>) /\
       (<<VALTGT: Const.le valr_tgt val_tgt1>>) /\
@@ -4140,7 +4154,7 @@ Lemma sim_thread_update_step_release
         __guard__(((<<SRC: vs_src1 loc = Some valw_src>>) /\ (<<TGT: vs_tgt1 loc = Some valw_tgt>>)) \/
         ((<<SRCNONE0: vs_src0 loc = None>>) /\ (<<TGTNONE0: vs_tgt0 loc = None>>) /\
            (<<SRCNONE1: vs_src1 loc = None>>) /\ (<<TGTNONE0: vs_tgt1 loc = None>>)))>>) /\
-      (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = None>>)>>) /\
+      (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = false>>)>>) /\
       (<<MAPFUTURE: map_future_memory f0 f1 mem_src2>>)
 .
 Proof.
@@ -4188,7 +4202,7 @@ Proof.
   }
   i. des.
   hexploit promise_steps_local_read_step; eauto.
-  { eapply sim_local_consistent.
+  { eapply sim_local_consistent_ex.
     { eapply CONSISTENT0. }
     { inv SIM1. eauto. }
     { eauto. }
@@ -4283,7 +4297,7 @@ Lemma sim_thread_promise_step
       (SCTGT: Memory.closed_timemap sc_tgt mem_tgt0)
       (WF: Mapping.wfs f0)
       (VERS: versions_wf f0 vers0)
-      (FLAGSRC: flag_src loc = None)
+      (FLAGSRC: flag_src loc = false)
   :
   exists f1 vers1 from_src to_src msg_src lc_src1 mem_src1 kind_src,
     (<<PROMISE: Local.promise_step lc_src0 mem_src0 loc from_src to_src msg_src lc_src1 mem_src1 kind_src>>) /\
@@ -4352,8 +4366,8 @@ Lemma sim_thread_racy_write_step
               mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt)
       (CONSISTENT: Local.promise_consistent lc_tgt)
       (RACE: Local.racy_write_step lc_tgt mem_tgt loc ord)
-      (FLAGSRC: flag_src loc = None)
-      (FLAGTGT: flag_tgt loc = None)
+      (FLAGSRC: flag_src loc = false)
+      (FLAGTGT: flag_tgt loc = false)
       (WF: Mapping.wfs f)
   :
   Local.racy_write_step lc_src mem_src loc ord.
@@ -4372,8 +4386,8 @@ Lemma sim_thread_racy_update_step
               mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt)
       (CONSISTENT: Local.promise_consistent lc_tgt)
       (RACE: Local.racy_update_step lc_tgt mem_tgt loc ordr ordw)
-      (FLAGSRC: flag_src loc = None)
-      (FLAGTGT: flag_tgt loc = None)
+      (FLAGSRC: flag_src loc = false)
+      (FLAGTGT: flag_tgt loc = false)
       (WF: Mapping.wfs f)
   :
   Local.racy_update_step lc_src mem_src loc ordr ordw.
@@ -4397,8 +4411,8 @@ Lemma sim_thread_racy_read_step
       (READ: Local.racy_read_step lc_tgt mem_tgt loc val_tgt ord)
       (CONSISTENT: Local.promise_consistent lc_tgt)
       (WF: Mapping.wfs f)
-      (FLAGSRC: flag_src loc = None)
-      (FLAGTGT: flag_tgt loc = None)
+      (FLAGSRC: flag_src loc = false)
+      (FLAGTGT: flag_tgt loc = false)
   :
   forall val_src, Local.racy_read_step lc_src mem_src loc val_src ord.
 Proof.

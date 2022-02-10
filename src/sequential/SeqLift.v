@@ -2459,6 +2459,17 @@ Proof.
   inv SIM. eauto.
 Qed.
 
+Lemma sim_promises_change_no_flag srctm0 srctm1 flag_src flag_tgt f vers prom_src prom_tgt
+      (SIM: sim_promises srctm0 flag_src flag_tgt f vers prom_src prom_tgt)
+      (TM: forall loc (FLAG: flag_tgt loc = true), srctm1 loc = srctm0 loc)
+  :
+    sim_promises srctm1 flag_src flag_tgt f vers prom_src prom_tgt.
+Proof.
+  inv SIM. econs; eauto. i. hexploit SOUND; eauto. i. des.
+  { esplits; eauto. left. esplits; eauto. }
+  { esplits; eauto. right. esplits; eauto. rewrite TM; auto. }
+Qed.
+
 
 Lemma add_sim_promises srctm flag_src flag_tgt f vers mem_tgt0 mem_tgt1 mem_src0 mem_src1
       loc from_tgt to_tgt from_src to_src msg_tgt msg_src

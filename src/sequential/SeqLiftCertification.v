@@ -288,14 +288,14 @@ Proof.
 Qed.
 
 Lemma sim_thread_sim_thread_sol
-      c f vers flag_src flag_tgt vs_src vs_tgt
-      mem_src0 mem_tgt lc_src0 lc_tgt sc_src sc_tgt D
+      c D f vers flag_src flag_tgt vs_src vs_tgt
+      mem_src0 mem_tgt lc_src0 lc_tgt sc_src sc_tgt
       (SIM: sim_thread
               f vers flag_src flag_tgt vs_src vs_tgt
               mem_src0 mem_tgt lc_src0 lc_tgt sc_src sc_tgt)
       (BOT: c = true -> lc_tgt.(Local.promises) = Memory.bot)
       (CONSTGT: Local.promise_consistent lc_tgt)
-      (DEBT: forall loc (TGT: flag_src loc = None) (DEBT: D loc = false), flag_tgt loc = None)
+      (DEBT: forall loc (TGT: flag_src loc = false) (DEBT: D loc = false), flag_tgt loc = false)
       (WF: Mapping.wfs f)
       (LOCAL: Local.wf lc_src0 mem_src0)
       lang st

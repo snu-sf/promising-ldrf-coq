@@ -83,14 +83,14 @@ Lemma sim_thread_future
 
       f1 vers1 mem_src1 mem_tgt1 sc_src1 sc_tgt1
       (SIM: sim_thread
-              f0 vers0 (fun _ => None) flag_tgt vs_src0 vs_tgt0
+              f0 vers0 (fun _ => false) flag_tgt vs_src0 vs_tgt0
               mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0)
 
       (MEMLESRC: Memory.future_weak mem_src0 mem_src1)
       (MEMLETGT: Memory.future_weak mem_tgt0 mem_tgt1)
       (SCLESRC: TimeMap.le sc_src0 sc_src1)
       (SCLETGT: TimeMap.le sc_tgt0 sc_tgt1)
-      (SIMMEM: sim_memory (fun _ => None) f1 vers1 mem_src1 mem_tgt1)
+      (SIMMEM: sim_memory_interference f1 vers1 mem_src1 mem_tgt1)
       (VERSIONED: versioned_memory vers1 mem_tgt1)
       (SIMCLOSED: sim_closed_memory f1 mem_src1)
 
@@ -121,7 +121,7 @@ Lemma sim_thread_future
       ((<<FAILURE: Thread.steps_failure (Thread.mk lang st lc_src2 sc_src2 mem_src2)>>) \/
          exists vs_src1 vs_tgt1,
            (<<SIM: sim_thread
-                     f1 vers1 (fun _ => None) flag_tgt vs_src1 vs_tgt1
+                     f1 vers1 (fun _ => false) flag_tgt vs_src1 vs_tgt1
                      mem_src2 mem_tgt1 lc_src2 lc_tgt0 sc_src2 sc_tgt1>>) /\
              (<<VALSRC: forall loc val (VAL: vs_src1 loc = Some val),
                exists val_old,
