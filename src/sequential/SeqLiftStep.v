@@ -596,7 +596,9 @@ Lemma sim_thread_tgt_flag_up
                                              then true
                                              else flag_tgt loc0)
                 vs_src vs_tgt
-                mem_src1 mem_tgt lc_src1 lc_tgt sc_src sc_tgt>>).
+                mem_src1 mem_tgt lc_src1 lc_tgt sc_src sc_tgt>>) /\
+      (<<SPACE: space_future_memory (unchangable mem_tgt lc_tgt.(Local.promises)) f mem_src0 f mem_src1>>)
+.
 Proof.
   inv SIM. dup LOCAL0. inv LOCAL0.
   hexploit tgt_flag_up_sim_promises.
@@ -620,6 +622,7 @@ Proof.
     eapply Thread.rtc_tau_step_future in STEPS; eauto.
     ss. des. eapply Memory.future_future_weak; eauto.
   }
+  { eapply space_future_covered_decr. i. eapply COVERED; eauto. }
 Qed.
 
 Lemma lower_write_memory_le prom0 mem0 loc from to msg prom1 mem1 kind
@@ -892,7 +895,8 @@ Lemma sim_thread_tgt_write_na
                 (fun loc0 => if Loc.eq_dec loc0 loc then Some val_new else vs_tgt loc0)
                 mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src sc_tgt1>>) /\
       (<<ORD: ord = Ordering.na>>) /\
-      (<<SC: sc_tgt1 = sc_tgt0>>)
+      (<<SC: sc_tgt1 = sc_tgt0>>) /\
+      (<<SPACE: space_future_memory (unchangable mem_tgt0 lc_tgt0.(Local.promises)) f mem_src0 f mem_src1>>)
 .
 Proof.
   hexploit sim_thread_tgt_flag_up; eauto.
@@ -900,6 +904,7 @@ Proof.
   i. des.
   hexploit sim_thread_tgt_write_na_aux; eauto.
   { ss. des_ifs. }
+  i. des. esplits; eauto.
 Qed.
 
 Lemma reserve_future_steps prom0 mem0 prom1 mem1
@@ -1508,6 +1513,29 @@ Proof.
   { eapply SIM. }
 Qed.
 
+Lemma cancel_future_memory_decr loc prom0 mem0 prom1 mem1
+      (FUTURE: cancel_future_memory loc prom0 mem0 prom1 mem1)
+  :
+  Memory.le mem1 mem0.
+Proof.
+  induction FUTURE; auto.
+  { refl. }
+  { etrans; eauto. inv CANCEL. eapply remove_le; eauto. }
+Qed.
+
+Lemma space_future_memory_trans_memory
+      msgs mem0 mem1 mem2 f
+      (FUTURE0: space_future_memory msgs f mem0 f mem1)
+      (FUTURE1: space_future_memory msgs f mem1 f mem2)
+      (MAPWF0: Mapping.wfs f)
+  :
+    space_future_memory msgs f mem0 f mem2.
+Proof.
+  eapply space_future_memory_trans; eauto.
+  { refl. }
+  { refl. }
+  Qed.
+
 Lemma sim_thread_src_write_na
       f vers flag_src flag_tgt vs_src vs_tgt
       mem_src0 mem_tgt lc_src0 lc_tgt sc_src sc_tgt
@@ -1536,7 +1564,8 @@ Lemma sim_thread_src_write_na
                 (fun loc0 => if Loc.eq_dec loc0 loc then true else flag_tgt loc0)
                 (fun loc0 => if Loc.eq_dec loc0 loc then Some val_new else vs_src loc0)
                 vs_tgt
-                mem_src2 mem_tgt lc_src2 lc_tgt sc_src sc_tgt>>)
+                mem_src2 mem_tgt lc_src2 lc_tgt sc_src sc_tgt>>) /\
+        (<<SPACE: space_future_memory (unchangable mem_tgt lc_tgt.(Local.promises)) f mem_src0 f mem_src2>>)
 .
 Proof.
   hexploit sim_thread_tgt_flag_up; eauto.
@@ -1562,9 +1591,6 @@ Proof.
   { eapply cancel_future_reserve_future; eauto. }
   i. des.
   hexploit Thread.rtc_tau_step_future; eauto. i. ss. des.
-  esplits.
-  { etrans; eauto. }
-  { eauto. }
   subst. hexploit src_cancels_sim_promises; eauto.
   { eapply WF2. }
   i. des.
@@ -1589,70 +1615,86 @@ Proof.
     eapply TimeFacts.le_join_l. unfold TimeMap.singleton.
     setoid_rewrite LocFun.add_spec_neq; auto. eapply Time.bot_spec.
   }
-  econs; auto.
-  { eapply add_src_sim_memory; eauto. i.
-    etransitivity; [|left; eapply TS].
+  assert (FLAGTOP: flag_src loc = true -> Time.le (srctm loc) top).
+  { i. etransitivity; [|left; eapply TS].
     inv LOCAL. hexploit FLAGSRC; eauto. i. des. subst.
     inv WF2. ss. inv TVIEW_CLOSED. inv CUR.
     exploit RLX0. i. des. rewrite SRCTM.
     eapply Memory.max_ts_spec in x. des. eauto.
   }
-  { dup LOCAL. ss. inv LOCAL0. econs.
-    { inv WRITE. clarify. ss.
-      eapply sim_src_na_write_tview; eauto.
-    }
-    { eapply src_writtten_sim_promises.
-      { eapply src_fulfill_sim_promises; eauto. }
-      { des_ifs. }
-      { i. des_ifs. }
-    }
-    { eauto. }
-    { i. des_ifs.
-      { rewrite VIEW. rewrite RLX. auto. }
-      { hexploit FLAGSRC; eauto. i. des.
-        rewrite OTHERRLX; auto. rewrite OTHERPLN; auto.
+  esplits.
+  { etrans; eauto. }
+  { eauto. }
+  { econs; auto.
+    { eapply add_src_sim_memory; eauto. }
+    { dup LOCAL. ss. inv LOCAL0. econs.
+      { inv WRITE. clarify. ss.
+        eapply sim_src_na_write_tview; eauto.
       }
+      { eapply src_writtten_sim_promises.
+        { eapply src_fulfill_sim_promises; eauto. }
+        { des_ifs. }
+        { i. des_ifs. }
+      }
+      { eauto. }
+      { i. des_ifs.
+        { rewrite VIEW. rewrite RLX. auto. }
+        { hexploit FLAGSRC; eauto. i. des.
+          rewrite OTHERRLX; auto. rewrite OTHERPLN; auto.
+        }
+      }
+      { i. des_ifs. rewrite OTHERRLX; auto. }
     }
-    { i. des_ifs. rewrite OTHERRLX; auto. }
-  }
-  { ii. specialize (MAXSRC loc0). inv MAXSRC. des_ifs.
-    { econs; ss. i. clarify. rewrite VIEW. eauto. }
-    { econs; ss.
-      { i. hexploit MAX2; eauto. i. des.
-        rewrite OTHERPLN; auto. esplits.
-        erewrite unchanged_loc_max_readable; eauto.
-        { econs. i. rewrite PROMISES. des_ifs. }
-        { symmetry. etrans.
-          { eapply cancel_future_unchanged_loc in RESERVE; eauto. des; eauto.  }
-          { etrans.
-            { eapply add_unchanged_loc; eauto. }
-            { eapply add_unchanged_loc; eauto. }
+    { ii. specialize (MAXSRC loc0). inv MAXSRC. des_ifs.
+      { econs; ss. i. clarify. rewrite VIEW. eauto. }
+      { econs; ss.
+        { i. hexploit MAX2; eauto. i. des.
+          rewrite OTHERPLN; auto. esplits.
+          erewrite unchanged_loc_max_readable; eauto.
+          { econs. i. rewrite PROMISES. des_ifs. }
+          { symmetry. etrans.
+            { eapply cancel_future_unchanged_loc in RESERVE; eauto. des; eauto.  }
+            { etrans.
+              { eapply add_unchanged_loc; eauto. }
+              { eapply add_unchanged_loc; eauto. }
+            }
+          }
+        }
+        { i. hexploit NONMAX0; eauto. i.
+          rewrite OTHERPLN; auto.
+          erewrite unchanged_loc_max_readable; eauto.
+          { econs. i. rewrite PROMISES. des_ifs. }
+          { symmetry. etrans.
+            { eapply cancel_future_unchanged_loc in RESERVE; eauto. des; eauto.  }
+            { etrans.
+              { eapply add_unchanged_loc; eauto. }
+              { eapply add_unchanged_loc; eauto. }
+            }
           }
         }
       }
-      { i. hexploit NONMAX0; eauto. i.
-        rewrite OTHERPLN; auto.
-        erewrite unchanged_loc_max_readable; eauto.
-        { econs. i. rewrite PROMISES. des_ifs. }
-        { symmetry. etrans.
-          { eapply cancel_future_unchanged_loc in RESERVE; eauto. des; eauto.  }
-          { etrans.
-            { eapply add_unchanged_loc; eauto. }
-            { eapply add_unchanged_loc; eauto. }
-          }
-        }
-      }
+    }
+    { i. des_ifs. hexploit (PERM loc). i.
+      rewrite VAL in H0. destruct (vs_tgt loc); auto.
+    }
+    { red in FIN. des. exists (loc::dom). ii. split; i.
+      { des. des_ifs; ss; auto. right. eapply DOM. eauto. }
+      { des_ifs; eauto. eapply DOM. ss. des; ss. intuition. }
+    }
+    { eapply sim_closed_memory_future; eauto.
+      eapply Memory.future_future_weak. etrans; eauto.
     }
   }
-  { i. des_ifs. hexploit (PERM loc). i.
-    rewrite VAL in H0. destruct (vs_tgt loc); auto.
-  }
-  { red in FIN. des. exists (loc::dom). ii. split; i.
-    { des. des_ifs; ss; auto. right. eapply DOM. eauto. }
-    { des_ifs; eauto. eapply DOM. ss. des; ss. intuition. }
-  }
-  { eapply sim_closed_memory_future; eauto.
-    eapply Memory.future_future_weak. etrans; eauto.
+  { eapply space_future_memory_trans_memory; eauto.
+    eapply space_future_memory_trans_memory; [..|eauto].
+    { eapply space_future_covered_decr.
+      { i. eapply memory_le_covered; [|eauto].
+        eapply cancel_future_memory_decr; eauto.
+      }
+    }
+    eapply space_future_memory_mon_msgs.
+    { eapply add_src_sim_memory_space_future; eauto. }
+    { eapply unchangable_messages_of_memory. }
   }
 Qed.
 
@@ -2631,7 +2673,8 @@ Lemma sim_thread_deflag_match_aux
       (<<WF: Mapping.wfs f1>>) /\
       (<<MAPLE: Mapping.les f0 f1>>) /\
       (<<UNCH: forall loc0 (NEQ: loc0 <> loc), f1 loc0 = f0 loc0>>) /\
-      (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>)
+      (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>) /\
+      (<<SPACE: space_future_memory (unchangable mem_tgt lc_tgt.(Local.promises)) f0 mem_src0 f1 mem_src1>>)
 .
 Proof.
 Admitted.
@@ -2667,7 +2710,8 @@ Lemma sim_thread_deflag_unmatch_aux
       (<<WF: Mapping.wfs f1>>) /\
       (<<MAPLE: Mapping.les f0 f1>>) /\
       (<<UNCH: forall loc0 (NEQ: loc0 <> loc), f1 loc0 = f0 loc0>>) /\
-      (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>)
+      (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>) /\
+      (<<SPACE: space_future_memory (unchangable mem_tgt lc_tgt.(Local.promises)) f0 mem_src0 f1 mem_src1>>)
 .
 Proof.
 Admitted.
@@ -2704,7 +2748,8 @@ Lemma sim_thread_deflag_match
       (<<WF: Mapping.wfs f1>>) /\
       (<<MAPLE: Mapping.les f0 f1>>) /\
       (<<UNCH: forall loc0 (NEQ: loc0 <> loc), f1 loc0 = f0 loc0>>) /\
-      (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>)
+      (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>) /\
+      (<<SPACE: space_future_memory (unchangable mem_tgt lc_tgt.(Local.promises)) f0 mem_src0 f1 mem_src1>>)
 .
 Proof.
   destruct (flag_src loc) eqn:EQ.
@@ -2721,6 +2766,7 @@ Proof.
     { refl. }
     { auto. }
     { eapply map_future_memory_refl. }
+    { eapply space_future_memory_refl; eauto. refl. }
   }
 Qed.
 
@@ -2754,7 +2800,8 @@ Lemma sim_thread_deflag_unmatch
       (<<WF: Mapping.wfs f1>>) /\
       (<<MAPLE: Mapping.les f0 f1>>) /\
       (<<UNCH: forall loc0 (NEQ: loc0 <> loc), f1 loc0 = f0 loc0>>) /\
-      (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>)
+      (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>) /\
+      (<<SPACE: space_future_memory (unchangable mem_tgt lc_tgt.(Local.promises)) f0 mem_src0 f1 mem_src1>>)
 .
 Proof.
   destruct (flag_src loc) eqn:FLAG.
@@ -2772,6 +2819,7 @@ Proof.
     { refl. }
     { auto. }
     { eapply map_future_memory_refl. }
+    { eapply space_future_memory_refl; eauto. refl. }
   }
 Qed.
 
@@ -2812,7 +2860,8 @@ Lemma sim_thread_deflag_all_aux
       (<<MAPLE: Mapping.les f0 f1>>) /\
       (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = false>>)>>) /\
       (<<UNCH: forall loc (NIN: ~ List.In loc dom), f1 loc = f0 loc>>) /\
-      (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>)
+      (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>) /\
+      (<<SPACE: space_future_memory (unchangable mem_tgt lc_tgt.(Local.promises)) f0 mem_src0 f1 mem_src1>>)
 .
 Proof.
   induction dom.
@@ -2828,6 +2877,7 @@ Proof.
     { i. hexploit DEBT; eauto. i. des; eauto. }
     { ss. }
     { eapply map_future_memory_refl. }
+    { eapply space_future_memory_refl; eauto. refl. }
   }
   i.
   cut (exists lc_src1 mem_src1 f1 flag,
@@ -2844,7 +2894,8 @@ Proof.
           (<<MAPLE: Mapping.les f0 f1>>) /\
           (<<FLAG: __guard__(flag = false \/ D a)>>) /\
           (<<UNCH: forall loc (NEQ: loc <> a), f1 loc = f0 loc>>) /\
-          (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>)
+          (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>) /\
+          (<<SPACE: space_future_memory (unchangable mem_tgt lc_tgt.(Local.promises)) f0 mem_src0 f1 mem_src1>>)
       ).
   { i. des.
     hexploit Thread.rtc_tau_step_future.
@@ -2881,6 +2932,7 @@ Proof.
       { eauto. }
       i. ss. des. eapply Memory.future_future_weak; eauto.
     }
+    { eapply space_future_memory_trans; eauto. }
   }
   hexploit (DEBT a). intros [|[]].
   { hexploit sim_thread_deflag_unmatch; eauto. i. des.
@@ -2925,7 +2977,8 @@ Lemma sim_thread_deflag_all
       (<<MAPLE: Mapping.les f0 f1>>) /\
       (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = false>>)>>) /\
       (<<UNCH: forall loc (FLAG: flag_src loc = false), f1 loc = f0 loc>>) /\
-      (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>)
+      (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>) /\
+      (<<SPACE: space_future_memory (unchangable mem_tgt lc_tgt.(Local.promises)) f0 mem_src0 f1 mem_src1>>)
 .
 Proof.
   dup SIM. inv SIM. red in FIN. des.
@@ -3245,7 +3298,8 @@ Lemma sim_thread_fence_step_release
       (<<MAPLE: Mapping.les f0 f1>>) /\
       (<<VERSWF: versions_wf f1 vers>>) /\
       (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = false>>)>>) /\
-      (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>)
+      (<<MAPFUTURE: map_future_memory f0 f1 mem_src1>>) /\
+      (<<SPACE: space_future_memory (unchangable mem_tgt lc_tgt0.(Local.promises)) f0 mem_src f1 mem_src1>>)
 .
 Proof.
   hexploit local_fence_step_split; eauto.
@@ -3284,6 +3338,7 @@ Proof.
   { eapply versions_wf_mapping_mon; eauto. }
   { eauto. }
   { eauto. }
+  { inv STEP0. eauto. }
 Qed.
 
 Lemma write_max_readable_none
@@ -3394,7 +3449,8 @@ Lemma sim_thread_write_aux
           ((<<SRC: vs_src1 loc0 = vs_src0 loc0>>) /\ (<<TGT: vs_tgt1 loc0 = vs_tgt0 loc0>>) /\ (<<LOC: loc0 <> loc>>)) \/
             ((<<LOC: loc0 = loc>>) /\
                ((<<VALSRC: vs_src1 loc0 = Some val_src>> /\ <<VALTGT: vs_tgt1 loc0 = Some val_tgt>>) \/
-                  (<<VALSRC0: vs_src0 loc0 = None>> /\ <<VALTGT0: vs_tgt0 loc0 = None>> /\ <<VALSRC1: vs_src1 loc0 = None>> /\ <<VALTGT1: vs_tgt1 loc0 = None>>)))>>).
+                  (<<VALSRC0: vs_src0 loc0 = None>> /\ <<VALTGT0: vs_tgt0 loc0 = None>> /\ <<VALSRC1: vs_src1 loc0 = None>> /\ <<VALTGT1: vs_tgt1 loc0 = None>>)))>>) /\
+      (<<SPACE: space_future_memory (unchangable mem_tgt0 lc_tgt0.(Local.promises)) f0 mem_src0 f1 mem_src1>>).
 Proof.
   hexploit Local.write_step_future; eauto. i. des.
   destruct lc_src0 as [tvw_src0 prom_src].
@@ -3559,6 +3615,7 @@ Proof.
     }
     { left. auto. }
   }
+  { auto. }
 Qed.
 
 Lemma sim_thread_mapping_add
@@ -3608,6 +3665,26 @@ Proof.
   { unfold f'. des_ifs. }
 Qed.
 
+Lemma space_future_memory_mon_map msgs f0 f1 f2 mem0 mem1
+      (SPACE: space_future_memory msgs f1 mem0 f2 mem1)
+      (MAP0: Mapping.les_strong f0 f1)
+      (MAP1: Mapping.les f1 f2)
+      (WF0: Mapping.wfs f0)
+      (WF1: Mapping.wfs f1)
+      (WF2: Mapping.wfs f2)
+  :
+  space_future_memory msgs f0 mem0 f2 mem1.
+Proof.
+  eapply space_future_memory_trans.
+  2:{ eauto. }
+  { eapply space_future_memory_refl; eauto. }
+  { eapply Mapping.les_strong_les; auto. }
+  { auto. }
+  { auto. }
+  { auto. }
+  { auto. }
+Qed.
+
 Lemma sim_thread_write_step_normal
       f0 vers0 flag_src flag_tgt vs_src0 vs_tgt0
       mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0
@@ -3645,7 +3722,8 @@ Lemma sim_thread_write_step_normal
           ((<<SRC: vs_src1 loc0 = vs_src0 loc0>>) /\ (<<TGT: vs_tgt1 loc0 = vs_tgt0 loc0>>) /\ (<<LOC: loc0 <> loc>>)) \/
             ((<<LOC: loc0 = loc>>) /\
                ((<<VALSRC: vs_src1 loc0 = Some val_src>> /\ <<VALTGT: vs_tgt1 loc0 = Some val_tgt>>) \/
-                  (<<VALSRC0: vs_src0 loc0 = None>> /\ <<VALTGT0: vs_tgt0 loc0 = None>> /\ <<VALSRC1: vs_src1 loc0 = None>> /\ <<VALTGT1: vs_tgt1 loc0 = None>>)))>>).
+                  (<<VALSRC0: vs_src0 loc0 = None>> /\ <<VALTGT0: vs_tgt0 loc0 = None>> /\ <<VALSRC1: vs_src1 loc0 = None>> /\ <<VALTGT1: vs_tgt1 loc0 = None>>)))>>) /\
+      (<<SPACE: space_future_memory (unchangable mem_tgt0 lc_tgt0.(Local.promises)) f0 mem_src0 f1 mem_src1>>).
 Proof.
   hexploit (@sim_thread_mapping_add loc from_tgt); eauto. i. des.
   hexploit (@sim_thread_mapping_add loc to_tgt); eauto. i. des.
@@ -3654,7 +3732,11 @@ Proof.
   { eapply Time.bot_spec. }
   { eapply sim_timestamp_exact_mon_strong; [..|eapply TS]; eauto. }
   i. des. esplits; eauto.
-  etrans; eauto. etrans; eauto.
+  { etrans; eauto. etrans; eauto. }
+  { eapply space_future_memory_mon_map; eauto.
+    { etrans; eauto. }
+    { eapply Mapping.les_strong_les; auto. }
+  }
 Qed.
 
 Lemma sim_thread_write_update_normal
@@ -3701,7 +3783,8 @@ Lemma sim_thread_write_update_normal
           ((<<SRC: vs_src1 loc0 = vs_src0 loc0>>) /\ (<<TGT: vs_tgt1 loc0 = vs_tgt0 loc0>>) /\ (<<LOC: loc0 <> loc>>)) \/
             ((<<LOC: loc0 = loc>>) /\
                ((<<VALSRC: vs_src1 loc0 = Some val_src>> /\ <<VALTGT: vs_tgt1 loc0 = Some val_tgt>>) \/
-                  (<<VALSRC0: vs_src0 loc0 = None>> /\ <<VALTGT0: vs_tgt0 loc0 = None>> /\ <<VALSRC1: vs_src1 loc0 = None>> /\ <<VALTGT1: vs_tgt1 loc0 = None>>)))>>).
+                  (<<VALSRC0: vs_src0 loc0 = None>> /\ <<VALTGT0: vs_tgt0 loc0 = None>> /\ <<VALSRC1: vs_src1 loc0 = None>> /\ <<VALTGT1: vs_tgt1 loc0 = None>>)))>>) /\
+      (<<SPACE: space_future_memory (unchangable mem_tgt0 lc_tgt0.(Local.promises)) f0 mem_src0 f1 mem_src1>>).
 Proof.
   hexploit (@sim_thread_mapping_add loc to_tgt); eauto. i. des.
   hexploit sim_thread_write_aux; eauto.
@@ -3710,7 +3793,10 @@ Proof.
   }
   { eapply sim_timestamp_exact_mon_strong; [..|eauto]; eauto. }
   i. des. esplits; eauto.
-  etrans; eauto.
+  { etrans; eauto. }
+  { eapply space_future_memory_mon_map; eauto.
+    eapply Mapping.les_strong_les; auto.
+  }
 Qed.
 
 Definition local_write_sync_tview (tview1: TView.t) (loc: Loc.t) (ord: Ordering.t): TView.t :=
@@ -3977,7 +4063,8 @@ Lemma sim_thread_write_step_release
                ((<<VALSRC: vs_src1 loc0 = Some val_src>> /\ <<VALTGT: vs_tgt1 loc0 = Some val_tgt>>) \/
                   (<<VALSRC0: vs_src0 loc0 = None>> /\ <<VALTGT0: vs_tgt0 loc0 = None>> /\ <<VALSRC1: vs_src1 loc0 = None>> /\ <<VALTGT1: vs_tgt1 loc0 = None>>)))>>) /\
       (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = false>>)>>) /\
-      (<<MAPFUTURE: map_future_memory f0 f1 mem_src2>>)
+      (<<MAPFUTURE: map_future_memory f0 f1 mem_src2>>) /\
+      (<<SPACE: space_future_memory (unchangable mem_tgt0 lc_tgt0.(Local.promises)) f0 mem_src0 f1 mem_src2>>)
 .
 Proof.
   hexploit (@sim_thread_deflag_all (fun loc0 => D loc0 /\ loc0 <> loc)); eauto.
@@ -4012,6 +4099,10 @@ Proof.
     { eapply Local.write_step_future in WRITE0; eauto. des.
       eapply Memory.future_future_weak; auto.
     }
+  }
+  { eapply space_future_memory_trans; eauto.
+    { inv STEP0. auto. }
+    { eapply Mapping.les_strong_les; eauto. }
   }
 Qed.
 
@@ -4067,7 +4158,9 @@ Lemma sim_thread_update_step_normal
       (<<UPDATED:
         __guard__(((<<SRC: vs_src1 loc = Some valw_src>>) /\ (<<TGT: vs_tgt1 loc = Some valw_tgt>>)) \/
         ((<<SRCNONE0: vs_src0 loc = None>>) /\ (<<TGTNONE0: vs_tgt0 loc = None>>) /\
-         (<<SRCNONE1: vs_src1 loc = None>>) /\ (<<TGTNONE0: vs_tgt1 loc = None>>)))>>).
+         (<<SRCNONE1: vs_src1 loc = None>>) /\ (<<TGTNONE0: vs_tgt1 loc = None>>)))>>) /\
+      (<<SPACE: space_future_memory (unchangable mem_tgt0 lc_tgt0.(Local.promises)) f0 mem_src0 f1 mem_src1>>)
+.
 Proof.
   hexploit Local.read_step_future; eauto. i. des.
   hexploit Local.write_step_future; eauto. i. des. ss.
@@ -4093,6 +4186,7 @@ Proof.
     { rewrite <- SRC. auto. }
     { rewrite <- TGT. auto. }
   }
+  { inv READ. auto. }
 Qed.
 
 Lemma sim_thread_update_step_release
@@ -4155,7 +4249,8 @@ Lemma sim_thread_update_step_release
         ((<<SRCNONE0: vs_src0 loc = None>>) /\ (<<TGTNONE0: vs_tgt0 loc = None>>) /\
            (<<SRCNONE1: vs_src1 loc = None>>) /\ (<<TGTNONE0: vs_tgt1 loc = None>>)))>>) /\
       (<<FLAG: forall loc, (<<DEBT: D loc>>) \/ (<<FLAG: flag_tgt1 loc = false>>)>>) /\
-      (<<MAPFUTURE: map_future_memory f0 f1 mem_src2>>)
+      (<<MAPFUTURE: map_future_memory f0 f1 mem_src2>>) /\
+      (<<SPACE: space_future_memory (unchangable mem_tgt0 lc_tgt0.(Local.promises)) f0 mem_src0 f1 mem_src2>>)
 .
 Proof.
   assert (CONSISTENT0: Local.promise_consistent lc_tgt1).
@@ -4230,6 +4325,15 @@ Proof.
       { des. eapply Memory.future_future_weak; auto. }
       { eapply Memory.future_closed_opt_view; eauto. }
     }
+  }
+  { eapply space_future_memory_trans.
+    { inv READ. eauto. }
+    { inv READ. inv STEP0. eauto. }
+    { eauto. }
+    { eapply Mapping.les_strong_les; eauto. }
+    { eauto. }
+    { eauto. }
+    { eauto. }
   }
 Qed.
 
@@ -4307,7 +4411,8 @@ Lemma sim_thread_promise_step
     (<<WF: Mapping.wfs f1>>) /\
     (<<MAPLE: Mapping.les_strong f0 f1>>) /\
     (<<VERSLE: versions_le vers0 vers1>>) /\
-    (<<VERSWF: versions_wf f1 vers1>>)
+    (<<VERSWF: versions_wf f1 vers1>>) /\
+    (<<SPACE: space_future_memory (unchangable mem_tgt0 lc_tgt0.(Local.promises)) f0 mem_src0 f1 mem_src1>>)
 .
 Proof.
   inv SIM. inv LOCAL. inv PROMISE.

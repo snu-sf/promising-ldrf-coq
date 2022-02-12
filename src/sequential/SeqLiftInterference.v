@@ -178,7 +178,8 @@ Lemma sim_thread_future
                exists val_old,
                  (<<VS: vs_src0 loc = Some val_old>>) /\
                    (<<VAL: Const.le val_old val>>)>>) /\
-             (<<VALTGT: forall loc val (VAL: vs_tgt1 loc = Some val) (NA: loc_na loc), vs_tgt0 loc = Some val>>))
+             (<<VALTGT: forall loc val (VAL: vs_tgt1 loc = Some val) (NA: loc_na loc), vs_tgt0 loc = Some val>>) /\
+             (<<SPACE: space_future_memory (unchangable mem_tgt1 lc_tgt0.(Local.promises)) f1 mem_src1 f1 mem_src2>>))
 .
 Proof.
   destruct (classic (exists loc from0 to0 msg from1 to1,

@@ -491,7 +491,8 @@ Section LIFT.
               (<<MAPLE: Mapping.les f0 f1>>) /\ (<<VERLE: versions_le vers0 vers1>>) /\
                 (<<MEMSRC: Memory.future_weak mem_src0 mem_src1>>) /\
                 (<<FUTURE: map_future_memory f0 f1 mem_src1>>) /\
-                (<<WF: Mapping.wfs f1>>)
+                (<<WF: Mapping.wfs f1>>) /\
+                (<<SPACE: space_future_memory msgs_tgt f0 mem_src0 f1 mem_src1>>)
         end
   .
 
@@ -503,6 +504,7 @@ Section LIFT.
     { refl. }
     { eapply map_future_memory_refl. }
     { auto. }
+    { eapply space_future_memory_refl; eauto. refl. }
   Qed.
   Next Obligation.
     unfold world_messages_le. ii. des_ifs. i.
@@ -514,6 +516,7 @@ Section LIFT.
     { etrans; eauto. }
     { eapply map_future_memory_trans; eauto. }
     { eauto. }
+    { eapply space_future_memory_trans; eauto. }
   Qed.
 
   Definition initial_world: world := (initial_mappings, initial_vers, Memory.init).
@@ -525,7 +528,9 @@ Section LIFT.
            (MSGTGT: msgs_tgt0 <4= msgs_tgt1),
       world_messages_le msgs_src0 msgs_tgt0 w0 w1.
   Proof.
-    unfold world_messages_le. i. des_ifs.
+    unfold world_messages_le. i. des_ifs. i.
+    hexploit LE; eauto. i. des. splits; auto.
+    eapply space_future_memory_mon_msgs; eauto.
   Qed.
 
   Definition sim_memory_lift: forall (w: world) (mem_src mem_tgt:Memory.t), Prop :=
@@ -801,7 +806,10 @@ Section LIFT.
       { ss. }
       { i. esplits.
         { econs; eauto. ss. }
-        { ss. i. splits; auto; try refl. eapply map_future_memory_refl. }
+        { ss. i. splits; auto; try refl.
+          { eapply map_future_memory_refl. }
+          { eapply space_future_memory_refl; eauto. refl. }
+        }
         { ss. }
       }
     }
@@ -840,7 +848,10 @@ Section LIFT.
       { ss. }
       { i. esplits.
         { econs; eauto. ss. }
-        { ss. i. splits; auto; try refl. eapply map_future_memory_refl. }
+        { ss. i. splits; auto; try refl.
+          { eapply map_future_memory_refl. }
+          { eapply space_future_memory_refl; eauto. refl. }
+        }
         { ss. }
       }
     }
@@ -850,7 +861,10 @@ Section LIFT.
       { econs 3; eauto. }
       { i. esplits.
         { econs; eauto. ss. }
-        { ss. i. splits; auto; try refl. eapply map_future_memory_refl. }
+        { ss. i. splits; auto; try refl.
+          { eapply map_future_memory_refl. }
+          { eapply space_future_memory_refl; eauto. refl. }
+        }
       }
       { i. hexploit (VALS loc); eauto. i. rewrite H in H0. inv H0.
         rewrite <- H2 in *. ss.
@@ -914,7 +928,10 @@ Section LIFT.
         { ss. destruct ord; ss. }
         { i. esplits; eauto.
           { econs; eauto. ss. }
-          { ss. i. splits; auto; try refl. eapply map_future_memory_refl. }
+          { ss. i. splits; auto; try refl.
+            { eapply map_future_memory_refl. }
+            { eapply space_future_memory_refl; eauto. refl. }
+          }
         }
       }
       { hexploit sim_thread_src_read_na.
@@ -932,7 +949,10 @@ Section LIFT.
         { ss. destruct ord; ss. }
         { i. esplits.
           { econs; eauto. ss. }
-          { ss. i. splits; auto; try refl. eapply map_future_memory_refl. }
+          { ss. i. splits; auto; try refl.
+            { eapply map_future_memory_refl. }
+            { eapply space_future_memory_refl; eauto. refl. }
+          }
         }
       }
     }
@@ -1869,7 +1889,7 @@ Section LIFT.
                (<<LIFT: sim_state_lift false w1 smem_src smem_tgt p D mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src1 sc_tgt0>>) /\
                  (<<SC: sim_timemap_lift w1 sc_src1 sc_tgt0>>) /\
                  (<<MEM: sim_memory_lift w1 mem_src1 mem_tgt1>>) /\
-                 (<<WORLD: world_messages_le (unchangable mem_src1 lc_src0.(Local.promises)) (unchangable mem_tgt1 lc_tgt0.(Local.promises)) w0 w1>>))).
+                 (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt0 lc_tgt0.(Local.promises)) w0 w1>>))).
   Proof.
     i. inv LIFT.
     hexploit INTERFERENCE; eauto. i. subst.
@@ -2544,7 +2564,8 @@ Section LIFT.
                     (<<VALSRC: vs_src1 loc = Some val_src>>) /\ (<<VALTGT: vs_tgt1 loc = Some val_tgt>>) /\
                     (<<VALLE: Const.le val_tgt val_src>>) /\
                     (<<ACQ: is_acquire pe_tgt>>))>>) /\
-          (<<NFAILURE: ThreadEvent.get_machine_event e_tgt = MachineEvent.silent>>)
+          (<<NFAILURE: ThreadEvent.get_machine_event e_tgt = MachineEvent.silent>>) /\
+        (<<SPACE: space_future_memory (unchangable mem_tgt0 lc_tgt0.(Local.promises)) f0 mem_src0 f1 mem_src1>>)
   .
   Proof.
     inv STEP; ss; clarify.
@@ -2579,6 +2600,7 @@ Section LIFT.
         { subst. exfalso. eapply LOCDISJOINT; eauto. }
       }
       { ss. }
+      { eapply space_future_memory_refl; eauto. refl. }
     }
     (* write *)
     { hexploit (ATLOCS loc); eauto. i. des_ifs. des. subst.
@@ -2609,6 +2631,7 @@ Section LIFT.
         { left. rewrite VALSRC0. rewrite VALTGT0. auto. }
       }
       { ss. }
+      { auto. }
     }
     (* update *)
     { hexploit (ATLOCS loc); eauto. i. des_ifs. des. subst.
@@ -2644,6 +2667,7 @@ Section LIFT.
         { ii. subst. eapply LOCDISJOINT; eauto. }
       }
       { ss. }
+      { auto. }
     }
     (* fence *)
     { hexploit sim_thread_fence_step_normal; eauto.
@@ -2675,6 +2699,7 @@ Section LIFT.
         { right. esplits; eauto. rewrite ORD. ss. }
       }
       { ss. }
+      { eapply space_future_memory_refl; eauto. refl. }
     }
     (* na write *)
     { inv LOCAL; ss. destruct ord; ss. }
@@ -2698,6 +2723,7 @@ Section LIFT.
       { i. hexploit ATLOCS; eauto. i. des. auto. }
       { i. left. auto. }
       { ss. }
+      { eapply space_future_memory_refl; eauto. refl. }
     }
     (* racy write *)
     { des_ifs. hexploit (ATLOCS loc); eauto. i. des. subst.
@@ -2769,6 +2795,7 @@ Section LIFT.
         (<<VERSLE: versions_le vers0 vers1>>) /\
         (<<VERSWF: versions_wf f1 vers1>>) /\
         (<<MAPFUTURE: map_future_memory f0 f1 mem_src3>>) /\
+        (<<SPACE: space_future_memory (unchangable mem_tgt0 lc_tgt0.(Local.promises)) f0 mem_src0 f1 mem_src3>>) /\
         (<<ATLOCS: forall loc (NNA: ~ loc_na loc), option_rel Const.le (vs_tgt1 loc) (vs_src1 loc)>>) /\
         (<<VAL: forall loc,
             (((<<SRC: vs_src1 loc = vs_src0 loc>>) /\ (<<TGT: vs_tgt1 loc = vs_tgt0 loc>>))) \/
@@ -2816,6 +2843,7 @@ Section LIFT.
       { eauto. }
       { eauto. }
       { eauto. }
+      { eauto. }
       { i. hexploit ATLOCS; eauto. i. des.
         hexploit (VALS loc); eauto. i. des.
         { rewrite SRC. rewrite TGT. auto. }
@@ -2845,6 +2873,7 @@ Section LIFT.
         { ss. }
       }
       { refl. }
+      { eauto. }
       { eauto. }
       { eauto. }
       { eauto. }
@@ -2892,6 +2921,7 @@ Section LIFT.
       { refl. }
       { eauto. }
       { eauto. }
+      { eauto. }
       { i. hexploit ATLOCS; eauto. i. des.
         hexploit (VALS loc); eauto. i. des.
         { rewrite SRC. rewrite TGT. auto. }
@@ -2921,6 +2951,7 @@ Section LIFT.
       { eauto. }
       { eauto. }
       { refl. }
+      { eauto. }
       { eauto. }
       { eauto. }
       { i. hexploit ATLOCS; eauto. i. des.
@@ -2990,7 +3021,7 @@ Section LIFT.
            (exists w1 p1 D1 smem_src1 smem_tgt1,
                (<<LIFT: sim_state_lift true w1 smem_src1 smem_tgt1 p1 D1 mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src1 sc_tgt1>>) /\
                  (<<SIM: @sim_seq _ _ sim_terminal p1 D1 (SeqState.mk lang_src st_src1 smem_src1) (SeqState.mk lang_tgt st_tgt1 smem_tgt1)>>) /\
-                 (<<WORLD: world_messages_le (unchangable mem_src1 lc_src0.(Local.promises)) (unchangable mem_tgt1 lc_tgt0.(Local.promises)) w0 w1>>) /\
+                 (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt0 lc_tgt0.(Local.promises)) w0 w1>>) /\
                  (<<NOMIXSRC: nomix _ st_src1>>) /\
                  (<<NOMIXTGT: nomix _ st_tgt1>>) /\
                  (<<NFAILURE: ThreadEvent.get_machine_event e = MachineEvent.silent>>))).
@@ -3081,7 +3112,7 @@ Section LIFT.
         (<<SIM: @sim_seq_interference _ _ sim_terminal p1 D1 (SeqState.mk lang_src st_src2 smem_src1) (SeqState.mk lang_tgt st_tgt1 smem_tgt1)>>) /\
         (<<SC: sim_timemap_lift w1 sc_src3 sc_tgt1>>) /\
         (<<MEM: sim_memory_lift w1 mem_src3 mem_tgt1>>) /\
-        (<<WORLD: world_messages_le (unchangable mem_src1 lc_src0.(Local.promises)) (unchangable mem_tgt1 lc_tgt0.(Local.promises)) w0 w1>>) /\
+        (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt0 lc_tgt0.(Local.promises)) w0 w1>>) /\
         (<<NOMIXSRC: nomix _ st_src2>>) /\
         (<<NOMIXTGT: nomix _ st_tgt1>>) /\
         (<<EVENT: machine_event_le (ThreadEvent.get_machine_event e_tgt) (ThreadEvent.get_machine_event e_src)>>)
@@ -3148,6 +3179,18 @@ Section LIFT.
     | _ => False
     end.
 
+  Lemma program_step_unchangable e lc0 sc0 mem0 lc1 sc1 mem1
+        (STEP: Local.program_step e lc0 sc0 mem0 lc1 sc1 mem1)
+    :
+    unchangable mem0 lc0.(Local.promises) <4= unchangable mem1 lc1.(Local.promises).
+  Proof.
+    i. inv STEP; ss; try inv LOCAL; ss.
+    - eapply unchangable_write; eauto.
+    - inv LOCAL1. inv LOCAL2. ss. inv WRITE.
+      eapply unchangable_write; eauto.
+    - eapply unchangable_write_na; eauto.
+  Qed.
+
   Lemma sim_lift_na_step_aux c:
     forall
       w0 p0 D0 smem_src0 smem_tgt0 mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0
@@ -3175,7 +3218,7 @@ Section LIFT.
            (exists w1 p1 D1 smem_src1 smem_tgt1,
                (<<LIFT: sim_state_lift true w1 smem_src1 smem_tgt1 p1 D1 mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src1 sc_tgt1>>) /\
                  (<<SIM: @sim_seq _ _ sim_terminal p1 D1 (SeqState.mk lang_src st_src1 smem_src1) (SeqState.mk lang_tgt st_tgt1 smem_tgt1)>>) /\
-                 (<<WORLD: world_messages_le (unchangable mem_src1 lc_src0.(Local.promises)) (unchangable mem_tgt1 lc_tgt0.(Local.promises)) w0 w1>>) /\
+                 (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt0 lc_tgt0.(Local.promises)) w0 w1>>) /\
                  (<<NOMIXSRC: nomix _ st_src1>>) /\
                  (<<NOMIXTGT: nomix _ st_tgt1>>) /\
                  (<<FAILURE: ThreadEvent.get_machine_event e = MachineEvent.silent>>))).
@@ -3219,7 +3262,10 @@ Section LIFT.
         { rewrite <- H1 in *. ss. }
       }
       { right. hexploit LIFT2; eauto. i. des. esplits; eauto.
-        etrans; eauto. etrans; eauto.
+        etrans; eauto. eapply world_messages_le_mon.
+        { etrans; eauto. }
+        { i. eapply rtc_step_unchangable in STEPS; eauto. }
+        { i. eapply program_step_unchangable; eauto. }
       }
     }
   Qed.
@@ -3251,7 +3297,7 @@ Section LIFT.
            (exists w1 p1 D1 smem_src1 smem_tgt1,
                (<<LIFT: sim_state_lift true w1 smem_src1 smem_tgt1 p1 D1 mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src1 sc_tgt1>>) /\
                  (<<SIM: @sim_seq _ _ sim_terminal p1 D1 (SeqState.mk lang_src st_src1 smem_src1) (SeqState.mk lang_tgt st_tgt1 smem_tgt1)>>) /\
-                 (<<WORLD: world_messages_le (unchangable mem_src1 lc_src0.(Local.promises)) (unchangable mem_tgt1 lc_tgt0.(Local.promises)) w0 w1>>) /\
+                 (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt0 lc_tgt0.(Local.promises)) w0 w1>>) /\
                  (<<NOMIXSRC: nomix _ st_src1>>) /\
                  (<<NOMIXTGT: nomix _ st_tgt1>>) /\
                  (<<FAILURE: ThreadEvent.get_machine_event e = MachineEvent.silent>>) /\
