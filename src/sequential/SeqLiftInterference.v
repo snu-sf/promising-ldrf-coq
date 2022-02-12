@@ -122,6 +122,228 @@ Proof.
   }
 Qed.
 
+Variant sim_promises_past
+        (reserves: list (Loc.t * Time.t * Time.t))
+        (f_past: Mapping.ts)
+
+        (srctm: Loc.t -> Time.t)
+        (flag_tgt: Loc.t -> bool)
+        (f: Mapping.ts)
+        (vers: versions)
+        (prom_src prom_tgt: Memory.t): Prop :=
+| sim_promises_past_intro
+    (MESSAGENORMAL: forall loc to from msg_tgt
+                     (GET: Memory.get loc to prom_tgt = Some (from, msg_tgt))
+                     (NIN: ~ List.In (loc, to, from) reserves),
+        exists fto ffrom msg_src,
+          (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ffrom from>>) /\
+          (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto to>>) /\
+          (<<GET: Memory.get loc fto prom_src = Some (ffrom, msg_src)>>) /\
+          (<<MSG: sim_message_max (flag_tgt loc) loc fto f (vers loc to) msg_src msg_tgt>>))
+    (MESSAGERESERVE: forall loc to from msg_tgt
+                     (GET: Memory.get loc to prom_tgt = Some (from, msg_tgt))
+                     (IN: List.In (loc, to, from) reserves),
+        exists fto ffrom msg_src,
+          (<<FROM: sim_timestamp_exact (f_past loc) (f_past loc).(Mapping.ver) ffrom from>>) /\
+          (<<TO: sim_timestamp_exact (f_past loc) (f_past loc).(Mapping.ver) fto to>>) /\
+          (<<GET: Memory.get loc fto prom_src = Some (ffrom, msg_src)>>) /\
+          (<<MSG: sim_message_max (flag_tgt loc) loc fto f_past (vers loc to) msg_src msg_tgt>>) /\
+          (<<RESERVE: msg_tgt = Message.reserve>>))
+    (SOUND: forall loc fto ffrom msg_src
+                   (GET: Memory.get loc fto prom_src = Some (ffrom, msg_src)),
+        ((exists to from msg_tgt,
+             (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto to>>) /\
+               (<<GET: Memory.get loc to prom_tgt = Some (from, msg_tgt)>>) /\
+               (<<IN: ~ List.In (loc, to, from) reserves>>)) \/
+           (exists to from msg_tgt,
+               (<<TO: sim_timestamp_exact (f_past loc) (f_past loc).(Mapping.ver) fto to>>) /\
+                 (<<GET: Memory.get loc to prom_tgt = Some (from, msg_tgt)>>) /\
+                 (<<IN: List.In (loc, to, from) reserves>>)) \/
+           ((<<FLAG: flag_tgt loc = true>>) /\ (<<TS: Time.lt (srctm loc) fto>>) /\ (<<RESERVE: msg_src <> Message.reserve>>) /\ (<<SYNC: forall val released (MSG: msg_src = Message.concrete val (Some released)), False>>))))
+    (RESERVES: forall loc from to (IN: List.In (loc, to, from) reserves),
+        Memory.get loc to prom_tgt = Some (from, Message.reserve))
+.
+
+Lemma sim_promises_past_nil_sim_promises
+      f_past srctm flag_tgt f vers prom_src prom_tgt
+      (SIM: sim_promises_past [] f_past srctm flag_tgt f vers prom_src prom_tgt)
+  :
+  sim_promises srctm (fun _ => false) flag_tgt f vers prom_src prom_tgt.
+Proof.
+  inv SIM. econs; eauto; ss.
+  i. hexploit SOUND; eauto. i. des.
+  { left. esplits; eauto. }
+  { ss. }
+  { right. esplits; eauto. }
+Qed.
+
+Lemma promise_max_values_src
+      lc0 mem0 loc from to msg lc1 mem1 kind vs
+      (PROMISE: Local.promise_step lc0 mem0 loc from to msg lc1 mem1 kind)
+      (MAX: max_values_src vs mem0 lc0)
+  :
+  max_values_src vs mem1 lc1.
+Proof.
+  inv PROMISE. ii. specialize (MAX loc0). inv MAX.
+  destruct (Loc.eq_dec loc0 loc); subst.
+  { econs.
+    { i. hexploit MAX0; eauto. i. des. esplits. ss.
+      erewrite <- promise_max_readable; eauto.
+    }
+    { i. hexploit NONMAX; eauto. ii. eapply H. ss.
+      erewrite promise_max_readable; eauto.
+    }
+  }
+  { eapply promise_unchanged_loc in PROMISE0; eauto. des.
+    econs.
+    { i. hexploit MAX0; eauto. i. des. esplits. ss.
+      erewrite <- unchanged_loc_max_readable; eauto.
+    }
+    { i. hexploit NONMAX; eauto. ii. eapply H. ss.
+      erewrite unchanged_loc_max_readable; eauto.
+    }
+  }
+Qed.
+
+Lemma promise_step_max_values_src
+      lang st0 st1 pf e lc0 lc1 sc0 sc1 mem0 mem1 vs
+      (PROMISE: Thread.promise_step pf e (Thread.mk lang st0 lc0 sc0 mem0) (Thread.mk _ st1 lc1 sc1 mem1))
+      (MAX: max_values_src vs mem0 lc0)
+  :
+  max_values_src vs mem1 lc1.
+Proof.
+  inv PROMISE. eapply promise_max_values_src; eauto.
+Qed.
+
+Lemma promise_steps_max_values_src
+      lang st0 st1 lc0 lc1 sc0 sc1 mem0 mem1 vs
+      (PROMISE: rtc (tau (@pred_step is_promise _)) (Thread.mk lang st0 lc0 sc0 mem0) (Thread.mk _ st1 lc1 sc1 mem1))
+      (MAX: max_values_src vs mem0 lc0)
+  :
+  max_values_src vs mem1 lc1.
+Proof.
+  remember (Thread.mk lang st0 lc0 sc0 mem0).
+  remember (Thread.mk lang st1 lc1 sc1 mem1).
+  revert st0 st1 lc0 lc1 sc0 sc1 mem0 mem1 Heqt Heqt0 MAX. induction PROMISE; i; clarify.
+  inv H. inv TSTEP. inv STEP. inv STEP0; [|inv STEP; inv LOCAL; ss].
+  destruct y. eapply promise_step_max_values_src in STEP; eauto.
+Qed.
+
+Inductive wf_reserve_list: list (Loc.t * Time.t * Time.t) -> Prop :=
+| wf_reserve_list_nil
+  :
+  wf_reserve_list []
+| wf_reserve_list_cons
+    loc from to tl
+    (TL: wf_reserve_list tl)
+    (HD: List.Forall (fun '(loc0, to0, from0) => forall (LOC: loc0 = loc), Interval.disjoint (from, to) (from0, to0)) tl)
+  :
+  wf_reserve_list ((loc, to, from)::tl)
+.
+
+Lemma past_update_sim_promises
+      prom_src0 loc to_tgt from_tgt reserves f_past srctm flag_tgt f vers prom_tgt
+      prom_src1 prom_src2 to_src0 from_src0 to_src1 from_src1
+      (SIMPROM: sim_promises_past ((loc, to_tgt, from_tgt)::reserves) f_past srctm flag_tgt f vers prom_src0 prom_tgt)
+      (RESERVES: wf_reserve_list ((loc, to_tgt, from_tgt)::reserves))
+      (REMOVE: Memory.remove prom_src0 loc from_src0 to_src0 Message.reserve prom_src1)
+      (ADD: Memory.add prom_src1 loc from_src1 to_src1 Message.reserve prom_src2)
+      (TO0: sim_timestamp_exact (f_past loc) (f_past loc).(Mapping.ver) to_src0 to_tgt)
+      (FROM0: sim_timestamp_exact (f_past loc) (f_past loc).(Mapping.ver) from_src0 from_tgt)
+      (TO1: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src1 to_tgt)
+      (FROM1: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src1 from_tgt)
+      (BOTNONE: Memory.bot_none prom_tgt)
+  :
+  sim_promises_past reserves f_past srctm flag_tgt f vers prom_src2 prom_tgt.
+Proof.
+  assert (NODUP: forall from0, ~ List.In (loc, to_tgt, from0) reserves).
+  { ii. inv RESERVES. eapply List.Forall_forall in HD; eauto. ss.
+    inv SIMPROM. hexploit RESERVES; eauto.
+    { left. eauto. }
+    i. hexploit memory_get_ts_strong; [eapply H0|]. i. des; clarify.
+    { rewrite BOTNONE in H0. ss. }
+    hexploit RESERVES; eauto.
+    { right. eauto. }
+    i. hexploit memory_get_ts_strong; [eapply H0|]. i. des; clarify.
+    eapply HD; auto.
+    { instantiate (1:=to_tgt). econs; ss. refl. }
+    { econs; ss. refl. }
+  }
+  assert (GET: Memory.get loc to_tgt prom_tgt = Some (from_tgt, Message.reserve)).
+  { inv SIMPROM. eapply RESERVES0; eauto. left. auto. }
+  inv SIMPROM. econs.
+  { i. destruct (classic ((loc, to, from) = (loc0, to_tgt, from_tgt))).
+    { clarify. esplits; eauto.
+      { eapply Memory.add_get0; eauto. }
+      { econs. }
+    }
+    { hexploit MESSAGENORMAL; eauto.
+      { ii. ss. des; eauto. clarify. }
+      i. des. esplits; eauto.
+      eapply Memory.add_get1; eauto.
+      erewrite Memory.remove_o; eauto. des_ifs.
+      ss. des; clarify. exfalso.
+Admitted.
+
+Lemma sim_promises_past_update
+      reserves f_past f vers flag_tgt srctm prom_tgt mem_tgt
+      (MAPWF0: Mapping.wfs f_past)
+      (MAPWF1: Mapping.wfs f)
+      (MAPLE: Mapping.les f_past f)
+      (MLETGT: Memory.le prom_tgt mem_tgt)
+  :
+  forall
+    prom_src0 mem_src0
+    (EMPTY: forall loc from0 to0 from1 to1 msg
+                   (IN: List.In (loc, to0, from0) reserves)
+                   (GET: Memory.get loc to1 mem_src0 = Some (from1, msg)),
+        Interval.disjoint (from0, to0) (from1, to1))
+    (RESERVES: wf_reserve_list reserves)
+    (MLESRC: Memory.le prom_src0 mem_src0)
+    (SIMMEM: sim_memory srctm (fun _ => false) f vers mem_src0 mem_tgt)
+    (SIMPROM: sim_promises_past reserves f_past srctm flag_tgt f vers prom_src0 prom_tgt)
+    lang st tvw sc,
+  exists prom_src1 mem_src1,
+    (<<STEPS: rtc (tau (@pred_step is_promise _)) (Thread.mk lang st (Local.mk tvw prom_src0) sc mem_src0) (Thread.mk lang st (Local.mk tvw prom_src1) sc mem_src1)>>) /\
+      (<<SIMMEM: sim_memory srctm (fun _ => false) f vers mem_src1 mem_tgt>>) /\
+      (<<SIMPROM: sim_promises srctm (fun _ => false) flag_tgt f vers prom_src1 prom_tgt>>) /\
+      (<<SPACE: space_future_memory (unchangable mem_tgt prom_tgt) f mem_src0 f mem_src1>>).
+Proof.
+  induction reserves.
+  { i. esplits.
+    { refl. }
+    { eauto. }
+    { eapply sim_promises_past_nil_sim_promises; eauto. }
+    { eapply space_future_memory_refl; eauto. refl. }
+  }
+  i.
+
+                                    prom_src1
+
+.
+
+  map_future_memory
+  True.
+
+
+
+
+               versioned_memory
+               map_future_memory
+               space_future_memory
+
+
+Variant sim_promises_past
+        (reserves: list (Time.t * Time.t))
+        (f_past: Mapping.ts)
+
+        (srctm: Loc.t -> Time.t)
+        (flag_tgt: Loc.t -> bool)
+        (f: Mapping.ts)
+        (vers: versions)
+        (prom_src prom_tgt: Memory.t): Prop :=
+
+
 Lemma sim_thread_future
       loc_na
       f0 vers0 flag_tgt vs_src0 vs_tgt0
@@ -137,6 +359,7 @@ Lemma sim_thread_future
       (MEMLETGT: Memory.future_weak mem_tgt0 mem_tgt1)
       (CLOSEDFUTURE: closed_future_tview loc_na lc_tgt0.(Local.tview) mem_tgt0 mem_tgt1)
       (MAPFUTURE: map_future_memory f0 f1 mem_src1)
+      (SPACE: space_future_memory (Messages.of_memory lc_tgt0.(Local.promises)) f0 mem_src0 f1 mem_src1)
 
       (SCLESRC: TimeMap.le sc_src0 sc_src1)
       (SCLETGT: TimeMap.le sc_tgt0 sc_tgt1)
@@ -250,7 +473,11 @@ Proof.
           { eapply mapping_latest_wf_loc. }
         }
         { inv MSG0; ss. }
-        i. hexploit sim_promises_get_if; eauto. i. admit. }
+        i. hexploit sim_promises_get_if; eauto. i. des.
+        { admit. }
+        {
+
+        admit. }
     }
     { i. hexploit (CLOSEDFUTURE.(closed_future_cur).(closed_future_pln) loc).
       { eapply NNPP. ii. hexploit ATFLAG; eauto. }

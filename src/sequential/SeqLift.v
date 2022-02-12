@@ -3650,6 +3650,96 @@ Proof.
   }
 Qed.
 
+Lemma src_cancel_sim_memory srctm flag_src f vers
+      mem_src0 loc from to mem_src1 mem_tgt
+      (REMOVE: Memory.remove mem_src0 loc from to Message.reserve mem_src1)
+      (SIM: sim_memory srctm flag_src f vers mem_src0 mem_tgt)
+  :
+  sim_memory srctm flag_src f vers mem_src1 mem_tgt.
+Proof.
+  econs.
+  { i. hexploit sim_memory_get; eauto. i. des. esplits; eauto.
+    erewrite Memory.remove_o; eauto.
+    des_ifs; eauto. ss. des; clarify. exfalso.
+    eapply Memory.remove_get0 in REMOVE. des; clarify. inv MSG; ss.
+  }
+  { i. hexploit sim_memory_sound; eauto.
+    erewrite Memory.remove_o in GET; eauto. des_ifs. eauto.
+  }
+  { i. eapply sim_memory_top; eauto. }
+  { i. hexploit sim_memory_undef; eauto. i. des.
+    exists to0, from0. splits; auto.
+    erewrite Memory.remove_o; eauto. des_ifs.
+    ss. des; clarify. eapply Memory.remove_get0 in REMOVE. des; clarify.
+  }
+Qed.
+
+Lemma tgt_cancel_sim_memory srctm flag_src f vers mem_tgt0 mem_tgt1 mem_src
+      loc from_tgt to_tgt from_src to_src
+      (REMOVETGT: Memory.remove mem_tgt0 loc from_tgt to_tgt Message.reserve mem_tgt1)
+      (MEM: sim_memory srctm flag_src f vers mem_src mem_tgt0)
+      (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
+      (FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt)
+      (WF: Mapping.wfs f)
+      (DISJOINT: forall to from msg (GET: Memory.get loc to mem_src = Some (from, msg)), Interval.disjoint (from_src, to_src) (from, to))
+  :
+    sim_memory srctm flag_src f vers mem_src mem_tgt1.
+Proof.
+  pose proof (mapping_latest_wf_loc (f loc)) as VERWF.
+  econs.
+  { i. erewrite Memory.remove_o in GET; eauto. des_ifs.
+    guardH o. hexploit sim_memory_get; eauto. i. des.
+    esplits; eauto.
+  }
+  { i. hexploit sim_memory_sound_strong; eauto. i. des; eauto.
+    left. esplits; eauto. i. eapply remove_covered; eauto.
+    splits; auto. eapply not_and_or. ii. des; subst.
+    hexploit DISJOINT; eauto. i.
+    assert (TIME0: Time.lt from to_tgt).
+    { inv ITV. inv H0. ss. eapply TimeFacts.lt_le_lt; eauto. }
+    assert (TIME1: Time.lt from_tgt to).
+    { inv ITV. inv H0. ss. eapply TimeFacts.lt_le_lt; eauto. }
+    assert (FTIME0: Time.lt ffrom0 to_src).
+    { unguard. des; subst.
+      { eapply sim_timestamp_lt; eauto. eapply sim_timestamp_bot; eauto. }
+      { eapply sim_timestamp_exact_lt; eauto. }
+    }
+    assert (FTIME1: Time.lt from_src fto1).
+    { eapply sim_timestamp_exact_lt; eauto. }
+    destruct (Time.le_lt_dec to_src ffrom1).
+    { eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; [eapply FTIME0|].
+      eapply MAX; eauto. right. eauto.
+    }
+    destruct (Time.le_lt_dec fto0 from_src).
+    { eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; [eapply FTIME1|].
+      eapply MIN; eauto.
+    }
+    destruct (Time.le_lt_dec to_src fto0).
+    { eapply (H to_src).
+      { econs; ss.
+        { eapply sim_timestamp_exact_lt; eauto.
+          eapply Memory.remove_get0 in REMOVETGT. des.
+          eapply memory_get_ts_strong in GET0. des; auto.
+          subst. inv TIME0.
+        }
+        { refl. }
+      }
+      { econs; ss. }
+    }
+    { eapply (H fto0).
+      { econs; ss. left. auto. }
+      { econs; ss.
+        { eapply memory_get_ts_strong in GET. des; auto.
+          subst. inv l0.
+        }
+        { refl. }
+      }
+    }
+  }
+  { i. hexploit sim_memory_top; eauto. }
+  { i. hexploit sim_memory_undef; eauto. }
+Qed.
+
 Lemma remove_sim_memory srctm flag_src f vers mem_tgt0 mem_tgt1 mem_src0 mem_src1
       loc from_tgt to_tgt from_src to_src
       (REMOVETGT: Memory.remove mem_tgt0 loc from_tgt to_tgt Message.reserve mem_tgt1)
@@ -3661,74 +3751,41 @@ Lemma remove_sim_memory srctm flag_src f vers mem_tgt0 mem_tgt1 mem_src0 mem_src
   :
     sim_memory srctm flag_src f vers mem_src1 mem_tgt1.
 Proof.
-  pose proof (mapping_latest_wf_loc (f loc)) as VERWF.
+  eapply src_cancel_sim_memory in MEM; eauto.
+  eapply tgt_cancel_sim_memory in MEM; eauto.
+  i. erewrite Memory.remove_o in GET; eauto. des_ifs.
+  eapply Memory.get_disjoint in GET; [|eapply Memory.remove_get0; eauto].
+  ss. des; clarify.
+Qed.
+
+Lemma add_src_covered_sim_memory srctm flag_src f vers mem_src0 mem_src1 mem_tgt
+      loc from_tgt to_tgt from_src to_src msg
+      (ADD: Memory.add mem_src0 loc from_src to_src msg mem_src1)
+      (MEM: sim_memory srctm flag_src f vers mem_src0 mem_tgt)
+      (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
+      (FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt)
+      (WF: Mapping.wfs f)
+      (COVERED: forall ts (COVER: Interval.mem (from_tgt, to_tgt) ts), covered loc ts mem_tgt)
+  :
+    sim_memory srctm flag_src f vers mem_src1 mem_tgt.
+Proof.
   econs.
-  { i. erewrite Memory.remove_o in GET; eauto. des_ifs.
-    guardH o. hexploit sim_memory_get; eauto. i. des.
-    esplits; eauto. erewrite Memory.remove_o; eauto. des_ifs; eauto.
-    exfalso. ss. des; clarify. unguard. des; ss.
-    eapply o. eapply sim_timestamp_exact_unique; eauto.
+  { i. hexploit sim_memory_get; eauto. i. des; eauto.
+    esplits; eauto. eapply Memory.add_get1; eauto.
   }
-  { i. erewrite Memory.remove_o in GET; eauto. des_ifs.
-    guardH o. hexploit sim_memory_sound_strong; eauto. i. des; eauto.
-    left. esplits; eauto. i. eapply remove_covered; eauto.
-    splits; auto. eapply not_and_or. ii. des; subst.
-    destruct FROM0 as [FROM0|FROM0]; des; clarify.
-    { hexploit (@sim_timestamp_exact_bot (f loc) (f loc).(Mapping.ver)); eauto. i. des.
-      eapply sim_disjoint_if; [..|eapply ITV|eapply H0]; eauto.
-      ii. ss.
-      hexploit memory_get_disjoint_strong.
-      { eapply GET. }
-      { eapply Memory.remove_get0; eauto. }
-      i. unguard. des; clarify.
-      { hexploit MIN; [|eapply TS|..]; eauto. i.
-        inv LHS. inv RHS. ss.
-        eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
-        { eapply FROM1. }
-        etrans.
-        { eapply TO1. }
-        { eauto. }
-      }
-      { hexploit MAX; [|eapply TS|..]; eauto. i.
-        inv LHS. inv RHS. ss.
-        eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
-        { eapply FROM0. }
-        etrans.
-        { eapply TO2. }
-        etrans.
-        { eapply H. }
-        { eapply Time.bot_spec. }
-      }
+  { i. erewrite Memory.add_o in GET; eauto. des_ifs.
+    { ss. des; clarify. left. esplits.
+      { refl. }
+      { refl. }
+      { right. eauto. }
+      { eauto. }
+      { eauto. }
     }
-    { eapply sim_disjoint_if; [..|eapply ITV|eapply H0]; eauto.
-      ii. ss.
-      hexploit memory_get_disjoint_strong.
-      { eapply GET. }
-      { eapply Memory.remove_get0; eauto. }
-      i. unguard. des; clarify.
-      { hexploit MIN; [|eapply TS|..]; eauto. i.
-        inv LHS. inv RHS. ss.
-        eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
-        { eapply FROM2. }
-        etrans.
-        { eapply TO1. }
-        { eauto. }
-      }
-      { hexploit MAX; [|eapply TS|..]; eauto. i.
-        inv LHS. inv RHS. ss.
-        eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
-        { eapply FROM1. }
-        etrans.
-        { eapply TO2. }
-        { eauto. }
-      }
-    }
+    { clear o. hexploit sim_memory_sound; eauto. }
   }
-  { i. eapply sim_memory_top; eauto. }
+  { i. hexploit sim_memory_top; eauto. }
   { i. hexploit sim_memory_undef; eauto. i. des.
-    esplits; eauto. erewrite Memory.remove_o; eauto.
-    des_ifs; eauto. ss. des; clarify.
-    eapply Memory.remove_get0 in REMOVESRC. des. clarify.
+    esplits; eauto. eapply Memory.add_get1; eauto.
   }
 Qed.
 
@@ -5031,22 +5088,7 @@ Lemma src_cancel_sim_promises srctm flag_src f vers prom_src0 mem_src0 mem_tgt l
 .
 Proof.
   inv CANCEL. splits.
-  { econs.
-    { i. hexploit sim_memory_get; eauto. i. des. esplits; eauto.
-      erewrite (@Memory.remove_o mem_src1 mem_src0); eauto.
-      des_ifs; eauto. ss. des; clarify. exfalso.
-      eapply Memory.remove_get0 in MEM0. des; clarify. inv MSG0; ss.
-    }
-    { i. hexploit sim_memory_sound; eauto.
-      erewrite Memory.remove_o in GET; eauto. des_ifs. eauto.
-    }
-    { i. eapply sim_memory_top; eauto. }
-    { i. hexploit sim_memory_undef; eauto. i. des.
-      exists to0, from0. splits; auto.
-      erewrite Memory.remove_o; eauto. des_ifs.
-      ss. des; clarify. eapply Memory.remove_get0 in MEM0. des; clarify.
-    }
-  }
+  { eapply src_cancel_sim_memory; eauto. }
   { i. erewrite (@Memory.remove_o prom_src1 prom_src0); eauto. des_ifs.
     ss. des; clarify.
   }
