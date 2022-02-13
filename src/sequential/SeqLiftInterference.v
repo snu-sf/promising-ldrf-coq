@@ -162,6 +162,13 @@ Variant sim_promises_past
            ((<<FLAG: flag_tgt loc = true>>) /\ (<<TS: Time.lt (srctm loc) fto>>) /\ (<<RESERVE: msg_src <> Message.reserve>>) /\ (<<SYNC: forall val released (MSG: msg_src = Message.concrete val (Some released)), False>>))))
     (RESERVES: forall loc from to (IN: List.In (loc, to, from) reserves),
         Memory.get loc to prom_tgt = Some (from, Message.reserve))
+    (DISJOINT: forall loc to_src0 to_src1 to_tgt0 to_tgt1 msg0 from_tgt0 from_tgt1
+                      (GET: Memory.get loc to_tgt0 prom_tgt = Some (from_tgt0, msg0))
+                      (NIN: ~ List.In (loc, to_tgt0, from_tgt0) reserves)
+                      (IN: List.In (loc, to_tgt1, from_tgt1) reserves)
+                      (TS0: sim_timestamp_exact (f_past loc) (f_past loc).(Mapping.ver) to_src1 to_tgt1)
+                      (TS1: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src0 to_tgt0),
+        to_src1 <> to_src0)
 .
 
 Lemma sim_promises_past_nil_sim_promises
@@ -253,9 +260,12 @@ Lemma past_update_sim_promises
       (TO1: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src1 to_tgt)
       (FROM1: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src1 from_tgt)
       (BOTNONE: Memory.bot_none prom_tgt)
+      (MAPWF0: Mapping.wfs f_past)
+      (MAPWF1: Mapping.wfs f)
   :
   sim_promises_past reserves f_past srctm flag_tgt f vers prom_src2 prom_tgt.
 Proof.
+  pose proof mapping_latest_wf_loc as VERWF.
   assert (NODUP: forall from0, ~ List.In (loc, to_tgt, from0) reserves).
   { ii. inv RESERVES. eapply List.Forall_forall in HD; eauto. ss.
     inv SIMPROM. hexploit RESERVES; eauto.
@@ -282,8 +292,51 @@ Proof.
       i. des. esplits; eauto.
       eapply Memory.add_get1; eauto.
       erewrite Memory.remove_o; eauto. des_ifs.
-      ss. des; clarify. exfalso.
-Admitted.
+      ss. des; clarify. exfalso. eapply DISJOINT; eauto. ii. des; auto.
+    }
+  }
+  { i. hexploit MESSAGERESERVE; eauto.
+    { right. auto. }
+    i. des. esplits; eauto.
+    eapply Memory.add_get1; eauto. erewrite Memory.remove_o; eauto. des_ifs.
+    ss. des; clarify. exfalso.
+    eapply sim_timestamp_exact_unique in TO0; eauto.
+    subst. eapply NODUP; eauto.
+  }
+  { i. erewrite Memory.add_o in GET0; eauto.
+    erewrite Memory.remove_o in GET0; eauto. des_ifs.
+    { ss. des; clarify. left. esplits; eauto. }
+    { guardH o. guardH o0. hexploit SOUND; eauto. i. des.
+      { left. esplits; eauto. ii. eapply IN. right. auto. }
+      { right. left. esplits; eauto. ss. des; auto. clarify.
+        eapply sim_timestamp_exact_inject in TO0; eauto.
+        subst. red in o0. des; ss.
+      }
+      { right. right. esplits; eauto. }
+    }
+  }
+  { i. eapply RESERVES0; eauto. right. auto. }
+  { i. destruct (classic ((loc0, to_tgt0, from_tgt0) = (loc, to_tgt, from_tgt))).
+    { clarify. ii. subst.
+      hexploit RESERVES0.
+      { right. eauto. }
+      i. hexploit MESSAGERESERVE.
+      { eauto. }
+      { right. auto. }
+      i. des.
+      eapply sim_timestamp_exact_inject in TO1; eauto. subst.
+      eapply sim_timestamp_exact_inject in TS0; eauto. subst.
+      eapply Memory.add_get0 in ADD. des.
+      erewrite Memory.remove_o in GET1; eauto. des_ifs.
+      ss. des; clarify.
+      eapply sim_timestamp_exact_unique in TO0; eauto. clarify.
+    }
+    { eapply DISJOINT; eauto.
+      { ii. ss. des; ss; auto. }
+      { ss. right. eauto. }
+    }
+  }
+Qed.
 
 Lemma sim_promises_past_update
       reserves f_past f vers flag_tgt srctm prom_tgt mem_tgt
@@ -317,6 +370,8 @@ Proof.
     { eapply space_future_memory_refl; eauto. refl. }
   }
   i.
+
+
 
                                     prom_src1
 
