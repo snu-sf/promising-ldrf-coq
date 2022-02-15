@@ -499,9 +499,34 @@ Proof.
   }
 Qed.
 
+Lemma sim_memory_get_top_time
+      srctm flag_src f vers mem_src mem_tgt loc ts to from msg
+      (MEM: sim_memory srctm flag_src f vers mem_src mem_tgt)
+      (TOP: top_time ts (f loc))
+      (GET: Memory.get loc to mem_src = Some (from, msg))
+      (FLAG: flag_src loc = false)
+  :
+    Time.lt to ts.
+Proof.
+  hexploit sim_memory_sound; eauto. i. des; clarify.
+  eapply TOP in TO. eapply TimeFacts.le_lt_lt; eauto.
+Qed.
+
+Lemma sim_memory_top_time_none
+      srctm flag_src f vers mem_src mem_tgt loc ts
+      (MEM: sim_memory srctm flag_src f vers mem_src mem_tgt)
+      (TOP: top_time ts (f loc))
+      (FLAG: flag_src loc = false)
+  :
+    Memory.get loc ts mem_src = None.
+Proof.
+  destruct (Memory.get loc ts mem_src) as [[from msg]|] eqn:GET; auto.
+  eapply sim_memory_get_top_time in GET; eauto. timetac.
+Qed.
+
 Lemma sim_promises_past_exists
       f0 vers0 f1 vers1 srctm flag_tgt
-      mem_src0 mem_src1 prom_src prom_tgt
+      mem_src0 mem_src1 mem_tgt prom_src prom_tgt
       (MAPLE: Mapping.les f0 f1)
       (VERSLE: versions_le vers0 vers1)
       (NOUNDEF: forall loc from0 to0 msg from1 to1
@@ -512,6 +537,7 @@ Lemma sim_promises_past_exists
                        (NONE: Memory.get loc to1 mem_src0 = None),
           False)
       (SIM: sim_promises srctm (fun _ => false) flag_tgt f0 vers0 prom_src prom_tgt)
+      (MEMORY: sim_memory srctm (fun _ => false) f0 vers0 mem_src0 mem_tgt)
       (MAPFUTURE: map_future_memory f0 f1 mem_src1)
       (SPACE: space_future_memory (Messages.of_memory prom_tgt) f0 mem_src0 f1 mem_src1)
       (FINITE: Memory.finite prom_tgt)
@@ -519,7 +545,7 @@ Lemma sim_promises_past_exists
       (WF0: Mapping.wfs f0)
       (WF1: Mapping.wfs f1)
       (VERSWF: versions_wf f0 vers0)
-      (MLESRC: Memory.le prom_src mem_src1)
+      (MLESRC0: Memory.le prom_src mem_src0)
   :
     exists reserves,
       (<<PROM: sim_promises_past reserves f0 srctm flag_tgt f1 vers1 prom_src prom_tgt>>) /\
@@ -539,7 +565,12 @@ Proof.
                            (MSG: msg <> Message.reserve)
                            (TO0: sim_timestamp_exact (f0 loc) (f0 loc).(Mapping.ver) ts_src ts_tgt),
              sim_timestamp_exact (f1 loc) (f1 loc).(Mapping.ver) ts_src ts_tgt).
-  { admit. }
+  { i. eapply NNPP. ii.
+    hexploit map_future_memory_undef; eauto. i. des.
+    eapply NOUNDEF; eauto.
+    { eapply MLESRC0 in GET. eapply sim_memory_get_top_time in GET; eauto. }
+    { eapply sim_memory_top_time_none; eauto. }
+  }
   red in FINITE. des.
   assert (exists (reserves0: list (Loc.t * Time.t * Time.t)),
              forall loc to_tgt from_tgt to_src from_src
@@ -697,7 +728,7 @@ Proof.
     { econs; eauto. }
     { i. des. subst. eapply TS; eauto. }
   }
-Admitted.
+Qed.
 
 Lemma sim_thread_future
       loc_na

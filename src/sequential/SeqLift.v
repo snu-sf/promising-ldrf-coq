@@ -3341,23 +3341,47 @@ Proof.
   { clarify. }
 Qed.
 
+Lemma sim_timestamp_exact_mon_exists
+      f0 f1 ts_src0 ts_tgt
+      (SIM: sim_timestamp_exact f0 f0.(Mapping.ver) ts_src0 ts_tgt)
+      (MAPLE: Mapping.le f0 f1)
+      (MAPWF0: Mapping.wf f0)
+      (MAPWF1: Mapping.wf f1)
+  :
+    exists ts_src1,
+      (<<SIM: sim_timestamp_exact f1 f1.(Mapping.ver) ts_src1 ts_tgt>>) /\
+      (<<TS: Time.le ts_src0 ts_src1>>).
+Proof.
+  hexploit sim_timestamp_exact_mon_ver.
+  { erewrite <- sim_timestamp_exact_mon_mapping; [eapply SIM|..].
+    { eauto. }
+    { eapply mapping_latest_wf_loc. }
+    { eapply MAPLE. }
+  }
+  { eapply MAPLE. }
+  { eauto. }
+  { eapply mapping_latest_wf_loc. }
+  i. des. esplits; eauto.
+Qed.
+
 Variant map_future_memory
-           (f0: Mapping.ts) (f1: Mapping.ts)
-           (mem: Memory.t): Prop :=
+        (f0: Mapping.ts) (f1: Mapping.ts)
+        (mem: Memory.t): Prop :=
 | map_future_memory_intro
-  (UNDEF: forall loc ts_src ts_tgt
+    (UNDEF: forall loc ts_src ts_tgt
                    (MAP0: sim_timestamp_exact (f0 loc) (f0 loc).(Mapping.ver) ts_src ts_tgt)
                    (MAP1: ~ sim_timestamp_exact (f1 loc) (f1 loc).(Mapping.ver) ts_src ts_tgt),
-    exists from to,
-      (<<GET: Memory.get loc to mem = Some (from, Message.undef)>>) /\
-      (<<TS: Time.le ts_src to>>))
-  (MAPLE: Mapping.les f0 f1)
+        exists from to,
+          (<<GET: Memory.get loc to mem = Some (from, Message.undef)>>) /\
+          (<<TS: Time.le ts_src to>>) /\
+          (<<TOP: top_time to (f0 loc)>>))
+    (MAPLE: Mapping.les f0 f1)
 .
 
 Lemma map_future_memory_les f0 f1 mem
       (MAP: map_future_memory f0 f1 mem)
   :
-  Mapping.les f0 f1.
+    Mapping.les f0 f1.
 Proof.
   inv MAP. auto.
 Qed.
@@ -3368,9 +3392,10 @@ Lemma map_future_memory_undef f0 f1 mem
       (MAP0: sim_timestamp_exact (f0 loc) (f0 loc).(Mapping.ver) ts_src ts_tgt)
       (MAP1: ~ sim_timestamp_exact (f1 loc) (f1 loc).(Mapping.ver) ts_src ts_tgt)
   :
-  exists from to,
-    (<<GET: Memory.get loc to mem = Some (from, Message.undef)>>) /\
-    (<<TS: Time.le ts_src to>>).
+    exists from to,
+      (<<GET: Memory.get loc to mem = Some (from, Message.undef)>>) /\
+      (<<TS: Time.le ts_src to>>) /\
+      (<<TOP: top_time to (f0 loc)>>).
 Proof.
   inv MAP. eapply UNDEF; eauto.
 Qed.
@@ -3385,6 +3410,19 @@ Proof.
   { red. refl. }
 Qed.
 
+Lemma top_time_mon_map f0 f1 ts
+      (LE: Mapping.le f0 f1)
+      (TOP: top_time ts f1)
+      (WF0: Mapping.wf f0)
+      (WF1: Mapping.wf f1)
+  :
+    top_time ts f0.
+Proof.
+  unfold top_time in *. i.
+  hexploit sim_timestamp_exact_mon_exists; eauto.
+  i. des. eapply TOP in SIM. eapply TimeFacts.le_lt_lt; eauto.
+Qed.
+
 Lemma map_future_memory_trans
       f0 f1 f2 mem0 mem1
       (MAP0: map_future_memory f0 f1 mem0)
@@ -3397,7 +3435,10 @@ Lemma map_future_memory_trans
 Proof.
   econs.
   { ii. destruct (classic (sim_timestamp_exact (f1 loc) (f1 loc).(Mapping.ver) ts_src ts_tgt)).
-    { exploit map_future_memory_undef; [eapply MAP1|..]; eauto. }
+    { exploit map_future_memory_undef; [eapply MAP1|..]; eauto.
+      i. des. esplits; eauto. eapply top_time_mon_map; eauto.
+      eapply map_future_memory_les; eauto.
+    }
     { exploit map_future_memory_undef; [eapply MAP0|..]; eauto. i. des.
       eapply Memory.future_weak_get1 in GET; eauto; ss.
       des. inv MSG_LE.
@@ -3421,29 +3462,6 @@ Proof.
   { ii. exfalso. eapply MAP1.
     eapply sim_timestamp_exact_mon_strong; eauto. }
   { eapply Mapping.les_strong_les; eauto. }
-Qed.
-
-Lemma sim_timestamp_exact_mon_exists
-      f0 f1 ts_src0 ts_tgt
-      (SIM: sim_timestamp_exact f0 f0.(Mapping.ver) ts_src0 ts_tgt)
-      (MAPLE: Mapping.le f0 f1)
-      (MAPWF0: Mapping.wf f0)
-      (MAPWF1: Mapping.wf f1)
-  :
-    exists ts_src1,
-      (<<SIM: sim_timestamp_exact f1 f1.(Mapping.ver) ts_src1 ts_tgt>>) /\
-      (<<TS: Time.le ts_src0 ts_src1>>).
-Proof.
-  hexploit sim_timestamp_exact_mon_ver.
-  { erewrite <- sim_timestamp_exact_mon_mapping; [eapply SIM|..].
-    { eauto. }
-    { eapply mapping_latest_wf_loc. }
-    { eapply MAPLE. }
-  }
-  { eapply MAPLE. }
-  { eauto. }
-  { eapply mapping_latest_wf_loc. }
-  i. des. esplits; eauto.
 Qed.
 
 
@@ -4613,8 +4631,10 @@ Proof.
   { econs.
     { ii. des_ifs. hexploit sim_memory_undef; eauto. i. des.
       eapply MLE in GET0. esplits; eauto.
-      eapply TOP in MAP0. eapply memory_get_ts_le in GET0.
-      etrans; eauto. left. auto.
+      { eapply TOP in MAP0. eapply memory_get_ts_le in GET0.
+        etrans; eauto. left. auto.
+      }
+      { eapply top_time_mon; eauto. eapply memory_get_ts_le; eauto. }
     }
     { ii. des_ifs. }
   }
