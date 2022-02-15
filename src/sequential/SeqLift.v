@@ -3347,7 +3347,6 @@ Variant map_future_memory
 | map_future_memory_intro
   (UNDEF: forall loc ts_src ts_tgt
                    (MAP0: sim_timestamp_exact (f0 loc) (f0 loc).(Mapping.ver) ts_src ts_tgt)
-                   (CLOSED: Mapping.closed (f0 loc) (f0 loc).(Mapping.ver) ts_src)
                    (MAP1: ~ sim_timestamp_exact (f1 loc) (f1 loc).(Mapping.ver) ts_src ts_tgt),
     exists from to,
       (<<GET: Memory.get loc to mem = Some (from, Message.undef)>>) /\
@@ -3367,7 +3366,6 @@ Lemma map_future_memory_undef f0 f1 mem
       (MAP: map_future_memory f0 f1 mem)
       loc ts_src ts_tgt
       (MAP0: sim_timestamp_exact (f0 loc) (f0 loc).(Mapping.ver) ts_src ts_tgt)
-      (CLOSED: Mapping.closed (f0 loc) (f0 loc).(Mapping.ver) ts_src)
       (MAP1: ~ sim_timestamp_exact (f1 loc) (f1 loc).(Mapping.ver) ts_src ts_tgt)
   :
   exists from to,
@@ -3399,16 +3397,7 @@ Lemma map_future_memory_trans
 Proof.
   econs.
   { ii. destruct (classic (sim_timestamp_exact (f1 loc) (f1 loc).(Mapping.ver) ts_src ts_tgt)).
-    { exploit map_future_memory_undef; [eapply MAP1|..]; eauto.
-      eapply sim_closed_mon_ver.
-      { erewrite <- sim_closed_mon_mapping; eauto.
-        { eapply mapping_latest_wf_loc. }
-        { eapply map_future_memory_les; eauto. }
-      }
-      { eapply map_future_memory_les; eauto. }
-      { eauto. }
-      { eapply mapping_latest_wf_loc. }
-    }
+    { exploit map_future_memory_undef; [eapply MAP1|..]; eauto. }
     { exploit map_future_memory_undef; [eapply MAP0|..]; eauto. i. des.
       eapply Memory.future_weak_get1 in GET; eauto; ss.
       des. inv MSG_LE.
