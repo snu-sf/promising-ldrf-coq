@@ -795,6 +795,7 @@ Lemma sim_thread_future
              (<<MAPWF: Mapping.wfs f2>>))
 .
 Proof.
+  pose proof mapping_latest_wf_loc as VERWF.
   destruct (classic (exists loc from0 to0 msg from1 to1,
                         (<<GET0: Memory.get loc to0 lc_src0.(Local.promises) = Some (from0, msg)>>) /\
                         (<<MSG: msg <> Message.reserve>>) /\
@@ -862,7 +863,18 @@ Proof.
           { eapply mapping_latest_wf_loc. }
         }
         { inv MSG0; ss. }
-        admit.
+        i. hexploit sim_promises_get_if; eauto. i. des.
+        { assert (SIMTS: sim_timestamp_exact (f1 loc) (f1 loc).(Mapping.ver) to_src to_tgt).
+          { eapply NNPP. ii.
+            hexploit map_future_memory_undef; eauto. i. des.
+            eapply UNDEF. esplits; eauto.
+            { inv MSG1; inv MSG0; ss. }
+            { eapply sim_memory_top_time_none; eauto. }
+          }
+          eapply sim_timestamp_exact_unique in TO; eauto. subst.
+          dup GET5. eapply LOCALTGT1 in GET5. rewrite GET5 in GET3. inv GET3. auto.
+        }
+        { admit. }
       }
     }
     { i. hexploit (CLOSEDFUTURE.(closed_future_cur).(closed_future_pln) loc).
@@ -875,7 +887,7 @@ Proof.
   { i. eapply UNDEF; eauto. esplits; eauto. }
   { eapply LOCALTGT1. }
   { eapply LOCALTGT1. }
-  { eapply LOCALSRC1. }
+  { eapply LOCALSRC0. }
   i. des.
   hexploit sim_promises_past_update; eauto.
   { eapply LOCALTGT1. }
@@ -920,5 +932,6 @@ Proof.
     { eapply space_future_memory_refl; eauto. }
     { refl. }
   }
+  { auto. }
   { auto. }
 Admitted.
