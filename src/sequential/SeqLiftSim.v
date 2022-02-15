@@ -1845,6 +1845,7 @@ Section LIFT.
         hexploit MAX; eauto. i. des. hexploit MAX0; eauto. i. des.
         eapply max_readable_inj in MAX1; eauto. des. subst. auto.
       }
+      { eapply versions_wf_mapping_mon; eauto. eapply Mapping.les_strong_les; eauto. }
     }
     { eapply sim_seq_interference_mon; eauto.
       ii. specialize (PERM1 loc). des.
@@ -1855,12 +1856,16 @@ Section LIFT.
       { rewrite AT; auto. refl. }
     }
     { inv SIM2. ss. }
-    { inv SIM2. ss. splits; auto. eapply sim_memory_sim_memory_interference; eauto. }
+    { inv SIM2. ss. splits; auto.
+      { eapply sim_memory_sim_memory_interference; eauto. }
+      { eapply versions_wf_mapping_mon; eauto. eapply Mapping.les_strong_les; eauto. }
+    }
     { ss. i. splits; auto; try refl.
+      { eapply Mapping.les_strong_les; eauto. }
       { hexploit Thread.rtc_tau_step_future; eauto. i. des; ss.
         eapply Memory.future_future_weak; eauto.
       }
-      { eapply map_future_memory_refl; eauto. }
+      { eapply map_future_memory_les_strong; eauto. }
     }
   Qed.
 

@@ -760,6 +760,7 @@ Lemma sim_thread_future
                    (<<VAL: Const.le val_old val>>)>>) /\
              (<<VALTGT: forall loc val (VAL: vs_tgt1 loc = Some val) (NA: loc_na loc), vs_tgt0 loc = Some val>>) /\
              (<<SPACE: space_future_memory (unchangable mem_tgt1 lc_tgt0.(Local.promises)) f1 mem_src1 f2 mem_src2>>) /\
+             (<<MAPLE: Mapping.les_strong f1 f2>>) /\
              (<<MAPWF: Mapping.wfs f2>>))
 .
 Proof.
