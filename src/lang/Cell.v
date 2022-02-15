@@ -1017,6 +1017,66 @@ Module Cell.
   Qed.
 
 
+  (* max_non_reserve_ts *)
+
+  Inductive max_non_reserve_ts (cell: t) (ts: Time.t): Prop :=
+  | max_non_reserve_ts_intro
+      (GET: exists from msg (RESERVE: msg <> Message.reserve),
+          get ts cell = Some (from, msg))
+      (MAX: forall to from' msg' (RESERVE: msg' <> Message.reserve)
+              (GET: get to cell = Some (from', msg')),
+          Time.le to ts)
+  .
+
+  Lemma max_non_reserve_ts_exists
+        cell
+        (INHABITED: get Time.bot cell = Some (Time.bot, Message.elt)):
+    exists ts, max_non_reserve_ts cell ts.
+  Proof.
+    destruct cell. unfold get in *. ss.
+    remember (DOMap.elements raw0) as l eqn:DOM.
+    exploit (max_concrete_ts_exists_aux
+               Time.bot (Time.bot, Message.elt) l
+               (fun (a: Time.t * Message.t) => match a with
+                                            | (_, Message.reserve) => false
+                                            | _ => true
+                                            end)).
+    { ss. }
+    { subst. eapply DOMap.elements_correct. auto. }
+    i. des. destruct max_a.
+    exists max_t. econs.
+    - subst. esplits; cycle 1.
+      + unfold get. ss. eapply DOMap.elements_complete. eauto.
+      + destruct t1; ss.
+    - i. unfold get in GET. ss.
+      apply DOMap.elements_correct in GET. subst.
+      eapply x2; eauto. destruct msg'; ss.
+  Qed.
+
+  Lemma max_non_reserve_ts_inj
+        cell ts1 ts2
+        (MAX1: max_non_reserve_ts cell ts1)
+        (MAX2: max_non_reserve_ts cell ts2):
+    ts1 = ts2.
+  Proof.
+    inv MAX1. inv MAX2. des.
+    apply MAX0 in GET; ss.
+    apply MAX in GET0; ss.
+    apply TimeFacts.antisym; auto.
+  Qed.
+
+  Lemma max_non_reserve_ts_spec
+        ts from msg cell mts
+        (MAX: max_non_reserve_ts cell mts)
+        (GET: get ts cell = Some (from, msg))
+        (RESERVE: msg <> Message.reserve):
+    <<GET: exists f m, get mts cell = Some (f, m) /\ m <> Message.reserve>> /\
+    <<MAX: Time.le ts mts>>.
+  Proof.
+    inv MAX. des. esplits; eauto.
+  Qed.
+
+
   (* next greater timestamp *)
 
   Fixpoint next (t: Time.t) (l: list Time.t) (res: option Time.t): option Time.t :=

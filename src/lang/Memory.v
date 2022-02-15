@@ -248,6 +248,45 @@ Module Memory.
     inv CLOSED; ss. apply closed_view_bot. ss.
   Qed.
 
+  Lemma le_closed_timemap
+        tm mem1 mem2
+        (LE: le mem1 mem2)
+        (CLOSED: Memory.closed_timemap tm mem1):
+    Memory.closed_timemap tm mem2.
+  Proof.
+    ii. exploit CLOSED; eauto. i. des.
+    esplits; eauto.
+  Qed.
+
+  Lemma le_closed_view
+        view mem1 mem2
+        (LE: le mem1 mem2)
+        (CLOSED: Memory.closed_view view mem1):
+    Memory.closed_view view mem2.
+  Proof.
+    inv CLOSED. econs; eauto using le_closed_timemap.
+  Qed.
+
+  Lemma le_closed_opt_view
+        view mem1 mem2
+        (LE: le mem1 mem2)
+        (CLOSED: Memory.closed_opt_view view mem1):
+    Memory.closed_opt_view view mem2.
+  Proof.
+    inv CLOSED; econs.
+    eapply le_closed_view; eauto.
+  Qed.
+
+  Lemma le_closed_message
+        msg mem1 mem2
+        (LE: le mem1 mem2)
+        (CLOSED: Memory.closed_message msg mem1):
+    Memory.closed_message msg mem2.
+  Proof.
+    inv CLOSED; econs.
+    eapply le_closed_opt_view; eauto.
+  Qed.
+
   Lemma init_closed: closed init.
   Proof.
     econs; i; ss.
@@ -2546,6 +2585,128 @@ Module Memory.
   Proof.
     inv MAX. inv VIEW.
     econs; eapply max_concrete_timemap_spec; eauto.
+  Qed.
+
+
+  (* Lemmas on max_non_reserve_timemap *)
+
+  Definition max_non_reserve_ts (mem: t) (loc: Loc.t) (ts: Time.t): Prop :=
+    Cell.max_non_reserve_ts (mem loc) ts.
+
+  Lemma max_non_reserve_ts_exists
+        mem loc
+        (INHABITED: inhabited mem):
+    exists ts, max_non_reserve_ts mem loc ts.
+  Proof.
+    eapply Cell.max_non_reserve_ts_exists. apply INHABITED.
+  Qed.
+
+  Lemma max_non_reserve_ts_inj
+        mem loc ts1 ts2
+        (MAX1: max_non_reserve_ts mem loc ts1)
+        (MAX2: max_non_reserve_ts mem loc ts2):
+    ts1 = ts2.
+  Proof.
+    eapply Cell.max_non_reserve_ts_inj; eauto.
+  Qed.
+
+  Lemma max_non_reserve_ts_spec
+        loc ts from msg mem mts
+        (MAX: max_non_reserve_ts mem loc mts)
+        (GET: get loc ts mem = Some (from, msg))
+        (RESERVE: msg <> Message.reserve):
+    <<GET: exists from msg', get loc mts mem = Some (from, msg') /\ msg' <> Message.reserve>> /\
+    <<MAX: Time.le ts mts>>.
+  Proof.
+    eapply Cell.max_non_reserve_ts_spec; eauto.
+  Qed.
+
+  Lemma max_non_reserve_ts_spec2
+        tm mem loc mts
+        (MAX: max_non_reserve_ts mem loc mts)
+        (CLOSED: closed_timemap tm mem):
+    Time.le (tm loc) mts.
+  Proof.
+    exploit CLOSED. i. des.
+    eapply max_non_reserve_ts_spec; eauto. ss.
+  Qed.
+
+  Definition max_non_reserve_timemap (mem: t) (tm: TimeMap.t): Prop :=
+    forall loc, max_non_reserve_ts mem loc (tm loc).
+
+  Lemma max_non_reserve_timemap_exists
+        mem
+        (INHABITED: inhabited mem):
+    exists tm, max_non_reserve_timemap mem tm.
+  Proof.
+    apply choice. i. apply max_non_reserve_ts_exists. auto.
+  Qed.
+
+  Lemma max_non_reserve_timemap_inj
+        mem tm1 tm2
+        (MAX1: max_non_reserve_timemap mem tm1)
+        (MAX2: max_non_reserve_timemap mem tm2):
+    tm1 = tm2.
+  Proof.
+    extensionality l.
+    specialize (MAX1 l). specialize (MAX2 l).
+    eapply max_non_reserve_ts_inj; eauto.
+  Qed.
+
+  Lemma max_non_reserve_timemap_spec
+        tm mem mtm
+        (MAX: max_non_reserve_timemap mem mtm)
+        (TIMEMAP: closed_timemap tm mem):
+    TimeMap.le tm mtm.
+  Proof.
+    ii. specialize (MAX loc). specialize (TIMEMAP loc).
+    des. eapply max_non_reserve_ts_spec; eauto. ss.
+  Qed.
+
+  Inductive max_non_reserve_view (mem: t): forall (view: View.t), Prop :=
+  | max_non_reserve_view_intro
+      tm
+      (MAX: max_non_reserve_timemap mem tm):
+      max_non_reserve_view mem (View.mk tm tm)
+  .
+  Hint Constructors max_non_reserve_view.
+
+  Lemma max_non_reserve_view_exists
+        mem
+        (INHABITED: inhabited mem):
+    exists view, max_non_reserve_view mem view.
+  Proof.
+    exploit max_non_reserve_timemap_exists; eauto. i. des.
+    esplits. econs; eauto.
+  Qed.
+
+  Lemma max_non_reserve_view_inj
+        mem view1 view2
+        (MAX1: max_non_reserve_view mem view1)
+        (MAX2: max_non_reserve_view mem view2):
+    view1 = view2.
+  Proof.
+    inv MAX1. inv MAX2.
+    exploit max_non_reserve_timemap_inj; [exact MAX|exact MAX0|..].
+    i. subst. refl.
+  Qed.
+
+  Lemma max_non_reserve_view_wf
+        mem view
+        (MAX: max_non_reserve_view mem view):
+    View.wf view.
+  Proof.
+    inv MAX. econs. refl.
+  Qed.
+
+  Lemma max_non_reserve_view_spec
+        view mem mview
+        (MAX: max_non_reserve_view mem mview)
+        (VIEW: closed_view view mem):
+    View.le view mview.
+  Proof.
+    inv MAX. inv VIEW.
+    econs; eapply max_non_reserve_timemap_spec; eauto.
   Qed.
 
 

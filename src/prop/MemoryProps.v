@@ -3064,10 +3064,11 @@ Section CONCRETELE.
     concrete_promised mem0 <2= concrete_promised mem1.
 
   Definition concrete_messages_le (mem0 mem1: Memory.t): Prop :=
-    forall loc to from0 val released
-           (GET0: Memory.get loc to mem0 = Some (from0, Message.concrete val released)),
+    forall loc to from0 msg
+      (GET0: Memory.get loc to mem0 = Some (from0, msg))
+      (RESERVE: msg <> Message.reserve),
     exists from1,
-      (<<GET1: Memory.get loc to mem1 = Some (from1, Message.concrete val released)>>).
+      (<<GET1: Memory.get loc to mem1 = Some (from1, msg)>>).
 
   Global Program Instance concrete_promised_le_PreOrder: PreOrder concrete_promised_le.
   Next Obligation.

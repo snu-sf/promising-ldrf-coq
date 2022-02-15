@@ -426,19 +426,20 @@ Section CAPFLEX.
 
   Lemma cap_flex_map_ident_concrete maxmap max tm0 tm1 times f mem0
         (MAP: cap_flex_map max tm0 tm1 times f)
-        (MAXMAP: Memory.max_concrete_timemap mem0 maxmap)
+        (MAXMAP: Memory.max_non_reserve_timemap mem0 maxmap)
         (MAX: TimeMap.le maxmap max)
     :
       map_ident_concrete f mem0.
   Proof.
-    ii. inv CONCRETE. eapply Memory.max_concrete_ts_spec in GET; eauto.
+    ii. inv CONCRETE.
+    eapply Memory.max_non_reserve_ts_spec in GET; eauto; ss.
     des. eapply MAP; eauto.
   Qed.
 
   Lemma concrete_messages_le_cap_flex_memory_map
         mem0 mem1 maxmap max tm0 tm1 cap0 cap1 times f
         (CONCRETE: concrete_messages_le mem0 mem1)
-        (MAXMAP: Memory.max_concrete_timemap mem0 maxmap)
+        (MAXMAP: Memory.max_non_reserve_timemap mem0 maxmap)
         (MAX: TimeMap.le maxmap max)
         (TM0: forall loc, Time.lt (Memory.max_ts loc mem0) (tm0 loc))
         (TM1: forall loc, Time.lt (Memory.max_ts loc mem1) (tm1 loc))
@@ -450,15 +451,13 @@ Section CAPFLEX.
     :
       memory_map f cap0 cap1.
   Proof.
-    assert (IDENT: map_ident_concrete f mem0).
-    { ii. inv CONCRETE0. eapply Memory.max_concrete_ts_spec in GET; eauto.
-      des. eapply MAP; eauto. }
+    hexploit cap_flex_map_ident_concrete; try exact MAP; eauto. i.
     econs.
     { i. eapply (@cap_flex_inv mem0 cap0 tm0) in GET; eauto. des; eauto.
       destruct (classic (msg = Message.reserve)); auto. right.
       exploit CONCRETE; eauto. i. des. esplits.
       { eapply cap_flex_map_ident; eauto. transitivity (maxmap loc); auto.
-        eapply Memory.max_concrete_ts_spec; eauto. }
+        eapply Memory.max_non_reserve_ts_spec; eauto. }
       { eapply map_ident_concrete_closed_message; eauto.
         eapply MEM0 in GET. des; auto. }
       { refl. }
@@ -469,7 +468,7 @@ Section CAPFLEX.
       { eapply Time.bot_spec. }
       { hexploit (@cap_flex_max_ts mem1 cap1 tm1); eauto.
         i. eapply Memory.max_ts_spec in GET. des.
-        erewrite H in MAX0. etrans; eauto. }
+        erewrite H0 in MAX0. etrans; eauto. }
       { eapply (cap_flex_map_map_bot MAP). }
       { i. eapply cap_flex_covered; eauto. }
     }
@@ -485,12 +484,10 @@ Section CAPFLEX.
     dup CLOSED. inv CLOSED. econs.
     { i. eapply cap_flex_inv in MSG; eauto. des; subst.
       { exploit CLOSED1; eauto. i. des. splits; auto.
-        eapply concrete_promised_le_closed_message; eauto.
-        eapply concrete_messages_le_concrete_promised_le; eauto.
-        eapply memory_le_concrete_messages_le; eauto.
-        eapply cap_flex_le; eauto. }
-      { esplits; eauto. econs. }
-      { esplits; eauto. econs. }
+        eapply Memory.le_closed_message; try apply CAP; eauto.
+      }
+      { esplits; eauto. }
+      { esplits; eauto. }
     }
     { ii. specialize (INHABITED loc).
       eapply cap_flex_le in INHABITED; eauto.
@@ -559,7 +556,7 @@ Section CAPFLEX.
       memory_map ident_map cap mem1.
   Proof.
     econs.
-    { i. destruct msg as [val released|]; auto. right.
+    { i. destruct (classic (msg = Message.reserve)); auto. right.
       eapply cap_flex_inv in GET; eauto. des; clarify.
       eapply Memory.future_weak_get1 in GET; eauto. des.
       esplits; eauto; ss. eapply ident_map_message. }
