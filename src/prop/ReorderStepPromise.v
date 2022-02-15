@@ -274,21 +274,21 @@ Proof.
 Qed.
 
 Lemma reorder_is_racy_promise
-      loc1 ord1
+      loc1 to1 ord1
       loc2 from2 to2 msg2 kind2
       lc0 mem0
       lc2 mem2
       (WF0: Local.wf lc0 mem0)
       (MEM0: Memory.closed mem0)
-      (STEP1: Local.is_racy lc0 mem0 loc1 ord1)
+      (STEP1: Local.is_racy lc0 mem0 loc1 to1 ord1)
       (STEP2: Local.promise_step lc0 mem0 loc2 from2 to2 msg2 lc2 mem2 kind2):
-  <<STEP: Local.is_racy lc2 mem2 loc1 ord1>>.
+  <<STEP: Local.is_racy lc2 mem2 loc1 to1 ord1>>.
 Proof.
   inv STEP1. inv STEP2.
   exploit Memory.promise_future; try exact PROMISE; try apply WF0; eauto. i. des.
   exploit Memory.future_get1; eauto. i. des.
   econs; eauto; ss.
-  - destruct (Memory.get loc1 to promises2) as [[]|] eqn:X; ss.
+  - destruct (Memory.get loc1 to1 promises2) as [[]|] eqn:X; ss.
     revert X. inv PROMISE; ss.
     + erewrite Memory.add_o; eauto. condtac; ss; try congr.
       i. des. inv X.
@@ -307,47 +307,47 @@ Proof.
 Qed.
 
 Lemma reorder_racy_read_promise
-      loc1 val1 ord1
+      loc1 to1 val1 ord1
       loc2 from2 to2 msg2 kind2
       lc0 mem0
       lc2 mem2
       (WF0: Local.wf lc0 mem0)
       (MEM0: Memory.closed mem0)
-      (STEP1: Local.racy_read_step lc0 mem0 loc1 val1 ord1)
+      (STEP1: Local.racy_read_step lc0 mem0 loc1 to1 val1 ord1)
       (STEP2: Local.promise_step lc0 mem0 loc2 from2 to2 msg2 lc2 mem2 kind2):
-  <<STEP: Local.racy_read_step lc2 mem2 loc1 val1 ord1>>.
+  <<STEP: Local.racy_read_step lc2 mem2 loc1 to1 val1 ord1>>.
 Proof.
   inv STEP1.
   exploit reorder_is_racy_promise; eauto.
 Qed.
 
 Lemma reorder_racy_write_promise
-      loc1 ord1
+      loc1 to1 ord1
       loc2 from2 to2 msg2 kind2
       lc0 mem0
       lc2 mem2
       (WF0: Local.wf lc0 mem0)
       (MEM0: Memory.closed mem0)
-      (STEP1: Local.racy_write_step lc0 mem0 loc1 ord1)
+      (STEP1: Local.racy_write_step lc0 mem0 loc1 to1 ord1)
       (STEP2: Local.promise_step lc0 mem0 loc2 from2 to2 msg2 lc2 mem2 kind2)
       (CONS: Local.promise_consistent lc2):
-  <<STEP: Local.racy_write_step lc2 mem2 loc1 ord1>>.
+  <<STEP: Local.racy_write_step lc2 mem2 loc1 to1 ord1>>.
 Proof.
   inv STEP1.
   exploit reorder_is_racy_promise; eauto.
 Qed.
 
 Lemma reorder_racy_update_promise
-      loc1 ord1
+      loc1 to1 ord1
       loc2 from2 to2 msg2 kind2
       lc0 mem0
       lc2 mem2
       (WF0: Local.wf lc0 mem0)
       (MEM0: Memory.closed mem0)
-      (STEP1: Local.racy_write_step lc0 mem0 loc1 ord1)
+      (STEP1: Local.racy_write_step lc0 mem0 loc1 to1 ord1)
       (STEP2: Local.promise_step lc0 mem0 loc2 from2 to2 msg2 lc2 mem2 kind2)
       (CONS: Local.promise_consistent lc2):
-  <<STEP: Local.racy_write_step lc2 mem2 loc1 ord1>>.
+  <<STEP: Local.racy_write_step lc2 mem2 loc1 to1 ord1>>.
 Proof.
   inv STEP1; eauto.
   exploit reorder_is_racy_promise; eauto.

@@ -162,11 +162,11 @@ Qed.
 Lemma reorder_is_racy_cancel
       lc1 mem1
       lc2 mem2
-      loc2 ord2
+      loc2 to2 ord2
       loc1 from1 to1 msg1
-      (RACY: Local.is_racy lc1 mem1 loc2 ord2)
+      (RACY: Local.is_racy lc1 mem1 loc2 to2 ord2)
       (STEP: Local.promise_step lc1 mem1 loc1 from1 to1 msg1 lc2 mem2 Memory.op_kind_cancel):
-  (<<RACY: Local.is_racy lc2 mem2 loc2 ord2>>).
+  (<<RACY: Local.is_racy lc2 mem2 loc2 to2 ord2>>).
 Proof.
   inv RACY. inv STEP. inv PROMISE.
   exploit Memory.remove_get1; try exact GET; eauto. i. des.
@@ -180,11 +180,11 @@ Qed.
 Lemma reorder_racy_read_cancel
       lc1 mem1
       lc2 mem2
-      loc2 val2 ord2
+      loc2 to2 val2 ord2
       loc1 from1 to1 msg1
-      (STEP1: Local.racy_read_step lc1 mem1 loc2 val2 ord2)
+      (STEP1: Local.racy_read_step lc1 mem1 loc2 to2 val2 ord2)
       (STEP2: Local.promise_step lc1 mem1 loc1 from1 to1 msg1 lc2 mem2 Memory.op_kind_cancel):
-  (<<STEP2: Local.racy_read_step lc2 mem2 loc2 val2 ord2>>).
+  (<<STEP2: Local.racy_read_step lc2 mem2 loc2 to2 val2 ord2>>).
 Proof.
   inv STEP1. econs.
   eapply reorder_is_racy_cancel; eauto.
@@ -193,11 +193,11 @@ Qed.
 Lemma reorder_racy_write_cancel
       lc1 mem1
       lc2 mem2
-      loc2 ord2
+      loc2 to2 ord2
       loc1 from1 to1 msg1
-      (STEP1: Local.racy_write_step lc1 mem1 loc2 ord2)
+      (STEP1: Local.racy_write_step lc1 mem1 loc2 to2 ord2)
       (STEP2: Local.promise_step lc1 mem1 loc1 from1 to1 msg1 lc2 mem2 Memory.op_kind_cancel):
-  (<<STEP2: Local.racy_write_step lc2 mem2 loc2 ord2>>).
+  (<<STEP2: Local.racy_write_step lc2 mem2 loc2 to2 ord2>>).
 Proof.
   inv STEP1. econs.
   - eapply reorder_is_racy_cancel; eauto.
@@ -207,11 +207,11 @@ Qed.
 Lemma reorder_racy_update_cancel
       lc1 mem1
       lc2 mem2
-      loc2 ordr2 ordw2
+      loc2 to2 ordr2 ordw2
       loc1 from1 to1 msg1
-      (STEP1: Local.racy_update_step lc1 mem1 loc2 ordr2 ordw2)
+      (STEP1: Local.racy_update_step lc1 mem1 loc2 to2 ordr2 ordw2)
       (STEP2: Local.promise_step lc1 mem1 loc1 from1 to1 msg1 lc2 mem2 Memory.op_kind_cancel):
-  (<<STEP2: Local.racy_update_step lc2 mem2 loc2 ordr2 ordw2>>).
+  (<<STEP2: Local.racy_update_step lc2 mem2 loc2 to2 ordr2 ordw2>>).
 Proof.
   inv STEP1.
   - econs 1; eauto.

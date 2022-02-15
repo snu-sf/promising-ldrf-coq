@@ -35,9 +35,9 @@ Module ThreadEvent.
   | fence (ordr ordw:Ordering.t)
   | syscall (e:Event.t)
   | failure
-  | racy_read (loc:Loc.t) (val:Const.t) (ord:Ordering.t)
-  | racy_write (loc:Loc.t) (val:Const.t) (ord:Ordering.t)
-  | racy_update (loc:Loc.t) (valr valw:Const.t) (ordr ordw:Ordering.t)
+  | racy_read (loc:Loc.t) (to:Time.t) (val:Const.t) (ord:Ordering.t)
+  | racy_write (loc:Loc.t) (to:Time.t) (val:Const.t) (ord:Ordering.t)
+  | racy_update (loc:Loc.t) (to:Time.t) (valr valw:Const.t) (ordr ordw:Ordering.t)
   .
   Hint Constructors t.
 
@@ -58,17 +58,17 @@ Module ThreadEvent.
     | fence ordr ordw => ProgramEvent.fence ordr ordw
     | syscall ev => ProgramEvent.syscall ev
     | failure => ProgramEvent.failure
-    | racy_read loc val ord => ProgramEvent.read loc val ord
-    | racy_write loc val ord => ProgramEvent.write loc val ord
-    | racy_update loc valr valw ordr ordw => ProgramEvent.update loc valr valw ordr ordw
+    | racy_read loc _ val ord => ProgramEvent.read loc val ord
+    | racy_write loc _ val ord => ProgramEvent.write loc val ord
+    | racy_update loc _ valr valw ordr ordw => ProgramEvent.update loc valr valw ordr ordw
     end.
 
   Definition get_machine_event (e: t): MachineEvent.t :=
     match e with
     | syscall e => MachineEvent.syscall e
     | failure
-    | racy_write _ _ _
-    | racy_update _ _ _ _ _ => MachineEvent.failure
+    | racy_write _ _ _ _
+    | racy_update _ _ _ _ _ _ => MachineEvent.failure
     | _ => MachineEvent.silent
     end.
 
@@ -108,9 +108,9 @@ Module ThreadEvent.
     | write loc _ _ _ _ _
     | write_na loc _ _ _ _ _
     | update loc _ _ _ _ _ _ _ _
-    | racy_read loc _ _
-    | racy_write loc _ _
-    | racy_update loc _ _ _ _ => loc = l
+    | racy_read loc _ _ _
+    | racy_write loc _ _ _
+    | racy_update loc _ _ _ _ _ => loc = l
     | _ => False
     end.
 
@@ -303,9 +303,9 @@ Module Local.
   .
   Hint Constructors failure_step.
 
-  Inductive is_racy (lc1:t) (mem1:Memory.t) (loc:Loc.t) (ord:Ordering.t): Prop :=
+  Inductive is_racy (lc1:t) (mem1:Memory.t) (loc:Loc.t) (to:Time.t) (ord:Ordering.t): Prop :=
   | is_racy_intro
-      from to msg
+      from msg
       (GET: Memory.get loc to mem1 = Some (from, msg))
       (GETP: Memory.get loc to lc1.(promises) = None)
       (RACE: TView.racy_view lc1.(tview).(TView.cur) loc to)
@@ -314,29 +314,36 @@ Module Local.
   .
   Hint Constructors is_racy.
 
-  Inductive racy_read_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (val:Const.t) (ord:Ordering.t): Prop :=
+  Inductive racy_read_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (to:Time.t) (val:Const.t) (ord:Ordering.t): Prop :=
   | racy_read_step_intro
-      (RACE: is_racy lc1 mem1 loc ord)
+      (RACE: is_racy lc1 mem1 loc to ord)
   .
   Hint Constructors racy_read_step.
 
-  Inductive racy_write_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (ord:Ordering.t): Prop :=
+  Inductive racy_write_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (to:Time.t) (ord:Ordering.t): Prop :=
   | racy_write_step_intro
-      (RACE: is_racy lc1 mem1 loc ord)
+      (RACE: is_racy lc1 mem1 loc to ord)
       (CONSISTENT: promise_consistent lc1)
   .
   Hint Constructors racy_write_step.
 
-  Inductive racy_update_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (ordr ordw:Ordering.t): Prop :=
+  Inductive racy_update_step (lc1:t) (mem1:Memory.t) (loc:Loc.t):
+    forall (to:Time.t) (ordr ordw:Ordering.t), Prop :=
   | racy_update_step_ordr
+      ordr ordw
       (ORDR: Ordering.le ordr Ordering.na)
-      (CONSISTENT: promise_consistent lc1)
+      (CONSISTENT: promise_consistent lc1):
+      racy_update_step lc1 mem1 loc Time.bot ordr ordw
   | racy_update_step_ordw
+      ordr ordw
       (ORDW: Ordering.le ordw Ordering.na)
-      (CONSISTENT: promise_consistent lc1)
-  | racy_update_step_intro
-      (RACE: is_racy lc1 mem1 loc ordr)
-      (CONSISTENT: promise_consistent lc1)
+      (CONSISTENT: promise_consistent lc1):
+      racy_update_step lc1 mem1 loc Time.bot ordr ordw
+  | racy_update_step_race
+      to ordr ordw
+      (RACE: is_racy lc1 mem1 loc to ordr)
+      (CONSISTENT: promise_consistent lc1):
+      racy_update_step lc1 mem1 loc to ordr ordw
   .
   Hint Constructors racy_update_step.
 
@@ -386,19 +393,19 @@ Module Local.
       program_step (ThreadEvent.write_na loc msgs from to val ord) lc1 sc1 mem1 lc2 sc2 mem2
   | step_racy_read
       lc1 sc1 mem1
-      loc val ord
-      (LOCAL: racy_read_step lc1 mem1 loc val ord):
-      program_step (ThreadEvent.racy_read loc val ord) lc1 sc1 mem1 lc1 sc1 mem1
+      loc to val ord
+      (LOCAL: racy_read_step lc1 mem1 loc to val ord):
+      program_step (ThreadEvent.racy_read loc to val ord) lc1 sc1 mem1 lc1 sc1 mem1
   | step_racy_write
       lc1 sc1 mem1
-      loc val ord
-      (LOCAL: racy_write_step lc1 mem1 loc ord):
-      program_step (ThreadEvent.racy_write loc val ord) lc1 sc1 mem1 lc1 sc1 mem1
+      loc to val ord
+      (LOCAL: racy_write_step lc1 mem1 loc to ord):
+      program_step (ThreadEvent.racy_write loc to val ord) lc1 sc1 mem1 lc1 sc1 mem1
   | step_racy_update
       lc1 sc1 mem1
-      loc valr valw ordr ordw
-      (LOCAL: racy_update_step lc1 mem1 loc ordr ordw):
-      program_step (ThreadEvent.racy_update loc valr valw ordr ordw) lc1 sc1 mem1 lc1 sc1 mem1
+      loc to valr valw ordr ordw
+      (LOCAL: racy_update_step lc1 mem1 loc to ordr ordw):
+      program_step (ThreadEvent.racy_update loc to valr valw ordr ordw) lc1 sc1 mem1 lc1 sc1 mem1
   .
   Hint Constructors program_step.
 

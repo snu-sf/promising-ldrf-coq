@@ -1070,23 +1070,23 @@ Module JSim.
         ThreadEvent.failure
         ThreadEvent.failure
   | sim_event_racy_read
-      loc val ord
+      loc to val ord
     :
       sim_event
-        (ThreadEvent.racy_read loc val ord)
-        (ThreadEvent.racy_read loc val ord)
+        (ThreadEvent.racy_read loc to val ord)
+        (ThreadEvent.racy_read loc to val ord)
   | sim_event_racy_write
-      loc val ord
+      loc to val ord
     :
       sim_event
-        (ThreadEvent.racy_write loc val ord)
-        (ThreadEvent.racy_write loc val ord)
+        (ThreadEvent.racy_write loc to val ord)
+        (ThreadEvent.racy_write loc to val ord)
   | sim_event_racy_update
-      loc valr valw ordr ordw
+      loc to valr valw ordr ordw
     :
       sim_event
-        (ThreadEvent.racy_update loc valr valw ordr ordw)
-        (ThreadEvent.racy_update loc valr valw ordr ordw)
+        (ThreadEvent.racy_update loc to valr valw ordr ordw)
+        (ThreadEvent.racy_update loc to valr valw ordr ordw)
   .
   Hint Constructors sim_event.
 
@@ -1272,8 +1272,8 @@ Module JSim.
         views
         lc1_src mem1_src
         lc1_tgt mem1_tgt
-        loc ord_src ord_tgt
-        (STEP_TGT: Local.is_racy lc1_tgt mem1_tgt loc ord_tgt)
+        loc to ord_src ord_tgt
+        (STEP_TGT: Local.is_racy lc1_tgt mem1_tgt loc to ord_tgt)
         (LOCAL1: sim_local views lc1_src lc1_tgt)
         (MEM1: sim_memory mem1_src mem1_tgt)
         (WF1_SRC: Local.wf lc1_src mem1_src)
@@ -1284,7 +1284,7 @@ Module JSim.
         (REL: joined_released views (Local.promises lc1_src) (TView.rel (Local.tview lc1_src)))
         (ORD: Ordering.le ord_src ord_tgt)
     :
-      Local.is_racy lc1_src mem1_src loc ord_src
+      Local.is_racy lc1_src mem1_src loc to ord_src
   .
   Proof.
     inv LOCAL1. inv STEP_TGT.
@@ -1300,8 +1300,8 @@ Module JSim.
         views
         lc1_src mem1_src
         lc1_tgt mem1_tgt
-        loc val ord_src ord_tgt
-        (STEP_TGT: Local.racy_read_step lc1_tgt mem1_tgt loc val ord_tgt)
+        loc to val ord_src ord_tgt
+        (STEP_TGT: Local.racy_read_step lc1_tgt mem1_tgt loc to val ord_tgt)
         (LOCAL1: sim_local views lc1_src lc1_tgt)
         (MEM1: sim_memory mem1_src mem1_tgt)
         (WF1_SRC: Local.wf lc1_src mem1_src)
@@ -1312,7 +1312,7 @@ Module JSim.
         (REL: joined_released views (Local.promises lc1_src) (TView.rel (Local.tview lc1_src)))
         (ORD: Ordering.le ord_src ord_tgt)
     :
-      Local.racy_read_step lc1_src mem1_src loc val ord_src
+      Local.racy_read_step lc1_src mem1_src loc to val ord_src
   .
   Proof.
     inv LOCAL1. inv STEP_TGT. econs; eauto. eapply sim_local_is_racy; eauto.
@@ -1414,8 +1414,8 @@ Module JSim.
         views
         lc1_src mem1_src
         lc1_tgt mem1_tgt
-        loc ord_src ord_tgt
-        (STEP_TGT: Local.racy_write_step lc1_tgt mem1_tgt loc ord_tgt)
+        loc to ord_src ord_tgt
+        (STEP_TGT: Local.racy_write_step lc1_tgt mem1_tgt loc to ord_tgt)
         (LOCAL1: sim_local views lc1_src lc1_tgt)
         (MEM1: sim_memory mem1_src mem1_tgt)
         (WF1_SRC: Local.wf lc1_src mem1_src)
@@ -1426,7 +1426,7 @@ Module JSim.
         (REL: joined_released views (Local.promises lc1_src) (TView.rel (Local.tview lc1_src)))
         (ORD: Ordering.le ord_src ord_tgt)
     :
-      Local.racy_write_step lc1_src mem1_src loc ord_src
+      Local.racy_write_step lc1_src mem1_src loc to ord_src
   .
   Proof.
     inv LOCAL1. inv STEP_TGT. econs; eauto.
@@ -1438,8 +1438,8 @@ Module JSim.
         views
         lc1_src mem1_src
         lc1_tgt mem1_tgt
-        loc ordr_src ordw_src ordr_tgt ordw_tgt
-        (STEP_TGT: Local.racy_update_step lc1_tgt mem1_tgt loc ordr_tgt ordw_tgt)
+        loc to ordr_src ordw_src ordr_tgt ordw_tgt
+        (STEP_TGT: Local.racy_update_step lc1_tgt mem1_tgt loc to ordr_tgt ordw_tgt)
         (LOCAL1: sim_local views lc1_src lc1_tgt)
         (MEM1: sim_memory mem1_src mem1_tgt)
         (WF1_SRC: Local.wf lc1_src mem1_src)
@@ -1451,7 +1451,7 @@ Module JSim.
         (ORDR: Ordering.le ordr_src ordr_tgt)
         (ORDW: Ordering.le ordw_src ordw_tgt)
     :
-      Local.racy_update_step lc1_src mem1_src loc ordr_src ordw_src
+      Local.racy_update_step lc1_src mem1_src loc to ordr_src ordw_src
   .
   Proof.
     inv LOCAL1. inv STEP_TGT.
@@ -3014,7 +3014,7 @@ Module JSim.
 
       + hexploit sim_local_racy_read; eauto.
         { refl. }
-        i. eexists (ThreadEvent.racy_read _ _ _). esplits.
+        i. eexists (ThreadEvent.racy_read _ _ _ _). esplits.
         * econs.
           { econs 2; eauto. }
           { ss. }
@@ -3027,7 +3027,7 @@ Module JSim.
 
       + hexploit sim_local_racy_write; eauto.
         { refl. }
-        i. eexists (ThreadEvent.racy_write _ _ _). esplits.
+        i. eexists (ThreadEvent.racy_write _ _ _ _). esplits.
         * econs.
           { econs 2; eauto. }
           { ss. }
@@ -3041,7 +3041,7 @@ Module JSim.
       + hexploit sim_local_racy_update; eauto.
         { refl. }
         { refl. }
-        i. eexists (ThreadEvent.racy_update _ _ _ _ _). esplits.
+        i. eexists (ThreadEvent.racy_update _ _ _ _ _ _). esplits.
         * econs.
           { econs 2; eauto. }
           { ss. }

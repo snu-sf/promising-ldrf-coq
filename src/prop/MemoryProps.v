@@ -2032,8 +2032,9 @@ Section PROMISED.
 
   Inductive concrete_promised (mem: Memory.t) (loc: Loc.t) (to: Time.t) : Prop :=
   | concrete_promised_intro
-      from val released
-      (GET: Memory.get loc to mem = Some (from, Message.concrete val released))
+      from msg
+      (GET: Memory.get loc to mem = Some (from, msg))
+      (RESERVE: msg <> Message.reserve)
   .
 
   Inductive concrete_covered (prom mem: Memory.t) (loc: Loc.t) (to: Time.t): Prop :=
@@ -2065,7 +2066,7 @@ Section PROMISED.
       exploit Memory.split_get1; eauto. i. des.
       econs; eauto.
     - ii. inv PR.
-      exploit Memory.lower_get1; eauto. i. des. inv MSG_LE. econs; eauto.
+      exploit Memory.lower_get1; eauto. i. des. inv MSG_LE; econs; eauto; ss.
     - ii. inv PR. econs; eauto.
       erewrite Memory.remove_o; eauto. des_ifs; eauto.
       eapply Memory.remove_get0 in MEM. ss; des; clarify.
@@ -2141,7 +2142,7 @@ Section PROMISED.
   Proof.
     ii. inv PR. eapply FUTURE in GET; ss. des.
     { subst. econs; eauto. }
-    { inv GET3. econs; eauto. }
+    { inv GET3; econs; eauto; ss. }
   Qed.
 
 End PROMISED.
@@ -2237,7 +2238,7 @@ Section PROMISEFREE.
     - inv STEP0. ss. inv LOCAL. ss. inv PROMISE; clarify.
       + inv PR. erewrite Memory.lower_o in GET; eauto. des_ifs.
         * ss; des. clarify. eapply Memory.lower_get0 in PROMISES.
-          des. inv MSG_LE; ss. econs; eauto.
+          des. inv MSG_LE; econs; eauto; ss.
         * econs; eauto.
       + inv PR. erewrite Memory.remove_o in GET; eauto. des_ifs.
         econs; eauto.
@@ -3428,19 +3429,17 @@ Section PROMISED.
       concrete_promised mem2 =
       fun loc' =>
         if (Loc.eq_dec loc' loc)
-        then fun ts' => if (Time.eq_dec ts' to) then (exists val released, msg = Message.concrete val released) else concrete_promised mem1 loc' ts'
+        then fun ts' => if (Time.eq_dec ts' to)
+                     then msg <> Message.reserve
+                     else concrete_promised mem1 loc' ts'
         else concrete_promised mem1 loc'.
   Proof.
     extensionality loc'. extensionality ts'.
     apply Coq.Logic.PropExtensionality.propositional_extensionality.
     split; i.
     - inv H. erewrite Memory.add_o in GET; eauto.
-      des_ifs.
-      + ss. des; clarify. eauto.
-      + ss. des; clarify.
-      + ss. des; clarify.
-      + ss. des; clarify. econs; eauto.
-      + ss. des; clarify.
+      des_ifs; ss; try by (des; clarify).
+      + econs; eauto.
       + econs; eauto.
     - des_ifs.
       + des. clarify. econs; eauto. eapply Memory.add_get0; eauto.
@@ -3476,10 +3475,10 @@ Section PROMISED.
     - inv H. erewrite Memory.lower_o in GET; eauto. des_ifs.
       + ss. des; clarify.
         exploit lower_succeed_wf; eauto. i. des.
-        inv MSG_LE. econs; eauto.
+        inv MSG_LE; econs; eauto; ss.
       + econs; eauto.
     - inv H. eapply Memory.lower_get1 in GET; eauto.
-      des. inv MSG_LE; ss. econs; eauto.
+      des. inv MSG_LE; econs; eauto; ss.
   Qed.
 
   Lemma promised_split mem1 loc ts1 ts2 ts3 msg2 msg3 mem2
@@ -3513,7 +3512,9 @@ Section PROMISED.
       concrete_promised mem2 =
       fun loc' =>
         if (Loc.eq_dec loc' loc)
-        then fun ts' => if (Time.eq_dec ts' ts2) then (exists val released, msg2 = Message.concrete val released) else concrete_promised mem1 loc' ts'
+        then fun ts' => if (Time.eq_dec ts' ts2)
+                     then (msg2 <> Message.reserve)
+                     else concrete_promised mem1 loc' ts'
         else concrete_promised mem1 loc'.
   Proof.
     extensionality loc'. extensionality ts'.
@@ -3521,7 +3522,6 @@ Section PROMISED.
     split; i.
     - inv H. erewrite Memory.split_o in GET; eauto.
       des_ifs; try by (des; ss; clarify).
-      + eauto.
       + ss. des; clarify. econs; eauto. eapply (Memory.split_get0 SPLIT); eauto.
       + econs; eauto.
       + econs; eauto.
@@ -4110,30 +4110,30 @@ Section SEMICLOSED.
     - eapply join_singleton_semi_closed_timemap; eauto.
   Qed.
 
-  Lemma concrete_promised_le_semi_closed_timemap tm mem0 mem1 loc to
-        (CLOSED: semi_closed_timemap tm mem0 loc to)
-        (CONCRETE: concrete_promised_le mem0 mem1)
-    :
-      semi_closed_timemap tm mem1 loc to.
-  Proof.
-    ii. specialize (CLOSED l). des.
-    { exploit CONCRETE.
-      { econs; eauto. }
-      i. inv x. left. eauto.
-    }
-    { clarify. auto. }
-  Qed.
+  (* Lemma concrete_promised_le_semi_closed_timemap tm mem0 mem1 loc to *)
+  (*       (CLOSED: semi_closed_timemap tm mem0 loc to) *)
+  (*       (CONCRETE: concrete_promised_le mem0 mem1) *)
+  (*   : *)
+  (*     semi_closed_timemap tm mem1 loc to. *)
+  (* Proof. *)
+  (*   ii. specialize (CLOSED l). des. *)
+  (*   { exploit CONCRETE. *)
+  (*     { econs; eauto. } *)
+  (*     i. inv x. left. eauto. *)
+  (*   } *)
+  (*   { clarify. auto. } *)
+  (* Qed. *)
 
-  Lemma concrete_promised_le_semi_closed_view vw mem0 mem1 loc to
-        (CLOSED: semi_closed_view vw mem0 loc to)
-        (CONCRETE: concrete_promised_le mem0 mem1)
-    :
-      semi_closed_view vw mem1 loc to.
-  Proof.
-    inv CLOSED. econs.
-    - eapply concrete_promised_le_semi_closed_timemap; eauto.
-    - eapply concrete_promised_le_semi_closed_timemap; eauto.
-  Qed.
+  (* Lemma concrete_promised_le_semi_closed_view vw mem0 mem1 loc to *)
+  (*       (CLOSED: semi_closed_view vw mem0 loc to) *)
+  (*       (CONCRETE: concrete_promised_le mem0 mem1) *)
+  (*   : *)
+  (*     semi_closed_view vw mem1 loc to. *)
+  (* Proof. *)
+  (*   inv CLOSED. econs. *)
+  (*   - eapply concrete_promised_le_semi_closed_timemap; eauto. *)
+  (*   - eapply concrete_promised_le_semi_closed_timemap; eauto. *)
+  (* Qed. *)
 
 End SEMICLOSED.
 

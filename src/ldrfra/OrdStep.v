@@ -75,19 +75,19 @@ Module OrdLocal.
     .
     Hint Constructors write_na_step.
 
-    Inductive racy_read_step (lc1:Local.t) (mem1:Memory.t) (loc:Loc.t) (val:Const.t) (ord:Ordering.t): Prop :=
+    Inductive racy_read_step (lc1:Local.t) (mem1:Memory.t) (loc:Loc.t) (to:Time.t) (val:Const.t) (ord:Ordering.t): Prop :=
     | racy_read_step_intro
         ord'
         (ORD: ord' = if L loc then Ordering.join ord ordcr else ord)
-        (STEP: Local.racy_read_step lc1 mem1 loc val ord')
+        (STEP: Local.racy_read_step lc1 mem1 loc to val ord')
     .
     Hint Constructors racy_read_step.
 
-    Inductive racy_write_step (lc1:Local.t) (mem1:Memory.t) (loc:Loc.t) (ord:Ordering.t): Prop :=
+    Inductive racy_write_step (lc1:Local.t) (mem1:Memory.t) (loc:Loc.t) (to:Time.t) (ord:Ordering.t): Prop :=
     | racy_write_step_intro
         ord'
         (ORD: ord' = if L loc then Ordering.join ord ordcw else ord)
-        (STEP: Local.racy_write_step lc1 mem1 loc ord')
+        (STEP: Local.racy_write_step lc1 mem1 loc to ord')
     .
     Hint Constructors racy_write_step.
 
@@ -136,19 +136,19 @@ Module OrdLocal.
       program_step (ThreadEvent.write_na loc msgs from to val ord) lc1 sc1 mem1 lc2 sc2 mem2
     | step_racy_read
         lc1 sc1 mem1
-        loc val ord
-        (LOCAL: racy_read_step lc1 mem1 loc val ord):
-      program_step (ThreadEvent.racy_read loc val ord) lc1 sc1 mem1 lc1 sc1 mem1
+        loc to val ord
+        (LOCAL: racy_read_step lc1 mem1 loc to val ord):
+      program_step (ThreadEvent.racy_read loc to val ord) lc1 sc1 mem1 lc1 sc1 mem1
     | step_racy_write
         lc1 sc1 mem1
-        loc val ord
-        (LOCAL: racy_write_step lc1 mem1 loc ord):
-      program_step (ThreadEvent.racy_write loc val ord) lc1 sc1 mem1 lc1 sc1 mem1
+        loc to val ord
+        (LOCAL: racy_write_step lc1 mem1 loc to ord):
+      program_step (ThreadEvent.racy_write loc to val ord) lc1 sc1 mem1 lc1 sc1 mem1
     | step_racy_update
         lc1 sc1 mem1
-        loc valr valw ordr ordw
-        (LOCAL: Local.racy_update_step lc1 mem1 loc ordr ordw):
-      program_step (ThreadEvent.racy_update loc valr valw ordr ordw) lc1 sc1 mem1 lc1 sc1 mem1
+        loc to valr valw ordr ordw
+        (LOCAL: Local.racy_update_step lc1 mem1 loc to ordr ordw):
+      program_step (ThreadEvent.racy_update loc to valr valw ordr ordw) lc1 sc1 mem1 lc1 sc1 mem1
     .
     Hint Constructors program_step.
 
@@ -381,11 +381,11 @@ Module OrdLocal.
     Qed.
 
     Lemma racy_write_step_le
-          lc1 mem1 loc ord
+          lc1 mem1 loc to ord
           ordc'
-          (STEP: racy_write_step lc1 mem1 loc (if L loc then Ordering.join ord ordc' else ord))
+          (STEP: racy_write_step lc1 mem1 loc to (if L loc then Ordering.join ord ordc' else ord))
           (ORDC: Ordering.le ordc' ordcw):
-      racy_write_step lc1 mem1 loc ord.
+      racy_write_step lc1 mem1 loc to ord.
     Proof.
       inv STEP. econs; eauto. condtac; ss.
       replace (Ordering.join ord ordcw) with
@@ -813,21 +813,25 @@ Module OrdThread.
         }
         { inv LOCAL2. exploit racy_read_step_map; eauto.
           { apply ident_map_lt. }
-          i. exists (ThreadEvent.racy_read loc val ord). esplits.
+          i. des.
+          exists (ThreadEvent.racy_read loc fto val ord). esplits.
           { econs; eauto. }
           { econs 2; eauto. econs; eauto. econs 9; eauto. econs; eauto. }
           { econs; eauto; ss. }
         }
         { inv LOCAL2. exploit racy_write_step_map; eauto.
           { apply ident_map_lt. }
-          i. exists (ThreadEvent.racy_write loc val ord). esplits.
+          i. des.
+          exists (ThreadEvent.racy_write loc fto val ord). esplits.
           { econs; eauto. }
           { econs 2; eauto. econs; eauto. econs 10; eauto. econs; eauto. }
           { econs; eauto; ss. }
         }
         { exploit racy_update_step_map; eauto.
+          { apply ident_map_bot. }
           { apply ident_map_lt. }
-          i. exists (ThreadEvent.racy_update loc valr valw ordr ordw). esplits.
+          i. des.
+          exists (ThreadEvent.racy_update loc fto valr valw ordr ordw). esplits.
           { econs; eauto. }
           { econs 2; eauto. econs; eauto. econs 11; eauto. }
           { econs; eauto; ss. }

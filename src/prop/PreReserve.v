@@ -398,10 +398,10 @@ Section LIFT.
   Qed.
 
   Lemma step_lifting_is_racy
-        lc0 mem0 loc ord cap0
-        (RACE: Local.is_racy lc0 mem0 loc ord)
+        lc0 mem0 loc to ord cap0
+        (RACE: Local.is_racy lc0 mem0 loc to ord)
         (SOUND: Memory.le mem0 cap0):
-    (<<STEP: Local.is_racy lc0 cap0 loc ord>>).
+    (<<STEP: Local.is_racy lc0 cap0 loc to ord>>).
   Proof.
     inv RACE. exploit SOUND; eauto.
   Qed. 
@@ -1533,7 +1533,12 @@ Proof.
         eapply NNPP. eauto.
       }
     }
-    { splits; auto. econs; eauto. }
+    { splits; auto. econs; eauto. split; ss.
+      inv LOCAL0. inv RACE.
+      exists to. splits; ss.
+      { left. econs; eauto. }
+      { refl. }
+    }
     { splits; auto. econs; eauto. }
     { splits; auto. econs; eauto. }
   }

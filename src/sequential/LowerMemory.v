@@ -87,23 +87,23 @@ Variant lower_event: forall (e_src e_tgt: ThreadEvent.t), Prop :=
     ThreadEvent.failure
     ThreadEvent.failure
 | lower_event_racy_read
-    loc val ord
+    loc to val ord
   :
   lower_event
-    (ThreadEvent.racy_read loc val ord)
-    (ThreadEvent.racy_read loc val ord)
+    (ThreadEvent.racy_read loc to val ord)
+    (ThreadEvent.racy_read loc to val ord)
 | lower_event_racy_write
-    loc val ord
+    loc to val ord
   :
   lower_event
-    (ThreadEvent.racy_write loc val ord)
-    (ThreadEvent.racy_write loc val ord)
+    (ThreadEvent.racy_write loc to val ord)
+    (ThreadEvent.racy_write loc to val ord)
 | lower_event_racy_update
-    loc valr valw ordr ordw
+    loc to valr valw ordr ordw
   :
   lower_event
-    (ThreadEvent.racy_update loc valr valw ordr ordw)
-    (ThreadEvent.racy_update loc valr valw ordr ordw)
+    (ThreadEvent.racy_update loc to valr valw ordr ordw)
+    (ThreadEvent.racy_update loc to valr valw ordr ordw)
 .
 Hint Constructors lower_event.
 
@@ -633,11 +633,11 @@ Qed.
 Lemma lower_memory_is_racy mem_src0 mem_tgt0
       (MEM: lower_memory mem_src0 mem_tgt0)
       lc_src0 lc_tgt0
-      loc ord
-      (RACE: Local.is_racy lc_tgt0 mem_tgt0 loc ord)
+      loc to ord
+      (RACE: Local.is_racy lc_tgt0 mem_tgt0 loc to ord)
       (LOCAL: lower_local lc_src0 lc_tgt0)
   :
-    Local.is_racy lc_src0 mem_src0 loc ord.
+    Local.is_racy lc_src0 mem_src0 loc to ord.
 Proof.
   inv LOCAL. inv RACE.
   hexploit lower_memory_get; eauto. i. des.
@@ -689,12 +689,12 @@ Proof.
   { hexploit lower_memory_write_na_step; eauto. i. des.
     eexists (ThreadEvent.write_na _ _ _ _ _ _). esplits; eauto. }
   { inv LOCAL0. hexploit lower_memory_is_racy; eauto. i.
-    eexists (ThreadEvent.racy_read _ _ _). esplits; eauto. }
+    eexists (ThreadEvent.racy_read _ _ _ _). esplits; eauto. }
   { inv LOCAL0. hexploit lower_memory_is_racy; eauto. i.
-    eexists (ThreadEvent.racy_write _ _ _). esplits; eauto.
+    eexists (ThreadEvent.racy_write _ _ _ _). esplits; eauto.
     econs; eauto. econs; eauto.
     eapply lower_local_consistent; eauto. }
-  { eexists (ThreadEvent.racy_update _ _ _ _ _). esplits; eauto.
+  { eexists (ThreadEvent.racy_update _ _ _ _ _ _). esplits; eauto.
     { econs. inv LOCAL0.
       { econs 1; auto. eapply lower_local_consistent; eauto. }
       { econs 2; auto. eapply lower_local_consistent; eauto. }

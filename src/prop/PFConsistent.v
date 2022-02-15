@@ -34,10 +34,10 @@ Definition pf_consistent lang (e:Thread.t lang): Prop :=
 
 Lemma promise_step_is_racy
       lc1 mem1 loc from to msg lc2 mem2 kind
-      loc' ord
+      loc' to' ord
       (STEP: Local.promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
-      (RACE: Local.is_racy lc2 mem2 loc' ord):
-  Local.is_racy lc1 mem1 loc' ord.
+      (RACE: Local.is_racy lc2 mem2 loc' to' ord):
+  Local.is_racy lc1 mem1 loc' to' ord.
 Proof.
   destruct lc1 as [tview1 promises1]. inv STEP. ss.
   inv RACE. ss. inv PROMISE; ss.

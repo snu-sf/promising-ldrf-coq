@@ -2195,12 +2195,12 @@ Module SimCommon.
   Lemma is_racy
         l
         lc1_src mem1_src
-        lc1_tgt mem1_tgt loc ord
+        lc1_tgt mem1_tgt loc to ord
         (LOC: loc <> l)
         (LC1: sim_local l lc1_src lc1_tgt)
         (MEM1: sim_memory l mem1_src mem1_tgt)
-        (STEP_TGT: Local.is_racy lc1_tgt mem1_tgt loc ord):
-    <<STEP_SRC: Local.is_racy lc1_src mem1_src loc ord>>.
+        (STEP_TGT: Local.is_racy lc1_tgt mem1_tgt loc to ord):
+    <<STEP_SRC: Local.is_racy lc1_src mem1_src loc to ord>>.
   Proof.
     inv LC1. inv PROMISES1. inv MEM1. inv STEP_TGT.
     exploit COMPLETE0; eauto. i. des.
@@ -2217,12 +2217,12 @@ Module SimCommon.
   Lemma racy_read_step
         l
         lc1_src mem1_src
-        lc1_tgt mem1_tgt loc val ord
+        lc1_tgt mem1_tgt loc to val ord
         (LOC: loc <> l)
         (LC1: sim_local l lc1_src lc1_tgt)
         (MEM1: sim_memory l mem1_src mem1_tgt)
-        (STEP_TGT: Local.racy_read_step lc1_tgt mem1_tgt loc val ord):
-    <<STEP_SRC: Local.racy_read_step lc1_src mem1_src loc val ord>>.
+        (STEP_TGT: Local.racy_read_step lc1_tgt mem1_tgt loc to val ord):
+    <<STEP_SRC: Local.racy_read_step lc1_src mem1_src loc to val ord>>.
   Proof.
     inv STEP_TGT. econs.
     eapply is_racy; eauto.
@@ -2231,13 +2231,13 @@ Module SimCommon.
   Lemma racy_write_step
         l
         lc1_src mem1_src
-        lc1_tgt mem1_tgt loc ord
+        lc1_tgt mem1_tgt loc to ord
         (LOC: loc <> l)
         (LC1: sim_local l lc1_src lc1_tgt)
         (MEM1: sim_memory l mem1_src mem1_tgt)
         (PROMISES1: forall to, Memory.get l to (Local.promises lc1_src) = None)
-        (STEP_TGT: Local.racy_write_step lc1_tgt mem1_tgt loc ord):
-    <<STEP_SRC: Local.racy_write_step lc1_src mem1_src loc ord>>.
+        (STEP_TGT: Local.racy_write_step lc1_tgt mem1_tgt loc to ord):
+    <<STEP_SRC: Local.racy_write_step lc1_src mem1_src loc to ord>>.
   Proof.
     inv STEP_TGT. econs.
     - eapply is_racy; eauto.
@@ -2247,13 +2247,13 @@ Module SimCommon.
   Lemma racy_update_step
         l
         lc1_src mem1_src
-        lc1_tgt mem1_tgt loc ordr ordw
+        lc1_tgt mem1_tgt loc to ordr ordw
         (LOC: loc <> l)
         (LC1: sim_local l lc1_src lc1_tgt)
         (MEM1: sim_memory l mem1_src mem1_tgt)
         (PROMISES1: forall to, Memory.get l to (Local.promises lc1_src) = None)
-        (STEP_TGT: Local.racy_update_step lc1_tgt mem1_tgt loc ordr ordw):
-    <<STEP_SRC: Local.racy_update_step lc1_src mem1_src loc ordr ordw>>.
+        (STEP_TGT: Local.racy_update_step lc1_tgt mem1_tgt loc to ordr ordw):
+    <<STEP_SRC: Local.racy_update_step lc1_src mem1_src loc to ordr ordw>>.
   Proof.
     inv STEP_TGT.
     - econs 1; eauto. eapply promise_consistent; eauto.

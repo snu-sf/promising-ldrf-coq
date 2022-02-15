@@ -211,10 +211,10 @@ Qed.
 
 Lemma reorder_reserve_is_racy
       lc0 mem0 loc1 from1 to1 lc1 mem1
-      loc2 ord2
+      loc2 to2 ord2
       (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 Message.reserve lc1 mem1 Memory.op_kind_add)
-      (STEP2: Local.is_racy lc1 mem1 loc2 ord2):
-  Local.is_racy lc0 mem0 loc2 ord2.
+      (STEP2: Local.is_racy lc1 mem1 loc2 to2 ord2):
+  Local.is_racy lc0 mem0 loc2 to2 ord2.
 Proof.
   inv STEP1. inv PROMISE. inv STEP2. ss.
   revert GET. erewrite Memory.add_o; eauto.
@@ -225,10 +225,10 @@ Qed.
 
 Lemma reorder_reserve_racy_read
       lc0 mem0 loc1 from1 to1 lc1 mem1
-      loc2 val2 ord2
+      loc2 to2 val2 ord2
       (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 Message.reserve lc1 mem1 Memory.op_kind_add)
-      (STEP2: Local.racy_read_step lc1 mem1 loc2 val2 ord2):
-  Local.racy_read_step lc0 mem0 loc2 val2 ord2.
+      (STEP2: Local.racy_read_step lc1 mem1 loc2 to2 val2 ord2):
+  Local.racy_read_step lc0 mem0 loc2 to2 val2 ord2.
 Proof.
   inv STEP2. econs.
   eapply reorder_reserve_is_racy; eauto.
@@ -236,10 +236,10 @@ Qed.
 
 Lemma reorder_reserve_racy_write
       lc0 mem0 loc1 from1 to1 lc1 mem1
-      loc2 ord2
+      loc2 to2 ord2
       (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 Message.reserve lc1 mem1 Memory.op_kind_add)
-      (STEP2: Local.racy_write_step lc1 mem1 loc2 ord2):
-  Local.racy_write_step lc0 mem0 loc2 ord2.
+      (STEP2: Local.racy_write_step lc1 mem1 loc2 to2 ord2):
+  Local.racy_write_step lc0 mem0 loc2 to2 ord2.
 Proof.
   inv STEP2. econs.
   - eapply reorder_reserve_is_racy; eauto.
@@ -248,10 +248,10 @@ Qed.
 
 Lemma reorder_reserve_racy_update
       lc0 mem0 loc1 from1 to1 lc1 mem1
-      loc2 ordr2 ordw2
+      loc2 to2 ordr2 ordw2
       (STEP1: Local.promise_step lc0 mem0 loc1 from1 to1 Message.reserve lc1 mem1 Memory.op_kind_add)
-      (STEP2: Local.racy_update_step lc1 mem1 loc2 ordr2 ordw2):
-  Local.racy_update_step lc0 mem0 loc2 ordr2 ordw2.
+      (STEP2: Local.racy_update_step lc1 mem1 loc2 to2 ordr2 ordw2):
+  Local.racy_update_step lc0 mem0 loc2 to2 ordr2 ordw2.
 Proof.
   inv STEP2.
   - econs 1; eauto.

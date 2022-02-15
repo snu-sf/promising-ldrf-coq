@@ -143,7 +143,13 @@ Module CompressSteps.
           + eapply mapping_map_lt_iff_map_eq; eauto.
         - ss.
       }
-      { esplits.
+      { exploit racy_write_step_map; eauto.
+        { eapply mapping_map_lt_iff_map_le; eauto. }
+        { eapply mapping_map_lt_iff_map_eq; eauto. }
+        { eapply mapping_map_lt_iff_map_lt; eauto. }
+        { exploit Trace.steps_future; try exact STEPS0; eauto. s. i. des. ss. }
+        { eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }
+        i. des. esplits.
         - eapply thread_steps_pred_steps.
           eapply pred_steps_trace_steps2.
           + eapply STEPS.
@@ -153,15 +159,16 @@ Module CompressSteps.
             ss. des. split; auto. rewrite <- TAU.
             eapply tevent_map_same_machine_event; eauto.
         - econs 2. econs; [|econs 10]; eauto.
-          eapply racy_write_step_map; eauto.
-          + eapply mapping_map_lt_iff_map_le; eauto.
-          + eapply mapping_map_lt_iff_map_eq; eauto.
-          + eapply mapping_map_lt_iff_map_lt; eauto.
-          + exploit Trace.steps_future; try exact STEPS0; eauto. s. i. des. ss.
-          + eapply mapping_map_lt_iff_collapsable_unwritable; eauto.
         - ss.
       }
-      { esplits.
+      { exploit racy_update_step_map; eauto.
+        { eapply mapping_map_lt_iff_map_le; eauto. }
+        { eapply map_ident_in_memory_bot; eauto. }
+        { eapply mapping_map_lt_iff_map_eq; eauto. }
+        { eapply mapping_map_lt_iff_map_lt; eauto. }
+        { exploit Trace.steps_future; try exact STEPS0; eauto. s. i. des. ss. }
+        { eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }
+        i. des. esplits.
         - eapply thread_steps_pred_steps.
           eapply pred_steps_trace_steps2.
           + eapply STEPS.
@@ -171,12 +178,6 @@ Module CompressSteps.
             ss. des. split; auto. rewrite <- TAU.
             eapply tevent_map_same_machine_event; eauto.
         - econs 2. econs; [|econs 11]; eauto.
-          eapply racy_update_step_map; eauto.
-          + eapply mapping_map_lt_iff_map_le; eauto.
-          + eapply mapping_map_lt_iff_map_eq; eauto.
-          + eapply mapping_map_lt_iff_map_lt; eauto.
-          + exploit Trace.steps_future; try exact STEPS0; eauto. s. i. des. ss.
-          + eapply mapping_map_lt_iff_collapsable_unwritable; eauto.
         - ss.
       }
     Qed.

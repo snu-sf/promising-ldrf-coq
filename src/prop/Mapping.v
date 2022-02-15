@@ -334,23 +334,29 @@ Section MAPPED.
         (ThreadEvent.failure)
         (ThreadEvent.failure)
   | tevent_map_racy_read
-      loc val ord
+      loc to val ord
+      fto
+      (TO: f loc to fto)
     :
       tevent_map
-        (ThreadEvent.racy_read loc val ord)
-        (ThreadEvent.racy_read loc val ord)
+        (ThreadEvent.racy_read loc fto val ord)
+        (ThreadEvent.racy_read loc to val ord)
   | tevent_map_racy_write
-      loc val ord
+      loc to val ord
+      fto
+      (TO: f loc to fto)
     :
       tevent_map
-        (ThreadEvent.racy_write loc val ord)
-        (ThreadEvent.racy_write loc val ord)
+        (ThreadEvent.racy_write loc fto val ord)
+        (ThreadEvent.racy_write loc to val ord)
   | tevent_map_racy_update
-      loc valr valw ordr ordw
+      loc to valr valw ordr ordw
+      fto
+      (TO: f loc to fto)
     :
       tevent_map
-        (ThreadEvent.racy_update loc valr valw ordr ordw)
-        (ThreadEvent.racy_update loc valr valw ordr ordw)
+        (ThreadEvent.racy_update loc fto valr valw ordr ordw)
+        (ThreadEvent.racy_update loc to valr valw ordr ordw)
   .
 
   Inductive msg_map_weak: Message.t -> Message.t -> Prop :=
@@ -438,23 +444,29 @@ Section MAPPED.
         (ThreadEvent.failure)
         (ThreadEvent.failure)
   | tevent_map_weak_racy_read
-      loc val ord
+      loc to val ord
+      fto
+      (TO: f loc to fto)
     :
       tevent_map_weak
-        (ThreadEvent.racy_read loc val ord)
-        (ThreadEvent.racy_read loc val ord)
+        (ThreadEvent.racy_read loc fto val ord)
+        (ThreadEvent.racy_read loc to val ord)
   | tevent_map_weak_racy_write
-      loc val ord
+      loc to val ord
+      fto
+      (TO: f loc to fto)
     :
       tevent_map_weak
-        (ThreadEvent.racy_write loc val ord)
-        (ThreadEvent.racy_write loc val ord)
+        (ThreadEvent.racy_write loc fto val ord)
+        (ThreadEvent.racy_write loc to val ord)
   | tevent_map_weak_racy_update
-      loc valr valw ordr ordw
+      loc to valr valw ordr ordw
+      fto
+      (TO: f loc to fto)
     :
       tevent_map_weak
-        (ThreadEvent.racy_update loc valr valw ordr ordw)
-        (ThreadEvent.racy_update loc valr valw ordr ordw)
+        (ThreadEvent.racy_update loc fto valr valw ordr ordw)
+        (ThreadEvent.racy_update loc to valr valw ordr ordw)
   .
   Hint Constructors tevent_map_weak.
 
@@ -2453,18 +2465,20 @@ Section MAPPED.
   Qed.
 
   Lemma is_racy_map
-        lc mem loc ord
+        lc mem loc to ord
         flc fmem
         (MAP_LT: mapping_map_lt)
         (LOCAL: local_map lc flc)
         (MEM: memory_map mem fmem)
         (WF: Local.wf lc mem)
         (UNWRITABLE: collapsable_unwritable (Local.promises lc) mem)
-        (RACE: Local.is_racy lc mem loc ord):
-    Local.is_racy flc fmem loc ord.
+        (RACE: Local.is_racy lc mem loc to ord):
+    exists fto,
+      (<<RACE: Local.is_racy flc fmem loc fto ord>>) /\
+      (<<TO: f loc to fto>>).
   Proof.
     inv RACE. exploit msg_get_map; eauto. i. des; try congr.
-    econs; eauto.
+    esplits; eauto. econs; eauto.
     - destruct (Memory.get loc fto (Local.promises flc)) as [[]|] eqn:GETPF; ss.
       inv LOCAL. inv PROMISES. exploit ONLY; eauto. i. des.
       destruct (classic (to = to0)); try by congr.
@@ -2478,48 +2492,59 @@ Section MAPPED.
   Qed.
 
   Lemma racy_read_step_map
-        lc mem loc val ord
+        lc mem loc to val ord
         flc fmem
         (MAP_LT: mapping_map_lt)
         (LOCAL: local_map lc flc)
         (MEM: memory_map mem fmem)
         (WF: Local.wf lc mem)
         (UNWRITABLE: collapsable_unwritable (Local.promises lc) mem)
-        (RACE: Local.racy_read_step lc mem loc val ord):
-    Local.racy_read_step flc fmem loc val ord.
+        (RACE: Local.racy_read_step lc mem loc to val ord):
+    exists fto,
+      (<<RACE: Local.racy_read_step flc fmem loc fto val ord>>) /\
+      (<<TO: f loc to fto>>).
   Proof.
-    inv RACE. econs. eauto using is_racy_map.
+    inv RACE.
+    exploit is_racy_map; eauto. i. des.
+    esplits; eauto.
   Qed.
 
   Lemma racy_write_step_map
-        lc mem loc ord
+        lc mem loc to ord
         flc fmem
         (MAP_LT: mapping_map_lt)
         (LOCAL: local_map lc flc)
         (MEM: memory_map mem fmem)
         (WF: Local.wf lc mem)
         (UNWRITABLE: collapsable_unwritable (Local.promises lc) mem)
-        (RACE: Local.racy_write_step lc mem loc ord):
-    Local.racy_write_step flc fmem loc ord.
+        (RACE: Local.racy_write_step lc mem loc to ord):
+    exists fto,
+      (<<RACE: Local.racy_write_step flc fmem loc fto ord>>) /\
+      (<<TO: f loc to fto>>).
   Proof.
-    inv RACE. econs; eauto using is_racy_map, promise_consistent_local_map.
+    inv RACE.
+    exploit is_racy_map; eauto. i. des.
+    esplits; eauto using promise_consistent_local_map.
   Qed.
 
   Lemma racy_update_step_map
-        lc mem loc ordr ordw
+        lc mem loc to ordr ordw
         flc fmem
         (MAP_LT: mapping_map_lt)
         (LOCAL: local_map lc flc)
         (MEM: memory_map mem fmem)
         (WF: Local.wf lc mem)
         (UNWRITABLE: collapsable_unwritable (Local.promises lc) mem)
-        (RACE: Local.racy_update_step lc mem loc ordr ordw):
-    Local.racy_update_step flc fmem loc ordr ordw.
+        (RACE: Local.racy_update_step lc mem loc to ordr ordw):
+    exists fto,
+      (<<RACE: Local.racy_update_step flc fmem loc fto ordr ordw>>) /\
+      (<<TO: f loc to fto>>).
   Proof.
     inv RACE.
-    - econs 1; eauto using promise_consistent_local_map.
-    - econs 2; eauto using promise_consistent_local_map.
-    - econs 3; eauto using is_racy_map, promise_consistent_local_map.
+    - esplits; [econs 1|]; eauto using promise_consistent_local_map.
+    - esplits; [econs 2|]; eauto using promise_consistent_local_map.
+    - exploit is_racy_map; eauto. i. des.
+      esplits; [econs 3|]; eauto using promise_consistent_local_map.
   Qed.
 
   Definition mappable_time loc to :=
@@ -3331,6 +3356,9 @@ Section IDENTMAP.
     { eauto. }
     { eapply ident_map_opt_view_eq in RELEASEDR0. subst. etrans; eauto. }
     { eapply ident_map_opt_view_eq in RELEASEDW0. subst. etrans; eauto. }
+    { inv TO0. eauto. }
+    { inv TO0. eauto. }
+    { inv TO0. eauto. }
   Qed.
 
   Lemma ident_map_mappable_time loc ts
@@ -3405,7 +3433,8 @@ Section IDENTMAP.
       concrete_promised fmem loc ts.
   Proof.
     inv CONCRETE. eapply MEM in GET. des; ss.
-    eapply IDENT in TO. subst. inv MSG. inv MSGLE. econs; eauto.
+    eapply IDENT in TO. subst.
+    inv MSG; inv MSGLE; econs; eauto; ss.
   Qed.
 
   Lemma timemap_ident_map f tm ftm
@@ -4100,7 +4129,7 @@ Section CONCRETEIDENT.
     :
       mapping_map_bot f.
   Proof.
-    ii. eapply MAP. inv CLOSED. econs; eauto.
+    ii. eapply MAP. inv CLOSED. econs; eauto. ss.
   Qed.
 
   Lemma map_ident_concrete_closed_timemap
@@ -4111,7 +4140,7 @@ Section CONCRETEIDENT.
       timemap_map f tm tm.
   Proof.
     ii. eapply MAP; eauto.
-    exploit CLOSED; eauto. i. des. econs; eauto.
+    exploit CLOSED; eauto. i. des. econs; eauto. ss.
   Qed.
 
   Lemma map_ident_concrete_closed_view
@@ -4165,9 +4194,10 @@ Section CONCRETEIDENT.
         (CLOSED: Memory.closed mem)
         (GET: Memory.get loc to mem = Some (from, Message.concrete val released))
         (MAPLT: mapping_map_lt_iff f)
-        (IDENT: forall loc' to' from' val' released' ts
-                       (GET: Memory.get loc' to' mem = Some (from', Message.concrete val' released'))
-                       (TS: Time.le ts to')
+        (IDENT: forall loc' to' from' msg' ts
+                  (GET: Memory.get loc' to' mem = Some (from', msg'))
+                  (RESERVE: msg' <> Message.reserve)
+                  (TS: Time.le ts to')
           ,
             f loc' ts ts)
         (WRITING: promise_writing_event loc from to val released e)
@@ -4179,9 +4209,11 @@ Section CONCRETEIDENT.
     { ii. inv CONCRETE. eapply IDENT; eauto. refl. }
     inv WRITING; inv EVENT.
     { assert (to = fto).
-      { eapply mapping_map_lt_iff_map_eq; eauto. eapply IDENT; eauto. refl. } subst.
+      { eapply mapping_map_lt_iff_map_eq; eauto. eapply IDENT; eauto; ss. refl. }
+      subst.
       assert (from' = ffrom).
-      { eapply mapping_map_lt_iff_map_eq; eauto. } subst.
+      { eapply mapping_map_lt_iff_map_eq; eauto. eapply IDENT; eauto; ss. }
+      subst.
       econs; eauto.
       exploit opt_view_le_map.
       { eapply mapping_map_lt_iff_map_le; eauto. }
@@ -4192,9 +4224,11 @@ Section CONCRETEIDENT.
       i. transitivity freleased'; auto.
     }
     { assert (to = fto).
-      { eapply mapping_map_lt_iff_map_eq; eauto. eapply IDENT; eauto. refl. } subst.
+      { eapply mapping_map_lt_iff_map_eq; eauto. eapply IDENT; eauto; ss. refl. }
+      subst.
       assert (from' = ffrom).
-      { eapply mapping_map_lt_iff_map_eq; eauto. } subst.
+      { eapply mapping_map_lt_iff_map_eq; eauto. eapply IDENT; eauto; ss. }
+      subst.
       econs; eauto.
       exploit opt_view_le_map.
       { eapply mapping_map_lt_iff_map_le; eauto. }
