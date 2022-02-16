@@ -276,6 +276,8 @@ Variant sim_thread
     (FIN: __guard__(exists dom, (<<DOM: forall loc, (flag_src loc = true) <-> (List.In loc dom)>>)))
     (VERSIONED: versioned_memory vers mem_tgt)
     (SIMCLOSED: sim_closed_memory f mem_src)
+    (MAXTIMES: forall loc (FLAG: flag_src loc = true),
+        srctm loc = Memory.max_ts loc mem_src)
 .
 
 Lemma max_value_src_exists loc mem lc
@@ -611,19 +613,21 @@ Proof.
   { eapply MEM. }
   i. des. esplits; [eapply STEPS|..].
   { i. ss. eapply NONE; eauto. }
-  econs; auto.
-  { eauto. }
-  { econs; eauto. }
-  { ii. hexploit (MAXSRC loc0). i. inv H. econs.
-    { i. hexploit MAX; eauto. i. des. esplits. eapply VALS; eauto. }
-    { i. hexploit NONMAX; eauto. ii. eapply H. eapply VALS; eauto. }
-  }
-  { eapply sim_closed_memory_future; eauto.
-    eapply Thread.rtc_tau_step_future in STEPS; eauto.
-    ss. des. eapply Memory.future_future_weak; eauto.
+  { econs; auto.
+    { eauto. }
+    { econs; eauto. }
+    { ii. hexploit (MAXSRC loc0). i. inv H. econs.
+      { i. hexploit MAX; eauto. i. des. esplits. eapply VALS; eauto. }
+      { i. hexploit NONMAX; eauto. ii. eapply H. eapply VALS; eauto. }
+    }
+    { eapply sim_closed_memory_future; eauto.
+      eapply Thread.rtc_tau_step_future in STEPS; eauto.
+      ss. des. eapply Memory.future_future_weak; eauto.
+    }
+    { admit. }
   }
   { eapply space_future_covered_decr. i. eapply COVERED; eauto. }
-Qed.
+Admitted.
 
 Lemma lower_write_memory_le prom0 mem0 loc from to msg prom1 mem1 kind
       (WRITE: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
@@ -1043,6 +1047,7 @@ Proof.
   { eapply cap_max_values_src; eauto. }
   { eapply cap_max_values_tgt; eauto. }
   { eapply versioned_memory_cap; eauto. }
+  { i. ss. }
 Qed.
 
 Lemma sim_readable L f vw_src vw_tgt loc to_src to_tgt released_src released_tgt ord
@@ -1536,6 +1541,24 @@ Proof.
   { refl. }
   Qed.
 
+Lemma unchanged_loc_max_ts mem0 mem1 loc
+      (UNCH: unchanged_loc_memory loc mem0 mem1)
+      (INHABITED: Memory.inhabited mem0)
+  :
+    Memory.max_ts loc mem0 = Memory.max_ts loc mem1.
+Proof.
+  specialize (INHABITED loc). eapply TimeFacts.antisym.
+  { eapply Memory.max_ts_spec in INHABITED. des.
+    inv UNCH. rewrite <- UNCH0 in GET.
+    eapply Memory.max_ts_spec in GET. des. auto.
+  }
+  { inv UNCH. rewrite <- UNCH0 in INHABITED.
+    eapply Memory.max_ts_spec in INHABITED. des.
+    rewrite UNCH0 in GET.
+    eapply Memory.max_ts_spec in GET. des. auto.
+  }
+Qed.
+
 Lemma sim_thread_src_write_na
       f vers flag_src flag_tgt vs_src vs_tgt
       mem_src0 mem_tgt lc_src0 lc_tgt sc_src sc_tgt
@@ -1683,6 +1706,15 @@ Proof.
     }
     { eapply sim_closed_memory_future; eauto.
       eapply Memory.future_future_weak. etrans; eauto.
+    }
+    { i. ss. des_ifs. rewrite MAXTIMES; auto.
+      eapply unchanged_loc_max_ts.
+      2:{ eapply CLOSED2. }
+      etrans.
+      { eapply cancel_future_unchanged_loc in RESERVE; eauto. des; eauto. }
+      etrans.
+      { eapply add_unchanged_loc; eauto. }
+      { eapply add_unchanged_loc; eauto. }
     }
   }
   { eapply space_future_memory_trans_memory; eauto.
@@ -1852,14 +1884,20 @@ Proof.
   }
   clear VALSRC. intros [vs_tgt1 MAXTGT].
   exists vs_src1, vs_tgt1. splits; auto.
-  { inv SIM. econs; auto.
+  { inv SIM. econs.
+    { auto. }
     { eapply MEM. }
+    { eauto. }
     { eauto. }
     { ii. hexploit (MAXTGT loc). i. des; auto. }
     { i. hexploit (MAXTGT loc). i. des.
       { rewrite SRC. rewrite TGT. auto. }
       { rewrite VALSRC. rewrite VALTGT. ss. }
     }
+    { auto. }
+    { auto. }
+    { auto. }
+    { i. rewrite <- MAXTIMES; auto. inv LOCAL. rewrite SRCTM. eapply VIEWEQ; auto. }
   }
   { i. hexploit (MAXTGT loc). i. des; eauto.
     right. esplits; eauto.
@@ -3549,6 +3587,14 @@ Proof.
     { eapply Time.bot_spec. }
     { ii. subst. rewrite FLAG in *. ss. }
   }
+  assert (PLNTS: forall loc0 (NEQ: loc0 <> loc), View.pln (TView.cur tvw_src1) loc0 = View.pln (TView.cur tvw_src0) loc0).
+  { i. ss. unfold TimeMap.join. rewrite timemap_singleton_neq; auto.
+    rewrite TimeFacts.le_join_l; auto. eapply Time.bot_spec.
+  }
+  assert (RLXTS: forall loc0 (NEQ: loc0 <> loc), View.rlx (TView.cur tvw_src1) loc0 = View.rlx (TView.cur tvw_src0) loc0).
+  { i. ss. unfold TimeMap.join. rewrite timemap_singleton_neq; auto.
+    rewrite TimeFacts.le_join_l; auto. eapply Time.bot_spec.
+  }
   esplits.
   { eauto. }
   { econs.
@@ -3558,16 +3604,12 @@ Proof.
     { instantiate (1:=vs_src1). ii. unfold vs_src1.
       clear WRITE0. des_ifs.
       { eauto. }
-      { assert (TS: View.pln (TView.cur tvw_src1) loc0 = View.pln (TView.cur tvw_src0) loc0).
-        { ss. unfold TimeMap.join. rewrite timemap_singleton_neq; auto.
-          rewrite TimeFacts.le_join_l; auto. eapply Time.bot_spec.
-        }
-        specialize (MAXSRC loc0). inv MAXSRC. econs.
-        { i. hexploit MAX0; eauto. i. des. esplits; eauto. rewrite TS.
+      { specialize (MAXSRC loc0). inv MAXSRC. econs.
+        { i. hexploit MAX0; eauto. i. des. esplits; eauto. rewrite PLNTS; eauto.
           eapply write_unchanged_loc in CANCEL; eauto. des.
           erewrite <- unchanged_loc_max_readable; eauto.
         }
-        { rewrite TS. i. eapply write_unchanged_loc in CANCEL; eauto. des.
+        { rewrite PLNTS; eauto. i. eapply write_unchanged_loc in CANCEL; eauto. des.
           erewrite <- unchanged_loc_max_readable; eauto.
         }
       }
@@ -3593,6 +3635,13 @@ Proof.
     { eauto. }
     { eauto. }
     { eauto. }
+    { i. assert (NEQ: loc0 <> loc).
+      { ii. subst. rewrite FLAG in *. ss. }
+      rewrite RLXTS; auto. rewrite <- SRCTM. rewrite MAXTIMES; auto.
+      eapply unchanged_loc_max_ts.
+      2:{ eapply MEMSRC. }
+      eapply write_unchanged_loc in CANCEL; eauto. des. auto.
+    }
   }
   { eauto. }
   { eauto. }
@@ -4458,6 +4507,12 @@ Proof.
         des. econs. i. hexploit MAX; eauto. i. des.
         esplits. erewrite <- unchanged_loc_max_readable; eauto.
       }
+    }
+    { i. assert (NEQ: loc0 <> loc).
+      { ii. subst. rewrite FLAG in *. ss. }
+      rewrite MAXTIMES; auto. eapply unchanged_loc_max_ts.
+      2:{ eapply MEMSRC. }
+      { eapply promise_unchanged_loc in CANCEL; eauto. des; eauto. }
     }
   }
 Qed.

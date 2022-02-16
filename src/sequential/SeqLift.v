@@ -4723,7 +4723,7 @@ Qed.
 
 Lemma added_memory_sim_promise_unmatch
       f0 f1 srctm flag_src flag_tgt vers prom_tgt prom_src0 prom_src1 loc
-      ts msgs
+      msgs
       (MEM: sim_promises srctm flag_src flag_tgt f0 vers prom_src0 prom_tgt)
       (WF: Mapping.wfs f0)
       (VERS: versions_wf f0 vers)
@@ -4743,7 +4743,7 @@ Lemma added_memory_sim_promise_unmatch
               ((exists from_tgt msg_tgt,
                    (<<FROM: sim_timestamp_exact f1 f1.(Mapping.ver) from_src from_tgt>>) /\
                    (<<GET: Memory.get loc to_tgt prom_tgt = Some (from_tgt, msg_tgt)>>)) \/
-               ((<<TS: Time.lt ts to_src>>) /\ (<<RESERVE: msg_src <> Message.reserve>>) /\ (<<NONE: forall val released (MSG: msg_src = Message.concrete val (Some released)), False>>) /\ (<<GET: Memory.get loc to_tgt prom_tgt = None>>)))))
+               ((<<TS: Time.lt (srctm loc) to_src>>) /\ (<<RESERVE: msg_src <> Message.reserve>>) /\ (<<NONE: forall val released (MSG: msg_src = Message.concrete val (Some released)), False>>) /\ (<<GET: Memory.get loc to_tgt prom_tgt = None>>)))))
       (MAPWF: Mapping.wf f1)
       (MAPLE: Mapping.le (f0 loc) f1)
   :
@@ -4787,7 +4787,7 @@ Proof.
       { exfalso. hexploit sim_promises_none; eauto. rewrite GET0. ss. }
       { hexploit MSGSOUND; eauto. i. des.
         { left. esplits; eauto. }
-        { right. esplits; eauto. admit. }
+        { right. esplits; eauto. }
       }
     }
     { replace (f' loc0) with (f0 loc0).
@@ -4799,7 +4799,7 @@ Proof.
     }
   }
   { i. des_ifs. rewrite OTHER; auto. eapply sim_promises_none; eauto. }
-Admitted.
+Qed.
 
 Lemma lower_lower_memory mem0 mem1 loc from to msg0 msg1
       (LOWER: Memory.lower mem0 loc from to msg0 msg1 mem1)
