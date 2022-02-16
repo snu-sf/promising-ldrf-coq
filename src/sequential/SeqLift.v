@@ -2394,6 +2394,8 @@ Variant sim_promises
         exists fto ffrom,
           (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ffrom from>>) /\
           (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto to>>) /\
+          (<<VERS: forall (MSG: msg_tgt <> Message.reserve),
+              exists v, (<<VER: vers loc to = Some v>>)>>) /\
           (<<GET: forall (FLAGSRC: flag_src loc = false),
               exists msg_src,
                 (<<GET: Memory.get loc fto prom_src = Some (ffrom, msg_src)>>) /\
@@ -2417,6 +2419,8 @@ Lemma sim_promises_get srctm flag_src flag_tgt
     exists from_src to_src,
       (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt>>) /\
       (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt>>) /\
+      (<<VERS: forall (MSG: msg_tgt <> Message.reserve),
+          exists v, (<<VER: vers loc to_tgt = Some v>>)>>) /\
       (<<GET: forall (FLAGSRC: flag_src loc = false),
           exists msg_src,
             (<<GET: Memory.get loc to_src prom_src = Some (from_src, msg_src)>>) /\
@@ -2433,6 +2437,8 @@ Lemma sim_promises_get_if srctm flag_src flag_tgt f vers prom_src prom_tgt loc f
         (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt>>) /\
         (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt>>) /\
         (<<GET: Memory.get loc to_tgt prom_tgt = Some (from_tgt, msg_tgt)>>) /\
+        (<<VERS: forall (MSG: msg_tgt <> Message.reserve),
+            exists v, (<<VER: vers loc to_tgt = Some v>>)>>) /\
         (<<MSG: sim_message_max (flag_tgt loc) loc to_src f (vers loc to_tgt) msg_src msg_tgt>>)) \/
     ((<<FLAG: flag_tgt loc = true>>) /\ (<<TS: Time.lt (srctm loc) to_src>>) /\ (<<RESERVE: msg_src <> Message.reserve>>) /\ (<<SYNC: forall val released (MSG: msg_src = Message.concrete val (Some released)), False>>))
 .
@@ -2489,7 +2495,9 @@ Lemma add_sim_promises srctm flag_src flag_tgt f vers mem_tgt0 mem_tgt1 mem_src0
 Proof.
   econs.
   { i. erewrite Memory.add_o in GET; eauto. des_ifs.
-    { ss. des; clarify. esplits; eauto. i. esplits; eauto.
+    { ss. des; clarify. esplits; eauto.
+      { i. inv MSG; ss; eauto. }
+      i. esplits; eauto.
       eapply Memory.add_get0; eauto. }
     { guardH o. hexploit sim_promises_get; eauto. i. des.
       esplits; eauto. erewrite Memory.add_o; eauto. des_ifs; eauto.
@@ -2568,7 +2576,9 @@ Proof.
   eapply sim_timestamp_exact_inject in TO; eauto. clarify.
   econs.
   { i. erewrite Memory.lower_o in GET; eauto. des_ifs.
-    { ss. des; clarify. esplits; eauto. i. esplits; eauto.
+    { ss. des; clarify. esplits; eauto.
+      { i. inv MSG; ss; eauto. }
+      i. esplits; eauto.
       eapply Memory.lower_get0; eauto. }
     { guardH o. hexploit sim_promises_get; eauto. i. des.
       esplits; eauto. i. erewrite Memory.lower_o; eauto.
@@ -2624,7 +2634,7 @@ Proof.
   eapply sim_timestamp_exact_inject in TS2; eauto. clarify.
   econs.
   { i. erewrite Memory.split_o in GET4; eauto. des_ifs.
-    { ss. des; clarify. esplits; eauto. }
+    { ss. des; clarify. esplits; eauto. i. inv MSG; ss; eauto. }
     { ss. des; clarify. esplits; eauto. }
     { guardH o. guardH o0.
       hexploit sim_promises_get; [|eapply GET4|..]; eauto.
@@ -4672,7 +4682,7 @@ Lemma added_memory_sim_promise_match
           exists to_src from_src msg_src,
             (<<TO: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
             (<<MSG: sim_message_max false loc to_src f0 (vers loc to_tgt) msg_src msg_tgt>>) /\
-            (<<CLOSED: Mapping.closed f1 f1.(Mapping.ver) to_src>>) /\
+            (<<CLOSED: forall val released (MSG: msg_tgt = Message.concrete val released), Mapping.closed f1 f1.(Mapping.ver) to_src>>) /\
             (<<IN: List.In (from_src, to_src, msg_src) msgs>>))
       (MSGSOUND: forall to_src from_src msg_src
                         (IN: List.In (from_src, to_src, msg_src) msgs),
@@ -4704,7 +4714,9 @@ Proof.
       hexploit MSGCOMPLETE; eauto. i. des.
       hexploit MSGSOUND; eauto. i. des.
       eapply sim_timestamp_exact_unique in TO; eauto; ss. clarify.
-      esplits; eauto. i. esplits; eauto.
+      esplits; eauto.
+      { i. inv MSG; ss; eauto. }
+      i. esplits; eauto.
       erewrite <- sim_message_max_mon_mapping; eauto.
     }
     { hexploit sim_promises_get; eauto. i. des.
@@ -4746,7 +4758,7 @@ Lemma added_memory_sim_promise_unmatch
           exists to_src from_src msg_src,
             (<<TO: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
             (<<MSG: sim_message_max true loc to_src f0 (vers loc to_tgt) msg_src msg_tgt>>) /\
-            (<<CLOSED: Mapping.closed f1 f1.(Mapping.ver) to_src>>) /\
+            (<<CLOSED: forall val released (MSG: msg_tgt = Message.concrete val released), Mapping.closed f1 f1.(Mapping.ver) to_src>>) /\
             (<<IN: List.In (from_src, to_src, msg_src) msgs>>))
       (MSGSOUND: forall to_src from_src msg_src
                         (IN: List.In (from_src, to_src, msg_src) msgs),
@@ -4780,7 +4792,9 @@ Proof.
       hexploit MSGCOMPLETE; eauto. i. des.
       hexploit MSGSOUND; eauto. i. des.
       { eapply sim_timestamp_exact_unique in TO; eauto; ss. clarify.
-        esplits; eauto. i. esplits; eauto.
+        esplits; eauto.
+        { i. inv MSG; ss; eauto. }
+        i. esplits; eauto.
         erewrite <- sim_message_max_mon_mapping; eauto.
       }
       { eapply sim_timestamp_exact_unique in TO; eauto; ss. clarify. }
@@ -5244,6 +5258,7 @@ Lemma sim_promises_mon_vers srctm flag_src flag_tgt f vers0 vers1 mem_src mem_tg
 Proof.
   econs.
   { ii. hexploit sim_promises_get; eauto. i. des. esplits; eauto.
+    { i. hexploit VERS0; eauto. i. des. eapply VERS in VER. eauto. }
     i. hexploit GET0; eauto. i. des. esplits; eauto. inv MSG.
     { exploit VERS; eauto. i. rewrite x. econs 1; eauto. }
     { exploit VERS; eauto. i. rewrite x. econs 2; eauto. }

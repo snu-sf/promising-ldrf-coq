@@ -45,99 +45,21 @@ Require Import Pred.
 Require Import SeqLiftStep.
 
 
-Lemma added_memory_sim_promise_unmatch
-      f0 f1 srctm flag_src flag_tgt vers prom_tgt prom_src0 prom_src1 loc
-      msgs
-      (MEM: sim_promises srctm flag_src flag_tgt f0 vers prom_src0 prom_tgt)
-      (WF: Mapping.wfs f0)
-      (VERS: versions_wf f0 vers)
-      (ADDED: added_memory loc msgs prom_src0 prom_src1)
-      (FLAG: flag_src loc = true)
-      (MSGCOMPLETE: forall to_tgt from_tgt msg_tgt
-                           (GETTGT: Memory.get loc to_tgt prom_tgt = Some (from_tgt, msg_tgt)),
-          exists to_src from_src msg_src,
-            (<<TO: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
-            (<<MSG: sim_message_max true loc to_src f0 (vers loc to_tgt) msg_src msg_tgt>>) /\
-            (<<CLOSED: Mapping.closed f1 f1.(Mapping.ver) to_src>>) /\
-            (<<IN: List.In (from_src, to_src, msg_src) msgs>>))
-      (MSGSOUND: forall to_src from_src msg_src
-                        (IN: List.In (from_src, to_src, msg_src) msgs),
-          (exists to_tgt,
-              (<<TO: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
-              ((exists from_tgt msg_tgt,
-                   (<<FROM: sim_timestamp_exact f1 f1.(Mapping.ver) from_src from_tgt>>) /\
-                   (<<GET: Memory.get loc to_tgt prom_tgt = Some (from_tgt, msg_tgt)>>)) \/
-               ((<<TS: Time.lt (srctm loc) to_src>>) /\ (<<RESERVE: msg_src <> Message.reserve>>) /\ (<<NONE: forall val released (MSG: msg_src = Message.concrete val (Some released)), False>>) /\ (<<GET: Memory.get loc to_tgt prom_tgt = None>>)))))
-      (MAPWF: Mapping.wf f1)
-      (MAPLE: Mapping.le (f0 loc) f1)
-  :
-  let f' := (fun loc' => if Loc.eq_dec loc' loc then f1 else f0 loc') in
-  (<<SIM: sim_promises
-            srctm
-            (fun loc' => if Loc.eq_dec loc' loc then false else flag_src loc')
-            (fun loc' => if Loc.eq_dec loc' loc then true else flag_tgt loc')
-            f'
-            vers prom_src1 prom_tgt>>)
-.
-Proof.
-  pose proof (mapping_latest_wf_loc (f0 loc)) as VERWF.
-  assert (MAPSLE: Mapping.les f0 (fun loc' => if Loc.eq_dec loc' loc then f1 else f0 loc')).
-  { ii. des_ifs. refl. }
-  assert (MAPSWF: Mapping.wfs (fun loc' => if Loc.eq_dec loc' loc then f1 else f0 loc')).
-  { ii. des_ifs. }
-  ii. inv ADDED. econs.
-  { i. des_ifs.
-    { replace (f' loc) with f1.
-      2:{ unfold f'. des_ifs. }
-      hexploit MSGCOMPLETE; eauto. i. des.
-      hexploit MSGSOUND; eauto. i. des.
-      { eapply sim_timestamp_exact_unique in TO; eauto; ss. clarify.
-        esplits; eauto. erewrite <- sim_message_max_mon_mapping; eauto.
-      }
-      { eapply sim_timestamp_exact_unique in TO; eauto; ss. clarify. }
-    }
-    { hexploit sim_promises_get; eauto. i. des.
-      replace (f' loc0) with (f0 loc0).
-      { esplits; eauto.
-        erewrite <- sim_message_max_mon_mapping; eauto.
-      }
-      { unfold f'. des_ifs. }
-    }
-  }
-  { i. des_ifs.
-    { replace (f' loc) with f1.
-      2:{ unfold f'. des_ifs. }
-      hexploit SOUND; eauto. i. des.
-      { exfalso. hexploit sim_promises_none; eauto. rewrite GET0. ss. }
-      { hexploit MSGSOUND; eauto. i. des.
-        { left. esplits; eauto. }
-        { right. esplits; eauto. }
-      }
-    }
-    { replace (f' loc0) with (f0 loc0).
-      2:{ unfold f'. des_ifs. }
-      rewrite OTHER in GET; eauto.
-      hexploit sim_promises_get_if; eauto. i. des.
-      { left. esplits; eauto. }
-      { right. esplits; eauto. }
-    }
-  }
-  { i. des_ifs. rewrite OTHER; auto. eapply sim_promises_none; eauto. }
-Qed.
 
-
-Lemma mapped_msgs_exists f0 f1 vers srctm flag_src flag_tgt msgs_tgt prom_src prom_tgt loc
+Lemma mapped_msgs_exists_aux f0 f1 vers srctm flag_src flag_tgt msgs_tgt prom_src prom_tgt loc flag_new
       (PROM: sim_promises srctm flag_src flag_tgt f0 vers prom_src prom_tgt)
-      (MAPLE: Mapping.les f0 f1)
+      (MAPLE: Mapping.le (f0 loc) f1)
       (MSGS: forall from to msg (IN: List.In (from, to, msg) msgs_tgt), Memory.get loc to prom_tgt = Some (from, msg))
-      (WF1: Mapping.wfs f1)
+      (WF0: Mapping.wfs f0)
+      (WF1: Mapping.wf f1)
+      (VERSWF: versions_wf f0 vers)
   :
     exists msgs_src,
       (<<FORALL: List.Forall2
                    (fun '(from_src, to_src, msg_src) '(from_tgt, to_tgt, msg_tgt) =>
-                      (<<FROM: sim_timestamp_exact (f1 loc) (f1 loc).(Mapping.ver) from_src from_tgt>>) /\
-                      (<<TO: sim_timestamp_exact (f1 loc) (f1 loc).(Mapping.ver) to_src to_tgt>>) /\
-                      (<<MESSAGE: sim_message_max (flag_tgt loc) loc to_src f1 (vers loc to_tgt) msg_src msg_tgt>>))
+                      (<<FROM: sim_timestamp_exact f1 f1.(Mapping.ver) from_src from_tgt>>) /\
+                      (<<TO: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
+                      (<<MESSAGE: sim_message_max flag_new loc to_src f0 (vers loc to_tgt) msg_src msg_tgt>>))
                    msgs_src msgs_tgt>>).
 Proof.
   revert MSGS. induction msgs_tgt; i.
@@ -145,28 +67,257 @@ Proof.
   destruct a as [[from_tgt to_tgt] msg_tgt].
   hexploit MSGS.
   { left. eauto. }
-  intros GETTGT. hexploit sim_promises_get; eauto.
+  intros GETTGT. hexploit sim_promises_get; eauto. i. des.
+  hexploit sim_timestamp_exact_mon_exists; [eapply FROM|..]; eauto. i. des.
+  hexploit sim_timestamp_exact_mon_exists; [eapply TO|..]; eauto. i. des.
+  hexploit (@sim_message_max_exists flag_new loc ts_src0 f0 (vers loc to_tgt) msg_tgt); eauto.
+  { i. hexploit VERS; eauto. i. des. esplits; eauto.
+    exploit VERSWF. rewrite VER. ss.
+  }
+  i. des.
+  hexploit IHmsgs_tgt; eauto.
+  { i. eapply MSGS. right. auto. }
+  i. des. exists ((ts_src1, ts_src0, msg_src)::msgs_src).
+  red. econs; eauto.
+Qed.
+
+Lemma mapped_msgs_wf_msgs f0 f1 msgs_src msgs_tgt loc vers flag_new
+      (WF1: Mapping.wf f1)
+      (MSGSWF: wf_cell_msgs msgs_tgt)
+      (FORALL: List.Forall2
+                 (fun '(from_src, to_src, msg_src) '(from_tgt, to_tgt, msg_tgt) =>
+                    (<<FROM: sim_timestamp_exact f1 f1.(Mapping.ver) from_src from_tgt>>) /\
+                    (<<TO: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
+                    (<<MESSAGE: sim_message_max flag_new loc to_src f0 (vers loc to_tgt) msg_src msg_tgt>>))
+                 msgs_src msgs_tgt)
+      (BOTNONE: List.Forall (fun '(_, to, _) => to <> Time.bot) msgs_tgt)
+  :
+    wf_cell_msgs msgs_src.
+Proof.
+  pose proof mapping_latest_wf_loc as VERWF.
+  red in MSGSWF. des.
+  revert msgs_src DISJOINT MSGSWF0 FORALL BOTNONE. induction msgs_tgt; i.
+  { inv FORALL. repeat red. splits.
+    { econs. }
+    { econs. }
+  }
+  inv FORALL. inv MSGSWF0. inv DISJOINT. inv BOTNONE.
+  destruct x as [[from_src to_src] msg_src]. des; clarify.
+  hexploit IHmsgs_tgt; eauto. i. repeat red in H. repeat red. des. econs.
+  { econs; eauto.
+    eapply List.Forall_forall. intros [[from_src0 to_src0] msg_src0] IN.
+    eapply list_Forall2_in2 in IN; eauto. des.
+    destruct b as [[from_tgt0 to_tgt0] msg_tgt0]. des.
+    eapply List.Forall_forall in HD; eauto. ss.
+    eapply sim_timestamp_exact_le; eauto.
+  }
+  { econs; eauto. split.
+    { eapply sim_message_max_msg_wf; eauto. }
+    { right. eapply sim_timestamp_exact_lt; eauto. }
+  }
+Qed.
+
+Lemma mapped_msgs_disjoint f0 f1 msgs_src msgs_tgt loc vers flag_new mem_src
+      ts_tgt ts_src
+      (WF1: Mapping.wf f1)
+      (MSGSWF: wf_cell_msgs msgs_tgt)
+      (FORALL: List.Forall2
+                 (fun '(from_src, to_src, msg_src) '(from_tgt, to_tgt, msg_tgt) =>
+                    (<<FROM: sim_timestamp_exact f1 f1.(Mapping.ver) from_src from_tgt>>) /\
+                    (<<TO: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
+                    (<<MESSAGE: sim_message_max flag_new loc to_src f0 (vers loc to_tgt) msg_src msg_tgt>>))
+                 msgs_src msgs_tgt)
+      (BOTNONE: List.Forall (fun '(_, to, _) => to <> Time.bot) msgs_tgt)
 
 
-wf_cell_msgs
+      (TS
+
+  :
+    List.Forall
+      (fun '(from, to, msg) => (__guard__((<<MAX: Time.le (Memory.max_ts loc mem_src) from>>) \/ (<<RESERVE: msg = Message.reserve>>) /\ (<<DISJOINT: forall to2 from2 msg2 (GET: Memory.get loc to2 mem_src = Some (from2, msg2)), Interval.disjoint (from, to) (from2, to2)>>))) /\ (<<TS: Time.lt from to>>) /\ (<<MSGTO: Memory.message_to msg loc to>>) /\ (<<WF: Message.wf msg>>) /\ (<<CLOSED: semi_closed_message msg mem_src loc to>>)) msgs_src.
+Proof.
 
 
-(*   exists l : list (Time.t * Time.t * Message.t), *)
-(*     << *)
-(*     forall (from to : Time.t) (msg : Message.t), *)
-(*     << Cell.get to c = Some (from, msg) >> <-> << List.In (from, to, msg) l >> >> /\ *)
-(*     << wf_cell_msgs l >> *)
+shifted_mapping_exists
 
 
-(* wf_cell_msgs *)
+Lemma mapped_msgs_wf_msgs f0 f1 msgs_src msgs_tgt loc vers flag_new
+      mem_src
+      (WF1: Mapping.wf f1)
+      (MSGSWF: wf_cell_msgs msgs_tgt)
+      (FORALL: List.Forall2
+                 (fun '(from_src, to_src, msg_src) '(from_tgt, to_tgt, msg_tgt) =>
+                    (<<FROM: sim_timestamp_exact f1 f1.(Mapping.ver) from_src from_tgt>>) /\
+                    (<<TO: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
+                    (<<MESSAGE: sim_message_max flag_new loc to_src f0 (vers loc to_tgt) msg_src msg_tgt>>))
+                 msgs_src msgs_tgt)
+      (BOTNONE: List.Forall (fun '(_, to, _) => to <> Time.bot) msgs_tgt)
+  :
+    (<<MSGSWF: wf_cell_msgs msgs_src>>) /\
+    (<<MSGS: List.Forall
+               (fun '(from, to, msg) => (__guard__((<<MAX: Time.le (Memory.max_ts loc mem_src) from>>) \/ (<<RESERVE: msg = Message.reserve>>) /\ (<<DISJOINT: forall to2 from2 msg2 (GET: Memory.get loc to2 mem_src = Some (from2, msg2)), Interval.disjoint (from, to) (from2, to2)>>))) /\ (<<TS: Time.lt from to>>) /\ (<<MSGTO: Memory.message_to msg loc to>>) /\ (<<WF: Message.wf msg>>) /\ (<<CLOSED: semi_closed_message msg mem_src loc to>>)) msgs_src>>)
+.
+Proof.
+  pose proof mapping_latest_wf_loc as VERWF.
+  red in MSGSWF. des.
+  revert msgs_src DISJOINT MSGSWF0 FORALL BOTNONE. induction msgs_tgt; i.
+  { inv FORALL. repeat red. splits.
+    { econs. }
+    { econs. }
+  }
+  inv FORALL. inv MSGSWF0. inv DISJOINT. inv BOTNONE.
+  destruct x as [[from_src to_src] msg_src]. des; clarify.
+  hexploit IHmsgs_tgt; eauto. i. repeat red in H. repeat red. des. econs.
+  { econs; eauto.
+    eapply List.Forall_forall. intros [[from_src0 to_src0] msg_src0] IN.
+    eapply list_Forall2_in2 in IN; eauto. des.
+    destruct b as [[from_tgt0 to_tgt0] msg_tgt0]. des.
+    eapply List.Forall_forall in HD; eauto. ss.
+    eapply sim_timestamp_exact_le; eauto.
+  }
+  { econs; eauto. split.
+    { eapply sim_message_max_msg_wf; eauto. }
+    { right. eapply sim_timestamp_exact_lt; eauto. }
+  }
+Qed.
 
 
-(*       (msgs: list (Time.t * Time.t * Message.t)) *)
 
-(*       sim_message_max_exists *)
+Lemma mapped_msgs_complete f0 f1 msgs_src msgs_tgt loc vers flag_new
+      (WF1: Mapping.wf f1)
+      (MSGSWF: wf_cell_msgs msgs_tgt)
+      (FORALL: List.Forall2
+                 (fun '(from_src, to_src, msg_src) '(from_tgt, to_tgt, msg_tgt) =>
+                    (<<FROM: sim_timestamp_exact f1 f1.(Mapping.ver) from_src from_tgt>>) /\
+                    (<<TO: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
+                    (<<MESSAGE: sim_message_max flag_new loc to_src f0 (vers loc to_tgt) msg_src msg_tgt>>))
+                 msgs_src msgs_tgt)
+      (CLOSED: List.Forall (fun '(from_src, to_src, msg_src) =>
+                              forall val released (MSG: msg_src = Message.concrete val released),
+                                Mapping.closed f1 f1.(Mapping.ver) to_src) msgs_src)
+  :
+    forall to_tgt from_tgt msg_tgt
+           (RESERVE: msg_tgt <> Message.reserve)
+           (GETTGT: List.In (from_tgt, to_tgt, msg_tgt) msgs_tgt),
+    exists to_src from_src msg_src,
+      (<<TO: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
+      (<<MSG: sim_message false loc f0 (vers loc to_tgt) msg_src msg_tgt>>) /\
+      (<<CLOSED: forall val released (MSG: msg_tgt = Message.concrete val released), Mapping.closed f1 f1.(Mapping.ver) to_src>>) /\
+      (<<IN: List.In (from_src, to_src, msg_src) msgs_src>>).
+Proof.
+  i. eapply list_Forall2_in in GETTGT; eauto. des.
+  destruct a as [[from_src to_src] msg_src]. des. esplits; eauto.
+  { eapply sim_message_flag_mon. eapply sim_message_max_sim; eauto. }
+  { i. subst. eapply List.Forall_forall in CLOSED; eauto. ss.
+    inv MESSAGE; eauto.
+  }
+Qed.
 
-(*       wf_cell_msgs *)
+Lemma mapped_msgs_sound f0 f1 msgs_src msgs_tgt loc vers flag_new
+      (WF1: Mapping.wf f1)
+      (MSGSWF: wf_cell_msgs msgs_tgt)
+      (FORALL: List.Forall2
+                 (fun '(from_src, to_src, msg_src) '(from_tgt, to_tgt, msg_tgt) =>
+                    (<<FROM: sim_timestamp_exact f1 f1.(Mapping.ver) from_src from_tgt>>) /\
+                    (<<TO: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
+                    (<<MESSAGE: sim_message_max flag_new loc to_src f0 (vers loc to_tgt) msg_src msg_tgt>>))
+                 msgs_src msgs_tgt)
+  :
+    forall to_src from_src msg_src
+           (IN: List.In (from_src, to_src, msg_src) msgs_src),
+    exists to_tgt from_tgt msg_tgt,
+      (<<TO: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
+      (<<FROM: sim_timestamp_exact f1 f1.(Mapping.ver) from_src from_tgt>>) /\
+      (<<GET: List.In (from_tgt, to_tgt, msg_tgt) msgs_tgt>>).
+Proof.
+  i. eapply list_Forall2_in2 in IN; eauto. des.
+  destruct b as [[from_tgt to_tgt] msg_tgt]. des. esplits; eauto.
+Qed.
 
+Lemma mapped_msgs_complete_promise f0 f1 msgs_src msgs_tgt loc vers flag_new
+      (WF1: Mapping.wf f1)
+      (MSGSWF: wf_cell_msgs msgs_tgt)
+      (FORALL: List.Forall2
+                 (fun '(from_src, to_src, msg_src) '(from_tgt, to_tgt, msg_tgt) =>
+                    (<<FROM: sim_timestamp_exact f1 f1.(Mapping.ver) from_src from_tgt>>) /\
+                    (<<TO: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
+                    (<<MESSAGE: sim_message_max flag_new loc to_src f0 (vers loc to_tgt) msg_src msg_tgt>>))
+                 msgs_src msgs_tgt)
+      (CLOSED: List.Forall (fun '(from_src, to_src, msg_src) =>
+                              forall val released (MSG: msg_src = Message.concrete val released),
+                                Mapping.closed f1 f1.(Mapping.ver) to_src) msgs_src)
+  :
+    forall to_tgt from_tgt msg_tgt
+           (GETTGT: List.In (from_tgt, to_tgt, msg_tgt) msgs_tgt),
+    exists to_src from_src msg_src,
+      (<<TO: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
+      (<<MSG: sim_message_max flag_new loc to_src f0 (vers loc to_tgt) msg_src msg_tgt>>) /\
+      (<<CLOSED: forall val released (MSG: msg_tgt = Message.concrete val released), Mapping.closed f1 f1.(Mapping.ver) to_src>>) /\
+      (<<IN: List.In (from_src, to_src, msg_src) msgs_src>>).
+Proof.
+  i. eapply list_Forall2_in in GETTGT; eauto. des.
+  destruct a as [[from_src to_src] msg_src]. des. esplits; eauto.
+  eapply List.Forall_forall in CLOSED; eauto. ss.
+  inv MESSAGE; eauto.
+Qed.
+
+Lemma mapped_msgs_sound_promise f0 f1 msgs_src msgs_tgt loc vers flag_new
+      (WF1: Mapping.wf f1)
+      (MSGSWF: wf_cell_msgs msgs_tgt)
+      (FORALL: List.Forall2
+                 (fun '(from_src, to_src, msg_src) '(from_tgt, to_tgt, msg_tgt) =>
+                    (<<FROM: sim_timestamp_exact f1 f1.(Mapping.ver) from_src from_tgt>>) /\
+                    (<<TO: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
+                    (<<MESSAGE: sim_message_max flag_new loc to_src f0 (vers loc to_tgt) msg_src msg_tgt>>))
+                 msgs_src msgs_tgt)
+      (CLOSED: List.Forall (fun '(from_src, to_src, msg_src) =>
+                              forall val released (MSG: msg_src = Message.concrete val released),
+                                Mapping.closed f1 f1.(Mapping.ver) to_src) msgs_src)
+  :
+    forall to_src from_src msg_src
+           (IN: List.In (from_src, to_src, msg_src) msgs_src),
+    exists to_tgt from_tgt msg_tgt,
+      (<<TO: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
+      (<<FROM: sim_timestamp_exact f1 f1.(Mapping.ver) from_src from_tgt>>) /\
+      (<<GET: List.In (from_tgt, to_tgt, msg_tgt) msgs_tgt>>).
+Proof.
+  i. eapply list_Forall2_in2 in IN; eauto. des.
+  destruct b as [[from_tgt to_tgt] msg_tgt]. des. esplits; eauto.
+Qed.
+
+Lemma mapped_msgs_disjoint f0 f1 msgs_src msgs_tgt loc vers flag_new mem_src
+      (WF1: Mapping.wf f1)
+      (MSGSWF: wf_cell_msgs msgs_tgt)
+      (FORALL: List.Forall2
+                 (fun '(from_src, to_src, msg_src) '(from_tgt, to_tgt, msg_tgt) =>
+                    (<<FROM: sim_timestamp_exact f1 f1.(Mapping.ver) from_src from_tgt>>) /\
+                    (<<TO: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
+                    (<<MESSAGE: sim_message_max flag_new loc to_src f0 (vers loc to_tgt) msg_src msg_tgt>>))
+                 msgs_src msgs_tgt)
+  :
+    List.Forall
+      (fun '(from, to, msg) => (__guard__((<<MAX: Time.le (Memory.max_ts loc mem_src) from>>) \/ (<<RESERVE: msg = Message.reserve>>) /\ (<<DISJOINT: forall to2 from2 msg2 (GET: Memory.get loc to2 mem_src = Some (from2, msg2)), Interval.disjoint (from, to) (from2, to2)>>))) /\ (<<TS: Time.lt from to>>) /\ (<<MSGTO: Memory.message_to msg loc to>>) /\ (<<WF: Message.wf msg>>) /\ (<<CLOSED: semi_closed_message msg mem_src loc to>>)) msgs_src.
+Proof.
+  i. eapply List.Forall_forall. i.
+  eapply list_Forall2_in2 in H; eauto. des.
+  destruct b as [[from_tgt to_tgt] msg_tgt].
+  destruct x as [[from_src to_src] msg_src]. des. esplits; eauto.
+
+
+
+    forall to_src from_src msg_src
+           (IN: List.In (from_src, to_src, msg_src) msgs_src),
+    exists to_tgt from_tgt msg_tgt,
+      (<<TO: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
+      (<<FROM: sim_timestamp_exact f1 f1.(Mapping.ver) from_src from_tgt>>) /\
+      (<<GET: List.In (from_tgt, to_tgt, msg_tgt) msgs_tgt>>).
+Proof.
+  i. eapply list_Forall2_in2 in IN; eauto. des.
+  destruct b as [[from_tgt to_tgt] msg_tgt]. des. esplits; eauto.
+Qed.
+
+List.Forall
+                    (fun '(from, to, msg) => (__guard__((<<MAX: Time.le (Memory.max_ts loc mem0) from>>) \/ (<<RESERVE: msg = Message.reserve>>) /\ (<<DISJOINT: forall to2 from2 msg2 (GET: Memory.get loc to2 mem0 = Some (from2, msg2)), Interval.disjoint (from, to) (from2, to2)>>))) /\ (<<TS: Time.lt from to>>) /\ (<<MSGTO: Memory.message_to msg loc to>>) /\ (<<WF: Message.wf msg>>) /\ (<<CLOSED: semi_closed_message msg mem0 loc to>>)) msgs
 
 Lemma sim_thread_deflag_match_aux2
       f0 vers flag_src flag_tgt vs_src vs_tgt
@@ -219,22 +370,6 @@ Proof.
   hexploit
 
 
-  (MSGCOMPLETE: forall to_tgt from_tgt msg_tgt
-                       (RESERVE: msg_tgt <> Message.reserve)
-                       (GETTGT: Memory.get loc to_tgt mem_tgt = Some (from_tgt, msg_tgt))
-                       (TS: Time.lt ts_tgt to_tgt),
-      exists to_src from_src msg_src,
-        (<<TO: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
-        (<<MSG: sim_message false loc f0 (vers loc to_tgt) msg_src msg_tgt>>) /\
-        (<<CLOSED: forall val released (MSG: msg_tgt = Message.concrete val released), Mapping.closed f1 f1.(Mapping.ver) to_src>>) /\
-        (<<IN: List.In (from_src, to_src, msg_src) msgs>>))
-    (MSGSOUND: forall to_src from_src msg_src
-                      (IN: List.In (from_src, to_src, msg_src) msgs),
-        exists to_tgt from_tgt msg_tgt,
-          (<<TO: sim_timestamp_exact f1 f1.(Mapping.ver) to_src to_tgt>>) /\
-          (<<FROM: sim_timestamp_exact f1 f1.(Mapping.ver) from_src from_tgt>>) /\
-          (<<GET: Memory.get loc to_tgt mem_tgt = Some (from_tgt, msg_tgt)>>))
-
     (MSGCOMPLETE: forall to_tgt from_tgt msg_tgt
                          (GETTGT: Memory.get loc to_tgt prom_tgt = Some (from_tgt, msg_tgt)),
         exists to_src from_src msg_src,
@@ -253,7 +388,6 @@ Proof.
         (<<CLOSED: Mapping.closed (f0 loc) (f0 loc).(Mapping.ver) ts>>) \/
         (exists from val released, (<<IN: List.In (from, ts, Message.concrete val released) msgs>>)))
 
-         (WFMSGS: wf_cell_msgs msgs)
          (FORALL: List.Forall
                     (fun '(from, to, msg) => (__guard__((<<MAX: Time.le (Memory.max_ts loc mem0) from>>) \/ (<<RESERVE: msg = Message.reserve>>) /\ (<<DISJOINT: forall to2 from2 msg2 (GET: Memory.get loc to2 mem0 = Some (from2, msg2)), Interval.disjoint (from, to) (from2, to2)>>))) /\ (<<TS: Time.lt from to>>) /\ (<<MSGTO: Memory.message_to msg loc to>>) /\ (<<WF: Message.wf msg>>) /\ (<<CLOSED: semi_closed_message msg mem0 loc to>>)) msgs),
 
