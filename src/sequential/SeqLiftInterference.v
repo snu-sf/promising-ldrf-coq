@@ -178,10 +178,12 @@ Lemma sim_promises_past_nil_sim_promises
   sim_promises srctm (fun _ => false) flag_tgt f vers prom_src prom_tgt.
 Proof.
   inv SIM. econs; eauto; ss.
-  i. hexploit SOUND; eauto. i. des.
-  { left. esplits; eauto. }
-  { ss. }
-  { right. esplits; eauto. }
+  { i. hexploit MESSAGENORMAL; eauto. i. des. esplits; eauto. }
+  { i. hexploit SOUND; eauto. i. des.
+    { left. esplits; eauto. }
+    { ss. }
+    { right. esplits; eauto. }
+  }
 Qed.
 
 Lemma promise_max_values_src
@@ -636,6 +638,7 @@ Proof.
           (<<GET: Memory.get loc fto prom_src = Some (ffrom, msg_src)>>) /\
           (<<MSG: sim_message_max (flag_tgt loc) loc fto f1 (vers1 loc to) msg_src msg_tgt>>)).
   { i. hexploit sim_promises_get; eauto. i. des.
+    hexploit GET0; eauto. i. des.
     destruct (classic (msg_src = Message.reserve)).
     { subst. inv MSG.
       assert (sim_timestamp_exact (f1 loc) (f1 loc).(Mapping.ver) from_src from /\ sim_timestamp_exact (f1 loc) (f1 loc).(Mapping.ver) to_src to).
@@ -664,7 +667,8 @@ Proof.
                (<<MSG: sim_message_max (flag_tgt loc) loc fto f0 (vers1 loc to) msg_src msg_tgt>>) /\
                (<<RESERVE: msg_tgt = Message.reserve>>)).
   { i. hexploit RESERVESOUND; eauto. i. des. clarify.
-    hexploit sim_promises_get; eauto. i. des. esplits; eauto.
+    hexploit sim_promises_get; eauto. i. des.
+    hexploit GET; eauto. i. des. esplits; eauto.
     inv MSG. econs.
   }
   exists l_nd. splits.

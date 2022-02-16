@@ -2390,13 +2390,14 @@ Variant sim_promises
         (prom_src prom_tgt: Memory.t): Prop :=
 | sim_promises_intro
     (MESSAGE: forall loc to from msg_tgt
-                     (FLAGSRC: flag_src loc = false)
                      (GET: Memory.get loc to prom_tgt = Some (from, msg_tgt)),
-        exists fto ffrom msg_src,
+        exists fto ffrom,
           (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) ffrom from>>) /\
           (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto to>>) /\
-          (<<GET: Memory.get loc fto prom_src = Some (ffrom, msg_src)>>) /\
-          (<<MSG: sim_message_max (flag_tgt loc) loc fto f (vers loc to) msg_src msg_tgt>>))
+          (<<GET: forall (FLAGSRC: flag_src loc = false),
+              exists msg_src,
+                (<<GET: Memory.get loc fto prom_src = Some (ffrom, msg_src)>>) /\
+                (<<MSG: sim_message_max (flag_tgt loc) loc fto f (vers loc to) msg_src msg_tgt>>)>>))
     (SOUND: forall loc fto ffrom msg_src
                    (GET: Memory.get loc fto prom_src = Some (ffrom, msg_src)),
         ((exists to from msg_tgt,
@@ -2412,13 +2413,14 @@ Lemma sim_promises_get srctm flag_src flag_tgt
       f vers prom_src prom_tgt loc from_tgt to_tgt msg_tgt
       (SIM: sim_promises srctm flag_src flag_tgt f vers prom_src prom_tgt)
       (GET: Memory.get loc to_tgt prom_tgt = Some (from_tgt, msg_tgt))
-      (FLAG: flag_src loc = false)
   :
-    exists from_src to_src msg_src,
+    exists from_src to_src,
       (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt>>) /\
       (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt>>) /\
-      (<<GET: Memory.get loc to_src prom_src = Some (from_src, msg_src)>>) /\
-      (<<MSG: sim_message_max (flag_tgt loc) loc to_src f (vers loc to_tgt) msg_src msg_tgt>>).
+      (<<GET: forall (FLAGSRC: flag_src loc = false),
+          exists msg_src,
+            (<<GET: Memory.get loc to_src prom_src = Some (from_src, msg_src)>>) /\
+            (<<MSG: sim_message_max (flag_tgt loc) loc to_src f (vers loc to_tgt) msg_src msg_tgt>>)>>).
 Proof.
   inv SIM. hexploit MESSAGE; eauto. i. des. esplits; eauto.
 Qed.
@@ -2436,7 +2438,8 @@ Lemma sim_promises_get_if srctm flag_src flag_tgt f vers prom_src prom_tgt loc f
 .
 Proof.
   inv SIM. hexploit SOUND; eauto. i. des.
-  { hexploit MESSAGE; eauto.
+  { hexploit MESSAGE; eauto. i. des.
+    hexploit GET1.
     { destruct (flag_src loc) eqn:FLAG; auto.
       hexploit NONE; eauto. rewrite GET. ss.
     }
@@ -2486,7 +2489,7 @@ Lemma add_sim_promises srctm flag_src flag_tgt f vers mem_tgt0 mem_tgt1 mem_src0
 Proof.
   econs.
   { i. erewrite Memory.add_o in GET; eauto. des_ifs.
-    { ss. des; clarify. esplits; eauto.
+    { ss. des; clarify. esplits; eauto. i. esplits; eauto.
       eapply Memory.add_get0; eauto. }
     { guardH o. hexploit sim_promises_get; eauto. i. des.
       esplits; eauto. erewrite Memory.add_o; eauto. des_ifs; eauto.
@@ -2561,14 +2564,16 @@ Proof.
     erewrite sim_promises_none in GET; eauto. ss.
   }
   hexploit sim_promises_get; eauto. i. des.
+  hexploit GET1; eauto. i. des.
   eapply sim_timestamp_exact_inject in TO; eauto. clarify.
   econs.
   { i. erewrite Memory.lower_o in GET; eauto. des_ifs.
-    { ss. des; clarify. esplits; eauto.
+    { ss. des; clarify. esplits; eauto. i. esplits; eauto.
       eapply Memory.lower_get0; eauto. }
     { guardH o. hexploit sim_promises_get; eauto. i. des.
-      esplits; eauto. erewrite Memory.lower_o; eauto.
-      rewrite <- GET2. des_ifs. exfalso.
+      esplits; eauto. i. erewrite Memory.lower_o; eauto.
+      hexploit GET3; eauto. i. des. esplits; eauto.
+      rewrite <- GET4. des_ifs. exfalso.
       unguard. ss. des; clarify.
       eapply o. eapply sim_timestamp_exact_unique; eauto.
     }
@@ -2578,7 +2583,7 @@ Proof.
       eapply Memory.lower_get0; eauto. }
     { guardH o. hexploit sim_promises_get_if; eauto. i. des.
       { left. esplits; eauto. erewrite Memory.lower_o; eauto.
-        rewrite <- GET2. des_ifs. exfalso.
+        rewrite <- GET3. des_ifs. exfalso.
         unguard. ss. des; clarify.
         eapply o. eapply sim_timestamp_exact_inject; eauto.
       }
@@ -2615,6 +2620,7 @@ Proof.
     erewrite sim_promises_none in GET4; eauto. ss.
   }
   hexploit sim_promises_get; eauto. i. des.
+  hexploit GET7; eauto. i. des.
   eapply sim_timestamp_exact_inject in TS2; eauto. clarify.
   econs.
   { i. erewrite Memory.split_o in GET4; eauto. des_ifs.
@@ -2622,8 +2628,9 @@ Proof.
     { ss. des; clarify. esplits; eauto. }
     { guardH o. guardH o0.
       hexploit sim_promises_get; [|eapply GET4|..]; eauto.
-      i. des. esplits; eauto.
-      erewrite Memory.split_o; eauto. rewrite <- GET8. des_ifs.
+      i. des. esplits; eauto. i.
+      hexploit GET9; eauto. i. des. esplits; eauto.
+      erewrite Memory.split_o; eauto. rewrite <- GET10. des_ifs.
       { exfalso. unguard. ss. des; clarify. }
       { exfalso. unguard. ss. des; clarify.
         eapply o0. eapply sim_timestamp_exact_unique; eauto.   }
@@ -2635,7 +2642,7 @@ Proof.
     { guardH o. guardH o0.
       hexploit sim_promises_get_if; eauto. i. des.
       { left. esplits; eauto. erewrite Memory.split_o; eauto.
-        rewrite <- GET8. des_ifs.
+        rewrite <- GET9. des_ifs.
         { exfalso. unguard. ss. des; clarify. }
         { exfalso. unguard. ss. des; clarify.
           eapply o0. eapply sim_timestamp_exact_inject; eauto. }
@@ -2677,23 +2684,25 @@ Proof.
   hexploit sim_promises_get; eauto. i. des.
   eapply sim_timestamp_exact_inject in TS2; eauto. clarify.
   econs.
-  { i. erewrite Memory.remove_o in GET4; eauto.
-    erewrite Memory.split_o in GET4; eauto. des_ifs.
+  { i. erewrite Memory.remove_o in GET8; eauto.
+    erewrite Memory.split_o in GET8; eauto. des_ifs.
     { ss. des; clarify. esplits; eauto.
+      i. hexploit GET7; eauto. i. des. esplits; eauto.
       erewrite Memory.remove_o; eauto. des_ifs. ss. des; clarify.
     }
     { guardH o. guardH o0.
-      hexploit sim_promises_get; [|eapply GET4|..]; eauto.
+      hexploit sim_promises_get; [|eapply GET8|..]; eauto.
       i. des. esplits; eauto.
+      i. hexploit GET9; eauto. i. des. esplits; eauto.
       erewrite Memory.remove_o; eauto.
-      erewrite Memory.split_o; eauto. rewrite <- GET8. des_ifs.
+      erewrite Memory.split_o; eauto. rewrite <- GET10. des_ifs.
       { exfalso. unguard. ss. des; clarify. }
       { exfalso. unguard. ss. des; clarify.
         eapply o0. eapply sim_timestamp_exact_unique; eauto.   }
     }
   }
-  { i. erewrite Memory.remove_o in GET4; eauto.
-    erewrite Memory.split_o in GET4; eauto. des_ifs.
+  { i. erewrite Memory.remove_o in GET8; eauto.
+    erewrite Memory.split_o in GET8; eauto. des_ifs.
     { ss. des; clarify. left. esplits; eauto.
       erewrite Memory.remove_o; eauto.
       erewrite Memory.split_o; eauto. des_ifs.
@@ -2704,7 +2713,7 @@ Proof.
       hexploit sim_promises_get_if; eauto. i. des.
       { left. esplits; eauto. erewrite Memory.remove_o; eauto.
         erewrite Memory.split_o; eauto.
-        rewrite <- GET8. des_ifs.
+        rewrite <- GET9. des_ifs.
         { exfalso. unguard. ss. des; clarify. }
         { exfalso. unguard. ss. des; clarify.
           eapply o0. eapply sim_timestamp_exact_inject; eauto. }
@@ -2796,7 +2805,8 @@ Lemma sim_promises_cancel srctm flag_src flag_tgt f vers mem_tgt0 mem_tgt1 mem_s
 Proof.
   hexploit sim_promises_get; eauto.
   { eapply Memory.remove_get0; eauto. }
-  i. des. inv MSG. hexploit Memory.remove_exists; eauto. i. des. esplits; eauto.
+  i. des. hexploit GET; eauto. i. des.
+  inv MSG. hexploit Memory.remove_exists; eauto. i. des. esplits; eauto.
 Qed.
 
 Lemma sim_promises_split srctm flag_src flag_tgt f vers mem_tgt0 mem_tgt1 mem_src0
@@ -2818,6 +2828,7 @@ Proof.
   pose proof (mapping_latest_wf_loc (f loc)) as VERWF.
   hexploit split_succeed_wf; eauto. i. des.
   hexploit sim_promises_get; eauto. i. des.
+  hexploit GET; eauto. i. des.
   hexploit (@Memory.split_exists mem_src0 loc from_src ts_src1 to_src msg_src0 msg_src); eauto.
   { eapply sim_timestamp_exact_lt; [| |eapply TS12|..]; eauto. }
   { eapply sim_timestamp_exact_lt; [| |eapply TS23|..]; eauto. }
@@ -2844,7 +2855,7 @@ Lemma sim_promises_lower srctm flag_src flag_tgt f vers mem_tgt0 mem_tgt1 mem_sr
 Proof.
   pose proof (mapping_latest_wf_loc (f loc)) as VERWF.
   hexploit lower_succeed_wf; eauto. i. des.
-  hexploit sim_promises_get; eauto. i. des.
+  hexploit sim_promises_get; eauto. i. des. hexploit GET0; eauto. i. des.
   eapply sim_timestamp_exact_inject in TS; eauto. clarify.
   assert (MSGLE: Message.le msg_src1 msg_src).
   { eapply sim_message_max_max; eauto.
@@ -2866,7 +2877,8 @@ Lemma src_fulfill_sim_promises srctm flag_src flag_tgt f vers mem_tgt mem_src0 m
     sim_promises (fun loc' => if (Loc.eq_dec loc' loc) then ts else srctm loc') (fun loc' => if (Loc.eq_dec loc' loc) then true else flag_src loc') flag_tgt f vers mem_src1 mem_tgt.
 Proof.
   econs.
-  { i. des_ifs. hexploit sim_promises_get; eauto. i. des.
+  { i. hexploit sim_promises_get; eauto. i. des. esplits; eauto.
+    i. des_ifs. hexploit GET0; eauto. i. des.
     esplits; eauto. rewrite MEM; eauto. des_ifs.
   }
   { i. rewrite MEM in GET; eauto. des_ifs.
@@ -4692,12 +4704,12 @@ Proof.
       hexploit MSGCOMPLETE; eauto. i. des.
       hexploit MSGSOUND; eauto. i. des.
       eapply sim_timestamp_exact_unique in TO; eauto; ss. clarify.
-      esplits; eauto.
+      esplits; eauto. i. esplits; eauto.
       erewrite <- sim_message_max_mon_mapping; eauto.
     }
     { hexploit sim_promises_get; eauto. i. des.
       replace (f' loc0) with (f0 loc0).
-      { esplits; eauto.
+      { esplits; eauto. i. hexploit GET0; eauto. i. des. esplits; eauto.
         erewrite <- sim_message_max_mon_mapping; eauto.
       }
       { unfold f'. des_ifs. }
@@ -4768,13 +4780,14 @@ Proof.
       hexploit MSGCOMPLETE; eauto. i. des.
       hexploit MSGSOUND; eauto. i. des.
       { eapply sim_timestamp_exact_unique in TO; eauto; ss. clarify.
-        esplits; eauto. erewrite <- sim_message_max_mon_mapping; eauto.
+        esplits; eauto. i. esplits; eauto.
+        erewrite <- sim_message_max_mon_mapping; eauto.
       }
       { eapply sim_timestamp_exact_unique in TO; eauto; ss. clarify. }
     }
     { hexploit sim_promises_get; eauto. i. des.
       replace (f' loc0) with (f0 loc0).
-      { esplits; eauto.
+      { esplits; eauto. i. hexploit GET0; eauto. i. des. esplits; eauto.
         erewrite <- sim_message_max_mon_mapping; eauto.
       }
       { unfold f'. des_ifs. }
@@ -4904,17 +4917,18 @@ Proof.
     { inv LOWERPROMS. econs.
       { i. hexploit sim_promises_get; eauto. i. des. des_ifs.
         { destruct (classic (List.In to_src dom)).
-          { hexploit SAMETS; eauto. i. rewrite GET0 in H0. inv H0.
+          { hexploit SAMETS; eauto. i. esplits; eauto.
+            i. hexploit GET0; eauto. i. des. rewrite GET1 in H0. inv H0.
             { esplits; eauto. inv MSG; try by (econs; auto). }
             { esplits; eauto. inv MSG; try by (econs; auto). }
             { esplits; eauto. inv MSG; try by (econs; auto). }
           }
           { hexploit OTHERTS; eauto. i. esplits; eauto.
-            { rewrite H0. eauto. }
-            { inv MSG; try by (econs; auto).
-              destruct vw_src; try by (econs; auto).
-              exfalso. eapply H. eapply DOM. eauto.
-            }
+            i. hexploit GET0; eauto. i. des.
+            rewrite H0. esplits; eauto.
+            inv MSG; try by (econs; auto).
+            destruct vw_src; try by (econs; auto).
+            exfalso. eapply H. eapply DOM. eauto.
           }
         }
         { esplits; eauto. rewrite OTHERLOC; auto. }
@@ -5229,7 +5243,8 @@ Lemma sim_promises_mon_vers srctm flag_src flag_tgt f vers0 vers1 mem_src mem_tg
     sim_promises srctm flag_src flag_tgt f vers1 mem_src mem_tgt.
 Proof.
   econs.
-  { ii. hexploit sim_promises_get; eauto. i. des. esplits; eauto. inv MSG.
+  { ii. hexploit sim_promises_get; eauto. i. des. esplits; eauto.
+    i. hexploit GET0; eauto. i. des. esplits; eauto. inv MSG.
     { exploit VERS; eauto. i. rewrite x. econs 1; eauto. }
     { exploit VERS; eauto. i. rewrite x. econs 2; eauto. }
     { econs 3; eauto. }
@@ -5256,7 +5271,8 @@ Proof.
   { ii. hexploit sim_promises_get; eauto. i. des. esplits; eauto.
     { eapply sim_timestamp_exact_mon_strong; eauto. }
     { eapply sim_timestamp_exact_mon_strong; eauto. }
-    { erewrite <- sim_message_max_mon_mapping; eauto.
+    { i. hexploit GET0; eauto. i. des. esplits; eauto.
+      erewrite <- sim_message_max_mon_mapping; eauto.
       eapply Mapping.les_strong_les; eauto.
     }
   }

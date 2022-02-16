@@ -301,6 +301,7 @@ Proof.
   { exists []. splits. i. split; i; des; ss. }
   { eapply initial_versioned_memory. }
   { eapply initial_sim_closed_memory. }
+  { i. ss. }
 Qed.
 
 Require Import Program.

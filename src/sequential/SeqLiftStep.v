@@ -998,8 +998,9 @@ Proof.
   { i. hexploit sim_promises_get; eauto. i. des. esplits.
     { eapply PRESERVE; eauto. eapply memory_get_ts_le; eauto. }
     { eapply PRESERVE; eauto. refl. }
-    { eauto. }
-    { erewrite <- sim_message_max_mon_mapping; eauto. }
+    { i. hexploit GET0; eauto. i. des. esplits; eauto.
+      erewrite <- sim_message_max_mon_mapping; eauto.
+    }
   }
   { i. hexploit sim_promises_get_if; eauto. i. des.
     { left. esplits.
