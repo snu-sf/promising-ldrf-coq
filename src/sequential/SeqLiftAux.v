@@ -467,12 +467,20 @@ Proof.
   { eauto. }
   { i. unfold f'. des_ifs. }
   { eauto. }
-  { econs. unfold f'. i. des_ifs.
-    { destruct (Time.le_lt_dec (srctm loc) to_tgt).
-      { admit. }
-      { rewrite SRCTM in l. rewrite FLAGSRC in l; eauto.
-        eapply SAME in TO0; eauto.
+  { eapply space_future_memory_trans.
+    { instantiate (1:=
 
+    econs. unfold f'. i. inv MSGS. des_ifs.
+    { destruct (Time.le_lt_dec (View.pln (TView.cur tvw0) loc) to_tgt).
+      { admit. }
+      { eapply SAME in TO0; eauto.
+        eapply SAME in FROM0; eauto.
+        2:{ eapply TimeFacts.le_lt_lt; eauto. eapply memory_get_ts_le; eauto. }
+        eapply sim_timestamp_exact_mon_strong in TO0; eauto.
+        eapply sim_timestamp_exact_mon_strong in FROM0; eauto.
+        eapply sim_timestamp_exact_inject in FROM1; eauto.
+        eapply sim_timestamp_exact_inject in TO1; eauto. subst.
+        splits; auto.
 
         eapply SAME in FROM1.
 
