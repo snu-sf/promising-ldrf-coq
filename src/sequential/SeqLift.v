@@ -3060,7 +3060,7 @@ Variant sim_memory
           (<<GET: Memory.get loc fto mem_src = Some (ffrom, msg_src)>>) /\
           (<<MSG: sim_message false loc f (vers loc to) msg_src msg_tgt>>) /\
           (<<CLOSED: forall val released (MSG: msg_src = Message.concrete val released),
-                Mapping.closed (f loc) (f loc).(Mapping.ver) fto>>))
+              Mapping.closed (f loc) (f loc).(Mapping.ver) fto>>))
     (SOUND: forall loc fto0 ffrom1 msg_src
                    (GET: Memory.get loc fto0 mem_src = Some (ffrom1, msg_src)),
         (exists fto1 ffrom0 to from,
@@ -3070,9 +3070,11 @@ Variant sim_memory
             (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto1 to>>) /\
             (<<COVERED: forall ts (ITV: Interval.mem (from, to) ts),
                 covered loc ts mem_tgt>>)) \/
-          ((<<FLAG: flag_src loc = true>>) /\
-             (<<TS: Time.le fto0 (srctm loc)>>) /\
-             (<<TOP: top_time ffrom1 (f loc)>>)))
+        ((<<FLAG: flag_src loc = true>>) /\
+         (<<TS: Time.le fto0 (srctm loc)>>) /\
+         (<<TOP: top_time ffrom1 (f loc)>>) /\
+         (<<NONE: forall val released (MSG: msg_src = Message.concrete val released),
+             released = None>>)))
     (TOP: forall loc
                  (FLAG: flag_src loc = true),
         top_time (srctm loc) (f loc))
@@ -3160,9 +3162,11 @@ Lemma sim_memory_sound srctm flag_src f vers mem_src mem_tgt loc fto0 ffrom1 msg
         (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) fto1 to>>) /\
         (<<COVERED: forall ts (ITV: Interval.mem (from, to) ts),
             covered loc ts mem_tgt>>)) \/
-      ((<<FLAG: flag_src loc = true>>) /\
-         (<<TS: Time.le fto0 (srctm loc)>>) /\
-         (<<TOP: top_time ffrom1 (f loc)>>)).
+    ((<<FLAG: flag_src loc = true>>) /\
+     (<<TS: Time.le fto0 (srctm loc)>>) /\
+     (<<TOP: top_time ffrom1 (f loc)>>) /\
+     (<<NONE: forall val released (MSG: msg_src = Message.concrete val released),
+         released = None>>)).
 Proof.
   inv SIM. eauto.
 Qed.
@@ -3223,7 +3227,9 @@ Lemma sim_memory_sound_strong srctm flag_src f vers mem_src mem_tgt loc fto0 ffr
             Time.le fto1 fto'>>)) \/
       ((<<FLAG: flag_src loc = true>>) /\
          (<<TS: Time.le fto0 (srctm loc)>>) /\
-         (<<TOP: top_time ffrom1 (f loc)>>)).
+         (<<TOP: top_time ffrom1 (f loc)>>) /\
+         (<<NONE: forall val released (MSG: msg_src = Message.concrete val released),
+             released = None>>)).
 Proof.
   pose proof (mapping_latest_wf_loc (f loc)) as VERWF.
   inv SIM. hexploit SOUND; eauto. i. des; eauto. left.
@@ -3693,7 +3699,7 @@ Proof.
     eapply Memory.remove_get0 in REMOVE. des; clarify. inv MSG; ss.
   }
   { i. hexploit sim_memory_sound; eauto.
-    erewrite Memory.remove_o in GET; eauto. des_ifs. eauto.
+    erewrite Memory.remove_o in GET; eauto. des_ifs.
   }
   { i. eapply sim_memory_top; eauto. }
   { i. hexploit sim_memory_undef; eauto. i. des.
@@ -3918,7 +3924,10 @@ Proof.
       { eapply Memory.lower_get0 in LOWERSRC. des; eauto. }
       i. des.
       { left. esplits; eauto. i. eapply lower_covered; eauto. }
-      { right. esplits; eauto. }
+      { right. esplits; eauto. i. subst.
+        eapply lower_succeed_wf in LOWERSRC. des. inv MSG_LE.
+        hexploit NONE; eauto. i. subst. inv RELEASED. auto.
+      }
     }
     { guardH o. hexploit sim_memory_sound; eauto. i. des.
       { left. esplits; eauto. i. eapply lower_covered; eauto. }
@@ -3991,7 +4000,11 @@ Proof.
       { ss. des; clarify. eauto. }
       { esplits; eauto. refl. }
     }
-    des. hexploit sim_memory_sound; eauto.
+    des. hexploit sim_memory_sound; eauto. i. des.
+    { left. esplits; eauto. }
+    { right. esplits; eauto. i. subst. inv MSG.
+      hexploit NONE; eauto. i. subst. inv RELEASED. auto.
+    }
   }
   { i. eapply sim_memory_top; eauto. }
   { i. hexploit sim_memory_undef; eauto. i. des.
@@ -4006,6 +4019,7 @@ Lemma add_src_sim_memory srctm flag_src f vers mem_tgt mem_src0 mem_src1 mem_src
       (ADD1: Memory.add mem_src1 loc to0 to msg mem_src2)
       (TOP: top_time from (f loc))
       (TS: forall (FLAG: flag_src loc = true), Time.le (srctm loc) from)
+      (NONE: forall val released (MSG: msg = Message.concrete val released), released = None)
   :
     sim_memory (fun loc' => if (Loc.eq_dec loc' loc) then to else srctm loc') (fun loc' => if (Loc.eq_dec loc' loc) then true else flag_src loc') f vers mem_src2 mem_tgt.
 Proof.
@@ -4031,7 +4045,8 @@ Proof.
     }
     destruct (loc_ts_eq_dec (loc0, fto0) (loc, to0)).
     { ss. des; clarify. right. des_ifs. esplits; eauto.
-      eapply add_succeed_wf in ADD1. des. left. eauto.
+      { eapply add_succeed_wf in ADD1. des. left. eauto. }
+      { ss. }
     }
     { guardH o. guardH o0. hexploit sim_memory_sound; eauto. i. des.
       { left. esplits; eauto. }
@@ -4488,7 +4503,8 @@ Lemma added_memory_sim_memory srctm f0 f1 flag_src vers mem_tgt mem_src0 mem_src
       (CLOSEDTS: Mapping.closed f1 f1.(Mapping.ver) (srctm loc))
       (CLOSEDIF: forall ts (CLOSED: Mapping.closed f1 f1.(Mapping.ver) ts),
           (<<CLOSED: Mapping.closed (f0 loc) (f0 loc).(Mapping.ver) ts>>) \/
-          (exists from val released, (<<IN: List.In (from, ts, Message.concrete val released) msgs>>)))
+          (exists from val released, (<<IN: List.In (from, ts, Message.concrete val released) msgs>>)) \/
+          (exists val released, (<<MSG: msg_new = Message.concrete val released>>) /\ (<<TS: ts = srctm loc>>)))
   :
   let f' := (fun loc' => if Loc.eq_dec loc' loc then f1 else f0 loc') in
   (<<SIM: sim_memory
@@ -4664,6 +4680,7 @@ Proof.
     { eapply CLOSEDIF in CLOSED0. des.
       { eapply SIMCLOSED in CLOSED1. des. esplits. eapply MLE; eauto. }
       { eapply COMPLETE in IN. eauto. }
+      { subst. esplits. eapply MLE. eauto. }
     }
     { eapply SIMCLOSED in CLOSED0. des. esplits. eapply MLE; eauto. }
   }

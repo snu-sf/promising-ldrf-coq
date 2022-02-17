@@ -1043,6 +1043,16 @@ Proof.
   }
 Qed.
 
+Lemma added_memory_unchanged_loc loc msgs mem0 mem1 loc0
+      (ADDED: added_memory loc msgs mem0 mem1)
+      (NEQ: loc0 <> loc)
+  :
+    unchanged_loc_memory loc0 mem0 mem1.
+Proof.
+  induction ADDED. econs. i.
+  rewrite OTHER; eauto.
+Qed.
+
 Require Import Pred.
 
 Lemma add_promises_latest lang (st: lang.(Language.state)) tvw sc loc msgs:

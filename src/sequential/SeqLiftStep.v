@@ -389,6 +389,142 @@ Proof.
   }
 Qed.
 
+Lemma promise_max_readable
+      prom0 mem0 loc from to msg prom1 mem1 kind tvw
+      (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
+  :
+  forall val0 released0,
+    max_readable mem0 prom0 loc tvw val0 released0 <-> max_readable mem1 prom1 loc tvw val0 released0.
+Proof.
+  i. split.
+  { intros MAX. inv MAX.
+    hexploit unchangable_promise.
+    { eauto. }
+    { econs; eauto. }
+    i. inv H. ss. econs; eauto.
+    i. inv PROMISE.
+    { erewrite Memory.add_o; eauto.
+      erewrite (@Memory.add_o mem1 mem0) in GET1; eauto. des_ifs.
+      eapply MAX0; eauto.
+    }
+    { erewrite Memory.split_o; eauto.
+      erewrite (@Memory.split_o mem1 mem0) in GET1; eauto. des_ifs.
+      eapply MAX0; eauto.
+    }
+    { erewrite Memory.lower_o; eauto.
+      erewrite (@Memory.lower_o mem1 mem0) in GET1; eauto. des_ifs.
+      eapply MAX0; eauto.
+    }
+    { erewrite Memory.remove_o; eauto.
+      erewrite (@Memory.remove_o mem1 mem0) in GET1; eauto. des_ifs.
+      eapply MAX0; eauto.
+    }
+  }
+  { i. inv H. inv PROMISE.
+    { erewrite Memory.add_o in GET; eauto.
+      erewrite Memory.add_o in NONE; eauto. des_ifs.
+      econs; eauto. i.
+      hexploit MAX; eauto.
+      { eapply Memory.add_get1; eauto. }
+      i. erewrite Memory.add_o in H; eauto.
+      des_ifs. ss. des; clarify.
+      eapply Memory.add_get0 in MEM. des; clarify.
+    }
+    { erewrite Memory.split_o in GET; eauto.
+      erewrite Memory.split_o in NONE; eauto. des_ifs.
+      econs; eauto. i.
+      hexploit Memory.split_o; [eapply MEM|]. i.
+      rewrite GET0 in H. des_ifs.
+      { ss. des; clarify. eapply Memory.split_get0 in MEM. des; clarify. }
+      { ss. des; clarify. eapply Memory.split_get0 in PROMISES.
+        eapply Memory.split_get0 in MEM. des; clarify.
+      }
+      { ss. des; clarify. hexploit MAX; eauto. i.
+        erewrite Memory.split_o in H0; eauto.
+        des_ifs; ss; des; clarify.
+      }
+    }
+    { erewrite Memory.lower_o in GET; eauto.
+      erewrite Memory.lower_o in NONE; eauto. des_ifs.
+      econs; eauto. i.
+      hexploit Memory.lower_o; [eapply MEM|]. i.
+      rewrite GET0 in H. des_ifs.
+      { ss. des; clarify. eapply Memory.lower_get0 in MEM. des; clarify.
+        eapply Memory.lower_get0 in PROMISES. des; eauto.
+      }
+      { ss. des; clarify. hexploit MAX; eauto. i.
+        erewrite Memory.lower_o in H0; eauto.
+        des_ifs; ss; des; clarify.
+      }
+    }
+    { erewrite Memory.remove_o in GET; eauto.
+      erewrite Memory.remove_o in NONE; eauto. des_ifs.
+      econs; eauto. i.
+      hexploit Memory.remove_o; [eapply MEM|]. i.
+      rewrite GET0 in H. des_ifs.
+      { ss. des; clarify. eapply Memory.remove_get0 in MEM. des; clarify. }
+      { ss. des; clarify. hexploit MAX; eauto. i.
+        erewrite Memory.remove_o in H0; eauto.
+        des_ifs; ss; des; clarify.
+      }
+    }
+  }
+Qed.
+
+Lemma promise_max_values_src
+      lc0 mem0 loc from to msg lc1 mem1 kind vs
+      (PROMISE: Local.promise_step lc0 mem0 loc from to msg lc1 mem1 kind)
+      (MAX: max_values_src vs mem0 lc0)
+  :
+  max_values_src vs mem1 lc1.
+Proof.
+  inv PROMISE. ii. specialize (MAX loc0). inv MAX.
+  destruct (Loc.eq_dec loc0 loc); subst.
+  { econs.
+    { i. hexploit MAX0; eauto. i. des. esplits. ss.
+      erewrite <- promise_max_readable; eauto.
+    }
+    { i. hexploit NONMAX; eauto. ii. eapply H. ss.
+      erewrite promise_max_readable; eauto.
+    }
+  }
+  { eapply promise_unchanged_loc in PROMISE0; eauto. des.
+    econs.
+    { i. hexploit MAX0; eauto. i. des. esplits. ss.
+      erewrite <- unchanged_loc_max_readable; eauto.
+    }
+    { i. hexploit NONMAX; eauto. ii. eapply H. ss.
+      erewrite unchanged_loc_max_readable; eauto.
+    }
+  }
+Qed.
+
+Lemma promise_step_max_values_src
+      lang st0 st1 pf e lc0 lc1 sc0 sc1 mem0 mem1 vs
+      (PROMISE: Thread.promise_step pf e (Thread.mk lang st0 lc0 sc0 mem0) (Thread.mk _ st1 lc1 sc1 mem1))
+      (MAX: max_values_src vs mem0 lc0)
+  :
+  max_values_src vs mem1 lc1.
+Proof.
+  inv PROMISE. eapply promise_max_values_src; eauto.
+Qed.
+
+Require Import Pred.
+
+Lemma promise_steps_max_values_src
+      lang st0 st1 lc0 lc1 sc0 sc1 mem0 mem1 vs
+      (PROMISE: rtc (tau (@pred_step is_promise _)) (Thread.mk lang st0 lc0 sc0 mem0) (Thread.mk _ st1 lc1 sc1 mem1))
+      (MAX: max_values_src vs mem0 lc0)
+  :
+  max_values_src vs mem1 lc1.
+Proof.
+  remember (Thread.mk lang st0 lc0 sc0 mem0).
+  remember (Thread.mk lang st1 lc1 sc1 mem1).
+  revert st0 st1 lc0 lc1 sc0 sc1 mem0 mem1 Heqt Heqt0 MAX. induction PROMISE; i; clarify.
+  inv H. inv TSTEP. inv STEP. inv STEP0; [|inv STEP; inv LOCAL; ss].
+  destruct y. eapply promise_step_max_values_src in STEP; eauto.
+Qed.
+
 Lemma no_flag_max_value_same f vers srctm flag_src flag_tgt lc_src lc_tgt mem_src mem_tgt loc v_src
       (MEM: sim_memory srctm flag_src f vers mem_src mem_tgt)
       (LOCAL: sim_local f vers srctm flag_src flag_tgt lc_src lc_tgt)
@@ -1651,7 +1787,7 @@ Proof.
   { etrans; eauto. }
   { eauto. }
   { econs; auto.
-    { eapply add_src_sim_memory; eauto. }
+    { eapply add_src_sim_memory; eauto. i. clarify. }
     { dup LOCAL. ss. inv LOCAL0. econs.
       { inv WRITE. clarify. ss.
         eapply sim_src_na_write_tview; eauto.
@@ -2596,90 +2732,6 @@ Proof.
     des_ifs; auto. timetac.
   }
 Qed.
-
-Lemma promise_max_readable
-      prom0 mem0 loc from to msg prom1 mem1 kind tvw
-      (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
-  :
-  forall val0 released0,
-    max_readable mem0 prom0 loc tvw val0 released0 <-> max_readable mem1 prom1 loc tvw val0 released0.
-Proof.
-  i. split.
-  { intros MAX. inv MAX.
-    hexploit unchangable_promise.
-    { eauto. }
-    { econs; eauto. }
-    i. inv H. ss. econs; eauto.
-    i. inv PROMISE.
-    { erewrite Memory.add_o; eauto.
-      erewrite (@Memory.add_o mem1 mem0) in GET1; eauto. des_ifs.
-      eapply MAX0; eauto.
-    }
-    { erewrite Memory.split_o; eauto.
-      erewrite (@Memory.split_o mem1 mem0) in GET1; eauto. des_ifs.
-      eapply MAX0; eauto.
-    }
-    { erewrite Memory.lower_o; eauto.
-      erewrite (@Memory.lower_o mem1 mem0) in GET1; eauto. des_ifs.
-      eapply MAX0; eauto.
-    }
-    { erewrite Memory.remove_o; eauto.
-      erewrite (@Memory.remove_o mem1 mem0) in GET1; eauto. des_ifs.
-      eapply MAX0; eauto.
-    }
-  }
-  { i. inv H. inv PROMISE.
-    { erewrite Memory.add_o in GET; eauto.
-      erewrite Memory.add_o in NONE; eauto. des_ifs.
-      econs; eauto. i.
-      hexploit MAX; eauto.
-      { eapply Memory.add_get1; eauto. }
-      i. erewrite Memory.add_o in H; eauto.
-      des_ifs. ss. des; clarify.
-      eapply Memory.add_get0 in MEM. des; clarify.
-    }
-    { erewrite Memory.split_o in GET; eauto.
-      erewrite Memory.split_o in NONE; eauto. des_ifs.
-      econs; eauto. i.
-      hexploit Memory.split_o; [eapply MEM|]. i.
-      rewrite GET0 in H. des_ifs.
-      { ss. des; clarify. eapply Memory.split_get0 in MEM. des; clarify. }
-      { ss. des; clarify. eapply Memory.split_get0 in PROMISES.
-        eapply Memory.split_get0 in MEM. des; clarify.
-      }
-      { ss. des; clarify. hexploit MAX; eauto. i.
-        erewrite Memory.split_o in H0; eauto.
-        des_ifs; ss; des; clarify.
-      }
-    }
-    { erewrite Memory.lower_o in GET; eauto.
-      erewrite Memory.lower_o in NONE; eauto. des_ifs.
-      econs; eauto. i.
-      hexploit Memory.lower_o; [eapply MEM|]. i.
-      rewrite GET0 in H. des_ifs.
-      { ss. des; clarify. eapply Memory.lower_get0 in MEM. des; clarify.
-        eapply Memory.lower_get0 in PROMISES. des; eauto.
-      }
-      { ss. des; clarify. hexploit MAX; eauto. i.
-        erewrite Memory.lower_o in H0; eauto.
-        des_ifs; ss; des; clarify.
-      }
-    }
-    { erewrite Memory.remove_o in GET; eauto.
-      erewrite Memory.remove_o in NONE; eauto. des_ifs.
-      econs; eauto. i.
-      hexploit Memory.remove_o; [eapply MEM|]. i.
-      rewrite GET0 in H. des_ifs.
-      { ss. des; clarify. eapply Memory.remove_get0 in MEM. des; clarify. }
-      { ss. des; clarify. hexploit MAX; eauto. i.
-        erewrite Memory.remove_o in H0; eauto.
-        des_ifs; ss; des; clarify.
-      }
-    }
-  }
-Qed.
-
-Require Import Pred.
 
 Lemma sim_thread_deflag_match_aux
       f0 vers flag_src flag_tgt vs_src vs_tgt

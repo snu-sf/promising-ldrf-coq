@@ -178,7 +178,9 @@ Lemma sim_promises_past_nil_sim_promises
   sim_promises srctm (fun _ => false) flag_tgt f vers prom_src prom_tgt.
 Proof.
   inv SIM. econs; eauto; ss.
-  { i. hexploit MESSAGENORMAL; eauto. i. des. esplits; eauto. }
+  { i. hexploit MESSAGENORMAL; eauto. i. des. esplits; eauto.
+    i. inv MSG; ss; eauto.
+  }
   { i. hexploit SOUND; eauto. i. des.
     { left. esplits; eauto. }
     { ss. }
