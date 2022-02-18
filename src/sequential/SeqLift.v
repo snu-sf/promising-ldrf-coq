@@ -4071,6 +4071,70 @@ Proof.
   }
 Qed.
 
+Lemma add_src_sim_memory_flag_up srctm flag_src f vers mem_tgt mem_src0 mem_src1
+      loc from to msg
+      (MEM: sim_memory srctm flag_src f vers mem_src0 mem_tgt)
+      (ADD: Memory.add mem_src0 loc from to msg mem_src1)
+      (TOP: top_time from (f loc))
+      (TS: Time.le (srctm loc) from)
+      (NONE: forall val released (MSG: msg = Message.concrete val released), released = None)
+      (FLAG: flag_src loc = true)
+  :
+    sim_memory (fun loc' => if (Loc.eq_dec loc' loc) then to else srctm loc') flag_src f vers mem_src1 mem_tgt.
+Proof.
+  assert (TOPLE: Time.le (srctm loc) to).
+  { i. etrans; eauto. left.
+    eapply add_succeed_wf in ADD.
+    des. auto.
+  }
+  econs.
+  { i. hexploit sim_memory_get; eauto. i. des.
+    esplits; eauto. eapply Memory.add_get1; eauto.
+  }
+  { i. erewrite Memory.add_o in GET; eauto.
+    destruct (loc_ts_eq_dec (loc0, fto0) (loc, to)).
+    { ss. des; clarify. right. des_ifs. esplits; eauto.
+      { refl. }
+    }
+    { guardH o. hexploit sim_memory_sound; eauto. i. des.
+      { left. esplits; eauto. }
+      { right. des_ifs. esplits; eauto. }
+    }
+  }
+  { i. des_ifs.
+    { eapply top_time_mon; eauto.
+      eapply add_succeed_wf in ADD.
+      des. left. auto.
+    }
+    { eapply sim_memory_top in FLAG0; eauto. }
+  }
+  { i. hexploit sim_memory_undef; eauto. i. des. esplits; eauto.
+    eapply Memory.add_get1; eauto.
+  }
+Qed.
+
+Lemma add_src_sim_memory_space_future_aux srctm flag_src f vers mem_tgt mem_src0 mem_src1
+      loc from to msg
+      (MEM: sim_memory srctm flag_src f vers mem_src0 mem_tgt)
+      (ADD0: Memory.add mem_src0 loc from to msg mem_src1)
+      (TOP: top_time from (f loc))
+      (TS: forall (FLAG: flag_src loc = true), Time.le (srctm loc) from)
+  :
+  space_future_memory (Messages.of_memory mem_tgt) f mem_src0 f mem_src1.
+Proof.
+  econs. i. inv MSGS.
+  eapply sim_timestamp_exact_inject in FROM0; eauto.
+  eapply sim_timestamp_exact_inject in TO0; eauto. subst. splits; auto.
+  erewrite add_covered in COVERED; eauto. des; subst; auto.
+  exfalso. eapply TOP in TO1; eauto.
+  inv ITV. inv COVERED0. ss. eapply Time.lt_strorder.
+  eapply TimeFacts.lt_le_lt.
+  { eapply TO1. }
+  etrans.
+  { left. eapply FROM0. }
+  { auto. }
+Qed.
+
 Lemma add_src_sim_memory_space_future srctm flag_src f vers mem_tgt mem_src0 mem_src1 mem_src2
       loc from to0 to msg
       (MEM: sim_memory srctm flag_src f vers mem_src0 mem_tgt)
@@ -4504,7 +4568,8 @@ Lemma added_memory_sim_memory srctm f0 f1 flag_src vers mem_tgt mem_src0 mem_src
       (CLOSEDIF: forall ts (CLOSED: Mapping.closed f1 f1.(Mapping.ver) ts),
           (<<CLOSED: Mapping.closed (f0 loc) (f0 loc).(Mapping.ver) ts>>) \/
           (exists from val released, (<<IN: List.In (from, ts, Message.concrete val released) msgs>>)) \/
-          (exists val released, (<<MSG: msg_new = Message.concrete val released>>) /\ (<<TS: ts = srctm loc>>)))
+          (exists val released, (<<MSG: msg_new = Message.concrete val released>>) /\ (<<TS: ts = srctm loc>>)) \/
+          (exists from val released, Memory.get loc ts mem_src0 = Some (from, Message.concrete val released)))
   :
   let f' := (fun loc' => if Loc.eq_dec loc' loc then f1 else f0 loc') in
   (<<SIM: sim_memory
@@ -4681,6 +4746,7 @@ Proof.
       { eapply SIMCLOSED in CLOSED1. des. esplits. eapply MLE; eauto. }
       { eapply COMPLETE in IN. eauto. }
       { subst. esplits. eapply MLE. eauto. }
+      { esplits. eapply MLE. eauto. }
     }
     { eapply SIMCLOSED in CLOSED0. des. esplits. eapply MLE; eauto. }
   }
