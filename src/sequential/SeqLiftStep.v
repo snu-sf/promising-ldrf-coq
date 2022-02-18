@@ -258,6 +258,247 @@ Proof.
   ii. eapply max_value_tgt_mon; eauto.
 Qed.
 
+Definition reserved_space_empty (f: Mapping.ts) (flag_src: Loc.t -> bool)
+           (prom_tgt: Memory.t) (mem_src: Memory.t): Prop :=
+  forall loc to_tgt from_tgt
+         (GETTGT: Memory.get loc to_tgt prom_tgt = Some (from_tgt, Message.reserve))
+         (FLAG: flag_src loc = true),
+  exists to_src from_src,
+    (<<FROM: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) from_src from_tgt>>) /\
+    (<<TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt>>) /\
+    (<<DISJOINT: forall from to msg
+                        (GETSRC: Memory.get loc to mem_src = Some (from, msg)),
+        Interval.disjoint (from_src, to_src) (from, to)>>).
+
+Lemma reserved_space_empty_mon_strong f0 f1 flag_src prom_tgt mem_src
+      (RESERVED: reserved_space_empty f0 flag_src prom_tgt mem_src)
+      (MAPLE: Mapping.les_strong f0 f1)
+      (MAPWF0: Mapping.wfs f0)
+      (MAPWF1: Mapping.wfs f1)
+  :
+    reserved_space_empty f1 flag_src prom_tgt mem_src.
+Proof.
+  ii. exploit RESERVED; eauto. i. des. esplits; eauto.
+  { eapply sim_timestamp_exact_mon_strong; eauto. }
+  { eapply sim_timestamp_exact_mon_strong; eauto. }
+Qed.
+
+Lemma reserved_space_empty_reserve_decr f flag_src prom_tgt0 prom_tgt1 mem_src
+      (RESERVED: reserved_space_empty f flag_src prom_tgt0 mem_src)
+      (DECR: forall loc to from
+                    (GET: Memory.get loc to prom_tgt1 = Some (from, Message.reserve))
+                    (FLAG: flag_src loc = true),
+          Memory.get loc to prom_tgt0 = Some (from, Message.reserve))
+  :
+    reserved_space_empty f flag_src prom_tgt1 mem_src.
+Proof.
+  ii. exploit RESERVED; eauto.
+Qed.
+
+Lemma memory_write_reserve_same prom0 mem0 loc from to msg prom1 mem1 kind
+      (WRITE: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
+  :
+    forall loc to from
+           (GET: Memory.get loc to prom1 = Some (from, Message.reserve)),
+      Memory.get loc to prom0 = Some (from, Message.reserve).
+Proof.
+  inv WRITE. i. erewrite Memory.remove_o in GET; eauto.
+  inv PROMISE.
+  { i. erewrite Memory.add_o in GET; eauto. des_ifs. }
+  { i. erewrite Memory.split_o in GET; eauto. des_ifs. }
+  { i. erewrite Memory.lower_o in GET; eauto. des_ifs. }
+  { i. erewrite Memory.remove_o in GET; eauto. des_ifs. }
+Qed.
+
+Lemma memory_write_reserve_same_rev prom0 mem0 loc from to msg prom1 mem1 kind
+      (WRITE: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
+      (MSG: msg <> Message.reserve)
+  :
+    forall loc to from
+           (GET: Memory.get loc to prom0 = Some (from, Message.reserve)),
+      Memory.get loc to prom1 = Some (from, Message.reserve).
+Proof.
+  inv WRITE. i. erewrite Memory.remove_o; eauto. inv PROMISE.
+  { i. erewrite Memory.add_o; eauto. des_ifs.
+    ss. des; clarify. eapply Memory.add_get0 in PROMISES. des; clarify.
+  }
+  { i. erewrite Memory.split_o; eauto. des_ifs.
+    { ss. des; clarify. eapply Memory.split_get0 in PROMISES. des; clarify. }
+    { ss. des; clarify. eapply Memory.split_get0 in PROMISES. des; clarify. }
+  }
+  { i. erewrite Memory.lower_o; eauto. des_ifs.
+    ss. des; clarify. eapply Memory.lower_get0 in PROMISES. des; clarify. inv MSG_LE; ss.
+  }
+  { des_ifs. }
+Qed.
+
+Lemma memory_write_na_reserve_same prom0 mem0 loc ts from to val prom1 mem1 kind kinds msgs
+      (WRITE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 kinds msgs kind)
+  :
+    forall loc to from
+           (GET: Memory.get loc to prom1 = Some (from, Message.reserve)),
+      Memory.get loc to prom0 = Some (from, Message.reserve).
+Proof.
+  induction WRITE.
+  { eapply memory_write_reserve_same; eauto. }
+  { i. eapply IHWRITE in GET.
+    eapply memory_write_reserve_same; eauto.
+  }
+Qed.
+
+Lemma memory_write_na_reserve_same_rev prom0 mem0 loc ts from to val prom1 mem1 kind kinds msgs
+      (WRITE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 kinds msgs kind)
+  :
+    forall loc to from
+           (GET: Memory.get loc to prom0 = Some (from, Message.reserve)),
+      Memory.get loc to prom1 = Some (from, Message.reserve).
+Proof.
+  induction WRITE.
+  { eapply memory_write_reserve_same_rev; eauto; ss. }
+  { i. eapply IHWRITE.
+    eapply memory_write_reserve_same_rev; eauto; ss.
+    unguard. des; clarify.
+  }
+Qed.
+
+Lemma reserved_space_empty_covered_decr f flag_src prom_tgt mem_src0 mem_src1
+      (RESERVED: reserved_space_empty f flag_src prom_tgt mem_src0)
+      (DECR: forall loc ts (FLAG: flag_src loc = true) (COVER: covered loc ts mem_src1), covered loc ts mem_src0)
+  :
+    reserved_space_empty f flag_src prom_tgt mem_src1.
+Proof.
+  ii. exploit RESERVED; eauto. i. des. esplits; eauto.
+  ii. exploit DECR; eauto.
+  { econs; eauto. }
+  i. inv x0. eapply DISJOINT; eauto.
+Qed.
+
+Lemma reserved_space_empty_unchanged_loc
+      f flag_src prom_tgt mem_src0 mem_src1
+      (RESERVED: reserved_space_empty f flag_src prom_tgt mem_src0)
+      (UNCH: forall loc (FLAG: flag_src loc = true), unchanged_loc_memory loc mem_src0 mem_src1)
+  :
+    reserved_space_empty f flag_src prom_tgt mem_src1.
+Proof.
+  ii. exploit RESERVED; eauto. i. des. esplits; eauto.
+  ii. hexploit UNCH; eauto. i. inv H. rewrite UNCH0 in GETSRC; eauto.
+  eapply DISJOINT; eauto.
+Qed.
+
+Lemma reserved_space_empty_add f flag_src prom_tgt mem_src0 mem_src1
+      loc from to msg
+      (RESERVED: reserved_space_empty f flag_src prom_tgt mem_src0)
+      (ADD: Memory.add mem_src0 loc from to msg mem_src1)
+      (TOP: top_time from (f loc))
+  :
+    reserved_space_empty f flag_src prom_tgt mem_src1.
+Proof.
+  ii. exploit RESERVED; eauto. i. des. esplits; eauto.
+  i. erewrite Memory.add_o in GETSRC; eauto. des_ifs; eauto.
+  ss. des; clarify. eapply interval_le_disjoint.
+  eapply TOP in TO. left. auto.
+Qed.
+
+Lemma cancel_future_memory_le loc prom0 mem0 prom1 mem1
+      (CANCEL: cancel_future_memory loc prom0 mem0 prom1 mem1)
+  :
+    Memory.le prom1 prom0.
+Proof.
+  induction CANCEL.
+  { refl. }
+  etrans; eauto. inv CANCEL. eapply remove_le; eauto.
+Qed.
+
+Lemma cancel_future_memory_get loc prom0 mem0 prom1 mem1
+      (CANCEL: cancel_future_memory loc prom0 mem0 prom1 mem1)
+  :
+    forall to,
+      Memory.get loc to mem1 =
+      match Memory.get loc to mem0 with
+      | None => None
+      | Some (from, msg) =>
+        match Memory.get loc to prom0 with
+        | None => Some (from, msg)
+        | Some _ =>
+          match Memory.get loc to prom1 with
+          | None => None
+          | Some _ => Some (from, msg)
+          end
+        end
+      end.
+Proof.
+  induction CANCEL.
+  { i. des_ifs. }
+  i. inv CANCEL. rewrite IHCANCEL.
+  erewrite (@Memory.remove_o mem1); eauto.
+  erewrite (@Memory.remove_o prom1); eauto. des_ifs.
+  { ss. des; clarify. destruct p0.
+    eapply cancel_future_memory_le in Heq2; eauto.
+    eapply Memory.remove_get0 in PROMISES. des; clarify.
+  }
+  { ss. des; clarify.
+    eapply Memory.remove_get0 in PROMISES. des; clarify.
+  }
+Qed.
+
+Lemma cancel_future_memory_memory_le loc prom0 mem0 prom1 mem1
+      (CANCEL: cancel_future_memory loc prom0 mem0 prom1 mem1)
+      (MLE: Memory.le prom0 mem0)
+  :
+    Memory.le prom1 mem1.
+Proof.
+  revert MLE. induction CANCEL; auto. i. eapply IHCANCEL.
+  eapply promise_memory_le; eauto.
+Qed.
+
+Lemma reserved_space_empty_fulfilled_memory f srctm vers
+      flag_src0 flag_src1 flag_tgt prom_tgt mem_src0 mem_src1
+      loc prom_src0 prom_src1
+      (RESERVED: reserved_space_empty f flag_src0 prom_tgt mem_src0)
+      (CANCEL: cancel_future_memory loc prom_src0 mem_src0 prom_src1 mem_src1)
+      (PROMISE: sim_promises srctm flag_src0 flag_tgt f vers prom_src0 prom_tgt)
+      (MLE: Memory.le prom_src0 mem_src0)
+      (NONE: forall from to msg
+                    (GET: Memory.get loc to prom_src1 = Some (from, msg)),
+          msg <> Message.reserve)
+      (FLAGS: forall loc0 (FLAG: flag_src1 loc0 = true), flag_src0 loc0 = true \/ loc0 = loc)
+  :
+    reserved_space_empty f flag_src1 prom_tgt mem_src1.
+Proof.
+  destruct (flag_src0 loc) eqn:EQ.
+  { revert RESERVED. clear MLE NONE PROMISE. induction CANCEL; auto.
+    { ii. exploit RESERVED; eauto. exploit FLAGS; eauto. i. des; clarify. }
+    i. eapply IHCANCEL.
+    inv CANCEL. eapply reserved_space_empty_covered_decr; eauto.
+    i. eapply remove_covered in COVER; eauto. des; eauto.
+  }
+  { ii. hexploit cancel_future_memory_memory_le; eauto. intros MLE1.
+    destruct (Loc.eq_dec loc0 loc).
+    { subst. hexploit sim_promises_get; eauto. i. des. esplits; eauto.
+      i. hexploit GET; eauto. i. des. dup GET0. eapply MLE in GET0.
+      dup GETSRC. erewrite cancel_future_memory_get in GETSRC; eauto. des_ifs.
+      { hexploit Memory.get_disjoint.
+        { eapply GET0. }
+        { eapply Heq. }
+        i. des; clarify. exfalso.
+        destruct p0. dup Heq1. eapply MLE1 in Heq1. clarify.
+        inv MSG. eapply NONE in Heq2; eauto.
+      }
+      { hexploit Memory.get_disjoint.
+        { eapply GET0. }
+        { eapply Heq. }
+        i. des; clarify.
+      }
+    }
+    { exploit RESERVED; eauto.
+      { eapply FLAGS in FLAG. des; clarify. }
+      i. des. esplits; eauto.
+      i. eapply cancel_future_unchanged_loc in CANCEL; eauto. des.
+      inv MEM. rewrite UNCH in GETSRC. eauto.
+    }
+  }
+Qed.
+
 Variant sim_thread
         (f: Mapping.ts) (vers: versions)
         (flag_src: Loc.t -> bool)
@@ -278,6 +519,7 @@ Variant sim_thread
     (SIMCLOSED: sim_closed_memory f mem_src)
     (MAXTIMES: forall loc (FLAG: flag_src loc = true),
         srctm loc = Memory.max_ts loc mem_src)
+    (RESERVED: reserved_space_empty f flag_src lc_tgt.(Local.promises) mem_src)
 .
 
 Lemma max_value_src_exists loc mem lc
@@ -596,6 +838,7 @@ Proof.
     { eapply max_values_tgt_mon; eauto.
       { inv READ; ss. }
     }
+    { inv READ. ss. }
   }
   { i. inv SIM. specialize (MAXTGT loc). inv MAXTGT.
     hexploit MAX; eauto. i. des.
@@ -760,10 +1003,13 @@ Proof.
       eapply Thread.rtc_tau_step_future in STEPS; eauto.
       ss. des. eapply Memory.future_future_weak; eauto.
     }
-    { admit. }
+    { i. rewrite MAXTS. auto. }
+    { eapply reserved_space_empty_covered_decr; eauto.
+      i. eapply COVERED; eauto.
+    }
   }
   { eapply space_future_covered_decr. i. eapply COVERED; eauto. }
-Admitted.
+Qed.
 
 Lemma lower_write_memory_le prom0 mem0 loc from to msg prom1 mem1 kind
       (WRITE: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
@@ -1003,6 +1249,7 @@ Proof.
   { i. des_ifs. specialize (PERM loc).
     rewrite VAL in PERM. unfold option_rel in *. des_ifs.
   }
+  { eapply reserved_space_empty_reserve_decr; eauto. }
 Qed.
 
 Lemma sim_thread_tgt_write_na
@@ -1186,6 +1433,7 @@ Proof.
   { eapply cap_max_values_tgt; eauto. }
   { eapply versioned_memory_cap; eauto. }
   { i. ss. }
+  { ss. }
 Qed.
 
 Lemma sim_readable L f vw_src vw_tgt loc to_src to_tgt released_src released_tgt ord
@@ -1854,6 +2102,24 @@ Proof.
       { eapply add_unchanged_loc; eauto. }
       { eapply add_unchanged_loc; eauto. }
     }
+    { inv LOCAL. eapply reserved_space_empty_fulfilled_memory in RESERVE; try exact PROMISES0.
+      { ss. eapply reserved_space_empty_add.
+        { eapply reserved_space_empty_add.
+          { eapply RESERVE. }
+          { eauto. }
+          { eauto. }
+        }
+        { eauto. }
+        { eapply top_time_mon; eauto. left. eapply Time.incr_spec. }
+      }
+      { eauto. }
+      { eapply WF2. }
+      { ii. subst. inv WRITE. ss. clarify.
+        eapply memory_write_na_reserve_same_rev in GET; eauto.
+        rewrite PROMISES in GET. des_ifs.
+      }
+      { i. ss. des_ifs; auto. }
+    }
   }
   { eapply space_future_memory_trans_memory; eauto.
     eapply space_future_memory_trans_memory; [..|eauto].
@@ -2036,6 +2302,7 @@ Proof.
     { auto. }
     { auto. }
     { i. rewrite <- MAXTIMES; auto. inv LOCAL. rewrite SRCTM. eapply VIEWEQ; auto. }
+    { auto. }
   }
   { i. hexploit (MAXTGT loc). i. des; eauto.
     right. esplits; eauto.
@@ -3696,6 +3963,18 @@ Proof.
       2:{ eapply MEMSRC. }
       eapply write_unchanged_loc in CANCEL; eauto. des. auto.
     }
+    { ss. eapply reserved_space_empty_mon_strong; eauto.
+      eapply reserved_space_empty_reserve_decr.
+      { eapply reserved_space_empty_covered_decr; eauto.
+        i. inv WRITE. ss. inv LC2. eapply write_unchanged_loc in WRITE2.
+        { des. inv MEM2. inv COVER. erewrite UNCH in GET. econs; eauto. }
+        { ii. subst. rewrite FLAG in *. ss. }
+      }
+      { i. inv WRITE0. ss. inv LC2. eapply write_unchanged_loc in WRITE2.
+        { des. inv PROM0. erewrite UNCH in GET. eauto. }
+        { ii. subst. rewrite FLAG in *. ss. }
+      }
+    }
   }
   { eauto. }
   { eauto. }
@@ -3763,6 +4042,7 @@ Proof.
       }
     }
     { unfold f'. ii. eapply SIMCLOSED. des_ifs. eapply TIMES. auto. }
+    { eapply reserved_space_empty_mon_strong; eauto. }
   }
   { eapply versions_wf_mapping_mon; eauto. }
   { unfold f'. des_ifs. }
@@ -4567,6 +4847,18 @@ Proof.
       rewrite MAXTIMES; auto. eapply unchanged_loc_max_ts.
       2:{ eapply MEMSRC. }
       { eapply promise_unchanged_loc in CANCEL; eauto. des; eauto. }
+    }
+    { eapply reserved_space_empty_mon_strong; eauto.
+      eapply reserved_space_empty_reserve_decr.
+      { eapply reserved_space_empty_covered_decr; eauto.
+        i. eapply promise_unchanged_loc in CANCEL.
+        { des. inv MEM1. inv COVER. erewrite UNCH in GET. econs; eauto. }
+        { ii. subst. rewrite FLAG in *. ss. }
+      }
+      { i. eapply promise_unchanged_loc in PROMISE0.
+        { des. inv PROM0. erewrite UNCH in GET. eauto. }
+        { ii. subst. rewrite FLAG in *. ss. }
+      }
     }
   }
 Qed.

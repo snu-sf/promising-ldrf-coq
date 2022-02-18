@@ -553,7 +553,32 @@ Proof.
   { eauto. }
   { eapply TS0. }
   { inv LOCAL. rewrite MAXTIMES; auto. refl. }
-  { i. admit. }
+  { i. inv MAX2. destruct (Time.le_lt_dec (View.pln (TView.cur tvw0) loc) to_tgt).
+    { exfalso. inv l.
+      { hexploit memory_get_from_mon.
+        { eapply GET0. }
+        { eapply LOCALTGT. eapply GET. }
+        { eauto. }
+        i. timetac.
+      }
+      { inv H. rewrite GET in NONE. ss. }
+    }
+    { destruct (classic (msg_tgt = Message.reserve)); cycle 1.
+      { exfalso. exploit CONSISTENT; eauto. i. ss. eapply Time.lt_strorder.
+        eapply TimeFacts.lt_le_lt.
+        { eapply x. }
+        { etrans.
+          { left. eapply l. }
+          { eapply LOCALTGT. }
+        }
+      }
+      splits; auto. i. subst.
+      exploit RESERVED; eauto. i. des.
+      eapply sim_timestamp_exact_inject in TO; eauto. subst.
+      eapply sim_timestamp_exact_inject in FROM; eauto. subst.
+      eauto.
+    }
+  }
   { eauto. }
   i. des.
   inv MAX0. inv MAX2. ss.
@@ -681,6 +706,10 @@ Proof.
       { eapply added_memory_unchanged_loc; eauto. }
       { eapply MEMSRC. }
     }
+    { ss. ii. unfold f'. des_ifs. hexploit (RESERVED loc0); eauto.
+      i. des. esplits; eauto. i.
+      inv MEM0. rewrite OTHER in GETSRC; eauto.
+    }
   }
   { eauto. }
   { eauto. }
@@ -714,4 +743,4 @@ Proof.
     { eauto. }
     { eauto. }
   }
-Admitted.
+Qed.

@@ -932,6 +932,7 @@ Proof.
     { auto. }
     { auto. }
     { ss. }
+    { ss. }
   }
   { i. hexploit VALSRC; eauto. }
   { i. hexploit (MAXTGT1 loc); eauto. i. des. eapply VALTGT; auto. }

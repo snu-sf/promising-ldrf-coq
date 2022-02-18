@@ -4897,6 +4897,25 @@ Proof.
   ss. des; clarify. eapply Memory.lower_get0 in LOWER. des; auto.
 Qed.
 
+Lemma memory_lower_max_ts mem0 loc from to msg0 msg1 mem1
+      (LOWER: Memory.lower mem0 loc from to msg0 msg1 mem1)
+      (INHABITED: Memory.inhabited mem0)
+  :
+    forall loc0, Memory.max_ts loc0 mem1 = Memory.max_ts loc0 mem0.
+Proof.
+  i. specialize (INHABITED loc0).
+  eapply Memory.max_ts_spec in INHABITED. des.
+  hexploit Memory.lower_get1; eauto. i. des.
+  eapply Memory.max_ts_spec in GET2. des.
+  eapply TimeFacts.antisym; eauto.
+  erewrite Memory.lower_o in GET0; eauto. des_ifs.
+  { ss. des; clarify.
+    eapply Memory.lower_get0 in LOWER. des.
+    eapply Memory.max_ts_spec in GET0. des; eauto.
+  }
+  { eapply Memory.max_ts_spec in GET0. des; eauto. }
+Qed.
+
 Lemma tgt_flag_up_sim_promises srctm flag_src flag_tgt f vers prom_src0 prom_tgt mem_src0 mem_tgt loc
       (MEM: sim_memory srctm flag_src f vers mem_src0 mem_tgt)
       (PROMS: sim_promises srctm flag_src flag_tgt f vers prom_src0 prom_tgt)
@@ -4919,7 +4938,8 @@ Lemma tgt_flag_up_sim_promises srctm flag_src flag_tgt f vers prom_src0 prom_tgt
           max_readable mem_src0 prom_src0 loc0 to val released
           <->
             max_readable mem_src1 prom_src1 loc0 to val released>>) /\
-      (<<COVERED: forall loc ts, covered loc ts mem_src1 <-> covered loc ts mem_src0>>)
+      (<<COVERED: forall loc ts, covered loc ts mem_src1 <-> covered loc ts mem_src0>>) /\
+      (<<MAXTS: forall loc, Memory.max_ts loc mem_src1 = Memory.max_ts loc mem_src0>>)
 .
 Proof.
   assert (exists dom,
@@ -4942,7 +4962,8 @@ Proof.
               <->
               max_readable mem_src1 prom_src1 loc0 to val released>>) /\
           (<<MEM: sim_memory srctm flag_src f vers mem_src1 mem_tgt>>) /\
-          (<<COVERED: forall loc ts, covered loc ts mem_src1 <-> covered loc ts mem_src0>>)).
+          (<<COVERED: forall loc ts, covered loc ts mem_src1 <-> covered loc ts mem_src0>>) /\
+          (<<MAXTS: forall loc, Memory.max_ts loc mem_src1 = Memory.max_ts loc mem_src0>>)).
   { i. des. esplits.
     { eauto. }
     { inv LOWERPROMS. econs.
@@ -5018,6 +5039,7 @@ Proof.
     { auto. }
     { auto. }
     { auto. }
+    { auto. }
   }
   { clear TS PROMS. revert prom_src0 mem_src0 DOM MEM MLE INHABITED.
     induction dom; i; ss.
@@ -5025,6 +5047,7 @@ Proof.
       { refl. }
       { econs; ss. }
       { refl. }
+      { auto. }
       { auto. }
       { auto. }
     }
@@ -5105,6 +5128,7 @@ Proof.
           }
         }
         { i. etrans; eauto. eapply lower_covered; eauto. }
+        { i. rewrite MAXTS. erewrite memory_lower_max_ts; eauto. }
       }
       { hexploit (@IHdom prom_src0 mem_src0); auto.
         { i. hexploit DOM; eauto. i. des; clarify.
