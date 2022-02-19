@@ -38,7 +38,6 @@ Require Import SeqLib.
 Require Import gSimAux.
 
 Set Implicit Arguments.
-Set Nested Proofs Allowed.
 
 
 Definition is_promise (e: ThreadEvent.t): Prop :=
@@ -54,8 +53,8 @@ Definition release_event (e: ThreadEvent.t): Prop :=
   | ThreadEvent.fence _ ordw => Ordering.le Ordering.strong_relaxed ordw
   | ThreadEvent.syscall _ => True
   | ThreadEvent.failure => True
-  | ThreadEvent.racy_write _ _ _ => True
-  | ThreadEvent.racy_update _ _ _ _ _ => True
+  | ThreadEvent.racy_write _ _ _ _ => True
+  | ThreadEvent.racy_update _ _ _ _ _ _ => True
   | _ => False
   end.
 
@@ -1661,14 +1660,14 @@ Proof.
 Qed.
 
 Lemma future_is_racy
-      lc1 mem1 loc ord
+      lc1 mem1 loc to ord
       lc1' mem1'
-      (STEP: Local.is_racy lc1 mem1 loc ord)
+      (STEP: Local.is_racy lc1 mem1 loc to ord)
       (LOCAL1: lower_local lc1' lc1)
       (MEM1: Memory.future_weak mem1 mem1')
       (WF: Local.wf lc1 mem1)
       (CLOSED: Memory.closed mem1):
-  <<STEP': Local.is_racy lc1' mem1' loc ord>>.
+  <<STEP': Local.is_racy lc1' mem1' loc to ord>>.
 Proof.
   inv STEP. inv LOCAL1. ss.
   exploit Memory.future_weak_get1; eauto. i. des.

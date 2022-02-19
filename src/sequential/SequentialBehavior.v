@@ -19,6 +19,7 @@ Require Import SeqLib.
 Require Import Simple.
 Require Import OracleFacts.
 
+Require Import SeqAux.
 Require Import SimAux.
 
 Set Implicit Arguments.
