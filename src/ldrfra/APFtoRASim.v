@@ -1289,11 +1289,11 @@ Module APFtoRASim.
 
     Lemma is_racy
           rels lc1_src mem1_src
-          lc1_tgt mem1_tgt loc ord
+          lc1_tgt mem1_tgt loc to ord
           (LC1: sim_local lc1_src lc1_tgt)
           (MEM1: sim_memory rels mem1_src mem1_tgt)
-          (STEP_TGT: Local.is_racy lc1_tgt mem1_tgt loc ord):
-      (<<STEP_SRC: Local.is_racy lc1_src mem1_src loc ord>>).
+          (STEP_TGT: Local.is_racy lc1_tgt mem1_tgt loc to ord):
+      (<<STEP_SRC: Local.is_racy lc1_src mem1_src loc to ord>>).
     Proof.
       inv LC1. inv TVIEW. inv MEM1. inv STEP_TGT.
       rewrite <- PROMISES, <- CUR in *.
@@ -1305,12 +1305,12 @@ Module APFtoRASim.
 
     Lemma racy_read_step
           rels lc1_src mem1_src
-          lc1_tgt mem1_tgt loc val ord
+          lc1_tgt mem1_tgt loc to val ord
           (LC1: sim_local lc1_src lc1_tgt)
           (MEM1: sim_memory rels mem1_src mem1_tgt)
           (LOC: ~ L loc)
-          (STEP_TGT: Local.racy_read_step lc1_tgt mem1_tgt loc val ord):
-      (<<STEP_SRC: OrdLocal.racy_read_step L Ordering.acqrel lc1_src mem1_src loc val ord>>).
+          (STEP_TGT: Local.racy_read_step lc1_tgt mem1_tgt loc to val ord):
+      (<<STEP_SRC: OrdLocal.racy_read_step L Ordering.acqrel lc1_src mem1_src loc to val ord>>).
     Proof.
       inv STEP_TGT.
       exploit is_racy; eauto. i. des.
@@ -1319,12 +1319,12 @@ Module APFtoRASim.
 
     Lemma racy_write_step
           rels lc1_src mem1_src
-          lc1_tgt mem1_tgt loc ord
+          lc1_tgt mem1_tgt loc to ord
           (LC1: sim_local lc1_src lc1_tgt)
           (MEM1: sim_memory rels mem1_src mem1_tgt)
           (LOC: ~ L loc)
-          (STEP_TGT: Local.racy_write_step lc1_tgt mem1_tgt loc ord):
-      (<<STEP_SRC: OrdLocal.racy_write_step L Ordering.acqrel lc1_src mem1_src loc ord>>).
+          (STEP_TGT: Local.racy_write_step lc1_tgt mem1_tgt loc to ord):
+      (<<STEP_SRC: OrdLocal.racy_write_step L Ordering.acqrel lc1_src mem1_src loc to ord>>).
     Proof.
       inv STEP_TGT.
       exploit is_racy; eauto. i. des.
@@ -1334,11 +1334,11 @@ Module APFtoRASim.
 
     Lemma racy_update_step
           rels lc1_src mem1_src
-          lc1_tgt mem1_tgt loc ordr ordw
+          lc1_tgt mem1_tgt loc to ordr ordw
           (LC1: sim_local lc1_src lc1_tgt)
           (MEM1: sim_memory rels mem1_src mem1_tgt)
-          (STEP_TGT: Local.racy_update_step lc1_tgt mem1_tgt loc ordr ordw):
-      (<<STEP_SRC: Local.racy_update_step lc1_src mem1_src loc ordr ordw>>).
+          (STEP_TGT: Local.racy_update_step lc1_tgt mem1_tgt loc to ordr ordw):
+      (<<STEP_SRC: Local.racy_update_step lc1_src mem1_src loc to ordr ordw>>).
     Proof.
       hexploit sim_local_promise_consistent; try eapply LC1; try by inv STEP_TGT; ss. i.
       inv STEP_TGT; eauto.
@@ -1378,17 +1378,17 @@ Module APFtoRASim.
     | sim_event_failure:
       sim_event ThreadEvent.failure ThreadEvent.failure
     | sim_event_racy_read
-        loc val ord:
-      sim_event (ThreadEvent.racy_read loc val ord)
-                (ThreadEvent.racy_read loc val ord)
+        loc to val ord:
+      sim_event (ThreadEvent.racy_read loc to val ord)
+                (ThreadEvent.racy_read loc to val ord)
     | sim_event_racy_write
-        loc val ord:
-      sim_event (ThreadEvent.racy_write loc val ord)
-                (ThreadEvent.racy_write loc val ord)
+        loc to val ord:
+      sim_event (ThreadEvent.racy_write loc to val ord)
+                (ThreadEvent.racy_write loc to val ord)
     | sim_event_racy_update
-        loc valr valw ordr ordw:
-      sim_event (ThreadEvent.racy_update loc valr valw ordr ordw)
-                (ThreadEvent.racy_update loc valr valw ordr ordw)
+        loc to valr valw ordr ordw:
+      sim_event (ThreadEvent.racy_update loc to valr valw ordr ordw)
+                (ThreadEvent.racy_update loc to valr valw ordr ordw)
     .
     Hint Constructors sim_event.
 
@@ -1418,10 +1418,10 @@ Module APFtoRASim.
           (PROMISE: forall loc from to msg kind
                       (EVENT: e_tgt = ThreadEvent.promise loc from to msg kind),
               L loc /\ msg = Message.reserve)
-          (RACY_READ: forall loc val ord (EVENT: e_tgt = ThreadEvent.racy_read loc val ord), ~ L loc)
-          (RACY_WRITE: forall loc val ord (EVENT: e_tgt = ThreadEvent.racy_write loc val ord), ~ L loc)
-          (RACY_UPDATE: forall loc valr valw ordr ordw
-                          (EVENT: e_tgt = ThreadEvent.racy_update loc valr valw ordr ordw),
+          (RACY_READ: forall loc to val ord (EVENT: e_tgt = ThreadEvent.racy_read loc to val ord), ~ L loc)
+          (RACY_WRITE: forall loc to val ord (EVENT: e_tgt = ThreadEvent.racy_write loc to val ord), ~ L loc)
+          (RACY_UPDATE: forall loc to valr valw ordr ordw
+                          (EVENT: e_tgt = ThreadEvent.racy_update loc to valr valw ordr ordw),
               ~ L loc \/ Ordering.le ordr Ordering.na \/ Ordering.le ordw Ordering.na)
           (STEP_TGT: OrdThread.step L Ordering.na Ordering.plain pf e_tgt e1_tgt e2_tgt):
       (exists e_src e2_src,

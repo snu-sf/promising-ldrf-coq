@@ -78,11 +78,11 @@ Inductive sim_load: forall R
       (Vis i2 (fun v2 => Ret (v1, v2))) lc1_tgt sc1_tgt mem1_tgt
 | sim_load_racy_read
     R
-    l1 v1 o1 (i2: MemE.t R)
+    l1 t1 v1 o1 (i2: MemE.t R)
     lc1_src sc1_src mem1_src
     lc1_tgt sc1_tgt mem1_tgt
     (REORDER: reorder_load l1 o1 i2)
-    (READ: Local.racy_read_step lc1_src mem1_src l1 v1 o1)
+    (READ: Local.racy_read_step lc1_src mem1_src l1 t1 v1 o1)
     (LOCAL: sim_local SimPromises.bot lc1_src lc1_tgt)
     (SC: TimeMap.le sc1_src sc1_tgt)
     (MEMORY: sim_memory mem1_src mem1_tgt)

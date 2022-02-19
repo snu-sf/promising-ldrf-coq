@@ -346,12 +346,12 @@ Lemma sim_local_is_racy_relfenced
       pview
       lc1_src mem1_src
       lc1_tgt mem1_tgt
-      loc ord_src ord_tgt
-      (STEP_TGT: Local.is_racy lc1_tgt mem1_tgt loc ord_tgt)
+      loc to ord_src ord_tgt
+      (STEP_TGT: Local.is_racy lc1_tgt mem1_tgt loc to ord_tgt)
       (LOCAL1: sim_local pview lc1_src (local_relfenced lc1_tgt))
       (MEM1: sim_memory mem1_src mem1_tgt)
       (ORD: Ordering.le ord_src ord_tgt):
-    <<STEP_SRC: Local.is_racy lc1_src mem1_src loc ord_src>>.
+    <<STEP_SRC: Local.is_racy lc1_src mem1_src loc to ord_src>>.
 Proof.
   inv LOCAL1. inv STEP_TGT.
   exploit sim_memory_get; try apply GET; try apply MEM1. i. des.
@@ -368,12 +368,12 @@ Lemma sim_local_racy_read_relfenced
       pview
       lc1_src mem1_src
       lc1_tgt mem1_tgt
-      loc val ord_src ord_tgt
-      (STEP_TGT: Local.racy_read_step lc1_tgt mem1_tgt loc val ord_tgt)
+      loc to val ord_src ord_tgt
+      (STEP_TGT: Local.racy_read_step lc1_tgt mem1_tgt loc to val ord_tgt)
       (LOCAL1: sim_local pview lc1_src (local_relfenced lc1_tgt))
       (MEM1: sim_memory mem1_src mem1_tgt)
       (ORD: Ordering.le ord_src ord_tgt):
-    <<STEP_SRC: Local.racy_read_step lc1_src mem1_src loc val ord_src>>.
+    <<STEP_SRC: Local.racy_read_step lc1_src mem1_src loc to val ord_src>>.
 Proof.
   inv STEP_TGT.
   exploit sim_local_is_racy_relfenced; eauto.
@@ -383,12 +383,12 @@ Lemma sim_local_racy_write_relfenced
       pview
       lc1_src mem1_src
       lc1_tgt mem1_tgt
-      loc ord_src ord_tgt
-      (STEP_TGT: Local.racy_write_step lc1_tgt mem1_tgt loc ord_tgt)
+      loc to ord_src ord_tgt
+      (STEP_TGT: Local.racy_write_step lc1_tgt mem1_tgt loc to ord_tgt)
       (LOCAL1: sim_local pview lc1_src (local_relfenced lc1_tgt))
       (MEM1: sim_memory mem1_src mem1_tgt)
       (ORD: Ordering.le ord_src ord_tgt):
-    <<STEP_SRC: Local.racy_write_step lc1_src mem1_src loc ord_src>>.
+    <<STEP_SRC: Local.racy_write_step lc1_src mem1_src loc to ord_src>>.
 Proof.
   inv STEP_TGT.
   exploit sim_local_is_racy_relfenced; eauto. i. des.
@@ -401,13 +401,13 @@ Lemma sim_local_racy_update_relfenced
       pview
       lc1_src mem1_src
       lc1_tgt mem1_tgt
-      loc ordr_src ordw_src ordr_tgt ordw_tgt
-      (STEP_TGT: Local.racy_update_step lc1_tgt mem1_tgt loc ordr_tgt ordw_tgt)
+      loc to ordr_src ordw_src ordr_tgt ordw_tgt
+      (STEP_TGT: Local.racy_update_step lc1_tgt mem1_tgt loc to ordr_tgt ordw_tgt)
       (LOCAL1: sim_local pview lc1_src (local_relfenced lc1_tgt))
       (MEM1: sim_memory mem1_src mem1_tgt)
       (ORDR: Ordering.le ordr_src ordr_tgt)
       (ORDW: Ordering.le ordw_src ordw_tgt):
-    <<STEP_SRC: Local.racy_update_step lc1_src mem1_src loc ordr_src ordw_src>>.
+    <<STEP_SRC: Local.racy_update_step lc1_src mem1_src loc to ordr_src ordw_src>>.
 Proof.
   hexploit sim_local_promise_consistent; try exact LOCAL1.
   { ii. ss. inv STEP_TGT; eauto. }

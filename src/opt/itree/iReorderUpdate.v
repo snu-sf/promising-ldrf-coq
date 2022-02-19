@@ -89,12 +89,12 @@ Inductive sim_update: forall R
       (Vis i2 (fun v2 => Ret (vret1, v2))) lc1_tgt sc1_tgt mem1_tgt
 | sim_update_racy_update
     R
-    l1 vr1 vret1 rmw1 or1 ow1 (i2: MemE.t R)
+    l1 t1 vr1 vret1 rmw1 or1 ow1 (i2: MemE.t R)
     lc1_src sc1_src mem1_src
     lc1_tgt sc1_tgt mem1_tgt
     (RMW: ILang.eval_rmw rmw1 vr1 vret1 None)
     (REORDER: reorder_update l1 or1 ow1 i2)
-    (RACY_READ: Local.racy_read_step lc1_src mem1_src l1 vr1 or1)
+    (RACY_READ: Local.racy_read_step lc1_src mem1_src l1 t1 vr1 or1)
     (LOCAL: sim_local SimPromises.bot lc1_src lc1_tgt)
     (SC: TimeMap.le sc1_src sc1_tgt)
     (MEMORY: sim_memory mem1_src mem1_tgt)
@@ -501,11 +501,11 @@ Inductive sim_update_race:
   forall R (st_src:itree MemE.t (Const.t * R)%type) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t), Prop :=
 | sim_update_race_intro
     R
-    l1 vr1 vret1 vw1 rmw1 or1 ow1 (i2: MemE.t R)
+    l1 t1 vr1 vret1 vw1 rmw1 or1 ow1 (i2: MemE.t R)
     lc1_src sc1_src mem1_src
     (RMW: ILang.eval_rmw rmw1 vr1 vret1 (Some vw1))
     (REORDER: reorder_update l1 or1 ow1 i2)
-    (RACY_UPDATE: Local.racy_update_step lc1_src mem1_src l1 or1 ow1)
+    (RACY_UPDATE: Local.racy_update_step lc1_src mem1_src l1 t1 or1 ow1)
     (WF_SRC: Local.wf lc1_src mem1_src)
     (SC_SRC: Memory.closed_timemap sc1_src mem1_src)
     (MEM_SRC: Memory.closed mem1_src):
@@ -530,7 +530,8 @@ Proof.
       * ss.
     + econs 2. econs; [|econs 11].
       * econs; eauto.
-      * assert (CONS: Local.promise_consistent lc2).
+      * instantiate (1:=t1).
+        assert (CONS: Local.promise_consistent lc2).
         { ii. rewrite <- PROMISES, <- TVIEW_RLX in *. inv RACY_UPDATE; eauto. }
         inv RACY_UPDATE.
         { econs 1; eauto. }
@@ -560,7 +561,8 @@ Proof.
       * ss.
     + econs 2. econs; [|econs 11].
       * econs; eauto.
-      * inv RACY_UPDATE.
+      * instantiate (1:=t1).
+        inv RACY_UPDATE.
         { econs 1; eauto. }
         { econs 2; eauto. }
         { inv RACE.

@@ -251,11 +251,11 @@ Inductive sim_store_race:
   forall R (st_src:itree MemE.t (unit * R)%type) (lc_src:Local.t) (sc1_src:TimeMap.t) (mem1_src:Memory.t), Prop :=
 | sim_store_race_intro
     R
-    l1 v1 o1 (i2: MemE.t R)
+    l1 t1 v1 o1 (i2: MemE.t R)
     lc1_src sc1_src mem1_src
     lc1_tgt sc1_tgt mem1_tgt
     (REORDER: reorder_store l1 o1 i2)
-    (RACY_WRITE: Local.racy_write_step lc1_src mem1_src l1 o1)
+    (RACY_WRITE: Local.racy_write_step lc1_src mem1_src l1 t1 o1)
     (LOCAL: sim_local SimPromises.bot lc1_src lc1_tgt)
     (SC: TimeMap.le sc1_src sc1_tgt)
     (MEMORY: sim_memory mem1_src mem1_tgt)
@@ -309,7 +309,8 @@ Proof.
       * ss.
     + econs 2. econs; [|econs 10].
       * econs. econs.
-      * inv RACY_WRITE. inv RACE.
+      * instantiate (1:=t1).
+        inv RACY_WRITE. inv RACE.
         exploit Thread.rtc_tau_step_non_promised; try exact STEPS0; eauto. s. i. des.
         exploit Local.program_step_non_promised; [econs 3|..]; try exact STEP; eauto. i. des.
         econs; eauto.
