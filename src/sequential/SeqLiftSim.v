@@ -302,6 +302,8 @@ Proof.
   { eapply initial_versioned_memory. }
   { eapply initial_sim_closed_memory. }
   { i. ss. }
+  { ii. ss. }
+  { ii. ss. erewrite Memory.bot_get in GETSRC. ss. }
 Qed.
 
 Require Import Program.

@@ -520,6 +520,7 @@ Variant sim_thread
     (MAXTIMES: forall loc (FLAG: flag_src loc = true),
         srctm loc = Memory.max_ts loc mem_src)
     (RESERVED: reserved_space_empty f flag_src lc_tgt.(Local.promises) mem_src)
+    (FINALIZED: promise_finalized f lc_src.(Local.promises) mem_tgt)
 .
 
 Lemma max_value_src_exists loc mem lc
@@ -990,6 +991,7 @@ Proof.
   }
   { eapply LOCAL. }
   { eapply MEM. }
+  { auto. }
   i. des. esplits; [eapply STEPS|..].
   { i. ss. eapply NONE; eauto. }
   { econs; auto.
@@ -1434,6 +1436,10 @@ Proof.
   { eapply versioned_memory_cap; eauto. }
   { i. ss. }
   { ss. }
+  { ii. exploit FINALIZED; eauto. i. des. esplits; eauto.
+    { eapply PRESERVE; eauto. refl. }
+    { eapply Memory.cap_le; eauto. refl. }
+  }
 Qed.
 
 Lemma sim_readable L f vw_src vw_tgt loc to_src to_tgt released_src released_tgt ord
@@ -2120,6 +2126,11 @@ Proof.
       }
       { i. ss. des_ifs; auto. }
     }
+    { eapply promise_finalized_promise_decr.
+      { eapply FINALIZED. }
+      i. ss. left. rewrite PROMISES in GETSRC. des_ifs.
+      esplits; eauto.
+    }
   }
   { eapply space_future_memory_trans_memory; eauto.
     eapply space_future_memory_trans_memory; [..|eauto].
@@ -2302,6 +2313,7 @@ Proof.
     { auto. }
     { auto. }
     { i. rewrite <- MAXTIMES; auto. inv LOCAL. rewrite SRCTM. eapply VIEWEQ; auto. }
+    { auto. }
     { auto. }
   }
   { i. hexploit (MAXTGT loc). i. des; eauto.
@@ -3644,6 +3656,18 @@ Proof.
       i. des. esplits; eauto. i.
       inv MEM0. rewrite OTHER in GETSRC; eauto.
     }
+    { unfold f'. ii. ss. inv PROMISES.
+      destruct (Loc.eq_dec loc0 loc); subst.
+      { eapply SOUND in GETSRC. des.
+        { hexploit sim_promises_none; eauto. i. rewrite GET1 in H. ss. }
+        { eapply list_Forall2_in2 in FORALL; eauto. des.
+          destruct b as [[from_tgt to_tgt] msg_tgt]. des.
+          eapply COMPLETE in IN0. eapply LOCALTGT in IN0.
+          esplits; eauto. inv MESSAGE; ss.
+        }
+      }
+      { erewrite OTHER in GETSRC; eauto. }
+    }
   }
   { eauto. }
   { eauto. }
@@ -3957,6 +3981,28 @@ Proof.
       inv MEM0. rewrite OTHER in GETSRC; eauto.
       erewrite Memory.add_o in GETSRC; eauto. des_ifs; eauto.
       ss. des; clarify.
+    }
+    { unfold f'. ii. ss. inv PROMISES.
+      destruct (Loc.eq_dec loc0 loc); subst.
+      { eapply SOUND in GETSRC. des.
+        { erewrite Memory.add_o in GET1; eauto. des_ifs.
+          { ss. des; clarify. esplits.
+            { eapply sim_timestamp_exact_mon_strong; [..|eauto]; eauto. }
+            { eauto. }
+            { ss. }
+          }
+          { hexploit sim_promises_none; eauto. i. rewrite GET1 in H. ss. }
+        }
+        { eapply list_Forall2_in2 in FORALL; eauto. des.
+          destruct b as [[from_tgt to_tgt] msg_tgt]. des.
+          eapply COMPLETE in IN0. eapply LOCALTGT in IN0.
+          esplits; eauto. inv MESSAGE; ss.
+        }
+      }
+      { erewrite OTHER in GETSRC; eauto.
+        erewrite Memory.add_o in GETSRC; eauto. des_ifs; eauto.
+        ss. des; clarify.
+      }
     }
   }
   { eauto. }
@@ -4913,6 +4959,7 @@ Proof.
         { ii. subst. rewrite FLAG in *. ss. }
       }
     }
+    { auto. }
   }
   { eauto. }
   { eauto. }
@@ -4981,6 +5028,7 @@ Proof.
     }
     { unfold f'. ii. eapply SIMCLOSED. des_ifs. eapply TIMES. auto. }
     { eapply reserved_space_empty_mon_strong; eauto. }
+    { eapply promise_finalized_mon_strong; eauto. }
   }
   { eapply versions_wf_mapping_mon; eauto. }
   { unfold f'. des_ifs. }

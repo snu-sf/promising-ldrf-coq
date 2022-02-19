@@ -379,12 +379,15 @@ Lemma sim_promises_past_update
                      (TO: sim_timestamp_exact (f loc) (f loc).(Mapping.ver) to_src to_tgt)
                      (GET: Memory.get loc to mem_src0 = Some (from, msg)),
           Interval.disjoint (from_src, to_src) (from, to))
+      (FINALIZED: promise_finalized f prom_src0 mem_tgt)
       lang st tvw sc,
     exists prom_src1 mem_src1,
       (<<STEPS: rtc (tau (@pred_step is_promise _)) (Thread.mk lang st (Local.mk tvw prom_src0) sc mem_src0) (Thread.mk lang st (Local.mk tvw prom_src1) sc mem_src1)>>) /\
       (<<SIMMEM: sim_memory srctm (fun _ => false) f vers mem_src1 mem_tgt>>) /\
       (<<SIMPROM: sim_promises srctm (fun _ => false) flag_tgt f vers prom_src1 prom_tgt>>) /\
-      (<<SPACE: space_future_memory (unchangable mem_tgt prom_tgt) f mem_src0 f mem_src1>>).
+      (<<SPACE: space_future_memory (unchangable mem_tgt prom_tgt) f mem_src0 f mem_src1>>) /\
+      (<<FINALIZED: promise_finalized f prom_src1 mem_tgt>>)
+.
 Proof.
   pose proof mapping_latest_wf_loc as VERWF.
   induction reserves.
@@ -393,6 +396,7 @@ Proof.
     { eauto. }
     { eapply sim_promises_past_nil_sim_promises; eauto. }
     { eapply space_future_memory_refl; eauto. refl. }
+    { auto. }
   }
   i. destruct a as [[loc from_tgt] to_tgt].
   hexploit sim_promises_past_get_reserve; eauto.
@@ -440,6 +444,10 @@ Proof.
     }
     { eapply EMPTY; eauto. right. auto. }
   }
+  { eapply promise_finalized_promise_decr; eauto. i. left.
+    dup GETSRC0. erewrite Memory.add_o in GETSRC0; eauto. erewrite Memory.remove_o in GETSRC0; eauto.
+    des_ifs. esplits; eauto.
+  }
   i. des. esplits.
   { econs 2.
     { econs 1.
@@ -475,6 +483,7 @@ Proof.
     }
     { eauto. }
   }
+  { auto. }
 Qed.
 
 Lemma to_NoDup A (l: list A)
@@ -826,6 +835,15 @@ Proof.
     }
     { exfalso. hexploit non_max_readable_future; eauto. }
   }
+  assert (FINALIZED0: promise_finalized f1 prom_src mem_tgt0).
+  { ii. ss. exploit FINALIZED; eauto. i. des.
+    assert (SIMTS: sim_timestamp_exact (f1 loc) (f1 loc).(Mapping.ver) to_src to_tgt).
+    { apply NNPP. ii. eapply map_future_memory_undef in H; eauto. des.
+      eapply UNDEF. esplits; eauto.
+      eapply sim_memory_top_time_none; eauto.
+    }
+    esplits; eauto.
+  }
   hexploit (choice (fun loc v_tgt =>
                       (<<MAX: max_value_tgt loc v_tgt mem_tgt1 (Local.mk tvw_tgt prom_tgt)>>) /\
                       (<<OPTREL: option_rel (fun _ _ => True) (vs_src1 loc) v_tgt>>) /\
@@ -869,18 +887,11 @@ Proof.
           { eapply mapping_latest_wf_loc. }
         }
         { inv MSG0; ss. }
-        i. hexploit sim_promises_get_if; eauto. i. des.
-        { assert (SIMTS: sim_timestamp_exact (f1 loc) (f1 loc).(Mapping.ver) to_src to_tgt).
-          { eapply NNPP. ii.
-            hexploit map_future_memory_undef; eauto. i. des.
-            eapply UNDEF. esplits; eauto.
-            { inv MSG1; inv MSG0; ss. }
-            { eapply sim_memory_top_time_none; eauto. }
-          }
-          eapply sim_timestamp_exact_unique in TO; eauto. subst.
-          dup GET5. eapply LOCALTGT1 in GET5. rewrite GET5 in GET3. inv GET3. auto.
-        }
-        { admit. }
+        i. exploit FINALIZED0; eauto.
+        { inv MSG0; ss. }
+        i. des. eapply sim_timestamp_exact_unique in TO; eauto. subst.
+        exploit MAX3; eauto. i.
+        erewrite x. eapply LOCALTGT1 in x. rewrite x in GET3. auto.
       }
     }
     { i. hexploit (CLOSEDFUTURE.(closed_future_cur).(closed_future_pln) loc).
@@ -902,6 +913,7 @@ Proof.
   { ss. replace (View.rlx (TView.cur tvw_src)) with srctm; eauto.
     extensionality loc. auto.
   }
+  { eapply promise_finalized_future; eauto. }
   i. des. ss. esplits.
   { eapply rtc_implies; [|eauto]. i. inv H. econs; eauto. inv TSTEP. auto. }
   hexploit sim_closed_memory_map_exists.
@@ -933,6 +945,7 @@ Proof.
     { auto. }
     { ss. }
     { ss. }
+    { eapply promise_finalized_mon_strong; eauto. }
   }
   { i. hexploit VALSRC; eauto. }
   { i. hexploit (MAXTGT1 loc); eauto. i. des. eapply VALTGT; auto. }
@@ -942,4 +955,4 @@ Proof.
   }
   { auto. }
   { auto. }
-Admitted.
+Qed.
