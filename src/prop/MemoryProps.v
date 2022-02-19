@@ -4143,11 +4143,13 @@ Section CONCRETEMAX.
   Inductive concrete_promise_max_ts mem prom loc ts: Prop :=
   | concrete_or_promise_max_ts_intro
       (EXISTS:
-         (<<CONCRETE: exists from val released,
-             (<<GET: Memory.get loc ts mem = Some (from, Message.concrete val released)>>)>>) \/
+         (<<CONCRETE: exists from msg,
+             (<<GET: Memory.get loc ts mem = Some (from, msg)>>) /\
+             (<<RESERVE: msg <> Message.reserve>>)>>) \/
          (<<PROMISE: exists from msg, (<<GET: Memory.get loc ts prom = Some (from, msg)>>)>>))
-      (CONCRETE: forall to from val released
-                        (GET: Memory.get loc to mem = Some (from, Message.concrete val released)),
+      (CONCRETE: forall to from msg
+                        (GET: Memory.get loc to mem = Some (from, msg))
+                        (RESERVE: msg <> Message.reserve),
           Time.le to ts)
       (PROMISE: forall to from msg
                        (GET: Memory.get loc to prom = Some (from, msg)),
@@ -4162,12 +4164,12 @@ Section CONCRETEMAX.
   Proof.
     eapply TimeFacts.antisym.
     { inv MAX0. des.
-      { eapply MAX1 in GET. auto. }
-      { eapply MAX1 in GET. auto. }
+      { eapply MAX1 in GET; auto. }
+      { eapply MAX1 in GET; auto. }
     }
     { inv MAX1. des.
-      { eapply MAX0 in GET. auto. }
-      { eapply MAX0 in GET. auto. }
+      { eapply MAX0 in GET; auto. }
+      { eapply MAX0 in GET; auto. }
     }
   Qed.
 
@@ -4176,22 +4178,20 @@ Section CONCRETEMAX.
     :
       exists ts, (<<MAX: concrete_promise_max_ts mem prom loc ts>>).
   Proof.
-    exploit Memory.max_concrete_ts_exists; eauto. intros [max MAX].
-    exploit Memory.max_concrete_ts_spec.
-    { eapply MAX. }
-    { eapply INHABITED. } i. des.
+    exploit Memory.max_non_reserve_ts_exists; eauto. intros [max MAX].
+    exploit Memory.max_non_reserve_ts_spec; try apply INHABITED; eauto; ss. i. des.
     destruct (classic (exists to from msg, (<<INHABITED: Memory.get loc to prom = Some (from, msg)>>))).
     { des. eapply Cell.max_ts_spec in INHABITED0. des.
       exists (Time.join max (Cell.max_ts (prom loc))). econs.
       { unfold Time.join. des_ifs; eauto. left. eauto. }
       { i. etrans; [|eapply Time.join_l].
-        eapply Memory.max_concrete_ts_spec in GET1; eauto. des. auto. }
+        eapply Memory.max_non_reserve_ts_spec in GET2; eauto. des. auto. }
       { i. etrans; [|eapply Time.join_r].
-        eapply Cell.max_ts_spec in GET1; eauto. des. auto. }
+        eapply Cell.max_ts_spec in GET2; eauto. des. auto. }
     }
     { exists max. econs.
       { left. eauto. }
-      { i. eapply Memory.max_concrete_ts_spec in GET0; eauto. des. auto. }
+      { i. eapply Memory.max_non_reserve_ts_spec in GET1; eauto. des. auto. }
       { i. exfalso. eauto. }
     }
   Qed.
@@ -4209,7 +4209,7 @@ Section CONCRETEMAX.
 
   Lemma concrete_promise_max_ts_max_concrete_ts mem prom loc ts max
         (MAX: concrete_promise_max_ts mem prom loc ts)
-        (CONCRETE: Memory.max_concrete_ts mem loc max)
+        (CONCRETE: Memory.max_non_reserve_ts mem loc max)
     :
       Time.le max ts.
   Proof.
@@ -4246,8 +4246,8 @@ Section CONCRETEMAX.
   Proof.
     ii. specialize (MAX0 loc). specialize (MAX1 loc). inv MAX0. des.
     { eapply FUTURE in GET; ss. des.
-      { subst. eapply MAX1 in GET. eauto. }
-      { inv GET3. eapply MAX1 in GET. eauto. }
+      { subst. eapply MAX1 in GET; eauto. }
+      { inv GET3; eapply MAX1 in GET; eauto; ss. }
     }
     { eapply MAX1 in GET. auto. }
   Qed.

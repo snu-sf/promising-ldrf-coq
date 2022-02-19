@@ -1506,7 +1506,7 @@ Proof.
     { splits; auto. econs. }
     { inv LOCAL0. ss. splits; auto. econs; eauto. split; auto.
       exists ts. splits; ss.
-      { left. econs; eauto. }
+      { left. econs; eauto. ss. }
       { refl. }
     }
     { inv LOCAL0. eapply event_in_concrete_or_writes_write in WRITE; eauto.
@@ -1539,8 +1539,25 @@ Proof.
       { left. econs; eauto. }
       { refl. }
     }
-    { splits; auto. econs; eauto. }
-    { splits; auto. econs; eauto. }
+    { splits; auto. econs; eauto. splits; ss.
+      inv LOCAL0. inv RACE.
+      exists to. splits; ss.
+      { left. econs; eauto. }
+      { refl. }
+    }
+    { splits; auto. econs; eauto. splits; ss.
+      inv LOCAL0.
+      { exists Time.bot. splits; try refl.
+        left. econs; try apply CLOSED. ss.
+      }
+      { exists Time.bot. splits; try refl.
+        left. econs; try apply CLOSED. ss.
+      }
+      { inv RACE.
+        exists to. splits; try refl.
+        left. econs; eauto.
+      }
+    }
   }
 Qed.
 
@@ -1780,8 +1797,8 @@ Proof.
                Time.le ts (max loc)).
     { i. unfold eventable_below in EVENTABLE. des. etrans; eauto.
       unfold eventable in TIME. des.
-      { inv TIME. eapply MAX in GET. auto. }
-      { inv TIME. eapply MAX in GET. inv ITV. ss. etrans; eauto. }
+      { inv TIME. eapply MAX in GET; auto. }
+      { inv TIME. eapply MAX in GET; auto. inv ITV. ss. etrans; eauto. }
       { eapply reservations_added_covered in ADDEDPROM; eauto. des.
         exploit ADDEDPROM1.
         { right. eauto. }
