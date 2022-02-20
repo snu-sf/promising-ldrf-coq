@@ -2351,9 +2351,11 @@ Definition no_reserves (proms: Memory.t): Prop :=
     msg <> Message.reserve.
 
 Definition memory_concrete_le (lhs rhs: Memory.t): Prop :=
-  forall loc to from val released
-         (GET: Memory.get loc to lhs = Some (from, Message.concrete val released)),
-    Memory.get loc to rhs = Some (from, Message.concrete val released).
+  forall loc to from msg
+    (GET: Memory.get loc to lhs = Some (from, msg))
+    (RESERVE: msg <> Message.reserve),
+    Memory.get loc to rhs = Some (from, msg).
+
 Global Program Instance concrete_le_PreOrder: PreOrder memory_concrete_le.
 Next Obligation. ii. ss. Qed.
 Next Obligation. ii. eauto. Qed.
@@ -2373,7 +2375,7 @@ Lemma memory_concrete_le_closed_timemap tm mem0 mem1
     Memory.closed_timemap tm mem1.
 Proof.
   ii. hexploit (TM loc). i. des.
-  esplits; eauto.
+  exploit MLE; eauto; ss.
 Qed.
 
 Lemma memory_concrete_le_closed_view vw mem0 mem1

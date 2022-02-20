@@ -25,6 +25,7 @@ Require Import Trace.
 
 Require Import MemoryMerge.
 Require Import PromiseConsistent.
+Require Import Cover.
 Require Import PFConsistent.
 Require Import ReorderCancel.
 Require Import MemoryProps.
@@ -33,7 +34,7 @@ Require Import OrderedTimes.
 Require Import Mapping.
 Require Import CapFlex.
 Require Import GoodFuture.
-Require Import Cover.
+Require Import PreReserve.
 
 Set Implicit Arguments.
 
@@ -50,7 +51,7 @@ Section CONCRETEMAX.
       promises_map f prom prom.
   Proof.
     assert (CONCRETE: map_ident_concrete f mem).
-    { ii. inv CONCRETE. eapply MAX in GET. auto. }
+    { ii. inv CONCRETE. eapply MAX in GET; auto. }
     econs.
     { i. exists to, from, msg. splits; auto.
       { eapply mapping_map_lt_iff_non_collapsable; eauto. }
@@ -96,8 +97,9 @@ Section CONCRETEMAX.
   Proof.
     ii. specialize (MAXTGT loc). inv MAXTGT. des.
     { eapply MEM in GET. des; ss.
-      eapply IDENT in TO. subst. inv MSG. inv MSGLE.
-      eapply MAXSRC in GET. auto. }
+      eapply IDENT in TO. subst.
+      inv MSG; inv MSGLE; ss; 
+        eapply MAXSRC in GET; auto; ss. }
     { eapply LOCAL in GET. des; ss.
       eapply IDENT in TO. subst.
       eapply MAXSRC in GET. auto. }
@@ -109,20 +111,21 @@ End CONCRETEMAX.
 
 
 Definition pf_consistent_strong lang (e0:Thread.t lang): Prop :=
-  forall mem1 sc1
-         (CAP: Memory.cap (Thread.memory e0) mem1),
+  forall mem1 sc1 (CAP: Memory.cap (Thread.memory e0) mem1),
   exists e1,
-    (<<STEPS0: rtc (tau (@pred_step ThreadEvent.is_cancel lang)) (Thread.mk _ (Thread.state e0) (Thread.local e0) sc1 mem1) e1>>) /\
+    (<<STEPS0: rtc (tau (@pred_step ThreadEvent.is_cancel lang))
+                   (Thread.mk _ (Thread.state e0) (Thread.local e0) sc1 mem1) e1>>) /\
     (<<NORESERVE: no_reserves (Local.promises (Thread.local e1))>>) /\
     exists e2,
       (<<STEPS1: rtc (tau (@pred_step ((promise_free /1\ (fun e => ~ ThreadEvent.is_cancel e)) /1\ no_sc) lang)) e1 e2>>) /\
-      (__guard__((exists st',
-                     (<<LOCAL: Local.failure_step (Thread.local e2)>>) /\
-                     (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e2) st'>>)) \/
+      (__guard__((exists e e3,
+                     (<<STEP_FAILURE: Thread.step true e e2 e3>>) /\
+                     (<<EVENT_FAILURE: ThreadEvent.get_machine_event e = MachineEvent.failure>>)) \/
                  (<<PROMISES: (Local.promises (Thread.local e2)) = Memory.bot>>))).
 
 Lemma pf_consistent_pf_consistent_strong lang (th: Thread.t lang)
       (WF: Local.wf (Thread.local th) (Thread.memory th))
+      (SC: Memory.closed_timemap (Thread.sc th) (Thread.memory th))
       (MEM: Memory.closed (Thread.memory th))
       (CONSISTENT: pf_consistent th)
   :
@@ -130,24 +133,22 @@ Lemma pf_consistent_pf_consistent_strong lang (th: Thread.t lang)
 Proof.
   assert (INHABITED: Memory.inhabited (Thread.memory th)).
   { inv MEM. auto. }
-  ii. exploit Memory.max_concrete_timemap_exists; eauto. intros MAX. des.
-  ii. exploit Memory.max_concrete_timemap_exists.
-  { eapply le_inhabited; eauto. eapply Memory.cap_le; eauto. refl. }
-  i. des. exploit CONSISTENT; eauto. i.
+  ii. exploit CONSISTENT; eauto. i.
 
   assert (exists e2,
              (<<STEPS: rtc (tau (Thread.step true))
-                           (Thread.mk _ (Thread.state th) (Thread.local th)
-                                      tm0 mem1) e2 >>) /\
+                           (Thread.mk _ (Thread.state th) (Thread.local th) (Thread.sc th) mem1) e2>>) /\
              (<<NORESERVES: no_reserves (Local.promises (Thread.local e2))>>) /\
-             (__guard__ ((exists e3, (<< FAILURE: Thread.step true ThreadEvent.failure e2 e3 >>)) \/
+             (__guard__ ((exists e e3,
+                             (<<STEP_FAILURE: Thread.step true e e2 e3>>) /\
+                             (<<EVENT_FAILURE: ThreadEvent.get_machine_event e = MachineEvent.failure>>)) \/
                          (<<PROMISES: Local.promises (Thread.local e2) = Memory.bot >>)))).
   { des.
     - exploit Thread.rtc_tau_step_future.
       + eapply rtc_implies; [|apply STEPS].
         i. inv H. econs; eauto. econs; eauto.
       + ss. eapply Local.cap_wf; eauto.
-      + ss. eapply Memory.max_concrete_timemap_closed; eauto.
+      + ss. eapply Memory.cap_closed_timemap; eauto.
       + ss. eapply Memory.cap_closed; eauto.
       + i. des.
         destruct e2. destruct local. inv WF2. ss.
@@ -162,24 +163,52 @@ Proof.
             - econs; eauto. econs; eauto. econs; eauto.
             - inv LOCAL. }
         * ss.
-        * left. inv FAILURE; inv STEP. inv LOCAL. inv LOCAL0.
-          exists (Thread.mk _ st2 (Local.mk tview proms1) sc2 mem0).
-          ss. econs 2. econs; eauto. econs; eauto. econs; eauto.
-          eapply cancels_promises_decrease in STEPS0; auto. ss.
-          ii. eapply CONSISTENT0; eauto.
+        * left.
+          inv STEP_FAILURE; inv STEP; ss. inv LOCAL; ss.
+          { inv LOCAL0.
+            exists ThreadEvent.failure, (Thread.mk _ st2 (Local.mk tview proms1) sc2 mem0).
+            splits; ss. econs 2. econs; eauto. econs; eauto. econs; eauto.
+            eapply cancels_promises_decrease in STEPS0; auto. ss.
+            ii. eapply CONSISTENT0; eauto.
+          }
+          { hexploit cancels_concrete_same; try exact STEPS0; eauto. s. i.
+            hexploit cancels_promises_decrease; try exact STEPS0; eauto. s. i.
+            exists (ThreadEvent.racy_write loc to val ord),
+              (Thread.mk _ st2 (Local.mk tview proms1) sc2 mem0).
+            inv LOCAL0. splits; ss. econs 2. econs; eauto. econs. econs.
+            - inv RACE. econs; eauto. ss.
+              destruct (Memory.get loc to proms1) as [[]|] eqn:GETP'; ss.
+              exploit H0; eauto. i. congr.
+            - ii. eapply CONSISTENT0; eauto.
+          }
+          { hexploit cancels_concrete_same; try exact STEPS0; eauto. s. i.
+            hexploit cancels_promises_decrease; try exact STEPS0; eauto. s. i.
+            exists (ThreadEvent.racy_update loc to valr valw ordr ordw),
+              (Thread.mk _ st2 (Local.mk tview proms1) sc2 mem0).
+            splits; ss. econs 2. econs; eauto. econs.
+            inv LOCAL0.
+            - econs 1; eauto. ii. eauto.
+            - econs 2; eauto. ii. eauto.
+            - econs 3.
+              + inv RACE. econs; eauto. ss.
+                destruct (Memory.get loc to proms1) as [[]|] eqn:GETP'; ss.
+                exploit H0; eauto. i. congr.
+              + ii. eauto.
+          }
     - unguard. esplits; eauto. rewrite PROMISES. ii.
-      rewrite Memory.bot_get in GET. clarify. }
+      rewrite Memory.bot_get in GET. clarify.
+  }
 
   clear x. des.
   eapply pf_step_promise_free_step_rtc in STEPS.
-  eapply steps_cancels_not_cancels in STEPS; cycle 1. des.
+  eapply steps_cancels_not_cancels in STEPS. des.
 
   exploit Thread.rtc_cancel_step_future.
   { eapply STEPS1. }
   { ss. eapply Local.cap_wf; eauto. }
-  { ss. eapply Memory.max_concrete_timemap_closed; eauto. }
+  { ss. eapply Memory.cap_closed_timemap; eauto. }
   { ss. eapply Memory.cap_closed; eauto. }
-  i. des. ss.
+  s. i. des.
 
   eapply rtc_implies with (R2 := tau (@pred_step ThreadEvent.is_cancel lang)) in STEPS1; cycle 1.
   { clear. i. inv H. econs.
@@ -191,25 +220,38 @@ Proof.
   }
   destruct th1. exploit no_sc_any_sc_rtc; try apply STEPS1; ss.
   { i. unfold ThreadEvent.is_cancel in PR. des_ifs. }
-  i. des. instantiate (1:=sc1) in STEP. clear STEPS1.
+  i. des. instantiate (1:=sc1) in STEP.
+  clear STEPS1. rename STEP into STEPS1.
 
   eexists. splits.
-  { eapply STEP. }
+  { eapply STEPS1. }
   { ss. ii. clarify.
     eapply steps_not_cancel_reserves_same in STEPS2; eauto.
     unguard. des.
     - eapply NORESERVES; eauto.
-    - rewrite PROMISES in *. erewrite Memory.bot_get in STEPS2. clarify. }
+    - rewrite PROMISES in *. erewrite Memory.bot_get in STEPS2. clarify.
+  }
 
   eapply hold_or_not with (Q := no_sc) in STEPS2. des.
-
   - destruct e2. ss.
     exploit no_sc_any_sc_rtc; try eapply HOLD; eauto.
     { ss. i. des. auto. } i. des.
     esplits.
-    + eapply pred_step_rtc_mon; try eapply STEP0. i. ss.
-    + ss. unguard. des.
-      * left. ss. inv FAILURE; inv STEP1. inv LOCAL. eauto.
+    + eapply pred_step_rtc_mon; try eapply STEP. i. ss.
+    + unguard. des.
+      * left. inv STEP_FAILURE; inv STEP0; ss. inv LOCAL; ss.
+        { esplits.
+          - econs 2. econs; [|econs 7]; eauto.
+          - ss.
+        }
+        { esplits.
+          - econs 2. econs; [|econs 10]; eauto.
+          - ss.
+        }
+        { esplits.
+          - econs 2. econs; [|econs 11]; eauto.
+          - ss.
+        }
       * right. esplits; eauto.
 
   - exploit Thread.rtc_tau_step_future.
@@ -217,25 +259,27 @@ Proof.
     { ss. }
     { ss. }
     { ss. } i. des.
-    inv STEP0.
+    inv STEP.
     exploit Thread.step_future; eauto. i. des.
 
     assert (PROMS: Local.promise_consistent (Thread.local e3)).
     { eapply rtc_tau_step_promise_consistent.
-      - eapply thread_steps_pred_steps. eapply STEPS1.
+      - eapply thread_steps_pred_steps. eapply STEPS2.
       - unguard. des.
-        + inv FAILURE; inv STEP0. inv LOCAL. inv LOCAL0. ss.
+        + inv STEP_FAILURE; inv STEP; ss. inv LOCAL; ss; inv LOCAL0; ss.
         + ii. rewrite PROMISES in PROMISE.
           rewrite Memory.bot_get in PROMISE. clarify.
       - eauto.
       - eauto.
-      - eauto. }
+      - eauto.
+    }
 
     assert (NOPROMISE: (Local.promises (Thread.local e2')) = Memory.bot).
     { apply Memory.ext. i. rewrite Memory.bot_get.
-      destruct (Memory.get loc ts (Local.promises (Thread.local e2')))
-        as [[from [val released|]]|] eqn:GET; auto; cycle 1.
-      - exfalso.
+      destruct (Memory.get loc ts (Local.promises (Thread.local e2'))) as [[from msg]|] eqn:GET; ss.
+      exfalso.
+      destruct (classic (msg = Message.reserve)).
+      - subst.
         eapply step_not_cancel_reserves_same in GET; cycle 1.
         + econs.
           * econs; eauto.
@@ -243,28 +287,23 @@ Proof.
         + ss.
         + des. eapply steps_not_cancel_reserves_same in GET; eauto.
           des. eapply NORESERVES; eauto.
-      - exfalso.
-        exploit pf_step_rtc_promises_decrease.
+      - exploit pf_step_rtc_promises_decrease.
         { eapply STEPS0. }
         { i. ss. des. auto. }
         { econs; eauto. } ss. i.
         exploit pf_step_rtc_promises_decrease.
-        { eapply STEP. }
+        { eapply STEPS1. }
         { i. unfold ThreadEvent.is_cancel in *. des_ifs. }
         { ss. eauto. }
-        ss. i. inv x2.
+        ss. i. inv x1.
         ss. unfold no_sc in BREAKQ. des_ifs; try by (exfalso; eauto).
         + des; clarify. apply NNPP in BREAKQ.
-          inv STEP1; inv STEP0. ss. inv LOCAL. inv LOCAL0. ss.
-          eapply PROMS in GET. ss. des_ifs. ss.
-          hexploit max_concrete_timemap_get; eauto.
-          * inv WF. eapply Memory.cap_le; eauto.
-          * i. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto.
-        + inv STEP1; inv STEP0. ss. inv LOCAL. inv LOCAL0. ss.
-          eapply PROMS in GET. ss. des_ifs. ss.
-          hexploit max_concrete_timemap_get; eauto.
-          * inv WF. eapply Memory.cap_le; eauto.
-          * i. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto.
+          inv STEP0; inv STEP. ss. inv LOCAL. inv LOCAL0. ss.
+          destruct ordw; ss. exploit PROMISES; eauto. i.
+          rewrite x, Memory.bot_get in *. ss.
+        + inv STEP0; inv STEP. ss. inv LOCAL. inv LOCAL0. ss.
+          exploit PROMISES; eauto. i.
+          rewrite x, Memory.bot_get in *. ss.
     }
 
     destruct e2'. destruct local. ss.
@@ -282,16 +321,15 @@ Definition cancel_normal_trace (tr: Trace.t): Prop :=
     (<<NORMAL: List.Forall (fun em => <<SAT: (fun e => ~ ThreadEvent.is_cancel e) (snd em)>>) tr_normal>>).
 
 Definition pf_consistent_strong_aux lang (e0:Thread.t lang): Prop :=
-  forall mem1
-         (CAP: Memory.cap (Thread.memory e0) mem1),
+  forall mem1 (CAP: Memory.cap (Thread.memory e0) mem1),
   exists tr e1 times,
     (<<STEPS: Trace.steps tr (Thread.mk _ (Thread.state e0) (Thread.local e0) TimeMap.bot mem1) e1>>) /\
     (<<EVENTS: List.Forall (fun em => <<SAT: (promise_free /1\ no_sc /1\ (wf_time_evt (fun loc to => List.In to (times loc)))) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) tr >>) /\
     (<<CANCEL: cancel_normal_trace tr>>) /\
-    (__guard__((exists st',
-                   (<<LOCAL: Local.failure_step (Thread.local e1)>>) /\
-                   (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
-               ((<<PROMISES: (Local.promises (Thread.local e1)) = Memory.bot>>)))).
+    (__guard__((exists e e2,
+                     (<<STEP_FAILURE: Thread.step true e e1 e2>>) /\
+                     (<<EVENT_FAILURE: ThreadEvent.get_machine_event e = MachineEvent.failure>>)) \/
+                 (<<PROMISES: (Local.promises (Thread.local e1)) = Memory.bot>>))).
 
 Lemma pf_consistent_strong_pf_consistent_strong_aux lang (th: Thread.t lang)
       (WF: Local.wf (Thread.local th) (Thread.memory th))
@@ -402,9 +440,9 @@ Definition pf_consistent_flex lang (e0:Thread.t lang)
                                                       /1\ no_sc
                                                       /1\ wf_time_evt (fun loc => certification_times times f max (Memory.max_timemap (Thread.memory e0)) loc)) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) ftr >>) /\
           (<<TRACE: List.Forall2 (fun em fem => tevent_map (fun loc => f loc (tm loc)) (snd fem) (snd em)) tr ftr>>) /\
-          (__guard__((exists st',
-                         (<<LOCAL: Local.failure_step (Thread.local e1)>>) /\
-                         (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
+          (__guard__((exists e e2,
+                         (<<STEP_FAILURE: Thread.step true e e1 e2>>) /\
+                         (<<EVENT_FAILURE: ThreadEvent.get_machine_event e = MachineEvent.failure>>)) \/
                      (<<PROMISES: (Local.promises (Thread.local e1)) = Memory.bot>>)))>>).
 
 
@@ -462,12 +500,13 @@ Proof.
     eapply (SPEC (loc, tm loc)). eauto. }
 
   assert (IDENT: map_ident_concrete (fun loc => f (loc, tm loc)) (Thread.memory th)).
-  { ii. inv CONCRETE. eapply MAX in GET. eapply MAP; eauto. }
+  { ii. inv CONCRETE. eapply MAX in GET. eapply MAP; eauto. ss. }
   destruct e1. ss.
   hexploit trace_steps_map.
   { eapply mapping_map_lt_iff_map_le. eapply MAP. }
   { eapply MAP. }
   { eapply mapping_map_lt_iff_map_eq. eapply MAP. }
+  { eapply mapping_map_lt_iff_map_lt. eapply MAP. }
   { eapply wf_time_mapped_mappable.
     { eapply List.Forall_impl; eauto. i. ss. des; eauto. }
     { eapply cap_flex_map_complete; eauto. }
@@ -494,7 +533,7 @@ Proof.
       { eapply WF. }
     }
   }
-  { exploit (@Memory.max_concrete_timemap_exists (Thread.memory th)).
+  { exploit (@Memory.max_non_reserve_timemap_exists (Thread.memory th)).
     { eapply MEM. } i. des.
     eapply concrete_messages_le_cap_flex_memory_map.
     { refl. }
@@ -538,15 +577,13 @@ Proof.
   }
   { eapply list_Forall2_impl; eauto. i. ss. des. auto. }
   { ss. unguard. des; eauto.
-    { left. esplits; eauto. eapply failure_step_map; eauto.
-      { eapply mapping_map_lt_iff_map_le. eapply MAP. }
-      { eapply mapping_map_lt_iff_map_eq. eapply MAP. }
+    { left. admit.
     }
     { right. splits.
       { inv LOCAL. erewrite PROMISES in *. eapply bot_promises_map; eauto. }
     }
   }
-Qed.
+Admitted.
 
 
 Definition pf_consistent_super_strong_easy lang (e0:Thread.t lang)
@@ -574,9 +611,9 @@ Definition pf_consistent_super_strong_easy lang (e0:Thread.t lang)
     (<<BOUND: forall loc ts fts (TS: Time.lt (max loc) fts) (MAP: f loc ts fts),
         Time.lt (max loc) ts /\ Time.le (incr_time_seq (tm loc)) fts>>) /\
     (<<TRACE: List.Forall2 (fun em fem => tevent_map_weak f (snd fem) (snd em)) tr ftr>>) /\
-    (__guard__((exists st',
-                   (<<LOCAL: Local.failure_step (Thread.local e1)>>) /\
-                   (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
+    (__guard__((exists e e2,
+                   (<<STEP_FAILURE: Thread.step true e e1 e2>>) /\
+                   (<<EVENT_FAILURE: ThreadEvent.get_machine_event e = MachineEvent.failure>>)) \/
                (<<PROMISES: (Local.promises (Thread.local e1)) = Memory.bot>>))).
 
 Lemma pf_consistent_super_strong_easy_same_sc lang (e0: Thread.t lang) tr times sc
@@ -673,10 +710,10 @@ Proof.
     eapply List.Forall2_app_inv_l in TRACE. des. esplits; eauto.
     { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
       destruct a, x. ss. eapply List.Forall_forall in IN; eauto. ss. inv SAT; ss.
-      inv KIND; ss; des_ifs. inv MSG. }
+      inv KIND; ss; des_ifs; inv MSG. }
     { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
       destruct a, x. ss. eapply List.Forall_forall in IN; eauto. ss. inv SAT; ss.
-      inv KIND; ss; des_ifs. inv MSG. }
+      inv KIND; ss; des_ifs; inv MSG. }
   }
   { eapply MAPALL. }
   { i. eapply MAPALL in TS; eauto.
@@ -698,8 +735,6 @@ Proof.
   { eapply list_Forall2_impl; eauto. i. eapply tevent_map_tevent_map_weak; eauto. }
 Qed.
 
-Require Import PreReserve.
-
 
 Definition pf_consistent_special lang (e0:Thread.t lang)
            (tr : Trace.t)
@@ -719,9 +754,9 @@ Definition pf_consistent_special lang (e0:Thread.t lang)
                                                 /1\ wf_time_evt times) (snd em)>> /\ <<TAU: ThreadEvent.get_machine_event (snd em) = MachineEvent.silent>>) ftr >>) /\
     (<<CANCELNORMAL: cancel_normal_trace ftr>>) /\
     (<<TRACE: List.Forall2 (fun em fem => tevent_map_weak (fun loc ts fts => ts = fts /\ Time.le ts (max loc)) (snd fem) (snd em)) tr ftr>>) /\
-    (__guard__((exists st',
-                   (<<LOCAL: Local.failure_step (Thread.local e1)>>) /\
-                   (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
+    (__guard__((exists e e2,
+                   (<<STEP_FAILURE: Thread.step true e e1 e2>>) /\
+                   (<<EVENT_FAILURE: ThreadEvent.get_machine_event e = MachineEvent.failure>>)) \/
                (<<PROMISES: (Local.promises (Thread.local e1)) = Memory.bot>>))).
 
 Lemma pf_consistent_speciali_strong_easy
@@ -792,9 +827,9 @@ Definition pf_consistent_super_strong_split lang (e0:Thread.t lang)
     (<<BOUND: forall loc ts fts (TS: Time.lt (max loc) fts) (MAP: f loc ts fts),
         Time.lt (max loc) ts /\ Time.le (incr_time_seq (tm loc)) fts>>) /\
     (<<TRACE: List.Forall2 (fun em fem => tevent_map_weak f (snd fem) (snd em)) tr ftr>>) /\
-    (__guard__((exists st',
-                   (<<LOCAL: Local.failure_step (Thread.local e1)>>) /\
-                   (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)) \/
+    (__guard__((exists e e2,
+                   (<<STEP_FAILURE: Thread.step true e e1 e2>>) /\
+                   (<<EVENT_FAILURE: ThreadEvent.get_machine_event e = MachineEvent.failure>>)) \/
                (<<PROMISES: (Local.promises (Thread.local e1)) = Memory.bot>>))).
 
 Lemma cap_flex_memory_times_wf times mem cap tm
@@ -830,15 +865,17 @@ Lemma ident_map_compose_tevent_weak f te0 te1 te2
   :
     tevent_map_weak f te2 te0.
 Proof.
-  inv MAP0; inv MAP1; econs.
-  { inv FROM0. auto. }
-  { inv TO0. auto. }
+  inv MAP0; inv MAP1; econs;
+    (try by inv FROM0; auto);
+    (try by inv TO0; auto).
   { inv TO0. etrans; eauto. }
-  { inv TO0. eauto. }
-  { inv FROM0. eauto. }
-  { inv TO0. eauto. }
-  { inv FROM0. eauto. }
-  { inv TO0. eauto. }
+  { revert_until MSGS.
+    induction MSGS; i; inv MSGS0; ss. des.
+    econs; eauto.
+    inv H2. inv H0. splits; auto.
+    destruct x, y, y0. ss.
+    inv H5; inv H1; econs.
+  }
 Qed.
 
 Lemma ident_map_compose_tevent_weak2 f te0 te1 te2
@@ -847,15 +884,17 @@ Lemma ident_map_compose_tevent_weak2 f te0 te1 te2
   :
     tevent_map_weak f te2 te0.
 Proof.
-  inv MAP0; inv MAP1; econs.
-  { inv FROM. auto. }
-  { inv TO. auto. }
+  inv MAP0; inv MAP1; econs;
+    (try by inv FROM; auto);
+    (try by inv TO; auto).
   { inv TO. eauto. etrans; eauto. }
-  { inv TO. eauto. }
-  { inv FROM. eauto. }
-  { inv TO. eauto. }
-  { inv FROM. eauto. }
-  { inv TO. eauto. }
+  { revert_until MSGS.
+    induction MSGS; i; inv MSGS0; ss. des.
+    econs; eauto.
+    inv H. inv H3. splits; try congr.
+    destruct x, y, y0. ss.
+    inv H5; inv H1; econs.
+  }
 Qed.
 
 Lemma ident_map_pf_consistent_super_strong_easy
@@ -903,6 +942,7 @@ Proof.
   { eapply ident_map_le; eauto. }
   { eapply ident_map_bot; eauto. }
   { eapply ident_map_eq; eauto. }
+  { eapply ident_map_lt; eauto. }
   { eapply List.Forall_forall. i. eapply ident_map_mappable_evt. }
   { eapply STEPS. }
   { ss. }
@@ -939,16 +979,20 @@ Proof.
   { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
     eapply List.Forall_forall in IN; eauto. ss. des.
     destruct a, x. ss. unfold ident_map in *.
-    inv EVENT; ss; des; subst; auto. splits; auto.
-    inv KIND; ss. inv MSG; ss. inv MAP; ss. }
+    inv EVENT; ss; des; subst; auto.
+    - splits; auto.
+      inv KIND; ss. inv MSG; ss. inv MAP; ss.
+    - splits; auto.
+      admit.
+  }
   { clear - CANCELNORMAL TRACE0. unfold cancel_normal_trace in *. des.
     subst. eapply List.Forall2_app_inv_l in TRACE0. des. subst. esplits; eauto.
     { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
       eapply List.Forall_forall in IN; eauto. ss.
-      destruct a, x. ss. inv EVENT; ss. inv KIND; ss; des_ifs. inv MSG. }
+      destruct a, x. ss. inv EVENT; ss. inv KIND; ss; des_ifs; inv MSG. }
     { eapply List.Forall_forall. i. eapply list_Forall2_in in H; eauto. des.
       eapply List.Forall_forall in IN; eauto. ss.
-      destruct a, x. ss. inv EVENT; ss. inv KIND; ss; des_ifs. inv MSG. }
+      destruct a, x. ss. inv EVENT; ss. inv KIND; ss; des_ifs; inv MSG. }
   }
   { eapply list_Forall2_compose.
     { eapply TRACE. }
@@ -958,14 +1002,12 @@ Proof.
     i. ss. des; subst. inv MAP1. split; auto. etrans; eauto.
   }
   { i. unguard. des.
-    { left. ss. esplits; eauto. eapply failure_step_map; eauto.
-      { eapply ident_map_le. }
-      { eapply ident_map_eq. }
+    { left. admit.
     }
     { right. ss. inv LOCAL0.
       rewrite PROMISES in *. eapply bot_promises_map in PROMISES0; auto. }
   }
-Qed.
+Admitted.
 
 
 Lemma pf_consistent_flex_super_strong_easy_split
