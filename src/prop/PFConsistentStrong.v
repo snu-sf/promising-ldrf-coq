@@ -983,7 +983,9 @@ Proof.
     - splits; auto.
       inv KIND; ss. inv MSG; ss. inv MAP; ss.
     - splits; auto.
-      admit.
+      clear - MSGS0 MSGS. revert_until MSGS0.
+      induction MSGS0; i; inv MSGS; ss. des.
+      econs; eauto. split; congr.
   }
   { clear - CANCELNORMAL TRACE0. unfold cancel_normal_trace in *. des.
     subst. eapply List.Forall2_app_inv_l in TRACE0. des. subst. esplits; eauto.
