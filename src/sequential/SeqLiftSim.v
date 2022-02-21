@@ -923,7 +923,7 @@ Section LIFT.
       }
     }
     { inv LIFT. ss. hexploit (VALS loc); eauto. i. inv H.
-      { hexploit sim_thread_src_read_na_racy; eauto. i.
+      { hexploit sim_thread_src_read_na_racy; eauto. i. des.
         esplits.
         { refl. }
         { eapply Local.step_racy_read; eauto. }
@@ -1011,7 +1011,7 @@ Section LIFT.
     }
     { inv LIFT. esplits.
       { refl. }
-      { instantiate (4:=ThreadEvent.racy_update loc valr valw ordr ordw).
+      { instantiate (4:=ThreadEvent.racy_update loc Time.bot valr valw ordr ordw).
         inv SIM. eapply sim_local_consistent in CONSISTENT; eauto.
         eapply Local.step_racy_update. red in ORD. des.
         { econs 1; eauto. }
@@ -1063,8 +1063,7 @@ Section LIFT.
       { red in ORD. destruct ordr, ordw; des; ss. }
     }
     i. des. subst. esplits; eauto.
-    { econs 2. econs; eauto. }
-    { pclearbot. auto. }
+    pclearbot. auto.
   Qed.
 
   Lemma sim_lift_src_na_opt_step:
@@ -1530,7 +1529,7 @@ Section LIFT.
       i. ss. des; subst.
       { assert (STEPS1: rtc (@Thread.tau_step _) (Thread.mk _ st0 lc0 sc0 mem0) (Thread.mk _ st4 lc2 sc2 mem2)).
         { etrans; [eauto|]. econs; [|refl]. econs; eauto.
-          econs. econs 2; eauto. econs; eauto.
+          econs. econs 2; eauto.
         }
         clear STEPS0 STEP.
         hexploit Thread.rtc_tau_step_future; eauto. i. des; ss.
@@ -1546,9 +1545,7 @@ Section LIFT.
           { auto. }
         }
       }
-      { left. splits. red. esplits; eauto.
-        econs 2. econs; eauto.
-      }
+      { left. splits. red. esplits; eauto. }
     }
     { destruct th1. destruct state0. inv TRACE.
       hexploit sim_lift_sol_at_step; eauto.
@@ -3319,7 +3316,7 @@ Section LIFT.
     { eauto. }
     i. ss. destruct (classic (racy_update_event e)).
     { destruct e; ss.
-      assert (RACE: Thread.program_step (ThreadEvent.racy_update loc valr valw ordr ordw) (Thread.mk lang_tgt st_tgt0 lc_tgt0 sc_tgt0 mem_tgt0) (Thread.mk lang_tgt st_tgt1 lc_tgt0 sc_tgt0 mem_tgt0)).
+      assert (RACE: Thread.program_step (ThreadEvent.racy_update loc Time.bot valr valw ordr ordw) (Thread.mk lang_tgt st_tgt0 lc_tgt0 sc_tgt0 mem_tgt0) (Thread.mk lang_tgt st_tgt1 lc_tgt0 sc_tgt0 mem_tgt0)).
       { inv STEP; ss. econs; ss. econs.
         destruct (Ordering.le ordw Ordering.na) eqn:ORDR; ss.
         { econs 2; eauto. }

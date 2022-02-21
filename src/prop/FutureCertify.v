@@ -74,11 +74,11 @@ Module FutureCertify.
       { eauto. }
       { eapply Memory.max_concrete_timemap_closed; eauto. }
       { eapply map_ident_in_memory_local; eauto; ss.
-        eapply ident_map_lt.
+        eapply ident_map_lt_iff.
       }
       { econs.
-        { i. destruct msg as [val released|]; auto. right.
-          exists to, from, (Message.concrete val released), (Message.concrete val released).
+        { i. destruct (classic (msg = Message.reserve)); auto. right.
+          exists to, from, msg.
           eapply Memory.cap_inv in GET; eauto. des; ss. esplits; eauto.
           { refl. }
           { eapply ident_map_message. }
@@ -90,7 +90,7 @@ Module FutureCertify.
           { i. econs; eauto. }
         }
       }
-      { eapply mapping_map_lt_collapsable_unwritable. eapply ident_map_lt. }
+      { eapply mapping_map_lt_iff_collapsable_unwritable. eapply ident_map_lt_iff. }
       { eapply ident_map_timemap. }
       { eapply Memory.max_concrete_timemap_spec; eauto.
         eapply Memory.cap_closed_timemap; eauto. }
@@ -134,7 +134,7 @@ Module FutureCertify.
       (* unguard. des. *)
       (* { left. unfold Thread.steps_failure. destruct e1. ss. esplits; eauto. } *)
       (* { right. esplits; eauto. } *)
-    Admitted
+    Admitted.
 
     Lemma future_consistent
           e sc' mem'

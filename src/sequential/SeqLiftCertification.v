@@ -409,7 +409,7 @@ Lemma sim_thread_sol_racy
       (LOCAL: Local.wf lc mem)
       (ORD: ~ P loc)
   :
-  Local.is_racy lc mem loc Ordering.na.
+  exists to, Local.is_racy lc mem loc to Ordering.na.
 Proof.
   inv SIM. destruct lc.
   hexploit non_max_readable_race; eauto.
@@ -422,9 +422,10 @@ Lemma sim_thread_sol_read_na_racy
       (ORD: ~ P loc)
       val
   :
-  Local.racy_read_step lc mem loc val Ordering.na.
+  exists to, Local.racy_read_step lc mem loc to val Ordering.na.
 Proof.
-  econs. eapply sim_thread_sol_racy; eauto.
+  exploit sim_thread_sol_racy; eauto. i. des.
+  esplits. eauto.
 Qed.
 
 Lemma sim_thread_sol_write_na_racy
@@ -433,11 +434,11 @@ Lemma sim_thread_sol_write_na_racy
       (LOCAL: Local.wf lc mem)
       (ORD: ~ P loc)
   :
-  Local.racy_write_step lc mem loc Ordering.na.
+  exists to, Local.racy_write_step lc mem loc to Ordering.na.
 Proof.
-  econs.
-  { eapply sim_thread_sol_racy; eauto. }
-  { inv SIM. auto. }
+  exploit sim_thread_sol_racy; eauto. i. des.
+  esplits. econs; eauto.
+  inv SIM. auto.
 Qed.
 
 Lemma sim_thread_sol_read_na
@@ -519,7 +520,7 @@ Lemma sim_thread_sol_write_na
       (MEM: Memory.closed mem0)
       lang st
   :
-  Local.racy_write_step lc0 mem0 loc Ordering.na
+  (exists to, Local.racy_write_step lc0 mem0 loc to Ordering.na)
   \/
   exists lc1 mem1 lc2 mem2 from to msgs kinds kind,
     (<<STEPS: rtc (@Thread.tau_step _)
@@ -531,7 +532,8 @@ Lemma sim_thread_sol_write_na
 Proof.
   destruct lc0 as [tvw0 prom0].
   destruct (classic (exists val released, <<MAX: max_readable mem0 prom0 loc (tvw0.(TView.cur).(View.pln) loc) val released>>)).
-  2:{ left. inv SIM. econs; eauto. eapply non_max_readable_race; eauto. }
+  2:{ left. inv SIM.
+      exploit non_max_readable_race; eauto. i. des. eauto. }
   right. des.
   inv SIM. hexploit max_readable_na_write_step; eauto.
   { i. exploit NSYNC; eauto. }

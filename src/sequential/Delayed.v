@@ -46,7 +46,7 @@ Variant lower_step {lang} e (th0 th1: Thread.t lang): Prop :=
     (STEP: Thread.program_step e th0 th1)
     (NRELEASE: ~ release_event e)
     (MEM: lower_memory th1.(Thread.memory) th0.(Thread.memory))
-    (SAME: is_write_na e -> th1.(Thread.memory) = th0.(Thread.memory))
+    (SAME: is_na_write e -> th1.(Thread.memory) = th0.(Thread.memory))
 .
 
 Lemma lower_step_step lang:

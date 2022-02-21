@@ -10,13 +10,9 @@ COQTHEORIES  := \
  	src/promotion/*.v \
  	src/ldrfpf/*.v \
  	src/ldrfra/*.v \
+# src/ldrfsc/*.v \
 # src/while/*.v \
 #	src/opt/while/*.v \
-# src/promotion/*.v \
-# src/drfprop/*.v \
-# src/ldrfpf/*.v \
-# src/ldrfra/*.v \
-# src/ldrfsc/*.v \
 
 .PHONY: all theories clean
 
@@ -37,6 +33,8 @@ Makefile.coq: Makefile $(COQTHEORIES)
    echo "-R src/gsim $(COQMODULE)"; \
    echo "-R src/sequential $(COQMODULE)"; \
    echo "-R src/promotion $(COQMODULE)"; \
+   echo "-R src/ldrfpf $(COQMODULE)"; \
+   echo "-R src/ldrfra $(COQMODULE)"; \
    \
    echo $(COQTHEORIES)) > _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq

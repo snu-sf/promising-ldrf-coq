@@ -176,10 +176,10 @@ Proof.
   destruct tvw; auto.
 Qed.
 
-Lemma max_readable_not_racy mem prom tvw loc ts val released ord
+Lemma max_readable_not_racy mem prom tvw loc to ts val released ord
       (MAX: max_readable mem prom loc ts val released)
       (TS: tvw.(TView.cur).(View.pln) loc = ts)
-      (RACE: Local.is_racy (Local.mk tvw prom) mem loc ord)
+      (RACE: Local.is_racy (Local.mk tvw prom) mem loc to ord)
       (WF: Local.wf (Local.mk tvw prom) mem)
   :
     False.
@@ -188,11 +188,11 @@ Proof.
   i. ss. clarify.
 Qed.
 
-Lemma max_readable_not_read_race mem prom tvw loc ts val released
+Lemma max_readable_not_read_race mem prom tvw loc to ts val released
       val' ord
       (MAX: max_readable mem prom loc ts val released)
       (TS: tvw.(TView.cur).(View.pln) loc = ts)
-      (READ: Local.racy_read_step (Local.mk tvw prom) mem loc val' ord)
+      (READ: Local.racy_read_step (Local.mk tvw prom) mem loc to val' ord)
       (WF: Local.wf (Local.mk tvw prom) mem)
   :
     False.
@@ -200,10 +200,10 @@ Proof.
   inv READ. eapply max_readable_not_racy; eauto.
 Qed.
 
-Lemma max_readable_not_write_race mem prom tvw loc ts val released ord
+Lemma max_readable_not_write_race mem prom tvw loc to ts val released ord
       (MAX: max_readable mem prom loc ts val released)
       (TS: tvw.(TView.cur).(View.pln) loc = ts)
-      (WRITE: Local.racy_write_step (Local.mk tvw prom) mem loc ord)
+      (WRITE: Local.racy_write_step (Local.mk tvw prom) mem loc to ord)
       (WF: Local.wf (Local.mk tvw prom) mem)
   :
     False.
@@ -832,11 +832,7 @@ Proof.
   }
 Qed.
 
-<<<<<<< HEAD
-Lemma max_readable_write_na_step mem0 prom0 tvw0 loc ts from to val0 val1 released sc
-=======
 Lemma max_readable_na_write_step mem0 prom0 tvw0 loc ts from to0 to1 val0 val1 released sc
->>>>>>> 30d76c9... wip
       (MAX: max_readable mem0 prom0 loc ts val0 released)
       (TS: tvw0.(TView.cur).(View.pln) loc = ts)
       (RESERVE: forall to' from' val' released'
@@ -959,7 +955,7 @@ Lemma non_max_readable_race mem prom tvw loc
       (WF: Local.wf (Local.mk tvw prom) mem)
       (CONS: Local.promise_consistent (Local.mk tvw prom))
   :
-    Local.is_racy (Local.mk tvw prom) mem loc Ordering.na.
+    exists to, Local.is_racy (Local.mk tvw prom) mem loc to Ordering.na.
 Proof.
   inv WF. inv TVIEW_CLOSED. inv CUR. ss.
   specialize (PLN loc). des.
@@ -971,9 +967,10 @@ Proof.
     eapply TVIEW_WF.
   }
   { i. eapply NNPP. ii.
-    eapply H. econs; eauto; ss.
-    { destruct (Memory.get loc ts' prom) as [[]|] eqn:EQ; auto.
-      exploit PROMISES; eauto. i. clarify. }
+    eapply H.
+    destruct (Memory.get loc ts' prom) as [[]|] eqn:EQ.
+    - exploit PROMISES; eauto. i. clarify.
+    - esplits. econs; eauto. ss.
   }
 Qed.
 
@@ -983,9 +980,9 @@ Lemma non_max_readable_read mem prom tvw loc ts val'
       (WF: Local.wf (Local.mk tvw prom) mem)
       (CONS: Local.promise_consistent (Local.mk tvw prom))
   :
-    Local.racy_read_step (Local.mk tvw prom) mem loc val' Ordering.na.
+    exists to, Local.racy_read_step (Local.mk tvw prom) mem loc to val' Ordering.na.
 Proof.
-  subst. hexploit non_max_readable_race; eauto.
+  subst. hexploit non_max_readable_race; eauto. i. des. eauto.
 Qed.
 
 Lemma non_max_readable_write mem prom tvw loc ts
@@ -994,9 +991,9 @@ Lemma non_max_readable_write mem prom tvw loc ts
       (WF: Local.wf (Local.mk tvw prom) mem)
       (CONS: Local.promise_consistent (Local.mk tvw prom))
   :
-    Local.racy_write_step (Local.mk tvw prom) mem loc Ordering.na.
+    exists to, Local.racy_write_step (Local.mk tvw prom) mem loc to Ordering.na.
 Proof.
-  subst. hexploit non_max_readable_race; eauto.
+  subst. hexploit non_max_readable_race; eauto. i. des. eauto.
 Qed.
 
 Variant added_memory loc msgs mem0 mem1: Prop :=

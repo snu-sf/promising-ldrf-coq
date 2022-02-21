@@ -1842,7 +1842,7 @@ Proof.
     { i. des_ifs. eapply Mapping.map_finite; eauto. }
     { i. des_ifs.
       { eapply MAPLT; eauto. }
-      { eapply Mapping.mapping_map_lt; eauto. }
+      { eapply Mapping.mapping_map_lt_iff; eauto. }
     }
     { i. des_ifs.
       { esplits; eauto. refl. }
@@ -1962,7 +1962,7 @@ Proof.
         eapply LEFT in H0; eauto.
         exfalso. eapply Time.lt_strorder. etrans; eauto. }
     }
-    { eapply Mapping.mapping_map_lt; eauto. }
+    { eapply Mapping.mapping_map_lt_iff; eauto. }
   }
   { i. des_ifs.
      { esplits; eauto. }
@@ -2018,7 +2018,7 @@ Proof.
   { inv SAT.
     2:{ inv H2. exfalso. eapply H; eauto. }
     assert (LT: Time.lt fts fts0).
-    { erewrite <- Mapping.mapping_map_lt; cycle 2; try eassumption.
+    { erewrite <- Mapping.mapping_map_lt_iff; cycle 2; try eassumption.
       transitivity ts; eauto. }
     exists (mapping_update f0 ts (Time.middle fts fts0)), (Time.middle fts fts0).
     splits.
@@ -2098,7 +2098,7 @@ Lemma mapping_update_times (f0: Mapping.t) (times: Time.t -> Prop)
 Proof.
   hexploit (@mapping_update_latest_wf f0 (f0.(Mapping.map) f0.(Mapping.ver)) times); eauto.
   { eapply Mapping.map_finite; eauto. }
-  { eapply Mapping.mapping_map_lt; eauto. }
+  { eapply Mapping.mapping_map_lt_iff; eauto. }
   { i. esplits; eauto. refl. }
   i. des. esplits; eauto.
   { erewrite mapping_update_latest_times. auto. }
@@ -2315,7 +2315,7 @@ Proof.
       refine (List.in_map fst _ (_, _) _). eapply H; eauto.
     }
     i. des.
-    { eapply Mapping.mapping_map_lt; eauto. }
+    { eapply Mapping.mapping_map_lt_iff; eauto. }
     { split.
       { i. eapply TimeFacts.lt_le_lt; eauto. }
       { i. eapply TimeFacts.lt_le_lt; eauto. }

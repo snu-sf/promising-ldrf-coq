@@ -26,6 +26,7 @@ Require Import Trace.
 
 Set Implicit Arguments.
 
+
 Section Pred.
 
   Definition te_pred := ThreadEvent.t -> Prop.
@@ -43,14 +44,14 @@ Section Pred.
     | ThreadEvent.fence _ ordw => Ordering.le Ordering.strong_relaxed ordw
     | ThreadEvent.syscall _ => True
     | ThreadEvent.failure => True
-    | ThreadEvent.racy_write _ _ _ => True
-    | ThreadEvent.racy_update _ _ _ _ _ => True
+    | ThreadEvent.racy_write _ _ _ _ => True
+    | ThreadEvent.racy_update _ _ _ _ _ _ => True
     | _ => False
     end.
 
   Definition is_na_write (e: ThreadEvent.t): Prop :=
     match e with
-    | ThreadEvent.na_write _ _ _ _ _ _ _ => True
+    | ThreadEvent.write_na _ _ _ _ _ _ => True
     | ThreadEvent.write _ _ _ _ _ ord => Ordering.le ord Ordering.na
     | _ => False
     end.

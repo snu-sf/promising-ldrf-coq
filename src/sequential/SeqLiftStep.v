@@ -160,18 +160,19 @@ Proof.
   des. eapply sim_local_consistent; eauto.
 Qed.
 
-Lemma sim_local_racy f vers srctm flag_src flag_tgt lc_src lc_tgt mem_src mem_tgt loc ord
+Lemma sim_local_racy f vers srctm flag_src flag_tgt lc_src lc_tgt mem_src mem_tgt loc to ord
       (CONSISTENT: Local.promise_consistent lc_tgt)
       (MEM: sim_memory srctm flag_src f vers mem_src mem_tgt)
       (SIM: sim_local f vers srctm flag_src flag_tgt lc_src lc_tgt)
       (WF: Mapping.wfs f)
-      (RACY: Local.is_racy lc_tgt mem_tgt loc ord)
+      (RACY: Local.is_racy lc_tgt mem_tgt loc to ord)
       (FLAGSRC: flag_src loc = false)
       (FLAGTGT: flag_tgt loc = false)
   :
-    Local.is_racy lc_src mem_src loc ord.
+    exists to_src, Local.is_racy lc_src mem_src loc to_src ord.
 Proof.
-  inv RACY. hexploit sim_memory_get; eauto. i. des. econs; eauto.
+  inv RACY. hexploit sim_memory_get; eauto. i. des.
+  exists to_src. econs; eauto.
   { inv SIM. ss.
     destruct (Memory.get loc to_src prom_src) eqn:EQ; ss.
     destruct p. hexploit sim_promises_get_if; eauto. i. des; ss; clarify.
@@ -575,8 +576,8 @@ Proof.
   hexploit max_readable_view_mon; eauto.
 Qed.
 
-Lemma race_non_max_readable mem prom tvw loc
-      (MAX: Local.is_racy (Local.mk tvw prom) mem loc Ordering.na)
+Lemma race_non_max_readable mem prom tvw loc to
+      (MAX: Local.is_racy (Local.mk tvw prom) mem loc to Ordering.na)
   :
     forall val released, ~ max_readable mem prom loc (tvw.(TView.cur).(View.pln) loc) val released.
 Proof.
@@ -788,7 +789,7 @@ Proof.
     { ii. eapply H; eauto. }
     { eauto. }
     { eauto. }
-    { i. eapply sim_local_racy in H0; eauto.
+    { i. des. eapply sim_local_racy in H0; eauto. des.
       eapply race_non_max_readable in H0; eauto. }
   }
   des. exists val. esplits.
@@ -851,8 +852,8 @@ Qed.
 Lemma sim_thread_tgt_read_na_racy
       f vers flag_src flag_tgt vs_src vs_tgt
       mem_src mem_tgt lc_src lc_tgt0 sc_src sc_tgt
-      loc val_tgt ord
-      (READ: Local.racy_read_step lc_tgt0 mem_tgt loc val_tgt ord)
+      loc to val_tgt ord
+      (READ: Local.racy_read_step lc_tgt0 mem_tgt loc to val_tgt ord)
       (SIM: sim_thread
               f vers flag_src flag_tgt vs_src vs_tgt
               mem_src mem_tgt lc_src lc_tgt0 sc_src sc_tgt)
@@ -901,7 +902,7 @@ Lemma sim_thread_src_read_na_racy
       (VALS: vs_src loc = None)
       (WF: Mapping.wfs f)
   :
-    Local.racy_read_step lc_src mem_src loc val_src Ordering.na.
+    exists to_src, Local.racy_read_step lc_src mem_src loc to_src val_src Ordering.na.
 Proof.
   inv SIM. specialize (MAXSRC loc). inv MAXSRC.
   hexploit non_max_readable_read; eauto.
@@ -911,8 +912,8 @@ Qed.
 Lemma sim_thread_tgt_write_na_racy
       f vers flag_src flag_tgt vs_src vs_tgt
       mem_src mem_tgt lc_src lc_tgt0 sc_src sc_tgt
-      loc
-      (WRITE: Local.racy_write_step lc_tgt0 mem_tgt loc Ordering.na)
+      loc to
+      (WRITE: Local.racy_write_step lc_tgt0 mem_tgt loc to Ordering.na)
       (SIM: sim_thread
               f vers flag_src flag_tgt vs_src vs_tgt
               mem_src mem_tgt lc_src lc_tgt0 sc_src sc_tgt)
@@ -937,7 +938,7 @@ Lemma sim_thread_src_write_na_racy
       (VALS: vs_src loc = None)
       (WF: Mapping.wfs f)
   :
-    Local.racy_write_step lc_src mem_src loc Ordering.na.
+    exists to_src, Local.racy_write_step lc_src mem_src loc to_src Ordering.na.
 Proof.
   inv SIM. specialize (MAXSRC loc). inv MAXSRC.
   hexploit non_max_readable_write; eauto.
@@ -1045,7 +1046,7 @@ Proof.
     { erewrite Memory.remove_o; eauto. des_ifs. ss. des; clarify. }
     { i. erewrite Memory.remove_o; eauto. des_ifs.
       { ss. des; clarify. exfalso. eapply Time.lt_strorder; eauto. }
-      { eapply MAX; eauto. etrans; eauto. }
+      { eapply MAX; eauto. }
     }
   }
   { i. inv KINDS. destruct kind'; ss. clarify.
@@ -1057,7 +1058,7 @@ Proof.
     { erewrite Memory.remove_o; eauto. des_ifs. ss. des; clarify. }
     { i. erewrite Memory.remove_o; eauto. des_ifs.
       { ss. des; clarify. exfalso. eapply Time.lt_strorder; eauto. }
-      { eapply MAX; eauto. etrans; eauto. }
+      { eapply MAX; eauto. }
     }
   }
 Qed.
@@ -5852,62 +5853,65 @@ Qed.
 Lemma sim_thread_racy_write_step
       f vers flag_src flag_tgt vs_src vs_tgt
       mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt
-      loc ord
+      loc to_tgt ord
       (SIM: sim_thread
               f vers flag_src flag_tgt vs_src vs_tgt
               mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt)
       (CONSISTENT: Local.promise_consistent lc_tgt)
-      (RACE: Local.racy_write_step lc_tgt mem_tgt loc ord)
+      (RACE: Local.racy_write_step lc_tgt mem_tgt loc to_tgt ord)
       (FLAGSRC: flag_src loc = false)
       (FLAGTGT: flag_tgt loc = false)
       (WF: Mapping.wfs f)
   :
-  Local.racy_write_step lc_src mem_src loc ord.
+  exists to_src, Local.racy_write_step lc_src mem_src loc to_src ord.
 Proof.
-  inv SIM. inv RACE. econs.
-  { eapply sim_local_racy; eauto. }
-  { eapply sim_local_consistent; eauto. }
+  inv SIM. inv RACE.
+  exploit sim_local_racy; eauto. i. des.
+  esplits. econs; eauto.
+  eapply sim_local_consistent; eauto.
 Qed.
 
 Lemma sim_thread_racy_update_step
       f vers flag_src flag_tgt vs_src vs_tgt
       mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt
-      loc ordr ordw
+      loc to_tgt ordr ordw
       (SIM: sim_thread
               f vers flag_src flag_tgt vs_src vs_tgt
               mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt)
       (CONSISTENT: Local.promise_consistent lc_tgt)
-      (RACE: Local.racy_update_step lc_tgt mem_tgt loc ordr ordw)
+      (RACE: Local.racy_update_step lc_tgt mem_tgt loc to_tgt ordr ordw)
       (FLAGSRC: flag_src loc = false)
       (FLAGTGT: flag_tgt loc = false)
       (WF: Mapping.wfs f)
   :
-  Local.racy_update_step lc_src mem_src loc ordr ordw.
+  exists to_src, Local.racy_update_step lc_src mem_src loc to_src ordr ordw.
 Proof.
   inv SIM. inv RACE.
-  { econs 1; eauto. eapply sim_local_consistent; eauto. }
-  { econs 2; eauto. eapply sim_local_consistent; eauto. }
-  { econs 3; eauto.
-    { eapply sim_local_racy; eauto. }
-    { eapply sim_local_consistent; eauto. }
+  { esplits. econs 1; eauto. eapply sim_local_consistent; eauto. }
+  { esplits. econs 2; eauto. eapply sim_local_consistent; eauto. }
+  { exploit sim_local_racy; eauto. i. des.
+    esplits. econs 3; eauto.
+    eapply sim_local_consistent; eauto.
   }
 Qed.
 
 Lemma sim_thread_racy_read_step
       f vers flag_src flag_tgt vs_src vs_tgt
       mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt
-      loc val_tgt ord
+      loc to_tgt val_tgt ord
       (SIM: sim_thread
               f vers flag_src flag_tgt vs_src vs_tgt
               mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt)
-      (READ: Local.racy_read_step lc_tgt mem_tgt loc val_tgt ord)
+      (READ: Local.racy_read_step lc_tgt mem_tgt loc to_tgt val_tgt ord)
       (CONSISTENT: Local.promise_consistent lc_tgt)
       (WF: Mapping.wfs f)
       (FLAGSRC: flag_src loc = false)
       (FLAGTGT: flag_tgt loc = false)
   :
-  forall val_src, Local.racy_read_step lc_src mem_src loc val_src ord.
+    forall val_src,
+      exists to_src, Local.racy_read_step lc_src mem_src loc to_src val_src ord.
 Proof.
-  inv SIM. inv READ. inv RACE. econs.
-  eapply sim_local_racy; eauto.
+  inv SIM. inv READ. inv RACE.
+  exploit sim_local_racy; eauto. i. des.
+  esplits. econs; eauto.
 Qed.
