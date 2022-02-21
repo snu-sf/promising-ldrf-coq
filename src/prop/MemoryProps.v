@@ -1883,8 +1883,10 @@ Section UNCHANGABLES.
   | unreadable_intro
       (UNWRITABLE: unwritable mem prom l t)
       (NOTCONCRETE: forall
-          from val released
-          (GET: Memory.get l t mem = Some (from, Message.concrete val released)), False)
+          from msg
+          (GET: Memory.get l t mem = Some (from, msg))
+          (NRESERVE: msg <> Message.reserve),
+          False)
   .
 
   Lemma unreadable_increase pf e lang (th0 th1: Thread.t lang)
@@ -1937,8 +1939,14 @@ Section UNCHANGABLES.
     inv STEP.
     - inv STEP0; ss.
     - inv STEP0; ss. inv LOCAL; ss.
-      + ii. inv H. inv LOCAL0. eapply NOTCONCRETE; eauto.
-      + ii. inv H. inv LOCAL1. eapply NOTCONCRETE; eauto.
+      + ii. inv H. inv LOCAL0. eapply NOTCONCRETE; eauto; ss.
+      + ii. inv H. inv LOCAL1. eapply NOTCONCRETE; eauto; ss.
+      + ii. inv H. inv LOCAL0. inv RACE. eapply NOTCONCRETE; eauto; ss.
+      + ii. inv H. inv LOCAL0. inv RACE. eapply NOTCONCRETE; eauto; ss.
+      + ii. inv H. inv LOCAL0.
+        * inv UNWRITABLE. inv ITV. inv FROM.
+        * inv UNWRITABLE. inv ITV. inv FROM.
+        * inv RACE. eapply NOTCONCRETE; eauto; ss.
   Qed.
 
   Lemma steps_no_read_unreadable P lang (th_tgt th_tgt': Thread.t lang)
@@ -2001,6 +2009,28 @@ Section UNCHANGABLES.
     inv WRITE. eapply promise_write_not_in_covered; eauto.
   Qed.
 
+  Lemma write_na_write_not_in_covered prom0 prom1 mem0 mem1 MSGS
+        loc ts from to val kind msgs kinds
+        (WRITE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 msgs kinds kind)
+        (NOTIN: kind = Memory.op_kind_add ->
+                forall ts (ITV: Interval.mem (from, to) ts), ~ MSGS loc ts)
+        (FORALL: List.Forall (fun m => forall t (IN: Interval.mem (fst m) t), ~ (MSGS loc t)) msgs)
+        l t
+        (COVERED: covered l t mem1)
+    :
+      covered l t mem0 \/ ~ MSGS l t.
+  Proof.
+    revert NOTIN FORALL l t COVERED. induction WRITE; i.
+    { eapply write_write_not_in_covered; eauto. }
+    { inv FORALL. hexploit IHWRITE.
+      { eauto. }
+      { eauto. }
+      { eauto. }
+      i. des; auto.
+      eapply write_write_not_in_covered; eauto.
+    }
+  Qed.
+
   Lemma step_write_not_in_covered MSGS lang (th0 th1: Thread.t lang) pf e
         (STEP: Thread.step pf e th0 th1)
         (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
@@ -2018,9 +2048,9 @@ Section UNCHANGABLES.
     { inv STEP0; ss. inv LOCAL0; auto.
       - inv LOCAL1. inv WRITE. ss. eapply promise_write_not_in_covered; eauto.
       - inv LOCAL2. inv WRITE. ss. eapply promise_write_not_in_covered; eauto.
-      - admit. (* TODO: handle na write *)
+      - inv LOCAL1. ss. des. eapply write_na_write_not_in_covered; eauto.
     }
-  Admitted.
+  Qed.
 
   Lemma steps_write_not_in_covered P MSGS lang (th0 th1: Thread.t lang)
         (STEPS: rtc (tau (@pred_step P lang)) th0 th1)
@@ -3220,144 +3250,218 @@ End CONCRETELE.
 Section PROMISEWRITING.
 
   Inductive promise_writing_event
-            (loc: Loc.t) (from to: Time.t) (val: Const.t) (released: option View.t)
+            (loc: Loc.t) (from to: Time.t) (msg: Message.t)
   : forall (e: ThreadEvent.t), Prop :=
   | writing_event_write
       from' val' released' ord
       (FROM: Time.le from from')
       (TO: Time.le from' to)
-      (VAL: Const.le val val')
-      (RELEASED: View.opt_le released' released)
+      (MSG: Message.le (Message.concrete val' released') msg)
       (ORD: Ordering.le ord Ordering.relaxed)
     :
       promise_writing_event
-        loc from to val released
+        loc from to msg
         (ThreadEvent.write loc from' to val' released' ord)
   | writing_event_update
       from' val' released' ord valr releasedr ordr
       (FROM: Time.le from from')
       (TO: Time.le from' to)
-      (VAL: Const.le val val')
-      (RELEASED: View.opt_le released' released)
+      (MSG: Message.le (Message.concrete val' released') msg)
       (ORD: Ordering.le ord Ordering.relaxed)
     :
       promise_writing_event
-        loc from to val released
+        loc from to msg
         (ThreadEvent.update loc from' to valr val' releasedr released' ordr ord)
+  | writing_event_na_write_exact
+      msgs from' to' val' ord
+      (FROM: Time.le from from')
+      (TO: Time.le from' to)
+      (MSG: Message.le (Message.concrete val' None) msg)
+      (ORD: Ordering.le ord Ordering.relaxed)
+    :
+      promise_writing_event
+        loc from to msg
+        (ThreadEvent.write_na loc msgs from' to' val' ord)
+  | writing_event_na_write_msgs
+      msgs from1 to1 val1 from' msg' ord
+      (IN: List.In (from', to, msg') msgs)
+      (FROM: Time.le from from')
+      (TO: Time.le from' to)
+      (ORD: Ordering.le ord Ordering.relaxed)
+    :
+      promise_writing_event
+        loc from to msg
+        (ThreadEvent.write_na loc msgs from1 to1 val1 ord)
   .
   Hint Constructors promise_writing_event.
 
   Lemma promise_writing_event_mon
-        loc from to val released from' val' released' e
+        loc from to msg from' msg' e
         (FROM: Time.le from from')
-        (VAL: Const.le val val')
-        (RELEASED: View.opt_le released' released)
-        (WRITING: promise_writing_event loc from' to val' released' e)
+        (MSG: Message.le msg' msg)
+        (WRITING: promise_writing_event loc from' to msg' e)
     :
-      promise_writing_event loc from to val released e.
+      promise_writing_event loc from to msg e.
   Proof.
-    inv WRITING; econs; eauto; try by (etrans; eauto).
+    inv WRITING; try by (econs; eauto; etrans; eauto).
   Qed.
 
   Lemma promise_promise_decrease prom0 mem0 prom1 mem1
         l f t m k
         (PROMISE: Memory.promise prom0 mem0 l f t m prom1 mem1 k)
-        loc from to val released
-        (GET: Memory.get loc to prom0 = Some (from, Message.concrete val released))
+        loc from to msg
+        (GET: Memory.get loc to prom0 = Some (from, msg))
+        (NRESERVE: msg <> Message.reserve)
     :
-      exists val' from' released',
+      exists msg' from',
         (<<FROM: Time.le from from'>>) /\
-        (<<VAL: Const.le val val'>>) /\
-        (<<RELEASED: View.opt_le released' released>>) /\
-        (<<GET: Memory.get loc to prom1 = Some (from', Message.concrete val' released')>>).
+        (<<MSG: Message.le msg' msg>>) /\
+        (<<GET: Memory.get loc to prom1 = Some (from', msg')>>).
   Proof.
     inv PROMISE.
     { eapply Memory.add_get1 in GET; eauto.
-      exists val, from, released. splits; auto; try by refl. }
+      exists msg, from. splits; auto; try by refl. }
     { eapply Memory.split_get1 in GET; eauto. des.
-      exists val, f', released. splits; auto; try by refl. }
-    { eapply Memory.lower_get1 in GET; eauto. des. inv MSG_LE.
-      exists val0, from, released0. splits; auto; try by refl. }
+      exists msg, f'. splits; auto; try by refl. }
+    { eapply Memory.lower_get1 in GET; eauto. des.
+      exists m', from. splits; auto; try by refl. }
     { dup GET. eapply Memory.remove_get1 in GET; eauto. des.
       { subst. eapply Memory.remove_get0 in PROMISES. des. clarify. }
-      { exists val, from, released. splits; auto; try by refl. }
+      { exists msg, from. splits; auto; try by refl. }
     }
+  Qed.
+
+  Lemma write_promise_decrease prom0 mem0 prom1 mem1
+        l f t m k
+        (WRITE: Memory.write prom0 mem0 l f t m prom1 mem1 k)
+        loc from to msg
+        (GET: Memory.get loc to prom0 = Some (from, msg))
+        (NRESERVE: msg <> Message.reserve)
+    :
+      (exists msg' from',
+          (<<FROM: Time.le from from'>>) /\
+          (<<MSG: Message.le msg' msg>>) /\
+          (<<GET: Memory.get loc to prom1 = Some (from', msg')>>)) \/
+      ((<<LOC: l = loc>>) /\
+       (<<TO: t = to>>) /\
+       (<<FROM: Time.le from f>>) /\
+       (<<TS: Time.le f to>>) /\
+       (<<MSG: Message.le m msg>>)).
+  Proof.
+    inv WRITE. eapply promise_promise_decrease in PROMISE; eauto.
+    des. dup GET0. eapply Memory.remove_get1 in GET0; eauto. des.
+    { subst. right. eapply Memory.remove_get0 in REMOVE.
+      des; clarify. splits; auto. eapply memory_get_ts_le in GET1; eauto. }
+    { left. eauto. }
+  Qed.
+
+  Lemma write_na_promise_decrease prom0 mem0 prom1 mem1
+        l f t v k ts msgs kinds
+        (WRITE: Memory.write_na ts prom0 mem0 l f t v prom1 mem1 msgs kinds k)
+        loc from to msg
+        (GET: Memory.get loc to prom0 = Some (from, msg))
+        (NRESERVE: msg <> Message.reserve)
+    :
+      (exists msg' from',
+          (<<FROM: Time.le from from'>>) /\
+          (<<MSG: Message.le msg' msg>>) /\
+          (<<GET: Memory.get loc to prom1 = Some (from', msg')>>)) \/
+      ((<<LOC: l = loc>>) /\
+       (<<TO: t = to>>) /\
+       (<<FROM: Time.le from f>>) /\
+       (<<TS: Time.le f to>>) /\
+       (<<MSG: Message.le (Message.concrete v None) msg>>)) \/
+      (exists from' msg',
+          (<<LOC: l = loc>>) /\
+          (<<IN: List.In (from', to, msg') msgs>>) /\
+          (<<FROM: Time.le from from'>>) /\
+          (<<TO: Time.le from' to>>)).
+  Proof.
+    revert from to msg GET NRESERVE. induction WRITE; i.
+    { eapply write_promise_decrease in WRITE; eauto. des.
+      { left. esplits; eauto. }
+      { subst. right. left. esplits; eauto. }
+    }
+    hexploit write_promise_decrease; eauto. i. des.
+    { hexploit IHWRITE; eauto.
+      { inv MSG; ss. }
+      i. des.
+      { left. esplits; [..|eauto]; eauto. etrans; eauto. }
+      { subst. right. left. esplits; [..|eauto]; eauto. etrans; eauto. }
+      { subst. right. right. esplits; [..|eauto]; eauto. right. eauto. }
+    }
+    { subst. right. right. esplits; eauto. left. eauto. }
   Qed.
 
   Lemma step_promise_decrease_promise_writing_event lang (th0 th1: Thread.t lang) pf e
         (STEP: Thread.step pf e th0 th1)
-        loc from to val released
-        (GET: Memory.get loc to (Local.promises (Thread.local th0)) = Some (from, Message.concrete val released))
+        loc from to msg
+        (GET: Memory.get loc to (Local.promises (Thread.local th0)) = Some (from, msg))
+        (NRESERVE: msg <> Message.reserve)
     :
-      (exists val' from' released',
+      (exists msg' from',
           (<<FROM: Time.le from from'>>) /\
-          (<<VAL: Const.le val val'>>) /\
-          (<<RELEASED: View.opt_le released' released>>) /\
-          (<<GET: Memory.get loc to (Local.promises (Thread.local th1)) = Some (from', Message.concrete val' released')>>)) \/
-      (promise_writing_event loc from to val released e).
+          (<<MSG: Message.le msg' msg>>) /\
+          (<<GET: Memory.get loc to (Local.promises (Thread.local th1)) = Some (from', msg')>>)) \/
+      (promise_writing_event loc from to msg e).
   Proof.
     inv STEP.
     { left. inv STEP0; ss. inv LOCAL.
       eapply promise_promise_decrease in GET; eauto. }
     { inv STEP0; ss.
-      inv LOCAL; try by (inv LOCAL0; left; exists val, from, released; splits; auto; refl).
-      { left; exists val, from, released; splits; auto; refl. }
-      { inv LOCAL0. ss. inv WRITE.
-        eapply promise_promise_decrease in PROMISE; eauto. des.
-        dup GET0. eapply Memory.remove_get1 in GET0; eauto. des.
-        { subst. eapply Memory.remove_get0 in REMOVE. des.
-          rewrite GET1 in *. inv GET0.
-          right. econs; eauto.
-          { eapply memory_get_ts_le; eauto. }
-          apply NNPP. ii.
-          exploit RELEASE.
+      inv LOCAL; try by (inv LOCAL0; left; exists msg, from; splits; auto; refl).
+      { left; exists msg, from; splits; auto; refl. }
+      { inv LOCAL0. ss.
+        hexploit write_promise_decrease; eauto. i. des.
+        { left. eauto. }
+        { right. inv MSG. econs; eauto. inv WRITE.
+          eapply Memory.remove_get0 in REMOVE. des.
+          eapply NNPP. ii. exploit RELEASE; eauto.
           { destruct ord; ss. }
-          { eapply GET. }
-          { ss. i. subst. inv RELEASED.
-            unfold TView.write_released in *. des_ifs. destruct ord; ss. }
+          i. inv RELEASED; ss. destruct ord; ss.
         }
-        { left. esplits; eauto. }
       }
-      { inv LOCAL1. inv LOCAL2. ss. inv WRITE.
-        eapply promise_promise_decrease in PROMISE; eauto. des.
-        dup GET1. eapply Memory.remove_get1 in GET1; eauto. des.
-        { subst. eapply Memory.remove_get0 in REMOVE. des.
-          rewrite GET2 in *. inv GET1.
-          right. econs; eauto.
-          { eapply memory_get_ts_le; eauto. }
-          apply NNPP. ii.
-          exploit RELEASE.
+      { inv LOCAL1. inv LOCAL2. ss.
+        hexploit write_promise_decrease; eauto. i. des.
+        { left. eauto. }
+        { right. inv MSG. econs; eauto. inv WRITE.
+          eapply Memory.remove_get0 in REMOVE. des.
+          eapply NNPP. ii. exploit RELEASE; eauto.
           { destruct ordw; ss. }
-          { eapply GET. }
-          { ss. i. subst. inv RELEASED.
-            unfold TView.write_released in *. des_ifs; destruct ordw; ss. }
+          i. inv RELEASED; ss. destruct ordw; ss.
         }
-        { left. esplits; eauto. }
       }
-      { admit. (* TODO: handle na write *) }
+      { inv LOCAL0. ss.
+        hexploit write_na_promise_decrease; eauto. i. des.
+        { left. eauto. }
+        { right. inv MSG. econs; eauto. }
+        { right. subst. econs 4; eauto. }
+      }
     }
-  Admitted.
+  Qed.
 
   Lemma steps_promise_decrease_promise_writing_event lang (th0 th1: Thread.t lang) tr
         (STEPS: Trace.steps tr th0 th1)
-        loc from to val released
-        (GET: Memory.get loc to (Local.promises (Thread.local th0)) = Some (from, Message.concrete val released))
+        loc from to msg
+        (GET: Memory.get loc to (Local.promises (Thread.local th0)) = Some (from, msg))
+        (NRESERVE: msg <> Message.reserve)
     :
-      (exists from' val' released',
+      (exists msg' from',
           (<<FROM: Time.le from from'>>) /\
-          (<<VAL: Const.le val val'>>) /\
-          (<<RELEASED: View.opt_le released' released>>) /\
-          (<<GET: Memory.get loc to (Local.promises (Thread.local th1)) = Some (from', Message.concrete val' released')>>)) \/
+          (<<MSG: Message.le msg' msg>>) /\
+          (<<GET: Memory.get loc to (Local.promises (Thread.local th1)) = Some (from', msg')>>)) \/
       (exists th e,
-          (<<WRITING: promise_writing_event loc from to val released e>>) /\
+          (<<WRITING: promise_writing_event loc from to msg e>>) /\
           (<<IN: List.In (th, e) tr>>)
       ).
   Proof.
     ginduction STEPS.
-    { i. left. exists from, val, released. splits; auto; try refl. }
+    { i. left. exists msg, from. splits; auto; try refl. }
     { subst. i. exploit step_promise_decrease_promise_writing_event; eauto. i. des.
-      { exploit IHSTEPS; eauto. i. des.
-        { left. exists from'0, val'0, released'0. splits; auto; etrans; eauto. }
+      { exploit IHSTEPS; eauto.
+        { inv MSG; ss. }
+        i. des.
+        { left. exists msg'0, from'0. splits; auto; etrans; eauto. }
         { right. ss. esplits; eauto.
           eapply promise_writing_event_mon; eauto. }
       }
@@ -3396,6 +3500,34 @@ Section WFTIME.
     { ii. erewrite Memory.remove_o in GET; eauto. des_ifs; eauto. }
   Qed.
 
+  Lemma write_memory_times_wf (times: Loc.t -> Time.t -> Prop)
+        prom0 mem0 loc from to msg prom1 mem1 kind
+        (WRITE: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
+        (FROM: times loc from)
+        (TO: times loc to)
+        (WF: memory_times_wf times mem0)
+    :
+      memory_times_wf times mem1.
+  Proof.
+    inv WRITE. eapply promise_memory_times_wf; eauto.
+  Qed.
+
+  Lemma write_na_memory_times_wf (times: Loc.t -> Time.t -> Prop)
+        prom0 mem0 ts loc from to val prom1 mem1 kind msgs kinds
+        (WRITE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 msgs kinds kind)
+        (MSGS: List.Forall (fun m => times loc (fst (fst m)) /\ times loc (snd (fst m))) msgs)
+        (FROM: times loc from)
+        (TO: times loc to)
+        (WF: memory_times_wf times mem0)
+    :
+      memory_times_wf times mem1.
+  Proof.
+    revert MSGS. induction WRITE.
+    { i. eapply write_memory_times_wf; eauto. }
+    { i. inv MSGS. eapply IHWRITE; eauto. ss. des.
+      eapply write_memory_times_wf; eauto. }
+  Qed.
+
   Lemma step_memory_times_wf times lang (th0 th1: Thread.t lang) e pf
         (STEP: Thread.step pf e th0 th1)
         (EVENT: wf_time_evt times e)
@@ -3406,11 +3538,11 @@ Section WFTIME.
     inv STEP.
     { inv STEP0. ss. inv LOCAL. des. eapply promise_memory_times_wf; eauto. }
     { inv STEP0. ss. inv LOCAL; ss.
-      { inv LOCAL0. inv WRITE. des. eapply promise_memory_times_wf; eauto. }
-      { inv LOCAL2. inv WRITE. des. eapply promise_memory_times_wf; eauto. }
-      { admit. (* TODO: handle na write *) }
+      { inv LOCAL0. des. eapply write_memory_times_wf; eauto. }
+      { inv LOCAL2. des. eapply write_memory_times_wf; eauto. }
+      { inv LOCAL0. des. eapply write_na_memory_times_wf; eauto. }
     }
-  Admitted.
+  Qed.
 
   Lemma steps_memory_times_wf times P lang (th0 th1: Thread.t lang)
         (STEPS: rtc (tau (@pred_step P lang)) th0 th1)
@@ -3722,13 +3854,14 @@ Section RESERVEFUTURE.
       eapply Memory.remove_get0 in MEM. des. clarify.
   Qed.
 
-  Lemma reserve_future_concrete_same_promise prom0 mem0 prom1 mem1 loc from to val released
+  Lemma reserve_future_concrete_same_promise prom0 mem0 prom1 mem1 loc from to msg
         (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
-        (GET: Memory.get loc to prom0 = Some (from, Message.concrete val released))
+        (GET: Memory.get loc to prom0 = Some (from, msg))
+        (NRESERVE: msg <> Message.reserve)
     :
-      Memory.get loc to prom1 = Some (from, Message.concrete val released).
+      Memory.get loc to prom1 = Some (from, msg).
   Proof.
-    ginduction FUTURE; auto. i. apply IHFUTURE.
+    ginduction FUTURE; auto. i. apply IHFUTURE; auto.
     inv HD; des; clarify.
     - erewrite Memory.add_o; eauto.
       des_ifs. ss. des; clarify.
@@ -3814,7 +3947,7 @@ Section RESERVEFUTURE.
     :
       Local.read_step (Local.mk vw0 prom1) mem1 loc to val released ord (Local.mk vw1 prom1).
   Proof.
-    inv READ. clarify. econs; eauto.
+    inv READ. inv LC2. econs; eauto.
     eapply reserve_future_concrete_same; eauto.
   Qed.
 

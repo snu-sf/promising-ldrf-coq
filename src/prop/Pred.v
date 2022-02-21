@@ -140,6 +140,9 @@ Section Pred.
     match e with
     | ThreadEvent.read loc to _ _ _ => ~ (MSGS loc to)
     | ThreadEvent.update loc from _ _ _ _ _ _ _ => ~ (MSGS loc from)
+    | ThreadEvent.racy_read loc to _ _ => ~ (MSGS loc to)
+    | ThreadEvent.racy_write loc to _ _ => ~ (MSGS loc to)
+    | ThreadEvent.racy_update loc to _ _ _ _ => ~ (MSGS loc to)
     | _ => True
     end.
 
@@ -149,6 +152,9 @@ Section Pred.
       no_read_msgs msgs e.
   Proof.
     unfold no_read_msgs. des_ifs.
+    { ii. eapply MSGS; eauto. }
+    { ii. eapply MSGS; eauto. }
+    { ii. eapply MSGS; eauto. }
     { ii. eapply MSGS; eauto. }
     { ii. eapply MSGS; eauto. }
   Qed.
@@ -249,6 +255,9 @@ Section Pred.
     i. unfold no_read_msgs in *. des_ifs.
     - ii. eapply NOTIN; eauto.
     - ii. eapply NOTIN; eauto.
+    - ii. eapply NOTIN; eauto.
+    - ii. eapply NOTIN; eauto.
+    - ii. eapply NOTIN; eauto.
   Qed.
 
   Lemma no_read_msgs_sum L0 L1 L2
@@ -260,6 +269,9 @@ Section Pred.
       no_read_msgs L2 e.
   Proof.
     unfold no_read_msgs in *. des_ifs.
+    - ii. eapply LE in H. des; auto.
+    - ii. eapply LE in H. des; auto.
+    - ii. eapply LE in H. des; auto.
     - ii. eapply LE in H. des; auto.
     - ii. eapply LE in H. des; auto.
   Qed.
