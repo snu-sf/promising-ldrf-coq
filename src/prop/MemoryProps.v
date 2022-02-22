@@ -3951,6 +3951,49 @@ Section RESERVEFUTURE.
     eapply reserve_future_concrete_same; eauto.
   Qed.
 
+  Inductive cancel_future_memory (loc: Loc.t) : Memory.t -> Memory.t -> Memory.t -> Memory.t -> Prop :=
+  | cancel_future_memory_base
+      prom0 mem0
+    :
+      cancel_future_memory loc prom0 mem0 prom0 mem0
+  | cancel_future_memory_step
+      prom0 mem0 prom1 mem1 prom2 mem2
+      from to
+      (CANCEL: Memory.promise prom0 mem0 loc from to Message.reserve prom1 mem1 Memory.op_kind_cancel)
+      (FUTURE: cancel_future_memory loc prom1 mem1 prom2 mem2)
+    :
+      cancel_future_memory loc prom0 mem0 prom2 mem2
+  .
+
+  Lemma cancel_future_reserve_future loc prom0 mem0 prom1 mem1
+        (CANCEL: cancel_future_memory loc prom0 mem0 prom1 mem1)
+    :
+      reserve_future_memory prom0 mem0 prom1 mem1.
+  Proof.
+    induction CANCEL; eauto.
+  Qed.
+
+  Inductive reserve_add_future_memory (loc: Loc.t) : Memory.t -> Memory.t -> Memory.t -> Memory.t -> Prop :=
+  | reserve_add_future_memory_base
+      prom0 mem0
+    :
+      reserve_add_future_memory loc prom0 mem0 prom0 mem0
+  | reserve_add_future_memory_step
+      prom0 mem0 prom1 mem1 prom2 mem2
+      from to
+      (ADD: Memory.promise prom0 mem0 loc from to Message.reserve prom1 mem1 Memory.op_kind_add)
+      (FUTURE: reserve_add_future_memory loc prom1 mem1 prom2 mem2)
+    :
+      reserve_add_future_memory loc prom0 mem0 prom2 mem2
+  .
+
+  Lemma reserve_add_future_reserve_future loc prom0 mem0 prom1 mem1
+        (ADD: reserve_add_future_memory loc prom0 mem0 prom1 mem1)
+    :
+      reserve_future_memory prom0 mem0 prom1 mem1.
+  Proof.
+    induction ADD; eauto.
+  Qed.
 End RESERVEFUTURE.
 
 
