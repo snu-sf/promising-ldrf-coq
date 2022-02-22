@@ -3273,7 +3273,7 @@ Section PROMISEWRITING.
         loc from to msg
         (ThreadEvent.update loc from' to valr val' releasedr released' ordr ord)
   | writing_event_na_write_exact
-      msgs from' to' val' ord
+      msgs from' val' ord
       (FROM: Time.le from from')
       (TO: Time.le from' to)
       (MSG: Message.le (Message.concrete val' None) msg)
@@ -3281,7 +3281,7 @@ Section PROMISEWRITING.
     :
       promise_writing_event
         loc from to msg
-        (ThreadEvent.write_na loc msgs from' to' val' ord)
+        (ThreadEvent.write_na loc msgs from' to val' ord)
   | writing_event_na_write_msgs
       msgs from1 to1 val1 from' msg' ord
       (IN: List.In (from', to, msg') msgs)

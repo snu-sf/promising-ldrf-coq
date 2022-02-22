@@ -2082,7 +2082,7 @@ Section MAPPED.
 
   Lemma write_map
         mem0 fmem0 prom0 fprom0 loc from ffrom to fto mem1 prom1 kind
-        msg fmsg' fmsg 
+        msg fmsg' fmsg
         (MLE: Memory.le fprom0 fmem0)
         (WRITE: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
         (MEM: memory_map mem0 fmem0)
@@ -3406,6 +3406,9 @@ Section IDENTMAP.
     inv MAP; auto.
     { inv TO. ss. }
     { inv FROM. ss. }
+    { inv TO. ss. }
+    { inv TO. ss. }
+    { inv TO. ss. }
   Qed.
 
   Lemma promises_ident_map_covered f prom_src prom_tgt
@@ -4190,20 +4193,21 @@ Section CONCRETEIDENT.
     eapply map_ident_concrete_closed_opt_view; eauto.
   Qed.
 
-  Lemma promise_writing_event_map loc to mem from val released f e fe
+  Lemma promise_writing_event_map loc to mem from msg f e fe
         (CLOSED: Memory.closed mem)
-        (GET: Memory.get loc to mem = Some (from, Message.concrete val released))
+        (GET: Memory.get loc to mem = Some (from, msg))
+        (NRESERVE: msg <> Message.reserve)
         (MAPLT: mapping_map_lt_iff f)
         (IDENT: forall loc' to' from' msg' ts
-                  (GET: Memory.get loc' to' mem = Some (from', msg'))
-                  (RESERVE: msg' <> Message.reserve)
-                  (TS: Time.le ts to')
+                       (GET: Memory.get loc' to' mem = Some (from', msg'))
+                       (RESERVE: msg' <> Message.reserve)
+                       (TS: Time.le ts to')
           ,
             f loc' ts ts)
-        (WRITING: promise_writing_event loc from to val released e)
+        (WRITING: promise_writing_event loc from to msg e)
         (EVENT: tevent_map f fe e)
     :
-      promise_writing_event loc from to val released fe.
+      promise_writing_event loc from to msg fe.
   Proof.
     assert (CONCRETE: map_ident_concrete f mem).
     { ii. inv CONCRETE. eapply IDENT; eauto. refl. }
@@ -4212,24 +4216,24 @@ Section CONCRETEIDENT.
       { eapply mapping_map_lt_iff_map_eq; eauto. eapply IDENT; eauto; ss. refl. }
       subst.
       assert (from' = ffrom).
-      { eapply mapping_map_lt_iff_map_eq; eauto. eapply IDENT; eauto; ss. }
+      { eapply mapping_map_lt_iff_map_eq; eauto. }
       subst.
-      econs; eauto.
+      econs; eauto. inv MSG. econs; eauto.
       exploit opt_view_le_map.
       { eapply mapping_map_lt_iff_map_le; eauto. }
-      { eapply RELEASED0. }
+      { eapply RELEASED. }
       { eapply CLOSED in GET. des. inv MSG_CLOSED.
         eapply map_ident_concrete_closed_opt_view; eauto. }
       { eauto. }
-      i. transitivity freleased'; auto.
+      i. etrans; eauto.
     }
     { assert (to = fto).
       { eapply mapping_map_lt_iff_map_eq; eauto. eapply IDENT; eauto; ss. refl. }
       subst.
       assert (from' = ffrom).
-      { eapply mapping_map_lt_iff_map_eq; eauto. eapply IDENT; eauto; ss. }
+      { eapply mapping_map_lt_iff_map_eq; eauto. }
       subst.
-      econs; eauto.
+      econs; eauto. inv MSG. econs; eauto.
       exploit opt_view_le_map.
       { eapply mapping_map_lt_iff_map_le; eauto. }
       { eapply RELEASEDW. }
@@ -4237,6 +4241,24 @@ Section CONCRETEIDENT.
         eapply map_ident_concrete_closed_opt_view; eauto. }
       { eauto. }
       i. transitivity freleasedw'; auto.
+    }
+    { assert (to = fto).
+      { eapply mapping_map_lt_iff_map_eq; eauto. eapply IDENT; eauto; ss. refl. }
+      subst.
+      assert (from' = ffrom).
+      { eapply mapping_map_lt_iff_map_eq; eauto. }
+      subst.
+      econs; eauto.
+    }
+    { eapply list_Forall2_in2 in IN; eauto. des.
+      ss. destruct b as [[from0 to0] msg0]. ss.
+      assert (to = to0).
+      { eapply mapping_map_lt_iff_map_eq; eauto. eapply IDENT; eauto; ss. refl. }
+      subst.
+      assert (from' = from0).
+      { eapply mapping_map_lt_iff_map_eq; eauto. }
+      subst.
+      econs; eauto.
     }
   Qed.
 
@@ -4536,3 +4558,139 @@ Section INCR.
   Qed.
 
 End INCR.
+
+Lemma cap_steps_current_steps lang
+      th0 th1 mem1 tr
+      (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
+      (MEMORY: Memory.closed (Thread.memory th0))
+      (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
+      (CAP: Memory.cap (Thread.memory th0) mem1)
+      (STEPS: Trace.steps
+                tr
+                (Thread.mk lang (Thread.state th0) (Thread.local th0) (Thread.sc th0) mem1)
+                th1)
+      (CONSISTENT: Local.promise_consistent (Thread.local th1))
+  :
+    exists lc' sc' mem' ftr,
+      (<<STEPS: Trace.steps
+                  ftr
+                  th0
+                  (Thread.mk lang (Thread.state th1) lc' sc' mem')>>) /\
+      (<<CONSISTENT: Local.promise_consistent lc'>>) /\
+      (<<TRACE: List.Forall2 (fun the fthe => <<EVENT: tevent_map ident_map (snd fthe) (snd the)>> /\ <<LOCAL: local_map ident_map (fst the) (fst fthe)>>) tr ftr>>)
+.
+Proof.
+  destruct th0, th1. ss.
+  hexploit trace_steps_map.
+  { eapply ident_map_le. }
+  { eapply ident_map_bot. }
+  { eapply ident_map_eq. }
+  { eapply ident_map_lt. }
+  { eapply List.Forall_forall. i. eapply ident_map_mappable_evt. }
+  { eapply STEPS. }
+  { ss. }
+  { ss. }
+  { ss. }
+  { eapply Local.cap_wf; eauto. }
+  { eapply LOCAL. }
+  { eauto. }
+  { eapply Memory.cap_closed; eauto. }
+  { eauto. }
+  { eapply Memory.cap_closed_timemap; eauto. }
+  { eapply map_ident_in_memory_local; eauto; ss.
+    eapply ident_map_lt_iff.
+  }
+  { econs.
+    { i. destruct (classic (msg = Message.reserve)); auto. right.
+      exists to, from, msg.
+      eapply Memory.cap_inv in GET; eauto. des; ss. esplits; eauto.
+      { refl. }
+      { eapply ident_map_message. }
+      { refl. }
+    }
+    { i. eapply CAP in GET. left. exists fto, ffrom, fto, ffrom. splits; ss.
+      { refl. }
+      { refl. }
+      { i. econs; eauto. }
+    }
+  }
+  { eapply mapping_map_lt_iff_collapsable_unwritable. eapply ident_map_lt_iff. }
+  { eapply ident_map_timemap. }
+  { refl. }
+  i. des. esplits; eauto.
+  { inv LOCAL0. eapply promise_consistent_mon; cycle 1; eauto.
+    { refl. }
+    eapply promise_consistent_map; eauto.
+    { eapply ident_map_le; eauto. }
+    { eapply ident_map_eq; eauto. }
+  }
+Qed.
+
+Lemma cap_tau_steps_current_steps lang
+      th0 th1 mem1
+      (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
+      (MEMORY: Memory.closed (Thread.memory th0))
+      (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
+      (CAP: Memory.cap (Thread.memory th0) mem1)
+      (STEPS: rtc (@Thread.tau_step lang)
+                  (Thread.mk lang (Thread.state th0) (Thread.local th0) (Thread.sc th0) mem1)
+                  th1)
+      (CONSISTENT: Local.promise_consistent (Thread.local th1))
+  :
+    exists lc' sc' mem',
+      (<<STEPS: rtc (@Thread.tau_step lang)
+                    th0
+                    (Thread.mk lang (Thread.state th1) lc' sc' mem')>>) /\
+      (<<CONSISTENT: Local.promise_consistent lc'>>)
+.
+Proof.
+  eapply Trace.tau_steps_silent_steps in STEPS. des.
+  exploit cap_steps_current_steps; eauto. i. des. esplits; eauto.
+  eapply Trace.silent_steps_tau_steps; eauto.
+  eapply List.Forall_forall. i.
+  eapply list_Forall2_in in H; eauto. des.
+  eapply List.Forall_forall in IN; eauto. ss.
+  erewrite tevent_map_same_machine_event; eauto.
+Qed.
+
+Lemma cap_failure_current_steps lang
+      th0 mem1
+      (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
+      (MEMORY: Memory.closed (Thread.memory th0))
+      (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
+      (CAP: Memory.cap (Thread.memory th0) mem1)
+      (STEPS: Thread.steps_failure (Thread.mk lang (Thread.state th0) (Thread.local th0) (Thread.sc th0) mem1))
+  :
+    Thread.steps_failure th0.
+Proof.
+  red in STEPS. des.
+  eapply Trace.tau_steps_silent_steps in STEPS0. des.
+  exploit cap_steps_current_steps.
+  { eauto. }
+  { eauto. }
+  { eauto. }
+  { eauto. }
+  { eapply Trace.steps_app.
+    { eauto. }
+    { eapply Trace.steps_one. eauto. }
+  }
+  { inv STEP_FAILURE; inv STEP; ss. inv LOCAL0; ss; try by (inv LOCAL1; ss). }
+  i. des.
+  eapply List.Forall2_app_inv_l in TRACE. des; subst.
+  inv TRACE0. inv H3. des.
+  eapply Trace.steps_separate in STEPS0. des.
+  inv STEPS2. inv TR. inv STEPS0; ss.
+  assert (FAILURE: ThreadEvent.get_machine_event e0 = MachineEvent.failure).
+  { erewrite tevent_map_same_machine_event; eauto. }
+  assert (pf = true).
+  { inv STEP; ss. inv STEP0; ss. }
+  subst. red. esplits.
+  { eapply Trace.silent_steps_tau_steps; eauto.
+    eapply List.Forall_forall. i.
+    eapply list_Forall2_in in H; eauto. des.
+    eapply List.Forall_forall in IN; eauto. ss.
+    erewrite tevent_map_same_machine_event; eauto.
+  }
+  { eauto. }
+  { eauto. }
+Qed.

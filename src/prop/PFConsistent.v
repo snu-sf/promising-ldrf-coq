@@ -19,6 +19,7 @@ Require Import Thread.
 
 Require Import PromiseConsistent.
 Require Import ReorderPromises.
+Require Import Mapping.
 
 Set Implicit Arguments.
 
@@ -27,10 +28,7 @@ Definition pf_consistent lang (e:Thread.t lang): Prop :=
   forall mem1 (CAP: Memory.cap (Thread.memory e) mem1),
   exists e2,
     (<<STEPS: rtc (tau (Thread.step true)) (Thread.mk _ (Thread.state e) (Thread.local e) (Thread.sc e) mem1) e2>>) /\
-    ((exists e e3,
-         (<<STEP_FAILURE: Thread.step true e e2 e3 >>) /\
-         (<<EVENT_FAILURE: ThreadEvent.get_machine_event e = MachineEvent.failure>>)) \/
-     (<<PROMISES: (Local.promises (Thread.local e2)) = Memory.bot>>)).
+    (<<PROMISES: (Local.promises (Thread.local e2)) = Memory.bot>>).
 
 Lemma promise_step_is_racy
       lc1 mem1 loc from to msg lc2 mem2 kind
@@ -91,24 +89,13 @@ Lemma consistent_pf_consistent lang (e:Thread.t lang)
       (MEM: Memory.closed (Thread.memory e))
       (CONSISTENT: Thread.consistent e)
   :
-    pf_consistent e.
+    (<<CONSISTENT: pf_consistent e>>) \/ (<<FAILURE: Thread.steps_failure e>>).
 Proof.
-  ii. exploit CONSISTENT; eauto. i. des.
-  - inv FAILURE. des.
-    hexploit tau_steps_pf_tau_steps; eauto; ss.
-    { inv STEP_FAILURE; inv STEP; ss.
-      inv LOCAL; ss; inv LOCAL0; ss.
-    }
-    { eapply Local.cap_wf; eauto. }
-    { eapply Memory.cap_closed_timemap; eauto. }
-    { eapply Memory.cap_closed; eauto. }
-    i. des.
-    exploit rtc_union_step_nonpf_failure.
-    { eapply rtc_implies; [|eauto]. apply tau_union. }
-    { eauto. }
-    { eauto. }
-    i. des.
-    esplits; eauto.
+  destruct (classic (Thread.steps_failure e)) as [|NFAILURE]; auto.
+  left. ii. exploit CONSISTENT; eauto. i. des.
+  - exfalso. red in FAILURE. des.
+    exploit cap_failure_current_steps; eauto.
+    red. esplits; eauto.
   - exploit tau_steps_pf_tau_steps; eauto; ss.
     { ii. rewrite PROMISES, Memory.bot_get in *.  congr. }
     { eapply Local.cap_wf; eauto. }
