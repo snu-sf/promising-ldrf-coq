@@ -2103,24 +2103,35 @@ Proof.
   { erewrite map_somes_split. erewrite MAP3. ss. }
 Qed.
 
-Definition writing_loc_prom (prom: Memory.t)
-           (te: ThreadEvent.t): option (Loc.t * Time.t) :=
+
+Definition writing_locs
+           (te: ThreadEvent.t): option (list (Loc.t * Time.t)) :=
   match te with
   | ThreadEvent.write loc _ to _ _ ord =>
-    if Ordering.le ord Ordering.relaxed then
-      match Memory.get loc to prom with
-      | Some (_, Message.concrete _ _) => Some (loc, to)
-      | _ => None
-      end
-    else None
+    if Ordering.le ord Ordering.relaxed then Some [(loc, to)] else None
   | ThreadEvent.update loc _ to _ _ _ _ _ ord =>
-    if Ordering.le ord Ordering.relaxed then
-      match Memory.get loc to prom with
-      | Some (_, Message.concrete _ _) => Some (loc, to)
-      | _ => None
-      end
-    else None
+    if Ordering.le ord Ordering.relaxed then Some [(loc, to)] else None
+  | ThreadEvent.write_na loc msgs from to _ ord =>
+    if Ordering.le ord Ordering.relaxed then Some ((loc, to)::List.map (fun '(from, to, msg) => (loc, to)) msgs) else None
   | _ => None
+  end.
+
+Definition check_in_promise prom :=
+  fun '(loc, to) =>
+    match Memory.get loc to prom with
+    | Some (_, msg) =>
+      match msg with
+      | Message.reserve => false
+      | _ => true
+      end
+    | _ => false
+    end.
+
+Definition writing_locs_prom (prom: Memory.t)
+           (te: ThreadEvent.t): option (list (Loc.t * Time.t)) :=
+  match writing_locs te with
+  | Some l => Some (List.filter (check_in_promise prom) l)
+  | None => None
   end.
 
 Lemma final_event_trace_post te tr0 tr1
@@ -2180,43 +2191,78 @@ Proof.
  }
 Qed.
 
+Lemma no_concrete_promise_concrete_decrease_write_na prom0 mem0 loc from to msg prom1 mem1 kind
+      ts msgs kinds
+      (WRITE: Memory.write_na ts prom0 mem0 loc from to msg prom1 mem1 msgs kinds kind)
+      loc0 ts0 from0 msg0
+      (GET: Memory.get loc0 ts0 prom1 = Some (from0, msg0))
+      (NRESERVE: msg0 <> Message.reserve)
+  :
+    exists from1,
+      (<<GET: Memory.get loc0 ts0 prom0 = Some (from1, msg0)>>).
+Proof.
+  revert loc0 ts0 from0 msg0 GET NRESERVE. induction WRITE; i.
+  { eapply no_concrete_promise_concrete_decrease_write; eauto. }
+  { hexploit IHWRITE; eauto. i. des.
+    hexploit no_concrete_promise_concrete_decrease_write; eauto.
+  }
+Qed.
+
 Lemma no_concrete_promise_concrete_decrease_steps lang (th0 th1: Thread.t lang) tr
       (STEPS: Trace.steps tr th0 th1)
       (NOPROMISE: List.Forall (fun em => <<SAT: (promise_free \1/ ThreadEvent.is_reserve) (snd em)>>) tr)
-      loc ts from msg
+      loc ts from msg1
       (GET: Memory.get loc ts (Local.promises (Thread.local th1)) =
-            Some (from, msg))
-      (NRESERVE: msg <> Message.reserve)
+            Some (from, msg1))
+      (NRESERVE: msg1 <> Message.reserve)
   :
-    exists from0,
+    exists from0 msg0,
       (<<GET: Memory.get loc ts (Local.promises (Thread.local th0)) =
-              Some (from0, msg)>>).
+              Some (from0, msg0)>>) /\
+      (<<MSG: Message.le msg1 msg0>>).
 Proof.
-  ginduction STEPS; eauto. i. subst. inv NOPROMISE. guardH H1. ss.
+  ginduction STEPS; eauto; i; subst.
+  { esplits; eauto. refl. }
+  inv NOPROMISE. guardH H1. ss.
   eapply IHSTEPS in GET; eauto. des. inv STEP.
   { unguard. inv STEP0; ss. inv LOCAL. inv PROMISE; ss.
-    { des_ifs; des; ss. erewrite Memory.add_o in GET0; eauto. des_ifs. eauto. }
+    { des_ifs; des; ss. erewrite Memory.add_o in GET0; eauto. des_ifs.
+      { inv MSG; ss. }
+      { esplits; eauto. }
+    }
     { des; ss; clarify. des_ifs. }
     { clear H1. erewrite Memory.lower_o in GET0; eauto. des_ifs; eauto.
       ss. des; clarify. eapply Memory.lower_get0 in PROMISES; eauto.
-      des. inv MSG_LE; esplits; eauto. }
+      des. esplits; eauto. etrans; eauto. }
     { des; ss. erewrite Memory.remove_o in GET0; eauto. des_ifs; eauto. }
   }
   { inv STEP0. inv LOCAL; eauto.
     { inv LOCAL0; ss; eauto. }
     { inv LOCAL0; ss; eauto.
-      eapply no_concrete_promise_concrete_decrease_write; eauto. }
+      hexploit no_concrete_promise_concrete_decrease_write; eauto.
+      { inv MSG; ss. }
+      i. des. esplits; eauto.
+    }
     { inv LOCAL1; ss; eauto. inv LOCAL2; ss; eauto.
-      eapply no_concrete_promise_concrete_decrease_write; eauto. }
+      hexploit no_concrete_promise_concrete_decrease_write; eauto.
+      { inv MSG; ss. }
+      i. des. esplits; eauto.
+    }
     { inv LOCAL0; ss; eauto. }
     { inv LOCAL0; ss; eauto. }
+    { inv LOCAL0; ss; eauto.
+      hexploit no_concrete_promise_concrete_decrease_write_na; eauto.
+      { inv MSG; ss. }
+      i. des. esplits; eauto.
+    }
   }
 Qed.
 
-Lemma write_become_unchangable prom0 mem0 loc from to val released prom1 mem1 kind
-      (WRITE: Memory.write prom0 mem0 loc from to val released prom1 mem1 kind)
+Lemma write_become_unchangable prom0 mem0 loc from to msg prom1 mem1 kind
+      (WRITE: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
+      (NRESERVE: msg <> Message.reserve)
   :
-    unchangable mem1 prom1 loc to from (Message.concrete val released).
+    unchangable mem1 prom1 loc to from msg.
 Proof.
   inv WRITE. eapply Memory.remove_get0 in REMOVE. des.
   eapply Memory.promise_get0 in PROMISE.
@@ -2224,28 +2270,43 @@ Proof.
   { inv PROMISE; ss. }
 Qed.
 
-Definition writing_loc
-           (te: ThreadEvent.t): option (Loc.t * Time.t) :=
-  match te with
-  | ThreadEvent.write loc _ to _ _ _ => Some (loc, to)
-  | ThreadEvent.update loc _ to _ _ _ _ _ _ => Some (loc, to)
-  | _ => None
-  end.
+Lemma write_na_become_unchangable prom0 mem0 loc from to val prom1 mem1 kind ts msgs kinds
+      (WRITE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 msgs kinds kind)
+  :
+    (<<EXACT: unchangable mem1 prom1 loc to from (Message.concrete val None)>>) /\
+    (<<FORALL: List.Forall (fun '(from, to, msg) => unchangable mem1 prom1 loc to from msg) msgs>>).
+Proof.
+  induction WRITE.
+  { splits; ss. eapply write_become_unchangable; eauto; ss. }
+  { des. splits; auto. econs; auto.
+    eapply unchangable_write_na; eauto.
+    eapply write_become_unchangable; eauto. unguard. des; clarify.
+  }
+Qed.
 
-Lemma writed_unchangable lang (th0 th1: Thread.t lang) tr lc we loc ts
+Lemma writed_unchangable lang (th0 th1: Thread.t lang) tr lc we ws loc ts
       (STEPS: Trace.steps tr th0 th1)
       (IN: List.In (lc, we) tr)
-      (WRITING: writing_loc we = Some (loc, ts))
+      (WRITING: writing_locs we = Some ws)
+      (WIN: List.In (loc, ts) ws)
   :
     exists from msg,
       (<<UNCH: unchangable (Thread.memory th1) (Local.promises (Thread.local th1)) loc ts from msg>>).
 Proof.
   ginduction STEPS; eauto; ss. i. subst. ss. des.
-  { clarify. inv STEP; inv STEP0; inv LOCAL; ss.
-    { clarify. inv LOCAL0. eapply write_become_unchangable in WRITE.
+  { clarify. inv STEP; inv STEP0; inv LOCAL; ss; clarify.
+    { inv LOCAL0. des_ifs. eapply write_become_unchangable in WRITE; ss. des; clarify.
       eapply unchangable_trace_steps_increase in STEPS; eauto. }
-    { clarify. inv LOCAL2. eapply write_become_unchangable in WRITE.
+    { inv LOCAL2. des_ifs. eapply write_become_unchangable in WRITE; ss. des; clarify.
       eapply unchangable_trace_steps_increase in STEPS; eauto. }
+    { inv LOCAL0. destruct (Ordering.le ord Ordering.relaxed); ss. inv WRITING.
+      eapply write_na_become_unchangable in WRITE; eauto. ss. des.
+      { inv WIN. esplits. eapply unchangable_trace_steps_increase in STEPS; eauto. }
+      { eapply List.in_map_iff in WIN. des. destruct x as [[from0 to0] msg0]; ss. inv WIN.
+        eapply List.Forall_forall in FORALL; eauto. ss.
+        eapply unchangable_trace_steps_increase in STEPS; eauto.
+      }
+    }
   }
   { exploit IHSTEPS; eauto. }
 Qed.
@@ -2255,15 +2316,19 @@ Qed.
 Definition pf_consistent_super_strong_promises_list lang (e0:Thread.t lang)
            (tr : Trace.t)
            (times: Loc.t -> (Time.t -> Prop))
-           (pl: list (Loc.t * Time.t))
+           (pl: list (list (Loc.t * Time.t)))
   : Prop :=
-  (<<COMPLETE: forall loc from to val released
-                 (GET: Memory.get loc to e0.(Thread.local).(Local.promises) =
-                       Some (from, Message.concrete val released)),
-      List.In (loc, to) pl>>) /\
+  (<<COMPLETE: forall loc from to msg
+                      (GET: Memory.get loc to e0.(Thread.local).(Local.promises) =
+                            Some (from, msg))
+                      (NRESERVE: msg <> Message.reserve),
+      exists ws,
+        (<<IN: List.In ws pl>>) /\
+        (<<WIN: List.In (loc, to) ws>>)>>) /\
   (<<CONSISTENT: forall
-      pl0 loc to pl1
-      (PROMISES: pl = pl0 ++ (loc, to) :: pl1)
+      pl0 ws loc to pl1
+      (PROMISES: pl = pl0 ++ ws :: pl1)
+      (WIN: List.In (loc, to) ws)
       mem1 tm sc max
       (FUTURE: Memory.future_weak (Thread.memory e0) mem1)
       (CLOSED: Memory.closed mem1)
@@ -2309,15 +2374,76 @@ Definition pf_consistent_super_strong_promises_list lang (e0:Thread.t lang)
 
           (<<FINAL: final_event_trace we (ftr0 ++ ftr_reserve)>>) /\
           (<<WRITING: relaxed_writing_event loc to val we>>) /\
-          (<<SOUND: forall loc0 from0 to0 val0 released0
-                           (GET: Memory.get loc0 to0 (Local.promises (Thread.local e1)) = Some (from0, Message.concrete val0 released0)),
-              exists from0' released0',
-                (<<GET: Memory.get loc0 to0 (Local.promises (Thread.local e0)) = Some (from0', Message.concrete val0 released0')>>)>>) /\
-          (<<WRITTEN: forall loc0 to0
-                             (IN: List.In (loc0, to0) (pl0 ++ [(loc, to)])),
-              Memory.get loc0 to0 (Local.promises (Thread.local e1)) = None>>))
+          (<<SOUND: forall loc0 from0 to0 msg0
+                           (GET: Memory.get loc0 to0 (Local.promises (Thread.local e1)) = Some (from0, msg0))
+                           (NRESERVE: msg0 <> Message.reserve),
+              exists from0' msg0',
+                (<<GET: Memory.get loc0 to0 (Local.promises (Thread.local e0)) = Some (from0', msg0')>>) /\
+                (<<MSG: Message.le msg0 msg0'>>)>>) /\
+          (<<WRITTEN: forall loc0 to0 ws0
+                             (IN: List.In ws0 (pl0 ++ [ws]))
+                             (WIN: List.In (loc0, to0) ws0),
+              Memory.get loc0 to0 (Local.promises (Thread.local e1)) = None>>))>>)
 .
 
+
+Lemma promise_writing_event_writing_locs loc from to msg te
+      (WRITE: promise_writing_event loc from to msg te)
+  :
+    exists ws,
+      (<<WRITE: writing_locs te = Some ws>>) /\
+      (<<WIN: List.In (loc, to) ws>>).
+Proof.
+  inv WRITE.
+  { ss. des_ifs. esplits; eauto. ss. auto. }
+  { ss. des_ifs. esplits; eauto. ss. auto. }
+  { ss. des_ifs. esplits; eauto. ss. auto. }
+  { ss. des_ifs. esplits; eauto. ss. right.
+    eapply List.in_map with (f:= (fun '(_, to, _) => (loc, to))) in IN. ss.
+  }
+Qed.
+
+Lemma tevent_map_weak_writing_locs f fe e
+      (EVENT: tevent_map_weak f fe e)
+  :
+    option_rel
+      (List.Forall2 (fun '(loc0, to0) '(loc1, to1) => loc0 = loc1 /\ f loc0 to1 to0))
+      (writing_locs fe) (writing_locs e).
+Proof.
+  inv EVENT; ss.
+  { des_ifs. ss. econs; eauto. }
+  { des_ifs. ss. econs; eauto.
+    induction MSGS; ss. econs; eauto.
+    destruct x as [[from0 to0] msg0], y as [[from1 to1] msg1]; ss.
+    des. splits; eauto.
+  }
+  { des_ifs. ss. econs; eauto. }
+Qed.
+
+Lemma writing_locs_relaxed_writing
+      e loc ts ws
+      (WRITE: writing_locs e = Some ws)
+      (IN: List.In (loc, ts) ws)
+  :
+    exists msg,
+      (<<WRITE: relaxed_writing_event loc ts msg e>>).
+Proof.
+  i. unfold writing_locs in WRITE. des_ifs; ss; des; clarify.
+  { esplits.
+    { econs; eauto. refl. }
+  }
+  { esplits.
+    { econs 3; eauto. refl. }
+  }
+  { eapply List.in_map_iff in IN. des.
+    destruct x as [[from1 to1] msg1]. clarify. esplits.
+    { econs 4; eauto. refl. }
+  }
+  { esplits.
+    { econs; eauto. refl. }
+  }
+  Unshelve. try exact None.
+Qed.
 
 Lemma pf_consistent_super_strong_promises_list_exists lang (e0: Thread.t lang)
       (tr : Trace.t)
@@ -2334,158 +2460,179 @@ Proof.
   assert (exists dom,
              (<<SOUND: forall loc to
                               (IN: List.In (loc, to) dom),
-                 exists from val released,
-                   (<<GET: Memory.get loc to (Local.promises (Thread.local e0)) = Some (from, Message.concrete val released)>>)>>) /\
-             (<<COMPLETE: forall loc from to val released
-                                 (GET: Memory.get loc to (Local.promises (Thread.local e0)) = Some (from, Message.concrete val released)),
+                 exists from msg,
+                   (<<GET: Memory.get loc to (Local.promises (Thread.local e0)) = Some (from, msg)>>) /\
+                   (<<NRESERVE: msg <> Message.reserve>>)>>) /\
+             (<<COMPLETE: forall loc from to msg
+                                 (GET: Memory.get loc to (Local.promises (Thread.local e0)) = Some (from, msg))
+                                 (NRESERVE: msg <> Message.reserve),
                  List.In (loc, to) dom>>)).
   { inv LOCAL. inv FINITE.
     hexploit (list_filter_exists
                 (fun (locto: Loc.t * Time.t) =>
                    let (loc, to) := locto in
-                   exists from val released,
-                     Memory.get loc to (Local.promises (Thread.local e0)) = Some (from, Message.concrete val released)) x).
+                   exists from msg,
+                     Memory.get loc to (Local.promises (Thread.local e0)) = Some (from, msg) /\ msg <> Message.reserve) x).
     { i. des. exists l'. splits.
       { i. eapply COMPLETE in IN. des. esplits; eauto. }
       { i. eapply COMPLETE. esplits; eauto. }
     }
   }
   des.
-  set (pl := map_somes (fun lce => writing_loc_prom (Local.promises (Thread.local e0)) (snd lce)) tr).
+  set (pl := map_somes (fun lce => writing_locs_prom (Local.promises (Thread.local e0)) (snd lce)) tr).
   destruct (classic (exists loc ts,
                         (<<IN: List.In (loc, ts) dom>>) /\
-                        (<<NIN: ~ List.In (loc, ts) pl>>))) as [EXIST|ALL].
-  { exists dom. split.
-    { ii. eapply COMPLETE in GET. auto. }
-    ii. exploit CONSISTENT; eauto. i. des. right. esplits; eauto.
-    unguard. des; eauto. exfalso.
+                        (<<NIN: forall ws (IN: List.In ws pl),
+                            ~ List.In (loc, ts) ws>>))) as [EXIST|ALL].
+  { exists [dom]. split.
+    { ii. eapply COMPLETE in GET; eauto. esplits; eauto. ss. auto. }
+    ii. exploit CONSISTENT; eauto. i. des. exfalso.
     eapply SOUND in IN. des.
     exploit WRITES; eauto. i. des.
     eapply list_Forall2_in in IN; eauto. des. destruct a. ss.
-    assert (WRITE: writing_loc_prom (Local.promises (Thread.local e0)) t0 = Some (loc0, ts)).
-    { inv WRITING; inv SAT; ss.
-      { rewrite ORD. replace ts with to0 in *.
-        { erewrite GET. auto. }
-        eapply MAPIDENT; eauto.
-        eapply MAX in GET. auto. }
-      { rewrite ORD. replace ts with to0 in *.
-        { erewrite GET. auto. }
-        eapply MAPIDENT; eauto.
-        eapply MAX in GET. auto. }
+    eapply promise_writing_event_writing_locs in WRITING. des.
+    pose proof (tevent_map_weak_writing_locs SAT) as WLOCS.
+    rewrite WRITE in WLOCS. destruct (writing_locs t0) eqn:EQ; ss.
+    eapply NIN.
+    { eapply map_somes_in.
+      { eauto. }
+      { ss. unfold writing_locs_prom. rewrite EQ. eauto. }
     }
-    eapply NIN. eapply map_somes_in; eauto.
+    eapply List.filter_In. split.
+    { eapply list_Forall2_in2 in WLOCS; eauto. des.
+      destruct b. des; subst. eapply MAPIDENT in SAT1; eauto.
+      { subst. auto. }
+      { eapply MAX in GET; eauto. }
+    }
+    { unfold check_in_promise. rewrite GET. destruct msg; ss. }
   }
-  { exists pl. split.
-    { ii. eapply COMPLETE in GET. eapply NNPP. ii.
-      eapply ALL. esplits; eauto. }
-    ii. left. exploit (@CONSISTENT mem1 tm sc max); eauto.
-    hexploit map_somes_split_inv_one; try apply PROMISES. i. des. subst.
-    dup TRACE.
-    eapply List.Forall2_app_inv_l in TRACE. des. subst.
-    dup TRACE. eapply List.Forall2_app_inv_l in TRACE. des. subst.
-    inv TRACE3. inv H3. destruct y, a. ss.
-    assert (TO: forall fto (MAP: f loc to fto), to = fto).
-    { i. destruct (Time.le_lt_dec fto (max loc)).
+  exists pl. split.
+  { ii. eapply COMPLETE in GET; auto. eapply NNPP. ii.
+    eapply ALL. esplits; eauto. }
+  ii. exploit (@CONSISTENT mem1 tm sc max); eauto.
+  hexploit map_somes_split_inv_one; try apply PROMISES. i. des. subst.
+  dup TRACE.
+  eapply List.Forall2_app_inv_l in TRACE. des. subst.
+  dup TRACE. eapply List.Forall2_app_inv_l in TRACE. des. subst.
+  inv TRACE3. inv H3. destruct y, a. ss.
+  assert (TO: forall fto (MAP: f loc to fto), to = fto).
+  { i. destruct (Time.le_lt_dec fto (max loc)).
+    { eapply MAPIDENT; eauto. }
+    dup l. eapply BOUND in l; eauto. des.
+    exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+    { eapply l. }
+    unfold writing_locs_prom in MAP1. des_ifs.
+    eapply List.filter_In in WIN. des.
+    unfold check_in_promise in WIN0. des_ifs.
+    { eapply MAX in Heq0. auto. }
+    { eapply MAX in Heq0. auto. }
+  }
+  assert (WRITING: exists val0,
+             (<<WRITING: relaxed_writing_event loc to val0 t0>>)).
+  {  unfold writing_locs_prom in MAP1. des_ifs.
+    eapply List.filter_In in WIN. des.
+    pose proof (tevent_map_weak_writing_locs H1) as WLOCS.
+    rewrite Heq in WLOCS. destruct (writing_locs t0) eqn:EQ; ss.
+    eapply list_Forall2_in in WLOCS; eauto. des. destruct a as [loc1 to1].
+    des. subst. eapply TO in SAT0. subst.
+    eapply writing_locs_relaxed_writing; eauto.
+  }
+  des.
+  hexploit SPLIT; eauto.
+  { clear - WRITING0 CANCELNORMAL. erewrite <- List.app_assoc in CANCELNORMAL.
+    eapply cancel_normal_normals_after_normal; eauto. inv WRITING0; ss. } i. des.
+  eexists (l1'0 ++ [(t, t0)]), l2', ftr_reserve, ftr_cancel. esplits; eauto.
+  { eapply Forall_app.
+    { eapply Forall_app_inv in EVENTS. des.
+      eapply List.Forall_impl; eauto. i. ss. des. splits; auto. }
+    { eapply List.Forall_impl; eauto. i. ss. des. destruct a. ss. splits; auto.
+      { destruct t4; ss. }
+      { destruct t4; ss. }
+      { destruct t4; ss. }
+    }
+  }
+  { eapply Forall_app.
+    { eapply List.Forall_impl; eauto. i. ss. des. destruct a. ss. splits; auto.
+      { destruct t4; ss. destruct kind; ss; des_ifs. auto. }
+      { destruct t4; ss. }
+      { destruct t4; ss. }
+      { destruct t4; ss. des_ifs. }
+      { destruct t4; ss. }
+    }
+    { eapply Forall_app_inv in EVENTS. des.
+      eapply List.Forall_impl; eauto. i. ss. des. splits; auto. }
+  }
+  { destruct e2. eapply no_sc_any_sc_traced in STEPS0; ss.
+    { des. exploit Trace.steps_future; try apply STEPS1; eauto; ss.
+      { instantiate (1:=TimeMap.bot). ss.
+        eapply Memory.closed_timemap_bot; eauto. eapply CLOSED0. }
+      i. des. hexploit pf_consistent_super_strong_same_sc.
+      { eapply pf_consistent_super_strong_not_easy; try apply CONSISTENT0; eauto.
+        { ss. eapply memory_times_wf_traced in STEPS1; eauto. eapply Forall_app.
+          { eapply Forall_app_inv in EVENTS. des. eapply List.Forall_impl; eauto.
+            i. ss. des; auto. }
+          { eapply List.Forall_impl; eauto. i. ss. des; auto. }
+        }
+      }
+      i. eauto. }
+    { eapply Forall_app.
+      { eapply Forall_app_inv in EVENTS. des. eapply List.Forall_impl; eauto.
+        i. ss. des; auto. }
+      { eapply List.Forall_impl; eauto. i. ss. des; auto.
+        destruct a. ss. destruct t4; ss. }
+    }
+  }
+  { erewrite <- List.app_assoc. eapply final_event_trace_post.
+    econs. eapply List.Forall_impl; eauto. i. ss.
+    des. destruct a. unfold ThreadEvent.is_reserve in *. des_ifs. }
+  { i. eapply no_concrete_promise_concrete_decrease_steps in STEPS0; eauto.
+    eapply Forall_app.
+    { eapply Forall_app_inv in EVENTS. des.
+      eapply List.Forall_impl; eauto. i. ss. des. splits; auto. }
+    { eapply List.Forall_impl; eauto. i. ss. des. destruct a. ss. splits; auto. }
+  }
+  { i. assert (WRITED: exists flc fwe ws,
+                  (<<IN: List.In (flc, fwe) (l0 ++ [(t1, t2)])>>) /\
+                  (<<WRITING: writing_locs_prom (Local.promises (Thread.local e0)) fwe = Some ws>>) /\
+                  (<<WIN: List.In (loc0, to0) ws>>)).
+    { apply List.in_app_or in IN. des.
+      { eapply map_somes_in_rev in IN. des. destruct a. ss. esplits; eauto.
+        eapply List.in_or_app; eauto. }
+      { inv IN; clarify. esplits; eauto.
+        eapply List.in_or_app; ss; eauto. }
+    } des.
+    assert (TO0: forall fto (MAP: f loc0 to0 fto), to0 = fto).
+    { i. destruct (Time.le_lt_dec fto (max loc0)).
       { eapply MAPIDENT; eauto. }
       dup l. eapply BOUND in l; eauto. des.
       exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
       { eapply l. }
-      unfold writing_loc_prom in MAP1. des_ifs.
+      clear - WRITING MAX WIN1.
+      unfold writing_locs_prom in WRITING. des_ifs.
+      eapply List.filter_In in WIN1. des.
+      unfold check_in_promise in WIN0. des_ifs.
       { eapply MAX in Heq0. auto. }
       { eapply MAX in Heq0. auto. }
     }
-    assert (WRITING: exists val0,
-               (<<WRITING: relaxed_writing_event loc to val0 t0>>)).
-    { unfold writing_loc_prom in MAP1. des_ifs.
-      { inv H1; ss. replace fto with to; eauto. }
-      { inv H1; ss. replace fto with to; eauto. }
-    } des.
-    hexploit SPLIT; eauto.
-    { clear - WRITING0 CANCELNORMAL. erewrite <- List.app_assoc in CANCELNORMAL.
-      eapply cancel_normal_normals_after_normal; eauto. inv WRITING0; ss. } i. des.
-    eexists (l1'0 ++ [(t, t0)]), l2', ftr_reserve, ftr_cancel. esplits; eauto.
-    { eapply Forall_app.
-      { eapply Forall_app_inv in EVENTS. des.
-        eapply List.Forall_impl; eauto. i. ss. des. splits; auto. }
-      { eapply List.Forall_impl; eauto. i. ss. des. destruct a. ss. splits; auto.
-        { destruct t4; ss. }
-        { destruct t4; ss. }
-        { destruct t4; ss. }
-      }
+    assert (WRITED: exists lc we ws,
+               (<<IN: List.In (lc, we) (l1'0 ++ [(t, t0)])>>) /\
+               (<<WRITING: writing_locs we = Some ws>>) /\
+               (<<WIN: List.In (loc0, to0) ws>>)).
+    { eapply list_Forall2_in2 in IN0; eauto. des. destruct b.
+      ss. unfold writing_locs_prom in WRITING. des_ifs.
+      eapply List.filter_In in WIN1. des.
+      pose proof (tevent_map_weak_writing_locs SAT) as WLOCS.
+      rewrite Heq in WLOCS.
+      destruct (writing_locs t4) eqn:EQ; ss. esplits; eauto.
+      eapply list_Forall2_in in WLOCS; eauto.
+      des. destruct a as [loc1 to1]. des; subst.
+      hexploit TO0; eauto. i. subst. auto.
     }
-    { eapply Forall_app.
-      { eapply List.Forall_impl; eauto. i. ss. des. destruct a. ss. splits; auto.
-        { destruct t4; ss. destruct kind; ss; des_ifs. auto. }
-        { destruct t4; ss. }
-        { destruct t4; ss. }
-        { destruct t4; ss. des_ifs. }
-        { destruct t4; ss. }
-      }
-      { eapply Forall_app_inv in EVENTS. des.
-        eapply List.Forall_impl; eauto. i. ss. des. splits; auto. }
-    }
-    { destruct e2. eapply no_sc_any_sc_traced in STEPS0; ss.
-      { des. exploit Trace.steps_future; try apply STEPS1; eauto; ss.
-        { instantiate (1:=TimeMap.bot). ss.
-          eapply Memory.closed_timemap_bot; eauto. eapply CLOSED0. }
-        i. des. hexploit pf_consistent_super_strong_same_sc.
-        { eapply pf_consistent_super_strong_not_easy; try apply CONSISTENT0; eauto.
-          { ss. eapply memory_times_wf_traced in STEPS1; eauto. eapply Forall_app.
-            { eapply Forall_app_inv in EVENTS. des. eapply List.Forall_impl; eauto.
-              i. ss. des; auto. }
-            { eapply List.Forall_impl; eauto. i. ss. des; auto. }
-          }
-        }
-        i. eauto. }
-      { eapply Forall_app.
-        { eapply Forall_app_inv in EVENTS. des. eapply List.Forall_impl; eauto.
-          i. ss. des; auto. }
-        { eapply List.Forall_impl; eauto. i. ss. des; auto.
-          destruct a. ss. destruct t4; ss. }
-      }
-    }
-    { erewrite <- List.app_assoc. eapply final_event_trace_post.
-      econs. eapply List.Forall_impl; eauto. i. ss.
-      des. destruct a. unfold ThreadEvent.is_reserve in *. des_ifs. }
-    { i. eapply no_concrete_promise_concrete_decrease_steps in STEPS0; eauto.
-      eapply Forall_app.
-      { eapply Forall_app_inv in EVENTS. des.
-        eapply List.Forall_impl; eauto. i. ss. des. splits; auto. }
-      { eapply List.Forall_impl; eauto. i. ss. des. destruct a. ss. splits; auto. }
-    }
-    { i. assert (WRITED: exists flc fwe,
-                    (<<IN: List.In (flc, fwe) (l0 ++ [(t1, t2)])>>) /\
-                    (<<WRITING: writing_loc_prom (Local.promises (Thread.local e0)) fwe = Some (loc0, to0)>>)).
-      { apply List.in_app_or in IN. des.
-        { eapply map_somes_in_rev in IN. des. destruct a. ss. esplits; eauto.
-          eapply List.in_or_app; eauto. }
-        { inv IN; clarify. esplits; eauto.
-          eapply List.in_or_app; ss; eauto. }
-      } des.
-      assert (TO0: forall fto (MAP: f loc0 to0 fto), to0 = fto).
-      { i. destruct (Time.le_lt_dec fto (max loc0)).
-        { eapply MAPIDENT; eauto. }
-        dup l. eapply BOUND in l; eauto. des.
-        exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
-        { eapply l. }
-        clear - WRITING MAX.
-        unfold writing_loc_prom in WRITING. des_ifs.
-        { eapply MAX in Heq0. auto. }
-        { eapply MAX in Heq0. auto. }
-      }
-      assert (WRITED: exists lc we,
-                 (<<IN: List.In (lc, we) (l1'0 ++ [(t, t0)])>>) /\
-                 (<<WRITING: writing_loc we = Some (loc0, to0)>>)).
-      { eapply list_Forall2_in2 in IN0; eauto. des. destruct b. ss. esplits; eauto.
-        clear - TO0 WRITING SAT.
-        unfold writing_loc_prom in WRITING. des_ifs.
-        { inv SAT; ss. eapply TO0 in TO. subst. auto. }
-        { inv SAT; ss. eapply TO0 in TO. subst. auto. }
-      }
-      des. eapply writed_unchangable in STEPS0; cycle 1.
-      { eapply List.in_or_app. left. eauto. }
-      { eauto. }
-      { des. inv UNCH. auto. }
-    }
+    des. eapply writed_unchangable in STEPS0; cycle 1.
+    { eapply List.in_or_app. left. eauto. }
+    { eauto. }
+    { eauto. }
+    { des. inv UNCH. auto. }
   }
+  Unshelve. all: eauto.
 Qed.
