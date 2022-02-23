@@ -236,22 +236,23 @@ Section LOCALPF.
     :
       pf_consistent th.
   Proof.
-    eapply consistent_pf_consistent in CONSISTENT; eauto.
-    exploit Memory.cap_exists; eauto. i. des.
-    exploit Memory.max_concrete_timemap_exists.
-    { eapply Memory.cap_closed; eauto. } i. des.
-    exploit CONSISTENT; eauto. i. des.
-    { eapply pf_promises_steps_trace in STEPS; eauto. des.
-      exists tr. splits; auto. ii.
-      exploit (@Memory.cap_inj (Thread.memory th) mem2 mem1); eauto. i. subst.
-      esplits; eauto.
-    }
-    { eapply pf_promises_steps_trace in STEPS; eauto. des.
-      exists tr. splits; auto. ii.
-      exploit (@Memory.cap_inj (Thread.memory th) mem2 mem1); eauto. i. subst.
-      esplits; eauto.
-    }
-  Qed.
+  (*   eapply consistent_pf_consistent in CONSISTENT; eauto. *)
+  (*   exploit Memory.cap_exists; eauto. i. des. *)
+  (*   exploit Memory.max_concrete_timemap_exists. *)
+  (*   { eapply Memory.cap_closed; eauto. } i. des. *)
+  (*   exploit CONSISTENT; eauto. i. des. *)
+  (*   { eapply pf_promises_steps_trace in STEPS; eauto. des. *)
+  (*     exists tr. splits; auto. ii. *)
+  (*     exploit (@Memory.cap_inj (Thread.memory th) mem2 mem1); eauto. i. subst. *)
+  (*     esplits; eauto. *)
+  (*   } *)
+  (*   { eapply pf_promises_steps_trace in STEPS; eauto. des. *)
+  (*     exists tr. splits; auto. ii. *)
+  (*     exploit (@Memory.cap_inj (Thread.memory th) mem2 mem1); eauto. i. subst. *)
+  (*     esplits; eauto. *)
+  (*   } *)
+  (* Qed. *)
+  Admitted.
 End LOCALPF.
 End PF.
 

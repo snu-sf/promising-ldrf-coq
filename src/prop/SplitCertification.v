@@ -281,7 +281,7 @@ Proof.
       erewrite (@Memory.add_o promises0 promises2); eauto.
       erewrite (@Memory.remove_o promises2 (Local.promises lc1)); eauto. des_ifs.
       ss. des; subst. eapply Memory.remove_get0; eauto. }
-    econs; eauto. ss.
+    econs; eauto.
   }
   destruct lc1. ss.
   econs. econs 1; eauto. econs; eauto.
@@ -347,6 +347,7 @@ Proof.
   { eauto. }
   i. des.
   exploit consistent_pf_consistent_super_strong; eauto. i. des.
+  { admit. }
   exploit (@concrete_promise_max_timemap_exists (Thread.memory th1) (Local.promises (Thread.local th1))).
   { eapply CLOSED2. } i. des. destruct th1; ss.
   exploit (CONSISTENT0 memory TimeMap.bot); eauto.
@@ -380,7 +381,9 @@ Proof.
   { ii. ss. }
   { eapply STEPS3. }
   { eapply List.Forall_impl; eauto. i. ss. des. splits; auto.
-    destruct a. ss. destruct t0; ss. }
+    destruct a. ss. destruct t0; ss. splits; auto.
+    eapply List.Forall_forall. i. auto.
+  }
   { eauto. }
   { eauto. }
   { eauto. }
@@ -399,57 +402,57 @@ Proof.
     }
   }
 
-  { unguard. des.
-    { ii. left. exploit (CAP mem1).
-      { eapply CAP0. }
-      i. ss. des.
-      eapply no_sc_any_sc_traced in CANCELSTEPS; eauto; cycle 1.
-      { eapply List.Forall_impl; eauto. clear.
-        i. ss. des. unfold ThreadEvent.is_cancel in *. des_ifs. }
-      des. eapply Trace.silent_steps_tau_steps in STEPS4; cycle 1.
-      { eapply List.Forall_impl; eauto. clear.
-        i. ss. des; auto. unfold ThreadEvent.is_cancel in *. des_ifs. }
-      eapply no_sc_any_sc_traced in STEPS2; eauto; cycle 1.
-      { eapply List.Forall_impl; eauto. clear.
-        i. ss. des. unfold ThreadEvent.is_cancel in *. des_ifs. }
-      des. eapply Trace.silent_steps_tau_steps in STEPS5; cycle 1.
-      { eapply List.Forall_impl; eauto. i. ss. des. auto. }
-      unfold Thread.steps_failure. esplits.
-      { etrans.
-        { eapply STEPS4. }
-        { eapply STEPS5. }
-      }
-      { eauto. }
-    }
-    { ii. right. exploit (CAP mem1).
-      { eapply CAP0. }
-      i. ss. des.
-      eapply no_sc_any_sc_traced in CANCELSTEPS; eauto; cycle 1.
-      { eapply List.Forall_impl; eauto. clear.
-        i. ss. des. unfold ThreadEvent.is_cancel in *. des_ifs. }
-      des. eapply Trace.silent_steps_tau_steps in STEPS4; cycle 1.
-      { eapply List.Forall_impl; eauto. clear.
-        i. ss. des; auto. unfold ThreadEvent.is_cancel in *. des_ifs. }
-      eapply no_sc_any_sc_traced in STEPS2; eauto; cycle 1.
-      { eapply List.Forall_impl; eauto. clear.
-        i. ss. des. unfold ThreadEvent.is_cancel in *. des_ifs. }
-      des. eapply Trace.silent_steps_tau_steps in STEPS5; cycle 1.
-      { eapply List.Forall_impl; eauto. i. ss. des. auto. }
-      unfold Thread.steps_failure. esplits.
-      { etrans.
-        { eapply STEPS4. }
-        { eapply STEPS5. }
-      }
-      { eauto. }
-    }
-  }
-Qed.
-
+(*   { unguard. des. *)
+(*     { ii. left. exploit (CAP mem1). *)
+(*       { eapply CAP0. } *)
+(*       i. ss. des. *)
+(*       eapply no_sc_any_sc_traced in CANCELSTEPS; eauto; cycle 1. *)
+(*       { eapply List.Forall_impl; eauto. clear. *)
+(*         i. ss. des. unfold ThreadEvent.is_cancel in *. des_ifs. } *)
+(*       des. eapply Trace.silent_steps_tau_steps in STEPS4; cycle 1. *)
+(*       { eapply List.Forall_impl; eauto. clear. *)
+(*         i. ss. des; auto. unfold ThreadEvent.is_cancel in *. des_ifs. } *)
+(*       eapply no_sc_any_sc_traced in STEPS2; eauto; cycle 1. *)
+(*       { eapply List.Forall_impl; eauto. clear. *)
+(*         i. ss. des. unfold ThreadEvent.is_cancel in *. des_ifs. } *)
+(*       des. eapply Trace.silent_steps_tau_steps in STEPS5; cycle 1. *)
+(*       { eapply List.Forall_impl; eauto. i. ss. des. auto. } *)
+(*       unfold Thread.steps_failure. esplits. *)
+(*       { etrans. *)
+(*         { eapply STEPS4. } *)
+(*         { eapply STEPS5. } *)
+(*       } *)
+(*       { eauto. } *)
+(*     } *)
+(*     { ii. right. exploit (CAP mem1). *)
+(*       { eapply CAP0. } *)
+(*       i. ss. des. *)
+(*       eapply no_sc_any_sc_traced in CANCELSTEPS; eauto; cycle 1. *)
+(*       { eapply List.Forall_impl; eauto. clear. *)
+(*         i. ss. des. unfold ThreadEvent.is_cancel in *. des_ifs. } *)
+(*       des. eapply Trace.silent_steps_tau_steps in STEPS4; cycle 1. *)
+(*       { eapply List.Forall_impl; eauto. clear. *)
+(*         i. ss. des; auto. unfold ThreadEvent.is_cancel in *. des_ifs. } *)
+(*       eapply no_sc_any_sc_traced in STEPS2; eauto; cycle 1. *)
+(*       { eapply List.Forall_impl; eauto. clear. *)
+(*         i. ss. des. unfold ThreadEvent.is_cancel in *. des_ifs. } *)
+(*       des. eapply Trace.silent_steps_tau_steps in STEPS5; cycle 1. *)
+(*       { eapply List.Forall_impl; eauto. i. ss. des. auto. } *)
+(*       unfold Thread.steps_failure. esplits. *)
+(*       { etrans. *)
+(*         { eapply STEPS4. } *)
+(*         { eapply STEPS5. } *)
+(*       } *)
+(*       { eauto. } *)
+(*     } *)
+(*   } *)
+(* Qed. *)
+Admitted.
 
 Lemma consistent_split lang (th0 th1' th1: Thread.t lang) pf e
       (STEP: Thread.step pf e th0 th1')
       (STEPS: rtc (@Thread.reserve_step _ \2/ @Thread.cancel_step _) th1' th1)
-      (CONSISTENT: Thread.consistent th1 \/ e = ThreadEvent.failure)
+      (CONSISTENT: Thread.consistent th1 \/ ThreadEvent.get_machine_event e = MachineEvent.failure)
       (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
       (MEM: Memory.closed (Thread.memory th0))
       (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
@@ -467,8 +470,8 @@ Proof.
   }
   destruct (ThreadEvent.get_machine_event e) eqn:EVT; cycle 1.
   { destruct e; ss. }
-  { destruct e; ss. inv STEP; inv STEP0; ss. inv LOCAL0.
-    esplits; eauto. left. unfold Thread.steps_failure. red. esplits; eauto.
+  { esplits; eauto. left. splits. red. esplits; eauto.
+    admit.
   }
   des; clarify.
   assert (STEPS0: rtc (tau (@pred_step no_sc _)) th0 th1).
@@ -496,4 +499,4 @@ Proof.
   }
   exploit tau_steps_consistent_split; eauto. i. des.
   esplits; eauto. eapply reserve_or_cancel_cancellable; eauto.
-Qed.
+Admitted.
