@@ -184,6 +184,14 @@ Proof.
   ii. inv H; inv H0. econs; eauto. etrans; eauto.
 Qed.
 
+Variant lower_thread {lang: language} (e_src e_tgt: Thread.t lang): Prop :=
+| lower_thread_intro
+    (STATE: Thread.state e_src = Thread.state e_tgt)
+    (LOCAL: lower_local (Thread.local e_src) (Thread.local e_tgt))
+    (SC: TimeMap.le (Thread.sc e_src) (Thread.sc e_tgt))
+    (MEMORY: lower_memory (Thread.memory e_src) (Thread.memory e_tgt))
+.
+
 Lemma lower_local_consistent lc_src lc_tgt
       (LOCAL: lower_local lc_src lc_tgt)
       (CONSISTENT: Local.promise_consistent lc_tgt)
@@ -759,4 +767,26 @@ Proof.
   inv STEP.
   { esplits; eauto. econs. }
   { hexploit lower_memory_thread_step; eauto. i. des. esplits; eauto. econs; eauto. }
+Qed.
+
+Lemma lower_thread_step
+      lang e1_src
+      pf e_tgt e1_tgt e2_tgt
+      (LOWER: @lower_thread lang e1_src e1_tgt)
+      (STEP: Thread.step pf e_tgt e1_tgt e2_tgt)
+      (WFSRC: Local.wf (Thread.local e1_src) (Thread.memory e1_src))
+      (WFTGT: Local.wf (Thread.local e1_tgt) (Thread.memory e1_tgt))
+      (CLOSEDSRC: Memory.closed (Thread.memory e1_src))
+      (CLOSEDTGT: Memory.closed (Thread.memory e1_tgt))
+  :
+    exists e_src e2_src,
+      (<<STEP: Thread.step pf e_src e1_src e2_src>>) /\
+      (<<EVENT: lower_event e_src e_tgt>>) /\
+      (<<LOWER: lower_thread e2_src e2_tgt>>)
+.
+Proof.
+  destruct e1_src, e1_tgt, e2_tgt. inv LOWER. ss. subst.
+  exploit lower_memory_thread_step;
+    try exact LOCAL; try exact SC; try exact MEMORY; eauto. i. des.
+  esplits; eauto. econs; eauto.
 Qed.
