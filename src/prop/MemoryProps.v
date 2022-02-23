@@ -4328,30 +4328,31 @@ Section SEMICLOSED.
     - eapply join_singleton_semi_closed_timemap; eauto.
   Qed.
 
-  (* Lemma concrete_promised_le_semi_closed_timemap tm mem0 mem1 loc to *)
-  (*       (CLOSED: semi_closed_timemap tm mem0 loc to) *)
-  (*       (CONCRETE: concrete_promised_le mem0 mem1) *)
-  (*   : *)
-  (*     semi_closed_timemap tm mem1 loc to. *)
-  (* Proof. *)
-  (*   ii. specialize (CLOSED l). des. *)
-  (*   { exploit CONCRETE. *)
-  (*     { econs; eauto. } *)
-  (*     i. inv x. left. eauto. *)
-  (*   } *)
-  (*   { clarify. auto. } *)
-  (* Qed. *)
+  Lemma concrete_messages_le_semi_closed_timemap tm mem0 mem1 loc to
+        (CLOSED: semi_closed_timemap tm mem0 loc to)
+        (CONCRETE: concrete_messages_le mem0 mem1)
+    :
+      semi_closed_timemap tm mem1 loc to.
+  Proof.
+    ii. specialize (CLOSED l). des.
+    { exploit CONCRETE.
+      { eauto. }
+      { ss. }
+      i. inv x. left. eauto.
+    }
+    { clarify. auto. }
+  Qed.
 
-  (* Lemma concrete_promised_le_semi_closed_view vw mem0 mem1 loc to *)
-  (*       (CLOSED: semi_closed_view vw mem0 loc to) *)
-  (*       (CONCRETE: concrete_promised_le mem0 mem1) *)
-  (*   : *)
-  (*     semi_closed_view vw mem1 loc to. *)
-  (* Proof. *)
-  (*   inv CLOSED. econs. *)
-  (*   - eapply concrete_promised_le_semi_closed_timemap; eauto. *)
-  (*   - eapply concrete_promised_le_semi_closed_timemap; eauto. *)
-  (* Qed. *)
+  Lemma concrete_messages_le_semi_closed_view vw mem0 mem1 loc to
+        (CLOSED: semi_closed_view vw mem0 loc to)
+        (CONCRETE: concrete_messages_le mem0 mem1)
+    :
+      semi_closed_view vw mem1 loc to.
+  Proof.
+    inv CLOSED. econs.
+    - eapply concrete_messages_le_semi_closed_timemap; eauto.
+    - eapply concrete_messages_le_semi_closed_timemap; eauto.
+  Qed.
 
 End SEMICLOSED.
 

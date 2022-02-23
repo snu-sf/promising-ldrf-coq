@@ -106,6 +106,17 @@ Proof.
       { econs; eauto. eapply reserving_trace_sim_trace_none; eauto. }
       { econs; eauto. }
     }
+    { esplits; eauto.
+      { econs; eauto. eapply reserving_trace_sim_trace_none; eauto. }
+      { econs; eauto. }
+    }
+    { esplits; eauto.
+      { econs; eauto. eapply reserving_trace_sim_trace_none; eauto. }
+      { econs; eauto. right.
+        eapply list_Forall2_in in MSGS; eauto. des.
+        destruct a as [[from' to'] msg']. des. subst. eauto.
+      }
+    }
   }
   { inv WRITING; ss. }
   { exploit IHTRACE; eauto. i. des. esplits; eauto. econs; eauto. }
@@ -175,11 +186,18 @@ Hint Constructors all_extra.
 Lemma jsim_event_sim_event
   :
     JSim.sim_event <2= sim_event.
-Proof. ii. inv PR; econs. inv MSG; ss. Qed.
+Proof.
+  ii. inv PR; econs.
+  { inv MSG; ss. }
+  { eapply list_Forall2_impl.
+    { instantiate (1:=eq). refl. }
+    { i. des_ifs. }
+  }
+Qed.
 
 Lemma promise_writing_event_racy
-      loc from ts val released e
-      (WRITING : promise_writing_event loc from ts val released e)
+      loc from ts msg e
+      (WRITING : promise_writing_event loc from ts msg e)
   :
     PFRace.writing_event loc ts e.
 Proof.
@@ -191,7 +209,7 @@ Lemma jsim_memory_concrete_promised mem_src mem_tgt
   :
     concrete_promised mem_tgt <2= concrete_promised mem_src.
 Proof.
-  ii. inv PR. eapply MEM in GET.  des. inv MSG. econs; eauto.
+  ii. inv PR. eapply MEM in GET.  des. econs; eauto. inv MSG; ss.
 Qed.
 
 Lemma sim_memory_concrete_promised_later mem_src mem_tgt loc ts
@@ -205,18 +223,21 @@ Lemma sim_memory_concrete_promised_later mem_src mem_tgt loc ts
 Proof.
   inv PROMISED. dup GET. apply memory_get_ts_strong in GET. des; subst.
   { exists Time.bot. splits.
-    { econs. eapply CLOSED. }
+    { econs.
+      { eapply CLOSED. }
+      { ss. }
+    }
     { refl. }
   }
   inv MEM. exploit (proj1 (COVER loc ts)).
   { econs; eauto. econs; ss. refl. }
-  i. inv x0. destruct msg.
-  { inv ITV. ss. exists to. splits; auto. econs; eauto. }
-  { eapply RESERVE in GET. exploit Memory.get_disjoint.
+  i. inv x0. destruct (classic (msg0 = Message.reserve)).
+  { subst. eapply RESERVE0 in GET. exploit Memory.get_disjoint.
     { eapply GET. }
     { eapply GET0. }
     i. des; clarify. exfalso. eapply x0; eauto. econs; ss. refl.
   }
+  { inv ITV. ss. exists to. splits; auto. econs; eauto. }
 Qed.
 
 Lemma jsim_joined_promises_covered prom_src prom_tgt view
@@ -228,8 +249,10 @@ Proof.
   { inv H. specialize (SIM loc to). rewrite GET in *. inv SIM; ss.
     { econs; eauto. }
     { econs; eauto. }
+    { econs; eauto. }
   }
   { inv H. specialize (SIM loc to). rewrite GET in *. inv SIM; ss.
+    { econs; eauto. }
     { econs; eauto. }
     { econs; eauto. }
   }
@@ -313,13 +336,16 @@ Proof.
     { left. exploit sim_memory_concrete_promised_later; eauto.
       { econs; eauto. }
       i. des. inv PROMISED. inv TS.
-      { exfalso. eapply MEM in GET0. des. inv MSG.
-        eapply CONCRETE in GET1. timetac. }
+      { exfalso. eapply MEM in GET0. des.
+        eapply CONCRETE in GET1.
+        { timetac. }
+        { inv MSG; ss. }
+      }
       { inv H. esplits; eauto.  }
     }
     { specialize (PROM loc (max loc)). rewrite GET in *. inv PROM; eauto. }
   }
-  { i. eapply MEM in GET. des; eauto. inv MSG. eauto. }
+  { i. eapply MEM in GET. des; eauto. eapply CONCRETE; eauto. inv MSG; ss. }
   { i. specialize (PROM loc to). rewrite GET in *. inv PROM; eauto. }
 Qed.
 
@@ -336,6 +362,12 @@ Proof.
     ii. eapply WRITE; eauto.
   }
   { ii. eapply WRITE; eauto. }
+  { des. splits.
+    { ii. eapply WRITE; eauto. }
+    { eapply List.Forall_impl; eauto.
+      ii. eapply H; eauto.
+    }
+  }
   { ii. eapply WRITE; eauto. }
 Qed.
 
@@ -349,7 +381,16 @@ Proof.
   { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. inv MSG; ss. }
   { eapply IDENT in TO. subst. econs; eauto. }
   { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. }
+  { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto.
+    eapply list_Forall2_impl; eauto. i. ss.
+    destruct a as [[from0 to0] msg0], b as [[from1 to1] msg1].
+    ss. des. splits; eauto. eapply ident_map_message_eq; eauto.
+    eapply message_map_incr; eauto.
+  }
   { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. }
+  { eapply IDENT in TO. subst. econs; eauto. }
+  { eapply IDENT in TO. subst. econs; eauto. }
+  { eapply IDENT in TO. subst. econs; eauto. }
 Qed.
 
 Lemma readable_not_exist_racy lc mem loc ts released ord
@@ -365,10 +406,10 @@ Proof.
   inv READABLE. des_ifs.
   { specialize (RLX eq_refl). destruct RLX; auto. inv H.
     inv CLOSED. inv CUR. specialize (RLX loc).
-    des. exfalso. eapply NOTEXIST. econs; eauto. }
+    des. exfalso. eapply NOTEXIST. econs; eauto; ss. }
   { destruct PLN; auto. inv H.
     inv CLOSED. inv CUR. specialize (PLN loc).
-    des. exfalso. eapply NOTEXIST. econs; eauto. }
+    des. exfalso. eapply NOTEXIST. econs; eauto; ss. }
 Qed.
 
 Lemma racy_read_mon loc ts lc0 lc1 e0 e1
@@ -379,6 +420,10 @@ Lemma racy_read_mon loc ts lc0 lc1 e0 e1
     PFRace.racy_read loc ts lc0 e0.
 Proof.
   inv RACY; inv EVENT; econs; eauto.
+  { des_ifs.
+    { eapply TimeFacts.le_lt_lt; eauto. eapply LOCAL. }
+    { eapply TimeFacts.le_lt_lt; eauto. eapply LOCAL. }
+  }
   { des_ifs.
     { eapply TimeFacts.le_lt_lt; eauto. eapply LOCAL. }
     { eapply TimeFacts.le_lt_lt; eauto. eapply LOCAL. }
@@ -416,23 +461,26 @@ Section SIM.
 
   Record pi_consistent
          (self: Loc.t -> Time.t -> Prop)
-         (pl: list (Loc.t * Time.t))
+         (pl: list (list (Loc.t * Time.t)))
          (mem_src: Memory.t)
          lang (e0:Thread.t lang)
     : Prop :=
     {
       pi_consistent_promises:
         forall loc ts (PROM: self loc ts),
-          List.In (loc, ts) pl;
+        exists ws,
+          (<<IN: List.In ws pl>>) /\
+          (<<WIN: List.In (loc, ts) ws>>);
       pi_consistent_certify:
         forall mem1 tm sc
-               (pl0 pl1: list (Loc.t * Time.t))
-               (ploc: Loc.t) (pts: Time.t)
+               (pl0 pl1: list (list (Loc.t * Time.t)))
+               (ws: list (Loc.t * Time.t)) (ploc: Loc.t) (pts: Time.t)
                (FUTURE: Memory.future_weak (Thread.memory e0) mem1)
                (CLOSED: Memory.closed mem1)
                (MWF: memory_times_wf times mem1)
                (LOCAL: Local.wf (Thread.local e0) mem1)
-               (PLIST: pl = pl0 ++ (ploc, pts) :: pl1)
+               (PLIST: pl = pl0 ++ ws :: pl1)
+               (WIN: List.In (ploc, pts) ws)
         ,
         exists ftr e1,
           (<<STEPS: Trace.steps ftr (Thread.mk _ (Thread.state e0) (Thread.local e0) sc mem1) e1>>) /\
@@ -449,16 +497,16 @@ Section SIM.
                         (<<EVENTSCERT: List.Forall (fun em => <<SAT: (no_read_msgs (fun loc ts => ~ (covered loc ts (Local.promises (Thread.local e0)) \/ concrete_promised mem_src loc ts \/ Time.lt (tm loc) ts))) (snd em)>>) ftr_cert>>) /\
                         (<<FINAL: final_event_trace we ftr>>) /\
                         (<<WRITING: relaxed_writing_event ploc pts val we>>) /\
-                        (<<SOUND: forall loc0 from0 to0 val0 released0
-                                         (GET: Memory.get loc0 to0 (Local.promises (Thread.local e1)) = Some (from0, Message.concrete val0 released0)),
-                            exists from0' released0',
-                              (<<GET: Memory.get loc0 to0 (Local.promises (Thread.local e0)) = Some (from0', Message.concrete val0 released0')>>)>>) /\
-                        (<<WRITTEN: forall loc0 to0
-                                           (IN: List.In (loc0, to0) (pl0 ++ [(ploc, pts)])),
-                            Memory.get loc0 to0 (Local.promises (Thread.local e1)) = None>>)) \/
-                    (exists st',
-                        (<<LOCAL: Local.failure_step (Thread.local e1)>>) /\
-                        (<<FAILURE: Language.step lang ProgramEvent.failure (@Thread.state lang e1) st'>>)));
+                        (<<SOUND: forall loc0 from0 to0 msg0
+                                         (GET: Memory.get loc0 to0 (Local.promises (Thread.local e1)) = Some (from0, msg0))
+                                         (NRESERVE: msg0 <> Message.reserve),
+                            exists from0' msg0',
+                              (<<GET: Memory.get loc0 to0 (Local.promises (Thread.local e0)) = Some (from0', msg0')>>) /\
+                              (<<MSG: Message.le msg0 msg0'>>)>>) /\
+                        (<<WRITTEN: forall ws0 loc0 to0
+                                           (IN: List.In ws0 (pl0 ++ [ws]))
+                                           (WIN: List.In (loc0, to0) ws0),
+                            Memory.get loc0 to0 (Local.promises (Thread.local e1)) = None>>)));
     }.
 
   Definition past_consistent
@@ -497,21 +545,15 @@ Section SIM.
       { eauto. }
       { eauto. }
       { eauto. }
+      { eauto. }
       i. unguard. des.
-      { ss. esplits; eauto.
-        { eapply List.Forall_impl; eauto. i. ss. des. splits; auto.
-          eapply no_read_msgs_mon; eauto. ii. des; eauto.
-          eapply memory_future_concrete_promised in H; eauto. }
-        { left. unguard. esplits; eauto.
-          eapply List.Forall_impl; eauto. i. ss. des. splits; auto.
-          eapply no_read_msgs_mon; eauto. ii. des; eauto.
-          eapply memory_future_concrete_promised in H0; eauto. }
-      }
-      { ss. esplits; eauto.
-        { eapply List.Forall_impl; eauto. i. ss. des. splits; auto.
-          eapply no_read_msgs_mon; eauto. ii. des; eauto.
-          eapply memory_future_concrete_promised in H; eauto. }
-      }
+      ss. esplits; eauto.
+      { eapply List.Forall_impl; eauto. i. ss. des. splits; auto.
+        eapply no_read_msgs_mon; eauto. ii. des; eauto.
+        eapply memory_future_concrete_promised in H; eauto. }
+      { eapply List.Forall_impl; eauto. i. ss. des. splits; auto.
+        eapply no_read_msgs_mon; eauto. ii. des; eauto.
+        eapply memory_future_concrete_promised in H0; eauto. }
     }
   Qed.
 
@@ -536,7 +578,7 @@ Section SIM.
             (views: Loc.t -> Time.t -> list View.t)
             (prom: Ident.t -> Loc.t -> Time.t -> Prop)
             (extra: Ident.t -> Loc.t -> Time.t -> Time.t -> Prop)
-            (proml: Ident.t -> list (Loc.t * Time.t))
+            (proml: Ident.t -> list (list (Loc.t * Time.t)))
     :
       forall (c_src c_mid c_tgt: Configuration.t), Prop :=
   | sim_configuration_intro
@@ -1021,12 +1063,14 @@ Section SIM.
                        tr_cert
                        times pl)
         (PROMOTHERS: forall loc ts (PROM: (prom_others \\2// prom_self) loc ts),
-            exists from to val released,
-              (<<GET: Memory.get loc to mem_tgt = Some (from, Message.concrete val released)>>) /\
+            exists from to msg,
+              (<<GET: Memory.get loc to mem_tgt = Some (from, msg)>>) /\
+              (<<NRESERVE: msg <> Message.reserve>>) /\
               (<<TS: Time.le ts to>>))
         (PROMSELF: forall loc ts (PROM: prom_self loc ts),
-            exists from val released,
-              (<<GET: Memory.get loc ts (Local.promises lc_tgt) = Some (from, Message.concrete val released)>>))
+            exists from msg,
+              (<<GET: Memory.get loc ts (Local.promises lc_tgt) = Some (from, msg)>>) /\
+              (<<NRESERVE: msg <> Message.reserve>>))
         (FORGET: forall loc ts
                         (PROMISED: concrete_promised mem_tgt loc ts),
             (<<PROMISED: concrete_promised mem_src loc ts>>) \/
@@ -1041,7 +1085,7 @@ Section SIM.
         (Thread.mk lang st_tgt lc_tgt sc_tgt mem_tgt).
   Proof.
     unfold pf_consistent_super_strong_promises_list in *. des. ss. econs.
-    { i. eapply PROMSELF in PROM. des. eapply COMPLETE; eauto. }
+    { i. eapply PROMSELF in PROM. des. eapply COMPLETE; eauto; ss. }
     { exploit (@concrete_promise_max_timemap_exists mem_tgt (Local.promises lc_tgt)).
       { eapply CONFIGTGT. } intros [max MAX].
       ii. exploit CONSISTENT0; eauto. i. ss. des.
@@ -1099,6 +1143,42 @@ Section SIM.
               dup GET. apply memory_get_ts_strong in GET0. des; auto.
               subst. inv LOCAL. erewrite BOT in GET. ss. }
           }
+          { ii. eapply H0. ii. eapply H. des; auto.
+            eapply FORGET in H1. des; ss; auto. destruct FORGET0; ss.
+            { replace fto with to in *; ss.
+              eapply MAPIDENT; eauto.
+              exploit PROMOTHERS.
+              { left. eauto. } i. des.
+              eapply MAX in GET; eauto.
+            }
+            { eapply PROMSELF in H1. des. left. econs; eauto. econs; ss; [|refl].
+              dup GET. apply memory_get_ts_strong in GET0. des; auto.
+              subst. inv LOCAL. erewrite BOT in GET. ss. }
+          }
+          { ii. eapply H0. ii. eapply H. des; auto.
+            eapply FORGET in H1. des; ss; auto. destruct FORGET0; ss.
+            { replace fto with to in *; ss.
+              eapply MAPIDENT; eauto.
+              exploit PROMOTHERS.
+              { left. eauto. } i. des.
+              eapply MAX in GET; eauto.
+            }
+            { eapply PROMSELF in H1. des. left. econs; eauto. econs; ss; [|refl].
+              dup GET. apply memory_get_ts_strong in GET0. des; auto.
+              subst. inv LOCAL. erewrite BOT in GET. ss. }
+          }
+          { ii. eapply H0. ii. eapply H. des; auto.
+            eapply FORGET in H1. des; ss; auto. destruct FORGET0; ss.
+            { replace fto with to in *; ss.
+              eapply MAPIDENT; eauto.
+              exploit PROMOTHERS.
+              { left. eauto. } i. des.
+              eapply MAX in GET; eauto.
+            }
+            { eapply PROMSELF in H1. des. left. econs; eauto. econs; ss; [|refl].
+              dup GET. apply memory_get_ts_strong in GET0. des; auto.
+              subst. inv LOCAL. erewrite BOT in GET. ss. }
+          }
         }
         splits; eauto.
         { eapply Forall_app_inv in NOREADSRC. des. eapply list_Forall_sum.
@@ -1108,44 +1188,13 @@ Section SIM.
             i. ss. des. destruct a. ss. destruct t0; ss. }
           { i. ss. des. splits; auto. }
         }
-        { left. exists val, we, (ftr_cancel ++ ftr1). splits; auto.
+        { red. exists val, we, (ftr_cancel ++ ftr1). splits; eauto.
           eapply Forall_app_inv in NOREADSRC. des. eapply list_Forall_sum.
           { instantiate (1:=fun em => wf_time_evt times (snd em) /\ ThreadEvent.get_machine_event (snd em) = MachineEvent.silent).
             eapply List.Forall_impl; eauto. i. ss. des; auto. }
           { eapply Forall_app; try apply FORALL2. eapply List.Forall_impl; eauto.
             i. ss. des. destruct a. ss. destruct t0; ss. }
           { i. ss. }
-        }
-      }
-      { unguard. exists ftr, e1. splits; auto.
-        eapply List.Forall_forall. i. dup H.
-        eapply List.Forall_forall in H0; try apply EVENTS; eauto. ss.
-        eapply list_Forall2_in in H; eauto. des.
-        eapply List.Forall_forall in IN; eauto. ss.
-        destruct x, a. ss. splits; auto. inv SAT; ss.
-        { ii. eapply SAT3. ii. eapply H. des; auto.
-          eapply FORGET in H0. des; ss; auto.
-          { replace fto with to in *; ss.
-            eapply MAPIDENT; eauto.
-            exploit PROMOTHERS.
-            { left. eauto. } i. des.
-            eapply MAX in GET; eauto.
-          }
-          { eapply PROMSELF in FORGET0. des. left. econs; eauto. econs; ss; [|refl].
-            dup GET. apply memory_get_ts_strong in GET0. des; auto.
-            subst. inv LOCAL. erewrite BOT in GET. ss. }
-        }
-        { ii. eapply SAT3. ii. eapply H. des; auto.
-          eapply FORGET in H0. des; ss; auto.
-          { replace ffrom with from in *; ss.
-            eapply MAPIDENT; eauto.
-            exploit PROMOTHERS.
-            { left. eauto. } i. des.
-            eapply MAX in GET; eauto.
-          }
-          { eapply PROMSELF in FORGET0. des. left. econs; eauto. econs; ss; [|refl].
-            dup GET. apply memory_get_ts_strong in GET0. des; auto.
-            subst. inv LOCAL. erewrite BOT in GET. ss. }
         }
       }
     }
@@ -1162,12 +1211,14 @@ Section SIM.
                        tr_cert
                        times)
         (PROMOTHERS: forall loc ts (PROM: (prom_others \\2// prom_self) loc ts),
-            exists from to val released,
-              (<<GET: Memory.get loc to mem_tgt = Some (from, Message.concrete val released)>>) /\
+            exists from to msg,
+              (<<GET: Memory.get loc to mem_tgt = Some (from, msg)>>) /\
+              (<<NRESERVE: msg <> Message.reserve>>) /\
               (<<TS: Time.le ts to>>))
         (PROMSELF: forall loc ts (PROM: prom_self loc ts),
-            exists from val released,
-              (<<GET: Memory.get loc ts (Local.promises lc_tgt) = Some (from, Message.concrete val released)>>))
+            exists from msg,
+              (<<GET: Memory.get loc ts (Local.promises lc_tgt) = Some (from, msg)>>) /\
+              (<<NRESERVE: msg <> Message.reserve>>))
         (FORGET: forall loc ts
                         (PROMISED: concrete_promised mem_tgt loc ts),
             (<<PROMISED: concrete_promised mem_src loc ts>>) \/
@@ -1196,7 +1247,7 @@ Section SIM.
           eapply MAPIDENT; eauto.
           exploit PROMOTHERS.
           { left. eauto. } i. des.
-          eapply MAX in GET; eauto.
+          eapply MAX in GET; eauto; ss.
         }
         { eapply PROMSELF in H0. des. left. econs; eauto. econs; ss; [|refl].
           dup GET. apply memory_get_ts_strong in GET0. des; auto.
@@ -1205,6 +1256,18 @@ Section SIM.
       { ii. eapply SAT3. ii. eapply H. des; eauto.
         eapply FORGET in H0. des; ss; auto. destruct FORGET0; ss.
         { replace ffrom with from in *; ss.
+          eapply MAPIDENT; eauto.
+          exploit PROMOTHERS.
+          { left. eauto. } i. des.
+          eapply MAX in GET; eauto.
+        }
+        { eapply PROMSELF in H0. des. left. econs; eauto. econs; ss; [|refl].
+          dup GET. apply memory_get_ts_strong in GET0. des; auto.
+          subst. inv LOCAL. erewrite BOT in GET. ss. }
+      }
+      { ii. eapply SAT3. ii. eapply H. des; eauto.
+        eapply FORGET in H0. des; ss; auto. destruct FORGET0; ss.
+        { replace fto with to in *; ss.
           eapply MAPIDENT; eauto.
           exploit PROMOTHERS.
           { left. eauto. } i. des.
@@ -1333,7 +1396,8 @@ Section SIM.
         }
         { i. inv LOCALPF. inv LOCALJOIN.
           set (CNT:=(sim_promise_contents PROMS) loc ts). inv CNT; ss.
-          specialize (PROMISES loc ts).  rewrite <- H in *. inv PROMISES. eauto. }
+          specialize (PROMISES loc ts). rewrite <- H in *.
+          inv PROMISES; eauto. esplits; eauto. ss. }
         { i. eapply jsim_memory_concrete_promised in PROMISED; cycle 1; eauto.
           apply NNPP. ii. apply not_or_and in H. des. eapply H.
           eapply sim_memory_concrete_promised; eauto. }
@@ -1354,7 +1418,8 @@ Section SIM.
         }
         { i. inv LOCALPF. inv LOCALJOIN.
           set (CNT:=(sim_promise_contents PROMS) loc ts). inv CNT; ss.
-          specialize (PROMISES loc ts).  rewrite <- H in *. inv PROMISES. eauto. }
+          specialize (PROMISES loc ts). rewrite <- H in *.
+          inv PROMISES; eauto. esplits; eauto. ss. }
         { i. eapply jsim_memory_concrete_promised in PROMISED; cycle 1; eauto.
           apply NNPP. ii. apply not_or_and in H. des. eapply H.
           eapply sim_memory_concrete_promised; eauto. }
@@ -1390,18 +1455,31 @@ Section SIM.
       inv THSPF. inv LOCAL.
       set (CNT:=(sim_promise_contents PROMS0) loc ts). inv CNT; ss.
       dep_inv THSJOIN. inv LOCAL.
-      specialize (PROMISES loc ts). rewrite <- H2 in *. inv PROMISES.
-      inv H. dep_inv THSJOIN0.
-      assert (exists msg_tgt, <<GET: Memory.get loc to (Local.promises lc_src) = Some (from0, msg_tgt)>>).
-      { inv LOCAL. specialize (PROMISES loc to). ss.
-        rewrite GET in PROMISES. inv PROMISES; eauto. } clear NIL. des.
-      inv WF_MID. inv WF. ss. inv WF0.
-      hexploit DISJOINT; eauto. i. inv H. ss. inv DISJOINT0.
-      hexploit DISJOINT1; eauto. i. des.
-      { eapply H; eauto. econs; ss; [|refl].
-        symmetry in H6. apply memory_get_ts_strong in H6. des; auto. subst.
-        inv ITV. ss. clear - FROM. exfalso.
-        eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt; eauto. eapply Time.bot_spec. }
+      specialize (PROMISES loc ts). rewrite <- H2 in *. inv PROMISES; ss.
+      { inv H. dep_inv THSJOIN0.
+        assert (exists msg_tgt, <<GET: Memory.get loc to (Local.promises lc_src) = Some (from0, msg_tgt)>>).
+        { inv LOCAL. specialize (PROMISES loc to). ss.
+          rewrite GET in PROMISES. inv PROMISES; eauto. } clear NIL. des.
+        inv WF_MID. inv WF. ss. inv WF0.
+        hexploit DISJOINT; eauto. i. inv H. ss. inv DISJOINT0.
+        hexploit DISJOINT1; eauto. i. des.
+        { eapply H; eauto. econs; ss; [|refl].
+          symmetry in H5. apply memory_get_ts_strong in H5. des; auto. subst.
+          inv ITV. ss. clear - FROM. exfalso.
+          eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt; eauto. eapply Time.bot_spec. }
+      }
+      { inv H. dep_inv THSJOIN0.
+        assert (exists msg_tgt, <<GET: Memory.get loc to (Local.promises lc_src) = Some (from0, msg_tgt)>>).
+        { inv LOCAL. specialize (PROMISES loc to). ss.
+          rewrite GET in PROMISES. inv PROMISES; eauto. } des.
+        inv WF_MID. inv WF. ss. inv WF0.
+        hexploit DISJOINT; eauto. i. inv H. ss. inv DISJOINT0.
+        hexploit DISJOINT1; eauto. i. des.
+        { eapply H; eauto. econs; ss; [|refl].
+          symmetry in H5. apply memory_get_ts_strong in H5. des; auto. subst.
+          inv ITV. ss. clear - FROM. exfalso.
+          eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt; eauto. eapply Time.bot_spec. }
+      }
     }
     { erewrite sim_memory_concrete_promised in H; eauto. des. ss. }
     { erewrite <- SimMemory.sim_memory_max_ts in H; eauto.
@@ -1486,34 +1564,20 @@ Section SIM.
     intros [max MAX].
 
     hexploit (@Memory.cap_exists mem_src); eauto. intros [mem1 CAP]. des.
-    hexploit (@Memory.max_concrete_timemap_exists mem1); eauto.
-    { eapply Memory.cap_closed in MEMSRC; eauto. eapply MEMSRC. } intros [sc1 SC_MAX].
-    assert (SCSRC0: Memory.closed_timemap sc1 mem_src).
-    { eapply concrete_promised_le_closed_timemap.
-      { eapply concrete_messages_le_concrete_promised_le.
-        eapply cap_flex_concrete_messages_le.
-        { eapply cap_cap_flex; eauto. }
-        { eauto. }
-        { i. ss. eapply Time.incr_spec. }
-      }
-      eapply Memory.max_concrete_timemap_closed; eauto.
-    }
-    assert (SCSRC1: Memory.closed_timemap sc1 mem_src').
-    { eapply concrete_promised_le_closed_timemap; eauto.
-      eapply concrete_messages_le_concrete_promised_le.
+    assert (SCSRC0: Memory.closed_timemap sc_src mem_src).
+    { eauto. }
+    assert (SCSRC1: Memory.closed_timemap sc_src mem_src').
+    { eapply concrete_messages_le_closed_timemap; eauto.
       eapply sim_memory_same_concrete_messages_le; eauto.
       eapply sim_memory_strong_sim_memory; eauto. }
-    assert (SCMID0: Memory.closed_timemap sc1 mem_mid).
-    { eapply concrete_promised_le_closed_timemap; try apply SCSRC0; eauto.
-      eapply concrete_messages_le_concrete_promised_le.
+    assert (SCMID0: Memory.closed_timemap sc_src mem_mid).
+    { eapply concrete_messages_le_closed_timemap; try apply SCSRC0; eauto.
       eapply sim_memory_concrete_messages_le; eauto. }
-    exploit (@Memory.max_concrete_timemap_exists mem_tgt).
-    { eapply MEMTGT. } intros [sctgt MAXTGT]. des.
 
     hexploit (@concrete_promise_max_timemap_exists mem_tgt (Local.promises lc_tgt)).
     { eapply MEMTGT. } intros [maxconcete MAXCONCRETE].
 
-    exploit (CONSISTENTTGT cap_tgt (Memory.max_timemap mem_src) sctgt); simpl.
+    exploit (CONSISTENTTGT cap_tgt (Memory.max_timemap mem_src) sc_tgt); simpl.
     { ss. eapply cap_flex_future_weak; eauto. }
     { eapply cap_flex_closed; eauto. }
     { eapply cap_flex_wf; eauto. }
@@ -1527,16 +1591,7 @@ Section SIM.
       { eauto. }
       { eapply sim_memory_strong_cap; eauto. }
       { eapply (@cap_flex_sim_memory mem_mid mem_tgt); eauto. }
-      { instantiate (1:=sc1).
-        eapply Memory.max_concrete_timemap_spec.
-        { instantiate (1:=mem_mid).
-          exploit (@Memory.max_concrete_timemap_exists mem_mid); eauto.
-          { eapply MEMMID. } i. des.
-          exploit (@SimMemory.sim_memory_max_concrete_timemap mem_mid mem_tgt); eauto.
-          i. subst. auto.
-        }
-        auto.
-      }
+      { instantiate (1:=sc_src). auto. }
     }
     { eapply List.Forall_forall. i.
       cut (no_read_msgs prom_others (snd x)).
@@ -1549,15 +1604,24 @@ Section SIM.
         { eapply MEMPF. }
         { left. eauto. }
         i. eapply sim_memory_concrete_promised_later in x0; eauto. des.
-        inv PROMISED. etrans; eauto. eapply MAXCONCRETE in GET. auto.
+        inv PROMISED. etrans; eauto. eapply MAXCONCRETE in GET; eauto.
       }
       { intros PROM. replace ffrom with from in PROM; ss. eapply MAPIDENT; eauto.
         exploit sim_memory_forget_concrete_promised.
         { eapply MEMPF. }
         { left. eauto. }
         i. eapply sim_memory_concrete_promised_later in x0; eauto. des.
-        inv PROMISED. etrans; eauto. eapply MAXCONCRETE in GET. auto.
+        inv PROMISED. etrans; eauto. eapply MAXCONCRETE in GET; eauto.
       }
+      { intros PROM. replace fto with to in PROM; ss. eapply MAPIDENT; eauto.
+        exploit sim_memory_forget_concrete_promised.
+        { eapply MEMPF. }
+        { left. eauto. }
+        i. eapply sim_memory_concrete_promised_later in x0; eauto. des.
+        inv PROMISED. etrans; eauto. eapply MAXCONCRETE in GET; eauto.
+      }
+      { ss. }
+      { ss. }
     }
     { ss. eapply Memory.future_weak_closed_timemap.
       { eapply cap_flex_future_weak; eauto. } eauto. }
@@ -1565,7 +1629,7 @@ Section SIM.
       { eapply cap_flex_future_weak; eauto. } eauto. }
     { ss. eapply Memory.future_weak_closed_timemap.
       { eapply cap_flex_future_weak; eauto. }
-      eapply Memory.max_concrete_timemap_closed; eauto. }
+      eauto. }
     { ss. eapply cap_flex_closed; eauto. }
     { ss. eapply cap_flex_closed; eauto. }
     { ss. eapply cap_flex_closed; eauto. }
@@ -1578,10 +1642,7 @@ Section SIM.
     { ss. eapply cap_flex_wf; eauto. }
     { ss. eapply cap_flex_memory_times_wf; cycle 1; eauto. }
     { ss. eapply cap_flex_memory_times_wf; cycle 1; eauto. }
-    { destruct x1.
-      { des. inv LOCAL. auto. }
-      { des. ii. erewrite PROMISES in *. erewrite Memory.bot_get in *. ss. }
-    }
+    { eapply Local.bot_promise_consistent; eauto. }
     { ss. ii. exploit EXCLUSIVE; eauto. i. des. inv UNCH.
       set (CNT:=(sim_memory_strong_contents MEM) loc ts).
       inv CNT; ss; try by (exfalso; eapply NPROM0; left; auto).
@@ -1596,8 +1657,7 @@ Section SIM.
     { ss. i. eapply List.Forall_impl; eauto. i. ss.
       eapply semi_closed_view_future.
       2: { eapply cap_flex_future_weak; eauto. }
-      { eapply concrete_promised_le_semi_closed_view; eauto.
-        eapply concrete_messages_le_concrete_promised_le.
+      { eapply concrete_messages_le_semi_closed_view; eauto.
         eapply sim_memory_same_concrete_messages_le; eauto.
         eapply sim_memory_strong_sim_memory; eauto. }
     }
@@ -1617,7 +1677,7 @@ Section SIM.
       { eapply sim_memory_strong_sim_memory; eauto. }
     } i. des.
 
-    exploit (@Memory.max_concrete_timemap_exists mem_src').
+    exploit (@Memory.max_non_reserve_timemap_exists mem_src').
     { eapply MEMSRCSTRONG. } i. des.
     hexploit concrete_messages_le_cap_flex_memory_map; try apply MAP.
     { eapply sim_memory_same_concrete_messages_le.
@@ -1625,7 +1685,9 @@ Section SIM.
       { eapply MEMPF. }
     }
     { eauto. }
-    { ii. ss. eapply max_concrete_ts_le_max_ts; eauto. }
+    { ii. specialize (x0 loc). inv x0. des.
+      eapply Memory.max_ts_spec in GET. des. eauto.
+    }
     { auto. }
     { i. ss. eapply Time.incr_spec. }
     { eauto. }
@@ -1637,6 +1699,7 @@ Section SIM.
     { eapply mapping_map_lt_iff_map_le. eapply MAP. }
     { eapply MAP. }
     { eapply mapping_map_lt_iff_map_eq. eapply MAP. }
+    { eapply mapping_map_lt_iff_map_lt. eapply MAP. }
     { eapply wf_time_mapped_mappable; eauto.
       i. ss. eapply MAP in IN0. eauto. }
     { eauto. }
@@ -1651,7 +1714,7 @@ Section SIM.
     { eapply Local.cap_wf; eauto. }
     { eapply Memory.cap_closed; eauto. }
     { eapply cap_flex_closed; eauto. }
-    { eapply Memory.max_concrete_timemap_closed; eauto. }
+    { eapply Memory.cap_closed_timemap; eauto. }
     { eapply Memory.future_weak_closed_timemap.
       { eapply cap_flex_future_weak; eauto. }
       { eauto. }
@@ -1685,32 +1748,22 @@ Section SIM.
 
     exists ftr0. dep_inv THREAD. esplits.
     { ii. ss. eapply Memory.cap_inj in CAP; eauto. subst.
-      eapply Memory.max_concrete_timemap_inj in SC_MAX; eauto. subst.
       esplits. eauto. eauto.
-      esplits; eauto. ss. unguard. des.
-      { left. esplits. econs 2. econs; eauto. econs.
-        eapply failure_step_map; eauto.
-        { eapply mapping_map_lt_iff_map_le. eapply MAP. }
-        { eapply mapping_map_lt_iff_map_eq. eapply MAP. }
-        eapply sim_failure_step; cycle 1.
-        { eapply sim_local_strong_sim_local; eauto. }
-        eapply JSim.sim_local_failure; eauto.
-      }
-      { right. esplits; eauto. ss. inv LOCAL.
+      esplits; eauto. ss.
+      right. esplits; eauto. ss. inv LOCAL.
       cut ((Local.promises local) = Memory.bot).
       { i. eapply bot_promises_map; eauto. erewrite <- H. eauto. }
       eapply JSim.sim_local_memory_bot in LOCALJOIN0; auto.
       inv LOCALPF0. ss.
       eapply sim_promise_bot; eauto. eapply sim_promise_strong_sim_promise; eauto.
-      }
     }
     { eapply sim_traces_pf in TRACE0; eauto.
       eapply List.Forall_forall. i.
       eapply list_Forall2_in in H; eauto. des. destruct a, x; ss.
       eapply List.Forall_forall in IN0; try apply TRACE0; eauto.
-      inv EVENT; ss. ii. ss. clarify. destruct msg; ss.
-      - exploit IN0; ss.
-      - inv MSG; ss. }
+      inv EVENT; ss. ii. ss. clarify.
+      exploit IN0; ss. inv MSG; ss.
+    }
   Qed.
 
 
@@ -1778,10 +1831,10 @@ Section SIM.
     hexploit times_configuration_step_future; eauto. i. des.
     dep_inv STEPTGT.
     assert (CONSISTENTLIST: exists pl,
-               forall (EQ: e0 <> ThreadEvent.failure),
+               forall (EQ: ThreadEvent.get_machine_event e0 <> MachineEvent.failure),
                  pf_consistent_super_strong_promises_list
                    (Thread.mk _ st3 lc3 sc3 memory3) tr_cert times pl).
-    { destruct (classic (e0 = ThreadEvent.failure)).
+    { destruct (classic (ThreadEvent.get_machine_event e0 = MachineEvent.failure)).
       { exists []. ii. ss. }
       { hexploit CONSISTENT; eauto. i.
         eapply pf_consistent_super_strong_promises_list_exists in H0; eauto.
@@ -1802,8 +1855,12 @@ Section SIM.
     { ss. eapply WF1; eauto. } i. des.
     exploit Thread.step_future; eauto. i. des. ss.
     assert (CONSISTENT1: Local.promise_consistent lc3).
-    { destruct (classic (e0 = ThreadEvent.failure)) as [EQ|NEQ].
-      { subst. inv STEP; inv STEP0. ss. inv LOCAL. inv LOCAL0. auto. }
+    { destruct (classic (ThreadEvent.get_machine_event e0 = MachineEvent.failure)) as [EQ|NEQ].
+      { inv STEP; inv STEP0; ss. inv LOCAL; ss.
+        { inv LOCAL0; auto. }
+        { inv LOCAL0; auto. }
+        { inv LOCAL0; auto. }
+      }
       specialize (CONSISTENT NEQ).
       eapply pf_consistent_super_strong_consistent in CONSISTENT; eauto.
       eapply consistent_promise_consistent in CONSISTENT; eauto. }
@@ -1862,7 +1919,7 @@ Section SIM.
         { destruct th_mid0. eauto. }
         { i. dep_inv THREAD0. eapply JSim.sim_thread_consistent; eauto; ss.
           eapply pf_consistent_super_strong_consistent; eauto.
-          eapply CONSISTENT. ii. subst. ss. }
+          eapply CONSISTENT. ii. rewrite H in *. ss. }
       }
       hexploit (list_match_rev (tr_src++tr)). i. des.
       { assert (tr_src = [] /\ tr = []).
@@ -1881,8 +1938,8 @@ Section SIM.
             {ss. eapply Memory.future_future_weak. etrans; eauto. }
             { ss. eapply Memory.future_future_weak. etrans; eauto. }
             { ss. eapply JConfiguration.step_future; eauto. }
-            { i. eapply CONSISTENTLIST. ii. subst. ss. }
-            { i. eapply CONSISTENT. ii. subst. ss. }
+            { i. eapply CONSISTENTLIST. ii. rewrite H0 in *. ss. }
+            { i. eapply CONSISTENT. ii. rewrite H0 in *. ss. }
             { eapply sim_thread_strong_sim_thread. eauto. }
             { i. des_ifs. }
             { i. erewrite IdentMap.gsspec. des_ifs; eauto. }
@@ -1919,7 +1976,7 @@ Section SIM.
         { rewrite EQ.
           replace MachineEvent.silent with (ThreadEvent.get_machine_event e); auto.
           exploit sim_thread_consistent; eauto.
-          { eapply CONSISTENT. ii. subst. clarify. }
+          { eapply CONSISTENT. ii. rewrite H0 in *. ss. }
           { i. ss. eapply EXCLUSIVE in OTHER. des.
             eapply unchangable_trace_steps_increase in ALLSTEPS0; eauto. }
           { i. ss. eapply EXCLUSIVEEXTRA in OTHER. des.
@@ -1940,8 +1997,8 @@ Section SIM.
             { ss. eapply Memory.future_future_weak. etrans; eauto. }
             { ss. eapply Memory.future_future_weak. etrans; eauto. }
             { eapply JConfiguration.step_future; eauto. }
-            { ss. eapply CONSISTENTLIST. ii. subst. ss. }
-            { ss. eapply CONSISTENT. ii. subst. ss. }
+            { ss. eapply CONSISTENTLIST. ii. rewrite H0 in *. ss. }
+            { ss. eapply CONSISTENT. ii. rewrite H0 in *. ss. }
             { dup THREAD0. eapply sim_thread_strong_sim_thread. eauto. }
             { i. erewrite IdentMap.gsspec. des_ifs; eauto. }
             { i. erewrite IdentMap.gsspec. des_ifs; eauto. }
@@ -2017,7 +2074,7 @@ Section SIM.
           { dep_inv THREAD. inv LOCALJOIN. inv LOCALPF. eauto. }
         }
       }
-      { unguard. destruct (classic (e0 = ThreadEvent.failure)); subst; auto.
+      { unguard. destruct (classic (ThreadEvent.get_machine_event e0 = MachineEvent.failure)); subst; auto.
         right. splits.
         { eapply (sim_thread_sim_configuration true); eauto.
           { etrans; eauto. }
@@ -2056,14 +2113,18 @@ Section SIM.
       apply Coq.Logic.PropExtensionality.propositional_extensionality. split; i; ss.
       set (CNT:=(sim_promise_contents PROMS) loc ts). inv CNT; ss.
       specialize (PROMISES loc ts). rewrite <- H2 in *. inv PROMISES; ss.
-      erewrite Memory.bot_get in *. clarify. }
+      { erewrite Memory.bot_get in *. clarify. }
+      { erewrite Memory.bot_get in *. clarify. }
+    }
     { red. extensionality loc. extensionality ts. extensionality from.
       apply Coq.Logic.PropExtensionality.propositional_extensionality. split; i; ss.
       eapply (sim_promise_wf PROMS) in H. des.
       set (CNT:=(sim_promise_contents PROMS) loc from). inv CNT; ss.
       specialize (PROMISES loc from). rewrite <- H in *. inv PROMISES; ss.
-      erewrite Memory.bot_get in *. clarify. }
-  Qed.
+      { erewrite Memory.bot_get in *. clarify. }
+      { erewrite Memory.bot_get in *. clarify. }
+    }
+ Qed.
 
   Lemma sim_thread_forget
         views prom_self prom_others extra_self extra_others
@@ -2082,21 +2143,28 @@ Section SIM.
     { split.
       { set (CNT0:=(sim_memory_contents MEMPF) loc ts).
         inv CNT0; ss; try by (exfalso; try apply NPROM; right; eauto).
-        ii. inv H0. rewrite GET in *. ss. }
+        ii. inv H0. rewrite GET in *. clarify. }
       { set (CNT0:=(sim_promise_contents PROMS) loc ts).
         set (CNT1:=PROMISES loc ts).
-        inv CNT0; ss. rewrite <- H2 in *. inv CNT1. econs; eauto. }
+        inv CNT0; ss. rewrite <- H2 in *. inv CNT1; ss.
+        { econs; eauto; ss. }
+        { econs; eauto; ss. }
+      }
     }
     { des. ss. inv PROMTGT.
       set (CNT0:=(sim_promise_contents PROMS) loc ts).
       set (CNT1:=PROMISES loc ts).
-      erewrite GET in *. inv CNT1.
-      rewrite <- H0 in *. inv CNT0; ss.
-      eapply LOCAL in H2. exfalso. eapply MEMSRC. econs; eauto.
+      erewrite GET in *. inv CNT1; ss.
+      { rewrite <- H0 in *. inv CNT0; ss.
+        eapply LOCAL in H2. exfalso. eapply MEMSRC. econs; eauto; ss.
+      }
+      { rewrite <- H0 in *. inv CNT0; ss.
+        eapply LOCAL in H2. exfalso. eapply MEMSRC. econs; eauto; ss.
+      }
     }
   Qed.
 
-  Lemma sim_configuration_certify_partial tids tid ploc pts pl0 pl1
+  Lemma sim_configuration_certify_partial tids tid ws ploc pts pl0 pl1
         views0 prom extra proml
         c_src0 c_mid0 c_tgt0 tm
         (SIM: sim_configuration tids views0 prom extra proml c_src0 c_mid0 c_tgt0)
@@ -2105,7 +2173,8 @@ Section SIM.
         (WF_MID: JConfiguration.wf views0 c_mid0)
         (WF_TGT: Configuration.wf c_tgt0)
         (TIDS: tids tid)
-        (EQ: proml tid = pl0 ++ (ploc, pts) :: pl1)
+        (EQ: proml tid = pl0 ++ ws :: pl1)
+        (WIN: List.In (ploc, pts) ws)
     :
       exists tr_src tr_tgt tr_cert c_src1 c_mid1 c_tgt1
              views1 e prom_self extra1 proml1 we,
@@ -2126,7 +2195,7 @@ Section SIM.
                    (<<WRITE: PFRace.writing_event ploc pts we>>) /\
                    (<<FINAL: final_event_trace we tr_src>>) /\
                    (<<DECR: prom_self <2= prom tid>>) /\
-                   (<<WRITTEN: forall loc ts (IN: List.In (loc, ts) (pl0 ++ [(ploc, pts)])),
+                   (<<WRITTEN: forall ws0 loc ts (IN: List.In ws0 (pl0 ++ [ws])) (WIN: List.In (loc, ts) ws0),
                        ~ prom_self loc ts>>) /\
                    (<<PROML: forall tid' (NEQ: tid <> tid'), proml1 tid' = proml tid'>>)))
   .
@@ -2139,6 +2208,7 @@ Section SIM.
       { auto. }
       { eapply WF_TGT; eauto. }
       { erewrite EQ. eauto. }
+      { eauto. }
       instantiate (3:=TimeMap.join tm (fun loc => Time.incr (Memory.max_ts loc mem_tgt))).
       i. des. ss.
       assert (NOREAD: List.Forall
@@ -2152,42 +2222,7 @@ Section SIM.
         { left. eapply Time.incr_spec. }
         { eapply Time.join_r. }
       }
-      destruct x1; des; cycle 1.
-      { destruct e1. ss.
-        assert (STEPTGT: @times_configuration_step
-                           times
-                           (ftr++[(local, ThreadEvent.failure)])
-                           []
-                           MachineEvent.failure
-                           tid
-                           (Configuration.mk ths_tgt sc_tgt mem_tgt)
-                           (Configuration.mk
-                              (IdentMap.add tid (existT _ lang_tgt st', local) ths_tgt)
-                              sc
-                              memory)).
-        { ss. replace MachineEvent.failure with
-                  (ThreadEvent.get_machine_event ThreadEvent.failure); auto.
-          econs; eauto; ss.
-          { eapply List.Forall_impl in EVENTS; eauto. i. ss. des. auto. }
-          { eapply Forall_app.
-            { eapply List.Forall_impl in EVENTS; eauto. i. ss. des. auto. }
-            { econs; ss. }
-          }
-        }
-        exploit (step_sim_configuration); eauto.
-        { eapply Forall_app.
-          { eapply List.Forall_impl in NOREAD; eauto. }
-          { econs; ss. }
-        }
-        i. des. esplits; eauto.
-        { econs 1. eauto. }
-        { left. ss. }
-        Unshelve.
-        { eapply (prom1 tid). }
-        { eapply extra1. }
-        { eapply proml1. }
-        { eapply ThreadEvent.failure. }
-      }
+      destruct x1; des.
       { destruct e1; ss.
         assert (STEPTGT: @times_configuration_step
                            times
@@ -2210,7 +2245,7 @@ Section SIM.
           { inv FORALL2. ss. des. auto. }
           econs; eauto.
           { eapply List.Forall_impl; eauto. i. ss. des; auto. }
-          { ii. exfalso. inv FORALL2. ss. des; clarify. }
+          { ii. exfalso. inv FORALL2. ss. des; clarify. rewrite TAU in *. ss. }
           { eapply List.Forall_impl; eauto. i. ss. des; auto. }
         }
         exploit (step_sim_configuration); eauto.

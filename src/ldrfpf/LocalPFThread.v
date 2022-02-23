@@ -92,6 +92,10 @@ Section SIM.
     | ThreadEvent.write _ _ _ _ _ _ => True
     | ThreadEvent.read _ _ _ _ _ => True
     | ThreadEvent.update _ _ _ _ _ _ _ _ _ => True
+    | ThreadEvent.write_na _ _ _ _ _ _ => True
+    | ThreadEvent.racy_read _ _ _ _ => True
+    | ThreadEvent.racy_write _ _ _ _ => True
+    | ThreadEvent.racy_update _ _ _ _ _ _ => True
     | _ => False
     end.
 

@@ -31,6 +31,26 @@ Require Import MemoryProps.
 Set Implicit Arguments.
 
 
+
+Lemma reorder_racy_reserve
+      lang th0 th1
+      (STEP: @Thread.reserve_step lang th0 th1)
+  :
+    (<<CONSISTENT: Local.promise_consistent th0.(Thread.local) -> Local.promise_consistent th1.(Thread.local)>>) /\
+    (<<RACY: forall loc to ord, Local.is_racy th0.(Thread.local) th0.(Thread.memory) loc to ord -> Local.is_racy th1.(Thread.local) th1.(Thread.memory) loc to ord>>).
+Proof.
+  inv STEP; inv STEP0; inv STEP; inv LOCAL; ss. inv PROMISE. splits.
+  { ii. ss. erewrite Memory.add_o in PROMISE; eauto. des_ifs.
+    eapply H; eauto.
+  }
+  { i. inv H. econs; eauto.
+    { eapply Memory.add_get1; eauto. }
+    { ss. erewrite Memory.add_o; eauto. des_ifs.
+      ss. des; clarify. eapply Memory.add_get0 in MEM. des; clarify.
+    }
+  }
+Qed.
+
 Lemma reorder_abort_reserve
       lang
       pf th0 th1 th2
@@ -41,12 +61,11 @@ Lemma reorder_abort_reserve
       (<<STEP0: Thread.reserve_step th0 th1'>>) /\
       (<<STEP1: Thread.step pf ThreadEvent.failure th1' th2>>).
 Proof.
+  hexploit reorder_racy_reserve; eauto. i. des.
   inv STEP1. inv STEP; inv STEP1; inv LOCAL.
   inv STEP0; inv STEP. inv LOCAL. inv LOCAL0. esplits.
   { econs; eauto. econs; eauto. econs; eauto. }
-  { econs 2; eauto. econs; eauto. econs; eauto. econs.
-    ii. inv PROMISE. erewrite Memory.add_o in PROMISE0; eauto. des_ifs.
-    eapply CONSISTENT; eauto. }
+  { econs 2; eauto. }
 Qed.
 
 Lemma reorder_abort_reserves
@@ -61,6 +80,79 @@ Lemma reorder_abort_reserves
 Proof.
   ginduction STEPS; eauto. i.
   exploit reorder_abort_reserve; eauto. i. des.
+  exploit IHSTEPS; eauto. i. des. esplits.
+  { econs 2; eauto. }
+  { eauto. }
+Qed.
+
+Lemma reorder_racy_write_reserve
+      lang
+      pf th0 th1 th2 loc to val ord
+      (STEP0: @Thread.step lang pf (ThreadEvent.racy_write loc to val ord) th0 th1)
+      (STEP1: Thread.reserve_step th1 th2)
+  :
+    exists th1',
+      (<<STEP0: Thread.reserve_step th0 th1'>>) /\
+      (<<STEP1: Thread.step pf (ThreadEvent.racy_write loc to val ord) th1' th2>>).
+Proof.
+  hexploit reorder_racy_reserve; eauto. i. des.
+  inv STEP1. inv STEP; inv STEP1; inv LOCAL.
+  inv STEP0; inv STEP. inv LOCAL. inv LOCAL0. esplits.
+  { econs; eauto. econs; eauto. econs; eauto. }
+  { econs 2; eauto. econs; eauto. }
+Qed.
+
+Lemma reorder_racy_update_reserve
+      lang
+      pf th0 th1 th2 loc to valr valw ordr ordw
+      (STEP0: @Thread.step lang pf (ThreadEvent.racy_update loc to valr valw ordr ordw) th0 th1)
+      (STEP1: Thread.reserve_step th1 th2)
+  :
+    exists th1',
+      (<<STEP0: Thread.reserve_step th0 th1'>>) /\
+      (<<STEP1: Thread.step pf (ThreadEvent.racy_update loc to valr valw ordr ordw) th1' th2>>).
+Proof.
+  hexploit reorder_racy_reserve; eauto. i. des.
+  inv STEP1. inv STEP; inv STEP1; inv LOCAL.
+  inv STEP0; inv STEP. inv LOCAL. esplits.
+  { econs; eauto. econs; eauto. econs; eauto. }
+  { econs 2; eauto. econs; eauto. econs; eauto. inv LOCAL0.
+    { econs 1; eauto. }
+    { econs 2; eauto. }
+    { econs 3; eauto. }
+  }
+Qed.
+
+Lemma reorder_failure_reserve
+      lang
+      pf e th0 th1 th2
+      (STEP0: @Thread.step lang pf e th0 th1)
+      (STEP1: Thread.reserve_step th1 th2)
+      (FAILURE: ThreadEvent.get_machine_event e = MachineEvent.failure)
+  :
+    exists th1',
+      (<<STEP0: Thread.reserve_step th0 th1'>>) /\
+      (<<STEP1: Thread.step pf e th1' th2>>).
+Proof.
+  destruct e; ss.
+  { eapply reorder_abort_reserve; eauto. }
+  { eapply reorder_racy_write_reserve; eauto. }
+  { eapply reorder_racy_update_reserve; eauto. }
+Qed.
+
+Lemma reorder_failure_reserves
+      lang
+      pf e th0 th1 th2
+      (STEP: Thread.step pf e th0 th1)
+      (STEPS: rtc (@Thread.reserve_step lang) th1 th2)
+      (FAILURE: ThreadEvent.get_machine_event e = MachineEvent.failure)
+  :
+    exists th1',
+      (<<STEPS: rtc (@Thread.reserve_step lang) th0 th1'>>) /\
+      (<<STEP: Thread.step pf e th1' th2>>).
+Proof.
+  ginduction STEPS; eauto. i.
+  exploit reorder_failure_reserve; eauto. i. des.
   exploit IHSTEPS; eauto. i. des. esplits.
   { econs 2; eauto. }
   { eauto. }

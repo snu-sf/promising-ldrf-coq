@@ -28,7 +28,7 @@ Require Import Behavior.
 Require Import ReorderCancel.
 Require Import ReorderReserve.
 Require Import MemoryProps.
-(* Require Import SplitCertification. *)
+Require Import SplitCertification.
 
 Set Implicit Arguments.
 
@@ -353,457 +353,460 @@ Module SConfiguration.
     { eauto. }
   Qed.
 
-  (* Lemma mixed_step_step e tid c1 c2 *)
-  (*       (STEP: mixed_step e tid c1 c2) *)
-  (*   : *)
-  (*     (<<STEP: step e tid c1 c2>>) \/ *)
-  (*     ((<<STEP: reservation_only_step tid c1 c2>>) /\ *)
-  (*      (<<RESERVATION: ~ ThreadEvent.is_normal e>>)). *)
-  (* Proof. *)
-  (*   inv STEP. *)
-  (*   exploit reorder_reserves_opt_step_cancels. *)
-  (*   { eapply CANCELS. } *)
-  (*   { eauto. } *)
-  (*   { eapply RESERVES. } *)
-  (*   i. des. *)
-  (*   { left. econs. *)
-  (*     { eauto. } *)
-  (*     { eapply STEPS1. } *)
-  (*     { eapply STEP2. } *)
-  (*     { eapply STEPS3. } *)
-  (*     { eauto. } *)
-  (*   } *)
-  (*   { right. splits; auto. econs. *)
-  (*     { eauto. } *)
-  (*     { eapply STEPS1. } *)
-  (*     { eapply STEPS3. } *)
-  (*     { eapply CONSISTENT; eauto. ii. clarify. *)
-  (*       eapply RESERVATION. ii. destruct H; ss. } *)
-  (*   } *)
-  (* Qed. *)
+  Lemma mixed_step_step e tid c1 c2
+        (STEP: mixed_step e tid c1 c2)
+    :
+      (<<STEP: step e tid c1 c2>>) \/
+      ((<<STEP: reservation_only_step tid c1 c2>>) /\
+       (<<RESERVATION: ~ ThreadEvent.is_normal e>>)).
+  Proof.
+    inv STEP.
+    exploit reorder_reserves_opt_step_cancels.
+    { eapply CANCELS. }
+    { eauto. }
+    { eapply RESERVES. }
+    i. des.
+    { left. econs.
+      { eauto. }
+      { eapply STEPS1. }
+      { eapply STEP2. }
+      { eapply STEPS3. }
+      { eauto. }
+    }
+    { right. splits; auto. econs.
+      { eauto. }
+      { eapply STEPS1. }
+      { eapply STEPS3. }
+      { eapply CONSISTENT; eauto. ii.
+        eapply RESERVATION. ii. destruct e; ss.
+      }
+    }
+  Qed.
 
-  (* Lemma merge_reservation_only_step_step e tid c1 c2 c3 *)
-  (*       (STEP0: reservation_only_step tid c1 c2) *)
-  (*       (STEP1: step e tid c2 c3) *)
-  (*   : *)
-  (*     (<<STEP: step e tid c1 c3>>) \/ *)
-  (*     ((<<STEP: reservation_only_step tid c1 c3>>) /\ *)
-  (*      (<<RESERVATION: ~ ThreadEvent.is_normal e>>)). *)
-  (* Proof. *)
-  (*   inv STEP0. inv STEP1. ss. *)
-  (*   erewrite IdentMap.gss in TID0. dep_clarify. dep_clarify. *)
-  (*   erewrite IdentMap.add_add_eq. *)
-  (*   exploit mixed_step_step. *)
-  (*   { econs. *)
-  (*     { eapply TID. } *)
-  (*     { etrans. *)
-  (*       { eapply rtc_implies; try apply CANCELS. eauto. } *)
-  (*       etrans. *)
-  (*       { eapply rtc_implies; try apply RESERVES. eauto. } *)
-  (*       { eapply rtc_implies; try apply CANCELS0. eauto. } *)
-  (*     } *)
-  (*     { eauto. } *)
-  (*     { eapply rtc_implies; try apply RESERVES0. eauto. } *)
-  (*     { eauto. } *)
-  (*   } *)
-  (*   i. des; eauto. *)
-  (* Qed. *)
+  Lemma merge_reservation_only_step_step e tid c1 c2 c3
+        (STEP0: reservation_only_step tid c1 c2)
+        (STEP1: step e tid c2 c3)
+    :
+      (<<STEP: step e tid c1 c3>>) \/
+      ((<<STEP: reservation_only_step tid c1 c3>>) /\
+       (<<RESERVATION: ~ ThreadEvent.is_normal e>>)).
+  Proof.
+    inv STEP0. inv STEP1. ss.
+    erewrite IdentMap.gss in TID0. dep_clarify. dep_clarify.
+    erewrite IdentMap.add_add_eq.
+    exploit mixed_step_step.
+    { econs.
+      { eapply TID. }
+      { etrans.
+        { eapply rtc_implies; try apply CANCELS. eauto. }
+        etrans.
+        { eapply rtc_implies; try apply RESERVES. eauto. }
+        { eapply rtc_implies; try apply CANCELS0. eauto. }
+      }
+      { eauto. }
+      { eapply rtc_implies; try apply RESERVES0. eauto. }
+      { eauto. }
+    }
+    i. des; eauto.
+  Qed.
 
-  (* Lemma merge_step_reservation_only_step e tid c1 c2 c3 *)
-  (*       (STEP0: step e tid c1 c2) *)
-  (*       (STEP1: reservation_only_step tid c2 c3) *)
-  (*   : *)
-  (*     (<<STEP: step e tid c1 c3>>) \/ *)
-  (*     ((<<STEP: reservation_only_step tid c1 c3>>) /\ *)
-  (*      (<<RESERVATION: ~ ThreadEvent.is_normal e>>)). *)
-  (* Proof. *)
-  (*   inv STEP0. inv STEP1. ss. *)
-  (*   erewrite IdentMap.gss in TID0. dep_clarify. dep_clarify. *)
-  (*   erewrite IdentMap.add_add_eq. *)
-  (*   exploit mixed_step_step. *)
-  (*   { econs. *)
-  (*     { eapply TID. } *)
-  (*     { eapply rtc_implies; try apply CANCELS. eauto. } *)
-  (*     { eauto. } *)
-  (*     { etrans. *)
-  (*       { eapply rtc_implies; try apply RESERVES. eauto. } *)
-  (*       etrans. *)
-  (*       { eapply rtc_implies; try apply CANCELS0. eauto. } *)
-  (*       { eapply rtc_implies; try apply RESERVES0. eauto. } *)
-  (*     } *)
-  (*     { eauto. } *)
-  (*   } *)
-  (*   i. des; eauto. *)
-  (* Qed. *)
+  Lemma merge_step_reservation_only_step e tid c1 c2 c3
+        (STEP0: step e tid c1 c2)
+        (STEP1: reservation_only_step tid c2 c3)
+    :
+      (<<STEP: step e tid c1 c3>>) \/
+      ((<<STEP: reservation_only_step tid c1 c3>>) /\
+       (<<RESERVATION: ~ ThreadEvent.is_normal e>>)).
+  Proof.
+    inv STEP0. inv STEP1. ss.
+    erewrite IdentMap.gss in TID0. dep_clarify. dep_clarify.
+    erewrite IdentMap.add_add_eq.
+    exploit mixed_step_step.
+    { econs.
+      { eapply TID. }
+      { eapply rtc_implies; try apply CANCELS. eauto. }
+      { eauto. }
+      { etrans.
+        { eapply rtc_implies; try apply RESERVES. eauto. }
+        etrans.
+        { eapply rtc_implies; try apply CANCELS0. eauto. }
+        { eapply rtc_implies; try apply RESERVES0. eauto. }
+      }
+      { eauto. }
+    }
+    i. des; eauto.
+  Qed.
 
-  (* Lemma steps_filtering es tid c1 c2 *)
-  (*       (STEPS: steps es tid c1 c2) *)
-  (*   : *)
-  (*     (<<STEPS: steps (List.filter ThreadEvent.is_normal_dec es) tid c1 c2>>) \/ *)
-  (*     ((<<STEP: reservation_only_step tid c1 c2>>) /\ *)
-  (*      (<<RESERVATION: List.filter ThreadEvent.is_normal_dec es = []>>)). *)
-  (* Proof. *)
-  (*   ginduction es; eauto. i. inv STEPS. ss. unfold proj_sumbool in *. des_ifs. *)
-  (*   { exploit IHes; eauto. i. des. *)
-  (*     { left. econs; eauto. } *)
-  (*     { rewrite RESERVATION in *. left. econs 2; [|econs 1]. *)
-  (*       exploit merge_step_reservation_only_step; eauto. i. des; ss. } *)
-  (*   } *)
-  (*   { eapply reservation_event_reservation_only_step in STEP; auto. *)
-  (*     exploit IHes; eauto. i. des. *)
-  (*     { inv STEPS. *)
-  (*       { right. splits; eauto. } *)
-  (*       { left. exploit merge_reservation_only_step_step; eauto. i. des. *)
-  (*         { econs; eauto. } *)
-  (*         { exfalso. *)
-  (*           hexploit *)
-  (*             (proj1 (List.filter_In *)
-  (*                       (fun e => if ThreadEvent.is_normal_dec e then true else false) ehd es)). *)
-  (*           { rewrite <- H0. ss. auto. } *)
-  (*           i. des. des_ifs. *)
-  (*         } *)
-  (*       } *)
-  (*     } *)
-  (*     { rewrite RESERVATION in *. right. splits; auto. *)
-  (*       eapply reservation_only_step_trans; eauto. } *)
-  (*   } *)
-  (* Qed. *)
+  Lemma steps_filtering es tid c1 c2
+        (STEPS: steps es tid c1 c2)
+    :
+      (<<STEPS: steps (List.filter ThreadEvent.is_normal_dec es) tid c1 c2>>) \/
+      ((<<STEP: reservation_only_step tid c1 c2>>) /\
+       (<<RESERVATION: List.filter ThreadEvent.is_normal_dec es = []>>)).
+  Proof.
+    ginduction es; eauto. i. inv STEPS. ss. unfold proj_sumbool in *. des_ifs.
+    { exploit IHes; eauto. i. des.
+      { left. econs; eauto. }
+      { rewrite RESERVATION in *. left. econs 2; [|econs 1].
+        exploit merge_step_reservation_only_step; eauto. i. des; ss. }
+    }
+    { eapply reservation_event_reservation_only_step in STEP; auto.
+      exploit IHes; eauto. i. des.
+      { inv STEPS.
+        { right. splits; eauto. }
+        { left. exploit merge_reservation_only_step_step; eauto. i. des.
+          { econs; eauto. }
+          { exfalso.
+            hexploit
+              (proj1 (List.filter_In
+                        (fun e => if ThreadEvent.is_normal_dec e then true else false) ehd es)).
+            { rewrite <- H0. ss. auto. }
+            i. des. des_ifs.
+          }
+        }
+      }
+      { rewrite RESERVATION in *. right. splits; auto.
+        eapply reservation_only_step_trans; eauto. }
+    }
+  Qed.
 
-  (* Lemma merge_reservation_only_step_steps es tid c1 c2 c3 *)
-  (*       (STEP0: reservation_only_step tid c1 c2) *)
-  (*       (STEP1: steps es tid c2 c3) *)
-  (*   : *)
-  (*     (<<STEPS: steps (List.filter ThreadEvent.is_normal_dec es) tid c1 c3>>) \/ *)
-  (*     ((<<STEP: reservation_only_step tid c1 c3>>) /\ *)
-  (*      (<<RESERVATION: List.filter ThreadEvent.is_normal_dec es = []>>)). *)
-  (* Proof. *)
-  (*   hexploit steps_filtering; try apply STEP1. i. des. *)
-  (*   { inv STEPS. *)
-  (*     { right. splits; auto. } *)
-  (*     { left. exploit merge_reservation_only_step_step; eauto. i. des. *)
-  (*       { econs; eauto. } *)
-  (*       { exfalso. *)
-  (*         hexploit *)
-  (*           (proj1 (List.filter_In *)
-  (*                     (fun e => ThreadEvent.is_normal_dec e) ehd es)). *)
-  (*         { rewrite <- H0. ss. auto. } *)
-  (*         i. des. unfold proj_sumbool in *. des_ifs. *)
-  (*       } *)
-  (*     } *)
-  (*   } *)
-  (*   { right. rewrite RESERVATION. splits; auto. *)
-  (*     eapply reservation_only_step_trans; eauto. } *)
-  (* Qed. *)
+  Lemma merge_reservation_only_step_steps es tid c1 c2 c3
+        (STEP0: reservation_only_step tid c1 c2)
+        (STEP1: steps es tid c2 c3)
+    :
+      (<<STEPS: steps (List.filter ThreadEvent.is_normal_dec es) tid c1 c3>>) \/
+      ((<<STEP: reservation_only_step tid c1 c3>>) /\
+       (<<RESERVATION: List.filter ThreadEvent.is_normal_dec es = []>>)).
+  Proof.
+    hexploit steps_filtering; try apply STEP1. i. des.
+    { inv STEPS.
+      { right. splits; auto. }
+      { left. exploit merge_reservation_only_step_step; eauto. i. des.
+        { econs; eauto. }
+        { exfalso.
+          hexploit
+            (proj1 (List.filter_In
+                      (fun e => ThreadEvent.is_normal_dec e) ehd es)).
+          { rewrite <- H0. ss. auto. }
+          i. des. unfold proj_sumbool in *. des_ifs.
+        }
+      }
+    }
+    { right. rewrite RESERVATION. splits; auto.
+      eapply reservation_only_step_trans; eauto. }
+  Qed.
 
-  (* Lemma merge_steps_reservation_only_step es tid c1 c2 c3 *)
-  (*       (STEP0: steps es tid c1 c2) *)
-  (*       (STEP1: reservation_only_step tid c2 c3) *)
-  (*   : *)
-  (*     (<<STEPS: steps (List.filter ThreadEvent.is_normal_dec es) tid c1 c3>>) \/ *)
-  (*     ((<<STEP: reservation_only_step tid c1 c3>>) /\ *)
-  (*      (<<RESERVATION: List.filter ThreadEvent.is_normal_dec es = []>>)). *)
-  (* Proof. *)
-  (*   hexploit steps_filtering; try apply STEP0. i. des. *)
-  (*   { destruct (list_match_rev (List.filter (fun e => ThreadEvent.is_normal_dec e) es)). *)
-  (*     { rewrite H in *. inv STEPS. splits; auto. } *)
-  (*     des. rewrite H in *. eapply steps_split in STEPS. des. *)
-  (*     inv STEPS1. inv STEPS. *)
-  (*     left. exploit merge_step_reservation_only_step; eauto. i. des. *)
-  (*     { eapply steps_trans; eauto. } *)
-  (*     { exfalso. *)
-  (*       hexploit *)
-  (*         (proj1 (List.filter_In *)
-  (*                   (fun e => ThreadEvent.is_normal_dec e) hd_rev es)). *)
-  (*       { rewrite H. eapply List.in_or_app. ss. auto. } *)
-  (*       i. des. unfold proj_sumbool in *. des_ifs. *)
-  (*     } *)
-  (*   } *)
-  (*   { right. rewrite RESERVATION. splits; auto. *)
-  (*     eapply reservation_only_step_trans; eauto. } *)
-  (* Qed. *)
+  Lemma merge_steps_reservation_only_step es tid c1 c2 c3
+        (STEP0: steps es tid c1 c2)
+        (STEP1: reservation_only_step tid c2 c3)
+    :
+      (<<STEPS: steps (List.filter ThreadEvent.is_normal_dec es) tid c1 c3>>) \/
+      ((<<STEP: reservation_only_step tid c1 c3>>) /\
+       (<<RESERVATION: List.filter ThreadEvent.is_normal_dec es = []>>)).
+  Proof.
+    hexploit steps_filtering; try apply STEP0. i. des.
+    { destruct (list_match_rev (List.filter (fun e => ThreadEvent.is_normal_dec e) es)).
+      { rewrite H in *. inv STEPS. splits; auto. }
+      des. rewrite H in *. eapply steps_split in STEPS. des.
+      inv STEPS1. inv STEPS.
+      left. exploit merge_step_reservation_only_step; eauto. i. des.
+      { eapply steps_trans; eauto. }
+      { exfalso.
+        hexploit
+          (proj1 (List.filter_In
+                    (fun e => ThreadEvent.is_normal_dec e) hd_rev es)).
+        { rewrite H. eapply List.in_or_app. ss. auto. }
+        i. des. unfold proj_sumbool in *. des_ifs.
+      }
+    }
+    { right. rewrite RESERVATION. splits; auto.
+      eapply reservation_only_step_trans; eauto. }
+  Qed.
 
-  (* Lemma trace_step_machine_step tr e tid c1 c3 *)
-  (*       (STEP: Trace.configuration_step tr e tid c1 c3) *)
-  (*       (WF: Configuration.wf c1) *)
-  (*   : *)
-  (*     ((<<STEPS: steps (List.filter ThreadEvent.is_normal_dec (List.map snd tr)) tid c1 c3>>) /\ *)
-  (*      (<<NIL: List.filter ThreadEvent.is_normal_dec (List.map snd tr) <> []>>)) \/ *)
-  (*     ((<<STEP: reservation_only_step tid c1 c3>>) /\ *)
-  (*      (<<NIL: List.filter ThreadEvent.is_normal_dec (List.map snd tr) = []>>)). *)
-  (* Proof. *)
-  (*   inv STEP. *)
-  (*   exploit Trace.steps_future; eauto. *)
-  (*   { eapply WF; eauto. } *)
-  (*   { eapply WF; eauto. } *)
-  (*   { eapply WF; eauto. } i. des. ss. *)
-  (*   clear TVIEW_FUTURE SC_FUTURE MEM_FUTURE. *)
-  (*   eapply Trace.steps_equivalent in STEPS. *)
-  (*   assert (exists e2', *)
-  (*              (<<STEP: Thread.step pf e0 e2 e2'>>) /\ *)
-  (*              (<<STEPS: rtc (@Thread.reserve_step _ \2/ @Thread.cancel_step _) e2' (Thread.mk _ st3 lc3 sc3 memory3)>>)). *)
-  (*   { eauto. } *)
-  (*   clear STEP0. des. *)
-  (*   remember (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)). *)
-  (*   ginduction STEPS. *)
-  (*   { i. subst. exploit mixed_step_step. *)
-  (*     { econs. *)
-  (*       { eauto. } *)
-  (*       { refl. } *)
-  (*       { econs 2. eapply STEP. } *)
-  (*       { eapply STEPS0. } *)
-  (*       { eauto. } *)
-  (*     } *)
-  (*     i. des. *)
-  (*     { ss. des_ifs. *)
-  (*       { left. splits; ss. econs; [|econs 1]. eauto. } *)
-  (*       { right. unfold proj_sumbool in *. des_ifs. splits; auto. *)
-  (*         eapply reservation_event_reservation_only_step; eauto. *)
-  (*       } *)
-  (*     } *)
-  (*     { right. ss. splits; auto. unfold proj_sumbool. des_ifs. } *)
-  (*   } *)
-  (*   i. subst. eapply rtc_implies with (R2 := @Thread.reserve_step lang \2/ @Thread.cancel_step _) in STEPS0; eauto. *)
-  (*   exploit consistent_split; try eassumption. *)
-  (*   { destruct (classic (e0 = ThreadEvent.failure)); auto. } *)
-  (*   i. des. destruct th0'. *)
-  (*   exploit Trace.steps_future. *)
-  (*   { eapply Trace.steps_equivalent. eapply STEPS. } *)
-  (*   { eapply WF; eauto. } *)
-  (*   { eapply WF; eauto. } *)
-  (*   { eapply WF; eauto. } i. des. ss. *)
-  (*   eapply list_Forall_app in SILENT. des. inv FORALL1; ss. inv H2. *)
-  (*   exploit IHSTEPS; try apply STEP0; try apply RESERVESTEPS; eauto. *)
+  Lemma trace_step_machine_step tr e tid c1 c3
+        (STEP: Trace.configuration_step tr e tid c1 c3)
+        (WF: Configuration.wf c1)
+    :
+      ((<<STEPS: steps (List.filter ThreadEvent.is_normal_dec (List.map snd tr)) tid c1 c3>>) /\
+       (<<NIL: List.filter ThreadEvent.is_normal_dec (List.map snd tr) <> []>>)) \/
+      ((<<STEP: reservation_only_step tid c1 c3>>) /\
+       (<<NIL: List.filter ThreadEvent.is_normal_dec (List.map snd tr) = []>>)).
+  Proof.
+    inv STEP.
+    exploit Trace.steps_future; eauto.
+    { eapply WF; eauto. }
+    { eapply WF; eauto. }
+    { eapply WF; eauto. } i. des. ss.
+    clear TVIEW_FUTURE SC_FUTURE MEM_FUTURE.
+    eapply Trace.steps_equivalent in STEPS.
+    assert (exists e2',
+               (<<STEP: Thread.step pf e0 e2 e2'>>) /\
+               (<<STEPS: rtc (@Thread.reserve_step _ \2/ @Thread.cancel_step _) e2' (Thread.mk _ st3 lc3 sc3 memory3)>>)).
+    { eauto. }
+    clear STEP0. des.
+    remember (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)).
+    ginduction STEPS.
+    { i. subst. exploit mixed_step_step.
+      { econs.
+        { eauto. }
+        { refl. }
+        { econs 2. eapply STEP. }
+        { eapply STEPS0. }
+        { eauto. }
+      }
+      i. des.
+      { ss. des_ifs.
+        { left. splits; ss. econs; [|econs 1]. eauto. }
+        { right. unfold proj_sumbool in *. des_ifs. splits; auto.
+          eapply reservation_event_reservation_only_step; eauto.
+        }
+      }
+      { right. ss. splits; auto. unfold proj_sumbool. des_ifs. }
+    }
+    i. subst. eapply rtc_implies with (R2 := @Thread.reserve_step lang \2/ @Thread.cancel_step _) in STEPS0; eauto.
+    exploit consistent_split; try eassumption.
+    { destruct (classic (ThreadEvent.get_machine_event e0 = MachineEvent.failure)); auto. }
+    i. des. destruct th0'.
+    exploit Trace.steps_future.
+    { eapply Trace.steps_equivalent. eapply STEPS. }
+    { eapply WF; eauto. }
+    { eapply WF; eauto. }
+    { eapply WF; eauto. } i. des. ss.
+    eapply list_Forall_app in SILENT. des. inv FORALL1; ss. inv H2.
+    exploit IHSTEPS; try apply STEP0; try apply RESERVESTEPS; eauto.
 
-  (*   exploit SConfiguration.mixed_step_step. *)
-  (*   { instantiate (1:=Configuration.mk *)
-  (*                       (IdentMap.add *)
-  (*                          tid *)
-  (*                          (existT _ _ st3, lc3) *)
-  (*                          (IdentMap.add *)
-  (*                             tid *)
-  (*                             (existT _ _ state, local) *)
-  (*                             (Configuration.threads c1))) *)
-  (*                       sc3 *)
-  (*                       memory3). *)
-  (*     instantiate (1:=Configuration.mk *)
-  (*                       (IdentMap.add *)
-  (*                          tid *)
-  (*                          (existT _ _ state, local) *)
-  (*                          (Configuration.threads c1)) *)
-  (*                       sc *)
-  (*                       memory). *)
-  (*     instantiate (1:=tid). *)
-  (*     instantiate (1:=e0). *)
-  (*     econs; ss; eauto. *)
-  (*     { erewrite IdentMap.gss. ss. } *)
-  (*     { econs 2; eauto. } *)
-  (*   } *)
-  (*   i. erewrite IdentMap.add_add_eq in *. *)
-  (*   erewrite List.map_app. ss. *)
-  (*   erewrite list_filter_app; eauto. ss. des_ifs. *)
-  (*   { unfold proj_sumbool in Heq. des_ifs. des; ss. *)
-  (*     { left. splits; ss. *)
-  (*       { eapply steps_trans. *)
-  (*         { eapply STEPS1. } *)
-  (*         { econs 2; eauto. } *)
-  (*       } *)
-  (*       { ii. apply List.app_eq_nil in H. des. ss. } *)
-  (*     } *)
-  (*     { rewrite NIL in *. ss. *)
-  (*       exploit merge_reservation_only_step_step; eauto. i. des; ss. *)
-  (*       left. splits; ss. econs; eauto. *)
-  (*     } *)
-  (*   } *)
-  (*   { erewrite List.app_nil_r in *. *)
-  (*     unfold proj_sumbool in Heq. des_ifs. des; ss. *)
-  (*     { eapply reservation_event_reservation_only_step in STEP0; eauto. *)
-  (*       exploit merge_steps_reservation_only_step; eauto. i. *)
-  (*       erewrite list_filter_idempotent in *. des; ss; eauto. } *)
-  (*     { exploit merge_steps_reservation_only_step; eauto. i. *)
-  (*       erewrite list_filter_idempotent in *. des; ss; eauto. } *)
-  (*     { eapply reservation_event_reservation_only_step in STEP1; eauto. *)
-  (*       right. splits; auto. eapply reservation_only_step_trans; eauto. } *)
-  (*     { right. splits; auto. eapply reservation_only_step_trans; eauto. } *)
-  (*   } *)
-  (* Qed. *)
+    exploit SConfiguration.mixed_step_step.
+    { instantiate (1:=Configuration.mk
+                        (IdentMap.add
+                           tid
+                           (existT _ _ st3, lc3)
+                           (IdentMap.add
+                              tid
+                              (existT _ _ state, local)
+                              (Configuration.threads c1)))
+                        sc3
+                        memory3).
+      instantiate (1:=Configuration.mk
+                        (IdentMap.add
+                           tid
+                           (existT _ _ state, local)
+                           (Configuration.threads c1))
+                        sc
+                        memory).
+      instantiate (1:=tid).
+      instantiate (1:=e0).
+      econs; ss; eauto.
+      { erewrite IdentMap.gss. ss. }
+      { econs 2; eauto. }
+    }
+    i. erewrite IdentMap.add_add_eq in *.
+    erewrite List.map_app. ss.
+    erewrite list_filter_app; eauto. ss. des_ifs.
+    { unfold proj_sumbool in Heq. des_ifs. des; ss.
+      { left. splits; ss.
+        { eapply steps_trans.
+          { eapply STEPS1. }
+          { econs 2; eauto. }
+        }
+        { ii. apply List.app_eq_nil in H. des. ss. }
+      }
+      { rewrite NIL in *. ss.
+        exploit merge_reservation_only_step_step; eauto. i. des; ss.
+        left. splits; ss. econs; eauto.
+      }
+    }
+    { erewrite List.app_nil_r in *.
+      unfold proj_sumbool in Heq. des_ifs. des; ss.
+      { eapply reservation_event_reservation_only_step in STEP0; eauto.
+        exploit merge_steps_reservation_only_step; eauto. i.
+        erewrite list_filter_idempotent in *. des; ss; eauto. }
+      { exploit merge_steps_reservation_only_step; eauto. i.
+        erewrite list_filter_idempotent in *. des; ss; eauto. }
+      { eapply reservation_event_reservation_only_step in STEP1; eauto.
+        right. splits; auto. eapply reservation_only_step_trans; eauto. }
+      { right. splits; auto. eapply reservation_only_step_trans; eauto. }
+    }
+  Qed.
 
-  (* Lemma multi_step_machine_step e tid c1 c3 *)
-  (*       (STEP: Configuration.step e tid c1 c3) *)
-  (*       (WF: Configuration.wf c1) *)
-  (*   : *)
-  (*     exists c2, *)
-  (*       (<<STEPS: rtc tau_machine_step c1 c2>>) /\ *)
-  (*       (<<STEP: opt_machine_step e tid c2 c3>>). *)
-  (* Proof. *)
-  (*   eapply Trace.configuration_step_step in STEP. des. *)
-  (*   exploit trace_step_machine_step; eauto. i. des. *)
-  (*   { inv STEP0. *)
-  (*     rewrite List.map_app in *. *)
-  (*     rewrite list_filter_app in *. ss. *)
-  (*     eapply steps_split in STEPS. des. exists c0. splits. *)
-  (*     { eapply silent_steps_tau_machine_steps; eauto. *)
-  (*       eapply list_filter_forall with (Q:=fun e => ThreadEvent.get_machine_event e = MachineEvent.silent); eauto. *)
-  (*       eapply list_map_forall; eauto. *)
-  (*     } *)
-  (*     unfold proj_sumbool in *. des_ifs. *)
-  (*     { inv STEPS2. inv STEPS. *)
-  (*       econs 2. econs; eauto. } *)
-  (*     { inv STEPS2. *)
-  (*       replace (ThreadEvent.get_machine_event e0) with MachineEvent.silent; eauto. *)
-  (*       apply NNPP in n. *)
-  (*       unfold ThreadEvent.is_reservation_event, ThreadEvent.is_reserve, ThreadEvent.is_cancel in n. *)
-  (*       des; des_ifs. *)
-  (*     } *)
-  (*   } *)
-  (*   { eapply reservation_only_step_step in STEP. *)
-  (*     exists c1. esplits; eauto. *)
-  (*     replace e with (ThreadEvent.get_machine_event ThreadEvent.silent); eauto. *)
-  (*     ss. inv STEP0. *)
-  (*     rewrite List.map_app in NIL. *)
-  (*     rewrite list_filter_app in NIL. *)
-  (*     eapply List.app_eq_nil in NIL. *)
-  (*     ss. unfold proj_sumbool in NIL. des. des_ifs. *)
-  (*     apply NNPP in n. *)
-  (*     unfold ThreadEvent.is_reservation_event, ThreadEvent.is_reserve, ThreadEvent.is_cancel in n. *)
-  (*     des; des_ifs. *)
-  (*   } *)
-  (* Qed. *)
+  Lemma multi_step_machine_step e tid c1 c3
+        (STEP: Configuration.step e tid c1 c3)
+        (WF: Configuration.wf c1)
+    :
+      exists c2,
+        (<<STEPS: rtc tau_machine_step c1 c2>>) /\
+        (<<STEP: opt_machine_step e tid c2 c3>>).
+  Proof.
+    eapply Trace.configuration_step_step in STEP. des.
+    exploit trace_step_machine_step; eauto. i. des.
+    { inv STEP0.
+      rewrite List.map_app in *.
+      rewrite list_filter_app in *. ss.
+      eapply steps_split in STEPS. des. exists c0. splits.
+      { eapply silent_steps_tau_machine_steps; eauto.
+        eapply list_filter_forall with (Q:=fun e => ThreadEvent.get_machine_event e = MachineEvent.silent); eauto.
+        eapply list_map_forall; eauto.
+      }
+      unfold proj_sumbool in *. des_ifs.
+      { inv STEPS2. inv STEPS.
+        econs 2. econs; eauto. }
+      { inv STEPS2.
+        replace (ThreadEvent.get_machine_event e0) with MachineEvent.silent; eauto.
+        apply NNPP in n.
+        unfold ThreadEvent.is_reservation_event, ThreadEvent.is_reserve, ThreadEvent.is_cancel in n.
+        des; des_ifs.
+      }
+    }
+    { eapply reservation_only_step_step in STEP.
+      exists c1. esplits; eauto.
+      replace e with (ThreadEvent.get_machine_event ThreadEvent.silent); eauto.
+      ss. inv STEP0.
+      rewrite List.map_app in NIL.
+      rewrite list_filter_app in NIL.
+      eapply List.app_eq_nil in NIL.
+      ss. unfold proj_sumbool in NIL. des. des_ifs.
+      apply NNPP in n.
+      unfold ThreadEvent.is_reservation_event, ThreadEvent.is_reserve, ThreadEvent.is_cancel in n.
+      des; des_ifs.
+    }
+  Qed.
 
-  (* Lemma machine_step_multi_step e tid c1 c3 *)
-  (*       (STEP: machine_step e tid c1 c3) *)
-  (*   : *)
-  (*     exists c2, *)
-  (*       (<<STEP: Configuration.opt_step e tid c1 c2>>) /\ *)
-  (*       (<<STEPS: Configuration.opt_step MachineEvent.silent tid c2 c3>>). *)
-  (* Proof. *)
-  (*   inv STEP. inv STEP0. *)
-  (*   eapply rtc_implies with (R2:=@Thread.tau_step _) in CANCELS; cycle 1. *)
-  (*   { clear. i. inv H. econs. *)
-  (*     { econs; eauto. } *)
-  (*     { ss. } *)
-  (*   } *)
-  (*   hexploit rtc_implies; [|apply RESERVES|]. *)
-  (*   { instantiate (1:=@Thread.tau_step _). *)
-  (*     clear. i. inv H. econs. *)
-  (*     { econs; eauto. } *)
-  (*     { ss. } *)
-  (*   } *)
-  (*   intros AFTERSTEPS. *)
-  (*   destruct (ThreadEvent.get_machine_event e0) eqn:EVENT. *)
-  (*   { esplits; [|econs 1]. *)
-  (*     assert (STEPS: rtc (@Thread.tau_step _) *)
-  (*                        (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) *)
-  (*                        (Thread.mk _ st4 lc4 sc4 memory4)). *)
-  (*     { etrans. *)
-  (*       { eapply CANCELS. } *)
-  (*       inv STEP; eauto. econs 2. *)
-  (*       { econs; eauto. econs; eauto. } *)
-  (*       { eauto. } *)
-  (*     } *)
-  (*     eapply rtc_tail in STEPS. des. *)
-  (*     { inv STEPS0. inv TSTEP. econs 2. *)
-  (*       rewrite <- EVENT0. econs; eauto. *)
-  (*       { destruct e; ss. } *)
-  (*       { eapply CONSISTENT. ii. subst. ss. } *)
-  (*     } *)
-  (*     { clarify. destruct c1; ss. *)
-  (*       rewrite IdentMap.gsident; eauto. } *)
-  (*   } *)
-  (*   { inv STEP; ss. *)
-  (*     assert (BOT: (Local.promises (Thread.local e3)) = Memory.bot). *)
-  (*     { destruct e0; ss. inv STEP0; inv STEP. inv LOCAL. inv LOCAL0; auto. } *)
-  (*     destruct e3. esplits. *)
-  (*     { econs 2. rewrite <- EVENT. econs; eauto. *)
-  (*       { destruct e0; ss. } *)
-  (*       { ii. right. ss. esplits; [refl|]. ss. } *)
-  (*     } *)
-  (*     { eapply rtc_tail in AFTERSTEPS. des; clarify. *)
-  (*       inv AFTERSTEPS0. inv TSTEP. *)
-  (*       econs 2. rewrite <- EVENT0. *)
-  (*       replace (IdentMap.add tid (existT _ _ st4, lc4) (Configuration.threads c1)) with (IdentMap.add tid (existT _ _ st4, lc4) (IdentMap.add tid (existT _ _ state, local) (Configuration.threads c1))) *)
-  (*       . *)
-  (*       { econs; ss. *)
-  (*         { eapply IdentMap.gss. } *)
-  (*         { eapply AFTERSTEPS. } *)
-  (*         { eapply STEP. } *)
-  (*         { destruct e1; ss. } *)
-  (*         { ii. right. *)
-  (*           exploit reserve_steps_le_cancel_steps. *)
-  (*           { eapply RESERVES. } *)
-  (*           { ss. eapply CAP. } *)
-  (*           i. des. ss. esplits. *)
-  (*           { eapply rtc_implies; try apply STEPS. *)
-  (*             clear. i. inv H. econs. *)
-  (*             { econs; eauto. } *)
-  (*             { ss. } *)
-  (*           } *)
-  (*           { rewrite LOCAL. auto. } *)
-  (*         } *)
-  (*       } *)
-  (*       { eapply IdentMap.add_add_eq. } *)
-  (*     } *)
-  (*   } *)
-  (*   { destruct e0; ss. inv STEP. *)
-  (*     exploit reorder_abort_reserves; eauto. i. des. *)
-  (*     esplits; [|econs 1]. econs 2. econs. *)
-  (*     { eauto. } *)
-  (*     { etrans. *)
-  (*       { eapply CANCELS. } *)
-  (*       { eapply rtc_implies; try apply STEPS. *)
-  (*         clear. i. inv H. econs. *)
-  (*         { econs; eauto. } *)
-  (*         { ss. } *)
-  (*       } *)
-  (*     } *)
-  (*     { eauto. } *)
-  (*   } *)
-  (* Qed. *)
+  Lemma machine_step_multi_step e tid c1 c3
+        (STEP: machine_step e tid c1 c3)
+    :
+      exists c2,
+        (<<STEP: Configuration.opt_step e tid c1 c2>>) /\
+        (<<STEPS: Configuration.opt_step MachineEvent.silent tid c2 c3>>).
+  Proof.
+    inv STEP. inv STEP0.
+    eapply rtc_implies with (R2:=@Thread.tau_step _) in CANCELS; cycle 1.
+    { clear. i. inv H. econs.
+      { econs; eauto. }
+      { ss. }
+    }
+    hexploit rtc_implies; [|apply RESERVES|].
+    { instantiate (1:=@Thread.tau_step _).
+      clear. i. inv H. econs.
+      { econs; eauto. }
+      { ss. }
+    }
+    intros AFTERSTEPS.
+    destruct (ThreadEvent.get_machine_event e0) eqn:EVENT.
+    { esplits; [|econs 1].
+      assert (STEPS: rtc (@Thread.tau_step _)
+                         (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1))
+                         (Thread.mk _ st4 lc4 sc4 memory4)).
+      { etrans.
+        { eapply CANCELS. }
+        inv STEP; eauto. econs 2.
+        { econs; eauto. econs; eauto. }
+        { eauto. }
+      }
+      eapply rtc_tail in STEPS. des.
+      { inv STEPS0. inv TSTEP. econs 2.
+        rewrite <- EVENT0. econs; eauto.
+        { destruct e; ss. }
+      }
+      { clarify. destruct c1; ss.
+        rewrite IdentMap.gsident; eauto. }
+    }
+    { inv STEP; ss.
+      assert (BOT: (Local.promises (Thread.local e3)) = Memory.bot).
+      { destruct e0; ss. inv STEP0; inv STEP. inv LOCAL. inv LOCAL0; auto. }
+      destruct e3. esplits.
+      { econs 2. rewrite <- EVENT. econs; eauto.
+        ii. right. ss. esplits; [refl|]. ss. }
+      { eapply rtc_tail in AFTERSTEPS. des; clarify.
+        inv AFTERSTEPS0. inv TSTEP.
+        econs 2. rewrite <- EVENT0.
+        replace (IdentMap.add tid (existT _ _ st4, lc4) (Configuration.threads c1)) with (IdentMap.add tid (existT _ _ st4, lc4) (IdentMap.add tid (existT _ _ state, local) (Configuration.threads c1)))
+        .
+        { econs; ss.
+          { eapply IdentMap.gss. }
+          { eapply AFTERSTEPS. }
+          { eapply STEP. }
+          { ii. right.
+            exploit reserve_steps_le_cancel_steps.
+            { eapply RESERVES. }
+            { ss. eapply CAP. }
+            i. des. ss. esplits.
+            { eapply rtc_implies; try apply STEPS.
+              clear. i. inv H. econs.
+              { econs; eauto. }
+              { ss. }
+            }
+            { rewrite LOCAL. auto. }
+          }
+        }
+        { eapply IdentMap.add_add_eq. }
+      }
+    }
+    { assert (Thread.step true e0 e2 e3).
+      { inv STEP; ss. inv STEP0; inv STEP; ss.
+        econs 2. inv LOCAL; eauto.
+      }
+      hexploit reorder_failure_reserves; eauto. i. des.
+      esplits; [|econs 1]. econs 2. rewrite <- EVENT. econs.
+      { eauto. }
+      { etrans.
+        { eapply CANCELS. }
+        { eapply rtc_implies; try apply STEPS.
+          clear. i. inv H. econs.
+          { econs; eauto. }
+          { ss. }
+        }
+      }
+      { eauto. }
+      { rewrite EVENT. ss. }
+    }
+  Qed.
 
-  (* Lemma multi_step_equiv c b *)
-  (*       (WF: Configuration.wf c) *)
-  (*   : *)
-  (*     behaviors Configuration.step c b <-> behaviors machine_step c b. *)
-  (* Proof. *)
-  (*   split; i. *)
-  (*   { ginduction H; i. *)
-  (*     { econs 1; eauto. } *)
-  (*     { exploit IHbehaviors. *)
-  (*       { eapply Configuration.step_future; eauto. } intros BEH. *)
-  (*       eapply multi_step_machine_step in STEP; eauto. des. *)
-  (*       eapply rtc_tau_step_behavior. *)
-  (*       { eapply STEPS. } *)
-  (*       { inv STEP0. econs 2; eauto. } *)
-  (*     } *)
-  (*     { eapply multi_step_machine_step in STEP; eauto. des. *)
-  (*       eapply rtc_tau_step_behavior. *)
-  (*       { eapply STEPS. } *)
-  (*       { inv STEP0. econs 3; eauto. } *)
-  (*     } *)
-  (*     { exploit IHbehaviors. *)
-  (*       { eapply Configuration.step_future; eauto. } intros BEH. *)
-  (*       eapply multi_step_machine_step in STEP; eauto. des. *)
-  (*       eapply rtc_tau_step_behavior. *)
-  (*       { eapply STEPS. } *)
-  (*       { inv STEP0; eauto. *)
-  (*         econs 4; eauto. *)
-  (*       } *)
-  (*     } *)
-  (*   } *)
-  (*   { clear WF. ginduction H; i. *)
-  (*     { econs 1; eauto. } *)
-  (*     { eapply machine_step_multi_step in STEP; eauto. des. *)
-  (*       inv STEP0. econs 2; eauto. *)
-  (*       inv STEPS; eauto. econs 4; eauto. *)
-  (*     } *)
-  (*     { eapply machine_step_multi_step in STEP; eauto. des. *)
-  (*       inv STEP0. econs 3; eauto. *)
-  (*     } *)
-  (*     { eapply machine_step_multi_step in STEP; eauto. des. *)
-  (*       inv STEP0. *)
-  (*       { inv STEPS; eauto. econs 4; eauto. } *)
-  (*       { econs 4; eauto. inv STEPS; eauto. econs 4; eauto. } *)
-  (*     } *)
-  (*   } *)
-  (* Qed. *)
+  Lemma multi_step_equiv c b f
+        (WF: Configuration.wf c)
+    :
+      behaviors Configuration.step c b f <-> behaviors machine_step c b f.
+  Proof.
+    split; i.
+    { ginduction H; i.
+      { econs 1; eauto. }
+      { exploit IHbehaviors.
+        { eapply Configuration.step_future; eauto. } intros BEH.
+        eapply multi_step_machine_step in STEP; eauto. des.
+        eapply rtc_tau_step_behavior.
+        { eapply STEPS. }
+        { inv STEP0. econs 2; eauto. }
+      }
+      { eapply multi_step_machine_step in STEP; eauto. des.
+        eapply rtc_tau_step_behavior.
+        { eapply STEPS. }
+        { inv STEP0. econs 3; eauto. }
+      }
+      { exploit IHbehaviors.
+        { eapply Configuration.step_future; eauto. } intros BEH.
+        eapply multi_step_machine_step in STEP; eauto. des.
+        eapply rtc_tau_step_behavior.
+        { eapply STEPS. }
+        { inv STEP0; eauto.
+          econs 4; eauto.
+        }
+      }
+      { econs 5. }
+    }
+    { clear WF. ginduction H; i.
+      { econs 1; eauto. }
+      { eapply machine_step_multi_step in STEP; eauto. des.
+        inv STEP0. econs 2; eauto.
+        inv STEPS; eauto. econs 4; eauto.
+      }
+      { eapply machine_step_multi_step in STEP; eauto. des.
+        inv STEP0. econs 3; eauto.
+      }
+      { eapply machine_step_multi_step in STEP; eauto. des.
+        inv STEP0.
+        { inv STEPS; eauto. econs 4; eauto. }
+        { econs 4; eauto. inv STEPS; eauto. econs 4; eauto. }
+      }
+      { econs 5. }
+    }
+  Qed.
 
 End SConfiguration.

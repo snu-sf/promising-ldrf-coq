@@ -607,76 +607,76 @@ Proof.
       steps_trace c0 c2 (tr ++ trs)
   .
 
-  (* Lemma step_trace_steps tr e tid c1 c3 *)
-  (*       (STEP: step_trace tr e tid c1 c3) *)
-  (*       (WF: Configuration.wf c1) *)
-  (*       (PF: PF.pf_configuration L c1) *)
-  (*   : *)
-  (*     ((<<STEPS: steps (List.filter ThreadEvent.is_normal_dec (List.map snd tr)) tid c1 c3>>) /\ *)
-  (*      (<<NIL: List.filter ThreadEvent.is_normal_dec (List.map snd tr) <> []>>)) \/ *)
-  (*     ((<<STEP: SConfiguration.reservation_only_step tid c1 c3>>) /\ *)
-  (*      (<<NIL: List.filter ThreadEvent.is_normal_dec (List.map snd tr) = []>>)). *)
-  (* Proof. *)
-  (*   eapply step_trace_trace_step in STEP; eauto. des. *)
-  (*   eapply SConfiguration.trace_step_machine_step in STEP0; eauto. des; eauto. *)
-  (*   left. splits; auto. clear e. *)
-  (*   remember (List.filter (fun e => ThreadEvent.is_normal_dec e) (List.map snd tr)). *)
-  (*   assert (EVENTS: List.Forall (PF.pf_event L) l). *)
-  (*   { subst. clear - TRACE. induction tr; ss. inv TRACE. des_ifs; eauto. } *)
-  (*   clear tr Heql NIL TRACE. ginduction STEPS; eauto. *)
-  (*   i. inv EVENTS. *)
-  (*   eapply event_configuration_step_step in STEP; eauto. *)
-  (*   exploit step_future; eauto. i. des. *)
-  (*   hexploit pf_configuration_step; eauto. *)
-  (* Qed. *)
+  Lemma step_trace_steps tr e tid c1 c3
+        (STEP: step_trace tr e tid c1 c3)
+        (WF: Configuration.wf c1)
+        (PF: PF.pf_configuration L c1)
+    :
+      ((<<STEPS: steps (List.filter ThreadEvent.is_normal_dec (List.map snd tr)) tid c1 c3>>) /\
+       (<<NIL: List.filter ThreadEvent.is_normal_dec (List.map snd tr) <> []>>)) \/
+      ((<<STEP: SConfiguration.reservation_only_step tid c1 c3>>) /\
+       (<<NIL: List.filter ThreadEvent.is_normal_dec (List.map snd tr) = []>>)).
+  Proof.
+    eapply step_trace_trace_step in STEP; eauto. des.
+    eapply SConfiguration.trace_step_machine_step in STEP0; eauto. des; eauto.
+    left. splits; auto. clear e.
+    remember (List.filter (fun e => ThreadEvent.is_normal_dec e) (List.map snd tr)).
+    assert (EVENTS: List.Forall (PF.pf_event L) l).
+    { subst. clear - TRACE. induction tr; ss. inv TRACE. des_ifs; eauto. }
+    clear tr Heql NIL TRACE. ginduction STEPS; eauto.
+    i. inv EVENTS.
+    eapply event_configuration_step_step in STEP; eauto.
+    exploit step_future; eauto. i. des.
+    hexploit pf_configuration_step; eauto.
+  Qed.
 
-  (* Lemma step_trace_future *)
-  (*       (tr: Trace.t) e tid c1 c2 *)
-  (*       (STEP: step_trace tr e tid c1 c2) *)
-  (*       (WF1: Configuration.wf c1) *)
-  (*       (PF: PF.pf_configuration L c1): *)
-  (*   (<<WF2: Configuration.wf c2>>) /\ *)
-  (*   (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\ *)
-  (*   (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\ *)
-  (*   (<<PF: PF.pf_configuration L c2>>). *)
-  (* Proof. *)
-  (*   eapply step_trace_steps in STEP; eauto. des. *)
-  (*   { eapply steps_future; eauto. } *)
-  (*   { eapply reservation_only_step_step in STEP0; eauto. *)
-  (*     eapply step_future; eauto. } *)
-  (* Qed. *)
+  Lemma step_trace_future
+        (tr: Trace.t) e tid c1 c2
+        (STEP: step_trace tr e tid c1 c2)
+        (WF1: Configuration.wf c1)
+        (PF: PF.pf_configuration L c1):
+    (<<WF2: Configuration.wf c2>>) /\
+    (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+    (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\
+    (<<PF: PF.pf_configuration L c2>>).
+  Proof.
+    eapply step_trace_steps in STEP; eauto. des.
+    { eapply steps_future; eauto. }
+    { eapply reservation_only_step_step in STEP0; eauto.
+      eapply step_future; eauto. }
+  Qed.
 
-  (* Lemma opt_step_trace_future *)
-  (*       (tr: Trace.t) e tid c1 c2 *)
-  (*       (STEP: opt_step_trace tr e tid c1 c2) *)
-  (*       (WF1: Configuration.wf c1) *)
-  (*       (PF: PF.pf_configuration L c1): *)
-  (*   (<<WF2: Configuration.wf c2>>) /\ *)
-  (*   (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\ *)
-  (*   (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\ *)
-  (*   (<<PF: PF.pf_configuration L c2>>). *)
-  (* Proof. *)
-  (*   inv STEP. *)
-  (*   { eapply step_trace_future; eauto. } *)
-  (*   { splits; auto. refl. } *)
-  (* Qed. *)
+  Lemma opt_step_trace_future
+        (tr: Trace.t) e tid c1 c2
+        (STEP: opt_step_trace tr e tid c1 c2)
+        (WF1: Configuration.wf c1)
+        (PF: PF.pf_configuration L c1):
+    (<<WF2: Configuration.wf c2>>) /\
+    (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+    (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\
+    (<<PF: PF.pf_configuration L c2>>).
+  Proof.
+    inv STEP.
+    { eapply step_trace_future; eauto. }
+    { splits; auto. refl. }
+  Qed.
 
-  (* Lemma steps_trace_future *)
-  (*       c1 c2 tr *)
-  (*       (STEPS: steps_trace c1 c2 tr) *)
-  (*       (WF1: Configuration.wf c1) *)
-  (*       (PF: PF.pf_configuration L c1): *)
-  (*   (<<WF2: Configuration.wf c2>>) /\ *)
-  (*   (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\ *)
-  (*   (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\ *)
-  (*   (<<PF: PF.pf_configuration L c2>>). *)
-  (* Proof. *)
-  (*   revert WF1. induction STEPS; i. *)
-  (*   - splits; ss; refl. *)
-  (*   - exploit step_trace_future; eauto. i. des. *)
-  (*     exploit IHSTEPS; eauto. i. des. *)
-  (*     splits; ss; etrans; eauto. *)
-  (* Qed. *)
+  Lemma steps_trace_future
+        c1 c2 tr
+        (STEPS: steps_trace c1 c2 tr)
+        (WF1: Configuration.wf c1)
+        (PF: PF.pf_configuration L c1):
+    (<<WF2: Configuration.wf c2>>) /\
+    (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+    (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\
+    (<<PF: PF.pf_configuration L c2>>).
+  Proof.
+    revert WF1. induction STEPS; i.
+    - splits; ss; refl.
+    - exploit step_trace_future; eauto. i. des.
+      exploit IHSTEPS; eauto. i. des.
+      splits; ss; etrans; eauto.
+  Qed.
 
   Lemma steps_trace_n1 c0 c1 c2 tr trs e tid
         (STEPS: steps_trace c0 c1 trs)
@@ -784,60 +784,60 @@ Proof.
       eapply steps_trace_n1; eauto.
   Qed.
 
-  (* Lemma steps_trace_inv *)
-  (*       c1 c2 tr lc e *)
-  (*       (STEPS: steps_trace c1 c2 tr) *)
-  (*       (WF: Configuration.wf c1) *)
-  (*       (PF: PF.pf_configuration L c1) *)
-  (*       (TRACE: List.In (lc, e) tr): *)
-  (*   exists c tr1 tid lang st1 lc1, *)
-  (*     (<<STEPS: steps_trace c1 c tr1>>) /\ *)
-  (*     (<<FIND: IdentMap.find tid (Configuration.threads c) = Some (existT _ lang st1, lc1)>>) /\ *)
-  (*     exists tr2 pf e2 e3, *)
-  (*       (<<THREAD_STEPS: Trace.steps tr2 (Thread.mk _ st1 lc1 (Configuration.sc c) (Configuration.memory c)) e2>>) /\ *)
-  (*       (<<SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr2>>) /\ *)
-  (*       (<<PF: List.Forall (compose (PF.pf_event L) snd) tr2>>) /\ *)
-  (*       (<<LC: (Thread.local e2) = lc>>) /\ *)
-  (*       (<<THREAD_STEP: Thread.step pf e e2 e3>>) /\ *)
-  (*       (<<CONS: Local.promise_consistent (Thread.local e3)>>). *)
-  (* Proof. *)
-  (*   rewrite steps_trace_equiv in STEPS. *)
-  (*   induction STEPS; ss. *)
-  (*   apply List.in_app_or in TRACE. des; eauto. *)
-  (*   clear IHSTEPS. inv STEP. *)
-  (*   exists c2, tr1, tid, lang, st1, lc1. *)
-  (*   rewrite <- steps_trace_equiv in STEPS. *)
-  (*   splits; ss. *)
-  (*   apply List.in_app_or in TRACE. des; cycle 1. *)
-  (*   { inv TRACE; ss. inv H. esplits; eauto. *)
-  (*     - apply Forall_app_inv in PF0. des. ss. *)
-  (*     - destruct (classic (ThreadEvent.get_machine_event e = MachineEvent.failure)). *)
-  (*       + destruct e; ss; inv STEP0; inv STEP; inv LOCAL; inv LOCAL0; ss. *)
-  (*       + exploit CONSISTENT; eauto. i. inv x. des. *)
-  (*         exploit steps_trace_future; eauto. i. des. *)
-  (*         inv WF2. inv WF0. exploit THREADS; eauto. i. *)
-  (*         exploit Trace.steps_future; try exact STEPS0; eauto. s. i. des. *)
-  (*         exploit Thread.step_future; try exact STEP0; eauto. s. i. des. *)
-  (*         hexploit consistent_promise_consistent; *)
-  (*           try eapply Trace.consistent_thread_consistent; try exact CONSISTENT0; eauto. *)
-  (*   } *)
-  (*   exploit steps_trace_future; eauto. i. des. *)
-  (*   inv WF2. inv WF0. exploit THREADS; eauto. i. clear DISJOINT THREADS. *)
-  (*   exploit Trace.steps_inv; try exact STEPS0; eauto. *)
-  (*   { destruct (classic (e1 = ThreadEvent.failure)). *)
-  (*     - subst. inv STEP0; inv STEP. inv LOCAL. inv LOCAL0. ss. *)
-  (*     - exploit CONSISTENT; ss. i. inv x0. des. *)
-  (*       exploit Trace.steps_future; eauto. s. i. des. *)
-  (*       exploit Thread.step_future; eauto. s. i. des. *)
-  (*       eapply step_promise_consistent; eauto. *)
-  (*       eapply consistent_promise_consistent; eauto. *)
-  (*       eapply Trace.consistent_thread_consistent; eauto. *)
-  (*   } *)
-  (*   i. des. esplits; eauto; subst. *)
-  (*   - apply Forall_app_inv in SILENT. des. ss. *)
-  (*   - apply Forall_app_inv in PF0. des. *)
-  (*     apply Forall_app_inv in FORALL1. des. ss. *)
-  (* Qed. *)
+  Lemma steps_trace_inv
+        c1 c2 tr lc e
+        (STEPS: steps_trace c1 c2 tr)
+        (WF: Configuration.wf c1)
+        (PF: PF.pf_configuration L c1)
+        (TRACE: List.In (lc, e) tr):
+    exists c tr1 tid lang st1 lc1,
+      (<<STEPS: steps_trace c1 c tr1>>) /\
+      (<<FIND: IdentMap.find tid (Configuration.threads c) = Some (existT _ lang st1, lc1)>>) /\
+      exists tr2 pf e2 e3,
+        (<<THREAD_STEPS: Trace.steps tr2 (Thread.mk _ st1 lc1 (Configuration.sc c) (Configuration.memory c)) e2>>) /\
+        (<<SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) tr2>>) /\
+        (<<PF: List.Forall (compose (PF.pf_event L) snd) tr2>>) /\
+        (<<LC: (Thread.local e2) = lc>>) /\
+        (<<THREAD_STEP: Thread.step pf e e2 e3>>) /\
+        (<<CONS: Local.promise_consistent (Thread.local e3)>>).
+  Proof.
+    rewrite steps_trace_equiv in STEPS.
+    induction STEPS; ss.
+    apply List.in_app_or in TRACE. des; eauto.
+    clear IHSTEPS. inv STEP.
+    exists c2, tr1, tid, lang, st1, lc1.
+    rewrite <- steps_trace_equiv in STEPS.
+    splits; ss.
+    apply List.in_app_or in TRACE. des; cycle 1.
+    { inv TRACE; ss. inv H. esplits; eauto.
+      - apply Forall_app_inv in PF0. des. ss.
+      - destruct (classic (ThreadEvent.get_machine_event e = MachineEvent.failure)).
+        + destruct e; ss; inv STEP0; inv STEP; inv LOCAL; inv LOCAL0; ss.
+        + exploit CONSISTENT; eauto. i. inv x. des.
+          exploit steps_trace_future; eauto. i. des.
+          inv WF2. inv WF0. exploit THREADS; eauto. i.
+          exploit Trace.steps_future; try exact STEPS0; eauto. s. i. des.
+          exploit Thread.step_future; try exact STEP0; eauto. s. i. des.
+          hexploit consistent_promise_consistent;
+            try eapply Trace.consistent_thread_consistent; try exact CONSISTENT0; eauto.
+    }
+    exploit steps_trace_future; eauto. i. des.
+    inv WF2. inv WF0. exploit THREADS; eauto. i. clear DISJOINT THREADS.
+    exploit Trace.steps_inv; try exact STEPS0; eauto.
+    { destruct (classic (ThreadEvent.get_machine_event e1 = MachineEvent.failure)).
+      - subst. inv STEP0; inv STEP; inv LOCAL; try inv LOCAL0; ss.
+      - exploit CONSISTENT; ss. i. inv x0. des.
+        exploit Trace.steps_future; eauto. s. i. des.
+        exploit Thread.step_future; eauto. s. i. des.
+        eapply step_promise_consistent; eauto.
+        eapply consistent_promise_consistent; eauto.
+        eapply Trace.consistent_thread_consistent; eauto.
+    }
+    i. des. esplits; eauto; subst.
+    - apply Forall_app_inv in SILENT. des. ss.
+    - apply Forall_app_inv in PF0. des.
+      apply Forall_app_inv in FORALL1. des. ss.
+  Qed.
 
   Inductive multi_step (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t): Prop :=
   | multi_step_intro
@@ -845,63 +845,63 @@ Proof.
       (STEP: step_trace tr e tid c1 c2)
   .
 
-  (* Lemma multi_step_machine_step e tid c1 c3 *)
-  (*       (STEP: multi_step e tid c1 c3) *)
-  (*       (WF: Configuration.wf c1) *)
-  (*       (PF: PF.pf_configuration L c1) *)
-  (*   : *)
-  (*     exists c2, *)
-  (*       (<<STEPS: rtc tau_machine_step c1 c2>>) /\ *)
-  (*       (<<STEP: opt_machine_step e tid c2 c3>>). *)
-  (* Proof. *)
-  (*   inv STEP. exploit step_trace_steps; eauto. i. des. *)
-  (*   { inv STEP0. *)
-  (*     rewrite List.map_app in *. *)
-  (*     rewrite list_filter_app in *. ss. *)
-  (*     eapply steps_split in STEPS. des. exists c0. splits. *)
-  (*     { eapply rtc_implies with (R1:=(machine_step MachineEvent.silent tid)). *)
-  (*       { clear. i. econs; eauto. } *)
-  (*       eapply silent_steps_tau_machine_steps; eauto. *)
-  (*       eapply list_filter_forall with (Q:=fun e => ThreadEvent.get_machine_event e = MachineEvent.silent); eauto. *)
-  (*       eapply list_map_forall; eauto. *)
-  (*     } *)
-  (*     unfold proj_sumbool in *. des_ifs. *)
-  (*     { inv STEPS2. inv STEPS. *)
-  (*       econs 2. econs; eauto. } *)
-  (*     { inv STEPS2. *)
-  (*       replace (ThreadEvent.get_machine_event e0) with MachineEvent.silent; eauto. *)
-  (*       apply NNPP in n. *)
-  (*       unfold ThreadEvent.is_reservation_event, ThreadEvent.is_reserve, ThreadEvent.is_cancel in n. *)
-  (*       des; des_ifs. *)
-  (*     } *)
-  (*   } *)
-  (*   { eapply SConfiguration.reservation_only_step_step in STEP. *)
-  (*     eapply event_configuration_step_step in STEP; eauto; ss. *)
-  (*     exists c1. esplits; eauto. *)
-  (*     replace e with (ThreadEvent.get_machine_event ThreadEvent.silent); eauto. *)
-  (*     ss. inv STEP0. *)
-  (*     rewrite List.map_app in NIL. *)
-  (*     rewrite list_filter_app in NIL. *)
-  (*     eapply List.app_eq_nil in NIL. *)
-  (*     ss. unfold proj_sumbool in NIL. des. des_ifs. *)
-  (*     apply NNPP in n. *)
-  (*     unfold ThreadEvent.is_reservation_event, ThreadEvent.is_reserve, ThreadEvent.is_cancel in n. *)
-  (*     des; des_ifs. *)
-  (*   } *)
-  (* Qed. *)
+  Lemma multi_step_machine_step e tid c1 c3
+        (STEP: multi_step e tid c1 c3)
+        (WF: Configuration.wf c1)
+        (PF: PF.pf_configuration L c1)
+    :
+      exists c2,
+        (<<STEPS: rtc tau_machine_step c1 c2>>) /\
+        (<<STEP: opt_machine_step e tid c2 c3>>).
+  Proof.
+    inv STEP. exploit step_trace_steps; eauto. i. des.
+    { inv STEP0.
+      rewrite List.map_app in *.
+      rewrite list_filter_app in *. ss.
+      eapply steps_split in STEPS. des. exists c0. splits.
+      { eapply rtc_implies with (R1:=(machine_step MachineEvent.silent tid)).
+        { clear. i. econs; eauto. }
+        eapply silent_steps_tau_machine_steps; eauto.
+        eapply list_filter_forall with (Q:=fun e => ThreadEvent.get_machine_event e = MachineEvent.silent); eauto.
+        eapply list_map_forall; eauto.
+      }
+      unfold proj_sumbool in *. des_ifs.
+      { inv STEPS2. inv STEPS.
+        econs 2. econs; eauto. }
+      { inv STEPS2.
+        replace (ThreadEvent.get_machine_event e0) with MachineEvent.silent; eauto.
+        apply NNPP in n.
+        unfold ThreadEvent.is_reservation_event, ThreadEvent.is_reserve, ThreadEvent.is_cancel in n.
+        des; des_ifs.
+      }
+    }
+    { eapply SConfiguration.reservation_only_step_step in STEP.
+      eapply event_configuration_step_step in STEP; eauto; ss.
+      exists c1. esplits; eauto.
+      replace e with (ThreadEvent.get_machine_event ThreadEvent.silent); eauto.
+      ss. inv STEP0.
+      rewrite List.map_app in NIL.
+      rewrite list_filter_app in NIL.
+      eapply List.app_eq_nil in NIL.
+      ss. unfold proj_sumbool in NIL. des. des_ifs.
+      apply NNPP in n.
+      unfold ThreadEvent.is_reservation_event, ThreadEvent.is_reserve, ThreadEvent.is_cancel in n.
+      des; des_ifs.
+    }
+  Qed.
 
-  (* Lemma multi_step_future *)
-  (*       e tid c1 c2 *)
-  (*       (STEP: multi_step e tid c1 c2) *)
-  (*       (WF1: Configuration.wf c1) *)
-  (*       (PF: PF.pf_configuration L c1): *)
-  (*   (<<WF2: Configuration.wf c2>>) /\ *)
-  (*   (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\ *)
-  (*   (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\ *)
-  (*   (<<PF: PF.pf_configuration L c2>>). *)
-  (* Proof. *)
-  (*   inv STEP. eapply step_trace_future; eauto. *)
-  (* Qed. *)
+  Lemma multi_step_future
+        e tid c1 c2
+        (STEP: multi_step e tid c1 c2)
+        (WF1: Configuration.wf c1)
+        (PF: PF.pf_configuration L c1):
+    (<<WF2: Configuration.wf c2>>) /\
+    (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+    (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>) /\
+    (<<PF: PF.pf_configuration L c2>>).
+  Proof.
+    inv STEP. eapply step_trace_future; eauto.
+  Qed.
 
   Lemma silent_multi_steps_trace_behaviors c0 c1 tr
         (STEP: silent_steps_trace c0 c1 tr)
@@ -913,27 +913,28 @@ Proof.
     econs. esplits; eauto.
   Qed.
 
-  (* Lemma multi_step_behavior c *)
-  (*       (WF: Configuration.wf c) *)
-  (*       (PF: PF.pf_configuration L c) *)
-  (*   : *)
-  (*     behaviors multi_step c <2= behaviors machine_step c. *)
-  (* Proof. *)
-  (*   i. induction PR. *)
-  (*   - econs 1; eauto. *)
-  (*   - exploit multi_step_future; eauto. i. des. *)
-  (*     eapply multi_step_machine_step in STEP; eauto. des. *)
-  (*     eapply rtc_tau_step_behavior; eauto. *)
-  (*     inv STEP0; eauto. econs 2; eauto. *)
-  (*   - exploit multi_step_future; eauto. i. des. *)
-  (*     eapply multi_step_machine_step in STEP; eauto. des. *)
-  (*     eapply rtc_tau_step_behavior; eauto. *)
-  (*     inv STEP0; eauto. econs 3; eauto. *)
-  (*   - exploit multi_step_future; eauto. i. des. *)
-  (*     eapply multi_step_machine_step in STEP; eauto. des. *)
-  (*     eapply rtc_tau_step_behavior; eauto. *)
-  (*     inv STEP0; eauto. econs 4; eauto. *)
-  (* Qed. *)
+  Lemma multi_step_behavior c
+        (WF: Configuration.wf c)
+        (PF: PF.pf_configuration L c)
+    :
+      behaviors multi_step c <2= behaviors machine_step c.
+  Proof.
+    i. induction PR.
+    - econs 1; eauto.
+    - exploit multi_step_future; eauto. i. des.
+      eapply multi_step_machine_step in STEP; eauto. des.
+      eapply rtc_tau_step_behavior; eauto.
+      inv STEP0; eauto. econs 2; eauto.
+    - exploit multi_step_future; eauto. i. des.
+      eapply multi_step_machine_step in STEP; eauto. des.
+      eapply rtc_tau_step_behavior; eauto.
+      inv STEP0; eauto. econs 3; eauto.
+    - exploit multi_step_future; eauto. i. des.
+      eapply multi_step_machine_step in STEP; eauto. des.
+      eapply rtc_tau_step_behavior; eauto.
+      inv STEP0; eauto. econs 4; eauto.
+    - econs 5.
+  Qed.
 
 End LOCALPF.
 End PFConfiguration.
@@ -943,6 +944,8 @@ End PFConfiguration.
 Module PFRace.
 Section LOCALPFRACE.
   Variable L: Loc.t -> bool.
+
+  Variable f: bool.
 
   Inductive reading_event (loc: Loc.t) (ts: Time.t):
     forall (e: ThreadEvent.t), Prop :=
@@ -954,6 +957,20 @@ Section LOCALPFRACE.
       to valr valw releasedr releasedw ordr ordw
     :
       reading_event loc ts (ThreadEvent.update loc ts to valr valw releasedr releasedw ordr ordw)
+  | reading_event_racy_read
+      valr ordr
+    :
+      reading_event loc ts (ThreadEvent.racy_read loc ts valr ordr)
+  | reading_event_racy_write
+      valw ordw
+      (FLAG: f = true)
+    :
+      reading_event loc ts (ThreadEvent.racy_write loc ts valw ordw)
+  | reading_event_racy_update
+      valr valw ordr ordw
+      (FLAG: f = true)
+    :
+      reading_event loc ts (ThreadEvent.racy_update loc ts valr valw ordr ordw)
   .
 
   Inductive writing_event (loc: Loc.t) (ts: Time.t):
@@ -968,6 +985,12 @@ Section LOCALPFRACE.
       (ORD: Ordering.le ordw Ordering.relaxed)
     :
       writing_event loc ts (ThreadEvent.update loc from ts valr valw releasedr releasedw ordr ordw)
+  | writing_event_write_na
+      from to msgs val ordw
+      (ORD: Ordering.le ordw Ordering.relaxed)
+      (IN: to = ts \/ (exists from msg, (<<IN: List.In (from, ts, msg) msgs>>)))
+    :
+      writing_event loc ts (ThreadEvent.write_na loc msgs from to val ordw)
   .
 
   Definition racy_execution (c0: Configuration.t): Prop :=
@@ -1096,109 +1119,109 @@ Section LOCALPFRACE.
     eapply multi_step_multi_racefree; eauto.
   Qed.
 
-  (* Lemma racefree_multi_racefree_imm c *)
-  (*       (RACEFREE: racefree c) *)
-  (*       (WF: Configuration.wf c) *)
-  (*       (PF: PF.pf_configuration L c) *)
-  (*   : *)
-  (*     multi_racefree_imm c. *)
-  (* Proof. *)
-  (*   ii. exploit PFConfiguration.step_trace_future; try apply CSTEP0; eauto.  i. des. *)
-  (*   exploit final_event_trace_filter; eauto. *)
-  (*   { unfold ThreadEvent.is_normal, ThreadEvent.is_reservation_event. *)
-  (*     inv WRITE; ss; ii; des; ss. } i. des. *)
-  (*   eapply PFConfiguration.step_trace_steps in CSTEP0; eauto. *)
-  (*   rewrite FILTER in *. des; cycle 1. *)
-  (*   { eapply List.app_eq_nil in NIL. des; ss. } *)
-  (*   eapply PFConfiguration.steps_split in STEPS. des. inv STEPS1. inv STEPS. *)
-  (*   eapply List.in_split in TRACE1. des; subst. *)
-  (*   dup CSTEP1. eapply PFConfiguration.step_trace_steps in CSTEP1; eauto. *)
-  (*   rewrite List.map_app in *. *)
-  (*   rewrite list_filter_app in *. ss. unfold proj_sumbool in *. *)
-  (*   des_ifs; cycle 1. *)
-  (*   { clear - READ n. apply NNPP in n. *)
-  (*     unfold ThreadEvent.is_normal, ThreadEvent.is_reservation_event in *. *)
-  (*     inv READ; ss; ii; des; ss. } *)
-  (*   des; cycle 1. *)
-  (*   { eapply List.app_eq_nil in NIL0. des; ss. } *)
-  (*   eapply PFConfiguration.steps_split in STEPS. des. inv STEPS2. *)
-  (*   eapply RACEFREE; try eassumption. *)
-  (*   { eapply PFConfiguration.steps_rtc_all_step; eauto. } *)
-  (*   { eapply PFConfiguration.silent_steps_tau_machine_steps; eauto. *)
-  (*     clear - CSTEP0. inv CSTEP0. *)
-  (*     destruct (list_match_rev l2); des; subst. *)
-  (*     { eapply List.app_inj_tail in TR. des; clarify. *)
-  (*       eapply List.Forall_forall. ii. *)
-  (*       eapply List.filter_In in H. des. *)
-  (*       eapply List.in_map_iff in H. des; subst. *)
-  (*       eapply List.Forall_forall in SILENT; eauto. } *)
-  (*     { rewrite List.app_comm_cons in TR. *)
-  (*       rewrite List.app_assoc in TR. *)
-  (*       eapply List.app_inj_tail in TR. des; clarify. *)
-  (*       eapply Forall_app_inv in SILENT. des. *)
-  (*       eapply List.Forall_forall. ii. *)
-  (*       eapply List.filter_In in H. des. *)
-  (*       eapply List.in_map_iff in H. des; subst. *)
-  (*       eapply List.Forall_forall in FORALL1; eauto. } *)
-  (*   } *)
-  (* Qed. *)
+  Lemma racefree_multi_racefree_imm c
+        (RACEFREE: racefree c)
+        (WF: Configuration.wf c)
+        (PF: PF.pf_configuration L c)
+    :
+      multi_racefree_imm c.
+  Proof.
+    ii. exploit PFConfiguration.step_trace_future; try apply CSTEP0; eauto.  i. des.
+    exploit final_event_trace_filter; eauto.
+    { unfold ThreadEvent.is_normal, ThreadEvent.is_reservation_event.
+      inv WRITE; ss; ii; des; ss. } i. des.
+    eapply PFConfiguration.step_trace_steps in CSTEP0; eauto.
+    rewrite FILTER in *. des; cycle 1.
+    { eapply List.app_eq_nil in NIL. des; ss. }
+    eapply PFConfiguration.steps_split in STEPS. des. inv STEPS1. inv STEPS.
+    eapply List.in_split in TRACE1. des; subst.
+    dup CSTEP1. eapply PFConfiguration.step_trace_steps in CSTEP1; eauto.
+    rewrite List.map_app in *.
+    rewrite list_filter_app in *. ss. unfold proj_sumbool in *.
+    des_ifs; cycle 1.
+    { clear - READ n. apply NNPP in n.
+      unfold ThreadEvent.is_normal, ThreadEvent.is_reservation_event in *.
+      inv READ; ss; ii; des; ss. }
+    des; cycle 1.
+    { eapply List.app_eq_nil in NIL0. des; ss. }
+    eapply PFConfiguration.steps_split in STEPS. des. inv STEPS2.
+    eapply RACEFREE; try eassumption.
+    { eapply PFConfiguration.steps_rtc_all_step; eauto. }
+    { eapply PFConfiguration.silent_steps_tau_machine_steps; eauto.
+      clear - CSTEP0. inv CSTEP0.
+      destruct (list_match_rev l2); des; subst.
+      { eapply List.app_inj_tail in TR. des; clarify.
+        eapply List.Forall_forall. ii.
+        eapply List.filter_In in H. des.
+        eapply List.in_map_iff in H. des; subst.
+        eapply List.Forall_forall in SILENT; eauto. }
+      { rewrite List.app_comm_cons in TR.
+        rewrite List.app_assoc in TR.
+        eapply List.app_inj_tail in TR. des; clarify.
+        eapply Forall_app_inv in SILENT. des.
+        eapply List.Forall_forall. ii.
+        eapply List.filter_In in H. des.
+        eapply List.in_map_iff in H. des; subst.
+        eapply List.Forall_forall in FORALL1; eauto. }
+    }
+  Qed.
 
-  (* Lemma racefree_multi_racefree c *)
-  (*       (RACEFREE: racefree c) *)
-  (*       (WF: Configuration.wf c) *)
-  (*       (PF: PF.pf_configuration L c) *)
-  (*   : *)
-  (*     multi_racefree c. *)
-  (* Proof. *)
-  (*   unfold multi_racefree. i. *)
-  (*   ginduction CSTEPS; eauto. *)
-  (*   { i. eapply racefree_multi_racefree_imm; eauto. } *)
-  (*   { i. exploit PFConfiguration.step_trace_future; eauto. *)
-  (*     i. des. eapply IHCSTEPS; eauto. *)
-  (*     eapply PFConfiguration.step_trace_steps in STEP; eauto. des. *)
-  (*     { eapply steps_racefree; eauto. } *)
-  (*     { eapply PFConfiguration.reservation_only_step_step in STEP0; eauto. *)
-  (*       eapply step_racefree; eauto. } *)
-  (*   } *)
-  (* Qed. *)
+  Lemma racefree_multi_racefree c
+        (RACEFREE: racefree c)
+        (WF: Configuration.wf c)
+        (PF: PF.pf_configuration L c)
+    :
+      multi_racefree c.
+  Proof.
+    unfold multi_racefree. i.
+    ginduction CSTEPS; eauto.
+    { i. eapply racefree_multi_racefree_imm; eauto. }
+    { i. exploit PFConfiguration.step_trace_future; eauto.
+      i. des. eapply IHCSTEPS; eauto.
+      eapply PFConfiguration.step_trace_steps in STEP; eauto. des.
+      { eapply steps_racefree; eauto. }
+      { eapply PFConfiguration.reservation_only_step_step in STEP0; eauto.
+        eapply step_racefree; eauto. }
+    }
+  Qed.
 
-  (* Lemma multi_race_race c *)
-  (*       (RACE: multi_race c) *)
-  (*       (WF: Configuration.wf c) *)
-  (*       (PF: PF.pf_configuration L c) *)
-  (*   : *)
-  (*     racy_state c. *)
-  (* Proof. *)
-  (*   inv RACE. *)
-  (*   exploit PFConfiguration.step_trace_future; try apply STEPS; eauto. i. des. *)
-  (*   exploit final_event_trace_filter; eauto. *)
-  (*   { ii. inv WRITE; eauto. } i. des. *)
-  (*   dup STEPS. eapply PFConfiguration.step_trace_steps in STEPS; eauto. *)
-  (*   rewrite FILTER in *. des; cycle 1. *)
-  (*   { eapply List.app_eq_nil in NIL. des; ss. } *)
-  (*   eapply PFConfiguration.steps_split in STEPS1. des. inv STEPS3. inv STEPS. *)
-  (*   econs; cycle 1; eauto. *)
-  (*   eapply PFConfiguration.silent_steps_tau_machine_steps; eauto. *)
-  (*   assert (exists trs_hd trs_tl, *)
-  (*              (<<TRS: trs = trs_hd ++ [trs_tl]>>) /\ *)
-  (*              (<<SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) trs_hd>>)). *)
-  (*   { inv STEPS0. eauto. } clear STEPS0. des. subst. *)
-  (*   erewrite List.map_app in FILTER. erewrite list_filter_app in FILTER. *)
-  (*   assert (exists tl, *)
-  (*              tr_hd ++ tl = List.filter (fun e => ThreadEvent.is_normal_dec e) (List.map snd trs_hd)). *)
-  (*   { ss. des_ifs. *)
-  (*     - exists []. rewrite List.app_nil_r. *)
-  (*       eapply List.app_inj_tail in FILTER. des. auto. *)
-  (*     - exists [e0]. rewrite <- FILTER. rewrite List.app_nil_r. auto. *)
-  (*   } *)
-  (*   des. exploit Forall_app_inv; cycle 1. *)
-  (*   { i. des. eapply FORALL1. } *)
-  (*   { rewrite H. eapply List.Forall_forall. i. *)
-  (*     eapply List.filter_In in H0. des. *)
-  (*     eapply List.in_map_iff in H0. des. subst. *)
-  (*     eapply List.Forall_forall in SILENT; eauto. *)
-  (*   } *)
-  (* Qed. *)
+  Lemma multi_race_race c
+        (RACE: multi_race c)
+        (WF: Configuration.wf c)
+        (PF: PF.pf_configuration L c)
+    :
+      racy_state c.
+  Proof.
+    inv RACE.
+    exploit PFConfiguration.step_trace_future; try apply STEPS; eauto. i. des.
+    exploit final_event_trace_filter; eauto.
+    { ii. inv WRITE; eauto. } i. des.
+    dup STEPS. eapply PFConfiguration.step_trace_steps in STEPS; eauto.
+    rewrite FILTER in *. des; cycle 1.
+    { eapply List.app_eq_nil in NIL. des; ss. }
+    eapply PFConfiguration.steps_split in STEPS1. des. inv STEPS3. inv STEPS.
+    econs; cycle 1; eauto.
+    eapply PFConfiguration.silent_steps_tau_machine_steps; eauto.
+    assert (exists trs_hd trs_tl,
+               (<<TRS: trs = trs_hd ++ [trs_tl]>>) /\
+               (<<SILENT: List.Forall (fun the => ThreadEvent.get_machine_event (snd the) = MachineEvent.silent) trs_hd>>)).
+    { inv STEPS0. eauto. } clear STEPS0. des. subst.
+    erewrite List.map_app in FILTER. erewrite list_filter_app in FILTER.
+    assert (exists tl,
+               tr_hd ++ tl = List.filter (fun e => ThreadEvent.is_normal_dec e) (List.map snd trs_hd)).
+    { ss. des_ifs.
+      - exists []. rewrite List.app_nil_r.
+        eapply List.app_inj_tail in FILTER. des. auto.
+      - exists [e0]. rewrite <- FILTER. rewrite List.app_nil_r. auto.
+    }
+    des. exploit Forall_app_inv; cycle 1.
+    { i. des. eapply FORALL1. }
+    { rewrite H. eapply List.Forall_forall. i.
+      eapply List.filter_In in H0. des.
+      eapply List.in_map_iff in H0. des. subst.
+      eapply List.Forall_forall in SILENT; eauto.
+    }
+  Qed.
 
   Inductive racy_read (loc: Loc.t) (ts: Time.t):
     forall (lc: Local.t) (e: ThreadEvent.t), Prop :=
@@ -1220,7 +1243,17 @@ Section LOCALPFRACE.
                   else ((TView.cur (Local.tview lc)).(View.pln) loc)) ts)
     :
       racy_read loc ts lc (ThreadEvent.update loc ts to valr valw releasedr releasedw ordr ordw)
+  | racy_read_racy_read
+      lc
+      valr ordr
+      (VIEW:
+         Time.lt (if Ordering.le Ordering.relaxed ordr
+                  then ((TView.cur (Local.tview lc)).(View.rlx) loc)
+                  else ((TView.cur (Local.tview lc)).(View.pln) loc)) ts)
+    :
+      racy_read loc ts lc (ThreadEvent.racy_read loc ts valr ordr)
   .
+
 
   Definition multi_racefree_view (c0: Configuration.t): Prop :=
     forall c1 trs1 c2 trs2

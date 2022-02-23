@@ -1974,6 +1974,7 @@ Inductive relaxed_writing_event
       (ThreadEvent.write_na loc msgs from to val0 ord)
 | relaxed_writing_event_na_write_msgs
     msgs from msg msg0 ord from1 to1 val1
+    (ORD: Ordering.le ord Ordering.relaxed)
     (IN: List.In (from, to, msg0) msgs)
     (MSG: Message.le msg0 msg)
   :
@@ -2326,9 +2327,8 @@ Definition pf_consistent_super_strong_promises_list lang (e0:Thread.t lang)
         (<<IN: List.In ws pl>>) /\
         (<<WIN: List.In (loc, to) ws>>)>>) /\
   (<<CONSISTENT: forall
-      pl0 ws loc to pl1
+      pl0 ws pl1
       (PROMISES: pl = pl0 ++ ws :: pl1)
-      (WIN: List.In (loc, to) ws)
       mem1 tm sc max
       (FUTURE: Memory.future_weak (Thread.memory e0) mem1)
       (CLOSED: Memory.closed mem1)
@@ -2373,7 +2373,7 @@ Definition pf_consistent_super_strong_promises_list lang (e0:Thread.t lang)
           (<<SC: (Thread.sc e1) = sc>>) /\
 
           (<<FINAL: final_event_trace we (ftr0 ++ ftr_reserve)>>) /\
-          (<<WRITING: relaxed_writing_event loc to val we>>) /\
+          (<<WRITING: forall loc to (WIN: List.In (loc, to) ws), relaxed_writing_event loc to val we>>) /\
           (<<SOUND: forall loc0 from0 to0 msg0
                            (GET: Memory.get loc0 to0 (Local.promises (Thread.local e1)) = Some (from0, msg0))
                            (NRESERVE: msg0 <> Message.reserve),
@@ -2515,7 +2515,8 @@ Proof.
   eapply List.Forall2_app_inv_l in TRACE. des. subst.
   dup TRACE. eapply List.Forall2_app_inv_l in TRACE. des. subst.
   inv TRACE3. inv H3. destruct y, a. ss.
-  assert (TO: forall fto (MAP: f loc to fto), to = fto).
+  assert (TO: forall loc to (WIN: List.In (loc, to) ws),
+             forall fto (MAP: f loc to fto), to = fto).
   { i. destruct (Time.le_lt_dec fto (max loc)).
     { eapply MAPIDENT; eauto. }
     dup l. eapply BOUND in l; eauto. des.
@@ -2528,19 +2529,20 @@ Proof.
     { eapply MAX in Heq0. auto. }
   }
   assert (WRITING: exists val0,
-             (<<WRITING: relaxed_writing_event loc to val0 t0>>)).
-  {  unfold writing_locs_prom in MAP1. des_ifs.
+             forall loc to (WIN: List.In (loc, to) ws),
+               (<<WRITING: relaxed_writing_event loc to val0 t0>>)).
+  { i. unfold writing_locs_prom in MAP1. des_ifs.
     eapply List.filter_In in WIN. des.
     pose proof (tevent_map_weak_writing_locs H1) as WLOCS.
     rewrite Heq in WLOCS. destruct (writing_locs t0) eqn:EQ; ss.
     eapply list_Forall2_in in WLOCS; eauto. des. destruct a as [loc1 to1].
-    des. subst. eapply TO in SAT0. subst.
+    des. subst. eapply TO0 in SAT0. subst.
     eapply writing_locs_relaxed_writing; eauto.
   }
   des.
   hexploit SPLIT; eauto.
-  { clear - WRITING0 CANCELNORMAL. erewrite <- List.app_assoc in CANCELNORMAL.
-    eapply cancel_normal_normals_after_normal; eauto. inv WRITING0; ss. } i. des.
+  { clear - WRITING CANCELNORMAL. erewrite <- List.app_assoc in CANCELNORMAL.
+    eapply cancel_normal_normals_after_normal; eauto. admit. } i. des.
   eexists (l1'0 ++ [(t, t0)]), l2', ftr_reserve, ftr_cancel. esplits; eauto.
   { eapply Forall_app.
     { eapply Forall_app_inv in EVENTS. des.
