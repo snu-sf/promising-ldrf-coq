@@ -80,7 +80,7 @@ Section MIDDLE.
       set (MEM0 := (sim_memory_contents MEM) loc from). inv MEM0; ss. symmetry in H.
       right. replace (Memory.max_ts loc mem_tgt) with from; auto.
       apply Memory.max_ts_spec in H; eauto. des. apply TimeFacts.antisym; auto.
-      destruct (Memory.get loc (Memory.max_ts loc mem_tgt) mem_src) as [[ts msg_src]|] eqn:GETSRC; cycle 1.
+      destruct (Memory.get loc (Memory.max_ts loc mem_tgt) mem_src) as [[ts msg_src0]|] eqn:GETSRC; cycle 1.
       { exfalso. eapply sim_memory_src_none in GETSRC; eauto. des; clarify. }
       hexploit memory_get_disjoint_strong.
       { eapply GETSRC. }
@@ -114,15 +114,16 @@ Section MIDDLE.
     :
       sim_memory_content_strong F extra extra_all loc ts (Some (from_src, msg)) (Some (from_tgt, msg))
   | sim_memory_content_strong_forget
-      from_src from_tgt val released
+      from_src from_tgt msg
       (PROM: F)
       (NEXTRA: forall t, ~ extra t)
       (NLOC: L loc)
       (FROM: Time.le from_tgt from_src)
       (LB: lb_time (times loc) from_tgt from_src)
       (EXTRA: from_tgt = from_src \/ extra_all from_src from_tgt)
+      (NRESERVE: msg <> Message.reserve)
     :
-      sim_memory_content_strong F extra extra_all loc ts (Some (from_src, Message.reserve)) (Some (from_tgt, Message.concrete val released))
+      sim_memory_content_strong F extra extra_all loc ts (Some (from_src, Message.reserve)) (Some (from_tgt, msg))
   | sim_memory_content_strong_extra
       from
       (NPROM: ~ F)
@@ -831,7 +832,7 @@ Section MIDDLE.
       transitivity from_tgt; auto. symmetry. auto. }
     { symmetry in H. rename H into RHS.
       exploit MLETGT; eauto. intros GETTGT. rewrite GETTGT in *.
-      inv MEM1. f_equal. f_equal. des; subst; auto.
+      inv MEM1; ss. f_equal. f_equal. des; subst; auto.
       { exploit (sim_memory_wf MEM); eauto. i. des.
         exfalso. set (MEM2:=(sim_memory_strong_contents MEMSTRONG) loc from).
         inv MEM2; try by (eapply NEXTRA1; eauto).
@@ -899,7 +900,7 @@ Section MIDDLE.
     ii.
     set (CNT0:=(sim_memory_contents MEM0) loc to).
     set (CNT1:=(sim_memory_contents MEM1) loc to).
-    rewrite GET0 in CNT0. inv CNT0.
+    rewrite GET0 in CNT0. inv CNT0; ss.
     rewrite <- H in *. inv CNT1; clarify. eauto.
   Qed.
 
@@ -910,7 +911,7 @@ Section MIDDLE.
       concrete_messages_le mem_src mem_tgt.
   Proof.
     ii. set (CNT:=(sim_memory_contents MEM) loc to).
-    rewrite GET0 in *. inv CNT. eauto.
+    rewrite GET0 in *. inv CNT; ss. eauto.
   Qed.
 
   Lemma sim_memory_strong_sim_local others self extra_others extra_self
@@ -927,9 +928,8 @@ Section MIDDLE.
   Proof.
     econs; ss.
     { eapply LOCALSRC. }
-    { eapply concrete_promised_le_closed_tview.
-      { eapply concrete_messages_le_concrete_promised_le.
-        eapply sim_memory_same_concrete_messages_le.
+    { eapply concrete_messages_le_closed_tview.
+      { eapply sim_memory_same_concrete_messages_le.
         { eapply MEM. }
         { eapply sim_memory_strong_sim_memory; eauto. }
       }
@@ -952,25 +952,26 @@ Section MIDDLE.
       Memory.closed mem_src'.
   Proof.
     econs.
-    { i. destruct msg as [val released|].
+    { i. destruct (classic (msg = Message.reserve)).
+      { subst. esplits; eauto. }
       { exploit sim_memory_same_concrete_messages_le.
         { eapply MEM1. }
         { eapply MEM0. }
         { eauto. }
+        { eauto. }
         i. des. eapply CLOSED in GET1.
         des. esplits; eauto.
-        eapply concrete_promised_le_closed_message; eauto.
-        eapply concrete_messages_le_concrete_promised_le.
+        eapply concrete_messages_le_closed_message; eauto.
         eapply sim_memory_same_concrete_messages_le.
         { eapply MEM0. }
         { eapply MEM1. }
       }
-      { esplits; eauto. econs. }
     }
     { ii. exploit sim_memory_same_concrete_messages_le.
       { eapply MEM0. }
       { eapply MEM1. }
       { eapply CLOSED. }
+      { ss. }
       i. des. replace from1 with Time.bot in GET1; eauto.
       apply TimeFacts.antisym.
       { eapply Time.bot_spec. }
