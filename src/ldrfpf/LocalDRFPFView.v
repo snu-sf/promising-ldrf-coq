@@ -70,6 +70,9 @@ Section NOTRELEASED.
   | not_released_message_reserve
     :
       not_released_message Message.reserve
+  | not_released_message_undef
+    :
+      not_released_message Message.undef
   .
   Hint Constructors not_released_message.
 
@@ -165,7 +168,7 @@ Section NOTRELEASED.
                         (GET: Memory.get loc0 ts0 mem = Some (from, msg))
                         (LOCTS: (loc0, ts0) <> (loc, ts)),
           (<<RELEASED: not_released_message msg>>) \/ (<<GET: Memory.get loc0 ts0 prom = Some (from, msg)>>))
-      (EXIST: exists from val released, Memory.get loc ts mem = Some (from, Message.concrete val released))
+      (EXIST: exists from msg, (<<GET: Memory.get loc ts mem = Some (from, msg)>>) /\ (<<NRESERVE: msg <> Message.reserve>>))
       (NONE: Memory.get loc ts prom = None)
   .
 
@@ -193,6 +196,15 @@ Section NOTRELEASED.
       des. clarify.
   Qed.
 
+  Lemma not_released_write_neq prom0 mem0 loc0 from to msg prom1 mem1 kind
+        (WRITE: Memory.write prom0 mem0 loc0 from to msg prom1 mem1 kind)
+        (RELEASED: not_released_memory prom0 mem0)
+    :
+      (loc0, to) <> (loc, ts).
+  Proof.
+    inv WRITE. eapply not_released_promise_neq; eauto.
+  Qed.
+
   Lemma not_released_promise prom0 mem0 loc0 from to msg prom1 mem1 kind
         (PROMISE: Memory.promise prom0 mem0 loc0 from to msg prom1 mem1 kind)
         (RELEASED: not_released_memory prom0 mem0)
@@ -204,12 +216,12 @@ Section NOTRELEASED.
     - econs.
       + ii. erewrite Memory.add_o in GET; eauto.
         erewrite (@Memory.add_o prom1 prom0); eauto. des_ifs; auto.
-      + des. eapply Memory.add_get1 in EXIST; eauto.
+      + des. eapply Memory.add_get1 in GET; eauto.
       + erewrite Memory.add_o; eauto. des_ifs. ss. des; clarify.
     - econs.
       + ii. erewrite Memory.split_o in GET; eauto.
         erewrite (@Memory.split_o prom1 prom0); eauto. des_ifs; auto.
-      + des. eapply Memory.split_get1 in EXIST; eauto. des. eauto.
+      + des. eapply Memory.split_get1 in GET; eauto. des. eauto.
       + erewrite Memory.split_o; eauto. des_ifs.
         * ss. des; clarify.
         * ss. des; clarify.
@@ -217,13 +229,13 @@ Section NOTRELEASED.
     - econs.
       + ii. erewrite Memory.lower_o in GET; eauto.
         erewrite (@Memory.lower_o prom1 prom0); eauto. des_ifs; auto.
-      + des. eapply Memory.lower_get1 in EXIST; eauto. des.
-        clarify. inv MSG_LE. eauto.
+      + des. eapply Memory.lower_get1 in GET; eauto. des.
+        clarify. esplits; eauto. inv MSG_LE; ss.
       + erewrite Memory.lower_o; eauto. des_ifs. ss. des; clarify.
     - econs.
       + ii. erewrite Memory.remove_o in GET; eauto.
         erewrite (@Memory.remove_o prom1 prom0); eauto. des_ifs; auto.
-      + des. eapply Memory.remove_get1 in EXIST; eauto. des; eauto. clarify.
+      + des. eapply Memory.remove_get1 in GET; eauto. des; eauto. clarify.
       + erewrite Memory.remove_o; eauto. des_ifs.
   Qed.
 
@@ -242,6 +254,44 @@ Section NOTRELEASED.
       { ii. clarify. }
     - eapply RELEASED.
     - inv RELEASED. erewrite Memory.remove_o; eauto. des_ifs.
+  Qed.
+
+  Lemma not_released_write prom0 mem0 loc0 from to msg prom1 mem1 kind
+        (WRITE: Memory.write prom0 mem0 loc0 from to msg prom1 mem1 kind)
+        (RELEASED: not_released_memory prom0 mem0)
+        (RELEASEDM: not_released_message msg)
+    :
+      not_released_memory prom1 mem1.
+  Proof.
+    inv WRITE. hexploit not_released_promise; eauto. i.
+    eapply not_released_fulfill; eauto.
+    eapply Memory.write_get2; eauto.
+  Qed.
+
+  Lemma not_released_write_na prom0 mem0 loc0 ts0 from to val prom1 mem1 kind msgs kinds
+        (WRITE: Memory.write_na ts0 prom0 mem0 loc0 from to val prom1 mem1 msgs kinds kind)
+        (RELEASED: not_released_memory prom0 mem0)
+    :
+      not_released_memory prom1 mem1.
+  Proof.
+    revert RELEASED. induction WRITE; i.
+    { eapply not_released_write; eauto. }
+    { eapply IHWRITE. eapply not_released_write; eauto.
+      unguard. des; clarify. econs; eauto.
+    }
+  Qed.
+
+  Lemma not_released_write_na_neq ts0 prom0 mem0 loc0 from to val prom1 mem1 msgs kinds kind
+        (WRITE: Memory.write_na ts0 prom0 mem0 loc0 from to val prom1 mem1 msgs kinds kind)
+        (RELEASED: not_released_memory prom0 mem0)
+    :
+      (loc0, to) <> (loc, ts).
+  Proof.
+    revert RELEASED. induction WRITE; i.
+    { eapply not_released_write_neq; eauto. }
+    { eapply IHWRITE. eapply not_released_write; eauto.
+      unguard. des; clarify. econs; eauto.
+    }
   Qed.
 
   Lemma not_released_read lc0 mem0 loc0 ts0 val released ord lc1
@@ -282,11 +332,13 @@ Section NOTRELEASED.
       }
       { econs; eauto. }
     }
-    { exfalso. eapply CONSISTENT in GET0. ss.
+    { exfalso. exploit CONSISTENT; eauto; ss. i.
       eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; eauto.
       etrans; [|try apply TimeMap.join_l].
       etrans; [|try apply TimeMap.join_r]. clear GET0.
       unfold View.singleton_ur_if. des_ifs; ss.
+      { unfold TimeMap.singleton. setoid_rewrite LocFun.add_spec_eq. refl. }
+      { unfold TimeMap.singleton. setoid_rewrite LocFun.add_spec_eq. refl. }
       { unfold TimeMap.singleton. setoid_rewrite LocFun.add_spec_eq. refl. }
       { unfold TimeMap.singleton. setoid_rewrite LocFun.add_spec_eq. refl. }
     }
@@ -309,7 +361,47 @@ Section NOTRELEASED.
       eapply (not_released_pln (not_released_cur TVIEW)); auto. }
   Qed.
 
-  Lemma not_released_write lc0 sc0 mem0 loc0 from to val releasedr releasedm ord lc1 sc1 mem1 kind
+  Lemma not_released_write_tview tvw0 sc0 loc0 to ord
+        (TVIEW: not_released_tview tvw0)
+        (NEQ: (loc0, to) <> (loc, ts))
+    :
+      not_released_tview (TView.write_tview tvw0 sc0 loc0 to ord).
+  Proof.
+    econs; ss.
+    { i. setoid_rewrite LocFun.add_spec. des_ifs.
+      { eapply not_released_view_join; eauto.
+        { eapply TVIEW. }
+        { eapply not_released_view_singleton_ur; eauto. }
+      }
+      { eapply not_released_view_join; eauto.
+        { eapply TVIEW. }
+        { eapply not_released_view_singleton_ur; eauto. }
+      }
+      { eapply TVIEW. }
+    }
+    { eapply not_released_view_join; eauto.
+      { eapply TVIEW. }
+      { eapply not_released_view_singleton_ur; eauto. }
+    }
+    { eapply not_released_view_join; eauto.
+      { eapply TVIEW. }
+      { eapply not_released_view_singleton_ur; eauto. }
+    }
+  Qed.
+
+  Lemma not_released_write_releaed tvw0 sc0 loc0 to releasedr ord
+        (TVIEW: not_released_tview tvw0)
+        (RELEASEDR: not_released_opt_view releasedr)
+        (NEQ: (loc0, to) <> (loc, ts))
+    :
+      not_released_opt_view (TView.write_released tvw0 sc0 loc0 to releasedr ord).
+  Proof.
+    unfold TView.write_released. des_ifs. econs. eapply not_released_view_join.
+    { eapply not_released_unwrap; eauto. }
+    { eapply not_released_write_tview; eauto. }
+  Qed.
+
+  Lemma not_released_write_step lc0 sc0 mem0 loc0 from to val releasedr releasedm ord lc1 sc1 mem1 kind
         (WRITE: Local.write_step lc0 sc0 mem0 loc0 from to val releasedr releasedm ord lc1 sc1 mem1 kind)
         (TVIEW: not_released_tview (Local.tview lc0))
         (MEM: not_released_memory (Local.promises lc0) mem0)
@@ -320,41 +412,29 @@ Section NOTRELEASED.
       (<<MEM: not_released_memory (Local.promises lc1) mem1>>) /\
       (<<SC: not_released_timemap sc1>>).
   Proof.
-    inv WRITE. inv WRITE0.
-    hexploit not_released_promise_neq; eauto. intros NEQ.
-    hexploit not_released_promise; eauto. intros MEM0.
-    assert (WRITETIVEW: not_released_tview (TView.write_tview (Local.tview lc0) sc0 loc0 to ord)).
-    { econs; ss.
-      { i. setoid_rewrite LocFun.add_spec. des_ifs.
-        { eapply not_released_view_join; eauto.
-          { eapply TVIEW. }
-          { eapply not_released_view_singleton_ur; eauto. }
-        }
-        { eapply not_released_view_join; eauto.
-          { eapply TVIEW. }
-          { eapply not_released_view_singleton_ur; eauto. }
-        }
-        { eapply TVIEW. }
-      }
-      { eapply not_released_view_join; eauto.
-        { eapply TVIEW. }
-        { eapply not_released_view_singleton_ur; eauto. }
-      }
-      { eapply not_released_view_join; eauto.
-        { eapply TVIEW. }
-        { eapply not_released_view_singleton_ur; eauto. }
-      }
-    }
-    splits; ss. eapply not_released_fulfill; eauto.
-    { econs. unfold TView.write_released. des_ifs. econs.
-      eapply not_released_view_join; eauto.
-      { eapply not_released_unwrap; eauto. }
-      { eapply WRITETIVEW. }
-    }
-    { eapply Memory.promise_get2 in PROMISE.
-      { des; eauto. }
-      { destruct kind; ss. inv PROMISE. ss. }
-    }
+    inv WRITE. ss.
+    hexploit not_released_write_neq; eauto. i.
+    hexploit not_released_write; eauto.
+    { econs. eapply not_released_write_releaed; eauto. }
+    i. esplits; eauto.
+    eapply not_released_write_tview; eauto.
+  Qed.
+
+  Lemma not_released_write_na_step lc0 sc0 mem0 loc0 from to val ord lc1 sc1 mem1 msgs kinds kind
+        (WRITE: Local.write_na_step lc0 sc0 mem0 loc0 from to val ord lc1 sc1 mem1 msgs kinds kind)
+        (TVIEW: not_released_tview (Local.tview lc0))
+        (MEM: not_released_memory (Local.promises lc0) mem0)
+        (SC: not_released_timemap sc0)
+    :
+      (<<TVIEW: not_released_tview (Local.tview lc1)>>) /\
+      (<<MEM: not_released_memory (Local.promises lc1) mem1>>) /\
+      (<<SC: not_released_timemap sc1>>).
+  Proof.
+    inv WRITE. ss.
+    hexploit not_released_write_na_neq; eauto. i.
+    hexploit not_released_write_na; eauto.
+    i. esplits; eauto.
+    eapply not_released_write_tview; eauto.
   Qed.
 
   Lemma not_released_read_fence_tview tvw ord
@@ -445,7 +525,7 @@ Section NOTRELEASED.
           { ii. inv H. ss. unguard. des; clarify. }
         }
       }
-      { exploit not_released_write; eauto. i. des.
+      { exploit not_released_write_step; eauto. i. des.
         left. splits; [|intros H; inv H]. econs; eauto. }
       { eapply write_step_promise_consistent in CONSISTENT; eauto.
         destruct (loc_ts_eq_dec (loc0, tsr) (loc, ts)).
@@ -455,7 +535,7 @@ Section NOTRELEASED.
         { exploit not_released_read; eauto.
           { ii. ss. des; clarify. }
           guardH o. i. des. left.
-          exploit not_released_write; eauto. i. des. splits.
+          exploit not_released_write_step; eauto. i. des. splits.
           { econs; eauto. }
           { ii. inv H. ss. unguard. des; clarify. }
         }
@@ -465,6 +545,22 @@ Section NOTRELEASED.
       { exploit not_released_fence; eauto.
         i. des. left. splits; [|intros H; inv H]. econs; eauto. }
       { inv LOCAL0. left. splits; [|intros H; inv H]. econs; eauto. }
+      { exploit not_released_write_na_step; eauto. i. des.
+        left. splits; [|intros H; inv H]. econs; eauto. }
+      { inv LOCAL0.
+        destruct (loc_ts_eq_dec (loc0, to) (loc, ts)).
+        { ss. des; clarify. right. inv RACE. econs; eauto. }
+        { left. splits.
+          { econs; eauto. }
+          { ii. inv H; des; ss. }
+        }
+      }
+      { inv LOCAL0. left. splits; [|intros H; inv H]. econs; eauto. }
+      { inv LOCAL0.
+        { left. splits; [|intros H; inv H]. econs; eauto. }
+        { left. splits; [|intros H; inv H]. econs; eauto. }
+        { left. splits; [|intros H; inv H]. econs; eauto. }
+      }
     }
   Qed.
 
@@ -525,9 +621,10 @@ Section NOTRELEASED.
     exploit Thread.opt_step_future; eauto. i. des. ss.
     exploit Thread.rtc_reserve_step_future; eauto. i. des. ss.
     assert (CONSISTENT4: Local.promise_consistent lc4).
-    { destruct (classic (e = ThreadEvent.failure)).
+    { destruct (classic (ThreadEvent.get_machine_event e = MachineEvent.failure)).
       { subst. eapply rtc_reserve_step_promise_consistent2 in RESERVES; eauto.
-        inv STEP0. inv STEP; inv STEP0; inv LOCAL. inv LOCAL0. ss. }
+        inv STEP0; ss. inv STEP; inv STEP0; ss. inv LOCAL; ss; inv LOCAL0; auto.
+      }
       { specialize (CONSISTENT H).
         eapply PF.pf_consistent_consistent in CONSISTENT.
         eapply consistent_promise_consistent in CONSISTENT; eauto. }
@@ -619,9 +716,10 @@ Section NOTRELEASED.
     inv MSG; econs. eapply promise_not_released_opt_view; eauto.
   Qed.
 
-  Lemma promise_not_released_memory prom0 mem0 from val released prom1 mem1
-        (PROMISE: Memory.promise prom0 mem0 loc from ts (Message.concrete val released) prom1 mem1 Memory.op_kind_add)
+  Lemma promise_not_released_memory prom0 mem0 from msg prom1 mem1
+        (PROMISE: Memory.promise prom0 mem0 loc from ts msg prom1 mem1 Memory.op_kind_add)
         (MEM: Memory.closed mem0)
+        (NRESERVE: msg <> Message.reserve)
         prom
         (MLE: Memory.le prom mem0)
     :
@@ -632,18 +730,247 @@ Section NOTRELEASED.
       { ss. des; clarify. }
       { left. eapply promise_not_released_message; eauto. eapply MEM; eauto. }
     }
-    { eapply Memory.add_get0 in MEM0. des. eauto. }
-    { destruct (Memory.get loc ts prom) as [[from0 msg]|] eqn:GET; auto.
+    { eapply Memory.add_get0 in MEM0. des. esplits; eauto. }
+    { destruct (Memory.get loc ts prom) as [[from0 msg0]|] eqn:GET; auto.
       eapply MLE in GET. eapply Memory.add_get0 in MEM0. des. clarify. }
   Qed.
 
+  Lemma write_not_released_timemap prom0 mem0 from msg prom1 mem1
+        (WRITE: Memory.write prom0 mem0 loc from ts msg prom1 mem1 Memory.op_kind_add)
+        tm
+        (TM: Memory.closed_timemap tm mem0)
+    :
+      not_released_timemap tm.
+  Proof.
+    inv WRITE. eapply promise_not_released_timemap; eauto.
+  Qed.
+
+  Lemma write_not_released_view prom0 mem0 from msg prom1 mem1
+        (WRITE: Memory.write prom0 mem0 loc from ts msg prom1 mem1 Memory.op_kind_add)
+        vw
+        (VW: Memory.closed_view vw mem0)
+    :
+      not_released_view vw.
+  Proof.
+    inv WRITE. eapply promise_not_released_view; eauto.
+  Qed.
+
+  Lemma write_not_released_tview prom0 mem0 from msg prom1 mem1
+        (WRITE: Memory.write prom0 mem0 loc from ts msg prom1 mem1 Memory.op_kind_add)
+        vw
+        (VW: TView.closed vw mem0)
+    :
+      not_released_tview vw.
+  Proof.
+    inv WRITE. eapply promise_not_released_tview; eauto.
+  Qed.
+
+  Lemma write_not_released_opt_view prom0 mem0 from msg prom1 mem1
+        (WRITE: Memory.write prom0 mem0 loc from ts msg prom1 mem1 Memory.op_kind_add)
+        vw
+        (VW: Memory.closed_opt_view vw mem0)
+    :
+      not_released_opt_view vw.
+  Proof.
+    inv WRITE. eapply promise_not_released_opt_view; eauto.
+  Qed.
+
+  Lemma write_not_released_message prom0 mem0 from msg prom1 mem1
+        (WRITE: Memory.write prom0 mem0 loc from ts msg prom1 mem1 Memory.op_kind_add)
+        msg0
+        (MSG: Memory.closed_message msg0 mem0)
+    :
+      not_released_message msg0.
+  Proof.
+    inv WRITE. eapply promise_not_released_message; eauto.
+  Qed.
+
+  Lemma write_not_released_memory prom0 mem0 from msg prom1 mem1
+        (WRITE: Memory.write prom0 mem0 loc from ts msg prom1 mem1 Memory.op_kind_add)
+        (MEM: Memory.closed mem0)
+        (NRESERVE: msg <> Message.reserve)
+        prom
+        (MLE: Memory.le prom mem0)
+    :
+      not_released_memory prom mem1.
+  Proof.
+    inv WRITE. eapply promise_not_released_memory; eauto.
+  Qed.
+
+  Lemma write_na_not_released_timemap prom0 mem0 ts0 from to msg prom1 mem1 msgs kinds
+        (WRITE: Memory.write_na ts0 prom0 mem0 loc from to msg prom1 mem1 msgs kinds Memory.op_kind_add)
+        (TS: to = ts \/ exists from0 msg0, (<<IN: List.In (from0, ts, msg0) msgs>>))
+        (KINDS: List.Forall (fun k => k = Memory.op_kind_add) kinds)
+        tm
+        (TM: Memory.closed_timemap tm mem0)
+    :
+      not_released_timemap tm.
+  Proof.
+    revert tm TM. remember Memory.op_kind_add. revert Heqo.
+    remember loc. revert Heqt KINDS. guardH TS. revert TS.
+    induction WRITE; i; subst.
+    { inv WRITE. inv PROMISE. ii.
+      specialize (TM loc). des. eapply Memory.add_get0 in MEM.
+      des. rewrite H in *. unguard. des; clarify.
+    }
+    { inv KINDS; subst.
+      cut (to' = ts \/ __guard__(to = ts \/ exists from0 msg0, (<<IN: List.In (from0, ts, msg0) msgs>>))).
+      2:{ unguard. ss. des; clarify; eauto. }
+      i. des.
+      { subst. eapply write_not_released_timemap; eauto. }
+      { eapply IHWRITE; eauto.
+        eapply Memory.future_closed_timemap; eauto.
+        econs; [|refl]. econs.
+        { eapply Memory.write_op; eauto. }
+        { red in MSG_EX. des; clarify. econs; eauto. }
+        { red in MSG_EX. des; clarify. econs; eauto. eapply Time.bot_spec. }
+      }
+    }
+  Qed.
+
+  Lemma write_na_not_released_view ts0 prom0 mem0 from to msg prom1 mem1 msgs kinds
+        (WRITE: Memory.write_na ts0 prom0 mem0 loc from to msg prom1 mem1 msgs kinds Memory.op_kind_add)
+        (TS: to = ts \/ exists from0 msg0, (<<IN: List.In (from0, ts, msg0) msgs>>))
+        (KINDS: List.Forall (fun k => k = Memory.op_kind_add) kinds)
+        vw
+        (VW: Memory.closed_view vw mem0)
+    :
+      not_released_view vw.
+  Proof.
+    inv VW. econs; eapply write_na_not_released_timemap; eauto.
+  Qed.
+
+  Lemma write_na_not_released_tview ts0 prom0 mem0 from to msg prom1 mem1 msgs kinds
+        (WRITE: Memory.write_na ts0 prom0 mem0 loc from to msg prom1 mem1 msgs kinds Memory.op_kind_add)
+        (TS: to = ts \/ exists from0 msg0, (<<IN: List.In (from0, ts, msg0) msgs>>))
+        (KINDS: List.Forall (fun k => k = Memory.op_kind_add) kinds)
+        vw
+        (VW: TView.closed vw mem0)
+    :
+      not_released_tview vw.
+  Proof.
+    inv VW. econs; i; eapply write_na_not_released_view; eauto.
+  Qed.
+
+  Lemma write_na_not_released_opt_view ts0 prom0 mem0 from to msg prom1 mem1 msgs kinds
+        (WRITE: Memory.write_na ts0 prom0 mem0 loc from to msg prom1 mem1 msgs kinds Memory.op_kind_add)
+        (TS: to = ts \/ exists from0 msg0, (<<IN: List.In (from0, ts, msg0) msgs>>))
+        (KINDS: List.Forall (fun k => k = Memory.op_kind_add) kinds)
+        vw
+        (VW: Memory.closed_opt_view vw mem0)
+    :
+      not_released_opt_view vw.
+  Proof.
+    inv VW; econs. eapply write_na_not_released_view; eauto.
+  Qed.
+
+  Lemma write_na_not_released_message ts0 prom0 mem0 from to msg prom1 mem1 msgs kinds
+        (WRITE: Memory.write_na ts0 prom0 mem0 loc from to msg prom1 mem1 msgs kinds Memory.op_kind_add)
+        (TS: to = ts \/ exists from0 msg0, (<<IN: List.In (from0, ts, msg0) msgs>>))
+        (KINDS: List.Forall (fun k => k = Memory.op_kind_add) kinds)
+        msg0
+        (MSG: Memory.closed_message msg0 mem0)
+    :
+      not_released_message msg0.
+  Proof.
+    inv MSG; econs. eapply write_na_not_released_opt_view; eauto.
+  Qed.
+
+  Lemma promise_other_not_released_memory prom0 mem0 loc0 from to msg prom1 mem1
+        (PROMISE: Memory.promise prom0 mem0 loc0 from to msg prom1 mem1 Memory.op_kind_add)
+        (RELEASEDM: not_released_message msg)
+        prom
+        (MLE: Memory.le prom mem0)
+        (RELEASED: not_released_memory prom mem0)
+    :
+      not_released_memory prom mem1.
+  Proof.
+    inv PROMISE. inv RELEASED. econs; eauto.
+    { i. erewrite Memory.add_o in GET; eauto. des_ifs.
+      { eauto. }
+      { eapply MESSAGES; eauto. }
+    }
+    { des. esplits; eauto. eapply Memory.add_get1; eauto. }
+  Qed.
+
+  Lemma write_other_not_released_memory prom0 mem0 loc0 from to msg prom1 mem1
+        (WRITE: Memory.write prom0 mem0 loc0 from to msg prom1 mem1 Memory.op_kind_add)
+        (RELEASEDM: not_released_message msg)
+        prom
+        (MLE: Memory.le prom mem0)
+        (RELEASED: not_released_memory prom mem0)
+    :
+      not_released_memory prom mem1.
+  Proof.
+    inv WRITE. eapply promise_other_not_released_memory; eauto.
+  Qed.
+
+  Lemma write_na_other_not_released_memory prom0 mem0 loc0 ts0 from to msg prom1 mem1 msgs kinds
+        (WRITE: Memory.write_na ts0 prom0 mem0 loc0 from to msg prom1 mem1 msgs kinds Memory.op_kind_add)
+        (KINDS: List.Forall (fun k => k = Memory.op_kind_add) kinds)
+        prom
+        (MLE: Memory.le prom mem0)
+        (RELEASED: not_released_memory prom mem0)
+    :
+      not_released_memory prom mem1.
+  Proof.
+    revert KINDS RELEASED. remember Memory.op_kind_add.
+    revert Heqo. induction WRITE; eauto; i; subst.
+    { eapply write_other_not_released_memory; eauto. }
+    inv KINDS. eapply IHWRITE; eauto.
+    { inv WRITE_EX. inv PROMISE. ii.
+      eapply MLE in LHS. eapply Memory.add_get1; eauto.
+    }
+    { eapply write_other_not_released_memory; eauto.
+      unguard. des; clarify. econs; eauto.
+    }
+  Qed.
+
+  Lemma write_na_not_released_memory ts0 prom0 mem0 from to msg prom1 mem1 msgs kinds
+        (WRITE: Memory.write_na ts0 prom0 mem0 loc from to msg prom1 mem1 msgs kinds Memory.op_kind_add)
+        (TS: to = ts \/ exists from0 msg0, (<<IN: List.In (from0, ts, msg0) msgs>>))
+        (KINDS: List.Forall (fun k => k = Memory.op_kind_add) kinds)
+        (MEM: Memory.closed mem0)
+        prom
+        (MLE: Memory.le prom mem0)
+    :
+      not_released_memory prom mem1.
+  Proof.
+    remember Memory.op_kind_add. revert Heqo.
+    remember loc. revert Heqt KINDS prom MLE. guardH TS. revert TS.
+    induction WRITE; i.
+    { unguard. des; ss; clarify.
+      eapply write_not_released_memory; eauto; ss.
+    }
+    { inv KINDS; subst.
+      cut (to' = ts \/ __guard__(to = ts \/ exists from0 msg0, (<<IN: List.In (from0, ts, msg0) msgs>>))).
+      2:{ unguard. ss. des; clarify; eauto. }
+      intros TS0. des.
+      { subst. hexploit write_not_released_memory; eauto.
+        { red in MSG_EX. des; clarify. }
+        i. eapply write_na_other_not_released_memory; eauto.
+        inv WRITE_EX. inv PROMISE. ii.
+        eapply MLE in LHS. eapply Memory.add_get1; eauto.
+      }
+      { eapply IHWRITE; eauto.
+        { eapply Memory.write_closed; eauto.
+          { red in MSG_EX. des; clarify. econs. econs. }
+          { red in MSG_EX. des; clarify. econs. eapply Time.bot_spec. }
+        }
+        { inv WRITE_EX. inv PROMISE. ii.
+          eapply MLE in LHS. eapply Memory.add_get1; eauto.
+        }
+      }
+    }
+  Qed.
 End NOTRELEASED.
 
 
-Lemma promise_not_released_add L loc ts prom0 mem0 from val released prom1 mem1 kind
-      (PROMISE: Memory.promise prom0 mem0 loc from ts (Message.concrete val released) prom1 mem1 kind)
+Lemma promise_not_released_add L loc ts prom0 mem0 from msg prom1 mem1 kind
+      (PROMISE: Memory.promise prom0 mem0 loc from ts msg prom1 mem1 kind)
       (PF: PF.pf_promises L prom0)
       (LOC: L loc)
+      (NRESERVE: msg <> Message.reserve)
   :
     (<<KIND: kind = Memory.op_kind_add>>) /\ (<<NONBOT: ts <> Time.bot>>).
 Proof.
@@ -655,8 +982,36 @@ Proof.
   { eapply Memory.split_get0 in PROMISES. des. subst.
     eapply PF in GET0; eauto. ss. }
   { eapply Memory.lower_get0 in PROMISES. des. subst.
-    eapply PF in GET; eauto. ss. }
+    eapply PF in GET; eauto. clarify. inv MSG_LE; ss. }
   { ss. }
+Qed.
+
+Lemma write_not_released_add L loc ts prom0 mem0 from msg prom1 mem1 kind
+      (WRITE: Memory.write prom0 mem0 loc from ts msg prom1 mem1 kind)
+      (PF: PF.pf_promises L prom0)
+      (LOC: L loc)
+      (NRESERVE: msg <> Message.reserve)
+  :
+    (<<KIND: kind = Memory.op_kind_add>>) /\ (<<NONBOT: ts <> Time.bot>>).
+Proof.
+  inv WRITE. eapply promise_not_released_add; eauto.
+Qed.
+
+Lemma write_na_not_released_add L loc ts ts0 prom0 mem0 from msg prom1 mem1 kind msgs kinds
+      (WRITE: Memory.write_na ts0 prom0 mem0 loc from ts msg prom1 mem1 msgs kinds kind)
+      (PF: PF.pf_promises L prom0)
+      (LOC: L loc)
+  :
+    (<<KIND: kind = Memory.op_kind_add>>) /\ (<<KINDS: List.Forall (fun k => k = Memory.op_kind_add) kinds>>) /\ (<<NONBOT: ts <> Time.bot>>) /\ (<<NONBOTS: List.Forall (fun '(from, to, msg) => to <> Time.bot) msgs>>).
+Proof.
+  revert PF. induction WRITE; i.
+  { hexploit write_not_released_add; eauto; ss. i. des. splits; auto. }
+  { hexploit write_not_released_add; eauto; ss.
+    { unguard. des; clarify. }
+    i. des. hexploit IHWRITE; eauto.
+    { eapply PF.pf_promises_write; eauto. }
+    i. des. splits; eauto.
+  }
 Qed.
 
 Lemma thread_step_write_not_released L loc ts lang (th0 th1: Thread.t lang) pf e
@@ -679,16 +1034,26 @@ Proof.
   { inv WRITE. }
   inv WRITE; inv LOCAL0.
   { inv LOCAL1. inv WRITE.
-    exploit promise_not_released_add; eauto. i. des; subst. splits; auto.
+    exploit promise_not_released_add; eauto; ss. i. des; subst. splits; auto.
     { eapply promise_not_released_tview; eauto. eapply LOCALOTHER. }
-    { eapply promise_not_released_memory; eauto. eapply LOCALOTHER. }
+    { eapply promise_not_released_memory; eauto; ss. eapply LOCALOTHER. }
     { eapply promise_not_released_timemap; eauto. }
   }
   { inv LOCAL1. inv LOCAL2. inv WRITE. ss.
-    exploit promise_not_released_add; eauto. i. des; subst. splits; auto.
+    exploit promise_not_released_add; eauto; ss. i. des. des; subst. splits; auto.
     { eapply promise_not_released_tview; eauto. eapply LOCALOTHER. }
-    { eapply promise_not_released_memory; eauto. eapply LOCALOTHER. }
+    { eapply promise_not_released_memory; eauto; ss. eapply LOCALOTHER. }
     { eapply promise_not_released_timemap; eauto. }
+  }
+  { inv LOCAL1. guardH IN.
+    exploit write_na_not_released_add; eauto; ss. i. des; subst.
+    assert (TSNBOT: ts <> Time.bot).
+    { red in IN. des; subst; ss.
+      eapply List.Forall_forall in NONBOTS; eauto. ss. }
+    splits; auto.
+    { eapply write_na_not_released_tview; eauto; ss. eapply LOCALOTHER. }
+    { eapply write_na_not_released_memory; eauto. eapply LOCALOTHER. }
+    { eapply write_na_not_released_timemap; eauto. }
   }
 Qed.
 
@@ -706,11 +1071,11 @@ Proof.
   ginduction STEPS; eauto.
   i. inv H. inv STEP; inv STEP0; inv LOCAL. ss. inv PROMISE.
   eapply IHSTEPS; eauto. inv MEM. des. econs; eauto.
-  { i. erewrite Memory.add_o in GET; eauto. des_ifs.
+  { i. erewrite Memory.add_o in GET0; eauto. des_ifs.
     { ss. des; clarify. left. econs. }
     { eapply MESSAGES; eauto. }
   }
-  { eapply Memory.add_get1 in EXIST; eauto. }
+  { eapply Memory.add_get1 in GET; eauto. }
 Qed.
 
 Lemma configuration_write_not_released L c0 c1 e loc ts tid0 tid1
@@ -732,10 +1097,14 @@ Proof.
   { inv WRITE.
     { inv STEP; inv STEP0; inv LOCAL. ss.
       inv LOCAL0. inv WRITE.
-      eapply promise_not_released_add in PROMISE; eauto. des; auto. }
+      eapply promise_not_released_add in PROMISE; eauto; ss. des; auto. }
     { inv STEP; inv STEP0; inv LOCAL. ss.
       inv LOCAL1. inv LOCAL2. inv WRITE.
-      eapply promise_not_released_add in PROMISE; eauto. des; auto. }
+      eapply promise_not_released_add in PROMISE; eauto; ss. des; auto. }
+    { inv STEP; inv STEP0; inv LOCAL. ss.
+      inv LOCAL0. eapply write_na_not_released_add in WRITE; eauto; ss.
+      des; subst; ss. eapply List.Forall_forall in NONBOTS; eauto; ss.
+    }
   }
   { ii. ss. erewrite IdentMap.gso in TID1; eauto.
     hexploit Thread.rtc_all_step_disjoint.
@@ -792,7 +1161,7 @@ Lemma local_drf_pf_view_after L c
         (PF: PF.pf_configuration L c)
         (RACEFRFEE: PFRace.racefree_view L c)
   :
-    behaviors SConfiguration.machine_step c <1=
+    behaviors SConfiguration.machine_step c <2=
     behaviors (PFConfiguration.machine_step L) c.
 Proof.
   ii. eapply local_drf_pf_after; eauto.
@@ -804,7 +1173,7 @@ Qed.
 Theorem local_drf_pf_view L
         s
         (RACEFRFEE: PFRace.racefree_view_syn L s):
-  behaviors SConfiguration.machine_step (Configuration.init s) <1=
+  behaviors SConfiguration.machine_step (Configuration.init s) <2=
   behaviors (PFConfiguration.machine_step L) (Configuration.init s).
 Proof.
   eapply local_drf_pf_view_after; eauto.

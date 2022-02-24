@@ -2977,7 +2977,7 @@ Section SIM.
     { eapply BOT in Heq1. des. exfalso. eapply PROM0; eauto. }
   Qed.
 
-  Lemma promise_read_race_aux views0 prom0 extra0 proml0
+  Lemma promise_read_race views0 prom0 extra0 proml0
         c_src0 c_mid0 c_tgt0 c_tgt1 e tid tr_tgt tr_cert
         (STEPTGT: @times_configuration_step_strong times tr_tgt tr_cert e tid c_tgt0 c_tgt1)
         (SIM: sim_configuration (fun _ => True) views0 prom0 extra0 proml0 c_src0 c_mid0 c_tgt0)
@@ -2989,12 +2989,12 @@ Section SIM.
         (PFSRC: PF.pf_configuration L c_src0)
         (WF_MID: JConfiguration.wf views0 c_mid0)
         (WF_TGT: Configuration.wf c_tgt0)
-        (RACEFREE: PFRace.multi_racefree L true c_src0)
+        (RACEFREE: PFRace.multi_racefree L c_src0)
     :
       (<<BEH: forall f beh, behaviors (PFConfiguration.multi_step L) c_src0 beh f>>) \/
-      (exists s, (<<EVENT: e = MachineEvent.syscall s>>) /\
-                 (<<BEH: forall beh f,
-                     behaviors (PFConfiguration.multi_step L) c_src0 (s :: beh) f>>)).
+      (exists s1, (<<EVENT: e = MachineEvent.syscall s1>>) /\
+                  (<<BEH: forall beh f s0 (EVENT: Event.le s0 s1),
+                      behaviors (PFConfiguration.multi_step L) c_src0 (s0 :: beh) f>>)).
   Proof.
     exploit times_configuration_step_future; eauto.
     { eapply times_configuration_step_strong_step; eauto. } i. des.
@@ -3036,7 +3036,7 @@ Section SIM.
       { ii. specialize (H loc'). des. auto. }
     } i. des.
     assert (exists tid0 ws ploc pts rlc re pl0 pl1,
-               (<<READING: PFRace.reading_event true ploc pts re>>) /\
+               (<<READING: PFRace.reading_or_racy_event ploc pts re>>) /\
                (<<IN: List.In (rlc, re) (tr_tgt ++ tr_cert')>>) /\
                (<<PROMISED: prom0 tid0 ploc pts>>) /\
                (<<NEQ: tid0 <> tid>>) /\
@@ -3047,7 +3047,7 @@ Section SIM.
                     (fun the =>
                        no_read_msgs (fun loc ts => exists ws, List.In (loc, ts) ws /\ List.In ws pl1 /\ prom0 tid0 loc ts) (snd the)) (tr_tgt ++ tr_cert')>>)).
     { assert (exists tid0 loc ts rlc0 re0,
-                 (<<READING0: PFRace.reading_event true loc ts re0>>) /\
+                 (<<READING0: PFRace.reading_or_racy_event loc ts re0>>) /\
                  (<<IN0: List.In (rlc0, re0) (tr_tgt ++ tr_cert)>>) /\
                  (<<PROMISED: prom0 tid0 loc ts>>) /\
                  (<<NEQ: tid0 <> tid>>)).
@@ -3070,7 +3070,7 @@ Section SIM.
         eapply sim_configuration_forget_tgt_concrete; eauto; ss.
       }
       assert (exists rlc re,
-                 (<<READING0: PFRace.reading_event true loc ts re>>) /\
+                 (<<READING0: PFRace.reading_or_racy_event loc ts re>>) /\
                  (<<IN0: List.In (rlc, re) (tr_tgt ++ tr_cert')>>)).
       { eapply List.in_app_or in IN0. des.
         { esplits; eauto. eapply List.in_or_app. eauto. }
@@ -3165,7 +3165,7 @@ Section SIM.
         eapply imply_to_and in SAT. des.
         apply not_or_and in SAT0. des. apply NNPP in SAT0. destruct n; ss.
         assert (exists rlc' re',
-                   (<<READING: PFRace.reading_event true t t0 re'>>) /\
+                   (<<READING: PFRace.reading_or_racy_event t t0 re'>>) /\
                    (<<IN: List.In (rlc', re') (tr_tgt ++ tr_cert')>>)).
         { apply NNPP. ii. eapply SAT1. eapply List.Forall_forall.
           i. destruct x. ss. unfold no_read_msgs. des_ifs.
@@ -3294,7 +3294,7 @@ Section SIM.
 
     assert (exists rlc' re',
                (<<IN: In (rlc', re') (tr_src0)>>) /\
-               (<<READING: PFRace.reading_event true ploc pts re'>>)).
+               (<<READING: PFRace.reading_or_racy_event ploc pts re'>>)).
     { eapply list_Forall2_in2 in IN; eauto. des. ss.
       destruct b. ss. exploit sim_traces_sim_event_exists; eauto.
       { inv READING; inv EVT; ss. }
@@ -3304,15 +3304,40 @@ Section SIM.
       inv READING; inv EVT; inv EVENT; ss; econs; auto. }
     des.
 
-    exfalso. eapply RACEFREE.
-    { eapply PFConfiguration.silent_steps_trace_steps_trace; eauto. }
-    { eauto. }
-    { eapply NEQ. }
-    { inv STEPSRC0; eauto. inv FINAL. }
-    { eauto. }
-    { eauto. }
-    { inv STEPSRC1; eauto. ss. }
-    { eauto. }
-    { eauto. }
+    destruct (classic (PFRace.reading_event ploc pts re')) as [READING1|FAILURE].
+    { exfalso. eapply RACEFREE.
+      { eapply PFConfiguration.silent_steps_trace_steps_trace; eauto. }
+      { eauto. }
+      { eapply NEQ. }
+      { inv STEPSRC0; eauto. inv FINAL. }
+      { eauto. }
+      { eauto. }
+      { inv STEPSRC1; eauto. ss. }
+      { eauto. }
+      { eauto. }
+    }
+    { left. ii.
+      eapply PFConfiguration.silent_multi_steps_trace_behaviors; eauto.
+      cut (behaviors (PFConfiguration.multi_step L) c_src2 beh f0).
+      { i. inv STEPSRC0; auto.
+        eapply PFConfiguration.multi_step_intro in STEP2. econs 4; eauto.
+      }
+      inv STEPSRC1; ss.
+      assert (EVENT: ThreadEvent.get_machine_event re' = MachineEvent.failure).
+      { inv READING0; ss.
+        { exfalso. eapply FAILURE. econs; eauto. }
+        { exfalso. eapply FAILURE. econs; eauto. }
+        { exfalso. eapply FAILURE. econs; eauto. }
+      }
+      assert (EVENTFAILURE: ThreadEvent.get_machine_event e1 = MachineEvent.failure).
+      { inv STEP2. eapply List.in_app_or in IN0; ss. des; ss.
+        { exfalso. eapply List.Forall_forall in SILENT0; eauto. ss.
+          rewrite EVENT in *. ss.
+        }
+        { inv IN0. auto. }
+      }
+      econs 3. rewrite <- EVENTFAILURE.
+      eapply PFConfiguration.multi_step_intro; eauto.
+    }
   Qed.
 End SIM.

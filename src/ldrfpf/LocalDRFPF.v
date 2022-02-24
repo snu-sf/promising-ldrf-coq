@@ -51,7 +51,7 @@ Lemma PF_sim_configuration_beh L times c_src c_mid c_tgt views prom extra proml
       (WF_TGT: Configuration.wf c_tgt)
       (SIM: sim_configuration L times (fun _ => True) views prom extra proml c_src c_mid c_tgt)
   :
-    behaviors (times_configuration_step_strong_all times) c_tgt <1=
+    behaviors (times_configuration_step_strong_all times) c_tgt <2=
     behaviors (PFConfiguration.multi_step L) c_src.
 Proof.
   i. ginduction PR; i.
@@ -83,7 +83,7 @@ Proof.
         { eapply times_configuration_step_future; eauto. }
       }
     }
-    { exploit promise_read_race; eauto. i. des; clarify. }
+    { exploit promise_read_race; eauto. i. des; clarify. eauto. }
   }
   { inv STEP.
     destruct (classic (List.Forall
@@ -127,6 +127,7 @@ Proof.
     }
     { exploit promise_read_race; eauto. i. des; clarify. }
   }
+  { econs 5. }
 Qed.
 
 Lemma local_drf_pf_multi L c
@@ -134,7 +135,7 @@ Lemma local_drf_pf_multi L c
       (WF: Configuration.wf c)
       (RACEFRFEE: PFRace.multi_racefree L c)
   :
-    behaviors Configuration.step c <1=
+    behaviors Configuration.step c <2=
     behaviors (PFConfiguration.multi_step L) c.
 Proof.
   hexploit joined_view_exist; eauto. intros [views JWF].
@@ -147,7 +148,8 @@ Proof.
   instantiate (1:=bot4). instantiate (1:=bot3). destruct c. econs; eauto.
   { i. unfold option_rel. des_ifs. destruct p as [[lang st] [tview prom]].
     econs; eauto. econs; eauto. econs; i; ss.
-    destruct (Memory.get loc ts prom) as [[from [val released|]]|] eqn:EQ; ss.
+    destruct (Memory.get loc ts prom) as [[from [val released| |]]|] eqn:EQ; ss.
+    - econs; eauto. ii. exploit PF; eauto. ss.
     - econs; eauto. ii. exploit PF; eauto. ss.
     - destruct (L loc) eqn:LOC; eauto.
       + econs 3; eauto.
@@ -159,7 +161,7 @@ Proof.
   { i. unfold option_rel, language. des_ifs.
     destruct p as [[lang st] [tview prom]]. econs; eauto. econs; eauto.
     { refl. }
-    { ii. destruct (Memory.get loc ts prom) as [[from [val [released|]|]]|] eqn:EQ; ss.
+    { ii. destruct (Memory.get loc ts prom) as [[from [val [released|]| |]]|] eqn:EQ; ss.
       - econs.
          + econs. econs; eauto.
            * eapply WF in Heq. eapply Heq in EQ. ss.
@@ -203,7 +205,7 @@ Lemma local_drf_pf_after L
         (WF: Configuration.wf c)
         (RACEFREE: PFRace.racefree L c)
   :
-    behaviors SConfiguration.machine_step c <1=
+    behaviors SConfiguration.machine_step c <2=
     behaviors (PFConfiguration.machine_step L) c.
 Proof.
   i. eapply SConfiguration.multi_step_equiv in PR; eauto.
@@ -217,7 +219,7 @@ Qed.
 Theorem local_drf_pf L
         s
         (RACEFREE: PFRace.racefree_syn L s):
-  behaviors SConfiguration.machine_step (Configuration.init s) <1=
+  behaviors SConfiguration.machine_step (Configuration.init s) <2=
   behaviors (PFConfiguration.machine_step L) (Configuration.init s).
 Proof.
   i. eapply local_drf_pf_after; eauto.

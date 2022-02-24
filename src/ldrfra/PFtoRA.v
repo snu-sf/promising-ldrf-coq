@@ -346,7 +346,7 @@ Module PFtoRA.
       (<<RACE: RARaceW.ra_race_steps L Ordering.acqrel Ordering.acqrel rels1 c1_ra>>).
     Proof.
       dup SIM1. inv SIM0. inv STEP. ss.
-      dup THS. specialize (THS0 tid). unfold option_rel4 in THS0. des_ifs. 
+      dup THS. specialize (THS0 tid). unfold option_rel4 in THS0. des_ifs.
       inv THS0. apply inj_pair2 in H1. subst.
       exploit wf_pf_thread; eauto. s. i.
       exploit wf_j_thread; eauto. s. i.
@@ -625,7 +625,44 @@ Module PFtoRA.
             inv NORMAL_APF. inv NORMAL_TVIEW. ss.
             destruct e2_apf; ss. subst. ss.
             rewrite CUR0; ss.
-    Qed.
+      - inv STEP_RA0. inv STEP; ss. inv STEP1; inv STEP; ss. inv LOCAL; ss.
+        esplits; [econs 1|..].
+        + eauto.
+        + eapply WThread.tau_steps_steps; eapply WThread.cancel_steps_tau_steps; eauto.
+        + ss.
+        + eauto.
+        + unfold RARaceW.ra_race.
+          left. esplits; eauto; ss.
+          inv SIM2. inv SIM_JOINED. inv SIM_APF. inv SIM_RA. ss.
+          apply inj_pair2 in H4, H5. subst. ss.
+          unfold RARaceW.wr_race.
+          inv LOCAL2. inv TVIEW. rewrite CUR.
+          esplits; eauto. inv LOCAL0. inv STEP. inv RACE.
+          unfold TView.racy_view in RACE0.
+          eapply TimeFacts.le_lt_lt; eauto.
+          * inv LOCAL. inv TVIEW. inv CUR0.
+            inv NORMAL_APF. inv NORMAL_TVIEW. ss.
+            destruct e2_apf; ss. subst. ss.
+            rewrite CUR0; ss.
+    Admitted.
+ (*      - inv  *)
+
+ (*          * inv LOCAL. inv TVIEW. inv CUR0. ss. apply RLX. *)
+ (*          * inv LOCAL. inv TVIEW. inv CUR0. *)
+ (*            inv NORMAL_APF. inv NORMAL_TVIEW. ss. *)
+ (*            destruct e2_apf; ss. subst. ss. *)
+ (*            rewrite CUR0; ss. *)
+ (*          eapply TimeFacts.le_lt_lt; eauto. *)
+
+
+ (* inv RACE0. *)
+ (*          eapply TimeFacts.le_lt_lt; eauto. condtac. *)
+ (*          * inv LOCAL. inv TVIEW. inv CUR0. apply RLX. *)
+ (*          * inv LOCAL. inv TVIEW. inv CUR0. *)
+ (*            inv NORMAL_APF. inv NORMAL_TVIEW. ss. *)
+ (*            destruct e2_apf; ss. subst. ss. *)
+ (*            rewrite CUR0; ss. *)
+ (*    Qed. *)
 
     Lemma sim_conf_racefree
           views rels c_pf c_j c_apf c_ra
@@ -657,6 +694,9 @@ Module PFtoRA.
         - inv STEP_APF. ss. inv STEP0; ss. inv STEP1.
           unfold Writes.append. ss. condtac; ss.
           esplits; [left|]; eauto.
+        - inv STEP_APF. ss. inv STEP0; ss. inv STEP1.
+          unfold Writes.append. ss. condtac; ss.
+          admit.
       }
       exploit step_pf_future; try exact STEP; eauto. i. des.
       exploit step_j_future; try exact STEP_J; eauto. i. des.
@@ -683,7 +723,7 @@ Module PFtoRA.
       eapply WConfiguration.steps_trans; eauto.
       eapply WConfiguration.steps_trans; eauto.
       econs 2; eauto.
-    Qed.
+    Admitted.
 
 
     (* behaviors *)

@@ -945,8 +945,6 @@ Module PFRace.
 Section LOCALPFRACE.
   Variable L: Loc.t -> bool.
 
-  Variable f: bool.
-
   Inductive reading_event (loc: Loc.t) (ts: Time.t):
     forall (e: ThreadEvent.t), Prop :=
   | reading_event_read
@@ -961,16 +959,30 @@ Section LOCALPFRACE.
       valr ordr
     :
       reading_event loc ts (ThreadEvent.racy_read loc ts valr ordr)
-  | reading_event_racy_write
+  .
+
+  Inductive reading_or_racy_event (loc: Loc.t) (ts: Time.t):
+    forall (e: ThreadEvent.t), Prop :=
+  | reading_or_racy_event_read
+      valr releasedr ordr
+    :
+      reading_or_racy_event loc ts (ThreadEvent.read loc ts valr releasedr ordr)
+  | reading_or_racy_event_update
+      to valr valw releasedr releasedw ordr ordw
+    :
+      reading_or_racy_event loc ts (ThreadEvent.update loc ts to valr valw releasedr releasedw ordr ordw)
+  | reading_or_racy_event_racy_read
+      valr ordr
+    :
+      reading_or_racy_event loc ts (ThreadEvent.racy_read loc ts valr ordr)
+  | reading_or_racy_event_racy_write
       valw ordw
-      (FLAG: f = true)
     :
-      reading_event loc ts (ThreadEvent.racy_write loc ts valw ordw)
-  | reading_event_racy_update
+      reading_or_racy_event loc ts (ThreadEvent.racy_write loc ts valw ordw)
+  | reading_or_racy_event_racy_update
       valr valw ordr ordw
-      (FLAG: f = true)
     :
-      reading_event loc ts (ThreadEvent.racy_update loc ts valr valw ordr ordw)
+      reading_or_racy_event loc ts (ThreadEvent.racy_update loc ts valr valw ordr ordw)
   .
 
   Inductive writing_event (loc: Loc.t) (ts: Time.t):
@@ -1246,10 +1258,6 @@ Section LOCALPFRACE.
   | racy_read_racy_read
       lc
       valr ordr
-      (VIEW:
-         Time.lt (if Ordering.le Ordering.relaxed ordr
-                  then ((TView.cur (Local.tview lc)).(View.rlx) loc)
-                  else ((TView.cur (Local.tview lc)).(View.pln) loc)) ts)
     :
       racy_read loc ts lc (ThreadEvent.racy_read loc ts valr ordr)
   .
