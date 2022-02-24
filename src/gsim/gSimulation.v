@@ -479,7 +479,7 @@ Proof.
   esplits; eauto. i. subst. des.
   { eapply FINMEMORY in PR.
     eapply JThread.step_thread_step in STEP.
-    eapply step_unchangable in STEP; eauto. }
+    eapply unchangable_increase in STEP; eauto. }
   { inv PR. auto. }
 Qed.
 
@@ -632,23 +632,23 @@ Proof.
       }
       { i. des; auto.
         { right. inv H0. econs; eauto.
-          eapply rtc_step_unchangable.
+          eapply unchangable_rtc_tau_step_increase.
           { eapply JThread.tau_steps_thread_tau_steps; eauto. }
           { ss. }
         }
         { right. inv H0. econs; eauto.
           ii. eapply NUNCHANGABLE.
-          inv STEP. ss. eapply step_unchangable in STEP1; eauto. }
+          inv STEP. ss. eapply unchangable_increase in STEP1; eauto. }
       }
     }
     { etrans; [eauto|].
       eapply world_messages_le_mon; eauto.
-      { i. eapply rtc_step_unchangable in STEPS0; eauto.
-        eapply opt_step_unchangable in STEP0; eauto.
-        eapply rtc_step_unchangable in STEPS_AFTER; eauto.
+      { i. eapply unchangable_rtc_tau_step_increase in STEPS0; eauto.
+        eapply unchangable_opt_step_increase in STEP0; eauto.
+        eapply unchangable_rtc_tau_step_increase in STEPS_AFTER; eauto.
       }
       { i. eapply JThread.step_thread_step in STEP.
-        eapply step_unchangable in STEP; eauto.
+        eapply unchangable_increase in STEP; eauto.
       }
     }
     { i. subst. des; auto. inv PR; auto. }
@@ -733,19 +733,19 @@ Proof.
       { i. des; auto.
         { right. inv H0. econs; eauto.
           eapply JThread.step_thread_step in STEP.
-          eapply step_unchangable in STEP; eauto.
+          eapply unchangable_increase in STEP; eauto.
         }
         { right. inv H0. econs; eauto.
           ii. eapply NUNCHANGABLE.
           eapply JThread.tau_steps_thread_tau_steps in STEPS.
-          eapply rtc_step_unchangable in STEPS; eauto. }
+          eapply unchangable_rtc_tau_step_increase in STEPS; eauto. }
       }
     }
     { etrans; [eauto|].
       eapply world_messages_le_mon; eauto.
-      { i. eapply rtc_step_unchangable in STEPS2; eauto. }
+      { i. eapply unchangable_rtc_tau_step_increase in STEPS2; eauto. }
       { i. eapply JThread.tau_steps_thread_tau_steps in STEPS.
-        eapply rtc_step_unchangable in STEPS; eauto.
+        eapply unchangable_rtc_tau_step_increase in STEPS; eauto.
       }
     }
     { i. subst. des; auto. inv PR. auto. }
@@ -941,7 +941,7 @@ Proof.
     { left. eauto. }
     all: eauto.
     { etrans; eauto. eapply world_messages_le_mon; eauto.
-      i. eapply rtc_step_unchangable in STEPS0; eauto.
+      i. eapply unchangable_rtc_tau_step_increase in STEPS0; eauto.
     }
   }
   { right. esplits.
@@ -955,7 +955,7 @@ Proof.
     all: eauto.
     { rewrite EVT. auto. }
     { etrans; eauto. eapply world_messages_le_mon; eauto.
-      i. eapply rtc_step_unchangable in STEPS0; eauto.
+      i. eapply unchangable_rtc_tau_step_increase in STEPS0; eauto.
     }
   }
   { left. inv STEP0; ss. repeat red.
@@ -1024,7 +1024,7 @@ Proof.
   { eauto. }
   { eauto. }
   { etrans; eauto. eapply world_messages_le_mon; eauto. i.
-    eapply rtc_step_unchangable in STEPS; ss; eauto.
+    eapply unchangable_rtc_tau_step_increase in STEPS; ss; eauto.
   }
 Qed.
 

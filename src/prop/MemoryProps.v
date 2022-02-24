@@ -1572,6 +1572,15 @@ Section UNCHANGABLES.
     { i. eapply IHPROMISE. eapply unchangable_write; eauto. }
   Qed.
 
+  Lemma unchangable_promise_step lc1 mem1 loc from to msg lc2 mem2 kind
+        (STEP: Local.promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
+    :
+      unchangable mem1 (Local.promises lc1) <4=
+      unchangable mem2 (Local.promises lc2).
+  Proof.
+    inv STEP. eapply unchangable_promise; eauto.
+  Qed.
+
   Lemma unchangable_increase pf e lang (th0 th1: Thread.t lang)
         (STEP: Thread.step pf e th0 th1)
     :
@@ -1586,6 +1595,37 @@ Section UNCHANGABLES.
       + inv LOCAL1. inv LOCAL2. ss. inv WRITE.
         eapply unchangable_write; eauto.
       + eapply unchangable_write_na; eauto.
+  Qed.
+
+  Lemma unchangable_opt_step_increase e lang (th0 th1: Thread.t lang)
+        (STEP: Thread.opt_step e th0 th1)
+    :
+      unchangable (Thread.memory th0) (Local.promises (Thread.local th0)) <4=
+      unchangable (Thread.memory th1) (Local.promises (Thread.local th1)).
+  Proof.
+    inv STEP; auto. eapply unchangable_increase; eauto.
+  Qed.
+
+  Lemma unchangable_rtc_tau_step_increase lang (th0 th1: Thread.t lang)
+        (STEP: rtc (@Thread.tau_step _) th0 th1)
+    :
+      unchangable (Thread.memory th0) (Local.promises (Thread.local th0)) <4=
+      unchangable (Thread.memory th1) (Local.promises (Thread.local th1)).
+  Proof.
+    induction STEP; eauto. i. eapply IHSTEP.
+    inv H. inv TSTEP. eapply unchangable_increase; eauto.
+  Qed.
+
+  Lemma unchangable_rtc_all_step_increase
+        lang (th0 th1: Thread.t lang)
+        (STEPS: rtc (@Thread.all_step lang)th0 th1)
+    :
+      unchangable (Thread.memory th0) (Local.promises (Thread.local th0)) <4=
+      unchangable (Thread.memory th1) (Local.promises (Thread.local th1)).
+  Proof.
+    ginduction STEPS; ss. i.
+    eapply IHSTEPS.
+    inv H. inv USTEP. eapply unchangable_increase; eauto.
   Qed.
 
   Lemma unchangable_rtc_increase P lang (th0 th1: Thread.t lang)

@@ -3269,7 +3269,7 @@ Section LIFT.
       { right. hexploit LIFT2; eauto. i. des. esplits; eauto.
         etrans; eauto. eapply world_messages_le_mon.
         { etrans; eauto. }
-        { i. eapply rtc_step_unchangable in STEPS; eauto. }
+        { i. eapply unchangable_rtc_tau_step_increase in STEPS; eauto. }
         { i. eapply program_step_unchangable; eauto. }
       }
     }

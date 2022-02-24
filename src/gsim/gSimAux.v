@@ -46,65 +46,25 @@ Module Messages.
   .
 End Messages.
 
-(* TODO: from MemoryProps.v *)
-Section UNCHANGABLE.
-  Lemma promise_step_unchangable lc1 mem1 loc from to msg lc2 mem2 kind
-        (STEP: Local.promise_step lc1 mem1 loc from to msg lc2 mem2 kind)
-    :
-      unchangable mem1 (Local.promises lc1) <4=
-      unchangable mem2 (Local.promises lc2).
-  Proof.
-    inv STEP. eapply unchangable_promise; eauto.
-  Qed.
-
-  Lemma step_unchangable pf e lang (th0 th1: Thread.t lang)
-        (STEP: Thread.step pf e th0 th1)
-    :
-      unchangable (Thread.memory th0) (Local.promises (Thread.local th0)) <4=
-      unchangable (Thread.memory th1) (Local.promises (Thread.local th1)).
-  Proof.
-    eapply unchangable_increase; eauto.
-  Qed.
-
-  Lemma opt_step_unchangable e lang (th0 th1: Thread.t lang)
-        (STEP: Thread.opt_step e th0 th1)
-    :
-      unchangable (Thread.memory th0) (Local.promises (Thread.local th0)) <4=
-      unchangable (Thread.memory th1) (Local.promises (Thread.local th1)).
-  Proof.
-    inv STEP; auto. eapply step_unchangable; eauto.
-  Qed.
-
-  Lemma rtc_step_unchangable lang (th0 th1: Thread.t lang)
-        (STEP: rtc (@Thread.tau_step _) th0 th1)
-    :
-      unchangable (Thread.memory th0) (Local.promises (Thread.local th0)) <4=
-      unchangable (Thread.memory th1) (Local.promises (Thread.local th1)).
-  Proof.
-    induction STEP; eauto. i. eapply IHSTEP.
-    inv H. inv TSTEP. eapply step_unchangable; eauto.
-  Qed.
-
-  Lemma other_promise_unchangable mem ths sc tid1 tid2 st1 st2 tvw1 prom1 tvw2 prom2
-        (CWF: Configuration.wf (Configuration.mk ths sc mem))
-        (TID1: IdentMap.find tid1 ths = Some (st1, Local.mk tvw1 prom1))
-        (TID2: IdentMap.find tid2 ths = Some (st2, Local.mk tvw2 prom2))
-        (DIFF: tid1 <> tid2)
-    :
-      Messages.of_memory prom2 <4= unchangable mem prom1.
-  Proof.
-    ii. inv PR.
-    inv CWF. inv WF. destruct st1, st2. econs; eauto.
-    - exploit THREADS; try apply TID2; eauto. intros LCWF. inv LCWF. eauto.
-    - destruct (Memory.get x0 x1 prom1) eqn:GET0; eauto. exfalso.
-      exploit DISJOINT; eauto. intros LCDISJ. inv LCDISJ. destruct p.
-      inv DISJOINT0. exploit DISJOINT1; eauto. i. des.
-      eapply Memory.get_ts in GET. eapply Memory.get_ts in GET0. des; clarify.
-      eapply x5; eauto.
-      + instantiate (1:=x1). econs; ss; eauto. refl.
-      + econs; ss; eauto. refl.
-  Qed.
-End UNCHANGABLE.
+Lemma other_promise_unchangable mem ths sc tid1 tid2 st1 st2 tvw1 prom1 tvw2 prom2
+      (CWF: Configuration.wf (Configuration.mk ths sc mem))
+      (TID1: IdentMap.find tid1 ths = Some (st1, Local.mk tvw1 prom1))
+      (TID2: IdentMap.find tid2 ths = Some (st2, Local.mk tvw2 prom2))
+      (DIFF: tid1 <> tid2)
+  :
+    Messages.of_memory prom2 <4= unchangable mem prom1.
+Proof.
+  ii. inv PR.
+  inv CWF. inv WF. destruct st1, st2. econs; eauto.
+  - exploit THREADS; try apply TID2; eauto. intros LCWF. inv LCWF. eauto.
+  - destruct (Memory.get x0 x1 prom1) eqn:GET0; eauto. exfalso.
+    exploit DISJOINT; eauto. intros LCDISJ. inv LCDISJ. destruct p.
+    inv DISJOINT0. exploit DISJOINT1; eauto. i. des.
+    eapply Memory.get_ts in GET. eapply Memory.get_ts in GET0. des; clarify.
+    eapply x5; eauto.
+    + instantiate (1:=x1). econs; ss; eauto. refl.
+    + econs; ss; eauto. refl.
+Qed.
 
 
 Section FINALIZED.
@@ -139,8 +99,8 @@ Section FINALIZED.
   Proof.
     ii. inv STEP.
     hexploit finalized_unchangable; eauto. i.
-    hexploit rtc_step_unchangable; eauto. i.
-    hexploit step_unchangable; eauto. i. ss.
+    hexploit unchangable_rtc_tau_step_increase; eauto. i.
+    hexploit unchangable_increase; eauto. i. ss.
     inv H1. econs; eauto. i. ss.
     rewrite IdentMap.gsspec in TID0. des_ifs.
     inv PR. eapply NPROM0; eauto.
