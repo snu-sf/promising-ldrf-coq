@@ -421,10 +421,6 @@ Proof.
     { eapply TimeFacts.le_lt_lt; eauto. eapply LOCAL. }
     { eapply TimeFacts.le_lt_lt; eauto. eapply LOCAL. }
   }
-  { des_ifs.
-    { eapply TimeFacts.le_lt_lt; eauto. eapply LOCAL. }
-    { eapply TimeFacts.le_lt_lt; eauto. eapply LOCAL. }
-  }
 Qed.
 
 
