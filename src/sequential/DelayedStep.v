@@ -46,7 +46,6 @@ Set Nested Proofs Allowed.
 Section DStep.
   Variable lang: language.
 
-
   (** delayed steps *)
 
   Variant dstep (e: ThreadEvent.t) (e1 e4: Thread.t lang): Prop :=
@@ -309,13 +308,14 @@ Section DStep.
   Qed.
 End DStep.
 
+
 Module DConfiguration.
   Variant step: forall (e: MachineEvent.t) (tid: Ident.t) (c1 c2: Configuration.t), Prop :=
   | step_intro
       e tid c1 lang st1 lc1 st2 lc2 sc2 mem2
       (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
       (DSTEPS: dsteps e (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1))
-                             (Thread.mk _ st2 lc2 sc2 mem2))
+                      (Thread.mk _ st2 lc2 sc2 mem2))
       (CONSISTENT: e <> MachineEvent.failure ->
                    delayed_consistent (Thread.mk _ st2 lc2 sc2 mem2)):
       step e tid c1
