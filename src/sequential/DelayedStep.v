@@ -46,8 +46,11 @@ Set Nested Proofs Allowed.
 Section DStep.
   Variable lang: language.
 
-  Variant delayed_step (e: ThreadEvent.t) (e1 e4: Thread.t lang): Prop :=
-  | delayed_step_intro
+
+  (** delayed steps *)
+
+  Variant dstep (e: ThreadEvent.t) (e1 e4: Thread.t lang): Prop :=
+  | dstep_intro
       e2 e3 pf
       (PROMISES: rtc (tau (@pred_step is_promise _)) e1 e2)
       (LOWERS: rtc (tau lower_step) e2 e3)
@@ -55,28 +58,31 @@ Section DStep.
       (EVENT_RELEASE: release_event e)
   .
 
-  Variant delayed_steps: forall (e: MachineEvent.t) (e1 e2: Thread.t lang), Prop :=
-  | delayed_steps_promises
+  Variant dsteps: forall (e: MachineEvent.t) (e1 e2: Thread.t lang), Prop :=
+  | dsteps_promises
       e1 e2 e3
-      (DSTEPS: rtc (tau delayed_step) e1 e2)
+      (DSTEPS: rtc (tau dstep) e1 e2)
       (PROMISES: rtc (tau (@pred_step is_promise _)) e2 e3):
-    delayed_steps MachineEvent.silent e1 e3
-  | delayed_steps_step
+    dsteps MachineEvent.silent e1 e3
+  | dsteps_step
       e te e1 e2 e3
       (DSTEPS: rtc (tau (@pred_step is_promise _)) e1 e2)
-      (DSTEP: delayed_step te e2 e3)
+      (DSTEP: dstep te e2 e3)
       (EVENT: e = ThreadEvent.get_machine_event te):
-    delayed_steps e e1 e3
+    dsteps e e1 e3
   .
 
   Definition delayed_consistent (e1: Thread.t lang): Prop :=
     forall mem1 (CAP: Memory.cap e1.(Thread.memory) mem1),
     exists e e2,
-      (<<DSTEPS: delayed_steps
+      (<<DSTEPS: dsteps
                    e (Thread.mk _ (Thread.state e1) (Thread.local e1) (Thread.sc e1) mem1) e2>>) /\
       ((<<FAILURE: e = MachineEvent.failure>>) \/
        (<<SILENT: e = MachineEvent.silent>>) /\
-         (<<PROMISES: Local.promises (Thread.local e2) = Memory.bot>>)).
+       (<<PROMISES: Local.promises (Thread.local e2) = Memory.bot>>)).
+
+
+  (** non release steps *)
 
   Variant non_release_step (e: ThreadEvent.t) (e1 e2: Thread.t lang): Prop :=
   | non_release_step_intro
@@ -112,6 +118,14 @@ Section DStep.
     ThreadEvent.get_machine_event e = MachineEvent.silent.
   Proof.
     destruct e; ss.
+  Qed.
+
+  Lemma lower_event_release
+        e_src e_tgt
+        (LOWER: lower_event e_src e_tgt):
+    release_event e_src <-> release_event e_tgt.
+  Proof.
+    inv LOWER; ss.
   Qed.
 
   Lemma plus_step_steps
@@ -178,32 +192,121 @@ Section DStep.
     }
   Qed.
 
+
+  (** steps to delayed steps *)
+
   Variant delayed_thread fin (e_src e_tgt: Thread.t lang): Prop :=
-    | delayed_thread_intro
-        lc_lower
-        (LOWER_LC: lower_local lc_lower (Thread.local e_tgt))
-        (LOWER_SC: TimeMap.le (Thread.sc e_src) (Thread.sc e_tgt))
-        (LOWER_MEM: lower_memory (Thread.memory e_src) (Thread.memory e_tgt))
-        (DELAYED: delayed (Thread.state e_src) (Thread.state e_tgt)
-                          (Thread.local e_src) lc_lower
-                          (Thread.sc e_src) (Thread.memory e_src) fin)
+  | delayed_thread_intro
+      (SC: Thread.sc e_src = Thread.sc e_tgt)
+      (MEM: Thread.memory e_src = Thread.memory e_tgt)
+      (DELAYED: delayed (Thread.state e_src) (Thread.state e_tgt)
+                        (Thread.local e_src) (Thread.local e_tgt)
+                        (Thread.sc e_tgt) (Thread.memory e_tgt) fin)
   .
 
   Definition committed_thread (e1 e2: Thread.t lang) :=
     committed (Thread.memory e1) (Local.promises (Thread.local e1))
               (Thread.memory e2) (Local.promises (Thread.local e2)).
 
-  Lemma non_release_step_delayed
-        e1_src
-        fin e_tgt e1_tgt e2_tgt
-        (DELAYED: delayed_thread fin e1_src e1_tgt)
-        (STEP: non_release_step e_tgt e1_tgt e2_tgt)
-        (CONS: Local.promise_consistent (Thread.local e2_tgt)):
-    exists e2_src,
-      (<<PROMISES: rtc (tau (@pred_step is_promise _)) e1_src e2_src>>) /\
-        (<<DELAYED: delayed_thread (fin \4/ committed_thread e1_src e2_src) e2_src e2_tgt>>).
+  Lemma rtc_non_release_step_delayed_aux
+        (st0 st1 st2: Language.state lang) lc0 lc1 lc2
+        mem1 sc1 mem2 sc2 fin
+        (STEP: rtc (tau non_release_step) (Thread.mk _ st1 lc1 sc1 mem1) (Thread.mk _ st2 lc2 sc2 mem2))
+        (CONS: Local.promise_consistent lc2)
+        (DELAYED: delayed st0 st1 lc0 lc1 sc1 mem1 fin)
+    :
+      exists lc0',
+        (<<PROMISES: rtc (tau (@pred_step is_promise _)) (Thread.mk _ st0 lc0 sc1 mem1) (Thread.mk _ st0 lc0' sc2 mem2)>>) /\
+        (<<DELAYED: delayed st0 st2 lc0' lc2 sc2 mem2 (fin \4/ committed mem1 lc1.(Local.promises) mem2 lc2.(Local.promises))>>).
   Proof.
-  Admitted.
+    remember (Thread.mk _ st1 lc1 sc1 mem1) as e1.
+    remember (Thread.mk _ st2 lc2 sc2 mem2) as e2.
+    revert lc0 fin st1 lc1 sc1 mem1 Heqe1 st2 lc2 sc2 mem2 Heqe2 CONS DELAYED.
+    induction STEP; i; subst.
+    { inv Heqe2. esplits; eauto. rewrite committed_same. ss. }
+    destruct y as [st lc sc mem].
+    inv H. inv TSTEP.
+    exploit delayed_step; try exact STEP0; try exact DELAYED; eauto.
+    { exploit Thread.step_future; try exact STEP0; try apply DELAYED. s. i. des.
+      hexploit rtc_all_step_promise_consistent;
+        try eapply rtc_implies; try eapply STEP; eauto; ss.
+      i. inv H. inv TSTEP. econs. econs. eauto.
+    }
+    i. des.
+    exploit IHSTEP; try exact DELAYED0; eauto. i. des.
+    esplits; [etrans; eauto|].
+    replace (committed mem1 (Local.promises lc1) mem2 (Local.promises lc2)) with
+        (committed mem1 (Local.promises lc1) mem (Local.promises lc) \4/
+         committed mem (Local.promises lc) mem2 (Local.promises lc2)).
+    { clear - DELAYED1. unfold delayed in *. des. splits; eauto. i.
+      exploit FIN; eauto. i. des; eauto.
+    }
+    clear - STEP0 STEP.
+    exploit committed_trans.
+    { econs 2; try refl. econs. econs. eauto. }
+    { eapply rtc_implies; try eapply STEP.
+      i. inv H. inv TSTEP. econs. econs. eauto.
+    }
+    ss.
+  Qed.
+
+  Lemma rtc_non_release_step_delayed
+        fin e1_src
+        e1_tgt e2_tgt
+        (DELAYED: delayed_thread fin e1_src e1_tgt)
+        (STEP: rtc (tau non_release_step) e1_tgt e2_tgt)
+        (CONS: Local.promise_consistent (Thread.local e2_tgt)):
+      exists e2_src,
+        (<<PROMISES: rtc (tau (@pred_step is_promise _)) e1_src e2_src>>) /\
+        (<<DELAYED: delayed_thread (fin \4/ committed_thread e1_tgt e2_tgt)
+                                   e2_src e2_tgt>>).
+  Proof.
+    destruct e1_src as [st1_src lc1_src sc1_src mem1_src],
+             e1_tgt as [st1_tgt lc1_tgt sc1_tgt mem1_tgt],
+             e2_tgt as [st2_tgt lc2_tgt sc2_tgt mem2_tgt].
+    inv DELAYED. ss. subst.
+    exploit rtc_non_release_step_delayed_aux; try exact DELAYED0; eauto. i. des.
+    esplits; eauto.
+    econs; ss; eauto.
+  Qed.
+
+  Lemma non_release_plus_step_delayed
+        fin e1_src
+        e_tgt e1_tgt e2_tgt
+        (DELAYED: delayed_thread fin e1_src e1_tgt)
+        (STEP: non_release_plus_step e_tgt e1_tgt e2_tgt)
+        (CONS: Local.promise_consistent (Thread.local e2_tgt)):
+    exists e_src e2_src,
+      (<<STEP_SRC: dstep e_src e1_src e2_src>>) /\
+      (<<EVENT: lower_event e_src e_tgt>>) /\
+      (<<LOWER: lower_thread e2_src e2_tgt>>).
+  Proof.
+    inv DELAYED. inv STEP.
+    destruct e1_src as [st1_src lc1_src sc1_src mem1_src],
+             e1_tgt as [st1_tgt lc1_tgt sc1_tgt mem1_tgt],
+             e2 as [st2_tgt lc2_tgt sc2_tgt mem2_tgt].
+    ss. subst.
+    exploit rtc_non_release_step_delayed_aux; try exact DELAYED0; eauto.
+    { exploit Thread.rtc_all_step_future;
+        try eapply rtc_implies; try exact STEPS; try apply DELAYED0.
+      { i. inv H. inv TSTEP. econs. econs. eauto. }
+      s. i. des.
+      hexploit step_promise_consistent; try exact STEP0; eauto.
+    }
+    i. des.
+    unfold delayed in DELAYED. des.
+    hexploit Thread.rtc_all_step_future;
+      try eapply rtc_implies; try exact STEPS0; ss; try apply DELAYED0.
+    { i. inv H. inv TSTEP. econs. econs. econs 2; eauto. }
+    i. des.
+    destruct e2_tgt as [st3_tgt lc3_tgt sc3_tgt mem3_tgt]. ss.
+    exploit lower_memory_thread_step; try exact STEP0;
+      try exact LOCAL; try exact MEM0; eauto. i. des.
+    esplits.
+    - econs; eauto. erewrite lower_event_release; eauto.
+    - ss.
+    - econs; eauto.
+  Qed.
 End DStep.
 
 Module DConfiguration.
@@ -211,7 +314,7 @@ Module DConfiguration.
   | step_intro
       e tid c1 lang st1 lc1 st2 lc2 sc2 mem2
       (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
-      (DSTEPS: delayed_steps e (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1))
+      (DSTEPS: dsteps e (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1))
                              (Thread.mk _ st2 lc2 sc2 mem2))
       (CONSISTENT: e <> MachineEvent.failure ->
                    delayed_consistent (Thread.mk _ st2 lc2 sc2 mem2)):

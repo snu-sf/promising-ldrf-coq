@@ -335,16 +335,6 @@ Proof.
   red. esplits; eauto; try refl.
 Qed.
 
-Lemma committed_same prom mem fin
-  :
-    fin \4/ committed mem prom mem prom = fin.
-Proof.
-  extensionality loc. extensionality to. extensionality from. extensionality msg.
-  eapply Coq.Logic.PropExtensionality.propositional_extensionality.
-  split; auto. i. des; auto.
-  exfalso. inv H. ss.
-Qed.
-
 Lemma sim_thread_future
       lang_src lang_tgt
       st_src lc_src sc1_src sc2_src mem1_src mem2_src w1 views1

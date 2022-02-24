@@ -192,6 +192,17 @@ Variant lower_thread {lang: language} (e_src e_tgt: Thread.t lang): Prop :=
     (MEMORY: lower_memory (Thread.memory e_src) (Thread.memory e_tgt))
 .
 
+Program Instance lower_thread_PreOrder {lang: language}: PreOrder (@lower_thread lang).
+Next Obligation.
+Proof.
+  ii. destruct x. econs; ss; refl.
+Qed.
+Next Obligation.
+Proof.
+  ii. destruct x, y, z. inv H. inv H0. ss. subst.
+  econs; ss; eauto; etrans; eauto.
+Qed.
+
 Lemma lower_local_consistent lc_src lc_tgt
       (LOCAL: lower_local lc_src lc_tgt)
       (CONSISTENT: Local.promise_consistent lc_tgt)

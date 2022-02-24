@@ -91,6 +91,45 @@ Section FINALIZED.
       (NUNCHANGABLE: ~ unchangable mem0 prom0 l t from msg)
   .
 
+  Lemma committed_same prom mem fin
+    :
+      fin \4/ committed mem prom mem prom = fin.
+  Proof.
+    extensionality loc. extensionality to. extensionality from. extensionality msg.
+    eapply Coq.Logic.PropExtensionality.propositional_extensionality.
+    split; auto. i. des; auto.
+    exfalso. inv H. ss.
+  Qed.
+
+  Lemma committed_trans
+        lang e1 e2 e3
+        (STEPS1: rtc (@Thread.all_step lang) e1 e2)
+        (STEPS2: rtc (@Thread.all_step lang) e2 e3):
+    committed (Thread.memory e1) (Local.promises (Thread.local e1))
+              (Thread.memory e3) (Local.promises (Thread.local e3)) =
+    (committed (Thread.memory e1) (Local.promises (Thread.local e1))
+               (Thread.memory e2) (Local.promises (Thread.local e2)) \4/
+     committed (Thread.memory e2) (Local.promises (Thread.local e2))
+               (Thread.memory e3) (Local.promises (Thread.local e3))).
+  Proof.
+    extensionality loc. extensionality to. extensionality from. extensionality msg.
+    eapply Coq.Logic.PropExtensionality.propositional_extensionality.
+    split; i; des.
+    { inv H.
+      destruct (classic (unchangable (Thread.memory e2) (Local.promises (Thread.local e2))
+                                     loc to from msg)).
+      - left. econs; eauto.
+      - right. econs; eauto.
+    }
+    { inv H. econs; eauto.
+      eapply unchangable_rtc_all_step_increase; eauto.
+    }
+    { inv H. econs; eauto.
+      ii. apply NUNCHANGABLE.
+      eapply unchangable_rtc_all_step_increase; eauto.
+    }
+  Qed.
+
   Definition step_finalized e tid c0 c1
              (STEP: Configuration.step e tid c0 c1)
              (WF: Configuration.wf c0)
