@@ -7,10 +7,10 @@ COQTHEORIES  := \
 	src/opt/itree/*.v \
 	src/gsim/*.v \
 	src/sequential/*.v \
- 	src/promotion/*.v \
- 	src/ldrfpf/*.v \
- 	src/ldrfra/*.v \
-# src/ldrfsc/*.v \
+	src/promotion/*.v \
+	src/ldrfpf/*.v \
+	src/ldrfra/*.v \
+	src/ldrfsc/*.v \
 # src/while/*.v \
 #	src/opt/while/*.v \
 
@@ -35,6 +35,7 @@ Makefile.coq: Makefile $(COQTHEORIES)
    echo "-R src/promotion $(COQMODULE)"; \
    echo "-R src/ldrfpf $(COQMODULE)"; \
    echo "-R src/ldrfra $(COQMODULE)"; \
+   echo "-R src/ldrfsc $(COQMODULE)"; \
    \
    echo $(COQTHEORIES)) > _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq

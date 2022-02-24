@@ -26,6 +26,7 @@ Require Import PromiseConsistent.
 Require Import Mapping.
 
 Require Import PFStep.
+Require Import OrdStep.
 
 Set Implicit Arguments.
 
@@ -38,8 +39,9 @@ Module SCLocal.
     Variable L: Loc.t -> bool.
 
     Definition non_maximal (lc: Local.t) (mem: Memory.t) (loc: Loc.t): Prop :=
-      exists to from val released,
-        (<<GET: Memory.get loc to mem = Some (from, Message.concrete val released)>>) /\
+      exists to from msg,
+        (<<GET: Memory.get loc to mem = Some (from, msg)>>) /\
+        (<<NRESERVE: msg <> Message.reserve>>) /\
         (<<TS: Time.lt ((TView.cur (Local.tview lc)).(View.rlx) loc) to>>)
     .
 
@@ -69,6 +71,24 @@ Module SCLocal.
             Time.lt to' to)
     .
     Hint Constructors write_step.
+
+    Inductive write_na_step (lc1:Local.t) (sc1:TimeMap.t) (mem1:Memory.t)
+                            (loc:Loc.t) (from to:Time.t) (val:Const.t) (ord:Ordering.t)
+                            (lc2:Local.t) (sc2:TimeMap.t) (mem2:Memory.t):
+      forall (msgs: list (Time.t * Time.t * Message.t))
+        (kinds: list Memory.op_kind) (kind:Memory.op_kind), Prop :=
+    | write_na_step_na
+        msgs kinds kind
+        (LOC: L loc = false)
+        (STEP: Local.write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 msgs kinds kind):
+      write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 msgs kinds kind
+    | write_na_step_at
+        released kind
+        (LOC: L loc = true)
+        (STEP: Local.write_step lc1 sc1 mem1 loc from to val None released Ordering.acqrel lc2 sc2 mem2 kind):
+      write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 [] [] kind
+    .
+    Hint Constructors write_na_step.
 
     Inductive program_step:
       forall (e:ThreadEvent.t) (lc1:Local.t) (sc1:TimeMap.t) (mem1:Memory.t) (lc2:Local.t) (sc2:TimeMap.t) (mem2:Memory.t), Prop :=
@@ -108,6 +128,26 @@ Module SCLocal.
         lc1 sc1 mem1
         (LOCAL: Local.failure_step lc1):
         program_step ThreadEvent.failure lc1 sc1 mem1 lc1 sc1 mem1
+    | step_write_na
+        lc1 sc1 mem1
+        loc from to val ord lc2 sc2 mem2 msgs kinds kind
+        (LOCAL: write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 msgs kinds kind):
+        program_step (ThreadEvent.write_na loc msgs from to val ord) lc1 sc1 mem1 lc2 sc2 mem2
+    | step_racy_read
+        lc1 sc1 mem1
+        loc to val ord
+        (LOCAL: OrdLocal.racy_read_step L Ordering.acqrel lc1 mem1 loc to val ord):
+        program_step (ThreadEvent.racy_read loc to val ord) lc1 sc1 mem1 lc1 sc1 mem1
+    | step_racy_write
+        lc1 sc1 mem1
+        loc to val ord
+        (LOCAL: OrdLocal.racy_write_step L Ordering.acqrel lc1 mem1 loc to ord):
+        program_step (ThreadEvent.racy_write loc to val ord) lc1 sc1 mem1 lc1 sc1 mem1
+    | step_racy_update
+        lc1 sc1 mem1
+        loc to valr valw ordr ordw
+        (LOCAL: Local.racy_update_step lc1 mem1 loc to ordr ordw):
+        program_step (ThreadEvent.racy_update loc to valr valw ordr ordw) lc1 sc1 mem1 lc1 sc1 mem1
     .
     Hint Constructors program_step.
 
@@ -161,6 +201,12 @@ Module SCLocal.
       - exploit Local.fence_step_future; eauto. i. des. esplits; eauto; try refl.
       - exploit Local.fence_step_future; eauto. i. des. esplits; eauto; try refl.
       - esplits; eauto; try refl.
+      - inv LOCAL.
+        { exploit Local.write_na_step_future; eauto. }
+        { exploit Local.write_step_future; eauto. i. des. esplits; eauto. }
+      - esplits; eauto; try refl.
+      - esplits; eauto; try refl.
+      - esplits; eauto; try refl.
     Qed.
 
     Lemma program_step_inhabited
@@ -174,6 +220,9 @@ Module SCLocal.
         inv PROMISE; eauto using Memory.add_inhabited, Memory.split_inhabited, Memory.lower_inhabited, Memory.cancel_inhabited.
       - inv LOCAL2. inv STEP. inv WRITE.
         inv PROMISE; eauto using Memory.add_inhabited, Memory.split_inhabited, Memory.lower_inhabited, Memory.cancel_inhabited.
+      - inv LOCAL.
+        { inv STEP. eapply Memory.write_na_inhabited; eauto. }
+        { inv STEP. eapply Memory.write_inhabited; eauto. }
     Qed.
 
 
@@ -201,6 +250,12 @@ Module SCLocal.
       - exploit Local.fence_step_disjoint; eauto.
       - exploit Local.fence_step_disjoint; eauto.
       - esplits; eauto.
+      - inv LOCAL.
+        { exploit Local.write_na_step_disjoint; eauto. }
+        { exploit Local.write_step_disjoint; eauto. }
+      - esplits; eauto.
+      - esplits; eauto.
+      - esplits; eauto.
     Qed.
 
     Lemma program_step_promises_bot
@@ -213,6 +268,8 @@ Module SCLocal.
       - eapply Memory.write_promises_bot; eauto.
       - inv LOCAL1. inv LOCAL2. inv STEP. inv STEP0.
         eapply Memory.write_promises_bot; eauto.
+      - eapply Memory.write_na_promises_bot; eauto.
+      - eapply Memory.write_promises_bot; eauto.
     Qed.
   End SCLocal.
 End SCLocal.
@@ -279,18 +336,18 @@ Module SCThread.
     Hint Constructors opt_step.
 
     Definition steps_failure (e1: Thread.t lang): Prop :=
-      exists e2 e3,
+      exists e e2 e3,
         <<STEPS: rtc tau_step e1 e2>> /\
-        <<FAILURE: step true ThreadEvent.failure e2 e3>>.
+        <<STEP_FAILURE: step true e e2 e3>> /\
+        <<EVENT_FAILURE: ThreadEvent.get_machine_event e = MachineEvent.failure>>.
     Hint Unfold steps_failure.
 
     Definition consistent (e: Thread.t lang): Prop :=
-      forall mem1 sc1
-        (CAP: Memory.cap (Thread.memory e) mem1)
-        (SC_MAX: Memory.max_concrete_timemap mem1 sc1),
-        <<FAILURE: steps_failure (Thread.mk lang (Thread.state e) (Thread.local e) sc1 mem1)>> \/
+      forall mem1
+        (CAP: Memory.cap (Thread.memory e) mem1),
+        <<FAILURE: steps_failure (Thread.mk lang (Thread.state e) (Thread.local e) (Thread.sc e) mem1)>> \/
         exists e2,
-          <<STEPS: rtc tau_step (Thread.mk lang (Thread.state e) (Thread.local e) sc1 mem1) e2>> /\
+          <<STEPS: rtc tau_step (Thread.mk lang (Thread.state e) (Thread.local e) (Thread.sc e) mem1) e2>> /\
           <<PROMISES: (Local.promises (Thread.local e2)) = Memory.bot>>.
 
 
@@ -463,6 +520,9 @@ Module SCThread.
           eapply write_step_promise_consistent; eauto.
         + eapply fence_step_promise_consistent; eauto.
         + eapply fence_step_promise_consistent; eauto.
+        + inv LOCAL0.
+          { eapply write_na_step_promise_consistent; eauto. }
+          { eapply write_step_promise_consistent; eauto. }
     Qed.
 
     Lemma rtc_all_step_promise_consistent
@@ -508,7 +568,7 @@ Module SCConfiguration.
         (CANCELS: rtc (@Thread.cancel_step _) (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1)) e2)
         (STEP: SCThread.opt_step L e e2 e3)
         (RESERVES: rtc (@Thread.reserve_step _) e3 (Thread.mk _ st4 lc4 sc4 memory4))
-        (CONSISTENT: e <> ThreadEvent.failure ->
+        (CONSISTENT: ThreadEvent.get_machine_event e <> MachineEvent.failure ->
                      SCThread.consistent L (Thread.mk _ st4 lc4 sc4 memory4)):
         step e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) (Configuration.threads c1)) sc4 memory4)
     .
@@ -606,20 +666,6 @@ Module SCRace.
         (<<ACCESS: is_accessing e = (Some loc)>>) /\
         (<<LOC: L loc>>) /\
         (<<MAXIMAL: SCLocal.non_maximal (Thread.local th) (Thread.memory th) loc>>).
-
-    Lemma non_maximal_equiv lc loc mem
-          (LOCAL: Local.wf lc mem)
-      :
-        SCLocal.non_maximal lc mem loc <->
-        ~ Memory.max_concrete_ts mem loc ((TView.cur (Local.tview lc)).(View.rlx) loc).
-    Proof.
-      inv LOCAL. unfold SCLocal.non_maximal. split; i.
-      - des. ii. eapply H in GET. timetac.
-      - inv TVIEW_CLOSED. inv CUR. specialize (RLX loc). des.
-        eapply NNPP. ii. eapply H. econs; eauto.
-        i. destruct (Time.le_lt_dec to (View.rlx (TView.cur (Local.tview lc)) loc)); auto.
-        exfalso. eapply H0. esplits; eauto.
-    Qed.
 
     Definition race_steps (c: Configuration.t) (tid: Ident.t): Prop :=
       exists lang st1 lc1 e2,

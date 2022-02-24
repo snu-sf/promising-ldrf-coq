@@ -42,7 +42,7 @@ Section SIM.
 
   Lemma ra_program_step_sc_program_step_or_race lang
         (th0 th1: Thread.t lang) e
-        (STEP: OrdThread.program_step L Ordering.acqrel e th0 th1)
+        (STEP: OrdThread.program_step L Ordering.acqrel Ordering.acqrel e th0 th1)
     :
       (<<STEP: SCThread.program_step L e th0 th1>>) \/
       (<<RACE: SCRace.race L th0>>).
@@ -74,11 +74,23 @@ Section SIM.
     - econs; eauto.
     - econs; eauto.
     - econs; eauto.
+    - inv LOCAL0.
+      { des_ifs.
+        { exfalso. inv STEP. destruct ord; ss. }
+        econs. econs 1; eauto.
+      }
+      { econs. econs 2; eauto.
+        replace Ordering.acqrel with (Ordering.join ord Ordering.acqrel); eauto.
+        destruct ord; ss.
+      }
+    - econs; eauto.
+    - econs; eauto.
+    - econs; eauto.
   Qed.
 
   Lemma ra_thread_step_sc_thread_step_or_race lang
         (th0 th1: Thread.t lang) pf e
-        (STEP: OrdThread.step L Ordering.acqrel pf e th0 th1)
+        (STEP: OrdThread.step L Ordering.acqrel Ordering.acqrel pf e th0 th1)
     :
       (<<STEP: SCThread.step L pf e th0 th1>>) \/
       (<<RACE: SCRace.race L th0>>).
@@ -91,7 +103,7 @@ Section SIM.
 
   Lemma ra_thread_opt_step_sc_thread_opt_step_or_race lang
         (th0 th1: Thread.t lang) e
-        (STEP: OrdThread.opt_step L Ordering.acqrel e th0 th1)
+        (STEP: OrdThread.opt_step L Ordering.acqrel Ordering.acqrel e th0 th1)
     :
       (<<STEP: SCThread.opt_step L e th0 th1>>) \/
       (<<RACE: SCRace.race L th0>>).
@@ -104,12 +116,12 @@ Section SIM.
 
   Lemma ra_thread_tau_steps_sc_thread_tau_steps_or_race lang
         (th0 th1: Thread.t lang)
-        (STEPS: rtc (OrdThread.tau_step L Ordering.acqrel) th0 th1)
+        (STEPS: rtc (OrdThread.tau_step L Ordering.acqrel Ordering.acqrel) th0 th1)
     :
       (<<STEPS: rtc (SCThread.tau_step L) th0 th1>>) \/
       (exists th',
           (<<STEPS0: rtc (SCThread.tau_step L) th0 th'>>) /\
-          (<<STEPS1: rtc (OrdThread.tau_step L Ordering.acqrel) th' th1>>) /\
+          (<<STEPS1: rtc (OrdThread.tau_step L Ordering.acqrel Ordering.acqrel) th' th1>>) /\
           (<<RACE: SCRace.race L th'>>)).
   Proof.
     induction STEPS; eauto. dup H. inv H. inv TSTEP.
@@ -122,12 +134,12 @@ Section SIM.
 
   Lemma ra_thread_all_steps_sc_thread_all_steps_or_race lang
         (th0 th1: Thread.t lang)
-        (STEPS: rtc (OrdThread.all_step L Ordering.acqrel) th0 th1)
+        (STEPS: rtc (OrdThread.all_step L Ordering.acqrel Ordering.acqrel) th0 th1)
     :
       (<<STEPS: rtc (SCThread.all_step L) th0 th1>>) \/
       (exists th',
           (<<STEPS0: rtc (SCThread.all_step L) th0 th'>>) /\
-          (<<STEPS1: rtc (OrdThread.all_step L Ordering.acqrel) th' th1>>) /\
+          (<<STEPS1: rtc (OrdThread.all_step L Ordering.acqrel Ordering.acqrel) th' th1>>) /\
           (<<RACE: SCRace.race L th'>>)).
   Proof.
     induction STEPS; eauto. dup H. inv H. inv USTEP.
@@ -181,7 +193,7 @@ Section SIM.
       { econs 1. econs.
         { econs; eauto. eapply closed_message_map; eauto.
           eapply ident_map_message. }
-        { inv KIND; ss. inv MSG; ss. }
+        { inv KIND; ss. }
         { ii. clarify. exploit PF; eauto. }
       }
       { econs; eauto; ss. eapply ident_map_message. }
@@ -201,7 +213,8 @@ Section SIM.
           ii. destruct (Time.le_lt_dec to' fto); auto. exfalso. eapply RACE.
           unfold SCRace.race, SCLocal.non_maximal. esplits; eauto; ss.
           inv READ. inv READABLE. eapply TimeFacts.le_lt_lt; eauto.
-          eapply RLX; eauto. des_ifs. etrans; [|eapply Ordering.join_r]. auto.
+          eapply RLX; eauto. destruct (L loc); ss.
+          etrans; [|eapply Ordering.join_r]. auto.
         }
         { econs; eauto. }
       }
@@ -243,7 +256,7 @@ Section SIM.
             ii. destruct (Time.le_lt_dec to' fto); auto. exfalso. eapply RACE.
             unfold SCRace.race, SCLocal.non_maximal. esplits; eauto; ss.
             inv READ. inv READABLE. eapply TimeFacts.le_lt_lt; eauto.
-            eapply RLX; eauto. des_ifs. etrans; [|eapply Ordering.join_r]. auto.
+            eapply RLX; eauto. destruct (L loc); ss. etrans; [|eapply Ordering.join_r]. auto.
           }
           { econs; eauto.
             ii. destruct (Time.le_lt_dec tsw to'); auto. exfalso. eapply RACE.
@@ -276,6 +289,63 @@ Section SIM.
         { econs 2; eauto. econs; eauto. econs 7; eauto. }
         { econs; eauto; ss. }
       }
+      { inv LOCAL2.
+        { hexploit write_na_step_map; try eassumption; eauto.
+          { eapply ident_map_bot. }
+          { eapply FLOCAL. }
+          { eapply FLOCAL. }
+          { refl. }
+          { refl. }
+          { eapply mapping_map_lt_iff_non_collapsable; eauto. }
+          { instantiate (1:=List.map (fun '(from, to, msg) => (from, to)) msgs).
+            clear. induction msgs; ss. econs; eauto. destruct a as [[from to] msg]. ss.
+          }
+          { eapply List.Forall_forall.
+            i. eapply mapping_map_lt_iff_non_collapsable; eauto.
+          }
+          i. des.
+          eexists (ThreadEvent.write_na _ fmsgs _ _ _ _). esplits.
+          { econs; eauto. eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }
+          { econs 2; eauto. econs; eauto. econs; eauto. econs 1; eauto. }
+          { econs; eauto; ss. }
+        }
+        { hexploit write_step_map; try eassumption; eauto.
+          { eapply ident_map_bot. }
+          { eapply FLOCAL. }
+          { eapply FLOCAL. }
+          { econs 2. }
+          { refl. }
+          { refl. }
+          { eapply mapping_map_lt_iff_non_collapsable; eauto. }
+          i. des.
+          eexists (ThreadEvent.write_na _ [] _ _ _ _). esplits.
+          { econs; eauto. eapply mapping_map_lt_iff_collapsable_unwritable; eauto. }
+          { econs 2; eauto. econs; eauto. econs; eauto. econs 2; eauto. }
+          { econs; eauto; ss. }
+        }
+      }
+      { inv LOCAL2. hexploit racy_read_step_map; try eassumption; eauto.
+        { eapply ident_map_lt. }
+        i. des. eexists (ThreadEvent.racy_read _ fto _ _). esplits.
+        { econs; eauto. }
+        { econs 2; eauto. econs; eauto. econs; eauto. econs; eauto. }
+        { econs; eauto; ss. }
+      }
+      { inv LOCAL2. hexploit racy_write_step_map; try eassumption; eauto.
+        { eapply ident_map_lt. }
+        i. des. eexists (ThreadEvent.racy_write _ fto _ _). esplits.
+        { econs; eauto. }
+        { econs 2; eauto. econs; eauto. econs; eauto. econs; eauto. }
+        { econs; eauto; ss. }
+      }
+      { hexploit racy_update_step_map; try eassumption; eauto.
+        { eapply ident_map_bot. }
+        { eapply ident_map_lt. }
+        i. des. eexists (ThreadEvent.racy_update _ fto _ _ _ _). esplits.
+        { econs; eauto. }
+        { econs 2; eauto. econs; eauto. econs; eauto. }
+        { econs; eauto; ss. }
+      }
     }
   Qed.
 
@@ -287,8 +357,10 @@ Section SIM.
       SCRace.race L fth0.
   Proof.
     unfold SCRace.race, SCLocal.non_maximal in *. des. inv THREAD. ss.
-    eapply MEM in GET. des; ss. inv MSG. inv MSGLE.
-    esplits; eauto. inv LOCAL. inv TVIEWLE. inv CUR. specialize (RLX loc).
+    eapply MEM in GET. des; ss.
+    esplits; eauto.
+    { inv MSG; inv MSGLE; ss. }
+    inv LOCAL. inv TVIEWLE. inv CUR. specialize (RLX loc).
     eapply TimeFacts.le_lt_lt; eauto.
     eapply (@MAPLT loc (View.rlx (TView.cur (Local.tview lc)) loc) to (View.rlx (TView.cur ftv') loc) fto); eauto.
     eapply TVIEW.
@@ -332,10 +404,9 @@ Section SIM.
   Qed.
 
   Lemma cap_race_current_race
-        lang (e0 e1: Thread.t lang) cap max
+        lang (e0 e1: Thread.t lang) cap
         (CAP: Memory.cap (Thread.memory e0) cap)
-        (MAX: Memory.max_concrete_timemap cap max)
-        (STEPS: rtc (SCThread.tau_step L) (Thread.mk _ (Thread.state e0) (Thread.local e0) max cap) e1)
+        (STEPS: rtc (SCThread.tau_step L) (Thread.mk _ (Thread.state e0) (Thread.local e0) (Thread.sc e0) cap) e1)
         (LOCAL: Local.wf (Thread.local e0) (Thread.memory e0))
         (MEMORY: Memory.closed (Thread.memory e0))
         (SC: Memory.closed_timemap (Thread.sc e0) (Thread.memory e0))
@@ -360,16 +431,14 @@ Section SIM.
       }
       { eapply mapping_map_lt_iff_collapsable_unwritable. eapply ident_map_lt_iff. }
       { eapply ident_map_timemap. }
-      { instantiate (1:=max). instantiate (1:=(Thread.sc e0)).
-        eapply Memory.max_concrete_timemap_spec; eauto.
-        eapply Memory.cap_closed_timemap; eauto. }
+      { refl. }
     }
     { eauto. }
     { eapply Local.cap_wf; eauto. }
     { eauto. }
     { eapply Memory.cap_closed; eauto. }
     { eauto. }
-    { eapply Memory.max_concrete_timemap_closed; eauto. }
+    { eapply Memory.cap_closed_timemap; eauto. }
     { eauto. }
     i. des.
     - exists fe1. esplits.
@@ -387,7 +456,7 @@ Section SIM.
     - assert (CONSISTENT0: Local.promise_consistent (Thread.local e')).
       { exploit SCThread.rtc_tau_step_future; try apply STEPS0; eauto.
         { eapply Local.cap_wf; eauto. }
-        { eapply Memory.max_concrete_timemap_closed; eauto. }
+        { eapply Memory.cap_closed_timemap; eauto. }
         { eapply Memory.cap_closed; eauto. }
         i. des. ss. eapply SCThread.rtc_tau_step_promise_consistent; eauto.
       }
@@ -407,7 +476,7 @@ Section SIM.
 
   Lemma ord_thread_consistent_promise_consistent lang
         (th0: Thread.t lang)
-        (CONSISTENT: OrdThread.consistent L Ordering.acqrel th0)
+        (CONSISTENT: OrdThread.consistent L Ordering.acqrel Ordering.acqrel th0)
         (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
         (MEMORY: Memory.closed (Thread.memory th0))
         (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
@@ -415,19 +484,19 @@ Section SIM.
       Local.promise_consistent (Thread.local th0).
   Proof.
     hexploit (@Memory.cap_exists (Thread.memory th0)); eauto. intros [cap CAP].
-    hexploit (@Memory.max_concrete_timemap_exists cap); eauto.
-    { eapply Memory.cap_closed; eauto. } intros [max MAX].
     exploit CONSISTENT; eauto. i. des.
     { unfold OrdThread.steps_failure in FAILURE. des.
       eapply OrdThread.rtc_tau_step_promise_consistent in STEPS; eauto.
       { eapply Local.cap_wf; eauto. }
-      { eapply Memory.max_concrete_timemap_closed; eauto. }
+      { eapply Memory.cap_closed_timemap; eauto. }
       { eapply Memory.cap_closed; eauto. }
-      { inv FAILURE0; inv STEP. inv LOCAL0. inv LOCAL1. ss. }
+      { inv STEP_FAILURE; inv STEP; ss.
+        inv LOCAL0; ss; inv LOCAL1; ss. inv STEP; ss.
+      }
     }
     { eapply OrdThread.rtc_tau_step_promise_consistent in STEPS; eauto.
       { eapply Local.cap_wf; eauto. }
-      { eapply Memory.max_concrete_timemap_closed; eauto. }
+      { eapply Memory.cap_closed_timemap; eauto. }
       { eapply Memory.cap_closed; eauto. }
       { eapply Local.bot_promise_consistent; eauto. }
     }
@@ -435,7 +504,7 @@ Section SIM.
 
   Lemma ra_thread_consistent_sc_thread_consistent_or_race lang
         (th0: Thread.t lang)
-        (CONSISTENT: OrdThread.consistent L Ordering.acqrel th0)
+        (CONSISTENT: OrdThread.consistent L Ordering.acqrel Ordering.acqrel th0)
         (LOCAL: Local.wf (Thread.local th0) (Thread.memory th0))
         (MEMORY: Memory.closed (Thread.memory th0))
         (SC: Memory.closed_timemap (Thread.sc th0) (Thread.memory th0))
@@ -454,30 +523,34 @@ Section SIM.
     - unfold OrdThread.steps_failure in *. des.
       left. unfold SCThread.steps_failure.
       eapply ra_thread_tau_steps_sc_thread_tau_steps_or_race in STEPS. des.
-      + inv FAILURE0; inv STEP. inv LOCAL0. inv LOCAL1.
-        esplits; eauto. econs 2; eauto; ss. econs; eauto. econs; eauto.
+      + hexploit ra_thread_step_sc_thread_step_or_race; eauto. i. des.
+        { red. esplits; eauto. }
+        { exfalso. eapply RACE.
+          eapply cap_race_current_race; eauto.
+          inv STEP_FAILURE; inv STEP; ss. inv LOCAL0; ss; inv LOCAL1; ss. inv STEP; ss.
+        }
       + exfalso. eapply RACE.
         eapply cap_race_current_race; eauto.
         exploit SCThread.rtc_tau_step_future; try apply STEPS0; eauto.
         { eapply Local.cap_wf; eauto. }
-        { eapply Memory.max_concrete_timemap_closed; eauto. }
+        { eapply Memory.cap_closed_timemap; eauto. }
         { eapply Memory.cap_closed; eauto. }
         i. des. ss. eapply OrdThread.rtc_tau_step_promise_consistent; eauto.
-        inv FAILURE0; inv STEP. inv LOCAL0. inv LOCAL1. ss.
+        inv STEP_FAILURE; inv STEP; ss. inv LOCAL0; ss; inv LOCAL1; ss. inv STEP; ss.
     - right. eapply ra_thread_tau_steps_sc_thread_tau_steps_or_race in STEPS. des.
       + esplits; eauto.
       + exfalso. eapply RACE.
         eapply cap_race_current_race; eauto.
         exploit SCThread.rtc_tau_step_future; try apply STEPS0; eauto.
         { eapply Local.cap_wf; eauto. }
-        { eapply Memory.max_concrete_timemap_closed; eauto. }
+        { eapply Memory.cap_closed_timemap; eauto. }
         { eapply Memory.cap_closed; eauto. }
         i. des. ss. eapply OrdThread.rtc_tau_step_promise_consistent; eauto.
         eapply Local.bot_promise_consistent; eauto.
   Qed.
 
   Lemma ra_configuration_step_sc_configuration_step_or_race e tid c0 c1
-        (STEP: OrdConfiguration.step L Ordering.acqrel e tid c0 c1)
+        (STEP: OrdConfiguration.step L Ordering.acqrel Ordering.acqrel e tid c0 c1)
         (WF: Configuration.wf c0)
     :
       (<<STEP: SCConfiguration.step L e tid c0 c1>>) \/
@@ -497,9 +570,10 @@ Section SIM.
 
     assert ((<<CONSISTENT: Local.promise_consistent (Thread.local e2)>>) /\
             (<<CONSISTENT: Local.promise_consistent lc4>>)).
-    { destruct (classic (e = ThreadEvent.failure)).
-      - clarify. inv STEP0. inv STEP; inv STEP0. inv LOCAL0. inv LOCAL1. splits; auto.
-        eapply PromiseConsistent.rtc_reserve_step_promise_consistent2 in RESERVES; eauto.
+    { destruct (classic (ThreadEvent.get_machine_event e = MachineEvent.failure)).
+      - cut (Local.promise_consistent (Thread.local e2) /\ Local.promise_consistent (Thread.local e3)).
+        { i. des. eapply PromiseConsistent.rtc_reserve_step_promise_consistent2 in RESERVES; eauto. }
+        inv STEP0; ss. inv STEP; inv STEP0; ss. inv LOCAL0; ss; inv LOCAL1; ss. inv STEP; ss.
       - hexploit ord_thread_consistent_promise_consistent; eauto. i. ss. splits; eauto.
         eapply PromiseConsistent.rtc_reserve_step_promise_consistent in RESERVES; eauto.
         inv STEP0; auto. eapply OrdThread.step_promise_consistent in STEP; eauto.
@@ -556,7 +630,7 @@ Section SIM.
   Qed.
 
   Lemma ra_configuration_steps_sc_configuration_steps_or_race c0 c1
-        (STEPS: rtc (OrdConfiguration.all_step L Ordering.acqrel) c0 c1)
+        (STEPS: rtc (OrdConfiguration.all_step L Ordering.acqrel Ordering.acqrel) c0 c1)
         (WF: Configuration.wf c0)
     :
       (<<STEPS: rtc (SCConfiguration.all_step L) c0 c1>>) \/
@@ -578,7 +652,7 @@ Section SIM.
         (RACEFREE: SCRace.racefree L c)
         (WF: Configuration.wf c)
     :
-      behaviors (@OrdConfiguration.machine_step L Ordering.acqrel) c <1=
+      behaviors (@OrdConfiguration.machine_step L Ordering.acqrel Ordering.acqrel) c <2=
       behaviors (@SCConfiguration.machine_step L) c.
   Proof.
     i. ginduction PR; eauto; i.
@@ -604,6 +678,7 @@ Section SIM.
           { eapply SCRace.step_racefree; eauto. }
           { eapply SCConfiguration.step_future; eauto. }
       + exfalso. eapply RACEFREE; eauto.
+    - econs 5.
   Qed.
 
   Lemma sc_racefree_ra_racefree c
@@ -626,10 +701,10 @@ Section SIM.
         unfold ThreadEvent.is_reading in *. des_ifs.
         - inv READ_STEP; inv STEP. econs; eauto. esplits; eauto; ss.
           inv LOCAL. inv LOCAL0. inv STEP.
-          unfold SCLocal.non_maximal. esplits; eauto.
+          unfold SCLocal.non_maximal. esplits; eauto; ss.
         - inv READ_STEP; inv STEP. econs; eauto. esplits; eauto; ss.
           inv LOCAL. inv LOCAL1. inv LOCAL2. inv STEP.
-          unfold SCLocal.non_maximal. esplits; eauto.
+          unfold SCLocal.non_maximal. esplits; eauto; ss.
       }
       { eapply RACEFREE; eauto. econs. esplits; eauto.
         exploit SCConfiguration.all_steps_future; eauto. i. des.
@@ -648,7 +723,7 @@ End SIM.
 Theorem local_drf_sc L
         s
         (RACEFREE: SCRace.racefree_syn L s):
-  behaviors SConfiguration.machine_step (Configuration.init s) <1=
+  behaviors SConfiguration.machine_step (Configuration.init s) <2=
   behaviors (@SCConfiguration.machine_step L) (Configuration.init s).
 Proof.
   i. eapply local_drf_ra in PR; eauto.
