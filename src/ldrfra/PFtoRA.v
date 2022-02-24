@@ -521,10 +521,9 @@ Module PFtoRA.
 
 
     (* racefree *)
-
     Lemma sim_conf_racy_read
           views1 rels1 c1_pf c1_j c1_apf c1_ra
-          loc ts e_pf tid c2_pf
+          loc ts e_pf tid c2_pf ts_aux
           (SIM1: sim_conf views1 rels1 c1_pf c1_j c1_apf c1_ra)
           (WF1_PF: wf_pf c1_pf)
           (WF1_J: wf_j views1 c1_j)
@@ -532,7 +531,8 @@ Module PFtoRA.
           (WF1_RA: wf_ra rels1 c1_ra)
           (STEP: PFRace.racy_read_step L loc ts e_pf tid c1_pf c2_pf)
           (LOC: L loc)
-          (RELS: exists ord, List.In (loc, ts, ord) rels1 /\ Ordering.le ord Ordering.strong_relaxed):
+          (TSAUX: Time.le ts ts_aux)
+          (RELS: exists ord, List.In (loc, ts_aux, ord) rels1 /\ Ordering.le ord Ordering.strong_relaxed):
       (<<RACE: RARaceW.ra_race_steps L Ordering.acqrel Ordering.acqrel rels1 c1_ra>>).
     Proof.
       inv STEP. inv SIM1. ss.
@@ -600,6 +600,7 @@ Module PFtoRA.
           unfold RARaceW.wr_race.
           inv LOCAL2. inv TVIEW. rewrite CUR.
           esplits; eauto.
+          eapply TimeFacts.lt_le_lt; [|eapply TSAUX].
           eapply TimeFacts.le_lt_lt; eauto. condtac.
           * inv LOCAL. inv TVIEW. inv CUR0. apply RLX.
           * inv LOCAL. inv TVIEW. inv CUR0.
@@ -619,6 +620,7 @@ Module PFtoRA.
           unfold RARaceW.wr_race.
           inv LOCAL3. inv TVIEW. rewrite CUR.
           esplits; eauto.
+          eapply TimeFacts.lt_le_lt; [|eapply TSAUX].
           eapply TimeFacts.le_lt_lt; eauto. condtac.
           * inv LOCAL. inv TVIEW. inv CUR0. apply RLX.
           * inv LOCAL. inv TVIEW. inv CUR0.
@@ -639,30 +641,21 @@ Module PFtoRA.
           inv LOCAL2. inv TVIEW. rewrite CUR.
           esplits; eauto. inv LOCAL0. inv STEP. inv RACE.
           unfold TView.racy_view in RACE0.
+          eapply TimeFacts.lt_le_lt; [|eapply TSAUX].
           eapply TimeFacts.le_lt_lt; eauto.
           * inv LOCAL. inv TVIEW. inv CUR0.
             inv NORMAL_APF. inv NORMAL_TVIEW. ss.
             destruct e2_apf; ss. subst. ss.
-            rewrite CUR0; ss.
-    Admitted.
- (*      - inv  *)
+            rewrite CUR0; ss. rewrite CUR. refl.
+    Qed.
 
- (*          * inv LOCAL. inv TVIEW. inv CUR0. ss. apply RLX. *)
- (*          * inv LOCAL. inv TVIEW. inv CUR0. *)
- (*            inv NORMAL_APF. inv NORMAL_TVIEW. ss. *)
- (*            destruct e2_apf; ss. subst. ss. *)
- (*            rewrite CUR0; ss. *)
- (*          eapply TimeFacts.le_lt_lt; eauto. *)
-
-
- (* inv RACE0. *)
- (*          eapply TimeFacts.le_lt_lt; eauto. condtac. *)
- (*          * inv LOCAL. inv TVIEW. inv CUR0. apply RLX. *)
- (*          * inv LOCAL. inv TVIEW. inv CUR0. *)
- (*            inv NORMAL_APF. inv NORMAL_TVIEW. ss. *)
- (*            destruct e2_apf; ss. subst. ss. *)
- (*            rewrite CUR0; ss. *)
- (*    Qed. *)
+    Lemma memory_write_na_time_max ts prom0 mem0 loc from to val prom1 mem1 msgs kinds kind
+          (WRITE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 msgs kinds kind)
+      :
+        List.Forall (fun '(_, to0, _) => Time.lt to0 to) msgs.
+    Proof.
+      induction WRITE; eauto. econs; eauto. eapply Memory.write_na_times; eauto.
+    Qed.
 
     Lemma sim_conf_racefree
           views rels c_pf c_j c_apf c_ra
@@ -686,17 +679,28 @@ Module PFtoRA.
         eapply RA_RACEFREE; cycle 1; eauto.
         eapply WConfiguration.steps_trans; eauto.
       }
-      assert (WRITE_RA: exists ord, List.In (loc, ts, ord) rels0 /\ Ordering.le ord Ordering.strong_relaxed).
+      assert (WRITE_RA: exists ts_aux ord, List.In (loc, ts_aux, ord) rels0 /\ Ordering.le ord Ordering.strong_relaxed /\ (<<WRITE: PFRace.writing_event loc ts_aux e0>>) /\ (<<TSAUX: Time.le ts ts_aux>>)).
       { inv WRITE0; inv EVENT_J; inv EVENT_APF; inv EVENT_RA; ss.
         - inv STEP_APF. ss. inv STEP0; ss. inv STEP1.
           unfold Writes.append. ss. condtac; ss.
-          esplits; [left|]; eauto.
+          esplits; [left|..]; eauto.
+          { econs; eauto. }
+          { refl. }
         - inv STEP_APF. ss. inv STEP0; ss. inv STEP1.
           unfold Writes.append. ss. condtac; ss.
-          esplits; [left|]; eauto.
+          esplits; [left|..]; eauto.
+          { econs; eauto. }
+          { refl. }
         - inv STEP_APF. ss. inv STEP0; ss. inv STEP1.
-          unfold Writes.append. ss. condtac; ss.
-          admit.
+          unfold Writes.append. ss. condtac; ss. esplits; eauto.
+          { econs; eauto. }
+          { inv STEP. inv STEP1. inv STEP; inv STEP1. inv LOCAL.
+            inv LOCAL0. des.
+            { subst. refl. }
+            { eapply memory_write_na_time_max in WRITE; eauto.
+              eapply List.Forall_forall in IN0; eauto. ss. left. auto.
+            }
+          }
       }
       exploit step_pf_future; try exact STEP; eauto. i. des.
       exploit step_j_future; try exact STEP_J; eauto. i. des.
@@ -712,7 +716,7 @@ Module PFtoRA.
       exploit steps_j_future; try exact STEPS_J0; eauto. i. des.
       exploit steps_ra_future; try exact STEPS_APF0; eauto. i. des.
       exploit steps_ra_future; try exact STEPS_RA0; eauto. i. des.
-      assert (READ_RA: exists ord, List.In (loc, ts, ord) rels1 /\ Ordering.le ord Ordering.strong_relaxed).
+      assert (READ_RA: exists ord, List.In (loc, ts_aux, ord) rels1 /\ Ordering.le ord Ordering.strong_relaxed).
       { exploit WConfiguration.steps_rels_incl; try exact STEPS_APF0. i. des. subst.
         esplits.
         - apply List.in_or_app. right. eauto.
@@ -723,7 +727,7 @@ Module PFtoRA.
       eapply WConfiguration.steps_trans; eauto.
       eapply WConfiguration.steps_trans; eauto.
       econs 2; eauto.
-    Admitted.
+    Qed.
 
 
     (* behaviors *)
