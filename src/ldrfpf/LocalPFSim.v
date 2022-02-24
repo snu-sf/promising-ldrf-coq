@@ -378,8 +378,7 @@ Proof.
   { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto.
     eapply list_Forall2_impl; eauto. i. ss.
     destruct a as [[from0 to0] msg0], b as [[from1 to1] msg1].
-    ss. des. splits; eauto. eapply ident_map_message_eq; eauto.
-    eapply message_map_incr; eauto.
+    ss. des. splits; eauto. inv SAT1; ss.
   }
   { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. }
   { eapply IDENT in TO. subst. econs; eauto. }
@@ -2599,35 +2598,28 @@ Section SIM.
     }
   Qed.
 
-  Definition sim_event: ThreadEvent.t -> ThreadEvent.t -> Prop.
-  Admitted.
-
   Lemma tevent_ident_map_weak f e fe
         (MAP: tevent_map_weak f fe e)
         (IDENT: forall loc to fto (MAP: f loc to fto), to = fto)
     :
       sim_event e fe.
   Proof.
-  Admitted.
- (*    inv MAP; try econs; eauto. *)
- (*    { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. } *)
- (*    { eapply IDENT in TO. subst. econs; eauto. } *)
- (*    { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. } *)
- (*    { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. *)
- (*      eapply list_Forall2_impl; eauto. i. *)
- (*      destruct a as [[from0 to0] msg0], b as [[from1 to1] msg1]. *)
- (*      ss. des; auto. *)
-
- (* des_ifs. *)
-
- (*    } *)
- (*    { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. } *)
- (*    { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. } *)
- (*    { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. } *)
- (*    { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. } *)
- (*    { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. } *)
- (*    { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. } *)
- (*  Qed. *)
+    inv MAP; try econs; eauto.
+    { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. }
+    { eapply IDENT in TO. subst. econs; eauto. }
+    { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. }
+    { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto.
+      eapply list_Forall2_impl; eauto. i.
+      destruct a as [[from0 to0] msg0], b as [[from1 to1] msg1].
+      ss. des. splits; auto.
+      { eapply IDENT; eauto. }
+      { inv SAT1; ss. }
+    }
+    { eapply IDENT in FROM. eapply IDENT in TO. subst. econs; eauto. }
+    { eapply IDENT in TO. subst. econs; eauto. }
+    { eapply IDENT in TO. subst. econs; eauto. }
+    { eapply IDENT in TO. subst. econs; eauto. }
+  Qed.
 
   Lemma good_future_configuration_step_aux c0 c1 c0' e tid (tr0 tr_cert0: Trace.t) tm
         lang st lc0 lc1 sc_tmp
@@ -2813,14 +2805,12 @@ Section SIM.
     }
     { eapply list_Forall2_app.
       { eapply list_Forall2_impl; eauto. i. destruct a, b. ss. des. split; auto.
-        { admit. }
-(* eapply tevent_ident_map; eauto. i. ss. des; auto. } *)
+        { eapply tevent_ident_map; eauto. i. ss. des; auto. }
         { inv LOCAL2. eapply tview_ident_map in TVIEW; subst; eauto.
           ii. ss. des. auto. }
       }
       { econs; ss; eauto. split; auto.
-        { admit. }
-(* eapply tevent_ident_map; eauto. i. ss. des; auto. } *)
+        { eapply tevent_ident_map; eauto. i. ss. des; auto. }
         { inv LOCAL0. eapply tview_ident_map in TVIEW; subst; eauto.
           ii. ss. des. auto. }
       }
@@ -2830,8 +2820,7 @@ Section SIM.
       { erewrite IdentMap.gss; eauto. }
       { ss. erewrite IdentMap.gss; eauto. }
     }
-  Admitted.
-  (* Qed. *)
+  Qed.
 
   Lemma configuration_step_certify c0 c1 e tid (tr tr_cert: Trace.t)
         (WF: Configuration.wf c0)
@@ -3056,7 +3045,7 @@ Section SIM.
                (<<NOREAD:
                   List.Forall
                     (fun the =>
-                       no_read_msgs (fun loc ts => exists ws, List.In (loc, ts) ws /\ List.In ws pl0 /\ prom0 tid0 loc ts) (snd the)) (tr_tgt ++ tr_cert')>>)).
+                       no_read_msgs (fun loc ts => exists ws, List.In (loc, ts) ws /\ List.In ws pl1 /\ prom0 tid0 loc ts) (snd the)) (tr_tgt ++ tr_cert')>>)).
     { assert (exists tid0 loc ts rlc0 re0,
                  (<<READING0: PFRace.reading_event true loc ts re0>>) /\
                  (<<IN0: List.In (rlc0, re0) (tr_tgt ++ tr_cert)>>) /\
@@ -3155,33 +3144,54 @@ Section SIM.
       }
       des.
       hexploit (list_final_exists
-                  (fun locts =>
-                     ~ prom0 tid0 (fst locts) (snd locts) \/
-                     List.Forall (fun the =>
-                                    no_read_msgs (fun loc0 ts0 => (loc0, ts0) = locts /\ prom0 tid0 loc0 ts0) (snd the)) (tr_tgt ++ tr_cert'))
+                  (List.Forall (fun locts =>
+                                  ~ prom0 tid0 (fst locts) (snd locts) \/
+                                  List.Forall (fun the =>
+                                                 no_read_msgs (fun loc0 ts0 => (loc0, ts0) = locts /\ prom0 tid0 loc0 ts0) (snd the)) (tr_tgt ++ tr_cert')))
                   (proml0 tid0)).
       i. des.
-      { exfalso. eapply List.Forall_forall in ALL; eauto. des; ss.
+      { exfalso. eapply List.Forall_forall in ALL; eauto.
+        eapply List.Forall_forall in ALL; eauto. des; ss.
         eapply List.Forall_forall in ALL; eauto. ss.
         unfold no_read_msgs in ALL. inv READING1; ss.
         { eapply ALL. splits; auto. }
         { eapply ALL. splits; auto. }
+        { eapply ALL. splits; auto. }
+        { eapply ALL. splits; auto. }
+        { eapply ALL. splits; auto. }
       }
-      { apply not_or_and in SAT. des. apply NNPP in SAT. destruct a. ss.
+      { erewrite Forall_forall in SAT.
+        eapply not_all_ex_not in SAT. des.
+        eapply imply_to_and in SAT. des.
+        apply not_or_and in SAT0. des. apply NNPP in SAT0. destruct n; ss.
         assert (exists rlc' re',
-                   (<<READING: PFRace.reading_event t t0 re'>>) /\
+                   (<<READING: PFRace.reading_event true t t0 re'>>) /\
                    (<<IN: List.In (rlc', re') (tr_tgt ++ tr_cert')>>)).
-        { apply NNPP. ii. eapply SAT0. eapply List.Forall_forall.
+        { apply NNPP. ii. eapply SAT1. eapply List.Forall_forall.
           i. destruct x. ss. unfold no_read_msgs. des_ifs.
           { ii. des; clarify. eapply H. esplits; eauto. econs; eauto. }
           { ii. des; clarify. eapply H. esplits; eauto. econs; eauto. }
+          { ii. des; clarify. eapply H. esplits; eauto. econs; eauto. }
+          { ii. des; clarify. eapply H. esplits; eauto. econs; eauto. }
+          { ii. des; clarify. eapply H. esplits; eauto. econs; eauto. }
         }
-        des. esplits; eauto. apply List.Forall_forall. i.
+        des. clear SAT1 IN1. esplits; eauto. apply List.Forall_forall. i.
         destruct x. ss. unfold no_read_msgs. des_ifs.
-        { ii. des. eapply List.Forall_forall in H0; eauto. ss. des; ss.
-          eapply List.Forall_forall in H0; eauto. ss. eapply H0; eauto. }
-        { ii. des. eapply List.Forall_forall in H0; eauto. ss. des; ss.
-          eapply List.Forall_forall in H0; eauto. ss. eapply H0; eauto. }
+        { ii. des. eapply List.Forall_forall in H1; eauto.
+          eapply List.Forall_forall in H0; eauto. ss. des; ss.
+          eapply List.Forall_forall in H; eauto. ss. eapply H; eauto. }
+        { ii. des. eapply List.Forall_forall in H1; eauto.
+          eapply List.Forall_forall in H0; eauto. ss. des; ss.
+          eapply List.Forall_forall in H; eauto. ss. eapply H; eauto. }
+        { ii. des. eapply List.Forall_forall in H1; eauto.
+          eapply List.Forall_forall in H0; eauto. ss. des; ss.
+          eapply List.Forall_forall in H; eauto. ss. eapply H; eauto. }
+        { ii. des. eapply List.Forall_forall in H1; eauto.
+          eapply List.Forall_forall in H0; eauto. ss. des; ss.
+          eapply List.Forall_forall in H; eauto. ss. eapply H; eauto. }
+        { ii. des. eapply List.Forall_forall in H1; eauto.
+          eapply List.Forall_forall in H0; eauto. ss. des; ss.
+          eapply List.Forall_forall in H; eauto. ss. eapply H; eauto. }
       }
     }
     des.
@@ -3206,7 +3216,7 @@ Section SIM.
       econs 3; eauto. }
 
     exploit (@sim_configuration_certify_partial
-               (fun _ => True) tid0 ploc pts pl0 pl1); eauto.
+               (fun _ => True) tid0 ws pl0 pl1); eauto.
     { erewrite <- PROML0; eauto. ii. des; ss. }
     i. des. destruct x0; des.
     { left. ii. eapply PFConfiguration.silent_multi_steps_trace_behaviors; eauto.
@@ -3253,21 +3263,24 @@ Section SIM.
       eapply List.Forall_forall in NOREAD; eauto.
       destruct x, a. ss.
       assert (NOREAD0: no_read_msgs
-jj                         (fun loc ts => In (loc, ts) pl1 /\ prom0 tid0 loc ts) t0).
-      { inv EVT; ss. }
+                         (fun loc ts => exists ws, In (loc, ts) ws /\ List.In ws pl1 /\ prom0 tid0 loc ts) t0).
+      { inv EVT; eauto. }
       eapply no_read_msgs_mon; eauto. i. ss. inv PR.
       clear - SIM DECR WRITTEN TID0 PROMS NEQ TID PROML. des_ifs; ss.
       { eapply DECR in PROMS. ss. }
-      { split; auto. dup PROMS. eapply DECR in PROMS.
+      { dup PROMS. eapply DECR in PROMS.
         destruct (IdentMap.find tid0 (Configuration.threads c_tgt0)) as [[[lang_tgt' st_tgt'] lc_tgt']|] eqn:TIDTGT.
         { dep_inv SIM. eapply CONSISTENT in TIDTGT; ss.
           eapply (pi_consistent_promises TIDTGT) in PROMS.
-          rewrite PROML in *.
-          clear - PROMS WRITTEN PROMS0.
-          eapply List.in_app_or in PROMS. des; ss.
+          rewrite PROML in *. des.
+          clear - IN WIN WRITTEN PROMS0 DECR.
+          eapply List.in_app_or in IN. des; ss.
           { exfalso. eapply WRITTEN; eauto. eapply List.in_or_app. eauto. }
-          { des; ss. exfalso. eapply WRITTEN; eauto. eapply List.in_or_app.
-            ss. eauto. }
+          { des; ss.
+            { exfalso. eapply WRITTEN; eauto. eapply List.in_or_app.
+              ss. eauto. }
+            { esplits; eauto. }
+          }
         }
         { inv SIM. specialize (THSJOIN tid0). specialize (THSPF tid0).
           setoid_rewrite TIDTGT in THSJOIN. unfold option_rel in *. des_ifs.
@@ -3281,14 +3294,14 @@ jj                         (fun loc ts => In (loc, ts) pl1 /\ prom0 tid0 loc ts)
 
     assert (exists rlc' re',
                (<<IN: In (rlc', re') (tr_src0)>>) /\
-               (<<READING: PFRace.reading_event ploc pts re'>>)).
+               (<<READING: PFRace.reading_event true ploc pts re'>>)).
     { eapply list_Forall2_in2 in IN; eauto. des. ss.
       destruct b. ss. exploit sim_traces_sim_event_exists; eauto.
       { inv READING; inv EVT; ss. }
       { inv READING; inv EVT; ss. }
       i. des. esplits; eauto.
       clear - READING EVT EVENT.
-      inv READING; inv EVT; inv EVENT; ss; econs. }
+      inv READING; inv EVT; inv EVENT; ss; econs; auto. }
     des.
 
     exfalso. eapply RACEFREE.
@@ -3302,5 +3315,4 @@ jj                         (fun loc ts => In (loc, ts) pl1 /\ prom0 tid0 loc ts)
     { eauto. }
     { eauto. }
   Qed.
-
 End SIM.

@@ -151,7 +151,7 @@ Section SIM.
       loc msgs_src msgs_tgt from_src from_tgt to val ord
       (MSGS: List.Forall2 (fun '(from_src, to_src, msg_src) '(from_tgt, to_tgt, msg_tgt) =>
                              (<<TO: to_src = to_tgt>>) /\
-                             (<<MSG: msg_src = msg_tgt>>)) msgs_src msgs_tgt)
+                             (<<MSG: msg_src = Message.reserve <-> msg_tgt = Message.reserve>>)) msgs_src msgs_tgt)
     :
       sim_event
         (ThreadEvent.write_na loc msgs_src from_src to val ord)
@@ -3528,7 +3528,7 @@ Section SIM.
             eapply reserving_r_sim_trace; eauto.
             econs 2; ss; eauto.
             { econs; eauto. eapply list_Forall2_impl; eauto.
-              i. ss. des_ifs. des. splits; auto.
+              i. ss. des_ifs. des. subst. splits; auto.
             }
             eapply sim_local_tview_le in SIM; eauto.
           }
