@@ -2338,7 +2338,7 @@ Definition pf_consistent_super_strong_promises_list lang (e0:Thread.t lang)
               ((Thread.memory e0))
               ((Local.promises (Thread.local e0)))
               max),
-      (exists ftr0 ftr1 ftr_reserve ftr_cancel e1 f we val,
+      (exists ftr0 ftr1 ftr_reserve ftr_cancel e1 f we,
           (<<STEPS: Trace.steps (ftr0 ++ ftr_reserve) (Thread.mk _ (Thread.state e0) (Thread.local e0) sc mem1) e1>>) /\
           (<<EVENTS: List.Forall (fun em => <<SAT: ((promise_free \1/ ThreadEvent.is_reserve)
                                                       /1\ no_sc
@@ -2373,7 +2373,8 @@ Definition pf_consistent_super_strong_promises_list lang (e0:Thread.t lang)
           (<<SC: (Thread.sc e1) = sc>>) /\
 
           (<<FINAL: final_event_trace we (ftr0 ++ ftr_reserve)>>) /\
-          (<<WRITING: forall loc to (WIN: List.In (loc, to) ws), relaxed_writing_event loc to val we>>) /\
+          (<<ISWRITE: __guard__(exists loc to val, relaxed_writing_event loc to val we)>>) /\
+          (<<WRITING: forall loc to (WIN: List.In (loc, to) ws), exists val, relaxed_writing_event loc to val we>>) /\
           (<<SOUND: forall loc0 from0 to0 msg0
                            (GET: Memory.get loc0 to0 (Local.promises (Thread.local e1)) = Some (from0, msg0))
                            (NRESERVE: msg0 <> Message.reserve),
@@ -2484,7 +2485,7 @@ Proof.
                         (<<IN: List.In (loc, ts) dom>>) /\
                         (<<NIN: forall ws (IN: List.In ws pl),
                             ~ List.In (loc, ts) ws>>))) as [EXIST|ALL].
-  { exists [dom]. split.
+  { exists [dom]. repeat red. splits.
     { ii. eapply COMPLETE in GET; eauto. esplits; eauto. ss. auto. }
     ii. exploit CONSISTENT; eauto. i. des. exfalso.
     eapply SOUND in IN. des.
@@ -2528,10 +2529,11 @@ Proof.
     { eapply MAX in Heq0. auto. }
     { eapply MAX in Heq0. auto. }
   }
-  assert (WRITING: exists val0,
-             forall loc to (WIN: List.In (loc, to) ws),
+  assert (WRITING: forall loc to (WIN: List.In (loc, to) ws),
+             exists val0,
                (<<WRITING: relaxed_writing_event loc to val0 t0>>)).
-  { i. unfold writing_locs_prom in MAP1. des_ifs.
+  { i. pose proof (TO _ _ WIN) as TO0.
+    unfold writing_locs_prom in MAP1. des_ifs.
     eapply List.filter_In in WIN. des.
     pose proof (tevent_map_weak_writing_locs H1) as WLOCS.
     rewrite Heq in WLOCS. destruct (writing_locs t0) eqn:EQ; ss.
@@ -2541,8 +2543,10 @@ Proof.
   }
   des.
   hexploit SPLIT; eauto.
-  { clear - WRITING CANCELNORMAL. erewrite <- List.app_assoc in CANCELNORMAL.
-    eapply cancel_normal_normals_after_normal; eauto. admit. } i. des.
+  { clear - WRITING CANCELNORMAL MAP1 H1.
+    erewrite <- List.app_assoc in CANCELNORMAL.
+    eapply cancel_normal_normals_after_normal; eauto.
+    inv MAP1; inv H1; ss. } i. des.
   eexists (l1'0 ++ [(t, t0)]), l2', ftr_reserve, ftr_cancel. esplits; eauto.
   { eapply Forall_app.
     { eapply Forall_app_inv in EVENTS. des.
@@ -2587,6 +2591,11 @@ Proof.
   { erewrite <- List.app_assoc. eapply final_event_trace_post.
     econs. eapply List.Forall_impl; eauto. i. ss.
     des. destruct a. unfold ThreadEvent.is_reserve in *. des_ifs. }
+  { clear - MAP1 H1. unfold writing_locs_prom in MAP1. des_ifs. inv H1; ss.
+    { des_ifs. red. esplits; econs; eauto. refl. }
+    { des_ifs. red. esplits; econs; eauto. refl. }
+    { des_ifs. red. esplits; econs; eauto. refl. }
+  }
   { i. eapply no_concrete_promise_concrete_decrease_steps in STEPS0; eauto.
     eapply Forall_app.
     { eapply Forall_app_inv in EVENTS. des.
@@ -2609,10 +2618,10 @@ Proof.
       dup l. eapply BOUND in l; eauto. des.
       exfalso. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
       { eapply l. }
-      clear - WRITING MAX WIN1.
-      unfold writing_locs_prom in WRITING. des_ifs.
-      eapply List.filter_In in WIN1. des.
-      unfold check_in_promise in WIN0. des_ifs.
+      clear - WRITING0 MAX WIN0.
+      unfold writing_locs_prom in WRITING0. des_ifs.
+      eapply List.filter_In in WIN0. des.
+      unfold check_in_promise in WIN1. des_ifs.
       { eapply MAX in Heq0. auto. }
       { eapply MAX in Heq0. auto. }
     }
@@ -2621,8 +2630,8 @@ Proof.
                (<<WRITING: writing_locs we = Some ws>>) /\
                (<<WIN: List.In (loc0, to0) ws>>)).
     { eapply list_Forall2_in2 in IN0; eauto. des. destruct b.
-      ss. unfold writing_locs_prom in WRITING. des_ifs.
-      eapply List.filter_In in WIN1. des.
+      ss. unfold writing_locs_prom in WRITING0. des_ifs.
+      eapply List.filter_In in WIN0. des.
       pose proof (tevent_map_weak_writing_locs SAT) as WLOCS.
       rewrite Heq in WLOCS.
       destruct (writing_locs t4) eqn:EQ; ss. esplits; eauto.
@@ -2636,5 +2645,5 @@ Proof.
     { eauto. }
     { des. inv UNCH. auto. }
   }
-  Unshelve. all: eauto.
+  Unshelve. all: eauto. all: try exact None.
 Qed.
