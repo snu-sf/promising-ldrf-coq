@@ -77,6 +77,18 @@ Section LANG.
     (<<MEMORY: b = false -> sim_memory w mem_src mem_tgt>>)
   .
 
+  Lemma steps_steps_failure lang th0 th1
+        (STEPS: rtc (@Thread.tau_step lang) th0 th1)
+        (FAILURE: Thread.steps_failure th1)
+    :
+      Thread.steps_failure th0.
+  Proof.
+    unfold Thread.steps_failure in *. des. esplits.
+    { etrans; eauto. }
+    { eauto. }
+    { eauto. }
+  Qed.
+
   Lemma sim_thread_failure_failure
         (w: world) st_src lc_src sc_src mem_src
         st_tgt lc_tgt sc_tgt mem_tgt
@@ -86,7 +98,8 @@ Section LANG.
     :
       Thread.steps_failure (Thread.mk _ st_src lc_src sc_src mem_src).
   Proof.
-    red in SIM. des.
+    red in SIM. des. eapply steps_steps_failure; eauto.
+  Qed.
 
   Lemma sim_thread_wf_promise_step
         w0 st_src0 lc_src0 sc_src0 mem_src0 st_tgt0 lc_tgt0 sc_tgt0 mem_tgt0
@@ -110,7 +123,60 @@ Section LANG.
     exploit Thread.step_future; eauto. i. des. ss.
     hexploit step_promise_consistent; eauto. i. ss.
     exploit SIM0; eauto. i. des; ss.
-    2:{
+    2:{ left. eapply sim_thread_failure_failure; eauto. }
+    exploit PROMISE0; eauto. i. des.
+    { left. eapply steps_steps_failure; eauto. }
+    hexploit Thread.rtc_tau_step_future; eauto. i. des; ss.
+    right. inv SIM; ss. esplits.
+    { eauto. }
+    { red. esplits; eauto. }
+    { eauto. }
+  Qed.
+
+  Lemma sim_thread_wf_promise_steps
+        w0 st_src0 lc_src0 sc_src0 mem_src0 st_tgt0 lc_tgt0 sc_tgt0 mem_tgt0
+        st_tgt1 lc_tgt1 sc_tgt1 mem_tgt1
+        (STEP_TGT: rtc (tau (@pred_step is_promise _))
+                       (Thread.mk _ st_tgt0 lc_tgt0 sc_tgt0 mem_tgt0)
+                       (Thread.mk _ st_tgt1 lc_tgt1 sc_tgt1 mem_tgt1))
+        (SIM: sim_thread_wf false w0 st_src0 lc_src0 sc_src0 mem_src0 st_tgt0 lc_tgt0 sc_tgt0 mem_tgt0)
+        (CONS_TGT: Local.promise_consistent lc_tgt1)
+    :
+      (<<FAILURE: Thread.steps_failure (Thread.mk _ st_src0 lc_src0 sc_src0 mem_src0)>>) \/
+      exists w1 st_src1 lc_src1 sc_src1 mem_src1,
+        (<<STEPS: rtc (@Thread.tau_step _)
+                      (Thread.mk _ st_src0 lc_src0 sc_src0 mem_src0)
+                      (Thread.mk _ st_src1 lc_src1 sc_src1 mem_src1)>>) /\
+        (<<SIM: sim_thread_wf false w1 st_src1 lc_src1 sc_src1 mem_src1 st_tgt1 lc_tgt1 sc_tgt1 mem_tgt1>>) /\
+        (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt0 lc_tgt0.(Local.promises)) w0 w1>>).
+  Proof.
+  Admitted.
+
+
+
+    red in SIM. des. punfold SIM0.
+    exploit Thread.step_future; eauto. i. des. ss.
+    hexploit step_promise_consistent; eauto. i. ss.
+    exploit SIM0; eauto. i. des; ss.
+    2:{ left. eapply sim_thread_failure_failure; eauto. }
+    exploit PROMISE0; eauto. i. des.
+    { left. eapply steps_steps_failure; eauto. }
+    hexploit Thread.rtc_tau_step_future; eauto. i. des; ss.
+    right. inv SIM; ss. esplits.
+    { eauto. }
+    { red. esplits; eauto. }
+    { eauto. }
+  Qed.
+
+
+ esplits; eauto. eauto.
+
+
+pclearbot.
+
+eapply sim_thread_failure_failure; eauto. }
+
+    left.
 
 
         exists w3,
