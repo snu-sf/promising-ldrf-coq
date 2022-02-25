@@ -65,7 +65,7 @@ Section DStep.
     dsteps MachineEvent.silent e1 e3
   | dsteps_step
       e te e1 e2 e3
-      (DSTEPS: rtc (tau (@pred_step is_promise _)) e1 e2)
+      (DSTEPS: rtc (tau dstep) e1 e2)
       (DSTEP: dstep te e2 e3)
       (EVENT: e = ThreadEvent.get_machine_event te):
     dsteps e e1 e3
