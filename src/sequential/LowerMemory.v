@@ -240,6 +240,23 @@ Proof.
   inv LOWER. eauto.
 Qed.
 
+Lemma lower_memory_future_weak
+      mem_src mem_tgt
+      (LOWER: lower_memory mem_src mem_tgt)
+      (MEM_SRC: Memory.closed mem_src):
+  Memory.future_weak mem_tgt mem_src.
+Proof.
+  inv LOWER. econs; i.
+  - specialize (LOWER0 loc to). inv LOWER0; try congr.
+    rewrite GET in *. inv H.
+    esplits; eauto; try refl.
+    symmetry in H0.
+    inv MEM_SRC. exploit CLOSED; eauto. i. des. eauto.
+  - specialize (LOWER0 loc to). inv LOWER0; try congr.
+  - specialize (LOWER0 loc to). inv LOWER0; try congr.
+    rewrite GET1, GET2 in *. clarify. inv MESSAGE.
+Qed.
+
 
 Lemma lower_memory_closed_timemap mem_src mem_tgt
       (MEM: lower_memory mem_src mem_tgt)
