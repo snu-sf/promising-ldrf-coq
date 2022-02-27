@@ -449,6 +449,39 @@ Proof.
 (* Qed. *)
 Admitted.
 
+Lemma local_is_racy_future lc mem0 mem1 loc to ord
+      (RACY: Local.is_racy lc mem0 loc to ord)
+      (FUTURE: Memory.future_weak mem0 mem1)
+  :
+  Local.is_racy lc mem1 loc to ord.
+Proof.
+  inv RACY. eapply Memory.future_weak_get1 in GET; eauto. des.
+  econs; eauto.
+  { inv MSG_LE; ss. }
+  { i. hexploit MSG2; eauto. i. inv MSG_LE; ss. }
+Qed.
+
+Lemma failure_future_failure lang pf e th0 th1 mem1 sc1
+      (STEP: Thread.step pf e th0 th1)
+      (FAILURE: ThreadEvent.get_machine_event e = MachineEvent.failure)
+      (MEM: Memory.future_weak th0.(Thread.memory) mem1)
+  :
+  exists th1',
+    (<<STEP: Thread.step true e (Thread.mk lang th0.(Thread.state) th0.(Thread.local) sc1 mem1) th1'>>).
+Proof.
+  inv STEP; inv STEP0; ss. inv LOCAL; ss.
+  { esplits. econs 2; eauto. }
+  { inv LOCAL0. esplits. econs 2; eauto. econs; eauto.
+    econs; eauto. econs; eauto. eapply local_is_racy_future; eauto.
+  }
+  { inv LOCAL0.
+    { esplits. econs 2; eauto. }
+    { esplits. econs 2; eauto. }
+    esplits. econs 2; eauto. econs; eauto.
+    econs; eauto. econs; eauto. eapply local_is_racy_future; eauto.
+  }
+Qed.
+
 Lemma consistent_split lang (th0 th1' th1: Thread.t lang) pf e
       (STEP: Thread.step pf e th0 th1')
       (STEPS: rtc (@Thread.reserve_step _ \2/ @Thread.cancel_step _) th1' th1)
@@ -470,8 +503,15 @@ Proof.
   }
   destruct (ThreadEvent.get_machine_event e) eqn:EVT; cycle 1.
   { destruct e; ss. }
-  { esplits; eauto. left. splits. red. esplits; eauto.
-    admit.
+  { clear CONSISTENT. esplits; [refl| |refl]. ii. left.
+    hexploit failure_future_failure.
+    { eapply STEP. }
+    { eauto. }
+    { eapply Memory.cap_future_weak; eauto. }
+    i. des. destruct th1'0. repeat red. esplits.
+    { refl. }
+    { eauto. }
+    { eauto. }
   }
   des; clarify.
   assert (STEPS0: rtc (tau (@pred_step no_sc _)) th0 th1).
@@ -499,4 +539,4 @@ Proof.
   }
   exploit tau_steps_consistent_split; eauto. i. des.
   esplits; eauto. eapply reserve_or_cancel_cancellable; eauto.
-Admitted.
+Qed.

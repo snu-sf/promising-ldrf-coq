@@ -28,13 +28,69 @@ Require Import Pred.
 Require Import Trace.
 Require Import MemoryProps.
 Require Import PFConsistent.
-(* Require Import PFConsistentStrong. *)
+Require Import CapFlex.
+Require Import PFConsistentStrong.
 
 Set Implicit Arguments.
 
 Module FutureCertify.
   Section FutureCertify.
     Variable (lang: language).
+
+    Lemma future_memory_map
+          mem mem_cap mem_future times
+          (CAP: Memory.cap mem mem_cap)
+          (FUTURE: Memory.future_weak mem mem_future)
+          (CLOSED: Memory.closed mem):
+      exists (f: Loc.t -> Time.t -> Time.t -> Prop),
+        (<<IDENT: map_ident_in_memory f mem>>) /\
+        (<<MAPLT: mapping_map_lt_iff f>>) /\
+        (<<MEMORY: memory_map f mem_cap mem_future>>) /\
+        (<<COMPLETE: forall loc to (IN: List.In to (times loc)),
+            exists fto, (<<MAPPED: f loc to fto>>)>>).
+    Proof.
+      exploit (choice (fun loc f =>
+                         (<<COMPLETE: forall to (IN: List.In to (Time.incr (Memory.max_ts loc mem)::(times loc))), exists fto, (<<MAPPED: f to fto>>)>>) /\
+                         (<<SAME: forall ts (TS: Time.le ts (Memory.max_ts loc mem)), f ts ts>>) /\
+                         (<<BOUND: forall to fto (MAPPED: f to fto) (TS: Time.lt (Memory.max_ts loc mem) to),
+                             (Time.lt (Time.join (Memory.max_ts loc mem_future) (Memory.max_ts loc mem)) fto)>>) /\
+                         (<<MAPLT: mapping_map_lt_iff_loc f>>))).
+      { intros loc. hexploit shift_map_exists.
+        - eapply Time.join_r.
+        - eapply Time.incr_spec.
+        - i. des. exists f. esplits; eauto.
+          i. exploit BOUND; eauto. i. des. eapply x. }
+      intros [f FSPEC]. exists f.
+      assert (IDENT: map_ident_in_memory f mem).
+      { ii. specialize (FSPEC loc). des. eauto. }
+      splits; eauto.
+      - ii. specialize (FSPEC loc). des.
+        red in MAPLT. eapply MAPLT; eauto.
+      - econs.
+        + i. eapply Memory.cap_inv in GET; eauto. des; eauto.
+          dup GET. destruct (classic (msg = Message.reserve)); auto.
+          eapply Memory.future_weak_get1 in GET; eauto; ss. des.
+          right. esplits; eauto.
+          * specialize (FSPEC loc). des. eapply SAME.
+            eapply Memory.max_ts_spec in GET0. des. auto.
+          * eapply map_ident_in_memory_closed_message; eauto.
+            inv CLOSED. eapply CLOSED0 in GET0. des. eauto.
+        + i. specialize (FSPEC loc). des.
+          exploit COMPLETE.
+          { ss. left. auto. } i. des.
+          exploit BOUND; eauto.
+          { eapply Time.incr_spec. } i.
+          left. esplits.
+          * eapply MAPPED.
+          * eapply Time.bot_spec.
+          * eapply Memory.max_ts_spec in GET. des.
+            etrans; eauto. etrans.
+            { eapply Time.join_l. }
+            { left. eapply x. }
+          * eapply map_ident_in_memory_bot; eauto.
+          * i. inv CLOSED. eapply memory_cap_covered; eauto.
+      - ii. specialize (FSPEC loc). des. eapply COMPLETE; ss; eauto.
+    Qed.
 
     Lemma cap_steps_current_steps
           th0 th1 mem1 sc1
@@ -125,16 +181,78 @@ Module FutureCertify.
           (CONSISTENT: @Thread.consistent lang e):
       future_certify e.
     Proof.
-      (* eapply consistent_pf_consistent_super_strong in CONSISTENT; eauto. des. *)
-      (* exploit (@concrete_promise_max_timemap_exists (Thread.memory e) (Local.promises (Thread.local e))). *)
-      (* { eapply MEMORY. } i. des. *)
-      (* ii. exploit (CONSISTENT0 mem1 TimeMap.bot sc1); eauto. i. des. *)
-      (* eapply Trace.silent_steps_tau_steps in STEPS; cycle 1. *)
-      (* { eapply List.Forall_impl; eauto. i. ss. des. auto. } *)
-      (* unguard. des. *)
-      (* { left. unfold Thread.steps_failure. destruct e1. ss. esplits; eauto. } *)
-      (* { right. esplits; eauto. } *)
-    Admitted.
+      eapply consistent_no_sc_trace_consistent in CONSISTENT; eauto.
+      ii. hexploit Memory.cap_exists.
+      { eapply MEMORY. } i. des.
+      exploit CONSISTENT; eauto. i. des.
+
+      hexploit trace_times_list_exists. i. des.
+      hexploit (future_memory_map times CAP FUTURE); eauto. i. des.
+
+      destruct e2.
+      hexploit trace_steps_map.
+      { eapply mapping_map_lt_iff_map_le; eauto. }
+      { eapply map_ident_in_memory_bot; eauto. }
+      { eapply mapping_map_lt_iff_map_eq; eauto. }
+      { eapply mapping_map_lt_iff_map_lt; eauto. }
+      { eapply wf_time_mapped_mappable; eauto. }
+      { eauto. }
+      { eauto. }
+      { eauto. }
+      { eauto. }
+      { eapply Local.cap_wf; eauto. }
+      { eapply WF. }
+      { eauto. }
+      { eapply Memory.cap_closed; eauto. }
+      { eapply Memory.closed_timemap_bot. inv MEM. auto. }
+      { eapply Memory.cap_closed_timemap; eauto. }
+      { eapply map_ident_in_memory_local; eauto. }
+      { eauto. }
+      { eapply mapping_map_lt_iff_collapsable_unwritable. eauto. }
+      { eapply map_ident_concrete_closed_timemap; eauto.
+        ii. eapply IDENT; eauto. inv CONCRETE.
+        eapply Memory.max_ts_spec in GET. des; eauto.
+      }
+      { ii. eapply Time.bot_spec. }
+      i. des.
+      hexploit no_sc_any_sc_traced.
+      { eapply STEPS0. }
+      { eauto. }
+      { eauto. }
+      { eauto. }
+      { eapply List.Forall_forall. ii.
+        eapply list_Forall2_in in H; eauto. des.
+        eapply List.Forall_forall in NOSC; eauto.
+        destruct a, x. ss. inv EVENT; ss.
+      }
+      i. des.
+      eapply List.Forall2_app_inv_l in TRACE0. des. subst.
+      eapply Trace.steps_separate in STEPS1. des.
+      eapply Trace.silent_steps_tau_steps in STEPS2; cycle 1.
+      { eapply List.Forall_forall. i.
+        eapply list_Forall2_in in H; eauto. des.
+        eapply List.Forall_forall in IN; eauto.
+        destruct a, x. ss. inv EVENT; ss.
+      }
+      red in TRACE. des; clarify.
+      { right. esplits.
+        { eauto. }
+        { inv TRACE1. inv STEPS3; ss. inv LOCAL0.
+          rewrite PROMISES in PROMISES0.
+          eapply bot_promises_map in PROMISES0; eauto.
+        }
+      }
+      { left. repeat red.
+        inv TRACE1. inv H3. des.
+        inv STEPS3. inv TR. inv STEPS1; ss.
+        esplits.
+        { eauto. }
+        { replace pf with true in STEP; [eauto|].
+          inv STEP; inv STEP0; ss. inv EVENT; ss.
+        }
+        { inv EVENT; ss. }
+      }
+    Qed.
 
     Lemma future_consistent
           e sc' mem'
@@ -158,6 +276,118 @@ Module FutureCertify.
     Qed.
   End FutureCertify.
 
+  Lemma undef_added_step lang pf e th0 th1
+        loc to0 to1 from1
+        (STEP: @Thread.step lang pf e th0 th1)
+        (PROMISED: concrete_promised th0.(Thread.local).(Local.promises) loc to0)
+        (TS: Time.lt to0 to1)
+        (UNCH: unchangable th0.(Thread.memory) th0.(Thread.local).(Local.promises) loc to1 from1 Message.undef)
+        (CONSISTENT: Local.promise_consistent th0.(Thread.local))
+        (LOCALWF: Local.wf th0.(Thread.local) th0.(Thread.memory))
+    :
+    (<<FAILURE: Thread.steps_failure th0>>) \/
+    (<<PROMISED: concrete_promised th1.(Thread.local).(Local.promises) loc to0>>).
+  Proof.
+    dup STEP. inv STEP.
+    { right. red.
+      inv STEP1; ss. inv LOCAL. inv PROMISED. inv PROMISE; ss.
+      { eapply Memory.add_get1 in GET; eauto. econs; eauto. }
+      { eapply Memory.split_get1 in GET; eauto. des. econs; eauto. }
+      { eapply Memory.lower_get1 in GET; eauto. des. econs; eauto. inv MSG_LE; ss. }
+      { dup GET. eapply Memory.remove_get1 in GET; eauto. des; clarify.
+        { eapply Memory.remove_get0 in PROMISES. des. clarify. }
+        { econs; eauto. }
+      }
+    }
+    { inv STEP1; ss. inv LOCAL; ss.
+      { right. eauto. }
+      { inv LOCAL0. eauto. }
+      { destruct (Loc.eq_dec loc0 loc).
+        { subst. left. repeat red. esplits; [refl|..].
+          { econs 2. instantiate (2:=ThreadEvent.racy_write loc to1 val ord).
+            econs; eauto. econs. econs; eauto.
+            inv PROMISED. inv UNCH. econs; eauto; ss.
+            eapply CONSISTENT in GET; eauto. red.
+            etrans; [|eauto]. eapply TimeFacts.le_lt_lt; [|eapply GET]; eauto.
+            eapply LOCALWF.
+          }
+          { ss. }
+        }
+        { inv PROMISED. right. inv LOCAL0. ss. econs.
+          { erewrite Memory.write_get_diff_promise; eauto. }
+          { eauto. }
+        }
+      }
+      { destruct (Loc.eq_dec loc0 loc).
+        { subst. left. repeat red. esplits; [refl|..].
+          { econs 2. instantiate (2:=ThreadEvent.racy_update loc to1 valr valw ordr ordw).
+            econs; eauto. econs. econs; eauto.
+            inv PROMISED. inv UNCH. econs; eauto; ss.
+            eapply CONSISTENT in GET; eauto. red.
+            etrans; [|eauto]. eapply TimeFacts.le_lt_lt; [|eapply GET]; eauto.
+            eapply LOCALWF.
+          }
+          { ss. }
+        }
+        { inv PROMISED. right. inv LOCAL1. inv LOCAL2. ss. econs.
+          { erewrite Memory.write_get_diff_promise; eauto. }
+          { eauto. }
+        }
+      }
+      { inv LOCAL0. eauto. }
+      { inv LOCAL0. eauto. }
+      { inv LOCAL0. eauto. }
+      { destruct (Loc.eq_dec loc0 loc).
+        { subst. left. repeat red. esplits; [refl|..].
+          { econs 2. instantiate (2:=ThreadEvent.racy_write loc to1 val ord).
+            econs; eauto. econs. econs; eauto.
+            inv PROMISED. inv UNCH. econs; eauto; ss.
+            eapply CONSISTENT in GET; eauto. red.
+            etrans; [|eauto]. eapply TimeFacts.le_lt_lt; [|eapply GET]; eauto.
+            eapply LOCALWF.
+          }
+          { ss. }
+        }
+        { inv PROMISED. right. inv LOCAL0. ss. econs.
+          { erewrite Memory.write_na_get_diff_promise; eauto. }
+          { eauto. }
+        }
+      }
+      { inv LOCAL0. eauto. }
+      { inv LOCAL0. eauto. }
+      { left. repeat red. esplits; eauto. }
+    }
+  Qed.
+
+  Lemma undef_added_steps lang th0 th1
+        loc to0 to1 from1
+        (STEPS: rtc (@Thread.tau_step lang) th0 th1)
+        (PROMISED: concrete_promised th0.(Thread.local).(Local.promises) loc to0)
+        (TS: Time.lt to0 to1)
+        (UNCH: unchangable th0.(Thread.memory) th0.(Thread.local).(Local.promises) loc to1 from1 Message.undef)
+        (CONSISTENT: Local.promise_consistent th1.(Thread.local))
+        (LOCALWF: Local.wf th0.(Thread.local) th0.(Thread.memory))
+        (MEMWF: Memory.closed th0.(Thread.memory))
+        (SCWF: Memory.closed_timemap th0.(Thread.sc) th0.(Thread.memory))
+    :
+    (<<FAILURE: Thread.steps_failure th0>>) \/
+    (<<PROMISED: concrete_promised th1.(Thread.local).(Local.promises) loc to0>>).
+  Proof.
+    revert PROMISED UNCH CONSISTENT LOCALWF MEMWF SCWF. induction STEPS; i.
+    { right. eauto. }
+    { inv H. inv TSTEP. hexploit Thread.step_future; eauto. i. des.
+      hexploit PromiseConsistent.rtc_tau_step_promise_consistent; eauto. i.
+      hexploit PromiseConsistent.step_promise_consistent; eauto. i.
+      hexploit undef_added_step; eauto. i. des; eauto.
+      eapply unchangable_increase in UNCH; eauto.
+      hexploit IHSTEPS; eauto. i. des.
+      { left. red in FAILURE. des. repeat red. esplits; [|eauto|eauto].
+        econs 2; [|eauto]. econs; eauto. econs; eauto.
+      }
+      { eauto. }
+    }
+  Qed.
+
   Lemma undef_added_failure lang st lc sc0 mem0 sc1 mem1
         (CONSISTENT: Thread.consistent (Thread.mk lang st lc sc0 mem0))
         (MEMLE: Memory.future_weak mem0 mem1)
@@ -167,6 +397,7 @@ Module FutureCertify.
         (SC0: Memory.closed_timemap sc0 mem0)
         (MEM1: Memory.closed mem1)
         (SC1: Memory.closed_timemap sc1 mem1)
+        (LOCAL1: Local.wf lc mem1)
         loc from0 to0 msg from1 to1
         (GET0: Memory.get loc to0 lc.(Local.promises) = Some (from0, msg))
         (MSG: msg <> Message.reserve)
@@ -177,5 +408,17 @@ Module FutureCertify.
     :
       Thread.steps_failure (Thread.mk _ st lc sc1 mem1).
   Proof.
-  Admitted.
+    eapply future_certify_exists in CONSISTENT; eauto.
+    exploit CONSISTENT; eauto. i. des; ss; auto.
+    eapply undef_added_steps in STEPS; eauto; ss.
+    { des; eauto. exfalso. rewrite PROMISES in PROMISED.
+      inv PROMISED. erewrite Memory.bot_get in GET. ss.
+    }
+    { econs; eauto. }
+    { econs; eauto.
+      destruct (Memory.get loc to1 lc.(Local.promises)) as [[]|] eqn:EQ; auto.
+      eapply LOCAL in EQ. clarify.
+    }
+    { eapply Local.bot_promise_consistent; eauto. }
+  Qed.
 End FutureCertify.
