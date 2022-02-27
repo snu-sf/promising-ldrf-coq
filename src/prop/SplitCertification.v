@@ -347,13 +347,76 @@ Proof.
   { eauto. }
   i. des.
   exploit consistent_pf_consistent_super_strong; eauto. i. des.
-  { admit. }
+  { red in FAILURE. des.
+    assert (STEPS': rtc (tau (@pred_step (fun _ => True)  _)) th0 e2).
+    { etrans.
+      { eapply pred_step_rtc_mon; [|eapply STEPS]. ss. }
+      { eapply rtc_implies; [|eapply STEPS0]. i. inv H. econs; eauto. econs; eauto. }
+    }
+    hexploit Thread.rtc_all_step_future.
+    { eapply rtc_implies; [|eapply STEPS']. i. inv H. inv TSTEP. econs; eauto. }
+    all: eauto.
+    i. des; ss.
+    exploit steps_cancels_not_cancels.
+    { eauto. }
+    i. des.
+    hexploit Thread.rtc_cancel_step_future; eauto. i. des; ss.
+    destruct th1, th2, e2, e3. ss. eapply pred_steps_trace_steps in STEPS2. des.
+    hexploit Trace.plus_step_steps.
+    { eapply STEPS3. }
+    { eauto. }
+    intros STEPS_ALL.
+    exploit can_reserve_all_needed.
+    { instantiate (1:=fun _ _ => True). esplits; eauto. eapply Time.incr_spec. }
+    { ii. ss. }
+    { eapply STEPS_ALL. }
+    { eapply List.Forall_app. split.
+      { eapply List.Forall_impl; eauto. i. ss. des. splits; auto.
+        destruct a. ss. destruct t0; ss. splits; auto.
+        eapply List.Forall_forall. i. auto.
+      }
+      { econs; ss. destruct e; ss. }
+    }
+    { eauto. }
+    { eauto. }
+    { eauto. }
+    i. des. esplits.
+    { etrans.
+      { eapply rtc_implies; cycle 1.
+        { eapply STEPS1. }
+        { auto. }
+      }
+      { eapply reserve_trace_reserve_steps in RESERVESTEPS.
+        { eapply rtc_implies; cycle 1.
+          { eapply RESERVESTEPS. }
+          { i. left. auto. }
+        }
+        { eapply List.Forall_impl; eauto. i. ss. des; auto. }
+      }
+    }
+    ii. left. exploit (CAP mem1).
+    { eapply CAP0. }
+    i. ss. des.
+    eapply Trace.steps_separate in STEPS2. des.
+    inv STEPS5. inv TR. inv STEPS2; ss.
+    eapply Trace.silent_steps_tau_steps in CANCELSTEPS; cycle 1.
+    { eapply List.Forall_impl; eauto. clear.
+      i. ss. des; auto. unfold ThreadEvent.is_cancel in *. des_ifs. }
+    eapply Trace.silent_steps_tau_steps in STEPS4; cycle 1.
+    { eapply List.Forall_impl; eauto. i. ss. des. auto. }
+    unfold Thread.steps_failure. esplits; [| |eauto].
+    { etrans.
+      { eapply CANCELSTEPS. }
+      { eapply STEPS4. }
+    }
+    { replace pf with true in STEP; [eauto|]. inv STEP; inv STEP0; ss. }
+  }
   exploit (@concrete_promise_max_timemap_exists (Thread.memory th1) (Local.promises (Thread.local th1))).
   { eapply CLOSED2. } i. des. destruct th1; ss.
   exploit (CONSISTENT0 memory TimeMap.bot); eauto.
   { refl. }
   i. des. ss.
-  clear CANCELNORMAL SPLIT MAPLT MAPIDENT BOUND TRACE GOOD SC0 PROMCONSISTENT.
+  clear CANCELNORMAL SPLIT MAPLT MAPIDENT BOUND TRACE GOOD SC0 PROMCONSISTENT WRITES.
   eapply pred_steps_trace_steps2 in STEPS0; cycle 1.
   { instantiate (1:=no_sc). eapply List.Forall_impl; eauto.
     i. ss. des. splits; auto. }
@@ -402,52 +465,21 @@ Proof.
     }
   }
 
-(*   { unguard. des. *)
-(*     { ii. left. exploit (CAP mem1). *)
-(*       { eapply CAP0. } *)
-(*       i. ss. des. *)
-(*       eapply no_sc_any_sc_traced in CANCELSTEPS; eauto; cycle 1. *)
-(*       { eapply List.Forall_impl; eauto. clear. *)
-(*         i. ss. des. unfold ThreadEvent.is_cancel in *. des_ifs. } *)
-(*       des. eapply Trace.silent_steps_tau_steps in STEPS4; cycle 1. *)
-(*       { eapply List.Forall_impl; eauto. clear. *)
-(*         i. ss. des; auto. unfold ThreadEvent.is_cancel in *. des_ifs. } *)
-(*       eapply no_sc_any_sc_traced in STEPS2; eauto; cycle 1. *)
-(*       { eapply List.Forall_impl; eauto. clear. *)
-(*         i. ss. des. unfold ThreadEvent.is_cancel in *. des_ifs. } *)
-(*       des. eapply Trace.silent_steps_tau_steps in STEPS5; cycle 1. *)
-(*       { eapply List.Forall_impl; eauto. i. ss. des. auto. } *)
-(*       unfold Thread.steps_failure. esplits. *)
-(*       { etrans. *)
-(*         { eapply STEPS4. } *)
-(*         { eapply STEPS5. } *)
-(*       } *)
-(*       { eauto. } *)
-(*     } *)
-(*     { ii. right. exploit (CAP mem1). *)
-(*       { eapply CAP0. } *)
-(*       i. ss. des. *)
-(*       eapply no_sc_any_sc_traced in CANCELSTEPS; eauto; cycle 1. *)
-(*       { eapply List.Forall_impl; eauto. clear. *)
-(*         i. ss. des. unfold ThreadEvent.is_cancel in *. des_ifs. } *)
-(*       des. eapply Trace.silent_steps_tau_steps in STEPS4; cycle 1. *)
-(*       { eapply List.Forall_impl; eauto. clear. *)
-(*         i. ss. des; auto. unfold ThreadEvent.is_cancel in *. des_ifs. } *)
-(*       eapply no_sc_any_sc_traced in STEPS2; eauto; cycle 1. *)
-(*       { eapply List.Forall_impl; eauto. clear. *)
-(*         i. ss. des. unfold ThreadEvent.is_cancel in *. des_ifs. } *)
-(*       des. eapply Trace.silent_steps_tau_steps in STEPS5; cycle 1. *)
-(*       { eapply List.Forall_impl; eauto. i. ss. des. auto. } *)
-(*       unfold Thread.steps_failure. esplits. *)
-(*       { etrans. *)
-(*         { eapply STEPS4. } *)
-(*         { eapply STEPS5. } *)
-(*       } *)
-(*       { eauto. } *)
-(*     } *)
-(*   } *)
-(* Qed. *)
-Admitted.
+  ii. right. exploit (CAP mem1).
+  { eapply CAP0. }
+  i. ss. des.
+  eapply Trace.silent_steps_tau_steps in CANCELSTEPS; cycle 1.
+  { eapply List.Forall_impl; eauto. clear.
+    i. ss. des; auto. unfold ThreadEvent.is_cancel in *. des_ifs. }
+  eapply Trace.silent_steps_tau_steps in STEPS2; cycle 1.
+  { eapply List.Forall_impl; eauto. i. ss. des. auto. }
+  unfold Thread.steps_failure. esplits.
+  { etrans.
+    { eapply CANCELSTEPS. }
+    { eapply STEPS2. }
+  }
+  { eauto. }
+Qed.
 
 Lemma local_is_racy_future lc mem0 mem1 loc to ord
       (RACY: Local.is_racy lc mem0 loc to ord)
