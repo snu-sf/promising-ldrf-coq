@@ -998,6 +998,7 @@ Module JSim.
   | sim_op_kind_lower
       msg_src msg_tgt
       (MSG: Message.le msg_src msg_tgt)
+      (OPT: forall val, msg_src = Message.concrete val None <-> msg_tgt = Message.concrete val None)
     :
       sim_op_kind (Memory.op_kind_lower msg_src) (Memory.op_kind_lower msg_tgt)
   | sim_op_kind_cancel
@@ -1034,6 +1035,7 @@ Module JSim.
   | sim_event_write
       loc from to val released_src released_tgt ord
       (RELEASED: View.opt_le released_src released_tgt)
+      (OPT: released_src = None <-> released_tgt = None)
     :
       sim_event
         (ThreadEvent.write loc from to val released_src ord)
@@ -1048,6 +1050,7 @@ Module JSim.
       loc tsr tsw valr valw releasedr_src releasedr_tgt releasedw_src releasedw_tgt ordr ordw
       (RELEASEDR: View.opt_le releasedr_src releasedr_tgt)
       (RELEASEDW: View.opt_le releasedw_src releasedw_tgt)
+      (OPT: releasedw_src = None <-> releasedw_tgt = None)
     :
       sim_event
         (ThreadEvent.update loc tsr tsw valr valw releasedr_src releasedw_src ordr ordw)
@@ -1996,7 +1999,10 @@ Module JSim.
         { i. clarify. eapply max_le_joined_opt_view_joined; eauto. }
         { i. clarify. }
         { econs; eauto; [refl|]. eapply max_le_joined_opt_view_le; eauto. }
-        { econs; eauto. econs; eauto; [refl|]. eapply max_le_joined_opt_view_le; eauto. }
+        { econs; eauto.
+          { econs; eauto; [refl|]. eapply max_le_joined_opt_view_le; eauto. }
+          { i. inv RELEASED0; ss. }
+        }
         { ss. }
         { ss. }
       }
@@ -2101,13 +2107,20 @@ Module JSim.
               (<<NONE: Memory.get loc ts mem1_src = None>>) /\
               (<<VIEW: views2 loc ts = (View.join ((TView.rel (Local.tview lc2_src)) loc) (View.singleton_ur loc ts))
                                          ::(all_join_views (View.singleton_ur loc ts) (views1 loc from))>>)>>) /\
-        (<<RELEASED: View.opt_le released_src released_tgt>>)
+        (<<RELEASED: View.opt_le released_src released_tgt>>) /\
+        (<<OPT: ord_src = ord_tgt -> released_src = None <-> released_tgt = None>>) /\
+        (<<KIND: sim_op_kind kind_src kind>>)
   .
   Proof.
     inv WF1_SRC.
     exploit (@TViewFacts.write_future0 loc to releasedm_src ord_src (Local.tview lc1_src) sc1_src); eauto. i. des.
 
     set (released_src := (TView.write_released (Local.tview lc1_src) sc1_src loc to releasedm_src ord_src)).
+    assert (OPT: ord_src = ord_tgt -> released_src = None <-> TView.write_released (Local.tview lc1_tgt) sc1_tgt loc to releasedm_tgt ord_tgt = None).
+    { i. subst. subst released_src.
+      unfold TView.write_released. destruct (Ordering.le Ordering.relaxed ord_tgt); ss.
+    }
+    
     exists released_src.
     set (write_tview := TView.write_tview (Local.tview lc1_src) sc1_src loc to ord_src).
 
@@ -2322,6 +2335,8 @@ Module JSim.
           { eapply View.join_r. }
           { eapply View.join_r. }
       - inv SIMMSG. eauto.
+      - auto.
+      - econs.
     }
 
     {
@@ -2503,6 +2518,8 @@ Module JSim.
             { eapply View.join_r. }
             { eapply View.join_r. }
       - inv SIMMSG. eauto.
+      - auto.
+      - econs; eauto.
     }
 
     {
@@ -2600,6 +2617,13 @@ Module JSim.
         exfalso. eapply Time.lt_strorder. etrans; eauto.
       - i. ss.
       - inv SIMMSG. eauto.
+      - auto.
+      - econs.
+        { econs.
+          { refl. }
+          { eapply max_le_joined_opt_view_le; eauto. }
+        }
+        { i. inv RELEASED; ss. }
     }
     { ss. }
   Qed.
@@ -2624,7 +2648,9 @@ Module JSim.
         (<<MEM2: sim_memory mem2_src mem2_tgt>>) /\
         (<<PROM2: sim_joined_promises views1 prom2_src prom2_tgt>>) /\
         (<<JOINED: joined_memory views1 mem2_src>>) /\
-        (<<REL2: joined_released views1 prom2_src rel>>).
+        (<<REL2: joined_released views1 prom2_src rel>>) /\
+        (<<KIND: sim_op_kind kind_src kind_tgt>>)
+  .
   Proof.
     inv STEP_TGT. inv PROMISE.
     (* add *)
@@ -2674,6 +2700,7 @@ Module JSim.
           i. eapply Memory.add_closed_view; eauto. }
       }
       { auto. }
+      { auto. }
     }
     (* split *)
     { hexploit split_succeed_wf; try apply PROMISES; eauto. i. des.
@@ -2715,6 +2742,10 @@ Module JSim.
         { ss. des; clarify. eapply REL1; eauto. }
         { eapply REL1; eauto. }
       }
+      { econs; eauto. inv CONTENT; econs.
+        { refl. }
+        { eapply max_le_joined_opt_view_le; eauto. }
+      }
     }
     (* lower *)
     { hexploit lower_succeed_wf; try apply PROMISES; eauto. i. des.
@@ -2749,6 +2780,13 @@ Module JSim.
         erewrite (@Memory.lower_o mem2) in GET1; eauto. des_ifs.
         { eapply REL1; eauto. }
       }
+      { inv CONTENT; econs; eauto.
+        { econs.
+          { refl. }
+          { eapply max_le_joined_opt_view_le; eauto. }
+        }
+        { inv RELEASED; ss. }
+      }
     }
     (* cancel *)
     { unguard. des; clarify. }
@@ -2776,7 +2814,10 @@ Module JSim.
         (<<JOINED: joined_memory views1 mem2_src>>) /\
         (<<PROM2: sim_joined_promises views1 prom2_src prom2_tgt>>) /\
         (<<JOINED: joined_memory views1 mem2_src>>) /\
-        (<<REL2: joined_released views1 prom2_src rel>>).
+        (<<REL2: joined_released views1 prom2_src rel>>) /\
+        (<<KIND: sim_op_kind kind_src kind_tgt>>) /\
+        (<<KINDS: List.Forall2 sim_op_kind kinds_src kinds_tgt>>)
+  .
   Proof.
     revert prom1_src mem1_src rel ts_src PROM1 MEM1_SRC MEM1_TGT MEM1 REL1 MLE TS JOINED. induction STEP_TGT.
     { i. hexploit sim_memory_write; eauto.
@@ -2832,7 +2873,9 @@ Module JSim.
         (<<MEM2: sim_memory mem2_src mem2_tgt>>) /\
         (<<JOINMEM2: joined_memory views1 mem2_src>>) /\
         (<<WFVIEWS2: wf_views views1>>) /\
-        (<<REL2: joined_released views1 (Local.promises lc2_src) (TView.rel (Local.tview lc2_src))>>)
+        (<<REL2: joined_released views1 (Local.promises lc2_src) (TView.rel (Local.tview lc2_src))>>) /\
+        (<<KIND: sim_op_kind kind_src kind>>) /\
+        (<<KINDS: List.Forall2 sim_op_kind kinds_src kinds>>)
   .
   Proof.
     inv LOCAL1. inv STEP_TGT. hexploit sim_local_write_na; eauto.
