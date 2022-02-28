@@ -27,6 +27,7 @@ Require Import JoinedView.
 
 Require Import MemoryProps.
 Require Import OrderedTimes.
+Require Import MemoryReorder.
 
 Require Import PFStep.
 
@@ -1931,6 +1932,42 @@ Section SIM.
     exists (Local.mk tvw prom_src'), mem_src'. splits; eauto.
   Qed.
 
+  Inductive reserve_loc_future_memory loc:
+    forall (prom0 mem0 prom1 mem1: Memory.t), Prop :=
+  | reserve_loc_future_memory_base
+      prom0 mem0
+    :
+      reserve_loc_future_memory
+        loc prom0 mem0 prom0 mem0
+  | reserve_loc_future_memory_step
+      prom0 mem0 prom1 mem1 prom2 mem2
+      from to kind
+      (HD: Memory.promise prom0 mem0 loc from to Message.reserve prom1 mem1 kind)
+      (TL: reserve_loc_future_memory loc prom1 mem1 prom2 mem2)
+    :
+      reserve_loc_future_memory
+        loc prom0 mem0 prom2 mem2
+  .
+
+  Lemma reserve_loc_future_reserve_future loc prom0 mem0 prom1 mem1
+        (FUTURE: reserve_loc_future_memory loc prom0 mem0 prom1 mem1)
+    :
+      reserve_future_memory prom0 mem0 prom1 mem1.
+  Proof.
+    induction FUTURE.
+    { econs 1. }
+    { econs 2; eauto. }
+  Qed.
+
+  Lemma reserve_loc_future_memory_trans loc prom0 mem0 prom1 mem1 prom2 mem2
+        (FUTURE01: reserve_loc_future_memory loc prom0 mem0 prom1 mem1)
+        (FUTURE12: reserve_loc_future_memory loc prom1 mem1 prom2 mem2)
+    :
+      reserve_loc_future_memory loc prom0 mem0 prom2 mem2.
+  Proof.
+    revert prom2 mem2 FUTURE12. induction FUTURE01; auto.
+    i. econs; eauto.
+  Qed.
 
   Lemma sim_promise_forget others self extra_others extra_self
         mem_src mem_tgt prom_src prom_tgt
@@ -1947,7 +1984,7 @@ Section SIM.
         (MEMWF: memory_times_wf times mem_tgt')
     :
       exists prom_src' mem_src' self' extra_self',
-        (<<STEPSRC: reserve_future_memory prom_src mem_src prom_src' mem_src'>>) /\
+        (<<STEPSRC: reserve_loc_future_memory loc prom_src mem_src prom_src' mem_src'>>) /\
         (<<MEM: sim_memory (others \\2// self') (extra_others \\3// extra_self') mem_src' mem_tgt'>>) /\
         (<<PROMISE: sim_promise self' extra_self' prom_src' prom_tgt'>>)
   .
@@ -2598,10 +2635,10 @@ Section SIM.
             Time.lt to to')
     :
       exists prom_src0 mem_src0 mem_src1 prom_src2 mem_src2 self' extra_self',
-        (<<FUTURE0: reserve_future_memory prom_src mem_src prom_src0 mem_src0>>) /\
+        (<<FUTURE0: reserve_loc_future_memory loc prom_src mem_src prom_src0 mem_src0>>) /\
         (<<WRITE: Memory.write prom_src0 mem_src0 loc from_src' to msg prom_src0 mem_src1 Memory.op_kind_add>>) /\
         (<<FROM: Time.le from_tgt from_src'>>) /\
-        (<<FUTURE1: reserve_future_memory prom_src0 mem_src1 prom_src2 mem_src2>>) /\
+        (<<FUTURE1: reserve_loc_future_memory loc prom_src0 mem_src1 prom_src2 mem_src2>>) /\
         (<<MEM: sim_memory (others \\2// self') (extra_others \\3// extra_self') mem_src2 mem_tgt>>) /\
         (<<PROMISE: sim_promise
                       self' extra_self'
@@ -2920,10 +2957,10 @@ Section SIM.
             Time.lt to to')
     :
       exists from_src prom_src0 mem_src0 mem_src1 prom_src2 mem_src2 self' extra_self',
-        (<<FUTURE0: reserve_future_memory prom_src mem_src prom_src0 mem_src0>>) /\
+        (<<FUTURE0: reserve_loc_future_memory loc prom_src mem_src prom_src0 mem_src0>>) /\
         (<<WRITE: Memory.write prom_src0 mem_src0 loc from_src to msg prom_src0 mem_src1 Memory.op_kind_add>>) /\
         (<<FROM: Time.le from_tgt from_src>>) /\
-        (<<FUTURE1: reserve_future_memory prom_src0 mem_src1 prom_src2 mem_src2>>) /\
+        (<<FUTURE1: reserve_loc_future_memory loc prom_src0 mem_src1 prom_src2 mem_src2>>) /\
         (<<MEM: sim_memory (others \\2// self') (extra_others \\3// extra_self') mem_src2 mem_tgt>>) /\
         (<<PROMISE: sim_promise
                       self' extra_self'
@@ -2975,10 +3012,10 @@ Section SIM.
             Time.lt to to')
     :
       exists prom_src0 mem_src0 mem_src1 prom_src2 mem_src2 self' extra_self',
-        (<<FUTURE0: reserve_future_memory prom_src mem_src prom_src0 mem_src0>>) /\
+        (<<FUTURE0: reserve_loc_future_memory loc prom_src mem_src prom_src0 mem_src0>>) /\
         (<<WRITE: Memory.write prom_src0 mem_src0 loc from_tgt to msg prom_src0 mem_src1 Memory.op_kind_add>>) /\
         (<<FROM: Time.le from_tgt from_tgt>>) /\
-        (<<FUTURE1: reserve_future_memory prom_src0 mem_src1 prom_src2 mem_src2>>) /\
+        (<<FUTURE1: reserve_loc_future_memory loc prom_src0 mem_src1 prom_src2 mem_src2>>) /\
         (<<MEM: sim_memory (others \\2// self') (extra_others \\3// extra_self') mem_src2 mem_tgt>>) /\
         (<<PROMISE: sim_promise
                       self' extra_self'
@@ -3074,7 +3111,7 @@ Section SIM.
         (MEMWF: memory_times_wf times mem_tgt')
     :
       exists self' extra_self' prom_src' mem_src',
-        (<<FUTURE: reserve_future_memory (Local.promises lc_src) mem_src prom_src' mem_src'>>) /\
+        (<<FUTURE: reserve_loc_future_memory loc (Local.promises lc_src) mem_src prom_src' mem_src'>>) /\
         (<<MEM: sim_memory (others \\2// self') (extra_others \\3// extra_self') mem_src' mem_tgt'>>) /\
         (<<SIM: sim_local self' extra_self' (Local.mk (Local.tview lc_src) prom_src') lc_tgt'>>)
   .
@@ -3113,10 +3150,10 @@ Section SIM.
             Time.lt to to')
     :
       exists from_src prom_src0 mem_src0 mem_src1 prom_src2 mem_src2 self' extra_self',
-        (<<FUTURE0: reserve_future_memory prom_src mem_src prom_src0 mem_src0>>) /\
+        (<<FUTURE0: reserve_loc_future_memory loc prom_src mem_src prom_src0 mem_src0>>) /\
         (<<WRITE: Memory.write prom_src0 mem_src0 loc from_src to msg prom_src0 mem_src1 Memory.op_kind_add>>) /\
         (<<FROM: Time.le from_tgt from_src>>) /\
-        (<<FUTURE1: reserve_future_memory prom_src0 mem_src1 prom_src2 mem_src2>>) /\
+        (<<FUTURE1: reserve_loc_future_memory loc prom_src0 mem_src1 prom_src2 mem_src2>>) /\
         (<<MEM: sim_memory (others \\2// self') (extra_others \\3// extra_self') mem_src2 mem_tgt'>>) /\
         (<<PROMISE: sim_promise
                       self' extra_self'
@@ -3125,6 +3162,7 @@ Section SIM.
     inv WRITE.
     hexploit Memory.promise_future; try apply PROMISE0; eauto. i. des.
     hexploit sim_promise_forget; ss; eauto. i. des.
+    hexploit reserve_loc_future_reserve_future; [eapply STEPSRC|]. i.
     hexploit sim_fulfill_forget_write_aux; try apply PROMISE1; eauto.
     { eapply reserve_future_memory_le; [|eauto]; eauto. }
     { eapply reserve_future_memory_finite; [|eauto]; eauto. }
@@ -3136,23 +3174,258 @@ Section SIM.
     i. des.
     eexists from_src, prom_src0, mem_src0, mem_src1, prom_src2, mem_src2, self'0, extra_self'0.
     splits; eauto.
-    { eapply reserve_future_memory_trans; eauto. }
+    { eapply reserve_loc_future_memory_trans; eauto. }
   Qed.
 
-  Lemma reserve_future_write_commute
-        prom0 mem0 loc0 from0 to0 msg0 prom1 mem1 kind0
-        prom2 mem2 loc1 from1 to1 msg1 prom3 mem3 kind1
-        (WRITE0: Memory.write prom0 mem0 loc0 from0 to0 msg0 prom1 mem1 kind0)
-        (FUTURE: reserve_future_memory prom1 mem1 prom2 mem2)
-        (WRITE1: Memory.write prom2 mem2 loc1 from1 to1 msg1 prom3 mem3 kind1)
+  Lemma reorder_add_cancels
+        prom0 mem0 loc from to msg prom1 mem1 prom2 mem2 kind
+        (PROMISE: Memory.promise prom0 mem0 loc from to msg prom1 mem1 kind)
+        (CANCELS: cancel_future_memory loc prom1 mem1 prom2 mem2)
     :
-      exists prom0' mem0' prom1' mem1' prom2' mem2',
-        (<<FUTURE0: reserve_future_memory prom0 mem0 prom0' mem0'>>) /\
-        (<<WRITE0: Memory.write prom0' mem0' loc0 from0 to0 msg0 prom1' mem1' kind0>>) /\
-        (<<WRITE1: Memory.write prom1' mem1' loc1 from1 to1 msg1 prom2' mem2' kind1>>) /\
-        (<<FUTURE1: reserve_future_memory prom2' mem2' prom3 mem3>>).
+      (exists prom1' mem1',
+          (<<CANCELS: cancel_future_memory loc prom0 mem0 prom1' mem1'>>) /\
+          (<<PROMISE: Memory.promise prom1' mem1' loc from to msg prom2 mem2 kind>>)) \/
+      (<<CANCELS: cancel_future_memory loc prom0 mem0 prom2 mem2>>).
   Proof.
-  Admitted.
+    revert prom0 mem0 PROMISE. induction CANCELS; i.
+    { left. esplits.
+      { econs 1. }
+      { eauto. }
+    }
+    { hexploit MemoryReorder.promise_cancel; eauto. i. des; clarify.
+      { right. esplits; eauto. }
+      { hexploit IHCANCELS; eauto. i. des.
+        { left. esplits.
+          { econs 2; eauto. }
+          { eauto. }
+        }
+        { right. esplits. econs 2; eauto. }
+      }
+    }
+  Qed.
+
+  Lemma reorder_write_cancels
+        prom0 mem0 loc from to msg prom1 mem1 prom2 mem2 kind
+        (WRITE: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
+        (CANCELS: cancel_future_memory loc prom1 mem1 prom2 mem2)
+    :
+      exists prom1' mem1',
+        (<<CANCELS: cancel_future_memory loc prom0 mem0 prom1' mem1'>>) /\
+        (<<WRITE: Memory.write prom1' mem1' loc from to msg prom2 mem2 kind>>).
+  Proof.
+    revert prom0 mem0 WRITE. induction CANCELS; i.
+    { esplits.
+      { econs 1. }
+      { eauto. }
+    }
+    { hexploit MemoryReorder.write_cancel; eauto. i. des; clarify.
+      hexploit IHCANCELS; eauto. i. des.
+      esplits.
+      { econs 2; eauto. }
+      { eauto. }
+    }
+  Qed.
+
+  Lemma reorder_reserves_write
+        prom0 mem0 loc from to msg prom1 mem1 prom2 mem2 kind
+        (RESERVES: reserve_add_future_memory loc prom0 mem0 prom1 mem1)
+        (WRITE: Memory.write prom1 mem1 loc from to msg prom2 mem2 kind)
+        (NRESERVE: msg <> Message.reserve)
+    :
+      exists prom1' mem1',
+        (<<WRITE: Memory.write prom0 mem0 loc from to msg prom1' mem1' kind>>) /\
+        (<<RESERVES: reserve_add_future_memory loc prom1' mem1' prom2 mem2>>).
+  Proof.
+    revert prom2 mem2 WRITE. induction RESERVES; i.
+    { esplits.
+      { eauto. }
+      { econs 1. }
+    }
+    hexploit IHRESERVES; eauto. i. des.
+    hexploit MemoryReorder.reserve_write; eauto. i. des.
+    esplits; eauto. econs 2; eauto.
+  Qed.
+
+  Lemma reorder_reserves_write_na
+        prom0 mem0 loc from to msg prom1 mem1 prom2 mem2 kind
+        ts msgs kinds
+        (RESERVES: reserve_add_future_memory loc prom0 mem0 prom1 mem1)
+        (WRITE: Memory.write_na ts prom1 mem1 loc from to msg prom2 mem2 msgs kinds kind)
+    :
+      exists prom1' mem1',
+        (<<WRITE: Memory.write_na ts prom0 mem0 loc from to msg prom1' mem1' msgs kinds kind>>) /\
+        (<<RESERVES: reserve_add_future_memory loc prom1' mem1' prom2 mem2>>).
+  Proof.
+    revert prom0 mem0 RESERVES. induction WRITE; i.
+    { hexploit reorder_reserves_write; eauto; ss.
+      i. des. esplits.
+      { econs; eauto. }
+      { eauto. }
+    }
+    { hexploit reorder_reserves_write; eauto; ss.
+      { red in MSG_EX. des; clarify. }
+      i. des. hexploit IHWRITE; eauto; ss.
+      i. des. esplits.
+      { econs; eauto. }
+      { eauto. }
+    }
+  Qed.
+
+  Lemma reserve_add_future_reserve_loc_future loc prom0 mem0 prom1 mem1
+        (RESERVES: reserve_add_future_memory loc prom0 mem0 prom1 mem1)
+    :
+      reserve_loc_future_memory loc prom0 mem0 prom1 mem1.
+  Proof.
+    induction RESERVES.
+    { econs 1. }
+    { econs 2; eauto. }
+  Qed.
+
+  Lemma cancel_future_reserve_loc_future loc prom0 mem0 prom1 mem1
+        (CANCELS: cancel_future_memory loc prom0 mem0 prom1 mem1)
+    :
+      reserve_loc_future_memory loc prom0 mem0 prom1 mem1.
+  Proof.
+    induction CANCELS.
+    { econs 1. }
+    { econs 2; eauto. }
+  Qed.
+
+  Lemma reserve_loc_future_split loc prom0 mem0 prom2 mem2
+        (FUTURE: reserve_loc_future_memory loc prom0 mem0 prom2 mem2)
+    :
+      exists prom1 mem1,
+        (<<CANCEL: cancel_future_memory loc prom0 mem0 prom1 mem1>>) /\
+        (<<RESERVE: reserve_add_future_memory loc prom1 mem1 prom2 mem2>>).
+  Proof.
+    induction FUTURE.
+    { esplits.
+      { econs 1. }
+      { econs 1. }
+    }
+    des. dup HD. inv HD; clarify.
+    { hexploit reorder_add_cancels; eauto. i. des.
+      { esplits.
+        { eauto. }
+        { econs 2; eauto. }
+      }
+      { esplits; eauto. }
+    }
+    { esplits.
+      { econs 2; eauto. }
+      { eauto. }
+    }
+  Qed.
+
+  Lemma reserve_future_memory_closed prom0 mem0 prom1 mem1
+        (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
+        (CLOSED: Memory.closed mem0)
+    :
+      Memory.closed mem1.
+  Proof.
+    revert CLOSED. induction FUTURE; i; auto.
+    eapply IHFUTURE. inv HD; clarify.
+    { eapply Memory.add_closed; eauto. }
+    { eapply Memory.cancel_closed; eauto. }
+  Qed.
+
+  Lemma write_memory_times_wf prom0 mem0 loc from to msg prom1 mem1 kind
+        (WRITE: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
+        (TIMES: memory_times_wf times mem1)
+        (NRESERVE: msg <> Message.reserve)
+    :
+      memory_times_wf times mem0.
+  Proof.
+    inv WRITE. inv PROMISE; clarify.
+    { ii. eapply Memory.add_get1 in GET; eauto. }
+    { ii. hexploit Memory.split_o.
+      { eauto. }
+      i. rewrite GET in H. des_ifs.
+      { ss. des; clarify.
+        eapply Memory.split_get0 in MEM. des; clarify.
+      }
+      { ss. des; clarify.
+        eapply Memory.split_get0 in MEM. des; clarify. splits.
+        { eapply TIMES in GET2; eauto. des; auto. }
+        { eapply TIMES in H; eauto. des; auto. }
+      }
+      { eauto. }
+    }
+    { ii. eapply Memory.lower_get1 in GET; eauto. des. eauto. }
+  Qed.
+
+  Lemma write_na_memory_times_wf prom0 mem0 loc from to msg prom1 mem1 kind
+        ts msgs kinds
+        (WRITE: Memory.write_na ts prom0 mem0 loc from to msg prom1 mem1 msgs kinds kind)
+        (TIMES: memory_times_wf times mem1)
+    :
+      memory_times_wf times mem0.
+  Proof.
+    revert TIMES. induction WRITE; i.
+    { eapply write_memory_times_wf; eauto; ss. }
+    { hexploit write_memory_times_wf; eauto; ss.
+      red in MSG_EX. des; clarify.
+    }
+  Qed.
+
+  Lemma write_consistent prom0 mem0 loc from to msg prom1 mem1 kind vw
+        (WRITE: Memory.write prom0 mem0 loc from to msg prom1 mem1 kind)
+        (CONSISTENT: forall to' from' msg'
+                            (GETTGT: Memory.get loc to' prom1 = Some (from', msg'))
+                            (RESERVE: msg' <> Message.reserve),
+            Time.lt vw to')
+        (TS: Time.lt vw to)
+    :
+      forall to' from' msg'
+             (GETTGT: Memory.get loc to' prom0 = Some (from', msg'))
+             (RESERVE: msg' <> Message.reserve),
+        Time.lt vw to'.
+  Proof.
+    i. inv WRITE. inv PROMISE.
+    { eapply Memory.add_get1 in GETTGT; [|eauto]; eauto.
+      eapply Memory.remove_get1 in GETTGT; eauto. des.
+      { subst. auto. }
+      { eapply CONSISTENT; eauto. }
+    }
+    { eapply Memory.split_get1 in GETTGT; [|eauto]; eauto. des.
+      eapply Memory.remove_get1 in GET2; eauto. des.
+      { subst. auto. }
+      { eapply CONSISTENT; eauto. }
+    }
+    { eapply Memory.lower_get1 in GETTGT; eauto. des.
+      eapply Memory.remove_get1 in GET2; eauto. des.
+      { subst. auto. }
+      { eapply CONSISTENT; eauto. inv MSG_LE; ss. }
+    }
+    { eapply Memory.remove_get0 in PROMISES.
+      eapply Memory.remove_get0 in REMOVE. des; clarify.
+    }
+  Qed.
+
+  Lemma write_na_consistent prom0 mem0 ts loc from to msg prom1 mem1 msgs kinds kind vw
+        (WRITE: Memory.write_na ts prom0 mem0 loc from to msg prom1 mem1 msgs kinds kind)
+        (CONSISTENT: forall to' from' msg'
+                            (GETTGT: Memory.get loc to' prom1 = Some (from', msg'))
+                            (RESERVE: msg' <> Message.reserve),
+            Time.lt vw to')
+        (TS: Time.le vw ts)
+    :
+      forall to' from' msg'
+             (GETTGT: Memory.get loc to' prom0 = Some (from', msg'))
+             (RESERVE: msg' <> Message.reserve),
+        Time.lt vw to'.
+  Proof.
+    revert vw CONSISTENT TS. induction WRITE; i.
+    { eapply write_consistent; eauto. eapply TimeFacts.le_lt_lt; eauto. }
+    { hexploit write_consistent.
+      { eauto. }
+      { i. eapply IHWRITE; eauto. left. eapply TimeFacts.le_lt_lt; eauto. }
+      { eapply TimeFacts.le_lt_lt; eauto. }
+      { eauto. }
+      { eauto. }
+      { auto. }
+    }
+  Qed.
 
   Lemma sim_fulfill_forget_write_na others self extra_others extra_self
         prom_src prom_tgt mem_src mem_tgt mem_tgt' prom_tgt'
@@ -3181,22 +3454,112 @@ Section SIM.
                             (RESERVE: msg' <> Message.reserve),
             Time.lt to to')
     :
-      exists from_src prom_src0 mem_src0 mem_src1 prom_src2 mem_src2 self' extra_self' msgs_src kinds_src,
-        (<<FUTURE0: reserve_future_memory prom_src mem_src prom_src0 mem_src0>>) /\
-        (<<WRITE: Memory.write_na ts prom_src0 mem_src0 loc from_src to val prom_src0 mem_src1 msgs_src kinds_src Memory.op_kind_add>>) /\
+      exists from_src prom_src0 prom_src0' mem_src0 mem_src1 prom_src2 mem_src2 self' extra_self' msgs_src kinds_src,
+        (<<FUTURE0: reserve_loc_future_memory loc prom_src mem_src prom_src0 mem_src0>>) /\
+        (<<WRITE: Memory.write_na ts prom_src0 mem_src0 loc from_src to val prom_src0' mem_src1 msgs_src kinds_src Memory.op_kind_add>>) /\
         (<<FROM: Time.le from_tgt from_src>>) /\
-        (<<FUTURE1: reserve_future_memory prom_src0 mem_src1 prom_src2 mem_src2>>) /\
+        (<<FUTURE1: reserve_loc_future_memory loc prom_src0' mem_src1 prom_src2 mem_src2>>) /\
         (<<MEM: sim_memory (others \\2// self') (extra_others \\3// extra_self') mem_src2 mem_tgt'>>) /\
-        (<<KINDS: List.Forall (fun k => k = Memory.op_kind_add) kinds>>) /\
+        (<<KINDS: List.Forall (fun k => k = Memory.op_kind_add) kinds_src>>) /\
         (<<MSGS: List.Forall2 (fun '(from_src, to_src, msg_src) '(from_tgt, to_tgt, msg_tgt) =>
                                  (<<TO: to_src = to_tgt>>) /\
                                  (<<MSG: msg_src = msg_tgt>>) /\
                                  (<<FROM: Time.le from_tgt from_src>>)) msgs_src msgs>>) /\
         (<<PROMISE: sim_promise
                       self' extra_self'
-                      prom_src2 prom_tgt'>>).
+                      prom_src2 prom_tgt'>>)
+  .
   Proof.
-  Admitted.
+    ginduction WRITE; i.
+    { hexploit sim_fulfill_forget_write; eauto; ss.
+      i. des. esplits; eauto.
+    }
+    hexploit sim_fulfill_forget_write; eauto; ss.
+    { eapply write_na_memory_times_wf; eauto. }
+    { red in MSG_EX. des; clarify. }
+    { red in MSG_EX. des; clarify. econs; eauto. }
+    { i. hexploit write_na_consistent.
+      { eauto. }
+      { i. hexploit CONSISTENT.
+        { eauto. }
+        { eauto. }
+        i. instantiate (1:=to'). eapply TimeFacts.le_lt_lt; eauto.
+        eapply Memory.write_na_times in WRITE. des. left. auto.
+      }
+      { refl. }
+      { eauto. }
+      { eauto. }
+      i. auto.
+    }
+    i. des.
+    hexploit reserve_loc_future_reserve_future.
+    { eapply FUTURE0. } intros FUTURE0'.
+    hexploit reserve_loc_future_reserve_future.
+    { eapply FUTURE1. } intros FUTURE1'.
+    hexploit IHWRITE; try exact PROMISE0; eauto.
+    { eapply write_promises_le in WRITE_EX; eauto. }
+    { eapply reserve_future_memory_le; [|eauto].
+      eapply write_promises_le; [|eauto].
+      eapply reserve_future_memory_le; [|eauto]. eauto.
+    }
+    { eapply reserve_future_memory_finite; [|eauto].
+      eapply Memory.write_finite; eauto.
+      eapply reserve_future_memory_finite; [|eauto]. eauto.
+    }
+    { eapply Memory.write_finite; eauto. }
+    { eapply reserve_future_memory_bot_none; [|eauto].
+      eapply Memory.write_bot_none; eauto.
+      eapply reserve_future_memory_bot_none; [|eauto]. eauto.
+    }
+    { eapply Memory.write_bot_none; eauto. }
+    { eapply reserve_future_memory_closed in FUTURE0'; eauto.
+      eapply reserve_future_memory_closed; eauto.
+      eapply Memory.write_closed; eauto.
+      { red in MSG_EX. des; clarify. econs; eauto. }
+      { red in MSG_EX. des; clarify. econs; eauto. eapply Time.bot_spec. }
+    }
+    { eapply Memory.write_closed; eauto.
+      { red in MSG_EX. des; clarify. econs; eauto. }
+      { red in MSG_EX. des; clarify. econs; eauto. eapply Time.bot_spec. }
+    }
+    { i. hexploit EXCLUSIVE; eauto. i. des.
+      eapply reserve_future_memory_unchangable in FUTURE0'; eauto.
+      eapply unchangable_write in WRITE0; eauto.
+      eapply reserve_future_memory_unchangable in FUTURE1'; eauto.
+    }
+    { i. hexploit EXCLUSIVEEXTRA; eauto. i. des.
+      eapply reserve_future_memory_unchangable in FUTURE0'; eauto.
+      eapply unchangable_write in WRITE0; eauto.
+      eapply reserve_future_memory_unchangable in FUTURE1'; eauto.
+    }
+    i. des.
+    hexploit reserve_loc_future_split.
+    { eapply reserve_loc_future_memory_trans.
+      { eapply FUTURE1. }
+      { eapply FUTURE2. }
+    }
+    i. des. hexploit reorder_write_cancels.
+    { eapply WRITE0. }
+    { eapply CANCEL. }
+    i. des. hexploit reorder_reserves_write_na.
+    { eapply RESERVE. }
+    { eapply WRITE1. }
+    i. des. esplits.
+    { eapply reserve_loc_future_memory_trans.
+      { eapply FUTURE0. }
+      { eapply cancel_future_reserve_loc_future. eapply CANCELS. }
+    }
+    { econs 2; [| |eauto|eauto]; eauto. }
+    { eauto. }
+    { eapply reserve_loc_future_memory_trans.
+      { eapply reserve_add_future_reserve_loc_future. eapply RESERVES. }
+      { eapply FUTURE3. }
+    }
+    { eauto. }
+    { econs; eauto. }
+    { econs; eauto. }
+    { eauto. }
+  Qed.
 
   Lemma sim_write_step_forget others self extra_others extra_self
         mem_src mem_tgt mem_tgt' lc_src lc_tgt lc_tgt' loc from to kind sc sc' val released ord
@@ -3240,6 +3603,8 @@ Section SIM.
       unfold TimeMap.join, TimeMap.singleton. etrans; [|eapply Time.join_r].
       setoid_rewrite LocFun.add_spec_eq. refl. }
     i. des.
+    eapply reserve_loc_future_reserve_future in FUTURE0.
+    eapply reserve_loc_future_reserve_future in FUTURE1.
     eexists self', extra_self', from_src, (Local.mk _ prom_src0), prom_src0, mem_src0, mem_src1, prom_src2, mem_src2.
     splits; eauto.
     { econs; eauto; ss. ii. des_ifs.
@@ -3278,7 +3643,7 @@ Section SIM.
         (<<FUTURE0: reserve_future_memory (Local.promises lc_src) mem_src prom_src0 mem_src0>>) /\
         (<<WRITE: Local.write_na_step (Local.mk (Local.tview lc_src) prom_src0) sc mem_src0 loc from' to val ord lc_src' sc' mem_src1 msgs_src kinds_src Memory.op_kind_add>>) /\
         (<<FROM: Time.le from from'>>) /\
-        (<<KINDS: List.Forall (fun k => k = Memory.op_kind_add) kinds>>) /\
+        (<<KINDS: List.Forall (fun k => k = Memory.op_kind_add) kinds_src>>) /\
         (<<MSGS: List.Forall2 (fun '(from_src, to_src, msg_src) '(from_tgt, to_tgt, msg_tgt) =>
                                  (<<TO: to_src = to_tgt>>) /\
                                  (<<MSG: msg_src = msg_tgt>>) /\
@@ -3296,7 +3661,9 @@ Section SIM.
       unfold TimeMap.join, TimeMap.singleton. etrans; [|eapply Time.join_r].
       setoid_rewrite LocFun.add_spec_eq. refl. }
     i. des.
-    eexists self', extra_self', from_src, (Local.mk _ prom_src0), prom_src0, mem_src0, mem_src1, prom_src2, mem_src2, msgs_src, kinds_src.
+    eapply reserve_loc_future_reserve_future in FUTURE0.
+    eapply reserve_loc_future_reserve_future in FUTURE1.
+    eexists self', extra_self', from_src, (Local.mk _ prom_src0'), prom_src0, mem_src0, mem_src1, prom_src2, mem_src2, msgs_src, kinds_src.
     splits; eauto.
   Qed.
 
@@ -3343,6 +3710,7 @@ Section SIM.
     { econs. inv PROMISE; try by (eapply TViewFacts.op_closed_released; eauto). } i. des.
 
     hexploit sim_promise_forget; ss; eauto. i. des.
+    eapply reserve_loc_future_reserve_future in STEPSRC.
     hexploit reserve_future_memory_future; try apply STEPSRC; eauto.
     i. des. inv LOCAL. ss.
 
@@ -3359,6 +3727,8 @@ Section SIM.
       setoid_rewrite LocFun.add_spec_eq. refl. }
 
     i. des.
+    eapply reserve_loc_future_reserve_future in FUTURE0.
+    eapply reserve_loc_future_reserve_future in FUTURE1.
     eexists self'0, extra_self'0, (Local.mk _ prom_src0), prom_src0, mem_src0, mem_src1, prom_src2, mem_src2.
     splits; eauto.
     { eapply reserve_future_memory_trans; eauto. }
@@ -3426,6 +3796,7 @@ Section SIM.
       }
       destruct (classic (L loc)).
       + hexploit sim_promise_step_forget; eauto. i. des.
+        eapply reserve_loc_future_reserve_future in FUTURE.
         destruct lc_src. ss. exploit reserve_future_memory_steps; eauto. i. des.
         eexists _, self', extra_self', (Local.mk _ _), mem_src'. splits; eauto.
         * econs 3; ss.
