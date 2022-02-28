@@ -164,6 +164,7 @@ Require Import gSimAux.
 
 Section POINTABLE.
   Variable loc_na: Loc.t -> Prop.
+  Section MESSAGES.
 
   Variable msgs: Messages.t.
   Hypothesis MSGSBOT: forall loc, msgs loc Time.bot Time.bot Message.elt.
@@ -486,18 +487,37 @@ Section POINTABLE.
     forall loc (AT: ~ loc_na loc) ts,
       List.Forall pointable_view (views loc ts).
 
+  Lemma pointable_joined_view views released
+        (JOINED: joined_view views released)
+        (VIEWS: List.Forall pointable_view views)
+    :
+      pointable_view released.
+  Proof.
+    revert VIEWS. induction JOINED; i.
+    { eapply pointable_view_bot; eauto. }
+    { eapply pointable_view_join; eauto.
+      eapply List.Forall_forall in VIEW; eauto.
+    }
+  Qed.
+
   Lemma pointable_joined_opt_view views released
         (JOINED: joined_opt_view views released)
         (VIEWS: List.Forall pointable_view views)
     :
       pointable_opt_view released.
   Proof.
-    inv JOINED; econs.
-    revert VIEWS. induction JOINED0; i.
-    { eapply pointable_view_bot; eauto. }
-    { eapply pointable_view_join; eauto.
-      eapply List.Forall_forall in VIEW; eauto.
-    }
+    inv JOINED; econs. eapply pointable_joined_view; eauto.
+  Qed.
+
+  Lemma pointable_joined_memory views mem
+        (JOINED: joined_memory views mem)
+        (VIEWS: pointable_views views)
+    :
+    pointable_memory mem.
+  Proof.
+    ii. destruct released; econs. inv JOINED.
+    exploit COMPLETE; eauto. i. des.
+    eapply pointable_joined_view; eauto.
   Qed.
 
   Lemma pointable_views_incr tvw (views1 views2: Loc.t -> Time.t -> list View.t)
@@ -526,4 +546,548 @@ Section POINTABLE.
       }
     }
   Qed.
+  End MESSAGES.
+
+  Variable msgs0: Messages.t.
+  Variable msgs1: Messages.t.
+  Hypothesis MSGSMON: msgs0 <4= msgs1.
+
+  Lemma pointable_timemap_mon tm
+        (TM: pointable_timemap msgs0 tm)
+    :
+    pointable_timemap msgs1 tm.
+  Proof.
+    ii. exploit TM; eauto. i. des. esplits; eauto.
+  Qed.
+
+  Lemma pointable_view_mon vw
+        (VW: pointable_view msgs0 vw)
+    :
+    pointable_view msgs1 vw.
+  Proof.
+    econs.
+    { eapply pointable_timemap_mon; eapply VW. }
+    { eapply pointable_timemap_mon; eapply VW. }
+  Qed.
+
+  Lemma pointable_opt_view_mon vw
+        (VW: pointable_opt_view msgs0 vw)
+    :
+    pointable_opt_view msgs1 vw.
+  Proof.
+    inv VW; econs. eapply pointable_view_mon; eauto.
+  Qed.
+
+  Lemma pointable_tview_mon tvw
+        (TVW: pointable_tview msgs0 tvw)
+    :
+    pointable_tview msgs1 tvw.
+  Proof.
+    inv TVW; econs; i; eapply pointable_view_mon; eauto.
+  Qed.
+
+  Lemma pointable_message_mon msg
+        (MSG: pointable_message msgs0 msg)
+    :
+    pointable_message msgs1 msg.
+  Proof.
+    inv MSG; econs; eauto. eapply pointable_opt_view_mon; eauto.
+  Qed.
+
+  Lemma pointable_memory_mon mem
+        (MEM: pointable_memory msgs0 mem)
+    :
+    pointable_memory msgs1 mem.
+  Proof.
+    ii. exploit MEM; eauto. i. eapply pointable_opt_view_mon; eauto.
+  Qed.
 End POINTABLE.
+
+Require Import Pred.
+Require Import Delayed.
+Require Import Simple.
+
+Section NA.
+  Variable loc_na: Loc.t -> Prop.
+
+  Lemma sim_thread_promise_step views0 lang_src lang_tgt fin
+        th0_src th0_tgt th1_tgt pf_tgt e_tgt
+        (STEP: Thread.step pf_tgt e_tgt th0_tgt th1_tgt)
+        (ISPROMISE: is_promise e_tgt)
+        (SIM: @JSim.sim_thread views0 lang_src lang_tgt th0_src th0_tgt)
+
+        (WF_SRC: Local.wf (Thread.local th0_src) (Thread.memory th0_src))
+        (WF_TGT: Local.wf (Thread.local th0_tgt) (Thread.memory th0_tgt))
+        (SC_SRC: Memory.closed_timemap (Thread.sc th0_src) (Thread.memory th0_src))
+        (SC_TGT: Memory.closed_timemap (Thread.sc th0_tgt) (Thread.memory th0_tgt))
+        (MEM_SRC: Memory.closed (Thread.memory th0_src))
+        (MEM_TGT: Memory.closed (Thread.memory th0_tgt))
+        (CONS_TGT: Local.promise_consistent (Thread.local th1_tgt))
+
+        (REL: joined_released views0 (Local.promises (Thread.local th0_src)) (Local.tview (Thread.local th0_src)).(TView.rel))
+        (JOINED: joined_memory views0 (Thread.memory th0_src))
+        (VIEWS: wf_views views0)
+
+        (POINTSC: pointable_timemap loc_na fin th0_src.(Thread.sc))
+        (POINTLOCAL: pointable_tview loc_na fin th0_src.(Thread.local).(Local.tview))
+        (POINTVIEWS: pointable_views loc_na fin views0)
+    :
+      exists e_src pf_src th1_src views1,
+        (<<JSTEP: JThread.step pf_src e_src th0_src th1_src views0 views1>>) /\
+        (<<ISPROMISE: is_promise e_src>>) /\
+        (<<SIM: JSim.sim_thread views1 th1_src th1_tgt>>) /\
+        (<<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>>) /\
+        (<<POINTSC: pointable_timemap loc_na fin th1_src.(Thread.sc)>>) /\
+        (<<POINTLOCAL: pointable_tview loc_na fin th1_src.(Thread.local).(Local.tview)>>)
+  .
+  Proof.
+    dup SIM. inv SIM.
+    apply inj_pair2 in H2. apply inj_pair2 in H4. subst. ss.
+    assert (st0 = st).
+    { inv SIM0.
+      apply inj_pair2 in H2. apply inj_pair2 in H7. subst. auto. }
+    subst. clear SIM0.
+    inv STEP; inv STEP0; [|inv LOCAL; inv LOCAL0; ss].
+    hexploit JSim.sim_local_promise; eauto. i. des. esplits.
+    { econs. econs 1; eauto.
+      { econs; eauto. }
+      { i. instantiate (1:=views2). clarify. eauto. }
+      { eauto. }
+      { eauto. }
+      { eauto. }
+      { eauto. }
+    }
+    { ss. }
+    { econs; eauto. }
+    { ss. }
+    { auto. }
+    { inv STEP_SRC; auto. }
+  Qed.
+
+  Lemma sim_thread_release_step views0 lang_src lang_tgt fin
+        th0_src th0_tgt th1_tgt pf_tgt e_tgt
+        (STEP: Thread.step pf_tgt e_tgt th0_tgt th1_tgt)
+        (ISRELEASE: release_event e_tgt)
+        (SIM: @JSim.sim_thread views0 lang_src lang_tgt th0_src th0_tgt)
+
+        (WF_SRC: Local.wf (Thread.local th0_src) (Thread.memory th0_src))
+        (WF_TGT: Local.wf (Thread.local th0_tgt) (Thread.memory th0_tgt))
+        (SC_SRC: Memory.closed_timemap (Thread.sc th0_src) (Thread.memory th0_src))
+        (SC_TGT: Memory.closed_timemap (Thread.sc th0_tgt) (Thread.memory th0_tgt))
+        (MEM_SRC: Memory.closed (Thread.memory th0_src))
+        (MEM_TGT: Memory.closed (Thread.memory th0_tgt))
+        (CONS_TGT: Local.promise_consistent (Thread.local th1_tgt))
+
+        (REL: joined_released views0 (Local.promises (Thread.local th0_src)) (Local.tview (Thread.local th0_src)).(TView.rel))
+        (JOINED: joined_memory views0 (Thread.memory th0_src))
+        (VIEWS: wf_views views0)
+
+        (POINTSC: pointable_timemap loc_na fin th0_src.(Thread.sc))
+        (POINTLOCAL: pointable_tview loc_na fin th0_src.(Thread.local).(Local.tview))
+        (POINTVIEWS: pointable_views loc_na fin views0)
+        (FINBOT: forall loc, fin loc Time.bot Time.bot Message.elt)
+        (AT: forall l c
+                    (ATOMIC: is_atomic_event (ThreadEvent.get_program_event e_tgt) = true)
+                    (ACCESS: is_accessing (ThreadEvent.get_program_event e_tgt) = Some (l, c)),
+            ~ loc_na l)
+    :
+      (<<FAILURE: Thread.steps_failure th0_src>>) \/
+      exists e_src pf_src th1_src views1,
+        (<<JSTEP: JThread.step pf_src e_src th0_src th1_src views0 views1>>) /\
+        (<<ISRELEASE: release_event e_src>>) /\
+        (<<SIM: JSim.sim_thread views1 th1_src th1_tgt>>) /\
+        (<<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>>) /\
+        (<<POINTSC: pointable_timemap loc_na fin th1_src.(Thread.sc)>>) /\
+        (<<POINTLOCAL: pointable_tview loc_na fin th1_src.(Thread.local).(Local.tview)>>)
+  .
+  Proof.
+    destruct (classic (Thread.steps_failure th0_src)) as [FAILURE|NFAILURE]; auto.
+    right. dup SIM. inv SIM.
+    apply inj_pair2 in H2. apply inj_pair2 in H4. subst. ss.
+    assert (st0 = st).
+    { inv SIM0.
+      apply inj_pair2 in H2. apply inj_pair2 in H7. subst. auto. }
+    subst. clear SIM0.
+    hexploit PromiseConsistent.step_promise_consistent; eauto. intros CONSISTENT0.
+    hexploit pointable_joined_memory; eauto. intros POINTMEM.
+    inv STEP; inv STEP0; ss. inv LOCAL0; ss.
+    (* write *)
+    { revert ISRELEASE. hexploit JSim.sim_local_write; eauto.
+      { econs. }
+      { refl. } i. des.
+      exists (ThreadEvent.write loc from to val released_src ord). esplits.
+      { econs.
+        { econs 2; eauto. }
+        { ss. }
+        { eapply VIEWSLE. }
+        { ss. }
+        { ss. }
+        { ss. }
+      }
+      { ss. }
+      { econs; eauto; refl. }
+      { ss. }
+      { ss. inv STEP_SRC. ss. }
+      { ss. inv STEP_SRC. ss.
+        hexploit AT.
+        { destruct ord; ss. }
+        { eauto. }
+        i. eapply pointable_write_tview; eauto. i. ss.
+      }
+    }
+    (* update *)
+    { hexploit JSim.sim_local_read; eauto.
+      { refl. } i. des.
+      hexploit Local.read_step_future; try apply LOCAL1; eauto. i. des.
+      hexploit Local.read_step_future; try apply STEP_SRC; eauto. i. des.
+      revert ISRELEASE. hexploit JSim.sim_local_write; eauto.
+      { refl. } i. des.
+      exists (ThreadEvent.update loc tsr tsw valr valw released_src released_src0 ordr ordw). esplits.
+      { econs.
+        { econs 2; eauto. }
+        { ss. }
+        { eapply VIEWSLE. }
+        { ss. }
+        { ss. }
+        { ss. }
+      }
+      { ss. }
+      { eauto. }
+      { ss. }
+      { ss. inv STEP_SRC. inv STEP_SRC0. ss. }
+      { ss. inv STEP_SRC. inv STEP_SRC0. ss.
+        hexploit AT.
+        { destruct (Ordering.le Ordering.plain ordr) eqn:ORDR; ss.
+          { destruct ordw; ss. }
+          exfalso. eapply NFAILURE. repeat red. esplits.
+          { refl. }
+          { econs 2. econs.
+            { instantiate (2:=ThreadEvent.racy_update _ _ _ _ _ _). eauto. }
+            econs. econs 1.
+            { destruct ordr; ss. }
+            { eapply JSim.sim_local_promise_consistent; eauto. }
+          }
+          { ss. }
+        }
+        { eauto. }
+        i. eapply pointable_write_tview; eauto; ss.
+        eapply pointable_read_tview; eauto; ss.
+      }
+    }
+    (* fence *)
+    { revert ISRELEASE.
+      hexploit JSim.sim_local_fence; try eassumption.
+      { refl. }
+      { refl. }
+      i. des.
+      exists (ThreadEvent.fence ordr ordw). esplits.
+      { econs.
+        { econs 2; eauto. }
+        { ss. }
+        { ss. }
+        { ss. }
+        { ss. }
+        { ss. }
+      }
+      { ss. }
+      { ss. }
+      { ss. }
+      { ss. inv STEP_SRC. ss.
+        eapply pointable_write_fence_sc; eauto.
+        eapply pointable_read_fence_tview; eauto.
+      }
+      { ss. inv STEP_SRC. ss.
+        eapply pointable_write_fence_tview; eauto.
+        eapply pointable_read_fence_tview; eauto.
+      }
+    }
+    (* syscall *)
+    { revert ISRELEASE.
+      hexploit JSim.sim_local_fence; try eassumption.
+      { refl. }
+      { refl. }
+      i. des.
+      exists (ThreadEvent.syscall e). esplits.
+      { econs.
+        { econs 2; eauto. }
+        { ss. }
+        { ss. }
+        { ss. }
+        { ss. }
+        { ss. }
+      }
+      { ss. }
+      { ss. }
+      { ss. }
+      { ss. inv STEP_SRC. ss.
+        eapply pointable_write_fence_sc; eauto.
+        eapply pointable_read_fence_tview; eauto.
+      }
+      { ss. inv STEP_SRC. ss.
+        eapply pointable_write_fence_tview; eauto.
+        eapply pointable_read_fence_tview; eauto.
+      }
+    }
+    (* failure *)
+    { hexploit JSim.sim_local_failure; eauto. i. des.
+      exists (ThreadEvent.failure). esplits.
+      { econs.
+        { econs 2; eauto. }
+        { ss. }
+        { ss. }
+        { ss. }
+        { ss. }
+        { ss. }
+      }
+      { ss. }
+      { ss. }
+      { ss. }
+      { ss. }
+      { ss. }
+    }
+    (* racy write *)
+    { hexploit JSim.sim_local_racy_write; eauto.
+      { refl. }
+      i. eexists (ThreadEvent.racy_write _ _ _ _). esplits.
+      { econs.
+        { econs 2; eauto. }
+        { ss. }
+        { ss. }
+        { ss. }
+        { ss. }
+        { ss. }
+      }
+      { ss. }
+      { ss. }
+      { ss. }
+      { ss. }
+      { ss. }
+    }
+    (* racy update *)
+    { hexploit JSim.sim_local_racy_update; eauto.
+      { refl. }
+      { refl. }
+      i. eexists (ThreadEvent.racy_update _ _ _ _ _ _). esplits.
+      { econs.
+        { econs 2; eauto. }
+        { ss. }
+        { ss. }
+        { ss. }
+        { ss. }
+        { ss. }
+      }
+      { ss. }
+      { ss. }
+      { ss. }
+      { ss. }
+      { ss. }
+    }
+  Qed.
+
+  Lemma sim_thread_lower_step views0 lang_src lang_tgt fin
+        th0_src th0_tgt th1_tgt e_tgt
+        (STEP: lower_step e_tgt th0_tgt th1_tgt)
+        (SIM: @JSim.sim_thread views0 lang_src lang_tgt th0_src th0_tgt)
+
+        (WF_SRC: Local.wf (Thread.local th0_src) (Thread.memory th0_src))
+        (WF_TGT: Local.wf (Thread.local th0_tgt) (Thread.memory th0_tgt))
+        (SC_SRC: Memory.closed_timemap (Thread.sc th0_src) (Thread.memory th0_src))
+        (SC_TGT: Memory.closed_timemap (Thread.sc th0_tgt) (Thread.memory th0_tgt))
+        (MEM_SRC: Memory.closed (Thread.memory th0_src))
+        (MEM_TGT: Memory.closed (Thread.memory th0_tgt))
+        (CONS_TGT: Local.promise_consistent (Thread.local th1_tgt))
+
+        (REL: joined_released views0 (Local.promises (Thread.local th0_src)) (Local.tview (Thread.local th0_src)).(TView.rel))
+        (JOINED: joined_memory views0 (Thread.memory th0_src))
+        (VIEWS: wf_views views0)
+
+        (POINTSC: pointable_timemap loc_na fin th0_src.(Thread.sc))
+        (POINTLOCAL: pointable_tview loc_na fin th0_src.(Thread.local).(Local.tview))
+        (POINTVIEWS: pointable_views loc_na fin views0)
+        (FINBOT: forall loc, fin loc Time.bot Time.bot Message.elt)
+        (AT: forall l c
+                    (ATOMIC: is_atomic_event (ThreadEvent.get_program_event e_tgt) = true)
+                    (ACCESS: is_accessing (ThreadEvent.get_program_event e_tgt) = Some (l, c)),
+            ~ loc_na l)
+    :
+      exists e_src pf_src th1_src views1,
+        (<<JSTEP: JThread.step pf_src e_src th0_src th1_src views0 views1>>) /\
+        (<<STEP: lower_step e_src th0_src th1_src>>) /\
+        (<<SIM: JSim.sim_thread views1 th1_src th1_tgt>>) /\
+        (<<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>>) /\
+        (<<POINTSC: pointable_timemap loc_na fin th1_src.(Thread.sc)>>) /\
+        (<<POINTLOCAL: pointable_tview loc_na fin th1_src.(Thread.local).(Local.tview)>>)
+  .
+  Proof.
+    TODO`
+
+    dup SIM. inv SIM.
+    apply inj_pair2 in H2. apply inj_pair2 in H4. subst. ss.
+    assert (st0 = st).
+    { inv SIM0.
+      apply inj_pair2 in H2. apply inj_pair2 in H7. subst. auto. }
+    subst. clear SIM0.
+    inv STEP. inv STEP0. inv LOCAL0; ss.
+    - inv STEP0.
+      hexploit sim_local_promise; eauto. i. des. esplits.
+      + econs.
+        * econs. econs 1; eauto.
+        * i. instantiate (1:=views2). clarify. eauto.
+        * eauto.
+        * eauto.
+        * eauto.
+        * ss.
+      + ss.
+      + eauto.
+    - inv STEP0. inv LOCAL0.
+      + esplits.
+        * econs.
+          { econs 2; eauto. }
+          { ss. }
+          { ss. }
+          { ss. }
+          { ss. }
+          { ss. }
+        * ss.
+        * ss.
+
+      + hexploit sim_local_read; eauto.
+        { refl. } i. des.
+        exists (ThreadEvent.read loc ts val released_src ord). esplits.
+        * econs.
+          { econs 2; eauto. }
+          { ss. }
+          { ss. }
+          { ss. }
+          { ss. }
+          { ss. }
+        * ss.
+        * eauto.
+
+      + hexploit sim_local_write; eauto.
+        { econs. }
+        { refl. } i. des.
+        exists (ThreadEvent.write loc from to val released_src ord). esplits.
+        * econs.
+          { econs 2; eauto. }
+          { ss. }
+          { eapply VIEWSLE. }
+          { ss. }
+          { ss. }
+          { ss. }
+        * ss.
+        * econs; eauto; refl.
+
+      + hexploit sim_local_read; eauto.
+        { refl. } i. des.
+        hexploit Local.read_step_future; try apply LOCAL1; eauto. i. des.
+        hexploit Local.read_step_future; try apply STEP_SRC; eauto. i. des.
+        hexploit sim_local_write; eauto.
+        { refl. } i. des.
+        exists (ThreadEvent.update loc tsr tsw valr valw released_src released_src0 ordr ordw). esplits.
+        * econs.
+          { econs 2; eauto. }
+          { ss. }
+          { eapply VIEWSLE. }
+          { ss. }
+          { ss. }
+          { ss. }
+        * ss.
+        * eauto.
+
+      + hexploit sim_local_fence; eauto.
+        { refl. }
+        { refl. } i. des.
+        exists (ThreadEvent.fence ordr ordw). esplits.
+        * econs.
+          { econs 2; eauto. }
+          { ss. }
+          { ss. }
+          { ss. }
+          { ss. }
+          { ss. }
+        * ss.
+        * ss.
+
+      + hexploit sim_local_fence; eauto.
+        { refl. }
+        { refl. } i. des.
+        exists (ThreadEvent.syscall e). esplits.
+        * econs.
+          { econs 2; eauto. }
+          { ss. }
+          { ss. }
+          { ss. }
+          { ss. }
+          { ss. }
+        * ss.
+        * ss.
+
+      + hexploit sim_local_failure; eauto.  i. des.
+        exists (ThreadEvent.failure). esplits.
+        * econs.
+          { econs 2; eauto. }
+          { ss. }
+          { ss. }
+          { ss. }
+          { ss. }
+          { ss. }
+        * ss.
+        * ss.
+
+      + hexploit sim_local_write_na_step; eauto.
+        { refl. }
+        i. des.
+        eexists (ThreadEvent.write_na _ _ _ _ _ _). esplits.
+        * econs.
+          { econs 2; eauto. }
+          { ss. }
+          { ss. }
+          { ss. }
+          { ss. }
+          { ss. }
+        * ss.
+        * econs.
+
+      + hexploit sim_local_racy_read; eauto.
+        { refl. }
+        i. eexists (ThreadEvent.racy_read _ _ _ _). esplits.
+        * econs.
+          { econs 2; eauto. }
+          { ss. }
+          { ss. }
+          { ss. }
+          { ss. }
+          { ss. }
+        * ss.
+        * ss.
+
+      + hexploit sim_local_racy_write; eauto.
+        { refl. }
+        i. eexists (ThreadEvent.racy_write _ _ _ _). esplits.
+        * econs.
+          { econs 2; eauto. }
+          { ss. }
+          { ss. }
+          { ss. }
+          { ss. }
+          { ss. }
+        * ss.
+        * ss.
+
+      + hexploit sim_local_racy_update; eauto.
+        { refl. }
+        { refl. }
+        i. eexists (ThreadEvent.racy_update _ _ _ _ _ _). esplits.
+        * econs.
+          { econs 2; eauto. }
+          { ss. }
+          { ss. }
+          { ss. }
+          { ss. }
+          { ss. }
+        * ss.
+        * ss.
+
+  Qed.
+End NA.
