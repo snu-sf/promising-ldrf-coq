@@ -50,6 +50,7 @@ Require Import Pred.
 Require Import SimAux.
 Require Import FlagAux.
 Require Import SeqAux.
+Require Import NoMix.
 
 Variant initial_finalized: Messages.t :=
   | initial_finalized_intro
@@ -398,29 +399,6 @@ Section LIFT.
   Variable loc_na: Loc.t -> Prop.
   Variable loc_at: Loc.t -> Prop.
   Hypothesis LOCDISJOINT: forall loc (NA: loc_na loc) (AT: loc_at loc), False.
-
-  Definition _nomix
-             (nomix: forall (lang: language) (st: lang.(Language.state)), Prop)
-             (lang: language) (st: lang.(Language.state)): Prop :=
-    forall st1 e
-           (STEP: lang.(Language.step) e st st1),
-      (<<NA: forall l c (NA: is_atomic_event e = false) (ACC: is_accessing e = Some (l, c)), loc_na l>>) /\
-        (<<AT: forall l c (AT: is_atomic_event e = true) (ACC: is_accessing e = Some (l, c)), loc_at l>>) /\
-        (<<CONT: nomix lang st1>>)
-  .
-
-  Definition nomix := paco2 _nomix bot2.
-  Arguments nomix: clear implicits.
-
-  Lemma nomix_mon: monotone2 _nomix.
-  Proof.
-    ii. exploit IN; eauto. i. des. splits.
-    { i. hexploit NA; eauto. }
-    { i. hexploit AT; eauto. }
-    { auto. }
-  Qed.
-  #[local] Hint Resolve nomix_mon: paco.
-
 
   Definition sim_seq_interference lang_src lang_tgt sim_terminal p0 D st_src st_tgt :=
     forall p1 (PERM: Perms.le p1 p0),
@@ -1030,7 +1008,7 @@ Section LIFT.
       lang_src st_src0 st_src1
       (LIFT: sim_state_lift c w0 smem_src0 smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
       (STEP: SeqState.na_step p me (SeqState.mk _ st_src0 smem_src0) (SeqState.mk _ st_src1 smem_src1))
-      (NOMIX: nomix _ st_src0)
+      (NOMIX: nomix loc_na loc_at _ st_src0)
       (CONSISTENT: Local.promise_consistent lc_tgt)
       (WF_SRC: Local.wf lc_src0 mem_src0)
       (WF_TGT: Local.wf lc_tgt mem_tgt)
@@ -1046,7 +1024,7 @@ Section LIFT.
           exists w1,
             (<<LIFT: sim_state_lift true w1 smem_src1 smem_tgt p D mem_src2 mem_tgt lc_src2 lc_tgt sc_src2 sc_tgt>>) /\
               (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt lc_tgt.(Local.promises)) w0 w1>>)>>) /\
-        (<<NOMIX: nomix _ st_src1>>)
+        (<<NOMIX: nomix loc_na loc_at _ st_src1>>)
   .
   Proof.
     i. inv STEP.
@@ -1073,7 +1051,7 @@ Section LIFT.
       lang_src st_src0 st_src1
       (LIFT: sim_state_lift c w0 smem_src0 smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
       (STEP: SeqState.na_opt_step p me (SeqState.mk _ st_src0 smem_src0) (SeqState.mk _ st_src1 smem_src1))
-      (NOMIX: nomix _ st_src0)
+      (NOMIX: nomix loc_na loc_at _ st_src0)
       (CONSISTENT: Local.promise_consistent lc_tgt)
       (WF_SRC: Local.wf lc_src0 mem_src0)
       (WF_TGT: Local.wf lc_tgt mem_tgt)
@@ -1089,7 +1067,7 @@ Section LIFT.
           exists w1,
             (<<LIFT: sim_state_lift true w1 smem_src1 smem_tgt p D mem_src2 mem_tgt lc_src2 lc_tgt sc_src2 sc_tgt>>) /\
               (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt lc_tgt.(Local.promises)) w0 w1>>)>>) /\
-        (<<NOMIX: nomix _ st_src1>>)
+        (<<NOMIX: nomix loc_na loc_at _ st_src1>>)
   .
   Proof.
     i. inv STEP.
@@ -1113,7 +1091,7 @@ Section LIFT.
       (STEPS: rtc (SeqState.na_step p MachineEvent.silent) (SeqState.mk _ st_src0 smem_src0) (SeqState.mk _ st_src1 smem_src1))
       w0 D smem_tgt mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt
       (LIFT: sim_state_lift c w0 smem_src0 smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
-      (NOMIX: nomix _ st_src0)
+      (NOMIX: nomix loc_na loc_at _ st_src0)
       (CONSISTENT: Local.promise_consistent lc_tgt)
       (WF_SRC: Local.wf lc_src0 mem_src0)
       (WF_TGT: Local.wf lc_tgt mem_tgt)
@@ -1126,7 +1104,7 @@ Section LIFT.
         (<<LIFT: exists w1,
             (<<LIFT: sim_state_lift true w1 smem_src1 smem_tgt p D mem_src1 mem_tgt lc_src1 lc_tgt sc_src1 sc_tgt>>) /\
               (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt lc_tgt.(Local.promises)) w0 w1>>)>>) /\
-        (<<NOMIX: nomix _ st_src1>>)
+        (<<NOMIX: nomix loc_na loc_at _ st_src1>>)
   .
   Proof.
     intros c lang_src st_src0 st_src1 p smem_src0 smem_src1 STEPS.
@@ -1500,7 +1478,7 @@ Section LIFT.
     :
     forall mem0 lc0 sc0 w D W
            (LIFT: sim_state_sol_lift c smem0 p0 D W mem0 lc0 sc0 o0)
-           (NOMIX: nomix _ st0)
+           (NOMIX: nomix loc_na loc_at _ st0)
            (TRACE: SeqThread.writing_trace tr w)
            (WF_SRC: Local.wf lc0 mem0)
            (SC_SRC: Memory.closed_timemap sc0 mem0)
@@ -1509,7 +1487,7 @@ Section LIFT.
         exists lc1 mem1 sc1,
           (<<STEPS: rtc (@Thread.tau_step lang) (Thread.mk _ st0 lc0 sc0 mem0) (Thread.mk _ st1 lc1 sc1 mem1)>>) /\
             (<<LIFT: sim_state_sol_lift c smem1 p1 D (Flags.join w W) mem1 lc1 sc1 o1>>) /\
-            (<<NOMIX: nomix _ st1>>)
+            (<<NOMIX: nomix loc_na loc_at _ st1>>)
   .
   Proof.
     remember (SeqThread.mk (SeqState.mk _ st0 smem0) p0 o0) as th0.
@@ -1587,7 +1565,7 @@ Section LIFT.
       lang st
       (LIFT: sim_state_lift c w smem_src smem_tgt p D mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt)
       (FAILURE: sim_seq_failure_case p (SeqState.mk _ st smem_src))
-      (NOMIX: nomix _ st)
+      (NOMIX: nomix loc_na loc_at _ st)
       (CONSISTENT: Local.promise_consistent lc_tgt)
       (WF_SRC: Local.wf lc_src mem_src)
       (WF_TGT: Local.wf lc_tgt mem_tgt)
@@ -1632,7 +1610,7 @@ Section LIFT.
       (LIFT: sim_state_lift c w smem_src smem_tgt p D mem_src0 mem_tgt lc_src0 lc_tgt sc_src0 sc_tgt)
       (PARTIAL: sim_seq_partial_case p D (SeqState.mk _ st_src0 smem_src) (SeqState.mk _ st_tgt smem_tgt))
       (BOT: lc_tgt.(Local.promises) = Memory.bot)
-      (NOMIX: nomix _ st_src0)
+      (NOMIX: nomix loc_na loc_at _ st_src0)
       (CONSISTENT: Local.promise_consistent lc_tgt)
       (WF_SRC: Local.wf lc_src0 mem_src0)
       (WF_TGT: Local.wf lc_tgt mem_tgt)
@@ -1693,7 +1671,7 @@ Section LIFT.
       (SIM: sim_seq_terminal_case sim_terminal p D (SeqState.mk _ st_src0 smem_src) (SeqState.mk _ st_tgt smem_tgt))
       (TERMINAL: lang_tgt.(Language.is_terminal) st_tgt)
       (BOT: lc_tgt.(Local.promises) = Memory.bot)
-      (NOMIX: nomix _ st_src0)
+      (NOMIX: nomix loc_na loc_at _ st_src0)
       (CONSISTENT: Local.promise_consistent lc_tgt)
       (WF_SRC: Local.wf lc_src0 mem_src0)
       (WF_TGT: Local.wf lc_tgt mem_tgt)
@@ -1764,7 +1742,7 @@ Section LIFT.
       lang_src lang_tgt sim_terminal st_src st_tgt
       (LIFT: sim_state_lift false w0 smem_src smem_tgt p0 D mem_src0 mem_tgt0 lc_src0 lc_tgt sc_src0 sc_tgt0)
       (SIM: sim_seq_interference _ _ sim_terminal p0 D (SeqState.mk lang_src st_src smem_src) (SeqState.mk lang_tgt st_tgt smem_tgt))
-      (NOMIX: nomix _ st_src)
+      (NOMIX: nomix loc_na loc_at _ st_src)
       (CONSISTENT: Local.promise_consistent lc_tgt)
       (WF_SRC0: Local.wf lc_src0 mem_src0)
       (WF_TGT0: Local.wf lc_tgt mem_tgt0)
@@ -1876,7 +1854,7 @@ Section LIFT.
       lc_tgt1 mem_tgt1 loc from_tgt to_tgt msg_tgt kind_tgt
       (LIFT: sim_state_lift false w0 smem_src smem_tgt p D mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0)
       (SIM: sim_seq_interference _ _ sim_terminal p D (SeqState.mk lang_src st_src smem_src) (SeqState.mk lang_tgt st_tgt smem_tgt))
-      (NOMIX: nomix _ st_src)
+      (NOMIX: nomix loc_na loc_at _ st_src)
       (CONSISTENT: Local.promise_consistent lc_tgt1)
       (WF_SRC0: Local.wf lc_src0 mem_src0)
       (WF_TGT0: Local.wf lc_tgt0 mem_tgt0)
@@ -1924,7 +1902,7 @@ Section LIFT.
       cap_src cap_tgt
       (LIFT: sim_state_lift false w0 smem_src smem_tgt p D mem_src0 mem_tgt0 lc_src0 lc_tgt0 sc_src0 sc_tgt0)
       (SIM: sim_seq_interference _ _ sim_terminal p D (SeqState.mk lang_src st_src smem_src) (SeqState.mk lang_tgt st_tgt smem_tgt))
-      (NOMIX: nomix _ st_src)
+      (NOMIX: nomix loc_na loc_at _ st_src)
       (CONSISTENT: Local.promise_consistent lc_tgt0)
       (WF_SRC0: Local.wf lc_src0 mem_src0)
       (WF_TGT0: Local.wf lc_tgt0 mem_tgt0)
@@ -3009,8 +2987,8 @@ Section LIFT.
       (SIM: sim_seq_at_step_case (@sim_seq lang_src lang_tgt sim_terminal) p0 D0 (SeqState.mk lang_src st_src0 smem_src0) (SeqState.mk lang_tgt st_tgt0 smem_tgt0))
       (ATOMIC: is_atomic_event (ThreadEvent.get_program_event e))
       (RELEASE: is_release (ThreadEvent.get_program_event e) = false)
-      (NOMIXSRC: nomix _ st_src0)
-      (NOMIXTGT: nomix _ st_tgt0)
+      (NOMIXSRC: nomix loc_na loc_at _ st_src0)
+      (NOMIXTGT: nomix loc_na loc_at _ st_tgt0)
       (CONSISTENT: Local.promise_consistent lc_tgt1)
       (WF_SRC0: Local.wf lc_src0 mem_src0)
       (WF_TGT0: Local.wf lc_tgt0 mem_tgt0)
@@ -3027,8 +3005,8 @@ Section LIFT.
                (<<LIFT: sim_state_lift true w1 smem_src1 smem_tgt1 p1 D1 mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src1 sc_tgt1>>) /\
                  (<<SIM: @sim_seq _ _ sim_terminal p1 D1 (SeqState.mk lang_src st_src1 smem_src1) (SeqState.mk lang_tgt st_tgt1 smem_tgt1)>>) /\
                  (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt0 lc_tgt0.(Local.promises)) w0 w1>>) /\
-                 (<<NOMIXSRC: nomix _ st_src1>>) /\
-                 (<<NOMIXTGT: nomix _ st_tgt1>>) /\
+                 (<<NOMIXSRC: nomix loc_na loc_at _ st_src1>>) /\
+                 (<<NOMIXTGT: nomix loc_na loc_at _ st_tgt1>>) /\
                  (<<NFAILURE: ThreadEvent.get_machine_event e = MachineEvent.silent>>))).
   Proof.
     i. hexploit PromiseConsistent.step_promise_consistent.
@@ -3092,8 +3070,8 @@ Section LIFT.
       (SIM: sim_seq_at_step_case (@sim_seq lang_src lang_tgt sim_terminal) p0 D0 (SeqState.mk lang_src st_src0 smem_src0) (SeqState.mk lang_tgt st_tgt0 smem_tgt0))
       (ATOMIC: is_atomic_event (ThreadEvent.get_program_event e_tgt))
       (RELEASE: is_release (ThreadEvent.get_program_event e_tgt) = true)
-      (NOMIXSRC: nomix _ st_src0)
-      (NOMIXTGT: nomix _ st_tgt0)
+      (NOMIXSRC: nomix loc_na loc_at _ st_src0)
+      (NOMIXTGT: nomix loc_na loc_at _ st_tgt0)
       (CONSISTENT: Local.promise_consistent lc_tgt1)
       (WF_SRC0: Local.wf lc_src0 mem_src0)
       (WF_TGT0: Local.wf lc_tgt0 mem_tgt0)
@@ -3118,8 +3096,8 @@ Section LIFT.
         (<<SC: sim_timemap_lift w1 sc_src3 sc_tgt1>>) /\
         (<<MEM: sim_memory_lift w1 mem_src3 mem_tgt1>>) /\
         (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt0 lc_tgt0.(Local.promises)) w0 w1>>) /\
-        (<<NOMIXSRC: nomix _ st_src2>>) /\
-        (<<NOMIXTGT: nomix _ st_tgt1>>) /\
+        (<<NOMIXSRC: nomix loc_na loc_at _ st_src2>>) /\
+        (<<NOMIXTGT: nomix loc_na loc_at _ st_tgt1>>) /\
         (<<EVENT: machine_event_le (ThreadEvent.get_machine_event e_tgt) (ThreadEvent.get_machine_event e_src)>>)
   .
   Proof.
@@ -3206,8 +3184,8 @@ Section LIFT.
       (SIM: sim_seq_na_step_case (@sim_seq lang_src lang_tgt sim_terminal) p0 D0 (SeqState.mk lang_src st_src0 smem_src0) (SeqState.mk lang_tgt st_tgt0 smem_tgt0))
       (ATOMIC: is_atomic_event (ThreadEvent.get_program_event e) = false)
       (LOWER: is_na_write e -> mem_tgt1 = mem_tgt0)
-      (NOMIXSRC: nomix _ st_src0)
-      (NOMIXTGT: nomix _ st_tgt0)
+      (NOMIXSRC: nomix loc_na loc_at _ st_src0)
+      (NOMIXTGT: nomix loc_na loc_at _ st_tgt0)
       (CONSISTENT: Local.promise_consistent lc_tgt1)
       (WF_SRC0: Local.wf lc_src0 mem_src0)
       (WF_TGT0: Local.wf lc_tgt0 mem_tgt0)
@@ -3224,8 +3202,8 @@ Section LIFT.
                (<<LIFT: sim_state_lift true w1 smem_src1 smem_tgt1 p1 D1 mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src1 sc_tgt1>>) /\
                  (<<SIM: @sim_seq _ _ sim_terminal p1 D1 (SeqState.mk lang_src st_src1 smem_src1) (SeqState.mk lang_tgt st_tgt1 smem_tgt1)>>) /\
                  (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt0 lc_tgt0.(Local.promises)) w0 w1>>) /\
-                 (<<NOMIXSRC: nomix _ st_src1>>) /\
-                 (<<NOMIXTGT: nomix _ st_tgt1>>) /\
+                 (<<NOMIXSRC: nomix loc_na loc_at _ st_src1>>) /\
+                 (<<NOMIXTGT: nomix loc_na loc_at _ st_tgt1>>) /\
                  (<<FAILURE: ThreadEvent.get_machine_event e = MachineEvent.silent>>))).
   Proof.
     i. hexploit PromiseConsistent.step_promise_consistent.
@@ -3285,8 +3263,8 @@ Section LIFT.
       (SIM: sim_seq_na_step_case (@sim_seq lang_src lang_tgt sim_terminal) p0 D0 (SeqState.mk lang_src st_src0 smem_src0) (SeqState.mk lang_tgt st_tgt0 smem_tgt0))
       (ATOMIC: is_atomic_event (ThreadEvent.get_program_event e) = false)
       (LOWER: is_na_write e -> mem_tgt1 = mem_tgt0)
-      (NOMIXSRC: nomix _ st_src0)
-      (NOMIXTGT: nomix _ st_tgt0)
+      (NOMIXSRC: nomix loc_na loc_at _ st_src0)
+      (NOMIXTGT: nomix loc_na loc_at _ st_tgt0)
       (CONSISTENT: Local.promise_consistent lc_tgt1)
       (WF_SRC0: Local.wf lc_src0 mem_src0)
       (WF_TGT0: Local.wf lc_tgt0 mem_tgt0)
@@ -3303,8 +3281,8 @@ Section LIFT.
                (<<LIFT: sim_state_lift true w1 smem_src1 smem_tgt1 p1 D1 mem_src1 mem_tgt1 lc_src1 lc_tgt1 sc_src1 sc_tgt1>>) /\
                  (<<SIM: @sim_seq _ _ sim_terminal p1 D1 (SeqState.mk lang_src st_src1 smem_src1) (SeqState.mk lang_tgt st_tgt1 smem_tgt1)>>) /\
                  (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt0 lc_tgt0.(Local.promises)) w0 w1>>) /\
-                 (<<NOMIXSRC: nomix _ st_src1>>) /\
-                 (<<NOMIXTGT: nomix _ st_tgt1>>) /\
+                 (<<NOMIXSRC: nomix loc_na loc_at _ st_src1>>) /\
+                 (<<NOMIXTGT: nomix loc_na loc_at _ st_tgt1>>) /\
                  (<<FAILURE: ThreadEvent.get_machine_event e = MachineEvent.silent>>) /\
                  (<<UPDATE: ~ racy_update_event e>>))).
   Proof.
@@ -3344,8 +3322,8 @@ Section LIFT.
       c (st_src: lang_src.(Language.state)) (st_tgt: lang_tgt.(Language.state))
       w p D smem_src smem_tgt mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt
       (SIM: @sim_seq_cond c _ _ sim_terminal p D (SeqState.mk _ st_src smem_src) (SeqState.mk _ st_tgt smem_tgt))
-      (NOMIXSRC: nomix _ st_src)
-      (NOMIXTGT: nomix _ st_tgt)
+      (NOMIXSRC: nomix loc_na loc_at _ st_src)
+      (NOMIXTGT: nomix loc_na loc_at _ st_tgt)
       (LIFT: sim_state_lift c w smem_src smem_tgt p D mem_src mem_tgt lc_src lc_tgt sc_src sc_tgt),
       @sim_thread
         world world_messages_le sim_memory_lift sim_timemap_lift loc_na
@@ -3435,8 +3413,8 @@ Section LIFT.
     forall
       (st_src: lang_src.(Language.state)) (st_tgt: lang_tgt.(Language.state))
       (SIM: @sim_seq_all lang_src lang_tgt sim_terminal st_src st_tgt)
-      (NOMIXSRC: nomix _ st_src)
-      (NOMIXTGT: nomix _ st_tgt),
+      (NOMIXSRC: nomix loc_na loc_at _ st_src)
+      (NOMIXTGT: nomix loc_na loc_at _ st_tgt),
       @sim_thread
         world world_messages_le sim_memory_lift sim_timemap_lift loc_na
         lang_src lang_tgt false initial_world
