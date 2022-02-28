@@ -214,6 +214,15 @@ Proof.
   ss. eapply TVIEW.
 Qed.
 
+Lemma lower_thread_consistent
+      lang (e_src e_tgt: Thread.t lang)
+      (LOWER: lower_thread e_src e_tgt)
+      (CONS: Local.promise_consistent (Thread.local e_tgt)):
+  Local.promise_consistent (Thread.local e_src).
+Proof.
+  eapply lower_local_consistent; eauto. apply LOWER.
+Qed.
+
 Lemma lower_memory_get mem_src mem_tgt
       (MEM: lower_memory mem_src mem_tgt)
       loc from to msg_tgt
