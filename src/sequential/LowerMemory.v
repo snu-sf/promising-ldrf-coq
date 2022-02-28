@@ -827,3 +827,73 @@ Proof.
     try exact LOCAL; try exact SC; try exact MEMORY; eauto. i. des.
   esplits; eauto. econs; eauto.
 Qed.
+
+Lemma lower_memory_max_ts
+      mem_src mem_tgt
+      (LOWER: lower_memory mem_src mem_tgt)
+      (MEM_SRC: Memory.inhabited mem_src)
+      (MEM_TGT: Memory.inhabited mem_tgt):
+  forall loc, Memory.max_ts loc mem_src = Memory.max_ts loc mem_tgt.
+Proof.
+  i.
+  exploit Memory.max_ts_spec; try eapply MEM_SRC.
+  instantiate (1:=loc). i. des.
+  exploit Memory.max_ts_spec; try eapply MEM_TGT.
+  instantiate (1:=loc). i. des.
+  inv LOWER.
+  generalize (LOWER0 loc (Memory.max_ts loc mem_src)).
+  rewrite GET. i. inv H. symmetry in H3.
+  exploit Memory.max_ts_spec; try eapply H3. i. des.
+  generalize (LOWER0 loc (Memory.max_ts loc mem_tgt)).
+  rewrite GET0. i. inv H. symmetry in H1.
+  exploit Memory.max_ts_spec; try eapply H1. i. des.
+  apply TimeFacts.antisym; eauto.
+Qed.
+
+Lemma lower_memory_cap
+      mem_src mem_tgt
+      cap_src cap_tgt
+      (LOWER: lower_memory mem_src mem_tgt)
+      (MEM_SRC: Memory.closed mem_src)
+      (MEM_TGT: Memory.closed mem_tgt)
+      (CAP_SRC: Memory.cap mem_src cap_src)
+      (CAP_TGT: Memory.cap mem_tgt cap_tgt):
+  lower_memory cap_src cap_tgt.
+Proof.
+  dup LOWER. inv LOWER. rename LOWER1 into LOWER. econs. i.
+  destruct (Memory.get loc to cap_src) as [[from msg]|] eqn:GET_SRC.
+  { inv CAP_TGT.
+    exploit Memory.cap_inv; try exact CAP_SRC; eauto. i. des.
+    - generalize (LOWER loc to). rewrite x0. i. inv H.
+      exploit SOUND; eauto. i. rewrite x. econs. ss.
+    - subst. inv x1.
+      exploit (MIDDLE loc from1 from to to2); eauto; cycle 1.
+      { i. rewrite x1. econs. ss. }
+      generalize (LOWER loc from). rewrite GET1. i. inv H.
+      generalize (LOWER loc to2). rewrite GET2. i. inv H.
+      econs; eauto. i.
+      exploit EMPTY; eauto. i.
+      generalize (LOWER loc ts). rewrite x. i. inv H. ss.
+    - subst.
+      erewrite lower_memory_max_ts; eauto; try apply MEM_SRC; try apply MEM_TGT.
+      rewrite BACK. econs. ss.
+  }
+  { destruct (Memory.get loc to cap_tgt) as [[from msg]|] eqn:GET_TGT; try by econs.
+    exfalso. inv CAP_SRC.
+    exploit Memory.cap_inv; try exact CAP_TGT; eauto. i. des.
+    - generalize (LOWER loc to). rewrite x0. i. inv H.
+      exploit SOUND; eauto. i. rewrite x in *. ss.
+    - subst. inv x1.
+      exploit (MIDDLE loc from1 from to to2); eauto; cycle 1.
+      { i. rewrite x1 in *. ss. }
+      generalize (LOWER loc from). rewrite GET1. i. inv H.
+      generalize (LOWER loc to2). rewrite GET2. i. inv H.
+      econs; eauto. i.
+      exploit EMPTY; eauto. i.
+      generalize (LOWER loc ts). rewrite x. i. inv H. ss.
+    - subst.
+      erewrite <- lower_memory_max_ts in GET_SRC; eauto;
+        try apply MEM_SRC; try apply MEM_TGT.
+      rewrite BACK in *. ss.
+  }
+Qed.

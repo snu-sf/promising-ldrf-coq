@@ -380,6 +380,62 @@ Section DStep.
     inv LOWER; ss.
   Qed.
 
+  Lemma rtc_tau_step_nrp_steps
+        e1 e2
+        (STEPS: rtc (@Thread.tau_step _) e1 e2):
+    nrp_steps MachineEvent.silent e1 e2.
+  Proof.
+    induction STEPS.
+    { econs; refl. }
+    clear - H IHSTEPS.
+    inv H. inv TSTEP.
+    destruct (classic (release_event e)).
+    { inv IHSTEPS.
+      { econs 1; try exact NSTEPS.
+        econs 2; try exact STEPS.
+        econs; try exact EVENT.
+        econs; try refl; eauto.
+      }
+      { econs 2; try exact STEP0.
+        econs 2; try exact STEPS.
+        econs; try exact EVENT.
+        econs; try refl; eauto.
+      }
+    }
+    { inv IHSTEPS.
+      { inv STEPS.
+        { econs 1; [refl|].
+          econs 2; try exact NSTEPS.
+          econs; try exact EVENT.
+          econs; eauto.
+        }
+        { econs 1; try exact NSTEPS.
+          econs 2; try exact H1.
+          inv H0. econs; try exact EVENT0.
+          inv TSTEP. econs; try exact STEP0; ss.
+          econs 2; try exact STEPS.
+          econs; try exact EVENT. econs; eauto.
+        }
+      }
+      { inv STEPS.
+        { econs 2; [refl|].
+          inv STEP0. econs; try exact STEP1; ss.
+          econs 2; try exact STEPS.
+          econs; try exact EVENT.
+          econs; eauto.
+        }
+        { econs 2; try exact STEP0.
+          econs 2; try exact H2.
+          inv H0. econs; try exact EVENT0.
+          inv TSTEP. econs; try exact STEP1; ss.
+          econs 2; try exact STEPS.
+          econs; try exact EVENT.
+          econs; eauto.
+        }
+      }
+    }
+  Qed.
+
   Lemma plus_step_nrp_steps
         pf e e1 e2 e3
         (STEPS: rtc (@Thread.tau_step _) e1 e2)
@@ -743,6 +799,40 @@ Section DStep.
     }
   Qed.
 
+  Lemma ld_rtc_tau_step_dsteps
+        e1_src e1_tgt e2_tgt
+        (LD1: lower_delayed_thread e1_src e1_tgt)
+        (WF1_TGT: Local.wf (Thread.local e1_tgt) (Thread.memory e1_tgt))
+        (SC1_TGT: Memory.closed_timemap (Thread.sc e1_tgt) (Thread.memory e1_tgt))
+        (CLOSED1_TGT: Memory.closed (Thread.memory e1_tgt))
+        (STEPS: rtc (@Thread.tau_step _) e1_tgt e2_tgt)
+        (CONS: Local.promise_consistent (Thread.local e2_tgt)):
+    exists e2_src,
+      (<<STEP_SRC: dsteps MachineEvent.silent e1_src e2_src>>) /\
+      (<<LD2: lower_delayed_thread e2_src e2_tgt>>).
+  Proof.
+    exploit rtc_tau_step_nrp_steps; eauto. i.
+    exploit ld_nrp_steps_dsteps; eauto. i. des. subst. eauto.
+  Qed.
+
+  Lemma ld_plus_step_dsteps
+        e1_src e1_tgt pf e_tgt e2_tgt e3_tgt
+        (LD1: lower_delayed_thread e1_src e1_tgt)
+        (WF1_TGT: Local.wf (Thread.local e1_tgt) (Thread.memory e1_tgt))
+        (SC1_TGT: Memory.closed_timemap (Thread.sc e1_tgt) (Thread.memory e1_tgt))
+        (CLOSED1_TGT: Memory.closed (Thread.memory e1_tgt))
+        (STEPS: rtc (@Thread.tau_step _) e1_tgt e2_tgt)
+        (STEP: Thread.step pf e_tgt e2_tgt e3_tgt)
+        (CONS: Local.promise_consistent (Thread.local e3_tgt)):
+    exists e_src e3_src,
+      (<<STEP_SRC: dsteps e_src e1_src e3_src>>) /\
+      (<<EVENT: e_src = ThreadEvent.get_machine_event e_tgt>>) /\
+      (<<LD2: lower_delayed_thread e3_src e3_tgt>>).
+  Proof.
+    exploit plus_step_nrp_steps; eauto. i.
+    exploit ld_nrp_steps_dsteps; eauto.
+  Qed.
+
   Lemma ld_future
         e_src e_tgt
         sc_src mem_src sc_tgt mem_tgt
@@ -768,6 +858,64 @@ Section DStep.
       rewrite <- MEM0.
       apply Memory.future_future_weak; eauto.
   Qed.
+
+  Lemma ld_cap
+        e_src e_tgt
+        cap_src cap_tgt
+        (LD: lower_delayed_thread e_src e_tgt)
+        (MEM_TGT: Memory.closed (Thread.memory e_tgt))
+        (CAP_SRC: Memory.cap (Thread.memory e_src) cap_src)
+        (CAP_TGT: Memory.cap (Thread.memory e_tgt) cap_tgt):
+    (<<LD_CAP: lower_delayed_thread
+                 (Thread.mk _ (Thread.state e_src) (Thread.local e_src) (Thread.sc e_src) cap_src)
+                 (Thread.mk _ (Thread.state e_tgt) (Thread.local e_tgt) (Thread.sc e_tgt) cap_tgt)>>).
+  Proof.
+    inv LD.
+    destruct e_src as [st_src lc_src sc_src mem_src],
+             e_lower as [st_lower lc_lower sc_lower mem_lower],
+             e_tgt as [st_tgt lc_tgt sc_tgt mem_tgt].
+    inv LOWER. inv DELAYED. ss. subst.
+    exploit lower_memory_cap; try exact MEMORY; eauto; try apply DELAYED0. i.
+    econs.
+    - instantiate (1 := Thread.mk _ st_tgt lc_lower sc_lower cap_src).
+      econs; ss.
+    - econs; ss.
+      eapply delayed_future; eauto.
+      + eapply Local.cap_wf; eauto. apply DELAYED0.
+      + eapply Memory.cap_closed_timemap; eauto. apply DELAYED0.
+      + eapply Memory.cap_closed; eauto. apply DELAYED0.
+      + eapply Memory.cap_future_weak; eauto. apply DELAYED0.
+  Qed.
+
+  Lemma ld_consistent
+        e_src e_tgt
+        (LD: lower_delayed_thread e_src e_tgt)
+        (WF_TGT: Local.wf (Thread.local e_tgt) (Thread.memory e_tgt))
+        (SC_TGT: Memory.closed_timemap (Thread.sc e_tgt) (Thread.memory e_tgt))
+        (CLOSED_TGT: Memory.closed (Thread.memory e_tgt))
+        (CONSISTENT_TGT: Thread.consistent e_tgt):
+    (<<CONSISTENT_SRC: delayed_consistent e_src>>).
+  Proof.
+    ii. exploit Memory.cap_exists; try apply CLOSED_TGT. i. des.
+    exploit ld_cap; try exact LD; eauto. i. des.
+    exploit CONSISTENT_TGT; eauto. unfold Thread.steps_failure. i. des.
+    { exploit ld_plus_step_dsteps; try exact x0; eauto; ss.
+      { eapply Local.cap_wf; eauto. }
+      { eapply Memory.cap_closed_timemap; eauto. }
+      { eapply Memory.cap_closed; eauto. }
+      { inv STEP_FAILURE; inv STEP; ss. inv LOCAL; ss; inv LOCAL0; ss. }
+      i. des.
+      rewrite EVENT_FAILURE in *. subst.
+      esplits; eauto.
+    }
+    { exploit ld_rtc_tau_step_dsteps; try exact x0; eauto; ss.
+      { eapply Local.cap_wf; eauto. }
+      { eapply Memory.cap_closed_timemap; eauto. }
+      { eapply Memory.cap_closed; eauto. }
+      { ii. rewrite PROMISES in *. rewrite Memory.bot_get in *. ss. }
+      i. des.
+      esplits; eauto. right. split; ss.
+      
 End DStep.
 
 
