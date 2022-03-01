@@ -917,6 +917,24 @@ Section NA.
     }
   Qed.
 
+  Lemma list_Forall2_impl_strong A B (P Q: A -> B -> Prop) (la: list A) (lb: list B)
+        (FORALL: List.Forall2 P la lb)
+        (IMPL: forall a b (INA: List.In a la) (INB: List.In b lb) (SAT: P a b),
+            Q a b)
+    :
+    List.Forall2 Q la lb.
+  Proof.
+    revert IMPL. induction FORALL; ss; i. econs; eauto.
+  Qed.
+
+  Lemma write_na_messages_wf ts prom0 mem0 loc from to val prom1 mem1 msgs kinds kind
+        (WRITE: Memory.write_na ts prom0 mem0 loc from to val prom1 mem1 msgs kinds kind)
+    :
+    List.Forall (fun '(_, _, msg) => msg = Message.undef \/ exists val, msg = Message.concrete val None) msgs.
+  Proof.
+    induction WRITE; i; econs; eauto.
+  Qed.
+
   Lemma sim_thread_lower_step views0 lang_src lang_tgt fin
         th0_src th0_tgt th1_tgt e_tgt
         (STEP: lower_step e_tgt th0_tgt th1_tgt)
@@ -1174,8 +1192,23 @@ Section NA.
         hexploit write_na_lower_memory_lower; eauto. i. des.
         hexploit write_na_lower_lower_memory.
         { eapply WRITE. }
-        { admit. }
-        { admit. }
+        { eapply list_Forall2_compose.
+          { eauto. }
+          { instantiate (1:=fun kind '(_, _, msg) => is_lower_kind kind msg /\
+                                                       __guard__(msg = Message.undef \/
+                                                                   (exists val0, msg = Message.concrete val0 None))).
+            eapply list_Forall2_impl_strong; eauto.
+            i. ss. eapply write_na_messages_wf in WRITE0.
+            eapply List.Forall_forall in INB; eauto.
+            destruct b as [[from0 to0] msg0]. auto.
+          }
+          i. destruct c as [[from0 to0] msg0]. des.
+          inv SAT0; ss. subst. des.
+          red in SAT2. des; subst.
+          { inv MSG. auto. }
+          { symmetry. eapply OPT; eauto. }
+        }
+        { inv KIND; ss. symmetry. eapply OPT; ss. }
         i. subst. econs; eauto.
         { refl. }
       }
