@@ -601,6 +601,15 @@ Section POINTABLE.
   Proof.
     ii. exploit MEM; eauto. i. eapply pointable_opt_view_mon; eauto.
   Qed.
+
+  Lemma pointable_views_mon views
+        (VW: pointable_views msgs0 views)
+    :
+    pointable_views msgs1 views.
+  Proof.
+    ii. eapply List.Forall_impl; [|eapply VW]; eauto.
+    eapply pointable_view_mon; eauto.
+  Qed.
 End POINTABLE.
 
 Require Import Pred.
@@ -609,36 +618,38 @@ Require Import Simple.
 
 Section NA.
   Variable loc_na: Loc.t -> Prop.
+  Variable loc_at: Loc.t -> Prop.
+  Hypothesis LOCDISJOINT: forall loc (NA: loc_na loc) (AT: loc_at loc), False.
 
   Lemma sim_thread_promise_step views0 lang_src lang_tgt fin
-        th0_src th0_tgt th1_tgt pf_tgt e_tgt
-        (STEP: Thread.step pf_tgt e_tgt th0_tgt th1_tgt)
+        th_src0 th_tgt0 th_tgt1 pf_tgt e_tgt
+        (STEP: Thread.step pf_tgt e_tgt th_tgt0 th_tgt1)
         (ISPROMISE: is_promise e_tgt)
-        (SIM: @JSim.sim_thread views0 lang_src lang_tgt th0_src th0_tgt)
+        (SIM: @JSim.sim_thread views0 lang_src lang_tgt th_src0 th_tgt0)
 
-        (WF_SRC: Local.wf (Thread.local th0_src) (Thread.memory th0_src))
-        (WF_TGT: Local.wf (Thread.local th0_tgt) (Thread.memory th0_tgt))
-        (SC_SRC: Memory.closed_timemap (Thread.sc th0_src) (Thread.memory th0_src))
-        (SC_TGT: Memory.closed_timemap (Thread.sc th0_tgt) (Thread.memory th0_tgt))
-        (MEM_SRC: Memory.closed (Thread.memory th0_src))
-        (MEM_TGT: Memory.closed (Thread.memory th0_tgt))
-        (CONS_TGT: Local.promise_consistent (Thread.local th1_tgt))
+        (WF_SRC: Local.wf (Thread.local th_src0) (Thread.memory th_src0))
+        (WF_TGT: Local.wf (Thread.local th_tgt0) (Thread.memory th_tgt0))
+        (SC_SRC: Memory.closed_timemap (Thread.sc th_src0) (Thread.memory th_src0))
+        (SC_TGT: Memory.closed_timemap (Thread.sc th_tgt0) (Thread.memory th_tgt0))
+        (MEM_SRC: Memory.closed (Thread.memory th_src0))
+        (MEM_TGT: Memory.closed (Thread.memory th_tgt0))
+        (CONS_TGT: Local.promise_consistent (Thread.local th_tgt1))
 
-        (REL: joined_released views0 (Local.promises (Thread.local th0_src)) (Local.tview (Thread.local th0_src)).(TView.rel))
-        (JOINED: joined_memory views0 (Thread.memory th0_src))
+        (REL: joined_released views0 (Local.promises (Thread.local th_src0)) (Local.tview (Thread.local th_src0)).(TView.rel))
+        (JOINED: joined_memory views0 (Thread.memory th_src0))
         (VIEWS: wf_views views0)
 
-        (POINTSC: pointable_timemap loc_na fin th0_src.(Thread.sc))
-        (POINTLOCAL: pointable_tview loc_na fin th0_src.(Thread.local).(Local.tview))
+        (POINTSC: pointable_timemap loc_na fin th_src0.(Thread.sc))
+        (POINTLOCAL: pointable_tview loc_na fin th_src0.(Thread.local).(Local.tview))
         (POINTVIEWS: pointable_views loc_na fin views0)
     :
-      exists e_src pf_src th1_src views1,
-        (<<JSTEP: JThread.step pf_src e_src th0_src th1_src views0 views1>>) /\
+      exists e_src pf_src th_src1 views1,
+        (<<JSTEP: JThread.step pf_src e_src th_src0 th_src1 views0 views1>>) /\
         (<<ISPROMISE: is_promise e_src>>) /\
-        (<<SIM: JSim.sim_thread views1 th1_src th1_tgt>>) /\
+        (<<SIM: JSim.sim_thread views1 th_src1 th_tgt1>>) /\
         (<<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>>) /\
-        (<<POINTSC: pointable_timemap loc_na fin th1_src.(Thread.sc)>>) /\
-        (<<POINTLOCAL: pointable_tview loc_na fin th1_src.(Thread.local).(Local.tview)>>)
+        (<<POINTSC: pointable_timemap loc_na fin th_src1.(Thread.sc)>>) /\
+        (<<POINTLOCAL: pointable_tview loc_na fin th_src1.(Thread.local).(Local.tview)>>)
   .
   Proof.
     dup SIM. inv SIM.
@@ -665,25 +676,25 @@ Section NA.
   Qed.
 
   Lemma sim_thread_release_step views0 lang_src lang_tgt fin
-        th0_src th0_tgt th1_tgt pf_tgt e_tgt
-        (STEP: Thread.step pf_tgt e_tgt th0_tgt th1_tgt)
+        th_src0 th_tgt0 th_tgt1 pf_tgt e_tgt
+        (STEP: Thread.step pf_tgt e_tgt th_tgt0 th_tgt1)
         (ISRELEASE: release_event e_tgt)
-        (SIM: @JSim.sim_thread views0 lang_src lang_tgt th0_src th0_tgt)
+        (SIM: @JSim.sim_thread views0 lang_src lang_tgt th_src0 th_tgt0)
 
-        (WF_SRC: Local.wf (Thread.local th0_src) (Thread.memory th0_src))
-        (WF_TGT: Local.wf (Thread.local th0_tgt) (Thread.memory th0_tgt))
-        (SC_SRC: Memory.closed_timemap (Thread.sc th0_src) (Thread.memory th0_src))
-        (SC_TGT: Memory.closed_timemap (Thread.sc th0_tgt) (Thread.memory th0_tgt))
-        (MEM_SRC: Memory.closed (Thread.memory th0_src))
-        (MEM_TGT: Memory.closed (Thread.memory th0_tgt))
-        (CONS_TGT: Local.promise_consistent (Thread.local th1_tgt))
+        (WF_SRC: Local.wf (Thread.local th_src0) (Thread.memory th_src0))
+        (WF_TGT: Local.wf (Thread.local th_tgt0) (Thread.memory th_tgt0))
+        (SC_SRC: Memory.closed_timemap (Thread.sc th_src0) (Thread.memory th_src0))
+        (SC_TGT: Memory.closed_timemap (Thread.sc th_tgt0) (Thread.memory th_tgt0))
+        (MEM_SRC: Memory.closed (Thread.memory th_src0))
+        (MEM_TGT: Memory.closed (Thread.memory th_tgt0))
+        (CONS_TGT: Local.promise_consistent (Thread.local th_tgt1))
 
-        (REL: joined_released views0 (Local.promises (Thread.local th0_src)) (Local.tview (Thread.local th0_src)).(TView.rel))
-        (JOINED: joined_memory views0 (Thread.memory th0_src))
+        (REL: joined_released views0 (Local.promises (Thread.local th_src0)) (Local.tview (Thread.local th_src0)).(TView.rel))
+        (JOINED: joined_memory views0 (Thread.memory th_src0))
         (VIEWS: wf_views views0)
 
-        (POINTSC: pointable_timemap loc_na fin th0_src.(Thread.sc))
-        (POINTLOCAL: pointable_tview loc_na fin th0_src.(Thread.local).(Local.tview))
+        (POINTSC: pointable_timemap loc_na fin th_src0.(Thread.sc))
+        (POINTLOCAL: pointable_tview loc_na fin th_src0.(Thread.local).(Local.tview))
         (POINTVIEWS: pointable_views loc_na fin views0)
         (FINBOT: forall loc, fin loc Time.bot Time.bot Message.elt)
         (AT: forall l c
@@ -691,17 +702,21 @@ Section NA.
                     (ACCESS: is_accessing (ThreadEvent.get_program_event e_tgt) = Some (l, c)),
             ~ loc_na l)
     :
-      (<<FAILURE: Thread.steps_failure th0_src>>) \/
-      exists e_src pf_src th1_src views1,
-        (<<JSTEP: JThread.step pf_src e_src th0_src th1_src views0 views1>>) /\
+      (exists e_src th_src1,
+          (<<FAILURE: Thread.step true e_src th_src0 th_src1>>) /\
+          (<<EVENT: ThreadEvent.get_machine_event e_src = MachineEvent.failure>>)) \/
+      exists e_src pf_src th_src1 views1,
+        (<<JSTEP: JThread.step pf_src e_src th_src0 th_src1 views0 views1>>) /\
         (<<ISRELEASE: release_event e_src>>) /\
-        (<<SIM: JSim.sim_thread views1 th1_src th1_tgt>>) /\
+        (<<SIM: JSim.sim_thread views1 th_src1 th_tgt1>>) /\
         (<<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>>) /\
-        (<<POINTSC: pointable_timemap loc_na fin th1_src.(Thread.sc)>>) /\
-        (<<POINTLOCAL: pointable_tview loc_na fin th1_src.(Thread.local).(Local.tview)>>)
+        (<<POINTSC: pointable_timemap loc_na fin th_src1.(Thread.sc)>>) /\
+        (<<POINTLOCAL: pointable_tview loc_na fin th_src1.(Thread.local).(Local.tview)>>)
   .
   Proof.
-    destruct (classic (Thread.steps_failure th0_src)) as [FAILURE|NFAILURE]; auto.
+    destruct (classic (exists e_src th_src1,
+                          (<<FAILURE: Thread.step true e_src th_src0 th_src1>>) /\
+                          (<<EVENT: ThreadEvent.get_machine_event e_src = MachineEvent.failure>>))) as [FAILURE|NFAILURE]; auto.
     right. dup SIM. inv SIM.
     apply inj_pair2 in H2. apply inj_pair2 in H4. subst. ss.
     assert (st0 = st).
@@ -740,8 +755,7 @@ Section NA.
       { exfalso.
         destruct (Ordering.le Ordering.plain ordr && Ordering.le Ordering.plain ordw) eqn:ORDNA.
         { eapply AT; auto. }
-        eapply NFAILURE. repeat red. esplits.
-        { refl. }
+        eapply NFAILURE. esplits.
         { econs 2. econs.
           { instantiate (2:=ThreadEvent.racy_update _ Time.bot _ _ _ _). eauto. }
           econs.
@@ -936,24 +950,24 @@ Section NA.
   Qed.
 
   Lemma sim_thread_lower_step views0 lang_src lang_tgt fin
-        th0_src th0_tgt th1_tgt e_tgt
-        (STEP: lower_step e_tgt th0_tgt th1_tgt)
-        (SIM: @JSim.sim_thread views0 lang_src lang_tgt th0_src th0_tgt)
+        th_src0 th_tgt0 th_tgt1 e_tgt
+        (STEP: lower_step e_tgt th_tgt0 th_tgt1)
+        (SIM: @JSim.sim_thread views0 lang_src lang_tgt th_src0 th_tgt0)
 
-        (WF_SRC: Local.wf (Thread.local th0_src) (Thread.memory th0_src))
-        (WF_TGT: Local.wf (Thread.local th0_tgt) (Thread.memory th0_tgt))
-        (SC_SRC: Memory.closed_timemap (Thread.sc th0_src) (Thread.memory th0_src))
-        (SC_TGT: Memory.closed_timemap (Thread.sc th0_tgt) (Thread.memory th0_tgt))
-        (MEM_SRC: Memory.closed (Thread.memory th0_src))
-        (MEM_TGT: Memory.closed (Thread.memory th0_tgt))
-        (CONS_TGT: Local.promise_consistent (Thread.local th1_tgt))
+        (WF_SRC: Local.wf (Thread.local th_src0) (Thread.memory th_src0))
+        (WF_TGT: Local.wf (Thread.local th_tgt0) (Thread.memory th_tgt0))
+        (SC_SRC: Memory.closed_timemap (Thread.sc th_src0) (Thread.memory th_src0))
+        (SC_TGT: Memory.closed_timemap (Thread.sc th_tgt0) (Thread.memory th_tgt0))
+        (MEM_SRC: Memory.closed (Thread.memory th_src0))
+        (MEM_TGT: Memory.closed (Thread.memory th_tgt0))
+        (CONS_TGT: Local.promise_consistent (Thread.local th_tgt1))
 
-        (REL: joined_released views0 (Local.promises (Thread.local th0_src)) (Local.tview (Thread.local th0_src)).(TView.rel))
-        (JOINED: joined_memory views0 (Thread.memory th0_src))
+        (REL: joined_released views0 (Local.promises (Thread.local th_src0)) (Local.tview (Thread.local th_src0)).(TView.rel))
+        (JOINED: joined_memory views0 (Thread.memory th_src0))
         (VIEWS: wf_views views0)
 
-        (POINTSC: pointable_timemap loc_na fin th0_src.(Thread.sc))
-        (POINTLOCAL: pointable_tview loc_na fin th0_src.(Thread.local).(Local.tview))
+        (POINTSC: pointable_timemap loc_na fin th_src0.(Thread.sc))
+        (POINTLOCAL: pointable_tview loc_na fin th_src0.(Thread.local).(Local.tview))
         (POINTVIEWS: pointable_views loc_na fin views0)
         (FINBOT: forall loc, fin loc Time.bot Time.bot Message.elt)
         (AT: forall l c
@@ -961,17 +975,21 @@ Section NA.
                     (ACCESS: is_accessing (ThreadEvent.get_program_event e_tgt) = Some (l, c)),
             ~ loc_na l)
     :
-      (<<FAILURE: Thread.steps_failure th0_src>>) \/
-      exists e_src pf_src th1_src views1,
-        (<<JSTEP: JThread.step pf_src e_src th0_src th1_src views0 views1>>) /\
-        (<<STEP: lower_step e_src th0_src th1_src>>) /\
-        (<<SIM: JSim.sim_thread views1 th1_src th1_tgt>>) /\
+      (exists e_src th_src1,
+          (<<FAILURE: Thread.step true e_src th_src0 th_src1>>) /\
+          (<<EVENT: ThreadEvent.get_machine_event e_src = MachineEvent.failure>>)) \/
+      exists e_src pf_src th_src1 views1,
+        (<<JSTEP: JThread.step pf_src e_src th_src0 th_src1 views0 views1>>) /\
+        (<<STEP: lower_step e_src th_src0 th_src1>>) /\
+        (<<SIM: JSim.sim_thread views1 th_src1 th_tgt1>>) /\
         (<<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>>) /\
-        (<<POINTSC: pointable_timemap loc_na fin th1_src.(Thread.sc)>>) /\
-        (<<POINTLOCAL: pointable_tview loc_na (fin \4/ (committed th0_src.(Thread.memory) th0_src.(Thread.local).(Local.promises) th1_src.(Thread.memory) th1_src.(Thread.local).(Local.promises))) th1_src.(Thread.local).(Local.tview)>>)
+        (<<POINTSC: pointable_timemap loc_na fin th_src1.(Thread.sc)>>) /\
+        (<<POINTLOCAL: pointable_tview loc_na (fin \4/ (committed th_src0.(Thread.memory) th_src0.(Thread.local).(Local.promises) th_src1.(Thread.memory) th_src1.(Thread.local).(Local.promises))) th_src1.(Thread.local).(Local.tview)>>)
   .
   Proof.
-    destruct (classic (Thread.steps_failure th0_src)) as [FAILURE|NFAILURE]; auto.
+    destruct (classic (exists e_src th_src1,
+                          (<<FAILURE: Thread.step true e_src th_src0 th_src1>>) /\
+                          (<<EVENT: ThreadEvent.get_machine_event e_src = MachineEvent.failure>>))) as [FAILURE|NFAILURE]; auto.
     right. dup SIM. inv SIM.
     apply inj_pair2 in H2. apply inj_pair2 in H4. subst. ss.
     assert (st0 = st).
@@ -1103,8 +1121,7 @@ Section NA.
       { exfalso.
         destruct (Ordering.le Ordering.plain ordr && Ordering.le Ordering.plain ordw) eqn:ORDNA.
         { eapply AT; auto. }
-        eapply NFAILURE. repeat red. esplits.
-        { refl. }
+        eapply NFAILURE. esplits.
         { econs 2. econs.
           { instantiate (2:=ThreadEvent.racy_update _ Time.bot _ _ _ _). eauto. }
           econs.
@@ -1239,6 +1256,791 @@ Section NA.
       { ss. }
       { ss. }
       { rewrite committed_same; eauto. }
+    }
+  Qed.
+
+  Lemma sim_thread_promise_steps lang_src lang_tgt
+        th_tgt0 th_tgt1
+        (STEPS: rtc (tau (@pred_step is_promise _)) th_tgt0 th_tgt1)
+    :
+      forall
+        fin th_src0 views0
+        (SIM: @JSim.sim_thread views0 lang_src lang_tgt th_src0 th_tgt0)
+
+        (WF_SRC: Local.wf (Thread.local th_src0) (Thread.memory th_src0))
+        (WF_TGT: Local.wf (Thread.local th_tgt0) (Thread.memory th_tgt0))
+        (SC_SRC: Memory.closed_timemap (Thread.sc th_src0) (Thread.memory th_src0))
+        (SC_TGT: Memory.closed_timemap (Thread.sc th_tgt0) (Thread.memory th_tgt0))
+        (MEM_SRC: Memory.closed (Thread.memory th_src0))
+        (MEM_TGT: Memory.closed (Thread.memory th_tgt0))
+        (CONS_TGT: Local.promise_consistent (Thread.local th_tgt1))
+
+        (REL: joined_released views0 (Local.promises (Thread.local th_src0)) (Local.tview (Thread.local th_src0)).(TView.rel))
+        (JOINED: joined_memory views0 (Thread.memory th_src0))
+        (VIEWS: wf_views views0)
+
+        (POINTSC: pointable_timemap loc_na fin th_src0.(Thread.sc))
+        (POINTLOCAL: pointable_tview loc_na fin th_src0.(Thread.local).(Local.tview))
+        (POINTVIEWS: pointable_views loc_na fin views0)
+        (FINBOT: forall loc, fin loc Time.bot Time.bot Message.elt)
+        (NOMIX: nomix loc_na loc_at _ th_tgt0.(Thread.state)),
+      exists th_src1 views1,
+        (<<STEPS_SRC: rtc (tau (@pred_step is_promise _)) th_src0 th_src1>>) /\
+        (<<SIM: JSim.sim_thread views1 th_src1 th_tgt1>>) /\
+        (<<POINTSC: pointable_timemap loc_na (fin \4/ (committed th_src0.(Thread.memory) th_src0.(Thread.local).(Local.promises) th_src1.(Thread.memory) th_src1.(Thread.local).(Local.promises))) th_src1.(Thread.sc)>>) /\
+        (<<POINTLOCAL: pointable_tview loc_na (fin \4/ (committed th_src0.(Thread.memory) th_src0.(Thread.local).(Local.promises) th_src1.(Thread.memory) th_src1.(Thread.local).(Local.promises))) th_src1.(Thread.local).(Local.tview)>>) /\
+        (<<POINTVIEWS: pointable_views loc_na (fin \4/ (committed th_src0.(Thread.memory) th_src0.(Thread.local).(Local.promises) th_src1.(Thread.memory) th_src1.(Thread.local).(Local.promises))) views1>>) /\
+        (<<JOINED: joined_memory views1 (Thread.memory th_src1)>>) /\
+        (<<RELEASED: joined_released views1 th_src1.(Thread.local).(Local.promises) th_src1.(Thread.local).(Local.tview).(TView.rel)>>) /\
+        (<<VIEWS: wf_views views1>>) /\
+        (<<VIEWSLE: views_le views0 views1>>) /\
+        (<<NOMIX: nomix loc_na loc_at _ th_tgt1.(Thread.state)>>)
+  .
+  Proof.
+    induction STEPS; i.
+    { esplits; eauto.
+      { eapply pointable_timemap_mon; [|eauto]. auto. }
+      { eapply pointable_tview_mon; [|eauto]. auto. }
+      { eapply pointable_views_mon; [|eauto]. auto. }
+      { refl. }
+    }
+    inv H. inv TSTEP. inv STEP.
+    hexploit Thread.step_future; eauto. i. des.
+    hexploit PromiseConsistent.rtc_all_step_promise_consistent.
+    { eapply rtc_implies; [|eauto]. i. inv H. inv TSTEP. econs; eauto. }
+    all: eauto. intros CONSISTENT1.
+    hexploit sim_thread_promise_step; eauto. i. des.
+    hexploit JThread.step_future; eauto. i. des.
+    inv JSTEP. hexploit (IHSTEPS (fin \4/ (committed th_src0.(Thread.memory) th_src0.(Thread.local).(Local.promises) th_src1.(Thread.memory) th_src1.(Thread.local).(Local.promises)))); eauto.
+    { eapply pointable_timemap_mon; [|eauto]. auto. }
+    { eapply pointable_tview_mon; [|eauto]. auto. }
+    { eapply pointable_views_mon.
+      { i. left. eapply PR. }
+      eapply pointable_views_incr; eauto.
+      i. hexploit VIEWSLE; eauto. i.  des. esplits; eauto. }
+    { inv STEP0; inv STEP1; ss. inv LOCAL; ss. }
+    i. des.
+    hexploit committed_trans.
+    { econs 2; [|refl]. econs. econs. eapply STEP. }
+    { eapply rtc_implies; [|eauto]. i. inv H. inv TSTEP. econs; eauto. }
+    intros COMMITTED. esplits.
+    { econs 2; [|eauto]. econs.
+      { econs; eauto. econs; eauto. }
+      { rewrite EVENT0. auto. }
+    }
+    { eauto. }
+    { rewrite COMMITTED. eapply pointable_timemap_mon; [|eauto]. i. ss. des; auto. }
+    { rewrite COMMITTED. eapply pointable_tview_mon; [|eauto]. i. ss. des; auto. }
+    { rewrite COMMITTED. eapply pointable_views_mon; [|eauto]. i. ss. des; auto. }
+    { auto. }
+    { auto. }
+    { auto. }
+    { etrans; eauto. }
+    { auto. }
+  Qed.
+
+  Lemma sim_thread_lower_steps lang_src lang_tgt
+        th_tgt0 th_tgt1
+        (STEPS: rtc (tau (@lower_step _)) th_tgt0 th_tgt1)
+    :
+      forall
+        fin th_src0 views0
+        (SIM: @JSim.sim_thread views0 lang_src lang_tgt th_src0 th_tgt0)
+
+        (WF_SRC: Local.wf (Thread.local th_src0) (Thread.memory th_src0))
+        (WF_TGT: Local.wf (Thread.local th_tgt0) (Thread.memory th_tgt0))
+        (SC_SRC: Memory.closed_timemap (Thread.sc th_src0) (Thread.memory th_src0))
+        (SC_TGT: Memory.closed_timemap (Thread.sc th_tgt0) (Thread.memory th_tgt0))
+        (MEM_SRC: Memory.closed (Thread.memory th_src0))
+        (MEM_TGT: Memory.closed (Thread.memory th_tgt0))
+        (CONS_TGT: Local.promise_consistent (Thread.local th_tgt1))
+
+        (REL: joined_released views0 (Local.promises (Thread.local th_src0)) (Local.tview (Thread.local th_src0)).(TView.rel))
+        (JOINED: joined_memory views0 (Thread.memory th_src0))
+        (VIEWS: wf_views views0)
+
+        (POINTSC: pointable_timemap loc_na fin th_src0.(Thread.sc))
+        (POINTLOCAL: pointable_tview loc_na fin th_src0.(Thread.local).(Local.tview))
+        (POINTVIEWS: pointable_views loc_na fin views0)
+        (FINBOT: forall loc, fin loc Time.bot Time.bot Message.elt)
+        (NOMIX: nomix loc_na loc_at _ th_tgt0.(Thread.state)),
+        (exists e_src th_src1 th_src2,
+            (<<STEPS: rtc (tau lower_step) th_src0 th_src1>>) /\
+            (<<FAILURE: Thread.step true e_src th_src1 th_src2>>) /\
+            (<<EVENT: ThreadEvent.get_machine_event e_src = MachineEvent.failure>>)) \/
+        (exists th_src1 views1,
+            (<<STEPS_SRC: rtc (tau (@lower_step _)) th_src0 th_src1>>) /\
+            (<<SIM: JSim.sim_thread views1 th_src1 th_tgt1>>) /\
+            (<<POINTSC: pointable_timemap loc_na (fin \4/ (committed th_src0.(Thread.memory) th_src0.(Thread.local).(Local.promises) th_src1.(Thread.memory) th_src1.(Thread.local).(Local.promises))) th_src1.(Thread.sc)>>) /\
+            (<<POINTLOCAL: pointable_tview loc_na (fin \4/ (committed th_src0.(Thread.memory) th_src0.(Thread.local).(Local.promises) th_src1.(Thread.memory) th_src1.(Thread.local).(Local.promises))) th_src1.(Thread.local).(Local.tview)>>) /\
+            (<<POINTVIEWS: pointable_views loc_na (fin \4/ (committed th_src0.(Thread.memory) th_src0.(Thread.local).(Local.promises) th_src1.(Thread.memory) th_src1.(Thread.local).(Local.promises))) views1>>) /\
+            (<<JOINED: joined_memory views1 (Thread.memory th_src1)>>) /\
+            (<<RELEASED: joined_released views1 th_src1.(Thread.local).(Local.promises) th_src1.(Thread.local).(Local.tview).(TView.rel)>>) /\
+            (<<VIEWS: wf_views views1>>) /\
+            (<<VIEWSLE: views_le views0 views1>>) /\
+            (<<NOMIX: nomix loc_na loc_at _ th_tgt1.(Thread.state)>>))
+  .
+  Proof.
+    induction STEPS; i.
+    { right. esplits; eauto.
+      { eapply pointable_timemap_mon; [|eauto]. auto. }
+      { eapply pointable_tview_mon; [|eauto]. auto. }
+      { eapply pointable_views_mon; [|eauto]. auto. }
+      { refl. }
+    }
+    inv H. hexploit Thread.step_future.
+    { inv TSTEP. econs 2; eauto. }
+    all: eauto. i. des.
+    hexploit PromiseConsistent.rtc_all_step_promise_consistent.
+    { eapply rtc_implies; [|eauto]. i. inv H. inv TSTEP0. econs; eauto. econs; eauto. }
+    all: eauto. intros CONSISTENT1.
+    punfold NOMIX. exploit NOMIX.
+    { instantiate (2:=ThreadEvent.get_program_event e). instantiate (1:=y.(Thread.state)). inv TSTEP. inv STEP. eauto. }
+    i. des. inv CONT; ss.
+    hexploit sim_thread_lower_step; eauto. i. des.
+    { left. esplits.
+      { refl. }
+      { eauto. }
+      { eauto. }
+    }
+    hexploit JThread.step_future; eauto. i. des.
+    inv JSTEP. hexploit (IHSTEPS (fin \4/ (committed th_src0.(Thread.memory) th_src0.(Thread.local).(Local.promises) th_src1.(Thread.memory) th_src1.(Thread.local).(Local.promises)))); eauto.
+    { eapply pointable_timemap_mon; [|eauto]. auto. }
+    { eapply pointable_views_incr.
+      { eauto. }
+      { eapply pointable_views_mon.
+        { i. left. eapply PR. }
+        { eauto. }
+      }
+      { eauto. }
+      i. hexploit VIEWSLE; eauto. i. des. esplits; eauto.
+    }
+    i. des.
+    { left. esplits.
+      { econs 2; [|eauto]. econs; eauto. inv STEP. destruct e_src; ss. }
+      { eauto. }
+      { eauto. }
+    }
+    right.
+    hexploit committed_trans.
+    { inv STEP. econs 2; [|refl]. econs. econs. econs 2; eauto. }
+    { eapply rtc_implies; [|eauto]. i. inv H0. inv TSTEP0. econs; eauto. econs; eauto. }
+    intros COMMITTED. esplits.
+    { econs 2; [|eauto]. econs.
+      { eauto. }
+      { rewrite EVENT0. auto. }
+    }
+    { eauto. }
+    { rewrite COMMITTED. eapply pointable_timemap_mon; [|eauto]. i. ss. des; auto. }
+    { rewrite COMMITTED. eapply pointable_tview_mon; [|eauto]. i. ss. des; auto. }
+    { rewrite COMMITTED. eapply pointable_views_mon; [|eauto]. i. ss. des; auto. }
+    { auto. }
+    { auto. }
+    { auto. }
+    { etrans; eauto. }
+    { auto. }
+  Qed.
+
+  Lemma sim_thread_dstep lang_src lang_tgt
+        th_tgt0 th_tgt1 e_tgt
+        (STEPS: dstep e_tgt th_tgt0 th_tgt1)
+        fin th_src0 views0
+        (SIM: @JSim.sim_thread views0 lang_src lang_tgt th_src0 th_tgt0)
+
+        (WF_SRC: Local.wf (Thread.local th_src0) (Thread.memory th_src0))
+        (WF_TGT: Local.wf (Thread.local th_tgt0) (Thread.memory th_tgt0))
+        (SC_SRC: Memory.closed_timemap (Thread.sc th_src0) (Thread.memory th_src0))
+        (SC_TGT: Memory.closed_timemap (Thread.sc th_tgt0) (Thread.memory th_tgt0))
+        (MEM_SRC: Memory.closed (Thread.memory th_src0))
+        (MEM_TGT: Memory.closed (Thread.memory th_tgt0))
+        (CONS_TGT: Local.promise_consistent (Thread.local th_tgt1))
+
+        (REL: joined_released views0 (Local.promises (Thread.local th_src0)) (Local.tview (Thread.local th_src0)).(TView.rel))
+        (JOINED: joined_memory views0 (Thread.memory th_src0))
+        (VIEWS: wf_views views0)
+
+        (POINTSC: pointable_timemap loc_na fin th_src0.(Thread.sc))
+        (POINTLOCAL: pointable_tview loc_na fin th_src0.(Thread.local).(Local.tview))
+        (POINTVIEWS: pointable_views loc_na fin views0)
+        (FINBOT: forall loc, fin loc Time.bot Time.bot Message.elt)
+        (NOMIX: nomix loc_na loc_at _ th_tgt0.(Thread.state))
+    :
+      (exists th_src1 e_src,
+          (<<STEPS_SRC: dstep e_src th_src0 th_src1>>) /\
+          (<<FAILURE: ThreadEvent.get_machine_event e_src = MachineEvent.failure>>)) \/
+      (exists th_src1 views1 e_src,
+          (<<STEPS_SRC: dstep e_src th_src0 th_src1>>) /\
+          (<<SIM: JSim.sim_thread views1 th_src1 th_tgt1>>) /\
+          (<<POINTSC: pointable_timemap loc_na (fin \4/ (committed th_src0.(Thread.memory) th_src0.(Thread.local).(Local.promises) th_src1.(Thread.memory) th_src1.(Thread.local).(Local.promises))) th_src1.(Thread.sc)>>) /\
+          (<<POINTLOCAL: pointable_tview loc_na (fin \4/ (committed th_src0.(Thread.memory) th_src0.(Thread.local).(Local.promises) th_src1.(Thread.memory) th_src1.(Thread.local).(Local.promises))) th_src1.(Thread.local).(Local.tview)>>) /\
+          (<<POINTVIEWS: pointable_views loc_na (fin \4/ (committed th_src0.(Thread.memory) th_src0.(Thread.local).(Local.promises) th_src1.(Thread.memory) th_src1.(Thread.local).(Local.promises))) views1>>) /\
+          (<<JOINED: joined_memory views1 (Thread.memory th_src1)>>) /\
+          (<<RELEASED: joined_released views1 th_src1.(Thread.local).(Local.promises) th_src1.(Thread.local).(Local.tview).(TView.rel)>>) /\
+          (<<VIEWS: wf_views views1>>) /\
+          (<<VIEWSLE: views_le views0 views1>>) /\
+          (<<NOMIX: nomix loc_na loc_at _ th_tgt1.(Thread.state)>>) /\
+          (<<EVENT: ThreadEvent.get_machine_event e_src = ThreadEvent.get_machine_event e_tgt>>))
+  .
+  Proof.
+    inv STEPS.
+    hexploit rtc_implies; [|eapply PROMISES|..].
+    { instantiate (1:=@Thread.tau_step _). i. inv H. inv TSTEP. econs; eauto. }
+    intros PROMISES_TGT.
+    hexploit rtc_implies; [|eapply LOWERS|..].
+    { instantiate (1:=@Thread.tau_step _). i. inv H. inv TSTEP. econs; eauto. econs; eauto. }
+    intros LOWERS_TGT.
+    hexploit Thread.rtc_tau_step_future; [eapply PROMISES_TGT|..]; eauto. i. des.
+    hexploit Thread.rtc_tau_step_future; [eapply LOWERS_TGT|..]; eauto. i. des.
+    hexploit PromiseConsistent.step_promise_consistent; [eapply STEP_RELEASE|..]; eauto.
+    intros CONSISTENT2.
+    hexploit PromiseConsistent.rtc_tau_step_promise_consistent; [eapply LOWERS_TGT|..]; eauto.
+    intros CONSISTENT1.
+    hexploit sim_thread_promise_steps; eauto. i. des.
+    hexploit rtc_implies; [|eapply STEPS_SRC|..].
+    { instantiate (1:=@Thread.tau_step _). i. inv H. inv TSTEP. econs; eauto. }
+    intros PROMISES_SRC.
+    hexploit Thread.rtc_tau_step_future; [eapply PROMISES_SRC|..]; eauto. i. des.
+    hexploit sim_thread_lower_steps; eauto.
+    { i. left. auto. }
+    i. des.
+    { left. esplits.
+      { econs; eauto. destruct e_src; ss. }
+      { auto. }
+    }
+    hexploit rtc_implies; [|eapply STEPS_SRC0|..].
+    { instantiate (1:=@Thread.tau_step _). i. inv H. inv TSTEP. econs; eauto. econs; eauto. }
+    intros LOWERS_SRC.
+    hexploit Thread.rtc_tau_step_future; [eapply LOWERS_SRC|..]; eauto. i. des.
+    punfold NOMIX1. exploit NOMIX1.
+    { instantiate (2:=ThreadEvent.get_program_event e_tgt). instantiate (1:=th_tgt1.(Thread.state)).
+      inv STEP_RELEASE; inv STEP; ss.
+    }
+    i. des. inv CONT; ss.
+    hexploit sim_thread_release_step; eauto.
+    { i. left. auto. }
+    i. des.
+    { left. esplits.
+      { econs; eauto. destruct e_src; ss. }
+      { auto. }
+    }
+    hexploit JThread.step_future; eauto. i. des.
+    inv JSTEP.
+    hexploit committed_trans.
+    { eapply rtc_implies; [|eapply PROMISES_SRC]. i. inv H0. econs; eauto. }
+    { eapply rtc_implies; [|eapply LOWERS_SRC]. i. inv H0. econs; eauto. }
+    intros SAME0.
+    hexploit committed_trans.
+    { etrans.
+      { eapply rtc_implies; [|eapply PROMISES_SRC]. i. inv H0. econs; eauto. }
+      { eapply rtc_implies; [|eapply LOWERS_SRC]. i. inv H0. econs; eauto. }
+    }
+    { econs 2; [|refl]. econs. econs. eapply STEP. }
+    intros SAME1. right. esplits.
+    { econs; eauto. }
+    { eauto. }
+    { rewrite SAME1. rewrite SAME0. eapply pointable_timemap_mon; [|eauto].
+      i. ss. des; auto.
+    }
+    { rewrite SAME1. rewrite SAME0. eapply pointable_tview_mon; [|eauto].
+      i. ss. des; auto.
+    }
+    { eapply pointable_views_incr.
+      { eauto. }
+      { instantiate (1:=views2). rewrite SAME1. rewrite SAME0.
+        eapply pointable_views_mon; [|eauto]. i. ss. des; auto.
+      }
+      { rewrite SAME1. rewrite SAME0. eapply pointable_tview_mon; [|eauto]. i. ss. des; auto. }
+      { i. hexploit VIEWSLE1; eauto. i. des; eauto. }
+    }
+    { eauto. }
+    { eauto. }
+    { eauto. }
+    { etrans; eauto. etrans; eauto. }
+    { eauto. }
+    { eauto. }
+  Qed.
+
+  Lemma sim_thread_rtc_tau_dstep lang_src lang_tgt
+        th_tgt0 th_tgt1
+        (STEPS: rtc (tau (@dstep _)) th_tgt0 th_tgt1)
+    :
+      forall
+        fin th_src0 views0
+        (SIM: @JSim.sim_thread views0 lang_src lang_tgt th_src0 th_tgt0)
+
+        (WF_SRC: Local.wf (Thread.local th_src0) (Thread.memory th_src0))
+        (WF_TGT: Local.wf (Thread.local th_tgt0) (Thread.memory th_tgt0))
+        (SC_SRC: Memory.closed_timemap (Thread.sc th_src0) (Thread.memory th_src0))
+        (SC_TGT: Memory.closed_timemap (Thread.sc th_tgt0) (Thread.memory th_tgt0))
+        (MEM_SRC: Memory.closed (Thread.memory th_src0))
+        (MEM_TGT: Memory.closed (Thread.memory th_tgt0))
+        (CONS_TGT: Local.promise_consistent (Thread.local th_tgt1))
+
+        (REL: joined_released views0 (Local.promises (Thread.local th_src0)) (Local.tview (Thread.local th_src0)).(TView.rel))
+        (JOINED: joined_memory views0 (Thread.memory th_src0))
+        (VIEWS: wf_views views0)
+
+        (POINTSC: pointable_timemap loc_na fin th_src0.(Thread.sc))
+        (POINTLOCAL: pointable_tview loc_na fin th_src0.(Thread.local).(Local.tview))
+        (POINTVIEWS: pointable_views loc_na fin views0)
+        (FINBOT: forall loc, fin loc Time.bot Time.bot Message.elt)
+        (NOMIX: nomix loc_na loc_at _ th_tgt0.(Thread.state)),
+        (exists th_src1,
+            (<<STEPS_SRC: dsteps MachineEvent.failure th_src0 th_src1>>)) \/
+        (exists th_src1 views1,
+            (<<STEPS_SRC: rtc (tau (@dstep _)) th_src0 th_src1>>) /\
+            (<<SIM: JSim.sim_thread views1 th_src1 th_tgt1>>) /\
+            (<<POINTSC: pointable_timemap loc_na (fin \4/ (committed th_src0.(Thread.memory) th_src0.(Thread.local).(Local.promises) th_src1.(Thread.memory) th_src1.(Thread.local).(Local.promises))) th_src1.(Thread.sc)>>) /\
+            (<<POINTLOCAL: pointable_tview loc_na (fin \4/ (committed th_src0.(Thread.memory) th_src0.(Thread.local).(Local.promises) th_src1.(Thread.memory) th_src1.(Thread.local).(Local.promises))) th_src1.(Thread.local).(Local.tview)>>) /\
+            (<<POINTVIEWS: pointable_views loc_na (fin \4/ (committed th_src0.(Thread.memory) th_src0.(Thread.local).(Local.promises) th_src1.(Thread.memory) th_src1.(Thread.local).(Local.promises))) views1>>) /\
+            (<<JOINED: joined_memory views1 (Thread.memory th_src1)>>) /\
+            (<<RELEASED: joined_released views1 th_src1.(Thread.local).(Local.promises) th_src1.(Thread.local).(Local.tview).(TView.rel)>>) /\
+            (<<VIEWS: wf_views views1>>) /\
+            (<<VIEWSLE: views_le views0 views1>>) /\
+            (<<NOMIX: nomix loc_na loc_at _ th_tgt1.(Thread.state)>>))
+  .
+  Proof.
+    induction STEPS; i.
+    { right. esplits.
+      { refl. }
+      { eauto. }
+      { rewrite committed_same. auto. }
+      { rewrite committed_same. auto. }
+      { rewrite committed_same. auto. }
+      { auto. }
+      { auto. }
+      { auto. }
+      { refl. }
+      { auto. }
+    }
+    inv H. pose proof (dstep_rtc_all_step TSTEP) as STEPS_TGT0.
+    pose proof (rtc_tau_dstep_rtc_all_step STEPS) as STEPS_TGT1.
+    hexploit Thread.rtc_all_step_future; [eapply STEPS_TGT0|..]; eauto. i. des.
+    hexploit PromiseConsistent.rtc_all_step_promise_consistent; [eapply STEPS_TGT1|..]; eauto. intros CONSISTENT1.
+    hexploit sim_thread_dstep; eauto. i. des.
+    { left. esplits. econs 2.
+      { refl. }
+      { eauto. }
+      { auto. }
+    }
+    pose proof (dstep_rtc_all_step STEPS_SRC) as STEPS_SRC0.
+    hexploit Thread.rtc_all_step_future; [eapply STEPS_SRC0|..]; eauto. i. des.
+    hexploit IHSTEPS; eauto.
+    { ss. i. left. auto. }
+    i. des.
+    { left. clear - STEPS_SRC1 STEPS_SRC EVENT EVENT0. inv STEPS_SRC1.
+      esplits. econs.
+      { econs 2; [|eapply DSTEPS]. econs; eauto. rewrite EVENT0. auto. }
+      { eauto. }
+      { eauto. }
+    }
+    hexploit committed_trans.
+    { eapply STEPS_SRC0. }
+    { eapply rtc_tau_dstep_rtc_all_step. eapply STEPS_SRC1. }
+    intros SAME. right. esplits.
+    { econs 2; [|eauto]. econs; eauto. rewrite EVENT0. auto. }
+    { eauto. }
+    { rewrite SAME. eapply pointable_timemap_mon; [|eauto]. i. ss. des; auto. }
+    { rewrite SAME. eapply pointable_tview_mon; [|eauto]. i. ss. des; auto. }
+    { rewrite SAME. eapply pointable_views_mon; [|eauto]. i. ss. des; auto. }
+    { eauto. }
+    { eauto. }
+    { eauto. }
+    { etrans; eauto. }
+    { eauto. }
+  Qed.
+
+  Lemma sim_thread_dsteps lang_src lang_tgt
+        th_tgt0 th_tgt1 e
+        (STEPS: dsteps e th_tgt0 th_tgt1)
+        fin th_src0 views0
+        (SIM: @JSim.sim_thread views0 lang_src lang_tgt th_src0 th_tgt0)
+
+        (WF_SRC: Local.wf (Thread.local th_src0) (Thread.memory th_src0))
+        (WF_TGT: Local.wf (Thread.local th_tgt0) (Thread.memory th_tgt0))
+        (SC_SRC: Memory.closed_timemap (Thread.sc th_src0) (Thread.memory th_src0))
+        (SC_TGT: Memory.closed_timemap (Thread.sc th_tgt0) (Thread.memory th_tgt0))
+        (MEM_SRC: Memory.closed (Thread.memory th_src0))
+        (MEM_TGT: Memory.closed (Thread.memory th_tgt0))
+        (CONS_TGT: Local.promise_consistent (Thread.local th_tgt1))
+
+        (REL: joined_released views0 (Local.promises (Thread.local th_src0)) (Local.tview (Thread.local th_src0)).(TView.rel))
+        (JOINED: joined_memory views0 (Thread.memory th_src0))
+        (VIEWS: wf_views views0)
+
+        (POINTSC: pointable_timemap loc_na fin th_src0.(Thread.sc))
+        (POINTLOCAL: pointable_tview loc_na fin th_src0.(Thread.local).(Local.tview))
+        (POINTVIEWS: pointable_views loc_na fin views0)
+        (FINBOT: forall loc, fin loc Time.bot Time.bot Message.elt)
+        (NOMIX: nomix loc_na loc_at _ th_tgt0.(Thread.state))
+    :
+      (exists th_src1,
+          (<<STEPS_SRC: dsteps MachineEvent.failure th_src0 th_src1>>)) \/
+      (exists th_src1 views1,
+          (<<STEPS_SRC: dsteps e th_src0 th_src1>>) /\
+          (<<SIM: JSim.sim_thread views1 th_src1 th_tgt1>>) /\
+          (<<POINTSC: pointable_timemap loc_na (fin \4/ (committed th_src0.(Thread.memory) th_src0.(Thread.local).(Local.promises) th_src1.(Thread.memory) th_src1.(Thread.local).(Local.promises))) th_src1.(Thread.sc)>>) /\
+          (<<POINTLOCAL: pointable_tview loc_na (fin \4/ (committed th_src0.(Thread.memory) th_src0.(Thread.local).(Local.promises) th_src1.(Thread.memory) th_src1.(Thread.local).(Local.promises))) th_src1.(Thread.local).(Local.tview)>>) /\
+          (<<POINTVIEWS: pointable_views loc_na (fin \4/ (committed th_src0.(Thread.memory) th_src0.(Thread.local).(Local.promises) th_src1.(Thread.memory) th_src1.(Thread.local).(Local.promises))) views1>>) /\
+          (<<JOINED: joined_memory views1 (Thread.memory th_src1)>>) /\
+          (<<RELEASED: joined_released views1 th_src1.(Thread.local).(Local.promises) th_src1.(Thread.local).(Local.tview).(TView.rel)>>) /\
+          (<<VIEWS: wf_views views1>>) /\
+          (<<VIEWSLE: views_le views0 views1>>) /\
+          (<<NOMIX: nomix loc_na loc_at _ th_tgt1.(Thread.state)>>))
+  .
+  Proof.
+    inv STEPS.
+    { pose proof (rtc_tau_dstep_rtc_all_step DSTEPS) as STEPS_TGT0.
+      hexploit rtc_implies; [|eapply PROMISES|..].
+      { instantiate (1:=@Thread.all_step _). i. inv H. inv TSTEP. econs; eauto. }
+      intros STEPS_TGT1.
+      hexploit Thread.rtc_all_step_future; [eapply STEPS_TGT0|..]; eauto. i. des.
+      hexploit PromiseConsistent.rtc_all_step_promise_consistent; [eapply STEPS_TGT1|..]; eauto. intros CONSISTENT1.
+      hexploit sim_thread_rtc_tau_dstep; eauto. i. des.
+      { left. eauto. }
+      pose proof (rtc_tau_dstep_rtc_all_step STEPS_SRC) as STEPS_SRC0.
+      hexploit Thread.rtc_all_step_future; [eapply STEPS_SRC0|..]; eauto. i. des.
+      hexploit sim_thread_promise_steps; eauto.
+      { i. ss. left. auto. }
+      i. des. right.
+      hexploit committed_trans.
+      { eapply STEPS_SRC0. }
+      { eapply rtc_implies; [|eapply STEPS_SRC1|..].
+        i. inv H. inv TSTEP. econs; eauto.
+      }
+      intros SAME. esplits.
+      { econs 1; eauto. }
+      { eauto. }
+      { rewrite SAME. eapply pointable_timemap_mon; [|eauto]. i. ss. des; auto. }
+      { rewrite SAME. eapply pointable_tview_mon; [|eauto]. i. ss. des; auto. }
+      { rewrite SAME. eapply pointable_views_mon; [|eauto]. i. ss. des; auto. }
+      { eauto. }
+      { eauto. }
+      { eauto. }
+      { etrans; eauto. }
+      { eauto. }
+    }
+    { pose proof (rtc_tau_dstep_rtc_all_step DSTEPS) as STEPS_TGT0.
+      hexploit Thread.rtc_all_step_future; [eapply STEPS_TGT0|..]; eauto. i. des.
+      pose proof (dstep_rtc_all_step DSTEP) as STEPS_TGT1.
+      hexploit PromiseConsistent.rtc_all_step_promise_consistent; [eapply STEPS_TGT1|..]; eauto. intros CONSISTENT1.
+      hexploit sim_thread_rtc_tau_dstep; eauto. i. des.
+      { left. eauto. }
+      pose proof (rtc_tau_dstep_rtc_all_step STEPS_SRC) as STEPS_SRC0.
+      hexploit Thread.rtc_all_step_future; [eapply STEPS_SRC0|..]; eauto. i. des.
+      hexploit sim_thread_dstep; eauto.
+      { i. ss. left. auto. }
+      i. des.
+      { left. esplits. econs; eauto. }
+      right. hexploit committed_trans.
+      { eapply STEPS_SRC0. }
+      { eapply dstep_rtc_all_step. eapply STEPS_SRC1. }
+      intros SAME. esplits.
+      { econs 2; eauto. }
+      { eauto. }
+      { rewrite SAME. eapply pointable_timemap_mon; [|eauto]. i. ss. des; auto. }
+      { rewrite SAME. eapply pointable_tview_mon; [|eauto]. i. ss. des; auto. }
+      { rewrite SAME. eapply pointable_views_mon; [|eauto]. i. ss. des; auto. }
+      { eauto. }
+      { eauto. }
+      { eauto. }
+      { etrans; eauto. }
+      { eauto. }
+    }
+  Qed.
+
+  Lemma sim_thread_delayed_consistent lang_src lang_tgt
+        th_tgt
+        (CONSISTENT: delayed_consistent th_tgt)
+        fin th_src views
+        (SIM: @JSim.sim_thread views lang_src lang_tgt th_src th_tgt)
+
+        (WF_SRC: Local.wf (Thread.local th_src) (Thread.memory th_src))
+        (WF_TGT: Local.wf (Thread.local th_tgt) (Thread.memory th_tgt))
+        (SC_SRC: Memory.closed_timemap (Thread.sc th_src) (Thread.memory th_src))
+        (SC_TGT: Memory.closed_timemap (Thread.sc th_tgt) (Thread.memory th_tgt))
+        (MEM_SRC: Memory.closed (Thread.memory th_src))
+        (MEM_TGT: Memory.closed (Thread.memory th_tgt))
+
+        (REL: joined_released views (Local.promises (Thread.local th_src)) (Local.tview (Thread.local th_src)).(TView.rel))
+        (JOINED: joined_memory views (Thread.memory th_src))
+        (VIEWS: wf_views views)
+
+        (POINTSC: pointable_timemap loc_na fin th_src.(Thread.sc))
+        (POINTLOCAL: pointable_tview loc_na fin th_src.(Thread.local).(Local.tview))
+        (POINTVIEWS: pointable_views loc_na fin views)
+        (FINBOT: forall loc, fin loc Time.bot Time.bot Message.elt)
+        (NOMIX: nomix loc_na loc_at _ th_tgt.(Thread.state))
+    :
+      delayed_consistent th_src.
+  Proof.
+    hexploit delayed_consistent_promise_consistent; eauto. intros CONSISTENT0.
+    ii. red in CONSISTENT.
+    hexploit (@Memory.cap_exists th_tgt.(Thread.memory)); eauto. i. des.
+    hexploit CONSISTENT; eauto. intros [e [th_tgt1 [STEPS ?]]].
+    guardH H. des.
+    assert (SIMCAP: JSim.sim_thread
+                      views
+                      (Thread.mk _ th_src.(Thread.state) th_src.(Thread.local) th_src.(Thread.sc) mem1)
+                      (Thread.mk _ th_tgt.(Thread.state) th_tgt.(Thread.local) th_tgt.(Thread.sc) mem2)).
+    { dup SIM. inv SIM.
+      apply inj_pair2 in H3. apply inj_pair2 in H5. subst. ss.
+      assert (st0 = st).
+      { inv SIM0.
+        apply inj_pair2 in H3. apply inj_pair2 in H8. subst. auto. }
+      subst. econs; eauto. eapply sim_memory_cap; eauto.
+    }
+    hexploit sim_thread_dsteps; eauto; ss.
+    { eapply Local.cap_wf; eauto. }
+    { eapply Local.cap_wf; eauto. }
+    { eapply Memory.cap_closed_timemap; eauto. }
+    { eapply Memory.cap_closed_timemap; eauto. }
+    { eapply Memory.cap_closed; eauto. }
+    { eapply Memory.cap_closed; eauto. }
+    { red in H. des; subst.
+      { inv STEPS; ss. inv DSTEP. inv STEP_RELEASE; inv STEP; ss.
+        inv LOCAL; ss; inv LOCAL0; ss.
+      }
+      { eapply Local.bot_promise_consistent; eauto. }
+    }
+    { eapply JSim.joined_memory_cap; eauto. }
+    i. des.
+    { esplits; eauto. }
+    esplits; eauto. red in H. des; auto.
+    right. splits; auto. inv SIM0.
+    apply inj_pair2 in H2. apply inj_pair2 in H4. subst. ss.
+    eapply JSim.sim_local_memory_bot; eauto.
+  Qed.
+
+  Definition dstep_finalized e tid c0 c1
+             (STEP: DConfiguration.step e tid c0 c1)
+             (WF: Configuration.wf c0)
+    :
+      finalized c0 <4= finalized c1.
+  Proof.
+    ii. inv STEP.
+    hexploit finalized_unchangable; eauto. i.
+    eapply dsteps_rtc_all_step in DSTEPS.
+    hexploit unchangable_rtc_all_step_increase; eauto. i.
+    inv H0. econs; eauto. i. ss.
+    rewrite IdentMap.gsspec in TID0. des_ifs.
+    inv PR. eapply NPROM0; eauto.
+  Qed.
+
+  Definition dstep_committed_finalized e tid c0 c1 st0 st1 lc0 lc1
+             (STEP: DConfiguration.step e tid c0 c1)
+             (FIND0: IdentMap.find tid c0.(Configuration.threads) = Some (st0, lc0))
+             (FIND1: IdentMap.find tid c1.(Configuration.threads) = Some (st1, lc1))
+             (WF: Configuration.wf c0)
+    :
+      committed c0.(Configuration.memory) lc0.(Local.promises) c1.(Configuration.memory) lc1.(Local.promises) <4= finalized c1.
+  Proof.
+    hexploit DConfiguration_step_future; eauto. i. des.
+    ii. inv PR. dup UNCHANGABLE. inv UNCHANGABLE. econs; eauto.
+    i. inv STEP. ss.
+    rewrite IdentMap.gss in FIND1. clarify.
+    dup TID. rewrite IdentMap.gsspec in TID. des_ifs.
+    destruct (Memory.get x0 x1 lc.(Local.promises)) as [[from msg]|] eqn:EQ; auto.
+    exfalso. eapply NUNCHANGABLE.
+    destruct c0, lc, lc0. ss.
+    eapply other_promise_unchangable with (tid1:=tid) (tid2:=tid0); eauto.
+    econs; eauto. inv WF2. ss.
+    inv WF0. destruct st. exploit THREADS; eauto.
+    i. inv x4. ss. rewrite EQ. eapply PROMISES in EQ. clarify.
+  Qed.
+
+  Variant d_na_step e tid c1 c2 :=
+  | d_na_step_intro
+      (STEP: DConfiguration.step e tid c1 c2)
+      (CLOSEDFUTURE: forall (NFAILURE: e <> MachineEvent.failure)
+                            tid0 (TID: tid0 <> tid)
+                            lang st lc
+                            (TID: IdentMap.find tid0 (Configuration.threads c1) = Some (existT _ lang st, lc)),
+          closed_future_tview loc_na lc.(Local.tview) c1.(Configuration.memory) c2.(Configuration.memory))
+  .
+
+  Variant sim_configuration
+          (views: Loc.t -> Time.t -> list View.t):
+    forall (c_src c_tgt: Configuration.t), Prop :=
+  | sim_configuration_intro
+      ths_src sc_src mem_src
+      ths_tgt sc_tgt mem_tgt
+      (THS: forall tid,
+          option_rel
+            (JSim.sim_statelocal views)
+            (IdentMap.find tid ths_src)
+            (IdentMap.find tid ths_tgt))
+      (MEM: sim_memory mem_src mem_tgt)
+      (SC: TimeMap.le sc_src sc_tgt)
+    :
+      sim_configuration
+        views
+        (Configuration.mk ths_src sc_src mem_src)
+        (Configuration.mk ths_tgt sc_tgt mem_tgt)
+  .
+  Hint Constructors sim_configuration.
+
+  Variant pointable_configuration
+          (views: Loc.t -> Time.t -> list View.t)
+          (fin: Messages.t) (c: Configuration.t): Prop :=
+  | pointable_configuration_intro
+      (SC: pointable_timemap loc_na fin c.(Configuration.sc))
+      (MEM: pointable_memory loc_na fin c.(Configuration.memory))
+      (THS: forall tid lang st lc
+                   (TID: IdentMap.find tid (Configuration.threads c) = Some (existT _ lang st, lc)),
+          pointable_tview loc_na fin lc.(Local.tview))
+      (VIEWS: pointable_views loc_na fin views)
+      (FIN: fin <4= finalized c)
+      (FINBOT: forall loc, fin loc Time.bot Time.bot Message.elt)
+  .
+
+  Variant nomix_configuration (c: Configuration.t): Prop :=
+  | nomix_configuration_intro
+      (THS: forall tid lang st lc
+                   (TID: IdentMap.find tid (Configuration.threads c) = Some (existT _ lang st, lc)),
+          nomix loc_na loc_at _ st)
+  .
+
+  Lemma pointable_closed_future_timemap fin tm mem0 mem1
+        (TM: pointable_timemap loc_na fin tm)
+        (FIN0: fin <4= Messages.of_memory mem0)
+        (FIN1: fin <4= Messages.of_memory mem1)
+    :
+      closed_future_timemap loc_na tm mem0 mem1.
+  Proof.
+    ii. hexploit (TM loc); auto. i. des.
+    hexploit FIN0; eauto. hexploit FIN1; eauto. i.
+    inv H0. inv H1. rewrite GET. rewrite GET0. ss.
+  Qed.
+
+  Lemma pointable_closed_future_view fin vw mem0 mem1
+        (VW: pointable_view loc_na fin vw)
+        (FIN0: fin <4= Messages.of_memory mem0)
+        (FIN1: fin <4= Messages.of_memory mem1)
+    :
+      closed_future_view loc_na vw mem0 mem1.
+  Proof.
+    econs.
+    { eapply pointable_closed_future_timemap; eauto. eapply VW. }
+    { eapply pointable_closed_future_timemap; eauto. eapply VW. }
+  Qed.
+
+  Lemma pointable_closed_future_tview fin tvw mem0 mem1
+        (TVW: pointable_tview loc_na fin tvw)
+        (FIN0: fin <4= Messages.of_memory mem0)
+        (FIN1: fin <4= Messages.of_memory mem1)
+    :
+      closed_future_tview loc_na tvw mem0 mem1.
+  Proof.
+    econs.
+    { i. eapply pointable_closed_future_view; eauto. eapply TVW. }
+    { eapply pointable_closed_future_view; eauto. eapply TVW. }
+    { eapply pointable_closed_future_view; eauto. eapply TVW. }
+  Qed.
+
+  Lemma sim_configuration_step views0 fin0 c_tgt0 c_tgt1 c_src0 e tid
+        (STEP: DConfiguration.step e tid c_tgt0 c_tgt1)
+        (SIM: sim_configuration views0 c_src0 c_tgt0)
+        (NOMIX: nomix_configuration c_tgt0)
+        (POINTABLE: pointable_configuration views0 fin0 c_src0)
+        (WFSRC: JConfiguration.wf views0 c_src0)
+        (WFTGT: Configuration.wf c_tgt0)
+    :
+      (exists c_src1,
+        (<<STEP: d_na_step MachineEvent.failure tid c_src0 c_src1>>)) \/
+      (exists c_src1 e views1 fin1,
+        (<<STEP: d_na_step e tid c_src0 c_src1>>) /\
+        (<<SIM: sim_configuration views0 c_src0 c_tgt0>>) /\
+        (<<NOMIX: nomix_configuration c_tgt1>>) /\
+        (<<POINTABLE: pointable_configuration views1 fin1 c_src1>>) /\
+        (<<WFSRC: JConfiguration.wf views1 c_src1>>) /\
+        (<<WFTGT: Configuration.wf c_tgt1>>))
+  .
+  Proof.
+    dup WFSRC. dup WFTGT. dup STEP.
+    hexploit DConfiguration_step_future; eauto. i. des.
+    inv SIM. inv STEP. inv NOMIX. inv POINTABLE. ss.
+    inv WFTGT. inv WFSRC. dup WF0. inv WF0. ss.
+    hexploit THS0; eauto. intros NOMIX.
+    hexploit (THS tid). i. rewrite TID in H.
+    destruct (IdentMap.find tid ths_src) as [|] eqn:TIDSRC; ss.
+    ss. dup H. inv H. eapply inj_pair2 in H4.
+    assert (st1 = st).
+    { inv H0. apply inj_pair2 in H2. apply inj_pair2 in H. subst. auto. }
+    subst. hexploit REL; eauto. intros RELEASED.
+    hexploit THS1; eauto. intros POINTVIEW.
+    inv WF3. inv WF.
+    hexploit THREADS; eauto. intros LOCALTGT.
+    hexploit THREADS0; eauto. intros LOCALSRC.
+    hexploit Thread.rtc_all_step_future.
+    { eapply dsteps_rtc_all_step. eapply DSTEPS. }
+    all: eauto. i. des. ss.
+    hexploit sim_thread_dsteps.
+    { eauto. }
+    { econs; eauto. }
+    all: eauto.
+    { destruct (classic (e = MachineEvent.failure)); eauto.
+      { subst. inv DSTEPS. inv DSTEP; ss. inv STEP_RELEASE; inv STEP; ss.
+        inv LOCAL0; ss; inv LOCAL1; ss.
+      }
+      { hexploit CONSISTENT; eauto. i.
+        eapply delayed_consistent_promise_consistent in H1; eauto; ss.
+      }
+    }
+    i. ss. des.
+    { destruct th_src1. left. esplits. econs.
+      { econs; eauto. ss. }
+      { ss. }
+    }
+    destruct th_src1.
+    assert (DSTEP: DConfiguration.step
+                     e
+                     tid
+                     (Configuration.mk
+                        ths_src sc_src mem_src)
+                     (Configuration.mk
+                        (IdentMap.add tid (existT (Language.state (E:=ProgramEvent.t)) lang state, local) ths_src)
+                        sc memory)).
+    { econs; eauto. i.
+      hexploit CONSISTENT; eauto. i.
+      hexploit Thread.rtc_all_step_future.
+      { eapply dsteps_rtc_all_step. eapply STEPS_SRC. }
+      all: eauto. i. des; ss.
+      eapply sim_thread_delayed_consistent; eauto.
+      i. ss. left. auto.
+    }
+    right. esplits; auto.
+    { econs.
+      { eauto. }
+      { i. ss. eapply pointable_closed_future_tview.
+        { eapply THS1 in TID1; eauto. }
+        { i. hexploit FIN; eauto. i. inv H. econs; eauto. }
+        { i. hexploit FIN; eauto. i.
+          hexploit dstep_finalized; eauto. i. inv H1. econs; eauto. }
+      }
+    }
+    { econs. i. ss. rewrite IdentMap.gsspec in TID0. des_ifs.
+      { eapply inj_pair2 in H1. subst. auto. }
+      { eauto. }
+    }
+    { econs; ss; eauto.
+      { eapply pointable_joined_memory; eauto. }
+      { i. rewrite IdentMap.gsspec in TID0. des_ifs.
+        eapply pointable_tview_mon.
+        { i. left. eapply PR. }
+        { eauto. }
+      }
+      { i. ss. des.
+        { eapply dstep_finalized; eauto. }
+        { eapply dstep_committed_finalized; eauto.
+          ss. erewrite IdentMap.gss. eauto.
+        }
+      }
+      { i. ss. left. auto. }
+    }
+    { hexploit DConfiguration_step_future; eauto. i. des; ss. econs; eauto.
+      i. ss. erewrite IdentMap.gsspec in TH. des_ifs.
+      eapply joined_released_le; eauto.
     }
   Qed.
 End NA.

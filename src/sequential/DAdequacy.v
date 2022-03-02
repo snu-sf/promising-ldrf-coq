@@ -102,51 +102,6 @@ Section LANG.
     { eauto. }
   Qed.
 
-  Lemma dstep_rtc_all_step lang e th0 th1
-        (STEP: dstep e th0 th1)
-    :
-      rtc (@Thread.all_step lang) th0 th1.
-  Proof.
-    inv STEP. etrans.
-    { eapply rtc_implies; [|eapply PROMISES].
-      i. inv H. inv TSTEP. econs; eauto.
-    }
-    etrans.
-    { eapply rtc_implies; [|eapply LOWERS].
-      i. inv H. inv TSTEP. econs; eauto. econs; eauto.
-    }
-    econs 2; [|refl]. econs; eauto. econs; eauto.
-  Qed.
-
-  Lemma rtc_tau_dstep_rtc_all_step lang th0 th1
-        (STEPS: rtc (tau (@dstep lang)) th0 th1)
-    :
-      rtc (@Thread.all_step lang) th0 th1.
-  Proof.
-    induction STEPS.
-    { refl. }
-    etrans; [|eauto]. inv H.
-    eapply dstep_rtc_all_step; eauto.
-  Qed.
-
-  Lemma dsteps_rtc_all_step lang e th0 th1
-        (STEPS: dsteps e th0 th1)
-    :
-      rtc (@Thread.all_step lang) th0 th1.
-  Proof.
-    inv STEPS.
-    { etrans.
-      { eapply rtc_tau_dstep_rtc_all_step; eauto. }
-      { eapply rtc_implies; [|eapply PROMISES].
-        i. inv H. inv TSTEP. econs; eauto.
-      }
-    }
-    { etrans.
-      { eapply rtc_tau_dstep_rtc_all_step; eauto. }
-      { eapply dstep_rtc_all_step; eauto. }
-    }
-  Qed.
-
   Lemma sim_thread_failure_failure
         (w: world) st_src lc_src sc_src mem_src
         st_tgt lc_tgt sc_tgt mem_tgt
@@ -624,30 +579,6 @@ Section LANG.
     }
   Qed.
 
-  Lemma delayed_consistent_promise_consistent lang (th: Thread.t lang)
-        (CONSISTENT: delayed_consistent th)
-        (MEM: Memory.closed th.(Thread.memory))
-        (LOCAL: Local.wf th.(Thread.local) th.(Thread.memory))
-        (SC: Memory.closed_timemap th.(Thread.sc) th.(Thread.memory))
-    :
-      Local.promise_consistent th.(Thread.local).
-  Proof.
-    hexploit Memory.cap_exists; eauto. i. des.
-    hexploit Local.cap_wf; eauto. i.
-    hexploit Memory.cap_closed_timemap; eauto. i.
-    hexploit Memory.cap_closed; eauto. i.
-    exploit CONSISTENT; eauto. i. des.
-    { pose proof (dsteps_rtc_all_step DSTEPS) as STEPS.
-      eapply rtc_all_step_promise_consistent in STEPS; eauto; ss.
-      inv DSTEPS; ss. inv DSTEP. inv STEP_RELEASE; inv STEP; ss.
-      inv LOCAL0; ss; inv LOCAL1; ss.
-    }
-    { pose proof (dsteps_rtc_all_step DSTEPS) as STEPS.
-      eapply rtc_all_step_promise_consistent in STEPS; eauto; ss.
-      eapply Local.bot_promise_consistent in PROMISES; eauto.
-    }
-  Qed.
-
   Lemma sim_thread_wf_terminal
         w0 st_src0 lc_src0 sc_src0 mem_src0 st_tgt lc_tgt sc_tgt mem_tgt
         (SIM: sim_thread_wf false w0 st_src0 lc_src0 sc_src0 mem_src0 st_tgt lc_tgt sc_tgt mem_tgt)
@@ -1053,16 +984,6 @@ Section Simulation.
 End Simulation.
 Hint Resolve _sim_mon: paco.
 
-
-Lemma DConfiguration_step_future c0 c1 e tid
-      (STEP: DConfiguration.step e tid c0 c1)
-      (WF: Configuration.wf c0)
-  :
-  (<<WF2: Configuration.wf c1>>) /\
-  (<<SC_FUTURE: TimeMap.le (Configuration.sc c0) (Configuration.sc c1)>>) /\
-  (<<MEM_FUTURE: Memory.future (Configuration.memory c0) (Configuration.memory c1)>>).
-Proof.
-Admitted.
 
 Lemma sim_adequacy
       ths_src sc_src mem_src
