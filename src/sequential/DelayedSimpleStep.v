@@ -1007,6 +1007,28 @@ Section DStep.
       i. inv H. inv TSTEP. econs; eauto. econs. econs 2. eauto.
     }
   Qed.
+
+  Lemma ld_terminal
+        e_src e_tgt
+        (LD: lower_delayed_thread e_src e_tgt)
+        (TERMINAL: Language.is_terminal _ (Thread.state e_tgt)):
+    exists e1_src,
+      (<<STEP: rtc (tau lower_step) e_src e1_src>>) /\
+      (<<TERMINAL_SRC: Language.is_terminal _ (Thread.state e1_src)>>) /\
+      (<<PROMISES: Local.promises (Thread.local e1_src) = Local.promises (Thread.local e_tgt)>>) /\
+      (<<SC_LOWER: TimeMap.le (Thread.sc e1_src) (Thread.sc e_tgt)>>) /\
+      (<<MEM_LOWER: lower_memory (Thread.memory e1_src) (Thread.memory e_tgt)>>).
+  Proof.
+    inv LD.
+    destruct e_src as [st_src lc_src sc_src mem_src],
+             e_lower as [st_lower lc_lower sc_lower mem_lower],
+             e_tgt as [st_tgt lc_tgt sc_tgt mem_tgt].
+    inv LOWER. inv DELAYED. ss. subst.
+    unfold delayed in *. des.
+    esplits; try exact STEPS; ss.
+    - inv LOCAL. ss. inv LOCAL2. ss.
+    - etrans; eauto.
+  Qed.
 End DStep.
 
 
@@ -1023,6 +1045,33 @@ Module DConfiguration.
            (Configuration.mk (IdentMap.add tid (existT _ _ st2, lc2) (Configuration.threads c1)) sc2 mem2)
   .
 
+  Variant terminal_step: forall (tid: Ident.t) (c1 c2: Configuration.t), Prop :=
+  | terminal_step_intro
+      tid c1 lang st1 lc1 st2 lc2 sc2 mem2
+      (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
+      (STEPS: rtc (tau lower_step)
+                  (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1))
+                  (Thread.mk _ st2 lc2 sc2 mem2))
+      (TERMINAL: Language.is_terminal _ st2)
+      (PROMISES: Local.promises lc2 = Memory.bot):
+      terminal_step tid c1
+                    (Configuration.mk
+                       (IdentMap.add tid (existT _ _ st2, lc2) (Configuration.threads c1))
+                       sc2 mem2)
+  .
+
+  Inductive terminal_steps: forall (tids: list Ident.t) (c1 c2: Configuration.t), Prop :=
+  | terminal_steps_nil
+      c:
+      terminal_steps [] c c
+  | terminal_steps_cons
+      tid c1 c2 tids c3
+      (NOTIN: ~ List.In tid tids)
+      (STEP: terminal_step tid c1 c2)
+      (STEPS: terminal_steps tids c2 c3):
+      terminal_steps (tid :: tids) c1 c3
+  .
+
   Lemma step_step
         e tid c1 c2
         (STEP: step e tid c1 c2):
@@ -1035,6 +1084,24 @@ Module DConfiguration.
     - subst. econs 2. econs; eauto. i.
       hexploit CONSISTENT; eauto. i.
       eapply delayed_consistent_consistent; eauto.
+  Qed.
+
+  Lemma terminal_step_step
+        tid c1 c2
+        (STEP: terminal_step tid c1 c2):
+    Configuration.opt_step MachineEvent.silent tid c1 c2.
+  Proof.
+    inv STEP.
+    exploit rtc_tail; eauto. i. des.
+    - inv x1. inv TSTEP. destruct a2. ss.
+      rewrite <- EVENT.
+      econs 2. econs; [eauto|..].
+      + eapply rtc_implies; try eapply x0.
+        i. inv H. inv TSTEP. econs; try exact EVENT0. econs. econs 2. eauto.
+      + econs 2. eauto.
+      + ii. ss. right. esplits; eauto.
+    - inv x0. destruct c1 as [threads sc mem]. ss.
+      rewrite IdentMap.gsident; eauto.
   Qed.
 
   Variant ld_sl (sc_src sc_tgt: TimeMap.t) (mem_src mem_tgt: Memory.t):
@@ -1173,13 +1240,157 @@ Module DConfiguration.
     }
   Qed.
 
-  (* ld_conf_terminal required *)
+  Lemma ld_conf_terminal
+        c_src c_tgt
+        (LD: ld_conf c_src c_tgt)
+        (WF_SRC: Configuration.wf c_src)
+        (TERMINAL: Configuration.is_terminal c_tgt):
+    exists c1_src,
+      (<<STEP: terminal_steps
+                 (IdentSet.elements (Threads.tids (Configuration.threads c_src)))
+                 c_src c1_src>>) /\
+      (<<TERMINAL: Configuration.is_terminal c1_src>>).
+  Proof.
+    destruct c_src as [ths_src sc_src mem_src],
+             c_tgt as [ths_tgt sc_tgt mem_tgt]. ss.
+    remember (Threads.tids ths_src) as tids eqn:TIDS_SRC.
+    assert (NOTIN: forall tid lang_src st_src lc_src
+                     (FIND: IdentMap.find tid ths_src = Some (existT _ lang_src st_src, lc_src))
+                     (TID: ~ List.In tid (IdentSet.elements tids)),
+               Language.is_terminal _ st_src /\ Local.is_terminal lc_src).
+    { i. destruct (IdentSet.mem tid tids) eqn:MEM.
+      - exfalso. apply TID. rewrite IdentSet.mem_spec in MEM.
+        rewrite <- IdentSet.elements_spec1 in MEM.
+        clear - MEM. induction MEM; [econs 1|econs 2]; auto.
+      - rewrite TIDS_SRC in MEM. rewrite Threads.tids_o in MEM.
+        destruct (IdentMap.find tid ths_src) eqn:IFIND; [inv MEM|]. ss.
+    }
+    assert (IN: forall tid (TID: List.In tid (IdentSet.elements tids)),
+               exists lang st_src lc_src st_tgt lc_tgt,
+                 (<<FIND_SRC: IdentMap.find tid ths_src = Some (existT _ lang st_src, lc_src)>>) /\
+                 (<<FIND_TGT: IdentMap.find tid ths_tgt = Some (existT _ lang st_tgt, lc_tgt)>>) /\
+                 (<<LD_THREAD: lower_delayed_thread
+                                 (Thread.mk _ st_src lc_src sc_src mem_src)
+                                 (Thread.mk _ st_tgt lc_tgt sc_tgt mem_tgt)>>)).
+    { i. destruct (IdentSet.mem tid tids) eqn:MEM.
+      - subst. dup MEM. rewrite Threads.tids_o in MEM0.
+        inv LD. specialize (THS tid).
+        destruct (IdentMap.find tid ths_src) as [[[lang_src st_src] lc_src]|] eqn:FIND_SRC; ss.
+        destruct (IdentMap.find tid ths_tgt) as [[[lang_tgt st_tgt] lc_tgt]|] eqn:FIND_TGT; ss.
+        inv THS. Configuration.simplify.
+        esplits; eauto.
+      - exfalso. subst.
+        assert (SetoidList.InA eq tid (IdentSet.elements (Threads.tids ths_src))).
+        { clear - TID. induction (IdentSet.elements (Threads.tids ths_src)); eauto. }
+        rewrite IdentSet.elements_spec1 in H.
+        rewrite <- IdentSet.mem_spec in H. congr.
+    }
+    assert (TIDS_MEM: forall tid, List.In tid (IdentSet.elements tids) -> IdentSet.mem tid tids = true).
+    { i. rewrite IdentSet.mem_spec.
+      rewrite <- IdentSet.elements_spec1.
+      eapply SetoidList.In_InA; auto.
+    }
+    assert (NODUP: List.NoDup (IdentSet.elements tids)).
+    { specialize (IdentSet.elements_spec2w tids). i.
+      clear - H. induction H; econs; eauto.
+    }
+    clear LD.
+    revert NOTIN IN TIDS_MEM NODUP.
+    revert ths_src sc_src mem_src WF_SRC TIDS_SRC.
+    induction (IdentSet.elements tids); i.
+    { esplits; [econs 1|]. ii. eauto. }
+    exploit (IN a); try by econs 1. i. des.
+    exploit TERMINAL; eauto. i. des. inv THREAD.
+    exploit ld_terminal; try exact LD_THREAD; eauto. s. i. des.
+    rewrite PROMISES in *.
+    destruct e1_src as [st1 lc1 sc1 mem1]. ss.
+    assert (STEP_SRC: terminal_step
+                        a
+                        (Configuration.mk ths_src sc_src mem_src)
+                        (Configuration.mk
+                           (IdentMap.add a (existT _ _ st1, lc1) ths_src) sc1 mem1)).
+    { econs; eauto. }
+    exploit Configuration.opt_step_future;
+      try eapply terminal_step_step; try eapply STEP_SRC; eauto. s. i. des.
+    exploit IHl; try exact WF2; ss; eauto; i.
+    { rewrite Threads.tids_add. rewrite IdentSet.add_mem; eauto. }
+    { rewrite IdentMap.gsspec in FIND. revert FIND. condtac; ss; i.
+      - subst. Configuration.simplify.
+      - eapply NOTIN; eauto. ii. des; ss. subst. ss.
+    }
+    { exploit IN; eauto. i. des. inv NODUP.
+      rewrite IdentMap.gso; try by (ii; subst; ss).
+      esplits; eauto.
+      exploit ld_future; try exact LD_THREAD0; [..|eauto]; ss; try apply WF2.
+      inv WF2. inv WF. ss.
+      eapply (THREADS tid).
+      rewrite IdentMap.gso; eauto. ii. subst. ss.
+    }
+    { inv NODUP. ss. }
+    des. esplits; [|eauto].
+    econs; eauto. inv NODUP. ss.
+  Qed.
+
+  Inductive delayed_behaviors:
+    forall (conf:Configuration.t) (b:list Event.t) (f: bool), Prop :=
+  | delayed_behaviors_nil
+      c1 c2
+      (STEP: terminal_steps
+               (IdentSet.elements (Threads.tids (Configuration.threads c1)))
+               c1 c2)
+      (TERMINAL: Configuration.is_terminal c2):
+      delayed_behaviors c1 nil true
+  | delayed_behaviors_syscall
+      e1 e2 tid c1 c2 beh f
+      (STEP: step (MachineEvent.syscall e2) tid c1 c2)
+      (NEXT: delayed_behaviors c2 beh f)
+      (EVENT: Event.le e1 e2):
+      delayed_behaviors c1 (e1::beh) f
+  | delayed_behaviors_failure
+      tid c1 c2 beh f
+      (STEP: step MachineEvent.failure tid c1 c2):
+      delayed_behaviors c1 beh f
+  | delayed_behaviors_tau
+      tid c1 c2 beh f
+      (STEP: step MachineEvent.silent tid c1 c2)
+      (NEXT: delayed_behaviors c2 beh f):
+      delayed_behaviors c1 beh f
+  | delayed_behaviors_partial_term
+      c:
+      delayed_behaviors c [] false
+  .
+
   Lemma ld_conf_behavior
         c_src c_tgt
         (LD: ld_conf c_src c_tgt)
         (WF_SRC: Configuration.wf c_src)
         (WF_tgt: Configuration.wf c_tgt):
-    behaviors Configuration.step c_tgt <2= behaviors step c_src.
+    behaviors Configuration.step c_tgt <2= delayed_behaviors c_src.
   Proof.
-  Admitted.
+    i. revert c_src LD WF_SRC. induction PR; i.
+    - exploit ld_conf_terminal; eauto. i. des.
+      econs 1; eauto.
+    - exploit ld_conf_step; eauto. i. des.
+      exploit Configuration.opt_step_future;
+        try eapply step_step; try exact STEP_SRC; eauto. i. des.
+      exploit Configuration.step_future; try exact STEP; eauto. i. des.
+      econs 2; eauto.
+    - exploit ld_conf_step; eauto. i. des.
+      econs 3; eauto.
+    - exploit ld_conf_step; eauto. i. des.
+      exploit Configuration.opt_step_future;
+        try eapply step_step; try exact STEP_SRC; eauto. i. des.
+      exploit Configuration.step_future; try exact STEP; eauto. i. des.
+      econs 4; eauto.
+    - econs 5.
+  Qed.
+
+  Lemma delayed_refinement
+        c
+        (WF: Configuration.wf c):
+    behaviors Configuration.step c <2= delayed_behaviors c.
+  Proof.
+    exploit ld_conf_refl; eauto. i.
+    eapply ld_conf_behavior; eauto.
+  Qed.
 End DConfiguration.
