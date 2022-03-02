@@ -37,3 +37,4 @@ Section NOMIX.
 End NOMIX.
 
 #[export] Hint Resolve nomix_mon: paco.
+#[export] Hint Resolve cpn2_wcompat: paco.

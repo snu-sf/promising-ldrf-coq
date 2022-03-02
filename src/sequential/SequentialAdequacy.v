@@ -67,7 +67,8 @@ Section ADEQUACY.
     { eapply Configuration.init_wf. }
   Qed.
 
-  Theorem sequential_adequcy_context (ctx: Threads.syntax) (tid: Ident.t)
+  Theorem sequential_adequacy_concurrent_context
+          (ctx: Threads.syntax) (tid: Ident.t)
           (lang_src: language) (prog_src: lang_src.(Language.syntax))
           (lang_tgt: language) (prog_tgt: lang_tgt.(Language.syntax))
           (SIM: exists sim_ret, @sim_seq_all
@@ -116,7 +117,7 @@ Section ADEQUACY.
       (CTX_G: forall b, @itree_context A C (g b))
     :
       @itree_context A C (fun itr => b <- (f itr);; g b itr)
-  | itree_context_itre
+  | itree_context_iter
       R I
       (body: I -> itree MemE.t A -> itree MemE.t (I + R))
       (CTX_BODY: forall i, @itree_context A (I + R) (body i))
@@ -125,22 +126,140 @@ Section ADEQUACY.
       @itree_context A R (fun itr => ITree.iter (fun i0 => body i0 itr) i)
   .
 
-  Lemma nomix_bind A B
+  Lemma itree_nomix_spin A
+    :
+    nomix loc_na loc_at (@lang A) ITree.spin.
+  Proof.
+    pcofix CIH. pfold. ii. rewrite unfold_spin in STEP. inv STEP.
+    splits; ss. right. auto.
+  Qed.
+
+  Variant itree_nomix_bind_clo (r: forall lang, lang.(Language.state) -> Prop)
+    : forall lang, lang.(Language.state) -> Prop :=
+  | itree_nomix_bind_clo_intro
+      A B itr ktr
+      (NOMIX0: r (@lang A) itr)
+      (NOMIX1: forall a, r (@lang B) (ktr a))
+    :
+    itree_nomix_bind_clo r (@lang B) (itr >>= ktr)
+  .
+
+  Lemma itree_nomix_bind_clo_uclo
+    :
+    itree_nomix_bind_clo <3= gupaco2 (_nomix loc_na loc_at) (cpn2 (_nomix loc_na loc_at)).
+  Proof.
+    eapply grespect2_uclo; auto with paco. econs.
+    { ii. dependent destruction IN. econs; eauto. }
+    { i. dependent destruction PR. eapply rclo2_base. ii.
+      dup STEP. eapply lang_step_deseq in STEP. des; clarify.
+      { specialize (NOMIX1 r0). eapply GF in NOMIX1.
+        exploit NOMIX1; eauto. i. des. splits; auto. eapply rclo2_base; auto.
+      }
+      { eapply GF in NOMIX0. exploit NOMIX0; eauto.
+        i. des. splits; auto. eapply rclo2_clo. left. econs; eauto.
+        { eapply rclo2_base; auto. }
+        { i. eapply rclo2_base. auto. }
+      }
+      { splits; ss. inv STEP0. eapply rclo2_clo. right.
+        gfinal. right. eapply paco2_mon; [eapply itree_nomix_spin|]; ss.
+      }
+    }
+  Qed.
+
+  Lemma itree_nomix_bind A B
         (itr: itree MemE.t A) (ktr: A -> itree MemE.t B)
         (NOMIX0: nomix loc_na loc_at (@lang A) itr)
         (NOMIX1: forall a, nomix loc_na loc_at (@lang B) (ktr a))
     :
       nomix loc_na loc_at (@lang B) (itr >>= ktr).
   Proof.
-    revert itr ktr NOMIX0 NOMIX1. pcofix CIH. i. pfold. ii.
-    eapply lang_step_deseq in STEP. des.
-    { admit. }
-  Admitted.
+    ginit. guclo itree_nomix_bind_clo_uclo. econs; eauto.
+    { gfinal. right. eapply NOMIX0. }
+    { i. gfinal. right. eapply NOMIX1. }
+  Qed.
 
-  Lemma itree_context_nomix A B itr ctx
+  Lemma itree_nomix_iter I R
+        (body: I -> itree MemE.t (I + R))
+        (NOMIX: forall i, nomix loc_na loc_at (@lang (I + R)) (body i))
+        i
+    :
+      nomix loc_na loc_at (@lang R) (ITree.iter body i).
+  Proof.
+    ginit. revert i. gcofix CIH. i. gstep. ii.
+    dup STEP. rewrite unfold_iter_eq in STEP.
+    eapply lang_step_deseq in STEP. des; clarify.
+    { destruct r0; inv STEP1. splits; ss.
+      gbase. eauto.
+    }
+    { specialize (NOMIX i). punfold NOMIX. exploit NOMIX; eauto.
+      i. des. inv CONT; ss. splits; auto.
+      guclo itree_nomix_bind_clo_uclo. econs; eauto.
+      { gfinal. right. eapply paco2_mon; eauto. ss. }
+      { i. destruct a.
+        { gstep. ii. inv STEP. splits; ss. gfinal. auto. }
+        { gstep. ii. inv STEP. }
+      }
+    }
+    { splits; ss. inv STEP0.
+      gfinal. right. eapply paco2_mon; [eapply itree_nomix_spin|]; ss.
+    }
+  Qed.
+
+  Lemma itree_nomix_context A B itr ctx
         (CTX: itree_context ctx)
         (NOMIX: nomix loc_na loc_at (@lang A) itr)
     :
       nomix loc_na loc_at (@lang B) (ctx itr).
-  Admitted.
+  Proof.
+    induction CTX; i; auto.
+    { eapply itree_nomix_bind; eauto. }
+    { eapply itree_nomix_iter; eauto. }
+  Qed.
+
+  Lemma itree_sim_seq_context A B itr_src itr_tgt
+        (ctx: itree MemE.t A -> itree MemE.t B)
+        (CTX: itree_context ctx)
+        (SIM: sim_seq_itree eq itr_src itr_tgt)
+    :
+    sim_seq_itree eq (ctx itr_src) (ctx itr_tgt).
+  Proof.
+    induction CTX.
+    { auto. }
+    { eapply sim_seq_itree_refl. }
+    { eapply sim_seq_itree_bind.
+      { eauto. }
+      { red. red. i. subst. eapply H. }
+    }
+    { eapply sim_seq_itree_iter.
+      { instantiate (1:=eq). red. red. i. subst.
+        specialize (H r_tgt). eapply sim_seq_itree_mon in H; eauto.
+        i. subst. destruct x1; ss; eauto.
+      }
+      { auto. }
+    }
+  Qed.
+
+  Theorem sequential_adequacy_context A B
+          (ctx_seq: itree MemE.t A -> itree MemE.t B)
+          (ctx_ths: Threads.syntax) (tid: Ident.t)
+          (prog_src prog_tgt: (lang A).(Language.syntax))
+          (SIM: sim_seq_itree eq prog_src prog_tgt)
+          (CTX: @itree_context A B ctx_seq)
+          (NOMIX_SRC: nomix loc_na loc_at _ ((lang A).(Language.init) prog_src))
+          (NOMIX_TGT: nomix loc_na loc_at _ ((lang A).(Language.init) prog_tgt))
+          (NOMIX_CTX: nomix_syntax loc_na loc_at ctx_ths)
+    :
+      behaviors
+        Configuration.step
+        (Configuration.init (IdentMap.add tid (existT _ (lang B) (ctx_seq prog_tgt)) ctx_ths))
+      <2=
+      behaviors
+        Configuration.step
+        (Configuration.init (IdentMap.add tid (existT _ (lang B) (ctx_seq prog_src)) ctx_ths)).
+  Proof.
+    eapply sequential_adequacy_concurrent_context; auto.
+    { esplits. hexploit itree_sim_seq_context; eauto. ii. eapply H. }
+    { clear NOMIX_TGT. exploit itree_nomix_context; eauto. }
+    { clear NOMIX_SRC. exploit itree_nomix_context; eauto. }
+  Qed.
 End ADEQUACY.

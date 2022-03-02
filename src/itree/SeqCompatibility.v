@@ -671,7 +671,7 @@ Proof.
   }
 Qed.
 
-Lemma sim_itree_refl R (itr: itree MemE.t R)
+Lemma sim_seq_itree_refl R (itr: itree MemE.t R)
   :
     sim_seq_itree eq itr itr.
 Proof.
