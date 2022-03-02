@@ -1273,110 +1273,40 @@ Proof.
 Qed.
 
 
-Definition delayed {lang} (st0 st1: lang.(Language.state)) lc0 lc1 sc mem fin: Prop :=
+Definition delayed {lang} (st0 st1: lang.(Language.state)) lc0 lc1 sc mem: Prop :=
     (<<MEM: Memory.closed mem>>) /\
     (<<SC: Memory.closed_timemap sc mem>>) /\
     (<<LOCAL0: Local.wf lc0 mem>>) /\
     (<<LOCAL1: Local.wf lc1 mem>>) /\
     (<<PROMISES: Memory.le lc1.(Local.promises) lc0.(Local.promises)>>) /\
-    (<<FIN: Messages.of_memory lc0.(Local.promises) <4= (Messages.of_memory lc1.(Local.promises) \4/ fin)>>) /\
     exists lc1' mem',
       (<<STEPS: rtc (tau lower_step) (Thread.mk _ st0 lc0 sc mem) (Thread.mk _ st1 lc1' sc mem')>>) /\
       (<<MEM: lower_memory mem' mem>>) /\
       (<<LOCAL: lower_local lc1' lc1>>).
 
 Lemma delayed_refl
-      lang (st: lang.(Language.state)) lc mem sc fin
+      lang (st: lang.(Language.state)) lc mem sc
       (MEM: Memory.closed mem)
       (SC: Memory.closed_timemap sc mem)
       (LOCAL: Local.wf lc mem)
   :
-    delayed st st lc lc sc mem fin.
+    delayed st st lc lc sc mem.
 Proof.
   red. esplits; eauto; refl.
 Qed.
 
-Lemma op_messages
-      promises1 loc from to msg promises2 kind
-      promises1' promises2'
-      fin
-      (OP: Memory.op promises1 loc from to msg promises2 kind)
-      (OP': Memory.op promises1' loc from to msg promises2' kind)
-      (MESSAGES1: Messages.of_memory promises1 <4= (Messages.of_memory promises1' \4/ fin)):
-  Messages.of_memory promises2 <4= (Messages.of_memory promises2' \4/ fin).
-Proof.
-  i. inv PR. revert GET.
-  inv OP; inv OP'; ss.
-  - erewrite Memory.add_o; eauto. condtac; ss; i.
-    + des. inv GET.
-      exploit Memory.add_get0; try exact ADD0. i. des.
-      left. econs. eauto.
-    + guardH o.
-      exploit MESSAGES1; try by (econs; eauto). i. des; eauto.
-      left. econs. inv x.
-      erewrite Memory.add_o; eauto. condtac; ss.
-  - erewrite Memory.split_o; eauto. repeat (condtac; ss); i.
-    + des. inv GET.
-      exploit Memory.split_get0; try exact SPLIT0. i. des.
-      left. econs. eauto.
-    + guardH o. des. inv GET.
-      exploit Memory.split_get0; try exact SPLIT0. i. des.
-      left. econs. eauto.
-    + guardH o. guardH o0.
-      exploit MESSAGES1; try by (econs; eauto). i. des; eauto.
-      left. econs. inv x.
-      erewrite Memory.split_o; eauto. repeat (condtac; ss).
-  - erewrite Memory.lower_o; eauto. condtac; ss; i.
-    + des. inv GET.
-      exploit Memory.lower_get0; try exact LOWER0. i. des.
-      left. econs. eauto.
-    + guardH o.
-      exploit MESSAGES1; try by (econs; eauto). i. des; eauto.
-      left. econs. inv x.
-      erewrite Memory.lower_o; eauto. condtac; ss.
-  - erewrite Memory.remove_o; eauto. condtac; ss; i.
-    guardH o.
-    exploit MESSAGES1; try by (econs; eauto). i. des; eauto.
-    left. econs. inv x.
-    erewrite Memory.remove_o; eauto. condtac; ss.
-Qed.
-
-Lemma promise_steps_messages
-      lang tr tr' (th1 th2 th1' th2': Thread.t lang)
-      fin
-      (STEPS: Trace.steps tr th1 th2)
-      (STEPS': Trace.steps tr' th1' th2')
-      (PROMISE: List.Forall (fun x => is_promise (snd x)) tr)
-      (TRACE: List.Forall2 (fun x y => snd x = snd y) tr tr')
-      (MESSAGES: Messages.of_memory th1.(Thread.local).(Local.promises) <4=
-                   (Messages.of_memory th1'.(Thread.local).(Local.promises) \4/ fin)):
-  __guard__ (Messages.of_memory th2.(Thread.local).(Local.promises) <4=
-             (Messages.of_memory th2'.(Thread.local).(Local.promises) \4/ fin)).
-Proof.
-  revert tr' th1' th2' STEPS' PROMISE TRACE MESSAGES.
-  induction STEPS; i; subst.
-  { inv TRACE. inv STEPS'; ss. }
-  inv TRACE. inv PROMISE. inv STEPS'. inv TR. ss. subst.
-  eapply IHSTEPS; eauto.
-  clear STEPS IHSTEPS STEPS0.
-  inv STEP; inv STEP1; try by (inv LOCAL; ss).
-  inv STEP0; inv STEP; try by (inv LOCAL0; ss).
-  inv LOCAL. inv LOCAL0. ss.
-  eapply op_messages; try eapply Memory.promise_op_promise; eauto.
-Qed.
-
 Lemma delayed_step
       lang (st0 st1 st2: Language.state lang) lc0 lc1 lc2
-      mem1 sc1 mem2 sc2 fin
+      mem1 sc1 mem2 sc2
       pf e
       (STEP: Thread.step pf e (Thread.mk _ st1 lc1 sc1 mem1) (Thread.mk _ st2 lc2 sc2 mem2))
       (CONS: Local.promise_consistent lc2)
       (NRELEASE: ~ release_event e)
-      (DELAYED: delayed st0 st1 lc0 lc1 sc1 mem1 fin)
+      (DELAYED: delayed st0 st1 lc0 lc1 sc1 mem1)
   :
     exists lc0',
       (<<PROMISES: rtc (tau (@pred_step is_promise _)) (Thread.mk _ st0 lc0 sc1 mem1) (Thread.mk _ st0 lc0' sc2 mem2)>>) /\
-      (<<DELAYED: delayed st0 st2 lc0' lc2 sc2 mem2 (fin \4/ committed mem1 lc1.(Local.promises) mem2 lc2.(Local.promises))>>).
+      (<<DELAYED: delayed st0 st2 lc0' lc2 sc2 mem2>>).
 Proof.
   unfold delayed in DELAYED. des.
   exploit Thread.step_future; try exact STEP; eauto. s. i. des.
@@ -1411,21 +1341,13 @@ Proof.
   i. esplits; try exact x0. clear x0.
   unfold delayed.
   exploit Trace.steps_future; try exact STEPS1; eauto. s. i. des.
-  splits; auto; cycle 2.
+  splits; auto.
+  - exploit lower_steps_future; try exact LOWER_L. s. i. des.
+    etrans; eauto. etrans; eauto. inv LC0. ss.
   - esplits.
     + etrans; eauto.
     + ss.
     + ss.
-  - exploit lower_steps_future; try exact LOWER_L. s. i. des.
-    etrans; eauto. etrans; eauto. inv LC0. ss.
-  - hexploit promise_steps_messages; [exact STEPS1|exact PROMISES|..]; ss.
-    { repeat (eapply trace_eq_promise; eauto). }
-    { eapply Forall2_symm; eauto.
-      eapply Forall2_trans; eauto. congr.
-    }
-    { i. eapply FIN; eauto. }
-    i. exploit H1; eauto. i. des; eauto.
-    exploit FIN0; eauto. i. des; eauto.
 Qed.
 
 Lemma writable_mon_non_release
@@ -1835,19 +1757,19 @@ Qed.
 
 Lemma delayed_future
       mem1 sc1
-      lang (st0 st1: lang.(Language.state)) lc0 lc1 mem0 sc0 fin0 fin1
-      (DELAYED: delayed st0 st1 lc0 lc1 sc0 mem0 fin0)
-      (WF0': Local.wf lc0 mem1)
-      (WF1': Local.wf lc1 mem1)
+      lang (st0 st1: lang.(Language.state)) lc0 lc1 mem0 sc0
+      (DELAYED: delayed st0 st1 lc0 lc1 sc0 mem0)
+      (WF: Local.wf lc0 mem1)
       (SC: Memory.closed_timemap sc1 mem1)
       (MEM: Memory.closed mem1)
-      (MEM_FUTURE: Memory.future_weak mem0 mem1)
-      (FIN_FUTURE: fin0 <4= fin1):
-    delayed st0 st1 lc0 lc1 sc1 mem1 fin1.
+      (MEM_FUTURE: Memory.future_weak mem0 mem1):
+    delayed st0 st1 lc0 lc1 sc1 mem1.
 Proof.
   unfold delayed in *. des. splits; auto.
-  { i. hexploit FIN; eauto. i. des; eauto. }
-  clear fin0 fin1 FIN FIN_FUTURE.
+  { inv LOCAL1. econs; ss.
+    - eapply TView.future_weak_closed; eauto.
+    - inv WF. etrans; try exact PROMISES1. ss.
+  }
   cut (exists lc2' sc2' mem1',
           rtc (tau lower_step) (Thread.mk _ st0 lc0 sc1 mem1) (Thread.mk _ st1 lc2' sc2' mem1') /\
           lower_local lc2' lc1').
@@ -1855,8 +1777,8 @@ Proof.
     exploit lower_steps_future; try exact H. s. i. des. subst.
     esplits; eauto. etrans; eauto.
   }
-  clear lc1 LOCAL1 PROMISES LOCAL WF1' MEM1.
-  rename LOCAL0 into WF0, WF0' into WF.
+  clear lc1 LOCAL1 PROMISES LOCAL MEM1.
+  rename LOCAL0 into WF0.
   assert (LOCAL: lower_local lc0 lc0) by refl.
   revert LOCAL WF. generalize lc0 at 1 3 4.
   remember (Thread.mk lang st0 lc0 sc0 mem0) as th0.
