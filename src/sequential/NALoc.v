@@ -1614,9 +1614,9 @@ Section NA.
       { auto. }
     }
     inv H. pose proof (dstep_rtc_all_step TSTEP) as STEPS_TGT0.
-    pose proof (rtc_tau_dstep_rtc_all_step STEPS) as STEPS_TGT1.
+    pose proof (rtc_dstep_rtc_tau_step STEPS) as STEPS_TGT1.
     hexploit Thread.rtc_all_step_future; [eapply STEPS_TGT0|..]; eauto. i. des.
-    hexploit PromiseConsistent.rtc_all_step_promise_consistent; [eapply STEPS_TGT1|..]; eauto. intros CONSISTENT1.
+    hexploit PromiseConsistent.rtc_tau_step_promise_consistent; [eapply STEPS_TGT1|..]; eauto. intros CONSISTENT1.
     hexploit sim_thread_dstep; eauto. i. des.
     { left. esplits. econs 2.
       { refl. }
@@ -1636,7 +1636,9 @@ Section NA.
     }
     hexploit committed_trans.
     { eapply STEPS_SRC0. }
-    { eapply rtc_tau_dstep_rtc_all_step. eapply STEPS_SRC1. }
+    { eapply rtc_implies.
+      { instantiate (1:=@Thread.tau_step _). i. inv H. econs; eauto. }
+      eapply rtc_dstep_rtc_tau_step. eapply STEPS_SRC1. }
     intros SAME. right. esplits.
     { econs 2; [|eauto]. econs; eauto. rewrite EVENT0. auto. }
     { eauto. }
@@ -1690,21 +1692,23 @@ Section NA.
   .
   Proof.
     inv STEPS.
-    { pose proof (rtc_tau_dstep_rtc_all_step DSTEPS) as STEPS_TGT0.
+    { pose proof (rtc_dstep_rtc_tau_step DSTEPS) as STEPS_TGT0.
       hexploit rtc_implies; [|eapply PROMISES|..].
       { instantiate (1:=@Thread.all_step _). i. inv H. inv TSTEP. econs; eauto. }
       intros STEPS_TGT1.
-      hexploit Thread.rtc_all_step_future; [eapply STEPS_TGT0|..]; eauto. i. des.
+      hexploit Thread.rtc_tau_step_future; [eapply STEPS_TGT0|..]; eauto. i. des.
       hexploit PromiseConsistent.rtc_all_step_promise_consistent; [eapply STEPS_TGT1|..]; eauto. intros CONSISTENT1.
       hexploit sim_thread_rtc_tau_dstep; eauto. i. des.
       { left. eauto. }
-      pose proof (rtc_tau_dstep_rtc_all_step STEPS_SRC) as STEPS_SRC0.
-      hexploit Thread.rtc_all_step_future; [eapply STEPS_SRC0|..]; eauto. i. des.
+      pose proof (rtc_dstep_rtc_tau_step STEPS_SRC) as STEPS_SRC0.
+      hexploit Thread.rtc_tau_step_future; [eapply STEPS_SRC0|..]; eauto. i. des.
       hexploit sim_thread_promise_steps; eauto.
       { i. ss. left. auto. }
       i. des. right.
       hexploit committed_trans.
-      { eapply STEPS_SRC0. }
+      { eapply rtc_implies.
+        { instantiate (2:=@Thread.tau_step lang_src). i. inv H. econs; eauto. }
+        eapply STEPS_SRC0. }
       { eapply rtc_implies; [|eapply STEPS_SRC1|..].
         i. inv H. inv TSTEP. econs; eauto.
       }
@@ -1720,20 +1724,22 @@ Section NA.
       { etrans; eauto. }
       { eauto. }
     }
-    { pose proof (rtc_tau_dstep_rtc_all_step DSTEPS) as STEPS_TGT0.
-      hexploit Thread.rtc_all_step_future; [eapply STEPS_TGT0|..]; eauto. i. des.
+    { pose proof (rtc_dstep_rtc_tau_step DSTEPS) as STEPS_TGT0.
+      hexploit Thread.rtc_tau_step_future; [eapply STEPS_TGT0|..]; eauto. i. des.
       pose proof (dstep_rtc_all_step DSTEP) as STEPS_TGT1.
       hexploit PromiseConsistent.rtc_all_step_promise_consistent; [eapply STEPS_TGT1|..]; eauto. intros CONSISTENT1.
       hexploit sim_thread_rtc_tau_dstep; eauto. i. des.
       { left. eauto. }
-      pose proof (rtc_tau_dstep_rtc_all_step STEPS_SRC) as STEPS_SRC0.
-      hexploit Thread.rtc_all_step_future; [eapply STEPS_SRC0|..]; eauto. i. des.
+      pose proof (rtc_dstep_rtc_tau_step STEPS_SRC) as STEPS_SRC0.
+      hexploit Thread.rtc_tau_step_future; [eapply STEPS_SRC0|..]; eauto. i. des.
       hexploit sim_thread_dstep; eauto.
       { i. ss. left. auto. }
       i. des.
       { left. esplits. econs; eauto. }
       right. hexploit committed_trans.
-      { eapply STEPS_SRC0. }
+      { eapply rtc_implies.
+        { instantiate (2:=@Thread.tau_step lang_src). i. inv H. econs; eauto. }
+        eapply STEPS_SRC0. }
       { eapply dstep_rtc_all_step. eapply STEPS_SRC1. }
       intros SAME. esplits.
       { econs 2; eauto. }
@@ -1790,6 +1796,12 @@ Section NA.
         apply inj_pair2 in H3. apply inj_pair2 in H8. subst. auto. }
       subst. econs; eauto. eapply sim_memory_cap; eauto.
     }
+    pose proof (dsteps_rtc_all_step STEPS) as STEPS_TGT0.
+    hexploit Thread.rtc_all_step_future; [eapply STEPS_TGT0|..]; eauto.
+    { eapply Local.cap_wf; eauto. }
+    { eapply Memory.cap_closed_timemap; eauto. }
+    { eapply Memory.cap_closed; eauto. }
+    i. des; ss.
     hexploit sim_thread_dsteps; eauto; ss.
     { eapply Local.cap_wf; eauto. }
     { eapply Local.cap_wf; eauto. }
@@ -1801,14 +1813,56 @@ Section NA.
       { inv STEPS; ss. inv DSTEP. inv STEP_RELEASE; inv STEP; ss.
         inv LOCAL; ss; inv LOCAL0; ss.
       }
-      { eapply Local.bot_promise_consistent; eauto. }
+      { eapply rtc_implies in STEPS0.
+        2:{ instantiate (1:=@Thread.tau_step _). i. inv H. inv TSTEP. econs; eauto. econs; eauto. }
+        eapply PromiseConsistent.rtc_tau_step_promise_consistent in STEPS0; eauto.
+        eapply Local.bot_promise_consistent; eauto.
+      }
     }
     { eapply JSim.joined_memory_cap; eauto. }
     i. des.
     { esplits; eauto. }
-    esplits; eauto. red in H. des; auto.
-    right. splits; auto. inv SIM0.
+    red in H. des.
+    { esplits; eauto. }
+    dup SIM0. inv SIM0.
     apply inj_pair2 in H2. apply inj_pair2 in H4. subst. ss.
+    assert (st0 = st).
+    { inv SIM1. apply inj_pair2 in H2. apply inj_pair2 in H7. subst. auto. }
+    subst.
+    pose proof (dsteps_rtc_all_step STEPS_SRC) as STEPS_SRC0.
+    hexploit Thread.rtc_all_step_future; [eapply STEPS_SRC0|..]; eauto.
+    { eapply Local.cap_wf; eauto. }
+    { eapply Memory.cap_closed_timemap; eauto. }
+    { eapply Memory.cap_closed; eauto. }
+    i. des; ss.
+    hexploit sim_thread_lower_steps; [eapply STEPS0|..]; eauto; ss.
+    { eapply Local.bot_promise_consistent; eauto. }
+    { auto. }
+    i. des.
+    { esplits; [|left; eauto]. instantiate (1:=th_src2). inv STEPS_SRC.
+      { econs 2.
+        { eauto. }
+        { econs.
+          { eauto. }
+          { etrans; eauto. }
+          { eauto. }
+          { destruct e_src; ss. }
+        }
+        { auto. }
+      }
+      { econs 2.
+        { etrans; [eauto|]. econs 2; [|refl]. econs; eauto. }
+        { econs.
+          { refl. }
+          { eauto. }
+          { eauto. }
+          { destruct e_src; ss. }
+        }
+        { auto. }
+      }
+    }
+    esplits; eauto. right. esplits; eauto.
+    inv SIM0. eapply inj_pair2 in H2. eapply inj_pair2 in H4. subst.
     eapply JSim.sim_local_memory_bot; eauto.
   Qed.
 
@@ -1835,7 +1889,7 @@ Section NA.
     :
       committed c0.(Configuration.memory) lc0.(Local.promises) c1.(Configuration.memory) lc1.(Local.promises) <4= finalized c1.
   Proof.
-    hexploit DConfiguration_step_future; eauto. i. des.
+    hexploit DConfiguration.step_future; eauto. i. des.
     ii. inv PR. dup UNCHANGABLE. inv UNCHANGABLE. econs; eauto.
     i. inv STEP. ss.
     rewrite IdentMap.gss in FIND1. clarify.
@@ -1958,7 +2012,7 @@ Section NA.
   .
   Proof.
     dup WFSRC. dup WFTGT. dup STEP.
-    hexploit DConfiguration_step_future; eauto. i. des.
+    hexploit DConfiguration.step_future; eauto. i. des.
     inv SIM. inv STEP. inv NOMIX. inv POINTABLE. ss.
     inv WFTGT. inv WFSRC. dup WF0. inv WF0. ss.
     hexploit THS0; eauto. intros NOMIX.
@@ -2038,7 +2092,7 @@ Section NA.
       }
       { i. ss. left. auto. }
     }
-    { hexploit DConfiguration_step_future; eauto. i. des; ss. econs; eauto.
+    { hexploit DConfiguration.step_future; eauto. i. des; ss. econs; eauto.
       i. ss. erewrite IdentMap.gsspec in TH. des_ifs.
       eapply joined_released_le; eauto.
     }

@@ -897,6 +897,22 @@ Section DStep.
     - inv LOCAL. ss. inv LOCAL2. ss.
     - etrans; eauto.
   Qed.
+
+  Lemma delayed_consistent_promise_consistent (th: Thread.t lang)
+        (CONSISTENT: delayed_consistent th)
+        (MEM: Memory.closed th.(Thread.memory))
+        (LOCAL: Local.wf th.(Thread.local) th.(Thread.memory))
+        (SC: Memory.closed_timemap th.(Thread.sc) th.(Thread.memory))
+    :
+      Local.promise_consistent th.(Thread.local).
+  Proof.
+    eapply delayed_consistent_consistent in CONSISTENT.
+    eapply consistent_promise_consistent; eauto.
+  Qed.
+Proof.
+
+
+
 End DStep.
 
 
@@ -1261,85 +1277,33 @@ Module DConfiguration.
     exploit ld_conf_refl; eauto. i.
     eapply ld_conf_behavior; eauto.
   Qed.
+
+  Lemma step_future c0 c1 e tid
+        (STEP: step e tid c0 c1)
+        (WF: Configuration.wf c0)
+    :
+      (<<WF2: Configuration.wf c1>>) /\
+      (<<SC_FUTURE: TimeMap.le (Configuration.sc c0) (Configuration.sc c1)>>) /\
+      (<<MEM_FUTURE: Memory.future (Configuration.memory c0) (Configuration.memory c1)>>).
+  Proof.
+    inv WF. inv WF0. inv STEP; s.
+    exploit THREADS; ss; eauto. i.
+    eapply dsteps_rtc_all_step in DSTEPS.
+    exploit Thread.rtc_all_step_future; eauto. s. i. des.
+    splits; eauto. econs; ss. econs.
+    - i. erewrite IdentMap.gsspec in *. des_ifs.
+      + eapply inj_pair2 in H0. subst.
+        exploit THREADS; try apply TH1; eauto. i.
+        exploit Thread.rtc_all_step_disjoint; eauto. i. des. ss.
+        symmetry. auto.
+      + eapply inj_pair2 in H0. subst.
+        exploit THREADS; try apply TH2; eauto. i. des.
+        exploit Thread.rtc_all_step_disjoint; eauto. i. des.
+        auto.
+      + eapply DISJOINT; [|eauto|eauto]. auto.
+    - i. erewrite IdentMap.gsspec in *. des_ifs.
+      exploit THREADS; try apply TH; eauto. i.
+      exploit Thread.rtc_all_step_disjoint; eauto. i. des.
+      auto.
+  Qed.
 End DConfiguration.
-
-
-
-Lemma dstep_rtc_all_step lang e th0 th1
-      (STEP: dstep e th0 th1)
-  :
-    rtc (@Thread.all_step lang) th0 th1.
-Proof.
-  inv STEP. etrans.
-  { eapply rtc_implies; [|eapply PROMISES].
-    i. inv H. inv TSTEP. econs; eauto.
-  }
-  etrans.
-  { eapply rtc_implies; [|eapply LOWERS].
-    i. inv H. inv TSTEP. econs; eauto. econs; eauto. econs 2; eauto.
-  }
-  econs 2; [|refl]. econs; eauto. econs; eauto.
-Qed.
-
-Lemma rtc_tau_dstep_rtc_all_step lang th0 th1
-      (STEPS: rtc (tau (@dstep lang)) th0 th1)
-  :
-    rtc (@Thread.all_step lang) th0 th1.
-Proof.
-  induction STEPS.
-  { refl. }
-  etrans; [|eauto]. inv H.
-  eapply dstep_rtc_all_step; eauto.
-Qed.
-
-Lemma dsteps_rtc_all_step lang e th0 th1
-      (STEPS: dsteps e th0 th1)
-  :
-    rtc (@Thread.all_step lang) th0 th1.
-Proof.
-  inv STEPS.
-  { etrans.
-    { eapply rtc_tau_dstep_rtc_all_step; eauto. }
-    { eapply rtc_implies; [|eapply PROMISES].
-      i. inv H. inv TSTEP. econs; eauto.
-    }
-  }
-  { etrans.
-    { eapply rtc_tau_dstep_rtc_all_step; eauto. }
-    { eapply dstep_rtc_all_step; eauto. }
-  }
-Qed.
-
-Lemma delayed_consistent_promise_consistent lang (th: Thread.t lang)
-      (CONSISTENT: delayed_consistent th)
-      (MEM: Memory.closed th.(Thread.memory))
-      (LOCAL: Local.wf th.(Thread.local) th.(Thread.memory))
-      (SC: Memory.closed_timemap th.(Thread.sc) th.(Thread.memory))
-  :
-    Local.promise_consistent th.(Thread.local).
-Proof.
-  hexploit Memory.cap_exists; eauto. i. des.
-  hexploit Local.cap_wf; eauto. i.
-  hexploit Memory.cap_closed_timemap; eauto. i.
-  hexploit Memory.cap_closed; eauto. i.
-  exploit CONSISTENT; eauto. i. des.
-  { pose proof (dsteps_rtc_all_step DSTEPS) as STEPS.
-    eapply rtc_all_step_promise_consistent in STEPS; eauto; ss.
-    inv DSTEPS; ss. inv DSTEP. inv STEP_RELEASE; inv STEP; ss.
-    inv LOCAL0; ss; inv LOCAL1; ss.
-  }
-  { pose proof (dsteps_rtc_all_step DSTEPS) as STEPS.
-    eapply rtc_all_step_promise_consistent in STEPS; eauto; ss.
-    eapply Local.bot_promise_consistent in PROMISES; eauto.
-  }
-Qed.
-
-Lemma DConfiguration_step_future c0 c1 e tid
-      (STEP: DConfiguration.step e tid c0 c1)
-      (WF: Configuration.wf c0)
-  :
-  (<<WF2: Configuration.wf c1>>) /\
-  (<<SC_FUTURE: TimeMap.le (Configuration.sc c0) (Configuration.sc c1)>>) /\
-  (<<MEM_FUTURE: Memory.future (Configuration.memory c0) (Configuration.memory c1)>>).
-Proof.
-Admitted.
