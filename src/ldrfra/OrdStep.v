@@ -972,5 +972,50 @@ Module OrdConfiguration.
         machine_step (ThreadEvent.get_machine_event e) tid c1 c2
     .
     Hint Constructors machine_step.
+
+
+    (* reserve_only *)
+
+    Definition reserve_only (c: Configuration.t): Prop :=
+      forall tid lang st lc
+        (FIND: IdentMap.find tid (Configuration.threads c) = Some (existT _ lang st, lc)),
+        OrdLocal.reserve_only L (Local.promises lc).
+
+    Lemma init_reserve_only s:
+      reserve_only (Configuration.init s).
+    Proof.
+      ii. unfold Configuration.init, Threads.init in *. ss.
+      rewrite IdentMap.Facts.map_o in *.
+      destruct (@UsualFMapPositive.UsualPositiveMap'.find
+                  (@sigT _ (@Language.syntax ProgramEvent.t)) tid s); inv FIND.
+      ss. rewrite Memory.bot_get in *. ss.
+    Qed.
+
+    Lemma step_reserve_only
+          tid e c1 c2
+          (RESERVE: reserve_only c1)
+          (STEP: step tid e c1 c2):
+      reserve_only c2.
+    Proof.
+      inv STEP. ii. ss.
+      revert FIND. rewrite IdentMap.gsspec. condtac; ss; i; cycle 1.
+      { eapply RESERVE; eauto. }
+      inv FIND. apply inj_pair2 in H1. subst.
+      unfold reserve_only in RESERVE.
+      hexploit RESERVE; eauto. i.
+      hexploit OrdThread.rtc_cancel_step_reserve_only; try exact CANCELS; eauto. i.
+      hexploit OrdThread.opt_step_reserve_only; try exact STEP0; eauto. i.
+      hexploit OrdThread.rtc_reserve_step_reserve_only; try exact RESERVES; eauto.
+    Qed.
+
+    Lemma rtc_all_step_reserve_only
+          c1 c2
+          (RESERVE: reserve_only c1)
+          (STEPS: rtc all_step c1 c2):
+      reserve_only c2.
+    Proof.
+      induction STEPS; ss. inv H.
+      hexploit step_reserve_only; eauto.
+    Qed.
   End OrdConfiguration.
 End OrdConfiguration.

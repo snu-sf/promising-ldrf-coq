@@ -1077,50 +1077,14 @@ Module WConfiguration.
     (*     congr. *)
     (* Qed. *)
 
-
-    (* reserve_only *)
-
-    (* Definition reserve_only (c: Configuration.t): Prop := *)
-    (*   forall tid lang st lc *)
-    (*     (FIND: IdentMap.find tid (Configuration.threads c) = Some (existT _ lang st, lc)), *)
-    (*     WThread.reserve_only L (Local.promises lc). *)
-
-    (* Lemma init_reserve_only s: *)
-    (*   reserve_only (Configuration.init s). *)
-    (* Proof. *)
-    (*   ii. unfold Configuration.init, Threads.init in *. ss. *)
-    (*   rewrite IdentMap.Facts.map_o in *. *)
-    (*   destruct (@UsualFMapPositive.UsualPositiveMap'.find *)
-    (*               (@sigT _ (@Language.syntax ProgramEvent.t)) tid s); inv FIND. *)
-    (*   ss. rewrite Memory.bot_get in *. ss. *)
-    (* Qed. *)
-
-    (* Lemma step_reserve_only *)
-    (*       tid e rels1 rels2 c1 c2 *)
-    (*       (RESERVE: reserve_only c1) *)
-    (*       (STEP: step tid e rels1 rels2 c1 c2): *)
-    (*   reserve_only c2. *)
-    (* Proof. *)
-    (*   inv STEP. ii. ss. *)
-    (*   revert FIND. rewrite IdentMap.gsspec. condtac; ss; i; cycle 1. *)
-    (*   { eapply RESERVE; eauto. } *)
-    (*   inv FIND. apply inj_pair2 in H1. subst. *)
-    (*   unfold reserve_only in RESERVE. *)
-    (*   hexploit RESERVE; eauto. i. *)
-    (*   hexploit WThread.cancel_steps_reserve_only; try exact CANCELS; eauto. i. des. *)
-    (*   hexploit WThread.opt_step_reserve_only; try exact STEP0; eauto. i. *)
-    (*   hexploit WThread.reserve_steps_reserve_only; try exact RESERVES; eauto. *)
-    (* Qed. *)
-
-    (* Lemma steps_reserve_only *)
-    (*       rels1 rels2 c1 c2 *)
-    (*       (RESERVE: reserve_only c1) *)
-    (*       (STEPS: steps rels1 rels2 c1 c2): *)
-    (*   reserve_only c2. *)
-    (* Proof. *)
-    (*   induction STEPS; ss. *)
-    (*   hexploit step_reserve_only; eauto. *)
-    (* Qed. *)
+    Lemma step_rels
+          e tid rels1 rels2 c1 c2
+          (STEP: WConfiguration.step e tid rels1 rels2 c1 c2):
+      rels2 = Writes.append L e rels1.
+    Proof.
+      unfold Writes.append.
+      inv STEP. inv STEP0; ss. inv STEP; ss.
+    Qed.
 
     Lemma step_rels_incl
           e tid rels1 rels2 c1 c2
@@ -1223,16 +1187,6 @@ Module RARaceW.
       racefree rels2 c2.
     Proof.
       ii. eapply RACEFREE; eauto. econs 2; eauto.
-    Qed.
-
-    Lemma step_ord_step
-          e tid rels1 rels2 c1 c2
-          (STEP: WConfiguration.step L ordcr ordcw e tid rels1 rels2 c1 c2):
-      OrdConfiguration.step L ordcr ordcw e tid c1 c2.
-    Proof.
-      inv STEP. econs; eauto. inv STEP0.
-      - econs 1.
-      - inv STEP. econs 2. eauto.
     Qed.
   End RARaceW.
 End RARaceW.

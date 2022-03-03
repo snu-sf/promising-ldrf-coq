@@ -747,7 +747,7 @@ Module PFtoRA.
       induction PR; i.
       - econs 1. eapply sim_conf_terminal; eauto.
       - inv STEP. exploit sim_conf_step; eauto. i. des.
-        + exploit RARaceW.step_ord_step; eauto. i.
+        + exploit WConfiguration.step_ord_step; eauto. i.
           inv EVENT_J; inv EVENT_APF; inv EVENT_RA; ss. inv H0.
           econs 2.
           { replace (MachineEvent.syscall e2) with
@@ -761,13 +761,13 @@ Module PFtoRA.
           exploit step_ra_future; try exact STEP_RA; eauto. ss.
         + exfalso. unfold RARaceW.ra_race_steps in *. des. eauto.
       - inv STEP. exploit sim_conf_step; eauto. i. des.
-        + exploit RARaceW.step_ord_step; eauto. i.
+        + exploit WConfiguration.step_ord_step; eauto. i.
           econs 3.
           replace MachineEvent.failure with (ThreadEvent.get_machine_event e_ra); [econs; eauto|].
           inv EVENT_J; inv EVENT_APF; inv EVENT_RA; ss.
         + exfalso. unfold RARaceW.ra_race_steps in *. des. eauto.
       - inv STEP. exploit sim_conf_step; eauto. i. des.
-        + exploit RARaceW.step_ord_step; eauto. i.
+        + exploit WConfiguration.step_ord_step; eauto. i.
           econs 4.
           { replace MachineEvent.silent with (ThreadEvent.get_machine_event e_ra); cycle 1.
             { inv EVENT_J; inv EVENT_APF; inv EVENT_RA; ss. }
