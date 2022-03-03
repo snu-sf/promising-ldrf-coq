@@ -206,23 +206,6 @@ Proof.
   { i. ss. }
 Qed.
 
-Lemma memory_init_get_if loc to from msg
-      (GET: Memory.get loc to Memory.init = Some (from, msg))
-  :
-    to = Time.bot /\ from = Time.bot /\ msg = Message.elt.
-Proof.
-  unfold Memory.get, Memory.init in *.
-  erewrite Cell.init_get in GET. des_ifs.
-Qed.
-
-Lemma memory_init_get loc
-  :
-  Memory.get loc Time.bot Memory.init = Some (Time.bot, Message.elt).
-Proof.
-  unfold Memory.get, Memory.init in *.
-  erewrite Cell.init_get. des_ifs.
-Qed.
-
 Lemma initial_sim_message loc
   :
   sim_message false loc initial_mappings (Some initial_ver) Message.elt Message.elt.

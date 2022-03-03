@@ -1306,4 +1306,34 @@ Module DConfiguration.
       exploit Thread.rtc_all_step_disjoint; eauto. i. des.
       auto.
   Qed.
+
+  Lemma terminal_step_future c0 c1 tid
+        (STEP: terminal_step tid c0 c1)
+        (WF: Configuration.wf c0)
+    :
+      (<<WF2: Configuration.wf c1>>) /\
+      (<<SC_FUTURE: TimeMap.le (Configuration.sc c0) (Configuration.sc c1)>>) /\
+      (<<MEM_FUTURE: Memory.future (Configuration.memory c0) (Configuration.memory c1)>>).
+  Proof.
+    inv WF. inv WF0. inv STEP; s.
+    exploit THREADS; ss; eauto. i.
+    eapply rtc_implies in STEPS.
+    2:{ instantiate (1:=@Thread.all_step _). i. inv H. inv TSTEP. econs; eauto. econs; eauto. econs 2; eauto. }
+    exploit Thread.rtc_all_step_future; eauto. s. i. des.
+    splits; eauto. econs; ss. econs.
+    - i. erewrite IdentMap.gsspec in *. des_ifs.
+      + eapply inj_pair2 in H0. subst.
+        exploit THREADS; try apply TH1; eauto. i.
+        exploit Thread.rtc_all_step_disjoint; eauto. i. des. ss.
+        symmetry. auto.
+      + eapply inj_pair2 in H0. subst.
+        exploit THREADS; try apply TH2; eauto. i. des.
+        exploit Thread.rtc_all_step_disjoint; eauto. i. des.
+        auto.
+      + eapply DISJOINT; [|eauto|eauto]. auto.
+    - i. erewrite IdentMap.gsspec in *. des_ifs.
+      exploit THREADS; try apply TH; eauto. i.
+      exploit Thread.rtc_all_step_disjoint; eauto. i. des.
+      auto.
+  Qed.
 End DConfiguration.

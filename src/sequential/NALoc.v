@@ -27,6 +27,8 @@ Require Import MemoryProps.
 Require Import JoinedView.
 Require Import JoinedViewExist.
 
+Require Import Program.
+
 Set Implicit Arguments.
 
 
@@ -620,6 +622,11 @@ Section NA.
   Variable loc_na: Loc.t -> Prop.
   Variable loc_at: Loc.t -> Prop.
   Hypothesis LOCDISJOINT: forall loc (NA: loc_na loc) (AT: loc_at loc), False.
+
+  Definition nomix_syntax (s: Threads.syntax): Prop :=
+    forall tid lang syn
+           (FIND: IdentMap.find tid s = Some (existT _ lang syn)),
+      nomix loc_na loc_at lang (lang.(Language.init) syn).
 
   Lemma sim_thread_promise_step views0 lang_src lang_tgt fin
         th_src0 th_tgt0 th_tgt1 pf_tgt e_tgt
@@ -1881,6 +1888,22 @@ Section NA.
     inv PR. eapply NPROM0; eauto.
   Qed.
 
+  Definition terminal_dstep_finalized tid c0 c1
+             (STEP: DConfiguration.terminal_step tid c0 c1)
+             (WF: Configuration.wf c0)
+    :
+      finalized c0 <4= finalized c1.
+  Proof.
+    ii. inv STEP.
+    hexploit finalized_unchangable; eauto. i.
+    eapply rtc_implies in STEPS.
+    2:{ instantiate (1:=@Thread.all_step _). i. inv H0. inv TSTEP. econs; eauto. econs; eauto. }
+    hexploit unchangable_rtc_all_step_increase; eauto. i.
+    inv H0. econs; eauto. i. ss.
+    rewrite IdentMap.gsspec in TID0. des_ifs.
+    inv PR. eapply NPROM0; eauto.
+  Qed.
+
   Definition dstep_committed_finalized e tid c0 c1 st0 st1 lc0 lc1
              (STEP: DConfiguration.step e tid c0 c1)
              (FIND0: IdentMap.find tid c0.(Configuration.threads) = Some (st0, lc0))
@@ -1903,6 +1926,28 @@ Section NA.
     i. inv x4. ss. rewrite EQ. eapply PROMISES in EQ. clarify.
   Qed.
 
+  Definition terminal_dstep_committed_finalized tid c0 c1 st0 st1 lc0 lc1
+             (STEP: DConfiguration.terminal_step tid c0 c1)
+             (FIND0: IdentMap.find tid c0.(Configuration.threads) = Some (st0, lc0))
+             (FIND1: IdentMap.find tid c1.(Configuration.threads) = Some (st1, lc1))
+             (WF: Configuration.wf c0)
+    :
+      committed c0.(Configuration.memory) lc0.(Local.promises) c1.(Configuration.memory) lc1.(Local.promises) <4= finalized c1.
+  Proof.
+    hexploit DConfiguration.terminal_step_future; eauto. i. des.
+    ii. inv PR. dup UNCHANGABLE. inv UNCHANGABLE. econs; eauto.
+    i. inv STEP. ss.
+    rewrite IdentMap.gss in FIND1. clarify.
+    dup TID. rewrite IdentMap.gsspec in TID. des_ifs.
+    destruct (Memory.get x0 x1 lc.(Local.promises)) as [[from msg]|] eqn:EQ; auto.
+    exfalso. eapply NUNCHANGABLE.
+    destruct c0, lc, lc0. ss.
+    eapply other_promise_unchangable with (tid1:=tid) (tid2:=tid0); eauto.
+    econs; eauto. inv WF2. ss.
+    inv WF0. destruct st. exploit THREADS; eauto.
+    i. inv x4. ss. rewrite EQ. eapply PROMISES0 in EQ. clarify.
+  Qed.
+
   Variant d_na_step e tid c1 c2 :=
   | d_na_step_intro
       (STEP: DConfiguration.step e tid c1 c2)
@@ -1911,6 +1956,72 @@ Section NA.
                             lang st lc
                             (TID: IdentMap.find tid0 (Configuration.threads c1) = Some (existT _ lang st, lc)),
           closed_future_tview loc_na lc.(Local.tview) c1.(Configuration.memory) c2.(Configuration.memory))
+  .
+
+  Variant d_na_terminal_step: forall (tid: Ident.t) (c1 c2: Configuration.t), Prop :=
+  | d_na_terminal_step_intro
+      tid c1 lang st1 lc1 st2 lc2 sc2 mem2
+      (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
+      (STEPS: rtc (tau lower_step)
+                  (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1))
+                  (Thread.mk _ st2 lc2 sc2 mem2))
+      (TERMINAL: Language.is_terminal _ st2)
+      (PROMISES: Local.promises lc2 = Memory.bot)
+      (CLOSEDFUTURE: forall tid0 (TID: tid0 <> tid)
+                            lang st lc
+                            (TID: IdentMap.find tid0 (Configuration.threads c1) = Some (existT _ lang st, lc)),
+          closed_future_tview loc_na lc.(Local.tview) c1.(Configuration.memory) mem2)
+    :
+      d_na_terminal_step tid c1
+                         (Configuration.mk
+                            (IdentMap.add tid (existT _ _ st2, lc2) (Configuration.threads c1))
+                            sc2 mem2)
+  .
+
+  Inductive d_na_terminal_steps: forall (tids: list Ident.t) (c: Configuration.t), Prop :=
+  | d_na_terminal_steps_nil
+      c
+      (TERMINAL: Configuration.is_terminal c):
+      d_na_terminal_steps [] c
+  | d_na_terminal_steps_cons
+      tid c1 c2 tids
+      (NOTIN: ~ List.In tid tids)
+      (STEP: d_na_terminal_step tid c1 c2)
+      (STEPS: d_na_terminal_steps tids c2):
+      d_na_terminal_steps (tid :: tids) c1
+  | d_na_terminal_steps_failure
+      tid c1 c2 tids
+      (NOTIN: ~ List.In tid tids)
+      (STEP: d_na_step MachineEvent.failure tid c1 c2):
+      d_na_terminal_steps (tid :: tids) c1
+  .
+
+  Inductive delayed_na_behaviors:
+    forall (conf:Configuration.t) (b:list Event.t) (f: bool), Prop :=
+  | delayed_na_behaviors_nil
+      c
+      (STEP: d_na_terminal_steps
+               (IdentSet.elements (Threads.tids (Configuration.threads c)))
+               c):
+      delayed_na_behaviors c nil true
+  | delayed_na_behaviors_syscall
+      e1 e2 tid c1 c2 beh f
+      (STEP: d_na_step (MachineEvent.syscall e2) tid c1 c2)
+      (NEXT: delayed_na_behaviors c2 beh f)
+      (EVENT: Event.le e1 e2):
+      delayed_na_behaviors c1 (e1::beh) f
+  | delayed_na_behaviors_failure
+      tid c1 c2 beh f
+      (STEP: d_na_step MachineEvent.failure tid c1 c2):
+      delayed_na_behaviors c1 beh f
+  | delayed_na_behaviors_tau
+      tid c1 c2 beh f
+      (STEP: d_na_step MachineEvent.silent tid c1 c2)
+      (NEXT: delayed_na_behaviors c2 beh f):
+      delayed_na_behaviors c1 beh f
+  | delayed_na_behaviors_partial_term
+      c:
+      delayed_na_behaviors c [] false
   .
 
   Variant sim_configuration
@@ -1999,16 +2110,18 @@ Section NA.
         (POINTABLE: pointable_configuration views0 fin0 c_src0)
         (WFSRC: JConfiguration.wf views0 c_src0)
         (WFTGT: Configuration.wf c_tgt0)
+        (TIDS: Threads.tids c_src0.(Configuration.threads) = Threads.tids c_tgt0.(Configuration.threads))
     :
       (exists c_src1,
         (<<STEP: d_na_step MachineEvent.failure tid c_src0 c_src1>>)) \/
-      (exists c_src1 e views1 fin1,
+      (exists c_src1 views1 fin1,
         (<<STEP: d_na_step e tid c_src0 c_src1>>) /\
-        (<<SIM: sim_configuration views0 c_src0 c_tgt0>>) /\
+        (<<SIM: sim_configuration views1 c_src1 c_tgt1>>) /\
         (<<NOMIX: nomix_configuration c_tgt1>>) /\
         (<<POINTABLE: pointable_configuration views1 fin1 c_src1>>) /\
         (<<WFSRC: JConfiguration.wf views1 c_src1>>) /\
-        (<<WFTGT: Configuration.wf c_tgt1>>))
+        (<<WFTGT: Configuration.wf c_tgt1>>) /\
+        (<<TIDS: Threads.tids c_src1.(Configuration.threads) = Threads.tids c_tgt1.(Configuration.threads)>>))
   .
   Proof.
     dup WFSRC. dup WFTGT. dup STEP.
@@ -2073,6 +2186,12 @@ Section NA.
           hexploit dstep_finalized; eauto. i. inv H1. econs; eauto. }
       }
     }
+    { instantiate (1:=views1).
+      dup SIM. dependent destruction SIM. econs; eauto. i.
+      rewrite ! IdentMap.gsspec. des_ifs.
+      eapply option_rel_mon; [|eauto].
+      i. inv PR. econs; eauto. eapply JSim.sim_local_le; eauto.
+    }
     { econs. i. ss. rewrite IdentMap.gsspec in TID0. des_ifs.
       { eapply inj_pair2 in H1. subst. auto. }
       { eauto. }
@@ -2096,5 +2215,216 @@ Section NA.
       i. ss. erewrite IdentMap.gsspec in TH. des_ifs.
       eapply joined_released_le; eauto.
     }
+    { ss. rewrite ! Threads.tids_add. f_equal. auto. }
+  Qed.
+
+  Lemma sim_configuration_terminal_step views0 fin0 c_tgt0 c_tgt1 c_src0 tid
+        (STEP: DConfiguration.terminal_step tid c_tgt0 c_tgt1)
+        (SIM: sim_configuration views0 c_src0 c_tgt0)
+        (NOMIX: nomix_configuration c_tgt0)
+        (POINTABLE: pointable_configuration views0 fin0 c_src0)
+        (WFSRC: JConfiguration.wf views0 c_src0)
+        (WFTGT: Configuration.wf c_tgt0)
+        (TIDS: Threads.tids c_src0.(Configuration.threads) = Threads.tids c_tgt0.(Configuration.threads))
+    :
+      (exists c_src1,
+          (<<STEP: d_na_step MachineEvent.failure tid c_src0 c_src1>>)) \/
+      (exists c_src1 views1 fin1,
+          (<<STEP: d_na_terminal_step tid c_src0 c_src1>>) /\
+          (<<SIM: sim_configuration views1 c_src1 c_tgt1>>) /\
+          (<<NOMIX: nomix_configuration c_tgt1>>) /\
+          (<<POINTABLE: pointable_configuration views1 fin1 c_src1>>) /\
+          (<<WFSRC: JConfiguration.wf views1 c_src1>>) /\
+          (<<WFTGT: Configuration.wf c_tgt1>>) /\
+          (<<TIDS: Threads.tids c_src1.(Configuration.threads) = Threads.tids c_tgt1.(Configuration.threads)>>))
+  .
+  Proof.
+    dup WFSRC. dup WFTGT. dup STEP.
+    hexploit DConfiguration.terminal_step_future; eauto. i. des.
+    inv SIM. inv STEP. inv NOMIX. inv POINTABLE. ss.
+    inv WFTGT. inv WFSRC. dup WF0. inv WF0. ss.
+    hexploit THS0; eauto. intros NOMIX.
+    hexploit (THS tid). i. rewrite TID in H.
+    destruct (IdentMap.find tid ths_src) as [|] eqn:TIDSRC; ss.
+    ss. dup H. inv H. eapply inj_pair2 in H4.
+    assert (st1 = st).
+    { inv H0. apply inj_pair2 in H2. apply inj_pair2 in H. subst. auto. }
+    subst. hexploit REL; eauto. intros RELEASED.
+    hexploit THS1; eauto. intros POINTVIEW.
+    inv WF3. inv WF.
+    hexploit THREADS; eauto. intros LOCALTGT.
+    hexploit THREADS0; eauto. intros LOCALSRC.
+    hexploit Thread.rtc_all_step_future.
+    { eapply rtc_implies; [|eapply STEPS]. i. inv H. inv TSTEP. econs; eauto. econs; eauto. }
+    all: eauto. i. des. ss.
+    hexploit sim_thread_lower_steps.
+    { eauto. }
+    { econs; eauto. }
+    all: eauto.
+    { eapply Local.bot_promise_consistent; eauto. }
+    i. ss. des.
+    { destruct th_src1, th_src2. ss. left. esplits. econs; ss.
+      econs; eauto; ss. econs; eauto. econs; eauto. destruct e_src; ss.
+    }
+    destruct th_src1. dup SIM. dependent destruction SIM.
+    assert (DSTEP: DConfiguration.terminal_step
+                     tid
+                     (Configuration.mk
+                        ths_src sc_src mem_src)
+                     (Configuration.mk
+                        (IdentMap.add tid (existT (Language.state (E:=ProgramEvent.t)) lang st2, local) ths_src)
+                        sc memory)).
+    { econs; eauto. eapply JSim.sim_local_memory_bot; eauto. }
+    right. esplits; auto.
+    { econs; eauto.
+      { eapply JSim.sim_local_memory_bot; eauto. }
+      { i. ss. eapply pointable_closed_future_tview.
+        { eapply THS1 in TID1; eauto. }
+        { i. hexploit FIN; eauto. i. inv H. econs; eauto. }
+        { i. hexploit FIN; eauto. i.
+          hexploit terminal_dstep_finalized; eauto. i. inv H1. econs; eauto. }
+      }
+    }
+    { instantiate (1:=views1).
+      dup SIM0. dependent destruction SIM0. econs; eauto. i.
+      rewrite ! IdentMap.gsspec. des_ifs.
+      eapply option_rel_mon; [|eauto].
+      i. inv PR. econs; eauto. eapply JSim.sim_local_le; eauto.
+    }
+    { econs. i. ss. rewrite IdentMap.gsspec in TID0. des_ifs.
+      { eapply inj_pair2 in H1. subst. auto. }
+      { eauto. }
+    }
+    { econs; ss; eauto.
+      { eapply pointable_joined_memory; eauto. }
+      { i. rewrite IdentMap.gsspec in TID0. des_ifs.
+        eapply pointable_tview_mon.
+        { i. left. eapply PR. }
+        { eauto. }
+      }
+      { i. ss. des.
+        { eapply terminal_dstep_finalized; eauto. }
+        { eapply terminal_dstep_committed_finalized; eauto.
+          ss. erewrite IdentMap.gss. eauto.
+        }
+      }
+      { i. ss. left. auto. }
+    }
+    { hexploit DConfiguration.terminal_step_future; eauto. i. des; ss. econs; eauto.
+      i. ss. erewrite IdentMap.gsspec in TH. des_ifs.
+      eapply joined_released_le; eauto.
+    }
+    { ss. rewrite ! Threads.tids_add. f_equal. auto. }
+  Qed.
+
+  Lemma sim_configuration_terminal_steps views0 fin0 c_tgt0 c_tgt1 c_src0 tids
+        (STEPS: DConfiguration.terminal_steps tids c_tgt0 c_tgt1)
+        (TERMINAL: Configuration.is_terminal c_tgt1)
+        (SIM: sim_configuration views0 c_src0 c_tgt0)
+        (NOMIX: nomix_configuration c_tgt0)
+        (POINTABLE: pointable_configuration views0 fin0 c_src0)
+        (WFSRC: JConfiguration.wf views0 c_src0)
+        (WFTGT: Configuration.wf c_tgt0)
+        (TIDS: Threads.tids c_src0.(Configuration.threads) = Threads.tids c_tgt0.(Configuration.threads))
+    :
+      d_na_terminal_steps tids c_src0.
+  Proof.
+    revert c_src0 views0 fin0 TERMINAL SIM NOMIX POINTABLE WFSRC WFTGT TIDS.
+    induction STEPS; i.
+    { econs 1; eauto. inv SIM. ii; ss.
+      specialize (THS tid). rewrite FIND in THS. ss. des_ifs.
+      dependent destruction THS. exploit TERMINAL; eauto.
+      i. des. splits; auto. inv THREAD. econs.
+      eapply JSim.sim_local_memory_bot; eauto.
+    }
+    { hexploit sim_configuration_terminal_step; eauto. i. des.
+      { econs 3; eauto. }
+      { econs 2; eauto. }
+    }
+  Qed.
+
+  Lemma sim_configuration_behavior views fin c_tgt c_src
+        (SIM: sim_configuration views c_src c_tgt)
+        (NOMIX: nomix_configuration c_tgt)
+        (POINTABLE: pointable_configuration views fin c_src)
+        (WFSRC: JConfiguration.wf views c_src)
+        (WFTGT: Configuration.wf c_tgt)
+        (TIDS: Threads.tids c_src.(Configuration.threads) = Threads.tids c_tgt.(Configuration.threads))
+    :
+      DConfiguration.delayed_behaviors c_tgt <2= delayed_na_behaviors c_src.
+  Proof.
+    i. revert c_src views fin SIM NOMIX POINTABLE WFSRC WFTGT TIDS.
+    induction PR; i.
+    { exploit sim_configuration_terminal_steps; eauto. i.
+      econs 1; eauto. rewrite TIDS. auto.
+    }
+    { exploit sim_configuration_step; eauto. i. des.
+      { econs 3; eauto. }
+      { econs 2; eauto. }
+    }
+    { exploit sim_configuration_step; eauto. i. des.
+      { econs 3; eauto. }
+      { econs 3; eauto. }
+    }
+    { exploit sim_configuration_step; eauto. i. des.
+      { econs 3; eauto. }
+      { econs 4; eauto. }
+    }
+    { econs 5; eauto. }
+  Qed.
+
+  Lemma sim_configuration_init s
+        (NOMIX: nomix_syntax s)
+    :
+      DConfiguration.delayed_behaviors (Configuration.init s)
+      <2=
+      delayed_na_behaviors (Configuration.init s).
+  Proof.
+    set (fin := Messages.of_memory Memory.init).
+    assert (FINBOT: forall loc, fin loc Time.bot Time.bot Message.elt).
+    { i. subst fin. econs. eapply memory_init_get. }
+    eapply sim_configuration_behavior.
+    { instantiate (1:=JConfiguration.init_views). econs.
+      { i. unfold Threads.init. rewrite IdentMap.Facts.map_o.
+        unfold option_map in *. des_ifs. ss. econs; eauto. econs.
+        { refl. }
+        { ii. rewrite Memory.bot_get. econs. }
+      }
+      { econs; eauto. i. eapply memory_init_get_if in GET.
+        des; clarify. esplits.
+        { eapply memory_init_get. }
+        { refl. }
+      }
+      { refl. }
+    }
+    { econs. i. ss. unfold Threads.init in TID.
+      rewrite IdentMap.Facts.map_o in TID. unfold option_map in *. des_ifs.
+      dependent destruction H0. destruct s0. exploit NOMIX; eauto.
+    }
+    { instantiate (1:=Messages.of_memory Memory.init). econs.
+      { ss. eapply pointable_timemap_bot; eauto. }
+      { ii. ss. eapply memory_init_get_if in GET. des; clarify.
+        inv GET1. econs.
+      }
+      { ss. i. unfold Threads.init in TID.
+        rewrite IdentMap.Facts.map_o in TID. unfold option_map in *. des_ifs.
+        econs.
+        { i. eapply pointable_view_bot; eauto. }
+        { eapply pointable_view_bot; eauto. }
+        { eapply pointable_view_bot; eauto. }
+      }
+      { unfold JConfiguration.init_views. ii. des_ifs. econs; eauto.
+        eapply pointable_view_bot; eauto.
+      }
+      { i. inv PR. econs; eauto. i. ss.
+        unfold Threads.init in TID. rewrite IdentMap.Facts.map_o in TID.
+        unfold option_map in *. des_ifs.
+        ss. eapply Memory.bot_get.
+      }
+      { auto. }
+    }
+    { eapply JConfiguration.init_wf. }
+    { eapply Configuration.init_wf. }
+    { auto. }
   Qed.
 End NA.
