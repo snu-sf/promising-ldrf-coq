@@ -1958,24 +1958,13 @@ Section NA.
           closed_future_tview loc_na lc.(Local.tview) c1.(Configuration.memory) c2.(Configuration.memory))
   .
 
-  Variant d_na_terminal_step: forall (tid: Ident.t) (c1 c2: Configuration.t), Prop :=
+  Variant d_na_terminal_step (tid: Ident.t) (c1 c2: Configuration.t): Prop :=
   | d_na_terminal_step_intro
-      tid c1 lang st1 lc1 st2 lc2 sc2 mem2
-      (TID: IdentMap.find tid (Configuration.threads c1) = Some (existT _ lang st1, lc1))
-      (STEPS: rtc (tau lower_step)
-                  (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1))
-                  (Thread.mk _ st2 lc2 sc2 mem2))
-      (TERMINAL: Language.is_terminal _ st2)
-      (PROMISES: Local.promises lc2 = Memory.bot)
+      (STEP: DConfiguration.terminal_step tid c1 c2)
       (CLOSEDFUTURE: forall tid0 (TID: tid0 <> tid)
                             lang st lc
                             (TID: IdentMap.find tid0 (Configuration.threads c1) = Some (existT _ lang st, lc)),
-          closed_future_tview loc_na lc.(Local.tview) c1.(Configuration.memory) mem2)
-    :
-      d_na_terminal_step tid c1
-                         (Configuration.mk
-                            (IdentMap.add tid (existT _ _ st2, lc2) (Configuration.threads c1))
-                            sc2 mem2)
+          closed_future_tview loc_na lc.(Local.tview) c1.(Configuration.memory) c2.(Configuration.memory))
   .
 
   Inductive d_na_terminal_steps: forall (tids: list Ident.t) (c: Configuration.t), Prop :=
@@ -2277,13 +2266,11 @@ Section NA.
     { econs; eauto. eapply JSim.sim_local_memory_bot; eauto. }
     right. esplits; auto.
     { econs; eauto.
-      { eapply JSim.sim_local_memory_bot; eauto. }
-      { i. ss. eapply pointable_closed_future_tview.
-        { eapply THS1 in TID1; eauto. }
-        { i. hexploit FIN; eauto. i. inv H. econs; eauto. }
-        { i. hexploit FIN; eauto. i.
-          hexploit terminal_dstep_finalized; eauto. i. inv H1. econs; eauto. }
-      }
+      i. ss. eapply pointable_closed_future_tview.
+      { eapply THS1 in TID1; eauto. }
+      { i. hexploit FIN; eauto. i. inv H. econs; eauto. }
+      { i. hexploit FIN; eauto. i.
+        hexploit terminal_dstep_finalized; eauto. i. inv H1. econs; eauto. }
     }
     { instantiate (1:=views1).
       dup SIM0. dependent destruction SIM0. econs; eauto. i.
