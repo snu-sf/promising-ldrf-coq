@@ -622,7 +622,7 @@ Section LANG.
 
   Lemma sim_thread_wf_terminal
         w0 st_src0 lc_src0 sc_src0 mem_src0 st_tgt lc_tgt sc_tgt mem_tgt
-        (SIM: sim_thread_wf false w0 st_src0 lc_src0 sc_src0 mem_src0 st_tgt lc_tgt sc_tgt mem_tgt)
+        (SIM: sim_thread_wf true w0 st_src0 lc_src0 sc_src0 mem_src0 st_tgt lc_tgt sc_tgt mem_tgt)
         (LANG_TGT: Language.is_terminal _ st_tgt)
         (LOCAL_TGT: Local.is_terminal lc_tgt)
     :
@@ -935,10 +935,14 @@ Section LANG.
   Qed.
 
   Lemma sim_thread_wf_past_terminal
-        w0 st_src0 lc_src0 sc_src0 mem_src0 st_tgt lc_tgt sc_tgt mem_tgt
-        (SIM: sim_thread_wf_past w0 st_src0 lc_src0 sc_src0 mem_src0 st_tgt lc_tgt sc_tgt mem_tgt)
-        (LANG_TGT: Language.is_terminal _ st_tgt)
-        (LOCAL_TGT: Local.is_terminal lc_tgt)
+        w0 st_src0 lc_src0 sc_src0 mem_src0 st_tgt0 lc_tgt0 sc_tgt0 mem_tgt0
+        st_tgt1 lc_tgt1 sc_tgt1 mem_tgt1
+        (SIM: sim_thread_wf_past w0 st_src0 lc_src0 sc_src0 mem_src0 st_tgt0 lc_tgt0 sc_tgt0 mem_tgt0)
+        (STEPS_TGT: rtc (tau (@lower_step _))
+                        (Thread.mk _ st_tgt0 lc_tgt0 sc_tgt0 mem_tgt0)
+                        (Thread.mk _ st_tgt1 lc_tgt1 sc_tgt1 mem_tgt1))
+        (LANG_TGT: Language.is_terminal _ st_tgt1)
+        (LOCAL_TGT: Local.is_terminal lc_tgt1)
     :
     (<<FAILURE: Thread.steps_failure (Thread.mk _ st_src0 lc_src0 sc_src0 mem_src0)>>) \/
     exists w1
@@ -948,23 +952,37 @@ Section LANG.
                     (Thread.mk _ st_src1 lc_src1 sc_src1 mem_src1)>>) /\
       (<<LANG_SRC: Language.is_terminal _ st_src1>>) /\
       (<<LOCAL_SRC: Local.is_terminal lc_src1>>) /\
-      (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt lc_tgt.(Local.promises)) w0 w1>>) /\
-      (<<MEM: sim_memory w1 mem_src1 mem_tgt>>) /\
-      (<<SC: sim_timemap w1 sc_src1 sc_tgt>>)
+      (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt0 lc_tgt0.(Local.promises)) w0 w1>>) /\
+      (<<MEM: sim_memory w1 mem_src1 mem_tgt1>>) /\
+      (<<SC: sim_timemap w1 sc_src1 sc_tgt1>>)
   .
   Proof.
     hexploit sim_thread_wf_past_future; eauto. i. des.
     { left. eauto. }
-    hexploit sim_thread_wf_terminal; eauto. i. des.
+    hexploit sim_thread_wf_lower_steps; eauto.
+    { inv LOCAL_TGT. eapply Local.bot_promise_consistent; eauto. }
+    i. des.
     { left. eapply steps_steps_failure; eauto. }
-    right. exists w2. esplits.
-    { etrans; eauto. }
+    hexploit sim_thread_wf_terminal; eauto. i. des.
+    { left. eapply steps_steps_failure; eauto. eapply steps_steps_failure; eauto. }
+    right. esplits.
+    { etrans; [|eauto]. etrans; eauto. }
     { eauto. }
     { eauto. }
     { etrans.
       { eauto. }
-      eapply world_messages_le_mon; [eauto|..]; eauto.
-      i. eapply unchangable_rtc_tau_step_increase in STEPS; eauto.
+      eapply world_messages_le_mon.
+      { etrans.
+        { eauto. }
+        eapply world_messages_le_mon.
+        { eauto. }
+        { i. eapply unchangable_rtc_tau_step_increase in STEPS0; eauto. }
+        { i. eapply rtc_implies in STEPS_TGT.
+          2:{ instantiate (1:=@Thread.tau_step _). i. inv H. inv TSTEP. econs; eauto. econs; eauto. }
+          eapply unchangable_rtc_tau_step_increase in STEPS_TGT; eauto. }
+      }
+      { i. eapply unchangable_rtc_tau_step_increase in STEPS; eauto. }
+      { auto. }
     }
     { eauto. }
     { eauto. }
@@ -1012,8 +1030,8 @@ Section Simulation.
     forall (WF_SRC: Configuration.wf (Configuration.mk ths_src0 sc_src0 mem_src0))
            (WF_TGT: Configuration.wf (Configuration.mk ths_tgt0 sc_tgt0 mem_tgt0)),
       (<<TERMINAL:
-        forall (TERMINAL_TGT: Threads.is_terminal ths_tgt0),
-          (<<FAILURE: Configuration.steps_failure (Configuration.mk ths_src0 sc_src0 mem_src0)>>) \/
+         forall (TERMINAL_TGT: d_na_terminal_steps loc_na (IdentSet.elements (Threads.tids ths_tgt0)) (Configuration.mk ths_tgt0 sc_tgt0 mem_tgt0)),
+           (<<FAILURE: Configuration.steps_failure (Configuration.mk ths_src0 sc_src0 mem_src0)>>) \/
             exists ths_src1 sc_src1 mem_src1,
               (<<STEPS_SRC: rtc Configuration.tau_step (Configuration.mk ths_src0 sc_src0 mem_src0) (Configuration.mk ths_src1 sc_src1 mem_src1)>>) /\
               (<<TERMINAL_SRC: Threads.is_terminal ths_src1>>)>>) /\
@@ -1051,7 +1069,7 @@ Lemma sim_adequacy
       (WF_SRC: Configuration.wf (Configuration.mk ths_src sc_src mem_src))
       (WF_TGT: Configuration.wf (Configuration.mk ths_tgt sc_tgt mem_tgt))
       (SIM: sim ths_src sc_src mem_src ths_tgt sc_tgt mem_tgt):
-  behaviors (d_na_step loc_na) (Configuration.mk ths_tgt sc_tgt mem_tgt) <2=
+  delayed_na_behaviors loc_na (Configuration.mk ths_tgt sc_tgt mem_tgt) <2=
   behaviors Configuration.step (Configuration.mk ths_src sc_src mem_src).
 Proof.
   s. i.
@@ -1061,7 +1079,7 @@ Proof.
   revert ths_tgt sc_tgt mem_tgt Heqt.
   induction PR; i; subst.
   - punfold SIM0. exploit SIM0; eauto; try refl. i. des.
-    exploit TERMINAL0; eauto. i. des.
+    exploit TERMINAL; eauto. i. des.
     + inv FAILURE. des.
       eapply rtc_tau_step_behavior; eauto.
       econs 3. eauto.
@@ -1210,6 +1228,187 @@ Proof.
   rewrite <- EVENT_FAILURE. econs; eauto; ss.
 Qed.
 
+Lemma sim_threads_terminal_step
+      (tids: Ident.t -> Prop)
+      ths_src0 sc_src0 mem_src0
+      ths_tgt0 sc_tgt0 mem_tgt0 w0
+      ths_tgt1 sc_tgt1 mem_tgt1
+      tid
+      (TIDS: Threads.tids ths_src0 = Threads.tids ths_tgt0)
+      (SIM: forall tid0 lang_src st_src lc_src lang_tgt st_tgt lc_tgt
+                   (IN: tids tid0),
+          IdentMap.find tid0 ths_src0 = Some (existT _ lang_src st_src, lc_src) ->
+          IdentMap.find tid0 ths_tgt0 = Some (existT _ lang_tgt st_tgt, lc_tgt) ->
+          @sim_thread_wf_past lang_src lang_tgt w0 st_src lc_src sc_src0 mem_src0 st_tgt lc_tgt sc_tgt0 mem_tgt0)
+      (TERMINAL: forall tid0 lang_src st_src lc_src
+                        (NIN: ~ tids tid0),
+          IdentMap.find tid0 ths_src0 = Some (existT _ lang_src st_src, lc_src) ->
+          (<<STATE: (Language.is_terminal lang_src) st_src>>) /\ (<<THREAD: Local.is_terminal lc_src>>))
+      (WF_SRC: Configuration.wf (Configuration.mk ths_src0 sc_src0 mem_src0))
+      (WF_TGT: Configuration.wf (Configuration.mk ths_tgt0 sc_tgt0 mem_tgt0))
+      (STEP_TGT: d_na_terminal_step loc_na tid (Configuration.mk ths_tgt0 sc_tgt0 mem_tgt0) (Configuration.mk ths_tgt1 sc_tgt1 mem_tgt1))
+      (NTID: tids tid)
+  :
+    (<<FAILURE: Configuration.steps_failure (Configuration.mk ths_src0 sc_src0 mem_src0)>>) \/
+    exists ths_src1 sc_src1 mem_src1 w1,
+      (<<STEPS_SRC: rtc Configuration.tau_step (Configuration.mk ths_src0 sc_src0 mem_src0) (Configuration.mk ths_src1 sc_src1 mem_src1)>>) /\
+      (<<SIM: forall tid0 lang_src st_src lc_src lang_tgt st_tgt lc_tgt
+                     (IN: tids tid0)
+                     (NEQ: tid0 <> tid),
+          IdentMap.find tid0 ths_src1 = Some (existT _ lang_src st_src, lc_src) ->
+          IdentMap.find tid0 ths_tgt1 = Some (existT _ lang_tgt st_tgt, lc_tgt) ->
+          @sim_thread_wf_past lang_src lang_tgt w1 st_src lc_src sc_src1 mem_src1 st_tgt lc_tgt sc_tgt1 mem_tgt1>>) /\
+      (<<TERMINAL: forall tid0 lang_src st_src lc_src
+                          (TID: tid0 = tid \/ ~ tids tid0),
+          IdentMap.find tid0 ths_src1 = Some (existT _ lang_src st_src, lc_src) ->
+          (<<STATE: (Language.is_terminal lang_src) st_src>>) /\ (<<THREAD: Local.is_terminal lc_src>>)>>) /\
+      (<<TIDS: Threads.tids ths_src1 = Threads.tids ths_tgt1>>)
+.
+Proof.
+  i. inv STEP_TGT. dup STEP. inv STEP. ss.
+  destruct (IdentMap.find tid ths_src0) as [[[lang_src st_src] lc_src]|] eqn:FIND_SRC; cycle 1.
+  { remember (Threads.tids ths_src0) as tids0 eqn:TIDS_SRC.
+    exploit tids_find; [exact TIDS_SRC|exact TIDS|..]. i. des.
+    exploit x1; eauto. i. des. rewrite FIND_SRC in x. inv x. }
+  dup WF_SRC. dup WF_TGT.
+  inv WF_SRC. inv WF_TGT. inv WF. inv WF0. ss.
+  exploit SIM; eauto. i.
+  hexploit sim_thread_wf_past_terminal; eauto. i. des.
+  { left. eapply thread_failure_configuration_failure; eauto. }
+  { hexploit thread_rtc_step_rtc_step; [eapply WF_SRC0|..]; eauto.
+    { ii. right. esplits; eauto. inv LOCAL_SRC. ss. }
+    i. right. esplits; eauto.
+    { instantiate (1:=w1).
+      i. hexploit DConfiguration.terminal_step_future; eauto. i. des.
+      hexploit Configuration.rtc_step_future; eauto. i. des. ss.
+      inv WF0. inv WF2. ss. inv WF. inv WF0.
+      exploit THREADS1; eauto. i. exploit THREADS2; eauto. i.
+      erewrite IdentMap.gso in H0; auto. erewrite IdentMap.gso in H1; auto.
+      hexploit SIM; eauto. i.
+      eapply sim_thread_wf_past_update; eauto.
+      { eapply Memory.future_future_weak; eauto. }
+      { eapply Memory.future_future_weak; eauto. }
+      { eapply world_messages_le_mon; eauto.
+        { destruct lc_src0, lc_src. eapply other_promise_unchangable; eauto. }
+        { destruct lc_tgt, lc1. eapply other_promise_unchangable; eauto. }
+      }
+    }
+    { i. ss. des.
+      { subst. erewrite IdentMap.gss in H0. dependent destruction H0; eauto. }
+      { erewrite IdentMap.gso in H0; eauto.
+        ii. subst. eapply TID0; eauto.
+      }
+    }
+    { rewrite ! Threads.tids_add. f_equal; auto. }
+  }
+Qed.
+
+Lemma sim_threads_terminal_steps
+      ths_src0 sc_src0 mem_src0
+      ths_tgt0 sc_tgt0 mem_tgt0 w0
+      tids
+      (STEPS_TGT: d_na_terminal_steps loc_na tids (Configuration.mk ths_tgt0 sc_tgt0 mem_tgt0))
+      (WF_SRC: Configuration.wf (Configuration.mk ths_src0 sc_src0 mem_src0))
+      (WF_TGT: Configuration.wf (Configuration.mk ths_tgt0 sc_tgt0 mem_tgt0))
+      (SIM: forall tid0 lang_src st_src lc_src lang_tgt st_tgt lc_tgt
+                   (IN: List.In tid0 tids),
+          IdentMap.find tid0 ths_src0 = Some (existT _ lang_src st_src, lc_src) ->
+          IdentMap.find tid0 ths_tgt0 = Some (existT _ lang_tgt st_tgt, lc_tgt) ->
+          @sim_thread_wf_past lang_src lang_tgt w0 st_src lc_src sc_src0 mem_src0 st_tgt lc_tgt sc_tgt0 mem_tgt0)
+      (TERMINAL: forall tid lang_src st_src lc_src
+                        (NIN: ~ List.In tid tids),
+          IdentMap.find tid ths_src0 = Some (existT _ lang_src st_src, lc_src) ->
+          (<<STATE: (Language.is_terminal lang_src) st_src>>) /\ (<<THREAD: Local.is_terminal lc_src>>))
+      (TIDS: Threads.tids ths_src0 = Threads.tids ths_tgt0)
+  :
+    (<<FAILURE: Configuration.steps_failure (Configuration.mk ths_src0 sc_src0 mem_src0)>>) \/
+    exists ths_src1 sc_src1 mem_src1,
+      (<<STEPS_SRC: rtc Configuration.tau_step (Configuration.mk ths_src0 sc_src0 mem_src0) (Configuration.mk ths_src1 sc_src1 mem_src1)>>) /\
+      (<<TERMINAL: forall tid0 lang_src st_src lc_src,
+          IdentMap.find tid0 ths_src1 = Some (existT _ lang_src st_src, lc_src) ->
+          (<<STATE: (Language.is_terminal lang_src) st_src>>) /\ (<<THREAD: Local.is_terminal lc_src>>)>>)
+.
+Proof.
+  remember (Configuration.mk ths_tgt0 sc_tgt0 mem_tgt0) as c_tgt0.
+  revert ths_src0 sc_src0 mem_src0 ths_tgt0 sc_tgt0 mem_tgt0 w0 WF_SRC WF_TGT SIM TERMINAL TIDS Heqc_tgt0.
+  induction STEPS_TGT; i; subst.
+  { right. esplits; eauto. }
+  { destruct c2. ss.
+    hexploit (@sim_threads_terminal_step (fun tid0 => List.In tid0 (tid::tids))).
+    { eapply TIDS. }
+    { i. eapply SIM0; eauto. }
+    { i. eapply TERMINAL; eauto. }
+    { eauto. }
+    { eauto. }
+    { eauto. }
+    { ss. eauto. }
+    i. des.
+    { left. eauto. }
+    inv STEP. hexploit DConfiguration.terminal_step_future; eauto. i. des; ss.
+    hexploit Configuration.rtc_step_future; eauto. i. des; ss.
+    hexploit IHSTEPS_TGT.
+    { eapply WF0. }
+    { eapply WF2. }
+    { i. eapply SIM1; eauto. ii. subst. eauto. }
+    { i. eapply TERMINAL0; [|eauto]. destruct (Ident.eq_dec tid0 tid); auto.
+      right. ii. des; clarify.
+    }
+    { auto. }
+    { auto. }
+    i. des.
+    { red in FAILURE. des. left. repeat red. esplits.
+      { etrans; eauto. }
+      { eauto. }
+    }
+    { right. esplits.
+      { etrans; eauto. }
+      i. eauto.
+    }
+  }
+  { inv STEP. inv STEP0. ss.
+    destruct (IdentMap.find tid ths_src0) as [[[lang_src st_src] lc_src]|] eqn:FIND_SRC; cycle 1.
+    { remember (Threads.tids ths_src0) as tids0 eqn:TIDS_SRC.
+      exploit tids_find; [exact TIDS_SRC|exact TIDS|..]. i. des.
+      exploit x1; eauto. i. des. rewrite FIND_SRC in x. inv x. }
+    hexploit SIM0; eauto. i.
+    hexploit sim_thread_wf_past_dsteps_full; eauto. i. des; ss.
+    { left. eapply thread_failure_configuration_failure; eauto. }
+    { left. inv EVENT. eapply thread_failure_configuration_failure; eauto.
+      replace pf_src with true in *.
+      2:{ inv STEPS1; inv STEP; ss. }
+      repeat red. esplits; eauto.
+    }
+  }
+Qed.
+
+Lemma sim_threads_terminal
+      ths_src0 sc_src0 mem_src0
+      ths_tgt0 sc_tgt0 mem_tgt0 w0
+      (STEPS_TGT: d_na_terminal_steps loc_na (IdentSet.elements (Threads.tids ths_tgt0)) (Configuration.mk ths_tgt0 sc_tgt0 mem_tgt0))
+      (WF_SRC: Configuration.wf (Configuration.mk ths_src0 sc_src0 mem_src0))
+      (WF_TGT: Configuration.wf (Configuration.mk ths_tgt0 sc_tgt0 mem_tgt0))
+      (SIM: forall tid lang_src st_src lc_src lang_tgt st_tgt lc_tgt,
+          IdentMap.find tid ths_src0 = Some (existT _ lang_src st_src, lc_src) ->
+          IdentMap.find tid ths_tgt0 = Some (existT _ lang_tgt st_tgt, lc_tgt) ->
+          @sim_thread_wf_past lang_src lang_tgt w0 st_src lc_src sc_src0 mem_src0 st_tgt lc_tgt sc_tgt0 mem_tgt0)
+      (TIDS: Threads.tids ths_src0 = Threads.tids ths_tgt0)
+  :
+    (<<FAILURE: Configuration.steps_failure (Configuration.mk ths_src0 sc_src0 mem_src0)>>) \/
+    exists ths_src1 sc_src1 mem_src1,
+      (<<STEPS_SRC: rtc Configuration.tau_step (Configuration.mk ths_src0 sc_src0 mem_src0) (Configuration.mk ths_src1 sc_src1 mem_src1)>>) /\
+      (<<TERMINAL: forall tid0 lang_src st_src lc_src,
+          IdentMap.find tid0 ths_src1 = Some (existT _ lang_src st_src, lc_src) ->
+          (<<STATE: (Language.is_terminal lang_src) st_src>>) /\ (<<THREAD: Local.is_terminal lc_src>>)>>)
+.
+Proof.
+  eapply sim_threads_terminal_steps; eauto.
+  i. exfalso. eapply NIN.
+  cut (SetoidList.InA eq tid (IdentSet.elements (Threads.tids ths_src0))).
+  { rewrite <- TIDS. clear. i. induction H; ss; eauto. }
+  eapply IdentSet.elements_spec1. eapply LocSet.Facts.mem_2.
+  rewrite Threads.tids_o. rewrite H. auto.
+Qed.
+
 Lemma sim_threads_sim
       ths_src sc0_src mem0_src
       ths_tgt sc0_tgt mem0_tgt w
@@ -1226,91 +1425,7 @@ Proof.
   revert w ths_src sc0_src mem0_src ths_tgt sc0_tgt mem0_tgt tids TIDS_SRC TIDS_TGT SIM.
   pcofix CIH. i. pfold. ii. splits.
   - (* TERMINAL CASE *)
-    assert (NOTIN: forall tid lang_src st_src lc_src
-                     (FIND: IdentMap.find tid ths_src = Some (existT _ lang_src st_src, lc_src))
-                     (TID: ~ List.In tid (IdentSet.elements tids)),
-               Language.is_terminal _ st_src /\ Local.is_terminal lc_src).
-    { i. destruct (IdentSet.mem tid tids) eqn:MEM.
-      - exfalso. apply TID. rewrite IdentSet.mem_spec in MEM.
-        rewrite <- IdentSet.elements_spec1 in MEM.
-        clear - MEM. induction MEM; [econs 1|econs 2]; auto.
-      - rewrite TIDS_SRC in MEM. rewrite Threads.tids_o in MEM.
-        destruct (IdentMap.find tid ths_src) eqn:IFIND; [inv MEM|]. ss. }
-    assert (IN: forall tid lang_src st_src lc_src lang_tgt st_tgt lc_tgt
-                  (TID: List.In tid (IdentSet.elements tids)),
-               IdentMap.find tid ths_src = Some (existT _ lang_src st_src, lc_src) ->
-               IdentMap.find tid ths_tgt = Some (existT _ lang_tgt st_tgt, lc_tgt) ->
-               @sim_thread_wf_past lang_src lang_tgt w st_src lc_src sc0_src mem0_src st_tgt lc_tgt sc0_tgt mem0_tgt).
-    { i. hexploit SIM0; eauto. }
-    assert (TIDS_MEM: forall tid, List.In tid (IdentSet.elements tids) -> IdentSet.mem tid tids = true).
-    { i. rewrite IdentSet.mem_spec.
-      rewrite <- IdentSet.elements_spec1.
-      eapply SetoidList.In_InA; auto. }
-    assert (NODUP: List.NoDup (IdentSet.elements tids)).
-    { specialize (IdentSet.elements_spec2w tids). i.
-      clear - H. induction H; econs; eauto. }
-    revert NOTIN IN TIDS_MEM NODUP.
-    move tids at top. clear SIM0. revert_until CIH.
-    induction (IdentSet.elements tids); i.
-    { right. esplits; eauto; try refl. ii. exploit NOTIN; eauto. }
-    destruct (IdentMap.find a ths_src) as [[[lang_src st_src] lc_src]|] eqn:ASRC;
-      destruct (IdentMap.find a ths_tgt) as [[[lang_tgt st_tgt] lc_tgt]|] eqn:ATGT; cycle 1.
-    { exploit tids_find; [apply TIDS_SRC|apply TIDS_TGT|..]. i. des.
-      exploit x0; eauto. i. des. rewrite ATGT in x. inv x. }
-    { exploit tids_find; [apply TIDS_SRC|apply TIDS_TGT|..]. i. des.
-      exploit x1; eauto. i. des. rewrite ASRC in x. inv x. }
-    { exploit IHl; [exact TIDS_SRC|exact TIDS_TGT|..]; eauto; i.
-      - eapply NOTIN; eauto. ii. inv H; ss. congr.
-      - exploit IN; eauto.
-      - eapply TIDS_MEM; eauto. econs 2; eauto.
-      - inv NODUP. ss.
-    }
-    generalize WF_SRC. intro X. inv X. ss. inv WF. exploit THREADS; eauto. i.
-    generalize WF_TGT. intro X. inv X. inv WF.
-    ss. exploit THREADS0; eauto. i.
-    exploit (IN a); eauto. i. des.
-    hexploit sim_thread_wf_past_terminal; eauto.
-    { exploit TERMINAL_TGT; eauto. i. des. eauto. }
-    { exploit TERMINAL_TGT; eauto. i. des. inv THREAD. eauto. }
-    i. des.
-    + (* failure *)
-      left. unfold Thread.steps_failure in FAILURE. des.
-      exploit Thread.rtc_tau_step_future; try exact STEPS; eauto. s. i. des.
-      exploit Thread.step_future; try exact STEP_FAILURE; eauto. s. i. des.
-      unfold Configuration.steps_failure.
-      destruct e3. ss.
-      esplits; [refl|]. rewrite <- EVENT_FAILURE. econs; eauto. destruct e; ss.
-    + (* non-failure *)
-      exploit thread_rtc_step_rtc_step; [eapply WF_SRC|eauto|exact STEPS|..].
-      { ii. right. esplits; [refl|..]. ss. eapply LOCAL_SRC. } i. des; auto.
-      exploit Configuration.rtc_step_future; try eapply x3; eauto. s. i. des.
-      exploit IHl; [| |eapply WF2|eapply WF_TGT|..]; eauto; i.
-      { rewrite Threads.tids_add. rewrite IdentSet.add_mem; eauto. }
-      { rewrite IdentMap.gsspec in FIND. revert FIND. condtac; ss; i.
-        - subst. Configuration.simplify.
-        - eapply NOTIN; eauto. ii. des; ss. subst. ss. }
-      { rewrite IdentMap.gsspec in H. revert H. condtac; ss; i.
-        - subst. inv NODUP. congr.
-        - hexploit IN; eauto. i.
-          inv WF2. ss.
-          eapply sim_thread_wf_past_update; eauto.
-          { refl. }
-          { eapply Memory.future_future_weak; eauto. }
-          { refl. }
-          { eapply world_messages_le_mon; [eauto|..].
-            { destruct lc_src0, lc_src. eapply other_promise_unchangable; eauto. }
-            { destruct lc_tgt0, lc_tgt. eapply other_promise_unchangable; eauto. }
-          }
-          { inv WF. eapply THREADS1. erewrite IdentMap.gso; eauto. }
-          { refl. }
-      }
-      { inv NODUP. ss. }
-      des.
-      * left.
-        unfold Configuration.steps_failure in *. des. esplits; [|eauto].
-        etrans; eauto.
-      * right. esplits; cycle 1; eauto.
-        { etrans; eauto. }
+    subst. i. eapply sim_threads_terminal; eauto.
 
   - (* STEP CASE *)
     i. inv STEP_TGT. dup STEP. inv STEP. ss.
@@ -1425,7 +1540,7 @@ Lemma sim_init (s_src s_tgt: Threads.syntax) (w_init: world)
       (MEM: sim_memory w_init Memory.init Memory.init)
       (SC: sim_timemap w_init TimeMap.bot TimeMap.bot)
   :
-    behaviors (d_na_step loc_na) (Configuration.init s_tgt) <2=
+    delayed_na_behaviors loc_na (Configuration.init s_tgt) <2=
     behaviors Configuration.step (Configuration.init s_src).
 Proof.
   destruct (classic (exists tid lang syn,
