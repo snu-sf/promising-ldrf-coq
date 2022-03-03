@@ -42,7 +42,7 @@ Require Import SeqLiftCertification.
 Require Import SeqLiftInterference.
 Require Import gSimulation.
 Require Import DelayedSimulation.
-Require Import SequentialAdequacy.
+Require Import SequentialRefinement.
 Require Import Simple.
 
 Require Import Pred.

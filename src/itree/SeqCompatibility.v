@@ -647,6 +647,30 @@ Proof.
   i. inv PR. econs; eauto.
 Qed.
 
+Lemma sim_seq_all_refl lang (prog: lang.(Language.state) )
+  :
+    @sim_seq_all _ _ eq prog prog.
+Proof.
+  ii. generalize (@SeqState.mk lang prog m). revert p. clear prog m.
+  pcofix CIH. pfold. econs.
+  { ii. esplits; eauto.
+    { refl. }
+    { refl. }
+  }
+  { ii. esplits; eauto.
+    { econs; eauto. }
+  }
+  { ii. esplits; eauto.
+    { refl. }
+    { i. esplits; eauto. eapply SeqEvent.input_match_bot. }
+  }
+  { ii. esplits; eauto.
+    { econs. }
+    { econs. }
+    { left. ss. refl. }
+  }
+Qed.
+
 Lemma sim_itree_refl R (itr: itree MemE.t R)
   :
     sim_seq_itree eq itr itr.
