@@ -235,12 +235,12 @@ Section SIMAUX.
       + inv LOCAL; ss; clarify. inv STEP; ss; clarify.
         destruct ord; ss; clarify.
       + inv LOCAL; ss; clarify. inv STEP; ss; clarify.
-        * apply andb_prop in ATOMIC. des. destruct ORD.
-          { destruct ordr; ss. }
-          { destruct ordw; ss. }
-        * unfold ubM in NOUB. clarify.
+        destruct ORD.
+        { destruct ordr; ss. }
+        { destruct ordw; ss. }
+        unfold ubM in NOUB. clarify.
       + inv LOCAL; ss; clarify. inv STEP; ss; clarify.
-        * apply andb_prop in ATOMIC; des. destruct ordr; ss.
+        * destruct ordr; ss.
         * destruct ordr; ss.
       + inv LOCAL; ss; clarify.
       + inv LOCAL; ss; clarify.

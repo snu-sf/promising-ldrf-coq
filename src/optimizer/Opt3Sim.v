@@ -87,7 +87,7 @@ Section ML.
         (ML: match_le tb2 src tgt)
     :
       match_le tb1 src tgt.
-  Proof. unfold match_le in *. i. eauto. Qed.
+  Proof. unfold match_le in *. i. unfold le in LE. eapply ML. eapply LE. eapply H. Qed.
 
   Lemma ml_expr
         tb ex src tgt
@@ -245,9 +245,9 @@ Section SIM.
         + eapply sim_seq_atomic; eauto.
           { eapply partial_same_mem; eauto. }
           { i. inv H. inv LOCAL; ss; clarify.
-            - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
-            - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
-            - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
+            - inv LANG. irw in H. apply eq_is_bisim in H. eapply eqitree_inv_Vis_r in H. des. ss.
+            - inv LANG. irw in H. apply eq_is_bisim in H. eapply eqitree_inv_Vis_r in H. des. ss.
+            - inv LANG. irw in H. apply eq_is_bisim in H. eapply eqitree_inv_Vis_r in H. des. ss.
           }
           { ss. do 2 eexists. esplits. rewrite bind_trigger. eapply ILang.step_read; eauto. ss. }
           ii. ss.
@@ -308,15 +308,9 @@ Section SIM.
         + eapply sim_seq_atomic; eauto.
           eapply partial_same_mem; eauto.
           { i. inv H. inv LOCAL; ss; clarify.
-            - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des.
-              (* easier way? *)
-              symmetry in H. eapply simpobs in H.
-              eapply eqit_inv_vis in H. des. unfold subevent in H.
-              unfold resum, IFun in H. unfold ReSum_id in H. unfold id_ in H.
-              unfold Id_IFun in H. clarify.
-              destruct ord; ss.
-            - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
-            - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
+            - inv LANG. irw in H. inv H. destruct ord; ss.
+            - inv LANG. irw in H. inv H.
+            - inv LANG. irw in H. inv H.
           }
           { ss. do 2 eexists. esplits. rewrite bind_trigger. eapply ILang.step_write; eauto. ss. }
           ii. ss. irw in STEP_TGT.
@@ -373,9 +367,7 @@ Section SIM.
         + (*na case*)
           gstep. econs 1.
           { ii. ss. unfold ILang.is_terminal in TERMINAL_TGT. des.
-            irw in TERMINAL_TGT. symmetry in TERMINAL_TGT.
-            eapply eq_is_bisim in TERMINAL_TGT. eapply eqitree_inv_ret_vis in TERMINAL_TGT.
-            clarify.
+            irw in TERMINAL_TGT. inv TERMINAL_TGT.
           }
           2:{ ii. ss. rewrite bind_trigger in STEP_TGT.
               apply Bool.orb_true_elim in ORD. destruct ORD as [ORD | ORD].
@@ -447,15 +439,10 @@ Section SIM.
           eapply sim_seq_atomic; eauto.
           { eapply partial_same_mem; eauto. }
           { i. inv H. inv LOCAL; ss; clarify.
-            - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
-            - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
-            - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des.
-              (* easier way? *)
-              symmetry in H. eapply simpobs in H.
-              eapply eqit_inv_vis in H. des. unfold subevent in H.
-              unfold resum, IFun in H. unfold ReSum_id in H. unfold id_ in H.
-              unfold Id_IFun in H. clarify.
-              unfold __guard__ in ORD1. des; clarify.
+            - inv LANG. irw in H. apply eq_is_bisim in H. eapply eqitree_inv_Vis_r in H. des. ss.
+            - inv LANG. irw in H. apply eq_is_bisim in H. eapply eqitree_inv_Vis_r in H. des. ss.
+            - inv LANG. irw in H. inv H.
+              unfold __guard__ in ORD1. des; [destruct ordr; ss | destruct ordw; ss].
           }
           { ss. destruct rmw.
             - do 2 eexists. esplits. rewrite bind_trigger.
@@ -512,9 +499,9 @@ Section SIM.
         eapply sim_seq_atomic; eauto.
         { apply partial_same_mem; eauto. }
         { i. inv H. inv LOCAL; ss; clarify.
-          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
-          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
-          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
+          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eqitree_inv_Vis_r in H. des. ss.
+          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eqitree_inv_Vis_r in H. des. ss.
+          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eqitree_inv_Vis_r in H. des. ss.
         }
         { ss. do 2 eexists. esplits. rewrite bind_trigger. eapply ILang.step_fence; eauto. ss. }
         ii. ss. irw in STEP_TGT. inv STEP_TGT. ss; clarify.
@@ -532,9 +519,9 @@ Section SIM.
         eapply sim_seq_atomic; eauto.
         apply partial_same_mem; auto.
         { i. inv H. inv LOCAL; ss; clarify.
-          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
-          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
-          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
+          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eqitree_inv_Vis_r in H. des. ss.
+          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eqitree_inv_Vis_r in H. des. ss.
+          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eqitree_inv_Vis_r in H. des. ss.
         }
         { ss. do 2 eexists. esplits. rewrite bind_trigger. eapply ILang.step_syscall; eauto. ss. }
         ii. ss. irw in STEP_TGT. inv STEP_TGT. ss; clarify.

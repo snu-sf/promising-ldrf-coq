@@ -2,14 +2,14 @@ COQMODULE    := Promising2
 COQTHEORIES  := \
 	src/lang/*.v \
 	src/itree/*.v \
-	src/itree/seq_opts/*.v \
 	src/prop/*.v \
-	src/opt/*.v \
+	src/transformation/*.v \
 	src/sequential/*.v \
 	src/promotion/*.v \
 	src/ldrfpf/*.v \
 	src/ldrfra/*.v \
 	src/ldrfsc/*.v \
+	src/optimizer/*.v \
 
 .PHONY: all theories clean
 
@@ -25,12 +25,13 @@ Makefile.coq: Makefile $(COQTHEORIES)
 	(echo "-R src/lang $(COQMODULE)"; \
    echo "-R src/itree $(COQMODULE)"; \
    echo "-R src/prop $(COQMODULE)"; \
-   echo "-R src/opt $(COQMODULE)"; \
+   echo "-R src/transformation $(COQMODULE)"; \
    echo "-R src/sequential $(COQMODULE)"; \
    echo "-R src/promotion $(COQMODULE)"; \
    echo "-R src/ldrfpf $(COQMODULE)"; \
    echo "-R src/ldrfra $(COQMODULE)"; \
    echo "-R src/ldrfsc $(COQMODULE)"; \
+   echo "-R src/optimizer $(COQMODULE)"; \
    \
    echo $(COQTHEORIES)) > _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq
