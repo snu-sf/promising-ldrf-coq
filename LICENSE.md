@@ -1,5 +1,7 @@
 MIT License
 
+Copyright (c) 2022 Minki Cho, Sung-Hwan Lee, Dongjae Lee, Chung-Kil Hur, Ori Lahav
+
 Copyright (c) 2021 Minki Cho, Sung-Hwan Lee, Chung-Kil Hur, Ori Lahav
 
 Copyright (c) 2020 Sung-Hwan Lee, Minki Cho, Anton Podkopaev, Soham Chakraborty, Chung-Kil Hur, Ori Lahav, Viktor Vafeiadis
