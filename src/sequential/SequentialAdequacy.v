@@ -240,10 +240,10 @@ Section ADEQUACY.
   Qed.
 
   Theorem sequential_adequacy_context A B
-          (ctx_seq: itree MemE.t A -> itree MemE.t B)
-          (ctx_ths: Threads.syntax) (tid: Ident.t)
           (prog_src prog_tgt: (lang A).(Language.syntax))
           (SIM: sim_seq_itree eq prog_src prog_tgt)
+          (ctx_seq: itree MemE.t A -> itree MemE.t B)
+          (ctx_ths: Threads.syntax) (tid: Ident.t)
           (CTX: @itree_context A B ctx_seq)
           (NOMIX_SRC: nomix loc_na loc_at _ ((lang A).(Language.init) prog_src))
           (NOMIX_TGT: nomix loc_na loc_at _ ((lang A).(Language.init) prog_tgt))
@@ -262,4 +262,73 @@ Section ADEQUACY.
     { clear NOMIX_TGT. exploit itree_nomix_context; eauto. }
     { clear NOMIX_SRC. exploit itree_nomix_context; eauto. }
   Qed.
+
+  Require Import WRforwarding.
+  Require Import WRforwardingProof2.
+
+  Theorem WRforwarding_sound A
+          (code: ITreeLang.block)
+          (prog_src prog_tgt: (lang Const.t).(Language.syntax))
+          (PROG_SRC: prog_src = eval_lang code)
+          (PROG_TGT: prog_tgt = eval_lang (WRfwd_opt_alg code))
+          (ctx_seq: itree MemE.t Const.t -> itree MemE.t A)
+          (ctx_ths: Threads.syntax) (tid: Ident.t)
+          (CTX: @itree_context Const.t A ctx_seq)
+          (NOMIX_SRC: nomix loc_na loc_at _ ((lang Const.t).(Language.init) prog_src))
+          (NOMIX_TGT: nomix loc_na loc_at _ ((lang Const.t).(Language.init) prog_tgt))
+          (NOMIX_CTX: nomix_syntax loc_na loc_at ctx_ths)
+    :
+      behaviors
+        Configuration.step
+        (Configuration.init (IdentMap.add tid (existT _ (lang A) (ctx_seq prog_tgt)) ctx_ths))
+      <2=
+      behaviors
+        Configuration.step
+        (Configuration.init (IdentMap.add tid (existT _ (lang A) (ctx_seq prog_src)) ctx_ths)).
+  Proof.
+    eapply sequential_adequacy_context; eauto.
+
+    hexploit WRforwardingProof2.WRfwd_sim; ss. i.
+
+    unfold sim_seq_itree.
+    unfold Simple.sim_seq_itree in H.
+    unfold sim_seq_all in H.
+    unfold _sim_itree.
+
+Simple.sim_seq_itree in H.
+
+
+  Qed.
+subst. ii. eapply WRforwardingProof2.WRfwd_sim; ss.
+  Qed.
+x
+
+i.
+    ii. eapply H; eauto.
+
+exploit H; eauto. i.
+
+eapply H.
+
+ii. eapply H.
+
+sim_seq_itree
+
+    i.
+
+
+
+
+eval_lang
+
+WRfwd_opt_alg
+
+  Proof.
+    eapply sequential_adequacy_concurrent_context; auto.
+    { esplits. hexploit itree_sim_seq_context; eauto. ii. eapply H. }
+    { clear NOMIX_TGT. exploit itree_nomix_context; eauto. }
+    { clear NOMIX_SRC. exploit itree_nomix_context; eauto. }
+  Qed.
+
+
 End ADEQUACY.

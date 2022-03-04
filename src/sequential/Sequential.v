@@ -1630,32 +1630,3 @@ End SIM.
 End SIMULATION.
 Arguments sim_seq [_] [_] _ _ _.
 #[export] Hint Resolve sim_seq_mon: paco.
-
-
-
-
-
-Require Import ITreeLang.
-
-Definition SIM_VAL R_src R_tgt := forall (r_src:R_src) (r_tgt:R_tgt), Prop.
-
-Definition SIM_TERMINAL (lang_src lang_tgt:language) :=
-  forall (st_src:(Language.state lang_src)) (st_tgt:(Language.state lang_tgt)), Prop.
-
-Variant sim_terminal R_src R_tgt
-           (sim_ret:SIM_VAL R_src R_tgt)
-           (st_src: itree MemE.t R_src) (st_tgt: itree MemE.t R_tgt): Prop :=
-| sim_terminal_intro
-    r0 r1
-    (SIMRET: sim_ret r0 r1)
-    (SRC: st_src = Ret r0)
-    (TGT: st_tgt = Ret r1)
-.
-
-Section ITREE.
-  Variable R_src R_tgt: Type.
-  Variable sim_val: R_src -> R_tgt -> Prop.
-
-  Definition sim_seq_itree (st_src: itree MemE.t R_src) (st_tgt: itree MemE.t R_tgt): Prop :=
-    @sim_seq_all (lang R_src) (lang R_tgt) (sim_terminal sim_val) st_src st_tgt.
-End ITREE.

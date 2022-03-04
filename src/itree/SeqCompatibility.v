@@ -51,6 +51,24 @@ Require Import SimAux.
 Require Import SeqAux.
 
 
+
+Require Import ITreeLang.
+
+Definition SIM_VAL R_src R_tgt := forall (r_src:R_src) (r_tgt:R_tgt), Prop.
+
+Definition SIM_TERMINAL (lang_src lang_tgt:language) :=
+  forall (st_src:(Language.state lang_src)) (st_tgt:(Language.state lang_tgt)), Prop.
+
+Variant sim_terminal R_src R_tgt
+           (sim_ret:SIM_VAL R_src R_tgt)
+           (st_src: itree MemE.t R_src) (st_tgt: itree MemE.t R_tgt): Prop :=
+| sim_terminal_intro
+    r0 r1
+    (SIMRET: sim_ret r0 r1)
+    (SRC: st_src = Ret r0)
+    (TGT: st_tgt = Ret r1)
+.
+
 Definition SIM_SEQ :=
   forall (lang_src lang_tgt:language) (sim_terminal: SIM_TERMINAL lang_src lang_tgt)
          (p0: Perms.t) (d0: Flags.t)
