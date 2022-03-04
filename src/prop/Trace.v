@@ -43,7 +43,7 @@ Module Trace.
     :
       steps tr' th0 th2
   .
-  Hint Constructors steps.
+  #[global] Hint Constructors steps: core.
 
   Inductive steps_n1 lang: t -> (Thread.t lang) -> (Thread.t lang) -> Prop :=
   | steps_n1_refl
@@ -57,7 +57,7 @@ Module Trace.
     :
       steps_n1 (hds++[((Thread.local th1), tle)]) th0 th2
   .
-  Hint Constructors steps_n1.
+  #[global] Hint Constructors steps_n1: core.
 
   Lemma steps_n1_one lang (th0 th1: Thread.t lang) e pf
         (STEP: Thread.step pf e th0 th1)
@@ -374,7 +374,7 @@ Module ThreadTrace.
     :
       steps tr' th0 th2
   .
-  Hint Constructors steps.
+  #[global] Hint Constructors steps: core.
 
   Lemma steps_trans lang (th0 th1 th2: Thread.t lang) tr0 tr1
         (STEPS0: steps tr0 th0 th1)

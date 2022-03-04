@@ -1022,6 +1022,7 @@ Section LIFT.
       { red in ORD. destruct ordr, ordw; des; ss. }
     }
     i. des. subst. esplits; eauto.
+    { econs 2; eauto. econs; eauto. }
     pclearbot. auto.
   Qed.
 
@@ -1488,7 +1489,7 @@ Section LIFT.
       i. ss. des; subst.
       { assert (STEPS1: rtc (@Thread.tau_step _) (Thread.mk _ st0 lc0 sc0 mem0) (Thread.mk _ st4 lc2 sc2 mem2)).
         { etrans; [eauto|]. econs; [|refl]. econs; eauto.
-          econs. econs 2; eauto.
+          econs. econs 2; eauto. econs; eauto.
         }
         clear STEPS0 STEP.
         hexploit Thread.rtc_tau_step_future; eauto. i. des; ss.
@@ -1504,7 +1505,7 @@ Section LIFT.
           { auto. }
         }
       }
-      { left. splits. red. esplits; eauto. }
+      { left. splits. red. esplits; eauto. econs 2; eauto. econs; eauto. }
     }
     { destruct th1. destruct state0. inv TRACE.
       hexploit sim_lift_sol_at_step; eauto.

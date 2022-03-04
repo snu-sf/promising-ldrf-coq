@@ -143,7 +143,7 @@ Section MAPPED.
       + left. eauto.
       + i. timetac.
   Qed.
-  Hint Resolve map_lt_only_if.
+  Hint Resolve map_lt_only_if: core.
 
   Definition map_eq_iff
              loc t0 t1 ft0 ft1
@@ -156,7 +156,7 @@ Section MAPPED.
     split; i; clarify; eauto.
     exfalso. apply CLPS. eexists. eauto.
   Qed.
-  Hint Resolve map_eq_iff.
+  Hint Resolve map_eq_iff: core.
 
   Definition map_lt_iff
              loc t0 t1 ft0 ft1
@@ -175,7 +175,7 @@ Section MAPPED.
     - i. destruct x; auto. exfalso. apply CLPS.
       destruct H0. eexists. eauto.
   Qed.
-  Hint Resolve map_lt_iff.
+  Hint Resolve map_lt_iff: core.
 
   Definition map_le_iff
              loc t0 t1 ft0 ft1
@@ -190,7 +190,7 @@ Section MAPPED.
     - left. erewrite <- map_lt_iff; eauto.
     - right. eapply map_eq_iff; eauto.
   Qed.
-  Hint Resolve map_le_iff.
+  Hint Resolve map_le_iff: core.
 
   Definition timemap_map (tm ftm: TimeMap.t): Prop :=
     forall loc, f loc (tm loc) (ftm loc).
@@ -252,7 +252,7 @@ Section MAPPED.
     :
       memory_op_kind_map loc (Memory.op_kind_cancel) (Memory.op_kind_cancel)
   .
-  Hint Constructors memory_op_kind_map.
+  Hint Constructors memory_op_kind_map: core.
 
   Inductive tevent_map: ThreadEvent.t -> ThreadEvent.t -> Prop :=
   | tevent_map_promise
@@ -468,7 +468,7 @@ Section MAPPED.
         (ThreadEvent.racy_update loc fto valr valw ordr ordw)
         (ThreadEvent.racy_update loc to valr valw ordr ordw)
   .
-  Hint Constructors tevent_map_weak.
+  Hint Constructors tevent_map_weak: core.
 
   Lemma msg_map_msg_map_weak
         m fm
@@ -709,7 +709,7 @@ Section MAPPED.
     eapply memory_map2_memory_map.
     eapply promises_map_memory_map2; eauto.
   Qed.
-  Hint Resolve promises_map_memory_map.
+  Hint Resolve promises_map_memory_map: core.
 
   Lemma closed_timemap_map m fm tm ftm
         (MEM: memory_map m fm)
@@ -4275,7 +4275,7 @@ Section COMPOSE.
     :
       compose_map f0 f1 loc ts0 ts2
   .
-  Hint Constructors compose_map.
+  Hint Constructors compose_map: core.
 
   Lemma compose_map_eq f0 f1
         (MAPEQ0: mapping_map_eq f0)

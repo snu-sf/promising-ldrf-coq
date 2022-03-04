@@ -47,7 +47,7 @@ Module SConfiguration.
                    Thread.consistent (Thread.mk _ st4 lc4 sc4 memory4)):
       step e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) (Configuration.threads c1)) sc4 memory4)
   .
-  Hint Constructors step.
+  #[global] Hint Constructors step: core.
 
   Inductive steps:
     forall (es: list ThreadEvent.t) (tid: Ident.t) (c1 c2:Configuration.t), Prop :=
@@ -62,7 +62,7 @@ Module SConfiguration.
     :
       steps (ehd :: etl) tid c1 c3
   .
-  Hint Constructors steps.
+  #[global] Hint Constructors steps: core.
 
   Lemma steps_trans es0 es1 tid c0 c1 c2
         (STEPS0: steps es0 tid c0 c1)
@@ -96,7 +96,7 @@ Module SConfiguration.
       (CONSISTENT: Thread.consistent (Thread.mk _ st4 lc4 sc4 memory4)):
       reservation_only_step tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) (Configuration.threads c1)) sc4 memory4)
   .
-  Hint Constructors reservation_only_step.
+  #[global] Hint Constructors reservation_only_step: core.
 
   Lemma reservation_only_step_step tid c1 c2
         (STEP: reservation_only_step tid c1 c2)
@@ -182,7 +182,7 @@ Module SConfiguration.
     :
       machine_step (ThreadEvent.get_machine_event e) tid c1 c2
   .
-  Hint Constructors machine_step.
+  #[global] Hint Constructors machine_step: core.
 
   Inductive mixed_step:
     forall (e:ThreadEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
@@ -196,7 +196,7 @@ Module SConfiguration.
                    Thread.consistent (Thread.mk _ st4 lc4 sc4 memory4)):
       mixed_step e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) (Configuration.threads c1)) sc4 memory4)
   .
-  Hint Constructors mixed_step.
+  #[global] Hint Constructors mixed_step: core.
 
   Inductive opt_machine_step:
     forall (e: MachineEvent.t) (tid: Ident.t) (c1 c2: Configuration.t), Prop :=
@@ -208,7 +208,7 @@ Module SConfiguration.
       (STEP: machine_step e tid c1 c2):
       opt_machine_step e tid c1 c2
   .
-  Hint Constructors opt_machine_step.
+  #[global] Hint Constructors opt_machine_step: core.
 
   Definition tau_machine_step := union (machine_step MachineEvent.silent).
 
@@ -219,7 +219,7 @@ Module SConfiguration.
     :
       all_machine_step c1 c2
   .
-  Hint Constructors all_machine_step.
+  #[global] Hint Constructors all_machine_step: core.
 
   Lemma step_future
         e tid c1 c2
@@ -742,7 +742,7 @@ Module SConfiguration.
     }
     { assert (Thread.step true e0 e2 e3).
       { inv STEP; ss. inv STEP0; inv STEP; ss.
-        econs 2. inv LOCAL; eauto.
+        econs 2. inv LOCAL; econs; eauto.
       }
       hexploit reorder_failure_reserves; eauto. i. des.
       esplits; [|econs 1]. econs 2. rewrite <- EVENT. econs.

@@ -738,7 +738,7 @@ Section NA.
       { refl. } i. des.
       exists (ThreadEvent.write loc from to val released_src ord). esplits.
       { econs.
-        { econs 2; eauto. }
+        { econs 2; eauto. econs; eauto. }
         { ss. }
         { eapply VIEWSLE. }
         { ss. }
@@ -781,7 +781,7 @@ Section NA.
       { refl. } i. des.
       exists (ThreadEvent.update loc tsr tsw valr valw released_src released_src0 ordr ordw). esplits.
       { econs.
-        { econs 2; eauto. }
+        { econs 2; eauto. econs; eauto. }
         { ss. }
         { eapply VIEWSLE. }
         { ss. }
@@ -805,7 +805,7 @@ Section NA.
       i. des.
       exists (ThreadEvent.fence ordr ordw). esplits.
       { econs.
-        { econs 2; eauto. }
+        { econs 2; eauto. econs; eauto. }
         { ss. }
         { ss. }
         { ss. }
@@ -832,7 +832,7 @@ Section NA.
       i. des.
       exists (ThreadEvent.syscall e). esplits.
       { econs.
-        { econs 2; eauto. }
+        { econs 2; eauto. econs; eauto. }
         { ss. }
         { ss. }
         { ss. }
@@ -855,7 +855,7 @@ Section NA.
     { hexploit JSim.sim_local_failure; eauto. i. des.
       exists (ThreadEvent.failure). esplits.
       { econs.
-        { econs 2; eauto. }
+        { econs 2; eauto. econs; eauto. }
         { ss. }
         { ss. }
         { ss. }
@@ -873,7 +873,7 @@ Section NA.
       { refl. }
       i. eexists (ThreadEvent.racy_write _ _ _ _). esplits.
       { econs.
-        { econs 2; eauto. }
+        { econs 2; eauto. econs; eauto. }
         { ss. }
         { ss. }
         { ss. }
@@ -892,7 +892,7 @@ Section NA.
       { refl. }
       i. eexists (ThreadEvent.racy_update _ _ _ _ _ _). esplits.
       { econs.
-        { econs 2; eauto. }
+        { econs 2; eauto. econs; eauto. }
         { ss. }
         { ss. }
         { ss. }
@@ -1003,13 +1003,14 @@ Section NA.
       apply inj_pair2 in H2. apply inj_pair2 in H7. subst. auto. }
     subst. clear SIM0.
     inv STEP; ss.
+    hexploit Thread.step_program; eauto. intros _STEP.
     hexploit PromiseConsistent.step_promise_consistent; eauto. intros CONSISTENT0.
     hexploit pointable_joined_memory; eauto. intros POINTMEM.
     inv STEP0; ss. inv LOCAL0; ss.
     (* silent *)
     { eexists (ThreadEvent.silent). esplits.
       { econs.
-        { econs 2; eauto. }
+        { econs 2; eauto. econs; eauto. }
         { ss. }
         { ss. }
         { ss. }
@@ -1034,14 +1035,17 @@ Section NA.
         i. des; subst.
         { exists (ThreadEvent.read loc ts val released_src ord). esplits.
           { econs.
-            { econs 2; eauto. }
+            { econs 2; eauto. econs; eauto. }
             { ss. }
             { ss. }
             { ss. }
             { ss. }
             { ss. }
           }
-          { econs; eauto. ss. refl. }
+          { econs; eauto.
+            { econs; eauto. }
+            { ss. refl. }
+          }
           { ss. }
           { ss. }
           { ss. }
@@ -1049,14 +1053,17 @@ Section NA.
         }
         { exists (ThreadEvent.racy_read loc ts val ord). esplits.
           { econs.
-            { econs 2; eauto. }
+            { econs 2; eauto. econs; eauto. }
             { ss. }
             { ss. }
             { ss. }
             { ss. }
             { ss. }
           }
-          { econs; eauto. ss. refl. }
+          { econs; eauto.
+            { econs; eauto. }
+            { ss. refl. }
+          }
           { ss. }
           { ss. }
           { ss. }
@@ -1067,14 +1074,17 @@ Section NA.
       { refl. } i. des.
       exists (ThreadEvent.read loc ts val released_src ord). esplits.
       { econs.
-        { econs 2; eauto. }
+        { econs 2; eauto. econs; eauto. }
         { ss. }
         { ss. }
         { ss. }
         { ss. }
         { ss. }
       }
-      { econs; eauto. ss. refl. }
+      { econs; eauto.
+        { econs; eauto. }
+        { ss. refl. }
+      }
       { ss. }
       { ss. }
       { ss. }
@@ -1088,7 +1098,7 @@ Section NA.
       { refl. } i. des.
       exists (ThreadEvent.write loc from to val released_src ord). esplits.
       { econs.
-        { econs 2; eauto. }
+        { econs 2; eauto. econs; eauto. }
         { ss. }
         { eapply VIEWSLE. }
         { ss. }
@@ -1096,6 +1106,7 @@ Section NA.
         { ss. }
       }
       { econs; eauto; ss.
+        { econs; eauto. }
         { inv LOCAL1. inv STEP_SRC. ss.
           eapply write_lower_memory_lower in WRITE; eauto.
           eapply write_lower_lower_memory; eauto.
@@ -1148,7 +1159,7 @@ Section NA.
       { refl. } i. des.
       exists (ThreadEvent.update loc tsr tsw valr valw released_src released_src0 ordr ordw). esplits.
       { econs.
-        { econs 2; eauto. }
+        { econs 2; eauto. econs; eauto. }
         { ss. }
         { eapply VIEWSLE. }
         { ss. }
@@ -1156,6 +1167,7 @@ Section NA.
         { ss. }
       }
       { econs; eauto; ss.
+        { econs; eauto. }
         { inv LOCAL2. inv STEP_SRC0. ss.
           eapply write_lower_memory_lower in WRITE; eauto.
           eapply write_lower_lower_memory; eauto.
@@ -1179,14 +1191,17 @@ Section NA.
       i. des.
       exists (ThreadEvent.fence ordr ordw). esplits.
       { econs.
-        { econs 2; eauto. }
+        { econs 2; eauto. econs; eauto. }
         { ss. }
         { ss. }
         { ss. }
         { ss. }
         { ss. }
       }
-      { econs; eauto. ss. refl. }
+      { econs; eauto.
+        { econs; eauto. }
+        { ss. refl. }
+      }
       { ss. }
       { ss. }
       { ss. inv STEP_SRC. ss.
@@ -1203,7 +1218,7 @@ Section NA.
       { refl. } i. des.
       exists (ThreadEvent.write_na loc msgs from to val ord). esplits.
       { econs.
-        { econs 2; eauto. }
+        { econs 2; eauto. econs; eauto. }
         { ss. }
         { ss. }
         { ss. }
@@ -1233,6 +1248,7 @@ Section NA.
         }
         { inv KIND; ss. symmetry. eapply OPT; ss. }
         i. subst. econs; eauto.
+        { econs; eauto. }
         { refl. }
       }
       { ss. }
@@ -1250,14 +1266,17 @@ Section NA.
       { refl. } i. des.
       exists (ThreadEvent.racy_read loc to val ord). esplits.
       { econs.
-        { econs 2; eauto. }
+        { econs 2; eauto. econs; eauto. }
         { ss. }
         { ss. }
         { ss. }
         { ss. }
         { ss. }
       }
-      { econs; eauto. ss. refl. }
+      { econs; eauto.
+        { econs; eauto. }
+        { ss. refl. }
+      }
       { ss. }
       { ss. }
       { ss. }
@@ -1398,7 +1417,7 @@ Section NA.
     { inv TSTEP. econs 2; eauto. }
     all: eauto. i. des.
     hexploit PromiseConsistent.rtc_all_step_promise_consistent.
-    { eapply rtc_implies; [|eauto]. i. inv H. inv TSTEP0. econs; eauto. econs; eauto. }
+    { eapply rtc_implies; [|eauto]. i. inv H. inv TSTEP0. econs; eauto. econs; eauto. econs 2; eauto. }
     all: eauto. intros CONSISTENT1.
     punfold NOMIX. exploit NOMIX.
     { instantiate (2:=ThreadEvent.get_program_event e). instantiate (1:=y.(Thread.state)). inv TSTEP. inv STEP. eauto. }
@@ -1430,7 +1449,7 @@ Section NA.
     right.
     hexploit committed_trans.
     { inv STEP. econs 2; [|refl]. econs. econs. econs 2; eauto. }
-    { eapply rtc_implies; [|eauto]. i. inv H0. inv TSTEP0. econs; eauto. econs; eauto. }
+    { eapply rtc_implies; [|eauto]. i. inv H0. inv TSTEP0. econs; eauto. econs; eauto. econs 2; eauto. }
     intros COMMITTED. esplits.
     { econs 2; [|eauto]. econs.
       { eauto. }
@@ -1493,7 +1512,7 @@ Section NA.
     { instantiate (1:=@Thread.tau_step _). i. inv H. inv TSTEP. econs; eauto. }
     intros PROMISES_TGT.
     hexploit rtc_implies; [|eapply LOWERS|..].
-    { instantiate (1:=@Thread.tau_step _). i. inv H. inv TSTEP. econs; eauto. econs; eauto. }
+    { instantiate (1:=@Thread.tau_step _). i. inv H. inv TSTEP. econs; eauto. econs; eauto. econs 2; eauto. }
     intros LOWERS_TGT.
     hexploit Thread.rtc_tau_step_future; [eapply PROMISES_TGT|..]; eauto. i. des.
     hexploit Thread.rtc_tau_step_future; [eapply LOWERS_TGT|..]; eauto. i. des.
@@ -1514,7 +1533,7 @@ Section NA.
       { auto. }
     }
     hexploit rtc_implies; [|eapply STEPS_SRC0|..].
-    { instantiate (1:=@Thread.tau_step _). i. inv H. inv TSTEP. econs; eauto. econs; eauto. }
+    { instantiate (1:=@Thread.tau_step _). i. inv H. inv TSTEP. econs; eauto. econs; eauto. econs 2; eauto. }
     intros LOWERS_SRC.
     hexploit Thread.rtc_tau_step_future; [eapply LOWERS_SRC|..]; eauto. i. des.
     punfold NOMIX1. exploit NOMIX1.
@@ -1820,7 +1839,7 @@ Section NA.
         inv LOCAL; ss; inv LOCAL0; ss.
       }
       { eapply rtc_implies in STEPS0.
-        2:{ instantiate (1:=@Thread.tau_step _). i. inv H. inv TSTEP. econs; eauto. econs; eauto. }
+        2:{ instantiate (1:=@Thread.tau_step _). i. inv H. inv TSTEP. econs; eauto. econs; eauto. econs 2; eauto. }
         eapply PromiseConsistent.rtc_tau_step_promise_consistent in STEPS0; eauto.
         eapply Local.bot_promise_consistent; eauto.
       }
@@ -1896,7 +1915,7 @@ Section NA.
     ii. inv STEP.
     hexploit finalized_unchangable; eauto. i.
     eapply rtc_implies in STEPS.
-    2:{ instantiate (1:=@Thread.all_step _). i. inv H0. inv TSTEP. econs; eauto. econs; eauto. }
+    2:{ instantiate (1:=@Thread.all_step _). i. inv H0. inv TSTEP. econs; eauto. econs; eauto. econs 2; eauto. }
     hexploit unchangable_rtc_all_step_increase; eauto. i.
     inv H0. econs; eauto. i. ss.
     rewrite IdentMap.gsspec in TID0. des_ifs.
@@ -2031,7 +2050,7 @@ Section NA.
         (Configuration.mk ths_src sc_src mem_src)
         (Configuration.mk ths_tgt sc_tgt mem_tgt)
   .
-  Hint Constructors sim_configuration.
+  Hint Constructors sim_configuration: core.
 
   Variant pointable_configuration
           (views: Loc.t -> Time.t -> list View.t)
@@ -2243,7 +2262,7 @@ Section NA.
     hexploit THREADS; eauto. intros LOCALTGT.
     hexploit THREADS0; eauto. intros LOCALSRC.
     hexploit Thread.rtc_all_step_future.
-    { eapply rtc_implies; [|eapply STEPS]. i. inv H. inv TSTEP. econs; eauto. econs; eauto. }
+    { eapply rtc_implies; [|eapply STEPS]. i. inv H. inv TSTEP. econs; eauto. econs; eauto. econs 2; eauto. }
     all: eauto. i. des. ss.
     hexploit sim_thread_lower_steps.
     { eauto. }

@@ -55,7 +55,7 @@ Module SCLocal.
                          (GET: Memory.get loc to' mem1 = Some (from', Message.concrete val' released')),
             Time.le to' to)
     .
-    Hint Constructors read_step.
+    Hint Constructors read_step: core.
 
     Inductive write_step (lc1:Local.t) (sc1:TimeMap.t) (mem1:Memory.t)
               (loc:Loc.t) (from to:Time.t)
@@ -70,7 +70,7 @@ Module SCLocal.
                          (GET: Memory.get loc to' mem1 = Some (from', Message.concrete val' released')),
             Time.lt to' to)
     .
-    Hint Constructors write_step.
+    Hint Constructors write_step: core.
 
     Inductive write_na_step (lc1:Local.t) (sc1:TimeMap.t) (mem1:Memory.t)
                             (loc:Loc.t) (from to:Time.t) (val:Const.t) (ord:Ordering.t)
@@ -88,7 +88,7 @@ Module SCLocal.
         (STEP: Local.write_step lc1 sc1 mem1 loc from to val None released Ordering.acqrel lc2 sc2 mem2 kind):
       write_na_step lc1 sc1 mem1 loc from to val ord lc2 sc2 mem2 [] [] kind
     .
-    Hint Constructors write_na_step.
+    Hint Constructors write_na_step: core.
 
     Inductive program_step:
       forall (e:ThreadEvent.t) (lc1:Local.t) (sc1:TimeMap.t) (mem1:Memory.t) (lc2:Local.t) (sc2:TimeMap.t) (mem2:Memory.t), Prop :=
@@ -149,7 +149,7 @@ Module SCLocal.
         (LOCAL: Local.racy_update_step lc1 mem1 loc to ordr ordw):
         program_step (ThreadEvent.racy_update loc to valr valw ordr ordw) lc1 sc1 mem1 lc1 sc1 mem1
     .
-    Hint Constructors program_step.
+    Hint Constructors program_step: core.
 
 
     (* step_future *)
@@ -288,7 +288,7 @@ Module SCThread.
         (LOCAL: SCLocal.program_step L e lc1 sc1 mem1 lc2 sc2 mem2):
         program_step e (Thread.mk lang st1 lc1 sc1 mem1) (Thread.mk lang st2 lc2 sc2 mem2)
     .
-    Hint Constructors program_step.
+    Hint Constructors program_step: core.
 
     Inductive step: forall (pf:bool) (e:ThreadEvent.t) (e1 e2:Thread.t lang), Prop :=
     | step_promise
@@ -301,14 +301,14 @@ Module SCThread.
         (STEP: program_step e e1 e2):
         step true e e1 e2
     .
-    Hint Constructors step.
+    Hint Constructors step: core.
 
     Inductive step_allpf (e: ThreadEvent.t) (e1 e2: Thread.t lang): Prop :=
     | step_nopf_intro
         pf
         (STEP: step pf e e1 e2)
     .
-    Hint Constructors step_allpf.
+    Hint Constructors step_allpf: core.
 
     Lemma allpf pf: step pf <3= step_allpf.
     Proof.
@@ -316,13 +316,13 @@ Module SCThread.
     Qed.
 
     Definition pf_tau_step := tau (step true).
-    Hint Unfold pf_tau_step.
+    Hint Unfold pf_tau_step: core.
 
     Definition tau_step := tau step_allpf.
-    Hint Unfold tau_step.
+    Hint Unfold tau_step: core.
 
     Definition all_step := union step_allpf.
-    Hint Unfold all_step.
+    Hint Unfold all_step: core.
 
     Inductive opt_step: forall (e: ThreadEvent.t) (e1 e2: Thread.t lang), Prop :=
     | step_none
@@ -333,14 +333,14 @@ Module SCThread.
         (STEP: step pf e e1 e2):
         opt_step e e1 e2
     .
-    Hint Constructors opt_step.
+    Hint Constructors opt_step: core.
 
     Definition steps_failure (e1: Thread.t lang): Prop :=
       exists e e2 e3,
         <<STEPS: rtc tau_step e1 e2>> /\
         <<STEP_FAILURE: step true e e2 e3>> /\
         <<EVENT_FAILURE: ThreadEvent.get_machine_event e = MachineEvent.failure>>.
-    Hint Unfold steps_failure.
+    Hint Unfold steps_failure: core.
 
     Definition consistent (e: Thread.t lang): Prop :=
       forall mem1
@@ -572,14 +572,14 @@ Module SCConfiguration.
                      SCThread.consistent L (Thread.mk _ st4 lc4 sc4 memory4)):
         step e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) (Configuration.threads c1)) sc4 memory4)
     .
-    Hint Constructors step.
+    Hint Constructors step: core.
 
     Inductive all_step (c1 c2: Configuration.t): Prop :=
     | all_step_intro
         e tid
         (STEP: step e tid c1 c2)
     .
-    Hint Constructors all_step.
+    Hint Constructors all_step: core.
 
     Inductive machine_step: forall (e: MachineEvent.t) (tid: Ident.t) (c1 c2: Configuration.t), Prop :=
     | machine_step_instro
@@ -587,7 +587,7 @@ Module SCConfiguration.
         (STEP: step e tid c1 c2):
         machine_step (ThreadEvent.get_machine_event e) tid c1 c2
     .
-    Hint Constructors machine_step.
+    Hint Constructors machine_step: core.
 
     Lemma step_future
           e tid c1 c2

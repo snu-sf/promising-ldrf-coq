@@ -132,8 +132,8 @@ Section MIDDLE.
     :
       sim_memory_content_strong F extra extra_all loc ts (Some (from, Message.reserve)) None
   .
-  Hint Constructors sim_memory_content_strong.
-  Hint Constructors sim_memory_content.
+  Hint Constructors sim_memory_content_strong: core.
+  Hint Constructors sim_memory_content: core.
 
   Lemma sim_memory_content_strong_sim_memory_content
         loc ts F extra get0 get1 extra_all

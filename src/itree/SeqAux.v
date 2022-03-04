@@ -1819,4 +1819,3 @@ End LANG.
   Qed.
 
 End UPTO.
-Hint Resolve cpn7_wcompat: paco.

@@ -109,22 +109,23 @@ Module ITreeLangNotations.
 
   Notation "{ }" := nil (format "{ }") : block_scope.
   Notation "{ x ; }" := (cons x nil) : block_scope.
-  Notation "{ x ; y ; .. ; z }" := (cons x (cons y .. (cons z nil) ..)) : block_scope. 
+  Notation "{ x ; y ; .. ; z }" := (cons x (cons y .. (cons z nil) ..)) : block_scope.
 
 End ITreeLangNotations.
+
+
+Import ITreeLangNotations.
+Require Import BinNums.
 
 (* ========================================================================== *)
 (** ** Example *)
 Section Example.
 
-  Import ITreeLangNotations.
 
   Local Open Scope expr_scope.
   Local Open Scope inst_scope.
   Local Open Scope stmt_scope.
   Local Open Scope block_scope.
-
-  Require Import BinNums.
 
   Let n : Ident.t := xH.
   Let out : Ident.t := xO xH.

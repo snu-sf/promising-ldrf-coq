@@ -37,7 +37,7 @@ Inductive message_same_kind: forall (msg_src msg_tgt: Message.t), Prop :=
 | message_same_kind_reserve:
     message_same_kind Message.reserve Message.reserve
 .
-Hint Constructors message_same_kind.
+#[local] Hint Constructors message_same_kind: core.
 
 Program Instance message_same_kind_Equivalence: Equivalence message_same_kind.
 Next Obligation.

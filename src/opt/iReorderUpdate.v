@@ -153,9 +153,8 @@ Proof.
     econs; [eauto|..]; s; eauto; etrans; eauto.
   - exploit future_racy_read_step; try exact RACY_READ; eauto. i. des.
     econs 2; eauto.
-Grab Existential Variables.
-{ econs 2. }
-{ econs. econs 3. }
+  Unshelve.
+all: auto.
 Qed.
 
 Lemma sim_update_step
@@ -408,9 +407,8 @@ Proof.
       + econs 2. econs; [|econs 10]; eauto. econs. econs.
       + ss.
   }
-Grab Existential Variables.
-{ econs 2. }
-{ econs. econs 3. }
+  Unshelve.
+  all: auto.
 Qed.
 
 Lemma sim_update_sim_thread R:

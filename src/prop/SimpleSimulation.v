@@ -47,7 +47,7 @@ Section Simulation.
 
   Definition sim: SIM := paco2 _sim bot2.
 End Simulation.
-Hint Resolve _sim_mon: paco.
+#[export] Hint Resolve _sim_mon: paco.
 
 
 Lemma sim_adequacy

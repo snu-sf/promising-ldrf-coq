@@ -293,7 +293,7 @@ Proof.
   - econs 2; eauto. ii. eapply LE. eapply SIM2; eauto.
   - econs 3; eauto. ii. eapply LE. eapply SIM; eauto.
 Qed.
-Hint Resolve ctx_mon.
+#[export] Hint Resolve ctx_mon: paco.
 
 
 Lemma ctx_compat:
@@ -303,7 +303,7 @@ Proof.
   (* paco tactics do not work well without this *)
   { eapply _sim_thread_mon; eauto. }
   eapply wrespect11_uclo; auto.
-  econs; auto. i. destruct PR.
+  econs; auto with paco. i. destruct PR.
   - (* ret *)
     ii.
     inversion LOCAL. apply SimPromises.sem_bot_inv in PROMISES; auto.
@@ -500,7 +500,7 @@ Proof.
   ii. destruct IN.
   econs; eauto. ii. eapply LE. eapply SIM; eauto.
 Qed.
-Hint Resolve iter_ctx_mon.
+#[export] Hint Resolve iter_ctx_mon: paco.
 
 Lemma iter_ctx_compat:
   iter_ctx <12= gupaco11 _sim_thread (cpn11 _sim_thread).
@@ -509,7 +509,7 @@ Proof.
   (* paco tactics do not work well without this *)
   { eapply _sim_thread_mon; eauto. }
   eapply grespect11_uclo; auto.
-  econs; auto. i. destruct PR.
+  econs; auto with paco. i. destruct PR.
   eapply rclo11_clo_base. eapply cpn11_gupaco; [eauto with paco|].
   rewrite unfold_iter_eq. rewrite unfold_iter_eq.
   guclo ctx_compat. eapply ctx_bind.

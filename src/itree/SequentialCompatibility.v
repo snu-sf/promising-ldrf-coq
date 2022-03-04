@@ -110,7 +110,7 @@ Proof.
   - econs 2; eauto. ii. eapply LE. eapply SIM2; eauto.
   - econs 3; eauto. ii. eapply LE. eapply SIM; eauto.
 Qed.
-Hint Resolve ctx_mon.
+#[export] Hint Resolve ctx_mon: paco.
 
 
 
@@ -134,7 +134,7 @@ Lemma ctx_src_mon: monotone7 ctx_src_steps.
 Proof.
   ii. destruct IN. econs; eauto.
 Qed.
-Hint Resolve ctx_src_mon.
+#[export] Hint Resolve ctx_src_mon: paco.
 
 Lemma na_steps_thread_steps lang th_src0 th_src1 th_src2 tr p0 o0
       (STEPS0: rtc (SeqState.na_step p0 MachineEvent.silent) th_src0 th_src1)
@@ -154,8 +154,8 @@ Proof.
   assert (MON: monotone7 _sim_seq).
   (* paco tactics do not work well without this *)
   { eapply sim_seq_mon; eauto. }
-  eapply grespect7_uclo; auto.
-  econs; auto. i. destruct PR. eapply rclo7_base.
+  eapply grespect7_uclo; auto with paco.
+  econs; auto with paco. i. destruct PR. eapply rclo7_base.
   eapply GF in SIM. inv SIM.
   { econs 1.
     { ii. exploit TERMINAL; eauto. i. des. esplits.
@@ -193,8 +193,8 @@ Proof.
   assert (MON: monotone7 _sim_seq).
   (* paco tactics do not work well without this *)
   { eapply sim_seq_mon; eauto. }
-  eapply grespect7_uclo; auto.
-  econs; auto. i. destruct PR.
+  eapply grespect7_uclo; auto with paco.
+  econs; auto with paco. i. destruct PR.
   - (* ret *)
     eapply rclo7_base. econs.
     { ii. ss. inv TERMINAL_TGT. clarify. esplits; ss.
@@ -380,7 +380,7 @@ Proof.
   ii. destruct IN.
   econs; eauto. ii. eapply LE. eapply SIM; eauto.
 Qed.
-Hint Resolve iter_ctx_mon.
+#[export] Hint Resolve iter_ctx_mon: paco.
 
 Lemma iter_ctx_compat:
   iter_ctx <8= gupaco7 _sim_seq (cpn7 _sim_seq).
@@ -389,7 +389,7 @@ Proof.
   (* paco tactics do not work well without this *)
   { eapply sim_seq_mon; eauto. }
   eapply grespect7_uclo; auto.
-  econs; auto. i. destruct PR.
+  econs; auto with paco. i. destruct PR.
   eapply rclo7_clo_base. eapply cpn7_gupaco; [eauto with paco|].
   rewrite unfold_iter_eq. rewrite unfold_iter_eq.
   guclo ctx_compat. eapply ctx_bind.

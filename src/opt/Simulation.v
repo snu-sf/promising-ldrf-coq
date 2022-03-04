@@ -68,7 +68,7 @@ Section Simulation.
 
   Definition sim: SIM := paco6 _sim bot6.
 End Simulation.
-Hint Resolve _sim_mon: paco.
+#[export] Hint Resolve _sim_mon: paco.
 
 
 Lemma sim_future

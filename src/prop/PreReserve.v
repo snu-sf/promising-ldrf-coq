@@ -404,7 +404,7 @@ Section LIFT.
     (<<STEP: Local.is_racy lc0 cap0 loc to ord>>).
   Proof.
     inv RACE. exploit SOUND; eauto.
-  Qed. 
+  Qed.
 
   Lemma step_lifting lang st0 st1 lc0 lc1 sc0 sc1 mem0 mem1 cap0 pf e
         (spaces lefts: Loc.t -> Time.t -> Prop)
@@ -447,37 +447,38 @@ Section LIFT.
       { ss. destruct kind; ss. }
     }
     { inv STEP0. inv LOCAL.
-      { esplits; eauto. }
-      { inv LOCAL1. eapply SOUND in GET. esplits; eauto. }
+      { esplits; eauto. econs 2; eauto. econs; eauto. }
+      { inv LOCAL1. eapply SOUND in GET. esplits; eauto. econs 2; eauto. econs; eauto. }
       { inv LOCAL1.
         exploit step_lifting_write; eauto.
         { eapply LOCAL0. }
         { transitivity mem0; eauto. eapply LOCAL0. }
-        i. des. esplits; eauto.
+        i. des. esplits; eauto. econs 2; eauto. econs; eauto.
       }
       { inv LOCAL1. eapply SOUND in GET. inv LOCAL2.
         exploit step_lifting_write; eauto.
         { eapply LOCAL0. }
         { transitivity mem0; eauto. eapply LOCAL0. }
-        i. des. esplits; eauto. econs 2; eauto.
+        i. des. esplits; eauto. econs 2; eauto. econs; eauto.
       }
-      { esplits; eauto. }
-      { esplits; eauto. }
-      { esplits; eauto. } 
+      { esplits; eauto. econs 2; eauto. econs; eauto. }
+      { esplits; eauto. econs 2; eauto. econs; eauto. }
+      { esplits; eauto. econs 2; eauto. econs; eauto. }
       { inv LOCAL1. ss. des.
         exploit step_lifting_write_na; eauto.
         { eapply LOCAL0. }
         { transitivity mem0; eauto. eapply LOCAL0. }
-        i. des. esplits; eauto.
+        i. des. esplits; eauto. econs 2; eauto. econs; eauto.
       }
       { inv LOCAL1. exploit step_lifting_is_racy; eauto. i. des.
-        esplits; eauto.
+        esplits; eauto. econs 2; eauto. econs; eauto.
       }
       { inv LOCAL1. exploit step_lifting_is_racy; eauto. i. des.
-        esplits; eauto.
+        esplits; eauto. econs 2; eauto. econs; eauto.
       }
-      { inv LOCAL1; try by (esplits; eauto).
-        exploit step_lifting_is_racy; eauto. i. des. esplits; eauto.
+      { inv LOCAL1; try by (esplits; eauto; econs 2; eauto; econs; eauto).
+        exploit step_lifting_is_racy; eauto. i. des.
+        esplits; eauto. econs 2; eauto. econs; eauto.
       }
     }
   Qed.
@@ -653,7 +654,7 @@ Inductive disjoint_intervals
   :
     disjoint_intervals ((loc, (from, to)) :: tl)
 .
-Hint Constructors disjoint_intervals.
+#[export] Hint Constructors disjoint_intervals: core.
 
 Lemma disjoint_intervals_app
       l1 l2

@@ -63,7 +63,7 @@ Module PFtoAPFSim.
                   (GET: Memory.get loc to mem_src = Some (from, msg)),
             msg <> Message.undef)
     .
-    Hint Constructors sim_memory.
+    Hint Constructors sim_memory: core.
 
     Inductive sim_statelocal (rels: Writes.t):
       forall (sl_src sl_tgt: {lang : language & Language.state lang} * Local.t), Prop :=
@@ -72,7 +72,7 @@ Module PFtoAPFSim.
         (LOCAL: lc_src = lc_tgt):
         sim_statelocal rels (existT _ lang st, lc_src) (existT _ lang st, lc_tgt)
     .
-    Hint Constructors sim_statelocal.
+    Hint Constructors sim_statelocal: core.
 
     Inductive sim_thread (rels: Writes.t) (e_src e_tgt: Thread.t lang): Prop :=
     | sim_thread_intro
@@ -81,7 +81,7 @@ Module PFtoAPFSim.
         (SC: (Thread.sc e_src) = (Thread.sc e_tgt))
         (MEMORY: sim_memory rels (Thread.memory e_src) (Thread.memory e_tgt))
     .
-    Hint Constructors sim_thread.
+    Hint Constructors sim_thread: core.
 
     Lemma sim_thread_promise_consistent
           rels e_src e_tgt
@@ -770,7 +770,7 @@ Module PFtoAPFSim.
       sim_event (ThreadEvent.racy_update loc to valr valw ordr ordw)
                 (ThreadEvent.racy_update loc to valr valw ordr ordw)
     .
-    Hint Constructors sim_event.
+    Hint Constructors sim_event: core.
 
     Lemma sim_event_eq_program_event
           e_src e_tgt
@@ -795,7 +795,7 @@ Module PFtoAPFSim.
           (MEM1_SRC: Memory.closed mem1_src)
           (STEP_TGT: Local.program_step e_tgt lc1_tgt sc1_tgt mem1_tgt lc2_tgt sc2_tgt mem2_tgt):
       (exists e_src lc2_src sc2_src mem2_src,
-          (<<STEP_SRC: OrdLocal.program_step L Ordering.na Ordering.plain 
+          (<<STEP_SRC: OrdLocal.program_step L Ordering.na Ordering.plain
                                              e_src lc1_src sc1_src mem1_src lc2_src sc2_src mem2_src>>) /\
           (<<EVENT: sim_event e_src e_tgt>>) /\
           (<<RACY_READ: forall loc to val ord (EVENT: e_tgt = ThreadEvent.racy_read loc to val ord), ~ L loc>>) /\

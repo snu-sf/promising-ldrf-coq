@@ -39,7 +39,7 @@ Module ThreadEvent.
   | racy_write (loc:Loc.t) (to:Time.t) (val:Const.t) (ord:Ordering.t)
   | racy_update (loc:Loc.t) (to:Time.t) (valr valw:Const.t) (ordr ordw:Ordering.t)
   .
-  Hint Constructors t.
+  #[global] Hint Constructors t: core.
 
   Definition get_event (e:t): option Event.t :=
     match e with
@@ -173,7 +173,7 @@ Module Local.
   | is_terminal_intro
       (PROMISES: (promises lc) = Memory.bot)
   .
-  Hint Constructors is_terminal.
+  #[global] Hint Constructors is_terminal: core.
 
   Inductive wf (lc:t) (mem:Memory.t): Prop :=
   | wf_intro
@@ -183,7 +183,7 @@ Module Local.
       (FINITE: Memory.finite (promises lc))
       (BOT: Memory.bot_none (promises lc))
   .
-  Hint Constructors wf.
+  #[global] Hint Constructors wf: core.
 
   Lemma cap_wf
         lc mem1 mem2
@@ -200,7 +200,7 @@ Module Local.
   | disjoint_intro
       (DISJOINT: Memory.disjoint (promises lc1) (promises lc2))
   .
-  Hint Constructors disjoint.
+  #[global] Hint Constructors disjoint: core.
 
   Global Program Instance disjoint_Symmetric: Symmetric disjoint.
   Next Obligation.
@@ -238,7 +238,7 @@ Module Local.
       (LC2: lc2 = mk (tview lc1) promises2):
       promise_step lc1 mem1 loc from to msg lc2 mem2 kind
   .
-  Hint Constructors promise_step.
+  #[global] Hint Constructors promise_step: core.
 
   Inductive read_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (to:Time.t) (val:Const.t) (released:option View.t) (ord:Ordering.t) (lc2:t): Prop :=
   | read_step_intro
@@ -251,7 +251,7 @@ Module Local.
       (LC2: lc2 = mk tview2 (promises lc1)):
       read_step lc1 mem1 loc to val released ord lc2
   .
-  Hint Constructors read_step.
+  #[global] Hint Constructors read_step: core.
 
   Inductive write_step (lc1:t) (sc1:TimeMap.t) (mem1:Memory.t)
                        (loc:Loc.t) (from to:Time.t)
@@ -267,7 +267,7 @@ Module Local.
       (SC2: sc2 = sc1):
       write_step lc1 sc1 mem1 loc from to val releasedm released ord lc2 sc2 mem2 kind
   .
-  Hint Constructors write_step.
+  #[global] Hint Constructors write_step: core.
 
   Inductive write_na_step (lc1:t) (sc1:TimeMap.t) (mem1:Memory.t)
                           (loc:Loc.t) (from to:Time.t) (val:Const.t) (ord:Ordering.t)
@@ -283,7 +283,7 @@ Module Local.
       (LC2: lc2 = mk (TView.write_tview (tview lc1) sc1 loc to ord) promises2)
       (SC2: sc2 = sc1)
   .
-  Hint Constructors write_na_step.
+  #[global] Hint Constructors write_na_step: core.
 
   Inductive fence_step (lc1:t) (sc1:TimeMap.t) (ordr ordw:Ordering.t) (lc2:t) (sc2:TimeMap.t): Prop :=
   | fence_step_intro
@@ -295,13 +295,13 @@ Module Local.
       (PROMISES: ordw = Ordering.seqcst -> (Local.promises lc1) = Memory.bot):
       fence_step lc1 sc1 ordr ordw lc2 sc2
   .
-  Hint Constructors fence_step.
+  #[global] Hint Constructors fence_step: core.
 
   Inductive failure_step (lc1:t): Prop :=
   | failure_step_intro
       (CONSISTENT: promise_consistent lc1)
   .
-  Hint Constructors failure_step.
+  #[global] Hint Constructors failure_step: core.
 
   Inductive is_racy (lc1:t) (mem1:Memory.t) (loc:Loc.t) (to:Time.t) (ord:Ordering.t): Prop :=
   | is_racy_intro
@@ -312,20 +312,20 @@ Module Local.
       (MSG1: msg <> Message.reserve)
       (MSG2: Ordering.le Ordering.plain ord -> msg = Message.undef)
   .
-  Hint Constructors is_racy.
+  #[global] Hint Constructors is_racy: core.
 
   Inductive racy_read_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (to:Time.t) (val:Const.t) (ord:Ordering.t): Prop :=
   | racy_read_step_intro
       (RACE: is_racy lc1 mem1 loc to ord)
   .
-  Hint Constructors racy_read_step.
+  #[global] Hint Constructors racy_read_step: core.
 
   Inductive racy_write_step (lc1:t) (mem1:Memory.t) (loc:Loc.t) (to:Time.t) (ord:Ordering.t): Prop :=
   | racy_write_step_intro
       (RACE: is_racy lc1 mem1 loc to ord)
       (CONSISTENT: promise_consistent lc1)
   .
-  Hint Constructors racy_write_step.
+  #[global] Hint Constructors racy_write_step: core.
 
   Inductive racy_update_step (lc1:t) (mem1:Memory.t) (loc:Loc.t):
     forall (to:Time.t) (ordr ordw:Ordering.t), Prop :=
@@ -345,7 +345,7 @@ Module Local.
       (CONSISTENT: promise_consistent lc1):
       racy_update_step lc1 mem1 loc to ordr ordw
   .
-  Hint Constructors racy_update_step.
+  #[global] Hint Constructors racy_update_step: core.
 
 
   Inductive program_step:
@@ -407,7 +407,7 @@ Module Local.
       (LOCAL: racy_update_step lc1 mem1 loc to ordr ordw):
       program_step (ThreadEvent.racy_update loc to valr valw ordr ordw) lc1 sc1 mem1 lc1 sc1 mem1
   .
-  Hint Constructors program_step.
+  #[global] Hint Constructors program_step: core.
 
 
   (* step_future *)

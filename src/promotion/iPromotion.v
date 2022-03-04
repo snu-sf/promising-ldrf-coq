@@ -65,7 +65,7 @@ Module Promotion.
                           (Thread.mk (lang _) st_src lc_src (Configuration.sc c_src) (Configuration.memory c_src))
                           (Thread.mk (lang _) st_tgt lc_tgt (Configuration.sc c_tgt) (Configuration.memory c_tgt))>>)
   .
-  Hint Constructors sim_conf.
+  Hint Constructors sim_conf: core.
 
   Lemma sim_conf_find
         p l c_src c_tgt tid

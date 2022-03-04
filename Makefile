@@ -4,7 +4,6 @@ COQTHEORIES  := \
 	src/itree/*.v \
 	src/prop/*.v \
 	src/opt/*.v \
-	src/opt/itree/*.v \
 	src/sequential/*.v \
 	src/promotion/*.v \
 	src/ldrfpf/*.v \
@@ -26,7 +25,6 @@ Makefile.coq: Makefile $(COQTHEORIES)
    echo "-R src/itree $(COQMODULE)"; \
    echo "-R src/prop $(COQMODULE)"; \
    echo "-R src/opt $(COQMODULE)"; \
-   echo "-R src/opt/itree $(COQMODULE)"; \
    echo "-R src/sequential $(COQMODULE)"; \
    echo "-R src/promotion $(COQMODULE)"; \
    echo "-R src/ldrfpf $(COQMODULE)"; \

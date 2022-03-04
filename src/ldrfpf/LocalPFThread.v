@@ -176,7 +176,7 @@ Section SIM.
         (ThreadEvent.racy_update loc to valr valw ordr ordw)
         (ThreadEvent.racy_update loc to valr valw ordr ordw)
   .
-  Hint Constructors sim_event.
+  Hint Constructors sim_event: core.
 
   Global Program Instance sim_event_Equivalence: Equivalence sim_event.
   Next Obligation.
@@ -239,7 +239,7 @@ Section SIM.
     :
       sim_trace ((th_src, e)::tl_src) e_tgt
   .
-  Hint Constructors sim_trace.
+  Hint Constructors sim_trace: core.
 
   Lemma sim_event_racy_event e_src e_tgt
         (RACY: racy_event e_tgt)
@@ -355,7 +355,7 @@ Section SIM.
     :
       sim_traces (hd_src ++ tl_src) tl_tgt
   .
-  Hint Constructors sim_traces.
+  Hint Constructors sim_traces: core.
 
   Lemma sim_traces_sim_event_exists (tr_src tr_tgt: Trace.t) th_tgt e_tgt
         (TRACE: sim_traces tr_src tr_tgt)
@@ -461,7 +461,7 @@ Section SIM.
     :
       sim_memory_content F extra loc ts (Some (from, Message.reserve)) None
   .
-  Hint Constructors sim_memory_content.
+  Hint Constructors sim_memory_content: core.
 
   Record sim_memory
          (F: Loc.t -> Time.t -> Prop)
@@ -797,7 +797,7 @@ Section SIM.
     :
       sim_promise_content F extra loc ts (Some (from, Message.reserve)) None
   .
-  Hint Constructors sim_promise_content.
+  Hint Constructors sim_promise_content: core.
 
   Record sim_promise
          (self: Loc.t -> Time.t -> Prop)
@@ -916,7 +916,7 @@ Section SIM.
     :
       sim_promise_content_strong F extra extra_all loc ts (Some (from, Message.reserve)) None
   .
-  Hint Constructors sim_promise_content_strong.
+  Hint Constructors sim_promise_content_strong: core.
 
   Lemma sim_promise_content_strong_sim_promise_content
         loc ts F extra get0 get1 extra_all
@@ -1367,7 +1367,7 @@ Section SIM.
     :
       sim_local self extra (Local.mk tvw prom_src) (Local.mk tvw prom_tgt)
   .
-  Hint Constructors sim_local.
+  Hint Constructors sim_local: core.
 
   Lemma sim_local_tview_le self extra lc_src lc_tgt
         (LOCAL: sim_local self extra lc_src lc_tgt)
@@ -3914,7 +3914,8 @@ Section SIM.
           }
       + hexploit sim_racy_read_step; eauto. i. des.
         eexists [(_, ThreadEvent.racy_read loc _ _ _)]. esplits; eauto.
-        econs 2; ss. eapply sim_local_tview_le; eauto.
+        { econs 2; ss. econs 2; eauto. econs; eauto. }
+        { econs; ss. eapply sim_local_tview_le; eauto. }
       + ss.
       + ss.
   Qed.
@@ -3930,7 +3931,7 @@ Section SIM.
     :
       sim_local_strong self extra extra_all (Local.mk tvw prom_src) (Local.mk tvw prom_tgt)
   .
-  Hint Constructors sim_local_strong.
+  Hint Constructors sim_local_strong: core.
 
   Lemma sim_local_strong_sim_local
         self extra extra_all lc_src lc_tgt
@@ -4064,9 +4065,13 @@ Section SIM.
     - inv STEP0; ss.
     - inv STEP0; ss. inv LOCAL; ss.
       + exploit sim_fence_step; eauto. i. des. esplits; eauto.
+        econs 2; eauto. econs; eauto.
       + exploit sim_failure_step; eauto. i. des. esplits; eauto.
+        econs 2; eauto. econs; eauto.
       + hexploit sim_racy_write_step; eauto. i. des. esplits; eauto.
+        econs 2; eauto. econs; eauto.
       + hexploit sim_racy_update_step; eauto. i. des. esplits; eauto.
+        econs 2; eauto. econs; eauto.
   Qed.
 
   Lemma sim_thread_step_event others self extra_others extra_self
@@ -4188,15 +4193,16 @@ Section SIM.
     - inv STEP0; ss.
     - inv STEP0; ss. inv LOCAL; ss.
       + exploit sim_fence_step_strong; eauto. i. des. esplits; eauto.
+        econs 2; eauto. econs; eauto.
       + exploit sim_failure_step; eauto.
         { eapply sim_local_strong_sim_local; eauto. }
-        i. des. esplits; eauto.
+        i. des. esplits; eauto. econs 2; eauto. econs; eauto.
       + hexploit sim_racy_write_step; eauto.
         { eapply sim_local_strong_sim_local; eauto. }
-        i. des. esplits; eauto.
+        i. des. esplits; eauto. econs 2; eauto. econs; eauto.
       + hexploit sim_racy_update_step; eauto.
         { eapply sim_local_strong_sim_local; eauto. }
-        i. des. esplits; eauto.
+        i. des. esplits; eauto. econs 2; eauto. econs; eauto.
   Qed.
 
   Lemma sim_thread_step_event_strong others self extra_others extra_self

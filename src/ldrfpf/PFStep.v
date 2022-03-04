@@ -272,7 +272,7 @@ Section LOCALPF.
     :
       step e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) (Configuration.threads c1)) sc4 memory4)
   .
-  Hint Constructors step.
+  Hint Constructors step: core.
 
   Inductive machine_step: forall (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t), Prop :=
   | machine_step_intro
@@ -281,14 +281,14 @@ Section LOCALPF.
     :
       machine_step (ThreadEvent.get_machine_event e) tid c1 c2
   .
-  Hint Constructors machine_step.
+  Hint Constructors machine_step: core.
 
   Inductive all_step (c1 c2: Configuration.t): Prop :=
   | all_step_intro
       e tid
       (STEP: step e tid c1 c2)
   .
-  Hint Constructors all_step.
+  Hint Constructors all_step: core.
 
   Inductive opt_machine_step:
     forall (e: MachineEvent.t) (tid: Ident.t) (c1 c2: Configuration.t), Prop :=
@@ -300,7 +300,7 @@ Section LOCALPF.
       (STEP: machine_step e tid c1 c2):
       opt_machine_step e tid c1 c2
   .
-  Hint Constructors opt_machine_step.
+  Hint Constructors opt_machine_step: core.
 
   Definition tau_machine_step := union (machine_step MachineEvent.silent).
 
@@ -317,7 +317,7 @@ Section LOCALPF.
     :
       steps (ehd :: etl) tid c1 c3
   .
-  Hint Constructors steps.
+  Hint Constructors steps: core.
 
   Lemma steps_rtc_all_step es tid c1 c2
         (STEPS: steps es tid c1 c2)
@@ -755,7 +755,7 @@ Proof.
       (STEP: step_trace tr2 e tid c2 c3):
       steps_trace_rev c1 c3 (tr1 ++ tr2)
   .
-  Hint Constructors steps_trace_rev.
+  Hint Constructors steps_trace_rev: core.
 
   Lemma steps_trace_rev_1n
         c1 c2 c3 tr1 tr2 e tid
@@ -1317,7 +1317,7 @@ Section LOCALPFRACE.
     :
       racy_read_step loc ts e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) (Configuration.threads c1)) sc4 memory4)
   .
-  Hint Constructors racy_read_step.
+  Hint Constructors racy_read_step: core.
 
   Inductive racy_write_step:
     forall (loc: Loc.t) (ts: Time.t)

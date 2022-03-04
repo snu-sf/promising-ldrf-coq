@@ -98,7 +98,7 @@ Module APFtoRASim.
         (LOCAL: sim_local lc_src lc_tgt):
         sim_statelocal rels (existT _ lang st, lc_src) (existT _ lang st, lc_tgt)
     .
-    Hint Constructors sim_statelocal.
+    Hint Constructors sim_statelocal: core.
 
     Inductive sim_thread (rels: Writes.t) (e_src e_tgt: Thread.t lang): Prop :=
     | sim_thread_intro
@@ -107,7 +107,7 @@ Module APFtoRASim.
         (SC: (Thread.sc e_src) = (Thread.sc e_tgt))
         (MEMORY: sim_memory rels (Thread.memory e_src) (Thread.memory e_tgt))
     .
-    Hint Constructors sim_thread.
+    Hint Constructors sim_thread: core.
 
 
     Lemma sim_tview_ra_race
@@ -1390,7 +1390,7 @@ Module APFtoRASim.
       sim_event (ThreadEvent.racy_update loc to valr valw ordr ordw)
                 (ThreadEvent.racy_update loc to valr valw ordr ordw)
     .
-    Hint Constructors sim_event.
+    Hint Constructors sim_event: core.
 
     Lemma sim_event_eq_program_event
           e_src e_tgt

@@ -1982,7 +1982,7 @@ Inductive relaxed_writing_event
       loc to msg
       (ThreadEvent.write_na loc msgs from1 to1 val1 ord)
 .
-Hint Constructors relaxed_writing_event.
+#[export] Hint Constructors relaxed_writing_event: core.
 
 Lemma pf_consistent_super_strong_same_sc lang (e0: Thread.t lang) tr times sc
       (CONSISTENT: pf_consistent_super_strong e0 tr times)

@@ -25,7 +25,7 @@ Module Message.
   | undef
   | reserve
   .
-  Hint Constructors t.
+  #[global] Hint Constructors t: core.
 
   Definition elt: t := concrete Const.undef None.
 
@@ -40,7 +40,7 @@ Module Message.
   | le_reserve:
       le reserve reserve
   .
-  Hint Constructors le.
+  #[global] Hint Constructors le: core.
 
   Program Instance le_PreOrder: PreOrder le.
   Next Obligation.
@@ -70,7 +70,7 @@ Module Message.
   | wf_reserve:
       wf reserve
   .
-  Hint Constructors wf.
+  #[global] Hint Constructors wf: core.
 
   Definition elt_wf: wf elt.
   Proof. econs; ss. Qed.
@@ -107,7 +107,7 @@ Module Cell.
                      (NEQ: to1 <> to2),
             Interval.disjoint (from1, to1) (from2, to2))
     .
-    Hint Constructors wf.
+    #[global] Hint Constructors wf: core.
 
     Definition bot: t := DOMap.empty _.
 
@@ -170,7 +170,7 @@ Module Cell.
         (MSG_WF: Message.wf msg)
         (CELL2: cell2 = DOMap.add to (from, msg) cell1):
         add cell1 from to msg cell2.
-    Hint Constructors add.
+    #[global] Hint Constructors add: core.
 
     Lemma add_o
           cell2 cell1 from to msg
@@ -217,7 +217,7 @@ Module Cell.
         (CELL2: cell2 = DOMap.add ts2 (ts1, msg2)
                                   (DOMap.add ts3 (ts2, msg3) cell1))
     .
-    Hint Constructors split.
+    #[global] Hint Constructors split: core.
 
     Lemma split_o
           cell2 cell1 ts1 ts2 ts3 msg2 msg3
@@ -284,7 +284,7 @@ Module Cell.
         (MSG_LE: Message.le msg2 msg1)
         (CELL2: cell2 = DOMap.add to (from, msg2) cell1)
     .
-    Hint Constructors lower.
+    #[global] Hint Constructors lower: core.
 
     Lemma lower_o
           cell2 cell1 from to msg1 msg2
@@ -327,7 +327,7 @@ Module Cell.
         (GET: DOMap.find to cell1 = Some (from, msg))
         (CELL2: cell2 = DOMap.remove to cell1)
     .
-    Hint Constructors remove.
+    #[global] Hint Constructors remove: core.
 
     Lemma remove_o
           cell2 cell1 from to msg
@@ -546,7 +546,7 @@ Module Cell.
     exists cell2, add cell1 from to msg cell2.
   Proof.
     destruct cell1. eexists (mk _). econs; s; eauto.
-    Grab Existential Variables.
+    Unshelve.
     eapply Raw.add_wf; eauto.
   Qed.
 
@@ -581,7 +581,7 @@ Module Cell.
     exists cell2, split cell1 ts1 ts2 ts3 msg2 msg3 cell2.
   Proof.
     destruct cell1. eexists (mk _). econs; s; eauto.
-  Grab Existential Variables.
+    Unshelve.
     eapply Raw.split_wf; eauto.
   Qed.
 
@@ -603,7 +603,7 @@ Module Cell.
     exists cell2, lower cell1 from to msg1 msg2 cell2.
   Proof.
     destruct cell1. eexists (mk _). unfold lower. econs; eauto. ss.
-  Grab Existential Variables.
+    Unshelve.
     eapply Raw.lower_wf; eauto.
   Qed.
 
@@ -616,7 +616,7 @@ Module Cell.
     inv LOWER. apply lower_exists; auto.
   Qed.
 
-  
+
   (* Lemmas on add, split, lower & remove *)
 
   Lemma add_get0
@@ -761,7 +761,7 @@ Module Cell.
     exists cell2, remove cell1 from to msg cell2.
   Proof.
     eexists (mk _). destruct cell1. ss.
-    Grab Existential Variables.
+    Unshelve.
     { eapply Raw.remove_wf.
       - econs; eauto.
       - apply WF.

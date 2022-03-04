@@ -56,7 +56,7 @@ Inductive message_from_to (mem: Memory.t) (loc: Loc.t):
   :
     message_from_to mem loc from to
 .
-Hint Constructors message_from_to.
+#[export] Hint Constructors message_from_to: core.
 
 Lemma message_from_to_ts mem (CLOSED: Memory.closed mem) loc:
   message_from_to mem loc <2= Time.lt.

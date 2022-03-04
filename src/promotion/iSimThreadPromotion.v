@@ -42,7 +42,7 @@ Module SimThreadPromotion.
   | sim_state_intro
       (STMTS: st_tgt = promote_itree l val st_src)
   .
-  Hint Constructors sim_state.
+  Hint Constructors sim_state: core.
 
 
   (* sim_thread *)
@@ -67,7 +67,7 @@ Module SimThreadPromotion.
       (PROMISES: forall to, Memory.get l to (Local.promises (Thread.local e_src)) = None)
       (SAFE: safe l (Thread.local e_src) (Thread.memory e_src))
   .
-  Hint Constructors sim_thread.
+  Hint Constructors sim_thread: core.
 
   Inductive sim_thread_reserve (l: Loc.t) (e_src: Thread.t (lang R)) (e_tgt: Thread.t (lang (Const.t * R))): Prop :=
   | sim_thread_reserve_intro
@@ -89,11 +89,11 @@ Module SimThreadPromotion.
           Memory.get l to (Local.promises (Thread.local e_src)) = None)
       (SAFE: safe l (Thread.local e_src) (Thread.memory e_src))
   .
-  Hint Constructors sim_thread_reserve.
+  Hint Constructors sim_thread_reserve: core.
 
   Definition sim_thread_all (l: Loc.t): forall (e_src: Thread.t (lang R)) (e_tgt: Thread.t (lang (Const.t * R))), Prop :=
     (sim_thread l) \2/ (sim_thread_reserve l).
-  Hint Unfold sim_thread_all.
+  Hint Unfold sim_thread_all: core.
 
 
   Lemma step_sim_thread_reserve

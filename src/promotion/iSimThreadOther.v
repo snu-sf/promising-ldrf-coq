@@ -46,7 +46,7 @@ Module SimThreadOther.
       (FULFILLABLE: fulfillable l (Local.tview (Thread.local e_src)) (Thread.memory e_src)
                                   (Local.promises (Thread.local e_src)))
   .
-  Hint Constructors sim_thread.
+  Hint Constructors sim_thread: core.
 
   Lemma sim_thread_promise_step
         l e1_src
@@ -78,7 +78,7 @@ Module SimThreadOther.
     - econs 2. econs; eauto.
     - inv SIM1. ss. econs; eauto; ss.
       i. inv STEP_SRC.
-      erewrite Memory.promise_get_diff_promise; try exact PROMISE; eauto. 
+      erewrite Memory.promise_get_diff_promise; try exact PROMISE; eauto.
     - i. s. inv STEP_SRC.
       erewrite <- Memory.promise_get_diff; try exact PROMISE; eauto.
   Qed.

@@ -162,7 +162,7 @@ Inductive all_promises
   :
     all_promises tids proms loc ts
 .
-Hint Constructors all_promises.
+#[export] Hint Constructors all_promises: core.
 
 Inductive all_extra
           (tids: Ident.t -> Prop)
@@ -175,7 +175,7 @@ Inductive all_extra
   :
     all_extra tids extra loc ts from
 .
-Hint Constructors all_extra.
+#[export] Hint Constructors all_extra: core.
 
 Lemma jsim_event_sim_event
   :
@@ -608,7 +608,7 @@ Section SIM.
         (Configuration.mk ths_mid sc_src mem_mid)
         (Configuration.mk ths_tgt sc_tgt mem_tgt)
   .
-  Hint Constructors sim_configuration.
+  Hint Constructors sim_configuration: core.
 
   Inductive sim_thread
             (views: Loc.t -> Time.t -> list View.t)
@@ -630,7 +630,7 @@ Section SIM.
         (Thread.mk lang st lc_mid sc_src mem_mid)
         (Thread.mk lang st lc_tgt sc_tgt mem_tgt)
   .
-  Hint Constructors sim_thread.
+  Hint Constructors sim_thread: core.
 
   Inductive sim_thread_strong
             (views: Loc.t -> Time.t -> list View.t)
@@ -652,7 +652,7 @@ Section SIM.
         (Thread.mk lang st lc_mid sc_src mem_mid)
         (Thread.mk lang st lc_tgt sc_tgt mem_tgt)
   .
-  Hint Constructors sim_thread_strong.
+  Hint Constructors sim_thread_strong: core.
 
   Lemma sim_thread_strong_sim_thread
     :

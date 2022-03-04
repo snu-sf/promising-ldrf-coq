@@ -55,7 +55,7 @@ Module WThread.
         (STEPS: steps rels2 rels3 e2 e3):
         steps rels1 rels3 e1 e3
     .
-    Hint Constructors steps.
+    Hint Constructors steps: core.
 
     Inductive tau_steps rels1: forall (rels2: Writes.t) (e1 e2: Thread.t lang), Prop :=
     | tau_steps_refl
@@ -68,7 +68,7 @@ Module WThread.
         (STEPS: tau_steps rels2 rels3 e2 e3):
         tau_steps rels1 rels3 e1 e3
     .
-    Hint Constructors tau_steps.
+    Hint Constructors tau_steps: core.
 
     Inductive opt_step rels1: forall (rels2: Writes.t) (e: ThreadEvent.t) (e1 e2: Thread.t lang), Prop :=
     | step_none
@@ -79,7 +79,7 @@ Module WThread.
         (STEP: step rels1 rels2 e e1 e2):
         opt_step rels1 rels2 e e1 e2
     .
-    Hint Constructors opt_step.
+    Hint Constructors opt_step: core.
 
 
     Lemma step_ord_step
@@ -837,7 +837,7 @@ Module WConfiguration.
         (STEPS: steps rels2 rels3 c2 c3):
         steps rels1 rels3 c1 c3
     .
-    Hint Constructors steps.
+    Hint Constructors steps: core.
 
     Lemma steps_trans
           rels1 rels2 rels3 c1 c2 c3

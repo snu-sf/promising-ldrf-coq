@@ -186,7 +186,6 @@ Proof.
     left.
     eapply sim_abort_steps_failure. econs; eauto.
     eapply sim_local_failure; eauto.
-Grab Existential Variables.
-  { econs 2. }
-  { econs. econs 3. }
+  Unshelve.
+  all: auto.
 Qed.

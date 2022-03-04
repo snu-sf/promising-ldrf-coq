@@ -47,7 +47,7 @@ Section NOTRELEASED.
       not_released_pln: not_released_timemap (View.pln vw);
       not_released_rlx: not_released_timemap (View.rlx vw);
     }.
-  Hint Constructors not_released_view.
+  Hint Constructors not_released_view: core.
 
   Inductive not_released_opt_view: option View.t -> Prop :=
   | not_released_opt_view_some
@@ -59,7 +59,7 @@ Section NOTRELEASED.
     :
       not_released_opt_view None
   .
-  Hint Constructors not_released_opt_view.
+  Hint Constructors not_released_opt_view: core.
 
   Inductive not_released_message: Message.t -> Prop :=
   | not_released_message_concrete
@@ -74,7 +74,7 @@ Section NOTRELEASED.
     :
       not_released_message Message.undef
   .
-  Hint Constructors not_released_message.
+  Hint Constructors not_released_message: core.
 
   Record not_released_tview (vw: TView.t): Prop :=
     {
@@ -82,7 +82,7 @@ Section NOTRELEASED.
       not_released_cur: not_released_view (TView.cur vw);
       not_released_acq: not_released_view (TView.acq vw);
     }.
-  Hint Constructors not_released_tview.
+  Hint Constructors not_released_tview: core.
 
   Lemma not_released_timemap_bot
     :

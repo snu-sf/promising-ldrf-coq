@@ -262,7 +262,7 @@ Section CELL.
     :
       times_sorted (hd :: tl)
   .
-  Hint Constructors times_sorted.
+  Hint Constructors times_sorted: core.
 
   Fixpoint insert (to: Time.t) (l: list Time.t): list Time.t :=
     match l with
@@ -2409,7 +2409,7 @@ Lemma memory_concrete_le_le
 Proof.
   ii. eauto.
 Qed.
-Hint Resolve memory_concrete_le_le.
+#[export] Hint Resolve memory_concrete_le_le: core.
 
 Lemma memory_concrete_le_closed_timemap tm mem0 mem1
       (MLE: memory_concrete_le mem0 mem1)
@@ -3266,7 +3266,7 @@ Section PROMISEWRITING.
         loc from to msg
         (ThreadEvent.write_na loc msgs from1 to1 val1 ord)
   .
-  Hint Constructors promise_writing_event.
+  Hint Constructors promise_writing_event: core.
 
   Lemma promise_writing_event_mon
         loc from to msg from' msg' e
@@ -3738,7 +3738,7 @@ Section RESERVEFUTURE.
       reserve_future_memory
         prom0 mem0 prom2 mem2
   .
-  Hint Constructors reserve_future_memory.
+  Hint Constructors reserve_future_memory: core.
 
   Lemma reserve_future_future prom0 mem0 prom1 mem1
         (FUTURE: reserve_future_memory prom0 mem0 prom1 mem1)
@@ -4062,7 +4062,7 @@ Section SEMICLOSED.
       (PLN: semi_closed_timemap (View.pln view) mem loc ts)
       (RLX: semi_closed_timemap (View.rlx view) mem loc ts)
   .
-  Hint Constructors semi_closed_view.
+  Hint Constructors semi_closed_view: core.
 
   Lemma closed_view_semi_closed vw mem loc ts
         (CLOSED: Memory.closed_view vw mem)
@@ -4149,7 +4149,7 @@ Section SEMICLOSED.
       mem loc ts:
       semi_closed_opt_view None mem loc ts
   .
-  Hint Constructors semi_closed_opt_view.
+  Hint Constructors semi_closed_opt_view: core.
 
   Lemma closed_opt_view_semi_closed vw mem loc ts
         (CLOSED: Memory.closed_opt_view vw mem)
@@ -4223,7 +4223,7 @@ Section SEMICLOSED.
       mem loc ts:
       semi_closed_message Message.reserve mem loc ts
   .
-  Hint Constructors semi_closed_message.
+  Hint Constructors semi_closed_message: core.
 
   Lemma closed_message_semi_closed msg mem loc ts
         (CLOSED: Memory.closed_message msg mem)

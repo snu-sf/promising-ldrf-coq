@@ -49,6 +49,6 @@ Proof.
   - hexploit Local.bot_promise_consistent; eauto. i.
     esplits. econs; [|econs 7]; eauto. econs.
   - esplits. econs; [|econs 1]; eauto. econs. econs.
-Grab Existential Variables.
+  Unshelve.
   all: try exact 0. all: try exact ITree.spin.
 Qed.

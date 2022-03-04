@@ -102,7 +102,7 @@ Module ILang.
       (VALW: valw = None):
       eval_rmw (MemE.cas o n) valr valret valw
   .
-  #[export] Hint Constructors eval_rmw.
+  #[export] Hint Constructors eval_rmw: core.
 
   Definition is_terminal R (s: itree MemE.t R): Prop :=
     exists r, s = Ret r.

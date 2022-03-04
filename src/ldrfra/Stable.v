@@ -51,7 +51,7 @@ Module Normal.
         (NORMAL_TVIEW: normal_tview (Local.tview (Thread.local e)))
         (NORMAL_MEMORY: normal_memory (Thread.memory e))
     .
-    Hint Constructors normal_thread.
+    Hint Constructors normal_thread: core.
 
     Lemma join_normal_view
           view1 view2
@@ -337,7 +337,7 @@ Module Stable.
         (STABLE_SC: Stable.stable_timemap (Thread.memory e) (Thread.sc e))
         (STABLE_MEMORY: Stable.stable_memory rels (Thread.memory e))
     .
-    Hint Constructors stable_thread.
+    Hint Constructors stable_thread: core.
 
 
     Lemma future_stable_view

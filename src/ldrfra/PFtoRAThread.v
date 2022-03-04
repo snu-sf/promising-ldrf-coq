@@ -205,7 +205,7 @@ Module PFtoRAThread.
         (SC: Memory.closed_timemap (Thread.sc e) (Thread.memory e))
         (MEM: Memory.closed (Thread.memory e))
     .
-    Hint Constructors wf_pf.
+    Hint Constructors wf_pf: core.
 
     Variant wf_j (views: Loc.t -> Time.t -> list View.t) (e: Thread.t lang): Prop :=
     | wf_j_intro
@@ -216,7 +216,7 @@ Module PFtoRAThread.
         (JOINED_MEM: joined_memory views (Thread.memory e))
         (JOINED_VIEWS: wf_views views)
     .
-    Hint Constructors wf_j.
+    Hint Constructors wf_j: core.
 
     Variant wf_ra (rels: Writes.t) (e: Thread.t lang): Prop :=
     | wf_ra_intro
@@ -226,7 +226,7 @@ Module PFtoRAThread.
         (RELS: Writes.wf L rels (Thread.memory e))
         (RESERVE_ONLY: OrdLocal.reserve_only L (Local.promises (Thread.local e)))
     .
-    Hint Constructors wf_ra.
+    Hint Constructors wf_ra: core.
 
     Lemma step_pf_future
           pf e e1 e2

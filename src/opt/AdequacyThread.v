@@ -276,6 +276,6 @@ Proof.
               try by (etrans; [eauto using Memory.future_future_weak|
                                etrans; eauto using Memory.future_future_weak]).
       }
-Grab Existential Variables.
+  Unshelve.
 { auto. }
 Qed.

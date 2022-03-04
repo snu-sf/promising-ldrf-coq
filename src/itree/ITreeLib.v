@@ -374,10 +374,10 @@ Abort.
 Definition resum_itr E F `{E -< F}: itree E ~> itree F := fun _ itr => interp (fun _ e => trigger e) itr.
 
 Definition tauK {E R}: R -> itree E R := fun r => tau;; Ret r.
-Hint Unfold tauK.
+#[export] Hint Unfold tauK: core.
 
 Definition idK {E R}: R -> itree E R := fun r => Ret r.
-Hint Unfold idK.
+#[export] Hint Unfold idK: core.
 
 Lemma idK_spec E R (i0: itree E R): i0 = i0 >>= idK. Proof. unfold idK. irw. reflexivity. Qed.
 

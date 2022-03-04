@@ -105,7 +105,7 @@ Variant lower_event: forall (e_src e_tgt: ThreadEvent.t), Prop :=
     (ThreadEvent.racy_update loc to valr valw ordr ordw)
     (ThreadEvent.racy_update loc to valr valw ordr ordw)
 .
-Hint Constructors lower_event.
+#[export] Hint Constructors lower_event: core.
 
 
 Global Program Instance lower_event_PreOrder: PreOrder lower_event.

@@ -59,7 +59,7 @@ Section JOINED.
     :
       joined_view views (View.join vw0 vw1)
   .
-  Hint Constructors joined_view.
+  Hint Constructors joined_view: core.
 
   Lemma joined_view_join
         views view0 view1
@@ -130,7 +130,7 @@ Section JOINED.
     :
       joined_opt_view views None
   .
-  Hint Constructors joined_view.
+  Hint Constructors joined_view: core.
 
   Inductive joined_memory
             (views: Loc.t -> Time.t -> list View.t)
@@ -189,7 +189,7 @@ Section JOINED.
                                      (VIEWLE: View.le vw view),
           View.le vw max;
     }.
-  Hint Constructors max_le_joined_view.
+  Hint Constructors max_le_joined_view: core.
 
   Lemma max_le_joined_view_le_le
         views view0 view1 max0 max1
@@ -253,7 +253,7 @@ Section JOINED.
     :
       max_le_joined_opt_view views None None
   .
-  Hint Constructors max_le_joined_opt_view.
+  Hint Constructors max_le_joined_opt_view: core.
 
   Lemma max_le_joined_opt_view_le_le
         views view0 view1 max0 max1
@@ -470,7 +470,7 @@ Module JThread.
     :
       step pf e e1 e2 views1 views2
   .
-  Hint Constructors step.
+  #[global] Hint Constructors step: core.
 
   Inductive opt_step lang: forall (e:ThreadEvent.t)
                                   (e1 e2:Thread.t lang)
@@ -483,7 +483,7 @@ Module JThread.
       (STEP: step pf e e1 e2 views1 views2):
       opt_step e e1 e2 views1 views2
   .
-  Hint Constructors opt_step.
+  #[global] Hint Constructors opt_step: core.
 
   Lemma step_thread_step lang pf e (e1 e2: Thread.t lang) views1 views2
         (STEP: step pf e e1 e2 views1 views2)
@@ -517,7 +517,7 @@ Module JThread.
     :
       rtc_tau e1 e3 views1 views3
   .
-  Hint Constructors rtc_tau.
+  #[global] Hint Constructors rtc_tau: core.
 
   Lemma tau_steps_thread_tau_steps lang (e1 e2: Thread.t lang) views1 views2
         (STEPS: rtc_tau e1 e2 views1 views2)
@@ -642,7 +642,7 @@ Module JThread.
     :
       reserve_step views e1 e2
   .
-  Hint Constructors reserve_step.
+  #[global] Hint Constructors reserve_step: core.
 
   Inductive cancel_step (views: Loc.t -> Time.t -> list View.t)
             lang (e1 e2:Thread.t lang): Prop :=
@@ -652,7 +652,7 @@ Module JThread.
     :
       cancel_step views e1 e2
   .
-  Hint Constructors cancel_step.
+  #[global] Hint Constructors cancel_step: core.
 
   Lemma rtc_reserve_step_rtc_tau lang th0 th1 views
         (STEPS: rtc (@reserve_step views lang) th0 th1)
@@ -737,7 +737,7 @@ Module JConfiguration.
     :
       step (ThreadEvent.get_machine_event e) tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st3, lc3) (Configuration.threads c1)) sc3 memory3) views1 views3
   .
-  Hint Constructors step.
+  #[global] Hint Constructors step: core.
 
   Inductive opt_step: forall (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t)
                              (views1 views2: Loc.t -> Time.t -> list View.t), Prop :=
@@ -750,7 +750,7 @@ Module JConfiguration.
       tid c views:
       opt_step MachineEvent.silent tid c c views views
   .
-  Hint Constructors opt_step.
+  #[global] Hint Constructors opt_step: core.
 
   Inductive steps: forall (c1 c2: Configuration.t) (views1 views2: Loc.t -> Time.t -> list View.t), Prop :=
   | steps_refl
@@ -762,7 +762,7 @@ Module JConfiguration.
       (STEPS: steps c2 c3 views2 views3):
       steps c1 c3 views1 views3
   .
-  Hint Constructors steps.
+  #[global] Hint Constructors steps: core.
 
   Lemma step_configuration_step e tid c1 c2 views1 views2
         (STEP: step e tid c1 c2 views1 views2)
@@ -885,7 +885,7 @@ Module JConfiguration.
           JThread.consistent (Thread.mk _ st4 lc4 sc4 memory4) views2):
       single_step e tid c1 (Configuration.mk (IdentMap.add tid (existT _ _ st4, lc4) (Configuration.threads c1)) sc4 memory4) views1 views2
   .
-  Hint Constructors single_step.
+  #[global] Hint Constructors single_step: core.
 
   Inductive machine_single_step: forall (e:MachineEvent.t) (tid:Ident.t) (c1 c2:Configuration.t)
                                  (views1 views2: Loc.t -> Time.t -> list View.t), Prop :=
@@ -895,7 +895,7 @@ Module JConfiguration.
     :
       machine_single_step (ThreadEvent.get_machine_event e) tid c1 c2 views1 views2
   .
-  Hint Constructors machine_single_step.
+  #[global] Hint Constructors machine_single_step: core.
 
   Lemma single_step_configuration_step e tid c1 c2 views1 views2
         (STEP: single_step e tid c1 c2 views1 views2)
@@ -963,7 +963,7 @@ Module JConfiguration.
       (STEPS: single_steps c2 c3 views2 views3):
       single_steps c1 c3 views1 views3
   .
-  Hint Constructors single_steps.
+  #[global] Hint Constructors single_steps: core.
 
   Lemma single_steps_future
         c1 c2 views1 views2
@@ -1005,7 +1005,7 @@ Module JSim.
     :
       sim_op_kind Memory.op_kind_cancel Memory.op_kind_cancel
   .
-  Hint Constructors sim_op_kind.
+  #[global] Hint Constructors sim_op_kind: core.
 
   Global Program Instance sim_op_kind_PreOrder: PreOrder sim_op_kind.
   Next Obligation. ii. destruct x; econs; eauto; refl. Qed.
@@ -1091,7 +1091,7 @@ Module JSim.
         (ThreadEvent.racy_update loc to valr valw ordr ordw)
         (ThreadEvent.racy_update loc to valr valw ordr ordw)
   .
-  Hint Constructors sim_event.
+  #[global] Hint Constructors sim_event: core.
 
   Global Program Instance sim_event_PreOrder: PreOrder sim_event.
   Next Obligation. ii. destruct x; try (econs; eauto); refl. Qed.
@@ -1147,7 +1147,7 @@ Module JSim.
         None
         None
   .
-  Hint Constructors joined_promise_content.
+  #[global] Hint Constructors joined_promise_content: core.
 
   Definition sim_joined_promises (views: Loc.t -> Time.t -> list View.t)
              (prom_src prom_tgt: Memory.t): Prop :=
@@ -1178,7 +1178,7 @@ Module JSim.
         (Local.mk vw_src prom_src)
         (Local.mk vw_tgt prom_tgt)
   .
-  Hint Constructors sim_local.
+  #[global] Hint Constructors sim_local: core.
 
   Lemma sim_local_le
         lc_src lc_tgt views0 views1
@@ -1202,7 +1202,7 @@ Module JSim.
         (existT _ lang st, lc_src)
         (existT _ lang st, lc_tgt)
   .
-  Hint Constructors sim_statelocal.
+  #[global] Hint Constructors sim_statelocal: core.
 
   Lemma sim_statelocal_le
         stlc_src stlc_tgt views0 views1
@@ -1229,7 +1229,7 @@ Module JSim.
         (Thread.mk lang st lc_src sc_src mem_src)
         (Thread.mk lang st lc_tgt sc_tgt mem_tgt)
   .
-  Hint Constructors sim_thread.
+  #[global] Hint Constructors sim_thread: core.
 
   Lemma sim_local_read
         views
@@ -1493,7 +1493,7 @@ Module JSim.
     eapply View.unwrap_opt_le in RELEASED. inv RELEASED. auto.
   Qed.
 
-  Let unwrap_views (vw: option View.t) (views: list View.t): list View.t :=
+  Definition unwrap_views (vw: option View.t) (views: list View.t): list View.t :=
     match vw with
     | Some _ => views
     | _ => []
@@ -1677,7 +1677,7 @@ Module JSim.
           { eapply Memory.add_get0; eauto. }
         }
         { econs; eauto; [refl|]. eapply max_le_joined_opt_view_le; eauto. }
-        { eauto. }
+        { econs; eauto. }
         { ss. }
         { ss. }
       }
@@ -2120,7 +2120,7 @@ Module JSim.
     { i. subst. subst released_src.
       unfold TView.write_released. destruct (Ordering.le Ordering.relaxed ord_tgt); ss.
     }
-    
+
     exists released_src.
     set (write_tview := TView.write_tview (Local.tview lc1_src) sc1_src loc to ord_src).
 
@@ -2948,7 +2948,7 @@ Module JSim.
     - inv STEP0. inv LOCAL0.
       + esplits.
         * econs.
-          { econs 2; eauto. }
+          { econs 2; eauto. econs; eauto. }
           { ss. }
           { ss. }
           { ss. }
@@ -2961,7 +2961,7 @@ Module JSim.
         { refl. } i. des.
         exists (ThreadEvent.read loc ts val released_src ord). esplits.
         * econs.
-          { econs 2; eauto. }
+          { econs 2; eauto. econs; eauto. }
           { ss. }
           { ss. }
           { ss. }
@@ -2975,7 +2975,7 @@ Module JSim.
         { refl. } i. des.
         exists (ThreadEvent.write loc from to val released_src ord). esplits.
         * econs.
-          { econs 2; eauto. }
+          { econs 2; eauto. econs; eauto. }
           { ss. }
           { eapply VIEWSLE. }
           { ss. }
@@ -2992,7 +2992,7 @@ Module JSim.
         { refl. } i. des.
         exists (ThreadEvent.update loc tsr tsw valr valw released_src released_src0 ordr ordw). esplits.
         * econs.
-          { econs 2; eauto. }
+          { econs 2; eauto. econs; eauto. }
           { ss. }
           { eapply VIEWSLE. }
           { ss. }
@@ -3006,7 +3006,7 @@ Module JSim.
         { refl. } i. des.
         exists (ThreadEvent.fence ordr ordw). esplits.
         * econs.
-          { econs 2; eauto. }
+          { econs 2; eauto. econs; eauto. }
           { ss. }
           { ss. }
           { ss. }
@@ -3020,7 +3020,7 @@ Module JSim.
         { refl. } i. des.
         exists (ThreadEvent.syscall e). esplits.
         * econs.
-          { econs 2; eauto. }
+          { econs 2; eauto. econs; eauto. }
           { ss. }
           { ss. }
           { ss. }
@@ -3032,7 +3032,7 @@ Module JSim.
       + hexploit sim_local_failure; eauto.  i. des.
         exists (ThreadEvent.failure). esplits.
         * econs.
-          { econs 2; eauto. }
+          { econs 2; eauto. econs; eauto. }
           { ss. }
           { ss. }
           { ss. }
@@ -3046,7 +3046,7 @@ Module JSim.
         i. des.
         eexists (ThreadEvent.write_na _ _ _ _ _ _). esplits.
         * econs.
-          { econs 2; eauto. }
+          { econs 2; eauto. econs; eauto. }
           { ss. }
           { ss. }
           { ss. }
@@ -3059,7 +3059,7 @@ Module JSim.
         { refl. }
         i. eexists (ThreadEvent.racy_read _ _ _ _). esplits.
         * econs.
-          { econs 2; eauto. }
+          { econs 2; eauto. econs; eauto. }
           { ss. }
           { ss. }
           { ss. }
@@ -3072,7 +3072,7 @@ Module JSim.
         { refl. }
         i. eexists (ThreadEvent.racy_write _ _ _ _). esplits.
         * econs.
-          { econs 2; eauto. }
+          { econs 2; eauto. econs; eauto. }
           { ss. }
           { ss. }
           { ss. }
@@ -3086,7 +3086,7 @@ Module JSim.
         { refl. }
         i. eexists (ThreadEvent.racy_update _ _ _ _ _ _). esplits.
         * econs.
-          { econs 2; eauto. }
+          { econs 2; eauto. econs; eauto. }
           { ss. }
           { ss. }
           { ss. }
@@ -3331,7 +3331,7 @@ Module JSim.
         (Configuration.mk ths_src sc_src mem_src)
         (Configuration.mk ths_tgt sc_tgt mem_tgt)
   .
-  Hint Constructors sim_configuration.
+  #[global] Hint Constructors sim_configuration: core.
 
   Lemma joined_memory_cap views mem cap
         (JOINED: joined_memory views mem)

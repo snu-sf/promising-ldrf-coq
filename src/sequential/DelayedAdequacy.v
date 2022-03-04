@@ -253,6 +253,7 @@ Section LANG.
         (<<WORLD: world_messages_le (unchangable mem_src0 lc_src0.(Local.promises)) (unchangable mem_tgt0 lc_tgt0.(Local.promises)) w0 w1>>).
   Proof.
     red in SIM. des. punfold SIM0. dup STEP_TGT. inv STEP_TGT; ss.
+    hexploit Thread.step_program; eauto. intros _STEP.
     exploit Thread.step_future; eauto. i. des. ss.
     hexploit step_promise_consistent; eauto. i. ss.
     exploit SIM0; eauto. i. des; ss.
@@ -298,7 +299,7 @@ Section LANG.
         hexploit Thread.program_step_future; eauto. i. des; ss.
         hexploit rtc_all_step_promise_consistent.
         { eapply rtc_implies; [|eapply STEP_TGT]. i.
-          inv H. inv TSTEP. econs; eauto. econs; eauto.
+          inv H. inv TSTEP. econs; eauto. econs; eauto. econs 2; eauto.
         }
         all: eauto.
       }
@@ -406,7 +407,7 @@ Section LANG.
     } intros PROMISES'.
     hexploit rtc_implies; [|eapply LOWERS|].
     { instantiate (1:=@Thread.all_step _).
-      i. inv H. inv TSTEP. econs; eauto. econs; eauto.
+      i. inv H. inv TSTEP. econs; eauto. econs; eauto. econs 2; eauto.
     } intros LOWERS'.
     hexploit Thread.rtc_all_step_future; [eapply PROMISES'|..]; eauto. i. des; ss.
     hexploit Thread.rtc_all_step_future; [eapply LOWERS'|..]; eauto. i. des; ss.
@@ -728,7 +729,7 @@ Section LANG.
     { destruct e2, e3. subst. ss.
       pose proof (dsteps_rtc_all_step DSTEPS) as STEPS_TGT0.
       hexploit rtc_implies; [|eapply STEPS0|..].
-      { instantiate (1:=@Thread.tau_step _). i. inv H. inv TSTEP. econs; eauto. econs; eauto. }
+      { instantiate (1:=@Thread.tau_step _). i. inv H. inv TSTEP. econs; eauto. econs; eauto. econs 2; eauto. }
       intros STEPS_TGT1.
       dup SIM0. red in SIM0. des.
       hexploit Thread.rtc_all_step_future; [eapply STEPS_TGT0|..]; eauto; ss. i. des.
@@ -976,7 +977,7 @@ Section LANG.
         { eauto. }
         { i. eapply unchangable_rtc_tau_step_increase in STEPS0; eauto. }
         { i. eapply rtc_implies in STEPS_TGT.
-          2:{ instantiate (1:=@Thread.tau_step _). i. inv H. inv TSTEP. econs; eauto. econs; eauto. }
+          2:{ instantiate (1:=@Thread.tau_step _). i. inv H. inv TSTEP. econs; eauto. econs; eauto. econs 2; eauto. }
           eapply unchangable_rtc_tau_step_increase in STEPS_TGT; eauto. }
       }
       { i. eapply unchangable_rtc_tau_step_increase in STEPS; eauto. }
@@ -1594,4 +1595,4 @@ Proof.
 Qed.
 
 End WORLD.
-Hint Resolve _sim_thread_mon: paco.
+#[export] Hint Resolve _sim_thread_mon: paco.

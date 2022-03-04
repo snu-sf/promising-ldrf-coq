@@ -19,19 +19,6 @@ Set Implicit Arguments.
 Set Printing Universes.
 Set Printing All.
 
-Definition T0 := Type@{Language.t.u0}.
-Definition T1 := Type@{language.u0}.
-Check T0: T1.
-
-(* From ITree Require Export ITree ITreeFacts. *)
-(* From PromisingLib Require Import Basic Language. *)
-(* Definition t: T0 := itree id unit. *)
-(* Definition aa:= (IdentMap.t (@sigT (itree id unit) (fun _ => False))). *)
-
-(* Check Type@{language.u0}: Type@{IdentMap.t.u0}. *)
-
-Definition aa: Type@{IdentMap.t.u0} := Type@{language.u0}.
-
 
 Module Threads.
   Definition syntax := IdentMap.t {lang:language & (Language.syntax lang)}.
@@ -223,14 +210,14 @@ Module Configuration.
       (STEP: step e tid c1 c2)
       (EVENT: e <> MachineEvent.failure)
   .
-  Hint Constructors normal_step.
+  #[global] Hint Constructors normal_step: core.
 
   Inductive all_step (c1 c2: t): Prop :=
   | all_step_intro
       e tid
       (STEP: step e tid c1 c2)
   .
-  Hint Constructors all_step.
+  #[global] Hint Constructors all_step: core.
 
   Inductive opt_step: forall (e: MachineEvent.t) (tid: Ident.t) (c1 c2: t), Prop :=
   | step_none
@@ -241,7 +228,7 @@ Module Configuration.
       (STEP: step e tid c1 c2):
       opt_step e tid c1 c2
   .
-  Hint Constructors opt_step.
+  #[global] Hint Constructors opt_step: core.
 
   Definition tau_step := union (step MachineEvent.silent).
 
@@ -249,7 +236,7 @@ Module Configuration.
     exists tid c2 c3,
       <<STEPS: rtc tau_step c1 c2>> /\
       <<FAILURE: step MachineEvent.failure tid c2 c3>>.
-  Hint Unfold steps_failure.
+  #[global] Hint Unfold steps_failure: core.
 
   Inductive has_promise (c:t): Prop :=
   | has_promise_intro

@@ -129,7 +129,7 @@ Section SimulationThread.
       right. esplits; eauto.
   Qed.
 End SimulationThread.
-Hint Resolve _sim_thread_mon: paco.
+#[export] Hint Resolve _sim_thread_mon: paco.
 
 
 Lemma sim_thread_step

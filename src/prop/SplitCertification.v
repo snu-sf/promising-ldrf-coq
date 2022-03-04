@@ -502,13 +502,13 @@ Lemma failure_future_failure lang pf e th0 th1 mem1 sc1
     (<<STEP: Thread.step true e (Thread.mk lang th0.(Thread.state) th0.(Thread.local) sc1 mem1) th1'>>).
 Proof.
   inv STEP; inv STEP0; ss. inv LOCAL; ss.
-  { esplits. econs 2; eauto. }
+  { esplits. econs 2; eauto. econs; eauto. }
   { inv LOCAL0. esplits. econs 2; eauto. econs; eauto.
     econs; eauto. econs; eauto. eapply local_is_racy_future; eauto.
   }
   { inv LOCAL0.
-    { esplits. econs 2; eauto. }
-    { esplits. econs 2; eauto. }
+    { esplits. econs 2; eauto. econs; eauto. }
+    { esplits. econs 2; eauto. econs; eauto. }
     esplits. econs 2; eauto. econs; eauto.
     econs; eauto. econs; eauto. eapply local_is_racy_future; eauto.
   }

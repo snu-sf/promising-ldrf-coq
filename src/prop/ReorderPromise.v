@@ -993,8 +993,8 @@ Proof.
 Qed.
 
 
-Hint Constructors Thread.program_step.
-Hint Constructors Thread.step.
+#[export] Hint Constructors Thread.program_step: core.
+#[export] Hint Constructors Thread.step: core.
 
 Lemma reorder_nonpf_program
       lang

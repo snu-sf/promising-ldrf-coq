@@ -28,7 +28,7 @@ Inductive split_reserve
     (RESERVE: exists val' released', msg = Message.concrete val' released'):
     split_reserve promises1 mem1 loc from to msg promises2 mem2 (Memory.op_kind_split ts3 Message.reserve)
 .
-Hint Constructors split_reserve.
+#[export] Hint Constructors split_reserve: core.
 
 Lemma split_reserve_write prom0 mem0 loc from to msg prom1 mem1 ts3 prom2
       (SEMI: split_reserve prom0 mem0 loc from to msg prom1 mem1 (Memory.op_kind_split ts3 Message.reserve))

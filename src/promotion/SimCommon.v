@@ -51,7 +51,7 @@ Module SimCommon.
       (PLN: sim_timemap l (View.pln view_src) (View.pln view_tgt))
       (RLX: sim_timemap l (View.rlx view_src) (View.rlx view_tgt))
   .
-  Hint Constructors sim_view.
+  #[global] Hint Constructors sim_view: core.
 
   Program Instance sim_view_Equivalence: forall l, Equivalence (sim_view l).
   Next Obligation.
@@ -72,7 +72,7 @@ Module SimCommon.
   | sim_opt_view_none:
       sim_opt_view l None None
   .
-  Hint Constructors sim_opt_view.
+  #[global] Hint Constructors sim_opt_view: core.
 
   Program Instance sim_opt_view_Equivalence: forall l, Equivalence (sim_opt_view l).
   Next Obligation.
@@ -92,7 +92,7 @@ Module SimCommon.
       (CUR: sim_view l (TView.cur tview_src) (TView.cur tview_tgt))
       (ACQ: sim_view l (TView.acq tview_src) (TView.acq tview_tgt))
   .
-  Hint Constructors sim_tview.
+  #[global] Hint Constructors sim_tview: core.
 
   Program Instance sim_tview_Equivalence: forall l, Equivalence (sim_tview l).
   Next Obligation.
@@ -322,7 +322,7 @@ Module SimCommon.
   | sim_message_reserve:
       sim_message l Message.reserve Message.reserve
   .
-  Hint Constructors sim_message.
+  #[global] Hint Constructors sim_message: core.
 
   Program Instance sim_message_Equivalence: forall l, Equivalence (sim_message l).
   Next Obligation.
@@ -350,7 +350,7 @@ Module SimCommon.
             <<GET_SRC: Memory.get loc to mem_src = Some (from, msg_src)>> /\
             <<MSG: sim_message l msg_src msg_tgt>>)
   .
-  Hint Constructors sim_memory.
+  #[global] Hint Constructors sim_memory: core.
 
   Program Instance sim_memory_Equivalence: forall l, Equivalence (sim_memory l).
   Next Obligation.
@@ -380,7 +380,7 @@ Module SimCommon.
       (TVIEW: sim_tview l (Local.tview lc_src) (Local.tview lc_tgt))
       (PROMISES1: sim_memory l (Local.promises lc_src) (Local.promises lc_tgt))
   .
-  Hint Constructors sim_local.
+  #[global] Hint Constructors sim_local: core.
 
   Program Instance sim_local_Equivalence: forall l, Equivalence (sim_local l).
   Next Obligation.
