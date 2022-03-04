@@ -25,7 +25,7 @@ From PromisingLib Require Import Loc.
 From PromisingLib Require Import Language.
 From PromisingLib Require Import Axioms.
 
-Require Import Event.
+From PromisingLib Require Import Event.
 
 Require Import Sequential.
 Require Import SimAux.

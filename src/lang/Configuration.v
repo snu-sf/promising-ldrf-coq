@@ -7,7 +7,7 @@ From PromisingLib Require Import Loc.
 From PromisingLib Require Import Language.
 
 Require Import Time.
-Require Import Event.
+From PromisingLib Require Import Event.
 Require Import View.
 Require Import Cell.
 Require Import Memory.

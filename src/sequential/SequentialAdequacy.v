@@ -6,11 +6,10 @@ From PromisingLib Require Import Basic.
 From PromisingLib Require Import Language.
 From PromisingLib Require Import Loc.
 
-Require Import Event.
+From PromisingLib Require Import Event.
 Require Import Configuration.
 Require Import Behavior.
 
-Require Import MemoryProps.
 Require Import NoMix.
 Require Import DelayedSimulation.
 Require Import DelayedStep.

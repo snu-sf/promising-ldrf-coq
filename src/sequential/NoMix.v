@@ -7,7 +7,7 @@ From PromisingLib Require Import Loc.
 From PromisingLib Require Import Language.
 Require Import Sequential.
 
-Require Import Event.
+From PromisingLib Require Import Event.
 
 Section NOMIX.
   Variable loc_na: Loc.t -> Prop.

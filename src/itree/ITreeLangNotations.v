@@ -24,7 +24,7 @@ From sflib Require Import sflib.
 
 From PromisingLib Require Import Basic.
 
-Require Import Event.
+From PromisingLib Require Import Event.
 Require Export ITreeLib.
 
 Require Import ITreeLang.

@@ -11,7 +11,7 @@ From PromisingLib Require Import DataStructure.
 From PromisingLib Require Import DenseOrder.
 From PromisingLib Require Import Loc.
 
-Require Import Event.
+From PromisingLib Require Import Event.
 Require Import Time.
 Require Import View.
 

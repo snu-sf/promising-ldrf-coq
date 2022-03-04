@@ -10,7 +10,7 @@ From PromisingLib Require Import DataStructure.
 From PromisingLib Require Import Language.
 From PromisingLib Require Import Loc.
 Require Import Time.
-Require Import Event.
+From PromisingLib Require Import Event.
 Require Import View.
 Require Import Cell.
 Require Import Memory.

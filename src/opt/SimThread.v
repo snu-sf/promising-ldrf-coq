@@ -5,7 +5,7 @@ From PromisingLib Require Import Axioms.
 From PromisingLib Require Import Basic.
 From PromisingLib Require Import Language.
 
-Require Import Event.
+From PromisingLib Require Import Event.
 Require Import View.
 Require Import Cell.
 Require Import Memory.

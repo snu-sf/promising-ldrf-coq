@@ -12,7 +12,7 @@ From PromisingLib Require Import Language.
 From PromisingLib Require Import Loc.
 
 Require Import Time.
-Require Import Event.
+From PromisingLib Require Import Event.
 Require Import View.
 Require Import Cell.
 Require Import Memory.
@@ -54,12 +54,6 @@ Section GENERAL.
 
   Definition ternary A (b: bool) (a_true a_false: A) :=
     if b then a_true else a_false.
-
-  Lemma option_rel_mon A B (R0 R1: A -> B-> Prop)
-        (LE: R0 <2= R1)
-    :
-      option_rel R0 <2= option_rel R1.
-  Proof. i. unfold option_rel in *. des_ifs. auto. Qed.
 
   Lemma list_filter_exists A (P: A -> Prop) (l: list A)
     :

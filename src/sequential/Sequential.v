@@ -11,7 +11,7 @@ From PromisingLib Require Import DenseOrder.
 From PromisingLib Require Import Language.
 From PromisingLib Require Import Loc.
 
-Require Import Event.
+From PromisingLib Require Import Event.
 
 Set Implicit Arguments.
 

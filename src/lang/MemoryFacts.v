@@ -7,7 +7,7 @@ From PromisingLib Require Import Axioms.
 From PromisingLib Require Import Basic.
 From PromisingLib Require Import DataStructure.
 From PromisingLib Require Import DenseOrder.
-Require Import Event.
+From PromisingLib Require Import Event.
 Require Import Time.
 Require Import View.
 Require Import Cell.
