@@ -128,9 +128,9 @@ Section MATCH.
     dest_ident x id.
     - dest_loc l l0.
       + apply VAL; eauto. rewrite H0; auto.
-      + rss.
+      + rss. clarify.
     - dest_loc l l0.
-      + rss.
+      + rss. clarify.
       + rss.
   Qed.
 
@@ -239,7 +239,7 @@ Section MATCH.
       { unfold bot in *; rss. }
       specialize MD with l0 id.
       unfold update. dest_ident x id.
-      { rss. }
+      { rss. clarify. }
       rss.
     - rewrite RRfwd_write_ordf.
       unfold match_data in *; i.
@@ -249,14 +249,14 @@ Section MATCH.
         { unfold bot in *; rss. }
         specialize MD with l0 id.
         unfold update. dest_ident x id.
-        { rss. }
+        { rss. clarify. }
         rss.
       + rewrite RRfwd_load_ord2 in H; auto.
         dest_loc l l0.
         { unfold bot in *; rss. }
         specialize MD with l0 id.
         unfold update. dest_ident x id.
-        { rss. }
+        { rss. clarify. }
         rss.
       + rewrite RRfwd_load_ord3 in H; auto.
         dest_loc l l0.

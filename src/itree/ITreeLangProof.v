@@ -66,7 +66,7 @@ Section Proof.
         lhs loc ord le
     :
       denote_inst le (Inst.load lhs loc ord) =
-      ` r : Event.Const.t <- trigger (MemE.read loc ord);; Ret (update lhs r le, ()).
+      r <- trigger (MemE.read loc ord);; Ret (update lhs r le, ()).
   Proof. ss. Qed.
 
   Lemma denote_inst_store
@@ -80,7 +80,7 @@ Section Proof.
         lhs loc rmw ord1 ord2 le
     :
       denote_inst le (Inst.update lhs loc rmw ord1 ord2) =
-      ` r : Event.Const.t <- trigger (MemE.update loc rmw ord1 ord2);; Ret (update lhs r le, ()).
+      r <- trigger (MemE.update loc rmw ord1 ord2);; Ret (update lhs r le, ()).
   Proof. ss. Qed.
 
   Lemma denote_inst_fence
@@ -94,7 +94,7 @@ Section Proof.
         lhs es le
     :
       denote_inst le (Inst.syscall lhs es) =
-      let args := denote_exprs le es in ` r : Event.Const.t <- trigger (MemE.syscall args);; Ret (update lhs r le, ()).
+      let args := denote_exprs le es in r <- trigger (MemE.syscall args);; Ret (update lhs r le, ()).
   Proof. ss. Qed.
 
   Lemma denote_inst_abort
@@ -108,7 +108,7 @@ Section Proof.
         lhs le
     :
       denote_inst le (Inst.choose lhs) =
-      ` v : Event.Const.t <- trigger MemE.choose;; Ret (update lhs v le, ()).
+      v <- trigger MemE.choose;; Ret (update lhs v le, ()).
   Proof. ss. Qed.
 
 
@@ -196,7 +196,7 @@ Section Proof.
                      tau;; match is_zero cr with
                            | Some true => ret (inr (le0, ()))
                            | Some false =>
-                             ` r : lunit <- denote_block le0 wb;; ret (inl r)
+                             r <- denote_block le0 wb;; ret (inl r)
                            | None => trigger MemE.abort;; Ret (inr (le0, ()))
                            end).
   Proof. ss. Qed.
@@ -205,12 +205,12 @@ Section Proof.
         c wb le
     :
       denote_stmt le (while c wb) =
-      ` x_: lunit + lunit <- (let rc := denote_expr le c in
+      x_ <- (let rc := denote_expr le c in
                              tau;;
                              match is_zero rc with
                              | Some true => ret (inr (le, ()))
                              | Some false =>
-                               ` r : lunit <- denote_block le wb;; ret (inl r)
+                               r <- denote_block le wb;; ret (inl r)
                              | None => trigger MemE.abort;; Ret (inr (le, ()))
                              end);;
             (let lr := x_ in
@@ -233,11 +233,11 @@ Section Proof.
     match goal with
     | [|- ?lhs = _ ] =>
       assert (A: lhs =
-                 ` lr : lunit + lunit <-
+                 lr <-
                         (tau;; match is_zero (denote_expr le c) with
                                | Some true => ret (inr (le, ()))
                                | Some false =>
-                                 ` r : lunit <- denote_block le wb;; ret (inl r)
+                                 r <- denote_block le wb;; ret (inl r)
                                | None => trigger MemE.abort;; Ret (inr (le, ()))
                                end);;
                         match lr with
@@ -248,7 +248,7 @@ Section Proof.
     end.
     { eapply ext_bind; ss.
       i. destruct x; ss. rewrite unfold_denote_while. unfold while_itree. grind.
-      f_equal. destruct l. destruct u. ss.
+      f_equal. destruct p. destruct u. ss.
     }
     rewrite A; clear A. eapply ext_bind; eauto.
     i. destruct x; eauto. grind.

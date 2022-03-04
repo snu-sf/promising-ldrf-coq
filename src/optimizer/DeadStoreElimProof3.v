@@ -422,7 +422,7 @@ Section AUX.
     inv STEP. inv LOCAL.
     - inv LANG. des_ifs.
       symmetry in H. apply eq_is_bisim in H. eapply eqitree_inv_bind_vis in H. des.
-      2:{ exfalso. destruct a. eapply eqitree_inv_ret_vis in H0. auto. }
+      2:{ exfalso. destruct a. apply bisim_is_eq in H0. inv H0. }
       match goal with | [H: ?a ≅ ?b |- _] => replace a with b end.
       2:{ apply bisim_is_eq. symmetry. auto. }
       eexists. split. econs. ired. econs; eauto.
@@ -430,7 +430,7 @@ Section AUX.
 
     - inv LANG.
       symmetry in H. apply eq_is_bisim in H. eapply eqitree_inv_bind_vis in H. des.
-      2:{ exfalso. destruct a. eapply eqitree_inv_ret_vis in H0. auto. }
+      2:{ exfalso. destruct a. apply bisim_is_eq in H0. inv H0. }
       match goal with | [H: ?a ≅ ?b |- _] => replace a with b end.
       2:{ apply bisim_is_eq. symmetry. auto. }
       eexists. split. econs. ired. econs; eauto.
@@ -438,7 +438,7 @@ Section AUX.
 
     - inv LANG.
       symmetry in H. apply eq_is_bisim in H. eapply eqitree_inv_bind_vis in H. des.
-      2:{ exfalso. destruct a. eapply eqitree_inv_ret_vis in H0. auto. }
+      2:{ exfalso. destruct a. apply bisim_is_eq in H0. inv H0. }
       match goal with | [H: ?a ≅ ?b |- _] => replace a with b end.
       2:{ apply bisim_is_eq. symmetry. auto. }
       eexists. split. econs. ired. econs; eauto.
@@ -1208,16 +1208,16 @@ Section PARTIAL.
     - subst s_src. unfold itr_code. rewrite denote_block_cons. rewrite denote_stmt_ite2. grind.
       + clear IHMD2.
         replace (
-            ` r : lenv * () <- denote_block le (cons Inst.skip sb2);;
-                  ` x : lunit <- (let (le1, _) := r in denote_block le1 b_src);;
-                        (let (le1, _) := x in Ret (le1 ret_reg))
+            r <- denote_block le (cons Inst.skip sb2);;
+            x <- (let (le1, _) := r in denote_block le1 b_src);;
+            (let (le1, _) := x in Ret (le1 ret_reg))
           )
           with
             (
-              ` x_ : lenv * () <- denote_block le (cons Inst.skip sb2);;
-                     (let (l1, _) := x_ in
-                      ` x_0 : lenv * () <- denote_block l1 b_src;;
-                              (let (l1, _) := x_0 in Ret (l1 ret_reg)))
+              x_ <- denote_block le (cons Inst.skip sb2);;
+              (let (l1, _) := x_ in
+               x_0 <- denote_block l1 b_src;;
+               (let (l1, _) := x_0 in Ret (l1 ret_reg)))
             ).
         2:{ grind. }
         rewrite <- itr_code_add_block.
@@ -1242,16 +1242,16 @@ Section PARTIAL.
 
       + clear IHMD3.
         replace (
-            ` r : lenv * () <- denote_block le (cons Inst.skip sb1);;
-                  ` x : lunit <- (let (le1, _) := r in denote_block le1 b_src);;
-                        (let (le1, _) := x in Ret (le1 ret_reg))
+            r <- denote_block le (cons Inst.skip sb1);;
+            x <- (let (le1, _) := r in denote_block le1 b_src);;
+            (let (le1, _) := x in Ret (le1 ret_reg))
           )
           with
             (
-              ` x_ : lenv * () <- denote_block le (cons Inst.skip sb1);;
-                     (let (l1, _) := x_ in
-                      ` x_0 : lenv * () <- denote_block l1 b_src;;
-                              (let (l1, _) := x_0 in Ret (l1 ret_reg)))
+              x_ <- denote_block le (cons Inst.skip sb1);;
+              (let (l1, _) := x_ in
+               x_0 <- denote_block l1 b_src;;
+               (let (l1, _) := x_0 in Ret (l1 ret_reg)))
             ).
         2:{ grind. }
         rewrite <- itr_code_add_block.
@@ -1295,17 +1295,17 @@ Section PARTIAL.
         }
 
       + replace (
-            ` r : lenv * () <-
-                  denote_block le (cons Inst.skip (add_block sb (cons Inst.skip (cons (while e sb) nil))));;
-                  ` x : lunit <- (let (le1, _) := r in denote_block le1 b_src);;
-                        (let (le1, _) := x in Ret (le1 ret_reg))
+            r <-
+            denote_block le (cons Inst.skip (add_block sb (cons Inst.skip (cons (while e sb) nil))));;
+            x <- (let (le1, _) := r in denote_block le1 b_src);;
+            (let (le1, _) := x in Ret (le1 ret_reg))
           )
           with
             (
-              ` x_ : lenv * () <- denote_block le (cons Inst.skip (add_block sb (cons Inst.skip (cons (while e sb) nil))));;
-                     (let (l1, _) := x_ in
-                      ` x_0 : lenv * () <- denote_block l1 b_src;;
-                              (let (l1, _) := x_0 in Ret (l1 ret_reg)))
+              x_ <- denote_block le (cons Inst.skip (add_block sb (cons Inst.skip (cons (while e sb) nil))));;
+              (let (l1, _) := x_ in
+               x_0 <- denote_block l1 b_src;;
+               (let (l1, _) := x_0 in Ret (l1 ret_reg)))
             ).
         2:{ grind. }
         rewrite <- itr_code_add_block.
@@ -1408,20 +1408,20 @@ Section PROOF.
       (MC0: match_code mp b_src b_tgt)
       (OPT: Opt2.do_opt O2 mp i)
       (SRC: src = @SeqState.mk (lang _)
-                               (` r0 : lenv * () <- denote_stmt le i;;
-                                       ` x : lunit <- (let (le1, _) := r0 in denote_block le1 b_src);;
-                                             (let (le2, _) := x in Ret (le2 ret_reg)))
+                               (r0 <- denote_stmt le i;;
+                                x <- (let (le1, _) := r0 in denote_block le1 b_src);;
+                                (let (le2, _) := x in Ret (le2 ret_reg)))
                                src_m)
       (TGT: tgt = @SeqState.mk (lang _)
-                               (` r0 : lenv * () <- denote_stmt le (Opt2.opt_inst O2 mp i);;
-                                       ` x : lunit <- (let (le1, _) := r0 in denote_block le1 b_tgt);;
-                                             (let (le2, _) := x in Ret (le2 ret_reg)))
+                               (r0 <- denote_stmt le (Opt2.opt_inst O2 mp i);;
+                                x <- (let (le1, _) := r0 in denote_block le1 b_tgt);;
+                                (let (le2, _) := x in Ret (le2 ret_reg)))
                                tgt_m)
       (SIM: forall up le1 sm tm,
           (<<MM1: match_mem mp sm tm>>) ->
           gupaco7 _sim_seq (cpn7 _sim_seq) g _ _ term up (to_deferred mp)
-                  (@SeqState.mk (lang _) (` x : lunit <- denote_block le1 b_src;; (let (le2, _) := x in Ret (le2 ret_reg))) sm)
-                  (@SeqState.mk (lang _) (` x : lunit <- denote_block le1 b_tgt;; (let (le2, _) := x in Ret (le2 ret_reg))) tm))
+                  (@SeqState.mk (lang _) (x <- denote_block le1 b_src;; (let (le2, _) := x in Ret (le2 ret_reg))) sm)
+                  (@SeqState.mk (lang _) (x <- denote_block le1 b_tgt;; (let (le2, _) := x in Ret (le2 ret_reg))) tm))
     ,
       gpaco7 _sim_seq (cpn7 _sim_seq) r g _ _ term p (to_deferred (inst_gd i mp)) src tgt.
   Proof.
@@ -1430,8 +1430,8 @@ Section PROOF.
     - destruct (Perm.le Perm.high (p lhs)) eqn:PERM.
       + eapply sim_seq_na.
         { replace (
-              ` r0 : lenv * () <- denote_stmt le (Inst.store lhs rhs Ordering.na);;
-                     ` x : lunit <- (let (le1, _) := r0 in denote_block le1 b_src);; (let (le2, _) := x in Ret (le2 ret_reg)))
+              r0 <- denote_stmt le (Inst.store lhs rhs Ordering.na);;
+              x <- (let (le1, _) := r0 in denote_block le1 b_src);; (let (le2, _) := x in Ret (le2 ret_reg)))
             with
               (itr_code (cons (Inst.store lhs rhs Ordering.na) b_src) le).
           2:{ rewrite itr_code_cons. unfold itr_code. grind. }
@@ -1471,8 +1471,8 @@ Section PROOF.
     - destruct (Perm.le Perm.high (p lhs)) eqn:PERM.
       + eapply sim_seq_na.
         { replace (
-              ` r0 : lenv * () <- denote_stmt le (Inst.store lhs rhs Ordering.na);;
-                     ` x : lunit <- (let (le1, _) := r0 in denote_block le1 b_src);; (let (le2, _) := x in Ret (le2 ret_reg)))
+              r0 <- denote_stmt le (Inst.store lhs rhs Ordering.na);;
+              x <- (let (le1, _) := r0 in denote_block le1 b_src);; (let (le2, _) := x in Ret (le2 ret_reg)))
             with
               (itr_code (cons (Inst.store lhs rhs Ordering.na) b_src) le).
           2:{ rewrite itr_code_cons. unfold itr_code. grind. }

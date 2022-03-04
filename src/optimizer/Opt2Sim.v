@@ -285,20 +285,20 @@ Section SIM.
         (MC: match_code (inst_gd i mp) (cons i b_src) (cons i b_tgt))
         (NOOPT: ~ Opt2.do_opt O2 mp i)
         (SRC: src = @SeqState.mk (lang _)
-                                 (` r0 : lenv * () <- denote_stmt le i;;
-                                         ` x : lunit <- (let (le1, _) := r0 in denote_block le1 b_src);;
-                                               (let (le2, _) := x in Ret (le2 ret_reg)))
+                                 (r0 <- denote_stmt le i;;
+                                  x <- (let (le1, _) := r0 in denote_block le1 b_src);;
+                                  (let (le2, _) := x in Ret (le2 ret_reg)))
                                  src_m)
         (TGT: tgt = @SeqState.mk (lang _)
-                                 (` r0 : lenv * () <- denote_stmt le i;;
-                                         ` x : lunit <- (let (le1, _) := r0 in denote_block le1 b_tgt);;
-                                               (let (le2, _) := x in Ret (le2 ret_reg)))
+                                 (r0 <- denote_stmt le i;;
+                                  x <- (let (le1, _) := r0 in denote_block le1 b_tgt);;
+                                  (let (le2, _) := x in Ret (le2 ret_reg)))
                                  tgt_m)
         (SIM: forall up le1 sm tm,
             (<<MM1: match_mem mp sm tm>>) ->
             gupaco7 _sim_seq (cpn7 _sim_seq) g _ _ term up (to_deferred mp)
-                    (@SeqState.mk (lang _) (` x : lunit <- denote_block le1 b_src;; (let (le2, _) := x in Ret (le2 ret_reg))) sm)
-                    (@SeqState.mk (lang _) (` x : lunit <- denote_block le1 b_tgt;; (let (le2, _) := x in Ret (le2 ret_reg))) tm))
+                    (@SeqState.mk (lang _) (x <- denote_block le1 b_src;; (let (le2, _) := x in Ret (le2 ret_reg))) sm)
+                    (@SeqState.mk (lang _) (x <- denote_block le1 b_tgt;; (let (le2, _) := x in Ret (le2 ret_reg))) tm))
     :
       gpaco7 _sim_seq (cpn7 _sim_seq) r g _ _ term p (to_deferred (inst_gd i mp)) src tgt.
   Proof.
@@ -358,9 +358,9 @@ Section SIM.
         }
         all: rewrite ! denote_stmt_inst; rewrite ! denote_inst_load; grind.
         { inv H. inv LOCAL; ss; clarify.
-          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
-          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
-          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
+          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eqitree_inv_Vis_r in H. des. ss.
+          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eqitree_inv_Vis_r in H. des. ss.
+          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eqitree_inv_Vis_r in H. des. ss.
         }
         { do 2 eexists. esplits. rewrite bind_trigger. eapply ILang.step_read; eauto. ss. }
         ss.
@@ -436,15 +436,9 @@ Section SIM.
         }
         all: rewrite ! denote_stmt_inst; rewrite ! denote_inst_store; grind.
         { inv H. inv LOCAL; ss; clarify.
-          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des.
-            (* easier way? *)
-            symmetry in H. eapply simpobs in H.
-            eapply eqit_inv_vis in H. des. unfold subevent in H.
-            unfold resum, IFun in H. unfold ReSum_id in H. unfold id_ in H.
-            unfold Id_IFun in H. clarify.
-            destruct ord; ss.
-          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
-          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
+          - inv LANG. irw in H. inv H. destruct ord; ss.
+          - inv LANG. irw in H. inv H.
+          - inv LANG. irw in H. inv H.
         }
         { do 2 eexists. esplits. rewrite bind_trigger. eapply ILang.step_write; eauto. ss. }
         ss. irw in STEP_TGT.
@@ -515,9 +509,7 @@ Section SIM.
         }
         all:rewrite ! denote_stmt_inst; rewrite ! denote_inst_update; grind.
         { ss. unfold ILang.is_terminal in TERMINAL_TGT. des.
-          irw in TERMINAL_TGT. symmetry in TERMINAL_TGT.
-          eapply eq_is_bisim in TERMINAL_TGT. eapply eqitree_inv_ret_vis in TERMINAL_TGT.
-          clarify.
+          irw in TERMINAL_TGT. symmetry in TERMINAL_TGT. inv TERMINAL_TGT.
         }
         2:{ ss. rewrite bind_trigger in STEP_TGT.
             apply Bool.orb_true_elim in ORD. destruct ORD as [ORD | ORD].
@@ -590,15 +582,10 @@ Section SIM.
         }
         all:rewrite ! denote_stmt_inst; rewrite ! denote_inst_update; grind.
         { i. inv H. inv LOCAL; ss; clarify.
-          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
-          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
-          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des.
-            (* easier way? *)
-            symmetry in H. eapply simpobs in H.
-            eapply eqit_inv_vis in H. des. unfold subevent in H.
-            unfold resum, IFun in H. unfold ReSum_id in H. unfold id_ in H.
-            unfold Id_IFun in H. clarify.
-            unfold __guard__ in ORD1. des; clarify.
+          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eqitree_inv_Vis_r in H. des. ss.
+          - inv LANG. irw in H. apply eq_is_bisim in H. eapply eqitree_inv_Vis_r in H. des. ss.
+          - inv LANG. irw in H. inv H.
+            unfold __guard__ in ORD1. des; [destruct ordr; ss | destruct ordw; ss].
         }
         { destruct rmw.
           - do 2 eexists. esplits. rewrite bind_trigger.
@@ -656,9 +643,9 @@ Section SIM.
       }
       all: rewrite ! denote_stmt_inst; rewrite ! denote_inst_fence; grind.
       { i. inv H. inv LOCAL; ss; clarify.
-        - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
-        - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
-        - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
+        - inv LANG. irw in H. apply eq_is_bisim in H. eapply eqitree_inv_Vis_r in H. des. ss.
+        - inv LANG. irw in H. apply eq_is_bisim in H. eapply eqitree_inv_Vis_r in H. des. ss.
+        - inv LANG. irw in H. apply eq_is_bisim in H. eapply eqitree_inv_Vis_r in H. des. ss.
       }
       { do 2 eexists. esplits. rewrite bind_trigger. eapply ILang.step_fence; eauto. ss. }
       ss. irw in STEP_TGT. inv STEP_TGT. ss; clarify.
@@ -683,9 +670,9 @@ Section SIM.
       }
       all: rewrite ! denote_stmt_inst; rewrite ! denote_inst_syscall; grind.
       { i. inv H. inv LOCAL; ss; clarify.
-        - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
-        - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
-        - inv LANG. irw in H. apply eq_is_bisim in H. eapply eq_itree_inv_vis in H. des. ss.
+        - inv LANG. irw in H. apply eq_is_bisim in H. eapply eqitree_inv_Vis_r in H. des. ss.
+        - inv LANG. irw in H. apply eq_is_bisim in H. eapply eqitree_inv_Vis_r in H. des. ss.
+        - inv LANG. irw in H. apply eq_is_bisim in H. eapply eqitree_inv_Vis_r in H. des. ss.
       }
       { do 2 eexists. esplits. rewrite bind_trigger. eapply ILang.step_syscall; eauto. ss. }
       ss. irw in STEP_TGT. inv STEP_TGT. ss; clarify.
@@ -749,20 +736,20 @@ Section SIM.
       (MC0: match_code mp b_src b_tgt)
       (OPT: Opt2.do_opt O2 mp i)
       (SRC: src = @SeqState.mk (lang _)
-                               (` r0 : lenv * () <- denote_stmt le i;;
-                                       ` x : lunit <- (let (le1, _) := r0 in denote_block le1 b_src);;
-                                             (let (le2, _) := x in Ret (le2 ret_reg)))
+                               (r0 <- denote_stmt le i;;
+                                x <- (let (le1, _) := r0 in denote_block le1 b_src);;
+                                (let (le2, _) := x in Ret (le2 ret_reg)))
                                src_m)
       (TGT: tgt = @SeqState.mk (lang _)
-                               (` r0 : lenv * () <- denote_stmt le (Opt2.opt_inst O2 mp i);;
-                                       ` x : lunit <- (let (le1, _) := r0 in denote_block le1 b_tgt);;
-                                             (let (le2, _) := x in Ret (le2 ret_reg)))
+                               (r0 <- denote_stmt le (Opt2.opt_inst O2 mp i);;
+                                x <- (let (le1, _) := r0 in denote_block le1 b_tgt);;
+                                (let (le2, _) := x in Ret (le2 ret_reg)))
                                tgt_m)
       (SIM: forall up le1 sm tm,
           (<<MM1: match_mem mp sm tm>>) ->
           gupaco7 _sim_seq (cpn7 _sim_seq) g _ _ term up (to_deferred mp)
-                  (@SeqState.mk (lang _) (` x : lunit <- denote_block le1 b_src;; (let (le2, _) := x in Ret (le2 ret_reg))) sm)
-                  (@SeqState.mk (lang _) (` x : lunit <- denote_block le1 b_tgt;; (let (le2, _) := x in Ret (le2 ret_reg))) tm))
+                  (@SeqState.mk (lang _) (x <- denote_block le1 b_src;; (let (le2, _) := x in Ret (le2 ret_reg))) sm)
+                  (@SeqState.mk (lang _) (x <- denote_block le1 b_tgt;; (let (le2, _) := x in Ret (le2 ret_reg))) tm))
     ,
       gpaco7 _sim_seq (cpn7 _sim_seq) r g _ _ term p (to_deferred (inst_gd i mp)) src tgt.
 
