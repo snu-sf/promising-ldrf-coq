@@ -34,7 +34,7 @@ Require Import Event.
 Require Import FoldN.
 Require Import Knowledge.
 
-Require Import Simple.
+Require Import Sequential.
 Require Import FlagAux.
 Require Import SimAux.
 Require Import SeqAux.
@@ -50,6 +50,7 @@ Require Import DeadStoreElim.
 Require Import DeadStoreElimProof1.
 Require Import DeadStoreElimProof2.
 
+Require Import SequentialITree.
 Require Export ITreeLib.
 
 

@@ -37,7 +37,6 @@ Require Import Pred.
 Require Import Trace.
 
 Require Import SeqLib.
-Require Import gSimAux.
 Require Import Delayed.
 
 Set Implicit Arguments.

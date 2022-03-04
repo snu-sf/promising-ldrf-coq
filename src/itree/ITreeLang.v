@@ -219,6 +219,42 @@ Proof.
   refl.
 Qed.
 
+Lemma lang_step_deseq
+      R0 R1 ktr (itr1: itree MemE.t R0) (itr2: itree MemE.t R1) e
+      (STEP: ILang.step e
+                        (itr1 >>= ktr)
+                        itr2):
+  (exists r,
+      itr1 = Ret r /\
+      ILang.step e (ktr r) itr2) \/
+  (exists itr2',
+      itr2 = itr2' >>= ktr /\
+      ILang.step e itr1 itr2') \/
+  (itr1 = Vis MemE.abort (Empty_set_rect _) /\
+   e = ProgramEvent.failure)
+.
+Proof.
+  ides itr1.
+  { rewrite bind_ret_l in STEP. left. esplits; eauto. }
+  { rewrite bind_tau in STEP. dependent destruction STEP.
+    right. left. esplits; eauto. econs. eauto. }
+  { rewrite bind_vis in STEP.
+    dependent destruction STEP; try by (right; left; esplits; eauto; econs; eauto).
+    right. right. splits; auto. f_equal. f_equal. extensionality v. ss. }
+Qed.
+
+Lemma unfold_iter_eq {E} {A B} (f: A -> itree E (A + B)) (a: A)
+  :
+    ITree.iter f a
+    = lr <- f a;;
+      match lr with
+      | inl l => tau;; ITree.iter f l
+      | inr r => Ret r
+      end.
+Proof.
+  eapply bisimulation_is_eq. eapply unfold_iter.
+Qed.
+
 
 
 

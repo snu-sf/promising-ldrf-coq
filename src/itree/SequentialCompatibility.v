@@ -41,210 +41,14 @@ From PromisingLib Require Import Axioms.
 
 Require Import Event.
 Require Export ITreeLib.
-Require Export Program.
 
-Require Import Simple.
+Require Import Sequential.
+Require Import SequentialITree.
+Require Import SeqAux.
 Require Import FlagAux.
 Require Import ITreeLang.
 
-Require Import SimAux.
-Require Import SeqAux.
 
-
-
-Require Import ITreeLang.
-
-Definition SIM_VAL R_src R_tgt := forall (r_src:R_src) (r_tgt:R_tgt), Prop.
-
-Definition SIM_TERMINAL (lang_src lang_tgt:language) :=
-  forall (st_src:(Language.state lang_src)) (st_tgt:(Language.state lang_tgt)), Prop.
-
-Variant sim_terminal R_src R_tgt
-           (sim_ret:SIM_VAL R_src R_tgt)
-           (st_src: itree MemE.t R_src) (st_tgt: itree MemE.t R_tgt): Prop :=
-| sim_terminal_intro
-    r0 r1
-    (SIMRET: sim_ret r0 r1)
-    (SRC: st_src = Ret r0)
-    (TGT: st_tgt = Ret r1)
-.
-
-Definition SIM_SEQ :=
-  forall (lang_src lang_tgt:language) (sim_terminal: SIM_TERMINAL lang_src lang_tgt)
-         (p0: Perms.t) (d0: Flags.t)
-         (st_src0: SeqState.t lang_src)
-         (st_tgt0: SeqState.t lang_tgt), Prop.
-
-Definition _sim_itree
-           (sim_seq:SIM_SEQ)
-           R_src R_tgt
-           (sim_ret:SIM_VAL R_src R_tgt)
-           (itr_src: itree MemE.t R_src) (itr_tgt: itree MemE.t R_tgt): Prop :=
-  forall mem p,
-    @sim_seq (lang R_src) (lang R_tgt) (sim_terminal sim_ret)
-             p Flags.bot
-             (@SeqState.mk (lang R_src) itr_src mem)
-             (@SeqState.mk (lang R_tgt) itr_tgt mem).
-
-Definition _sim_ktree
-           (sim_seq:SIM_SEQ)
-           R_src0 R_tgt0 R_src1 R_tgt1
-           (sim_ret0:SIM_VAL R_src0 R_tgt0)
-           (ktr_src: R_src0 -> itree MemE.t R_src1)
-           (ktr_tgt: R_tgt0 -> itree MemE.t R_tgt1)
-           (sim_ret1:SIM_VAL R_src1 R_tgt1): Prop :=
-  forall r_src r_tgt
-         (RET: sim_ret0 r_src r_tgt),
-    _sim_itree sim_seq sim_ret1 (ktr_src r_src) (ktr_tgt r_tgt).
-
-Lemma _sim_itree_mon
-      s1 s2 (S: s1 <7= s2):
-  @_sim_itree s1 <5= @_sim_itree s2.
-Proof.
-  ii. apply S. apply PR; auto.
-Qed.
-
-Lemma _sim_ktree_mon
-      s1 s2 (S: s1 <7= s2):
-  @_sim_ktree s1 <8= @_sim_ktree s2.
-Proof.
-  ii. apply S. apply PR; auto.
-Qed.
-
-Lemma lang_step_bind R0 R1
-      (itr0 itr1: itree MemE.t R0) (k: R0 -> itree MemE.t R1) e
-      (STEP: ILang.step e itr0 itr1):
-  ILang.step e
-             (itr0 >>= k)
-             (itr1 >>= k).
-Proof.
-  dependent destruction STEP; subst; ired; try econs; eauto.
-  rewrite bind_spin. econs; eauto.
-Qed.
-
-Lemma na_step_bind R0 R1
-      (itr0 itr1: itree MemE.t R0) (k: R0 -> itree MemE.t R1)
-      mem1 mem2 p e
-      (STEP: SeqState.na_step
-               p e
-               (@SeqState.mk (lang R0) itr0 mem1)
-               (@SeqState.mk (lang R0) itr1 mem2)):
-  SeqState.na_step
-    p e
-    (@SeqState.mk (lang R1) (itr0 >>= k) mem1)
-    (@SeqState.mk (lang R1) (itr1 >>= k) mem2).
-Proof.
-  inv STEP. econs; eauto.
-  apply lang_step_bind. auto.
-Qed.
-
-Lemma na_opt_step_bind R0 R1
-      (itr0 itr1: itree MemE.t R0) (k: R0 -> itree MemE.t R1)
-      mem1 mem2 p e
-      (STEP: SeqState.na_opt_step
-               p e
-               (@SeqState.mk (lang R0) itr0 mem1)
-               (@SeqState.mk (lang R0) itr1 mem2)):
-  SeqState.na_opt_step
-    p e
-    (@SeqState.mk (lang R1) (itr0 >>= k) mem1)
-    (@SeqState.mk (lang R1) (itr1 >>= k) mem2).
-Proof.
-  inv STEP.
-  { econs 1; eauto. eapply na_step_bind; eauto. }
-  { econs 2; eauto. }
-Qed.
-
-Lemma rtc_na_step_bind R0 R1
-      (itr0 itr1: itree MemE.t R0) (k: R0 -> itree MemE.t R1)
-      mem1 mem2 p
-      (STEP: rtc (SeqState.na_step p MachineEvent.silent)
-                 (@SeqState.mk (lang R0) itr0 mem1)
-                 (@SeqState.mk (lang R0) itr1 mem2)):
-  rtc (SeqState.na_step p MachineEvent.silent)
-      (@SeqState.mk (lang R1) (itr0 >>= k) mem1)
-      (@SeqState.mk (lang R1) (itr1 >>= k) mem2).
-Proof.
-  remember (@SeqState.mk (lang R0) itr0 mem1).
-  remember (@SeqState.mk (lang R0) itr1 mem2).
-  revert itr0 itr1 mem1 mem2 Heqt Heqt0.
-  induction STEP; i; clarify.
-  { econs. }
-  { destruct y. econs.
-    { eapply na_step_bind; eauto. }
-    { eapply IHSTEP; eauto. }
-  }
-Qed.
-
-Lemma seq_thread_steps_bind R0 R1
-      (itr0 itr1: itree MemE.t R0) (k: R0 -> itree MemE.t R1)
-      mem0 mem1 p0 p1 o0 o1 tr
-      (STEPS: SeqThread.steps
-                (@SeqState.na_step _) tr
-                (SeqThread.mk (@SeqState.mk (lang R0) itr0 mem0) p0 o0)
-                (SeqThread.mk (@SeqState.mk (lang R0) itr1 mem1) p1 o1))
-  :
-    SeqThread.steps
-      (@SeqState.na_step _) tr
-      (@SeqThread.mk (lang R1) (@SeqState.mk (lang R1) (itr0 >>= k) mem0) p0 o0)
-      (@SeqThread.mk (lang R1) (@SeqState.mk (lang R1) (itr1 >>= k) mem1) p1 o1).
-Proof.
-  remember (SeqThread.mk (@SeqState.mk (lang R0) itr0 mem0) p0 o0).
-  remember (SeqThread.mk (@SeqState.mk (lang R0) itr1 mem1) p1 o1).
-  revert itr0 itr1 mem0 mem1 p0 p1 o0 o1 Heqt Heqt0.
-  induction STEPS; i; clarify; ss.
-  { econs 1. }
-  { inv STEP. destruct st1. econs 2.
-    { econs. eapply na_step_bind; eauto. }
-    { eapply IHSTEPS; eauto. }
-  }
-  { inv STEP. econs 3.
-    { econs; eauto. eapply lang_step_bind; eauto. }
-    { eapply IHSTEPS; eauto. }
-  }
-Qed.
-
-Lemma seq_thread_failure_bind R0 R1
-      (itr0 itr1: itree MemE.t R0) (k: R0 -> itree MemE.t R1)
-      mem0 p0 o0
-      (STEPS: SeqThread.failure
-                (@SeqState.na_step _)
-                (SeqThread.mk (@SeqState.mk (lang R0) itr0 mem0) p0 o0))
-  :
-    SeqThread.failure
-      (@SeqState.na_step _)
-      (@SeqThread.mk (lang R1) (@SeqState.mk (lang R1) (itr0 >>= k) mem0) p0 o0).
-Proof.
-  unfold SeqThread.failure in *. des. inv FAILURE. destruct st1.
-  esplits. econs. eapply na_step_bind; eauto.
-Qed.
-
-Lemma lang_step_deseq
-      R0 R1 ktr (itr1: itree MemE.t R0) (itr2: itree MemE.t R1) e
-      (STEP: ILang.step e
-                        (itr1 >>= ktr)
-                        itr2):
-  (exists r,
-      itr1 = Ret r /\
-      ILang.step e (ktr r) itr2) \/
-  (exists itr2',
-      itr2 = itr2' >>= ktr /\
-      ILang.step e itr1 itr2') \/
-  (itr1 = Vis MemE.abort (Empty_set_rect _) /\
-   e = ProgramEvent.failure)
-.
-Proof.
-  ides itr1.
-  { rewrite bind_ret_l in STEP. left. esplits; eauto. }
-  { rewrite bind_tau in STEP. dependent destruction STEP.
-    right. left. esplits; eauto. econs. eauto. }
-  { rewrite bind_vis in STEP.
-    dependent destruction STEP; try by (right; left; esplits; eauto; econs; eauto).
-    right. right. splits; auto. f_equal. f_equal. extensionality v. ss. }
-Qed.
-
-
-Global Hint Resolve cpn7_wcompat: paco.
 
 Inductive ctx (sim_seq:SIM_SEQ): SIM_SEQ :=
 | ctx_ret
@@ -308,18 +112,6 @@ Proof.
 Qed.
 Hint Resolve ctx_mon.
 
-
-Lemma unfold_iter_eq {E} {A B} (f: A -> itree E (A + B)) (a: A)
-  :
-    ITree.iter f a
-    = lr <- f a;;
-      match lr with
-      | inl l => tau;; ITree.iter f l
-      | inr r => Ret r
-      end.
-Proof.
-  eapply bisimulation_is_eq. eapply unfold_iter.
-Qed.
 
 
 Inductive ctx_src_steps (sim_seq:SIM_SEQ): SIM_SEQ :=
@@ -626,9 +418,6 @@ Proof.
   }
 Qed.
 
-Definition sim_seq_itree := @_sim_itree sim_seq.
-Definition sim_seq_ktree := @_sim_ktree sim_seq.
-
 Lemma sim_seq_ret_mon lang_src lang_tgt sim_terminal0 sim_terminal1
       p f th_src th_tgt
       (SIM01: sim_terminal0 <2= sim_terminal1)
@@ -663,30 +452,6 @@ Proof.
   ii. eapply sim_seq_ret_mon.
   2:{ eauto. }
   i. inv PR. econs; eauto.
-Qed.
-
-Lemma sim_seq_all_refl lang (prog: lang.(Language.state) )
-  :
-    @sim_seq_all _ _ eq prog prog.
-Proof.
-  ii. generalize (@SeqState.mk lang prog m). revert p. clear prog m.
-  pcofix CIH. pfold. econs.
-  { ii. esplits; eauto.
-    { refl. }
-    { refl. }
-  }
-  { ii. esplits; eauto.
-    { econs; eauto. }
-  }
-  { ii. esplits; eauto.
-    { refl. }
-    { i. esplits; eauto. eapply SeqEvent.input_match_bot. }
-  }
-  { ii. esplits; eauto.
-    { econs. }
-    { econs. }
-    { left. ss. refl. }
-  }
 Qed.
 
 Lemma sim_seq_itree_refl R (itr: itree MemE.t R)
@@ -795,15 +560,148 @@ Proof.
   { refl. }
 Qed.
 
-Lemma sim_seq_weak_mon: monotone7 sim_seq_weak.
-Proof.
-  ii. inv IN.
-  { econs 1; eauto.
-    { ii. exploit NASTEP; eauto. i. des. esplits; eauto. }
-    { ii. exploit ATSTEP; eauto. i. des. esplits; eauto.
-      i. exploit SIM; eauto. i. des. esplits; eauto.
+Require Import NoMix.
+
+Section NOMIX.
+  Variable loc_na: Loc.t -> Prop.
+  Variable loc_at: Loc.t -> Prop.
+
+  Inductive itree_context A: forall B, (itree MemE.t A -> itree MemE.t B) -> Prop :=
+  | itree_context_id
+    :
+      @itree_context A A id
+  | itree_context_constant
+      B (c: itree MemE.t B)
+      (NOMIX: nomix loc_na loc_at (@lang B) c)
+    :
+      @itree_context A B (fun _ => c)
+  | itree_context_bind
+      B C
+      (f: itree MemE.t A -> itree MemE.t B)
+      (g: B -> (itree MemE.t A -> itree MemE.t C))
+      (CTX_F: @itree_context A B f)
+      (CTX_G: forall b, @itree_context A C (g b))
+    :
+      @itree_context A C (fun itr => b <- (f itr);; g b itr)
+  | itree_context_iter
+      R I
+      (body: I -> itree MemE.t A -> itree MemE.t (I + R))
+      (CTX_BODY: forall i, @itree_context A (I + R) (body i))
+      i
+    :
+      @itree_context A R (fun itr => ITree.iter (fun i0 => body i0 itr) i)
+  .
+
+  Lemma itree_nomix_spin A
+    :
+      nomix loc_na loc_at (@lang A) ITree.spin.
+  Proof.
+    pcofix CIH. pfold. ii. rewrite unfold_spin in STEP. inv STEP.
+    splits; ss. right. auto.
+  Qed.
+
+  Variant itree_nomix_bind_clo (r: forall lang, lang.(Language.state) -> Prop)
+    : forall lang, lang.(Language.state) -> Prop :=
+  | itree_nomix_bind_clo_intro
+      A B itr ktr
+      (NOMIX0: r (@lang A) itr)
+      (NOMIX1: forall a, r (@lang B) (ktr a))
+    :
+      itree_nomix_bind_clo r (@lang B) (itr >>= ktr)
+  .
+
+  Lemma itree_nomix_bind_clo_uclo
+    :
+      itree_nomix_bind_clo <3= gupaco2 (_nomix loc_na loc_at) (cpn2 (_nomix loc_na loc_at)).
+  Proof.
+    eapply grespect2_uclo; auto with paco. econs.
+    { ii. dependent destruction IN. econs; eauto. }
+    { i. dependent destruction PR. eapply rclo2_base. ii.
+      dup STEP. eapply lang_step_deseq in STEP. des; clarify.
+      { specialize (NOMIX1 r0). eapply GF in NOMIX1.
+        exploit NOMIX1; eauto. i. des. splits; auto. eapply rclo2_base; auto.
+      }
+      { eapply GF in NOMIX0. exploit NOMIX0; eauto.
+        i. des. splits; auto. eapply rclo2_clo. left. econs; eauto.
+        { eapply rclo2_base; auto. }
+        { i. eapply rclo2_base. auto. }
+      }
+      { splits; ss. inv STEP0. eapply rclo2_clo. right.
+        gfinal. right. eapply paco2_mon; [eapply itree_nomix_spin|]; ss.
+      }
     }
-  }
-  { econs 2; eauto. }
-Qed.
-Hint Resolve sim_seq_weak_mon.
+  Qed.
+
+  Lemma itree_nomix_bind A B
+        (itr: itree MemE.t A) (ktr: A -> itree MemE.t B)
+        (NOMIX0: nomix loc_na loc_at (@lang A) itr)
+        (NOMIX1: forall a, nomix loc_na loc_at (@lang B) (ktr a))
+    :
+      nomix loc_na loc_at (@lang B) (itr >>= ktr).
+  Proof.
+    ginit. guclo itree_nomix_bind_clo_uclo. econs; eauto.
+    { gfinal. right. eapply NOMIX0. }
+    { i. gfinal. right. eapply NOMIX1. }
+  Qed.
+
+  Lemma itree_nomix_iter I R
+        (body: I -> itree MemE.t (I + R))
+        (NOMIX: forall i, nomix loc_na loc_at (@lang (I + R)) (body i))
+        i
+    :
+      nomix loc_na loc_at (@lang R) (ITree.iter body i).
+  Proof.
+    ginit. revert i. gcofix CIH. i. gstep. ii.
+    dup STEP. rewrite unfold_iter_eq in STEP.
+    eapply lang_step_deseq in STEP. des; clarify.
+    { destruct r0; inv STEP1. splits; ss.
+      gbase. eauto.
+    }
+    { specialize (NOMIX i). punfold NOMIX. exploit NOMIX; eauto.
+      i. des. inv CONT; ss. splits; auto.
+      guclo itree_nomix_bind_clo_uclo. econs; eauto.
+      { gfinal. right. eapply paco2_mon; eauto. ss. }
+      { i. destruct a.
+        { gstep. ii. inv STEP. splits; ss. gfinal. auto. }
+        { gstep. ii. inv STEP. }
+      }
+    }
+    { splits; ss. inv STEP0.
+      gfinal. right. eapply paco2_mon; [eapply itree_nomix_spin|]; ss.
+    }
+  Qed.
+
+  Lemma itree_nomix_context A B itr ctx
+        (CTX: itree_context ctx)
+        (NOMIX: nomix loc_na loc_at (@lang A) itr)
+    :
+      nomix loc_na loc_at (@lang B) (ctx itr).
+  Proof.
+    induction CTX; i; auto.
+    { eapply itree_nomix_bind; eauto. }
+    { eapply itree_nomix_iter; eauto. }
+  Qed.
+
+  Lemma itree_sim_seq_context A B itr_src itr_tgt
+        (ctx: itree MemE.t A -> itree MemE.t B)
+        (CTX: itree_context ctx)
+        (SIM: sim_seq_itree eq itr_src itr_tgt)
+    :
+      sim_seq_itree eq (ctx itr_src) (ctx itr_tgt).
+  Proof.
+    induction CTX.
+    { auto. }
+    { eapply sim_seq_itree_refl. }
+    { eapply sim_seq_itree_bind.
+      { eauto. }
+      { red. red. i. subst. eapply H. }
+    }
+    { eapply sim_seq_itree_iter.
+      { instantiate (1:=eq). red. red. i. subst.
+        specialize (H r_tgt). eapply sim_seq_itree_mon in H; eauto.
+        i. subst. destruct x1; ss; eauto.
+      }
+      { auto. }
+    }
+  Qed.
+End NOMIX.

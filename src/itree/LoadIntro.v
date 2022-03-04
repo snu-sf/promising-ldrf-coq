@@ -42,7 +42,7 @@ Require Import Event.
 Require Export ITreeLib.
 Require Export Program.
 
-Require Import Simple.
+Require Import Sequential.
 Require Import SimAux.
 
 Require Import IDCollect.
@@ -52,6 +52,7 @@ Require Import Opt3Sim.
 Require Import ITreeLangNotations.
 Require Import ITreeLangProof.
 Require Import ITreeLang.
+Require Import SequentialITree.
 
 
 

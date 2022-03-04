@@ -26,7 +26,6 @@ Require Import MemoryMerge.
 Require Import FulfillStep.
 Require Import MemoryProps.
 
-Require Import gSimAux.
 Require Import LowerMemory.
 Require Import JoinedView.
 
@@ -35,11 +34,9 @@ Require Import Delayed.
 
 Require Import Lia.
 
-Require Import gSimulation.
-
 Require Import JoinedView.
 Require Import SeqLift.
-Require Import Simple.
+Require Import Sequential.
 
 Require Import Pred.
 

@@ -1606,6 +1606,17 @@ Section SIM.
     }
     { econs 2; eauto. }
   Qed.
+  Lemma sim_seq_weak_mon: monotone7 sim_seq_weak.
+  Proof.
+    ii. inv IN.
+    { econs 1; eauto.
+      { ii. exploit NASTEP; eauto. i. des. esplits; eauto. }
+      { ii. exploit ATSTEP; eauto. i. des. esplits; eauto.
+        i. exploit SIM; eauto. i. des. esplits; eauto.
+      }
+    }
+    { econs 2; eauto. }
+  Qed.
 
   Lemma sim_seq_failure_imm lang_src lang_tgt sim_terminal
         p0 d st_src0 st_tgt0 st_src1
@@ -1630,3 +1641,54 @@ End SIM.
 End SIMULATION.
 Arguments sim_seq [_] [_] _ _ _.
 #[export] Hint Resolve sim_seq_mon: paco.
+#[export] Hint Resolve sim_seq_weak_mon: paco.
+#[export] Hint Resolve cpn7_wcompat: paco.
+
+Arguments sim_seq_all [lang_src] [lang_tgt] sim_terminal st_src st_tgt.
+
+Lemma sim_seq_all_refl lang (prog: lang.(Language.state))
+  :
+    @sim_seq_all _ _ eq prog prog.
+Proof.
+  ii. generalize (@SeqState.mk lang prog m). revert p. clear prog m.
+  pcofix CIH. pfold. econs.
+  { ii. esplits; eauto.
+    { refl. }
+    { refl. }
+  }
+  { ii. esplits; eauto.
+    { econs; eauto. }
+  }
+  { ii. esplits; eauto.
+    { refl. }
+    { i. esplits; eauto. eapply SeqEvent.input_match_bot. }
+  }
+  { ii. esplits; eauto.
+    { econs. }
+    { econs. }
+    { left. ss. refl. }
+  }
+Qed.
+
+Lemma sim_seq_all_mon lang_src lang_tgt
+      (prog_src: lang_src.(Language.state)) (prog_tgt: lang_tgt.(Language.state))
+      (sim_terminal0 sim_terminal1: lang_src.(Language.state) -> lang_tgt.(Language.state) -> Prop)
+      (SIM: sim_seq_all sim_terminal0 prog_src prog_tgt)
+      (LE: sim_terminal0 <2= sim_terminal1)
+  :
+    sim_seq_all sim_terminal1 prog_src prog_tgt.
+Proof.
+  ii. specialize (SIM p m). revert SIM.
+  generalize Flags.bot (@SeqState.mk _ prog_src m) (@SeqState.mk _ prog_tgt m).
+  revert p m. pcofix CIH. i.
+  pfold. punfold SIM. inv SIM.
+  { econs 1.
+    { ii. exploit TERMINAL; eauto. i. des. esplits; eauto. }
+    { ii. exploit NASTEP; eauto. i. des. pclearbot. esplits; eauto. }
+    { ii. exploit ATSTEP; eauto. i. des. esplits; eauto.
+      i. hexploit SIM; eauto. i. des. pclearbot. esplits; eauto.
+    }
+    { auto. }
+  }
+  { econs 2; eauto. }
+Qed.

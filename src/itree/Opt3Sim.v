@@ -43,7 +43,7 @@ Require Import Event.
 Require Export ITreeLib.
 Require Export Program.
 
-Require Import Simple.
+Require Import Sequential.
 Require Import SimAux.
 
 Require Import Opt3.

@@ -15,7 +15,7 @@ Require Import Event.
 Require Import FoldN.
 Require Import Knowledge.
 
-Require Import Simple.
+Require Import Sequential.
 Require Import FlagAux.
 Require Import SimAux.
 Require Import SeqAux.

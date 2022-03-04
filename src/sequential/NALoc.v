@@ -162,7 +162,6 @@ Qed.
 
 Require Import DelayedStep.
 Require Import NoMix.
-Require Import gSimAux.
 
 Section POINTABLE.
   Variable loc_na: Loc.t -> Prop.
@@ -616,7 +615,7 @@ End POINTABLE.
 
 Require Import Pred.
 Require Import Delayed.
-Require Import Simple.
+Require Import Sequential.
 
 Section NA.
   Variable loc_na: Loc.t -> Prop.

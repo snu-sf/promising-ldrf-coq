@@ -31,8 +31,6 @@ Require Import MemoryProps.
 Require Import Program.
 
 Require Import JoinedView.
-Require Import gSimAux.
-Require Import gSimulation.
 Require Import Pred.
 Require Import Delayed.
 Require Import LowerMemory.

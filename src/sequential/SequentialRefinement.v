@@ -16,7 +16,7 @@ Require Import Event.
 Require Import List.
 
 Require Import SeqLib.
-Require Import Simple.
+Require Import Sequential.
 Require Import OracleFacts.
 
 Require Import SimAux.
@@ -2130,7 +2130,7 @@ Section ADEQUACY.
               SeqThread.perm := p; SeqThread.oracle := o |}).
   Proof.
     unfold SeqTrace.incl. i.
-    cut 
+    cut
   (exists tr1 : SeqTrace.t,
     SeqBehavior.behavior (SeqState.na_step (lang:=lang_src))
       {| SeqThread.state := {| SeqState.state := st_src; SeqState.memory := m_src |}; SeqThread.perm := p; SeqThread.oracle := o |}
@@ -2240,7 +2240,7 @@ Section ADEQUACY.
   Theorem simulation_implies_refinement
           (st_src: lang_src.(Language.state))
           (st_tgt: lang_tgt.(Language.state))
-          (SIM: sim_seq_all _ _ (fun _ _ => True) st_src st_tgt)
+          (SIM: sim_seq_all (fun _ _ => True) st_src st_tgt)
     :
       SeqBehavior.refine _ _ st_tgt st_src.
   Proof.
@@ -2259,7 +2259,7 @@ Section ADEQUACY.
               <1=
               SeqBehavior.behavior state_step (SeqThread.mk (SeqState.mk _ st_src m) p o))
     :
-      sim_seq_all _ _ (fun _ _ => True) st_src st_tgt.
+      sim_seq_all (fun _ _ => True) st_src st_tgt.
   Proof.
     ii. eapply refinement_implies_simulation_aux; eauto; try by econs 1.
     ii. exploit REFINE; eauto. i. des. eauto.

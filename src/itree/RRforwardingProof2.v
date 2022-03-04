@@ -27,7 +27,7 @@ From PromisingLib Require Import Axioms.
 
 Require Import Event.
 
-Require Import Simple.
+Require Import Sequential.
 Require Import SimAux.
 Require Import SeqAux.
 
@@ -43,6 +43,7 @@ Require Import ITreeLang.
 Require Import RRforwarding.
 Require Import RRforwardingProof1.
 
+Require Import SequentialITree.
 Require Export ITreeLib.
 
 

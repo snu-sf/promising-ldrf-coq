@@ -27,7 +27,7 @@ From PromisingLib Require Import Axioms.
 
 Require Import Event.
 
-Require Import Simple.
+Require Import Sequential.
 Require Import SimAux.
 Require Import SeqAux.
 
@@ -43,6 +43,7 @@ Require Import ITreeLang.
 Require Import WRforwarding.
 Require Import WRforwardingProof1.
 
+Require Import SequentialITree.
 Require Export ITreeLib.
 
 
@@ -199,7 +200,7 @@ Section MATCH.
       i; des. hexploit H0; clear H0; eauto. i; des.
       destruct (mp l) eqn:MPL; ss. destruct p0 as [v b]. i.
       rewrite RELMEMV; clear RELMEMV.
-      rewrite H0 in RELPERM. hexploit perm_meet_high. rewrite RELPERM; auto. i; des. 
+      rewrite H0 in RELPERM. hexploit perm_meet_high. rewrite RELPERM; auto. i; des.
       des_ifs; ss; des; auto.
   Qed.
 
@@ -298,7 +299,7 @@ Section MATCH.
         { destruct ordr; ss. }
         i; des. hexploit H1; clear H1. eauto. i; des.
         rewrite RELMEMV; clear RELMEMV.
-        rewrite H2 in RELPERM. hexploit perm_meet_high. rewrite RELPERM; auto. i; des. 
+        rewrite H2 in RELPERM. hexploit perm_meet_high. rewrite RELPERM; auto. i; des.
         destruct b; ss; des; auto.
       + rewrite WRfwd_read_ord3; eauto.
         unfold Two_set_flag, Two_elim.

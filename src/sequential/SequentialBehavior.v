@@ -16,7 +16,7 @@ Require Import Event.
 Require Import List.
 
 Require Import SeqLib.
-Require Import Simple.
+Require Import Sequential.
 Require Import OracleFacts.
 
 Require Import SeqAux.

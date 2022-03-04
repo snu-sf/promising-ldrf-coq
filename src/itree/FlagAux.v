@@ -12,7 +12,7 @@ From PromisingLib Require Import Axioms.
 Require Import Event.
 Require Export Program.
 
-Require Import Simple.
+Require Import Sequential.
 
 
 Ltac unfold_flags := unfold Flags.update, Flags.add, Flags.sub, Flags.sub_opt, Flags.meet, Flags.join, Flags.minus in *.

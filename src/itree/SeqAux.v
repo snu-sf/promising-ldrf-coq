@@ -13,7 +13,7 @@ From PromisingLib Require Import Axioms.
 Require Import Event.
 Require Export Program.
 
-Require Import Simple.
+Require Import Sequential.
 Require Import FlagAux.
 
 

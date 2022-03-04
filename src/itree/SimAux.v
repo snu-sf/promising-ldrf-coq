@@ -43,7 +43,8 @@ Require Import Event.
 Require Export ITreeLib.
 Require Export Program.
 
-Require Import Simple.
+Require Import Sequential.
+Require Import SequentialITree.
 Require Import FlagAux.
 Require Import ITreeLang.
 
@@ -352,4 +353,3 @@ Section SIMAUX.
   Qed.
 
 End SIMAUX.
-Hint Resolve cpn7_wcompat: paco.

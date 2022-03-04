@@ -26,7 +26,6 @@ Require Import MemoryMerge.
 Require Import FulfillStep.
 Require Import MemoryProps.
 
-Require Import gSimAux.
 Require Import LowerMemory.
 Require Import JoinedView.
 
@@ -37,8 +36,7 @@ Require Import Lia.
 
 Require Import JoinedView.
 Require Import SeqLift.
-Require Import gSimulation.
-Require Import Simple.
+Require Import Sequential.
 
 
 Record sim_tview

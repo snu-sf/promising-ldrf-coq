@@ -26,7 +26,6 @@ Require Import MemoryMerge.
 Require Import FulfillStep.
 Require Import MemoryProps.
 
-Require Import gSimAux.
 Require Import LowerMemory.
 Require Import JoinedView.
 
