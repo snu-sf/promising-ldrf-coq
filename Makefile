@@ -5,14 +5,11 @@ COQTHEORIES  := \
 	src/prop/*.v \
 	src/opt/*.v \
 	src/opt/itree/*.v \
-	src/gsim/*.v \
 	src/sequential/*.v \
 	src/promotion/*.v \
 	src/ldrfpf/*.v \
 	src/ldrfra/*.v \
 	src/ldrfsc/*.v \
-# src/while/*.v \
-#	src/opt/while/*.v \
 
 .PHONY: all theories clean
 
@@ -30,7 +27,6 @@ Makefile.coq: Makefile $(COQTHEORIES)
    echo "-R src/prop $(COQMODULE)"; \
    echo "-R src/opt $(COQMODULE)"; \
    echo "-R src/opt/itree $(COQMODULE)"; \
-   echo "-R src/gsim $(COQMODULE)"; \
    echo "-R src/sequential $(COQMODULE)"; \
    echo "-R src/promotion $(COQMODULE)"; \
    echo "-R src/ldrfpf $(COQMODULE)"; \
