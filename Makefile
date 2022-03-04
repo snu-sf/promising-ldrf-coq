@@ -2,6 +2,7 @@ COQMODULE    := Promising2
 COQTHEORIES  := \
 	src/lang/*.v \
 	src/itree/*.v \
+	src/itree/seq_opts/*.v \
 	src/prop/*.v \
 	src/opt/*.v \
 	src/sequential/*.v \
