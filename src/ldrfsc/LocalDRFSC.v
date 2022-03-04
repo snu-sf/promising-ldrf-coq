@@ -687,7 +687,7 @@ Section SIM.
     :
       RARace.racefree L c.
   Proof.
-    ii. unfold RARace.race in *. des. guardH ORDERING.
+    ii. unfold RARace.race in *. des.
     exploit ra_configuration_steps_sc_configuration_steps_or_race.
     { etrans.
       { eapply STEPS1. } econs 2.
@@ -697,14 +697,62 @@ Section SIM.
     { eauto. }
     i. des.
     { exploit ra_thread_all_steps_sc_thread_all_steps_or_race; eauto. i. des.
-      { eapply RACEFREE; eauto. econs. esplits; eauto.
-        unfold ThreadEvent.is_reading in *. des_ifs.
-        - inv READ_STEP; inv STEP. econs; eauto. esplits; eauto; ss.
-          inv LOCAL. inv LOCAL0. inv STEP.
-          unfold SCLocal.non_maximal. esplits; eauto; ss.
-        - inv READ_STEP; inv STEP. econs; eauto. esplits; eauto; ss.
-          inv LOCAL. inv LOCAL1. inv LOCAL2. inv STEP.
-          unfold SCLocal.non_maximal. esplits; eauto; ss.
+      { des. eapply RACEFREE; eauto. econs. esplits; eauto.
+        exploit SCConfiguration.all_steps_future; eauto. i. des.
+        exploit SCThread.rtc_all_step_future; eauto; try eapply WF2; eauto.
+        i. des. ss.
+        assert (exists from msg, (<<GET: Memory.get loc to e4.(Thread.memory) = Some (from, msg)>>) /\ (<<NRESERVE: msg <> Message.reserve>>)).
+        { hexploit OrdConfiguration.rtc_all_step_future; [eapply STEPS1|..]; eauto.
+          i. des.
+          hexploit OrdConfiguration.step_future; eauto. i. des. auto.
+          hexploit OrdConfiguration.rtc_all_step_future; [eapply STEPS2|..]; eauto. i. des.
+          inv WRITE_STEP. ss.
+          inv WF1. inv WF5. hexploit Thread.rtc_cancel_step_future; eauto.
+          i. des. inv STEP0; ss.
+          hexploit OrdThread.step_future; eauto. i. des.
+          hexploit Thread.rtc_reserve_step_future; eauto. i. des. ss.
+          assert (LOC: L loc = true).
+          { clear - RACE. red in RACE. des.
+            { red in WRRACE. des; auto. }
+            { red in WWRACE. des; auto. }
+          }
+          assert (exists from msg, (<<GET: Memory.get loc to e3.(Thread.memory) = Some (from, msg)>>) /\ (<<NRESERVE: msg <> Message.reserve>>)).
+          { clear - LOC STEP1 WRITE_EVENT RACE. inv STEP1.
+            { inv STEP; ss. }
+            inv STEP; ss. inv LOCAL; ss; clarify.
+            { inv LOCAL0. inv STEP. esplits.
+              { eapply Memory.write_get2; eauto. }
+              { ss. }
+            }
+            { inv LOCAL2. inv STEP. esplits.
+              { eapply Memory.write_get2; eauto. }
+              { ss. }
+            }
+            { inv LOCAL0.
+              { rewrite LOC in STEP. inv STEP. destruct ordw; ss. }
+              { inv STEP. esplits.
+                { eapply Memory.write_get2; eauto. }
+                { ss.
+                }
+              }
+            }
+          }
+          des. eapply Memory.future_get1 in GET.
+          { des. esplits; eauto. inv MSG_LE; ss. }
+          { etrans; eauto. etrans; eauto. }
+          { auto. }
+        }
+        red in RACE. des.
+        { red. red in WRRACE. destruct WRRACE as [LOC [TS ORD]]. guardH ORD. des.
+          unfold ProgramEvent.is_reading in READ. des_ifs.
+          { esplits; eauto; ss. red. esplits; eauto. }
+          { esplits; eauto; ss. red. esplits; eauto. }
+        }
+        { red. red in WWRACE. destruct WWRACE as [LOC [TS ORD]]. guardH ORD. des.
+          unfold ProgramEvent.is_writing in WRITE. des_ifs.
+          { esplits; eauto; ss. red. esplits; eauto. }
+          { esplits; eauto; ss. red. esplits; eauto. }
+        }
       }
       { eapply RACEFREE; eauto. econs. esplits; eauto.
         exploit SCConfiguration.all_steps_future; eauto. i. des.

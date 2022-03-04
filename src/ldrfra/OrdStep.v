@@ -1017,5 +1017,68 @@ Module OrdConfiguration.
       induction STEPS; ss. inv H.
       hexploit step_reserve_only; eauto.
     Qed.
+
+    Lemma step_future
+          e tid c1 c2
+          (STEP: step e tid c1 c2)
+          (WF1: Configuration.wf c1):
+      (<<WF2: Configuration.wf c2>>) /\
+      (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+      (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>).
+    Proof.
+      inv WF1. inv WF. inv STEP; s. exploit THREADS; ss; eauto. i.
+      assert (STEPS: rtc
+                       (@OrdThread.all_step _ L ordcr ordcw)
+                       (Thread.mk _ st1 lc1 (Configuration.sc c1) (Configuration.memory c1))
+                       (Thread.mk _ st4 lc4 sc4 memory4)).
+      { etrans.
+        { eapply rtc_implies; try apply CANCELS. i. inv H.
+          inv STEP.
+          2:{ inv STEP1; inv LOCAL. }
+          econs; eauto. econs; eauto. econs 1; eauto. ii. clarify.
+        }
+        etrans.
+        { instantiate (1:=e3). inv STEP0.
+          { refl. }
+          { econs 2; [|refl]. econs; eauto. econs; eauto. }
+        }
+        { eapply rtc_implies; try apply RESERVES. i. inv H.
+          inv STEP.
+          2:{ inv STEP1; inv LOCAL. }
+          econs; eauto. econs; eauto. econs 1; eauto. ii. clarify.
+        }
+      }
+      exploit OrdThread.rtc_all_step_future; eauto. s. i. des.
+      splits; eauto. econs; ss. econs.
+      + i. Configuration.simplify.
+        * exploit THREADS; try apply TH1; eauto. i. des.
+          exploit OrdThread.rtc_all_step_disjoint; eauto. i. des.
+          symmetry. auto.
+        * exploit THREADS; try apply TH2; eauto. i. des.
+          exploit OrdThread.rtc_all_step_disjoint; eauto. i. des.
+          auto.
+        * eapply DISJOINT; [|eauto|eauto]. auto.
+      + i. Configuration.simplify.
+        exploit THREADS; try apply TH; eauto. i.
+        exploit OrdThread.rtc_all_step_disjoint; eauto. i. des.
+        auto.
+    Qed.
+
+    Lemma rtc_all_step_future
+          c1 c2
+          (STEP: rtc all_step c1 c2)
+          (WF1: Configuration.wf c1):
+      (<<WF2: Configuration.wf c2>>) /\
+      (<<SC_FUTURE: TimeMap.le (Configuration.sc c1) (Configuration.sc c2)>>) /\
+      (<<MEM_FUTURE: Memory.future (Configuration.memory c1) (Configuration.memory c2)>>).
+    Proof.
+      induction STEP; i.
+      { splits; auto; try refl. }
+      { inv H. hexploit step_future; eauto. i. des.
+        hexploit IHSTEP; eauto. i. des. splits; auto.
+        { etrans; eauto. }
+        { etrans; eauto. }
+      }
+    Qed.
   End OrdConfiguration.
 End OrdConfiguration.

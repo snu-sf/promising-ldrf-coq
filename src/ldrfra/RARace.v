@@ -54,10 +54,10 @@ Section RARACE.
      (<<ORDW2: Ordering.le ord Ordering.na>>)).
 
   Definition ra_race (loc: Loc.t) (to: Time.t) (ordw: Ordering.t) (tview: TView.t) (e: ProgramEvent.t): Prop :=
-    (exists loc val ord,
+    (exists val ord,
         (<<READ: ProgramEvent.is_reading e = Some (loc, val, ord)>>) /\
         (<<WRRACE: wr_race loc to ordw tview ord>>)) \/
-    (exists loc val ord,
+    (exists val ord,
         (<<WRITE: ProgramEvent.is_writing e = Some (loc, val, ord)>>) /\
         (<<WWRACE: ww_race loc to ordw tview ord>>)).
 
