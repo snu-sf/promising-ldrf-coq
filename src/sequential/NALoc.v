@@ -110,11 +110,11 @@ Proof.
   { right. econs. econs; try exact GET0; ss.
     - destruct (Memory.get loc ts prom_src) as [[]|] eqn:GETP; ss.
       inv WF1_SRC. ss.
-      exploit PROMISES0; eauto. i.
+      exploit PROMISES0; eauto. intros x.
       rewrite x in *. inv GET0.
       specialize (PROMISES loc ts).
       rewrite GETP in *. inv PROMISES. clear NIL.
-      exploit CONS; eauto; ss. i.
+      exploit CONS; eauto; ss. intros x0.
       exfalso.
       eapply Time.lt_strorder.
       eapply TimeFacts.le_lt_lt; try eapply x0.
@@ -1941,7 +1941,7 @@ Section NA.
     eapply other_promise_unchangable with (tid1:=tid) (tid2:=tid0); eauto.
     econs; eauto. inv WF2. ss.
     inv WF0. destruct st. exploit THREADS; eauto.
-    i. inv x4. ss. rewrite EQ. eapply PROMISES in EQ. clarify.
+    intros x4. inv x4. ss. rewrite EQ. eapply PROMISES in EQ. clarify.
   Qed.
 
   Definition terminal_dstep_committed_finalized tid c0 c1 st0 st1 lc0 lc1
@@ -1963,7 +1963,7 @@ Section NA.
     eapply other_promise_unchangable with (tid1:=tid) (tid2:=tid0); eauto.
     econs; eauto. inv WF2. ss.
     inv WF0. destruct st. exploit THREADS; eauto.
-    i. inv x4. ss. rewrite EQ. eapply PROMISES0 in EQ. clarify.
+    intros x4. inv x4. ss. rewrite EQ. eapply PROMISES0 in EQ. clarify.
   Qed.
 
   Variant d_na_step e tid c1 c2 :=

@@ -346,7 +346,7 @@ Lemma promise_consistent_promise_read
       (CONS: Local.promise_consistent lc2):
   Time.lt to t.
 Proof.
-  inv STEP. exploit CONS; eauto; ss. i.
+  inv STEP. exploit CONS; eauto; ss. intros x.
   apply TimeFacts.join_lt_des in x. des.
   apply TimeFacts.join_lt_des in AC. des.
   revert BC0. unfold View.singleton_ur_if. condtac; ss.
@@ -371,7 +371,7 @@ Proof.
     { inv PROMISE0; ss. }
     i. des.
     rewrite X0 in *. inv GET.
-    exploit CONS; eauto; try by (inv MSG_LE; ss). s. i.
+    exploit CONS; eauto; try by (inv MSG_LE; ss). s. intros x.
     apply TimeFacts.join_lt_des in x. des.
     revert BC. unfold TimeMap.singleton, LocFun.add. condtac; ss. i.
     econs. ss.

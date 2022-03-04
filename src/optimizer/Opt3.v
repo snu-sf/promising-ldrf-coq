@@ -26,7 +26,7 @@ Module Opt3.
         expr_g: gdata -> Inst.expr -> gdata;
         inst_g: gdata -> Inst.t -> gdata;
         join_g: gdata -> gdata -> gdata;
-        
+
         le_g: gdata -> gdata -> Prop;
         le_g_PreOrder: PreOrder le_g;
         le_g_PartialOrder: PartialOrder eq le_g;
@@ -127,12 +127,12 @@ Section OPT.
   Let le_g_PreOrder: PreOrder le_g := Opt3.le_g_PreOrder O3.
   Let le_g_PartialOrder: PartialOrder eq le_g := Opt3.le_g_PartialOrder O3.
 
-  Program Instance le_g_PreOrder_i: PreOrder le_g.
-  Program Instance le_g_PartialOrder_i: PartialOrder eq le_g.
+  Global Program Instance le_g_PreOrder_i: PreOrder le_g.
+  Global Program Instance le_g_PartialOrder_i: PartialOrder eq le_g.
 
   Definition lt_g gd1 gd2 := (le_g gd1 gd2) /\ (gd1 <> gd2).
 
-  Program Instance lt_g_Transitive_i: Transitive lt_g.
+  Global Program Instance lt_g_Transitive_i: Transitive lt_g.
   Next Obligation.
   Proof.
     unfold lt_g in *. des. split.

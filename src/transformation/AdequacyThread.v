@@ -142,17 +142,17 @@ Proof.
     destruct (IdentMap.find a ths_src) as [[[lang_src st_src] lc_src]|] eqn:ASRC;
       destruct (IdentMap.find a ths_tgt) as [[[lang_tgt st_tgt] lc_tgt]|] eqn:ATGT; cycle 1.
     { exploit tids_find; [apply TIDS_SRC|apply TIDS_TGT|..]. i. des.
-      exploit x0; eauto. i. des. rewrite ATGT in x. inv x. }
+      exploit x0; eauto. intros x. des. rewrite ATGT in x. inv x. }
     { exploit tids_find; [apply TIDS_SRC|apply TIDS_TGT|..]. i. des.
-      exploit x1; eauto. i. des. rewrite ASRC in x. inv x. }
+      exploit x1; eauto. intros x. des. rewrite ASRC in x. inv x. }
     { exploit IHl; [exact TIDS_SRC|exact TIDS_TGT|exact SC1|exact MEMORY1|..]; eauto; i.
       - eapply NOTIN; eauto. ii. inv H; ss. congr.
       - eapply IN; eauto. econs 2; eauto.
       - eapply TIDS_MEM; eauto. econs 2; eauto.
       - inv NODUP. ss.
     }
-    generalize WF_SRC. intro X. inv X. ss. inv WF. exploit THREADS; eauto. i.
-    generalize WF_TGT. intro X. inv X. ss. inv WF. exploit THREADS0; eauto. i.
+    generalize WF_SRC. intro X. inv X. ss. inv WF. exploit THREADS; eauto. intros x.
+    generalize WF_TGT. intro X. inv X. ss. inv WF. exploit THREADS0; eauto. intros x0.
     exploit (IN a); eauto. i. des.
     exploit TERMINAL_TGT; eauto. i. des.
     hexploit Local.terminal_promise_consistent; eauto. i.
@@ -177,17 +177,17 @@ Proof.
       exploit IHl; [| |exact SC2|exact MEMORY|..]; try exact WF2; try exact WF_TGT;
         try exact SC_FUTURE_TGT; try exact MEM_FUTURE_TGT;
           try (etrans; [exact SC_FUTURE_SRC|exact SC_FUTURE]);
-          try (etrans; [exact MEM_FUTURE_SRC|exact MEM_FUTURE]); eauto; i.
+          try (etrans; [exact MEM_FUTURE_SRC|exact MEM_FUTURE]); eauto.
       { rewrite Threads.tids_add. rewrite IdentSet.add_mem; eauto. }
-      { rewrite IdentMap.gsspec in FIND. revert FIND. condtac; ss; i.
+      { i. rewrite IdentMap.gsspec in FIND. revert FIND. condtac; ss; i.
         - subst. Configuration.simplify. split; auto.
           inv THREAD. econs. eapply sim_local_memory_bot; eauto.
         - eapply NOTIN; eauto. ii. des; ss. subst. ss. }
-      { rewrite IdentMap.gsspec in H0. revert H0. condtac; ss; i.
+      { i. rewrite IdentMap.gsspec in H0. revert H0. condtac; ss; i.
         - subst. inv NODUP. congr.
         - exploit IN; eauto. }
       { inv NODUP. ss. }
-      des.
+      intros x1. des.
       * left.
         unfold Configuration.steps_failure in *. des.
         rewrite STEPS0 in x3. esplits; try exact x3; eauto.
@@ -199,7 +199,7 @@ Proof.
     destruct (IdentMap.find tid_tgt ths_src) as [[[lang_src st_src] lc_src]|] eqn:FIND_SRC; cycle 1.
     { remember (Threads.tids ths_src) as tids eqn:TIDS_SRC.
       exploit tids_find; [exact TIDS_SRC|exact TIDS_TGT|..]. i. des.
-      exploit x1; eauto. i. des. rewrite FIND_SRC in x. inv x. }
+      exploit x1; eauto. intros x. des. rewrite FIND_SRC in x. inv x. }
     inv WF_SRC. inv WF_TGT. inv WF. inv WF0. ss.
     exploit SIM; eauto. i. des.
     exploit sim_thread_future; eauto using Memory.future_future_weak. i.
@@ -234,9 +234,9 @@ Proof.
               exploit Thread.step_future; try exact STEP; eauto. s. i. des.
               exploit Thread.rtc_tau_step_future; try exact X; eauto. s. i. des.
               exploit Thread.step_future; try exact STEP0; eauto. s. i. des.
-              exploit SIM; try eapply H; eauto. i. des.
+              exploit SIM; try eapply H; eauto. intros x2. des.
               eexists.
-              eapply sim_thread_future; try exact x0;
+              eapply sim_thread_future; try exact x2;
                 try by (etrans; [eauto using Memory.future_future_weak|
                                  etrans; eauto using Memory.future_future_weak]).
         - ss. inv X. esplits; eauto.
@@ -270,9 +270,9 @@ Proof.
             exploit Thread.step_future; try exact STEP; eauto. s. i. des.
             exploit Thread.rtc_tau_step_future; try exact STEPS0; eauto. s. i. des.
             exploit Thread.step_future; try exact STEP1; eauto. s. i. des.
-            exploit SIM; try eapply H; eauto. i. des.
+            exploit SIM; try eapply H; eauto. intros x2. des.
             eexists.
-            eapply sim_thread_future; try exact x0;
+            eapply sim_thread_future; try exact x2;
               try by (etrans; [eauto using Memory.future_future_weak|
                                etrans; eauto using Memory.future_future_weak]).
       }

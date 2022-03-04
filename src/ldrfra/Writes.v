@@ -209,15 +209,15 @@ Module Writes.
       - exploit Memory.add_get0; try exact MEM. i. des. congr.
       - exploit Memory.split_get0; try exact MEM. i. des. congr.
       - exploit Memory.lower_get0; try exact PROMISES. i. des.
-        inv DISJOINT. exploit DISJOINT0; eauto. i. des. exfalso.
+        inv DISJOINT. exploit DISJOINT0; eauto. intros x4. des. exfalso.
         exploit Memory.get_ts; try exact GETP. i. des; try congr.
         exploit Memory.get_ts; try exact GET. i. des; try congr.
-        apply (x0 to); econs; try refl; ss.
+        apply (x4 to); econs; try refl; ss.
       - exploit Memory.remove_get0; try exact PROMISES. i. des.
-        inv DISJOINT. exploit DISJOINT0; eauto. i. des. exfalso.
+        inv DISJOINT. exploit DISJOINT0; eauto. intros x4. des. exfalso.
         exploit Memory.get_ts; try exact GETP. i. des; try congr.
         exploit Memory.get_ts; try exact GET. i. des; try congr.
-        apply (x0 to); econs; try refl; ss.
+        apply (x4 to); econs; try refl; ss.
     Qed.
 
     Lemma write_disjoint

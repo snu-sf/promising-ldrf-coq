@@ -82,59 +82,8 @@ Module SeqTrace.
     }
   Qed.
 
-  (* Program Instance le_PreOrder: PreOrder (le Flags.bot). *)
-  (* Next Obligation. *)
-  (* Proof. *)
-  (*   ii. destruct x. induction l. *)
-  (*   { destruct r. *)
-  (*     { econs 1; refl. } *)
-  (*     { econs 2; eauto. *)
-  (*       { econs 1. } *)
-  (*       { refl. } *)
-  (*     } *)
-  (*     { econs 3; eauto. econs 1. } *)
-  (*   } *)
-  (*   { destruct a as [[e i] o]. econs 4; eauto. *)
-  (*     { eapply SeqEvent.input_match_bot; eauto. } *)
-  (*     { refl. } *)
-  (*   } *)
-  (* Qed. *)
-  (* Next Obligation. *)
-  (* Proof. *)
-  (*   ii. destruct z. ginduction l. *)
-  (*   { i. inv H0. *)
-  (*     { inv H. econs 1. *)
-  (*       { etrans; eauto. } *)
-  (*       { etrans; eauto. } *)
-  (*     } *)
-  (*     { inv TRACE. inv H. inv TRACE. econs 2. *)
-  (*       { econs. } *)
-  (*       { etrans; eauto. } *)
-  (*     } *)
-  (*     { econs 3. econs. } *)
-  (*   } *)
-  (*   { i. inv H0. *)
-  (*     { inv H. econs 2; eauto. *)
-  (*       inv TRACE0. etrans; eauto. *)
-  (*     } *)
-  (*     { econs; eauto. } *)
-  (*     { inv H. *)
-  (*       { inv LE. *)
-  (*         { econs 2. *)
-
   Definition incl (b0: t -> Prop) (b1: t -> Prop): Prop :=
     forall tr0, b0 tr0 -> exists tr1, b1 tr1 /\ le Flags.bot tr0 tr1.
-
-  (* Program Instance incl_PreOrder: PreOrder incl. *)
-  (* Next Obligation. *)
-  (* Proof. *)
-  (*   ii. exists tr0. split; auto. refl. *)
-  (* Qed. *)
-  (* Next Obligation. *)
-  (* Proof. *)
-  (*   ii. apply H in H1. des. apply H0 in H1. des. *)
-  (*   esplits; eauto. etrans; eauto. *)
-  (* Qed. *)
 End SeqTrace.
 
 
@@ -274,7 +223,7 @@ Lemma step_deterministic
   deterministic lang st1.
 Proof.
   punfold DETERM. inv DETERM.
-  exploit PRESERVE; eauto. i. inv x; done.
+  exploit PRESERVE; eauto. intros x. inv x; done.
 Qed.
 
 
@@ -382,5 +331,5 @@ Lemma step_receptive
   receptive _ st2.
 Proof.
   punfold RECEPTIVE. inv RECEPTIVE.
-  exploit PRESERVE; eauto. i. inv x; ss.
+  exploit PRESERVE; eauto. intros x. inv x; ss.
 Qed.

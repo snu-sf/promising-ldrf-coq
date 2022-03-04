@@ -340,7 +340,7 @@ Section ADEQUACY.
       simple_match_event (e_src, i_src, o) (e_tgt, i_tgt, o)
   .
 
-  Program Instance simple_match_event_PreOrder: PreOrder simple_match_event.
+  Global Program Instance simple_match_event_PreOrder: PreOrder simple_match_event.
   Next Obligation.
     ii. destruct x as [[]]. econs; refl.
   Qed.
@@ -366,7 +366,7 @@ Section ADEQUACY.
   Proof.
     revert orc FOLLOWS. induction MATCH; i; eauto. inv H.
     inv FOLLOWS. econs; i.
-    - exploit SOUND; try exact STEP. i. des. split.
+    - exploit SOUND; try exact STEP. intros x. des. split.
       + destruct e_src, e_tgt; ss; inv EVENT; des; subst; ss.
       + i. exploit x0; try by (etrans; eauto). i. des. splits; auto.
     - eapply COMPLETE; eauto; try by etrans; eauto.
@@ -381,7 +381,7 @@ Section ADEQUACY.
   Proof.
     revert orc FOLLOWS. induction MATCH; i; eauto. inv H.
     inv FOLLOWS. econs; i.
-    - exploit SOUND; try exact STEP. i. des. split.
+    - exploit SOUND; try exact STEP. intros x. des. split.
       + destruct e_src, e_tgt; ss; inv EVENT; des; subst; ss.
       + i. exploit x0.
         { etrans; eauto. symmetry. ss. }
@@ -737,7 +737,7 @@ Section ADEQUACY.
     - eapply na_steps_behavior; eauto.
       inv ORACLE. exploit COMPLETE; try refl.
       { eapply wf_input_oracle_wf_input; eauto. }
-      i. des. exploit SOUND; eauto. i. des. exploit x0; try refl. i. des.
+      i. des. exploit SOUND; eauto. intros x. des. exploit x0; try refl. i. des.
       econs 5; try eapply IHSTEPS; try eapply FOLLOWS; eauto.
       destruct st0, st3. econs; eauto; try refl.
   Qed.
@@ -757,7 +757,7 @@ Section ADEQUACY.
     - eapply na_steps_behavior; eauto.
       inv ORACLE. exploit COMPLETE; try refl.
       { eapply wf_input_oracle_wf_input; eauto. }
-      i. des. exploit SOUND; eauto. i. des. exploit x0; try refl. i. des.
+      i. des. exploit SOUND; eauto. intros x. des. exploit x0; try refl. i. des.
       econs 5; try eapply IHSTEPS; try eapply FOLLOWS; eauto.
       destruct st0, st3. econs; eauto; try refl.
   Qed.
@@ -776,7 +776,7 @@ Section ADEQUACY.
     - eapply na_steps_behavior; eauto.
       inv ORACLE. exploit COMPLETE; try refl.
       { eapply wf_input_oracle_wf_input; eauto. }
-      i. des. exploit SOUND; eauto. i. des. exploit x0; try refl. i. des.
+      i. des. exploit SOUND; eauto. intros x. des. exploit x0; try refl. i. des.
       econs 5; try eapply IHSTEPS; try eapply FOLLOWS; eauto.
       destruct st0, st4. econs; eauto; try refl.
   Qed.
@@ -793,7 +793,7 @@ Section ADEQUACY.
     repeat f_equal.
     - inv UPD; ss; des_ifs; ss.
       + specialize (H t t0). des. exploit H5; eauto. i. des. ss.
-      + specialize (H t t0). des. exploit H5; eauto. i. des. inv x.
+      + specialize (H t t0). des. exploit H5; eauto. intros x. des. inv x.
         inv MEM. ss.
       + specialize (H loc v_new). des. exploit H; eauto. i. ss.
     - inv ACQ; ss; condtac; ss; intuition.
@@ -831,7 +831,7 @@ Section ADEQUACY.
     clear INPUT OUTPUT.
     inv ORACLE. exploit COMPLETE; try refl.
     { eapply wf_input_oracle_wf_input; eauto. }
-    i. des. exploit SOUND; eauto. i. des. exploit x0; try refl. i. des.
+    i. des. exploit SOUND; eauto. intros x. des. exploit x0; try refl. i. des.
     exploit IHSTEPS; eauto. i. des. esplits; eauto. ss.
     eapply na_steps_behavior; eauto.
     econs 5; try eapply IHSTEPS; try eapply FOLLOWS; eauto.
@@ -868,7 +868,7 @@ Section ADEQUACY.
     clear INPUT OUTPUT.
     inv ORACLE. exploit COMPLETE; try refl.
     { eapply wf_input_oracle_wf_input; eauto. }
-    i. des. exploit SOUND; eauto. i. des. exploit x0; try refl. i. des.
+    i. des. exploit SOUND; eauto. intros x. des. exploit x0; try refl. i. des.
     exploit IHSTEPS; eauto. i. des. esplits; eauto. ss.
     eapply na_steps_behavior; eauto.
     econs 5; try eapply IHSTEPS; try eapply FOLLOWS; eauto.
@@ -958,7 +958,7 @@ Section ADEQUACY.
   Proof.
     inv BEH; ss.
     - inv STEP0. exploit state_step_determ; [exact STEP|exact STEP1|]. i. des. subst. ss.
-    - inv STEP0. exploit state_step_subset; eauto. i. inv x.
+    - inv STEP0. exploit state_step_subset; eauto. intros x. inv x.
       punfold DETERM. inv DETERM.
       exploit STEP_STEP; [exact LANG|exact LANG0|]. i. des.
       exploit similar_is_atomic; eauto; try by (i; subst; eapply NO_NA_UPDATE; eauto). i.
@@ -977,8 +977,8 @@ Section ADEQUACY.
     revert DETERM BEH. induction STEP; i; ss.
     exploit state_step_behavior; eauto. i.
     apply IHSTEP; eauto.
-    exploit state_step_subset; eauto. i. inv x0. s.
-    punfold DETERM. inv DETERM. exploit PRESERVE; eauto. i.
+    exploit state_step_subset; eauto. intros x0. inv x0. s.
+    punfold DETERM. inv DETERM. exploit PRESERVE; eauto. intros x.
     inv x; ss.
   Qed.
 
@@ -994,7 +994,7 @@ Section ADEQUACY.
       exploit state_step_determ; [exact STEP|exact STEP0|]. i. des. ss.
     - inv STEP0.
       exploit state_step_determ; [exact STEP|exact STEP1|]. i. des. subst. ss.
-    - inv STEP0. exploit state_step_subset; eauto. i. inv x.
+    - inv STEP0. exploit state_step_subset; eauto. intros x. inv x.
       punfold DETERM. inv DETERM.
       exploit STEP_STEP; [exact LANG|exact LANG0|]. i. des.
       exploit similar_is_atomic; eauto; try by (i; subst; eapply NO_NA_UPDATE; eauto). i.
@@ -1012,8 +1012,8 @@ Section ADEQUACY.
     revert DETERM BEH. induction STEP; i; ss.
     exploit state_step_behavior_ub; eauto. i.
     apply IHSTEP; eauto.
-    exploit state_step_subset; eauto. i. inv x0. s.
-    punfold DETERM. inv DETERM. exploit PRESERVE; eauto. i.
+    exploit state_step_subset; eauto. intros x0. inv x0. s.
+    punfold DETERM. inv DETERM. exploit PRESERVE; eauto. intros x.
     inv x; ss.
   Qed.
 
@@ -1035,7 +1035,7 @@ Section ADEQUACY.
     deterministic _ st2.(SeqState.state).
   Proof.
     induction STEP; ss.
-    exploit state_step_subset; eauto. i. inv x0.
+    exploit state_step_subset; eauto. intros x0. inv x0.
     apply IHSTEP. eapply step_deterministic; eauto.
   Qed.
 
@@ -1085,7 +1085,7 @@ Section ADEQUACY.
     unfold SeqEvent.wf_input in *. des.
     destruct i1, i2. ss. subst.
     specialize (UPDATE0 loc1 v_new1). des. exploit UPDATE0; eauto. i.
-    specialize (UPDATE loc2 v_new2). des. exploit UPDATE; eauto. i.
+    specialize (UPDATE loc2 v_new2). des. exploit UPDATE; eauto. intros x.
     rewrite x in *. inv x0. ss.
   Qed.
 
@@ -1180,7 +1180,7 @@ Section ADEQUACY.
       (<<INPUT: SeqEvent.wf_input e' i>>).
   Proof.
     inv BEH.
-    { inv STEP. exploit state_step_subset; eauto. i. inv x. ss.
+    { inv STEP. exploit state_step_subset; eauto. intros x. inv x. ss.
       exploit deterministic_step; [|exact LSTEP|exact LANG|]; ss. i. des.
       punfold DETERM. inv DETERM.
       exploit similar_is_atomic; eauto; try by (i; subst; eapply NO_NA_UPDATE; eauto). i.
@@ -1210,7 +1210,7 @@ Section ADEQUACY.
       (<<BEH2: SeqBehavior.behavior state_step (SeqThread.mk st2 p2 orc2) (l, r)>>).
   Proof.
     inv BEH.
-    { inv STEP. exploit state_step_subset; eauto. i. inv x0.
+    { inv STEP. exploit state_step_subset; eauto. intros x0. inv x0.
       punfold DETERM. inv DETERM.
       exploit STEP_STEP; [exact LSTEP|exact LANG|]. i. des.
       exploit similar_is_atomic; eauto; try by (i; subst; eapply NO_NA_UPDATE; eauto). i.
@@ -1218,7 +1218,7 @@ Section ADEQUACY.
     }
     inv STEP. ss.
     punfold DETERM. inv DETERM.
-    exploit STEP_STEP; [exact LSTEP|exact LANG|]. i. des.
+    exploit STEP_STEP; [exact LSTEP|exact LANG|]. intros x. des.
     destruct y as [[ey iy] oy].
     replace o with oy in * by (inv EVENT1; ss).
     replace e0 with e in *; cycle 1.
@@ -1240,7 +1240,7 @@ Section ADEQUACY.
     }
     replace o0 with oy in *; cycle 1.
     { clear - ORACLE EVENT1 ORACLE0 EVENT INPUT INPUT0 INPUT1 ISIMILAR. inv EVENT1.
-      inv ORACLE. exploit SOUND; eauto. i. des.
+      inv ORACLE. exploit SOUND; eauto. intros x. des.
       exploit x0; eauto. i. des. ss.
     }
     destruct st2. ss. exploit x0; eauto. i. subst.
@@ -1248,7 +1248,7 @@ Section ADEQUACY.
     { i. exploit wf_input_in_access; [exact INPUT|exact INPUT1|..]; eauto. }
     i. des. subst.
     esplits; eauto.
-    inv ORACLE. exploit SOUND; try exact ORACLE0. i. des.
+    inv ORACLE. exploit SOUND; try exact ORACLE0. intros x1. des.
     apply x2. ss.
   Qed.
 
@@ -1322,16 +1322,16 @@ Section ADEQUACY.
     destruct tr_src' as [|[[e' i'] o'] tr_src'].
     { inv x0; ss.
       - inv FAILURE. inv H.
-        exploit state_step_subset; eauto. i. inv x.
+        exploit state_step_subset; eauto. intros x. inv x.
         punfold x1. inv x1.
-        exploit STEP_STEP; [exact LSTEP|exact LANG|]. i. des.
-        exploit similar_is_atomic; try exact x; try by (i; subst; eapply NO_NA_UPDATE; eauto). i.
+        exploit STEP_STEP; [exact LSTEP|exact LANG|]. intros x. des.
+        exploit similar_is_atomic; try exact x; try by (i; subst; eapply NO_NA_UPDATE; eauto). intros x2.
         rewrite x2 in *.
         exploit na_local_step_na_event; eauto. ss.
-      - inv STEP. exploit state_step_subset; eauto. i. inv x.
+      - inv STEP. exploit state_step_subset; eauto. intros x. inv x.
         punfold x1. inv x1.
-        exploit STEP_STEP; [exact LSTEP|exact LANG|]. i. des.
-        exploit similar_is_atomic; try exact x; try by (i; subst; eapply NO_NA_UPDATE; eauto). i.
+        exploit STEP_STEP; [exact LSTEP|exact LANG|]. intros x. des.
+        exploit similar_is_atomic; try exact x; try by (i; subst; eapply NO_NA_UPDATE; eauto). intros x2.
         rewrite x2 in *.
         exploit na_local_step_na_event; eauto. ss.
     }
@@ -1511,7 +1511,7 @@ Section ADEQUACY.
   Proof.
     induction NASTEPS.
     { inv BEH; ss; eauto.
-      inv STEP. exploit state_step_subset; eauto. i.
+      inv STEP. exploit state_step_subset; eauto. intros x0.
       inv x0. exploit deterministic_step; [|exact LSTEP|exact LANG|]; ss. i. des.
       punfold DETERM. inv DETERM.
       rewrite similar_is_atomic in ATOMIC; eauto;
@@ -1519,12 +1519,12 @@ Section ADEQUACY.
       inv LOCAL; ss; try destruct ord; ss.
     }
     inv BEH; ss.
-    { inv STEP. exploit state_step_determ; [exact H|exact STEP0|]. i. des. subst.
+    { inv STEP. exploit state_step_determ; [exact H|exact STEP0|]. intros x0. des. subst.
       exploit IHNASTEPS; eauto.
-      exploit state_step_subset; eauto. i. inv x1. ss.
+      exploit state_step_subset; eauto. intros x1. inv x1. ss.
       eapply step_deterministic; eauto.
     }
-    { inv STEP. exploit state_step_subset; eauto. i.
+    { inv STEP. exploit state_step_subset; eauto. intros x.
       inv x. exploit deterministic_step; [|exact LANG|exact LANG0|]; ss. i. des.
       punfold DETERM. inv DETERM.
       rewrite similar_is_atomic in ATOMIC0; eauto;
@@ -1556,7 +1556,7 @@ Section ADEQUACY.
     induction NASTEPS; ss; i.
     { inv x0; ss.
       - exploit deterministic_step; [|exact LSTEP|exact LANG|]; eauto. i. des. auto.
-      - exploit state_step_subset; eauto. i. inv x0. ss.
+      - exploit state_step_subset; eauto. intros x0. inv x0. ss.
         exploit deterministic_step; [|exact LSTEP|exact LANG0|]; eauto. i. des.
         destruct e; inv LOCAL; ss; inv x0; ss; des; subst;
           try destruct ord; try destruct ord0; ss.
@@ -1564,7 +1564,7 @@ Section ADEQUACY.
     apply IHNASTEPS; auto.
     { eapply rtc_state_step_deterministic; eauto. }
     inv x0.
-    - exploit state_step_subset; try exact H. i. inv x.
+    - exploit state_step_subset; try exact H. intros x. inv x.
       exploit deterministic_step; [|exact LANG|exact LANG0|]; eauto. i. des.
       destruct e'; inv LOCAL; ss; inv x0; ss; des; subst;
         try destruct ord; try destruct ord0; ss.
@@ -1631,7 +1631,7 @@ Section ADEQUACY.
       intro BEH_TGT.
       exploit REFINE; try exact BEH_TGT.
       { apply oracle_of_trace_wf. eapply state_steps_wf_trace; eauto. ss. }
-      i. des.
+      intros x. des.
       exploit trace_le_cases; eauto. i. des; try congr.
       { (* src terminal *)
         inv TERM0.
@@ -1675,7 +1675,7 @@ Section ADEQUACY.
         intro BEH_TGT.
         exploit REFINE; try exact BEH_TGT.
         { apply oracle_of_trace_wf; ss. eapply state_steps_wf_trace; eauto. }
-        i. des.
+        intros x. des.
         exploit trace_le_cases; eauto. i. des; try congr. subst.
         exploit steps_behavior_prefix_ub; try exact STEPS_SRC; try exact x; eauto.
         { eapply match_trace_simple_match; eauto. }
@@ -1709,8 +1709,8 @@ Section ADEQUACY.
           - eapply add_oracle_wf; eauto.
             eapply wf_input_oracle_wf_input. ss.
         }
-        i. des.
-        exploit trace_le_cases; eauto. i. des; try congr; subst.
+        intros x. des.
+        exploit trace_le_cases; eauto. intros x1. des; try congr; subst.
         { (* src partial *)
           inv PARTIAL0.
           exploit simple_match_last_inv; try exact PARTIAL1. i. des. subst. clear PARTIAL1.
@@ -1757,18 +1757,18 @@ Section ADEQUACY.
         - eapply add_oracle_wf; eauto.
           eapply wf_input_oracle_wf_input. ss.
       }
-      i. des.
-      exploit trace_le_cases; eauto. i. des; try congr; subst.
+      intros x. des.
+      exploit trace_le_cases; eauto. intros x1. des; try congr; subst.
       { (* src partial *)
         inv PARTIAL0.
-        exploit simple_match_last_inv; try exact PARTIAL1. i. des. subst. clear PARTIAL1.
+        exploit simple_match_last_inv; try exact PARTIAL1. intros x1. des. subst. clear PARTIAL1.
         destruct e_src0 as [[e_src0 i_src] o_src]. inv x3.
         rewrite <- app_assoc in x.
         exploit steps_behavior_prefix_partial; try exact STEPS_SRC; try exact x; eauto.
         { eapply match_trace_simple_match; eauto. }
         { apply oracle_of_trace_follows. }
-        i. des; ss. symmetry in TRACES0. subst.
-        exploit state_steps_deterministic; eauto; ss. i.
+        intros x1. des; ss. symmetry in TRACES0. subst.
+        exploit state_steps_deterministic; eauto; ss. intros x1.
         exploit rtc_state_step_deterministic; try exact H0; eauto. i.
         exploit rtc_state_step_behavior; try exact H0; eauto; ss. i.
 
@@ -1779,8 +1779,8 @@ Section ADEQUACY.
         { clear - INPUT INPUT2 SIMILAR H2. i.
           destruct i_src, i_tgt. ss. subst.
           unfold SeqEvent.wf_input in *. ss. splitsH. clear H1 H3 H5 H6.
-          specialize (H loc2 v_new2). des. exploit H; eauto. i.
-          specialize (H0 loc1 v_new1). des. exploit H0; eauto. i.
+          specialize (H loc2 v_new2). des. exploit H; eauto. intros x.
+          specialize (H0 loc1 v_new1). des. exploit H0; eauto. intros x0.
           destruct e_src, e_src0, e_tgt; ss; des; subst; inv x; inv x0; ss; inv H2; ss.
         }
         i. subst.
@@ -1824,8 +1824,8 @@ Section ADEQUACY.
             { clear - INPUT INPUT2 EVENT. i.
               destruct i_src, i_tgt. ss. subst.
               unfold SeqEvent.wf_input in *. ss. splitsH. clear H1 H2 H4 H5.
-              specialize (H loc2 v_new2). des. exploit H; eauto. i.
-              specialize (H0 loc1 v_new1). des. exploit H0; eauto. i.
+              specialize (H loc2 v_new2). des. exploit H; eauto. intros x.
+              specialize (H0 loc1 v_new1). des. exploit H0; eauto. intros x0.
               destruct e_src0, e_tgt; ss; des; subst; inv x; inv x0; ss; inv EVENT; ss.
             }
             i. subst. esplits; try eapply MIN; eauto.
@@ -1846,8 +1846,8 @@ Section ADEQUACY.
         { clear - INPUT INPUT2 EVENT. i.
           destruct i', i_tgt. ss. subst.
           unfold SeqEvent.wf_input in *. ss. splitsH. clear H1 H2 H4 H5.
-          specialize (H loc2 v_new2). des. exploit H; eauto. i.
-          specialize (H0 loc1 v_new1). des. exploit H0; eauto. i.
+          specialize (H loc2 v_new2). des. exploit H; eauto. intros x.
+          specialize (H0 loc1 v_new1). des. exploit H0; eauto. intros x0.
           destruct e_src, e_tgt; ss; des; subst; inv x; inv x0; ss; inv EVENT; ss.
         }
         i. subst.
@@ -1907,9 +1907,9 @@ Section ADEQUACY.
               destruct in_access0 as [[[[]]]|]; cycle 1.
               { specialize (H7 loc v1). des. exploit H1; eauto. i. des. ss. }
               inv x2. inv x4. ss. des. subst.
-              specialize (H7 loc1 v0). des. exploit H1; eauto. i. des. inv x.
-              specialize (H0 loc1 v5). des. exploit H3; eauto. i. des. inv x.
-              specialize (H4 loc1 v3). des. exploit H5; eauto. i. des. inv x.
+              specialize (H7 loc1 v0). des. exploit H1; eauto. intros x. des. inv x.
+              specialize (H0 loc1 v5). des. exploit H3; eauto. intros x. des. inv x.
+              specialize (H4 loc1 v3). des. exploit H5; eauto. intros x. des. inv x.
               econs; eauto.
           - clear ACCESS RELEASE H H3 H0 H6 H4 H9 H7 H12.
             instantiate (1:=d2).
@@ -1952,8 +1952,8 @@ Section ADEQUACY.
         { eapply oracle_of_trace_follows. }
         i. exploit REFINE; try exact x1.
         { apply oracle_of_trace_wf; ss.  eapply state_steps_wf_trace; eauto. }
-        i. des.
-        exploit trace_le_cases; try exact x2. i. des; try congr.
+        intros x. des.
+        hexploit trace_le_cases; try exact x2. i. des; try congr.
         { (* src partial *)
           inv PARTIAL0.
           exploit simple_match_last_inv; try exact PARTIAL1. i. des. subst.
@@ -2008,7 +2008,7 @@ Section ADEQUACY.
       intro BEH_TGT.
       exploit REFINE; try exact BEH_TGT.
       { apply oracle_of_trace_wf. eapply state_steps_wf_trace; eauto. ss. }
-      i. des.
+      intros x. des.
       exploit trace_le_cases; eauto. i. des; try congr.
       { (* src partial *)
         inv PARTIAL0.

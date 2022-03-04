@@ -139,7 +139,7 @@ Variant lower_memory_content: forall (cnt_src cnt_tgt: option (Loc.t * Message.t
     lower_memory_content (Some (from, msg_src)) (Some (from, msg_tgt))
 .
 
-Program Instance lower_memory_content_PreOrder: PreOrder lower_memory_content.
+Global Program Instance lower_memory_content_PreOrder: PreOrder lower_memory_content.
 Next Obligation.
 Proof.
   ii. destruct x as [[]|]; econs. refl.
@@ -155,7 +155,7 @@ Variant lower_memory (mem_src mem_tgt: Memory.t): Prop :=
     (LOWER: forall loc to, lower_memory_content (Memory.get loc to mem_src) (Memory.get loc to mem_tgt))
 .
 
-Program Instance lower_memory_PreOrder: PreOrder lower_memory.
+Global Program Instance lower_memory_PreOrder: PreOrder lower_memory.
 Next Obligation.
 Proof.
   ii. econs. i. refl.
@@ -174,7 +174,7 @@ Variant lower_local: forall (lc_src lc_tgt: Local.t), Prop :=
     lower_local (Local.mk tvw_src prom) (Local.mk tvw_tgt prom)
 .
 
-Program Instance lower_local_PreOrder: PreOrder lower_local.
+Global Program Instance lower_local_PreOrder: PreOrder lower_local.
 Next Obligation.
 Proof.
   ii. destruct x. econs; eauto. refl.
@@ -192,7 +192,7 @@ Variant lower_thread {lang: language} (e_src e_tgt: Thread.t lang): Prop :=
     (MEMORY: lower_memory (Thread.memory e_src) (Thread.memory e_tgt))
 .
 
-Program Instance lower_thread_PreOrder {lang: language}: PreOrder (@lower_thread lang).
+Global Program Instance lower_thread_PreOrder {lang: language}: PreOrder (@lower_thread lang).
 Next Obligation.
 Proof.
   ii. destruct x. econs; ss; refl.
@@ -865,14 +865,14 @@ Proof.
   { inv CAP_TGT.
     exploit Memory.cap_inv; try exact CAP_SRC; eauto. i. des.
     - generalize (LOWER loc to). rewrite x0. i. inv H.
-      exploit SOUND; eauto. i. rewrite x. econs. ss.
+      exploit SOUND; eauto. intros x. rewrite x. econs. ss.
     - subst. inv x1.
       exploit (MIDDLE loc from1 from to to2); eauto; cycle 1.
       { i. rewrite x1. econs. ss. }
       generalize (LOWER loc from). rewrite GET1. i. inv H.
       generalize (LOWER loc to2). rewrite GET2. i. inv H.
       econs; eauto. i.
-      exploit EMPTY; eauto. i.
+      exploit EMPTY; eauto. intros x.
       generalize (LOWER loc ts). rewrite x. i. inv H. ss.
     - subst.
       erewrite lower_memory_max_ts; eauto; try apply MEM_SRC; try apply MEM_TGT.
@@ -882,14 +882,14 @@ Proof.
     exfalso. inv CAP_SRC.
     exploit Memory.cap_inv; try exact CAP_TGT; eauto. i. des.
     - generalize (LOWER loc to). rewrite x0. i. inv H.
-      exploit SOUND; eauto. i. rewrite x in *. ss.
+      exploit SOUND; eauto. intros x. rewrite x in *. ss.
     - subst. inv x1.
       exploit (MIDDLE loc from1 from to to2); eauto; cycle 1.
       { i. rewrite x1 in *. ss. }
       generalize (LOWER loc from). rewrite GET1. i. inv H.
       generalize (LOWER loc to2). rewrite GET2. i. inv H.
       econs; eauto. i.
-      exploit EMPTY; eauto. i.
+      exploit EMPTY; eauto. intros x.
       generalize (LOWER loc ts). rewrite x. i. inv H. ss.
     - subst.
       erewrite <- lower_memory_max_ts in GET_SRC; eauto;

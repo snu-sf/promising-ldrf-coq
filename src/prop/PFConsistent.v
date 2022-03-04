@@ -78,7 +78,7 @@ Lemma rtc_union_step_nonpf_failure
       Thread.step true e e1 e1'.
 Proof.
   ginduction STEP; eauto.
-  i. exploit IHSTEP; eauto. i. des.
+  i. exploit IHSTEP; eauto. intros x0. des.
   exists (Thread.mk _ (Thread.state e1') (Thread.local x) (Thread.sc x) (Thread.memory x)).
   econs 2; eauto.
     inv H. inv USTEP. inv STEP0. ss.
@@ -213,7 +213,7 @@ Lemma consistent_no_sc_trace_consistent lang (e:Thread.t lang)
   no_sc_trace_consistent e.
 Proof.
   eapply consistent_no_sc_consistent in CONSISTENT; eauto.
-  ii. exploit CONSISTENT; eauto. i. des.
+  ii. exploit CONSISTENT; eauto. intros x. des.
   eapply pred_steps_trace_steps in STEPS. des. red in x0. des.
   { exists tr, [(Thread.local e2, e0)]. esplits; eauto.
     { eapply Trace.plus_step_steps; eauto. }

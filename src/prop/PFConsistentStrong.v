@@ -214,10 +214,10 @@ Proof.
         ss. unfold no_sc in BREAKQ. des_ifs; try by (exfalso; eauto).
         + des; clarify. apply NNPP in BREAKQ.
           inv STEP0; inv STEP. ss. inv LOCAL. inv LOCAL0. ss.
-          destruct ordw; ss. exploit PROMISES0; eauto. i.
+          destruct ordw; ss. exploit PROMISES0; eauto. intros x.
           rewrite x, Memory.bot_get in *. ss.
         + inv STEP0; inv STEP. ss. inv LOCAL. inv LOCAL0. ss.
-          exploit PROMISES0; eauto. i.
+          exploit PROMISES0; eauto. intros x.
           rewrite x, Memory.bot_get in *. ss.
     }
 

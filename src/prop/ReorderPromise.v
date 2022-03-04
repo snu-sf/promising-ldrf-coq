@@ -193,7 +193,7 @@ Proof.
         * econs; eauto. i. revert GET.
           erewrite Memory.add_o; eauto. condtac; ss; eauto.
           i. des. inv GET.
-          exploit LOCTS2; eauto. i.
+          exploit LOCTS2; eauto. intros x.
           inv ADD0. inv ADD. rewrite x in TO. timetac.
         * eapply Memory.add_closed_message; cycle 1; eauto.
       + auto.
@@ -646,7 +646,7 @@ Proof.
         revert GET. erewrite Memory.add_o; eauto. condtac; ss; eauto.
         i. des. inv GET.
         exploit Memory.add_get0; try exact ADD4. i. des.
-        exploit CONS; eauto. i.
+        exploit CONS; eauto. intros x.
         inv MEM0. inv ADD. rewrite x in TO. timetac.
       + ss.
   }
@@ -718,7 +718,7 @@ Proof.
     exploit MemoryReorder.add_lower; try exact MEM; eauto. i.
     des; subst; ss.
     { clear x1 x2 x3 x4.
-      exploit Memory.add_get0; try exact x9. i. des.
+      exploit Memory.add_get0; try exact x9. intros x. des.
       exploit Memory.remove_exists; try exact GET0. i. des.
       esplits.
       - econs; try exact x0. econs 1; eauto. i.
@@ -739,7 +739,7 @@ Proof.
         exploit Memory.remove_get1; try exact GET2; eauto. i. des; subst; ss.
         exploit CONS; try exact GET1; eauto.
         { ii. subst. inv MSG_LE. ss. }
-        i. inv PROMISES0. inv LOWER. rewrite TS1 in x. timetac.
+        intros x. inv PROMISES0. inv LOWER. rewrite TS1 in x. timetac.
       - ss.
     }
   }
@@ -767,8 +767,8 @@ Proof.
   { (* split-split *)
     assert (LOCTS: (loc1, ts3) <> (loc2, ts0)).
     { ii. inv H.
-      exploit Memory.split_get0; try exact PROMISES. i. des.
-      exploit Memory.split_get0; try exact PROMISES0. i. des.
+      exploit Memory.split_get0; try exact PROMISES. intros x. des.
+      exploit Memory.split_get0; try exact PROMISES0. intros x. des.
       rewrite GET2 in *. inv GET4.
       destruct (Memory.get loc2 from2 promises2) as [[]|] eqn:GET'.
       { exploit CONS; try exact GET'.
@@ -777,7 +777,7 @@ Proof.
           erewrite Memory.split_o; eauto. repeat (condtac; ss); eauto.
           + guardH o0. i. des. inv GET'. ss.
           + guardH o0. guardH o1. i. rewrite GET' in *. inv GET1. ss.
-        - i. inv PROMISES0. inv SPLIT. rewrite x in TS12. timetac.
+        - intros x. inv PROMISES0. inv SPLIT. rewrite x in TS12. timetac.
       }
       { revert GET'. erewrite Memory.remove_o; eauto. condtac; ss.
         - des. subst. inv MEM0. inv SPLIT. timetac.
@@ -813,7 +813,7 @@ Proof.
         erewrite Memory.remove_o; eauto. condtac; ss.
         erewrite Memory.lower_o; eauto. condtac; ss.
         i. rewrite GET' in *. inv GET1.
-        exploit CONS; try exact GET'0; eauto. i.
+        exploit CONS; try exact GET'0; eauto. intros x.
         inv MEM. inv SPLIT. rewrite x in TS23. timetac.
       }
       { revert GET'.
@@ -951,7 +951,7 @@ Proof.
   i. unguardH x0. des.
   { inv PROMISE0. esplits; eauto. left. ss. }
   exploit IHWRITE; try exact PROMISE0; eauto.
-  i. unguardH x. des.
+  intros x. unguardH x. des.
   - inv PROMISE1. esplits; eauto. left. ss.
   - esplits; eauto. right. esplits; eauto.
 Qed.

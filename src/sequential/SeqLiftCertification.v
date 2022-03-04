@@ -84,7 +84,7 @@ Qed.
 Definition lowered_memory mem0 mem1: Prop :=
   forall loc to, lowered_content false (Memory.get loc to mem0) (Memory.get loc to mem1).
 
-Program Instance lowered_memory_PreOrder: PreOrder lowered_memory.
+Global Program Instance lowered_memory_PreOrder: PreOrder lowered_memory.
 Next Obligation.
 Proof.
   ii. left. auto.

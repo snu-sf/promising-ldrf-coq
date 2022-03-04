@@ -178,7 +178,7 @@ Proof.
     inv WF1. inv TVIEW_CLOSED. inv CUR.
     specialize (RLX loc). des.
     clear REL ACQ PLN.
-    exploit PROMISES; try exact GET. i.
+    exploit PROMISES; try exact GET. intros x.
     exploit Memory.get_ts; try exact RLX. i. des.
     { subst. rewrite x4 in l. inv l. }
     exploit Memory.get_disjoint; [exact RLX|exact x|..]. i. des.

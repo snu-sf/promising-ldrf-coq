@@ -458,7 +458,7 @@ Section LIFT.
         end
   .
 
-  Program Instance world_messages_le_PreOrder msgs_src msgs_tgt: PreOrder (world_messages_le msgs_src msgs_tgt).
+  Global Program Instance world_messages_le_PreOrder msgs_src msgs_tgt: PreOrder (world_messages_le msgs_src msgs_tgt).
   Next Obligation.
     unfold world_messages_le. ii. des_ifs. splits.
     { refl. }
@@ -1610,7 +1610,7 @@ Section LIFT.
     i. hexploit sim_lift_sim_lift_sol; eauto.
     i. des.
     hexploit Thread.rtc_tau_step_future; eauto. i. des; ss.
-    exploit PARTIAL; eauto. i.
+    exploit PARTIAL; eauto. intros x.
     destruct x as [?th [?tr [?w [STEPS0 [WRITING FINAL]]]]].
     guardH FINAL. destruct th. destruct state0. des.
     hexploit sim_lift_sol_steps; eauto. i. des; eauto.
@@ -2158,7 +2158,7 @@ Section LIFT.
       }
     }
     { inv STEP_TGT. inv STEP_SRC. inv MEM. inv MEM0. ss.
-      exploit INPUT_TGT. i. des. exploit x; eauto. i. rewrite x2 in *.
+      exploit INPUT_TGT. intros x. des. exploit x; eauto. i. rewrite x2 in *.
       splits.
       { rewrite <- H in H5. inv H5. auto. }
       { ii. unfold ValueMap.write, Perms.update. condtac; subst.

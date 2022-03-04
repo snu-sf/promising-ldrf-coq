@@ -1022,7 +1022,7 @@ Proof.
   ginduction l; i.
   { exists []. splits; ss. i. destruct lc. ss. inv ADDEDPROM. esplits; eauto. econs. }
   { inv TIMES. inv ADDEDPROM.
-    exploit IHl; eauto. i. des.
+    exploit IHl; eauto. intros x. des.
     eexists (tr++[(Local.mk (Local.tview lc) mem1, ThreadEvent.promise loc from to Message.reserve Memory.op_kind_cancel)]).
     splits.
     { eapply Forall_app; eauto. econs; ss. }
@@ -1329,19 +1329,19 @@ Proof.
       { inv PR. erewrite Memory.add_o in GET; eauto. des_ifs.
         { ss. des; clarify. right. exploit NOTIN; eauto.
           { econs; eauto. refl. }
-          i. des; auto. inv x. exfalso. eapply DISJOINT; eauto.
+          intros x. des; auto. inv x. exfalso. eapply DISJOINT; eauto.
           econs; ss. refl.
         }
         { left. econs; eauto. }
       }
       { erewrite add_covered in PR; eauto. des; auto. subst.
-        right. right. exploit NOTIN; eauto. i. des; auto.
+        right. right. exploit NOTIN; eauto. intros x. des; auto.
         inv x. exfalso. eapply DISJOINT; eauto. }
     }
     { exists to. esplits; eauto.
       { right. right. exploit NOTIN; eauto.
         { econs; eauto. refl. }
-        i. des; auto. inv x. exfalso. eapply DISJOINT; eauto.
+        intros x. des; auto. inv x. exfalso. eapply DISJOINT; eauto.
         econs; ss. refl.
       }
       { left. auto. }
@@ -1349,7 +1349,7 @@ Proof.
     { exists to. esplits; eauto.
       { right. right. exploit NOTIN; eauto.
         { econs; eauto. refl. }
-        i. des; auto. inv x. exfalso. eapply DISJOINT; eauto.
+        intros x. des; auto. inv x. exfalso. eapply DISJOINT; eauto.
         econs; ss. refl.
       }
       { refl. }
@@ -1803,10 +1803,10 @@ Proof.
       { eapply reservations_added_covered in ADDEDPROM; eauto. des.
         exploit ADDEDPROM1.
         { right. eauto. }
-        i. eapply reservations_added_covered in ADDEDPROM0; eauto. des.
+        intros x. eapply reservations_added_covered in ADDEDPROM0; eauto. des.
         exploit ADDEDPROM2.
         { left. eauto. }
-        i. inv x2. eapply MAX in GET. inv ITV. ss. etrans; eauto.
+        intros x2. inv x2. eapply MAX in GET. inv ITV. ss. etrans; eauto.
       }
     }
     eapply List.Forall2_app.

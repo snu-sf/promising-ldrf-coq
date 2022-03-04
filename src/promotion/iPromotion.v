@@ -104,7 +104,7 @@ Module Promotion.
     { (* terminal *)
       dup SIM. inv SIM0. des. ss.
       dup WF_SRC. inv WF_SRC0. inv WF.
-      exploit THREADS; eauto. i. clear DISJOINT THREADS.
+      exploit THREADS; eauto. intros x. clear DISJOINT THREADS.
       inv SIM_THREAD.
       { esplits; eauto. ii. destruct (Ident.eq_dec tid p).
         + subst. rewrite FIND in FIND_SRC0. Configuration.simplify2.
@@ -278,7 +278,7 @@ Module Promotion.
 
     { (* other *)
       exploit sim_conf_find; eauto. i. des.
-      exploit x1; eauto. i. des. clear x0 x1.
+      exploit x1; eauto. intros x. des. clear x0 x1.
       destruct c_src as [ths1_src sc1_src mem1_src].
       destruct c_tgt as [ths1_tgt sc1_tgt mem1_tgt].
       dup SIM. inv SIM0. ss.

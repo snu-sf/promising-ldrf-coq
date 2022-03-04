@@ -161,7 +161,7 @@ Proof.
   - apply GET1.
   - apply GET2.
   - ii. subst. eapply Time.lt_strorder. eauto.
-  - apply Interval.mem_ub. exploit VOLUME; try exact GET1; eauto. i. des; auto.
+  - apply Interval.mem_ub. exploit VOLUME; try exact GET1; eauto. intros x. des; auto.
     inv x. inv l.
   - econs.
     + apply l.

@@ -42,7 +42,7 @@ Module Message.
   .
   #[global] Hint Constructors le: core.
 
-  Program Instance le_PreOrder: PreOrder le.
+  Global Program Instance le_PreOrder: PreOrder le.
   Next Obligation.
     ii. destruct x; econs; refl.
   Qed.
@@ -384,7 +384,7 @@ Module Cell.
     (from = Time.bot /\ to = Time.bot) \/ Time.lt from to.
   Proof.
     destruct cell. unfold get in *. ss.
-    inv WF0. exploit VOLUME; eauto. i. des.
+    inv WF0. exploit VOLUME; eauto. intros x. des.
     - inv x. auto.
     - generalize (Time.le_lteq from to). i. des. auto.
   Qed.
@@ -630,7 +630,7 @@ Module Cell.
       exfalso. exploit DISJOINT; eauto.
       + apply Interval.mem_ub. auto.
       + apply Interval.mem_ub.
-        destruct (Cell.WF cell1). exploit VOLUME; eauto. i. des; ss.
+        destruct (Cell.WF cell1). exploit VOLUME; eauto. intros x. des; ss.
         inv x. inv TO.
     - rewrite CELL2, DOMap.gsspec. condtac; ss.
   Qed.
@@ -649,7 +649,7 @@ Module Cell.
       + apply X.
       + apply GET2.
       + ii. subst. eapply Time.lt_strorder. eauto.
-      + apply Interval.mem_ub. exploit VOLUME; eauto. i. des; auto.
+      + apply Interval.mem_ub. exploit VOLUME; eauto. intros x. des; auto.
         inv x. inv TS12.
       + econs; ss. left. auto.
     - unfold get. rewrite CELL2. rewrite ? DOMap.gsspec.
@@ -1123,7 +1123,7 @@ Module Cell.
     revert t tnext init NEXT. induction l; ss; i.
     { left. ss. }
     revert NEXT. condtac; ss; i.
-    - exploit IHl; eauto. i. des.
+    - exploit IHl; eauto. intros x. des.
       + subst. left. split; auto. ii. des.
         * subst. timetac.
         * eapply x0; eauto.
@@ -1132,7 +1132,7 @@ Module Cell.
         * eapply x1; eauto.
     - destruct init0.
       + revert NEXT. condtac; ss; i.
-        * exploit IHl; eauto. i. des.
+        * exploit IHl; eauto. intros x. des.
           { inv x. left. split; auto. ii. des.
             - subst. timetac.
             - eapply x0; eauto. }
@@ -1140,14 +1140,14 @@ Module Cell.
             - subst. exploit next_le; eauto. i.
               rewrite l1 in x3. timetac.
             - eapply x1; eauto. }
-        * exploit IHl; eauto. i. des.
+        * exploit IHl; eauto. intros x. des.
           { inv x. right. splits; eauto. ii. des.
             - subst. timetac.
             - eapply x0; eauto. }
           { right. splits; eauto. ii. des.
             - subst. exploit next_le; eauto. i. timetac.
             - eapply x1; eauto. }
-      + right. exploit IHl; eauto. i. des.
+      + right. exploit IHl; eauto. intros x. des.
         * inv x. esplits; eauto. ii. des.
           { subst. timetac. }
           { eapply x0; eauto. }
@@ -1346,7 +1346,7 @@ Module Cell.
     revert cell1 INHABITED.
     induction dom; i.
     { exists cell1. econs; ss; i. congr. }
-    exploit IHdom; eauto. i. des. clear IHdom.
+    exploit IHdom; eauto. intros x. des. clear IHdom.
     destruct (In_decidable time_decidable a dom).
     { exists cell2. inv x. econs; ii; eauto.
       - inv IN; eauto.
@@ -1379,7 +1379,7 @@ Module Cell.
       { inv x. inv x1. inv LHS. inv RHS. ss.
         clear MIDDLE BACK.
         destruct (get to0 cell1) as [[]|] eqn:GET4.
-        - exploit SOUND; try exact GET4. i.
+        - exploit SOUND; try exact GET4. intros x.
           rewrite x in *. inv GET2.
           destruct (Time.le_lt_dec to0 from2).
           { exploit (EMPTY to0); try congr.
@@ -1396,12 +1396,12 @@ Module Cell.
             * eapply TimeFacts.le_lt_lt; try exact x2.
               etrans; try exact TO. econs. ss.
             * econs. ss.
-        - exploit COMPLETE; try exact GET2; eauto. i. des.
+        - exploit COMPLETE; try exact GET2; eauto. intros x. des.
           cut (from1 = a); try by (i; subst; ss).
           clear COMPLETE.
           destruct (Time.le_lt_dec from1 a).
           + inv l; try by (inv H2; ss).
-            exploit SOUND; try exact GET0. i.
+            exploit SOUND; try exact GET0. intros x2.
             exploit get_ts; try exact x2. i. des.
             { subst. inv H2. }
             exploit get_disjoint; [exact x2|exact GET2|..]. i. des.
@@ -1436,16 +1436,16 @@ Module Cell.
     exploit (@add_exists cell2 (max_ts cell1) (Time.incr (max_ts cell1)) Message.reserve); ii.
     { inv x. inv LHS. inv RHS. ss.
       destruct (get to2 cell1) as [[]|] eqn:GET3.
-      { exploit SOUND; eauto. i.
+      { exploit SOUND; eauto. intros x.
         rewrite x in *. inv GET2.
         exploit max_ts_spec; try exact GET3. i. des.
         exploit TimeFacts.le_lt_lt; try exact FROM; try exact MAX. i.
         timetac. }
-      exploit COMPLETE; eauto. i. des.
+      exploit COMPLETE; eauto. intros x. des.
       cut (from2 = max_ts cell1); try by (i; subst; ss).
       destruct (Time.le_lt_dec from2 (max_ts cell1)).
       - inv l; try by (inv H0; ss).
-        exploit SOUND; try exact GET1. i.
+        exploit SOUND; try exact GET1. intros x2.
         exploit get_ts; try exact x2. i. des.
         { subst. rewrite x3 in *. inv H0. }
         exploit get_ts; try exact GET2. i. des.

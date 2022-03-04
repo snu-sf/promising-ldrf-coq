@@ -2124,7 +2124,7 @@ Section SIM.
                 { instantiate (1:=from_tgt).
                   eapply MEMWF in GETTGT1. des. auto. }
                 { auto. }
-                { i. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+                { intros x0. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
                   { eapply x0. } etrans.
                   { eapply TS1. } etrans.
                   { left. eapply FROM1. }

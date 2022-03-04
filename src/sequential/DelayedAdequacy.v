@@ -41,7 +41,7 @@ Set Implicit Arguments.
 
 
 
-Program Instance closed_future_timemap_PreOrder loc_na tm: PreOrder (closed_future_timemap loc_na tm).
+Global Program Instance closed_future_timemap_PreOrder loc_na tm: PreOrder (closed_future_timemap loc_na tm).
 Next Obligation.
 Proof.
   ii. auto.
@@ -1268,7 +1268,7 @@ Proof.
   destruct (IdentMap.find tid ths_src0) as [[[lang_src st_src] lc_src]|] eqn:FIND_SRC; cycle 1.
   { remember (Threads.tids ths_src0) as tids0 eqn:TIDS_SRC.
     exploit tids_find; [exact TIDS_SRC|exact TIDS|..]. i. des.
-    exploit x1; eauto. i. des. rewrite FIND_SRC in x. inv x. }
+    exploit x1; eauto. intros x. des. rewrite FIND_SRC in x. inv x. }
   dup WF_SRC. dup WF_TGT.
   inv WF_SRC. inv WF_TGT. inv WF. inv WF0. ss.
   exploit SIM; eauto. i.
@@ -1368,7 +1368,7 @@ Proof.
     destruct (IdentMap.find tid ths_src0) as [[[lang_src st_src] lc_src]|] eqn:FIND_SRC; cycle 1.
     { remember (Threads.tids ths_src0) as tids0 eqn:TIDS_SRC.
       exploit tids_find; [exact TIDS_SRC|exact TIDS|..]. i. des.
-      exploit x1; eauto. i. des. rewrite FIND_SRC in x. inv x. }
+      exploit x1; eauto. intros x. des. rewrite FIND_SRC in x. inv x. }
     hexploit SIM0; eauto. i.
     hexploit sim_thread_wf_past_dsteps_full; eauto. i. des; ss.
     { left. eapply thread_failure_configuration_failure; eauto. }
@@ -1431,7 +1431,7 @@ Proof.
     destruct (IdentMap.find tid_tgt ths_src) as [[[lang_src st_src] lc_src]|] eqn:FIND_SRC; cycle 1.
     { remember (Threads.tids ths_src) as tids eqn:TIDS_SRC.
       exploit tids_find; [exact TIDS_SRC|exact TIDS_TGT|..]. i. des.
-      exploit x1; eauto. i. des. rewrite FIND_SRC in x. inv x. }
+      exploit x1; eauto. intros x. des. rewrite FIND_SRC in x. inv x. }
     dup WF_SRC. dup WF_TGT.
     inv WF_SRC. inv WF_TGT. inv WF. inv WF0. ss.
     exploit SIM0; eauto. i.

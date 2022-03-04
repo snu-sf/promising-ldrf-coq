@@ -35,7 +35,7 @@ Ltac existT_elim1 :=
 
 Ltac existT_elim := repeat existT_elim1.
 
-Ltac splitsH := 
+Ltac splitsH :=
   repeat match goal with
          | [H: ?a /\ ?b |- _] => inv H
          end; unnw.
@@ -54,7 +54,7 @@ Proof.
     + destruct in_access; ss. destruct p as [[[]]]. inv H0.
       specialize (H loc t2). des. eauto.
     + specialize (H loc v_new). des.
-      exploit H5; eauto. i. des. rewrite x. ss. eauto.
+      exploit H5; eauto. intros x. des. rewrite x. ss. eauto.
   - rewrite <- H1. destruct in_acquire; ss.
   - rewrite <- H2. destruct in_release; ss.
 Qed.
@@ -101,7 +101,7 @@ Proof.
   right. eapply CIH; eauto.
 Qed.
 
-Program Instance oracle_le_PreOrder: PreOrder oracle_le.
+Global Program Instance oracle_le_PreOrder: PreOrder oracle_le.
 Next Obligation.
   ii. revert x. pcofix CIH. i.
   pfold. econs. i. esplits; eauto.
@@ -138,7 +138,7 @@ Proof.
   }
   { inv STEP. punfold ORACLE. inv ORACLE.
     exploit LE; eauto. i. des. inv LE1; try done.
-    exploit IHSTEPS; try eapply H; eauto. i. des.
+    exploit IHSTEPS; try eapply H; eauto. intros x. des.
     esplits. econs 3; try exact x. econs; eauto.
   }
 Qed.
@@ -152,7 +152,7 @@ Lemma wf_in_access_some
 Proof.
   destruct i; ss.
   - destruct p as [[[]]]. destruct (WF t t2).
-    exploit H; eauto. i. rewrite x. ss.
+    exploit H; eauto. intros x. rewrite x. ss.
   - destruct e; ss.
     + destruct (WF loc val). exploit H0; eauto. i. des. ss.
     + destruct (WF loc val). exploit H0; eauto. i. des. ss.
@@ -167,7 +167,7 @@ Lemma oracle_wf_in_access_some
 Proof.
   destruct i; ss.
   - destruct p as [[]]. destruct (WF t).
-    exploit H; eauto. i. des. rewrite x. ss.
+    exploit H; eauto. intros x. des. rewrite x. ss.
   - destruct e; ss.
     + destruct (WF loc). exploit H0; eauto. i. des. ss.
     + destruct (WF loc). exploit H0; eauto. i. des. ss.
@@ -329,12 +329,12 @@ Definition eq_reading_value (e1 e2: ProgramEvent.t): Prop :=
   | _, _ => True
   end.
 
-Program Instance eq_reading_value_Reflexive: Reflexive eq_reading_value.
+Global Program Instance eq_reading_value_Reflexive: Reflexive eq_reading_value.
 Next Obligation.
   ii. destruct x; ss.
 Qed.
 
-Program Instance eq_reading_value_Symmetric: Symmetric eq_reading_value.
+Global Program Instance eq_reading_value_Symmetric: Symmetric eq_reading_value.
 Next Obligation.
   ii. destruct x, y; ss; inv H; ss.
 Qed.
@@ -424,7 +424,7 @@ Proof.
   - inv STEP. existT_elim. subst. inv STEP0.
     exploit SOUND.
     { econs; eauto. }
-    i. des. split; ss. i.
+    intros x. des. split; ss. i.
     exploit x0; eauto. i. des. subst. splits; ss.
     eapply IHtr; eauto.
   - exploit COMPLETE; eauto. i. des. inv STEP. existT_elim. subst.

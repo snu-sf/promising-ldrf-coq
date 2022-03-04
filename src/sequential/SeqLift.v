@@ -46,7 +46,7 @@ Definition opt_version_le (v0 v1: option version): Prop :=
   | _, _ => False
   end.
 
-Program Instance version_le_PreOrder: PreOrder version_le.
+Global Program Instance version_le_PreOrder: PreOrder version_le.
 Next Obligation.
 Proof.
   ii. refl.
@@ -56,7 +56,7 @@ Proof.
   ii. etrans; eauto.
 Qed.
 
-Program Instance opt_version_le_PreOrder: PreOrder opt_version_le.
+Global Program Instance opt_version_le_PreOrder: PreOrder opt_version_le.
 Next Obligation.
 Proof.
   ii. destruct x; ss.
@@ -130,7 +130,7 @@ Definition versions_le (vers0 vers1: versions): Prop :=
   forall loc ts v (VER: vers0 loc ts = Some v),
     vers1 loc ts = Some v.
 
-Program Instance versions_le_PreOrder: PreOrder versions_le.
+Global Program Instance versions_le_PreOrder: PreOrder versions_le.
 Next Obligation.
 Proof.
   ii. auto.
@@ -182,7 +182,7 @@ Module Mapping.
         f1.(times) v =f0.(times) v>>)
   .
 
-  Program Instance le_PreOrder: PreOrder le.
+  Global Program Instance le_PreOrder: PreOrder le.
   Next Obligation.
   Proof.
     ii. unfold le. splits; i; refl.
@@ -207,7 +207,7 @@ Module Mapping.
         f1.(map) v ts = Some fts>>)
   .
 
-  Program Instance le_strong_PreOrder: PreOrder le_strong.
+  Global Program Instance le_strong_PreOrder: PreOrder le_strong.
   Next Obligation.
   Proof.
     ii. unfold le_strong. splits; i; auto. exfalso. lia.
@@ -247,7 +247,7 @@ Module Mapping.
         (<<EQ: fts0 = fts2>>) \/ (<<LT: Time.lt fts1 fts2>>)>>)
   .
 
-  Program Instance le_update_PreOrder: PreOrder le_update.
+  Global Program Instance le_update_PreOrder: PreOrder le_update.
   Next Obligation.
   Proof.
     ii. unfold le_update. splits.
@@ -342,7 +342,7 @@ Module Mapping.
   Definition les (f0 f1: ts): Prop :=
     forall loc, le (f0 loc) (f1 loc).
 
-  Program Instance les_PreOrder: PreOrder les.
+  Global Program Instance les_PreOrder: PreOrder les.
   Next Obligation.
   Proof.
     ii. refl.
@@ -355,7 +355,7 @@ Module Mapping.
   Definition les_strong (f0 f1: ts): Prop :=
     forall loc, le_strong (f0 loc) (f1 loc).
 
-  Program Instance les_strong_PreOrder: PreOrder les_strong.
+  Global Program Instance les_strong_PreOrder: PreOrder les_strong.
   Next Obligation.
   Proof.
     ii. refl.
@@ -376,7 +376,7 @@ Module Mapping.
   Definition les_update (f0 f1: ts): Prop :=
     forall loc, le_update (f0 loc) (f1 loc).
 
-  Program Instance les_update_PreOrder: PreOrder les_update.
+  Global Program Instance les_update_PreOrder: PreOrder les_update.
   Next Obligation.
   Proof.
     ii. refl.
@@ -436,7 +436,7 @@ Definition versions_messages_le (msgs: Messages.t) (vers0 vers1: versions): Prop
          (TS: Time.lt ts to),
     vers1 loc ts = Some v.
 
-Program Instance versions_messages_le_PreOrder: forall msgs, PreOrder (versions_messages_le msgs).
+Global Program Instance versions_messages_le_PreOrder: forall msgs, PreOrder (versions_messages_le msgs).
 Next Obligation.
 Proof.
   ii. eauto.
@@ -1722,7 +1722,7 @@ Lemma sim_closed_memory_future f mem0 mem1
   :
     sim_closed_memory f mem1.
 Proof.
-  ii. exploit CLOSED; eauto. i. des.
+  ii. exploit CLOSED; eauto. intros x. des.
   eapply Memory.future_weak_get1 in x; eauto; ss.
   des. inv MSG_LE. esplits; eauto.
 Qed.
@@ -1737,7 +1737,7 @@ Lemma sim_closed_memory_sim_timemap loc ts_src f v tm_src tm_tgt mem
 Proof.
   ii. inv SIM. destruct (Loc.eq_dec l loc).
   { subst. right. splits; auto. }
-  { left. exploit MAX; eauto. i.
+  { left. exploit MAX; eauto. intros x.
     eapply sim_timestamp_max_sim in x. unfold sim_timestamp in *. des.
     exploit MEM.
     { eapply sim_closed_mon_ver; eauto.
@@ -5414,10 +5414,10 @@ Lemma sim_memory_mon_vers srctm flag_src f vers0 vers1 mem_src mem_tgt
 Proof.
   econs.
   { ii. hexploit sim_memory_get; eauto. i. des. esplits; eauto. inv MSG.
-    { exploit VERS; eauto. i. rewrite x. econs 1; eauto. }
-    { exploit VERS; eauto. i. rewrite x. econs 2; eauto. }
+    { exploit VERS; eauto. intros x. rewrite x. econs 1; eauto. }
+    { exploit VERS; eauto. intros x. rewrite x. econs 2; eauto. }
     { econs 3; eauto. }
-    { exploit VERS; eauto. i. rewrite x. econs 4; eauto. }
+    { exploit VERS; eauto. intros x. rewrite x. econs 4; eauto. }
   }
   { i. hexploit sim_memory_sound; eauto. }
   { i. eapply sim_memory_top; eauto. }
@@ -5435,10 +5435,10 @@ Proof.
   { ii. hexploit sim_promises_get; eauto. i. des. esplits; eauto.
     { i. hexploit VERS0; eauto. i. des. eapply VERS in VER. eauto. }
     i. hexploit GET0; eauto. i. des. esplits; eauto. inv MSG.
-    { exploit VERS; eauto. i. rewrite x. econs 1; eauto. }
-    { exploit VERS; eauto. i. rewrite x. econs 2; eauto. }
+    { exploit VERS; eauto. intros x. rewrite x. econs 1; eauto. }
+    { exploit VERS; eauto. intros x. rewrite x. econs 2; eauto. }
     { econs 3; eauto. }
-    { exploit VERS; eauto. i. rewrite x. econs 4; eauto. }
+    { exploit VERS; eauto. intros x. rewrite x. econs 4; eauto. }
   }
   { i. hexploit sim_promises_get_if; eauto. i. des.
     { left. esplits; eauto. }

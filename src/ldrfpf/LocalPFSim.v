@@ -1002,7 +1002,7 @@ Section SIM.
     { eapply PROMISES. eauto. }
     { inv WF. exploit DISJOINT; eauto. intros DISJ. inv DISJ.
       destruct (Memory.get loc ts (Local.promises lc_src)) as [[from' msg']|] eqn:GET; auto.
-      exfalso. inv DISJOINT0. exploit DISJOINT1; eauto. i. des.
+      exfalso. inv DISJOINT0. exploit DISJOINT1; eauto. intros x. des.
       eapply memory_get_ts_strong in GET. des; subst; ss.
       eapply memory_get_ts_strong in  PROMISE. des; subst; ss.
       eapply x; eauto.
@@ -1028,7 +1028,7 @@ Section SIM.
     { eapply PROMISES. eauto. }
     { inv WF. exploit DISJOINT; eauto. intros DISJ. inv DISJ.
       destruct (Memory.get loc ts (Local.promises lc_src)) as [[from' msg']|] eqn:GET; auto.
-      exfalso. inv DISJOINT0. exploit DISJOINT1; eauto. i. des.
+      exfalso. inv DISJOINT0. exploit DISJOINT1; eauto. intros x. des.
       eapply memory_get_ts_strong in GET. des; subst; ss.
       eapply memory_get_ts_strong in  PROMISE. des; subst; ss.
       eapply x; eauto.
@@ -1631,7 +1631,7 @@ Section SIM.
       set (CNT:=(sim_memory_strong_contents MEM) loc ts).
       inv CNT; ss; try by (exfalso; eapply NPROM0; left; auto).
       symmetry in H0. eapply CAPSRCSTRONG in H0. esplits. econs; eauto. }
-    { ss. ii. exploit EXCLUSIVEEXTRA; eauto. i. des. inv x.
+    { ss. ii. exploit EXCLUSIVEEXTRA; eauto. intros x. des. inv x.
       set (CNT:=(sim_memory_strong_contents MEM) loc ts).
       exploit ((sim_memory_strong_wf MEM) loc from ts).
       { left. auto. } i. des.

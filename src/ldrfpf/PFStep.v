@@ -810,7 +810,7 @@ Proof.
       - apply Forall_app_inv in PF0. des. ss.
       - destruct (classic (ThreadEvent.get_machine_event e = MachineEvent.failure)).
         + destruct e; ss; inv STEP0; inv STEP; inv LOCAL; inv LOCAL0; ss.
-        + exploit CONSISTENT; eauto. i. inv x. des.
+        + exploit CONSISTENT; eauto. intros x. inv x. des.
           exploit steps_trace_future; eauto. i. des.
           inv WF2. inv WF0. exploit THREADS; eauto. i.
           exploit Trace.steps_future; try exact STEPS0; eauto. s. i. des.
@@ -823,7 +823,7 @@ Proof.
     exploit Trace.steps_inv; try exact STEPS0; eauto.
     { destruct (classic (ThreadEvent.get_machine_event e1 = MachineEvent.failure)).
       - subst. inv STEP0; inv STEP; inv LOCAL; try inv LOCAL0; ss.
-      - exploit CONSISTENT; ss. i. inv x0. des.
+      - exploit CONSISTENT; ss. intros x1. inv x1. des.
         exploit Trace.steps_future; eauto. s. i. des.
         exploit Thread.step_future; eauto. s. i. des.
         eapply step_promise_consistent; eauto.

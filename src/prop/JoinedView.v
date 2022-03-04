@@ -375,11 +375,11 @@ Section JOINED.
     :
       joined_released views1 prom rel.
   Proof.
-    ii. exploit REL; eauto. i. des.
+    ii. exploit REL; eauto. intros x. des.
     destruct (views0 loc ts) eqn:VIEW; ss.
     exploit VIEWSLE; eauto.
     { erewrite VIEW. ss. }
-    i. rewrite x0. rewrite VIEW. eauto.
+    intros x0. rewrite x0. rewrite VIEW. eauto.
   Qed.
 
   Definition all_join_views (view: View.t) (views: list View.t) :=
@@ -1163,7 +1163,7 @@ Module JSim.
   Proof.
     ii. specialize (PROM loc ts). inv PROM; eauto. des.
     { clarify. econs; eauto. econs. }
-    { exploit VIEWSLE; eauto. i. rewrite x. auto. }
+    { exploit VIEWSLE; eauto. intros x. rewrite x. auto. }
   Qed.
 
   Inductive sim_local (views: Loc.t -> Time.t -> list View.t):

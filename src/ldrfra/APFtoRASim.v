@@ -63,7 +63,7 @@ Module APFtoRASim.
         sim_message loc Message.undef Message.undef
     .
 
-    Program Instance sim_message_PreOrder: forall loc, PreOrder (sim_message loc).
+    Global Program Instance sim_message_PreOrder: forall loc, PreOrder (sim_message loc).
     Next Obligation.
       ii. destruct x; econs; eauto. des_ifs. refl.
     Qed.
@@ -586,9 +586,7 @@ Module APFtoRASim.
         { ii. inv WRITES1. exploit SOUND; eauto. i. des.
           exploit Memory.split_get0; try exact MEM. i. des.
           inv MEM1. exploit COMPLETE0; try exact GET0. i. des.
-          rewrite GET_SRC in *. inv x0. inv MSG0.
-          exploit Memory.split_get0; try exact PROMISES. i. des.
-          exploit PROMISES1; eauto.
+          rewrite GET_SRC in *. clarify.
         }
         i. des. esplits; eauto.
       - (* lower *)
@@ -596,9 +594,7 @@ Module APFtoRASim.
         { ii. inv WRITES1. exploit SOUND; eauto. i. des.
           exploit Memory.lower_get0; try exact MEM. i. des.
           inv MEM1. exploit COMPLETE0; try exact GET. i. des.
-          rewrite GET_SRC in *. inv x0. inv MSG0.
-          exploit Memory.lower_get0; try exact PROMISES. i. des.
-          exploit PROMISES1; eauto. ss.
+          rewrite GET_SRC in *. clarify.
         }
         i. des.
         inv MEM1. esplits; eauto.

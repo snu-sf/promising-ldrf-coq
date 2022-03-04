@@ -945,17 +945,17 @@ Module SimThreadPromotion.
       <<SC_SRC: Memory.closed_timemap sc_src mem1_src>> /\
       <<CLOSED_SRC: Memory.closed mem1_src>>.
   Proof.
-    exploit sim_memory_cap; try eapply SIM; eauto. i. des.
+    exploit sim_memory_cap; try eapply SIM; eauto. intros x. des.
     exploit (@Memory.remove_exists cap_src l (Memory.max_ts l mem_src)
                                    (Time.incr (Memory.max_ts l mem_src)) Message.reserve);
       try apply CAP_SRC.
-    i. des.
+    intros x0. des.
     assert (MAX: Memory.max_ts l mem2 = Memory.max_ts l mem_src).
     { inv SIM. ss. des.
       dup CAP_SRC. inv CAP_SRC0.
       exploit Memory.cap_max_ts; try exact CAP_SRC; eauto.
-      instantiate (1 := l). i.
-      exploit SOUND; try exact MEM. i.
+      instantiate (1 := l). intros x1.
+      exploit SOUND; try exact MEM. intros x2.
       exploit Memory.remove_get1; try exact x; eauto. i. des.
       { specialize (Time.incr_spec (Memory.max_ts l mem_src)). i.
         rewrite <- LOCTS0 in *. timetac. }
@@ -968,14 +968,14 @@ Module SimThreadPromotion.
       exploit Memory.cap_inv; try exact GET0; try exact CAP_SRC; eauto. i. des.
       - exploit Memory.max_ts_spec; try exact x4. i. des. timetac.
       - inv x3. exploit Memory.max_ts_spec; try exact GET3. i. des.
-        exploit Memory.get_ts; try exact GET3. i. des.
+        exploit Memory.get_ts; try exact GET3. intros x6. des.
         { rewrite x6 in *. inv l0. }
         { exploit TimeFacts.lt_le_lt; try exact x6; try exact MAX1. i. timetac. }
       - subst. ss.
     }
     esplits; eauto.
     - inv SIM. ss. des. econs; ss; eauto.
-      + inv x0. econs; i.
+      + inv x. econs; i.
         * revert GET_SRC.
           erewrite Memory.remove_o; eauto. condtac; ss; eauto.
         * erewrite Memory.remove_o; eauto. condtac; ss; eauto.
@@ -1017,11 +1017,11 @@ Module SimThreadPromotion.
       inv x2. econs; ii; eauto.
       + inv TVIEW_CLOSED.
         econs; i; eauto using Memory.cancel_closed_view.
-      + inv WF_SRC. exploit PROMISES0; eauto. i.
+      + inv WF_SRC. exploit PROMISES0; eauto. intros x1.
         erewrite Memory.remove_o; eauto. condtac; ss; cycle 1.
         { apply CAP_SRC. ss. }
         des. subst.
-        exploit Memory.max_ts_spec; try exact x. i. des.
+        exploit Memory.max_ts_spec; try exact x1. i. des.
         specialize (Time.incr_spec (Memory.max_ts l mem_src)). i.
         exploit TimeFacts.le_lt_lt; try exact MAX0; try exact H. i. timetac.
     - hexploit Memory.cap_closed_timemap; try exact CAP_SRC; eauto. i.
@@ -1079,7 +1079,7 @@ Module SimThreadPromotion.
     inv SIM. ss. des. dup CAP_SRC. inv CAP_SRC0.
     inv STEP; inv STEP0; inv LOCAL0. inv PROMISE0. ss.
     replace from0 with from in *; cycle 1.
-    { exploit SOUND; try exact MEM. i.
+    { exploit SOUND; try exact MEM. intros x.
       exploit Memory.remove_get0; try exact MEM0. i. des.
       revert GET. erewrite Memory.remove_o; eauto. condtac; ss. i.
       rewrite GET in *. inv x. ss. }

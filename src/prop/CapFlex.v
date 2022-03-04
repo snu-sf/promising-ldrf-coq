@@ -69,12 +69,12 @@ Section CAPFLEX.
   Proof.
     inv CAP. move GET at bottom.
     destruct (Memory.get loc to mem1) as [[]|] eqn:GET1.
-    { exploit cap_flex_le0; eauto. i.
+    { exploit cap_flex_le0; eauto. intros x.
       rewrite GET in x. inv x. auto. }
-    right. exploit cap_flex_complete0; eauto. i. des.
+    right. exploit cap_flex_complete0; eauto. intros x. des.
     exploit Memory.max_ts_spec; eauto. i. des. inv MAX.
     - left.
-      exploit Memory.adjacent_exists; try eapply H; eauto. i. des.
+      exploit Memory.adjacent_exists; try eapply H; eauto. intros x1. des.
       assert (LT: Time.lt from from2).
       { clear cap_flex_middle0 cap_flex_back0 cap_flex_complete0 GET0 H.
         (* clear MIDDLE BACK COMPLETE GET0 H. *)
@@ -92,7 +92,7 @@ Section CAPFLEX.
           + refl.
           + econs. auto.
         - exfalso. inv H.
-          exploit cap_flex_le0; try exact GET2. i.
+          exploit cap_flex_le0; try exact GET2. intros x.
           exploit Memory.get_ts; try exact GET. i. des.
           { subst. rewrite GET1 in GET0. inv GET0. }
           exploit Memory.get_disjoint; [exact GET|exact x|..]. i. des.
@@ -103,14 +103,14 @@ Section CAPFLEX.
             * econs. auto.
             * refl.
       }
-      exploit cap_flex_middle0; try eapply x1; eauto. i.
+      exploit cap_flex_middle0; try eapply x1; eauto. intros x0.
       destruct (Time.eq_dec to from2).
       + subst. rewrite GET in x0. inv x0. esplits; eauto.
       + exfalso. inv x1.
         exploit Memory.get_ts; try exact GET. i. des.
         { subst. rewrite GET1 in x. inv x. }
         exploit Memory.get_ts; try exact x0. i. des.
-        { subst. exploit cap_flex_le0; try exact GET3. i.
+        { subst. exploit cap_flex_le0; try exact GET3. intros x1.
           exploit Memory.get_disjoint; [exact GET|exact x1|..]. i. des.
           { subst. rewrite GET1 in GET3. inv GET3. }
           destruct (Time.le_lt_dec to to2).
@@ -298,7 +298,7 @@ Section CAPFLEX.
           * i. destruct (Memory.get loc ts mem0) eqn:GET1; auto.
             exfalso. destruct p.
             destruct (Time.le_lt_dec to ts).
-            { exploit LEAST; eauto. i.
+            { exploit LEAST; eauto. intros x.
               eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt.
               { eapply x. }
               eapply TimeFacts.le_lt_lt.
@@ -307,7 +307,7 @@ Section CAPFLEX.
                 exfalso. eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt.
                 - eapply l.
                 - eauto. } }
-            { exploit GREATEST; eauto. i.
+            { exploit GREATEST; eauto. intros x.
               eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt.
               { eapply x. }
               { eauto. } }

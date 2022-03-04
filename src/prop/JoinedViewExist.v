@@ -275,7 +275,7 @@ Proof.
     specialize (FSPEC loc ts). des_ifs.
     + des. clarify. destruct (Ident.eq_dec tid tid0); dep_clarify; eauto. exfalso.
       destruct st0. eapply WF in n; eauto.
-      inv n. inv DISJOINT. exploit DISJOINT0; eauto. i. des; ss.
+      inv n. inv DISJOINT. exploit DISJOINT0; eauto. intros x0. des; ss.
       eapply memory_get_ts_strong in GET. eapply memory_get_ts_strong in GET1. des; clarify.
       eapply x0; econs; eauto; ss; try refl.
     + exfalso. eapply FSPEC; eauto.

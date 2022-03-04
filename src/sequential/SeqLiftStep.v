@@ -369,7 +369,7 @@ Proof.
   ii. exploit RESERVED; eauto. i. des. esplits; eauto.
   ii. exploit DECR; eauto.
   { econs; eauto. }
-  i. inv x0. eapply DISJOINT; eauto.
+  intros x0. inv x0. eapply DISJOINT; eauto.
 Qed.
 
 Lemma reserved_space_empty_unchanged_loc
@@ -2012,7 +2012,7 @@ Proof.
   assert (RLX: View.rlx (TView.cur tvw1) loc = Time.incr (Time.incr top)).
   { eapply TimeFacts.antisym.
     { rewrite <- MAXTS. inv WF1. ss.
-      inv TVIEW_CLOSED. inv CUR. exploit RLX; eauto. i. des.
+      inv TVIEW_CLOSED. inv CUR. exploit RLX; eauto. intros x. des.
       eapply Memory.max_ts_spec in x. des. eauto.
     }
     { rewrite <- VIEW. inv WF1. ss. inv TVIEW_WF. eapply CUR. }
@@ -2033,7 +2033,7 @@ Proof.
   { i. etransitivity; [|left; eapply TS].
     inv LOCAL. hexploit FLAGSRC; eauto. i. des. subst.
     inv WF2. ss. inv TVIEW_CLOSED. inv CUR.
-    exploit RLX0. i. des. rewrite SRCTM.
+    exploit RLX0. intros x. des. rewrite SRCTM.
     eapply Memory.max_ts_spec in x. des. eauto.
   }
   esplits.
@@ -3529,7 +3529,7 @@ Proof.
       { inv H. rewrite GET in NONE. ss. }
     }
     { destruct (classic (msg_tgt = Message.reserve)); cycle 1.
-      { exfalso. exploit CONSISTENT; eauto. i. ss. eapply Time.lt_strorder.
+      { exfalso. exploit CONSISTENT; eauto. intros x. ss. eapply Time.lt_strorder.
         eapply TimeFacts.lt_le_lt.
         { eapply x. }
         { etrans.
@@ -3813,7 +3813,7 @@ Proof.
       { inv H. rewrite GET in NONE. ss. }
     }
     { destruct (classic (msg_tgt = Message.reserve)); cycle 1.
-      { exfalso. exploit CONSISTENT; eauto. i. ss. eapply Time.lt_strorder.
+      { exfalso. exploit CONSISTENT; eauto. intros x. ss. eapply Time.lt_strorder.
         eapply TimeFacts.lt_le_lt.
         { eapply x. }
         { etrans.
@@ -4400,7 +4400,7 @@ Proof.
     { erewrite Memory.lower_o; eauto. des_ifs; eauto.
       exfalso. ss. des; clarify. exploit CONS; eauto.
       { eapply Memory.lower_get0; eauto. }
-      i. ss. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; [eapply x|].
+      intros x. ss. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt; [eapply x|].
       clear x. etrans; [|eapply Time.join_l]. etrans; [|eapply Time.join_r].
       unfold View.singleton_ur_if. des_ifs; ss.
       { rewrite timemap_singleton_eq. refl. }

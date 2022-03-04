@@ -594,7 +594,7 @@ Section PARTIAL.
 
   Let data_eq := @data_eq (Opt2.D DSE_opt2) eq (Opt2.P DSE_opt2).
 
-  Program Instance data_le_PartialOrder: PartialOrder data_eq data_le.
+  Global Program Instance data_le_PartialOrder: PartialOrder data_eq data_le.
   Next Obligation.
   Proof.
     unfold data_le, le2. unfold data_eq.

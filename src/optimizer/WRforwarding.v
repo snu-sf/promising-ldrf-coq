@@ -26,7 +26,7 @@ Section DATA.
 
   Definition Two := option (Const.t * bool).
 
-  Program Instance eq_Equiv: Equivalence (@eq Two).
+  Global Program Instance eq_Equiv: Equivalence (@eq Two).
   Lemma eq_leibniz : forall x y : Two, eq x y -> x = y.
   Proof. auto. Qed.
 

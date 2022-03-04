@@ -172,7 +172,7 @@ Section MAPPED.
     - eapply MAP0.
     - eapply MAP1.
     - left. eauto.
-    - i. destruct x; auto. exfalso. apply CLPS.
+    - intros x. destruct x; auto. exfalso. apply CLPS.
       destruct H0. eexists. eauto.
   Qed.
   Hint Resolve map_lt_iff: core.
@@ -2158,7 +2158,7 @@ Section MAPPED.
       econs; ss.
       eapply TimeFacts.le_lt_lt; eauto.
       exploit map_le; (try by econs; exact WRITABLE); eauto.
-      i. inv x; ss. inv H.
+      intros x. inv x; ss. inv H.
       exploit NCLPS; eauto; ss.
       exists fto. splits; ss.
     }
@@ -2174,14 +2174,14 @@ Section MAPPED.
     exploit write_map; try exact WRITE_EX; eauto; try refl. i. des.
     hexploit Memory.write_le; eauto. i. des.
     exploit IHWRITE; try exact H; eauto; try refl.
-    { ii. exploit UNWRITABLE; eauto. i. inv x. econs; eauto.
+    { ii. exploit UNWRITABLE; eauto. intros x. inv x. econs; eauto.
       eapply unchangable_write; eauto.
     }
     i. des. esplits; eauto.
     - instantiate (1 := (ffrom', fto', fmsg') :: fmsgs). eauto.
     - econs 2; eauto.
       + exploit map_le; (try by econs; exact WRITABLE_EX); eauto.
-        i. eapply TimeFacts.le_lt_lt; eauto.
+        intros x. eapply TimeFacts.le_lt_lt; eauto.
         inv x; ss. inv H5.
         exploit H2; eauto; ss.
         exists fto'. splits; ss.
@@ -2809,7 +2809,7 @@ Section MAPPED.
         - destruct kind; ss. exploit UNWRITABLE.
           + exists to', to. unfold collapsed. esplits; eauto.
             instantiate (1:=to). econs; ss. refl.
-          + ii. inv x. inv UNCH. inv PROMISE.
+          + intros x. inv x. inv UNCH. inv PROMISE.
             eapply Memory.remove_get0 in MEM0.
             eapply Memory.remove_get0 in PROMISES1. des.
             exploit Memory.get_disjoint.
@@ -3138,7 +3138,7 @@ Section MAPLT.
       mapping_map_lt f.
   Proof.
     ii. exploit MAPLT; [exact MAP0|exact MAP1|].
-    i. rewrite x in *. ss.
+    intros x. rewrite x in *. ss.
   Qed.
 
   Lemma mapping_map_lt_iff_non_collapsable f
@@ -3509,7 +3509,7 @@ Section MAPIDENT.
       timemap_map f tm tm.
   Proof.
     ii. eapply MAP; eauto.
-    exploit CLOSED; eauto. i. des.
+    exploit CLOSED; eauto. intros x. des.
     eapply Memory.max_ts_spec in x. des. eauto.
   Qed.
 
@@ -3966,7 +3966,7 @@ Section SHIFTMAP.
       esplits.
       - eapply mapping_map_lt_iff_pair_loc_update_one.
         + eauto.
-        + instantiate (1:=(fts, fts)). i. exploit INF; eauto. i. ss.
+        + instantiate (1:=(fts, fts)). i. exploit INF; eauto. intros x. ss.
           eapply (@TimeFacts.le_lt_lt _ (snd fts_left)).
           { destruct x.
             - transitivity (fst fts_left).
@@ -3993,7 +3993,7 @@ Section SHIFTMAP.
       - eapply mapping_map_lt_iff_pair_loc_update_one.
         + eauto.
         + instantiate (1:=(Time.middle (snd fts_left) (fst fts_right), Time.middle (snd fts_left) (fst fts_right))).
-          i. exploit INF; eauto. i. ss.
+          i. exploit INF; eauto. intros x. ss.
           eapply (@TimeFacts.le_lt_lt _ (snd fts_left)).
           { destruct x.
             - transitivity (fst fts_left).
@@ -4002,7 +4002,7 @@ Section SHIFTMAP.
             - inv H. hexploit ((mapping_map_lt_iff_pair_loc_inj MAPLT) _ _ _ MAP MAP1); eauto.
               i. subst. refl. }
           { eapply Time.middle_spec. auto. }
-        + i. exploit SUP; eauto. i. ss.
+        + i. exploit SUP; eauto. intros x. ss.
           eapply (@TimeFacts.lt_le_lt _ (fst fts_right)).
           { eapply Time.middle_spec. auto. }
           { destruct x.
@@ -4388,7 +4388,7 @@ Section COMPOSE.
       mappable_memory (compose_map f0 f1) mem0.
   Proof.
     ii. inv MAP. exploit MAPPED; eauto. i. des; clarify.
-    inv MSG. inv MSGLE. exploit MAPPABLE; eauto. i. inv x.
+    inv MSG. inv MSGLE. exploit MAPPABLE; eauto. intros x. inv x.
     eexists. eauto.
   Qed.
 

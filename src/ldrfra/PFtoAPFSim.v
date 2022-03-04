@@ -989,7 +989,7 @@ Module PFtoAPFSim.
       { rewrite x1. apply Time.bot_spec. }
       exploit COVER.
       { econs; eauto. econs; try refl. ss. }
-      s. i. inv x. inv ITV. ss.
+      s. intros x. inv x. inv ITV. ss.
       exploit Memory.max_ts_spec; try exact GET0. i. des.
       etrans; eauto.
     Qed.
@@ -1016,7 +1016,7 @@ Module PFtoAPFSim.
         - destruct (Cell.get ts (cap_tgt loc)) as [[from2 msg2]|] eqn:GET2; ss.
           inv CAP_SRC. exploit Memory.cap_inv; try exact CAP_TGT; eauto. i. des.
           + unfold Memory.get in x0. rewrite <- EQ in x0; ss.
-            exploit SOUND0; eauto. unfold Memory.get. i.
+            exploit SOUND0; eauto. unfold Memory.get. intros x.
             rewrite GET1 in x. ss.
           + subst. inv x1.
             unfold Memory.get in MIDDLE. erewrite MIDDLE in GET1; eauto.

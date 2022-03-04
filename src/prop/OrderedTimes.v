@@ -313,14 +313,14 @@ Proof.
     { destruct l.
       { exploit MAPLT.
         { eapply MAP0. }
-        { eapply MAP1. } i. des.
+        { eapply MAP1. } intros x1. des.
         exfalso. eapply Time.lt_strorder. eapply x1; eauto.
       }
       { inv H. auto. }
     }
     { exploit MAPLT.
       { eapply MAP1. }
-      { eapply MAP0. } i. des.
+      { eapply MAP0. } intros x1. des.
       exfalso. eapply Time.lt_strorder. eapply x1; eauto.
     }
   }

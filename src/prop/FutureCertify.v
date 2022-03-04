@@ -59,7 +59,7 @@ Module FutureCertify.
         - eapply Time.join_r.
         - eapply Time.incr_spec.
         - i. des. exists f. esplits; eauto.
-          i. exploit BOUND; eauto. i. des. eapply x. }
+          i. exploit BOUND; eauto. intros x. des. eapply x. }
       intros [f FSPEC]. exists f.
       assert (IDENT: map_ident_in_memory f mem).
       { ii. specialize (FSPEC loc). des. eauto. }
@@ -79,7 +79,7 @@ Module FutureCertify.
           exploit COMPLETE.
           { ss. left. auto. } i. des.
           exploit BOUND; eauto.
-          { eapply Time.incr_spec. } i.
+          { eapply Time.incr_spec. } intros x.
           left. esplits.
           * eapply MAPPED.
           * eapply Time.bot_spec.

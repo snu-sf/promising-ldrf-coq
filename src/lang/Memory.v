@@ -85,14 +85,14 @@ Module Memory.
         (RMSG: get loc to rhs = Some (fromr, msgr)):
     False.
   Proof.
-    inv DISJOINT. exploit DISJOINT0; eauto. i. des.
+    inv DISJOINT. exploit DISJOINT0; eauto. intros x. des.
     destruct (Time.eq_dec to Time.bot).
     - subst. congr.
     - eapply x.
       + apply Interval.mem_ub. destruct (Cell.WF (lhs loc)).
-        exploit VOLUME; eauto. i. des; auto. inv x1. congr.
+        exploit VOLUME; eauto. intros x1. des; auto. inv x1. congr.
       + apply Interval.mem_ub. destruct (Cell.WF (rhs loc)).
-        exploit VOLUME; eauto. i. des; auto. inv x1. congr.
+        exploit VOLUME; eauto. intros x1. des; auto. inv x1. congr.
   Qed.
 
   Lemma disjoint_get_general
@@ -105,9 +105,9 @@ Module Memory.
         (RMSG: get loc ts3 rhs = Some (ts1, msgr)):
     False.
   Proof.
-    inv DISJOINT. exploit DISJOINT0; eauto. i. des.
+    inv DISJOINT. exploit DISJOINT0; eauto. intros x. des.
     destruct (Time.le_lt_dec ts2 ts0).
-    - destruct (Cell.WF (lhs loc)). exploit VOLUME; eauto. i. des.
+    - destruct (Cell.WF (lhs loc)). exploit VOLUME; eauto. intros x1. des.
       + inv x1. inv TS12.
       + eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt; eauto.
     - eapply x.
@@ -1949,7 +1949,7 @@ Module Memory.
         des. subst. exfalso. inv MEM. inv ADD. eapply DISJOINT0; eauto.
         * apply Interval.mem_ub. auto.
         * apply Interval.mem_ub.
-          destruct (Cell.WF (mem1 loc)). exploit VOLUME; eauto. i. des; auto.
+          destruct (Cell.WF (mem1 loc)). exploit VOLUME; eauto. intros x. des; auto.
           inv x. inv TO.
     - splits.
       + inv DISJOINT. econs. i. revert GET1. erewrite split_o; eauto. repeat condtac; ss.
@@ -1973,18 +1973,18 @@ Module Memory.
       + ii. erewrite split_o; eauto. repeat condtac; ss; eauto.
         * des. subst. exfalso. inv DISJOINT. exploit DISJOINT0; eauto.
           { hexploit split_get0; try exact PROMISES; eauto. i. des. eauto. }
-          i. des. eapply x.
+          intros x. des. eapply x.
           { inv MEM. inv SPLIT. econs. eauto. left. auto. }
           { apply Interval.mem_ub.
-            destruct (Cell.WF (mem1 loc)). exploit VOLUME; eauto. i. des; auto.
+            destruct (Cell.WF (mem1 loc)). exploit VOLUME; eauto. intros x1. des; auto.
             inv x1. inv MEM. inv SPLIT. inv TS12.
           }
         * guardH o. des. subst. exfalso. inv DISJOINT. exploit DISJOINT0; eauto.
           { hexploit split_get0; try exact PROMISES; eauto. i. des. eauto. }
-          i. des. eapply x.
+          intros x. des. eapply x.
           { apply Interval.mem_ub. inv MEM. inv SPLIT. etrans; eauto. }
           { apply Interval.mem_ub.
-            destruct (Cell.WF (ctx loc)). exploit VOLUME; eauto. i. des; auto.
+            destruct (Cell.WF (ctx loc)). exploit VOLUME; eauto. intros x1. des; auto.
             inv x1. inv MEM. inv SPLIT. inv TS23.
           }
     - splits.
@@ -2160,7 +2160,7 @@ Module Memory.
     closed_timemap times mem2.
   Proof.
     ii. specialize (CLOSED loc). des.
-    inv FUTURE. exploit SOUND; eauto; ss. i. des; subst; eauto.
+    inv FUTURE. exploit SOUND; eauto; ss. intros x. des; subst; eauto.
     inv x3. eauto.
   Qed.
 
@@ -2201,22 +2201,22 @@ Module Memory.
     - destruct msg; try by (splits; econs).
       destruct (get loc to mem1) as [[f []]|] eqn:GET1.
       + exploit CLOSED0; eauto. i. des.
-        exploit SOUND; eauto; ss. i. des.
+        exploit SOUND; eauto; ss. intros x. des.
         * rewrite MSG in *. inv x. inv H1.
           splits; auto. eapply future_weak_closed_message; eauto.
         * rewrite MSG in *. inv x. splits; eauto.
           econs. inv MSG_TS. etrans; eauto.
           inv x3. inv RELEASED; ss; try apply LE.
           unfold TimeMap.bot. apply Time.bot_spec.
-      + exploit SOUND; eauto; ss. i. des; subst; try congr.
+      + exploit SOUND; eauto; ss. intros x. des; subst; try congr.
         inv x3. congr.
       + exploit COMPLETE2; eauto. i. des.
         splits; econs; eauto.
       + exploit COMPLETE1; eauto. i. des.
         splits; econs; eauto.
     - ii. specialize (INHABITED loc).
-      exploit SOUND; eauto; ss. i. des.
-      + subst. exploit get_ts; try exact x. i. des; subst; eauto. inv x2.
+      exploit SOUND; eauto; ss. intros x. des.
+      + subst. exploit get_ts; try exact x. intros x2. des; subst; eauto. inv x2.
       + exploit get_ts; try exact x. i. des.
         * subst. inv x3. inv RELEASED.
           exploit Const.undef_le_inv; eauto. i. subst. eauto.
@@ -2243,7 +2243,7 @@ Module Memory.
     - destruct (get loc to y) as [[f []]|] eqn:GET; eauto; cycle 1.
       { exploit SOUND0; eauto; ss. i. des; subst; try congr. inv x4. congr. }
       exploit COMPLETE1; eauto. i. des.
-      exploit SOUND0; eauto; ss. i. des; subst.
+      exploit SOUND0; eauto; ss. intros x3. des; subst.
       + rewrite GET2 in *. inv x3. splits; eauto.
         eapply future_weak_closed_opt_view; eauto.
       + rewrite GET2 in *. inv x3. inv x5. inv x6. inv x7.
@@ -2252,7 +2252,7 @@ Module Memory.
     - destruct (get loc to y) as [[f' []]|] eqn:GET; eauto; cycle 1.
       { exploit SOUND0; eauto; ss. i. des; subst; try congr. inv x4. congr. }
       exploit COMPLETE2; eauto. i. des.
-      exploit SOUND0; eauto; ss. i. des; subst.
+      exploit SOUND0; eauto; ss. intros x3. des; subst.
       + rewrite GET2 in *. inv x3. splits; eauto.
         eapply future_weak_closed_opt_view; eauto.
       + rewrite GET2 in *. inv x3. inv x5. inv x6. inv x7.
@@ -2936,7 +2936,7 @@ Module Memory.
     exists mem2, remove mem1 loc from to msg mem2.
   Proof.
     exploit remove_get0; eauto. i. des.
-    exploit LE; eauto. i.
+    exploit LE; eauto. intros x.
     exploit remove_exists; try exact x. eauto.
   Qed.
 
@@ -3095,12 +3095,12 @@ Module Memory.
   Proof.
     inv CAP. move GET at bottom.
     destruct (get loc to mem1) as [[]|] eqn:GET1.
-    { exploit SOUND; eauto. i.
+    { exploit SOUND; eauto. intros x.
       rewrite GET in x. inv x. auto. }
-    right. exploit COMPLETE; eauto. i. des.
-    exploit max_ts_spec; eauto. i. des. inv MAX.
+    right. exploit COMPLETE; eauto. intros x. des.
+    exploit max_ts_spec; eauto. intros x0. des. inv MAX.
     - left.
-      exploit adjacent_exists; try eapply H; eauto. i. des.
+      exploit adjacent_exists; try eapply H; eauto. intros x1. des.
       assert (LT: Time.lt from from2).
       { clear MIDDLE BACK COMPLETE GET0 H.
         inv x1. rewrite GET0 in x. inv x.
@@ -3117,7 +3117,7 @@ Module Memory.
           + refl.
           + econs. auto.
         - exfalso. inv H.
-          exploit SOUND; try exact GET2. i.
+          exploit SOUND; try exact GET2. intros x.
           exploit get_ts; try exact GET. i. des.
           { subst. rewrite GET1 in GET0. inv GET0. }
           exploit get_disjoint; [exact GET|exact x|..]. i. des.
@@ -3128,14 +3128,14 @@ Module Memory.
             * econs. auto.
             * refl.
       }
-      exploit MIDDLE; try eapply x1; eauto. i.
+      exploit MIDDLE; try eapply x1; eauto. intros x0.
       destruct (Time.eq_dec to from2).
       + subst. rewrite GET in x0. inv x0. esplits; eauto.
       + exfalso. inv x1.
         exploit get_ts; try exact GET. i. des.
         { subst. rewrite GET1 in x. inv x. }
         exploit get_ts; try exact x0. i. des.
-        { subst. exploit SOUND; try exact GET3. i.
+        { subst. exploit SOUND; try exact GET3. intros x1.
           exploit get_disjoint; [exact GET|exact x1|..]. i. des.
           { subst. rewrite GET1 in GET3. inv GET3. }
           destruct (Time.le_lt_dec to to2).

@@ -1740,7 +1740,7 @@ Section UNCHANGABLES.
     revert MLE. induction WRITE; i.
     { split; ss. eapply step_write_not_in_write; eauto. }
     hexploit Memory.write_le; eauto. i. des.
-    exploit IHWRITE; eauto. i. des. split.
+    exploit IHWRITE; eauto. intros x. des. split.
     - ii. eapply x; eauto. inv H0. econs; eauto.
       eapply unchangable_write; eauto.
     - econs; eauto using step_write_not_in_write.
@@ -1843,12 +1843,12 @@ Section UNCHANGABLES.
   Proof.
     inv CWF. inv WF. inv COV. destruct st1, st2.
     rewrite unwritable_eq; cycle 1.
-    { exploit THREADS; try apply TID1. i. inv x1. auto. }
+    { exploit THREADS; try apply TID1. intros x1. inv x1. auto. }
     unfold unwritable2. esplits; eauto.
     - exploit THREADS; try apply TID2; eauto. intros LCWF. inv LCWF.
       econs; eauto.
     - ii. inv H. exploit DISJOINT; eauto. intros LCDISJ. inv LCDISJ.
-      inv DISJOINT0. exploit DISJOINT1; eauto. i. des.
+      inv DISJOINT0. exploit DISJOINT1; eauto. intros x1. des.
       eapply x1; eauto.
   Qed.
 
@@ -3077,7 +3077,7 @@ Proof.
         * i. destruct (Memory.get loc ts mem0) eqn:GET1; auto.
           exfalso. destruct p.
           destruct (Time.le_lt_dec to ts).
-          { exploit LEAST; eauto. i.
+          { exploit LEAST; eauto. intros x.
             eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt.
             { eapply x. }
             eapply TimeFacts.le_lt_lt.
@@ -3086,7 +3086,7 @@ Proof.
               exfalso. eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt.
               - eapply l.
               - eauto. } }
-          { exploit GREATEST; eauto. i.
+          { exploit GREATEST; eauto. intros x.
             eapply Time.lt_strorder. eapply TimeFacts.le_lt_lt.
             { eapply x. }
             { eauto. } }
@@ -3148,7 +3148,7 @@ Section CONCRETELE.
   Proof.
     ii. specialize (CLOSED loc). des.
     exploit CONCRETELE; eauto; ss.
-    i. inv x. des. eauto.
+    intros x. inv x. des. eauto.
   Qed.
 
   Lemma concrete_messages_le_closed_view
@@ -4311,7 +4311,7 @@ Section SEMICLOSED.
     { exploit CONCRETE.
       { eauto. }
       { ss. }
-      i. inv x. left. eauto.
+      intros x. inv x. left. eauto.
     }
     { clarify. auto. }
   Qed.
@@ -4532,7 +4532,7 @@ Proof.
   - exploit THREADS; try apply TID2; eauto. intros LCWF. inv LCWF. eauto.
   - destruct (Memory.get x0 x1 prom1) eqn:GET0; eauto. exfalso.
     exploit DISJOINT; eauto. intros LCDISJ. inv LCDISJ. destruct p.
-    inv DISJOINT0. exploit DISJOINT1; eauto. i. des.
+    inv DISJOINT0. exploit DISJOINT1; eauto. intros x5. des.
     eapply Memory.get_ts in GET. eapply Memory.get_ts in GET0. des; clarify.
     eapply x5; eauto.
     + instantiate (1:=x1). econs; ss; eauto. refl.
@@ -4637,7 +4637,7 @@ Section FINALIZED.
     eapply other_promise_unchangable with (tid1:=tid) (tid2:=tid0); eauto.
     econs; eauto. inv WF2. ss.
     inv WF0. destruct st. exploit THREADS; eauto.
-    i. inv x4. ss. rewrite EQ. eapply PROMISES in EQ. clarify.
+    intros x4. inv x4. ss. rewrite EQ. eapply PROMISES in EQ. clarify.
   Qed.
 End FINALIZED.
 

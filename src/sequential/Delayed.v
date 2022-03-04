@@ -489,7 +489,7 @@ Lemma trace_promise_steps_promise_steps
 Proof.
   induction STEPS; eauto.
   inv PROMISE; ss. inv H1.
-  exploit IHSTEPS; eauto. i.
+  exploit IHSTEPS; eauto. intros x.
   etrans; try exact x.
   econs 2; try refl. econs.
   - econs; eauto. econs; eauto.
@@ -1027,7 +1027,7 @@ Proof.
     { econs; try apply LOCAL; eauto.
       eapply TView.future_closed; eauto. apply LOCAL. }
     { econs. eapply TimeFacts.le_lt_lt; eauto. }
-    i. des. clear IHWRITE.
+    intros x. des. clear IHWRITE.
     exploit split_memory_write; try exact WRITE_EX.
     { unguard. des; subst; ss. }
     i. des.

@@ -135,8 +135,8 @@ Section SIM.
   Let le_g: gdata -> gdata -> Prop := Opt3.le_g O3.
   Let le_g_PreOrder: PreOrder le_g := Opt3.le_g_PreOrder O3.
   Let le_g_PartialOrder: PartialOrder eq le_g := Opt3.le_g_PartialOrder O3.
-  Program Instance le_g_PreOrder_i: PreOrder le_g.
-  Program Instance le_g_PartialOrder_i: PartialOrder eq le_g.
+  Global Program Instance le_g_PreOrder_i: PreOrder le_g.
+  Global Program Instance le_g_PartialOrder_i: PartialOrder eq le_g.
 
   Let bot_g_spec: forall gd, le_g bot_g gd := Opt3.bot_g_spec O3.
   Let expr_g_inc: forall ex gd, le_g gd (expr_g gd ex) := Opt3.expr_g_inc O3.

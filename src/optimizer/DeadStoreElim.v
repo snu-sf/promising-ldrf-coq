@@ -26,7 +26,7 @@ Section DATA.
 
   Variant Three := none | half | full.
 
-  Program Instance eq_Equiv: Equivalence (@eq Three).
+  Global Program Instance eq_Equiv: Equivalence (@eq Three).
   Lemma eq_leibniz : forall x y : Three, eq x y -> x = y.
   Proof. auto. Qed.
 

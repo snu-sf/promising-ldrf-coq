@@ -98,7 +98,7 @@ Module PFtoRAThread.
           (FUTURE: Memory.future mem1 mem2):
       stable_views mem2 views.
     Proof.
-      ii. exploit CLOSED1; eauto. i.
+      ii. exploit CLOSED1; eauto. intros x.
       inv x. specialize (RLX loc0). des.
       exploit Memory.future_get1; try exact RLX; eauto; ss. i. des.
       rewrite GET0 in *. inv GET. inv MSG_LE. inv RELEASED.
@@ -588,7 +588,7 @@ Module PFtoRAThread.
       des. subst. dup STEP. inv STEP0.
       inv STEP1; [|inv STEP0; inv LOCAL]. inv STEP0. ss.
       hexploit PFtoAPFSim.promise_step; try exact LOCAL; try eapply SIM1; eauto.
-      { i. destruct msg; ss. exploit PROMISE0; eauto. i. des.
+      { i. destruct msg; ss. exploit PROMISE0; eauto. intros x. des.
         inv x; eauto. econs. econs.
         hexploit Memory.promise_inhabited; try exact PROMISE1; try apply MEM1_APF. i.
         eapply joined_view_closed; try exact JOINED; eauto.

@@ -16,7 +16,7 @@ From PromisingLib Require Import Event.
 Set Implicit Arguments.
 
 
-Program Instance option_rel_PreOrder A R `{@PreOrder A R}: PreOrder (option_rel R).
+Global Program Instance option_rel_PreOrder A R `{@PreOrder A R}: PreOrder (option_rel R).
 Next Obligation.
 Proof.
   ii. destruct x; ss. refl.
@@ -102,7 +102,7 @@ Module Perm.
     | _, _ => false
     end.
 
-  Program Instance le_PreOrder: PreOrder le.
+  Global Program Instance le_PreOrder: PreOrder le.
   Next Obligation.
   Proof.
     ii. destruct x; ss.
@@ -206,7 +206,7 @@ Module Perms.
   Definition le (p0 p1: t): Prop :=
     forall loc, Perm.le (p0 loc) (p1 loc).
 
-  Program Instance le_PreOrder: PreOrder le.
+  Global Program Instance le_PreOrder: PreOrder le.
   Next Obligation.
   Proof.
     ii. refl.
@@ -307,7 +307,7 @@ Module Flag.
 
   Definition le (f0 f1: t): bool := implb f0 f1.
 
-  Program Instance le_PreOrder: PreOrder le.
+  Global Program Instance le_PreOrder: PreOrder le.
   Next Obligation.
   Proof.
     ii. destruct x; ss.
@@ -445,7 +445,7 @@ Module Flags.
   Definition le (f0 f1: t): Prop :=
     forall loc, Flag.le (f0 loc) (f1 loc).
 
-  Program Instance le_PreOrder: PreOrder le.
+  Global Program Instance le_PreOrder: PreOrder le.
   Next Obligation.
   Proof.
     ii. refl.
@@ -587,7 +587,7 @@ Module ValueMap.
   Definition le (vs0 vs1: t): Prop :=
     forall loc, Const.le (vs0 loc) (vs1 loc).
 
-  Program Instance le_PreOrder: PreOrder le.
+  Global Program Instance le_PreOrder: PreOrder le.
   Next Obligation.
   Proof.
     ii. refl.
@@ -705,7 +705,7 @@ Module Oracle.
     (<<RELEASE: option_rel in_release_le i0.(in_release) i1.(in_release)>>)
   .
 
-  Program Instance in_access_le_PreOrder: PreOrder in_access_le.
+  Global Program Instance in_access_le_PreOrder: PreOrder in_access_le.
   Next Obligation.
   Proof.
     ii. unfold in_access_le. des_ifs. splits; refl.
@@ -715,11 +715,11 @@ Module Oracle.
     ii. unfold in_access_le in *. des_ifs. des. splits; etrans; eauto.
   Qed.
 
-  Program Instance in_acquire_le_PreOrder: PreOrder in_acquire_le.
+  Global Program Instance in_acquire_le_PreOrder: PreOrder in_acquire_le.
 
-  Program Instance in_release_le_PreOrder: PreOrder in_release_le.
+  Global Program Instance in_release_le_PreOrder: PreOrder in_release_le.
 
-  Program Instance input_le_PreOrder: PreOrder input_le.
+  Global Program Instance input_le_PreOrder: PreOrder input_le.
   Next Obligation.
   Proof.
     ii. unfold input_le. splits; refl.

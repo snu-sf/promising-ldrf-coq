@@ -106,7 +106,7 @@ Proof.
     { eapply mapping_latest_wf_loc. }
     i. subst. exploit CONSISTENT; eauto.
     { inv MSG; inv MSG0; ss. }
-    i. ss. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
+    intros x. ss. eapply Time.lt_strorder. eapply TimeFacts.lt_le_lt.
     { eapply x. }
     { eapply LOCALWF. }
   }
@@ -887,7 +887,7 @@ Proof.
         i. exploit FINALIZED0; eauto.
         { inv MSG0; ss. }
         i. des. eapply sim_timestamp_exact_unique in TO; eauto. subst.
-        exploit MAX3; eauto. i.
+        exploit MAX3; eauto. intros x.
         erewrite x. eapply LOCALTGT1 in x. rewrite x in GET3. auto.
       }
     }

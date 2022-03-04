@@ -181,7 +181,7 @@ Module SimPromises.
             inv INV1. exploit PVIEW; eauto. i. des.
             exploit Memory.add_get0; try exact PROMISES; eauto. i. des. congr. }
           { apply INV1. }
-        * i. inv INV1. exploit PVIEW; eauto. i. des.
+        * i. inv INV1. exploit PVIEW; eauto. intros x. des.
           erewrite Memory.add_o; eauto. condtac; eauto.
           ss. des. subst. exploit LE; eauto. i.
           inv x1. inv ADD. exfalso.
@@ -218,7 +218,7 @@ Module SimPromises.
             exploit Memory.split_get0; try exact PROMISES; eauto. congr. }
           { guardH o. i. des. inv LHS. ss. }
           { apply INV1. }
-        * i. inv INV1. exploit PVIEW; eauto. i. des.
+        * i. inv INV1. exploit PVIEW; eauto. intros x. des.
           erewrite Memory.split_o; eauto. repeat condtac; eauto; ss.
           { des. subst. congr. }
           { guardH o. des. subst. rewrite GET0 in *. inv x. eauto. }
@@ -254,7 +254,7 @@ Module SimPromises.
           condtac; ss.
           { i. des. inv LHS. ss. }
           { apply INV1. }
-        * i. inv INV1. exploit PVIEW; eauto. i. des.
+        * i. inv INV1. exploit PVIEW; eauto. intros x. des.
           erewrite Memory.lower_o; eauto. condtac; eauto.
           des. ss. subst. rewrite GET in x. inv x.
           inv MSG_LE. esplits; eauto.

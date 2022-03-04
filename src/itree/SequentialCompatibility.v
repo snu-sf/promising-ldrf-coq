@@ -238,7 +238,7 @@ Proof.
         etrans; eauto. eapply Flags.join_ge_r.
       }
       { ss. }
-      exploit SIM2; eauto. i.
+      exploit SIM2; eauto. intros x .
       gbase. eapply rclo7_base. eapply GF in x.
       eapply sim_seq_mon; eauto.
       i. eapply rclo7_base. auto.

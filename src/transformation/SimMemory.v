@@ -39,7 +39,7 @@ Inductive message_same_kind: forall (msg_src msg_tgt: Message.t), Prop :=
 .
 #[local] Hint Constructors message_same_kind: core.
 
-Program Instance message_same_kind_Equivalence: Equivalence message_same_kind.
+Global Program Instance message_same_kind_Equivalence: Equivalence message_same_kind.
 Next Obligation.
   ii. destruct x; eauto; econs 1; ss.
 Qed.
@@ -71,7 +71,7 @@ Inductive sim_memory (mem_src mem_tgt:Memory.t): Prop :=
         Memory.get loc to mem_tgt = Some (from, Message.reserve))
 .
 
-Program Instance sim_memory_PreOrder: PreOrder sim_memory.
+Global Program Instance sim_memory_PreOrder: PreOrder sim_memory.
 Next Obligation.
   econs; try refl. i. esplits; eauto. refl.
 Qed.
@@ -136,13 +136,13 @@ Proof.
   exploit COVER0.
   { econs; eauto. econs; try refl.
     exploit Memory.get_ts; eauto. i. des; subst; timetac. }
-  i. dup x. inv x0. esplits; eauto.
+  intros x. dup x. inv x0. esplits; eauto.
   - destruct (Time.le_lt_dec from from_src); ss.
     dup COVER. specialize (COVER2 loc from). des. exploit COVER2.
     { econs; eauto.
       exploit Memory.get_ts; try exact GET_SRC. i. des; ss.
       inv ITV. econs; eauto. econs. ss. }
-    i. inv x0.
+    intros x0. inv x0.
     destruct (Time.eq_dec to0 from).
     + subst. exploit MSG; try exact GET0. i. des.
       exploit Memory.get_disjoint; [exact GET_SRC|exact GET1|..]. i. des.
@@ -190,17 +190,17 @@ Proof.
     exploit Memory.max_ts_spec; try eapply (INHABITED loc). i. des.
     exploit Memory.get_ts; eauto. i. des.
     { rewrite x1. apply Time.bot_spec. }
-    exploit COVER; i.
+    exploit COVER.
     { econs; eauto. econs; eauto. refl. }
-    inv x. exploit Memory.max_ts_spec; try exact GET0. i. des.
+    intros x. inv x. exploit Memory.max_ts_spec; try exact GET0. i. des.
     inv ITV. ss. etrans; eauto.
   - specialize (COVER loc (Memory.max_ts loc mem_tgt)). des.
     exploit Memory.max_ts_spec; try eapply (INHABITED0 loc). i. des.
     exploit Memory.get_ts; eauto. i. des.
     { rewrite x1. apply Time.bot_spec. }
-    exploit COVER0; i.
+    exploit COVER0.
     { econs; eauto. econs; eauto. refl. }
-    inv x. exploit Memory.max_ts_spec; try exact GET0. i. des.
+    intros x. inv x. exploit Memory.max_ts_spec; try exact GET0. i. des.
     inv ITV. ss. etrans; eauto.
 Qed.
 
@@ -494,20 +494,20 @@ Proof.
   assert (GET1_TGT: exists from1' m1', Memory.get loc to1 mem_tgt = Some (from1', m1')).
   { exploit Memory.get_ts; try exact GET1. i. des.
     { subst. esplits. eapply CLOSED_TGT. }
-    destruct (COVER loc to1). exploit H; i.
+    destruct (COVER loc to1). exploit H.
     { econs; try exact GET1. econs; eauto. refl. }
-    inv x. inv ITV. ss. inv TO; cycle 1.
+    intros x. inv x. inv ITV. ss. inv TO; cycle 1.
     { inv H1. esplits; eauto. }
     exfalso.
     destruct (Time.le_lt_dec to from2).
     { exploit MSG; eauto. i. des.
       exploit (EMPTY to); eauto. i. congr. }
-    destruct (COVER loc from2). exploit H3; i.
+    destruct (COVER loc from2). exploit H3.
     { econs; eauto. econs; ss.
       - etrans; eauto.
       - econs; ss.
     }
-    inv x. inv ITV. ss. inv TO.
+    intros x. inv x. inv ITV. ss. inv TO.
     - exploit Memory.get_ts; try exact GET2. i. des.
       { subst. inv FROM0. }
       exploit Memory.get_ts; try exact GET0. i. des.
@@ -532,9 +532,9 @@ Proof.
     destruct (TimeFacts.le_lt_dec from from2).
     - inv l; cycle 1.
       { inv H. esplits; eauto. }
-      destruct (COVER loc from2). exploit H1; i.
+      destruct (COVER loc from2). exploit H1.
       { econs; try exact x2. econs; ss. econs; ss. }
-      inv x. inv ITV. ss. inv TO; cycle 1.
+      intros x. inv x. inv ITV. ss. inv TO; cycle 1.
       { inv H2. exploit (EMPTY to0); eauto; try refl. i. congr. }
       exploit Memory.get_disjoint; [exact GET2|exact GET|..]. i. des.
       { subst. timetac. }
@@ -546,9 +546,9 @@ Proof.
         * econs. ss.
         * etrans; eauto.
     - destruct (TimeFacts.le_lt_dec to2 from).
-      + destruct (COVER loc to2). exploit H; i.
+      + destruct (COVER loc to2). exploit H.
         { econs; eauto. econs; ss. refl. }
-        inv x. inv ITV. ss.
+        intros x. inv x. inv ITV. ss.
         exploit (x4 to0); eauto; try congr.
         { eapply TimeFacts.lt_le_lt; try exact TO; ss. }
         destruct (Time.le_lt_dec to to0); ss.
@@ -560,9 +560,9 @@ Proof.
         apply (x6 to); econs; ss; try refl.
         etrans; try exact FROM.
         eapply TimeFacts.le_lt_lt; try exact x5. ss.
-      + destruct (COVER loc from). exploit H; i.
+      + destruct (COVER loc from). exploit H.
         { econs; try exact GET2. econs; ss. econs. ss. }
-        inv x. inv ITV. ss.
+        intros x. inv x. inv ITV. ss.
         destruct (TimeFacts.le_lt_dec to to0).
         * exploit Memory.get_ts; try exact x2. i. des.
           { subst. inv x3. }
@@ -584,9 +584,9 @@ Proof.
   exfalso.
   exploit Memory.get_ts; try exact GET. i. des.
   { subst. inv TS1. }
-  destruct (COVER loc ts). exploit H0; i.
+  destruct (COVER loc ts). exploit H0.
   { econs; eauto. econs; ss. refl. }
-  inv x. inv ITV. ss.
+  intros x. inv x. inv ITV. ss.
   destruct (TimeFacts.le_lt_dec to from2).
   { exploit (EMPTY to); try congr.
     eapply TimeFacts.lt_le_lt; try exact TS1. ss. }
@@ -628,9 +628,9 @@ Proof.
     destruct (TimeFacts.le_lt_dec from from2).
     - inv l; cycle 1.
       { inv H. esplits; eauto. }
-      destruct (COVER loc from2). exploit H0; i.
+      destruct (COVER loc from2). exploit H0.
       { econs; try exact x2. econs; ss. econs; ss. }
-      inv x. inv ITV. ss. inv TO; cycle 1.
+      intros x. inv x. inv ITV. ss. inv TO; cycle 1.
       { inv H2. exploit (EMPTY to0); eauto; try refl. i. congr. }
       exploit Memory.get_disjoint; [exact GET2|exact GET|..]. i. des.
       { subst. timetac. }
@@ -642,9 +642,9 @@ Proof.
         * econs. ss.
         * etrans; eauto.
     - destruct (TimeFacts.le_lt_dec to2 from).
-      + destruct (COVER loc to2). exploit H0; i.
+      + destruct (COVER loc to2). exploit H0.
         { econs; eauto. econs; ss. refl. }
-        inv x. inv ITV. ss.
+        intros x. inv x. inv ITV. ss.
         exploit (x4 to0); eauto; try congr.
         { eapply TimeFacts.lt_le_lt; try exact TO; ss. }
         destruct (Time.le_lt_dec to to0); ss.
@@ -656,9 +656,9 @@ Proof.
         apply (x6 to); econs; ss; try refl.
         etrans; try exact FROM.
         eapply TimeFacts.le_lt_lt; try exact x5. ss.
-      + destruct (COVER loc from). exploit H0; i.
+      + destruct (COVER loc from). exploit H0.
         { econs; try exact GET2. econs; ss. econs. ss. }
-        inv x. inv ITV. ss.
+        intros x. inv x. inv ITV. ss.
         destruct (TimeFacts.le_lt_dec to to0).
         * exploit Memory.get_ts; try exact x2. i. des.
           { subst. inv x3. }
@@ -680,9 +680,9 @@ Proof.
   exfalso.
   exploit Memory.get_ts; try exact GET. i. des.
   { subst. inv TS1. }
-  destruct (COVER loc ts). exploit H; i.
+  destruct (COVER loc ts). exploit H.
   { econs; eauto. econs; ss. refl. }
-  inv x. inv ITV. ss.
+  intros x. inv x. inv ITV. ss.
   destruct (TimeFacts.le_lt_dec to from2).
   { exploit (EMPTY to); try congr.
     eapply TimeFacts.lt_le_lt; try exact TS1. ss. }
@@ -768,7 +768,7 @@ Proof.
   econs; i; try split; i.
   - inv H.
     destruct (Memory.get loc to mem1_src) as [[]|] eqn:GET1.
-    + inv CAP_SRC. exploit SOUND; eauto. i.
+    + inv CAP_SRC. exploit SOUND; eauto. intros x.
       rewrite x in GET. inv GET.
       eapply cap_covered; eauto.
       inv MEM1. rewrite <- COVER.
@@ -777,7 +777,7 @@ Proof.
       econs; eauto.
   - inv H.
     destruct (Memory.get loc to mem1_tgt) as [[]|] eqn:GET1.
-    + inv CAP_TGT. exploit SOUND; eauto. i.
+    + inv CAP_TGT. exploit SOUND; eauto. intros x.
       rewrite x in GET. inv GET.
       eapply cap_covered; eauto.
       inv MEM1. rewrite COVER.
@@ -785,7 +785,7 @@ Proof.
     + exploit sim_memory_cap_get_tgt; eauto. i. des.
       econs; eauto.
   - destruct (Memory.get loc to mem1_tgt) as [[]|] eqn:GET1.
-    + inv CAP_TGT. exploit SOUND; eauto. i.
+    + inv CAP_TGT. exploit SOUND; eauto. intros x.
       rewrite x in GET. inv GET.
       inv MEM1. exploit MSG; eauto. i. des.
       inv CAP_SRC. exploit SOUND; eauto. i.
@@ -793,13 +793,13 @@ Proof.
     + exploit sim_memory_cap_get_tgt; eauto. i. des.
       esplits; eauto. refl.
   - destruct (Memory.get loc to mem1_src) as [[]|] eqn:GET1.
-    + inv CAP_SRC. exploit SOUND; eauto. i.
+    + inv CAP_SRC. exploit SOUND; eauto. intros x.
       rewrite x in H. inv H.
       inv MEM1. rewrite RESERVE in GET1.
       inv CAP_TGT. exploit SOUND0; eauto.
     + exploit sim_memory_cap_get_src; eauto. i. des. auto.
   - destruct (Memory.get loc to mem1_tgt) as [[]|] eqn:GET1.
-    + inv CAP_TGT. exploit SOUND; eauto. i.
+    + inv CAP_TGT. exploit SOUND; eauto. intros x.
       rewrite x in H. inv H.
       inv MEM1. rewrite <- RESERVE in GET1.
       inv CAP_SRC. exploit SOUND0; eauto.

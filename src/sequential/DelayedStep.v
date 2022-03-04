@@ -372,7 +372,7 @@ Section DStep.
         econs; try eapply non_release_silent; eauto.
         econs; eauto.
     }
-    exploit IHSTEPS; eauto. i. clear IHSTEPS.
+    exploit IHSTEPS; eauto. intros x0. clear IHSTEPS.
     clear - H x0.
     inv H. inv TSTEP.
     destruct (classic (release_event e0)).
@@ -908,7 +908,6 @@ Section DStep.
     eapply delayed_consistent_consistent in CONSISTENT.
     eapply consistent_promise_consistent; eauto.
   Qed.
-Proof.
 
 
 

@@ -104,9 +104,9 @@ Proof.
   inv MAX. inv WF.
   inv TVIEW_CLOSED. inv CUR. specialize (PLN loc). des.
   exploit MAX0; eauto; ss.
-  i. exploit CONS; eauto; ss. i.
+  i. exploit CONS; eauto; ss. intros x1.
   exfalso. eapply Time.lt_strorder.
-  eapply TimeFacts.lt_le_lt; [eapply x0|]. eapply TVIEW_WF.
+  eapply TimeFacts.lt_le_lt; [eapply x1|]. eapply TVIEW_WF.
 Qed.
 
 Lemma non_max_readable_future mem0 mem1 prom tvw loc ts
@@ -124,7 +124,7 @@ Proof.
   hexploit Memory.future_weak_get1; eauto; ss. i. des.
   exploit MAX0; eauto.
   { inv MSG_LE; ss. }
-  i. eapply PROMISES in x. clarify. auto.
+  intros x. eapply PROMISES in x. clarify. auto.
 Qed.
 
 Lemma max_readable_read_only_aux mem prom tvw loc ts val released ord
@@ -236,7 +236,7 @@ Variant fulfilled_memory (loc: Loc.t) (mem0 mem1: Memory.t): Prop :=
           (<<MSG_LE: Message.le msg1 msg0>>))
 .
 
-Program Instance fulfilled_memory_PreOrder loc: PreOrder (fulfilled_memory loc).
+Global Program Instance fulfilled_memory_PreOrder loc: PreOrder (fulfilled_memory loc).
 Next Obligation.
 Proof.
   ii. econs; eauto. i. exists msg1. splits; auto. refl.

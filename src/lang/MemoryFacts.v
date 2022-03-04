@@ -148,10 +148,10 @@ Module MemoryFacts.
     assert (t1 <> t2).
     { ii. subst. eapply Time.lt_strorder. eauto. }
     eapply DISJOINT; try exact H0; eauto.
-    - apply Interval.mem_ub. exploit VOLUME; try exact GET1; eauto. i. des; ss.
+    - apply Interval.mem_ub. exploit VOLUME; try exact GET1; eauto. intros x. des; ss.
       inv x. congr.
     - econs; ss.
-      + exploit VOLUME; try exact GET1; eauto. i. des; ss. inv x. congr.
+      + exploit VOLUME; try exact GET1; eauto. intros x. des; ss. inv x. congr.
       + left. ss.
   Qed.
 
@@ -224,7 +224,7 @@ Module MemoryFacts.
         (GET: Memory.get loc to mem = Some (from, Message.concrete val (Some released))):
     Time.lt from to.
   Proof.
-    destruct (Cell.WF (mem loc)). exploit VOLUME; eauto. i. des; ss. inv x.
+    destruct (Cell.WF (mem loc)). exploit VOLUME; eauto. intros x. des; ss. inv x.
     inv CLOSED. rewrite INHABITED in GET. inv GET.
   Qed.
 End MemoryFacts.

@@ -101,7 +101,7 @@ Section RARACE.
     hexploit WThread.step_reserve_only; try exact STEP; eauto. i. des.
     exploit WThread.step_future; eauto. i. des.
     exploit WThread.steps_future; try exact STEPS; eauto. i. des.
-    exploit IHSTEPS; eauto. i. des.
+    exploit IHSTEPS; eauto. intros x. des.
     clear IHSTEPS. revert x.
     inv STEP. inv STEP0; inv STEP; [|inv LOCAL]; ss; try by (esplits; eauto).
     - unfold Writes.append. ss. condtac; ss. i. des; ss. inv x.
