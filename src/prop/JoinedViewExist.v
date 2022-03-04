@@ -1,4 +1,4 @@
-Require Import Omega.
+Require Import Lia.
 Require Import Bool.
 Require Import RelationClasses.
 
@@ -86,7 +86,7 @@ Proof.
     - i. destruct l; ss.
     - i. hexploit (list_match_rev l). i. des; clarify.
       erewrite List.app_length in LEN. ss.
-      rewrite Nat.add_comm in LEN. ss. clarify.
+      rewrite PeanoNat.Nat.add_comm in LEN. ss. clarify.
       eapply times_sorted_split in SORTED. des. ss.
       econs. i. eapply NNPP.
       ii. eapply H0. econs. i. exfalso. eapply H0.
