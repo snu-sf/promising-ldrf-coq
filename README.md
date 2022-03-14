@@ -1,20 +1,5 @@
 # Sequential Reasoning for Optimizing Compilers Under Weak Memory Concurrency
 
-This artifact contains Coq development for the paper *Sequential Reasoning for Optimizing Compilers Under Weak Memory Concurrency*.
-
-- `promising-seq-source.zip` contains source code.
-- You can also clone the source code from GitHub:
-```
-git clone -b seq git@github.com:snu-sf/promising-ldrf-coq.git promising-seq
-```
-- `promising-seq.zip` contains a docker image (`promising-seq.tar`) where you can find the pre-compiled Coq development.
-See following commands for running the image:
-```
-sudo docker load < promising-seq.tar
-docker run -it pldi2022ae /bin/bash
-cd promising-seq # in the container
-```
-
 ## Build
 - Requirement: opam (>=2.0.0), Coq 8.15.0
 - Install dependencies with opam
@@ -54,7 +39,7 @@ The following are updated proofs from existing formalization (i.e., they are not
 - `src/sequential/OptimizerAdequacy.v` - Final soundness theorems for optimization passes (`Theorem WRforwarding_sound`, `Theorem RRforwarding_sound`, `Theorem LICM_LoadIntro_sound`, and `Theorem DeadStoreElim_sound`)
 
 
-## Guides for Reviewers
+## Guides for Readers
 
 ### The PS model with non-atomics (Section 5)
 Mapping between the new transition rules in the paper (Figure 4) and the definitions in Coq (`src/lang/Local.v`)
