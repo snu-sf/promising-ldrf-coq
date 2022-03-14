@@ -350,7 +350,7 @@ Proof.
         assert (r0 = r2).
         { eapply f_equal with (f:=observe) in TGT. ss. clarify. }
         subst.
-        exploit SIM2; eauto. i. eapply GF in x0.
+        exploit SIM2; eauto. intros x0. eapply GF in x0.
         exploit x0; try apply SC0; eauto using Memory.future_future_weak.
         i. ss. des. exploit TERMINAL0; try by econs.
         { econs. eauto. }
@@ -400,7 +400,7 @@ Proof.
         assert (r0 = r2).
         { eapply f_equal with (f:=observe) in TGT. ss. clarify. }
         subst.
-        exploit SIM2; eauto. i. eapply GF in x.
+        exploit SIM2; eauto. intros x. eapply GF in x.
         exploit x; try apply SC0; eauto using Memory.future_future_weak.
         i. ss. des.
         exploit STEP0; eauto. i. des.

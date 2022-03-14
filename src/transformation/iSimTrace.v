@@ -162,7 +162,7 @@ Proof.
         { econs 1. }
         { ss. }
         { gbase. inv SIM0; eauto.
-          { exploit H; eauto. i. eapply GF in x.
+          { exploit H; eauto. intros x. eapply GF in x.
             eapply CIH0. eapply _sim_thread_mon; eauto.
             i. eapply rclo11_clo_base. right. gbase. auto.
           }
@@ -174,7 +174,7 @@ Proof.
         { econs 2. econs 2. econs; [|econs 1]; eauto. }
         { ss. }
         { gbase. inv SIM0; eauto.
-          { exploit H; eauto. i. eapply GF in x.
+          { exploit H; eauto. intros x. eapply GF in x.
             eapply CIH0. eapply _sim_thread_mon; eauto.
             i. eapply rclo11_clo_base. right. gbase. auto.
           }
@@ -191,7 +191,7 @@ Proof.
       * ss.
       * ss.
       * gbase. inv SIM0; eauto.
-        { exploit H; eauto. i. eapply GF in x.
+        { exploit H; eauto. intros x. eapply GF in x.
           eapply CIH0. eapply _sim_thread_mon; eauto.
           i. eapply rclo11_clo_base. right. gbase. auto.
         }
@@ -212,7 +212,7 @@ Proof.
       * ss.
       * ss.
       * gbase. inv SIM0; eauto.
-        { exploit H; eauto. i. eapply GF in x.
+        { exploit H; eauto. intros x. eapply GF in x.
           eapply CIH0. eapply _sim_thread_mon; eauto.
           i. eapply rclo11_clo_base. right. gbase. auto.
         }
@@ -235,7 +235,7 @@ Proof.
       * ss.
       * ss.
       * gbase. inv SIM0; eauto.
-        { exploit H; eauto. i. eapply GF in x.
+        { exploit H; eauto. intros x. eapply GF in x.
           eapply CIH0. eapply _sim_thread_mon; eauto.
           i. eapply rclo11_clo_base. right. gbase. auto.
         }
@@ -255,7 +255,7 @@ Proof.
       * ss.
       * ss.
       * gbase. inv SIM0; eauto.
-        { exploit H; eauto. i. eapply GF in x.
+        { exploit H; eauto. intros x. eapply GF in x.
           eapply CIH0. eapply _sim_thread_mon; eauto.
           i. eapply rclo11_clo_base. right. gbase. auto.
         }
@@ -276,7 +276,7 @@ Proof.
       * ss.
       * ss.
       * gbase. inv SIM0; eauto.
-        { exploit H; eauto. i. eapply GF in x.
+        { exploit H; eauto. intros x. eapply GF in x.
           eapply CIH0. eapply _sim_thread_mon; eauto.
           i. eapply rclo11_clo_base. right. gbase. auto.
         }
@@ -306,7 +306,7 @@ Proof.
       * ss.
       * ss.
       * gbase. inv SIM0; eauto.
-        exploit H; eauto. i. eapply GF in x.
+        exploit H; eauto. intros x. eapply GF in x.
         eapply CIH0. eapply _sim_thread_mon; eauto.
         i. eapply rclo11_clo_base. right. gbase. auto.
     + (* racy read*)
@@ -321,7 +321,7 @@ Proof.
       * ss.
       * ss.
       * gbase. inv SIM0; eauto.
-        { exploit H; eauto. i. eapply GF in x.
+        { exploit H; eauto. intros x. eapply GF in x.
           eapply CIH0. eapply _sim_thread_mon; eauto.
           i. eapply rclo11_clo_base. right. gbase. auto.
         }
