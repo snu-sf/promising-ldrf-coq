@@ -56,7 +56,7 @@ Mapping between the transition rules in the paper (Figure 1) and the definitions
 - (REL-WRITE) - `SeqEvent.step_release`
 
 How the Coq development is different from the paper presentation
-- A racy non-atomic read can read *any* value rather than only the *undef* value. Since any value includes the undef value, two definitions are equivalent.
+- A racy non-atomic read can read *any* value rather than only the *undef* value. Since any value includes the undef value, two definitions are equivalent for well-formed programs.
 - There is no codition `P' <= P` in (REL-WRITE) rule of SEQ. Instead, we use `meet P' P` for a new permission.
 - Similarly, there is a no codition `P <= P'` and `dom(V) = P' \ P` in (ACQ-READ) rule of SEQ. Instead, we use `join P' P` for a new permission and ignore `V(x)` for `x` not in `P' \ P`.
 - SEQ allows atomic operations on non-atomic locations. In that case, the permission and the value of that location is changed, following the rule `SeqEvent.step_update`.
